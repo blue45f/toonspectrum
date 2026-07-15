@@ -709,11 +709,15 @@ export function StudioLayerNavigator({
             beginRename("item", item.id, item.label);
           }}
           className={cn(
-            "group/layer relative flex min-h-9 items-center gap-1 rounded-md border px-1 py-0.5 text-left [contain-intrinsic-size:44px] [content-visibility:auto] max-lg:min-h-11 pointer-coarse:min-h-11",
-            selected ? "border-accent/55 bg-accent-soft/45" : "border-transparent hover:border-line hover:bg-raised/55",
+            "group/layer relative flex min-h-9 items-center gap-1 rounded-lg border px-1 py-0.5 text-left [contain-intrinsic-size:44px] [content-visibility:auto] max-lg:min-h-11 pointer-coarse:min-h-11",
+            selected
+              ? "border-accent/55 bg-accent-soft/45 shadow-[inset_0_0_0_1px_oklch(0.72_0.185_42/0.12)]"
+              : "border-transparent hover:border-line/80 hover:bg-raised/60",
             focusRing
           )}
           title={statusLabel || undefined}
+          data-studio-layer-row="true"
+          data-studio-layer-selected={selected ? "true" : "false"}
         >
           {mobileMultiSelect ? (
             <span
@@ -729,11 +733,18 @@ export function StudioLayerNavigator({
           {item.color ? (
             <span
               aria-label={`색 라벨 ${STUDIO_LAYER_COLOR_LABELS[item.color]}`}
-              className={cn("h-5 w-1 shrink-0 rounded-full", COLOR_DOT_CLASS[item.color])}
+              className={cn("h-5 w-1.5 shrink-0 rounded-full shadow-sm", COLOR_DOT_CLASS[item.color])}
             />
           ) : null}
-          <span className={cn("grid size-6 shrink-0 place-items-center rounded bg-card text-fg-3", entry.effectivelyHidden && "opacity-55")} aria-hidden>
-            <Icon size={13} />
+          <span
+            className={cn(
+              "grid size-7 shrink-0 place-items-center rounded-lg border border-line/50 bg-[linear-gradient(160deg,oklch(0.24_0.01_66),oklch(0.19_0.009_68))] text-fg-3 shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.05)]",
+              entry.effectivelyHidden && "opacity-55",
+              selected && "border-accent/35 text-accent"
+            )}
+            aria-hidden
+          >
+            <Icon size={13} strokeWidth={1.75} />
           </span>
           <span className={cn("flex min-w-0 flex-1 items-center gap-1.5 px-0.5", entry.effectivelyHidden && "opacity-55")}>
             {editing && renameTarget

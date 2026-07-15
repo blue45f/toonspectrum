@@ -1,5 +1,5 @@
 /**
- * Select tool options strip — Photoshop/CSP context actions when elements are selected.
+ * Select tool options strip — Photoshop / CSP / Magma context actions when elements are selected.
  */
 import {
   ArrowDownToLine,
@@ -14,7 +14,6 @@ import {
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 
 import type { ReactElement } from "react";
-
 
 import { cn } from "@/lib/utils";
 
@@ -46,15 +45,22 @@ function Action({
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex h-8 items-center gap-1.5 rounded-xl border border-line/80 bg-card/90 px-2.5 text-[0.68rem] font-semibold",
+        "inline-flex h-8 items-center gap-1.5 rounded-xl border px-2.5 text-[0.68rem] font-semibold",
         STUDIO_EASE,
         STUDIO_FOCUS_RING,
         danger
-          ? "text-bad hover:bg-bad/10"
-          : "text-fg-2 shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.04)] hover:bg-raised hover:text-fg"
+          ? "border-bad/35 bg-bad/10 text-bad hover:bg-bad/15"
+          : "border-line/70 bg-card/95 text-fg-2 shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.05)] hover:border-line hover:bg-raised hover:text-fg"
       )}
     >
-      <Icon size={14} strokeWidth={1.75} aria-hidden />
+      <span
+        className={cn(
+          "grid size-5 place-items-center rounded-md",
+          danger ? "bg-bad/15" : "bg-canvas/60 text-fg-2"
+        )}
+      >
+        <Icon size={13} strokeWidth={1.75} aria-hidden />
+      </span>
       {label}
     </button>
   );
@@ -83,19 +89,36 @@ export function StudioSelectOptionsBar({
         className
       )}
     >
-      <span className="mr-1 max-w-[12rem] truncate rounded-xl border border-line/60 bg-card/70 px-2.5 py-1.5 text-[0.7rem] font-semibold tracking-tight text-fg shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.05)]">
-        {selectionCount > 1 ? `${selectionCount}개 선택` : selectionLabel ?? "선택됨"}
+      <span
+        data-studio-selection-badge="true"
+        className={cn(
+          "mr-0.5 inline-flex max-w-[14rem] items-center gap-2 truncate rounded-xl border border-accent/35",
+          "bg-[linear-gradient(135deg,oklch(0.72_0.185_42/0.16),oklch(0.2_0.01_66/0.55))] px-2.5 py-1.5",
+          "text-[0.7rem] font-bold tracking-tight text-fg shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.08)]"
+        )}
+      >
+        <span
+          aria-hidden
+          className="grid size-5 shrink-0 place-items-center rounded-md bg-accent text-[0.6rem] font-black text-on-accent"
+        >
+          {selectionCount > 9 ? "9+" : selectionCount}
+        </span>
+        <span className="min-w-0 truncate">
+          {selectionCount > 1 ? `${selectionCount}개 선택` : selectionLabel ?? "선택됨"}
+        </span>
       </span>
-      <Action icon={Copy} label="복제" onClick={onDuplicate} />
-      <Action icon={ArrowUpToLine} label="맨 앞" onClick={onBringFront} />
-      <Action icon={ArrowDownToLine} label="맨 뒤" onClick={onSendBack} />
-      {onToggleLock ? (
-        <Action
-          icon={locked ? LockOpen : Lock}
-          label={locked ? "잠금 해제" : "잠금"}
-          onClick={onToggleLock}
-        />
-      ) : null}
+      <div className="studio-opt-cluster flex shrink-0 items-center gap-0.5">
+        <Action icon={Copy} label="복제" onClick={onDuplicate} />
+        <Action icon={ArrowUpToLine} label="맨 앞" onClick={onBringFront} />
+        <Action icon={ArrowDownToLine} label="맨 뒤" onClick={onSendBack} />
+        {onToggleLock ? (
+          <Action
+            icon={locked ? LockOpen : Lock}
+            label={locked ? "잠금 해제" : "잠금"}
+            onClick={onToggleLock}
+          />
+        ) : null}
+      </div>
       <Action icon={Trash2} label="삭제" danger onClick={onDelete} />
     </div>
   );

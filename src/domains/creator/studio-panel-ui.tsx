@@ -123,23 +123,38 @@ export function StudioEmptyState({
 }): ReactElement {
   return (
     <div
+      data-studio-empty-state="true"
       className={cn(
-        "rounded-xl border border-line bg-panel/40 px-4 py-8 text-center",
+        "relative overflow-hidden rounded-2xl border border-dashed border-line/80 px-4 py-8 text-center",
+        "bg-[linear-gradient(165deg,oklch(0.22_0.01_66/0.55),oklch(0.17_0.009_68/0.75))]",
         className
       )}
     >
-      {icon ? (
-        <div className="mx-auto mb-2 grid size-11 place-items-center rounded-xl border border-line bg-card text-fg-3">
-          {icon}
-        </div>
-      ) : null}
-      <p className="text-xs font-semibold text-fg-2 text-pretty">{title}</p>
-      {description ? (
-        <p className="mx-auto mt-1.5 max-w-[28ch] text-[0.7rem] leading-relaxed text-fg-3 text-pretty">
-          {description}
-        </p>
-      ) : null}
-      {action ? <div className="mt-3 flex flex-wrap items-center justify-center gap-2">{action}</div> : null}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-40"
+        style={{
+          backgroundImage:
+            "radial-gradient(oklch(0.72 0.185 42 / 0.08) 0.6px, transparent 0.7px)",
+          backgroundSize: "10px 10px",
+        }}
+      />
+      <div className="relative">
+        {icon ? (
+          <div className="mx-auto mb-2.5 grid size-12 place-items-center rounded-2xl border border-line/80 bg-card/90 text-fg-3 shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.06),0_4px_14px_oklch(0.08_0.01_70/0.25)]">
+            {icon}
+          </div>
+        ) : null}
+        <p className="text-xs font-bold tracking-tight text-fg text-pretty">{title}</p>
+        {description ? (
+          <p className="mx-auto mt-1.5 max-w-[28ch] text-[0.7rem] leading-relaxed text-fg-3 text-pretty">
+            {description}
+          </p>
+        ) : null}
+        {action ? (
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-2">{action}</div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -167,9 +182,9 @@ export function StudioContextPill({
   );
 }
 
-// 스와치(색 점)를 품는 프리셋 칩 전용 클래스 — flex 레이아웃이 필요해 공용 칩(StudioPanelChip)을 쓰지 않는다.
+// 스와치(색 점)를 품는 프리셋 칩 — CSP/Photopea 룩 팔레트 칩.
 export const PANEL_SWATCH_CHIP_CLASS =
-  "flex min-h-6 items-center gap-1.5 rounded-md border border-line bg-card px-2 py-0.5 text-[0.72rem] text-fg-2 transition-colors hover:bg-raised hover:text-fg pointer-coarse:px-2.5 pointer-coarse:py-1.5 pointer-coarse:text-[0.75rem]";
+  "flex min-h-7 items-center gap-1.5 rounded-lg border border-line/80 bg-card/90 px-2 py-1 text-[0.72rem] font-medium text-fg-2 shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.04)] transition-[background,border-color,box-shadow,transform] duration-150 hover:-translate-y-px hover:bg-raised hover:text-fg pointer-coarse:min-h-11 pointer-coarse:px-2.5 pointer-coarse:py-1.5 pointer-coarse:text-[0.75rem]";
 
 // 색 스와치 + 라벨을 한 칩에 담는 프리셋 칩. swatch 는 color 로 칠하고, active 면 강조 테두리로 표시한다.
 export function StudioSwatchChip({
@@ -190,9 +205,17 @@ export function StudioSwatchChip({
       type="button"
       onClick={onClick}
       title={title}
-      className={cn(PANEL_SWATCH_CHIP_CLASS, active && "border-accent bg-raised text-fg")}
+      data-studio-swatch-chip="true"
+      className={cn(
+        PANEL_SWATCH_CHIP_CLASS,
+        active && "border-accent/60 bg-accent-soft/40 text-fg shadow-sm ring-1 ring-accent/20"
+      )}
     >
-      <span aria-hidden className="size-2.5 rounded-full border border-line/60" style={{ backgroundColor: color }} />
+      <span
+        aria-hidden
+        className="size-3.5 shrink-0 rounded-md border border-line/50 shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.25),0_1px_2px_oklch(0.1_0.01_70/0.25)] ring-1 ring-black/10"
+        style={{ backgroundColor: color }}
+      />
       {label}
     </button>
   );

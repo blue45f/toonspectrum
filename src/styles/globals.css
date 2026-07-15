@@ -792,6 +792,63 @@ body[data-studio-app="true"] .route-stage::before,
   overflow: visible;
 }
 
+/* ---- Creative UI graphic system v4 (Magma/CSP/Photopea/Canva surfaces) ---- */
+[data-studio-asset-grid="true"] {
+  scrollbar-width: thin;
+  scrollbar-color: oklch(0.4 0.02 70 / 0.45) transparent;
+}
+[data-studio-asset-card="true"]:active {
+  transform: translateY(0) scale(0.99);
+}
+[data-studio-layer-row="true"][data-studio-layer-selected="true"] {
+  background:
+    linear-gradient(
+      90deg,
+      oklch(0.72 0.185 42 / 0.14) 0%,
+      oklch(0.22 0.01 66 / 0.35) 100%
+    );
+}
+[data-studio-selection-badge="true"] {
+  letter-spacing: -0.01em;
+}
+[data-studio-empty-state="true"] {
+  box-shadow: inset 0 1px 0 oklch(0.97 0.01 85 / 0.04);
+}
+[data-studio-swatch-chip="true"][aria-pressed="true"],
+[data-studio-swatch-chip="true"].border-accent {
+  box-shadow:
+    0 1px 4px oklch(0.72 0.185 42 / 0.12),
+    inset 0 1px 0 oklch(0.97 0.01 85 / 0.06);
+}
+/* Popover chrome shared by tool groups */
+[data-studio-tool-popover="true"],
+[data-studio-menu-popover="true"] {
+  border-radius: 0.9rem;
+  border-color: oklch(0.36 0.013 64 / 0.65);
+  background:
+    linear-gradient(
+      180deg,
+      oklch(0.21 0.01 66 / 0.98) 0%,
+      oklch(0.175 0.009 68 / 0.99) 100%
+    );
+  box-shadow:
+    0 16px 48px oklch(0.06 0.01 70 / 0.55),
+    0 0 0 1px oklch(0.3 0.012 64 / 0.4),
+    inset 0 1px 0 oklch(0.97 0.01 85 / 0.05);
+  backdrop-filter: blur(12px) saturate(1.08);
+  -webkit-backdrop-filter: blur(12px) saturate(1.08);
+}
+/* Inspector dock polish */
+[data-studio-inspector="true"],
+[data-studio-layer-navigator="true"] {
+  background:
+    linear-gradient(
+      180deg,
+      oklch(0.185 0.009 68 / 0.98) 0%,
+      oklch(0.16 0.008 70 / 0.99) 100%
+    );
+}
+
 /* Rail active spine */
 [data-studio-tool-rail="true"] button[aria-pressed="true"] {
   position: relative;

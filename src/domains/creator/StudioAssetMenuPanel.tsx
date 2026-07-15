@@ -243,7 +243,7 @@ export function StudioAssetMenuPanel({
             className={cx(
               TOUCH_CONTROL_CLASS,
               "rounded-md px-2 text-[0.65rem] font-semibold transition-colors",
-              assetTab === "mine" ? "bg-accent text-white" : "text-fg-3 hover:bg-raised"
+              assetTab === "mine" ? "bg-accent text-on-accent shadow-sm" : "text-fg-3 hover:bg-raised"
             )}
           >
             내 에셋
@@ -255,7 +255,7 @@ export function StudioAssetMenuPanel({
             className={cx(
               TOUCH_CONTROL_CLASS,
               "flex items-center gap-1 rounded-md px-2 text-[0.65rem] font-semibold transition-colors",
-              assetTab === "community" ? "bg-accent text-white" : "text-fg-3 hover:bg-raised"
+              assetTab === "community" ? "bg-accent text-on-accent shadow-sm" : "text-fg-3 hover:bg-raised"
             )}
           >
             <Globe size={13} aria-hidden /> 커뮤니티
@@ -264,7 +264,7 @@ export function StudioAssetMenuPanel({
         {assetTab === "mine" && (
           <label
             className={cx(
-              "flex min-h-11 cursor-pointer items-center gap-1.5 rounded-lg bg-accent px-2.5 text-[0.65rem] font-semibold text-white transition-colors hover:bg-accent/90",
+              "flex min-h-11 cursor-pointer items-center gap-1.5 rounded-lg bg-accent px-2.5 text-[0.65rem] font-semibold text-on-accent transition-colors hover:bg-accent/90",
               "focus-within:outline-none focus-within:ring-2 focus-within:ring-accent focus-within:ring-offset-1 focus-within:ring-offset-panel"
             )}
           >
@@ -319,7 +319,7 @@ export function StudioAssetMenuPanel({
               aria-label={assetGenerating ? "AI 에셋 생성 중" : "AI 에셋 생성"}
               className={cx(
                 TOUCH_CONTROL_CLASS,
-                "inline-flex items-center gap-1.5 rounded-md bg-accent px-3 text-[0.65rem] font-semibold text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-55"
+                "inline-flex items-center gap-1.5 rounded-md bg-accent px-3 text-[0.65rem] font-semibold text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-55"
               )}
             >
               {assetGenerating ? <Loader2 size={14} className="animate-spin" aria-hidden /> : <Sparkles size={14} aria-hidden />}
@@ -499,9 +499,26 @@ function LocalAssetGrid({
   }
   if (assets.length === 0) {
     return (
-      <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
-        <p className="text-xs text-fg-3">업로드한 에셋이 없습니다 …</p>
-        <p className="mt-1 text-[0.6rem] leading-normal text-fg-3">자주 쓰는 이미지를 업로드해 편리하게 사용해 보세요.</p>
+      <div
+        data-studio-asset-empty="true"
+        className="relative flex h-36 flex-col items-center justify-center overflow-hidden rounded-2xl border border-dashed border-line/80 p-4 text-center"
+      >
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-50"
+          style={{
+            backgroundImage:
+              "linear-gradient(145deg, oklch(0.24 0.02 42 / 0.12), transparent 55%), radial-gradient(oklch(0.5 0.01 70 / 0.12) 1px, transparent 1px)",
+            backgroundSize: "auto, 8px 8px",
+          }}
+        />
+        <span className="relative mb-2 grid size-11 place-items-center rounded-2xl border border-line bg-card text-fg-3 shadow-sm">
+          <ImagePlus size={18} aria-hidden />
+        </span>
+        <p className="relative text-xs font-semibold text-fg-2">업로드한 에셋이 없습니다</p>
+        <p className="relative mt-1 max-w-[28ch] text-[0.6rem] leading-normal text-fg-3">
+          자주 쓰는 이미지를 올려 두면 컷에 바로 끌어다 쓸 수 있어요.
+        </p>
       </div>
     );
   }
@@ -509,7 +526,10 @@ function LocalAssetGrid({
     return favoriteOnly ? <EmptyFavoriteResult /> : <EmptySearchResult />;
   }
   return (
-    <div className="grid max-h-64 grid-cols-3 gap-2 overflow-y-auto pr-1">
+    <div
+      data-studio-asset-grid="true"
+      className="grid max-h-64 grid-cols-3 gap-2 overflow-y-auto pr-1"
+    >
       {filteredAssets.map((asset) => {
         const actionRegionId = `local-asset-actions-${asset.id}`;
         const actionsOpen = openActionsId === asset.id;
@@ -519,7 +539,8 @@ function LocalAssetGrid({
         return (
           <div
             key={asset.id}
-            className="group relative flex cursor-grab flex-col items-stretch rounded-lg border border-line bg-card p-1.5 transition-colors hover:border-accent/50 focus-within:border-accent/50 active:cursor-grabbing"
+            data-studio-asset-card="true"
+            className="group relative flex cursor-grab flex-col items-stretch rounded-xl border border-line/80 bg-card p-1.5 shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.04)] transition-[border-color,box-shadow,transform] duration-150 hover:-translate-y-0.5 hover:border-accent/50 hover:shadow-md focus-within:border-accent/50 active:cursor-grabbing"
             draggable
             onDragStart={(event) => dragAssetData(event, asset)}
           >
@@ -533,24 +554,31 @@ function LocalAssetGrid({
               type="button"
               onClick={() => onUseLocalAsset(asset)}
               className={cx(
-                "relative flex h-20 w-full cursor-pointer items-center justify-center overflow-hidden rounded-md bg-neutral-100 dark:bg-neutral-800",
+                "relative flex h-20 w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg",
                 CONTROL_FOCUS_CLASS
               )}
+              style={{
+                // Warm checkerboard (Canva/Photopea asset preview) — not cold neutral-800.
+                backgroundColor: "oklch(0.22 0.01 66)",
+                backgroundImage:
+                  "linear-gradient(45deg, oklch(0.26 0.01 66) 25%, transparent 25%), linear-gradient(-45deg, oklch(0.26 0.01 66) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, oklch(0.26 0.01 66) 75%), linear-gradient(-45deg, transparent 75%, oklch(0.26 0.01 66) 75%)",
+                backgroundSize: "10px 10px",
+                backgroundPosition: "0 0, 0 5px, 5px -5px, -5px 0",
+              }}
               title={asset.kind === "ai" ? `${asset.name} · AI 생성 이미지` : asset.name}
               aria-label={`${asset.name} 캔버스에 추가`}
             >
               <img
                 src={asset.dataUrl}
                 alt=""
-                className="max-h-full max-w-full object-contain transition-transform group-hover:scale-105"
+                className="max-h-full max-w-full object-contain drop-shadow-sm transition-transform duration-150 group-hover:scale-105"
               />
-              {/* 생성형 AI 결과물 라벨(정책 필수) — 콘텐츠로 위장하지 않도록 항상 보이는 배지. */}
               {asset.kind === "ai" && (
-                <span className="pointer-events-none absolute left-1 top-1 inline-flex items-center gap-0.5 rounded bg-accent px-1 py-px text-[0.5rem] font-bold uppercase leading-none tracking-wide text-white shadow">
+                <span className="pointer-events-none absolute left-1 top-1 inline-flex items-center gap-0.5 rounded-md bg-accent px-1 py-px text-[0.5rem] font-bold uppercase leading-none tracking-wide text-on-accent shadow">
                   <Sparkles size={7} aria-hidden /> AI
                 </span>
               )}
-              <span className="pointer-events-none absolute bottom-1 right-1 inline-flex items-center gap-0.5 rounded bg-black/70 px-1.5 py-0.5 text-[0.55rem] font-semibold text-white shadow-sm">
+              <span className="pointer-events-none absolute bottom-1 right-1 inline-flex items-center gap-0.5 rounded-md border border-line/40 bg-panel/90 px-1.5 py-0.5 text-[0.55rem] font-semibold text-fg shadow-sm backdrop-blur-sm">
                 <Plus size={10} aria-hidden /> 추가
               </span>
             </button>
@@ -690,7 +718,7 @@ function RenameAssetInline({
           onClick={() => handleRenameAsset(asset.id)}
           disabled={!renamingAssetName.trim()}
           className={cx(
-            "flex min-h-11 items-center justify-center rounded-md bg-accent text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-55",
+            "flex min-h-11 items-center justify-center rounded-md bg-accent text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-55",
             CONTROL_FOCUS_CLASS
           )}
           title="이름 저장"
@@ -763,9 +791,23 @@ function SharedAssetGrid({
   }
   if (shared.length === 0) {
     return (
-      <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
-        <p className="text-xs text-fg-3">아직 공유된 에셋이 없어요.</p>
-        <p className="mt-1 text-[0.6rem] leading-normal text-fg-3">내 에셋 탭에서 공유 버튼을 눌러 첫 에셋을 올려보세요.</p>
+      <div
+        data-studio-asset-empty="true"
+        className="relative flex h-36 flex-col items-center justify-center overflow-hidden rounded-2xl border border-dashed border-line/80 p-4 text-center"
+      >
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-40"
+          style={{
+            backgroundImage:
+              "radial-gradient(oklch(0.72 0.185 42 / 0.08) 0.7px, transparent 0.8px)",
+            backgroundSize: "9px 9px",
+          }}
+        />
+        <p className="relative text-xs font-semibold text-fg-2">아직 공유된 에셋이 없어요</p>
+        <p className="relative mt-1 max-w-[28ch] text-[0.6rem] leading-normal text-fg-3">
+          내 에셋 탭에서 공유 버튼을 눌러 첫 에셋을 올려보세요.
+        </p>
       </div>
     );
   }
@@ -773,7 +815,7 @@ function SharedAssetGrid({
     return favoriteOnly ? <EmptyFavoriteResult /> : <EmptySearchResult />;
   }
   return (
-    <div className="grid max-h-64 grid-cols-3 gap-2 overflow-y-auto pr-1">
+    <div data-studio-asset-grid="true" className="grid max-h-64 grid-cols-3 gap-2 overflow-y-auto pr-1">
       {filteredShared.map((asset) => {
         const actionRegionId = `shared-asset-actions-${asset.id}`;
         const actionsOpen = openActionsId === asset.id;
@@ -782,7 +824,8 @@ function SharedAssetGrid({
         return (
           <div
             key={asset.id}
-            className="group relative flex cursor-grab flex-col items-stretch rounded-lg border border-line bg-card p-1.5 transition-colors hover:border-accent/50 focus-within:border-accent/50 active:cursor-grabbing"
+            data-studio-asset-card="true"
+            className="group relative flex cursor-grab flex-col items-stretch rounded-xl border border-line/80 bg-card p-1.5 shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.04)] transition-[border-color,box-shadow,transform] duration-150 hover:-translate-y-0.5 hover:border-accent/50 hover:shadow-md focus-within:border-accent/50 active:cursor-grabbing"
             draggable
             onDragStart={(event) => dragAssetData(event, asset)}
           >
@@ -796,18 +839,25 @@ function SharedAssetGrid({
               type="button"
               onClick={() => onUseSharedAsset(asset)}
               className={cx(
-                "relative flex h-20 w-full cursor-pointer items-center justify-center overflow-hidden rounded-md bg-neutral-100 dark:bg-neutral-800",
+                "relative flex h-20 w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg",
                 CONTROL_FOCUS_CLASS
               )}
+              style={{
+                backgroundColor: "oklch(0.22 0.01 66)",
+                backgroundImage:
+                  "linear-gradient(45deg, oklch(0.26 0.01 66) 25%, transparent 25%), linear-gradient(-45deg, oklch(0.26 0.01 66) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, oklch(0.26 0.01 66) 75%), linear-gradient(-45deg, transparent 75%, oklch(0.26 0.01 66) 75%)",
+                backgroundSize: "10px 10px",
+                backgroundPosition: "0 0, 0 5px, 5px -5px, -5px 0",
+              }}
               title={`${asset.name} · ${asset.author.name}`}
               aria-label={`${asset.name} 캔버스에 추가`}
             >
               <img
                 src={asset.dataUrl}
                 alt=""
-                className="max-h-full max-w-full object-contain transition-transform group-hover:scale-105"
+                className="max-h-full max-w-full object-contain drop-shadow-sm transition-transform duration-150 group-hover:scale-105"
               />
-              <span className="pointer-events-none absolute bottom-1 right-1 inline-flex items-center gap-0.5 rounded bg-black/70 px-1.5 py-0.5 text-[0.55rem] font-semibold text-white shadow-sm">
+              <span className="pointer-events-none absolute bottom-1 right-1 inline-flex items-center gap-0.5 rounded-md border border-line/40 bg-panel/90 px-1.5 py-0.5 text-[0.55rem] font-semibold text-fg shadow-sm backdrop-blur-sm">
                 <Plus size={10} aria-hidden /> 추가
               </span>
             </button>
