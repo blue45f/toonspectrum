@@ -54,14 +54,15 @@ export function StudioQuickShapePanel({
           <div className="min-w-0">
             <p className="text-xs font-semibold text-fg-2">스마트 도형</p>
             <p className="mt-0.5 text-[0.62rem] leading-snug text-fg-3">
-              낙서 후 잠시 멈추면 깔끔한 도형으로 다듬어요.
+              선·네모·원·삼각을 대충 그린 뒤 손을 떼면 깔끔한 도형으로 다듬어요. 펜 모드에서만
+              동작합니다.
             </p>
           </div>
         </div>
         <StudioToggleChip
           active={active}
           onClick={onToggleActive}
-          title="펜으로 대충 그린 도형이 멈추는 순간 정확한 도형으로 자동 스냅됩니다."
+          title="펜으로 대충 그린 도형을 손을 떼는 순간 정확한 도형으로 스냅합니다. 그리는 중 잠시 멈춰도 미리보기가 뜹니다."
           aria-label={active ? "스마트 도형 켜짐" : "스마트 도형 꺼짐"}
         >
           <span className="inline-flex items-center gap-1">
@@ -83,10 +84,10 @@ export function StudioQuickShapePanel({
               <>
                 <Sparkles className="size-3.5 shrink-0 text-accent" aria-hidden />
                 <span className="font-semibold text-accent">{matchedKindLabel}</span>
-                <span className="text-fg-3">인식 · 손을 떼면 확정</span>
+                <span className="text-fg-3">인식됨 · 손을 떼면 확정</span>
               </>
             ) : (
-              <span className="text-fg-3">도형을 그리고 잠시 멈춰 보세요</span>
+              <span className="text-fg-3">도형을 그린 뒤 손을 떼거나, 끝에서 잠깐 멈춰 보세요</span>
             )}
           </p>
         </div>

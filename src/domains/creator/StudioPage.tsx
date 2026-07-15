@@ -800,6 +800,7 @@ import {
 import {
   anchorQuickShapePoints,
   classifyQuickShape,
+  promoteFreehandQuickShapeOnRelease,
   regularizeQuickShapePoints,
   QUICKSHAPE_LOCK_HOLD_MS,
   QUICKSHAPE_STILL_RADIUS_PX,
@@ -15546,6 +15547,41 @@ function StudioCuttoonEditor() {
       }
       if (drawingRef.current && isCompleteStudioDrawOp(drawingRef.current)) {
         let finished = drawingRef.current;
+        // Smart shape release snap: users often lift without holding 350ms still.
+        // Live hold preview still runs via runQuickShapeTick; this catches lift-to-confirm.
+        if (
+          quickShapeActive
+          && finished.mode !== "eraser"
+          && (finished.kind ?? "freehand") === "freehand"
+        ) {
+          const promoted = promoteFreehandQuickShapeOnRelease(finished.points, {
+            anchor: quickShapeStillAnchorRef.current,
+            lockAspect:
+              quickShapeLockedRef.current
+              || quickShapeStillElapsedRef.current >= QUICKSHAPE_LOCK_HOLD_MS,
+          });
+          if (promoted) {
+            finished = {
+              ...finished,
+              kind: promoted.kind,
+              brush: undefined,
+              pressures: undefined,
+              tiltXs: undefined,
+              tiltYs: undefined,
+              twists: undefined,
+              brushTip: undefined,
+              fill: undefined,
+              points: promoted.points,
+              shapeParams:
+                promoted.polygonSides !== undefined
+                  ? { ...DEFAULT_SHAPE_PARAMS, polygonSides: promoted.polygonSides }
+                  : undefined,
+            };
+            announceDrawingShortcut(
+              `스마트 도형 · ${QUICKSHAPE_KIND_LABELS[promoted.kind] ?? promoted.kind}`
+            );
+          }
+        }
         // 라이브 입력 안정화와 독립된 후보정. 각점 보존을 켜면 말풍선·의상 모서리처럼 의도적인
         // 방향 전환은 그대로 두고 고주파 떨림만 정리한다(점 개수·필압 정렬은 보존).
         if ((finished.kind ?? "freehand") === "freehand" && postCorrection > 0) {
@@ -18948,7 +18984,15 @@ function StudioCuttoonEditor() {
             }}
             onToggleQuickShape={() => {
               const next = !quickShapeActive;
-              if (next) disarmAllPixelTools();
+              if (next) {
+                disarmAllPixelTools();
+                setTool("draw");
+                setDrawMode("pen");
+                setEyedropperActive(false);
+                announceDrawingShortcut("스마트 도형 켜짐 · 그리고 손을 떼면 다듬어요");
+              } else {
+                announceDrawingShortcut("스마트 도형 꺼짐");
+              }
               setQuickShapeActive(next);
             }}
             onSetDrawMode={(mode) => {
@@ -26907,7 +26951,15 @@ function StudioCuttoonEditor() {
                       }
                       onToggleActive={() => {
                         const next = !quickShapeActive;
-                        if (next) disarmAllPixelTools();
+                        if (next) {
+                          disarmAllPixelTools();
+                          setTool("draw");
+                          setDrawMode("pen");
+                          setEyedropperActive(false);
+                          announceDrawingShortcut("스마트 도형 켜짐 · 그리고 손을 떼면 다듬어요");
+                        } else {
+                          announceDrawingShortcut("스마트 도형 꺼짐");
+                        }
                         setQuickShapeActive(next);
                       }}
                     />

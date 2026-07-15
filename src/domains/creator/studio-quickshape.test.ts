@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   anchorQuickShapePoints,
   classifyQuickShape,
+  promoteFreehandQuickShapeOnRelease,
   QUICKSHAPE_HOLD_MS,
   QUICKSHAPE_LOCK_HOLD_MS,
   regularizeQuickShapePoints,
@@ -431,5 +432,22 @@ describe("2단계(정비율 고정) 통합 시나리오", () => {
     const anchored = anchorQuickShapePoints(match!.kind, match!.points, { x: match!.points[0], y: match!.points[1] });
     const locked = regularizeQuickShapePoints(match!.kind, anchored);
     expect(Math.abs(locked[2] - locked[0])).toBeCloseTo(Math.abs(locked[3] - locked[1]), 6);
+  });
+});
+
+describe("promoteFreehandQuickShapeOnRelease", () => {
+  it("스냅샷 없이(손을 바로 떼도) 네모 낙서를 rect 로 승격한다", () => {
+    const pts = rectStrokePoints(20, 20, 180, 140, 12, 1);
+    // classify with short hold would fail; release promotion bypasses wait
+    expect(classifyQuickShape(pts, 50)).toBeNull();
+    const promoted = promoteFreehandQuickShapeOnRelease(pts, { lockAspect: false });
+    expect(promoted?.kind).toBe("rect");
+    expect(promoted?.points).toHaveLength(4);
+  });
+
+  it("직선 낙서를 line 으로 승격한다", () => {
+    const pts = nearLinePoints(0, 0, 120, 4, 16, 0.3);
+    const promoted = promoteFreehandQuickShapeOnRelease(pts);
+    expect(promoted?.kind).toBe("line");
   });
 });

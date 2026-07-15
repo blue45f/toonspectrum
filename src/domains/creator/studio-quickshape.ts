@@ -31,7 +31,7 @@ export type QuickShapeMatch = {
 
 export const QUICKSHAPE_HOLD_MS = 350; // 1단계: 인식 시작까지 정지 시간
 export const QUICKSHAPE_LOCK_HOLD_MS = 1100; // 2단계: 정비율 고정까지 누적 정지 시간
-export const QUICKSHAPE_STILL_RADIUS_PX = 6; // "정지"로 볼 포인터 이동 허용 반경(화면 px)
+export const QUICKSHAPE_STILL_RADIUS_PX = 10; // "정지" 허용 반경(화면 px) — 터치 지터 여유
 export const QUICKSHAPE_MIN_POINTS = 5; // 분류 시도 최소 점 개수
 export const QUICKSHAPE_MIN_SIZE_PX = 8; // 분류 시도 최소 바운딩박스 대각선(우발적 탭 방지)
 export const QUICKSHAPE_CLOSURE_RATIO = 0.22; // (끝-시작 거리)/전체 길이 ≤ 이 값이면 "닫힘"
@@ -508,6 +508,37 @@ export function regularizeQuickShapePoints(
  * anchor와 실제 인식된 도형의 가장 가까운 모서리 사이의 거리(≤ QUICKSHAPE_STILL_RADIUS_PX 보장됨,
  * "정지"의 정의상)만큼의 시각적 미세 팝(≤6px)이 발생할 수 있음 — 허용 가능한 트레이드오프.
  */
+/**
+ * Pointer-up promotion: skip the live hold timer and snap if geometry already looks like a shape.
+ * Live preview still uses hold; release uses this so users who lift immediately still get a snap.
+ */
+export function promoteFreehandQuickShapeOnRelease(
+  points: readonly number[],
+  options?: {
+    anchor?: { x: number; y: number } | null;
+    /** When true (long hold already accumulated), snap to square/circle/45° line. */
+    lockAspect?: boolean;
+  }
+): QuickShapeMatch | null {
+  // Pass the hold gate without requiring the user to stay still for 350ms on release.
+  const match = classifyQuickShape(points, QUICKSHAPE_HOLD_MS);
+  if (!match) return null;
+  const lastX = points[points.length - 2];
+  const lastY = points[points.length - 1];
+  const anchor =
+    options?.anchor
+    ?? (typeof lastX === "number" && typeof lastY === "number" ? { x: lastX, y: lastY } : { x: match.points[0], y: match.points[1] });
+  const anchored = anchorQuickShapePoints(match.kind, match.points, anchor);
+  const finalPoints = options?.lockAspect
+    ? regularizeQuickShapePoints(match.kind, anchored)
+    : anchored;
+  return {
+    kind: match.kind,
+    points: finalPoints,
+    ...(match.polygonSides !== undefined ? { polygonSides: match.polygonSides } : {}),
+  };
+}
+
 export function anchorQuickShapePoints(
   kind: QuickShapeKind,
   points: readonly [number, number, number, number],
