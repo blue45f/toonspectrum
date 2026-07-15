@@ -19,7 +19,7 @@
  * 구현해 두 모듈 모두에 주입되고 있다). DOM 의존 0 — studio-selection-tools.test.ts와 동일한
  * fakeCtx/fakeFactory(호출 기록) 패턴으로 유닛 테스트한다.
  */
-import type { MaskCanvasLike, MaskImageSource, SelectionCanvasFactory } from "./studio-selection-tools";
+import type { MaskCanvasLike, MaskCtx2DLike, MaskImageSource, SelectionCanvasFactory } from "./studio-selection-tools";
 
 /** StudioPage El의 최소 부분집합(이 모듈은 이 형태만 본다) — studio-layers.ts의 LayerItemLike와 동일한 취지. */
 export type AlphaLockLayerLike = { type?: string; alphaLocked?: boolean };
@@ -96,20 +96,19 @@ export function applyAlphaLockToRasterPixels(
 
 /**
  * 알파 락 합성 — edited(편집 결과)를 original(편집 전 알파 모양) 밖으로 나가지 않게 오려낸다.
- * Porter-Duff "source-atop": 결과 알파 = original 알파 그대로(확장·축소 없음) — 이건 항상 정확히
- * 성립한다(Ao = Ab, source의 알파와 무관). 색상은 "항상 edited로 완전히 바뀐다"가 아니라
- * Co = Cs·Ab + Cb·(1-As) 로 프리멀티플라이드 알파 가중 블렌드된다 — original이 완전 불투명
- * (α=1)했던 자리는 edited 색으로 완전히 스왑되고 완전 투명(α=0)했던 자리는 항상 투명하게
- * 남지만, 그 사이(안티앨리어싱 가장자리 등 부분 투명 픽셀)는 edited·이전(original) 색이 알파
- * 비율로 섞인다(완전 스왑 아님). floodFillImage처럼 edited가 original의 알파를 그대로 물려받는
- * 호출부(As≡Ab)에서는 가장자리로 갈수록 새 색 반영 비율이 낮아지는 형태가 되어 halo 억제에는
- * 오히려 유리하지만, "부분 투명 픽셀도 완전히 새 색이 된다"고 가정하는 호출부가 있다면 이 함수는
- * 그 기대를 만족시키지 않는다 — 픽셀 단위로 정확히 색은 edited·알파는 original을 강제하려면
- * drawImage 합성이 아니라 getImageData/putImageData 기반 재작성이 필요하다(현재 미구현).
+ * 과거 Porter-Duff "source-atop" 기반 합성에서는 부분 투명 픽셀에서 기존 색상과 새 색상이 
+ * 섞이는 문제가 있었으나, 현재는 getImageData/putImageData를 사용하여 픽셀 단위로 정확히 
+ * RGB는 edited, Alpha는 original을 강제하도록 구현되었다. 투명한 부분은 원래 색상을 유지한다.
  * width/height는 두 이미지가 공유하는 자연 픽셀 크기(가공 없이 "같은 캔버스 크기의 이전/이후
  * 프레임"이라는 전제 — 크롭처럼 크기 자체가 바뀌는 편집에는 쓰지 않는다). 팩토리가 null(2D
  * 컨텍스트 획득 실패)이면 null.
  */
+
+export type AlphaLockCtx2DLike = MaskCtx2DLike & {
+  getImageData(sx: number, sy: number, sw: number, sh: number): { data: Uint8ClampedArray; width: number; height: number };
+  putImageData(imagedata: { data: Uint8ClampedArray; width: number; height: number }, dx: number, dy: number): void;
+};
+
 export function compositeAlphaLocked(
   original: MaskImageSource,
   edited: MaskImageSource,
@@ -123,9 +122,28 @@ export function compositeAlphaLocked(
 
   const out = createCanvas(w, h);
   if (!out) return null;
-  out.ctx.drawImage(original, 0, 0);
-  out.ctx.globalCompositeOperation = "source-atop";
-  out.ctx.drawImage(edited, 0, 0);
-  out.ctx.globalCompositeOperation = "source-over"; // 관례상 원복(팩토리가 캔버스를 재사용할 수도 있으니).
+
+  const outCtx = out.ctx as AlphaLockCtx2DLike;
+
+  outCtx.drawImage(original, 0, 0);
+  const origData = outCtx.getImageData(0, 0, w, h);
+
+  outCtx.clearRect(0, 0, w, h);
+  outCtx.drawImage(edited, 0, 0);
+  const editedData = outCtx.getImageData(0, 0, w, h);
+
+  for (let i = 0; i < origData.data.length; i += 4) {
+    const alpha = origData.data[i + 3]!;
+    if (alpha === 0) {
+      editedData.data[i] = origData.data[i]!;
+      editedData.data[i + 1] = origData.data[i + 1]!;
+      editedData.data[i + 2] = origData.data[i + 2]!;
+      editedData.data[i + 3] = 0;
+    } else {
+      editedData.data[i + 3] = alpha;
+    }
+  }
+
+  outCtx.putImageData(editedData, 0, 0);
   return out.canvas;
 }

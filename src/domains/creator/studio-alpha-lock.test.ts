@@ -43,9 +43,14 @@ function fakeCtx(log: string[], label: string): MaskCtx2DLike {
     fill: () => {},
     stroke: () => {},
     fillRect: () => {},
-    clearRect: () => {},
-    drawImage: (image, dx, dy) => log.push(`${label}:drawImage(#${(image as FakeCanvas).id},${dx},${dy})`),
-  };
+    clearRect: (x: number, y: number, w: number, h: number) => log.push(`${label}:clearRect(${x},${y},${w},${h})`),
+    drawImage: (image: any, dx: number, dy: number) => log.push(`${label}:drawImage(#${(image as FakeCanvas).id},${dx},${dy})`),
+    getImageData: (x: number, y: number, w: number, h: number) => {
+      log.push(`${label}:getImageData(${x},${y},${w},${h})`);
+      return { data: new Uint8ClampedArray(w * h * 4), width: w, height: h };
+    },
+    putImageData: (_data: any, x: number, y: number) => log.push(`${label}:putImageData(${x},${y})`),
+  } as unknown as MaskCtx2DLike;
 }
 
 /** 생성 순서대로 id 를 붙이는 가짜 팩토리 — n 번째 생성부터 실패시킬 수도 있다. */
@@ -176,7 +181,7 @@ describe("applyAlphaLockToRasterPixels", () => {
 // ---------------------------------------------------------------------------
 
 describe("compositeAlphaLocked", () => {
-  it("원본 → source-atop → 편집후 순서로 그리고 끝에 source-over 로 원복, 반환은 유일하게 생성된 캔버스", () => {
+  it("원본, 편집후 이미지를 각각 그리고 getImageData 로 가져와 픽셀단위 알파 합성후 putImageData, 반환은 유일하게 생성된 캔버스", () => {
     const log: string[] = [];
     const original: FakeCanvas = { id: 900, width: 100, height: 50 };
     const edited: FakeCanvas = { id: 901, width: 100, height: 50 };
@@ -185,9 +190,11 @@ describe("compositeAlphaLocked", () => {
     expect(log).toEqual([
       "create#1(100x50)",
       "c1:drawImage(#900,0,0)",
-      "c1:gco=source-atop",
+      "c1:getImageData(0,0,100,50)",
+      "c1:clearRect(0,0,100,50)",
       "c1:drawImage(#901,0,0)",
-      "c1:gco=source-over",
+      "c1:getImageData(0,0,100,50)",
+      "c1:putImageData(0,0)",
     ]);
   });
 
