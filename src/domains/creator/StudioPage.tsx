@@ -15615,6 +15615,32 @@ function StudioCuttoonEditor() {
           separatorAfter: true,
         },
         {
+          id: "select-all",
+          label: "모두 선택",
+          icon: LayoutGrid,
+          shortcut: "⌘A",
+          disabled: elements.length === 0,
+          onSelect: () => {
+            setTool("select");
+            setEyedropperActive(false);
+            setSelectedId(null);
+            setMarqueeIds(elements.map((el) => el.id));
+          },
+        },
+        {
+          id: "deselect",
+          label: "선택 해제",
+          icon: X,
+          shortcut: "Esc",
+          disabled: !selected && marqueeIds.length === 0,
+          onSelect: () => {
+            setSelectedId(null);
+            setMarqueeIds([]);
+            setEyedropperActive(false);
+          },
+          separatorAfter: true,
+        },
+        {
           id: "history",
           label: "작업 내역",
           icon: HistoryIcon,
@@ -15749,6 +15775,26 @@ function StudioCuttoonEditor() {
               setZoom(1);
             }
           },
+        },
+        {
+          id: "zoom-in",
+          label: "확대",
+          icon: Plus,
+          shortcut: "⌘+",
+          onSelect: () => setZoom((z) => clampZoom(z + 0.2)),
+        },
+        {
+          id: "zoom-out",
+          label: "축소",
+          icon: Minus,
+          shortcut: "⌘-",
+          onSelect: () => setZoom((z) => clampZoom(z - 0.2)),
+        },
+        {
+          id: "zoom-reset",
+          label: "실제 크기 (100%)",
+          icon: Maximize2,
+          onSelect: () => setZoom(1),
           separatorAfter: true,
         },
         {
@@ -17311,7 +17357,9 @@ function StudioCuttoonEditor() {
         <Suspense fallback={null}>
           <StudioMainMenu
             groups={studioMainMenuGroups}
-            className={cn("hidden min-w-0 lg:flex", mobileImmersive && "!hidden")}
+            // md+: tablet landscape and up — Magma/Photopea-class menus stay discoverable
+            // without waiting for desktop-only lg; still hidden in mobile immersive shell.
+            className={cn("hidden min-w-0 md:flex", mobileImmersive && "!hidden")}
           />
         </Suspense>
         <span aria-hidden className="mx-0.5 hidden h-4 w-px shrink-0 bg-line lg:block" />
