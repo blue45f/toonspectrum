@@ -76,6 +76,17 @@ export function studioShapeKindLabel(kind: string): string {
   return map[kind] ?? kind;
 }
 
+/** Canonical shape kinds for pickers — pure data (keeps heavy glyphs out of StudioPage static graph). */
+export const STUDIO_DRAW_SHAPE_PICKER_KINDS = [
+  { kind: "line", label: "선" },
+  { kind: "rect", label: "사각형" },
+  { kind: "ellipse", label: "타원" },
+  { kind: "star", label: "별" },
+  { kind: "arrow", label: "화살표" },
+  { kind: "triangle", label: "삼각형" },
+  { kind: "polygon", label: "다각형" },
+] as const;
+
 export function studioPressureCurveHudLabel(
   curve: "soft" | "linear" | "firm" | number
 ): string {

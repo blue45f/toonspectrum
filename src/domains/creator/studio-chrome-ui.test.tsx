@@ -156,7 +156,7 @@ describe("studio chrome UI", () => {
     expect(html).toContain("⌘S");
   });
 
-  it("renders Krita/Pixlr tool identity and Concepts/Ibis HUD pills", () => {
+  it("renders Krita/Pixlr tool identity (icon-first) and Concepts/Ibis HUD pills", () => {
     const html = renderToStaticMarkup(
       <>
         <StudioToolIdentity icon={Pencil} title="펜(매끈)" detail="6px · 100%" shortcut="B" />
@@ -166,6 +166,8 @@ describe("studio chrome UI", () => {
       </>
     );
     expect(html).toContain('data-studio-tool-identity="true"');
+    expect(html).toContain('data-studio-tool-identity-icon-first="true"');
+    // Title is aria/tooltip; metrics stay visible
     expect(html).toContain("펜(매끈)");
     expect(html).toContain("6px · 100%");
     expect(html).toContain("B");

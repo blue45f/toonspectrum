@@ -366,13 +366,6 @@ import {
   type StudioContinuityIssue,
   type StudioStoryBeat,
 } from "./studio-continuity";
-import {
-  StudioPressureHudMeter,
-  StudioShapePickerGrid,
-  StudioShapePickerStrip,
-  StudioStarterCardArt,
-  STUDIO_DRAW_SHAPE_PICKER_KINDS,
-} from "./studio-creative-visuals";
 import { creatorWorkSnapshotToStudioProject } from "./studio-creator-work-project";
 import {
   applyCropAspect,
@@ -427,6 +420,7 @@ import {
 } from "./studio-document-export-loaders";
 import { isCompleteStudioDrawOp } from "./studio-draw-completion";
 import {
+  STUDIO_DRAW_SHAPE_PICKER_KINDS,
   studioDrawHudToolLabel,
   studioPressureCurveHudLabel,
   studioPressureHudRatio,
@@ -1233,6 +1227,23 @@ const StudioMainMenu = lazyRetry(
 const StudioDrawOptionsBar = lazyRetry(
   () => import("./StudioDrawOptionsBar").then((mod) => ({ default: mod.StudioDrawOptionsBar })),
   "StudioDrawOptionsBar"
+);
+/** Glyph UI kept out of StudioPage static graph (bundle budget). */
+const StudioStarterCardArt = lazyRetry(
+  () => import("./studio-creative-visuals").then((mod) => ({ default: mod.StudioStarterCardArt })),
+  "StudioStarterCardArt"
+);
+const StudioShapePickerGrid = lazyRetry(
+  () => import("./studio-creative-visuals").then((mod) => ({ default: mod.StudioShapePickerGrid })),
+  "StudioShapePickerGrid"
+);
+const StudioShapePickerStrip = lazyRetry(
+  () => import("./studio-creative-visuals").then((mod) => ({ default: mod.StudioShapePickerStrip })),
+  "StudioShapePickerStrip"
+);
+const StudioPressureHudMeter = lazyRetry(
+  () => import("./studio-creative-visuals").then((mod) => ({ default: mod.StudioPressureHudMeter })),
+  "StudioPressureHudMeter"
 );
 const StudioSelectOptionsBar = lazyRetry(
   () => import("./StudioSelectOptionsBar").then((mod) => ({ default: mod.StudioSelectOptionsBar })),
@@ -2361,7 +2372,9 @@ function QuickStartPanel({
               data-studio-starter-card={step.id}
               className="group flex min-h-[5.5rem] flex-col items-stretch gap-1.5 rounded-xl border border-line bg-card p-1.5 text-left shadow-sm transition-[border-color,background,transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:border-accent/55 hover:bg-raised hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
-              <StudioStarterCardArt id={step.id} />
+              <Suspense fallback={<div className="h-11 w-full rounded-lg bg-raised/60" aria-hidden />}>
+                <StudioStarterCardArt id={step.id} />
+              </Suspense>
               <span className="flex min-w-0 items-start gap-1.5 px-1 pb-0.5">
                 <span className="grid size-6 shrink-0 place-items-center rounded-md bg-accent-soft text-accent ring-1 ring-accent/15">
                   <Icon size={13} aria-hidden />
@@ -19501,56 +19514,58 @@ function StudioCuttoonEditor() {
 
             <div className="mx-0.5 h-5 w-px bg-line/60" />
 
-            {/* Shapes Toggle Button */}
+            {/* Shapes Toggle — icon-first */}
             <button
               type="button"
               onClick={() => setDrawAdvancedOpen((open) => !open)}
               className={cn(
-                "h-8 px-2.5 text-xs font-semibold rounded-lg border flex items-center gap-1.5 transition-all cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
+                "grid h-8 w-8 place-items-center rounded-lg border transition-all cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
                 drawAdvancedOpen || drawMode === "shape" ? "border-accent bg-accent-soft text-fg" : "border-line text-fg-2 hover:bg-raised"
               )}
               aria-expanded={drawAdvancedOpen}
+              aria-label="도형 도구"
+              title="도형 도구"
             >
-              <SlidersHorizontal size={14} />
-              <span>도형 도구</span>
-              <ChevronDown size={13} className={cn("transition-transform", drawAdvancedOpen && "rotate-180")} />
+              <Shapes size={14} strokeWidth={1.75} aria-hidden />
             </button>
 
             {/* Shapes Options Dropdown — Photopea/Canva glyph strip */}
             {drawAdvancedOpen && (
               <div className="flex basis-full flex-wrap items-center gap-2 border-t border-line/70 pt-2 mt-1">
-                <span className="text-xs text-fg-3 font-semibold select-none">도형 모양:</span>
-                <StudioShapePickerStrip
-                  activeKind={drawShape}
-                  filled={shapeFill}
-                  showLabels
-                  onSelect={(kind) => {
-                    setTool("draw");
-                    setDrawMode("shape");
-                    setDrawShape(kind as DrawShapeKind);
-                    setMenu(null);
-                  }}
-                />
+                <Suspense fallback={<div className="h-8 w-40 rounded-lg bg-raised/50" aria-hidden />}>
+                  <StudioShapePickerStrip
+                    activeKind={drawShape}
+                    filled={shapeFill}
+                    showLabels={false}
+                    onSelect={(kind) => {
+                      setTool("draw");
+                      setDrawMode("shape");
+                      setDrawShape(kind as DrawShapeKind);
+                      setMenu(null);
+                    }}
+                  />
+                </Suspense>
                 <div className="mx-1 h-4 w-px bg-line/60" />
                 <label
                   className={cn(
-                    "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs transition-colors cursor-pointer",
+                    "inline-flex size-8 items-center justify-center rounded-lg border transition-colors cursor-pointer",
                     drawShape === "line" || drawShape === "arrow"
                       ? "border-line bg-card text-fg-3 opacity-50 cursor-not-allowed"
                       : shapeFill
                       ? "border-accent/60 bg-accent-soft/50 text-fg"
                       : "border-line bg-card text-fg-2 hover:bg-raised"
                   )}
+                  title="채우기"
                 >
                   <input
                     type="checkbox"
                     checked={shapeFill}
                     disabled={drawShape === "line" || drawShape === "arrow"}
                     onChange={(e) => setShapeFill(e.target.checked)}
-                    className="size-3.5 accent-[var(--color-accent)] cursor-pointer disabled:cursor-not-allowed"
+                    className="sr-only"
+                    aria-label="도형 채우기"
                   />
-                  <PaintBucket size={13} aria-hidden />
-                  <span className="font-semibold select-none">채우기</span>
+                  <PaintBucket size={14} aria-hidden />
                 </label>
               </div>
             )}
@@ -20567,8 +20582,8 @@ function StudioCuttoonEditor() {
               <StudioHudPill title={pageDisplayName(activePage, activePageIndex)} className="max-w-[7rem] truncate">
                 {pageDisplayName(activePage, activePageIndex)}
               </StudioHudPill>
-              <StudioHudPill title="현재 도구" accent={tool === "draw"}>
-                {studioDrawHudToolLabel(
+              <StudioHudPill
+                title={studioDrawHudToolLabel(
                   tool === "draw"
                     ? drawMode === "eraser"
                       ? { mode: "eraser", widthPx: strokeWidth }
@@ -20587,54 +20602,81 @@ function StudioCuttoonEditor() {
                         }
                       : { mode: "other", label: String(tool) }
                 )}
+                accent={tool === "draw"}
+              >
+                {tool === "draw" && drawMode === "eraser" ? (
+                  <Eraser size={12} strokeWidth={1.75} aria-hidden />
+                ) : tool === "draw" && drawMode === "shape" ? (
+                  <Shapes size={12} strokeWidth={1.75} aria-hidden />
+                ) : tool === "draw" ? (
+                  <Pencil size={12} strokeWidth={1.75} aria-hidden />
+                ) : tool === "select" ? (
+                  <MousePointer2 size={12} strokeWidth={1.75} aria-hidden />
+                ) : (
+                  <span className="tabular-nums">{String(tool)}</span>
+                )}
+                {tool === "draw" ? (
+                  <span className="tabular-nums">
+                    {drawMode === "shape" ? studioShapeKindLabel(drawShape) : `${strokeWidth}px`}
+                  </span>
+                ) : null}
               </StudioHudPill>
               {tool === "draw" && drawMode === "pen" ? (
-                <StudioHudPill title="손떨림 보정">
-                  {studioStabilizerHudLabel(stabilizer, stabilizerMode)}
+                <StudioHudPill title={studioStabilizerHudLabel(stabilizer, stabilizerMode)}>
+                  <Wind size={12} strokeWidth={1.75} aria-hidden />
+                  <span className="tabular-nums">{stabilizer}</span>
                 </StudioHudPill>
               ) : null}
               {tool === "draw" && drawMode === "pen" ? (
-                <StudioHudPill title="필압 곡선">
-                  {studioPressureCurveHudLabel(pressureCurve)}
+                <StudioHudPill title={studioPressureCurveHudLabel(pressureCurve)}>
+                  <PenTool size={12} strokeWidth={1.75} aria-hidden />
                 </StudioHudPill>
               ) : null}
               {tool === "draw" && drawMode === "pen" && studioPressureHudRatio(liveDrawPressure) !== null ? (
                 <StudioHudPill title="실시간 필압" accent>
-                  <StudioPressureHudMeter ratio={studioPressureHudRatio(liveDrawPressure)} />
+                  <Suspense fallback={null}>
+                    <StudioPressureHudMeter ratio={studioPressureHudRatio(liveDrawPressure)} />
+                  </Suspense>
                 </StudioHudPill>
               ) : null}
               {tool === "draw" && drawMode === "shape" && studioShapeFillHudLabel(shapeFill, drawShape) ? (
                 <StudioHudPill accent title="도형 채우기">
-                  {studioShapeFillHudLabel(shapeFill, drawShape)}
+                  <PaintBucket size={12} strokeWidth={1.75} aria-hidden />
                 </StudioHudPill>
               ) : null}
               {tool === "draw" && symmetryType !== "none" ? (
-                <StudioHudPill accent title="대칭 그리기">
-                  {studioSymmetryHudLabel(symmetryType) ?? "대칭"}
+                <StudioHudPill accent title={studioSymmetryHudLabel(symmetryType) ?? "대칭"}>
+                  <FlipHorizontal2 size={12} strokeWidth={1.75} aria-hidden />
                 </StudioHudPill>
               ) : null}
               {tool === "draw" && quickShapeActive ? (
                 <StudioHudPill accent title="스마트 도형">
-                  스마트도형
+                  <Sparkles size={12} strokeWidth={1.75} aria-hidden />
                 </StudioHudPill>
               ) : null}
               <div className="flex items-center gap-px" role="group" aria-label="레이아웃 모드">
-                {(["focus", "simple", "full"] as const).map((mode) => (
+                {(
+                  [
+                    { mode: "focus" as const, Icon: Minimize2 },
+                    { mode: "simple" as const, Icon: Square },
+                    { mode: "full" as const, Icon: Maximize2 },
+                  ] as const
+                ).map(({ mode, Icon }) => (
                   <button
                     key={mode}
                     type="button"
                     aria-pressed={uiDensityMode === mode}
-                    title={studioUiDensityDescription(mode)}
+                    title={`${studioUiDensityLabel(mode)} — ${studioUiDensityDescription(mode)}`}
                     aria-label={`${studioUiDensityLabel(mode)} — ${studioUiDensityDescription(mode)}`}
                     onClick={() => setStudioUiDensity(mode)}
                     className={cn(
-                      "rounded-full px-1.5 py-0.5 text-[0.58rem] font-bold transition-colors",
+                      "grid size-6 place-items-center rounded-full transition-colors",
                       uiDensityMode === mode
                         ? "bg-accent text-on-accent"
                         : "text-fg-3 hover:bg-raised hover:text-fg-2"
                     )}
                   >
-                    {studioUiDensityLabel(mode)}
+                    <Icon size={11} strokeWidth={1.75} aria-hidden />
                   </button>
                 ))}
               </div>
@@ -25207,30 +25249,35 @@ function StudioCuttoonEditor() {
             >
               <p className="text-xs font-semibold text-fg-3">그리기 도구 설정</p>
               
-              {/* 모드 선택: 펜 / 지우개 / 도형 */}
-              <div className="flex gap-1 bg-card rounded-lg p-0.5 border border-line">
-                {[
-                  { label: "펜", v: "pen" },
-                  { label: "지우개", v: "eraser" },
-                  { label: "도형", v: "shape" },
-                ].map((mode) => (
+              {/* 모드 선택: 펜 / 지우개 / 도형 — icon-first */}
+              <div className="flex gap-1 rounded-lg border border-line bg-card p-0.5" role="group" aria-label="그리기 모드">
+                {(
+                  [
+                    { label: "펜", v: "pen" as const, Icon: Pencil },
+                    { label: "지우개", v: "eraser" as const, Icon: Eraser },
+                    { label: "도형", v: "shape" as const, Icon: Shapes },
+                  ] as const
+                ).map((mode) => (
                   <button
                     key={mode.v}
                     type="button"
+                    title={mode.label}
+                    aria-label={mode.label}
+                    aria-pressed={drawMode === mode.v}
                     onClick={() => {
-                      setDrawMode(mode.v as "pen" | "eraser" | "shape");
+                      setDrawMode(mode.v);
                       if (mode.v === "shape") {
                         setDrawShape("line");
                       }
                     }}
                     className={cn(
-                      "flex-1 rounded py-1 text-[0.68rem] font-semibold transition-colors",
+                      "grid h-9 flex-1 place-items-center rounded-md transition-colors",
                       drawMode === mode.v
                         ? "bg-accent text-on-accent"
                         : "text-fg-2 hover:bg-raised"
                     )}
                   >
-                    {mode.label}
+                    <mode.Icon size={15} strokeWidth={1.75} aria-hidden />
                   </button>
                 ))}
               </div>
@@ -25283,32 +25330,32 @@ function StudioCuttoonEditor() {
                   <p className="text-[0.66rem] font-semibold uppercase tracking-wider text-fg-3">
                     도형 종류
                   </p>
-                  <StudioShapePickerGrid
-                    activeKind={drawShape}
-                    filled={shapeFill}
-                    onSelect={(kind) => setDrawShape(kind as DrawShapeKind)}
-                    kinds={STUDIO_DRAW_SHAPE_PICKER_KINDS}
-                  />
-                  <label
+                  <Suspense fallback={<div className="h-20 rounded-xl bg-raised/40" aria-hidden />}>
+                    <StudioShapePickerGrid
+                      activeKind={drawShape}
+                      filled={shapeFill}
+                      onSelect={(kind) => setDrawShape(kind as DrawShapeKind)}
+                      kinds={STUDIO_DRAW_SHAPE_PICKER_KINDS}
+                    />
+                  </Suspense>
+                  <button
+                    type="button"
+                    aria-pressed={shapeFill}
+                    disabled={drawShape === "line" || drawShape === "arrow"}
+                    title="채우기"
+                    aria-label="도형 채우기"
+                    onClick={() => setShapeFill((v) => !v)}
                     className={cn(
-                      "flex min-h-9 items-center gap-2 rounded-lg border px-2.5 text-xs font-semibold transition-colors",
+                      "grid size-9 place-items-center rounded-lg border transition-colors",
                       drawShape === "line" || drawShape === "arrow"
                         ? "cursor-not-allowed border-line bg-card text-fg-3 opacity-50"
                         : shapeFill
-                          ? "border-accent/60 bg-accent-soft/50 text-fg"
+                          ? "border-accent/60 bg-accent-soft/50 text-accent"
                           : "border-line bg-card text-fg-2 hover:bg-raised"
                     )}
                   >
-                    <input
-                      type="checkbox"
-                      checked={shapeFill}
-                      disabled={drawShape === "line" || drawShape === "arrow"}
-                      onChange={(e) => setShapeFill(e.target.checked)}
-                      className="size-3.5 accent-[var(--color-accent)]"
-                    />
-                    <PaintBucket size={13} aria-hidden />
-                    채우기
-                  </label>
+                    <PaintBucket size={15} aria-hidden />
+                  </button>
                 </div>
               )}
 
@@ -25917,12 +25964,12 @@ function StudioCuttoonEditor() {
               </button>
             </div>
 
-            {/* 모드 전환 — 시트 안에서도 펜↔지우개↔도형 빠르게 */}
-            <div className="mb-2.5 grid grid-cols-3 gap-1 rounded-xl border border-line bg-card/60 p-1">
+            {/* 모드 전환 — icon-first (펜↔지우개↔도형) */}
+            <div className="mb-2.5 grid grid-cols-3 gap-1 rounded-xl border border-line bg-card/60 p-1" role="group" aria-label="그리기 모드">
               {([
                 { v: "pen" as const, label: "펜", icon: Pencil },
                 { v: "eraser" as const, label: "지우개", icon: Eraser },
-                { v: "shape" as const, label: "도형", icon: Square },
+                { v: "shape" as const, label: "도형", icon: Shapes },
               ]).map((m) => {
                 const Icon = m.icon;
                 const active = drawMode === m.v;
@@ -25935,12 +25982,14 @@ function StudioCuttoonEditor() {
                       setDrawMode(m.v);
                     }}
                     aria-pressed={active}
+                    aria-label={m.label}
+                    title={m.label}
                     className={cn(
-                      "flex min-h-11 items-center justify-center gap-1.5 rounded-lg text-xs font-semibold transition-colors",
+                      "grid min-h-11 place-items-center rounded-lg transition-colors",
                       active ? "bg-accent text-on-accent shadow-sm" : "text-fg-2 hover:bg-raised"
                     )}
                   >
-                    <Icon size={15} aria-hidden /> {m.label}
+                    <Icon size={18} strokeWidth={1.75} aria-hidden />
                   </button>
                 );
               })}
@@ -26146,37 +26195,37 @@ function StudioCuttoonEditor() {
                 <p className="mb-1.5 text-[0.7rem] font-semibold uppercase tracking-wider text-fg-3">
                   도형 모양
                 </p>
-                <StudioShapePickerGrid
-                  activeKind={drawShape}
-                  filled={shapeFill}
-                  onSelect={(kind) => {
-                    setTool("draw");
-                    setDrawMode("shape");
-                    setDrawShape(kind as DrawShapeKind);
-                  }}
-                  kinds={STUDIO_DRAW_SHAPE_PICKER_KINDS}
-                  className="grid-cols-4"
-                />
-                <label
+                <Suspense fallback={<div className="h-24 rounded-xl bg-raised/40" aria-hidden />}>
+                  <StudioShapePickerGrid
+                    activeKind={drawShape}
+                    filled={shapeFill}
+                    onSelect={(kind) => {
+                      setTool("draw");
+                      setDrawMode("shape");
+                      setDrawShape(kind as DrawShapeKind);
+                    }}
+                    kinds={STUDIO_DRAW_SHAPE_PICKER_KINDS}
+                    className="grid-cols-4"
+                  />
+                </Suspense>
+                <button
+                  type="button"
+                  aria-pressed={shapeFill}
+                  disabled={drawShape === "line" || drawShape === "arrow"}
+                  title="채우기"
+                  aria-label="도형 채우기"
+                  onClick={() => setShapeFill((v) => !v)}
                   className={cn(
-                    "mt-2 flex min-h-11 items-center gap-2 rounded-lg border px-3 text-xs font-semibold transition-colors",
+                    "mt-2 grid min-h-11 w-full place-items-center rounded-lg border transition-colors",
                     drawShape === "line" || drawShape === "arrow"
                       ? "cursor-not-allowed border-line bg-card text-fg-3 opacity-50"
                       : shapeFill
-                        ? "border-accent/60 bg-accent-soft/50 text-fg"
+                        ? "border-accent/60 bg-accent-soft/50 text-accent"
                         : "border-line bg-card text-fg-2"
                   )}
                 >
-                  <input
-                    type="checkbox"
-                    checked={shapeFill}
-                    disabled={drawShape === "line" || drawShape === "arrow"}
-                    onChange={(e) => setShapeFill(e.target.checked)}
-                    className="size-4 accent-[var(--color-accent)]"
-                  />
-                  <PaintBucket size={15} aria-hidden />
-                  채우기
-                </label>
+                  <PaintBucket size={18} aria-hidden />
+                </button>
               </div>
             )}
           </div>

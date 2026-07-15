@@ -27,22 +27,25 @@ describe("StudioDrawOptionsBar", () => {
       />
     );
     expect(html).toContain('data-studio-draw-options="true"');
-    expect(html).toContain("크기");
-    expect(html).toContain("불투명");
-    expect(html).toContain("보정");
-    expect(html).toContain("스마트 도형");
+    expect(html).toContain('data-studio-icon-first="true"');
+    // Icon-first: labels live in aria/sr-only, not visible chip text
     expect(html).toContain('aria-label="스마트 도형"');
+    expect(html).toContain('aria-label="브러시 크기"');
+    expect(html).toContain('aria-label="브러시 불투명도"');
+    expect(html).toContain('aria-label="손떨림 보정"');
     expect(html).toContain('data-studio-draw-options-end="true"');
     expect(html).toContain("브러시 크기 프리셋");
-    expect(html).toContain("XS");
-    expect(html).toContain("XL");
+    expect(html).toContain('data-studio-size-chip-glyph=');
+    expect(html).toContain('data-studio-size-chip="');
     expect(html).toContain('data-studio-tool-identity="true"');
-    expect(html).toContain("펜(매끈)");
+    expect(html).toContain('data-studio-tool-identity-icon-first="true"');
     expect(html).toContain('aria-pressed="true"');
     // CSP/Photopea dual well on the commercial options strip
     expect(html).toContain('data-studio-dual-color-well="true"');
     expect(html).toContain('data-studio-color-swap="true"');
     expect(html).toContain('data-studio-size-preview="true"');
+    expect(html).toContain('data-studio-stabilizer-glyph="true"');
+    expect(html).toContain('data-studio-opacity-glyph="true"');
   });
 
   it("renders brush slots and symmetry chips when provided", () => {
@@ -77,7 +80,9 @@ describe("StudioDrawOptionsBar", () => {
     );
     expect(html).toContain("브러시 슬롯 1");
     expect(html).toContain("대칭 그리기");
-    expect(html).toContain("세로");
+    // Symmetry is glyph-only (label in aria/title)
+    expect(html).toContain('data-studio-symmetry-glyph="vertical"');
+    expect(html).toContain('aria-label="대칭 세로"');
   });
 
   it("renders commercial shape strip and fill when shape mode is active", () => {

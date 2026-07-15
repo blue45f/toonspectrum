@@ -4,18 +4,16 @@ import { describe, expect, it, vi } from "vitest";
 import { StudioBrushTray } from "./StudioBrushTray";
 
 describe("StudioBrushTray", () => {
-  it("renders visual brush chips with short labels and expand control", () => {
+  it("renders icon-first brush chips with stroke previews and expand control", () => {
     const onSelect = vi.fn();
     const html = renderToStaticMarkup(
       <StudioBrushTray activeBrushId="pen" onSelect={onSelect} compact />
     );
     expect(html).toContain('data-studio-brush-tray="true"');
     expect(html).toContain('role="listbox"');
+    // Names live in aria-label / title only — no short-label text chips
+    expect(html).toContain('aria-label="');
     expect(html).toContain("펜");
-    expect(html).toContain("연필");
-    expect(html).toContain("마커");
-    expect(html).toContain("파인");
-    expect(html).toContain("볼펜");
     expect(html).toContain('aria-selected="true"');
     expect(html).toContain("브러시 키트 펼치기");
     // Commercial stroke-preview glyphs (not text-only chips)

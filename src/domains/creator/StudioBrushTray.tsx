@@ -3,7 +3,16 @@
  * Category chips + commercial stroke-preview tiles (not flat labels alone).
  * Pure presentation.
  */
-import { ChevronDown, ChevronUp } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  Droplets,
+  Highlighter,
+  Pencil,
+  Sparkles,
+  Squircle,
+  Wand2,
+} from "lucide-react";
 import { useState, type ReactElement } from "react";
 
 import {
@@ -21,7 +30,19 @@ import {
 } from "./studio-creative-ux";
 import { STUDIO_FOCUS_RING, STUDIO_EASE } from "./studio-panel-ui";
 
+import type { LucideIcon } from "lucide-react";
+
 import { cn } from "@/lib/utils";
+
+const CATEGORY_ICONS: Record<StudioBrushTrayCategory, LucideIcon> = {
+  beginner: Sparkles,
+  expressive: Wand2,
+  line: Pencil,
+  marker: Highlighter,
+  paint: Droplets,
+  texture: Squircle,
+  all: Wand2,
+};
 
 export interface StudioBrushTrayProps {
   activeBrushId: string;
@@ -34,8 +55,8 @@ export interface StudioBrushTrayProps {
   hideCategories?: boolean;
 }
 
-const PREVIEW_W = 36;
-const PREVIEW_H = 16;
+const PREVIEW_W = 40;
+const PREVIEW_H = 18;
 
 function BrushPreviewGlyph({
   item,
@@ -176,16 +197,18 @@ export function StudioBrushTray({
             const active =
               effectiveCategory === chip.id ||
               (chip.id === "expressive" && effectiveCategory === "all");
+            const CatIcon = CATEGORY_ICONS[chip.id] ?? Sparkles;
             return (
               <button
                 key={chip.id}
                 type="button"
                 role="tab"
                 aria-selected={active}
+                aria-label={chip.title}
                 title={chip.title}
                 onClick={() => setCategory(chip.id)}
                 className={cn(
-                  "h-6 rounded-md px-1.5 text-[0.55rem] font-bold tracking-tight",
+                  "grid size-7 place-items-center rounded-md",
                   STUDIO_EASE,
                   STUDIO_FOCUS_RING,
                   active
@@ -193,7 +216,7 @@ export function StudioBrushTray({
                     : "text-fg-3 hover:bg-raised/70 hover:text-fg-2"
                 )}
               >
-                {chip.label}
+                <CatIcon size={13} strokeWidth={1.75} aria-hidden />
               </button>
             );
           })}
@@ -214,13 +237,14 @@ export function StudioBrushTray({
               type="button"
               role="option"
               aria-selected={active}
+              aria-label={`${item.name} — ${item.hint}`}
               title={`${item.name} — ${item.hint}`}
               onClick={() => onSelect(item)}
               data-studio-brush-chip={item.id}
               data-studio-brush-media={item.mediaGroup}
               className={cn(
-                // Commercial tile: stroke preview + short label (Ibis/Picsart/CSP)
-                "flex h-12 min-w-[3.35rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border px-1.5",
+                // Icon/image-first tile: stroke preview only (Ibis/Picsart/CSP)
+                "grid h-11 w-11 shrink-0 place-items-center rounded-xl border",
                 STUDIO_EASE,
                 STUDIO_FOCUS_RING,
                 active
@@ -236,9 +260,6 @@ export function StudioBrushTray({
               }
             >
               <BrushPreviewGlyph item={item} active={active} />
-              <span className="max-w-[3.1rem] truncate text-[0.56rem] font-bold leading-none tracking-tight">
-                {item.shortName}
-              </span>
             </button>
           );
         })}

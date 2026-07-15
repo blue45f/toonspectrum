@@ -549,31 +549,44 @@ export function StudioToolIdentity({
   title,
   detail,
   shortcut,
+  /** Icon + metrics only — tool name lives in title tooltip (CSP/Krita dense chrome). */
+  iconFirst = true,
   className,
 }: {
   icon?: LucideIcon;
   title: string;
   detail?: string;
   shortcut?: string;
+  iconFirst?: boolean;
   className?: string;
 }): ReactElement {
   return (
     <div
       data-studio-tool-identity="true"
-      className={cn("shrink-0", className)}
+      data-studio-tool-identity-icon-first={iconFirst ? "true" : undefined}
+      className={cn("inline-flex shrink-0 items-center gap-1.5", className)}
       title={detail ? `${title} — ${detail}` : title}
+      aria-label={detail ? `${title}, ${detail}` : title}
     >
       {Icon ? (
-        <span className="grid size-7 place-items-center rounded-lg bg-canvas/60 text-accent shadow-[inset_0_0_0_1px_oklch(0.72_0.185_42/0.18)]">
-          <Icon size={15} strokeWidth={STUDIO_ICON_STROKE} aria-hidden />
+        <span className="grid size-8 place-items-center rounded-lg bg-canvas/60 text-accent shadow-[inset_0_0_0_1px_oklch(0.72_0.185_42/0.18)]">
+          <Icon size={16} strokeWidth={STUDIO_ICON_STROKE} aria-hidden />
         </span>
       ) : null}
-      <span className="min-w-0 leading-tight">
-        <span className="block truncate text-[0.72rem] font-bold tracking-tight text-fg">{title}</span>
-        {detail ? (
-          <span className="block truncate text-[0.58rem] font-medium text-fg-3">{detail}</span>
-        ) : null}
-      </span>
+      {iconFirst ? (
+        detail ? (
+          <span className="hidden min-w-0 tabular-nums text-[0.62rem] font-bold tracking-tight text-fg-2 sm:block">
+            {detail}
+          </span>
+        ) : null
+      ) : (
+        <span className="min-w-0 leading-tight">
+          <span className="block truncate text-[0.72rem] font-bold tracking-tight text-fg">{title}</span>
+          {detail ? (
+            <span className="block truncate text-[0.58rem] font-medium text-fg-3">{detail}</span>
+          ) : null}
+        </span>
+      )}
       {shortcut ? (
         <StudioKbdBadge className="ml-0.5 hidden sm:inline-flex">{shortcut}</StudioKbdBadge>
       ) : null}

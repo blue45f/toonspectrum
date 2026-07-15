@@ -2,11 +2,16 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import {
+  StudioOpacityGlyph,
+  StudioPressureCurveGlyph,
   StudioPressureHudMeter,
   StudioShapeKindGlyph,
   StudioShapePickerGrid,
   StudioShapePickerStrip,
+  StudioSizeChipGlyph,
   StudioSmartShapeKindRow,
+  StudioStabilizerGlyph,
+  StudioStabilizerModeGlyph,
   StudioStarterCardArt,
   StudioSymmetryGlyph,
   STUDIO_DRAW_SHAPE_PICKER_KINDS,
@@ -32,7 +37,7 @@ describe("studio creative visuals", () => {
     expect(html).toContain('data-studio-shape-glyph="poly"');
   });
 
-  it("renders a commercial shape picker grid", () => {
+  it("renders a commercial shape picker grid (glyph-first by default)", () => {
     const html = renderToStaticMarkup(
       <StudioShapePickerGrid
         activeKind="rect"
@@ -46,10 +51,12 @@ describe("studio creative visuals", () => {
     );
     expect(html).toContain('data-studio-shape-picker="true"');
     expect(html).toContain('aria-selected="true"');
-    expect(html).toContain("사각형");
+    expect(html).toContain('aria-label="사각형"');
+    // Default is icon-first — no visible text label node for kinds
+    expect(html).not.toMatch(/>사각형</);
   });
 
-  it("renders compact shape strip and pressure meter for HUD/options", () => {
+  it("renders compact shape strip, pressure meter, and draw glyphs", () => {
     const strip = renderToStaticMarkup(
       <StudioShapePickerStrip
         activeKind="ellipse"
@@ -66,6 +73,21 @@ describe("studio creative visuals", () => {
     expect(meter).toContain('data-studio-pressure-meter="true"');
     expect(meter).toContain("42%");
     expect(renderToStaticMarkup(<StudioPressureHudMeter ratio={null} />)).toBe("");
+
+    const glyphs = renderToStaticMarkup(
+      <>
+        <StudioSizeChipGlyph widthPx={12} />
+        <StudioOpacityGlyph opacity01={0.5} />
+        <StudioStabilizerGlyph />
+        <StudioStabilizerModeGlyph mode="adaptive" />
+        <StudioPressureCurveGlyph curve="soft" />
+      </>
+    );
+    expect(glyphs).toContain('data-studio-size-chip-glyph="12"');
+    expect(glyphs).toContain('data-studio-opacity-glyph="true"');
+    expect(glyphs).toContain('data-studio-stabilizer-glyph="true"');
+    expect(glyphs).toContain('data-studio-stabilizer-mode="adaptive"');
+    expect(glyphs).toContain('data-studio-pressure-curve="soft"');
   });
 
   it("renders symmetry glyphs for options strip", () => {

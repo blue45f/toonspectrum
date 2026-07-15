@@ -1,9 +1,11 @@
 /**
  * StudioDrawOptionsBar — Krita/Pixlr tool-options + Canva size chips + MediBang clarity.
- * Tool identity · brush kit · size · opacity · stabilizer · color · smart shape.
- * Pure presentation.
+ * Icon-first commercial chrome: tool identity · brush kit · size · opacity · stabilizer · color.
+ * Labels live in title/aria only — no brand clones.
  */
 import {
+  Circle,
+  Droplets,
   Eraser,
   FlipHorizontal2,
   Lock,
@@ -22,7 +24,16 @@ import {
   nearestStudioBrushSizeChip,
 } from "./studio-brush";
 import { StudioDualColorWell, StudioToolIdentity } from "./studio-chrome-ui";
-import { StudioShapePickerStrip, StudioSymmetryGlyph } from "./studio-creative-visuals";
+import {
+  StudioOpacityGlyph,
+  StudioPostCorrectGlyph,
+  StudioPressureCurveGlyph,
+  StudioShapePickerStrip,
+  StudioSizeChipGlyph,
+  StudioStabilizerGlyph,
+  StudioStabilizerModeGlyph,
+  StudioSymmetryGlyph,
+} from "./studio-creative-visuals";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { StudioBrushTray } from "./StudioBrushTray";
 
@@ -93,7 +104,6 @@ export interface StudioDrawOptionsBarProps {
 
 function SizePreview({ size, color }: { size: number; color: string }): ReactElement {
   const d = Math.min(22, Math.max(4, size * 0.55));
-  // Soft halo behind tip — reads more like CSP/Procreate brush size readouts.
   const halo = Math.min(26, d + 5);
   return (
     <span
@@ -110,13 +120,49 @@ function SizePreview({ size, color }: { size: number; color: string }): ReactEle
         className="relative rounded-full shadow-[0_1px_3px_oklch(0.1_0.01_70/0.35)] ring-1 ring-black/15"
         style={{
           width: d,
-          height: d,          backgroundColor: color,
+          height: d,
+          backgroundColor: color,
           opacity: 0.95,
         }}
       />
     </span>
   );
 }
+
+/** Mini stroke tile for recent brushes (no text label). */
+function RecentBrushGlyph({
+  active,
+  color,
+}: {
+  active: boolean;
+  color: string;
+}): ReactElement {
+  return (
+    <svg
+      aria-hidden
+      width={22}
+      height={12}
+      viewBox="0 0 22 12"
+      className="block"
+      data-studio-recent-brush-glyph="true"
+    >
+      <path
+        d="M2 9 C6 3, 10 10, 14 4 S20 6, 20 6"
+        fill="none"
+        stroke={active ? "currentColor" : color}
+        strokeWidth={2.2}
+        strokeLinecap="round"
+        opacity={active ? 0.95 : 0.85}
+      />
+    </svg>
+  );
+}
+
+const iconBtn = cn(
+  "grid size-8 shrink-0 place-items-center rounded-lg border",
+  STUDIO_EASE,
+  STUDIO_FOCUS_RING
+);
 
 export function StudioDrawOptionsBar({
   drawMode,
@@ -175,32 +221,33 @@ export function StudioDrawOptionsBar({
     drawMode === "eraser"
       ? `${strokeWidth}px`
       : drawMode === "shape"
-        ? "드래그로 그리기"
-        : `${strokeWidth}px · ${Math.round(brushOpacity * 100)}%${sizeLocked ? " · 크기잠금" : ""}${opacityLocked ? " · 불투명잠금" : ""}`;
+        ? "드래그"
+        : `${strokeWidth}px · ${Math.round(brushOpacity * 100)}%`;
   const IdentityIcon = drawMode === "eraser" ? Eraser : drawMode === "shape" ? Shapes : Pencil;
   const isFavorite = favoriteBrushIds.includes(brushId);
   const recentPresets = recentBrushIds
     .map((id) => BRUSH_PRESETS.find((preset) => preset.id === id))
     .filter((preset): preset is (typeof BRUSH_PRESETS)[number] => Boolean(preset));
+  const tipColor = drawMode === "eraser" ? "oklch(0.55 0.02 70)" : color;
 
   return (
     <div
       role="toolbar"
       aria-label="그리기 옵션"
       data-studio-draw-options="true"
+      data-studio-icon-first="true"
       className={cn(
-        // Primary icons stay in view; secondary chips can scroll. End cluster is sticky.
-        "relative z-[40] flex h-[3.25rem] min-h-[3.25rem] shrink-0 flex-nowrap items-center gap-2 overflow-x-auto border-b border-line px-2.5",
+        "relative z-[40] flex h-[3.25rem] min-h-[3.25rem] shrink-0 flex-nowrap items-center gap-1.5 overflow-x-auto border-b border-line px-2",
         "[scrollbar-width:thin] [scrollbar-color:oklch(0.42_0.02_70/0.4)_transparent]",
         className
       )}
     >
-      {/* Krita/Pixlr: always know the active tool */}
       <StudioToolIdentity
         icon={IdentityIcon}
         title={identityTitle}
         detail={identityDetail}
         shortcut={drawMode === "eraser" ? "E" : drawMode === "pen" ? "B" : undefined}
+        iconFirst
         className="hidden sm:inline-flex"
       />
 
@@ -217,19 +264,18 @@ export function StudioDrawOptionsBar({
               key={id}
               type="button"
               aria-pressed={drawMode === id}
+              aria-label={label}
               title={label}
               onClick={() => onSetDrawMode(id)}
               className={cn(
-                "inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[0.7rem] font-semibold",
-                STUDIO_EASE,
-                STUDIO_FOCUS_RING,
+                iconBtn,
+                "border-transparent",
                 drawMode === id
                   ? "bg-accent text-on-accent shadow-[0_1px_4px_oklch(0.72_0.185_42/0.25)]"
                   : "text-fg-2 hover:bg-raised hover:text-fg"
               )}
             >
-              <Icon size={14} strokeWidth={1.75} aria-hidden />
-              <span className="hidden md:inline">{label}</span>
+              <Icon size={15} strokeWidth={1.75} aria-hidden />
             </button>
           ))}
         </div>
@@ -239,6 +285,7 @@ export function StudioDrawOptionsBar({
         <div className="flex shrink-0 items-center gap-0.5" role="group" aria-label="최근 브러시 슬롯 1–6">
           {Array.from({ length: 6 }, (_, index) => {
             const slot = brushSlots[index] ?? null;
+            const slotW = slot ? Math.min(10, Math.max(3, slot.strokeWidth * 0.45)) : 0;
             return (
               <button
                 key={index}
@@ -256,7 +303,7 @@ export function StudioDrawOptionsBar({
                   else if (onAssignBrushSlot) onAssignBrushSlot(index);
                 }}
                 className={cn(
-                  "grid size-7 place-items-center rounded-lg border text-[0.6rem] font-bold tabular-nums",
+                  "grid size-7 place-items-center rounded-lg border",
                   STUDIO_EASE,
                   STUDIO_FOCUS_RING,
                   slot
@@ -265,7 +312,20 @@ export function StudioDrawOptionsBar({
                   !slot && !onAssignBrushSlot && "opacity-40"
                 )}
               >
-                {index + 1}
+                {slot ? (
+                  <span
+                    aria-hidden
+                    className="rounded-full ring-1 ring-black/20"
+                    style={{
+                      width: slotW,
+                      height: slotW,
+                      background: color,
+                      opacity: slot.brushOpacity,
+                    }}
+                  />
+                ) : (
+                  <span className="text-[0.55rem] font-bold tabular-nums text-fg-3">{index + 1}</span>
+                )}
               </button>
             );
           })}
@@ -277,14 +337,12 @@ export function StudioDrawOptionsBar({
           activeBrushId={brushId}
           compact={compactBrushes}
           onSelect={onSelectBrush}
-          // Cap width so size/color/end icons stay on-screen at laptop widths.
           className="min-w-0 max-w-[min(14rem,28vw)] xl:max-w-[min(20rem,34vw)]"
         />
       ) : null}
 
-      {/* Photopea/Canva shape kinds — glyph strip when shape tool is active */}
       {drawMode === "shape" && onShapeKindChange ? (
-        <div className="flex min-w-0 max-w-[min(28rem,52vw)] shrink items-center gap-1.5">
+        <div className="flex min-w-0 max-w-[min(28rem,52vw)] shrink items-center gap-1">
           <StudioShapePickerStrip
             activeKind={shapeKind}
             onSelect={onShapeKindChange}
@@ -301,48 +359,44 @@ export function StudioDrawOptionsBar({
               aria-label="도형 채우기"
               onClick={() => onShapeFillChange(!shapeFill)}
               className={cn(
-                "inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border px-2 text-[0.62rem] font-bold",
-                STUDIO_EASE,
-                STUDIO_FOCUS_RING,
+                iconBtn,
                 shapeFill && shapeKind !== "line" && shapeKind !== "arrow"
                   ? "border-accent/55 bg-accent-soft text-accent"
                   : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg",
                 (shapeKind === "line" || shapeKind === "arrow") && "cursor-not-allowed opacity-45"
               )}
             >
-              <PaintBucket size={13} strokeWidth={1.75} aria-hidden />
-              <span className="hidden sm:inline">채우기</span>
+              <PaintBucket size={14} strokeWidth={1.75} aria-hidden />
             </button>
           ) : null}
         </div>
       ) : null}
 
-      {/* Ibis/Procreate recent strip */}
       {drawMode === "pen" && recentPresets.length > 0 && onSelectRecentBrush ? (
-        <div
-          className="flex shrink-0 items-center gap-0.5"
-          role="group"
-          aria-label="최근 브러시"
-        >
-          {recentPresets.slice(0, 4).map((preset) => (
-            <button
-              key={preset.id}
-              type="button"
-              title={`최근: ${preset.name}`}
-              aria-pressed={brushId === preset.id}
-              onClick={() => onSelectRecentBrush(preset.id)}
-              className={cn(
-                "max-w-[3.5rem] truncate rounded-md px-1.5 py-1 text-[0.55rem] font-bold",
-                STUDIO_EASE,
-                STUDIO_FOCUS_RING,
-                brushId === preset.id
-                  ? "bg-accent text-on-accent"
-                  : "bg-card text-fg-3 ring-1 ring-line/70 hover:bg-raised hover:text-fg"
-              )}
-            >
-              {preset.name.replace(/\(.*\)/, "").trim().slice(0, 4)}
-            </button>
-          ))}
+        <div className="flex shrink-0 items-center gap-0.5" role="group" aria-label="최근 브러시">
+          {recentPresets.slice(0, 4).map((preset) => {
+            const active = brushId === preset.id;
+            return (
+              <button
+                key={preset.id}
+                type="button"
+                title={`최근: ${preset.name}`}
+                aria-label={`최근 브러시 ${preset.name}`}
+                aria-pressed={active}
+                onClick={() => onSelectRecentBrush(preset.id)}
+                className={cn(
+                  "grid h-8 w-9 place-items-center rounded-lg border",
+                  STUDIO_EASE,
+                  STUDIO_FOCUS_RING,
+                  active
+                    ? "border-accent/50 bg-accent text-on-accent"
+                    : "border-line/70 bg-card text-fg-2 hover:bg-raised"
+                )}
+              >
+                <RecentBrushGlyph active={active} color={color} />
+              </button>
+            );
+          })}
         </div>
       ) : null}
 
@@ -354,9 +408,7 @@ export function StudioDrawOptionsBar({
           aria-label={isFavorite ? "즐겨찾기 해제" : "즐겨찾기 추가"}
           onClick={() => onToggleFavoriteBrush(brushId)}
           className={cn(
-            "grid size-7 place-items-center rounded-md border",
-            STUDIO_EASE,
-            STUDIO_FOCUS_RING,
+            iconBtn,
             isFavorite
               ? "border-accent/50 bg-accent-soft text-accent"
               : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
@@ -368,9 +420,8 @@ export function StudioDrawOptionsBar({
 
       <span aria-hidden className="hidden h-5 w-px shrink-0 bg-line sm:block" />
 
-      <SizePreview size={strokeWidth} color={drawMode === "eraser" ? "oklch(0.55 0.02 70)" : color} />
+      <SizePreview size={strokeWidth} color={tipColor} />
 
-      {/* Procreate size / opacity locks */}
       {onToggleSizeLock ? (
         <button
           type="button"
@@ -379,9 +430,8 @@ export function StudioDrawOptionsBar({
           aria-label="브러시 크기 잠금"
           onClick={onToggleSizeLock}
           className={cn(
-            "grid size-7 place-items-center rounded-md border",
-            STUDIO_EASE,
-            STUDIO_FOCUS_RING,
+            iconBtn,
+            "size-7",
             sizeLocked
               ? "border-accent/50 bg-accent-soft text-accent"
               : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
@@ -398,19 +448,18 @@ export function StudioDrawOptionsBar({
           aria-label="브러시 불투명도 잠금"
           onClick={onToggleOpacityLock}
           className={cn(
-            "grid size-7 place-items-center rounded-md border text-[0.55rem] font-bold",
-            STUDIO_EASE,
-            STUDIO_FOCUS_RING,
+            iconBtn,
+            "size-7",
             opacityLocked
               ? "border-accent/50 bg-accent-soft text-accent"
               : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
           )}
         >
-          %
+          <Droplets size={12} strokeWidth={1.75} aria-hidden />
         </button>
       ) : null}
 
-      {/* Canva/Express-style size chips — one-tap brush scale */}
+      {/* Size chips as discs (Canva) — no XS/S/M text */}
       <div className="flex shrink-0 items-center gap-0.5" role="group" aria-label="브러시 크기 프리셋">
         {STUDIO_BRUSH_SIZE_CHIPS.map((chip) => {
           const active = nearestStudioBrushSizeChip(strokeWidth) === chip.id;
@@ -422,8 +471,9 @@ export function StudioDrawOptionsBar({
               aria-label={`브러시 크기 ${chip.label} ${chip.width}픽셀`}
               aria-pressed={active}
               onClick={() => onStrokeWidthChange(chip.width)}
+              data-studio-size-chip={chip.id}
               className={cn(
-                "grid h-7 min-w-7 place-items-center rounded-lg px-1.5 text-[0.6rem] font-bold tabular-nums",
+                "grid size-7 place-items-center rounded-lg",
                 STUDIO_EASE,
                 STUDIO_FOCUS_RING,
                 active
@@ -431,14 +481,18 @@ export function StudioDrawOptionsBar({
                   : "bg-card/90 text-fg-3 ring-1 ring-line/70 hover:bg-raised hover:text-fg"
               )}
             >
-              {chip.label}
+              <StudioSizeChipGlyph widthPx={chip.width} />
             </button>
           );
         })}
       </div>
 
-      <label className="flex shrink-0 items-center gap-1 text-[0.65rem] font-semibold text-fg-3">
-        <span className="select-none">크기</span>
+      <label
+        className="flex shrink-0 items-center gap-1 text-fg-3"
+        title={`크기 ${strokeWidth}px`}
+      >
+        <Circle size={12} strokeWidth={1.75} className="shrink-0 opacity-80" aria-hidden />
+        <span className="sr-only">크기</span>
         <input
           type="range"
           min={1}
@@ -446,13 +500,18 @@ export function StudioDrawOptionsBar({
           value={strokeWidth}
           onChange={(e) => onStrokeWidthChange(Number(e.target.value))}
           className="studio-range w-16 sm:w-20"
+          aria-label="브러시 크기"
           aria-valuetext={`${strokeWidth}픽셀`}
         />
-        <span className="w-6 tabular-nums text-[0.68rem] text-fg">{strokeWidth}</span>
+        <span className="w-6 tabular-nums text-[0.68rem] font-bold text-fg">{strokeWidth}</span>
       </label>
 
-      <label className="flex shrink-0 items-center gap-1 text-[0.68rem] font-medium text-fg-3">
-        <span className="select-none">불투명</span>
+      <label
+        className="flex shrink-0 items-center gap-1 text-fg-3"
+        title={`불투명도 ${Math.round(brushOpacity * 100)}%`}
+      >
+        <StudioOpacityGlyph opacity01={brushOpacity} />
+        <span className="sr-only">불투명</span>
         <input
           type="range"
           min={5}
@@ -461,12 +520,19 @@ export function StudioDrawOptionsBar({
           value={Math.round(brushOpacity * 100)}
           onChange={(e) => onOpacityChange(Number(e.target.value) / 100)}
           className="studio-range w-14 sm:w-16"
+          aria-label="브러시 불투명도"
         />
-        <span className="w-7 tabular-nums text-[0.68rem] text-fg">{Math.round(brushOpacity * 100)}%</span>
+        <span className="w-7 tabular-nums text-[0.68rem] font-bold text-fg">
+          {Math.round(brushOpacity * 100)}
+        </span>
       </label>
 
-      <label className="flex shrink-0 items-center gap-1 text-[0.68rem] font-medium text-fg-3" title="라이브 손떨림 보정 강도 (S: 단계 순환 · SAI/CSP)">
-        <span className="select-none">보정</span>
+      <label
+        className="flex shrink-0 items-center gap-1 text-fg-3"
+        title={`손떨림 보정 ${stabilizer} (S: 단계 순환)`}
+      >
+        <StudioStabilizerGlyph />
+        <span className="sr-only">보정</span>
         <input
           type="range"
           min={0}
@@ -475,11 +541,13 @@ export function StudioDrawOptionsBar({
           value={stabilizer}
           onChange={(e) => onStabilizerChange(Number(e.target.value))}
           className="studio-range w-12 sm:w-14"
+          aria-label="손떨림 보정"
         />
         {onCycleStabilizer ? (
           <button
             type="button"
             title="보정 강도 순환 (S)"
+            aria-label={`보정 강도 ${stabilizer}`}
             onClick={onCycleStabilizer}
             className={cn(
               "w-5 rounded tabular-nums text-[0.68rem] font-bold text-fg hover:bg-raised",
@@ -489,11 +557,10 @@ export function StudioDrawOptionsBar({
             {stabilizer}
           </button>
         ) : (
-          <span className="w-4 tabular-nums text-[0.68rem] text-fg">{stabilizer}</span>
+          <span className="w-4 tabular-nums text-[0.68rem] font-bold text-fg">{stabilizer}</span>
         )}
       </label>
 
-      {/* Secondary drawing science — hide under xl so icons/color stay exposed on laptop widths */}
       {onStabilizerModeChange ? (
         <div className="hidden shrink-0 items-center gap-0.5 xl:flex" role="group" aria-label="보정 방식">
           {(
@@ -507,18 +574,18 @@ export function StudioDrawOptionsBar({
               key={item.id}
               type="button"
               aria-pressed={stabilizerMode === item.id}
+              aria-label={`보정 방식 ${item.label}`}
               title={`보정 방식: ${item.label}`}
               onClick={() => onStabilizerModeChange(item.id)}
               className={cn(
-                "h-7 rounded px-1.5 text-[0.58rem] font-bold",
-                STUDIO_EASE,
-                STUDIO_FOCUS_RING,
+                iconBtn,
+                "size-7 border-transparent",
                 stabilizerMode === item.id
                   ? "bg-raised text-fg ring-1 ring-accent/40"
                   : "text-fg-3 hover:bg-raised/70"
               )}
             >
-              {item.label}
+              <StudioStabilizerModeGlyph mode={item.id} />
             </button>
           ))}
         </div>
@@ -526,10 +593,11 @@ export function StudioDrawOptionsBar({
 
       {onPostCorrectionChange ? (
         <label
-          className="hidden shrink-0 items-center gap-1 text-[0.65rem] font-semibold text-fg-3 xl:flex"
-          title="획 끝난 뒤 곡선 다듬기"
+          className="hidden shrink-0 items-center gap-1 text-fg-3 xl:flex"
+          title={`후처리 ${postCorrection} — 획 끝난 뒤 곡선 다듬기`}
         >
-          <span className="select-none">후처리</span>
+          <StudioPostCorrectGlyph />
+          <span className="sr-only">후처리</span>
           <input
             type="range"
             min={0}
@@ -538,8 +606,9 @@ export function StudioDrawOptionsBar({
             value={postCorrection}
             onChange={(e) => onPostCorrectionChange(Number(e.target.value))}
             className="w-12 accent-accent"
+            aria-label="후처리 보정"
           />
-          <span className="w-4 tabular-nums text-fg-2">{postCorrection}</span>
+          <span className="w-4 tabular-nums text-[0.68rem] font-bold text-fg-2">{postCorrection}</span>
         </label>
       ) : null}
 
@@ -556,18 +625,18 @@ export function StudioDrawOptionsBar({
               key={item.id}
               type="button"
               aria-pressed={pressureCurveId === item.id}
+              aria-label={`필압 ${item.label}`}
               title={`필압: ${item.label}`}
               onClick={() => onPressureCurveChange(item.id)}
               className={cn(
-                "h-7 rounded px-1.5 text-[0.58rem] font-bold",
-                STUDIO_EASE,
-                STUDIO_FOCUS_RING,
+                iconBtn,
+                "size-7 border-transparent",
                 pressureCurveId === item.id
                   ? "bg-raised text-fg ring-1 ring-accent/40"
                   : "text-fg-3 hover:bg-raised/70"
               )}
             >
-              {item.label}
+              <StudioPressureCurveGlyph curve={item.id} />
             </button>
           ))}
         </div>
@@ -587,7 +656,6 @@ export function StudioDrawOptionsBar({
         </>
       ) : null}
 
-      {/* Sticky end cluster — always pin primary action icons even when the middle scrolls */}
       <div
         data-studio-draw-options-end="true"
         className={cn(
@@ -603,16 +671,14 @@ export function StudioDrawOptionsBar({
             title="캔버스 좌우 반전 (그리기 확인용)"
             aria-label="캔버스 좌우 반전"
             className={cn(
-              "inline-flex h-7 items-center gap-1 rounded-md border px-1.5 text-[0.6rem] font-bold",
-              STUDIO_EASE,
-              STUDIO_FOCUS_RING,
+              iconBtn,
+              "size-7",
               canvasFlipH
                 ? "border-accent bg-accent-soft text-accent"
                 : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
             )}
           >
             <FlipHorizontal2 size={13} strokeWidth={1.75} aria-hidden />
-            <span className="hidden sm:inline">반전</span>
           </button>
         ) : null}
 
@@ -622,14 +688,9 @@ export function StudioDrawOptionsBar({
             onClick={onOpenBrushStudio}
             title="브러시 스튜디오 — 필압·도장·촉 고급 설정"
             aria-label="브러시 고급 설정"
-            className={cn(
-              "inline-flex h-7 items-center gap-1 rounded-md border border-line bg-card px-1.5 text-[0.6rem] font-bold text-fg-2 hover:bg-raised",
-              STUDIO_EASE,
-              STUDIO_FOCUS_RING
-            )}
+            className={cn(iconBtn, "size-7 border-line bg-card text-fg-2 hover:bg-raised")}
           >
             <Wand2 size={13} strokeWidth={1.75} aria-hidden />
-            <span className="hidden sm:inline">고급</span>
           </button>
         ) : null}
 
@@ -655,16 +716,14 @@ export function StudioDrawOptionsBar({
                 aria-label={`대칭 ${item.label}`}
                 onClick={() => onSymmetryTypeChange(item.id)}
                 className={cn(
-                  "inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-[0.58rem] font-bold",
-                  STUDIO_EASE,
-                  STUDIO_FOCUS_RING,
+                  iconBtn,
+                  "size-7 border-transparent",
                   symmetryType === item.id
                     ? "bg-accent text-on-accent shadow-sm"
                     : "text-fg-3 hover:bg-raised hover:text-fg-2"
                 )}
               >
                 <StudioSymmetryGlyph mode={item.id} />
-                <span className="hidden xl:inline">{item.label}</span>
               </button>
             ))}
           </div>
@@ -678,9 +737,8 @@ export function StudioDrawOptionsBar({
             title="스마트 도형 — 낙서를 선·원·사각형으로 다듬기"
             aria-label="스마트 도형"
             className={cn(
-              "inline-flex h-7 shrink-0 items-center gap-1 rounded-md border px-2 text-[0.65rem] font-bold",
-              STUDIO_EASE,
-              STUDIO_FOCUS_RING,
+              iconBtn,
+              "size-7",
               quickShapeActive
                 ? "border-accent bg-accent-soft text-accent"
                 : "border-line bg-card text-fg-2 hover:bg-raised"
@@ -691,7 +749,6 @@ export function StudioDrawOptionsBar({
             ) : (
               <Shapes size={13} strokeWidth={1.75} aria-hidden />
             )}
-            <span className="hidden sm:inline">스마트 도형</span>
           </button>
         ) : null}
 

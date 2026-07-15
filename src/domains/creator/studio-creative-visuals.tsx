@@ -3,9 +3,15 @@
  * mini illustrations for tools, not brand clones. Pure presentation.
  */
 /* eslint-disable react-refresh/only-export-components -- shape kind maps + picker kinds shared with StudioPage / options bar */
+import { STUDIO_DRAW_SHAPE_PICKER_KINDS as DRAW_SHAPE_PICKER_KINDS } from "./studio-draw-hud";
+
 import type { ReactElement } from "react";
 
+
 import { cn } from "@/lib/utils";
+
+/** Re-export pure kind list for pickers (SSOT: studio-draw-hud). */
+export const STUDIO_DRAW_SHAPE_PICKER_KINDS = DRAW_SHAPE_PICKER_KINDS;
 
 export type StudioShapeKindVisual =
   | "line"
@@ -142,23 +148,13 @@ export function StudioShapeKindGlyph({
   );
 }
 
-/** Canonical shape kinds for pickers (Photopea/Canva order). */
-export const STUDIO_DRAW_SHAPE_PICKER_KINDS = [
-  { kind: "line", label: "선" },
-  { kind: "rect", label: "사각형" },
-  { kind: "ellipse", label: "타원" },
-  { kind: "star", label: "별" },
-  { kind: "arrow", label: "화살표" },
-  { kind: "triangle", label: "삼각형" },
-  { kind: "polygon", label: "다각형" },
-] as const;
-
 /** Visual shape picker tile grid used in tool options / inspector. */
 export function StudioShapePickerGrid({
   kinds = STUDIO_DRAW_SHAPE_PICKER_KINDS,
   activeKind,
   onSelect,
   filled = false,
+  showLabels = false,
   className,
 }: {
   kinds?: readonly { kind: string; label: string }[];
@@ -166,6 +162,8 @@ export function StudioShapePickerGrid({
   onSelect: (kind: string) => void;
   /** Preview glyphs with soft fill (when shape fill is on). */
   filled?: boolean;
+  /** Prefer glyph-only; labels live in title/aria. */
+  showLabels?: boolean;
   className?: string;
 }): ReactElement {
   return (
@@ -173,7 +171,10 @@ export function StudioShapePickerGrid({
       data-studio-shape-picker="true"
       role="listbox"
       aria-label="도형 종류"
-      className={cn("grid grid-cols-4 gap-1.5 sm:grid-cols-4", className)}
+      className={cn(
+        showLabels ? "grid grid-cols-4 gap-1.5" : "grid grid-cols-4 gap-1 sm:grid-cols-7",
+        className
+      )}
     >
       {kinds.map((item) => {
         const active = activeKind === item.kind;
@@ -185,11 +186,13 @@ export function StudioShapePickerGrid({
             type="button"
             role="option"
             aria-selected={active}
+            aria-label={item.label}
             title={item.label}
             onClick={() => onSelect(item.kind)}
             className={cn(
-              "flex flex-col items-center gap-1 rounded-xl border px-1 py-1.5 transition-[background,border-color,box-shadow,transform] duration-150",
+              "flex flex-col items-center gap-1 rounded-xl border transition-[background,border-color,box-shadow,transform] duration-150",
               "hover:-translate-y-px hover:shadow-sm",
+              showLabels ? "px-1 py-1.5" : "aspect-square place-items-center p-1.5",
               active
                 ? "border-accent/55 bg-accent-soft/50 text-fg shadow-sm ring-1 ring-accent/20"
                 : "border-line/70 bg-card/90 text-fg-2 hover:border-line hover:bg-raised"
@@ -197,7 +200,8 @@ export function StudioShapePickerGrid({
           >
             <span
               className={cn(
-                "grid size-8 place-items-center rounded-lg border",
+                "grid place-items-center rounded-lg border",
+                showLabels ? "size-8" : "size-9",
                 active
                   ? "border-accent/40 bg-canvas/50 text-accent"
                   : "border-line/50 bg-canvas/40"
@@ -205,7 +209,9 @@ export function StudioShapePickerGrid({
             >
               <StudioShapeKindGlyph kind={glyph} active={active} filled={filled && canFill} />
             </span>
-            <span className="text-[0.58rem] font-bold leading-none tracking-tight">{item.label}</span>
+            {showLabels ? (
+              <span className="text-[0.58rem] font-bold leading-none tracking-tight">{item.label}</span>
+            ) : null}
           </button>
         );
       })}
@@ -222,7 +228,7 @@ export function StudioShapePickerStrip({
   activeKind,
   onSelect,
   filled = false,
-  showLabels = true,
+  showLabels = false,
   className,
 }: {
   kinds?: readonly { kind: string; label: string }[];
@@ -252,11 +258,13 @@ export function StudioShapePickerStrip({
             type="button"
             role="option"
             aria-selected={active}
+            aria-label={item.label}
             title={item.label}
             onClick={() => onSelect(item.kind)}
             className={cn(
-              "inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border px-1.5 text-[0.62rem] font-bold transition-[background,border-color,box-shadow,transform] duration-150",
+              "inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border transition-[background,border-color,box-shadow,transform] duration-150",
               "hover:-translate-y-px",
+              showLabels ? "px-1.5 text-[0.62rem] font-bold" : "w-8 justify-center px-0",
               active
                 ? "border-accent/55 bg-accent-soft/55 text-fg shadow-sm ring-1 ring-accent/20"
                 : "border-line/70 bg-card/90 text-fg-2 hover:border-line hover:bg-raised"
@@ -275,6 +283,176 @@ export function StudioShapePickerStrip({
         );
       })}
     </div>
+  );
+}
+
+/** Canva/Express size chip — disc radius encodes width (no XS/S/M text). */
+export function StudioSizeChipGlyph({
+  widthPx,
+  className,
+}: {
+  widthPx: number;
+  className?: string;
+}): ReactElement {
+  const r = Math.min(7.5, Math.max(1.4, widthPx * 0.32));
+  return (
+    <svg
+      aria-hidden
+      width={16}
+      height={16}
+      viewBox="0 0 16 16"
+      className={cn("text-current", className)}
+      data-studio-size-chip-glyph={widthPx}
+    >
+      <circle cx={8} cy={8} r={r} fill="currentColor" opacity={0.92} />
+    </svg>
+  );
+}
+
+/** Opacity well — checkerboard + fill level. */
+export function StudioOpacityGlyph({
+  opacity01,
+  className,
+}: {
+  opacity01: number;
+  className?: string;
+}): ReactElement {
+  const op = Math.min(1, Math.max(0, opacity01));
+  return (
+    <svg
+      aria-hidden
+      width={14}
+      height={14}
+      viewBox="0 0 14 14"
+      className={cn("text-current", className)}
+      data-studio-opacity-glyph="true"
+    >
+      <rect x={1} y={1} width={12} height={12} rx={2} fill="oklch(0.35 0.01 70 / 0.45)" />
+      <path d="M1 1 H7 V7 H1 Z M7 7 H13 V13 H7 Z" fill="oklch(0.55 0.01 70 / 0.35)" />
+      <rect
+        x={1}
+        y={1}
+        width={12}
+        height={12}
+        rx={2}
+        fill="currentColor"
+        fillOpacity={0.25 + op * 0.7}
+      />
+      <rect x={1} y={1} width={12} height={12} rx={2} fill="none" stroke="currentColor" strokeWidth={1.2} />
+    </svg>
+  );
+}
+
+/** Stabilizer / stream-line wave mark. */
+export function StudioStabilizerGlyph({ className }: { className?: string }): ReactElement {
+  return (
+    <svg
+      aria-hidden
+      width={14}
+      height={14}
+      viewBox="0 0 14 14"
+      className={cn("text-current", className)}
+      data-studio-stabilizer-glyph="true"
+    >
+      <path
+        d="M2 9 C4 4, 6 10, 8 6 S12 5, 12 5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.6}
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+export type StudioStabilizerModeVisual = "standard" | "adaptive" | "precision";
+
+/** Stabilizer mode glyphs — jagged → smooth. */
+export function StudioStabilizerModeGlyph({
+  mode,
+  className,
+}: {
+  mode: StudioStabilizerModeVisual;
+  className?: string;
+}): ReactElement {
+  const d =
+    mode === "standard"
+      ? "M2 9 L4 5 L6 10 L8 4 L10 9 L12 6"
+      : mode === "adaptive"
+        ? "M2 8 C4 4, 5 10, 7 6 S11 5, 12 7"
+        : "M2 7 C5 4, 9 4, 12 7";
+  return (
+    <svg
+      aria-hidden
+      width={14}
+      height={14}
+      viewBox="0 0 14 14"
+      className={cn("text-current", className)}
+      data-studio-stabilizer-mode={mode}
+    >
+      <path d={d} fill="none" stroke="currentColor" strokeWidth={1.55} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export type StudioPressureCurveVisual = "soft" | "linear" | "firm";
+
+/** Pressure response curve mini-graph (Procreate/CSP cue). */
+export function StudioPressureCurveGlyph({
+  curve,
+  className,
+}: {
+  curve: StudioPressureCurveVisual;
+  className?: string;
+}): ReactElement {
+  const d =
+    curve === "soft"
+      ? "M2 11 C5 11, 6 3, 12 3"
+      : curve === "firm"
+        ? "M2 11 C8 11, 9 3, 12 3"
+        : "M2 11 L12 3";
+  return (
+    <svg
+      aria-hidden
+      width={14}
+      height={14}
+      viewBox="0 0 14 14"
+      className={cn("text-current", className)}
+      data-studio-pressure-curve={curve}
+    >
+      <path d="M2 12 H12 M2 2 V12" stroke="currentColor" strokeWidth={1} opacity={0.35} />
+      <path d={d} fill="none" stroke="currentColor" strokeWidth={1.55} strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Post-stroke smooth / polish mark. */
+export function StudioPostCorrectGlyph({ className }: { className?: string }): ReactElement {
+  return (
+    <svg
+      aria-hidden
+      width={14}
+      height={14}
+      viewBox="0 0 14 14"
+      className={cn("text-current", className)}
+      data-studio-post-correct-glyph="true"
+    >
+      <path
+        d="M2 10 C4 6, 6 11, 8 7 S12 6, 12 6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.4}
+        strokeLinecap="round"
+        opacity={0.45}
+      />
+      <path
+        d="M2 9 C5 5, 7 9, 9 6 S12 5, 12 5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.55}
+        strokeLinecap="round"
+      />
+    </svg>
   );
 }
 
