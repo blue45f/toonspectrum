@@ -24667,7 +24667,9 @@ function StudioCuttoonEditor() {
               height={canvasH}
               flipX={canvasFlipH}
               strokes={webGpuPreviewStrokes}
-              onBackendChange={() => setWebGpuPreviewReady(true)}
+              frameAuthorized={webGpuPreviewReady}
+              onFrameInvalid={() => setWebGpuPreviewReady(false)}
+              onFrameReady={() => setWebGpuPreviewReady(true)}
             />
           </Suspense>
           </div>

@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef } from "react";
 import {
   StudioWebGpuEngine,
   type StudioGpuBackend,
+  type StudioGpuFrameReceipt,
   type StudioGpuStroke,
   type StudioGpuViewTransform,
 } from "./studio-webgpu-engine";
@@ -22,8 +23,13 @@ export interface StudioWebGpuCanvasProps extends StudioGpuViewTransform {
    * content below the transparent canvas.
    */
   readonly strokes?: readonly StudioGpuStroke[];
+  /** Must match the parent's authoritative-canvas handoff state for an atomic show/hide commit. */
+  readonly frameAuthorized?: boolean;
   readonly onBackendChange?: (backend: StudioGpuBackend) => void;
   readonly onDeviceLost?: (info: GPUDeviceLostInfo) => void;
+  /** A matching receipt is the only safe signal for hiding the authoritative Konva preview. */
+  readonly onFrameReady?: (receipt: StudioGpuFrameReceipt) => void;
+  readonly onFrameInvalid?: () => void;
 }
 
 interface LatestCanvasProps {
@@ -35,6 +41,49 @@ interface LatestCanvasProps {
   offsetX: number | undefined;
   offsetY: number | undefined;
   flipX: boolean | undefined;
+}
+
+function sameNumberArray(
+  left: readonly number[] | undefined,
+  right: readonly number[] | undefined
+): boolean {
+  if (left === right) return true;
+  if (!left || !right || left.length !== right.length) return false;
+  return left.every((value, index) => Object.is(value, right[index]));
+}
+
+function sameStroke(left: StudioGpuStroke, right: StudioGpuStroke): boolean {
+  return left.id === right.id
+    && left.color === right.color
+    && Object.is(left.size, right.size)
+    && Object.is(left.opacity, right.opacity)
+    && left.composite === right.composite
+    && left.orderKey === right.orderKey
+    && sameNumberArray(left.points, right.points)
+    && sameNumberArray(left.pressures, right.pressures);
+}
+
+function sameCanvasRequest(left: LatestCanvasProps, right: LatestCanvasProps): boolean {
+  return Object.is(left.width, right.width)
+    && Object.is(left.height, right.height)
+    && Object.is(left.scaleX, right.scaleX)
+    && Object.is(left.scaleY, right.scaleY)
+    && Object.is(left.offsetX, right.offsetX)
+    && Object.is(left.offsetY, right.offsetY)
+    && left.flipX === right.flipX
+    && left.strokes.length === right.strokes.length
+    && left.strokes.every((stroke, index) => sameStroke(stroke, right.strokes[index]!));
+}
+
+function snapshotCanvasRequest(request: LatestCanvasProps): LatestCanvasProps {
+  return {
+    ...request,
+    strokes: request.strokes.map((stroke) => ({
+      ...stroke,
+      points: [...stroke.points],
+      pressures: stroke.pressures ? [...stroke.pressures] : undefined,
+    })),
+  };
 }
 
 function measuredCssSize(element: HTMLElement | null, logicalWidth: number, logicalHeight: number) {
@@ -56,6 +105,7 @@ export function StudioWebGpuCanvas({
   width,
   height,
   strokes = EMPTY_STROKES,
+  frameAuthorized = false,
   scaleX,
   scaleY,
   offsetX,
@@ -63,12 +113,17 @@ export function StudioWebGpuCanvas({
   flipX,
   onBackendChange,
   onDeviceLost,
+  onFrameReady,
+  onFrameInvalid,
 }: StudioWebGpuCanvasProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const gpuCanvasRef = useRef<HTMLCanvasElement>(null);
   const fallbackCanvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<StudioWebGpuEngine | null>(null);
-  const callbacksRef = useRef({ onBackendChange, onDeviceLost });
+  const callbacksRef = useRef({ onBackendChange, onDeviceLost, onFrameReady, onFrameInvalid });
+  const requestSequenceRef = useRef(0);
+  const desiredRequestIdRef = useRef("frame:0");
+  const lastIssuedRequestRef = useRef<LatestCanvasProps | null>(null);
   const latestRef = useRef<LatestCanvasProps>({
     width,
     height,
@@ -80,7 +135,7 @@ export function StudioWebGpuCanvas({
     flipX,
   });
 
-  callbacksRef.current = { onBackendChange, onDeviceLost };
+  callbacksRef.current = { onBackendChange, onDeviceLost, onFrameReady, onFrameInvalid };
   latestRef.current = { width, height, strokes, scaleX, scaleY, offsetX, offsetY, flipX };
 
   useEffect(() => {
@@ -94,6 +149,11 @@ export function StudioWebGpuCanvas({
       fallbackCanvas,
       onBackendChange: (backend) => callbacksRef.current.onBackendChange?.(backend),
       onDeviceLost: (info) => callbacksRef.current.onDeviceLost?.(info),
+      onFrameInvalid: () => callbacksRef.current.onFrameInvalid?.(),
+      onFrameReady: (receipt) => {
+        if (receipt.requestId !== desiredRequestIdRef.current) return;
+        callbacksRef.current.onFrameReady?.(receipt);
+      },
     });
     engineRef.current = engine;
     callbacksRef.current.onBackendChange?.(engine.getBackend());
@@ -116,14 +176,14 @@ export function StudioWebGpuCanvas({
     };
 
     syncViewport();
-    engine.render(latestRef.current.strokes);
+    engine.render(latestRef.current.strokes, desiredRequestIdRef.current);
     void engine.initialize().then(() => {
       if (!active) {
         engine.dispose();
         return;
       }
       syncViewport();
-      engine.render(latestRef.current.strokes);
+      engine.render(latestRef.current.strokes, desiredRequestIdRef.current);
     });
 
     const resizeObserver = typeof ResizeObserver === "undefined"
@@ -146,36 +206,48 @@ export function StudioWebGpuCanvas({
     };
   }, []);
 
-  // The authoritative Konva draft is hidden in the same React commit. Draw/clear the transparent
-  // GPU handoff before paint so the user never sees a blank or double-dark transition frame.
+  // Invalidate the old authority first, then resize and render under a new request identity in the
+  // same layout phase. This semantic comparison deliberately avoids a hash collision becoming an
+  // authority decision and also tolerates parents rebuilding equivalent stroke arrays.
   useLayoutEffect(() => {
-    engineRef.current?.render(strokes);
-  }, [strokes]);
-
-  useLayoutEffect(() => {
+    const latest = latestRef.current;
+    if (lastIssuedRequestRef.current && sameCanvasRequest(lastIssuedRequestRef.current, latest)) {
+      return;
+    }
+    lastIssuedRequestRef.current = snapshotCanvasRequest(latest);
+    const requestId = `frame:${requestSequenceRef.current + 1}`;
+    requestSequenceRef.current += 1;
+    desiredRequestIdRef.current = requestId;
+    callbacksRef.current.onFrameInvalid?.();
     const engine = engineRef.current;
     if (!engine) return;
-    const measured = measuredCssSize(rootRef.current, width, height);
+    const measured = measuredCssSize(rootRef.current, latest.width, latest.height);
     engine.resize({
-      logicalWidth: width,
-      logicalHeight: height,
+      logicalWidth: latest.width,
+      logicalHeight: latest.height,
       cssWidth: measured.width,
       cssHeight: measured.height,
       dpr: devicePixelRatio(),
-      scaleX,
-      scaleY,
-      offsetX,
-      offsetY,
-      flipX,
+      scaleX: latest.scaleX,
+      scaleY: latest.scaleY,
+      offsetX: latest.offsetX,
+      offsetY: latest.offsetY,
+      flipX: latest.flipX,
     });
-  }, [flipX, height, offsetX, offsetY, scaleX, scaleY, width]);
+    engine.render(latest.strokes, requestId);
+  });
 
   return (
     <div
       ref={rootRef}
       aria-hidden="true"
-      className={cn("relative h-full w-full overflow-hidden", className)}
+      className={cn(
+        "relative h-full w-full overflow-hidden",
+        !frameAuthorized && "invisible",
+        className
+      )}
       data-studio-gpu-compositor="true"
+      data-studio-gpu-frame-authorized={frameAuthorized ? "true" : "false"}
     >
       <canvas
         ref={gpuCanvasRef}

@@ -1,9 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  fingerprintStudioGpuFrame,
   planStudioGpuDabUpdate,
   planStudioGpuDabs,
+  STUDIO_GPU_MAX_DABS,
   StudioWebGpuEngine,
+  type StudioGpuFrameReceipt,
   type StudioGpuStroke,
 } from "./studio-webgpu-engine";
 
@@ -88,7 +91,10 @@ function stroke(overrides: Partial<StudioGpuStroke> = {}): StudioGpuStroke {
   };
 }
 
-function fakeGpuDevice(lost: Promise<GPUDeviceLostInfo>) {
+function fakeGpuDevice(
+  lost: Promise<GPUDeviceLostInfo>,
+  onSubmittedWorkDone: () => Promise<void> = async () => undefined
+) {
   const draw = vi.fn();
   const setPipeline = vi.fn();
   const setVertexBuffer = vi.fn();
@@ -111,6 +117,7 @@ function fakeGpuDevice(lost: Promise<GPUDeviceLostInfo>) {
     queue: {
       writeBuffer: vi.fn(),
       submit: vi.fn(),
+      onSubmittedWorkDone: vi.fn(onSubmittedWorkDone),
     },
     createShaderModule: vi.fn(() => ({ shader: true })),
     createRenderPipeline: vi.fn((descriptor: GPURenderPipelineDescriptor) => ({ descriptor })),
@@ -123,6 +130,61 @@ function fakeGpuDevice(lost: Promise<GPUDeviceLostInfo>) {
 }
 
 describe("StudioWebGpuEngine", () => {
+  it("invalidates first and acknowledges only a completely covered Canvas2D frame request", () => {
+    const gpuSurface = fakeGpuCanvas(null);
+    const fallback = fakeCanvas2d();
+    const events: string[] = [];
+    const onFrameReady = vi.fn((receipt: StudioGpuFrameReceipt) => (
+      events.push(`ready:${receipt.requestId}`)
+    ));
+    const engine = new StudioWebGpuEngine({
+      canvas: gpuSurface,
+      fallbackCanvas: fallback.canvas,
+      gpu: null,
+      onFrameInvalid: () => events.push("invalid"),
+      onFrameReady,
+    });
+    engine.resize({ logicalWidth: 100, logicalHeight: 80 });
+    events.length = 0;
+    onFrameReady.mockClear();
+
+    engine.render([stroke()], "draft:7");
+
+    expect(events).toEqual(["invalid", "ready:draft:7"]);
+    expect(onFrameReady).toHaveBeenCalledWith(expect.objectContaining({
+      requestId: "draft:7",
+      backend: "canvas2d",
+      complete: true,
+      strokeCount: 1,
+      physicalWidth: 100,
+      physicalHeight: 80,
+    }));
+    expect(onFrameReady.mock.calls[0]?.[0].fingerprint).toBe(
+      fingerprintStudioGpuFrame(
+        [stroke()],
+        { logicalWidth: 100, logicalHeight: 80 },
+        100,
+        80
+      )
+    );
+  });
+
+  it("refuses frame authority for an overflowing brush contract", () => {
+    const onFrameReady = vi.fn();
+    const engine = new StudioWebGpuEngine({
+      canvas: fakeGpuCanvas(null),
+      fallbackCanvas: fakeCanvas2d().canvas,
+      gpu: null,
+      onFrameReady,
+    });
+    engine.resize({ logicalWidth: 100, logicalHeight: 80 });
+    onFrameReady.mockClear();
+
+    engine.render([stroke({ size: Number.MAX_VALUE })], "invalid:overflow");
+
+    expect(onFrameReady).not.toHaveBeenCalled();
+  });
+
   it("renders normal and erase strokes through the silent Canvas2D fallback", async () => {
     const gpuSurface = fakeGpuCanvas(null);
     const fallback = fakeCanvas2d();
@@ -213,6 +275,44 @@ describe("StudioWebGpuEngine", () => {
     expect(fallback.clearRect).toHaveBeenCalledTimes(clearsAfterInitial + 2);
     engine.resize({ logicalWidth: 100, logicalHeight: 80, scaleX: 1.1 });
     expect(fallback.clearRect).toHaveBeenCalledTimes(clearsAfterInitial + 2);
+  });
+
+  it("snapshots retained operations so an in-place pointer tail cannot receive a stale receipt", () => {
+    const gpuSurface = fakeGpuCanvas(null);
+    const fallback = fakeCanvas2d();
+    const onFrameReady = vi.fn();
+    const engine = new StudioWebGpuEngine({
+      canvas: gpuSurface,
+      fallbackCanvas: fallback.canvas,
+      gpu: null,
+      onFrameReady,
+    });
+    const mutable = stroke({
+      points: [0, 0, 20, 0],
+      pressures: [0.5, 0.6],
+    });
+    const renderedSnapshot = {
+      ...mutable,
+      points: [...mutable.points],
+      pressures: [...(mutable.pressures ?? [])],
+    };
+    engine.resize({ logicalWidth: 100, logicalHeight: 80 });
+    engine.render([mutable], "mutable:before");
+    const arcsBeforeTail = fallback.arcs.length;
+    onFrameReady.mockClear();
+
+    (mutable.points as number[]).push(30, 2);
+    (mutable.pressures as number[]).push(0.9);
+    engine.render([mutable], "mutable:after");
+
+    const expected = planStudioGpuDabUpdate([renderedSnapshot], [mutable]);
+    expect(expected.mode).toBe("append");
+    expect(expected.dabs.length).toBeGreaterThan(0);
+    expect(fallback.arcs).toHaveLength(arcsBeforeTail + expected.dabs.length);
+    expect(onFrameReady).toHaveBeenCalledWith(expect.objectContaining({
+      requestId: "mutable:after",
+      complete: true,
+    }));
   });
 
   it("incrementally destination-outs a newly appended eraser on the Canvas2D fallback", () => {
@@ -310,6 +410,41 @@ describe("StudioWebGpuEngine", () => {
 
     engine.dispose();
     expect(fake.buffer.destroy).toHaveBeenCalled();
+  });
+
+  it("drops stale WebGPU queue receipts and authorizes only the latest request", async () => {
+    const neverLost = new Promise<GPUDeviceLostInfo>(() => undefined);
+    const workDone = deferred<void>();
+    const fake = fakeGpuDevice(neverLost, () => workDone.promise);
+    const context = {
+      configure: vi.fn(),
+      unconfigure: vi.fn(),
+      getCurrentTexture: vi.fn(() => ({ createView: vi.fn(() => ({ view: true })) })),
+    } as unknown as GPUCanvasContext;
+    const adapter = { requestDevice: vi.fn(async () => fake.device) } as unknown as GPUAdapter;
+    const gpu = {
+      requestAdapter: vi.fn(async () => adapter),
+      getPreferredCanvasFormat: vi.fn(() => "bgra8unorm"),
+    } as unknown as GPU;
+    const onFrameReady = vi.fn();
+    const engine = new StudioWebGpuEngine({
+      canvas: fakeGpuCanvas(context),
+      fallbackCanvas: fakeCanvas2d().canvas,
+      gpu,
+      onFrameReady,
+    });
+    engine.resize({ logicalWidth: 100, logicalHeight: 80 });
+    await engine.initialize();
+    engine.render([stroke({ id: "older" })], "request:older");
+    engine.render([stroke({ id: "latest", color: "#0055ff" })], "request:latest");
+
+    workDone.resolve(undefined);
+    await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalledTimes(1));
+    expect(onFrameReady).toHaveBeenCalledWith(expect.objectContaining({
+      requestId: "request:latest",
+      backend: "webgpu",
+      complete: true,
+    }));
   });
 
   it("loads the retained WebGPU frame for a suffix and clears it for divergence and resize", async () => {
@@ -411,6 +546,35 @@ describe("StudioWebGpuEngine", () => {
 });
 
 describe("planStudioGpuDabs", () => {
+  it("fails closed instead of looping on finite endpoints whose segment math overflows", () => {
+    const overflowingSegment = planStudioGpuDabs([
+      stroke({
+        points: [-Number.MAX_VALUE, 0, Number.MAX_VALUE, 0],
+        pressures: [0.5, 0.5],
+      }),
+    ]);
+    const overflowingRadius = planStudioGpuDabs([
+      stroke({ size: Number.MAX_VALUE }),
+    ]);
+
+    expect(overflowingSegment.complete).toBe(false);
+    expect(overflowingSegment.dabs).toHaveLength(0);
+    expect(overflowingRadius).toMatchObject({ complete: false, dabs: [] });
+  });
+
+  it("reports incomplete coverage instead of authorizing a silently truncated frame", () => {
+    const planned = planStudioGpuDabs([
+      stroke({
+        size: 1,
+        points: [0, 0, 50_001, 0],
+        pressures: [1, 1],
+      }),
+    ]);
+
+    expect(planned.complete).toBe(false);
+    expect(planned.dabs).toHaveLength(STUDIO_GPU_MAX_DABS);
+  });
+
   it("uses locale-independent operation order and color-independent erase coverage", () => {
     const planned = planStudioGpuDabs([
       stroke({ id: "umlaut", orderKey: "ä", points: [20, 0], color: "#ff0000" }),

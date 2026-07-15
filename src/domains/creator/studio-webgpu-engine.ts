@@ -1,3 +1,5 @@
+import { parseStudioGpuColor } from "./studio-webgpu-color";
+
 export type StudioGpuComposite = "normal" | "erase";
 
 export interface StudioGpuStroke {
@@ -29,6 +31,19 @@ export interface StudioGpuViewport extends StudioGpuViewTransform {
 
 export type StudioGpuBackend = "webgpu" | "canvas2d";
 
+export interface StudioGpuFrameReceipt {
+  /** Caller-owned identity; stale receipts can never authorize a newer React render. */
+  readonly requestId: string;
+  /** Deterministic identity of ordered operations, viewport transform, and physical surface size. */
+  readonly fingerprint: string;
+  readonly backend: StudioGpuBackend;
+  readonly complete: true;
+  readonly strokeCount: number;
+  readonly dabCount: number;
+  readonly physicalWidth: number;
+  readonly physicalHeight: number;
+}
+
 export interface StudioWebGpuEngineOptions {
   /** WebGPU presentation surface. It remains hidden while the Canvas2D fallback is active. */
   readonly canvas: HTMLCanvasElement;
@@ -39,6 +54,10 @@ export interface StudioWebGpuEngineOptions {
   readonly autoRecover?: boolean;
   readonly onBackendChange?: (backend: StudioGpuBackend) => void;
   readonly onDeviceLost?: (info: GPUDeviceLostInfo) => void;
+  /** Fired synchronously before pixels for an older request may no longer be trusted. */
+  readonly onFrameInvalid?: () => void;
+  /** Fired only after the latest request is fully covered and submitted by the active backend. */
+  readonly onFrameReady?: (receipt: StudioGpuFrameReceipt) => void;
 }
 
 interface NormalizedStudioGpuViewport {
@@ -74,6 +93,8 @@ export interface StudioGpuBatch {
 export interface PlannedStudioGpuDabs {
   dabs: StudioGpuDab[];
   batches: StudioGpuBatch[];
+  /** False means the safety cap stopped planning before every requested operation was covered. */
+  complete: boolean;
 }
 
 export interface StudioGpuDabRenderUpdate extends PlannedStudioGpuDabs {
@@ -83,7 +104,8 @@ export interface StudioGpuDabRenderUpdate extends PlannedStudioGpuDabs {
 
 const INSTANCE_FLOATS = 8;
 const INSTANCE_BYTES = INSTANCE_FLOATS * Float32Array.BYTES_PER_ELEMENT;
-const MAX_DABS = 100_000;
+export const STUDIO_GPU_MAX_DABS = 100_000;
+export const STUDIO_GPU_MAX_BRUSH_SIZE = 8_192;
 const DEFAULT_MAX_TEXTURE_DIMENSION = 8_192;
 
 const STUDIO_GPU_BRUSH_SHADER = /* wgsl */ `
@@ -159,60 +181,43 @@ function normalizeViewport(input: StudioGpuViewport): NormalizedStudioGpuViewpor
   };
 }
 
-function parseHexPair(value: string): number {
-  return Number.parseInt(value, 16) / 255;
-}
-
-function parseStudioGpuColor(value: string): readonly [number, number, number, number] {
-  const color = value.trim().toLowerCase();
-  if (color === "transparent") return [0, 0, 0, 0];
-  if (/^#[0-9a-f]{3,4}$/u.test(color)) {
-    const red = parseHexPair(`${color[1]}${color[1]}`);
-    const green = parseHexPair(`${color[2]}${color[2]}`);
-    const blue = parseHexPair(`${color[3]}${color[3]}`);
-    const alpha = color.length === 5 ? parseHexPair(`${color[4]}${color[4]}`) : 1;
-    return [red, green, blue, alpha];
-  }
-  if (/^#[0-9a-f]{6}([0-9a-f]{2})?$/u.test(color)) {
-    return [
-      parseHexPair(color.slice(1, 3)),
-      parseHexPair(color.slice(3, 5)),
-      parseHexPair(color.slice(5, 7)),
-      color.length === 9 ? parseHexPair(color.slice(7, 9)) : 1,
-    ];
-  }
-  const rgb = color.match(
-    /^rgba?\(\s*([+-]?[\d.]+)\s*[, ]\s*([+-]?[\d.]+)\s*[, ]\s*([+-]?[\d.]+)(?:\s*[,/]\s*([+-]?[\d.]+%?))?\s*\)$/u
-  );
-  if (rgb) {
-    const alphaToken = rgb[4];
-    const alpha = alphaToken?.endsWith("%")
-      ? Number.parseFloat(alphaToken) / 100
-      : Number.parseFloat(alphaToken ?? "1");
-    return [
-      clamp(Number.parseFloat(rgb[1] ?? "0") / 255, 0, 1),
-      clamp(Number.parseFloat(rgb[2] ?? "0") / 255, 0, 1),
-      clamp(Number.parseFloat(rgb[3] ?? "0") / 255, 0, 1),
-      clamp(alpha, 0, 1),
-    ];
-  }
-  return [0, 0, 0, 1];
-}
-
 function pointPressure(stroke: StudioGpuStroke, index: number): number {
   return clamp(finiteOr(stroke.pressures?.[index], 1), 0, 1);
 }
 
-function pressureRadius(size: number, pressure: number): number {
+export function studioGpuPressureRadius(size: number, pressure: number): number {
   // Exact default-pen width contract used by StudioDrawNode after pressure resampling.
-  return Math.max(0.25, (size * (0.3 + pressure * 1.4)) / 2);
+  const safeSize = clamp(finiteOr(size, 1), 0.01, STUDIO_GPU_MAX_BRUSH_SIZE);
+  const safePressure = clamp(finiteOr(pressure, 1), 0, 1);
+  return Math.max(0.25, (safeSize * (0.3 + safePressure * 1.4)) / 2);
 }
 
 function compareCodeUnits(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
-function orderedStrokes(strokes: readonly StudioGpuStroke[]): readonly StudioGpuStroke[] {
+function stableFingerprintNumber(value: number): string {
+  if (Number.isNaN(value)) return "NaN";
+  if (value === Number.POSITIVE_INFINITY) return "+Infinity";
+  if (value === Number.NEGATIVE_INFINITY) return "-Infinity";
+  if (Object.is(value, -0)) return "-0";
+  return String(value);
+}
+
+function updateFingerprint(hash: number, value: string | number | boolean | undefined): number {
+  const token = typeof value === "number" ? stableFingerprintNumber(value) : String(value);
+  let next = hash >>> 0;
+  for (let index = 0; index < token.length; index += 1) {
+    next ^= token.charCodeAt(index);
+    next = Math.imul(next, 0x01000193) >>> 0;
+  }
+  next ^= 0;
+  return Math.imul(next, 0x01000193) >>> 0;
+}
+
+export function orderStudioGpuStrokes(
+  strokes: readonly StudioGpuStroke[]
+): readonly StudioGpuStroke[] {
   if (!strokes.some((stroke) => stroke.orderKey !== undefined)) return strokes;
   return strokes
     .map((stroke, index) => ({ stroke, index }))
@@ -234,30 +239,127 @@ function orderedStrokes(strokes: readonly StudioGpuStroke[]): readonly StudioGpu
     .map(({ stroke }) => stroke);
 }
 
+function snapshotStudioGpuStrokes(
+  strokes: readonly StudioGpuStroke[]
+): readonly StudioGpuStroke[] {
+  return strokes.map((stroke) => ({
+    ...stroke,
+    points: [...stroke.points],
+    pressures: stroke.pressures ? [...stroke.pressures] : undefined,
+  }));
+}
+
+export function fingerprintStudioGpuFrame(
+  strokes: readonly StudioGpuStroke[],
+  viewport: StudioGpuViewport,
+  physicalWidth: number,
+  physicalHeight: number
+): string {
+  const normalized = normalizeViewport(viewport);
+  let hash = 0x811c9dc5;
+  for (const value of [
+    normalized.logicalWidth,
+    normalized.logicalHeight,
+    normalized.cssWidth,
+    normalized.cssHeight,
+    normalized.dpr,
+    normalized.scaleX,
+    normalized.scaleY,
+    normalized.offsetX,
+    normalized.offsetY,
+    normalized.flipX,
+    physicalWidth,
+    physicalHeight,
+  ]) {
+    hash = updateFingerprint(hash, value);
+  }
+  const ordered = orderStudioGpuStrokes(strokes);
+  hash = updateFingerprint(hash, ordered.length);
+  for (const stroke of ordered) {
+    for (const value of [
+      stroke.id,
+      stroke.color,
+      stroke.size,
+      stroke.opacity,
+      stroke.composite,
+      stroke.orderKey,
+      stroke.points.length,
+    ]) {
+      hash = updateFingerprint(hash, value);
+    }
+    for (const point of stroke.points) hash = updateFingerprint(hash, point);
+    hash = updateFingerprint(hash, stroke.pressures?.length);
+    for (const pressure of stroke.pressures ?? []) hash = updateFingerprint(hash, pressure);
+  }
+  return `${ordered.length}:${hash.toString(16).padStart(8, "0")}`;
+}
+
 /** CPU planning is shared by WebGPU and Canvas2D so fallback has identical geometry and ordering. */
 export function planStudioGpuDabs(strokes: readonly StudioGpuStroke[]): PlannedStudioGpuDabs {
   const dabs: StudioGpuDab[] = [];
   const batches: StudioGpuBatch[] = [];
+  let complete = true;
 
-  for (const stroke of orderedStrokes(strokes)) {
-    if (dabs.length >= MAX_DABS) break;
-    const pointCount = Math.floor(stroke.points.length / 2);
-    if (pointCount < 1) continue;
-    const size = positiveOr(stroke.size, 1);
-    const opacity = clamp(finiteOr(stroke.opacity, 1), 0, 1);
+  for (const stroke of orderStudioGpuStrokes(strokes)) {
+    if (dabs.length >= STUDIO_GPU_MAX_DABS) {
+      complete = false;
+      break;
+    }
+    if (
+      !Array.isArray(stroke.points)
+      || stroke.points.length < 2
+      || stroke.points.length % 2 !== 0
+      || (stroke.pressures !== undefined && !Array.isArray(stroke.pressures))
+      || typeof stroke.color !== "string"
+    ) {
+      complete = false;
+      break;
+    }
+    const pointCount = stroke.points.length / 2;
+    if (
+      !Number.isFinite(stroke.size)
+      || stroke.size <= 0
+      || stroke.size > STUDIO_GPU_MAX_BRUSH_SIZE
+      || (stroke.opacity !== undefined && (
+        !Number.isFinite(stroke.opacity) || stroke.opacity < 0 || stroke.opacity > 1
+      ))
+      || stroke.points.some((coordinate) => !Number.isFinite(coordinate))
+      || stroke.pressures?.some((pressure) => !Number.isFinite(pressure)) === true
+    ) {
+      complete = false;
+      break;
+    }
+    const size = stroke.size;
+    const opacity = stroke.opacity ?? 1;
     const composite: StudioGpuComposite = stroke.composite === "erase" ? "erase" : "normal";
-    const [red, green, blue, colorAlpha] = parseStudioGpuColor(stroke.color);
+    const parsedColor = parseStudioGpuColor(stroke.color);
+    if (!parsedColor) {
+      complete = false;
+      break;
+    }
+    const [red, green, blue, colorAlpha] = parsedColor;
     // Erasing is coverage, not paint color. A transparent/alpha-zero color must therefore erase
     // with the requested opacity instead of silently becoming a no-op.
     const alpha = opacity * (composite === "erase" ? 1 : colorAlpha);
     if (alpha <= 0) continue;
     const batchStart = dabs.length;
+    let capacityExceeded = false;
+    let invalidStroke = false;
     const pushDab = (x: number, y: number, pressure: number) => {
-      if (dabs.length >= MAX_DABS || !Number.isFinite(x) || !Number.isFinite(y)) return;
+      if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(pressure)) {
+        complete = false;
+        invalidStroke = true;
+        return;
+      }
+      if (dabs.length >= STUDIO_GPU_MAX_DABS) {
+        complete = false;
+        capacityExceeded = true;
+        return;
+      }
       dabs.push({
         x,
         y,
-        radius: pressureRadius(size, pressure),
+        radius: studioGpuPressureRadius(size, pressure),
         red,
         green,
         blue,
@@ -271,7 +373,11 @@ export function planStudioGpuDabs(strokes: readonly StudioGpuStroke[]): PlannedS
     if (!Number.isFinite(firstX) || !Number.isFinite(firstY)) continue;
     pushDab(firstX!, firstY!, pointPressure(stroke, 0));
 
-    for (let pointIndex = 1; pointIndex < pointCount && dabs.length < MAX_DABS; pointIndex += 1) {
+    for (
+      let pointIndex = 1;
+      pointIndex < pointCount && !capacityExceeded && !invalidStroke;
+      pointIndex += 1
+    ) {
       const x0 = stroke.points[(pointIndex - 1) * 2];
       const y0 = stroke.points[(pointIndex - 1) * 2 + 1];
       const x1 = stroke.points[pointIndex * 2];
@@ -280,13 +386,33 @@ export function planStudioGpuDabs(strokes: readonly StudioGpuStroke[]): PlannedS
       const dx = x1! - x0!;
       const dy = y1! - y0!;
       const distance = Math.hypot(dx, dy);
+      if (![dx, dy, distance].every(Number.isFinite)) {
+        complete = false;
+        invalidStroke = true;
+        break;
+      }
       if (distance <= 1e-6) continue;
       const p0 = pointPressure(stroke, pointIndex - 1);
       const p1 = pointPressure(stroke, pointIndex);
       // Overlapping circular dabs form an anti-aliased round-cap stroke without geometry cracks.
-      const spacing = Math.max(0.5, Math.min(pressureRadius(size, p0), pressureRadius(size, p1)) * 0.45);
+      const spacing = Math.max(
+        0.5,
+        Math.min(
+          studioGpuPressureRadius(size, p0),
+          studioGpuPressureRadius(size, p1)
+        ) * 0.45
+      );
       const steps = Math.max(1, Math.ceil(distance / spacing));
-      for (let step = 1; step <= steps && dabs.length < MAX_DABS; step += 1) {
+      if (!Number.isFinite(spacing) || !Number.isFinite(steps)) {
+        complete = false;
+        invalidStroke = true;
+        break;
+      }
+      for (
+        let step = 1;
+        step <= steps && !capacityExceeded && !invalidStroke;
+        step += 1
+      ) {
         const amount = step / steps;
         pushDab(
           x0! + dx * amount,
@@ -294,6 +420,11 @@ export function planStudioGpuDabs(strokes: readonly StudioGpuStroke[]): PlannedS
           p0 + (p1 - p0) * amount
         );
       }
+    }
+
+    if (invalidStroke) {
+      dabs.length = batchStart;
+      break;
     }
 
     const batchCount = dabs.length - batchStart;
@@ -304,9 +435,10 @@ export function planStudioGpuDabs(strokes: readonly StudioGpuStroke[]): PlannedS
     } else {
       batches.push({ composite, firstInstance: batchStart, instanceCount: batchCount });
     }
+    if (capacityExceeded) break;
   }
 
-  return { dabs, batches };
+  return { dabs, batches, complete };
 }
 
 function sameStrokeStyle(previous: StudioGpuStroke, next: StudioGpuStroke): boolean {
@@ -369,11 +501,11 @@ function concatenateStudioGpuDabPlans(
       }
     }
   }
-  return { dabs, batches };
+  return { dabs, batches, complete: plans.every((plan) => plan.complete) };
 }
 
 function withoutInitialDab(plan: PlannedStudioGpuDabs): PlannedStudioGpuDabs {
-  if (plan.dabs.length <= 1) return { dabs: [], batches: [] };
+  if (plan.dabs.length <= 1) return { dabs: [], batches: [], complete: plan.complete };
   const dabs = plan.dabs.slice(1);
   const batches = plan.batches.flatMap((batch) => {
     const batchEnd = batch.firstInstance + batch.instanceCount;
@@ -385,7 +517,7 @@ function withoutInitialDab(plan: PlannedStudioGpuDabs): PlannedStudioGpuDabs {
       instanceCount: batchEnd - retainedStart,
     }];
   });
-  return { dabs, batches };
+  return { dabs, batches, complete: plan.complete };
 }
 
 /**
@@ -396,8 +528,8 @@ export function planStudioGpuDabUpdate(
   previousStrokes: readonly StudioGpuStroke[],
   nextStrokes: readonly StudioGpuStroke[]
 ): StudioGpuDabRenderUpdate {
-  const previousOrdered = orderedStrokes(previousStrokes);
-  const nextOrdered = orderedStrokes(nextStrokes);
+  const previousOrdered = orderStudioGpuStrokes(previousStrokes);
+  const nextOrdered = orderStudioGpuStrokes(nextStrokes);
   const sharedCount = Math.min(previousOrdered.length, nextOrdered.length);
   let exactPrefixCount = 0;
   while (
@@ -469,7 +601,7 @@ function limitStudioGpuDabPlan(
       instanceCount: Math.min(batch.instanceCount, dabs.length - batch.firstInstance),
     }];
   });
-  return { mode: update.mode, dabs, batches };
+  return { mode: update.mode, dabs, batches, complete: false };
 }
 
 function bufferUsage(): number {
@@ -564,7 +696,10 @@ export class StudioWebGpuEngine {
   private renderedStrokes: readonly StudioGpuStroke[] | null = null;
   private renderedBackend: StudioGpuBackend | null = null;
   private renderedDabCount = 0;
+  private renderedFrameComplete = false;
   private renderedFrameInvalid = true;
+  private frameGeneration = 0;
+  private lastRequestId = "initial";
 
   constructor(options: StudioWebGpuEngineOptions) {
     this.options = options;
@@ -624,9 +759,11 @@ export class StudioWebGpuEngine {
     this.render(this.lastStrokes);
   }
 
-  public render(strokes: readonly StudioGpuStroke[]): void {
+  public render(strokes: readonly StudioGpuStroke[], requestId = this.lastRequestId): void {
     if (this.disposed) return;
     this.lastStrokes = strokes;
+    this.lastRequestId = requestId;
+    const frameGeneration = this.invalidateFrameReceipt();
     if (
       this.backend === "webgpu" &&
       this.device &&
@@ -634,10 +771,10 @@ export class StudioWebGpuEngine {
       this.normalPipeline &&
       this.erasePipeline
     ) {
-      this.renderWebGpu(strokes);
+      this.renderWebGpu(strokes, requestId, frameGeneration);
       return;
     }
-    this.renderCanvas2d(strokes);
+    this.renderCanvas2d(strokes, requestId, frameGeneration);
   }
 
   public clear(): void {
@@ -648,6 +785,7 @@ export class StudioWebGpuEngine {
     if (this.disposed) return;
     this.disposed = true;
     this.lifecycleGeneration += 1;
+    this.invalidateFrameReceipt();
     const device = this.device;
     this.device = null;
     this.normalPipeline = null;
@@ -798,7 +936,7 @@ export class StudioWebGpuEngine {
     this.destroyAccumulationTexture();
     safeUnconfigure(this.context);
     this.activateCanvas2d();
-    this.renderCanvas2d(this.lastStrokes);
+    this.render(this.lastStrokes, this.lastRequestId);
     this.options.onDeviceLost?.(info);
 
     if (this.options.autoRecover === false) return;
@@ -821,6 +959,7 @@ export class StudioWebGpuEngine {
     if (changed) {
       this.destroyAccumulationTexture();
       this.invalidateRenderedFrame();
+      this.invalidateFrameReceipt();
     }
     this.backend = backend;
     this.setSurfaceVisibility(backend);
@@ -900,35 +1039,58 @@ export class StudioWebGpuEngine {
     this.renderedStrokes = null;
     this.renderedBackend = null;
     this.renderedDabCount = 0;
+    this.renderedFrameComplete = false;
     this.renderedFrameInvalid = true;
+  }
+
+  private invalidateFrameReceipt(): number {
+    this.frameGeneration += 1;
+    this.options.onFrameInvalid?.();
+    return this.frameGeneration;
   }
 
   private planRenderUpdate(strokes: readonly StudioGpuStroke[]): StudioGpuDabRenderUpdate {
     if (
       this.renderedFrameInvalid ||
       this.renderedBackend !== this.backend ||
-      !this.renderedStrokes
+      !this.renderedStrokes ||
+      !this.renderedFrameComplete
     ) {
       return { mode: "rebuild", ...planStudioGpuDabs(strokes) };
     }
     const update = planStudioGpuDabUpdate(this.renderedStrokes, strokes);
     if (update.mode === "rebuild") return update;
-    return limitStudioGpuDabPlan(update, Math.max(0, MAX_DABS - this.renderedDabCount));
+    return limitStudioGpuDabPlan(
+      update,
+      Math.max(0, STUDIO_GPU_MAX_DABS - this.renderedDabCount)
+    );
   }
 
   private recordRenderedFrame(
     strokes: readonly StudioGpuStroke[],
     update: StudioGpuDabRenderUpdate
-  ): void {
-    this.renderedStrokes = strokes;
+  ): boolean {
+    const previousComplete = this.renderedFrameComplete;
+    // Callers usually provide immutable React data, but pointer hot paths may reuse an object.
+    // Retained-frame diffing must compare against pixels that were actually submitted, not an
+    // array that can later mutate in place and make an undrawn tail appear equal.
+    this.renderedStrokes = snapshotStudioGpuStrokes(strokes);
     this.renderedBackend = this.backend;
     this.renderedDabCount = update.mode === "append"
       ? this.renderedDabCount + update.dabs.length
       : update.dabs.length;
+    this.renderedFrameComplete = update.mode === "rebuild"
+      ? update.complete
+      : previousComplete && update.complete;
     this.renderedFrameInvalid = false;
+    return this.renderedFrameComplete;
   }
 
-  private renderWebGpu(strokes: readonly StudioGpuStroke[]): void {
+  private renderWebGpu(
+    strokes: readonly StudioGpuStroke[],
+    requestId: string,
+    frameGeneration: number
+  ): void {
     const { device, context, normalPipeline, erasePipeline } = this;
     if (!device || !context || !normalPipeline || !erasePipeline) return;
     try {
@@ -978,12 +1140,30 @@ export class StudioWebGpuEngine {
         }
       );
       device.queue.submit([encoder.finish()]);
-      this.recordRenderedFrame(strokes, update);
+      const complete = this.recordRenderedFrame(strokes, update);
+      if (complete) {
+        const receipt = this.createFrameReceipt(strokes, requestId);
+        const submitted = typeof device.queue.onSubmittedWorkDone === "function"
+          ? device.queue.onSubmittedWorkDone()
+          : Promise.resolve();
+        void submitted.then(() => {
+          if (
+            !this.disposed
+            && frameGeneration === this.frameGeneration
+            && requestId === this.lastRequestId
+            && this.backend === "webgpu"
+          ) {
+            this.options.onFrameReady?.(receipt);
+          }
+        }).catch(() => {
+          if (frameGeneration === this.frameGeneration) this.invalidateFrameReceipt();
+        });
+      }
     } catch {
       // Validation/context errors do not always resolve `device.lost`. Fail visibly-safe for this
       // session instead of leaving a selected but blank GPU surface above the authoritative scene.
       this.activateCanvas2d();
-      this.renderCanvas2d(strokes);
+      this.render(strokes, requestId);
     }
   }
 
@@ -996,7 +1176,11 @@ export class StudioWebGpuEngine {
     context.restore();
   }
 
-  private renderCanvas2d(strokes: readonly StudioGpuStroke[]): void {
+  private renderCanvas2d(
+    strokes: readonly StudioGpuStroke[],
+    requestId: string,
+    frameGeneration: number
+  ): void {
     this.activateCanvas2d();
     const context = this.fallbackContext;
     if (!context) return;
@@ -1022,6 +1206,36 @@ export class StudioWebGpuEngine {
       context.fill();
     }
     context.restore();
-    this.recordRenderedFrame(strokes, update);
+    const complete = this.recordRenderedFrame(strokes, update);
+    if (
+      complete
+      && !this.disposed
+      && frameGeneration === this.frameGeneration
+      && requestId === this.lastRequestId
+      && this.backend === "canvas2d"
+    ) {
+      this.options.onFrameReady?.(this.createFrameReceipt(strokes, requestId));
+    }
+  }
+
+  private createFrameReceipt(
+    strokes: readonly StudioGpuStroke[],
+    requestId: string
+  ): StudioGpuFrameReceipt {
+    return {
+      requestId,
+      fingerprint: fingerprintStudioGpuFrame(
+        strokes,
+        this.viewport,
+        this.canvas.width,
+        this.canvas.height
+      ),
+      backend: this.backend,
+      complete: true,
+      strokeCount: strokes.length,
+      dabCount: this.renderedDabCount,
+      physicalWidth: this.canvas.width,
+      physicalHeight: this.canvas.height,
+    };
   }
 }
