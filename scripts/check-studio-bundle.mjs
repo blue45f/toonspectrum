@@ -13,7 +13,9 @@ const budgets = {
   // 2026-07-15 evening: pro-draw prefs, menu portal stacking, chrome polish ≈ 744 KiB gzip.
   // 2026-07-15 residual always-on presence + pressure-curve helpers: ~755 KiB gzip observed.
   // 2026-07-15 Magma selection transform (content bake + marquee translate/scale): ~762 KiB gzip.
-  studio: { raw: 2_450_000, gzip: 800_000 },
+  // 2026-07-15 bubble path/export + floating tool popovers + insert/tutorial wiring:
+  // observed ~2438 KiB raw / ~787 KiB gzip (tutorial hub remains lazy).
+  studio: { raw: 2_520_000, gzip: 820_000 },
   // Measured after the same build: 443,257 raw / 143,956 gzip.
   app: { raw: 500_000, gzip: 170_000 },
 };
