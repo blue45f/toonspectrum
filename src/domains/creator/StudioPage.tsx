@@ -952,6 +952,12 @@ import {
   watermarkPlacement,
   type WatermarkSettings,
 } from "./studio-watermark";
+import {
+  isStudioWebGpuAuthorityCurrent,
+  snapshotStudioWebGpuAuthority,
+  type StudioWebGpuAuthorityFrame,
+} from "./studio-webgpu-authority";
+import { createStudioWebGpuCommittedHandoff } from "./studio-webgpu-committed-handoff";
 import { planStudioWebGpuViewportSurface } from "./studio-webgpu-viewport";
 import {
   STUDIO_WORKSPACE_LEFT_PANEL_WIDTH,
@@ -1075,6 +1081,7 @@ import type { StudioStockImageCredit, StudioStockPhoto } from "./studio-stock-im
 import type { Stylize } from "./studio-stylize";
 import type { SvgExportEl, SvgExportResult } from "./studio-svg-export";
 import type { Vibrance } from "./studio-vibrance";
+import type { StudioGpuStroke } from "./studio-webgpu-stroke";
 import type {
   StudioAssetMenuPanelProps,
   StudioAssetSortOrder,
@@ -4602,7 +4609,8 @@ function studioTimelineClockMs(): number {
 
 const ZOOM_MIN = 0.2;
 const ZOOM_MAX = 5;
-const EMPTY_STUDIO_GPU_STROKES = [] as const;
+const EMPTY_STUDIO_GPU_STROKES: readonly StudioGpuStroke[] = Object.freeze([]);
+
 function clampZoom(z: number) {
   return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z * 20) / 20));
 }
@@ -7676,7 +7684,7 @@ function StudioCuttoonEditor() {
   // 브러시 커서 프리뷰(Konva 노드 직접 갱신 — hover 리렌더 방지).
   const brushCursorRef = useRef<Konva.Circle>(null);
   const [draft, setDraft] = useState<DrawEl | null>(null);
-  const [webGpuPreviewReady, setWebGpuPreviewReady] = useState(false);
+  const [webGpuAuthority, setWebGpuAuthority] = useState<StudioWebGpuAuthorityFrame | null>(null);
   const draftRafRef = useRef<number | null>(null);
   const pendingDraftRef = useRef<DrawEl | null>(null);
   const marqueeRafRef = useRef<number | null>(null);
@@ -18799,12 +18807,10 @@ function StudioCuttoonEditor() {
   const isolatedDynamicDraft = draft?.mode === "pen" && resolveStudioBrushDynamicsPresetId(draft.brush) !== null
     ? draft
     : null;
-  // G10b vertical slice: the latency-sensitive, pressure-aware ink preview is composited on WebGPU
-  // (with a silent Canvas2D fallback). The engine supports retained normal + destination-out
-  // operation lists, but this transparent DOM surface does not own the committed Konva pixels
-  // below it, so the live eraser deliberately stays in the authoritative scene canvas. Texture,
-  // particle and shape brushes also stay on their exact Konva renderers until their shaders reach
-  // visual parity. Committed document/export nodes remain authoritative throughout the migration.
+  // G10b authority slice: pressure-aware live ink and the frontmost compatible committed pen suffix
+  // share the retained WebGPU compositor (with a silent Canvas2D fallback). An exact frame receipt
+  // controls the atomic Konva show/hide handoff below. Erasers, clipped/masked ink, specialty
+  // brushes and editing overlays deliberately remain on their exact source renderers.
   const webGpuDraft = draft && draft.mode !== "eraser"
     && (draft.kind ?? "freehand") === "freehand" && !isolatedDynamicDraft
     && resolveStudioBrushRenderFamily(draft.brush ?? "pen") === "pen"
@@ -18825,19 +18831,54 @@ function StudioCuttoonEditor() {
         0.5
       )
     : null;
-  const webGpuPreviewStrokes = webGpuDraft && webGpuPreviewPoints
-    ? [
-        {
-          id: webGpuDraft.id,
-          points: webGpuPreviewPoints,
-          pressures: webGpuPreviewPressures ?? undefined,
-          color: webGpuDraft.stroke,
-          size: webGpuDraft.strokeWidth,
-          opacity: webGpuDraft.opacity,
-          composite: "normal" as const,
-        },
-      ]
-    : EMPTY_STUDIO_GPU_STROKES;
+  const webGpuDraftStroke: StudioGpuStroke | null = webGpuDraft && webGpuPreviewPoints
+    ? {
+        id: webGpuDraft.id,
+        points: webGpuPreviewPoints,
+        pressures: webGpuPreviewPressures ?? undefined,
+        color: webGpuDraft.stroke,
+        size: Math.max(1, webGpuDraft.strokeWidth),
+        opacity: webGpuDraft.opacity,
+        composite: "normal",
+      }
+    : null;
+  const webGpuCommittedGateActive =
+    isExporting
+    || masterEditMode
+    || selectedId !== null
+    || marqueeIds.length > 0
+    || editing !== null
+    || nodeEditDraft !== null
+    || Boolean(draft && !webGpuDraft);
+  // Adapting panel membership is intentionally skipped while globally gated; containingPanel may
+  // scan every frame and should not add work during export, transforms, or specialty-brush input.
+  const webGpuCommittedElements = webGpuCommittedGateActive
+    ? []
+    : elements.map((element) => ({
+        ...element,
+        hidden: isEffectivelyHidden(element, groups),
+        panelClip: element.noClip || containingPanel(element, elements) === null
+          ? "none" as const
+          : "clipped" as const,
+      }));
+  const webGpuCommittedHandoff = createStudioWebGpuCommittedHandoff({
+    elements: webGpuCommittedElements,
+    gates: {
+      exportActive: isExporting,
+      masterEditActive: masterEditMode,
+      editActive:
+        selectedId !== null
+        || marqueeIds.length > 0
+        || editing !== null
+        || nodeEditDraft !== null,
+      specialDraftActive: Boolean(draft && !webGpuDraft),
+    },
+  });
+  const webGpuPreviewStrokes: readonly StudioGpuStroke[] = webGpuDraftStroke
+    ? [...webGpuCommittedHandoff.strokes, webGpuDraftStroke]
+    : webGpuCommittedHandoff.strokes.length > 0
+      ? webGpuCommittedHandoff.strokes
+      : EMPTY_STUDIO_GPU_STROKES;
   const webGpuViewportSurface = planStudioWebGpuViewportSurface({
     documentWidth: CANVAS_W,
     documentHeight: canvasH,
@@ -18848,7 +18889,21 @@ function StudioCuttoonEditor() {
     viewportHeight: scrollPos.height,
     flipX: canvasFlipH,
   });
-  const webGpuPreviewAuthorized = webGpuViewportSurface !== null && webGpuPreviewReady;
+  const webGpuPreviewAuthorized = webGpuViewportSurface !== null
+    && isStudioWebGpuAuthorityCurrent(webGpuAuthority, {
+      strokes: webGpuPreviewStrokes,
+      committedElementIds: webGpuCommittedHandoff.elementIds,
+      draftElementId: webGpuDraftStroke?.id ?? null,
+      documentWidth: CANVAS_W,
+      documentHeight: canvasH,
+      viewport: webGpuViewportSurface,
+    });
+  const webGpuCommittedAuthorizedIds = new Set(
+    webGpuPreviewAuthorized ? webGpuAuthority.committedElementIds : []
+  );
+  const webGpuDraftAuthorized = webGpuPreviewAuthorized
+    && webGpuAuthority.draftElementId !== null
+    && webGpuAuthority.draftElementId === webGpuDraftStroke?.id;
 
   return (
     <StudioLiveCollaborationProvider
@@ -23999,6 +24054,9 @@ function StudioCuttoonEditor() {
                 ) : null;
                 const mainEls = elements.map((el, idx) => {
                   if (isEffectivelyHidden(el, groups)) return null; // 숨긴 레이어/그룹은 렌더·내보내기에서 제외
+                  // Hide source pixels only after the exact current GPU operation list has emitted a
+                  // complete receipt. Any scene, viewport, or draft change invalidates this set first.
+                  if (webGpuCommittedAuthorizedIds.has(el.id)) return null;
                   const base = el.clipBelow && idx > 0 ? elements[idx - 1] : null;
                   // 자기 완결형 마스크(el.maskSrc) — clipBelow와 별개 축, 교집합으로 합성해야 하므로
                   // clipBelow보다 먼저 적용해 "이미 마스크 적용된 노드"를 만든다.
@@ -24066,7 +24124,7 @@ function StudioCuttoonEditor() {
                   </>
                 );
               })()}
-              {draft && !isolatedDynamicDraft && !(webGpuDraft && webGpuPreviewAuthorized)
+              {draft && !isolatedDynamicDraft && !webGpuDraftAuthorized
                 ? <StudioDrawNode el={draft} />
                 : null}
               <Transformer
@@ -24694,8 +24752,17 @@ function StudioCuttoonEditor() {
                 flipX={webGpuViewportSurface.transform.flipX}
                 strokes={webGpuPreviewStrokes}
                 frameAuthorized={webGpuPreviewAuthorized}
-                onFrameInvalid={() => setWebGpuPreviewReady(false)}
-                onFrameReady={() => setWebGpuPreviewReady(true)}
+                onFrameInvalid={() => setWebGpuAuthority(null)}
+                onFrameReady={() => {
+                  setWebGpuAuthority(snapshotStudioWebGpuAuthority({
+                    strokes: webGpuPreviewStrokes,
+                    committedElementIds: [...webGpuCommittedHandoff.elementIds],
+                    draftElementId: webGpuDraftStroke?.id ?? null,
+                    documentWidth: CANVAS_W,
+                    documentHeight: canvasH,
+                    viewport: webGpuViewportSurface,
+                  }));
+                }}
               />
             </Suspense>
           ) : null}

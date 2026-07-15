@@ -110,7 +110,9 @@ function activeGate(gates: StudioWebGpuCommittedPlanGates | undefined): StudioWe
 
 function finitePointArray(value: unknown): value is readonly number[] {
   return Array.isArray(value)
-    && value.length >= 2
+    // Single-point Konva strokes use a circle-specific minimum-radius contract. Keep them on the
+    // authoritative renderer until that exact point primitive exists in the GPU compositor.
+    && value.length >= 4
     && value.length % 2 === 0
     && value.every((coordinate) => typeof coordinate === "number" && Number.isFinite(coordinate));
 }

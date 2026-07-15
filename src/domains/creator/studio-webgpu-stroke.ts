@@ -13,6 +13,54 @@ export interface StudioGpuStroke {
 
 export const STUDIO_GPU_MAX_BRUSH_SIZE = 8_192;
 
+export function sameStudioGpuNumberArray(
+  left: readonly number[] | undefined,
+  right: readonly number[] | undefined
+): boolean {
+  if (left === right) return true;
+  if (!left || !right || left.length !== right.length) return false;
+  return left.every((value, index) => Object.is(value, right[index]));
+}
+
+/**
+ * Exact semantic equality used at the authoritative Konva/WebGPU handoff boundary.
+ * A hash is intentionally insufficient here: a collision must never hide the source pixels.
+ */
+export function sameStudioGpuStroke(left: StudioGpuStroke, right: StudioGpuStroke): boolean {
+  return left.id === right.id
+    && left.color === right.color
+    && Object.is(left.size, right.size)
+    && Object.is(left.opacity, right.opacity)
+    && left.composite === right.composite
+    && left.orderKey === right.orderKey
+    && sameStudioGpuNumberArray(left.points, right.points)
+    && sameStudioGpuNumberArray(left.pressures, right.pressures);
+}
+
+export function sameStudioGpuStrokes(
+  left: readonly StudioGpuStroke[],
+  right: readonly StudioGpuStroke[]
+): boolean {
+  return left === right || (
+    left.length === right.length
+    && left.every((stroke, index) => sameStudioGpuStroke(stroke, right[index]!))
+  );
+}
+
+export function snapshotStudioGpuStroke(stroke: StudioGpuStroke): StudioGpuStroke {
+  return {
+    ...stroke,
+    points: [...stroke.points],
+    pressures: stroke.pressures ? [...stroke.pressures] : undefined,
+  };
+}
+
+export function snapshotStudioGpuStrokes(
+  strokes: readonly StudioGpuStroke[]
+): readonly StudioGpuStroke[] {
+  return strokes.map(snapshotStudioGpuStroke);
+}
+
 function finiteOr(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }

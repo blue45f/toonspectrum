@@ -137,6 +137,7 @@ describe("planStudioWebGpuCommittedSuffix", () => {
   });
 
   it.each([
+    ["single point", { points: [0, 0], pressures: [0.5] }],
     ["odd points", { points: [0, 0, 10] }],
     ["non-finite points", { points: [0, 0, Number.NaN, 10] }],
     ["missing pressure", { pressures: undefined }],

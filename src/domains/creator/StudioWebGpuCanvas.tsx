@@ -8,6 +8,10 @@ import {
   type StudioGpuStroke,
   type StudioGpuViewTransform,
 } from "./studio-webgpu-engine";
+import {
+  sameStudioGpuStrokes,
+  snapshotStudioGpuStrokes,
+} from "./studio-webgpu-stroke";
 
 import type { StudioWebGpuSurfaceBounds } from "./studio-webgpu-viewport";
 
@@ -55,26 +59,6 @@ interface LatestCanvasProps {
   surfaceHeight: number | undefined;
 }
 
-function sameNumberArray(
-  left: readonly number[] | undefined,
-  right: readonly number[] | undefined
-): boolean {
-  if (left === right) return true;
-  if (!left || !right || left.length !== right.length) return false;
-  return left.every((value, index) => Object.is(value, right[index]));
-}
-
-function sameStroke(left: StudioGpuStroke, right: StudioGpuStroke): boolean {
-  return left.id === right.id
-    && left.color === right.color
-    && Object.is(left.size, right.size)
-    && Object.is(left.opacity, right.opacity)
-    && left.composite === right.composite
-    && left.orderKey === right.orderKey
-    && sameNumberArray(left.points, right.points)
-    && sameNumberArray(left.pressures, right.pressures);
-}
-
 function sameCanvasRequest(left: LatestCanvasProps, right: LatestCanvasProps): boolean {
   return Object.is(left.width, right.width)
     && Object.is(left.height, right.height)
@@ -87,18 +71,13 @@ function sameCanvasRequest(left: LatestCanvasProps, right: LatestCanvasProps): b
     && Object.is(left.surfaceTop, right.surfaceTop)
     && Object.is(left.surfaceWidth, right.surfaceWidth)
     && Object.is(left.surfaceHeight, right.surfaceHeight)
-    && left.strokes.length === right.strokes.length
-    && left.strokes.every((stroke, index) => sameStroke(stroke, right.strokes[index]!));
+    && sameStudioGpuStrokes(left.strokes, right.strokes);
 }
 
 function snapshotCanvasRequest(request: LatestCanvasProps): LatestCanvasProps {
   return {
     ...request,
-    strokes: request.strokes.map((stroke) => ({
-      ...stroke,
-      points: [...stroke.points],
-      pressures: stroke.pressures ? [...stroke.pressures] : undefined,
-    })),
+    strokes: snapshotStudioGpuStrokes(request.strokes),
   };
 }
 
