@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import * as Y from "yjs";
 
 import {
+  STUDIO_LIVE_ADAPTER_DISCOVERY_TIMEOUT_MS,
+  STUDIO_LIVE_RELAY_RPC_TIMEOUT_MS,
   StudioLiveCrdtSyncSchema,
   StudioLiveCrdtUpdateSchema,
   StudioLiveCursorSchema,
@@ -22,7 +24,13 @@ import {
 import type { CreatorService } from "./creator.service";
 import type { StudioCrdtService } from "./studio-crdt.service";
 import type {
+  AcquireStudioLiveLockInput,
+  StudioLiveLockRecord,
+  StudioLiveLockRepository,
+} from "./studio-live-lock.repository";
+import type {
   StudioLiveAuthPrincipal,
+  StudioLiveParticipant,
   StudioLiveSessionAuthenticator,
   StudioLiveSessionRevalidator,
 } from "./studio-live.gateway";
@@ -34,9 +42,25 @@ interface Emission {
   payload: unknown;
 }
 
+interface InterServerEmission {
+  origin: number;
+  event: string;
+  payload: unknown;
+}
+
+type FakeInterServerListener = (
+  payload: unknown,
+  ack: (response: unknown) => void
+) => void;
+
 interface FakeSocket {
   id: string;
-  data: { authUserId?: string; authPrincipal?: StudioLiveAuthPrincipal };
+  data: {
+    authUserId?: string;
+    authPrincipal?: StudioLiveAuthPrincipal;
+    studioParticipant?: StudioLiveParticipant;
+    studioWorkId?: string;
+  };
   handshake: { auth: Record<string, unknown> };
   joined: Set<string>;
   left: Set<string>;
@@ -52,6 +76,104 @@ type FakeNamespaceMiddleware = (
   socket: FakeSocket,
   next: (error?: Error) => void
 ) => void;
+
+class MemoryStudioLiveLockRepository implements StudioLiveLockRepository {
+  private readonly locks = new Map<string, StudioLiveLockRecord>();
+
+  private key(workId: string, resourceId: string): string {
+    return JSON.stringify([workId, resourceId]);
+  }
+
+  async acquire(input: AcquireStudioLiveLockInput) {
+    await this.purgeExpired();
+    const key = this.key(input.workId, input.resourceId);
+    const current = this.locks.get(key);
+    if (current && current.ownerConnectionId !== input.ownerConnectionId) {
+      return { status: "conflict" as const, lock: current };
+    }
+    if (
+      !current &&
+      [...this.locks.values()].filter((lock) => lock.workId === input.workId).length >= 200
+    ) {
+      return { status: "limit" as const };
+    }
+    const lock: StudioLiveLockRecord = {
+      workId: input.workId,
+      resourceId: input.resourceId,
+      leaseId: current?.leaseId ?? input.requestedLeaseId,
+      acquisitionId: input.requestedLeaseId,
+      ownerConnectionId: input.ownerConnectionId,
+      ownerName: input.ownerName,
+      expiresAt: new Date(Date.now() + input.leaseMs),
+    };
+    this.locks.set(key, lock);
+    return { status: "acquired" as const, lock, created: !current };
+  }
+
+  async release(input: {
+    workId: string;
+    resourceId: string;
+    leaseId: string;
+    ownerConnectionId: string;
+  }) {
+    const key = this.key(input.workId, input.resourceId);
+    const current = this.locks.get(key);
+    if (
+      !current ||
+      current.ownerConnectionId !== input.ownerConnectionId ||
+      current.leaseId !== input.leaseId
+    ) return null;
+    this.locks.delete(key);
+    return current;
+  }
+
+  async rollbackAcquire(input: {
+    workId: string;
+    resourceId: string;
+    leaseId: string;
+    acquisitionId: string;
+    ownerConnectionId: string;
+  }) {
+    const key = this.key(input.workId, input.resourceId);
+    const current = this.locks.get(key);
+    if (
+      !current ||
+      current.ownerConnectionId !== input.ownerConnectionId ||
+      current.leaseId !== input.leaseId ||
+      current.acquisitionId !== input.acquisitionId
+    ) return null;
+    this.locks.delete(key);
+    return current;
+  }
+
+  async releaseConnection(workId: string, ownerConnectionId: string) {
+    const released: StudioLiveLockRecord[] = [];
+    for (const [key, lock] of this.locks) {
+      if (lock.workId !== workId || lock.ownerConnectionId !== ownerConnectionId) continue;
+      this.locks.delete(key);
+      released.push(lock);
+    }
+    return released;
+  }
+
+  async list(workId: string) {
+    await this.purgeExpired();
+    return [...this.locks.values()]
+      .filter((lock) => lock.workId === workId)
+      .sort((left, right) => left.resourceId.localeCompare(right.resourceId));
+  }
+
+  async purgeExpired() {
+    const now = Date.now();
+    const expired: StudioLiveLockRecord[] = [];
+    for (const [key, lock] of this.locks) {
+      if (lock.expiresAt.getTime() > now) continue;
+      this.locks.delete(key);
+      expired.push(lock);
+    }
+    return expired;
+  }
+}
 
 function teamSnapshot(
   userId: string,
@@ -101,16 +223,40 @@ function createHarness(
         }
       : null,
   revalidateSession: StudioLiveSessionRevalidator = async (principal) =>
-    principal.expiresAt > Date.now()
+    principal.expiresAt > Date.now(),
+  lockRepository: StudioLiveLockRepository = new MemoryStudioLiveLockRepository()
 ) {
   const emissions: Emission[] = [];
   const sockets = new Map<string, FakeSocket>();
   const middlewares: FakeNamespaceMiddleware[] = [];
+  const interServerListeners = new Map<string, Set<FakeInterServerListener>>();
   const namespace = {
     sockets,
     use(middleware: FakeNamespaceMiddleware) {
       middlewares.push(middleware);
       return namespace;
+    },
+    on(event: string, listener: FakeInterServerListener) {
+      const listeners = interServerListeners.get(event) ?? new Set<FakeInterServerListener>();
+      listeners.add(listener);
+      interServerListeners.set(event, listeners);
+      return namespace;
+    },
+    off(event: string, listener: FakeInterServerListener) {
+      const listeners = interServerListeners.get(event);
+      listeners?.delete(listener);
+      if (listeners?.size === 0) interServerListeners.delete(event);
+      return namespace;
+    },
+    async serverSideEmitWithAck(_event: string, _payload: unknown): Promise<unknown[]> {
+      return [];
+    },
+    in(room: string) {
+      return {
+        async fetchSockets() {
+          return [...sockets.values()].filter((candidate) => candidate.joined.has(room));
+        },
+      };
     },
     to(target: string) {
       return {
@@ -143,7 +289,8 @@ function createHarness(
     service as unknown as CreatorService,
     authenticate,
     revalidate,
-    crdtService as unknown as StudioCrdtService
+    crdtService as unknown as StudioCrdtService,
+    lockRepository
   );
   gateway.server = namespace as unknown as Namespace;
 
@@ -186,11 +333,54 @@ function createHarness(
     crdtService,
     authenticate,
     revalidate,
+    lockRepository,
     emissions,
     sockets,
     middlewares,
+    interServerListeners,
     namespace,
     socket,
+  };
+}
+
+function connectFakeInterServerBus(
+  ...harnesses: Array<ReturnType<typeof createHarness>>
+) {
+  const emissions: InterServerEmission[] = [];
+  let stalled = false;
+  for (const [origin, harness] of harnesses.entries()) {
+    harness.namespace.serverSideEmitWithAck = async (event, payload) => {
+      emissions.push({ origin, event, payload });
+      if (stalled) return new Promise<never>(() => undefined);
+      return Promise.all(
+        harnesses
+          .filter((_candidate, candidateIndex) => candidateIndex !== origin)
+          .map(
+            (candidate) =>
+              new Promise<unknown>((resolve) => {
+                const listeners = candidate.interServerListeners.get(event);
+                if (!listeners || listeners.size === 0) return;
+                let acknowledged = false;
+                const acknowledge = (response: unknown) => {
+                  if (acknowledged) return;
+                  acknowledged = true;
+                  resolve(response);
+                };
+                for (const listener of listeners) listener(payload, acknowledge);
+              })
+          )
+      );
+    };
+    harness.gateway.afterInit(harness.namespace as unknown as Namespace);
+  }
+  return {
+    emissions,
+    setStalled(value: boolean) {
+      stalled = value;
+    },
+    destroy() {
+      for (const harness of harnesses) harness.gateway.onModuleDestroy();
+    },
   };
 }
 
@@ -644,6 +834,142 @@ describe("StudioLiveGateway", () => {
     expect(harness.service.getWorkTeam).toHaveBeenCalledWith("owner", "work-1");
   });
 
+  it("discovers adapter-visible participants across nodes without leaking socket-private data", async () => {
+    const harness = createHarness();
+    const remote = harness.socket("remote", "valid:remote-user");
+    remote.joined.add("studio-live:work-1");
+    remote.data.authUserId = "remote-database-user";
+    remote.data.authPrincipal = {
+      userId: "remote-database-user",
+      sessionVersion: 7,
+      expiresAt: Date.now() + 60_000,
+    };
+    remote.data.studioWorkId = "work-1";
+    remote.data.studioParticipant = {
+      connectionId: "remote",
+      clientInstanceId: "remote-device",
+      name: "원격 어시스턴트",
+      role: "editor",
+      capabilities: {
+        view: true,
+        comment: true,
+        edit: true,
+        manageMembers: false,
+      },
+      state: "active",
+      pageId: "page-remote",
+      tool: "brush",
+      sharingScreen: false,
+      joinedAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    };
+    Object.assign(remote.data.studioParticipant, {
+      userId: "must-not-leak",
+      workId: "must-not-leak",
+      authPrincipal: remote.data.authPrincipal,
+    });
+    const local = harness.socket("owner");
+
+    const response = await connectAndJoin(harness, local);
+
+    expect(response.ok).toBe(true);
+    if (!response.ok) throw new Error("join failed");
+    expect(response.data.participants.map(({ connectionId }) => connectionId)).toEqual([
+      "remote",
+      "owner",
+    ]);
+    const serialized = JSON.stringify(response.data.participants);
+    expect(serialized).not.toContain("remote-database-user");
+    expect(serialized).not.toContain("must-not-leak");
+    expect(local.data.studioWorkId).toBe("work-1");
+    expect(local.data.studioParticipant).toEqual(response.data.self);
+    expect(local.data.studioParticipant).not.toHaveProperty("userId");
+    expect(harness.emissions).toContainEqual({
+      target: "studio-live:work-1",
+      event: "studio:presence:update",
+      payload: response.data.self,
+    });
+    expect(harness.emissions.some(({ event }) => event === "studio:presence:snapshot")).toBe(
+      false
+    );
+  });
+
+  it("ignores stale adapter metadata whose work or connection identity does not match", async () => {
+    const harness = createHarness();
+    const stale = harness.socket("remote");
+    stale.joined.add("studio-live:work-1");
+    stale.data.studioWorkId = "work-other";
+    stale.data.studioParticipant = {
+      connectionId: "impersonated-id",
+      clientInstanceId: "remote-device",
+      name: "잘못된 원격 상태",
+      role: "editor",
+      capabilities: {
+        view: true,
+        comment: true,
+        edit: true,
+        manageMembers: false,
+      },
+      state: "active",
+      pageId: null,
+      tool: null,
+      sharingScreen: false,
+      joinedAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    };
+
+    const response = await connectAndJoin(harness, harness.socket("owner"));
+
+    expect(response.ok).toBe(true);
+    if (!response.ok) throw new Error("join failed");
+    expect(response.data.participants.map(({ connectionId }) => connectionId)).toEqual(["owner"]);
+  });
+
+  it("falls back only in the join ACK when adapter discovery fails and never broadcasts a partial snapshot", async () => {
+    const harness = createHarness();
+    harness.namespace.in = () => ({
+      async fetchSockets() {
+        throw new Error("shared adapter unavailable");
+      },
+    });
+
+    const response = await connectAndJoin(harness, harness.socket("owner"));
+
+    expect(response.ok).toBe(true);
+    if (!response.ok) throw new Error("join failed");
+    expect(response.data.participants.map(({ connectionId }) => connectionId)).toEqual(["owner"]);
+    expect(harness.emissions.some(({ event }) => event === "studio:presence:snapshot")).toBe(
+      false
+    );
+  });
+
+  it("bounds a stalled adapter discovery so the serialized join can still acknowledge", async () => {
+    vi.useFakeTimers();
+    try {
+      const harness = createHarness();
+      harness.namespace.in = () => ({
+        async fetchSockets() {
+          return new Promise<never>(() => undefined);
+        },
+      });
+      const joining = connectAndJoin(harness, harness.socket("owner"));
+
+      await vi.advanceTimersByTimeAsync(STUDIO_LIVE_ADAPTER_DISCOVERY_TIMEOUT_MS);
+      const response = await joining;
+
+      expect(response.ok).toBe(true);
+      if (!response.ok) throw new Error("join failed");
+      expect(response.data.participants.map(({ connectionId }) => connectionId)).toEqual([
+        "owner",
+      ]);
+      expect(harness.emissions.some(({ event }) => event === "studio:presence:snapshot")).toBe(
+        false
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("fails closed when the work ACL lookup rejects", async () => {
     const harness = createHarness(async () => {
       throw new Error("forbidden");
@@ -929,6 +1255,145 @@ describe("StudioLiveGateway", () => {
     expect(released).toEqual({ ok: true, data: { released: true } });
   });
 
+  it("serializes one shared lock owner across API gateway instances", async () => {
+    const repository = new MemoryStudioLiveLockRepository();
+    const firstHarness = createHarness(undefined, undefined, undefined, repository);
+    const secondHarness = createHarness(undefined, undefined, undefined, repository);
+    const first = firstHarness.socket("editor-a");
+    const second = secondHarness.socket("editor-b");
+    await connectAndJoin(firstHarness, first);
+    await connectAndJoin(secondHarness, second);
+
+    const results = await Promise.all([
+      firstHarness.gateway.requestLock(
+        first as never,
+        { workId: "work-1", resourceId: "element:shared", leaseMs: 15_000 },
+        undefined
+      ),
+      secondHarness.gateway.requestLock(
+        second as never,
+        { workId: "work-1", resourceId: "element:shared", leaseMs: 15_000 },
+        undefined
+      ),
+    ]);
+    expect(results.filter((result) => result.ok)).toHaveLength(1);
+    expect(results.filter((result) => !result.ok)).toEqual([
+      expect.objectContaining({ ok: false, code: "lock_conflict" }),
+    ]);
+
+    const winnerIndex = results.findIndex((result) => result.ok);
+    const winnerHarness = winnerIndex === 0 ? firstHarness : secondHarness;
+    const winnerSocket = winnerIndex === 0 ? first : second;
+    const loserHarness = winnerIndex === 0 ? secondHarness : firstHarness;
+    const loserSocket = winnerIndex === 0 ? second : first;
+    const winner = results[winnerIndex];
+    if (!winner?.ok) throw new Error("distributed lock winner missing");
+
+    const observerHarness = createHarness(undefined, undefined, undefined, repository);
+    const observer = observerHarness.socket("observer");
+    const joined = await connectAndJoin(observerHarness, observer);
+    expect(joined).toMatchObject({
+      ok: true,
+      data: {
+        locks: [
+          expect.objectContaining({
+            resourceId: "element:shared",
+            leaseId: winner.data.lock.leaseId,
+            ownerConnectionId: winnerSocket.id,
+          }),
+        ],
+      },
+    });
+    if (!joined.ok) throw new Error("observer join failed");
+    expect(joined.data.locks[0]).not.toHaveProperty("acquisitionId");
+
+    const wrongOwnerRelease = await loserHarness.gateway.releaseLock(
+      loserSocket as never,
+      {
+        workId: "work-1",
+        resourceId: "element:shared",
+        leaseId: winner.data.lock.leaseId,
+      },
+      undefined
+    );
+    expect(wrongOwnerRelease).toEqual({ ok: true, data: { released: false } });
+
+    winnerHarness.gateway.handleDisconnect(winnerSocket as never);
+    await vi.waitFor(async () => {
+      expect(await repository.list("work-1")).toEqual([]);
+    });
+    await expect(
+      loserHarness.gateway.requestLock(
+        loserSocket as never,
+        { workId: "work-1", resourceId: "element:shared", leaseMs: 15_000 },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: true });
+  });
+
+  it("lets another API node reacquire an expired shared lease", async () => {
+    vi.useFakeTimers({ now: new Date("2026-07-16T00:00:00.000Z") });
+    try {
+      const repository = new MemoryStudioLiveLockRepository();
+      const firstHarness = createHarness(undefined, undefined, undefined, repository);
+      const secondHarness = createHarness(undefined, undefined, undefined, repository);
+      const first = firstHarness.socket("editor-a");
+      const second = secondHarness.socket("editor-b");
+      await connectAndJoin(firstHarness, first);
+      await connectAndJoin(secondHarness, second);
+      await expect(
+        firstHarness.gateway.requestLock(
+          first as never,
+          { workId: "work-1", resourceId: "page:lease", leaseMs: 5_000 },
+          undefined
+        )
+      ).resolves.toMatchObject({ ok: true });
+
+      vi.advanceTimersByTime(5_001);
+      await expect(
+        secondHarness.gateway.requestLock(
+          second as never,
+          { workId: "work-1", resourceId: "page:lease", leaseMs: 5_000 },
+          undefined
+        )
+      ).resolves.toMatchObject({
+        ok: true,
+        data: { lock: { ownerConnectionId: "editor-b" } },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("allows separate API nodes to lock different resources in parallel", async () => {
+    const repository = new MemoryStudioLiveLockRepository();
+    const firstHarness = createHarness(undefined, undefined, undefined, repository);
+    const secondHarness = createHarness(undefined, undefined, undefined, repository);
+    const first = firstHarness.socket("editor-a");
+    const second = secondHarness.socket("editor-b");
+    await connectAndJoin(firstHarness, first);
+    await connectAndJoin(secondHarness, second);
+
+    const results = await Promise.all([
+      firstHarness.gateway.requestLock(
+        first as never,
+        { workId: "work-1", resourceId: "element:a", leaseMs: 15_000 },
+        undefined
+      ),
+      secondHarness.gateway.requestLock(
+        second as never,
+        { workId: "work-1", resourceId: "element:b", leaseMs: 15_000 },
+        undefined
+      ),
+    ]);
+
+    expect(results).toEqual([
+      expect.objectContaining({ ok: true }),
+      expect.objectContaining({ ok: true }),
+    ]);
+    expect(await repository.list("work-1")).toHaveLength(2);
+  });
+
   it("rechecks edit ACL before a new lock and fails closed after revocation", async () => {
     let canEdit = true;
     const harness = createHarness(async (userId, workId) =>
@@ -961,6 +1426,19 @@ describe("StudioLiveGateway", () => {
     );
     const socket = harness.socket("editor");
     await connectAndJoin(harness, socket);
+    await expect(
+      harness.gateway.updatePresence(
+        socket as never,
+        { workId: "work-1", state: "idle", pageId: "page-2", tool: "eraser" },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: true });
+    expect(socket.data.studioParticipant).toMatchObject({
+      connectionId: "editor",
+      state: "idle",
+      pageId: "page-2",
+      tool: "eraser",
+    });
     const acquired = await harness.gateway.requestLock(
       socket as never,
       { workId: "work-1", resourceId: "page:role", leaseMs: 15_000 },
@@ -977,6 +1455,12 @@ describe("StudioLiveGateway", () => {
     expect(rejoined.ok).toBe(true);
     if (!rejoined.ok) throw new Error("rejoin failed");
     expect(rejoined.data.self.capabilities.edit).toBe(false);
+    expect(socket.data.studioParticipant).toMatchObject({
+      state: "active",
+      pageId: "page-2",
+      tool: "eraser",
+      capabilities: { edit: false },
+    });
     expect(harness.emissions).toContainEqual({
       target: "studio-live:work-1",
       event: "studio:lock:update",
@@ -985,6 +1469,118 @@ describe("StudioLiveGateway", () => {
         resourceId: "page:role",
       }),
     });
+  });
+
+  it("does not delete a pre-existing lease when its renewal finishes after a same-work rejoin", async () => {
+    const repository = new MemoryStudioLiveLockRepository();
+    const harness = createHarness(undefined, undefined, undefined, repository);
+    const socket = harness.socket("editor");
+    await connectAndJoin(harness, socket);
+    const acquired = await harness.gateway.requestLock(
+      socket as never,
+      { workId: "work-1", resourceId: "page:renew-race", leaseMs: 15_000 },
+      undefined
+    );
+    expect(acquired.ok).toBe(true);
+    if (!acquired.ok) throw new Error("initial lock failed");
+
+    let announceRenewal: (() => void) | undefined;
+    const renewalStored = new Promise<void>((resolve) => {
+      announceRenewal = resolve;
+    });
+    let resumeRenewal: (() => void) | undefined;
+    const renewalBarrier = new Promise<void>((resolve) => {
+      resumeRenewal = resolve;
+    });
+    const acquire = repository.acquire.bind(repository);
+    vi.spyOn(repository, "acquire").mockImplementation(async (input) => {
+      const result = await acquire(input);
+      announceRenewal?.();
+      await renewalBarrier;
+      return result;
+    });
+
+    const renewal = harness.gateway.requestLock(
+      socket as never,
+      { workId: "work-1", resourceId: "page:renew-race", leaseMs: 20_000 },
+      undefined
+    );
+    await renewalStored;
+    const rejoined = await harness.gateway.join(
+      socket as never,
+      { workId: "work-1", clientInstanceId: "client-editor-rejoined" },
+      undefined
+    );
+    expect(rejoined).toMatchObject({ ok: true, data: { self: { capabilities: { edit: true } } } });
+
+    resumeRenewal?.();
+    await expect(renewal).resolves.toMatchObject({ ok: false, code: "forbidden" });
+    await expect(repository.list("work-1")).resolves.toEqual([
+      expect.objectContaining({
+        resourceId: "page:renew-race",
+        leaseId: acquired.data.lock.leaseId,
+        ownerConnectionId: socket.id,
+      }),
+    ]);
+  });
+
+  it("cannot roll back a newly created lease after a newer participant generation adopts it", async () => {
+    const repository = new MemoryStudioLiveLockRepository();
+    const harness = createHarness(undefined, undefined, undefined, repository);
+    const socket = harness.socket("editor");
+    await connectAndJoin(harness, socket);
+
+    let announceFirstAcquire: (() => void) | undefined;
+    const firstAcquireStored = new Promise<void>((resolve) => {
+      announceFirstAcquire = resolve;
+    });
+    let resumeFirstAcquire: (() => void) | undefined;
+    const firstAcquireBarrier = new Promise<void>((resolve) => {
+      resumeFirstAcquire = resolve;
+    });
+    const acquire = repository.acquire.bind(repository);
+    let acquireCount = 0;
+    vi.spyOn(repository, "acquire").mockImplementation(async (input) => {
+      const result = await acquire(input);
+      acquireCount += 1;
+      if (acquireCount === 1) {
+        announceFirstAcquire?.();
+        await firstAcquireBarrier;
+      }
+      return result;
+    });
+
+    const staleAcquire = harness.gateway.requestLock(
+      socket as never,
+      { workId: "work-1", resourceId: "page:adopt-race", leaseMs: 15_000 },
+      undefined
+    );
+    await firstAcquireStored;
+    await expect(
+      harness.gateway.join(
+        socket as never,
+        { workId: "work-1", clientInstanceId: "client-editor-new-generation" },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: true });
+
+    const adopted = await harness.gateway.requestLock(
+      socket as never,
+      { workId: "work-1", resourceId: "page:adopt-race", leaseMs: 20_000 },
+      undefined
+    );
+    expect(adopted).toMatchObject({ ok: true });
+    if (!adopted.ok) throw new Error("new participant did not adopt the lease");
+
+    resumeFirstAcquire?.();
+    await expect(staleAcquire).resolves.toMatchObject({ ok: false, code: "forbidden" });
+    await expect(repository.list("work-1")).resolves.toEqual([
+      expect.objectContaining({
+        resourceId: "page:adopt-race",
+        leaseId: adopted.data.lock.leaseId,
+        ownerConnectionId: socket.id,
+      }),
+    ]);
   });
 
   it("does not authorize an old-work lock with a newer work participant", async () => {
@@ -1489,6 +2085,271 @@ describe("StudioLiveGateway", () => {
         decision: "approved",
       },
     });
+  });
+
+  it("relays every targeted screen/WebRTC event exactly once across two API nodes without private auth data", async () => {
+    const caller = createHarness();
+    const receiver = createHarness();
+    const sender = caller.socket(
+      "sender-connection",
+      "valid:private-sender-database-user"
+    );
+    const target = receiver.socket(
+      "target-connection",
+      "valid:private-target-database-user"
+    );
+    await connectAndJoin(caller, sender);
+    await connectAndJoin(receiver, target);
+    const bus = connectFakeInterServerBus(caller, receiver);
+
+    try {
+      const responses = await Promise.all([
+        caller.gateway.requestScreenAccess(
+          sender as never,
+          {
+            workId: "work-1",
+            targetConnectionId: target.id,
+            shareId: "share-cross-node",
+          },
+          undefined
+        ),
+        caller.gateway.relayScreenAccess(
+          sender as never,
+          {
+            workId: "work-1",
+            targetConnectionId: target.id,
+            shareId: "share-cross-node",
+            decision: "approved",
+          },
+          undefined
+        ),
+        caller.gateway.relaySignal(
+          sender as never,
+          {
+            workId: "work-1",
+            targetConnectionId: target.id,
+            shareId: "share-cross-node",
+            kind: "description",
+            description: { type: "offer", sdp: "v=0\r\ns=cluster\r\n" },
+          },
+          undefined
+        ),
+        caller.gateway.relaySignal(
+          sender as never,
+          {
+            workId: "work-1",
+            targetConnectionId: target.id,
+            shareId: "share-cross-node",
+            kind: "candidate",
+            candidate: { candidate: "candidate:cluster" },
+          },
+          undefined
+        ),
+        caller.gateway.relaySignal(
+          sender as never,
+          {
+            workId: "work-1",
+            targetConnectionId: target.id,
+            shareId: "share-cross-node",
+            kind: "bye",
+          },
+          undefined
+        ),
+      ]);
+
+      expect(responses).toHaveLength(5);
+      for (const response of responses) expect(response.ok).toBe(true);
+      const targeted = receiver.emissions.filter(
+        (emission) => emission.target === target.id
+      );
+      expect(
+        targeted.filter(({ event }) => event === "studio:screen:request")
+      ).toHaveLength(1);
+      expect(
+        targeted.filter(({ event }) => event === "studio:screen:access")
+      ).toHaveLength(1);
+      const signals = targeted.filter(({ event }) => event === "studio:signal");
+      expect(signals).toHaveLength(3);
+      expect(signals.map(({ payload }) => (payload as { kind: string }).kind).sort()).toEqual([
+        "bye",
+        "candidate",
+        "description",
+      ]);
+
+      expect(bus.emissions).toHaveLength(5);
+      const serialized = JSON.stringify(bus.emissions);
+      expect(serialized).not.toContain("private-sender-database-user");
+      expect(serialized).not.toContain("private-target-database-user");
+      expect(serialized).not.toContain("authPrincipal");
+      expect(serialized).not.toContain("authUserId");
+      expect(serialized).not.toContain("sessionVersion");
+      expect(serialized).not.toContain("expiresAt");
+      expect(serialized).not.toContain('"userId"');
+      for (const emission of bus.emissions) {
+        expect(emission.payload).toMatchObject({
+          workId: "work-1",
+          targetConnectionId: target.id,
+          deadlineAt: expect.any(Number),
+          sender: {
+            connectionId: sender.id,
+            name: "어시스턴트",
+          },
+          relay: expect.any(Object),
+        });
+        expect(Object.keys(emission.payload as object).sort()).toEqual([
+          "deadlineAt",
+          "relay",
+          "sender",
+          "targetConnectionId",
+          "workId",
+        ]);
+      }
+    } finally {
+      bus.destroy();
+    }
+  });
+
+  it("fails closed across nodes when the target switches work, loses access, or disconnects", async () => {
+    let blockSwitchRecheck = false;
+    let resolveSwitchRecheck: (() => void) | null = null;
+    let announceSwitchRecheck: (() => void) | null = null;
+    const switchRecheckStarted = new Promise<void>((resolve) => {
+      announceSwitchRecheck = resolve;
+    });
+    let revokedUserId: string | null = null;
+    const caller = createHarness();
+    const receiver = createHarness(async (userId, workId) => {
+      if (
+        blockSwitchRecheck &&
+        userId === "switch-target-user" &&
+        workId === "work-1"
+      ) {
+        announceSwitchRecheck?.();
+        await new Promise<void>((resolve) => {
+          resolveSwitchRecheck = resolve;
+        });
+      }
+      return teamSnapshot(userId, workId, { view: userId !== revokedUserId });
+    });
+    const sender = caller.socket("sender-node-a", "valid:sender-user");
+    const switchingTarget = receiver.socket(
+      "switch-target",
+      "valid:switch-target-user"
+    );
+    await connectAndJoin(caller, sender);
+    await connectAndJoin(receiver, switchingTarget);
+    const bus = connectFakeInterServerBus(caller, receiver);
+
+    try {
+      blockSwitchRecheck = true;
+      const switchingRelay = caller.gateway.requestScreenAccess(
+        sender as never,
+        {
+          workId: "work-1",
+          targetConnectionId: switchingTarget.id,
+          shareId: "share-switch",
+        },
+        undefined
+      );
+      await switchRecheckStarted;
+      const switched = await connectAndJoin(receiver, switchingTarget, "work-2");
+      expect(switched.ok).toBe(true);
+      resolveSwitchRecheck?.();
+      await expect(switchingRelay).resolves.toMatchObject({
+        ok: false,
+        code: "peer_unavailable",
+      });
+
+      const revokedTarget = receiver.socket(
+        "revoked-target",
+        "valid:revoked-target-user"
+      );
+      await connectAndJoin(receiver, revokedTarget);
+      revokedUserId = "revoked-target-user";
+      await expect(
+        caller.gateway.requestScreenAccess(
+          sender as never,
+          {
+            workId: "work-1",
+            targetConnectionId: revokedTarget.id,
+            shareId: "share-revoked",
+          },
+          undefined
+        )
+      ).resolves.toMatchObject({ ok: false, code: "peer_unavailable" });
+      expect(revokedTarget.disconnected).toBe(true);
+
+      revokedUserId = null;
+      const disconnectedTarget = receiver.socket(
+        "disconnected-target",
+        "valid:disconnected-target-user"
+      );
+      await connectAndJoin(receiver, disconnectedTarget);
+      receiver.gateway.handleDisconnect(disconnectedTarget as never);
+      await expect(
+        caller.gateway.requestScreenAccess(
+          sender as never,
+          {
+            workId: "work-1",
+            targetConnectionId: disconnectedTarget.id,
+            shareId: "share-disconnected",
+          },
+          undefined
+        )
+      ).resolves.toMatchObject({ ok: false, code: "peer_unavailable" });
+
+      expect(
+        receiver.emissions.filter(
+          ({ event, payload }) =>
+            event === "studio:screen:request" &&
+            ["share-switch", "share-revoked", "share-disconnected"].includes(
+              (payload as { shareId?: string }).shareId ?? ""
+            )
+        )
+      ).toHaveLength(0);
+    } finally {
+      resolveSwitchRecheck?.();
+      bus.destroy();
+    }
+  });
+
+  it("bounds a stalled cross-node relay RPC at two seconds and emits nothing", async () => {
+    vi.useFakeTimers();
+    const caller = createHarness();
+    const receiver = createHarness();
+    const sender = caller.socket("stalled-sender", "valid:stalled-sender-user");
+    const target = receiver.socket("stalled-target", "valid:stalled-target-user");
+    const bus = connectFakeInterServerBus(caller, receiver);
+    try {
+      await connectAndJoin(caller, sender);
+      await connectAndJoin(receiver, target);
+      bus.setStalled(true);
+      const pending = caller.gateway.requestScreenAccess(
+        sender as never,
+        {
+          workId: "work-1",
+          targetConnectionId: target.id,
+          shareId: "share-stalled",
+        },
+        undefined
+      );
+
+      await vi.advanceTimersByTimeAsync(STUDIO_LIVE_RELAY_RPC_TIMEOUT_MS);
+      await expect(pending).resolves.toMatchObject({
+        ok: false,
+        code: "peer_unavailable",
+      });
+      expect(
+        receiver.emissions.some(
+          ({ event, payload }) =>
+            event === "studio:screen:request" &&
+            (payload as { shareId?: string }).shareId === "share-stalled"
+        )
+      ).toBe(false);
+    } finally {
+      bus.destroy();
+      vi.useRealTimers();
+    }
   });
 
   it("rejects self/cross-work screen relays and rechecks the sender session", async () => {
@@ -2703,15 +3564,20 @@ describe("StudioLiveGateway", () => {
 
     harness.gateway.handleDisconnect(socket as never);
 
+    expect(socket.data.studioParticipant).toBeUndefined();
+    expect(socket.data.studioWorkId).toBeUndefined();
+
     expect(harness.emissions).toContainEqual({
       target: "studio-live:work-1",
       event: "studio:presence:leave",
       payload: { connectionId: "editor", reason: "disconnect" },
     });
-    expect(harness.emissions).toContainEqual({
-      target: "studio-live:work-1",
-      event: "studio:lock:update",
-      payload: expect.objectContaining({ action: "released", resourceId: "element:1" }),
+    await vi.waitFor(() => {
+      expect(harness.emissions).toContainEqual({
+        target: "studio-live:work-1",
+        event: "studio:lock:update",
+        payload: expect.objectContaining({ action: "released", resourceId: "element:1" }),
+      });
     });
   });
 });

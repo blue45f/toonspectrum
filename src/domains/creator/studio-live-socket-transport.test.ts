@@ -221,6 +221,99 @@ describe("StudioLiveSocketTransport", () => {
     expect(socket.auth).toEqual({});
   });
 
+  it("replays bounded pre-ACK presence deltas over the adapter snapshot", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.holdEvents.add("studio:join");
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    const received: StudioLiveEnvelope[] = [];
+    transport.subscribe((value) => received.push(value as StudioLiveEnvelope));
+    const departed = serverParticipant(
+      "connection-departed",
+      "departed-client-instance",
+      "퇴장한 어시스턴트"
+    );
+    const departedAfterAck = serverParticipant(
+      "connection-departed-after-ack",
+      "departed-after-ack-client-instance",
+      "ACK 뒤 퇴장한 어시스턴트"
+    );
+
+    const connecting = transport.connect();
+    socket.serverEmit("studio:presence:update", {
+      ...remote,
+      state: "idle",
+      pageId: "page-after-snapshot",
+      updatedAt: new Date(NOW + 1).toISOString(),
+    });
+    socket.serverEmit("studio:presence:leave", {
+      connectionId: departed.connectionId,
+      reason: "disconnect",
+    });
+    socket.reply("studio:join", joinSuccess({
+      participants: [self, remote, departed, departedAfterAck],
+    }));
+    await connecting;
+    socket.serverEmit("studio:presence:update", {
+      ...remote,
+      state: "away",
+      pageId: "page-after-ack",
+      updatedAt: new Date(NOW + 2).toISOString(),
+    });
+    socket.serverEmit("studio:presence:leave", {
+      connectionId: departedAfterAck.connectionId,
+      reason: "disconnect",
+    });
+    activate(transport);
+
+    expect(received).toEqual([
+      expect.objectContaining({
+        kind: "presence:heartbeat",
+        sender: expect.objectContaining({ sessionId: remote.connectionId }),
+        payload: expect.objectContaining({
+          visibility: "idle",
+          pageId: "page-after-ack",
+        }),
+      }),
+    ]);
+    transport.close();
+  });
+
+  it("treats a rolling-deploy legacy presence snapshot as merge-only", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    const received: StudioLiveEnvelope[] = [];
+    transport.subscribe((value) => received.push(value as StudioLiveEnvelope));
+    await transport.connect();
+    activate(transport);
+    received.length = 0;
+
+    socket.serverEmit("studio:presence:snapshot", {
+      workId: "work-1",
+      participants: [self],
+    });
+    socket.serverEmit("studio:cursor", {
+      connectionId: remote.connectionId,
+      pageId: "page-still-present",
+      x: 0.25,
+      y: 0.75,
+    });
+
+    expect(received).toEqual([
+      expect.objectContaining({
+        kind: "cursor:update",
+        sender: expect.objectContaining({ sessionId: remote.connectionId }),
+        payload: expect.objectContaining({ pageId: "page-still-present" }),
+      }),
+    ]);
+    transport.close();
+  });
+
   it("translates authoritative participants and every targeted screen/WebRTC event", async () => {
     const socket = new FakeSocket({ sessionToken: TOKEN });
     const transport = new StudioLiveSocketTransport(context(), TOKEN, {

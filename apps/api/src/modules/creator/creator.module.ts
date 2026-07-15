@@ -5,6 +5,7 @@ import { CreatorController } from "./creator.controller";
 import { CreatorService } from "./creator.service";
 import { studioCrdtRepositoryProvider } from "./studio-crdt.repository";
 import { StudioCrdtService } from "./studio-crdt.service";
+import { studioLiveLockRepositoryProvider } from "./studio-live-lock.repository";
 import {
   StudioLiveGateway,
   studioLiveSessionAuthenticatorProvider,
@@ -16,6 +17,7 @@ import {
   providers: [
     creatorCollaborationRepositoryProvider,
     studioCrdtRepositoryProvider,
+    studioLiveLockRepositoryProvider,
     CreatorService,
     StudioCrdtService,
     studioLiveSessionAuthenticatorProvider,

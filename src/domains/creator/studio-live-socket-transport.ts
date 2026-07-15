@@ -43,6 +43,7 @@ const CONNECT_TIMEOUT_MS = 10_000;
 const CRDT_ACK_TIMEOUT_MS = 10_000;
 const MAX_TOKEN_LENGTH = 8_192;
 const MAX_SEEN_CRDT_UPDATE_IDS = 4_096;
+const MAX_PENDING_PRESENCE_CONNECTIONS = 2_048;
 
 type ServerRole = StudioLiveParticipant["role"];
 
@@ -55,7 +56,12 @@ interface ServerParticipant {
   pageId: string | null;
   tool: string | null;
   sharingScreen: boolean;
+  updatedAt: string;
 }
+
+type PendingPresenceDelta =
+  | { kind: "update"; participant: ServerParticipant }
+  | { kind: "leave"; connectionId: string };
 
 interface ServerLock {
   resourceId: string;
@@ -167,7 +173,9 @@ function parseParticipant(value: unknown): ServerParticipant | null {
     (value.state !== "active" && value.state !== "idle" && value.state !== "away") ||
     !nullableString(value.pageId, 160) ||
     !nullableString(value.tool, 48) ||
-    typeof value.sharingScreen !== "boolean"
+    typeof value.sharingScreen !== "boolean" ||
+    typeof value.updatedAt !== "string" ||
+    !Number.isFinite(Date.parse(value.updatedAt))
   ) {
     return null;
   }
@@ -180,6 +188,7 @@ function parseParticipant(value: unknown): ServerParticipant | null {
     pageId: value.pageId,
     tool: value.tool,
     sharingScreen: value.sharingScreen,
+    updatedAt: value.updatedAt,
   };
 }
 
@@ -288,6 +297,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
   private readonly sequenceByConnection = new Map<string, number>();
   private readonly shareIdByConnection = new Map<string, string>();
   private readonly locksByResource = new Map<string, ServerLock>();
+  private readonly pendingPresenceByConnection = new Map<string, PendingPresenceDelta>();
   private sessionToken: string | null;
   private selfConnectionId: string | null = null;
   private pendingInitialSnapshot: ServerJoinSnapshot | null = null;
@@ -587,6 +597,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.shareIdByConnection.clear();
     this.locksByResource.clear();
     this.pendingInitialSnapshot = null;
+    this.pendingPresenceByConnection.clear();
     this.selfConnectionId = null;
   }
 
@@ -613,6 +624,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.accessRevoked = true;
     this.joined = false;
     this.pendingInitialSnapshot = null;
+    this.pendingPresenceByConnection.clear();
     this.clearConnectTimeout();
     this.rejectConnect?.(new Error(message));
     this.clearConnectDeferred();
@@ -624,6 +636,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     if (this.closed) return;
     this.joined = false;
     this.selfConnectionId = null;
+    this.pendingPresenceByConnection.clear();
     this.rejectPendingCrdtOperations("연결이 끊겨 CRDT 작업을 다시 시도해야 합니다.");
     this.pendingCrdtPublishes.clear();
     if (this.accessRevoked) return;
@@ -649,6 +662,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.accessRevoked = true;
     this.joined = false;
     this.pendingInitialSnapshot = null;
+    this.pendingPresenceByConnection.clear();
     this.clearConnectTimeout();
     this.rejectConnect?.(new Error(message));
     this.clearConnectDeferred();
@@ -657,36 +671,100 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
   };
 
   private readonly onPresenceSnapshot = (value: unknown) => {
-    if (!this.ready) return;
     if (!isRecord(value) || value.workId !== this.context.workId || !Array.isArray(value.participants)) {
       return;
     }
     const participants = value.participants.map(parseParticipant);
     if (participants.some((participant) => participant === null)) return;
-    this.applyParticipants(participants as ServerParticipant[]);
+    if (!this.ready || this.pendingInitialSnapshot) {
+      for (const participant of participants as ServerParticipant[]) {
+        const delta = { kind: "update" as const, participant };
+        this.bufferPresenceDelta(delta);
+        if (this.ready) this.stagePresenceDelta(delta);
+      }
+      return;
+    }
+    // Older gateway versions broadcast process-local snapshots. Treat them as additive heartbeats
+    // so a rolling deployment cannot erase peers discovered through another adapter node.
+    for (const participant of participants as ServerParticipant[]) {
+      this.applyPresenceUpdate(participant);
+    }
   };
 
   private readonly onPresenceUpdate = (value: unknown) => {
-    if (!this.ready) return;
     const participant = parseParticipant(value);
     if (!participant) return;
+    if (!this.ready || this.pendingInitialSnapshot) {
+      const delta = { kind: "update" as const, participant };
+      this.bufferPresenceDelta(delta);
+      if (this.ready) this.stagePresenceDelta(delta);
+      return;
+    }
+    this.applyPresenceUpdate(participant);
+  };
+
+  private readonly onPresenceLeave = (value: unknown) => {
+    if (!isRecord(value) || !safeString(value.connectionId, 128)) return;
+    if (!this.ready || this.pendingInitialSnapshot) {
+      const delta = { kind: "leave" as const, connectionId: value.connectionId };
+      this.bufferPresenceDelta(delta);
+      if (this.ready) this.stagePresenceDelta(delta);
+      return;
+    }
+    this.applyPresenceLeave(value.connectionId);
+  };
+
+  private applyPresenceLeave(connectionId: string): void {
+    const participant = this.participants.get(connectionId);
+    this.participants.delete(connectionId);
+    this.shareIdByConnection.delete(connectionId);
+    if (!participant || participant.connectionId === this.selfConnectionId) return;
+    this.deliver(participant, "presence:leave", {});
+  }
+
+  private applyPresenceUpdate(participant: ServerParticipant): void {
+    const previous = this.participants.get(participant.connectionId);
+    if (previous && Date.parse(previous.updatedAt) > Date.parse(participant.updatedAt)) return;
     this.participants.set(participant.connectionId, participant);
     if (participant.connectionId === this.selfConnectionId) return;
     this.deliver(participant, "presence:heartbeat", {
       visibility: participant.state === "active" ? "active" : "idle",
       pageId: participant.pageId,
     });
-  };
+  }
 
-  private readonly onPresenceLeave = (value: unknown) => {
-    if (!this.ready) return;
-    if (!isRecord(value) || !safeString(value.connectionId, 128)) return;
-    const participant = this.participants.get(value.connectionId);
-    this.participants.delete(value.connectionId);
-    this.shareIdByConnection.delete(value.connectionId);
-    if (!participant || participant.connectionId === this.selfConnectionId) return;
-    this.deliver(participant, "presence:leave", {});
-  };
+  private bufferPresenceDelta(delta: PendingPresenceDelta): void {
+    if (this.closed || this.accessRevoked || !this.socket.connected || this.joinGeneration <= 0) {
+      return;
+    }
+    const connectionId = delta.kind === "update"
+      ? delta.participant.connectionId
+      : delta.connectionId;
+    const previous = this.pendingPresenceByConnection.get(connectionId);
+    if (
+      previous?.kind === "update" && delta.kind === "update" &&
+      Date.parse(previous.participant.updatedAt) > Date.parse(delta.participant.updatedAt)
+    ) {
+      return;
+    }
+    this.pendingPresenceByConnection.delete(connectionId);
+    this.pendingPresenceByConnection.set(connectionId, delta);
+    if (this.pendingPresenceByConnection.size <= MAX_PENDING_PRESENCE_CONNECTIONS) return;
+    const oldest = this.pendingPresenceByConnection.keys().next().value;
+    if (typeof oldest === "string") this.pendingPresenceByConnection.delete(oldest);
+  }
+
+  private stagePresenceDelta(delta: PendingPresenceDelta): void {
+    if (delta.kind === "leave") {
+      this.participants.delete(delta.connectionId);
+      this.shareIdByConnection.delete(delta.connectionId);
+      return;
+    }
+    const previous = this.participants.get(delta.participant.connectionId);
+    if (!previous || Date.parse(previous.updatedAt) <= Date.parse(delta.participant.updatedAt)) {
+      this.participants.set(delta.participant.connectionId, delta.participant);
+    }
+  }
 
   private readonly onCursor = (value: unknown) => {
     if (!this.ready) return;
@@ -876,6 +954,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     if (this.closed || !this.socket.connected || !this.sessionToken) return;
     const generation = ++this.joinGeneration;
     this.joined = false;
+    this.pendingPresenceByConnection.clear();
     this.emitStatus({
       state: "connecting",
       message: "작품 팀 권한을 확인하고 있습니다.",
@@ -901,14 +980,15 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
   }
 
   private acceptJoin(snapshot: ServerJoinSnapshot): void {
+    const reconciledSnapshot = this.reconcilePendingPresence(snapshot);
     const wasJoined = this.everJoined;
-    this.selfConnectionId = snapshot.self.connectionId;
+    this.selfConnectionId = reconciledSnapshot.self.connectionId;
     this.joined = true;
     this.everJoined = true;
-    this.pendingInitialSnapshot = snapshot;
+    this.pendingInitialSnapshot = reconciledSnapshot;
     // Stage the authoritative identity map immediately so an update arriving between join ACK and
     // the room's first heartbeat can still resolve lock owners and targeted connection ids.
-    for (const participant of snapshot.participants) {
+    for (const participant of reconciledSnapshot.participants) {
       this.participants.set(participant.connectionId, participant);
     }
     this.clearConnectTimeout();
@@ -922,8 +1002,31 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     if (wasJoined) this.flushInitialSnapshot();
   }
 
+  private reconcilePendingPresence(snapshot: ServerJoinSnapshot): ServerJoinSnapshot {
+    const participantsByConnection = new Map(
+      snapshot.participants.map((participant) => [participant.connectionId, participant])
+    );
+    for (const delta of this.pendingPresenceByConnection.values()) {
+      if (delta.kind === "leave") {
+        participantsByConnection.delete(delta.connectionId);
+        continue;
+      }
+      const previous = participantsByConnection.get(delta.participant.connectionId);
+      if (!previous || Date.parse(previous.updatedAt) <= Date.parse(delta.participant.updatedAt)) {
+        participantsByConnection.set(delta.participant.connectionId, delta.participant);
+      }
+    }
+    participantsByConnection.set(snapshot.self.connectionId, snapshot.self);
+    this.pendingPresenceByConnection.clear();
+    return {
+      ...snapshot,
+      participants: [...participantsByConnection.values()],
+    };
+  }
+
   private failJoin(message: string, recoverable: boolean, code?: string): void {
     this.joined = false;
+    this.pendingPresenceByConnection.clear();
     const state: StudioLiveTransportStatus["state"] = recoverable ? "error" : "revoked";
     this.emitStatus({ state, message, recoverable } as StudioLiveTransportStatus);
     if (!this.everJoined) {
@@ -958,6 +1061,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       this.accessRevoked = true;
       this.joined = false;
       this.pendingInitialSnapshot = null;
+      this.pendingPresenceByConnection.clear();
       this.socket.disconnect();
     }
   }
@@ -966,8 +1070,9 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     const snapshot = this.pendingInitialSnapshot;
     if (!snapshot || !this.ready) return;
     this.pendingInitialSnapshot = null;
-    this.applyParticipants(snapshot.participants);
-    this.applyLockSnapshot(snapshot.locks);
+    const reconciled = this.reconcilePendingPresence(snapshot);
+    this.applyParticipants(reconciled.participants);
+    this.applyLockSnapshot(reconciled.locks);
   }
 
   private applyParticipants(nextParticipants: ServerParticipant[]): void {

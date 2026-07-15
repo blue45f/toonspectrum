@@ -568,6 +568,63 @@ export const creatorWorkCrdtUpdateReceipts = pgTable(
   ]
 );
 
+// 실시간 편집의 짧은 임대 잠금. WebSocket gateway 프로세스 메모리가 아니라 PostgreSQL을
+// 권위 저장소로 사용하므로 여러 API 인스턴스가 같은 리소스를 동시에 승인할 수 없다. 연결이
+// 비정상 종료되더라도 expiresAt 이후 다른 편집자가 재획득하며, 정상 종료는 owner/lease 조건부
+// 삭제로 즉시 해제한다.
+export const creatorWorkLiveLocks = pgTable(
+  "creator_work_live_lock",
+  {
+    workId: text("workId").notNull(),
+    resourceId: text("resourceId").notNull(),
+    leaseId: text("leaseId").notNull(),
+    // Every acquire/renew mutation rotates this internal fencing token. It is never exposed to
+    // clients; stale authorization rollback may delete only the exact mutation it created.
+    acquisitionId: text("acquisitionId").notNull(),
+    ownerConnectionId: text("ownerConnectionId").notNull(),
+    ownerName: text("ownerName").notNull(),
+    expiresAt: timestamp("expiresAt", { mode: "date", withTimezone: true }).notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({
+      name: "creator_work_live_lock_work_fkey",
+      columns: [t.workId],
+      foreignColumns: [creatorWorks.id],
+    }).onDelete("cascade"),
+    primaryKey({
+      name: "creator_work_live_lock_pkey",
+      columns: [t.workId, t.resourceId],
+    }),
+    index("idx_creator_work_live_lock_expiry").on(t.expiresAt),
+    check(
+      "creator_work_live_lock_resource_id_check",
+      sql`length(${t.resourceId}) between 1 and 200`
+    ),
+    check(
+      "creator_work_live_lock_lease_id_check",
+      sql`length(${t.leaseId}) between 1 and 80`
+    ),
+    check(
+      "creator_work_live_lock_acquisition_id_check",
+      sql`length(${t.acquisitionId}) between 1 and 80`
+    ),
+    check(
+      "creator_work_live_lock_connection_id_check",
+      sql`length(${t.ownerConnectionId}) between 1 and 128`
+    ),
+    check(
+      "creator_work_live_lock_owner_name_check",
+      sql`length(${t.ownerName}) between 1 and 80`
+    ),
+    check(
+      "creator_work_live_lock_expiry_order_check",
+      sql`${t.expiresAt} > ${t.createdAt}`
+    ),
+  ]
+);
+
 // 작품 소유자는 creator_work.userId로 판정하며 이 테이블에는 넣지 않는다. 멤버 행은 초대부터
 // 수락/거절까지의 상태를 보존해 팀 관리 API와 이후 실시간 presence 권한의 단일 근거로 사용한다.
 export const creatorWorkCollaborators = pgTable(
