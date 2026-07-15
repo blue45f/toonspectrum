@@ -404,6 +404,34 @@ describe("StudioGpuTileRuntime", () => {
     expect(resources.created).toEqual([]);
   });
 
+  it("uses one global physical edge grid for adjacent tiles at fractional resolution", () => {
+    const leftTile = tile(0, 0);
+    const rightTile = tile(1, 0);
+    const options = {
+      resolutionScale: 1.3,
+      bytesPerPixel: 4,
+      maxTextureDimension2D: 8_192,
+    } as const;
+    const left = describeStudioGpuTileTexture(leftTile, CONTRACT, options)!;
+    const right = describeStudioGpuTileTexture(rightTile, CONTRACT, options)!;
+
+    expect(left.contentWidth).toBe(666);
+    expect(right.contentWidth).toBe(665);
+    expect(left.contentWidth + right.contentWidth).toBe(Math.round(1_024 * 1.3));
+    expect((leftTile.x - left.renderX) / left.renderWidth).toBeCloseTo(
+      left.contentX / left.width,
+      12
+    );
+    expect((leftTile.x + leftTile.width - left.renderX) / left.renderWidth).toBeCloseTo(
+      (left.contentX + left.contentWidth) / left.width,
+      12
+    );
+    expect((rightTile.x - right.renderX) / right.renderWidth).toBeCloseTo(
+      right.contentX / right.width,
+      12
+    );
+  });
+
   it("derives rgba16float budget cost and creates sampleable render-attachment textures", () => {
     const texture = { destroy: vi.fn() };
     const createTexture = vi.fn(() => texture);

@@ -1,5 +1,9 @@
 # Studio commercial residual closeout — 2026-07-15 (evening)
 
+> **2026-07-16 engine update:** G9b and G10b now have production vertical slices rather than being
+> blanket-deferred. See `docs/studio-crdt-webgpu-architecture-2026-07-16.md` for the exact authority
+> boundary, fail-closed behavior, and remaining raster/scene migration work.
+
 Finite competitor **기능 · 디자인 · UI/UX** residual batch after full-area visual + icon-first passes.  
 **No brand clones**, no ABR/cs3*, no unbounded “until parity with every install product.”
 

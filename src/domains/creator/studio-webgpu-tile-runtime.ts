@@ -3,6 +3,7 @@ import {
   type StudioGpuTile,
   type StudioGpuTileOperation,
   type StudioGpuTileState,
+  type StudioGpuTileStrokeExtension,
   type StudioGpuTileUpdateMode,
 } from "./studio-webgpu-tile-plan";
 
@@ -90,6 +91,7 @@ export interface StudioGpuTileRenderTask<Resource> {
   readonly operations: readonly StudioGpuTileOperation[];
   readonly previousOperationCount: number;
   readonly nextOperationCount: number;
+  readonly strokeExtension?: StudioGpuTileStrokeExtension;
 }
 
 export interface StudioGpuTilePreparedFrame<Resource> {
@@ -356,11 +358,25 @@ function validateState(
     && Object.is(state.tileSize, contract.tileSize)
     && Object.is(state.bleed, contract.bleed)
     && Array.isArray(state.operations)
-    && state.operations.every((operation) => (
-      typeof operation.id === "string"
-      && typeof operation.fingerprint === "string"
-      && typeof operation.signature === "string"
-    ));
+    && state.operations.every((operation) => {
+      const extensionMetadata = [
+        operation.strokeStyleSignature,
+        operation.pointSamplesSignature,
+        operation.pressureSamplesSignature,
+        operation.pointCount,
+      ];
+      const hasExtensionMetadata = extensionMetadata.some((value) => value !== undefined);
+      return typeof operation.id === "string"
+        && typeof operation.fingerprint === "string"
+        && typeof operation.signature === "string"
+        && (!hasExtensionMetadata || (
+          typeof operation.strokeStyleSignature === "string"
+          && typeof operation.pointSamplesSignature === "string"
+          && typeof operation.pressureSamplesSignature === "string"
+          && Number.isSafeInteger(operation.pointCount)
+          && (operation.pointCount ?? 0) >= 1
+        ));
+    });
 }
 
 function validateFrame(input: StudioGpuTileFrameInput): ValidatedFrame | null {
@@ -400,17 +416,33 @@ export function describeStudioGpuTileTexture(
   ) {
     return null;
   }
-  const contentX = Math.ceil(contract.bleed * options.resolutionScale);
-  const contentY = contentX;
-  const contentWidth = Math.max(1, Math.ceil(tile.width * options.resolutionScale));
-  const contentHeight = Math.max(1, Math.ceil(tile.height * options.resolutionScale));
+  // Content edges share one document-wide physical pixel grid. Independently rounding each tile's
+  // width makes two neighbours disagree at fractional scales (for example 512 * 1.3), which then
+  // crops a thin logical gap from both textures. Deriving width from the same rounded global edge
+  // keeps the right edge of one tile byte-identical to the left edge of the next.
+  const physicalLeft = Math.round(tile.x * options.resolutionScale);
+  const physicalTop = Math.round(tile.y * options.resolutionScale);
+  const physicalRight = Math.round((tile.x + tile.width) * options.resolutionScale);
+  const physicalBottom = Math.round((tile.y + tile.height) * options.resolutionScale);
+  if (![physicalLeft, physicalTop, physicalRight, physicalBottom].every(Number.isSafeInteger)) {
+    return null;
+  }
+  const contentWidth = Math.max(1, physicalRight - physicalLeft);
+  const contentHeight = Math.max(1, physicalBottom - physicalTop);
+  const horizontalContentScale = contentWidth / tile.width;
+  const verticalContentScale = contentHeight / tile.height;
+  const contentX = Math.ceil(contract.bleed * horizontalContentScale);
+  const contentY = Math.ceil(contract.bleed * verticalContentScale);
   const width = contentWidth + contentX * 2;
   const height = contentHeight + contentY * 2;
   const byteLength = width * height * options.bytesPerPixel;
-  const renderX = tile.x - contract.bleed;
-  const renderY = tile.y - contract.bleed;
-  const renderWidth = tile.width + contract.bleed * 2;
-  const renderHeight = tile.height + contract.bleed * 2;
+  // The logical render rect is derived from those exact physical crop edges. This makes
+  // `(tile.x - renderX) / renderWidth === contentX / width` (and the corresponding right/bottom
+  // equations) even when the requested resolution scale is fractional.
+  const renderX = tile.x - contentX / horizontalContentScale;
+  const renderY = tile.y - contentY / verticalContentScale;
+  const renderWidth = width / horizontalContentScale;
+  const renderHeight = height / verticalContentScale;
   if (
     width > options.maxTextureDimension2D
     || height > options.maxTextureDimension2D
@@ -605,6 +637,7 @@ export class StudioGpuTileRuntime<Resource> {
         operations: mode === "append" ? update?.operations ?? [] : state.operations,
         previousOperationCount: entry.renderedState?.operations.length ?? 0,
         nextOperationCount: state.operations.length,
+        strokeExtension: mode === "append" ? update?.strokeExtension : undefined,
       });
       targets.set(tile.id, state);
     }
@@ -631,7 +664,8 @@ export class StudioGpuTileRuntime<Resource> {
 
   /**
    * Call only after every operation was resolved to its exact stroke snapshot, every dab plan was
-   * complete (including the global safety cap), and all task submissions finished successfully.
+   * complete (including the frame-wide visible-task safety cap), and all task submissions finished
+   * successfully.
    * Any missing/incomplete task must use abortFrame so partially-written textures cannot survive.
    */
   public completeFrame(token: StudioGpuTileFrameToken): StudioGpuTileCompositeFrame<Resource> | null {

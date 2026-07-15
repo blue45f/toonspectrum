@@ -37,4 +37,28 @@ describe("StudioWebGpuCanvas", () => {
     expect(html).toContain('data-studio-gpu-frame-authorized="true"');
     expect(html).not.toContain("invisible");
   });
+
+  it("renders a bounded viewport surface instead of a full-height document surface", () => {
+    const html = renderToStaticMarkup(
+      <StudioWebGpuCanvas
+        width={800}
+        height={12_000}
+        surfaceBounds={{ left: 120, top: 4_800, width: 640, height: 720 }}
+        scaleX={1.875}
+        scaleY={25}
+        offsetX={-150}
+        offsetY={-80_000}
+        frameAuthorized
+      />
+    );
+
+    expect(html).toContain('data-studio-gpu-surface-width="640"');
+    expect(html).toContain('data-studio-gpu-surface-height="720"');
+    expect(html).toContain("left:120px");
+    expect(html).toContain("top:4800px");
+    expect(html).toContain("width:640px");
+    expect(html).toContain("height:720px");
+    expect(html).not.toContain("height:12000px");
+    expect(html).toContain('class="overflow-hidden absolute"');
+  });
 });

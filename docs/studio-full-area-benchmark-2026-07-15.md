@@ -1,5 +1,10 @@
 # Studio full-area competitor benchmark — 2026-07-15
 
+> **2026-07-16 engine update:** the `WebGPU / CRDT` deferred row below records the state of this
+> historical UI pass. A durable Yjs operation engine and retained, viewport-tiled WebGPU ink
+> compositor now ship as bounded vertical slices; see
+> `docs/studio-crdt-webgpu-architecture-2026-07-16.md`.
+
 IA + visual + drawing interaction only. **No brand clones**, no proprietary formats (ABR, cs3*).
 
 Sources: public Magma help, CSP/Photopea/Canva/Krita/Procreate/Ibis/MediBang/Pixlr/Sketchbook/Concepts/Fresco/AutoDraw product docs & screenshots; prior `docs/studio-competitor-features.md`, `docs/studio-commercial-gap-close-2026-07-15.md`.

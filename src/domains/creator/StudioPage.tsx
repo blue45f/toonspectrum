@@ -952,6 +952,7 @@ import {
   watermarkPlacement,
   type WatermarkSettings,
 } from "./studio-watermark";
+import { planStudioWebGpuViewportSurface } from "./studio-webgpu-viewport";
 import {
   STUDIO_WORKSPACE_LEFT_PANEL_WIDTH,
   STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH,
@@ -7258,10 +7259,15 @@ function StudioCuttoonEditor() {
     const onResize = () => updateScrollPosRef.current();
     wrap.addEventListener("scroll", onScroll, { passive: true });
     globalThis.addEventListener("resize", onResize);
+    const resizeObserver = typeof ResizeObserver === "undefined"
+      ? null
+      : new ResizeObserver(onResize);
+    resizeObserver?.observe(wrap);
     const timer = globalThis.setTimeout(onResize, 150);
     return () => {
       wrap.removeEventListener("scroll", onScroll);
       globalThis.removeEventListener("resize", onResize);
+      resizeObserver?.disconnect();
       globalThis.clearTimeout(timer);
       if (scrollRafRef.current !== null) {
         globalThis.cancelAnimationFrame(scrollRafRef.current);
@@ -18804,9 +18810,6 @@ function StudioCuttoonEditor() {
     && resolveStudioBrushRenderFamily(draft.brush ?? "pen") === "pen"
     && (draft.opacity ?? 1) >= 0.999
     && (draft.symmetry?.type ?? "none") === "none"
-    // Until the compositor is tiled, never downsample a tall/zoomed canvas to the device's common
-    // 8K texture limit. This conservative CSS-pixel guard preserves exact Konva preview quality.
-    && canvasH * effScale <= 4_096
       ? draft
       : null;
   const webGpuPreviewPoints = webGpuDraft
@@ -18835,6 +18838,17 @@ function StudioCuttoonEditor() {
         },
       ]
     : EMPTY_STUDIO_GPU_STROKES;
+  const webGpuViewportSurface = planStudioWebGpuViewportSurface({
+    documentWidth: CANVAS_W,
+    documentHeight: canvasH,
+    documentScale: effScale,
+    scrollLeft: scrollPos.left,
+    scrollTop: scrollPos.top,
+    viewportWidth: scrollPos.width,
+    viewportHeight: scrollPos.height,
+    flipX: canvasFlipH,
+  });
+  const webGpuPreviewAuthorized = webGpuViewportSurface !== null && webGpuPreviewReady;
 
   return (
     <StudioLiveCollaborationProvider
@@ -24052,7 +24066,7 @@ function StudioCuttoonEditor() {
                   </>
                 );
               })()}
-              {draft && !isolatedDynamicDraft && !(webGpuDraft && webGpuPreviewReady)
+              {draft && !isolatedDynamicDraft && !(webGpuDraft && webGpuPreviewAuthorized)
                 ? <StudioDrawNode el={draft} />
                 : null}
               <Transformer
@@ -24666,18 +24680,25 @@ function StudioCuttoonEditor() {
               </Layer>
             )}
           </Stage>
-          <Suspense fallback={null}>
-            <StudioWebGpuCanvas
-              className="pointer-events-none absolute inset-0 z-10"
-              width={CANVAS_W}
-              height={canvasH}
-              flipX={canvasFlipH}
-              strokes={webGpuPreviewStrokes}
-              frameAuthorized={webGpuPreviewReady}
-              onFrameInvalid={() => setWebGpuPreviewReady(false)}
-              onFrameReady={() => setWebGpuPreviewReady(true)}
-            />
-          </Suspense>
+          {webGpuViewportSurface ? (
+            <Suspense fallback={null}>
+              <StudioWebGpuCanvas
+                className="pointer-events-none z-10"
+                width={CANVAS_W}
+                height={canvasH}
+                surfaceBounds={webGpuViewportSurface.surface}
+                scaleX={webGpuViewportSurface.transform.scaleX}
+                scaleY={webGpuViewportSurface.transform.scaleY}
+                offsetX={webGpuViewportSurface.transform.offsetX}
+                offsetY={webGpuViewportSurface.transform.offsetY}
+                flipX={webGpuViewportSurface.transform.flipX}
+                strokes={webGpuPreviewStrokes}
+                frameAuthorized={webGpuPreviewAuthorized}
+                onFrameInvalid={() => setWebGpuPreviewReady(false)}
+                onFrameReady={() => setWebGpuPreviewReady(true)}
+              />
+            </Suspense>
+          ) : null}
           </div>
           {pageGrade.vignette > 0 && (
             <div

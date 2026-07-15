@@ -91,6 +91,44 @@ describe("studio WebGPU tile planning", () => {
     ]);
   });
 
+  it("treats an exact terminal live-stroke point suffix as an append", () => {
+    const initial = stroke({
+      points: [20, 40, 80, 40],
+      pressures: [0.4, 0.6],
+    });
+    const extended = stroke({
+      points: [20, 40, 80, 40, 140, 42],
+      pressures: [0.4, 0.6, 0.8],
+    });
+    const previous = planStudioGpuTileStates([initial], DOCUMENT);
+    const [update] = diffStudioGpuTileStates(
+      previous,
+      planStudioGpuTileStates([extended], DOCUMENT)
+    );
+
+    expect(update).toMatchObject({
+      mode: "append",
+      previousOperationCount: 1,
+      nextOperationCount: 1,
+      operations: [expect.objectContaining({ id: initial.id, pointCount: 3 })],
+      strokeExtension: {
+        previous: expect.objectContaining({ pointCount: 2 }),
+        next: expect.objectContaining({ pointCount: 3 }),
+      },
+    });
+
+    const changedPressurePrefix = stroke({
+      ...extended,
+      pressures: [0.4, 0.65, 0.8],
+    });
+    const changedPressureUpdate = diffStudioGpuTileStates(
+      previous,
+      planStudioGpuTileStates([changedPressurePrefix], DOCUMENT)
+    )[0]!;
+    expect(changedPressureUpdate.mode).toBe("rebuild");
+    expect(changedPressureUpdate.strokeExtension).toBeUndefined();
+  });
+
   it("rebuilds changed, deleted, and reordered old/new tile coverage without touching other tiles", () => {
     const stationary = stroke({ id: "stationary", orderKey: "a", points: [40, 700, 80, 700] });
     const moving = stroke({ id: "moving", orderKey: "b", points: [40, 40, 80, 40] });

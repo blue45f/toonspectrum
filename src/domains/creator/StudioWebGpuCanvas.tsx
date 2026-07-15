@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 
+
 import {
   StudioWebGpuEngine,
   type StudioGpuBackend,
@@ -7,6 +8,8 @@ import {
   type StudioGpuStroke,
   type StudioGpuViewTransform,
 } from "./studio-webgpu-engine";
+
+import type { StudioWebGpuSurfaceBounds } from "./studio-webgpu-viewport";
 
 import { cn } from "@/lib/utils";
 
@@ -17,6 +20,11 @@ export interface StudioWebGpuCanvasProps extends StudioGpuViewTransform {
   /** Logical document coordinates, independent of CSS zoom and device pixel ratio. */
   readonly width: number;
   readonly height: number;
+  /**
+   * Optional CSS bounds inside the scaled document. Supplying these keeps the presentation and
+   * backing surfaces viewport-sized while `width`/`height` continue to describe document space.
+   */
+  readonly surfaceBounds?: StudioWebGpuSurfaceBounds;
   /**
    * Ordered operations composited inside this surface. `erase` strokes destination-out only pixels
    * produced by earlier strokes in this array; they intentionally cannot punch through DOM/Konva
@@ -41,6 +49,10 @@ interface LatestCanvasProps {
   offsetX: number | undefined;
   offsetY: number | undefined;
   flipX: boolean | undefined;
+  surfaceLeft: number | undefined;
+  surfaceTop: number | undefined;
+  surfaceWidth: number | undefined;
+  surfaceHeight: number | undefined;
 }
 
 function sameNumberArray(
@@ -71,6 +83,10 @@ function sameCanvasRequest(left: LatestCanvasProps, right: LatestCanvasProps): b
     && Object.is(left.offsetX, right.offsetX)
     && Object.is(left.offsetY, right.offsetY)
     && left.flipX === right.flipX
+    && Object.is(left.surfaceLeft, right.surfaceLeft)
+    && Object.is(left.surfaceTop, right.surfaceTop)
+    && Object.is(left.surfaceWidth, right.surfaceWidth)
+    && Object.is(left.surfaceHeight, right.surfaceHeight)
     && left.strokes.length === right.strokes.length
     && left.strokes.every((stroke, index) => sameStroke(stroke, right.strokes[index]!));
 }
@@ -104,6 +120,7 @@ export function StudioWebGpuCanvas({
   className,
   width,
   height,
+  surfaceBounds,
   strokes = EMPTY_STROKES,
   frameAuthorized = false,
   scaleX,
@@ -133,10 +150,27 @@ export function StudioWebGpuCanvas({
     offsetX,
     offsetY,
     flipX,
+    surfaceLeft: surfaceBounds?.left,
+    surfaceTop: surfaceBounds?.top,
+    surfaceWidth: surfaceBounds?.width,
+    surfaceHeight: surfaceBounds?.height,
   });
 
   callbacksRef.current = { onBackendChange, onDeviceLost, onFrameReady, onFrameInvalid };
-  latestRef.current = { width, height, strokes, scaleX, scaleY, offsetX, offsetY, flipX };
+  latestRef.current = {
+    width,
+    height,
+    strokes,
+    scaleX,
+    scaleY,
+    offsetX,
+    offsetY,
+    flipX,
+    surfaceLeft: surfaceBounds?.left,
+    surfaceTop: surfaceBounds?.top,
+    surfaceWidth: surfaceBounds?.width,
+    surfaceHeight: surfaceBounds?.height,
+  };
 
   useEffect(() => {
     const canvas = gpuCanvasRef.current;
@@ -160,7 +194,11 @@ export function StudioWebGpuCanvas({
 
     const syncViewport = (observedWidth?: number, observedHeight?: number) => {
       const latest = latestRef.current;
-      const measured = measuredCssSize(rootRef.current, latest.width, latest.height);
+      const measured = measuredCssSize(
+        rootRef.current,
+        latest.surfaceWidth ?? latest.width,
+        latest.surfaceHeight ?? latest.height
+      );
       engine.resize({
         logicalWidth: latest.width,
         logicalHeight: latest.height,
@@ -221,7 +259,11 @@ export function StudioWebGpuCanvas({
     callbacksRef.current.onFrameInvalid?.();
     const engine = engineRef.current;
     if (!engine) return;
-    const measured = measuredCssSize(rootRef.current, latest.width, latest.height);
+    const measured = measuredCssSize(
+      rootRef.current,
+      latest.surfaceWidth ?? latest.width,
+      latest.surfaceHeight ?? latest.height
+    );
     engine.resize({
       logicalWidth: latest.width,
       logicalHeight: latest.height,
@@ -242,12 +284,21 @@ export function StudioWebGpuCanvas({
       ref={rootRef}
       aria-hidden="true"
       className={cn(
-        "relative h-full w-full overflow-hidden",
+        "overflow-hidden",
+        surfaceBounds ? "absolute" : "relative h-full w-full",
         !frameAuthorized && "invisible",
         className
       )}
+      style={surfaceBounds ? {
+        left: surfaceBounds.left,
+        top: surfaceBounds.top,
+        width: surfaceBounds.width,
+        height: surfaceBounds.height,
+      } : undefined}
       data-studio-gpu-compositor="true"
       data-studio-gpu-frame-authorized={frameAuthorized ? "true" : "false"}
+      data-studio-gpu-surface-width={surfaceBounds?.width}
+      data-studio-gpu-surface-height={surfaceBounds?.height}
     >
       <canvas
         ref={gpuCanvasRef}

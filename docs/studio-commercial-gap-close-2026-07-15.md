@@ -1,5 +1,9 @@
 # Studio commercial gap-close (finite batch) — 2026-07-15
 
+> **2026-07-16 engine update:** the original #12 deferral is no longer the current implementation
+> status for CRDT/WebGPU. See `docs/studio-crdt-webgpu-architecture-2026-07-16.md` for the shipped
+> vertical slices and their explicit remaining boundaries.
+
 Goal: close a **finite, benchmark-backed** set of Studio gaps for Magma/CSP/Photopea/Canva/Krita/Pixlr/ibis-class **IA** (not brand clones). Unbounded “parity with every install product” is **out of contract**.
 
 Sources: `docs/studio-web-drawing-benchmark-2026-07-12.md`, `docs/studio-capability-audit-2026-07-12.md`, `docs/studio-competitor-features.md`, recent Studio chrome/menu/pointer work.

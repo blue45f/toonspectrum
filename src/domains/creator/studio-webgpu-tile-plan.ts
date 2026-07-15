@@ -2,7 +2,7 @@ import {
   orderStudioGpuStrokes,
   studioGpuPressureRadius,
   type StudioGpuStroke,
-} from "./studio-webgpu-engine";
+} from "./studio-webgpu-stroke";
 
 export const STUDIO_GPU_TILE_SIZE = 512;
 export const STUDIO_GPU_TILE_BLEED = 2;
@@ -26,6 +26,16 @@ export interface StudioGpuTileOperation {
   readonly fingerprint: string;
   /** Collision-free length-prefixed semantic snapshot of every render-affecting stroke field. */
   readonly signature: string;
+  /** Exact metadata used only to prove that the terminal live stroke is an immutable point suffix. */
+  readonly strokeStyleSignature?: string;
+  readonly pointSamplesSignature?: string;
+  readonly pressureSamplesSignature?: string;
+  readonly pointCount?: number;
+}
+
+export interface StudioGpuTileStrokeExtension {
+  readonly previous: StudioGpuTileOperation;
+  readonly next: StudioGpuTileOperation;
 }
 
 export interface StudioGpuTileState extends StudioGpuTile {
@@ -59,6 +69,8 @@ export interface StudioGpuTileUpdate {
   readonly operations: readonly StudioGpuTileOperation[];
   readonly previousOperationCount: number;
   readonly nextOperationCount: number;
+  /** Present only when the final operation itself grew by an exact immutable point suffix. */
+  readonly strokeExtension?: StudioGpuTileStrokeExtension;
 }
 
 function finiteOr(value: unknown, fallback: number): number {
@@ -133,6 +145,41 @@ function semanticToken(value: string | number | undefined): string {
   const payload = typeof value === "number" ? stableNumber(value) : value;
   const type = typeof value === "number" ? "n" : "s";
   return `${type}${payload.length}:${payload}`;
+}
+
+function sequenceSignature(values: readonly number[]): string {
+  return values.map((value) => semanticToken(value)).join("");
+}
+
+function effectiveStrokePressure(stroke: StudioGpuStroke, index: number): number {
+  return clamp(finiteOr(stroke.pressures?.[index], 1), 0, 1);
+}
+
+function strokeStyleSignature(stroke: StudioGpuStroke): string {
+  return [
+    stroke.id,
+    stroke.color,
+    stroke.size,
+    stroke.opacity,
+    stroke.composite,
+    stroke.orderKey,
+  ].map((value) => semanticToken(value)).join("");
+}
+
+function operationForStudioGpuStroke(stroke: StudioGpuStroke): StudioGpuTileOperation {
+  const pointCount = Math.floor(stroke.points.length / 2);
+  return {
+    id: stroke.id,
+    fingerprint: fingerprintStudioGpuStroke(stroke),
+    signature: signatureStudioGpuStroke(stroke),
+    strokeStyleSignature: strokeStyleSignature(stroke),
+    pointSamplesSignature: sequenceSignature(stroke.points),
+    pressureSamplesSignature: sequenceSignature(Array.from(
+      { length: pointCount },
+      (_, index) => effectiveStrokePressure(stroke, index)
+    )),
+    pointCount,
+  };
 }
 
 /** Exact, immutable operation snapshot. Length prefixes make adjacent fields unambiguous. */
@@ -229,25 +276,49 @@ function tileRangeForRect(rect: StudioGpuRect, options: StudioGpuTilePlanOptions
 /** Builds ordered per-tile operation logs without allocating any GPU resources. */
 export function planStudioGpuTileStates(
   strokes: readonly StudioGpuStroke[],
-  options: StudioGpuTilePlanOptions
+  options: StudioGpuTilePlanOptions,
+  includedTiles?: readonly StudioGpuTile[]
 ): readonly StudioGpuTileState[] {
   const dimensions = normalizeDimensions(options);
   const operationsByTile = new Map<string, StudioGpuTileOperation[]>();
+  const includedIds = includedTiles === undefined
+    ? null
+    : new Set(includedTiles.map(({ id }) => id));
+  if (includedIds?.size === 0) return [];
+  const includedRange = includedTiles && includedTiles.length > 0
+    ? includedTiles.reduce((range, tile) => ({
+        minimumColumn: Math.min(range.minimumColumn, tile.column),
+        maximumColumn: Math.max(range.maximumColumn, tile.column),
+        minimumRow: Math.min(range.minimumRow, tile.row),
+        maximumRow: Math.max(range.maximumRow, tile.row),
+      }), {
+        minimumColumn: Number.POSITIVE_INFINITY,
+        maximumColumn: Number.NEGATIVE_INFINITY,
+        minimumRow: Number.POSITIVE_INFINITY,
+        maximumRow: Number.NEGATIVE_INFINITY,
+      })
+    : null;
 
   for (const stroke of orderStudioGpuStrokes(strokes)) {
     const bounds = boundsForStudioGpuStroke(stroke, dimensions.bleed);
     if (!bounds) continue;
     const range = tileRangeForRect(bounds, dimensions);
     if (!range) continue;
-    const signature = signatureStudioGpuStroke(stroke);
-    const operation = {
-      id: stroke.id,
-      fingerprint: fingerprintStudioGpuStroke(stroke),
-      signature,
-    };
+    if (
+      includedRange && (
+        range.maximumColumn < includedRange.minimumColumn ||
+        range.minimumColumn > includedRange.maximumColumn ||
+        range.maximumRow < includedRange.minimumRow ||
+        range.minimumRow > includedRange.maximumRow
+      )
+    ) {
+      continue;
+    }
+    const operation = operationForStudioGpuStroke(stroke);
     for (let row = range.minimumRow; row <= range.maximumRow; row += 1) {
       for (let column = range.minimumColumn; column <= range.maximumColumn; column += 1) {
         const id = tileId(column, row);
+        if (includedIds && !includedIds.has(id)) continue;
         const operations = operationsByTile.get(id) ?? [];
         operations.push(operation);
         operationsByTile.set(id, operations);
@@ -334,6 +405,41 @@ function isStrictSequencePrefix(
   ));
 }
 
+function terminalStrokeExtension(
+  previous: readonly StudioGpuTileOperation[],
+  next: readonly StudioGpuTileOperation[]
+): StudioGpuTileStrokeExtension | null {
+  if (previous.length === 0 || previous.length !== next.length) return null;
+  const terminalIndex = previous.length - 1;
+  if (!previous.slice(0, terminalIndex).every((operation, index) => (
+    sameOperation(operation, next[index]!)
+  ))) {
+    return null;
+  }
+  const before = previous[terminalIndex]!;
+  const after = next[terminalIndex]!;
+  if (
+    before.id !== after.id
+    || before.strokeStyleSignature === undefined
+    || before.pointSamplesSignature === undefined
+    || before.pressureSamplesSignature === undefined
+    || before.pointCount === undefined
+    || after.strokeStyleSignature !== before.strokeStyleSignature
+    || after.pointSamplesSignature === undefined
+    || after.pressureSamplesSignature === undefined
+    || after.pointCount === undefined
+    || !Number.isSafeInteger(before.pointCount)
+    || !Number.isSafeInteger(after.pointCount)
+    || before.pointCount < 1
+    || after.pointCount <= before.pointCount
+    || !after.pointSamplesSignature.startsWith(before.pointSamplesSignature)
+    || !after.pressureSamplesSignature.startsWith(before.pressureSamplesSignature)
+  ) {
+    return null;
+  }
+  return { previous: before, next: after };
+}
+
 function sameTileContract(left: StudioGpuTileState, right: StudioGpuTileState): boolean {
   return left.id === right.id
     && left.column === right.column
@@ -375,6 +481,19 @@ export function diffStudioGpuTileStates(
           operations: [],
           previousOperationCount: previousOperations.length,
           nextOperationCount: nextOperations.length,
+        };
+      }
+      const strokeExtension = contractMatches
+        ? terminalStrokeExtension(previousOperations, nextOperations)
+        : null;
+      if (strokeExtension) {
+        return {
+          tile,
+          mode: "append",
+          operations: [strokeExtension.next],
+          previousOperationCount: previousOperations.length,
+          nextOperationCount: nextOperations.length,
+          strokeExtension,
         };
       }
       if (

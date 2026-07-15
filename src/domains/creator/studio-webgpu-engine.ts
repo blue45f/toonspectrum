@@ -1,17 +1,31 @@
 import { parseStudioGpuColor } from "./studio-webgpu-color";
+import {
+  orderStudioGpuStrokes,
+  studioGpuPressureRadius,
+  STUDIO_GPU_MAX_BRUSH_SIZE,
+  type StudioGpuComposite,
+  type StudioGpuStroke,
+} from "./studio-webgpu-stroke";
+import {
+  packStudioGpuTileDabs,
+  planStudioGpuTilePresentation,
+  planStudioGpuVisibleTileFrame,
+  resolveStudioGpuTileTasks,
+} from "./studio-webgpu-tile-compositor";
+import {
+  createStudioGpuTileTextureFactory,
+  StudioGpuTileRuntime,
+  type StudioGpuTileFrameToken,
+} from "./studio-webgpu-tile-runtime";
 
-export type StudioGpuComposite = "normal" | "erase";
+import type { StudioGpuRect } from "./studio-webgpu-tile-plan";
 
-export interface StudioGpuStroke {
-  readonly id: string;
-  readonly points: readonly number[];
-  readonly pressures?: readonly number[];
-  readonly color: string;
-  readonly size: number;
-  readonly opacity?: number;
-  readonly composite?: StudioGpuComposite;
-  readonly orderKey?: string;
-}
+export {
+  orderStudioGpuStrokes,
+  studioGpuPressureRadius,
+  STUDIO_GPU_MAX_BRUSH_SIZE,
+} from "./studio-webgpu-stroke";
+export type { StudioGpuComposite, StudioGpuStroke } from "./studio-webgpu-stroke";
 
 export interface StudioGpuViewTransform {
   readonly scaleX?: number;
@@ -105,8 +119,11 @@ export interface StudioGpuDabRenderUpdate extends PlannedStudioGpuDabs {
 const INSTANCE_FLOATS = 8;
 const INSTANCE_BYTES = INSTANCE_FLOATS * Float32Array.BYTES_PER_ELEMENT;
 export const STUDIO_GPU_MAX_DABS = 100_000;
-export const STUDIO_GPU_MAX_BRUSH_SIZE = 8_192;
+export const STUDIO_GPU_MAX_TILE_RESOLUTION_SCALE = 4;
 const DEFAULT_MAX_TEXTURE_DIMENSION = 8_192;
+const STUDIO_GPU_TILE_TEXTURE_FORMAT = "rgba8unorm" as const;
+const PRESENTATION_VERTEX_FLOATS = 4;
+const PRESENTATION_VERTEX_BYTES = PRESENTATION_VERTEX_FLOATS * Float32Array.BYTES_PER_ELEMENT;
 
 const STUDIO_GPU_BRUSH_SHADER = /* wgsl */ `
   struct VertexOutput {
@@ -151,6 +168,32 @@ const STUDIO_GPU_BRUSH_SHADER = /* wgsl */ `
   }
 `;
 
+const STUDIO_GPU_TILE_PRESENTATION_SHADER = /* wgsl */ `
+  struct VertexOutput {
+    @builtin(position) position: vec4<f32>,
+    @location(0) uv: vec2<f32>,
+  }
+
+  @group(0) @binding(0) var tile_sampler: sampler;
+  @group(0) @binding(1) var tile_texture: texture_2d<f32>;
+
+  @vertex
+  fn vs_main(
+    @location(0) position: vec2<f32>,
+    @location(1) uv: vec2<f32>,
+  ) -> VertexOutput {
+    var output: VertexOutput;
+    output.position = vec4<f32>(position, 0.0, 1.0);
+    output.uv = uv;
+    return output;
+  }
+
+  @fragment
+  fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
+    return textureSample(tile_texture, tile_sampler, input.uv);
+  }
+`;
+
 function finiteOr(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
@@ -185,17 +228,6 @@ function pointPressure(stroke: StudioGpuStroke, index: number): number {
   return clamp(finiteOr(stroke.pressures?.[index], 1), 0, 1);
 }
 
-export function studioGpuPressureRadius(size: number, pressure: number): number {
-  // Exact default-pen width contract used by StudioDrawNode after pressure resampling.
-  const safeSize = clamp(finiteOr(size, 1), 0.01, STUDIO_GPU_MAX_BRUSH_SIZE);
-  const safePressure = clamp(finiteOr(pressure, 1), 0, 1);
-  return Math.max(0.25, (safeSize * (0.3 + safePressure * 1.4)) / 2);
-}
-
-function compareCodeUnits(left: string, right: string): number {
-  return left < right ? -1 : left > right ? 1 : 0;
-}
-
 function stableFingerprintNumber(value: number): string {
   if (Number.isNaN(value)) return "NaN";
   if (value === Number.POSITIVE_INFINITY) return "+Infinity";
@@ -213,30 +245,6 @@ function updateFingerprint(hash: number, value: string | number | boolean | unde
   }
   next ^= 0;
   return Math.imul(next, 0x01000193) >>> 0;
-}
-
-export function orderStudioGpuStrokes(
-  strokes: readonly StudioGpuStroke[]
-): readonly StudioGpuStroke[] {
-  if (!strokes.some((stroke) => stroke.orderKey !== undefined)) return strokes;
-  return strokes
-    .map((stroke, index) => ({ stroke, index }))
-    .sort((left, right) => {
-      const leftKey = left.stroke.orderKey;
-      const rightKey = right.stroke.orderKey;
-      if (leftKey !== undefined && rightKey !== undefined) {
-        // CRDT operation order must be identical in every browser/locale. Relational string
-        // comparison follows the ECMAScript UTF-16 code-unit order and does not consult locale.
-        const order = compareCodeUnits(leftKey, rightKey);
-        if (order !== 0) return order;
-      } else if (leftKey !== undefined) {
-        return -1;
-      } else if (rightKey !== undefined) {
-        return 1;
-      }
-      return left.index - right.index;
-    })
-    .map(({ stroke }) => stroke);
 }
 
 function snapshotStudioGpuStrokes(
@@ -294,41 +302,137 @@ export function fingerprintStudioGpuFrame(
   return `${ordered.length}:${hash.toString(16).padStart(8, "0")}`;
 }
 
-/** CPU planning is shared by WebGPU and Canvas2D so fallback has identical geometry and ordering. */
-export function planStudioGpuDabs(strokes: readonly StudioGpuStroke[]): PlannedStudioGpuDabs {
+interface StudioGpuDabPlanOptions {
+  readonly clipRect: StudioGpuRect | null;
+  readonly maximumDabs: number;
+  readonly includeInitialDab: boolean;
+}
+
+function validClipRect(rect: StudioGpuRect): boolean {
+  return Number.isFinite(rect.x)
+    && Number.isFinite(rect.y)
+    && Number.isFinite(rect.width)
+    && Number.isFinite(rect.height)
+    && rect.width > 0
+    && rect.height > 0
+    && Number.isFinite(rect.x + rect.width)
+    && Number.isFinite(rect.y + rect.height);
+}
+
+/** Shared fail-closed validation for both full-frame and tiled render paths. */
+export function isValidStudioGpuStroke(stroke: StudioGpuStroke): boolean {
+  return Array.isArray(stroke.points)
+    && stroke.points.length >= 2
+    && stroke.points.length % 2 === 0
+    && stroke.points.every(Number.isFinite)
+    && (stroke.pressures === undefined || (
+      Array.isArray(stroke.pressures) && stroke.pressures.every(Number.isFinite)
+    ))
+    && typeof stroke.color === "string"
+    && parseStudioGpuColor(stroke.color) !== null
+    && Number.isFinite(stroke.size)
+    && stroke.size > 0
+    && stroke.size <= STUDIO_GPU_MAX_BRUSH_SIZE
+    && (stroke.opacity === undefined || (
+      Number.isFinite(stroke.opacity) && stroke.opacity >= 0 && stroke.opacity <= 1
+    ));
+}
+
+function dabIntersectsRect(
+  x: number,
+  y: number,
+  radius: number,
+  rect: StudioGpuRect
+): boolean {
+  const nearestX = clamp(x, rect.x, rect.x + rect.width);
+  const nearestY = clamp(y, rect.y, rect.y + rect.height);
+  return Math.hypot(x - nearestX, y - nearestY) <= radius;
+}
+
+interface StudioGpuSegmentClip {
+  readonly valid: boolean;
+  readonly interval: readonly [number, number] | null;
+}
+
+/**
+ * Returns the parameter interval whose dab centers can possibly touch the rectangle. The caller
+ * performs an exact circle/rectangle check because pressure can make the radius vary per dab.
+ */
+function clipStudioGpuSegment(
+  x: number,
+  y: number,
+  dx: number,
+  dy: number,
+  radius: number,
+  rect: StudioGpuRect
+): StudioGpuSegmentClip {
+  const minimumX = rect.x - radius;
+  const minimumY = rect.y - radius;
+  const maximumX = rect.x + rect.width + radius;
+  const maximumY = rect.y + rect.height + radius;
+  if (![minimumX, minimumY, maximumX, maximumY].every(Number.isFinite)) {
+    return { valid: false, interval: null };
+  }
+
+  let minimumAmount = 0;
+  let maximumAmount = 1;
+  for (const [origin, delta, minimum, maximum] of [
+    [x, dx, minimumX, maximumX],
+    [y, dy, minimumY, maximumY],
+  ] as const) {
+    if (delta === 0) {
+      if (origin < minimum || origin > maximum) {
+        return { valid: true, interval: null };
+      }
+      continue;
+    }
+    const first = (minimum - origin) / delta;
+    const second = (maximum - origin) / delta;
+    if (!Number.isFinite(first) || !Number.isFinite(second)) {
+      return { valid: false, interval: null };
+    }
+    minimumAmount = Math.max(minimumAmount, Math.min(first, second));
+    maximumAmount = Math.min(maximumAmount, Math.max(first, second));
+    if (minimumAmount > maximumAmount) {
+      return { valid: true, interval: null };
+    }
+  }
+  return {
+    valid: true,
+    interval: [clamp(minimumAmount, 0, 1), clamp(maximumAmount, 0, 1)],
+  };
+}
+
+function planStudioGpuDabsInternal(
+  strokes: readonly StudioGpuStroke[],
+  options: StudioGpuDabPlanOptions
+): PlannedStudioGpuDabs {
   const dabs: StudioGpuDab[] = [];
   const batches: StudioGpuBatch[] = [];
   let complete = true;
+  const { clipRect, maximumDabs, includeInitialDab } = options;
+
+  if (
+    !Number.isSafeInteger(maximumDabs)
+    || maximumDabs < 0
+    || (clipRect !== null && !validClipRect(clipRect))
+  ) {
+    return { dabs, batches, complete: false };
+  }
 
   for (const stroke of orderStudioGpuStrokes(strokes)) {
-    if (dabs.length >= STUDIO_GPU_MAX_DABS) {
+    // The unclipped Canvas2D/full-frame planner retains its historical truncation behavior. A
+    // clipped tile planner must continue validating off-tile operations after reaching the exact
+    // emitted-dab limit, because those operations consume no frame budget.
+    if (clipRect === null && dabs.length >= maximumDabs) {
       complete = false;
       break;
     }
-    if (
-      !Array.isArray(stroke.points)
-      || stroke.points.length < 2
-      || stroke.points.length % 2 !== 0
-      || (stroke.pressures !== undefined && !Array.isArray(stroke.pressures))
-      || typeof stroke.color !== "string"
-    ) {
+    if (!isValidStudioGpuStroke(stroke)) {
       complete = false;
       break;
     }
     const pointCount = stroke.points.length / 2;
-    if (
-      !Number.isFinite(stroke.size)
-      || stroke.size <= 0
-      || stroke.size > STUDIO_GPU_MAX_BRUSH_SIZE
-      || (stroke.opacity !== undefined && (
-        !Number.isFinite(stroke.opacity) || stroke.opacity < 0 || stroke.opacity > 1
-      ))
-      || stroke.points.some((coordinate) => !Number.isFinite(coordinate))
-      || stroke.pressures?.some((pressure) => !Number.isFinite(pressure)) === true
-    ) {
-      complete = false;
-      break;
-    }
     const size = stroke.size;
     const opacity = stroke.opacity ?? 1;
     const composite: StudioGpuComposite = stroke.composite === "erase" ? "erase" : "normal";
@@ -351,7 +455,9 @@ export function planStudioGpuDabs(strokes: readonly StudioGpuStroke[]): PlannedS
         invalidStroke = true;
         return;
       }
-      if (dabs.length >= STUDIO_GPU_MAX_DABS) {
+      const radius = studioGpuPressureRadius(size, pressure);
+      if (clipRect !== null && !dabIntersectsRect(x, y, radius, clipRect)) return;
+      if (dabs.length >= maximumDabs) {
         complete = false;
         capacityExceeded = true;
         return;
@@ -359,7 +465,7 @@ export function planStudioGpuDabs(strokes: readonly StudioGpuStroke[]): PlannedS
       dabs.push({
         x,
         y,
-        radius: studioGpuPressureRadius(size, pressure),
+        radius,
         red,
         green,
         blue,
@@ -371,7 +477,7 @@ export function planStudioGpuDabs(strokes: readonly StudioGpuStroke[]): PlannedS
     const firstX = stroke.points[0];
     const firstY = stroke.points[1];
     if (!Number.isFinite(firstX) || !Number.isFinite(firstY)) continue;
-    pushDab(firstX!, firstY!, pointPressure(stroke, 0));
+    if (includeInitialDab) pushDab(firstX!, firstY!, pointPressure(stroke, 0));
 
     for (
       let pointIndex = 1;
@@ -408,9 +514,41 @@ export function planStudioGpuDabs(strokes: readonly StudioGpuStroke[]): PlannedS
         invalidStroke = true;
         break;
       }
+      let firstStep = 1;
+      let lastStep = steps;
+      if (clipRect !== null) {
+        if (!Number.isSafeInteger(steps)) {
+          complete = false;
+          invalidStroke = true;
+          break;
+        }
+        const maximumRadius = Math.max(
+          studioGpuPressureRadius(size, p0),
+          studioGpuPressureRadius(size, p1)
+        );
+        const clipped = clipStudioGpuSegment(
+          x0!,
+          y0!,
+          dx,
+          dy,
+          maximumRadius,
+          clipRect
+        );
+        if (!clipped.valid) {
+          complete = false;
+          invalidStroke = true;
+          break;
+        }
+        if (!clipped.interval) continue;
+        const [minimumAmount, maximumAmount] = clipped.interval;
+        // Expand by one sample on both ends, then use the exact circle test in `pushDab`. This
+        // avoids losing a boundary dab to floating-point rounding without scanning the segment.
+        firstStep = Math.max(1, Math.floor(minimumAmount * steps) - 1);
+        lastStep = Math.min(steps, Math.ceil(maximumAmount * steps) + 1);
+      }
       for (
-        let step = 1;
-        step <= steps && !capacityExceeded && !invalidStroke;
+        let step = firstStep;
+        step <= lastStep && !capacityExceeded && !invalidStroke;
         step += 1
       ) {
         const amount = step / steps;
@@ -439,6 +577,63 @@ export function planStudioGpuDabs(strokes: readonly StudioGpuStroke[]): PlannedS
   }
 
   return { dabs, batches, complete };
+}
+
+/** CPU planning is shared by Canvas2D and non-tiled callers with identical geometry and ordering. */
+export function planStudioGpuDabs(strokes: readonly StudioGpuStroke[]): PlannedStudioGpuDabs {
+  return planStudioGpuDabsInternal(strokes, {
+    clipRect: null,
+    maximumDabs: STUDIO_GPU_MAX_DABS,
+    includeInitialDab: true,
+  });
+}
+
+/**
+ * Plans only round dabs whose coverage intersects one tile render rectangle. Segment step counts,
+ * pressure interpolation, and batch ordering remain byte-for-byte compatible with the full plan.
+ */
+export function planStudioGpuDabsInRect(
+  strokes: readonly StudioGpuStroke[],
+  clipRect: StudioGpuRect,
+  maximumDabs = STUDIO_GPU_MAX_DABS
+): PlannedStudioGpuDabs {
+  return planStudioGpuDabsInternal(strokes, {
+    clipRect,
+    maximumDabs,
+    includeInitialDab: true,
+  });
+}
+
+/** Plans the bridge from the retained endpoint plus only the newly appended point suffix. */
+export function planStudioGpuStrokeExtensionInRect(
+  stroke: StudioGpuStroke,
+  previousPointCount: number,
+  clipRect: StudioGpuRect,
+  maximumDabs = STUDIO_GPU_MAX_DABS
+): PlannedStudioGpuDabs {
+  const pointCount = stroke.points.length / 2;
+  if (
+    !Number.isSafeInteger(previousPointCount)
+    || previousPointCount < 1
+    || previousPointCount >= pointCount
+  ) {
+    return { dabs: [], batches: [], complete: false };
+  }
+  const suffixStart = previousPointCount - 1;
+  const suffixPointCount = pointCount - suffixStart;
+  const suffix: StudioGpuStroke = {
+    ...stroke,
+    points: stroke.points.slice(suffixStart * 2),
+    pressures: Array.from(
+      { length: suffixPointCount },
+      (_, index) => pointPressure(stroke, suffixStart + index)
+    ),
+  };
+  return planStudioGpuDabsInternal([suffix], {
+    clipRect,
+    maximumDabs,
+    includeInitialDab: false,
+  });
 }
 
 function sameStrokeStyle(previous: StudioGpuStroke, next: StudioGpuStroke): boolean {
@@ -610,38 +805,9 @@ function bufferUsage(): number {
   return 0x20 | 0x08;
 }
 
-function accumulationTextureUsage(): number {
-  // RENDER_ATTACHMENT (0x10) | COPY_SRC (0x01).
-  return 0x10 | 0x01;
-}
-
 function presentationTextureUsage(): number {
   // RENDER_ATTACHMENT (0x10) | COPY_DST (0x02).
   return 0x10 | 0x02;
-}
-
-function packGpuDabs(
-  dabs: readonly StudioGpuDab[],
-  viewport: NormalizedStudioGpuViewport
-): Float32Array {
-  const packed = new Float32Array(dabs.length * INSTANCE_FLOATS);
-  const { logicalWidth, logicalHeight, scaleX, scaleY, offsetX, offsetY, flipX } = viewport;
-  for (let index = 0; index < dabs.length; index += 1) {
-    const dab = dabs[index]!;
-    const transformedX = (flipX ? logicalWidth - dab.x : dab.x) * scaleX + offsetX;
-    const transformedY = dab.y * scaleY + offsetY;
-    const alpha = clamp(dab.alpha, 0, 1);
-    const offset = index * INSTANCE_FLOATS;
-    packed[offset] = (transformedX / logicalWidth) * 2 - 1;
-    packed[offset + 1] = 1 - (transformedY / logicalHeight) * 2;
-    packed[offset + 2] = (dab.radius * Math.abs(scaleX) / logicalWidth) * 2;
-    packed[offset + 3] = (dab.radius * Math.abs(scaleY) / logicalHeight) * 2;
-    packed[offset + 4] = dab.red * alpha;
-    packed[offset + 5] = dab.green * alpha;
-    packed[offset + 6] = dab.blue * alpha;
-    packed[offset + 7] = alpha;
-  }
-  return packed;
 }
 
 function safeDestroyDevice(device: GPUDevice | null): void {
@@ -662,15 +828,6 @@ function safeUnconfigure(context: GPUCanvasContext | null): void {
   }
 }
 
-function safeDestroyTexture(texture: GPUTexture | null): void {
-  if (!texture) return;
-  try {
-    texture.destroy();
-  } catch {
-    // A texture owned by a lost device is already unusable.
-  }
-}
-
 export class StudioWebGpuEngine {
   private readonly canvas: HTMLCanvasElement;
   private readonly fallbackCanvas: HTMLCanvasElement;
@@ -684,11 +841,26 @@ export class StudioWebGpuEngine {
   private format: GPUTextureFormat | null = null;
   private normalPipeline: GPURenderPipeline | null = null;
   private erasePipeline: GPURenderPipeline | null = null;
+  private presentationPipeline: GPURenderPipeline | null = null;
+  private presentationSampler: GPUSampler | null = null;
   private instanceBuffer: GPUBuffer | null = null;
   private instanceCapacity = 0;
-  private accumulationTexture: GPUTexture | null = null;
-  private accumulationWidth = 0;
-  private accumulationHeight = 0;
+  private presentationBuffer: GPUBuffer | null = null;
+  private presentationCapacity = 0;
+  private tileRuntime: StudioGpuTileRuntime<GPUTexture> | null = null;
+  private tileRuntimeDevice: GPUDevice | null = null;
+  private tileRuntimeResolutionScale = 0;
+  private activeTileFrame: {
+    readonly runtime: StudioGpuTileRuntime<GPUTexture>;
+    readonly token: StudioGpuTileFrameToken;
+    readonly device: GPUDevice;
+  } | null = null;
+  private webGpuRenderInFlight = false;
+  private pendingWebGpuRender: {
+    readonly strokes: readonly StudioGpuStroke[];
+    readonly requestId: string;
+    readonly frameGeneration: number;
+  } | null = null;
   private lifecycleGeneration = 0;
   private disposed = false;
   private viewport = normalizeViewport({ logicalWidth: 1, logicalHeight: 1 });
@@ -715,6 +887,26 @@ export class StudioWebGpuEngine {
 
   public async initialize(): Promise<StudioGpuBackend> {
     if (this.disposed) return this.backend;
+    if (this.backend === "webgpu" && this.device) return this.backend;
+    if (this.device) {
+      const previousDevice = this.device;
+      this.device = null;
+      this.normalPipeline = null;
+      this.erasePipeline = null;
+      this.presentationPipeline = null;
+      this.presentationSampler = null;
+      this.format = null;
+      this.instanceBuffer?.destroy();
+      this.instanceBuffer = null;
+      this.instanceCapacity = 0;
+      this.presentationBuffer?.destroy();
+      this.presentationBuffer = null;
+      this.presentationCapacity = 0;
+      this.destroyTileRuntime();
+      safeUnconfigure(this.context);
+      this.context = null;
+      safeDestroyDevice(previousDevice);
+    }
     const generation = ++this.lifecycleGeneration;
     this.activateCanvas2d();
     const ready = await this.initializeWebGpu(generation);
@@ -751,9 +943,7 @@ export class StudioWebGpuEngine {
       if (surface.width !== physicalWidth) surface.width = physicalWidth;
       if (surface.height !== physicalHeight) surface.height = physicalHeight;
     }
-    // Resizing a canvas discards its backing store. View-transform changes also invalidate every
-    // packed dab, even when the physical dimensions happen to remain unchanged.
-    this.destroyAccumulationTexture();
+    // Resizing discards presentation pixels; transforms also change visible-tile selection/quads.
     this.invalidateRenderedFrame();
     this.configureContext();
     this.render(this.lastStrokes);
@@ -761,7 +951,8 @@ export class StudioWebGpuEngine {
 
   public render(strokes: readonly StudioGpuStroke[], requestId = this.lastRequestId): void {
     if (this.disposed) return;
-    this.lastStrokes = strokes;
+    const strokeSnapshot = snapshotStudioGpuStrokes(strokes);
+    this.lastStrokes = strokeSnapshot;
     this.lastRequestId = requestId;
     const frameGeneration = this.invalidateFrameReceipt();
     if (
@@ -769,12 +960,24 @@ export class StudioWebGpuEngine {
       this.device &&
       this.context &&
       this.normalPipeline &&
-      this.erasePipeline
+      this.erasePipeline &&
+      this.presentationPipeline &&
+      this.presentationSampler
     ) {
-      this.renderWebGpu(strokes, requestId, frameGeneration);
+      const request = { strokes: strokeSnapshot, requestId, frameGeneration };
+      if (this.webGpuRenderInFlight) {
+        // Pointer input can outrun GPU completion. Keep only the newest request while allowing the
+        // submitted prefix frame to finish into its retained textures; cancelling here would
+        // destroy those textures and restart allocation on every pointermove.
+        this.pendingWebGpuRender = request;
+      } else {
+        this.startWebGpuRender(request);
+      }
       return;
     }
-    this.renderCanvas2d(strokes, requestId, frameGeneration);
+    this.pendingWebGpuRender = null;
+    this.cancelActiveTileFrame();
+    this.renderCanvas2d(strokeSnapshot, requestId, frameGeneration);
   }
 
   public clear(): void {
@@ -785,16 +988,22 @@ export class StudioWebGpuEngine {
     if (this.disposed) return;
     this.disposed = true;
     this.lifecycleGeneration += 1;
+    this.pendingWebGpuRender = null;
     this.invalidateFrameReceipt();
     const device = this.device;
     this.device = null;
     this.normalPipeline = null;
     this.erasePipeline = null;
+    this.presentationPipeline = null;
+    this.presentationSampler = null;
     this.format = null;
     this.instanceBuffer?.destroy();
     this.instanceBuffer = null;
     this.instanceCapacity = 0;
-    this.destroyAccumulationTexture();
+    this.presentationBuffer?.destroy();
+    this.presentationBuffer = null;
+    this.presentationCapacity = 0;
+    this.destroyTileRuntime();
     this.invalidateRenderedFrame();
     safeUnconfigure(this.context);
     this.context = null;
@@ -864,7 +1073,7 @@ export class StudioWebGpuEngine {
           entryPoint: "fs_main",
           targets: [
             {
-              format,
+              format: STUDIO_GPU_TILE_TEXTURE_FORMAT,
               blend: {
                 color: { srcFactor: "one", dstFactor: "one-minus-src-alpha", operation: "add" },
                 alpha: { srcFactor: "one", dstFactor: "one-minus-src-alpha", operation: "add" },
@@ -881,7 +1090,7 @@ export class StudioWebGpuEngine {
           entryPoint: "fs_main",
           targets: [
             {
-              format,
+              format: STUDIO_GPU_TILE_TEXTURE_FORMAT,
               blend: {
                 color: { srcFactor: "zero", dstFactor: "one-minus-src-alpha", operation: "add" },
                 alpha: { srcFactor: "zero", dstFactor: "one-minus-src-alpha", operation: "add" },
@@ -889,6 +1098,39 @@ export class StudioWebGpuEngine {
             },
           ],
         },
+      });
+      const presentationModule = device.createShaderModule({
+        label: "Studio retained tile presentation shader",
+        code: STUDIO_GPU_TILE_PRESENTATION_SHADER,
+      });
+      const presentationPipeline = device.createRenderPipeline({
+        label: "Studio retained tile presentation pipeline",
+        layout: "auto",
+        vertex: {
+          module: presentationModule,
+          entryPoint: "vs_main",
+          buffers: [{
+            arrayStride: PRESENTATION_VERTEX_BYTES,
+            stepMode: "vertex",
+            attributes: [
+              { shaderLocation: 0, offset: 0, format: "float32x2" },
+              { shaderLocation: 1, offset: 8, format: "float32x2" },
+            ],
+          }],
+        },
+        fragment: {
+          module: presentationModule,
+          entryPoint: "fs_main",
+          targets: [{ format }],
+        },
+        primitive: { topology: "triangle-list" },
+      });
+      const presentationSampler = device.createSampler({
+        label: "Studio retained tile linear sampler",
+        addressModeU: "clamp-to-edge",
+        addressModeV: "clamp-to-edge",
+        magFilter: "linear",
+        minFilter: "linear",
       });
       context.configure({
         device,
@@ -907,10 +1149,15 @@ export class StudioWebGpuEngine {
       this.format = format;
       this.normalPipeline = normalPipeline;
       this.erasePipeline = erasePipeline;
+      this.presentationPipeline = presentationPipeline;
+      this.presentationSampler = presentationSampler;
       this.instanceBuffer?.destroy();
       this.instanceBuffer = null;
       this.instanceCapacity = 0;
-      this.destroyAccumulationTexture();
+      this.presentationBuffer?.destroy();
+      this.presentationBuffer = null;
+      this.presentationCapacity = 0;
+      this.destroyTileRuntime();
       this.setBackend("webgpu");
       this.configureContext();
       void device.lost.then((info) => this.handleDeviceLost(device!, info));
@@ -929,11 +1176,16 @@ export class StudioWebGpuEngine {
     this.device = null;
     this.normalPipeline = null;
     this.erasePipeline = null;
+    this.presentationPipeline = null;
+    this.presentationSampler = null;
     this.format = null;
     this.instanceBuffer?.destroy();
     this.instanceBuffer = null;
     this.instanceCapacity = 0;
-    this.destroyAccumulationTexture();
+    this.presentationBuffer?.destroy();
+    this.presentationBuffer = null;
+    this.presentationCapacity = 0;
+    this.destroyTileRuntime();
     safeUnconfigure(this.context);
     this.activateCanvas2d();
     this.render(this.lastStrokes, this.lastRequestId);
@@ -957,7 +1209,8 @@ export class StudioWebGpuEngine {
   private setBackend(backend: StudioGpuBackend): void {
     const changed = this.backend !== backend;
     if (changed) {
-      this.destroyAccumulationTexture();
+      this.cancelActiveTileFrame();
+      if (backend === "canvas2d") this.destroyTileRuntime();
       this.invalidateRenderedFrame();
       this.invalidateFrameReceipt();
     }
@@ -1005,34 +1258,79 @@ export class StudioWebGpuEngine {
     return replacement;
   }
 
-  private destroyAccumulationTexture(): void {
-    safeDestroyTexture(this.accumulationTexture);
-    this.accumulationTexture = null;
-    this.accumulationWidth = 0;
-    this.accumulationHeight = 0;
+  private ensurePresentationBuffer(vertexCount: number): GPUBuffer | null {
+    if (!this.device || vertexCount <= 0) return null;
+    if (this.presentationBuffer && this.presentationCapacity >= vertexCount) {
+      return this.presentationBuffer;
+    }
+    let capacity = 256;
+    while (capacity < vertexCount) capacity *= 2;
+    const replacement = this.device.createBuffer({
+      label: "Studio retained tile presentation vertices",
+      size: capacity * PRESENTATION_VERTEX_BYTES,
+      usage: bufferUsage(),
+    });
+    this.presentationBuffer?.destroy();
+    this.presentationBuffer = replacement;
+    this.presentationCapacity = capacity;
+    return replacement;
   }
 
-  private ensureAccumulationTexture(): GPUTexture | null {
-    if (!this.device || !this.format) return null;
-    const width = Math.max(1, this.canvas.width);
-    const height = Math.max(1, this.canvas.height);
+  private requiredTileResolutionScale(): number {
+    const horizontal = this.viewport.cssWidth * this.viewport.dpr
+      / this.viewport.logicalWidth * this.viewport.scaleX;
+    const vertical = this.viewport.cssHeight * this.viewport.dpr
+      / this.viewport.logicalHeight * this.viewport.scaleY;
+    return Math.max(horizontal, vertical);
+  }
+
+  private tileResolutionScale(): number {
+    const horizontal = this.canvas.width / this.viewport.logicalWidth * this.viewport.scaleX;
+    const vertical = this.canvas.height / this.viewport.logicalHeight * this.viewport.scaleY;
+    return clamp(
+      Math.max(horizontal, vertical),
+      0.25,
+      STUDIO_GPU_MAX_TILE_RESOLUTION_SCALE
+    );
+  }
+
+  private ensureTileRuntime(device: GPUDevice): StudioGpuTileRuntime<GPUTexture> {
+    const resolutionScale = this.tileResolutionScale();
     if (
-      this.accumulationTexture &&
-      this.accumulationWidth === width &&
-      this.accumulationHeight === height
+      this.tileRuntime
+      && this.tileRuntimeDevice === device
+      && Object.is(this.tileRuntimeResolutionScale, resolutionScale)
     ) {
-      return this.accumulationTexture;
+      return this.tileRuntime;
     }
-    this.destroyAccumulationTexture();
-    this.accumulationTexture = this.device.createTexture({
-      label: "Studio retained brush compositor",
-      size: { width, height, depthOrArrayLayers: 1 },
-      format: this.format,
-      usage: accumulationTextureUsage(),
+    this.destroyTileRuntime();
+    this.tileRuntime = new StudioGpuTileRuntime({
+      resourceFactory: createStudioGpuTileTextureFactory(device, {
+        format: STUDIO_GPU_TILE_TEXTURE_FORMAT,
+      }),
+      resolutionScale,
+      maxTextureDimension2D: Math.max(
+        1,
+        Number(device.limits.maxTextureDimension2D ?? DEFAULT_MAX_TEXTURE_DIMENSION)
+      ),
     });
-    this.accumulationWidth = width;
-    this.accumulationHeight = height;
-    return this.accumulationTexture;
+    this.tileRuntimeDevice = device;
+    this.tileRuntimeResolutionScale = resolutionScale;
+    return this.tileRuntime;
+  }
+
+  private cancelActiveTileFrame(): void {
+    const active = this.activeTileFrame;
+    this.activeTileFrame = null;
+    if (active) active.runtime.abortFrame(active.token);
+  }
+
+  private destroyTileRuntime(): void {
+    this.cancelActiveTileFrame();
+    this.tileRuntime?.dispose();
+    this.tileRuntime = null;
+    this.tileRuntimeDevice = null;
+    this.tileRuntimeResolutionScale = 0;
   }
 
   private invalidateRenderedFrame(): void {
@@ -1086,19 +1384,114 @@ export class StudioWebGpuEngine {
     return this.renderedFrameComplete;
   }
 
-  private renderWebGpu(
+  private recordRenderedTileFrame(
+    strokes: readonly StudioGpuStroke[],
+    submittedDabCount: number
+  ): void {
+    // A tiled WebGPU frame is complete once every dirty visible-tile task and the presentation
+    // pass have finished. Re-planning the whole (potentially very tall) document here would make
+    // offscreen ink consume the visible frame's safety budget and defeat viewport-bounded work.
+    this.renderedStrokes = snapshotStudioGpuStrokes(strokes);
+    this.renderedBackend = this.backend;
+    this.renderedDabCount = submittedDabCount;
+    this.renderedFrameComplete = true;
+    this.renderedFrameInvalid = false;
+  }
+
+  private startWebGpuRender(request: {
+    readonly strokes: readonly StudioGpuStroke[];
+    readonly requestId: string;
+    readonly frameGeneration: number;
+  }): void {
+    this.webGpuRenderInFlight = true;
+    const finish = () => {
+      this.webGpuRenderInFlight = false;
+      const pending = this.pendingWebGpuRender;
+      this.pendingWebGpuRender = null;
+      if (!pending || this.disposed) return;
+      if (
+        pending.frameGeneration !== this.frameGeneration
+        || pending.requestId !== this.lastRequestId
+      ) {
+        return;
+      }
+      if (
+        this.backend === "webgpu"
+        && this.device
+        && this.context
+        && this.normalPipeline
+        && this.erasePipeline
+        && this.presentationPipeline
+        && this.presentationSampler
+      ) {
+        this.startWebGpuRender(pending);
+        return;
+      }
+      this.cancelActiveTileFrame();
+      this.renderCanvas2d(pending.strokes, pending.requestId, pending.frameGeneration);
+    };
+    void this.renderWebGpu(
+      request.strokes,
+      request.requestId,
+      request.frameGeneration
+    ).then(finish, finish);
+  }
+
+  private async renderWebGpu(
     strokes: readonly StudioGpuStroke[],
     requestId: string,
     frameGeneration: number
-  ): void {
-    const { device, context, normalPipeline, erasePipeline } = this;
-    if (!device || !context || !normalPipeline || !erasePipeline) return;
+  ): Promise<void> {
+    const {
+      device,
+      context,
+      normalPipeline,
+      erasePipeline,
+      presentationPipeline,
+      presentationSampler,
+    } = this;
+    if (
+      !device
+      || !context
+      || !normalPipeline
+      || !erasePipeline
+      || !presentationPipeline
+      || !presentationSampler
+    ) {
+      return;
+    }
+    let runtime: StudioGpuTileRuntime<GPUTexture> | null = null;
+    let token: StudioGpuTileFrameToken | null = null;
     try {
-      const update = this.planRenderUpdate(strokes);
-      const accumulationTexture = this.ensureAccumulationTexture();
-      if (!accumulationTexture) return;
-      const packed = packGpuDabs(update.dabs, this.viewport);
-      const instanceBuffer = this.ensureInstanceBuffer(update.dabs.length);
+      // A capped tile enlarged beyond its native physical density is visibly softer than Konva.
+      // Do not bless that degraded surface: the invalidation already makes the authoritative
+      // preview visible, and a later resize below the cap can request a fresh GPU handoff.
+      if (this.requiredTileResolutionScale() > STUDIO_GPU_MAX_TILE_RESOLUTION_SCALE) return;
+      // Tile bounds intentionally omit non-painting entries. Validate the source operations first
+      // so a malformed/empty stroke cannot disappear from every tile and receive a complete blank
+      // frame receipt that would hide the authoritative Konva preview.
+      if (!strokes.every(isValidStudioGpuStroke)) {
+        throw new Error("Studio WebGPU frame contains an invalid stroke");
+      }
+      const tileFrame = planStudioGpuVisibleTileFrame(strokes, this.viewport);
+      runtime = this.ensureTileRuntime(device);
+      const preparation = runtime.prepareFrame(tileFrame);
+      if (preparation.status !== "prepared") {
+        throw new Error(`Studio WebGPU tile frame rejected: ${preparation.reason}`);
+      }
+      token = preparation.token;
+      this.activeTileFrame = { runtime, token, device };
+
+      const resolved = resolveStudioGpuTileTasks(
+        preparation.tasks,
+        strokes,
+        planStudioGpuDabsInRect,
+        STUDIO_GPU_MAX_DABS,
+        planStudioGpuStrokeExtensionInRect
+      );
+      if (!resolved) throw new Error("Studio WebGPU tile operation resolution failed");
+      const packed = packStudioGpuTileDabs(resolved);
+      const instanceBuffer = this.ensureInstanceBuffer(resolved.dabCount);
       if (instanceBuffer && packed.byteLength > 0) {
         device.queue.writeBuffer(
           instanceBuffer,
@@ -1109,62 +1502,151 @@ export class StudioWebGpuEngine {
         );
       }
 
-      const encoder = device.createCommandEncoder({ label: "Studio brush compositor frame" });
-      const presentationTexture = context.getCurrentTexture();
+      if (preparation.tasks.length > 0) {
+        const encoder = device.createCommandEncoder({ label: "Studio retained tile render frame" });
+        for (const resolvedTask of resolved.tasks) {
+          const pass = encoder.beginRenderPass({
+            label: `Studio retained tile ${resolvedTask.task.tile.id}`,
+            colorAttachments: [{
+              view: resolvedTask.task.resource.createView(),
+              clearValue: { r: 0, g: 0, b: 0, a: 0 },
+              loadOp: resolvedTask.task.mode === "append" ? "load" : "clear",
+              storeOp: "store",
+            }],
+          });
+          if (instanceBuffer) {
+            pass.setVertexBuffer(0, instanceBuffer);
+            for (const batch of resolvedTask.plan.batches) {
+              pass.setPipeline(batch.composite === "erase" ? erasePipeline : normalPipeline);
+              pass.draw(
+                6,
+                batch.instanceCount,
+                0,
+                resolvedTask.firstInstance + batch.firstInstance
+              );
+            }
+          }
+          pass.end();
+        }
+        device.queue.submit([encoder.finish()]);
+        await this.submittedWork(device);
+      }
+
+      if (!this.isUsableWebGpuFrame(device, runtime, token)) {
+        runtime.abortFrame(token);
+        return;
+      }
+      const compositeFrame = runtime.completeFrame(token);
+      if (!compositeFrame) throw new Error("Studio WebGPU tile frame completion failed");
+      if (!this.isCurrentWebGpuFrame(device, runtime, token, requestId, frameGeneration)) {
+        // A newer pointer request arrived while this submitted prefix was running. The texture is
+        // fully written and therefore a safe retained base, but its pixels must never be presented
+        // or authorized. Commit/release it, then the one-slot pending queue renders only the latest
+        // suffix over that exact state.
+        runtime.releaseFrame(token);
+        if (this.activeTileFrame?.token === token) this.activeTileFrame = null;
+        return;
+      }
+      const presentation = planStudioGpuTilePresentation(compositeFrame, this.viewport);
+      const presentationBuffer = this.ensurePresentationBuffer(presentation.vertices.length / 4);
+      if (presentationBuffer && presentation.vertices.byteLength > 0) {
+        device.queue.writeBuffer(
+          presentationBuffer,
+          0,
+          presentation.vertices.buffer,
+          presentation.vertices.byteOffset,
+          presentation.vertices.byteLength
+        );
+      }
+
+      const encoder = device.createCommandEncoder({ label: "Studio retained tile presentation" });
       const pass = encoder.beginRenderPass({
-        label: "Studio transparent brush compositor",
-        colorAttachments: [
-          {
-            view: accumulationTexture.createView(),
-            clearValue: { r: 0, g: 0, b: 0, a: 0 },
-            loadOp: update.mode === "append" ? "load" : "clear",
-            storeOp: "store",
-          },
-        ],
+        label: "Studio retained tile presentation",
+        colorAttachments: [{
+          view: context.getCurrentTexture().createView(),
+          clearValue: { r: 0, g: 0, b: 0, a: 0 },
+          loadOp: "clear",
+          storeOp: "store",
+        }],
       });
-      if (instanceBuffer) {
-        pass.setVertexBuffer(0, instanceBuffer);
-        for (const batch of update.batches) {
-          pass.setPipeline(batch.composite === "erase" ? erasePipeline : normalPipeline);
-          pass.draw(6, batch.instanceCount, 0, batch.firstInstance);
+      if (presentationBuffer && presentation.draws.length > 0) {
+        pass.setPipeline(presentationPipeline);
+        pass.setVertexBuffer(0, presentationBuffer);
+        const bindGroupLayout = presentationPipeline.getBindGroupLayout(0);
+        for (const draw of presentation.draws) {
+          pass.setBindGroup(0, device.createBindGroup({
+            label: `Studio retained tile ${draw.tileId} presentation bindings`,
+            layout: bindGroupLayout,
+            entries: [
+              { binding: 0, resource: presentationSampler },
+              { binding: 1, resource: draw.resource.createView() },
+            ],
+          }));
+          pass.draw(draw.vertexCount, 1, draw.firstVertex, 0);
         }
       }
       pass.end();
-      encoder.copyTextureToTexture(
-        { texture: accumulationTexture },
-        { texture: presentationTexture },
-        {
-          width: this.canvas.width,
-          height: this.canvas.height,
-          depthOrArrayLayers: 1,
-        }
-      );
       device.queue.submit([encoder.finish()]);
-      const complete = this.recordRenderedFrame(strokes, update);
-      if (complete) {
-        const receipt = this.createFrameReceipt(strokes, requestId);
-        const submitted = typeof device.queue.onSubmittedWorkDone === "function"
-          ? device.queue.onSubmittedWorkDone()
-          : Promise.resolve();
-        void submitted.then(() => {
-          if (
-            !this.disposed
-            && frameGeneration === this.frameGeneration
-            && requestId === this.lastRequestId
-            && this.backend === "webgpu"
-          ) {
-            this.options.onFrameReady?.(receipt);
-          }
-        }).catch(() => {
-          if (frameGeneration === this.frameGeneration) this.invalidateFrameReceipt();
-        });
+      await this.submittedWork(device);
+
+      const released = runtime.releaseFrame(token);
+      if (this.activeTileFrame?.token === token) this.activeTileFrame = null;
+      if (
+        !released
+        || !this.isCurrentWebGpuFrame(device, runtime, token, requestId, frameGeneration, false)
+      ) {
+        return;
       }
+      this.recordRenderedTileFrame(strokes, resolved.dabCount);
+      this.options.onFrameReady?.(this.createFrameReceipt(strokes, requestId));
     } catch {
+      if (runtime && token) runtime.abortFrame(token);
+      if (this.activeTileFrame?.token === token) this.activeTileFrame = null;
       // Validation/context errors do not always resolve `device.lost`. Fail visibly-safe for this
       // session instead of leaving a selected but blank GPU surface above the authoritative scene.
-      this.activateCanvas2d();
-      this.render(strokes, requestId);
+      if (
+        !this.disposed
+        && frameGeneration === this.frameGeneration
+        && requestId === this.lastRequestId
+        && this.device === device
+        && this.backend === "webgpu"
+      ) {
+        this.activateCanvas2d();
+        this.render(strokes, requestId);
+      }
     }
+  }
+
+  private submittedWork(device: GPUDevice): Promise<void> {
+    return typeof device.queue.onSubmittedWorkDone === "function"
+      ? device.queue.onSubmittedWorkDone()
+      : Promise.resolve();
+  }
+
+  private isCurrentWebGpuFrame(
+    device: GPUDevice,
+    runtime: StudioGpuTileRuntime<GPUTexture>,
+    token: StudioGpuTileFrameToken,
+    requestId: string,
+    frameGeneration: number,
+    requireActiveToken = true
+  ): boolean {
+    return this.isUsableWebGpuFrame(device, runtime, token, requireActiveToken)
+      && frameGeneration === this.frameGeneration
+      && requestId === this.lastRequestId;
+  }
+
+  private isUsableWebGpuFrame(
+    device: GPUDevice,
+    runtime: StudioGpuTileRuntime<GPUTexture>,
+    token: StudioGpuTileFrameToken,
+    requireActiveToken = true
+  ): boolean {
+    return !this.disposed
+      && this.device === device
+      && this.tileRuntime === runtime
+      && (!requireActiveToken || this.activeTileFrame?.token === token)
+      && this.backend === "webgpu";
   }
 
   private clearCanvas2d(): void {
