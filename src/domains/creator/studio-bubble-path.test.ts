@@ -3,8 +3,12 @@ import { describe, it, expect } from "vitest";
 import {
   bubblePathData,
   bubblePathDataMulti,
+  burstStarPathData,
   doubleBubblePathData,
+  heartBubblePathData,
   normalizeExtraTails,
+  scaredBubblePathData,
+  thoughtBubbleBodyPath,
   type BubbleTailSpec,
 } from "./studio-bubble-path";
 
@@ -166,6 +170,41 @@ describe("다중 꼬리(bubblePathDataMulti)", () => {
     ]);
     expect(curved).not.toBe(straight);
     expect(curved.match(/Q /g)).toHaveLength(4);
+  });
+});
+
+describe("variant body paths", () => {
+  it("thought: 타원 본체 닫힌 path", () => {
+    const d = thoughtBubbleBodyPath(200, 100);
+    expect(d.startsWith("M ")).toBe(true);
+    expect(d.trim().endsWith("Z")).toBe(true);
+    expect(d.includes("A ")).toBe(true);
+  });
+
+  it("scared: 톱니 윤곽 + 꼬리 단일 path", () => {
+    const body = scaredBubblePathData(200, 120, null);
+    const withTail = scaredBubblePathData(200, 120, tail({ direction: "bottom" }));
+    expect(body.startsWith("M ")).toBe(true);
+    expect(body.trim().endsWith("Z")).toBe(true);
+    expect(withTail).not.toBe(body);
+    expect(withTail.includes("Q ")).toBe(true);
+    expect(withTail.includes("NaN")).toBe(false);
+  });
+
+  it("heart: 스케일된 하트 path", () => {
+    const d = heartBubblePathData(120, 100);
+    expect(d.startsWith("M ")).toBe(true);
+    expect(d.trim().endsWith("Z")).toBe(true);
+    expect(d.includes("C ")).toBe(true);
+  });
+
+  it("burstStar: 외침/격앙 별 폴리곤", () => {
+    const shout = burstStarPathData(136, 136, 20, 36, 68);
+    const angry = burstStarPathData(160, 160, 22, 28, 64);
+    expect(shout.startsWith("M ")).toBe(true);
+    expect(shout.trim().endsWith("Z")).toBe(true);
+    expect(angry).not.toBe(shout);
+    expect(shout.includes("NaN")).toBe(false);
   });
 });
 

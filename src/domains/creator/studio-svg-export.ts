@@ -59,8 +59,12 @@ import {
 import {
   bubblePathData,
   bubblePathDataMulti,
+  burstStarPathData,
   doubleBubblePathData,
+  heartBubblePathData,
   normalizeExtraTails,
+  scaredBubblePathData,
+  thoughtBubbleBodyPath,
   type BubbleTailSpec,
 } from "./studio-bubble-path";
 import {
@@ -203,6 +207,8 @@ export interface SvgBubbleElLike extends SvgElMeta {
   shadowOffsetX?: number;
   shadowOffsetY?: number;
   shadowOpacity?: number;
+  /** shout/angry Star 안쪽 반경 비율(0..1). 미설정 시 variant 기본값. */
+  starAmplitude?: number;
   customShapePoints?: number[];
 }
 
@@ -531,17 +537,6 @@ function tensionPathD(points: readonly number[], tension: number): string {
     `Q ${fmt(tp[tp.length - 2])} ${fmt(tp[tp.length - 1])} ${fmt(points[points.length - 2])} ${fmt(points[points.length - 1])}`
   );
   return parts.join(" ");
-}
-
-/** 별 폴리곤(클램프 없는 원시 버전) — 말풍선 shout/angry 의 20/22꼭짓점 별용. */
-function rawStarPoints(cx: number, cy: number, numPoints: number, innerRadius: number, outerRadius: number): number[] {
-  const pts: number[] = [];
-  for (let i = 0; i < numPoints * 2; i++) {
-    const radius = i % 2 === 0 ? outerRadius : innerRadius;
-    const angle = -Math.PI / 2 + (i * Math.PI) / numPoints;
-    pts.push(cx + radius * Math.cos(angle), cy + radius * Math.sin(angle));
-  }
-  return pts;
 }
 
 // ---------------------------------------------------------------------------
@@ -1228,14 +1223,6 @@ function serializeBubble(ctx: ExportCtx, el: SvgBubbleElLike): string {
   const tailDirection = el.tailDirection ?? "bottom";
   const showTail = tailDir !== "none";
 
-  const flipTailX = (pts: number[]): number[] => {
-    if (tailDir !== "right") return pts;
-    if (tailDirection === "bottom" || tailDirection === "top") {
-      return pts.map((v, i) => (i % 2 === 0 ? el.width - v : v));
-    }
-    return pts;
-  };
-
   // 본체+꼬리 단일 path — StudioPage 와 동일 정규화(최소변 비례 꼬리 길이/밑동).
   const tailIsVertical = tailDirection === "bottom" || tailDirection === "top";
   const bMinDim = Math.min(el.width, el.height);
@@ -1270,8 +1257,10 @@ function serializeBubble(ctx: ExportCtx, el: SvgBubbleElLike): string {
     );
   } else if (el.variant === "shout" || el.variant === "angry") {
     const isShout = el.variant === "shout";
-    const base = isShout ? 136 : 160;
-    const pts = isShout ? rawStarPoints(0, 0, 20, 36, 68) : rawStarPoints(0, 0, 22, 28, 64);
+    const outer = isShout ? 68 : 64;
+    const innerBase = isShout ? 36 / 68 : 28 / 64;
+    const amp = el.starAmplitude ?? innerBase;
+    const inner = outer * Math.min(0.95, Math.max(0.1, amp));
     const starStroke = isShout
       ? bStroke
       : theme === "soft"
@@ -1281,7 +1270,7 @@ function serializeBubble(ctx: ExportCtx, el: SvgBubbleElLike): string {
           : "#991b1b";
     const starStrokeW = isShout ? bStrokeW : Math.max(bStrokeW, 3.5);
     body.push(
-      `<polygon points="${pointsAttr(pts)}" transform="translate(${fmt(el.width / 2)} ${fmt(el.height / 2)}) scale(${fmt(el.width / base)} ${fmt(el.height / base)})" fill="${escapeXml(el.fill)}" stroke="${escapeXml(starStroke)}" stroke-width="${fmt(starStrokeW)}" stroke-linejoin="round"/>`
+      `<path d="${escapeXml(burstStarPathData(el.width, el.height, isShout ? 20 : 22, inner, outer))}" fill="${escapeXml(el.fill)}" stroke="${escapeXml(starStroke)}" stroke-width="${fmt(starStrokeW)}" stroke-linejoin="round" stroke-linecap="round"/>`
     );
   } else if (el.variant === "double") {
     body.push(
@@ -1289,7 +1278,7 @@ function serializeBubble(ctx: ExportCtx, el: SvgBubbleElLike): string {
     );
   } else if (el.variant === "thought") {
     body.push(
-      `<rect width="${fmt(el.width)}" height="${fmt(el.height)}" rx="${fmt(Math.min(el.width, el.height) / 2)}" fill="${escapeXml(el.fill)}"${strokeAttrs}/>`
+      `<path d="${escapeXml(thoughtBubbleBodyPath(el.width, el.height))}" fill="${escapeXml(el.fill)}"${strokeAttrs} stroke-linejoin="round" stroke-linecap="round"/>`
     );
     if (showTail) {
       const thoughtSW = bStrokeW * 0.8;
@@ -1316,21 +1305,8 @@ function serializeBubble(ctx: ExportCtx, el: SvgBubbleElLike): string {
   } else if (el.variant === "scared") {
     const scaredFill = el.fill === "transparent" ? "transparent" : el.fill === "#ffffff" ? "#f5f3ff" : el.fill;
     body.push(
-      `<rect width="${fmt(el.width)}" height="${fmt(el.height)}" rx="14" fill="${escapeXml(scaredFill)}" stroke="#7c3aed" stroke-width="2"/>`
+      `<path d="${escapeXml(scaredBubblePathData(el.width, el.height, bubbleTailSpec))}" fill="${escapeXml(scaredFill)}" stroke="#7c3aed" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`
     );
-    if (showTail) {
-      let pts: number[];
-      if (tailDirection === "bottom") {
-        pts = [el.width * 0.32, el.height - 2, el.width * 0.26, el.height + 22, el.width * 0.45, el.height - 2];
-      } else if (tailDirection === "top") {
-        pts = [el.width * 0.32, 2, el.width * 0.26, -22, el.width * 0.45, 2];
-      } else if (tailDirection === "left") {
-        pts = [2, el.height * 0.32, -22, el.height * 0.26, 2, el.height * 0.45];
-      } else {
-        pts = [el.width - 2, el.height * 0.32, el.width + 22, el.height * 0.26, el.width - 2, el.height * 0.45];
-      }
-      body.push(`<path d="${pointsToPathD(flipTailX(pts), true)}" fill="${escapeXml(scaredFill)}" stroke="#7c3aed" stroke-width="2"/>`);
-    }
   } else if (el.variant === "system") {
     body.push(
       `<rect width="${fmt(el.width)}" height="${fmt(el.height)}" rx="4" fill="#0a0f24" opacity="0.88" stroke="#0ea5e9" stroke-width="2.5"/>`,
@@ -1338,30 +1314,21 @@ function serializeBubble(ctx: ExportCtx, el: SvgBubbleElLike): string {
     );
   } else if (el.variant === "phone") {
     const phoneRadius = theme === "soft" ? 10 : theme === "vivid" ? 6 : 8;
+    const bMinDim = Math.min(el.width, el.height);
+    const phoneTail =
+      showTail && bubbleTailSpec
+        ? {
+            ...bubbleTailSpec,
+            length: Math.min(bubbleTailSpec.length, Math.max(8, bMinDim * 0.1)),
+            base: Math.min(bubbleTailSpec.base, Math.max(6, bMinDim * 0.12)),
+          }
+        : null;
     body.push(
-      `<rect width="${fmt(el.width)}" height="${fmt(el.height)}" rx="${fmt(phoneRadius)}" fill="${escapeXml(el.fill)}"${strokeAttrs}/>`
+      `<path d="${escapeXml(bubblePathData(el.width, el.height, phoneRadius, phoneTail))}" fill="${escapeXml(el.fill)}"${strokeAttrs} stroke-linejoin="round" stroke-linecap="round"/>`
     );
-    if (showTail) {
-      let pts: number[];
-      if (tailDirection === "bottom") {
-        pts =
-          tailDir === "right"
-            ? [el.width - 26, el.height - 1, el.width - 20, el.height + 10, el.width - 14, el.height - 1]
-            : [14, el.height - 1, 20, el.height + 10, 26, el.height - 1];
-      } else if (tailDirection === "top") {
-        pts = tailDir === "right" ? [el.width - 26, 1, el.width - 20, -10, el.width - 14, 1] : [14, 1, 20, -10, 26, 1];
-      } else if (tailDirection === "left") {
-        pts = [1, el.height * 0.35, -10, el.height * 0.45, 1, el.height * 0.55];
-      } else {
-        pts = [el.width - 1, el.height * 0.35, el.width + 10, el.height * 0.45, el.width - 1, el.height * 0.55];
-      }
-      body.push(`<path d="${pointsToPathD(pts, true)}" fill="${escapeXml(el.fill)}"${strokeAttrs}/>`);
-    }
   } else if (el.variant === "heart") {
-    const HEART_PATH =
-      "M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41 0.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z";
     body.push(
-      `<path d="${HEART_PATH}" transform="scale(${fmt(el.width / 24)} ${fmt(el.height / 24)})" fill="${escapeXml(el.fill)}"${strokeAttrs}/>`
+      `<path d="${escapeXml(heartBubblePathData(el.width, el.height))}" fill="${escapeXml(el.fill)}"${strokeAttrs} stroke-linejoin="round" stroke-linecap="round"/>`
     );
   } else if (el.variant === "box") {
     const boxRadius = theme === "soft" ? 6 : theme === "vivid" ? 3 : 4;

@@ -730,11 +730,14 @@ describe("말풍선 직렬화", () => {
     expect(svg).toContain('stroke-dasharray="8 5"');
   });
 
-  it("shout — 20각 별을 크기 비율로 스케일해 그린다", () => {
+  it("shout — 20각 별을 path로 그린다", () => {
     const { svg } = exportPageToSvg(page([bubbleEl({ variant: "shout" })]));
-    expect(svg).toContain('transform="translate(100 60) scale(1.47 0.88)"');
-    const star = /<polygon points="([^"]+)"/.exec(svg)?.[1] ?? "";
-    expect(star.split(" ").length).toBe(40); // 20각 별 = 외곽/내곽 40개 정점
+    // 본체는 transform scale 대신 좌표가 스케일된 단일 path.
+    expect(svg).toMatch(/<path d="M [\d.]+ 0 L /);
+    const d = /<path d="([^"]+)"/.exec(svg)?.[1] ?? "";
+    // 20각 별 = 40개 꼭짓점 → L 명령이 충분히 많다.
+    expect((d.match(/ L /g) ?? []).length).toBeGreaterThanOrEqual(38);
+    expect(d.trim().endsWith("Z")).toBe(true);
   });
 
   it("box — 테마별 모서리 반경(classic 4/vivid 3)을 반영한다", () => {
@@ -745,9 +748,10 @@ describe("말풍선 직렬화", () => {
     expect(vivid.svg).toContain('stroke="#444444"');
   });
 
-  it("thought — 본체 캡슐 + 꼬리 구름방울 3단을 그린다", () => {
+  it("thought — 타원 본체 + 꼬리 구름방울 3단을 그린다", () => {
     const { svg } = exportPageToSvg(page([bubbleEl({ variant: "thought" })]));
-    expect(svg).toContain('rx="60"'); // min(200,120)/2
+    // thoughtBubbleBodyPath: 반경 (w/2, h/2) = (100, 60)
+    expect(svg).toContain("A 100 60 0 1 1 100 120");
     expect((svg.match(/<ellipse /g) ?? []).length).toBe(3);
   });
 

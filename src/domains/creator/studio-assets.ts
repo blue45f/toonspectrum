@@ -114,6 +114,23 @@ export const BUBBLE_VARIANTS: { id: BubbleVariant; label: string; hint: string }
   { id: "box", label: "내레이션", hint: "시간·장소 설명" },
 ];
 
+/** 말풍선 라이브러리/인스펙터에서 종류를 역할별로 묶어 보여 다양성이 한눈에 들어오게 한다. */
+export const BUBBLE_VARIANT_GROUPS: { group: string; ids: BubbleVariant[] }[] = [
+  { group: "대사", ids: ["speech", "double", "whisper"] },
+  { group: "감정", ids: ["thought", "shout", "scared", "angry", "heart"] },
+  { group: "연출·UI", ids: ["system", "phone", "box"] },
+];
+
+export function groupBubbleVariants(
+  variants: { id: BubbleVariant; label: string; hint: string }[] = BUBBLE_VARIANTS
+): { group: string; variants: { id: BubbleVariant; label: string; hint: string }[] }[] {
+  const byId = new Map(variants.map((v) => [v.id, v] as const));
+  return BUBBLE_VARIANT_GROUPS.map((g) => ({
+    group: g.group,
+    variants: g.ids.map((id) => byId.get(id)).filter((v): v is { id: BubbleVariant; label: string; hint: string } => !!v),
+  })).filter((g) => g.variants.length > 0);
+}
+
 // 만화 효과 이모지(스티커).
 export const EFFECT_EMOJIS = [
   "💢", "💦", "✨", "💕", "💥", "😱", "🔥", "⚡", "😤", "💧", "❗", "❓", "💤", "🎶", "👊", "🌀",

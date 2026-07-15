@@ -18,8 +18,12 @@ describe("StudioBubbleStylePresetPanel", () => {
       />
     );
     expect(html).toContain('data-studio-bubble-style-presets="true"');
-    expect(html).toContain("스타일 프리셋");
+    expect(html).toContain("분위기 스와치");
     expect(html).toContain('data-studio-bubble-swatch="classic_white"');
+    expect(html).toContain('data-studio-bubble-swatch-variant="speech"');
+    expect(html).toContain('data-studio-bubble-swatch-variant="thought"');
+    expect(html).toContain('data-studio-bubble-swatch-variant="scared"');
+    expect(html).toContain('data-studio-bubble-swatch-variant="heart"');
     expect(html).toContain("기본 흰색");
     // SVG speech-body path present (not text-only row)
     expect(html).toContain("<svg");

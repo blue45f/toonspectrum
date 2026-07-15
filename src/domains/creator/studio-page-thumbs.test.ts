@@ -311,12 +311,15 @@ describe("studio-page-thumbs — buildThumbNodes(요소 프록시)", () => {
     expect(label.fill).toBe("#222222");
   });
 
-  it("bubble(shout): 별 폭발 폴리곤 근사, tail=none 은 꼬리 스펙 없음", () => {
+  it("bubble(shout): 별 폭발 path 근사, tail=none 은 꼬리 스펙 없음", () => {
     const { nodes } = buildThumbNodes(
       pageWith([{ id: "b2", type: "bubble", variant: "shout", text: "", x: 0, y: 0, width: 136, height: 136 }])
     );
     expect(nodes).toHaveLength(1); // 빈 텍스트 → 본체만
-    expect(nodes[0].kind).toBe("polygon");
+    expect(nodes[0].kind).toBe("path");
+    if (nodes[0].kind !== "path") throw new Error("path 노드가 아님");
+    expect(nodes[0].d.startsWith("M ")).toBe(true);
+    expect(nodes[0].d.trim().endsWith("Z")).toBe(true);
     expect(bubbleTailSpecOf({ id: "b3", type: "bubble", tail: "none" }, 100, 100)).toBeNull();
   });
 

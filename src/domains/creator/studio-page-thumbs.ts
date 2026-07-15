@@ -12,7 +12,16 @@
  * 실제 순서 변경은 studio-pages.reorderPages 가 담당하고, 여기는 슬롯 산술만 제공한다.
  */
 
-import { bubblePathData, doubleBubblePathData, type BubbleTailDirection, type BubbleTailSpec } from "./studio-bubble-path";
+import {
+  bubblePathData,
+  burstStarPathData,
+  doubleBubblePathData,
+  heartBubblePathData,
+  scaredBubblePathData,
+  thoughtBubbleBodyPath,
+  type BubbleTailDirection,
+  type BubbleTailSpec,
+} from "./studio-bubble-path";
 import { isEffectivelyHidden, type LayerGroup } from "./studio-layers";
 
 // ── 입력 — 느슨한 구조 타입(StudioPage 의 El/PageState 가 그대로 대입 가능) ────────────
@@ -554,23 +563,16 @@ function bubbleNodes(el: ThumbElement, ctx: ThumbBuildContext): ThumbNode[] {
   const nodes: ThumbNode[] = [];
 
   if (variant === "shout" || variant === "angry") {
-    // 캔버스 Star 파라미터(20각 136 기준 / 22각 160 기준)를 폴리곤으로 재현.
-    const baseSize = variant === "shout" ? 136 : 160;
+    const outer = variant === "shout" ? 68 : 64;
+    const inner = variant === "shout" ? 36 : 28;
     nodes.push({
-      kind: "polygon",
+      kind: "path",
       key: el.id,
-      points: starPolygonPoints(
-        w / 2,
-        h / 2,
-        variant === "shout" ? 20 : 22,
-        variant === "shout" ? 36 : 28,
-        variant === "shout" ? 68 : 64,
-        w / baseSize || 1,
-        h / baseSize || 1
-      ),
+      d: burstStarPathData(w, h, variant === "shout" ? 20 : 22, inner, outer),
       fill,
       stroke: variant === "angry" ? "#dc2626" : stroke,
       strokeWidth,
+      dashed: false,
       transform: local,
       opacity,
     });
@@ -578,7 +580,7 @@ function bubbleNodes(el: ThumbElement, ctx: ThumbBuildContext): ThumbNode[] {
     nodes.push({
       kind: "path",
       key: el.id,
-      d: bubblePathData(w, h, Math.min(w, h) / 2, null),
+      d: thoughtBubbleBodyPath(w, h),
       fill,
       stroke,
       strokeWidth,
@@ -600,17 +602,24 @@ function bubbleNodes(el: ThumbElement, ctx: ThumbBuildContext): ThumbNode[] {
     });
   } else if (variant === "scared") {
     nodes.push({
-      kind: "rect",
+      kind: "path",
       key: el.id,
-      x: 0,
-      y: 0,
-      w,
-      h,
-      rx: 14,
+      d: scaredBubblePathData(w, h, bubbleTailSpecOf(el, w, h)),
       fill,
-      fillOpacity: 1,
       stroke: "#7c3aed",
       strokeWidth: clampThumbStroke(2, ctx.minStroke),
+      dashed: false,
+      transform: local,
+      opacity,
+    });
+  } else if (variant === "heart") {
+    nodes.push({
+      kind: "path",
+      key: el.id,
+      d: heartBubblePathData(w, h),
+      fill,
+      stroke,
+      strokeWidth,
       dashed: false,
       transform: local,
       opacity,
@@ -633,11 +642,11 @@ function bubbleNodes(el: ThumbElement, ctx: ThumbBuildContext): ThumbNode[] {
       opacity,
     });
   } else {
-    // speech · whisper · box · phone · heart 등 — 캔버스와 동일한 단일 path(꼬리 포함).
+    // speech · whisper · box · phone 등 — 캔버스와 동일한 단일 path(꼬리 포함).
     nodes.push({
       kind: "path",
       key: el.id,
-      d: bubblePathData(w, h, 24, bubbleTailSpecOf(el, w, h)),
+      d: bubblePathData(w, h, variant === "phone" ? 8 : variant === "box" ? 4 : 24, bubbleTailSpecOf(el, w, h)),
       fill,
       stroke,
       strokeWidth,

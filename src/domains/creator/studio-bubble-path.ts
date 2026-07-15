@@ -414,3 +414,160 @@ function roundedRect(w: number, h: number, r: number): string {
     "Z",
   ].join(" ");
 }
+
+/**
+ * 생각 말풍선 본체 — 타원. 꼬리(구름 방울 3단)는 캔버스/SVG 쪽에서 별도 그린다.
+ * 메뉴 글리프(StudioBubbleVariantGlyph)와 실루엣을 맞춘다.
+ */
+export function thoughtBubbleBodyPath(w: number, h: number): string {
+  const rx = Math.max(1, w / 2);
+  const ry = Math.max(1, h / 2);
+  // 두 개의 180° 호로 닫힌 타원(시작=상단 중앙).
+  return [
+    `M ${N(rx)} 0`,
+    `A ${N(rx)} ${N(ry)} 0 1 1 ${N(rx)} ${N(h)}`,
+    `A ${N(rx)} ${N(ry)} 0 1 1 ${N(rx)} 0`,
+    "Z",
+  ].join(" ");
+}
+
+/**
+ * 소심·공포 말풍선 — 상단 톱니(떨림) 윤곽 + 선택 꼬리를 단일 path로.
+ * 메뉴 글리프의 톱니 실루엣을 캔버스/내보내기와 공유한다.
+ */
+export function scaredBubblePathData(w: number, h: number, tail?: BubbleTailSpec | null): string {
+  const ww = Math.max(24, w);
+  const hh = Math.max(24, h);
+  const amp = Math.min(12, Math.max(5, hh * 0.09));
+  const r = Math.min(12, Math.min(ww, hh) * 0.08);
+  const peaks = Math.max(5, Math.min(11, Math.round(ww / 28)));
+  const TAPER = 0.55;
+
+  // 상단 톱니: y=amp 기준선에서 위아래로 흔들린다(첫·끝은 amp로 모서리 정렬).
+  const topPts: { x: number; y: number }[] = [];
+  for (let i = 0; i <= peaks; i++) {
+    const t = i / peaks;
+    const x = r + (ww - r * 2) * t;
+    const y = i === 0 || i === peaks ? amp : i % 2 === 1 ? 0 : amp * 1.15;
+    topPts.push({ x, y });
+  }
+
+  const parts: string[] = [`M ${N(topPts[0].x)} ${N(topPts[0].y)}`];
+  for (let i = 1; i < topPts.length; i++) {
+    parts.push(`L ${N(topPts[i].x)} ${N(topPts[i].y)}`);
+  }
+
+  // 우상 → 우하 라운드
+  parts.push(
+    `L ${N(ww - r)} ${N(amp)}`,
+    `A ${N(r)} ${N(r)} 0 0 1 ${N(ww)} ${N(amp + r)}`,
+    `V ${N(hh - r)}`,
+    `A ${N(r)} ${N(r)} 0 0 1 ${N(ww - r)} ${N(hh)}`
+  );
+
+  const active = tail && tail.length > 0 && tail.base > 0 ? tail : null;
+  if (active && (active.direction === "bottom" || active.direction === "top")) {
+    // 가로변 꼬리 — speech 규약과 동일한 테이퍼 이차베지어.
+    const center = clamp(ww * active.ratio, r + active.base / 2 + 4, ww - r - active.base / 2 - 4);
+    const b1 = center - active.base / 2;
+    const b2 = center + active.base / 2;
+    const sideShift = active.side === "left" ? -active.base * 0.45 : active.side === "right" ? active.base * 0.45 : 0;
+    const tip = clamp(center + sideShift, r + 2, ww - r - 2);
+    const bend = clamp(active.bend ?? 0, -1, 1) * Math.min(Math.max(active.base, active.length) * 0.42, active.base * 1.4);
+    if (active.direction === "bottom") {
+      const ty = hh + active.length;
+      const cy = hh + active.length * TAPER;
+      parts.push(
+        `H ${N(b2)}`,
+        `Q ${N((b2 + tip) / 2 + bend)} ${N(cy)} ${N(tip)} ${N(ty)}`,
+        `Q ${N((tip + b1) / 2 + bend)} ${N(cy)} ${N(b1)} ${N(hh)}`,
+        `H ${N(r)}`
+      );
+    } else {
+      // top 꼬리는 톱니 변에 붙이기 어려워 하단 꼬리로 폴백(시각적으로 안정).
+      const ty = hh + active.length;
+      const cy = hh + active.length * TAPER;
+      parts.push(
+        `H ${N(b2)}`,
+        `Q ${N((b2 + tip) / 2 + bend)} ${N(cy)} ${N(tip)} ${N(ty)}`,
+        `Q ${N((tip + b1) / 2 + bend)} ${N(cy)} ${N(b1)} ${N(hh)}`,
+        `H ${N(r)}`
+      );
+    }
+  } else if (active && (active.direction === "left" || active.direction === "right")) {
+    // 세로변 꼬리는 우/좌 변 중간 구간에서 처리하기 위해 하단 직선 후 별도 삽입이 필요 —
+    // 단순화: 하단에 짧은 꼬리로 폴백해 이음새 없는 path를 유지한다.
+    const center = clamp(ww * 0.35, r + active.base / 2 + 4, ww - r - active.base / 2 - 4);
+    const b1 = center - active.base / 2;
+    const b2 = center + active.base / 2;
+    const tip = center;
+    const ty = hh + active.length;
+    const cy = hh + active.length * TAPER;
+    parts.push(
+      `H ${N(b2)}`,
+      `Q ${N((b2 + tip) / 2)} ${N(cy)} ${N(tip)} ${N(ty)}`,
+      `Q ${N((tip + b1) / 2)} ${N(cy)} ${N(b1)} ${N(hh)}`,
+      `H ${N(r)}`
+    );
+  } else {
+    parts.push(`H ${N(r)}`);
+  }
+
+  parts.push(
+    `A ${N(r)} ${N(r)} 0 0 1 0 ${N(hh - r)}`,
+    `V ${N(amp + r)}`,
+    `A ${N(r)} ${N(r)} 0 0 1 ${N(r)} ${N(amp)}`,
+    `L ${N(topPts[0].x)} ${N(topPts[0].y)}`,
+    "Z"
+  );
+  return parts.join(" ");
+}
+
+/**
+ * 하트 말풍선 — viewBox 24×24 기준 표준 path를 요소 크기로 스케일.
+ * transform 대신 좌표를 직접 곱해 stroke 두께가 찌그러지지 않게 한다.
+ */
+export function heartBubblePathData(w: number, h: number): string {
+  // Material-style heart in 0..24 space (matches previous Konva path).
+  const sx = Math.max(1, w) / 24;
+  const sy = Math.max(1, h) / 24;
+  const X = (n: number) => N(n * sx);
+  const Y = (n: number) => N(n * sy);
+  return [
+    `M ${X(12)} ${Y(21.35)}`,
+    `L ${X(10.55)} ${Y(20.03)}`,
+    `C ${X(5.4)} ${Y(15.36)} ${X(2)} ${Y(12.28)} ${X(2)} ${Y(8.5)}`,
+    `C ${X(2)} ${Y(5.42)} ${X(4.42)} ${Y(3)} ${X(7.5)} ${Y(3)}`,
+    `C ${X(9.24)} ${Y(3)} ${X(10.91)} ${Y(3.81)} ${X(12)} ${Y(5.09)}`,
+    `C ${X(13.09)} ${Y(3.81)} ${X(14.76)} ${Y(3)} ${X(16.5)} ${Y(3)}`,
+    `C ${X(19.58)} ${Y(3)} ${X(22)} ${Y(5.42)} ${X(22)} ${Y(8.5)}`,
+    `C ${X(22)} ${Y(12.28)} ${X(18.6)} ${Y(15.36)} ${X(13.45)} ${Y(20.03)}`,
+    `Z`,
+  ].join(" ");
+}
+
+/**
+ * 외침/격앙 별 폴리곤 path — Konva Star와 같은 파라미터(numPoints·inner/outer).
+ * SVG export / thumbs / 캔버스가 동일 좌표를 쓰도록 순수 함수로 둔다.
+ */
+export function burstStarPathData(
+  w: number,
+  h: number,
+  numPoints: number,
+  innerRadius: number,
+  outerRadius: number
+): string {
+  const cx = w / 2;
+  const cy = h / 2;
+  const scaleX = w / (outerRadius * 2);
+  const scaleY = h / (outerRadius * 2);
+  const pts: string[] = [];
+  for (let i = 0; i < numPoints * 2; i++) {
+    const radius = i % 2 === 0 ? outerRadius : innerRadius;
+    const angle = (Math.PI * i) / numPoints - Math.PI / 2;
+    const x = cx + Math.cos(angle) * radius * scaleX;
+    const y = cy + Math.sin(angle) * radius * scaleY;
+    pts.push(`${N(x)} ${N(y)}`);
+  }
+  return `M ${pts.join(" L ")} Z`;
+}
