@@ -1,9 +1,11 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef } from "react";
 
 
 import {
   StudioWebGpuEngine,
   type StudioGpuBackend,
+  type StudioGpuFrameReadbackRequest,
+  type StudioGpuFrameReadbackResult,
   type StudioGpuFrameReceipt,
   type StudioGpuStroke,
   type StudioGpuViewTransform,
@@ -42,6 +44,13 @@ export interface StudioWebGpuCanvasProps extends StudioGpuViewTransform {
   /** A matching receipt is the only safe signal for hiding the authoritative Konva preview. */
   readonly onFrameReady?: (receipt: StudioGpuFrameReceipt) => void;
   readonly onFrameInvalid?: () => void;
+}
+
+export interface StudioWebGpuCanvasHandle {
+  /** Captures only the exact receipt-authorized frame; stale or unavailable frames are rejected. */
+  readonly captureFrame: (
+    request: StudioGpuFrameReadbackRequest
+  ) => Promise<StudioGpuFrameReadbackResult>;
 }
 
 interface LatestCanvasProps {
@@ -95,7 +104,8 @@ function devicePixelRatio(): number {
     : 1;
 }
 
-export function StudioWebGpuCanvas({
+export const StudioWebGpuCanvas = forwardRef<StudioWebGpuCanvasHandle, StudioWebGpuCanvasProps>(
+function StudioWebGpuCanvas({
   className,
   width,
   height,
@@ -111,7 +121,7 @@ export function StudioWebGpuCanvas({
   onDeviceLost,
   onFrameReady,
   onFrameInvalid,
-}: StudioWebGpuCanvasProps) {
+}: StudioWebGpuCanvasProps, ref) {
   const rootRef = useRef<HTMLDivElement>(null);
   const gpuCanvasRef = useRef<HTMLCanvasElement>(null);
   const fallbackCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -150,6 +160,13 @@ export function StudioWebGpuCanvas({
     surfaceWidth: surfaceBounds?.width,
     surfaceHeight: surfaceBounds?.height,
   };
+
+  useImperativeHandle(ref, () => ({
+    captureFrame: (request) => engineRef.current?.captureFrame(request) ?? Promise.resolve({
+      status: "rejected",
+      reason: "frame-unavailable",
+    }),
+  }), []);
 
   useEffect(() => {
     const canvas = gpuCanvasRef.current;
@@ -291,4 +308,6 @@ export function StudioWebGpuCanvas({
       />
     </div>
   );
-}
+});
+
+StudioWebGpuCanvas.displayName = "StudioWebGpuCanvas";

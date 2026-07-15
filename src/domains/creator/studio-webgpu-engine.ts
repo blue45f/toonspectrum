@@ -1,5 +1,14 @@
 import { parseStudioGpuColor } from "./studio-webgpu-color";
 import {
+  copyStudioGpuReadbackRows,
+  planStudioGpuReadbackLayout,
+  STUDIO_GPU_MAX_READBACK_PIXELS,
+  type StudioGpuReadbackArea,
+  type StudioGpuReadbackFailureReason,
+  type StudioGpuReadbackLayout,
+  type StudioGpuReadbackPixelRect,
+} from "./studio-webgpu-readback";
+import {
   orderStudioGpuStrokes,
   studioGpuPressureRadius,
   STUDIO_GPU_MAX_BRUSH_SIZE,
@@ -26,6 +35,20 @@ export {
   STUDIO_GPU_MAX_BRUSH_SIZE,
 } from "./studio-webgpu-stroke";
 export type { StudioGpuComposite, StudioGpuStroke } from "./studio-webgpu-stroke";
+export {
+  STUDIO_GPU_MAX_READBACK_PIXELS,
+  STUDIO_GPU_READBACK_BYTES_PER_PIXEL,
+  STUDIO_GPU_READBACK_ROW_ALIGNMENT,
+  copyStudioGpuReadbackRows,
+  planStudioGpuReadbackLayout,
+} from "./studio-webgpu-readback";
+export type {
+  StudioGpuReadbackArea,
+  StudioGpuReadbackFailureReason,
+  StudioGpuReadbackLayout,
+  StudioGpuReadbackLayoutResult,
+  StudioGpuReadbackPixelRect,
+} from "./studio-webgpu-readback";
 
 export interface StudioGpuViewTransform {
   readonly scaleX?: number;
@@ -57,6 +80,35 @@ export interface StudioGpuFrameReceipt {
   readonly physicalWidth: number;
   readonly physicalHeight: number;
 }
+
+export interface StudioGpuFrameReadbackRequest {
+  /** Exact receipt previously emitted by this engine. Older or reconstructed frames fail closed. */
+  readonly receipt: StudioGpuFrameReceipt;
+  /** Captures either the whole current presentation viewport or one fully-visible document rect. */
+  readonly area: StudioGpuReadbackArea;
+}
+
+export interface StudioGpuFrameReadback {
+  readonly status: "captured";
+  readonly receipt: StudioGpuFrameReceipt;
+  readonly area: StudioGpuReadbackArea;
+  readonly pixelRect: StudioGpuReadbackPixelRect;
+  readonly width: number;
+  readonly height: number;
+  /** Canvas ImageData-compatible, unpremultiplied RGBA bytes. */
+  readonly pixels: Uint8ClampedArray;
+  readonly format: "rgba8unorm";
+  readonly alphaMode: "unpremultiplied";
+}
+
+export interface StudioGpuFrameReadbackRejection {
+  readonly status: "rejected";
+  readonly reason: StudioGpuReadbackFailureReason;
+}
+
+export type StudioGpuFrameReadbackResult =
+  | StudioGpuFrameReadback
+  | StudioGpuFrameReadbackRejection;
 
 export interface StudioWebGpuEngineOptions {
   /** WebGPU presentation surface. It remains hidden while the Canvas2D fallback is active. */
@@ -120,6 +172,13 @@ const INSTANCE_FLOATS = 8;
 const INSTANCE_BYTES = INSTANCE_FLOATS * Float32Array.BYTES_PER_ELEMENT;
 export const STUDIO_GPU_MAX_DABS = 100_000;
 export const STUDIO_GPU_MAX_TILE_RESOLUTION_SCALE = 4;
+export const STUDIO_GPU_MAX_CONCURRENT_READBACKS = 2;
+export const STUDIO_GPU_READBACK_SNAPSHOT_POOL_SIZE = 2;
+/** Includes the current authority texture, retired reader-held textures, and the reuse pool. */
+export const STUDIO_GPU_MAX_READBACK_SNAPSHOT_BYTES = 128 * 1024 * 1024;
+export const STUDIO_GPU_MAX_READBACK_SNAPSHOT_PIXELS = 2 * STUDIO_GPU_MAX_READBACK_PIXELS;
+/** Two immutable surfaces are sufficient for one authority frame plus copy-on-write. */
+export const STUDIO_GPU_MAX_READBACK_SNAPSHOTS = 2;
 const DEFAULT_MAX_TEXTURE_DIMENSION = 8_192;
 const STUDIO_GPU_TILE_TEXTURE_FORMAT = "rgba8unorm" as const;
 const PRESENTATION_VERTEX_FLOATS = 4;
@@ -806,8 +865,19 @@ function bufferUsage(): number {
 }
 
 function presentationTextureUsage(): number {
-  // RENDER_ATTACHMENT (0x10) | COPY_DST (0x02).
-  return 0x10 | 0x02;
+  // RENDER_ATTACHMENT (0x10) | COPY_DST (0x02) | COPY_SRC (0x01). COPY_SRC lets the
+  // presentation pass atomically retain the exact receipt-authorized pixels for later readback.
+  return 0x10 | 0x02 | 0x01;
+}
+
+function readbackTextureUsage(): number {
+  // COPY_SRC (0x01) | COPY_DST (0x02).
+  return 0x01 | 0x02;
+}
+
+function readbackBufferUsage(): number {
+  // MAP_READ (0x01) | COPY_DST (0x08).
+  return 0x01 | 0x08;
 }
 
 function safeDestroyDevice(device: GPUDevice | null): void {
@@ -826,6 +896,90 @@ function safeUnconfigure(context: GPUCanvasContext | null): void {
   } catch {
     // Some implementations throw after device loss; fallback does not depend on unconfigure.
   }
+}
+
+function safeDestroyTexture(texture: GPUTexture | null): void {
+  if (!texture) return;
+  try {
+    texture.destroy();
+  } catch {
+    // Lost-device and already-retired snapshots are both fully released states.
+  }
+}
+
+function sameStudioGpuFrameReceipt(
+  left: StudioGpuFrameReceipt,
+  right: StudioGpuFrameReceipt
+): boolean {
+  return left.requestId === right.requestId
+    && left.fingerprint === right.fingerprint
+    && left.backend === right.backend
+    && left.complete === right.complete
+    && left.strokeCount === right.strokeCount
+    && left.dabCount === right.dabCount
+    && left.physicalWidth === right.physicalWidth
+    && left.physicalHeight === right.physicalHeight;
+}
+
+function snapshotStudioGpuReadbackArea(area: StudioGpuReadbackArea): StudioGpuReadbackArea | null {
+  if (!area || typeof area !== "object") return null;
+  if (area.kind === "viewport") return { kind: "viewport" };
+  if (area.kind !== "document" || !area.rect || typeof area.rect !== "object") return null;
+  return { kind: "document", rect: { ...area.rect } };
+}
+
+type StudioGpuReadbackTextureFormat =
+  | "bgra8unorm"
+  | "rgba8unorm";
+
+function readbackTextureFormat(
+  format: GPUTextureFormat | null | undefined
+): StudioGpuReadbackTextureFormat | null {
+  return format === "bgra8unorm"
+    || format === "rgba8unorm"
+    ? format
+    : null;
+}
+
+function readbackSnapshotByteLength(width: number, height: number): number | null {
+  if (
+    !Number.isSafeInteger(width)
+    || !Number.isSafeInteger(height)
+    || width <= 0
+    || height <= 0
+  ) {
+    return null;
+  }
+  const pixelCount = width * height;
+  if (
+    !Number.isSafeInteger(pixelCount)
+    || pixelCount > STUDIO_GPU_MAX_READBACK_PIXELS
+  ) {
+    return null;
+  }
+  const byteLength = pixelCount * 4;
+  return Number.isSafeInteger(byteLength) && byteLength <= STUDIO_GPU_MAX_READBACK_SNAPSHOT_BYTES
+    ? byteLength
+    : null;
+}
+
+interface StudioGpuFrameSnapshot {
+  readonly texture: GPUTexture;
+  readonly device: GPUDevice;
+  readonly format: GPUTextureFormat;
+  readonly width: number;
+  readonly height: number;
+  readonly pixelCount: number;
+  readonly byteLength: number;
+  readonly alphaMode: "premultiplied";
+  readers: number;
+  retired: boolean;
+}
+
+interface StudioGpuAuthorityFrame {
+  readonly receipt: StudioGpuFrameReceipt;
+  readonly generation: number;
+  readonly snapshot: StudioGpuFrameSnapshot | null;
 }
 
 export class StudioWebGpuEngine {
@@ -872,6 +1026,10 @@ export class StudioWebGpuEngine {
   private renderedFrameInvalid = true;
   private frameGeneration = 0;
   private lastRequestId = "initial";
+  private authorityFrame: StudioGpuAuthorityFrame | null = null;
+  private readonly readbackSnapshotPool: StudioGpuFrameSnapshot[] = [];
+  private readonly readbackSnapshots = new Set<StudioGpuFrameSnapshot>();
+  private activeWebGpuReadbacks = 0;
 
   constructor(options: StudioWebGpuEngineOptions) {
     this.options = options;
@@ -890,6 +1048,8 @@ export class StudioWebGpuEngine {
     if (this.backend === "webgpu" && this.device) return this.backend;
     if (this.device) {
       const previousDevice = this.device;
+      this.invalidateAuthorityFrame();
+      this.destroyReadbackSnapshotPool();
       this.device = null;
       this.normalPipeline = null;
       this.erasePipeline = null;
@@ -943,6 +1103,12 @@ export class StudioWebGpuEngine {
       if (surface.width !== physicalWidth) surface.width = physicalWidth;
       if (surface.height !== physicalHeight) surface.height = physicalHeight;
     }
+    this.evictIncompatibleReadbackSnapshots(
+      this.device,
+      this.format,
+      physicalWidth,
+      physicalHeight
+    );
     // Resizing discards presentation pixels; transforms also change visible-tile selection/quads.
     this.invalidateRenderedFrame();
     this.configureContext();
@@ -984,6 +1150,45 @@ export class StudioWebGpuEngine {
     this.render([]);
   }
 
+  /**
+   * Reads only a receipt-authorized immutable frame. Any render, resize, backend switch, device
+   * loss, or disposal that happens before completion turns the result into a stale rejection.
+   */
+  public async captureFrame(
+    request: StudioGpuFrameReadbackRequest
+  ): Promise<StudioGpuFrameReadbackResult> {
+    if (this.disposed) return { status: "rejected", reason: "disposed" };
+    if (!request || typeof request !== "object") {
+      return { status: "rejected", reason: "invalid-area" };
+    }
+    const area = snapshotStudioGpuReadbackArea(request.area);
+    if (!area) return { status: "rejected", reason: "invalid-area" };
+    if (!request.receipt || typeof request.receipt !== "object") {
+      return { status: "rejected", reason: "invalid-area" };
+    }
+    const frame = this.authorityFrame;
+    if (
+      !frame
+      || frame.receipt !== request.receipt
+      || !sameStudioGpuFrameReceipt(frame.receipt, request.receipt)
+    ) {
+      return { status: "rejected", reason: "stale-frame" };
+    }
+    const planned = planStudioGpuReadbackLayout(
+      area,
+      this.viewport,
+      frame.receipt.physicalWidth,
+      frame.receipt.physicalHeight
+    );
+    if (planned.status === "rejected") return planned;
+    if (!this.isAuthorityFrameCurrent(frame)) {
+      return { status: "rejected", reason: "stale-frame" };
+    }
+    return frame.receipt.backend === "webgpu"
+      ? this.captureWebGpuFrame(frame, area, planned.layout)
+      : this.captureCanvas2dFrame(frame, area, planned.layout);
+  }
+
   public dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
@@ -1005,10 +1210,376 @@ export class StudioWebGpuEngine {
     this.presentationCapacity = 0;
     this.destroyTileRuntime();
     this.invalidateRenderedFrame();
+    this.invalidateAuthorityFrame();
+    this.destroyReadbackSnapshotPool();
     safeUnconfigure(this.context);
     this.context = null;
     safeDestroyDevice(device);
     this.clearCanvas2d();
+  }
+
+  private isAuthorityFrameCurrent(frame: StudioGpuAuthorityFrame): boolean {
+    return this.authorityFrame === frame
+      && frame.generation === this.frameGeneration
+      && frame.receipt.backend === this.backend
+      && frame.receipt.physicalWidth === this.canvas.width
+      && frame.receipt.physicalHeight === this.canvas.height;
+  }
+
+  private retireFrameSnapshot(snapshot: StudioGpuFrameSnapshot | null): void {
+    if (!snapshot || snapshot.retired) return;
+    snapshot.retired = true;
+    if (snapshot.readers === 0) this.poolFrameSnapshot(snapshot);
+  }
+
+  private releaseFrameSnapshotReader(snapshot: StudioGpuFrameSnapshot): void {
+    snapshot.readers = Math.max(0, snapshot.readers - 1);
+    if (snapshot.retired && snapshot.readers === 0) this.poolFrameSnapshot(snapshot);
+  }
+
+  private destroyFrameSnapshot(snapshot: StudioGpuFrameSnapshot): void {
+    const pooledIndex = this.readbackSnapshotPool.indexOf(snapshot);
+    if (pooledIndex >= 0) this.readbackSnapshotPool.splice(pooledIndex, 1);
+    if (!this.readbackSnapshots.delete(snapshot)) return;
+    safeDestroyTexture(snapshot.texture);
+  }
+
+  private allocatedReadbackSnapshotBytes(): number {
+    let total = 0;
+    for (const snapshot of this.readbackSnapshots) total += snapshot.byteLength;
+    return total;
+  }
+
+  private allocatedReadbackSnapshotPixels(): number {
+    let total = 0;
+    for (const snapshot of this.readbackSnapshots) total += snapshot.pixelCount;
+    return total;
+  }
+
+  private isSnapshotCompatible(
+    snapshot: StudioGpuFrameSnapshot,
+    device: GPUDevice | null,
+    format: GPUTextureFormat | null,
+    width: number,
+    height: number
+  ): boolean {
+    const expectedByteLength = readbackSnapshotByteLength(width, height);
+    return expectedByteLength !== null
+      && readbackTextureFormat(format) !== null
+      && snapshot.device === device
+      && snapshot.format === format
+      && snapshot.width === width
+      && snapshot.height === height
+      && snapshot.pixelCount === width * height
+      && snapshot.byteLength === expectedByteLength
+      && snapshot.readers === 0;
+  }
+
+  private evictIncompatibleReadbackSnapshots(
+    device: GPUDevice | null,
+    format: GPUTextureFormat | null,
+    width: number,
+    height: number
+  ): void {
+    for (const snapshot of [...this.readbackSnapshotPool]) {
+      if (!this.isSnapshotCompatible(snapshot, device, format, width, height)) {
+        this.destroyFrameSnapshot(snapshot);
+      }
+    }
+  }
+
+  private poolFrameSnapshot(snapshot: StudioGpuFrameSnapshot): void {
+    if (this.readbackSnapshotPool.includes(snapshot)) return;
+    if (
+      this.disposed
+      || !this.isSnapshotCompatible(
+        snapshot,
+        this.device,
+        this.format,
+        this.canvas.width,
+        this.canvas.height
+      )
+    ) {
+      this.destroyFrameSnapshot(snapshot);
+      return;
+    }
+    if (this.readbackSnapshotPool.length >= STUDIO_GPU_READBACK_SNAPSHOT_POOL_SIZE) {
+      const evicted = this.readbackSnapshotPool.shift();
+      if (evicted) this.destroyFrameSnapshot(evicted);
+    }
+    this.readbackSnapshotPool.push(snapshot);
+  }
+
+  private acquireFrameSnapshot(
+    device: GPUDevice,
+    format: GPUTextureFormat,
+    width: number,
+    height: number
+  ): StudioGpuFrameSnapshot | null {
+    const byteLength = readbackSnapshotByteLength(width, height);
+    if (byteLength === null || readbackTextureFormat(format) === null) return null;
+    const pixelCount = width * height;
+    this.evictIncompatibleReadbackSnapshots(device, format, width, height);
+    const reusableIndex = this.readbackSnapshotPool.findIndex((snapshot) => (
+      this.isSnapshotCompatible(snapshot, device, format, width, height)
+    ));
+    if (reusableIndex >= 0) {
+      const snapshot = this.readbackSnapshotPool.splice(reusableIndex, 1)[0]!;
+      snapshot.retired = false;
+      return snapshot;
+    }
+    if (
+      this.readbackSnapshots.size >= STUDIO_GPU_MAX_READBACK_SNAPSHOTS
+      || this.allocatedReadbackSnapshotPixels() + pixelCount
+        > STUDIO_GPU_MAX_READBACK_SNAPSHOT_PIXELS
+      || this.allocatedReadbackSnapshotBytes() + byteLength
+        > STUDIO_GPU_MAX_READBACK_SNAPSHOT_BYTES
+    ) {
+      return null;
+    }
+    const snapshot: StudioGpuFrameSnapshot = {
+      texture: device.createTexture({
+        label: "Studio authoritative frame readback snapshot",
+        size: { width, height, depthOrArrayLayers: 1 },
+        format,
+        usage: readbackTextureUsage(),
+      }),
+      device,
+      format,
+      width,
+      height,
+      pixelCount,
+      byteLength,
+      alphaMode: "premultiplied",
+      readers: 0,
+      retired: false,
+    };
+    this.readbackSnapshots.add(snapshot);
+    return snapshot;
+  }
+
+  private destroyReadbackSnapshotPool(): void {
+    for (const snapshot of this.readbackSnapshotPool.splice(0)) {
+      this.destroyFrameSnapshot(snapshot);
+    }
+  }
+
+  private invalidateAuthorityFrame(): void {
+    const previous = this.authorityFrame;
+    this.authorityFrame = null;
+    this.retireFrameSnapshot(previous?.snapshot ?? null);
+  }
+
+  private publishAuthorityFrame(
+    receipt: StudioGpuFrameReceipt,
+    snapshot: StudioGpuFrameSnapshot | null
+  ): StudioGpuAuthorityFrame | null {
+    if (
+      this.disposed
+      || receipt.requestId !== this.lastRequestId
+      || receipt.backend !== this.backend
+      || receipt.physicalWidth !== this.canvas.width
+      || receipt.physicalHeight !== this.canvas.height
+    ) {
+      this.retireFrameSnapshot(snapshot);
+      return null;
+    }
+    this.invalidateAuthorityFrame();
+    const frame: StudioGpuAuthorityFrame = {
+      receipt,
+      generation: this.frameGeneration,
+      snapshot,
+    };
+    this.authorityFrame = frame;
+    return frame;
+  }
+
+  private capturedReadback(
+    frame: StudioGpuAuthorityFrame,
+    area: StudioGpuReadbackArea,
+    layout: StudioGpuReadbackLayout,
+    pixels: Uint8ClampedArray
+  ): StudioGpuFrameReadbackResult {
+    if (!this.isAuthorityFrameCurrent(frame)) {
+      return { status: "rejected", reason: "stale-frame" };
+    }
+    return {
+      status: "captured",
+      receipt: frame.receipt,
+      area,
+      pixelRect: {
+        x: layout.x,
+        y: layout.y,
+        width: layout.width,
+        height: layout.height,
+      },
+      width: layout.width,
+      height: layout.height,
+      pixels,
+      format: "rgba8unorm",
+      alphaMode: "unpremultiplied",
+    };
+  }
+
+  private async captureCanvas2dFrame(
+    frame: StudioGpuAuthorityFrame,
+    area: StudioGpuReadbackArea,
+    layout: StudioGpuReadbackLayout
+  ): Promise<StudioGpuFrameReadbackResult> {
+    const context = this.fallbackContext;
+    if (
+      !context
+      || frame.snapshot !== null
+      || this.fallbackCanvas.width !== frame.receipt.physicalWidth
+      || this.fallbackCanvas.height !== frame.receipt.physicalHeight
+    ) {
+      return { status: "rejected", reason: "frame-unavailable" };
+    }
+    try {
+      // getImageData snapshots synchronously. JavaScript cannot interleave a render between this
+      // call and the generation check below, so no partially-mutated Canvas2D frame can escape.
+      const image = context.getImageData(layout.x, layout.y, layout.width, layout.height);
+      const expectedBytes = layout.width * layout.height * 4;
+      if (image.data.byteLength !== expectedBytes) {
+        return { status: "rejected", reason: "readback-failed" };
+      }
+      return this.capturedReadback(
+        frame,
+        area,
+        layout,
+        new Uint8ClampedArray(image.data)
+      );
+    } catch (error) {
+      const name = typeof error === "object" && error !== null && "name" in error
+        ? String(error.name)
+        : "";
+      return {
+        status: "rejected",
+        reason: name === "SecurityError" ? "tainted" : "readback-failed",
+      };
+    }
+  }
+
+  private readbackRaceReason(
+    frame: StudioGpuAuthorityFrame,
+    snapshot: StudioGpuFrameSnapshot
+  ): StudioGpuReadbackFailureReason {
+    if (this.disposed) return "disposed";
+    if (this.device !== snapshot.device) return "device-lost";
+    return this.isAuthorityFrameCurrent(frame) ? "readback-failed" : "stale-frame";
+  }
+
+  private async captureWebGpuFrame(
+    frame: StudioGpuAuthorityFrame,
+    area: StudioGpuReadbackArea,
+    layout: StudioGpuReadbackLayout
+  ): Promise<StudioGpuFrameReadbackResult> {
+    const snapshot = frame.snapshot;
+    if (!snapshot) {
+      if (readbackSnapshotByteLength(
+        frame.receipt.physicalWidth,
+        frame.receipt.physicalHeight
+      ) === null) {
+        return { status: "rejected", reason: "oversize" };
+      }
+      if (readbackTextureFormat(this.format) === null) {
+        return { status: "rejected", reason: "unsupported-format" };
+      }
+      return { status: "rejected", reason: "frame-unavailable" };
+    }
+    const device = snapshot.device;
+    if (snapshot.retired || this.device !== device) {
+      return { status: "rejected", reason: "frame-unavailable" };
+    }
+    const format = readbackTextureFormat(snapshot.format);
+    if (!format) return { status: "rejected", reason: "unsupported-format" };
+    if (
+      snapshot.width !== frame.receipt.physicalWidth
+      || snapshot.height !== frame.receipt.physicalHeight
+    ) {
+      return { status: "rejected", reason: "frame-unavailable" };
+    }
+    if (this.activeWebGpuReadbacks >= STUDIO_GPU_MAX_CONCURRENT_READBACKS) {
+      return { status: "rejected", reason: "busy" };
+    }
+    const maximumBufferSize = Number(
+      device.limits.maxBufferSize ?? 256 * 1024 * 1024
+    );
+    if (
+      !Number.isSafeInteger(layout.byteLength)
+      || !Number.isFinite(maximumBufferSize)
+      || maximumBufferSize <= 0
+      || layout.byteLength > maximumBufferSize
+    ) {
+      return { status: "rejected", reason: "oversize" };
+    }
+
+    snapshot.readers += 1;
+    this.activeWebGpuReadbacks += 1;
+    let buffer: GPUBuffer | null = null;
+    let mapped = false;
+    try {
+      if (!this.isAuthorityFrameCurrent(frame)) {
+        return { status: "rejected", reason: "stale-frame" };
+      }
+      buffer = device.createBuffer({
+        label: `Studio frame readback ${frame.receipt.requestId}`,
+        size: layout.byteLength,
+        usage: readbackBufferUsage(),
+      });
+      const encoder = device.createCommandEncoder({ label: "Studio frame readback" });
+      encoder.copyTextureToBuffer(
+        {
+          texture: snapshot.texture,
+          origin: { x: layout.x, y: layout.y, z: 0 },
+        },
+        {
+          buffer,
+          offset: 0,
+          bytesPerRow: layout.bytesPerRow,
+          rowsPerImage: layout.height,
+        },
+        { width: layout.width, height: layout.height, depthOrArrayLayers: 1 }
+      );
+      device.queue.submit([encoder.finish()]);
+      await this.submittedWork(device);
+      if (!this.isAuthorityFrameCurrent(frame)) {
+        return { status: "rejected", reason: this.readbackRaceReason(frame, snapshot) };
+      }
+      await buffer.mapAsync(0x01, 0, layout.byteLength);
+      mapped = true;
+      if (!this.isAuthorityFrameCurrent(frame)) {
+        return { status: "rejected", reason: this.readbackRaceReason(frame, snapshot) };
+      }
+      const pixels = copyStudioGpuReadbackRows(
+        buffer.getMappedRange(0, layout.byteLength),
+        layout,
+        format,
+        snapshot.alphaMode === "premultiplied"
+      );
+      if (!pixels) return { status: "rejected", reason: "readback-failed" };
+      return this.capturedReadback(frame, area, layout, pixels);
+    } catch {
+      return {
+        status: "rejected",
+        reason: this.readbackRaceReason(frame, snapshot),
+      };
+    } finally {
+      if (mapped && buffer) {
+        try {
+          buffer.unmap();
+        } catch {
+          // A lost device may already have invalidated the mapping.
+        }
+      }
+      try {
+        buffer?.destroy();
+      } catch {
+        // A failed/lost staging buffer has no remaining ownership.
+      }
+      this.releaseFrameSnapshotReader(snapshot);
+      this.activeWebGpuReadbacks = Math.max(0, this.activeWebGpuReadbacks - 1);
+    }
   }
 
   private gpu(): GPU | null {
@@ -1173,6 +1744,8 @@ export class StudioWebGpuEngine {
   private handleDeviceLost(lostDevice: GPUDevice, info: GPUDeviceLostInfo): void {
     if (this.disposed || this.device !== lostDevice) return;
     const recoveryGeneration = ++this.lifecycleGeneration;
+    this.invalidateAuthorityFrame();
+    this.destroyReadbackSnapshotPool();
     this.device = null;
     this.normalPipeline = null;
     this.erasePipeline = null;
@@ -1342,6 +1915,7 @@ export class StudioWebGpuEngine {
   }
 
   private invalidateFrameReceipt(): number {
+    this.invalidateAuthorityFrame();
     this.frameGeneration += 1;
     this.options.onFrameInvalid?.();
     return this.frameGeneration;
@@ -1449,6 +2023,7 @@ export class StudioWebGpuEngine {
       erasePipeline,
       presentationPipeline,
       presentationSampler,
+      format,
     } = this;
     if (
       !device
@@ -1457,11 +2032,14 @@ export class StudioWebGpuEngine {
       || !erasePipeline
       || !presentationPipeline
       || !presentationSampler
+      || !format
     ) {
       return;
     }
     let runtime: StudioGpuTileRuntime<GPUTexture> | null = null;
     let token: StudioGpuTileFrameToken | null = null;
+    let presentationSnapshot: StudioGpuFrameSnapshot | null = null;
+    let snapshotPublished = false;
     try {
       // A capped tile enlarged beyond its native physical density is visibly softer than Konva.
       // Do not bless that degraded surface: the invalidation already makes the authoritative
@@ -1560,10 +2138,17 @@ export class StudioWebGpuEngine {
       }
 
       const encoder = device.createCommandEncoder({ label: "Studio retained tile presentation" });
+      const presentationTexture = context.getCurrentTexture();
+      presentationSnapshot = this.acquireFrameSnapshot(
+        device,
+        format,
+        this.canvas.width,
+        this.canvas.height
+      );
       const pass = encoder.beginRenderPass({
         label: "Studio retained tile presentation",
         colorAttachments: [{
-          view: context.getCurrentTexture().createView(),
+          view: presentationTexture.createView(),
           clearValue: { r: 0, g: 0, b: 0, a: 0 },
           loadOp: "clear",
           storeOp: "store",
@@ -1586,6 +2171,17 @@ export class StudioWebGpuEngine {
         }
       }
       pass.end();
+      if (presentationSnapshot) {
+        encoder.copyTextureToTexture(
+          { texture: presentationTexture },
+          { texture: presentationSnapshot.texture },
+          {
+            width: presentationSnapshot.width,
+            height: presentationSnapshot.height,
+            depthOrArrayLayers: 1,
+          }
+        );
+      }
       device.queue.submit([encoder.finish()]);
       await this.submittedWork(device);
 
@@ -1598,7 +2194,11 @@ export class StudioWebGpuEngine {
         return;
       }
       this.recordRenderedTileFrame(strokes, resolved.dabCount);
-      this.options.onFrameReady?.(this.createFrameReceipt(strokes, requestId));
+      const receipt = this.createFrameReceipt(strokes, requestId);
+      if (this.publishAuthorityFrame(receipt, presentationSnapshot)) {
+        snapshotPublished = true;
+        this.options.onFrameReady?.(receipt);
+      }
     } catch {
       if (runtime && token) runtime.abortFrame(token);
       if (this.activeTileFrame?.token === token) this.activeTileFrame = null;
@@ -1613,6 +2213,10 @@ export class StudioWebGpuEngine {
       ) {
         this.activateCanvas2d();
         this.render(strokes, requestId);
+      }
+    } finally {
+      if (presentationSnapshot && !snapshotPublished) {
+        this.retireFrameSnapshot(presentationSnapshot);
       }
     }
   }
@@ -1696,7 +2300,10 @@ export class StudioWebGpuEngine {
       && requestId === this.lastRequestId
       && this.backend === "canvas2d"
     ) {
-      this.options.onFrameReady?.(this.createFrameReceipt(strokes, requestId));
+      const receipt = this.createFrameReceipt(strokes, requestId);
+      if (this.publishAuthorityFrame(receipt, null)) {
+        this.options.onFrameReady?.(receipt);
+      }
     }
   }
 
@@ -1704,7 +2311,7 @@ export class StudioWebGpuEngine {
     strokes: readonly StudioGpuStroke[],
     requestId: string
   ): StudioGpuFrameReceipt {
-    return {
+    return Object.freeze({
       requestId,
       fingerprint: fingerprintStudioGpuFrame(
         strokes,
@@ -1718,6 +2325,6 @@ export class StudioWebGpuEngine {
       dabCount: this.renderedDabCount,
       physicalWidth: this.canvas.width,
       physicalHeight: this.canvas.height,
-    };
+    });
   }
 }

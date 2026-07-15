@@ -23,6 +23,7 @@ interface FakeCanvas2d {
   arcs: Array<{ x: number; y: number; radius: number }>;
   composites: GlobalCompositeOperation[];
   clearRect: ReturnType<typeof vi.fn>;
+  getImageData: ReturnType<typeof vi.fn>;
 }
 
 function deferred<Value>(): Deferred<Value> {
@@ -39,11 +40,15 @@ function fakeCanvas2d(): FakeCanvas2d {
   let composite: GlobalCompositeOperation = "source-over";
   let fillStyle: string | CanvasGradient | CanvasPattern = "#000000";
   const clearRect = vi.fn();
+  const getImageData = vi.fn((_x: number, _y: number, width: number, height: number) => ({
+    data: new Uint8ClampedArray(width * height * 4),
+  }));
   const context = {
     save: vi.fn(),
     restore: vi.fn(),
     setTransform: vi.fn(),
     clearRect,
+    getImageData,
     beginPath: vi.fn(),
     arc: vi.fn((x: number, y: number, radius: number) => arcs.push({ x, y, radius })),
     fill: vi.fn(),
@@ -69,7 +74,7 @@ function fakeCanvas2d(): FakeCanvas2d {
     style: {},
     getContext: vi.fn((kind: string) => kind === "2d" ? context : null),
   } as unknown as HTMLCanvasElement;
-  return { canvas, context, arcs, composites, clearRect };
+  return { canvas, context, arcs, composites, clearRect, getImageData };
 }
 
 function fakeGpuCanvas(context: GPUCanvasContext | null) {
@@ -95,7 +100,8 @@ function stroke(overrides: Partial<StudioGpuStroke> = {}): StudioGpuStroke {
 
 function fakeGpuDevice(
   lost: Promise<GPUDeviceLostInfo>,
-  onSubmittedWorkDone: () => Promise<void> = async () => undefined
+  onSubmittedWorkDone: () => Promise<void> = async () => undefined,
+  maxTextureDimension2D = 4_096
 ) {
   const draw = vi.fn();
   const setPipeline = vi.fn();
@@ -109,14 +115,17 @@ function fakeGpuDevice(
   };
   const buffer = { destroy: vi.fn() };
   const texture = { createView: vi.fn(() => ({ retainedView: true })), destroy: vi.fn() };
+  const textures: Array<GPUTexture & { descriptor: GPUTextureDescriptor }> = [];
+  const readbackBuffers: Array<GPUBuffer & { storage: ArrayBuffer }> = [];
   const encoder = {
     beginRenderPass: vi.fn(() => pass),
     copyTextureToTexture: vi.fn(),
+    copyTextureToBuffer: vi.fn(),
     finish: vi.fn(() => ({ command: true })),
   };
   const device = {
     lost,
-    limits: { maxTextureDimension2D: 4_096 },
+    limits: { maxTextureDimension2D },
     queue: {
       writeBuffer: vi.fn(),
       submit: vi.fn(),
@@ -129,12 +138,45 @@ function fakeGpuDevice(
     })),
     createSampler: vi.fn(() => ({ sampler: true })),
     createBindGroup: vi.fn((descriptor: GPUBindGroupDescriptor) => ({ descriptor })),
-    createBuffer: vi.fn(() => buffer),
-    createTexture: vi.fn(() => texture),
+    createBuffer: vi.fn((descriptor: GPUBufferDescriptor) => {
+      if ((Number(descriptor.usage) & 0x01) !== 0) {
+        const storage = new ArrayBuffer(Number(descriptor.size));
+        const readback = {
+          storage,
+          mapAsync: vi.fn(async () => undefined),
+          getMappedRange: vi.fn(() => storage),
+          unmap: vi.fn(),
+          destroy: vi.fn(),
+        } as unknown as GPUBuffer & { storage: ArrayBuffer };
+        readbackBuffers.push(readback);
+        return readback;
+      }
+      return buffer;
+    }),
+    createTexture: vi.fn((descriptor: GPUTextureDescriptor) => {
+      if (String(descriptor.label).startsWith("Studio retained tile ")) return texture;
+      const created = {
+        descriptor,
+        createView: vi.fn(() => ({ retainedView: true })),
+        destroy: vi.fn(),
+      } as unknown as GPUTexture & { descriptor: GPUTextureDescriptor };
+      textures.push(created);
+      return created;
+    }),
     createCommandEncoder: vi.fn(() => encoder),
     destroy: vi.fn(),
   } as unknown as GPUDevice;
-  return { device, draw, setPipeline, setVertexBuffer, buffer, texture, encoder };
+  return {
+    device,
+    draw,
+    setPipeline,
+    setVertexBuffer,
+    buffer,
+    texture,
+    textures,
+    readbackBuffers,
+    encoder,
+  };
 }
 
 function renderPassDescriptors(
@@ -183,6 +225,86 @@ describe("StudioWebGpuEngine", () => {
         80
       )
     );
+  });
+
+  it("captures only the exact current Canvas2D receipt and rejects stale receipt objects", async () => {
+    const fallback = fakeCanvas2d();
+    const onFrameReady = vi.fn((_receipt: StudioGpuFrameReceipt) => undefined);
+    const engine = new StudioWebGpuEngine({
+      canvas: fakeGpuCanvas(null),
+      fallbackCanvas: fallback.canvas,
+      gpu: null,
+      onFrameReady,
+    });
+    engine.resize({
+      logicalWidth: 100,
+      logicalHeight: 80,
+      cssWidth: 50,
+      cssHeight: 40,
+      dpr: 2,
+    });
+    engine.render([stroke()], "capture:canvas");
+    const receipt = onFrameReady.mock.calls.at(-1)![0];
+    fallback.getImageData.mockImplementationOnce((_x, _y, width, height) => ({
+      data: new Uint8ClampedArray(width * height * 4).fill(17),
+    }));
+
+    await expect(engine.captureFrame({
+      receipt,
+      area: { kind: "document", rect: { x: 10, y: 10, width: 20, height: 10 } },
+    })).resolves.toEqual(expect.objectContaining({
+      status: "captured",
+      receipt,
+      pixelRect: { x: 10, y: 10, width: 20, height: 10 },
+      width: 20,
+      height: 10,
+      pixels: new Uint8ClampedArray(800).fill(17),
+    }));
+
+    await expect(engine.captureFrame({
+      receipt: { ...receipt },
+      area: { kind: "viewport" },
+    })).resolves.toEqual({ status: "rejected", reason: "stale-frame" });
+    await expect(engine.captureFrame(
+      null as unknown as Parameters<StudioWebGpuEngine["captureFrame"]>[0]
+    )).resolves.toEqual({ status: "rejected", reason: "invalid-area" });
+    await expect(engine.captureFrame({
+      receipt,
+      area: null as unknown as { kind: "viewport" },
+    })).resolves.toEqual({ status: "rejected", reason: "invalid-area" });
+    await expect(engine.captureFrame({
+      area: { kind: "viewport" },
+    } as unknown as Parameters<StudioWebGpuEngine["captureFrame"]>[0])).resolves.toEqual({
+      status: "rejected",
+      reason: "invalid-area",
+    });
+    engine.render([stroke({ id: "new" })], "capture:new");
+    await expect(engine.captureFrame({
+      receipt,
+      area: { kind: "viewport" },
+    })).resolves.toEqual({ status: "rejected", reason: "stale-frame" });
+  });
+
+  it("reports a tainted Canvas2D frame without leaking partial pixels", async () => {
+    const fallback = fakeCanvas2d();
+    const onFrameReady = vi.fn((_receipt: StudioGpuFrameReceipt) => undefined);
+    const engine = new StudioWebGpuEngine({
+      canvas: fakeGpuCanvas(null),
+      fallbackCanvas: fallback.canvas,
+      gpu: null,
+      onFrameReady,
+    });
+    engine.resize({ logicalWidth: 100, logicalHeight: 80 });
+    engine.render([stroke()], "capture:tainted");
+    const receipt = onFrameReady.mock.calls.at(-1)![0];
+    fallback.getImageData.mockImplementationOnce(() => {
+      throw Object.assign(new Error("cross-origin"), { name: "SecurityError" });
+    });
+
+    await expect(engine.captureFrame({ receipt, area: { kind: "viewport" } })).resolves.toEqual({
+      status: "rejected",
+      reason: "tainted",
+    });
   });
 
   it("refuses frame authority for an overflowing brush contract", () => {
@@ -556,7 +678,12 @@ describe("StudioWebGpuEngine", () => {
     expect(vi.mocked(fake.device.queue.writeBuffer).mock.calls[0]?.[4]).toBe(
       suffix.dabs.length * 8 * Float32Array.BYTES_PER_ELEMENT
     );
-    expect(fake.device.createTexture).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(fake.device.createTexture).mock.calls.filter(([descriptor]) => (
+      String(descriptor.label).startsWith("Studio retained tile ")
+    ))).toHaveLength(1);
+    expect(vi.mocked(fake.device.createTexture).mock.calls.filter(([descriptor]) => (
+      descriptor.label === "Studio authoritative frame readback snapshot"
+    ))).toHaveLength(1);
     expect(fake.texture.destroy).not.toHaveBeenCalled();
   });
 
@@ -601,7 +728,12 @@ describe("StudioWebGpuEngine", () => {
     vi.mocked(fake.device.queue.writeBuffer).mockClear();
     vi.mocked(fake.encoder.beginRenderPass).mockClear();
     vi.mocked(fake.encoder.copyTextureToTexture).mockClear();
-    expect(fake.device.createTexture).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(fake.device.createTexture).mock.calls.filter(([descriptor]) => (
+      String(descriptor.label).startsWith("Studio retained tile ")
+    ))).toHaveLength(1);
+    expect(vi.mocked(fake.device.createTexture).mock.calls.filter(([descriptor]) => (
+      descriptor.label === "Studio authoritative frame readback snapshot"
+    ))).toHaveLength(1);
     engine.render([initial, appended], "tiles:append");
     await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalledWith(expect.objectContaining({
       requestId: "tiles:append",
@@ -612,8 +744,13 @@ describe("StudioWebGpuEngine", () => {
     expect(vi.mocked(fake.device.queue.writeBuffer).mock.calls[0]?.[4]).toBe(
       planStudioGpuDabs([appended]).dabs.length * 8 * Float32Array.BYTES_PER_ELEMENT
     );
-    expect(fake.device.createTexture).toHaveBeenCalledTimes(1);
-    expect(fake.encoder.copyTextureToTexture).not.toHaveBeenCalled();
+    expect(vi.mocked(fake.device.createTexture).mock.calls.filter(([descriptor]) => (
+      String(descriptor.label).startsWith("Studio retained tile ")
+    ))).toHaveLength(1);
+    expect(vi.mocked(fake.device.createTexture).mock.calls.filter(([descriptor]) => (
+      descriptor.label === "Studio authoritative frame readback snapshot"
+    ))).toHaveLength(1);
+    expect(fake.encoder.copyTextureToTexture).toHaveBeenCalledTimes(1);
 
     const changedHistory = stroke({
       orderKey: "a",
@@ -640,6 +777,377 @@ describe("StudioWebGpuEngine", () => {
       descriptor.label === "Studio retained tile 0:0"
     ))).toBe(false);
     expect(fake.device.createTexture).toHaveBeenCalledTimes(textureCount);
+  });
+
+  it("captures an aligned WebGPU snapshot and reuses a bounded copy-on-write texture ring", async () => {
+    const neverLost = new Promise<GPUDeviceLostInfo>(() => undefined);
+    const fake = fakeGpuDevice(neverLost);
+    const onFrameReady = vi.fn((_receipt: StudioGpuFrameReceipt) => undefined);
+    const context = {
+      configure: vi.fn(),
+      unconfigure: vi.fn(),
+      getCurrentTexture: vi.fn(() => ({ createView: vi.fn(() => ({ view: true })) })),
+    } as unknown as GPUCanvasContext;
+    const adapter = { requestDevice: vi.fn(async () => fake.device) } as unknown as GPUAdapter;
+    const gpu = {
+      requestAdapter: vi.fn(async () => adapter),
+      getPreferredCanvasFormat: vi.fn(() => "bgra8unorm"),
+    } as unknown as GPU;
+    const engine = new StudioWebGpuEngine({
+      canvas: fakeGpuCanvas(context),
+      fallbackCanvas: fakeCanvas2d().canvas,
+      gpu,
+      onFrameReady,
+    });
+    engine.resize({ logicalWidth: 100, logicalHeight: 80 });
+    await engine.initialize();
+    await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalled());
+
+    for (let index = 0; index < 3; index += 1) {
+      const requestId = `snapshot:reuse:${index}`;
+      engine.render([stroke({ points: [5, 10, 35 + index, 10] })], requestId);
+      await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalledWith(expect.objectContaining({
+        requestId,
+      })));
+    }
+    expect(fake.textures).toHaveLength(1);
+    const receipt = onFrameReady.mock.calls.at(-1)![0];
+    vi.mocked(fake.encoder.copyTextureToBuffer).mockImplementationOnce((
+      _source,
+      destination
+    ) => {
+      const readback = destination.buffer as GPUBuffer & { storage: ArrayBuffer };
+      new Uint8Array(readback.storage).set([25, 50, 100, 128]);
+    });
+
+    const captured = await engine.captureFrame({ receipt, area: { kind: "viewport" } });
+    expect(captured).toEqual(expect.objectContaining({
+      status: "captured",
+      receipt,
+      width: 100,
+      height: 80,
+      pixelRect: { x: 0, y: 0, width: 100, height: 80 },
+    }));
+    expect(captured.status === "captured" ? [...captured.pixels.slice(0, 4)] : null).toEqual([
+      199, 100, 50, 128,
+    ]);
+    expect(fake.readbackBuffers.at(-1)?.unmap).toHaveBeenCalledTimes(1);
+    expect(fake.readbackBuffers.at(-1)?.destroy).toHaveBeenCalledTimes(1);
+
+    const captureSubmission = deferred<void>();
+    vi.mocked(fake.device.queue.onSubmittedWorkDone).mockImplementationOnce(
+      () => captureSubmission.promise
+    );
+    const staleCapture = engine.captureFrame({ receipt, area: { kind: "viewport" } });
+    await vi.waitFor(() => expect(fake.encoder.copyTextureToBuffer).toHaveBeenCalledTimes(2));
+    engine.render([stroke({ points: [5, 10, 60, 10] })], "snapshot:cow");
+    await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalledWith(expect.objectContaining({
+      requestId: "snapshot:cow",
+    })));
+    expect(fake.textures).toHaveLength(2);
+
+    captureSubmission.resolve(undefined);
+    await expect(staleCapture).resolves.toEqual({
+      status: "rejected",
+      reason: "stale-frame",
+    });
+    engine.render([stroke({ points: [5, 10, 70, 10] })], "snapshot:reuse-after-reader");
+    await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalledWith(expect.objectContaining({
+      requestId: "snapshot:reuse-after-reader",
+    })));
+    expect(fake.textures).toHaveLength(2);
+  });
+
+  it("publishes oversized WebGPU display frames without allocating or copying a readback snapshot", async () => {
+    const neverLost = new Promise<GPUDeviceLostInfo>(() => undefined);
+    const fake = fakeGpuDevice(neverLost, async () => undefined, 8_192);
+    const onFrameReady = vi.fn((_receipt: StudioGpuFrameReceipt) => undefined);
+    const context = {
+      configure: vi.fn(),
+      unconfigure: vi.fn(),
+      getCurrentTexture: vi.fn(() => ({ createView: vi.fn(() => ({ view: true })) })),
+    } as unknown as GPUCanvasContext;
+    const adapter = { requestDevice: vi.fn(async () => fake.device) } as unknown as GPUAdapter;
+    const gpu = {
+      requestAdapter: vi.fn(async () => adapter),
+      getPreferredCanvasFormat: vi.fn(() => "bgra8unorm"),
+    } as unknown as GPU;
+    const engine = new StudioWebGpuEngine({
+      canvas: fakeGpuCanvas(context),
+      fallbackCanvas: fakeCanvas2d().canvas,
+      gpu,
+      onFrameReady,
+    });
+    engine.resize({
+      logicalWidth: 4_097,
+      logicalHeight: 4_097,
+      cssWidth: 4_097,
+      cssHeight: 4_097,
+    });
+    await engine.initialize();
+    await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalledWith(expect.objectContaining({
+      backend: "webgpu",
+      physicalWidth: 4_097,
+      physicalHeight: 4_097,
+    })));
+    const receipt = onFrameReady.mock.calls.at(-1)![0];
+
+    expect(fake.textures).toHaveLength(0);
+    expect(fake.encoder.copyTextureToTexture).not.toHaveBeenCalled();
+    await expect(engine.captureFrame({ receipt, area: { kind: "viewport" } })).resolves.toEqual({
+      status: "rejected",
+      reason: "oversize",
+    });
+    await expect(engine.captureFrame({
+      receipt,
+      area: { kind: "document", rect: { x: 0, y: 0, width: 1, height: 1 } },
+    })).resolves.toEqual({ status: "rejected", reason: "oversize" });
+  });
+
+  it("rejects nonlinear presentation formats instead of unpremultiplying sRGB bytes", async () => {
+    const neverLost = new Promise<GPUDeviceLostInfo>(() => undefined);
+    const fake = fakeGpuDevice(neverLost);
+    const onFrameReady = vi.fn((_receipt: StudioGpuFrameReceipt) => undefined);
+    const context = {
+      configure: vi.fn(),
+      unconfigure: vi.fn(),
+      getCurrentTexture: vi.fn(() => ({ createView: vi.fn(() => ({ view: true })) })),
+    } as unknown as GPUCanvasContext;
+    const adapter = { requestDevice: vi.fn(async () => fake.device) } as unknown as GPUAdapter;
+    const gpu = {
+      requestAdapter: vi.fn(async () => adapter),
+      getPreferredCanvasFormat: vi.fn(() => "bgra8unorm-srgb"),
+    } as unknown as GPU;
+    const engine = new StudioWebGpuEngine({
+      canvas: fakeGpuCanvas(context),
+      fallbackCanvas: fakeCanvas2d().canvas,
+      gpu,
+      onFrameReady,
+    });
+    engine.resize({ logicalWidth: 100, logicalHeight: 80 });
+    await engine.initialize();
+    await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalledWith(expect.objectContaining({
+      backend: "webgpu",
+    })));
+    const receipt = onFrameReady.mock.calls.at(-1)![0];
+
+    expect(fake.textures).toHaveLength(0);
+    expect(fake.encoder.copyTextureToTexture).not.toHaveBeenCalled();
+    await expect(engine.captureFrame({ receipt, area: { kind: "viewport" } })).resolves.toEqual({
+      status: "rejected",
+      reason: "unsupported-format",
+    });
+  });
+
+  it("caps snapshot memory at two reader-held surfaces and still publishes the newest display", async () => {
+    const neverLost = new Promise<GPUDeviceLostInfo>(() => undefined);
+    const fake = fakeGpuDevice(neverLost);
+    const onFrameReady = vi.fn((_receipt: StudioGpuFrameReceipt) => undefined);
+    const context = {
+      configure: vi.fn(),
+      unconfigure: vi.fn(),
+      getCurrentTexture: vi.fn(() => ({ createView: vi.fn(() => ({ view: true })) })),
+    } as unknown as GPUCanvasContext;
+    const adapter = { requestDevice: vi.fn(async () => fake.device) } as unknown as GPUAdapter;
+    const gpu = {
+      requestAdapter: vi.fn(async () => adapter),
+      getPreferredCanvasFormat: vi.fn(() => "bgra8unorm"),
+    } as unknown as GPU;
+    const engine = new StudioWebGpuEngine({
+      canvas: fakeGpuCanvas(context),
+      fallbackCanvas: fakeCanvas2d().canvas,
+      gpu,
+      onFrameReady,
+    });
+    engine.resize({ logicalWidth: 100, logicalHeight: 80 });
+    await engine.initialize();
+    await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalled());
+    const firstReceipt = onFrameReady.mock.calls.at(-1)![0];
+    const firstRead = deferred<void>();
+    vi.mocked(fake.device.queue.onSubmittedWorkDone).mockImplementationOnce(
+      () => firstRead.promise
+    );
+    const firstCapture = engine.captureFrame({
+      receipt: firstReceipt,
+      area: { kind: "viewport" },
+    });
+    await vi.waitFor(() => expect(fake.readbackBuffers).toHaveLength(1));
+
+    engine.render([stroke({ points: [5, 10, 50, 10] })], "budget:second");
+    await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalledWith(expect.objectContaining({
+      requestId: "budget:second",
+    })));
+    const secondReceipt = onFrameReady.mock.calls.at(-1)![0];
+    const secondRead = deferred<void>();
+    vi.mocked(fake.device.queue.onSubmittedWorkDone).mockImplementationOnce(
+      () => secondRead.promise
+    );
+    const secondCapture = engine.captureFrame({
+      receipt: secondReceipt,
+      area: { kind: "viewport" },
+    });
+    await vi.waitFor(() => expect(fake.readbackBuffers).toHaveLength(2));
+
+    engine.render([stroke({ points: [5, 10, 60, 10] })], "budget:display-only");
+    await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalledWith(expect.objectContaining({
+      requestId: "budget:display-only",
+    })));
+    const displayOnlyReceipt = onFrameReady.mock.calls.at(-1)![0];
+    expect(fake.textures).toHaveLength(2);
+    expect(fake.encoder.copyTextureToTexture).toHaveBeenCalledTimes(2);
+    await expect(engine.captureFrame({
+      receipt: displayOnlyReceipt,
+      area: { kind: "viewport" },
+    })).resolves.toEqual({ status: "rejected", reason: "frame-unavailable" });
+
+    firstRead.resolve(undefined);
+    secondRead.resolve(undefined);
+    await expect(firstCapture).resolves.toEqual({ status: "rejected", reason: "stale-frame" });
+    await expect(secondCapture).resolves.toEqual({ status: "rejected", reason: "stale-frame" });
+  });
+
+  it("rejects a third concurrent WebGPU read and cleans up a failed map", async () => {
+    const neverLost = new Promise<GPUDeviceLostInfo>(() => undefined);
+    const fake = fakeGpuDevice(neverLost);
+    const onFrameReady = vi.fn((_receipt: StudioGpuFrameReceipt) => undefined);
+    const context = {
+      configure: vi.fn(),
+      unconfigure: vi.fn(),
+      getCurrentTexture: vi.fn(() => ({ createView: vi.fn(() => ({ view: true })) })),
+    } as unknown as GPUCanvasContext;
+    const adapter = { requestDevice: vi.fn(async () => fake.device) } as unknown as GPUAdapter;
+    const gpu = {
+      requestAdapter: vi.fn(async () => adapter),
+      getPreferredCanvasFormat: vi.fn(() => "rgba8unorm"),
+    } as unknown as GPU;
+    const engine = new StudioWebGpuEngine({
+      canvas: fakeGpuCanvas(context),
+      fallbackCanvas: fakeCanvas2d().canvas,
+      gpu,
+      onFrameReady,
+    });
+    engine.resize({ logicalWidth: 100, logicalHeight: 80 });
+    await engine.initialize();
+    await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalled());
+    const receipt = onFrameReady.mock.calls.at(-1)![0];
+    const firstRead = deferred<void>();
+    const secondRead = deferred<void>();
+    vi.mocked(fake.device.queue.onSubmittedWorkDone)
+      .mockImplementationOnce(() => firstRead.promise)
+      .mockImplementationOnce(() => secondRead.promise);
+    const firstCapture = engine.captureFrame({ receipt, area: { kind: "viewport" } });
+    const secondCapture = engine.captureFrame({ receipt, area: { kind: "viewport" } });
+    await vi.waitFor(() => expect(fake.readbackBuffers).toHaveLength(2));
+
+    await expect(engine.captureFrame({ receipt, area: { kind: "viewport" } })).resolves.toEqual({
+      status: "rejected",
+      reason: "busy",
+    });
+    expect(fake.readbackBuffers).toHaveLength(2);
+    firstRead.resolve(undefined);
+    secondRead.resolve(undefined);
+    await expect(firstCapture).resolves.toEqual(expect.objectContaining({ status: "captured" }));
+    await expect(secondCapture).resolves.toEqual(expect.objectContaining({ status: "captured" }));
+
+    const mapFailure = engine.captureFrame({ receipt, area: { kind: "viewport" } });
+    const failedBuffer = fake.readbackBuffers.at(-1)!;
+    vi.mocked(failedBuffer.mapAsync).mockRejectedValueOnce(new Error("map failed"));
+    await expect(mapFailure).resolves.toEqual({ status: "rejected", reason: "readback-failed" });
+    expect(failedBuffer.unmap).not.toHaveBeenCalled();
+    expect(failedBuffer.destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it("evicts reader-retired snapshot textures when the presentation size changes", async () => {
+    const neverLost = new Promise<GPUDeviceLostInfo>(() => undefined);
+    const fake = fakeGpuDevice(neverLost);
+    const onFrameReady = vi.fn((_receipt: StudioGpuFrameReceipt) => undefined);
+    const context = {
+      configure: vi.fn(),
+      unconfigure: vi.fn(),
+      getCurrentTexture: vi.fn(() => ({ createView: vi.fn(() => ({ view: true })) })),
+    } as unknown as GPUCanvasContext;
+    const adapter = { requestDevice: vi.fn(async () => fake.device) } as unknown as GPUAdapter;
+    const gpu = {
+      requestAdapter: vi.fn(async () => adapter),
+      getPreferredCanvasFormat: vi.fn(() => "bgra8unorm"),
+    } as unknown as GPU;
+    const engine = new StudioWebGpuEngine({
+      canvas: fakeGpuCanvas(context),
+      fallbackCanvas: fakeCanvas2d().canvas,
+      gpu,
+      onFrameReady,
+    });
+    engine.resize({ logicalWidth: 100, logicalHeight: 80 });
+    await engine.initialize();
+    await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalled());
+    const firstReceipt = onFrameReady.mock.calls.at(-1)![0];
+    const read = deferred<void>();
+    vi.mocked(fake.device.queue.onSubmittedWorkDone).mockImplementationOnce(() => read.promise);
+    const capture = engine.captureFrame({ receipt: firstReceipt, area: { kind: "viewport" } });
+    await vi.waitFor(() => expect(fake.readbackBuffers).toHaveLength(1));
+    engine.render([stroke()], "resize:second");
+    await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalledWith(expect.objectContaining({
+      requestId: "resize:second",
+    })));
+    expect(fake.textures).toHaveLength(2);
+    read.resolve(undefined);
+    await expect(capture).resolves.toEqual({ status: "rejected", reason: "stale-frame" });
+    expect(fake.textures.every((texture) => !vi.mocked(texture.destroy).mock.calls.length)).toBe(true);
+
+    engine.resize({ logicalWidth: 120, logicalHeight: 80, cssWidth: 120, cssHeight: 80 });
+    await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalledWith(expect.objectContaining({
+      physicalWidth: 120,
+      physicalHeight: 80,
+    })));
+    expect(fake.textures).toHaveLength(3);
+    expect(fake.textures[0]?.destroy).toHaveBeenCalledTimes(1);
+    expect(fake.textures[1]?.destroy).toHaveBeenCalledTimes(1);
+    expect(fake.textures[2]?.descriptor.size).toEqual({
+      width: 120,
+      height: 80,
+      depthOrArrayLayers: 1,
+    });
+  });
+
+  it("rejects an in-flight WebGPU readback on device loss and releases its staging resources", async () => {
+    const lost = deferred<GPUDeviceLostInfo>();
+    const fake = fakeGpuDevice(lost.promise);
+    const onFrameReady = vi.fn((_receipt: StudioGpuFrameReceipt) => undefined);
+    const context = {
+      configure: vi.fn(),
+      unconfigure: vi.fn(),
+      getCurrentTexture: vi.fn(() => ({ createView: vi.fn(() => ({ view: true })) })),
+    } as unknown as GPUCanvasContext;
+    const adapter = { requestDevice: vi.fn(async () => fake.device) } as unknown as GPUAdapter;
+    const gpu = {
+      requestAdapter: vi.fn(async () => adapter),
+      getPreferredCanvasFormat: vi.fn(() => "bgra8unorm"),
+    } as unknown as GPU;
+    const engine = new StudioWebGpuEngine({
+      canvas: fakeGpuCanvas(context),
+      fallbackCanvas: fakeCanvas2d().canvas,
+      gpu,
+      autoRecover: false,
+      onFrameReady,
+    });
+    engine.resize({ logicalWidth: 100, logicalHeight: 80 });
+    await engine.initialize();
+    await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalled());
+    const receipt = onFrameReady.mock.calls.at(-1)![0];
+    const readbackSubmission = deferred<void>();
+    vi.mocked(fake.device.queue.onSubmittedWorkDone).mockImplementationOnce(
+      () => readbackSubmission.promise
+    );
+    const capture = engine.captureFrame({ receipt, area: { kind: "viewport" } });
+    await vi.waitFor(() => expect(fake.readbackBuffers).toHaveLength(1));
+
+    lost.resolve({ reason: "unknown", message: "lost during capture" } as GPUDeviceLostInfo);
+    await vi.waitFor(() => expect(engine.getBackend()).toBe("canvas2d"));
+    readbackSubmission.resolve(undefined);
+
+    await expect(capture).resolves.toEqual({ status: "rejected", reason: "device-lost" });
+    expect(fake.readbackBuffers[0]?.destroy).toHaveBeenCalledTimes(1);
+    expect(fake.textures[0]?.destroy).toHaveBeenCalledTimes(1);
   });
 
   it("keeps viewport-bounded WebGPU authority when only offscreen ink exceeds the dab cap", async () => {
