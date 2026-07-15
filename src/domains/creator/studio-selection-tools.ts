@@ -445,6 +445,101 @@ export function expandContractSelection(
   return { ...sel!, subpaths: nextSubs };
 }
 
+/** 선택 마퀴 회전 각도 슬라이더 범위(도). */
+export const SELECTION_ROTATE_RANGE = { min: -180, max: 180, step: 1 } as const;
+/** 선택 마퀴 회전 프리셋(도) — 패널 빠른 버튼. */
+export const SELECTION_ROTATE_PRESETS = [-90, 90, 180] as const;
+
+/**
+ * 선택 영역 중심(정규화) — add 서브패스 bbox 중심. 반전 전체 선택이면 (0.5, 0.5).
+ * 쓸 수 없는 선택이면 null.
+ */
+export function selectionCentroidNorm(sel: PixelSelection | null): SelPoint | null {
+  const b = selectionBoundsNorm(sel);
+  if (!b) return null;
+  return { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+}
+
+/**
+ * 정규화 좌표 한 점을 중심 기준으로 회전.
+ * aspect = 요소 높이/폭 — 비정사각 이미지에서도 화면상 각도가 맞게 돌리기 위한 y축 스케일.
+ */
+function rotateNormPoint(p: SelPoint, cx: number, cy: number, cos: number, sin: number, aspect: number): SelPoint {
+  const A = Number.isFinite(aspect) && aspect > 0 ? aspect : 1;
+  const sx = p.x - cx;
+  const sy = (p.y - cy) * A;
+  const rx = sx * cos - sy * sin;
+  const ry = sx * sin + sy * cos;
+  return sanitizePoint({ x: cx + rx, y: cy + ry / A }, SEL_POINT_MIN, SEL_POINT_MAX);
+}
+
+/**
+ * 선택 마퀴 회전(Transform Selection) — 픽셀 내용은 건드리지 않고 경계 기하만 돌린다.
+ * degrees: 시계 방향 양수(캔버스 y-down 기준 CSS/Canvas 와 동일).
+ * opts.aspect: 요소 height/width (기본 1). 비정사각일 때 필수에 가깝다.
+ * 전체 반전 선택(서브패스 0)은 대칭이라 그대로 반환. 면적이 사라지면 null.
+ */
+export function rotateSelection(
+  sel: PixelSelection | null,
+  degrees: number,
+  opts?: { aspect?: number }
+): PixelSelection | null {
+  if (!isSelectionUsable(sel)) return null;
+  const deg = clampNum(degrees, -3600, 3600, 0);
+  if (deg === 0 || (sel!.invert && sel!.subpaths.length === 0)) return sel;
+  const center = selectionCentroidNorm(sel);
+  if (!center) return sel;
+  const rad = (deg * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const aspect = opts?.aspect ?? 1;
+  const nextSubs: SelectionSubpath[] = [];
+  for (const sp of sel!.subpaths) {
+    const points = sp.points.map((p) => rotateNormPoint(p, center.x, center.y, cos, sin, aspect));
+    if (sp.kind === "brush") {
+      if (points.length === 0) continue;
+      nextSubs.push({ ...sp, points });
+      continue;
+    }
+    if (points.length >= 3 && polygonAreaNorm(points) >= MIN_SELECTION_SUBPATH_AREA) {
+      nextSubs.push({ mode: sp.mode, points });
+    }
+  }
+  if (nextSubs.length === 0 && !sel!.invert) return null;
+  return { ...sel!, subpaths: nextSubs };
+}
+
+/**
+ * 선택 마퀴 좌우/상하 반전 — 중심 기준. 픽셀 내용은 유지하고 경계만 뒤집는다.
+ * axis "x" = 좌우, "y" = 상하.
+ */
+export function flipSelection(sel: PixelSelection | null, axis: "x" | "y"): PixelSelection | null {
+  if (!isSelectionUsable(sel)) return null;
+  if (sel!.invert && sel!.subpaths.length === 0) return sel;
+  const center = selectionCentroidNorm(sel);
+  if (!center) return sel;
+  const nextSubs: SelectionSubpath[] = [];
+  for (const sp of sel!.subpaths) {
+    const points = sp.points.map((p) =>
+      sanitizePoint(
+        axis === "x" ? { x: 2 * center.x - p.x, y: p.y } : { x: p.x, y: 2 * center.y - p.y },
+        SEL_POINT_MIN,
+        SEL_POINT_MAX
+      )
+    );
+    if (sp.kind === "brush") {
+      if (points.length === 0) continue;
+      nextSubs.push({ ...sp, points });
+      continue;
+    }
+    if (points.length >= 3 && polygonAreaNorm(points) >= MIN_SELECTION_SUBPATH_AREA) {
+      nextSubs.push({ mode: sp.mode, points });
+    }
+  }
+  if (nextSubs.length === 0 && !sel!.invert) return null;
+  return { ...sel!, subpaths: nextSubs };
+}
+
 // ---------------------------------------------------------------------------
 // 다각형 올가미(클릭-꼭짓점) 세션 — 드래그 올가미와 분리된 상태 기계
 // ---------------------------------------------------------------------------

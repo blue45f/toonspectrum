@@ -1,17 +1,20 @@
 /**
  * Studio Selection Tools Panel
  * 픽셀 선택 — 사각/타원/자유 올가미/다각형 올가미/브러시 + 합치기/빼기/교집합 +
- * 페더/반전/전체선택/확장·축소 + 부분 조정.
+ * 페더/반전/전체선택/확장·축소/회전·뒤집기 + 부분 조정.
  */
 import {
   Circle,
   Eraser,
+  FlipHorizontal2,
+  FlipVertical2,
   Lasso,
   Maximize2,
   Minimize2,
   Paintbrush,
   Pentagon,
   RotateCcw,
+  RotateCw,
   Square,
   Undo2,
   WandSparkles,
@@ -28,6 +31,7 @@ import {
   SELECTION_EXPAND_RANGE,
   SELECTION_FEATHER_RANGE,
   SELECTION_HUE_RANGE,
+  SELECTION_ROTATE_RANGE,
   SELECTION_TOOLS,
   isSelectionUsable,
   planSelectionAdjust,
@@ -69,6 +73,10 @@ export type StudioSelectionToolsPanelProps = {
   onSelectAll: () => void;
   onExpand: (amountNorm: number) => void;
   onContract: (amountNorm: number) => void;
+  /** 선택 마퀴만 회전(도, 시계 방향 양수). 픽셀 내용은 유지. */
+  onRotate: (degrees: number) => void;
+  /** 선택 마퀴 좌우(x)·상하(y) 반전. */
+  onFlip: (axis: "x" | "y") => void;
   onApplyAdjust: (plan: SelectionAdjustPlan) => void;
   onContentAwareFill: () => void;
 };
@@ -90,12 +98,15 @@ export function StudioSelectionToolsPanel({
   onSelectAll,
   onExpand,
   onContract,
+  onRotate,
+  onFlip,
   onApplyAdjust,
   onContentAwareFill,
 }: StudioSelectionToolsPanelProps): ReactElement {
   const [brightness, setBrightness] = useState(0);
   const [hue, setHue] = useState(0);
   const [expandAmount, setExpandAmount] = useState(SELECTION_EXPAND_DEFAULT);
+  const [rotateAmount, setRotateAmount] = useState(15);
 
   const usable = isSelectionUsable(selection);
   const subpathCount = selection?.subpaths.length ?? 0;
@@ -257,6 +268,85 @@ export function StudioSelectionToolsPanel({
           <Minimize2 className="size-3.5" aria-hidden />
           축소
         </button>
+      </div>
+
+      {/* 선택 마퀴 회전 / 뒤집기 — 픽셀 내용은 그대로, 경계만 변형(Transform Selection). */}
+      <div className="space-y-1.5 border-t border-line/40 pt-2">
+        <StudioSliderRow
+          label="회전"
+          min={SELECTION_ROTATE_RANGE.min}
+          max={SELECTION_ROTATE_RANGE.max}
+          step={SELECTION_ROTATE_RANGE.step}
+          value={rotateAmount}
+          onChange={setRotateAmount}
+          readout={`${rotateAmount}°`}
+        />
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            disabled={!usable || busy || rotateAmount === 0}
+            className={buttonClass({ size: "sm", variant: "outline" })}
+            title="슬라이더 각도만큼 선택 경계를 시계 방향으로 돌립니다(픽셀 유지)."
+            onClick={() => onRotate(rotateAmount)}
+          >
+            <RotateCw className="size-3.5" aria-hidden />
+            적용
+          </button>
+          <button
+            type="button"
+            disabled={!usable || busy}
+            className={buttonClass({ size: "sm", variant: "quiet" })}
+            title="선택 경계를 시계 방향으로 90° 돌립니다."
+            onClick={() => onRotate(90)}
+            aria-label="시계 방향 90도"
+          >
+            <RotateCw className="size-3.5" aria-hidden />
+            90°
+          </button>
+          <button
+            type="button"
+            disabled={!usable || busy}
+            className={buttonClass({ size: "sm", variant: "quiet" })}
+            title="선택 경계를 반시계 방향으로 90° 돌립니다."
+            onClick={() => onRotate(-90)}
+            aria-label="반시계 방향 90도"
+          >
+            <RotateCcw className="size-3.5" aria-hidden />
+            -90°
+          </button>
+          <button
+            type="button"
+            disabled={!usable || busy}
+            className={buttonClass({ size: "sm", variant: "quiet" })}
+            title="선택 경계를 180° 돌립니다."
+            onClick={() => onRotate(180)}
+            aria-label="180도 회전"
+          >
+            180°
+          </button>
+          <button
+            type="button"
+            disabled={!usable || busy}
+            className={buttonClass({ size: "sm", variant: "quiet" })}
+            title="선택 경계를 좌우로 뒤집습니다."
+            onClick={() => onFlip("x")}
+            aria-label="좌우 반전"
+          >
+            <FlipHorizontal2 className="size-3.5" aria-hidden />
+            좌우
+          </button>
+          <button
+            type="button"
+            disabled={!usable || busy}
+            className={buttonClass({ size: "sm", variant: "quiet" })}
+            title="선택 경계를 상하로 뒤집습니다."
+            onClick={() => onFlip("y")}
+            aria-label="상하 반전"
+          >
+            <FlipVertical2 className="size-3.5" aria-hidden />
+            상하
+          </button>
+        </div>
       </div>
 
       <p className="text-[0.72rem] leading-relaxed text-fg-3" role="status">

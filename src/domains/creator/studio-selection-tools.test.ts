@@ -32,6 +32,7 @@ import {
   ellipseSelectionPolygon,
   emptyPixelSelection,
   expandContractSelection,
+  flipSelection,
   isSelectionAdjustNoop,
   isSelectionUsable,
   marchingAntsDashOffset,
@@ -47,8 +48,10 @@ import {
   rasterizeSelectionMask,
   rectSelectionPolygon,
   removeLastSubpath,
+  rotateSelection,
   selectAllPixels,
   selectionBoundsNorm,
+  selectionCentroidNorm,
   setSelectionFeather,
   simplifyLassoPolygon,
   subpathOutlinePoints,
@@ -428,6 +431,61 @@ describe("selectAllPixels / expandContractSelection", () => {
     expect(inset!.invert).toBe(false);
     expect(pointInSelection(inset, { x: 0.5, y: 0.5 })).toBe(true);
     expect(pointInSelection(inset, { x: 0.02, y: 0.02 })).toBe(false);
+  });
+});
+
+describe("rotateSelection / flipSelection", () => {
+  it("중심 기준으로 90° 회전 — 점유 영역이 따라 돌고 전체 반전 선택은 no-op", () => {
+    // 중심(0.5,0.5) 근처 가로 길쭉한 박스
+    const base = addSelectionSubpath(null, "add", rectSelectionPolygon({ x: 0.2, y: 0.4 }, { x: 0.8, y: 0.6 }))!;
+    const c = selectionCentroidNorm(base)!;
+    expect(c.x).toBeCloseTo(0.5, 5);
+    expect(c.y).toBeCloseTo(0.5, 5);
+    const rot = rotateSelection(base, 90, { aspect: 1 });
+    expect(rot).not.toBeNull();
+    // 가로 박스 → 세로 박스: (0.5, 0.2) 쪽은 들어오고 (0.2, 0.5) 쪽은 나갈 수 있다
+    expect(pointInSelection(rot, { x: 0.5, y: 0.25 })).toBe(true);
+    expect(pointInSelection(rot, { x: 0.25, y: 0.5 })).toBe(false);
+    expect(rotateSelection(selectAllPixels(), 45)).toEqual(selectAllPixels());
+    expect(rotateSelection(base, 0)).toBe(base);
+  });
+
+  it("aspect≠1 이면 y 스케일을 반영해 비정사각에서도 기하 회전", () => {
+    const base = addSelectionSubpath(null, "add", rectSelectionPolygon({ x: 0.3, y: 0.45 }, { x: 0.7, y: 0.55 }))!;
+    const tall = rotateSelection(base, 90, { aspect: 2 });
+    expect(tall).not.toBeNull();
+    expect(pointInSelection(tall, { x: 0.5, y: 0.5 })).toBe(true);
+    // 0° 와 360° 는 동일 중심·영역 유지(수치 오차 허용)
+    const full = rotateSelection(base, 360, { aspect: 1.5 })!;
+    expect(pointInSelection(full, { x: 0.5, y: 0.5 })).toBe(true);
+    expect(pointInSelection(full, { x: 0.35, y: 0.5 })).toBe(true);
+  });
+
+  it("좌우/상하 반전 — 꼭짓점이 중심 대칭으로 이동한다", () => {
+    // 축정렬 사각형은 자기 중심 반전이 항등이라 비대칭 삼각형 꼭짓점 좌표로 검증한다.
+    const tri = addSelectionSubpath(null, "add", [
+      { x: 0.2, y: 0.2 },
+      { x: 0.5, y: 0.2 },
+      { x: 0.2, y: 0.5 },
+    ])!;
+    const c = selectionCentroidNorm(tri)!;
+    expect(c.x).toBeCloseTo(0.35, 5);
+    expect(c.y).toBeCloseTo(0.35, 5);
+    const fx = flipSelection(tri, "x")!;
+    const fxXs = fx.subpaths[0]!.points.map((p) => p.x).sort((a, b) => a - b);
+    // 0.2 ↔ 0.5 가 중심 0.35 기준으로 서로 자리 바꿈(집합은 {0.2,0.5})
+    expect(fxXs[0]).toBeCloseTo(0.2, 5);
+    expect(fxXs[fxXs.length - 1]).toBeCloseTo(0.5, 5);
+    // 원본 왼쪽 하단 꼭짓점(0.2,0.5) → 좌우 반전 후 (0.5,0.5)
+    expect(fx.subpaths[0]!.points.some((p) => Math.abs(p.x - 0.5) < 1e-9 && Math.abs(p.y - 0.5) < 1e-9)).toBe(
+      true
+    );
+    const fy = flipSelection(tri, "y")!;
+    // 원본 오른쪽 상단(0.5,0.2) → 상하 반전 후 (0.5,0.5)
+    expect(fy.subpaths[0]!.points.some((p) => Math.abs(p.x - 0.5) < 1e-9 && Math.abs(p.y - 0.5) < 1e-9)).toBe(
+      true
+    );
+    expect(flipSelection(selectAllPixels(), "x")).toEqual(selectAllPixels());
   });
 });
 

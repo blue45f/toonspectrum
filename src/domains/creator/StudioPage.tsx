@@ -801,6 +801,7 @@ import {
   commitSelectionDrag,
   emptyPixelSelection,
   expandContractSelection,
+  flipSelection,
   isSelectionAdjustNoop,
   isSelectionUsable,
   marchingAntsPasses,
@@ -809,6 +810,7 @@ import {
   polyLassoCloseToStart,
   rasterizeSelectionMask,
   removeLastSubpath,
+  rotateSelection,
   selectAllPixels,
   SELECTION_BRUSH_RADIUS_DEFAULT,
   setSelectionFeather,
@@ -25184,6 +25186,14 @@ function StudioCuttoonEditor() {
                     }}
                     onExpand={(amount) => setPixelSel((s) => expandContractSelection(s, amount))}
                     onContract={(amount) => setPixelSel((s) => expandContractSelection(s, -amount))}
+                    onRotate={(degrees) => {
+                      const aspect =
+                        selected?.type === "image" && selected.width > 0
+                          ? selected.height / selected.width
+                          : 1;
+                      setPixelSel((s) => rotateSelection(s, degrees, { aspect }) ?? s);
+                    }}
+                    onFlip={(axis) => setPixelSel((s) => flipSelection(s, axis) ?? s)}
                     onApplyAdjust={(plan) => void applyPixelSelectionAdjust(plan)}
                     onContentAwareFill={() => void applyContentAwareFill()}
                   />
