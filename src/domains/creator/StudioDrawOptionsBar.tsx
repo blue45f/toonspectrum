@@ -8,6 +8,7 @@ import {
   FlipHorizontal2,
   Lock,
   LockOpen,
+  PaintBucket,
   Pencil,
   Shapes,
   Sparkles,
@@ -21,7 +22,7 @@ import {
   nearestStudioBrushSizeChip,
 } from "./studio-brush";
 import { StudioDualColorWell, StudioToolIdentity } from "./studio-chrome-ui";
-import { StudioSymmetryGlyph } from "./studio-creative-visuals";
+import { StudioShapePickerStrip, StudioSymmetryGlyph } from "./studio-creative-visuals";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { StudioBrushTray } from "./StudioBrushTray";
 
@@ -81,6 +82,11 @@ export interface StudioDrawOptionsBarProps {
   onToggleFavoriteBrush?: (brushId: string) => void;
   onSelectRecentBrush?: (brushId: string) => void;
   onCycleStabilizer?: () => void;
+  /** Active shape kind when drawMode === "shape". */
+  shapeKind?: string;
+  onShapeKindChange?: (kind: string) => void;
+  shapeFill?: boolean;
+  onShapeFillChange?: (filled: boolean) => void;
   shapeSlot?: ReactNode;
   className?: string;
 }
@@ -155,6 +161,10 @@ export function StudioDrawOptionsBar({
   onToggleFavoriteBrush,
   onSelectRecentBrush,
   onCycleStabilizer,
+  shapeKind = "line",
+  onShapeKindChange,
+  shapeFill = false,
+  onShapeFillChange,
   shapeSlot,
   className,
 }: StudioDrawOptionsBarProps): ReactElement {
@@ -167,7 +177,7 @@ export function StudioDrawOptionsBar({
       : drawMode === "shape"
         ? "드래그로 그리기"
         : `${strokeWidth}px · ${Math.round(brushOpacity * 100)}%${sizeLocked ? " · 크기잠금" : ""}${opacityLocked ? " · 불투명잠금" : ""}`;
-  const IdentityIcon = drawMode === "eraser" ? Eraser : Pencil;
+  const IdentityIcon = drawMode === "eraser" ? Eraser : drawMode === "shape" ? Shapes : Pencil;
   const isFavorite = favoriteBrushIds.includes(brushId);
   const recentPresets = recentBrushIds
     .map((id) => BRUSH_PRESETS.find((preset) => preset.id === id))
@@ -200,6 +210,7 @@ export function StudioDrawOptionsBar({
             [
               { id: "pen" as const, label: "펜", Icon: Pencil },
               { id: "eraser" as const, label: "지우개", Icon: Eraser },
+              { id: "shape" as const, label: "도형", Icon: Shapes },
             ] as const
           ).map(({ id, label, Icon }) => (
             <button
@@ -269,6 +280,41 @@ export function StudioDrawOptionsBar({
           // Cap width so size/color/end icons stay on-screen at laptop widths.
           className="min-w-0 max-w-[min(14rem,28vw)] xl:max-w-[min(20rem,34vw)]"
         />
+      ) : null}
+
+      {/* Photopea/Canva shape kinds — glyph strip when shape tool is active */}
+      {drawMode === "shape" && onShapeKindChange ? (
+        <div className="flex min-w-0 max-w-[min(28rem,52vw)] shrink items-center gap-1.5">
+          <StudioShapePickerStrip
+            activeKind={shapeKind}
+            onSelect={onShapeKindChange}
+            filled={shapeFill}
+            showLabels={false}
+            className="min-w-0"
+          />
+          {onShapeFillChange ? (
+            <button
+              type="button"
+              aria-pressed={shapeFill}
+              disabled={shapeKind === "line" || shapeKind === "arrow"}
+              title="도형 채우기"
+              aria-label="도형 채우기"
+              onClick={() => onShapeFillChange(!shapeFill)}
+              className={cn(
+                "inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border px-2 text-[0.62rem] font-bold",
+                STUDIO_EASE,
+                STUDIO_FOCUS_RING,
+                shapeFill && shapeKind !== "line" && shapeKind !== "arrow"
+                  ? "border-accent/55 bg-accent-soft text-accent"
+                  : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg",
+                (shapeKind === "line" || shapeKind === "arrow") && "cursor-not-allowed opacity-45"
+              )}
+            >
+              <PaintBucket size={13} strokeWidth={1.75} aria-hidden />
+              <span className="hidden sm:inline">채우기</span>
+            </button>
+          ) : null}
+        </div>
       ) : null}
 
       {/* Ibis/Procreate recent strip */}

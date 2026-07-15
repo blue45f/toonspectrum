@@ -2,23 +2,54 @@
  * Creative-feature visual glyphs — AutoDraw / CSP / Canva / Concepts style
  * mini illustrations for tools, not brand clones. Pure presentation.
  */
+/* eslint-disable react-refresh/only-export-components -- shape kind maps + picker kinds shared with StudioPage / options bar */
 import type { ReactElement } from "react";
 
 import { cn } from "@/lib/utils";
 
-export type StudioShapeKindVisual = "line" | "rect" | "circle" | "triangle" | "poly";
+export type StudioShapeKindVisual =
+  | "line"
+  | "rect"
+  | "circle"
+  | "triangle"
+  | "poly"
+  | "star"
+  | "arrow"
+  | "ellipse";
 
-/** Mini recognized-shape icons for smart-shape / rail affordances. */
+/** Map StudioPage DrawShapeKind → glyph id. */
+export function studioDrawShapeToGlyph(
+  kind: string
+): StudioShapeKindVisual {
+  if (kind === "ellipse") return "ellipse";
+  if (kind === "polygon") return "poly";
+  if (
+    kind === "line" ||
+    kind === "rect" ||
+    kind === "triangle" ||
+    kind === "star" ||
+    kind === "arrow"
+  ) {
+    return kind;
+  }
+  return "rect";
+}
+
+/** Mini shape icons for smart-shape / shape tool pickers (Photopea/Canva). */
 export function StudioShapeKindGlyph({
   kind,
   className,
   active = false,
+  filled = false,
 }: {
   kind: StudioShapeKindVisual;
   className?: string;
   active?: boolean;
+  filled?: boolean;
 }): ReactElement {
   const stroke = "currentColor";
+  const fill = filled ? "currentColor" : "none";
+  const fillOp = filled ? 0.22 : undefined;
   return (
     <svg
       aria-hidden
@@ -38,18 +69,40 @@ export function StudioShapeKindGlyph({
           width={11}
           height={9}
           rx={1.5}
-          fill="none"
+          fill={fill}
+          fillOpacity={fillOp}
           stroke={stroke}
           strokeWidth={1.6}
         />
       )}
       {kind === "circle" && (
-        <circle cx={9} cy={9} r={5.2} fill="none" stroke={stroke} strokeWidth={1.6} />
+        <circle
+          cx={9}
+          cy={9}
+          r={5.2}
+          fill={fill}
+          fillOpacity={fillOp}
+          stroke={stroke}
+          strokeWidth={1.6}
+        />
+      )}
+      {kind === "ellipse" && (
+        <ellipse
+          cx={9}
+          cy={9}
+          rx={6.2}
+          ry={4.5}
+          fill={fill}
+          fillOpacity={fillOp}
+          stroke={stroke}
+          strokeWidth={1.6}
+        />
       )}
       {kind === "triangle" && (
         <path
           d="M9 3.5 L14.5 14 H3.5 Z"
-          fill="none"
+          fill={fill}
+          fillOpacity={fillOp}
           stroke={stroke}
           strokeWidth={1.6}
           strokeLinejoin="round"
@@ -58,13 +111,202 @@ export function StudioShapeKindGlyph({
       {kind === "poly" && (
         <path
           d="M9 2.8 L14.2 6.2 L12.8 12.5 H5.2 L3.8 6.2 Z"
-          fill="none"
+          fill={fill}
+          fillOpacity={fillOp}
           stroke={stroke}
           strokeWidth={1.5}
           strokeLinejoin="round"
         />
       )}
+      {kind === "star" && (
+        <path
+          d="M9 2.5 L10.7 6.8 L15.3 7.1 L11.7 10 L12.9 14.5 L9 12.2 L5.1 14.5 L6.3 10 L2.7 7.1 L7.3 6.8 Z"
+          fill={fill}
+          fillOpacity={fillOp}
+          stroke={stroke}
+          strokeWidth={1.35}
+          strokeLinejoin="round"
+        />
+      )}
+      {kind === "arrow" && (
+        <path
+          d="M3 9 H12 M12 9 L8.5 5.5 M12 9 L8.5 12.5"
+          fill="none"
+          stroke={stroke}
+          strokeWidth={1.65}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      )}
     </svg>
+  );
+}
+
+/** Canonical shape kinds for pickers (Photopea/Canva order). */
+export const STUDIO_DRAW_SHAPE_PICKER_KINDS = [
+  { kind: "line", label: "선" },
+  { kind: "rect", label: "사각형" },
+  { kind: "ellipse", label: "타원" },
+  { kind: "star", label: "별" },
+  { kind: "arrow", label: "화살표" },
+  { kind: "triangle", label: "삼각형" },
+  { kind: "polygon", label: "다각형" },
+] as const;
+
+/** Visual shape picker tile grid used in tool options / inspector. */
+export function StudioShapePickerGrid({
+  kinds = STUDIO_DRAW_SHAPE_PICKER_KINDS,
+  activeKind,
+  onSelect,
+  filled = false,
+  className,
+}: {
+  kinds?: readonly { kind: string; label: string }[];
+  activeKind: string;
+  onSelect: (kind: string) => void;
+  /** Preview glyphs with soft fill (when shape fill is on). */
+  filled?: boolean;
+  className?: string;
+}): ReactElement {
+  return (
+    <div
+      data-studio-shape-picker="true"
+      role="listbox"
+      aria-label="도형 종류"
+      className={cn("grid grid-cols-4 gap-1.5 sm:grid-cols-4", className)}
+    >
+      {kinds.map((item) => {
+        const active = activeKind === item.kind;
+        const glyph = studioDrawShapeToGlyph(item.kind);
+        const canFill = item.kind !== "line" && item.kind !== "arrow";
+        return (
+          <button
+            key={item.kind}
+            type="button"
+            role="option"
+            aria-selected={active}
+            title={item.label}
+            onClick={() => onSelect(item.kind)}
+            className={cn(
+              "flex flex-col items-center gap-1 rounded-xl border px-1 py-1.5 transition-[background,border-color,box-shadow,transform] duration-150",
+              "hover:-translate-y-px hover:shadow-sm",
+              active
+                ? "border-accent/55 bg-accent-soft/50 text-fg shadow-sm ring-1 ring-accent/20"
+                : "border-line/70 bg-card/90 text-fg-2 hover:border-line hover:bg-raised"
+            )}
+          >
+            <span
+              className={cn(
+                "grid size-8 place-items-center rounded-lg border",
+                active
+                  ? "border-accent/40 bg-canvas/50 text-accent"
+                  : "border-line/50 bg-canvas/40"
+              )}
+            >
+              <StudioShapeKindGlyph kind={glyph} active={active} filled={filled && canFill} />
+            </span>
+            <span className="text-[0.58rem] font-bold leading-none tracking-tight">{item.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * Compact horizontal shape chips for tool-options / mobile dock (CSP/Photopea).
+ * Glyph-first, label optional — denser than the inspector grid.
+ */
+export function StudioShapePickerStrip({
+  kinds = STUDIO_DRAW_SHAPE_PICKER_KINDS,
+  activeKind,
+  onSelect,
+  filled = false,
+  showLabels = true,
+  className,
+}: {
+  kinds?: readonly { kind: string; label: string }[];
+  activeKind: string;
+  onSelect: (kind: string) => void;
+  filled?: boolean;
+  showLabels?: boolean;
+  className?: string;
+}): ReactElement {
+  return (
+    <div
+      data-studio-shape-strip="true"
+      role="listbox"
+      aria-label="도형 모양"
+      className={cn(
+        "flex max-w-full items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        className
+      )}
+    >
+      {kinds.map((item) => {
+        const active = activeKind === item.kind;
+        const glyph = studioDrawShapeToGlyph(item.kind);
+        const canFill = item.kind !== "line" && item.kind !== "arrow";
+        return (
+          <button
+            key={item.kind}
+            type="button"
+            role="option"
+            aria-selected={active}
+            title={item.label}
+            onClick={() => onSelect(item.kind)}
+            className={cn(
+              "inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border px-1.5 text-[0.62rem] font-bold transition-[background,border-color,box-shadow,transform] duration-150",
+              "hover:-translate-y-px",
+              active
+                ? "border-accent/55 bg-accent-soft/55 text-fg shadow-sm ring-1 ring-accent/20"
+                : "border-line/70 bg-card/90 text-fg-2 hover:border-line hover:bg-raised"
+            )}
+          >
+            <span
+              className={cn(
+                "grid size-6 place-items-center rounded-md",
+                active ? "bg-canvas/40 text-accent" : "text-current"
+              )}
+            >
+              <StudioShapeKindGlyph kind={glyph} active={active} filled={filled && canFill} />
+            </span>
+            {showLabels ? <span className="pr-0.5">{item.label}</span> : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Concepts/Krita-style live pressure meter for status HUD. */
+export function StudioPressureHudMeter({
+  ratio,
+  className,
+}: {
+  /** 0–1, or null when no pen sample. */
+  ratio: number | null;
+  className?: string;
+}): ReactElement | null {
+  if (ratio === null) return null;
+  const pct = Math.round(ratio * 100);
+  return (
+    <span
+      data-studio-pressure-meter="true"
+      title={`필압 ${pct}%`}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full border border-line/70 bg-card/80 px-1.5 py-0.5",
+        className
+      )}
+      aria-label={`필압 ${pct}퍼센트`}
+    >
+      <span className="relative h-1.5 w-10 overflow-hidden rounded-full bg-raised ring-1 ring-line/50">
+        <span
+          className="absolute inset-y-0 left-0 rounded-full bg-accent transition-[width] duration-75"
+          style={{ width: `${pct}%` }}
+        />
+      </span>
+      <span className="tabular-nums text-[0.58rem] font-bold text-fg-2">{pct}%</span>
+    </span>
   );
 }
 

@@ -79,4 +79,33 @@ describe("StudioDrawOptionsBar", () => {
     expect(html).toContain("대칭 그리기");
     expect(html).toContain("세로");
   });
+
+  it("renders commercial shape strip and fill when shape mode is active", () => {
+    const html = renderToStaticMarkup(
+      <StudioDrawOptionsBar
+        drawMode="shape"
+        brushId="pen"
+        strokeWidth={4}
+        brushOpacity={1}
+        stabilizer={0}
+        color="#112233"
+        quickShapeActive={false}
+        shapeKind="rect"
+        shapeFill
+        onShapeKindChange={vi.fn()}
+        onShapeFillChange={vi.fn()}
+        onSetDrawMode={vi.fn()}
+        onSelectBrush={vi.fn()}
+        onStrokeWidthChange={vi.fn()}
+        onOpacityChange={vi.fn()}
+        onStabilizerChange={vi.fn()}
+        onColorChange={vi.fn()}
+        onToggleQuickShape={vi.fn()}
+      />
+    );
+    expect(html).toContain('data-studio-shape-strip="true"');
+    expect(html).toContain("도형 채우기");
+    expect(html).toContain("도형");
+    expect(html).toContain('aria-label="그리기 모드"');
+  });
 });
