@@ -10,14 +10,19 @@ import {
   Cone,
   Copy,
   Cylinder,
+  Eye,
+  EyeOff,
   Globe,
   Hexagon,
   ImagePlus,
   Layers,
   LayoutTemplate,
   Loader2,
+  Lock,
+  Magnet,
   Maximize2,
   Move,
+  MoveDown,
   PackageOpen,
   PencilLine,
   Pill,
@@ -33,6 +38,7 @@ import {
   Torus as TorusIcon,
   Umbrella,
   Undo2,
+  Unlock,
   Upload,
   X,
   ZoomIn,
@@ -138,6 +144,22 @@ import {
   type StudioBg3dLtRasterLayer,
   type StudioBg3dLtRasterLayerRole,
 } from "./studio-bg3d-lt-render";
+import {
+  applyStudioBg3dSnapToTransform,
+  DEFAULT_STUDIO_BG3D_SNAP_SETTINGS,
+  filterStudioBg3dLayerItems,
+  groundModelTransform,
+  groundPrimitiveTransform,
+  isBgObjectLocked,
+  isBgObjectTransformBlocked,
+  isBgObjectVisible,
+  normalizeStudioBg3dSnapSettings,
+  STUDIO_BG3D_ROTATE_STEP_OPTIONS_DEG,
+  STUDIO_BG3D_TRANSLATE_STEP_OPTIONS,
+  studioBg3dSnapSettingsSummary,
+  type StudioBg3dLayerListItem,
+  type StudioBg3dSnapSettings,
+} from "./studio-bg3d-object-ops";
 import {
   DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
   parseStudioBg3dSceneDocument,
@@ -930,12 +952,15 @@ function BgPrimitiveMesh({ prim, lineArt, showEdges, onSelect, registerRef }: Bg
     return () => registerRef(prim.id, null);
   }, [prim.id, registerRef]);
 
+  const visible = isBgObjectVisible(prim);
+
   return (
     <group
       ref={groupRef}
       position={prim.position}
       rotation={prim.rotation}
       scale={prim.scale}
+      visible={visible}
       onClick={(e) => {
         e.stopPropagation();
         onSelect(prim.id);
@@ -1005,12 +1030,15 @@ function BgCustomModelMesh({ instance, cachedRoot, onSelect, registerRef, onClon
 
   if (!cloned) return null;
 
+  const visible = isBgObjectVisible(instance);
+
   return (
     <group
       ref={groupRef}
       position={instance.position}
       rotation={instance.rotation}
       scale={instance.scale}
+      visible={visible}
       onClick={(e) => {
         e.stopPropagation();
         onSelect(instance.id);
@@ -1101,6 +1129,11 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   // 실제로 alpha=0 clearColor 로 바꾸는 건 handleInsert 캡처 순간뿐이다(사용자가 작업 중엔 여전히
   // 하늘색 배경을 보면서 구도를 잡을 수 있게).
   const [transparentInsert, setTransparentInsert] = useState(false);
+  // CSP-style move/rotate step snap + 레이어 목록 검색.
+  const [snapSettings, setSnapSettings] = useState<StudioBg3dSnapSettings>(() => ({
+    ...DEFAULT_STUDIO_BG3D_SNAP_SETTINGS,
+  }));
+  const [layerQuery, setLayerQuery] = useState("");
 
   // 업로드된 커스텀 3D 모델(§bg3d-model-library.ts)의 씬 배치 인스턴스 + 라이브러리 목록/상태.
   const [customModels, setCustomModels] = useState<BgCustomModelInstance[]>([]);
@@ -1508,17 +1541,100 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     setSelectedId(clone.id);
   };
 
-  const updateTransform = (id: string, patch: Partial<Pick<BgPrimitive, "position" | "rotation" | "scale">>) => {
-    setPrimitives((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+  const updateTransform = (
+    id: string,
+    patch: Partial<Pick<BgPrimitive, "position" | "rotation" | "scale">>,
+    options: { readonly snap?: boolean } = {}
+  ) => {
+    const shouldSnap = options.snap !== false;
+    setPrimitives((prev) =>
+      prev.map((p) => {
+        if (p.id !== id) return p;
+        if (isBgObjectTransformBlocked(p)) return p;
+        const next = { ...p, ...patch };
+        if (shouldSnap && (patch.position || patch.rotation)) {
+          const snapped = applyStudioBg3dSnapToTransform(
+            {
+              position: next.position,
+              rotation: next.rotation,
+            },
+            snapSettings
+          );
+          if (patch.position) next.position = snapped.position;
+          if (patch.rotation) next.rotation = snapped.rotation;
+        }
+        return next;
+      })
+    );
   };
 
-  function updateCustomModelTransform(id: string, patch: Partial<Pick<BgCustomModelInstance, "position" | "rotation" | "scale">>) {
-    setCustomModels((prev) => prev.map((m) => (m.id === id ? { ...m, ...patch } : m)));
+  function updateCustomModelTransform(
+    id: string,
+    patch: Partial<Pick<BgCustomModelInstance, "position" | "rotation" | "scale">>,
+    options: { readonly snap?: boolean } = {}
+  ) {
+    const shouldSnap = options.snap !== false;
+    setCustomModels((prev) =>
+      prev.map((m) => {
+        if (m.id !== id) return m;
+        if (isBgObjectTransformBlocked(m)) return m;
+        const next = { ...m, ...patch };
+        if (shouldSnap && (patch.position || patch.rotation)) {
+          const snapped = applyStudioBg3dSnapToTransform(
+            {
+              position: next.position,
+              rotation: next.rotation,
+            },
+            snapSettings
+          );
+          if (patch.position) next.position = snapped.position;
+          if (patch.rotation) next.rotation = snapped.rotation;
+        }
+        return next;
+      })
+    );
   }
 
   const updateColor = (id: string, color: string) => {
     setPrimitives((prev) => prev.map((p) => (p.id === id ? { ...p, color } : p)));
   };
+
+  function togglePrimitiveFlag(id: string, flag: "visible" | "locked") {
+    setPrimitives((prev) =>
+      prev.map((p) => {
+        if (p.id !== id) return p;
+        if (flag === "visible") return { ...p, visible: !isBgObjectVisible(p) };
+        return { ...p, locked: !isBgObjectLocked(p) };
+      })
+    );
+  }
+
+  function toggleCustomModelFlag(id: string, flag: "visible" | "locked") {
+    setCustomModels((prev) =>
+      prev.map((m) => {
+        if (m.id !== id) return m;
+        if (flag === "visible") return { ...m, visible: !isBgObjectVisible(m) };
+        return { ...m, locked: !isBgObjectLocked(m) };
+      })
+    );
+  }
+
+  function groundSelectedEntity() {
+    if (!selectedId) return;
+    const prim = primitives.find((p) => p.id === selectedId);
+    if (prim) {
+      if (isBgObjectTransformBlocked(prim)) return;
+      const position = groundPrimitiveTransform(prim.kind, prim.position, prim.rotation, prim.scale);
+      updateTransform(prim.id, { position });
+      return;
+    }
+    const model = customModels.find((m) => m.id === selectedId);
+    if (!model || isBgObjectTransformBlocked(model)) return;
+    const root = modelRootCacheRef.current.get(model.modelId)?.root;
+    const size = root ? measureBg3dObjectSize(root) : ([2, 2, 2] as [number, number, number]);
+    const position = groundModelTransform(size, model.position, model.rotation, model.scale);
+    updateCustomModelTransform(model.id, { position });
+  }
 
   const registerPrimitiveRef = (id: string, obj: THREE.Group | null) => {
     if (obj) primitiveObjectsRef.current.set(id, obj);
@@ -2079,6 +2195,32 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   // selectedId/primitiveObjectsRef를 공유하므로(§4) "primitives에 있으면 도형, 아니면 모델"로 분기한다.
   const selectedPrimitive = primitives.find((p) => p.id === selectedId) ?? null;
   const selectedCustomModel = customModels.find((m) => m.id === selectedId) ?? null;
+  const selectedEntity = selectedPrimitive ?? selectedCustomModel;
+  const selectedIsLocked = isBgObjectTransformBlocked(selectedEntity);
+  const layerListItems: StudioBg3dLayerListItem[] = [
+    ...primitives.map((prim, index) => {
+      const kindCountBefore = primitives.slice(0, index).filter((p) => p.kind === prim.kind).length;
+      return {
+        id: prim.id,
+        label: `${PRIMITIVE_DEFS[prim.kind].label} ${kindCountBefore + 1}`,
+        kind: "primitive" as const,
+        visible: isBgObjectVisible(prim),
+        locked: isBgObjectLocked(prim),
+      };
+    }),
+    ...customModels.map((inst, index) => {
+      const kindCountBefore = customModels.slice(0, index).filter((m) => m.modelId === inst.modelId).length;
+      const modelName = modelLibrary.find((entry) => entry.id === inst.modelId)?.name ?? "3D 모델";
+      return {
+        id: inst.id,
+        label: `${modelName} ${kindCountBefore + 1}`,
+        kind: "model" as const,
+        visible: isBgObjectVisible(inst),
+        locked: isBgObjectLocked(inst),
+      };
+    }),
+  ];
+  const filteredLayerItems = filterStudioBg3dLayerItems(layerListItems, layerQuery);
   const ltLineSettings = sceneBaseDocument.output.line;
   const ltToneSettings = sceneBaseDocument.output.tone;
   const hasFilledOutput = ltToneSettings.mode !== "none" && ltToneSettings.opacity > 0;
@@ -2227,22 +2369,40 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                       }}
                     />
                   ))}
-                  {!isCapturing && selectedId && primitiveObjectsRef.current.get(selectedId) ? (
+                  {!isCapturing &&
+                  selectedId &&
+                  !selectedIsLocked &&
+                  isBgObjectVisible(selectedEntity) &&
+                  primitiveObjectsRef.current.get(selectedId) ? (
                     <group ref={registerStudioBg3dCaptureExcludedObject}>
                       <TransformControls
                         object={primitiveObjectsRef.current.get(selectedId)}
                         mode={transformMode}
                         space={transformMode === "rotate" ? "local" : "world"}
                         onMouseDown={() => setIsTransforming(true)}
-                        onMouseUp={() => setIsTransforming(false)}
+                        onMouseUp={() => {
+                          setIsTransforming(false);
+                          // 드래그 중에는 스냅을 끄고, 놓을 때만 격자/각도 스냅을 적용해 떨림을 막는다.
+                          const obj = primitiveObjectsRef.current.get(selectedId);
+                          if (!obj || !snapSettings.enabled) return;
+                          const position: [number, number, number] = [obj.position.x, obj.position.y, obj.position.z];
+                          const rotation: [number, number, number] = [obj.rotation.x, obj.rotation.y, obj.rotation.z];
+                          const scale: [number, number, number] = [obj.scale.x, obj.scale.y, obj.scale.z];
+                          if (selectedPrimitive) updateTransform(selectedId, { position, rotation, scale }, { snap: true });
+                          else if (selectedCustomModel) {
+                            updateCustomModelTransform(selectedId, { position, rotation, scale }, { snap: true });
+                          }
+                        }}
                         onObjectChange={() => {
                           const obj = primitiveObjectsRef.current.get(selectedId);
                           if (!obj) return;
                           const position: [number, number, number] = [obj.position.x, obj.position.y, obj.position.z];
                           const rotation: [number, number, number] = [obj.rotation.x, obj.rotation.y, obj.rotation.z];
                           const scale: [number, number, number] = [obj.scale.x, obj.scale.y, obj.scale.z];
-                          if (selectedPrimitive) updateTransform(selectedId, { position, rotation, scale });
-                          else if (selectedCustomModel) updateCustomModelTransform(selectedId, { position, rotation, scale });
+                          if (selectedPrimitive) updateTransform(selectedId, { position, rotation, scale }, { snap: false });
+                          else if (selectedCustomModel) {
+                            updateCustomModelTransform(selectedId, { position, rotation, scale }, { snap: false });
+                          }
                         }}
                       />
                     </group>
@@ -2292,6 +2452,33 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                     onClick={doRedo}
                   >
                     <Redo2 size={16} aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={snapSettings.enabled ? "스냅 끄기" : "스냅 켜기"}
+                    title={studioBg3dSnapSettingsSummary(snapSettings)}
+                    aria-pressed={snapSettings.enabled}
+                    className={cx(
+                      VIEWPORT_BTN,
+                      snapSettings.enabled && "border-accent/60 bg-accent text-on-accent hover:bg-accent/90 hover:text-on-accent"
+                    )}
+                    onClick={() =>
+                      setSnapSettings((prev) =>
+                        normalizeStudioBg3dSnapSettings({ ...prev, enabled: !prev.enabled })
+                      )
+                    }
+                  >
+                    <Magnet size={16} aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="바닥에 접지"
+                    title="선택 객체를 바닥에 붙이기"
+                    disabled={!selectedEntity || selectedIsLocked}
+                    className={cx(VIEWPORT_BTN, "disabled:cursor-not-allowed disabled:opacity-40")}
+                    onClick={groundSelectedEntity}
+                  >
+                    <MoveDown size={16} aria-hidden />
                   </button>
                 </div>
 
@@ -2490,11 +2677,149 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                 </div>
 
                 <div className="mt-5 border-t border-line pt-4">
+                  <div className="mb-4 rounded-xl border border-line/80 bg-card/70 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-bold text-fg">변형 스냅</p>
+                      <button
+                        type="button"
+                        aria-pressed={snapSettings.enabled}
+                        className={cx(
+                          "inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-2.5 text-[0.68rem] font-semibold transition-colors",
+                          snapSettings.enabled
+                            ? "border-accent/55 bg-accent text-on-accent"
+                            : "border-line bg-panel text-fg-2 hover:bg-accent-soft hover:text-accent"
+                        )}
+                        onClick={() =>
+                          setSnapSettings((prev) =>
+                            normalizeStudioBg3dSnapSettings({ ...prev, enabled: !prev.enabled })
+                          )
+                        }
+                      >
+                        <Magnet size={13} aria-hidden />
+                        {snapSettings.enabled ? "켜짐" : "꺼짐"}
+                      </button>
+                    </div>
+                    <p className="mt-1 text-[0.65rem] leading-relaxed text-fg-3">
+                      {studioBg3dSnapSettingsSummary(snapSettings)} · 기즈모·수치 입력 모두 적용
+                    </p>
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      <label className="text-[0.65rem] font-semibold text-fg-3">
+                        이동 간격
+                        <select
+                          className="mt-1 min-h-9 w-full rounded-lg border border-line bg-panel px-2 text-xs font-semibold text-fg"
+                          value={snapSettings.translateStep}
+                          disabled={!snapSettings.enabled}
+                          onChange={(e) =>
+                            setSnapSettings((prev) =>
+                              normalizeStudioBg3dSnapSettings({
+                                ...prev,
+                                translateStep: Number(e.target.value),
+                              })
+                            )
+                          }
+                        >
+                          {STUDIO_BG3D_TRANSLATE_STEP_OPTIONS.map((step) => (
+                            <option key={step} value={step}>
+                              {step}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="text-[0.65rem] font-semibold text-fg-3">
+                        회전 간격
+                        <select
+                          className="mt-1 min-h-9 w-full rounded-lg border border-line bg-panel px-2 text-xs font-semibold text-fg"
+                          value={snapSettings.rotateStepDegrees}
+                          disabled={!snapSettings.enabled}
+                          onChange={(e) =>
+                            setSnapSettings((prev) =>
+                              normalizeStudioBg3dSnapSettings({
+                                ...prev,
+                                rotateStepDegrees: Number(e.target.value),
+                              })
+                            )
+                          }
+                        >
+                          {STUDIO_BG3D_ROTATE_STEP_OPTIONS_DEG.map((step) => (
+                            <option key={step} value={step}>
+                              {step}°
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {(
+                        [
+                          { id: "xyz" as const, label: "XYZ" },
+                          { id: "xz" as const, label: "XZ(바닥)" },
+                          { id: "none" as const, label: "회전만" },
+                        ] as const
+                      ).map((axis) => (
+                        <button
+                          key={axis.id}
+                          type="button"
+                          disabled={!snapSettings.enabled}
+                          aria-pressed={snapSettings.translateAxes === axis.id}
+                          className={cx(
+                            "min-h-8 rounded-lg border px-2 text-[0.65rem] font-semibold transition-colors disabled:opacity-45",
+                            snapSettings.translateAxes === axis.id
+                              ? "border-accent/55 bg-accent-soft text-accent"
+                              : "border-line bg-panel text-fg-2 hover:bg-raised"
+                          )}
+                          onClick={() =>
+                            setSnapSettings((prev) =>
+                              normalizeStudioBg3dSnapSettings({ ...prev, translateAxes: axis.id })
+                            )
+                          }
+                        >
+                          {axis.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   {selectedPrimitive ? (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between gap-2">
                         <h3 className="text-sm font-bold text-fg">선택한 도형</h3>
                         <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            aria-label={isBgObjectVisible(selectedPrimitive) ? "숨기기" : "보이기"}
+                            title={isBgObjectVisible(selectedPrimitive) ? "숨기기" : "보이기"}
+                            className={ICON_BUTTON}
+                            onClick={() => togglePrimitiveFlag(selectedPrimitive.id, "visible")}
+                          >
+                            {isBgObjectVisible(selectedPrimitive) ? (
+                              <Eye size={14} aria-hidden />
+                            ) : (
+                              <EyeOff size={14} aria-hidden />
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={isBgObjectLocked(selectedPrimitive) ? "잠금 해제" : "잠금"}
+                            title={isBgObjectLocked(selectedPrimitive) ? "잠금 해제" : "잠금"}
+                            className={cx(ICON_BUTTON, isBgObjectLocked(selectedPrimitive) && "border-accent/40 bg-accent-soft text-accent")}
+                            onClick={() => togglePrimitiveFlag(selectedPrimitive.id, "locked")}
+                          >
+                            {isBgObjectLocked(selectedPrimitive) ? (
+                              <Lock size={14} aria-hidden />
+                            ) : (
+                              <Unlock size={14} aria-hidden />
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            aria-label="바닥에 접지"
+                            title="바닥에 접지"
+                            disabled={selectedIsLocked}
+                            className={cx(ICON_BUTTON, "disabled:opacity-40")}
+                            onClick={groundSelectedEntity}
+                          >
+                            <MoveDown size={14} aria-hidden />
+                          </button>
                           <button
                             type="button"
                             aria-label="복제"
@@ -2516,10 +2841,16 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                         </div>
                       </div>
 
+                      {selectedIsLocked ? (
+                        <p className="rounded-lg border border-line bg-raised/60 px-2.5 py-2 text-[0.68rem] leading-relaxed text-fg-3">
+                          잠긴 객체입니다. 위치·회전·크기를 바꾸려면 잠금을 해제하세요.
+                        </p>
+                      ) : null}
+
                       <Vec3Field
                         label="위치"
                         values={selectedPrimitive.position}
-                        step={0.1}
+                        step={snapSettings.enabled ? snapSettings.translateStep : 0.1}
                         precision={2}
                         onCommit={(i, v) => {
                           const next: [number, number, number] = [...selectedPrimitive.position];
@@ -2530,7 +2861,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                       <Vec3Field
                         label="회전"
                         values={[radToDeg(selectedPrimitive.rotation[0]), radToDeg(selectedPrimitive.rotation[1]), radToDeg(selectedPrimitive.rotation[2])]}
-                        step={1}
+                        step={snapSettings.enabled ? snapSettings.rotateStepDegrees : 1}
                         precision={0}
                         suffix="°"
                         onCommit={(i, v) => {
@@ -2572,6 +2903,42 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                         <div className="flex items-center gap-1.5">
                           <button
                             type="button"
+                            aria-label={isBgObjectVisible(selectedCustomModel) ? "숨기기" : "보이기"}
+                            title={isBgObjectVisible(selectedCustomModel) ? "숨기기" : "보이기"}
+                            className={ICON_BUTTON}
+                            onClick={() => toggleCustomModelFlag(selectedCustomModel.id, "visible")}
+                          >
+                            {isBgObjectVisible(selectedCustomModel) ? (
+                              <Eye size={14} aria-hidden />
+                            ) : (
+                              <EyeOff size={14} aria-hidden />
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={isBgObjectLocked(selectedCustomModel) ? "잠금 해제" : "잠금"}
+                            title={isBgObjectLocked(selectedCustomModel) ? "잠금 해제" : "잠금"}
+                            className={cx(ICON_BUTTON, isBgObjectLocked(selectedCustomModel) && "border-accent/40 bg-accent-soft text-accent")}
+                            onClick={() => toggleCustomModelFlag(selectedCustomModel.id, "locked")}
+                          >
+                            {isBgObjectLocked(selectedCustomModel) ? (
+                              <Lock size={14} aria-hidden />
+                            ) : (
+                              <Unlock size={14} aria-hidden />
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            aria-label="바닥에 접지"
+                            title="바닥에 접지"
+                            disabled={selectedIsLocked}
+                            className={cx(ICON_BUTTON, "disabled:opacity-40")}
+                            onClick={groundSelectedEntity}
+                          >
+                            <MoveDown size={14} aria-hidden />
+                          </button>
+                          <button
+                            type="button"
                             aria-label="복제"
                             title="복제"
                             className={ICON_BUTTON}
@@ -2591,10 +2958,16 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                         </div>
                       </div>
 
+                      {selectedIsLocked ? (
+                        <p className="rounded-lg border border-line bg-raised/60 px-2.5 py-2 text-[0.68rem] leading-relaxed text-fg-3">
+                          잠긴 객체입니다. 위치·회전·크기를 바꾸려면 잠금을 해제하세요.
+                        </p>
+                      ) : null}
+
                       <Vec3Field
                         label="위치"
                         values={selectedCustomModel.position}
-                        step={0.1}
+                        step={snapSettings.enabled ? snapSettings.translateStep : 0.1}
                         precision={2}
                         onCommit={(i, v) => {
                           const next: [number, number, number] = [...selectedCustomModel.position];
@@ -2605,7 +2978,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                       <Vec3Field
                         label="회전"
                         values={[radToDeg(selectedCustomModel.rotation[0]), radToDeg(selectedCustomModel.rotation[1]), radToDeg(selectedCustomModel.rotation[2])]}
-                        step={1}
+                        step={snapSettings.enabled ? snapSettings.rotateStepDegrees : 1}
                         precision={0}
                         suffix="°"
                         onCommit={(i, v) => {
@@ -2656,106 +3029,129 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                     <Layers size={15} className="text-accent" aria-hidden />
                     레이어
                   </h3>
-                  <span className="text-[0.68rem] text-fg-3">{primitives.length + customModels.length}개</span>
+                  <span className="text-[0.68rem] text-fg-3">
+                    {filteredLayerItems.length}/{layerListItems.length}개
+                  </span>
                 </div>
-                {primitives.length === 0 && customModels.length === 0 ? (
+                {layerListItems.length === 0 ? (
                   <p className="text-xs leading-relaxed text-fg-3">아직 추가한 도형·모델이 없습니다. &ldquo;도형&rdquo;/&ldquo;모델&rdquo; 탭에서 먼저 추가해 주세요.</p>
                 ) : (
-                  <ul className="space-y-1">
-                    {primitives.map((prim, index) => {
-                      const kindCountBefore = primitives.slice(0, index).filter((p) => p.kind === prim.kind).length;
-                      const rowLabel = `${PRIMITIVE_DEFS[prim.kind].label} ${kindCountBefore + 1}`;
-                      const isActive = prim.id === selectedId;
-                      return (
-                        <li key={prim.id}>
-                          <div
-                            className={cx(
-                              "flex min-h-11 items-center gap-2 rounded-lg border px-2 py-1.5 text-xs transition-colors sm:min-h-0",
-                              isActive ? "border-accent/55 bg-accent-soft text-accent" : "border-line bg-card text-fg-2 hover:bg-raised"
-                            )}
-                          >
-                            <button type="button" className="flex min-h-11 min-w-0 flex-1 items-center gap-2 text-left sm:min-h-0" onClick={() => setSelectedId(prim.id)}>
-                              <span className="inline-block size-2.5 shrink-0 rounded-sm" style={{ backgroundColor: prim.color }} aria-hidden />
-                              <span className="truncate font-semibold">{rowLabel}</span>
-                            </button>
-                            <button
-                              type="button"
-                              aria-label={`${rowLabel} 복제`}
-                              title="복제"
-                              className="grid size-11 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent sm:size-6"
-                              onClick={() => {
-                                setSelectedId(prim.id);
-                                const clone = duplicatePrimitive(prim);
-                                setPrimitives((prev) => [...prev, clone]);
-                                setSelectedId(clone.id);
-                              }}
-                            >
-                              <Copy size={12} aria-hidden />
-                            </button>
-                            <button
-                              type="button"
-                              aria-label={`${rowLabel} 삭제`}
-                              title="삭제"
-                              className="grid size-11 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent sm:size-6"
-                              onClick={() => {
-                                setPrimitives((prev) => prev.filter((p) => p.id !== prim.id));
-                                if (isActive) setSelectedId(null);
-                              }}
-                            >
-                              <Trash2 size={12} aria-hidden />
-                            </button>
-                          </div>
-                        </li>
-                      );
-                    })}
-                    {customModels.map((inst, index) => {
-                      const kindCountBefore = customModels.slice(0, index).filter((m) => m.modelId === inst.modelId).length;
-                      const modelName = modelLibrary.find((entry) => entry.id === inst.modelId)?.name ?? "3D 모델";
-                      const rowLabel = `${modelName} ${kindCountBefore + 1}`;
-                      const isActive = inst.id === selectedId;
-                      return (
-                        <li key={inst.id}>
-                          <div
-                            className={cx(
-                              "flex min-h-11 items-center gap-2 rounded-lg border px-2 py-1.5 text-xs transition-colors sm:min-h-0",
-                              isActive ? "border-accent/55 bg-accent-soft text-accent" : "border-line bg-card text-fg-2 hover:bg-raised"
-                            )}
-                          >
-                            <button type="button" className="flex min-h-11 min-w-0 flex-1 items-center gap-2 text-left sm:min-h-0" onClick={() => setSelectedId(inst.id)}>
-                              <PackageOpen size={13} className="shrink-0 text-fg-3" aria-hidden />
-                              <span className="truncate font-semibold">{rowLabel}</span>
-                            </button>
-                            <button
-                              type="button"
-                              aria-label={`${rowLabel} 복제`}
-                              title="복제"
-                              className="grid size-11 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent sm:size-6"
-                              onClick={() => {
-                                setSelectedId(inst.id);
-                                const clone = duplicateBgCustomModelInstance(inst);
-                                setCustomModels((prev) => [...prev, clone]);
-                                setSelectedId(clone.id);
-                              }}
-                            >
-                              <Copy size={12} aria-hidden />
-                            </button>
-                            <button
-                              type="button"
-                              aria-label={`${rowLabel} 삭제`}
-                              title="삭제"
-                              className="grid size-11 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent sm:size-6"
-                              onClick={() => {
-                                setCustomModels((prev) => prev.filter((m) => m.id !== inst.id));
-                                if (isActive) setSelectedId(null);
-                              }}
-                            >
-                              <Trash2 size={12} aria-hidden />
-                            </button>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
+                  <>
+                    <label className="mb-2 block">
+                      <span className="sr-only">레이어 검색</span>
+                      <input
+                        type="search"
+                        value={layerQuery}
+                        onChange={(e) => setLayerQuery(e.target.value)}
+                        placeholder="이름 검색…"
+                        className="min-h-11 w-full rounded-lg border border-line bg-card px-3 text-xs font-medium text-fg outline-none focus:border-accent sm:min-h-9"
+                      />
+                    </label>
+                    {filteredLayerItems.length === 0 ? (
+                      <p className="text-xs leading-relaxed text-fg-3">검색 결과가 없습니다.</p>
+                    ) : (
+                      <ul className="space-y-1">
+                        {filteredLayerItems.map((item) => {
+                          const isActive = item.id === selectedId;
+                          const prim = item.kind === "primitive" ? primitives.find((p) => p.id === item.id) : null;
+                          return (
+                            <li key={item.id}>
+                              <div
+                                className={cx(
+                                  "flex min-h-11 items-center gap-1 rounded-lg border px-1.5 py-1.5 text-xs transition-colors sm:min-h-0",
+                                  isActive
+                                    ? "border-accent/55 bg-accent-soft text-accent"
+                                    : "border-line bg-card text-fg-2 hover:bg-raised",
+                                  !item.visible && "opacity-60"
+                                )}
+                              >
+                                <button
+                                  type="button"
+                                  className="flex min-h-11 min-w-0 flex-1 items-center gap-2 px-1 text-left sm:min-h-0"
+                                  onClick={() => setSelectedId(item.id)}
+                                >
+                                  {prim ? (
+                                    <span
+                                      className="inline-block size-2.5 shrink-0 rounded-sm"
+                                      style={{ backgroundColor: prim.color }}
+                                      aria-hidden
+                                    />
+                                  ) : (
+                                    <PackageOpen size={13} className="shrink-0 text-fg-3" aria-hidden />
+                                  )}
+                                  <span className="truncate font-semibold">{item.label}</span>
+                                  {item.locked ? <Lock size={11} className="shrink-0 opacity-80" aria-hidden /> : null}
+                                </button>
+                                <button
+                                  type="button"
+                                  aria-label={`${item.label} ${item.visible ? "숨기기" : "보이기"}`}
+                                  title={item.visible ? "숨기기" : "보이기"}
+                                  className="grid size-11 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent sm:size-6"
+                                  onClick={() => {
+                                    if (item.kind === "primitive") togglePrimitiveFlag(item.id, "visible");
+                                    else toggleCustomModelFlag(item.id, "visible");
+                                  }}
+                                >
+                                  {item.visible ? <Eye size={12} aria-hidden /> : <EyeOff size={12} aria-hidden />}
+                                </button>
+                                <button
+                                  type="button"
+                                  aria-label={`${item.label} ${item.locked ? "잠금 해제" : "잠금"}`}
+                                  title={item.locked ? "잠금 해제" : "잠금"}
+                                  className="grid size-11 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent sm:size-6"
+                                  onClick={() => {
+                                    if (item.kind === "primitive") togglePrimitiveFlag(item.id, "locked");
+                                    else toggleCustomModelFlag(item.id, "locked");
+                                  }}
+                                >
+                                  {item.locked ? <Lock size={12} aria-hidden /> : <Unlock size={12} aria-hidden />}
+                                </button>
+                                <button
+                                  type="button"
+                                  aria-label={`${item.label} 복제`}
+                                  title="복제"
+                                  className="grid size-11 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent sm:size-6"
+                                  onClick={() => {
+                                    if (item.kind === "primitive") {
+                                      const source = primitives.find((p) => p.id === item.id);
+                                      if (!source) return;
+                                      const clone = duplicatePrimitive(source);
+                                      setPrimitives((prev) => [...prev, clone]);
+                                      setSelectedId(clone.id);
+                                      return;
+                                    }
+                                    const source = customModels.find((m) => m.id === item.id);
+                                    if (!source) return;
+                                    const clone = duplicateBgCustomModelInstance(source);
+                                    setCustomModels((prev) => [...prev, clone]);
+                                    setSelectedId(clone.id);
+                                  }}
+                                >
+                                  <Copy size={12} aria-hidden />
+                                </button>
+                                <button
+                                  type="button"
+                                  aria-label={`${item.label} 삭제`}
+                                  title="삭제"
+                                  className="grid size-11 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent sm:size-6"
+                                  onClick={() => {
+                                    if (item.kind === "primitive") {
+                                      setPrimitives((prev) => prev.filter((p) => p.id !== item.id));
+                                    } else {
+                                      setCustomModels((prev) => prev.filter((m) => m.id !== item.id));
+                                    }
+                                    if (isActive) setSelectedId(null);
+                                  }}
+                                >
+                                  <Trash2 size={12} aria-hidden />
+                                </button>
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </>
                 )}
               </section>
 

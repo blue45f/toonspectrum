@@ -48,6 +48,9 @@ export function duplicatePrimitive(prim: BgPrimitive): BgPrimitive {
     ...prim,
     id: uid(),
     position: [prim.position[0] + 0.4, prim.position[1], prim.position[2] + 0.4],
+    // 복제본은 편집 가능·표시 상태로 둔다(잠긴 원본을 복제해 곧바로 못 움직이는 함정 방지).
+    locked: false,
+    visible: prim.visible !== false,
   };
 }
 
@@ -59,6 +62,8 @@ export function clonePrimitives(primitives: BgPrimitive[]): BgPrimitive[] {
     position: [...p.position] as [number, number, number],
     rotation: [...p.rotation] as [number, number, number],
     scale: [...p.scale] as [number, number, number],
+    visible: p.visible,
+    locked: p.locked,
   }));
 }
 

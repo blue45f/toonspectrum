@@ -64,6 +64,22 @@ import {
   type VrmMaterialFx,
 } from "./studio-vrm-poser-utils";
 import {
+  filterStudioVrmPosesByBucket,
+  filterStudioVrmPosesByQuery,
+  findStudioVrmLightingQuickPreset,
+  loadStudioVrmRecentCharacters,
+  loadStudioVrmRecentPoses,
+  rememberStudioVrmRecent,
+  saveStudioVrmRecentCharacters,
+  saveStudioVrmRecentPoses,
+  STUDIO_VRM_LIGHTING_QUICK_PRESETS,
+  STUDIO_VRM_POSE_BUCKETS,
+  studioVrmPoseBucketCountLabel,
+  type StudioVrmPoseBucketId,
+  type StudioVrmPoseListItem,
+  type StudioVrmRecentState,
+} from "./studio-vrm-poser-ux";
+import {
   applyVrmTwoBoneGrip,
   createVrmTwoBoneGripState,
   releaseVrmTwoBoneGripState,
@@ -2779,6 +2795,13 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   const [activePanelTab, setActivePanelTab] = useState<PanelTab>("character");
   const [activeCharacterSection, setActiveCharacterSection] = useState<CharacterPanelSection>("library");
   const [poseQuery, setPoseQuery] = useState("");
+  const [poseBucket, setPoseBucket] = useState<StudioVrmPoseBucketId>("all");
+  const [recentPoseState, setRecentPoseState] = useState<StudioVrmRecentState>(() =>
+    loadStudioVrmRecentPoses(typeof localStorage === "undefined" ? null : localStorage)
+  );
+  const [recentCharacterState, setRecentCharacterState] = useState<StudioVrmRecentState>(() =>
+    loadStudioVrmRecentCharacters(typeof localStorage === "undefined" ? null : localStorage)
+  );
   const [bodyRotation, setBodyRotation] = useState(0);
   // 뷰포트 오버레이 컨트롤 — 줌/시점초기화/턴테이블/드래그 힌트.
   const [turntable, setTurntable] = useState(false);
@@ -3125,15 +3148,31 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     }
   }, []);
   const activeCamera = findCameraPreset(activeCameraId);
-  // 포즈 검색 — 이름/분위기 기준 필터. 빈 검색이면 전체 노출.
+  // 포즈 검색 + 상황 버킷(최근/서기/액션/앉기/감정/손짓) — 상용 포즈 팔레트 탐색 속도용.
+  const allPoseListItems: StudioVrmPoseListItem[] = [
+    ...POSE_PRESETS.map((pose) => ({ id: pose.id, label: pose.label, tone: pose.tone })),
+    ...NATURAL_IDLE_POSES.map((pose) => ({ id: pose.id, label: pose.label, tone: pose.tone })),
+    ...EXTRA_POSE_PRESETS.map((pose) => ({ id: pose.id, label: pose.label, tone: pose.tone })),
+    ...savedPoses.map((pose) => ({ id: pose.id, label: pose.label, tone: "사용자 저장" })),
+  ];
+  const bucketedPoseIds = new Set(
+    filterStudioVrmPosesByBucket(allPoseListItems, poseBucket, recentPoseState.ids).map((item) => item.id)
+  );
   const poseQ = poseQuery.trim().toLowerCase();
-  const poseMatches = (p: { label: string; tone?: string }) =>
-    !poseQ || p.label.toLowerCase().includes(poseQ) || (p.tone?.toLowerCase().includes(poseQ) ?? false);
+  const poseMatches = (p: { id: string; label: string; tone?: string }) => {
+    if (poseBucket !== "all" && !bucketedPoseIds.has(p.id)) return false;
+    if (!poseQ) return true;
+    return filterStudioVrmPosesByQuery([p], poseQuery).length > 0;
+  };
   const poseResultCount =
     POSE_PRESETS.filter(poseMatches).length +
     NATURAL_IDLE_POSES.filter(poseMatches).length +
     EXTRA_POSE_PRESETS.filter(poseMatches).length +
     savedPoses.filter(poseMatches).length;
+  const recentCharacterEntries = recentCharacterState.ids
+    .map((id) => libraryEntries.find((entry) => entry.id === id))
+    .filter((entry): entry is (typeof libraryEntries)[number] => Boolean(entry))
+    .slice(0, 6);
   // 비활성 탭 섹션은 hidden 속성으로 숨겨 마운트는 유지(웹캠 video 등 ref 보존).
   // hidden 속성은 space-y 유틸의 :not([hidden]) 선택자에서 제외돼 간격도 자연 정리된다.
   const hideOnTab = (tab: PanelTab) => activePanelTab !== tab;
@@ -4251,6 +4290,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   }
 
   function loadModelFromLibraryEntry(entry: VrmLibraryEntry) {
+    rememberCharacterSelection(entry.id);
     if (entry.source === "sample") {
       loadModelFromUrl(sampleVrmUrl(entry.id), entry.name, false, entry.id);
       return;
@@ -4342,6 +4382,9 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     const strippedBones = stripFingerBones(pose.bones);
     setCustomBones(strippedBones);
     setCustomYOffset(pose.yOffset ?? 0);
+    const nextRecent = rememberStudioVrmRecent(recentPoseState, poseId);
+    setRecentPoseState(nextRecent);
+    saveStudioVrmRecentPoses(typeof localStorage === "undefined" ? null : localStorage, nextRecent);
     if (vrmRef.current) {
       applyPoserVisualState(vrmRef.current, {
         bones: strippedBones,
@@ -4357,6 +4400,22 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         applyExpressionWeightsToVrm(vrmRef.current, {});
       }
     }
+  }
+
+  function rememberCharacterSelection(modelId: string) {
+    const nextRecent = rememberStudioVrmRecent(recentCharacterState, modelId);
+    setRecentCharacterState(nextRecent);
+    saveStudioVrmRecentCharacters(typeof localStorage === "undefined" ? null : localStorage, nextRecent);
+  }
+
+  function applyLightingQuickPreset(presetId: string) {
+    const preset = findStudioVrmLightingQuickPreset(presetId);
+    setLighting({
+      intensity: preset.intensity,
+      colorTemp: preset.colorTemp,
+      directionDeg: preset.directionDeg,
+    });
+    if (preset.tone) setLightingTone(preset.tone);
   }
 
   // 포즈 좌우 반전 — 좌우 본을 맞바꾼다. 방향(aim) 본은 side 스왑만으로 자동 미러되고,
@@ -5205,6 +5264,30 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                   />
                 </div>
 
+                {recentCharacterEntries.length > 0 ? (
+                  <div className="mt-3">
+                    <p className="mb-1.5 text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">최근 캐릭터</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {recentCharacterEntries.map((entry) => (
+                        <button
+                          key={`recent-${entry.id}`}
+                          type="button"
+                          disabled={status === "loading" && entry.id === activeModelId}
+                          className={cx(
+                            "min-h-9 rounded-full border px-2.5 text-[0.68rem] font-semibold transition-colors",
+                            entry.id === activeModelId
+                              ? "border-accent/55 bg-accent-soft text-accent"
+                              : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"
+                          )}
+                          onClick={() => loadModelFromLibraryEntry(entry)}
+                        >
+                          {entry.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   {libraryStatus === "loading" ? (
                     <div className="col-span-2 rounded-xl border border-line bg-card/60 px-3 py-4 text-center text-xs text-fg-3">저장된 캐릭터를 불러오는 중입니다.</div>
@@ -5519,6 +5602,33 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                   <span className="font-medium">포즈 적용 시 캐릭터 표정 유지</span>
                 </label>
 
+                <div className="mb-3 flex flex-wrap gap-1.5">
+                  {STUDIO_VRM_POSE_BUCKETS.map((bucket) => {
+                    const count =
+                      bucket.id === "all"
+                        ? allPoseListItems.length
+                        : filterStudioVrmPosesByBucket(allPoseListItems, bucket.id, recentPoseState.ids).length;
+                    return (
+                      <button
+                        key={bucket.id}
+                        type="button"
+                        title={`${bucket.hint} · ${studioVrmPoseBucketCountLabel(bucket.id, count)}`}
+                        aria-pressed={poseBucket === bucket.id}
+                        className={cx(
+                          "min-h-8 rounded-full border px-2.5 text-[0.65rem] font-bold transition-colors",
+                          poseBucket === bucket.id
+                            ? "border-accent/55 bg-accent text-on-accent"
+                            : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"
+                        )}
+                        onClick={() => setPoseBucket(bucket.id)}
+                      >
+                        {bucket.label}
+                        <span className="ml-1 opacity-75">{count}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
                 <div className="relative mb-3">
                   <Search size={14} aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-3" />
                   <input
@@ -5529,9 +5639,13 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                     className="w-full rounded-lg border border-line bg-card py-1.5 pl-8 pr-3 text-xs text-fg placeholder:text-fg-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                   />
                 </div>
-                {poseQ && poseResultCount === 0 ? (
+                {poseResultCount === 0 ? (
                   <p className="rounded-xl border border-dashed border-line/55 bg-card/20 py-4 text-center text-[0.68rem] italic text-fg-3">
-                    “{poseQuery}” 검색 결과가 없습니다.
+                    {poseQ
+                      ? `“${poseQuery}” 검색 결과가 없습니다.`
+                      : poseBucket === "recent"
+                        ? "최근에 쓴 포즈가 없습니다. 포즈를 선택하면 여기에 쌓입니다."
+                        : "이 분류에 맞는 포즈가 없습니다."}
                   </p>
                 ) : null}
 
@@ -6236,6 +6350,21 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                       onClick={() => setLightingTone(preset.id as LightingTone)}
                     >
                       {preset.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="mb-1.5 mt-3 text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">퀵 라이팅</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {STUDIO_VRM_LIGHTING_QUICK_PRESETS.map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      title={preset.hint}
+                      className="min-h-[3rem] rounded-xl border border-line bg-card px-3 py-2 text-left transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                      onClick={() => applyLightingQuickPreset(preset.id)}
+                    >
+                      <span className="block text-xs font-bold text-fg">{preset.label}</span>
+                      <span className="mt-0.5 block text-[0.65rem] leading-snug text-fg-3">{preset.hint}</span>
                     </button>
                   ))}
                 </div>

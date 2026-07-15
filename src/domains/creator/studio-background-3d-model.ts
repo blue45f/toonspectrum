@@ -20,6 +20,10 @@ export interface BgCustomModelInstance {
   position: [number, number, number];
   rotation: [number, number, number]; // Euler XYZ, 라디안 — BgPrimitive와 동일 계약
   scale: [number, number, number];
+  /** When false, mesh is hidden in viewport/capture but kept in the scene graph. Default true. */
+  visible?: boolean;
+  /** When true, transform gizmo and numeric edits are blocked. Default false. */
+  locked?: boolean;
 }
 
 // PRIMITIVE_DEFS 도형들의 대략적인 크기 감각(반경 0.5~1m대)과 맞춘 오토핏 목표 치수.
@@ -54,6 +58,9 @@ export function duplicateBgCustomModelInstance(instance: BgCustomModelInstance):
     ...instance,
     id: uid(),
     position: [instance.position[0] + 0.4, instance.position[1], instance.position[2] + 0.4],
+    // 복제본은 편집 가능·표시 상태로 둔다(잠긴 원본을 복제해 곧바로 못 움직이는 함정 방지).
+    locked: false,
+    visible: instance.visible !== false,
   };
 }
 
@@ -65,6 +72,8 @@ export function cloneBgCustomModelInstances(instances: BgCustomModelInstance[]):
     position: [...inst.position] as [number, number, number],
     rotation: [...inst.rotation] as [number, number, number],
     scale: [...inst.scale] as [number, number, number],
+    visible: inst.visible,
+    locked: inst.locked,
   }));
 }
 

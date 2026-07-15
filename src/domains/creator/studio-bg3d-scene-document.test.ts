@@ -56,6 +56,7 @@ function primitiveNode(index = 1): Record<string, unknown> {
       scale: [1, 1, 1],
     },
     visible: true,
+    locked: false,
     castsShadow: true,
     receivesShadow: true,
   };
@@ -497,6 +498,7 @@ describe("Studio BG3D scene document normalization", () => {
         scale: [1, 1, 1],
       },
       visible: true,
+      locked: false,
       castsShadow: true,
       receivesShadow: true,
     };

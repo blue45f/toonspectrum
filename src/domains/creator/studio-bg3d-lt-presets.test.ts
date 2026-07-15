@@ -301,6 +301,7 @@ describe("Studio BG3D LT lookup and application", () => {
             scale: [2, 3, 4],
           },
           visible: true,
+          locked: false,
           castsShadow: false,
           receivesShadow: true,
         },

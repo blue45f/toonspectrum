@@ -264,7 +264,8 @@ function primitiveNodeFromRuntime(value: BgPrimitive): StudioBg3dSceneNode | nul
       rotation: [...value.rotation],
       scale: [...value.scale],
     },
-    visible: true,
+    visible: value.visible !== false,
+    locked: value.locked === true,
     castsShadow: true,
     receivesShadow: true,
   };
@@ -292,7 +293,8 @@ function modelNodeFromRuntime(
       rotation: [...value.rotation],
       scale: [...value.scale],
     },
-    visible: true,
+    visible: value.visible !== false,
+    locked: value.locked === true,
     castsShadow: true,
     receivesShadow: true,
   };
@@ -598,6 +600,8 @@ export function hydrateStudioBg3dDocumentToRuntime(
         position: [...node.transform.position],
         rotation: [...node.transform.rotation],
         scale: [...node.transform.scale],
+        visible: node.visible !== false,
+        locked: node.locked === true,
       });
       continue;
     }
@@ -643,6 +647,8 @@ export function hydrateStudioBg3dDocumentToRuntime(
       position: [...node.transform.position],
       rotation: [...node.transform.rotation],
       scale: [...node.transform.scale],
+      visible: node.visible !== false,
+      locked: node.locked === true,
     });
   }
 

@@ -331,7 +331,7 @@ describe("Studio BG3D document to runtime adapter", () => {
 
     expect(hydrated.ok).toBe(true);
     expect(hydrated.primitives).toEqual([
-      { ...primitive("primitive-a"), color: "#c9a876" },
+      { ...primitive("primitive-a"), color: "#c9a876", visible: true, locked: false },
     ]);
     expect(hydrated.customModels.map((model) => [model.id, model.modelId])).toEqual([
       ["model-a", firstStorageId],

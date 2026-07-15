@@ -261,6 +261,8 @@ interface StudioBg3dSceneNodeBase {
   readonly name: string;
   readonly transform: StudioBg3dTransform;
   readonly visible: boolean;
+  /** When true, transform gizmo and numeric edits are blocked in the editor. */
+  readonly locked: boolean;
   readonly castsShadow: boolean;
   readonly receivesShadow: boolean;
 }
@@ -966,6 +968,7 @@ function normalizeNode(
     name: normalizedText(value.name, MAX_NODE_NAME_LENGTH, true) ?? "3D 요소",
     transform: normalizeTransform(value.transform),
     visible: normalizedBoolean(value.visible, true),
+    locked: normalizedBoolean(value.locked, false),
     castsShadow: normalizedBoolean(value.castsShadow, true),
     receivesShadow: normalizedBoolean(value.receivesShadow, true),
   };
@@ -1104,6 +1107,7 @@ function legacyPrimitiveNode(value: unknown): Record<string, unknown> | null {
       scale: value.scale,
     },
     visible: true,
+    locked: false,
     castsShadow: true,
     receivesShadow: true,
   };
@@ -1142,6 +1146,7 @@ function legacyModelNode(
       scale: value.scale,
     },
     visible: true,
+    locked: false,
     castsShadow: true,
     receivesShadow: true,
   };
