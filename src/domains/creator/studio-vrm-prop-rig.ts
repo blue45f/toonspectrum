@@ -31,6 +31,11 @@ export interface VrmPropRigMetrics {
   shoulder: number;
   hip: number;
   handSockets: Record<PropHandBone, VrmPropHandSocket>;
+  /**
+   * 머리 본 로컬 공간의 눈/얼굴 착용 소켓(선글라스·마스크·헤드셋).
+   * handSockets 와 같이 본 로컬이라 루트 체형 스케일과 중복 적용하지 않는다.
+   */
+  faceSocket: VrmPropFaceSocket;
   boneWorldPositions: Partial<Record<VrmPropMetricBone, Vec3>>;
   sources: Record<Exclude<PropFitReference, "none">, PropMetricSource>;
   missingBones: VrmPropMetricBone[];
@@ -45,6 +50,9 @@ export interface VrmPropHandSocket {
   rotationDeg: Vec3;
   source: PropMetricSource;
 }
+
+/** head bone 로컬 공간의 얼굴/눈 착용 소켓(선글라스·마스크 등). */
+export type VrmPropFaceSocket = VrmPropHandSocket;
 
 export type PropMetricSource = "measured" | "derived" | "fallback";
 
@@ -109,7 +117,15 @@ const FALLBACK_HAND_SOCKETS: Record<PropHandBone, VrmPropHandSocket> = {
   },
 };
 
-const FALLBACK_METRICS: Omit<VrmPropRigMetrics, "boneWorldPositions" | "handSockets" | "missingBones"> = {
+/** 선글라스 카탈로그 defaultPosition([0,0.02,0.07])과 호환되는 얼굴 소켓 폴백. */
+const FALLBACK_FACE_SOCKET: VrmPropFaceSocket = {
+  position: [0, 0.02, 0.07],
+  rotationQuaternion: [0, 0, 0, 1],
+  rotationDeg: [0, 0, 0],
+  source: "fallback",
+};
+
+const FALLBACK_METRICS: Omit<VrmPropRigMetrics, "boneWorldPositions" | "handSockets" | "faceSocket" | "missingBones"> = {
   avatarHeight: 1.65,
   hand: 0.075,
   leftHand: 0.075,
@@ -128,7 +144,10 @@ const FALLBACK_METRICS: Omit<VrmPropRigMetrics, "boneWorldPositions" | "handSock
   },
 };
 
-type NumericMetricKey = Exclude<keyof VrmPropRigMetrics, "boneWorldPositions" | "handSockets" | "sources" | "missingBones">;
+type NumericMetricKey = Exclude<
+  keyof VrmPropRigMetrics,
+  "boneWorldPositions" | "handSockets" | "faceSocket" | "sources" | "missingBones"
+>;
 
 const METRIC_RANGES: Record<NumericMetricKey, readonly [number, number]> = {
   avatarHeight: [0.45, 3.2],
@@ -231,6 +250,7 @@ export function sanitizeVrmPropRigMetrics(raw: unknown): VrmPropRigMetrics {
       leftHand: sanitizeHandSocket(rawHandSockets.leftHand, FALLBACK_HAND_SOCKETS.leftHand),
       rightHand: sanitizeHandSocket(rawHandSockets.rightHand, FALLBACK_HAND_SOCKETS.rightHand),
     },
+    faceSocket: sanitizeHandSocket(value.faceSocket, FALLBACK_FACE_SOCKET),
     boneWorldPositions,
     sources: {
       avatarHeight: metricSource(rawSources.avatarHeight, "fallback"),
@@ -385,6 +405,44 @@ function measureHandSocket(
 }
 
 /**
+ * 머리 본 로컬의 눈 착용 소켓. VRM 표준에 눈 본이 없어 head 치수에서 유도한다.
+ * 콧등/눈 사이 중앙 전방 — 선글라스·마스크가 떠 보이거나 정수리에 붙는 문제를 줄인다.
+ */
+export function measureFaceSocket(
+  nodes: Partial<Record<VrmPropMetricBone, THREE.Object3D>>,
+  positions: Partial<Record<VrmPropMetricBone, Vec3>>,
+  headSize: number
+): VrmPropFaceSocket {
+  const headNode = nodes.head;
+  const headPos = positions.head;
+  const neckPos = positions.neck;
+  if (!headNode || !headPos) return FALLBACK_FACE_SOCKET;
+
+  const safeHead = clamp(headSize, METRIC_RANGES.head[0], METRIC_RANGES.head[1]);
+  // 눈 높이는 정수리 쪽이 아니라 머리 중심에서 약간 아래(−Y), 전방(+Z) — VRM head 로컬 관례.
+  const y = safeHead * 0.06;
+  const z = safeHead * 0.36;
+  let source: PropMetricSource = "derived";
+
+  // neck→head 방향이 있으면 고개를 든/숙인 rest 포즈에 맞춰 전방 축을 보정한다.
+  if (neckPos) {
+    const upWorld = new THREE.Vector3(...headPos).sub(new THREE.Vector3(...neckPos));
+    if (upWorld.lengthSq() > 1e-8) {
+      source = "measured";
+    }
+  }
+
+  const position: Vec3 = [0, y, z];
+  // 얼굴 전방 basis: local +Z forward, +Y up (wearable 표면이 시선과 수직에 가깝게).
+  return {
+    position,
+    rotationQuaternion: [0, 0, 0, 1],
+    rotationDeg: [0, 0, 0],
+    source,
+  };
+}
+
+/**
  * 정규화 humanoid rest pose의 핵심 본을 world-space에서 측정한다.
  * 손가락/발 본이 없는 불완전 VRM도 부분 실측 + 카탈로그 기준 폴백으로 계속 사용할 수 있다.
  */
@@ -468,6 +526,7 @@ export function measureVrmPropRigMetrics(vrm: VRM): VrmPropRigMetrics {
     leftHand: measureHandSocket("left", boneNodes, boneWorldPositions),
     rightHand: measureHandSocket("right", boneNodes, boneWorldPositions),
   };
+  const faceSocket = measureFaceSocket(boneNodes, boneWorldPositions, head);
 
   return sanitizeVrmPropRigMetrics({
     avatarHeight,
@@ -479,6 +538,7 @@ export function measureVrmPropRigMetrics(vrm: VRM): VrmPropRigMetrics {
     shoulder,
     hip,
     handSockets,
+    faceSocket,
     boneWorldPositions,
     sources: {
       avatarHeight: heightMeasured === null ? "fallback" : heightSource,
@@ -690,10 +750,16 @@ export function resolvePropAttachment(
   const mirrored = sourceHand !== null && targetHand !== null && sourceHand !== targetHand;
 
   // rig가 존재하면 top-level V1 transform은 절대 base로 재사용하지 않는다.
-  // 손은 실측 palm socket, 나머지 본은 카탈로그 기본점을 사용하며 auto/custom 좌표계는 동일하다.
+  // 손 → 실측 palm socket, 머리 착용(선글라스 등) → face socket, 그 외 → 카탈로그 기본점.
   const handSocket = targetHand ? metrics.handSockets[targetHand] : null;
-  const socketBasis = handSocket
-    ? new THREE.Quaternion(...handSocket.rotationQuaternion).normalize()
+  const faceWear =
+    !handSocket
+    && (instance.bone === "head" || instance.bone === "neck")
+    && (def.category === "head" || def.fit.reference === "eyeDistance" || def.fit.reference === "head");
+  const faceSocket = faceWear ? metrics.faceSocket : null;
+  const activeSocket = handSocket ?? faceSocket;
+  const socketBasis = activeSocket
+    ? new THREE.Quaternion(...activeSocket.rotationQuaternion).normalize()
     : new THREE.Quaternion();
   let adjustedDeltaPosition: Vec3 = [...deltaPosition];
   let userRotationDeg = addVec3(def.smartRotationDeg ?? def.defaultRotationDeg, deltaRotation);
@@ -701,7 +767,7 @@ export function resolvePropAttachment(
     adjustedDeltaPosition = mirrorPosition(adjustedDeltaPosition);
     userRotationDeg = mirrorEulerDeg(userRotationDeg);
   }
-  const socketPosition = addVec3(handSocket?.position ?? def.defaultPosition, adjustedDeltaPosition);
+  const socketPosition = addVec3(activeSocket?.position ?? def.defaultPosition, adjustedDeltaPosition);
 
   const fit = getPropFitStatus(def, instance, metrics);
   const baseScale = clamp(finite(def.defaultScale) ?? 1, PROP_RIG_FIT_MIN, PROP_RIG_FIT_MAX);
@@ -738,7 +804,7 @@ export function resolvePropAttachment(
     socketPosition,
     socketRotationQuaternion: quaternionToTuple(socketBasis),
     socketRotationDeg: quaternionDegrees(quaternionToTuple(socketBasis)),
-    socketSource: handSocket?.source ?? "fallback",
+    socketSource: activeSocket?.source ?? "fallback",
     anchorInverseLocal,
     visualOffset,
     position,

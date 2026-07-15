@@ -88,6 +88,10 @@ describe("VRM 소품 리그 실측", () => {
     expect(metrics.handSockets.rightHand.source).toBe("measured");
     expect(Math.hypot(...metrics.handSockets.leftHand.position)).toBeGreaterThan(0.03);
     expect(Math.hypot(...metrics.handSockets.rightHand.position)).toBeGreaterThan(0.03);
+    // 얼굴 소켓: 눈 높이 전방 — Z(전방)가 Y보다 커 정수리가 아니라 얼굴 쪽.
+    expect(metrics.faceSocket.source).not.toBe("fallback");
+    expect(metrics.faceSocket.position[2]).toBeGreaterThan(metrics.faceSocket.position[1]);
+    expect(metrics.faceSocket.position[2]).toBeGreaterThan(0.04);
   });
 
   it("좌우 손의 palm basis가 반사되고 quaternion은 정규화된다", () => {
@@ -141,8 +145,31 @@ describe("VRM 소품 리그 실측", () => {
       DEFAULT_VRM_PROP_RIG_METRICS.hand * Math.sqrt(1.4 * 0.8),
       6
     );
-    // hand socket은 hand bone 로컬 좌표이므로 루트 스케일과 중복 적용하지 않는다.
+    // hand/face socket은 본 로컬 좌표이므로 루트 스케일과 중복 적용하지 않는다.
     expect(scaled.handSockets).toEqual(DEFAULT_VRM_PROP_RIG_METRICS.handSockets);
+    expect(scaled.faceSocket).toEqual(DEFAULT_VRM_PROP_RIG_METRICS.faceSocket);
+  });
+});
+
+describe("얼굴 착용 소켓(선글라스)", () => {
+  it("head 소품은 faceSocket 위치에 맞춘다", () => {
+    const def = propDefById("sunglasses")!;
+    const instance = createPropInstance("sunglasses", "sg-1")!;
+    instance.bone = "head";
+    instance.rig = {
+      ...instance.rig!,
+      deltaPosition: [0, 0, 0],
+      deltaRotationDeg: [0, 0, 0],
+      deltaScale: 1,
+    };
+    const metrics = measureVrmPropRigMetrics(createMeasuredVrm());
+    const result = resolvePropAttachment(def, instance, metrics);
+    expect(result.usesSmartRig).toBe(true);
+    expect(result.socketSource).not.toBe("fallback");
+    // 소켓 원점 ≈ faceSocket (delta 0)
+    expectVecClose(result.socketPosition, metrics.faceSocket.position, 4);
+    // 전방(+Z)이 충분해 얼굴 앞에 앉는다
+    expect(result.position[2]).toBeGreaterThan(0.03);
   });
 });
 
