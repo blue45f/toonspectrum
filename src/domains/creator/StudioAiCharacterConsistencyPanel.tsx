@@ -37,8 +37,8 @@ export function StudioAiCharacterConsistencyPanel({
 
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-line bg-panel/50 p-3">
-      <div className="flex items-center gap-1.5 text-sm font-medium text-fg-1">
-        <UserRoundCheck size={14} />
+      <div className="flex items-center gap-1.5 text-sm font-bold text-fg">
+        <UserRoundCheck size={14} className="text-accent" aria-hidden />
         AI 캐릭터 일관성 생성
       </div>
 

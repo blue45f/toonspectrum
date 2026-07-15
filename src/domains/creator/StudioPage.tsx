@@ -11906,6 +11906,8 @@ function StudioCuttoonEditor() {
   }
 
   function applyAiAssistPresetPrompt(tool: StudioAiAssistToolId, prompt: string) {
+    // Ensure the matching tool tab is visible when a preset/recent chip is used.
+    if (tool !== aiAssistTool) setAiAssistTool(tool);
     switch (tool) {
       case "background":
         setAiBgPrompt(prompt);
@@ -11925,6 +11927,11 @@ function StudioCuttoonEditor() {
       default:
         break;
     }
+    // Bring the tool form into view after preset fill (hub body is the scroll container).
+    globalThis.requestAnimationFrame(() => {
+      const panel = menuRef.current?.querySelector<HTMLElement>("[data-studio-ai-assist-tool-panel]");
+      panel?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
   }
 
   // AI 자동 채색 실행 — elId/srcAtRequestTime을 호출 시점에 캡처해 넘긴다(await 도중 선택이 바뀌어도
@@ -16485,7 +16492,8 @@ function StudioCuttoonEditor() {
   const groupPopoverClass = (width: "w-72" | "w-80") =>
     cn(
       // data-studio-tool-popover is set via class list attribute pattern in markup where needed.
-      "fixed inset-x-2 top-[6.5rem] z-[70] max-h-[min(70dvh,32rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-2xl lg:inset-x-auto lg:left-3 lg:w-auto lg:max-w-[min(28rem,calc(100vw-1.5rem))]",
+      // Default scrolls as one body; AI group overrides to overflow-hidden + flex for nested scroll.
+      "fixed inset-x-2 top-[6.5rem] z-[70] max-h-[min(78dvh,36rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-2xl lg:inset-x-auto lg:left-3 lg:w-auto lg:max-w-[min(28rem,calc(100vw-1.5rem))]",
       width === "w-72" ? "lg:w-72" : "lg:w-80"
     );
 
@@ -20167,14 +20175,24 @@ function StudioCuttoonEditor() {
             <ChevronDown size={12} aria-hidden className={cn("transition-transform duration-150", activeToolbarGroup === "aiGroup" && "rotate-180")} />
           </button>
           {activeToolbarGroup === "aiGroup" && (
-            <div className={groupPopoverClass("w-80")}>
+            <div
+              className={cn(
+                groupPopoverClass("w-80"),
+                // Fixed flex column: nested max-heights previously clipped generate buttons.
+                // Use a definite height so flex-1 tool bodies scroll reliably.
+                "flex h-[min(78dvh,36rem)] max-h-[min(78dvh,36rem)] flex-col overflow-hidden lg:w-96 lg:max-w-[min(24rem,calc(100vw-1.5rem))]"
+              )}
+              data-studio-tool-popover="ai-group"
+            >
               <StudioMenuPopoverHeader
                 icon={WandSparkles}
                 title="AI 연동"
                 description="초안·스톡·시나리오를 연결하고, 키 설정은 연동 탭에서 관리합니다."
+                className="shrink-0"
               />
               <StudioMenuSubtabs
                 aria-label="AI 메뉴 구역"
+                className="shrink-0"
                 activeId={
                   menu === "aiAssist" || menu === "stockImage" || menu === "integrations"
                     ? menu
@@ -20199,8 +20217,10 @@ function StudioCuttoonEditor() {
                 ]}
               />
               {menu === "aiAssist" && (
+                <div className="flex min-h-0 flex-1 flex-col">
                 <Suspense fallback={<StudioPanelLoading label="AI 어시스트 패널을 여는 중..." />}>
                   <StudioAiAssistHub
+                    className="min-h-0 flex-1"
                     activeTool={aiAssistTool}
                     onToolChange={setAiAssistTool}
                     imageConfigured={isStudioAiConfigured(aiSettings)}
@@ -20377,22 +20397,27 @@ function StudioCuttoonEditor() {
                     }
                   />
                 </Suspense>
+                </div>
               )}
               {menu === "stockImage" && (
-                <Suspense fallback={<StudioPanelLoading label="스톡 사진 패널을 여는 중..." />}>
-                  <StudioStockImagePanel
-                    onInsert={insertStockImage}
-                    onOpenSettings={() => {
-                      preloadStudioIntegrationsSettingsPanel();
-                      setMenu("integrations");
-                    }}
-                  />
-                </Suspense>
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                  <Suspense fallback={<StudioPanelLoading label="스톡 사진 패널을 여는 중..." />}>
+                    <StudioStockImagePanel
+                      onInsert={insertStockImage}
+                      onOpenSettings={() => {
+                        preloadStudioIntegrationsSettingsPanel();
+                        setMenu("integrations");
+                      }}
+                    />
+                  </Suspense>
+                </div>
               )}
               {menu === "integrations" && (
-                <Suspense fallback={<StudioPanelLoading label="연동 설정 패널을 여는 중..." />}>
-                  <StudioIntegrationsSettingsPanel aiSettings={aiSettings} onAiSettingsChange={updateAiSettings} />
-                </Suspense>
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                  <Suspense fallback={<StudioPanelLoading label="연동 설정 패널을 여는 중..." />}>
+                    <StudioIntegrationsSettingsPanel aiSettings={aiSettings} onAiSettingsChange={updateAiSettings} />
+                  </Suspense>
+                </div>
               )}
             </div>
           )}
