@@ -320,6 +320,7 @@ import {
   createCanvasBubbleTextMeasurer,
   fitBubbleFontSize,
 } from "./studio-bubble-text-fit";
+import { clampStudioCanvasHeight } from "./studio-canvas-size";
 import {
   collectStudioCaptureAssetSources,
   waitForStudioCaptureReady,
@@ -1180,6 +1181,10 @@ const StudioElementsPanel = lazyRetry(
 const StudioBackgroundPanel = lazyRetry(
   () => import("./StudioBackgroundPanel").then((mod) => ({ default: mod.StudioBackgroundPanel })),
   "StudioBackgroundPanel"
+);
+const StudioCanvasResizer = lazyRetry(
+  () => import("./StudioCanvasResizer").then((mod) => ({ default: mod.StudioCanvasResizer })),
+  "StudioCanvasResizer"
 );
 const StudioRasterAssetGrid = lazyRetry(
   () => import("./StudioRasterAssetGrid").then((mod) => ({ default: mod.StudioRasterAssetGrid })),
@@ -5224,8 +5229,8 @@ function StudioCuttoonEditor() {
     updateActivePage({ bgGrad: val });
   };
   const setCanvasH = (newH: number | ((prev: number) => number)) => {
-    const val = typeof newH === "function" ? newH(activePage.canvasH) : newH;
-    updateActivePage({ canvasH: val });
+    const raw = typeof newH === "function" ? newH(activePage.canvasH) : newH;
+    updateActivePage({ canvasH: clampStudioCanvasHeight(raw) });
   };
 
   function updateActivePage(patch: Partial<Omit<PageState, "id">>) {
@@ -19805,8 +19810,8 @@ function StudioCuttoonEditor() {
             <div className={groupPopoverClass("w-80")}>
               <StudioMenuPopoverHeader
                 icon={Mountain}
-                title="배경·톤"
-                description="단색·그라데이션·패턴·2D 씬·스크린톤·3D를 한 곳에서 배치합니다."
+                title="배경 편집"
+                description="채우기·캔버스 크기, 2D 씬, 톤, 3D를 한곳에서 고르세요."
               />
               <StudioMenuSubtabs
                 aria-label="배경 메뉴 구역"
@@ -19825,30 +19830,54 @@ function StudioCuttoonEditor() {
                   setMenu(id as StudioMenu);
                 }}
                 items={[
-                  { id: "bgFill", label: "채우기", icon: Droplets, title: "단색·그라데이션·패턴·분위기" },
-                  { id: "bgScene", label: "배경 씬", icon: ImageIcon },
-                  { id: "tone", label: "톤", icon: Grid2x2 },
-                  { id: "bg3d", label: "3D 배경", icon: Boxes, title: "3D 배경 블록아웃 만들기" },
+                  { id: "bgFill", label: "편집", icon: Droplets, title: "채우기·크기·비율 리사이저" },
+                  { id: "bgScene", label: "씬", icon: ImageIcon, title: "2D 배경 씬" },
+                  { id: "tone", label: "톤", icon: Grid2x2, title: "만화 스크린톤" },
+                  { id: "bg3d", label: "3D", icon: Boxes, title: "3D 배경 블록아웃" },
                 ]}
               />
               {menu === "bgFill" && (
-                <Suspense fallback={<StudioPanelLoading label="배경 채우기 패널을 여는 중..." />}>
+                <Suspense fallback={<StudioPanelLoading label="배경 편집기를 여는 중..." />}>
                   <StudioBackgroundPanel
                     canvasW={CANVAS_W}
                     canvasH={canvasH}
                     currentBg={bg}
+                    currentBgGrad={bgGrad}
                     onApply={(payload) => {
                       void applyStudioBackgroundFill(payload);
                     }}
+                    sizeSlot={
+                      <StudioCanvasResizer
+                        canvasW={CANVAS_W}
+                        canvasH={canvasH}
+                        strategy={magicResizeStrategy}
+                        onStrategyChange={setMagicResizeStrategy}
+                        disabled={masterEditMode}
+                        onSetHeight={(height) => {
+                          if (masterEditMode) return;
+                          setCanvasH(height);
+                          announceDrawingShortcut(`캔버스 높이 ${height}px`);
+                        }}
+                        onMagicResizePreset={(preset) => {
+                          applyMagicResizePreset(preset);
+                          announceDrawingShortcut(`${preset.label} 규격 적용`);
+                        }}
+                      />
+                    }
                   />
                 </Suspense>
               )}
               {menu === "bgScene" && (
                 <>
-                  <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">2D 배경 씬</p>
-                  <p className="mb-2 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.66rem] leading-snug text-fg-3">
-                    배경을 누르면 모든 패널에 적용돼요. 특정 컷만 바꾸려면 그 패널을 먼저 선택하세요.
-                  </p>
+                  <div className="mb-2 flex items-start gap-2 rounded-xl border border-line bg-card px-2.5 py-2">
+                    <ImageIcon size={14} className="mt-0.5 shrink-0 text-accent" aria-hidden />
+                    <div className="min-w-0">
+                      <p className="text-[0.72rem] font-bold text-fg">2D 배경 씬</p>
+                      <p className="text-[0.62rem] leading-snug text-fg-3">
+                        탭하면 모든 패널에 깔려요. 한 컷만 바꾸려면 그 패널을 먼저 선택한 뒤 골라 주세요.
+                      </p>
+                    </div>
+                  </div>
                   <div className="relative mb-2">
                     <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-3" />
                     <input
@@ -24305,19 +24334,19 @@ function StudioCuttoonEditor() {
             <button
               type="button"
               onClick={() => setMenu("bgFill")}
-              className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.68rem] font-semibold text-fg-2 hover:border-accent/40 hover:bg-raised"
+              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl border border-accent/30 bg-accent-soft px-2 py-2 text-[0.7rem] font-bold text-accent hover:border-accent/50"
             >
-              <Droplets size={12} className="text-accent" aria-hidden />
-              패턴·분위기·단색 전체 보기
+              <Droplets size={13} aria-hidden />
+              배경 편집기 · 리사이저 열기
             </button>
             <div className="mt-3 flex items-center justify-between gap-2 text-sm text-fg-2">
               <span>높이</span>
               <span className="flex items-center gap-1">
-                <button type="button" aria-label="높이 240px 줄이기" onClick={() => setCanvasH((h) => Math.max(480, h - 240))} className="rounded border border-line px-2 text-fg-2 hover:bg-raised">
+                <button type="button" aria-label="높이 240px 줄이기" onClick={() => setCanvasH((h) => h - 240)} className="rounded border border-line px-2 text-fg-2 hover:bg-raised">
                   −
                 </button>
                 <span className="numeral w-12 text-center text-xs" aria-label={`높이 ${canvasH}px`}>{canvasH}</span>
-                <button type="button" aria-label="높이 240px 늘리기" onClick={() => setCanvasH((h) => Math.min(6000, h + 240))} className="rounded border border-line px-2 text-fg-2 hover:bg-raised">
+                <button type="button" aria-label="높이 240px 늘리기" onClick={() => setCanvasH((h) => h + 240)} className="rounded border border-line px-2 text-fg-2 hover:bg-raised">
                   +
                 </button>
               </span>
