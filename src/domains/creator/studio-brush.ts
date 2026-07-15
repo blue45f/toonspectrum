@@ -120,13 +120,14 @@ export const BRUSH_PRESETS: BrushPreset[] = [
   { id: "screentone", name: "스크린톤(도트)", defaultWidth: 22, defaultOpacity: 1.0 },
 ];
 
-/** Canva-style quick size chips (screen px brush width). */
+/** Canva/PicsArt-style quick size chips (screen px brush width). */
 export const STUDIO_BRUSH_SIZE_CHIPS = [
   { id: "xs", label: "XS", width: 2 },
   { id: "s", label: "S", width: 6 },
   { id: "m", label: "M", width: 12 },
   { id: "l", label: "L", width: 24 },
   { id: "xl", label: "XL", width: 40 },
+  { id: "xxl", label: "2XL", width: 64 },
 ] as const;
 
 export type StudioBrushSizeChipId = (typeof STUDIO_BRUSH_SIZE_CHIPS)[number]["id"];

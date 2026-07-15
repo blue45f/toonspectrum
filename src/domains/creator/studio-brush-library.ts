@@ -30,7 +30,7 @@ import {
 export interface StudioBrushSnapshot {
   /** BRUSH_PRESETS[].id (studio-brush.ts). StudioPage의 `brush` state에 대응. */
   brushId: string;
-  /** StudioPage의 `strokeWidth` state에 대응. UI 슬라이더 범위와 동일하게 1~48로 clamp. */
+  /** StudioPage의 `strokeWidth` state에 대응. UI 슬라이더 범위와 동일하게 1~80로 clamp. */
   strokeWidth: number;
   /** StudioPage의 `brushOpacity` state에 대응(0~1). UI 슬라이더 범위와 동일하게 0.1~1로 clamp. */
   brushOpacity: number;
@@ -139,7 +139,7 @@ export interface BrushUpdateResult {
   status: "updated" | "missing" | "unchanged" | BrushMutationFailureStatus;
 }
 
-export const BRUSH_STROKE_WIDTH_RANGE = [1, 48] as const;
+export const BRUSH_STROKE_WIDTH_RANGE = [1, 80] as const;
 export const BRUSH_OPACITY_RANGE = [0.1, 1] as const;
 export const BRUSH_PRESSURE_CURVE_RANGE = [0.3, 3] as const;
 export const BRUSH_VELOCITY_SENSITIVITY_RANGE = [0.1, 1] as const;

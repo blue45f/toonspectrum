@@ -32,7 +32,6 @@ describe("StudioDrawOptionsBar", () => {
     expect(html).toContain('aria-label="스마트 도형"');
     expect(html).toContain('aria-label="브러시 크기"');
     expect(html).toContain('aria-label="브러시 불투명도"');
-    expect(html).toContain('aria-label="손떨림 보정"');
     expect(html).toContain('data-studio-draw-options-end="true"');
     expect(html).toContain("브러시 크기 프리셋");
     expect(html).toContain('data-studio-size-chip-glyph=');
@@ -44,11 +43,41 @@ describe("StudioDrawOptionsBar", () => {
     expect(html).toContain('data-studio-dual-color-well="true"');
     expect(html).toContain('data-studio-color-swap="true"');
     expect(html).toContain('data-studio-size-preview="true"');
-    expect(html).toContain('data-studio-stabilizer-glyph="true"');
     expect(html).toContain('data-studio-opacity-glyph="true"');
+    // Magma/PicsArt: active brush pill + size nudge + advanced disclosure
+    expect(html).toContain('data-studio-brush-active-pill="true"');
+    expect(html).toContain('aria-label="브러시 크기 줄이기"');
+    expect(html).toContain('data-studio-draw-advanced-toggle="true"');
   });
 
-  it("renders brush slots and symmetry chips when provided", () => {
+  it("exposes advanced stabilizer controls when expanded via static advanced props", () => {
+    // Advanced row is closed by default; stabilizer lives behind toggle.
+    // Library pill and size chips remain always visible.
+    const html = renderToStaticMarkup(
+      <StudioDrawOptionsBar
+        drawMode="pen"
+        brushId="neon"
+        strokeWidth={18}
+        brushOpacity={0.75}
+        stabilizer={6}
+        color="#39ff14"
+        quickShapeActive={false}
+        onSelectBrush={vi.fn()}
+        onStrokeWidthChange={vi.fn()}
+        onOpacityChange={vi.fn()}
+        onStabilizerChange={vi.fn()}
+        onColorChange={vi.fn()}
+        onToggleQuickShape={vi.fn()}
+        favoriteBrushIds={["neon", "pen"]}
+        onToggleFavoriteBrush={vi.fn()}
+        onSelectRecentBrush={vi.fn()}
+      />
+    );
+    expect(html).toContain("브러시 라이브러리");
+    expect(html).toContain("네온");
+  });
+
+  it("renders symmetry chips on the primary strip; slots stay behind advanced", () => {
     const html = renderToStaticMarkup(
       <StudioDrawOptionsBar
         drawMode="pen"
@@ -78,9 +107,10 @@ describe("StudioDrawOptionsBar", () => {
         onSymmetryTypeChange={vi.fn()}
       />
     );
-    expect(html).toContain("브러시 슬롯 1");
+    // Progressive disclosure: slots only when advanced is open
+    expect(html).not.toContain("브러시 슬롯 1");
+    expect(html).toContain('data-studio-draw-advanced-toggle="true"');
     expect(html).toContain("대칭 그리기");
-    // Symmetry is glyph-only (label in aria/title)
     expect(html).toContain('data-studio-symmetry-glyph="vertical"');
     expect(html).toContain('aria-label="대칭 세로"');
   });

@@ -118,9 +118,10 @@ describe("BRUSH_PRESETS", () => {
   });
 
   it("exposes Canva-style size chips and nearest selection", () => {
-    expect(STUDIO_BRUSH_SIZE_CHIPS.map((c) => c.id)).toEqual(["xs", "s", "m", "l", "xl"]);
+    expect(STUDIO_BRUSH_SIZE_CHIPS.map((c) => c.id)).toEqual(["xs", "s", "m", "l", "xl", "xxl"]);
     expect(nearestStudioBrushSizeChip(7)).toBe("s");
     expect(nearestStudioBrushSizeChip(40)).toBe("xl");
+    expect(nearestStudioBrushSizeChip(64)).toBe("xxl");
   });
 
   it("exposes PicsArt-style opacity chips", () => {

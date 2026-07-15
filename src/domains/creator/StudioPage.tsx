@@ -20419,7 +20419,7 @@ function StudioCuttoonEditor() {
                 <input
                   type="range"
                   min={1}
-                  max={48}
+                  max={80}
                   value={strokeWidth}
                   onChange={(e) => setStrokeWidth(Number(e.target.value))}
                   className="w-20 sm:w-24 accent-accent cursor-pointer"
@@ -27417,7 +27417,7 @@ function StudioCuttoonEditor() {
                   <input
                     type="range"
                     min={1}
-                    max={48}
+                    max={80}
                     value={strokeWidth}
                     onChange={(e) => setStrokeWidth(Number(e.target.value))}
                     className="h-11 w-full accent-accent"
@@ -27428,11 +27428,11 @@ function StudioCuttoonEditor() {
                     id="mobile-brush-width"
                     type="number"
                     min={1}
-                    max={48}
+                    max={80}
                     inputMode="numeric"
                     value={strokeWidth}
                     onChange={(event) =>
-                      setStrokeWidth(Math.min(48, Math.max(1, Number(event.target.value) || 1)))
+                      setStrokeWidth(Math.min(80, Math.max(1, Number(event.target.value) || 1)))
                     }
                     className="min-h-11 w-full rounded-lg border border-line bg-card px-2 text-center text-xs tabular-nums text-fg outline-none focus:border-accent"
                   />
