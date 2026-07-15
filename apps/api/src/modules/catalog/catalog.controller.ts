@@ -14,6 +14,7 @@ import {
   Res,
 } from "@nestjs/common";
 
+import { buildAffiliateUrl } from "../../../../../lib/affiliate";
 import { getAppConfig } from "../../../../../lib/server/app-config";
 import { coverImagePolicy } from "../../../../../lib/server/cover-policy";
 
@@ -265,6 +266,27 @@ export class CatalogController {
     const data = await this.catalogService.getAuthorData(name);
     if (!data) throw new NotFoundException("not_found");
     return data;
+  }
+
+  @Get("/api/go/:platformId")
+  @Header("Cache-Control", "no-store, max-age=0")
+  async redirectAffiliate(
+    @Param("platformId") platformId: string,
+    @Query("to") toUrl: string | undefined,
+    @Req() req: Request,
+    @Res() res: Response
+  ) {
+    if (!toUrl) {
+      return res.status(400).send("missing destination url ('to')");
+    }
+
+    const referrer = req.headers["referer"] || "direct";
+    const userAgent = req.headers["user-agent"] || "unknown";
+    const timestamp = new Date().toISOString();
+    console.log(`[Affiliate Click] platform=${platformId} timestamp=${timestamp} to=${toUrl} referrer=${referrer} ua=${userAgent}`);
+
+    const finalUrl = buildAffiliateUrl(platformId, toUrl);
+    res.redirect(302, finalUrl);
   }
 }
 
