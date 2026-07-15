@@ -64,6 +64,13 @@ import {
   type BubbleTailSpec,
 } from "./studio-bubble-path";
 import {
+  fxBrushSeedFromKey,
+  planGlitterBrushParticles,
+  planGlowBrushPasses,
+  planOilBrushDabs,
+  planPastelBrushDabs,
+} from "./studio-fx-brush";
+import {
   estimateTextGradientBBox,
   legacyTextGradientToSpec,
   linearGradientPoints,
@@ -833,6 +840,10 @@ function serializeFreehand(
     points.length === 2 &&
     brushFamily !== "watercolor" &&
     brushFamily !== "screentone" &&
+    brushFamily !== "glow" &&
+    brushFamily !== "glitter" &&
+    brushFamily !== "oil" &&
+    brushFamily !== "pastel" &&
     !dynamicBrush
   ) {
     const pressure = Math.min(1, Math.max(0, el.pressures?.[0] ?? 0.5));
@@ -995,6 +1006,70 @@ function serializeFreehand(
   if (brushFamily === "neon") {
     const smoothed = processFreehandPoints(points, renderSampleDistance);
     return `<path d="${tensionPathD(smoothed, 0.35)}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(strokeWidth)}" stroke-linecap="round" stroke-linejoin="round" style="mix-blend-mode:screen"${opacityAttr}/>`;
+  }
+
+  if (brushFamily === "glow") {
+    const smoothed = processFreehandPoints(points, renderSampleDistance);
+    const soft = (el.brush ?? "glow") === "soft-glow";
+    const passes = planGlowBrushPasses(strokeWidth, soft);
+    const pathD = tensionPathD(smoothed, 0.35);
+    const layers = passes.map((pass) => (
+      `<path d="${pathD}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(Math.max(0.5, strokeWidth * pass.widthScale))}" stroke-linecap="round" stroke-linejoin="round" opacity="${fmt(pass.opacity)}" style="mix-blend-mode:screen"/>`
+    )).join("");
+    return `<g${opacityAttr}>${layers}</g>`;
+  }
+
+  if (brushFamily === "glitter") {
+    const mode = (el.brush ?? "glitter") === "star-dust" ? "star-dust" : "glitter";
+    const particles = planGlitterBrushParticles({
+      points: processFreehandPoints(points, renderSampleDistance),
+      pressures: el.pressures,
+      baseWidth: strokeWidth,
+      seed: fxBrushSeedFromKey(el.id),
+      mode,
+      maxParticles: 512,
+    });
+    const marks = particles.map((p) => {
+      if (p.kind === 1) {
+        const s = p.radius * 1.35;
+        return `<rect x="${fmt(p.x - s / 2)}" y="${fmt(p.y - s / 2)}" width="${fmt(s)}" height="${fmt(s)}" fill="${escapeXml(stroke)}" opacity="${fmt(p.opacity)}" transform="rotate(45 ${fmt(p.x)} ${fmt(p.y)})"/>`;
+      }
+      return `<circle cx="${fmt(p.x)}" cy="${fmt(p.y)}" r="${fmt(p.radius)}" fill="${escapeXml(stroke)}" opacity="${fmt(p.opacity)}"/>`;
+    }).join("");
+    return `<g style="mix-blend-mode:screen"${opacityAttr}>${marks}</g>`;
+  }
+
+  if (brushFamily === "oil") {
+    const dabs = planOilBrushDabs({
+      points: processFreehandPoints(points, renderSampleDistance),
+      pressures: el.pressures,
+      baseWidth: strokeWidth,
+      seed: fxBrushSeedFromKey(el.id),
+      maxDabs: 512,
+    });
+    const ellipses = dabs.map((dab) => (
+      `<ellipse cx="${fmt(dab.x)}" cy="${fmt(dab.y)}" rx="${fmt(dab.radiusX)}" ry="${fmt(dab.radiusY)}" fill="${escapeXml(stroke)}" opacity="${fmt(dab.opacity)}" transform="rotate(${fmt((dab.angleRad * 180) / Math.PI)} ${fmt(dab.x)} ${fmt(dab.y)})"/>`
+    )).join("");
+    return `<g${opacityAttr}>${ellipses}</g>`;
+  }
+
+  if (brushFamily === "pastel") {
+    const dabs = planPastelBrushDabs({
+      points: processFreehandPoints(points, renderSampleDistance),
+      pressures: el.pressures,
+      baseWidth: strokeWidth,
+      seed: fxBrushSeedFromKey(el.id),
+      maxDabs: 512,
+    });
+    if (dabs.length === 0) return "";
+    const softId = nextId(ctx, "sp");
+    ctx.defs.push(
+      `<radialGradient id="${softId}" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="${escapeXml(stroke)}"/><stop offset="55%" stop-color="${escapeXml(stroke)}"/><stop offset="100%" stop-color="${escapeXml(stroke)}" stop-opacity="0"/></radialGradient>`
+    );
+    const circles = dabs.map((dab) => (
+      `<circle cx="${fmt(dab.x)}" cy="${fmt(dab.y)}" r="${fmt(dab.radius)}" fill="url(#${softId})" opacity="${fmt(dab.opacity)}"/>`
+    )).join("");
+    return `<g${opacityAttr}>${circles}</g>`;
   }
 
   // 기본 펜/마커 — 필압 배열이 있으면 세그먼트별 굵기(캔버스 산식 0.3+p×1.4)로 재현.

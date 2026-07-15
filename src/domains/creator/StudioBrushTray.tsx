@@ -11,6 +11,7 @@ import {
   Pencil,
   Sparkles,
   Squircle,
+  Stars,
   Wand2,
 } from "lucide-react";
 import { useState, type ReactElement } from "react";
@@ -40,6 +41,7 @@ const CATEGORY_ICONS: Record<StudioBrushTrayCategory, LucideIcon> = {
   line: Pencil,
   marker: Highlighter,
   paint: Droplets,
+  fx: Stars,
   texture: Squircle,
   all: Wand2,
 };
@@ -71,7 +73,7 @@ function BrushPreviewGlyph({
   const dash = studioBrushPreviewDashArray(item.previewStyle);
   const dots = studioBrushPreviewDotCenters(item.previewStyle, PREVIEW_W, PREVIEW_H);
   const ink = active ? "currentColor" : surface.ink;
-  const glow = item.previewStyle === "neon";
+  const glow = item.previewStyle === "neon" || item.previewStyle === "glow";
 
   return (
     <svg
@@ -94,7 +96,10 @@ function BrushPreviewGlyph({
         strokeWidth={0.6}
       />
       {/* Subtle grain for texture media */}
-      {(item.previewStyle === "texture" || item.previewStyle === "tone" || item.previewStyle === "dots") &&
+      {(item.previewStyle === "texture"
+        || item.previewStyle === "tone"
+        || item.previewStyle === "dots"
+        || item.previewStyle === "glitter") &&
         !active && (
           <g opacity={0.35} fill={surface.ink}>
             <circle cx={6} cy={4} r={0.4} />

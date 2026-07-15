@@ -4,9 +4,11 @@ import {
   BRUSH_PRESETS,
   BRUSH_PRESSURE_CURVE_PRESETS,
   STABILIZER_MAX,
+  STUDIO_BRUSH_OPACITY_CHIPS,
   STUDIO_BRUSH_SIZE_CHIPS,
   buildCalligraphySegments,
   gpenSegmentWidths,
+  nearestStudioBrushOpacityChip,
   nearestStudioBrushSizeChip,
   normalizeCalligraphyStylusInput,
   polylineLength,
@@ -43,14 +45,23 @@ describe("BRUSH_PRESETS", () => {
       "marker-bold",
       "highlighter",
       "neon",
+      "glow",
+      "soft-glow",
+      "glitter",
+      "star-dust",
       "brush",
       "watercolor",
+      "ink-wash",
+      "oil",
+      "pastel",
       "ink-particle",
       "airbrush",
+      "soft-brush",
       "spray",
       "dry-media",
       "crayon",
       "chalk",
+      "charcoal",
       "pencil",
       "soft-pencil",
       "screentone",
@@ -75,6 +86,9 @@ describe("BRUSH_PRESETS", () => {
     expect(BRUSH_PRESETS.find((preset) => preset.id === "neon")).toMatchObject({
       defaultColor: "#39ff14",
     });
+    expect(BRUSH_PRESETS.find((preset) => preset.id === "glow")).toMatchObject({
+      defaultColor: "#ff4fd8",
+    });
   });
 
   it("defines sane defaults for every preset", () => {
@@ -89,8 +103,17 @@ describe("BRUSH_PRESETS", () => {
   it("maps commercial aliases onto stable render families", () => {
     expect(resolveStudioBrushRenderFamily("fineliner")).toBe("pen");
     expect(resolveStudioBrushRenderFamily("spray")).toBe("airbrush");
+    expect(resolveStudioBrushRenderFamily("soft-brush")).toBe("airbrush");
     expect(resolveStudioBrushRenderFamily("crayon")).toBe("dry-media");
+    expect(resolveStudioBrushRenderFamily("charcoal")).toBe("dry-media");
     expect(resolveStudioBrushRenderFamily("neon")).toBe("neon");
+    expect(resolveStudioBrushRenderFamily("glow")).toBe("glow");
+    expect(resolveStudioBrushRenderFamily("soft-glow")).toBe("glow");
+    expect(resolveStudioBrushRenderFamily("glitter")).toBe("glitter");
+    expect(resolveStudioBrushRenderFamily("star-dust")).toBe("glitter");
+    expect(resolveStudioBrushRenderFamily("oil")).toBe("oil");
+    expect(resolveStudioBrushRenderFamily("pastel")).toBe("pastel");
+    expect(resolveStudioBrushRenderFamily("ink-wash")).toBe("watercolor");
     expect(resolveStudioBrushRenderFamily("unknown-tool")).toBe("pen");
   });
 
@@ -98,6 +121,12 @@ describe("BRUSH_PRESETS", () => {
     expect(STUDIO_BRUSH_SIZE_CHIPS.map((c) => c.id)).toEqual(["xs", "s", "m", "l", "xl"]);
     expect(nearestStudioBrushSizeChip(7)).toBe("s");
     expect(nearestStudioBrushSizeChip(40)).toBe("xl");
+  });
+
+  it("exposes PicsArt-style opacity chips", () => {
+    expect(STUDIO_BRUSH_OPACITY_CHIPS.map((c) => c.opacity)).toEqual([0.2, 0.4, 0.6, 0.8, 1]);
+    expect(nearestStudioBrushOpacityChip(0.58)).toBe("o60");
+    expect(nearestStudioBrushOpacityChip(1)).toBe("o100");
   });
 });
 

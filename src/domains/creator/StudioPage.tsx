@@ -488,6 +488,13 @@ import {
   type OnionSkinSettings,
   type StudioAnimFrame,
 } from "./studio-frame-animation";
+import {
+  fxBrushSeedFromKey,
+  planGlitterBrushParticles,
+  planGlowBrushPasses,
+  planOilBrushDabs,
+  planPastelBrushDabs,
+} from "./studio-fx-brush";
 import { isAnimatedGifDataUrl, isGifFile } from "./studio-gif-element";
 import {
   estimateTextGradientBBox,
@@ -2712,6 +2719,10 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
             points.length === 2 &&
             brushFamily !== "watercolor" &&
             brushFamily !== "screentone" &&
+            brushFamily !== "glow" &&
+            brushFamily !== "glitter" &&
+            brushFamily !== "oil" &&
+            brushFamily !== "pastel" &&
             !dynamicBrush
           ) {
             const pressure = Math.min(1, Math.max(0, el.pressures?.[0] ?? 0.5));
@@ -3036,6 +3047,141 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
                 tension={0.35}
                 // Screen-style glow on dark panels — Express/Picsart neon marker affordance.
                 globalCompositeOperation="lighter"
+                listening={false}
+              />
+            );
+          }
+
+          if (brushFamily === "glow" && el.mode !== "eraser") {
+            const smoothed = processFreehandPoints(points, renderSampleDistance);
+            const soft = (el.brush ?? "glow") === "soft-glow";
+            const passes = planGlowBrushPasses(strokeWidth, soft);
+            return (
+              <Group key={index} opacity={opacity} listening={false}>
+                {passes.map((pass, passIndex) => (
+                  <Line
+                    key={passIndex}
+                    points={smoothed}
+                    stroke={stroke}
+                    strokeWidth={Math.max(0.5, strokeWidth * pass.widthScale)}
+                    opacity={pass.opacity}
+                    lineCap="round"
+                    lineJoin="round"
+                    tension={0.35}
+                    globalCompositeOperation="lighter"
+                    listening={false}
+                  />
+                ))}
+              </Group>
+            );
+          }
+
+          if (brushFamily === "glitter" && el.mode !== "eraser") {
+            const mode = (el.brush ?? "glitter") === "star-dust" ? "star-dust" : "glitter";
+            const particles = planGlitterBrushParticles({
+              points: processFreehandPoints(points, renderSampleDistance),
+              pressures: el.pressures,
+              baseWidth: strokeWidth,
+              seed: fxBrushSeedFromKey(el.id),
+              mode,
+              maxParticles: 512,
+            });
+            return (
+              <Shape
+                key={index}
+                sceneFunc={(context) => {
+                  context.save();
+                  for (const particle of particles) {
+                    context.globalAlpha = Math.min(1, Math.max(0, particle.opacity * opacity));
+                    context.fillStyle = stroke;
+                    if (particle.kind === 1) {
+                      const s = particle.radius * 1.35;
+                      context.save();
+                      context.translate(particle.x, particle.y);
+                      context.rotate(Math.PI / 4);
+                      context.fillRect(-s * 0.5, -s * 0.5, s, s);
+                      context.restore();
+                    } else {
+                      context.beginPath();
+                      context.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
+                      context.fill();
+                    }
+                  }
+                  context.restore();
+                }}
+                globalCompositeOperation="lighter"
+                listening={false}
+              />
+            );
+          }
+
+          if (brushFamily === "oil" && el.mode !== "eraser") {
+            const dabs = planOilBrushDabs({
+              points: processFreehandPoints(points, renderSampleDistance),
+              pressures: el.pressures,
+              baseWidth: strokeWidth,
+              seed: fxBrushSeedFromKey(el.id),
+              maxDabs: 512,
+            });
+            return (
+              <Shape
+                key={index}
+                sceneFunc={(context) => {
+                  for (const dab of dabs) {
+                    context.save();
+                    context.globalAlpha = Math.min(1, Math.max(0, dab.opacity * opacity));
+                    context.translate(dab.x, dab.y);
+                    context.rotate(dab.angleRad);
+                    const rx = Math.max(0.25, dab.radiusX);
+                    const ry = Math.max(0.15, dab.radiusY);
+                    context.scale(1, ry / rx);
+                    context.beginPath();
+                    context.arc(0, 0, rx, 0, Math.PI * 2);
+                    context.fillStyle = stroke;
+                    context.fill();
+                    context.restore();
+                  }
+                }}
+                globalCompositeOperation={composite}
+                listening={false}
+              />
+            );
+          }
+
+          if (brushFamily === "pastel" && el.mode !== "eraser") {
+            const dabs = planPastelBrushDabs({
+              points: processFreehandPoints(points, renderSampleDistance),
+              pressures: el.pressures,
+              baseWidth: strokeWidth,
+              seed: fxBrushSeedFromKey(el.id),
+              maxDabs: 512,
+            });
+            return (
+              <Shape
+                key={index}
+                sceneFunc={(context) => {
+                  context.save();
+                  for (const dab of dabs) {
+                    context.globalAlpha = Math.min(1, Math.max(0, dab.opacity * opacity));
+                    const gradient = context.createRadialGradient(
+                      dab.x,
+                      dab.y,
+                      0,
+                      dab.x,
+                      dab.y,
+                      dab.radius
+                    );
+                    gradient.addColorStop(0, stroke);
+                    gradient.addColorStop(0.55, stroke);
+                    gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+                    context.beginPath();
+                    context.arc(dab.x, dab.y, dab.radius, 0, Math.PI * 2);
+                    context.fillStyle = gradient;
+                    context.fill();
+                  }
+                  context.restore();
+                }}
+                globalCompositeOperation={composite}
                 listening={false}
               />
             );

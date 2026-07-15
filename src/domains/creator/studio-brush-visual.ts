@@ -11,10 +11,13 @@ export type StudioBrushPreviewStyle =
   | "wavy"
   | "calligraphy"
   | "neon"
+  | "glow"
+  | "glitter"
+  | "oil"
   | "texture"
   | "tone";
 
-export type StudioBrushMediaGroupVisual = "line" | "marker" | "paint" | "texture";
+export type StudioBrushMediaGroupVisual = "line" | "marker" | "paint" | "fx" | "texture";
 
 export interface StudioBrushChipSurface {
   /** Tile rest background */
@@ -45,6 +48,12 @@ export function studioBrushChipSurface(media: StudioBrushMediaGroupVisual): Stud
         tile: "oklch(0.21 0.03 150 / 0.28)",
         ink: "oklch(0.72 0.1 150)",
         paper: "oklch(0.28 0.03 150 / 0.22)",
+      };
+    case "fx":
+      return {
+        tile: "oklch(0.2 0.05 320 / 0.32)",
+        ink: "oklch(0.78 0.16 330)",
+        paper: "oklch(0.28 0.04 300 / 0.28)",
       };
     case "texture":
       return {
@@ -80,7 +89,7 @@ export function studioBrushPreviewPathD(
   if (style === "wavy" || style === "calligraphy") {
     return `M2 ${mid + 2} C${width * 0.22} ${mid - 5}, ${width * 0.38} ${mid + 5}, ${width * 0.52} ${mid - 2} S${width * 0.78} ${mid + 4}, ${width - 2} ${mid}`;
   }
-  if (style === "soft" || style === "neon") {
+  if (style === "soft" || style === "neon" || style === "glow" || style === "oil") {
     return `M2 ${mid} C${width * 0.28} ${mid - 4}, ${width * 0.48} ${mid + 4}, ${width - 2} ${mid - 1}`;
   }
   // solid / dashed / texture fallbacks share a clean arc
@@ -89,9 +98,10 @@ export function studioBrushPreviewPathD(
 
 export function studioBrushPreviewStrokeWidth(weight: number, style: StudioBrushPreviewStyle): number {
   const base = Math.max(1.15, Math.min(5.5, weight * 4.2));
-  if (style === "soft" || style === "neon") return base * 1.15;
+  if (style === "soft" || style === "neon" || style === "glow") return base * 1.15;
+  if (style === "oil") return base * 1.4;
   if (style === "calligraphy") return base * 1.35;
-  if (style === "dots" || style === "tone") return base * 0.85;
+  if (style === "dots" || style === "tone" || style === "glitter") return base * 0.85;
   if (style === "dashed") return base * 0.9;
   return base;
 }
@@ -111,6 +121,17 @@ export function studioBrushPreviewDotCenters(
       }
     }
     return dots;
+  }
+  if (style === "glitter") {
+    return [
+      { x: 4, y: mid - 3, r: 0.9 },
+      { x: 9, y: mid + 2, r: 1.4 },
+      { x: 14, y: mid - 1.5, r: 0.7 },
+      { x: 19, y: mid + 1, r: 1.6 },
+      { x: 24, y: mid - 2.5, r: 1.1 },
+      { x: 29, y: mid + 0.5, r: 1.3 },
+      { x: 33, y: mid - 1, r: 0.8 },
+    ];
   }
   if (style === "dots" || style === "texture") {
     return [

@@ -33,12 +33,21 @@ export const STUDIO_EXPRESSIVE_BRUSH_IDS = [
   "calligraphy",
   "marker-bold",
   "neon",
+  "glow",
+  "soft-glow",
+  "glitter",
+  "star-dust",
   "soft-pencil",
   "watercolor",
+  "ink-wash",
+  "oil",
+  "pastel",
   "airbrush",
+  "soft-brush",
   "spray",
   "crayon",
   "chalk",
+  "charcoal",
   "dry-media",
   "ink-particle",
   "screentone",
@@ -51,12 +60,13 @@ export type StudioBrushTrayCategory =
   | "line"
   | "marker"
   | "paint"
+  | "fx"
   | "texture"
   | "all";
 
 export type StudioBrushTrayItemCategory = "beginner" | "expressive";
 
-export type StudioBrushMediaGroup = "line" | "marker" | "paint" | "texture";
+export type StudioBrushMediaGroup = "line" | "marker" | "paint" | "fx" | "texture";
 
 export interface StudioBrushTrayItem {
   id: string;
@@ -90,13 +100,22 @@ const MEDIA_GROUP: Record<string, StudioBrushMediaGroup> = {
   "marker-bold": "marker",
   highlighter: "marker",
   neon: "marker",
+  glow: "fx",
+  "soft-glow": "fx",
+  glitter: "fx",
+  "star-dust": "fx",
   brush: "paint",
   watercolor: "paint",
+  "ink-wash": "paint",
+  oil: "paint",
   airbrush: "paint",
+  "soft-brush": "paint",
   spray: "paint",
   "dry-media": "texture",
   crayon: "texture",
   chalk: "texture",
+  charcoal: "texture",
+  pastel: "texture",
   "ink-particle": "texture",
   screentone: "texture",
 };
@@ -113,14 +132,23 @@ const SHORT_NAMES: Record<string, string> = {
   "marker-bold": "볼드",
   highlighter: "형광",
   neon: "네온",
+  glow: "글로우",
+  "soft-glow": "소프광",
+  glitter: "글리터",
+  "star-dust": "스타",
   brush: "붓",
   watercolor: "수채",
+  "ink-wash": "수묵",
+  oil: "유화",
+  pastel: "파스텔",
   "ink-particle": "잉크",
   airbrush: "에어",
+  "soft-brush": "소프트",
   spray: "스프레이",
   "dry-media": "드라이",
   crayon: "크레용",
   chalk: "초크",
+  charcoal: "목탄",
   pencil: "연필",
   "soft-pencil": "연연필",
   screentone: "톤",
@@ -138,14 +166,23 @@ const HINTS: Record<string, string> = {
   "marker-bold": "넓은 마커 — 면 채색",
   highlighter: "하이라이트 강조",
   neon: "네온 글로우 마커",
+  glow: "다중 할로 글로우 — SNS 효과선",
+  "soft-glow": "넓은 소프트 글로우",
+  glitter: "반짝 글리터 입자",
+  "star-dust": "성긴 스타 스파클",
   brush: "일반 붓 스트로크",
   watercolor: "번지는 수채 느낌",
+  "ink-wash": "수묵·먹 번짐",
+  oil: "두꺼운 유화 붓터치",
+  pastel: "부드러운 파스텔 쌓임",
   "ink-particle": "잉크 입자 텍스처",
   airbrush: "부드러운 에어브러시",
+  "soft-brush": "가장자리 부드러운 페인트",
   spray: "스프레이 분무 — 그라데이션",
   "dry-media": "연필·파스텔 텍스처",
   crayon: "크레용 거친 질감",
   chalk: "초크·분필 느낌",
+  charcoal: "거친 목탄 셰이딩",
   pencil: "가벼운 밑그림 연필",
   "soft-pencil": "부드러운 셰이딩 연필",
   screentone: "만화 스크린톤 도트",
@@ -163,15 +200,24 @@ const PREVIEW_STYLE: Record<string, StudioBrushPreviewStyle> = {
   "marker-bold": "soft",
   highlighter: "soft",
   neon: "neon",
+  glow: "glow",
+  "soft-glow": "glow",
+  glitter: "glitter",
+  "star-dust": "glitter",
   brush: "wavy",
   watercolor: "soft",
+  "ink-wash": "soft",
+  oil: "oil",
+  pastel: "soft",
   airbrush: "soft",
+  "soft-brush": "soft",
   spray: "dots",
   pencil: "dashed",
   "soft-pencil": "dashed",
   "dry-media": "texture",
   crayon: "texture",
   chalk: "texture",
+  charcoal: "texture",
   "ink-particle": "dots",
   screentone: "tone",
 };
@@ -213,7 +259,13 @@ export function listStudioBrushTrayItems(
 
   if (category === "beginner") return beginner;
   if (category === "expressive") return [...expressive, ...extras];
-  if (category === "line" || category === "marker" || category === "paint" || category === "texture") {
+  if (
+    category === "line"
+    || category === "marker"
+    || category === "paint"
+    || category === "fx"
+    || category === "texture"
+  ) {
     return all.filter((item) => item.mediaGroup === category);
   }
   return all;
@@ -227,8 +279,9 @@ export const STUDIO_BRUSH_TRAY_CATEGORY_CHIPS: readonly {
   { id: "beginner", label: "기본", title: "Canva·Express 초보 키트" },
   { id: "line", label: "선", title: "펜·연필·G펜 선화" },
   { id: "marker", label: "마커", title: "마커·형광·네온" },
-  { id: "paint", label: "페인트", title: "붓·수채·에어" },
-  { id: "texture", label: "질감", title: "크레용·초크·톤" },
+  { id: "paint", label: "페인트", title: "붓·수채·유화·에어" },
+  { id: "fx", label: "효과", title: "글로우·글리터 (PicsArt-class)" },
+  { id: "texture", label: "질감", title: "크레용·초크·파스텔·톤" },
   { id: "expressive", label: "전체+", title: "확장 브러시 전체" },
 ];
 
@@ -268,7 +321,7 @@ export const STUDIO_CREATIVE_STARTER_CARDS: readonly StudioCreativeStarterCard[]
   {
     id: "brush-kit",
     label: "브러시",
-    hint: "연필·마커·붓·형광펜",
+    hint: "펜·수채·글로우·글리터·유화",
     inspiredBy: "Picsart Draw / Adobe Express",
   },
   {

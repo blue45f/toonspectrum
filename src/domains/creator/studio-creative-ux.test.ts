@@ -26,6 +26,10 @@ describe("studio creative ux", () => {
     expect(markers.length).toBeGreaterThan(0);
     expect(markers.every((item) => item.mediaGroup === "marker")).toBe(true);
     expect(markers.some((item) => item.id === "neon")).toBe(true);
+    const fx = listStudioBrushTrayItems("fx");
+    expect(fx.some((item) => item.id === "glow")).toBe(true);
+    expect(fx.some((item) => item.id === "glitter")).toBe(true);
+    expect(fx.every((item) => item.mediaGroup === "fx")).toBe(true);
   });
 
   it("builds short labels and preview weights for tray chips", () => {

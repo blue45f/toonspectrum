@@ -20,7 +20,9 @@ import {
 
 import {
   BRUSH_PRESETS,
+  STUDIO_BRUSH_OPACITY_CHIPS,
   STUDIO_BRUSH_SIZE_CHIPS,
+  nearestStudioBrushOpacityChip,
   nearestStudioBrushSizeChip,
 } from "./studio-brush";
 import { StudioDualColorWell, StudioToolIdentity } from "./studio-chrome-ui";
@@ -505,6 +507,34 @@ export function StudioDrawOptionsBar({
         />
         <span className="w-6 tabular-nums text-[0.68rem] font-bold text-fg">{strokeWidth}</span>
       </label>
+
+      {/* PicsArt-style opacity chips */}
+      <div className="flex shrink-0 items-center gap-0.5" role="group" aria-label="브러시 불투명도 프리셋">
+        {STUDIO_BRUSH_OPACITY_CHIPS.map((chip) => {
+          const active = nearestStudioBrushOpacityChip(brushOpacity) === chip.id;
+          return (
+            <button
+              key={chip.id}
+              type="button"
+              title={`불투명도 ${chip.label}`}
+              aria-label={`브러시 불투명도 ${chip.label}`}
+              aria-pressed={active}
+              onClick={() => onOpacityChange(chip.opacity)}
+              data-studio-opacity-chip={chip.id}
+              className={cn(
+                "min-w-7 rounded-lg px-1 py-1 text-[0.62rem] font-bold tabular-nums",
+                STUDIO_EASE,
+                STUDIO_FOCUS_RING,
+                active
+                  ? "bg-accent text-on-accent shadow-[0_1px_4px_oklch(0.72_0.185_42/0.28)]"
+                  : "bg-card/90 text-fg-3 ring-1 ring-line/70 hover:bg-raised hover:text-fg"
+              )}
+            >
+              {Math.round(chip.opacity * 100)}
+            </button>
+          );
+        })}
+      </div>
 
       <label
         className="flex shrink-0 items-center gap-1 text-fg-3"

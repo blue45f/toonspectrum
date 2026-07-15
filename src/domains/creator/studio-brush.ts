@@ -25,8 +25,12 @@ export type StudioBrushRenderFamily =
   | "marker"
   | "highlighter"
   | "neon"
+  | "glow"
+  | "glitter"
   | "brush"
   | "watercolor"
+  | "oil"
+  | "pastel"
   | "ink-particle"
   | "airbrush"
   | "dry-media"
@@ -46,14 +50,23 @@ export const STUDIO_BRUSH_RENDER_FAMILY: Readonly<Record<string, StudioBrushRend
   "marker-bold": "marker",
   highlighter: "highlighter",
   neon: "neon",
+  glow: "glow",
+  "soft-glow": "glow",
+  glitter: "glitter",
+  "star-dust": "glitter",
   brush: "brush",
   watercolor: "watercolor",
+  "ink-wash": "watercolor",
+  oil: "oil",
+  pastel: "pastel",
   "ink-particle": "ink-particle",
   airbrush: "airbrush",
   spray: "airbrush",
+  "soft-brush": "airbrush",
   "dry-media": "dry-media",
   crayon: "dry-media",
   chalk: "dry-media",
+  charcoal: "dry-media",
   pencil: "pencil",
   "soft-pencil": "pencil",
   screentone: "screentone",
@@ -82,10 +95,18 @@ export const BRUSH_PRESETS: BrushPreset[] = [
   { id: "marker-bold", name: "볼드 마커", defaultWidth: 28, defaultOpacity: 0.55 },
   { id: "highlighter", name: "형광펜", defaultWidth: 24, defaultOpacity: 0.45, defaultColor: "#ffd84d" },
   { id: "neon", name: "네온 마커", defaultWidth: 18, defaultOpacity: 0.75, defaultColor: "#39ff14" },
+  // —— FX glow / sparkle (PicsArt Draw effects kit) ——
+  { id: "glow", name: "글로우", defaultWidth: 16, defaultOpacity: 0.9, defaultColor: "#ff4fd8" },
+  { id: "soft-glow", name: "소프트 글로우", defaultWidth: 28, defaultOpacity: 0.75, defaultColor: "#5ce1ff" },
+  { id: "glitter", name: "글리터", defaultWidth: 22, defaultOpacity: 0.95, defaultColor: "#ffd24a" },
+  { id: "star-dust", name: "스타 더스트", defaultWidth: 26, defaultOpacity: 0.9, defaultColor: "#e8f0ff" },
   // —— Paint (Picsart / Express digital paint) ——
   { id: "brush", name: "붓", defaultWidth: 10, defaultOpacity: 1.0 },
   { id: "watercolor", name: "수채 번짐", defaultWidth: 28, defaultOpacity: 0.55 },
+  { id: "ink-wash", name: "수묵 번짐", defaultWidth: 30, defaultOpacity: 0.5 },
+  { id: "oil", name: "유화 붓", defaultWidth: 22, defaultOpacity: 0.92 },
   { id: "airbrush", name: "소프트 에어브러시", defaultWidth: 32, defaultOpacity: 0.7 },
+  { id: "soft-brush", name: "소프트 브러시", defaultWidth: 36, defaultOpacity: 0.55 },
   { id: "spray", name: "스프레이", defaultWidth: 40, defaultOpacity: 0.55 },
   // —— Texture / dry media ——
   { id: "pencil", name: "연필", defaultWidth: 2.5, defaultOpacity: 0.85 },
@@ -93,6 +114,8 @@ export const BRUSH_PRESETS: BrushPreset[] = [
   { id: "dry-media", name: "드라이 미디어", defaultWidth: 7, defaultOpacity: 0.92 },
   { id: "crayon", name: "크레용", defaultWidth: 14, defaultOpacity: 0.88 },
   { id: "chalk", name: "초크", defaultWidth: 16, defaultOpacity: 0.8 },
+  { id: "charcoal", name: "목탄", defaultWidth: 12, defaultOpacity: 0.88 },
+  { id: "pastel", name: "파스텔", defaultWidth: 20, defaultOpacity: 0.72 },
   { id: "ink-particle", name: "잉크 입자", defaultWidth: 8, defaultOpacity: 1.0 },
   { id: "screentone", name: "스크린톤(도트)", defaultWidth: 22, defaultOpacity: 1.0 },
 ];
@@ -114,6 +137,34 @@ export function nearestStudioBrushSizeChip(width: unknown): StudioBrushSizeChipI
   let dist = Math.abs(w - best.width);
   for (const chip of STUDIO_BRUSH_SIZE_CHIPS) {
     const d = Math.abs(w - chip.width);
+    if (d < dist) {
+      best = chip;
+      dist = d;
+    }
+  }
+  return best.id;
+}
+
+/** PicsArt-style quick opacity chips (0–1). */
+export const STUDIO_BRUSH_OPACITY_CHIPS = [
+  { id: "o20", label: "20%", opacity: 0.2 },
+  { id: "o40", label: "40%", opacity: 0.4 },
+  { id: "o60", label: "60%", opacity: 0.6 },
+  { id: "o80", label: "80%", opacity: 0.8 },
+  { id: "o100", label: "100%", opacity: 1 },
+] as const;
+
+export type StudioBrushOpacityChipId = (typeof STUDIO_BRUSH_OPACITY_CHIPS)[number]["id"];
+
+export function nearestStudioBrushOpacityChip(opacity: unknown): StudioBrushOpacityChipId {
+  const o =
+    typeof opacity === "number" && Number.isFinite(opacity)
+      ? Math.min(1, Math.max(0, opacity))
+      : 1;
+  let best: (typeof STUDIO_BRUSH_OPACITY_CHIPS)[number] = STUDIO_BRUSH_OPACITY_CHIPS[4];
+  let dist = Math.abs(o - best.opacity);
+  for (const chip of STUDIO_BRUSH_OPACITY_CHIPS) {
+    const d = Math.abs(o - chip.opacity);
     if (d < dist) {
       best = chip;
       dist = d;
