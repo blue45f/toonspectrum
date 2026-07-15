@@ -50,6 +50,7 @@ import {
   useMemo,
   useRef,
   useState,
+  Fragment,
   type ChangeEvent,
   type CSSProperties,
 } from "react";
@@ -67,6 +68,12 @@ import {
   type Bg3dModelLibraryEntry,
   type Bg3dVerifiedStoredRecord,
 } from "./bg3d-model-library";
+import {
+  deleteBg3dTemplate,
+  listBg3dTemplates,
+  saveBg3dTemplate,
+  type Bg3dTemplateLibraryEntry,
+} from "./bg3d-template-library";
 import { saveAsset } from "./studio-asset-library";
 import {
   COMPOSITE_CATEGORIES,
@@ -937,6 +944,7 @@ interface BgPrimitiveMeshProps {
   showEdges: boolean;
   onSelect: (id: string, isMulti: boolean) => void;
   registerRef: (id: string, obj: THREE.Group | null) => void;
+  children?: React.ReactNode;
 }
 
 /* 도형 하나의 렌더 — 셰이딩 채움 + 검은 엣지 오버레이를 항상 함께 그린다.
@@ -944,7 +952,7 @@ interface BgPrimitiveMeshProps {
    바꾸는 게 핵심: 깊이쓰기가 계속 켜져 있어 (1) 가려진 도형의 엣지가 앞 도형에 정확히 가려지는
    hidden-line-removal이 유지되고 (2) three.js/R3F가 invisible 오브젝트는 레이캐스트에서 제외하므로
    라인아트 미리보기 중에도 클릭 선택이 계속 동작한다. */
-function BgPrimitiveMesh({ prim, lineArt, showEdges, onSelect, registerRef }: BgPrimitiveMeshProps) {
+function BgPrimitiveMesh({ prim, lineArt, showEdges, onSelect, registerRef, children }: BgPrimitiveMeshProps) {
   const geometry = useMemo(() => makeGeometry(prim.kind), [prim.kind]);
   // BoxGeometry의 각 면은 삼각형 2장(동일 평면)이라 임계각이 낮으면 면 대각선에 가짜 엣지가 그려진다.
   // 20°는 그 가짜 대각선은 없애면서 상자 모서리·원기둥 캡 테두리 같은 실제 크리스는 모두 살린다.
@@ -992,6 +1000,7 @@ function BgPrimitiveMesh({ prim, lineArt, showEdges, onSelect, registerRef }: Bg
           <lineBasicMaterial color="#000000" />
         </lineSegments>
       ) : null}
+      {children}
     </group>
   );
 }
@@ -1002,9 +1011,10 @@ interface BgCustomModelMeshProps {
   onSelect: (id: string, isMulti: boolean) => void;
   registerRef: (id: string, obj: THREE.Group | null) => void;
   onCloneStatus: (id: string, ok: boolean) => void;
+  children?: React.ReactNode;
 }
 
-function BgCustomModelMesh({ instance, cachedRoot, onSelect, registerRef, onCloneStatus }: BgCustomModelMeshProps) {
+function BgCustomModelMesh({ instance, cachedRoot, onSelect, registerRef, onCloneStatus, children }: BgCustomModelMeshProps) {
   // 검증 로더의 루트를 인스턴스마다 복제하되, 스킨 메시가 있으면 SkeletonUtils.clone을 거쳐 뼈와
   // 스켈레톤 바인딩을 분리한다. geometry/material은 로더 캐시가 소유하므로 여기서는 dispose하지 않는다.
   const [cloned, setCloned] = useState<THREE.Object3D | null>(null);
@@ -1059,6 +1069,7 @@ function BgCustomModelMesh({ instance, cachedRoot, onSelect, registerRef, onClon
       }}
     >
       <primitive object={cloned} />
+      {children}
     </group>
   );
 }
@@ -1156,7 +1167,46 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   const [isUploadingModel, setIsUploadingModel] = useState(false);
   const [deletingModelId, setDeletingModelId] = useState<string | null>(null);
   const [isRestoringScene, setIsRestoringScene] = useState(false);
-  const [sceneRecoveryError, setSceneRecoveryError] = useState<string | null>(null);
+  const [templateLibrary, setTemplateLibrary] = useState<Bg3dTemplateLibraryEntry[]>([]);
+  const [templateLibraryStatus, setTemplateLibraryStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+  
+  const generateId = () => "template-" + Math.random().toString(36).substring(2, 15);
+
+  const handleSaveSceneAsTemplate = async () => {
+    if (primitives.length === 0 && customModels.length === 0) return;
+    setIsSavingTemplate(true);
+    try {
+      const templateName = `내 소재 ${new Date().toLocaleDateString()}`;
+      const newTemplate: Bg3dTemplateLibraryEntry = {
+        id: generateId(),
+        name: templateName,
+        createdAt: Date.now(),
+        template: {
+          primitives: primitives.map(p => ({ ...p, id: generateId() })),
+          customModels: customModels.map(m => ({ ...m, id: generateId() }))
+        },
+        commercialUse: true
+      };
+      await saveBg3dTemplate(newTemplate);
+      setTemplateLibrary(await listBg3dTemplates());
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSavingTemplate(false);
+    }
+  };
+  
+  const handleDeleteTemplate = async (id: string) => {
+    try {
+      await deleteBg3dTemplate(id);
+      setTemplateLibrary(await listBg3dTemplates());
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+    const [sceneRecoveryError, setSceneRecoveryError] = useState<string | null>(null);
   const [failedCloneIds, setFailedCloneIds] = useState<Set<string>>(() => new Set());
   const [readyCloneIds, setReadyCloneIds] = useState<Set<string>>(() => new Set());
   const [sceneBaseDocument, setSceneBaseDocument] = useState<StudioBg3dSceneDocument>(
@@ -1212,7 +1262,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
       attachmentByStorageId.clear();
       storageIdByAttachment.clear();
     };
-  }, [open]);
+  }, [open, setTemplateLibrary, setTemplateLibraryStatus]);
 
   // 사용자 LT 프리셋은 장면 문서와 분리된 로컬 라이브러리다. 저장소가 차단되거나 손상돼도
   // 3D 장면 복원/캡처를 막지 않고, 검증된 빈 payload로만 폴백한다.
@@ -1258,7 +1308,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     }
     setLtUserPresetLibraryStatus("ready");
     setLtUserPresetNotice(null);
-  }, [open]);
+  }, [open, setTemplateLibrary, setTemplateLibraryStatus]);
 
   // CSS 뷰포트, DPR, 포인터, 데이터 절약/기기 성능 신호를 명시적으로 수집해 순수 품질 정책에 전달한다.
   useEffect(() => {
@@ -1281,7 +1331,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
       fine?.removeEventListener?.("change", refresh);
       browserNavigator.connection?.removeEventListener?.("change", refresh);
     };
-  }, [open]);
+  }, [open, setTemplateLibrary, setTemplateLibraryStatus]);
 
   // 모델 라이브러리 목록은 모달이 열릴 때 한 번 읽어온다(VRM 포저의 listVrmLibraryEntries() 패턴과 동일).
   useEffect(() => {
@@ -1293,7 +1343,18 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
         setModelLibraryStatus("ready");
       })
       .catch(() => setModelLibraryStatus("error"));
-  }, [open]);
+  }, [open, setTemplateLibrary, setTemplateLibraryStatus]);
+
+  useEffect(() => {
+    if (!open) return;
+    setTemplateLibraryStatus("loading");
+    listBg3dTemplates()
+      .then((entries) => {
+        setTemplateLibrary(entries);
+        setTemplateLibraryStatus("ready");
+      })
+      .catch(() => setTemplateLibraryStatus("error"));
+  }, [open, setTemplateLibrary, setTemplateLibraryStatus]);
 
   // 신규 장면 문서는 hash로 검증 레코드를 찾고, admission→Three 안전 파서를 모두 통과한 뒤 runtime
   // 배열로 hydrate한다. 실패한 모델 노드는 절대 저장 시 조용히 제거하지 않고 업데이트 자체를 잠근다.
@@ -2390,6 +2451,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
         kind: "primitive" as const,
         visible: isBgObjectVisible(prim),
         locked: isBgObjectLocked(prim),
+        parentId: prim.parentId,
       };
     }),
     ...customModels.map((inst, index) => {
@@ -2401,6 +2463,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
         kind: "model" as const,
         visible: isBgObjectVisible(inst),
         locked: isBgObjectLocked(inst),
+        parentId: inst.parentId,
       };
     }),
   ];
@@ -3075,6 +3138,26 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                         </p>
                       ) : null}
 
+                                            <div className="flex flex-col gap-1.5">
+                        <label className="flex flex-col gap-1.5 text-xs font-medium text-fg-2">부모 계층 (Parent)
+                        <select
+                          className="h-9 w-full rounded border border-line bg-card px-2 text-xs text-fg focus:border-accent"
+                          value={selectedPrimitive.parentId || ""}
+                          onChange={(e) => {
+                            const newParentId = e.target.value || null;
+                            setPrimitives((prev) => prev.map((p) => p.id === selectedPrimitive.id ? { ...p, parentId: newParentId } : p));
+                          }}
+                        >
+                          <option value="">(최상위 / 없음)</option>
+                          {layerListItems.filter(item => item.id !== selectedPrimitive.id).map(item => (
+                            <option key={item.id} value={item.id}>
+                              {item.label}
+                            </option>
+                          ))}
+                        </select>
+                        </label>
+                      </div>
+
                       <Vec3Field
                         label="위치"
                         values={selectedPrimitive.position}
@@ -3201,6 +3284,26 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                         </p>
                       ) : null}
 
+                                            <div className="flex flex-col gap-1.5">
+                        <label className="flex flex-col gap-1.5 text-xs font-medium text-fg-2">부모 계층 (Parent)
+                        <select
+                          className="h-9 w-full rounded border border-line bg-card px-2 text-xs text-fg focus:border-accent"
+                          value={selectedCustomModel.parentId || ""}
+                          onChange={(e) => {
+                            const newParentId = e.target.value || null;
+                            setCustomModels((prev) => prev.map((m) => m.id === selectedCustomModel.id ? { ...m, parentId: newParentId } : m));
+                          }}
+                        >
+                          <option value="">(최상위 / 없음)</option>
+                          {layerListItems.filter(item => item.id !== selectedCustomModel.id).map(item => (
+                            <option key={item.id} value={item.id}>
+                              {item.label}
+                            </option>
+                          ))}
+                        </select>
+                        </label>
+                      </div>
+
                       <Vec3Field
                         label="위치"
                         values={selectedCustomModel.position}
@@ -3287,125 +3390,139 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                     {filteredLayerItems.length === 0 ? (
                       <p className="text-xs leading-relaxed text-fg-3">검색 결과가 없습니다.</p>
                     ) : (
-                      <ul className="space-y-1">
-                        {filteredLayerItems.map((item) => {
-                          const isActive = selectedIds.has(item.id);
-                          const prim = item.kind === "primitive" ? primitives.find((p) => p.id === item.id) : null;
-                          return (
-                            <li key={item.id}>
-                              <div
-                                className={cx(
-                                  "flex min-h-11 items-center gap-1 rounded-lg border px-1.5 py-1.5 text-xs transition-colors sm:min-h-0",
-                                  isActive
-                                    ? "border-accent/55 bg-accent-soft text-accent"
-                                    : "border-line bg-card text-fg-2 hover:bg-raised",
-                                  !item.visible && "opacity-60"
-                                )}
-                              >
-                                <button
-                                  type="button"
-                                  className="flex min-h-11 min-w-0 flex-1 items-center gap-2 px-1 text-left sm:min-h-0"
-                                  onClick={(e) => {
-                                    setSelectedIds((prev) => {
-                                      const isMulti = e.shiftKey || e.metaKey || e.ctrlKey;
-                                      if (isMulti) {
-                                        const next = new Set(prev);
-                                        if (next.has(item.id)) next.delete(item.id);
-                                        else next.add(item.id);
-                                        return next;
-                                      }
-                                      return new Set([item.id]);
-                                    });
-                                  }}
-                                >
-                                  {prim ? (
-                                    <span
-                                      className="inline-block size-2.5 shrink-0 rounded-sm"
-                                      style={{ backgroundColor: prim.color }}
-                                      aria-hidden
-                                    />
-                                  ) : (
-                                    <PackageOpen size={13} className="shrink-0 text-fg-3" aria-hidden />
-                                  )}
-                                  <span className="truncate font-semibold">{item.label}</span>
-                                  {item.locked ? <Lock size={11} className="shrink-0 opacity-80" aria-hidden /> : null}
-                                </button>
-                                <button
-                                  type="button"
-                                  aria-label={`${item.label} 이름 변경`}
-                                  title="이름 변경"
-                                  className="grid size-11 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent sm:size-6"
-                                  onClick={() => renameBgObject(item.id, item.kind)}
-                                >
-                                  <PencilLine size={12} aria-hidden />
-                                </button>
-                                <button
-                                  type="button"
-                                  aria-label={`${item.label} ${item.visible ? "숨기기" : "보이기"}`}
-                                  title={item.visible ? "숨기기" : "보이기"}
-                                  className="grid size-11 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent sm:size-6"
-                                  onClick={() => {
-                                    if (item.kind === "primitive") togglePrimitiveFlag(item.id, "visible");
-                                    else toggleCustomModelFlag(item.id, "visible");
-                                  }}
-                                >
-                                  {item.visible ? <Eye size={12} aria-hidden /> : <EyeOff size={12} aria-hidden />}
-                                </button>
-                                <button
-                                  type="button"
-                                  aria-label={`${item.label} ${item.locked ? "잠금 해제" : "잠금"}`}
-                                  title={item.locked ? "잠금 해제" : "잠금"}
-                                  className="grid size-11 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent sm:size-6"
-                                  onClick={() => {
-                                    if (item.kind === "primitive") togglePrimitiveFlag(item.id, "locked");
-                                    else toggleCustomModelFlag(item.id, "locked");
-                                  }}
-                                >
-                                  {item.locked ? <Lock size={12} aria-hidden /> : <Unlock size={12} aria-hidden />}
-                                </button>
-                                <button
-                                  type="button"
-                                  aria-label={`${item.label} 복제`}
-                                  title="복제"
-                                  className="grid size-11 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent sm:size-6"
-                                  onClick={() => {
-                                    if (item.kind === "primitive") {
-                                      const source = primitives.find((p) => p.id === item.id);
-                                      if (!source) return;
-                                      const clone = duplicatePrimitive(source);
-                                      setPrimitives((prev) => [...prev, clone]);
-                                      setSelectedIds(new Set([clone.id]));
-                                      return;
-                                    }
-                                    const source = customModels.find((m) => m.id === item.id);
-                                    if (!source) return;
-                                    const clone = duplicateBgCustomModelInstance(source);
-                                    setCustomModels((prev) => [...prev, clone]);
-                                    setSelectedIds(new Set([clone.id]));
-                                  }}
-                                >
-                                  <Copy size={12} aria-hidden />
-                                </button>
-                                <button
-                                  type="button"
-                                  aria-label={`${item.label} 삭제`}
-                                  title="삭제"
-                                  className="grid size-11 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent sm:size-6"
-                                  onClick={() => {
-                                    if (item.kind === "primitive") {
-                                      setPrimitives((prev) => prev.filter((p) => p.id !== item.id));
-                                    } else {
-                                      setCustomModels((prev) => prev.filter((m) => m.id !== item.id));
-                                    }
-                                    if (isActive) setSelectedIds(new Set());
-                                  }}
-                                >
-                                  <Trash2 size={12} aria-hidden />
-                                </button>
-                              </div>
-                            </li>
-                          );
-                        })}
+                                            <ul className="space-y-1">
+                        {(() => {
+                          const renderSidebarNode = (item: typeof filteredLayerItems[0], depth: number = 0) => {
+                            const isActive = selectedIds.has(item.id);
+                            const prim = item.kind === "primitive" ? primitives.find((p) => p.id === item.id) : null;
+                            const children = filteredLayerItems.filter(x => x.parentId === item.id);
+                            
+                            return (
+                              <Fragment key={item.id}>
+                                <li>
+                                  <div
+                                    style={{ marginLeft: `${depth * 16}px` }}
+                                    className={cx(
+                                      "flex min-h-11 items-center gap-1 rounded-lg border px-1.5 py-1.5 text-xs transition-colors sm:min-h-0",
+                                      isActive
+                                        ? "border-accent/55 bg-accent-soft text-accent"
+                                        : "border-line bg-card text-fg-2 hover:bg-raised",
+                                      !item.visible && "opacity-60"
+                                    )}
+                                  >
+                                    <button
+                                      type="button"
+                                      className="flex min-h-11 min-w-0 flex-1 items-center gap-2 px-1 text-left sm:min-h-0"
+                                      onClick={(e) => {
+                                        setSelectedIds((prev) => {
+                                          const isMulti = e.shiftKey || e.metaKey || e.ctrlKey;
+                                          if (isMulti) {
+                                            const next = new Set(prev);
+                                            if (next.has(item.id)) next.delete(item.id);
+                                            else next.add(item.id);
+                                            return next;
+                                          }
+                                          return new Set([item.id]);
+                                        });
+                                      }}
+                                    >
+                                      {prim ? (
+                                        <span
+                                          className="inline-block size-2.5 shrink-0 rounded-sm"
+                                          style={{ backgroundColor: prim.color }}
+                                          aria-hidden
+                                        />
+                                      ) : (
+                                        <PackageOpen size={13} className="shrink-0 text-fg-3" aria-hidden />
+                                      )}
+                                      <span className="truncate font-semibold">{item.label}</span>
+                                      {item.locked ? <Lock size={11} className="shrink-0 opacity-80" aria-hidden /> : null}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      aria-label={`${item.label} 이름 변경`}
+                                      title="이름 변경"
+                                      className="grid size-11 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent sm:size-6"
+                                      onClick={() => renameBgObject(item.id, item.kind)}
+                                    >
+                                      <PencilLine size={12} aria-hidden />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      aria-label={`${item.label} ${item.visible ? "숨기기" : "보이기"}`}
+                                      title={item.visible ? "숨기기" : "보이기"}
+                                      className="grid size-11 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent sm:size-6"
+                                      onClick={() => {
+                                        if (item.kind === "primitive") togglePrimitiveFlag(item.id, "visible");
+                                        else toggleCustomModelFlag(item.id, "visible");
+                                      }}
+                                    >
+                                      {item.visible ? <Eye size={12} aria-hidden /> : <EyeOff size={12} aria-hidden />}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      aria-label={`${item.label} ${item.locked ? "잠금 해제" : "잠금"}`}
+                                      title={item.locked ? "잠금 해제" : "잠금"}
+                                      className="grid size-11 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent sm:size-6"
+                                      onClick={() => {
+                                        if (item.kind === "primitive") togglePrimitiveFlag(item.id, "locked");
+                                        else toggleCustomModelFlag(item.id, "locked");
+                                      }}
+                                    >
+                                      {item.locked ? <Lock size={12} aria-hidden /> : <Unlock size={12} aria-hidden />}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      aria-label={`${item.label} 복제`}
+                                      title="복제"
+                                      className="grid size-11 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent sm:size-6"
+                                      onClick={() => {
+                                        if (item.kind === "primitive") {
+                                          const source = primitives.find((p) => p.id === item.id);
+                                          if (!source) return;
+                                          const clone = duplicatePrimitive(source);
+                                          setPrimitives((prev) => [...prev, clone]);
+                                          setSelectedIds(new Set([clone.id]));
+                                          return;
+                                        }
+                                        const source = customModels.find((m) => m.id === item.id);
+                                        if (!source) return;
+                                        const clone = duplicateBgCustomModelInstance(source);
+                                        setCustomModels((prev) => [...prev, clone]);
+                                        setSelectedIds(new Set([clone.id]));
+                                      }}
+                                    >
+                                      <Copy size={12} aria-hidden />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      aria-label={`${item.label} 삭제`}
+                                      title="삭제"
+                                      className="grid size-11 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent sm:size-6"
+                                      onClick={() => {
+                                        if (item.kind === "primitive") {
+                                          setPrimitives((prev) => prev.filter((p) => p.id !== item.id));
+                                        } else {
+                                          setCustomModels((prev) => prev.filter((m) => m.id !== item.id));
+                                        }
+                                        setSelectedIds((prev) => {
+                                          const next = new Set(prev);
+                                          next.delete(item.id);
+                                          return next;
+                                        });
+                                      }}
+                                    >
+                                      <Trash2 size={12} aria-hidden />
+                                    </button>
+                                  </div>
+                                </li>
+                                {children.map(child => renderSidebarNode(child, depth + 1))}
+                              </Fragment>
+                            );
+                          };
+                          const roots = filteredLayerItems.filter(x => !x.parentId);
+                          return roots.map(root => renderSidebarNode(root, 0));
+                        })()}
                       </ul>
                     )}
                   </>
@@ -4096,6 +4213,69 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
               </section>
 
               <section hidden={hideOnTab("models")}>
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
+                    내 템플릿
+                  </h3>
+                  <span className="text-[0.68rem] text-fg-3">
+                    {templateLibrary.length}개
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className={cx(CONTROL_BUTTON, "mb-4 w-full border-accent/50 bg-accent text-on-accent hover:bg-accent/90")}
+                  disabled={isSavingTemplate || (primitives.length === 0 && customModels.length === 0)}
+                  onClick={() => void handleSaveSceneAsTemplate()}
+                >
+                  {isSavingTemplate ? <Loader2 className="animate-spin" size={14} aria-hidden /> : <Upload size={14} aria-hidden />}
+                  현재 장면을 내 템플릿으로 저장
+                </button>
+                
+                <div className="mb-6 grid grid-cols-2 gap-2">
+                  {templateLibraryStatus === "loading" ? (
+                    <div className="col-span-2 rounded-xl border border-line bg-card/60 px-3 py-4 text-center text-xs text-fg-3">템플릿을 불러오는 중입니다.</div>
+                  ) : null}
+                  {templateLibraryStatus === "error" ? (
+                    <p className="col-span-2 mt-2 rounded-xl border border-line bg-card/70 px-3 py-2 text-xs leading-relaxed text-fg-3">템플릿 목록을 불러오지 못했습니다.</p>
+                  ) : null}
+                  {templateLibraryStatus === "ready" && templateLibrary.length === 0 ? (
+                    <div className="col-span-2 rounded-xl border border-dashed border-line bg-card/45 px-3 py-4 text-center text-xs leading-relaxed text-fg-3">
+                      저장된 템플릿이 없습니다.
+                    </div>
+                  ) : null}
+                  {templateLibrary.map((entry) => (
+                    <div key={entry.id} className="relative overflow-hidden rounded-xl border border-line bg-card transition-colors hover:bg-raised">
+                      <button
+                        type="button"
+                        className="grid min-h-[5rem] w-full gap-2 px-2.5 py-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent"
+                        onClick={() => {
+                          if (entry.template.primitives) {
+                            setPrimitives(prev => [...prev, ...entry.template.primitives!.map(p => ({ ...p, id: generateId() }))]);
+                          }
+                          if (entry.template.customModels) {
+                            setCustomModels(prev => [...prev, ...entry.template.customModels!.map(m => ({ ...m, id: generateId() }))]);
+                          }
+                        }}
+                      >
+                        <span className="block truncate text-xs font-bold text-fg">{entry.name}</span>
+                        <span className="mt-1 flex flex-wrap gap-1">
+                          <span className={cx("inline-flex rounded-full px-1.5 py-0.5 text-[0.64rem] font-bold", entry.commercialUse ? "bg-[oklch(0.80_0.15_150/0.14)] text-good" : "bg-raised text-fg-3")}>
+                            {entry.commercialUse ? "상업 이용 가능" : "상업 이용 확인 필요"}
+                          </span>
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        className="absolute right-1.5 top-1.5 grid size-7 place-items-center rounded-lg border border-line bg-panel/90 text-fg-3 transition-colors hover:bg-raised hover:text-accent"
+                        onClick={(e) => { e.stopPropagation(); void handleDeleteTemplate(entry.id); }}
+                      >
+                        <Trash2 size={13} aria-hidden />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                
+
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
                     <PackageOpen size={15} className="text-accent" aria-hidden />

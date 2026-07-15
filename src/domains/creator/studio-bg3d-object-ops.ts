@@ -311,6 +311,7 @@ export interface StudioBg3dLayerListItem {
   readonly kind: "primitive" | "model";
   readonly visible: boolean;
   readonly locked: boolean;
+  readonly parentId?: string | null;
 }
 
 export function filterStudioBg3dLayerItems(
