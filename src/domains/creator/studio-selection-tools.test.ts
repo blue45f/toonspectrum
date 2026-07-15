@@ -27,8 +27,10 @@ import {
   brushStrokePreview,
   buildSelectionMaskPlan,
   canvasPointToNormalized,
+  circleSelectionPolygon,
   commitPolyLassoSession,
   commitSelectionDrag,
+  constrainSelectionDragCorners,
   ellipseSelectionPolygon,
   emptyPixelSelection,
   expandContractSelection,
@@ -235,6 +237,29 @@ describe("rectSelectionPolygon", () => {
       expect(p.y).toBeLessThanOrEqual(1);
     }
     expect(polygonAreaNorm(poly)).toBeCloseTo(0.5, 10);
+  });
+});
+
+describe("constrainSelectionDragCorners / circleSelectionPolygon", () => {
+  it("Shift 는 정사각 코너를, forceCircle 은 정원을 만든다", () => {
+    const { a, b } = constrainSelectionDragCorners(
+      { x: 0.2, y: 0.2 },
+      { x: 0.6, y: 0.4 },
+      { shift: true, aspect: 1 }
+    );
+    expect(Math.abs(b.x - a.x)).toBeCloseTo(Math.abs(b.y - a.y), 5);
+    const circle = circleSelectionPolygon({ x: 0.2, y: 0.2 }, { x: 0.8, y: 0.5 }, 1);
+    expect(circle.length).toBe(ELLIPSE_POLYGON_SEGMENTS);
+  });
+
+  it("Alt 는 시작점을 중심으로 확장한다", () => {
+    const { a, b } = constrainSelectionDragCorners(
+      { x: 0.5, y: 0.5 },
+      { x: 0.7, y: 0.6 },
+      { alt: true, aspect: 1 }
+    );
+    expect((a.x + b.x) / 2).toBeCloseTo(0.5, 5);
+    expect((a.y + b.y) / 2).toBeCloseTo(0.5, 5);
   });
 });
 

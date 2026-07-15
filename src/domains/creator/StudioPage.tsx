@@ -96,6 +96,10 @@ import {
   Mountain,
   Shapes,
   Lasso,
+  Paintbrush,
+  Move,
+  MessageSquare,
+  Triangle,
 } from "lucide-react";
 import { Fragment, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -575,6 +579,11 @@ import {
   ungroupItems,
   type LayerGroup,
 } from "./studio-layers";
+import {
+  bakeLiquifyStrokeToCanvas,
+  LIQUIFY_RADIUS_RANGE,
+  LIQUIFY_STRENGTH_RANGE,
+} from "./studio-liquify";
 import { projectStudioCanvasCommentPins } from "./studio-live-canvas-overlay-model";
 import {
   canBeginStudioLiveMutation,
@@ -1227,6 +1236,10 @@ const StudioSmudgePanel = lazyRetry(
   () => import("./StudioSmudgePanel").then((mod) => ({ default: mod.StudioSmudgePanel })),
   "StudioSmudgePanel"
 );
+const StudioLiquifyPanel = lazyRetry(
+  () => import("./StudioLiquifyPanel").then((mod) => ({ default: mod.StudioLiquifyPanel })),
+  "StudioLiquifyPanel"
+);
 const StudioHealClonePanel = lazyRetry(
   () => import("./StudioHealClonePanel").then((mod) => ({ default: mod.StudioHealClonePanel })),
   "StudioHealClonePanel"
@@ -1586,8 +1599,9 @@ function PanelResizeHandle({
   );
 }
 
-type Tool = "select" | "draw";
-type DrawMode = "pen" | "eraser" | "shape";
+type Tool = "select" | "draw" | "hand";
+/** pen/eraser/shape + Magma pixel pencil · lasso fill. */
+type DrawMode = "pen" | "eraser" | "shape" | "pixel" | "lasso-fill";
 type DrawShapeKind = "line" | "rect" | "ellipse" | "star" | "arrow" | "triangle" | "polygon";
 const QUICKSHAPE_KIND_LABELS: Record<string, string> = {
   line: "선",
@@ -7127,9 +7141,9 @@ function StudioCuttoonEditor() {
     }
   }
 
-  // 화면 드래그 스크롤 핸들러 (Space + Drag)
+  // 화면 드래그 스크롤 핸들러 (Space + Drag · Magma Hand tool)
   const onWrapMouseDown = (e: React.MouseEvent) => {
-    if (!isSpacePressed) return;
+    if (!isSpacePressed && tool !== "hand") return;
     setIsPanning(true);
     const wrap = wrapRef.current;
     if (!wrap) return;
@@ -7358,6 +7372,14 @@ function StudioCuttoonEditor() {
   // "wand"는 이 파일에서만 쓰는 로컬 확장 — StudioSelectionToolsPanel의 activeTool prop은 여전히
   // SelectionToolKind만 받으므로(export 자체는 안 건드림), 그 패널에 넘길 때는 wand를 null로 좁힌다.
   const [pixelTool, setPixelTool] = useState<SelectionToolKind | "wand" | null>(null);
+  /** Magma Circle Selection — ellipse 도구를 정원으로 강제. */
+  const [pixelForceCircle, setPixelForceCircle] = useState(false);
+  /** Magma Liquify push brush. */
+  const [liquifyActive, setLiquifyActive] = useState(false);
+  const [liquifyRadius, setLiquifyRadius] = useState(40);
+  const [liquifyStrength, setLiquifyStrength] = useState(50);
+  const [liquifyBusy, setLiquifyBusy] = useState(false);
+  const liquifyDragRef = useRef<{ elId: string; frame: SelectionFrame; points: SelPoint[] } | null>(null);
   const [pixelCombine, setPixelCombine] = useState<SelectionCombineMode>("add");
   const [pixelBusy, setPixelBusy] = useState(false);
   // 브러시 선택 반경(캔버스 표시 px) — 드래그 시작 시 요소 폭으로 나눠 정규화 반경으로 넘긴다.
@@ -9590,6 +9612,7 @@ function StudioCuttoonEditor() {
     setPanelSplitActive(false);
     setNodeEditTool(null);
     setSmudgeActive(false);
+    setLiquifyActive(false);
     setHealCloneTool(null);
     setEyedropperActive(false);
     setBubbleAnchorPickActive(false);
@@ -11315,6 +11338,9 @@ function StudioCuttoonEditor() {
           clearHistoryBrushDragPreview();
         } else if (smudgeActive) {
           setSmudgeActive(false);
+        } else if (liquifyActive) {
+          setLiquifyActive(false);
+          liquifyDragRef.current = null;
         } else if (layerMaskPaintActive) {
           setLayerMaskPaintActive(false);
           layerMaskDragRef.current = null;
@@ -13106,6 +13132,52 @@ function StudioCuttoonEditor() {
   }
 
   // 문지르기 브러시 — 누적된 정규화 좌표 스트로크로 픽셀을 재인코딩한다.
+  async function applyLiquifyStroke(elId: string, points: SelPoint[]) {
+    if (liquifyBusy) return;
+    const target = elementById.get(elId);
+    if (
+      !target ||
+      target.type !== "image" ||
+      activeSurfaceReviewLocked ||
+      isEffectivelyLocked(target, groups)
+    ) {
+      return;
+    }
+    const mutationTicket = captureStudioMutationTicket();
+    setLiquifyBusy(true);
+    try {
+      const img = await loadPixelEditImage(target.src);
+      const w = img.naturalWidth || img.width;
+      const h = img.naturalHeight || img.height;
+      // 정규화 → 디바이스 px 궤적
+      const devicePts = points.map((p) => ({
+        x: p.x * w,
+        y: p.y * h,
+      }));
+      const radiusDevice = (liquifyRadius / Math.max(1, target.width)) * w;
+      const out = bakeLiquifyStrokeToCanvas(
+        img,
+        w,
+        h,
+        devicePts,
+        radiusDevice,
+        liquifyStrength / 100,
+        createPixelEditCanvas
+      );
+      if (!out) return;
+      const src = (out as HTMLCanvasElement).toDataURL("image/png");
+      if (!canApplyStudioMutation(mutationTicket)) return;
+      if (src !== target.src && !isLatestLayerContentMutationLocked(target.id)) {
+        patchEl(target.id, { src } as Partial<El>);
+      }
+    } catch (err) {
+      console.error("Failed to apply liquify stroke:", err);
+      setError(err instanceof Error ? err.message : "리퀴파이 적용에 실패했습니다.");
+    } finally {
+      setLiquifyBusy(false);
+    }
+  }
+
   async function applySmudgeStroke(elId: string, points: SelPoint[]) {
     if (smudgeBusy) return;
     const target = elementById.get(elId);
@@ -14085,6 +14157,31 @@ function StudioCuttoonEditor() {
       smudgeDragRef.current = { elId: selected.id, frame, points: [canvasPointToNormalized(pos.x, pos.y, frame)] };
       return;
     }
+    // Magma Liquify — 이미지를 드래그하면 픽셀을 밀어 왜곡한다.
+    if (
+      liquifyActive &&
+      !liquifyBusy &&
+      selected?.type === "image" &&
+      !isSpacePressed &&
+      tool !== "hand" &&
+      !(e.target.getParent() instanceof KonvaRuntime.Transformer)
+    ) {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      if (!pos) return;
+      const frame: SelectionFrame = {
+        x: selected.x,
+        y: selected.y,
+        width: selected.width,
+        height: selected.height,
+        rotation: selected.rotation,
+      };
+      liquifyDragRef.current = {
+        elId: selected.id,
+        frame,
+        points: [canvasPointToNormalized(pos.x, pos.y, frame)],
+      };
+      return;
+    }
     // 레이어 마스크 브러시 무장 중: 스테이지 드래그를 마스크 스트로크 좌표 누적으로 가로챈다.
     // maskSrc가 아직 없어도 드래그를 시작할 수 있다(bakeLayerMaskStroke가 없으면 "전체 보임"
     // 흰 마스크를 자동으로 베이스 삼는다 — Photoshop이 마스크 없는 레이어에 처음 브러시를 대면
@@ -14198,11 +14295,12 @@ function StudioCuttoonEditor() {
     }
     // 픽셀 선택 도구 무장 중: 스테이지 드래그를 픽셀 선택 그리기로 가로챈다(요소 이동·마퀴·
     // 드로잉보다 우선). 트랜스포머 앵커는 예외(선택이 정규화 좌표라 리사이즈/회전을 따라간다),
-    // Space 팬도 예외. 시작점은 이미지 밖이어도 된다(rect/ellipse 는 0..1 로 클램프).
+    // Space/Hand 팬도 예외. 시작점은 이미지 밖이어도 된다(rect/ellipse 는 0..1 로 클램프).
     if (
       pixelTool &&
       selected?.type === "image" &&
       !isSpacePressed &&
+      tool !== "hand" &&
       !(e.target.getParent() instanceof KonvaRuntime.Transformer)
     ) {
       const pos = e.target.getStage()?.getRelativePointerPosition();
@@ -14242,7 +14340,13 @@ function StudioCuttoonEditor() {
       }
       // 브러시는 캔버스 px 반경을 요소 폭 기준 정규화 반경으로 넘긴다(다른 도구는 무시됨).
       const brushRadiusNorm = pixelBrushRadius / Math.max(1, selected.width);
-      const drag = beginSelectionDrag(pixelTool, pixelCombine, canvasPointToNormalized(pos.x, pos.y, frame), brushRadiusNorm);
+      const drag = beginSelectionDrag(
+        pixelTool,
+        pixelCombine,
+        canvasPointToNormalized(pos.x, pos.y, frame),
+        brushRadiusNorm,
+        { forceCircle: pixelForceCircle || (pixelTool === "ellipse" && e.evt.shiftKey) }
+      );
       pixelDragRef.current = { elId: selected.id, frame, drag };
       schedulePixelDragPreview(drag);
       return;
@@ -14325,23 +14429,28 @@ function StudioCuttoonEditor() {
           ? {
               ...common,
               kind: drawShape,
-              mode: "pen",
+              mode: "pen" as const,
               points: [pos.x, pos.y, pos.x, pos.y],
               fill: shapeFill && drawShape !== "line" ? color : undefined,
               pressures: [pressure, pressure],
             }
           : {
               ...common,
-              kind: "freehand",
-              mode: drawMode,
+              kind: "freehand" as const,
+              // Magma: pixel pencil / lasso fill map to pen mode with special fill/width.
+              mode: (drawMode === "eraser" ? "eraser" : "pen") as "pen" | "eraser",
               points: [pos.x, pos.y],
-              pressures: [pressure],
-              sampleSpacing: strokeSampleDistanceForScale(effScale),
-              tiltXs: captureStylus ? [stylus.tiltX] : undefined,
-              tiltYs: captureStylus ? [stylus.tiltY] : undefined,
-              twists: captureStylus ? [stylus.twist] : undefined,
-              speeds: capturePointerDynamics ? [0] : undefined,
-              tangentialPressures: capturePointerDynamics ? [tangentialPressure] : undefined,
+              strokeWidth: drawMode === "pixel" ? 1 : strokeWidth,
+              fill: drawMode === "lasso-fill" ? color : undefined,
+              pressures: [drawMode === "pixel" ? 1 : pressure],
+              sampleSpacing:
+                drawMode === "pixel" ? 1 : strokeSampleDistanceForScale(effScale),
+              tiltXs: captureStylus && drawMode === "pen" ? [stylus.tiltX] : undefined,
+              tiltYs: captureStylus && drawMode === "pen" ? [stylus.tiltY] : undefined,
+              twists: captureStylus && drawMode === "pen" ? [stylus.twist] : undefined,
+              speeds: capturePointerDynamics && drawMode === "pen" ? [0] : undefined,
+              tangentialPressures:
+                capturePointerDynamics && drawMode === "pen" ? [tangentialPressure] : undefined,
             };
       drawingPointerSessionRef.current = pointerSession;
       // Capture on Konva content/canvas (not outer container) so Stage keeps receiving moves after leave.
@@ -14352,12 +14461,15 @@ function StudioCuttoonEditor() {
       tryCaptureStudioStrokePointer(drawingPointerCaptureTargetRef.current, pointerSession.pointerId);
       // Window safety net: mouse can release outside the stage when capture fails or is stolen.
       attachDrawingPointerSafetyListeners(pointerSession.pointerId);
-      drawingStabilizerRef.current = drawMode === "shape"
-        ? null
-        : createStudioStrokeStabilizerState({ x: pos.x, y: pos.y, timeStamp: pointerSample.timeStamp });
-      drawingVelocityRef.current = drawMode === "shape"
-        ? null
-        : createStudioPointerVelocityState(pointerSample);
+      // Magma pixel pencil: no stabilizer (hard 1px steps). Lasso-fill keeps light smoothing.
+      drawingStabilizerRef.current =
+        drawMode === "shape" || drawMode === "pixel"
+          ? null
+          : createStudioStrokeStabilizerState({ x: pos.x, y: pos.y, timeStamp: pointerSample.timeStamp });
+      drawingVelocityRef.current =
+        drawMode === "shape" || drawMode === "pixel"
+          ? null
+          : createStudioPointerVelocityState(pointerSample);
       drawingRef.current = next;
       perspectiveRayRef.current = null; // 새 스트로크마다 원근 락을 다시 잡는다(첫 move에서 재계산).
       isometricAxisRayRef.current = null; // 새 스트로크마다 아이소메트릭 축 락도 다시 잡는다.
@@ -14564,7 +14676,16 @@ function StudioCuttoonEditor() {
       const pos = e.target.getStage()?.getRelativePointerPosition();
       if (pos) {
         const session = pixelDragRef.current;
-        const next = updateSelectionDrag(session.drag, canvasPointToNormalized(pos.x, pos.y, session.frame));
+        const aspect = session.frame.height / Math.max(1, session.frame.width);
+        const next = updateSelectionDrag(
+          session.drag,
+          canvasPointToNormalized(pos.x, pos.y, session.frame),
+          {
+            shift: e.evt.shiftKey,
+            alt: e.evt.altKey,
+            aspect,
+          }
+        );
         if (next !== session.drag) {
           session.drag = next;
           schedulePixelDragPreview(next);
@@ -14592,6 +14713,16 @@ function StudioCuttoonEditor() {
       const pos = e.target.getStage()?.getRelativePointerPosition();
       if (pos) {
         const session = smudgeDragRef.current;
+        const next = canvasPointToNormalized(pos.x, pos.y, session.frame);
+        const last = session.points[session.points.length - 1];
+        if (!last || Math.hypot(next.x - last.x, next.y - last.y) >= 0.002) session.points.push(next);
+      }
+      return;
+    }
+    if (liquifyDragRef.current) {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      if (pos) {
+        const session = liquifyDragRef.current;
         const next = canvasPointToNormalized(pos.x, pos.y, session.frame);
         const last = session.points[session.points.length - 1];
         if (!last || Math.hypot(next.x - last.x, next.y - last.y) >= 0.002) session.points.push(next);
@@ -15227,6 +15358,12 @@ function StudioCuttoonEditor() {
       const session = smudgeDragRef.current;
       smudgeDragRef.current = null;
       if (session.points.length >= 2) void applySmudgeStroke(session.elId, session.points);
+      return;
+    }
+    if (liquifyDragRef.current) {
+      const session = liquifyDragRef.current;
+      liquifyDragRef.current = null;
+      if (session.points.length >= 2) void applyLiquifyStroke(session.elId, session.points);
       return;
     }
     // 레이어 마스크 브러시 드래그 종료 — 누적된 좌표로 실제 마스크 스트로크를 굽는다.
@@ -20553,6 +20690,67 @@ function StudioCuttoonEditor() {
               }}
             />
             ) : null}
+            {isRailToolVisible("hand") ? (
+            <StudioRailToolButton
+              icon={Hand}
+              label="핸드 (팬)"
+              description="캔버스를 드래그해 이동합니다. Space 키와 같은 역할입니다. (Magma Hand)"
+              active={tool === "hand"}
+              onClick={() => {
+                setTool((t) => (t === "hand" ? "select" : "hand"));
+                setEyedropperActive(false);
+                setMenu(null);
+              }}
+            />
+            ) : null}
+            {isRailToolVisible("marquee-rect") ? (
+            <StudioRailToolButton
+              icon={Square}
+              label="사각 선택 (M)"
+              description="이미지 픽셀을 사각형으로 선택합니다. Shift=정사각, Alt=중심 확장. (Magma Selection)"
+              active={pixelTool === "rect" && !pixelForceCircle}
+              disabled={selected?.type !== "image" || selectedContentMutationLocked}
+              onClick={() => {
+                if (selected?.type !== "image" || selectedContentMutationLocked) return;
+                setTool("select");
+                clearPolyLassoDraft();
+                disarmAllPixelTools();
+                setPixelForceCircle(false);
+                setPixelTool((t) => (t === "rect" ? null : "rect"));
+              }}
+            />
+            ) : null}
+            {isRailToolVisible("marquee-circle") ? (
+            <StudioRailToolButton
+              icon={Circle}
+              label="원형 선택"
+              description="이미지 픽셀을 정원으로 선택합니다. Alt=중심 확장. (Magma Circle Selection)"
+              active={pixelTool === "ellipse" && pixelForceCircle}
+              disabled={selected?.type !== "image" || selectedContentMutationLocked}
+              onClick={() => {
+                if (selected?.type !== "image" || selectedContentMutationLocked) return;
+                setTool("select");
+                clearPolyLassoDraft();
+                disarmAllPixelTools();
+                setPixelForceCircle(true);
+                setPixelTool((t) => (t === "ellipse" && pixelForceCircle ? null : "ellipse"));
+              }}
+            />
+            ) : null}
+            {isRailToolVisible("transform") ? (
+            <StudioRailToolButton
+              icon={Maximize2}
+              label="변형 (⇧T)"
+              description="픽셀 선택이 있으면 속성→리터치에서 내용 변형(스케일·회전·뒤집기)을 적용합니다. (Magma Transform)"
+              active={false}
+              disabled={selected?.type !== "image" || !isSelectionUsable(pixelSel)}
+              onClick={() => {
+                if (!isSelectionUsable(pixelSel)) return;
+                setRightPanelOpen(true);
+                announceDrawingShortcut("리터치 패널에서 내용 변형을 적용하세요");
+              }}
+            />
+            ) : null}
             {isRailToolVisible("pen") ? (
             <StudioRailToolButton
               icon={Pencil}
@@ -20564,6 +20762,22 @@ function StudioCuttoonEditor() {
               onClick={() => {
                 setTool("draw");
                 setDrawMode("pen");
+                setEyedropperActive(false);
+                setMenu(null);
+              }}
+            />
+            ) : null}
+            {isRailToolVisible("pixel-pencil") ? (
+            <StudioRailToolButton
+              icon={PenTool}
+              label="픽셀 펜 (P)"
+              description="1px 하드 픽셀 펜으로 그립니다. 안티앨리어스·필압 없이 또렷한 선을 남깁니다. (Magma Pixel Pencil)"
+              active={tool === "draw" && drawMode === "pixel"}
+              disabled={activeSurfaceReviewLocked}
+              onClick={() => {
+                setTool("draw");
+                setDrawMode("pixel");
+                setStrokeWidth(1);
                 setEyedropperActive(false);
                 setMenu(null);
               }}
@@ -20581,6 +20795,40 @@ function StudioCuttoonEditor() {
                 setDrawMode("eraser");
                 setEyedropperActive(false);
                 setMenu(null);
+              }}
+            />
+            ) : null}
+            {isRailToolVisible("blend") ? (
+            <StudioRailToolButton
+              icon={Wind}
+              label="혼합 (스머지)"
+              description="이미지 픽셀을 문질러 색을 섞습니다. (Magma Blend)"
+              active={smudgeActive}
+              disabled={selected?.type !== "image" || selectedContentMutationLocked}
+              onClick={() => {
+                if (selected?.type !== "image") return;
+                setSmudgeActive((v) => {
+                  const next = !v;
+                  if (next) disarmAllPixelTools();
+                  return next;
+                });
+              }}
+            />
+            ) : null}
+            {isRailToolVisible("liquify") ? (
+            <StudioRailToolButton
+              icon={Move}
+              label="리퀴파이"
+              description="이미지 위를 밀어 국소 왜곡합니다. (Magma Liquify)"
+              active={liquifyActive}
+              disabled={selected?.type !== "image" || selectedContentMutationLocked}
+              onClick={() => {
+                if (selected?.type !== "image") return;
+                setLiquifyActive((v) => {
+                  const next = !v;
+                  if (next) disarmAllPixelTools();
+                  return next;
+                });
               }}
             />
             ) : null}
@@ -20606,6 +20854,21 @@ function StudioCuttoonEditor() {
               }}
             />
             ) : null}
+            {isRailToolVisible("lasso-fill") ? (
+            <StudioRailToolButton
+              icon={Paintbrush}
+              label="라쏘 필"
+              description="닫힌 궤적을 그려 현재 색으로 채웁니다. (Magma Lasso Brush)"
+              active={tool === "draw" && drawMode === "lasso-fill"}
+              disabled={activeSurfaceReviewLocked}
+              onClick={() => {
+                setTool("draw");
+                setDrawMode("lasso-fill");
+                setEyedropperActive(false);
+                setMenu(null);
+              }}
+            />
+            ) : null}
             {isRailToolVisible("lasso") ? (
             <StudioRailToolButton
               icon={Lasso}
@@ -20618,15 +20881,15 @@ function StudioCuttoonEditor() {
                       ? "다각형 올가미 사용 중 · 다시 누르면 자유 올가미"
                       : "올가미 선택"
               }
-              description="이미지 픽셀을 자유 올가미(드래그) 또는 다각형 올가미(클릭)로 선택합니다. 속성 패널에서 도구·합치기/빼기/교집합·페더·확장·축소·부분 조정을 쓸 수 있어요."
-              active={pixelTool === "lasso" || pixelTool === "poly-lasso"}
+              description="이미지 픽셀을 자유 올가미(드래그) 또는 다각형 올가미(클릭)로 선택합니다."
+              active={(pixelTool === "lasso" || pixelTool === "poly-lasso") && !pixelForceCircle}
               disabled={selected?.type !== "image" || selectedContentMutationLocked}
               onClick={() => {
                 if (selected?.type !== "image" || selectedContentMutationLocked) return;
                 setTool("select");
                 setMenu(null);
+                setPixelForceCircle(false);
                 if (pixelTool === "lasso") {
-                  // 자유 → 다각형 올가미로 전환(같은 레일 버튼 순환).
                   clearPolyLassoDraft();
                   disarmAllPixelTools();
                   setPixelTool("poly-lasso");
@@ -20641,6 +20904,51 @@ function StudioCuttoonEditor() {
                 disarmAllPixelTools();
                 setPixelTool("lasso");
               }}
+            />
+            ) : null}
+            {isRailToolVisible("comment") ? (
+            <StudioRailToolButton
+              icon={MessageSquare}
+              label="댓글"
+              description="캔버스에 협업 댓글을 달고 스레드를 관리합니다. (Magma Comment)"
+              active={commentsOpen}
+              onClick={() => setCommentsOpen((v) => !v)}
+            />
+            ) : null}
+            {isRailToolVisible("perspective") ? (
+            <StudioRailToolButton
+              icon={Triangle}
+              label="투시도"
+              description="소실점 가이드로 원근을 맞춥니다. (Magma Perspective Grid)"
+              active={perspectiveRulerActive}
+              onClick={() => {
+                setPerspectiveRulerActive((v) => !v);
+                setTool("draw");
+              }}
+            />
+            ) : null}
+            {isRailToolVisible("zoom-fit") ? (
+            <StudioRailToolButton
+              icon={ScanLine}
+              label="화면 맞춤"
+              description="캔버스 폭에 맞춰 확대·축소합니다."
+              onClick={() => {
+                const wrap = wrapRef.current;
+                if (wrap) {
+                  const w = wrap.clientWidth;
+                  setScale(Math.min(isFullscreen ? 4 : 2.5, Math.max(0.1, w / CANVAS_W)));
+                  setZoom(1);
+                }
+              }}
+            />
+            ) : null}
+            {isRailToolVisible("rotate-view") ? (
+            <StudioRailToolButton
+              icon={FlipHorizontal2}
+              label="보기 반전"
+              description="캔버스를 좌우로 뒤집어 균형·대칭을 확인합니다. (Magma/CSP flip view)"
+              active={canvasFlipH}
+              onClick={() => setCanvasFlipH((v) => !v)}
             />
             ) : null}
             {isRailToolVisible("smart-shape") ? (
@@ -20777,23 +21085,35 @@ function StudioCuttoonEditor() {
                   <p className="px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-wider text-fg-3">
                     숨긴 도구
                   </p>
-                  {appSettings.toolbar.visibleIds.length >= 14 ? (
+                  {appSettings.toolbar.visibleIds.length >= 26 ? (
                     <p className="px-2 py-1.5 text-[0.68rem] text-fg-3">모두 표시 중</p>
                   ) : (
                     (
                       [
                         "select",
+                        "hand",
                         "pen",
+                        "pixel-pencil",
                         "eraser",
+                        "blend",
+                        "liquify",
                         "fill",
+                        "lasso-fill",
                         "eyedropper",
+                        "marquee-rect",
+                        "marquee-circle",
                         "lasso",
+                        "transform",
                         "smart-shape",
                         "shape-rect",
                         "shape-ellipse",
                         "text",
                         "bubble",
                         "image",
+                        "comment",
+                        "perspective",
+                        "zoom-fit",
+                        "rotate-view",
                         "frame-anim",
                         "reference",
                       ] as StudioRailToolId[]
@@ -25563,6 +25883,24 @@ function StudioCuttoonEditor() {
                     }
                     onRadiusChange={setSmudgeRadius}
                     onStrengthChange={setSmudgeStrength}
+                  />
+                  <StudioLiquifyPanel
+                    active={liquifyActive}
+                    radius={Math.min(LIQUIFY_RADIUS_RANGE.max, Math.max(LIQUIFY_RADIUS_RANGE.min, liquifyRadius))}
+                    strength={Math.min(LIQUIFY_STRENGTH_RANGE.max, Math.max(LIQUIFY_STRENGTH_RANGE.min, liquifyStrength))}
+                    busy={liquifyBusy}
+                    onToggleActive={() =>
+                      setLiquifyActive((v) => {
+                        const next = !v;
+                        if (next) {
+                          disarmAllPixelTools();
+                          return true;
+                        }
+                        return false;
+                      })
+                    }
+                    onRadiusChange={setLiquifyRadius}
+                    onStrengthChange={setLiquifyStrength}
                   />
                   <StudioHealClonePanel
                     mode={healCloneTool}

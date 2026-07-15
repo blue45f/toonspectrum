@@ -170,6 +170,63 @@ export function ellipseSelectionPolygon(
 }
 
 /**
+ * Magma 선택 제스처 수정자 — Shift=정사각/정원, Alt=클릭 중심 확장.
+ * aspect = 요소 height/width (정규화 공간에서 화면상 정원을 만들기 위함).
+ * 반환 { a, b } 는 rect/ellipseSelectionPolygon 에 그대로 넘길 코너.
+ */
+export function constrainSelectionDragCorners(
+  start: SelPoint,
+  current: SelPoint,
+  opts?: { shift?: boolean; alt?: boolean; aspect?: number; forceCircle?: boolean }
+): { a: SelPoint; b: SelPoint } {
+  const aspect = Number.isFinite(opts?.aspect) && (opts?.aspect ?? 0) > 0 ? opts!.aspect! : 1;
+  let ax = start.x;
+  let ay = start.y;
+  let bx = current.x;
+  let by = current.y;
+  if (opts?.alt) {
+    // 중심=start, 반대편=start-(current-start)
+    bx = current.x;
+    by = current.y;
+    ax = 2 * start.x - current.x;
+    ay = 2 * start.y - current.y;
+  }
+  if (opts?.shift || opts?.forceCircle) {
+    // 화면 픽셀 기준 정사각/정원: Δy_px = Δx_px → Δy_norm = Δx_norm / aspect
+    const dx = bx - ax;
+    const dy = by - ay;
+    const adx = Math.abs(dx);
+    const ady = Math.abs(dy) * aspect;
+    const side = Math.max(adx, ady);
+    const sx = Math.sign(dx) || 1;
+    const sy = Math.sign(dy) || 1;
+    if (opts?.alt) {
+      // 중심 고정, 반쪽 변 길이 side/2
+      const hx = (side / 2) * sx;
+      const hy = ((side / 2) / aspect) * sy;
+      return {
+        a: { x: start.x - Math.abs(hx), y: start.y - Math.abs(hy) },
+        b: { x: start.x + Math.abs(hx), y: start.y + Math.abs(hy) },
+      };
+    }
+    bx = ax + sx * side;
+    by = ay + (sy * side) / aspect;
+  }
+  return { a: { x: ax, y: ay }, b: { x: bx, y: by } };
+}
+
+/** Magma Circle Selection — 드래그 박스를 정원(종횡비 보정)으로 강제. */
+export function circleSelectionPolygon(
+  a: SelPoint,
+  b: SelPoint,
+  aspect = 1,
+  segments = ELLIPSE_POLYGON_SEGMENTS
+): SelPoint[] {
+  const corners = constrainSelectionDragCorners(a, b, { forceCircle: true, aspect });
+  return ellipseSelectionPolygon(corners.a, corners.b, segments);
+}
+
+/**
  * 올가미 궤적에 점 추가 — 마지막 점과 minDist 미만이면 기존 배열을 그대로 반환(추가 없음).
  * 불변: 추가 시 새 배열을 만든다(React 상태로 바로 쓸 수 있음).
  */
@@ -875,6 +932,15 @@ export type SelectionDragState = {
   points: SelPoint[];
   /** 브러시 전용 — 정규화 반경(요소 폭 대비). 다른 도구는 0. */
   brushRadius: number;
+  /** Magma: 정원/정사각 강제 (Circle Selection 도구 또는 Shift). */
+  forceCircle?: boolean;
+};
+
+export type SelectionDragModifiers = {
+  shift?: boolean;
+  alt?: boolean;
+  /** 요소 height/width — 화면상 정원 보정. */
+  aspect?: number;
 };
 
 /**
@@ -886,24 +952,38 @@ export function beginSelectionDrag(
   tool: SelectionToolKind,
   mode: SelectionCombineMode,
   p: SelPoint,
-  brushRadiusNorm = 0
+  brushRadiusNorm = 0,
+  opts?: { forceCircle?: boolean }
 ): SelectionDragState {
   const start = sanitizePoint(p, SEL_POINT_MIN, SEL_POINT_MAX);
   // poly-lasso treated as freehand lasso if drag path is used by mistake
   const freehand = tool === "lasso" || tool === "poly-lasso" || tool === "brush";
   const points = freehand ? [start] : rectSelectionPolygon(start, start);
   const brushRadius = tool === "brush" ? clampNum(brushRadiusNorm, 0, MAX_BRUSH_RADIUS_NORM) : 0;
-  return { tool, mode, start, points, brushRadius };
+  return { tool, mode, start, points, brushRadius, forceCircle: !!opts?.forceCircle };
 }
 
-/** 드래그 이동 — rect/ellipse 는 시작→현재 박스로 재계산, lasso/brush 는 궤적 누적. */
-export function updateSelectionDrag(drag: SelectionDragState, p: SelPoint): SelectionDragState {
+/** 드래그 이동 — rect/ellipse 는 시작→현재 박스로 재계산(+Shift/Alt), lasso/brush 는 궤적 누적. */
+export function updateSelectionDrag(
+  drag: SelectionDragState,
+  p: SelPoint,
+  mods?: SelectionDragModifiers
+): SelectionDragState {
   if (drag.tool === "lasso" || drag.tool === "poly-lasso" || drag.tool === "brush") {
     const points =
       drag.tool === "brush" ? appendBrushPoint(drag.points, p, drag.brushRadius) : appendLassoPoint(drag.points, p);
     return points === drag.points ? drag : { ...drag, points };
   }
-  const points = drag.tool === "rect" ? rectSelectionPolygon(drag.start, p) : ellipseSelectionPolygon(drag.start, p);
+  const corners = constrainSelectionDragCorners(drag.start, p, {
+    shift: mods?.shift,
+    alt: mods?.alt,
+    aspect: mods?.aspect,
+    forceCircle: drag.forceCircle || (drag.tool === "ellipse" && mods?.shift),
+  });
+  const points =
+    drag.tool === "rect"
+      ? rectSelectionPolygon(corners.a, corners.b)
+      : ellipseSelectionPolygon(corners.a, corners.b);
   return { ...drag, points };
 }
 

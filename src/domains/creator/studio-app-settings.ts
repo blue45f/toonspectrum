@@ -29,17 +29,29 @@ export type StudioAppSettingsTab = (typeof STUDIO_APP_SETTINGS_TABS)[number];
 /** Left tool-rail ids that users can reorder/hide (Magma Toolbar tab). */
 export const STUDIO_RAIL_TOOL_CATALOG = [
   { id: "select", label: "선택", defaultShortcut: "V" },
+  { id: "hand", label: "핸드(팬)", defaultShortcut: "H" },
   { id: "pen", label: "펜", defaultShortcut: "B" },
+  { id: "pixel-pencil", label: "픽셀 펜", defaultShortcut: "P" },
   { id: "eraser", label: "지우개", defaultShortcut: "E" },
-  { id: "fill", label: "채우기", defaultShortcut: "G" },
+  { id: "blend", label: "혼합(스머지)", defaultShortcut: "" },
+  { id: "liquify", label: "리퀴파이", defaultShortcut: "" },
+  { id: "fill", label: "페인트 버킷", defaultShortcut: "G" },
+  { id: "lasso-fill", label: "라쏘 필", defaultShortcut: "" },
   { id: "eyedropper", label: "스포이드", defaultShortcut: "I" },
-  { id: "lasso", label: "올가미", defaultShortcut: "L" },
+  { id: "marquee-rect", label: "사각 선택", defaultShortcut: "M" },
+  { id: "marquee-circle", label: "원형 선택", defaultShortcut: "" },
+  { id: "lasso", label: "올가미 선택", defaultShortcut: "L" },
+  { id: "transform", label: "변형", defaultShortcut: "Shift+T" },
   { id: "smart-shape", label: "스마트 도형", defaultShortcut: "" },
   { id: "shape-rect", label: "사각형 도형", defaultShortcut: "" },
   { id: "shape-ellipse", label: "타원 도형", defaultShortcut: "" },
   { id: "text", label: "텍스트", defaultShortcut: "T" },
   { id: "bubble", label: "말풍선", defaultShortcut: "" },
   { id: "image", label: "이미지", defaultShortcut: "" },
+  { id: "comment", label: "댓글", defaultShortcut: "" },
+  { id: "perspective", label: "투시도", defaultShortcut: "" },
+  { id: "zoom-fit", label: "화면 맞춤", defaultShortcut: "Mod+0" },
+  { id: "rotate-view", label: "캔버스 반전", defaultShortcut: "" },
   { id: "frame-anim", label: "프레임 애니", defaultShortcut: "" },
   { id: "reference", label: "참고 이미지", defaultShortcut: "" },
 ] as const;
@@ -53,11 +65,15 @@ export const DEFAULT_STUDIO_RAIL_TOOL_ORDER: StudioRailToolId[] = STUDIO_RAIL_TO
 /** Customizable shortcut action ids (subset wired in StudioPage). */
 export const STUDIO_SHORTCUT_ACTIONS = [
   { id: "tool-select", label: "선택 도구", defaultKeys: "V" },
+  { id: "tool-hand", label: "핸드(팬)", defaultKeys: "Space" },
   { id: "tool-pen", label: "펜", defaultKeys: "B" },
+  { id: "tool-pixel", label: "픽셀 펜", defaultKeys: "P" },
   { id: "tool-eraser", label: "지우개", defaultKeys: "E" },
-  { id: "tool-fill", label: "채우기", defaultKeys: "G" },
+  { id: "tool-fill", label: "페인트 버킷", defaultKeys: "G" },
   { id: "tool-eyedropper", label: "스포이드", defaultKeys: "I" },
-  { id: "tool-lasso", label: "올가미", defaultKeys: "L" },
+  { id: "tool-lasso", label: "올가미 선택", defaultKeys: "L" },
+  { id: "tool-marquee", label: "사각 선택", defaultKeys: "M" },
+  { id: "tool-transform", label: "변형", defaultKeys: "Shift+T" },
   { id: "undo", label: "실행취소", defaultKeys: "Mod+Z" },
   { id: "redo", label: "다시실행", defaultKeys: "Mod+Shift+Z" },
   { id: "deselect-pixels", label: "픽셀 선택 해제", defaultKeys: "Mod+D" },
@@ -203,6 +219,7 @@ export function normalizeStudioRailVisibleIds(value: unknown): StudioRailToolId[
     }
   }
   // Empty list is invalid — fall back to full default (Magma always keeps some tools).
+  // New catalog tools not in the saved list stay "hidden" and surface via More menu.
   if (out.length === 0) return [...DEFAULT_STUDIO_RAIL_TOOL_ORDER];
   return out;
 }
