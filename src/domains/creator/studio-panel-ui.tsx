@@ -184,7 +184,7 @@ export function StudioContextPill({
 
 // 스와치(색 점)를 품는 프리셋 칩 — CSP/Photopea 룩 팔레트 칩.
 export const PANEL_SWATCH_CHIP_CLASS =
-  "flex min-h-7 items-center gap-1.5 rounded-lg border border-line/80 bg-card/90 px-2 py-1 text-[0.72rem] font-medium text-fg-2 shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.04)] transition-[background,border-color,box-shadow,transform] duration-150 hover:-translate-y-px hover:bg-raised hover:text-fg pointer-coarse:min-h-11 pointer-coarse:px-2.5 pointer-coarse:py-1.5 pointer-coarse:text-[0.75rem]";
+  "flex min-h-6 items-center gap-1.5 rounded-lg border border-line/80 bg-card/90 px-2 py-1 text-[0.72rem] font-medium text-fg-2 shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.04)] transition-[background,border-color,box-shadow,transform] duration-150 hover:-translate-y-px hover:bg-raised hover:text-fg pointer-coarse:min-h-11 pointer-coarse:px-2.5 pointer-coarse:py-1.5 pointer-coarse:text-[0.75rem]";
 
 // 색 스와치 + 라벨을 한 칩에 담는 프리셋 칩. swatch 는 color 로 칠하고, active 면 강조 테두리로 표시한다.
 export function StudioSwatchChip({
