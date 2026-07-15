@@ -1,6 +1,7 @@
 // "에셋" 툴바 그룹 팝오버 안에 서브탭 콘텐츠로 얹히는 컴포넌트 — 팝오버 위치·z-index·max-height는
 // 호출부(StudioPage.tsx의 에셋 그룹 wrapper)가 담당한다(2026-07-05 툴바 그룹화로 이관, 자체 wrapper 없음).
 import {
+  BadgeCheck,
   Check,
   Globe,
   ImagePlus,
@@ -576,6 +577,11 @@ function LocalAssetGrid({
               {asset.kind === "ai" && (
                 <span className="pointer-events-none absolute left-1 top-1 inline-flex items-center gap-0.5 rounded-md bg-accent px-1 py-px text-[0.5rem] font-bold uppercase leading-none tracking-wide text-on-accent shadow">
                   <Sparkles size={7} aria-hidden /> AI
+                </span>
+              )}
+              {asset.kind === "bg3d" && (
+                <span className="pointer-events-none absolute left-1 top-1 inline-flex items-center gap-0.5 rounded-md border border-line/70 bg-panel/90 px-1 py-px text-[0.5rem] font-bold leading-none tracking-wide text-fg-2 shadow backdrop-blur-sm">
+                  <BadgeCheck size={8} className="text-good" aria-hidden /> 권리 인증
                 </span>
               )}
               <span className="pointer-events-none absolute bottom-1 right-1 inline-flex items-center gap-0.5 rounded-md border border-line/40 bg-panel/90 px-1.5 py-0.5 text-[0.55rem] font-semibold text-fg shadow-sm backdrop-blur-sm">
