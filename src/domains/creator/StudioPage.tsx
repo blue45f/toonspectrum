@@ -1167,6 +1167,14 @@ const StudioStickerGrid = lazyRetry(
   () => import("./studio-sticker-grid").then((mod) => ({ default: mod.StudioStickerGrid })),
   "StudioStickerGrid"
 );
+const StudioCollagePanel = lazyRetry(
+  () => import("./StudioCollagePanel").then((mod) => ({ default: mod.StudioCollagePanel })),
+  "StudioCollagePanel"
+);
+const StudioElementsPanel = lazyRetry(
+  () => import("./StudioElementsPanel").then((mod) => ({ default: mod.StudioElementsPanel })),
+  "StudioElementsPanel"
+);
 const StudioRasterAssetGrid = lazyRetry(
   () => import("./StudioRasterAssetGrid").then((mod) => ({ default: mod.StudioRasterAssetGrid })),
   "StudioRasterAssetGrid"
@@ -1929,7 +1937,7 @@ export type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl | F
   emeresSourceId?: string;
 };
 const EMPTY_LAYER_GROUPS: LayerGroup[] = [];
-type StudioMenu = "template" | "bubble" | "sticker" | "char" | "bgScene" | "asset" | "emeres" | "tone" | "scene" | "clip" | "palette" | "brandKit" | "stockImage" | "aiAssist" | "integrations";
+type StudioMenu = "template" | "collage" | "bubble" | "sticker" | "elements" | "char" | "bgScene" | "asset" | "emeres" | "tone" | "scene" | "clip" | "palette" | "brandKit" | "stockImage" | "aiAssist" | "integrations";
 // 2026-07-05 툴바 그룹화 — 20개 이상의 플랫한 툴바 버튼을 논리 그룹 4개로 묶는다(선택/펜/지우개/
 // 텍스트/말풍선처럼 사용 빈도가 높은 핵심 도구는 그룹화 대상에서 제외하고 그대로 1줄 유지).
 // 그룹 팝오버는 `menu` 하나로 열림 상태·활성 서브탭을 동시에 표현한다(별도 상태 미도입) — 그룹 멤버인
@@ -1941,10 +1949,12 @@ const STUDIO_TOOLBAR_GROUP_OF: Partial<Record<StudioMenu, StudioToolbarGroupId>>
   bgScene: "bgGroup",
   tone: "bgGroup",
   template: "assetGroup",
+  collage: "assetGroup",
   emeres: "assetGroup",
   scene: "assetGroup",
   clip: "assetGroup",
   sticker: "assetGroup",
+  elements: "assetGroup",
   asset: "assetGroup",
   palette: "styleGroup",
   brandKit: "styleGroup",
@@ -13079,6 +13089,107 @@ function StudioCuttoonEditor() {
     commit(comipoSeedsToEls(assembled.seeds));
     setSelectedId(null);
   }
+
+  /** PicsArt-class multi-photo collage — frames + optional cover-fit of existing images. */
+  function applyCollage(payload: {
+    canvasH: number;
+    canvasBg: string;
+    frames: readonly {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      bg: string;
+      stroke: string;
+      strokeWidth: number;
+      name: string;
+      groupId: string;
+    }[];
+    groupId: string;
+    imagePlacements: readonly {
+      imageId: string;
+      slotIndex: number;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    }[];
+    replaceExisting: boolean;
+  }) {
+    setMenu(null);
+    if (
+      payload.replaceExisting
+      && elements.length > 0
+      && !globalThis.confirm("기존 작업을 지우고 콜라주를 적용할까요?")
+    ) {
+      return;
+    }
+    setCanvasH(payload.canvasH);
+    setBg(payload.canvasBg);
+    setBgGrad(null);
+    setCurrentTemplate(null);
+
+    const groupId = `${payload.groupId}-${uid()}`;
+    const frameEls: El[] = payload.frames.map((frame) => ({
+      id: uid(),
+      type: "frame" as const,
+      x: frame.x,
+      y: frame.y,
+      width: frame.width,
+      height: frame.height,
+      bg: frame.bg,
+      bgColor: frame.bg,
+      stroke: frame.strokeWidth > 0 && frame.stroke !== "transparent" ? frame.stroke : undefined,
+      strokeWidth: frame.strokeWidth > 0 ? frame.strokeWidth : undefined,
+      name: frame.name,
+      groupId,
+    }));
+
+    const imageById = new Map(
+      elements.filter((el) => el.type === "image").map((el) => [el.id, el])
+    );
+    const placedImages: El[] = [];
+    for (const placement of payload.imagePlacements) {
+      const source = imageById.get(placement.imageId);
+      if (!source || source.type !== "image") continue;
+      placedImages.push({
+        ...source,
+        x: placement.x,
+        y: placement.y,
+        width: placement.width,
+        height: placement.height,
+        rotation: 0,
+        noClip: false,
+        groupId,
+        name: source.name ?? `콜라주 사진 ${placement.slotIndex + 1}`,
+      });
+    }
+
+    if (payload.replaceExisting) {
+      commit([...frameEls, ...placedImages]);
+    } else {
+      const placedIds = new Set(placedImages.map((el) => el.id));
+      const kept = elements.filter((el) => !placedIds.has(el.id));
+      commit([...kept, ...frameEls, ...placedImages]);
+    }
+    setSelectedId(null);
+    announceDrawingShortcut(`${payload.frames.length}칸 콜라주를 적용했어요.`);
+  }
+
+  function addCatalogElement(item: { svg: string; width: number; height: number; label: string }) {
+    setMenu(null);
+    addEl(
+      createCanvasImageElement({
+        id: uid(),
+        src: svgToDataUrl(item.svg),
+        canvasWidth: CANVAS_W,
+        canvasHeight: canvasH,
+        sourceWidth: item.width,
+        sourceHeight: item.height,
+        horizontalInset: 100,
+      })
+    );
+  }
   function applyBgPreset(p: BgPreset) {
     if (p.grad) setBgGrad(p.grad);
     else if (p.fill) {
@@ -16379,6 +16490,18 @@ function StudioCuttoonEditor() {
           },
         },
         {
+          id: "collage",
+          label: "콜라주",
+          icon: Grid2x2,
+          onSelect: () => setMenu("collage"),
+        },
+        {
+          id: "elements",
+          label: "요소 · 도형",
+          icon: Shapes,
+          onSelect: () => setMenu("elements"),
+        },
+        {
           id: "bubble",
           label: "말풍선",
           icon: MessageCircle,
@@ -18843,7 +18966,7 @@ function StudioCuttoonEditor() {
               <StudioMenuPopoverHeader
                 icon={Folder}
                 title="에셋"
-                description="템플릿·밑그림·장면·클립·효과를 한 메뉴에서 고릅니다."
+                description="템플릿·콜라주·요소·장면·클립·효과를 한 메뉴에서 고릅니다."
               />
               <StudioMenuSubtabs
                 aria-label="에셋 메뉴 구역"
@@ -18854,6 +18977,8 @@ function StudioCuttoonEditor() {
                 }}
                 items={[
                   { id: "template", label: "템플릿", icon: LayoutTemplate },
+                  { id: "collage", label: "콜라주", icon: Grid2x2 },
+                  { id: "elements", label: "요소", icon: Shapes },
                   { id: "emeres", label: "이메레스", icon: PenTool },
                   { id: "scene", label: "장면", icon: Clapperboard },
                   { id: "clip", label: "클립", icon: Bookmark },
@@ -18902,6 +19027,30 @@ function StudioCuttoonEditor() {
                     ))}
                   </div>
                 </div>
+              )}
+              {menu === "collage" && (
+                <Suspense fallback={<StudioPanelLoading label="콜라주 패널을 여는 중..." />}>
+                  <StudioCollagePanel
+                    canvasW={CANVAS_W}
+                    availableImages={elements
+                      .filter((el): el is ImageEl => el.type === "image" && !el.hidden)
+                      .map((el) => ({
+                        id: el.id,
+                        width: el.width,
+                        height: el.height,
+                      }))}
+                    onApply={applyCollage}
+                  />
+                </Suspense>
+              )}
+              {menu === "elements" && (
+                <Suspense fallback={<StudioPanelLoading label="요소 패널을 여는 중..." />}>
+                  <StudioElementsPanel
+                    onAdd={(item) => {
+                      addCatalogElement(item);
+                    }}
+                  />
+                </Suspense>
               )}
               {menu === "emeres" && (
                 <>
@@ -19192,6 +19341,17 @@ function StudioCuttoonEditor() {
               )}
               {menu === "sticker" && (
                 <>
+                  <button
+                    type="button"
+                    onClick={() => setMenu("elements")}
+                    className="mb-2 flex w-full items-center justify-between gap-2 rounded-lg border border-line bg-card px-2.5 py-2 text-left text-xs hover:border-accent/40 hover:bg-raised"
+                  >
+                    <span className="inline-flex items-center gap-1.5 font-semibold text-fg">
+                      <Shapes size={13} className="text-accent" aria-hidden />
+                      도형 · 프레임 · 배지 요소
+                    </span>
+                    <span className="text-[0.62rem] text-fg-3">요소 탭 →</span>
+                  </button>
                   <div className="relative mb-2">
                     <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-3" />
                     <input
