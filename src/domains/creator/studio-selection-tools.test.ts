@@ -10,6 +10,8 @@ import {
   SELECTION_BRUSH_RADIUS_DEFAULT,
   SELECTION_BRUSH_RADIUS_RANGE,
   SELECTION_COMBINE_MODES,
+  SELECTION_EXPAND_DEFAULT,
+  SELECTION_EXPAND_RANGE,
   SELECTION_FEATHER_RANGE,
   SELECTION_HUE_RANGE,
   SELECTION_TOOLS,
@@ -17,15 +19,19 @@ import {
   addSelectionSubpath,
   appendBrushPoint,
   appendLassoPoint,
+  appendPolyLassoVertex,
   applySelectionAdjustToCanvas,
+  beginPolyLassoSession,
   beginSelectionDrag,
   brushPointMinDist,
   brushStrokePreview,
   buildSelectionMaskPlan,
   canvasPointToNormalized,
+  commitPolyLassoSession,
   commitSelectionDrag,
   ellipseSelectionPolygon,
   emptyPixelSelection,
+  expandContractSelection,
   isSelectionAdjustNoop,
   isSelectionUsable,
   marchingAntsDashOffset,
@@ -37,9 +43,11 @@ import {
   pointInSelection,
   pointOnBrushSubpath,
   polygonAreaNorm,
+  polyLassoCloseToStart,
   rasterizeSelectionMask,
   rectSelectionPolygon,
   removeLastSubpath,
+  selectAllPixels,
   selectionBoundsNorm,
   setSelectionFeather,
   simplifyLassoPolygon,
@@ -160,9 +168,9 @@ function leftHalfSelection(over: Partial<PixelSelection> = {}): PixelSelection {
 // ---------------------------------------------------------------------------
 
 describe("상수·칩 목록", () => {
-  it("도구 4종(rect/ellipse/lasso/brush)·결합 2종(add/subtract) — id 고유·한글 라벨", () => {
-    expect(SELECTION_TOOLS.map((t) => t.id)).toEqual(["rect", "ellipse", "lasso", "brush"]);
-    expect(SELECTION_COMBINE_MODES.map((m) => m.id)).toEqual(["add", "subtract"]);
+  it("도구 5종(rect/ellipse/lasso/poly-lasso/brush)·결합 3종(add/subtract/intersect) — id 고유·한글 라벨", () => {
+    expect(SELECTION_TOOLS.map((t) => t.id)).toEqual(["rect", "ellipse", "lasso", "poly-lasso", "brush"]);
+    expect(SELECTION_COMBINE_MODES.map((m) => m.id)).toEqual(["add", "subtract", "intersect"]);
     for (const item of [...SELECTION_TOOLS, ...SELECTION_COMBINE_MODES]) {
       expect(item.label.length).toBeGreaterThan(0);
       expect(item.tip.length).toBeGreaterThan(0);
@@ -176,12 +184,16 @@ describe("상수·칩 목록", () => {
     expect(SELECTION_BRUSH_RADIUS_RANGE).toEqual({ min: 8, max: 120, step: 1 });
     expect(SELECTION_BRUSH_RADIUS_DEFAULT).toBeGreaterThanOrEqual(SELECTION_BRUSH_RADIUS_RANGE.min);
     expect(SELECTION_BRUSH_RADIUS_DEFAULT).toBeLessThanOrEqual(SELECTION_BRUSH_RADIUS_RANGE.max);
+    expect(SELECTION_EXPAND_DEFAULT).toBeGreaterThanOrEqual(SELECTION_EXPAND_RANGE.min);
+    expect(SELECTION_EXPAND_DEFAULT).toBeLessThanOrEqual(SELECTION_EXPAND_RANGE.max);
   });
 
   it("브러시 미리보기 틴트 — 결합 모드별 반투명 rgba", () => {
     expect(BRUSH_PREVIEW_COLORS.add).toMatch(/^rgba\(/);
     expect(BRUSH_PREVIEW_COLORS.subtract).toMatch(/^rgba\(/);
+    expect(BRUSH_PREVIEW_COLORS.intersect).toMatch(/^rgba\(/);
     expect(BRUSH_PREVIEW_COLORS.add).not.toBe(BRUSH_PREVIEW_COLORS.subtract);
+    expect(BRUSH_PREVIEW_COLORS.add).not.toBe(BRUSH_PREVIEW_COLORS.intersect);
   });
 });
 
@@ -368,6 +380,91 @@ describe("addSelectionSubpath / removeLastSubpath", () => {
     const invertedOnly = removeLastSubpath({ ...one, invert: true });
     expect(invertedOnly).not.toBeNull();
     expect(invertedOnly!.subpaths).toHaveLength(0);
+  });
+
+  it("교집합 — 기존 선택과 새 폴리곤이 겹치는 부분만 남기고 mode 는 add 로 정규화", () => {
+    const left = leftHalfSelection();
+    // 가운데 세로 띠(0.25..0.75) ∩ 왼쪽 절반 → 0.25..0.5 근처
+    const band = rectSelectionPolygon({ x: 0.25, y: 0 }, { x: 0.75, y: 1 });
+    const hit = addSelectionSubpath(left, "intersect", band);
+    expect(hit).not.toBeNull();
+    expect(hit!.invert).toBe(false);
+    expect(hit!.subpaths.every((sp) => sp.mode === "add")).toBe(true);
+    expect(pointInSelection(hit, { x: 0.3, y: 0.5 })).toBe(true);
+    expect(pointInSelection(hit, { x: 0.1, y: 0.5 })).toBe(false); // 왼쪽만 있던 영역은 교집합 밖
+    expect(pointInSelection(hit, { x: 0.7, y: 0.5 })).toBe(false); // 새 영역만 있던 곳
+    // 기존 선택 없으면 교집합 결과 없음
+    expect(addSelectionSubpath(null, "intersect", band)).toBeNull();
+  });
+});
+
+describe("selectAllPixels / expandContractSelection", () => {
+  it("전체 선택 — 빈 서브패스 + 반전, 페더 유지", () => {
+    const base = setSelectionFeather(leftHalfSelection(), 8);
+    const all = selectAllPixels(base);
+    expect(all.subpaths).toHaveLength(0);
+    expect(all.invert).toBe(true);
+    expect(all.featherPx).toBe(8);
+    expect(isSelectionUsable(all)).toBe(true);
+    expect(pointInSelection(all, { x: 0.9, y: 0.9 })).toBe(true);
+    expect(selectAllPixels(null).invert).toBe(true);
+  });
+
+  it("확장 — 폴리곤 꼭짓점이 중심에서 바깥으로 밀린다", () => {
+    const base = leftHalfSelection();
+    const expanded = expandContractSelection(base, 0.05);
+    expect(expanded).not.toBeNull();
+    expect(polygonAreaNorm(expanded!.subpaths[0]!.points)).toBeGreaterThan(
+      polygonAreaNorm(base.subpaths[0]!.points)
+    );
+  });
+
+  it("축소 — 너무 작아지면 null, 전체 선택 축소는 안쪽 박스로", () => {
+    const tiny = addSelectionSubpath(null, "add", rectSelectionPolygon({ x: 0.48, y: 0.48 }, { x: 0.52, y: 0.52 }))!;
+    expect(expandContractSelection(tiny, -0.4)).toBeNull();
+    const all = selectAllPixels();
+    const inset = expandContractSelection(all, -0.1);
+    expect(inset).not.toBeNull();
+    expect(inset!.invert).toBe(false);
+    expect(pointInSelection(inset, { x: 0.5, y: 0.5 })).toBe(true);
+    expect(pointInSelection(inset, { x: 0.02, y: 0.02 })).toBe(false);
+  });
+});
+
+describe("다각형 올가미 세션", () => {
+  it("begin/append/commit — 클릭 꼭짓점을 폴리곤 선택으로 결합", () => {
+    let session = beginPolyLassoSession("add", { x: 0.1, y: 0.1 });
+    expect(session.points).toHaveLength(1);
+    session = appendPolyLassoVertex(session, { x: 0.8, y: 0.1 });
+    session = appendPolyLassoVertex(session, { x: 0.8, y: 0.8 });
+    session = appendPolyLassoVertex(session, { x: 0.1, y: 0.8 });
+    expect(session.points.length).toBeGreaterThanOrEqual(4);
+    const sel = commitPolyLassoSession(null, session);
+    expect(sel).not.toBeNull();
+    expect(sel!.subpaths[0]!.mode).toBe("add");
+    expect(pointInSelection(sel, { x: 0.5, y: 0.5 })).toBe(true);
+  });
+
+  it("시작점 근처 재클릭 감지 + 점 2개 이하는 커밋해도 선택 없음", () => {
+    let session = beginPolyLassoSession("subtract", { x: 0.2, y: 0.2 });
+    session = appendPolyLassoVertex(session, { x: 0.7, y: 0.2 });
+    session = appendPolyLassoVertex(session, { x: 0.5, y: 0.7 });
+    expect(polyLassoCloseToStart(session, { x: 0.21, y: 0.21 })).toBe(true);
+    expect(polyLassoCloseToStart(session, { x: 0.9, y: 0.9 })).toBe(false);
+    const open = beginPolyLassoSession("add", { x: 0.1, y: 0.1 });
+    expect(commitPolyLassoSession(null, appendPolyLassoVertex(open, { x: 0.9, y: 0.9 }))).toBeNull();
+  });
+
+  it("교집합 모드 세션 커밋은 기존 선택과 겹친 영역만 남긴다", () => {
+    const left = leftHalfSelection();
+    let session = beginPolyLassoSession("intersect", { x: 0.3, y: 0 });
+    session = appendPolyLassoVertex(session, { x: 0.9, y: 0 });
+    session = appendPolyLassoVertex(session, { x: 0.9, y: 1 });
+    session = appendPolyLassoVertex(session, { x: 0.3, y: 1 });
+    const hit = commitPolyLassoSession(left, session);
+    expect(hit).not.toBeNull();
+    expect(pointInSelection(hit, { x: 0.4, y: 0.5 })).toBe(true);
+    expect(pointInSelection(hit, { x: 0.1, y: 0.5 })).toBe(false);
   });
 });
 

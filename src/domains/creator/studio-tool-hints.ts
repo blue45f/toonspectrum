@@ -82,6 +82,23 @@ const HINTS: Record<string, StudioToolHintSpec> = {
     title: "필터",
     description: "이미지에 가우시안/모션 블러, 곡선, 레벨 등 보정 필터를 쌓아 관리합니다.",
   },
+  lasso: {
+    id: "lasso",
+    title: "올가미 선택",
+    description:
+      "이미지 픽셀을 자유 올가미(드래그 닫기) 또는 다각형 올가미(클릭 꼭짓점 → Enter/더블클릭 닫기)로 고릅니다. 합치기·빼기·교집합, 페더, 확장/축소, 밝기·색조·콘텐츠 인식 채우기를 속성 패널에서 이어서 쓸 수 있어요.",
+  },
+  "poly-lasso": {
+    id: "poly-lasso",
+    title: "다각형 올가미",
+    description: "클릭으로 꼭짓점을 찍고, 더블클릭 또는 Enter로 닫습니다. Esc로 초안을 취소해요.",
+  },
+  "pixel-select": {
+    id: "pixel-select",
+    title: "픽셀 선택",
+    description:
+      "사각·타원·올가미·브러시로 이미지 안쪽 픽셀을 고른 뒤 부분 조정·삭제·콘텐츠 인식 채우기를 적용합니다.",
+  },
 };
 
 export function studioToolHint(id: string): StudioToolHintSpec | null {

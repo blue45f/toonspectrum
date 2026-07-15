@@ -33,11 +33,11 @@
 /** 정규화 점 — 이미지 요소 비회전 로컬 박스 기준 0..1(올가미는 살짝 벗어남 허용). */
 export type SelPoint = { x: number; y: number };
 
-/** 픽셀 선택 도구 종류 — rect/ellipse/lasso 는 폴리곤으로, brush 는 궤적+반경으로 저장된다. */
-export type SelectionToolKind = "rect" | "ellipse" | "lasso" | "brush";
+/** 픽셀 선택 도구 종류 — rect/ellipse/lasso/poly-lasso 는 폴리곤, brush 는 궤적+반경. */
+export type SelectionToolKind = "rect" | "ellipse" | "lasso" | "poly-lasso" | "brush";
 
-/** 서브패스 결합 모드 — 합치기(fill) / 빼기(erase). */
-export type SelectionCombineMode = "add" | "subtract";
+/** 서브패스 결합 모드 — 합치기(fill) / 빼기(erase) / 교집합(intersect). */
+export type SelectionCombineMode = "add" | "subtract" | "intersect";
 
 /** 폴리곤 서브패스 — rect/ellipse/lasso 가 수렴하는 형식(≥3점, 자동 닫힘). kind 없음 = 하위호환. */
 export type SelectionPolygonSubpath = { mode: SelectionCombineMode; kind?: never; points: SelPoint[] };
@@ -92,7 +92,12 @@ const MAX_BRUSH_RADIUS_NORM = 4;
 export const SELECTION_TOOLS: { id: SelectionToolKind; label: string; tip: string }[] = [
   { id: "rect", label: "사각형", tip: "드래그한 사각형 안쪽 픽셀을 선택합니다." },
   { id: "ellipse", label: "타원", tip: "드래그한 박스에 내접하는 타원 안쪽을 선택합니다." },
-  { id: "lasso", label: "올가미", tip: "자유롭게 그린 궤적 안쪽을 선택합니다(자동 닫힘)." },
+  { id: "lasso", label: "올가미", tip: "자유롭게 그린 궤적 안쪽을 선택합니다(자동 닫힘). 자유형 올가미." },
+  {
+    id: "poly-lasso",
+    label: "다각형 올가미",
+    tip: "클릭으로 꼭짓점을 찍고, 더블클릭 또는 Enter로 닫습니다. Esc로 취소.",
+  },
   { id: "brush", label: "브러시", tip: "붓으로 칠한 자리(둥근 획)를 선택합니다. 반경 슬라이더로 굵기를 조절하세요." },
 ];
 
@@ -100,7 +105,12 @@ export const SELECTION_TOOLS: { id: SelectionToolKind; label: string; tip: strin
 export const SELECTION_COMBINE_MODES: { id: SelectionCombineMode; label: string; tip: string }[] = [
   { id: "add", label: "합치기", tip: "기존 선택 영역에 새 영역을 더합니다." },
   { id: "subtract", label: "빼기", tip: "기존 선택 영역에서 새 영역을 뺍니다." },
+  { id: "intersect", label: "교집합", tip: "기존 선택과 새 영역이 겹치는 부분만 남깁니다." },
 ];
+
+/** 확장/축소 슬라이더 범위(정규화 단위 — 약 이미지 폭의 %). */
+export const SELECTION_EXPAND_RANGE = { min: 0.005, max: 0.08, step: 0.005 } as const;
+export const SELECTION_EXPAND_DEFAULT = 0.02;
 
 // ---------------------------------------------------------------------------
 // 내부 수치 헬퍼
@@ -297,8 +307,9 @@ export function emptyPixelSelection(): PixelSelection {
 }
 
 /**
- * 서브패스 추가(합치기/빼기 결합) — 점 위생 처리 후 면적이 무의미하면 기존 선택을 그대로 반환.
+ * 서브패스 추가(합치기/빼기/교집합 결합) — 점 위생 처리 후 면적이 무의미하면 기존 선택을 그대로 반환.
  * sel 이 null 이면 빈 선택에서 시작한다.
+ * intersect: 기존 선택 ∩ 새 폴리곤 — 기존 서브패스를 비우고 교집합 영역을 단일 add 로 대체한다.
  */
 export function addSelectionSubpath(
   sel: PixelSelection | null,
@@ -307,8 +318,166 @@ export function addSelectionSubpath(
 ): PixelSelection | null {
   const clean = points.map((p) => sanitizePoint(p, SEL_POINT_MIN, SEL_POINT_MAX));
   if (clean.length < 3 || polygonAreaNorm(clean) < MIN_SELECTION_SUBPATH_AREA) return sel;
+  if (mode === "intersect") {
+    return intersectSelectionWithPolygon(sel, clean);
+  }
   const base = sel ?? emptyPixelSelection();
   return { ...base, subpaths: [...base.subpaths, { mode, points: clean }] };
+}
+
+/**
+ * 기존 선택 ∩ 폴리곤 — 샘플 그리드로 교집합 외곽 bbox를 잡고, 그 안을 새 add 폴리곤(입력 poly)으로
+ * 두되 반전·기존 서브패스를 제거한 뒤 "새 영역 중 기존에 있던 점만" 남기도록 마스크 근사한다.
+ * 정확도: poly 자체가 새 선택의 윤곽; 기존 선택 밖 점은 빼기 서브패스로 근사하지 않고
+ * sample-and-keep 으로 poly를 클리핑한 단순 버전을 쓴다(상업용 근사, 유닛 테스트 가능).
+ */
+export function intersectSelectionWithPolygon(
+  sel: PixelSelection | null,
+  poly: readonly SelPoint[]
+): PixelSelection | null {
+  const clean = poly.map((p) => sanitizePoint(p, SEL_POINT_MIN, SEL_POINT_MAX));
+  if (clean.length < 3 || polygonAreaNorm(clean) < MIN_SELECTION_SUBPATH_AREA) return sel;
+  if (!isSelectionUsable(sel)) {
+    // 기존 선택이 없으면 교집합 결과는 빈 선택과 같다.
+    return null;
+  }
+  // Dense sample: keep vertices of poly that lie inside old selection; if few, fall back to poly
+  // only when majority of grid samples inside poly are also in old selection.
+  const kept = clean.filter((p) => pointInSelection(sel, p));
+  if (kept.length >= 3 && polygonAreaNorm(kept) >= MIN_SELECTION_SUBPATH_AREA) {
+    return {
+      featherPx: sel!.featherPx,
+      invert: false,
+      subpaths: [{ mode: "add", points: kept }],
+    };
+  }
+  // Grid sample rebuild of intersection bbox polygon (rect approx of common area).
+  const N = 32;
+  let minX = 1;
+  let minY = 1;
+  let maxX = 0;
+  let maxY = 0;
+  let hits = 0;
+  for (let j = 0; j <= N; j++) {
+    for (let i = 0; i <= N; i++) {
+      const p = { x: i / N, y: j / N };
+      if (pointInPolygon(p, clean) && pointInSelection(sel, p)) {
+        hits += 1;
+        if (p.x < minX) minX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y > maxY) maxY = p.y;
+      }
+    }
+  }
+  if (hits === 0) return null;
+  const box = rectSelectionPolygon({ x: minX, y: minY }, { x: maxX, y: maxY });
+  return {
+    featherPx: sel!.featherPx,
+    invert: false,
+    subpaths: [{ mode: "add", points: box }],
+  };
+}
+
+/** 전체 선택 — 반전+빈 서브패스(Ctrl+A 상당). 페더는 유지. */
+export function selectAllPixels(sel: PixelSelection | null = null): PixelSelection {
+  return { subpaths: [], featherPx: sel?.featherPx ?? 0, invert: true };
+}
+
+/**
+ * 선택 영역 확장/축소 — 폴리곤 꼭짓점을 중심에서 바깥/안쪽으로 밀고, 브러시 반경을 키우거나 줄인다.
+ * amountNorm > 0 확장, < 0 축소. 축소 후 면적이 너무 작으면 null.
+ */
+export function expandContractSelection(
+  sel: PixelSelection | null,
+  amountNorm: number
+): PixelSelection | null {
+  if (!isSelectionUsable(sel)) return null;
+  const amount = clampNum(amountNorm, -0.5, 0.5, 0);
+  if (amount === 0) return sel;
+  if (sel!.invert && amount > 0) return sel; // 이미 전체 선택이면 확장 의미 없음
+  if (sel!.invert && amount < 0) {
+    // 전체 선택 축소 ≈ 가장자리 inset 박스 선택(반전 해제 + 안쪽 사각형)
+    const inset = Math.min(0.45, Math.abs(amount));
+    return {
+      featherPx: sel!.featherPx,
+      invert: false,
+      subpaths: [
+        {
+          mode: "add",
+          points: rectSelectionPolygon({ x: inset, y: inset }, { x: 1 - inset, y: 1 - inset }),
+        },
+      ],
+    };
+  }
+  const nextSubs: SelectionSubpath[] = [];
+  for (const sp of sel!.subpaths) {
+    if (sp.kind === "brush") {
+      const radius = clampNum(sp.radius + amount, 0, MAX_BRUSH_RADIUS_NORM);
+      // 축소로 반경이 사실상 0 이 되면 그 획은 제거한다.
+      if (radius < 0.001) continue;
+      nextSubs.push({ ...sp, radius });
+      continue;
+    }
+    const cx = sp.points.reduce((s, p) => s + p.x, 0) / sp.points.length;
+    const cy = sp.points.reduce((s, p) => s + p.y, 0) / sp.points.length;
+    // 축소 시 꼭짓점이 중심을 지나 뒤집히면(newLen≤0) 영역이 커지거나 뒤집히므로 서브패스를 폐기한다.
+    let collapsed = false;
+    const scaled: SelPoint[] = [];
+    for (const p of sp.points) {
+      const dx = p.x - cx;
+      const dy = p.y - cy;
+      const len = Math.hypot(dx, dy) || 1e-6;
+      const newLen = len + amount;
+      if (newLen <= 1e-6) {
+        collapsed = true;
+        break;
+      }
+      const scale = newLen / len;
+      scaled.push(sanitizePoint({ x: cx + dx * scale, y: cy + dy * scale }, SEL_POINT_MIN, SEL_POINT_MAX));
+    }
+    if (collapsed) continue;
+    if (scaled.length >= 3 && polygonAreaNorm(scaled) >= MIN_SELECTION_SUBPATH_AREA) {
+      nextSubs.push({ mode: sp.mode, points: scaled });
+    }
+  }
+  if (nextSubs.length === 0 && !sel!.invert) return null;
+  return { ...sel!, subpaths: nextSubs };
+}
+
+// ---------------------------------------------------------------------------
+// 다각형 올가미(클릭-꼭짓점) 세션 — 드래그 올가미와 분리된 상태 기계
+// ---------------------------------------------------------------------------
+
+export type PolyLassoSession = {
+  mode: SelectionCombineMode;
+  points: SelPoint[];
+};
+
+export function beginPolyLassoSession(mode: SelectionCombineMode, p: SelPoint): PolyLassoSession {
+  return { mode, points: [sanitizePoint(p, SEL_POINT_MIN, SEL_POINT_MAX)] };
+}
+
+export function appendPolyLassoVertex(session: PolyLassoSession, p: SelPoint): PolyLassoSession {
+  const points = appendLassoPoint(session.points, p, LASSO_MIN_POINT_DIST * 2);
+  return points === session.points ? session : { ...session, points };
+}
+
+/** 닫기 확정 — 점 ≥3 이고 면적 충분하면 선택에 결합. */
+export function commitPolyLassoSession(
+  sel: PixelSelection | null,
+  session: PolyLassoSession
+): PixelSelection | null {
+  return addSelectionSubpath(sel, session.mode, session.points);
+}
+
+/** 시작점에 가깝게 다시 클릭했는지 — 닫기 제스처 힌트. */
+export function polyLassoCloseToStart(session: PolyLassoSession, p: SelPoint, threshold = 0.03): boolean {
+  const first = session.points[0];
+  if (!first || session.points.length < 3) return false;
+  const dx = p.x - first.x;
+  const dy = p.y - first.y;
+  return dx * dx + dy * dy <= threshold * threshold;
 }
 
 /**
@@ -324,6 +493,24 @@ export function addBrushSubpath(
   const radius = clampNum(radiusNorm, 0, MAX_BRUSH_RADIUS_NORM);
   if (points.length === 0 || radius <= 0) return sel;
   const clean = points.map((p) => sanitizePoint(p, SEL_POINT_MIN, SEL_POINT_MAX));
+  if (mode === "intersect") {
+    // Approximate brush ∩ old selection by converting stroke to a thick polygon hull (bbox + radius).
+    let minX = 1;
+    let minY = 1;
+    let maxX = 0;
+    let maxY = 0;
+    for (const p of clean) {
+      if (p.x - radius < minX) minX = p.x - radius;
+      if (p.y - radius < minY) minY = p.y - radius;
+      if (p.x + radius > maxX) maxX = p.x + radius;
+      if (p.y + radius > maxY) maxY = p.y + radius;
+    }
+    const hull = rectSelectionPolygon(
+      { x: Math.max(0, minX), y: Math.max(0, minY) },
+      { x: Math.min(1, maxX), y: Math.min(1, maxY) }
+    );
+    return intersectSelectionWithPolygon(sel, hull);
+  }
   const base = sel ?? emptyPixelSelection();
   return { ...base, subpaths: [...base.subpaths, { mode, kind: "brush", points: clean, radius }] };
 }
@@ -407,6 +594,7 @@ export type SelectionDragState = {
 
 /**
  * 드래그 시작 — rect/ellipse 는 퇴화 폴리곤(면적 0), lasso/brush 는 시작점 1개로 초기화한다.
+ * poly-lasso 는 클릭 세션(beginPolyLassoSession)을 쓰므로 여기로 오지 않는다.
  * brushRadiusNorm: 브러시 도구의 정규화 반경(캔버스 px ÷ 요소 폭). 다른 도구는 무시된다.
  */
 export function beginSelectionDrag(
@@ -416,14 +604,16 @@ export function beginSelectionDrag(
   brushRadiusNorm = 0
 ): SelectionDragState {
   const start = sanitizePoint(p, SEL_POINT_MIN, SEL_POINT_MAX);
-  const points = tool === "lasso" || tool === "brush" ? [start] : rectSelectionPolygon(start, start);
+  // poly-lasso treated as freehand lasso if drag path is used by mistake
+  const freehand = tool === "lasso" || tool === "poly-lasso" || tool === "brush";
+  const points = freehand ? [start] : rectSelectionPolygon(start, start);
   const brushRadius = tool === "brush" ? clampNum(brushRadiusNorm, 0, MAX_BRUSH_RADIUS_NORM) : 0;
   return { tool, mode, start, points, brushRadius };
 }
 
 /** 드래그 이동 — rect/ellipse 는 시작→현재 박스로 재계산, lasso/brush 는 궤적 누적. */
 export function updateSelectionDrag(drag: SelectionDragState, p: SelPoint): SelectionDragState {
-  if (drag.tool === "lasso" || drag.tool === "brush") {
+  if (drag.tool === "lasso" || drag.tool === "poly-lasso" || drag.tool === "brush") {
     const points =
       drag.tool === "brush" ? appendBrushPoint(drag.points, p, drag.brushRadius) : appendLassoPoint(drag.points, p);
     return points === drag.points ? drag : { ...drag, points };
@@ -441,7 +631,10 @@ export function commitSelectionDrag(sel: PixelSelection | null, drag: SelectionD
     const next = addBrushSubpath(sel, drag.mode, drag.points, drag.brushRadius);
     return next === sel ? null : next;
   }
-  const points = drag.tool === "lasso" ? simplifyLassoPolygon(drag.points) : drag.points;
+  const points =
+    drag.tool === "lasso" || drag.tool === "poly-lasso"
+      ? simplifyLassoPolygon(drag.points)
+      : drag.points;
   if (points.length < 3 || polygonAreaNorm(points) < MIN_SELECTION_SUBPATH_AREA) return null;
   const next = addSelectionSubpath(sel, drag.mode, points);
   return next === sel ? null : next;
@@ -527,6 +720,7 @@ export function brushStrokePreview(
 export const BRUSH_PREVIEW_COLORS: Record<SelectionCombineMode, string> = {
   add: "rgba(124, 92, 252, 0.24)",
   subtract: "rgba(244, 63, 94, 0.24)",
+  intersect: "rgba(14, 165, 233, 0.24)",
 };
 
 /** 마칭앤츠 대시 패턴(px) — [칠함, 빔]. 합(9px)이 한 주기. */

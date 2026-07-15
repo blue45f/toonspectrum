@@ -95,6 +95,7 @@ import {
   SquareSplitHorizontal,
   Mountain,
   Shapes,
+  Lasso,
 } from "lucide-react";
 import { Fragment, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -789,26 +790,33 @@ import {
 } from "./studio-selection";
 import {
   appendBrushPoint,
+  appendPolyLassoVertex,
   applySelectionAdjustToCanvas,
+  beginPolyLassoSession,
   beginSelectionDrag,
   brushStrokePreview,
   buildSelectionMaskPlan,
   canvasPointToNormalized,
+  commitPolyLassoSession,
   commitSelectionDrag,
   emptyPixelSelection,
+  expandContractSelection,
   isSelectionAdjustNoop,
   isSelectionUsable,
   marchingAntsPasses,
   normalizedPointToCanvas,
   planSelectionAdjust,
+  polyLassoCloseToStart,
   rasterizeSelectionMask,
   removeLastSubpath,
+  selectAllPixels,
   SELECTION_BRUSH_RADIUS_DEFAULT,
   setSelectionFeather,
   subpathOutlinePoints,
   toggleSelectionInvert,
   updateSelectionDrag,
   type PixelSelection,
+  type PolyLassoSession,
   type SelectionAdjustPlan,
   type SelectionCombineMode,
   type SelectionDragState,
@@ -3446,16 +3454,26 @@ function cachedBuildImageFilters(el: ImageEl, key: string, mod: StudioKonvaFilte
   return built;
 }
 
+/** 선택 결합 모드별 드래그/드래프트 미리보기 색 — 합치기=보라, 빼기=적, 교집합=하늘. */
+function selectionModePreviewColors(mode: SelectionCombineMode): { stroke: string; fill: string } {
+  if (mode === "subtract") return { stroke: "rgba(244, 63, 94, 0.55)", fill: "rgba(244, 63, 94, 0.12)" };
+  if (mode === "intersect") return { stroke: "rgba(14, 165, 233, 0.55)", fill: "rgba(14, 165, 233, 0.12)" };
+  return { stroke: "rgba(124, 92, 252, 0.5)", fill: "rgba(124, 92, 252, 0.10)" };
+}
+
 // 픽셀 선택 마칭앤츠 오버레이 — 자체 RAF 로 대시 오프셋만 갱신해 StudioPage 전체 리렌더 없이
 // 자기 자신(전용 Layer 안 소수 노드)만 다시 그린다. 오프셋은 경과시간의 순수 함수(결정적).
 function StudioSelectionAntsOverlay({
   selection,
   drag,
+  polyDraft,
   frame,
   scale,
 }: {
   selection: PixelSelection | null;
   drag: SelectionDragState | null;
+  /** 다각형 올가미 진행 중 — 열린 폴리라인 + 고무줄(hover) + 꼭짓점 점. */
+  polyDraft?: { points: SelPoint[]; hover: SelPoint | null; mode: SelectionCombineMode } | null;
   frame: SelectionFrame;
   scale: number;
 }) {
@@ -3480,8 +3498,19 @@ function StudioSelectionAntsOverlay({
     drag && drag.tool !== "brush" && drag.points.length >= 2
       ? subpathOutlinePoints({ mode: drag.mode, points: drag.points }, size)
       : null;
-  const dragStroke = drag?.mode === "subtract" ? "rgba(244, 63, 94, 0.55)" : "rgba(124, 92, 252, 0.5)";
-  const dragFill = drag?.mode === "subtract" ? "rgba(244, 63, 94, 0.12)" : "rgba(124, 92, 252, 0.10)";
+  const dragColors = selectionModePreviewColors(drag?.mode ?? "add");
+  const polyDraftPoints =
+    polyDraft && polyDraft.points.length > 0
+      ? subpathOutlinePoints(
+          {
+            mode: polyDraft.mode,
+            points: polyDraft.hover ? [...polyDraft.points, polyDraft.hover] : polyDraft.points,
+          },
+          size
+        )
+      : null;
+  const polyColors = selectionModePreviewColors(polyDraft?.mode ?? "add");
+  const vertexR = 3.5 / scale;
   return (
     <Group x={frame.x} y={frame.y} rotation={frame.rotation ?? 0} listening={false}>
       {selection?.subpaths.map((sp, i) => {
@@ -3531,12 +3560,18 @@ function StudioSelectionAntsOverlay({
         ))}
       {/* 진행 중 브러시 드래그 — 반투명 라운드 획(결과 마스크와 동일 도형). */}
       {brushDrag && (
-        <Line points={brushDrag.points} stroke={dragStroke} strokeWidth={brushDrag.strokeWidth} lineCap="round" lineJoin="round" />
+        <Line
+          points={brushDrag.points}
+          stroke={dragColors.stroke}
+          strokeWidth={brushDrag.strokeWidth}
+          lineCap="round"
+          lineJoin="round"
+        />
       )}
-      {/* 진행 중 폴리곤 드래그 미리보기 — 합치기=보라, 빼기=적색 반투명 채움 + 앤츠 외곽선. */}
+      {/* 진행 중 폴리곤 드래그 미리보기 — 합치기=보라, 빼기=적, 교집합=하늘 반투명 채움 + 앤츠. */}
       {dragPoints && (
         <>
-          <Line points={dragPoints} closed fill={dragFill} />
+          <Line points={dragPoints} closed fill={dragColors.fill} />
           {passes.map((pass, j) => (
             <Line
               key={`ants-drag-${j}`}
@@ -3546,6 +3581,30 @@ function StudioSelectionAntsOverlay({
               strokeWidth={pass.strokeWidth}
               dash={pass.dash ?? undefined}
               dashOffset={pass.dashOffset}
+            />
+          ))}
+        </>
+      )}
+      {/* 다각형 올가미 초안 — 열린 폴리라인 + 고무줄 + 꼭짓점(닫히기 전). */}
+      {polyDraftPoints && polyDraft && (
+        <>
+          <Line
+            points={polyDraftPoints}
+            closed={false}
+            stroke={polyColors.stroke}
+            strokeWidth={1.5 / scale}
+            lineJoin="round"
+            lineCap="round"
+          />
+          {polyDraft.points.map((p, i) => (
+            <KCircle
+              key={`poly-v-${i}`}
+              x={p.x * size.width}
+              y={p.y * size.height}
+              radius={i === 0 && polyDraft.points.length >= 3 ? vertexR * 1.35 : vertexR}
+              fill={i === 0 ? polyColors.stroke : "rgba(255,255,255,0.9)"}
+              stroke={polyColors.stroke}
+              strokeWidth={1 / scale}
             />
           ))}
         </>
@@ -7241,6 +7300,16 @@ function StudioCuttoonEditor() {
   const pixelDragRafRef = useRef<number | null>(null);
   const pendingPixelDragRef = useRef<SelectionDragState | null>(null);
   const [pixelDragPreview, setPixelDragPreview] = useState<SelectionDragState | null>(null);
+  // 다각형 올가미(클릭 꼭짓점) — 드래그 세션과 분리. ref 로 포인터 핸들러가 최신 세션을 읽고,
+  // state 로 패널 상태 문구·오버레이를 갱신한다.
+  const polyLassoSessionRef = useRef<PolyLassoSession | null>(null);
+  const [polyLassoSession, setPolyLassoSession] = useState<PolyLassoSession | null>(null);
+  const [polyLassoHover, setPolyLassoHover] = useState<SelPoint | null>(null);
+  const clearPolyLassoDraft = () => {
+    polyLassoSessionRef.current = null;
+    setPolyLassoSession(null);
+    setPolyLassoHover(null);
+  };
   const schedulePixelDragPreview = (next: SelectionDragState | null) => {
     pendingPixelDragRef.current = next;
     if (pixelDragRafRef.current !== null) return;
@@ -7273,6 +7342,7 @@ function StudioCuttoonEditor() {
       pixelDragRafRef.current = null;
     }
     setPixelDragPreview(null);
+    clearPolyLassoDraft();
     setPixelSel(null);
     setPixelBusy(false);
     pixelWandRunIdRef.current += 1; // 요소가 바뀌면 진행 중인 매직완드 스캔 결과를 무효화한다.
@@ -9440,6 +9510,7 @@ function StudioCuttoonEditor() {
     setAdvancedFillStatus(null);
     setCropRect(null);
     setPixelTool(null);
+    clearPolyLassoDraft();
     setPanelSplitActive(false);
     setNodeEditTool(null);
     setSmudgeActive(false);
@@ -9453,6 +9524,15 @@ function StudioCuttoonEditor() {
     setBubbleShapeEditActive(false); // ← 추가(말풍선 커스텀 모양 점 편집)
     setPuppetWarpActive(false); // ← 추가
     setPuppetWarpPins([]); // ← 추가(핀도 함께 폐기 — 다른 도구로 전환 시 세션 종료)
+  }
+
+  /** 다각형 올가미 세션을 선택에 닫아 넣고 초안을 비운다. 점 <3 이면 폐기. */
+  function finishPolyLassoSession() {
+    const session = polyLassoSessionRef.current;
+    if (!session) return;
+    clearPolyLassoDraft();
+    if (session.points.length < 3) return;
+    setPixelSel((prev) => commitPolyLassoSession(prev, session) ?? prev);
   }
   // pointerdown/pointermove 이벤트(마우스/터치 유니언)에서 뷰포트 기준 client 좌표를 뽑는다.
   // Stage 이벤트는 마우스/터치 둘 다 이 유니언 타입으로 온다.
@@ -11086,14 +11166,43 @@ function StudioCuttoonEditor() {
           setLayerMaskPaintActive(false);
           layerMaskDragRef.current = null;
           clearLayerMaskDragPreview();
+        } else if (polyLassoSessionRef.current) {
+          // 다각형 올가미 초안만 먼저 취소 — 다음 Esc 가 도구/완성 선택을 해제한다.
+          e.preventDefault();
+          clearPolyLassoDraft();
         } else if (pixelTool || pixelSel) {
           // 픽셀 선택 도구/영역을 먼저 해제 — 다음 Esc 가 요소 선택을 해제한다.
           setPixelTool(null);
           setPixelSel(null);
+          clearPolyLassoDraft();
         } else {
           setSelectedId(null);
           setMarqueeIds([]);
         }
+      } else if (
+        !mod &&
+        !e.altKey &&
+        !e.shiftKey &&
+        !e.repeat &&
+        e.key === "Enter" &&
+        polyLassoSessionRef.current &&
+        !(e.target instanceof HTMLElement && e.target.closest("input, textarea, select, [contenteditable=true]"))
+      ) {
+        e.preventDefault();
+        finishPolyLassoSession();
+      } else if (
+        mod &&
+        !e.altKey &&
+        !e.shiftKey &&
+        !e.repeat &&
+        (e.key === "a" || e.key === "A") &&
+        selected?.type === "image" &&
+        (pixelTool || pixelSel)
+      ) {
+        // 픽셀 도구/선택이 살아 있을 때 ⌘A = 이미지 전체 픽셀 선택(요소 전체 선택과 구분).
+        e.preventDefault();
+        setPixelSel((s) => selectAllPixels(s));
+        clearPolyLassoDraft();
       } else if ((selectedId || marqueeIds.length > 0) && e.key.startsWith("Arrow")) {
         // 방향키 미세이동: 1px, Shift 동반 시 10px.
         e.preventDefault();
@@ -13897,6 +14006,28 @@ function StudioCuttoonEditor() {
         void runMagicWandSelect(pos, frame);
         return;
       }
+      // 다각형 올가미 — 클릭마다 꼭짓점. 시작점 근처 재클릭·더블클릭으로 닫기(드래그 세션 아님).
+      if (pixelTool === "poly-lasso") {
+        const p = canvasPointToNormalized(pos.x, pos.y, frame);
+        const existing = polyLassoSessionRef.current;
+        const detail = "detail" in e.evt ? e.evt.detail : 1;
+        if (existing && (detail >= 2 || polyLassoCloseToStart(existing, p))) {
+          finishPolyLassoSession();
+          return;
+        }
+        if (!existing) {
+          const next = beginPolyLassoSession(pixelCombine, p);
+          polyLassoSessionRef.current = next;
+          setPolyLassoSession(next);
+          setPolyLassoHover(null);
+        } else {
+          const next = appendPolyLassoVertex(existing, p);
+          polyLassoSessionRef.current = next;
+          setPolyLassoSession(next);
+          setPolyLassoHover(null);
+        }
+        return;
+      }
       // 브러시는 캔버스 px 반경을 요소 폭 기준 정규화 반경으로 넘긴다(다른 도구는 무시됨).
       const brushRadiusNorm = pixelBrushRadius / Math.max(1, selected.width);
       const drag = beginSelectionDrag(pixelTool, pixelCombine, canvasPointToNormalized(pos.x, pos.y, frame), brushRadiusNorm);
@@ -14220,6 +14351,21 @@ function StudioCuttoonEditor() {
           session.drag = next;
           schedulePixelDragPreview(next);
         }
+      }
+      return;
+    }
+    // 다각형 올가미 초안 중 — 마지막 꼭짓점→커서 고무줄 미리보기.
+    if (polyLassoSessionRef.current && selected?.type === "image" && pixelTool === "poly-lasso") {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      if (pos) {
+        const frame: SelectionFrame = {
+          x: selected.x,
+          y: selected.y,
+          width: selected.width,
+          height: selected.height,
+          rotation: selected.rotation,
+        };
+        setPolyLassoHover(canvasPointToNormalized(pos.x, pos.y, frame));
       }
       return;
     }
@@ -20227,6 +20373,41 @@ function StudioCuttoonEditor() {
               }}
             />
             <StudioRailToolButton
+              icon={Lasso}
+              label={
+                selected?.type !== "image"
+                  ? "이미지를 선택하면 올가미로 픽셀을 고를 수 있어요"
+                  : pixelTool === "lasso"
+                    ? "자유 올가미 끄기"
+                    : pixelTool === "poly-lasso"
+                      ? "다각형 올가미 사용 중 · 다시 누르면 자유 올가미"
+                      : "올가미 선택"
+              }
+              description="이미지 픽셀을 자유 올가미(드래그) 또는 다각형 올가미(클릭)로 선택합니다. 속성 패널에서 도구·합치기/빼기/교집합·페더·확장·축소·부분 조정을 쓸 수 있어요."
+              active={pixelTool === "lasso" || pixelTool === "poly-lasso"}
+              disabled={selected?.type !== "image" || selectedContentMutationLocked}
+              onClick={() => {
+                if (selected?.type !== "image" || selectedContentMutationLocked) return;
+                setTool("select");
+                setMenu(null);
+                if (pixelTool === "lasso") {
+                  // 자유 → 다각형 올가미로 전환(같은 레일 버튼 순환).
+                  clearPolyLassoDraft();
+                  disarmAllPixelTools();
+                  setPixelTool("poly-lasso");
+                  return;
+                }
+                if (pixelTool === "poly-lasso") {
+                  clearPolyLassoDraft();
+                  setPixelTool(null);
+                  return;
+                }
+                clearPolyLassoDraft();
+                disarmAllPixelTools();
+                setPixelTool("lasso");
+              }}
+            />
+            <StudioRailToolButton
               icon={Shapes}
               label="스마트 도형"
               description="낙서를 잠시 멈추면 선·원·사각형 등 깔끔한 도형으로 자동 다듬어요."
@@ -22072,11 +22253,22 @@ function StudioCuttoonEditor() {
               </Layer>
             )}
             {/* 픽셀 선택 마칭앤츠 — 전용 레이어라 RAF 틱마다 이 레이어만 다시 그린다. */}
-            {!isExporting && pixelOverlayFrame && (pixelOverlaySel || pixelDragPreview) && (
+            {!isExporting &&
+              pixelOverlayFrame &&
+              (pixelOverlaySel || pixelDragPreview || polyLassoSession) && (
               <Layer listening={false}>
                 <StudioSelectionAntsOverlay
                   selection={pixelOverlaySel}
                   drag={pixelDragPreview}
+                  polyDraft={
+                    polyLassoSession
+                      ? {
+                          points: polyLassoSession.points,
+                          hover: polyLassoHover,
+                          mode: polyLassoSession.mode,
+                        }
+                      : null
+                  }
                   frame={pixelOverlayFrame}
                   scale={effScale}
                 />
@@ -24964,15 +25156,17 @@ function StudioCuttoonEditor() {
                     }
                     className="space-y-3"
                   >
-                    {/* 픽셀 선택 도구 — 이미지 안쪽 영역을 사각/타원/올가미/브러시로 선택해 부분 조정/삭제. */}
+                    {/* 픽셀 선택 도구 — 사각/타원/자유·다각형 올가미/브러시 + 결합/페더/확장·축소. */}
                     <StudioSelectionToolsPanel
                     selection={pixelSel}
                     activeTool={pixelTool === "wand" ? null : pixelTool}
                     combineMode={pixelCombine}
                     busy={pixelBusy}
                     brushRadius={pixelBrushRadius}
+                    polyLassoPointCount={polyLassoSession?.points.length ?? 0}
                     onBrushRadiusChange={setPixelBrushRadius}
                     onPickTool={(t) => {
+                      clearPolyLassoDraft();
                       if (t) disarmAllPixelTools();
                       setPixelTool(t);
                     }}
@@ -24980,7 +25174,16 @@ function StudioCuttoonEditor() {
                     onFeatherChange={(px) => setPixelSel((s) => (s ? setSelectionFeather(s, px) : s))}
                     onToggleInvert={() => setPixelSel((s) => toggleSelectionInvert(s ?? emptyPixelSelection()))}
                     onUndoSubpath={() => setPixelSel((s) => (s ? removeLastSubpath(s) : s))}
-                    onClearSelection={() => setPixelSel(null)}
+                    onClearSelection={() => {
+                      clearPolyLassoDraft();
+                      setPixelSel(null);
+                    }}
+                    onSelectAll={() => {
+                      clearPolyLassoDraft();
+                      setPixelSel((s) => selectAllPixels(s));
+                    }}
+                    onExpand={(amount) => setPixelSel((s) => expandContractSelection(s, amount))}
+                    onContract={(amount) => setPixelSel((s) => expandContractSelection(s, -amount))}
                     onApplyAdjust={(plan) => void applyPixelSelectionAdjust(plan)}
                     onContentAwareFill={() => void applyContentAwareFill()}
                   />
