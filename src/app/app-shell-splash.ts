@@ -4,6 +4,9 @@
  * 게시용 upload 모드는 기존 사이트 흐름을 유지하므로 query까지 함께 판별한다.
  */
 export function shouldRenderAppSplash(pathname: string, search = ""): boolean {
-  if (pathname !== "/studio" && pathname !== "/studio/") return true;
-  return new URLSearchParams(search).get("mode") === "upload";
+  // 전용 스튜디오 셸(/studio, /studio/tools-companion 등)은 앱 인트로를 생략한다.
+  if (pathname === "/studio" || pathname === "/studio/" || pathname.startsWith("/studio/")) {
+    return new URLSearchParams(search).get("mode") === "upload";
+  }
+  return true;
 }

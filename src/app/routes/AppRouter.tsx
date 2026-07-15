@@ -148,6 +148,13 @@ const CreateChallengesPage = lazyRetry(
   "CreateChallengesPage"
 );
 const StudioPage = lazyRetry(() => import("@/src/domains/creator/StudioPage").then((m) => ({ default: m.StudioPage })), "StudioPage");
+const StudioToolsCompanionPage = lazyRetry(
+  () =>
+    import("@/src/domains/creator/StudioToolsCompanionPage").then((m) => ({
+      default: m.StudioToolsCompanionPage,
+    })),
+  "StudioToolsCompanionPage"
+);
 const AccountPage = lazyRetry(() => import("@/src/domains/account/AccountPage").then((m) => ({ default: m.AccountPage })), "AccountPage");
 const AuthCallbackPage = lazyRetry(
   () => import("@/src/domains/account/AuthCallbackPage").then((m) => ({ default: m.AuthCallbackPage })),
@@ -248,6 +255,7 @@ export function AppRouter() {
           <Route path="/create/series/:id" element={<CreateSeriesPage />} />
           <Route path="/create/:id" element={<CreateWorkPage />} />
           <Route path="/studio" element={<StudioPage />} />
+          <Route path="/studio/tools-companion" element={<StudioToolsCompanionPage />} />
           <Route path="/me" element={<AccountPage />} />
           <Route path="/title/:slug" element={<TitleDetailPage />} />
           <Route path="/author/:name" element={<AuthorPage />} />

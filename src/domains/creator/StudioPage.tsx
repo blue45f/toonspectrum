@@ -923,6 +923,14 @@ import {
 } from "./studio-stroke-stabilizer";
 import { buildTextPathData, normalizeTextPath, isFlatTextPath, type TextPathConfig } from "./studio-text-path";
 import {
+  buildStudioCompanionHello,
+  buildStudioCompanionPrimaryState,
+  createStudioCompanionChannel,
+  openStudioToolsCompanionWindow,
+  parseStudioCompanionMessage,
+  type StudioCompanionToolId,
+} from "./studio-tools-companion";
+import {
   loadStudioUiDensityState,
   saveStudioUiDensityState,
   studioUiDensityAllows,
@@ -8204,6 +8212,171 @@ function StudioCuttoonEditor() {
     };
   }, []);
 
+  // 멀티 디스플레이 도구 컴패니언 — 문서/undo 는 이 탭이 소유, 도구 의도만 BroadcastChannel.
+  const companionChannelRef = useRef<ReturnType<typeof createStudioCompanionChannel>>(null);
+  const companionUiRef = useRef({
+    tool,
+    drawMode,
+    menu,
+    uiDensityMode,
+    canvasOnlyMode,
+    title,
+  });
+
+  useEffect(() => {
+    companionUiRef.current = { tool, drawMode, menu, uiDensityMode, canvasOnlyMode, title };
+  }, [tool, drawMode, menu, uiDensityMode, canvasOnlyMode, title]);
+
+  useEffect(() => {
+    const channel = createStudioCompanionChannel();
+    companionChannelRef.current = channel;
+    if (!channel) return;
+
+    const mapTool = (): StudioCompanionToolId => {
+      const s = companionUiRef.current;
+      if (s.tool === "draw" && s.drawMode === "eraser") return "eraser";
+      if (s.tool === "draw") return "pen";
+      if (s.menu === "bubble") return "bubble";
+      if (s.menu === "template" || s.menu === "asset" || s.menu === "elements") return "template";
+      if (s.menu === "aiAssist") return "ai";
+      return "select";
+    };
+    const publish = () => {
+      const s = companionUiRef.current;
+      try {
+        channel.postMessage(
+          buildStudioCompanionPrimaryState({
+            tool: mapTool(),
+            density: s.uiDensityMode,
+            canvasOnly: s.canvasOnlyMode,
+            title: s.title || "스튜디오",
+          })
+        );
+      } catch {
+        // channel may be closed
+      }
+    };
+
+    channel.onmessage = (ev: MessageEvent) => {
+      const msg = parseStudioCompanionMessage(ev.data);
+      if (!msg) return;
+      if (msg.type === "hello" && msg.role === "companion") {
+        try {
+          channel.postMessage(buildStudioCompanionHello("primary"));
+          publish();
+        } catch {
+          // ignore
+        }
+        return;
+      }
+      if (msg.type === "ping") {
+        try {
+          channel.postMessage({ v: 1, type: "pong", at: Date.now() });
+        } catch {
+          // ignore
+        }
+        return;
+      }
+      if (msg.type !== "companion-command") return;
+      switch (msg.command) {
+        case "select":
+          setTool("select");
+          break;
+        case "pen":
+          setTool("draw");
+          setDrawMode("pen");
+          break;
+        case "eraser":
+          setTool("draw");
+          setDrawMode("eraser");
+          break;
+        case "template":
+          preloadStudioAssetMenuPanel();
+          setMenu("template");
+          break;
+        case "bubble":
+          setMenu("bubble");
+          break;
+        case "text":
+          setMenu(null);
+          setTool("select");
+          // Defer text insert to avoid re-entering React from the channel handler.
+          globalThis.setTimeout(() => {
+            window.dispatchEvent(new CustomEvent("studio-companion-add-text"));
+          }, 0);
+          break;
+        case "layers":
+          setLeftPanelOpen(true);
+          if (companionUiRef.current.uiDensityMode === "focus") setStudioUiDensity("simple");
+          break;
+        case "ai":
+          setMenu("aiAssist");
+          break;
+        case "3d-character":
+          setPoserVrmOpen(true);
+          break;
+        case "3d-bg":
+          setBg3dOpen(true);
+          break;
+        case "focus-primary":
+          try {
+            window.focus();
+          } catch {
+            // ignore
+          }
+          break;
+        case "toggle-canvas-only":
+          if (companionUiRef.current.canvasOnlyMode) setCanvasOnlyMode(false);
+          else setCanvasOnlyMode(true);
+          break;
+        default:
+          break;
+      }
+    };
+
+    try {
+      channel.postMessage(buildStudioCompanionHello("primary"));
+      publish();
+    } catch {
+      // ignore
+    }
+
+    return () => {
+      try {
+        channel.close();
+      } catch {
+        // ignore
+      }
+      companionChannelRef.current = null;
+    };
+  }, []);
+
+  // 컴패니언에 현재 UI 상태 미러 (채널은 위 effect 가 소유).
+  useEffect(() => {
+    const channel = companionChannelRef.current;
+    if (!channel) return;
+    try {
+      const mapTool = (): StudioCompanionToolId => {
+        if (tool === "draw" && drawMode === "eraser") return "eraser";
+        if (tool === "draw") return "pen";
+        if (menu === "bubble") return "bubble";
+        if (menu === "template" || menu === "asset" || menu === "elements") return "template";
+        if (menu === "aiAssist") return "ai";
+        return "select";
+      };
+      channel.postMessage(
+        buildStudioCompanionPrimaryState({
+          tool: mapTool(),
+          density: uiDensityMode,
+          canvasOnly: canvasOnlyMode,
+          title: title || "스튜디오",
+        })
+      );
+    } catch {
+      // ignore
+    }
+  }, [tool, drawMode, menu, uiDensityMode, canvasOnlyMode, title]);
+
   // 툴바 드롭다운 바깥 클릭 시 닫기.
   // 팝오버는 body 포털(data-studio-tool-popover) — 트리거 래퍼(menuRef)와 포털 둘 다 내부로 본다.
   const menuRef = useRef<HTMLDivElement>(null);
@@ -11818,6 +11991,14 @@ function StudioCuttoonEditor() {
       rotation: 0,
     });
   }
+  // 멀티 디스플레이 컴패니언 "텍스트" 명령 — 채널 핸들러와 삽입 로직을 느슨히 결합.
+  useEffect(() => {
+    const onCompanionAddText = () => {
+      addText();
+    };
+    window.addEventListener("studio-companion-add-text", onCompanionAddText);
+    return () => window.removeEventListener("studio-companion-add-text", onCompanionAddText);
+  });
   function addBubble(variant: BubbleVariant) {
     setMenu(null);
     let fill = "#ffffff";
@@ -16899,6 +17080,20 @@ function StudioCuttoonEditor() {
           onSelect: () => {
             setLeftPanelOpen(false);
             setRightPanelOpen(false);
+          },
+        },
+        {
+          id: "tools-companion",
+          label: "도구 창 분리 (멀티 디스플레이)",
+          icon: PictureInPicture2,
+          onSelect: () => {
+            const win = openStudioToolsCompanionWindow();
+            if (!win) {
+              announceDrawingShortcut("팝업이 차단됐습니다. 브라우저에서 팝업을 허용해 주세요.");
+              return;
+            }
+            announceDrawingShortcut("도구 창을 열었습니다 · 다른 모니터로 옮겨 쓰세요");
+            // 연결 핸드셰이크는 companion channel effect 가 처리한다.
           },
         },
         {
