@@ -699,27 +699,44 @@ export function StudioStarterCardArt({
 /** Row of shape kinds shown when smart-shape is armed. */
 export function StudioSmartShapeKindRow({
   className,
+  highlightKind = null,
 }: {
   className?: string;
+  /** Currently recognized kind — Magma/AutoDraw-class match cue. */
+  highlightKind?: StudioShapeKindVisual | null;
 }): ReactElement {
   const kinds: StudioShapeKindVisual[] = ["line", "rect", "circle", "triangle", "poly"];
   return (
     <div
       data-studio-smart-shape-kinds="true"
+      data-studio-smart-shape-match={highlightKind ?? undefined}
+      role="list"
+      aria-label="인식 가능한 도형"
       className={cn(
         "flex items-center gap-1 rounded-lg border border-line/60 bg-canvas/40 px-1.5 py-1",
         className
       )}
-      aria-hidden
     >
-      {kinds.map((kind) => (
-        <span
-          key={kind}
-          className="grid size-7 place-items-center rounded-md bg-card/80 ring-1 ring-line/50"
-        >
-          <StudioShapeKindGlyph kind={kind} />
-        </span>
-      ))}
+      {kinds.map((kind) => {
+        const active = highlightKind === kind;
+        return (
+          <span
+            key={kind}
+            role="listitem"
+            title={kind}
+            data-studio-smart-shape-kind={kind}
+            data-active={active ? "true" : undefined}
+            className={cn(
+              "grid size-7 place-items-center rounded-md ring-1 transition-[background,box-shadow,transform] duration-150",
+              active
+                ? "bg-accent-soft text-accent ring-accent/45 shadow-sm scale-105"
+                : "bg-card/80 ring-line/50 text-fg-2"
+            )}
+          >
+            <StudioShapeKindGlyph kind={kind} active={active} />
+          </span>
+        );
+      })}
     </div>
   );
 }

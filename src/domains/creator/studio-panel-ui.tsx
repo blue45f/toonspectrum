@@ -227,17 +227,20 @@ export function StudioToggleChip({
   title,
   onClick,
   children,
+  "aria-label": ariaLabel,
 }: {
   active: boolean;
   title?: string;
   onClick: () => void;
   children: ReactNode;
+  "aria-label"?: string;
 }): ReactElement {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={active}
+      aria-label={ariaLabel}
       title={title}
       className={cn(PANEL_CHIP_CLASS, active && "border-accent bg-accent-soft/50 text-fg")}
     >

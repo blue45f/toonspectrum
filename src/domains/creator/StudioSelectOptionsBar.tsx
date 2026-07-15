@@ -1,5 +1,6 @@
 /**
  * Select tool options strip — Photoshop / CSP / Magma context actions when elements are selected.
+ * Icon-first commercial chrome; labels live in title/aria.
  */
 import {
   ArrowDownToLine,
@@ -7,10 +8,15 @@ import {
   Copy,
   Lock,
   LockOpen,
+  MousePointer2,
   Trash2,
   type LucideIcon,
 } from "lucide-react";
 
+import {
+  studioSelectionBadgeText,
+  studioSelectionCountChip,
+} from "./studio-commercial-residuals";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 
 import type { ReactElement } from "react";
@@ -44,8 +50,10 @@ function Action({
     <button
       type="button"
       onClick={onClick}
+      title={label}
+      aria-label={label}
       className={cn(
-        "inline-flex h-8 items-center gap-1.5 rounded-xl border px-2.5 text-[0.68rem] font-semibold",
+        "grid size-8 place-items-center rounded-xl border",
         STUDIO_EASE,
         STUDIO_FOCUS_RING,
         danger
@@ -53,15 +61,7 @@ function Action({
           : "border-line/70 bg-card/95 text-fg-2 shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.05)] hover:border-line hover:bg-raised hover:text-fg"
       )}
     >
-      <span
-        className={cn(
-          "grid size-5 place-items-center rounded-md",
-          danger ? "bg-bad/15" : "bg-canvas/60 text-fg-2"
-        )}
-      >
-        <Icon size={13} strokeWidth={1.75} aria-hidden />
-      </span>
-      {label}
+      <Icon size={14} strokeWidth={1.75} aria-hidden />
     </button>
   );
 }
@@ -78,34 +78,44 @@ export function StudioSelectOptionsBar({
   className,
 }: StudioSelectOptionsBarProps): ReactElement | null {
   if (selectionCount <= 0) return null;
+  const badgeText = studioSelectionBadgeText(selectionCount, selectionLabel);
+  const countChip = studioSelectionCountChip(selectionCount);
   return (
     <div
       role="toolbar"
       aria-label="선택 옵션"
       data-studio-select-options="true"
+      data-studio-icon-first="true"
       className={cn(
-        "relative z-[40] flex h-11 min-h-11 shrink-0 flex-nowrap items-center gap-2 overflow-x-auto border-b border-line px-3",
+        "relative z-[40] flex h-11 min-h-11 shrink-0 flex-nowrap items-center gap-1.5 overflow-x-auto border-b border-line px-2.5",
         "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         className
       )}
     >
       <span
         data-studio-selection-badge="true"
+        title={selectionCount > 1 ? `${selectionCount}개 선택` : badgeText}
         className={cn(
-          "mr-0.5 inline-flex max-w-[14rem] items-center gap-2 truncate rounded-xl border border-accent/35",
-          "bg-[linear-gradient(135deg,oklch(0.72_0.185_42/0.16),oklch(0.2_0.01_66/0.55))] px-2.5 py-1.5",
-          "text-[0.7rem] font-bold tracking-tight text-fg shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.08)]"
+          "mr-0.5 inline-flex max-w-[12rem] items-center gap-1.5 truncate rounded-xl border border-accent/35",
+          "bg-[linear-gradient(135deg,oklch(0.72_0.185_42/0.16),oklch(0.2_0.01_66/0.55))] px-2 py-1",
+          "text-[0.68rem] font-bold tracking-tight text-fg shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.08)]"
         )}
       >
         <span
           aria-hidden
-          className="grid size-5 shrink-0 place-items-center rounded-md bg-accent text-[0.6rem] font-black text-on-accent"
+          className="grid size-6 shrink-0 place-items-center rounded-md bg-accent text-on-accent"
         >
-          {selectionCount > 9 ? "9+" : selectionCount}
+          {selectionCount > 1 ? (
+            <span className="text-[0.58rem] font-black tabular-nums">{countChip}</span>
+          ) : (
+            <MousePointer2 size={12} strokeWidth={1.75} />
+          )}
         </span>
-        <span className="min-w-0 truncate">
-          {selectionCount > 1 ? `${selectionCount}개 선택` : selectionLabel ?? "선택됨"}
-        </span>
+        {selectionCount === 1 ? (
+          <span className="min-w-0 truncate">{badgeText}</span>
+        ) : (
+          <span className="sr-only">{selectionCount}개 선택</span>
+        )}
       </span>
       <div className="studio-opt-cluster flex shrink-0 items-center gap-0.5">
         <Action icon={Copy} label="복제" onClick={onDuplicate} />

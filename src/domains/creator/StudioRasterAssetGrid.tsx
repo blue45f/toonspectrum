@@ -72,15 +72,16 @@ export function StudioRasterAssetGrid({
         <button
           type="button"
           aria-pressed={favoriteOnly}
+          aria-label={favoriteOnly ? "전체 소품 보기" : "즐겨찾기만"}
+          title={favoriteOnly ? "전체 소품 보기" : "즐겨찾기만"}
           onClick={() => setFavoriteOnly(!favoriteOnly)}
-          className={`inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full border px-2.5 text-[0.62rem] font-semibold transition-colors ${FOCUS_RING_CLASS} ${
+          className={`grid size-11 min-h-11 min-w-11 shrink-0 place-items-center rounded-xl border transition-colors ${FOCUS_RING_CLASS} ${
             favoriteOnly
               ? "border-accent bg-accent text-on-accent"
               : "border-line bg-card text-fg-2 hover:border-line-strong hover:bg-raised hover:text-fg"
           }`}
         >
-          <Star size={13} fill={favoriteOnly ? "currentColor" : "none"} aria-hidden />
-          즐겨찾기만
+          <Star size={15} fill={favoriteOnly ? "currentColor" : "none"} aria-hidden />
         </button>
       </div>
 

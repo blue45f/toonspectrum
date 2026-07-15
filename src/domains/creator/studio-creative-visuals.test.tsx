@@ -25,7 +25,7 @@ describe("studio creative visuals", () => {
         <StudioShapeKindGlyph kind="triangle" active />
         <StudioShapeKindGlyph kind="star" />
         <StudioShapeKindGlyph kind="arrow" />
-        <StudioSmartShapeKindRow />
+        <StudioSmartShapeKindRow highlightKind="rect" />
       </>
     );
     expect(html).toContain('data-studio-shape-glyph="circle"');
@@ -33,6 +33,9 @@ describe("studio creative visuals", () => {
     expect(html).toContain('data-studio-shape-glyph="star"');
     expect(html).toContain('data-studio-shape-glyph="arrow"');
     expect(html).toContain('data-studio-smart-shape-kinds="true"');
+    expect(html).toContain('data-studio-smart-shape-match="rect"');
+    expect(html).toContain('data-studio-smart-shape-kind="rect"');
+    expect(html).toContain('data-active="true"');
     expect(html).toContain('data-studio-shape-glyph="line"');
     expect(html).toContain('data-studio-shape-glyph="poly"');
   });

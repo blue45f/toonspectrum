@@ -2,6 +2,11 @@ import { Check, MessageCircle, MousePointer2, Radio, UsersRound, X } from "lucid
 import { useEffect, useRef, useState } from "react";
 
 import {
+  studioPresenceConnectionLabel,
+  studioPresenceOverflowLabel,
+  studioPresenceVisiblePeerCount,
+} from "./studio-commercial-residuals";
+import {
   studioLiveParticipantColor,
   type StudioCanvasCommentPin,
 } from "./studio-live-canvas-overlay-model";
@@ -250,90 +255,112 @@ export function StudioLivePresenceDock({
   onToggleFollow,
 }: StudioLivePresenceDockProps) {
   if (!connected && peers.length === 0) return null;
-  const visiblePeers = peers.slice(0, 5);
+  const visibleCount = studioPresenceVisiblePeerCount(peers.length, 5);
+  const visiblePeers = peers.slice(0, visibleCount);
   const mobileHiddenPeerCount = Math.max(0, peers.length - 2);
   const desktopHiddenPeerCount = Math.max(0, peers.length - visiblePeers.length);
+  const mobileOverflow = studioPresenceOverflowLabel(mobileHiddenPeerCount);
+  const desktopOverflow = studioPresenceOverflowLabel(desktopHiddenPeerCount);
+  const connectionLabel = studioPresenceConnectionLabel(connected);
   const followedPeer = peers.find((peer) => peer.sessionId === followingSessionId) ?? null;
 
   return (
-    <div className="pointer-events-auto flex max-w-[calc(100%-1rem)] flex-wrap items-center justify-end gap-1 rounded-xl border border-line bg-panel/95 p-1.5 shadow-xl backdrop-blur-md">
+    <div
+      data-studio-presence-dock="true"
+      className="pointer-events-auto flex max-w-[calc(100%-1rem)] flex-wrap items-center justify-end gap-1 rounded-xl border border-line/80 bg-panel/95 p-1.5 shadow-xl backdrop-blur-md"
+    >
       <button
         type="button"
         aria-label="팀 작업 공간 열기"
-        className="grid size-9 shrink-0 place-items-center rounded-lg text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+        title="팀"
+        className="grid size-9 shrink-0 place-items-center rounded-lg border border-line/60 bg-card/80 text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
         onClick={onOpenTeam}
       >
-        <UsersRound size={16} aria-hidden />
+        <UsersRound size={16} strokeWidth={1.75} aria-hidden />
       </button>
       <span
-        aria-label={connected ? "실시간 공동작업 연결됨" : "실시간 공동작업 다시 연결 중"}
+        aria-label={connectionLabel}
+        title={connectionLabel}
+        data-studio-presence-link={connected ? "ready" : "retry"}
         className={cn(
-          "grid size-5 shrink-0 place-items-center rounded-full",
-          connected ? "text-good" : "animate-pulse text-warn motion-reduce:animate-none"
+          "inline-flex h-7 shrink-0 items-center gap-1 rounded-full border px-1.5",
+          connected
+            ? "border-good/40 bg-good/10 text-good"
+            : "animate-pulse border-warn/40 bg-warn/10 text-warn motion-reduce:animate-none"
         )}
         role="status"
       >
         <Radio size={12} aria-hidden />
+        <span className="sr-only">{connectionLabel}</span>
       </span>
 
-      {visiblePeers.map((peer, index) => {
-        const following = peer.sessionId === followingSessionId;
-        const color = studioLiveParticipantColor(peer.sessionId);
-        return (
-          <button
-            key={peer.sessionId}
-            type="button"
-            aria-label={
-              following
-                ? `${peer.displayName} 따라가기 중지`
-                : `${peer.displayName} 작업 페이지 따라가기`
-            }
-            aria-pressed={following}
-            className={cn(
-              "relative grid size-9 shrink-0 place-items-center rounded-full border-2 text-xs font-black text-white shadow-sm transition-transform hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-              following ? "border-accent ring-2 ring-accent/30" : "border-panel",
-              index >= 2 && "hidden sm:grid"
-            )}
-            style={{ backgroundColor: color }}
-            title={`${peer.displayName} · ${roleLabel(peer.role)}${peer.pageId ? " · 클릭해 따라가기" : ""}`}
-            onClick={() => onToggleFollow(peer.sessionId)}
-          >
-            {initial(peer.displayName)}
-            <span
-              aria-label={peer.visibility === "active" ? "활성" : "자리 비움"}
+      <div
+        className="flex items-center -space-x-1.5 pl-0.5"
+        role="group"
+        aria-label="참여자"
+        data-studio-presence-stack="true"
+      >
+        {visiblePeers.map((peer, index) => {
+          const following = peer.sessionId === followingSessionId;
+          const color = studioLiveParticipantColor(peer.sessionId);
+          return (
+            <button
+              key={peer.sessionId}
+              type="button"
+              aria-label={
+                following
+                  ? `${peer.displayName} 따라가기 중지`
+                  : `${peer.displayName} 작업 페이지 따라가기`
+              }
+              aria-pressed={following}
               className={cn(
-                "absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-panel",
-                peer.visibility === "active" ? "bg-good" : "bg-fg-3"
+                "relative grid size-9 shrink-0 place-items-center rounded-full border-2 text-xs font-black shadow-sm transition-transform hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+                // Peer hue is data color; cream ink for contrast (DESIGN: no raw white on accent surfaces).
+                "text-[oklch(0.96_0.01_85)]",
+                following ? "z-10 border-accent ring-2 ring-accent/30" : "border-panel",
+                index >= 2 && "hidden sm:grid"
               )}
-            />
-            {following ? (
-              <span className="absolute -right-1.5 -top-1.5 grid size-4 place-items-center rounded-full bg-accent text-on-accent">
-                <Check size={10} aria-hidden />
-              </span>
-            ) : null}
-          </button>
-        );
-      })}
+              style={{ backgroundColor: color, zIndex: following ? 20 : 10 - index }}
+              title={`${peer.displayName} · ${roleLabel(peer.role)}${peer.pageId ? " · 클릭해 따라가기" : ""}`}
+              onClick={() => onToggleFollow(peer.sessionId)}
+            >
+              {initial(peer.displayName)}
+              <span
+                aria-label={peer.visibility === "active" ? "활성" : "자리 비움"}
+                className={cn(
+                  "absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-panel",
+                  peer.visibility === "active" ? "bg-good" : "bg-fg-3"
+                )}
+              />
+              {following ? (
+                <span className="absolute -right-1.5 -top-1.5 grid size-4 place-items-center rounded-full bg-accent text-on-accent">
+                  <Check size={10} aria-hidden />
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
 
-      {mobileHiddenPeerCount > 0 ? (
+      {mobileOverflow ? (
         <button
           type="button"
           aria-label={`추가 팀원 ${mobileHiddenPeerCount}명, 팀 작업 공간 열기`}
           className="grid size-9 shrink-0 place-items-center rounded-full border border-line bg-raised text-[0.65rem] font-bold text-fg-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent sm:hidden"
           onClick={onOpenTeam}
         >
-          +{mobileHiddenPeerCount}
+          {mobileOverflow}
         </button>
       ) : null}
 
-      {desktopHiddenPeerCount > 0 ? (
+      {desktopOverflow ? (
         <button
           type="button"
           aria-label={`추가 팀원 ${desktopHiddenPeerCount}명, 팀 작업 공간 열기`}
           className="hidden size-9 shrink-0 place-items-center rounded-full border border-line bg-raised text-[0.65rem] font-bold text-fg-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent sm:grid"
           onClick={onOpenTeam}
         >
-          +{desktopHiddenPeerCount}
+          {desktopOverflow}
         </button>
       ) : null}
 

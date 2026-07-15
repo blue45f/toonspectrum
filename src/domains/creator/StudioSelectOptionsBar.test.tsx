@@ -17,15 +17,17 @@ describe("StudioSelectOptionsBar", () => {
       />
     );
     expect(html).toContain('data-studio-select-options="true"');
+    expect(html).toContain('data-studio-icon-first="true"');
     expect(html).toContain('data-studio-selection-badge="true"');
     expect(html).toContain("레이어 1");
-    expect(html).toContain("복제");
-    expect(html).toContain("맨 앞");
-    expect(html).toContain("삭제");
+    // Icon-first actions — names live in aria-label
+    expect(html).toContain('aria-label="복제"');
+    expect(html).toContain('aria-label="맨 앞"');
+    expect(html).toContain('aria-label="삭제"');
     expect(html).toContain("studio-opt-cluster");
   });
 
-  it("shows multi-select count badge", () => {
+  it("shows multi-select count badge without long Korean label chrome", () => {
     const html = renderToStaticMarkup(
       <StudioSelectOptionsBar
         selectionLabel={null}
@@ -36,6 +38,7 @@ describe("StudioSelectOptionsBar", () => {
         onSendBack={vi.fn()}
       />
     );
-    expect(html).toContain("3개 선택");
+    expect(html).toContain("3개 선택"); // sr-only
+    expect(html).toContain(">3<");
   });
 });

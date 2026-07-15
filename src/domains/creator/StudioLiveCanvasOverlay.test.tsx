@@ -175,6 +175,9 @@ describe("StudioLiveCanvasOverlay", () => {
     );
 
     expect(html).toContain("실시간 공동작업 연결됨");
+    expect(html).toContain('data-studio-presence-dock="true"');
+    expect(html).toContain('data-studio-presence-stack="true"');
+    expect(html).toContain('data-studio-presence-link="ready"');
     expect(html).toContain("민호 · 이 탭 따라가기 중지");
     expect(html).toContain('aria-pressed="true"');
     expect(html).toContain("민호 · 이 탭 따라가기");
