@@ -30,6 +30,7 @@ import {
   type StudioBrushTrayItem,
 } from "./studio-creative-ux";
 import { STUDIO_FOCUS_RING, STUDIO_EASE } from "./studio-panel-ui";
+import { StudioBrushPresetIcon } from "./StudioBrushPresetIcon";
 
 import type { LucideIcon } from "lucide-react";
 
@@ -248,8 +249,8 @@ export function StudioBrushTray({
               data-studio-brush-chip={item.id}
               data-studio-brush-media={item.mediaGroup}
               className={cn(
-                // Icon/image-first tile: stroke preview only (Ibis/Picsart/CSP)
-                "grid h-11 w-11 shrink-0 place-items-center rounded-xl border",
+                // Icon + stroke preview tile (Ibis/Picsart/CSP)
+                "relative grid h-11 w-11 shrink-0 place-items-center rounded-xl border",
                 STUDIO_EASE,
                 STUDIO_FOCUS_RING,
                 active
@@ -264,6 +265,15 @@ export function StudioBrushTray({
                     }
               }
             >
+              <span
+                className={cn(
+                  "absolute left-0.5 top-0.5 grid size-4 place-items-center rounded-md",
+                  active ? "bg-on-accent/15 text-on-accent" : "bg-canvas/55 text-fg-2"
+                )}
+                data-studio-brush-chip-icon={item.id}
+              >
+                <StudioBrushPresetIcon brushId={item.id} size={10} strokeWidth={2} />
+              </span>
               <BrushPreviewGlyph item={item} active={active} />
             </button>
           );

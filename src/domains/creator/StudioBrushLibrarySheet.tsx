@@ -16,6 +16,7 @@ import {
   STUDIO_BRUSH_LIBRARY_TABS,
 } from "./studio-draw-ux";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
+import { StudioBrushPresetIcon } from "./StudioBrushPresetIcon";
 
 import type { StudioBrushTrayItem } from "./studio-creative-ux";
 
@@ -234,7 +235,15 @@ export function StudioBrushLibrarySheet({
                     className={cn("flex flex-col items-stretch gap-1 text-left", STUDIO_FOCUS_RING, "rounded-lg")}
                   >
                     <LargeBrushPreview item={item} active={active} />
-                    <span className="truncate text-[0.68rem] font-bold leading-tight">{item.name}</span>
+                    <span className="flex min-w-0 items-center gap-1 pr-5">
+                      <StudioBrushPresetIcon
+                        brushId={item.id}
+                        size={12}
+                        strokeWidth={2}
+                        className={active ? "text-on-accent" : "text-fg-2"}
+                      />
+                      <span className="truncate text-[0.68rem] font-bold leading-tight">{item.name}</span>
+                    </span>
                     <span
                       className={cn(
                         "truncate text-[0.55rem] leading-tight",

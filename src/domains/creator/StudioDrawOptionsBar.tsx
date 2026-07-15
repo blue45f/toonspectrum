@@ -52,6 +52,7 @@ import {
 } from "./studio-draw-ux";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { StudioBrushLibrarySheet } from "./StudioBrushLibrarySheet";
+import { StudioBrushPresetIcon } from "./StudioBrushPresetIcon";
 import { StudioBrushTray } from "./StudioBrushTray";
 
 import type { StudioBrushSlot } from "./studio-brush-slots";
@@ -327,8 +328,17 @@ export function StudioDrawOptionsBar({
               )}
             >
               <span
+                className={cn(
+                  "grid size-6 shrink-0 place-items-center rounded-md",
+                  libraryOpen ? "bg-on-accent/15" : "bg-canvas/70"
+                )}
                 aria-hidden
-                className="size-2.5 shrink-0 rounded-full ring-1 ring-black/20"
+              >
+                <StudioBrushPresetIcon brushId={brushId} size={13} strokeWidth={2} />
+              </span>
+              <span
+                aria-hidden
+                className="size-2 shrink-0 rounded-full ring-1 ring-black/15"
                 style={{ background: tipColor, opacity: brushOpacity }}
               />
               <span className="min-w-0 truncate text-[0.7rem] font-bold leading-none">
@@ -388,7 +398,7 @@ export function StudioDrawOptionsBar({
                   aria-pressed={active}
                   onClick={() => selectBrushById(preset.id)}
                   className={cn(
-                    "grid size-7 place-items-center rounded-lg border text-[0.55rem] font-bold",
+                    "grid size-7 place-items-center rounded-lg border",
                     STUDIO_EASE,
                     STUDIO_FOCUS_RING,
                     active
@@ -396,7 +406,7 @@ export function StudioDrawOptionsBar({
                       : "border-line/70 bg-card text-fg-3 hover:bg-raised hover:text-fg"
                   )}
                 >
-                  <Star size={10} fill={active ? "currentColor" : "none"} aria-hidden />
+                  <StudioBrushPresetIcon brushId={preset.id} size={12} strokeWidth={2} />
                 </button>
               );
             })}
