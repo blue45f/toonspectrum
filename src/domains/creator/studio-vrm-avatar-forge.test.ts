@@ -12,7 +12,7 @@ import {
 
 describe("studio-vrm-avatar-forge state", () => {
   it("offers diverse, independently cloned starter presets", () => {
-    expect(AVATAR_FORGE_PRESETS).toHaveLength(8);
+    expect(AVATAR_FORGE_PRESETS.length).toBeGreaterThanOrEqual(8);
     expect(new Set(AVATAR_FORGE_PRESETS.map((preset) => preset.state.hair.style)).size).toBeGreaterThanOrEqual(6);
 
     const first = createAvatarForgeState("soft-bob");

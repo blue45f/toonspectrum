@@ -325,6 +325,16 @@ export const WARDROBE_SETS: readonly WardrobeSet[] = [
   { id: "surgeon", label: "외과 수술복 세트", emoji: "🩺", equips: { top: { itemId: "scrubs", color: "#0f766e" }, bottom: { itemId: "scrubpants", color: "#115e59" }, shoes: { itemId: "clogs", color: "#dbeafe" } } },
   { id: "nurse", label: "간호 스크럽 세트", emoji: "🏥", equips: { top: { itemId: "scrubs", color: "#60a5fa" }, bottom: { itemId: "scrubpants", color: "#2563eb" }, shoes: { itemId: "clogs", color: "#f8fafc" } } },
   { id: "paramedic", label: "응급구조사 세트", emoji: "🚑", equips: { outer: { itemId: "hoodie", color: "#f97316" }, top: { itemId: "tshirt", color: "#f8fafc" }, bottom: { itemId: "pants", color: "#1e293b" }, shoes: { itemId: "sneakers", color: "#111827" } } },
+  { id: "idol", label: "아이돌 무대 세트", emoji: "🎤", equips: { top: { itemId: "dress", color: "#f9a8d4" }, shoes: { itemId: "heels", color: "#fde68a" } } },
+  { id: "street", label: "스트릿 후디 세트", emoji: "🏙️", equips: { outer: { itemId: "hoodie", color: "#7c3aed" }, bottom: { itemId: "wide", color: "#1e293b" }, shoes: { itemId: "sneakers", color: "#22d3ee" } } },
+  { id: "detective", label: "탐정 코트 세트", emoji: "🔎", equips: { outer: { itemId: "coat", color: "#3f2d20" }, top: { itemId: "shirt", color: "#f8fafc" }, bottom: { itemId: "pants", color: "#1c1917" }, shoes: { itemId: "loafers", color: "#292524" } } },
+  { id: "athlete", label: "트레이닝 세트", emoji: "🏃", equips: { top: { itemId: "tank", color: "#0ea5e9" }, bottom: { itemId: "shorts", color: "#0f172a" }, shoes: { itemId: "sneakers", color: "#f8fafc" } } },
+  { id: "mage", label: "마법사 세트", emoji: "🔮", equips: { outer: { itemId: "robe", color: "#4c1d95" }, bottom: { itemId: "pants", color: "#1e1b4b" }, shoes: { itemId: "longboots", color: "#312e81" } } },
+  { id: "summer", label: "여름 원피스 세트", emoji: "☀️", equips: { top: { itemId: "dress", color: "#7dd3fc" }, shoes: { itemId: "sandals", color: "#fef3c7" } } },
+  { id: "barista", label: "바리스타 세트", emoji: "☕", equips: { outer: { itemId: "cardigan", color: "#a16207" }, top: { itemId: "shirt", color: "#f8fafc" }, bottom: { itemId: "pants", color: "#292524" }, shoes: { itemId: "sneakers", color: "#e7e5e4" } } },
+  { id: "formal_evening", label: "이브닝 드레스 세트", emoji: "🌙", equips: { top: { itemId: "dress", color: "#1e1b4b" }, shoes: { itemId: "heels", color: "#111827" } } },
+  { id: "denim", label: "데님 캐주얼 세트", emoji: "👖", equips: { top: { itemId: "tshirt", color: "#fef2f2" }, bottom: { itemId: "jeans", color: "#1e3a5f" }, shoes: { itemId: "boots", color: "#451a03" } } },
+  { id: "lab_researcher", label: "연구원 세트", emoji: "🔬", equips: { outer: { itemId: "labcoat", color: "#f8fafc" }, top: { itemId: "sweater", color: "#64748b" }, bottom: { itemId: "pants", color: "#334155" }, shoes: { itemId: "clogs", color: "#e2e8f0" } } },
 ] as const;
 
 export function wardrobeSetById(id: string): WardrobeSet | undefined {

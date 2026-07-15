@@ -158,6 +158,32 @@ const VRM_PROP_BASES = [
   { id: "backwing", label: "작은 날개", category: "body", defaultBone: "chest", defaultPosition: [0, 0.05, -0.12], defaultRotationDeg: [10, 0, 0], defaultScale: 0.8, defaultColor: "#a5b4fc", hint: "요정·소악마." },
   { id: "gloves", label: "장갑", category: "body", defaultBone: "leftHand", defaultPosition: [0.01, -0.02, 0.01], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#1e293b", hint: "액션·정장." },
   { id: "choker", label: "초커", category: "head", defaultBone: "neck", defaultPosition: [0, -0.02, 0.06], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#111827", hint: "패션 장식." },
+  // 추가 손 소품
+  { id: "pencil", label: "연필", category: "hand", defaultBone: "rightHand", defaultPosition: [0.02, 0.01, 0.02], defaultRotationDeg: [0, 0, -70], defaultScale: 0.95, defaultColor: "#fbbf24", hint: "필기·학원 컷." },
+  { id: "camera", label: "카메라", category: "hand", defaultBone: "rightHand", defaultPosition: [0.02, 0.01, 0.03], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#1c1c22", hint: "취재·여행 컷." },
+  { id: "bottle", label: "물병", category: "hand", defaultBone: "rightHand", defaultPosition: [0.02, 0.02, 0.02], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#38bdf8", hint: "스포츠·일상." },
+  { id: "coffee", label: "테이크아웃 커피", category: "hand", defaultBone: "rightHand", defaultPosition: [0.02, 0.02, 0.02], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#f5f0e8", hint: "카페·오피스 컷." },
+  { id: "laptop", label: "노트북", category: "hand", defaultBone: "leftHand", defaultPosition: [0.02, 0.02, 0.04], defaultRotationDeg: [55, 0, 0], defaultScale: 1, defaultColor: "#94a3b8", hint: "업무·카페 컷." },
+  { id: "shield", label: "방패", category: "hand", defaultBone: "leftHand", defaultPosition: [0.03, 0.02, 0.02], defaultRotationDeg: [0, 0, 15], defaultScale: 1, defaultColor: "#9aa3b2", hint: "판타지·전투 컷." },
+  { id: "torch", label: "횃불", category: "hand", defaultBone: "rightHand", defaultPosition: [0.02, 0.02, 0.01], defaultRotationDeg: [0, 0, -20], defaultScale: 1, defaultColor: "#8a5a2b", hint: "던전·야간 컷." },
+  { id: "lollipop", label: "막대사탕", category: "hand", defaultBone: "rightHand", defaultPosition: [0.02, 0.02, 0.02], defaultRotationDeg: [0, 0, -40], defaultScale: 0.9, defaultColor: "#f472b6", hint: "귀여운 일상 컷." },
+  { id: "plate", label: "접시", category: "hand", defaultBone: "leftHand", defaultPosition: [0.02, 0.02, 0.03], defaultRotationDeg: [70, 0, 0], defaultScale: 1, defaultColor: "#f8fafc", hint: "요리·카페 컷." },
+  { id: "gun", label: "권총", category: "hand", defaultBone: "rightHand", defaultPosition: [0.02, 0.01, 0.02], defaultRotationDeg: [0, 0, -90], defaultScale: 0.95, defaultColor: "#374151", hint: "액션·스릴러 컷." },
+  // 추가 머리 소품
+  { id: "catEars", label: "고양이 귀", category: "head", defaultBone: "head", defaultPosition: [0, 0.1, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#f5c6a0", hint: "코스프레·귀여운 컷." },
+  { id: "horns", label: "뿔", category: "head", defaultBone: "head", defaultPosition: [0, 0.1, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#2b2b2b", hint: "악마·판타지." },
+  { id: "halo", label: "후광", category: "head", defaultBone: "head", defaultPosition: [0, 0.16, 0], defaultRotationDeg: [90, 0, 0], defaultScale: 1, defaultColor: "#fde68a", hint: "천사·성스러운 컷." },
+  { id: "eyepatch", label: "안대", category: "head", defaultBone: "head", defaultPosition: [0.03, 0.02, 0.07], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#111827", hint: "해적·다크 히어로." },
+  { id: "beanie", label: "비니", category: "head", defaultBone: "head", defaultPosition: [0, 0.09, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#334155", hint: "겨울·캐주얼." },
+  { id: "earmuffs", label: "귀마개", category: "head", defaultBone: "head", defaultPosition: [0, 0.05, 0], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#e11d48", hint: "겨울 컷." },
+  { id: "hairpin", label: "머리핀", category: "head", defaultBone: "head", defaultPosition: [0.06, 0.08, 0.02], defaultRotationDeg: [0, 20, 15], defaultScale: 1, defaultColor: "#fbbf24", hint: "포인트 장식." },
+  { id: "goggles", label: "고글", category: "head", defaultBone: "head", defaultPosition: [0, 0.06, 0.06], defaultRotationDeg: [-15, 0, 0], defaultScale: 1, defaultColor: "#1e293b", hint: "이마에 올린 고글." },
+  // 추가 몸 소품
+  { id: "guitar", label: "기타", category: "body", defaultBone: "chest", defaultPosition: [0.05, -0.1, 0.08], defaultRotationDeg: [10, 0, -25], defaultScale: 1, defaultColor: "#a67c4a", hint: "밴드·거리 연주." },
+  { id: "quiver", label: "화살통", category: "body", defaultBone: "chest", defaultPosition: [-0.1, -0.05, -0.08], defaultRotationDeg: [0, 0, 15], defaultScale: 1, defaultColor: "#5a4632", hint: "궁수·판타지." },
+  { id: "nameTag", label: "명찰", category: "body", defaultBone: "chest", defaultPosition: [0.09, 0.05, 0.09], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#f8fafc", hint: "학교·회사 컷." },
+  { id: "apron", label: "앞치마", category: "body", defaultBone: "chest", defaultPosition: [0, -0.08, 0.08], defaultRotationDeg: [0, 0, 0], defaultScale: 1, defaultColor: "#f8fafc", hint: "요리·카페 컷." },
+  { id: "tail", label: "꼬리", category: "body", defaultBone: "hips", defaultPosition: [0, 0, -0.08], defaultRotationDeg: [20, 0, 0], defaultScale: 1, defaultColor: "#f5c6a0", hint: "동물귀 코스튬." },
 ] as const satisfies readonly LegacyPropDef[];
 
 export type VrmPropId = (typeof VRM_PROP_BASES)[number]["id"];
@@ -318,6 +344,69 @@ const PROP_PROFILES: Record<VrmPropId, PropProfile> = {
   backwing: { anchors: [anchor("surface", "surface", [0, 0, 0], [0, 0, -1])], fit: fit("shoulder", 0.32, 0.68, 1.6) },
   gloves: { anchors: [anchor("surface", "surface", [0, 0, 0])], fit: fit("hand", 0.075, 0.72, 1.4) },
   choker: { anchors: [anchor("surface", "surface", [0, 0, -0.065])], fit: fit("none", 1, 0.72, 1.45) },
+  pencil: {
+    anchors: [handAnchor("primary", "primary", [0, -0.06, 0], 0.005)],
+    grip: grip("pinch", 0.005, 28, 40),
+    fit: fit("hand", 0.075, 0.72, 1.35),
+  },
+  camera: {
+    anchors: [handAnchor("primary", "primary", [0, -0.02, -0.02], 0.012)],
+    grip: grip("flat", 0.012, 36, 32),
+    fit: fit("hand", 0.075, 0.72, 1.4),
+  },
+  bottle: {
+    anchors: [handAnchor("primary", "primary", [0, -0.04, 0], 0.018)],
+    grip: grip("cylinder", 0.018, 42, 30),
+    fit: fit("hand", 0.075, 0.72, 1.4),
+  },
+  coffee: {
+    anchors: [handAnchor("primary", "primary", [0, -0.03, 0], 0.02)],
+    grip: grip("cylinder", 0.02, 40, 28),
+    fit: fit("hand", 0.075, 0.72, 1.4),
+  },
+  laptop: {
+    anchors: [handAnchor("primary", "primary", [0, 0, 0], 0.02)],
+    grip: grip("flat", 0.01, 22, 20),
+    fit: fit("hand", 0.075, 0.7, 1.45),
+  },
+  shield: {
+    anchors: [handAnchor("primary", "primary", [0, 0, 0.01], 0.02)],
+    grip: grip("handle", 0.015, 35, 25),
+    fit: fit("hand", 0.075, 0.7, 1.5),
+  },
+  torch: {
+    anchors: [handAnchor("primary", "primary", [0, -0.08, 0], 0.014)],
+    grip: grip("cylinder", 0.014, 40, 28),
+    fit: fit("hand", 0.075, 0.72, 1.4),
+  },
+  lollipop: {
+    anchors: [handAnchor("primary", "primary", [0, -0.05, 0], 0.004)],
+    grip: grip("pinch", 0.004, 24, 38),
+    fit: fit("hand", 0.075, 0.72, 1.3),
+  },
+  plate: {
+    anchors: [handAnchor("primary", "primary", [0, 0, 0], 0.02)],
+    grip: grip("flat", 0.01, 18, 22),
+    fit: fit("hand", 0.075, 0.72, 1.4),
+  },
+  gun: {
+    anchors: [handAnchor("primary", "primary", [0, -0.02, 0], 0.012)],
+    grip: grip("handle", 0.012, 45, 35),
+    fit: fit("hand", 0.075, 0.72, 1.35),
+  },
+  catEars: { anchors: [anchor("surface", "surface", [0, -0.02, 0])], fit: fit("head", 0.18, 0.72, 1.45) },
+  horns: { anchors: [anchor("surface", "surface", [0, -0.02, 0])], fit: fit("head", 0.18, 0.72, 1.5) },
+  halo: { anchors: [anchor("surface", "surface", [0, 0, 0])], fit: fit("head", 0.18, 0.72, 1.45) },
+  eyepatch: { anchors: [anchor("surface", "surface", [0, 0, 0])], fit: fit("eyeDistance", 0.064, 0.72, 1.4) },
+  beanie: { anchors: [anchor("surface", "surface", [0, 0, 0])], fit: fit("head", 0.18, 0.72, 1.45) },
+  earmuffs: { anchors: [anchor("surface", "surface", [0, 0, 0])], fit: fit("head", 0.18, 0.72, 1.45) },
+  hairpin: { anchors: [anchor("surface", "surface", [0, 0, 0])], fit: fit("head", 0.18, 0.7, 1.4) },
+  goggles: { anchors: [anchor("surface", "surface", [0, 0, 0])], fit: fit("eyeDistance", 0.064, 0.72, 1.45) },
+  guitar: { anchors: [anchor("surface", "surface", [0, 0.08, 0])], fit: fit("shoulder", 0.32, 0.68, 1.55) },
+  quiver: { anchors: [anchor("surface", "surface", [0, 0.05, 0], [0, 0, -1])], fit: fit("shoulder", 0.32, 0.7, 1.5) },
+  nameTag: { anchors: [anchor("surface", "surface", [0, 0, -0.004])], fit: fit("shoulder", 0.32, 0.72, 1.4) },
+  apron: { anchors: [anchor("surface", "surface", [0, 0.05, 0])], fit: fit("shoulder", 0.32, 0.7, 1.5) },
+  tail: { anchors: [anchor("surface", "surface", [0, 0, 0.02], [0, 0, -1])], fit: fit("hip", 0.18, 0.7, 1.5) },
 };
 
 export const VRM_PROPS: readonly PropDef[] = VRM_PROP_BASES.map((def) => ({
@@ -988,6 +1077,225 @@ export function buildPropObject(three: ThreeLike, def: PropDef, color: string | 
       const pendant = mesh(new three.SphereGeometry(0.009, 8, 8), mat(0.1, 0.9, hex));
       pendant.position.set(0, 0, 0.065);
       group.add(pendant);
+      break;
+    }
+    case "pencil": {
+      group.add(mesh(new three.CylinderGeometry(0.006, 0.006, 0.14, 10), mat(0.55, 0.05)));
+      const tip = mesh(new three.ConeGeometry(0.006, 0.025, 10), mat(0.45, 0.05, "#f5e6c8"));
+      tip.position.set(0, 0.08, 0);
+      group.add(tip);
+      const lead = mesh(new three.ConeGeometry(0.0025, 0.012, 8), mat(0.4, 0.1, "#1c1c1c"));
+      lead.position.set(0, 0.095, 0);
+      group.add(lead);
+      break;
+    }
+    case "camera": {
+      group.add(mesh(new three.BoxGeometry(0.1, 0.065, 0.045), mat(0.55, 0.15)));
+      const lens = mesh(new three.CylinderGeometry(0.022, 0.022, 0.035, 16), mat(0.2, 0.6, "#111827"));
+      lens.position.set(0, 0, 0.035);
+      lens.rotation.set(Math.PI / 2, 0, 0);
+      group.add(lens);
+      const flash = mesh(new three.BoxGeometry(0.03, 0.015, 0.02), mat(0.3, 0.2, "#e2e8f0"));
+      flash.position.set(0.03, 0.04, 0);
+      group.add(flash);
+      break;
+    }
+    case "bottle": {
+      group.add(mesh(new three.CylinderGeometry(0.028, 0.03, 0.12, 16), mat(0.25, 0.15)));
+      const neck = mesh(new three.CylinderGeometry(0.012, 0.016, 0.04, 12), mat(0.25, 0.15));
+      neck.position.set(0, 0.075, 0);
+      group.add(neck);
+      const cap = mesh(new three.CylinderGeometry(0.014, 0.014, 0.015, 12), mat(0.5, 0.1, "#1e293b"));
+      cap.position.set(0, 0.1, 0);
+      group.add(cap);
+      break;
+    }
+    case "coffee": {
+      group.add(mesh(new three.CylinderGeometry(0.035, 0.03, 0.1, 16), mat(0.75, 0.02)));
+      const lid = mesh(new three.CylinderGeometry(0.036, 0.036, 0.012, 16), mat(0.55, 0.05, "#1c1c1c"));
+      lid.position.set(0, 0.055, 0);
+      group.add(lid);
+      const sleeve = mesh(new three.CylinderGeometry(0.037, 0.037, 0.035, 16), mat(0.85, 0, "#d6b98c"));
+      sleeve.position.set(0, 0, 0);
+      group.add(sleeve);
+      break;
+    }
+    case "laptop": {
+      const base = mesh(new three.BoxGeometry(0.22, 0.01, 0.15), mat(0.4, 0.35));
+      group.add(base);
+      const screen = mesh(new three.BoxGeometry(0.22, 0.14, 0.008), mat(0.35, 0.4));
+      screen.position.set(0, 0.07, -0.07);
+      screen.rotation.set(-0.35, 0, 0);
+      group.add(screen);
+      const display = mesh(new three.BoxGeometry(0.19, 0.11, 0.002), mat(0.2, 0.2, "#0ea5e9"));
+      display.position.set(0, 0.075, -0.065);
+      display.rotation.set(-0.35, 0, 0);
+      group.add(display);
+      break;
+    }
+    case "shield": {
+      group.add(mesh(new three.BoxGeometry(0.22, 0.28, 0.03), mat(0.35, 0.55)));
+      const boss = mesh(new three.SphereGeometry(0.035, 12, 12), mat(0.25, 0.8, "#cbd5e1"));
+      boss.position.set(0, 0, 0.02);
+      group.add(boss);
+      const rim = mesh(new three.TorusGeometry(0.11, 0.012, 8, 24), mat(0.3, 0.7, "#94a3b8"));
+      rim.position.set(0, 0, 0.01);
+      group.add(rim);
+      break;
+    }
+    case "torch": {
+      group.add(mesh(new three.CylinderGeometry(0.014, 0.018, 0.22, 10), mat(0.75, 0.08)));
+      const flame = mesh(new three.ConeGeometry(0.03, 0.08, 10), mat(0.3, 0.1, "#f97316"));
+      flame.position.set(0, 0.14, 0);
+      group.add(flame);
+      const core = mesh(new three.SphereGeometry(0.02, 10, 10), mat(0.2, 0.1, "#fde68a"));
+      core.position.set(0, 0.12, 0);
+      group.add(core);
+      break;
+    }
+    case "lollipop": {
+      const stick = mesh(new three.CylinderGeometry(0.004, 0.004, 0.1, 8), mat(0.5, 0.05, "#f8fafc"));
+      stick.position.set(0, -0.05, 0);
+      group.add(stick);
+      group.add(mesh(new three.SphereGeometry(0.028, 14, 14), mat(0.35, 0.05)));
+      break;
+    }
+    case "plate": {
+      group.add(mesh(new three.CylinderGeometry(0.09, 0.08, 0.012, 24), mat(0.35, 0.05)));
+      const rim = mesh(new three.TorusGeometry(0.085, 0.008, 8, 24), mat(0.4, 0.05, "#e2e8f0"));
+      group.add(rim);
+      break;
+    }
+    case "gun": {
+      group.add(mesh(new three.BoxGeometry(0.04, 0.05, 0.14), mat(0.4, 0.35)));
+      const grip = mesh(new three.BoxGeometry(0.03, 0.08, 0.04), mat(0.55, 0.15, "#1c1c1c"));
+      grip.position.set(0, -0.05, -0.03);
+      group.add(grip);
+      const barrel = mesh(new three.CylinderGeometry(0.01, 0.01, 0.08, 10), mat(0.3, 0.5, "#374151"));
+      barrel.position.set(0, 0.01, 0.1);
+      barrel.rotation.set(Math.PI / 2, 0, 0);
+      group.add(barrel);
+      break;
+    }
+    case "catEars": {
+      for (const side of [-1, 1] as const) {
+        const ear = mesh(new three.ConeGeometry(0.035, 0.07, 8), mat(0.55, 0.05));
+        ear.position.set(side * 0.055, 0.04, 0);
+        ear.rotation.set(0, 0, side * 0.25);
+        group.add(ear);
+        const inner = mesh(new three.ConeGeometry(0.018, 0.04, 8), mat(0.6, 0.05, "#f9a8d4"));
+        inner.position.set(side * 0.055, 0.035, 0.01);
+        inner.rotation.set(0, 0, side * 0.25);
+        group.add(inner);
+      }
+      break;
+    }
+    case "horns": {
+      for (const side of [-1, 1] as const) {
+        const horn = mesh(new three.ConeGeometry(0.02, 0.08, 10), mat(0.45, 0.15));
+        horn.position.set(side * 0.05, 0.05, -0.01);
+        horn.rotation.set(-0.4, 0, side * 0.35);
+        group.add(horn);
+      }
+      break;
+    }
+    case "halo": {
+      const ring = mesh(new three.TorusGeometry(0.08, 0.008, 8, 28), mat(0.2, 0.85));
+      ring.rotation.set(Math.PI / 2, 0, 0);
+      group.add(ring);
+      break;
+    }
+    case "eyepatch": {
+      group.add(mesh(new three.BoxGeometry(0.055, 0.04, 0.01), mat(0.7, 0.05)));
+      const strap = mesh(new three.BoxGeometry(0.14, 0.01, 0.006), mat(0.65, 0.05, "#1c1c1c"));
+      strap.position.set(-0.02, 0.01, -0.01);
+      group.add(strap);
+      break;
+    }
+    case "beanie": {
+      group.add(mesh(new three.SphereGeometry(0.1, 18, 12, 0, Math.PI * 2, 0, Math.PI / 1.6), mat(0.75, 0.05)));
+      const pom = mesh(new three.SphereGeometry(0.025, 10, 10), mat(0.55, 0.05, "#f8fafc"));
+      pom.position.set(0, 0.1, 0);
+      group.add(pom);
+      break;
+    }
+    case "earmuffs": {
+      const band = mesh(new three.TorusGeometry(0.1, 0.008, 8, 20, Math.PI), mat(0.55, 0.1));
+      band.position.set(0, 0.02, 0);
+      group.add(band);
+      for (const side of [-1, 1] as const) {
+        const muff = mesh(new three.SphereGeometry(0.04, 12, 12), mat(0.7, 0.05));
+        muff.position.set(side * 0.1, 0.01, 0);
+        group.add(muff);
+      }
+      break;
+    }
+    case "hairpin": {
+      group.add(mesh(new three.BoxGeometry(0.05, 0.01, 0.006), mat(0.25, 0.75)));
+      const gem = mesh(new three.SphereGeometry(0.012, 10, 10), mat(0.15, 0.8, "#f472b6"));
+      gem.position.set(0.02, 0.01, 0);
+      group.add(gem);
+      break;
+    }
+    case "goggles": {
+      for (const side of [-1, 1] as const) {
+        const cup = mesh(new three.TorusGeometry(0.028, 0.006, 8, 16), mat(0.4, 0.3));
+        cup.position.set(side * 0.038, 0, 0);
+        group.add(cup);
+        const lens = mesh(new three.CylinderGeometry(0.024, 0.024, 0.004, 14), mat(0.2, 0.4, "#7dd3fc"));
+        lens.position.set(side * 0.038, 0, 0);
+        lens.rotation.set(Math.PI / 2, 0, 0);
+        group.add(lens);
+      }
+      const strap = mesh(new three.TorusGeometry(0.09, 0.005, 6, 20, Math.PI), mat(0.6, 0.1, "#1c1c1c"));
+      strap.position.set(0, 0.01, -0.02);
+      group.add(strap);
+      break;
+    }
+    case "guitar": {
+      // 테스트 더블 mesh는 scale.set을 갖지 않을 수 있어 타원 변형 대신 박스 바디를 쓴다.
+      group.add(mesh(new three.BoxGeometry(0.16, 0.22, 0.055), mat(0.55, 0.15)));
+      const neck = mesh(new three.BoxGeometry(0.03, 0.28, 0.02), mat(0.5, 0.1, "#5a4632"));
+      neck.position.set(0, 0.2, 0);
+      group.add(neck);
+      const headstock = mesh(new three.BoxGeometry(0.05, 0.06, 0.02), mat(0.5, 0.1, "#5a4632"));
+      headstock.position.set(0, 0.35, 0);
+      group.add(headstock);
+      break;
+    }
+    case "quiver": {
+      group.add(mesh(new three.CylinderGeometry(0.035, 0.04, 0.28, 12), mat(0.7, 0.1)));
+      for (let i = 0; i < 3; i += 1) {
+        const arrow = mesh(new three.CylinderGeometry(0.004, 0.004, 0.32, 6), mat(0.4, 0.2, "#d6b98c"));
+        arrow.position.set((i - 1) * 0.015, 0.08, 0);
+        group.add(arrow);
+      }
+      break;
+    }
+    case "nameTag": {
+      group.add(mesh(new three.BoxGeometry(0.07, 0.035, 0.006), mat(0.55, 0.05)));
+      const bar = mesh(new three.BoxGeometry(0.06, 0.01, 0.003), mat(0.4, 0.1, "#2563eb"));
+      bar.position.set(0, 0.008, 0.004);
+      group.add(bar);
+      break;
+    }
+    case "apron": {
+      group.add(mesh(new three.BoxGeometry(0.28, 0.35, 0.02), mat(0.8, 0.02)));
+      const strapL = mesh(new three.BoxGeometry(0.03, 0.2, 0.01), mat(0.75, 0.02));
+      strapL.position.set(-0.1, 0.22, -0.02);
+      group.add(strapL);
+      const strapR = mesh(new three.BoxGeometry(0.03, 0.2, 0.01), mat(0.75, 0.02));
+      strapR.position.set(0.1, 0.22, -0.02);
+      group.add(strapR);
+      break;
+    }
+    case "tail": {
+      const base = mesh(new three.CylinderGeometry(0.025, 0.018, 0.18, 10), mat(0.6, 0.05));
+      base.rotation.set(0.8, 0, 0);
+      group.add(base);
+      const tip = mesh(new three.SphereGeometry(0.03, 10, 10), mat(0.55, 0.05));
+      tip.position.set(0, -0.02, -0.16);
+      group.add(tip);
       break;
     }
     default:

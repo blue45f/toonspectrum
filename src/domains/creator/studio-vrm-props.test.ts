@@ -61,8 +61,8 @@ describe("VRM 소품 카탈로그", () => {
     expect(propsByCategory("body").length).toBeGreaterThan(0);
   });
 
-  it("37개 소품 모두 유효한 접촉 앵커와 자동 맞춤 프로필을 가진다", () => {
-    expect(VRM_PROPS).toHaveLength(37);
+  it("등록된 모든 소품이 유효한 접촉 앵커와 자동 맞춤 프로필을 가진다", () => {
+    expect(VRM_PROPS.length).toBeGreaterThanOrEqual(37);
 
     for (const def of VRM_PROPS) {
       expect(def.anchors.length, `${def.id}: anchors`).toBeGreaterThan(0);

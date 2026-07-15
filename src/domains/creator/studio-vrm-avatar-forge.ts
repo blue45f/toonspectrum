@@ -190,6 +190,12 @@ export const AVATAR_FORGE_PRESETS: ReadonlyArray<AvatarForgePreset> = [
   preset("elegant-bun", "엘리건트 번", "✨", "사극·오피스·의료 장면에 단정한 올림머리", { headHeight: 1.02 }, { style: "bun", volume: 0.95, shine: 0.55, baseColor: "#29211f", tipColor: "#59443e" }),
   preset("androgynous-crop", "앤드로지너스", "◇", "성별 표현에 구애받지 않는 짧은 커트", { headWidth: 0.96, headHeight: 1.04, chinLength: 1.04 }, { style: "short", fringe: 0.48, volume: 0.9, baseColor: "#3b3d42", tipColor: "#747980" }),
   preset("silver-senior", "실버 시니어", "🕊️", "중·노년 캐릭터용 은빛 보브", { headWidth: 1.04, cheekVolume: 0.48 }, { style: "bob", volume: 0.9, curl: 0.12, shine: 0.28, baseColor: "#a7a6a2", tipColor: "#e4e1db" }, { freckles: { enabled: true, intensity: 0.24 } }),
+  preset("fiery-long", "파이어 롱", "🔥", "강렬한 붉은 긴 머리", { headWidth: 0.98 }, { style: "long", length: 1.25, volume: 1.15, shine: 0.72, baseColor: "#7f1d1d", tipColor: "#f97316" }, { blush: { enabled: true, intensity: 0.35, color: "#fb7185" } }),
+  preset("mint-bob", "민트 보브", "🧊", "시원한 민트 보브", { cheekVolume: 0.58, headWidth: 1.03 }, { style: "bob", curl: 0.22, baseColor: "#134e4a", tipColor: "#5eead4" }, { freckles: { enabled: true, intensity: 0.18 } }),
+  preset("gold-pony", "골드 포니", "🌟", "밝은 금발 포니테일", { chinLength: 1.02 }, { style: "ponytail", length: 1.18, shine: 0.8, baseColor: "#a16207", tipColor: "#fde68a" }),
+  preset("ink-twin", "잉크 트윈", "🖤", "흑발 트윈테일", { headHeight: 1.03 }, { style: "twintail", volume: 1.08, curl: 0.4, baseColor: "#0f172a", tipColor: "#334155" }, { "beauty-mark": { enabled: true, intensity: 0.5 } }),
+  preset("sakura-bun", "벚꽃 번", "🌸", "분홍 톤 올림머리", { cheekVolume: 0.7, headWidth: 1.04 }, { style: "bun", volume: 1.0, baseColor: "#9d174d", tipColor: "#fbcfe8" }, { blush: { enabled: true, intensity: 0.4 } }),
+  preset("hero-crop", "히어로 크롭", "🦸", "단정한 액션 숏컷", { headWidth: 0.95, chinLength: 1.06 }, { style: "short", fringe: 0.4, volume: 0.88, baseColor: "#1e293b", tipColor: "#64748b" }),
 ] as const;
 
 const HAIR_STYLE_IDS = new Set<AvatarForgeHairStyle>(AVATAR_FORGE_HAIR_STYLE_OPTIONS.map((option) => option.id));

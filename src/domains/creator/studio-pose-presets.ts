@@ -746,6 +746,22 @@ export const EXTRA_POSE_PRESETS: StudioPosePreset[] = [
   { id: "xp_sleep_stand", label: "졸음 서기", tone: "꾸벅", bones: basePose({ head: rotate([d(12), d(3), d(-2)]), spine: rotate([d(2), 0, d(-1)]), leftUpperArm: aim(0.2, -0.8, -0.1) }) },
   { id: "xp_victory", label: "승리 V", tone: "승리", bones: basePose({ leftUpperArm: aim(0.55, 0.3, 0.5), leftLowerArm: aim(0.1, 0.9, 0.3), rightUpperArm: aim(0.5, -0.25, -0.45), rightLowerArm: aim(0.05, 0.85, -0.4) }) },
   { id: "xp_cool_lean", label: "쿨 기대기", tone: "멋", bones: basePose({ spine: rotate([d(-1), d(-15), 0]), rightUpperArm: aim(0.15, -0.75, -0.4), head: rotate([d(-1), d(-8), d(3)]) }) },
+  // 추가 장르·상황 포즈
+  { id: "xp_phone_selfie", label: "셀카", tone: "스마트폰 각도", bones: basePose({ rightUpperArm: aim(0.35, 0.35, 0.7), rightLowerArm: aim(0.1, 0.55, 0.75), head: rotate([d(-4), d(8), d(3)]) }) },
+  { id: "xp_typing", label: "타이핑", tone: "노트북 작업", bones: basePose({ spine: rotate([d(8), 0, 0]), leftUpperArm: aim(0.35, -0.45, 0.55), rightUpperArm: aim(0.35, -0.45, -0.55), head: rotate([d(6), 0, 0]) }) },
+  { id: "xp_cooking", label: "요리", tone: "팬 젓기", bones: basePose({ rightUpperArm: aim(0.4, -0.2, 0.75), rightLowerArm: aim(0.1, 0.15, 0.9), leftUpperArm: aim(0.3, -0.55, 0.4) }) },
+  { id: "xp_reading", label: "독서", tone: "책 펼침", bones: basePose({ leftUpperArm: aim(0.45, -0.35, 0.55), rightUpperArm: aim(0.4, -0.3, -0.5), head: rotate([d(8), 0, 0]) }) },
+  { id: "xp_guard", label: "가드", tone: "방어 자세", bones: basePose({ leftUpperArm: aim(0.5, -0.1, 0.7), rightUpperArm: aim(0.45, -0.15, -0.65), hips: rotate([d(-3), 0, 0]) }) },
+  { id: "xp_archer", label: "궁수", tone: "활 시위", bones: basePose({ leftUpperArm: aim(0.15, 0.05, 0.95), rightUpperArm: aim(0.55, -0.1, -0.7), head: rotate([d(-2), d(-12), 0]) }) },
+  { id: "xp_salutation", label: "경례", tone: "군대·교칙", bones: basePose({ rightUpperArm: aim(0.2, 0.75, 0.25), rightLowerArm: aim(-0.15, 0.55, 0.7), head: rotate([d(-1), 0, 0]) }) },
+  { id: "xp_present", label: "소개 포즈", tone: "안내·쇼", bones: basePose({ leftUpperArm: aim(0.55, -0.15, 0.65), leftLowerArm: aim(0.1, 0.2, 0.9), head: rotate([d(-2), d(6), 0]) }) },
+  { id: "xp_wait_line", label: "줄 서기", tone: "대기", bones: basePose({ spine: rotate([d(1), 0, d(1)]), leftUpperArm: aim(0.25, -0.85, 0.1), rightUpperArm: aim(0.25, -0.85, -0.1) }) },
+  { id: "xp_stretch", label: "기지개", tone: "기상", bones: basePose({ leftUpperArm: aim(0.15, 0.95, 0.15), rightUpperArm: aim(0.15, 0.9, -0.2), spine: rotate([d(-6), 0, 0]) }) },
+  { id: "xp_fall_back", label: "뒤로 넘어짐", tone: "충격", yOffset: -0.15, bones: basePose({ spine: rotate([d(-18), 0, 0]), head: rotate([d(-10), 0, 0]), leftUpperArm: aim(0.7, 0.3, 0.4), rightUpperArm: aim(0.65, -0.25, -0.4) }) },
+  { id: "xp_hug_self", label: "자기 안기", tone: "추위·불안", bones: basePose({ leftUpperArm: aim(0.55, -0.35, 0.55), rightUpperArm: aim(0.55, -0.35, -0.55), spine: rotate([d(6), 0, 0]) }) },
+  { id: "xp_cheer_both", label: "양손 환호", tone: "응원", bones: basePose({ leftUpperArm: aim(0.25, 0.95, 0.2), rightUpperArm: aim(0.25, 0.95, -0.2), head: rotate([d(-6), 0, 0]) }) },
+  { id: "xp_sneak", label: "살금", tone: "잠입", yOffset: -0.12, bones: basePose({ spine: rotate([d(10), d(8), 0]), head: rotate([d(4), d(10), 0]), leftUpperLeg: aim(0.25, -0.7, 0.55), rightUpperLeg: aim(0.2, -0.85, -0.25) }) },
+  { id: "xp_balance", label: "균형", tone: "한 발", yOffset: -0.02, bones: basePose({ leftUpperLeg: aim(0.15, -0.95, 0.05), rightUpperLeg: aim(0.4, -0.5, 0.7), leftUpperArm: aim(0.6, 0.2, 0.5), rightUpperArm: aim(0.55, -0.15, -0.55) }) },
 ];
 
 // ── 표정 프리셋 14종 — VRM 표준 표정 가중치 "조합"을 원클릭 적용 ─────────
@@ -773,4 +789,10 @@ export const EXPRESSION_PRESETS: StudioExpressionPreset[] = [
   { id: "xf_love", label: "사랑", emoji: "🥰", tone: "하트 눈", weights: { happy: 0.9, relaxed: 0.4 } },
   { id: "xf_scream", label: "비명", emoji: "😱", tone: "공포", weights: { surprised: 1, oh: 0.9, aa: 0.6 } },
   { id: "xf_cool", label: "쿨", emoji: "😎", tone: "선글라스 감성", weights: { relaxed: 0.6, happy: 0.3, lookDown: 0.2 } },
+  { id: "xf_focus", label: "집중", emoji: "🧐", tone: "일에 몰입", weights: { angry: 0.25, ee: 0.35, lookDown: 0.4 } },
+  { id: "xf_yawn", label: "하품", emoji: "🥱", tone: "피곤", weights: { relaxed: 0.7, aa: 0.75, blink: 0.5 } },
+  { id: "xf_sassy", label: "도도", emoji: "💅", tone: "자존심", weights: { happy: 0.35, angry: 0.25, lookRight: 0.45, ou: 0.25 } },
+  { id: "xf_innocent", label: "순수", emoji: "🥺", tone: "순진", weights: { sad: 0.2, happy: 0.45, lookUp: 0.35 } },
+  { id: "xf_serious", label: "진지", emoji: "😐", tone: "무거움", weights: { angry: 0.35, relaxed: 0.2, ee: 0.2 } },
+  { id: "xf_excited", label: "흥분", emoji: "🤩", tone: "설렘", weights: { happy: 1, surprised: 0.45, aa: 0.35 } },
 ];
