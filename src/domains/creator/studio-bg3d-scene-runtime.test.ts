@@ -52,6 +52,8 @@ function primitive(id: string, offset = 0): BgPrimitive {
     rotation: [0, 0, 0],
     scale: [1, 1, 1],
     color: "#C9A876",
+    parentId: null,
+    name: undefined,
   };
 }
 
@@ -66,6 +68,8 @@ function customModel(
     position: [offset, 0, 1],
     rotation: [0, Math.PI / 2, 0],
     scale: [1, 2, 1],
+    parentId: null,
+    name: undefined,
   };
 }
 
@@ -77,7 +81,10 @@ function canonicalDocument(
     ...overrides,
   });
   const parsed = parseStudioBg3dSceneDocument(serialized ?? "");
-  if (!parsed) throw new Error("Invalid canonical document test fixture.");
+  if (!parsed) {
+    const raw = JSON.parse(serialized ?? "{}");
+    throw new Error("Invalid canonical document test fixture. Serialized:\n" + JSON.stringify(raw, null, 2));
+  }
   return parsed;
 }
 
@@ -99,8 +106,8 @@ describe("Studio BG3D runtime to document adapter", () => {
       customModel("model-node-b", secondStorageId, 4),
     ];
     const base = canonicalDocument({
-      camera: { position: [9, 4, 7], target: [0, 1, 0], fovDegrees: 42 },
-      background: { mode: "color", color: "#223344", skyPresetId: "night" },
+      camera: { ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera, position: [9, 4, 7], target: [0, 1, 0], fovDegrees: 42 },
+      background: { ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.background, mode: "color", color: "#223344", skyPresetId: "night" },
       output: {
         ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.output,
         exportHeight: 1280,
@@ -331,7 +338,7 @@ describe("Studio BG3D document to runtime adapter", () => {
 
     expect(hydrated.ok).toBe(true);
     expect(hydrated.primitives).toEqual([
-      { ...primitive("primitive-a"), color: "#c9a876", visible: true, locked: false },
+      { ...primitive("primitive-a"), color: "#c9a876", visible: true, locked: false, parentId: null, name: undefined },
     ]);
     expect(hydrated.customModels.map((model) => [model.id, model.modelId])).toEqual([
       ["model-a", firstStorageId],
