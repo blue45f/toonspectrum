@@ -13,6 +13,7 @@ import {
   Query,
 } from "@nestjs/common";
 
+import { isAdminUser } from "../../../../../lib/server/app-config";
 import { ZodValidationPipe } from "../../common/zod-validation.pipe";
 
 import {
@@ -258,8 +259,8 @@ export class CreatorController {
   @Delete("/creator/works/:id")
   async deleteWork(@Param("id") id: string, @Headers("x-user-id") userId?: string) {
     const uid = enforceUserOrError(userId);
-    // 관리자 판정은 추후 보강 — 현재는 작성자 전용 삭제(isAdmin=false).
-    return this.creatorService.deleteWork(uid, id, false);
+    const admin = await isAdminUser(uid);
+    return this.creatorService.deleteWork(uid, id, admin);
   }
 
   @Post("/creator/works/:id/like")
@@ -305,7 +306,8 @@ export class CreatorController {
   @Delete("/creator/assets/:id")
   async deleteSharedAsset(@Param("id") id: string, @Headers("x-user-id") userId?: string) {
     const uid = enforceUserOrError(userId);
-    return this.creatorService.deleteSharedAsset(uid, id, false);
+    const admin = await isAdminUser(uid);
+    return this.creatorService.deleteSharedAsset(uid, id, admin);
   }
 
   @Post("/creator/assets/:id/use")
@@ -344,8 +346,8 @@ export class CreatorController {
   @Delete("/creator/series/:id")
   async deleteSeries(@Param("id") id: string, @Headers("x-user-id") userId?: string) {
     const uid = enforceUserOrError(userId);
-    // 관리자 판정은 추후 보강 — 현재는 소유자 전용 삭제(isAdmin=false).
-    return this.creatorService.deleteSeries(uid, id, false);
+    const admin = await isAdminUser(uid);
+    return this.creatorService.deleteSeries(uid, id, admin);
   }
 
   // ── 창작 챌린지(주간 주제 이벤트) ─────────────────────────────────────
