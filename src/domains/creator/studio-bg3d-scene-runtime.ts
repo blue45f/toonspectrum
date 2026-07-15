@@ -255,7 +255,7 @@ function primitiveNodeFromRuntime(value: BgPrimitive): StudioBg3dSceneNode | nul
   }
   return {
     id: value.id,
-    name: value.kind,
+    name: value.name || value.kind,
     kind: "primitive",
     primitiveKind: value.kind as BgPrimitiveKind,
     color: value.color,
@@ -285,7 +285,7 @@ function modelNodeFromRuntime(
   }
   return {
     id: value.id,
-    name: "GLB 모델",
+    name: value.name || "GLB 모델",
     kind: "model",
     attachmentId,
     transform: {
@@ -597,6 +597,7 @@ export function hydrateStudioBg3dDocumentToRuntime(
         id: node.id,
         kind: node.primitiveKind,
         color: node.color,
+        name: node.name !== node.primitiveKind ? node.name : undefined,
         position: [...node.transform.position],
         rotation: [...node.transform.rotation],
         scale: [...node.transform.scale],
@@ -644,6 +645,7 @@ export function hydrateStudioBg3dDocumentToRuntime(
     customModels.push({
       id: node.id,
       modelId: storageModelId,
+      name: node.name !== "GLB 모델" ? node.name : undefined,
       position: [...node.transform.position],
       rotation: [...node.transform.rotation],
       scale: [...node.transform.scale],

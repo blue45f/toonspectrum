@@ -62,6 +62,7 @@ export function clonePrimitives(primitives: BgPrimitive[]): BgPrimitive[] {
     position: [...p.position] as [number, number, number],
     rotation: [...p.rotation] as [number, number, number],
     scale: [...p.scale] as [number, number, number],
+    name: p.name,
     visible: p.visible,
     locked: p.locked,
   }));

@@ -828,6 +828,7 @@ type BgViewportApi = {
   applyPreset: (presetId: string) => void;
   applyView: (view: StudioBg3dCameraSettings) => void;
   readView: () => StudioBg3dCameraSettings;
+  focusOn: (position: [number, number, number]) => void;
 };
 
 /* Canvas 내부에서 카메라/컨트롤을 잡아 줌·프리셋 같은 명령형 동작을 패널 오버레이(Canvas 밖 HTML 버튼)에
@@ -895,6 +896,18 @@ function BgViewportController({ onReady }: { onReady: (api: BgViewportApi | null
           target: [target.x, target.y, target.z],
           fovDegrees,
         };
+      },
+      focusOn: (position: [number, number, number]) => {
+        const newTarget = new THREE.Vector3(...position);
+        if (controls?.target) {
+          const offset = camera.position.clone().sub(controls.target);
+          controls.target.copy(newTarget);
+          camera.position.copy(newTarget).add(offset);
+          camera.updateMatrixWorld();
+          controls.update?.();
+        } else {
+          camera.lookAt(newTarget);
+        }
       },
     });
     return () => onReady(null);
@@ -1619,6 +1632,21 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     );
   }
 
+  function renameBgObject(id: string, kind: "primitive" | "model") {
+    const item = kind === "primitive" ? primitives.find(p => p.id === id) : customModels.find(m => m.id === id);
+    if (!item) return;
+    const currentName = item.name || (kind === "primitive" ? PRIMITIVE_DEFS[(item as BgPrimitive).kind].label : "3D 모델");
+    const newName = window.prompt("새 이름을 입력하세요", currentName);
+    if (newName === null) return;
+    const trimmed = newName.trim();
+    
+    if (kind === "primitive") {
+      setPrimitives((prev) => prev.map(p => p.id === id ? { ...p, name: trimmed || undefined } : p));
+    } else {
+      setCustomModels((prev) => prev.map(m => m.id === id ? { ...m, name: trimmed || undefined } : m));
+    }
+  }
+
   function groundSelectedEntity() {
     if (!selectedId) return;
     const prim = primitives.find((p) => p.id === selectedId);
@@ -1634,6 +1662,13 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     const size = root ? measureBg3dObjectSize(root) : ([2, 2, 2] as [number, number, number]);
     const position = groundModelTransform(size, model.position, model.rotation, model.scale);
     updateCustomModelTransform(model.id, { position });
+  }
+
+  function focusSelectedEntity() {
+    if (!selectedId) return;
+    const entity = primitives.find((p) => p.id === selectedId) || customModels.find((m) => m.id === selectedId);
+    if (!entity) return;
+    viewportApiRef.current?.focusOn(entity.position);
   }
 
   const registerPrimitiveRef = (id: string, obj: THREE.Group | null) => {
@@ -2202,7 +2237,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
       const kindCountBefore = primitives.slice(0, index).filter((p) => p.kind === prim.kind).length;
       return {
         id: prim.id,
-        label: `${PRIMITIVE_DEFS[prim.kind].label} ${kindCountBefore + 1}`,
+        label: prim.name || `${PRIMITIVE_DEFS[prim.kind].label} ${kindCountBefore + 1}`,
         kind: "primitive" as const,
         visible: isBgObjectVisible(prim),
         locked: isBgObjectLocked(prim),
@@ -2213,7 +2248,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
       const modelName = modelLibrary.find((entry) => entry.id === inst.modelId)?.name ?? "3D 모델";
       return {
         id: inst.id,
-        label: `${modelName} ${kindCountBefore + 1}`,
+        label: inst.name || `${modelName} ${kindCountBefore + 1}`,
         kind: "model" as const,
         visible: isBgObjectVisible(inst),
         locked: isBgObjectLocked(inst),
@@ -2479,6 +2514,15 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                     onClick={groundSelectedEntity}
                   >
                     <MoveDown size={16} aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="초점 맞춤"
+                    title="초점 맞춤"
+                    className="flex flex-1 flex-col items-center justify-center gap-1 text-fg-2"
+                    onClick={focusSelectedEntity}
+                  >
+                    <ScanLine size={16} aria-hidden />
                   </button>
                 </div>
 
@@ -2822,6 +2866,15 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                           </button>
                           <button
                             type="button"
+                            aria-label="초점 맞춤"
+                            title="초점 맞춤"
+                            className={ICON_BUTTON}
+                            onClick={focusSelectedEntity}
+                          >
+                            <ScanLine size={14} aria-hidden />
+                          </button>
+                          <button
+                            type="button"
                             aria-label="복제"
                             title="복제"
                             className={ICON_BUTTON}
@@ -2936,6 +2989,15 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                             onClick={groundSelectedEntity}
                           >
                             <MoveDown size={14} aria-hidden />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label="초점 맞춤"
+                            title="초점 맞춤"
+                            className={ICON_BUTTON}
+                            onClick={focusSelectedEntity}
+                          >
+                            <ScanLine size={14} aria-hidden />
                           </button>
                           <button
                             type="button"
@@ -3081,6 +3143,15 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                                   )}
                                   <span className="truncate font-semibold">{item.label}</span>
                                   {item.locked ? <Lock size={11} className="shrink-0 opacity-80" aria-hidden /> : null}
+                                </button>
+                                <button
+                                  type="button"
+                                  aria-label={`${item.label} 이름 변경`}
+                                  title="이름 변경"
+                                  className="grid size-11 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent sm:size-6"
+                                  onClick={() => renameBgObject(item.id, item.kind)}
+                                >
+                                  <PencilLine size={12} aria-hidden />
                                 </button>
                                 <button
                                   type="button"

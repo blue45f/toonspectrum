@@ -23,6 +23,8 @@ export interface BgPrimitive {
   rotation: [number, number, number]; // Euler XYZ, radians
   scale: [number, number, number];
   color: string; // Shaded preview only; line-art export ignores this value.
+  /** Optional user-defined name for the object list. */
+  name?: string;
   /** When false, mesh is hidden in viewport/capture but kept in the scene graph. Default true. */
   visible?: boolean;
   /** When true, transform gizmo and numeric edits are blocked. Default false. */

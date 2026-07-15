@@ -20,6 +20,8 @@ export interface BgCustomModelInstance {
   position: [number, number, number];
   rotation: [number, number, number]; // Euler XYZ, 라디안 — BgPrimitive와 동일 계약
   scale: [number, number, number];
+  /** Optional user-defined name for the object list. */
+  name?: string;
   /** When false, mesh is hidden in viewport/capture but kept in the scene graph. Default true. */
   visible?: boolean;
   /** When true, transform gizmo and numeric edits are blocked. Default false. */
@@ -72,6 +74,7 @@ export function cloneBgCustomModelInstances(instances: BgCustomModelInstance[]):
     position: [...inst.position] as [number, number, number],
     rotation: [...inst.rotation] as [number, number, number],
     scale: [...inst.scale] as [number, number, number],
+    name: inst.name,
     visible: inst.visible,
     locked: inst.locked,
   }));
