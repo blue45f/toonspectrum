@@ -17,6 +17,9 @@ export const STUDIO_ADJUSTMENT_ENGINE_IDS = [
   "channel-mixer",
   "gradient-map",
   "blur",
+  /** Magma-class blur gallery engines (map onto blurFx). */
+  "gaussian-blur",
+  "motion-blur",
   "sharpen",
   "noise",
   "invert",
@@ -194,7 +197,11 @@ export function studioAdjustmentEngineLabel(engine: StudioAdjustmentEngineId): s
     case "gradient-map":
       return "그라디언트 맵";
     case "blur":
-      return "블러";
+      return "빠른 블러";
+    case "gaussian-blur":
+      return "가우시안 블러";
+    case "motion-blur":
+      return "모션 블러";
     case "sharpen":
       return "샤픈";
     case "noise":
@@ -206,15 +213,38 @@ export function studioAdjustmentEngineLabel(engine: StudioAdjustmentEngineId): s
   }
 }
 
+export type StudioAdjustmentFilterFields = {
+  blur?: number;
+  brightness?: number;
+  contrast?: number;
+  hue?: number;
+  saturation?: number;
+  levelsBlack?: number;
+  levelsWhite?: number;
+  levelsGamma?: number;
+  levelsOutBlack?: number;
+  levelsOutWhite?: number;
+  sharpen?: number;
+  noise?: number;
+  invert?: boolean;
+  /** Magma gaussian/motion blur gallery — applied via studio-blur Konva filter. */
+  blurFx?: {
+    type: "gaussian" | "motion" | "spin" | "zoom";
+    strength: number;
+    radius: number;
+    angle: number;
+  };
+};
+
 /**
- * Map enabled smart-filter stack entries onto flat ImageFilterFields for the existing
+ * Map enabled smart-filter stack entries onto ImageFilterFields for the existing
  * Konva filter pipeline. Later entries override earlier ones for the same field.
  * Pure; does not mutate base.
  */
 export function studioAdjustmentStackToFilterFields(
   stack: unknown
-): Record<string, number | boolean | string | undefined> {
-  const out: Record<string, number | boolean | string | undefined> = {};
+): StudioAdjustmentFilterFields {
+  const out: StudioAdjustmentFilterFields = {};
   const entries = normalizeStudioAdjustmentStack(stack).entries.filter((entry) => entry.enabled);
   for (const entry of entries) {
     const p = entry.params;
@@ -222,6 +252,29 @@ export function studioAdjustmentStackToFilterFields(
       case "blur":
         out.blur = finiteNumber(p.radius ?? p.blur, Number(out.blur) || 0);
         break;
+      case "gaussian-blur": {
+        const radius = finiteNumber(p.radius, 8);
+        const strength = finiteNumber(p.strength, 70);
+        out.blurFx = {
+          type: "gaussian",
+          strength: Math.min(100, Math.max(0, strength)),
+          radius: Math.min(40, Math.max(1, radius)),
+          angle: 0,
+        };
+        break;
+      }
+      case "motion-blur": {
+        const radius = finiteNumber(p.radius ?? p.distance, 18);
+        const strength = finiteNumber(p.strength, 85);
+        const angle = finiteNumber(p.angle, 0);
+        out.blurFx = {
+          type: "motion",
+          strength: Math.min(100, Math.max(0, strength)),
+          radius: Math.min(40, Math.max(1, radius)),
+          angle: ((angle % 360) + 360) % 360,
+        };
+        break;
+      }
       case "brightness-contrast":
         out.brightness = finiteNumber(p.brightness, Number(out.brightness) || 0);
         out.contrast = finiteNumber(p.contrast, Number(out.contrast) || 0);
@@ -265,6 +318,8 @@ export function studioAdjustmentStackHasLivePreview(stack: unknown): boolean {
   return listEnabledStudioAdjustmentEngines(stack).some(
     (engine) =>
       engine === "blur" ||
+      engine === "gaussian-blur" ||
+      engine === "motion-blur" ||
       engine === "brightness-contrast" ||
       engine === "hue-saturation" ||
       engine === "levels" ||

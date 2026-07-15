@@ -24,6 +24,7 @@ import {
   studioSegmentChipClass,
   studioToolButtonClass,
 } from "./studio-panel-ui";
+import { StudioToolHintTarget } from "./StudioToolHint";
 
 import type { LucideIcon } from "lucide-react";
 
@@ -755,6 +756,8 @@ export interface StudioRailToolButtonProps
   active?: boolean;
   icon: LucideIcon;
   label: string;
+  /** Magma-style longer body for rich hover tooltip (shown with StudioToolHintTarget). */
+  description?: string;
   /** Magma-style group indicator (long-press / alternate tools exist). */
   grouped?: boolean;
   accented?: boolean;
@@ -765,19 +768,24 @@ export function StudioRailToolButton({
   active = false,
   icon: Icon,
   label,
+  description,
   grouped = false,
   accented = false,
   className,
   disabled,
   type = "button",
+  title,
   ...rest
 }: StudioRailToolButtonProps): ReactElement {
-  return (
+  // When a rich description is provided, leave title empty so Magma-style bubble is the only hover UI.
+  const nativeTitle = description ? undefined : (title ?? label);
+  const button = (
     <button
       type={type}
       disabled={disabled}
       aria-label={label}
-      title={label}
+      title={nativeTitle}
+      data-studio-tool-description={description ? "true" : undefined}
       aria-pressed={active}
       className={cn(
         // Fresco/Magma: slightly larger hit, soft radius, no hard bevel.
@@ -807,6 +815,24 @@ export function StudioRailToolButton({
         />
       ) : null}
     </button>
+  );
+
+  if (!description) return button;
+  return (
+    <StudioToolHintTarget
+      disabled={disabled}
+      hint={{
+        id: label,
+        title: label.replace(/\s*\([^)]*\)\s*$/, "").trim() || label,
+        description,
+        shortcut: (() => {
+          const m = label.match(/\(([^)]+)\)\s*$/);
+          return m?.[1];
+        })(),
+      }}
+    >
+      {button}
+    </StudioToolHintTarget>
   );
 }
 

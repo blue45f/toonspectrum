@@ -20173,6 +20173,7 @@ function StudioCuttoonEditor() {
             <StudioRailToolButton
               icon={MousePointer2}
               label="선택 (V)"
+              description="캔버스 위 요소를 클릭·드래그로 고르고 옮기거나 크기를 바꿉니다. 여러 개를 드래그해 함께 선택할 수 있어요."
               active={tool === "select" && !advancedFillActive && !eyedropperActive}
               onClick={() => {
                 setTool("select");
@@ -20183,6 +20184,7 @@ function StudioCuttoonEditor() {
             <StudioRailToolButton
               icon={Pencil}
               label={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 펜을 사용할 수 있어요" : "펜 (B)"}
+              description="자유선으로 그립니다. 필압·보정·브러시 프리셋은 상단 옵션 막대와 브러시 스튜디오에서 조절해요."
               active={tool === "draw" && drawMode === "pen"}
               disabled={activeSurfaceReviewLocked}
               grouped
@@ -20196,6 +20198,7 @@ function StudioCuttoonEditor() {
             <StudioRailToolButton
               icon={Eraser}
               label={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 지우개를 사용할 수 있어요" : "지우개 (E)"}
+              description="현재 레이어/획 위를 지웁니다. 굵기는 펜과 같은 크기 칩으로 맞출 수 있어요."
               active={tool === "draw" && drawMode === "eraser"}
               disabled={activeSurfaceReviewLocked}
               onClick={() => {
@@ -20208,6 +20211,7 @@ function StudioCuttoonEditor() {
             <StudioRailToolButton
               icon={PaintBucket}
               label={advancedFillUnsupportedReason ?? "채우기 (G)"}
+              description="선 안을 탭해 색을 채웁니다. 경계 인식과 참조 레이어 설정은 속성 패널에서 조정해요."
               active={advancedFillActive}
               disabled={!advancedFillActive && advancedFillUnsupportedReason !== null}
               onClick={toggleAdvancedFill}
@@ -20215,6 +20219,7 @@ function StudioCuttoonEditor() {
             <StudioRailToolButton
               icon={Pipette}
               label="스포이드 (I / Alt+클릭)"
+              description="캔버스 색을 샘플링해 주 색으로 가져옵니다. 펜으로 그리는 중엔 Alt+클릭으로도 동작해요."
               active={eyedropperActive}
               onClick={() => {
                 setEyedropperActive((v) => !v);
@@ -20223,7 +20228,8 @@ function StudioCuttoonEditor() {
             />
             <StudioRailToolButton
               icon={Shapes}
-              label="스마트 도형 — 낙서를 선·원·사각형으로 다듬기"
+              label="스마트 도형"
+              description="낙서를 잠시 멈추면 선·원·사각형 등 깔끔한 도형으로 자동 다듬어요."
               active={quickShapeActive}
               accented
               onClick={() => {
@@ -20237,6 +20243,7 @@ function StudioCuttoonEditor() {
             <StudioRailToolButton
               icon={Square}
               label="사각형 도형"
+              description="드래그로 사각형을 그립니다. Shift를 누르면 정사각형으로 맞출 수 있어요."
               active={tool === "draw" && drawMode === "shape" && drawShape === "rect"}
               onClick={() => {
                 setTool("draw");
@@ -20249,6 +20256,7 @@ function StudioCuttoonEditor() {
             <StudioRailToolButton
               icon={Circle}
               label="타원 도형"
+              description="드래그로 타원을 그립니다. Shift를 누르면 정원으로 맞출 수 있어요."
               active={tool === "draw" && drawMode === "shape" && drawShape === "ellipse"}
               onClick={() => {
                 setTool("draw");
@@ -20262,6 +20270,7 @@ function StudioCuttoonEditor() {
             <StudioRailToolButton
               icon={TypeIcon}
               label="텍스트 추가"
+              description="캔버스에 글자 상자를 추가합니다. 폰트·정렬·효과는 우측 속성에서 편집해요."
               onClick={() => {
                 addText();
               }}
@@ -20269,11 +20278,15 @@ function StudioCuttoonEditor() {
             <StudioRailToolButton
               icon={MessageCircle}
               label="말풍선 추가"
+              description="만화 말풍선을 넣습니다. 꼬리 위치·스타일 프리셋은 말풍선 패널에서 바꿀 수 있어요."
               onClick={() => {
                 addBubble("speech");
               }}
             />
-            <label className="relative grid size-9 cursor-pointer place-items-center rounded-md border border-transparent text-fg-2 hover:border-line hover:bg-raised hover:text-fg" title="이미지 추가">
+            <label
+              className="relative grid size-9 cursor-pointer place-items-center rounded-md border border-transparent text-fg-2 hover:border-line hover:bg-raised hover:text-fg"
+              title="이미지 추가 — 파일에서 그림을 불러와 캔버스에 배치합니다. 이후 필터·블러를 적용할 수 있어요."
+            >
               <ImagePlus size={16} strokeWidth={1.75} aria-hidden />
               <span className="sr-only">이미지 추가</span>
               <input type="file" accept="image/*" className="absolute inset-0 cursor-pointer opacity-0" onChange={onPickImage} />
@@ -20286,6 +20299,7 @@ function StudioCuttoonEditor() {
                   ? "이미지를 선택하면 프레임 애니메이션을 만들 수 있어요"
                   : "프레임 애니메이션"
               }
+              description="선택한 이미지에 여러 프레임을 쌓아 간단한 셀 애니메이션을 만듭니다."
               active={frameAnimOpen && frameAnimTargetId === selected?.id}
               disabled={selected?.type !== "image"}
               onClick={() => {

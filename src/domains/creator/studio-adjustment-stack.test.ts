@@ -57,4 +57,31 @@ describe("studio adjustment stack", () => {
     expect(fields.blur).toBe(4);
     expect(fields.invert).toBe(true);
   });
+
+  it("maps Magma-class gaussian and motion blur onto blurFx for live preview", () => {
+    let stack = createEmptyStudioAdjustmentStack();
+    stack = appendStudioAdjustmentEntry(stack, {
+      engine: "gaussian-blur",
+      params: { radius: 10, strength: 80 },
+    });
+    let fields = studioAdjustmentStackToFilterFields(stack);
+    expect(fields.blurFx).toEqual({
+      type: "gaussian",
+      strength: 80,
+      radius: 10,
+      angle: 0,
+    });
+
+    stack = appendStudioAdjustmentEntry(createEmptyStudioAdjustmentStack(), {
+      engine: "motion-blur",
+      params: { radius: 20, strength: 90, angle: 45 },
+    });
+    fields = studioAdjustmentStackToFilterFields(stack);
+    expect(fields.blurFx).toEqual({
+      type: "motion",
+      strength: 90,
+      radius: 20,
+      angle: 45,
+    });
+  });
 });
