@@ -65,6 +65,7 @@ export function clonePrimitives(primitives: BgPrimitive[]): BgPrimitive[] {
     name: p.name,
     visible: p.visible,
     locked: p.locked,
+    parentId: p.parentId,
   }));
 }
 

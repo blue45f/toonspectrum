@@ -268,6 +268,7 @@ function primitiveNodeFromRuntime(value: BgPrimitive): StudioBg3dSceneNode | nul
     locked: value.locked === true,
     castsShadow: true,
     receivesShadow: true,
+    parentId: value.parentId ?? null,
   };
 }
 
@@ -297,6 +298,7 @@ function modelNodeFromRuntime(
     locked: value.locked === true,
     castsShadow: true,
     receivesShadow: true,
+    parentId: value.parentId ?? null,
   };
 }
 
@@ -603,6 +605,7 @@ export function hydrateStudioBg3dDocumentToRuntime(
         scale: [...node.transform.scale],
         visible: node.visible !== false,
         locked: node.locked === true,
+        parentId: node.parentId ?? null,
       });
       continue;
     }
@@ -651,6 +654,7 @@ export function hydrateStudioBg3dDocumentToRuntime(
       scale: [...node.transform.scale],
       visible: node.visible !== false,
       locked: node.locked === true,
+      parentId: node.parentId ?? null,
     });
   }
 

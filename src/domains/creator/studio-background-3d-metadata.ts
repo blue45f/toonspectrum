@@ -29,11 +29,13 @@ export interface BgPrimitive {
   visible?: boolean;
   /** When true, transform gizmo and numeric edits are blocked. Default false. */
   locked?: boolean;
+  /** Parent entity ID for hierarchy grouping. null/undefined means root. */
+  parentId?: string | null;
 }
 
 export interface BgSceneState {
   primitives: BgPrimitive[];
-  selectedId: string | null;
+  selectedIds: string[];
 }
 
 export interface BgPrimitiveDef {

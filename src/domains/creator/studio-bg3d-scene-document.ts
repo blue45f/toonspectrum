@@ -265,6 +265,8 @@ interface StudioBg3dSceneNodeBase {
   readonly locked: boolean;
   readonly castsShadow: boolean;
   readonly receivesShadow: boolean;
+  /** Parent node ID for hierarchy grouping. null/undefined means root. */
+  readonly parentId?: string | null;
 }
 
 export interface StudioBg3dPrimitiveNode extends StudioBg3dSceneNodeBase {
@@ -971,6 +973,7 @@ function normalizeNode(
     locked: normalizedBoolean(value.locked, false),
     castsShadow: normalizedBoolean(value.castsShadow, true),
     receivesShadow: normalizedBoolean(value.receivesShadow, true),
+    parentId: normalizedId(value.parentId) ?? null,
   };
   if (value.kind === "primitive") {
     if (typeof value.primitiveKind !== "string" || !PRIMITIVE_KIND_SET.has(value.primitiveKind)) {

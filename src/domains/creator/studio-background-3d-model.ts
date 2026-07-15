@@ -26,6 +26,8 @@ export interface BgCustomModelInstance {
   visible?: boolean;
   /** When true, transform gizmo and numeric edits are blocked. Default false. */
   locked?: boolean;
+  /** Parent entity ID for hierarchy grouping. null/undefined means root. */
+  parentId?: string | null;
 }
 
 // PRIMITIVE_DEFS 도형들의 대략적인 크기 감각(반경 0.5~1m대)과 맞춘 오토핏 목표 치수.
@@ -77,6 +79,7 @@ export function cloneBgCustomModelInstances(instances: BgCustomModelInstance[]):
     name: inst.name,
     visible: inst.visible,
     locked: inst.locked,
+    parentId: inst.parentId,
   }));
 }
 
