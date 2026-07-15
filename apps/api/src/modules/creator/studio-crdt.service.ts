@@ -75,6 +75,8 @@ const STUDIO_CRDT_SCENE_ROOT_PREFIX = "scene-element:";
 const STUDIO_CRDT_PAGE_ROOT_PREFIX = "studio-page:";
 const STUDIO_CRDT_LAYER_GROUP_ROOT_PREFIX = "layer-group:";
 const STUDIO_CRDT_PAGE_ORDER_ROOT = "page-order";
+const STUDIO_CRDT_DELETION_OPS_ROOT = "studio-deletion-ops";
+const STUDIO_CRDT_DELETION_ACKS_ROOT = "studio-deletion-acks";
 const STUDIO_CRDT_PROPERTY_PREFIXES = ["base:", "prop:", "unset:"] as const;
 const STUDIO_CRDT_SCENE_PAYLOAD_MAX_BYTES = 16 * 1_024;
 const STUDIO_CRDT_PAGE_PAYLOAD_MAX_BYTES = 8 * 1_024;
@@ -86,7 +88,14 @@ const STUDIO_CRDT_JSON_MAX_DEPTH = 10;
 const STUDIO_CRDT_JSON_MAX_ENTRIES = 4_096;
 const STUDIO_CRDT_JSON_MAX_STRING_LENGTH = 64 * 1_024;
 const STUDIO_CRDT_MAX_COORDINATE = 10_000_000;
+const STUDIO_CRDT_DELETION_TARGET_MAX_LENGTH = 384;
 const STUDIO_CRDT_TEXT_ENCODER = new TextEncoder();
+
+type StudioCrdtDeletionTarget =
+  | { kind: "stroke"; id: string }
+  | { kind: "scene"; id: string }
+  | { kind: "page"; id: string }
+  | { kind: "group"; pageId: string; id: string };
 
 const STUDIO_CRDT_COMMON_SCENE_KEYS = [
   "name",
@@ -143,6 +152,9 @@ const STUDIO_CRDT_SCENE_KEYS_BY_TYPE = {
     "x", "y", "width", "height", "lineCount", "direction", "stroke", "strokeWidth",
     "noise", "rotation",
   ]),
+  // Wire-only topology for image/VRM/3D and future asset-backed elements. Asset payloads stay in
+  // project storage; this record owns page/layer while the flat delete-wins roots own tombstones.
+  reference: new Set(["elementType"]),
 } as const;
 
 type StudioCrdtSceneType = keyof typeof STUDIO_CRDT_SCENE_KEYS_BY_TYPE;
@@ -160,6 +172,7 @@ const STUDIO_CRDT_REQUIRED_SCENE_KEYS: Record<StudioCrdtSceneType, readonly stri
     "x", "y", "width", "height", "lineCount", "direction", "stroke", "strokeWidth",
     "rotation",
   ],
+  reference: ["elementType"],
 };
 
 const STUDIO_CRDT_PAGE_KEYS = new Set([
@@ -424,7 +437,7 @@ function boundedExactText(value: unknown, maximum: number): value is string {
 }
 
 function isStudioCrdtSceneType(value: unknown): value is StudioCrdtSceneType {
-  return typeof value === "string" && value in STUDIO_CRDT_SCENE_KEYS_BY_TYPE;
+  return typeof value === "string" && Object.hasOwn(STUDIO_CRDT_SCENE_KEYS_BY_TYPE, value);
 }
 
 function readReservedProperties(
@@ -522,6 +535,141 @@ function canonicalReservedLayerGroupKey(rootName: string): StudioCrdtLayerGroupI
   }
 }
 
+function encodeStudioCrdtDeletionTarget(target: StudioCrdtDeletionTarget): string {
+  return target.kind === "group"
+    ? JSON.stringify([target.kind, target.pageId, target.id])
+    : JSON.stringify([target.kind, target.id]);
+}
+
+function parseStudioCrdtDeletionTarget(value: unknown): StudioCrdtDeletionTarget | null {
+  if (
+    typeof value !== "string" ||
+    value.length === 0 ||
+    value.length > STUDIO_CRDT_DELETION_TARGET_MAX_LENGTH
+  ) return null;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!Array.isArray(parsed)) return null;
+    if (
+      parsed.length === 2 &&
+      (parsed[0] === "stroke" || parsed[0] === "scene" || parsed[0] === "page") &&
+      isBoundedStudioCrdtId(parsed[1])
+    ) {
+      const target = { kind: parsed[0], id: parsed[1] } satisfies StudioCrdtDeletionTarget;
+      return encodeStudioCrdtDeletionTarget(target) === value ? target : null;
+    }
+    if (
+      parsed.length === 3 &&
+      parsed[0] === "group" &&
+      isBoundedStudioCrdtId(parsed[1]) &&
+      isBoundedStudioCrdtId(parsed[2]) &&
+      parsed[2] !== "page-root"
+    ) {
+      const target = {
+        kind: "group",
+        pageId: parsed[1],
+        id: parsed[2],
+      } satisfies StudioCrdtDeletionTarget;
+      return encodeStudioCrdtDeletionTarget(target) === value ? target : null;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function studioCrdtDeletionTargetExists(doc: Y.Doc, target: StudioCrdtDeletionTarget): boolean {
+  if (target.kind === "stroke") {
+    const strokes = materializeExistingMapRoot(doc, "strokes");
+    return strokes instanceof Y.Map && strokes.get(target.id) instanceof Y.Map;
+  }
+  if (target.kind === "scene") {
+    const index = materializeExistingMapRoot(doc, STUDIO_CRDT_SCENE_INDEX_ROOT);
+    const record = materializeExistingMapRoot(
+      doc,
+      `${STUDIO_CRDT_SCENE_ROOT_PREFIX}${encodeURIComponent(target.id)}`
+    );
+    return index instanceof Y.Map && index.get(target.id) === true && record instanceof Y.Map;
+  }
+  if (target.kind === "page") {
+    const index = materializeExistingMapRoot(doc, STUDIO_CRDT_PAGE_INDEX_ROOT);
+    const record = materializeExistingMapRoot(
+      doc,
+      `${STUDIO_CRDT_PAGE_ROOT_PREFIX}${encodeURIComponent(target.id)}`
+    );
+    return index instanceof Y.Map && index.get(target.id) === true && record instanceof Y.Map;
+  }
+  const key = `${target.pageId.length}:${target.pageId}${target.id.length}:${target.id}`;
+  const index = materializeExistingMapRoot(doc, STUDIO_CRDT_LAYER_GROUP_INDEX_ROOT);
+  const record = materializeExistingMapRoot(
+    doc,
+    `${STUDIO_CRDT_LAYER_GROUP_ROOT_PREFIX}${encodeURIComponent(key)}`
+  );
+  return index instanceof Y.Map && index.get(key) === true && record instanceof Y.Map;
+}
+
+function validateStudioCrdtDeletionRoots(doc: Y.Doc): boolean {
+  const operations = materializeExistingMapRoot(doc, STUDIO_CRDT_DELETION_OPS_ROOT);
+  const acknowledgements = materializeExistingMapRoot(doc, STUDIO_CRDT_DELETION_ACKS_ROOT);
+  if (
+    operations === null ||
+    acknowledgements === null ||
+    (operations?.size ?? 0) > STUDIO_CRDT_COLLECTION_MAX_ENTRIES ||
+    (acknowledgements?.size ?? 0) > STUDIO_CRDT_COLLECTION_MAX_ENTRIES
+  ) return false;
+  if (operations) {
+    for (const [operationId, encodedTarget] of operations) {
+      const target = parseStudioCrdtDeletionTarget(encodedTarget);
+      if (!UUID_PATTERN.test(operationId) || !target || !studioCrdtDeletionTargetExists(doc, target)) {
+        return false;
+      }
+    }
+  }
+  if (acknowledgements) {
+    for (const [operationId, encodedTarget] of acknowledgements) {
+      if (
+        !UUID_PATTERN.test(operationId) ||
+        !parseStudioCrdtDeletionTarget(encodedTarget) ||
+        !operations ||
+        operations.get(operationId) !== encodedTarget
+      ) return false;
+    }
+  }
+  return true;
+}
+
+interface StudioCrdtDeletionRootSnapshot {
+  operations: ReadonlyMap<string, unknown>;
+  acknowledgements: ReadonlyMap<string, unknown>;
+}
+
+function snapshotStudioCrdtDeletionRoots(doc: Y.Doc): StudioCrdtDeletionRootSnapshot | null {
+  const operations = materializeExistingMapRoot(doc, STUDIO_CRDT_DELETION_OPS_ROOT);
+  const acknowledgements = materializeExistingMapRoot(doc, STUDIO_CRDT_DELETION_ACKS_ROOT);
+  if (operations === null || acknowledgements === null) return null;
+  return {
+    operations: new Map(operations ?? []),
+    acknowledgements: new Map(acknowledgements ?? []),
+  };
+}
+
+function preservesStudioCrdtDeletionRoots(
+  snapshot: StudioCrdtDeletionRootSnapshot | null,
+  doc: Y.Doc
+): boolean {
+  if (!snapshot) return false;
+  const operations = materializeExistingMapRoot(doc, STUDIO_CRDT_DELETION_OPS_ROOT);
+  const acknowledgements = materializeExistingMapRoot(doc, STUDIO_CRDT_DELETION_ACKS_ROOT);
+  if (operations === null || acknowledgements === null) return false;
+  for (const [operationId, target] of snapshot.operations) {
+    if (!operations || operations.get(operationId) !== target) return false;
+  }
+  for (const [operationId, target] of snapshot.acknowledgements) {
+    if (!acknowledgements || acknowledgements.get(operationId) !== target) return false;
+  }
+  return true;
+}
+
 function validateSceneElementRoot(id: string, record: Y.Map<unknown>): boolean {
   const metadataKeys = new Set(["id", "pageId", "layerId", "payloadVersion", "type", "deleted"]);
   const type = record.get("type");
@@ -531,7 +679,7 @@ function validateSceneElementRoot(id: string, record: Y.Map<unknown>): boolean {
     !isBoundedStudioCrdtId(record.get("layerId")) ||
     record.get("payloadVersion") !== 1 ||
     !isStudioCrdtSceneType(type) ||
-    typeof record.get("deleted") !== "boolean"
+    (record.has("deleted") && typeof record.get("deleted") !== "boolean")
   ) {
     return false;
   }
@@ -539,6 +687,24 @@ function validateSceneElementRoot(id: string, record: Y.Map<unknown>): boolean {
   if (!props) return false;
   for (const key of STUDIO_CRDT_REQUIRED_SCENE_KEYS[type]) {
     if (!(key in props)) return false;
+  }
+  if (
+    type === "reference" &&
+    (
+      !boundedExactText(props.elementType, 160) || props.elementType === "draw" ||
+      isStudioCrdtSceneType(props.elementType)
+    )
+  ) return false;
+  if (type === "reference") {
+    // Validate losing baseline/override candidates too. Otherwise a small effective `prop:` value
+    // could hide an oversized or reserved `base:` candidate in the durable Y.Map.
+    for (const [key, value] of record) {
+      if (key !== "base:elementType" && key !== "prop:elementType") continue;
+      if (
+        !boundedExactText(value, 160) || value === "draw" ||
+        isStudioCrdtSceneType(value)
+      ) return false;
+    }
   }
   for (const key of ["x", "y"]) {
     if (key in props && !finiteNumberInRange(props[key], -STUDIO_CRDT_MAX_COORDINATE, STUDIO_CRDT_MAX_COORDINATE)) {
@@ -639,7 +805,7 @@ function validatePageRoot(id: string, record: Y.Map<unknown>): boolean {
   if (
     record.get("id") !== id ||
     record.get("payloadVersion") !== 1 ||
-    typeof record.get("deleted") !== "boolean"
+    (record.has("deleted") && typeof record.get("deleted") !== "boolean")
   ) {
     return false;
   }
@@ -671,7 +837,7 @@ function validateLayerGroupRoot(
     record.get("id") !== identity.groupId ||
     record.get("pageId") !== identity.pageId ||
     record.get("payloadVersion") !== 1 ||
-    typeof record.get("deleted") !== "boolean" ||
+    (record.has("deleted") && typeof record.get("deleted") !== "boolean") ||
     record.get("unset:name") === true
   ) {
     return false;
@@ -737,7 +903,7 @@ function validateStrokeRoot(id: string, record: Y.Map<unknown>): boolean {
     !isBoundedStudioCrdtId(record.get("pageId")) ||
     !isBoundedStudioCrdtId(record.get("layerId")) ||
     (record.get("status") !== "drawing" && record.get("status") !== "finalized") ||
-    typeof record.get("deleted") !== "boolean" ||
+    (record.has("deleted") && typeof record.get("deleted") !== "boolean") ||
     record.get("payloadVersion") !== 1 ||
     record.get("type") !== "draw" ||
     (record.get("mode") !== "pen" && record.get("mode") !== "eraser") ||
@@ -977,7 +1143,7 @@ export function hasValidStudioCrdtRootSchema(doc: Y.Doc): boolean {
       }
     }
   }
-  return true;
+  return validateStudioCrdtDeletionRoots(doc);
 }
 
 @Injectable()
@@ -1095,14 +1261,16 @@ export class StudioCrdtService implements OnModuleDestroy {
     const update = decodeStudioCrdtBase64(input.data, STUDIO_CRDT_UPDATE_MAX_BYTES, "update");
     return this.withWorkLock(input.workId, async () => {
       const entry = await this.getCaughtUpDocument(input.workId);
-      this.validateUpdateAgainstDocument(entry.doc, update);
-      const persisted = await this.repository.appendUpdate({
-        workId: input.workId,
-        updateId: input.updateId,
-        actorUserId: input.actorUserId,
-        payload: update,
-        createdAt: this.now(),
-      });
+      const persisted = await this.repository.appendUpdate(
+        {
+          workId: input.workId,
+          updateId: input.updateId,
+          actorUserId: input.actorUserId,
+          payload: update,
+          createdAt: this.now(),
+        },
+        (current) => this.validateUpdateAgainstHydration(input.workId, current, update)
+      );
       if (
         persisted.receipt.actorUserId !== input.actorUserId ||
         !bytesEqual(persisted.receipt.payloadHash, studioCrdtPayloadHash(update))
@@ -1202,7 +1370,6 @@ export class StudioCrdtService implements OnModuleDestroy {
     entry: CachedStudioCrdtDocument,
     state: StudioCrdtHydrationState
   ): void {
-    let changed = false;
     if (state.snapshot) {
       if (
         state.snapshot.workId !== workId ||
@@ -1212,49 +1379,99 @@ export class StudioCrdtService implements OnModuleDestroy {
       ) {
         throw new StudioCrdtStorageCorruptionError("Stored CRDT snapshot violates its contract");
       }
-      try {
-        Y.applyUpdate(entry.doc, state.snapshot.snapshot, "server-hydrate");
-      } catch {
-        throw new StudioCrdtStorageCorruptionError("Stored CRDT snapshot cannot be decoded");
-      }
-      entry.sequence = state.snapshot.compactedSequence;
-      entry.compactedSequence = state.snapshot.compactedSequence;
-      entry.uncompactedUpdateCount = 0;
-      entry.uncompactedUpdateBytes = 0;
-      entry.lastCompactedAt = state.snapshot.updatedAt.getTime();
-      changed = true;
     }
     for (const update of state.updates) {
       validateStoredUpdate(update, workId);
-      if (update.sequence <= entry.sequence) continue;
-      try {
-        Y.applyUpdate(entry.doc, update.payload, "server-hydrate");
-      } catch {
-        throw new StudioCrdtStorageCorruptionError("Stored CRDT update cannot be decoded");
-      }
-      entry.sequence = update.sequence;
-      entry.uncompactedUpdateCount += 1;
-      entry.uncompactedUpdateBytes += update.payload.byteLength;
-      changed = true;
     }
-    if (changed) {
-      if (!hasValidStudioCrdtRootSchema(entry.doc)) {
+    const prospectiveSequence = state.snapshot?.compactedSequence ?? entry.sequence;
+    if (
+      !state.snapshot &&
+      !state.updates.some((update) => update.sequence > prospectiveSequence)
+    ) return;
+
+    const staged = new Y.Doc();
+    let ownsStagedDocument = true;
+    let sequence = entry.sequence;
+    let compactedSequence = entry.compactedSequence;
+    let uncompactedUpdateCount = entry.uncompactedUpdateCount;
+    let uncompactedUpdateBytes = entry.uncompactedUpdateBytes;
+    let lastCompactedAt = entry.lastCompactedAt;
+    try {
+      try {
+        Y.applyUpdate(staged, Y.encodeStateAsUpdate(entry.doc), "server-hydrate-base");
+      } catch {
+        throw new StudioCrdtStorageCorruptionError("Cached CRDT document cannot be staged");
+      }
+      if (state.snapshot) {
+        const deletionRootsBefore = snapshotStudioCrdtDeletionRoots(staged);
+        try {
+          Y.applyUpdate(staged, state.snapshot.snapshot, "server-hydrate-snapshot");
+        } catch {
+          throw new StudioCrdtStorageCorruptionError("Stored CRDT snapshot cannot be decoded");
+        }
+        if (!preservesStudioCrdtDeletionRoots(deletionRootsBefore, staged)) {
+          throw new StudioCrdtStorageCorruptionError(
+            "Stored CRDT snapshot rewrites grow-only deletion history"
+          );
+        }
+        sequence = state.snapshot.compactedSequence;
+        compactedSequence = state.snapshot.compactedSequence;
+        uncompactedUpdateCount = 0;
+        uncompactedUpdateBytes = 0;
+        lastCompactedAt = state.snapshot.updatedAt.getTime();
+      }
+      for (const update of state.updates) {
+        if (update.sequence <= sequence) continue;
+        const deletionRootsBefore = snapshotStudioCrdtDeletionRoots(staged);
+        try {
+          Y.applyUpdate(staged, update.payload, "server-hydrate-update");
+        } catch {
+          throw new StudioCrdtStorageCorruptionError("Stored CRDT update cannot be decoded");
+        }
+        if (!preservesStudioCrdtDeletionRoots(deletionRootsBefore, staged)) {
+          throw new StudioCrdtStorageCorruptionError(
+            "Stored CRDT update rewrites grow-only deletion history"
+          );
+        }
+        sequence = update.sequence;
+        uncompactedUpdateCount += 1;
+        uncompactedUpdateBytes += update.payload.byteLength;
+      }
+      if (!hasValidStudioCrdtRootSchema(staged)) {
         throw new StudioCrdtStorageCorruptionError("Stored CRDT document violates its root schema");
       }
-      if (Y.encodeStateAsUpdate(entry.doc).byteLength > STUDIO_CRDT_SNAPSHOT_MAX_BYTES) {
+      if (Y.encodeStateAsUpdate(staged).byteLength > STUDIO_CRDT_SNAPSHOT_MAX_BYTES) {
         throw new StudioCrdtStorageCorruptionError("Stored CRDT document exceeds its byte budget");
       }
-      encodeStudioCrdtServerStateVector(entry.doc, this.stateVectorMaxBytes);
+      encodeStudioCrdtServerStateVector(staged, this.stateVectorMaxBytes);
+
+      const previous = entry.doc;
+      entry.doc = staged;
+      entry.sequence = sequence;
+      entry.compactedSequence = compactedSequence;
+      entry.uncompactedUpdateCount = uncompactedUpdateCount;
+      entry.uncompactedUpdateBytes = uncompactedUpdateBytes;
+      entry.lastCompactedAt = lastCompactedAt;
+      ownsStagedDocument = false;
+      previous.destroy();
+    } finally {
+      if (ownsStagedDocument) staged.destroy();
     }
   }
 
   private validateUpdateAgainstDocument(doc: Y.Doc, update: Uint8Array): void {
     const probe = new Y.Doc();
+    const deletionRootsBefore = snapshotStudioCrdtDeletionRoots(doc);
     try {
       Y.applyUpdate(probe, Y.encodeStateAsUpdate(doc), "server-validation-base");
       Y.applyUpdate(probe, update, "server-validation-update");
       if (!hasValidStudioCrdtRootSchema(probe)) {
         throw new StudioCrdtInvalidPayloadError("update violates the Studio CRDT root schema");
+      }
+      if (!preservesStudioCrdtDeletionRoots(deletionRootsBefore, probe)) {
+        throw new StudioCrdtInvalidPayloadError(
+          "update rewrites grow-only Studio deletion history"
+        );
       }
       if (Y.encodeStateAsUpdate(probe).byteLength > STUDIO_CRDT_SNAPSHOT_MAX_BYTES) {
         throw new StudioCrdtDocumentTooLargeError();
@@ -1270,6 +1487,19 @@ export class StudioCrdtService implements OnModuleDestroy {
       throw new StudioCrdtInvalidPayloadError("update is not a valid Yjs update");
     } finally {
       probe.destroy();
+    }
+  }
+
+  private validateUpdateAgainstHydration(
+    workId: string,
+    current: StudioCrdtHydrationState,
+    update: Uint8Array
+  ): void {
+    const durable = this.createCachedDocument(workId, current);
+    try {
+      this.validateUpdateAgainstDocument(durable.doc, update);
+    } finally {
+      durable.doc.destroy();
     }
   }
 

@@ -2,7 +2,10 @@ import { fromUint8Array, toUint8Array } from "js-base64";
 import { afterEach, describe, expect, it } from "vitest";
 import * as Y from "yjs";
 
-import { studioCrdtPayloadHash } from "./studio-crdt.repository";
+import {
+  STUDIO_CRDT_UPDATE_MAX_BYTES,
+  studioCrdtPayloadHash,
+} from "./studio-crdt.repository";
 import {
   STUDIO_CRDT_SYNC_CHUNK_MAX_BYTES,
   StudioCrdtDocumentTooLargeError,
@@ -24,6 +27,7 @@ import type {
   StudioCrdtSnapshotRecord,
   StudioCrdtUpdateReceiptRecord,
   StudioCrdtUpdateRecord,
+  ValidateStudioCrdtAppend,
 } from "./studio-crdt.repository";
 
 function copyBytes(value: Uint8Array): Uint8Array {
@@ -41,6 +45,25 @@ class MemoryStudioCrdtRepository implements StudioCrdtRepository {
   nextSequence = 1n;
   failAppend = false;
   compactCalls = 0;
+  beforeAppend: (() => Promise<void>) | null = null;
+  private readonly mutationTails = new Map<string, Promise<void>>();
+
+  private async withWorkMutation<T>(workId: string, operation: () => Promise<T>): Promise<T> {
+    const predecessor = this.mutationTails.get(workId) ?? Promise.resolve();
+    let release: (() => void) | undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const tail = predecessor.then(() => gate);
+    this.mutationTails.set(workId, tail);
+    await predecessor;
+    try {
+      return await operation();
+    } finally {
+      release?.();
+      if (this.mutationTails.get(workId) === tail) this.mutationTails.delete(workId);
+    }
+  }
 
   async loadDocument(workId: string): Promise<StudioCrdtHydrationState> {
     const snapshot = this.snapshots.get(workId) ?? null;
@@ -80,68 +103,77 @@ class MemoryStudioCrdtRepository implements StudioCrdtRepository {
       .map(copyUpdate);
   }
 
-  async appendUpdate(input: AppendStudioCrdtUpdateInput): Promise<AppendStudioCrdtUpdateResult> {
-    if (this.failAppend) throw new Error("write failed");
-    const receiptKey = JSON.stringify([input.workId, input.updateId]);
-    const existingReceipt = this.receipts.get(receiptKey);
-    if (existingReceipt) {
+  async appendUpdate(
+    input: AppendStudioCrdtUpdateInput,
+    validate: ValidateStudioCrdtAppend
+  ): Promise<AppendStudioCrdtUpdateResult> {
+    await this.beforeAppend?.();
+    return this.withWorkMutation(input.workId, async () => {
+      if (this.failAppend) throw new Error("write failed");
+      const receiptKey = JSON.stringify([input.workId, input.updateId]);
+      const existingReceipt = this.receipts.get(receiptKey);
+      if (existingReceipt) {
+        return {
+          inserted: false,
+          receipt: {
+            ...existingReceipt,
+            payloadHash: copyBytes(existingReceipt.payloadHash),
+            createdAt: new Date(existingReceipt.createdAt),
+          },
+        };
+      }
+      await validate(await this.loadDocument(input.workId));
+      const rows = this.updates.get(input.workId) ?? [];
+      const update: StudioCrdtUpdateRecord = {
+        workId: input.workId,
+        sequence: this.nextSequence,
+        updateId: input.updateId,
+        actorUserId: input.actorUserId,
+        payload: copyBytes(input.payload),
+        createdAt: new Date(input.createdAt),
+      };
+      this.nextSequence += 1n;
+      rows.push(update);
+      this.updates.set(input.workId, rows);
+      const receipt: StudioCrdtUpdateReceiptRecord = {
+        workId: input.workId,
+        updateId: input.updateId,
+        sequence: update.sequence,
+        actorUserId: input.actorUserId,
+        payloadHash: studioCrdtPayloadHash(input.payload),
+        createdAt: new Date(input.createdAt),
+      };
+      this.receipts.set(receiptKey, receipt);
       return {
-        inserted: false,
+        inserted: true,
         receipt: {
-          ...existingReceipt,
-          payloadHash: copyBytes(existingReceipt.payloadHash),
-          createdAt: new Date(existingReceipt.createdAt),
+          ...receipt,
+          payloadHash: copyBytes(receipt.payloadHash),
+          createdAt: new Date(receipt.createdAt),
         },
       };
-    }
-    const rows = this.updates.get(input.workId) ?? [];
-    const update: StudioCrdtUpdateRecord = {
-      workId: input.workId,
-      sequence: this.nextSequence,
-      updateId: input.updateId,
-      actorUserId: input.actorUserId,
-      payload: copyBytes(input.payload),
-      createdAt: new Date(input.createdAt),
-    };
-    this.nextSequence += 1n;
-    rows.push(update);
-    this.updates.set(input.workId, rows);
-    const receipt: StudioCrdtUpdateReceiptRecord = {
-      workId: input.workId,
-      updateId: input.updateId,
-      sequence: update.sequence,
-      actorUserId: input.actorUserId,
-      payloadHash: studioCrdtPayloadHash(input.payload),
-      createdAt: new Date(input.createdAt),
-    };
-    this.receipts.set(receiptKey, receipt);
-    return {
-      inserted: true,
-      receipt: {
-        ...receipt,
-        payloadHash: copyBytes(receipt.payloadHash),
-        createdAt: new Date(receipt.createdAt),
-      },
-    };
+    });
   }
 
   async compact(input: CompactStudioCrdtInput): Promise<boolean> {
-    this.compactCalls += 1;
-    const existing = this.snapshots.get(input.workId);
-    if (existing && existing.compactedSequence >= input.throughSequence) return false;
-    this.snapshots.set(input.workId, {
-      workId: input.workId,
-      snapshot: copyBytes(input.snapshot),
-      compactedSequence: input.throughSequence,
-      updatedAt: new Date(input.updatedAt),
+    return this.withWorkMutation(input.workId, async () => {
+      this.compactCalls += 1;
+      const existing = this.snapshots.get(input.workId);
+      if (existing && existing.compactedSequence >= input.throughSequence) return false;
+      this.snapshots.set(input.workId, {
+        workId: input.workId,
+        snapshot: copyBytes(input.snapshot),
+        compactedSequence: input.throughSequence,
+        updatedAt: new Date(input.updatedAt),
+      });
+      this.updates.set(
+        input.workId,
+        (this.updates.get(input.workId) ?? []).filter(
+          (update) => update.sequence > input.throughSequence
+        )
+      );
+      return true;
     });
-    this.updates.set(
-      input.workId,
-      (this.updates.get(input.workId) ?? []).filter(
-        (update) => update.sequence > input.throughSequence
-      )
-    );
-    return true;
   }
 }
 
@@ -207,6 +239,57 @@ function createScenePageDocument(): Y.Doc {
   pageOrder.set("pageId", "page-1");
   pageOrder.set("active", true);
   doc.getArray<Y.Map<unknown>>("page-order").push([pageOrder]);
+  return doc;
+}
+
+const DELETION_OPERATION_ID = "00000000-0000-4000-8000-000000000301";
+const DELETION_TARGET = JSON.stringify(["scene", "scene-1"]);
+
+function addSceneDeletionProtocol(doc: Y.Doc, acknowledged = false): void {
+  doc.getMap<string>("studio-deletion-ops").set(DELETION_OPERATION_ID, DELETION_TARGET);
+  if (acknowledged) {
+    doc.getMap<string>("studio-deletion-acks").set(DELETION_OPERATION_ID, DELETION_TARGET);
+  }
+}
+
+function createSceneOrderFloodDocument(activeEntryCount: number): Y.Doc {
+  const doc = createScenePageDocument();
+  const order = doc.getArray<Y.Map<unknown>>("stroke-order");
+  for (let index = 1; index < activeEntryCount; index += 1) {
+    const entry = new Y.Map<unknown>();
+    entry.set("elementId", "scene-1");
+    entry.set("pageId", "page-1");
+    entry.set("layerId", "layer-1");
+    entry.set("kind", "scene");
+    entry.set("active", true);
+    order.push([entry]);
+  }
+  return doc;
+}
+
+function twoPartyBarrier(): () => Promise<void> {
+  let arrivals = 0;
+  let release: (() => void) | undefined;
+  const ready = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return async () => {
+    arrivals += 1;
+    if (arrivals === 2) release?.();
+    await ready;
+  };
+}
+
+function createReferenceTopologyDocument(elementType = "image"): Y.Doc {
+  const doc = createScenePageDocument();
+  const scene = doc.getMap<unknown>("scene-element:scene-1");
+  scene.set("type", "reference");
+  for (const key of [...scene.keys()]) {
+    if (key.startsWith("base:") || key.startsWith("prop:") || key.startsWith("unset:")) {
+      scene.delete(key);
+    }
+  }
+  scene.set("prop:elementType", elementType);
   return doc;
 }
 
@@ -331,6 +414,173 @@ describe("StudioCrdtService", () => {
 
     expect(hasValidStudioCrdtRootSchema(doc)).toBe(true);
     doc.destroy();
+  });
+
+  it("accepts canonical flat deletion operations and rejects malformed or orphan acknowledgements", () => {
+    const valid = createScenePageDocument();
+    const validGroup = addLayerGroup(valid);
+    addSceneDeletionProtocol(valid, true);
+    valid.getMap("scene-element:scene-1").delete("deleted");
+    valid.getMap("studio-page:page-1").delete("deleted");
+    validGroup.delete("deleted");
+    expect(hasValidStudioCrdtRootSchema(valid)).toBe(true);
+    valid.destroy();
+
+    const validStroke = createStrokeDocument();
+    (validStroke.getMap("strokes").get("stroke-1") as Y.Map<unknown>).delete("deleted");
+    expect(hasValidStudioCrdtRootSchema(validStroke)).toBe(true);
+    validStroke.destroy();
+
+    const invalidCases: Array<(doc: Y.Doc) => void> = [
+      (doc) => doc.getMap<string>("studio-deletion-ops").set("not-a-uuid", DELETION_TARGET),
+      (doc) => doc.getMap<string>("studio-deletion-ops").set(
+        DELETION_OPERATION_ID,
+        '[ "scene", "scene-1" ]'
+      ),
+      (doc) => doc.getMap<string>("studio-deletion-ops").set(
+        DELETION_OPERATION_ID,
+        JSON.stringify(["scene", "missing-scene"])
+      ),
+      (doc) => doc.getMap<string>("studio-deletion-acks").set(
+        DELETION_OPERATION_ID,
+        DELETION_TARGET
+      ),
+      (doc) => {
+        addSceneDeletionProtocol(doc);
+        doc.getMap<string>("studio-deletion-acks").set(
+          DELETION_OPERATION_ID,
+          JSON.stringify(["page", "page-1"])
+        );
+      },
+      (doc) => doc.getMap<unknown>("studio-deletion-ops").set(
+        DELETION_OPERATION_ID,
+        new Y.Map<unknown>()
+      ),
+    ];
+    for (const mutate of invalidCases) {
+      const invalid = createScenePageDocument();
+      mutate(invalid);
+      expect(hasValidStudioCrdtRootSchema(invalid)).toBe(false);
+      invalid.destroy();
+    }
+  });
+
+  it.each(["operation", "acknowledgement"] as const)(
+    "rejects removal of an existing grow-only deletion %s before durable storage",
+    async (kind) => {
+      const repository = new MemoryStudioCrdtRepository();
+      const current = service(repository);
+      const base = createScenePageDocument();
+      addSceneDeletionProtocol(base, kind === "acknowledgement");
+      const baseUpdate = Y.encodeStateAsUpdate(base);
+      await current.applyUpdate({
+        workId: `work-grow-only-${kind}`,
+        updateId: kind === "operation"
+          ? "00000000-0000-4000-8000-000000000302"
+          : "00000000-0000-4000-8000-000000000303",
+        actorUserId: "editor",
+        data: fromUint8Array(baseUpdate),
+      });
+
+      const attacker = new Y.Doc();
+      Y.applyUpdate(attacker, baseUpdate);
+      const stateVector = Y.encodeStateVector(attacker);
+      attacker.getMap(
+        kind === "operation" ? "studio-deletion-ops" : "studio-deletion-acks"
+      ).delete(DELETION_OPERATION_ID);
+      const rewrite = Y.encodeStateAsUpdate(attacker, stateVector);
+      expect(hasValidStudioCrdtRootSchema(attacker)).toBe(true);
+
+      await expect(current.applyUpdate({
+        workId: `work-grow-only-${kind}`,
+        updateId: kind === "operation"
+          ? "00000000-0000-4000-8000-000000000304"
+          : "00000000-0000-4000-8000-000000000305",
+        actorUserId: "editor",
+        data: fromUint8Array(rewrite),
+      })).rejects.toBeInstanceOf(StudioCrdtInvalidPayloadError);
+      expect(repository.updates.get(`work-grow-only-${kind}`)).toHaveLength(1);
+      expect(repository.receipts.size).toBe(1);
+      base.destroy();
+      attacker.destroy();
+    }
+  );
+
+  it("classifies a persisted deletion-history rewrite as storage corruption during hydration", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const base = createScenePageDocument();
+    addSceneDeletionProtocol(base);
+    const baseUpdate = Y.encodeStateAsUpdate(base);
+    const attacker = new Y.Doc();
+    Y.applyUpdate(attacker, baseUpdate);
+    const stateVector = Y.encodeStateVector(attacker);
+    attacker.getMap("studio-deletion-ops").delete(DELETION_OPERATION_ID);
+    const rewrite = Y.encodeStateAsUpdate(attacker, stateVector);
+    repository.updates.set("work-corrupt-delete-history", [
+      {
+        workId: "work-corrupt-delete-history",
+        sequence: 1n,
+        updateId: "00000000-0000-4000-8000-000000000306",
+        actorUserId: "editor",
+        payload: baseUpdate,
+        createdAt: new Date("2026-07-16T00:00:00.000Z"),
+      },
+      {
+        workId: "work-corrupt-delete-history",
+        sequence: 2n,
+        updateId: "00000000-0000-4000-8000-000000000307",
+        actorUserId: "editor",
+        payload: rewrite,
+        createdAt: new Date("2026-07-16T00:00:01.000Z"),
+      },
+    ]);
+
+    await expect(service(repository).sync("work-corrupt-delete-history")).rejects.toBeInstanceOf(
+      StudioCrdtStorageCorruptionError
+    );
+    base.destroy();
+    attacker.destroy();
+  });
+
+  it("keeps the cached document unchanged when catch-up contains a deletion-history rewrite", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const current = service(repository);
+    const base = createScenePageDocument();
+    addSceneDeletionProtocol(base);
+    const baseUpdate = Y.encodeStateAsUpdate(base);
+    await current.applyUpdate({
+      workId: "work-atomic-hydration",
+      updateId: "00000000-0000-4000-8000-000000000308",
+      actorUserId: "editor",
+      data: fromUint8Array(baseUpdate),
+    });
+
+    const attacker = new Y.Doc();
+    Y.applyUpdate(attacker, baseUpdate);
+    const stateVector = Y.encodeStateVector(attacker);
+    attacker.getMap("studio-deletion-ops").delete(DELETION_OPERATION_ID);
+    const rows = repository.updates.get("work-atomic-hydration")!;
+    rows.push({
+      workId: "work-atomic-hydration",
+      sequence: 2n,
+      updateId: "00000000-0000-4000-8000-000000000309",
+      actorUserId: "attacker",
+      payload: Y.encodeStateAsUpdate(attacker, stateVector),
+      createdAt: new Date("2026-07-16T00:00:01.000Z"),
+    });
+
+    await expect(current.sync("work-atomic-hydration")).rejects.toBeInstanceOf(
+      StudioCrdtStorageCorruptionError
+    );
+    rows.pop();
+    const hydrated = new Y.Doc();
+    applySync(hydrated, await current.sync("work-atomic-hydration"));
+    expect(hydrated.getMap("studio-deletion-ops").get(DELETION_OPERATION_ID)).toBe(
+      DELETION_TARGET
+    );
+    base.destroy();
+    attacker.destroy();
+    hydrated.destroy();
   });
 
   it("validates reserved layer-group roots without synchronizing local collapse state", () => {
@@ -547,6 +797,43 @@ describe("StudioCrdtService", () => {
     text.set("prop:textPath", Array<number>(2_100).fill(0));
     expect(hasValidStudioCrdtRootSchema(aggregateEntryOverflow)).toBe(false);
     aggregateEntryOverflow.destroy();
+  });
+
+  it("accepts topology-only asset references and rejects payload smuggling or reserved types", () => {
+    for (const elementType of ["image", "vrm", "background3d", "toString"]) {
+      const valid = createReferenceTopologyDocument(elementType);
+      expect(hasValidStudioCrdtRootSchema(valid)).toBe(true);
+      valid.destroy();
+    }
+
+    for (const elementType of ["draw", "text", "reference", "bad\u0007type", "x".repeat(161)]) {
+      const invalid = createReferenceTopologyDocument(elementType);
+      expect(hasValidStudioCrdtRootSchema(invalid)).toBe(false);
+      invalid.destroy();
+    }
+
+    const smuggledRaster = createReferenceTopologyDocument();
+    smuggledRaster.getMap<unknown>("scene-element:scene-1")
+      .set("prop:src", "data:image/png;base64,AA==");
+    expect(hasValidStudioCrdtRootSchema(smuggledRaster)).toBe(false);
+    smuggledRaster.destroy();
+
+    const wrongValue = createReferenceTopologyDocument();
+    wrongValue.getMap<unknown>("scene-element:scene-1").set("prop:elementType", 3);
+    expect(hasValidStudioCrdtRootSchema(wrongValue)).toBe(false);
+    wrongValue.destroy();
+
+    const hiddenBaseline = createReferenceTopologyDocument();
+    hiddenBaseline.getMap<unknown>("scene-element:scene-1")
+      .set("base:elementType", "x".repeat(1_000));
+    expect(hasValidStudioCrdtRootSchema(hiddenBaseline)).toBe(false);
+    hiddenBaseline.destroy();
+
+    const prototypeType = createReferenceTopologyDocument();
+    prototypeType.getMap<unknown>("scene-element:scene-1").set("type", "toString");
+    expect(() => hasValidStudioCrdtRootSchema(prototypeType)).not.toThrow();
+    expect(hasValidStudioCrdtRootSchema(prototypeType)).toBe(false);
+    prototypeType.destroy();
   });
 
   it("rejects order entries whose target or page/layer coordinates do not match the record", () => {
@@ -873,6 +1160,60 @@ describe("StudioCrdtService", () => {
     applySync(target, sync);
     expect(Object.fromEntries(target.getMap("root"))).toEqual({ a: "1", b: "2" });
     target.destroy();
+  });
+
+  it("atomically rejects a concurrently-valid append whose durable merge violates schema", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    repository.beforeAppend = twoPartyBarrier();
+    const first = service(repository);
+    const second = service(repository);
+    const left = createSceneOrderFloodDocument(130);
+    const right = createSceneOrderFloodDocument(130);
+    const leftUpdate = Y.encodeStateAsUpdate(left);
+    const rightUpdate = Y.encodeStateAsUpdate(right);
+    const merged = new Y.Doc();
+    Y.applyUpdate(merged, leftUpdate);
+    Y.applyUpdate(merged, rightUpdate);
+
+    expect(hasValidStudioCrdtRootSchema(left)).toBe(true);
+    expect(hasValidStudioCrdtRootSchema(right)).toBe(true);
+    expect(leftUpdate.byteLength).toBeLessThanOrEqual(STUDIO_CRDT_UPDATE_MAX_BYTES);
+    expect(rightUpdate.byteLength).toBeLessThanOrEqual(STUDIO_CRDT_UPDATE_MAX_BYTES);
+    expect(hasValidStudioCrdtRootSchema(merged)).toBe(false);
+
+    const results = await Promise.allSettled([
+      first.applyUpdate({
+        workId: "work-atomic-merge",
+        updateId: "00000000-0000-4000-8000-000000000201",
+        actorUserId: "editor-left",
+        data: fromUint8Array(leftUpdate),
+      }),
+      second.applyUpdate({
+        workId: "work-atomic-merge",
+        updateId: "00000000-0000-4000-8000-000000000202",
+        actorUserId: "editor-right",
+        data: fromUint8Array(rightUpdate),
+      }),
+    ]);
+
+    expect(results.filter(({ status }) => status === "fulfilled")).toHaveLength(1);
+    const rejected = results.find(({ status }) => status === "rejected");
+    expect(rejected?.status).toBe("rejected");
+    if (rejected?.status === "rejected") {
+      expect(rejected.reason).toBeInstanceOf(StudioCrdtInvalidPayloadError);
+    }
+    expect(repository.updates.get("work-atomic-merge")).toHaveLength(1);
+    expect(repository.receipts.size).toBe(1);
+
+    const durable = new Y.Doc();
+    applySync(durable, await first.sync("work-atomic-merge"));
+    expect(hasValidStudioCrdtRootSchema(durable)).toBe(true);
+    expect(durable.getArray("stroke-order")).toHaveLength(130);
+
+    left.destroy();
+    right.destroy();
+    merged.destroy();
+    durable.destroy();
   });
 
   it("returns a state-vector diff and the server vector for local-op reupload", async () => {

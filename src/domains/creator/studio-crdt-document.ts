@@ -44,9 +44,11 @@ export {
   STUDIO_CRDT_LAYER_GROUP_PAYLOAD_VERSION,
   STUDIO_CRDT_PAGE_MAX_BYTES,
   STUDIO_CRDT_PAGE_PAYLOAD_VERSION,
+  STUDIO_CRDT_PAYLOAD_SCENE_ELEMENT_TYPES,
   STUDIO_CRDT_SCENE_ELEMENT_MAX_BYTES,
   STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION,
   STUDIO_CRDT_SCENE_ELEMENT_TYPES,
+  isStudioCrdtPayloadSceneElementType,
   validateStudioCrdtPagePayload,
   validateStudioCrdtLayerGroupPayload,
   validateStudioCrdtSceneElementPayload,
@@ -54,6 +56,7 @@ export {
   type StudioCrdtJsonValue,
   type StudioCrdtLayerGroupPayload,
   type StudioCrdtPagePayload,
+  type StudioCrdtPayloadSceneElementType,
   type StudioCrdtSceneElementPayload,
   type StudioCrdtSceneElementType,
 } from "./studio-crdt-scene-schema";
@@ -62,6 +65,13 @@ export const STUDIO_CRDT_APPEND_MAX_SAMPLES = 4_096;
 export const STUDIO_CRDT_REPLACE_CHUNK_SAMPLES = 256;
 /** Inline CRDT metadata is intentionally small; large masks/assets must use an external reference. */
 export const STUDIO_CRDT_METADATA_MAX_BYTES = 16 * 1024;
+/**
+ * Delete-wins observed-remove protocol roots. Each delete owns a unique, immutable operation ID;
+ * explicit restore only acknowledges deletion IDs already visible to that peer.
+ */
+export const STUDIO_CRDT_DELETION_OPS_ROOT = "studio-deletion-ops";
+export const STUDIO_CRDT_DELETION_ACKS_ROOT = "studio-deletion-acks";
+export const STUDIO_CRDT_DELETION_OPERATION_MAX_ENTRIES = 100_000;
 
 const MAX_ID_LENGTH = 160;
 const MAX_LAYER_GROUP_KEY_LENGTH = MAX_ID_LENGTH * 2 + 32;
@@ -72,6 +82,7 @@ const MAX_JSON_DEPTH = 10;
 const MAX_JSON_ENTRIES = 4_096;
 const MAX_JSON_STRING_LENGTH = 64 * 1024;
 const MAX_ACTIVE_ORDER_ENTRIES_PER_STROKE = 256;
+const MAX_DELETION_TARGET_LENGTH = MAX_ID_LENGTH * 2 + 64;
 const BATCH_MIN_DELAY_MS = 30;
 const BATCH_MAX_DELAY_MS = 50;
 const DEFAULT_BATCH_DELAY_MS = 40;
@@ -83,6 +94,13 @@ const LAYER_GROUP_ROOT_PREFIX = "layer-group:";
 const PROPERTY_PREFIX = "prop:";
 const BASELINE_PROPERTY_PREFIX = "base:";
 const UNSET_PROPERTY_PREFIX = "unset:";
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+
+type StudioCrdtDeletionTarget =
+  | { kind: "stroke"; id: string }
+  | { kind: "scene"; id: string }
+  | { kind: "page"; id: string }
+  | { kind: "group"; pageId: string; id: string };
 
 const SAMPLE_ARRAY_KEYS = [
   "points",
@@ -165,8 +183,9 @@ export interface StudioCrdtStrokeRecord extends StudioCrdtStrokeInput {
 }
 
 /**
- * Small, editable Studio objects only. Raster images and embedded 3D documents intentionally stay
- * outside this envelope because their sources belong in asset storage, not a 48 KiB realtime op.
+ * Small editable Studio objects use their bounded field payload. Asset-backed image/VRM/3D or
+ * future element types use the wire-only `reference` payload; their source bytes intentionally
+ * stay in project asset storage rather than entering a 48 KiB realtime operation.
  */
 export interface StudioCrdtSceneElementInput {
   id: string;
@@ -401,6 +420,78 @@ function pageRootName(id: string): string {
 
 function layerGroupRootName(compositeKey: string): string {
   return `${LAYER_GROUP_ROOT_PREFIX}${encodeURIComponent(compositeKey)}`;
+}
+
+function encodeDeletionTarget(target: StudioCrdtDeletionTarget): string {
+  return target.kind === "group"
+    ? JSON.stringify([target.kind, target.pageId, target.id])
+    : JSON.stringify([target.kind, target.id]);
+}
+
+function strokeDeletionTarget(id: string): string {
+  return encodeDeletionTarget({ kind: "stroke", id });
+}
+
+function sceneDeletionTarget(id: string): string {
+  return encodeDeletionTarget({ kind: "scene", id });
+}
+
+function pageDeletionTarget(id: string): string {
+  return encodeDeletionTarget({ kind: "page", id });
+}
+
+function layerGroupDeletionTarget(pageId: string, id: string): string {
+  return encodeDeletionTarget({ kind: "group", pageId, id });
+}
+
+function parseDeletionTarget(value: unknown): StudioCrdtDeletionTarget | null {
+  if (typeof value !== "string" || value.length === 0 || value.length > MAX_DELETION_TARGET_LENGTH) {
+    return null;
+  }
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!Array.isArray(parsed)) return null;
+    if (
+      parsed.length === 2 &&
+      (parsed[0] === "stroke" || parsed[0] === "scene" || parsed[0] === "page") &&
+      exactText(parsed[1], MAX_ID_LENGTH)
+    ) {
+      const target = { kind: parsed[0], id: parsed[1] } satisfies StudioCrdtDeletionTarget;
+      return encodeDeletionTarget(target) === value ? target : null;
+    }
+    if (
+      parsed.length === 3 &&
+      parsed[0] === "group" &&
+      exactText(parsed[1], MAX_ID_LENGTH) &&
+      exactText(parsed[2], MAX_ID_LENGTH) &&
+      parsed[2] !== "page-root"
+    ) {
+      const target = {
+        kind: "group",
+        pageId: parsed[1],
+        id: parsed[2],
+      } satisfies StudioCrdtDeletionTarget;
+      return encodeDeletionTarget(target) === value ? target : null;
+    }
+  } catch {
+    // Untrusted remote documents are read defensively; the API rejects malformed protocol roots.
+  }
+  return null;
+}
+
+function createDeletionOperationId(): string {
+  const cryptoApi = globalThis.crypto;
+  if (typeof cryptoApi?.randomUUID === "function") return cryptoApi.randomUUID();
+  if (typeof cryptoApi?.getRandomValues !== "function") {
+    throw new Error("삭제 작업 식별자를 안전하게 생성할 수 없습니다.");
+  }
+  const bytes = cryptoApi.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6]! & 0x0f) | 0x40;
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+  const hex = [...bytes].map((value) => value.toString(16).padStart(2, "0"));
+  return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex
+    .slice(6, 8)
+    .join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10).join("")}`;
 }
 
 function propertyKey(prefix: typeof PROPERTY_PREFIX | typeof BASELINE_PROPERTY_PREFIX, key: string): string {
@@ -772,6 +863,9 @@ export class StudioCrdtDocument {
   private readonly layerGroupIds: Y.Map<boolean>;
   private readonly order: Y.Array<Y.Map<unknown>>;
   private readonly pageOrder: Y.Array<Y.Map<unknown>>;
+  private readonly deletionOps: Y.Map<string>;
+  private readonly deletionAcks: Y.Map<string>;
+  private readonly deletionOpIdsByTarget = new Map<string, Set<string>>();
   private readonly cleanup = new Set<() => void>();
   private readonly strokeIdByType = new WeakMap<object, string>();
   private readonly changedStrokeIdsByTransaction = new WeakMap<Y.Transaction, Set<string>>();
@@ -791,6 +885,8 @@ export class StudioCrdtDocument {
     this.layerGroupIds = this.doc.getMap<boolean>("layer-groups");
     this.order = this.doc.getArray<Y.Map<unknown>>("stroke-order");
     this.pageOrder = this.doc.getArray<Y.Map<unknown>>("page-order");
+    this.deletionOps = this.doc.getMap<string>(STUDIO_CRDT_DELETION_OPS_ROOT);
+    this.deletionAcks = this.doc.getMap<string>(STUDIO_CRDT_DELETION_ACKS_ROOT);
     if (initialUpdate !== undefined) {
       const decoded =
         typeof initialUpdate === "string" ? decodeStudioCrdtUpdate(initialUpdate) : initialUpdate;
@@ -806,6 +902,9 @@ export class StudioCrdtDocument {
     }
     for (const [compositeKey, active] of this.layerGroupIds) {
       if (active === true) this.observeLayerGroupRoot(compositeKey);
+    }
+    for (const [operationId, target] of this.deletionOps) {
+      this.indexDeletionOperation(operationId, target);
     }
 
     const observeStrokes: Parameters<typeof this.strokes.observeDeep>[0] = (events, transaction) => {
@@ -912,18 +1011,44 @@ export class StudioCrdtDocument {
         }
       }
     };
+    const observeDeletionOps = (event: Y.YMapEvent<string>, transaction: Y.Transaction) => {
+      for (const operationId of event.keysChanged) {
+        const oldValue = event.changes.keys.get(operationId)?.oldValue;
+        if (typeof oldValue === "string") {
+          this.unindexDeletionOperation(operationId, oldValue);
+          this.markDeletionTargetChanged(oldValue, transaction);
+        }
+        const target = this.deletionOps.get(operationId);
+        if (typeof target === "string") {
+          this.indexDeletionOperation(operationId, target);
+          this.markDeletionTargetChanged(target, transaction);
+        }
+      }
+    };
+    const observeDeletionAcks = (event: Y.YMapEvent<string>, transaction: Y.Transaction) => {
+      for (const operationId of event.keysChanged) {
+        const oldValue = event.changes.keys.get(operationId)?.oldValue;
+        if (typeof oldValue === "string") this.markDeletionTargetChanged(oldValue, transaction);
+        const target = this.deletionAcks.get(operationId);
+        if (typeof target === "string") this.markDeletionTargetChanged(target, transaction);
+      }
+    };
     this.strokes.observeDeep(observeStrokes);
     this.order.observeDeep(observeOrder);
     this.sceneElementIds.observe(observeSceneElementIds);
     this.pageIds.observe(observePageIds);
     this.layerGroupIds.observe(observeLayerGroupIds);
     this.pageOrder.observeDeep(observePageOrder);
+    this.deletionOps.observe(observeDeletionOps);
+    this.deletionAcks.observe(observeDeletionAcks);
     this.cleanup.add(() => this.strokes.unobserveDeep(observeStrokes));
     this.cleanup.add(() => this.order.unobserveDeep(observeOrder));
     this.cleanup.add(() => this.sceneElementIds.unobserve(observeSceneElementIds));
     this.cleanup.add(() => this.pageIds.unobserve(observePageIds));
     this.cleanup.add(() => this.layerGroupIds.unobserve(observeLayerGroupIds));
     this.cleanup.add(() => this.pageOrder.unobserveDeep(observePageOrder));
+    this.cleanup.add(() => this.deletionOps.unobserve(observeDeletionOps));
+    this.cleanup.add(() => this.deletionAcks.unobserve(observeDeletionAcks));
   }
 
   subscribe(handler: StudioCrdtUpdateHandler): () => void {
@@ -1037,7 +1162,7 @@ export class StudioCrdtDocument {
     const normalized = normalizedSamples(input.payload, true);
     const emptyInput = this.withoutSamples(input);
     this.doc.transact(() => {
-      const record = this.createRecord(emptyInput, "drawing", false);
+      const record = this.createRecord(emptyInput, "drawing");
       this.strokes.set(input.id, record);
       this.insertOrderEntry(input, beforeStrokeId);
     }, STUDIO_CRDT_ORIGIN_LOCAL);
@@ -1056,7 +1181,7 @@ export class StudioCrdtDocument {
       throw new Error("한 번에 추가할 수 있는 획 샘플 수를 초과했습니다.");
     }
     const record = this.strokes.get(id);
-    if (!(record instanceof Y.Map) || record.get("deleted") === true) {
+    if (!(record instanceof Y.Map) || this.isDeleted(record, strokeDeletionTarget(id))) {
       throw new Error("추가할 획을 찾을 수 없습니다.");
     }
     if (record.get("status") !== "drawing") throw new Error("완료된 획에는 샘플을 추가할 수 없습니다.");
@@ -1072,7 +1197,7 @@ export class StudioCrdtDocument {
     this.assertAlive();
     if (finalSamples !== undefined) this.appendStrokeSamples(id, finalSamples);
     const record = this.strokes.get(id);
-    if (!(record instanceof Y.Map) || record.get("deleted") === true) {
+    if (!(record instanceof Y.Map) || this.isDeleted(record, strokeDeletionTarget(id))) {
       throw new Error("완료할 획을 찾을 수 없습니다.");
     }
     this.doc.transact(() => record.set("status", "finalized"), STUDIO_CRDT_ORIGIN_LOCAL);
@@ -1107,7 +1232,8 @@ export class StudioCrdtDocument {
       return this.requiredStroke(input.id);
     }
 
-    const deleted = existing.get("deleted") === true;
+    const deletionTarget = strokeDeletionTarget(input.id);
+    const deleted = this.isDeleted(existing, deletionTarget);
     if (deleted && !options.resurrect) throw new Error("삭제된 획은 명시적으로 복원해야 합니다.");
     const normalized = normalizedSamples(input.payload, true);
     const previousPageId = readString(existing, "pageId");
@@ -1117,9 +1243,11 @@ export class StudioCrdtDocument {
       options.beforeStrokeId !== undefined;
     if (requiresReorder) this.assertOrderEditBound(input.id);
     this.doc.transact(() => {
+      if (deleted && options.resurrect) {
+        this.acknowledgeCurrentDeletionOperations(existing, deletionTarget);
+      }
       existing.set("pageId", input.pageId);
       existing.set("layerId", input.layerId);
-      existing.set("deleted", false);
       existing.set("status", "drawing");
       setPayloadMetadata(existing, input.payload);
       for (const key of SAMPLE_ARRAY_KEYS) {
@@ -1161,7 +1289,7 @@ export class StudioCrdtDocument {
     this.assertAlive();
     assertId(id, "획");
     const record = this.strokes.get(id);
-    if (!(record instanceof Y.Map) || record.get("deleted") === true) {
+    if (!(record instanceof Y.Map) || this.isDeleted(record, strokeDeletionTarget(id))) {
       throw new Error("수정할 획을 찾을 수 없습니다.");
     }
     const current = this.requiredStroke(id);
@@ -1225,8 +1353,9 @@ export class StudioCrdtDocument {
     this.assertAlive();
     assertId(id, "획");
     const record = this.strokes.get(id);
-    if (!(record instanceof Y.Map) || record.get("deleted") === true) return false;
-    this.doc.transact(() => record.set("deleted", true), STUDIO_CRDT_ORIGIN_LOCAL);
+    const target = strokeDeletionTarget(id);
+    if (!(record instanceof Y.Map) || this.isDeleted(record, target)) return false;
+    this.doc.transact(() => this.addDeletionOperation(target), STUDIO_CRDT_ORIGIN_LOCAL);
     return true;
   }
 
@@ -1234,9 +1363,9 @@ export class StudioCrdtDocument {
     this.assertAlive();
     assertId(id, "획");
     const record = this.strokes.get(id);
-    if (!(record instanceof Y.Map) || record.get("deleted") !== true) return false;
-    this.doc.transact(() => record.set("deleted", false), STUDIO_CRDT_ORIGIN_LOCAL);
-    return true;
+    return record instanceof Y.Map
+      ? this.restoreDeletedRecord(record, strokeDeletionTarget(id))
+      : false;
   }
 
   moveStroke(id: string, beforeStrokeId: string | null): StudioCrdtStrokeRecord {
@@ -1312,12 +1441,14 @@ export class StudioCrdtDocument {
     const exists = this.sceneElementIds.get(input.id) === true;
     const record = this.sceneElementRecord(input.id, !exists);
     if (!record) throw new Error("장면 요소 레코드가 손상되었습니다.");
+    const deletionTarget = sceneDeletionTarget(input.id);
+    const deleted = this.isDeleted(record, deletionTarget);
     const existingPayload = exists ? this.readSceneElementPayload(record) : null;
     if (exists && !existingPayload) throw new Error("기존 장면 요소 레코드가 손상되었습니다.");
     if (existingPayload && existingPayload.type !== payload.type) {
       throw new Error("기존 장면 요소의 타입은 변경할 수 없습니다.");
     }
-    if (record.get("deleted") === true && !options.resurrect) {
+    if (deleted && !options.resurrect) {
       throw new Error("삭제된 장면 요소는 명시적으로 복원해야 합니다.");
     }
 
@@ -1362,13 +1493,15 @@ export class StudioCrdtDocument {
     if (exists && requiresOrderEntry) this.assertMixedOrderEditBound(input.id, "elementId");
 
     this.doc.transact(() => {
+      if (deleted && options.resurrect) {
+        this.acknowledgeCurrentDeletionOperations(record, deletionTarget);
+      }
       this.sceneElementIds.set(input.id, true);
       record.set("id", input.id);
       record.set("pageId", input.pageId);
       record.set("layerId", input.layerId);
       record.set("payloadVersion", payload.version);
       record.set("type", payload.type);
-      if (!exists || options.resurrect) record.set("deleted", false);
       if (baseline) {
         for (const [key, value] of Object.entries(baseline)) {
           const baselineKey = propertyKey(BASELINE_PROPERTY_PREFIX, key);
@@ -1395,7 +1528,9 @@ export class StudioCrdtDocument {
     this.assertAlive();
     assertId(id, "장면 요소");
     const record = this.sceneElementRecord(id);
-    if (!record) throw new Error("수정할 장면 요소를 찾을 수 없습니다.");
+    if (!record || this.isDeleted(record, sceneDeletionTarget(id))) {
+      throw new Error("수정할 장면 요소를 찾을 수 없습니다.");
+    }
     const current = this.readSceneElementPayload(record);
     if (!current) throw new Error("장면 요소 레코드가 손상되었습니다.");
     const set = patch.set ? cloneJsonObject(patch.set) : {};
@@ -1433,8 +1568,9 @@ export class StudioCrdtDocument {
     this.assertAlive();
     assertId(id, "장면 요소");
     const record = this.sceneElementRecord(id);
-    if (!record || record.get("deleted") === true) return false;
-    this.doc.transact(() => record.set("deleted", true), STUDIO_CRDT_ORIGIN_LOCAL);
+    const target = sceneDeletionTarget(id);
+    if (!record || this.isDeleted(record, target)) return false;
+    this.doc.transact(() => this.addDeletionOperation(target), STUDIO_CRDT_ORIGIN_LOCAL);
     return true;
   }
 
@@ -1442,9 +1578,7 @@ export class StudioCrdtDocument {
     this.assertAlive();
     assertId(id, "장면 요소");
     const record = this.sceneElementRecord(id);
-    if (!record || record.get("deleted") !== true) return false;
-    this.doc.transact(() => record.set("deleted", false), STUDIO_CRDT_ORIGIN_LOCAL);
-    return true;
+    return record ? this.restoreDeletedRecord(record, sceneDeletionTarget(id)) : false;
   }
 
   moveSceneElement(id: string, beforeElementId: string | null): StudioCrdtSceneElementRecord {
@@ -1527,9 +1661,11 @@ export class StudioCrdtDocument {
     const exists = this.pageIds.get(input.id) === true;
     const record = this.pageRecord(input.id, !exists);
     if (!record) throw new Error("페이지 레코드가 손상되었습니다.");
+    const deletionTarget = pageDeletionTarget(input.id);
+    const deleted = this.isDeleted(record, deletionTarget);
     const previousPayload = exists ? this.readPagePayload(record) : null;
     if (exists && !previousPayload) throw new Error("기존 페이지 레코드가 손상되었습니다.");
-    if (record.get("deleted") === true && !options.resurrect) {
+    if (deleted && !options.resurrect) {
       throw new Error("삭제된 페이지는 명시적으로 복원해야 합니다.");
     }
     const usesLegacyBootstrap = options.baselineProps !== undefined || options.changedProps !== undefined ||
@@ -1565,10 +1701,12 @@ export class StudioCrdtDocument {
     const requiresOrderEntry = !exists || options.beforePageId !== undefined;
     if (exists && requiresOrderEntry) this.assertPageOrderEditBound(input.id);
     this.doc.transact(() => {
+      if (deleted && options.resurrect) {
+        this.acknowledgeCurrentDeletionOperations(record, deletionTarget);
+      }
       this.pageIds.set(input.id, true);
       record.set("id", input.id);
       record.set("payloadVersion", payload.version);
-      if (!exists || options.resurrect) record.set("deleted", false);
       if (baseline) {
         for (const [key, value] of Object.entries(baseline)) {
           const baselineKey = propertyKey(BASELINE_PROPERTY_PREFIX, key);
@@ -1594,7 +1732,9 @@ export class StudioCrdtDocument {
     this.assertAlive();
     assertId(id, "페이지");
     const record = this.pageRecord(id);
-    if (!record) throw new Error("수정할 페이지를 찾을 수 없습니다.");
+    if (!record || this.isDeleted(record, pageDeletionTarget(id))) {
+      throw new Error("수정할 페이지를 찾을 수 없습니다.");
+    }
     const current = this.readPagePayload(record);
     if (!current) throw new Error("페이지 레코드가 손상되었습니다.");
     const set = patch.set ? cloneJsonObject(patch.set) : {};
@@ -1624,8 +1764,9 @@ export class StudioCrdtDocument {
     this.assertAlive();
     assertId(id, "페이지");
     const record = this.pageRecord(id);
-    if (!record || record.get("deleted") === true) return false;
-    this.doc.transact(() => record.set("deleted", true), STUDIO_CRDT_ORIGIN_LOCAL);
+    const target = pageDeletionTarget(id);
+    if (!record || this.isDeleted(record, target)) return false;
+    this.doc.transact(() => this.addDeletionOperation(target), STUDIO_CRDT_ORIGIN_LOCAL);
     return true;
   }
 
@@ -1633,9 +1774,7 @@ export class StudioCrdtDocument {
     this.assertAlive();
     assertId(id, "페이지");
     const record = this.pageRecord(id);
-    if (!record || record.get("deleted") !== true) return false;
-    this.doc.transact(() => record.set("deleted", false), STUDIO_CRDT_ORIGIN_LOCAL);
-    return true;
+    return record ? this.restoreDeletedRecord(record, pageDeletionTarget(id)) : false;
   }
 
   movePage(id: string, beforePageId: string | null): StudioCrdtPageRecord {
@@ -1702,9 +1841,11 @@ export class StudioCrdtDocument {
     const exists = this.layerGroupIds.get(compositeKey) === true;
     const record = this.layerGroupRecord(compositeKey, !exists);
     if (!record) throw new Error("레이어 그룹 레코드가 손상되었습니다.");
+    const deletionTarget = layerGroupDeletionTarget(input.pageId, input.id);
+    const deleted = this.isDeleted(record, deletionTarget);
     const previousPayload = exists ? this.readLayerGroupPayload(record) : null;
     if (exists && !previousPayload) throw new Error("기존 레이어 그룹 레코드가 손상되었습니다.");
-    if (record.get("deleted") === true && !options.resurrect) {
+    if (deleted && !options.resurrect) {
       throw new Error("삭제된 레이어 그룹은 명시적으로 복원해야 합니다.");
     }
 
@@ -1744,11 +1885,13 @@ export class StudioCrdtDocument {
     }
 
     this.doc.transact(() => {
+      if (deleted && options.resurrect) {
+        this.acknowledgeCurrentDeletionOperations(record, deletionTarget);
+      }
       this.layerGroupIds.set(compositeKey, true);
       record.set("id", input.id);
       record.set("pageId", input.pageId);
       record.set("payloadVersion", payload.version);
-      if (!exists || options.resurrect) record.set("deleted", false);
       if (baseline) {
         for (const [key, value] of Object.entries(baseline)) {
           const baselineKey = propertyKey(BASELINE_PROPERTY_PREFIX, key);
@@ -1774,7 +1917,7 @@ export class StudioCrdtDocument {
     this.assertAlive();
     const compositeKey = studioCrdtLayerGroupKey(pageId, id);
     const record = this.layerGroupRecord(compositeKey);
-    if (!record || record.get("deleted") === true) {
+    if (!record || this.isDeleted(record, layerGroupDeletionTarget(pageId, id))) {
       throw new Error("수정할 레이어 그룹을 찾을 수 없습니다.");
     }
     const current = this.readLayerGroupPayload(record);
@@ -1806,17 +1949,18 @@ export class StudioCrdtDocument {
   deleteLayerGroup(pageId: string, id: string): boolean {
     this.assertAlive();
     const record = this.layerGroupRecord(studioCrdtLayerGroupKey(pageId, id));
-    if (!record || record.get("deleted") === true) return false;
-    this.doc.transact(() => record.set("deleted", true), STUDIO_CRDT_ORIGIN_LOCAL);
+    const target = layerGroupDeletionTarget(pageId, id);
+    if (!record || this.isDeleted(record, target)) return false;
+    this.doc.transact(() => this.addDeletionOperation(target), STUDIO_CRDT_ORIGIN_LOCAL);
     return true;
   }
 
   restoreLayerGroup(pageId: string, id: string): boolean {
     this.assertAlive();
     const record = this.layerGroupRecord(studioCrdtLayerGroupKey(pageId, id));
-    if (!record || record.get("deleted") !== true) return false;
-    this.doc.transact(() => record.set("deleted", false), STUDIO_CRDT_ORIGIN_LOCAL);
-    return true;
+    return record
+      ? this.restoreDeletedRecord(record, layerGroupDeletionTarget(pageId, id))
+      : false;
   }
 
   getLayerGroup(
@@ -1998,6 +2142,111 @@ export class StudioCrdtDocument {
     return created;
   }
 
+  private indexDeletionOperation(operationId: string, target: string): void {
+    if (!UUID_PATTERN.test(operationId) || !parseDeletionTarget(target)) return;
+    const operationIds = this.deletionOpIdsByTarget.get(target) ?? new Set<string>();
+    operationIds.add(operationId);
+    this.deletionOpIdsByTarget.set(target, operationIds);
+  }
+
+  private unindexDeletionOperation(operationId: string, target: string): void {
+    const operationIds = this.deletionOpIdsByTarget.get(target);
+    if (!operationIds) return;
+    operationIds.delete(operationId);
+    if (operationIds.size === 0) this.deletionOpIdsByTarget.delete(target);
+  }
+
+  private markDeletionTargetChanged(targetValue: string, transaction: Y.Transaction): void {
+    const target = parseDeletionTarget(targetValue);
+    if (!target) return;
+    if (target.kind === "stroke") this.changedIdsFor(transaction).add(target.id);
+    else if (target.kind === "scene") {
+      this.changedSceneElementIdsFor(transaction).add(target.id);
+    } else if (target.kind === "page") {
+      this.changedPageIdsFor(transaction).add(target.id);
+    } else {
+      this.changedLayerGroupIdsFor(transaction).add(
+        studioCrdtLayerGroupKey(target.pageId, target.id)
+      );
+    }
+  }
+
+  private activeDeletionOperationIds(target: string): string[] {
+    const operationIds = this.deletionOpIdsByTarget.get(target);
+    if (!operationIds) return [];
+    const active: string[] = [];
+    for (const operationId of operationIds) {
+      if (
+        this.deletionOps.get(operationId) === target &&
+        this.deletionAcks.get(operationId) !== target
+      ) active.push(operationId);
+    }
+    return active;
+  }
+
+  private hasActiveDeletionOperation(target: string): boolean {
+    const operationIds = this.deletionOpIdsByTarget.get(target);
+    if (!operationIds) return false;
+    for (const operationId of operationIds) {
+      if (
+        this.deletionOps.get(operationId) === target &&
+        this.deletionAcks.get(operationId) !== target
+      ) return true;
+    }
+    return false;
+  }
+
+  private isDeleted(record: Y.Map<unknown>, target: string): boolean {
+    return record.get("deleted") === true || this.hasActiveDeletionOperation(target);
+  }
+
+  private addDeletionOperation(target: string): void {
+    if (!parseDeletionTarget(target)) throw new Error("삭제 대상 식별자가 올바르지 않습니다.");
+    if (this.deletionOps.size >= STUDIO_CRDT_DELETION_OPERATION_MAX_ENTRIES) {
+      throw new Error("삭제 작업 기록이 최대 한도를 초과했습니다. 문서를 압축해 주세요.");
+    }
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const operationId = createDeletionOperationId();
+      if (this.deletionOps.has(operationId) || this.deletionAcks.has(operationId)) continue;
+      this.deletionOps.set(operationId, target);
+      return;
+    }
+    throw new Error("충돌 없는 삭제 작업 식별자를 생성하지 못했습니다.");
+  }
+
+  private acknowledgeCurrentDeletionOperations(record: Y.Map<unknown>, target: string): void {
+    const activeOperationIds = this.activeDeletionOperationIds(target);
+    let newAcknowledgementCount = 0;
+    for (const operationId of activeOperationIds) {
+      const current = this.deletionAcks.get(operationId);
+      if (current === undefined) newAcknowledgementCount += 1;
+      else if (current !== target) {
+        throw new Error("삭제 복원 승인 기록이 손상되었습니다.");
+      }
+    }
+    if (
+      this.deletionAcks.size + newAcknowledgementCount >
+      STUDIO_CRDT_DELETION_OPERATION_MAX_ENTRIES
+    ) {
+      throw new Error("삭제 복원 승인 기록이 최대 한도를 초과했습니다. 문서를 압축해 주세요.");
+    }
+    // `deleted` is a read-only legacy fallback for normal edits. Only an explicit restore may
+    // clear it; new deletes and all ordinary writes live exclusively in the OR-set roots.
+    if (record.get("deleted") === true) record.set("deleted", false);
+    for (const operationId of activeOperationIds) {
+      if (!this.deletionAcks.has(operationId)) this.deletionAcks.set(operationId, target);
+    }
+  }
+
+  private restoreDeletedRecord(record: Y.Map<unknown>, target: string): boolean {
+    if (!this.isDeleted(record, target)) return false;
+    this.doc.transact(
+      () => this.acknowledgeCurrentDeletionOperations(record, target),
+      STUDIO_CRDT_ORIGIN_LOCAL
+    );
+    return true;
+  }
+
   private observeSceneElementRoot(id: string): void {
     const rootName = sceneElementRootName(id);
     if (this.observedSceneElementRoots.has(rootName)) return;
@@ -2128,7 +2377,7 @@ export class StudioCrdtDocument {
       pageId,
       layerId,
       payload,
-      deleted: record.get("deleted") === true,
+      deleted: this.isDeleted(record, sceneDeletionTarget(id)),
       orderIndex,
     };
   }
@@ -2150,7 +2399,7 @@ export class StudioCrdtDocument {
   ): StudioCrdtPageRecord | null {
     const payload = this.readPagePayload(record);
     if (readString(record, "id") !== id || !payload) return null;
-    return { id, payload, deleted: record.get("deleted") === true, orderIndex };
+    return { id, payload, deleted: this.isDeleted(record, pageDeletionTarget(id)), orderIndex };
   }
 
   private readLayerGroupPayload(record: Y.Map<unknown>): StudioCrdtLayerGroupPayload | null {
@@ -2179,7 +2428,12 @@ export class StudioCrdtDocument {
     } catch {
       return null;
     }
-    return { id, pageId, payload, deleted: record.get("deleted") === true };
+    return {
+      id,
+      pageId,
+      payload,
+      deleted: this.isDeleted(record, layerGroupDeletionTarget(pageId, id)),
+    };
   }
 
   private registerRecord(id: string, value: unknown): void {
@@ -2199,15 +2453,13 @@ export class StudioCrdtDocument {
 
   private createRecord(
     input: StudioCrdtStrokeInput,
-    status: StudioCrdtStrokeRecord["status"],
-    deleted: boolean
+    status: StudioCrdtStrokeRecord["status"]
   ): Y.Map<unknown> {
     const record = new Y.Map<unknown>();
     record.set("id", input.id);
     record.set("pageId", input.pageId);
     record.set("layerId", input.layerId);
     record.set("status", status);
-    record.set("deleted", deleted);
     setPayloadMetadata(record, input.payload);
     const samples = normalizedSamples(input.payload, true);
     for (const key of SAMPLE_ARRAY_KEYS) record.set(key, createSampleArray(samples[key]));
@@ -2268,13 +2520,13 @@ export class StudioCrdtDocument {
     const strokeId = orderEntryValue(entry, "strokeId");
     if (strokeId) {
       const stroke = this.strokes.get(strokeId);
-      return stroke instanceof Y.Map && stroke.get("deleted") !== true &&
+      return stroke instanceof Y.Map && !this.isDeleted(stroke, strokeDeletionTarget(strokeId)) &&
         readString(stroke, "pageId") === pageId && readString(stroke, "layerId") === layerId;
     }
     const elementId = sceneOrderEntryId(entry);
     if (!elementId) return false;
     const element = this.sceneElementRecord(elementId);
-    return element !== null && element.get("deleted") !== true &&
+    return element !== null && !this.isDeleted(element, sceneDeletionTarget(elementId)) &&
       readString(element, "pageId") === pageId && readString(element, "layerId") === layerId;
   }
 
@@ -2337,7 +2589,7 @@ export class StudioCrdtDocument {
       if (
         candidate instanceof Y.Map && candidate.get("active") === true &&
         pageOrderEntryId(candidate) === beforePageId &&
-        targetRecord !== null && targetRecord.get("deleted") !== true &&
+        targetRecord !== null && !this.isDeleted(targetRecord, pageDeletionTarget(beforePageId)) &&
         readString(targetRecord, "id") === beforePageId
       ) {
         targetIndex = index;
@@ -2476,7 +2728,7 @@ export class StudioCrdtDocument {
       layerId,
       payload,
       status,
-      deleted: record.get("deleted") === true,
+      deleted: this.isDeleted(record, strokeDeletionTarget(id)),
       orderIndex,
     };
   }

@@ -5,7 +5,7 @@ export const STUDIO_CRDT_PAGE_MAX_BYTES = 8 * 1024;
 export const STUDIO_CRDT_LAYER_GROUP_PAYLOAD_VERSION = 1 as const;
 export const STUDIO_CRDT_LAYER_GROUP_MAX_BYTES = 2 * 1024;
 
-export const STUDIO_CRDT_SCENE_ELEMENT_TYPES = [
+export const STUDIO_CRDT_PAYLOAD_SCENE_ELEMENT_TYPES = [
   "text",
   "bubble",
   "sticker",
@@ -14,6 +14,18 @@ export const STUDIO_CRDT_SCENE_ELEMENT_TYPES = [
   "speedLines",
 ] as const;
 
+/**
+ * `reference` is a wire-only topology envelope for asset-backed or future Studio element types.
+ * It intentionally carries only the authored element type: raster/VRM/3D sources remain in the
+ * project asset document while page, group, tombstone, and z-order converge through CRDT.
+ */
+export const STUDIO_CRDT_SCENE_ELEMENT_TYPES = [
+  ...STUDIO_CRDT_PAYLOAD_SCENE_ELEMENT_TYPES,
+  "reference",
+] as const;
+
+export type StudioCrdtPayloadSceneElementType =
+  (typeof STUDIO_CRDT_PAYLOAD_SCENE_ELEMENT_TYPES)[number];
 export type StudioCrdtSceneElementType = (typeof STUDIO_CRDT_SCENE_ELEMENT_TYPES)[number];
 export type StudioCrdtJsonValue =
   | null
@@ -117,6 +129,7 @@ export const STUDIO_CRDT_SCENE_ELEMENT_KEYS_BY_TYPE: Record<
     "x", "y", "width", "height", "lineCount", "direction", "stroke", "strokeWidth",
     "noise", "rotation",
   ]),
+  reference: new Set(["elementType"]),
 };
 
 export const STUDIO_CRDT_REQUIRED_SCENE_ELEMENT_KEYS: Record<
@@ -135,6 +148,7 @@ export const STUDIO_CRDT_REQUIRED_SCENE_ELEMENT_KEYS: Record<
     "x", "y", "width", "height", "lineCount", "direction", "stroke", "strokeWidth",
     "rotation",
   ],
+  reference: ["elementType"],
 };
 
 export const STUDIO_CRDT_PAGE_PROPERTY_KEYS: ReadonlySet<string> = new Set([
@@ -150,6 +164,13 @@ export function isStudioCrdtSceneElementType(
 ): value is StudioCrdtSceneElementType {
   return typeof value === "string" &&
     (STUDIO_CRDT_SCENE_ELEMENT_TYPES as readonly string[]).includes(value);
+}
+
+export function isStudioCrdtPayloadSceneElementType(
+  value: unknown
+): value is StudioCrdtPayloadSceneElementType {
+  return typeof value === "string" &&
+    (STUDIO_CRDT_PAYLOAD_SCENE_ELEMENT_TYPES as readonly string[]).includes(value);
 }
 
 function cloneJson(
@@ -219,6 +240,15 @@ export function validateStudioCrdtSceneElementPayload(
   }
   for (const key of STUDIO_CRDT_REQUIRED_SCENE_ELEMENT_KEYS[payload.type]) {
     if (!(key in props)) throw new Error(`${payload.type} 요소의 ${key} 속성이 필요합니다.`);
+  }
+  if (
+    payload.type === "reference" &&
+    (
+      !exactIdentifier(props.elementType) || props.elementType === "draw" ||
+      isStudioCrdtSceneElementType(props.elementType)
+    )
+  ) {
+    throw new Error("참조 요소의 원본 타입이 올바르지 않습니다.");
   }
   for (const key of ["x", "y"] as const) {
     if (key in props) finiteRange(props[key], -MAX_COORDINATE, MAX_COORDINATE, key);

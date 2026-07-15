@@ -3,6 +3,9 @@ import * as Y from "yjs";
 
 import {
   STUDIO_CRDT_APPEND_MAX_SAMPLES,
+  STUDIO_CRDT_DELETION_ACKS_ROOT,
+  STUDIO_CRDT_DELETION_OPS_ROOT,
+  STUDIO_CRDT_LAYER_GROUP_PAYLOAD_VERSION,
   STUDIO_CRDT_METADATA_MAX_BYTES,
   STUDIO_CRDT_ORIGIN_LOCAL,
   STUDIO_CRDT_ORIGIN_REMOTE,
@@ -103,6 +106,14 @@ function page(id: string, overrides: Record<string, string | number | boolean | 
       },
     },
   };
+}
+
+function underlyingYDoc(document: StudioCrdtDocument): Y.Doc {
+  return (document as unknown as { doc: Y.Doc }).doc;
+}
+
+function setYjsClientId(document: StudioCrdtDocument, clientId: number): void {
+  (underlyingYDoc(document) as unknown as { clientID: number }).clientID = clientId;
 }
 
 describe("StudioCrdtDocument", () => {
@@ -227,6 +238,189 @@ describe("StudioCrdtDocument", () => {
     left.destroy();
     right.destroy();
   });
+
+  it.each([
+    { deleteClientId: 10, editClientId: 20 },
+    { deleteClientId: 20, editClientId: 10 },
+  ])(
+    "keeps an initial-registration delete when the deleting clientID is $deleteClientId and the editing clientID is $editClientId",
+    ({ deleteClientId, editClientId }) => {
+      const baseline = textElement("initial-delete");
+      const deletingPeer = new StudioCrdtDocument();
+      const editingPeer = new StudioCrdtDocument();
+      setYjsClientId(deletingPeer, deleteClientId);
+      setYjsClientId(editingPeer, editClientId);
+
+      deletingPeer.upsertSceneElement(baseline, {
+        baselineProps: baseline.payload.props,
+        changedProps: [],
+      });
+      expect(deletingPeer.deleteSceneElement("initial-delete")).toBe(true);
+      editingPeer.upsertSceneElement(textElement("initial-delete", { x: 640 }), {
+        baselineProps: baseline.payload.props,
+        changedProps: ["x"],
+      });
+
+      const deletionUpdate = deletingPeer.encodeStateAsUpdate();
+      const editUpdate = editingPeer.encodeStateAsUpdate();
+      deletingPeer.applyUpdate(editUpdate);
+      editingPeer.applyUpdate(deletionUpdate);
+
+      expect(deletingPeer.getSceneElement("initial-delete")).toBeNull();
+      expect(editingPeer.getSceneElement("initial-delete")).toBeNull();
+      expect(deletingPeer.getSceneElement("initial-delete", true)?.payload.props.x).toBe(640);
+      expect(editingPeer.getSceneElement("initial-delete", true)?.deleted).toBe(true);
+      deletingPeer.destroy();
+      editingPeer.destroy();
+    }
+  );
+
+  it("acknowledges only observed deletes so stale restore cannot erase a concurrent delete", () => {
+    const source = new StudioCrdtDocument();
+    source.addSceneElement(textElement("observed-remove"));
+    const baseline = source.encodeStateAsUpdate();
+    const firstDeleter = new StudioCrdtDocument(baseline);
+    const restorer = new StudioCrdtDocument(baseline);
+    const staleDeleter = new StudioCrdtDocument(baseline);
+    const staleRestorer = new StudioCrdtDocument(baseline);
+
+    expect(firstDeleter.deleteSceneElement("observed-remove")).toBe(true);
+    expect(staleRestorer.restoreSceneElement("observed-remove")).toBe(false);
+    staleRestorer.upsertSceneElement(textElement("observed-remove", { x: 777 }), {
+      resurrect: true,
+    });
+    staleRestorer.applyUpdate(firstDeleter.encodeStateAsUpdate());
+    expect(staleRestorer.getSceneElement("observed-remove")).toBeNull();
+    expect(staleRestorer.getSceneElement("observed-remove", true)?.payload.props.x).toBe(777);
+
+    restorer.applyUpdate(firstDeleter.encodeStateAsUpdate());
+    expect(restorer.restoreSceneElement("observed-remove")).toBe(true);
+    expect(staleDeleter.deleteSceneElement("observed-remove")).toBe(true);
+
+    const restoredState = restorer.encodeStateAsUpdate();
+    const concurrentDeleteState = staleDeleter.encodeStateAsUpdate();
+    for (const peer of [firstDeleter, restorer, staleDeleter]) {
+      peer.applyUpdate(restoredState);
+      peer.applyUpdate(concurrentDeleteState);
+      expect(peer.getSceneElement("observed-remove")).toBeNull();
+    }
+
+    expect(restorer.restoreSceneElement("observed-remove")).toBe(true);
+    const finalRestore = restorer.encodeStateAsUpdate();
+    firstDeleter.applyUpdate(finalRestore);
+    staleDeleter.applyUpdate(finalRestore);
+    expect(firstDeleter.getSceneElement("observed-remove")?.deleted).toBe(false);
+    expect(staleDeleter.getSceneElement("observed-remove")?.deleted).toBe(false);
+
+    source.destroy();
+    firstDeleter.destroy();
+    restorer.destroy();
+    staleDeleter.destroy();
+    staleRestorer.destroy();
+  });
+
+  it("uses the same flat grow-only deletion protocol for strokes, scenes, pages, and groups", () => {
+    const document = new StudioCrdtDocument();
+    document.addStroke(stroke("delete-stroke", "page-a"));
+    document.addSceneElement(textElement("delete-scene"));
+    document.addPage(page("delete-page"));
+    document.addLayerGroup({
+      id: "delete-group",
+      pageId: "page-a",
+      payload: {
+        version: STUDIO_CRDT_LAYER_GROUP_PAYLOAD_VERSION,
+        props: { name: "삭제 그룹" },
+      },
+    });
+
+    const raw = underlyingYDoc(document);
+    expect((raw.getMap("strokes").get("delete-stroke") as Y.Map<unknown>).has("deleted")).toBe(false);
+    expect(raw.getMap("scene-element:delete-scene").has("deleted")).toBe(false);
+    expect(raw.getMap("studio-page:delete-page").has("deleted")).toBe(false);
+    const groupKey = `${"page-a".length}:page-a${"delete-group".length}:delete-group`;
+    expect(raw.getMap(`layer-group:${encodeURIComponent(groupKey)}`).has("deleted")).toBe(false);
+    expect(raw.getMap(STUDIO_CRDT_DELETION_OPS_ROOT).size).toBe(0);
+    expect(raw.getMap(STUDIO_CRDT_DELETION_ACKS_ROOT).size).toBe(0);
+
+    expect(document.deleteStroke("delete-stroke")).toBe(true);
+    expect(document.deleteSceneElement("delete-scene")).toBe(true);
+    expect(document.deletePage("delete-page")).toBe(true);
+    expect(document.deleteLayerGroup("page-a", "delete-group")).toBe(true);
+    expect(raw.getMap(STUDIO_CRDT_DELETION_OPS_ROOT).size).toBe(4);
+
+    expect(document.restoreStroke("delete-stroke")).toBe(true);
+    expect(document.restoreSceneElement("delete-scene")).toBe(true);
+    expect(document.restorePage("delete-page")).toBe(true);
+    expect(document.restoreLayerGroup("page-a", "delete-group")).toBe(true);
+    expect(raw.getMap(STUDIO_CRDT_DELETION_ACKS_ROOT).size).toBe(4);
+    expect(document.getStroke("delete-stroke")?.deleted).toBe(false);
+    expect(document.getSceneElement("delete-scene")?.deleted).toBe(false);
+    expect(document.getPage("delete-page")?.deleted).toBe(false);
+    expect(document.getLayerGroup("page-a", "delete-group")?.deleted).toBe(false);
+    document.destroy();
+  });
+
+  it.each(["stroke", "scene", "page", "group"] as const)(
+    "keeps a concurrent initial %s delete over an independent first registration",
+    (kind) => {
+      const deletingPeer = new StudioCrdtDocument();
+      const editingPeer = new StudioCrdtDocument();
+      setYjsClientId(deletingPeer, 90);
+      setYjsClientId(editingPeer, 5);
+      if (kind === "stroke") {
+        deletingPeer.addStroke(stroke("initial-shared", "page-a"));
+        editingPeer.addStroke(stroke("initial-shared", "page-a", [40, 50]));
+        deletingPeer.deleteStroke("initial-shared");
+      } else if (kind === "scene") {
+        deletingPeer.addSceneElement(textElement("initial-shared"));
+        editingPeer.addSceneElement(textElement("initial-shared", { x: 500 }));
+        deletingPeer.deleteSceneElement("initial-shared");
+      } else if (kind === "page") {
+        deletingPeer.addPage(page("initial-shared"));
+        editingPeer.addPage(page("initial-shared", { name: "동시 편집" }));
+        deletingPeer.deletePage("initial-shared");
+      } else {
+        const input = {
+          id: "initial-shared",
+          pageId: "page-a",
+          payload: {
+            version: STUDIO_CRDT_LAYER_GROUP_PAYLOAD_VERSION,
+            props: { name: "초기 그룹" },
+          },
+        } as const;
+        deletingPeer.addLayerGroup(input);
+        editingPeer.addLayerGroup({
+          ...input,
+          payload: { ...input.payload, props: { name: "동시 편집 그룹" } },
+        });
+        deletingPeer.deleteLayerGroup("page-a", "initial-shared");
+      }
+
+      const deletionState = deletingPeer.encodeStateAsUpdate();
+      const editingState = editingPeer.encodeStateAsUpdate();
+      deletingPeer.applyUpdate(editingState);
+      editingPeer.applyUpdate(deletionState);
+      const deletingRecord = kind === "stroke"
+        ? deletingPeer.getStroke("initial-shared", true)
+        : kind === "scene"
+          ? deletingPeer.getSceneElement("initial-shared", true)
+          : kind === "page"
+            ? deletingPeer.getPage("initial-shared", true)
+            : deletingPeer.getLayerGroup("page-a", "initial-shared", true);
+      const editingRecord = kind === "stroke"
+        ? editingPeer.getStroke("initial-shared", true)
+        : kind === "scene"
+          ? editingPeer.getSceneElement("initial-shared", true)
+          : kind === "page"
+            ? editingPeer.getPage("initial-shared", true)
+            : editingPeer.getLayerGroup("page-a", "initial-shared", true);
+      expect(deletingRecord?.deleted).toBe(true);
+      expect(editingRecord?.deleted).toBe(true);
+      expect(underlyingYDoc(editingPeer).getMap(STUDIO_CRDT_DELETION_OPS_ROOT).size).toBe(1);
+      deletingPeer.destroy();
+      editingPeer.destroy();
+    }
+  );
 
   it("merges independent fields when two peers first register the same legacy scene element", () => {
     const baseline = textElement("legacy-text");

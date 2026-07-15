@@ -1,13 +1,11 @@
 import {
-  isStudioCrdtSceneElementType,
   studioLayerGroupToCrdtGroup,
   studioDrawElementToCrdtStroke,
+  studioElementToCrdtSceneElement,
   studioPageToCrdtPage,
-  studioSceneElementToCrdtElement,
   type StudioCrdtCompatibleDrawElement,
   type StudioCrdtCompatibleElement,
   type StudioCrdtCompatibleOrderedPage,
-  type StudioCrdtCompatibleSceneElement,
 } from "./studio-crdt-page-bridge";
 import { studioCrdtLayerGroupKey } from "./studio-crdt-scene-schema";
 
@@ -129,12 +127,6 @@ function uniqueIds(ids: readonly string[]): string[] {
   return result;
 }
 
-function isSupportedSceneElement<TElement extends StudioCrdtCompatibleElement>(
-  element: TElement
-): element is TElement & StudioCrdtCompatibleSceneElement {
-  return isStudioCrdtSceneElementType(element.type);
-}
-
 function isCompatibleDrawElement<TElement extends StudioCrdtCompatibleElement>(
   element: TElement
 ): element is TElement & StudioCrdtCompatibleDrawElement {
@@ -194,11 +186,11 @@ function supportedSceneInputs<
   const result = new Map<string, StudioCrdtSceneElementInput>();
   for (const page of pages) {
     for (const element of page.elements) {
-      if (!isSupportedSceneElement(element)) continue;
+      if (isCompatibleDrawElement(element)) continue;
       if (result.has(element.id)) throw new Error("페이지 간에 중복된 장면 요소 식별자가 있습니다.");
       result.set(
         element.id,
-        studioSceneElementToCrdtElement(page.id, element)
+        studioElementToCrdtSceneElement(page.id, element)
       );
     }
   }
@@ -549,19 +541,15 @@ function publishSceneOrderForPage<TElement extends StudioCrdtCompatibleElement>(
   forceBootstrap: boolean
 ): { mutations: number; moves: number } {
   let mutations = 0;
-  const previousMixedOrder = previousElements
-    .filter((element) => element.type === "draw" || isStudioCrdtSceneElementType(element.type))
-    .map((element) => element.id);
-  const nextMixedOrder = nextElements
-    .filter((element) => element.type === "draw" || isStudioCrdtSceneElementType(element.type))
-    .map((element) => element.id);
+  const previousMixedOrder = previousElements.map((element) => element.id);
+  const nextMixedOrder = nextElements.map((element) => element.id);
   if (!forceBootstrap && previousMixedOrder.join("\0") === nextMixedOrder.join("\0")) {
     return { mutations: 0, moves: 0 };
   }
 
   // Add/delete/reorder all need complete sibling context, including legacy draw operations.
   for (const element of nextElements) {
-    if (isSupportedSceneElement(element)) {
+    if (!isCompatibleDrawElement(element)) {
       const id = element.id;
       if (document.getSceneElement(id, true)) continue;
       const previousInput = previous.get(id);
@@ -578,7 +566,6 @@ function publishSceneOrderForPage<TElement extends StudioCrdtCompatibleElement>(
       mutations += 1;
       continue;
     }
-    if (!isCompatibleDrawElement(element)) continue;
     const current = document.getStroke(element.id, true);
     if (current?.deleted) continue;
     if (!current) {
@@ -587,9 +574,7 @@ function publishSceneOrderForPage<TElement extends StudioCrdtCompatibleElement>(
     }
   }
 
-  const desiredIds = nextElements
-    .filter((element) => element.type === "draw" || isStudioCrdtSceneElementType(element.type))
-    .map((element) => element.id)
+  const desiredIds = nextElements.map((element) => element.id)
     .filter((id) => document.getStroke(id) !== null || document.getSceneElement(id) !== null);
   const desiredSet = new Set(desiredIds);
   const currentIds = [
@@ -651,7 +636,6 @@ export function publishStudioCrdtSceneGraphDiff<
   const bootstrapElementOrderPages = new Set<string>();
   for (const page of nextPages) {
     if (page.elements.some((element) =>
-      (element.type === "draw" || isStudioCrdtSceneElementType(element.type)) &&
       !managedElementIdsBefore.has(element.id) &&
       (document.getStroke(element.id, true) !== null ||
         document.getSceneElement(element.id, true) !== null)

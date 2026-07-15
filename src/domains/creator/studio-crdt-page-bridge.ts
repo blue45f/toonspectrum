@@ -2,14 +2,14 @@ import {
   STUDIO_CRDT_LAYER_GROUP_PAYLOAD_VERSION,
   STUDIO_CRDT_PAGE_PAYLOAD_VERSION,
   STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION,
-  isStudioCrdtSceneElementType,
+  isStudioCrdtPayloadSceneElementType,
   studioCrdtLayerGroupKey,
   validateStudioCrdtLayerGroupPayload,
   validateStudioCrdtPagePayload,
   validateStudioCrdtSceneElementPayload,
   type StudioCrdtJsonObject,
   type StudioCrdtJsonValue,
-  type StudioCrdtSceneElementType,
+  type StudioCrdtPayloadSceneElementType,
 } from "./studio-crdt-scene-schema";
 
 import type {
@@ -22,7 +22,10 @@ import type {
 } from "./studio-crdt-document";
 import type { StudioCrdtCompatibleDrawElement } from "./studio-crdt-draw-bridge";
 
-export { isStudioCrdtSceneElementType } from "./studio-crdt-scene-schema";
+export {
+  isStudioCrdtPayloadSceneElementType,
+  isStudioCrdtSceneElementType,
+} from "./studio-crdt-scene-schema";
 export {
   studioDrawElementSampleSlice,
   studioDrawElementToCrdtStroke,
@@ -49,7 +52,7 @@ export interface StudioCrdtCompatibleLayerGroup {
 }
 
 export interface StudioCrdtCompatibleSceneElement extends StudioCrdtCompatibleElement {
-  type: StudioCrdtSceneElementType;
+  type: StudioCrdtPayloadSceneElementType;
   groupId?: string;
   [key: string]: unknown;
 }
@@ -98,6 +101,11 @@ function jsonObject(value: unknown): StudioCrdtJsonObject | undefined {
     : undefined;
 }
 
+function studioElementLayerId(element: StudioCrdtCompatibleElement): string {
+  const groupId = (element as StudioCrdtCompatibleElement & { groupId?: unknown }).groupId;
+  return typeof groupId === "string" && groupId.length > 0 ? groupId : "page-root";
+}
+
 export function studioCrdtStrokeToDrawElement(
   record: StudioCrdtStrokeRecord
 ): StudioCrdtCompatibleDrawElement {
@@ -144,7 +152,7 @@ export function studioSceneElementToCrdtElement(
   pageId: string,
   element: StudioCrdtCompatibleSceneElement
 ): StudioCrdtSceneElementInput {
-  if (!isStudioCrdtSceneElementType(element.type)) {
+  if (!isStudioCrdtPayloadSceneElementType(element.type)) {
     throw new Error(`${element.type} 요소는 장면 CRDT에서 지원하지 않습니다.`);
   }
   const propsSource: Record<string, unknown> = {};
@@ -161,16 +169,60 @@ export function studioSceneElementToCrdtElement(
   return {
     id: element.id,
     pageId,
-    layerId: typeof element.groupId === "string" && element.groupId.length > 0
-      ? element.groupId
-      : "page-root",
+    layerId: studioElementLayerId(element),
     payload,
   };
 }
 
-export function studioCrdtElementToSceneElement(
-  record: StudioCrdtSceneElementRecord
-): StudioCrdtCompatibleSceneElement {
+/**
+ * Encodes every non-draw Studio element into the shared scene topology. Rich vector objects keep
+ * their field-editable payload; asset-backed and future objects use a wire-only `reference`
+ * envelope so large image/VRM/3D sources never enter a realtime operation.
+ */
+export function studioElementToCrdtSceneElement(
+  pageId: string,
+  element: StudioCrdtCompatibleElement
+): StudioCrdtSceneElementInput {
+  if (element.type === "draw") {
+    throw new Error("드로우 요소는 획 CRDT로 동기화해야 합니다.");
+  }
+  if (isStudioCrdtPayloadSceneElementType(element.type)) {
+    return studioSceneElementToCrdtElement(
+      pageId,
+      element as StudioCrdtCompatibleSceneElement
+    );
+  }
+  return {
+    id: element.id,
+    pageId,
+    layerId: studioElementLayerId(element),
+    payload: validateStudioCrdtSceneElementPayload({
+      version: STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION,
+      type: "reference",
+      props: { elementType: element.type },
+    }),
+  };
+}
+
+export function studioCrdtElementToSceneElement<
+  TElement extends StudioCrdtCompatibleElement = StudioCrdtCompatibleSceneElement,
+>(
+  record: StudioCrdtSceneElementRecord,
+  referenceSource?: TElement
+): StudioCrdtCompatibleSceneElement | TElement {
+  if (record.payload.type === "reference") {
+    const elementType = record.payload.props.elementType;
+    if (
+      !referenceSource || referenceSource.id !== record.id ||
+      referenceSource.type !== elementType
+    ) {
+      throw new Error("참조 장면 요소를 복원할 원본 에셋 요소가 없습니다.");
+    }
+    const element = { ...referenceSource } as TElement & { groupId?: string };
+    if (record.layerId === "page-root") delete element.groupId;
+    else element.groupId = record.layerId;
+    return element;
+  }
   const element = {
     id: record.id,
     type: record.payload.type,
@@ -455,8 +507,12 @@ export function reconcileStudioCrdtSceneGraphPages<
     for (const group of groups) availableGroupKeys.add(studioCrdtLayerGroupKey(pageId, group.id));
   }
 
+  // Resolve topology-only asset references from the pre-reconciliation project snapshot. A page
+  // tombstone can concurrently win while one of its assets is moved to a surviving page; building
+  // this registry from `orderedPages` would discard the only local image/VRM/3D body before the
+  // authoritative reference record gets a chance to reparent it.
   const sourceElementById = new Map<string, { pageId: string; element: TElement }>();
-  for (const page of orderedPages) {
+  for (const page of pages) {
     for (const element of page.elements) sourceElementById.set(element.id, { pageId: page.id, element });
   }
   const managedElementIds = new Set<string>();
@@ -495,6 +551,15 @@ export function reconcileStudioCrdtSceneGraphPages<
     if (!authoritative && !source) continue;
     if (!authoritative) managedElementIds.add(record.id);
     if (authoritative && record.deleted) continue;
+    if (
+      authoritative && record.payload.type === "reference" &&
+      (!source || source.element.type !== record.payload.props.elementType)
+    ) {
+      // A topology-only record cannot invent or replace an asset payload. Keep the ID managed so
+      // a mismatched stale snapshot is removed, but fail closed until project hydration supplies
+      // the exact authored source object.
+      continue;
+    }
     const pageId = authoritative ? record.pageId : source!.pageId;
     const bucket = activeByPage.get(pageId) ?? [];
     bucket.push({
@@ -502,7 +567,7 @@ export function reconcileStudioCrdtSceneGraphPages<
       orderIndex: record.orderIndex,
       element: authoritative
         ? withConvergedLayerGroup(
-          studioCrdtElementToSceneElement(record) as unknown as TElement,
+          studioCrdtElementToSceneElement(record, source?.element) as TElement,
           record.pageId,
           record.layerId,
           availableGroupKeys

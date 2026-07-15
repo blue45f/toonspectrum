@@ -86,6 +86,14 @@ export interface AppendStudioCrdtUpdateResult {
   receipt: StudioCrdtUpdateReceiptRecord;
 }
 
+/**
+ * Runs after the per-work database lock is acquired and against the latest committed durable
+ * document, but before the candidate update is inserted. Throwing aborts the whole transaction.
+ */
+export type ValidateStudioCrdtAppend = (
+  current: StudioCrdtHydrationState
+) => void | Promise<void>;
+
 export interface CompactStudioCrdtInput {
   workId: string;
   snapshot: Uint8Array;
@@ -97,7 +105,10 @@ export interface StudioCrdtRepository {
   loadDocument(workId: string): Promise<StudioCrdtHydrationState>;
   loadCatchUp(workId: string, afterSequence: bigint): Promise<StudioCrdtHydrationState>;
   listUpdatesAfter(workId: string, sequence: bigint): Promise<StudioCrdtUpdateRecord[]>;
-  appendUpdate(input: AppendStudioCrdtUpdateInput): Promise<AppendStudioCrdtUpdateResult>;
+  appendUpdate(
+    input: AppendStudioCrdtUpdateInput,
+    validate: ValidateStudioCrdtAppend
+  ): Promise<AppendStudioCrdtUpdateResult>;
   compact(input: CompactStudioCrdtInput): Promise<boolean>;
 }
 
@@ -145,32 +156,40 @@ function receiptRecord(
   };
 }
 
-/** PostgreSQL-backed append log. Every multi-query read uses one repeatable-read snapshot. */
+async function loadDocumentInTransaction(
+  transaction: DrizzleStudioCrdtTransaction,
+  workId: string
+): Promise<StudioCrdtHydrationState> {
+  const [storedSnapshot] = await transaction
+    .select()
+    .from(creatorWorkCrdtSnapshots)
+    .where(eq(creatorWorkCrdtSnapshots.workId, workId))
+    .limit(1);
+  const compactedSequence = storedSnapshot?.compactedSequence ?? 0n;
+  const rows = await transaction
+    .select()
+    .from(creatorWorkCrdtUpdates)
+    .where(
+      and(
+        eq(creatorWorkCrdtUpdates.workId, workId),
+        gt(creatorWorkCrdtUpdates.sequence, compactedSequence)
+      )
+    )
+    .orderBy(asc(creatorWorkCrdtUpdates.sequence));
+  return {
+    snapshot: storedSnapshot ? snapshotRecord(storedSnapshot) : null,
+    updates: rows.map(updateRecord),
+  };
+}
+
+/**
+ * PostgreSQL-backed append log. Hydration reads use repeatable-read snapshots, while mutations
+ * serialize per work through a transaction-scoped advisory lock.
+ */
 export class DrizzleStudioCrdtRepository implements StudioCrdtRepository {
   async loadDocument(workId: string): Promise<StudioCrdtHydrationState> {
     return db.transaction(
-      async (transaction) => {
-        const [storedSnapshot] = await transaction
-          .select()
-          .from(creatorWorkCrdtSnapshots)
-          .where(eq(creatorWorkCrdtSnapshots.workId, workId))
-          .limit(1);
-        const compactedSequence = storedSnapshot?.compactedSequence ?? 0n;
-        const rows = await transaction
-          .select()
-          .from(creatorWorkCrdtUpdates)
-          .where(
-            and(
-              eq(creatorWorkCrdtUpdates.workId, workId),
-              gt(creatorWorkCrdtUpdates.sequence, compactedSequence)
-            )
-          )
-          .orderBy(asc(creatorWorkCrdtUpdates.sequence));
-        return {
-          snapshot: storedSnapshot ? snapshotRecord(storedSnapshot) : null,
-          updates: rows.map(updateRecord),
-        };
-      },
+      (transaction) => loadDocumentInTransaction(transaction, workId),
       { isolationLevel: "repeatable read", accessMode: "read only" }
     );
   }
@@ -228,14 +247,38 @@ export class DrizzleStudioCrdtRepository implements StudioCrdtRepository {
     return rows.map(updateRecord);
   }
 
-  async appendUpdate(input: AppendStudioCrdtUpdateInput): Promise<AppendStudioCrdtUpdateResult> {
+  async appendUpdate(
+    input: AppendStudioCrdtUpdateInput,
+    validate: ValidateStudioCrdtAppend
+  ): Promise<AppendStudioCrdtUpdateResult> {
     return db.transaction((transaction) =>
       withStudioCrdtWorkMutationLock(transaction, input.workId, async () => {
         // The advisory lock is the first database operation in this mutation transaction, so
         // identity allocation and commit order for one work are identical across API processes.
         const payloadHash = studioCrdtPayloadHash(input.payload);
-        // Claim the durable dedupe key first. PostgreSQL's unique-index conflict wait serializes
-        // concurrent retries for the same work/updateId without a process-local mutex.
+        const [existingReceipt] = await transaction
+          .select()
+          .from(creatorWorkCrdtUpdateReceipts)
+          .where(
+            and(
+              eq(creatorWorkCrdtUpdateReceipts.workId, input.workId),
+              eq(creatorWorkCrdtUpdateReceipts.updateId, input.updateId)
+            )
+          )
+          .limit(1);
+        if (existingReceipt) {
+          if (existingReceipt.sequence === null) {
+            throw new Error("CRDT update receipt is incomplete");
+          }
+          return { inserted: false, receipt: receiptRecord(existingReceipt) };
+        }
+
+        // This read and the candidate insert share one lock/transaction. A later API process must
+        // validate against this commit, not against its stale process-local Y.Doc cache.
+        await validate(await loadDocumentInTransaction(transaction, input.workId));
+
+        // Claim the durable dedupe key after merged validation. The unique conflict fallback is
+        // defense in depth for a writer that does not yet participate in this lock protocol.
         const [claimedReceipt] = await transaction
           .insert(creatorWorkCrdtUpdateReceipts)
           .values({
@@ -253,7 +296,7 @@ export class DrizzleStudioCrdtRepository implements StudioCrdtRepository {
           })
           .returning();
         if (!claimedReceipt) {
-          const [existingReceipt] = await transaction
+          const [conflictingReceipt] = await transaction
             .select()
             .from(creatorWorkCrdtUpdateReceipts)
             .where(
@@ -263,10 +306,10 @@ export class DrizzleStudioCrdtRepository implements StudioCrdtRepository {
               )
             )
             .limit(1);
-          if (!existingReceipt || existingReceipt.sequence === null) {
+          if (!conflictingReceipt || conflictingReceipt.sequence === null) {
             throw new Error("CRDT update receipt disappeared or is incomplete");
           }
-          return { inserted: false, receipt: receiptRecord(existingReceipt) };
+          return { inserted: false, receipt: receiptRecord(conflictingReceipt) };
         }
 
         const [inserted] = await transaction
