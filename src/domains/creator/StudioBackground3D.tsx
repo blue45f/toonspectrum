@@ -1,5 +1,8 @@
 import { OrbitControls } from "@react-three/drei/core/OrbitControls.js";
+import { OrthographicCamera } from "@react-three/drei/core/OrthographicCamera.js";
+import { PerspectiveCamera } from "@react-three/drei/core/PerspectiveCamera.js";
 import { TransformControls } from "@react-three/drei/core/TransformControls.js";
+import { View } from "@react-three/drei/web/View.js";
 import { Canvas, useThree } from "@react-three/fiber";
 import {
   AlertTriangle,
@@ -1121,6 +1124,11 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   const [transformMode, setTransformMode] = useState<TransformModeId>("translate");
   const [lineArtPreview, setLineArtPreview] = useState(false);
   const [isTransforming, setIsTransforming] = useState(false);
+  const [isQuadView, setIsQuadView] = useState(false);
+  const viewTopRef = useRef<HTMLDivElement>(null);
+  const viewFrontRef = useRef<HTMLDivElement>(null);
+  const viewRightRef = useRef<HTMLDivElement>(null);
+  const viewPerspRef = useRef<HTMLDivElement>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activePanelTab, setActivePanelTab] = useState<BgPanelTab>("shapes");
@@ -2505,6 +2513,189 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
 
   if (!open) return null;
 
+  const effectiveIsQuadView = isQuadView && !isCapturing;
+  const isMainOrtho = sceneBaseDocument.camera.projection === "orthographic";
+  
+  const sceneContent = (
+    <Fragment>
+      <CaptureBridge onCaptureUpdate={onCaptureUpdate} />
+      <BgViewportController
+        onReady={(api) => {
+          viewportApiRef.current = api;
+          if (api && pendingInitialCameraRef.current) {
+            api.applyView(pendingInitialCameraRef.current);
+            pendingInitialCameraRef.current = null;
+          }
+        }}
+      />
+      <SkyClearColorController clearColor={getSkyPreset(skyPresetId).clearColor} />
+      <ambientLight
+        color={sceneBaseDocument.lighting.ambientColor}
+        intensity={sceneBaseDocument.lighting.ambientIntensity}
+      />
+      <directionalLight
+        castShadow={deviceQuality.shadows && sceneBaseDocument.lighting.key.castsShadow}
+        color={sceneBaseDocument.lighting.key.color}
+        intensity={sceneBaseDocument.lighting.key.intensity}
+        position={[...sceneBaseDocument.lighting.key.direction]}
+        shadow-mapSize-height={deviceQuality.shadowMapSize || 1024}
+        shadow-mapSize-width={deviceQuality.shadowMapSize || 1024}
+      />
+      <directionalLight
+        castShadow={deviceQuality.shadows && sceneBaseDocument.lighting.fill.castsShadow}
+        color={sceneBaseDocument.lighting.fill.color}
+        intensity={sceneBaseDocument.lighting.fill.intensity}
+        position={[...sceneBaseDocument.lighting.fill.direction]}
+        shadow-mapSize-height={deviceQuality.shadowMapSize || 1024}
+        shadow-mapSize-width={deviceQuality.shadowMapSize || 1024}
+      />
+      <BgGroundHelper visible={!lineArtPreview && !isCapturing} />
+      {primitives.map((prim) => (
+        <BgPrimitiveMesh
+          key={prim.id}
+          prim={prim}
+          lineArt={lineArtPreview}
+          showEdges={!isCapturing}
+          onSelect={(id, isMulti) => {
+            setSelectedIds((prev) => {
+              if (isMulti) {
+                const next = new Set(prev);
+                if (next.has(id)) next.delete(id);
+                else next.add(id);
+                return next;
+              }
+              return new Set([id]);
+            });
+          }}
+          registerRef={registerPrimitiveRef}
+        />
+      ))}
+      {customModels.map((inst) => (
+        <BgCustomModelMesh
+          key={inst.id}
+          instance={inst}
+          cachedRoot={modelRootCacheRef.current.get(inst.modelId)?.root}
+          onSelect={(id, isMulti) => {
+            setSelectedIds((prev) => {
+              if (isMulti) {
+                const next = new Set(prev);
+                if (next.has(id)) next.delete(id);
+                else next.add(id);
+                return next;
+              }
+              return new Set([id]);
+            });
+          }}
+          registerRef={registerPrimitiveRef}
+          onCloneStatus={(id, ok) => {
+            setReadyCloneIds((prev) => {
+              const next = new Set(prev);
+              if (ok) next.add(id);
+              else next.delete(id);
+              return next;
+            });
+            setFailedCloneIds((prev) => {
+              const next = new Set(prev);
+              if (ok) next.delete(id);
+              else next.add(id);
+              return next;
+            });
+          }}
+        />
+      ))}
+      {!isCapturing &&
+      firstSelectedId &&
+      !selectedIsLocked &&
+      isBgObjectVisible(selectedEntity) &&
+      primitiveObjectsRef.current.get(firstSelectedId) ? (
+        <group ref={registerStudioBg3dCaptureExcludedObject}>
+          <TransformControls
+            object={primitiveObjectsRef.current.get(firstSelectedId)}
+            mode={transformMode}
+            space={transformMode === "rotate" ? "local" : "world"}
+            onMouseDown={() => {
+              setIsTransforming(true);
+              if (!firstSelectedId) return;
+              const firstObj = primitiveObjectsRef.current.get(firstSelectedId);
+              if (firstObj) {
+                dragInitialFirstTransformRef.current = {
+                  position: [firstObj.position.x, firstObj.position.y, firstObj.position.z],
+                  rotation: [firstObj.rotation.x, firstObj.rotation.y, firstObj.rotation.z],
+                  scale: [firstObj.scale.x, firstObj.scale.y, firstObj.scale.z],
+                };
+              }
+              dragInitialSelectedTransformsRef.current.clear();
+              for (const id of selectedIds) {
+                const obj = primitiveObjectsRef.current.get(id);
+                if (obj) {
+                  dragInitialSelectedTransformsRef.current.set(id, {
+                    position: [obj.position.x, obj.position.y, obj.position.z],
+                    rotation: [obj.rotation.x, obj.rotation.y, obj.rotation.z],
+                    scale: [obj.scale.x, obj.scale.y, obj.scale.z],
+                  });
+                }
+              }
+            }}
+            onMouseUp={() => {
+              setIsTransforming(false);
+              if (!snapSettings.enabled) return;
+              applyMultiSelectDelta(true);
+            }}
+            onObjectChange={() => {
+              applyMultiSelectDelta(false);
+            }}
+          />
+        </group>
+      ) : null}
+    </Fragment>
+  );
+
+  const applyLensShift = (c: THREE.PerspectiveCamera | THREE.OrthographicCamera) => {
+    if (sceneBaseDocument.camera.lensShift) {
+      const [sx, sy] = sceneBaseDocument.camera.lensShift;
+      if (sx === 0 && sy === 0) {
+        c.clearViewOffset();
+      } else {
+        c.setViewOffset(1000, 1000, sx * 1000, sy * 1000, 1000, 1000);
+      }
+    } else {
+      if (c.view !== null) c.clearViewOffset();
+    }
+  };
+
+  const mainCameraNode = isMainOrtho ? (
+    <OrthographicCamera
+      makeDefault
+      position={[...sceneBaseDocument.camera.position]}
+      zoom={sceneBaseDocument.camera.zoom ?? 1}
+      near={0.1}
+      far={200}
+      onUpdate={applyLensShift}
+    />
+  ) : (
+    <PerspectiveCamera
+      makeDefault
+      fov={sceneBaseDocument.camera.fovDegrees}
+      position={[...sceneBaseDocument.camera.position]}
+      zoom={sceneBaseDocument.camera.zoom ?? 1}
+      near={0.1}
+      far={200}
+      onUpdate={applyLensShift}
+    />
+  );
+
+  const commonOrbitControls = (
+    <OrbitControls
+      makeDefault
+      enableDamping
+      dampingFactor={0.08}
+      enablePan
+      enabled={!isTransforming}
+      minDistance={2}
+      maxDistance={60}
+    />
+  );
+
   const modal = (
     <div
       aria-modal="true"
@@ -2537,150 +2728,59 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                 ref={viewportHostRef}
                 className="relative aspect-video h-full max-h-full min-h-0 w-auto overflow-hidden rounded-xl border border-line/80 bg-white shadow-[inset_0_0_0_1px_oklch(1_0_0/0.04)] lg:min-h-[360px]"
               >
+                {effectiveIsQuadView && (
+                  <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 divide-x divide-y divide-line/80">
+                    <div ref={viewTopRef} className="relative w-full h-full" />
+                    <div ref={viewPerspRef} className="relative w-full h-full" />
+                    <div ref={viewFrontRef} className="relative w-full h-full" />
+                    <div ref={viewRightRef} className="relative w-full h-full" />
+                  </div>
+                )}
                 <Canvas
+                  eventSource={viewportHostRef as unknown as React.RefObject<HTMLElement>}
                   camera={{
                     fov: sceneBaseDocument.camera.fovDegrees,
                     position: [...sceneBaseDocument.camera.position],
                     near: 0.1,
                     far: 200,
                   }}
-                  className="h-full w-full"
+                  className={cx("h-full w-full", effectiveIsQuadView && "pointer-events-none absolute inset-0 z-10")}
                   dpr={deviceQuality.effectiveDpr}
                   shadows={{ enabled: deviceQuality.shadows, type: THREE.PCFShadowMap }}
                   gl={{ antialias: sceneBaseDocument.render.antialias, alpha: true }}
                   onCreated={({ gl }) => gl.setClearColor(getSkyPreset(skyPresetId).clearColor, 1)}
                   onPointerMissed={() => setSelectedIds(new Set())}
                 >
-                  <CaptureBridge onCaptureUpdate={onCaptureUpdate} />
-                  <BgViewportController
-                    onReady={(api) => {
-                      viewportApiRef.current = api;
-                      if (api && pendingInitialCameraRef.current) {
-                        api.applyView(pendingInitialCameraRef.current);
-                        pendingInitialCameraRef.current = null;
-                      }
-                    }}
-                  />
-                  <SkyClearColorController clearColor={getSkyPreset(skyPresetId).clearColor} />
-                  <ambientLight
-                    color={sceneBaseDocument.lighting.ambientColor}
-                    intensity={sceneBaseDocument.lighting.ambientIntensity}
-                  />
-                  <directionalLight
-                    castShadow={deviceQuality.shadows && sceneBaseDocument.lighting.key.castsShadow}
-                    color={sceneBaseDocument.lighting.key.color}
-                    intensity={sceneBaseDocument.lighting.key.intensity}
-                    position={[...sceneBaseDocument.lighting.key.direction]}
-                    shadow-mapSize-height={deviceQuality.shadowMapSize || 1024}
-                    shadow-mapSize-width={deviceQuality.shadowMapSize || 1024}
-                  />
-                  <directionalLight
-                    castShadow={deviceQuality.shadows && sceneBaseDocument.lighting.fill.castsShadow}
-                    color={sceneBaseDocument.lighting.fill.color}
-                    intensity={sceneBaseDocument.lighting.fill.intensity}
-                    position={[...sceneBaseDocument.lighting.fill.direction]}
-                    shadow-mapSize-height={deviceQuality.shadowMapSize || 1024}
-                    shadow-mapSize-width={deviceQuality.shadowMapSize || 1024}
-                  />
-                  <BgGroundHelper visible={!lineArtPreview && !isCapturing} />
-                  {primitives.map((prim) => (
-                    <BgPrimitiveMesh
-                      key={prim.id}
-                      prim={prim}
-                      lineArt={lineArtPreview}
-                      showEdges={!isCapturing}
-                      onSelect={(id, isMulti) => {
-                        setSelectedIds((prev) => {
-                          if (isMulti) {
-                            const next = new Set(prev);
-                            if (next.has(id)) next.delete(id);
-                            else next.add(id);
-                            return next;
-                          }
-                          return new Set([id]);
-                        });
-                      }}
-                      registerRef={registerPrimitiveRef}
-                    />
-                  ))}
-                  {customModels.map((inst) => (
-                    <BgCustomModelMesh
-                      key={inst.id}
-                      instance={inst}
-                      cachedRoot={modelRootCacheRef.current.get(inst.modelId)?.root}
-                      onSelect={(id, isMulti) => {
-                        setSelectedIds((prev) => {
-                          if (isMulti) {
-                            const next = new Set(prev);
-                            if (next.has(id)) next.delete(id);
-                            else next.add(id);
-                            return next;
-                          }
-                          return new Set([id]);
-                        });
-                      }}
-                      registerRef={registerPrimitiveRef}
-                      onCloneStatus={(id, ok) => {
-                        setReadyCloneIds((prev) => {
-                          const next = new Set(prev);
-                          if (ok) next.add(id);
-                          else next.delete(id);
-                          return next;
-                        });
-                        setFailedCloneIds((prev) => {
-                          const next = new Set(prev);
-                          if (ok) next.delete(id);
-                          else next.add(id);
-                          return next;
-                        });
-                      }}
-                    />
-                  ))}
-                  {!isCapturing &&
-                  firstSelectedId &&
-                  !selectedIsLocked &&
-                  isBgObjectVisible(selectedEntity) &&
-                  primitiveObjectsRef.current.get(firstSelectedId) ? (
-                    <group ref={registerStudioBg3dCaptureExcludedObject}>
-                      <TransformControls
-                        object={primitiveObjectsRef.current.get(firstSelectedId)}
-                        mode={transformMode}
-                        space={transformMode === "rotate" ? "local" : "world"}
-                        onMouseDown={() => {
-                          setIsTransforming(true);
-                          if (!firstSelectedId) return;
-                          const firstObj = primitiveObjectsRef.current.get(firstSelectedId);
-                          if (firstObj) {
-                            dragInitialFirstTransformRef.current = {
-                              position: [firstObj.position.x, firstObj.position.y, firstObj.position.z],
-                              rotation: [firstObj.rotation.x, firstObj.rotation.y, firstObj.rotation.z],
-                              scale: [firstObj.scale.x, firstObj.scale.y, firstObj.scale.z],
-                            };
-                          }
-                          dragInitialSelectedTransformsRef.current.clear();
-                          for (const id of selectedIds) {
-                            const obj = primitiveObjectsRef.current.get(id);
-                            if (obj) {
-                              dragInitialSelectedTransformsRef.current.set(id, {
-                                position: [obj.position.x, obj.position.y, obj.position.z],
-                                rotation: [obj.rotation.x, obj.rotation.y, obj.rotation.z],
-                                scale: [obj.scale.x, obj.scale.y, obj.scale.z],
-                              });
-                            }
-                          }
-                        }}
-                        onMouseUp={() => {
-                          setIsTransforming(false);
-                          if (!snapSettings.enabled) return;
-                          applyMultiSelectDelta(true);
-                        }}
-                        onObjectChange={() => {
-                          applyMultiSelectDelta(false);
-                        }}
-                      />
-                    </group>
-                  ) : null}
-                  <OrbitControls makeDefault enableDamping dampingFactor={0.08} enablePan enabled={!isTransforming} minDistance={2} maxDistance={60} />
+                  {effectiveIsQuadView ? (
+                    <Fragment>
+                      <View track={viewTopRef as unknown as React.RefObject<HTMLElement>}>
+                        <OrthographicCamera makeDefault position={[0, 15, 0]} rotation={[-Math.PI / 2, 0, 0]} zoom={40} near={-100} far={100} />
+                        {sceneContent}
+                        <OrbitControls makeDefault enableRotate={false} enableDamping dampingFactor={0.08} enablePan enabled={!isTransforming} />
+                      </View>
+                      <View track={viewFrontRef as unknown as React.RefObject<HTMLElement>}>
+                        <OrthographicCamera makeDefault position={[0, 0, 15]} rotation={[0, 0, 0]} zoom={40} near={-100} far={100} />
+                        {sceneContent}
+                        <OrbitControls makeDefault enableRotate={false} enableDamping dampingFactor={0.08} enablePan enabled={!isTransforming} />
+                      </View>
+                      <View track={viewRightRef as unknown as React.RefObject<HTMLElement>}>
+                        <OrthographicCamera makeDefault position={[15, 0, 0]} rotation={[0, Math.PI / 2, 0]} zoom={40} near={-100} far={100} />
+                        {sceneContent}
+                        <OrbitControls makeDefault enableRotate={false} enableDamping dampingFactor={0.08} enablePan enabled={!isTransforming} />
+                      </View>
+                      <View track={viewPerspRef as unknown as React.RefObject<HTMLElement>}>
+                        {mainCameraNode}
+                        {sceneContent}
+                        {commonOrbitControls}
+                      </View>
+                    </Fragment>
+                  ) : (
+                    <Fragment>
+                      {mainCameraNode}
+                      {sceneContent}
+                      {commonOrbitControls}
+                    </Fragment>
+                  )}
                 </Canvas>
 
                 <div className="absolute left-2.5 top-2.5 z-10 flex flex-col gap-1.5">
@@ -2706,6 +2806,19 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                       );
                     })}
                   </div>
+                  <button
+                    type="button"
+                    aria-label="4분할 뷰 토글"
+                    title="4분할 뷰 토글"
+                    aria-pressed={isQuadView}
+                    className={cx(
+                      VIEWPORT_BTN,
+                      isQuadView && "bg-accent text-on-accent hover:bg-accent/90 hover:text-on-accent"
+                    )}
+                    onClick={() => setIsQuadView((prev) => !prev)}
+                  >
+                    <LayoutTemplate size={16} aria-hidden />
+                  </button>
                   <button
                     type="button"
                     aria-label="실행 취소"
