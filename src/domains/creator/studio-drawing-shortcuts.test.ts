@@ -103,9 +103,10 @@ describe("resolveStudioDrawingShortcut", () => {
 });
 
 describe("드로잉 단축키 수치 조절", () => {
-  it("브러시 크기를 1~48px로 clamp하고 비정상 입력도 정규화한다", () => {
+  it("브러시 크기를 허용 범위로 clamp하고 비정상 입력도 정규화한다", () => {
+    // 상한은 BRUSH_STROKE_WIDTH_RANGE[1](=80) — UI 슬라이더와 동일 계약.
     expect(adjustStudioBrushWidth(1, -5)).toBe(1);
-    expect(adjustStudioBrushWidth(48, 5)).toBe(48);
+    expect(adjustStudioBrushWidth(80, 5)).toBe(80);
     expect(adjustStudioBrushWidth(Number.NaN, 5)).toBe(6);
   });
 
