@@ -64,6 +64,7 @@ import {
   Minus,
   MousePointer2,
   PaintBucket,
+  Droplets,
   Pencil,
   PenTool,
   Plus,
@@ -232,6 +233,7 @@ import {
   preloadStudioBackground3D,
 } from "./studio-background-3d-loader";
 import { parseStudio3dTool } from "./studio-background-3d-metadata";
+import { studioBackgroundGradientColorStops } from "./studio-background-presets";
 import {
   planStudioBg3dLtLayers,
   preserveStudioBg3dLtSceneAnchorAfterRemoval,
@@ -1175,6 +1177,10 @@ const StudioElementsPanel = lazyRetry(
   () => import("./StudioElementsPanel").then((mod) => ({ default: mod.StudioElementsPanel })),
   "StudioElementsPanel"
 );
+const StudioBackgroundPanel = lazyRetry(
+  () => import("./StudioBackgroundPanel").then((mod) => ({ default: mod.StudioBackgroundPanel })),
+  "StudioBackgroundPanel"
+);
 const StudioRasterAssetGrid = lazyRetry(
   () => import("./StudioRasterAssetGrid").then((mod) => ({ default: mod.StudioRasterAssetGrid })),
   "StudioRasterAssetGrid"
@@ -1937,7 +1943,7 @@ export type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl | F
   emeresSourceId?: string;
 };
 const EMPTY_LAYER_GROUPS: LayerGroup[] = [];
-type StudioMenu = "template" | "collage" | "bubble" | "sticker" | "elements" | "char" | "bgScene" | "asset" | "emeres" | "tone" | "scene" | "clip" | "palette" | "brandKit" | "stockImage" | "aiAssist" | "integrations";
+type StudioMenu = "template" | "collage" | "bubble" | "sticker" | "elements" | "char" | "bgScene" | "bgFill" | "asset" | "emeres" | "tone" | "scene" | "clip" | "palette" | "brandKit" | "stockImage" | "aiAssist" | "integrations";
 // 2026-07-05 툴바 그룹화 — 20개 이상의 플랫한 툴바 버튼을 논리 그룹 4개로 묶는다(선택/펜/지우개/
 // 텍스트/말풍선처럼 사용 빈도가 높은 핵심 도구는 그룹화 대상에서 제외하고 그대로 1줄 유지).
 // 그룹 팝오버는 `menu` 하나로 열림 상태·활성 서브탭을 동시에 표현한다(별도 상태 미도입) — 그룹 멤버인
@@ -1947,6 +1953,7 @@ type StudioMenu = "template" | "collage" | "bubble" | "sticker" | "elements" | "
 type StudioToolbarGroupId = "bgGroup" | "assetGroup" | "styleGroup" | "aiGroup";
 const STUDIO_TOOLBAR_GROUP_OF: Partial<Record<StudioMenu, StudioToolbarGroupId>> = {
   bgScene: "bgGroup",
+  bgFill: "bgGroup",
   tone: "bgGroup",
   template: "assetGroup",
   collage: "assetGroup",
@@ -13197,6 +13204,101 @@ function StudioCuttoonEditor() {
       setBgGrad(null);
     }
   }
+
+  /**
+   * PicsArt-class page fill: solid/gradient → page bg fields;
+   * pattern/atmosphere/horizontal gradient → locked full-bleed image under content.
+   */
+  async function applyStudioBackgroundFill(payload: {
+    kind: "solid" | "gradient" | "svg";
+    color?: string;
+    stops?: string[];
+    direction?: "vertical" | "horizontal";
+    svg?: string;
+    width?: number;
+    height?: number;
+    label?: string;
+    presetId?: string;
+  }) {
+    setMenu(null);
+    const {
+      buildStudioBackgroundGradientSvg,
+      isStudioBackgroundFillLayerName,
+      STUDIO_BG_FILL_LAYER_PREFIX,
+    } = await import("./studio-background-presets");
+    const stripFillLayers = (list: El[]) =>
+      list.filter((el) => !isStudioBackgroundFillLayerName(el.name));
+
+    if (payload.kind === "solid" && payload.color) {
+      setBg(payload.color);
+      setBgGrad(null);
+      const next = stripFillLayers(elements);
+      if (next.length !== elements.length) commit(next);
+      announceDrawingShortcut("단색 배경을 적용했어요.");
+      return;
+    }
+
+    if (payload.kind === "gradient" && payload.stops && payload.stops.length > 0) {
+      const direction = payload.direction ?? "vertical";
+      if (direction === "vertical") {
+        setBg(payload.stops[0] ?? "#ffffff");
+        setBgGrad([...payload.stops]);
+        const next = stripFillLayers(elements);
+        if (next.length !== elements.length) commit(next);
+        announceDrawingShortcut("그라데이션 배경을 적용했어요.");
+        return;
+      }
+      // Horizontal: bake as full-bleed SVG (page bg field is vertical-only).
+      const svg = buildStudioBackgroundGradientSvg(
+        CANVAS_W,
+        canvasH,
+        payload.stops,
+        "horizontal"
+      );
+      const src = svgToDataUrl(svg);
+      setBg("#ffffff");
+      setBgGrad(null);
+      const bgEl: El = {
+        id: uid(),
+        type: "image",
+        src,
+        x: 0,
+        y: 0,
+        width: CANVAS_W,
+        height: canvasH,
+        rotation: 0,
+        locked: true,
+        noClip: true,
+        name: `${STUDIO_BG_FILL_LAYER_PREFIX} · ${payload.label ?? "가로 그라데이션"}`,
+      };
+      commit([bgEl, ...stripFillLayers(elements)]);
+      announceDrawingShortcut("가로 그라데이션 배경을 적용했어요.");
+      return;
+    }
+
+    if (payload.kind === "svg" && payload.svg) {
+      const src = svgToDataUrl(payload.svg);
+      const w = payload.width ?? CANVAS_W;
+      const h = payload.height ?? canvasH;
+      setBg("#ffffff");
+      setBgGrad(null);
+      const bgEl: El = {
+        id: uid(),
+        type: "image",
+        src,
+        x: 0,
+        y: 0,
+        width: w,
+        height: h,
+        rotation: 0,
+        locked: true,
+        noClip: true,
+        name: `${STUDIO_BG_FILL_LAYER_PREFIX} · ${payload.label ?? "패턴"}`,
+      };
+      commit([bgEl, ...stripFillLayers(elements)]);
+      announceDrawingShortcut("패턴·분위기 배경을 적용했어요.");
+    }
+  }
   async function onPickImage(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -16704,7 +16806,7 @@ function StudioCuttoonEditor() {
           id: "bg",
           label: "배경 · 톤",
           icon: Mountain,
-          onSelect: () => setMenu("bgScene"),
+          onSelect: () => setMenu("bgFill"),
         },
         {
           id: "style",
@@ -19691,7 +19793,7 @@ function StudioCuttoonEditor() {
         <div ref={activeToolbarGroup === "bgGroup" ? menuRef : undefined} className="relative">
           <button
             type="button"
-            onClick={() => setMenu(activeToolbarGroup === "bgGroup" ? null : "bgScene")}
+            onClick={() => setMenu(activeToolbarGroup === "bgGroup" ? null : "bgFill")}
             aria-haspopup="menu"
             aria-expanded={activeToolbarGroup === "bgGroup"}
             className={toolBtn(activeToolbarGroup === "bgGroup")}
@@ -19704,11 +19806,13 @@ function StudioCuttoonEditor() {
               <StudioMenuPopoverHeader
                 icon={Mountain}
                 title="배경·톤"
-                description="2D 씬, 스크린톤, 3D 블록아웃을 한 곳에서 배치합니다."
+                description="단색·그라데이션·패턴·2D 씬·스크린톤·3D를 한 곳에서 배치합니다."
               />
               <StudioMenuSubtabs
                 aria-label="배경 메뉴 구역"
-                activeId={menu === "bgScene" || menu === "tone" ? menu : "bgScene"}
+                activeId={
+                  menu === "bgScene" || menu === "tone" || menu === "bgFill" ? menu : "bgFill"
+                }
                 onSelect={(id) => {
                   if (id === "bg3d") {
                     setBg3dInitialScene(undefined);
@@ -19721,11 +19825,24 @@ function StudioCuttoonEditor() {
                   setMenu(id as StudioMenu);
                 }}
                 items={[
+                  { id: "bgFill", label: "채우기", icon: Droplets, title: "단색·그라데이션·패턴·분위기" },
                   { id: "bgScene", label: "배경 씬", icon: ImageIcon },
                   { id: "tone", label: "톤", icon: Grid2x2 },
                   { id: "bg3d", label: "3D 배경", icon: Boxes, title: "3D 배경 블록아웃 만들기" },
                 ]}
               />
+              {menu === "bgFill" && (
+                <Suspense fallback={<StudioPanelLoading label="배경 채우기 패널을 여는 중..." />}>
+                  <StudioBackgroundPanel
+                    canvasW={CANVAS_W}
+                    canvasH={canvasH}
+                    currentBg={bg}
+                    onApply={(payload) => {
+                      void applyStudioBackgroundFill(payload);
+                    }}
+                  />
+                </Suspense>
+              )}
               {menu === "bgScene" && (
                 <>
                   <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">2D 배경 씬</p>
@@ -22022,7 +22139,11 @@ function StudioCuttoonEditor() {
                 fill={bgGrad ? undefined : bg}
                 fillLinearGradientStartPoint={bgGrad ? { x: 0, y: 0 } : undefined}
                 fillLinearGradientEndPoint={bgGrad ? { x: 0, y: canvasH } : undefined}
-                fillLinearGradientColorStops={bgGrad ? [0, bgGrad[0], 1, bgGrad[1]] : undefined}
+                fillLinearGradientColorStops={
+                  bgGrad
+                    ? (studioBackgroundGradientColorStops(bgGrad) as (string | number)[])
+                    : undefined
+                }
               />
             </Layer>
             <Layer>
@@ -24181,6 +24302,14 @@ function StudioCuttoonEditor() {
                 })}
               </div>
             </div>
+            <button
+              type="button"
+              onClick={() => setMenu("bgFill")}
+              className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.68rem] font-semibold text-fg-2 hover:border-accent/40 hover:bg-raised"
+            >
+              <Droplets size={12} className="text-accent" aria-hidden />
+              패턴·분위기·단색 전체 보기
+            </button>
             <div className="mt-3 flex items-center justify-between gap-2 text-sm text-fg-2">
               <span>높이</span>
               <span className="flex items-center gap-1">
