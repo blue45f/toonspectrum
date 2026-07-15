@@ -9,7 +9,7 @@ rewrites rather than claims that every legacy scene type already runs on the new
 | Track | Current status | Authority boundary |
 | --- | --- | --- |
 | G9b — realtime CRDT operations | **Shipped vertical slice** | Yjs is authoritative for strokes, scene references, pages, layer groups, mixed order, and delete/restore operations. PostgreSQL is authoritative for durable updates/snapshots and short edit leases. |
-| G10b — WebGPU canvas | **Shipped vertical slice** | WebGPU is authoritative only after a matching, complete frame receipt for the frontmost compatible drawing suffix. Konva remains visible for unsupported content and every failed or stale GPU frame. |
+| G10b — WebGPU canvas | **Safe live-input slice** | WebGPU is authoritative only for a matching, complete live-draft frame. Committed document pixels remain authoritative in Konva until pixel parity and every Stage readback path share one contract. |
 
 ## G9b: convergent multi-user document
 
@@ -72,6 +72,11 @@ rewrites rather than claims that every legacy scene type already runs on the new
   ratio. It does not allocate a texture the height of a complete scrolling episode.
 - Queue completion carries an opaque request receipt. A stale, superseded, incomplete, lost-device,
   empty, non-finite, or over-budget frame cannot hide the authoritative Konva canvas.
+- A fail-closed committed-suffix planner and exact scene/viewport authority snapshot are implemented,
+  but Studio intentionally does not hide committed Konva nodes yet. The current Konva pressure
+  renderer uses endpoint-width segments while the GPU compositor uses interpolated dabs; treating
+  those as interchangeable would also omit GPU-owned pixels from Stage-only timelapse, animation,
+  eyedropper, and asset-capture readbacks.
 
 ### Safety and fallback
 
@@ -81,9 +86,12 @@ rewrites rather than claims that every legacy scene type already runs on the new
   GPU path declines authority instead of approving a blurry preview.
 - WebGPU initialization is idempotent, late device acquisition after cancellation is destroyed,
   and device loss invalidates every old-generation resource before recovery.
-- Canvas2D remains the geometry-compatible fallback when WebGPU is unavailable. Konva remains the
+- Canvas2D remains the compositor-compatible fallback when WebGPU is unavailable. Konva remains the
   scene/interactions authority for unsupported images, text, bubbles, filters, selections, and 3D
   surfaces until their render contracts move to GPU passes.
+- Committed ownership will be enabled only after an analytic endpoint-width segment pass, alpha and
+  single-point golden-pixel parity, receipt ownership tokens, native-scroll pre-paint revocation,
+  GPU-aware readback composition, and a top interaction overlay plane all pass together.
 
 ## Verification contracts
 
@@ -93,5 +101,5 @@ rewrites rather than claims that every legacy scene type already runs on the new
 - WebGPU: retained suffix upload, historical rebuild, visible-only tall-document planning,
   fractional tile edges, high-DPI quality rejection, empty/non-finite rejection, stale receipts,
   queue serialization/coalescing, device loss, initialization cancellation, and Canvas2D fallback.
-- UI smoke verification covers desktop and mobile immersive Studio layouts with the bounded WebGPU
-  canvas authorized on supported hardware.
+- UI smoke verification covers desktop and mobile immersive Studio layouts, bounded viewport
+  surfaces, exact invalidation, and safe Konva fallback whenever a GPU frame is not authorized.
