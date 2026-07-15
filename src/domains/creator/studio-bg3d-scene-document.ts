@@ -54,6 +54,9 @@ export interface StudioBg3dCameraSettings {
   readonly position: StudioBg3dVec3;
   readonly target: StudioBg3dVec3;
   readonly fovDegrees: number;
+  readonly projection?: "perspective" | "orthographic";
+  readonly zoom?: number;
+  readonly lensShift?: readonly [number, number];
 }
 
 export interface StudioBg3dRenderSettings {
@@ -68,6 +71,10 @@ export interface StudioBg3dBackgroundSettings {
   readonly mode: StudioBg3dBackgroundMode;
   readonly color: string;
   readonly skyPresetId: StudioBg3dSkyPresetId;
+  readonly fogEnabled?: boolean;
+  readonly fogColor?: string;
+  readonly fogNear?: number;
+  readonly fogFar?: number;
 }
 
 export interface StudioBg3dDirectionalLightSettings {
@@ -680,6 +687,11 @@ function normalizeCamera(value: unknown): StudioBg3dCameraSettings {
     position,
     target,
     fovDegrees: boundedNumber(candidate.fovDegrees, 50, 10, 120),
+    projection: candidate.projection === "orthographic" ? "orthographic" : "perspective",
+    zoom: boundedNumber(candidate.zoom, 1, 0.1, 100),
+    lensShift: Array.isArray(candidate.lensShift) && candidate.lensShift.length === 2 && typeof candidate.lensShift[0] === "number" && typeof candidate.lensShift[1] === "number"
+      ? [boundedNumber(candidate.lensShift[0], 0, -2, 2), boundedNumber(candidate.lensShift[1], 0, -2, 2)] as readonly [number, number]
+      : undefined,
   };
 }
 
@@ -700,6 +712,10 @@ function normalizeBackground(value: unknown): StudioBg3dBackgroundSettings {
     mode: normalizedEnum(candidate.mode, BACKGROUND_MODE_SET, "sky-preset"),
     color: normalizedColor(candidate.color, "#ffffff"),
     skyPresetId: normalizedEnum(candidate.skyPresetId, SKY_PRESET_SET, "blank"),
+    fogEnabled: normalizedBoolean(candidate.fogEnabled, false),
+    fogColor: normalizedColor(candidate.fogColor, "#ffffff"),
+    fogNear: boundedNumber(candidate.fogNear, 10, 0, MAX_WORLD_COORDINATE),
+    fogFar: boundedNumber(candidate.fogFar, 50, 0, MAX_WORLD_COORDINATE * 2),
   };
 }
 
