@@ -32,8 +32,10 @@ import {
   ellipseSelectionPolygon,
   emptyPixelSelection,
   expandContractSelection,
+  applySelectionContentTransformToCanvas,
   flipSelection,
   isSelectionAdjustNoop,
+  isSelectionContentTransformNoop,
   isSelectionUsable,
   marchingAntsDashOffset,
   marchingAntsPasses,
@@ -49,6 +51,7 @@ import {
   rectSelectionPolygon,
   removeLastSubpath,
   rotateSelection,
+  scaleSelection,
   selectAllPixels,
   selectionBoundsNorm,
   selectionCentroidNorm,
@@ -56,6 +59,8 @@ import {
   simplifyLassoPolygon,
   subpathOutlinePoints,
   toggleSelectionInvert,
+  transformSelectionMarquee,
+  translateSelection,
   updateSelectionDrag,
   type MaskCanvasLike,
   type MaskCtx2DLike,
@@ -131,6 +136,11 @@ function fakeCtx(log: string[], label: string): MaskCtx2DLike {
     fillRect: (x, y, w, h) => log.push(`${label}:fillRect(${x},${y},${w},${h})`),
     clearRect: (x, y, w, h) => log.push(`${label}:clearRect(${x},${y},${w},${h})`),
     drawImage: (image, dx, dy) => log.push(`${label}:drawImage(#${(image as FakeCanvas).id},${dx},${dy})`),
+    save: () => log.push(`${label}:save`),
+    restore: () => log.push(`${label}:restore`),
+    translate: (x, y) => log.push(`${label}:translate(${x},${y})`),
+    rotate: (a) => log.push(`${label}:rotate(${a})`),
+    scale: (x, y) => log.push(`${label}:scale(${x},${y})`),
   };
 }
 
@@ -486,6 +496,45 @@ describe("rotateSelection / flipSelection", () => {
       true
     );
     expect(flipSelection(selectAllPixels(), "x")).toEqual(selectAllPixels());
+  });
+
+  it("translateSelection / scaleSelection — 마퀴 이동·스케일", () => {
+    const base = addSelectionSubpath(null, "add", rectSelectionPolygon({ x: 0.2, y: 0.2 }, { x: 0.4, y: 0.4 }))!;
+    const moved = translateSelection(base, 0.1, 0.05)!;
+    expect(pointInSelection(moved, { x: 0.35, y: 0.3 })).toBe(true);
+    expect(pointInSelection(moved, { x: 0.25, y: 0.25 })).toBe(false);
+    const scaled = scaleSelection(base, 2, { aspect: 1 })!;
+    expect(pointInSelection(scaled, { x: 0.3, y: 0.15 })).toBe(true); // 세로로 커진 영역
+    expect(translateSelection(base, 0, 0)).toBe(base);
+  });
+
+  it("transformSelectionMarquee 는 스케일·이동을 합성한다", () => {
+    const base = addSelectionSubpath(null, "add", rectSelectionPolygon({ x: 0.4, y: 0.4 }, { x: 0.6, y: 0.6 }))!;
+    const next = transformSelectionMarquee(base, { scale: 1.5, dxNorm: 0.1, dyNorm: 0 });
+    expect(next).not.toBeNull();
+    expect(pointInSelection(next, { x: 0.7, y: 0.5 })).toBe(true);
+  });
+});
+
+describe("applySelectionContentTransformToCanvas", () => {
+  it("noop 변환은 null, 회전 시 마스크 영역을 지우고 조각을 다시 그린다", () => {
+    expect(isSelectionContentTransformNoop({})).toBe(true);
+    expect(isSelectionContentTransformNoop({ rotateDeg: 90 })).toBe(false);
+    const log: string[] = [];
+    const factory = fakeFactory(log);
+    const source: FakeCanvas = { id: 99, width: 32, height: 32 };
+    const mask: FakeCanvas = { id: 98, width: 32, height: 32 };
+    const out = applySelectionContentTransformToCanvas(source, 32, 32, mask, { rotateDeg: 90 }, factory, {
+      x: 8,
+      y: 8,
+      w: 16,
+      h: 16,
+    });
+    expect(out).not.toBeNull();
+    expect(log.some((l) => l.includes("gco=destination-in"))).toBe(true);
+    expect(log.some((l) => l.includes("gco=destination-out"))).toBe(true);
+    expect(log.some((l) => l.includes(":rotate("))).toBe(true);
+    expect(applySelectionContentTransformToCanvas(source, 32, 32, mask, {}, factory)).toBeNull();
   });
 });
 

@@ -540,6 +540,196 @@ export function flipSelection(sel: PixelSelection | null, axis: "x" | "y"): Pixe
   return { ...sel!, subpaths: nextSubs };
 }
 
+/**
+ * 선택 마퀴 이동(Magma: 선택 안을 드래그) — 픽셀 내용은 유지하고 경계만 평행 이동.
+ * dx/dy 는 정규화 단위. 전체 반전(서브패스 0)은 이동 의미 없어 그대로 반환.
+ */
+export function translateSelection(
+  sel: PixelSelection | null,
+  dx: number,
+  dy: number
+): PixelSelection | null {
+  if (!isSelectionUsable(sel)) return null;
+  if (sel!.invert && sel!.subpaths.length === 0) return sel;
+  const ox = clampNum(dx, -2, 2, 0);
+  const oy = clampNum(dy, -2, 2, 0);
+  if (ox === 0 && oy === 0) return sel;
+  const nextSubs: SelectionSubpath[] = [];
+  for (const sp of sel!.subpaths) {
+    const points = sp.points.map((p) =>
+      sanitizePoint({ x: p.x + ox, y: p.y + oy }, SEL_POINT_MIN, SEL_POINT_MAX)
+    );
+    if (sp.kind === "brush") {
+      if (points.length === 0) continue;
+      nextSubs.push({ ...sp, points });
+      continue;
+    }
+    if (points.length >= 3 && polygonAreaNorm(points) >= MIN_SELECTION_SUBPATH_AREA) {
+      nextSubs.push({ mode: sp.mode, points });
+    }
+  }
+  if (nextSubs.length === 0 && !sel!.invert) return null;
+  return { ...sel!, subpaths: nextSubs };
+}
+
+/** 선택 마퀴 스케일(중심 기준). factor=1 불변, 0.5=절반. 브러시 반경도 같이 스케일. */
+export function scaleSelection(
+  sel: PixelSelection | null,
+  factor: number,
+  opts?: { aspect?: number }
+): PixelSelection | null {
+  if (!isSelectionUsable(sel)) return null;
+  const f = clampNum(factor, 0.05, 8, 1);
+  if (f === 1 || (sel!.invert && sel!.subpaths.length === 0)) return sel;
+  const center = selectionCentroidNorm(sel);
+  if (!center) return sel;
+  const aspect = opts?.aspect ?? 1;
+  const A = Number.isFinite(aspect) && aspect > 0 ? aspect : 1;
+  const nextSubs: SelectionSubpath[] = [];
+  for (const sp of sel!.subpaths) {
+    const points = sp.points.map((p) => {
+      const sx = p.x - center.x;
+      const sy = (p.y - center.y) * A;
+      return sanitizePoint(
+        { x: center.x + sx * f, y: center.y + (sy * f) / A },
+        SEL_POINT_MIN,
+        SEL_POINT_MAX
+      );
+    });
+    if (sp.kind === "brush") {
+      const radius = clampNum(sp.radius * f, 0.001, MAX_BRUSH_RADIUS_NORM);
+      if (points.length === 0 || radius < 0.001) continue;
+      nextSubs.push({ ...sp, points, radius });
+      continue;
+    }
+    if (points.length >= 3 && polygonAreaNorm(points) >= MIN_SELECTION_SUBPATH_AREA) {
+      nextSubs.push({ mode: sp.mode, points });
+    }
+  }
+  if (nextSubs.length === 0 && !sel!.invert) return null;
+  return { ...sel!, subpaths: nextSubs };
+}
+
+/** Magma Transform 내용 변형 — 픽셀을 이동/회전/스케일/반전(원본 선택 영역은 지우고 변형본을 얹음). */
+export type SelectionContentTransform = {
+  /** 디바이스 px 평행 이동. */
+  dxPx?: number;
+  dyPx?: number;
+  /** 시계 방향 도. */
+  rotateDeg?: number;
+  /** 균일 스케일(1=불변). */
+  scale?: number;
+  flipX?: boolean;
+  flipY?: boolean;
+};
+
+/** 내용 변형이 실질 no-op 인지. */
+export function isSelectionContentTransformNoop(t: SelectionContentTransform): boolean {
+  const dx = t.dxPx ?? 0;
+  const dy = t.dyPx ?? 0;
+  const rot = t.rotateDeg ?? 0;
+  const sc = t.scale ?? 1;
+  return (
+    (!Number.isFinite(dx) || dx === 0) &&
+    (!Number.isFinite(dy) || dy === 0) &&
+    (!Number.isFinite(rot) || rot === 0) &&
+    (!Number.isFinite(sc) || sc === 1) &&
+    !t.flipX &&
+    !t.flipY
+  );
+}
+
+/**
+ * 마퀴 기하에 내용 변형과 같은 변환을 적용 — 변형 후 선택이 픽셀을 따라가도록.
+ * dx/dy 는 정규화(디바이스 px ÷ 폭/높이로 환산해 호출).
+ */
+export function transformSelectionMarquee(
+  sel: PixelSelection | null,
+  t: {
+    dxNorm?: number;
+    dyNorm?: number;
+    rotateDeg?: number;
+    scale?: number;
+    flipX?: boolean;
+    flipY?: boolean;
+    aspect?: number;
+  }
+): PixelSelection | null {
+  if (!isSelectionUsable(sel)) return null;
+  let next: PixelSelection | null = sel;
+  const sc = t.scale ?? 1;
+  if (sc !== 1) next = scaleSelection(next, sc, { aspect: t.aspect });
+  if (t.flipX) next = flipSelection(next, "x");
+  if (t.flipY) next = flipSelection(next, "y");
+  const rot = t.rotateDeg ?? 0;
+  if (rot !== 0) next = rotateSelection(next, rot, { aspect: t.aspect });
+  const dx = t.dxNorm ?? 0;
+  const dy = t.dyNorm ?? 0;
+  if (dx !== 0 || dy !== 0) next = translateSelection(next, dx, dy);
+  return next;
+}
+
+/**
+ * 원본 + 마스크 + 내용 변형 → 결과 캔버스.
+ * 1) 마스크 영역을 원본에서 지우고 2) 마스크로 오린 조각을 중심 기준으로 변형해 다시 그린다.
+ * Magma Transform(Scale/Rotate/Flip/Move) 의 비대화형 적용 경로.
+ */
+export function applySelectionContentTransformToCanvas(
+  source: MaskImageSource,
+  width: number,
+  height: number,
+  mask: MaskImageSource,
+  transform: SelectionContentTransform,
+  createCanvas: SelectionCanvasFactory,
+  boundsPx?: { x: number; y: number; w: number; h: number }
+): (MaskCanvasLike & MaskImageSource) | null {
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null;
+  if (isSelectionContentTransformNoop(transform)) return null;
+  const w = Math.max(1, Math.round(width));
+  const h = Math.max(1, Math.round(height));
+  const dx = clampNum(transform.dxPx ?? 0, -w * 2, w * 2, 0);
+  const dy = clampNum(transform.dyPx ?? 0, -h * 2, h * 2, 0);
+  const rot = clampNum(transform.rotateDeg ?? 0, -3600, 3600, 0);
+  const scale = clampNum(transform.scale ?? 1, 0.05, 8, 1);
+  const flipX = !!transform.flipX;
+  const flipY = !!transform.flipY;
+
+  // 중심: 호출자가 준 bbox 또는 전체 캔버스 중심.
+  let cx = w / 2;
+  let cy = h / 2;
+  if (boundsPx && Number.isFinite(boundsPx.w) && Number.isFinite(boundsPx.h) && boundsPx.w > 0 && boundsPx.h > 0) {
+    cx = boundsPx.x + boundsPx.w / 2;
+    cy = boundsPx.y + boundsPx.h / 2;
+  }
+
+  const piece = createCanvas(w, h);
+  if (!piece) return null;
+  piece.ctx.drawImage(source, 0, 0);
+  piece.ctx.globalCompositeOperation = "destination-in";
+  piece.ctx.drawImage(mask, 0, 0);
+  piece.ctx.globalCompositeOperation = "source-over";
+
+  const out = createCanvas(w, h);
+  if (!out) return null;
+  out.ctx.drawImage(source, 0, 0);
+  out.ctx.globalCompositeOperation = "destination-out";
+  out.ctx.drawImage(mask, 0, 0);
+  out.ctx.globalCompositeOperation = "source-over";
+
+  // 구조 타입 가드 — 실제 CanvasRenderingContext2D 는 전부 구현. 테스트 픽스처도 save 계열을 채운다.
+  if (!out.ctx.save || !out.ctx.restore || !out.ctx.translate || !out.ctx.rotate || !out.ctx.scale) {
+    return null;
+  }
+  out.ctx.save();
+  out.ctx.translate(cx + dx, cy + dy);
+  out.ctx.rotate((rot * Math.PI) / 180);
+  out.ctx.scale(scale * (flipX ? -1 : 1), scale * (flipY ? -1 : 1));
+  out.ctx.translate(-cx, -cy);
+  out.ctx.drawImage(piece.canvas, 0, 0);
+  out.ctx.restore();
+  return out.canvas;
+}
+
 // ---------------------------------------------------------------------------
 // 다각형 올가미(클릭-꼭짓점) 세션 — 드래그 올가미와 분리된 상태 기계
 // ---------------------------------------------------------------------------
@@ -956,6 +1146,12 @@ export type MaskCtx2DLike = {
   fillRect(x: number, y: number, w: number, h: number): void;
   clearRect(x: number, y: number, w: number, h: number): void;
   drawImage(image: MaskImageSource, dx: number, dy: number): void;
+  /** 내용 변형(Transform)용 — Canvas 2D 와 동일 계약. 마스크 래스터 경로에서는 쓰지 않아도 된다. */
+  save?(): void;
+  restore?(): void;
+  translate?(x: number, y: number): void;
+  rotate?(angleRad: number): void;
+  scale?(x: number, y: number): void;
 };
 
 /** 오프스크린 캔버스 팩토리 — DOM 의존부를 호출자(StudioPage)가 주입한다. */

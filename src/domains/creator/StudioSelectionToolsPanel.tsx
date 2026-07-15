@@ -4,6 +4,10 @@
  * 페더/반전/전체선택/확장·축소/회전·뒤집기 + 부분 조정.
  */
 import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
   Circle,
   Eraser,
   FlipHorizontal2,
@@ -11,6 +15,7 @@ import {
   Lasso,
   Maximize2,
   Minimize2,
+  Move,
   Paintbrush,
   Pentagon,
   RotateCcw,
@@ -38,6 +43,7 @@ import {
   type PixelSelection,
   type SelectionAdjustPlan,
   type SelectionCombineMode,
+  type SelectionContentTransform,
   type SelectionToolKind,
 } from "./studio-selection-tools";
 import { StudioToolHintTarget } from "./StudioToolHint";
@@ -77,9 +83,21 @@ export type StudioSelectionToolsPanelProps = {
   onRotate: (degrees: number) => void;
   /** 선택 마퀴 좌우(x)·상하(y) 반전. */
   onFlip: (axis: "x" | "y") => void;
+  /** 선택 마퀴만 평행 이동(정규화 dx/dy). Magma: 선택 안 드래그와 동일 의미. */
+  onTranslate: (dxNorm: number, dyNorm: number) => void;
+  /** 선택 마퀴 중심 기준 스케일. */
+  onScale: (factor: number) => void;
+  /**
+   * Magma Transform — 선택 안 픽셀을 이동/회전/스케일/반전하고 마퀴도 따라감.
+   * 파괴적 굽기(원본 src 교체).
+   */
+  onContentTransform: (transform: SelectionContentTransform) => void;
   onApplyAdjust: (plan: SelectionAdjustPlan) => void;
   onContentAwareFill: () => void;
 };
+
+/** 마퀴 이동 한 칸(정규화) — 이미지 폭 대비 약 2%. */
+const MARQUEE_NUDGE = 0.02;
 
 export function StudioSelectionToolsPanel({
   selection,
@@ -100,6 +118,9 @@ export function StudioSelectionToolsPanel({
   onContract,
   onRotate,
   onFlip,
+  onTranslate,
+  onScale,
+  onContentTransform,
   onApplyAdjust,
   onContentAwareFill,
 }: StudioSelectionToolsPanelProps): ReactElement {
@@ -107,6 +128,8 @@ export function StudioSelectionToolsPanel({
   const [hue, setHue] = useState(0);
   const [expandAmount, setExpandAmount] = useState(SELECTION_EXPAND_DEFAULT);
   const [rotateAmount, setRotateAmount] = useState(15);
+  const [contentScale, setContentScale] = useState(1);
+  const [contentRotate, setContentRotate] = useState(15);
 
   const usable = isSelectionUsable(selection);
   const subpathCount = selection?.subpaths.length ?? 0;
@@ -347,6 +370,125 @@ export function StudioSelectionToolsPanel({
             상하
           </button>
         </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="inline-flex items-center gap-1 text-[0.66rem] text-fg-3">
+            <Move className="size-3" aria-hidden />
+            마퀴 이동
+          </span>
+          {(
+            [
+              { dx: -MARQUEE_NUDGE, dy: 0, label: "왼쪽", Icon: ArrowLeft },
+              { dx: MARQUEE_NUDGE, dy: 0, label: "오른쪽", Icon: ArrowRight },
+              { dx: 0, dy: -MARQUEE_NUDGE, label: "위", Icon: ArrowUp },
+              { dx: 0, dy: MARQUEE_NUDGE, label: "아래", Icon: ArrowDown },
+            ] as const
+          ).map(({ dx, dy, label, Icon }) => (
+            <button
+              key={label}
+              type="button"
+              disabled={!usable || busy}
+              className={buttonClass({ size: "sm", variant: "quiet" })}
+              title={`선택 경계만 ${label}으로 옮깁니다(픽셀 유지 · Magma 마퀴 이동).`}
+              onClick={() => onTranslate(dx, dy)}
+              aria-label={`마퀴 ${label} 이동`}
+            >
+              <Icon className="size-3.5" aria-hidden />
+            </button>
+          ))}
+          <button
+            type="button"
+            disabled={!usable || busy}
+            className={buttonClass({ size: "sm", variant: "quiet" })}
+            title="선택 경계를 중심 기준으로 1.1배 키웁니다."
+            onClick={() => onScale(1.1)}
+          >
+            확대
+          </button>
+          <button
+            type="button"
+            disabled={!usable || busy}
+            className={buttonClass({ size: "sm", variant: "quiet" })}
+            title="선택 경계를 중심 기준으로 0.9배 줄입니다."
+            onClick={() => onScale(0.9)}
+          >
+            축소
+          </button>
+        </div>
+      </div>
+
+      {/* Magma Transform — 선택 안 픽셀 내용 변형(굽기). 마퀴 회전/이동과 구분. */}
+      <div className="space-y-1.5 border-t border-line/40 pt-2">
+        <p className="text-[0.66rem] font-semibold uppercase tracking-wider text-fg-3">
+          내용 변형 (Transform)
+        </p>
+        <StudioSliderRow
+          label="내용 스케일"
+          min={0.25}
+          max={2}
+          step={0.05}
+          value={contentScale}
+          onChange={setContentScale}
+          readout={`×${contentScale.toFixed(2)}`}
+        />
+        <StudioSliderRow
+          label="내용 회전"
+          min={SELECTION_ROTATE_RANGE.min}
+          max={SELECTION_ROTATE_RANGE.max}
+          step={SELECTION_ROTATE_RANGE.step}
+          value={contentRotate}
+          onChange={setContentRotate}
+          readout={`${contentRotate}°`}
+        />
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            disabled={!usable || busy || (contentScale === 1 && contentRotate === 0)}
+            className={buttonClass({ size: "sm", variant: "outline" })}
+            title="선택 안 픽셀을 스케일·회전해 원본에 굽습니다. 마퀴도 같이 따라갑니다. (Magma Shift+T)"
+            onClick={() =>
+              onContentTransform({
+                scale: contentScale === 1 ? undefined : contentScale,
+                rotateDeg: contentRotate === 0 ? undefined : contentRotate,
+              })
+            }
+          >
+            {busy ? "적용 중..." : "내용 적용"}
+          </button>
+          <button
+            type="button"
+            disabled={!usable || busy}
+            className={buttonClass({ size: "sm", variant: "quiet" })}
+            title="선택 안 픽셀을 시계 방향 90° 돌립니다."
+            onClick={() => onContentTransform({ rotateDeg: 90 })}
+          >
+            <RotateCw className="size-3.5" aria-hidden />
+            내용 90°
+          </button>
+          <button
+            type="button"
+            disabled={!usable || busy}
+            className={buttonClass({ size: "sm", variant: "quiet" })}
+            title="선택 안 픽셀을 좌우로 뒤집습니다."
+            onClick={() => onContentTransform({ flipX: true })}
+          >
+            <FlipHorizontal2 className="size-3.5" aria-hidden />
+            내용 좌우
+          </button>
+          <button
+            type="button"
+            disabled={!usable || busy}
+            className={buttonClass({ size: "sm", variant: "quiet" })}
+            title="선택 안 픽셀을 상하로 뒤집습니다."
+            onClick={() => onContentTransform({ flipY: true })}
+          >
+            <FlipVertical2 className="size-3.5" aria-hidden />
+            내용 상하
+          </button>
+        </div>
+        <p className="text-[0.68rem] leading-relaxed text-fg-3">
+          마퀴만 바꾸려면 위 회전·이동을, 그림 자체를 옮기려면 내용 변형을 쓰세요. ⌘⇧I 반전 ·
+          픽셀 선택 중 ⌘D 해제도 지원합니다.
+        </p>
       </div>
 
       <p className="text-[0.72rem] leading-relaxed text-fg-3" role="status">

@@ -792,6 +792,7 @@ import {
   appendBrushPoint,
   appendPolyLassoVertex,
   applySelectionAdjustToCanvas,
+  applySelectionContentTransformToCanvas,
   beginPolyLassoSession,
   beginSelectionDrag,
   brushStrokePreview,
@@ -803,6 +804,7 @@ import {
   expandContractSelection,
   flipSelection,
   isSelectionAdjustNoop,
+  isSelectionContentTransformNoop,
   isSelectionUsable,
   marchingAntsPasses,
   normalizedPointToCanvas,
@@ -811,16 +813,21 @@ import {
   rasterizeSelectionMask,
   removeLastSubpath,
   rotateSelection,
+  scaleSelection,
   selectAllPixels,
+  selectionBoundsNorm,
   SELECTION_BRUSH_RADIUS_DEFAULT,
   setSelectionFeather,
   subpathOutlinePoints,
   toggleSelectionInvert,
+  transformSelectionMarquee,
+  translateSelection,
   updateSelectionDrag,
   type PixelSelection,
   type PolyLassoSession,
   type SelectionAdjustPlan,
   type SelectionCombineMode,
+  type SelectionContentTransform,
   type SelectionDragState,
   type SelectionFrame,
   type SelectionToolKind,
@@ -10939,9 +10946,24 @@ function StudioCuttoonEditor() {
       } else if (mod && (e.key === "y" || e.key === "Y")) {
         e.preventDefault();
         redo();
-      } else if (mod && (e.key === "d" || e.key === "D")) {
+      } else if (mod && (e.key === "d" || e.key === "D") && !e.altKey) {
+        // Magma: 픽셀 선택이 살아 있으면 ⌘D = 선택 해제. 없으면 요소 복제(기존 동작).
         e.preventDefault();
-        duplicateSelected();
+        if (pixelSel || pixelTool) {
+          setPixelTool(null);
+          setPixelSel(null);
+          clearPolyLassoDraft();
+          announceDrawingShortcut("픽셀 선택 해제");
+        } else {
+          duplicateSelected();
+        }
+      } else if (mod && e.shiftKey && !e.altKey && (e.key === "i" || e.key === "I")) {
+        // Magma Ctrl+Shift+I — 픽셀 선택 반전(선택이 없으면 빈 선택에서 전체 선택으로 토글).
+        if (selected?.type === "image") {
+          e.preventDefault();
+          setPixelSel((s) => toggleSelectionInvert(s ?? emptyPixelSelection()));
+          announceDrawingShortcut("선택 반전");
+        }
       } else if (mod && (e.key === "c" || e.key === "C") && !e.shiftKey && !e.altKey) {
         // 요소 복사(⌘C): 선택이 있을 때만 가로챈다 — 없으면 브라우저 기본 복사 유지.
         if (copySelectedElements()) e.preventDefault();
@@ -12852,6 +12874,65 @@ function StudioCuttoonEditor() {
     } catch (err) {
       console.error("Failed to apply pixel selection adjust:", err);
       setError(err instanceof Error ? err.message : "선택 영역 조정에 실패했습니다.");
+    } finally {
+      setPixelBusy(false);
+    }
+  }
+
+  // ── Magma Transform — 선택 안 픽셀을 이동/회전/스케일/반전하고 마퀴 기하도 동일 변환으로 맞춤.
+  async function applyPixelSelectionContentTransform(transform: SelectionContentTransform) {
+    if (pixelBusy || isSelectionContentTransformNoop(transform)) return;
+    if (selected?.type !== "image" || !pixelSel || !isSelectionUsable(pixelSel)) return;
+    const target = selected;
+    const mutationTicket = captureStudioMutationTicket();
+    if (activeSurfaceReviewLocked || isEffectivelyLocked(target, groups)) return;
+    const sel = pixelSel;
+    setPixelBusy(true);
+    try {
+      const img = await loadPixelEditImage(target.src);
+      const w = img.naturalWidth || img.width;
+      const h = img.naturalHeight || img.height;
+      const featherScale = target.width > 0 ? w / target.width : 1;
+      const maskPlan = buildSelectionMaskPlan(sel, w, h, {
+        featherScale,
+        flipX: target.flipped,
+        flipY: target.flippedY,
+      });
+      if (!maskPlan) return;
+      const mask = rasterizeSelectionMask(maskPlan, createPixelEditCanvas);
+      const boundsN = selectionBoundsNorm(sel);
+      const boundsPx = boundsN
+        ? {
+            x: boundsN.x * w,
+            y: boundsN.y * h,
+            w: boundsN.w * w,
+            h: boundsN.h * h,
+          }
+        : undefined;
+      const out =
+        mask &&
+        applySelectionContentTransformToCanvas(img, w, h, mask, transform, createPixelEditCanvas, boundsPx);
+      if (!out) throw new Error("변형 캔버스를 만들지 못했습니다.");
+      const src = (out as HTMLCanvasElement).toDataURL("image/png");
+      if (!canApplyStudioMutation(mutationTicket)) return;
+      if (isLatestLayerContentMutationLocked(target.id)) return;
+      patchEl(target.id, { src } as Partial<El>);
+      // 마퀴를 같은 변환으로 따라가게 한다(정규화 좌표 · 요소 종횡비).
+      const aspect = target.width > 0 ? target.height / target.width : 1;
+      const nextSel = transformSelectionMarquee(sel, {
+        dxNorm: (transform.dxPx ?? 0) / Math.max(1, w),
+        dyNorm: (transform.dyPx ?? 0) / Math.max(1, h),
+        rotateDeg: transform.rotateDeg,
+        scale: transform.scale,
+        flipX: transform.flipX,
+        flipY: transform.flipY,
+        aspect,
+      });
+      if (nextSel) setPixelSel(nextSel);
+      setError(null);
+    } catch (err) {
+      console.error("Failed to apply selection content transform:", err);
+      setError(err instanceof Error ? err.message : "선택 내용 변형에 실패했습니다.");
     } finally {
       setPixelBusy(false);
     }
@@ -25194,6 +25275,15 @@ function StudioCuttoonEditor() {
                       setPixelSel((s) => rotateSelection(s, degrees, { aspect }) ?? s);
                     }}
                     onFlip={(axis) => setPixelSel((s) => flipSelection(s, axis) ?? s)}
+                    onTranslate={(dx, dy) => setPixelSel((s) => translateSelection(s, dx, dy) ?? s)}
+                    onScale={(factor) => {
+                      const aspect =
+                        selected?.type === "image" && selected.width > 0
+                          ? selected.height / selected.width
+                          : 1;
+                      setPixelSel((s) => scaleSelection(s, factor, { aspect }) ?? s);
+                    }}
+                    onContentTransform={(t) => void applyPixelSelectionContentTransform(t)}
                     onApplyAdjust={(plan) => void applyPixelSelectionAdjust(plan)}
                     onContentAwareFill={() => void applyContentAwareFill()}
                   />
