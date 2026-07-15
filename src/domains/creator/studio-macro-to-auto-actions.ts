@@ -34,6 +34,24 @@ function macroCommandToAutoAction(
       return { id, enabled: true, type: "lettering.set-size", fontSize: command.fontSize };
     case "lettering-color":
       return { id, enabled: true, type: "lettering.set-color", color: command.color };
+    case "lettering-font":
+      return { id, enabled: true, type: "lettering.set-font", font: command.font };
+    case "page-set-background":
+      return { id, enabled: true, type: "page.set-background", background: command.background };
+    case "page-apply-grade-preset": {
+      const preset = command.preset as
+        | "neutral"
+        | "recall"
+        | "night"
+        | "dawn"
+        | "dusk"
+        | "horror"
+        | "dreamy"
+        | "mono-manuscript"
+        | "rainy"
+        | "warm-afternoon";
+      return { id, enabled: true, type: "page.apply-grade-preset", preset };
+    }
     default:
       return null;
   }

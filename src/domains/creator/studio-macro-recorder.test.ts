@@ -18,9 +18,12 @@ describe("studio macro recorder", () => {
     session = recordStudioMacroCommand(session, { type: "set-opacity", opacity: 0.4 });
     session = recordStudioMacroCommand(session, { type: "set-hidden", hidden: true });
     session = recordStudioMacroCommand(session, { type: "lettering-font-size", fontSize: 18 });
+    session = recordStudioMacroCommand(session, { type: "lettering-font", font: "Comic Sans" });
+    session = recordStudioMacroCommand(session, { type: "page-set-background", background: { kind: "solid", color: "#ff0000" } });
+    session = recordStudioMacroCommand(session, { type: "page-apply-grade-preset", preset: "horror" });
     session = stopStudioMacroRecording(session);
     session = recordStudioMacroCommand(session, { type: "set-locked", locked: true });
-    expect(session.commands).toHaveLength(3);
+    expect(session.commands).toHaveLength(6);
 
     const set = studioMacroSessionToAutoActionSet(session);
     expect(set.name).toBe("테스트 매크로");
@@ -28,6 +31,9 @@ describe("studio macro recorder", () => {
       "element.set-opacity",
       "element.set-hidden",
       "lettering.set-size",
+      "lettering.set-font",
+      "page.set-background",
+      "page.apply-grade-preset",
     ]);
   });
 });

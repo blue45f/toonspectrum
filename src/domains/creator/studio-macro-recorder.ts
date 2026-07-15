@@ -13,7 +13,10 @@ export type StudioMacroCommand =
   | { type: "set-locked"; locked: boolean }
   | { type: "set-blend-mode"; blendMode: string }
   | { type: "lettering-font-size"; fontSize: number }
-  | { type: "lettering-color"; color: string };
+  | { type: "lettering-color"; color: string }
+  | { type: "lettering-font"; font: string }
+  | { type: "page-set-background"; background: { kind: "solid"; color: string } | { kind: "gradient"; colors: [string, string] } }
+  | { type: "page-apply-grade-preset"; preset: string };
 
 export interface StudioMacroSession {
   version: typeof STUDIO_MACRO_RECORDER_VERSION;
@@ -80,6 +83,34 @@ export function normalizeStudioMacroCommand(value: unknown): StudioMacroCommand 
         type: "lettering-color",
         color: /^#(?:[\da-f]{3}|[\da-f]{6}|[\da-f]{8})$/i.test(color) ? color : "#202020",
       };
+    }
+    case "lettering-font": {
+      const font = typeof record.font === "string" ? record.font.trim() : "";
+      if (!font || font.length > 120) return null;
+      return { type: "lettering-font", font };
+    }
+    case "page-set-background": {
+      if (!record.background || typeof record.background !== "object") return null;
+      const bg = record.background as Record<string, unknown>;
+      if (bg.kind === "solid") {
+        const color = typeof bg.color === "string" ? bg.color.trim().toLowerCase() : "#ffffff";
+        if (!/^#(?:[\da-f]{3}|[\da-f]{6}|[\da-f]{8})$/i.test(color)) return null;
+        return { type: "page-set-background", background: { kind: "solid", color } };
+      } else if (bg.kind === "gradient") {
+        if (!Array.isArray(bg.colors) || bg.colors.length !== 2) return null;
+        const c1 = typeof bg.colors[0] === "string" ? bg.colors[0].trim().toLowerCase() : "#ffffff";
+        const c2 = typeof bg.colors[1] === "string" ? bg.colors[1].trim().toLowerCase() : "#ffffff";
+        if (!/^#(?:[\da-f]{3}|[\da-f]{6}|[\da-f]{8})$/i.test(c1)) return null;
+        if (!/^#(?:[\da-f]{3}|[\da-f]{6}|[\da-f]{8})$/i.test(c2)) return null;
+        return { type: "page-set-background", background: { kind: "gradient", colors: [c1, c2] } };
+      }
+      return null;
+    }
+    case "page-apply-grade-preset": {
+      const preset = typeof record.preset === "string" ? record.preset.trim() : "";
+      const validPresets = ["neutral", "recall", "night", "dawn", "dusk", "horror", "dreamy", "mono-manuscript", "rainy", "warm-afternoon"];
+      if (!validPresets.includes(preset)) return null;
+      return { type: "page-apply-grade-preset", preset };
     }
     default:
       return null;
