@@ -13,6 +13,7 @@ describe("StudioDrawOptionsBar", () => {
         brushOpacity={0.85}
         stabilizer={6}
         color="#112233"
+        secondaryColor="#445566"
         recentSwatches={["#000000", "#ffffff"]}
         quickShapeActive
         onSelectBrush={vi.fn()}
@@ -20,6 +21,8 @@ describe("StudioDrawOptionsBar", () => {
         onOpacityChange={vi.fn()}
         onStabilizerChange={vi.fn()}
         onColorChange={vi.fn()}
+        onSecondaryColorChange={vi.fn()}
+        onSwapColors={vi.fn()}
         onToggleQuickShape={vi.fn()}
       />
     );
@@ -36,6 +39,9 @@ describe("StudioDrawOptionsBar", () => {
     expect(html).toContain('data-studio-tool-identity="true"');
     expect(html).toContain("펜(매끈)");
     expect(html).toContain('aria-pressed="true"');
+    // CSP/Photopea dual well on the commercial options strip
+    expect(html).toContain('data-studio-dual-color-well="true"');
+    expect(html).toContain('data-studio-color-swap="true"');
   });
 
   it("renders brush slots and symmetry chips when provided", () => {

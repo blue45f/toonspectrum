@@ -719,7 +719,7 @@ body[data-studio-app="true"] .route-stage::before,
     2px 0 16px oklch(0.08 0.01 70 / 0.12);
 }
 
-/* Floating status — premium glass */
+/* Floating status — premium glass (Sketchbook / Concepts HUD) */
 [data-studio-status-bar="true"] {
   backdrop-filter: blur(18px) saturate(1.2);
   -webkit-backdrop-filter: blur(18px) saturate(1.2);
@@ -734,6 +734,42 @@ body[data-studio-app="true"] .route-stage::before,
     0 12px 40px oklch(0.06 0.01 70 / 0.55),
     0 0 0 1px oklch(0.1 0.01 70 / 0.25),
     inset 0 1px 0 oklch(0.97 0.01 85 / 0.08);
+}
+
+/* Krita/Fresco options cluster — glass tool groups */
+[data-studio-draw-options="true"] .studio-opt-cluster,
+[data-studio-quick-actions="true"].studio-opt-cluster,
+.studio-opt-cluster {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.15rem;
+  border-radius: 0.75rem;
+  border: 1px solid oklch(0.36 0.013 64 / 0.55);
+  background:
+    linear-gradient(
+      160deg,
+      oklch(0.23 0.011 66 / 0.55) 0%,
+      oklch(0.18 0.009 68 / 0.4) 100%
+    );
+  box-shadow: inset 0 1px 0 oklch(0.97 0.01 85 / 0.05);
+}
+
+/* CSP/Photopea dual color well */
+[data-studio-dual-color-well="true"] {
+  padding: 0.15rem 0.25rem 0.15rem 0.35rem;
+  border-radius: 0.75rem;
+  border: 1px solid oklch(0.36 0.013 64 / 0.45);
+  background: oklch(0.16 0.008 70 / 0.45);
+}
+[data-studio-color-stack="true"] {
+  filter: drop-shadow(0 1px 2px oklch(0.08 0.01 70 / 0.4));
+}
+
+/* Document title in Magma-style top bar */
+[data-studio-app-menubar="true"] h1 {
+  letter-spacing: -0.02em;
+  font-feature-settings: "ss01" on;
 }
 
 /* Rail active spine */

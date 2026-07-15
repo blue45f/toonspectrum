@@ -4,7 +4,6 @@
  * Pure presentation.
  */
 import {
-  ArrowLeftRight,
   Eraser,
   FlipHorizontal2,
   Lock,
@@ -21,7 +20,7 @@ import {
   STUDIO_BRUSH_SIZE_CHIPS,
   nearestStudioBrushSizeChip,
 } from "./studio-brush";
-import { StudioToolIdentity } from "./studio-chrome-ui";
+import { StudioDualColorWell, StudioToolIdentity } from "./studio-chrome-ui";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { StudioBrushTray } from "./StudioBrushTray";
 
@@ -523,73 +522,15 @@ export function StudioDrawOptionsBar({
 
       {drawMode !== "eraser" ? (
         <>
-          <span aria-hidden className="h-5 w-px shrink-0 bg-line" />
-          <div className="flex shrink-0 items-center gap-1" aria-label="색상">
-            {recentSwatches.slice(0, 5).map((swatch) => (
-              <button
-                key={swatch}
-                type="button"
-                title={swatch}
-                aria-label={`색 ${swatch}`}
-                onClick={() => onColorChange(swatch)}
-                className={cn(
-                  "size-5 rounded-md border transition-transform hover:scale-110",
-                  STUDIO_FOCUS_RING,
-                  color.toLowerCase() === swatch.toLowerCase()
-                    ? "ring-2 ring-accent ring-offset-1 ring-offset-panel"
-                    : "border-line/70"
-                )}
-                style={{ background: swatch }}
-              />
-            ))}
-            <div className="relative size-7">
-              {onSecondaryColorChange ? (
-                <label
-                  className="absolute bottom-0 right-0 size-4 cursor-pointer overflow-hidden rounded border border-line shadow-sm"
-                  title="보조 색 (X로 교체)"
-                  style={{ background: secondaryColor }}
-                >
-                  <span className="sr-only">보조 색</span>
-                  <input
-                    type="color"
-                    value={secondaryColor}
-                    onChange={(e) => onSecondaryColorChange(e.target.value)}
-                    className="absolute inset-0 size-full cursor-pointer opacity-0"
-                    aria-label="보조 색"
-                  />
-                </label>
-              ) : null}
-              <label
-                className="absolute left-0 top-0 size-5 cursor-pointer overflow-hidden rounded-md border border-line shadow-sm"
-                title="주 색"
-                style={{ background: color }}
-              >
-                <span className="sr-only">브러시 색 선택</span>
-                <input
-                  type="color"
-                  value={color}
-                  onChange={(e) => onColorChange(e.target.value)}
-                  className="absolute inset-0 size-full cursor-pointer opacity-0"
-                  aria-label="브러시 색 선택"
-                />
-              </label>
-            </div>
-            {onSwapColors ? (
-              <button
-                type="button"
-                onClick={onSwapColors}
-                title="주/보조 색 교체 (X)"
-                aria-label="주 색과 보조 색 교체"
-                className={cn(
-                  "grid size-7 place-items-center rounded border border-line text-fg-3 hover:bg-raised hover:text-fg",
-                  STUDIO_EASE,
-                  STUDIO_FOCUS_RING
-                )}
-              >
-                <ArrowLeftRight size={12} aria-hidden />
-              </button>
-            ) : null}
-          </div>
+          <span aria-hidden className="hidden h-5 w-px shrink-0 bg-line/80 sm:block" />
+          <StudioDualColorWell
+            primary={color}
+            secondary={secondaryColor}
+            recent={recentSwatches}
+            onPrimaryChange={onColorChange}
+            onSecondaryChange={onSecondaryColorChange}
+            onSwap={onSwapColors}
+          />
         </>
       ) : null}
 

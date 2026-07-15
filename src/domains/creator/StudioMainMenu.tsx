@@ -17,6 +17,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
+import { StudioKbdBadge } from "./studio-chrome-ui";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { STUDIO_Z } from "./studio-z-index";
 
@@ -181,11 +182,7 @@ function MenuDropdown({
                       <span aria-hidden className="size-[15px] shrink-0" />
                     )}
                     <span className="min-w-0 flex-1 truncate tracking-tight">{item.label}</span>
-                    {item.shortcut ? (
-                      <span className="shrink-0 rounded-md border border-line/70 bg-canvas/55 px-1.5 py-0.5 text-[0.62rem] font-semibold tabular-nums tracking-wide text-fg-3">
-                        {item.shortcut}
-                      </span>
-                    ) : null}
+                    {item.shortcut ? <StudioKbdBadge>{item.shortcut}</StudioKbdBadge> : null}
                   </button>
                   {item.separatorAfter ? (
                     <div role="separator" className="mx-3 my-1.5 h-px bg-line/60" />

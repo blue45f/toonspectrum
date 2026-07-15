@@ -166,6 +166,7 @@ export function StudioAppMenubar({
       aria-label={ariaLabel}
       data-studio-app-menubar="true"
       className={cn(
+        // Magma/Sumo top bar — denser commercial app chrome, still canvas-max height.
         "relative z-[50] h-11 min-h-11 shrink-0 border-b border-line",
         // Critical: do NOT put overflow-x-auto here — it clips File/Edit dropdowns.
         "overflow-visible",
@@ -175,7 +176,7 @@ export function StudioAppMenubar({
       <div
         data-studio-app-menubar-scroll="true"
         className={cn(
-          "flex h-full min-h-11 w-full flex-nowrap items-center gap-2.5 px-3",
+          "flex h-full min-h-11 w-full flex-nowrap items-center gap-2 px-2.5 sm:gap-2.5 sm:px-3",
           "overflow-x-auto overflow-y-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         )}
       >
@@ -574,9 +575,135 @@ export function StudioToolIdentity({
         ) : null}
       </span>
       {shortcut ? (
-        <kbd className="ml-0.5 hidden rounded-md border border-line/70 bg-canvas/50 px-1.5 py-0.5 text-[0.55rem] font-semibold tabular-nums text-fg-3 sm:inline">
-          {shortcut}
-        </kbd>
+        <StudioKbdBadge className="ml-0.5 hidden sm:inline-flex">{shortcut}</StudioKbdBadge>
+      ) : null}
+    </div>
+  );
+}
+
+/** Photopea/CSP-style keyboard chip — menus, identity, HUD. */
+export function StudioKbdBadge({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}): ReactElement {
+  return (
+    <kbd
+      data-studio-kbd="true"
+      className={cn(
+        "inline-flex shrink-0 items-center rounded-md border border-line/70 bg-canvas/55 px-1.5 py-0.5",
+        "text-[0.58rem] font-semibold tabular-nums tracking-wide text-fg-3",
+        className
+      )}
+    >
+      {children}
+    </kbd>
+  );
+}
+
+/**
+ * CSP / Photopea dual color well — primary + secondary with X-swap affordance.
+ * Keeps canvas-max density: no labels, only color geometry + optional recent strip.
+ */
+export function StudioDualColorWell({
+  primary,
+  secondary,
+  recent = [],
+  onPrimaryChange,
+  onSecondaryChange,
+  onSwap,
+  className,
+}: {
+  primary: string;
+  secondary?: string;
+  recent?: readonly string[];
+  onPrimaryChange: (hex: string) => void;
+  onSecondaryChange?: (hex: string) => void;
+  onSwap?: () => void;
+  className?: string;
+}): ReactElement {
+  const showSecondary = Boolean(onSecondaryChange && secondary !== undefined);
+  return (
+    <div
+      data-studio-dual-color-well="true"
+      className={cn("flex shrink-0 items-center gap-1.5", className)}
+      aria-label="색상"
+    >
+      {recent.slice(0, 5).map((swatch) => (
+        <button
+          key={swatch}
+          type="button"
+          title={swatch}
+          aria-label={`최근 색 ${swatch}`}
+          onClick={() => onPrimaryChange(swatch)}
+          className={cn(
+            "size-5 rounded-md border shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.12)] transition-transform hover:scale-110",
+            STUDIO_FOCUS_RING,
+            primary.toLowerCase() === swatch.toLowerCase()
+              ? "ring-2 ring-accent ring-offset-1 ring-offset-panel"
+              : "border-line/70"
+          )}
+          style={{ background: swatch }}
+        />
+      ))}
+      <div className="relative size-8 shrink-0" data-studio-color-stack="true">
+        {showSecondary ? (
+          <label
+            className="absolute bottom-0 right-0 size-[1.05rem] cursor-pointer overflow-hidden rounded border border-line shadow-md"
+            title="보조 색 (X로 주 색과 교체)"
+            style={{ background: secondary }}
+          >
+            <span className="sr-only">보조 색</span>
+            <input
+              type="color"
+              value={secondary}
+              onChange={(e) => onSecondaryChange?.(e.target.value)}
+              className="absolute inset-0 size-full cursor-pointer opacity-0"
+              aria-label="보조 색"
+            />
+          </label>
+        ) : null}
+        <label
+          className="absolute left-0 top-0 size-[1.35rem] cursor-pointer overflow-hidden rounded-lg border border-line shadow-md ring-1 ring-black/10"
+          title="주 색"
+          style={{ background: primary }}
+        >
+          <span className="sr-only">주 색 선택</span>
+          <input
+            type="color"
+            value={primary}
+            onChange={(e) => onPrimaryChange(e.target.value)}
+            className="absolute inset-0 size-full cursor-pointer opacity-0"
+            aria-label="주 색 선택"
+          />
+        </label>
+      </div>
+      {onSwap && showSecondary ? (
+        <button
+          type="button"
+          onClick={onSwap}
+          title="주/보조 색 교체 (X)"
+          aria-label="주 색과 보조 색 교체"
+          data-studio-color-swap="true"
+          className={cn(
+            "grid size-7 place-items-center rounded-lg border border-line/80 bg-card/80 text-fg-3",
+            "hover:border-line-strong hover:bg-raised hover:text-fg",
+            STUDIO_EASE,
+            STUDIO_FOCUS_RING
+          )}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path
+              d="M7 7h11M18 7l-3-3M18 7l-3 3M17 17H6M6 17l3-3M6 17l3 3"
+              stroke="currentColor"
+              strokeWidth="1.75"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
       ) : null}
     </div>
   );
@@ -599,6 +726,8 @@ export function StudioHudPill({
       data-studio-hud-pill="true"
       title={title}
       className={cn(
+        "inline-flex items-center gap-1 rounded-lg border border-line/60 bg-canvas/35 px-2 py-0.5",
+        "text-[0.65rem] font-semibold tabular-nums tracking-tight text-fg-2",
         accent && "border-accent/40 bg-accent-soft/50 text-accent",
         className
       )}
@@ -638,14 +767,15 @@ export function StudioRailToolButton({
       title={label}
       aria-pressed={active}
       className={cn(
+        // Fresco/Magma: slightly larger hit, soft radius, no hard bevel.
         "relative grid size-10 place-items-center rounded-2xl border border-transparent xl:size-11",
         STUDIO_EASE,
         STUDIO_FOCUS_RING,
         active
-          ? "bg-accent-soft text-fg shadow-[inset_0_0_0_1px_oklch(0.72_0.185_42/0.32),0_1px_6px_oklch(0.72_0.185_42/0.12)]"
+          ? "bg-accent-soft text-fg shadow-[inset_0_0_0_1px_oklch(0.72_0.185_42/0.32),0_2px_8px_oklch(0.72_0.185_42/0.14)]"
           : accented
             ? "text-accent hover:bg-accent-soft/50"
-            : "text-fg-2 hover:bg-raised hover:text-fg",
+            : "text-fg-2 hover:bg-raised/90 hover:text-fg hover:shadow-[inset_0_0_0_1px_oklch(0.4_0.012_64/0.35)]",
         disabled && "cursor-not-allowed opacity-35",
         className
       )}

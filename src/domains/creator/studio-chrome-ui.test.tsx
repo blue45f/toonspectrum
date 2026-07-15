@@ -5,8 +5,10 @@ import { describe, expect, it, vi } from "vitest";
 import {
   StudioAppMenubar,
   StudioDockButton,
+  StudioDualColorWell,
   StudioEdgeRailButton,
   StudioHudPill,
+  StudioKbdBadge,
   StudioMenuPopoverHeader,
   StudioMenuSubtabs,
   StudioQuickActionsBar,
@@ -127,6 +129,31 @@ describe("studio chrome UI", () => {
     expect(html).toContain('data-studio-quick-actions="true"');
     expect(html).toContain('data-studio-status-bar="true"');
     expect(html).toContain("100%");
+  });
+
+  it("renders CSP/Photopea dual color well with recent swatches and swap", () => {
+    const html = renderToStaticMarkup(
+      <StudioDualColorWell
+        primary="#c45c26"
+        secondary="#2a2118"
+        recent={["#c45c26", "#1a1410"]}
+        onPrimaryChange={() => {}}
+        onSecondaryChange={() => {}}
+        onSwap={() => {}}
+      />
+    );
+    expect(html).toContain('data-studio-dual-color-well="true"');
+    expect(html).toContain('data-studio-color-stack="true"');
+    expect(html).toContain('data-studio-color-swap="true"');
+    expect(html).toContain("주 색 선택");
+    expect(html).toContain("보조 색");
+    expect(html).toContain("최근 색");
+  });
+
+  it("renders shared kbd badge for menu/HUD shortcuts", () => {
+    const html = renderToStaticMarkup(<StudioKbdBadge>⌘S</StudioKbdBadge>);
+    expect(html).toContain('data-studio-kbd="true"');
+    expect(html).toContain("⌘S");
   });
 
   it("renders Krita/Pixlr tool identity and Concepts/Ibis HUD pills", () => {

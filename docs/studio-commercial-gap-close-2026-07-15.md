@@ -35,3 +35,14 @@ Sources: `docs/studio-web-drawing-benchmark-2026-07-12.md`, `docs/studio-capabil
 - AC2: closed rows are in UI/logic; #12 deferred with reason.
 - AC3–4: chrome portal + pointer unit tests.
 - AC5: Vitest + scratch logs under implementer scratch.
+
+## Follow-on UI/UX polish (2026-07-15 multi-product)
+
+See `docs/studio-ui-ux-multi-product-benchmark-2026-07-15.md` for Magma/CSP/Photopea/Canva/Krita/Pixlr/Procreate/ibis/MediBang/Sketchbook/Concepts/Fresco/AutoDraw/Sumo/Affinity mapping.
+
+Shipped in same session:
+
+- `StudioDualColorWell` (CSP/Photopea FG·BG + swap) on draw options
+- `StudioKbdBadge` shared shortcut chip
+- Options-cluster glass, dual-well surface, HUD pill base styles
+- Rail hover/active shadow refinement
