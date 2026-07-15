@@ -183,6 +183,16 @@ import {
   assertStudioApiJsonPayloadSize,
 } from "./studio-api-payload-safety";
 import {
+  loadStudioAppSettings,
+  matchStudioShortcut,
+  resetStudioAppSettings,
+  saveStudioAppSettings,
+  studioAppSettingsStorage,
+  studioRailToolLabel,
+  type StudioAppSettings,
+  type StudioRailToolId,
+} from "./studio-app-settings";
+import {
   createStudioAssetFavoriteId,
   loadStudioAssetFavoriteState,
   normalizeStudioAssetFavoriteState,
@@ -1431,6 +1441,11 @@ const StudioIntegrationsSettingsPanel = lazyRetry(
 function preloadStudioIntegrationsSettingsPanel(): void {
   void loadStudioIntegrationsSettingsPanel();
 }
+
+const StudioAppSettingsPanel = lazyRetry(
+  () => import("./StudioAppSettingsPanel").then((mod) => ({ default: mod.StudioAppSettingsPanel })),
+  "StudioAppSettingsPanel"
+);
 
 type StudioExportMenuPanelModule = { default: ComponentType<StudioExportMenuPanelProps> };
 let studioExportMenuPanelPromise: Promise<StudioExportMenuPanelModule> | null = null;
@@ -4508,6 +4523,14 @@ function StudioCuttoonEditor() {
       typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage
     ).mode
   );
+  // Magma Application Settings — toolbar / shortcuts / mouse / touch / grids / other.
+  const [appSettings, setAppSettings] = useState<StudioAppSettings>(() =>
+    loadStudioAppSettings(studioAppSettingsStorage())
+  );
+  const [appSettingsOpen, setAppSettingsOpen] = useState(false);
+  const [railMoreOpen, setRailMoreOpen] = useState(false);
+  const appSettingsRef = useRef(appSettings);
+  appSettingsRef.current = appSettings;
   const [effectFavoriteState, setEffectFavoriteState] = useState<StudioEffectFavoriteState>(() =>
     loadStudioEffectFavoriteState(
       typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage
@@ -4521,6 +4544,30 @@ function StudioCuttoonEditor() {
       typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage,
       { mode }
     );
+    setAppSettings((prev) => {
+      if (prev.general.densityMode === mode) return prev;
+      const next = { ...prev, general: { ...prev.general, densityMode: mode } };
+      saveStudioAppSettings(studioAppSettingsStorage(), next);
+      return next;
+    });
+  }
+  function commitAppSettings(next: StudioAppSettings) {
+    setAppSettings(next);
+    saveStudioAppSettings(studioAppSettingsStorage(), next);
+    // Mirror high-impact prefs into existing live state (avoid recursive setStudioUiDensity).
+    setUiDensityMode(next.general.densityMode);
+    saveStudioUiDensityState(
+      typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage,
+      { mode: next.general.densityMode }
+    );
+    setShowGrid(next.grids.showPixelGrid);
+    setGridSize(next.grids.pixelGridSize);
+    setPressureCurve(next.other.pressureCurve);
+    if (next.grids.snapToPixelGrid) setSnapEnabled(true);
+    if (next.grids.showIsometricOnDraw) setIsometricGridActive(true);
+  }
+  function isRailToolVisible(id: StudioRailToolId): boolean {
+    return appSettings.toolbar.visibleIds.includes(id);
   }
   function persistEffectFavoriteState(next: StudioEffectFavoriteState) {
     setEffectFavoriteState(next);
@@ -5026,8 +5073,8 @@ function StudioCuttoonEditor() {
 
   // 그리드 스냅 상태
   const [snapEnabled, setSnapEnabled] = useState(true);
-  const [showGrid, setShowGrid] = useState(false);
-  const [gridSize, setGridSize] = useState(40);
+  const [showGrid, setShowGrid] = useState(() => loadStudioAppSettings(studioAppSettingsStorage()).grids.showPixelGrid);
+  const [gridSize, setGridSize] = useState(() => loadStudioAppSettings(studioAppSettingsStorage()).grids.pixelGridSize);
   // 웹툰 표준폭 가이드(네이버 690·카카오 720…)·세이프영역 표시 토글.
   const [showWebtoonGuides, setShowWebtoonGuides] = useState(false);
   const [webtoonGuides, setWebtoonGuides] = useState<StudioWebtoonGuidesModule | null>(null);
@@ -5857,7 +5904,9 @@ function StudioCuttoonEditor() {
   const [stabilizerMode, setStabilizerMode] = useState<StudioStabilizerMode>("adaptive");
   const [postCorrection, setPostCorrection] = useState<number>(4);
   const [preserveCorners, setPreserveCorners] = useState<boolean>(true);
-  const [pressureCurve, setPressureCurve] = useState<number>(1.0);
+  const [pressureCurve, setPressureCurve] = useState<number>(
+    () => loadStudioAppSettings(studioAppSettingsStorage()).other.pressureCurve
+  );
   const [useVelocityPressure, setUseVelocityPressure] = useState<boolean>(true);
   const [velocitySensitivity, setVelocitySensitivity] = useState<number>(0.65);
   const [tiltEnabled, setTiltEnabled] = useState<boolean>(true);
@@ -6661,14 +6710,32 @@ function StudioCuttoonEditor() {
     const snappedLocalY = Math.round(localPos.y / gridSize) * gridSize;
     return stage.getAbsoluteTransform().point({ x: snappedLocalX, y: snappedLocalY });
   };
-  // ⌘/Ctrl + 휠로 줌(네이티브 비-passive 리스너 — preventDefault로 브라우저 줌 차단).
+  // 휠 동작 — Magma Mouse 설정: 줌 / 팬 / 브러시 크기 (+ 기존 ⌘휠 줌).
   useEffect(() => {
     const node = wrapRef.current;
     if (!node) return;
     const onWheel = (e: WheelEvent) => {
-      if (!(e.ctrlKey || e.metaKey)) return;
-      e.preventDefault();
-      setZoom((z) => clampZoom(z + (e.deltaY < 0 ? 0.15 : -0.15)));
+      const prefs = appSettingsRef.current.mouse;
+      const modZoom = e.ctrlKey || e.metaKey;
+      const wheelMode = modZoom ? "zoom" : prefs.wheel;
+      if (wheelMode === "zoom") {
+        e.preventDefault();
+        const dir = (e.deltaY < 0 ? 1 : -1) * (prefs.reverseWheel ? -1 : 1);
+        setZoom((z) => clampZoom(z + dir * 0.15));
+        return;
+      }
+      if (wheelMode === "brush-size") {
+        e.preventDefault();
+        const dir = (e.deltaY < 0 ? 1 : -1) * (prefs.reverseWheel ? -1 : 1);
+        setStrokeWidth((w) => adjustStudioBrushWidth(w, dir * (e.shiftKey ? 5 : 1)));
+        return;
+      }
+      if (wheelMode === "pan") {
+        e.preventDefault();
+        const mul = prefs.reverseWheel ? -1 : 1;
+        node.scrollLeft += e.deltaX * mul;
+        node.scrollTop += e.deltaY * mul;
+      }
     };
     node.addEventListener("wheel", onWheel, { passive: false });
     return () => node.removeEventListener("wheel", onWheel);
@@ -10938,6 +11005,67 @@ function StudioCuttoonEditor() {
       if (insideShortcutBoundary) return;
       if (timelapseCapturing) return; // 타임랩스 캡처 중엔 ⌘Z 등 전역 단축키를 막는다(pagesHi 임시 점유 보호)
       const mod = e.metaKey || e.ctrlKey;
+      // Magma Application Settings → Shortcuts: user-bound chords (tool switchers etc.).
+      const sc = appSettingsRef.current.shortcuts;
+      if (matchStudioShortcut(sc["tool-select"], e)) {
+        e.preventDefault();
+        setTool("select");
+        setEyedropperActive(false);
+        return;
+      }
+      if (matchStudioShortcut(sc["tool-pen"], e)) {
+        e.preventDefault();
+        setTool("draw");
+        setDrawMode("pen");
+        setEyedropperActive(false);
+        return;
+      }
+      if (matchStudioShortcut(sc["tool-eraser"], e)) {
+        e.preventDefault();
+        setTool("draw");
+        setDrawMode("eraser");
+        setEyedropperActive(false);
+        return;
+      }
+      if (matchStudioShortcut(sc["tool-fill"], e)) {
+        e.preventDefault();
+        toggleAdvancedFill();
+        return;
+      }
+      if (matchStudioShortcut(sc["tool-eyedropper"], e)) {
+        e.preventDefault();
+        setEyedropperActive((v) => !v);
+        return;
+      }
+      if (matchStudioShortcut(sc["tool-lasso"], e)) {
+        e.preventDefault();
+        if (selected?.type === "image" && !selectedContentMutationLocked) {
+          setTool("select");
+          clearPolyLassoDraft();
+          disarmAllPixelTools();
+          setPixelTool("lasso");
+        }
+        return;
+      }
+      if (matchStudioShortcut(sc["deselect-pixels"], e)) {
+        e.preventDefault();
+        setPixelTool(null);
+        setPixelSel(null);
+        clearPolyLassoDraft();
+        announceDrawingShortcut("픽셀 선택 해제");
+        return;
+      }
+      if (matchStudioShortcut(sc["invert-pixels"], e) && selected?.type === "image") {
+        e.preventDefault();
+        setPixelSel((s) => toggleSelectionInvert(s ?? emptyPixelSelection()));
+        announceDrawingShortcut("선택 반전");
+        return;
+      }
+      if (matchStudioShortcut(sc["shortcuts-help"], e)) {
+        e.preventDefault();
+        setShortcutsOpen((v) => !v);
+        return;
+      }
       const drawingShortcut = resolveStudioDrawingShortcut(e);
       if (mod && (e.key === "z" || e.key === "Z")) {
         e.preventDefault();
@@ -10948,6 +11076,7 @@ function StudioCuttoonEditor() {
         redo();
       } else if (mod && (e.key === "d" || e.key === "D") && !e.altKey) {
         // Magma: 픽셀 선택이 살아 있으면 ⌘D = 선택 해제. 없으면 요소 복제(기존 동작).
+        // Custom deselect-pixels chord already handled above when rebound.
         e.preventDefault();
         if (pixelSel || pixelTool) {
           setPixelTool(null);
@@ -14120,6 +14249,12 @@ function StudioCuttoonEditor() {
     }
     if (tool === "draw") {
       const pointerSample = e.evt as PointerEvent;
+      // Magma Touch: one-finger drag = draw | pan | none. Palm rejection ignores touch while pen preferred.
+      const touchPrefs = appSettingsRef.current.touch;
+      if (pointerSample.pointerType === "touch") {
+        if (touchPrefs.oneFingerDrag !== "draw") return;
+        if (touchPrefs.palmRejection && drawingPointerSessionRef.current?.pointerType === "pen") return;
+      }
       const activePointerSession = drawingPointerSessionRef.current;
       if (activePointerSession || drawingRef.current) {
         if (shouldCancelStudioFingerStrokeForAdditionalContact(activePointerSession, pointerSample)) {
@@ -16108,6 +16243,12 @@ function StudioCuttoonEditor() {
           icon: Command,
           shortcut: "?",
           onSelect: () => setShortcutsOpen(true),
+        },
+        {
+          id: "app-settings",
+          label: "애플리케이션 설정",
+          icon: Settings2,
+          onSelect: () => setAppSettingsOpen(true),
         },
       ],
     },
@@ -20399,6 +20540,7 @@ function StudioCuttoonEditor() {
         {/* Magma-style left vertical Toolbar — desktop only; mobile uses bottom dock / horizontal belt */}
         {studioUiDensityAllows(uiDensityMode, "tool-rail") && !canvasOnlyMode ? (
           <StudioVerticalToolRail className={cn(mobileImmersive && "hidden")}>
+            {isRailToolVisible("select") ? (
             <StudioRailToolButton
               icon={MousePointer2}
               label="선택 (V)"
@@ -20410,6 +20552,8 @@ function StudioCuttoonEditor() {
                 setMenu(null);
               }}
             />
+            ) : null}
+            {isRailToolVisible("pen") ? (
             <StudioRailToolButton
               icon={Pencil}
               label={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 펜을 사용할 수 있어요" : "펜 (B)"}
@@ -20424,6 +20568,8 @@ function StudioCuttoonEditor() {
                 setMenu(null);
               }}
             />
+            ) : null}
+            {isRailToolVisible("eraser") ? (
             <StudioRailToolButton
               icon={Eraser}
               label={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 지우개를 사용할 수 있어요" : "지우개 (E)"}
@@ -20437,6 +20583,8 @@ function StudioCuttoonEditor() {
                 setMenu(null);
               }}
             />
+            ) : null}
+            {isRailToolVisible("fill") ? (
             <StudioRailToolButton
               icon={PaintBucket}
               label={advancedFillUnsupportedReason ?? "채우기 (G)"}
@@ -20445,6 +20593,8 @@ function StudioCuttoonEditor() {
               disabled={!advancedFillActive && advancedFillUnsupportedReason !== null}
               onClick={toggleAdvancedFill}
             />
+            ) : null}
+            {isRailToolVisible("eyedropper") ? (
             <StudioRailToolButton
               icon={Pipette}
               label="스포이드 (I / Alt+클릭)"
@@ -20455,6 +20605,8 @@ function StudioCuttoonEditor() {
                 setMenu(null);
               }}
             />
+            ) : null}
+            {isRailToolVisible("lasso") ? (
             <StudioRailToolButton
               icon={Lasso}
               label={
@@ -20490,6 +20642,8 @@ function StudioCuttoonEditor() {
                 setPixelTool("lasso");
               }}
             />
+            ) : null}
+            {isRailToolVisible("smart-shape") ? (
             <StudioRailToolButton
               icon={Shapes}
               label="스마트 도형"
@@ -20504,6 +20658,8 @@ function StudioCuttoonEditor() {
                 setMenu(null);
               }}
             />
+            ) : null}
+            {isRailToolVisible("shape-rect") ? (
             <StudioRailToolButton
               icon={Square}
               label="사각형 도형"
@@ -20517,6 +20673,8 @@ function StudioCuttoonEditor() {
                 setMenu(null);
               }}
             />
+            ) : null}
+            {isRailToolVisible("shape-ellipse") ? (
             <StudioRailToolButton
               icon={Circle}
               label="타원 도형"
@@ -20530,7 +20688,9 @@ function StudioCuttoonEditor() {
                 setMenu(null);
               }}
             />
+            ) : null}
             <StudioRailDivider />
+            {isRailToolVisible("text") ? (
             <StudioRailToolButton
               icon={TypeIcon}
               label="텍스트 추가"
@@ -20539,6 +20699,8 @@ function StudioCuttoonEditor() {
                 addText();
               }}
             />
+            ) : null}
+            {isRailToolVisible("bubble") ? (
             <StudioRailToolButton
               icon={MessageCircle}
               label="말풍선 추가"
@@ -20547,6 +20709,8 @@ function StudioCuttoonEditor() {
                 addBubble("speech");
               }}
             />
+            ) : null}
+            {isRailToolVisible("image") ? (
             <label
               className="relative grid size-9 cursor-pointer place-items-center rounded-md border border-transparent text-fg-2 hover:border-line hover:bg-raised hover:text-fg"
               title="이미지 추가 — 파일에서 그림을 불러와 캔버스에 배치합니다. 이후 필터·블러를 적용할 수 있어요."
@@ -20555,7 +20719,9 @@ function StudioCuttoonEditor() {
               <span className="sr-only">이미지 추가</span>
               <input type="file" accept="image/*" className="absolute inset-0 cursor-pointer opacity-0" onChange={onPickImage} />
             </label>
+            ) : null}
             <StudioRailDivider />
+            {isRailToolVisible("frame-anim") ? (
             <StudioRailToolButton
               icon={Film}
               label={
@@ -20582,7 +20748,8 @@ function StudioCuttoonEditor() {
                 setFrameAnimOpen((v) => (frameAnimTargetId === selected.id ? !v : true));
               }}
             />
-            {studioUiDensityAllows(uiDensityMode, "toolbar-reference") ? (
+            ) : null}
+            {studioUiDensityAllows(uiDensityMode, "toolbar-reference") && isRailToolVisible("reference") ? (
               <StudioRailToolButton
                 icon={PictureInPicture2}
                 label="참고 이미지"
@@ -20596,6 +20763,75 @@ function StudioCuttoonEditor() {
                 onFocus={preloadStudioReferencePanel}
               />
             ) : null}
+            {/* Magma More tools — hidden rail tools + Application Settings */}
+            <div className="relative">
+              <StudioRailToolButton
+                icon={Settings2}
+                label="더보기 · 툴바 설정"
+                description="숨긴 도구를 열거나 애플리케이션 설정에서 툴바·단축키·마우스·터치를 맞춤 설정합니다."
+                active={railMoreOpen || appSettingsOpen}
+                onClick={() => setRailMoreOpen((v) => !v)}
+              />
+              {railMoreOpen ? (
+                <div className="absolute left-full top-0 z-[80] ml-1 w-48 rounded-xl border border-line bg-panel p-1.5 shadow-2xl">
+                  <p className="px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-wider text-fg-3">
+                    숨긴 도구
+                  </p>
+                  {appSettings.toolbar.visibleIds.length >= 14 ? (
+                    <p className="px-2 py-1.5 text-[0.68rem] text-fg-3">모두 표시 중</p>
+                  ) : (
+                    (
+                      [
+                        "select",
+                        "pen",
+                        "eraser",
+                        "fill",
+                        "eyedropper",
+                        "lasso",
+                        "smart-shape",
+                        "shape-rect",
+                        "shape-ellipse",
+                        "text",
+                        "bubble",
+                        "image",
+                        "frame-anim",
+                        "reference",
+                      ] as StudioRailToolId[]
+                    )
+                      .filter((id) => !isRailToolVisible(id))
+                      .map((id) => (
+                        <button
+                          key={id}
+                          type="button"
+                          className="flex w-full rounded-lg px-2 py-1.5 text-left text-xs text-fg hover:bg-raised"
+                          onClick={() => {
+                            commitAppSettings({
+                              ...appSettings,
+                              toolbar: {
+                                visibleIds: [...appSettings.toolbar.visibleIds, id],
+                              },
+                            });
+                            setRailMoreOpen(false);
+                          }}
+                        >
+                          {studioRailToolLabel(id)}
+                        </button>
+                      ))
+                  )}
+                  <button
+                    type="button"
+                    className="mt-1 flex w-full items-center gap-1 rounded-lg border border-line px-2 py-1.5 text-left text-xs font-medium text-accent hover:bg-accent-soft"
+                    onClick={() => {
+                      setRailMoreOpen(false);
+                      setAppSettingsOpen(true);
+                    }}
+                  >
+                    <Settings2 className="size-3.5" aria-hidden />
+                    애플리케이션 설정
+                  </button>
+                </div>
+              ) : null}
+            </div>
           </StudioVerticalToolRail>
         ) : null}
 
@@ -22931,6 +23167,18 @@ function StudioCuttoonEditor() {
           {shortcutsOpen && (
             <Suspense fallback={null}>
               <StudioShortcutsHelp open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+              <Suspense fallback={null}>
+                <StudioAppSettingsPanel
+                  open={appSettingsOpen}
+                  settings={appSettings}
+                  onClose={() => setAppSettingsOpen(false)}
+                  onChange={commitAppSettings}
+                  onResetAll={() => {
+                    const next = resetStudioAppSettings(studioAppSettingsStorage());
+                    commitAppSettings(next);
+                  }}
+                />
+              </Suspense>
             </Suspense>
           )}
           {historyPanelOpen && (
