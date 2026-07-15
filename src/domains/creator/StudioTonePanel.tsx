@@ -22,9 +22,9 @@ const CATEGORY_ORDER: ToneCategory[] = ["dot", "line", "gradient", "crosshatch"]
 // 그룹 헤더 — 인스펙터 다른 패널과 같은 소제목 토큰.
 const GROUP_HEADING = "text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider";
 
-// 스와치 버튼 — 56px 정사각. 톤 패턴 자체가 미리보기라 테두리/호버만 토큰으로 입힌다.
+// 스와치 — CSP 톤 팔레트처럼 패턴 면이 주인공, 카드 프레임은 warm-ink.
 const SWATCH_CLASS =
-  "size-14 shrink-0 rounded-md border border-line bg-card transition-colors hover:bg-raised";
+  "size-14 shrink-0 overflow-hidden rounded-xl border border-line bg-card shadow-sm transition-[transform,box-shadow,border-color] duration-150 hover:-translate-y-0.5 hover:border-accent/45 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
 export function StudioTonePanel({
   onPick,
@@ -33,17 +33,16 @@ export function StudioTonePanel({
   onPick: (svg: string, label: string) => void;
   query?: string;
 }): React.ReactElement {
-  // 검색어 정규화 — 공백 제거 + 소문자. 비어 있으면 전체 통과.
   const needle = (query ?? "").trim().toLowerCase();
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" data-studio-tone-panel="true">
       {CATEGORY_ORDER.map((category) => {
-        // 카테고리별 프리셋을 query(라벨 부분일치, 대소문자 무시)로 거른다.
         const presets = TONE_PRESETS.filter(
-          (preset) => preset.category === category && (needle === "" || preset.label.toLowerCase().includes(needle))
+          (preset) =>
+            preset.category === category &&
+            (needle === "" || preset.label.toLowerCase().includes(needle))
         );
-        // 매치가 하나도 없으면 헤더까지 통째로 생략한다.
         if (presets.length === 0) return null;
 
         return (
@@ -51,22 +50,24 @@ export function StudioTonePanel({
             <p className={GROUP_HEADING}>{toneCategoryLabel(category)}</p>
             <div className="flex flex-wrap gap-2">
               {presets.map((preset: TonePreset) => (
-                // 한 스와치 = 버튼 + 그 아래 라벨 캡션. 묶어서 같이 줄바꿈돼 라벨이 항상 제 톤 밑에 붙는다.
                 <div key={preset.id} className="flex w-14 shrink-0 flex-col items-center gap-1">
                   <button
                     type="button"
                     title={preset.tip}
                     aria-label={preset.label}
+                    data-studio-tone-swatch={preset.id}
                     onClick={() => onPick(preset.svg, preset.label)}
-                    // 흰 배경 + 톤 패턴 이미지 — 검은 망점이 흰 면 위에 보이게 깐다(cover로 타일 채움).
                     style={{
-                      backgroundColor: "#fff",
+                      // Warm paper (not pure #fff) so DESIGN.md ink canvas stays consistent.
+                      backgroundColor: "oklch(0.96 0.012 85)",
                       backgroundImage: `url("${toneDataUrl(preset.svg)}")`,
                       backgroundSize: "cover",
                     }}
                     className={cn(SWATCH_CLASS)}
                   />
-                  <span className="text-center text-[10px] leading-tight text-fg-2">{preset.label}</span>
+                  <span className="text-center text-[10px] font-medium leading-tight text-fg-2">
+                    {preset.label}
+                  </span>
                 </div>
               ))}
             </div>

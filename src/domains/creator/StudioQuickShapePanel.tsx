@@ -5,6 +5,7 @@
  */
 import { Sparkles, Shapes } from "lucide-react";
 
+import { StudioSmartShapeKindRow } from "./studio-creative-visuals";
 import { StudioToggleChip } from "./studio-panel-ui";
 
 import type { ReactElement } from "react";
@@ -57,13 +58,16 @@ export function StudioQuickShapePanel({
         </StudioToggleChip>
       </div>
 
-      {active && (
-        <p role="status" className="text-[0.7rem] leading-relaxed text-fg-2">
-          {matchedKindLabel
-            ? `✨ ${matchedKindLabel}(으)로 인식됐어요. 손을 떼면 확정 · 더 멈추면 정비율 고정.`
-            : "선·사각형·원·삼각형·다각형을 대충 그리고 그 자리에 잠시 멈춰 보세요."}
-        </p>
-      )}
+      {active ? (
+        <div className="space-y-1.5">
+          <StudioSmartShapeKindRow />
+          <p role="status" className="text-[0.7rem] leading-relaxed text-fg-2">
+            {matchedKindLabel
+              ? `✨ ${matchedKindLabel}(으)로 인식됐어요. 손을 떼면 확정 · 더 멈추면 정비율 고정.`
+              : "선·사각형·원·삼각형·다각형을 대충 그리고 그 자리에 잠시 멈춰 보세요."}
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }

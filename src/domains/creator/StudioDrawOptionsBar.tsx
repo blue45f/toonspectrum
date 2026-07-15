@@ -21,6 +21,7 @@ import {
   nearestStudioBrushSizeChip,
 } from "./studio-brush";
 import { StudioDualColorWell, StudioToolIdentity } from "./studio-chrome-ui";
+import { StudioSymmetryGlyph } from "./studio-creative-visuals";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { StudioBrushTray } from "./StudioBrushTray";
 
@@ -587,8 +588,11 @@ export function StudioDrawOptionsBar({
         ) : null}
 
         {onSymmetryTypeChange ? (
-          <div className="hidden shrink-0 items-center gap-0.5 lg:flex" role="group" aria-label="대칭 그리기">
-            <FlipHorizontal2 size={13} className="mr-0.5 text-fg-3" aria-hidden />
+          <div
+            className="studio-opt-cluster hidden shrink-0 items-center gap-0.5 lg:flex"
+            role="group"
+            aria-label="대칭 그리기"
+          >
             {(
               [
                 { id: "none" as const, label: "없음" },
@@ -602,17 +606,19 @@ export function StudioDrawOptionsBar({
                 type="button"
                 aria-pressed={symmetryType === item.id}
                 title={`대칭: ${item.label}`}
+                aria-label={`대칭 ${item.label}`}
                 onClick={() => onSymmetryTypeChange(item.id)}
                 className={cn(
-                  "h-7 rounded px-1.5 text-[0.6rem] font-bold",
+                  "inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-[0.58rem] font-bold",
                   STUDIO_EASE,
                   STUDIO_FOCUS_RING,
                   symmetryType === item.id
-                    ? "bg-accent text-on-accent"
+                    ? "bg-accent text-on-accent shadow-sm"
                     : "text-fg-3 hover:bg-raised hover:text-fg-2"
                 )}
               >
-                {item.label}
+                <StudioSymmetryGlyph mode={item.id} />
+                <span className="hidden xl:inline">{item.label}</span>
               </button>
             ))}
           </div>
