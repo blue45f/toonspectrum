@@ -42,6 +42,7 @@ import {
   AlignCenter,
   AlignRight,
   Bold,
+  BookOpen,
   Italic,
   FlipHorizontal2,
   FlipVertical2,
@@ -221,6 +222,7 @@ import {
   TEMPLATES,
   filterAssetsByLabel,
   filterBgSceneSections,
+  groupBubbleVariants,
   groupTemplates,
   type BgPreset,
   type BubbleVariant,
@@ -315,8 +317,12 @@ import {
 import {
   bubblePathData,
   bubblePathDataMulti,
+  burstStarPathData,
   doubleBubblePathData,
+  heartBubblePathData,
   normalizeExtraTails,
+  scaredBubblePathData,
+  thoughtBubbleBodyPath,
   type BubbleTailSpec,
 } from "./studio-bubble-path";
 import {
@@ -359,6 +365,7 @@ import {
   StudioHudPill,
   StudioStatusBar,
   StudioToolBelt,
+  StudioFloatingToolPopover,
   StudioToolbarCluster,
   StudioToolbarDivider,
   StudioVerticalToolRail,
@@ -1022,6 +1029,7 @@ import type { CurvePoint } from "./studio-curves";
 import type { Detail } from "./studio-detail";
 import type { Distort } from "./studio-distort";
 import type { StudioEmeresLibraryItem } from "./studio-emeres-library";
+import type { StudioTutorialTryAction } from "./studio-feature-tutorials";
 import type { Glow } from "./studio-glow";
 import type { GradientMap } from "./studio-gradient-map";
 import type { Grain } from "./studio-grain";
@@ -1292,6 +1300,10 @@ const StudioPuppetWarpPanel = lazyRetry(
 const StudioQuickShapePanel = lazyRetry(
   () => import("./StudioQuickShapePanel").then((mod) => ({ default: mod.StudioQuickShapePanel })),
   "StudioQuickShapePanel"
+);
+const StudioFeatureTutorialHub = lazyRetry(
+  () => import("./StudioFeatureTutorialHub").then((mod) => ({ default: mod.StudioFeatureTutorialHub })),
+  "StudioFeatureTutorialHub"
 );
 const StudioMainMenu = lazyRetry(
   () => import("./StudioMainMenu").then((mod) => ({ default: mod.StudioMainMenu })),
@@ -2329,6 +2341,7 @@ function QuickStartPanel({
   onStartDraw,
   onBrushKit,
   onCollabFocus,
+  onOpenTutorials,
 }: {
   onDismiss: () => void;
   onExample: () => void;
@@ -2339,6 +2352,7 @@ function QuickStartPanel({
   onStartDraw: () => void;
   onBrushKit: () => void;
   onCollabFocus: () => void;
+  onOpenTutorials: () => void;
 }) {
   // Drawing-first tools only — Canva-style visual starter cards (no marketing copy).
   const steps: {
@@ -2444,6 +2458,17 @@ function QuickStartPanel({
         >
           <Pencil size={15} aria-hidden />
           빈 캔버스에서 그리기
+        </button>
+        <button
+          type="button"
+          onClick={onOpenTutorials}
+          className={cn(
+            buttonClass({ size: "sm", variant: "outline" }),
+            "min-h-9 justify-center gap-1.5 px-3 text-sm"
+          )}
+        >
+          <BookOpen size={15} aria-hidden />
+          기능 튜토리얼
         </button>
       </div>
 
@@ -5921,6 +5946,66 @@ function StudioCuttoonEditor() {
   const [filterClipboard, setFilterClipboard] = useState<Partial<ImageFilterFields> | null>(null);
   const [editing, setEditing] = useState<{ id: string; value: string } | null>(null);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [tutorialHubOpen, setTutorialHubOpen] = useState(false);
+  const [tutorialInitialId, setTutorialInitialId] = useState<string | null>(null);
+  function openFeatureTutorial(tutorialId?: string | null) {
+    setTutorialInitialId(tutorialId ?? null);
+    setTutorialHubOpen(true);
+  }
+  /** 튜토리얼 「따라 해보기」— 해당 도구/메뉴를 실제로 연다. */
+  function handleTutorialTry(action: StudioTutorialTryAction) {
+    setTutorialHubOpen(false);
+    switch (action) {
+      case "pen":
+        setTool("draw");
+        setDrawMode("pen");
+        setEyedropperActive(false);
+        announceDrawingShortcut("펜 모드 · 선을 그어 보세요");
+        break;
+      case "smart-shape":
+        setTool("draw");
+        setDrawMode("pen");
+        setEyedropperActive(false);
+        setQuickShapeActive(true);
+        announceDrawingShortcut("스마트 도형 켜짐 · 도형을 그리고 손을 떼 보세요");
+        break;
+      case "bubble":
+        setMenu("bubble");
+        break;
+      case "brush":
+        setTool("draw");
+        setDrawMode("pen");
+        setEyedropperActive(false);
+        applyBuiltInBrushPreset(BRUSH_PRESETS.find((p) => p.id === "pencil") ?? BRUSH_PRESETS[0]);
+        announceDrawingShortcut("브러시 · 옵션에서 질감을 바꿔 보세요");
+        break;
+      case "template":
+        setMenu("template");
+        break;
+      case "layers":
+        setLeftPanelOpen(true);
+        if (uiDensityMode === "focus") setStudioUiDensity("simple");
+        announceDrawingShortcut("레이어 패널을 열었어요");
+        break;
+      case "character":
+        setPoserVrmOpen(true);
+        break;
+      case "bg3d":
+        setBg3dOpen(true);
+        break;
+      case "ai-assist":
+        setMenu("aiAssist");
+        break;
+      case "dialogue":
+        setMenu("bubble");
+        break;
+      case "export":
+        setExportMenuOpen(true);
+        break;
+      default:
+        break;
+    }
+  }
   const [drawingShortcutNotice, setDrawingShortcutNotice] = useState<{ id: number; message: string } | null>(null);
   const drawingShortcutNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const drawingShortcutNoticeSequenceRef = useRef(0);
@@ -8119,13 +8204,22 @@ function StudioCuttoonEditor() {
     };
   }, []);
 
-  // 툴바 드롭다운(템플릿·배경 씬·말풍선·효과·내 에셋) 바깥 클릭시 닫기.
-  // ref는 열린 메뉴의 래퍼(트리거+드롭다운)에만 붙는다 — 한 번에 하나만 열리므로 ref 하나로 충분.
+  // 툴바 드롭다운 바깥 클릭 시 닫기.
+  // 팝오버는 body 포털(data-studio-tool-popover) — 트리거 래퍼(menuRef)와 포털 둘 다 내부로 본다.
   const menuRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!menu) return;
     const handlePointerDown = (e: PointerEvent) => {
-      if (!menuRef.current?.contains(e.target as Node)) setMenu(null);
+      const target = e.target;
+      if (!(target instanceof Element)) {
+        setMenu(null);
+        return;
+      }
+      if (menuRef.current?.contains(target)) return;
+      if (target.closest("[data-studio-tool-popover]")) return;
+      // 메인 메뉴에서 항목을 고르는 클릭은 닫지 않는다(같은 pointerdown 경합 방지).
+      if (target.closest("[data-studio-main-menu], [data-studio-app-menubar]")) return;
+      setMenu(null);
     };
     globalThis.addEventListener("pointerdown", handlePointerDown);
     return () => globalThis.removeEventListener("pointerdown", handlePointerDown);
@@ -13120,8 +13214,9 @@ function StudioCuttoonEditor() {
   }
 
   function applyTemplate(tpl: TemplateSpec) {
-    setMenu(null);
+    // confirm 전에 메뉴를 닫지 않는다 — 취소 시 다시 고를 수 있게.
     if (elements.length > 0 && !globalThis.confirm("기존 작업을 지우고 템플릿을 적용할까요?")) return;
+    setMenu(null);
     setCanvasH(tpl.canvasH);
     setBg("#ffffff");
     setBgGrad(null);
@@ -13129,10 +13224,14 @@ function StudioCuttoonEditor() {
     const nextEls = regenerateTemplate(tpl, panelGutter, []);
     commit(nextEls);
     setSelectedId(null);
+    announceDrawingShortcut(
+      tpl.frames.length > 0
+        ? `「${tpl.label}」템플릿 · 컷 ${tpl.frames.length}개`
+        : `「${tpl.label}」빈 캔버스`
+    );
   }
   // 코미Po!식 정형 컷 레이아웃 — assembleComipoPage 로 프레임·대사를 충돌 없이 배치.
   function applyPanelLayout(layout: PanelLayoutPreset) {
-    setMenu(null);
     if (elements.length > 0 && !globalThis.confirm("기존 작업을 지우고 컷 템플릿을 적용할까요?")) return;
     const assembled = assembleComipoPage({
       layoutId: layout.id,
@@ -13142,12 +13241,14 @@ function StudioCuttoonEditor() {
       setError("컷 템플릿을 배치하지 못했습니다. 대사 길이를 줄이거나 레이아웃을 바꿔 보세요.");
       return;
     }
+    setMenu(null);
     setCanvasH(assembled.canvasH);
     setBg("#ffffff");
     setBgGrad(null);
     setCurrentTemplate(null);
     commit(comipoSeedsToEls(assembled.seeds));
     setSelectedId(null);
+    announceDrawingShortcut(`「${layout.label}」컷 템플릿 적용`);
   }
 
   /** PicsArt-class multi-photo collage — frames + optional cover-fit of existing images. */
@@ -16722,7 +16823,7 @@ function StudioCuttoonEditor() {
           id: "bubble",
           label: "말풍선",
           icon: MessageCircle,
-          onSelect: () => addBubble("speech"),
+          onSelect: () => setMenu("bubble"),
         },
         {
           id: "text",
@@ -16859,6 +16960,12 @@ function StudioCuttoonEditor() {
           label: rightPanelOpen ? "속성 패널 숨기기" : "속성 패널 보이기",
           icon: SlidersHorizontal,
           onSelect: () => setRightPanelOpen((v) => !v),
+        },
+        {
+          id: "feature-tutorials",
+          label: "기능 튜토리얼",
+          icon: BookOpen,
+          onSelect: () => openFeatureTutorial(null),
         },
         {
           id: "shortcuts",
@@ -18405,6 +18512,47 @@ function StudioCuttoonEditor() {
             className={cn("hidden min-w-0 md:flex", mobileImmersive && "!hidden")}
           />
         </Suspense>
+        {/* 데스크톱: 툴벨트가 파킹되므로 삽입 핵심을 메뉴바에서 직접 연다. */}
+        <div
+          className={cn(
+            "hidden min-w-0 items-center gap-0.5 md:flex",
+            mobileImmersive && "!hidden"
+          )}
+          role="group"
+          aria-label="삽입 바로가기"
+        >
+          <button
+            type="button"
+            onClick={() => {
+              preloadStudioAssetMenuPanel();
+              setMenu(activeToolbarGroup === "assetGroup" ? null : "template");
+            }}
+            aria-haspopup="menu"
+            aria-expanded={activeToolbarGroup === "assetGroup"}
+            className={cn(
+              buttonClass({ size: "sm", variant: activeToolbarGroup === "assetGroup" ? "solid" : "quiet" }),
+              "min-h-9 gap-1.5 px-2.5 text-[0.72rem]"
+            )}
+            title="템플릿 · 콜라주 · 요소 · 장면 · 클립 · 효과 · 내 에셋"
+          >
+            <Folder size={14} aria-hidden />
+            템플릿·에셋
+          </button>
+          <button
+            type="button"
+            onClick={() => setMenu(menu === "bubble" ? null : "bubble")}
+            aria-haspopup="menu"
+            aria-expanded={menu === "bubble"}
+            className={cn(
+              buttonClass({ size: "sm", variant: menu === "bubble" ? "solid" : "quiet" }),
+              "min-h-9 gap-1.5 px-2.5 text-[0.72rem]"
+            )}
+            title="말풍선 라이브러리"
+          >
+            <MessageCircle size={14} aria-hidden />
+            말풍선
+          </button>
+        </div>
         <span aria-hidden className="mx-0.5 hidden h-4 w-px shrink-0 bg-line lg:block" />
         {/* 파일·내보내기 — 드로잉 앱 메뉴바 */}
         <div
@@ -19120,13 +19268,16 @@ function StudioCuttoonEditor() {
         </Suspense>
       ) : null}
 
-      {/* Legacy tool belt: primary on mobile; off-screen host on desktop so popovers still mount. */}
+      {/* Legacy tool belt: primary on mobile. Desktop menubar owns discovery; belt is a zero-size
+          host for triggers (popovers portal to body — never nest fixed UI under backdrop-filter). */}
       <StudioToolBelt
         className={cn(
           canvasOnlyMode && "hidden",
           mobileImmersive && "shrink-0",
-          // Desktop: park belt chrome off-screen (not display:none) so fixed popovers still mount & click.
-          "lg:fixed lg:left-[-100vw] lg:top-0 lg:h-0 lg:w-0 lg:overflow-visible lg:border-0 lg:p-0"
+          // Desktop: collapse belt (not -100vw fixed — that + filter made popovers unusable).
+          "lg:pointer-events-none lg:absolute lg:left-0 lg:top-0 lg:z-[1] lg:h-0 lg:w-0 lg:overflow-visible lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none",
+          // 트리거/숨은 호스트는 클릭 불필요(포털 팝오버는 body). 모바일은 정상 클릭.
+          "max-lg:pointer-events-auto"
         )}
       >
         {/* 모바일: 가로 스크롤 가능 힌트(좌측 페이드). 데스크톱에선 숨김. */}
@@ -19167,9 +19318,13 @@ function StudioCuttoonEditor() {
           </StudioQuickActionsBar>
         ) : null}
         <StudioToolbarDivider />
-        {/* Main-menu can open these groups even when density hides the belt trigger — keep host mounted. */}
+        {/* Main-menu can open these groups even when density hides the belt trigger — keep host mounted.
+            트리거만 sr-hide: 클러스터 전체에 lg:sr-only 를 주면 fixed 팝오버까지 잘려 메뉴가 안 보인다. */}
         {(studioUiDensityAllows(uiDensityMode, "toolbar-assets") || activeToolbarGroup === "assetGroup") ? (
-        <StudioToolbarCluster label="에셋 라이브러리" className={cn(!studioUiDensityAllows(uiDensityMode, "toolbar-assets") && "lg:sr-only")}>
+        <StudioToolbarCluster
+          label="에셋 라이브러리"
+          className={cn(!studioUiDensityAllows(uiDensityMode, "toolbar-assets") && "border-0 bg-transparent p-0 shadow-none")}
+        >
         <div ref={activeToolbarGroup === "assetGroup" ? menuRef : undefined} className="relative">
           <button
             type="button"
@@ -19181,17 +19336,24 @@ function StudioCuttoonEditor() {
             onFocus={preloadStudioAssetMenuPanel}
             aria-haspopup="menu"
             aria-expanded={activeToolbarGroup === "assetGroup"}
-            className={toolBtn(activeToolbarGroup === "assetGroup")}
+            className={cn(
+              toolBtn(activeToolbarGroup === "assetGroup"),
+              !studioUiDensityAllows(uiDensityMode, "toolbar-assets") && "sr-only"
+            )}
+            title="템플릿 · 콜라주 · 요소 · 장면 · 클립 · 효과 · 내 에셋"
           >
-            <Folder size={15} aria-hidden /> 에셋
+            <Folder size={15} aria-hidden /> 템플릿·에셋
             <ChevronDown size={12} aria-hidden className={cn("transition-transform duration-150", activeToolbarGroup === "assetGroup" && "rotate-180")} />
           </button>
-          {activeToolbarGroup === "assetGroup" && (
-            <div className={groupPopoverClass("w-80")}>
+          <StudioFloatingToolPopover
+            open={activeToolbarGroup === "assetGroup"}
+            id="asset-group"
+            className={cn(groupPopoverClass("w-80"), "lg:w-[22rem] lg:max-w-[min(24rem,calc(100vw-1.5rem))]")}
+          >
               <StudioMenuPopoverHeader
                 icon={Folder}
-                title="에셋"
-                description="템플릿·콜라주·요소·장면·클립·효과를 한 메뉴에서 고릅니다."
+                title="템플릿 · 에셋"
+                description="컷 템플릿·콜라주·요소·장면·클립·효과·내 에셋을 한 메뉴에서 고릅니다."
               />
               <StudioMenuSubtabs
                 aria-label="에셋 메뉴 구역"
@@ -19201,14 +19363,14 @@ function StudioCuttoonEditor() {
                   setMenu(id as StudioMenu);
                 }}
                 items={[
-                  { id: "template", label: "템플릿", icon: LayoutTemplate },
-                  { id: "collage", label: "콜라주", icon: Grid2x2 },
-                  { id: "elements", label: "요소", icon: Shapes },
-                  { id: "emeres", label: "이메레스", icon: PenTool },
-                  { id: "scene", label: "장면", icon: Clapperboard },
-                  { id: "clip", label: "클립", icon: Bookmark },
-                  { id: "sticker", label: "효과", icon: StickerIcon },
-                  { id: "asset", label: "내 에셋", icon: Library },
+                  { id: "template", label: "템플릿", icon: LayoutTemplate, title: "캔버스·컷 레이아웃 템플릿" },
+                  { id: "collage", label: "콜라주", icon: Grid2x2, title: "이미지 콜라주 배치" },
+                  { id: "elements", label: "요소", icon: Shapes, title: "도형·장식 요소" },
+                  { id: "emeres", label: "이메레스", icon: PenTool, title: "스케치 밑그림 틀" },
+                  { id: "scene", label: "장면", icon: Clapperboard, title: "장면 템플릿" },
+                  { id: "clip", label: "클립", icon: Bookmark, title: "저장된 클립" },
+                  { id: "sticker", label: "효과", icon: StickerIcon, title: "만화 효과·스티커" },
+                  { id: "asset", label: "내 에셋", icon: Library, title: "업로드·생성한 에셋" },
                 ]}
               />
               {menu === "template" && (
@@ -19778,8 +19940,7 @@ function StudioCuttoonEditor() {
                   />
                 </Suspense>
               )}
-            </div>
-          )}
+          </StudioFloatingToolPopover>
         </div>
         </StudioToolbarCluster>
         ) : null}
@@ -19912,20 +20073,29 @@ function StudioCuttoonEditor() {
         {(studioUiDensityAllows(uiDensityMode, "toolbar-scene") || activeToolbarGroup === "bgGroup") ? (
         <>
         {studioUiDensityAllows(uiDensityMode, "toolbar-scene") ? <StudioToolbarDivider label="장면" /> : null}
-        <StudioToolbarCluster label="배경·톤" className={cn(!studioUiDensityAllows(uiDensityMode, "toolbar-scene") && "lg:sr-only")}>
+        <StudioToolbarCluster
+          label="배경·톤"
+          className={cn(!studioUiDensityAllows(uiDensityMode, "toolbar-scene") && "border-0 bg-transparent p-0 shadow-none")}
+        >
         <div ref={activeToolbarGroup === "bgGroup" ? menuRef : undefined} className="relative">
           <button
             type="button"
             onClick={() => setMenu(activeToolbarGroup === "bgGroup" ? null : "bgFill")}
             aria-haspopup="menu"
             aria-expanded={activeToolbarGroup === "bgGroup"}
-            className={toolBtn(activeToolbarGroup === "bgGroup")}
+            className={cn(
+              toolBtn(activeToolbarGroup === "bgGroup"),
+              !studioUiDensityAllows(uiDensityMode, "toolbar-scene") && "sr-only"
+            )}
           >
             <Mountain size={15} aria-hidden /> 배경
             <ChevronDown size={12} aria-hidden className={cn("transition-transform duration-150", activeToolbarGroup === "bgGroup" && "rotate-180")} />
           </button>
-          {activeToolbarGroup === "bgGroup" && (
-            <div className={groupPopoverClass("w-80")}>
+          <StudioFloatingToolPopover
+            open={activeToolbarGroup === "bgGroup"}
+            id="bg-group"
+            className={groupPopoverClass("w-80")}
+          >
               <StudioMenuPopoverHeader
                 icon={Mountain}
                 title="배경 편집"
@@ -20104,29 +20274,37 @@ function StudioCuttoonEditor() {
                   </div>
                 </>
               )}
-            </div>
-          )}
+          </StudioFloatingToolPopover>
         </div>
         </StudioToolbarCluster>
         </>
         ) : null}
 
         {(studioUiDensityAllows(uiDensityMode, "toolbar-style") || activeToolbarGroup === "styleGroup") ? (
-        <StudioToolbarCluster label="스타일" className={cn(!studioUiDensityAllows(uiDensityMode, "toolbar-style") && "lg:sr-only")}>
+        <StudioToolbarCluster
+          label="스타일"
+          className={cn(!studioUiDensityAllows(uiDensityMode, "toolbar-style") && "border-0 bg-transparent p-0 shadow-none")}
+        >
         <div ref={activeToolbarGroup === "styleGroup" ? menuRef : undefined} className="relative">
           <button
             type="button"
             onClick={() => setMenu(activeToolbarGroup === "styleGroup" ? null : "palette")}
             aria-haspopup="menu"
             aria-expanded={activeToolbarGroup === "styleGroup"}
-            className={toolBtn(activeToolbarGroup === "styleGroup")}
+            className={cn(
+              toolBtn(activeToolbarGroup === "styleGroup"),
+              !studioUiDensityAllows(uiDensityMode, "toolbar-style") && "sr-only"
+            )}
             title="색상 팔레트 · 브랜드 킷(글꼴·로고)"
           >
             <Palette size={15} aria-hidden /> 스타일
             <ChevronDown size={12} aria-hidden className={cn("transition-transform duration-150", activeToolbarGroup === "styleGroup" && "rotate-180")} />
           </button>
-          {activeToolbarGroup === "styleGroup" && (
-            <div className={groupPopoverClass("w-72")}>
+          <StudioFloatingToolPopover
+            open={activeToolbarGroup === "styleGroup"}
+            id="style-group"
+            className={groupPopoverClass("w-72")}
+          >
               <StudioMenuPopoverHeader
                 icon={Palette}
                 title="스타일"
@@ -20152,8 +20330,7 @@ function StudioCuttoonEditor() {
                   />
                 </Suspense>
               )}
-            </div>
-          )}
+          </StudioFloatingToolPopover>
         </div>
         </StudioToolbarCluster>
         ) : null}
@@ -20161,29 +20338,34 @@ function StudioCuttoonEditor() {
         {(studioUiDensityAllows(uiDensityMode, "toolbar-ai") || activeToolbarGroup === "aiGroup") ? (
         <>
         {studioUiDensityAllows(uiDensityMode, "toolbar-ai") ? <StudioToolbarDivider label="AI" /> : null}
-        <StudioToolbarCluster label="AI 연동" className={cn(!studioUiDensityAllows(uiDensityMode, "toolbar-ai") && "lg:sr-only")}>
+        <StudioToolbarCluster
+          label="AI 연동"
+          className={cn(!studioUiDensityAllows(uiDensityMode, "toolbar-ai") && "border-0 bg-transparent p-0 shadow-none")}
+        >
         <div ref={activeToolbarGroup === "aiGroup" ? menuRef : undefined} className="relative">
           <button
             type="button"
             onClick={() => setMenu(activeToolbarGroup === "aiGroup" ? null : "aiAssist")}
             aria-haspopup="menu"
             aria-expanded={activeToolbarGroup === "aiGroup"}
-            className={toolBtn(activeToolbarGroup === "aiGroup")}
+            className={cn(
+              toolBtn(activeToolbarGroup === "aiGroup"),
+              !studioUiDensityAllows(uiDensityMode, "toolbar-ai") && "sr-only"
+            )}
             title="AI 어시스트 · 시나리오 설계 · 스톡 사진 · 연동 설정 — Z.ai/DeepSeek 서버 텍스트 또는 내 API 연동"
           >
             <WandSparkles size={15} aria-hidden /> AI
             <ChevronDown size={12} aria-hidden className={cn("transition-transform duration-150", activeToolbarGroup === "aiGroup" && "rotate-180")} />
           </button>
-          {activeToolbarGroup === "aiGroup" && (
-            <div
-              className={cn(
-                groupPopoverClass("w-80"),
-                // Fixed flex column: nested max-heights previously clipped generate buttons.
-                // Use a definite height so flex-1 tool bodies scroll reliably.
-                "flex h-[min(78dvh,36rem)] max-h-[min(78dvh,36rem)] flex-col overflow-hidden lg:w-96 lg:max-w-[min(24rem,calc(100vw-1.5rem))]"
-              )}
-              data-studio-tool-popover="ai-group"
-            >
+          <StudioFloatingToolPopover
+            open={activeToolbarGroup === "aiGroup"}
+            id="ai-group"
+            className={cn(
+              groupPopoverClass("w-80"),
+              // Fixed flex column: nested max-heights previously clipped generate buttons.
+              "flex h-[min(78dvh,36rem)] max-h-[min(78dvh,36rem)] flex-col overflow-hidden lg:w-96 lg:max-w-[min(24rem,calc(100vw-1.5rem))]"
+            )}
+          >
               <StudioMenuPopoverHeader
                 icon={WandSparkles}
                 title="AI 연동"
@@ -20419,102 +20601,153 @@ function StudioCuttoonEditor() {
                   </Suspense>
                 </div>
               )}
-            </div>
-          )}
+          </StudioFloatingToolPopover>
         </div>
-        <button type="button" onClick={addText} className={toolBtn(false)}>
-          <TypeIcon size={14} /> 텍스트
+        </StudioToolbarCluster>
+        </>
+        ) : null}
+
+        {/* 삽입 코어 — 밀도 모드와 무관하게 항상 노출(텍스트·말풍선은 예전에 AI 클러스터에 묶여
+            simple/focus 에서 통째로 사라지던 회귀를 분리). */}
+        {studioUiDensityAllows(uiDensityMode, "toolbar-insert") ? (
+        <>
+        <StudioToolbarDivider label="삽입" />
+        <StudioToolbarCluster label="삽입·대사">
+        <button type="button" onClick={addText} className={toolBtn(false)} title="텍스트 넣기">
+          <TypeIcon size={14} aria-hidden /> 텍스트
         </button>
         <div ref={menu === "bubble" ? menuRef : undefined} className="relative">
-          <button type="button" onClick={() => setMenu(menu === "bubble" ? null : "bubble")} aria-haspopup="menu" aria-expanded={menu === "bubble"} className={toolBtn(menu === "bubble")}>
-            <MessageCircle size={14} /> 말풍선
+          <button
+            type="button"
+            onClick={() => setMenu(menu === "bubble" ? null : "bubble")}
+            aria-haspopup="menu"
+            aria-expanded={menu === "bubble"}
+            className={toolBtn(menu === "bubble")}
+            title="말풍선 라이브러리"
+          >
+            <MessageCircle size={14} aria-hidden /> 말풍선
           </button>
-          {menu === "bubble" && (
-            <div className="fixed inset-x-2 top-[4.5rem] z-[70] max-h-[calc(100dvh-13rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-xl lg:absolute lg:inset-x-auto lg:left-0 lg:top-full lg:z-[70] lg:mt-1 lg:max-h-[min(42rem,calc(100dvh-7rem))] lg:w-80 lg:max-w-[calc(100vw-1.5rem)] lg:overflow-y-auto lg:shadow-lg">
-              <div className="mb-2 flex items-start gap-2 px-1 pt-1">
-                <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent">
-                  <MessageCircle size={17} aria-hidden />
-                </span>
-                <div>
-                  <p className="text-sm font-bold text-fg">말풍선 라이브러리</p>
-                  <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">장면의 목소리와 감정에 맞는 형태를 고르세요.</p>
+          <StudioFloatingToolPopover
+            open={menu === "bubble"}
+            id="bubble-menu"
+            className="fixed inset-x-2 top-[4.5rem] z-[70] max-h-[calc(100dvh-13rem)] w-auto overflow-y-auto rounded-2xl border border-line/70 bg-panel p-0 shadow-xl lg:inset-x-auto lg:left-3 lg:top-[4.5rem] lg:max-h-[min(42rem,calc(100dvh-7rem))] lg:w-[22rem] lg:max-w-[calc(100vw-1.5rem)]"
+          >
+              <div className="relative overflow-hidden border-b border-line/50 bg-gradient-to-br from-accent-soft/35 via-card/60 to-panel px-3 pb-3 pt-3">
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute -right-4 -top-6 size-20 rounded-full bg-accent/10 blur-2xl"
+                />
+                <div className="relative flex items-start gap-2.5">
+                  <span className="grid size-10 shrink-0 place-items-center rounded-2xl border border-accent/25 bg-accent-soft text-accent shadow-[inset_0_1px_0_oklch(0.95_0.02_85_/_0.12)]">
+                    <MessageCircle size={18} aria-hidden strokeWidth={1.75} />
+                  </span>
+                  <div className="min-w-0 pt-0.5">
+                    <p className="text-[0.9rem] font-semibold tracking-tight text-fg">말풍선 골라 넣기</p>
+                    <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                      장면에 맞는 목소리를 고르면 돼요. 대충 골라도 나중에 바꿀 수 있어요.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenu(null);
+                        openFeatureTutorial("bubble");
+                      }}
+                      className="mt-1.5 text-[0.65rem] font-medium text-accent/90 underline-offset-2 transition-colors hover:text-accent hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                    >
+                      말풍선 튜토리얼 보기
+                    </button>
+                  </div>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-1.5" role="menu" aria-label="말풍선 종류">
-                {BUBBLE_VARIANTS.map((v) => (
-                  <button
-                    key={v.id}
-                    type="button"
-                    role="menuitem"
-                    onClick={() => addBubble(v.id)}
-                    className="group min-h-24 rounded-xl border border-line/70 bg-card/45 p-2 text-left transition-colors hover:border-accent/35 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                  >
-                    <StudioBubbleVariantGlyph
-                      variant={v.id}
-                      className="h-11 w-full text-fg-2 transition-colors group-hover:text-accent"
-                    />
-                    <span className="mt-1 block text-xs font-bold text-fg">{v.label}</span>
-                    <span className="mt-0.5 block text-[0.62rem] text-fg-3">{v.hint}</span>
-                  </button>
+
+              <div className="space-y-3 p-2.5" role="menu" aria-label="말풍선 종류">
+                {groupBubbleVariants().map((section) => (
+                  <div key={section.group}>
+                    <p className="mb-1.5 flex items-center gap-1.5 px-1 text-[0.62rem] font-semibold text-fg-3">
+                      <span className="inline-block size-1 rounded-full bg-accent/55" aria-hidden />
+                      {section.group}
+                    </p>
+                    <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                      {section.variants.map((v) => (
+                        <button
+                          key={v.id}
+                          type="button"
+                          role="menuitem"
+                          onClick={() => addBubble(v.id)}
+                          className="group flex min-h-[5.75rem] flex-col rounded-2xl border border-line/55 bg-gradient-to-b from-card/90 to-canvas/30 p-2 text-left shadow-[inset_0_1px_0_oklch(0.95_0.02_85_/_0.04)] transition-[border-color,background,transform,box-shadow] duration-200 ease-out hover:-translate-y-px hover:border-accent/40 hover:bg-raised/80 hover:shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:translate-y-0"
+                        >
+                          <span className="flex h-12 items-center justify-center rounded-xl bg-canvas/45 ring-1 ring-line/35 transition-colors group-hover:bg-accent-soft/25 group-hover:ring-accent/20">
+                            <StudioBubbleVariantGlyph
+                              variant={v.id}
+                              className="h-10 w-full text-fg-2 transition-colors duration-200 group-hover:text-accent"
+                            />
+                          </span>
+                          <span className="mt-1.5 block text-[0.78rem] font-semibold tracking-tight text-fg">
+                            {v.label}
+                          </span>
+                          <span className="mt-0.5 block text-[0.6rem] leading-snug text-fg-3">{v.hint}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
-              <div className="mt-2 border-t border-line pt-2">
-                <p className="mb-1 text-[0.66rem] font-medium text-fg-3">대사 한 번에</p>
-                <p className="mb-1.5 text-[0.66rem] leading-snug text-fg-3">
-                  한 줄에 한 대사. <span className="text-fg-3">이름: 대사</span>로 화자 지정(좌/우 자동), <span className="text-fg-3">(지문)</span>은 나레이션.
-                </p>
+
+              <div className="space-y-2 border-t border-line/50 bg-canvas/25 px-2.5 py-2.5">
+                <div>
+                  <p className="text-[0.72rem] font-semibold text-fg-2">대사를 한 번에</p>
+                  <p className="mt-0.5 text-[0.64rem] leading-snug text-fg-3">
+                    한 줄에 한 마디. <span className="text-fg-2">이름: 대사</span>면 화자 자동,
+                    <span className="text-fg-2"> (지문)</span>은 나레이션.
+                  </p>
+                </div>
                 <textarea
                   value={dialogueScript}
                   onChange={(e) => setDialogueScript(e.target.value)}
                   placeholder={"민수: 안녕?\n지영: 오랜만이야\n(잠시 후)"}
                   spellCheck
                   rows={4}
-                  className="w-full resize-y rounded-lg border border-line bg-card px-2 py-1.5 text-[0.7rem] text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-accent/50"
+                  className="w-full resize-y rounded-xl border border-line/60 bg-card/80 px-2.5 py-2 text-[0.7rem] leading-relaxed text-fg outline-none transition-colors placeholder:text-fg-3/80 focus:border-accent/45 focus:bg-card"
                 />
                 <button
                   type="button"
                   onClick={() => void addDialogueBubbles()}
                   disabled={!dialogueScript.trim()}
                   className={cn(
-                    "mt-1.5 w-full rounded-lg py-1.5 text-xs font-semibold transition-colors",
-                    dialogueScript.trim() ? "bg-accent text-on-accent hover:opacity-90" : "cursor-not-allowed bg-card text-fg-3"
+                    "w-full rounded-xl py-2 text-xs font-semibold transition-[opacity,transform,background] duration-150",
+                    dialogueScript.trim()
+                      ? "bg-accent text-on-accent shadow-sm hover:opacity-95 active:scale-[0.99]"
+                      : "cursor-not-allowed bg-card text-fg-3 ring-1 ring-line/50"
                   )}
                 >
                   말풍선으로 한 번에 넣기
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMenu(null);
-                    setDialogueBatchOpen(true);
-                  }}
-                  className="mt-1.5 w-full rounded-lg border border-line bg-card py-1.5 text-xs font-medium text-fg-2 transition-colors hover:bg-raised"
-                >
-                  배치된 대사 일괄 편집…
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMenu(null);
-                    setDialogueBatchOpen(false); // 우상단 위치가 겹치므로 다른 플로팅 패널은 닫는다.
-                    setDialogueTranslateOpen(true);
-                  }}
-                  className="mt-1.5 w-full rounded-lg border border-line bg-card py-1.5 text-xs font-medium text-fg-2 transition-colors hover:bg-raised"
-                >
-                  대사 번역(내 API 키)…
-                </button>
+                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenu(null);
+                      setDialogueBatchOpen(true);
+                    }}
+                    className="rounded-xl border border-line/60 bg-card/70 py-1.5 text-[0.7rem] font-medium text-fg-2 transition-colors hover:bg-raised"
+                  >
+                    배치 대사 편집
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenu(null);
+                      setDialogueBatchOpen(false);
+                      setDialogueTranslateOpen(true);
+                    }}
+                    className="rounded-xl border border-line/60 bg-card/70 py-1.5 text-[0.7rem] font-medium text-fg-2 transition-colors hover:bg-raised"
+                  >
+                    번역 (내 API 키)
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
+          </StudioFloatingToolPopover>
         </div>
-        </StudioToolbarCluster>
-        </>
-        ) : null}
-
-        {studioUiDensityAllows(uiDensityMode, "toolbar-insert") ? (
-        <>
-        <StudioToolbarDivider />
-        <StudioToolbarCluster label="삽입·색">
         <label className={cn(toolBtn(false), "cursor-pointer")} title="이미지 추가 (⌘V로 클립보드 이미지 붙여넣기 가능)">
           <ImagePlus size={15} aria-hidden /> 이미지
           <input type="file" accept="image/*" className="hidden" onChange={onPickImage} />
@@ -22838,14 +23071,6 @@ function StudioCuttoonEditor() {
                     ? [8, 5]
                     : undefined;
 
-                const flipTailX = (pts: number[]) => {
-                  if (tailDir !== "right") return pts;
-                  if (tailDirection === "bottom" || tailDirection === "top") {
-                    return pts.map((v, i) => (i % 2 === 0 ? el.width - v : v));
-                  }
-                  return pts;
-                };
-
                 // 본체+꼬리를 단일 path로(이음새 없는 매끈한 말풍선). 위치는 기존 tXRatio/flip을 보존.
                 // 꼬리 길이·밑동을 말풍선 최소변 기준으로 정규화 — 작은 말풍선의 과대 꼬리/큰 말풍선의 빈약 꼬리 방지.
                 const tailIsVertical = tailDirection === "bottom" || tailDirection === "top";
@@ -22908,18 +23133,6 @@ function StudioCuttoonEditor() {
                 const bHPad = bubbleHorizontalPadding(bFs);
                 const { top: bVPadTop, bottom: bVPadBot } = bubbleVerticalPadding(bFs);
 
-                let baseScaredTailPts: number[] = [];
-                if (tailDirection === "bottom") {
-                  baseScaredTailPts = [el.width * 0.32, el.height - 2, el.width * 0.26, el.height + 22, el.width * 0.45, el.height - 2];
-                } else if (tailDirection === "top") {
-                  baseScaredTailPts = [el.width * 0.32, 2, el.width * 0.26, -22, el.width * 0.45, 2];
-                } else if (tailDirection === "left") {
-                  baseScaredTailPts = [2, el.height * 0.32, -22, el.height * 0.26, 2, el.height * 0.45];
-                } else if (tailDirection === "right") {
-                  baseScaredTailPts = [el.width - 2, el.height * 0.32, el.width + 22, el.height * 0.26, el.width - 2, el.height * 0.45];
-                }
-                const scaredTailPts = flipTailX(baseScaredTailPts);
-
                 const thoughtBigX = tailDir === "right" ? el.width * 0.74 : el.width * 0.26;
                 const thoughtSmallX = tailDir === "right" ? el.width * 0.84 : el.width * 0.16;
 
@@ -22966,26 +23179,6 @@ function StudioCuttoonEditor() {
                         {tBubble(el.width + 54, smallY, 5, 6, "c")}
                       </>
                     );
-                  }
-                }
-
-                let phoneTailPts = tailDir === "right"
-                  ? [el.width - 1, 14, el.width + 10, 20, el.width - 1, 26]
-                  : [1, 14, -10, 20, 1, 26];
-
-                if (showTail) {
-                  if (tailDirection === "bottom") {
-                    phoneTailPts = tailDir === "right"
-                      ? [el.width - 26, el.height - 1, el.width - 20, el.height + 10, el.width - 14, el.height - 1]
-                      : [14, el.height - 1, 20, el.height + 10, 26, el.height - 1];
-                  } else if (tailDirection === "top") {
-                    phoneTailPts = tailDir === "right"
-                      ? [el.width - 26, 1, el.width - 20, -10, el.width - 14, 1]
-                      : [14, 1, 20, -10, 26, 1];
-                  } else if (tailDirection === "left") {
-                    phoneTailPts = [1, el.height * 0.35, -10, el.height * 0.45, 1, el.height * 0.55];
-                  } else if (tailDirection === "right") {
-                    phoneTailPts = [el.width - 1, el.height * 0.35, el.width + 10, el.height * 0.45, el.width - 1, el.height * 0.55];
                   }
                 }
 
@@ -23125,32 +23318,33 @@ function StudioCuttoonEditor() {
                         lineCap="round"
                       />
                     ) : el.variant === "shout" ? (
-                      <Star
-                        x={el.width / 2}
-                        y={el.height / 2}
-                        numPoints={20}
-                        innerRadius={68 * Math.min(0.95, Math.max(0.1, el.starAmplitude ?? 36 / 68))}
-                        outerRadius={68}
-                        scaleX={el.width / 136}
-                        scaleY={el.height / 136}
+                      <Path
+                        data={burstStarPathData(
+                          el.width,
+                          el.height,
+                          20,
+                          68 * Math.min(0.95, Math.max(0.1, el.starAmplitude ?? 36 / 68)),
+                          68
+                        )}
                         fill={el.fill}
-                        {...konvaGradientProps(el.gradient, { x: -68, y: -68, width: 136, height: 136 })}
+                        {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: el.width, height: el.height })}
                         stroke={bStroke}
                         strokeWidth={bStrokeW}
                         dash={bDash}
                         lineJoin="round"
+                        lineCap="round"
                       />
                     ) : el.variant === "thought" ? (
                       <>
-                        <Rect
-                          width={el.width}
-                          height={el.height}
+                        <Path
+                          data={thoughtBubbleBodyPath(el.width, el.height)}
                           fill={el.fill}
                           {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: el.width, height: el.height })}
-                          cornerRadius={Math.min(el.width, el.height) / 2}
                           stroke={bStroke}
                           strokeWidth={bStrokeW}
                           dash={bDash}
+                          lineJoin="round"
+                          lineCap="round"
                         />
                         {thoughtEllipses}
                       </>
@@ -23166,29 +23360,18 @@ function StudioCuttoonEditor() {
                         dash={bDash}
                       />
                     ) : el.variant === "scared" ? (
-                      <>
-                        <Rect
-                          width={el.width}
-                          height={el.height}
-                          fill={el.fill === "transparent" ? "transparent" : (el.fill === "#ffffff" ? "#f5f3ff" : el.fill)}
-                          {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: el.width, height: el.height })}
-                          cornerRadius={14}
-                          stroke="#7c3aed"
-                          strokeWidth={2}
-                          shadowColor="#7c3aed"
-                          shadowBlur={6}
-                          shadowOpacity={0.16}
-                        />
-                        {showTail && (
-                          <Line
-                            points={scaredTailPts}
-                            closed
-                            fill={el.fill === "transparent" ? "transparent" : (el.fill === "#ffffff" ? "#f5f3ff" : el.fill)}
-                            stroke="#7c3aed"
-                            strokeWidth={2}
-                          />
-                        )}
-                      </>
+                      <Path
+                        data={scaredBubblePathData(el.width, el.height, bubbleTailSpec)}
+                        fill={el.fill === "transparent" ? "transparent" : (el.fill === "#ffffff" ? "#f5f3ff" : el.fill)}
+                        {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: el.width, height: el.height })}
+                        stroke="#7c3aed"
+                        strokeWidth={2}
+                        shadowColor="#7c3aed"
+                        shadowBlur={6}
+                        shadowOpacity={0.16}
+                        lineJoin="round"
+                        lineCap="round"
+                      />
                     ) : el.variant === "system" ? (
                       <>
                         <Rect
@@ -23216,52 +23399,50 @@ function StudioCuttoonEditor() {
                         />
                       </>
                     ) : el.variant === "angry" ? (
-                      <Star
-                        x={el.width / 2}
-                        y={el.height / 2}
-                        numPoints={22}
-                        innerRadius={64 * Math.min(0.95, Math.max(0.1, el.starAmplitude ?? 28 / 64))}
-                        outerRadius={64}
-                        scaleX={el.width / 160}
-                        scaleY={el.height / 160}
+                      <Path
+                        data={burstStarPathData(
+                          el.width,
+                          el.height,
+                          22,
+                          64 * Math.min(0.95, Math.max(0.1, el.starAmplitude ?? 28 / 64)),
+                          64
+                        )}
                         fill={el.fill}
-                        {...konvaGradientProps(el.gradient, { x: -64, y: -64, width: 128, height: 128 })}
+                        {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: el.width, height: el.height })}
                         stroke={webtoonTheme === "soft" ? "#dc2626" : webtoonTheme === "vivid" ? "#7f1d1d" : "#991b1b"}
                         strokeWidth={Math.max(bStrokeW, 3.5)}
                         lineJoin="round"
+                        lineCap="round"
                       />
                     ) : el.variant === "phone" ? (
-                      <>
-                        <Rect
-                          width={el.width}
-                          height={el.height}
-                          fill={el.fill}
-                          {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: el.width, height: el.height })}
-                          cornerRadius={webtoonTheme === "soft" ? 10 : webtoonTheme === "vivid" ? 6 : 8}
-                          stroke={bStroke}
-                          strokeWidth={bStrokeW}
-                          dash={bDash}
-                        />
-                        {showTail && (
-                          <Line
-                            points={phoneTailPts}
-                            closed
-                            fill={el.fill}
-                            stroke={bStroke}
-                            strokeWidth={bStrokeW}
-                          />
-                        )}
-                      </>
-                    ) : el.variant === "heart" ? (
                       <Path
-                        data="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41 0.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+                        data={bubblePathData(
+                          el.width,
+                          el.height,
+                          webtoonTheme === "soft" ? 10 : webtoonTheme === "vivid" ? 6 : 8,
+                          // 메신저는 짧은 꼬리(채팅 꼬리 느낌) — 없으면 본체만.
+                          showTail && bubbleTailSpec
+                            ? { ...bubbleTailSpec, length: Math.min(bubbleTailSpec.length, Math.max(8, bMinDim * 0.1)), base: Math.min(bubbleTailSpec.base, Math.max(6, bMinDim * 0.12)) }
+                            : null
+                        )}
                         fill={el.fill}
-                        {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: 24, height: 24 })}
+                        {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: el.width, height: el.height })}
                         stroke={bStroke}
                         strokeWidth={bStrokeW}
                         dash={bDash}
-                        scaleX={el.width / 24}
-                        scaleY={el.height / 24}
+                        lineJoin="round"
+                        lineCap="round"
+                      />
+                    ) : el.variant === "heart" ? (
+                      <Path
+                        data={heartBubblePathData(el.width, el.height)}
+                        fill={el.fill}
+                        {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: el.width, height: el.height })}
+                        stroke={bStroke}
+                        strokeWidth={bStrokeW}
+                        dash={bDash}
+                        lineJoin="round"
+                        lineCap="round"
                       />
                     ) : el.variant === "box" ? (
                       <Rect
@@ -24061,6 +24242,10 @@ function StudioCuttoonEditor() {
                 setLeftPanelOpen(false);
                 setRightPanelOpen(false);
               }}
+              onOpenTutorials={() => {
+                dismissQuickStart();
+                openFeatureTutorial(null);
+              }}
             />
           )}
 
@@ -24112,6 +24297,31 @@ function StudioCuttoonEditor() {
           >
             ⌨
           </button>
+
+          <button
+            type="button"
+            onClick={() => openFeatureTutorial(null)}
+            className={cn(
+              "absolute bottom-3 right-[6.5rem] z-30 hidden size-9 place-items-center rounded-lg border border-line bg-panel/90 text-fg-2 shadow-md backdrop-blur transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:grid",
+              canvasOnlyMode && "!hidden"
+            )}
+            aria-label="기능 튜토리얼"
+            aria-expanded={tutorialHubOpen}
+            title="기능 튜토리얼"
+          >
+            <BookOpen size={15} aria-hidden />
+          </button>
+
+          {tutorialHubOpen && (
+            <Suspense fallback={null}>
+              <StudioFeatureTutorialHub
+                open={tutorialHubOpen}
+                onClose={() => setTutorialHubOpen(false)}
+                initialTutorialId={tutorialInitialId}
+                onTryAction={handleTutorialTry}
+              />
+            </Suspense>
+          )}
 
           {shortcutsOpen && (
             <Suspense fallback={null}>
@@ -24959,6 +25169,51 @@ function StudioCuttoonEditor() {
               )}
               {selected.type === "bubble" && (
                 <>
+                  <div
+                    className="mt-2.5 rounded-2xl border border-line/45 bg-gradient-to-b from-card/70 to-canvas/20 p-2.5"
+                    data-studio-bubble-variant-picker="true"
+                  >
+                    <p className="mb-0.5 text-[0.72rem] font-semibold tracking-tight text-fg-2">모양 바꾸기</p>
+                    <p className="mb-2 text-[0.6rem] leading-snug text-fg-3">
+                      같은 대사이어도 말투만 바꿔 보면 분위기가 달라져요.
+                    </p>
+                    <div className="grid grid-cols-3 gap-1 sm:grid-cols-4">
+                      {BUBBLE_VARIANTS.map((v) => {
+                        const active = selected.variant === v.id;
+                        return (
+                          <button
+                            key={v.id}
+                            type="button"
+                            title={`${v.label} — ${v.hint}`}
+                            aria-pressed={active}
+                            onClick={() => patchEl(selected.id, { variant: v.id } as Partial<El>)}
+                            className={cn(
+                              "flex flex-col items-stretch gap-0.5 rounded-xl border p-1.5 text-left transition-[border-color,background,transform,box-shadow] duration-150 ease-out",
+                              active
+                                ? "border-accent/50 bg-accent-soft/55 shadow-sm ring-1 ring-accent/25"
+                                : "border-line/55 bg-card/80 hover:border-line-strong/50 hover:bg-raised"
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                "flex h-8 items-center justify-center rounded-lg ring-1",
+                                active ? "bg-accent-soft/40 ring-accent/20" : "bg-canvas/40 ring-line/30"
+                              )}
+                            >
+                              <StudioBubbleVariantGlyph
+                                variant={v.id}
+                                className={cn("h-7 w-full", active ? "text-accent" : "text-fg-2")}
+                              />
+                            </span>
+                            <span className="truncate text-center text-[0.58rem] font-semibold text-fg">
+                              {v.label}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                   <Suspense fallback={<StudioPanelLoading label="말풍선 스타일을 여는 중..." />}>
                     <StudioBubbleStylePresetPanel
                       selected={selected}
@@ -27007,6 +27262,7 @@ function StudioCuttoonEditor() {
                           ? (QUICKSHAPE_KIND_LABELS[draft.kind] ?? null)
                           : null
                       }
+                      onOpenTutorial={() => openFeatureTutorial("smart-shape")}
                       onToggleActive={() => {
                         const next = !quickShapeActive;
                         if (next) {

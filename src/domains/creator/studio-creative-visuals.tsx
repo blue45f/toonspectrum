@@ -696,7 +696,18 @@ export function StudioStarterCardArt({
   );
 }
 
-/** Row of shape kinds shown when smart-shape is armed. */
+const SMART_SHAPE_KIND_LABELS: Record<
+  Extract<StudioShapeKindVisual, "line" | "rect" | "circle" | "triangle" | "poly">,
+  string
+> = {
+  line: "선",
+  rect: "네모",
+  circle: "원",
+  triangle: "삼각",
+  poly: "다각",
+};
+
+/** Row of shape kinds shown when smart-shape is armed — soft chips + Korean labels. */
 export function StudioSmartShapeKindRow({
   className,
   highlightKind = null,
@@ -705,7 +716,13 @@ export function StudioSmartShapeKindRow({
   /** Currently recognized kind — Magma/AutoDraw-class match cue. */
   highlightKind?: StudioShapeKindVisual | null;
 }): ReactElement {
-  const kinds: StudioShapeKindVisual[] = ["line", "rect", "circle", "triangle", "poly"];
+  const kinds: Array<keyof typeof SMART_SHAPE_KIND_LABELS> = [
+    "line",
+    "rect",
+    "circle",
+    "triangle",
+    "poly",
+  ];
   return (
     <div
       data-studio-smart-shape-kinds="true"
@@ -713,27 +730,36 @@ export function StudioSmartShapeKindRow({
       role="list"
       aria-label="인식 가능한 도형"
       className={cn(
-        "flex items-center gap-1 rounded-lg border border-line/60 bg-canvas/40 px-1.5 py-1",
+        "grid grid-cols-5 gap-1 rounded-xl border border-line/45 bg-canvas/35 p-1.5",
         className
       )}
     >
       {kinds.map((kind) => {
         const active = highlightKind === kind;
+        const label = SMART_SHAPE_KIND_LABELS[kind];
         return (
           <span
             key={kind}
             role="listitem"
-            title={kind}
+            title={label}
             data-studio-smart-shape-kind={kind}
             data-active={active ? "true" : undefined}
             className={cn(
-              "grid size-7 place-items-center rounded-md ring-1 transition-[background,box-shadow,transform] duration-150",
+              "flex flex-col items-center gap-0.5 rounded-lg px-0.5 py-1.5 ring-1 transition-[background,box-shadow,transform,color] duration-200 ease-out",
               active
-                ? "bg-accent-soft text-accent ring-accent/45 shadow-sm scale-105"
-                : "bg-card/80 ring-line/50 text-fg-2"
+                ? "scale-[1.03] bg-accent-soft text-accent shadow-[0_1px_0_oklch(0.95_0.02_85_/_0.08)] ring-accent/40"
+                : "bg-card/70 text-fg-2 ring-line/40"
             )}
           >
-            <StudioShapeKindGlyph kind={kind} active={active} />
+            <StudioShapeKindGlyph kind={kind} active={active} className="size-4" />
+            <span
+              className={cn(
+                "text-[0.55rem] font-semibold leading-none tracking-tight",
+                active ? "text-accent" : "text-fg-3"
+              )}
+            >
+              {label}
+            </span>
           </span>
         );
       })}
