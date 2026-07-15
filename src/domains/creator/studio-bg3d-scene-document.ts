@@ -339,6 +339,8 @@ const DEFAULT_RAW_DOCUMENT = {
     position: DEFAULT_CAMERA_POSITION,
     target: DEFAULT_CAMERA_TARGET,
     fovDegrees: 50,
+    projection: "perspective",
+    zoom: 1,
   },
   render: {
     antialias: true,
@@ -351,6 +353,11 @@ const DEFAULT_RAW_DOCUMENT = {
     mode: "sky-preset",
     color: "#ffffff",
     skyPresetId: "blank",
+    panoramaRotation: 0,
+    fogEnabled: false,
+    fogColor: "#ffffff",
+    fogNear: 10,
+    fogFar: 50,
   },
   lighting: {
     ambientColor: "#ffffff",
@@ -683,16 +690,17 @@ function normalizeCamera(value: unknown): StudioBg3dCameraSettings {
       target[2] > MAX_WORLD_COORDINATE - 1 ? target[2] - 1 : target[2] + 1,
     ];
   }
-  return {
+  const result: Record<string, unknown> = {
     position,
     target,
     fovDegrees: boundedNumber(candidate.fovDegrees, 50, 10, 120),
     projection: candidate.projection === "orthographic" ? "orthographic" : "perspective",
     zoom: boundedNumber(candidate.zoom, 1, 0.1, 100),
-    lensShift: Array.isArray(candidate.lensShift) && candidate.lensShift.length === 2 && typeof candidate.lensShift[0] === "number" && typeof candidate.lensShift[1] === "number"
-      ? [boundedNumber(candidate.lensShift[0], 0, -2, 2), boundedNumber(candidate.lensShift[1], 0, -2, 2)] as readonly [number, number]
-      : undefined,
   };
+  if (Array.isArray(candidate.lensShift) && candidate.lensShift.length === 2 && typeof candidate.lensShift[0] === "number" && typeof candidate.lensShift[1] === "number") {
+    result.lensShift = [boundedNumber(candidate.lensShift[0], 0, -2, 2), boundedNumber(candidate.lensShift[1], 0, -2, 2)] as readonly [number, number];
+  }
+  return result as unknown as StudioBg3dCameraSettings;
 }
 
 function normalizeRender(value: unknown): StudioBg3dRenderSettings {
@@ -708,15 +716,20 @@ function normalizeRender(value: unknown): StudioBg3dRenderSettings {
 
 function normalizeBackground(value: unknown): StudioBg3dBackgroundSettings {
   const candidate = isRecord(value) ? value : {};
-  return {
+  const result: Record<string, unknown> = {
     mode: normalizedEnum(candidate.mode, BACKGROUND_MODE_SET, "sky-preset"),
     color: normalizedColor(candidate.color, "#ffffff"),
     skyPresetId: normalizedEnum(candidate.skyPresetId, SKY_PRESET_SET, "blank"),
+    panoramaRotation: boundedNumber(candidate.panoramaRotation, 0, -360, 360),
     fogEnabled: normalizedBoolean(candidate.fogEnabled, false),
     fogColor: normalizedColor(candidate.fogColor, "#ffffff"),
     fogNear: boundedNumber(candidate.fogNear, 10, 0, MAX_WORLD_COORDINATE),
     fogFar: boundedNumber(candidate.fogFar, 50, 0, MAX_WORLD_COORDINATE * 2),
   };
+  if (typeof candidate.panoramaUrl === "string") {
+    result.panoramaUrl = candidate.panoramaUrl;
+  }
+  return result as unknown as StudioBg3dBackgroundSettings;
 }
 
 function normalizeDirectionalLight(
@@ -1120,6 +1133,7 @@ function legacyPrimitiveNode(value: unknown): Record<string, unknown> | null {
     kind: "primitive",
     primitiveKind: value.kind,
     color: value.color,
+    parentId: null,
     transform: {
       position: value.position,
       rotation: value.rotation,
@@ -1164,6 +1178,7 @@ function legacyModelNode(
       rotation: value.rotation,
       scale: value.scale,
     },
+    parentId: null,
     visible: true,
     locked: false,
     castsShadow: true,

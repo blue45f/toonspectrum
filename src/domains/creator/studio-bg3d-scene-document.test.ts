@@ -55,6 +55,7 @@ function primitiveNode(index = 1): Record<string, unknown> {
       rotation: [0, 0, 0],
       scale: [1, 1, 1],
     },
+    parentId: null,
     visible: true,
     locked: false,
     castsShadow: true,
@@ -91,6 +92,8 @@ describe("Studio BG3D scene document defaults", () => {
       position: [4, 3, 6],
       target: [0, 0.6, 0],
       fovDegrees: 50,
+      projection: "perspective",
+      zoom: 1,
     });
     expect(document.quality.desktop.targetFps).toBe(60);
     expect(document.quality.mobile.targetFps).toBe(30);
