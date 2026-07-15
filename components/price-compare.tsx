@@ -60,7 +60,7 @@ export function PriceCompare({ availability }: { availability: Availability[] })
               <tr key={r.platformId} className="border-b border-line/60 last:border-0">
                 <td className="px-3 py-2">
                   <a
-                    href={r.url}
+                    href={`/api/go/${r.platformId}?to=${encodeURIComponent(r.url ?? "")}`}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center gap-1.5 font-medium text-fg hover:text-accent"
@@ -105,7 +105,7 @@ function PriceCard({ row: r, multi }: { row: PlatformCost; multi: boolean }) {
       <Card3D maxTilt={6} scale={1.02} className="rounded-xl">
         <div className="rounded-xl border border-line bg-card/60 p-3 shadow-sm">
           <a
-            href={r.url}
+            href={`/api/go/${r.platformId}?to=${encodeURIComponent(r.url ?? "")}`}
             target="_blank"
             rel="noreferrer"
             className="flex items-center justify-between gap-2 text-fg hover:text-accent"

@@ -136,7 +136,7 @@ export function AvailabilityRouter({
         return hasUrl ? (
           <a
             key={a.platformId}
-            href={a.url ?? undefined}
+            href={`/api/go/${a.platformId}?to=${encodeURIComponent(a.url ?? "")}`}
             target="_blank"
             rel="noopener noreferrer"
             className="group flex items-center gap-3 rounded-xl border border-line bg-card px-3.5 py-3 transition-[background,border-color,transform] duration-150 hover:-translate-y-0.5 hover:border-line-strong hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"

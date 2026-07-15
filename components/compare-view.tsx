@@ -466,7 +466,7 @@ function ComparePlatformPrice({ t }: { t: Title }) {
                 </span>
                 {av.url && (
                   <a
-                    href={av.url}
+                    href={`/api/go/${av.platformId}?to=${encodeURIComponent(av.url)}`}
                     target="_blank"
                     rel="noreferrer"
                     className="flex items-center gap-0.5 text-[0.62rem] text-fg-3 hover:text-accent font-semibold transition-colors"
