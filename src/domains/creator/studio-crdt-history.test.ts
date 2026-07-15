@@ -191,8 +191,14 @@ describe("reconcileStudioCrdtHistory", () => {
         strokes: [],
         sceneElements: [textRecord("a", "A-remote", 5), textRecord("b", "B-frontier", 2)],
         pages: [],
+        layerGroups: [],
       },
-      { strokeIds: new Set(), sceneElementIds: new Set(["a"]), pageIds: new Set() }
+      {
+        strokeIds: new Set(),
+        sceneElementIds: new Set(["a"]),
+        pageIds: new Set(),
+        layerGroupIds: new Set(),
+      }
     );
 
     expect(result.history[0]?.[0]?.elements.map((element) => element.id)).toEqual(["b", "a"]);
@@ -214,8 +220,14 @@ describe("reconcileStudioCrdtHistory", () => {
         strokes: [],
         sceneElements: [],
         pages: [pageRecord("page-a", "A-remote", 5), pageRecord("page-b", "B-frontier", 2)],
+        layerGroups: [],
       },
-      { strokeIds: new Set(), sceneElementIds: new Set(), pageIds: new Set(["page-a"]) }
+      {
+        strokeIds: new Set(),
+        sceneElementIds: new Set(),
+        pageIds: new Set(["page-a"]),
+        layerGroupIds: new Set(),
+      }
     );
 
     expect(result.history[0]?.map((page) => page.id)).toEqual(["page-b", "page-a"]);

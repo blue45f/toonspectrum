@@ -2,6 +2,8 @@ export const STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION = 1 as const;
 export const STUDIO_CRDT_SCENE_ELEMENT_MAX_BYTES = 16 * 1024;
 export const STUDIO_CRDT_PAGE_PAYLOAD_VERSION = 1 as const;
 export const STUDIO_CRDT_PAGE_MAX_BYTES = 8 * 1024;
+export const STUDIO_CRDT_LAYER_GROUP_PAYLOAD_VERSION = 1 as const;
+export const STUDIO_CRDT_LAYER_GROUP_MAX_BYTES = 2 * 1024;
 
 export const STUDIO_CRDT_SCENE_ELEMENT_TYPES = [
   "text",
@@ -33,11 +35,41 @@ export interface StudioCrdtPagePayload {
   props: StudioCrdtJsonObject;
 }
 
+/**
+ * Shared layer-folder metadata. `collapsed` deliberately does not belong to this envelope: it is
+ * a per-artist navigator preference and must never make another collaborator's panel jump.
+ */
+export interface StudioCrdtLayerGroupPayload {
+  version: typeof STUDIO_CRDT_LAYER_GROUP_PAYLOAD_VERSION;
+  props: StudioCrdtJsonObject;
+}
+
 const MAX_COORDINATE = 10_000_000;
+const MAX_ID_LENGTH = 160;
 const MAX_JSON_DEPTH = 10;
 const MAX_JSON_ENTRIES = 4_096;
 const MAX_JSON_STRING_LENGTH = 64 * 1024;
 const TEXT_ENCODER = new TextEncoder();
+
+function exactIdentifier(value: unknown): value is string {
+  if (typeof value !== "string" || value.length === 0 || value.length > MAX_ID_LENGTH) return false;
+  return ![...value].some((character) => {
+    const codePoint = character.codePointAt(0) ?? 0;
+    return codePoint <= 31 || (codePoint >= 127 && codePoint <= 159);
+  });
+}
+
+/** Collision-free page-scoped identity shared by the client document and server validator. */
+export function studioCrdtLayerGroupKey(pageId: string, groupId: string): string {
+  if (!exactIdentifier(pageId)) throw new Error("페이지 식별자가 올바르지 않습니다.");
+  if (groupId === "page-root") {
+    throw new Error("page-root는 레이어 그룹 식별자로 사용할 수 없습니다.");
+  }
+  if (!exactIdentifier(groupId)) {
+    throw new Error("레이어 그룹 식별자가 올바르지 않습니다.");
+  }
+  return `${pageId.length}:${pageId}${groupId.length}:${groupId}`;
+}
 
 const COMMON_SCENE_ELEMENT_KEYS = [
   "name", "hidden", "locked", "noClip", "opacity", "blendMode", "lockAspect", "groupId",
@@ -107,6 +139,10 @@ export const STUDIO_CRDT_REQUIRED_SCENE_ELEMENT_KEYS: Record<
 
 export const STUDIO_CRDT_PAGE_PROPERTY_KEYS: ReadonlySet<string> = new Set([
   "bg", "bgGrad", "canvasH", "name", "note", "hideMaster", "shotType", "cameraAngle",
+]);
+
+export const STUDIO_CRDT_LAYER_GROUP_PROPERTY_KEYS: ReadonlySet<string> = new Set([
+  "name", "hidden", "locked",
 ]);
 
 export function isStudioCrdtSceneElementType(
@@ -281,6 +317,41 @@ export function validateStudioCrdtPagePayload(payload: StudioCrdtPagePayload): S
   if (TEXT_ENCODER.encode(JSON.stringify({ version: payload.version, props })).byteLength >
     STUDIO_CRDT_PAGE_MAX_BYTES) {
     throw new Error("페이지 정보가 실시간 동기화 8KiB 한도를 초과했습니다.");
+  }
+  return { version: payload.version, props };
+}
+
+export function validateStudioCrdtLayerGroupPayload(
+  payload: StudioCrdtLayerGroupPayload
+): StudioCrdtLayerGroupPayload {
+  if (payload.version !== STUDIO_CRDT_LAYER_GROUP_PAYLOAD_VERSION) {
+    throw new Error("지원하지 않는 레이어 그룹 페이로드 버전입니다.");
+  }
+  const props = cloneJsonObject(payload.props);
+  for (const key of Object.keys(props)) {
+    if (!STUDIO_CRDT_LAYER_GROUP_PROPERTY_KEYS.has(key)) {
+      throw new Error(`레이어 그룹의 ${key} 속성은 동기화할 수 없습니다.`);
+    }
+  }
+  if (
+    !boundedString(props.name, 512) || props.name.length === 0 ||
+    [...props.name].some((character) => {
+      const codePoint = character.codePointAt(0) ?? 0;
+      return codePoint <= 31 || (codePoint >= 127 && codePoint <= 159);
+    })
+  ) {
+    throw new Error("레이어 그룹 이름이 올바르지 않습니다.");
+  }
+  for (const key of ["hidden", "locked"] as const) {
+    if (key in props && typeof props[key] !== "boolean") {
+      throw new Error(`레이어 그룹의 ${key} 값이 올바르지 않습니다.`);
+    }
+  }
+  if (
+    TEXT_ENCODER.encode(JSON.stringify({ version: payload.version, props })).byteLength >
+    STUDIO_CRDT_LAYER_GROUP_MAX_BYTES
+  ) {
+    throw new Error("레이어 그룹 정보가 실시간 동기화 2KiB 한도를 초과했습니다.");
   }
   return { version: payload.version, props };
 }

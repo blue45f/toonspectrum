@@ -70,13 +70,17 @@ const STUDIO_CRDT_STROKE_METADATA_MAX_BYTES = 16 * 1_024;
 const STUDIO_CRDT_STROKE_WIDTH_MAX = 8_192;
 const STUDIO_CRDT_SCENE_INDEX_ROOT = "scene-elements";
 const STUDIO_CRDT_PAGE_INDEX_ROOT = "studio-pages";
+const STUDIO_CRDT_LAYER_GROUP_INDEX_ROOT = "layer-groups";
 const STUDIO_CRDT_SCENE_ROOT_PREFIX = "scene-element:";
 const STUDIO_CRDT_PAGE_ROOT_PREFIX = "studio-page:";
+const STUDIO_CRDT_LAYER_GROUP_ROOT_PREFIX = "layer-group:";
 const STUDIO_CRDT_PAGE_ORDER_ROOT = "page-order";
 const STUDIO_CRDT_PROPERTY_PREFIXES = ["base:", "prop:", "unset:"] as const;
 const STUDIO_CRDT_SCENE_PAYLOAD_MAX_BYTES = 16 * 1_024;
 const STUDIO_CRDT_PAGE_PAYLOAD_MAX_BYTES = 8 * 1_024;
+const STUDIO_CRDT_LAYER_GROUP_PAYLOAD_MAX_BYTES = 2 * 1_024;
 const STUDIO_CRDT_COLLECTION_MAX_ENTRIES = 100_000;
+const STUDIO_CRDT_LAYER_GROUP_MAX_ENTRIES = 4_096;
 const STUDIO_CRDT_ACTIVE_ORDER_ENTRY_MAX_COUNT = 256;
 const STUDIO_CRDT_JSON_MAX_DEPTH = 10;
 const STUDIO_CRDT_JSON_MAX_ENTRIES = 4_096;
@@ -168,6 +172,8 @@ const STUDIO_CRDT_PAGE_KEYS = new Set([
   "shotType",
   "cameraAngle",
 ]);
+
+const STUDIO_CRDT_LAYER_GROUP_KEYS = new Set(["name", "hidden", "locked"]);
 
 export interface StudioCrdtServiceOptions {
   now?: () => Date;
@@ -465,6 +471,57 @@ function canonicalReservedRootId(rootName: string, prefix: string): string | nul
   }
 }
 
+interface StudioCrdtLayerGroupIdentity {
+  key: string;
+  pageId: string;
+  groupId: string;
+}
+
+function parseStudioCrdtLayerGroupKey(key: string): StudioCrdtLayerGroupIdentity | null {
+  if (key.length < 5 || key.length > 328) return null;
+  const readPart = (offset: number): { value: string; nextOffset: number } | null => {
+    const separator = key.indexOf(":", offset);
+    if (separator < 0) return null;
+    const lengthToken = key.slice(offset, separator);
+    if (!/^(?:0|[1-9][0-9]*)$/u.test(lengthToken)) return null;
+    const length = Number(lengthToken);
+    if (!Number.isSafeInteger(length) || length <= 0 || length > 160) return null;
+    const start = separator + 1;
+    const end = start + length;
+    if (end > key.length) return null;
+    return { value: key.slice(start, end), nextOffset: end };
+  };
+  const page = readPart(0);
+  if (!page) return null;
+  const group = readPart(page.nextOffset);
+  if (
+    !group ||
+    group.nextOffset !== key.length ||
+    !isBoundedStudioCrdtId(page.value) ||
+    !isBoundedStudioCrdtId(group.value) ||
+    group.value === "page-root"
+  ) {
+    return null;
+  }
+  const canonical = `${page.value.length}:${page.value}${group.value.length}:${group.value}`;
+  return canonical === key
+    ? { key, pageId: page.value, groupId: group.value }
+    : null;
+}
+
+function canonicalReservedLayerGroupKey(rootName: string): StudioCrdtLayerGroupIdentity | null {
+  if (!rootName.startsWith(STUDIO_CRDT_LAYER_GROUP_ROOT_PREFIX)) return null;
+  const encodedKey = rootName.slice(STUDIO_CRDT_LAYER_GROUP_ROOT_PREFIX.length);
+  if (!encodedKey) return null;
+  try {
+    const key = decodeURIComponent(encodedKey);
+    if (encodeURIComponent(key) !== encodedKey) return null;
+    return parseStudioCrdtLayerGroupKey(key);
+  } catch {
+    return null;
+  }
+}
+
 function validateSceneElementRoot(id: string, record: Y.Map<unknown>): boolean {
   const metadataKeys = new Set(["id", "pageId", "layerId", "payloadVersion", "type", "deleted"]);
   const type = record.get("type");
@@ -605,6 +662,73 @@ function validatePageRoot(id: string, record: Y.Map<unknown>): boolean {
   return byteLength !== null && byteLength <= STUDIO_CRDT_PAGE_PAYLOAD_MAX_BYTES;
 }
 
+function validateLayerGroupRoot(
+  identity: StudioCrdtLayerGroupIdentity,
+  record: Y.Map<unknown>
+): boolean {
+  const metadataKeys = new Set(["id", "pageId", "payloadVersion", "deleted"]);
+  if (
+    record.get("id") !== identity.groupId ||
+    record.get("pageId") !== identity.pageId ||
+    record.get("payloadVersion") !== 1 ||
+    typeof record.get("deleted") !== "boolean" ||
+    record.get("unset:name") === true
+  ) {
+    return false;
+  }
+  for (const [key, value] of record) {
+    if (metadataKeys.has(key) || key.startsWith("unset:")) continue;
+    const separator = key.indexOf(":");
+    const property = separator >= 0 ? key.slice(separator + 1) : "";
+    if (property === "name") {
+      if (!boundedExactText(value, 512)) return false;
+    } else if ((property === "hidden" || property === "locked") && typeof value !== "boolean") {
+      return false;
+    }
+  }
+  const props = readReservedProperties(record, STUDIO_CRDT_LAYER_GROUP_KEYS, metadataKeys);
+  if (!props || !boundedExactText(props.name, 512)) return false;
+  for (const key of ["hidden", "locked"] as const) {
+    if (key in props && typeof props[key] !== "boolean") return false;
+  }
+  const byteLength = encodedJsonByteLength({ version: 1, props });
+  return byteLength !== null && byteLength <= STUDIO_CRDT_LAYER_GROUP_PAYLOAD_MAX_BYTES;
+}
+
+function validateTrackedLayerGroupRoots(doc: Y.Doc): boolean {
+  const root = materializeExistingMapRoot(doc, STUDIO_CRDT_LAYER_GROUP_INDEX_ROOT);
+  const trackedKeys = new Set<string>();
+  if (root !== undefined) {
+    if (root === null || root.size > STUDIO_CRDT_LAYER_GROUP_MAX_ENTRIES) return false;
+    for (const [key, active] of root) {
+      const identity = parseStudioCrdtLayerGroupKey(key);
+      if (!identity || active !== true) return false;
+      const record = materializeExistingMapRoot(
+        doc,
+        `${STUDIO_CRDT_LAYER_GROUP_ROOT_PREFIX}${encodeURIComponent(key)}`
+      );
+      if (!record || !validateLayerGroupRoot(identity, record)) return false;
+      trackedKeys.add(key);
+    }
+  }
+  let dynamicRootCount = 0;
+  for (const [rootName, value] of doc.share) {
+    if (!rootName.startsWith(STUDIO_CRDT_LAYER_GROUP_ROOT_PREFIX)) continue;
+    dynamicRootCount += 1;
+    if (dynamicRootCount > STUDIO_CRDT_LAYER_GROUP_MAX_ENTRIES) return false;
+    const identity = canonicalReservedLayerGroupKey(rootName);
+    if (
+      !identity ||
+      !trackedKeys.has(identity.key) ||
+      !(value instanceof Y.Map) ||
+      !validateLayerGroupRoot(identity, value)
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function validateStrokeRoot(id: string, record: Y.Map<unknown>): boolean {
   const strokeWidth = record.get("strokeWidth");
   if (
@@ -702,12 +826,13 @@ function validateTrackedDynamicRoots(
   doc: Y.Doc,
   indexRootName: string,
   dynamicPrefix: string,
-  validateRecord: (id: string, record: Y.Map<unknown>) => boolean
+  validateRecord: (id: string, record: Y.Map<unknown>) => boolean,
+  maximumEntries = STUDIO_CRDT_COLLECTION_MAX_ENTRIES
 ): boolean {
   const root = materializeExistingMapRoot(doc, indexRootName);
   const trackedIds = new Set<string>();
   if (root !== undefined) {
-    if (root === null || root.size > STUDIO_CRDT_COLLECTION_MAX_ENTRIES) return false;
+    if (root === null || root.size > maximumEntries) return false;
     for (const [id, active] of root) {
       if (!isBoundedStudioCrdtId(id) || active !== true) return false;
       const record = materializeExistingMapRoot(doc, `${dynamicPrefix}${encodeURIComponent(id)}`);
@@ -719,7 +844,7 @@ function validateTrackedDynamicRoots(
   for (const [rootName, value] of doc.share) {
     if (!rootName.startsWith(dynamicPrefix)) continue;
     dynamicRootCount += 1;
-    if (dynamicRootCount > STUDIO_CRDT_COLLECTION_MAX_ENTRIES) return false;
+    if (dynamicRootCount > maximumEntries) return false;
     const id = canonicalReservedRootId(rootName, dynamicPrefix);
     if (!id || !trackedIds.has(id) || !(value instanceof Y.Map) || !validateRecord(id, value)) {
       return false;
@@ -812,7 +937,8 @@ export function hasValidStudioCrdtRootSchema(doc: Y.Doc): boolean {
       STUDIO_CRDT_PAGE_INDEX_ROOT,
       STUDIO_CRDT_PAGE_ROOT_PREFIX,
       validatePageRoot
-    )
+    ) ||
+    !validateTrackedLayerGroupRoots(doc)
   ) {
     return false;
   }

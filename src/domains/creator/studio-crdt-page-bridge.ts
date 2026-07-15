@@ -1,7 +1,10 @@
 import {
+  STUDIO_CRDT_LAYER_GROUP_PAYLOAD_VERSION,
   STUDIO_CRDT_PAGE_PAYLOAD_VERSION,
   STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION,
   isStudioCrdtSceneElementType,
+  studioCrdtLayerGroupKey,
+  validateStudioCrdtLayerGroupPayload,
   validateStudioCrdtPagePayload,
   validateStudioCrdtSceneElementPayload,
   type StudioCrdtJsonObject,
@@ -10,6 +13,8 @@ import {
 } from "./studio-crdt-scene-schema";
 
 import type {
+  StudioCrdtLayerGroupInput,
+  StudioCrdtLayerGroupRecord,
   StudioCrdtPageRecord,
   StudioCrdtSceneElementInput,
   StudioCrdtSceneElementRecord,
@@ -32,6 +37,15 @@ export interface StudioCrdtCompatibleElement {
 export interface StudioCrdtCompatiblePage<TElement extends StudioCrdtCompatibleElement> {
   id: string;
   elements: TElement[];
+}
+
+export interface StudioCrdtCompatibleLayerGroup {
+  id: string;
+  name: string;
+  hidden?: boolean;
+  locked?: boolean;
+  /** Local navigator state. This value is deliberately never serialized into CRDT. */
+  collapsed?: boolean;
 }
 
 export interface StudioCrdtCompatibleSceneElement extends StudioCrdtCompatibleElement {
@@ -188,6 +202,42 @@ export interface StudioCrdtCompatibleOrderedPage<
   hideMaster?: boolean;
   shotType?: string;
   cameraAngle?: string;
+  groups?: StudioCrdtCompatibleLayerGroup[];
+}
+
+export function studioLayerGroupToCrdtGroup(
+  pageId: string,
+  group: StudioCrdtCompatibleLayerGroup
+): StudioCrdtLayerGroupInput {
+  const props: StudioCrdtJsonObject = { name: group.name };
+  if (group.hidden !== undefined) props.hidden = group.hidden;
+  if (group.locked !== undefined) props.locked = group.locked;
+  return {
+    id: group.id,
+    pageId,
+    payload: validateStudioCrdtLayerGroupPayload({
+      version: STUDIO_CRDT_LAYER_GROUP_PAYLOAD_VERSION,
+      props,
+    }),
+  };
+}
+
+export function studioCrdtGroupToLayerGroup(
+  record: StudioCrdtLayerGroupRecord,
+  collapsed?: boolean
+): StudioCrdtCompatibleLayerGroup {
+  const group: StudioCrdtCompatibleLayerGroup = {
+    id: record.id,
+    name: record.payload.props.name as string,
+  };
+  if (typeof record.payload.props.hidden === "boolean") {
+    group.hidden = record.payload.props.hidden;
+  }
+  if (typeof record.payload.props.locked === "boolean") {
+    group.locked = record.payload.props.locked;
+  }
+  if (collapsed !== undefined) group.collapsed = collapsed;
+  return group;
 }
 
 export function studioPageToCrdtPage<
@@ -220,6 +270,30 @@ export interface StudioCrdtSceneGraphAuthority {
   strokeIds: ReadonlySet<string>;
   sceneElementIds: ReadonlySet<string>;
   pageIds: ReadonlySet<string>;
+  layerGroupIds: ReadonlySet<string>;
+}
+
+function withConvergedLayerGroup<TElement extends StudioCrdtCompatibleElement>(
+  element: TElement,
+  pageId: string,
+  layerId: string,
+  availableGroupKeys: ReadonlySet<string>
+): TElement {
+  const next = { ...element } as TElement & { groupId?: string };
+  let valid: boolean;
+  try {
+    valid = layerId !== "page-root" &&
+      availableGroupKeys.has(studioCrdtLayerGroupKey(pageId, layerId));
+  } catch {
+    delete next.groupId;
+    return next;
+  }
+  if (valid) {
+    next.groupId = layerId;
+  } else {
+    delete next.groupId;
+  }
+  return next;
 }
 
 /**
@@ -279,6 +353,7 @@ export function reconcileStudioCrdtSceneGraphPages<
   strokes: readonly StudioCrdtStrokeRecord[],
   sceneElements: readonly StudioCrdtSceneElementRecord[],
   pageRecords: readonly StudioCrdtPageRecord[],
+  layerGroupRecords: readonly StudioCrdtLayerGroupRecord[] = [],
   authority?: StudioCrdtSceneGraphAuthority
 ): StudioCrdtPageReconcileResult<TPage> {
   const sourcePageById = new Map(pages.map((page) => [page.id, page]));
@@ -329,6 +404,57 @@ export function reconcileStudioCrdtSceneGraphPages<
     topologyChanged = true;
   }
 
+  const pageIdSet = new Set(orderedPages.map((page) => page.id));
+  const sourceGroupByKey = new Map<string, {
+    pageId: string;
+    group: StudioCrdtCompatibleLayerGroup;
+  }>();
+  for (const page of orderedPages) {
+    for (const group of page.groups ?? []) {
+      let key: string;
+      try {
+        key = studioCrdtLayerGroupKey(page.id, group.id);
+      } catch {
+        continue;
+      }
+      if (!sourceGroupByKey.has(key)) sourceGroupByKey.set(key, { pageId: page.id, group });
+    }
+  }
+  const managedGroupIds = new Set<string>();
+  const activeGroupsByPage = new Map<string, StudioCrdtCompatibleLayerGroup[]>();
+  for (const record of layerGroupRecords) {
+    let key: string;
+    try {
+      key = studioCrdtLayerGroupKey(record.pageId, record.id);
+    } catch {
+      continue;
+    }
+    const authoritative = authority === undefined || authority.layerGroupIds.has(key);
+    if (authoritative) managedGroupIds.add(key);
+    const source = sourceGroupByKey.get(key);
+    if (!authoritative && !source) continue;
+    if (!authoritative) managedGroupIds.add(key);
+    if (authoritative && record.deleted) continue;
+    const pageId = authoritative ? record.pageId : source!.pageId;
+    if (!pageIdSet.has(pageId)) continue;
+    const group = authoritative
+      ? studioCrdtGroupToLayerGroup(record, source?.group.collapsed)
+      : source!.group;
+    const bucket = activeGroupsByPage.get(pageId) ?? [];
+    bucket.push(group);
+    activeGroupsByPage.set(pageId, bucket);
+  }
+
+  // Unmanaged legacy groups stay usable until their first real group operation materializes a
+  // CRDT record. A managed tombstone or page reparent, however, immediately removes the old slot.
+  const availableGroupKeys = new Set<string>();
+  for (const [key] of sourceGroupByKey) {
+    if (!managedGroupIds.has(key)) availableGroupKeys.add(key);
+  }
+  for (const [pageId, groups] of activeGroupsByPage) {
+    for (const group of groups) availableGroupKeys.add(studioCrdtLayerGroupKey(pageId, group.id));
+  }
+
   const sourceElementById = new Map<string, { pageId: string; element: TElement }>();
   for (const page of orderedPages) {
     for (const element of page.elements) sourceElementById.set(element.id, { pageId: page.id, element });
@@ -352,7 +478,12 @@ export function reconcileStudioCrdtSceneGraphPages<
       id: record.id,
       orderIndex: record.orderIndex,
       element: authoritative
-        ? studioCrdtStrokeToDrawElement(record) as unknown as TElement
+        ? withConvergedLayerGroup(
+          studioCrdtStrokeToDrawElement(record) as unknown as TElement,
+          record.pageId,
+          record.layerId,
+          availableGroupKeys
+        )
         : source!.element,
     });
     activeByPage.set(pageId, bucket);
@@ -370,7 +501,12 @@ export function reconcileStudioCrdtSceneGraphPages<
       id: record.id,
       orderIndex: record.orderIndex,
       element: authoritative
-        ? studioCrdtElementToSceneElement(record) as unknown as TElement
+        ? withConvergedLayerGroup(
+          studioCrdtElementToSceneElement(record) as unknown as TElement,
+          record.pageId,
+          record.layerId,
+          availableGroupKeys
+        )
         : source!.element,
     });
     activeByPage.set(pageId, bucket);
@@ -382,7 +518,7 @@ export function reconcileStudioCrdtSceneGraphPages<
   }
 
   let elementChanged = false;
-  const nextPages = orderedPages.map((page) => {
+  const elementPages = orderedPages.map((page) => {
     const active = activeByPage.get(page.id) ?? [];
     let cursor = 0;
     let pageChanged = false;
@@ -405,6 +541,63 @@ export function reconcileStudioCrdtSceneGraphPages<
     return { ...page, elements: nextElements };
   });
 
-  const changed = topologyChanged || elementChanged;
+  // Group metadata is authoritative for membership validity even when the element itself was not
+  // part of this transaction. This also covers legacy/image/3D elements that are not yet payload-
+  // managed by the scene CRDT: a remote group tombstone must not leave an unlocked orphan groupId
+  // in an older undo snapshot.
+  const membershipPages = elementPages.map((page) => {
+    let pageChanged = false;
+    const elements = page.elements.map((element) => {
+      const groupId = (element as TElement & { groupId?: string }).groupId;
+      if (!groupId) return element;
+      try {
+        if (availableGroupKeys.has(studioCrdtLayerGroupKey(page.id, groupId))) return element;
+      } catch {
+        // Invalid/reserved legacy group identifiers are normalized to the page root below.
+      }
+      const next = { ...element } as TElement & { groupId?: string };
+      delete next.groupId;
+      pageChanged = true;
+      return next as TElement;
+    });
+    if (!pageChanged) return page;
+    elementChanged = true;
+    return { ...page, elements };
+  });
+
+  let groupChanged = false;
+  const nextPages = membershipPages.map((page) => {
+    const legacy = (page.groups ?? []).filter((group) => {
+      try {
+        return !managedGroupIds.has(studioCrdtLayerGroupKey(page.id, group.id));
+      } catch {
+        return false;
+      }
+    });
+    const managed = [...(activeGroupsByPage.get(page.id) ?? [])];
+    const firstMemberIndex = new Map<string, number>();
+    page.elements.forEach((element, index) => {
+      const groupId = (element as TElement & { groupId?: string }).groupId;
+      if (groupId && !firstMemberIndex.has(groupId)) firstMemberIndex.set(groupId, index);
+    });
+    managed.sort((left, right) =>
+      (firstMemberIndex.get(left.id) ?? Number.MAX_SAFE_INTEGER) -
+        (firstMemberIndex.get(right.id) ?? Number.MAX_SAFE_INTEGER) ||
+      left.id.localeCompare(right.id)
+    );
+    const groups = [...legacy, ...managed];
+    const previousGroups = page.groups ?? [];
+    const same = previousGroups.length === groups.length && previousGroups.every((group, index) => {
+      const next = groups[index];
+      return next !== undefined && group.id === next.id && group.name === next.name &&
+        group.hidden === next.hidden && group.locked === next.locked &&
+        group.collapsed === next.collapsed;
+    });
+    if (same) return page;
+    groupChanged = true;
+    return { ...page, groups };
+  });
+
+  const changed = topologyChanged || elementChanged || groupChanged;
   return { pages: changed ? nextPages : [...pages], changed };
 }

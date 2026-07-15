@@ -7,6 +7,7 @@ import {
 } from "./studio-crdt-page-bridge";
 
 import type {
+  StudioCrdtLayerGroupRecord,
   StudioCrdtPageRecord,
   StudioCrdtSceneElementRecord,
   StudioCrdtStrokeRecord,
@@ -21,12 +22,14 @@ export interface StudioCrdtSceneGraphFrontier {
   strokes: readonly StudioCrdtStrokeRecord[];
   sceneElements: readonly StudioCrdtSceneElementRecord[];
   pages: readonly StudioCrdtPageRecord[];
+  layerGroups: readonly StudioCrdtLayerGroupRecord[];
 }
 
 export interface StudioCrdtSceneGraphChangedIds {
   strokeIds: ReadonlySet<string>;
   sceneElementIds: ReadonlySet<string>;
   pageIds: ReadonlySet<string>;
+  layerGroupIds: ReadonlySet<string>;
 }
 
 /**
@@ -96,6 +99,7 @@ export function reconcileStudioCrdtSceneGraphHistory<
   if (
     changedIds !== null && changedIds.strokeIds.size === 0 &&
     changedIds.sceneElementIds.size === 0 && changedIds.pageIds.size === 0
+    && changedIds.layerGroupIds.size === 0
   ) {
     return { history, changed: false };
   }
@@ -116,6 +120,7 @@ export function reconcileStudioCrdtSceneGraphHistory<
       frontier.strokes,
       frontier.sceneElements,
       frontier.pages,
+      frontier.layerGroups,
       changedIds ?? undefined
     );
     if (reconciled.changed) replaceSnapshot(index, reconciled.pages);
@@ -129,7 +134,8 @@ export function reconcileStudioCrdtSceneGraphHistory<
         currentSnapshot,
         frontier.strokes,
         frontier.sceneElements,
-        frontier.pages
+        frontier.pages,
+        frontier.layerGroups
       );
       if (current.changed) replaceSnapshot(boundedCurrentIndex, current.pages);
     }

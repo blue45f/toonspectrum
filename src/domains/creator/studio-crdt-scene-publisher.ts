@@ -1,5 +1,6 @@
 import {
   isStudioCrdtSceneElementType,
+  studioLayerGroupToCrdtGroup,
   studioDrawElementToCrdtStroke,
   studioPageToCrdtPage,
   studioSceneElementToCrdtElement,
@@ -8,11 +9,13 @@ import {
   type StudioCrdtCompatibleOrderedPage,
   type StudioCrdtCompatibleSceneElement,
 } from "./studio-crdt-page-bridge";
+import { studioCrdtLayerGroupKey } from "./studio-crdt-scene-schema";
 
 import type {
   StudioCrdtDocument,
   StudioCrdtDrawStrokePayload,
   StudioCrdtJsonObject,
+  StudioCrdtLayerGroupInput,
   StudioCrdtSceneElementInput,
   StudioCrdtStrokePayloadKey,
 } from "./studio-crdt-document";
@@ -24,6 +27,7 @@ export interface StudioCrdtOrderMove {
 
 export interface StudioCrdtScenePublishResult {
   sceneElementMutations: number;
+  layerGroupMutations: number;
   pageMutations: number;
   elementMoves: number;
   pageMoves: number;
@@ -196,6 +200,21 @@ function supportedSceneInputs<
         element.id,
         studioSceneElementToCrdtElement(page.id, element)
       );
+    }
+  }
+  return result;
+}
+
+function supportedLayerGroupInputs<
+  TElement extends StudioCrdtCompatibleElement,
+  TPage extends StudioCrdtCompatibleOrderedPage<TElement>,
+>(pages: readonly TPage[]): Map<string, StudioCrdtLayerGroupInput> {
+  const result = new Map<string, StudioCrdtLayerGroupInput>();
+  for (const page of pages) {
+    for (const group of page.groups ?? []) {
+      const key = studioCrdtLayerGroupKey(page.id, group.id);
+      if (result.has(key)) throw new Error("같은 페이지에 중복된 레이어 그룹 식별자가 있습니다.");
+      result.set(key, studioLayerGroupToCrdtGroup(page.id, group));
     }
   }
   return result;
@@ -455,6 +474,71 @@ function publishSceneElementRecords(
   return mutations;
 }
 
+function publishLayerGroupRecords(
+  document: StudioCrdtDocument,
+  previous: ReadonlyMap<string, StudioCrdtLayerGroupInput>,
+  next: ReadonlyMap<string, StudioCrdtLayerGroupInput>
+): number {
+  let mutations = 0;
+  for (const [key, previousInput] of previous) {
+    if (next.has(key)) continue;
+    let current = document.getLayerGroup(previousInput.pageId, previousInput.id, true);
+    if (!current) {
+      document.upsertLayerGroup(previousInput, {
+        baselineProps: previousInput.payload.props,
+        changedProps: [],
+      });
+      mutations += 1;
+      current = document.getLayerGroup(previousInput.pageId, previousInput.id, true);
+    }
+    if (
+      current && !current.deleted &&
+      document.deleteLayerGroup(previousInput.pageId, previousInput.id)
+    ) {
+      mutations += 1;
+    }
+  }
+
+  for (const [key, nextInput] of next) {
+    const previousInput = previous.get(key) ?? null;
+    const current = document.getLayerGroup(nextInput.pageId, nextInput.id, true);
+    if (!current) {
+      if (!previousInput) {
+        document.addLayerGroup(nextInput);
+      } else {
+        const diff = diffProperties(previousInput.payload.props, nextInput.payload.props);
+        // Register unchanged legacy metadata too. A grouped element may be the actual operation in
+        // this transition, and its canonical layer target must exist before that element is sent.
+        document.upsertLayerGroup(nextInput, {
+          baselineProps: previousInput.payload.props,
+          changedProps: diff.changed,
+          unsetProps: diff.unset,
+        });
+      }
+      mutations += 1;
+      continue;
+    }
+    if (current.deleted) {
+      // Stale snapshots cannot revive a peer tombstone. Re-add/redo is the only absent -> present
+      // transition that owns an explicit resurrection.
+      if (!previousInput) {
+        document.upsertLayerGroup(nextInput, { resurrect: true });
+        mutations += 1;
+      }
+      continue;
+    }
+    if (!previousInput) continue;
+    const diff = diffProperties(previousInput.payload.props, nextInput.payload.props);
+    if (diff.changed.length === 0 && diff.unset.length === 0) continue;
+    document.patchLayerGroup(nextInput.pageId, nextInput.id, {
+      set: diff.set,
+      unset: diff.unset,
+    });
+    mutations += 1;
+  }
+  return mutations;
+}
+
 function publishSceneOrderForPage<TElement extends StudioCrdtCompatibleElement>(
   document: StudioCrdtDocument,
   pageId: string,
@@ -533,6 +617,8 @@ export function publishStudioCrdtSceneGraphDiff<
   const nextById = new Map(nextPages.map((page) => [page.id, page]));
   const previousSceneInputs = supportedSceneInputs(previousPages);
   const nextSceneInputs = supportedSceneInputs(nextPages);
+  const previousLayerGroupInputs = supportedLayerGroupInputs(previousPages);
+  const nextLayerGroupInputs = supportedLayerGroupInputs(nextPages);
   const previousDrawInputs = supportedDrawInputs(previousPages);
   const nextDrawInputs = supportedDrawInputs(nextPages);
   const managedElementIdsBefore = new Set([
@@ -540,6 +626,11 @@ export function publishStudioCrdtSceneGraphDiff<
     ...document.getSceneElements({ includeDeleted: true }).map(({ id }) => id),
   ]);
   const managedPageIdsBefore = new Set(document.getPages(true).map(({ id }) => id));
+  const layerGroupMutations = publishLayerGroupRecords(
+    document,
+    previousLayerGroupInputs,
+    nextLayerGroupInputs
+  );
   let sceneElementMutations = publishStudioCrdtDrawGraphDiff(
     document,
     previousPages,
@@ -660,6 +751,7 @@ export function publishStudioCrdtSceneGraphDiff<
     for (const move of pageMoves) document.movePage(move.id, move.beforeId);
     return {
       sceneElementMutations,
+      layerGroupMutations,
       pageMutations,
       elementMoves,
       pageMoves: pageMoves.length,
@@ -668,6 +760,7 @@ export function publishStudioCrdtSceneGraphDiff<
 
   return {
     sceneElementMutations,
+    layerGroupMutations,
     pageMutations,
     elementMoves,
     pageMoves: 0,

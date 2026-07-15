@@ -5231,20 +5231,22 @@ function StudioCuttoonEditor() {
         strokes: ReturnType<StudioCrdtDocument["getStrokes"]>;
         sceneElements: ReturnType<StudioCrdtDocument["getSceneElements"]>;
         pages: ReturnType<StudioCrdtDocument["getPages"]>;
+        layerGroups: ReturnType<StudioCrdtDocument["getLayerGroups"]>;
       },
       changedIds: {
         strokeIds: ReadonlySet<string>;
         sceneElementIds: ReadonlySet<string>;
         pageIds: ReadonlySet<string>;
+        layerGroupIds: ReadonlySet<string>;
       } | null
     ) => {
       if (
         !editorMountedRef.current ||
         (changedIds === null
           ? frontier.strokes.length === 0 && frontier.sceneElements.length === 0 &&
-            frontier.pages.length === 0
+            frontier.pages.length === 0 && frontier.layerGroups.length === 0
           : changedIds.strokeIds.size === 0 && changedIds.sceneElementIds.size === 0 &&
-            changedIds.pageIds.size === 0)
+            changedIds.pageIds.size === 0 && changedIds.layerGroupIds.size === 0)
       ) return;
       studioRevisionProjectGenerationRef.current += 1;
       collaborationAccessRef.current = {
@@ -5266,6 +5268,7 @@ function StudioCuttoonEditor() {
       strokes: studioCrdtDocument.getStrokes({ includeDeleted: true }),
       sceneElements: studioCrdtDocument.getSceneElements({ includeDeleted: true }),
       pages: studioCrdtDocument.getPages(true),
+      layerGroups: studioCrdtDocument.getLayerGroups({ includeDeleted: true }),
     }, null);
     // layout effect 안의 history update와 같은 commit 전 배치로 처리한다. 따라서 stale 로컬
     // 캔버스가 한 프레임 먼저 활성화되는 구간 없이 frontier가 반영된 다음 편집이 열린다.
@@ -5275,10 +5278,12 @@ function StudioCuttoonEditor() {
         strokes: change.strokes,
         sceneElements: change.sceneElements,
         pages: change.pages,
+        layerGroups: change.layerGroups,
       }, {
         strokeIds: change.changedStrokeIds,
         sceneElementIds: change.changedSceneElementIds,
         pageIds: change.changedPageIds,
+        layerGroupIds: change.changedLayerGroupIds,
       }),
       { includeOrigin: (origin) => origin !== STUDIO_CRDT_ORIGIN_LOCAL }
     );
@@ -10060,7 +10065,8 @@ function StudioCuttoonEditor() {
       nextPages,
       document.getStrokes({ includeDeleted: true }),
       document.getSceneElements({ includeDeleted: true }),
-      document.getPages(true)
+      document.getPages(true),
+      document.getLayerGroups({ includeDeleted: true })
     );
     return reconciled.pages;
   }

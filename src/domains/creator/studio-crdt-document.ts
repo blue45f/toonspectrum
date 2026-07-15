@@ -14,16 +14,21 @@ import {
   type StudioCrdtSyncResponse,
 } from "./studio-crdt-protocol";
 import {
+  STUDIO_CRDT_LAYER_GROUP_PAYLOAD_VERSION,
+  STUDIO_CRDT_LAYER_GROUP_PROPERTY_KEYS,
   STUDIO_CRDT_PAGE_PAYLOAD_VERSION,
   STUDIO_CRDT_PAGE_PROPERTY_KEYS,
   STUDIO_CRDT_REQUIRED_SCENE_ELEMENT_KEYS,
   STUDIO_CRDT_SCENE_ELEMENT_KEYS_BY_TYPE,
   STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION,
   isStudioCrdtSceneElementType,
+  studioCrdtLayerGroupKey,
+  validateStudioCrdtLayerGroupPayload,
   validateStudioCrdtPagePayload,
   validateStudioCrdtSceneElementPayload,
   type StudioCrdtJsonObject,
   type StudioCrdtJsonValue,
+  type StudioCrdtLayerGroupPayload,
   type StudioCrdtPagePayload,
   type StudioCrdtSceneElementPayload,
 } from "./studio-crdt-scene-schema";
@@ -35,15 +40,19 @@ export {
   STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
 } from "./studio-crdt-protocol";
 export {
+  STUDIO_CRDT_LAYER_GROUP_MAX_BYTES,
+  STUDIO_CRDT_LAYER_GROUP_PAYLOAD_VERSION,
   STUDIO_CRDT_PAGE_MAX_BYTES,
   STUDIO_CRDT_PAGE_PAYLOAD_VERSION,
   STUDIO_CRDT_SCENE_ELEMENT_MAX_BYTES,
   STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION,
   STUDIO_CRDT_SCENE_ELEMENT_TYPES,
   validateStudioCrdtPagePayload,
+  validateStudioCrdtLayerGroupPayload,
   validateStudioCrdtSceneElementPayload,
   type StudioCrdtJsonObject,
   type StudioCrdtJsonValue,
+  type StudioCrdtLayerGroupPayload,
   type StudioCrdtPagePayload,
   type StudioCrdtSceneElementPayload,
   type StudioCrdtSceneElementType,
@@ -55,6 +64,7 @@ export const STUDIO_CRDT_REPLACE_CHUNK_SAMPLES = 256;
 export const STUDIO_CRDT_METADATA_MAX_BYTES = 16 * 1024;
 
 const MAX_ID_LENGTH = 160;
+const MAX_LAYER_GROUP_KEY_LENGTH = MAX_ID_LENGTH * 2 + 32;
 const MAX_TEXT_LENGTH = 512;
 const MAX_COORDINATE = 10_000_000;
 const MAX_STROKE_WIDTH = 8_192;
@@ -69,6 +79,7 @@ const DEFAULT_BATCH_MAX_BYTES = 32 * 1024;
 const TEXT_ENCODER = new TextEncoder();
 const SCENE_ELEMENT_ROOT_PREFIX = "scene-element:";
 const PAGE_ROOT_PREFIX = "studio-page:";
+const LAYER_GROUP_ROOT_PREFIX = "layer-group:";
 const PROPERTY_PREFIX = "prop:";
 const BASELINE_PROPERTY_PREFIX = "base:";
 const UNSET_PROPERTY_PREFIX = "unset:";
@@ -219,6 +230,33 @@ export interface StudioCrdtPageUpsertOptions {
   unsetProps?: readonly string[];
 }
 
+export interface StudioCrdtLayerGroupInput {
+  id: string;
+  pageId: string;
+  payload: StudioCrdtLayerGroupPayload;
+}
+
+export interface StudioCrdtLayerGroupRecord extends StudioCrdtLayerGroupInput {
+  deleted: boolean;
+}
+
+export interface StudioCrdtLayerGroupQuery {
+  pageId?: string;
+  includeDeleted?: boolean;
+}
+
+export interface StudioCrdtLayerGroupPatch {
+  set?: StudioCrdtJsonObject;
+  unset?: readonly string[];
+}
+
+export interface StudioCrdtLayerGroupUpsertOptions {
+  resurrect?: boolean;
+  baselineProps?: StudioCrdtJsonObject;
+  changedProps?: readonly string[];
+  unsetProps?: readonly string[];
+}
+
 export interface StudioCrdtStrokeQuery {
   pageId?: string;
   layerId?: string;
@@ -249,6 +287,8 @@ export interface StudioCrdtChange {
   sceneElements: StudioCrdtSceneElementRecord[];
   changedPageIds: ReadonlySet<string>;
   pages: StudioCrdtPageRecord[];
+  changedLayerGroupIds: ReadonlySet<string>;
+  layerGroups: StudioCrdtLayerGroupRecord[];
 }
 
 export interface StudioCrdtChangeSubscriptionOptions {
@@ -297,6 +337,11 @@ function exactText(value: unknown, maximum = MAX_TEXT_LENGTH): value is string {
 
 function assertId(value: unknown, label: string): asserts value is string {
   if (!exactText(value, MAX_ID_LENGTH)) throw new Error(`${label} 식별자가 올바르지 않습니다.`);
+}
+
+function assertLayerGroupId(value: unknown): asserts value is string {
+  assertId(value, "레이어 그룹");
+  if (value === "page-root") throw new Error("page-root는 레이어 그룹 식별자로 사용할 수 없습니다.");
 }
 
 function assertFiniteRange(value: unknown, minimum: number, maximum: number, label: string): void {
@@ -352,6 +397,10 @@ function sceneElementRootName(id: string): string {
 
 function pageRootName(id: string): string {
   return `${PAGE_ROOT_PREFIX}${encodeURIComponent(id)}`;
+}
+
+function layerGroupRootName(compositeKey: string): string {
+  return `${LAYER_GROUP_ROOT_PREFIX}${encodeURIComponent(compositeKey)}`;
 }
 
 function propertyKey(prefix: typeof PROPERTY_PREFIX | typeof BASELINE_PROPERTY_PREFIX, key: string): string {
@@ -720,6 +769,7 @@ export class StudioCrdtDocument {
   private readonly strokes: Y.Map<Y.Map<unknown>>;
   private readonly sceneElementIds: Y.Map<boolean>;
   private readonly pageIds: Y.Map<boolean>;
+  private readonly layerGroupIds: Y.Map<boolean>;
   private readonly order: Y.Array<Y.Map<unknown>>;
   private readonly pageOrder: Y.Array<Y.Map<unknown>>;
   private readonly cleanup = new Set<() => void>();
@@ -727,8 +777,10 @@ export class StudioCrdtDocument {
   private readonly changedStrokeIdsByTransaction = new WeakMap<Y.Transaction, Set<string>>();
   private readonly changedSceneElementIdsByTransaction = new WeakMap<Y.Transaction, Set<string>>();
   private readonly changedPageIdsByTransaction = new WeakMap<Y.Transaction, Set<string>>();
+  private readonly changedLayerGroupIdsByTransaction = new WeakMap<Y.Transaction, Set<string>>();
   private readonly observedSceneElementRoots = new Set<string>();
   private readonly observedPageRoots = new Set<string>();
+  private readonly observedLayerGroupRoots = new Set<string>();
   private destroyed = false;
 
   constructor(initialUpdate?: Uint8Array | string) {
@@ -736,6 +788,7 @@ export class StudioCrdtDocument {
     this.strokes = this.doc.getMap<Y.Map<unknown>>("strokes");
     this.sceneElementIds = this.doc.getMap<boolean>("scene-elements");
     this.pageIds = this.doc.getMap<boolean>("studio-pages");
+    this.layerGroupIds = this.doc.getMap<boolean>("layer-groups");
     this.order = this.doc.getArray<Y.Map<unknown>>("stroke-order");
     this.pageOrder = this.doc.getArray<Y.Map<unknown>>("page-order");
     if (initialUpdate !== undefined) {
@@ -750,6 +803,9 @@ export class StudioCrdtDocument {
     }
     for (const [id, active] of this.pageIds) {
       if (active === true) this.observePageRoot(id);
+    }
+    for (const [compositeKey, active] of this.layerGroupIds) {
+      if (active === true) this.observeLayerGroupRoot(compositeKey);
     }
 
     const observeStrokes: Parameters<typeof this.strokes.observeDeep>[0] = (events, transaction) => {
@@ -821,6 +877,16 @@ export class StudioCrdtDocument {
         if (this.pageIds.get(id) === true) this.observePageRoot(id);
       }
     };
+    const observeLayerGroupIds = (event: Y.YMapEvent<boolean>, transaction: Y.Transaction) => {
+      const changedIds = this.changedLayerGroupIdsFor(transaction);
+      for (const compositeKey of event.keysChanged) {
+        if (!exactText(compositeKey, MAX_LAYER_GROUP_KEY_LENGTH)) continue;
+        changedIds.add(compositeKey);
+        if (this.layerGroupIds.get(compositeKey) === true) {
+          this.observeLayerGroupRoot(compositeKey);
+        }
+      }
+    };
     const observePageOrder: Parameters<typeof this.pageOrder.observeDeep>[0] = (events, transaction) => {
       const changedIds = this.changedPageIdsFor(transaction);
       for (const event of events) {
@@ -850,11 +916,13 @@ export class StudioCrdtDocument {
     this.order.observeDeep(observeOrder);
     this.sceneElementIds.observe(observeSceneElementIds);
     this.pageIds.observe(observePageIds);
+    this.layerGroupIds.observe(observeLayerGroupIds);
     this.pageOrder.observeDeep(observePageOrder);
     this.cleanup.add(() => this.strokes.unobserveDeep(observeStrokes));
     this.cleanup.add(() => this.order.unobserveDeep(observeOrder));
     this.cleanup.add(() => this.sceneElementIds.unobserve(observeSceneElementIds));
     this.cleanup.add(() => this.pageIds.unobserve(observePageIds));
+    this.cleanup.add(() => this.layerGroupIds.unobserve(observeLayerGroupIds));
     this.cleanup.add(() => this.pageOrder.unobserveDeep(observePageOrder));
   }
 
@@ -888,6 +956,10 @@ export class StudioCrdtDocument {
         sceneElements: this.getSceneElements({ includeDeleted: true }),
         changedPageIds: new Set(this.changedPageIdsByTransaction.get(transaction) ?? []),
         pages: this.getPages(true),
+        changedLayerGroupIds: new Set(
+          this.changedLayerGroupIdsByTransaction.get(transaction) ?? []
+        ),
+        layerGroups: this.getLayerGroups({ includeDeleted: true }),
       });
     };
     this.doc.on("afterTransaction", listener);
@@ -1610,6 +1682,174 @@ export class StudioCrdtDocument {
     );
   }
 
+  addLayerGroup(input: StudioCrdtLayerGroupInput): StudioCrdtLayerGroupRecord {
+    const compositeKey = studioCrdtLayerGroupKey(input.pageId, input.id);
+    if (this.layerGroupIds.get(compositeKey) === true) {
+      throw new Error("이미 존재하는 레이어 그룹 식별자입니다.");
+    }
+    return this.upsertLayerGroup(input);
+  }
+
+  upsertLayerGroup(
+    input: StudioCrdtLayerGroupInput,
+    options: StudioCrdtLayerGroupUpsertOptions = {}
+  ): StudioCrdtLayerGroupRecord {
+    this.assertAlive();
+    assertLayerGroupId(input.id);
+    assertId(input.pageId, "페이지");
+    const compositeKey = studioCrdtLayerGroupKey(input.pageId, input.id);
+    const payload = validateStudioCrdtLayerGroupPayload(input.payload);
+    const exists = this.layerGroupIds.get(compositeKey) === true;
+    const record = this.layerGroupRecord(compositeKey, !exists);
+    if (!record) throw new Error("레이어 그룹 레코드가 손상되었습니다.");
+    const previousPayload = exists ? this.readLayerGroupPayload(record) : null;
+    if (exists && !previousPayload) throw new Error("기존 레이어 그룹 레코드가 손상되었습니다.");
+    if (record.get("deleted") === true && !options.resurrect) {
+      throw new Error("삭제된 레이어 그룹은 명시적으로 복원해야 합니다.");
+    }
+
+    const usesLegacyBootstrap = options.baselineProps !== undefined ||
+      options.changedProps !== undefined || options.unsetProps !== undefined;
+    let baseline: StudioCrdtJsonObject | null = null;
+    let changedProps: readonly string[] = [];
+    let unsetProps: readonly string[] = [];
+    if (usesLegacyBootstrap) {
+      if (!options.baselineProps) {
+        throw new Error("레거시 레이어 그룹 등록에는 기준 속성이 필요합니다.");
+      }
+      baseline = validateStudioCrdtLayerGroupPayload({
+        version: STUDIO_CRDT_LAYER_GROUP_PAYLOAD_VERSION,
+        props: options.baselineProps,
+      }).props;
+      const seen = new Set<string>();
+      for (const key of options.changedProps ?? []) {
+        if (
+          !exactText(key, MAX_TEXT_LENGTH) || !STUDIO_CRDT_LAYER_GROUP_PROPERTY_KEYS.has(key) ||
+          seen.has(key) || !(key in payload.props)
+        ) {
+          throw new Error("레거시 레이어 그룹의 변경 속성 목록이 올바르지 않습니다.");
+        }
+        seen.add(key);
+      }
+      changedProps = [...seen];
+      validateUnsetKeys(
+        options.unsetProps ?? [],
+        STUDIO_CRDT_LAYER_GROUP_PROPERTY_KEYS,
+        ["name"]
+      );
+      unsetProps = [...new Set(options.unsetProps ?? [])];
+      if (unsetProps.some((key) => seen.has(key) || key in payload.props)) {
+        throw new Error("제거할 레이어 그룹 속성은 변경 목록과 현재 페이로드에 포함될 수 없습니다.");
+      }
+    }
+
+    this.doc.transact(() => {
+      this.layerGroupIds.set(compositeKey, true);
+      record.set("id", input.id);
+      record.set("pageId", input.pageId);
+      record.set("payloadVersion", payload.version);
+      if (!exists || options.resurrect) record.set("deleted", false);
+      if (baseline) {
+        for (const [key, value] of Object.entries(baseline)) {
+          const baselineKey = propertyKey(BASELINE_PROPERTY_PREFIX, key);
+          if (!record.has(baselineKey)) record.set(baselineKey, cloneAndValidateJson(value));
+        }
+        setCrdtProperties(record, PROPERTY_PREFIX, payload.props, changedProps);
+        for (const key of unsetProps) record.set(`${UNSET_PROPERTY_PREFIX}${key}`, true);
+      } else {
+        setCrdtProperties(record, PROPERTY_PREFIX, payload.props);
+        for (const key of Object.keys(previousPayload?.props ?? {})) {
+          if (!(key in payload.props)) record.set(`${UNSET_PROPERTY_PREFIX}${key}`, true);
+        }
+      }
+    }, STUDIO_CRDT_ORIGIN_LOCAL);
+    return this.requiredLayerGroup(input.pageId, input.id);
+  }
+
+  patchLayerGroup(
+    pageId: string,
+    id: string,
+    patch: StudioCrdtLayerGroupPatch
+  ): StudioCrdtLayerGroupRecord {
+    this.assertAlive();
+    const compositeKey = studioCrdtLayerGroupKey(pageId, id);
+    const record = this.layerGroupRecord(compositeKey);
+    if (!record || record.get("deleted") === true) {
+      throw new Error("수정할 레이어 그룹을 찾을 수 없습니다.");
+    }
+    const current = this.readLayerGroupPayload(record);
+    if (!current) throw new Error("레이어 그룹 레코드가 손상되었습니다.");
+    const set = patch.set ? cloneJsonObject(patch.set) : {};
+    for (const key of Object.keys(set)) {
+      if (!STUDIO_CRDT_LAYER_GROUP_PROPERTY_KEYS.has(key)) {
+        throw new Error(`레이어 그룹의 ${key} 속성은 동기화할 수 없습니다.`);
+      }
+    }
+    validateUnsetKeys(
+      patch.unset ?? [],
+      STUDIO_CRDT_LAYER_GROUP_PROPERTY_KEYS,
+      ["name"]
+    );
+    const props = { ...current.props, ...set };
+    for (const key of patch.unset ?? []) delete props[key];
+    validateStudioCrdtLayerGroupPayload({
+      version: STUDIO_CRDT_LAYER_GROUP_PAYLOAD_VERSION,
+      props,
+    });
+    this.doc.transact(() => {
+      setCrdtProperties(record, PROPERTY_PREFIX, set);
+      for (const key of patch.unset ?? []) record.set(`${UNSET_PROPERTY_PREFIX}${key}`, true);
+    }, STUDIO_CRDT_ORIGIN_LOCAL);
+    return this.requiredLayerGroup(pageId, id);
+  }
+
+  deleteLayerGroup(pageId: string, id: string): boolean {
+    this.assertAlive();
+    const record = this.layerGroupRecord(studioCrdtLayerGroupKey(pageId, id));
+    if (!record || record.get("deleted") === true) return false;
+    this.doc.transact(() => record.set("deleted", true), STUDIO_CRDT_ORIGIN_LOCAL);
+    return true;
+  }
+
+  restoreLayerGroup(pageId: string, id: string): boolean {
+    this.assertAlive();
+    const record = this.layerGroupRecord(studioCrdtLayerGroupKey(pageId, id));
+    if (!record || record.get("deleted") !== true) return false;
+    this.doc.transact(() => record.set("deleted", false), STUDIO_CRDT_ORIGIN_LOCAL);
+    return true;
+  }
+
+  getLayerGroup(
+    pageId: string,
+    id: string,
+    includeDeleted = false
+  ): StudioCrdtLayerGroupRecord | null {
+    this.assertAlive();
+    const compositeKey = studioCrdtLayerGroupKey(pageId, id);
+    const record = this.layerGroupRecord(compositeKey);
+    if (!record) return null;
+    const result = this.readLayerGroupRecord(compositeKey, record);
+    if (!result || (!includeDeleted && result.deleted)) return null;
+    return result;
+  }
+
+  getLayerGroups(query: StudioCrdtLayerGroupQuery = {}): StudioCrdtLayerGroupRecord[] {
+    this.assertAlive();
+    const records: StudioCrdtLayerGroupRecord[] = [];
+    for (const [compositeKey, active] of this.layerGroupIds) {
+      if (active !== true || !exactText(compositeKey, MAX_LAYER_GROUP_KEY_LENGTH)) continue;
+      const record = this.layerGroupRecord(compositeKey);
+      if (!record) continue;
+      const result = this.readLayerGroupRecord(compositeKey, record);
+      if (!result || (!query.includeDeleted && result.deleted)) continue;
+      if (query.pageId !== undefined && result.pageId !== query.pageId) continue;
+      records.push(result);
+    }
+    return records.sort(
+      (left, right) => left.pageId.localeCompare(right.pageId) || left.id.localeCompare(right.id)
+    );
+  }
+
   applyUpdate(update: Uint8Array, origin: unknown = STUDIO_CRDT_ORIGIN_REMOTE): void {
     this.assertAlive();
     if (update.byteLength === 0 || update.byteLength > STUDIO_CRDT_UPDATE_MAX_BYTES) {
@@ -1750,6 +1990,14 @@ export class StudioCrdtDocument {
     return created;
   }
 
+  private changedLayerGroupIdsFor(transaction: Y.Transaction): Set<string> {
+    const existing = this.changedLayerGroupIdsByTransaction.get(transaction);
+    if (existing) return existing;
+    const created = new Set<string>();
+    this.changedLayerGroupIdsByTransaction.set(transaction, created);
+    return created;
+  }
+
   private observeSceneElementRoot(id: string): void {
     const rootName = sceneElementRootName(id);
     if (this.observedSceneElementRoots.has(rootName)) return;
@@ -1792,6 +2040,27 @@ export class StudioCrdtDocument {
     this.cleanup.add(dispose);
   }
 
+  private observeLayerGroupRoot(compositeKey: string): void {
+    const rootName = layerGroupRootName(compositeKey);
+    if (this.observedLayerGroupRoots.has(rootName)) return;
+    let value: Y.Map<unknown>;
+    try {
+      value = this.doc.getMap<unknown>(rootName);
+    } catch {
+      return;
+    }
+    const listener = (_event: Y.YMapEvent<unknown>, transaction: Y.Transaction) => {
+      this.changedLayerGroupIdsFor(transaction).add(compositeKey);
+    };
+    value.observe(listener);
+    this.observedLayerGroupRoots.add(rootName);
+    const dispose = () => {
+      value.unobserve(listener);
+      this.observedLayerGroupRoots.delete(rootName);
+    };
+    this.cleanup.add(dispose);
+  }
+
   private sceneElementRecord(id: string, create = false): Y.Map<unknown> | null {
     if (!create && this.sceneElementIds.get(id) !== true) return null;
     const rootName = sceneElementRootName(id);
@@ -1815,6 +2084,19 @@ export class StudioCrdtDocument {
       return null;
     }
     this.observePageRoot(id);
+    return value as Y.Map<unknown>;
+  }
+
+  private layerGroupRecord(compositeKey: string, create = false): Y.Map<unknown> | null {
+    if (!create && this.layerGroupIds.get(compositeKey) !== true) return null;
+    const rootName = layerGroupRootName(compositeKey);
+    let value: Y.Map<unknown>;
+    try {
+      value = this.doc.getMap<unknown>(rootName);
+    } catch {
+      return null;
+    }
+    this.observeLayerGroupRoot(compositeKey);
     return value as Y.Map<unknown>;
   }
 
@@ -1869,6 +2151,35 @@ export class StudioCrdtDocument {
     const payload = this.readPagePayload(record);
     if (readString(record, "id") !== id || !payload) return null;
     return { id, payload, deleted: record.get("deleted") === true, orderIndex };
+  }
+
+  private readLayerGroupPayload(record: Y.Map<unknown>): StudioCrdtLayerGroupPayload | null {
+    const version = record.get("payloadVersion");
+    if (version !== STUDIO_CRDT_LAYER_GROUP_PAYLOAD_VERSION) return null;
+    try {
+      return validateStudioCrdtLayerGroupPayload({
+        version,
+        props: readCrdtProperties(record),
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  private readLayerGroupRecord(
+    compositeKey: string,
+    record: Y.Map<unknown>
+  ): StudioCrdtLayerGroupRecord | null {
+    const id = readString(record, "id");
+    const pageId = readString(record, "pageId");
+    const payload = this.readLayerGroupPayload(record);
+    if (!id || !pageId || !payload) return null;
+    try {
+      if (studioCrdtLayerGroupKey(pageId, id) !== compositeKey) return null;
+    } catch {
+      return null;
+    }
+    return { id, pageId, payload, deleted: record.get("deleted") === true };
   }
 
   private registerRecord(id: string, value: unknown): void {
@@ -2185,6 +2496,12 @@ export class StudioCrdtDocument {
   private requiredPage(id: string): StudioCrdtPageRecord {
     const result = this.getPage(id, true);
     if (!result) throw new Error("CRDT 페이지를 읽지 못했습니다.");
+    return result;
+  }
+
+  private requiredLayerGroup(pageId: string, id: string): StudioCrdtLayerGroupRecord {
+    const result = this.getLayerGroup(pageId, id, true);
+    if (!result) throw new Error("CRDT 레이어 그룹을 읽지 못했습니다.");
     return result;
   }
 }

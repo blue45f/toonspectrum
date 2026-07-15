@@ -210,6 +210,28 @@ function createScenePageDocument(): Y.Doc {
   return doc;
 }
 
+function addLayerGroup(
+  doc: Y.Doc,
+  options: {
+    id?: string;
+    pageId?: string;
+    name?: string;
+  } = {}
+): Y.Map<unknown> {
+  const id = options.id ?? "group-1";
+  const pageId = options.pageId ?? "page-1";
+  const key = `${pageId.length}:${pageId}${id.length}:${id}`;
+  doc.getMap<boolean>("layer-groups").set(key, true);
+  const group = doc.getMap<unknown>(`layer-group:${encodeURIComponent(key)}`);
+  group.set("id", id);
+  group.set("pageId", pageId);
+  group.set("payloadVersion", 1);
+  group.set("deleted", false);
+  group.set("prop:name", options.name ?? "선화");
+  group.set("unset:name", false);
+  return group;
+}
+
 function createStrokeDocument(): Y.Doc {
   const doc = new Y.Doc();
   const stroke = new Y.Map<unknown>();
@@ -300,12 +322,73 @@ describe("StudioCrdtService", () => {
     poison.destroy();
   });
 
-  it("accepts bounded scene/page field CRDT roots and their mixed z-order entries", () => {
+  it("accepts bounded scene/page/group field CRDT roots and their mixed z-order entries", () => {
     const doc = createScenePageDocument();
+    const group = addLayerGroup(doc);
+    group.set("prop:hidden", true);
+    group.set("unset:locked", true);
     doc.getMap<string>("future-compatible-root").set("key", "unreserved roots stay compatible");
 
     expect(hasValidStudioCrdtRootSchema(doc)).toBe(true);
     doc.destroy();
+  });
+
+  it("validates reserved layer-group roots without synchronizing local collapse state", () => {
+    const valid = createScenePageDocument();
+    const validGroup = addLayerGroup(valid, { id: "group/slash", name: "배경 후보" });
+    validGroup.set("base:hidden", false);
+    validGroup.set("prop:hidden", true);
+    validGroup.set("prop:locked", false);
+    addLayerGroup(valid, { id: "group/slash", pageId: "page-copy", name: "복제 페이지" });
+    expect(hasValidStudioCrdtRootSchema(valid)).toBe(true);
+    valid.destroy();
+
+    const orphan = createScenePageDocument();
+    orphan.getMap<unknown>("layer-group:6%3Aorphan").set("id", "orphan");
+    expect(hasValidStudioCrdtRootSchema(orphan)).toBe(false);
+    orphan.destroy();
+
+    const nonCanonical = createScenePageDocument();
+    nonCanonical.getMap<boolean>("layer-groups").set("06:page-111:group/slash", true);
+    const wrongName = nonCanonical.getMap<unknown>("layer-group:06%3Apage-111%3Agroup%2Fslash");
+    wrongName.set("id", "group/slash");
+    expect(hasValidStudioCrdtRootSchema(nonCanonical)).toBe(false);
+    nonCanonical.destroy();
+
+    const invalidCases: Array<(group: Y.Map<unknown>) => void> = [
+      (group) => group.set("pageId", ""),
+      (group) => group.set("payloadVersion", 2),
+      (group) => group.set("deleted", "no"),
+      (group) => group.set("prop:name", ""),
+      (group) => group.set("prop:name", "선화\n폴더"),
+      (group) => group.set("prop:name", "가".repeat(513)),
+      (group) => group.set("prop:hidden", "yes"),
+      (group) => group.set("prop:locked", 1),
+      (group) => {
+        group.set("base:hidden", { garbage: "x".repeat(3_000) });
+        group.set("prop:hidden", false);
+      },
+      (group) => group.set("unset:name", true),
+      (group) => group.set("name", "raw keys are not part of the wire contract"),
+      (group) => group.set("prop:collapsed", true),
+      (group) => group.set("prop:payload", "x".repeat(2_048)),
+    ];
+    for (const mutate of invalidCases) {
+      const invalid = createScenePageDocument();
+      mutate(addLayerGroup(invalid));
+      expect(hasValidStudioCrdtRootSchema(invalid)).toBe(false);
+      invalid.destroy();
+    }
+
+    const reserved = createScenePageDocument();
+    addLayerGroup(reserved, { id: "page-root" });
+    expect(hasValidStudioCrdtRootSchema(reserved)).toBe(false);
+    reserved.destroy();
+
+    const mismatchedIdentity = createScenePageDocument();
+    addLayerGroup(mismatchedIdentity).set("pageId", "other-page");
+    expect(hasValidStudioCrdtRootSchema(mismatchedIdentity)).toBe(false);
+    mismatchedIdentity.destroy();
   });
 
   it("materializes valid remote top-level scene/page Yjs types before durable validation", async () => {
