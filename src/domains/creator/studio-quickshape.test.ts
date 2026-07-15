@@ -277,10 +277,13 @@ describe("classifyQuickShape — 닫힌 루프(코너 카운팅)", () => {
     expect(match?.polygonSides).toBe(10);
   });
 
-  it("11각 이상(모호한 코너 수)은 null — 잘못된 정다각형 추측보다 미인식을 택한다", () => {
+  it("11각 이상 정n각형은 polygon 으로 잘못 스냅하지 않는다(원형이면 ellipse 폴백 허용)", () => {
+    // 정십이각형은 반경 CV 가 원에 가까워 ellipse 폴백이 될 수 있다 — 잘못된 "polygon sides=10/12"
+    // 추측만 막으면 된다(손그림 다각 별/별똥별 낙서를 정십이각형으로 고정하는 것보다 안전).
     const pts = polygonStrokePoints(100, 100, 80, 12, 6, 0.4);
     const match = classifyQuickShape(pts, QUICKSHAPE_HOLD_MS);
-    expect(match).toBeNull();
+    expect(match?.kind).not.toBe("polygon");
+    expect(match === null || match?.kind === "ellipse").toBe(true);
   });
 
   it("변 길이가 들쭉날쭉한 5~10코너 낙서는 null(고름성 CV 가드)", () => {
@@ -459,15 +462,92 @@ describe("promoteFreehandQuickShapeOnRelease", () => {
     expect(promoted?.kind).toBe("line");
   });
 
-  it("닫히지 않은 원형 낙서도 release 경로에서 ellipse 후보가 될 수 있다", () => {
+  it("닫히지 않은 원형 낙서도 release 경로에서 ellipse 로 승격한다", () => {
     // Incomplete circle (gap at end) — release closure is more tolerant than live.
     const pts: number[] = [];
     const n = 28;
     for (let i = 0; i < n; i += 1) {
-      const t = (i / n) * Math.PI * 1.75; // not fully closed
+      const t = (i / n) * Math.PI * 1.75; // not fully closed (~315°)
       pts.push(80 + Math.cos(t) * 50, 80 + Math.sin(t) * 48);
     }
     const promoted = promoteFreehandQuickShapeOnRelease(pts);
-    expect(promoted === null || promoted.kind === "ellipse" || promoted.kind === "line").toBe(true);
+    expect(promoted?.kind).toBe("ellipse");
+  });
+
+  it("지터가 큰 원(가짜 코너 가능)도 release 에서 ellipse 로 승격한다", () => {
+    const pts = ellipseStrokePoints(120, 120, 70, 68, 36, 2.4);
+    const promoted = promoteFreehandQuickShapeOnRelease(pts);
+    expect(promoted?.kind).toBe("ellipse");
+  });
+
+  it("변이 살짝 휜 손그림 삼각형도 release 에서 triangle 로 승격한다", () => {
+    // 각 변 중앙을 바깥으로 불룩하게 — live 직선성 문턱(0.18)을 넘기기 쉬운 픽스처.
+    const verts = [
+      { x: 100, y: 20 },
+      { x: 180, y: 160 },
+      { x: 20, y: 160 },
+      { x: 100, y: 20 },
+    ];
+    const pts: number[] = [];
+    for (let e = 0; e < 3; e++) {
+      const a = verts[e]!;
+      const b = verts[e + 1]!;
+      for (let k = 0; k <= 14; k++) {
+        const t = k / 14;
+        const nx = -(b.y - a.y);
+        const ny = b.x - a.x;
+        const nl = Math.hypot(nx, ny) || 1;
+        const bulge = Math.sin(t * Math.PI) * 6;
+        const j = (detHash(e * 20 + k) - 0.5) * 1.2;
+        pts.push(a.x + (b.x - a.x) * t + (nx / nl) * bulge + j, a.y + (b.y - a.y) * t + (ny / nl) * bulge + j);
+      }
+    }
+    const promoted = promoteFreehandQuickShapeOnRelease(pts);
+    expect(promoted?.kind).toBe("triangle");
+  });
+
+  it("끝이 덜 닫힌 원호(~270°)도 release 에서 ellipse 로 승격한다", () => {
+    const pts: number[] = [];
+    const n = 32;
+    for (let i = 0; i < n; i++) {
+      const t = -Math.PI / 2 + (i / (n - 1)) * Math.PI * 1.55; // ~279°
+      const j = (detHash(i * 3) - 0.5) * 1.5;
+      pts.push(100 + (55 + j) * Math.cos(t), 100 + (52 + j) * Math.sin(t));
+    }
+    const promoted = promoteFreehandQuickShapeOnRelease(pts);
+    expect(promoted?.kind).toBe("ellipse");
+  });
+});
+
+describe("classifyQuickShape — 원/삼각형 실사용 폴백", () => {
+  it("원에 가짜 코너가 잡혀도 radial CV 가 낮으면 ellipse 로 폴백한다", () => {
+    // 지터를 키워 코너 검출기가 1~3개를 잡을 수 있게 하되, 전체 반경 분포는 원형.
+    const pts = ellipseStrokePoints(100, 100, 64, 62, 40, 2.0);
+    const match = classifyQuickShape(pts, QUICKSHAPE_HOLD_MS);
+    expect(match?.kind).toBe("ellipse");
+  });
+
+  it("살짝 불룩한 변의 삼각형은 live 에서도 triangle 로 인식된다", () => {
+    const verts = [
+      { x: 100, y: 15 },
+      { x: 185, y: 165 },
+      { x: 15, y: 165 },
+      { x: 100, y: 15 },
+    ];
+    const pts: number[] = [];
+    for (let e = 0; e < 3; e++) {
+      const a = verts[e]!;
+      const b = verts[e + 1]!;
+      for (let k = 0; k <= 12; k++) {
+        const t = k / 12;
+        const nx = -(b.y - a.y);
+        const ny = b.x - a.x;
+        const nl = Math.hypot(nx, ny) || 1;
+        const bulge = Math.sin(t * Math.PI) * 4;
+        pts.push(a.x + (b.x - a.x) * t + (nx / nl) * bulge, a.y + (b.y - a.y) * t + (ny / nl) * bulge);
+      }
+    }
+    const match = classifyQuickShape(pts, QUICKSHAPE_HOLD_MS);
+    expect(match?.kind).toBe("triangle");
   });
 });

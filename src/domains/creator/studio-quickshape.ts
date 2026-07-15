@@ -57,6 +57,15 @@ export const QUICKSHAPE_RESAMPLE_COUNT = 64; // 코너 검출 전 등호길이 �
 // 손떨림을 크게 줘도 ≤0.16, 원의 곡률이 threshold를 넘겨 잘못 잡힌 코너 3개짜리 오검출은 ~0.49로
 // 한 자릿수 차이가 나 관대하게 잡아도 안전하게 분리된다.
 export const QUICKSHAPE_MAX_SIDE_DEVIATION_RATIO = 0.18;
+// 손그림 삼각형은 변이 살짝 휘는 경우가 흔해 rect 문턱(0.18)보다 관대하게 허용한다.
+// 실측: 살짝 불룩한 변 3개 + 지터면 ~0.22~0.26, 원 오검출 코너 3개 현 편차는 ~0.45+.
+export const QUICKSHAPE_TRIANGLE_MAX_SIDE_DEVIATION_RATIO = 0.28;
+// 타원/원 폴백 — 코너 1~2개 또는 직선성 실패 시, 중심 대비 반경 변동계수(CV)가 낮으면 원형으로 본다.
+// 정다각형·사각형은 CV가 훨씬 커서(정삼각형 ~0.3+, 사각형 ~0.2+) 이 문턱 아래로 잘 안 내려간다.
+export const QUICKSHAPE_ELLIPSE_RADIAL_CV_MAX = 0.16;
+export const QUICKSHAPE_ELLIPSE_RADIAL_CV_MAX_RELAXED = 0.24; // release / 불완전 원호
+export const QUICKSHAPE_ELLIPSE_MIN_ANGULAR_SPAN_DEG = 240; // 불완전 원도 이 각도 이상이면 후보
+export const QUICKSHAPE_ELLIPSE_MAX_ASPECT = 3.2; // 장단축 비가 이보다 크면 원형 후보에서 제외(납작 선 방지)
 
 // ---------------------------------------------------------------------------
 // 내부 수치 헬퍼
@@ -303,6 +312,87 @@ function sideLengthCV(loop: readonly Pt[], cornerIndices: readonly number[]): nu
   return Math.sqrt(variance) / mean;
 }
 
+/**
+ * 원형 유사도 통계 — 중심 대비 반경 변동계수(CV), 각도 커버리지, bbox 장단축비.
+ * 손그림 원에 가짜 코너가 잡히거나 끝점이 덜 닫혀도, CV가 낮고 각도 스팬이 충분하면 ellipse로 폴백한다.
+ */
+function ellipseShapeStats(vertices: readonly Pt[]): {
+  radialCv: number;
+  angularSpanDeg: number;
+  aspect: number;
+  meanR: number;
+} {
+  const n = vertices.length;
+  if (n < 4) {
+    return { radialCv: Number.POSITIVE_INFINITY, angularSpanDeg: 0, aspect: Number.POSITIVE_INFINITY, meanR: 0 };
+  }
+  let sx = 0;
+  let sy = 0;
+  for (const p of vertices) {
+    sx += p.x;
+    sy += p.y;
+  }
+  const cx = sx / n;
+  const cy = sy / n;
+
+  const radii: number[] = [];
+  const angles: number[] = [];
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const p of vertices) {
+    const dx = p.x - cx;
+    const dy = p.y - cy;
+    radii.push(Math.hypot(dx, dy));
+    angles.push(Math.atan2(dy, dx));
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+  }
+  const meanR = radii.reduce((s, v) => s + v, 0) / n;
+  const variance = radii.reduce((s, v) => s + (v - meanR) ** 2, 0) / n;
+  const radialCv = meanR < 1e-6 ? Number.POSITIVE_INFINITY : Math.sqrt(variance) / meanR;
+
+  // 각도 커버리지: 정렬된 atan2 간격 중 최대 갭을 빼고 나머지 스팬.
+  const sorted = angles.slice().sort((a, b) => a - b);
+  let maxGap = 0;
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const gap = sorted[i + 1]! - sorted[i]!;
+    if (gap > maxGap) maxGap = gap;
+  }
+  // wraparound 갭 (첫 + 2π - 마지막)
+  const wrapGap = sorted[0]! + Math.PI * 2 - sorted[sorted.length - 1]!;
+  if (wrapGap > maxGap) maxGap = wrapGap;
+  const angularSpanDeg = ((Math.PI * 2 - maxGap) * 180) / Math.PI;
+
+  const w = Math.max(1e-6, maxX - minX);
+  const h = Math.max(1e-6, maxY - minY);
+  const aspect = Math.max(w, h) / Math.min(w, h);
+
+  return { radialCv, angularSpanDeg, aspect, meanR };
+}
+
+/**
+ * 타원/원 후보 여부. strict 는 live 홀드용, relaxed 는 펜을 바로 뗄 때·불완전 원호용.
+ * aspect 가 너무 크면(납작한 호/선에 가까움) 제외해 line 과 충돌을 막는다.
+ */
+function looksLikeEllipse(vertices: readonly Pt[], mode: "strict" | "relaxed"): boolean {
+  const { radialCv, angularSpanDeg, aspect, meanR } = ellipseShapeStats(vertices);
+  if (!(meanR >= QUICKSHAPE_MIN_SIZE_PX * 0.35)) return false;
+  if (aspect > QUICKSHAPE_ELLIPSE_MAX_ASPECT) return false;
+  const cvMax = mode === "strict" ? QUICKSHAPE_ELLIPSE_RADIAL_CV_MAX : QUICKSHAPE_ELLIPSE_RADIAL_CV_MAX_RELAXED;
+  if (radialCv > cvMax) return false;
+  // 거의 닫힌 루프는 스팬 문턱을 낮추고, 열린 원호는 충분히 돌아야 한다.
+  const minSpan = mode === "strict" ? 200 : QUICKSHAPE_ELLIPSE_MIN_ANGULAR_SPAN_DEG;
+  return angularSpanDeg >= minSpan;
+}
+
+function bboxPoints(bbox: { minX: number; minY: number; maxX: number; maxY: number }): [number, number, number, number] {
+  return [round2(bbox.minX), round2(bbox.minY), round2(bbox.maxX), round2(bbox.maxY)];
+}
+
 // ---------------------------------------------------------------------------
 // 열린 스트로크 분기 — 전체최소제곱(PCA) 직선 적합
 // ---------------------------------------------------------------------------
@@ -373,48 +463,63 @@ function classifyOpenStroke(points: readonly number[], startPt: Pt): QuickShapeM
 
 function classifyClosedLoop(
   points: readonly number[],
-  bbox: { minX: number; minY: number; maxX: number; maxY: number }
+  bbox: { minX: number; minY: number; maxX: number; maxY: number },
+  options?: { relaxTriangle?: boolean; relaxEllipse?: boolean }
 ): QuickShapeMatch | null {
   const vertices = toVertices(points);
   const loop = resampleClosedLoop(vertices, QUICKSHAPE_RESAMPLE_COUNT);
   const cornerIndices = detectCorners(loop, QUICKSHAPE_CORNER_ANGLE_THRESHOLD_DEG);
   const cornerCount = cornerIndices.length;
+  const outPoints = bboxPoints(bbox);
+  const ellipseMode = options?.relaxEllipse ? "relaxed" : "strict";
+  const tryEllipse = (): QuickShapeMatch | null =>
+    looksLikeEllipse(vertices, ellipseMode) ? { kind: "ellipse", points: outPoints } : null;
 
-  const outPoints: [number, number, number, number] = [
-    round2(bbox.minX),
-    round2(bbox.minY),
-    round2(bbox.maxX),
-    round2(bbox.maxY),
-  ];
-
-  if (cornerCount === 0) return { kind: "ellipse", points: outPoints };
-
-  // N===3(삼각형)/N===4(사각형)/5..MAX(다각형) 전부 "변이 실제로 곧은가"부터 공통으로 검사한다 —
-  // 원이 문턱을 살짝 넘긴 지점 몇 개만 코너로 잘못 잡힌 경우(진짜 코너가 아니라 완만한 곡률의
-  // 일부)를 걸러낸다. 통과하지 못하면 그 어떤 kind로도 추측하지 않는다.
-  if (cornerCount === 3 || cornerCount === 4 || cornerCount >= QUICKSHAPE_MIN_POLYGON_SIDES) {
-    if (maxSideDeviationRatio(loop, cornerIndices) > QUICKSHAPE_MAX_SIDE_DEVIATION_RATIO) return null;
+  if (cornerCount === 0) {
+    // 코너 0은 원형의 1차 신호. 다만 아주 찌그러진 루프(장단축 과다)는 ellipse 가드가 막는다.
+    return tryEllipse() ?? { kind: "ellipse", points: outPoints };
   }
 
-  if (cornerCount === 3) return { kind: "triangle", points: outPoints };
+  // 가짜 코너 1~2개(원 곡률 스파이크) — 다각형 후보가 아니므로 원형 폴백만 시도.
+  if (cornerCount === 1 || cornerCount === 2) {
+    return tryEllipse();
+  }
+
+  const sideDev = maxSideDeviationRatio(loop, cornerIndices);
+  const triDevMax = options?.relaxTriangle
+    ? QUICKSHAPE_TRIANGLE_MAX_SIDE_DEVIATION_RATIO
+    : Math.min(QUICKSHAPE_TRIANGLE_MAX_SIDE_DEVIATION_RATIO, QUICKSHAPE_MAX_SIDE_DEVIATION_RATIO + 0.06);
+  // live 에서도 삼각형은 rect 보다 약간 관대(0.24), release 는 0.28.
+
+  if (cornerCount === 3) {
+    if (sideDev <= triDevMax) return { kind: "triangle", points: outPoints };
+    // 원 오검출 코너 3개(현 편차 큼) → 원형 폴백. 진짜 휘어진 삼각형은 폴백 실패 시 null.
+    return tryEllipse();
+  }
 
   if (cornerCount === 4) {
+    if (sideDev > QUICKSHAPE_MAX_SIDE_DEVIATION_RATIO) {
+      // 원/타원에 가짜 코너 4개가 잡힌 경우.
+      return tryEllipse();
+    }
     // Konva RegularPolygon(sides=4)은 마름모로 렌더되어 손그림 사각형과 전혀 달라 보이므로,
     // 4코너는 항상 "rect"(바운딩 박스, 각도 무시)로 보낸다 — 나비매듭은 변 자체가 곧아 위
     // 직선성 검사를 통과해버리므로(자기교차는 "휜 변"이 아니라 "겹친 변" 문제) 별도 가드가 필요하다.
-    // area-ratio(shoelace/bbox ≤ 0.5) 대신 실제 "대각선 두 변이 서로 교차하는가"를 직접 검사한다 —
-    // 정사각형을 45°로 회전한 다이아몬드는 area-ratio가 수학적으로 정확히 0.5(= 이전 문턱과 동일)라
-    // 지터 방향에 따라 무작위로 rect/null 이 갈렸다(적대적 리뷰에서 발견, 회귀 테스트로 검증됨).
-    // 자기교차 검사는 다이아몬드/회전한 사각형은 항상 통과시키면서 진짜 나비매듭만 가려낸다.
     const [c0, c1, c2, c3] = cornerIndices.map((i) => loop[i]!) as [Pt, Pt, Pt, Pt];
-    if (segmentsIntersect(c0, c1, c2, c3) || segmentsIntersect(c1, c2, c3, c0)) return null;
+    if (segmentsIntersect(c0, c1, c2, c3) || segmentsIntersect(c1, c2, c3, c0)) {
+      // 자기교차 낙서 — 원형으로도 보지 않는다.
+      return null;
+    }
     return { kind: "rect", points: outPoints };
   }
 
   if (cornerCount >= QUICKSHAPE_MIN_POLYGON_SIDES && cornerCount <= QUICKSHAPE_MAX_POLYGON_SIDES) {
-    if (sideLengthCV(loop, cornerIndices) > QUICKSHAPE_SIDE_LENGTH_CV_MAX) return null;
-    // SHAPE_PARAM_RANGES.polygonSides(3..12)보다 이미 보수적인 범위지만, 향후 QUICKSHAPE 상수가
-    // 독자적으로 조정되더라도 shapeParams 슬라이더 계약을 벗어나지 않도록 이중 클램프한다.
+    if (sideDev > QUICKSHAPE_MAX_SIDE_DEVIATION_RATIO) {
+      return tryEllipse();
+    }
+    if (sideLengthCV(loop, cornerIndices) > QUICKSHAPE_SIDE_LENGTH_CV_MAX) {
+      return tryEllipse();
+    }
     const sides = clampInt(
       clampInt(cornerCount, QUICKSHAPE_MIN_POLYGON_SIDES, QUICKSHAPE_MAX_POLYGON_SIDES),
       SHAPE_PARAM_RANGES.polygonSides.min,
@@ -423,8 +528,8 @@ function classifyClosedLoop(
     return { kind: "polygon", points: outPoints, polygonSides: sides };
   }
 
-  // N===1, N===2, N>MAX, 또는 변 길이가 고르지 않은 경우 — 추측하지 않고 null.
-  return null;
+  // N>MAX 등 — 원형 폴백 후 포기.
+  return tryEllipse();
 }
 
 // ---------------------------------------------------------------------------
@@ -570,17 +675,49 @@ export function classifyQuickShapeForRelease(points: readonly number[]): QuickSh
   const yn = points[points.length - 1]!;
   // More open ends still count as "trying to close" on release (finger often lifts early).
   const closureRatio = Math.hypot(xn - x0, yn - y0) / total;
-  const releaseClosure = Math.min(0.34, QUICKSHAPE_CLOSURE_RATIO + 0.12);
+  // 원/삼각형은 끝이 덜 닫힌 채 손을 떼는 경우가 흔해 live(0.22)보다 더 관대하게 닫힘으로 본다.
+  const releaseClosure = Math.min(0.42, QUICKSHAPE_CLOSURE_RATIO + 0.2);
+  const vertices = toVertices(points);
 
   if (closureRatio > releaseClosure) {
-    // Temporarily loosen line residual by reusing open classifier after padding a near-line check.
+    // 열린 경로: 직선 우선, 그다음 원호(불완전 원), 마지막에 느슨한 직선.
     const line = classifyOpenStroke(points, { x: x0, y: y0 });
     if (line) return line;
-    // Near-lines that fail the tight residual: accept if max perpendicular residual is still modest.
-    const loose = classifyLooseLine(points, { x: x0, y: y0 });
-    return loose;
+    if (looksLikeEllipse(vertices, "relaxed")) {
+      return { kind: "ellipse", points: bboxPoints(bbox) };
+    }
+    // 열린 삼각형 낙서 — 낮은 각도 문턱으로 코너를 한 번 더 잡아 본다.
+    const openTri = classifyLooseTriangle(points, bbox);
+    if (openTri) return openTri;
+    return classifyLooseLine(points, { x: x0, y: y0 });
   }
-  return classifyClosedLoop(points, bbox);
+  // 닫힌(또는 거의 닫힌) 경로: 삼각형 변 편차·원형 폴백을 완화한 닫힌 루프 분류.
+  return (
+    classifyClosedLoop(points, bbox, { relaxTriangle: true, relaxEllipse: true })
+    ?? classifyLooseTriangle(points, bbox)
+  );
+}
+
+/**
+ * Release 전용 — 코너 문턱을 낮춰 손그림 삼각형(둥근 꼭짓점)을 다시 잡는다.
+ * live 경로에는 쓰지 않는다(원 오검출을 늘릴 수 있음).
+ */
+function classifyLooseTriangle(
+  points: readonly number[],
+  bbox: { minX: number; minY: number; maxX: number; maxY: number }
+): QuickShapeMatch | null {
+  const vertices = toVertices(points);
+  if (vertices.length < 5) return null;
+  // 열린 스트로크도 가상으로 닫아 코너를 센다(끝이 덜 붙은 삼각형).
+  const loop = resampleClosedLoop(vertices, QUICKSHAPE_RESAMPLE_COUNT);
+  const softCorners = detectCorners(loop, Math.max(18, QUICKSHAPE_CORNER_ANGLE_THRESHOLD_DEG - 10));
+  if (softCorners.length !== 3) return null;
+  if (maxSideDeviationRatio(loop, softCorners) > QUICKSHAPE_TRIANGLE_MAX_SIDE_DEVIATION_RATIO) {
+    return null;
+  }
+  // 원형에 가까운 3코너 오검출은 제외(이미 ellipse 후보였을 것).
+  if (looksLikeEllipse(vertices, "relaxed")) return null;
+  return { kind: "triangle", points: bboxPoints(bbox) };
 }
 
 /** Slightly looser open-stroke line accept for release-only promotion. */
