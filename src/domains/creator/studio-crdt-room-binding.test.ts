@@ -396,6 +396,51 @@ describe("StudioCrdtRoomBinding", () => {
     server.destroy();
   });
 
+  it("keeps degraded outbox health visible after fallback restore and server sync", async () => {
+    const server = new StudioCrdtDocument();
+    const client = new StudioCrdtDocument();
+    const fake = new FakeRoom(server);
+    const statuses: Array<{
+      state: string;
+      message: string;
+      durabilityAtRisk?: boolean;
+    }> = [];
+    const outbox: StudioCrdtOutbox = {
+      async list() {
+        return [];
+      },
+      async put() {
+        return undefined;
+      },
+      async remove() {
+        return undefined;
+      },
+      getStatus: () => ({
+        state: "degraded",
+        message: "permanent IndexedDB read failure",
+      }),
+    };
+    const binding = new StudioCrdtRoomBinding({
+      document: client,
+      room: room(fake),
+      outbox,
+      outboxScope: "user-degraded-restore",
+      onStatus: (status) => statuses.push(status),
+    });
+
+    await binding.start();
+
+    expect(statuses.at(-1)).toMatchObject({
+      state: "error",
+      durabilityAtRisk: true,
+    });
+    expect(statuses.at(-1)?.message).toContain("permanent IndexedDB read failure");
+
+    binding.close();
+    client.destroy();
+    server.destroy();
+  });
+
   it("times out a wedged local persistence call and still reaches the online server", async () => {
     vi.useFakeTimers();
     const server = new StudioCrdtDocument();

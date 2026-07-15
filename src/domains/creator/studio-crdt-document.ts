@@ -13,6 +13,20 @@ import {
   STUDIO_CRDT_UPDATE_MAX_BYTES,
   type StudioCrdtSyncResponse,
 } from "./studio-crdt-protocol";
+import {
+  STUDIO_CRDT_PAGE_PAYLOAD_VERSION,
+  STUDIO_CRDT_PAGE_PROPERTY_KEYS,
+  STUDIO_CRDT_REQUIRED_SCENE_ELEMENT_KEYS,
+  STUDIO_CRDT_SCENE_ELEMENT_KEYS_BY_TYPE,
+  STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION,
+  isStudioCrdtSceneElementType,
+  validateStudioCrdtPagePayload,
+  validateStudioCrdtSceneElementPayload,
+  type StudioCrdtJsonObject,
+  type StudioCrdtJsonValue,
+  type StudioCrdtPagePayload,
+  type StudioCrdtSceneElementPayload,
+} from "./studio-crdt-scene-schema";
 
 export {
   STUDIO_CRDT_ORIGIN_LOCAL,
@@ -20,6 +34,20 @@ export {
   STUDIO_CRDT_ORIGIN_SYNC,
   STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
 } from "./studio-crdt-protocol";
+export {
+  STUDIO_CRDT_PAGE_MAX_BYTES,
+  STUDIO_CRDT_PAGE_PAYLOAD_VERSION,
+  STUDIO_CRDT_SCENE_ELEMENT_MAX_BYTES,
+  STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION,
+  STUDIO_CRDT_SCENE_ELEMENT_TYPES,
+  validateStudioCrdtPagePayload,
+  validateStudioCrdtSceneElementPayload,
+  type StudioCrdtJsonObject,
+  type StudioCrdtJsonValue,
+  type StudioCrdtPagePayload,
+  type StudioCrdtSceneElementPayload,
+  type StudioCrdtSceneElementType,
+} from "./studio-crdt-scene-schema";
 export const STUDIO_CRDT_STROKE_MAX_SAMPLES = 100_000;
 export const STUDIO_CRDT_APPEND_MAX_SAMPLES = 4_096;
 export const STUDIO_CRDT_REPLACE_CHUNK_SAMPLES = 256;
@@ -39,6 +67,11 @@ const BATCH_MAX_DELAY_MS = 50;
 const DEFAULT_BATCH_DELAY_MS = 40;
 const DEFAULT_BATCH_MAX_BYTES = 32 * 1024;
 const TEXT_ENCODER = new TextEncoder();
+const SCENE_ELEMENT_ROOT_PREFIX = "scene-element:";
+const PAGE_ROOT_PREFIX = "studio-page:";
+const PROPERTY_PREFIX = "prop:";
+const BASELINE_PROPERTY_PREFIX = "base:";
+const UNSET_PROPERTY_PREFIX = "unset:";
 
 const SAMPLE_ARRAY_KEYS = [
   "points",
@@ -62,19 +95,15 @@ const JSON_PAYLOAD_KEYS = [
 ] as const;
 
 const OPTIONAL_STRING_PAYLOAD_KEYS = ["fill", "brush", "blendMode"] as const;
+const STROKE_PAYLOAD_KEYS = [
+  "version", "type", "kind", "mode", "stroke", "strokeWidth", "opacity", "fill",
+  "gradient", "pattern", "brush", "sampleSpacing", "brushDynamics", "brushTip",
+  "strokeStyle", "shapeParams", "symmetry", "blendMode", "extensions", ...SAMPLE_ARRAY_KEYS,
+] as const;
 
 type StudioCrdtSampleArrayKey = (typeof SAMPLE_ARRAY_KEYS)[number];
 type StudioCrdtStringPayloadKey = (typeof OPTIONAL_STRING_PAYLOAD_KEYS)[number];
-
-export type StudioCrdtJsonValue =
-  | null
-  | boolean
-  | number
-  | string
-  | StudioCrdtJsonValue[]
-  | { [key: string]: StudioCrdtJsonValue };
-
-export type StudioCrdtJsonObject = { [key: string]: StudioCrdtJsonValue };
+export type StudioCrdtStrokePayloadKey = (typeof STROKE_PAYLOAD_KEYS)[number];
 
 export interface StudioCrdtStrokeSamples {
   /** Flattened logical coordinates: [x0, y0, x1, y1, ...]. */
@@ -124,6 +153,72 @@ export interface StudioCrdtStrokeRecord extends StudioCrdtStrokeInput {
   orderIndex: number;
 }
 
+/**
+ * Small, editable Studio objects only. Raster images and embedded 3D documents intentionally stay
+ * outside this envelope because their sources belong in asset storage, not a 48 KiB realtime op.
+ */
+export interface StudioCrdtSceneElementInput {
+  id: string;
+  pageId: string;
+  layerId: string;
+  payload: StudioCrdtSceneElementPayload;
+}
+
+export interface StudioCrdtSceneElementRecord extends StudioCrdtSceneElementInput {
+  deleted: boolean;
+  orderIndex: number;
+}
+
+export interface StudioCrdtSceneElementQuery {
+  pageId?: string;
+  layerId?: string;
+  includeDeleted?: boolean;
+}
+
+export interface StudioCrdtSceneElementPatch {
+  pageId?: string;
+  layerId?: string;
+  set?: StudioCrdtJsonObject;
+  unset?: readonly string[];
+}
+
+export interface StudioCrdtSceneElementUpsertOptions {
+  beforeElementId?: string | null;
+  resurrect?: boolean;
+  /**
+   * Legacy bootstrap contract. Every peer supplies the same previous snapshot as `baselineProps`
+   * and only its actual local edits as `changedProps`. Baselines and edits use different Y.Map
+   * keys, so simultaneous first registration of one legacy ID preserves independent field edits.
+   */
+  baselineProps?: StudioCrdtJsonObject;
+  changedProps?: readonly string[];
+  /** Optional baseline fields intentionally removed by this first local edit. */
+  unsetProps?: readonly string[];
+}
+
+export interface StudioCrdtPageInput {
+  id: string;
+  payload: StudioCrdtPagePayload;
+}
+
+export interface StudioCrdtPageRecord extends StudioCrdtPageInput {
+  deleted: boolean;
+  orderIndex: number;
+}
+
+export interface StudioCrdtPagePatch {
+  set?: StudioCrdtJsonObject;
+  unset?: readonly string[];
+}
+
+export interface StudioCrdtPageUpsertOptions {
+  beforePageId?: string | null;
+  resurrect?: boolean;
+  baselineProps?: StudioCrdtJsonObject;
+  changedProps?: readonly string[];
+  unsetProps?: readonly string[];
+}
+
 export interface StudioCrdtStrokeQuery {
   pageId?: string;
   layerId?: string;
@@ -136,12 +231,24 @@ export interface StudioCrdtUpsertOptions {
   status?: StudioCrdtStrokeRecord["status"];
 }
 
+export interface StudioCrdtStrokePatch {
+  pageId?: string;
+  layerId?: string;
+  /** Complete candidate payload; only `changedPayloadKeys` are written to the shared record. */
+  payload?: StudioCrdtDrawStrokePayload;
+  changedPayloadKeys?: readonly StudioCrdtStrokePayloadKey[];
+}
+
 export interface StudioCrdtChange {
   origin: unknown;
   local: boolean;
   /** Exact IDs touched by record/sample operations; order-only corruption may conservatively widen. */
   changedStrokeIds: ReadonlySet<string>;
   strokes: StudioCrdtStrokeRecord[];
+  changedSceneElementIds: ReadonlySet<string>;
+  sceneElements: StudioCrdtSceneElementRecord[];
+  changedPageIds: ReadonlySet<string>;
+  pages: StudioCrdtPageRecord[];
 }
 
 export interface StudioCrdtChangeSubscriptionOptions {
@@ -237,6 +344,77 @@ function cloneJsonObject(value: StudioCrdtJsonObject): StudioCrdtJsonObject {
     throw new Error("획 확장 데이터는 JSON 객체여야 합니다.");
   }
   return cloned;
+}
+
+function sceneElementRootName(id: string): string {
+  return `${SCENE_ELEMENT_ROOT_PREFIX}${encodeURIComponent(id)}`;
+}
+
+function pageRootName(id: string): string {
+  return `${PAGE_ROOT_PREFIX}${encodeURIComponent(id)}`;
+}
+
+function propertyKey(prefix: typeof PROPERTY_PREFIX | typeof BASELINE_PROPERTY_PREFIX, key: string): string {
+  return `${prefix}${key}`;
+}
+
+function readCrdtProperties(record: Y.Map<unknown>): StudioCrdtJsonObject {
+  const result: StudioCrdtJsonObject = {};
+  let encodedKeyCount = 0;
+  for (const key of record.keys()) {
+    if (
+      key.startsWith(BASELINE_PROPERTY_PREFIX) || key.startsWith(PROPERTY_PREFIX) ||
+      key.startsWith(UNSET_PROPERTY_PREFIX)
+    ) {
+      encodedKeyCount += 1;
+      if (encodedKeyCount > 256) throw new Error("CRDT 요소 속성 수가 허용 범위를 초과했습니다.");
+    }
+  }
+  for (const [key, value] of record) {
+    if (!key.startsWith(BASELINE_PROPERTY_PREFIX)) continue;
+    const property = key.slice(BASELINE_PROPERTY_PREFIX.length);
+    const cloned = cloneAndValidateJson(value as StudioCrdtJsonValue);
+    result[property] = cloned;
+  }
+  for (const [key, value] of record) {
+    if (!key.startsWith(PROPERTY_PREFIX)) continue;
+    const property = key.slice(PROPERTY_PREFIX.length);
+    const cloned = cloneAndValidateJson(value as StudioCrdtJsonValue);
+    result[property] = cloned;
+  }
+  for (const [key, value] of record) {
+    if (!key.startsWith(UNSET_PROPERTY_PREFIX) || value !== true) continue;
+    delete result[key.slice(UNSET_PROPERTY_PREFIX.length)];
+  }
+  return result;
+}
+
+function setCrdtProperties(
+  record: Y.Map<unknown>,
+  prefix: typeof PROPERTY_PREFIX | typeof BASELINE_PROPERTY_PREFIX,
+  props: StudioCrdtJsonObject,
+  keys: readonly string[] = Object.keys(props)
+): void {
+  for (const key of keys) {
+    if (!(key in props)) continue;
+    record.set(propertyKey(prefix, key), cloneAndValidateJson(props[key]!));
+    if (prefix === PROPERTY_PREFIX) record.set(`${UNSET_PROPERTY_PREFIX}${key}`, false);
+  }
+}
+
+function validateUnsetKeys(
+  keys: readonly string[],
+  allowed: ReadonlySet<string>,
+  required: readonly string[]
+): void {
+  const seen = new Set<string>();
+  for (const key of keys) {
+    if (!exactText(key, MAX_TEXT_LENGTH) || !allowed.has(key) || seen.has(key)) {
+      throw new Error("동기화에서 제거할 속성이 올바르지 않습니다.");
+    }
+    if (required.includes(key)) throw new Error(`${key} 필수 속성은 제거할 수 없습니다.`);
+    seen.add(key);
+  }
 }
 
 function payloadMetadataByteLength(payload: StudioCrdtDrawStrokePayload): number {
@@ -400,6 +578,51 @@ function setPayloadMetadata(record: Y.Map<unknown>, payload: StudioCrdtDrawStrok
   }
 }
 
+function setPayloadMetadataField(
+  record: Y.Map<unknown>,
+  payload: StudioCrdtDrawStrokePayload,
+  key: Exclude<StudioCrdtStrokePayloadKey, StudioCrdtSampleArrayKey>
+): void {
+  if (key === "version") record.set("payloadVersion", payload.version);
+  else if (key === "type") record.set("type", payload.type);
+  else if (key === "kind") record.set("kind", payload.kind);
+  else if (key === "mode") record.set("mode", payload.mode);
+  else if (key === "stroke") record.set("stroke", payload.stroke);
+  else if (key === "strokeWidth") record.set("strokeWidth", payload.strokeWidth);
+  else if (key === "opacity" || key === "sampleSpacing") {
+    setOptionalRecordValue(record, key, payload[key]);
+  } else if ((OPTIONAL_STRING_PAYLOAD_KEYS as readonly string[]).includes(key)) {
+    const stringKey = key as StudioCrdtStringPayloadKey;
+    setOptionalRecordValue(record, stringKey, payload[stringKey]);
+  } else {
+    const jsonKey = key as (typeof JSON_PAYLOAD_KEYS)[number];
+    const value = payload[jsonKey];
+    if (value === undefined) record.delete(jsonKey);
+    else record.set(jsonKey, cloneJsonObject(value));
+  }
+}
+
+function mergeStrokePayloadFields(
+  current: StudioCrdtDrawStrokePayload,
+  next: StudioCrdtDrawStrokePayload,
+  changedKeys: readonly StudioCrdtStrokePayloadKey[]
+): StudioCrdtDrawStrokePayload {
+  const merged = { ...current } as Record<string, unknown>;
+  for (const key of changedKeys) {
+    const value = next[key];
+    if (value === undefined) {
+      delete merged[key];
+    } else if (Array.isArray(value)) {
+      merged[key] = [...value];
+    } else if (value !== null && typeof value === "object") {
+      merged[key] = cloneJsonObject(value as StudioCrdtJsonObject);
+    } else {
+      merged[key] = value;
+    }
+  }
+  return merged as unknown as StudioCrdtDrawStrokePayload;
+}
+
 function readPayload(record: Y.Map<unknown>): StudioCrdtDrawStrokePayload | null {
   const version = record.get("payloadVersion");
   const type = record.get("type");
@@ -471,6 +694,18 @@ function orderEntryValue(entry: unknown, key: string): string | null {
   return typeof value === "string" ? value : null;
 }
 
+function sceneOrderEntryId(entry: unknown): string | null {
+  return orderEntryValue(entry, "elementId");
+}
+
+function pageOrderEntryId(entry: unknown): string | null {
+  return orderEntryValue(entry, "pageId");
+}
+
+function mixedOrderEntryId(entry: unknown): string | null {
+  return orderEntryValue(entry, "strokeId") ?? sceneOrderEntryId(entry);
+}
+
 export function mergeStudioCrdtUpdates(updates: readonly Uint8Array[]): Uint8Array {
   if (updates.length === 0) throw new Error("병합할 CRDT 업데이트가 없습니다.");
   return updates.length === 1 ? updates[0].slice() : Y.mergeUpdates([...updates]);
@@ -483,16 +718,26 @@ export function mergeStudioCrdtUpdates(updates: readonly Uint8Array[]): Uint8Arr
 export class StudioCrdtDocument {
   private readonly doc: Y.Doc;
   private readonly strokes: Y.Map<Y.Map<unknown>>;
+  private readonly sceneElementIds: Y.Map<boolean>;
+  private readonly pageIds: Y.Map<boolean>;
   private readonly order: Y.Array<Y.Map<unknown>>;
+  private readonly pageOrder: Y.Array<Y.Map<unknown>>;
   private readonly cleanup = new Set<() => void>();
   private readonly strokeIdByType = new WeakMap<object, string>();
   private readonly changedStrokeIdsByTransaction = new WeakMap<Y.Transaction, Set<string>>();
+  private readonly changedSceneElementIdsByTransaction = new WeakMap<Y.Transaction, Set<string>>();
+  private readonly changedPageIdsByTransaction = new WeakMap<Y.Transaction, Set<string>>();
+  private readonly observedSceneElementRoots = new Set<string>();
+  private readonly observedPageRoots = new Set<string>();
   private destroyed = false;
 
   constructor(initialUpdate?: Uint8Array | string) {
     this.doc = new Y.Doc();
     this.strokes = this.doc.getMap<Y.Map<unknown>>("strokes");
+    this.sceneElementIds = this.doc.getMap<boolean>("scene-elements");
+    this.pageIds = this.doc.getMap<boolean>("studio-pages");
     this.order = this.doc.getArray<Y.Map<unknown>>("stroke-order");
+    this.pageOrder = this.doc.getArray<Y.Map<unknown>>("page-order");
     if (initialUpdate !== undefined) {
       const decoded =
         typeof initialUpdate === "string" ? decodeStudioCrdtUpdate(initialUpdate) : initialUpdate;
@@ -500,6 +745,12 @@ export class StudioCrdtDocument {
     }
     for (const [id, value] of this.strokes) this.registerRecord(id, value);
     for (const value of this.order) this.registerOrderEntry(value);
+    for (const [id, active] of this.sceneElementIds) {
+      if (active === true) this.observeSceneElementRoot(id);
+    }
+    for (const [id, active] of this.pageIds) {
+      if (active === true) this.observePageRoot(id);
+    }
 
     const observeStrokes: Parameters<typeof this.strokes.observeDeep>[0] = (events, transaction) => {
       const changedIds = this.changedIdsFor(transaction);
@@ -515,16 +766,19 @@ export class StudioCrdtDocument {
       }
     };
     const observeOrder: Parameters<typeof this.order.observeDeep>[0] = (events, transaction) => {
-      const changedIds = this.changedIdsFor(transaction);
+      const changedStrokeIds = this.changedIdsFor(transaction);
+      const changedSceneElementIds = this.changedSceneElementIdsFor(transaction);
       for (const event of events) {
         const knownId = this.strokeIdByType.get(event.target);
-        if (knownId) changedIds.add(knownId);
+        if (knownId) changedStrokeIds.add(knownId);
         if (event.target instanceof Y.Map) {
-          const id = orderEntryValue(event.target, "strokeId");
-          if (id) {
-            changedIds.add(id);
+          const strokeId = orderEntryValue(event.target, "strokeId");
+          const elementId = sceneOrderEntryId(event.target);
+          if (strokeId) {
+            changedStrokeIds.add(strokeId);
             this.registerOrderEntry(event.target);
           }
+          if (elementId) changedSceneElementIds.add(elementId);
         }
         if (event.target !== this.order || !(event instanceof Y.YArrayEvent)) continue;
         let deletedUnknownEntry = false;
@@ -532,8 +786,10 @@ export class StudioCrdtDocument {
           if (delta.delete) deletedUnknownEntry = true;
           if (!Array.isArray(delta.insert)) continue;
           for (const value of delta.insert) {
-            const id = orderEntryValue(value, "strokeId");
-            if (id) changedIds.add(id);
+            const strokeId = orderEntryValue(value, "strokeId");
+            const elementId = sceneOrderEntryId(value);
+            if (strokeId) changedStrokeIds.add(strokeId);
+            if (elementId) changedSceneElementIds.add(elementId);
             this.registerOrderEntry(value);
           }
         }
@@ -541,7 +797,50 @@ export class StudioCrdtDocument {
           // Production operations tombstone entries instead of deleting them. For an untrusted
           // structural delete, all surviving indices may have shifted, so widening is safest.
           for (const value of this.order) {
-            const id = orderEntryValue(value, "strokeId");
+            const strokeId = orderEntryValue(value, "strokeId");
+            const elementId = sceneOrderEntryId(value);
+            if (strokeId) changedStrokeIds.add(strokeId);
+            if (elementId) changedSceneElementIds.add(elementId);
+          }
+        }
+      }
+    };
+    const observeSceneElementIds = (event: Y.YMapEvent<boolean>, transaction: Y.Transaction) => {
+      const changedIds = this.changedSceneElementIdsFor(transaction);
+      for (const id of event.keysChanged) {
+        if (!exactText(id, MAX_ID_LENGTH)) continue;
+        changedIds.add(id);
+        if (this.sceneElementIds.get(id) === true) this.observeSceneElementRoot(id);
+      }
+    };
+    const observePageIds = (event: Y.YMapEvent<boolean>, transaction: Y.Transaction) => {
+      const changedIds = this.changedPageIdsFor(transaction);
+      for (const id of event.keysChanged) {
+        if (!exactText(id, MAX_ID_LENGTH)) continue;
+        changedIds.add(id);
+        if (this.pageIds.get(id) === true) this.observePageRoot(id);
+      }
+    };
+    const observePageOrder: Parameters<typeof this.pageOrder.observeDeep>[0] = (events, transaction) => {
+      const changedIds = this.changedPageIdsFor(transaction);
+      for (const event of events) {
+        if (event.target instanceof Y.Map) {
+          const id = pageOrderEntryId(event.target);
+          if (id) changedIds.add(id);
+        }
+        if (event.target !== this.pageOrder || !(event instanceof Y.YArrayEvent)) continue;
+        let deletedUnknownEntry = false;
+        for (const delta of event.changes.delta) {
+          if (delta.delete) deletedUnknownEntry = true;
+          if (!Array.isArray(delta.insert)) continue;
+          for (const value of delta.insert) {
+            const id = pageOrderEntryId(value);
+            if (id) changedIds.add(id);
+          }
+        }
+        if (deletedUnknownEntry) {
+          for (const value of this.pageOrder) {
+            const id = pageOrderEntryId(value);
             if (id) changedIds.add(id);
           }
         }
@@ -549,8 +848,14 @@ export class StudioCrdtDocument {
     };
     this.strokes.observeDeep(observeStrokes);
     this.order.observeDeep(observeOrder);
+    this.sceneElementIds.observe(observeSceneElementIds);
+    this.pageIds.observe(observePageIds);
+    this.pageOrder.observeDeep(observePageOrder);
     this.cleanup.add(() => this.strokes.unobserveDeep(observeStrokes));
     this.cleanup.add(() => this.order.unobserveDeep(observeOrder));
+    this.cleanup.add(() => this.sceneElementIds.unobserve(observeSceneElementIds));
+    this.cleanup.add(() => this.pageIds.unobserve(observePageIds));
+    this.cleanup.add(() => this.pageOrder.unobserveDeep(observePageOrder));
   }
 
   subscribe(handler: StudioCrdtUpdateHandler): () => void {
@@ -577,6 +882,12 @@ export class StudioCrdtDocument {
         local: transaction.local || transaction.origin === STUDIO_CRDT_ORIGIN_LOCAL,
         changedStrokeIds: new Set(this.changedStrokeIdsByTransaction.get(transaction) ?? []),
         strokes: this.getStrokes({ includeDeleted: true }),
+        changedSceneElementIds: new Set(
+          this.changedSceneElementIdsByTransaction.get(transaction) ?? []
+        ),
+        sceneElements: this.getSceneElements({ includeDeleted: true }),
+        changedPageIds: new Set(this.changedPageIdsByTransaction.get(transaction) ?? []),
+        pages: this.getPages(true),
       });
     };
     this.doc.on("afterTransaction", listener);
@@ -769,6 +1080,75 @@ export class StudioCrdtDocument {
     return this.upsertStroke(input, { status: "finalized" });
   }
 
+  /**
+   * Applies only fields that changed in the caller's local before/after snapshot. Independent
+   * metadata edits therefore remain independent Y.Map operations instead of a replace-all write.
+   * Pointer arrays are one aligned atomic group and retain the existing bounded chunk transport.
+   */
+  patchStroke(id: string, patch: StudioCrdtStrokePatch): StudioCrdtStrokeRecord {
+    this.assertAlive();
+    assertId(id, "획");
+    const record = this.strokes.get(id);
+    if (!(record instanceof Y.Map) || record.get("deleted") === true) {
+      throw new Error("수정할 획을 찾을 수 없습니다.");
+    }
+    const current = this.requiredStroke(id);
+    const changedKeys = [...new Set(patch.changedPayloadKeys ?? [])];
+    for (const key of changedKeys) {
+      if (!(STROKE_PAYLOAD_KEYS as readonly string[]).includes(key)) {
+        throw new Error("수정할 획 속성이 올바르지 않습니다.");
+      }
+    }
+    if (changedKeys.some((key) => (SAMPLE_ARRAY_KEYS as readonly string[]).includes(key))) {
+      for (const key of SAMPLE_ARRAY_KEYS) {
+        if (!changedKeys.includes(key)) changedKeys.push(key);
+      }
+    }
+    if (changedKeys.length > 0 && !patch.payload) {
+      throw new Error("획 속성을 수정하려면 다음 페이로드가 필요합니다.");
+    }
+    const pageId = patch.pageId ?? current.pageId;
+    const layerId = patch.layerId ?? current.layerId;
+    const payload = patch.payload
+      ? mergeStrokePayloadFields(current.payload, patch.payload, changedKeys)
+      : current.payload;
+    this.assertStrokeInput({ id, pageId, layerId, payload }, true);
+
+    const requiresReorder = pageId !== current.pageId || layerId !== current.layerId;
+    if (requiresReorder) this.assertOrderEditBound(id);
+    const sampleChanged = changedKeys.some((key) =>
+      (SAMPLE_ARRAY_KEYS as readonly string[]).includes(key)
+    );
+    const metadataKeys = changedKeys.filter((key) =>
+      !(SAMPLE_ARRAY_KEYS as readonly string[]).includes(key)
+    ) as Exclude<StudioCrdtStrokePayloadKey, StudioCrdtSampleArrayKey>[];
+    if (!requiresReorder && !sampleChanged && metadataKeys.length === 0) return current;
+
+    const normalized = sampleChanged ? normalizedSamples(payload, true) : null;
+    this.doc.transact(() => {
+      if (requiresReorder) {
+        record.set("pageId", pageId);
+        record.set("layerId", layerId);
+        this.deactivateOrderEntries(id);
+        this.insertOrderEntry({ id, pageId, layerId }, null);
+      }
+      for (const key of metadataKeys) setPayloadMetadataField(record, payload, key);
+      if (sampleChanged) {
+        record.set("status", "drawing");
+        for (const key of SAMPLE_ARRAY_KEYS) {
+          const target = yArray(record, key);
+          if (!target) throw new Error("획 샘플 배열이 손상되었습니다.");
+          if (target.length > 0) target.delete(0, target.length);
+        }
+      }
+    }, STUDIO_CRDT_ORIGIN_LOCAL);
+    if (normalized) {
+      this.appendNormalizedSamples(record, normalized);
+      this.doc.transact(() => record.set("status", "finalized"), STUDIO_CRDT_ORIGIN_LOCAL);
+    }
+    return this.requiredStroke(id);
+  }
+
   deleteStroke(id: string): boolean {
     this.assertAlive();
     assertId(id, "획");
@@ -837,6 +1217,396 @@ export class StudioCrdtDocument {
         left.pageId.localeCompare(right.pageId) ||
         left.orderIndex - right.orderIndex ||
         left.id.localeCompare(right.id)
+    );
+  }
+
+  addSceneElement(
+    input: StudioCrdtSceneElementInput,
+    beforeElementId: string | null = null
+  ): StudioCrdtSceneElementRecord {
+    if (this.sceneElementIds.get(input.id) === true) {
+      throw new Error("이미 존재하는 장면 요소 식별자입니다.");
+    }
+    return this.upsertSceneElement(input, { beforeElementId });
+  }
+
+  upsertSceneElement(
+    input: StudioCrdtSceneElementInput,
+    options: StudioCrdtSceneElementUpsertOptions = {}
+  ): StudioCrdtSceneElementRecord {
+    this.assertAlive();
+    this.assertSceneElementInput(input);
+    const payload = validateStudioCrdtSceneElementPayload(input.payload);
+    const exists = this.sceneElementIds.get(input.id) === true;
+    const record = this.sceneElementRecord(input.id, !exists);
+    if (!record) throw new Error("장면 요소 레코드가 손상되었습니다.");
+    const existingPayload = exists ? this.readSceneElementPayload(record) : null;
+    if (exists && !existingPayload) throw new Error("기존 장면 요소 레코드가 손상되었습니다.");
+    if (existingPayload && existingPayload.type !== payload.type) {
+      throw new Error("기존 장면 요소의 타입은 변경할 수 없습니다.");
+    }
+    if (record.get("deleted") === true && !options.resurrect) {
+      throw new Error("삭제된 장면 요소는 명시적으로 복원해야 합니다.");
+    }
+
+    const usesLegacyBootstrap = options.baselineProps !== undefined || options.changedProps !== undefined ||
+      options.unsetProps !== undefined;
+    let baseline: StudioCrdtJsonObject | null = null;
+    let changedProps: readonly string[] = [];
+    let unsetProps: readonly string[] = [];
+    if (usesLegacyBootstrap) {
+      if (!options.baselineProps) {
+        throw new Error("레거시 요소 등록에는 기준 속성이 필요합니다.");
+      }
+      baseline = validateStudioCrdtSceneElementPayload({
+        version: STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION,
+        type: payload.type,
+        props: options.baselineProps,
+      }).props;
+      const allowed = STUDIO_CRDT_SCENE_ELEMENT_KEYS_BY_TYPE[payload.type];
+      const seen = new Set<string>();
+      for (const key of options.changedProps ?? []) {
+        if (!exactText(key, MAX_TEXT_LENGTH) || !allowed.has(key) || seen.has(key) || !(key in payload.props)) {
+          throw new Error("레거시 요소의 변경 속성 목록이 올바르지 않습니다.");
+        }
+        seen.add(key);
+      }
+      changedProps = [...seen];
+      validateUnsetKeys(
+        options.unsetProps ?? [],
+        allowed,
+        STUDIO_CRDT_REQUIRED_SCENE_ELEMENT_KEYS[payload.type]
+      );
+      unsetProps = [...new Set(options.unsetProps ?? [])];
+      if (unsetProps.some((key) => seen.has(key) || key in payload.props)) {
+        throw new Error("제거할 레거시 속성은 변경 목록과 현재 페이로드에 포함될 수 없습니다.");
+      }
+    }
+
+    const previousPageId = readString(record, "pageId");
+    const previousLayerId = readString(record, "layerId");
+    const requiresOrderEntry = !exists || previousPageId !== input.pageId ||
+      previousLayerId !== input.layerId || options.beforeElementId !== undefined;
+    if (exists && requiresOrderEntry) this.assertMixedOrderEditBound(input.id, "elementId");
+
+    this.doc.transact(() => {
+      this.sceneElementIds.set(input.id, true);
+      record.set("id", input.id);
+      record.set("pageId", input.pageId);
+      record.set("layerId", input.layerId);
+      record.set("payloadVersion", payload.version);
+      record.set("type", payload.type);
+      if (!exists || options.resurrect) record.set("deleted", false);
+      if (baseline) {
+        for (const [key, value] of Object.entries(baseline)) {
+          const baselineKey = propertyKey(BASELINE_PROPERTY_PREFIX, key);
+          if (!record.has(baselineKey)) record.set(baselineKey, cloneAndValidateJson(value));
+        }
+        setCrdtProperties(record, PROPERTY_PREFIX, payload.props, changedProps);
+        for (const key of unsetProps) record.set(`${UNSET_PROPERTY_PREFIX}${key}`, true);
+      } else {
+        const previous = existingPayload?.props ?? {};
+        setCrdtProperties(record, PROPERTY_PREFIX, payload.props);
+        for (const key of Object.keys(previous)) {
+          if (!(key in payload.props)) record.set(`${UNSET_PROPERTY_PREFIX}${key}`, true);
+        }
+      }
+      if (requiresOrderEntry) {
+        this.deactivateMixedOrderEntries(input.id, "elementId");
+        this.insertSceneOrderEntry(input, options.beforeElementId ?? null);
+      }
+    }, STUDIO_CRDT_ORIGIN_LOCAL);
+    return this.requiredSceneElement(input.id);
+  }
+
+  patchSceneElement(id: string, patch: StudioCrdtSceneElementPatch): StudioCrdtSceneElementRecord {
+    this.assertAlive();
+    assertId(id, "장면 요소");
+    const record = this.sceneElementRecord(id);
+    if (!record) throw new Error("수정할 장면 요소를 찾을 수 없습니다.");
+    const current = this.readSceneElementPayload(record);
+    if (!current) throw new Error("장면 요소 레코드가 손상되었습니다.");
+    const set = patch.set ? cloneJsonObject(patch.set) : {};
+    const unset = patch.unset ?? [];
+    const allowed = STUDIO_CRDT_SCENE_ELEMENT_KEYS_BY_TYPE[current.type];
+    for (const key of Object.keys(set)) {
+      if (!allowed.has(key)) throw new Error(`${current.type} 요소의 ${key} 속성은 동기화할 수 없습니다.`);
+    }
+    validateUnsetKeys(unset, allowed, STUDIO_CRDT_REQUIRED_SCENE_ELEMENT_KEYS[current.type]);
+    const nextProps = { ...current.props, ...set };
+    for (const key of unset) delete nextProps[key];
+    validateStudioCrdtSceneElementPayload({ ...current, props: nextProps });
+    if (patch.pageId !== undefined) assertId(patch.pageId, "페이지");
+    if (patch.layerId !== undefined) assertId(patch.layerId, "레이어");
+    const nextPageId = patch.pageId ?? readString(record, "pageId");
+    const nextLayerId = patch.layerId ?? readString(record, "layerId");
+    if (!nextPageId || !nextLayerId) throw new Error("장면 요소 위치 정보가 손상되었습니다.");
+    const reparented = nextPageId !== record.get("pageId") || nextLayerId !== record.get("layerId");
+    if (reparented) this.assertMixedOrderEditBound(id, "elementId");
+
+    this.doc.transact(() => {
+      record.set("pageId", nextPageId);
+      record.set("layerId", nextLayerId);
+      setCrdtProperties(record, PROPERTY_PREFIX, set);
+      for (const key of unset) record.set(`${UNSET_PROPERTY_PREFIX}${key}`, true);
+      if (reparented) {
+        this.deactivateMixedOrderEntries(id, "elementId");
+        this.insertSceneOrderEntry({ id, pageId: nextPageId, layerId: nextLayerId }, null);
+      }
+    }, STUDIO_CRDT_ORIGIN_LOCAL);
+    return this.requiredSceneElement(id);
+  }
+
+  deleteSceneElement(id: string): boolean {
+    this.assertAlive();
+    assertId(id, "장면 요소");
+    const record = this.sceneElementRecord(id);
+    if (!record || record.get("deleted") === true) return false;
+    this.doc.transact(() => record.set("deleted", true), STUDIO_CRDT_ORIGIN_LOCAL);
+    return true;
+  }
+
+  restoreSceneElement(id: string): boolean {
+    this.assertAlive();
+    assertId(id, "장면 요소");
+    const record = this.sceneElementRecord(id);
+    if (!record || record.get("deleted") !== true) return false;
+    this.doc.transact(() => record.set("deleted", false), STUDIO_CRDT_ORIGIN_LOCAL);
+    return true;
+  }
+
+  moveSceneElement(id: string, beforeElementId: string | null): StudioCrdtSceneElementRecord {
+    this.assertAlive();
+    assertId(id, "장면 요소");
+    if (beforeElementId !== null) assertId(beforeElementId, "대상 요소");
+    const record = this.sceneElementRecord(id);
+    if (!record) throw new Error("이동할 장면 요소를 찾을 수 없습니다.");
+    const pageId = readString(record, "pageId");
+    const layerId = readString(record, "layerId");
+    if (!pageId || !layerId) throw new Error("장면 요소 위치 정보가 손상되었습니다.");
+    this.assertMixedOrderEditBound(id, "elementId");
+    this.doc.transact(() => {
+      this.deactivateMixedOrderEntries(id, "elementId");
+      this.insertSceneOrderEntry({ id, pageId, layerId }, beforeElementId);
+    }, STUDIO_CRDT_ORIGIN_LOCAL);
+    return this.requiredSceneElement(id);
+  }
+
+  /** Moves a draw or supported non-raster object in their shared page-global z-order. */
+  moveElement(
+    id: string,
+    beforeElementId: string | null
+  ): StudioCrdtStrokeRecord | StudioCrdtSceneElementRecord {
+    this.assertAlive();
+    const hasSceneElement = this.sceneElementIds.get(id) === true;
+    const hasStroke = this.strokes.has(id);
+    if (hasSceneElement && hasStroke) throw new Error("중복된 CRDT 요소 식별자는 이동할 수 없습니다.");
+    if (hasSceneElement) return this.moveSceneElement(id, beforeElementId);
+    if (hasStroke) return this.moveStroke(id, beforeElementId);
+    throw new Error("이동할 CRDT 요소를 찾을 수 없습니다.");
+  }
+
+  getSceneElement(id: string, includeDeleted = false): StudioCrdtSceneElementRecord | null {
+    this.assertAlive();
+    const record = this.sceneElementRecord(id);
+    if (!record) return null;
+    const result = this.readSceneElementRecord(id, record, this.lastActiveMixedOrderIndex(id, "elementId"));
+    if (!result || (!includeDeleted && result.deleted)) return null;
+    return result;
+  }
+
+  getSceneElements(query: StudioCrdtSceneElementQuery = {}): StudioCrdtSceneElementRecord[] {
+    this.assertAlive();
+    const latestOrder = new Map<string, number>();
+    this.order.forEach((entry, index) => {
+      if (!(entry instanceof Y.Map) || entry.get("active") !== true) return;
+      const id = sceneOrderEntryId(entry);
+      if (id) latestOrder.set(id, index);
+    });
+    const records: StudioCrdtSceneElementRecord[] = [];
+    for (const [id, active] of this.sceneElementIds) {
+      if (active !== true || !exactText(id, MAX_ID_LENGTH)) continue;
+      const record = this.sceneElementRecord(id);
+      if (!record) continue;
+      const result = this.readSceneElementRecord(id, record, latestOrder.get(id) ?? Number.MAX_SAFE_INTEGER);
+      if (!result || (!query.includeDeleted && result.deleted)) continue;
+      if (query.pageId !== undefined && result.pageId !== query.pageId) continue;
+      if (query.layerId !== undefined && result.layerId !== query.layerId) continue;
+      records.push(result);
+    }
+    return records.sort(
+      (left, right) => left.pageId.localeCompare(right.pageId) ||
+        left.orderIndex - right.orderIndex || left.id.localeCompare(right.id)
+    );
+  }
+
+  addPage(input: StudioCrdtPageInput, beforePageId: string | null = null): StudioCrdtPageRecord {
+    if (this.pageIds.get(input.id) === true) throw new Error("이미 존재하는 페이지 식별자입니다.");
+    return this.upsertPage(input, { beforePageId });
+  }
+
+  upsertPage(
+    input: StudioCrdtPageInput,
+    options: StudioCrdtPageUpsertOptions = {}
+  ): StudioCrdtPageRecord {
+    this.assertAlive();
+    assertId(input.id, "페이지");
+    const payload = validateStudioCrdtPagePayload(input.payload);
+    const exists = this.pageIds.get(input.id) === true;
+    const record = this.pageRecord(input.id, !exists);
+    if (!record) throw new Error("페이지 레코드가 손상되었습니다.");
+    const previousPayload = exists ? this.readPagePayload(record) : null;
+    if (exists && !previousPayload) throw new Error("기존 페이지 레코드가 손상되었습니다.");
+    if (record.get("deleted") === true && !options.resurrect) {
+      throw new Error("삭제된 페이지는 명시적으로 복원해야 합니다.");
+    }
+    const usesLegacyBootstrap = options.baselineProps !== undefined || options.changedProps !== undefined ||
+      options.unsetProps !== undefined;
+    let baseline: StudioCrdtJsonObject | null = null;
+    let changedProps: readonly string[] = [];
+    let unsetProps: readonly string[] = [];
+    if (usesLegacyBootstrap) {
+      if (!options.baselineProps) throw new Error("레거시 페이지 등록에는 기준 속성이 필요합니다.");
+      baseline = validateStudioCrdtPagePayload({
+        version: STUDIO_CRDT_PAGE_PAYLOAD_VERSION,
+        props: options.baselineProps,
+      }).props;
+      const seen = new Set<string>();
+      for (const key of options.changedProps ?? []) {
+        if (!exactText(key, MAX_TEXT_LENGTH) || !STUDIO_CRDT_PAGE_PROPERTY_KEYS.has(key) ||
+          seen.has(key) || !(key in payload.props)) {
+          throw new Error("레거시 페이지의 변경 속성 목록이 올바르지 않습니다.");
+        }
+        seen.add(key);
+      }
+      changedProps = [...seen];
+      validateUnsetKeys(
+        options.unsetProps ?? [],
+        STUDIO_CRDT_PAGE_PROPERTY_KEYS,
+        ["bg", "bgGrad", "canvasH"]
+      );
+      unsetProps = [...new Set(options.unsetProps ?? [])];
+      if (unsetProps.some((key) => seen.has(key) || key in payload.props)) {
+        throw new Error("제거할 레거시 페이지 속성은 변경 목록과 현재 페이로드에 포함될 수 없습니다.");
+      }
+    }
+    const requiresOrderEntry = !exists || options.beforePageId !== undefined;
+    if (exists && requiresOrderEntry) this.assertPageOrderEditBound(input.id);
+    this.doc.transact(() => {
+      this.pageIds.set(input.id, true);
+      record.set("id", input.id);
+      record.set("payloadVersion", payload.version);
+      if (!exists || options.resurrect) record.set("deleted", false);
+      if (baseline) {
+        for (const [key, value] of Object.entries(baseline)) {
+          const baselineKey = propertyKey(BASELINE_PROPERTY_PREFIX, key);
+          if (!record.has(baselineKey)) record.set(baselineKey, cloneAndValidateJson(value));
+        }
+        setCrdtProperties(record, PROPERTY_PREFIX, payload.props, changedProps);
+        for (const key of unsetProps) record.set(`${UNSET_PROPERTY_PREFIX}${key}`, true);
+      } else {
+        setCrdtProperties(record, PROPERTY_PREFIX, payload.props);
+        for (const key of Object.keys(previousPayload?.props ?? {})) {
+          if (!(key in payload.props)) record.set(`${UNSET_PROPERTY_PREFIX}${key}`, true);
+        }
+      }
+      if (requiresOrderEntry) {
+        this.deactivatePageOrderEntries(input.id);
+        this.insertPageOrderEntry(input.id, options.beforePageId ?? null);
+      }
+    }, STUDIO_CRDT_ORIGIN_LOCAL);
+    return this.requiredPage(input.id);
+  }
+
+  patchPage(id: string, patch: StudioCrdtPagePatch): StudioCrdtPageRecord {
+    this.assertAlive();
+    assertId(id, "페이지");
+    const record = this.pageRecord(id);
+    if (!record) throw new Error("수정할 페이지를 찾을 수 없습니다.");
+    const current = this.readPagePayload(record);
+    if (!current) throw new Error("페이지 레코드가 손상되었습니다.");
+    const set = patch.set ? cloneJsonObject(patch.set) : {};
+    for (const key of Object.keys(set)) {
+      if (!STUDIO_CRDT_PAGE_PROPERTY_KEYS.has(key)) {
+        throw new Error(`페이지의 ${key} 속성은 동기화할 수 없습니다.`);
+      }
+    }
+    validateUnsetKeys(
+      patch.unset ?? [],
+      STUDIO_CRDT_PAGE_PROPERTY_KEYS,
+      ["bg", "bgGrad", "canvasH"]
+    );
+    const props = { ...current.props, ...set };
+    for (const key of patch.unset ?? []) delete props[key];
+    validateStudioCrdtPagePayload({ version: STUDIO_CRDT_PAGE_PAYLOAD_VERSION, props });
+    this.doc.transact(() => {
+      setCrdtProperties(record, PROPERTY_PREFIX, set);
+      for (const key of patch.unset ?? []) {
+        record.set(`${UNSET_PROPERTY_PREFIX}${key}`, true);
+      }
+    }, STUDIO_CRDT_ORIGIN_LOCAL);
+    return this.requiredPage(id);
+  }
+
+  deletePage(id: string): boolean {
+    this.assertAlive();
+    assertId(id, "페이지");
+    const record = this.pageRecord(id);
+    if (!record || record.get("deleted") === true) return false;
+    this.doc.transact(() => record.set("deleted", true), STUDIO_CRDT_ORIGIN_LOCAL);
+    return true;
+  }
+
+  restorePage(id: string): boolean {
+    this.assertAlive();
+    assertId(id, "페이지");
+    const record = this.pageRecord(id);
+    if (!record || record.get("deleted") !== true) return false;
+    this.doc.transact(() => record.set("deleted", false), STUDIO_CRDT_ORIGIN_LOCAL);
+    return true;
+  }
+
+  movePage(id: string, beforePageId: string | null): StudioCrdtPageRecord {
+    this.assertAlive();
+    assertId(id, "페이지");
+    if (beforePageId !== null) assertId(beforePageId, "대상 페이지");
+    if (!this.pageRecord(id)) throw new Error("이동할 페이지를 찾을 수 없습니다.");
+    this.assertPageOrderEditBound(id);
+    this.doc.transact(() => {
+      this.deactivatePageOrderEntries(id);
+      this.insertPageOrderEntry(id, beforePageId);
+    }, STUDIO_CRDT_ORIGIN_LOCAL);
+    return this.requiredPage(id);
+  }
+
+  getPage(id: string, includeDeleted = false): StudioCrdtPageRecord | null {
+    this.assertAlive();
+    const record = this.pageRecord(id);
+    if (!record) return null;
+    const result = this.readPageRecord(id, record, this.lastActivePageOrderIndex(id));
+    if (!result || (!includeDeleted && result.deleted)) return null;
+    return result;
+  }
+
+  getPages(includeDeleted = false): StudioCrdtPageRecord[] {
+    this.assertAlive();
+    const latestOrder = new Map<string, number>();
+    this.pageOrder.forEach((entry, index) => {
+      if (!(entry instanceof Y.Map) || entry.get("active") !== true) return;
+      const id = pageOrderEntryId(entry);
+      if (id) latestOrder.set(id, index);
+    });
+    const records: StudioCrdtPageRecord[] = [];
+    for (const [id, active] of this.pageIds) {
+      if (active !== true || !exactText(id, MAX_ID_LENGTH)) continue;
+      const record = this.pageRecord(id);
+      if (!record) continue;
+      const result = this.readPageRecord(id, record, latestOrder.get(id) ?? Number.MAX_SAFE_INTEGER);
+      if (!result || (!includeDeleted && result.deleted)) continue;
+      records.push(result);
+    }
+    return records.sort(
+      (left, right) => left.orderIndex - right.orderIndex || left.id.localeCompare(right.id)
     );
   }
 
@@ -909,6 +1679,13 @@ export class StudioCrdtDocument {
     validatePayload(input.payload, allowEmpty);
   }
 
+  private assertSceneElementInput(input: StudioCrdtSceneElementInput): void {
+    assertId(input.id, "장면 요소");
+    assertId(input.pageId, "페이지");
+    assertId(input.layerId, "레이어");
+    validateStudioCrdtSceneElementPayload(input.payload);
+  }
+
   private withoutSamples(input: StudioCrdtStrokeInput): StudioCrdtStrokeInput {
     return {
       ...input,
@@ -957,6 +1734,143 @@ export class StudioCrdtDocument {
     return created;
   }
 
+  private changedSceneElementIdsFor(transaction: Y.Transaction): Set<string> {
+    const existing = this.changedSceneElementIdsByTransaction.get(transaction);
+    if (existing) return existing;
+    const created = new Set<string>();
+    this.changedSceneElementIdsByTransaction.set(transaction, created);
+    return created;
+  }
+
+  private changedPageIdsFor(transaction: Y.Transaction): Set<string> {
+    const existing = this.changedPageIdsByTransaction.get(transaction);
+    if (existing) return existing;
+    const created = new Set<string>();
+    this.changedPageIdsByTransaction.set(transaction, created);
+    return created;
+  }
+
+  private observeSceneElementRoot(id: string): void {
+    const rootName = sceneElementRootName(id);
+    if (this.observedSceneElementRoots.has(rootName)) return;
+    let value: Y.Map<unknown>;
+    try {
+      value = this.doc.getMap<unknown>(rootName);
+    } catch {
+      return;
+    }
+    const listener = (_event: Y.YMapEvent<unknown>, transaction: Y.Transaction) => {
+      this.changedSceneElementIdsFor(transaction).add(id);
+    };
+    value.observe(listener);
+    this.observedSceneElementRoots.add(rootName);
+    const dispose = () => {
+      value.unobserve(listener);
+      this.observedSceneElementRoots.delete(rootName);
+    };
+    this.cleanup.add(dispose);
+  }
+
+  private observePageRoot(id: string): void {
+    const rootName = pageRootName(id);
+    if (this.observedPageRoots.has(rootName)) return;
+    let value: Y.Map<unknown>;
+    try {
+      value = this.doc.getMap<unknown>(rootName);
+    } catch {
+      return;
+    }
+    const listener = (_event: Y.YMapEvent<unknown>, transaction: Y.Transaction) => {
+      this.changedPageIdsFor(transaction).add(id);
+    };
+    value.observe(listener);
+    this.observedPageRoots.add(rootName);
+    const dispose = () => {
+      value.unobserve(listener);
+      this.observedPageRoots.delete(rootName);
+    };
+    this.cleanup.add(dispose);
+  }
+
+  private sceneElementRecord(id: string, create = false): Y.Map<unknown> | null {
+    if (!create && this.sceneElementIds.get(id) !== true) return null;
+    const rootName = sceneElementRootName(id);
+    let value: Y.Map<unknown>;
+    try {
+      value = this.doc.getMap<unknown>(rootName);
+    } catch {
+      return null;
+    }
+    this.observeSceneElementRoot(id);
+    return value as Y.Map<unknown>;
+  }
+
+  private pageRecord(id: string, create = false): Y.Map<unknown> | null {
+    if (!create && this.pageIds.get(id) !== true) return null;
+    const rootName = pageRootName(id);
+    let value: Y.Map<unknown>;
+    try {
+      value = this.doc.getMap<unknown>(rootName);
+    } catch {
+      return null;
+    }
+    this.observePageRoot(id);
+    return value as Y.Map<unknown>;
+  }
+
+  private readSceneElementPayload(record: Y.Map<unknown>): StudioCrdtSceneElementPayload | null {
+    const version = record.get("payloadVersion");
+    const type = record.get("type");
+    if (
+      version !== STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION ||
+      !isStudioCrdtSceneElementType(type)
+    ) return null;
+    try {
+      return validateStudioCrdtSceneElementPayload({ version, type, props: readCrdtProperties(record) });
+    } catch {
+      return null;
+    }
+  }
+
+  private readSceneElementRecord(
+    id: string,
+    record: Y.Map<unknown>,
+    orderIndex: number
+  ): StudioCrdtSceneElementRecord | null {
+    const pageId = readString(record, "pageId");
+    const layerId = readString(record, "layerId");
+    const payload = this.readSceneElementPayload(record);
+    if (readString(record, "id") !== id || !pageId || !layerId || !payload) return null;
+    return {
+      id,
+      pageId,
+      layerId,
+      payload,
+      deleted: record.get("deleted") === true,
+      orderIndex,
+    };
+  }
+
+  private readPagePayload(record: Y.Map<unknown>): StudioCrdtPagePayload | null {
+    const version = record.get("payloadVersion");
+    if (version !== STUDIO_CRDT_PAGE_PAYLOAD_VERSION) return null;
+    try {
+      return validateStudioCrdtPagePayload({ version, props: readCrdtProperties(record) });
+    } catch {
+      return null;
+    }
+  }
+
+  private readPageRecord(
+    id: string,
+    record: Y.Map<unknown>,
+    orderIndex: number
+  ): StudioCrdtPageRecord | null {
+    const payload = this.readPagePayload(record);
+    if (readString(record, "id") !== id || !payload) return null;
+    return { id, payload, deleted: record.get("deleted") === true, orderIndex };
+  }
+
   private registerRecord(id: string, value: unknown): void {
     if (!(value instanceof Y.Map)) return;
     this.strokeIdByType.set(value, id);
@@ -1000,6 +1914,164 @@ export class StudioCrdtDocument {
     return entry;
   }
 
+  private createSceneOrderEntry(
+    input: Pick<StudioCrdtSceneElementInput, "id" | "pageId" | "layerId">
+  ): Y.Map<unknown> {
+    const entry = new Y.Map<unknown>();
+    entry.set("elementId", input.id);
+    entry.set("pageId", input.pageId);
+    entry.set("layerId", input.layerId);
+    entry.set("kind", "scene");
+    entry.set("active", true);
+    return entry;
+  }
+
+  private insertSceneOrderEntry(
+    input: Pick<StudioCrdtSceneElementInput, "id" | "pageId" | "layerId">,
+    beforeElementId: string | null
+  ): void {
+    const entry = this.createSceneOrderEntry(input);
+    if (beforeElementId === null) {
+      this.order.push([entry]);
+      return;
+    }
+    assertId(beforeElementId, "대상 요소");
+    let targetIndex = -1;
+    this.order.forEach((candidate, index) => {
+      if (
+        candidate instanceof Y.Map && candidate.get("active") === true &&
+        mixedOrderEntryId(candidate) === beforeElementId &&
+        this.isLiveMixedOrderEntry(candidate, input.pageId)
+      ) {
+        targetIndex = index;
+      }
+    });
+    if (targetIndex < 0) this.order.push([entry]);
+    else this.order.insert(targetIndex, [entry]);
+  }
+
+  private isLiveMixedOrderEntry(entry: Y.Map<unknown>, expectedPageId: string): boolean {
+    const pageId = orderEntryValue(entry, "pageId");
+    const layerId = orderEntryValue(entry, "layerId");
+    if (pageId !== expectedPageId || !layerId) return false;
+    const strokeId = orderEntryValue(entry, "strokeId");
+    if (strokeId) {
+      const stroke = this.strokes.get(strokeId);
+      return stroke instanceof Y.Map && stroke.get("deleted") !== true &&
+        readString(stroke, "pageId") === pageId && readString(stroke, "layerId") === layerId;
+    }
+    const elementId = sceneOrderEntryId(entry);
+    if (!elementId) return false;
+    const element = this.sceneElementRecord(elementId);
+    return element !== null && element.get("deleted") !== true &&
+      readString(element, "pageId") === pageId && readString(element, "layerId") === layerId;
+  }
+
+  private deactivateMixedOrderEntries(id: string, idKey: "strokeId" | "elementId"): void {
+    for (const entry of this.order) {
+      if (
+        entry instanceof Y.Map && entry.get("active") === true &&
+        orderEntryValue(entry, idKey) === id
+      ) {
+        entry.set("active", false);
+      }
+    }
+  }
+
+  private assertMixedOrderEditBound(id: string, idKey: "strokeId" | "elementId"): void {
+    let activeCount = 0;
+    for (const entry of this.order) {
+      if (
+        entry instanceof Y.Map && entry.get("active") === true &&
+        orderEntryValue(entry, idKey) === id
+      ) {
+        activeCount += 1;
+        if (activeCount >= MAX_ACTIVE_ORDER_ENTRIES_PER_STROKE) {
+          throw new Error("요소 순서 충돌이 너무 많아 안전하게 이동할 수 없습니다. 먼저 다시 동기화해 주세요.");
+        }
+      }
+    }
+  }
+
+  private lastActiveMixedOrderIndex(id: string, idKey: "strokeId" | "elementId"): number {
+    let result = Number.MAX_SAFE_INTEGER;
+    this.order.forEach((entry, index) => {
+      if (
+        entry instanceof Y.Map && entry.get("active") === true &&
+        orderEntryValue(entry, idKey) === id
+      ) {
+        result = index;
+      }
+    });
+    return result;
+  }
+
+  private createPageOrderEntry(id: string): Y.Map<unknown> {
+    const entry = new Y.Map<unknown>();
+    entry.set("pageId", id);
+    entry.set("active", true);
+    return entry;
+  }
+
+  private insertPageOrderEntry(id: string, beforePageId: string | null): void {
+    const entry = this.createPageOrderEntry(id);
+    if (beforePageId === null) {
+      this.pageOrder.push([entry]);
+      return;
+    }
+    assertId(beforePageId, "대상 페이지");
+    const targetRecord = this.pageRecord(beforePageId);
+    let targetIndex = -1;
+    this.pageOrder.forEach((candidate, index) => {
+      if (
+        candidate instanceof Y.Map && candidate.get("active") === true &&
+        pageOrderEntryId(candidate) === beforePageId &&
+        targetRecord !== null && targetRecord.get("deleted") !== true &&
+        readString(targetRecord, "id") === beforePageId
+      ) {
+        targetIndex = index;
+      }
+    });
+    if (targetIndex < 0) this.pageOrder.push([entry]);
+    else this.pageOrder.insert(targetIndex, [entry]);
+  }
+
+  private deactivatePageOrderEntries(id: string): void {
+    for (const entry of this.pageOrder) {
+      if (
+        entry instanceof Y.Map && entry.get("active") === true && pageOrderEntryId(entry) === id
+      ) {
+        entry.set("active", false);
+      }
+    }
+  }
+
+  private assertPageOrderEditBound(id: string): void {
+    let activeCount = 0;
+    for (const entry of this.pageOrder) {
+      if (
+        entry instanceof Y.Map && entry.get("active") === true && pageOrderEntryId(entry) === id
+      ) {
+        activeCount += 1;
+        if (activeCount >= MAX_ACTIVE_ORDER_ENTRIES_PER_STROKE) {
+          throw new Error("페이지 순서 충돌이 너무 많아 안전하게 이동할 수 없습니다. 먼저 다시 동기화해 주세요.");
+        }
+      }
+    }
+  }
+
+  private lastActivePageOrderIndex(id: string): number {
+    let result = Number.MAX_SAFE_INTEGER;
+    this.pageOrder.forEach((entry, index) => {
+      if (
+        entry instanceof Y.Map && entry.get("active") === true && pageOrderEntryId(entry) === id
+      ) {
+        result = index;
+      }
+    });
+    return result;
+  }
+
   private insertOrderEntry(
     input: Pick<StudioCrdtStrokeInput, "id" | "pageId" | "layerId">,
     beforeStrokeId: string | null
@@ -1013,11 +2085,10 @@ export class StudioCrdtDocument {
     let targetIndex = -1;
     this.order.forEach((candidate, index) => {
       if (
-        targetIndex < 0 &&
         candidate instanceof Y.Map &&
         candidate.get("active") === true &&
-        orderEntryValue(candidate, "strokeId") === beforeStrokeId &&
-        orderEntryValue(candidate, "pageId") === input.pageId
+        mixedOrderEntryId(candidate) === beforeStrokeId &&
+        this.isLiveMixedOrderEntry(candidate, input.pageId)
       ) {
         targetIndex = index;
       }
@@ -1047,7 +2118,7 @@ export class StudioCrdtDocument {
         orderEntryValue(entry, "strokeId") === id
       ) {
         activeCount += 1;
-        if (activeCount > MAX_ACTIVE_ORDER_ENTRIES_PER_STROKE) {
+        if (activeCount >= MAX_ACTIVE_ORDER_ENTRIES_PER_STROKE) {
           throw new Error("획 순서 충돌이 너무 많아 안전하게 이동할 수 없습니다. 먼저 다시 동기화해 주세요.");
         }
       }
@@ -1102,6 +2173,18 @@ export class StudioCrdtDocument {
   private requiredStroke(id: string): StudioCrdtStrokeRecord {
     const result = this.getStroke(id, true);
     if (!result) throw new Error("CRDT 획을 읽지 못했습니다.");
+    return result;
+  }
+
+  private requiredSceneElement(id: string): StudioCrdtSceneElementRecord {
+    const result = this.getSceneElement(id, true);
+    if (!result) throw new Error("CRDT 장면 요소를 읽지 못했습니다.");
+    return result;
+  }
+
+  private requiredPage(id: string): StudioCrdtPageRecord {
+    const result = this.getPage(id, true);
+    if (!result) throw new Error("CRDT 페이지를 읽지 못했습니다.");
     return result;
   }
 }

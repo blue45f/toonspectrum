@@ -1,54 +1,28 @@
-import { STUDIO_CRDT_STROKE_PAYLOAD_VERSION } from "./studio-crdt-protocol";
+import {
+  STUDIO_CRDT_PAGE_PAYLOAD_VERSION,
+  STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION,
+  isStudioCrdtSceneElementType,
+  validateStudioCrdtPagePayload,
+  validateStudioCrdtSceneElementPayload,
+  type StudioCrdtJsonObject,
+  type StudioCrdtJsonValue,
+  type StudioCrdtSceneElementType,
+} from "./studio-crdt-scene-schema";
 
 import type {
-  StudioCrdtDrawStrokePayload,
-  StudioCrdtJsonObject,
-  StudioCrdtJsonValue,
-  StudioCrdtStrokeInput,
+  StudioCrdtPageRecord,
+  StudioCrdtSceneElementInput,
+  StudioCrdtSceneElementRecord,
   StudioCrdtStrokeRecord,
-  StudioCrdtStrokeSamples,
 } from "./studio-crdt-document";
+import type { StudioCrdtCompatibleDrawElement } from "./studio-crdt-draw-bridge";
 
-export interface StudioCrdtCompatibleDrawElement {
-  id: string;
-  type: "draw";
-  kind?: string;
-  mode?: "pen" | "eraser";
-  points: number[];
-  stroke: string;
-  strokeWidth: number;
-  opacity?: number;
-  fill?: string;
-  gradient?: unknown;
-  pattern?: unknown;
-  brush?: string;
-  pressures?: number[];
-  sampleSpacing?: number;
-  tiltXs?: number[];
-  tiltYs?: number[];
-  twists?: number[];
-  speeds?: number[];
-  tangentialPressures?: number[];
-  brushDynamics?: unknown;
-  brushTip?: unknown;
-  strokeStyle?: unknown;
-  shapeParams?: unknown;
-  symmetry?: unknown;
-  blendMode?: string;
-  name?: string;
-  hidden?: boolean;
-  locked?: boolean;
-  noClip?: boolean;
-  lockAspect?: boolean;
-  groupId?: string;
-  clipBelow?: boolean;
-  alphaLocked?: boolean;
-  maskSrc?: string;
-  maskEnabled?: boolean;
-  layerRole?: string;
-  layerColor?: string;
-  emeresSourceId?: string;
-}
+export { isStudioCrdtSceneElementType } from "./studio-crdt-scene-schema";
+export {
+  studioDrawElementSampleSlice,
+  studioDrawElementToCrdtStroke,
+} from "./studio-crdt-draw-bridge";
+export type { StudioCrdtCompatibleDrawElement } from "./studio-crdt-draw-bridge";
 
 export interface StudioCrdtCompatibleElement {
   id: string;
@@ -58,6 +32,12 @@ export interface StudioCrdtCompatibleElement {
 export interface StudioCrdtCompatiblePage<TElement extends StudioCrdtCompatibleElement> {
   id: string;
   elements: TElement[];
+}
+
+export interface StudioCrdtCompatibleSceneElement extends StudioCrdtCompatibleElement {
+  type: StudioCrdtSceneElementType;
+  groupId?: string;
+  [key: string]: unknown;
 }
 
 const EXTENSION_KEYS = [
@@ -104,85 +84,6 @@ function jsonObject(value: unknown): StudioCrdtJsonObject | undefined {
     : undefined;
 }
 
-function aligned(values: number[] | undefined, count: number, fallback: number): number[] | undefined {
-  if (!values) return undefined;
-  return Array.from({ length: count }, (_, index) => {
-    const value = values[index];
-    return typeof value === "number" && Number.isFinite(value) ? value : fallback;
-  });
-}
-
-function extensionsOf(element: StudioCrdtCompatibleDrawElement): StudioCrdtJsonObject | undefined {
-  const extensions: StudioCrdtJsonObject = {};
-  for (const key of EXTENSION_KEYS) {
-    const normalized = jsonValue(element[key]);
-    if (normalized !== undefined) extensions[key] = normalized;
-  }
-  return Object.keys(extensions).length > 0 ? extensions : undefined;
-}
-
-export function studioDrawElementToCrdtStroke(
-  pageId: string,
-  element: StudioCrdtCompatibleDrawElement
-): StudioCrdtStrokeInput {
-  const sampleCount = Math.floor(element.points.length / 2);
-  const payload: StudioCrdtDrawStrokePayload = {
-    version: STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
-    type: "draw",
-    kind: element.kind ?? "freehand",
-    mode: element.mode ?? "pen",
-    points: element.points.slice(0, sampleCount * 2),
-    stroke: element.stroke,
-    strokeWidth: element.strokeWidth,
-  };
-  const optionalNumbers = {
-    pressures: aligned(element.pressures, sampleCount, 0.5),
-    tiltXs: aligned(element.tiltXs, sampleCount, 0),
-    tiltYs: aligned(element.tiltYs, sampleCount, 0),
-    twists: aligned(element.twists, sampleCount, 0),
-    speeds: aligned(element.speeds, sampleCount, 0),
-    tangentialPressures: aligned(element.tangentialPressures, sampleCount, 0),
-  };
-  Object.assign(payload, optionalNumbers);
-  if (element.opacity !== undefined) payload.opacity = element.opacity;
-  if (element.fill !== undefined) payload.fill = element.fill;
-  if (element.brush !== undefined) payload.brush = element.brush;
-  if (element.sampleSpacing !== undefined) payload.sampleSpacing = element.sampleSpacing;
-  if (element.blendMode !== undefined) payload.blendMode = element.blendMode;
-  payload.gradient = jsonObject(element.gradient);
-  payload.pattern = jsonObject(element.pattern);
-  payload.brushDynamics = jsonObject(element.brushDynamics);
-  payload.brushTip = jsonObject(element.brushTip);
-  payload.strokeStyle = jsonObject(element.strokeStyle);
-  payload.shapeParams = jsonObject(element.shapeParams);
-  payload.symmetry = jsonObject(element.symmetry);
-  payload.extensions = extensionsOf(element);
-  return {
-    id: element.id,
-    pageId,
-    layerId: element.groupId ?? "page-root",
-    payload,
-  };
-}
-
-export function studioDrawElementSampleSlice(
-  element: StudioCrdtCompatibleDrawElement,
-  startSample: number
-): StudioCrdtStrokeSamples | null {
-  const sampleCount = Math.floor(element.points.length / 2);
-  const start = Math.max(0, Math.min(sampleCount, Math.trunc(startSample)));
-  if (start >= sampleCount) return null;
-  return {
-    points: element.points.slice(start * 2, sampleCount * 2),
-    pressures: aligned(element.pressures, sampleCount, 0.5)?.slice(start),
-    tiltXs: aligned(element.tiltXs, sampleCount, 0)?.slice(start),
-    tiltYs: aligned(element.tiltYs, sampleCount, 0)?.slice(start),
-    twists: aligned(element.twists, sampleCount, 0)?.slice(start),
-    speeds: aligned(element.speeds, sampleCount, 0)?.slice(start),
-    tangentialPressures: aligned(element.tangentialPressures, sampleCount, 0)?.slice(start),
-  };
-}
-
 export function studioCrdtStrokeToDrawElement(
   record: StudioCrdtStrokeRecord
 ): StudioCrdtCompatibleDrawElement {
@@ -225,9 +126,100 @@ export function studioCrdtStrokeToDrawElement(
   return result;
 }
 
+export function studioSceneElementToCrdtElement(
+  pageId: string,
+  element: StudioCrdtCompatibleSceneElement
+): StudioCrdtSceneElementInput {
+  if (!isStudioCrdtSceneElementType(element.type)) {
+    throw new Error(`${element.type} 요소는 장면 CRDT에서 지원하지 않습니다.`);
+  }
+  const propsSource: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(element)) {
+    if (key === "id" || key === "type" || value === undefined) continue;
+    propsSource[key] = value;
+  }
+  const props = jsonObject(propsSource) ?? {};
+  const payload = validateStudioCrdtSceneElementPayload({
+    version: STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION,
+    type: element.type,
+    props,
+  });
+  return {
+    id: element.id,
+    pageId,
+    layerId: typeof element.groupId === "string" && element.groupId.length > 0
+      ? element.groupId
+      : "page-root",
+    payload,
+  };
+}
+
+export function studioCrdtElementToSceneElement(
+  record: StudioCrdtSceneElementRecord
+): StudioCrdtCompatibleSceneElement {
+  const element = {
+    id: record.id,
+    type: record.payload.type,
+    ...record.payload.props,
+  } as StudioCrdtCompatibleSceneElement;
+  if (!element.groupId && record.layerId !== "page-root") element.groupId = record.layerId;
+  return element;
+}
+
+const PAGE_PAYLOAD_KEYS = [
+  "bg",
+  "bgGrad",
+  "canvasH",
+  "name",
+  "note",
+  "hideMaster",
+  "shotType",
+  "cameraAngle",
+] as const;
+
+export interface StudioCrdtCompatibleOrderedPage<
+  TElement extends StudioCrdtCompatibleElement,
+> extends StudioCrdtCompatiblePage<TElement> {
+  bg: string;
+  bgGrad: string[] | null;
+  canvasH: number;
+  name?: string;
+  note?: string;
+  hideMaster?: boolean;
+  shotType?: string;
+  cameraAngle?: string;
+}
+
+export function studioPageToCrdtPage<
+  TElement extends StudioCrdtCompatibleElement,
+>(page: StudioCrdtCompatibleOrderedPage<TElement>) {
+  const props: StudioCrdtJsonObject = {
+    bg: page.bg,
+    bgGrad: page.bgGrad,
+    canvasH: page.canvasH,
+  };
+  for (const key of PAGE_PAYLOAD_KEYS.slice(3)) {
+    const normalized = jsonValue(page[key]);
+    if (normalized !== undefined) props[key] = normalized;
+  }
+  return {
+    id: page.id,
+    payload: validateStudioCrdtPagePayload({
+      version: STUDIO_CRDT_PAGE_PAYLOAD_VERSION,
+      props,
+    }),
+  };
+}
+
 export interface StudioCrdtPageReconcileResult<TPage> {
   pages: TPage[];
   changed: boolean;
+}
+
+export interface StudioCrdtSceneGraphAuthority {
+  strokeIds: ReadonlySet<string>;
+  sceneElementIds: ReadonlySet<string>;
+  pageIds: ReadonlySet<string>;
 }
 
 /**
@@ -271,5 +263,148 @@ export function reconcileStudioCrdtPages<
     }
     return changed ? { ...page, elements: nextElements } : page;
   });
+  return { pages: changed ? nextPages : [...pages], changed };
+}
+
+/**
+ * Phase-2 scene graph reconciliation. Draw and non-raster objects share the physical legacy
+ * `stroke-order` Y.Array, so their `orderIndex` values form one mixed z-order. Only IDs present in
+ * the supplied durable records are authoritative; legacy pages/elements remain in their slots.
+ */
+export function reconcileStudioCrdtSceneGraphPages<
+  TElement extends StudioCrdtCompatibleElement,
+  TPage extends StudioCrdtCompatibleOrderedPage<TElement>,
+>(
+  pages: readonly TPage[],
+  strokes: readonly StudioCrdtStrokeRecord[],
+  sceneElements: readonly StudioCrdtSceneElementRecord[],
+  pageRecords: readonly StudioCrdtPageRecord[],
+  authority?: StudioCrdtSceneGraphAuthority
+): StudioCrdtPageReconcileResult<TPage> {
+  const sourcePageById = new Map(pages.map((page) => [page.id, page]));
+  const materializePage = (record: StudioCrdtPageRecord): TPage => {
+    const source = sourcePageById.get(record.id);
+    return {
+      ...(source ?? { id: record.id, elements: [] }),
+      ...record.payload.props,
+      id: record.id,
+      elements: source?.elements ?? [],
+    } as TPage;
+  };
+
+  const managedPageIds = new Set<string>();
+  const activePages: Array<{ id: string; orderIndex: number; page: TPage }> = [];
+  for (const record of pageRecords) {
+    const authoritative = authority === undefined || authority.pageIds.has(record.id);
+    if (authoritative) {
+      managedPageIds.add(record.id);
+      if (!record.deleted) {
+        activePages.push({ id: record.id, orderIndex: record.orderIndex, page: materializePage(record) });
+      }
+      continue;
+    }
+    const source = sourcePageById.get(record.id);
+    if (!source) continue;
+    managedPageIds.add(record.id);
+    activePages.push({ id: record.id, orderIndex: record.orderIndex, page: source });
+  }
+  activePages.sort(
+    (left, right) => left.orderIndex - right.orderIndex || left.id.localeCompare(right.id)
+  );
+
+  let topologyChanged = false;
+  let pageCursor = 0;
+  const orderedPages: TPage[] = [];
+  for (const page of pages) {
+    if (!managedPageIds.has(page.id)) {
+      orderedPages.push(page);
+      continue;
+    }
+    const replacement = activePages[pageCursor++];
+    if (replacement) orderedPages.push(replacement.page);
+    topologyChanged = true;
+  }
+  while (pageCursor < activePages.length) {
+    orderedPages.push(activePages[pageCursor++]!.page);
+    topologyChanged = true;
+  }
+
+  const sourceElementById = new Map<string, { pageId: string; element: TElement }>();
+  for (const page of orderedPages) {
+    for (const element of page.elements) sourceElementById.set(element.id, { pageId: page.id, element });
+  }
+  const managedElementIds = new Set<string>();
+  const activeByPage = new Map<string, Array<{
+    id: string;
+    orderIndex: number;
+    element: TElement;
+  }>>();
+  for (const record of strokes) {
+    const authoritative = authority === undefined || authority.strokeIds.has(record.id);
+    if (authoritative) managedElementIds.add(record.id);
+    const source = sourceElementById.get(record.id);
+    if (!authoritative && !source) continue;
+    if (!authoritative) managedElementIds.add(record.id);
+    if (authoritative && record.deleted) continue;
+    const pageId = authoritative ? record.pageId : source!.pageId;
+    const bucket = activeByPage.get(pageId) ?? [];
+    bucket.push({
+      id: record.id,
+      orderIndex: record.orderIndex,
+      element: authoritative
+        ? studioCrdtStrokeToDrawElement(record) as unknown as TElement
+        : source!.element,
+    });
+    activeByPage.set(pageId, bucket);
+  }
+  for (const record of sceneElements) {
+    const authoritative = authority === undefined || authority.sceneElementIds.has(record.id);
+    if (authoritative) managedElementIds.add(record.id);
+    const source = sourceElementById.get(record.id);
+    if (!authoritative && !source) continue;
+    if (!authoritative) managedElementIds.add(record.id);
+    if (authoritative && record.deleted) continue;
+    const pageId = authoritative ? record.pageId : source!.pageId;
+    const bucket = activeByPage.get(pageId) ?? [];
+    bucket.push({
+      id: record.id,
+      orderIndex: record.orderIndex,
+      element: authoritative
+        ? studioCrdtElementToSceneElement(record) as unknown as TElement
+        : source!.element,
+    });
+    activeByPage.set(pageId, bucket);
+  }
+  for (const bucket of activeByPage.values()) {
+    bucket.sort(
+      (left, right) => left.orderIndex - right.orderIndex || left.id.localeCompare(right.id)
+    );
+  }
+
+  let elementChanged = false;
+  const nextPages = orderedPages.map((page) => {
+    const active = activeByPage.get(page.id) ?? [];
+    let cursor = 0;
+    let pageChanged = false;
+    const nextElements: TElement[] = [];
+    for (const element of page.elements) {
+      if (!managedElementIds.has(element.id)) {
+        nextElements.push(element);
+        continue;
+      }
+      const replacement = active[cursor++];
+      if (replacement) nextElements.push(replacement.element);
+      pageChanged = true;
+    }
+    while (cursor < active.length) {
+      nextElements.push(active[cursor++]!.element);
+      pageChanged = true;
+    }
+    if (!pageChanged) return page;
+    elementChanged = true;
+    return { ...page, elements: nextElements };
+  });
+
+  const changed = topologyChanged || elementChanged;
   return { pages: changed ? nextPages : [...pages], changed };
 }

@@ -25,6 +25,12 @@ import {
 import type { StudioCrdtDocument } from "./studio-crdt-document";
 import type { StudioCrdtRoomBinding } from "./studio-crdt-room-binding";
 
+interface StudioCrdtSceneGraphRuntime {
+  publish: typeof import("./studio-crdt-scene-publisher").publishStudioCrdtSceneGraphDiff;
+  reconcileHistory: typeof import("./studio-crdt-history").reconcileStudioCrdtSceneGraphHistory;
+  reconcilePages: typeof import("./studio-crdt-page-bridge").reconcileStudioCrdtSceneGraphPages;
+}
+
 export interface StudioLiveCollaborationProviderProps {
   children: ReactNode;
   workId: string | null;
@@ -37,7 +43,10 @@ export interface StudioLiveCollaborationProviderProps {
   /** Prevent an authenticated work from silently becoming an unauthenticated local-tab room. */
   serverRequired?: boolean;
   onRoomChange?: (room: StudioLiveRoom | null) => void;
-  onCrdtDocumentChange?: (document: StudioCrdtDocument | null) => void;
+  onCrdtDocumentChange?: (
+    document: StudioCrdtDocument | null,
+    runtime: StudioCrdtSceneGraphRuntime | null
+  ) => void;
 }
 
 function localSessionId(): string {
@@ -100,12 +109,14 @@ export function StudioLiveCollaborationProvider({
     setLocks([]);
     setError(null);
     setLocalFallbackAllowed(true);
+    // Presence/transport는 동적 CRDT 모듈과 초기 frontier보다 먼저 준비될 수 있다. effect가
+    // 새 room 세대로 진입하는 순간 이전 pair를 먼저 폐기해 부모 편집기가 즉시 잠기게 한다.
+    onCrdtDocumentChange?.(null, null);
 
     if (!workId || !participantName || !participantRole) {
       setAvailability("idle");
       setMode(null);
       onRoomChange?.(null);
-      onCrdtDocumentChange?.(null);
       return;
     }
     if (transportPreference === "server" && !transportFactory) {
@@ -113,14 +124,12 @@ export function StudioLiveCollaborationProvider({
       setMode("server");
       setError("인증된 팀 연결 정보가 없어 로컬 모드로 자동 전환하지 않았습니다. 다시 로그인해 주세요.");
       onRoomChange?.(null);
-      onCrdtDocumentChange?.(null);
       return;
     }
     if (transportPreference === "local" && !isStudioLocalLiveTransportSupported()) {
       setAvailability("unsupported");
       setMode(null);
       onRoomChange?.(null);
-      onCrdtDocumentChange?.(null);
       return;
     }
 
@@ -146,7 +155,6 @@ export function StudioLiveCollaborationProvider({
       setAvailability("error");
       setError(messageFrom(cause, "공동작업 세션을 만들지 못했습니다."));
       onRoomChange?.(null);
-      onCrdtDocumentChange?.(null);
       return;
     }
 
@@ -166,11 +174,21 @@ export function StudioLiveCollaborationProvider({
     };
     let crdtDocument: StudioCrdtDocument | null = null;
     let crdtBinding: StudioCrdtRoomBinding | null = null;
+    let crdtDurabilityWarning: string | null = null;
+    const exposeReadyRoom = (nextError?: string | null) => {
+      if (crdtDurabilityWarning) {
+        setAvailability("error");
+        setError(crdtDurabilityWarning);
+        return;
+      }
+      setAvailability("ready");
+      if (nextError !== undefined) setError(nextError);
+    };
     const unsubscribe = nextRoom.subscribe((event) => {
       if (cancelled) return;
       if (event.type === "presence") {
         setPeers(event.peers);
-        if (nextRoom.ready) setAvailability("ready");
+        if (nextRoom.ready) exposeReadyRoom();
         return;
       }
       if (event.type === "locks") {
@@ -185,15 +203,13 @@ export function StudioLiveCollaborationProvider({
 
       setMode(nextRoom.mode);
       if (event.status.state === "ready") {
-        setAvailability("ready");
-        setError(null);
+        exposeReadyRoom(null);
       } else if (event.status.state === "connecting" || event.status.state === "disconnected") {
         setAvailability("connecting");
         setError(event.status.message);
       } else if (event.status.state === "error" && nextRoom.ready) {
         // Operation-level denial (for example a lease conflict) does not destroy the live room.
-        setAvailability("ready");
-        setError(event.status.message);
+        exposeReadyRoom(event.status.message);
       } else {
         setAvailability("error");
         setError(event.status.message);
@@ -236,9 +252,18 @@ export function StudioLiveCollaborationProvider({
       try {
         await nextRoom.start();
         if (cancelled) return;
-        const [documentModule, bindingModule] = await Promise.all([
+        const [
+          documentModule,
+          bindingModule,
+          scenePublisherModule,
+          sceneHistoryModule,
+          scenePageBridgeModule,
+        ] = await Promise.all([
           import("./studio-crdt-document"),
           import("./studio-crdt-room-binding"),
+          import("./studio-crdt-scene-publisher"),
+          import("./studio-crdt-history"),
+          import("./studio-crdt-page-bridge"),
         ]);
         if (cancelled) return;
         crdtDocument = new documentModule.StudioCrdtDocument();
@@ -250,22 +275,30 @@ export function StudioLiveCollaborationProvider({
           onStatus: (status) => {
             if (cancelled) return;
             if (status.state === "error") {
+              if (status.durabilityAtRisk) crdtDurabilityWarning = status.message;
               setError(status.message);
               if (status.durabilityAtRisk) setAvailability("error");
             }
             if (status.state === "ready" && nextRoom.ready) {
-              setAvailability("ready");
-              setError(null);
+              crdtDurabilityWarning = null;
+              exposeReadyRoom(null);
             }
           },
         });
         await crdtBinding.start();
         if (cancelled) return;
-        onCrdtDocumentChange?.(crdtDocument);
+        onCrdtDocumentChange?.(
+          crdtDocument,
+          {
+            publish: scenePublisherModule.publishStudioCrdtSceneGraphDiff,
+            reconcileHistory: sceneHistoryModule.reconcileStudioCrdtSceneGraphHistory,
+            reconcilePages: scenePageBridgeModule.reconcileStudioCrdtSceneGraphPages,
+          }
+        );
         setMode(nextRoom.mode);
         setPeers(nextRoom.getPeers());
         setLocks(nextRoom.getLocks());
-        setAvailability("ready");
+        exposeReadyRoom(null);
       } catch (cause: unknown) {
         if (cancelled) return;
         const failedBinding = crdtBinding;
@@ -278,7 +311,7 @@ export function StudioLiveCollaborationProvider({
         stopRoomSubscription();
         closeRoom();
         clearExposedRoom();
-        onCrdtDocumentChange?.(null);
+        onCrdtDocumentChange?.(null, null);
         setRoom(null);
         setPeers([]);
         setLocks([]);
@@ -291,7 +324,7 @@ export function StudioLiveCollaborationProvider({
       cancelled = true;
       stopVisibilityListener();
       stopRoomSubscription();
-      onCrdtDocumentChange?.(null);
+      onCrdtDocumentChange?.(null, null);
       const closingBinding = crdtBinding;
       const closingDocument = crdtDocument;
       crdtBinding = null;

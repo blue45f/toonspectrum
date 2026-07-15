@@ -208,6 +208,10 @@ function pressureRadius(size: number, pressure: number): number {
   return Math.max(0.25, (size * (0.3 + pressure * 1.4)) / 2);
 }
 
+function compareCodeUnits(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 function orderedStrokes(strokes: readonly StudioGpuStroke[]): readonly StudioGpuStroke[] {
   if (!strokes.some((stroke) => stroke.orderKey !== undefined)) return strokes;
   return strokes
@@ -216,7 +220,9 @@ function orderedStrokes(strokes: readonly StudioGpuStroke[]): readonly StudioGpu
       const leftKey = left.stroke.orderKey;
       const rightKey = right.stroke.orderKey;
       if (leftKey !== undefined && rightKey !== undefined) {
-        const order = leftKey.localeCompare(rightKey);
+        // CRDT operation order must be identical in every browser/locale. Relational string
+        // comparison follows the ECMAScript UTF-16 code-unit order and does not consult locale.
+        const order = compareCodeUnits(leftKey, rightKey);
         if (order !== 0) return order;
       } else if (leftKey !== undefined) {
         return -1;
@@ -239,10 +245,12 @@ export function planStudioGpuDabs(strokes: readonly StudioGpuStroke[]): PlannedS
     if (pointCount < 1) continue;
     const size = positiveOr(stroke.size, 1);
     const opacity = clamp(finiteOr(stroke.opacity, 1), 0, 1);
-    const [red, green, blue, colorAlpha] = parseStudioGpuColor(stroke.color);
-    const alpha = opacity * colorAlpha;
-    if (alpha <= 0) continue;
     const composite: StudioGpuComposite = stroke.composite === "erase" ? "erase" : "normal";
+    const [red, green, blue, colorAlpha] = parseStudioGpuColor(stroke.color);
+    // Erasing is coverage, not paint color. A transparent/alpha-zero color must therefore erase
+    // with the requested opacity instead of silently becoming a no-op.
+    const alpha = opacity * (composite === "erase" ? 1 : colorAlpha);
+    if (alpha <= 0) continue;
     const batchStart = dabs.length;
     const pushDab = (x: number, y: number, pressure: number) => {
       if (dabs.length >= MAX_DABS || !Number.isFinite(x) || !Number.isFinite(y)) return;
@@ -324,6 +332,46 @@ function isStrictPointPrefix(previous: StudioGpuStroke, next: StudioGpuStroke): 
   return true;
 }
 
+function isExactStrokeMatch(previous: StudioGpuStroke, next: StudioGpuStroke): boolean {
+  if (!sameStrokeStyle(previous, next) || previous.points.length !== next.points.length) {
+    return false;
+  }
+  if (previous.points.length % 2 !== 0) return false;
+  for (let index = 0; index < previous.points.length; index += 1) {
+    if (!Number.isFinite(previous.points[index])) return false;
+    if (!Object.is(previous.points[index], next.points[index])) return false;
+  }
+  const pointCount = previous.points.length / 2;
+  for (let index = 0; index < pointCount; index += 1) {
+    if (!Object.is(pointPressure(previous, index), pointPressure(next, index))) return false;
+  }
+  return true;
+}
+
+function concatenateStudioGpuDabPlans(
+  plans: readonly PlannedStudioGpuDabs[]
+): PlannedStudioGpuDabs {
+  const dabs: StudioGpuDab[] = [];
+  const batches: StudioGpuBatch[] = [];
+  for (const plan of plans) {
+    const instanceOffset = dabs.length;
+    dabs.push(...plan.dabs);
+    for (const batch of plan.batches) {
+      const firstInstance = instanceOffset + batch.firstInstance;
+      const previous = batches.at(-1);
+      if (
+        previous?.composite === batch.composite
+        && previous.firstInstance + previous.instanceCount === firstInstance
+      ) {
+        previous.instanceCount += batch.instanceCount;
+      } else {
+        batches.push({ ...batch, firstInstance });
+      }
+    }
+  }
+  return { dabs, batches };
+}
+
 function withoutInitialDab(plan: PlannedStudioGpuDabs): PlannedStudioGpuDabs {
   if (plan.dabs.length <= 1) return { dabs: [], batches: [] };
   const dabs = plan.dabs.slice(1);
@@ -348,24 +396,64 @@ export function planStudioGpuDabUpdate(
   previousStrokes: readonly StudioGpuStroke[],
   nextStrokes: readonly StudioGpuStroke[]
 ): StudioGpuDabRenderUpdate {
-  const previous = previousStrokes.length === 1 ? previousStrokes[0] : undefined;
-  const next = nextStrokes.length === 1 ? nextStrokes[0] : undefined;
-  if (!previous || !next || !sameStrokeStyle(previous, next) || !isStrictPointPrefix(previous, next)) {
-    return { mode: "rebuild", ...planStudioGpuDabs(nextStrokes) };
+  const previousOrdered = orderedStrokes(previousStrokes);
+  const nextOrdered = orderedStrokes(nextStrokes);
+  const sharedCount = Math.min(previousOrdered.length, nextOrdered.length);
+  let exactPrefixCount = 0;
+  while (
+    exactPrefixCount < sharedCount
+    && isExactStrokeMatch(previousOrdered[exactPrefixCount]!, nextOrdered[exactPrefixCount]!)
+  ) {
+    exactPrefixCount += 1;
   }
 
-  const previousPointCount = previous.points.length / 2;
-  const suffixStart = previousPointCount - 1;
-  const suffixPointCount = next.points.length / 2 - suffixStart;
-  const suffix: StudioGpuStroke = {
-    ...next,
-    points: next.points.slice(suffixStart * 2),
-    pressures: Array.from(
-      { length: suffixPointCount },
-      (_, index) => pointPressure(next, suffixStart + index)
-    ),
-  };
-  return { mode: "append", ...withoutInitialDab(planStudioGpuDabs([suffix])) };
+  // An immutable operation-log suffix is safe to composite over the retained texture. This is the
+  // important layer-level case: a new destination-out stroke can erase earlier normal strokes
+  // without replaying them, while a new normal stroke can paint over an earlier eraser.
+  if (exactPrefixCount === previousOrdered.length && nextOrdered.length >= previousOrdered.length) {
+    return {
+      mode: "append",
+      ...planStudioGpuDabs(nextOrdered.slice(previousOrdered.length)),
+    };
+  }
+
+  // The common live-input case keeps immutable completed strokes and extends only the final one.
+  // New strokes that already follow it in deterministic order can be appended in the same pass.
+  const terminalIndex = previousOrdered.length - 1;
+  const previousTerminal = previousOrdered[terminalIndex];
+  const nextTerminal = nextOrdered[terminalIndex];
+  if (
+    terminalIndex >= 0
+    && exactPrefixCount === terminalIndex
+    && nextOrdered.length >= previousOrdered.length
+    && previousTerminal
+    && nextTerminal
+    && sameStrokeStyle(previousTerminal, nextTerminal)
+    && isStrictPointPrefix(previousTerminal, nextTerminal)
+  ) {
+    const previousPointCount = previousTerminal.points.length / 2;
+    const suffixStart = previousPointCount - 1;
+    const suffixPointCount = nextTerminal.points.length / 2 - suffixStart;
+    const suffix: StudioGpuStroke = {
+      ...nextTerminal,
+      points: nextTerminal.points.slice(suffixStart * 2),
+      pressures: Array.from(
+        { length: suffixPointCount },
+        (_, index) => pointPressure(nextTerminal, suffixStart + index)
+      ),
+    };
+    return {
+      mode: "append",
+      ...concatenateStudioGpuDabPlans([
+        withoutInitialDab(planStudioGpuDabs([suffix])),
+        planStudioGpuDabs(nextOrdered.slice(previousOrdered.length)),
+      ]),
+    };
+  }
+
+  // Deletion, insertion before retained content, prediction-tail replacement and any historical
+  // style/sample change can alter pixels already in the texture and therefore requires replay.
+  return { mode: "rebuild", ...planStudioGpuDabs(nextOrdered) };
 }
 
 function limitStudioGpuDabPlan(
@@ -503,16 +591,26 @@ export class StudioWebGpuEngine {
 
   public resize(input: StudioGpuViewport): void {
     if (this.disposed) return;
-    this.viewport = normalizeViewport(input);
+    const nextViewport = normalizeViewport(input);
     const textureLimit = Math.max(
       1,
       Number(this.device?.limits.maxTextureDimension2D ?? DEFAULT_MAX_TEXTURE_DIMENSION)
     );
-    const requestedWidth = Math.max(1, Math.round(this.viewport.cssWidth * this.viewport.dpr));
-    const requestedHeight = Math.max(1, Math.round(this.viewport.cssHeight * this.viewport.dpr));
+    const requestedWidth = Math.max(1, Math.round(nextViewport.cssWidth * nextViewport.dpr));
+    const requestedHeight = Math.max(1, Math.round(nextViewport.cssHeight * nextViewport.dpr));
     const fit = Math.min(1, textureLimit / requestedWidth, textureLimit / requestedHeight);
     const physicalWidth = Math.max(1, Math.floor(requestedWidth * fit));
     const physicalHeight = Math.max(1, Math.floor(requestedHeight * fit));
+    const viewportChanged = Object.keys(nextViewport).some((key) => {
+      const viewportKey = key as keyof NormalizedStudioGpuViewport;
+      return !Object.is(nextViewport[viewportKey], this.viewport[viewportKey]);
+    });
+    const physicalSizeChanged = this.canvas.width !== physicalWidth ||
+      this.canvas.height !== physicalHeight ||
+      this.fallbackCanvas.width !== physicalWidth ||
+      this.fallbackCanvas.height !== physicalHeight;
+    this.viewport = nextViewport;
+    if (!viewportChanged && !physicalSizeChanged) return;
 
     for (const surface of new Set([this.canvas, this.fallbackCanvas])) {
       if (surface.width !== physicalWidth) surface.width = physicalWidth;

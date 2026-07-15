@@ -397,12 +397,10 @@ import {
   type StudioContinuityIssue,
   type StudioStoryBeat,
 } from "./studio-continuity";
-import { reconcileStudioCrdtHistory } from "./studio-crdt-history";
 import {
-  reconcileStudioCrdtPages,
   studioDrawElementSampleSlice,
   studioDrawElementToCrdtStroke,
-} from "./studio-crdt-page-bridge";
+} from "./studio-crdt-draw-bridge";
 import { STUDIO_CRDT_ORIGIN_LOCAL } from "./studio-crdt-protocol";
 import { creatorWorkSnapshotToStudioProject } from "./studio-creator-work-project";
 import {
@@ -478,6 +476,7 @@ import {
   invalidateStudioOwnerDetailAfterSharedSave,
   isStudioCuttoonSourceFormat,
   isStudioEditorAsyncScopeCurrent,
+  isStudioEditorCollaborationLocked,
   isStudioEditorMutationContinuationAllowed,
   isStudioSourceHydrationPending,
   studioEditorInstanceKey,
@@ -1104,6 +1103,12 @@ import { lazyRetry } from "@/lib/lazy-retry";
 import { cn } from "@/lib/utils";
 import { resolveAssetUrl } from "@/src/catalog-static";
 import { useSession } from "@/src/compat/auth-session-store";
+
+interface StudioCrdtSceneGraphRuntime {
+  publish: typeof import("./studio-crdt-scene-publisher").publishStudioCrdtSceneGraphDiff;
+  reconcileHistory: typeof import("./studio-crdt-history").reconcileStudioCrdtSceneGraphHistory;
+  reconcilePages: typeof import("./studio-crdt-page-bridge").reconcileStudioCrdtSceneGraphPages;
+}
 
 const KonvaRuntime = KonvaCore as unknown as typeof Konva;
 KonvaRuntime.Filters = KonvaRuntime.Filters ?? {};
@@ -4761,7 +4766,10 @@ function StudioCuttoonEditor() {
   // to live cursor state. The always-mounted provider owns and rotates the actual room.
   const studioLiveRoomRef = useRef<StudioLiveRoom | null>(null);
   const studioCrdtDocumentRef = useRef<StudioCrdtDocument | null>(null);
+  const studioCrdtSceneRuntimeRef = useRef<StudioCrdtSceneGraphRuntime | null>(null);
   const [studioCrdtDocument, setStudioCrdtDocument] = useState<StudioCrdtDocument | null>(null);
+  const [studioCrdtReconciledDocument, setStudioCrdtReconciledDocument] =
+    useState<StudioCrdtDocument | null>(null);
   const studioLiveHeldResourcesRef = useRef<string[]>([]);
   const [uiDensityMode, setUiDensityMode] = useState<StudioUiDensityMode>(() =>
     loadStudioUiDensityState(
@@ -4931,9 +4939,18 @@ function StudioCuttoonEditor() {
   const handleStudioLiveRoomChange = useCallback((room: StudioLiveRoom | null) => {
     studioLiveRoomRef.current = room;
   }, []);
-  const handleStudioCrdtDocumentChange = useCallback((document: StudioCrdtDocument | null) => {
-    studioCrdtDocumentRef.current = document;
-    setStudioCrdtDocument(document);
+  const handleStudioCrdtDocumentChange = useCallback((
+    document: StudioCrdtDocument | null,
+    runtime: StudioCrdtSceneGraphRuntime | null
+  ) => {
+    // document와 동적 scene runtime은 반드시 같은 room 세대의 한 쌍으로만 공개한다. 둘 중
+    // 하나라도 없으면 즉시 fail-closed 상태로 되돌려 지연 로딩/room 교체 틈의 로컬 편집을 막는다.
+    const readyDocument = document && runtime ? document : null;
+    studioCrdtDocumentRef.current = readyDocument;
+    studioCrdtSceneRuntimeRef.current = readyDocument ? runtime : null;
+    // 새 pair가 도착해도 initial frontier를 React history에 합치기 전에는 편집을 열지 않는다.
+    setStudioCrdtReconciledDocument(null);
+    setStudioCrdtDocument(readyDocument);
   }, []);
   const workAuthScopeKey = workId ? studioAuthUserId : null;
   const autosaveKey = studioAutosaveKey({ userId: studioAuthUserId, workId, remixId });
@@ -4971,11 +4988,26 @@ function StudioCuttoonEditor() {
   const collaborationDocumentUnavailable = expectsSharedDocument && !sharedDocument;
   const collaborationReadOnly = Boolean(sharedDocument && sharedDocument.access !== "edit");
   const sourceHydrationPending = isStudioSourceHydrationPending(workId, remixId, workHydrated);
-  const collaborationDocumentLocked =
-    documentReloadRequired ||
-    sourceHydrationPending ||
-    collaborationDocumentUnavailable ||
-    collaborationReadOnly;
+  const studioCrdtOperationSyncReady = Boolean(
+    studioCrdtDocument &&
+    studioCrdtDocumentRef.current === studioCrdtDocument &&
+    studioCrdtSceneRuntimeRef.current &&
+    studioCrdtReconciledDocument === studioCrdtDocument
+  );
+  const collaborationOperationSyncRequired = Boolean(
+    studioLiveParticipant && !collaborationReadOnly
+  );
+  const collaborationOperationSyncPending =
+    collaborationOperationSyncRequired && !studioCrdtOperationSyncReady;
+  const collaborationDocumentLocked = isStudioEditorCollaborationLocked({
+    documentAccessLocked:
+      documentReloadRequired ||
+      sourceHydrationPending ||
+      collaborationDocumentUnavailable ||
+      collaborationReadOnly,
+    operationSyncRequired: collaborationOperationSyncRequired,
+    operationSyncReady: studioCrdtOperationSyncReady,
+  });
   const collaborationAccessRef = useRef({
     authScopeKey: studioAuthUserId,
     workId,
@@ -5192,15 +5224,27 @@ function StudioCuttoonEditor() {
   const activeSurfaceReviewLocked =
     collaborationDocumentLocked || (pageEditLocked && !masterEditMode);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!studioCrdtDocument || sourceHydrationPending) return;
-    const applyRecords = (
-      records: ReturnType<StudioCrdtDocument["getStrokes"]>,
-      changedStrokeIds: ReadonlySet<string> | null
+    const applyFrontier = (
+      frontier: {
+        strokes: ReturnType<StudioCrdtDocument["getStrokes"]>;
+        sceneElements: ReturnType<StudioCrdtDocument["getSceneElements"]>;
+        pages: ReturnType<StudioCrdtDocument["getPages"]>;
+      },
+      changedIds: {
+        strokeIds: ReadonlySet<string>;
+        sceneElementIds: ReadonlySet<string>;
+        pageIds: ReadonlySet<string>;
+      } | null
     ) => {
       if (
         !editorMountedRef.current ||
-        (changedStrokeIds === null ? records.length === 0 : changedStrokeIds.size === 0)
+        (changedIds === null
+          ? frontier.strokes.length === 0 && frontier.sceneElements.length === 0 &&
+            frontier.pages.length === 0
+          : changedIds.strokeIds.size === 0 && changedIds.sceneElementIds.size === 0 &&
+            changedIds.pageIds.size === 0)
       ) return;
       studioRevisionProjectGenerationRef.current += 1;
       collaborationAccessRef.current = {
@@ -5208,19 +5252,34 @@ function StudioCuttoonEditor() {
         documentGeneration: collaborationAccessRef.current.documentGeneration + 1,
       };
       setPagesHistoryState((history) => {
-        const reconciled = reconcileStudioCrdtHistory(
+        const reconciled = studioCrdtSceneRuntimeRef.current?.reconcileHistory(
           history,
           pagesHiRef.current,
-          records,
-          changedStrokeIds
+          frontier,
+          changedIds
         );
-        return reconciled.changed ? reconciled.history : history;
+        return reconciled?.changed ? reconciled.history : history;
       });
     };
 
-    applyRecords(studioCrdtDocument.getStrokes({ includeDeleted: true }), null);
+    applyFrontier({
+      strokes: studioCrdtDocument.getStrokes({ includeDeleted: true }),
+      sceneElements: studioCrdtDocument.getSceneElements({ includeDeleted: true }),
+      pages: studioCrdtDocument.getPages(true),
+    }, null);
+    // layout effect 안의 history update와 같은 commit 전 배치로 처리한다. 따라서 stale 로컬
+    // 캔버스가 한 프레임 먼저 활성화되는 구간 없이 frontier가 반영된 다음 편집이 열린다.
+    setStudioCrdtReconciledDocument(studioCrdtDocument);
     return studioCrdtDocument.subscribeChanges(
-      (change) => applyRecords(change.strokes, change.changedStrokeIds),
+      (change) => applyFrontier({
+        strokes: change.strokes,
+        sceneElements: change.sceneElements,
+        pages: change.pages,
+      }, {
+        strokeIds: change.changedStrokeIds,
+        sceneElementIds: change.changedSceneElementIds,
+        pageIds: change.changedPageIds,
+      }),
       { includeOrigin: (origin) => origin !== STUDIO_CRDT_ORIGIN_LOCAL }
     );
   }, [sourceHydrationPending, studioCrdtDocument]);
@@ -5238,6 +5297,9 @@ function StudioCuttoonEditor() {
       return workHydrated
         ? "공동 문서를 열지 못해 편집과 저장을 잠갔어요. 연결을 확인한 뒤 다시 시도해 주세요."
         : "공동 문서를 불러오는 동안 편집과 저장을 사용할 수 없어요.";
+    }
+    if (collaborationOperationSyncPending) {
+      return "같은 화면의 원고 연산을 동기화하고 있어요. CRDT 문서와 장면 런타임이 모두 준비되면 편집이 자동으로 열립니다.";
     }
     if (sharedDocument.role === "commenter") {
       return "검토 전용 권한입니다. 서버 댓글은 다음 단계에서 제공되며, 지금은 원고 열람·스크롤·내보내기만 할 수 있어요.";
@@ -9958,56 +10020,26 @@ function StudioCuttoonEditor() {
     tr.getLayer()?.batchDraw();
   }, [collaborationDocumentLocked, selectedId, marqueeIds, tool, elements, groups]);
 
-  function publishStudioCrdtDrawDiff(
-    previousElements: readonly El[],
-    nextElements: readonly El[],
-    pageId: string,
+  function publishStudioCrdtSceneTransition(
+    previousPages: readonly PageState[],
+    nextPages: readonly PageState[],
     registerNewDraws = true
   ): void {
     const document = studioCrdtDocumentRef.current;
-    if (!document) return;
-    const previousDraws = new Map(
-      previousElements.filter((element): element is El & DrawEl => element.type === "draw")
-        .map((element) => [element.id, element])
-    );
-    const nextDraws = new Map(
-      nextElements.filter((element): element is El & DrawEl => element.type === "draw")
-        .map((element) => [element.id, element])
-    );
+    const runtime = studioCrdtSceneRuntimeRef.current;
+    if (!document || !runtime) return;
     try {
-      for (const [id] of previousDraws) {
-        if (!nextDraws.has(id) && document.getStroke(id, true)) {
-          document.deleteStroke(id);
-        }
-      }
-      for (const [id, element] of nextDraws) {
-        const previous = previousDraws.get(id);
-        const current = document.getStroke(id, true);
-        if (!current) {
-          // Existing legacy strokes stay in the saved document. Only drawings created after this
-          // collaboration session begins enter the durable CRDT surface.
-          if (!previous && registerNewDraws) {
-            document.replaceStroke(studioDrawElementToCrdtStroke(pageId, element));
-          }
-          continue;
-        }
-        // A tombstoned stroke may still exist in this render's stale React snapshot because Yjs
-        // applies the peer delete synchronously and history reconciliation follows asynchronously.
-        // Only an actual absent -> present transition (redo/explicit re-add) is allowed to restore
-        // it; an unrelated commit must preserve the peer's delete.
-        if (current.deleted) {
-          if (!previous) document.restoreStroke(id);
-          else continue;
-        }
-        if (!previous || previous !== element || current.status !== "finalized") {
-          document.replaceStroke(studioDrawElementToCrdtStroke(pageId, element));
-        }
-      }
+      runtime.publish(
+        document,
+        previousPages,
+        nextPages,
+        { registerNewDraws }
+      );
     } catch (cause) {
       setError(
         cause instanceof Error
-          ? `실시간 획 동기화: ${cause.message}`
-          : "실시간 획을 팀 문서에 반영하지 못했습니다."
+          ? `실시간 장면 동기화: ${cause.message}`
+          : "장면 요소와 페이지 순서를 팀 문서에 반영하지 못했습니다."
       );
     }
   }
@@ -10017,28 +10049,20 @@ function StudioCuttoonEditor() {
     nextPages: readonly PageState[]
   ): void {
     if (!studioCrdtDocumentRef.current) return;
-    const pageIds = new Set([
-      ...previousPages.map((page) => page.id),
-      ...nextPages.map((page) => page.id),
-    ]);
-    for (const pageId of pageIds) {
-      publishStudioCrdtDrawDiff(
-        previousPages.find((page) => page.id === pageId)?.elements ?? [],
-        nextPages.find((page) => page.id === pageId)?.elements ?? [],
-        pageId,
-        false
-      );
-    }
+    publishStudioCrdtSceneTransition(previousPages, nextPages, false);
   }
 
-  function mergeStudioCrdtDrawsIntoElements(pageId: string, nextElements: El[]): El[] {
+  function mergeStudioCrdtFrontier(nextPages: PageState[]): PageState[] {
     const document = studioCrdtDocumentRef.current;
-    if (!document) return nextElements;
-    const reconciled = reconcileStudioCrdtPages(
-      [{ id: pageId, elements: nextElements }],
-      document.getStrokes({ includeDeleted: true })
+    const runtime = studioCrdtSceneRuntimeRef.current;
+    if (!document || !runtime) return nextPages;
+    const reconciled = runtime.reconcilePages(
+      nextPages,
+      document.getStrokes({ includeDeleted: true }),
+      document.getSceneElements({ includeDeleted: true }),
+      document.getPages(true)
     );
-    return reconciled.pages[0]?.elements ?? nextElements;
+    return reconciled.pages;
   }
 
   // 요소 변경을 히스토리에 커밋. (마스터 편집 모드에서는 문서 마스터로 커밋 — 히스토리 미포함, 패널에서 고지)
@@ -10057,7 +10081,7 @@ function StudioCuttoonEditor() {
       return;
     }
     setSharedDocumentNotice(null);
-    let resolved = applyBubbleAnchors(nextElements);
+    const resolved = applyBubbleAnchors(nextElements);
     if (masterEditMode) {
       setMaster((m) => withMasterElements(m, resolved)); // extraPatch는 마스터엔 개념 없음 — 무시
       return;
@@ -10069,10 +10093,12 @@ function StudioCuttoonEditor() {
     if (!advancedFillApplyingRef.current) {
       invalidateAdvancedFillWork("문서가 바뀌어 진행 중인 계산과 채우기 미리보기를 취소했습니다.");
     }
-    publishStudioCrdtDrawDiff(elements, resolved, activePage.id);
-    resolved = mergeStudioCrdtDrawsIntoElements(activePage.id, resolved);
     coalesceKeyRef.current = null; // 일반 커밋은 합치기 체인을 끊는다.
-    const nextPages = pages.map((p) => (p.id === activePage.id ? { ...p, ...extraPatch, elements: resolved } : p));
+    const localNextPages = pages.map((p) =>
+      p.id === activePage.id ? { ...p, ...extraPatch, elements: resolved } : p
+    );
+    publishStudioCrdtSceneTransition(pages, localNextPages);
+    const nextPages = mergeStudioCrdtFrontier(localNextPages);
     const h = pagesHistory.slice(0, pagesHi + 1);
     h.push(nextPages);
     setPagesHistory(h);
@@ -10090,7 +10116,7 @@ function StudioCuttoonEditor() {
       return;
     }
     setSharedDocumentNotice(null);
-    let resolved = applyBubbleAnchors(nextElements);
+    const resolved = applyBubbleAnchors(nextElements);
     if (masterEditMode) {
       // 마스터 편집은 히스토리 밖이라 합치기(coalesce) 개념이 없다 — 마스터로 바로 커밋.
       setMaster((m) => withMasterElements(m, resolved));
@@ -10103,9 +10129,11 @@ function StudioCuttoonEditor() {
     if (!advancedFillApplyingRef.current) {
       invalidateAdvancedFillWork("문서가 바뀌어 진행 중인 계산과 채우기 미리보기를 취소했습니다.");
     }
-    publishStudioCrdtDrawDiff(elements, resolved, activePage.id);
-    resolved = mergeStudioCrdtDrawsIntoElements(activePage.id, resolved);
-    const nextPages = pages.map((p) => (p.id === activePage.id ? { ...p, elements: resolved } : p));
+    const localNextPages = pages.map((p) =>
+      p.id === activePage.id ? { ...p, elements: resolved } : p
+    );
+    publishStudioCrdtSceneTransition(pages, localNextPages);
+    const nextPages = mergeStudioCrdtFrontier(localNextPages);
     if (coalesceKeyRef.current === key && pagesHi === pagesHistory.length - 1) {
       setPagesHistory((h) => {
         const c = h.slice();
@@ -10145,21 +10173,8 @@ function StudioCuttoonEditor() {
     const document = studioCrdtDocumentRef.current;
     let resolvedPages = nextPages;
     if (document) {
-      const pageIds = new Set([
-        ...pages.map((page) => page.id),
-        ...nextPages.map((page) => page.id),
-      ]);
-      for (const pageId of pageIds) {
-        publishStudioCrdtDrawDiff(
-          pages.find((page) => page.id === pageId)?.elements ?? [],
-          nextPages.find((page) => page.id === pageId)?.elements ?? [],
-          pageId
-        );
-      }
-      const records = document.getStrokes({ includeDeleted: true });
-      resolvedPages = nextPages.map((page) =>
-        reconcileStudioCrdtPages([page], records).pages[0] ?? page
-      );
+      publishStudioCrdtSceneTransition(pages, nextPages);
+      resolvedPages = mergeStudioCrdtFrontier(nextPages);
     }
     coalesceKeyRef.current = null;
     const h = pagesHistory.slice(0, pagesHi + 1);
@@ -18772,12 +18787,12 @@ function StudioCuttoonEditor() {
   const isolatedDynamicDraft = draft?.mode === "pen" && resolveStudioBrushDynamicsPresetId(draft.brush) !== null
     ? draft
     : null;
-  // G10b vertical slice: the latency-sensitive, pressure-aware ink/eraser preview is composited on
-  // WebGPU (with a silent Canvas2D fallback). Texture, particle and shape brushes stay on their
-  // exact Konva renderers until their shaders reach visual parity; an eraser preview also stays in
-  // the scene canvas because a separate transparent DOM surface cannot destination-out pixels in
-  // the Konva surface below it. Committed document/export nodes remain authoritative throughout
-  // the staged renderer migration.
+  // G10b vertical slice: the latency-sensitive, pressure-aware ink preview is composited on WebGPU
+  // (with a silent Canvas2D fallback). The engine supports retained normal + destination-out
+  // operation lists, but this transparent DOM surface does not own the committed Konva pixels
+  // below it, so the live eraser deliberately stays in the authoritative scene canvas. Texture,
+  // particle and shape brushes also stay on their exact Konva renderers until their shaders reach
+  // visual parity. Committed document/export nodes remain authoritative throughout the migration.
   const webGpuDraft = draft && draft.mode !== "eraser"
     && (draft.kind ?? "freehand") === "freehand" && !isolatedDynamicDraft
     && resolveStudioBrushRenderFamily(draft.brush ?? "pen") === "pen"
@@ -19516,7 +19531,7 @@ function StudioCuttoonEditor() {
           <div
             role="status"
             aria-live="polite"
-            aria-busy={!workHydrated}
+            aria-busy={!workHydrated || collaborationOperationSyncPending}
             className={cn(
               "my-1 flex min-h-9 items-start gap-2 rounded-lg border px-2.5 py-1.5 text-xs",
               collaborationDocumentLocked
@@ -19535,7 +19550,9 @@ function StudioCuttoonEditor() {
                   ? workHydrated
                     ? "공동 문서를 열지 못했어요"
                     : "공동 문서 권한을 확인하고 있어요"
-                  : collaborationReadOnly
+                  : collaborationOperationSyncPending
+                    ? "동시 편집 연산 동기화 중"
+                    : collaborationReadOnly
                     ? `${collaborationRoleLabel()} · 읽기 전용`
                     : `${collaborationRoleLabel()} · 공동 편집 가능`}
               </strong>
@@ -22886,7 +22903,7 @@ function StudioCuttoonEditor() {
           <div className="pointer-events-none sticky top-2 z-40 flex h-0 items-start justify-end pr-2">
             <Suspense fallback={null}>
               <StudioLivePresenceDockConnected
-                operationSyncReady={studioCrdtDocument !== null}
+                operationSyncReady={studioCrdtOperationSyncReady}
                 followingSessionId={followingStudioSessionId}
                 onOpenTeam={() => setTeamPanelOpen(true)}
                 onToggleFollow={(sessionId) =>

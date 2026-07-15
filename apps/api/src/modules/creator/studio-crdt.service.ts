@@ -37,6 +37,137 @@ const STUDIO_CRDT_STROKE_SAMPLE_KEYS = [
   "speeds",
   "tangentialPressures",
 ] as const;
+const STUDIO_CRDT_STROKE_JSON_KEYS = [
+  "gradient",
+  "pattern",
+  "brushDynamics",
+  "brushTip",
+  "strokeStyle",
+  "shapeParams",
+  "symmetry",
+  "extensions",
+] as const;
+const STUDIO_CRDT_STROKE_OPTIONAL_STRING_KEYS = ["fill", "brush", "blendMode"] as const;
+const STUDIO_CRDT_STROKE_RECORD_KEYS = new Set([
+  "id",
+  "pageId",
+  "layerId",
+  "status",
+  "deleted",
+  "payloadVersion",
+  "type",
+  "kind",
+  "mode",
+  "stroke",
+  "strokeWidth",
+  "opacity",
+  "sampleSpacing",
+  ...STUDIO_CRDT_STROKE_OPTIONAL_STRING_KEYS,
+  ...STUDIO_CRDT_STROKE_JSON_KEYS,
+  ...STUDIO_CRDT_STROKE_SAMPLE_KEYS,
+]);
+const STUDIO_CRDT_STROKE_METADATA_MAX_BYTES = 16 * 1_024;
+const STUDIO_CRDT_STROKE_WIDTH_MAX = 8_192;
+const STUDIO_CRDT_SCENE_INDEX_ROOT = "scene-elements";
+const STUDIO_CRDT_PAGE_INDEX_ROOT = "studio-pages";
+const STUDIO_CRDT_SCENE_ROOT_PREFIX = "scene-element:";
+const STUDIO_CRDT_PAGE_ROOT_PREFIX = "studio-page:";
+const STUDIO_CRDT_PAGE_ORDER_ROOT = "page-order";
+const STUDIO_CRDT_PROPERTY_PREFIXES = ["base:", "prop:", "unset:"] as const;
+const STUDIO_CRDT_SCENE_PAYLOAD_MAX_BYTES = 16 * 1_024;
+const STUDIO_CRDT_PAGE_PAYLOAD_MAX_BYTES = 8 * 1_024;
+const STUDIO_CRDT_COLLECTION_MAX_ENTRIES = 100_000;
+const STUDIO_CRDT_ACTIVE_ORDER_ENTRY_MAX_COUNT = 256;
+const STUDIO_CRDT_JSON_MAX_DEPTH = 10;
+const STUDIO_CRDT_JSON_MAX_ENTRIES = 4_096;
+const STUDIO_CRDT_JSON_MAX_STRING_LENGTH = 64 * 1_024;
+const STUDIO_CRDT_MAX_COORDINATE = 10_000_000;
+const STUDIO_CRDT_TEXT_ENCODER = new TextEncoder();
+
+const STUDIO_CRDT_COMMON_SCENE_KEYS = [
+  "name",
+  "hidden",
+  "locked",
+  "noClip",
+  "opacity",
+  "blendMode",
+  "lockAspect",
+  "groupId",
+  "clipBelow",
+  "alphaLocked",
+  "maskSrc",
+  "maskEnabled",
+  "layerRole",
+  "layerColor",
+  "emeresSourceId",
+] as const;
+
+const STUDIO_CRDT_SCENE_KEYS_BY_TYPE = {
+  text: new Set([
+    ...STUDIO_CRDT_COMMON_SCENE_KEYS,
+    "text", "x", "y", "width", "fontSize", "fill", "rotation", "font", "stroke",
+    "strokeWidth", "letterSpacing", "lineHeight", "vertical", "align", "fontStyle",
+    "shadowColor", "shadowBlur", "shadowOffsetX", "shadowOffsetY", "shadowOpacity",
+    "fillType", "gradientColorStart", "gradientColorEnd", "gradientDirection", "gradient",
+    "textPath", "skewX", "skewY",
+  ]),
+  bubble: new Set([
+    ...STUDIO_CRDT_COMMON_SCENE_KEYS,
+    "variant", "text", "x", "y", "width", "height", "fill", "textFill", "rotation",
+    "tail", "tailDirection", "extraTails", "font", "fontSize", "lineHeight", "vertical",
+    "align", "fontStyle", "tailXRatio", "tailHeight", "tailBase", "tailBend",
+    "tailAnchorId", "tailAnchorPoint", "stroke", "strokeWidth", "strokeStyle", "gradient",
+    "autoShrinkText", "autoShrinkMinFontSize", "starAmplitude", "shadowColor", "shadowBlur",
+    "shadowOffsetX", "shadowOffsetY", "shadowOpacity", "customShapePoints",
+  ]),
+  sticker: new Set([
+    ...STUDIO_CRDT_COMMON_SCENE_KEYS,
+    "text", "x", "y", "fontSize", "rotation", "skewX", "skewY",
+  ]),
+  frame: new Set([
+    ...STUDIO_CRDT_COMMON_SCENE_KEYS,
+    "x", "y", "width", "height", "bg", "bgColor", "stroke", "strokeWidth", "dashStyle",
+    "storyBeat", "aiProvenance", "points",
+  ]),
+  focusLines: new Set([
+    ...STUDIO_CRDT_COMMON_SCENE_KEYS,
+    "x", "y", "width", "height", "lineCount", "innerRadius", "outerRadius", "stroke",
+    "strokeWidth", "noise", "rotation", "centerXRatio", "centerYRatio",
+  ]),
+  speedLines: new Set([
+    ...STUDIO_CRDT_COMMON_SCENE_KEYS,
+    "x", "y", "width", "height", "lineCount", "direction", "stroke", "strokeWidth",
+    "noise", "rotation",
+  ]),
+} as const;
+
+type StudioCrdtSceneType = keyof typeof STUDIO_CRDT_SCENE_KEYS_BY_TYPE;
+
+const STUDIO_CRDT_REQUIRED_SCENE_KEYS: Record<StudioCrdtSceneType, readonly string[]> = {
+  text: ["text", "x", "y", "width", "fontSize", "fill", "rotation"],
+  bubble: ["variant", "text", "x", "y", "width", "height", "fill", "textFill", "rotation"],
+  sticker: ["text", "x", "y", "fontSize", "rotation"],
+  frame: ["x", "y", "width", "height"],
+  focusLines: [
+    "x", "y", "width", "height", "lineCount", "innerRadius", "outerRadius", "stroke",
+    "strokeWidth", "noise", "rotation",
+  ],
+  speedLines: [
+    "x", "y", "width", "height", "lineCount", "direction", "stroke", "strokeWidth",
+    "rotation",
+  ],
+};
+
+const STUDIO_CRDT_PAGE_KEYS = new Set([
+  "bg",
+  "bgGrad",
+  "canvasH",
+  "name",
+  "note",
+  "hideMaster",
+  "shotType",
+  "cameraAngle",
+]);
 
 export interface StudioCrdtServiceOptions {
   now?: () => Date;
@@ -187,59 +318,536 @@ function validateStoredUpdate(update: StudioCrdtUpdateRecord, workId: string): v
 }
 
 function isBoundedStudioCrdtId(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0 && value.length <= 160;
+  if (typeof value !== "string" || value.length === 0 || value.length > 160) return false;
+  for (const character of value) {
+    const codePoint = character.codePointAt(0) ?? 0;
+    if (codePoint <= 31 || (codePoint >= 127 && codePoint <= 159)) return false;
+  }
+  return true;
+}
+
+function hasOnlyKeys(value: Y.Map<unknown>, allowed: ReadonlySet<string>): boolean {
+  for (const key of value.keys()) {
+    if (!allowed.has(key)) return false;
+  }
+  return true;
+}
+
+function materializeExistingMapRoot(
+  doc: Y.Doc,
+  rootName: string
+): Y.Map<unknown> | null | undefined {
+  if (!doc.share.has(rootName)) return undefined;
+  try {
+    return doc.getMap<unknown>(rootName);
+  } catch {
+    return null;
+  }
+}
+
+function materializeExistingArrayRoot(
+  doc: Y.Doc,
+  rootName: string
+): Y.Array<unknown> | null | undefined {
+  if (!doc.share.has(rootName)) return undefined;
+  try {
+    return doc.getArray<unknown>(rootName);
+  } catch {
+    return null;
+  }
+}
+
+function isBoundedJsonValue(
+  value: unknown,
+  state = { entries: 0, seen: new WeakSet<object>() },
+  depth = 0
+): boolean {
+  if (depth > STUDIO_CRDT_JSON_MAX_DEPTH || ++state.entries > STUDIO_CRDT_JSON_MAX_ENTRIES) {
+    return false;
+  }
+  if (value === null || typeof value === "boolean") return true;
+  if (typeof value === "number") return Number.isFinite(value);
+  if (typeof value === "string") {
+    return value.length <= STUDIO_CRDT_JSON_MAX_STRING_LENGTH && !value.includes("\0");
+  }
+  if (typeof value !== "object" || value instanceof Y.AbstractType || state.seen.has(value)) {
+    return false;
+  }
+  state.seen.add(value);
+  if (Array.isArray(value)) {
+    return value.every((item) => isBoundedJsonValue(item, state, depth + 1));
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) return false;
+  for (const [key, item] of Object.entries(value)) {
+    if (
+      key.length === 0 ||
+      key.length > 512 ||
+      key.includes("\0") ||
+      !isBoundedJsonValue(item, state, depth + 1)
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function encodedJsonByteLength(value: unknown): number | null {
+  try {
+    return STUDIO_CRDT_TEXT_ENCODER.encode(JSON.stringify(value)).byteLength;
+  } catch {
+    return null;
+  }
+}
+
+function finiteNumberInRange(value: unknown, minimum: number, maximum: number): boolean {
+  return typeof value === "number" && Number.isFinite(value) && value >= minimum && value <= maximum;
+}
+
+function boundedString(value: unknown, maximum: number): value is string {
+  return typeof value === "string" && value.length <= maximum && !value.includes("\0");
+}
+
+function boundedExactText(value: unknown, maximum: number): value is string {
+  if (typeof value !== "string" || value.length === 0 || value.length > maximum) return false;
+  for (const character of value) {
+    const codePoint = character.codePointAt(0) ?? 0;
+    if (codePoint <= 31 || (codePoint >= 127 && codePoint <= 159)) return false;
+  }
+  return true;
+}
+
+function isStudioCrdtSceneType(value: unknown): value is StudioCrdtSceneType {
+  return typeof value === "string" && value in STUDIO_CRDT_SCENE_KEYS_BY_TYPE;
+}
+
+function readReservedProperties(
+  record: Y.Map<unknown>,
+  allowedProperties: ReadonlySet<string>,
+  metadataKeys: ReadonlySet<string>
+): Record<string, unknown> | null {
+  const baseline: Record<string, unknown> = {};
+  const properties: Record<string, unknown> = {};
+  const unset = new Set<string>();
+  for (const [key, value] of record) {
+    if (metadataKeys.has(key)) continue;
+    const prefix = STUDIO_CRDT_PROPERTY_PREFIXES.find((candidate) => key.startsWith(candidate));
+    if (!prefix) return null;
+    const property = key.slice(prefix.length);
+    if (!allowedProperties.has(property)) return null;
+    if (prefix === "unset:") {
+      if (typeof value !== "boolean") return null;
+      if (value) unset.add(property);
+      continue;
+    }
+    if (!isBoundedJsonValue(value)) return null;
+    if (prefix === "base:") baseline[property] = value;
+    else properties[property] = value;
+  }
+  const effective = { ...baseline, ...properties };
+  for (const property of unset) delete effective[property];
+  // The browser validates the effective payload as one JSON tree after resolving base/prop/unset.
+  // Re-validating the whole object here is essential: validating each property with a fresh entry
+  // counter would allow several individually-small values to exceed the shared 4,096-entry limit
+  // and create a durable document that every conforming client refuses to materialize.
+  return isBoundedJsonValue(effective) ? effective : null;
+}
+
+function canonicalReservedRootId(rootName: string, prefix: string): string | null {
+  if (!rootName.startsWith(prefix)) return null;
+  const encodedId = rootName.slice(prefix.length);
+  if (encodedId.length === 0) return null;
+  try {
+    const id = decodeURIComponent(encodedId);
+    return isBoundedStudioCrdtId(id) && encodeURIComponent(id) === encodedId ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+function validateSceneElementRoot(id: string, record: Y.Map<unknown>): boolean {
+  const metadataKeys = new Set(["id", "pageId", "layerId", "payloadVersion", "type", "deleted"]);
+  const type = record.get("type");
+  if (
+    record.get("id") !== id ||
+    !isBoundedStudioCrdtId(record.get("pageId")) ||
+    !isBoundedStudioCrdtId(record.get("layerId")) ||
+    record.get("payloadVersion") !== 1 ||
+    !isStudioCrdtSceneType(type) ||
+    typeof record.get("deleted") !== "boolean"
+  ) {
+    return false;
+  }
+  const props = readReservedProperties(record, STUDIO_CRDT_SCENE_KEYS_BY_TYPE[type], metadataKeys);
+  if (!props) return false;
+  for (const key of STUDIO_CRDT_REQUIRED_SCENE_KEYS[type]) {
+    if (!(key in props)) return false;
+  }
+  for (const key of ["x", "y"]) {
+    if (key in props && !finiteNumberInRange(props[key], -STUDIO_CRDT_MAX_COORDINATE, STUDIO_CRDT_MAX_COORDINATE)) {
+      return false;
+    }
+  }
+  for (const key of ["width", "height", "fontSize", "strokeWidth"]) {
+    if (key in props && !finiteNumberInRange(props[key], 0, STUDIO_CRDT_MAX_COORDINATE)) return false;
+  }
+  for (const key of [
+    "letterSpacing",
+    "lineHeight",
+    "shadowBlur",
+    "shadowOffsetX",
+    "shadowOffsetY",
+    "shadowOpacity",
+    "skewX",
+    "skewY",
+    "tailXRatio",
+    "tailHeight",
+    "tailBase",
+    "tailBend",
+    "autoShrinkMinFontSize",
+    "starAmplitude",
+    "lineCount",
+    "innerRadius",
+    "outerRadius",
+    "noise",
+    "centerXRatio",
+    "centerYRatio",
+  ]) {
+    if (
+      key in props &&
+      !finiteNumberInRange(
+        props[key],
+        -STUDIO_CRDT_MAX_COORDINATE,
+        STUDIO_CRDT_MAX_COORDINATE
+      )
+    ) return false;
+  }
+  if ("rotation" in props && !finiteNumberInRange(props.rotation, -1_000_000, 1_000_000)) return false;
+  if ("opacity" in props && !finiteNumberInRange(props.opacity, 0, 1)) return false;
+  for (const key of [
+    "hidden",
+    "locked",
+    "noClip",
+    "lockAspect",
+    "clipBelow",
+    "alphaLocked",
+    "maskEnabled",
+    "vertical",
+    "autoShrinkText",
+  ]) {
+    if (key in props && typeof props[key] !== "boolean") return false;
+  }
+  if ("text" in props && !boundedString(props.text, STUDIO_CRDT_JSON_MAX_STRING_LENGTH)) return false;
+  for (const key of ["fill", "textFill", "stroke", "variant", "direction"]) {
+    if (key in props && !boundedString(props[key], 512)) return false;
+  }
+  const enumValues: Readonly<Record<string, readonly string[]>> = {
+    align: ["left", "center", "right"],
+    fontStyle: ["normal", "bold", "italic", "bold italic"],
+    fillType: ["solid", "gradient"],
+    gradientDirection: ["vertical", "horizontal"],
+    tail: ["left", "right", "none"],
+    tailDirection: ["bottom", "top", "left", "right"],
+    dashStyle: ["solid", "dashed"],
+    direction: ["horizontal", "vertical"],
+  };
+  for (const [key, values] of Object.entries(enumValues)) {
+    if (key in props && !values.includes(props[key] as string)) return false;
+  }
+  if (
+    "lineCount" in props &&
+    (!Number.isInteger(props.lineCount) || (props.lineCount as number) < 1)
+  ) return false;
+  for (const key of ["points", "customShapePoints"] as const) {
+    if (!(key in props)) continue;
+    const values = props[key];
+    if (
+      !Array.isArray(values) ||
+      values.length % 2 !== 0 ||
+      (key === "points" ? values.length !== 8 : values.length < 6) ||
+      values.some(
+        (value) =>
+          typeof value !== "number" ||
+          !Number.isFinite(value) ||
+          Math.abs(value) > STUDIO_CRDT_MAX_COORDINATE
+      )
+    ) return false;
+  }
+  const byteLength = encodedJsonByteLength({ version: 1, type, props });
+  return byteLength !== null && byteLength <= STUDIO_CRDT_SCENE_PAYLOAD_MAX_BYTES;
+}
+
+function validatePageRoot(id: string, record: Y.Map<unknown>): boolean {
+  const metadataKeys = new Set(["id", "payloadVersion", "deleted"]);
+  if (
+    record.get("id") !== id ||
+    record.get("payloadVersion") !== 1 ||
+    typeof record.get("deleted") !== "boolean"
+  ) {
+    return false;
+  }
+  const props = readReservedProperties(record, STUDIO_CRDT_PAGE_KEYS, metadataKeys);
+  if (!props || !boundedString(props.bg, 512)) return false;
+  if (!finiteNumberInRange(props.canvasH, 1, STUDIO_CRDT_MAX_COORDINATE)) return false;
+  if (
+    props.bgGrad !== null &&
+    (!Array.isArray(props.bgGrad) ||
+      props.bgGrad.length > 32 ||
+      props.bgGrad.some((color) => !boundedString(color, 512)))
+  ) {
+    return false;
+  }
+  for (const key of ["name", "note", "shotType", "cameraAngle"]) {
+    if (key in props && !boundedString(props[key], key === "note" ? 8_192 : 512)) return false;
+  }
+  if ("hideMaster" in props && typeof props.hideMaster !== "boolean") return false;
+  const byteLength = encodedJsonByteLength({ version: 1, props });
+  return byteLength !== null && byteLength <= STUDIO_CRDT_PAGE_PAYLOAD_MAX_BYTES;
+}
+
+function validateStrokeRoot(id: string, record: Y.Map<unknown>): boolean {
+  const strokeWidth = record.get("strokeWidth");
+  if (
+    !hasOnlyKeys(record, STUDIO_CRDT_STROKE_RECORD_KEYS) ||
+    record.get("id") !== id ||
+    !isBoundedStudioCrdtId(record.get("pageId")) ||
+    !isBoundedStudioCrdtId(record.get("layerId")) ||
+    (record.get("status") !== "drawing" && record.get("status") !== "finalized") ||
+    typeof record.get("deleted") !== "boolean" ||
+    record.get("payloadVersion") !== 1 ||
+    record.get("type") !== "draw" ||
+    (record.get("mode") !== "pen" && record.get("mode") !== "eraser") ||
+    !boundedExactText(record.get("kind"), 80) ||
+    !boundedExactText(record.get("stroke"), 256) ||
+    !finiteNumberInRange(strokeWidth, 0.01, STUDIO_CRDT_STROKE_WIDTH_MAX)
+  ) {
+    return false;
+  }
+  const opacity = record.get("opacity");
+  if (record.has("opacity") && !finiteNumberInRange(opacity, 0, 1)) return false;
+  const sampleSpacing = record.get("sampleSpacing");
+  if (
+    record.has("sampleSpacing") &&
+    !finiteNumberInRange(sampleSpacing, 0.01, STUDIO_CRDT_STROKE_WIDTH_MAX)
+  ) return false;
+  for (const key of STUDIO_CRDT_STROKE_OPTIONAL_STRING_KEYS) {
+    const value = record.get(key);
+    if (record.has(key) && !boundedExactText(value, 512)) return false;
+  }
+  for (const key of STUDIO_CRDT_STROKE_JSON_KEYS) {
+    const value = record.get(key);
+    if (
+      record.has(key) &&
+      (value === null || typeof value !== "object" || Array.isArray(value) ||
+        !isBoundedJsonValue(value))
+    ) return false;
+  }
+  const metadata: Record<string, unknown> = {
+    version: 1,
+    type: "draw",
+    kind: record.get("kind"),
+    mode: record.get("mode"),
+    stroke: record.get("stroke"),
+    strokeWidth,
+  };
+  for (const key of [
+    "opacity",
+    "sampleSpacing",
+    ...STUDIO_CRDT_STROKE_OPTIONAL_STRING_KEYS,
+    ...STUDIO_CRDT_STROKE_JSON_KEYS,
+  ]) {
+    if (record.has(key)) metadata[key] = record.get(key);
+  }
+  const metadataBytes = encodedJsonByteLength(metadata);
+  if (metadataBytes === null || metadataBytes > STUDIO_CRDT_STROKE_METADATA_MAX_BYTES) return false;
+
+  const arrays = Object.fromEntries(
+    STUDIO_CRDT_STROKE_SAMPLE_KEYS.map((key) => [key, record.get(key)])
+  ) as Record<(typeof STUDIO_CRDT_STROKE_SAMPLE_KEYS)[number], unknown>;
+  if (STUDIO_CRDT_STROKE_SAMPLE_KEYS.some((key) => !(arrays[key] instanceof Y.Array))) {
+    return false;
+  }
+  const points = arrays.points as Y.Array<unknown>;
+  if (
+    points.length % 2 !== 0 ||
+    points.length / 2 > STUDIO_CRDT_STROKE_SAMPLE_MAX_COUNT
+  ) return false;
+  const sampleCount = points.length / 2;
+  if (
+    STUDIO_CRDT_STROKE_SAMPLE_KEYS.slice(1).some(
+      (key) => (arrays[key] as Y.Array<unknown>).length !== sampleCount
+    )
+  ) return false;
+  const ranges: Record<(typeof STUDIO_CRDT_STROKE_SAMPLE_KEYS)[number], readonly [number, number]> = {
+    points: [-STUDIO_CRDT_MAX_COORDINATE, STUDIO_CRDT_MAX_COORDINATE],
+    pressures: [0, 1],
+    tiltXs: [-90, 90],
+    tiltYs: [-90, 90],
+    twists: [0, 359],
+    speeds: [0, 1_000_000],
+    tangentialPressures: [-1, 1],
+  };
+  for (const key of STUDIO_CRDT_STROKE_SAMPLE_KEYS) {
+    const [minimum, maximum] = ranges[key];
+    if (
+      (arrays[key] as Y.Array<unknown>).toArray().some(
+        (value) => !finiteNumberInRange(value, minimum, maximum)
+      )
+    ) return false;
+  }
+  return true;
+}
+
+function validateTrackedDynamicRoots(
+  doc: Y.Doc,
+  indexRootName: string,
+  dynamicPrefix: string,
+  validateRecord: (id: string, record: Y.Map<unknown>) => boolean
+): boolean {
+  const root = materializeExistingMapRoot(doc, indexRootName);
+  const trackedIds = new Set<string>();
+  if (root !== undefined) {
+    if (root === null || root.size > STUDIO_CRDT_COLLECTION_MAX_ENTRIES) return false;
+    for (const [id, active] of root) {
+      if (!isBoundedStudioCrdtId(id) || active !== true) return false;
+      const record = materializeExistingMapRoot(doc, `${dynamicPrefix}${encodeURIComponent(id)}`);
+      if (!record || !validateRecord(id, record)) return false;
+      trackedIds.add(id);
+    }
+  }
+  let dynamicRootCount = 0;
+  for (const [rootName, value] of doc.share) {
+    if (!rootName.startsWith(dynamicPrefix)) continue;
+    dynamicRootCount += 1;
+    if (dynamicRootCount > STUDIO_CRDT_COLLECTION_MAX_ENTRIES) return false;
+    const id = canonicalReservedRootId(rootName, dynamicPrefix);
+    if (!id || !trackedIds.has(id) || !(value instanceof Y.Map) || !validateRecord(id, value)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /** Rejects valid Yjs syntax that would poison the Studio document's runtime collection contract. */
 export function hasValidStudioCrdtRootSchema(doc: Y.Doc): boolean {
-  const strokesRoot = doc.share.get("strokes");
+  const strokesRoot = materializeExistingMapRoot(doc, "strokes");
   if (strokesRoot !== undefined) {
-    if (!(strokesRoot instanceof Y.Map)) return false;
+    if (strokesRoot === null) return false;
     for (const [id, value] of strokesRoot) {
-      if (!isBoundedStudioCrdtId(id) || !(value instanceof Y.Map)) return false;
-      const strokeWidth = value.get("strokeWidth");
       if (
-        value.get("id") !== id ||
-        !isBoundedStudioCrdtId(value.get("pageId")) ||
-        !isBoundedStudioCrdtId(value.get("layerId")) ||
-        (value.get("status") !== "drawing" && value.get("status") !== "finalized") ||
-        typeof value.get("deleted") !== "boolean" ||
-        value.get("payloadVersion") !== 1 ||
-        value.get("type") !== "draw" ||
-        (value.get("mode") !== "pen" && value.get("mode") !== "eraser") ||
-        typeof value.get("kind") !== "string" ||
-        typeof value.get("stroke") !== "string" ||
-        typeof strokeWidth !== "number" ||
-        !Number.isFinite(strokeWidth)
-      ) {
-        return false;
-      }
-      const arrays = STUDIO_CRDT_STROKE_SAMPLE_KEYS.map((key) => value.get(key));
-      if (arrays.some((samples) => !(samples instanceof Y.Array))) return false;
-      const pointsLength = (arrays[0] as Y.Array<unknown>).length;
-      const sampleCount = pointsLength / 2;
-      if (
-        pointsLength % 2 !== 0 ||
-        sampleCount > STUDIO_CRDT_STROKE_SAMPLE_MAX_COUNT ||
-        arrays.slice(1).some((samples) => (samples as Y.Array<unknown>).length !== sampleCount)
-      ) {
-        return false;
-      }
+        !isBoundedStudioCrdtId(id) ||
+        !(value instanceof Y.Map) ||
+        !validateStrokeRoot(id, value)
+      ) return false;
     }
   }
 
-  const orderRoot = doc.share.get("stroke-order");
+  const orderRoot = materializeExistingArrayRoot(doc, "stroke-order");
   if (orderRoot !== undefined) {
-    if (!(orderRoot instanceof Y.Array)) return false;
+    if (orderRoot === null || orderRoot.length > STUDIO_CRDT_COLLECTION_MAX_ENTRIES) {
+      return false;
+    }
+    const activeCounts = new Map<string, number>();
+    const matchingActiveCoordinates = new Set<string>();
+    const sceneIndexRoot = materializeExistingMapRoot(doc, STUDIO_CRDT_SCENE_INDEX_ROOT);
     for (const value of orderRoot) {
+      if (!(value instanceof Y.Map)) return false;
+      const strokeId = value.get("strokeId");
+      const elementId = value.get("elementId");
+      const isStroke = isBoundedStudioCrdtId(strokeId) && elementId === undefined;
+      const isScene = isBoundedStudioCrdtId(elementId) && strokeId === undefined;
+      if (!isStroke && !isScene) return false;
+      const allowedKeys = isStroke
+        ? new Set(["strokeId", "pageId", "layerId", "active"])
+        : new Set(["elementId", "pageId", "layerId", "kind", "active"]);
       if (
-        !(value instanceof Y.Map) ||
-        !isBoundedStudioCrdtId(value.get("strokeId")) ||
+        !hasOnlyKeys(value, allowedKeys) ||
         !isBoundedStudioCrdtId(value.get("pageId")) ||
         !isBoundedStudioCrdtId(value.get("layerId")) ||
-        typeof value.get("active") !== "boolean"
-      ) {
-        return false;
+        typeof value.get("active") !== "boolean" ||
+        (isScene && value.get("kind") !== "scene")
+      ) return false;
+      const targetId = (isStroke ? strokeId : elementId) as string;
+      const target = isStroke
+        ? strokesRoot?.get(targetId)
+        : materializeExistingMapRoot(
+            doc,
+            `${STUDIO_CRDT_SCENE_ROOT_PREFIX}${encodeURIComponent(targetId)}`
+          );
+      const active = value.get("active") === true;
+      if (
+        !(target instanceof Y.Map) ||
+        target.get("id") !== targetId ||
+        (isScene && (!sceneIndexRoot || sceneIndexRoot.get(targetId) !== true))
+      ) return false;
+      if (active) {
+        const countKey = `${isStroke ? "stroke" : "scene"}:${targetId}`;
+        const count = (activeCounts.get(countKey) ?? 0) + 1;
+        if (count > STUDIO_CRDT_ACTIVE_ORDER_ENTRY_MAX_COUNT) return false;
+        activeCounts.set(countKey, count);
+        if (
+          target.get("pageId") === value.get("pageId") &&
+          target.get("layerId") === value.get("layerId")
+        ) matchingActiveCoordinates.add(countKey);
+      }
+    }
+    // Concurrent reparents can leave multiple active entries with different coordinates. Y.Map
+    // deterministically chooses one record owner while Y.Array retains both operations, so losing
+    // active entries are valid history. At least one active entry must still describe the winning
+    // record coordinate; otherwise the order log cannot place the current record coherently.
+    for (const countKey of activeCounts.keys()) {
+      if (!matchingActiveCoordinates.has(countKey)) return false;
+    }
+  }
+
+  if (
+    !validateTrackedDynamicRoots(
+      doc,
+      STUDIO_CRDT_SCENE_INDEX_ROOT,
+      STUDIO_CRDT_SCENE_ROOT_PREFIX,
+      validateSceneElementRoot
+    ) ||
+    !validateTrackedDynamicRoots(
+      doc,
+      STUDIO_CRDT_PAGE_INDEX_ROOT,
+      STUDIO_CRDT_PAGE_ROOT_PREFIX,
+      validatePageRoot
+    )
+  ) {
+    return false;
+  }
+
+  const pageOrderRoot = materializeExistingArrayRoot(doc, STUDIO_CRDT_PAGE_ORDER_ROOT);
+  if (pageOrderRoot !== undefined) {
+    if (
+      pageOrderRoot === null ||
+      pageOrderRoot.length > STUDIO_CRDT_COLLECTION_MAX_ENTRIES
+    ) return false;
+    const allowedKeys = new Set(["pageId", "active"]);
+    const activeCounts = new Map<string, number>();
+    const pageIndexRoot = materializeExistingMapRoot(doc, STUDIO_CRDT_PAGE_INDEX_ROOT);
+    for (const value of pageOrderRoot) {
+      const pageId = value instanceof Y.Map ? value.get("pageId") : undefined;
+      const pageRecord = isBoundedStudioCrdtId(pageId)
+        ? materializeExistingMapRoot(
+            doc,
+            `${STUDIO_CRDT_PAGE_ROOT_PREFIX}${encodeURIComponent(pageId)}`
+          )
+        : undefined;
+      if (
+        !(value instanceof Y.Map) ||
+        !hasOnlyKeys(value, allowedKeys) ||
+        !isBoundedStudioCrdtId(pageId) ||
+        typeof value.get("active") !== "boolean" ||
+        !pageIndexRoot ||
+        pageIndexRoot.get(pageId) !== true ||
+        !(pageRecord instanceof Y.Map) ||
+        pageRecord.get("id") !== pageId
+      ) return false;
+      if (value.get("active") === true) {
+        const count = (activeCounts.get(pageId) ?? 0) + 1;
+        if (count > STUDIO_CRDT_ACTIVE_ORDER_ENTRY_MAX_COUNT) return false;
+        activeCounts.set(pageId, count);
       }
     }
   }

@@ -155,11 +155,22 @@ const rooms = vi.hoisted(() => ({ instances: [] as RoomRecord[] }));
 const lifecycle = vi.hoisted(() => ({
   roomStart: "pending" as "pending" | "resolve" | "reject",
   bindingStart: "resolve" as "pending" | "resolve" | "reject",
+  bindingStartResolvers: [] as Array<() => void>,
+  bindingStatusOnStart: null as null | {
+    state: "ready" | "error";
+    message: string;
+    durabilityAtRisk?: boolean;
+  },
   documents: [] as Array<{ destroyCount: number }>,
   bindings: [] as Array<{
     closeCount: number;
     closeGracefullyCount: number;
     document: { destroyCount: number };
+    onStatus?: (status: {
+      state: "ready" | "error";
+      message: string;
+      durabilityAtRisk?: boolean;
+    }) => void;
   }>,
 }));
 
@@ -259,21 +270,32 @@ vi.mock("./studio-crdt-room-binding", () => ({
   StudioCrdtRoomBinding: class StudioCrdtRoomBinding {
     readonly record: (typeof lifecycle.bindings)[number];
 
-    constructor(options: { document: { record: { destroyCount: number } } }) {
+    constructor(options: {
+      document: { record: { destroyCount: number } };
+      onStatus?: (status: {
+        state: "ready" | "error";
+        message: string;
+        durabilityAtRisk?: boolean;
+      }) => void;
+    }) {
       this.record = {
         closeCount: 0,
         closeGracefullyCount: 0,
         document: options.document.record,
+        onStatus: options.onStatus,
       };
       lifecycle.bindings.push(this.record);
     }
 
     start(): Promise<void> {
+      if (lifecycle.bindingStatusOnStart) this.record.onStatus?.(lifecycle.bindingStatusOnStart);
       if (lifecycle.bindingStart === "reject") {
         return Promise.reject(new Error("binding start failed"));
       }
       if (lifecycle.bindingStart === "resolve") return Promise.resolve();
-      return new Promise(() => undefined);
+      return new Promise<void>((resolve) => {
+        lifecycle.bindingStartResolvers.push(resolve);
+      });
     }
 
     close(): void {
@@ -284,6 +306,23 @@ vi.mock("./studio-crdt-room-binding", () => ({
       this.record.closeGracefullyCount += 1;
     }
   },
+}));
+
+vi.mock("./studio-crdt-scene-publisher", () => ({
+  publishStudioCrdtSceneGraphDiff: () => ({
+    sceneElementMutations: 0,
+    pageMutations: 0,
+    elementMoves: 0,
+    pageMoves: 0,
+  }),
+}));
+
+vi.mock("./studio-crdt-history", () => ({
+  reconcileStudioCrdtSceneGraphHistory: () => ({ history: [], changed: false }),
+}));
+
+vi.mock("./studio-crdt-page-bridge", () => ({
+  reconcileStudioCrdtSceneGraphPages: () => ({ pages: [], changed: false }),
 }));
 
 const participant: Omit<StudioLiveParticipant, "sessionId"> = {
@@ -304,7 +343,7 @@ interface RenderProviderOptions {
   transportFactory?: StudioLiveTransportFactory | null;
   serverRequired?: boolean;
   onRoomChange?: (room: unknown) => void;
-  onCrdtDocumentChange?: (document: unknown) => void;
+  onCrdtDocumentChange?: (document: unknown, runtime: unknown | null) => void;
 }
 
 function renderProvider(options: RenderProviderOptions = {}): StudioLiveCollaborationContextValue {
@@ -330,6 +369,8 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
     rooms.instances.length = 0;
     lifecycle.roomStart = "pending";
     lifecycle.bindingStart = "resolve";
+    lifecycle.bindingStartResolvers.length = 0;
+    lifecycle.bindingStatusOnStart = null;
     lifecycle.documents.length = 0;
     lifecycle.bindings.length = 0;
   });
@@ -461,7 +502,14 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
 
     await vi.waitFor(() => {
       expect(lifecycle.bindings).toHaveLength(1);
-      expect(onCrdtDocumentChange).toHaveBeenCalledWith(expect.anything());
+      expect(onCrdtDocumentChange).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          publish: expect.any(Function),
+          reconcileHistory: expect.any(Function),
+          reconcilePages: expect.any(Function),
+        })
+      );
     });
     const room = rooms.instances[0];
     const binding = lifecycle.bindings[0];
@@ -474,8 +522,69 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
       expect(room?.closeCount).toBe(1);
     });
 
-    expect(onCrdtDocumentChange).toHaveBeenLastCalledWith(null);
+    expect(onCrdtDocumentChange).toHaveBeenLastCalledWith(null, null);
     expect(onRoomChange).toHaveBeenLastCalledWith(null);
+  });
+
+  it("keeps operation sync fail-closed while the lazy runtime and initial binding are pending", async () => {
+    lifecycle.roomStart = "resolve";
+    lifecycle.bindingStart = "pending";
+    const onRoomChange = vi.fn();
+    const onCrdtDocumentChange = vi.fn();
+    const options = { onRoomChange, onCrdtDocumentChange };
+
+    const connecting = renderProvider(options);
+
+    expect(onRoomChange).toHaveBeenCalledWith(expect.anything());
+    expect(onCrdtDocumentChange).toHaveBeenLastCalledWith(null, null);
+    expect(connecting.availability).toBe("connecting");
+    await vi.waitFor(() => {
+      expect(lifecycle.bindings).toHaveLength(1);
+      expect(lifecycle.bindingStartResolvers).toHaveLength(1);
+    });
+    expect(
+      onCrdtDocumentChange.mock.calls.filter(([document]) => document !== null)
+    ).toHaveLength(0);
+
+    lifecycle.bindingStartResolvers[0]?.();
+
+    await vi.waitFor(() => {
+      expect(onCrdtDocumentChange).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          publish: expect.any(Function),
+          reconcileHistory: expect.any(Function),
+          reconcilePages: expect.any(Function),
+        })
+      );
+    });
+  });
+
+  it("does not overwrite a degraded local durability warning with ready after initial sync", async () => {
+    lifecycle.roomStart = "resolve";
+    lifecycle.bindingStatusOnStart = {
+      state: "error",
+      message: "실시간 서버 동기화는 유지되지만 IndexedDB 복구 저장소가 저하되었습니다.",
+      durabilityAtRisk: true,
+    };
+    const onCrdtDocumentChange = vi.fn();
+    const options = { onCrdtDocumentChange };
+    renderProvider(options);
+
+    await vi.waitFor(() => {
+      expect(onCrdtDocumentChange).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          publish: expect.any(Function),
+          reconcileHistory: expect.any(Function),
+          reconcilePages: expect.any(Function),
+        })
+      );
+    });
+    const live = renderProvider(options);
+
+    expect(live.availability).toBe("error");
+    expect(live.error).toContain("IndexedDB 복구 저장소가 저하");
   });
 
   it("fails closed and releases every resource when initial CRDT sync rejects", async () => {
@@ -496,7 +605,7 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
 
     expect(failed.availability).toBe("error");
     expect(failed.error).toContain("binding start failed");
-    expect(onCrdtDocumentChange).toHaveBeenLastCalledWith(null);
+    expect(onCrdtDocumentChange).toHaveBeenLastCalledWith(null, null);
     expect(onRoomChange).toHaveBeenLastCalledWith(null);
 
     hooks.unmount();

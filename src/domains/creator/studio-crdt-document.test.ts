@@ -6,8 +6,13 @@ import {
   STUDIO_CRDT_METADATA_MAX_BYTES,
   STUDIO_CRDT_ORIGIN_LOCAL,
   STUDIO_CRDT_ORIGIN_REMOTE,
+  STUDIO_CRDT_PAGE_PAYLOAD_VERSION,
+  STUDIO_CRDT_SCENE_ELEMENT_MAX_BYTES,
+  STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION,
   StudioCrdtDocument,
   type StudioCrdtDrawStrokePayload,
+  type StudioCrdtPageInput,
+  type StudioCrdtSceneElementInput,
   type StudioCrdtStrokeInput,
 } from "./studio-crdt-document";
 import {
@@ -58,6 +63,46 @@ function comparable(document: StudioCrdtDocument) {
     payload: record.payload,
     orderIndex: record.orderIndex,
   }));
+}
+
+function textElement(
+  id: string,
+  overrides: Record<string, string | number | boolean | null> = {}
+): StudioCrdtSceneElementInput {
+  return {
+    id,
+    pageId: "page-a",
+    layerId: "lettering",
+    payload: {
+      version: STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION,
+      type: "text",
+      props: {
+        text: "기준 대사",
+        x: 10,
+        y: 20,
+        width: 240,
+        fontSize: 28,
+        fill: "#111111",
+        rotation: 0,
+        ...overrides,
+      },
+    },
+  };
+}
+
+function page(id: string, overrides: Record<string, string | number | boolean | null | string[]> = {}): StudioCrdtPageInput {
+  return {
+    id,
+    payload: {
+      version: STUDIO_CRDT_PAGE_PAYLOAD_VERSION,
+      props: {
+        bg: "#ffffff",
+        bgGrad: null,
+        canvasH: 1600,
+        ...overrides,
+      },
+    },
+  };
 }
 
 describe("StudioCrdtDocument", () => {
@@ -183,6 +228,207 @@ describe("StudioCrdtDocument", () => {
     right.destroy();
   });
 
+  it("merges independent fields when two peers first register the same legacy scene element", () => {
+    const baseline = textElement("legacy-text");
+    const left = new StudioCrdtDocument();
+    const right = new StudioCrdtDocument();
+    left.upsertSceneElement(textElement("legacy-text", { text: "왼쪽이 고친 대사" }), {
+      baselineProps: baseline.payload.props,
+      changedProps: ["text"],
+    });
+    right.upsertSceneElement(textElement("legacy-text", { x: 480 }), {
+      baselineProps: baseline.payload.props,
+      changedProps: ["x"],
+    });
+
+    const leftUpdate = left.encodeStateAsUpdate();
+    const rightUpdate = right.encodeStateAsUpdate();
+    left.applyUpdate(rightUpdate);
+    right.applyUpdate(leftUpdate);
+
+    expect(left.getSceneElement("legacy-text")?.payload.props).toMatchObject({
+      text: "왼쪽이 고친 대사",
+      x: 480,
+      y: 20,
+      width: 240,
+    });
+    expect(right.getSceneElement("legacy-text")).toEqual(left.getSceneElement("legacy-text"));
+    left.destroy();
+    right.destroy();
+  });
+
+  it("merges a first-registration optional-property removal with another peer's field edit", () => {
+    const baseline = textElement("legacy-unset", { font: "Pretendard" });
+    const withoutFont = textElement("legacy-unset");
+    const left = new StudioCrdtDocument();
+    const right = new StudioCrdtDocument();
+    left.upsertSceneElement(withoutFont, {
+      baselineProps: baseline.payload.props,
+      changedProps: [],
+      unsetProps: ["font"],
+    });
+    right.upsertSceneElement(textElement("legacy-unset", { font: "Pretendard", x: 720 }), {
+      baselineProps: baseline.payload.props,
+      changedProps: ["x"],
+    });
+
+    const leftUpdate = left.encodeStateAsUpdate();
+    const rightUpdate = right.encodeStateAsUpdate();
+    left.applyUpdate(rightUpdate);
+    right.applyUpdate(leftUpdate);
+
+    expect(left.getSceneElement("legacy-unset")?.payload.props).toMatchObject({ x: 720 });
+    expect(left.getSceneElement("legacy-unset")?.payload.props).not.toHaveProperty("font");
+    expect(right.getSceneElement("legacy-unset")).toEqual(left.getSceneElement("legacy-unset"));
+    left.destroy();
+    right.destroy();
+  });
+
+  it("resolves a same-property conflict deterministically on every peer", () => {
+    const left = new StudioCrdtDocument();
+    left.addSceneElement(textElement("shared-text"));
+    const right = new StudioCrdtDocument(left.encodeStateAsUpdate());
+    left.patchSceneElement("shared-text", { set: { text: "왼쪽 버전" } });
+    right.patchSceneElement("shared-text", { set: { text: "오른쪽 버전" } });
+
+    const leftUpdate = left.encodeStateAsUpdate();
+    const rightUpdate = right.encodeStateAsUpdate();
+    left.applyUpdate(rightUpdate);
+    right.applyUpdate(leftUpdate);
+
+    const resolved = left.getSceneElement("shared-text")?.payload.props.text;
+    expect(["왼쪽 버전", "오른쪽 버전"]).toContain(resolved);
+    expect(right.getSceneElement("shared-text")).toEqual(left.getSceneElement("shared-text"));
+    left.destroy();
+    right.destroy();
+  });
+
+  it("keeps a scene tombstone across a concurrent edit and requires explicit resurrection", () => {
+    const left = new StudioCrdtDocument();
+    left.addSceneElement(textElement("deleted-text"));
+    const right = new StudioCrdtDocument(left.encodeStateAsUpdate());
+    left.deleteSceneElement("deleted-text");
+    right.upsertSceneElement(textElement("deleted-text", { x: 900 }));
+
+    const leftUpdate = left.encodeStateAsUpdate();
+    const rightUpdate = right.encodeStateAsUpdate();
+    left.applyUpdate(rightUpdate);
+    right.applyUpdate(leftUpdate);
+
+    expect(left.getSceneElement("deleted-text")).toBeNull();
+    expect(right.getSceneElement("deleted-text")).toBeNull();
+    expect(left.getSceneElement("deleted-text", true)?.payload.props.x).toBe(900);
+    expect(() => left.upsertSceneElement(textElement("deleted-text"))).toThrow("명시적으로 복원");
+    left.upsertSceneElement(textElement("deleted-text", { x: 900 }), { resurrect: true });
+    right.applyUpdate(left.encodeStateAsUpdate(right.encodeStateVector()));
+    expect(right.getSceneElement("deleted-text")?.payload.props.x).toBe(900);
+    left.destroy();
+    right.destroy();
+  });
+
+  it("rejects oversized or unsupported scene metadata before mutating the Yjs document", () => {
+    const document = new StudioCrdtDocument();
+    const updates: Uint8Array[] = [];
+    document.subscribe((update, origin) => {
+      if (origin === STUDIO_CRDT_ORIGIN_LOCAL) updates.push(update);
+    });
+    const hugeText = "가".repeat(STUDIO_CRDT_SCENE_ELEMENT_MAX_BYTES);
+    expect(() => document.addSceneElement(textElement("too-large", { text: hugeText })))
+      .toThrow("16KiB 한도");
+    expect(() => document.addSceneElement({
+      ...textElement("unsupported-field"),
+      payload: {
+        ...textElement("unsupported-field").payload,
+        props: { ...textElement("unsupported-field").payload.props, src: "data:image/png;base64,AA==" },
+      },
+    })).toThrow("src 속성은 동기화할 수 없습니다");
+    expect(updates).toHaveLength(0);
+    expect(document.getSceneElements({ includeDeleted: true })).toEqual([]);
+    document.destroy();
+  });
+
+  it("shares one mixed z-order between strokes and scene elements without exceeding the wire cap", () => {
+    const document = new StudioCrdtDocument();
+    const updates: Uint8Array[] = [];
+    document.subscribe((update, origin) => {
+      if (origin === STUDIO_CRDT_ORIGIN_LOCAL) updates.push(update);
+    });
+    document.addStroke(stroke("ink", "page-a"));
+    document.addSceneElement(textElement("caption"), "ink");
+
+    const caption = document.getSceneElement("caption");
+    const ink = document.getStroke("ink");
+    expect(caption?.orderIndex).toBeLessThan(ink?.orderIndex ?? -1);
+    document.moveElement("ink", "caption");
+    expect(document.getStroke("ink")!.orderIndex)
+      .toBeLessThan(document.getSceneElement("caption")!.orderIndex);
+    document.moveElement("caption", "ink");
+    expect(document.getSceneElement("caption")!.orderIndex)
+      .toBeLessThan(document.getStroke("ink")!.orderIndex);
+    expect(Math.max(...updates.map((update) => update.byteLength)))
+      .toBeLessThanOrEqual(STUDIO_CRDT_UPDATE_MAX_BYTES);
+    document.destroy();
+  });
+
+  it("creates, reorders, patches and tombstones authoritative page payloads", () => {
+    const document = new StudioCrdtDocument();
+    document.addPage(page("page-a", { name: "첫 페이지" }));
+    document.addPage(page("page-b", { name: "둘째 페이지" }));
+    document.movePage("page-b", "page-a");
+    document.patchPage("page-b", { set: { canvasH: 2200, note: "원격 콘티" } });
+
+    expect(document.getPages().map(({ id }) => id)).toEqual(["page-b", "page-a"]);
+    expect(document.getPage("page-b")?.payload.props).toMatchObject({
+      canvasH: 2200,
+      note: "원격 콘티",
+    });
+    expect(document.deletePage("page-a")).toBe(true);
+    expect(document.getPages().map(({ id }) => id)).toEqual(["page-b"]);
+    expect(document.getPage("page-a", true)?.deleted).toBe(true);
+    document.destroy();
+  });
+
+  it("merges independent first-registration page fields and resolves same-field edits deterministically", () => {
+    const baseline = page("legacy-page", { name: "기준", note: "삭제할 메모" });
+    const left = new StudioCrdtDocument();
+    const right = new StudioCrdtDocument();
+    left.upsertPage(page("legacy-page", { name: "왼쪽 제목" }), {
+      baselineProps: baseline.payload.props,
+      changedProps: ["name"],
+      unsetProps: ["note"],
+    });
+    right.upsertPage(page("legacy-page", {
+      bg: "#101010",
+      name: "기준",
+      note: "삭제할 메모",
+    }), {
+      baselineProps: baseline.payload.props,
+      changedProps: ["bg"],
+    });
+
+    const firstLeft = left.encodeStateAsUpdate();
+    const firstRight = right.encodeStateAsUpdate();
+    left.applyUpdate(firstRight);
+    right.applyUpdate(firstLeft);
+    expect(left.getPage("legacy-page")?.payload.props).toMatchObject({
+      bg: "#101010",
+      name: "왼쪽 제목",
+    });
+    expect(left.getPage("legacy-page")?.payload.props).not.toHaveProperty("note");
+
+    left.patchPage("legacy-page", { set: { name: "왼쪽 재수정" } });
+    right.patchPage("legacy-page", { set: { name: "오른쪽 재수정" } });
+    const secondLeft = left.encodeStateAsUpdate();
+    const secondRight = right.encodeStateAsUpdate();
+    left.applyUpdate(secondRight);
+    right.applyUpdate(secondLeft);
+    expect(right.getPage("legacy-page")).toEqual(left.getPage("legacy-page"));
+    expect(["왼쪽 재수정", "오른쪽 재수정"])
+      .toContain(left.getPage("legacy-page")?.payload.props.name);
+    left.destroy();
+    right.destroy();
+  });
+
   it("batches local updates without echoing remotely applied updates", () => {
     vi.useFakeTimers();
     const document = new StudioCrdtDocument();
@@ -235,6 +481,27 @@ describe("StudioCrdtDocument", () => {
     subscription.unsubscribe();
     document.destroy();
     vi.useRealTimers();
+  });
+
+  it("expands a partial sample patch to the full aligned pointer-array group", () => {
+    const document = new StudioCrdtDocument();
+    document.addStroke(stroke("sample-patch", "page-a", [0, 0, 10, 10]));
+
+    expect(() => document.patchStroke("sample-patch", {
+      payload: payload([0, 0, 10, 10, 20, 20], { pressures: undefined }),
+      changedPayloadKeys: ["points"],
+    })).not.toThrow();
+
+    expect(document.getStroke("sample-patch")?.payload).toMatchObject({
+      points: [0, 0, 10, 10, 20, 20],
+      pressures: [0.5, 0.5, 0.5],
+      tiltXs: [0, 0, 0],
+      tiltYs: [0, 0, 0],
+      twists: [0, 0, 0],
+      speeds: [0, 0, 0],
+      tangentialPressures: [0, 0, 0],
+    });
+    document.destroy();
   });
 
   it("keeps full-size add/upsert replacement updates below the incremental wire cap", () => {
@@ -308,6 +575,10 @@ describe("StudioCrdtDocument", () => {
     malformed.set("points", "not-an-array");
     attacker.getMap<unknown>("strokes").set("malformed-stroke", malformed);
     attacker.getArray<unknown>("stroke-order").push(["not-a-map", 42]);
+    attacker.getMap<boolean>("scene-elements").set("poison-scene", true);
+    attacker.getArray<unknown>("scene-element:poison-scene").push(["not-a-map"]);
+    attacker.getMap<boolean>("studio-pages").set("poison-page", true);
+    attacker.getArray<unknown>("studio-page:poison-page").push(["not-a-map"]);
 
     const document = new StudioCrdtDocument();
     const changes = vi.fn();
@@ -316,6 +587,8 @@ describe("StudioCrdtDocument", () => {
     expect(() => document.getStrokes({ includeDeleted: true })).not.toThrow();
     expect(document.getStrokes({ includeDeleted: true })).toEqual([]);
     expect(document.getStroke("string-stroke", true)).toBeNull();
+    expect(document.getSceneElements({ includeDeleted: true })).toEqual([]);
+    expect(document.getPages(true)).toEqual([]);
     expect(changes).toHaveBeenCalled();
 
     document.destroy();
@@ -353,6 +626,29 @@ describe("StudioCrdtDocument", () => {
     const streamedChange = remoteOnly.mock.calls.at(-1)?.[0];
     expect([...streamedChange.changedStrokeIds]).toEqual(["remote-stream"]);
     document.destroy();
+    remote.destroy();
+  });
+
+  it("reports exact scene and page IDs introduced by one remote update", () => {
+    const receiver = new StudioCrdtDocument();
+    const changes = vi.fn();
+    receiver.subscribeChanges(changes, {
+      includeOrigin: (origin) => origin === STUDIO_CRDT_ORIGIN_REMOTE,
+    });
+    const remote = new StudioCrdtDocument();
+    remote.addSceneElement(textElement("remote-text"));
+    remote.addPage(page("remote-page"));
+
+    receiver.applyUpdate(remote.encodeStateAsUpdate(), STUDIO_CRDT_ORIGIN_REMOTE);
+
+    expect(changes).toHaveBeenCalledTimes(1);
+    const change = changes.mock.calls[0]?.[0];
+    expect([...change.changedStrokeIds]).toEqual([]);
+    expect([...change.changedSceneElementIds]).toEqual(["remote-text"]);
+    expect([...change.changedPageIds]).toEqual(["remote-page"]);
+    expect(change.sceneElements.map(({ id }: { id: string }) => id)).toEqual(["remote-text"]);
+    expect(change.pages.map(({ id }: { id: string }) => id)).toEqual(["remote-page"]);
+    receiver.destroy();
     remote.destroy();
   });
 

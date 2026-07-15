@@ -23,6 +23,7 @@ function request(workId: string, updateId: string): StudioCrdtUpdateRequest {
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 describe("Studio CRDT durable outbox", () => {
@@ -34,6 +35,7 @@ describe("Studio CRDT durable outbox", () => {
 
     await expect(outbox.put(scope, pending)).rejects.toThrow("IndexedDB");
     await expect(outbox.list(scope, workId)).resolves.toEqual([pending]);
+    expect(outbox.getStatus()).toMatchObject({ state: "degraded" });
 
     await outbox.remove(scope, workId, pending.updateId);
     expect(outbox.listEmergency(scope, workId)).toEqual([]);
@@ -80,7 +82,7 @@ describe("Studio CRDT durable outbox", () => {
     expect(listCalls).toBe(1);
   });
 
-  it("releases the scoped queue when an IndexedDB operation never settles", async () => {
+  it("releases the scoped queue and returns an empty degraded fallback when a put never settles", async () => {
     let listCalls = 0;
     const delegate: StudioCrdtOutbox = {
       async list() {
@@ -100,8 +102,148 @@ describe("Studio CRDT durable outbox", () => {
     const listing = replacement.list("timeout-user-a", pending.workId);
 
     await expect(writing).rejects.toThrow("시간이 초과");
-    await expect(listing).rejects.toThrow("복구 대기");
+    await expect(listing).resolves.toEqual([]);
+    expect(replacement.getStatus()).toMatchObject({ state: "degraded" });
     expect(listCalls).toBe(0);
+  });
+
+  it("does not let a late put resurrect an update after its authoritative ACK", async () => {
+    const startedAt = Date.now();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(startedAt);
+    const stored = new Map<string, StudioCrdtUpdateRequest>();
+    let signalPutStarted: () => void = () => undefined;
+    const putStarted = new Promise<void>((resolve) => {
+      signalPutStarted = resolve;
+    });
+    let signalPutCompleted: () => void = () => undefined;
+    const putCompleted = new Promise<void>((resolve) => {
+      signalPutCompleted = resolve;
+    });
+    let releasePut: () => void = () => undefined;
+    const putGate = new Promise<void>((resolve) => {
+      releasePut = resolve;
+    });
+    const delegate: StudioCrdtOutbox = {
+      async list() {
+        return [...stored.values()];
+      },
+      async put(_scope, value) {
+        signalPutStarted();
+        await putGate;
+        stored.set(value.updateId, value);
+        signalPutCompleted();
+      },
+      async remove(_scope, _workId, updateId) {
+        stored.delete(updateId);
+      },
+    };
+    const outbox = new SerializedStudioCrdtOutbox(delegate, { timeoutMs: 100 });
+    const replacement = new SerializedStudioCrdtOutbox(delegate, { timeoutMs: 100 });
+    const pending = request("late-work-a", "66666666-6666-4666-8666-666666666666");
+
+    const writing = outbox.put("late-user-a", pending);
+    await putStarted;
+    const removing = outbox.remove("late-user-a", pending.workId, pending.updateId);
+
+    await expect(writing).rejects.toThrow("시간이 초과");
+    await expect(removing).resolves.toBeUndefined();
+    clock.mockReturnValue(startedAt + 5 * 60_000 + 1);
+    releasePut();
+
+    await putCompleted;
+    await vi.waitFor(() => expect(stored.has(pending.updateId)).toBe(false));
+    await expect(replacement.list("late-user-a", pending.workId)).resolves.toEqual([]);
+  });
+
+  it("releases a replacement list when ACK cleanup itself never settles", async () => {
+    let listCalls = 0;
+    const delegate: StudioCrdtOutbox = {
+      async list() {
+        listCalls += 1;
+        return [];
+      },
+      async put() {
+        return undefined;
+      },
+      remove: () => new Promise<void>(() => undefined),
+    };
+    const previous = new SerializedStudioCrdtOutbox(delegate, { timeoutMs: 100 });
+    const replacement = new SerializedStudioCrdtOutbox(delegate, { timeoutMs: 100 });
+    const pending = request("remove-timeout-work-a", "77777777-7777-4777-8777-777777777777");
+
+    const removing = previous.remove("remove-timeout-user-a", pending.workId, pending.updateId);
+    const listing = replacement.list("remove-timeout-user-a", pending.workId);
+
+    await expect(removing).rejects.toThrow("시간이 초과");
+    await expect(listing).resolves.toEqual([]);
+    expect(listCalls).toBe(0);
+  });
+
+  it("clears the shared ACK marker when a timed-out remove succeeds late", async () => {
+    const startedAt = Date.now();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(startedAt);
+    const pending = request(
+      "late-remove-work-a",
+      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    );
+    const stored = new Map([[pending.updateId, pending]]);
+    let releaseRemove: () => void = () => undefined;
+    const removeGate = new Promise<void>((resolve) => {
+      releaseRemove = resolve;
+    });
+    let signalRemoveCompleted: () => void = () => undefined;
+    const removeCompleted = new Promise<void>((resolve) => {
+      signalRemoveCompleted = resolve;
+    });
+    const delegate: StudioCrdtOutbox = {
+      async list() {
+        return [...stored.values()];
+      },
+      async put(_scope, value) {
+        stored.set(value.updateId, value);
+      },
+      async remove(_scope, _workId, updateId) {
+        await removeGate;
+        stored.delete(updateId);
+        signalRemoveCompleted();
+      },
+    };
+    const previous = new SerializedStudioCrdtOutbox(delegate, { timeoutMs: 100 });
+    const replacement = new SerializedStudioCrdtOutbox(delegate, { timeoutMs: 100 });
+
+    const removing = previous.remove("late-remove-user-a", pending.workId, pending.updateId);
+    await expect(removing).rejects.toThrow("시간이 초과");
+    releaseRemove();
+    await removeCompleted;
+    await Promise.resolve();
+
+    stored.set(pending.updateId, pending);
+    clock.mockReturnValue(startedAt + 5_001);
+    await expect(replacement.list("late-remove-user-a", pending.workId)).resolves.toEqual([
+      pending,
+    ]);
+  });
+
+  it("returns an empty memory fallback and exposes degraded health on permanent reads", async () => {
+    const delegate: StudioCrdtOutbox = {
+      async list() {
+        throw new Error("permanent IndexedDB read failure");
+      },
+      listEmergency: () => [],
+      async put() {
+        return undefined;
+      },
+      async remove() {
+        return undefined;
+      },
+    };
+    const outbox = new SerializedStudioCrdtOutbox(delegate, { timeoutMs: 100 });
+
+    await expect(outbox.list("read-failure-user-a", "read-failure-work-a")).resolves.toEqual([]);
+    expect(outbox.getStatus()).toEqual({
+      state: "degraded",
+      message: "permanent IndexedDB read failure",
+    });
   });
 
   it("returns the emergency snapshot when an IndexedDB list never settles", async () => {
@@ -119,6 +261,23 @@ describe("Studio CRDT durable outbox", () => {
     const outbox = new SerializedStudioCrdtOutbox(delegate, { timeoutMs: 100 });
 
     await expect(outbox.list("emergency-user-a", pending.workId)).resolves.toEqual([pending]);
+  });
+
+  it("shares ACK tombstones across replacement IndexedDB delegate instances", async () => {
+    const scope = "replacement-instance-user-a";
+    const pending = request(
+      "replacement-instance-work-a",
+      "99999999-9999-4999-8999-999999999999"
+    );
+    const previous = new IndexedDbStudioCrdtOutbox();
+    const replacement = new IndexedDbStudioCrdtOutbox();
+
+    previous.putEmergency(scope, pending);
+    replacement.removeEmergency(scope, pending.workId, pending.updateId);
+    previous.putEmergency(scope, pending);
+
+    expect(replacement.listEmergency(scope, pending.workId)).toEqual([]);
+    await replacement.remove(scope, pending.workId, pending.updateId);
   });
 
   it("opens a circuit after one timeout instead of charging every queued put a timeout", async () => {
@@ -152,12 +311,107 @@ describe("Studio CRDT durable outbox", () => {
         request("circuit-work-a", `55555555-5555-4555-8555-${suffix}`)
       );
     });
+    const settlements = Promise.allSettled(writes);
 
     await vi.advanceTimersByTimeAsync(100);
-    const results = await Promise.allSettled(writes);
+    const results = await settlements;
 
     expect(results.every((result) => result.status === "rejected")).toBe(true);
     expect(delegatePutCalls).toBe(1);
     await expect(outbox.list("circuit-user-a", "circuit-work-a")).resolves.toHaveLength(20);
+  });
+
+  it("preserves more than the former row and emergency caps without silent eviction", async () => {
+    const delegate = new IndexedDbStudioCrdtOutbox();
+    const scope = "uncapped-user-a";
+    const workId = "uncapped-work-a";
+    const count = 8_193;
+
+    for (let index = 0; index < count; index += 1) {
+      delegate.putEmergency(
+        scope,
+        request(workId, `88888888-8888-4888-8888-${String(index).padStart(12, "0")}`)
+      );
+    }
+
+    const replacement = new IndexedDbStudioCrdtOutbox();
+    expect(replacement.listEmergency(scope, workId)).toHaveLength(count);
+    await Promise.all(
+      Array.from({ length: count }, (_, index) =>
+        delegate.remove(
+          scope,
+          workId,
+          `88888888-8888-4888-8888-${String(index).padStart(12, "0")}`
+        )
+      )
+    );
+  });
+
+  it("prevents a late durable put from reviving an ACK across different delegate instances", async () => {
+    const scope = "durable-replacement-user-a";
+    const pending = request(
+      "durable-replacement-work-a",
+      "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+    );
+    const rows = new Map<string, unknown>();
+    let signalDelayedPut: () => void = () => undefined;
+    const delayedPut = new Promise<void>((resolve) => {
+      signalDelayedPut = resolve;
+    });
+    let releaseDelayedPut: () => void = () => undefined;
+    const delayedPutGate = new Promise<void>((resolve) => {
+      releaseDelayedPut = resolve;
+    });
+    let signalDelayedPutCompleted: () => void = () => undefined;
+    const delayedPutCompleted = new Promise<void>((resolve) => {
+      signalDelayedPutCompleted = resolve;
+    });
+    let shouldDelayUpdate = true;
+    const persistence = {
+      async list(expectedScope: string, expectedWorkId: string): Promise<unknown[]> {
+        return [...rows.values()].filter((value) => {
+          const row = value as { scope?: unknown; workId?: unknown };
+          return row.scope === expectedScope && row.workId === expectedWorkId;
+        });
+      },
+      async put(value: unknown): Promise<void> {
+        const row = value as {
+          key: string;
+          kind?: string;
+          updateId: string;
+        };
+        if (
+          shouldDelayUpdate &&
+          row.kind === "update" &&
+          row.updateId === pending.updateId
+        ) {
+          shouldDelayUpdate = false;
+          signalDelayedPut();
+          await delayedPutGate;
+        }
+        rows.set(row.key, value);
+        if (row.kind === "update" && row.updateId === pending.updateId) {
+          signalDelayedPutCompleted();
+        }
+      },
+      async delete(keys: readonly string[]): Promise<void> {
+        for (const key of keys) rows.delete(key);
+      },
+    };
+    const previousDelegate = new IndexedDbStudioCrdtOutbox(persistence);
+    const replacementDelegate = new IndexedDbStudioCrdtOutbox(persistence);
+    const previous = new SerializedStudioCrdtOutbox(previousDelegate, { timeoutMs: 100 });
+    const replacement = new SerializedStudioCrdtOutbox(replacementDelegate, { timeoutMs: 100 });
+
+    const writing = previous.put(scope, pending);
+    await delayedPut;
+    await expect(writing).rejects.toThrow("시간이 초과");
+    await replacement.remove(scope, pending.workId, pending.updateId);
+    expect([...rows.values()][0]).toMatchObject({ kind: "tombstone" });
+
+    releaseDelayedPut();
+    await delayedPutCompleted;
+    await vi.waitFor(() => expect(rows.size).toBe(0));
+    await expect(replacement.list(scope, pending.workId)).resolves.toEqual([]);
   });
 });

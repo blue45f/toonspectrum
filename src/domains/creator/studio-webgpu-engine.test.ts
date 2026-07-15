@@ -211,6 +211,41 @@ describe("StudioWebGpuEngine", () => {
 
     engine.resize({ logicalWidth: 100, logicalHeight: 80, scaleX: 1.1 });
     expect(fallback.clearRect).toHaveBeenCalledTimes(clearsAfterInitial + 2);
+    engine.resize({ logicalWidth: 100, logicalHeight: 80, scaleX: 1.1 });
+    expect(fallback.clearRect).toHaveBeenCalledTimes(clearsAfterInitial + 2);
+  });
+
+  it("incrementally destination-outs a newly appended eraser on the Canvas2D fallback", () => {
+    const gpuSurface = fakeGpuCanvas(null);
+    const fallback = fakeCanvas2d();
+    const engine = new StudioWebGpuEngine({
+      canvas: gpuSurface,
+      fallbackCanvas: fallback.canvas,
+      gpu: null,
+    });
+    const ink = stroke({ id: "ink", orderKey: "a" });
+    const eraser = stroke({
+      id: "eraser",
+      orderKey: "b",
+      points: [12, 10, 24, 10],
+      pressures: [0.4, 0.8],
+      opacity: 0.6,
+      composite: "erase",
+    });
+
+    engine.resize({ logicalWidth: 100, logicalHeight: 80 });
+    engine.render([ink]);
+    const clearsAfterInk = fallback.clearRect.mock.calls.length;
+    const arcsAfterInk = fallback.arcs.length;
+    const compositesAfterInk = fallback.composites.length;
+    engine.render([ink, eraser]);
+
+    expect(fallback.clearRect).toHaveBeenCalledTimes(clearsAfterInk);
+    expect(fallback.arcs).toHaveLength(arcsAfterInk + planStudioGpuDabs([eraser]).dabs.length);
+    expect(fallback.composites.slice(compositesAfterInk)).not.toHaveLength(0);
+    expect(fallback.composites.slice(compositesAfterInk)).toEqual(
+      expect.arrayContaining(["destination-out"])
+    );
   });
 
   it("creates premultiplied normal/erase pipelines, renders dabs, and falls back on device loss", async () => {
@@ -320,6 +355,21 @@ describe("StudioWebGpuEngine", () => {
       { width: 100, height: 80, depthOrArrayLayers: 1 }
     );
 
+    const eraser = stroke({
+      id: "eraser",
+      points: [4, 0, 12, 0],
+      pressures: [0.5, 0.8],
+      composite: "erase",
+    });
+    vi.mocked(fake.setPipeline).mockClear();
+    engine.render([extension, eraser]);
+    expect(fake.encoder.beginRenderPass).toHaveBeenLastCalledWith(expect.objectContaining({
+      colorAttachments: [expect.objectContaining({ loadOp: "load" })],
+    }));
+    expect(fake.setPipeline).toHaveBeenCalledWith(expect.objectContaining({
+      descriptor: expect.objectContaining({ label: "Studio destination-out round-dab pipeline" }),
+    }));
+
     engine.render([stroke({ points: [0, 0, 19, 1, 24, 0], pressures: [0.5, 0.6, 0.7] })]);
     expect(fake.encoder.beginRenderPass).toHaveBeenLastCalledWith(expect.objectContaining({
       colorAttachments: [expect.objectContaining({ loadOp: "clear" })],
@@ -361,6 +411,27 @@ describe("StudioWebGpuEngine", () => {
 });
 
 describe("planStudioGpuDabs", () => {
+  it("uses locale-independent operation order and color-independent erase coverage", () => {
+    const planned = planStudioGpuDabs([
+      stroke({ id: "umlaut", orderKey: "ä", points: [20, 0], color: "#ff0000" }),
+      stroke({ id: "ascii", orderKey: "z", points: [10, 0], color: "#00ff00" }),
+      stroke({
+        id: "transparent-eraser",
+        orderKey: "🙂",
+        points: [30, 0],
+        color: "transparent",
+        opacity: 0.6,
+        composite: "erase",
+      }),
+    ]);
+
+    expect(planned.dabs.map(({ x }) => x)).toEqual([10, 20, 30]);
+    expect(planned.dabs.at(-1)).toMatchObject({
+      composite: "erase",
+      alpha: 0.6,
+    });
+  });
+
   it("covers a segment with pressure-aware round dabs and deterministic batches", () => {
     const planned = planStudioGpuDabs([
       stroke({ id: "later", orderKey: "b", points: [0, 0, 12, 0] }),
@@ -398,5 +469,50 @@ describe("planStudioGpuDabs", () => {
     const rebuild = planStudioGpuDabUpdate([extended], [predictionReplaced]);
     expect(rebuild.mode).toBe("rebuild");
     expect(rebuild.dabs).toEqual(planStudioGpuDabs([predictionReplaced]).dabs);
+  });
+
+  it("appends deterministic normal/erase operation-log suffixes and rebuilds reordered history", () => {
+    const ink = stroke({ id: "ink", orderKey: "a" });
+    const eraser = stroke({
+      id: "eraser",
+      orderKey: "b",
+      points: [8, 10, 18, 10],
+      composite: "erase",
+    });
+    const appendEraser = planStudioGpuDabUpdate([ink], [ink, eraser]);
+
+    expect(appendEraser.mode).toBe("append");
+    expect(appendEraser.dabs).toEqual(planStudioGpuDabs([eraser]).dabs);
+    expect(appendEraser.batches.map((batch) => batch.composite)).toEqual(["erase"]);
+    expect(planStudioGpuDabs([ink]).dabs.concat(appendEraser.dabs)).toEqual(
+      planStudioGpuDabs([ink, eraser]).dabs
+    );
+
+    const insertedBefore = stroke({ id: "inserted", orderKey: "0", points: [0, 20, 5, 20] });
+    const reordered = planStudioGpuDabUpdate([ink], [ink, insertedBefore]);
+    expect(reordered.mode).toBe("rebuild");
+    expect(reordered.dabs).toEqual(planStudioGpuDabs([insertedBefore, ink]).dabs);
+  });
+
+  it("extends only the terminal live stroke after immutable completed operations", () => {
+    const completed = stroke({ id: "completed", orderKey: "a", points: [0, 10, 10, 10] });
+    const live = stroke({
+      id: "live",
+      orderKey: "b",
+      points: [0, 20, 10, 20],
+      pressures: [0.4, 0.5],
+    });
+    const extended = stroke({
+      id: "live",
+      orderKey: "b",
+      points: [0, 20, 10, 20, 16, 22],
+      pressures: [0.4, 0.5, 0.8],
+    });
+    const append = planStudioGpuDabUpdate([completed, live], [completed, extended]);
+
+    expect(append.mode).toBe("append");
+    expect(planStudioGpuDabs([completed, live]).dabs.concat(append.dabs)).toEqual(
+      planStudioGpuDabs([completed, extended]).dabs
+    );
   });
 });

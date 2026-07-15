@@ -2,12 +2,22 @@ import { describe, expect, it } from "vitest";
 
 import {
   reconcileStudioCrdtPages,
+  reconcileStudioCrdtSceneGraphPages,
+  studioCrdtElementToSceneElement,
   studioCrdtStrokeToDrawElement,
   studioDrawElementToCrdtStroke,
+  studioPageToCrdtPage,
+  studioSceneElementToCrdtElement,
   type StudioCrdtCompatibleDrawElement,
+  type StudioCrdtCompatibleSceneElement,
 } from "./studio-crdt-page-bridge";
 
-import type { StudioCrdtStrokeRecord } from "./studio-crdt-document";
+import type {
+  StudioCrdtPageRecord,
+  StudioCrdtJsonObject,
+  StudioCrdtSceneElementRecord,
+  StudioCrdtStrokeRecord,
+} from "./studio-crdt-document";
 
 function record(
   id: string,
@@ -31,6 +41,47 @@ function record(
       pressures: [0.4, 0.8],
       stroke: "#123456",
       strokeWidth: 7,
+    },
+    ...overrides,
+  };
+}
+
+function sceneRecord(
+  id: string,
+  pageId: string,
+  orderIndex: number,
+  type: "text" | "bubble" = "text",
+  overrides: Partial<StudioCrdtSceneElementRecord> = {}
+): StudioCrdtSceneElementRecord {
+  const props: StudioCrdtJsonObject = type === "text"
+    ? { text: "대사", x: 10, y: 20, width: 240, fontSize: 28, fill: "#111", rotation: 0 }
+    : {
+        variant: "round", text: "말풍선", x: 20, y: 30, width: 260, height: 150,
+        fill: "#fff", textFill: "#111", rotation: 0,
+      };
+  return {
+    id,
+    pageId,
+    layerId: "lettering",
+    deleted: false,
+    orderIndex,
+    payload: { version: 1, type, props },
+    ...overrides,
+  };
+}
+
+function pageRecord(
+  id: string,
+  orderIndex: number,
+  overrides: Partial<StudioCrdtPageRecord> = {}
+): StudioCrdtPageRecord {
+  return {
+    id,
+    deleted: false,
+    orderIndex,
+    payload: {
+      version: 1,
+      props: { bg: "#ffffff", bgGrad: null, canvasH: 1600, name: id },
     },
     ...overrides,
   };
@@ -126,5 +177,125 @@ describe("studio CRDT page bridge", () => {
     ]);
 
     expect(result.pages[0]?.elements.map((element) => element.id)).toEqual(["legacy"]);
+  });
+
+  it("round-trips explicitly supported text and bubble fields without accepting raster payloads", () => {
+    const text: StudioCrdtCompatibleSceneElement = {
+      id: "text-a",
+      type: "text",
+      text: "세로 대사\n둘째 줄",
+      x: 30,
+      y: 40,
+      width: 260,
+      fontSize: 32,
+      fill: "#222222",
+      rotation: 5,
+      fontStyle: "bold",
+      gradient: { type: "linear", angle: 90, stops: [] },
+      groupId: "lettering",
+      hidden: true,
+    };
+    const encoded = studioSceneElementToCrdtElement("page-a", text);
+    const decoded = studioCrdtElementToSceneElement({
+      ...sceneRecord("text-a", "page-a", 0),
+      ...encoded,
+      orderIndex: 0,
+      deleted: false,
+    });
+    expect(decoded).toMatchObject(text);
+
+    const bubble = studioSceneElementToCrdtElement("page-a", {
+      id: "bubble-a",
+      type: "bubble",
+      variant: "cloud",
+      text: "동시 편집",
+      x: 100,
+      y: 120,
+      width: 300,
+      height: 180,
+      fill: "#fff",
+      textFill: "#000",
+      rotation: 0,
+      tailAnchorPoint: { x: 450, y: 500 },
+      customShapePoints: [0, 0, 300, 0, 300, 180],
+    });
+    expect(bubble.payload.type).toBe("bubble");
+    expect(bubble.payload.props.tailAnchorPoint).toEqual({ x: 450, y: 500 });
+    expect(() => studioSceneElementToCrdtElement("page-a", {
+      ...text,
+      id: "bad-raster",
+      src: "data:image/png;base64,AA==",
+    })).toThrow("src 속성은 동기화할 수 없습니다");
+  });
+
+  it("uses the shared draw/scene order for deterministic mixed z-order while preserving legacy slots", () => {
+    const pages = [{
+      id: "page-a",
+      bg: "#fff",
+      bgGrad: null,
+      canvasH: 1600,
+      elements: [
+        { id: "legacy-image", type: "image", src: "asset:background" },
+        { id: "ink", type: "draw", points: [], stroke: "#000", strokeWidth: 1 },
+        { id: "caption", type: "text", text: "old" },
+      ],
+    }];
+
+    const result = reconcileStudioCrdtSceneGraphPages(
+      pages,
+      [record("ink", "page-a", 4)],
+      [sceneRecord("caption", "page-a", 2)],
+      []
+    );
+
+    expect(result.pages[0]?.elements.map((element) => element.id)).toEqual([
+      "legacy-image",
+      "caption",
+      "ink",
+    ]);
+    expect(result.pages[0]?.elements[1]).toMatchObject({ type: "text", text: "대사" });
+  });
+
+  it("materializes authoritative page payloads, deterministic order, creation and tombstones", () => {
+    const pages = [
+      {
+        id: "page-a", bg: "#aaa", bgGrad: null, canvasH: 1200,
+        elements: [{ id: "a-text", type: "text", text: "A" }], future: "preserve-a",
+      },
+      {
+        id: "legacy-page", bg: "#ccc", bgGrad: null, canvasH: 1400,
+        elements: [{ id: "legacy-text", type: "text", text: "legacy" }],
+      },
+      {
+        id: "page-b", bg: "#bbb", bgGrad: null, canvasH: 1300,
+        elements: [{ id: "b-text", type: "text", text: "B" }], future: "preserve-b",
+      },
+    ];
+    const result = reconcileStudioCrdtSceneGraphPages(
+      pages,
+      [],
+      [],
+      [
+        pageRecord("page-b", 0, { payload: { version: 1, props: {
+          bg: "#0b0b0b", bgGrad: null, canvasH: 2000, name: "이동한 B",
+        } } }),
+        pageRecord("page-c", 1, { payload: { version: 1, props: {
+          bg: "#ffffff", bgGrad: ["#fff", "#eee"], canvasH: 1800, name: "새 C",
+        } } }),
+        pageRecord("page-a", 2, { deleted: true }),
+      ]
+    );
+
+    expect(result.pages.map((page) => page.id)).toEqual(["page-b", "legacy-page", "page-c"]);
+    expect(result.pages[0]).toMatchObject({
+      id: "page-b", bg: "#0b0b0b", canvasH: 2000, future: "preserve-b",
+    });
+    expect(result.pages[0]?.elements.map((element) => element.id)).toEqual(["b-text"]);
+    expect(result.pages[2]).toMatchObject({ id: "page-c", elements: [], name: "새 C" });
+
+    expect(studioPageToCrdtPage(result.pages[0]!)).toMatchObject({
+      id: "page-b",
+      payload: { props: { bg: "#0b0b0b", canvasH: 2000, name: "이동한 B" } },
+    });
   });
 });

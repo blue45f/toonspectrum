@@ -64,6 +64,29 @@ export interface StudioEditorMutationState extends StudioEditorAsyncScope {
   locked: boolean;
 }
 
+export interface StudioEditorCollaborationLockState {
+  /** 권한·원본 hydration·revision 충돌 등 CRDT와 무관한 기존 문서 잠금. */
+  documentAccessLocked: boolean;
+  /** 서버 공유 원고에서 실제 연산 채널이 필요한 편집 세션인지 여부. */
+  operationSyncRequired: boolean;
+  /** 같은 room 세대의 document/runtime pair와 최초 remote frontier 병합이 모두 끝났는지 여부. */
+  operationSyncReady: boolean;
+}
+
+/**
+ * Presence 연결은 CRDT 모듈 로딩과 초기 frontier 동기화보다 먼저 준비될 수 있다. 공유 편집은
+ * document와 scene runtime이 한 쌍으로 노출되고 최초 remote frontier가 화면 history에
+ * 병합되기 전까지 fail-closed로 유지해 그 사이의 로컬 변경이 서버 연산 로그에서 빠지는 일을
+ * 막는다. 신규/리믹스 로컬 초안에는 이 추가 잠금을 적용하지 않는다.
+ */
+export function isStudioEditorCollaborationLocked({
+  documentAccessLocked,
+  operationSyncRequired,
+  operationSyncReady,
+}: StudioEditorCollaborationLockState): boolean {
+  return documentAccessLocked || (operationSyncRequired && !operationSyncReady);
+}
+
 export function isStudioEditorAsyncScopeCurrent(
   request: Pick<StudioEditorInstanceScope, "authScopeKey" | "workId">,
   current: StudioEditorAsyncScope

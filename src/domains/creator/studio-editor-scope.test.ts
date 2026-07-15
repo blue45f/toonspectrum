@@ -7,9 +7,46 @@ import {
   isStudioSourceHydrationPending,
   isStudioCuttoonSourceFormat,
   isStudioEditorAsyncScopeCurrent,
+  isStudioEditorCollaborationLocked,
   isStudioEditorMutationContinuationAllowed,
   studioEditorInstanceKey,
 } from "./studio-editor-scope";
+
+describe("isStudioEditorCollaborationLocked", () => {
+  it("공유 편집은 CRDT pair와 최초 remote frontier가 모두 준비될 때까지 잠근다", () => {
+    expect(
+      isStudioEditorCollaborationLocked({
+        documentAccessLocked: false,
+        operationSyncRequired: true,
+        operationSyncReady: false,
+      })
+    ).toBe(true);
+    expect(
+      isStudioEditorCollaborationLocked({
+        documentAccessLocked: false,
+        operationSyncRequired: true,
+        operationSyncReady: true,
+      })
+    ).toBe(false);
+  });
+
+  it("로컬 초안은 CRDT 지연 로딩 때문에 잠그지 않으며 기존 문서 잠금은 항상 우선한다", () => {
+    expect(
+      isStudioEditorCollaborationLocked({
+        documentAccessLocked: false,
+        operationSyncRequired: false,
+        operationSyncReady: false,
+      })
+    ).toBe(false);
+    expect(
+      isStudioEditorCollaborationLocked({
+        documentAccessLocked: true,
+        operationSyncRequired: false,
+        operationSyncReady: true,
+      })
+    ).toBe(true);
+  });
+});
 
 describe("studioEditorInstanceKey", () => {
   it("저장 작품은 계정이 바뀌면 이전 문서 state를 재사용하지 않는다", () => {

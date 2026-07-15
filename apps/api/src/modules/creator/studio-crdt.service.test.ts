@@ -12,6 +12,7 @@ import {
   StudioCrdtUpdateIdConflictError,
   chunkStudioCrdtSyncDiff,
   encodeStudioCrdtServerStateVector,
+  hasValidStudioCrdtRootSchema,
 } from "./studio-crdt.service";
 
 import type {
@@ -167,6 +168,75 @@ function yUpdate(key: string, value: string): string {
   return update;
 }
 
+function createScenePageDocument(): Y.Doc {
+  const doc = new Y.Doc();
+  doc.getMap<boolean>("scene-elements").set("scene-1", true);
+  const scene = doc.getMap<unknown>("scene-element:scene-1");
+  scene.set("id", "scene-1");
+  scene.set("pageId", "page-1");
+  scene.set("layerId", "layer-1");
+  scene.set("payloadVersion", 1);
+  scene.set("type", "text");
+  scene.set("deleted", false);
+  scene.set("prop:text", "동시에 편집하는 대사");
+  scene.set("prop:x", 120);
+  scene.set("prop:y", 240);
+  scene.set("prop:width", 360);
+  scene.set("prop:fontSize", 28);
+  scene.set("prop:fill", "#111111");
+  scene.set("prop:rotation", 0);
+  scene.set("unset:font", false);
+
+  const sceneOrder = new Y.Map<unknown>();
+  sceneOrder.set("elementId", "scene-1");
+  sceneOrder.set("pageId", "page-1");
+  sceneOrder.set("layerId", "layer-1");
+  sceneOrder.set("kind", "scene");
+  sceneOrder.set("active", true);
+  doc.getArray<Y.Map<unknown>>("stroke-order").push([sceneOrder]);
+
+  doc.getMap<boolean>("studio-pages").set("page-1", true);
+  const page = doc.getMap<unknown>("studio-page:page-1");
+  page.set("id", "page-1");
+  page.set("payloadVersion", 1);
+  page.set("deleted", false);
+  page.set("prop:bg", "#ffffff");
+  page.set("prop:bgGrad", null);
+  page.set("prop:canvasH", 1080);
+  const pageOrder = new Y.Map<unknown>();
+  pageOrder.set("pageId", "page-1");
+  pageOrder.set("active", true);
+  doc.getArray<Y.Map<unknown>>("page-order").push([pageOrder]);
+  return doc;
+}
+
+function createStrokeDocument(): Y.Doc {
+  const doc = new Y.Doc();
+  const stroke = new Y.Map<unknown>();
+  stroke.set("id", "stroke-1");
+  stroke.set("pageId", "page-1");
+  stroke.set("layerId", "page-root");
+  stroke.set("status", "finalized");
+  stroke.set("deleted", false);
+  stroke.set("payloadVersion", 1);
+  stroke.set("type", "draw");
+  stroke.set("mode", "pen");
+  stroke.set("kind", "freehand");
+  stroke.set("stroke", "#111111");
+  stroke.set("strokeWidth", 8);
+  for (const key of [
+    "points", "pressures", "tiltXs", "tiltYs", "twists", "speeds", "tangentialPressures",
+  ]) stroke.set(key, new Y.Array<number>());
+  doc.getMap<Y.Map<unknown>>("strokes").set("stroke-1", stroke);
+  const order = new Y.Map<unknown>();
+  order.set("strokeId", "stroke-1");
+  order.set("pageId", "page-1");
+  order.set("layerId", "page-root");
+  order.set("active", true);
+  doc.getArray<Y.Map<unknown>>("stroke-order").push([order]);
+  return doc;
+}
+
 function syncBytes(sync: Awaited<ReturnType<StudioCrdtService["sync"]>>): Uint8Array {
   const result = new Uint8Array(sync.totalBytes);
   let offset = 0;
@@ -228,6 +298,367 @@ describe("StudioCrdtService", () => {
     expect(repository.updates.get("work-1") ?? []).toEqual([]);
     expect(repository.receipts.size).toBe(0);
     poison.destroy();
+  });
+
+  it("accepts bounded scene/page field CRDT roots and their mixed z-order entries", () => {
+    const doc = createScenePageDocument();
+    doc.getMap<string>("future-compatible-root").set("key", "unreserved roots stay compatible");
+
+    expect(hasValidStudioCrdtRootSchema(doc)).toBe(true);
+    doc.destroy();
+  });
+
+  it("materializes valid remote top-level scene/page Yjs types before durable validation", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const current = service(repository);
+    const source = createScenePageDocument();
+
+    await expect(current.applyUpdate({
+      workId: "work-1",
+      updateId: "00000000-0000-4000-8000-000000000104",
+      actorUserId: "editor",
+      data: fromUint8Array(Y.encodeStateAsUpdate(source)),
+    })).resolves.toMatchObject({ duplicate: false });
+
+    const hydrated = new Y.Doc();
+    applySync(hydrated, await current.sync("work-1"));
+    expect(hasValidStudioCrdtRootSchema(hydrated)).toBe(true);
+    expect(hydrated.getMap<unknown>("scene-element:scene-1").get("prop:text"))
+      .toBe("동시에 편집하는 대사");
+    hydrated.destroy();
+    source.destroy();
+  });
+
+  it("materializes valid remote stroke roots instead of misclassifying them as abstract types", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const current = service(repository);
+    const source = createStrokeDocument();
+
+    await expect(current.applyUpdate({
+      workId: "work-1",
+      updateId: "00000000-0000-4000-8000-000000000105",
+      actorUserId: "editor",
+      data: fromUint8Array(Y.encodeStateAsUpdate(source)),
+    })).resolves.toMatchObject({ duplicate: false });
+
+    const hydrated = new Y.Doc();
+    applySync(hydrated, await current.sync("work-1"));
+    expect(hasValidStudioCrdtRootSchema(hydrated)).toBe(true);
+    expect(hydrated.getMap<Y.Map<unknown>>("strokes").get("stroke-1")?.get("status"))
+      .toBe("finalized");
+    hydrated.destroy();
+    source.destroy();
+  });
+
+  it("rejects stroke metadata and pointer samples the browser cannot decode", () => {
+    const invalidPressure = createStrokeDocument();
+    const pressureStroke = invalidPressure.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!;
+    (pressureStroke.get("points") as Y.Array<number>).push([10, 20]);
+    (pressureStroke.get("pressures") as Y.Array<number>).push([2]);
+    for (const key of ["tiltXs", "tiltYs", "twists", "speeds", "tangentialPressures"]) {
+      (pressureStroke.get(key) as Y.Array<number>).push([0]);
+    }
+    expect(hasValidStudioCrdtRootSchema(invalidPressure)).toBe(false);
+    invalidPressure.destroy();
+
+    const unknownMetadata = createStrokeDocument();
+    unknownMetadata.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!
+      .set("unboundedPluginPayload", new Y.Map());
+    expect(hasValidStudioCrdtRootSchema(unknownMetadata)).toBe(false);
+    unknownMetadata.destroy();
+
+    const invalidStyle = createStrokeDocument();
+    invalidStyle.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!
+      .set("opacity", 1.5);
+    expect(hasValidStudioCrdtRootSchema(invalidStyle)).toBe(false);
+    invalidStyle.destroy();
+  });
+
+  it("rejects orphaned, non-canonical, or incorrectly typed reserved dynamic roots", () => {
+    const orphan = createScenePageDocument();
+    orphan.getMap<unknown>("scene-element:orphan").set("id", "orphan");
+    expect(hasValidStudioCrdtRootSchema(orphan)).toBe(false);
+    orphan.destroy();
+
+    const nonCanonical = createScenePageDocument();
+    nonCanonical.getMap<boolean>("scene-elements").set("scene/slash", true);
+    const wrongName = nonCanonical.getMap<unknown>("scene-element:scene/slash");
+    wrongName.set("id", "scene/slash");
+    expect(hasValidStudioCrdtRootSchema(nonCanonical)).toBe(false);
+    nonCanonical.destroy();
+
+    const wrongTrackerValue = createScenePageDocument();
+    wrongTrackerValue.getMap<unknown>("studio-pages").set("page-1", false);
+    expect(hasValidStudioCrdtRootSchema(wrongTrackerValue)).toBe(false);
+    wrongTrackerValue.destroy();
+
+    const wrongDynamicType = new Y.Doc();
+    wrongDynamicType.getMap<boolean>("scene-elements").set("scene-1", true);
+    wrongDynamicType.getArray("scene-element:scene-1");
+    expect(hasValidStudioCrdtRootSchema(wrongDynamicType)).toBe(false);
+    wrongDynamicType.destroy();
+  });
+
+  it("rejects illegal scene fields, nested Yjs values, oversize payloads, and ambiguous order ids", () => {
+    const illegalProperty = createScenePageDocument();
+    illegalProperty.getMap<unknown>("scene-element:scene-1").set("prop:src", "data:image/png;base64,AA");
+    expect(hasValidStudioCrdtRootSchema(illegalProperty)).toBe(false);
+    illegalProperty.destroy();
+
+    const nestedYjs = createScenePageDocument();
+    nestedYjs.getMap<unknown>("scene-element:scene-1").set("prop:gradient", new Y.Map());
+    expect(hasValidStudioCrdtRootSchema(nestedYjs)).toBe(false);
+    nestedYjs.destroy();
+
+    const oversized = createScenePageDocument();
+    oversized.getMap<unknown>("scene-element:scene-1").set("prop:text", "가".repeat(20_000));
+    expect(hasValidStudioCrdtRootSchema(oversized)).toBe(false);
+    oversized.destroy();
+
+    const ambiguousOrder = createScenePageDocument();
+    const entry = ambiguousOrder.getArray<Y.Map<unknown>>("stroke-order").get(0);
+    entry.set("strokeId", "stroke-1");
+    expect(hasValidStudioCrdtRootSchema(ambiguousOrder)).toBe(false);
+    ambiguousOrder.destroy();
+  });
+
+  it("enforces the same typed scene-property contract as the browser", () => {
+    const invalidCases: Array<[property: string, value: unknown]> = [
+      ["hidden", "yes"],
+      ["align", "diagonal"],
+      ["lineHeight", "wide"],
+    ];
+    for (const [property, value] of invalidCases) {
+      const invalid = createScenePageDocument();
+      invalid.getMap<unknown>("scene-element:scene-1").set(`prop:${property}`, value);
+      expect(hasValidStudioCrdtRootSchema(invalid)).toBe(false);
+      invalid.destroy();
+    }
+
+    const invalidFramePoints = createScenePageDocument();
+    const frame = invalidFramePoints.getMap<unknown>("scene-element:scene-1");
+    frame.set("type", "frame");
+    for (const key of ["text", "fontSize", "fill", "rotation"]) frame.delete(`prop:${key}`);
+    frame.set("prop:height", 300);
+    frame.set("prop:points", [0, 0, 100, 0, 100, 100]);
+    expect(hasValidStudioCrdtRootSchema(invalidFramePoints)).toBe(false);
+    invalidFramePoints.destroy();
+
+    const invalidLineCount = createScenePageDocument();
+    const focus = invalidLineCount.getMap<unknown>("scene-element:scene-1");
+    focus.set("type", "focusLines");
+    for (const key of ["text", "fontSize", "fill"]) focus.delete(`prop:${key}`);
+    focus.set("prop:height", 300);
+    focus.set("prop:lineCount", 1.5);
+    focus.set("prop:innerRadius", 10);
+    focus.set("prop:outerRadius", 100);
+    focus.set("prop:stroke", "#111111");
+    focus.set("prop:strokeWidth", 2);
+    focus.set("prop:noise", 0);
+    expect(hasValidStudioCrdtRootSchema(invalidLineCount)).toBe(false);
+    invalidLineCount.destroy();
+
+    const aggregateEntryOverflow = createScenePageDocument();
+    const text = aggregateEntryOverflow.getMap<unknown>("scene-element:scene-1");
+    text.set("prop:gradient", Array<number>(2_100).fill(0));
+    text.set("prop:textPath", Array<number>(2_100).fill(0));
+    expect(hasValidStudioCrdtRootSchema(aggregateEntryOverflow)).toBe(false);
+    aggregateEntryOverflow.destroy();
+  });
+
+  it("rejects order entries whose target or page/layer coordinates do not match the record", () => {
+    const mismatchedLayer = createScenePageDocument();
+    mismatchedLayer.getArray<Y.Map<unknown>>("stroke-order").get(0).set("layerId", "other-layer");
+    expect(hasValidStudioCrdtRootSchema(mismatchedLayer)).toBe(false);
+    mismatchedLayer.destroy();
+
+    const missingPage = createScenePageDocument();
+    missingPage.getArray<Y.Map<unknown>>("page-order").get(0).set("pageId", "missing-page");
+    expect(hasValidStudioCrdtRootSchema(missingPage)).toBe(false);
+    missingPage.destroy();
+
+    const activeFlood = createScenePageDocument();
+    const order = activeFlood.getArray<Y.Map<unknown>>("stroke-order");
+    for (let index = 1; index <= 256; index += 1) {
+      const entry = new Y.Map<unknown>();
+      entry.set("elementId", "scene-1");
+      entry.set("pageId", "page-1");
+      entry.set("layerId", "layer-1");
+      entry.set("kind", "scene");
+      entry.set("active", true);
+      order.push([entry]);
+    }
+    expect(hasValidStudioCrdtRootSchema(activeFlood)).toBe(false);
+    activeFlood.destroy();
+  });
+
+  it("accepts reparent history while requiring the active order entry to match", async () => {
+    const strokeDoc = createStrokeDocument();
+    const stroke = strokeDoc.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!;
+    stroke.set("pageId", "page-2");
+    stroke.set("layerId", "layer-2");
+    strokeDoc.getArray<Y.Map<unknown>>("stroke-order").get(0).set("active", false);
+    const movedStrokeOrder = new Y.Map<unknown>();
+    movedStrokeOrder.set("strokeId", "stroke-1");
+    movedStrokeOrder.set("pageId", "page-2");
+    movedStrokeOrder.set("layerId", "layer-2");
+    movedStrokeOrder.set("active", true);
+    strokeDoc.getArray<Y.Map<unknown>>("stroke-order").push([movedStrokeOrder]);
+    expect(hasValidStudioCrdtRootSchema(strokeDoc)).toBe(true);
+
+    const sceneDoc = createScenePageDocument();
+    const scene = sceneDoc.getMap<unknown>("scene-element:scene-1");
+    scene.set("pageId", "page-2");
+    scene.set("layerId", "layer-2");
+    sceneDoc.getArray<Y.Map<unknown>>("stroke-order").get(0).set("active", false);
+    const movedSceneOrder = new Y.Map<unknown>();
+    movedSceneOrder.set("elementId", "scene-1");
+    movedSceneOrder.set("pageId", "page-2");
+    movedSceneOrder.set("layerId", "layer-2");
+    movedSceneOrder.set("kind", "scene");
+    movedSceneOrder.set("active", true);
+    sceneDoc.getArray<Y.Map<unknown>>("stroke-order").push([movedSceneOrder]);
+    expect(hasValidStudioCrdtRootSchema(sceneDoc)).toBe(true);
+
+    const current = service(new MemoryStudioCrdtRepository());
+    await expect(current.applyUpdate({
+      workId: "work-reparent-stroke",
+      updateId: "00000000-0000-4000-8000-000000000106",
+      actorUserId: "editor",
+      data: fromUint8Array(Y.encodeStateAsUpdate(strokeDoc)),
+    })).resolves.toMatchObject({ duplicate: false });
+    await expect(current.applyUpdate({
+      workId: "work-reparent-scene",
+      updateId: "00000000-0000-4000-8000-000000000107",
+      actorUserId: "editor",
+      data: fromUint8Array(Y.encodeStateAsUpdate(sceneDoc)),
+    })).resolves.toMatchObject({ duplicate: false });
+
+    strokeDoc.destroy();
+    sceneDoc.destroy();
+  });
+
+  it("accepts converged concurrent draw and scene reparents with losing active entries", async () => {
+    const fork = (source: Y.Doc): Y.Doc => {
+      const target = new Y.Doc();
+      Y.applyUpdate(target, Y.encodeStateAsUpdate(source));
+      return target;
+    };
+    const reparentStroke = (doc: Y.Doc, pageId: string, layerId: string) => {
+      const record = doc.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!;
+      record.set("pageId", pageId);
+      record.set("layerId", layerId);
+      doc.getArray<Y.Map<unknown>>("stroke-order").get(0).set("active", false);
+      const entry = new Y.Map<unknown>();
+      entry.set("strokeId", "stroke-1");
+      entry.set("pageId", pageId);
+      entry.set("layerId", layerId);
+      entry.set("active", true);
+      doc.getArray<Y.Map<unknown>>("stroke-order").push([entry]);
+    };
+    const reparentScene = (doc: Y.Doc, pageId: string, layerId: string) => {
+      const record = doc.getMap<unknown>("scene-element:scene-1");
+      record.set("pageId", pageId);
+      record.set("layerId", layerId);
+      doc.getArray<Y.Map<unknown>>("stroke-order").get(0).set("active", false);
+      const entry = new Y.Map<unknown>();
+      entry.set("elementId", "scene-1");
+      entry.set("pageId", pageId);
+      entry.set("layerId", layerId);
+      entry.set("kind", "scene");
+      entry.set("active", true);
+      doc.getArray<Y.Map<unknown>>("stroke-order").push([entry]);
+    };
+    const converge = (
+      base: Y.Doc,
+      mutate: (doc: Y.Doc, pageId: string, layerId: string) => void
+    ) => {
+      const left = fork(base);
+      const right = fork(base);
+      mutate(left, "page-left", "layer-left");
+      mutate(right, "page-right", "layer-right");
+      const baseVector = Y.encodeStateVector(base);
+      const leftUpdate = Y.encodeStateAsUpdate(left, baseVector);
+      const rightUpdate = Y.encodeStateAsUpdate(right, baseVector);
+      const merged = fork(base);
+      Y.applyUpdate(merged, leftUpdate);
+      Y.applyUpdate(merged, rightUpdate);
+      return { left, right, merged, leftUpdate, rightUpdate };
+    };
+
+    const strokeBase = createStrokeDocument();
+    const strokeForks = converge(strokeBase, reparentStroke);
+    expect(hasValidStudioCrdtRootSchema(strokeForks.merged)).toBe(true);
+    expect(strokeForks.merged.getArray<Y.Map<unknown>>("stroke-order").toArray()
+      .filter((entry) => entry.get("active") === true)).toHaveLength(2);
+
+    const sceneBase = createScenePageDocument();
+    const sceneForks = converge(sceneBase, reparentScene);
+    expect(hasValidStudioCrdtRootSchema(sceneForks.merged)).toBe(true);
+    expect(sceneForks.merged.getArray<Y.Map<unknown>>("stroke-order").toArray()
+      .filter((entry) => entry.get("active") === true)).toHaveLength(2);
+
+    const current = service(new MemoryStudioCrdtRepository());
+    const applySequence = async (
+      workId: string,
+      base: Y.Doc,
+      first: Uint8Array,
+      second: Uint8Array,
+      idOffset: number
+    ) => {
+      for (const [index, update] of [Y.encodeStateAsUpdate(base), first, second].entries()) {
+        await current.applyUpdate({
+          workId,
+          updateId: `00000000-0000-4000-8000-${String(idOffset + index).padStart(12, "0")}`,
+          actorUserId: index === 2 ? "editor-right" : "editor-left",
+          data: fromUint8Array(update),
+        });
+      }
+    };
+    await expect(applySequence(
+      "work-concurrent-stroke-reparent",
+      strokeBase,
+      strokeForks.leftUpdate,
+      strokeForks.rightUpdate,
+      108
+    )).resolves.toBeUndefined();
+    await expect(applySequence(
+      "work-concurrent-scene-reparent",
+      sceneBase,
+      sceneForks.leftUpdate,
+      sceneForks.rightUpdate,
+      111
+    )).resolves.toBeUndefined();
+
+    for (const doc of [
+      strokeBase,
+      strokeForks.left,
+      strokeForks.right,
+      strokeForks.merged,
+      sceneBase,
+      sceneForks.left,
+      sceneForks.right,
+      sceneForks.merged,
+    ]) doc.destroy();
+  });
+
+  it("rejects malformed scene/page updates before they reach durable storage", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const current = service(repository);
+    const malformed = createScenePageDocument();
+    malformed.getMap<unknown>("studio-page:page-1").set("prop:canvasH", Number.NaN);
+
+    await expect(
+      current.applyUpdate({
+        workId: "work-1",
+        updateId: "00000000-0000-4000-8000-000000000103",
+        actorUserId: "editor",
+        data: fromUint8Array(Y.encodeStateAsUpdate(malformed)),
+      })
+    ).rejects.toBeInstanceOf(StudioCrdtInvalidPayloadError);
+    expect(repository.updates.get("work-1") ?? []).toEqual([]);
+    expect(repository.receipts.size).toBe(0);
+    malformed.destroy();
   });
 
   it("classifies a poisoned persisted Studio root as stored-state corruption", async () => {

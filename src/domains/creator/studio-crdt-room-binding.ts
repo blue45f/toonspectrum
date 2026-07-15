@@ -114,6 +114,7 @@ export class StudioCrdtRoomBinding {
   private activeSyncRequestId: string | null = null;
   private clientSequence = 0;
   private localServerSequence = 0;
+  private durabilityWarning: string | null = null;
   private started = false;
   private closed = false;
 
@@ -291,10 +292,15 @@ export class StudioCrdtRoomBinding {
     const persisted = this.withPersistenceTimeout(operation).then(
       () => {
         if (pending.persisted === persisted) pending.persistenceState = "ready";
+        this.captureOutboxStatus();
         return true;
       },
       (error: unknown) => {
         if (pending.persisted === persisted) pending.persistenceState = "failed";
+        this.durabilityWarning = messageFrom(
+          error,
+          "오프라인 CRDT 보관함에 획을 저장하지 못했습니다."
+        );
         if (!this.closed) {
           this.emitStatus({
             state: "error",
@@ -419,6 +425,15 @@ export class StudioCrdtRoomBinding {
         if (this.outboxScope) {
           void this.outbox
             .remove(this.outboxScope, pending.request.workId, updateId)
+            .then(() => {
+              this.captureOutboxStatus();
+              if (!this.closed && !this.durabilityWarning) {
+                this.emitStatus({
+                  state: "ready",
+                  message: "팀 원고와 로컬 복구 저장소가 동기화됩니다.",
+                });
+              }
+            })
             .catch((error) => {
               this.emitStatus({
                 state: "error",
@@ -560,11 +575,24 @@ export class StudioCrdtRoomBinding {
       requests = await this.outbox.list(scope, this.room.workId);
     } catch (error) {
       if (this.closed) return;
+      this.durabilityWarning = messageFrom(
+        error,
+        "오프라인 CRDT 보관함을 불러오지 못했습니다."
+      );
       this.emitStatus({
         state: "error",
         message: messageFrom(error, "오프라인 CRDT 보관함을 불러오지 못했습니다."),
+        durabilityAtRisk: true,
       });
       return;
+    }
+    this.captureOutboxStatus();
+    if (this.durabilityWarning && !this.closed) {
+      this.emitStatus({
+        state: "error",
+        message: this.durabilityWarning,
+        durabilityAtRisk: true,
+      });
     }
     if (this.closed) return;
     for (const request of requests) {
@@ -589,6 +617,20 @@ export class StudioCrdtRoomBinding {
   }
 
   private emitStatus(status: StudioCrdtBindingStatus): void {
+    if (status.state === "ready" && this.durabilityWarning) {
+      this.onStatus?.({
+        state: "error",
+        message: `실시간 서버 동기화는 유지되지만 로컬 복구 저장소가 저하되었습니다. ${this.durabilityWarning}`,
+        durabilityAtRisk: true,
+      });
+      return;
+    }
     this.onStatus?.(status);
+  }
+
+  private captureOutboxStatus(): void {
+    const status = this.outbox.getStatus?.();
+    if (!status) return;
+    this.durabilityWarning = status.state === "degraded" ? status.message : null;
   }
 }

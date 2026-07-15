@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 
 import {
   StudioWebGpuEngine,
@@ -16,6 +16,11 @@ export interface StudioWebGpuCanvasProps extends StudioGpuViewTransform {
   /** Logical document coordinates, independent of CSS zoom and device pixel ratio. */
   readonly width: number;
   readonly height: number;
+  /**
+   * Ordered operations composited inside this surface. `erase` strokes destination-out only pixels
+   * produced by earlier strokes in this array; they intentionally cannot punch through DOM/Konva
+   * content below the transparent canvas.
+   */
   readonly strokes?: readonly StudioGpuStroke[];
   readonly onBackendChange?: (backend: StudioGpuBackend) => void;
   readonly onDeviceLost?: (info: GPUDeviceLostInfo) => void;
@@ -141,11 +146,13 @@ export function StudioWebGpuCanvas({
     };
   }, []);
 
-  useEffect(() => {
+  // The authoritative Konva draft is hidden in the same React commit. Draw/clear the transparent
+  // GPU handoff before paint so the user never sees a blank or double-dark transition frame.
+  useLayoutEffect(() => {
     engineRef.current?.render(strokes);
   }, [strokes]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const engine = engineRef.current;
     if (!engine) return;
     const measured = measuredCssSize(rootRef.current, width, height);
