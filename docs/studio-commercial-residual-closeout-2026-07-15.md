@@ -31,12 +31,16 @@ Sources: `docs/studio-full-area-benchmark-2026-07-15.md`, `docs/studio-ui-ux-mul
 | G6 | Selection multi-count chip pure formatter | Magma multi-select badge | **closed** | `studioSelectionCountChip` + SelectOptionsBar |
 | G7 | Presence overflow / visible peer cap pure helpers | Magma avatar overflow | **closed** | `studioPresenceOverflowLabel`, `studioPresenceVisiblePeerCount` |
 | G8 | Toggle chip a11y label prop for icon-only toggles | CSP tool options a11y | **closed** | `StudioToggleChip` `aria-label` |
-| G9 | Full Magma always-on collab + CRDT ops | Magma realtime product | **deferred** | Needs server CRDT + product room model — not SPA chrome |
-| G10 | WebGPU rewrite / ABR marketplace / Photopea smart objects / full pressure graph editor | Engine / proprietary | **deferred** | Multi-year or proprietary-format residual |
+| G9a | Magma **always-on presence chrome** (dock while connecting/ready, even zero peers) | Magma presence strip | **closed** | `studioLivePresenceAlwaysVisible`, `StudioLivePresenceDockConnected` alwaysOn — **not** CRDT ops |
+| G9b | Full Magma CRDT realtime ops / always-on multiplayer document merge | Magma product backend | **deferred** | Requires server CRDT + conflict model; transport presence already ships |
+| G10a | CSP/Procreate-class **pressure response graph editor** (transfer curve SVG + continuous γ) | Procreate / CSP pressure curve | **closed** | `studio-pressure-curve-graph.ts`, `StudioPressureCurveGraph` in `StudioBrushInputControls` |
+| G10b | WebGPU canvas rewrite | Engine | **deferred** | Architecture multi-year |
+| G10c | ABR tip marketplace | Proprietary format | **deferred** | Policy: no ABR/cs3* marketplace |
+| G10d | Photopea-complete smart objects / editable text PSD round-trip | PSD engine | **deferred** | Partial raster PSD import/export already ships; smart-object graph not in scope |
 
 ## Saturation closeout
 
-**No further finite commercial IA/drawing chrome batch is claimed without industry investments listed as deferred (G9–G10).** Remaining open work is **only deferred industry residuals** (always-on Magma-class CRDT rooms, WebGPU canvas rewrite, ABR tip marketplace, Photopea-complete smart objects, Procreate-class full pressure graph editor). Shippable Magma/CSP/Photopea/Canva/Krita/Procreate/Ibis **IA · visual · drawing chrome** residuals in this matrix are closed (G1–G8).
+**Implementable slices of former “deferred” rows are closed (G9a, G10a).** Remaining open work is **only true industry/engine residuals**: full CRDT document merge (G9b), WebGPU rewrite (G10b), ABR marketplace (G10c), Photopea-complete smart objects (G10d). Shippable Magma/CSP/Procreate **presence chrome + pressure graph** are product code, not deferred theater.
 
 ## DESIGN constraints held
 

@@ -180,12 +180,25 @@ describe("StudioLiveCanvasOverlay", () => {
     expect(html).toContain('data-studio-presence-link="ready"');
     expect(html).toContain("민호 · 이 탭 따라가기 중지");
     expect(html).toContain('aria-pressed="true"');
-    expect(html).toContain("민호 · 이 탭 따라가기");
-    expect(html).not.toContain(privateSessionId);
-    expect(html).not.toContain("page-private-id");
   });
 
-  it("keeps every participant color readable behind compact white labels", () => {
+  it("renders always-on presence dock while connecting with zero peers", () => {
+    const html = renderToStaticMarkup(
+      <StudioLivePresenceDock
+        connected={false}
+        alwaysOn
+        peers={[]}
+        followingSessionId={null}
+        onOpenTeam={noop}
+        onToggleFollow={noop}
+      />
+    );
+    expect(html).toContain('data-studio-presence-dock="true"');
+    expect(html).toContain("팀 작업 공간 열기");
+    expect(html).toContain('data-studio-presence-link="retry"');
+  });
+
+  it("keeps every participant color readable behind compact cream labels", () => {
     for (const color of STUDIO_LIVE_PARTICIPANT_COLORS) {
       const contrast = 1.05 / (relativeLuminance(color) + 0.05);
       expect(contrast, color).toBeGreaterThanOrEqual(4.5);

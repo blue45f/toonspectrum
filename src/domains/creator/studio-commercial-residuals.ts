@@ -59,3 +59,24 @@ export function studioPresenceVisiblePeerCount(
   if (totalPeers <= 0) return 0;
   return Math.min(maxVisible, totalPeers);
 }
+
+/** Live collab HUD: peer count chip when room is active (Magma always-on presence cue). */
+export function studioLivePresenceHudLabel(
+  availability: "idle" | "connecting" | "ready" | "unsupported" | "error",
+  peerCount: number
+): string | null {
+  if (availability === "idle" || availability === "unsupported") return null;
+  if (availability === "connecting") return "연결 중";
+  if (availability === "error") return "연결 오류";
+  const n = Math.max(0, Math.floor(peerCount));
+  if (n <= 0) return "라이브";
+  return `라이브 · ${n}`;
+}
+
+export function studioLivePresenceAlwaysVisible(
+  availability: "idle" | "connecting" | "ready" | "unsupported" | "error",
+  peerCount: number
+): boolean {
+  if (peerCount > 0) return true;
+  return availability === "connecting" || availability === "ready" || availability === "error";
+}

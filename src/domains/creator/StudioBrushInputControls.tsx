@@ -1,9 +1,4 @@
-import {
-  BRUSH_PRESSURE_CURVE_PRESETS,
-  pressureCurvePresetId,
-  pressureCurveValueForPreset,
-  type BrushPressureCurvePresetId,
-} from "./studio-brush";
+import { StudioPressureCurveGraph } from "./StudioPressureCurveGraph";
 
 import { cx } from "@/lib/cx";
 
@@ -26,9 +21,6 @@ export function StudioBrushInputControls({
   density = "compact",
 }: StudioBrushInputControlsProps) {
   const touch = density === "touch";
-  const curveId = pressureCurvePresetId(pressureCurve);
-  const curve = BRUSH_PRESSURE_CURVE_PRESETS.find((preset) => preset.id === curveId)
-    ?? BRUSH_PRESSURE_CURVE_PRESETS[1];
 
   return (
     <section
@@ -76,24 +68,12 @@ export function StudioBrushInputControls({
         </label>
       ) : null}
 
-      <label className={cx("flex items-center justify-between gap-3 text-fg-3", touch ? "min-h-11 text-[0.7rem]" : "text-xs")}>
-        <span className="shrink-0">필압 반응</span>
-        <select
-          value={curveId}
-          onChange={(event) => onPressureCurveChange(
-            pressureCurveValueForPreset(event.target.value as BrushPressureCurvePresetId)
-          )}
-          className={cx(
-            "min-w-0 rounded-lg border border-line bg-card px-2 text-fg outline-none focus:border-accent",
-            touch ? "min-h-11 flex-1 text-xs" : "h-7 w-32 text-xs"
-          )}
-        >
-          {BRUSH_PRESSURE_CURVE_PRESETS.map((preset) => (
-            <option key={preset.id} value={preset.id}>{preset.label}</option>
-          ))}
-        </select>
-      </label>
-      <p className="text-[0.62rem] leading-relaxed text-fg-3">{curve.description}</p>
+      {/* CSP/Procreate-class response graph (implementable deferred slice) */}
+      <StudioPressureCurveGraph
+        pressureCurve={pressureCurve}
+        onPressureCurveChange={onPressureCurveChange}
+        density={density}
+      />
     </section>
   );
 }

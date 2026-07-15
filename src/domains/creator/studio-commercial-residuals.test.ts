@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  studioLivePresenceAlwaysVisible,
+  studioLivePresenceHudLabel,
   studioPresenceConnectionLabel,
   studioPresenceOverflowLabel,
   studioPresenceVisiblePeerCount,
@@ -36,5 +38,15 @@ describe("studio commercial residual helpers", () => {
     expect(studioPresenceOverflowLabel(3)).toBe("+3");
     expect(studioPresenceVisiblePeerCount(12)).toBe(5);
     expect(studioPresenceVisiblePeerCount(2)).toBe(2);
+  });
+
+  it("labels always-on live presence for status HUD", () => {
+    expect(studioLivePresenceHudLabel("idle", 0)).toBeNull();
+    expect(studioLivePresenceHudLabel("connecting", 0)).toBe("연결 중");
+    expect(studioLivePresenceHudLabel("ready", 0)).toBe("라이브");
+    expect(studioLivePresenceHudLabel("ready", 3)).toBe("라이브 · 3");
+    expect(studioLivePresenceAlwaysVisible("idle", 0)).toBe(false);
+    expect(studioLivePresenceAlwaysVisible("connecting", 0)).toBe(true);
+    expect(studioLivePresenceAlwaysVisible("ready", 0)).toBe(true);
   });
 });

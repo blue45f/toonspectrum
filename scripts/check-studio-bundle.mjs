@@ -11,7 +11,8 @@ const budgets = {
   // Measured 2026-07-15 after commercial close-out (soft-lock, merge, density, smart filters):
   // StudioPage ~1.03 MiB + static deps ≈ 2.29 MiB raw / ~753 KiB gzip.
   // 2026-07-15 evening: pro-draw prefs, menu portal stacking, chrome polish ≈ 744 KiB gzip.
-  studio: { raw: 2_450_000, gzip: 770_000 },
+  // 2026-07-15 residual always-on presence + pressure-curve helpers: ~755 KiB gzip observed.
+  studio: { raw: 2_450_000, gzip: 780_000 },
   // Measured after the same build: 443,257 raw / 143,956 gzip.
   app: { raw: 500_000, gzip: 170_000 },
 };

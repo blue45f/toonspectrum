@@ -2,6 +2,7 @@ import { Check, MessageCircle, MousePointer2, Radio, UsersRound, X } from "lucid
 import { useEffect, useRef, useState } from "react";
 
 import {
+  studioLivePresenceAlwaysVisible,
   studioPresenceConnectionLabel,
   studioPresenceOverflowLabel,
   studioPresenceVisiblePeerCount,
@@ -37,6 +38,8 @@ export interface StudioLiveCanvasOverlayProps {
 
 export interface StudioLivePresenceDockProps {
   connected: boolean;
+  /** Magma always-on: show while connecting/ready even with zero peers. */
+  alwaysOn?: boolean;
   peers: readonly StudioLivePeer[];
   followingSessionId: string | null;
   onOpenTeam: () => void;
@@ -249,12 +252,14 @@ export function StudioRemoteCursorOverlay({
 
 export function StudioLivePresenceDock({
   connected,
+  alwaysOn = false,
   peers,
   followingSessionId,
   onOpenTeam,
   onToggleFollow,
 }: StudioLivePresenceDockProps) {
-  if (!connected && peers.length === 0) return null;
+  // Always-on collab chrome: parent passes alwaysOn while connecting/ready (Magma presence strip).
+  if (!alwaysOn && !connected && peers.length === 0) return null;
   const visibleCount = studioPresenceVisiblePeerCount(peers.length, 5);
   const visiblePeers = peers.slice(0, visibleCount);
   const mobileHiddenPeerCount = Math.max(0, peers.length - 2);
@@ -387,6 +392,7 @@ export function StudioLivePresenceDockConnected({
 }: StudioLivePresenceDockConnectedProps) {
   const { availability, peers } = useStudioLiveCollaboration();
   const followedPeer = peers.find((peer) => peer.sessionId === followingSessionId) ?? null;
+  const alwaysOn = studioLivePresenceAlwaysVisible(availability, peers.length);
 
   useEffect(() => {
     if (followedPeer?.pageId) onFollowPage(followedPeer.pageId);
@@ -396,9 +402,12 @@ export function StudioLivePresenceDockConnected({
     if (followingSessionId && !followedPeer) onToggleFollow(followingSessionId);
   }, [followedPeer, followingSessionId, onToggleFollow]);
 
+  if (!alwaysOn) return null;
+
   return (
     <StudioLivePresenceDock
       connected={availability === "ready"}
+      alwaysOn
       peers={peers}
       followingSessionId={followingSessionId}
       onOpenTeam={onOpenTeam}
@@ -406,3 +415,5 @@ export function StudioLivePresenceDockConnected({
     />
   );
 }
+
+
