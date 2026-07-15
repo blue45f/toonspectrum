@@ -935,7 +935,7 @@ interface BgPrimitiveMeshProps {
   prim: BgPrimitive;
   lineArt: boolean;
   showEdges: boolean;
-  onSelect: (id: string) => void;
+  onSelect: (id: string, isMulti: boolean) => void;
   registerRef: (id: string, obj: THREE.Group | null) => void;
 }
 
@@ -977,7 +977,7 @@ function BgPrimitiveMesh({ prim, lineArt, showEdges, onSelect, registerRef }: Bg
       visible={visible}
       onClick={(e) => {
         e.stopPropagation();
-        onSelect(prim.id);
+        onSelect(prim.id, e.shiftKey || e.metaKey || e.ctrlKey);
       }}
     >
       <mesh geometry={geometry} castShadow receiveShadow>
@@ -999,7 +999,7 @@ function BgPrimitiveMesh({ prim, lineArt, showEdges, onSelect, registerRef }: Bg
 interface BgCustomModelMeshProps {
   instance: BgCustomModelInstance;
   cachedRoot: THREE.Object3D | undefined;
-  onSelect: (id: string) => void;
+  onSelect: (id: string, isMulti: boolean) => void;
   registerRef: (id: string, obj: THREE.Group | null) => void;
   onCloneStatus: (id: string, ok: boolean) => void;
 }
@@ -1055,7 +1055,7 @@ function BgCustomModelMesh({ instance, cachedRoot, onSelect, registerRef, onClon
       visible={visible}
       onClick={(e) => {
         e.stopPropagation();
-        onSelect(instance.id);
+        onSelect(instance.id, e.shiftKey || e.metaKey || e.ctrlKey);
       }}
     >
       <primitive object={cloned} />
@@ -1169,6 +1169,8 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   const pendingInitialCameraRef = useRef<StudioBg3dCameraSettings | null>(null);
   const viewportHostRef = useRef<HTMLDivElement>(null);
   const primitiveObjectsRef = useRef<Map<string, THREE.Group>>(new Map());
+  const dragInitialSelectedTransformsRef = useRef<Map<string, { position: [number, number, number], rotation: [number, number, number], scale: [number, number, number] }>>(new Map());
+  const dragInitialFirstTransformRef = useRef<{ position: [number, number, number], rotation: [number, number, number], scale: [number, number, number] } | null>(null);
   const [, setRefTick] = useState(0);
   const panelScrollRef = useRef<HTMLDivElement>(null);
   // storage id는 이 두 Map과 검증 캐시 안에서만 쓰며 Studio 장면 문서에는 절대 직렬화하지 않는다.
@@ -1562,6 +1564,55 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
 
   const duplicateSelectedCustomModel = () => {
     duplicateSelected();
+  };
+
+  const applyMultiSelectDelta = (snap: boolean) => {
+    const firstObj = primitiveObjectsRef.current.get(firstSelectedId!);
+    const initialFirst = dragInitialFirstTransformRef.current;
+    if (!firstObj || !initialFirst) return;
+
+    const dx = firstObj.position.x - initialFirst.position[0];
+    const dy = firstObj.position.y - initialFirst.position[1];
+    const dz = firstObj.position.z - initialFirst.position[2];
+
+    const patchTransform = (item: BgPrimitive | BgCustomModelInstance, isFirst: boolean) => {
+      const initial = dragInitialSelectedTransformsRef.current.get(item.id);
+      if (isFirst) {
+        const next = {
+          ...item,
+          position: [firstObj.position.x, firstObj.position.y, firstObj.position.z] as [number, number, number],
+          rotation: [firstObj.rotation.x, firstObj.rotation.y, firstObj.rotation.z] as [number, number, number],
+          scale: [firstObj.scale.x, firstObj.scale.y, firstObj.scale.z] as [number, number, number],
+        };
+        if (snap && (next.position || next.rotation)) {
+          const snapped = applyStudioBg3dSnapToTransform(next as { position: [number, number, number]; rotation: [number, number, number] }, snapSettings);
+          next.position = snapped.position as [number, number, number];
+          next.rotation = snapped.rotation as [number, number, number];
+        }
+        return next;
+      }
+      
+      if (!initial) return item;
+      const next = {
+        ...item,
+        position: [initial.position[0] + dx, initial.position[1] + dy, initial.position[2] + dz] as [number, number, number],
+      };
+      if (snap) {
+        const snapped = applyStudioBg3dSnapToTransform({ position: next.position, rotation: initial.rotation }, snapSettings);
+        next.position = snapped.position as [number, number, number];
+      }
+      return next;
+    };
+
+    setPrimitives((prev) => prev.map((p) => {
+      if (!selectedIds.has(p.id) || isBgObjectTransformBlocked(p)) return p;
+      return patchTransform(p, p.id === firstSelectedId) as BgPrimitive;
+    }));
+
+    setCustomModels((prev) => prev.map((m) => {
+      if (!selectedIds.has(m.id) || isBgObjectTransformBlocked(m)) return m;
+      return patchTransform(m, m.id === firstSelectedId) as BgCustomModelInstance;
+    }));
   };
 
   const updateTransform = (
@@ -2475,7 +2526,17 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                       prim={prim}
                       lineArt={lineArtPreview}
                       showEdges={!isCapturing}
-                      onSelect={(id) => setSelectedIds(new Set([id]))}
+                      onSelect={(id, isMulti) => {
+                        setSelectedIds((prev) => {
+                          if (isMulti) {
+                            const next = new Set(prev);
+                            if (next.has(id)) next.delete(id);
+                            else next.add(id);
+                            return next;
+                          }
+                          return new Set([id]);
+                        });
+                      }}
                       registerRef={registerPrimitiveRef}
                     />
                   ))}
@@ -2484,7 +2545,17 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                       key={inst.id}
                       instance={inst}
                       cachedRoot={modelRootCacheRef.current.get(inst.modelId)?.root}
-                      onSelect={(id) => setSelectedIds(new Set([id]))}
+                      onSelect={(id, isMulti) => {
+                        setSelectedIds((prev) => {
+                          if (isMulti) {
+                            const next = new Set(prev);
+                            if (next.has(id)) next.delete(id);
+                            else next.add(id);
+                            return next;
+                          }
+                          return new Set([id]);
+                        });
+                      }}
                       registerRef={registerPrimitiveRef}
                       onCloneStatus={(id, ok) => {
                         setReadyCloneIds((prev) => {
@@ -2512,30 +2583,36 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                         object={primitiveObjectsRef.current.get(firstSelectedId)}
                         mode={transformMode}
                         space={transformMode === "rotate" ? "local" : "world"}
-                        onMouseDown={() => setIsTransforming(true)}
-                        onMouseUp={() => {
-                          setIsTransforming(false);
-                          // 드래그 중에는 스냅을 끄고, 놓을 때만 격자/각도 스냅을 적용해 떨림을 막는다.
-                          const obj = primitiveObjectsRef.current.get(firstSelectedId);
-                          if (!obj || !snapSettings.enabled) return;
-                          const position: [number, number, number] = [obj.position.x, obj.position.y, obj.position.z];
-                          const rotation: [number, number, number] = [obj.rotation.x, obj.rotation.y, obj.rotation.z];
-                          const scale: [number, number, number] = [obj.scale.x, obj.scale.y, obj.scale.z];
-                          if (selectedPrimitive) updateTransform(firstSelectedId, { position, rotation, scale }, { snap: true });
-                          else if (selectedCustomModel) {
-                            updateCustomModelTransform(firstSelectedId, { position, rotation, scale }, { snap: true });
+                        onMouseDown={() => {
+                          setIsTransforming(true);
+                          if (!firstSelectedId) return;
+                          const firstObj = primitiveObjectsRef.current.get(firstSelectedId);
+                          if (firstObj) {
+                            dragInitialFirstTransformRef.current = {
+                              position: [firstObj.position.x, firstObj.position.y, firstObj.position.z],
+                              rotation: [firstObj.rotation.x, firstObj.rotation.y, firstObj.rotation.z],
+                              scale: [firstObj.scale.x, firstObj.scale.y, firstObj.scale.z],
+                            };
+                          }
+                          dragInitialSelectedTransformsRef.current.clear();
+                          for (const id of selectedIds) {
+                            const obj = primitiveObjectsRef.current.get(id);
+                            if (obj) {
+                              dragInitialSelectedTransformsRef.current.set(id, {
+                                position: [obj.position.x, obj.position.y, obj.position.z],
+                                rotation: [obj.rotation.x, obj.rotation.y, obj.rotation.z],
+                                scale: [obj.scale.x, obj.scale.y, obj.scale.z],
+                              });
+                            }
                           }
                         }}
+                        onMouseUp={() => {
+                          setIsTransforming(false);
+                          if (!snapSettings.enabled) return;
+                          applyMultiSelectDelta(true);
+                        }}
                         onObjectChange={() => {
-                          const obj = primitiveObjectsRef.current.get(firstSelectedId);
-                          if (!obj) return;
-                          const position: [number, number, number] = [obj.position.x, obj.position.y, obj.position.z];
-                          const rotation: [number, number, number] = [obj.rotation.x, obj.rotation.y, obj.rotation.z];
-                          const scale: [number, number, number] = [obj.scale.x, obj.scale.y, obj.scale.z];
-                          if (selectedPrimitive) updateTransform(firstSelectedId, { position, rotation, scale }, { snap: false });
-                          else if (selectedCustomModel) {
-                            updateCustomModelTransform(firstSelectedId, { position, rotation, scale }, { snap: false });
-                          }
+                          applyMultiSelectDelta(false);
                         }}
                       />
                     </group>
@@ -3228,7 +3305,18 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                                 <button
                                   type="button"
                                   className="flex min-h-11 min-w-0 flex-1 items-center gap-2 px-1 text-left sm:min-h-0"
-                                  onClick={() => setSelectedIds(new Set([item.id]))}
+                                  onClick={(e) => {
+                                    setSelectedIds((prev) => {
+                                      const isMulti = e.shiftKey || e.metaKey || e.ctrlKey;
+                                      if (isMulti) {
+                                        const next = new Set(prev);
+                                        if (next.has(item.id)) next.delete(item.id);
+                                        else next.add(item.id);
+                                        return next;
+                                      }
+                                      return new Set([item.id]);
+                                    });
+                                  }}
                                 >
                                   {prim ? (
                                     <span
