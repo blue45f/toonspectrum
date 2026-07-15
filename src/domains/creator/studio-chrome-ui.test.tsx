@@ -14,6 +14,7 @@ import {
   StudioQuickActionsBar,
   StudioRailToolButton,
   StudioStatusBar,
+  StudioFloatingToolPopover,
   StudioToolBelt,
   StudioToolIdentity,
   StudioToolbarDivider,
@@ -40,6 +41,11 @@ describe("studio chrome UI", () => {
     expect(html).toContain('aria-label="그리기 도구"');
     expect(html).toContain("rounded-xl");
     expect(html).toContain("border-line");
+  });
+
+  it("floating tool popover is a portal host (closed renders nothing)", () => {
+    expect(renderToStaticMarkup(<StudioFloatingToolPopover open={false}>x</StudioFloatingToolPopover>)).toBe("");
+    expect(typeof StudioFloatingToolPopover).toBe("function");
   });
 
   it("renders a full tool-belt rail for the immersive draw-app shell", () => {

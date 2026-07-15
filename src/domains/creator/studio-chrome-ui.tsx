@@ -16,6 +16,7 @@
  * Pure presentation only — no document state.
  */
 import { forwardRef, type ButtonHTMLAttributes, type ReactElement, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 import {
   STUDIO_EASE,
@@ -136,7 +137,9 @@ export function StudioToolBelt({
         // Single-row draw-app belt (Figma/CSP): horizontal scroll, never multi-row wrap.
         "sticky top-0 z-[30] flex max-w-full shrink-0 flex-nowrap items-center gap-1.5 overflow-x-auto",
         "border-b border-line bg-panel/95 px-2 py-1.5",
-        "shadow-[0_1px_0_oklch(0.2_0.01_70/0.08)] backdrop-blur-md",
+        // backdrop-filter 는 fixed 자손의 containing block 이 되어 데스크톱 파킹 시
+        // 팝오버를 -100vw 쪽으로 끌고 감 → 블러는 모바일만, 팝오버는 포털 사용.
+        "shadow-[0_1px_0_oklch(0.2_0.01_70/0.08)] max-lg:backdrop-blur-md",
         "[-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         "lg:gap-2 lg:px-2.5 lg:py-1.5",
         className
@@ -144,6 +147,35 @@ export function StudioToolBelt({
     >
       {children}
     </div>
+  );
+}
+
+/**
+ * 툴바 그룹 팝오버 — document.body 포털.
+ * 데스크톱에서 레거시 툴벨트가 off-screen fixed 로 파킹돼 있어도 뷰포트 기준으로 표시된다.
+ */
+export function StudioFloatingToolPopover({
+  open,
+  children,
+  className,
+  id = "tool",
+}: {
+  open: boolean;
+  children: ReactNode;
+  className?: string;
+  id?: string;
+}): ReactElement | null {
+  if (!open || typeof document === "undefined") return null;
+  return createPortal(
+    <div
+      data-studio-tool-popover={id}
+      role="dialog"
+      aria-modal="false"
+      className={className}
+    >
+      {children}
+    </div>,
+    document.body
   );
 }
 
@@ -306,7 +338,7 @@ export function StudioMenuSubtabs({
       role="tablist"
       aria-label={ariaLabel}
       className={cn(
-        "sticky top-0 z-10 -mx-0.5 mb-1.5 flex flex-wrap gap-0.5 border-b border-line/70 bg-panel pb-1.5",
+        "sticky top-0 z-10 -mx-0.5 mb-1.5 flex flex-wrap gap-1 border-b border-line/70 bg-panel pb-1.5",
         className
       )}
     >
@@ -324,12 +356,13 @@ export function StudioMenuSubtabs({
             onClick={() => onSelect(item.id)}
             className={cn(
               studioSegmentChipClass(active),
-              "text-[0.68rem]",
+              // 8탭 이상 에셋 메뉴에서도 라벨이 잘리지 않게 최소 터치·가독 폭 확보
+              "min-h-8 px-2 text-[0.68rem] sm:min-h-9",
               item.disabled && "cursor-not-allowed opacity-40"
             )}
           >
             <Icon size={STUDIO_ICON_SIZE.subtab} strokeWidth={STUDIO_ICON_STROKE} aria-hidden className="shrink-0" />
-            {item.label}
+            <span className="truncate">{item.label}</span>
           </button>
         );
       })}

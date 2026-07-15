@@ -95,11 +95,13 @@ export function studioUiDensityAllows(
   const normalized = normalizeStudioUiDensityMode(mode);
   if (normalized === "full") return true;
 
-  // Super Simple (focus): left tool rail + quick actions + status; panels off.
+  // Super Simple (focus): draw + 삽입 코어(템플릿·에셋·텍스트·말풍선) + 레일. 패널·AI·3D 참조는 접는다.
   if (normalized === "focus") {
     return (
       region === "toolbar-draw"
       || region === "toolbar-insert"
+      || region === "toolbar-assets"
+      || region === "toolbar-cut"
       || region === "tool-rail"
       || region === "quick-actions"
       || region === "status-rail"
@@ -123,7 +125,7 @@ export function studioUiDensityDescription(mode: StudioUiDensityMode): string {
     return "Magma Simple에 가깝게 — 핵심 도구와 기본 설정만 보여 입문·집중 작업에 맞춥니다.";
   }
   if (mode === "focus") {
-    return "Magma Super Simple에 가깝게 — 좌측 도구 레일과 캔버스 위주, 패널·고급 메뉴를 접습니다.";
+    return "Magma Super Simple에 가깝게 — 그리기·삽입(템플릿·에셋·말풍선)과 캔버스 위주, AI·3D·속성 패널은 접습니다.";
   }
   return "Magma Full에 가깝게 — 모든 메뉴·패널·AI·3D 도구를 표시합니다.";
 }
