@@ -12,6 +12,8 @@
 
 import { BRUSH_PRESETS, type BrushPreset } from "./studio-brush";
 
+import type { StudioBrushPreviewStyle } from "./studio-brush-visual";
+
 /** Canva/Express style “simple draw” kit — first tools a beginner sees. */
 export const STUDIO_BEGINNER_BRUSH_IDS = [
   "pen",
@@ -68,8 +70,8 @@ export interface StudioBrushTrayItem {
   mediaGroup: StudioBrushMediaGroup;
   /** 0–1 visual weight for stroke preview thickness. */
   previewWeight: number;
-  /** Preview stroke style for SVG chip (Picsart/Express affordance). */
-  previewStyle: "solid" | "soft" | "dashed" | "dots" | "wavy";
+  /** Preview stroke style for SVG chip (Picsart/Express/Ibis affordance). */
+  previewStyle: StudioBrushPreviewStyle;
 }
 
 const BEGINNER_SET = new Set<string>(STUDIO_BEGINNER_BRUSH_IDS);
@@ -149,29 +151,29 @@ const HINTS: Record<string, string> = {
   screentone: "만화 스크린톤 도트",
 };
 
-const PREVIEW_STYLE: Record<string, StudioBrushTrayItem["previewStyle"]> = {
+const PREVIEW_STYLE: Record<string, StudioBrushPreviewStyle> = {
   pen: "solid",
   fineliner: "solid",
   ballpoint: "solid",
-  gpen: "wavy",
+  gpen: "calligraphy",
   liner: "solid",
-  calligraphy: "wavy",
+  calligraphy: "calligraphy",
   marker: "soft",
   "felt-tip": "solid",
   "marker-bold": "soft",
   highlighter: "soft",
-  neon: "soft",
+  neon: "neon",
   brush: "wavy",
   watercolor: "soft",
   airbrush: "soft",
   spray: "dots",
   pencil: "dashed",
   "soft-pencil": "dashed",
-  "dry-media": "dashed",
-  crayon: "dashed",
-  chalk: "dots",
+  "dry-media": "texture",
+  crayon: "texture",
+  chalk: "texture",
   "ink-particle": "dots",
-  screentone: "dots",
+  screentone: "tone",
 };
 
 function previewWeightFor(preset: BrushPreset): number {

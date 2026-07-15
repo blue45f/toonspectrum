@@ -42,6 +42,15 @@ IA and interaction patterns only — **no brand clones**, no proprietary asset f
 | Size chips + locks | Canva / Procreate | Existing chips + locks (prior) |
 | Body menus / no clip | Magma / Sumo | Portal menus (prior) |
 
+## Creative feature visuals (shipped 2026-07-15 pass 2)
+
+| Feature | Competitor cue | Implementation |
+| --- | --- | --- |
+| Brush tray tiles | Picsart / Ibis / CSP subtool | SVG stroke previews per media family + paper tooth (`studio-brush-visual`, `StudioBrushTray`) |
+| Preview styles | Express media chips | solid / soft / dashed / dots / wavy / calligraphy / neon / texture / tone |
+| Size readout | Procreate / CSP | Soft halo tip preview on options bar |
+| Bubble styles | Clip Studio / Canva text styles | Mini speech SVG swatches (`StudioBubbleStylePresetPanel`) |
+
 ## Explicit non-goals
 
 1:1 visual skins; CSP assets marketplace; ABR; native companion hardware skins; Firefly branding.

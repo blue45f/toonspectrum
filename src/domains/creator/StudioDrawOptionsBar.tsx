@@ -86,18 +86,24 @@ export interface StudioDrawOptionsBarProps {
 
 function SizePreview({ size, color }: { size: number; color: string }): ReactElement {
   const d = Math.min(22, Math.max(4, size * 0.55));
+  // Soft halo behind tip — reads more like CSP/Procreate brush size readouts.
+  const halo = Math.min(26, d + 5);
   return (
     <span
       aria-hidden
-      className="grid size-8 place-items-center rounded-xl border border-line/80 bg-canvas/80 shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.05)]"
+      data-studio-size-preview="true"
+      className="relative grid size-8 place-items-center overflow-hidden rounded-xl border border-line/80 bg-canvas/85 shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.06)]"
       title={`크기 ${size}px`}
     >
       <span
-        className="rounded-full shadow-[0_1px_3px_oklch(0.1_0.01_70/0.35)]"
+        className="absolute rounded-full opacity-30 blur-[1px]"
+        style={{ width: halo, height: halo, background: color }}
+      />
+      <span
+        className="relative rounded-full shadow-[0_1px_3px_oklch(0.1_0.01_70/0.35)] ring-1 ring-black/15"
         style={{
           width: d,
-          height: d,
-          backgroundColor: color,
+          height: d,          backgroundColor: color,
           opacity: 0.95,
         }}
       />

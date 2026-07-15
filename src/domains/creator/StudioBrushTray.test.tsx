@@ -18,6 +18,10 @@ describe("StudioBrushTray", () => {
     expect(html).toContain("볼펜");
     expect(html).toContain('aria-selected="true"');
     expect(html).toContain("브러시 키트 펼치기");
+    // Commercial stroke-preview glyphs (not text-only chips)
+    expect(html).toContain('data-studio-brush-preview=');
+    expect(html).toContain('data-studio-brush-chip="pen"');
+    expect(html).toContain('data-studio-brush-media=');
     // Compact starts collapsed — category tabs appear after expand.
     expect(html).not.toContain('role="tablist"');
   });

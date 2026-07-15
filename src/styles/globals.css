@@ -772,6 +772,26 @@ body[data-studio-app="true"] .route-stage::before,
   font-feature-settings: "ss01" on;
 }
 
+/* Commercial brush tray tiles (Picsart/Ibis/CSP) */
+[data-studio-brush-tray="true"] [data-studio-brush-chip] {
+  transition:
+    border-color 150ms var(--studio-ease),
+    background 150ms var(--studio-ease),
+    box-shadow 150ms var(--studio-ease),
+    transform 140ms var(--studio-ease);
+}
+[data-studio-brush-tray="true"] [data-studio-brush-chip]:hover:not([aria-selected="true"]) {
+  transform: translateY(-1px);
+}
+[data-studio-brush-tray="true"] [data-studio-brush-chip][aria-selected="true"] {
+  transform: translateY(0);
+}
+
+/* Bubble style visual grid */
+[data-studio-bubble-style-presets="true"] [data-studio-bubble-swatch] {
+  overflow: visible;
+}
+
 /* Rail active spine */
 [data-studio-tool-rail="true"] button[aria-pressed="true"] {
   position: relative;

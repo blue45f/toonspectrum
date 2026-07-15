@@ -12,7 +12,7 @@ export type BubbleStylePresetTarget = {
   strokeWidth?: number;
   font?: string;
   strokeStyle?: StrokeStyle;
-  variant: BubbleVariant; // 항상 존재(BubbleEl.variant는 필수 필드) — 프리셋이 모양을 안 바꿀 때 되돌릴 기본값으로 쓴다.
+  variant: BubbleVariant;
 };
 
 export type BubbleStylePresetPatch = Pick<
@@ -32,6 +32,46 @@ export type BubbleStylePresetPatch = Pick<
   | "font"
 >;
 
+/** Mini bubble glyph — Canva/Clip Studio style swatch instead of text-only chips. */
+function BubbleStyleSwatch({ preset }: { preset: BubbleStylePreset }) {
+  const fill = preset.fill === "transparent" ? "oklch(0.95 0.01 85 / 0.15)" : preset.fill;
+  const stroke = preset.stroke || "oklch(0.3 0.01 70 / 0.35)";
+  const sw = Math.max(1.2, Math.min(2.8, preset.strokeWidth ?? 1.75));
+  return (
+    <svg
+      aria-hidden
+      width={44}
+      height={28}
+      viewBox="0 0 44 28"
+      className="block drop-shadow-sm"
+      data-studio-bubble-swatch={preset.id}
+    >
+      {/* Soft drop shadow */}
+      <ellipse cx={22} cy={24} rx={14} ry={2.2} fill="oklch(0.1 0.01 70 / 0.22)" />
+      {/* Speech body */}
+      <path
+        d="M8 5.5 C8 3.5, 10 2, 14 2 H30 C34 2, 36 3.5, 36 5.5 V15 C36 17, 34 18.5, 30 18.5 H20 L14 24.5 V18.5 H14 C10 18.5, 8 17, 8 15 Z"
+        fill={fill}
+        stroke={stroke}
+        strokeWidth={sw}
+        strokeLinejoin="round"
+      />
+      {/* Sample glyph */}
+      <text
+        x={22}
+        y={13.5}
+        textAnchor="middle"
+        fontSize={8}
+        fontWeight={700}
+        fill={preset.textFill}
+        fontFamily="system-ui, sans-serif"
+      >
+        가
+      </text>
+    </svg>
+  );
+}
+
 export function StudioBubbleStylePresetPanel({
   selected,
   onApplyPreset,
@@ -40,9 +80,11 @@ export function StudioBubbleStylePresetPanel({
   onApplyPreset: (patch: BubbleStylePresetPatch) => void;
 }) {
   return (
-    <div className="mt-2.5 border-b border-line/40 pb-2.5">
-      <p className="mb-2 text-[0.66rem] font-semibold uppercase tracking-wider text-fg-3">스타일 프리셋</p>
-      <div className="grid grid-cols-2 gap-1.5">
+    <div className="mt-2.5 border-b border-line/40 pb-2.5" data-studio-bubble-style-presets="true">
+      <p className="mb-2 text-[0.66rem] font-semibold uppercase tracking-wider text-fg-3">
+        스타일 프리셋
+      </p>
+      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
         {BUBBLE_STYLE_PRESETS.map((preset) => {
           const isMatch =
             selected.fill === preset.fill &&
@@ -76,26 +118,21 @@ export function StudioBubbleStylePresetPanel({
                 });
               }}
               className={cx(
-                "flex cursor-pointer flex-col items-start rounded-lg border p-1.5 text-left transition-all hover:bg-raised/70",
-                isMatch ? "border-accent bg-accent-soft/40 shadow-sm" : "border-line bg-card"
+                "flex cursor-pointer flex-col items-stretch gap-1 rounded-xl border p-1.5 text-left transition-all",
+                "hover:bg-raised/70 hover:shadow-sm",
+                isMatch
+                  ? "border-accent bg-accent-soft/40 shadow-sm ring-1 ring-accent/25"
+                  : "border-line bg-card"
               )}
               title={preset.description}
             >
-              <span className="mb-1 text-[0.65rem] font-semibold text-fg">{preset.label}</span>
-              <div className="mt-auto flex w-full items-center gap-1">
-                <span
-                  className="flex size-3.5 items-center justify-center rounded-full border border-line text-[8px] font-bold shadow-sm"
-                  style={{
-                    backgroundColor: preset.fill === "transparent" ? "transparent" : preset.fill,
-                    color: preset.textFill,
-                    borderColor: preset.stroke || "rgba(0,0,0,0.15)",
-                    borderWidth: preset.stroke ? "1.5px" : "1px",
-                  }}
-                >
-                  가
-                </span>
-                <span className="truncate text-[0.55rem] text-fg-3">{preset.description}</span>
+              <div className="flex items-center justify-center rounded-lg bg-canvas/50 py-1 ring-1 ring-line/40">
+                <BubbleStyleSwatch preset={preset} />
               </div>
+              <span className="truncate text-[0.65rem] font-semibold text-fg">{preset.label}</span>
+              <span className="line-clamp-2 text-[0.55rem] leading-snug text-fg-3">
+                {preset.description}
+              </span>
             </button>
           );
         })}

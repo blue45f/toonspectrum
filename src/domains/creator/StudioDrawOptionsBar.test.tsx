@@ -42,6 +42,7 @@ describe("StudioDrawOptionsBar", () => {
     // CSP/Photopea dual well on the commercial options strip
     expect(html).toContain('data-studio-dual-color-well="true"');
     expect(html).toContain('data-studio-color-swap="true"');
+    expect(html).toContain('data-studio-size-preview="true"');
   });
 
   it("renders brush slots and symmetry chips when provided", () => {

@@ -34,6 +34,12 @@ describe("studio creative ux", () => {
     expect(pen.previewWeight).toBeGreaterThan(0);
     expect(pen.hint.length).toBeGreaterThan(4);
     expect(pen.previewStyle).toBe("solid");
+    const neon = studioBrushTrayItem(BRUSH_PRESETS.find((p) => p.id === "neon")!);
+    expect(neon.previewStyle).toBe("neon");
+    const tone = studioBrushTrayItem(BRUSH_PRESETS.find((p) => p.id === "screentone")!);
+    expect(tone.previewStyle).toBe("tone");
+    const gpen = studioBrushTrayItem(BRUSH_PRESETS.find((p) => p.id === "gpen")!);
+    expect(gpen.previewStyle).toBe("calligraphy");
   });
 
   it("exposes drawing-first starter cards without publish marketing", () => {
