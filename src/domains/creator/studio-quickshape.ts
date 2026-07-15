@@ -31,7 +31,7 @@ export type QuickShapeMatch = {
 
 export const QUICKSHAPE_HOLD_MS = 350; // 1단계: 인식 시작까지 정지 시간
 export const QUICKSHAPE_LOCK_HOLD_MS = 1100; // 2단계: 정비율 고정까지 누적 정지 시간
-export const QUICKSHAPE_STILL_RADIUS_PX = 10; // "정지" 허용 반경(화면 px) — 터치 지터 여유
+export const QUICKSHAPE_STILL_RADIUS_PX = 14; // "정지" 허용 반경(화면 px) — 터치·펜 지터 여유
 export const QUICKSHAPE_MIN_POINTS = 5; // 분류 시도 최소 점 개수
 export const QUICKSHAPE_MIN_SIZE_PX = 8; // 분류 시도 최소 바운딩박스 대각선(우발적 탭 방지)
 export const QUICKSHAPE_CLOSURE_RATIO = 0.22; // (끝-시작 거리)/전체 길이 ≤ 이 값이면 "닫힘"
@@ -511,6 +511,9 @@ export function regularizeQuickShapePoints(
 /**
  * Pointer-up promotion: skip the live hold timer and snap if geometry already looks like a shape.
  * Live preview still uses hold; release uses this so users who lift immediately still get a snap.
+ *
+ * Classification is intentionally a bit more lenient than the live tick path — release is a
+ * one-shot confirm gesture and real pen/finger strokes rarely meet the strict live thresholds.
  */
 export function promoteFreehandQuickShapeOnRelease(
   points: readonly number[],
@@ -521,7 +524,10 @@ export function promoteFreehandQuickShapeOnRelease(
   }
 ): QuickShapeMatch | null {
   // Pass the hold gate without requiring the user to stay still for 350ms on release.
-  const match = classifyQuickShape(points, QUICKSHAPE_HOLD_MS);
+  // Prefer the strict classifier first (same as live), then a release-tolerant pass.
+  const match =
+    classifyQuickShape(points, QUICKSHAPE_HOLD_MS)
+    ?? classifyQuickShapeForRelease(points);
   if (!match) return null;
   const lastX = points[points.length - 2];
   const lastY = points[points.length - 1];
@@ -537,6 +543,99 @@ export function promoteFreehandQuickShapeOnRelease(
     points: finalPoints,
     ...(match.polygonSides !== undefined ? { polygonSides: match.polygonSides } : {}),
   };
+}
+
+/**
+ * Release-only classification with relaxed closure/line residual gates.
+ * Does not replace live hold recognition; only backs stop-and-lift confirmations.
+ */
+export function classifyQuickShapeForRelease(points: readonly number[]): QuickShapeMatch | null {
+  if (points.length % 2 !== 0) return null;
+  if (points.some((v) => typeof v !== "number" || !Number.isFinite(v))) return null;
+
+  const pointCount = points.length / 2;
+  // Allow slightly shorter scribbles on lift (live still requires QUICKSHAPE_MIN_POINTS).
+  if (pointCount < Math.max(4, QUICKSHAPE_MIN_POINTS - 1)) return null;
+
+  const bbox = boundsOfPoints(points);
+  const diag = Math.hypot(bbox.maxX - bbox.minX, bbox.maxY - bbox.minY);
+  if (diag < QUICKSHAPE_MIN_SIZE_PX) return null;
+
+  const total = polylineLength(points);
+  if (total < 1e-6) return null;
+
+  const x0 = points[0]!;
+  const y0 = points[1]!;
+  const xn = points[points.length - 2]!;
+  const yn = points[points.length - 1]!;
+  // More open ends still count as "trying to close" on release (finger often lifts early).
+  const closureRatio = Math.hypot(xn - x0, yn - y0) / total;
+  const releaseClosure = Math.min(0.34, QUICKSHAPE_CLOSURE_RATIO + 0.12);
+
+  if (closureRatio > releaseClosure) {
+    // Temporarily loosen line residual by reusing open classifier after padding a near-line check.
+    const line = classifyOpenStroke(points, { x: x0, y: y0 });
+    if (line) return line;
+    // Near-lines that fail the tight residual: accept if max perpendicular residual is still modest.
+    const loose = classifyLooseLine(points, { x: x0, y: y0 });
+    return loose;
+  }
+  return classifyClosedLoop(points, bbox);
+}
+
+/** Slightly looser open-stroke line accept for release-only promotion. */
+function classifyLooseLine(points: readonly number[], startPt: Pt): QuickShapeMatch | null {
+  const tight = classifyOpenStroke(points, startPt);
+  if (tight) return tight;
+  // Re-run PCA residual with 1.6× tolerance of the live gate.
+  const vertices = toVertices(points);
+  const n = vertices.length;
+  if (n < 3) return null;
+  let sx = 0;
+  let sy = 0;
+  for (const p of vertices) {
+    sx += p.x;
+    sy += p.y;
+  }
+  const cx = sx / n;
+  const cy = sy / n;
+  let sxx = 0;
+  let syy = 0;
+  let sxy = 0;
+  for (const p of vertices) {
+    const dx = p.x - cx;
+    const dy = p.y - cy;
+    sxx += dx * dx;
+    syy += dy * dy;
+    sxy += dx * dy;
+  }
+  const angle = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+  const dirX = Math.cos(angle);
+  const dirY = Math.sin(angle);
+  let sumSqResidual = 0;
+  let minProj = Infinity;
+  let maxProj = -Infinity;
+  for (const p of vertices) {
+    const dx = p.x - cx;
+    const dy = p.y - cy;
+    const proj = dx * dirX + dy * dirY;
+    const perp = -dx * dirY + dy * dirX;
+    sumSqResidual += perp * perp;
+    if (proj < minProj) minProj = proj;
+    if (proj > maxProj) maxProj = proj;
+  }
+  const span = maxProj - minProj;
+  if (span < QUICKSHAPE_MIN_SIZE_PX) return null;
+  const rms = Math.sqrt(sumSqResidual / n);
+  if (rms / span > QUICKSHAPE_LINE_MAX_DEVIATION_RATIO * 1.75) return null;
+  const ex = cx + dirX * minProj;
+  const ey = cy + dirY * minProj;
+  const fx = cx + dirX * maxProj;
+  const fy = cy + dirY * maxProj;
+  const distE = Math.hypot(ex - startPt.x, ey - startPt.y);
+  const distF = Math.hypot(fx - startPt.x, fy - startPt.y);
+  const [ax, ay, bx, by] = distE <= distF ? [ex, ey, fx, fy] : [fx, fy, ex, ey];
+  return { kind: "line", points: [round2(ax), round2(ay), round2(bx), round2(by)] };
 }
 
 export function anchorQuickShapePoints(

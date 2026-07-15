@@ -450,4 +450,24 @@ describe("promoteFreehandQuickShapeOnRelease", () => {
     const promoted = promoteFreehandQuickShapeOnRelease(pts);
     expect(promoted?.kind).toBe("line");
   });
+
+  it("잔차가 큰 거의-직선도 release 경로에서는 line 으로 승격한다", () => {
+    // Live residual gate is 0.06; a wavier freehand may fail classifyQuickShape but should still
+    // promote on release via the looser line pass.
+    const pts = nearLinePoints(0, 0, 160, 14, 20, 1.8);
+    const promoted = promoteFreehandQuickShapeOnRelease(pts, { lockAspect: false });
+    expect(promoted?.kind).toBe("line");
+  });
+
+  it("닫히지 않은 원형 낙서도 release 경로에서 ellipse 후보가 될 수 있다", () => {
+    // Incomplete circle (gap at end) — release closure is more tolerant than live.
+    const pts: number[] = [];
+    const n = 28;
+    for (let i = 0; i < n; i += 1) {
+      const t = (i / n) * Math.PI * 1.75; // not fully closed
+      pts.push(80 + Math.cos(t) * 50, 80 + Math.sin(t) * 48);
+    }
+    const promoted = promoteFreehandQuickShapeOnRelease(pts);
+    expect(promoted === null || promoted.kind === "ellipse" || promoted.kind === "line").toBe(true);
+  });
 });

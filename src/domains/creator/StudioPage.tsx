@@ -14226,6 +14226,15 @@ function StudioCuttoonEditor() {
     quickShapeConvertedRef.current = false;
     quickShapeLockedRef.current = false;
   }
+  /** Snapshot hold/lock state before clearing the timer — release promotion must see the same values. */
+  function snapshotQuickShapeTracking() {
+    return {
+      anchor: quickShapeStillAnchorRef.current,
+      elapsed: quickShapeStillElapsedRef.current,
+      locked: quickShapeLockedRef.current,
+      converted: quickShapeConvertedRef.current,
+    };
+  }
   function clearDrawingPointerSafetyListeners() {
     drawingPointerSafetyCleanupRef.current?.();
     drawingPointerSafetyCleanupRef.current = null;
@@ -15250,7 +15259,7 @@ function StudioCuttoonEditor() {
     // Mouse: buttons can report 0 mid-drag when release is lost (capture fail / leave window).
     // Pen/touch must not end on buttons alone — drivers often omit a reliable mask mid-stroke.
     if (shouldEndStudioStrokeForReleasedContact(drawingPointerSessionRef.current, pointerEvent)) {
-      stopQuickShapeTracking();
+      // Do not stop QuickShape before finish — finishDrawingPointer snapshots hold/lock first.
       if (colorWheelTimerRef.current) {
         clearTimeout(colorWheelTimerRef.current);
         colorWheelTimerRef.current = null;
@@ -15490,6 +15499,9 @@ function StudioCuttoonEditor() {
   function finishDrawingPointer(stage: Konva.Stage | null, pointerEvent: PointerEvent) {
     // Idempotent: Stage pointerup and the window safety listener can both observe the same release.
     if (!drawingRef.current && !drawingPointerSessionRef.current) return;
+    // Capture hold/lock BEFORE any stopQuickShapeTracking() side-effect from callers/global listeners.
+    // Callers historically stopped tracking first and wiped the refs used by release promotion.
+    const quickShapeSnapshot = snapshotQuickShapeTracking();
     try {
       if (drawingRef.current && (drawingRef.current.kind ?? "freehand") === "freehand" && stage) {
         // Pointermove is not guaranteed immediately before pointerup. Consume the release sample
@@ -15549,16 +15561,17 @@ function StudioCuttoonEditor() {
         let finished = drawingRef.current;
         // Smart shape release snap: users often lift without holding 350ms still.
         // Live hold preview still runs via runQuickShapeTick; this catches lift-to-confirm.
+        // Prefer live-converted draft (kind already non-freehand); only promote remaining freehand.
         if (
           quickShapeActive
           && finished.mode !== "eraser"
           && (finished.kind ?? "freehand") === "freehand"
         ) {
           const promoted = promoteFreehandQuickShapeOnRelease(finished.points, {
-            anchor: quickShapeStillAnchorRef.current,
+            anchor: quickShapeSnapshot.anchor,
             lockAspect:
-              quickShapeLockedRef.current
-              || quickShapeStillElapsedRef.current >= QUICKSHAPE_LOCK_HOLD_MS,
+              quickShapeSnapshot.locked
+              || quickShapeSnapshot.elapsed >= QUICKSHAPE_LOCK_HOLD_MS,
           });
           if (promoted) {
             finished = {
@@ -15581,6 +15594,17 @@ function StudioCuttoonEditor() {
               `스마트 도형 · ${QUICKSHAPE_KIND_LABELS[promoted.kind] ?? promoted.kind}`
             );
           }
+        } else if (
+          quickShapeActive
+          && finished.mode !== "eraser"
+          && finished.kind
+          && finished.kind !== "freehand"
+          && quickShapeSnapshot.converted
+        ) {
+          // Live conversion already ran — announce so the gesture does not feel silent.
+          announceDrawingShortcut(
+            `스마트 도형 · ${QUICKSHAPE_KIND_LABELS[finished.kind] ?? finished.kind}`
+          );
         }
         // 라이브 입력 안정화와 독립된 후보정. 각점 보존을 켜면 말풍선·의상 모서리처럼 의도적인
         // 방향 전환은 그대로 두고 고주파 떨림만 정리한다(점 개수·필압 정렬은 보존).
@@ -15594,6 +15618,8 @@ function StudioCuttoonEditor() {
         commit([...elements, finished]);
       }
     } finally {
+      // Always clear the hold timer after commit/promote so a second pointerup cannot re-use it.
+      stopQuickShapeTracking();
       // No error or stale tool ref may strand DOM capture or a predicted RAF after the stroke ends.
       releaseDrawingPointerSession();
       drawingRef.current = null;
@@ -15612,7 +15638,7 @@ function StudioCuttoonEditor() {
       discardDrawingPointerSession();
       return;
     }
-    stopQuickShapeTracking();
+    // Snapshot + stop happen inside finishDrawingPointer; clearing here wiped promote state.
     if (colorWheelTimerRef.current) {
       clearTimeout(colorWheelTimerRef.current);
       colorWheelTimerRef.current = null;
@@ -15658,17 +15684,17 @@ function StudioCuttoonEditor() {
         // A secondary touch ending must not stop QuickShape, commit, or discard the active pen.
         return;
       }
-      stopQuickShapeTracking();
       if (colorWheelTimerRef.current) {
         clearTimeout(colorWheelTimerRef.current);
         colorWheelTimerRef.current = null;
       }
       // Handle drawing before every other tool's early-return branch. Even a stale marquee/crop ref
-      // cannot intercept pointerup and leak capture; finishDrawingPointer always cleans up in finally.
+      // cannot intercept pointerup and leak capture; finishDrawingPointer always cleans up in finally
+      // (including QuickShape timer stop after promote snapshot).
       finishDrawingPointer(e.target.getStage(), pointerEvent);
       return;
     }
-    stopQuickShapeTracking(); // 무조건 실행 — 어느 분기로 빠지든 인터벌이 새지 않게 한다.
+    stopQuickShapeTracking(); // 드로잉이 아닌 경로 — 잔여 인터벌만 정리.
     // 색상 휠 롱프레스 타이머가 아직 안 터졌는데 포인터를 뗐다 — 평범한 클릭/드래그였다는 뜻이니
     // 타이머만 정리한다(이미 열려 있었다면 오버레이가 이벤트를 가로채서 애초에 여기까지 안 온다).
     if (colorWheelTimerRef.current) {
@@ -18989,7 +19015,7 @@ function StudioCuttoonEditor() {
                 setTool("draw");
                 setDrawMode("pen");
                 setEyedropperActive(false);
-                announceDrawingShortcut("스마트 도형 켜짐 · 그리고 손을 떼면 다듬어요");
+                announceDrawingShortcut("스마트 도형 켜짐 · 그려서 손을 떼면 다듬어요");
               } else {
                 announceDrawingShortcut("스마트 도형 꺼짐");
               }
@@ -21526,10 +21552,17 @@ function StudioCuttoonEditor() {
               active={quickShapeActive}
               accented
               onClick={() => {
-                setQuickShapeActive((v) => !v);
-                setTool("draw");
-                setDrawMode("pen");
-                setEyedropperActive(false);
+                const next = !quickShapeActive;
+                if (next) {
+                  disarmAllPixelTools();
+                  setTool("draw");
+                  setDrawMode("pen");
+                  setEyedropperActive(false);
+                  announceDrawingShortcut("스마트 도형 켜짐 · 그려서 손을 떼면 다듬어요");
+                } else {
+                  announceDrawingShortcut("스마트 도형 꺼짐");
+                }
+                setQuickShapeActive(next);
                 setMenu(null);
               }}
             />
@@ -24023,7 +24056,7 @@ function StudioCuttoonEditor() {
             {quickShapeActive && tool === "draw" && drawMode === "pen" && !drawingShortcutNotice ? (
               <span className="mx-3 inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-panel/95 px-3 py-1 text-center text-[0.68rem] font-semibold text-accent shadow-lg backdrop-blur">
                 <Shapes size={12} aria-hidden />
-                스마트 도형 켜짐 · 그려서 잠시 멈추면 다듬어요
+                스마트 도형 · 선·원·네모 등을 그리고 손을 떼면 다듬어요 (잠시 멈추면 미리보기)
               </span>
             ) : null}
           </div>
@@ -26956,7 +26989,7 @@ function StudioCuttoonEditor() {
                           setTool("draw");
                           setDrawMode("pen");
                           setEyedropperActive(false);
-                          announceDrawingShortcut("스마트 도형 켜짐 · 그리고 손을 떼면 다듬어요");
+                          announceDrawingShortcut("스마트 도형 켜짐 · 그려서 손을 떼면 다듬어요");
                         } else {
                           announceDrawingShortcut("스마트 도형 꺼짐");
                         }
