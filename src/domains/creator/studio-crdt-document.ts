@@ -1,5 +1,6 @@
 import * as Y from "yjs";
 
+
 import {
   decodeStudioCrdtStateVector,
   decodeStudioCrdtSyncChunks,
@@ -32,6 +33,35 @@ import {
   type StudioCrdtPagePayload,
   type StudioCrdtSceneElementPayload,
 } from "./studio-crdt-scene-schema";
+
+import type { StudioRasterCompactionCheckpoint } from "@/lib/studio-crdt-raster-compaction";
+
+import {
+  STUDIO_CRDT_RASTER_CHECKPOINTS_ROOT,
+  STUDIO_CRDT_RASTER_MAX_REFERENCED_BYTES,
+  STUDIO_CRDT_RASTER_MAX_SURFACES,
+  STUDIO_CRDT_RASTER_OPERATIONS_ROOT,
+  STUDIO_CRDT_RASTER_SURFACES_ROOT,
+  STUDIO_CRDT_RASTER_UNDO_ACKS_ROOT,
+  STUDIO_CRDT_RASTER_UNDO_OPERATIONS_ROOT,
+  readStudioCrdtRasterDocument,
+  type StudioCrdtRasterDocumentSnapshot,
+  type StudioCrdtRasterIdentityKind,
+} from "@/lib/studio-crdt-raster-document-contract";
+import {
+  STUDIO_RASTER_CRDT_VERSION,
+  STUDIO_RASTER_MAX_OPERATIONS,
+  STUDIO_RASTER_MAX_UNDO_OPERATIONS,
+  canonicalStudioRasterJson,
+  compareStudioRasterEventOrder,
+  createStudioRasterOperationLog,
+  mergeStudioRasterOperationLogs,
+  type StudioRasterAssetReference,
+  type StudioRasterOperation,
+  type StudioRasterOperationLog,
+  type StudioRasterUndoAcknowledgement,
+  type StudioRasterUndoOperation,
+} from "@/lib/studio-crdt-raster-ops";
 
 export {
   STUDIO_CRDT_ORIGIN_LOCAL,
@@ -72,6 +102,20 @@ export const STUDIO_CRDT_METADATA_MAX_BYTES = 16 * 1024;
 export const STUDIO_CRDT_DELETION_OPS_ROOT = "studio-deletion-ops";
 export const STUDIO_CRDT_DELETION_ACKS_ROOT = "studio-deletion-acks";
 export const STUDIO_CRDT_DELETION_OPERATION_MAX_ENTRIES = 100_000;
+/**
+ * Flat grow-only semantic raster roots. Values are canonical JSON strings rather than nested Yjs
+ * objects so one immutable event is one atomic CRDT value and raster bytes never enter the doc.
+ */
+export {
+  STUDIO_CRDT_RASTER_CHECKPOINTS_ROOT,
+  STUDIO_CRDT_RASTER_MAX_CHECKPOINTS,
+  STUDIO_CRDT_RASTER_MAX_REFERENCED_BYTES,
+  STUDIO_CRDT_RASTER_MAX_SURFACES,
+  STUDIO_CRDT_RASTER_OPERATIONS_ROOT,
+  STUDIO_CRDT_RASTER_SURFACES_ROOT,
+  STUDIO_CRDT_RASTER_UNDO_ACKS_ROOT,
+  STUDIO_CRDT_RASTER_UNDO_OPERATIONS_ROOT,
+} from "@/lib/studio-crdt-raster-document-contract";
 
 const MAX_ID_LENGTH = 160;
 const MAX_LAYER_GROUP_KEY_LENGTH = MAX_ID_LENGTH * 2 + 32;
@@ -95,6 +139,10 @@ const PROPERTY_PREFIX = "prop:";
 const BASELINE_PROPERTY_PREFIX = "base:";
 const UNSET_PROPERTY_PREFIX = "unset:";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+const RASTER_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
+const RASTER_SAFE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:@-]*$/u;
+// A probe update starts at clock zero. Actual Yjs client/clock varuints can be a few bytes wider.
+const RASTER_LOCAL_UPDATE_ENCODING_HEADROOM_BYTES = 64;
 
 type StudioCrdtDeletionTarget =
   | { kind: "stroke"; id: string }
@@ -308,6 +356,15 @@ export interface StudioCrdtChange {
   pages: StudioCrdtPageRecord[];
   changedLayerGroupIds: ReadonlySet<string>;
   layerGroups: StudioCrdtLayerGroupRecord[];
+  /** Exact immutable raster identities touched by this transaction. */
+  changedRasterSurfaceIds: ReadonlySet<string>;
+  changedRasterOperationIds: ReadonlySet<string>;
+  changedRasterUndoOperationIds: ReadonlySet<string>;
+  changedRasterUndoAcknowledgementIds: ReadonlySet<string>;
+  changedRasterCheckpointIds: ReadonlySet<string>;
+  /** Only complete, exact-schema logs/checkpoints are materialized; malformed remote roots fail closed. */
+  rasterOperationLogs: StudioRasterOperationLog[];
+  rasterCheckpoints: StudioRasterCompactionCheckpoint[];
 }
 
 export interface StudioCrdtChangeSubscriptionOptions {
@@ -846,6 +903,81 @@ function mixedOrderEntryId(entry: unknown): string | null {
   return orderEntryValue(entry, "strokeId") ?? sceneOrderEntryId(entry);
 }
 
+function isRasterPlainRecord(value: unknown): value is Record<string, unknown> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function hasExactRasterKeys(value: unknown, keys: readonly string[]): value is Record<string, unknown> {
+  if (!isRasterPlainRecord(value)) return false;
+  const actual = Object.keys(value);
+  return actual.length === keys.length && keys.every((key) => Object.hasOwn(value, key));
+}
+
+function parseCanonicalRasterJson(value: unknown): unknown | null {
+  if (typeof value !== "string") return null;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return canonicalStudioRasterJson(parsed) === value ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function rasterEnvelopeSurfaceId(value: unknown): string | null {
+  const parsed = parseCanonicalRasterJson(value);
+  if (!hasExactRasterKeys(parsed, ["surfaceId", "operation"]) &&
+      !hasExactRasterKeys(parsed, ["surfaceId", "undoOperation"]) &&
+      !hasExactRasterKeys(parsed, ["surfaceId", "acknowledgement"])) {
+    return null;
+  }
+  return typeof parsed.surfaceId === "string" && RASTER_SAFE_ID_PATTERN.test(parsed.surfaceId)
+    ? parsed.surfaceId
+    : null;
+}
+
+function rasterCheckpointSurfaceId(value: unknown): string | null {
+  const parsed = parseCanonicalRasterJson(value);
+  if (!isRasterPlainRecord(parsed) || !isRasterPlainRecord(parsed.surface)) return null;
+  const surfaceId = parsed.surface.surfaceId;
+  return typeof surfaceId === "string" && RASTER_SAFE_ID_PATTERN.test(surfaceId)
+    ? surfaceId
+    : null;
+}
+
+function assertRasterSafeId(value: unknown, label: string): asserts value is string {
+  if (
+    typeof value !== "string" || value.length === 0 || value.length > MAX_ID_LENGTH ||
+    !RASTER_SAFE_ID_PATTERN.test(value)
+  ) {
+    throw new Error(`${label} 식별자가 올바르지 않습니다.`);
+  }
+}
+
+interface StudioCrdtRasterMutation {
+  readonly surface?: { readonly id: string; readonly value: string };
+  readonly operations?: readonly { readonly id: string; readonly value: string }[];
+  readonly undoOperations?: readonly { readonly id: string; readonly value: string }[];
+  readonly undoAcknowledgements?: readonly { readonly id: string; readonly value: string }[];
+}
+
+function addRasterAsset(
+  assets: Map<string, StudioRasterAssetReference>,
+  asset: StudioRasterAssetReference,
+  label: string
+): number {
+  const existing = assets.get(asset.assetId);
+  if (existing) {
+    if (canonicalStudioRasterJson(existing) !== canonicalStudioRasterJson(asset)) {
+      throw new Error(`${label}: 같은 assetId가 서로 다른 불변 자산을 가리킵니다.`);
+    }
+    return 0;
+  }
+  assets.set(asset.assetId, asset);
+  return asset.byteLength;
+}
+
 export function mergeStudioCrdtUpdates(updates: readonly Uint8Array[]): Uint8Array {
   if (updates.length === 0) throw new Error("병합할 CRDT 업데이트가 없습니다.");
   return updates.length === 1 ? updates[0].slice() : Y.mergeUpdates([...updates]);
@@ -865,6 +997,11 @@ export class StudioCrdtDocument {
   private readonly pageOrder: Y.Array<Y.Map<unknown>>;
   private readonly deletionOps: Y.Map<string>;
   private readonly deletionAcks: Y.Map<string>;
+  private readonly rasterSurfaces: Y.Map<string>;
+  private readonly rasterOperations: Y.Map<string>;
+  private readonly rasterUndoOperations: Y.Map<string>;
+  private readonly rasterUndoAcknowledgements: Y.Map<string>;
+  private readonly rasterCheckpoints: Y.Map<string>;
   private readonly deletionOpIdsByTarget = new Map<string, Set<string>>();
   private readonly cleanup = new Set<() => void>();
   private readonly strokeIdByType = new WeakMap<object, string>();
@@ -872,6 +1009,11 @@ export class StudioCrdtDocument {
   private readonly changedSceneElementIdsByTransaction = new WeakMap<Y.Transaction, Set<string>>();
   private readonly changedPageIdsByTransaction = new WeakMap<Y.Transaction, Set<string>>();
   private readonly changedLayerGroupIdsByTransaction = new WeakMap<Y.Transaction, Set<string>>();
+  private readonly changedRasterSurfaceIdsByTransaction = new WeakMap<Y.Transaction, Set<string>>();
+  private readonly changedRasterOperationIdsByTransaction = new WeakMap<Y.Transaction, Set<string>>();
+  private readonly changedRasterUndoOperationIdsByTransaction = new WeakMap<Y.Transaction, Set<string>>();
+  private readonly changedRasterUndoAcknowledgementIdsByTransaction = new WeakMap<Y.Transaction, Set<string>>();
+  private readonly changedRasterCheckpointIdsByTransaction = new WeakMap<Y.Transaction, Set<string>>();
   private readonly observedSceneElementRoots = new Set<string>();
   private readonly observedPageRoots = new Set<string>();
   private readonly observedLayerGroupRoots = new Set<string>();
@@ -887,6 +1029,11 @@ export class StudioCrdtDocument {
     this.pageOrder = this.doc.getArray<Y.Map<unknown>>("page-order");
     this.deletionOps = this.doc.getMap<string>(STUDIO_CRDT_DELETION_OPS_ROOT);
     this.deletionAcks = this.doc.getMap<string>(STUDIO_CRDT_DELETION_ACKS_ROOT);
+    this.rasterSurfaces = this.doc.getMap<string>(STUDIO_CRDT_RASTER_SURFACES_ROOT);
+    this.rasterOperations = this.doc.getMap<string>(STUDIO_CRDT_RASTER_OPERATIONS_ROOT);
+    this.rasterUndoOperations = this.doc.getMap<string>(STUDIO_CRDT_RASTER_UNDO_OPERATIONS_ROOT);
+    this.rasterUndoAcknowledgements = this.doc.getMap<string>(STUDIO_CRDT_RASTER_UNDO_ACKS_ROOT);
+    this.rasterCheckpoints = this.doc.getMap<string>(STUDIO_CRDT_RASTER_CHECKPOINTS_ROOT);
     if (initialUpdate !== undefined) {
       const decoded =
         typeof initialUpdate === "string" ? decodeStudioCrdtUpdate(initialUpdate) : initialUpdate;
@@ -1033,6 +1180,75 @@ export class StudioCrdtDocument {
         if (typeof target === "string") this.markDeletionTargetChanged(target, transaction);
       }
     };
+    const markRasterEnvelopeSurfaces = (
+      currentValue: unknown,
+      oldValue: unknown,
+      transaction: Y.Transaction,
+      checkpoint = false
+    ) => {
+      const changedSurfaceIds = this.changedRasterSurfaceIdsFor(transaction);
+      const parse = checkpoint ? rasterCheckpointSurfaceId : rasterEnvelopeSurfaceId;
+      const currentSurfaceId = parse(currentValue);
+      const oldSurfaceId = parse(oldValue);
+      if (currentSurfaceId) changedSurfaceIds.add(currentSurfaceId);
+      if (oldSurfaceId) changedSurfaceIds.add(oldSurfaceId);
+    };
+    const observeRasterSurfaces = (event: Y.YMapEvent<string>, transaction: Y.Transaction) => {
+      const changedIds = this.changedRasterSurfaceIdsFor(transaction);
+      for (const surfaceId of event.keysChanged) {
+        if (RASTER_SAFE_ID_PATTERN.test(surfaceId) && surfaceId.length <= MAX_ID_LENGTH) {
+          changedIds.add(surfaceId);
+        }
+      }
+    };
+    const observeRasterOperations = (event: Y.YMapEvent<string>, transaction: Y.Transaction) => {
+      const changedIds = this.changedRasterOperationIdsFor(transaction);
+      for (const operationId of event.keysChanged) {
+        if (RASTER_UUID_PATTERN.test(operationId)) changedIds.add(operationId);
+        markRasterEnvelopeSurfaces(
+          this.rasterOperations.get(operationId),
+          event.changes.keys.get(operationId)?.oldValue,
+          transaction
+        );
+      }
+    };
+    const observeRasterUndoOperations = (event: Y.YMapEvent<string>, transaction: Y.Transaction) => {
+      const changedIds = this.changedRasterUndoOperationIdsFor(transaction);
+      for (const undoOperationId of event.keysChanged) {
+        if (RASTER_UUID_PATTERN.test(undoOperationId)) changedIds.add(undoOperationId);
+        markRasterEnvelopeSurfaces(
+          this.rasterUndoOperations.get(undoOperationId),
+          event.changes.keys.get(undoOperationId)?.oldValue,
+          transaction
+        );
+      }
+    };
+    const observeRasterUndoAcknowledgements = (
+      event: Y.YMapEvent<string>,
+      transaction: Y.Transaction
+    ) => {
+      const changedIds = this.changedRasterUndoAcknowledgementIdsFor(transaction);
+      for (const acknowledgementId of event.keysChanged) {
+        if (RASTER_UUID_PATTERN.test(acknowledgementId)) changedIds.add(acknowledgementId);
+        markRasterEnvelopeSurfaces(
+          this.rasterUndoAcknowledgements.get(acknowledgementId),
+          event.changes.keys.get(acknowledgementId)?.oldValue,
+          transaction
+        );
+      }
+    };
+    const observeRasterCheckpoints = (event: Y.YMapEvent<string>, transaction: Y.Transaction) => {
+      const changedIds = this.changedRasterCheckpointIdsFor(transaction);
+      for (const checkpointId of event.keysChanged) {
+        if (RASTER_UUID_PATTERN.test(checkpointId)) changedIds.add(checkpointId);
+        markRasterEnvelopeSurfaces(
+          this.rasterCheckpoints.get(checkpointId),
+          event.changes.keys.get(checkpointId)?.oldValue,
+          transaction,
+          true
+        );
+      }
+    };
     this.strokes.observeDeep(observeStrokes);
     this.order.observeDeep(observeOrder);
     this.sceneElementIds.observe(observeSceneElementIds);
@@ -1041,6 +1257,11 @@ export class StudioCrdtDocument {
     this.pageOrder.observeDeep(observePageOrder);
     this.deletionOps.observe(observeDeletionOps);
     this.deletionAcks.observe(observeDeletionAcks);
+    this.rasterSurfaces.observe(observeRasterSurfaces);
+    this.rasterOperations.observe(observeRasterOperations);
+    this.rasterUndoOperations.observe(observeRasterUndoOperations);
+    this.rasterUndoAcknowledgements.observe(observeRasterUndoAcknowledgements);
+    this.rasterCheckpoints.observe(observeRasterCheckpoints);
     this.cleanup.add(() => this.strokes.unobserveDeep(observeStrokes));
     this.cleanup.add(() => this.order.unobserveDeep(observeOrder));
     this.cleanup.add(() => this.sceneElementIds.unobserve(observeSceneElementIds));
@@ -1049,6 +1270,11 @@ export class StudioCrdtDocument {
     this.cleanup.add(() => this.pageOrder.unobserveDeep(observePageOrder));
     this.cleanup.add(() => this.deletionOps.unobserve(observeDeletionOps));
     this.cleanup.add(() => this.deletionAcks.unobserve(observeDeletionAcks));
+    this.cleanup.add(() => this.rasterSurfaces.unobserve(observeRasterSurfaces));
+    this.cleanup.add(() => this.rasterOperations.unobserve(observeRasterOperations));
+    this.cleanup.add(() => this.rasterUndoOperations.unobserve(observeRasterUndoOperations));
+    this.cleanup.add(() => this.rasterUndoAcknowledgements.unobserve(observeRasterUndoAcknowledgements));
+    this.cleanup.add(() => this.rasterCheckpoints.unobserve(observeRasterCheckpoints));
   }
 
   subscribe(handler: StudioCrdtUpdateHandler): () => void {
@@ -1070,6 +1296,7 @@ export class StudioCrdtDocument {
     this.assertAlive();
     const listener = (transaction: Y.Transaction) => {
       if (options.includeOrigin && !options.includeOrigin(transaction.origin)) return;
+      const rasterSnapshot = this.tryReadExactRasterDocumentSnapshot();
       handler({
         origin: transaction.origin,
         local: transaction.local || transaction.origin === STUDIO_CRDT_ORIGIN_LOCAL,
@@ -1085,6 +1312,35 @@ export class StudioCrdtDocument {
           this.changedLayerGroupIdsByTransaction.get(transaction) ?? []
         ),
         layerGroups: this.getLayerGroups({ includeDeleted: true }),
+        changedRasterSurfaceIds: new Set(
+          this.changedRasterSurfaceIdsByTransaction.get(transaction) ?? []
+        ),
+        changedRasterOperationIds: new Set(
+          this.changedRasterOperationIdsByTransaction.get(transaction) ?? []
+        ),
+        changedRasterUndoOperationIds: new Set(
+          this.changedRasterUndoOperationIdsByTransaction.get(transaction) ?? []
+        ),
+        changedRasterUndoAcknowledgementIds: new Set(
+          this.changedRasterUndoAcknowledgementIdsByTransaction.get(transaction) ?? []
+        ),
+        changedRasterCheckpointIds: new Set(
+          this.changedRasterCheckpointIdsByTransaction.get(transaction) ?? []
+        ),
+        rasterOperationLogs: rasterSnapshot
+          ? [...rasterSnapshot.logs.values()].sort((left, right) => (
+              left.surface.surfaceId < right.surface.surfaceId ? -1 :
+              left.surface.surfaceId > right.surface.surfaceId ? 1 : 0
+            ))
+          : [],
+        rasterCheckpoints: rasterSnapshot
+          ? [...rasterSnapshot.checkpoints].sort((left, right) => {
+              const order = compareStudioRasterEventOrder(left.through, right.through);
+              if (order !== 0) return order;
+              return left.checkpointId < right.checkpointId ? -1 :
+                left.checkpointId > right.checkpointId ? 1 : 0;
+            })
+          : [],
       });
     };
     this.doc.on("afterTransaction", listener);
@@ -1994,6 +2250,131 @@ export class StudioCrdtDocument {
     );
   }
 
+  /**
+   * Adds the immutable set-union of one validated raster replica. Existing entries are never
+   * overwritten or deleted. Every conflict is preflighted before the Yjs transaction because Yjs
+   * transactions are atomic for observers but do not roll back JavaScript exceptions.
+   */
+  mergeRasterOperationLog(value: StudioRasterOperationLog): StudioRasterOperationLog {
+    this.assertAlive();
+    const incoming = createStudioRasterOperationLog(value);
+    const snapshot = this.readExactRasterDocumentSnapshot();
+    const surfaceId = incoming.surface.surfaceId;
+    const surfaceJson = canonicalStudioRasterJson(incoming.surface);
+    const existingSurfaceValue = this.rasterSurfaces.get(surfaceId);
+    if (existingSurfaceValue !== undefined && existingSurfaceValue !== surfaceJson) {
+      throw new Error("같은 래스터 surfaceId가 서로 다른 표면 계약을 가리킵니다.");
+    }
+    const current = snapshot.logs.get(surfaceId) ?? createStudioRasterOperationLog({
+      version: STUDIO_RASTER_CRDT_VERSION,
+      surface: incoming.surface,
+      operations: [],
+      undoOperations: [],
+      undoAcknowledgements: [],
+    });
+    const merged = mergeStudioRasterOperationLogs([current, incoming]);
+    for (const checkpoint of snapshot.checkpoints) {
+      if (checkpoint.surface.surfaceId === surfaceId) {
+        this.assertRasterCheckpointMatchesLog(checkpoint, merged);
+      }
+    }
+    const operationEntries = merged.operations.map((operation) => ({
+      id: operation.operationId,
+      value: canonicalStudioRasterJson({ surfaceId, operation }),
+    }));
+    const undoEntries = merged.undoOperations.map((undoOperation) => ({
+      id: undoOperation.undoOperationId,
+      value: canonicalStudioRasterJson({ surfaceId, undoOperation }),
+    }));
+    const acknowledgementEntries = merged.undoAcknowledgements.map((acknowledgement) => ({
+      id: acknowledgement.acknowledgementId,
+      value: canonicalStudioRasterJson({ surfaceId, acknowledgement }),
+    }));
+    this.assertImmutableRasterEntries(this.rasterOperations, operationEntries, "래스터 작업");
+    this.assertImmutableRasterEntries(this.rasterUndoOperations, undoEntries, "래스터 실행 취소");
+    this.assertImmutableRasterEntries(
+      this.rasterUndoAcknowledgements,
+      acknowledgementEntries,
+      "래스터 복원 확인"
+    );
+    this.assertRasterGlobalIdentities(snapshot, [
+      ...operationEntries.map(({ id }) => ({ id, kind: "operation" as const })),
+      ...undoEntries.map(({ id }) => ({ id, kind: "undo-operation" as const })),
+      ...acknowledgementEntries.map(({ id }) => ({
+        id,
+        kind: "undo-acknowledgement" as const,
+      })),
+    ]);
+    const writesSurface = existingSurfaceValue === undefined;
+    const missingOperations = operationEntries.filter(({ id }) => !this.rasterOperations.has(id));
+    const missingUndos = undoEntries.filter(({ id }) => !this.rasterUndoOperations.has(id));
+    const missingAcknowledgements = acknowledgementEntries.filter(
+      ({ id }) => !this.rasterUndoAcknowledgements.has(id)
+    );
+    if (this.rasterSurfaces.size + (writesSurface ? 1 : 0) > STUDIO_CRDT_RASTER_MAX_SURFACES ||
+        this.rasterOperations.size + missingOperations.length > STUDIO_RASTER_MAX_OPERATIONS ||
+        this.rasterUndoOperations.size + missingUndos.length > STUDIO_RASTER_MAX_UNDO_OPERATIONS ||
+        this.rasterUndoAcknowledgements.size + missingAcknowledgements.length >
+          STUDIO_RASTER_MAX_UNDO_OPERATIONS) {
+      throw new Error("래스터 CRDT 문서 전역 root 수가 허용 한도를 초과했습니다.");
+    }
+    this.assertRasterProjectedAssetBudget(snapshot, incoming.operations, []);
+    if (
+      writesSurface || missingOperations.length > 0 || missingUndos.length > 0 ||
+      missingAcknowledgements.length > 0
+    ) {
+      this.assertRasterMutationFitsTransport({
+        surface: writesSurface ? { id: surfaceId, value: surfaceJson } : undefined,
+        operations: missingOperations,
+        undoOperations: missingUndos,
+        undoAcknowledgements: missingAcknowledgements,
+      });
+      this.doc.transact(() => {
+        if (writesSurface) this.rasterSurfaces.set(surfaceId, surfaceJson);
+        for (const entry of missingOperations) this.rasterOperations.set(entry.id, entry.value);
+        for (const entry of missingUndos) this.rasterUndoOperations.set(entry.id, entry.value);
+        for (const entry of missingAcknowledgements) {
+          this.rasterUndoAcknowledgements.set(entry.id, entry.value);
+        }
+      }, STUDIO_CRDT_ORIGIN_LOCAL);
+    }
+    return merged;
+  }
+
+  getRasterOperationLog(surfaceId: string): StudioRasterOperationLog | null {
+    this.assertAlive();
+    assertRasterSafeId(surfaceId, "래스터 surface");
+    return this.tryReadExactRasterDocumentSnapshot()?.logs.get(surfaceId) ?? null;
+  }
+
+  getRasterOperationLogs(): StudioRasterOperationLog[] {
+    this.assertAlive();
+    const snapshot = this.tryReadExactRasterDocumentSnapshot();
+    if (!snapshot) return [];
+    return [...snapshot.logs.values()].sort((left, right) => (
+      left.surface.surfaceId < right.surface.surfaceId ? -1 :
+      left.surface.surfaceId > right.surface.surfaceId ? 1 : 0
+    ));
+  }
+
+  getRasterCompactionCheckpoints(surfaceId?: string): StudioRasterCompactionCheckpoint[] {
+    // Advisory metadata only. The wire form does not carry trusted replica membership/frontiers,
+    // so callers must never use this as an authoritative replay base or prune events from it.
+    this.assertAlive();
+    if (surfaceId !== undefined) assertRasterSafeId(surfaceId, "래스터 surface");
+    const snapshot = this.tryReadExactRasterDocumentSnapshot();
+    if (!snapshot) return [];
+    const checkpoints = snapshot.checkpoints.filter((checkpoint) => (
+      surfaceId === undefined || checkpoint.surface.surfaceId === surfaceId
+    ));
+    return checkpoints.sort((left, right) => {
+      const order = compareStudioRasterEventOrder(left.through, right.through);
+      if (order !== 0) return order;
+      return left.checkpointId < right.checkpointId ? -1 :
+        left.checkpointId > right.checkpointId ? 1 : 0;
+    });
+  }
+
   applyUpdate(update: Uint8Array, origin: unknown = STUDIO_CRDT_ORIGIN_REMOTE): void {
     this.assertAlive();
     if (update.byteLength === 0 || update.byteLength > STUDIO_CRDT_UPDATE_MAX_BYTES) {
@@ -2054,6 +2435,167 @@ export class StudioCrdtDocument {
 
   private assertAlive(): void {
     if (this.destroyed) throw new Error("이미 닫힌 CRDT 문서입니다.");
+  }
+
+  private assertImmutableRasterEntries(
+    root: Y.Map<string>,
+    entries: readonly { readonly id: string; readonly value: string }[],
+    label: string
+  ): void {
+    for (const entry of entries) {
+      const existing = root.get(entry.id);
+      if (existing !== undefined && existing !== entry.value) {
+        throw new Error(`같은 ${label} ID가 서로 다른 불변 내용을 가리킵니다.`);
+      }
+    }
+  }
+
+  /**
+   * Strict local-write preflight. Read APIs remain fail-closed for malformed remote state, while a
+   * new local event is rejected until every existing raster root can be accounted for globally.
+   */
+  private readExactRasterDocumentSnapshot(): StudioCrdtRasterDocumentSnapshot {
+    return readStudioCrdtRasterDocument(this.doc);
+  }
+
+  private assertRasterCheckpointMatchesLog(
+    checkpoint: StudioRasterCompactionCheckpoint,
+    log: StudioRasterOperationLog
+  ): void {
+    const operationKey = (operation: StudioRasterOperation) => ({
+      ...operation.order,
+      eventId: operation.operationId,
+    });
+    const undoKey = (operation: StudioRasterUndoOperation) => ({
+      ...operation.order,
+      eventId: operation.undoOperationId,
+    });
+    const acknowledgementKey = (acknowledgement: StudioRasterUndoAcknowledgement) => ({
+      ...acknowledgement.order,
+      eventId: acknowledgement.acknowledgementId,
+    });
+    const allKeys = [
+      ...log.operations.map(operationKey),
+      ...log.undoOperations.map(undoKey),
+      ...log.undoAcknowledgements.map(acknowledgementKey),
+    ];
+    if (!allKeys.some((key) => (
+      key.logicalClock === checkpoint.through.logicalClock &&
+      key.actorId === checkpoint.through.actorId &&
+      key.eventId === checkpoint.through.eventId
+    ))) {
+      throw new Error("래스터 checkpoint 경계가 실제 이벤트와 일치하지 않습니다.");
+    }
+    const sealedOperationIds = log.operations
+      .filter((operation) => compareStudioRasterEventOrder(operationKey(operation), checkpoint.through) <= 0)
+      .map(({ operationId }) => operationId)
+      .sort();
+    const sealedUndoOperationIds = log.undoOperations
+      .filter((operation) => compareStudioRasterEventOrder(undoKey(operation), checkpoint.through) <= 0)
+      .map(({ undoOperationId }) => undoOperationId)
+      .sort();
+    const sealedUndoAcknowledgementIds = log.undoAcknowledgements
+      .filter((acknowledgement) => (
+        compareStudioRasterEventOrder(acknowledgementKey(acknowledgement), checkpoint.through) <= 0
+      ))
+      .map(({ acknowledgementId }) => acknowledgementId)
+      .sort();
+    if (canonicalStudioRasterJson(sealedOperationIds) !==
+          canonicalStudioRasterJson(checkpoint.sealedOperationIds) ||
+        canonicalStudioRasterJson(sealedUndoOperationIds) !==
+          canonicalStudioRasterJson(checkpoint.sealedUndoOperationIds) ||
+        canonicalStudioRasterJson(sealedUndoAcknowledgementIds) !==
+          canonicalStudioRasterJson(checkpoint.sealedUndoAcknowledgementIds)) {
+      throw new Error("래스터 checkpoint 봉인 집합이 안정 prefix와 일치하지 않습니다.");
+    }
+    const sealedOperations = new Set(sealedOperationIds);
+    const sealedUndos = new Set(sealedUndoOperationIds);
+    if (log.undoOperations.some((operation) => (
+      compareStudioRasterEventOrder(undoKey(operation), checkpoint.through) > 0 &&
+      sealedOperations.has(operation.targetOperationId)
+    )) || log.undoAcknowledgements.some((acknowledgement) => (
+      compareStudioRasterEventOrder(acknowledgementKey(acknowledgement), checkpoint.through) > 0 &&
+      sealedUndos.has(acknowledgement.undoOperationId)
+    ))) {
+      throw new Error("래스터 checkpoint가 닫히지 않은 undo horizon을 봉인합니다.");
+    }
+  }
+
+  private assertRasterGlobalIdentities(
+    snapshot: StudioCrdtRasterDocumentSnapshot,
+    projected: readonly {
+      readonly id: string;
+      readonly kind: StudioCrdtRasterIdentityKind;
+    }[]
+  ): void {
+    const identities = new Map(snapshot.identityKinds);
+    for (const entry of projected) {
+      const existingKind = identities.get(entry.id);
+      if (existingKind !== undefined && existingKind !== entry.kind) {
+        throw new Error("래스터 이벤트 UUID는 operation/undo/ack/checkpoint 전체에서 전역 고유해야 합니다.");
+      }
+      identities.set(entry.id, entry.kind);
+    }
+  }
+
+  private assertRasterProjectedAssetBudget(
+    snapshot: StudioCrdtRasterDocumentSnapshot,
+    operations: readonly StudioRasterOperation[],
+    checkpointAssets: readonly StudioRasterAssetReference[]
+  ): void {
+    const assets = new Map(snapshot.assets);
+    let referencedBytes = snapshot.referencedBytes;
+    for (const operation of operations) {
+      for (const patch of operation.patches) {
+        referencedBytes += addRasterAsset(assets, patch.effect.payload, "래스터 operation 자산");
+        if (patch.selectionMask) {
+          referencedBytes += addRasterAsset(assets, patch.selectionMask, "래스터 selection 자산");
+        }
+      }
+    }
+    for (const asset of checkpointAssets) {
+      referencedBytes += addRasterAsset(assets, asset, "래스터 checkpoint 자산");
+    }
+    if (referencedBytes > STUDIO_CRDT_RASTER_MAX_REFERENCED_BYTES) {
+      throw new Error("래스터 CRDT 문서 전역 자산 참조 예산을 초과했습니다.");
+    }
+  }
+
+  private assertRasterMutationFitsTransport(mutation: StudioCrdtRasterMutation): void {
+    const probe = new Y.Doc();
+    try {
+      probe.transact(() => {
+        if (mutation.surface) {
+          probe.getMap<string>(STUDIO_CRDT_RASTER_SURFACES_ROOT)
+            .set(mutation.surface.id, mutation.surface.value);
+        }
+        const operations = probe.getMap<string>(STUDIO_CRDT_RASTER_OPERATIONS_ROOT);
+        for (const entry of mutation.operations ?? []) operations.set(entry.id, entry.value);
+        const undoOperations = probe.getMap<string>(STUDIO_CRDT_RASTER_UNDO_OPERATIONS_ROOT);
+        for (const entry of mutation.undoOperations ?? []) undoOperations.set(entry.id, entry.value);
+        const acknowledgements = probe.getMap<string>(STUDIO_CRDT_RASTER_UNDO_ACKS_ROOT);
+        for (const entry of mutation.undoAcknowledgements ?? []) {
+          acknowledgements.set(entry.id, entry.value);
+        }
+      });
+      const encoded = Y.encodeStateAsUpdate(probe);
+      if (encoded.byteLength + RASTER_LOCAL_UPDATE_ENCODING_HEADROOM_BYTES >
+          STUDIO_CRDT_UPDATE_MAX_BYTES) {
+        throw new Error(
+          "래스터 CRDT 로컬 업데이트가 전송 한도를 초과합니다. 더 작은 이벤트 묶음으로 나눠 주세요."
+        );
+      }
+    } finally {
+      probe.destroy();
+    }
+  }
+
+  private tryReadExactRasterDocumentSnapshot(): StudioCrdtRasterDocumentSnapshot | null {
+    try {
+      return this.readExactRasterDocumentSnapshot();
+    } catch {
+      return null;
+    }
   }
 
   private assertStrokeInput(input: StudioCrdtStrokeInput, allowEmpty: boolean): void {
@@ -2139,6 +2681,48 @@ export class StudioCrdtDocument {
     if (existing) return existing;
     const created = new Set<string>();
     this.changedLayerGroupIdsByTransaction.set(transaction, created);
+    return created;
+  }
+
+  private changedRasterSurfaceIdsFor(transaction: Y.Transaction): Set<string> {
+    const existing = this.changedRasterSurfaceIdsByTransaction.get(transaction);
+    if (existing) return existing;
+    const created = new Set<string>();
+    this.changedRasterSurfaceIdsByTransaction.set(transaction, created);
+    return created;
+  }
+
+  private changedRasterOperationIdsFor(transaction: Y.Transaction): Set<string> {
+    const existing = this.changedRasterOperationIdsByTransaction.get(transaction);
+    if (existing) return existing;
+    const created = new Set<string>();
+    this.changedRasterOperationIdsByTransaction.set(transaction, created);
+    return created;
+  }
+
+  private changedRasterUndoOperationIdsFor(transaction: Y.Transaction): Set<string> {
+    const existing = this.changedRasterUndoOperationIdsByTransaction.get(transaction);
+    if (existing) return existing;
+    const created = new Set<string>();
+    this.changedRasterUndoOperationIdsByTransaction.set(transaction, created);
+    return created;
+  }
+
+  private changedRasterUndoAcknowledgementIdsFor(
+    transaction: Y.Transaction
+  ): Set<string> {
+    const existing = this.changedRasterUndoAcknowledgementIdsByTransaction.get(transaction);
+    if (existing) return existing;
+    const created = new Set<string>();
+    this.changedRasterUndoAcknowledgementIdsByTransaction.set(transaction, created);
+    return created;
+  }
+
+  private changedRasterCheckpointIdsFor(transaction: Y.Transaction): Set<string> {
+    const existing = this.changedRasterCheckpointIdsByTransaction.get(transaction);
+    if (existing) return existing;
+    const created = new Set<string>();
+    this.changedRasterCheckpointIdsByTransaction.set(transaction, created);
     return created;
   }
 

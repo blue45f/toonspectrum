@@ -3,6 +3,15 @@ import { fromUint8Array, toUint8Array } from "js-base64";
 import * as Y from "yjs";
 
 import {
+  appendsStudioCrdtRasterCheckpoint,
+  assertStudioCrdtRasterAppendedEventActors,
+  conflictsWithStudioCrdtRasterRootSnapshot,
+  hasValidStudioCrdtRasterDocument,
+  preservesStudioCrdtRasterRoots,
+  snapshotStudioCrdtRasterRoots,
+} from "../../../../../lib/studio-crdt-raster-document-contract";
+
+import {
   STUDIO_CRDT_REPOSITORY,
   STUDIO_CRDT_SNAPSHOT_MAX_BYTES,
   STUDIO_CRDT_UPDATE_MAX_BYTES,
@@ -1143,7 +1152,7 @@ export function hasValidStudioCrdtRootSchema(doc: Y.Doc): boolean {
       }
     }
   }
-  return validateStudioCrdtDeletionRoots(doc);
+  return validateStudioCrdtDeletionRoots(doc) && hasValidStudioCrdtRasterDocument(doc);
 }
 
 @Injectable()
@@ -1269,7 +1278,12 @@ export class StudioCrdtService implements OnModuleDestroy {
           payload: update,
           createdAt: this.now(),
         },
-        (current) => this.validateUpdateAgainstHydration(input.workId, current, update)
+        (current) => this.validateUpdateAgainstHydration(
+          input.workId,
+          current,
+          update,
+          input.actorUserId
+        )
       );
       if (
         persisted.receipt.actorUserId !== input.actorUserId ||
@@ -1404,6 +1418,7 @@ export class StudioCrdtService implements OnModuleDestroy {
       }
       if (state.snapshot) {
         const deletionRootsBefore = snapshotStudioCrdtDeletionRoots(staged);
+        const rasterRootsBefore = snapshotStudioCrdtRasterRoots(staged);
         try {
           Y.applyUpdate(staged, state.snapshot.snapshot, "server-hydrate-snapshot");
         } catch {
@@ -1412,6 +1427,11 @@ export class StudioCrdtService implements OnModuleDestroy {
         if (!preservesStudioCrdtDeletionRoots(deletionRootsBefore, staged)) {
           throw new StudioCrdtStorageCorruptionError(
             "Stored CRDT snapshot rewrites grow-only deletion history"
+          );
+        }
+        if (!preservesStudioCrdtRasterRoots(rasterRootsBefore, staged)) {
+          throw new StudioCrdtStorageCorruptionError(
+            "Stored CRDT snapshot rewrites grow-only raster history"
           );
         }
         sequence = state.snapshot.compactedSequence;
@@ -1423,6 +1443,7 @@ export class StudioCrdtService implements OnModuleDestroy {
       for (const update of state.updates) {
         if (update.sequence <= sequence) continue;
         const deletionRootsBefore = snapshotStudioCrdtDeletionRoots(staged);
+        const rasterRootsBefore = snapshotStudioCrdtRasterRoots(staged);
         try {
           Y.applyUpdate(staged, update.payload, "server-hydrate-update");
         } catch {
@@ -1431,6 +1452,11 @@ export class StudioCrdtService implements OnModuleDestroy {
         if (!preservesStudioCrdtDeletionRoots(deletionRootsBefore, staged)) {
           throw new StudioCrdtStorageCorruptionError(
             "Stored CRDT update rewrites grow-only deletion history"
+          );
+        }
+        if (!preservesStudioCrdtRasterRoots(rasterRootsBefore, staged)) {
+          throw new StudioCrdtStorageCorruptionError(
+            "Stored CRDT update rewrites grow-only raster history"
           );
         }
         sequence = update.sequence;
@@ -1459,10 +1485,22 @@ export class StudioCrdtService implements OnModuleDestroy {
     }
   }
 
-  private validateUpdateAgainstDocument(doc: Y.Doc, update: Uint8Array): void {
+  private validateUpdateAgainstDocument(
+    doc: Y.Doc,
+    update: Uint8Array,
+    actorUserId: string
+  ): void {
     const probe = new Y.Doc();
+    const candidate = new Y.Doc();
     const deletionRootsBefore = snapshotStudioCrdtDeletionRoots(doc);
+    const rasterRootsBefore = snapshotStudioCrdtRasterRoots(doc);
     try {
+      Y.applyUpdate(candidate, update, "server-validation-candidate");
+      if (conflictsWithStudioCrdtRasterRootSnapshot(rasterRootsBefore, candidate)) {
+        throw new StudioCrdtInvalidPayloadError(
+          "update reuses an immutable Studio raster identity with different content"
+        );
+      }
       Y.applyUpdate(probe, Y.encodeStateAsUpdate(doc), "server-validation-base");
       Y.applyUpdate(probe, update, "server-validation-update");
       if (!hasValidStudioCrdtRootSchema(probe)) {
@@ -1473,6 +1511,17 @@ export class StudioCrdtService implements OnModuleDestroy {
           "update rewrites grow-only Studio deletion history"
         );
       }
+      if (!preservesStudioCrdtRasterRoots(rasterRootsBefore, probe)) {
+        throw new StudioCrdtInvalidPayloadError(
+          "update rewrites grow-only Studio raster history"
+        );
+      }
+      if (appendsStudioCrdtRasterCheckpoint(rasterRootsBefore, probe)) {
+        throw new StudioCrdtInvalidPayloadError(
+          "client updates cannot publish unverified Studio raster checkpoints"
+        );
+      }
+      assertStudioCrdtRasterAppendedEventActors(rasterRootsBefore, probe, actorUserId);
       if (Y.encodeStateAsUpdate(probe).byteLength > STUDIO_CRDT_SNAPSHOT_MAX_BYTES) {
         throw new StudioCrdtDocumentTooLargeError();
       }
@@ -1486,6 +1535,7 @@ export class StudioCrdtService implements OnModuleDestroy {
       ) throw error;
       throw new StudioCrdtInvalidPayloadError("update is not a valid Yjs update");
     } finally {
+      candidate.destroy();
       probe.destroy();
     }
   }
@@ -1493,11 +1543,12 @@ export class StudioCrdtService implements OnModuleDestroy {
   private validateUpdateAgainstHydration(
     workId: string,
     current: StudioCrdtHydrationState,
-    update: Uint8Array
+    update: Uint8Array,
+    actorUserId: string
   ): void {
     const durable = this.createCachedDocument(workId, current);
     try {
-      this.validateUpdateAgainstDocument(durable.doc, update);
+      this.validateUpdateAgainstDocument(durable.doc, update, actorUserId);
     } finally {
       durable.doc.destroy();
     }

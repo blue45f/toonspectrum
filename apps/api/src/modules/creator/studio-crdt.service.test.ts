@@ -2,6 +2,24 @@ import { fromUint8Array, toUint8Array } from "js-base64";
 import { afterEach, describe, expect, it } from "vitest";
 import * as Y from "yjs";
 
+import { compactStudioRasterOperationLog } from "../../../../../lib/studio-crdt-raster-compaction";
+import {
+  STUDIO_CRDT_RASTER_CHECKPOINTS_ROOT,
+  STUDIO_CRDT_RASTER_OPERATIONS_ROOT,
+  STUDIO_CRDT_RASTER_SURFACES_ROOT,
+  STUDIO_CRDT_RASTER_UNDO_ACKS_ROOT,
+  STUDIO_CRDT_RASTER_UNDO_OPERATIONS_ROOT,
+} from "../../../../../lib/studio-crdt-raster-document-contract";
+import {
+  STUDIO_RASTER_CRDT_VERSION,
+  STUDIO_RASTER_KERNEL,
+  canonicalStudioRasterJson,
+  createStudioRasterOperationLog,
+  type StudioRasterOperation,
+  type StudioRasterUndoAcknowledgement,
+  type StudioRasterUndoOperation,
+} from "../../../../../lib/studio-crdt-raster-ops";
+
 import {
   STUDIO_CRDT_UPDATE_MAX_BYTES,
   studioCrdtPayloadHash,
@@ -250,6 +268,159 @@ function addSceneDeletionProtocol(doc: Y.Doc, acknowledged = false): void {
   if (acknowledged) {
     doc.getMap<string>("studio-deletion-acks").set(DELETION_OPERATION_ID, DELETION_TARGET);
   }
+}
+
+const RASTER_SURFACE = {
+  version: STUDIO_RASTER_CRDT_VERSION,
+  surfaceId: "surface-main",
+  width: 128,
+  height: 128,
+  tileSize: 128,
+} as const;
+const RASTER_OPERATION_ID = "30000000-0000-4000-8000-000000000401";
+const RASTER_UNDO_ID = "30000000-0000-4000-8000-000000000402";
+const RASTER_ACK_ID = "30000000-0000-4000-8000-000000000403";
+const RASTER_CHECKPOINT_ID = "30000000-0000-4000-8000-000000000404";
+
+function rasterAsset(assetId: string, width = 16, height = 16) {
+  return {
+    scope: "work" as const,
+    assetId,
+    sha256: "a".repeat(64),
+    byteLength: 1_024,
+    mediaType: "application/x-toonspectrum-rgba-zstd" as const,
+    width,
+    height,
+  };
+}
+
+function rasterOperation(
+  operationId = RASTER_OPERATION_ID,
+  semanticParametersSha256 = "b".repeat(64),
+  actorId = "editor"
+): StudioRasterOperation {
+  return {
+    version: STUDIO_RASTER_CRDT_VERSION,
+    operationId,
+    order: { logicalClock: "1", actorId },
+    pageId: "page-1",
+    layerId: "layer-ink",
+    intent: "paint",
+    kernel: STUDIO_RASTER_KERNEL,
+    semanticParametersSha256,
+    patches: [{
+      tileX: 0,
+      tileY: 0,
+      region: { x: 0, y: 0, width: 16, height: 16 },
+      effect: {
+        kind: "composite",
+        blendMode: "source-over",
+        payload: rasterAsset(`patch-${operationId}`),
+      },
+    }],
+  };
+}
+
+interface RasterDocumentFixtureOptions {
+  operation?: StudioRasterOperation | false;
+  undo?: boolean;
+  acknowledgement?: boolean;
+  checkpoint?: boolean;
+  actorId?: string;
+  undoActorId?: string;
+  acknowledgementActorId?: string;
+}
+
+function createRasterDocument(options: RasterDocumentFixtureOptions = {}): Y.Doc {
+  const operation = options.operation === false
+    ? null
+    : (options.operation ?? rasterOperation(
+        RASTER_OPERATION_ID,
+        "b".repeat(64),
+        options.actorId
+      ));
+  const undo: StudioRasterUndoOperation | null = options.undo || options.acknowledgement
+    ? {
+        version: STUDIO_RASTER_CRDT_VERSION,
+        undoOperationId: RASTER_UNDO_ID,
+        targetOperationId: operation?.operationId ?? RASTER_OPERATION_ID,
+        order: {
+          logicalClock: "2",
+          actorId: options.undoActorId ?? options.actorId ?? "editor",
+        },
+      }
+    : null;
+  const acknowledgement: StudioRasterUndoAcknowledgement | null = options.acknowledgement
+    ? {
+        version: STUDIO_RASTER_CRDT_VERSION,
+        acknowledgementId: RASTER_ACK_ID,
+        undoOperationId: RASTER_UNDO_ID,
+        targetOperationId: operation?.operationId ?? RASTER_OPERATION_ID,
+        order: {
+          logicalClock: "3",
+          actorId: options.acknowledgementActorId ?? options.actorId ?? "editor",
+        },
+      }
+    : null;
+  const log = createStudioRasterOperationLog({
+    version: STUDIO_RASTER_CRDT_VERSION,
+    surface: RASTER_SURFACE,
+    operations: operation ? [operation] : [],
+    undoOperations: undo ? [undo] : [],
+    undoAcknowledgements: acknowledgement ? [acknowledgement] : [],
+  });
+  const doc = new Y.Doc();
+  doc.getMap<string>(STUDIO_CRDT_RASTER_SURFACES_ROOT).set(
+    RASTER_SURFACE.surfaceId,
+    canonicalStudioRasterJson(RASTER_SURFACE)
+  );
+  if (operation) {
+    doc.getMap<string>(STUDIO_CRDT_RASTER_OPERATIONS_ROOT).set(
+      operation.operationId,
+      canonicalStudioRasterJson({ surfaceId: RASTER_SURFACE.surfaceId, operation })
+    );
+  }
+  if (undo) {
+    doc.getMap<string>(STUDIO_CRDT_RASTER_UNDO_OPERATIONS_ROOT).set(
+      undo.undoOperationId,
+      canonicalStudioRasterJson({ surfaceId: RASTER_SURFACE.surfaceId, undoOperation: undo })
+    );
+  }
+  if (acknowledgement) {
+    doc.getMap<string>(STUDIO_CRDT_RASTER_UNDO_ACKS_ROOT).set(
+      acknowledgement.acknowledgementId,
+      canonicalStudioRasterJson({
+        surfaceId: RASTER_SURFACE.surfaceId,
+        acknowledgement,
+      })
+    );
+  }
+  if (options.checkpoint) {
+    if (!operation) throw new Error("checkpoint fixture requires an operation");
+    const through = acknowledgement
+      ? { ...acknowledgement.order, eventId: acknowledgement.acknowledgementId }
+      : undo
+        ? { ...undo.order, eventId: undo.undoOperationId }
+        : { ...operation.order, eventId: operation.operationId };
+    const { checkpoint } = compactStudioRasterOperationLog(log, {
+      checkpointId: RASTER_CHECKPOINT_ID,
+      through,
+      requiredReplicaIds: ["replica-a"],
+      stabilityProof: {
+        version: STUDIO_RASTER_CRDT_VERSION,
+        proofId: "30000000-0000-4000-8000-000000000405",
+        undoHorizonClosedThrough: through,
+        replicaFrontiers: [{ replicaId: "replica-a", through }],
+      },
+      tileManifestSha256: "c".repeat(64),
+      tiles: [{ tileX: 0, tileY: 0, asset: rasterAsset("checkpoint-main", 128, 128) }],
+    });
+    doc.getMap<string>(STUDIO_CRDT_RASTER_CHECKPOINTS_ROOT).set(
+      checkpoint.checkpointId,
+      canonicalStudioRasterJson(checkpoint)
+    );
+  }
+  return doc;
 }
 
 function createSceneOrderFloodDocument(activeEntryCount: number): Y.Doc {
@@ -581,6 +752,491 @@ describe("StudioCrdtService", () => {
     base.destroy();
     attacker.destroy();
     hydrated.destroy();
+  });
+
+  it("validates canonical raster roots, cross-root identities, and checkpoint prefixes exactly", () => {
+    const valid = createRasterDocument({ undo: true, acknowledgement: true, checkpoint: true });
+    expect(hasValidStudioCrdtRootSchema(valid)).toBe(true);
+    valid.destroy();
+
+    const invalidDocuments: Y.Doc[] = [];
+
+    const wrongRootType = new Y.Doc();
+    wrongRootType.getArray(STUDIO_CRDT_RASTER_SURFACES_ROOT).push(["not-a-map"]);
+    invalidDocuments.push(wrongRootType);
+
+    const nonCanonical = createRasterDocument({ operation: false });
+    nonCanonical.getMap<string>(STUDIO_CRDT_RASTER_SURFACES_ROOT).set(
+      RASTER_SURFACE.surfaceId,
+      JSON.stringify(RASTER_SURFACE)
+    );
+    invalidDocuments.push(nonCanonical);
+
+    const unknownOperationField = createRasterDocument();
+    const operationRoot = unknownOperationField.getMap<string>(STUDIO_CRDT_RASTER_OPERATIONS_ROOT);
+    const operationEnvelope = JSON.parse(operationRoot.get(RASTER_OPERATION_ID)!) as {
+      surfaceId: string;
+      operation: Record<string, unknown>;
+    };
+    operationEnvelope.operation.unexpected = true;
+    operationRoot.set(RASTER_OPERATION_ID, canonicalStudioRasterJson(operationEnvelope));
+    invalidDocuments.push(unknownOperationField);
+
+    const keyMismatch = createRasterDocument();
+    keyMismatch.getMap<string>(STUDIO_CRDT_RASTER_OPERATIONS_ROOT).set(
+      "30000000-0000-4000-8000-000000000499",
+      keyMismatch.getMap<string>(STUDIO_CRDT_RASTER_OPERATIONS_ROOT).get(RASTER_OPERATION_ID)!
+    );
+    invalidDocuments.push(keyMismatch);
+
+    const orphanUndo = createRasterDocument({ operation: false });
+    const orphan: StudioRasterUndoOperation = {
+      version: STUDIO_RASTER_CRDT_VERSION,
+      undoOperationId: RASTER_UNDO_ID,
+      targetOperationId: RASTER_OPERATION_ID,
+      order: { logicalClock: "2", actorId: "artist-a" },
+    };
+    orphanUndo.getMap<string>(STUDIO_CRDT_RASTER_UNDO_OPERATIONS_ROOT).set(
+      orphan.undoOperationId,
+      canonicalStudioRasterJson({ surfaceId: RASTER_SURFACE.surfaceId, undoOperation: orphan })
+    );
+    invalidDocuments.push(orphanUndo);
+
+    const identityCollision = createRasterDocument({ undo: true });
+    const collidingAcknowledgement: StudioRasterUndoAcknowledgement = {
+      version: STUDIO_RASTER_CRDT_VERSION,
+      acknowledgementId: RASTER_OPERATION_ID,
+      undoOperationId: RASTER_UNDO_ID,
+      targetOperationId: RASTER_OPERATION_ID,
+      order: { logicalClock: "3", actorId: "artist-a" },
+    };
+    identityCollision.getMap<string>(STUDIO_CRDT_RASTER_UNDO_ACKS_ROOT).set(
+      collidingAcknowledgement.acknowledgementId,
+      canonicalStudioRasterJson({
+        surfaceId: RASTER_SURFACE.surfaceId,
+        acknowledgement: collidingAcknowledgement,
+      })
+    );
+    invalidDocuments.push(identityCollision);
+
+    const invalidCheckpoint = createRasterDocument({ checkpoint: true });
+    const checkpointRoot = invalidCheckpoint.getMap<string>(STUDIO_CRDT_RASTER_CHECKPOINTS_ROOT);
+    const checkpoint = JSON.parse(checkpointRoot.get(RASTER_CHECKPOINT_ID)!) as Record<string, unknown>;
+    checkpoint.sealedOperationIds = [];
+    checkpointRoot.set(RASTER_CHECKPOINT_ID, canonicalStudioRasterJson(checkpoint));
+    invalidDocuments.push(invalidCheckpoint);
+
+    for (const invalid of invalidDocuments) {
+      expect(hasValidStudioCrdtRootSchema(invalid)).toBe(false);
+      invalid.destroy();
+    }
+  });
+
+  it.each([
+    [
+      "operation",
+      null,
+      { actorId: "forged-user" },
+      "30000000-0000-4000-8000-000000000470",
+    ],
+    [
+      "undo",
+      { actorId: "forged-user" },
+      { undo: true, actorId: "forged-user" },
+      "30000000-0000-4000-8000-000000000471",
+    ],
+    [
+      "acknowledgement",
+      { undo: true, actorId: "forged-user" },
+      { acknowledgement: true, actorId: "forged-user" },
+      "30000000-0000-4000-8000-000000000472",
+    ],
+  ] as const)(
+    "atomically rejects a forged raster %s actor before durable update and receipt storage",
+    async (_kind, baseOptions, options, updateId) => {
+      const repository = new MemoryStudioCrdtRepository();
+      const current = service(repository);
+      const workId = `work-raster-forged-${_kind}`;
+      const base = baseOptions ? createRasterDocument(baseOptions) : null;
+      if (base) {
+        await current.applyUpdate({
+          workId,
+          updateId: _kind === "undo"
+            ? "30000000-0000-4000-8000-000000000478"
+            : "30000000-0000-4000-8000-000000000479",
+          actorUserId: "forged-user",
+          data: fromUint8Array(Y.encodeStateAsUpdate(base)),
+        });
+      }
+      const forged = createRasterDocument(options);
+      const durableCount = repository.updates.get(workId)?.length ?? 0;
+      const receiptCount = repository.receipts.size;
+
+      await expect(current.applyUpdate({
+        workId,
+        updateId,
+        actorUserId: "editor",
+        data: fromUint8Array(Y.encodeStateAsUpdate(forged)),
+      })).rejects.toBeInstanceOf(StudioCrdtInvalidPayloadError);
+      expect(repository.updates.get(workId) ?? []).toHaveLength(durableCount);
+      expect(repository.receipts.size).toBe(receiptCount);
+
+      base?.destroy();
+      forged.destroy();
+    }
+  );
+
+  it("accepts a same-actor operation, undo, and acknowledgement append", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const current = service(repository);
+    const authored = createRasterDocument({
+      acknowledgement: true,
+      actorId: "editor",
+    });
+
+    await expect(current.applyUpdate({
+      workId: "work-raster-authored",
+      updateId: "30000000-0000-4000-8000-000000000473",
+      actorUserId: "editor",
+      data: fromUint8Array(Y.encodeStateAsUpdate(authored)),
+    })).resolves.toMatchObject({ duplicate: false, serverSequence: "1" });
+    expect(repository.updates.get("work-raster-authored")).toHaveLength(1);
+    expect(repository.receipts.size).toBe(1);
+
+    const hydrated = new Y.Doc();
+    applySync(hydrated, await current.sync("work-raster-authored"));
+    expect(hydrated.getMap(STUDIO_CRDT_RASTER_OPERATIONS_ROOT).has(RASTER_OPERATION_ID))
+      .toBe(true);
+    expect(hydrated.getMap(STUDIO_CRDT_RASTER_UNDO_OPERATIONS_ROOT).has(RASTER_UNDO_ID))
+      .toBe(true);
+    expect(hydrated.getMap(STUDIO_CRDT_RASTER_UNDO_ACKS_ROOT).has(RASTER_ACK_ID))
+      .toBe(true);
+
+    authored.destroy();
+    hydrated.destroy();
+  });
+
+  it("allows an aggregate update to retransmit an existing other-actor event", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const current = service(repository);
+    const firstId = "30000000-0000-4000-8000-000000000474";
+    const secondId = "30000000-0000-4000-8000-000000000475";
+    const firstOperation = rasterOperation(firstId, "b".repeat(64), "artist-a");
+    const secondOperation = rasterOperation(secondId, "c".repeat(64), "artist-b");
+    const first = createRasterDocument({ operation: firstOperation });
+
+    await current.applyUpdate({
+      workId: "work-raster-aggregate",
+      updateId: "30000000-0000-4000-8000-000000000476",
+      actorUserId: "artist-a",
+      data: fromUint8Array(Y.encodeStateAsUpdate(first)),
+    });
+
+    const aggregate = createRasterDocument({ operation: false });
+    const operationRoot = aggregate.getMap<string>(STUDIO_CRDT_RASTER_OPERATIONS_ROOT);
+    for (const operation of [firstOperation, secondOperation]) {
+      operationRoot.set(
+        operation.operationId,
+        canonicalStudioRasterJson({ surfaceId: RASTER_SURFACE.surfaceId, operation })
+      );
+    }
+    await expect(current.applyUpdate({
+      workId: "work-raster-aggregate",
+      updateId: "30000000-0000-4000-8000-000000000477",
+      actorUserId: "artist-b",
+      data: fromUint8Array(Y.encodeStateAsUpdate(aggregate)),
+    })).resolves.toMatchObject({ duplicate: false, serverSequence: "2" });
+    expect(repository.updates.get("work-raster-aggregate")).toHaveLength(2);
+    expect(repository.receipts.size).toBe(2);
+
+    const hydrated = new Y.Doc();
+    applySync(hydrated, await current.sync("work-raster-aggregate"));
+    expect([...hydrated.getMap(STUDIO_CRDT_RASTER_OPERATIONS_ROOT).keys()].sort())
+      .toEqual([firstId, secondId]);
+
+    first.destroy();
+    aggregate.destroy();
+    hydrated.destroy();
+  });
+
+  it.each([
+    ["surface", { operation: false }, STUDIO_CRDT_RASTER_SURFACES_ROOT, RASTER_SURFACE.surfaceId],
+    ["operation", {}, STUDIO_CRDT_RASTER_OPERATIONS_ROOT, RASTER_OPERATION_ID],
+    ["undo", { undo: true }, STUDIO_CRDT_RASTER_UNDO_OPERATIONS_ROOT, RASTER_UNDO_ID],
+    ["acknowledgement", { acknowledgement: true }, STUDIO_CRDT_RASTER_UNDO_ACKS_ROOT, RASTER_ACK_ID],
+    ["checkpoint", { checkpoint: true }, STUDIO_CRDT_RASTER_CHECKPOINTS_ROOT, RASTER_CHECKPOINT_ID],
+  ] as const)(
+    "rejects removal of an existing grow-only raster %s before durable storage",
+    async (kind, options, rootName, identity) => {
+      const repository = new MemoryStudioCrdtRepository();
+      const current = service(repository);
+      const workId = `work-raster-grow-only-${kind}`;
+      const base = createRasterDocument(options);
+      const baseUpdate = Y.encodeStateAsUpdate(base);
+      if (kind === "checkpoint") {
+        repository.updates.set(workId, [{
+          workId,
+          sequence: 1n,
+          updateId: "30000000-0000-4000-8000-000000000430",
+          actorUserId: "trusted-coordinator",
+          payload: baseUpdate,
+          createdAt: new Date("2026-07-16T00:00:00.000Z"),
+        }]);
+        await current.sync(workId);
+      } else {
+        await current.applyUpdate({
+          workId,
+          updateId: `30000000-0000-4000-8000-0000000004${31 + [
+            "surface", "operation", "undo", "acknowledgement",
+          ].indexOf(kind)}`,
+          actorUserId: "editor",
+          data: fromUint8Array(baseUpdate),
+        });
+      }
+      const durableCount = repository.updates.get(workId)?.length ?? 0;
+      const receiptCount = repository.receipts.size;
+
+      const attacker = new Y.Doc();
+      Y.applyUpdate(attacker, baseUpdate);
+      const stateVector = Y.encodeStateVector(attacker);
+      attacker.getMap(rootName).delete(identity);
+      expect(hasValidStudioCrdtRootSchema(attacker)).toBe(true);
+
+      await expect(current.applyUpdate({
+        workId,
+        updateId: `30000000-0000-4000-8000-0000000004${41 + [
+          "surface", "operation", "undo", "acknowledgement", "checkpoint",
+        ].indexOf(kind)}`,
+        actorUserId: "attacker",
+        data: fromUint8Array(Y.encodeStateAsUpdate(attacker, stateVector)),
+      })).rejects.toBeInstanceOf(StudioCrdtInvalidPayloadError);
+      expect(repository.updates.get(workId)).toHaveLength(durableCount);
+      expect(repository.receipts.size).toBe(receiptCount);
+      base.destroy();
+      attacker.destroy();
+    }
+  );
+
+  it("rejects a same-ID raster rewrite even when the rewritten value is independently valid", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const current = service(repository);
+    const base = createRasterDocument();
+    const baseUpdate = Y.encodeStateAsUpdate(base);
+    await current.applyUpdate({
+      workId: "work-raster-rewrite",
+      updateId: "30000000-0000-4000-8000-000000000450",
+      actorUserId: "editor",
+      data: fromUint8Array(baseUpdate),
+    });
+    const attacker = new Y.Doc();
+    Y.applyUpdate(attacker, baseUpdate);
+    const stateVector = Y.encodeStateVector(attacker);
+    const rewritten = rasterOperation(RASTER_OPERATION_ID, "d".repeat(64));
+    attacker.getMap<string>(STUDIO_CRDT_RASTER_OPERATIONS_ROOT).set(
+      RASTER_OPERATION_ID,
+      canonicalStudioRasterJson({ surfaceId: RASTER_SURFACE.surfaceId, operation: rewritten })
+    );
+    expect(hasValidStudioCrdtRootSchema(attacker)).toBe(true);
+
+    await expect(current.applyUpdate({
+      workId: "work-raster-rewrite",
+      updateId: "30000000-0000-4000-8000-000000000451",
+      actorUserId: "attacker",
+      data: fromUint8Array(Y.encodeStateAsUpdate(attacker, stateVector)),
+    })).rejects.toBeInstanceOf(StudioCrdtInvalidPayloadError);
+    expect(repository.updates.get("work-raster-rewrite")).toHaveLength(1);
+    expect(repository.receipts.size).toBe(1);
+    base.destroy();
+    attacker.destroy();
+  });
+
+  it("classifies a persisted raster rewrite as storage corruption during update hydration", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const base = createRasterDocument();
+    const baseUpdate = Y.encodeStateAsUpdate(base);
+    const attacker = new Y.Doc();
+    Y.applyUpdate(attacker, baseUpdate);
+    const stateVector = Y.encodeStateVector(attacker);
+    attacker.getMap(STUDIO_CRDT_RASTER_OPERATIONS_ROOT).delete(RASTER_OPERATION_ID);
+    repository.updates.set("work-raster-corruption", [
+      {
+        workId: "work-raster-corruption",
+        sequence: 1n,
+        updateId: "30000000-0000-4000-8000-000000000452",
+        actorUserId: "editor",
+        payload: baseUpdate,
+        createdAt: new Date("2026-07-16T00:00:00.000Z"),
+      },
+      {
+        workId: "work-raster-corruption",
+        sequence: 2n,
+        updateId: "30000000-0000-4000-8000-000000000453",
+        actorUserId: "attacker",
+        payload: Y.encodeStateAsUpdate(attacker, stateVector),
+        createdAt: new Date("2026-07-16T00:00:01.000Z"),
+      },
+    ]);
+    await expect(service(repository).sync("work-raster-corruption")).rejects.toBeInstanceOf(
+      StudioCrdtStorageCorruptionError
+    );
+    base.destroy();
+    attacker.destroy();
+  });
+
+  it("rolls back cached raster state when a catch-up snapshot rewrites immutable history", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const current = service(repository);
+    const base = createRasterDocument();
+    const baseUpdate = Y.encodeStateAsUpdate(base);
+    await current.applyUpdate({
+      workId: "work-raster-snapshot-rollback",
+      updateId: "30000000-0000-4000-8000-000000000454",
+      actorUserId: "editor",
+      data: fromUint8Array(baseUpdate),
+    });
+    const attacker = new Y.Doc();
+    Y.applyUpdate(attacker, baseUpdate);
+    attacker.getMap(STUDIO_CRDT_RASTER_OPERATIONS_ROOT).delete(RASTER_OPERATION_ID);
+    repository.snapshots.set("work-raster-snapshot-rollback", {
+      workId: "work-raster-snapshot-rollback",
+      snapshot: Y.encodeStateAsUpdate(attacker),
+      compactedSequence: 2n,
+      updatedAt: new Date("2026-07-16T00:00:01.000Z"),
+    });
+
+    await expect(current.sync("work-raster-snapshot-rollback")).rejects.toBeInstanceOf(
+      StudioCrdtStorageCorruptionError
+    );
+    repository.snapshots.delete("work-raster-snapshot-rollback");
+    const hydrated = new Y.Doc();
+    applySync(hydrated, await current.sync("work-raster-snapshot-rollback"));
+    expect(hydrated.getMap(STUDIO_CRDT_RASTER_OPERATIONS_ROOT).has(RASTER_OPERATION_ID)).toBe(true);
+    base.destroy();
+    attacker.destroy();
+    hydrated.destroy();
+  });
+
+  it("rejects client-authored checkpoints but still validates persisted coordinator checkpoints", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const current = service(repository);
+    const base = createRasterDocument();
+    const baseUpdate = Y.encodeStateAsUpdate(base);
+    await current.applyUpdate({
+      workId: "work-raster-checkpoint-trust",
+      updateId: "30000000-0000-4000-8000-000000000455",
+      actorUserId: "editor",
+      data: fromUint8Array(baseUpdate),
+    });
+    const withCheckpoint = createRasterDocument({ checkpoint: true });
+    const attacker = new Y.Doc();
+    Y.applyUpdate(attacker, baseUpdate);
+    const stateVector = Y.encodeStateVector(attacker);
+    attacker.getMap<string>(STUDIO_CRDT_RASTER_CHECKPOINTS_ROOT).set(
+      RASTER_CHECKPOINT_ID,
+      withCheckpoint.getMap<string>(STUDIO_CRDT_RASTER_CHECKPOINTS_ROOT)
+        .get(RASTER_CHECKPOINT_ID)!
+    );
+    await expect(current.applyUpdate({
+      workId: "work-raster-checkpoint-trust",
+      updateId: "30000000-0000-4000-8000-000000000456",
+      actorUserId: "editor",
+      data: fromUint8Array(Y.encodeStateAsUpdate(attacker, stateVector)),
+    })).rejects.toBeInstanceOf(StudioCrdtInvalidPayloadError);
+    expect(repository.updates.get("work-raster-checkpoint-trust")).toHaveLength(1);
+    expect(repository.receipts.size).toBe(1);
+
+    const trustedRepository = new MemoryStudioCrdtRepository();
+    const trusted = createRasterDocument({ checkpoint: true });
+    trustedRepository.updates.set("work-raster-trusted-checkpoint", [{
+      workId: "work-raster-trusted-checkpoint",
+      sequence: 1n,
+      updateId: "30000000-0000-4000-8000-000000000457",
+      actorUserId: "trusted-coordinator",
+      payload: Y.encodeStateAsUpdate(trusted),
+      createdAt: new Date("2026-07-16T00:00:00.000Z"),
+    }]);
+    const hydrated = new Y.Doc();
+    applySync(hydrated, await service(trustedRepository).sync("work-raster-trusted-checkpoint"));
+    expect(hydrated.getMap(STUDIO_CRDT_RASTER_CHECKPOINTS_ROOT).has(RASTER_CHECKPOINT_ID))
+      .toBe(true);
+    base.destroy();
+    withCheckpoint.destroy();
+    attacker.destroy();
+    trusted.destroy();
+    hydrated.destroy();
+  });
+
+  it("serializes raster set-union races and rejects a concurrent immutable-ID collision", async () => {
+    const unionRepository = new MemoryStudioCrdtRepository();
+    unionRepository.beforeAppend = twoPartyBarrier();
+    const unionLeft = service(unionRepository);
+    const unionRight = service(unionRepository);
+    const leftDocument = createRasterDocument({
+      operation: rasterOperation(
+        "30000000-0000-4000-8000-000000000460",
+        "b".repeat(64),
+        "artist-a"
+      ),
+    });
+    const rightDocument = createRasterDocument({
+      operation: rasterOperation(
+        "30000000-0000-4000-8000-000000000461",
+        "b".repeat(64),
+        "artist-a"
+      ),
+    });
+    const unionResults = await Promise.allSettled([
+      unionLeft.applyUpdate({
+        workId: "work-raster-union-race",
+        updateId: "30000000-0000-4000-8000-000000000462",
+        actorUserId: "artist-a",
+        data: fromUint8Array(Y.encodeStateAsUpdate(leftDocument)),
+      }),
+      unionRight.applyUpdate({
+        workId: "work-raster-union-race",
+        updateId: "30000000-0000-4000-8000-000000000463",
+        actorUserId: "artist-a",
+        data: fromUint8Array(Y.encodeStateAsUpdate(rightDocument)),
+      }),
+    ]);
+    expect(unionResults.every(({ status }) => status === "fulfilled")).toBe(true);
+    const unionHydrated = new Y.Doc();
+    applySync(unionHydrated, await unionLeft.sync("work-raster-union-race"));
+    expect([...unionHydrated.getMap(STUDIO_CRDT_RASTER_OPERATIONS_ROOT).keys()].sort()).toEqual([
+      "30000000-0000-4000-8000-000000000460",
+      "30000000-0000-4000-8000-000000000461",
+    ]);
+
+    const conflictRepository = new MemoryStudioCrdtRepository();
+    conflictRepository.beforeAppend = twoPartyBarrier();
+    const conflictLeft = service(conflictRepository);
+    const conflictRight = service(conflictRepository);
+    const firstValue = createRasterDocument({ actorId: "artist-a" });
+    const secondValue = createRasterDocument({
+      operation: rasterOperation(RASTER_OPERATION_ID, "e".repeat(64), "artist-a"),
+    });
+    const conflictResults = await Promise.allSettled([
+      conflictLeft.applyUpdate({
+        workId: "work-raster-conflict-race",
+        updateId: "30000000-0000-4000-8000-000000000464",
+        actorUserId: "artist-a",
+        data: fromUint8Array(Y.encodeStateAsUpdate(firstValue)),
+      }),
+      conflictRight.applyUpdate({
+        workId: "work-raster-conflict-race",
+        updateId: "30000000-0000-4000-8000-000000000465",
+        actorUserId: "artist-a",
+        data: fromUint8Array(Y.encodeStateAsUpdate(secondValue)),
+      }),
+    ]);
+    expect(conflictResults.filter(({ status }) => status === "fulfilled")).toHaveLength(1);
+    expect(conflictResults.filter(({ status }) => status === "rejected")).toHaveLength(1);
+    expect(conflictRepository.updates.get("work-raster-conflict-race")).toHaveLength(1);
+    expect(conflictRepository.receipts.size).toBe(1);
+
+    for (const doc of [
+      leftDocument, rightDocument, unionHydrated, firstValue, secondValue,
+    ]) doc.destroy();
   });
 
   it("validates reserved layer-group roots without synchronizing local collapse state", () => {
