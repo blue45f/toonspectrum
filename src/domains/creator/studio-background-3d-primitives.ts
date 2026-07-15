@@ -23,7 +23,7 @@ export {
 const BG3D_EXPORT_HEIGHT = 640;
 const BG3D_FALLBACK_EXPORT_WIDTH = 640;
 
-function uid(): string {
+export function uid(): string {
   return `bg3d-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 

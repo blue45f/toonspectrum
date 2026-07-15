@@ -2,17 +2,7 @@
 // 상대 위치로 조합된 형태를 코드로 합성한다. 외부 glTF 에셋 없이 기존 PRIMITIVE_DEFS의 13종
 // 지오메트리만 재사용(studio-background-3d-primitives.ts §makeGeometry 확장 없음) — 라이선스/
 // 파일크기 리스크를 피하기 위한 설계 결정.
-import type { BgPrimitive, BgPrimitiveKind } from "./studio-background-3d-primitives";
-
-// studio-background-3d-primitives.ts의 uid()는 현재 미export(private)다. "재사용, 재발명 금지"
-// 원칙상 원래는 그쪽에 `export` 한 줄만 추가해 여기서 import하는 것이 맞지만, 이 작업 범위는
-// "새 파일만 생성, 기존 파일은 절대 수정 금지"로 제한되어 있어 그 1줄 변경조차 할 수 없었다.
-// 따라서 동일한 포맷 문자열을 임시로 복제해 둔다 — 후속 배선(wiring) 작업에서
-// studio-background-3d-primitives.ts의 uid()에 `export`를 추가하고 이 로컬 복제본을 지운 뒤
-// 그 export를 import하도록 교체할 것(설계 문서 §0.4 참고).
-function uid(): string {
-  return `bg3d-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-}
+import { uid, type BgPrimitive, type BgPrimitiveKind } from "./studio-background-3d-primitives";
 
 export type BgCompositeCategory = "building" | "nature" | "vehicle" | "prop";
 
