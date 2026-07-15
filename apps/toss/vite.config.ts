@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-
+import react, { reactCompilerPreset } from '@vitejs/plugin-react';
+import babel from '@rolldown/plugin-babel';
 // 브라우저 프리뷰 빌드(PREVIEW_NO_TDS=1)에서는 TDS를 대체 컴포넌트로 alias 해요.
 // @toss/tds-mobile은 앱인토스 밖에서 런타임 가드로 예외를 던져 일반 브라우저 마운트를 막거든요.
 // 실제 앱인토스(.ait) 빌드에는 영향이 없어요(env 미설정 시 alias 비활성).
@@ -14,7 +14,7 @@ const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react({ babel: { plugins: [['babel-plugin-react-compiler', {}]] } })],
+  plugins: [react(), babel({ presets: [reactCompilerPreset()] })],
   resolve: {
     // web·toss 가 같은 모노레포에서 섞이지 않도록(둘 다 React 19) 단일 React 인스턴스로 정렬.
     // (invalid hook 방지) 웹 컴포넌트를 끌어와도 동일 react/react-dom 으로 dedupe 된다.
