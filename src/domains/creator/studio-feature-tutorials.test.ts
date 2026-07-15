@@ -1,0 +1,63 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  emptyTutorialProgress,
+  groupStudioFeatureTutorials,
+  isTutorialCompleted,
+  markTutorialCompleted,
+  STUDIO_FEATURE_TUTORIALS,
+  STUDIO_FEATURE_TUTORIAL_BY_ID,
+  tutorialCompletionRatio,
+} from "./studio-feature-tutorials";
+
+describe("studio-feature-tutorials catalog", () => {
+  it("튜토리얼 id 가 유일하다", () => {
+    const ids = STUDIO_FEATURE_TUTORIALS.map((t) => t.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("모든 튜토리얼에 단계·요약이 있다", () => {
+    for (const t of STUDIO_FEATURE_TUTORIALS) {
+      expect(t.title.trim().length).toBeGreaterThan(0);
+      expect(t.summary.trim().length).toBeGreaterThan(0);
+      expect(t.steps.length).toBeGreaterThanOrEqual(2);
+      for (const s of t.steps) {
+        expect(s.title.trim().length).toBeGreaterThan(0);
+        expect(s.body.trim().length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("맵과 그룹핑이 카탈로그와 일치한다", () => {
+    expect(STUDIO_FEATURE_TUTORIAL_BY_ID.size).toBe(STUDIO_FEATURE_TUTORIALS.length);
+    const groups = groupStudioFeatureTutorials();
+    const flat = groups.flatMap((g) => g.items);
+    expect(flat).toHaveLength(STUDIO_FEATURE_TUTORIALS.length);
+    expect(groups.every((g) => g.items.length > 0)).toBe(true);
+  });
+
+  it("smart-shape·bubble 등 핵심 기능이 포함된다", () => {
+    expect(STUDIO_FEATURE_TUTORIAL_BY_ID.has("smart-shape")).toBe(true);
+    expect(STUDIO_FEATURE_TUTORIAL_BY_ID.has("bubble")).toBe(true);
+    expect(STUDIO_FEATURE_TUTORIAL_BY_ID.has("pen")).toBe(true);
+  });
+});
+
+describe("tutorial progress", () => {
+  it("완료 표시가 멱등하다", () => {
+    let p = emptyTutorialProgress();
+    p = markTutorialCompleted(p, "pen");
+    p = markTutorialCompleted(p, "pen");
+    expect(p.completed).toEqual(["pen"]);
+    expect(isTutorialCompleted(p, "pen")).toBe(true);
+    expect(isTutorialCompleted(p, "bubble")).toBe(false);
+  });
+
+  it("완료 비율을 센다", () => {
+    let p = emptyTutorialProgress();
+    expect(tutorialCompletionRatio(p)).toEqual({ done: 0, total: STUDIO_FEATURE_TUTORIALS.length });
+    p = markTutorialCompleted(p, "pen");
+    p = markTutorialCompleted(p, "bubble");
+    expect(tutorialCompletionRatio(p).done).toBe(2);
+  });
+});
