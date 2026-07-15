@@ -3,6 +3,8 @@ import { Module } from "@nestjs/common";
 import { creatorCollaborationRepositoryProvider } from "./creator-collaboration.repository";
 import { CreatorController } from "./creator.controller";
 import { CreatorService } from "./creator.service";
+import { studioCrdtRepositoryProvider } from "./studio-crdt.repository";
+import { StudioCrdtService } from "./studio-crdt.service";
 import {
   StudioLiveGateway,
   studioLiveSessionAuthenticatorProvider,
@@ -13,7 +15,9 @@ import {
   controllers: [CreatorController],
   providers: [
     creatorCollaborationRepositoryProvider,
+    studioCrdtRepositoryProvider,
     CreatorService,
+    StudioCrdtService,
     studioLiveSessionAuthenticatorProvider,
     studioLiveSessionRevalidatorProvider,
     StudioLiveGateway,

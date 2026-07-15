@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  encodeStudioCrdtStateVector,
+  encodeStudioCrdtSyncChunks,
+  encodeStudioCrdtUpdate,
+  STUDIO_CRDT_PROTOCOL_VERSION,
+  type StudioCrdtSyncRequest,
+  type StudioCrdtSyncResponse,
+  type StudioCrdtTransportMessage,
+  type StudioCrdtUpdateAck,
+  type StudioCrdtUpdateRequest,
+} from "./studio-crdt-protocol";
+import {
   createStudioLiveEnvelope,
   type StudioLiveEnvelope,
   type StudioLiveParticipant,
@@ -23,6 +34,7 @@ import type {
 class FakeHubTransport implements StudioLiveTransport {
   private readonly listeners = new Set<(value: unknown) => void>();
   private readonly controlListeners = new Set<(event: StudioLiveTransportControlEvent) => void>();
+  private readonly crdtListeners = new Set<(event: StudioCrdtTransportMessage) => void>();
   private connected = false;
   private closed = false;
 
@@ -57,6 +69,28 @@ class FakeHubTransport implements StudioLiveTransport {
     return () => this.controlListeners.delete(listener);
   }
 
+  subscribeCrdt(listener: (event: StudioCrdtTransportMessage) => void): () => void {
+    this.crdtListeners.add(listener);
+    return () => this.crdtListeners.delete(listener);
+  }
+
+  requestCrdtSync(request: StudioCrdtSyncRequest): Promise<StudioCrdtSyncResponse | null> {
+    this.hub.crdtSyncRequests.push(structuredClone(request));
+    return Promise.resolve(this.hub.crdtSyncResponse);
+  }
+
+  publishCrdtUpdate(request: StudioCrdtUpdateRequest): Promise<StudioCrdtUpdateAck> {
+    this.hub.crdtUpdateRequests.push(structuredClone(request));
+    return Promise.resolve({
+      protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+      workId: request.workId,
+      updateId: request.updateId,
+      serverSequence: "1",
+      serverStateVector: null,
+      duplicate: false,
+    });
+  }
+
   receive(value: unknown): void {
     if (!this.ready) return;
     for (const listener of this.listeners) listener(structuredClone(value));
@@ -70,16 +104,25 @@ class FakeHubTransport implements StudioLiveTransport {
     for (const listener of this.controlListeners) listener(structuredClone(event));
   }
 
+  receiveCrdt(event: StudioCrdtTransportMessage): void {
+    if (!this.ready) return;
+    for (const listener of this.crdtListeners) listener(structuredClone(event));
+  }
+
   close(): void {
     this.closed = true;
     this.listeners.clear();
     this.controlListeners.clear();
+    this.crdtListeners.clear();
   }
 }
 
 class FakeTransportHub {
   readonly transports: FakeHubTransport[] = [];
   readonly published: StudioLiveEnvelope[] = [];
+  readonly crdtSyncRequests: StudioCrdtSyncRequest[] = [];
+  readonly crdtUpdateRequests: StudioCrdtUpdateRequest[] = [];
+  crdtSyncResponse: StudioCrdtSyncResponse | null = null;
   queued = false;
   private queue: Array<{ sender: FakeHubTransport; value: unknown }> = [];
 
@@ -486,5 +529,66 @@ describe("StudioLiveRoom", () => {
     expect(roomB.getPeers()).toEqual([]);
     expect(roomB.getLocks()).toEqual([]);
     roomB.close();
+  });
+
+  it("exposes sync, publish and remote CRDT updates on a separate room subscription", async () => {
+    const test = harness();
+    const stateVector = encodeStudioCrdtStateVector(new Uint8Array([0]));
+    const syncBytes = new Uint8Array([1, 2, 3]);
+    const chunks = encodeStudioCrdtSyncChunks(syncBytes);
+    test.hub.crdtSyncResponse = {
+      protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+      workId: "work-1",
+      requestId: "request-1",
+      transferId: "11111111-1111-4111-8111-111111111111",
+      chunks,
+      chunkCount: chunks.length,
+      totalBytes: syncBytes.byteLength,
+      serverStateVector: stateVector,
+      serverSequence: "1",
+    };
+    const room = test.room(alice);
+    const ephemeral: StudioLiveRoomEvent[] = [];
+    const durable: unknown[] = [];
+    room.subscribe((event) => ephemeral.push(event));
+    room.subscribeCrdt((event) => durable.push(event));
+    await room.start();
+    ephemeral.length = 0;
+
+    await expect(
+      room.requestCrdtSync({
+        protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+        workId: "work-1",
+        requestId: "request-1",
+        stateVector,
+      })
+    ).resolves.toEqual(test.hub.crdtSyncResponse);
+    await room.publishCrdtUpdate({
+      protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+      workId: "work-1",
+      updateId: "22222222-2222-4222-8222-222222222222",
+      clientSequence: 1,
+      update: encodeStudioCrdtUpdate(new Uint8Array([4, 5, 6])),
+    });
+    test.hub.transports[0]?.receiveCrdt({
+      type: "update",
+      senderSessionId: bob.sessionId,
+      update: {
+        protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+        workId: "work-1",
+        updateId: "33333333-3333-4333-8333-333333333333",
+        serverSequence: "2",
+        update: encodeStudioCrdtUpdate(new Uint8Array([7, 8, 9])),
+      },
+    });
+
+    expect(test.hub.crdtSyncRequests).toHaveLength(1);
+    expect(test.hub.crdtUpdateRequests).toHaveLength(1);
+    expect(durable).toEqual([
+      expect.objectContaining({ type: "sync-response" }),
+      expect.objectContaining({ type: "update", senderSessionId: bob.sessionId }),
+    ]);
+    expect(ephemeral).toEqual([]);
+    room.close();
   });
 });

@@ -21,6 +21,15 @@ import { isSessionAllowed } from "../../../../../lib/server/user-lifecycle";
 import { allowedCorsOrigins } from "../../config/cors";
 
 import { CreatorService } from "./creator.service";
+import { STUDIO_CRDT_UPDATE_MAX_BYTES } from "./studio-crdt.repository";
+import {
+  STUDIO_CRDT_STATE_VECTOR_MAX_BYTES,
+  StudioCrdtDocumentTooLargeError,
+  StudioCrdtInvalidPayloadError,
+  StudioCrdtService,
+  StudioCrdtStorageCorruptionError,
+  StudioCrdtUpdateIdConflictError,
+} from "./studio-crdt.service";
 
 import type { CreatorCollaborationViewerRole } from "./creator-collaboration.policy";
 import type { Namespace, Socket } from "socket.io";
@@ -32,9 +41,16 @@ const STUDIO_LIVE_ACCESS_CACHE_MS = 5_000;
 const STUDIO_LIVE_CANDIDATE_AUTHORIZATION_CACHE_MS = 2_000;
 const STUDIO_LIVE_CANDIDATE_AUTHORIZATION_CACHE_LIMIT = 512;
 const STUDIO_LIVE_LOCK_LIMIT_PER_WORK = 200;
-const STUDIO_LIVE_MAX_HTTP_BUFFER_SIZE = 70 * 1_024;
+const STUDIO_LIVE_MAX_HTTP_BUFFER_SIZE = 384 * 1_024;
 const STUDIO_LIVE_SIGNAL_SDP_MAX_LENGTH = 48 * 1_024;
 const STUDIO_LIVE_SIGNAL_CANDIDATE_MAX_LENGTH = 8 * 1_024;
+const STUDIO_CRDT_OPERATION_BURST = 120;
+const STUDIO_CRDT_OPERATIONS_PER_SECOND = 40;
+const STUDIO_CRDT_BYTE_BURST = 2 * 1_024 * 1_024;
+const STUDIO_CRDT_BYTES_PER_SECOND = 1 * 1_024 * 1_024;
+const STUDIO_CRDT_QUOTA_BUCKET_LIMIT = 4_096;
+const STUDIO_CRDT_QUOTA_CLEANUP_INTERVAL_MS = 30_000;
+const STUDIO_CRDT_QUOTA_IDLE_TTL_MS = 10 * 60_000;
 
 const isControlCharacterCode = (codePoint: number): boolean =>
   codePoint <= 0x1f || (codePoint >= 0x7f && codePoint <= 0x9f);
@@ -69,6 +85,16 @@ const ResourceIdSchema = boundedIdentifier(200);
 const ConnectionIdSchema = boundedIdentifier(128);
 const ScreenShareIdSchema = boundedIdentifier(160);
 const ScreenShareLabelSchema = boundedIdentifier(80);
+const StudioCrdtProtocolVersionSchema = z.literal(1);
+const StudioCrdtRequestIdSchema = boundedIdentifier(160);
+const StudioCrdtUpdateIdSchema = z.uuid();
+const STUDIO_CRDT_BASE64_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u;
+const encodedBase64 = (maximumDecodedBytes: number) =>
+  z
+    .string()
+    .min(4)
+    .max(Math.ceil(maximumDecodedBytes / 3) * 4)
+    .regex(STUDIO_CRDT_BASE64_PATTERN);
 
 export const StudioLiveJoinSchema = z
   .object({
@@ -226,6 +252,25 @@ export const StudioLiveSignalSchema = z.discriminatedUnion("kind", [
     .strict(),
 ]);
 
+export const StudioLiveCrdtSyncSchema = z
+  .object({
+    protocolVersion: StudioCrdtProtocolVersionSchema,
+    workId: WorkIdSchema,
+    requestId: StudioCrdtRequestIdSchema,
+    stateVector: encodedBase64(STUDIO_CRDT_STATE_VECTOR_MAX_BYTES),
+  })
+  .strict();
+
+export const StudioLiveCrdtUpdateSchema = z
+  .object({
+    protocolVersion: StudioCrdtProtocolVersionSchema,
+    workId: WorkIdSchema,
+    updateId: StudioCrdtUpdateIdSchema,
+    clientSequence: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
+    update: encodedBase64(STUDIO_CRDT_UPDATE_MAX_BYTES),
+  })
+  .strict();
+
 type StudioLiveJoinInput = z.infer<typeof StudioLiveJoinSchema>;
 type StudioLivePresenceInput = z.infer<typeof StudioLivePresenceSchema>;
 type StudioLiveCursorInput = z.infer<typeof StudioLiveCursorSchema>;
@@ -237,6 +282,37 @@ type StudioLiveScreenAnnounceInput = z.infer<typeof StudioLiveScreenAnnounceSche
 type StudioLiveScreenRequestInput = z.infer<typeof StudioLiveScreenRequestSchema>;
 type StudioLiveScreenStopInput = z.infer<typeof StudioLiveScreenStopSchema>;
 type StudioLiveSignalInput = z.infer<typeof StudioLiveSignalSchema>;
+type StudioLiveCrdtSyncInput = z.infer<typeof StudioLiveCrdtSyncSchema>;
+type StudioLiveCrdtUpdateInput = z.infer<typeof StudioLiveCrdtUpdateSchema>;
+
+export interface StudioLiveCrdtSyncResult {
+  protocolVersion: 1;
+  workId: string;
+  requestId: string;
+  transferId: string;
+  chunks: string[];
+  chunkCount: number;
+  totalBytes: number;
+  serverStateVector: string;
+  serverSequence: string;
+}
+
+export interface StudioLiveCrdtUpdateAck {
+  protocolVersion: 1;
+  workId: string;
+  updateId: string;
+  serverSequence: string;
+  serverStateVector: string;
+  duplicate: boolean;
+}
+
+export interface StudioLiveCrdtRemoteUpdate {
+  protocolVersion: 1;
+  workId: string;
+  updateId: string;
+  serverSequence: string;
+  update: string;
+}
 
 export interface StudioLiveParticipant {
   connectionId: string;
@@ -332,6 +408,16 @@ interface RateLimitBucket {
   resetsAt: number;
 }
 
+interface StudioCrdtTokenBucket {
+  operationTokens: number;
+  byteTokens: number;
+  updatedAt: number;
+}
+
+interface StudioCrdtSyncBucket extends RateLimitBucket {
+  updatedAt: number;
+}
+
 interface StudioLiveParticipantAuthorizationRecheck {
   participant: StudioLiveParticipantInternal;
   promise: Promise<number | null>;
@@ -408,6 +494,11 @@ function reply<T>(ack: StudioLiveAckCallback<T> | undefined, response: StudioLiv
   return response;
 }
 
+function canonicalBase64DecodedLength(value: string): number {
+  const padding = value.endsWith("==") ? 2 : value.endsWith("=") ? 1 : 0;
+  return (value.length / 4) * 3 - padding;
+}
+
 function extractHandshakeToken(client: StudioLiveSocket): string | null {
   const auth = client.handshake?.auth;
   if (!auth || typeof auth !== "object") return null;
@@ -463,6 +554,9 @@ export class StudioLiveGateway
   private readonly socketIdsByWork = new Map<string, Set<string>>();
   private readonly locksByWork = new Map<string, Map<string, StudioLiveLock>>();
   private readonly rateLimits = new Map<string, Map<string, RateLimitBucket>>();
+  private readonly crdtSyncBuckets = new Map<string, StudioCrdtSyncBucket>();
+  private readonly crdtTokenBuckets = new Map<string, StudioCrdtTokenBucket>();
+  private crdtQuotaLastCleanupAt = 0;
   private readonly joinTransitionSequences = new Map<string, number>();
   private readonly joinTransitionTails = new Map<string, Promise<void>>();
   private readonly participantAuthorizationRechecks = new Map<
@@ -481,7 +575,9 @@ export class StudioLiveGateway
     @Inject(STUDIO_LIVE_SESSION_AUTHENTICATOR)
     private readonly authenticateSession: StudioLiveSessionAuthenticator,
     @Inject(STUDIO_LIVE_SESSION_REVALIDATOR)
-    private readonly revalidateSession: StudioLiveSessionRevalidator
+    private readonly revalidateSession: StudioLiveSessionRevalidator,
+    @Inject(StudioCrdtService)
+    private readonly studioCrdtService: StudioCrdtService
   ) {}
 
   afterInit(server: Namespace): void {
@@ -523,6 +619,9 @@ export class StudioLiveGateway
     this.socketIdsByWork.clear();
     this.locksByWork.clear();
     this.rateLimits.clear();
+    this.crdtSyncBuckets.clear();
+    this.crdtTokenBuckets.clear();
+    this.crdtQuotaLastCleanupAt = 0;
     this.joinTransitionSequences.clear();
     this.joinTransitionTails.clear();
     this.participantAuthorizationRechecks.clear();
@@ -774,6 +873,164 @@ export class StudioLiveGateway
     );
     if (!authorized) return reply(ack, failure("not_joined", "실시간 작업실에 다시 참여해 주세요."));
     return reply(ack, { ok: true, data: { accepted: true } });
+  }
+
+  @SubscribeMessage("studio:crdt:sync")
+  async syncCrdtDocument(
+    @ConnectedSocket() client: StudioLiveSocket,
+    @MessageBody() body: StudioLiveCrdtSyncInput,
+    @Ack() ack?: StudioLiveAckCallback<StudioLiveCrdtSyncResult>
+  ) {
+    const parsed = StudioLiveCrdtSyncSchema.safeParse(body);
+    if (!parsed.success) {
+      return reply(ack, failure("invalid_payload", "CRDT 동기화 요청이 올바르지 않습니다."));
+    }
+    const quotaParticipant = this.currentJoinedCrdtParticipant(
+      client,
+      parsed.data.workId
+    );
+    if (!quotaParticipant) {
+      return reply(ack, failure("not_joined", "실시간 작업실에 다시 참여해 주세요."));
+    }
+    if (!this.consumeCrdtSyncQuota(quotaParticipant.userId, parsed.data.workId)) {
+      return reply(ack, failure("rate_limited", "CRDT 전체 동기화 요청이 너무 많습니다."));
+    }
+    const authorizedBefore = await this.runWithAuthorizedParticipant(
+      client,
+      parsed.data.workId,
+      false,
+      true,
+      (participant) => participant
+    );
+    if (!authorizedBefore || authorizedBefore.value !== quotaParticipant) {
+      return reply(ack, failure("not_joined", "실시간 작업실에 다시 참여해 주세요."));
+    }
+
+    let sync: Awaited<ReturnType<StudioCrdtService["sync"]>>;
+    try {
+      sync = await this.studioCrdtService.sync(
+        parsed.data.workId,
+        parsed.data.stateVector
+      );
+    } catch (error) {
+      return reply(ack, this.crdtFailure(error, parsed.data.workId, "sync"));
+    }
+    const authorizedAfter = await this.runWithAuthorizedParticipant(
+      client,
+      parsed.data.workId,
+      false,
+      true,
+      (participant) => participant
+    );
+    if (!authorizedAfter || authorizedAfter.value !== authorizedBefore.value) {
+      return reply(ack, failure("not_joined", "실시간 작업실에 다시 참여해 주세요."));
+    }
+    return reply(ack, {
+      ok: true,
+      data: {
+        protocolVersion: 1,
+        workId: parsed.data.workId,
+        requestId: parsed.data.requestId,
+        transferId: crypto.randomUUID(),
+        chunks: sync.chunks,
+        chunkCount: sync.chunkCount,
+        totalBytes: sync.totalBytes,
+        serverStateVector: sync.serverStateVector,
+        serverSequence: sync.serverSequence,
+      },
+    });
+  }
+
+  @SubscribeMessage("studio:crdt:update")
+  async applyCrdtUpdate(
+    @ConnectedSocket() client: StudioLiveSocket,
+    @MessageBody() body: StudioLiveCrdtUpdateInput,
+    @Ack() ack?: StudioLiveAckCallback<StudioLiveCrdtUpdateAck>
+  ) {
+    const parsed = StudioLiveCrdtUpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      return reply(ack, failure("invalid_payload", "CRDT 편집 업데이트가 올바르지 않습니다."));
+    }
+    const decodedBytes = canonicalBase64DecodedLength(parsed.data.update);
+    const quotaParticipant = this.currentJoinedCrdtParticipant(
+      client,
+      parsed.data.workId
+    );
+    if (!quotaParticipant) {
+      return reply(ack, failure("not_joined", "실시간 작업실에 다시 참여해 주세요."));
+    }
+    if (
+      !this.consumeCrdtUpdateQuota(
+        quotaParticipant.userId,
+        parsed.data.workId,
+        decodedBytes
+      )
+    ) {
+      return reply(ack, failure("rate_limited", "CRDT 편집 업데이트 전송이 너무 빠릅니다."));
+    }
+    const authorizedBefore = await this.runWithAuthorizedParticipant(
+      client,
+      parsed.data.workId,
+      false,
+      true,
+      (participant) => participant
+    );
+    if (!authorizedBefore || authorizedBefore.value !== quotaParticipant) {
+      return reply(ack, failure("not_joined", "실시간 작업실에 다시 참여해 주세요."));
+    }
+    if (!authorizedBefore.value.capabilities.edit) {
+      return reply(ack, failure("forbidden", "이 작품을 편집할 권한이 없습니다."));
+    }
+
+    let applied: Awaited<ReturnType<StudioCrdtService["applyUpdate"]>>;
+    try {
+      applied = await this.studioCrdtService.applyUpdate({
+        workId: parsed.data.workId,
+        updateId: parsed.data.updateId,
+        actorUserId: authorizedBefore.value.userId,
+        data: parsed.data.update,
+      });
+    } catch (error) {
+      return reply(ack, this.crdtFailure(error, parsed.data.workId, "update"));
+    }
+
+    const data: StudioLiveCrdtUpdateAck = {
+      protocolVersion: 1,
+      workId: parsed.data.workId,
+      updateId: applied.updateId,
+      serverSequence: applied.serverSequence,
+      serverStateVector: applied.serverStateVector,
+      duplicate: applied.duplicate,
+    };
+    const response: StudioLiveAck<StudioLiveCrdtUpdateAck> = { ok: true, data };
+    // The forced ACL check immediately before applyUpdate is the authorization linearization
+    // point. Once persistence starts, its durable outcome must always be ACKed and fanned out: a
+    // second ACL check here could turn a committed operation into an apparent failure, causing
+    // retries while peers never observe the already-persisted update.
+    // The sender learns that durable persistence succeeded before any peer can observe the op.
+    reply(ack, response);
+    if (!applied.duplicate) {
+      const remote: StudioLiveCrdtRemoteUpdate = {
+        protocolVersion: 1,
+        workId: parsed.data.workId,
+        updateId: applied.updateId,
+        serverSequence: applied.serverSequence,
+        update: applied.update,
+      };
+      try {
+        client.to(studioLiveRoom(parsed.data.workId)).emit("studio:crdt:update", remote);
+      } catch (error) {
+        this.logger.error(
+          {
+            workId: parsed.data.workId,
+            updateId: applied.updateId,
+            error: error instanceof Error ? error.message : "unknown",
+          },
+          "studio CRDT persisted but peer broadcast failed"
+        );
+      }
+    }
+    return response;
   }
 
   @SubscribeMessage("studio:lock:request")
@@ -1513,6 +1770,23 @@ export class StudioLiveGateway
     );
   }
 
+  private currentJoinedCrdtParticipant(
+    client: StudioLiveSocket,
+    workId: string
+  ): StudioLiveParticipantInternal | null {
+    const participant = this.participantsBySocket.get(client.id);
+    const principal = client.data.authPrincipal;
+    if (
+      !participant ||
+      participant.workId !== workId ||
+      !principal ||
+      !this.isSocketPrincipalCurrent(client, principal, participant.userId)
+    ) {
+      return null;
+    }
+    return participant;
+  }
+
   private disconnectInvalidJoinSession(client: StudioLiveSocket): void {
     // A reconnect may reuse the Socket.IO id while speculative adapter cleanup is pending. Never
     // tear down that replacement socket or its participant when this join belongs to the old one.
@@ -1621,6 +1895,117 @@ export class StudioLiveGateway
     if (bucket.count >= maximum) return false;
     bucket.count += 1;
     return true;
+  }
+
+  private consumeCrdtSyncQuota(userId: string, workId: string): boolean {
+    const now = Date.now();
+    const quotaKey = this.crdtQuotaKey(userId, workId);
+    this.cleanupCrdtQuotaBuckets(now);
+    if (!this.hasCrdtQuotaCapacity(this.crdtSyncBuckets, quotaKey)) return false;
+
+    const bucket = this.crdtSyncBuckets.get(quotaKey);
+    if (!bucket || bucket.resetsAt <= now) {
+      this.crdtSyncBuckets.set(quotaKey, {
+        count: 1,
+        resetsAt: now + 60_000,
+        updatedAt: now,
+      });
+      return true;
+    }
+    bucket.updatedAt = now;
+    if (bucket.count >= 30) return false;
+    bucket.count += 1;
+    return true;
+  }
+
+  private consumeCrdtUpdateQuota(
+    userId: string,
+    workId: string,
+    decodedBytes: number
+  ): boolean {
+    const now = Date.now();
+    const quotaKey = this.crdtQuotaKey(userId, workId);
+    this.cleanupCrdtQuotaBuckets(now);
+    if (!this.hasCrdtQuotaCapacity(this.crdtTokenBuckets, quotaKey)) return false;
+    const existing = this.crdtTokenBuckets.get(quotaKey);
+    const elapsedSeconds = existing ? Math.max(0, now - existing.updatedAt) / 1_000 : 0;
+    const operationTokens = existing
+      ? Math.min(
+          STUDIO_CRDT_OPERATION_BURST,
+          existing.operationTokens + elapsedSeconds * STUDIO_CRDT_OPERATIONS_PER_SECOND
+        )
+      : STUDIO_CRDT_OPERATION_BURST;
+    const byteTokens = existing
+      ? Math.min(
+          STUDIO_CRDT_BYTE_BURST,
+          existing.byteTokens + elapsedSeconds * STUDIO_CRDT_BYTES_PER_SECOND
+        )
+      : STUDIO_CRDT_BYTE_BURST;
+    const accepted = operationTokens >= 1 && byteTokens >= decodedBytes;
+    this.crdtTokenBuckets.set(quotaKey, {
+      operationTokens: accepted ? operationTokens - 1 : operationTokens,
+      byteTokens: accepted ? byteTokens - decodedBytes : byteTokens,
+      updatedAt: now,
+    });
+    return accepted;
+  }
+
+  private crdtQuotaKey(userId: string, workId: string): string {
+    // A serialized tuple avoids delimiter collisions while making every authenticated identity
+    // share one budget for a work across tabs, parallel sockets, and reconnects in this process.
+    return JSON.stringify([userId, workId]);
+  }
+
+  private cleanupCrdtQuotaBuckets(now: number): void {
+    if (
+      now >= this.crdtQuotaLastCleanupAt &&
+      now - this.crdtQuotaLastCleanupAt < STUDIO_CRDT_QUOTA_CLEANUP_INTERVAL_MS
+    ) {
+      return;
+    }
+    this.crdtQuotaLastCleanupAt = now;
+    for (const [key, bucket] of this.crdtSyncBuckets) {
+      if (bucket.resetsAt <= now) this.crdtSyncBuckets.delete(key);
+    }
+    for (const [key, bucket] of this.crdtTokenBuckets) {
+      if (now - bucket.updatedAt >= STUDIO_CRDT_QUOTA_IDLE_TTL_MS) {
+        this.crdtTokenBuckets.delete(key);
+      }
+    }
+  }
+
+  private hasCrdtQuotaCapacity<T>(
+    buckets: Map<string, T>,
+    incomingKey: string
+  ): boolean {
+    // Fail closed at capacity instead of evicting a live bucket: eviction would let a reconnecting
+    // client regain a fresh budget by churning enough authenticated user/work scopes.
+    return buckets.has(incomingKey) || buckets.size < STUDIO_CRDT_QUOTA_BUCKET_LIMIT;
+  }
+
+  private crdtFailure(
+    error: unknown,
+    workId: string,
+    operation: "sync" | "update"
+  ): StudioLiveFailure {
+    if (
+      error instanceof StudioCrdtInvalidPayloadError ||
+      error instanceof StudioCrdtUpdateIdConflictError ||
+      error instanceof StudioCrdtDocumentTooLargeError
+    ) {
+      return failure("invalid_payload", "CRDT 데이터가 올바르지 않거나 허용 크기를 초과했습니다.");
+    }
+    const corruption = error instanceof StudioCrdtStorageCorruptionError;
+    this.logger.error(
+      {
+        workId,
+        operation,
+        error: error instanceof Error ? error.message : "unknown",
+        corruption,
+      },
+      "studio CRDT operation failed"
+    );
+    return failure("internal_error", "CRDT 데이터를 안전하게 저장하거나 불러오지 못했습니다.");
   }
 
   private isParticipantAuthorizationCurrent(

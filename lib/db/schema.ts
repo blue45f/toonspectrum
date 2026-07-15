@@ -1,5 +1,24 @@
 import { sql } from "drizzle-orm";
-import { bigint, boolean, check, date, index, integer, jsonb, pgTable, primaryKey, text, timestamp, unique } from "drizzle-orm/pg-core";
+import {
+  bigint,
+  boolean,
+  check,
+  customType,
+  date,
+  foreignKey,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  unique,
+} from "drizzle-orm/pg-core";
+
+const bytea = customType<{ data: Uint8Array; driverData: Uint8Array }>({
+  dataType: () => "bytea",
+});
 
 // libSQL(SQLite) → PostgreSQL(Neon) 마이그레이션:
 //  - integer{mode:"timestamp_ms"} → timestamp({mode:"date"})  (Drizzle가 Date로 주고받음)
@@ -429,6 +448,123 @@ export const creatorWorkRevisions = pgTable(
       sql`${t.restoredFromRevision} is null or ${t.restoredFromRevision} >= 1`
     ),
     check("creator_work_revision_snapshot_object_check", sql`jsonb_typeof(${t.snapshot}) = 'object'`),
+  ]
+);
+
+// Yjs 문서의 압축 기준점. 전체 snapshot은 공개 원고 JSON과 분리하고, 해당 sequence 이하의
+// append-only update를 모두 포함할 때만 전진한다. 단일 work 행이라 FK cascade와 hydrate 조회가 단순하다.
+export const creatorWorkCrdtSnapshots = pgTable(
+  "creator_work_crdt_snapshot",
+  {
+    workId: text("workId").primaryKey(),
+    snapshot: bytea("snapshot").notNull(),
+    compactedSequence: bigint("compactedSequence", { mode: "bigint" })
+      .notNull()
+      .default(BigInt(0)),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({
+      name: "creator_work_crdt_snapshot_work_fkey",
+      columns: [t.workId],
+      foreignColumns: [creatorWorks.id],
+    }).onDelete("cascade"),
+    check(
+      "creator_work_crdt_snapshot_sequence_check",
+      sql`${t.compactedSequence} >= 0`
+    ),
+    check(
+      "creator_work_crdt_snapshot_size_check",
+      sql`octet_length(${t.snapshot}) between 1 and 16777216`
+    ),
+  ]
+);
+
+// CRDT 수신 확인은 DB commit 이후에만 성공한다. updateId는 재전송 dedupe 키이고, 전역 identity
+// sequence는 작품별 정렬 index와 함께 snapshot 경계·재시작 복구의 안정적인 순서를 제공한다.
+export const creatorWorkCrdtUpdates = pgTable(
+  "creator_work_crdt_update",
+  {
+    workId: text("workId").notNull(),
+    sequence: bigint("sequence", { mode: "bigint" }).generatedAlwaysAsIdentity(),
+    updateId: text("updateId").notNull(),
+    actorUserId: text("actorUserId"),
+    payload: bytea("payload").notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({
+      name: "creator_work_crdt_update_work_fkey",
+      columns: [t.workId],
+      foreignColumns: [creatorWorks.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "creator_work_crdt_update_actor_fkey",
+      columns: [t.actorUserId],
+      foreignColumns: [users.id],
+    }).onDelete("set null"),
+    primaryKey({ name: "creator_work_crdt_update_pkey", columns: [t.workId, t.sequence] }),
+    unique("creator_work_crdt_update_work_update_id_unique").on(t.workId, t.updateId),
+    index("idx_creator_work_crdt_update_actor_created").on(t.actorUserId, t.createdAt.desc()),
+    check(
+      "creator_work_crdt_update_id_check",
+      sql`length(${t.updateId}) between 1 and 160`
+    ),
+    check(
+      "creator_work_crdt_update_payload_size_check",
+      sql`octet_length(${t.payload}) between 1 and 49152`
+    ),
+  ]
+);
+
+// 압축으로 update log 본문을 삭제한 뒤에도 updateId 재전송은 영구적으로 판별해야 한다.
+// 작은 SHA-256 receipt만 보존하면 전체 payload를 중복 저장하지 않고도 exactly-once ACK와
+// 다른 내용으로 같은 updateId를 재사용하는 충돌 탐지를 유지할 수 있다.
+export const creatorWorkCrdtUpdateReceipts = pgTable(
+  "creator_work_crdt_update_receipt",
+  {
+    workId: text("workId").notNull(),
+    updateId: text("updateId").notNull(),
+    sequence: bigint("sequence", { mode: "bigint" }),
+    actorUserId: text("actorUserId"),
+    payloadHash: bytea("payloadHash").notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({
+      name: "creator_work_crdt_update_receipt_work_fkey",
+      columns: [t.workId],
+      foreignColumns: [creatorWorks.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "creator_work_crdt_update_receipt_actor_fkey",
+      columns: [t.actorUserId],
+      foreignColumns: [users.id],
+    }).onDelete("set null"),
+    primaryKey({
+      name: "creator_work_crdt_update_receipt_pkey",
+      columns: [t.workId, t.updateId],
+    }),
+    unique("creator_work_crdt_update_receipt_work_sequence_unique").on(
+      t.workId,
+      t.sequence
+    ),
+    index("idx_creator_work_crdt_update_receipt_actor_created").on(
+      t.actorUserId,
+      t.createdAt.desc()
+    ),
+    check(
+      "creator_work_crdt_update_receipt_id_check",
+      sql`length(${t.updateId}) between 1 and 160`
+    ),
+    check(
+      "creator_work_crdt_update_receipt_sequence_check",
+      sql`${t.sequence} is null or ${t.sequence} > 0`
+    ),
+    check(
+      "creator_work_crdt_update_receipt_hash_check",
+      sql`octet_length(${t.payloadHash}) = 32`
+    ),
   ]
 );
 

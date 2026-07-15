@@ -1,3 +1,18 @@
+import {
+  createStudioCrdtLocalWireMessage,
+  isStudioCrdtLocalWireCandidate,
+  parseStudioCrdtLocalWireMessage,
+  parseStudioCrdtSyncRequest,
+  parseStudioCrdtSyncResponse,
+  parseStudioCrdtUpdateRequest,
+  STUDIO_CRDT_PROTOCOL_VERSION,
+  type StudioCrdtSyncRequest,
+  type StudioCrdtSyncResponse,
+  type StudioCrdtTransportMessage,
+  type StudioCrdtUpdateAck,
+  type StudioCrdtUpdateRequest,
+} from "./studio-crdt-protocol";
+
 import type {
   StudioLiveEnvelope,
   StudioLiveParticipant,
@@ -44,6 +59,11 @@ export interface StudioLiveTransport {
   subscribe(listener: (value: unknown) => void): () => void;
   /** Optional server-only authoritative status/ACK seam; local transports need no control plane. */
   subscribeControl?(listener: (event: StudioLiveTransportControlEvent) => void): () => void;
+  /** Durable CRDT operations deliberately do not share the ephemeral signaling envelope. */
+  requestCrdtSync?(request: StudioCrdtSyncRequest): Promise<StudioCrdtSyncResponse | null>;
+  respondCrdtSync?(response: StudioCrdtSyncResponse, targetSessionId: string): boolean;
+  publishCrdtUpdate?(request: StudioCrdtUpdateRequest): Promise<StudioCrdtUpdateAck>;
+  subscribeCrdt?(listener: (message: StudioCrdtTransportMessage) => void): () => void;
   close(): void;
 }
 
@@ -60,6 +80,25 @@ export interface StudioBroadcastChannelLike {
 
 export type StudioBroadcastChannelFactory = (name: string) => StudioBroadcastChannelLike;
 
+export interface StudioBroadcastCrdtDependencies {
+  setTimeout?: (handler: () => void, delay: number) => unknown;
+  clearTimeout?: (handle: unknown) => void;
+  syncTimeoutMs?: number;
+}
+
+interface StudioBroadcastCrdtContext {
+  workId: string;
+  participant: StudioLiveParticipant;
+}
+
+interface PendingLocalSync {
+  resolve: (response: StudioCrdtSyncResponse | null) => void;
+  timeout: unknown;
+}
+
+const DEFAULT_LOCAL_CRDT_SYNC_TIMEOUT_MS = 750;
+const MAX_SEEN_LOCAL_UPDATE_IDS = 2_048;
+
 function defaultBroadcastChannelFactory(name: string): StudioBroadcastChannelLike {
   return new BroadcastChannel(name);
 }
@@ -73,17 +112,39 @@ export class StudioBroadcastChannelTransport implements StudioLiveTransport {
   readonly mode = "local" as const;
   private readonly channel: StudioBroadcastChannelLike;
   private readonly listeners = new Set<(value: unknown) => void>();
+  private readonly crdtListeners = new Set<(message: StudioCrdtTransportMessage) => void>();
+  private readonly crdtContext: StudioBroadcastCrdtContext | null;
+  private readonly pendingSync = new Map<string, PendingLocalSync>();
+  private readonly seenUpdateIds = new Set<string>();
+  private readonly scheduleTimeout: (handler: () => void, delay: number) => unknown;
+  private readonly cancelTimeout: (handle: unknown) => void;
+  private readonly syncTimeoutMs: number;
   private closed = false;
   private connected = false;
   private readonly onMessage = (event: MessageEvent<unknown>) => {
+    if (isStudioCrdtLocalWireCandidate(event.data)) {
+      this.onCrdtMessage(event.data);
+      return;
+    }
     for (const listener of this.listeners) listener(event.data);
   };
 
   constructor(
     roomName: string,
-    createChannel: StudioBroadcastChannelFactory = defaultBroadcastChannelFactory
+    createChannel: StudioBroadcastChannelFactory = defaultBroadcastChannelFactory,
+    crdtContext: StudioBroadcastCrdtContext | null = null,
+    dependencies: StudioBroadcastCrdtDependencies = {}
   ) {
     this.channel = createChannel(roomName);
+    this.crdtContext = crdtContext;
+    this.scheduleTimeout = dependencies.setTimeout ?? ((handler, delay) => globalThis.setTimeout(handler, delay));
+    this.cancelTimeout =
+      dependencies.clearTimeout ??
+      ((handle) => globalThis.clearTimeout(handle as ReturnType<typeof setTimeout>));
+    this.syncTimeoutMs = Math.min(
+      5_000,
+      Math.max(100, Math.trunc(dependencies.syncTimeoutMs ?? DEFAULT_LOCAL_CRDT_SYNC_TIMEOUT_MS))
+    );
     this.channel.addEventListener("message", this.onMessage);
   }
 
@@ -115,18 +176,175 @@ export class StudioBroadcastChannelTransport implements StudioLiveTransport {
     return () => this.listeners.delete(listener);
   }
 
+  requestCrdtSync(request: StudioCrdtSyncRequest): Promise<StudioCrdtSyncResponse | null> {
+    const context = this.crdtContext;
+    if (!this.ready || !context) return Promise.reject(new Error("로컬 CRDT 채널이 준비되지 않았습니다."));
+    const parsed = parseStudioCrdtSyncRequest(request, { expectedWorkId: context.workId });
+    if (!parsed) return Promise.reject(new Error("CRDT 동기화 요청이 올바르지 않습니다."));
+    const previous = this.pendingSync.get(parsed.requestId);
+    if (previous) return Promise.reject(new Error("같은 CRDT 동기화 요청이 이미 진행 중입니다."));
+
+    return new Promise((resolve, reject) => {
+      const timeout = this.scheduleTimeout(() => {
+        this.pendingSync.delete(parsed.requestId);
+        resolve(null);
+      }, this.syncTimeoutMs);
+      this.pendingSync.set(parsed.requestId, { resolve, timeout });
+      try {
+        this.channel.postMessage(
+          createStudioCrdtLocalWireMessage({
+            workId: context.workId,
+            senderSessionId: context.participant.sessionId,
+            targetSessionId: null,
+            kind: "sync-request",
+            payload: parsed,
+          })
+        );
+      } catch {
+        this.cancelTimeout(timeout);
+        this.pendingSync.delete(parsed.requestId);
+        reject(new Error("로컬 CRDT 동기화 요청을 보내지 못했습니다."));
+      }
+    });
+  }
+
+  respondCrdtSync(response: StudioCrdtSyncResponse, targetSessionId: string): boolean {
+    const context = this.crdtContext;
+    if (!this.ready || !context || !targetSessionId) return false;
+    const parsed = parseStudioCrdtSyncResponse(response, { expectedWorkId: context.workId });
+    if (!parsed) return false;
+    try {
+      this.channel.postMessage(
+        createStudioCrdtLocalWireMessage({
+          workId: context.workId,
+          senderSessionId: context.participant.sessionId,
+          targetSessionId,
+          kind: "sync-response",
+          payload: parsed,
+        })
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  publishCrdtUpdate(request: StudioCrdtUpdateRequest): Promise<StudioCrdtUpdateAck> {
+    const context = this.crdtContext;
+    if (!this.ready || !context) return Promise.reject(new Error("로컬 CRDT 채널이 준비되지 않았습니다."));
+    const parsed = parseStudioCrdtUpdateRequest(request, { expectedWorkId: context.workId });
+    if (!parsed) return Promise.reject(new Error("CRDT 업데이트가 올바르지 않습니다."));
+    const duplicate = this.seenUpdateIds.has(parsed.updateId);
+    if (!duplicate) {
+      this.rememberUpdateId(parsed.updateId);
+      try {
+        this.channel.postMessage(
+          createStudioCrdtLocalWireMessage({
+            workId: context.workId,
+            senderSessionId: context.participant.sessionId,
+            targetSessionId: null,
+            kind: "update",
+            payload: {
+              protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+              workId: context.workId,
+              updateId: parsed.updateId,
+              serverSequence: "0",
+              update: parsed.update,
+            },
+          })
+        );
+      } catch {
+        this.seenUpdateIds.delete(parsed.updateId);
+        return Promise.reject(new Error("로컬 CRDT 업데이트를 보내지 못했습니다."));
+      }
+    }
+    return Promise.resolve({
+      protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+      workId: context.workId,
+      updateId: parsed.updateId,
+      serverSequence: "0",
+      serverStateVector: null,
+      duplicate,
+    });
+  }
+
+  subscribeCrdt(listener: (message: StudioCrdtTransportMessage) => void): () => void {
+    if (this.closed) return () => undefined;
+    this.crdtListeners.add(listener);
+    return () => this.crdtListeners.delete(listener);
+  }
+
   close(): void {
     if (this.closed) return;
     this.closed = true;
     this.listeners.clear();
+    this.crdtListeners.clear();
+    for (const pending of this.pendingSync.values()) {
+      this.cancelTimeout(pending.timeout);
+      pending.resolve(null);
+    }
+    this.pendingSync.clear();
+    this.seenUpdateIds.clear();
     this.channel.removeEventListener("message", this.onMessage);
     this.channel.close();
   }
+
+  private onCrdtMessage(value: unknown): void {
+    const context = this.crdtContext;
+    if (!this.ready || !context) return;
+    const wire = parseStudioCrdtLocalWireMessage(value, {
+      expectedWorkId: context.workId,
+      selfSessionId: context.participant.sessionId,
+    });
+    if (!wire) return;
+    if (wire.kind === "sync-response") {
+      const pending = this.pendingSync.get(wire.payload.requestId);
+      if (!pending) return;
+      this.pendingSync.delete(wire.payload.requestId);
+      this.cancelTimeout(pending.timeout);
+      pending.resolve(wire.payload);
+      return;
+    }
+    if (wire.kind === "sync-request") {
+      this.emitCrdt({
+        type: "sync-request",
+        request: wire.payload,
+        senderSessionId: wire.senderSessionId,
+      });
+      return;
+    }
+    if (this.seenUpdateIds.has(wire.payload.updateId)) return;
+    this.rememberUpdateId(wire.payload.updateId);
+    this.emitCrdt({
+      type: "update",
+      update: wire.payload,
+      senderSessionId: wire.senderSessionId,
+    });
+  }
+
+  private emitCrdt(message: StudioCrdtTransportMessage): void {
+    for (const listener of this.crdtListeners) listener(message);
+  }
+
+  private rememberUpdateId(updateId: string): void {
+    if (this.seenUpdateIds.has(updateId)) return;
+    this.seenUpdateIds.add(updateId);
+    if (this.seenUpdateIds.size <= MAX_SEEN_LOCAL_UPDATE_IDS) return;
+    const oldest = this.seenUpdateIds.values().next().value;
+    if (typeof oldest === "string") this.seenUpdateIds.delete(oldest);
+  }
 }
 
-export const createStudioLocalLiveTransport: StudioLiveTransportFactory = ({ roomName }) => {
+export const createStudioLocalLiveTransport: StudioLiveTransportFactory = ({
+  roomName,
+  workId,
+  participant,
+}) => {
   if (!isStudioLocalLiveTransportSupported()) {
     throw new Error("이 브라우저는 로컬 탭 공동작업 채널을 지원하지 않습니다.");
   }
-  return new StudioBroadcastChannelTransport(roomName);
+  return new StudioBroadcastChannelTransport(roomName, defaultBroadcastChannelFactory, {
+    workId,
+    participant,
+  });
 };

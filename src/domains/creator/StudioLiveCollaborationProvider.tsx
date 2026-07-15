@@ -22,16 +22,22 @@ import {
   type StudioLiveTransportMode,
 } from "./studio-live-collaboration-transport";
 
+import type { StudioCrdtDocument } from "./studio-crdt-document";
+import type { StudioCrdtRoomBinding } from "./studio-crdt-room-binding";
+
 export interface StudioLiveCollaborationProviderProps {
   children: ReactNode;
   workId: string | null;
   participant: Omit<StudioLiveParticipant, "sessionId"> | null;
   currentPageId: string | null;
   currentTool: string | null;
+  /** Stable authenticated user id used to isolate the durable CRDT outbox on this device. */
+  outboxScope?: string | null;
   transportFactory?: StudioLiveTransportFactory;
   /** Prevent an authenticated work from silently becoming an unauthenticated local-tab room. */
   serverRequired?: boolean;
   onRoomChange?: (room: StudioLiveRoom | null) => void;
+  onCrdtDocumentChange?: (document: StudioCrdtDocument | null) => void;
 }
 
 function localSessionId(): string {
@@ -55,9 +61,11 @@ export function StudioLiveCollaborationProvider({
   participant,
   currentPageId,
   currentTool,
+  outboxScope = null,
   transportFactory,
   serverRequired = false,
   onRoomChange,
+  onCrdtDocumentChange,
 }: StudioLiveCollaborationProviderProps) {
   const [room, setRoom] = useState<StudioLiveRoom | null>(null);
   const [availability, setAvailability] = useState<StudioLiveAvailability>("idle");
@@ -97,6 +105,7 @@ export function StudioLiveCollaborationProvider({
       setAvailability("idle");
       setMode(null);
       onRoomChange?.(null);
+      onCrdtDocumentChange?.(null);
       return;
     }
     if (transportPreference === "server" && !transportFactory) {
@@ -104,12 +113,14 @@ export function StudioLiveCollaborationProvider({
       setMode("server");
       setError("인증된 팀 연결 정보가 없어 로컬 모드로 자동 전환하지 않았습니다. 다시 로그인해 주세요.");
       onRoomChange?.(null);
+      onCrdtDocumentChange?.(null);
       return;
     }
     if (transportPreference === "local" && !isStudioLocalLiveTransportSupported()) {
       setAvailability("unsupported");
       setMode(null);
       onRoomChange?.(null);
+      onCrdtDocumentChange?.(null);
       return;
     }
 
@@ -135,11 +146,26 @@ export function StudioLiveCollaborationProvider({
       setAvailability("error");
       setError(messageFrom(cause, "공동작업 세션을 만들지 못했습니다."));
       onRoomChange?.(null);
+      onCrdtDocumentChange?.(null);
       return;
     }
 
     setRoom(nextRoom);
     onRoomChange?.(nextRoom);
+    let roomClosed = false;
+    let roomExposed = true;
+    const closeRoom = () => {
+      if (roomClosed) return;
+      roomClosed = true;
+      nextRoom.close();
+    };
+    const clearExposedRoom = () => {
+      if (!roomExposed) return;
+      roomExposed = false;
+      onRoomChange?.(null);
+    };
+    let crdtDocument: StudioCrdtDocument | null = null;
+    let crdtBinding: StudioCrdtRoomBinding | null = null;
     const unsubscribe = nextRoom.subscribe((event) => {
       if (cancelled) return;
       if (event.type === "presence") {
@@ -179,6 +205,12 @@ export function StudioLiveCollaborationProvider({
         setLocalFallbackAllowed(false);
       }
     });
+    let roomSubscriptionActive = true;
+    const stopRoomSubscription = () => {
+      if (!roomSubscriptionActive) return;
+      roomSubscriptionActive = false;
+      unsubscribe();
+    };
 
     const onVisibilityChange = () => {
       try {
@@ -188,39 +220,102 @@ export function StudioLiveCollaborationProvider({
         if (!cancelled) setError(messageFrom(cause, "작업 상태를 팀에 알리지 못했습니다."));
       }
     };
+    let visibilityListenerActive = false;
     if (typeof document !== "undefined") {
       nextRoom.updatePresence({ visibility: document.hidden ? "idle" : "active" });
       document.addEventListener("visibilitychange", onVisibilityChange);
+      visibilityListenerActive = true;
     }
+    const stopVisibilityListener = () => {
+      if (!visibilityListenerActive || typeof document === "undefined") return;
+      visibilityListenerActive = false;
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
 
-    void nextRoom
-      .start()
-      .then(() => {
+    void (async () => {
+      try {
+        await nextRoom.start();
         if (cancelled) return;
+        const [documentModule, bindingModule] = await Promise.all([
+          import("./studio-crdt-document"),
+          import("./studio-crdt-room-binding"),
+        ]);
+        if (cancelled) return;
+        crdtDocument = new documentModule.StudioCrdtDocument();
+        crdtBinding = new bindingModule.StudioCrdtRoomBinding({
+          document: crdtDocument,
+          room: nextRoom,
+          canEdit: participantRole === "owner" || participantRole === "admin" || participantRole === "editor",
+          outboxScope,
+          onStatus: (status) => {
+            if (cancelled) return;
+            if (status.state === "error") {
+              setError(status.message);
+              if (status.durabilityAtRisk) setAvailability("error");
+            }
+            if (status.state === "ready" && nextRoom.ready) {
+              setAvailability("ready");
+              setError(null);
+            }
+          },
+        });
+        await crdtBinding.start();
+        if (cancelled) return;
+        onCrdtDocumentChange?.(crdtDocument);
         setMode(nextRoom.mode);
         setPeers(nextRoom.getPeers());
         setLocks(nextRoom.getLocks());
         setAvailability("ready");
-      })
-      .catch((cause: unknown) => {
+      } catch (cause: unknown) {
         if (cancelled) return;
+        const failedBinding = crdtBinding;
+        const failedDocument = crdtDocument;
+        crdtBinding = null;
+        crdtDocument = null;
+        failedBinding?.close();
+        failedDocument?.destroy();
+        stopVisibilityListener();
+        stopRoomSubscription();
+        closeRoom();
+        clearExposedRoom();
+        onCrdtDocumentChange?.(null);
+        setRoom(null);
+        setPeers([]);
+        setLocks([]);
         setAvailability("error");
         setError(messageFrom(cause, "공동작업 채널에 연결하지 못했습니다."));
-      });
+      }
+    })();
 
     return () => {
       cancelled = true;
-      if (typeof document !== "undefined") {
-        document.removeEventListener("visibilitychange", onVisibilityChange);
+      stopVisibilityListener();
+      stopRoomSubscription();
+      onCrdtDocumentChange?.(null);
+      const closingBinding = crdtBinding;
+      const closingDocument = crdtDocument;
+      crdtBinding = null;
+      crdtDocument = null;
+      if (closingBinding && closingDocument) {
+        void closingBinding.closeGracefully()
+          .finally(() => {
+            closingDocument.destroy();
+            closeRoom();
+          })
+          .catch(() => undefined);
+      } else {
+        closingBinding?.close();
+        closingDocument?.destroy();
+        closeRoom();
       }
-      unsubscribe();
-      nextRoom.close();
-      onRoomChange?.(null);
+      clearExposedRoom();
     };
   }, [
     participantName,
     participantRole,
+    onCrdtDocumentChange,
     onRoomChange,
+    outboxScope,
     transportFactory,
     transportPreference,
     transportRetryKey,

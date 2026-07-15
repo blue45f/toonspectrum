@@ -27,6 +27,14 @@ import {
   type StudioLiveTransportStatus,
 } from "./studio-live-collaboration-transport";
 
+import type {
+  StudioCrdtSyncRequest,
+  StudioCrdtSyncResponse,
+  StudioCrdtTransportMessage,
+  StudioCrdtUpdateAck,
+  StudioCrdtUpdateRequest,
+} from "./studio-crdt-protocol";
+
 const DEFAULT_HEARTBEAT_MS = 10_000;
 const DEFAULT_PRESENCE_TTL_MS = 30_000;
 const DEFAULT_LOCK_LEASE_MS = 15_000;
@@ -68,6 +76,11 @@ export type StudioLiveRoomEvent =
   | { type: "signal"; envelope: StudioLiveSignalEnvelope }
   | { type: "transport-status"; status: StudioLiveTransportStatus }
   | { type: "transport-error"; message: string };
+
+/** Durable document events are intentionally separate from cursor/screen/presence signaling. */
+export type StudioLiveCrdtRoomEvent =
+  | StudioCrdtTransportMessage
+  | { type: "error"; operation: "sync" | "publish"; message: string };
 
 export interface StudioLiveRoomDependencies {
   transportFactory?: StudioLiveTransportFactory;
@@ -134,12 +147,14 @@ export class StudioLiveRoom {
   private readonly lockLeaseMs: number;
   private readonly cursorIntervalMs: number;
   private readonly listeners = new Set<(event: StudioLiveRoomEvent) => void>();
+  private readonly crdtListeners = new Set<(event: StudioLiveCrdtRoomEvent) => void>();
   private readonly peers = new Map<string, StudioLivePeer>();
   private readonly locks = new Map<string, StudioLiveLock>();
   private readonly lastSequenceBySession = new Map<string, number>();
   private transport: StudioLiveTransport | null = null;
   private unsubscribeTransport: (() => void) | null = null;
   private unsubscribeTransportControl: (() => void) | null = null;
+  private unsubscribeTransportCrdt: (() => void) | null = null;
   private heartbeatHandle: unknown = null;
   private phase: "idle" | "starting" | "ready" | "closed" = "idle";
   private startPromise: Promise<void> | null = null;
@@ -205,6 +220,11 @@ export class StudioLiveRoom {
     return () => this.listeners.delete(listener);
   }
 
+  subscribeCrdt(listener: (event: StudioLiveCrdtRoomEvent) => void): () => void {
+    this.crdtListeners.add(listener);
+    return () => this.crdtListeners.delete(listener);
+  }
+
   async start(): Promise<void> {
     if (this.phase === "ready") return;
     if (this.phase === "closed") throw new Error("이미 닫힌 공동작업 세션입니다.");
@@ -222,6 +242,8 @@ export class StudioLiveRoom {
       this.unsubscribeTransport = transport.subscribe((value) => this.onTransportMessage(value));
       this.unsubscribeTransportControl =
         transport.subscribeControl?.((event) => this.onTransportControl(event)) ?? null;
+      this.unsubscribeTransportCrdt =
+        transport.subscribeCrdt?.((message) => this.emitCrdt(message)) ?? null;
       try {
         await transport.connect();
         if (this.phase === "closed" || generation !== this.connectionGeneration) {
@@ -239,6 +261,8 @@ export class StudioLiveRoom {
           this.unsubscribeTransport = null;
           this.unsubscribeTransportControl?.();
           this.unsubscribeTransportControl = null;
+          this.unsubscribeTransportCrdt?.();
+          this.unsubscribeTransportCrdt = null;
         }
         transport.close();
         throw error;
@@ -374,6 +398,39 @@ export class StudioLiveRoom {
     return this.post("webrtc:ice", payload, targetSessionId);
   }
 
+  async requestCrdtSync(request: StudioCrdtSyncRequest): Promise<StudioCrdtSyncResponse | null> {
+    if (!this.ready || !this.transport?.requestCrdtSync) {
+      throw new Error("CRDT 동기화 전송 계층이 준비되지 않았습니다.");
+    }
+    try {
+      const response = await this.transport.requestCrdtSync(request);
+      if (response) this.emitCrdt({ type: "sync-response", response, senderSessionId: null });
+      return response;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "CRDT 문서를 동기화하지 못했습니다.";
+      this.emitCrdt({ type: "error", operation: "sync", message });
+      throw error;
+    }
+  }
+
+  respondCrdtSync(response: StudioCrdtSyncResponse, targetSessionId: string): boolean {
+    if (!this.ready || !this.transport?.respondCrdtSync) return false;
+    return this.transport.respondCrdtSync(response, targetSessionId);
+  }
+
+  async publishCrdtUpdate(request: StudioCrdtUpdateRequest): Promise<StudioCrdtUpdateAck> {
+    if (!this.ready || !this.transport?.publishCrdtUpdate) {
+      throw new Error("CRDT 업데이트 전송 계층이 준비되지 않았습니다.");
+    }
+    try {
+      return await this.transport.publishCrdtUpdate(request);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "CRDT 변경을 게시하지 못했습니다.";
+      this.emitCrdt({ type: "error", operation: "publish", message });
+      throw error;
+    }
+  }
+
   stopScreen(payload: StudioLiveScreenStopPayload): boolean {
     return this.post("screen:stop", payload);
   }
@@ -395,12 +452,15 @@ export class StudioLiveRoom {
     this.unsubscribeTransport = null;
     this.unsubscribeTransportControl?.();
     this.unsubscribeTransportControl = null;
+    this.unsubscribeTransportCrdt?.();
+    this.unsubscribeTransportCrdt = null;
     this.transport?.close();
     this.transport = null;
     this.peers.clear();
     this.locks.clear();
     this.lastSequenceBySession.clear();
     this.listeners.clear();
+    this.crdtListeners.clear();
   }
 
   private onHeartbeat(): void {
@@ -670,6 +730,16 @@ export class StudioLiveRoom {
         listener(event);
       } catch {
         // One UI subscriber must not break transport cleanup or other subscribers.
+      }
+    }
+  }
+
+  private emitCrdt(event: StudioLiveCrdtRoomEvent): void {
+    for (const listener of this.crdtListeners) {
+      try {
+        listener(event);
+      } catch {
+        // One CRDT binding cannot interrupt room cleanup or other document subscribers.
       }
     }
   }

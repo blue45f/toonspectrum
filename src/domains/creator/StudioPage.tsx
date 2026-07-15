@@ -397,6 +397,13 @@ import {
   type StudioContinuityIssue,
   type StudioStoryBeat,
 } from "./studio-continuity";
+import { reconcileStudioCrdtHistory } from "./studio-crdt-history";
+import {
+  reconcileStudioCrdtPages,
+  studioDrawElementSampleSlice,
+  studioDrawElementToCrdtStroke,
+} from "./studio-crdt-page-bridge";
+import { STUDIO_CRDT_ORIGIN_LOCAL } from "./studio-crdt-protocol";
 import { creatorWorkSnapshotToStudioProject } from "./studio-creator-work-project";
 import {
   applyCropAspect,
@@ -998,10 +1005,6 @@ import {
 } from "./StudioLayerNavigator";
 import { StudioLineCleanupPanel } from "./StudioLineCleanupPanel";
 import { StudioLineCorrectionControls } from "./StudioLineCorrectionControls";
-import {
-  StudioLivePresenceDockConnected,
-  StudioRemoteCursorOverlay,
-} from "./StudioLiveCanvasOverlay";
 import { StudioLiveCollaborationProvider } from "./StudioLiveCollaborationProvider";
 import { StudioMagicResizePanel } from "./StudioMagicResizePanel";
 import { StudioMagicWandPanel } from "./StudioMagicWandPanel";
@@ -1033,6 +1036,7 @@ import type { Clarity } from "./studio-clarity";
 import type { StudioClip } from "./studio-clips";
 import type { ColorBalance } from "./studio-color-balance";
 import type { ColorToAlpha } from "./studio-color-to-alpha";
+import type { StudioCrdtDocument } from "./studio-crdt-document";
 import type { CurvePoint } from "./studio-curves";
 import type { Detail } from "./studio-detail";
 import type { Distort } from "./studio-distort";
@@ -1113,6 +1117,18 @@ const BUBBLE_TEXT_MEASURER = createCanvasBubbleTextMeasurer();
 const StudioImageAdjustmentsPanel = lazyRetry(
   () => import("./StudioImageAdjustmentsPanel").then((mod) => ({ default: mod.StudioImageAdjustmentsPanel })),
   "StudioImageAdjustmentsPanel"
+);
+const StudioWebGpuCanvas = lazyRetry(
+  () => import("./StudioWebGpuCanvas").then((mod) => ({ default: mod.StudioWebGpuCanvas })),
+  "StudioWebGpuCanvas"
+);
+const StudioLivePresenceDockConnected = lazyRetry(
+  () => import("./StudioLiveCanvasOverlay").then((mod) => ({ default: mod.StudioLivePresenceDockConnected })),
+  "StudioLivePresenceDockConnected"
+);
+const StudioRemoteCursorOverlay = lazyRetry(
+  () => import("./StudioLiveCanvasOverlay").then((mod) => ({ default: mod.StudioRemoteCursorOverlay })),
+  "StudioRemoteCursorOverlay"
 );
 const StudioPageGradePanel = lazyRetry(
   () => import("./StudioPageGradePanel").then((mod) => ({ default: mod.StudioPageGradePanel })),
@@ -4580,6 +4596,7 @@ function studioTimelineClockMs(): number {
 
 const ZOOM_MIN = 0.2;
 const ZOOM_MAX = 5;
+const EMPTY_STUDIO_GPU_STROKES = [] as const;
 function clampZoom(z: number) {
   return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z * 20) / 20));
 }
@@ -4743,6 +4760,8 @@ function StudioCuttoonEditor() {
   // Command-only seam: high-frequency pointer publication does not subscribe this giant editor
   // to live cursor state. The always-mounted provider owns and rotates the actual room.
   const studioLiveRoomRef = useRef<StudioLiveRoom | null>(null);
+  const studioCrdtDocumentRef = useRef<StudioCrdtDocument | null>(null);
+  const [studioCrdtDocument, setStudioCrdtDocument] = useState<StudioCrdtDocument | null>(null);
   const studioLiveHeldResourcesRef = useRef<string[]>([]);
   const [uiDensityMode, setUiDensityMode] = useState<StudioUiDensityMode>(() =>
     loadStudioUiDensityState(
@@ -4911,6 +4930,10 @@ function StudioCuttoonEditor() {
   }
   const handleStudioLiveRoomChange = useCallback((room: StudioLiveRoom | null) => {
     studioLiveRoomRef.current = room;
+  }, []);
+  const handleStudioCrdtDocumentChange = useCallback((document: StudioCrdtDocument | null) => {
+    studioCrdtDocumentRef.current = document;
+    setStudioCrdtDocument(document);
   }, []);
   const workAuthScopeKey = workId ? studioAuthUserId : null;
   const autosaveKey = studioAutosaveKey({ userId: studioAuthUserId, workId, remixId });
@@ -5168,6 +5191,39 @@ function StudioCuttoonEditor() {
   const activePageMutationLocked = pageEditLocked || collaborationDocumentLocked;
   const activeSurfaceReviewLocked =
     collaborationDocumentLocked || (pageEditLocked && !masterEditMode);
+
+  useEffect(() => {
+    if (!studioCrdtDocument || sourceHydrationPending) return;
+    const applyRecords = (
+      records: ReturnType<StudioCrdtDocument["getStrokes"]>,
+      changedStrokeIds: ReadonlySet<string> | null
+    ) => {
+      if (
+        !editorMountedRef.current ||
+        (changedStrokeIds === null ? records.length === 0 : changedStrokeIds.size === 0)
+      ) return;
+      studioRevisionProjectGenerationRef.current += 1;
+      collaborationAccessRef.current = {
+        ...collaborationAccessRef.current,
+        documentGeneration: collaborationAccessRef.current.documentGeneration + 1,
+      };
+      setPagesHistoryState((history) => {
+        const reconciled = reconcileStudioCrdtHistory(
+          history,
+          pagesHiRef.current,
+          records,
+          changedStrokeIds
+        );
+        return reconciled.changed ? reconciled.history : history;
+      });
+    };
+
+    applyRecords(studioCrdtDocument.getStrokes({ includeDeleted: true }), null);
+    return studioCrdtDocument.subscribeChanges(
+      (change) => applyRecords(change.strokes, change.changedStrokeIds),
+      { includeOrigin: (origin) => origin !== STUDIO_CRDT_ORIGIN_LOCAL }
+    );
+  }, [sourceHydrationPending, studioCrdtDocument]);
 
   function collaborationLockMessage(): string {
     if (documentReloadRequired) {
@@ -7547,6 +7603,7 @@ function StudioCuttoonEditor() {
   // 브러시 커서 프리뷰(Konva 노드 직접 갱신 — hover 리렌더 방지).
   const brushCursorRef = useRef<Konva.Circle>(null);
   const [draft, setDraft] = useState<DrawEl | null>(null);
+  const [webGpuPreviewReady, setWebGpuPreviewReady] = useState(false);
   const draftRafRef = useRef<number | null>(null);
   const pendingDraftRef = useRef<DrawEl | null>(null);
   const marqueeRafRef = useRef<number | null>(null);
@@ -9901,6 +9958,89 @@ function StudioCuttoonEditor() {
     tr.getLayer()?.batchDraw();
   }, [collaborationDocumentLocked, selectedId, marqueeIds, tool, elements, groups]);
 
+  function publishStudioCrdtDrawDiff(
+    previousElements: readonly El[],
+    nextElements: readonly El[],
+    pageId: string,
+    registerNewDraws = true
+  ): void {
+    const document = studioCrdtDocumentRef.current;
+    if (!document) return;
+    const previousDraws = new Map(
+      previousElements.filter((element): element is El & DrawEl => element.type === "draw")
+        .map((element) => [element.id, element])
+    );
+    const nextDraws = new Map(
+      nextElements.filter((element): element is El & DrawEl => element.type === "draw")
+        .map((element) => [element.id, element])
+    );
+    try {
+      for (const [id] of previousDraws) {
+        if (!nextDraws.has(id) && document.getStroke(id, true)) {
+          document.deleteStroke(id);
+        }
+      }
+      for (const [id, element] of nextDraws) {
+        const previous = previousDraws.get(id);
+        const current = document.getStroke(id, true);
+        if (!current) {
+          // Existing legacy strokes stay in the saved document. Only drawings created after this
+          // collaboration session begins enter the durable CRDT surface.
+          if (!previous && registerNewDraws) {
+            document.replaceStroke(studioDrawElementToCrdtStroke(pageId, element));
+          }
+          continue;
+        }
+        // A tombstoned stroke may still exist in this render's stale React snapshot because Yjs
+        // applies the peer delete synchronously and history reconciliation follows asynchronously.
+        // Only an actual absent -> present transition (redo/explicit re-add) is allowed to restore
+        // it; an unrelated commit must preserve the peer's delete.
+        if (current.deleted) {
+          if (!previous) document.restoreStroke(id);
+          else continue;
+        }
+        if (!previous || previous !== element || current.status !== "finalized") {
+          document.replaceStroke(studioDrawElementToCrdtStroke(pageId, element));
+        }
+      }
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? `실시간 획 동기화: ${cause.message}`
+          : "실시간 획을 팀 문서에 반영하지 못했습니다."
+      );
+    }
+  }
+
+  function publishStudioCrdtHistoryTransition(
+    previousPages: readonly PageState[],
+    nextPages: readonly PageState[]
+  ): void {
+    if (!studioCrdtDocumentRef.current) return;
+    const pageIds = new Set([
+      ...previousPages.map((page) => page.id),
+      ...nextPages.map((page) => page.id),
+    ]);
+    for (const pageId of pageIds) {
+      publishStudioCrdtDrawDiff(
+        previousPages.find((page) => page.id === pageId)?.elements ?? [],
+        nextPages.find((page) => page.id === pageId)?.elements ?? [],
+        pageId,
+        false
+      );
+    }
+  }
+
+  function mergeStudioCrdtDrawsIntoElements(pageId: string, nextElements: El[]): El[] {
+    const document = studioCrdtDocumentRef.current;
+    if (!document) return nextElements;
+    const reconciled = reconcileStudioCrdtPages(
+      [{ id: pageId, elements: nextElements }],
+      document.getStrokes({ includeDeleted: true })
+    );
+    return reconciled.pages[0]?.elements ?? nextElements;
+  }
+
   // 요소 변경을 히스토리에 커밋. (마스터 편집 모드에서는 문서 마스터로 커밋 — 히스토리 미포함, 패널에서 고지)
   // extraPatch — 레이어 삭제 시 elements 와 animTimeline(트랙 정리)을 원자적(단일 undo 스텝)으로
   // 함께 커밋하기 위한 옵셔널 2번째 파라미터(하위호환 — 기존 15곳 이상의 commit(nextElements)
@@ -9917,7 +10057,7 @@ function StudioCuttoonEditor() {
       return;
     }
     setSharedDocumentNotice(null);
-    const resolved = applyBubbleAnchors(nextElements);
+    let resolved = applyBubbleAnchors(nextElements);
     if (masterEditMode) {
       setMaster((m) => withMasterElements(m, resolved)); // extraPatch는 마스터엔 개념 없음 — 무시
       return;
@@ -9929,6 +10069,8 @@ function StudioCuttoonEditor() {
     if (!advancedFillApplyingRef.current) {
       invalidateAdvancedFillWork("문서가 바뀌어 진행 중인 계산과 채우기 미리보기를 취소했습니다.");
     }
+    publishStudioCrdtDrawDiff(elements, resolved, activePage.id);
+    resolved = mergeStudioCrdtDrawsIntoElements(activePage.id, resolved);
     coalesceKeyRef.current = null; // 일반 커밋은 합치기 체인을 끊는다.
     const nextPages = pages.map((p) => (p.id === activePage.id ? { ...p, ...extraPatch, elements: resolved } : p));
     const h = pagesHistory.slice(0, pagesHi + 1);
@@ -9948,7 +10090,7 @@ function StudioCuttoonEditor() {
       return;
     }
     setSharedDocumentNotice(null);
-    const resolved = applyBubbleAnchors(nextElements);
+    let resolved = applyBubbleAnchors(nextElements);
     if (masterEditMode) {
       // 마스터 편집은 히스토리 밖이라 합치기(coalesce) 개념이 없다 — 마스터로 바로 커밋.
       setMaster((m) => withMasterElements(m, resolved));
@@ -9961,6 +10103,8 @@ function StudioCuttoonEditor() {
     if (!advancedFillApplyingRef.current) {
       invalidateAdvancedFillWork("문서가 바뀌어 진행 중인 계산과 채우기 미리보기를 취소했습니다.");
     }
+    publishStudioCrdtDrawDiff(elements, resolved, activePage.id);
+    resolved = mergeStudioCrdtDrawsIntoElements(activePage.id, resolved);
     const nextPages = pages.map((p) => (p.id === activePage.id ? { ...p, elements: resolved } : p));
     if (coalesceKeyRef.current === key && pagesHi === pagesHistory.length - 1) {
       setPagesHistory((h) => {
@@ -9998,9 +10142,28 @@ function StudioCuttoonEditor() {
     if (!advancedFillApplyingRef.current) {
       invalidateAdvancedFillWork("문서가 바뀌어 진행 중인 계산과 채우기 미리보기를 취소했습니다.");
     }
+    const document = studioCrdtDocumentRef.current;
+    let resolvedPages = nextPages;
+    if (document) {
+      const pageIds = new Set([
+        ...pages.map((page) => page.id),
+        ...nextPages.map((page) => page.id),
+      ]);
+      for (const pageId of pageIds) {
+        publishStudioCrdtDrawDiff(
+          pages.find((page) => page.id === pageId)?.elements ?? [],
+          nextPages.find((page) => page.id === pageId)?.elements ?? [],
+          pageId
+        );
+      }
+      const records = document.getStrokes({ includeDeleted: true });
+      resolvedPages = nextPages.map((page) =>
+        reconcileStudioCrdtPages([page], records).pages[0] ?? page
+      );
+    }
     coalesceKeyRef.current = null;
     const h = pagesHistory.slice(0, pagesHi + 1);
-    h.push(nextPages);
+    h.push(resolvedPages);
     setPagesHistory(h);
     setPagesHi(h.length - 1);
     return true;
@@ -11304,7 +11467,10 @@ function StudioCuttoonEditor() {
     setAdvancedFillBusy(false);
     setAdvancedFillPreview(null);
     setAdvancedFillStatus(null);
-    setPagesHi((i) => Math.max(0, i - 1));
+    const nextIndex = Math.max(0, pagesHi - 1);
+    const nextSnapshot = pagesHistory[nextIndex];
+    if (nextSnapshot) publishStudioCrdtHistoryTransition(pages, nextSnapshot);
+    setPagesHi(nextIndex);
   };
   const redo = () => {
     if (masterEditMode || collaborationDocumentLocked) return;
@@ -11314,7 +11480,10 @@ function StudioCuttoonEditor() {
     setAdvancedFillBusy(false);
     setAdvancedFillPreview(null);
     setAdvancedFillStatus(null);
-    setPagesHi((i) => Math.min(pagesHistory.length - 1, i + 1));
+    const nextIndex = Math.min(pagesHistory.length - 1, pagesHi + 1);
+    const nextSnapshot = pagesHistory[nextIndex];
+    if (nextSnapshot) publishStudioCrdtHistoryTransition(pages, nextSnapshot);
+    setPagesHi(nextIndex);
   };
   function fitCanvasToWidth() {
     const wrap = wrapRef.current;
@@ -11437,7 +11606,10 @@ function StudioCuttoonEditor() {
     setAdvancedFillBusy(false);
     setAdvancedFillPreview(null);
     setAdvancedFillStatus(null);
-    setPagesHi(Math.max(0, Math.min(pagesHistory.length - 1, index)));
+    const nextIndex = Math.max(0, Math.min(pagesHistory.length - 1, index));
+    const nextSnapshot = pagesHistory[nextIndex];
+    if (nextSnapshot) publishStudioCrdtHistoryTransition(pages, nextSnapshot);
+    setPagesHi(nextIndex);
   };
 
   // 키보드 단축키: ⌘Z 실행취소 · ⌘⇧Z/⌘Y 다시실행 · G 고급 채우기 · ⌘D 복제 · Delete/Backspace 삭제 · Esc 메뉴 닫기/선택해제.
@@ -14581,6 +14753,15 @@ function StudioCuttoonEditor() {
     drawingVelocityRef.current = null;
   }
   function discardDrawingPointerSession() {
+    const discardedId = drawingRef.current?.id;
+    if (discardedId) {
+      try {
+        studioCrdtDocumentRef.current?.deleteStroke(discardedId);
+      } catch {
+        // A room may close between pointercancel and cleanup; the unfinished local draft is still
+        // discarded and state-vector sync will repair the durable document on reconnect.
+      }
+    }
     drawingRef.current = null;
     perspectiveRayRef.current = null;
     isometricAxisRayRef.current = null;
@@ -15072,7 +15253,10 @@ function StudioCuttoonEditor() {
         }
         return;
       }
-      if (!beginLiveResourceEdit()) return;
+      // A CRDT stroke has its own conflict-free operation stream, so it must not claim the old
+      // page-wide lease that prevented two artists from drawing at once. Keep the lease fallback
+      // only while the durable document is not connected.
+      if (!studioCrdtDocumentRef.current && !beginLiveResourceEdit()) return;
       const pointerSession = beginStudioStrokePointerSession(pointerSample);
       // A second contact cannot replace a live pen stroke. Right-click/barrel-button presses also
       // remain available to the context menu instead of leaving a one-point draft behind.
@@ -15173,6 +15357,17 @@ function StudioCuttoonEditor() {
         drawMode === "shape" || drawMode === "pixel"
           ? null
           : createStudioPointerVelocityState(pointerSample);
+      try {
+        studioCrdtDocumentRef.current?.beginStroke(
+          studioDrawElementToCrdtStroke(activePage.id, next)
+        );
+      } catch (cause) {
+        setError(
+          cause instanceof Error
+            ? `실시간 획 시작: ${cause.message}`
+            : "실시간 획을 시작하지 못했지만 로컬 드로잉은 계속할 수 있습니다."
+        );
+      }
       drawingRef.current = next;
       perspectiveRayRef.current = null; // 새 스트로크마다 원근 락을 다시 잡는다(첫 move에서 재계산).
       isometricAxisRayRef.current = null; // 새 스트로크마다 아이소메트릭 축 락도 다시 잡는다.
@@ -15744,6 +15939,7 @@ function StudioCuttoonEditor() {
 
     const batch = collectStudioStrokePointerBatch(session, pointerEvent, { includePredicted });
     drawingPointerSessionRef.current = batch.session;
+    const crdtSampleStart = Math.floor((drawingRef.current?.points.length ?? 0) / 2);
     try {
       // Konva derives canvas coordinates from client coordinates. Temporarily feeding each restored
       // hardware event through the public pointer API avoids duplicating its transform math.
@@ -15751,6 +15947,23 @@ function StudioCuttoonEditor() {
         stage.setPointersPositions(sample);
         const point = stage.getRelativePointerPosition();
         if (point) appendFreehandStrokePoint(point, sample);
+      }
+
+      const authoritativeForCrdt = drawingRef.current;
+      const crdtDocument = studioCrdtDocumentRef.current;
+      if (authoritativeForCrdt && crdtDocument?.getStroke(authoritativeForCrdt.id, true)) {
+        const samples = studioDrawElementSampleSlice(authoritativeForCrdt, crdtSampleStart);
+        if (samples) {
+          try {
+            crdtDocument.appendStrokeSamples(authoritativeForCrdt.id, samples);
+          } catch (cause) {
+            setError(
+              cause instanceof Error
+                ? `실시간 획 전송: ${cause.message}`
+                : "실시간 획 샘플을 팀 문서에 추가하지 못했습니다."
+            );
+          }
+        }
       }
 
       const authoritativeDrawing = drawingRef.current;
@@ -18559,6 +18772,48 @@ function StudioCuttoonEditor() {
   const isolatedDynamicDraft = draft?.mode === "pen" && resolveStudioBrushDynamicsPresetId(draft.brush) !== null
     ? draft
     : null;
+  // G10b vertical slice: the latency-sensitive, pressure-aware ink/eraser preview is composited on
+  // WebGPU (with a silent Canvas2D fallback). Texture, particle and shape brushes stay on their
+  // exact Konva renderers until their shaders reach visual parity; an eraser preview also stays in
+  // the scene canvas because a separate transparent DOM surface cannot destination-out pixels in
+  // the Konva surface below it. Committed document/export nodes remain authoritative throughout
+  // the staged renderer migration.
+  const webGpuDraft = draft && draft.mode !== "eraser"
+    && (draft.kind ?? "freehand") === "freehand" && !isolatedDynamicDraft
+    && resolveStudioBrushRenderFamily(draft.brush ?? "pen") === "pen"
+    && (draft.opacity ?? 1) >= 0.999
+    && (draft.symmetry?.type ?? "none") === "none"
+    // Until the compositor is tiled, never downsample a tall/zoomed canvas to the device's common
+    // 8K texture limit. This conservative CSS-pixel guard preserves exact Konva preview quality.
+    && canvasH * effScale <= 4_096
+      ? draft
+      : null;
+  const webGpuPreviewPoints = webGpuDraft
+    ? processFreehandPoints(
+        webGpuDraft.points,
+        strokeRenderDistance(webGpuDraft.sampleSpacing)
+      )
+    : null;
+  const webGpuPreviewPressures = webGpuDraft && webGpuPreviewPoints
+    ? resampleStrokePressures(
+        webGpuDraft.pressures ?? [],
+        Math.floor(webGpuPreviewPoints.length / 2),
+        0.5
+      )
+    : null;
+  const webGpuPreviewStrokes = webGpuDraft && webGpuPreviewPoints
+    ? [
+        {
+          id: webGpuDraft.id,
+          points: webGpuPreviewPoints,
+          pressures: webGpuPreviewPressures ?? undefined,
+          color: webGpuDraft.stroke,
+          size: webGpuDraft.strokeWidth,
+          opacity: webGpuDraft.opacity,
+          composite: "normal" as const,
+        },
+      ]
+    : EMPTY_STUDIO_GPU_STROKES;
 
   return (
     <StudioLiveCollaborationProvider
@@ -18566,9 +18821,11 @@ function StudioCuttoonEditor() {
       participant={studioLiveParticipant}
       currentPageId={activePage.id}
       currentTool={tool}
+      outboxScope={studioAuthUserId}
       transportFactory={studioLiveTransportFactory}
       serverRequired={Boolean(studioLiveParticipant)}
       onRoomChange={handleStudioLiveRoomChange}
+      onCrdtDocumentChange={handleStudioCrdtDocumentChange}
     >
     <div
       ref={studioRootRef}
@@ -22627,21 +22884,24 @@ function StudioCuttoonEditor() {
             )}
           >
           <div className="pointer-events-none sticky top-2 z-40 flex h-0 items-start justify-end pr-2">
-            <StudioLivePresenceDockConnected
-              followingSessionId={followingStudioSessionId}
-              onOpenTeam={() => setTeamPanelOpen(true)}
-              onToggleFollow={(sessionId) =>
-                setFollowingStudioSessionId((current) =>
-                  current === sessionId ? null : sessionId
-                )
-              }
-              onFollowPage={(pageId) => {
-                if (pageId === activePage.id || !pages.some((page) => page.id === pageId)) return;
-                setCurrentPageId(pageId);
-                setSelectedId(null);
-                setTool("select");
-              }}
-            />
+            <Suspense fallback={null}>
+              <StudioLivePresenceDockConnected
+                operationSyncReady={studioCrdtDocument !== null}
+                followingSessionId={followingStudioSessionId}
+                onOpenTeam={() => setTeamPanelOpen(true)}
+                onToggleFollow={(sessionId) =>
+                  setFollowingStudioSessionId((current) =>
+                    current === sessionId ? null : sessionId
+                  )
+                }
+                onFollowPage={(pageId) => {
+                  if (pageId === activePage.id || !pages.some((page) => page.id === pageId)) return;
+                  setCurrentPageId(pageId);
+                  setSelectedId(null);
+                  setTool("select");
+                }}
+              />
+            </Suspense>
           </div>
           {sourceHydrationPending || collaborationDocumentUnavailable ? (
             <div className="sticky left-0 top-0 z-20 grid min-h-[15rem] w-full place-items-center px-6 py-10 text-center lg:min-h-[20rem]">
@@ -22705,7 +22965,10 @@ function StudioCuttoonEditor() {
             )}
             style={{ width: CANVAS_W * effScale, height: canvasH * effScale }}
           >
-          <div style={{ filter: [pageGradeCss, colorBlindFilterStyle(colorBlindPreview).filter].filter(Boolean).join(" ") || undefined }}>
+          <div
+            className="relative"
+            style={{ filter: [pageGradeCss, colorBlindFilterStyle(colorBlindPreview).filter].filter(Boolean).join(" ") || undefined }}
+          >
           <Stage
             ref={stageRef}
             width={CANVAS_W * effScale}
@@ -23766,7 +24029,9 @@ function StudioCuttoonEditor() {
                   </>
                 );
               })()}
-              {draft && !isolatedDynamicDraft ? <StudioDrawNode el={draft} /> : null}
+              {draft && !isolatedDynamicDraft && !(webGpuDraft && webGpuPreviewReady)
+                ? <StudioDrawNode el={draft} />
+                : null}
               <Transformer
                 ref={trRef}
                 rotateEnabled
@@ -24378,6 +24643,16 @@ function StudioCuttoonEditor() {
               </Layer>
             )}
           </Stage>
+          <Suspense fallback={null}>
+            <StudioWebGpuCanvas
+              className="pointer-events-none absolute inset-0 z-10"
+              width={CANVAS_W}
+              height={canvasH}
+              flipX={canvasFlipH}
+              strokes={webGpuPreviewStrokes}
+              onBackendChange={() => setWebGpuPreviewReady(true)}
+            />
+          </Suspense>
           </div>
           {pageGrade.vignette > 0 && (
             <div
@@ -24386,18 +24661,20 @@ function StudioCuttoonEditor() {
             />
           )}
           {!masterEditMode ? (
-            <StudioRemoteCursorOverlay
-              pageId={activePage.id}
-              canvasWidth={CANVAS_W}
-              canvasHeight={canvasH}
-              hidden={isExporting || sourceHydrationPending || collaborationDocumentUnavailable}
-              commentPins={collaborationDocumentLocked ? [] : studioCanvasCommentPins}
-              onCommentPinClick={(anchor) => {
-                selectStudioCommentAnchor(anchor);
-                setTeamPanelOpen(false);
-                setCommentsOpen(true);
-              }}
-            />
+            <Suspense fallback={null}>
+              <StudioRemoteCursorOverlay
+                pageId={activePage.id}
+                canvasWidth={CANVAS_W}
+                canvasHeight={canvasH}
+                hidden={isExporting || sourceHydrationPending || collaborationDocumentUnavailable}
+                commentPins={collaborationDocumentLocked ? [] : studioCanvasCommentPins}
+                onCommentPinClick={(anchor) => {
+                  selectStudioCommentAnchor(anchor);
+                  setTeamPanelOpen(false);
+                  setCommentsOpen(true);
+                }}
+              />
+            </Suspense>
           ) : null}
           </div>
           </div>

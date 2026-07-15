@@ -30,6 +30,7 @@ interface RoomRecord {
     participant: StudioLiveParticipant;
     dependencies?: { transportFactory?: StudioLiveTransportFactory };
   };
+  ready: boolean;
   closeCount: number;
   startCount: number;
   unsubscribeCount: number;
@@ -151,6 +152,16 @@ const hooks = vi.hoisted(() => {
 });
 
 const rooms = vi.hoisted(() => ({ instances: [] as RoomRecord[] }));
+const lifecycle = vi.hoisted(() => ({
+  roomStart: "pending" as "pending" | "resolve" | "reject",
+  bindingStart: "resolve" as "pending" | "resolve" | "reject",
+  documents: [] as Array<{ destroyCount: number }>,
+  bindings: [] as Array<{
+    closeCount: number;
+    closeGracefullyCount: number;
+    document: { destroyCount: number };
+  }>,
+}));
 
 vi.mock("react", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react")>();
@@ -164,13 +175,17 @@ vi.mock("react", async (importOriginal) => {
 
 vi.mock("./studio-live-collaboration-room", () => {
   class StudioLiveRoom {
-    readonly ready = false;
     readonly mode = "server";
     readonly record: RoomRecord;
+
+    get ready(): boolean {
+      return this.record.ready;
+    }
 
     constructor(options: RoomRecord["options"]) {
       this.record = {
         options,
+        ready: false,
         closeCount: 0,
         startCount: 0,
         unsubscribeCount: 0,
@@ -191,7 +206,13 @@ vi.mock("./studio-live-collaboration-room", () => {
 
     start(): Promise<void> {
       this.record.startCount += 1;
-      // Keep connection completion outside this lifecycle-focused test driver.
+      if (lifecycle.roomStart === "reject") {
+        return Promise.reject(new Error("room start failed"));
+      }
+      if (lifecycle.roomStart === "resolve") {
+        this.record.ready = true;
+        return Promise.resolve();
+      }
       return new Promise(() => undefined);
     }
 
@@ -220,6 +241,51 @@ vi.mock("./studio-live-collaboration-room", () => {
   return { StudioLiveRoom };
 });
 
+vi.mock("./studio-crdt-document", () => ({
+  StudioCrdtDocument: class StudioCrdtDocument {
+    readonly record = { destroyCount: 0 };
+
+    constructor() {
+      lifecycle.documents.push(this.record);
+    }
+
+    destroy(): void {
+      this.record.destroyCount += 1;
+    }
+  },
+}));
+
+vi.mock("./studio-crdt-room-binding", () => ({
+  StudioCrdtRoomBinding: class StudioCrdtRoomBinding {
+    readonly record: (typeof lifecycle.bindings)[number];
+
+    constructor(options: { document: { record: { destroyCount: number } } }) {
+      this.record = {
+        closeCount: 0,
+        closeGracefullyCount: 0,
+        document: options.document.record,
+      };
+      lifecycle.bindings.push(this.record);
+    }
+
+    start(): Promise<void> {
+      if (lifecycle.bindingStart === "reject") {
+        return Promise.reject(new Error("binding start failed"));
+      }
+      if (lifecycle.bindingStart === "resolve") return Promise.resolve();
+      return new Promise(() => undefined);
+    }
+
+    close(): void {
+      this.record.closeCount += 1;
+    }
+
+    async closeGracefully(): Promise<void> {
+      this.record.closeGracefullyCount += 1;
+    }
+  },
+}));
+
 const participant: Omit<StudioLiveParticipant, "sessionId"> = {
   displayName: "민지",
   role: "editor",
@@ -238,6 +304,7 @@ interface RenderProviderOptions {
   transportFactory?: StudioLiveTransportFactory | null;
   serverRequired?: boolean;
   onRoomChange?: (room: unknown) => void;
+  onCrdtDocumentChange?: (document: unknown) => void;
 }
 
 function renderProvider(options: RenderProviderOptions = {}): StudioLiveCollaborationContextValue {
@@ -253,6 +320,7 @@ function renderProvider(options: RenderProviderOptions = {}): StudioLiveCollabor
         : (options.transportFactory ?? transportFactory),
     serverRequired: options.serverRequired,
     onRoomChange: options.onRoomChange,
+    onCrdtDocumentChange: options.onCrdtDocumentChange,
   }));
   return (output as { props: { value: StudioLiveCollaborationContextValue } }).props.value;
 }
@@ -260,6 +328,10 @@ function renderProvider(options: RenderProviderOptions = {}): StudioLiveCollabor
 describe("StudioLiveCollaborationProvider lifecycle", () => {
   beforeEach(() => {
     rooms.instances.length = 0;
+    lifecycle.roomStart = "pending";
+    lifecycle.bindingStart = "resolve";
+    lifecycle.documents.length = 0;
+    lifecycle.bindings.length = 0;
   });
 
   afterEach(() => {
@@ -379,5 +451,56 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
     expect(room.unsubscribeCount).toBe(1);
     expect(room.closeCount).toBe(1);
     expect(onRoomChange).toHaveBeenLastCalledWith(null);
+  });
+
+  it("exposes the CRDT document only after binding sync and destroys it on unmount", async () => {
+    lifecycle.roomStart = "resolve";
+    const onRoomChange = vi.fn();
+    const onCrdtDocumentChange = vi.fn();
+    renderProvider({ onRoomChange, onCrdtDocumentChange });
+
+    await vi.waitFor(() => {
+      expect(lifecycle.bindings).toHaveLength(1);
+      expect(onCrdtDocumentChange).toHaveBeenCalledWith(expect.anything());
+    });
+    const room = rooms.instances[0];
+    const binding = lifecycle.bindings[0];
+    const document = lifecycle.documents[0];
+
+    hooks.unmount();
+    await vi.waitFor(() => {
+      expect(binding?.closeGracefullyCount).toBe(1);
+      expect(document?.destroyCount).toBe(1);
+      expect(room?.closeCount).toBe(1);
+    });
+
+    expect(onCrdtDocumentChange).toHaveBeenLastCalledWith(null);
+    expect(onRoomChange).toHaveBeenLastCalledWith(null);
+  });
+
+  it("fails closed and releases every resource when initial CRDT sync rejects", async () => {
+    lifecycle.roomStart = "resolve";
+    lifecycle.bindingStart = "reject";
+    const onRoomChange = vi.fn();
+    const onCrdtDocumentChange = vi.fn();
+    const options = { onRoomChange, onCrdtDocumentChange };
+    renderProvider(options);
+
+    await vi.waitFor(() => {
+      expect(lifecycle.bindings).toHaveLength(1);
+      expect(lifecycle.bindings[0]?.closeCount).toBe(1);
+      expect(lifecycle.documents[0]?.destroyCount).toBe(1);
+      expect(rooms.instances[0]?.closeCount).toBe(1);
+    });
+    const failed = renderProvider(options);
+
+    expect(failed.availability).toBe("error");
+    expect(failed.error).toContain("binding start failed");
+    expect(onCrdtDocumentChange).toHaveBeenLastCalledWith(null);
+    expect(onRoomChange).toHaveBeenLastCalledWith(null);
+
+    hooks.unmount();
+    expect(rooms.instances[0]?.closeCount).toBe(1);
+    expect(lifecycle.documents[0]?.destroyCount).toBe(1);
   });
 });

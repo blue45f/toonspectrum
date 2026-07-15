@@ -1,5 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import {
+  encodeStudioCrdtStateVector,
+  encodeStudioCrdtSyncChunks,
+  encodeStudioCrdtUpdate,
+  STUDIO_CRDT_PROTOCOL_VERSION,
+  type StudioCrdtTransportMessage,
+} from "./studio-crdt-protocol";
 import {
   STUDIO_LIVE_ICE_CANDIDATE_MAX_LENGTH,
   STUDIO_LIVE_SDP_MAX_LENGTH,
@@ -70,6 +77,7 @@ class FakeSocket implements StudioLiveSocketLike {
   readonly emitted: EmittedRecord[] = [];
   readonly listeners = new Map<string, Set<(...args: unknown[]) => void>>();
   readonly heldAcks = new Map<string, Array<(value: unknown) => void>>();
+  readonly ackResponses = new Map<string, unknown>();
   joinResponse: unknown = joinSuccess();
   holdEvents = new Set<string>();
 
@@ -101,7 +109,11 @@ class FakeSocket implements StudioLiveSocketLike {
       this.heldAcks.set(event, queue);
       return this;
     }
-    callback(event === "studio:join" ? this.joinResponse : { ok: true, data: {} });
+    callback(
+      event === "studio:join"
+        ? this.joinResponse
+        : (this.ackResponses.get(event) ?? { ok: true, data: {} })
+    );
     return this;
   }
 
@@ -166,6 +178,10 @@ function activate(transport: StudioLiveSocketTransport): void {
     )
   ).toBe(true);
 }
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("StudioLiveSocketTransport", () => {
   it("uses a same-origin websocket auth handshake and stays unready until join ACL succeeds", async () => {
@@ -893,5 +909,248 @@ describe("StudioLiveSocketTransport", () => {
     expect(transport.ready).toBe(false);
     expect(JSON.stringify(socket.emitted)).not.toContain(TOKEN);
     transport.close();
+  });
+
+  it("uses ACKed durable CRDT events outside the ephemeral signaling union", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    const stateVector = encodeStudioCrdtStateVector(new Uint8Array([0]));
+    const syncBytes = new Uint8Array([1, 2, 3, 4]);
+    const chunks = encodeStudioCrdtSyncChunks(syncBytes);
+    socket.ackResponses.set("studio:crdt:sync", {
+      ok: true,
+      data: {
+        protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+        workId: "work-1",
+        requestId: "request-1",
+        transferId: "11111111-1111-4111-8111-111111111111",
+        chunks,
+        chunkCount: chunks.length,
+        totalBytes: syncBytes.byteLength,
+        serverStateVector: stateVector,
+        serverSequence: "12",
+      },
+    });
+    socket.ackResponses.set("studio:crdt:update", {
+      ok: true,
+      data: {
+        protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+        workId: "work-1",
+        updateId: "22222222-2222-4222-8222-222222222222",
+        serverSequence: "13",
+        serverStateVector: stateVector,
+        duplicate: false,
+      },
+    });
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    const ephemeral: unknown[] = [];
+    transport.subscribe((value) => ephemeral.push(value));
+    await transport.connect();
+
+    await expect(
+      transport.requestCrdtSync({
+        protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+        workId: "work-1",
+        requestId: "request-1",
+        stateVector,
+      })
+    ).resolves.toEqual(
+      expect.objectContaining({
+        transferId: "11111111-1111-4111-8111-111111111111",
+        chunks,
+      })
+    );
+    await expect(
+      transport.publishCrdtUpdate({
+        protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+        workId: "work-1",
+        updateId: "22222222-2222-4222-8222-222222222222",
+        clientSequence: 1,
+        update: encodeStudioCrdtUpdate(new Uint8Array([9, 8, 7])),
+      })
+    ).resolves.toEqual(
+      expect.objectContaining({
+        updateId: "22222222-2222-4222-8222-222222222222",
+        serverSequence: "13",
+      })
+    );
+    expect(
+      socket.emitted.filter(
+        ({ event }) => event === "studio:crdt:sync" || event === "studio:crdt:update"
+      )
+    ).toHaveLength(2);
+    expect(ephemeral).toEqual([]);
+    transport.close();
+  });
+
+  it("coalesces an in-flight updateId retry and deduplicates remote broadcasts", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.holdEvents.add("studio:crdt:update");
+    const stateVector = encodeStudioCrdtStateVector(new Uint8Array([0]));
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    const durable: StudioCrdtTransportMessage[] = [];
+    transport.subscribeCrdt((message) => durable.push(message));
+    await transport.connect();
+    const request = {
+      protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+      workId: "work-1",
+      updateId: "33333333-3333-4333-8333-333333333333",
+      clientSequence: 1,
+      update: encodeStudioCrdtUpdate(new Uint8Array([5, 6, 7])),
+    } as const;
+    const first = transport.publishCrdtUpdate(request);
+    const retry = transport.publishCrdtUpdate(request);
+    expect(retry).toBe(first);
+    expect(socket.emitted.filter(({ event }) => event === "studio:crdt:update")).toHaveLength(1);
+    socket.reply("studio:crdt:update", {
+      ok: true,
+      data: {
+        protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+        workId: "work-1",
+        updateId: request.updateId,
+        serverSequence: "21",
+        serverStateVector: stateVector,
+        duplicate: false,
+      },
+    });
+    await expect(first).resolves.toEqual(expect.objectContaining({ serverSequence: "21" }));
+
+    const remoteUpdate = {
+      protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+      workId: "work-1",
+      updateId: "44444444-4444-4444-8444-444444444444",
+      serverSequence: "22",
+      update: request.update,
+    } as const;
+    socket.serverEmit("studio:crdt:update", remoteUpdate);
+    socket.serverEmit("studio:crdt:update", remoteUpdate);
+    expect(durable).toEqual([
+      expect.objectContaining({ type: "update", update: remoteUpdate }),
+    ]);
+    transport.close();
+  });
+
+  it("rejects a durable CRDT operation when its Socket.IO ACK never arrives", async () => {
+    vi.useFakeTimers();
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.holdEvents.add("studio:crdt:update");
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    await transport.connect();
+    const request = {
+      protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+      workId: "work-1",
+      updateId: "66666666-6666-4666-8666-666666666666",
+      clientSequence: 1,
+      update: encodeStudioCrdtUpdate(new Uint8Array([5, 4, 3])),
+    } as const;
+
+    const publication = transport.publishCrdtUpdate(request);
+    const rejected = expect(publication).rejects.toThrow("응답 시간이 초과");
+    await vi.advanceTimersByTimeAsync(10_000);
+    await rejected;
+
+    // A very late ACK belongs to the expired operation and must not revive it or emit errors.
+    socket.reply("studio:crdt:update", {
+      ok: true,
+      data: {
+        protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+        workId: "work-1",
+        updateId: request.updateId,
+        serverSequence: "23",
+        serverStateVector: encodeStudioCrdtStateVector(new Uint8Array([0])),
+        duplicate: false,
+      },
+    });
+    transport.close();
+  });
+
+  it("rejects a CRDT ACK whose durable operation id does not match the request", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    const stateVector = encodeStudioCrdtStateVector(new Uint8Array([0]));
+    socket.ackResponses.set("studio:crdt:update", {
+      ok: true,
+      data: {
+        protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+        workId: "work-1",
+        updateId: "88888888-8888-4888-8888-888888888888",
+        serverSequence: "24",
+        serverStateVector: stateVector,
+        duplicate: false,
+      },
+    });
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    await transport.connect();
+
+    await expect(
+      transport.publishCrdtUpdate({
+        protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+        workId: "work-1",
+        updateId: "77777777-7777-4777-8777-777777777777",
+        clientSequence: 1,
+        update: encodeStudioCrdtUpdate(new Uint8Array([1, 2, 3])),
+      })
+    ).rejects.toThrow("식별자가 요청과 일치하지 않습니다");
+    transport.close();
+  });
+
+  it("accepts a fresh state-vector sync after an authenticated reconnect", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    const stateVector = encodeStudioCrdtStateVector(new Uint8Array([0]));
+    const chunks = encodeStudioCrdtSyncChunks(new Uint8Array([0]));
+    socket.ackResponses.set("studio:crdt:sync", {
+      ok: true,
+      data: {
+        protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+        workId: "work-1",
+        requestId: "reconnect-request",
+        transferId: "55555555-5555-4555-8555-555555555555",
+        chunks,
+        chunkCount: chunks.length,
+        totalBytes: 1,
+        serverStateVector: stateVector,
+        serverSequence: "0",
+      },
+    });
+    const room = new StudioLiveRoom({
+      workId: "work-1",
+      participant: localParticipant,
+      dependencies: {
+        transportFactory: createStudioServerLiveTransportFactory(TOKEN, {
+          createSocket: () => socket,
+          now: () => NOW,
+        }),
+        now: () => NOW,
+      },
+    });
+    await room.start();
+    await room.requestCrdtSync({
+      protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+      workId: "work-1",
+      requestId: "reconnect-request",
+      stateVector,
+    });
+    expect(socket.emitted.filter(({ event }) => event === "studio:crdt:sync")).toHaveLength(1);
+
+    socket.serverDisconnect();
+    socket.serverReconnect();
+    await room.requestCrdtSync({
+      protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+      workId: "work-1",
+      requestId: "reconnect-request",
+      stateVector,
+    });
+    expect(socket.emitted.filter(({ event }) => event === "studio:crdt:sync")).toHaveLength(2);
+    room.close();
   });
 });

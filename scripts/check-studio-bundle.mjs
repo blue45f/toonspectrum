@@ -93,6 +93,14 @@ if (!fs.existsSync(manifestPath)) {
       fail(`SVG/PSD engines returned to the Studio static graph: ${eagerDocumentEngines.join(", ")}`);
     }
 
+    const eagerCrdtRuntime = matchingEntries(
+      studioKeys,
+      /(?:studio-crdt-document|studio-crdt-room-binding|node_modules.*\/yjs\/)/,
+    );
+    if (eagerCrdtRuntime.length > 0) {
+      fail(`Yjs/CRDT runtime returned to the Studio static graph: ${eagerCrdtRuntime.join(", ")}`);
+    }
+
     const eager3dRuntime = matchingEntries(
       studioKeys,
       /(?:studio-background-3d-primitives|StudioBackground3D|react-three-fiber|three\.module)/,

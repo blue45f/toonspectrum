@@ -38,6 +38,7 @@ export interface StudioLiveCanvasOverlayProps {
 
 export interface StudioLivePresenceDockProps {
   connected: boolean;
+  operationSyncReady?: boolean;
   /** Magma always-on: show while connecting/ready even with zero peers. */
   alwaysOn?: boolean;
   peers: readonly StudioLivePeer[];
@@ -56,6 +57,7 @@ export interface StudioRemoteCursorOverlayProps {
 }
 
 export interface StudioLivePresenceDockConnectedProps {
+  operationSyncReady?: boolean;
   followingSessionId: string | null;
   onOpenTeam: () => void;
   onToggleFollow: (sessionId: string) => void;
@@ -252,6 +254,7 @@ export function StudioRemoteCursorOverlay({
 
 export function StudioLivePresenceDock({
   connected,
+  operationSyncReady = false,
   alwaysOn = false,
   peers,
   followingSessionId,
@@ -267,6 +270,11 @@ export function StudioLivePresenceDock({
   const mobileOverflow = studioPresenceOverflowLabel(mobileHiddenPeerCount);
   const desktopOverflow = studioPresenceOverflowLabel(desktopHiddenPeerCount);
   const connectionLabel = studioPresenceConnectionLabel(connected);
+  const collaborationLabel = connected
+    ? operationSyncReady
+      ? `${connectionLabel} · 획 동시 편집 준비됨`
+      : `${connectionLabel} · 원고 연산 동기화 중`
+    : connectionLabel;
   const followedPeer = peers.find((peer) => peer.sessionId === followingSessionId) ?? null;
 
   return (
@@ -284,8 +292,8 @@ export function StudioLivePresenceDock({
         <UsersRound size={16} strokeWidth={1.75} aria-hidden />
       </button>
       <span
-        aria-label={connectionLabel}
-        title={connectionLabel}
+        aria-label={collaborationLabel}
+        title={collaborationLabel}
         data-studio-presence-link={connected ? "ready" : "retry"}
         className={cn(
           "inline-flex h-7 shrink-0 items-center gap-1 rounded-full border px-1.5",
@@ -296,7 +304,7 @@ export function StudioLivePresenceDock({
         role="status"
       >
         <Radio size={12} aria-hidden />
-        <span className="sr-only">{connectionLabel}</span>
+        <span className="sr-only">{collaborationLabel}</span>
       </span>
 
       <div
@@ -385,6 +393,7 @@ export function StudioLivePresenceDock({
 }
 
 export function StudioLivePresenceDockConnected({
+  operationSyncReady,
   followingSessionId,
   onOpenTeam,
   onToggleFollow,
@@ -407,6 +416,7 @@ export function StudioLivePresenceDockConnected({
   return (
     <StudioLivePresenceDock
       connected={availability === "ready"}
+      operationSyncReady={operationSyncReady}
       alwaysOn
       peers={peers}
       followingSessionId={followingSessionId}
@@ -415,5 +425,3 @@ export function StudioLivePresenceDockConnected({
     />
   );
 }
-
-

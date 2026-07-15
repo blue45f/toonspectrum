@@ -158,6 +158,7 @@ describe("StudioLiveCanvasOverlay", () => {
     const html = renderToStaticMarkup(
       <StudioLivePresenceDock
         connected
+        operationSyncReady
         peers={[
           {
             sessionId: privateSessionId,
@@ -175,6 +176,7 @@ describe("StudioLiveCanvasOverlay", () => {
     );
 
     expect(html).toContain("실시간 공동작업 연결됨");
+    expect(html).toContain("획 동시 편집 준비됨");
     expect(html).toContain('data-studio-presence-dock="true"');
     expect(html).toContain('data-studio-presence-stack="true"');
     expect(html).toContain('data-studio-presence-link="ready"');

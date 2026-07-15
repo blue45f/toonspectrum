@@ -1,6 +1,10 @@
+import { fromUint8Array } from "js-base64";
 import { describe, expect, it, vi } from "vitest";
+import * as Y from "yjs";
 
 import {
+  StudioLiveCrdtSyncSchema,
+  StudioLiveCrdtUpdateSchema,
   StudioLiveCursorSchema,
   StudioLiveGateway,
   StudioLiveJoinSchema,
@@ -16,6 +20,7 @@ import {
 } from "./studio-live.gateway";
 
 import type { CreatorService } from "./creator.service";
+import type { StudioCrdtService } from "./studio-crdt.service";
 import type {
   StudioLiveAuthPrincipal,
   StudioLiveSessionAuthenticator,
@@ -116,12 +121,29 @@ function createHarness(
     },
   };
   const service = { getWorkTeam: vi.fn(getWorkTeam) };
+  const crdtService = {
+    sync: vi.fn(async () => ({
+      chunks: ["AA=="],
+      chunkCount: 1,
+      totalBytes: 1,
+      serverStateVector: "AA==",
+      serverSequence: "0",
+    })),
+    applyUpdate: vi.fn(async (input: { updateId: string; data: string }) => ({
+      duplicate: false,
+      updateId: input.updateId,
+      update: input.data,
+      serverStateVector: "AA==",
+      serverSequence: "1",
+    })),
+  };
   const authenticate = vi.fn(authenticateSession);
   const revalidate = vi.fn(revalidateSession);
   const gateway = new StudioLiveGateway(
     service as unknown as CreatorService,
     authenticate,
-    revalidate
+    revalidate,
+    crdtService as unknown as StudioCrdtService
   );
   gateway.server = namespace as unknown as Namespace;
 
@@ -161,6 +183,7 @@ function createHarness(
   return {
     gateway,
     service,
+    crdtService,
     authenticate,
     revalidate,
     emissions,
@@ -182,6 +205,31 @@ async function connectAndJoin(
     { workId, clientInstanceId: `client-${socket.id}` },
     undefined
   );
+}
+
+function crdtStateVector(): string {
+  const doc = new Y.Doc();
+  const stateVector = fromUint8Array(Y.encodeStateVector(doc));
+  doc.destroy();
+  return stateVector;
+}
+
+function crdtUpdate(key = "stroke", value = "1"): string {
+  const doc = new Y.Doc();
+  doc.getMap<string>("canvas").set(key, value);
+  const update = fromUint8Array(Y.encodeStateAsUpdate(doc));
+  doc.destroy();
+  return update;
+}
+
+function crdtUpdateRequest(sequence = 1) {
+  return {
+    protocolVersion: 1 as const,
+    workId: "work-1",
+    updateId: `00000000-0000-4000-8000-${sequence.toString().padStart(12, "0")}`,
+    clientSequence: sequence,
+    update: crdtUpdate(`stroke-${sequence}`, String(sequence)),
+  };
 }
 
 function createTeamReadGate() {
@@ -221,6 +269,38 @@ describe("studio live protocol", () => {
         shareId: "share-1",
         kind: "description",
         description: { type: "offer", sdp: "s".repeat(48 * 1_024 + 1) },
+      }).success
+    ).toBe(false);
+  });
+
+  it("enforces the exact CRDT v1 request shape and incremental byte boundary", () => {
+    const sync = {
+      protocolVersion: 1,
+      workId: "work-1",
+      requestId: "request-1",
+      stateVector: crdtStateVector(),
+    };
+    expect(StudioLiveCrdtSyncSchema.safeParse(sync).success).toBe(true);
+    expect(StudioLiveCrdtSyncSchema.safeParse({ ...sync, protocolVersion: 2 }).success).toBe(
+      false
+    );
+    expect(StudioLiveCrdtSyncSchema.safeParse({ ...sync, extra: true }).success).toBe(false);
+
+    const update = crdtUpdateRequest();
+    expect(StudioLiveCrdtUpdateSchema.safeParse(update).success).toBe(true);
+    expect(StudioLiveCrdtUpdateSchema.safeParse({ ...update, clientSequence: 0 }).success).toBe(
+      false
+    );
+    expect(
+      StudioLiveCrdtUpdateSchema.safeParse({
+        ...update,
+        update: fromUint8Array(new Uint8Array(48 * 1_024)),
+      }).success
+    ).toBe(true);
+    expect(
+      StudioLiveCrdtUpdateSchema.safeParse({
+        ...update,
+        update: fromUint8Array(new Uint8Array(48 * 1_024 + 1)),
       }).success
     ).toBe(false);
   });
@@ -2202,6 +2282,412 @@ describe("StudioLiveGateway", () => {
     expect(
       harness.emissions.some((emission) => emission.event === "studio:signal")
     ).toBe(false);
+  });
+
+  it("allows a joined viewer to fetch an exact, chunked CRDT sync response", async () => {
+    const harness = createHarness(async (userId, workId) =>
+      teamSnapshot(userId, workId, { role: "viewer", edit: false })
+    );
+    const viewer = harness.socket("viewer");
+    await connectAndJoin(harness, viewer);
+
+    const response = await harness.gateway.syncCrdtDocument(
+      viewer as never,
+      {
+        protocolVersion: 1,
+        workId: "work-1",
+        requestId: "request-1",
+        stateVector: crdtStateVector(),
+      },
+      undefined
+    );
+
+    expect(response).toEqual({
+      ok: true,
+      data: {
+        protocolVersion: 1,
+        workId: "work-1",
+        requestId: "request-1",
+        transferId: expect.any(String),
+        chunks: ["AA=="],
+        chunkCount: 1,
+        totalBytes: 1,
+        serverStateVector: "AA==",
+        serverSequence: "0",
+      },
+    });
+    expect(harness.crdtService.sync).toHaveBeenCalledWith(
+      "work-1",
+      crdtStateVector()
+    );
+  });
+
+  it("persists, ACKs, then broadcasts one canonical remote CRDT update", async () => {
+    const harness = createHarness();
+    const editor = harness.socket("editor");
+    await connectAndJoin(harness, editor);
+    const order: string[] = [];
+    const originalTo = editor.to;
+    editor.to = (room) => {
+      const target = originalTo(room);
+      return {
+        emit(event, payload) {
+          if (event === "studio:crdt:update") order.push("broadcast");
+          target.emit(event, payload);
+        },
+      };
+    };
+    const request = crdtUpdateRequest(21);
+
+    const response = await harness.gateway.applyCrdtUpdate(
+      editor as never,
+      request,
+      () => order.push("ack")
+    );
+
+    expect(order).toEqual(["ack", "broadcast"]);
+    expect(harness.crdtService.applyUpdate).toHaveBeenCalledWith({
+      workId: "work-1",
+      updateId: request.updateId,
+      actorUserId: "editor",
+      data: request.update,
+    });
+    expect(response).toEqual({
+      ok: true,
+      data: {
+        protocolVersion: 1,
+        workId: "work-1",
+        updateId: request.updateId,
+        serverSequence: "1",
+        serverStateVector: "AA==",
+        duplicate: false,
+      },
+    });
+    expect(harness.emissions).toContainEqual({
+      target: "from:editor:studio-live:work-1",
+      event: "studio:crdt:update",
+      payload: {
+        protocolVersion: 1,
+        workId: "work-1",
+        updateId: request.updateId,
+        serverSequence: "1",
+        update: request.update,
+      },
+    });
+  });
+
+  it("denies viewer writes and never broadcasts an exact-retry duplicate", async () => {
+    const viewerHarness = createHarness(async (userId, workId) =>
+      teamSnapshot(userId, workId, { role: "viewer", edit: false })
+    );
+    const viewer = viewerHarness.socket("viewer");
+    await connectAndJoin(viewerHarness, viewer);
+    await expect(
+      viewerHarness.gateway.applyCrdtUpdate(
+        viewer as never,
+        crdtUpdateRequest(22),
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: false, code: "forbidden" });
+    expect(viewerHarness.crdtService.applyUpdate).not.toHaveBeenCalled();
+
+    const editorHarness = createHarness();
+    const editor = editorHarness.socket("editor");
+    await connectAndJoin(editorHarness, editor);
+    const request = crdtUpdateRequest(23);
+    editorHarness.crdtService.applyUpdate.mockResolvedValueOnce({
+      duplicate: true,
+      updateId: request.updateId,
+      update: request.update,
+      serverStateVector: "AA==",
+      serverSequence: "7",
+    });
+    await expect(
+      editorHarness.gateway.applyCrdtUpdate(editor as never, request, undefined)
+    ).resolves.toMatchObject({ ok: true, data: { duplicate: true, serverSequence: "7" } });
+    expect(
+      editorHarness.emissions.some((emission) => emission.event === "studio:crdt:update")
+    ).toBe(false);
+  });
+
+  it("ACKs and broadcasts a committed update even when ACL changes after admission", async () => {
+    let canEdit = true;
+    const harness = createHarness(async (userId, workId) =>
+      teamSnapshot(userId, workId, {
+        role: canEdit ? "editor" : "viewer",
+        edit: canEdit,
+      })
+    );
+    const editor = harness.socket("editor");
+    await connectAndJoin(harness, editor);
+    const request = crdtUpdateRequest(24);
+    let releasePersist: (() => void) | undefined;
+    harness.crdtService.applyUpdate.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releasePersist = () =>
+            resolve({
+              duplicate: false,
+              updateId: request.updateId,
+              update: request.update,
+              serverStateVector: "AA==",
+              serverSequence: "8",
+            });
+        })
+    );
+
+    const pending = harness.gateway.applyCrdtUpdate(editor as never, request, undefined);
+    await vi.waitFor(() => expect(releasePersist).toBeTypeOf("function"));
+    canEdit = false;
+    releasePersist?.();
+
+    await expect(pending).resolves.toMatchObject({
+      ok: true,
+      data: {
+        updateId: request.updateId,
+        serverSequence: "8",
+        duplicate: false,
+      },
+    });
+    expect(harness.emissions).toContainEqual({
+      target: "from:editor:studio-live:work-1",
+      event: "studio:crdt:update",
+      payload: {
+        protocolVersion: 1,
+        workId: "work-1",
+        updateId: request.updateId,
+        serverSequence: "8",
+        update: request.update,
+      },
+    });
+  });
+
+  it("admits at least forty 30-50 ms batched CRDT ops in one short burst", async () => {
+    const harness = createHarness();
+    const editor = harness.socket("editor");
+    await connectAndJoin(harness, editor);
+
+    for (let sequence = 1; sequence <= 40; sequence += 1) {
+      const response = await harness.gateway.applyCrdtUpdate(
+        editor as never,
+        crdtUpdateRequest(100 + sequence),
+        undefined
+      );
+      expect(response.ok).toBe(true);
+    }
+    expect(harness.crdtService.applyUpdate).toHaveBeenCalledTimes(40);
+  });
+
+  it("shares the CRDT update burst across parallel sockets for one authenticated user and work", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-16T00:00:00.000Z"));
+    try {
+      const harness = createHarness();
+      const firstTab = harness.socket("editor-tab-a", "valid:shared-editor");
+      const secondTab = harness.socket("editor-tab-b", "valid:shared-editor");
+      await connectAndJoin(harness, firstTab);
+      await connectAndJoin(harness, secondTab);
+
+      const accepted = await Promise.all(
+        Array.from({ length: 120 }, (_, index) =>
+          harness.gateway.applyCrdtUpdate(
+            (index % 2 === 0 ? firstTab : secondTab) as never,
+            crdtUpdateRequest(1_000 + index),
+            undefined
+          )
+        )
+      );
+
+      expect(accepted.every((response) => response.ok)).toBe(true);
+      const teamCallsBeforeRejection = harness.service.getWorkTeam.mock.calls.length;
+      const sessionCallsBeforeRejection = harness.revalidate.mock.calls.length;
+      await expect(
+        harness.gateway.applyCrdtUpdate(
+          secondTab as never,
+          crdtUpdateRequest(1_121),
+          undefined
+        )
+      ).resolves.toMatchObject({ ok: false, code: "rate_limited" });
+      expect(harness.crdtService.applyUpdate).toHaveBeenCalledTimes(120);
+      expect(harness.service.getWorkTeam).toHaveBeenCalledTimes(
+        teamCallsBeforeRejection
+      );
+      expect(harness.revalidate).toHaveBeenCalledTimes(
+        sessionCallsBeforeRejection
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not reset the shared CRDT sync quota when the same user reconnects", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-16T00:00:00.000Z"));
+    try {
+      const harness = createHarness();
+      const firstConnection = harness.socket("sync-before-reconnect", "valid:sync-user");
+      await connectAndJoin(harness, firstConnection);
+
+      for (let request = 1; request <= 30; request += 1) {
+        await expect(
+          harness.gateway.syncCrdtDocument(
+            firstConnection as never,
+            {
+              protocolVersion: 1,
+              workId: "work-1",
+              requestId: `sync-before-${request}`,
+              stateVector: crdtStateVector(),
+            },
+            undefined
+          )
+        ).resolves.toMatchObject({ ok: true });
+      }
+
+      harness.gateway.handleDisconnect(firstConnection as never);
+      const reconnected = harness.socket("sync-after-reconnect", "valid:sync-user");
+      await connectAndJoin(harness, reconnected);
+      const teamCallsBeforeRejection = harness.service.getWorkTeam.mock.calls.length;
+      const sessionCallsBeforeRejection = harness.revalidate.mock.calls.length;
+      await expect(
+        harness.gateway.syncCrdtDocument(
+          reconnected as never,
+          {
+            protocolVersion: 1,
+            workId: "work-1",
+            requestId: "sync-after-reconnect",
+            stateVector: crdtStateVector(),
+          },
+          undefined
+        )
+      ).resolves.toMatchObject({ ok: false, code: "rate_limited" });
+      expect(harness.crdtService.sync).toHaveBeenCalledTimes(30);
+      expect(harness.service.getWorkTeam).toHaveBeenCalledTimes(
+        teamCallsBeforeRejection
+      );
+      expect(harness.revalidate).toHaveBeenCalledTimes(
+        sessionCallsBeforeRejection
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not charge CRDT quota or revalidate ACL for invalid and unjoined callers", async () => {
+    const harness = createHarness();
+    const joined = harness.socket("joined-quota-owner", "valid:shared-quota-user");
+    await connectAndJoin(harness, joined);
+    const unjoined = harness.socket("unjoined-quota-peer", "valid:shared-quota-user");
+    await harness.gateway.handleConnection(unjoined as never);
+    const teamCallsBeforeRequests = harness.service.getWorkTeam.mock.calls.length;
+    const sessionCallsBeforeRequests = harness.revalidate.mock.calls.length;
+    const internals = harness.gateway as unknown as {
+      crdtSyncBuckets: Map<string, unknown>;
+      crdtTokenBuckets: Map<string, unknown>;
+    };
+
+    await expect(
+      harness.gateway.applyCrdtUpdate(
+        unjoined as never,
+        { ...crdtUpdateRequest(1_122), update: "not-base64" },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: false, code: "invalid_payload" });
+    await expect(
+      harness.gateway.applyCrdtUpdate(
+        unjoined as never,
+        crdtUpdateRequest(1_123),
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: false, code: "not_joined" });
+    await expect(
+      harness.gateway.syncCrdtDocument(
+        unjoined as never,
+        {
+          protocolVersion: 1,
+          workId: "work-1",
+          requestId: "unjoined-sync",
+          stateVector: crdtStateVector(),
+        },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: false, code: "not_joined" });
+
+    expect(internals.crdtSyncBuckets.size).toBe(0);
+    expect(internals.crdtTokenBuckets.size).toBe(0);
+    expect(harness.service.getWorkTeam).toHaveBeenCalledTimes(
+      teamCallsBeforeRequests
+    );
+    expect(harness.revalidate).toHaveBeenCalledTimes(
+      sessionCallsBeforeRequests
+    );
+  });
+
+  it("purges stale CRDT quota buckets and keeps each in-process quota map bounded", async () => {
+    const harness = createHarness();
+    const editor = harness.socket("quota-cap-editor", "valid:quota-cap-user");
+    await connectAndJoin(harness, editor);
+    const now = Date.now();
+    const internals = harness.gateway as unknown as {
+      crdtQuotaLastCleanupAt: number;
+      crdtSyncBuckets: Map<
+        string,
+        { count: number; resetsAt: number; updatedAt: number }
+      >;
+      crdtTokenBuckets: Map<
+        string,
+        { operationTokens: number; byteTokens: number; updatedAt: number }
+      >;
+    };
+    for (let index = 0; index < 4_096; index += 1) {
+      internals.crdtSyncBuckets.set(`active-${index}`, {
+        count: 1,
+        resetsAt: now + 60_000,
+        updatedAt: now + index,
+      });
+    }
+
+    await expect(
+      harness.gateway.syncCrdtDocument(
+        editor as never,
+        {
+          protocolVersion: 1,
+          workId: "work-1",
+          requestId: "bounded-quota-map",
+          stateVector: crdtStateVector(),
+        },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: false, code: "rate_limited" });
+    expect(internals.crdtSyncBuckets.size).toBe(4_096);
+
+    internals.crdtSyncBuckets.set("active-0", {
+      count: 30,
+      resetsAt: now - 1,
+      updatedAt: now - 1,
+    });
+    internals.crdtTokenBuckets.set("idle-update", {
+      operationTokens: 0,
+      byteTokens: 0,
+      updatedAt: now - 11 * 60_000,
+    });
+    internals.crdtQuotaLastCleanupAt = 0;
+
+    await expect(
+      harness.gateway.syncCrdtDocument(
+        editor as never,
+        {
+          protocolVersion: 1,
+          workId: "work-1",
+          requestId: "purge-stale-quota",
+          stateVector: crdtStateVector(),
+        },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: true });
+    expect(internals.crdtSyncBuckets.has("active-0")).toBe(false);
+    expect(internals.crdtTokenBuckets.has("idle-update")).toBe(false);
+    expect(internals.crdtSyncBuckets.size).toBeLessThanOrEqual(4_096);
+    expect(internals.crdtTokenBuckets.size).toBeLessThanOrEqual(4_096);
   });
 
   it("releases presence and leases when a socket disconnects", async () => {
