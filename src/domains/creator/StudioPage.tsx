@@ -8108,6 +8108,32 @@ function StudioCuttoonEditor() {
       ? Array.from(e.dataTransfer.files).find((f) => f.type.startsWith("image/"))
       : undefined;
     const assetData = e.dataTransfer.getData("application/json-asset");
+    const insertData = e.dataTransfer.getData("application/json-insert");
+
+    const dropStagePoint = () => {
+      const rect = wrap.getBoundingClientRect();
+      return {
+        x: (cx - rect.left + wrap.scrollLeft) / effScale,
+        y: (cy - rect.top + wrap.scrollTop) / effScale,
+      };
+    };
+
+    // 메뉴 타일을 캔버스로 끌어다 놓기 — 클릭 삽입(중앙/패널 규칙)과 달리 드롭 지점에 배치한다.
+    if (insertData) {
+      try {
+        const parsed = JSON.parse(insertData) as
+          | { kind: "bubble"; variant: BubbleVariant }
+          | { kind: "sticker"; emoji: string }
+          | { kind: "text" };
+        const at = dropStagePoint();
+        if (parsed.kind === "bubble") addBubble(parsed.variant, at);
+        else if (parsed.kind === "sticker") addSticker(parsed.emoji, at);
+        else if (parsed.kind === "text") addText(at);
+      } catch {
+        // 형식이 깨진 내부 드래그 페이로드는 조용히 무시한다(외부 드롭 경로와 동일한 태도).
+      }
+      return;
+    }
 
     // 드롭 지점(스테이지 좌표) → 거기에 중앙을 맞춰 배치한다.
     const placeAt = (src: string, width: number, height: number) => {
@@ -12834,8 +12860,8 @@ function StudioCuttoonEditor() {
       : null;
     return viewportSpawnCenter(state.canvasW ?? CANVAS_W, state.canvasH, selectedRect);
   }
-  function addText() {
-    const [cx, cy] = spawnCenter();
+  function addText(at?: { x: number; y: number }) {
+    const [cx, cy] = at ? [at.x, at.y] : spawnCenter();
     addEl({
       id: uid(),
       type: "text",
@@ -12856,7 +12882,7 @@ function StudioCuttoonEditor() {
     window.addEventListener("studio-companion-add-text", onCompanionAddText);
     return () => window.removeEventListener("studio-companion-add-text", onCompanionAddText);
   });
-  function addBubble(variant: BubbleVariant) {
+  function addBubble(variant: BubbleVariant, at?: { x: number; y: number }) {
     setMenu(null);
     let fill = "#ffffff";
     let textFill = "#111111";
@@ -12896,7 +12922,7 @@ function StudioCuttoonEditor() {
       height = 180;
     }
 
-    const [cx, cy] = spawnCenter();
+    const [cx, cy] = at ? [at.x, at.y] : spawnCenter();
     addEl({
       id: uid(),
       type: "bubble",
@@ -12911,9 +12937,9 @@ function StudioCuttoonEditor() {
       rotation: 0,
     });
   }
-  function addSticker(emoji: string) {
+  function addSticker(emoji: string, at?: { x: number; y: number }) {
     setMenu(null);
-    const [cx, cy] = spawnCenter();
+    const [cx, cy] = at ? [at.x, at.y] : spawnCenter();
     addEl({ id: uid(), type: "sticker", text: emoji, x: cx - 40, y: cy - 40, fontSize: 96, rotation: 0 });
   }
   // 효과음 프리셋 삽입 — studio-sfx-presets의 무드별 스타일(색·외곽선·그라디언트·기울기)을
@@ -21421,7 +21447,21 @@ function StudioCuttoonEditor() {
                       <p className="mb-1 text-[0.66rem] font-medium text-fg-3">이모지</p>
                       <div className="grid grid-cols-8 gap-1 mb-2">
                         {fxEmojisFiltered.map((em) => (
-                          <button key={em} type="button" onClick={() => addSticker(em)} className="grid size-9 place-items-center rounded-md text-lg hover:bg-raised pointer-coarse:size-11">
+                          <button
+                            key={em}
+                            type="button"
+                            onClick={() => addSticker(em)}
+                            draggable
+                            onDragStart={(event) => {
+                              event.dataTransfer.setData(
+                                "application/json-insert",
+                                JSON.stringify({ kind: "sticker", emoji: em })
+                              );
+                              event.dataTransfer.effectAllowed = "copy";
+                            }}
+                            title="클릭해 추가하거나 캔버스로 끌어다 원하는 위치에 놓으세요"
+                            className="grid size-9 place-items-center rounded-md text-lg hover:bg-raised pointer-coarse:size-11"
+                          >
                             {em}
                           </button>
                         ))}
@@ -22218,7 +22258,17 @@ function StudioCuttoonEditor() {
         <>
         <StudioToolbarDivider label="삽입" />
         <StudioToolbarCluster label="삽입·대사">
-        <button type="button" onClick={addText} className={toolBtn(false)} title="텍스트 넣기">
+        <button
+          type="button"
+          onClick={() => addText()}
+          draggable
+          onDragStart={(event) => {
+            event.dataTransfer.setData("application/json-insert", JSON.stringify({ kind: "text" }));
+            event.dataTransfer.effectAllowed = "copy";
+          }}
+          className={toolBtn(false)}
+          title="텍스트 넣기 — 클릭해 추가하거나 캔버스로 끌어다 원하는 위치에 놓으세요"
+        >
           <TypeIcon size={14} aria-hidden /> 텍스트
         </button>
         <div ref={menu === "bubble" ? menuRef : undefined} className="relative">
@@ -22279,6 +22329,16 @@ function StudioCuttoonEditor() {
                           type="button"
                           role="menuitem"
                           onClick={() => addBubble(v.id)}
+                          // 클릭=중앙/패널 규칙, 드래그=캔버스 드롭 지점 배치(onWrapDrop 이 처리).
+                          draggable
+                          onDragStart={(event) => {
+                            event.dataTransfer.setData(
+                              "application/json-insert",
+                              JSON.stringify({ kind: "bubble", variant: v.id })
+                            );
+                            event.dataTransfer.effectAllowed = "copy";
+                          }}
+                          title={`${v.label} — 클릭해 추가하거나 캔버스로 끌어다 원하는 위치에 놓으세요`}
                           className="group flex min-h-[5.75rem] flex-col rounded-2xl border border-line/55 bg-gradient-to-b from-card/90 to-canvas/30 p-2 text-left shadow-[inset_0_1px_0_oklch(0.95_0.02_85_/_0.04)] transition-[border-color,background,transform,box-shadow] duration-200 ease-out hover:-translate-y-px hover:border-accent/40 hover:bg-raised/80 hover:shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:translate-y-0"
                         >
                           <span className="flex h-12 items-center justify-center rounded-xl bg-canvas/45 ring-1 ring-line/35 transition-colors group-hover:bg-accent-soft/25 group-hover:ring-accent/20">
