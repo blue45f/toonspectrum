@@ -62,7 +62,7 @@ const PRODUCTION_MENU_CATALOG: StudioMainMenuGroup[] = [
       { id: "zoom-out", label: "축소", shortcut: "⌘-", onSelect: vi.fn() },
       { id: "zoom-reset", label: "실제 크기 (100%)", onSelect: vi.fn(), separatorAfter: true },
       { id: "fullscreen", label: "전체화면", onSelect: vi.fn() },
-      { id: "canvas-only", label: "캔버스만", shortcut: "Tab", onSelect: vi.fn(), separatorAfter: true },
+      { id: "canvas-only", label: "캔버스만", shortcut: "`", onSelect: vi.fn(), separatorAfter: true },
       { id: "left-panel", label: "왼쪽 패널 보이기", onSelect: vi.fn() },
       { id: "right-panel", label: "속성 패널 보이기", onSelect: vi.fn() },
       { id: "shortcuts", label: "단축키 도움말", shortcut: "?", onSelect: vi.fn() },

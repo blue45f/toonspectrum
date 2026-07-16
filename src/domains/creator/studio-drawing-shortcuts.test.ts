@@ -4,6 +4,7 @@ import {
   adjustStudioBrushOpacity,
   adjustStudioBrushWidth,
   resolveStudioDrawingShortcut,
+  shouldPreserveStudioTabNavigation,
 } from "./studio-drawing-shortcuts";
 
 describe("resolveStudioDrawingShortcut", () => {
@@ -81,9 +82,31 @@ describe("resolveStudioDrawingShortcut", () => {
     expect(resolveStudioDrawingShortcut({ code: "Digit1", shiftKey: true })).toBeNull();
   });
 
-  it("Tab은 크롬 토글로 해석한다", () => {
-    expect(resolveStudioDrawingShortcut({ code: "Tab" })).toEqual({ type: "toggle-chrome" });
+  it("Tab은 브라우저 포커스 이동으로 보존하고 Backquote만 크롬 토글로 해석한다", () => {
+    expect(resolveStudioDrawingShortcut({ code: "Tab" })).toBeNull();
+    expect(resolveStudioDrawingShortcut({ code: "Tab", shiftKey: true })).toBeNull();
     expect(resolveStudioDrawingShortcut({ code: "Tab", metaKey: true })).toBeNull();
+    expect(resolveStudioDrawingShortcut({ code: "Backquote" })).toEqual({ type: "toggle-chrome" });
+    expect(resolveStudioDrawingShortcut({ key: "`" })).toEqual({ type: "toggle-chrome" });
+    expect(resolveStudioDrawingShortcut({ code: "Backquote", shiftKey: true })).toBeNull();
+  });
+
+  it("크롬 토글은 명시적 캔버스에서만 허용하고 나머지 문서 포커스를 보존한다", () => {
+    expect(shouldPreserveStudioTabNavigation({ tagName: "BUTTON", tabIndex: 0 })).toBe(true);
+    expect(shouldPreserveStudioTabNavigation({ tagName: "SPAN", tabIndex: 0 })).toBe(true);
+    expect(shouldPreserveStudioTabNavigation({ tagName: "DIV", role: "treeitem", tabIndex: -1 })).toBe(true);
+    expect(shouldPreserveStudioTabNavigation({ tagName: "DIV", isContentEditable: true })).toBe(true);
+    expect(
+      shouldPreserveStudioTabNavigation({
+        tagName: "DIV",
+        role: "group",
+        tabIndex: 0,
+        canvasViewportFocused: true,
+      })
+    ).toBe(false);
+    expect(shouldPreserveStudioTabNavigation({ tagName: "BODY", tabIndex: -1 })).toBe(true);
+    expect(shouldPreserveStudioTabNavigation({ tagName: "DIV", tabIndex: -1 })).toBe(true);
+    expect(shouldPreserveStudioTabNavigation({})).toBe(true);
   });
 
   it("CSP/Photoshop/Procreate 계열 색·보정·잠금 단축키를 해석한다", () => {

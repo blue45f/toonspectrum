@@ -156,8 +156,9 @@ describe("StudioLayerNavigator", () => {
     expect(html).toContain('aria-label="선택 레이어 일괄 작업"');
     expect(html).toContain('aria-label="선택 레이어 병합"');
     expect(html).toContain('aria-label="표시 레이어 병합"');
-    expect(html).toContain("선택한 레이어를 하나로 병합합니다 (가능하면 래스터 베이크)");
-    expect(html).toContain("표시 중인 레이어를 하나로 병합합니다 (가능하면 래스터 베이크)");
+    expect(html.match(/data-studio-tool-hint-target="true"/g)?.length).toBeGreaterThanOrEqual(7);
+    expect(html).not.toContain('title="선택한 레이어를 하나로 병합합니다');
+    expect(html).not.toContain('title="표시 중인 레이어를 하나로 병합합니다');
   });
 
   it("disables document mutations while retaining search and selection in read-only mode", () => {
@@ -170,6 +171,8 @@ describe("StudioLayerNavigator", () => {
     expect(html).toContain('aria-label="레이어 이름·텍스트·그룹 검색"');
     expect(html).toContain('aria-selected="true"');
     expect((html.match(/disabled=""/g) ?? []).length).toBeGreaterThanOrEqual(6);
+    expect((html.match(/data-studio-tool-hint-unavailable="true"/g) ?? []).length).toBeGreaterThanOrEqual(6);
+    expect((html.match(/aria-disabled="true"/g) ?? []).length).toBeGreaterThanOrEqual(6);
   });
 
   it("can disable unsupported grouping without disabling layer search or selection", () => {

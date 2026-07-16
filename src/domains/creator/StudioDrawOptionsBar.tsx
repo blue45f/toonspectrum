@@ -45,9 +45,11 @@ import {
 } from "./studio-creative-visuals";
 import { STUDIO_BRUSH_SIZE_RANGE } from "./studio-draw-ux";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
+import { studioToolHintFromLabel } from "./studio-tool-hints";
 import { StudioBrushLibrarySheet } from "./StudioBrushLibrarySheet";
 import { StudioBrushPresetIcon } from "./StudioBrushPresetIcon";
 import { StudioBrushTray } from "./StudioBrushTray";
+import { StudioToolHintTarget } from "./StudioToolHint";
 
 import type { StudioBrushSlot } from "./studio-brush-slots";
 import type { StudioBrushTrayItem } from "./studio-creative-ux";
@@ -333,23 +335,35 @@ export function StudioDrawOptionsBar({
                 { id: "shape" as const, label: "도형", Icon: Shapes },
               ] as const
             ).map(({ id, label, Icon }) => (
-              <button
+              <StudioToolHintTarget
                 key={id}
-                type="button"
-                aria-pressed={drawMode === id}
-                aria-label={label}
-                title={label}
-                onClick={() => onSetDrawMode(id)}
-                className={cn(
-                  iconBtn,
-                  "border-transparent",
-                  drawMode === id
-                    ? "bg-accent text-on-accent shadow-[0_1px_4px_oklch(0.72_0.185_42/0.25)]"
-                    : "text-fg-2 hover:bg-raised hover:text-fg"
+                hint={studioToolHintFromLabel(
+                  label,
+                  id === "pen"
+                    ? "현재 브러시와 필압·보정 설정으로 자유선을 그립니다. 하단 크기와 불투명도를 바꾸면 즉시 반영돼요."
+                    : id === "eraser"
+                      ? "현재 레이어의 획을 지웁니다. 펜과 같은 크기·불투명도 조절을 사용해 가장자리를 자연스럽게 다듬어요."
+                      : "선·사각형·타원·화살표를 정확한 벡터 도형으로 그립니다. 채우기는 도형 선택 옆에서 켤 수 있어요.",
+                  id === "pen" ? "B" : id === "eraser" ? "E" : undefined,
+                  id === "pen" ? "ink" : id === "eraser" ? "erase" : "shape"
                 )}
               >
-                <Icon size={15} strokeWidth={1.75} aria-hidden />
-              </button>
+                <button
+                  type="button"
+                  aria-pressed={drawMode === id}
+                  aria-label={label}
+                  onClick={() => onSetDrawMode(id)}
+                  className={cn(
+                    iconBtn,
+                    "border-transparent",
+                    drawMode === id
+                      ? "bg-accent text-on-accent shadow-[0_1px_4px_oklch(0.72_0.185_42/0.25)]"
+                      : "text-fg-2 hover:bg-raised hover:text-fg"
+                  )}
+                >
+                  <Icon size={15} strokeWidth={1.75} aria-hidden />
+                </button>
+              </StudioToolHintTarget>
             ))}
           </div>
         ) : null}
@@ -357,60 +371,79 @@ export function StudioDrawOptionsBar({
         {/* Active brush pill + library (PicsArt/Magma) */}
         {drawMode === "pen" ? (
           <div className="flex shrink-0 items-center gap-0.5">
-            <button
-              ref={brushLibraryTriggerRef}
-              type="button"
-              onClick={() => setLibraryOpen((v) => !v)}
-              aria-expanded={libraryOpen}
-              aria-haspopup="dialog"
-              title={`${brushMeta?.name ?? brushId} — 브러시 라이브러리`}
-              aria-label={`현재 브러시 ${brushMeta?.name ?? brushId}, 라이브러리 열기`}
-              data-studio-brush-active-pill="true"
-              className={cn(
-                "flex h-9 max-w-[9.5rem] items-center gap-1.5 rounded-xl border px-2",
-                STUDIO_EASE,
-                STUDIO_FOCUS_RING,
-                libraryOpen
-                  ? "border-accent bg-accent text-on-accent shadow-[0_2px_8px_oklch(0.72_0.185_42/0.28)]"
-                  : "border-line/80 bg-card text-fg hover:border-accent/40 hover:bg-raised"
+            <StudioToolHintTarget
+              className="min-w-0"
+              hint={studioToolHintFromLabel(
+                `현재 브러시 · ${brushMeta?.name ?? brushId}`,
+                "브러시 라이브러리를 열어 촉감·용도별 프리셋을 검색하고 바로 교체합니다. 현재 색과 불투명도는 그대로 유지돼요.",
+                undefined,
+                "ink"
               )}
             >
-              <span
-                className={cn(
-                  "grid size-6 shrink-0 place-items-center rounded-md",
-                  libraryOpen ? "bg-on-accent/15" : "bg-canvas/70"
-                )}
-                aria-hidden
-              >
-                <StudioBrushPresetIcon brushId={brushId} size={13} strokeWidth={2} />
-              </span>
-              <span
-                aria-hidden
-                className="size-2 shrink-0 rounded-full ring-1 ring-black/15"
-                style={{ background: tipColor, opacity: brushOpacity }}
-              />
-              <span className="min-w-0 truncate text-[0.7rem] font-bold leading-none">
-                {brushTrayItem?.shortName ?? brushMeta?.name?.slice(0, 6) ?? brushId}
-              </span>
-              <LayoutGrid size={12} className="shrink-0 opacity-80" aria-hidden />
-            </button>
-            {onToggleFavoriteBrush ? (
               <button
+                ref={brushLibraryTriggerRef}
                 type="button"
-                title={isFavorite ? "즐겨찾기 해제" : "즐겨찾기 추가"}
-                aria-pressed={isFavorite}
-                aria-label={isFavorite ? "즐겨찾기 해제" : "즐겨찾기 추가"}
-                onClick={() => onToggleFavoriteBrush(brushId)}
+                onClick={() => setLibraryOpen((v) => !v)}
+                aria-expanded={libraryOpen}
+                aria-haspopup="dialog"
+                aria-label={`현재 브러시 ${brushMeta?.name ?? brushId}, 브러시 라이브러리 열기`}
+                data-studio-brush-active-pill="true"
                 className={cn(
-                  iconBtn,
-                  "size-8",
-                  isFavorite
-                    ? "border-accent/50 bg-accent-soft text-accent"
-                    : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
+                  "flex h-9 max-w-[9.5rem] items-center gap-1.5 rounded-xl border px-2",
+                  STUDIO_EASE,
+                  STUDIO_FOCUS_RING,
+                  libraryOpen
+                    ? "border-accent bg-accent text-on-accent shadow-[0_2px_8px_oklch(0.72_0.185_42/0.28)]"
+                    : "border-line/80 bg-card text-fg hover:border-accent/40 hover:bg-raised"
                 )}
               >
-                <Star size={13} fill={isFavorite ? "currentColor" : "none"} aria-hidden />
+                <span
+                  className={cn(
+                    "grid size-6 shrink-0 place-items-center rounded-md",
+                    libraryOpen ? "bg-on-accent/15" : "bg-canvas/70"
+                  )}
+                  aria-hidden
+                >
+                  <StudioBrushPresetIcon brushId={brushId} size={13} strokeWidth={2} />
+                </span>
+                <span
+                  aria-hidden
+                  className="size-2 shrink-0 rounded-full ring-1 ring-black/15"
+                  style={{ background: tipColor, opacity: brushOpacity }}
+                />
+                <span className="min-w-0 truncate text-[0.7rem] font-bold leading-none">
+                  {brushTrayItem?.shortName ?? brushMeta?.name?.slice(0, 6) ?? brushId}
+                </span>
+                <LayoutGrid size={12} className="shrink-0 opacity-80" aria-hidden />
               </button>
+            </StudioToolHintTarget>
+            {onToggleFavoriteBrush ? (
+              <StudioToolHintTarget
+                hint={studioToolHintFromLabel(
+                  isFavorite ? "브러시 즐겨찾기 해제" : "브러시 즐겨찾기",
+                  isFavorite
+                    ? "현재 브러시를 즐겨찾기 선반에서 제거합니다. 브러시 자체 설정과 최근 사용 기록은 유지돼요."
+                    : "현재 브러시를 즐겨찾기 선반에 고정해 다음 작업에서도 빠르게 다시 꺼냅니다.",
+                  undefined,
+                  "ink"
+                )}
+              >
+                <button
+                  type="button"
+                  aria-pressed={isFavorite}
+                  aria-label={isFavorite ? "즐겨찾기 해제" : "즐겨찾기 추가"}
+                  onClick={() => onToggleFavoriteBrush(brushId)}
+                  className={cn(
+                    iconBtn,
+                    "size-8",
+                    isFavorite
+                      ? "border-accent/50 bg-accent-soft text-accent"
+                      : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
+                  )}
+                >
+                  <Star size={13} fill={isFavorite ? "currentColor" : "none"} aria-hidden />
+                </button>
+              </StudioToolHintTarget>
             ) : null}
           </div>
         ) : null}
@@ -425,23 +458,41 @@ export function StudioDrawOptionsBar({
               className="min-w-0"
             />
             {onShapeFillChange ? (
-              <button
-                type="button"
-                aria-pressed={shapeFill}
+              <StudioToolHintTarget
                 disabled={shapeKind === "line" || shapeKind === "arrow"}
-                title="도형 채우기"
-                aria-label="도형 채우기"
-                onClick={() => onShapeFillChange(!shapeFill)}
-                className={cn(
-                  iconBtn,
-                  shapeFill && shapeKind !== "line" && shapeKind !== "arrow"
-                    ? "border-accent/55 bg-accent-soft text-accent"
-                    : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg",
-                  (shapeKind === "line" || shapeKind === "arrow") && "cursor-not-allowed opacity-45"
+                unavailableReason={
+                  shapeKind === "line" || shapeKind === "arrow"
+                    ? "선과 화살표는 내부 영역이 없어요. 사각형·타원·다각형을 선택하면 채우기를 사용할 수 있어요."
+                    : undefined
+                }
+                hint={studioToolHintFromLabel(
+                  shapeFill ? "도형 채우기 끄기" : "도형 채우기",
+                  shapeKind === "line" || shapeKind === "arrow"
+                    ? "선과 화살표는 내부 영역이 없어 채울 수 없습니다. 사각형·타원·다각형을 선택하면 활성화돼요."
+                    : shapeFill
+                      ? "도형 내부를 비워 윤곽선만 그립니다."
+                      : "새 도형의 내부를 현재 주 색으로 채웁니다. 윤곽선과 채움은 함께 유지돼요.",
+                  undefined,
+                  "shape"
                 )}
               >
-                <PaintBucket size={14} strokeWidth={1.75} aria-hidden />
-              </button>
+                <button
+                  type="button"
+                  aria-pressed={shapeFill}
+                  disabled={shapeKind === "line" || shapeKind === "arrow"}
+                  aria-label="도형 채우기"
+                  onClick={() => onShapeFillChange(!shapeFill)}
+                  className={cn(
+                    iconBtn,
+                    shapeFill && shapeKind !== "line" && shapeKind !== "arrow"
+                      ? "border-accent/55 bg-accent-soft text-accent"
+                      : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg",
+                    (shapeKind === "line" || shapeKind === "arrow") && "cursor-not-allowed opacity-45"
+                  )}
+                >
+                  <PaintBucket size={14} strokeWidth={1.75} aria-hidden />
+                </button>
+              </StudioToolHintTarget>
             ) : null}
           </div>
         ) : null}
@@ -450,43 +501,60 @@ export function StudioDrawOptionsBar({
 
         <SizePreview size={strokeWidth} color={tipColor} opacity={brushOpacity} />
 
-        <label className="flex shrink-0 items-center gap-1 text-fg-3" title={`크기 ${strokeWidth}px`}>
-          <Circle size={12} strokeWidth={1.75} className="shrink-0 opacity-80" aria-hidden />
-          <span className="sr-only">크기</span>
-          <input
-            type="range"
-            min={STUDIO_BRUSH_SIZE_RANGE.min}
-            max={STUDIO_BRUSH_SIZE_RANGE.max}
-            value={strokeWidth}
-            onChange={(e) => onStrokeWidthChange(Number(e.target.value))}
-            className="studio-range w-16 sm:w-20"
-            aria-label="브러시 크기"
-            aria-valuetext={`${strokeWidth}픽셀`}
-          />
-          <span className="w-6 tabular-nums text-[0.68rem] font-bold text-fg">{strokeWidth}</span>
-        </label>
-
-
-        <label
-          className="flex shrink-0 items-center gap-1 text-fg-3"
-          title={`불투명도 ${Math.round(brushOpacity * 100)}%`}
+        <StudioToolHintTarget
+          className="shrink-0"
+          hint={studioToolHintFromLabel(
+            "브러시 크기",
+            `현재 ${strokeWidth}px입니다. 슬라이더나 [ · ] 단축키로 획 굵기를 조절하며 왼쪽 원에서 실제 상대 크기를 확인할 수 있어요.`,
+            "[  ]",
+            "brush-size"
+          )}
         >
-          <StudioOpacityGlyph opacity01={brushOpacity} />
-          <span className="sr-only">불투명</span>
-          <input
-            type="range"
-            min={5}
-            max={100}
-            step={1}
-            value={Math.round(brushOpacity * 100)}
-            onChange={(e) => onOpacityChange(Number(e.target.value) / 100)}
-            className="studio-range w-14 sm:w-16"
-            aria-label="브러시 불투명도"
-          />
-          <span className="w-7 tabular-nums text-[0.68rem] font-bold text-fg">
-            {Math.round(brushOpacity * 100)}
-          </span>
-        </label>
+          <label className="flex shrink-0 items-center gap-1 text-fg-3">
+            <Circle size={12} strokeWidth={1.75} className="shrink-0 opacity-80" aria-hidden />
+            <span className="sr-only">크기</span>
+            <input
+              type="range"
+              min={STUDIO_BRUSH_SIZE_RANGE.min}
+              max={STUDIO_BRUSH_SIZE_RANGE.max}
+              value={strokeWidth}
+              onChange={(e) => onStrokeWidthChange(Number(e.target.value))}
+              className="studio-range w-16 sm:w-20"
+              aria-label="브러시 크기"
+              aria-valuetext={`${strokeWidth}픽셀`}
+            />
+            <span className="w-6 tabular-nums text-[0.68rem] font-bold text-fg">{strokeWidth}</span>
+          </label>
+        </StudioToolHintTarget>
+
+
+        <StudioToolHintTarget
+          className="shrink-0"
+          hint={studioToolHintFromLabel(
+            "브러시 불투명도",
+            `현재 ${Math.round(brushOpacity * 100)}%입니다. 낮추면 획 아래의 색이 비쳐 여러 번 덧칠할수록 농도가 자연스럽게 쌓여요.`,
+            undefined,
+            "opacity"
+          )}
+        >
+          <label className="flex shrink-0 items-center gap-1 text-fg-3">
+            <StudioOpacityGlyph opacity01={brushOpacity} />
+            <span className="sr-only">불투명</span>
+            <input
+              type="range"
+              min={5}
+              max={100}
+              step={1}
+              value={Math.round(brushOpacity * 100)}
+              onChange={(e) => onOpacityChange(Number(e.target.value) / 100)}
+              className="studio-range w-14 sm:w-16"
+              aria-label="브러시 불투명도"
+            />
+            <span className="w-7 tabular-nums text-[0.68rem] font-bold text-fg">
+              {Math.round(brushOpacity * 100)}
+            </span>
+          </label>
+        </StudioToolHintTarget>
 
         {drawMode !== "eraser" ? (
           <>
@@ -503,24 +571,34 @@ export function StudioDrawOptionsBar({
         ) : null}
 
         {/* Advanced toggle — Magma-style progressive disclosure */}
-        <button
-          type="button"
-          aria-expanded={advancedOpen}
-          aria-controls="studio-draw-advanced"
-          onClick={() => setAdvancedOpen((v) => !v)}
-          title={advancedOpen ? "세부 옵션 접기" : "세부 옵션 (프리셋·보정·필압·대칭·슬롯)"}
-          aria-label={advancedOpen ? "세부 옵션 접기" : "세부 옵션 펼치기"}
-          data-studio-draw-advanced-toggle="true"
-          className={cn(
-            iconBtn,
-            "size-8",
+        <StudioToolHintTarget
+          hint={studioToolHintFromLabel(
+            advancedOpen ? "세부 그리기 옵션 접기" : "세부 그리기 옵션",
             advancedOpen
-              ? "border-accent/50 bg-accent-soft text-accent"
-              : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
+              ? "브러시 프리셋·보정·필압·대칭·빠른 슬롯 행을 접어 캔버스 공간을 되찾습니다."
+              : "브러시 프리셋·손떨림 보정·필압 곡선·대칭·빠른 슬롯을 한 줄에서 정밀 조정합니다.",
+            undefined,
+            "stabilizer"
           )}
         >
-          {advancedOpen ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
-        </button>
+          <button
+            type="button"
+            aria-expanded={advancedOpen}
+            aria-controls="studio-draw-advanced"
+            onClick={() => setAdvancedOpen((v) => !v)}
+            aria-label={advancedOpen ? "세부 옵션 접기" : "세부 옵션 펼치기"}
+            data-studio-draw-advanced-toggle="true"
+            className={cn(
+              iconBtn,
+              "size-8",
+              advancedOpen
+                ? "border-accent/50 bg-accent-soft text-accent"
+                : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
+            )}
+          >
+            {advancedOpen ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
+          </button>
+        </StudioToolHintTarget>
 
         <div
           data-studio-draw-options-end="true"
@@ -530,58 +608,86 @@ export function StudioDrawOptionsBar({
           )}
         >
           {onToggleCanvasFlipH ? (
-            <button
-              type="button"
-              aria-pressed={canvasFlipH}
-              onClick={onToggleCanvasFlipH}
-              title="캔버스 좌우 반전"
-              aria-label="캔버스 좌우 반전"
-              className={cn(
-                iconBtn,
-                "size-7",
+            <StudioToolHintTarget
+              hint={studioToolHintFromLabel(
+                "캔버스 좌우 반전",
                 canvasFlipH
-                  ? "border-accent bg-accent-soft text-accent"
-                  : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
+                  ? "작업 캔버스를 원래 방향으로 되돌립니다. 데이터는 바뀌지 않아 비율과 실루엣을 점검할 때 안전해요."
+                  : "캔버스를 거울처럼 좌우로 보여 비율·기울기 오류를 새 눈으로 확인합니다. 작품 데이터 자체는 뒤집히지 않아요.",
+                undefined,
+                "zoom-view"
               )}
             >
-              <FlipHorizontal2 size={13} strokeWidth={1.75} aria-hidden />
-            </button>
+              <button
+                type="button"
+                aria-pressed={canvasFlipH}
+                onClick={onToggleCanvasFlipH}
+                aria-label="캔버스 좌우 반전"
+                className={cn(
+                  iconBtn,
+                  "size-7",
+                  canvasFlipH
+                    ? "border-accent bg-accent-soft text-accent"
+                    : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
+                )}
+              >
+                <FlipHorizontal2 size={13} strokeWidth={1.75} aria-hidden />
+              </button>
+            </StudioToolHintTarget>
           ) : null}
 
           {onOpenBrushStudio ? (
-            <button
-              type="button"
-              onClick={onOpenBrushStudio}
-              title="브러시 스튜디오 — 필압·도장·촉 고급 설정"
-              aria-label="브러시 고급 설정"
-              className={cn(iconBtn, "size-7 border-line bg-card text-fg-2 hover:bg-raised")}
+            <StudioToolHintTarget
+              hint={studioToolHintFromLabel(
+                "브러시 스튜디오",
+                "현재 브러시의 필압 곡선·도장 간격·촉 회전·질감을 세밀하게 편집하고 재사용 프리셋으로 저장합니다.",
+                undefined,
+                "pressure"
+              )}
             >
-              <Wand2 size={13} strokeWidth={1.75} aria-hidden />
-            </button>
+              <button
+                type="button"
+                onClick={onOpenBrushStudio}
+                aria-label="브러시 고급 설정"
+                className={cn(iconBtn, "size-7 border-line bg-card text-fg-2 hover:bg-raised")}
+              >
+                <Wand2 size={13} strokeWidth={1.75} aria-hidden />
+              </button>
+            </StudioToolHintTarget>
           ) : null}
 
 
           {drawMode === "pen" ? (
-            <button
-              type="button"
-              aria-pressed={quickShapeActive}
-              onClick={onToggleQuickShape}
-              title="스마트 도형 — 낙서를 선·원·사각형으로"
-              aria-label="스마트 도형"
-              className={cn(
-                iconBtn,
-                "size-7",
+            <StudioToolHintTarget
+              hint={studioToolHintFromLabel(
+                quickShapeActive ? "스마트 도형 끄기" : "스마트 도형",
                 quickShapeActive
-                  ? "border-accent bg-accent-soft text-accent"
-                  : "border-line bg-card text-fg-2 hover:bg-raised"
+                  ? "자유선 자동 정리를 끕니다. 이후 획은 브러시의 손맛 그대로 남아요."
+                  : "선을 긋고 끝에서 잠시 멈추면 낙서를 직선·원·사각형처럼 매끈한 도형으로 자동 정리합니다.",
+                undefined,
+                "shape"
               )}
             >
-              {quickShapeActive ? (
-                <Sparkles size={13} strokeWidth={1.75} aria-hidden />
-              ) : (
-                <Shapes size={13} strokeWidth={1.75} aria-hidden />
-              )}
-            </button>
+              <button
+                type="button"
+                aria-pressed={quickShapeActive}
+                onClick={onToggleQuickShape}
+                aria-label="스마트 도형"
+                className={cn(
+                  iconBtn,
+                  "size-7",
+                  quickShapeActive
+                    ? "border-accent bg-accent-soft text-accent"
+                    : "border-line bg-card text-fg-2 hover:bg-raised"
+                )}
+              >
+                {quickShapeActive ? (
+                  <Sparkles size={13} strokeWidth={1.75} aria-hidden />
+                ) : (
+                  <Shapes size={13} strokeWidth={1.75} aria-hidden />
+                )}
+              </button>
+            </StudioToolHintTarget>
           ) : null}
 
           {shapeSlot}
@@ -700,23 +806,39 @@ export function StudioDrawOptionsBar({
                   { id: "kaleidoscope" as const, label: "만화경" },
                 ] as const
               ).map((item) => (
-                <button
+                <StudioToolHintTarget
                   key={item.id}
-                  type="button"
-                  aria-pressed={symmetryType === item.id}
-                  title={`대칭: ${item.label}`}
-                  aria-label={`대칭 ${item.label}`}
-                  onClick={() => onSymmetryTypeChange(item.id)}
-                  className={cn(
-                    iconBtn,
-                    "size-7 border-transparent",
-                    symmetryType === item.id
-                      ? "bg-accent text-on-accent"
-                      : "text-fg-3 hover:bg-raised hover:text-fg"
+                  hint={studioToolHintFromLabel(
+                    `대칭 · ${item.label}`,
+                    item.id === "none"
+                      ? "대칭 복제를 끄고 한 번의 펜 입력을 그대로 그립니다."
+                      : item.id === "vertical"
+                        ? "세로 중심축을 기준으로 좌우에 같은 획을 동시에 그려 얼굴·의상 정면을 빠르게 맞춥니다."
+                        : item.id === "horizontal"
+                          ? "가로 중심축을 기준으로 위아래에 같은 획을 동시에 그립니다."
+                          : item.id === "radial"
+                            ? "중심을 둘러싼 여러 방향으로 획을 복제해 장식·효과선을 만듭니다."
+                            : "회전과 반사를 함께 반복해 만화경처럼 연속된 무늬를 만듭니다.",
+                    undefined,
+                    "symmetry"
                   )}
                 >
-                  <StudioSymmetryGlyph mode={item.id} />
-                </button>
+                  <button
+                    type="button"
+                    aria-pressed={symmetryType === item.id}
+                    aria-label={`대칭 ${item.label}`}
+                    onClick={() => onSymmetryTypeChange(item.id)}
+                    className={cn(
+                      iconBtn,
+                      "size-7 border-transparent",
+                      symmetryType === item.id
+                        ? "bg-accent text-on-accent"
+                        : "text-fg-3 hover:bg-raised hover:text-fg"
+                    )}
+                  >
+                    <StudioSymmetryGlyph mode={item.id} />
+                  </button>
+                </StudioToolHintTarget>
               ))}
             </div>
           ) : null}
@@ -727,83 +849,103 @@ export function StudioDrawOptionsBar({
                 const slot = brushSlots[index] ?? null;
                 const slotW = slot ? Math.min(10, Math.max(3, slot.strokeWidth * 0.45)) : 0;
                 return (
-                  <button
+                  <StudioToolHintTarget
                     key={index}
-                    type="button"
                     disabled={!slot && !onAssignBrushSlot}
-                    title={
-                      slot
-                        ? `${index + 1}: ${slot.brushId} · ${slot.strokeWidth}px`
-                        : `${index + 1}: 빈 슬롯 — 클릭으로 저장`
+                    unavailableReason={
+                      !slot && !onAssignBrushSlot
+                        ? "브러시 슬롯 저장 기능이 연결되지 않았어요. 저장 가능한 작업공간에서 현재 브러시를 슬롯에 먼저 등록하세요."
+                        : undefined
                     }
-                    aria-label={`브러시 슬롯 ${index + 1}`}
-                    onClick={(e) => {
-                      if (e.shiftKey && onAssignBrushSlot) onAssignBrushSlot(index);
-                      else if (slot) onRecallBrushSlot(index);
-                      else if (onAssignBrushSlot) onAssignBrushSlot(index);
-                    }}
-                    className={cn(
-                      "grid size-7 place-items-center rounded-lg border",
-                      STUDIO_EASE,
-                      STUDIO_FOCUS_RING,
+                    hint={studioToolHintFromLabel(
+                      `브러시 슬롯 ${index + 1}`,
                       slot
-                        ? "border-line/80 bg-card text-fg-2 hover:border-accent/45 hover:bg-raised"
-                        : "border-dashed border-line/60 text-fg-3 hover:bg-raised/70"
+                        ? `${slot.brushId} · ${slot.strokeWidth}px · ${Math.round(slot.brushOpacity * 100)}% 설정을 한 번에 불러옵니다. Shift+클릭하면 현재 브러시로 덮어써요.`
+                        : onAssignBrushSlot
+                          ? "비어 있는 빠른 슬롯입니다. 클릭하면 현재 브러시·크기·불투명도를 저장해 다음에 한 번에 불러올 수 있어요."
+                          : "비어 있는 빠른 슬롯입니다. 슬롯 저장 기능이 연결되면 현재 브러시 설정을 보관할 수 있어요.",
+                      `${index + 1}`,
+                      "ink"
                     )}
                   >
-                    {slot ? (
-                      <span
-                        aria-hidden
-                        className="rounded-full ring-1 ring-black/20"
-                        style={{
-                          width: slotW,
-                          height: slotW,
-                          background: color,
-                          opacity: slot.brushOpacity,
-                        }}
-                      />
-                    ) : (
-                      <span className="text-[0.55rem] font-bold tabular-nums text-fg-3">{index + 1}</span>
-                    )}
-                  </button>
+                    <button
+                      type="button"
+                      disabled={!slot && !onAssignBrushSlot}
+                      aria-label={`브러시 슬롯 ${index + 1}`}
+                      onClick={(e) => {
+                        if (e.shiftKey && onAssignBrushSlot) onAssignBrushSlot(index);
+                        else if (slot) onRecallBrushSlot(index);
+                        else if (onAssignBrushSlot) onAssignBrushSlot(index);
+                      }}
+                      className={cn(
+                        "grid size-7 place-items-center rounded-lg border",
+                        STUDIO_EASE,
+                        STUDIO_FOCUS_RING,
+                        slot
+                          ? "border-line/80 bg-card text-fg-2 hover:border-accent/45 hover:bg-raised"
+                          : "border-dashed border-line/60 text-fg-3 hover:bg-raised/70"
+                      )}
+                    >
+                      {slot ? (
+                        <span
+                          aria-hidden
+                          className="rounded-full ring-1 ring-black/20"
+                          style={{
+                            width: slotW,
+                            height: slotW,
+                            background: color,
+                            opacity: slot.brushOpacity,
+                          }}
+                        />
+                      ) : (
+                        <span className="text-[0.55rem] font-bold tabular-nums text-fg-3">{index + 1}</span>
+                      )}
+                    </button>
+                  </StudioToolHintTarget>
                 );
               })}
             </div>
           ) : null}
 
-          <label
-            className="flex shrink-0 items-center gap-1 text-fg-3"
-            title={`손떨림 보정 ${stabilizer} (S: 단계 순환)`}
-          >
-            <StudioStabilizerGlyph />
-            <span className="sr-only">보정</span>
-            <input
-              type="range"
-              min={0}
-              max={10}
-              step={1}
-              value={stabilizer}
-              onChange={(e) => onStabilizerChange(Number(e.target.value))}
-              className="studio-range w-14"
-              aria-label="손떨림 보정"
-            />
-            {onCycleStabilizer ? (
-              <button
-                type="button"
-                title="보정 강도 순환 (S)"
-                aria-label={`보정 강도 ${stabilizer}`}
-                onClick={onCycleStabilizer}
-                className={cn(
-                  "w-5 rounded tabular-nums text-[0.68rem] font-bold text-fg hover:bg-raised",
-                  STUDIO_FOCUS_RING
-                )}
-              >
-                {stabilizer}
-              </button>
-            ) : (
-              <span className="w-4 tabular-nums text-[0.68rem] font-bold text-fg">{stabilizer}</span>
+          <StudioToolHintTarget
+            className="shrink-0"
+            hint={studioToolHintFromLabel(
+              "손떨림 보정",
+              `현재 강도 ${stabilizer}/10입니다. 값이 높을수록 입력을 더 오래 평균내 매끈한 선을 만들지만 펜을 따라오는 느낌은 느려질 수 있어요.`,
+              "S",
+              "stabilizer"
             )}
-          </label>
+          >
+            <label className="flex shrink-0 items-center gap-1 text-fg-3">
+              <StudioStabilizerGlyph />
+              <span className="sr-only">보정</span>
+              <input
+                type="range"
+                min={0}
+                max={10}
+                step={1}
+                value={stabilizer}
+                onChange={(e) => onStabilizerChange(Number(e.target.value))}
+                className="studio-range w-14"
+                aria-label="손떨림 보정"
+              />
+              {onCycleStabilizer ? (
+                <button
+                  type="button"
+                  aria-label={`보정 강도 ${stabilizer}`}
+                  onClick={onCycleStabilizer}
+                  className={cn(
+                    "w-5 rounded tabular-nums text-[0.68rem] font-bold text-fg hover:bg-raised",
+                    STUDIO_FOCUS_RING
+                  )}
+                >
+                  {stabilizer}
+                </button>
+              ) : (
+                <span className="w-4 tabular-nums text-[0.68rem] font-bold text-fg">{stabilizer}</span>
+              )}
+            </label>
+          </StudioToolHintTarget>
 
           {onStabilizerModeChange ? (
             <div className="flex shrink-0 items-center gap-0.5" role="group" aria-label="보정 방식">
@@ -814,46 +956,65 @@ export function StudioDrawOptionsBar({
                   { id: "precision" as const, label: "정밀" },
                 ] as const
               ).map((item) => (
-                <button
+                <StudioToolHintTarget
                   key={item.id}
-                  type="button"
-                  aria-pressed={stabilizerMode === item.id}
-                  aria-label={`보정 방식 ${item.label}`}
-                  title={`보정 방식: ${item.label}`}
-                  onClick={() => onStabilizerModeChange(item.id)}
-                  className={cn(
-                    iconBtn,
-                    "size-7 border-transparent",
-                    stabilizerMode === item.id
-                      ? "bg-raised text-fg ring-1 ring-accent/40"
-                      : "text-fg-3 hover:bg-raised/70"
+                  hint={studioToolHintFromLabel(
+                    `보정 방식 · ${item.label}`,
+                    item.id === "standard"
+                      ? "입력 지연을 최소화하며 잔떨림을 고르게 줄입니다. 짧고 빠른 선화에 잘 맞아요."
+                      : item.id === "adaptive"
+                        ? "그리는 속도에 맞춰 보정량을 바꿉니다. 빠른 제스처와 느린 곡선을 함께 쓸 때 균형이 좋아요."
+                        : "입력을 더 길게 분석해 긴 곡선과 깨끗한 윤곽을 정밀하게 다듬습니다.",
+                    undefined,
+                    "stabilizer"
                   )}
                 >
-                  <StudioStabilizerModeGlyph mode={item.id} />
-                </button>
+                  <button
+                    type="button"
+                    aria-pressed={stabilizerMode === item.id}
+                    aria-label={`보정 방식 ${item.label}`}
+                    onClick={() => onStabilizerModeChange(item.id)}
+                    className={cn(
+                      iconBtn,
+                      "size-7 border-transparent",
+                      stabilizerMode === item.id
+                        ? "bg-raised text-fg ring-1 ring-accent/40"
+                        : "text-fg-3 hover:bg-raised/70"
+                    )}
+                  >
+                    <StudioStabilizerModeGlyph mode={item.id} />
+                  </button>
+                </StudioToolHintTarget>
               ))}
             </div>
           ) : null}
 
           {onPostCorrectionChange ? (
-            <label
-              className="flex shrink-0 items-center gap-1 text-fg-3"
-              title={`후처리 ${postCorrection}`}
+            <StudioToolHintTarget
+              className="shrink-0"
+              hint={studioToolHintFromLabel(
+                "획 후처리 보정",
+                `현재 강도 ${postCorrection}/10입니다. 펜을 뗀 뒤 완성된 획의 작은 꺾임과 불필요한 점을 정리하며 원본 제스처는 유지합니다.`,
+                undefined,
+                "stabilizer"
+              )}
             >
-              <StudioPostCorrectGlyph />
-              <span className="sr-only">후처리</span>
-              <input
-                type="range"
-                min={0}
-                max={10}
-                step={1}
-                value={postCorrection}
-                onChange={(e) => onPostCorrectionChange(Number(e.target.value))}
-                className="w-12 accent-accent"
-                aria-label="후처리 보정"
-              />
-              <span className="w-4 tabular-nums text-[0.68rem] font-bold text-fg-2">{postCorrection}</span>
-            </label>
+              <label className="flex shrink-0 items-center gap-1 text-fg-3">
+                <StudioPostCorrectGlyph />
+                <span className="sr-only">후처리</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={10}
+                  step={1}
+                  value={postCorrection}
+                  onChange={(e) => onPostCorrectionChange(Number(e.target.value))}
+                  className="w-12 accent-accent"
+                  aria-label="후처리 보정"
+                />
+                <span className="w-4 tabular-nums text-[0.68rem] font-bold text-fg-2">{postCorrection}</span>
+              </label>
+            </StudioToolHintTarget>
           ) : null}
 
           {onPressureCurveChange ? (
@@ -865,23 +1026,35 @@ export function StudioDrawOptionsBar({
                   { id: "firm" as const, label: "단단" },
                 ] as const
               ).map((item) => (
-                <button
+                <StudioToolHintTarget
                   key={item.id}
-                  type="button"
-                  aria-pressed={pressureCurveId === item.id}
-                  aria-label={`필압 ${item.label}`}
-                  title={`필압: ${item.label}`}
-                  onClick={() => onPressureCurveChange(item.id)}
-                  className={cn(
-                    iconBtn,
-                    "size-7 border-transparent",
-                    pressureCurveId === item.id
-                      ? "bg-raised text-fg ring-1 ring-accent/40"
-                      : "text-fg-3 hover:bg-raised/70"
+                  hint={studioToolHintFromLabel(
+                    `필압 · ${item.label}`,
+                    item.id === "soft"
+                      ? "가벼운 압력에도 굵기와 농도가 빠르게 올라갑니다. 힘을 적게 주는 펜이나 부드러운 명암에 좋아요."
+                      : item.id === "linear"
+                        ? "펜 압력과 굵기·농도를 균일하게 대응시켜 예측 가능한 기본 반응을 만듭니다."
+                        : "더 강하게 눌러야 굵기와 농도가 올라갑니다. 힘 있는 선과 세밀한 초입 제어에 좋아요.",
+                    undefined,
+                    "pressure"
                   )}
                 >
-                  <StudioPressureCurveGlyph curve={item.id} />
-                </button>
+                  <button
+                    type="button"
+                    aria-pressed={pressureCurveId === item.id}
+                    aria-label={`필압 ${item.label}`}
+                    onClick={() => onPressureCurveChange(item.id)}
+                    className={cn(
+                      iconBtn,
+                      "size-7 border-transparent",
+                      pressureCurveId === item.id
+                        ? "bg-raised text-fg ring-1 ring-accent/40"
+                        : "text-fg-3 hover:bg-raised/70"
+                    )}
+                  >
+                    <StudioPressureCurveGlyph curve={item.id} />
+                  </button>
+                </StudioToolHintTarget>
               ))}
             </div>
           ) : null}

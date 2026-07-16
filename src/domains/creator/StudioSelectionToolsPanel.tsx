@@ -178,12 +178,20 @@ export function StudioSelectionToolsPanel({
           return (
             <StudioToolHintTarget
               key={tool.id}
-              hint={{ id: tool.id, title: tool.label, description: tool.tip }}
+              hint={{
+                id: `pixel-selection-${tool.id}`,
+                title: tool.label,
+                description: tool.tip,
+                preview: "lasso",
+                tip:
+                  tool.id === "poly-lasso"
+                    ? "Enter 또는 더블클릭으로 닫고, Esc로 그리던 경로를 취소할 수 있어요."
+                    : undefined,
+              }}
             >
               <StudioToggleChip
                 active={active}
                 onClick={() => onPickTool(active ? null : tool.id)}
-                title={tool.tip}
                 aria-label={tool.label}
               >
                 <span className="inline-flex items-center gap-1">
@@ -214,12 +222,22 @@ export function StudioSelectionToolsPanel({
           {SELECTION_COMBINE_MODES.map((mode) => (
             <StudioToolHintTarget
               key={mode.id}
-              hint={{ id: mode.id, title: mode.label, description: mode.tip }}
+              hint={{
+                id: `pixel-selection-combine-${mode.id}`,
+                title: mode.label,
+                description: mode.tip,
+                preview: "select",
+                tip:
+                  mode.id === "add"
+                    ? "Shift를 누르면 작업 중에도 합치기로 잠시 전환할 수 있어요."
+                    : mode.id === "subtract"
+                      ? "Alt 또는 Option을 누르면 작업 중에도 빼기로 잠시 전환할 수 있어요."
+                      : "겹친 픽셀만 남겨 정교한 마스크를 만들 때 유용해요.",
+              }}
             >
               <StudioToggleChip
                 active={combineMode === mode.id}
                 onClick={() => onCombineModeChange(mode.id)}
-                title={mode.tip}
                 aria-label={mode.label}
               >
                 {mode.label}

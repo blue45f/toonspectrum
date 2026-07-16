@@ -30,6 +30,7 @@ describe("studio-app-settings", () => {
     const d = defaultStudioAppSettings();
     expect(d.toolbar.visibleIds).toEqual(DEFAULT_STUDIO_RAIL_TOOL_ORDER);
     expect(Object.keys(d.shortcuts).length).toBe(STUDIO_SHORTCUT_ACTIONS.length);
+    expect(d.shortcuts["toggle-chrome"]).toBe("`");
     expect(d.mouse.wheel).toBe("zoom");
     expect(d.touch.oneFingerDrag).toBe("draw");
   });
@@ -48,6 +49,7 @@ describe("studio-app-settings", () => {
     expect(n.grids.pixelGridSize).toBe(50);
     expect(n.other.pressureCurve).toBe(2.5);
     expect(n.shortcuts["tool-pen"]).toBe("P");
+    expect(normalizeStudioAppSettings({ shortcuts: { "toggle-chrome": "Tab" } }).shortcuts["toggle-chrome"]).toBe("`");
   });
 
   it("rail hide/show/move preserve at least one tool", () => {

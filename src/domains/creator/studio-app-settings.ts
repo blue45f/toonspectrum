@@ -78,7 +78,7 @@ export const STUDIO_SHORTCUT_ACTIONS = [
   { id: "redo", label: "다시실행", defaultKeys: "Mod+Shift+Z" },
   { id: "deselect-pixels", label: "픽셀 선택 해제", defaultKeys: "Mod+D" },
   { id: "invert-pixels", label: "픽셀 선택 반전", defaultKeys: "Mod+Shift+I" },
-  { id: "toggle-chrome", label: "캔버스만 보기", defaultKeys: "Tab" },
+  { id: "toggle-chrome", label: "캔버스만 보기", defaultKeys: "`" },
   { id: "swap-colors", label: "주·보조 색 교체", defaultKeys: "X" },
   { id: "brush-smaller", label: "브러시 작게", defaultKeys: "[" },
   { id: "brush-larger", label: "브러시 크게", defaultKeys: "]" },
@@ -274,6 +274,9 @@ export function normalizeStudioShortcuts(
       base[action.id] = raw.trim().slice(0, 48);
     }
   }
+  // Browser editors must never turn Tab into an in-canvas trap. Migrate the
+  // former desktop-app-style binding while preserving an explicitly unbound key.
+  if (base["toggle-chrome"].toLocaleLowerCase() === "tab") base["toggle-chrome"] = "`";
   return base;
 }
 

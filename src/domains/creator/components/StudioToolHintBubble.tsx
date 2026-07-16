@@ -1,4 +1,4 @@
-import { Lightbulb, Sparkles } from "lucide-react";
+import { Lightbulb, LockKeyhole, Sparkles } from "lucide-react";
 import {
   Suspense,
   lazy,
@@ -14,10 +14,9 @@ import {
   planStudioToolHintPosition,
   type StudioToolHintSide,
 } from "../studio-tool-hint-position";
-import {
-  studioToolHintPreview,
-  type StudioToolHintSpec,
-} from "../studio-tool-hints";
+import { studioToolHintPreview } from "../studio-tool-hint-preview-routing";
+
+import type { StudioToolHintSpec } from "../studio-tool-hints";
 
 import { cn } from "@/lib/utils";
 
@@ -35,6 +34,7 @@ export interface StudioToolHintBubbleProps {
   readonly anchor: HintAnchor;
   readonly id?: string;
   readonly expanded?: boolean;
+  readonly unavailableReason?: string;
   readonly preferredSide?: StudioToolHintSide;
   readonly className?: string;
   readonly onMouseEnter?: MouseEventHandler<HTMLDivElement>;
@@ -108,6 +108,7 @@ export function StudioToolHintBubble({
   anchor,
   id,
   expanded = true,
+  unavailableReason,
   preferredSide,
   className,
   onMouseEnter,
@@ -119,7 +120,9 @@ export function StudioToolHintBubble({
   const coachExpanded = expanded && viewportHeight >= MIN_RICH_COACH_VIEWPORT_HEIGHT;
   const [measuredSize, setMeasuredSize] = useState({
     width: coachExpanded ? COACH_WIDTH : COMPACT_WIDTH,
-    height: coachExpanded ? COACH_HEIGHT : COMPACT_HEIGHT,
+    height: coachExpanded
+      ? COACH_HEIGHT + (unavailableReason ? 40 : 0)
+      : COMPACT_HEIGHT + (unavailableReason ? 40 : 0),
   });
   const resolvedPreferredSide = preferredSide ?? (anchor.bottom > viewportHeight * 0.72 ? "top" : "right");
   const position = planStudioToolHintPosition({
@@ -141,7 +144,7 @@ export function StudioToolHintBubble({
         ? current
         : { width: rect.width, height: rect.height }
     );
-  }, [coachExpanded, hint.description, hint.tip]);
+  }, [coachExpanded, hint.description, hint.tip, unavailableReason]);
 
   return (
     <div
@@ -155,7 +158,7 @@ export function StudioToolHintBubble({
       className={cn(
         "pointer-events-auto fixed z-[200] max-h-[calc(100vh-1.25rem)] overflow-hidden rounded-lg border border-line/80",
         "bg-panel/98 p-2.5 text-left shadow-[0_20px_56px_oklch(0.06_0.01_70/0.66)] backdrop-blur-xl",
-        "transition-[width] duration-150 ease-out",
+        "transition-[width] duration-150 ease-out motion-reduce:transition-none",
         coachExpanded
           ? "w-[min(19rem,calc(100vw-1.25rem))]"
           : "w-[min(15rem,calc(100vw-1.25rem))]",
@@ -177,8 +180,8 @@ export function StudioToolHintBubble({
 
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate text-[0.78rem] font-bold leading-tight text-fg">{hint.title}</p>
-          <span className="mt-1 inline-flex items-center gap-1 text-[0.56rem] font-semibold uppercase tracking-[0.12em] text-accent">
+          <p className="truncate text-[0.8125rem] font-bold leading-tight text-fg">{hint.title}</p>
+          <span className="mt-1 inline-flex items-center gap-1 text-[0.65rem] font-semibold uppercase tracking-[0.1em] text-accent">
             <Sparkles size={10} strokeWidth={1.8} aria-hidden />
             {coachExpanded ? "동작 미리보기" : "잠시 머물러 미리보기"}
           </span>
@@ -186,7 +189,7 @@ export function StudioToolHintBubble({
         {hint.shortcut ? (
           <kbd
             data-studio-kbd="true"
-            className="shrink-0 rounded-md border border-line/70 bg-canvas/75 px-1.5 py-0.5 text-[0.58rem] font-semibold tabular-nums text-fg-2 shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.06)]"
+            className="shrink-0 rounded-md border border-line/70 bg-canvas/75 px-1.5 py-0.5 text-[0.625rem] font-semibold tabular-nums text-fg-2 shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.06)]"
           >
             {hint.shortcut}
           </kbd>
@@ -204,14 +207,25 @@ export function StudioToolHintBubble({
         </div>
       ) : null}
 
-      <p className={cn("text-[0.68rem] leading-relaxed text-fg-2", coachExpanded ? "mt-2" : "mt-1.5")}>
+      <p className={cn("text-[0.75rem] leading-relaxed text-fg-2", coachExpanded ? "mt-2" : "mt-1.5")}>
         {hint.description}
       </p>
+
+      {unavailableReason ? (
+        <div
+          data-studio-tool-hint-unavailable="true"
+          className="mt-2 flex items-start gap-1.5 rounded-md border border-warn/35 bg-warn/10 px-2 py-1.5 text-[0.7rem] leading-relaxed"
+        >
+          <LockKeyhole size={12} strokeWidth={1.9} className="mt-0.5 shrink-0 text-warn" aria-hidden />
+          <span className="shrink-0 font-bold text-warn">사용 조건</span>
+          <span className="min-w-0 text-fg-2">{unavailableReason}</span>
+        </div>
+      ) : null}
 
       {coachExpanded && hint.tip ? (
         <div
           data-studio-tool-hint-tip="true"
-          className="mt-2 flex items-start gap-1.5 rounded-md border border-accent/20 bg-accent-soft/50 px-2 py-1.5 text-[0.62rem] leading-relaxed text-fg-2"
+          className="mt-2 flex items-start gap-1.5 rounded-md border border-accent/20 bg-accent-soft/50 px-2 py-1.5 text-[0.7rem] leading-relaxed text-fg-2"
         >
           <Lightbulb size={12} strokeWidth={1.8} className="mt-0.5 shrink-0 text-accent" aria-hidden />
           <span>{hint.tip}</span>

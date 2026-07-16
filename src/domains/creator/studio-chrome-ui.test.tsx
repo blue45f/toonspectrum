@@ -128,6 +128,31 @@ describe("studio chrome UI", () => {
     expect(html).toContain("min-h-11");
   });
 
+  it("keeps disabled dock and rail coaches focusable without duplicate native titles", () => {
+    const html = renderToStaticMarkup(
+      <>
+        <StudioDockButton
+          icon={Pencil}
+          label="펜"
+          disabled
+          title="편집 잠금을 먼저 해제하세요"
+          hintDescription="필압과 보정이 적용되는 자유선을 그립니다."
+        />
+        <StudioRailToolButton
+          icon={Pencil}
+          label="픽셀 펜 (P)"
+          description="1픽셀 선을 그립니다."
+          disabled
+          unavailableReason="이미지 레이어를 먼저 선택하세요."
+        />
+      </>
+    );
+    expect(html.match(/data-studio-tool-hint-unavailable="true"/g)).toHaveLength(2);
+    expect(html.match(/aria-disabled="true"/g)).toHaveLength(2);
+    expect(html.match(/tabindex="0"/g)).toHaveLength(2);
+    expect(html).not.toContain('title="편집 잠금을 먼저 해제하세요"');
+  });
+
   it("renders Magma-style vertical tool rail, quick actions, and status bar", () => {
     const html = renderToStaticMarkup(
       <>

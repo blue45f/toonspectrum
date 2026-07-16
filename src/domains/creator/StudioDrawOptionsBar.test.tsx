@@ -1,8 +1,12 @@
+import { readFileSync } from "node:fs";
+
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { StudioBrushLibrarySheet } from "./StudioBrushLibrarySheet";
 import { StudioDrawOptionsBar } from "./StudioDrawOptionsBar";
+
+const drawOptionsSource = readFileSync(new URL("./StudioDrawOptionsBar.tsx", import.meta.url), "utf8");
 
 describe("StudioDrawOptionsBar", () => {
   it("renders a compact primary dock with continuous size, opacity, and smart-shape controls", () => {
@@ -73,6 +77,63 @@ describe("StudioDrawOptionsBar", () => {
     expect(html).toContain("네온");
   });
 
+  it("gives high-frequency primary controls one rich coach target without native-title duplication", () => {
+    const html = renderToStaticMarkup(
+      <StudioDrawOptionsBar
+        drawMode="pen"
+        brushId="pen"
+        strokeWidth={8}
+        brushOpacity={0.85}
+        stabilizer={6}
+        color="#112233"
+        quickShapeActive={false}
+        onSetDrawMode={vi.fn()}
+        onSelectBrush={vi.fn()}
+        onStrokeWidthChange={vi.fn()}
+        onOpacityChange={vi.fn()}
+        onStabilizerChange={vi.fn()}
+        onColorChange={vi.fn()}
+        onToggleQuickShape={vi.fn()}
+        onToggleFavoriteBrush={vi.fn()}
+        onToggleCanvasFlipH={vi.fn()}
+        onOpenBrushStudio={vi.fn()}
+      />
+    );
+
+    expect(html.match(/data-studio-tool-hint-target="true"/g)?.length ?? 0).toBeGreaterThanOrEqual(11);
+    expect(html).not.toContain('title="캔버스 좌우 반전"');
+    expect(html).not.toContain('title="브러시 스튜디오');
+    expect(html).not.toContain('title="스마트 도형');
+    expect(html).toContain('aria-label="브러시 크기"');
+    expect(html).toContain('aria-label="브러시 불투명도"');
+  });
+
+  it("assigns semantic animated previews across advanced drawing workflows", () => {
+    for (const preview of [
+      "brush-size",
+      "opacity",
+      "stabilizer",
+      "pressure",
+      "symmetry",
+      "shape",
+      "zoom-view",
+      "ink",
+      "erase",
+    ]) {
+      expect(drawOptionsSource).toContain(`"${preview}"`);
+    }
+
+    expect(drawOptionsSource.match(/<StudioToolHintTarget/g)?.length ?? 0).toBeGreaterThanOrEqual(16);
+    expect(drawOptionsSource).not.toContain('title="캔버스 좌우 반전"');
+    expect(drawOptionsSource).not.toContain('title="브러시 스튜디오');
+    expect(drawOptionsSource).not.toContain('title="스마트 도형');
+    expect(drawOptionsSource).not.toContain("title={`손떨림 보정");
+    expect(drawOptionsSource).not.toContain("title={`후처리");
+    expect(drawOptionsSource).not.toContain("title={`보정 방식:");
+    expect(drawOptionsSource).not.toContain("title={`필압:");
+    expect(drawOptionsSource).not.toContain("title={`대칭:");
+  });
+
   it("keeps symmetry and slots behind the advanced disclosure", () => {
     const html = renderToStaticMarkup(
       <StudioDrawOptionsBar
@@ -137,6 +198,36 @@ describe("StudioDrawOptionsBar", () => {
     expect(html).toContain("도형 채우기");
     expect(html).toContain("도형");
     expect(html).toContain('aria-label="그리기 모드"');
+  });
+
+  it("keeps unavailable shape fill discoverable from a named disabled coach", () => {
+    const html = renderToStaticMarkup(
+      <StudioDrawOptionsBar
+        drawMode="shape"
+        brushId="pen"
+        strokeWidth={4}
+        brushOpacity={1}
+        stabilizer={0}
+        color="#112233"
+        quickShapeActive={false}
+        shapeKind="line"
+        shapeFill={false}
+        onShapeKindChange={vi.fn()}
+        onShapeFillChange={vi.fn()}
+        onSelectBrush={vi.fn()}
+        onStrokeWidthChange={vi.fn()}
+        onOpacityChange={vi.fn()}
+        onStabilizerChange={vi.fn()}
+        onColorChange={vi.fn()}
+        onToggleQuickShape={vi.fn()}
+      />
+    );
+
+    expect(html).toContain('data-studio-tool-hint-unavailable="true"');
+    expect(html).toContain('role="button"');
+    expect(html).toContain('aria-label="도형 채우기"');
+    expect(html).toContain('aria-disabled="true"');
+    expect(html).toContain('tabindex="0"');
   });
 
   it("keeps the fixed dock inside the canvas column when desktop panels are open", () => {

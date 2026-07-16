@@ -10,7 +10,7 @@ export type StudioDrawingShortcut =
   | { type: "adjust-opacity"; delta: number }
   /** Magma-style recent brush slot recall (0–5). */
   | { type: "recall-brush-slot"; index: number }
-  /** Toggle canvas-first chrome (Tab, Magma-style). */
+  /** Toggle canvas-first chrome (Backquote; Tab stays native browser navigation). */
   | { type: "toggle-chrome" }
   /** CSP / Photoshop: swap primary ↔ secondary color (X). */
   | { type: "swap-colors" }
@@ -37,6 +37,25 @@ export interface StudioDrawingShortcutEvent {
   isComposing?: boolean;
 }
 
+export interface StudioShortcutFocusContext {
+  tagName?: string;
+  role?: string | null;
+  tabIndex?: number;
+  isContentEditable?: boolean;
+  canvasViewportFocused?: boolean;
+}
+
+/**
+ * Keep browser focus navigation intact. The chrome shortcut is allowed only
+ * while the explicit canvas viewport owns focus; Tab itself never resolves to
+ * this action, so both forward and reverse traversal can always leave canvas.
+ */
+export function shouldPreserveStudioTabNavigation(
+  context: StudioShortcutFocusContext
+): boolean {
+  return !context.canvasViewportFocused;
+}
+
 function physicalCode(event: StudioDrawingShortcutEvent): string {
   if (event.code) {
     if (event.code === "b" || event.code === "B") return "KeyB";
@@ -58,6 +77,7 @@ function physicalCode(event: StudioDrawingShortcutEvent): string {
   if (key === "f") return "KeyF";
   if (key === "[") return "BracketLeft";
   if (key === "]") return "BracketRight";
+  if (key === "`" || key === "~") return "Backquote";
   return "";
 }
 
@@ -82,8 +102,8 @@ export function resolveStudioDrawingShortcut(
     }
   }
 
-  // Tab toggles chrome (ignore when focus is in inputs — caller checks).
-  if (code === "Tab" && !event.altKey && !event.repeat) {
+  // Backquote toggles canvas chrome. Tab must remain native focus navigation.
+  if (code === "Backquote" && !event.altKey && !event.shiftKey && !event.repeat) {
     return { type: "toggle-chrome" };
   }
 

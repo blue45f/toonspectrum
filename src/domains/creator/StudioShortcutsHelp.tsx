@@ -60,7 +60,7 @@ const GROUPS: ShortcutGroup[] = [
       { keys: "⌘ 0", label: "100%로 맞춤" },
       { keys: "⌘ + 휠", label: "포인터 기준 확대/축소" },
       { keys: "Space + 드래그", label: "화면 이동(팬)" },
-      { keys: "Tab", label: "캔버스만 / 도구 토글" },
+      { keys: "`", label: "캔버스만 / 도구 토글" },
       { keys: "H", label: "캔버스 좌우 반전 (보기)" },
       { keys: "?", label: "단축키 도움말" },
     ],

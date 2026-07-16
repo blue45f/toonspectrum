@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { StudioToolHintBubble } from "./components/StudioToolHintBubble";
+import { StudioToolHintTarget } from "./StudioToolHint";
 import source from "./StudioToolHint.tsx?raw";
 
 describe("StudioToolHint", () => {
@@ -84,5 +85,60 @@ describe("StudioToolHint", () => {
     expect(source).toContain("event.stopPropagation();");
     expect(source).toContain("onClickCapture={handleClickCapture}");
     expect(source).not.toContain("if (touchHoldOpened.current) scheduleHide()");
+  });
+
+  it("keeps unavailable controls inert but makes their usage conditions discoverable", () => {
+    const targetHtml = renderToStaticMarkup(
+      <StudioToolHintTarget
+        disabled
+        unavailableReason="먼저 편집할 레이어를 선택하세요."
+        hint={{ id: "locked-fill", title: "채우기", description: "닫힌 영역을 채웁니다." }}
+      >
+        <button type="button" disabled>채우기</button>
+      </StudioToolHintTarget>
+    );
+    const bubbleHtml = renderToStaticMarkup(
+      <StudioToolHintBubble
+        unavailableReason="먼저 편집할 레이어를 선택하세요."
+        hint={{ id: "locked-fill", title: "채우기", description: "닫힌 영역을 채웁니다." }}
+        anchor={{ left: 10, top: 20, right: 50, bottom: 60, width: 40, height: 40 } as DOMRect}
+      />
+    );
+
+    expect(targetHtml).toContain('data-studio-tool-hint-target="true"');
+    expect(targetHtml).toContain('data-studio-tool-hint-unavailable="true"');
+    expect(targetHtml).toContain('aria-disabled="true"');
+    expect(targetHtml).toContain('tabindex="0"');
+    expect(targetHtml).toContain('disabled=""');
+    expect(bubbleHtml).toContain('data-studio-tool-hint-unavailable="true"');
+    expect(bubbleHtml).toContain("사용 조건");
+    expect(bubbleHtml).toContain("먼저 편집할 레이어를 선택하세요.");
+  });
+
+  it("does not add wrapper keyboard semantics to active controls or no-hint fallbacks", () => {
+    const activeHtml = renderToStaticMarkup(
+      <StudioToolHintTarget
+        hint={{ id: "active-pen", title: "펜", description: "자유선을 그립니다." }}
+      >
+        <button type="button">펜</button>
+      </StudioToolHintTarget>
+    );
+    const fallbackHtml = renderToStaticMarkup(
+      <StudioToolHintTarget hint={null} disabled unavailableReason="사용할 수 없습니다.">
+        <button type="button" disabled>미지원</button>
+      </StudioToolHintTarget>
+    );
+
+    expect(activeHtml).not.toContain("aria-disabled");
+    expect(activeHtml).not.toContain("tabindex=");
+    expect(fallbackHtml).not.toContain("data-studio-tool-hint-target");
+    expect(fallbackHtml).not.toContain("aria-disabled");
+    expect(fallbackHtml).not.toContain("tabindex=");
+  });
+
+  it("opens from keyboard and assistive focus without depending on :focus-visible support", () => {
+    expect(source).toContain("Pointer focus is already filtered by pointerdown suppression");
+    expect(source).not.toContain('matches(":focus-visible")');
+    expect(source).toContain("reveal(true);");
   });
 });

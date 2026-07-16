@@ -25,6 +25,8 @@ describe("StudioSelectOptionsBar", () => {
     expect(html).toContain('aria-label="맨 앞"');
     expect(html).toContain('aria-label="삭제"');
     expect(html).toContain("studio-opt-cluster");
+    expect(html.match(/data-studio-tool-hint-target="true"/g)).toHaveLength(5);
+    expect(html).not.toContain('title="복제"');
   });
 
   it("shows multi-select count badge without long Korean label chrome", () => {

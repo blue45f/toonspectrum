@@ -469,6 +469,7 @@ import {
   adjustStudioBrushOpacity,
   adjustStudioBrushWidth,
   resolveStudioDrawingShortcut,
+  shouldPreserveStudioTabNavigation,
 } from "./studio-drawing-shortcuts";
 import {
   advanceStudioDraftIdentityScope,
@@ -1046,6 +1047,7 @@ import { StudioPublishContextBanner, type PublishContext } from "./StudioPublish
 import { StudioPuppetWarpOverlay } from "./StudioPuppetWarpOverlay";
 import { StudioSavedBrushShelf } from "./StudioSavedBrushShelf";
 import { StudioSkewPanel } from "./StudioSkewPanel";
+import { StudioToolHintTarget } from "./StudioToolHint";
 import { StudioUploadPublish } from "./StudioUploadPublish";
 import { StudioWorkspaceMenu } from "./StudioWorkspaceMenu";
 
@@ -12197,8 +12199,21 @@ function StudioCuttoonEditor() {
         const inField = Boolean(
           targetEl?.closest("input, textarea, select, [contenteditable='true']")
         );
-        // Tab / number slots must not steal focus from form fields.
-        if (inField && (drawingShortcut.type === "toggle-chrome" || drawingShortcut.type === "recall-brush-slot")) {
+        const preserveTabNavigation =
+          drawingShortcut.type === "toggle-chrome" &&
+          targetEl !== null &&
+          shouldPreserveStudioTabNavigation({
+            tagName: targetEl.tagName,
+            role: targetEl.getAttribute("role"),
+            tabIndex: targetEl.tabIndex,
+            isContentEditable: targetEl.isContentEditable,
+            canvasViewportFocused: targetEl.matches("[data-studio-canvas-viewport]"),
+          });
+        // Chrome toggle / number slots must not steal focus from form fields.
+        if (
+          preserveTabNavigation ||
+          (inField && drawingShortcut.type === "recall-brush-slot")
+        ) {
           return;
         }
         e.preventDefault();
@@ -12285,7 +12300,7 @@ function StudioCuttoonEditor() {
           applyBrushSlot(slot);
           announceDrawingShortcut(`슬롯 ${drawingShortcut.index + 1}`);
         } else if (drawingShortcut.type === "toggle-chrome") {
-          // Magma Tab: hide chrome for canvas-first drawing.
+          // Browser-safe canvas-first toggle; Tab remains native focus navigation.
           if (canvasOnlyMode) {
             setCanvasOnlyMode(false);
             announceDrawingShortcut("도구 표시");
@@ -17953,7 +17968,7 @@ function StudioCuttoonEditor() {
           id: "canvas-only",
           label: "캔버스만",
           icon: Square,
-          shortcut: "Tab",
+          shortcut: "`",
           onSelect: () => enterCanvasOnlyMode(),
           separatorAfter: true,
         },
@@ -22497,6 +22512,13 @@ function StudioCuttoonEditor() {
               description="이미지 픽셀을 사각형으로 선택합니다. Shift=정사각, Alt=중심 확장. (Magma Selection)"
               active={pixelTool === "rect" && !pixelForceCircle}
               disabled={selected?.type !== "image" || selectedContentMutationLocked}
+              unavailableReason={
+                selected?.type !== "image"
+                  ? "픽셀을 선택할 이미지 레이어를 먼저 고르세요."
+                  : selectedContentMutationLocked
+                    ? "선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요."
+                    : undefined
+              }
               onClick={() => {
                 if (selected?.type !== "image" || selectedContentMutationLocked) return;
                 setTool("select");
@@ -22514,6 +22536,13 @@ function StudioCuttoonEditor() {
               description="이미지 픽셀을 정원으로 선택합니다. Alt=중심 확장. (Magma Circle Selection)"
               active={pixelTool === "ellipse" && pixelForceCircle}
               disabled={selected?.type !== "image" || selectedContentMutationLocked}
+              unavailableReason={
+                selected?.type !== "image"
+                  ? "픽셀을 선택할 이미지 레이어를 먼저 고르세요."
+                  : selectedContentMutationLocked
+                    ? "선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요."
+                    : undefined
+              }
               onClick={() => {
                 if (selected?.type !== "image" || selectedContentMutationLocked) return;
                 setTool("select");
@@ -22531,6 +22560,13 @@ function StudioCuttoonEditor() {
               description="픽셀 선택이 있으면 속성→리터치에서 내용 변형(스케일·회전·뒤집기)을 적용합니다. (Magma Transform)"
               active={false}
               disabled={selected?.type !== "image" || !isSelectionUsable(pixelSel)}
+              unavailableReason={
+                selected?.type !== "image"
+                  ? "변형할 이미지 레이어를 먼저 고르세요."
+                  : !isSelectionUsable(pixelSel)
+                    ? "이미지 안에서 변형할 픽셀 영역을 먼저 선택하세요."
+                    : undefined
+              }
               onClick={() => {
                 if (!isSelectionUsable(pixelSel)) return;
                 setRightPanelOpen(true);
@@ -22541,10 +22577,11 @@ function StudioCuttoonEditor() {
             {isRailToolVisible("pen") ? (
             <StudioRailToolButton
               icon={Pencil}
-              label={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 펜을 사용할 수 있어요" : "펜 (B)"}
+              label="펜 (B)"
               description="자유선으로 그립니다. 필압·보정·브러시 프리셋은 하단 옵션 도크와 브러시 스튜디오에서 조절해요."
               active={tool === "draw" && drawMode === "pen"}
               disabled={activeSurfaceReviewLocked}
+              unavailableReason={activeSurfaceReviewLocked ? "현재 작업면의 검토 잠금을 먼저 해제하세요." : undefined}
               grouped
               onClick={() => {
                 setTool("draw");
@@ -22561,6 +22598,7 @@ function StudioCuttoonEditor() {
               description="1px 하드 픽셀 펜으로 그립니다. 안티앨리어스·필압 없이 또렷한 선을 남깁니다. (Magma Pixel Pencil)"
               active={tool === "draw" && drawMode === "pixel"}
               disabled={activeSurfaceReviewLocked}
+              unavailableReason={activeSurfaceReviewLocked ? "현재 작업면의 검토 잠금을 먼저 해제하세요." : undefined}
               onClick={() => {
                 setTool("draw");
                 setDrawMode("pixel");
@@ -22573,10 +22611,11 @@ function StudioCuttoonEditor() {
             {isRailToolVisible("eraser") ? (
             <StudioRailToolButton
               icon={Eraser}
-              label={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 지우개를 사용할 수 있어요" : "지우개 (E)"}
+              label="지우개 (E)"
               description="현재 레이어/획 위를 지웁니다. 굵기는 펜과 같은 크기 칩으로 맞출 수 있어요."
               active={tool === "draw" && drawMode === "eraser"}
               disabled={activeSurfaceReviewLocked}
+              unavailableReason={activeSurfaceReviewLocked ? "현재 작업면의 검토 잠금을 먼저 해제하세요." : undefined}
               onClick={() => {
                 setTool("draw");
                 setDrawMode("eraser");
@@ -22592,6 +22631,13 @@ function StudioCuttoonEditor() {
               description="이미지 픽셀을 문질러 색을 섞습니다. (Magma Blend)"
               active={smudgeActive}
               disabled={selected?.type !== "image" || selectedContentMutationLocked}
+              unavailableReason={
+                selected?.type !== "image"
+                  ? "색을 섞을 이미지 레이어를 먼저 고르세요."
+                  : selectedContentMutationLocked
+                    ? "선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요."
+                    : undefined
+              }
               onClick={() => {
                 if (selected?.type !== "image") return;
                 setSmudgeActive((v) => {
@@ -22609,6 +22655,13 @@ function StudioCuttoonEditor() {
               description="이미지 위를 밀어 국소 왜곡합니다. (Magma Liquify)"
               active={liquifyActive}
               disabled={selected?.type !== "image" || selectedContentMutationLocked}
+              unavailableReason={
+                selected?.type !== "image"
+                  ? "왜곡할 이미지 레이어를 먼저 고르세요."
+                  : selectedContentMutationLocked
+                    ? "선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요."
+                    : undefined
+              }
               onClick={() => {
                 if (selected?.type !== "image") return;
                 setLiquifyActive((v) => {
@@ -22622,10 +22675,11 @@ function StudioCuttoonEditor() {
             {isRailToolVisible("fill") ? (
             <StudioRailToolButton
               icon={PaintBucket}
-              label={advancedFillUnsupportedReason ?? "채우기 (G)"}
+              label="채우기 (G)"
               description="선 안을 탭해 색을 채웁니다. 경계 인식과 참조 레이어 설정은 속성 패널에서 조정해요."
               active={advancedFillActive}
               disabled={!advancedFillActive && advancedFillUnsupportedReason !== null}
+              unavailableReason={advancedFillUnsupportedReason ?? undefined}
               onClick={toggleAdvancedFill}
             />
             ) : null}
@@ -22648,6 +22702,7 @@ function StudioCuttoonEditor() {
               description="닫힌 궤적을 그려 현재 색으로 채웁니다. (Magma Lasso Brush)"
               active={tool === "draw" && drawMode === "lasso-fill"}
               disabled={activeSurfaceReviewLocked}
+              unavailableReason={activeSurfaceReviewLocked ? "현재 작업면의 검토 잠금을 먼저 해제하세요." : undefined}
               onClick={() => {
                 setTool("draw");
                 setDrawMode("lasso-fill");
@@ -22660,9 +22715,7 @@ function StudioCuttoonEditor() {
             <StudioRailToolButton
               icon={Lasso}
               label={
-                selected?.type !== "image"
-                  ? "이미지를 선택하면 올가미로 픽셀을 고를 수 있어요"
-                  : pixelTool === "lasso"
+                pixelTool === "lasso"
                     ? "자유 올가미 끄기"
                     : pixelTool === "poly-lasso"
                       ? "다각형 올가미 사용 중 · 다시 누르면 자유 올가미"
@@ -22671,6 +22724,13 @@ function StudioCuttoonEditor() {
               description="이미지 픽셀을 자유 올가미(드래그) 또는 다각형 올가미(클릭)로 선택합니다."
               active={(pixelTool === "lasso" || pixelTool === "poly-lasso") && !pixelForceCircle}
               disabled={selected?.type !== "image" || selectedContentMutationLocked}
+              unavailableReason={
+                selected?.type !== "image"
+                  ? "픽셀을 고를 이미지 레이어를 먼저 선택하세요."
+                  : selectedContentMutationLocked
+                    ? "선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요."
+                    : undefined
+              }
               onClick={() => {
                 if (selected?.type !== "image" || selectedContentMutationLocked) return;
                 setTool("select");
@@ -22813,27 +22873,37 @@ function StudioCuttoonEditor() {
             />
             ) : null}
             {isRailToolVisible("image") ? (
-            <label
-              className="relative grid size-9 cursor-pointer place-items-center rounded-md border border-transparent text-fg-2 hover:border-line hover:bg-raised hover:text-fg"
-              title="이미지 추가 — 파일에서 그림을 불러와 캔버스에 배치합니다. 이후 필터·블러를 적용할 수 있어요."
+            <StudioToolHintTarget
+              hint={{
+                id: "image",
+                title: "이미지 추가",
+                description: "파일에서 그림을 불러와 캔버스에 배치합니다. 이후 비파괴 필터·블러·픽셀 선택을 적용할 수 있어요.",
+                preview: "image",
+                tip: "클립보드의 이미지는 ⌘V 또는 Ctrl+V로 바로 붙여넣을 수도 있어요.",
+              }}
             >
-              <ImagePlus size={16} strokeWidth={1.75} aria-hidden />
-              <span className="sr-only">이미지 추가</span>
-              <input type="file" accept="image/*" className="absolute inset-0 cursor-pointer opacity-0" onChange={onPickImage} />
-            </label>
+              <label className="relative grid size-9 cursor-pointer place-items-center rounded-md border border-transparent text-fg-2 hover:border-line hover:bg-raised hover:text-fg">
+                <ImagePlus size={16} strokeWidth={1.75} aria-hidden />
+                <span className="sr-only">이미지 추가</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="absolute inset-0 cursor-pointer opacity-0"
+                  onChange={onPickImage}
+                  aria-label="이미지 추가"
+                />
+              </label>
+            </StudioToolHintTarget>
             ) : null}
             <StudioRailDivider />
             {isRailToolVisible("frame-anim") ? (
             <StudioRailToolButton
               icon={Film}
-              label={
-                selected?.type !== "image"
-                  ? "이미지를 선택하면 프레임 애니메이션을 만들 수 있어요"
-                  : "프레임 애니메이션"
-              }
+              label="프레임 애니메이션"
               description="선택한 이미지에 여러 프레임을 쌓아 간단한 셀 애니메이션을 만듭니다."
               active={frameAnimOpen && frameAnimTargetId === selected?.id}
               disabled={selected?.type !== "image"}
+              unavailableReason={selected?.type !== "image" ? "애니메이션으로 편집할 이미지 레이어를 먼저 선택하세요." : undefined}
               onClick={() => {
                 if (!selected || selected.type !== "image") return;
                 if (!selected.frames || selected.frames.length === 0) {
@@ -22855,6 +22925,7 @@ function StudioCuttoonEditor() {
               <StudioRailToolButton
                 icon={PictureInPicture2}
                 label="참고 이미지"
+                description="캔버스와 분리된 참고 이미지를 띄워 구도·색·의상을 보면서 작업합니다. 완성 원고에는 포함되지 않아요."
                 active={referencePanelOpen}
                 accented
                 onClick={() => {
@@ -23335,9 +23406,9 @@ function StudioCuttoonEditor() {
                   else enterCanvasOnlyMode();
                 }}
                 className="rounded-full px-1.5 py-0.5 text-[0.58rem] font-bold text-fg-3 hover:bg-raised hover:text-fg"
-                title="Tab — 캔버스만 / 도구 토글"
+                title="` — 캔버스만 / 도구 토글"
               >
-                {canvasOnlyMode ? "도구" : "Tab"}
+                {canvasOnlyMode ? "도구" : "`"}
               </button>
             </StudioStatusBar>
           ) : null}
@@ -29158,6 +29229,13 @@ function StudioCuttoonEditor() {
                 label="되돌리기"
                 hintDescription="마지막 편집을 한 단계 되돌립니다. 공동 작업 변경 이력과 함께 안전하게 이동합니다."
                 disabled={hi === 0 || collaborationDocumentLocked}
+                hintUnavailableReason={
+                  collaborationDocumentLocked
+                    ? "공동 작업 문서 잠금을 해제한 뒤 편집 기록을 이동할 수 있어요."
+                    : hi === 0
+                      ? "아직 되돌릴 편집 기록이 없어요."
+                      : undefined
+                }
                 onClick={undo}
                 aria-label="실행취소"
               />
@@ -29166,6 +29244,13 @@ function StudioCuttoonEditor() {
                 label="다시"
                 hintDescription="되돌린 편집을 한 단계 다시 적용합니다."
                 disabled={hi >= history.length - 1 || collaborationDocumentLocked}
+                hintUnavailableReason={
+                  collaborationDocumentLocked
+                    ? "공동 작업 문서 잠금을 해제한 뒤 편집 기록을 이동할 수 있어요."
+                    : hi >= history.length - 1
+                      ? "다시 적용할 편집 기록이 없어요."
+                      : undefined
+                }
                 onClick={redo}
                 aria-label="다시실행"
               />

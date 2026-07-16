@@ -134,30 +134,73 @@ const HINTS: Record<string, StudioToolHintSpec> = {
   },
 };
 
+const HINT_ID_BY_DESCRIPTION = new Map(
+  Object.values(HINTS).map((hint) => [hint.description, hint.id] as const)
+);
+
 export function studioToolHint(id: string): StudioToolHintSpec | null {
   return HINTS[id] ?? null;
 }
 
-/** Resolve a meaningful visual for dynamic rail labels that are not in HINTS. */
-export function studioToolHintPreview(
-  hint: Pick<StudioToolHintSpec, "id" | "title" | "description" | "preview">
-): StudioToolHintPreviewKind {
-  if (hint.preview) return hint.preview;
-  const identity = `${hint.id} ${hint.title}`.toLocaleLowerCase("ko-KR");
-  const text = `${identity} ${hint.description}`.toLocaleLowerCase("ko-KR");
-  // Tool identity wins over incidental words in the help copy. For example,
-  // a pen description mentions stabilisation/correction but is still an ink demo.
-  if (/(지우|eraser)/u.test(identity)) return "erase";
-  if (/(스포이드|색.?추출|eyedrop|sample)/u.test(identity)) return "sample";
-  if (/(올가미|lasso)/u.test(identity)) return "lasso";
-  if (/(채우|paint.?bucket|fill)/u.test(identity)) return "fill";
-  if (/(펜|연필|브러시|픽셀|pen|pencil|brush)/u.test(identity)) return "ink";
-  if (/(말풍선|대사|댓글|bubble|comment)/u.test(identity)) return "bubble";
-  if (/(텍스트|글자|자막|text|type)/u.test(identity)) return "text";
-  if (/(이미지|사진|프레임|애니메이션|소재|image|photo|frame|asset)/u.test(identity)) return "image";
-  if (/(도형|사각|타원|원근|그리드|반전|shape|rect|ellipse|grid|flip)/u.test(identity)) return "shape";
-  if (/(필터|블러|보정|왜곡|리퀴|섞|filter|blur|liquify|blend)/u.test(text)) return "filter";
-  return "select";
+const REGISTERED_HINT_ID_BY_LABEL: Readonly<Record<string, string>> = {
+  선택: "select",
+  변형: "transform",
+  핸드: "hand",
+  펜: "pen",
+  "픽셀 펜": "pixel-pencil",
+  브러시: "brush-settings",
+  "브러시 설정": "brush-settings",
+  "브러시 크기": "brush-size",
+  굵기: "brush-size",
+  불투명도: "opacity",
+  "선 보정": "stabilizer",
+  보정: "stabilizer",
+  필압: "pressure",
+  "대칭 그리기": "symmetry",
+  대칭: "symmetry",
+  지우개: "eraser",
+  혼합: "blend",
+  리퀴파이: "liquify",
+  채우기: "fill",
+  스포이드: "eyedropper",
+  "라쏘 필": "lasso-fill",
+  도형: "smart-shape",
+  "스마트 도형": "smart-shape",
+  "사각형 도형": "shape-rect",
+  "타원 도형": "shape-ellipse",
+  텍스트: "text",
+  "텍스트 추가": "text",
+  말풍선: "bubble",
+  "말풍선 추가": "bubble",
+  "프레임 애니메이션": "frame-anim",
+  이미지: "image",
+  "이미지 추가": "image",
+  필터: "filter",
+  "다각형 올가미": "poly-lasso",
+  "올가미 선택": "lasso",
+  올가미: "lasso",
+  "사각 선택": "marquee-rect",
+  "원형 선택": "marquee-circle",
+  댓글: "comment",
+  투시도: "perspective",
+  "화면 맞춤": "zoom-view",
+  "보기 반전": "zoom-view",
+  확대: "zoom-view",
+  축소: "zoom-view",
+  되돌리기: "undo",
+  실행취소: "undo",
+  다시: "redo",
+  다시실행: "redo",
+  레이어: "layer",
+};
+
+export function normalizeStudioToolHintStableId(value: string): string {
+  return value
+    .normalize("NFKC")
+    .trim()
+    .toLocaleLowerCase("ko-KR")
+    .replaceAll("_", "-")
+    .replace(/\s+/gu, "-");
 }
 
 export function studioToolHintFromLabel(
@@ -167,124 +210,22 @@ export function studioToolHintFromLabel(
   preview?: StudioToolHintPreviewKind
 ): StudioToolHintSpec {
   const cleanTitle = title.replace(/\s*\([^)]*\)\s*$/u, "").trim() || title;
-  const registeredId = (() => {
-    if (/^선택$/u.test(cleanTitle)) return "select";
-    if (/^(펜|브러시)$/u.test(cleanTitle)) return "pen";
-    if (/지우개/u.test(cleanTitle)) return "eraser";
-    if (/스포이드/u.test(cleanTitle)) return "eyedropper";
-    if (/스마트 도형/u.test(cleanTitle)) return "smart-shape";
-    if (/사각형 도형/u.test(cleanTitle)) return "shape-rect";
-    if (/타원 도형/u.test(cleanTitle)) return "shape-ellipse";
-    if (/텍스트/u.test(cleanTitle)) return "text";
-    if (/말풍선/u.test(cleanTitle)) return "bubble";
-    if (/프레임 애니메이션/u.test(cleanTitle)) return "frame-anim";
-    if (/이미지/u.test(cleanTitle)) return "image";
-    if (/필터/u.test(cleanTitle)) return "filter";
-    if (/다각형 올가미/u.test(cleanTitle)) return "poly-lasso";
-    if (/올가미/u.test(cleanTitle)) return "lasso";
-    return null;
-  })();
+  const normalizedLabel = cleanTitle.normalize("NFKC").trim().toLocaleLowerCase("ko-KR");
+  const registeredId =
+    REGISTERED_HINT_ID_BY_LABEL[normalizedLabel] ??
+    HINT_ID_BY_DESCRIPTION.get(description) ??
+    null;
   const registered = registeredId ? HINTS[registeredId] : null;
+  const slug = normalizeStudioToolHintStableId(cleanTitle)
+    .replace(/[^a-z0-9가-힣-]+/gu, "-")
+    .replace(/-{2,}/gu, "-")
+    .replace(/^-|-$/gu, "");
   return {
-    id: title,
+    id: (registeredId ?? slug) || "studio-tool",
     title: cleanTitle,
     description,
     shortcut: shortcut ?? registered?.shortcut,
     preview: preview ?? registered?.preview,
     tip: registered?.tip,
   };
-}
-
-/** Magma-style filter catalog entries for the smart-filter manager. */
-export type StudioFilterCatalogEntry = {
-  engine: string;
-  title: string;
-  description: string;
-  group: "blur" | "tone" | "color" | "detail";
-};
-
-export const STUDIO_FILTER_CATALOG: readonly StudioFilterCatalogEntry[] = [
-  {
-    engine: "gaussian-blur",
-    title: "가우시안 블러",
-    description: "픽셀을 고르게 퍼뜨려 부드럽게 만듭니다. 배경을 흐리게 해 초점을 강조할 때 유용해요. (Magma Gaussian Blur)",
-    group: "blur",
-  },
-  {
-    engine: "motion-blur",
-    title: "모션 블러",
-    description: "지정한 각도로 선형 잔상을 만들어 속도·이동감을 냅니다. 거리와 각도를 조절하세요. (Magma Motion Blur)",
-    group: "blur",
-  },
-  {
-    engine: "blur",
-    title: "빠른 블러",
-    description: "가벼운 박스 블러입니다. 미리보기용 가벼운 흐림에 적합해요.",
-    group: "blur",
-  },
-  {
-    engine: "curves",
-    title: "색상 곡선",
-    description: "톤 커브로 밝기·대비·채널 응답을 정밀하게 잡습니다. 포토샵 Curves 계열입니다.",
-    group: "tone",
-  },
-  {
-    engine: "levels",
-    title: "레벨",
-    description: "검정·흰점과 감마로 노출과 대비를 빠르게 보정합니다.",
-    group: "tone",
-  },
-  {
-    engine: "brightness-contrast",
-    title: "밝기/대비",
-    description: "전체 밝기와 대비를 한 번에 조절합니다.",
-    group: "tone",
-  },
-  {
-    engine: "hue-saturation",
-    title: "색조/채도",
-    description: "색상 회전과 선명도(채도)를 바꿉니다.",
-    group: "color",
-  },
-  {
-    engine: "color-balance",
-    title: "색 균형",
-    description: "그림자와 하이라이트 쪽 색 기운을 조절합니다.",
-    group: "color",
-  },
-  {
-    engine: "sharpen",
-    title: "샤픈",
-    description: "가장자리를 선명하게 해 초점을 또렷하게 만듭니다.",
-    group: "detail",
-  },
-  {
-    engine: "noise",
-    title: "노이즈",
-    description: "필름 입자처럼 미세한 잡음을 더합니다.",
-    group: "detail",
-  },
-  {
-    engine: "invert",
-    title: "반전",
-    description: "색상을 반전합니다. 마스크·특수 효과에 자주 씁니다.",
-    group: "detail",
-  },
-] as const;
-
-export function studioFilterCatalogEntry(engine: string): StudioFilterCatalogEntry | null {
-  return STUDIO_FILTER_CATALOG.find((e) => e.engine === engine) ?? null;
-}
-
-export function studioFilterGroupLabel(group: StudioFilterCatalogEntry["group"]): string {
-  switch (group) {
-    case "blur":
-      return "블러";
-    case "tone":
-      return "톤";
-    case "color":
-      return "색";
-    case "detail":
-      return "디테일";
-  }
 }

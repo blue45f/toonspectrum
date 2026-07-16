@@ -18,6 +18,14 @@ const PREVIEW_KINDS = [
   "image",
   "filter",
   "lasso",
+  "brush-size",
+  "opacity",
+  "stabilizer",
+  "pressure",
+  "symmetry",
+  "zoom-view",
+  "history",
+  "layer",
 ] as const satisfies readonly StudioToolHintPreviewKind[];
 
 describe("StudioToolHintPreview", () => {
@@ -76,6 +84,25 @@ describe("StudioToolHintPreview", () => {
 
     expect(identifiers.length).toBe(4);
     expect(new Set(identifiers).size).toBe(identifiers.length);
+    for (const identifier of identifiers) {
+      expect(html).toContain(`url(#${identifier})`);
+    }
+  });
+
+  it("creates collision-free checker patterns for sibling opacity previews", () => {
+    const html = renderToStaticMarkup(
+      <div>
+        <StudioToolHintPreview kind="opacity" reducedMotion />
+        <StudioToolHintPreview kind="opacity" reducedMotion />
+      </div>
+    );
+
+    const identifiers = [...html.matchAll(/id="([^"]+-opacity-checker)"/g)].map(
+      (match) => match[1]
+    );
+
+    expect(identifiers).toHaveLength(2);
+    expect(new Set(identifiers).size).toBe(2);
     for (const identifier of identifiers) {
       expect(html).toContain(`url(#${identifier})`);
     }

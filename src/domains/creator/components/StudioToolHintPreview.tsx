@@ -22,7 +22,15 @@ export type StudioToolHintPreviewKind =
   | "bubble"
   | "image"
   | "filter"
-  | "lasso";
+  | "lasso"
+  | "brush-size"
+  | "opacity"
+  | "stabilizer"
+  | "pressure"
+  | "symmetry"
+  | "zoom-view"
+  | "history"
+  | "layer";
 
 export type StudioToolHintPreviewProps = Omit<
   SVGProps<SVGSVGElement>,
@@ -625,6 +633,235 @@ function FilterPreview({ animate, clipId }: { animate: boolean; clipId: string }
   );
 }
 
+function BrushSizePreview({ animate }: { animate: boolean }): ReactElement {
+  return (
+    <>
+      <circle cx="75" cy="50" r="25" fill={COLOR.canvas} stroke={COLOR.lineStrong} strokeWidth="1.5" />
+      <circle cx="75" cy="50" r={animate ? "7" : "17"} fill={COLOR.accent} opacity=".88">
+        {animate ? (
+          <animate
+            attributeName="r"
+            dur="2.7s"
+            values="7; 19; 19; 7"
+            keyTimes="0; .38; .68; 1"
+            calcMode="spline"
+            keySplines=".16 1 .3 1; .16 1 .3 1; .16 1 .3 1"
+            repeatCount="indefinite"
+          />
+        ) : null}
+      </circle>
+      <path d="M119 68h62" stroke={COLOR.fg3} strokeLinecap="round" strokeWidth="3" />
+      <path d={animate ? "M119 68h8" : "M119 68h38"} stroke={COLOR.accent} strokeLinecap="round" strokeWidth="3">
+        {animate ? (
+          <animate attributeName="d" dur="2.7s" values="M119 68h8;M119 68h54;M119 68h54;M119 68h8" keyTimes="0;.38;.68;1" repeatCount="indefinite" />
+        ) : null}
+      </path>
+      <circle cx={animate ? "127" : "157"} cy="68" r="6" fill={COLOR.fg} stroke={COLOR.canvas} strokeWidth="2">
+        {animate ? (
+          <animate attributeName="cx" dur="2.7s" values="127;173;173;127" keyTimes="0;.38;.68;1" repeatCount="indefinite" />
+        ) : null}
+      </circle>
+      <path d="M124 34h52M124 42h32" stroke={COLOR.fg2} strokeLinecap="round" strokeWidth="2" opacity=".74" />
+      <circle cx="178" cy="34" r="3" fill={COLOR.accent} />
+    </>
+  );
+}
+
+function OpacityPreview({
+  animate,
+  patternId,
+}: {
+  animate: boolean;
+  patternId: string;
+}): ReactElement {
+  return (
+    <>
+      <defs>
+        <pattern id={patternId} width="12" height="12" patternUnits="userSpaceOnUse">
+          <rect width="12" height="12" fill={COLOR.canvas} />
+          <path d="M0 0h6v6H0ZM6 6h6v6H6Z" fill={COLOR.raised} />
+        </pattern>
+      </defs>
+      <rect x="42" y="21" width="74" height="62" rx="7" fill={`url(#${patternId})`} stroke={COLOR.lineStrong} />
+      <circle cx="79" cy="52" r="22" fill={COLOR.accent} opacity={animate ? ".24" : ".72"}>
+        {animate ? (
+          <animate attributeName="opacity" dur="2.8s" values=".22;.9;.9;.22" keyTimes="0;.4;.68;1" repeatCount="indefinite" />
+        ) : null}
+      </circle>
+      <path d="M135 34h45M135 52h45M135 70h45" stroke={COLOR.fg3} strokeLinecap="round" strokeWidth="2" />
+      <circle cx="165" cy="34" r="4" fill={COLOR.fg2} />
+      <circle cx={animate ? "145" : "166"} cy="52" r="5" fill={COLOR.accent} stroke={COLOR.canvas} strokeWidth="2">
+        {animate ? (
+          <animate attributeName="cx" dur="2.8s" values="145;176;176;145" keyTimes="0;.4;.68;1" repeatCount="indefinite" />
+        ) : null}
+      </circle>
+      <circle cx="151" cy="70" r="4" fill={COLOR.fg2} />
+    </>
+  );
+}
+
+function StabilizerPreview({ animate }: { animate: boolean }): ReactElement {
+  const smoothPath = "M43 69c18-30 36-29 53-6 18 25 38 20 52-6 9-17 18-21 28-20";
+
+  return (
+    <>
+      <path
+        d="M42 72c8-37 19 2 29-29 9 42 19-11 29 25 10-30 19 4 29-22 8 38 20-14 48-11"
+        fill="none"
+        stroke={COLOR.fg3}
+        strokeDasharray="3 4"
+        strokeLinecap="round"
+        strokeWidth="1.5"
+        opacity=".68"
+      />
+      <path
+        d={smoothPath}
+        fill="none"
+        stroke={COLOR.accent}
+        strokeDasharray="190"
+        strokeDashoffset={animate ? "190" : "0"}
+        strokeLinecap="round"
+        strokeWidth="4"
+      >
+        {animate ? (
+          <animate attributeName="stroke-dashoffset" dur="2.9s" values="190;0;0" keyTimes="0;.72;1" repeatCount="indefinite" />
+        ) : null}
+      </path>
+      {[43, 96, 148, 176].map((cx, index) => (
+        <circle key={cx} cx={cx} cy={[69, 63, 57, 37][index]} r="3" fill={COLOR.card} stroke={COLOR.fg2} strokeWidth="1.5" />
+      ))}
+      <g transform={animate ? undefined : "translate(176 37)"}>
+        <circle r="8" fill={COLOR.fg} stroke={COLOR.canvas} strokeWidth="2" />
+        <circle r="2.5" fill={COLOR.accent} />
+        {animate ? (
+          <animateMotion dur="2.9s" path={smoothPath} keyPoints="0;1;1" keyTimes="0;.72;1" repeatCount="indefinite" />
+        ) : null}
+      </g>
+    </>
+  );
+}
+
+function PressurePreview({ animate }: { animate: boolean }): ReactElement {
+  return (
+    <>
+      <path d="M40 67C75 35 119 36 176 61" fill="none" stroke={COLOR.lineStrong} strokeLinecap="round" strokeWidth="1.5" opacity=".5" />
+      <path
+        d="M40 67C75 35 119 36 176 61"
+        fill="none"
+        stroke={COLOR.accent}
+        strokeLinecap="round"
+        strokeWidth={animate ? "2" : "9"}
+      >
+        {animate ? (
+          <animate attributeName="stroke-width" dur="2.6s" values="2;11;5;2" keyTimes="0;.42;.76;1" repeatCount="indefinite" />
+        ) : null}
+      </path>
+      <g transform="translate(105 36)">
+        <path d="M-8-16H8L5 5 0 14-5 5Z" fill={COLOR.fg2} stroke={COLOR.canvas} strokeLinejoin="round" strokeWidth="2" />
+        <path d="M0 14 5 5H-5Z" fill={COLOR.accent} />
+        {animate ? (
+          <animateTransform attributeName="transform" additive="sum" type="translate" dur="2.6s" values="0 -5;0 6;0 0;0 -5" keyTimes="0;.42;.76;1" repeatCount="indefinite" />
+        ) : null}
+      </g>
+      <path d="M63 82h98" stroke={COLOR.fg3} strokeLinecap="round" strokeWidth="2" />
+      {[73, 105, 151].map((cx, index) => (
+        <circle key={cx} cx={cx} cy="82" r={2 + index * 1.5} fill={index === 1 ? COLOR.accent : COLOR.fg2} />
+      ))}
+    </>
+  );
+}
+
+function SymmetryPreview({ animate }: { animate: boolean }): ReactElement {
+  const leftPath = "M99 25c-23 8-35 27-30 50 10-8 19-9 30-5";
+  const rightPath = "M117 25c23 8 35 27 30 50-10-8-19-9-30-5";
+
+  return (
+    <>
+      <path d="M108 17v70" stroke={COLOR.cool} strokeDasharray="3 4" strokeWidth="1.5" />
+      <path d={leftPath} fill="none" stroke={COLOR.accent} strokeDasharray="95" strokeDashoffset={animate ? "95" : "0"} strokeLinecap="round" strokeWidth="4">
+        {animate ? <animate attributeName="stroke-dashoffset" dur="2.7s" values="95;0;0" keyTimes="0;.65;1" repeatCount="indefinite" /> : null}
+      </path>
+      <path d={rightPath} fill="none" stroke={COLOR.accent} strokeDasharray="95" strokeDashoffset={animate ? "95" : "0"} strokeLinecap="round" strokeWidth="4" opacity=".72">
+        {animate ? <animate attributeName="stroke-dashoffset" dur="2.7s" values="95;0;0" keyTimes="0;.65;1" repeatCount="indefinite" /> : null}
+      </path>
+      <circle cx="108" cy="17" r="4" fill={COLOR.card} stroke={COLOR.cool} strokeWidth="2" />
+      <path d="m84 79 9 7M132 86l9-7" stroke={COLOR.fg2} strokeLinecap="round" strokeWidth="2" />
+    </>
+  );
+}
+
+function ZoomViewPreview({ animate }: { animate: boolean }): ReactElement {
+  return (
+    <>
+      <rect x={animate ? "63" : "52"} y={animate ? "29" : "20"} width={animate ? "82" : "104"} height={animate ? "47" : "64"} rx="5" fill={COLOR.canvas} stroke={COLOR.fg2} strokeWidth="2">
+        {animate ? (
+          <>
+            <animate attributeName="x" dur="2.8s" values="63;48;48;63" keyTimes="0;.38;.72;1" repeatCount="indefinite" />
+            <animate attributeName="y" dur="2.8s" values="29;18;18;29" keyTimes="0;.38;.72;1" repeatCount="indefinite" />
+            <animate attributeName="width" dur="2.8s" values="82;112;112;82" keyTimes="0;.38;.72;1" repeatCount="indefinite" />
+            <animate attributeName="height" dur="2.8s" values="47;68;68;47" keyTimes="0;.38;.72;1" repeatCount="indefinite" />
+          </>
+        ) : null}
+      </rect>
+      <path d="M72 67 91 46l16 14 14-11 22 19" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
+      <circle cx="81" cy="42" r="6" fill={COLOR.cool} />
+      <circle cx="158" cy="71" r="17" fill={COLOR.card} stroke={COLOR.fg} strokeWidth="2" />
+      <path d="M170 83l13 9M151 71h14M158 64v14" stroke={COLOR.fg} strokeLinecap="round" strokeWidth="2.5" />
+      <path d="M42 31V17h14M160 17h14v14M174 73v14h-14M56 87H42V73" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeWidth="2" opacity=".75" />
+    </>
+  );
+}
+
+function HistoryPreview({ animate }: { animate: boolean }): ReactElement {
+  return (
+    <>
+      {[0, 1, 2].map((index) => (
+        <g key={index} transform={`translate(${70 + index * 16} ${21 + index * 8})`} opacity={index === 2 ? "1" : ".46"}>
+          <rect width="74" height="48" rx="5" fill={index === 2 ? COLOR.canvas : COLOR.raised} stroke={index === 2 ? COLOR.accent : COLOR.lineStrong} strokeWidth="1.5" />
+          <circle cx="19" cy="18" r="6" fill={index === 2 ? COLOR.accent : COLOR.fg3} />
+          <path d="M11 40 28 25l13 10 10-8 12 13" fill="none" stroke={COLOR.fg2} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+        </g>
+      ))}
+      <path d="M71 32H48l9-9M48 32l9 9" fill="none" stroke={COLOR.fg} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
+      <path d="M48 32c0 19 12 31 31 34" fill="none" stroke={COLOR.accent} strokeDasharray={animate ? "64" : undefined} strokeDashoffset={animate ? "64" : undefined} strokeLinecap="round" strokeWidth="2.5">
+        {animate ? <animate attributeName="stroke-dashoffset" dur="2.6s" values="64;0;0;64" keyTimes="0;.38;.72;1" repeatCount="indefinite" /> : null}
+      </path>
+      <g fill={COLOR.fg3}>
+        <circle cx="60" cy="82" r="3" />
+        <circle cx="78" cy="82" r="3" />
+        <circle cx="96" cy="82" r="3" />
+      </g>
+      <circle cx={animate ? "96" : "78"} cy="82" r="5" fill={COLOR.accent} stroke={COLOR.canvas} strokeWidth="2">
+        {animate ? <animate attributeName="cx" dur="2.6s" values="96;60;60;96" keyTimes="0;.38;.72;1" repeatCount="indefinite" /> : null}
+      </circle>
+    </>
+  );
+}
+
+function LayerPreview({ animate }: { animate: boolean }): ReactElement {
+  return (
+    <>
+      <g transform="translate(42 4)">
+        <path d="m66 18 58 20-58 20L8 38Z" fill={COLOR.raised} stroke={COLOR.lineStrong} strokeLinejoin="round" strokeWidth="1.5" opacity=".65" />
+        <path d="m66 32 58 20-58 20L8 52Z" fill={COLOR.canvas} stroke={COLOR.fg2} strokeLinejoin="round" strokeWidth="1.5" opacity=".88" />
+        <g transform={animate ? undefined : "translate(0 -10)"}>
+          <path d="m66 46 58 20-58 20L8 66Z" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeLinejoin="round" strokeWidth="2" />
+          <path d="m43 66 17-9 19 7 12-5 18 7-43 15Z" fill={COLOR.accent} opacity=".72" />
+          {animate ? (
+            <animateTransform attributeName="transform" type="translate" dur="2.8s" values="0 0;0 -12;0 -12;0 0" keyTimes="0;.32;.72;1" repeatCount="indefinite" />
+          ) : null}
+        </g>
+      </g>
+      <g transform="translate(177 32)" fill="none" stroke={COLOR.fg2} strokeWidth="1.8">
+        <path d="M-9 0C-4-6 4-6 9 0-4 6 4 6-9 0Z" />
+        <circle r="2.5" fill={COLOR.accent} stroke="none" opacity={animate ? ".3" : "1"}>
+          {animate ? <animate attributeName="opacity" dur="1.4s" values=".3;1;.3" repeatCount="indefinite" /> : null}
+        </circle>
+      </g>
+    </>
+  );
+}
+
 function LassoPreview({ animate }: { animate: boolean }): ReactElement {
   const lassoPath = "M55 63c-18-14 3-39 27-37 19-18 59-5 58 14 27 5 27 30 5 38-24 9-65 5-90-15Z";
 
@@ -704,6 +941,22 @@ function renderPreview(
       return <FilterPreview animate={animate} clipId={`${id}-filter-clip`} />;
     case "lasso":
       return <LassoPreview animate={animate} />;
+    case "brush-size":
+      return <BrushSizePreview animate={animate} />;
+    case "opacity":
+      return <OpacityPreview animate={animate} patternId={`${id}-opacity-checker`} />;
+    case "stabilizer":
+      return <StabilizerPreview animate={animate} />;
+    case "pressure":
+      return <PressurePreview animate={animate} />;
+    case "symmetry":
+      return <SymmetryPreview animate={animate} />;
+    case "zoom-view":
+      return <ZoomViewPreview animate={animate} />;
+    case "history":
+      return <HistoryPreview animate={animate} />;
+    case "layer":
+      return <LayerPreview animate={animate} />;
   }
 }
 

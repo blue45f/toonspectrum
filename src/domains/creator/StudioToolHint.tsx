@@ -80,31 +80,43 @@ const LazyStudioToolHintBubble = lazy(async () => ({
 
 type DescribedChildProps = {
   "aria-describedby"?: string;
+  "aria-hidden"?: boolean;
+  tabIndex?: number;
 };
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(Math.max(value, minimum), Math.max(minimum, maximum));
 }
 
+function removeAriaDescription(target: HTMLElement, descriptionId: string) {
+  const descriptions = (target.getAttribute("aria-describedby") ?? "")
+    .split(/\s+/u)
+    .filter((id) => id && id !== descriptionId);
+  if (descriptions.length > 0) target.setAttribute("aria-describedby", descriptions.join(" "));
+  else target.removeAttribute("aria-describedby");
+}
+
 function compactFallbackStyle(
   anchor: DOMRect,
-  preferredSide: StudioToolHintSide | undefined
+  preferredSide: StudioToolHintSide | undefined,
+  hasUnavailableReason: boolean
 ): CSSProperties {
   const viewportWidth = typeof globalThis.innerWidth === "number" ? globalThis.innerWidth : 1280;
   const viewportHeight = typeof globalThis.innerHeight === "number" ? globalThis.innerHeight : 800;
+  const fallbackHeight = hasUnavailableReason ? 124 : FALLBACK_HEIGHT;
   const side = preferredSide ?? (anchor.bottom > viewportHeight * 0.72 ? "top" : "right");
   let left = anchor.right + FALLBACK_GAP;
-  let top = anchor.top + anchor.height / 2 - FALLBACK_HEIGHT / 2;
+  let top = anchor.top + anchor.height / 2 - fallbackHeight / 2;
   if (side === "left") left = anchor.left - FALLBACK_GAP - FALLBACK_WIDTH;
   if (side === "bottom" || side === "top") {
     left = anchor.left + anchor.width / 2 - FALLBACK_WIDTH / 2;
     top = side === "bottom"
       ? anchor.bottom + FALLBACK_GAP
-      : anchor.top - FALLBACK_GAP - FALLBACK_HEIGHT;
+      : anchor.top - FALLBACK_GAP - fallbackHeight;
   }
   return {
     left: clamp(left, VIEWPORT_PADDING, viewportWidth - FALLBACK_WIDTH - VIEWPORT_PADDING),
-    top: clamp(top, VIEWPORT_PADDING, viewportHeight - FALLBACK_HEIGHT - VIEWPORT_PADDING),
+    top: clamp(top, VIEWPORT_PADDING, viewportHeight - fallbackHeight - VIEWPORT_PADDING),
   };
 }
 
@@ -112,12 +124,19 @@ function StudioToolHintCompactFallback({
   id,
   hint,
   anchor,
+  unavailableReason,
   preferredSide,
   onMouseEnter,
   onMouseLeave,
 }: Pick<
   StudioToolHintBubbleProps,
-  "id" | "hint" | "anchor" | "preferredSide" | "onMouseEnter" | "onMouseLeave"
+  | "id"
+  | "hint"
+  | "anchor"
+  | "unavailableReason"
+  | "preferredSide"
+  | "onMouseEnter"
+  | "onMouseLeave"
 >): ReactElement {
   return (
     <div
@@ -127,19 +146,28 @@ function StudioToolHintCompactFallback({
       data-studio-tool-hint-expanded="false"
       data-studio-tool-hint-loading="true"
       className="pointer-events-auto fixed z-[200] w-[min(15rem,calc(100vw-1.25rem))] rounded-lg border border-line/80 bg-panel/98 p-2.5 text-left shadow-[0_20px_56px_oklch(0.06_0.01_70/0.66)] backdrop-blur-xl"
-      style={compactFallbackStyle(anchor as DOMRect, preferredSide)}
+      style={compactFallbackStyle(anchor as DOMRect, preferredSide, Boolean(unavailableReason))}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
       <div className="flex items-start justify-between gap-2">
-        <p className="truncate text-[0.78rem] font-bold leading-tight text-fg">{hint.title}</p>
+        <p className="truncate text-[0.8125rem] font-bold leading-tight text-fg">{hint.title}</p>
         {hint.shortcut ? (
-          <kbd className="shrink-0 rounded-md border border-line/70 bg-canvas/75 px-1.5 py-0.5 text-[0.58rem] font-semibold text-fg-2">
+          <kbd className="shrink-0 rounded-md border border-line/70 bg-canvas/75 px-1.5 py-0.5 text-[0.625rem] font-semibold text-fg-2">
             {hint.shortcut}
           </kbd>
         ) : null}
       </div>
-      <p className="mt-1.5 line-clamp-2 text-[0.68rem] leading-relaxed text-fg-2">{hint.description}</p>
+      <p className="mt-1.5 line-clamp-2 text-[0.75rem] leading-relaxed text-fg-2">{hint.description}</p>
+      {unavailableReason ? (
+        <div
+          data-studio-tool-hint-unavailable="true"
+          className="mt-2 flex items-start gap-1.5 rounded-md border border-warn/35 bg-warn/10 px-2 py-1.5 text-[0.7rem] leading-relaxed"
+        >
+          <span className="shrink-0 font-bold text-warn">사용 조건</span>
+          <span className="min-w-0 text-fg-2">{unavailableReason}</span>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -153,12 +181,14 @@ export function StudioToolHintTarget({
   children,
   className,
   disabled,
+  unavailableReason,
   preferredSide,
 }: {
   hint: StudioToolHintSpec | null | undefined;
   children: ReactNode;
   className?: string;
   disabled?: boolean;
+  unavailableReason?: string;
   preferredSide?: StudioToolHintSide;
 }): ReactElement {
   const tipId = useId();
@@ -169,6 +199,7 @@ export function StudioToolHintTarget({
   const touchHoldTimer = useRef<number>(0);
   const touchHoldOpened = useRef(false);
   const pointerDismissed = useRef(false);
+  const describedFocusTarget = useRef<HTMLElement | null>(null);
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [anchor, setAnchor] = useState<DOMRect | null>(null);
@@ -196,7 +227,7 @@ export function StudioToolHintTarget({
   }
 
   function reveal(expandImmediately: boolean) {
-    if (disabled || !hint) return;
+    if (!hint) return;
     void loadStudioToolHintBubbleModule();
     if (hideTimer.current) {
       globalThis.clearTimeout(hideTimer.current);
@@ -218,7 +249,7 @@ export function StudioToolHintTarget({
   }
 
   function scheduleShow() {
-    if (disabled || !hint) return;
+    if (!hint) return;
     if (suppressedPointerHintAt) return;
     void loadStudioToolHintBubbleModule();
     if (hideTimer.current) {
@@ -315,6 +346,13 @@ export function StudioToolHintTarget({
       event.stopPropagation();
       return;
     }
+    if (disabled) {
+      // Preserve native disabled controls and also guard custom button-like
+      // descendants that do not implement disabled semantics themselves.
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     dismissPointerActivation(event);
   }
 
@@ -329,19 +367,34 @@ export function StudioToolHintTarget({
     setExpanded(false);
   }
 
+  function clearFocusedDescription(target = describedFocusTarget.current) {
+    if (!target) return;
+    removeAriaDescription(target, tipId);
+    if (describedFocusTarget.current === target) describedFocusTarget.current = null;
+  }
+
+  function describeFocusedControl(target: EventTarget | null) {
+    if (disabled || !(target instanceof HTMLElement) || target === wrapRef.current) return;
+    clearFocusedDescription();
+    const descriptions = new Set(
+      (target.getAttribute("aria-describedby") ?? "").split(/\s+/u).filter(Boolean)
+    );
+    descriptions.add(tipId);
+    target.setAttribute("aria-describedby", [...descriptions].join(" "));
+    describedFocusTarget.current = target;
+  }
+
   function handleFocus(event: React.FocusEvent<HTMLSpanElement>) {
-    if (
-      pointerDismissed.current ||
-      suppressedPointerHintAt !== null
-    ) {
-      return;
-    }
-    const target = event.target;
-    if (target instanceof HTMLElement && target.matches(":focus-visible")) {
-      pointerDismissed.current = false;
-      clearPointerSuppression();
-      reveal(true);
-    }
+    if (pointerDismissed.current) return;
+    // Pointer focus is already filtered by pointerdown suppression. Opening on
+    // every remaining focus path clears any suppression left by a previously
+    // clicked target. This lets Tab/assistive focus deliberately take over even
+    // when the physical pointer has not moved yet, and also covers Safari/
+    // embedded WebViews that do not reliably expose :focus-visible.
+    pointerDismissed.current = false;
+    clearPointerSuppression();
+    describeFocusedControl(event.target);
+    reveal(true);
   }
 
   function handleMouseLeave(event: ReactMouseEvent<HTMLSpanElement>) {
@@ -361,12 +414,29 @@ export function StudioToolHintTarget({
     scheduleHide();
   }
 
-  function handleBlur() {
+  function handleBlur(event: React.FocusEvent<HTMLSpanElement>) {
+    if (event.target === describedFocusTarget.current) clearFocusedDescription(event.target);
     pointerDismissed.current = false;
     scheduleHide();
   }
 
   useEffect(() => clearTimers, []);
+
+  useEffect(
+    () => () => {
+      const target = describedFocusTarget.current;
+      if (target) removeAriaDescription(target, tipId);
+    },
+    [tipId]
+  );
+
+  useEffect(() => {
+    if (open) return;
+    const target = describedFocusTarget.current;
+    if (!target) return;
+    removeAriaDescription(target, tipId);
+    describedFocusTarget.current = null;
+  }, [open, tipId]);
 
   useEffect(() => {
     if (!open) return;
@@ -410,24 +480,34 @@ export function StudioToolHintTarget({
     };
   }, [open, tipId]);
 
-  if (!hint || disabled) {
+  if (!hint) {
     return <span className={cn("inline-flex", className)}>{children}</span>;
   }
 
   const canDescribeChild = isValidElement<DescribedChildProps>(children) && children.type !== Fragment;
   const describedChildren =
-    open && canDescribeChild
+    disabled && canDescribeChild
+      ? cloneElement(children, {
+          "aria-hidden": true,
+          tabIndex: -1,
+        })
+      : open && canDescribeChild
       ? cloneElement(children, {
           "aria-describedby": [children.props["aria-describedby"], tipId].filter(Boolean).join(" "),
         })
       : children;
-  const needsWrapperDescription = open && !canDescribeChild;
+  const needsWrapperDescription = open && (disabled || !canDescribeChild);
 
   return (
     <span
       ref={wrapRef}
       data-studio-tool-hint-target="true"
-      className={cn("relative inline-flex", className)}
+      data-studio-tool-hint-unavailable={disabled ? "true" : undefined}
+      className={cn(
+        "relative inline-flex",
+        disabled && "rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+        className
+      )}
       onMouseEnter={scheduleShow}
       onMouseLeave={handleMouseLeave}
       onPointerDownCapture={handlePointerDownCapture}
@@ -436,7 +516,11 @@ export function StudioToolHintTarget({
       onClickCapture={handleClickCapture}
       onFocus={handleFocus}
       onBlur={handleBlur}
+      role={disabled ? "button" : undefined}
+      aria-label={disabled ? hint.title : undefined}
+      aria-disabled={disabled ? true : undefined}
       aria-describedby={needsWrapperDescription ? tipId : undefined}
+      tabIndex={disabled ? 0 : undefined}
     >
       {describedChildren}
       {open && !suppressedPointerHintAt && anchor && typeof document !== "undefined"
@@ -447,6 +531,7 @@ export function StudioToolHintTarget({
                   id={tipId}
                   hint={hint}
                   anchor={anchor}
+                  unavailableReason={unavailableReason}
                   preferredSide={preferredSide}
                   onMouseEnter={keepOpenFromBubble}
                   onMouseLeave={leaveBubble}
@@ -458,6 +543,7 @@ export function StudioToolHintTarget({
                 hint={hint}
                 anchor={anchor}
                 expanded={expanded}
+                unavailableReason={unavailableReason}
                 preferredSide={preferredSide}
                 onMouseEnter={keepOpenFromBubble}
                 onMouseLeave={leaveBubble}

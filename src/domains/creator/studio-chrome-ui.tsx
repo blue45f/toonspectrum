@@ -435,6 +435,7 @@ export const StudioDockButton = forwardRef<
     className?: string;
     hintDescription?: string;
     hintShortcut?: string;
+    hintUnavailableReason?: string;
   } & Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children">
 >(function StudioDockButton(
   {
@@ -448,6 +449,8 @@ export const StudioDockButton = forwardRef<
     swatch,
     hintDescription,
     hintShortcut,
+    hintUnavailableReason,
+    title,
     ...rest
   },
   ref
@@ -457,6 +460,7 @@ export const StudioDockButton = forwardRef<
       ref={ref}
       type={type}
       disabled={disabled}
+      title={hintDescription ? undefined : title}
       className={cn(
         "flex flex-1 flex-col items-center justify-center gap-0.5 rounded-xl py-1 text-[0.6875rem] font-semibold leading-none",
         STUDIO_EASE,
@@ -484,6 +488,11 @@ export const StudioDockButton = forwardRef<
   return (
     <StudioToolHintTarget
       disabled={disabled}
+      unavailableReason={
+        disabled
+          ? hintUnavailableReason ?? (typeof title === "string" ? title : "현재 작업 상태에서는 이 도구를 사용할 수 없어요.")
+          : undefined
+      }
       preferredSide="top"
       className="min-w-0 flex-1"
       hint={studioToolHintFromLabel(label, hintDescription, hintShortcut)}
@@ -818,6 +827,8 @@ export interface StudioRailToolButtonProps
   /** Magma-style group indicator (long-press / alternate tools exist). */
   grouped?: boolean;
   accented?: boolean;
+  /** Why the underlying tool is unavailable; remains discoverable from the disabled coach. */
+  unavailableReason?: string;
 }
 
 /** Icon-only tool on the left Magma/Ibis-style rail. */
@@ -828,6 +839,7 @@ export function StudioRailToolButton({
   description,
   grouped = false,
   accented = false,
+  unavailableReason,
   className,
   disabled,
   type = "button",
@@ -878,6 +890,11 @@ export function StudioRailToolButton({
   return (
     <StudioToolHintTarget
       disabled={disabled}
+      unavailableReason={
+        disabled
+          ? unavailableReason ?? (typeof title === "string" ? title : "선택 항목과 편집 권한 조건을 확인하세요.")
+          : undefined
+      }
       hint={studioToolHintFromLabel(
         label,
         description,

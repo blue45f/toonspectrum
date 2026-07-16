@@ -20,7 +20,7 @@ import {
   studioFilterCatalogEntry,
   studioFilterGroupLabel,
   type StudioFilterCatalogEntry,
-} from "./studio-tool-hints";
+} from "./studio-filter-catalog";
 import { StudioToolHintTarget } from "./StudioToolHint";
 
 import { buttonClass } from "@/components/ui/button-utils";
@@ -102,9 +102,11 @@ export function StudioSmartFiltersPanel({
                   <StudioToolHintTarget
                     key={entry.engine}
                     hint={{
-                      id: entry.engine,
+                      id: `smart-filter-${entry.engine}`,
                       title: entry.title,
                       description: entry.description,
+                      preview: "filter",
+                      tip: "필터는 원본을 보존한 채 스택에 추가되며, 적용 순서와 강도를 나중에 다시 바꿀 수 있어요.",
                     }}
                   >
                     <button
