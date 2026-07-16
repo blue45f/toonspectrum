@@ -1,15 +1,20 @@
 import { createContext, useContext } from "react";
 
-export type Session = {
-  user: {
-    id?: string;
-    name?: string | null;
-    email?: string | null;
-    image?: string | null;
-    role?: string | null;
-  };
-  token?: string | null; // 서명 세션 토큰 — 인증 요청의 x-user-id 헤더로 전송한다.
-} | null;
+import { getAuthToken, persistSession, type Session } from "./auth-session-state";
+
+import { api, apiPath } from "@/src/infrastructure/api";
+
+export {
+  SESSION_KEY,
+  emitSession,
+  getAuthSession,
+  getAuthToken,
+  getAuthUserId,
+  listeners,
+  persistSession,
+  readStoredSession,
+} from "./auth-session-state";
+export type { Session } from "./auth-session-state";
 
 export type SessionContextValue =
   | {
@@ -23,16 +28,11 @@ export type SessionContextValue =
       update: () => Promise<null>;
     };
 
-export const SESSION_KEY = "toonspectrum-auth-session";
-
 export const SessionContext = createContext<SessionContextValue>({
   data: null,
   status: "unauthenticated",
   update: async () => null,
 });
-
-let currentSession: Session = readStoredSession();
-export const listeners = new Set<(session: Session) => void>();
 
 export function useSession(): SessionContextValue {
   return useContext(SessionContext);
@@ -41,7 +41,6 @@ export function useSession(): SessionContextValue {
 // GIS(Google Identity Services) ID 토큰 로그인 — GIS 버튼 콜백이 받은 credential(ID 토큰)을
 // 서버에서 검증해 세션을 확정한다. 리다이렉트 없이 모달에서 바로 로그인 완료.
 export async function signInWithGoogleIdToken(idToken: string) {
-  const { api, apiPath } = await import("@/src/infrastructure/api");
   const response = await api.raw(apiPath("/auth/oauth/google/id-token"), {
     method: "POST",
     throwHttpErrors: false,
@@ -120,7 +119,6 @@ export async function tossLoginFlow(): Promise<TossLoginResult> {
 
   let response: Response;
   try {
-    const { api, apiPath } = await import("@/src/infrastructure/api");
     response = await api.raw(apiPath("/auth/toss/exchange"), {
       method: "POST",
       throwHttpErrors: false,
@@ -194,7 +192,6 @@ export async function signIn(provider?: string, options?: Record<string, unknown
   }
 
   // 로그인 실패(비-2xx)도 정상 흐름으로 { ok:false, error } 를 돌려주므로 ky 예외를 끄고 Response 를 직접 다룬다.
-  const { api, apiPath } = await import("@/src/infrastructure/api");
   const response = await api.raw(apiPath("/auth/login"), {
     method: "POST",
     throwHttpErrors: false,
@@ -223,9 +220,8 @@ export async function signIn(provider?: string, options?: Record<string, unknown
 }
 
 export async function signOut() {
-  const token = currentSession?.token;
+  const token = getAuthToken();
   if (token) {
-    const { api, apiPath } = await import("@/src/infrastructure/api");
     await api
       .raw(apiPath("/auth/logout"), {
         method: "POST",
@@ -242,44 +238,4 @@ export async function signOut() {
 // OAuth 콜백 페이지가 핸드오프/데모로 받은 사용자 객체로 세션을 확정할 때 사용.
 export function completeOAuthLogin(user: NonNullable<Session>["user"] | null, token?: string | null) {
   persistSession(user?.id ? { user, token: token ?? null } : null);
-}
-
-export function getAuthSession() {
-  return currentSession;
-}
-
-export function getAuthUserId() {
-  return currentSession?.user.id ?? null;
-}
-
-// 인증 요청의 x-user-id 헤더 값(서명 세션 토큰). 없으면 null → 미인증.
-export function getAuthToken() {
-  return currentSession?.token ?? null;
-}
-
-export function readStoredSession(): Session {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = globalThis.localStorage.getItem(SESSION_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Session;
-    return parsed?.user?.id ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-export function persistSession(session: Session) {
-  currentSession = session?.user?.id ? session : null;
-  if (typeof window !== "undefined") {
-    if (currentSession) globalThis.localStorage.setItem(SESSION_KEY, JSON.stringify(currentSession));
-    else globalThis.localStorage.removeItem(SESSION_KEY);
-  }
-  emitSession(currentSession);
-}
-
-export function emitSession(session: Session) {
-  currentSession = session;
-  // listeners 는 src/compat/auth-session.tsx 의 subscribe 에서 add 된다(교차 모듈이라 정적분석이 빈 Set 으로 오판).
-  listeners.forEach((listener) => listener(session)); // NOSONAR S4158
 }

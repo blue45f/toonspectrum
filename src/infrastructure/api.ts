@@ -4,7 +4,7 @@
 import ky, { HTTPError, type KyResponse, type Options } from "ky";
 
 import { resolveApiError, safeParseJson } from "@/lib/http-safe";
-import { getAuthToken } from "@/src/compat/auth-session-store";
+import { getAuthToken } from "@/src/compat/auth-session-state";
 import { getRuntimeApiBase } from "@/src/infrastructure/runtime-api-base";
 
 function apiBase() {

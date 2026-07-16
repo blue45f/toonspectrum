@@ -16,7 +16,8 @@ const budgets = {
   // 2026-07-15 bubble path/export + floating tool popovers + insert/tutorial wiring:
   // observed ~2438 KiB raw / ~787 KiB gzip (tutorial hub remains lazy).
   // 2026-07-16 upload route + scene/panel assembly split: ~2.33 MiB raw / ~771 KiB gzip.
-  studio: { raw: 2_480_000, gzip: 805_000 },
+  // 2026-07-16 release planner split + auth graph cleanup: ~2.32 MiB raw / ~768 KiB gzip.
+  studio: { raw: 2_460_000, gzip: 798_000 },
   // Measured after the same build: 443,257 raw / 143,956 gzip.
   app: { raw: 500_000, gzip: 170_000 },
 };
@@ -110,6 +111,14 @@ if (!fs.existsSync(manifestPath)) {
       fail(
         `upload/template workflows returned to the Studio static graph: ${eagerOptionalStudioWorkflows.join(", ")}`,
       );
+    }
+
+    const eagerReleasePlanner = matchingEntries(
+      studioKeys,
+      /studio-release-schedule(?!-loader)/,
+    );
+    if (eagerReleasePlanner.length > 0) {
+      fail(`release planning engine returned to the Studio static graph: ${eagerReleasePlanner.join(", ")}`);
     }
 
     const eager3dRuntime = matchingEntries(

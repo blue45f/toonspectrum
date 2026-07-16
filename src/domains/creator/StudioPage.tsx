@@ -815,10 +815,9 @@ import {
 } from "./studio-raster-assets";
 import { STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED } from "./studio-raster-publication-feature";
 import {
-  createEmptyStudioReleaseSchedule,
-  normalizeStudioReleaseSchedule,
-  type StudioReleaseSchedule,
-} from "./studio-release-schedule";
+  createEmptyStudioReleaseScheduleSnapshot,
+  loadStudioReleaseScheduleRuntime,
+} from "./studio-release-schedule-loader";
 import { layoutScenarioPanels, type ScenarioPanelAspect, type ScenarioPreviewItem } from "./studio-scenario-layout";
 import {
   computeAlignDeltas,
@@ -1094,6 +1093,7 @@ import type {
   StudioPublishPreflightInput,
   StudioPublishProfile,
 } from "./studio-publish-preflight";
+import type { StudioReleaseSchedule } from "./studio-release-schedule";
 import type { SceneTemplate } from "./studio-scene-templates";
 import type { SelectiveHsl } from "./studio-selective-hsl";
 import type { SfxPreset } from "./studio-sfx-presets";
@@ -5379,7 +5379,7 @@ function StudioCuttoonEditor() {
     setStudioCommentsState(next);
   };
   const [releaseSchedule, setReleaseScheduleState] = useState<StudioReleaseSchedule>(() =>
-    createEmptyStudioReleaseSchedule()
+    createEmptyStudioReleaseScheduleSnapshot()
   );
   const setReleaseSchedule = (next: Parameters<typeof setReleaseScheduleState>[0]) => {
     if (!markStudioDocumentChanged()) return;
@@ -7823,11 +7823,12 @@ function StudioCuttoonEditor() {
     workId,
   ]);
 
-  function restoreAutosave() {
+  async function restoreAutosave() {
     if (collaborationDocumentLocked) {
       setError(collaborationLockMessage());
       return;
     }
+    const mutationTicket = captureStudioMutationTicket();
     try {
       const saved = readStudioAutosave(localStorage, autosaveKey, !workId && !remixId);
       if (saved) {
@@ -7847,6 +7848,11 @@ function StudioCuttoonEditor() {
           }
         }
         const parsed = saved.payload;
+        const { normalizeStudioReleaseSchedule } = await loadStudioReleaseScheduleRuntime();
+        if (!canApplyStudioMutation(mutationTicket)) {
+          setError("임시저장본을 준비하는 동안 원고가 변경되어 복구하지 않았어요. 다시 확인해 주세요.");
+          return;
+        }
         if (parsed.pagesList.length > 0) {
           const restoredPages = parsed.pagesList as PageState[];
           const workAssetReason = studioWorkAssetDocumentSourceTransitionReason(
@@ -9284,8 +9290,8 @@ function StudioCuttoonEditor() {
       };
     }
 
-    void loadStudioWork()
-      .then(({ work: w, remixAuthorName, shared, detail }) => {
+    void Promise.all([loadStudioWork(), loadStudioReleaseScheduleRuntime()])
+      .then(([{ work: w, remixAuthorName, shared, detail }, { normalizeStudioReleaseSchedule }]) => {
         if (!alive) return;
         if (!isStudioCuttoonSourceFormat(w.format)) {
           setWorkHydrationFailed(true);
@@ -9377,7 +9383,9 @@ function StudioCuttoonEditor() {
           remixId ? createEmptyStudioCommentsDocument() : normalizeStudioCommentsDocument(doc?.comments)
         );
         setReleaseScheduleState(
-          remixId ? createEmptyStudioReleaseSchedule() : normalizeStudioReleaseSchedule(doc?.releaseSchedule)
+          remixId
+            ? createEmptyStudioReleaseScheduleSnapshot()
+            : normalizeStudioReleaseSchedule(doc?.releaseSchedule)
         );
         setPublicationAnalyticsState(
           remixId
@@ -18837,22 +18845,25 @@ function StudioCuttoonEditor() {
     };
   }
 
-  function applyStudioProjectSnapshot(projectData: StudioProjectFile) {
-    if (!editorMountedRef.current) return;
+  function applyStudioProjectSnapshotWithReleaseSchedule(
+    projectData: StudioProjectFile,
+    normalizeReleaseSchedule: (value: unknown) => StudioReleaseSchedule,
+  ): boolean {
+    if (!editorMountedRef.current) return false;
     if (documentSaveInFlightRef.current) {
       setError("저장 중에는 프로젝트를 교체할 수 없어요. 저장이 끝난 뒤 다시 시도해 주세요.");
-      return;
+      return false;
     }
     if (collaborationAccessRef.current.locked) {
       setError(collaborationLockMessage());
-      return;
+      return false;
     }
     setSharedDocumentNotice(null);
     const restoredPages = projectData.pagesList as PageState[];
     const workAssetReason = studioWorkAssetDocumentSourceTransitionReason(pages, restoredPages);
     if (workAssetReason) {
       setError(workAssetReason);
-      return;
+      return false;
     }
     resetAdvancedFillForDocumentReplacement();
     // 히스토리에 새 페이지 상태를 추가해 JSON/복구 지점 복원도 ⌘Z 흐름과 충돌하지 않게 한다.
@@ -18886,9 +18897,20 @@ function StudioCuttoonEditor() {
       )
     );
     setStudioComments(normalizeStudioCommentsDocument(projectData.comments));
-    setReleaseSchedule(normalizeStudioReleaseSchedule(projectData.releaseSchedule));
+    setReleaseSchedule(normalizeReleaseSchedule(projectData.releaseSchedule));
     setPublicationAnalytics(
       normalizeStudioPublicationAnalyticsDocument(projectData.publicationAnalytics)
+    );
+    return true;
+  }
+
+  async function applyStudioProjectSnapshot(projectData: StudioProjectFile): Promise<boolean> {
+    const mutationTicket = captureStudioMutationTicket();
+    const { normalizeStudioReleaseSchedule } = await loadStudioReleaseScheduleRuntime();
+    if (!canApplyStudioMutation(mutationTicket)) return false;
+    return applyStudioProjectSnapshotWithReleaseSchedule(
+      projectData,
+      normalizeStudioReleaseSchedule,
     );
   }
 
@@ -18913,12 +18935,13 @@ function StudioCuttoonEditor() {
     void saveNamedCheckpoint(name);
   }
 
-  function restoreNamedCheckpoint(checkpoint: StudioCheckpoint) {
+  async function restoreNamedCheckpoint(checkpoint: StudioCheckpoint) {
     if (!globalThis.confirm(`'${checkpoint.name}' 시점으로 문서를 복원할까요? 현재 상태는 자동저장에 남을 수 있어요.`)) {
       return;
     }
     try {
-      applyStudioProjectSnapshot(parseStudioProjectFile(checkpoint.payload));
+      const applied = await applyStudioProjectSnapshot(parseStudioProjectFile(checkpoint.payload));
+      if (!applied) return;
       setCheckpointPanelOpen(false);
       setCheckpointError(null);
     } catch (error) {
@@ -19128,7 +19151,14 @@ function StudioCuttoonEditor() {
         throw new Error("복원된 작품 형식은 컷툰 편집기와 호환되지 않아 자동 적용하지 않았어요.");
       }
       documentSaveInFlightRef.current = false;
-      applyStudioProjectSnapshot(creatorWorkSnapshotToStudioProject(restoredWork));
+      if (!(await applyStudioProjectSnapshot(creatorWorkSnapshotToStudioProject(restoredWork)))) {
+        lockStudioMutationsNow();
+        setDocumentReloadRequired(true);
+        setServerRevisionError(
+          "서버 복원은 완료됐지만 로컬 편집 상태가 달라 자동 적용하지 않았어요. 페이지를 다시 불러와 주세요.",
+        );
+        return false;
+      }
       setLoadedWork(restoredWork);
       setSharedDocumentScope({
         authScopeKey: restoreAuthScopeKey,
@@ -19397,12 +19427,12 @@ function StudioCuttoonEditor() {
     const mutationTicket = captureStudioMutationTicket();
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         if (!canApplyStudioMutation(mutationTicket)) return;
         const text = event.target?.result as string;
         const projectData = parseStudioProjectFile(JSON.parse(text));
-        applyStudioProjectSnapshot(projectData);
+        if (!(await applyStudioProjectSnapshot(projectData))) return;
         alert("프로젝트 불러오기가 완료되었습니다.");
       } catch (err) {
         console.error(err);
@@ -19421,10 +19451,15 @@ function StudioCuttoonEditor() {
     setProjectArchiveBusy(true);
     setProjectArchiveStatus(null);
     try {
-      const [{ importStudioProjectArchive }, { installStudioBg3dProjectArchiveModelsAndApply }] =
+      const [
+        { importStudioProjectArchive },
+        { installStudioBg3dProjectArchiveModelsAndApply },
+        { normalizeStudioReleaseSchedule },
+      ] =
         await Promise.all([
           import("./studio-project-archive"),
           import("./studio-bg3d-project-library"),
+          loadStudioReleaseScheduleRuntime(),
         ]);
       const result = await importStudioProjectArchive(file, {
         rehydrateDataUrls: true,
@@ -19436,8 +19471,10 @@ function StudioCuttoonEditor() {
         result,
         (project) => {
           if (!canApplyStudioMutation(mutationTicket)) return;
-          applyStudioProjectSnapshot(project);
-          projectApplied = true;
+          projectApplied = applyStudioProjectSnapshotWithReleaseSchedule(
+            project,
+            normalizeStudioReleaseSchedule,
+          );
         },
         {
           limits: isMobile ? MOBILE_PROJECT_ARCHIVE_LIMITS : undefined,
@@ -23189,7 +23226,7 @@ function StudioCuttoonEditor() {
                 ) : (
                   <button
                     type="button"
-                    onClick={restoreAutosave}
+                    onClick={() => void restoreAutosave()}
                     className="min-h-11 rounded-lg bg-accent/20 px-3 py-2 font-bold text-accent hover:bg-accent/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                   >
                     복구하기
@@ -29723,7 +29760,7 @@ function StudioCuttoonEditor() {
             schedule={releaseSchedule}
             onScheduleChange={(value) => {
               if (!collaborationDocumentLocked) {
-                setReleaseSchedule(normalizeStudioReleaseSchedule(value));
+                setReleaseSchedule(value);
                 setSharedDocumentNotice(null);
               }
             }}

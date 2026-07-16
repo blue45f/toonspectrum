@@ -806,7 +806,7 @@ export function StudioHudPill({
       data-studio-hud-pill="true"
       title={title}
       className={cn(
-        "inline-flex items-center gap-1 rounded-lg border border-line/60 bg-canvas/35 px-2 py-0.5",
+        "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-line/60 bg-canvas/35 px-2 py-0.5",
         "text-[0.65rem] font-semibold tabular-nums tracking-tight text-fg-2",
         accent && "border-accent/40 bg-accent-soft/50 text-accent",
         className
@@ -949,7 +949,7 @@ export function StudioQuickActionsBar({
 export function StudioStatusBar({
   children,
   className,
-  "aria-label": ariaLabel = "캔버스 상태",
+  "aria-label": ariaLabel = "캔버스 상태 및 보기",
 }: {
   children: ReactNode;
   className?: string;
@@ -957,11 +957,13 @@ export function StudioStatusBar({
 }): ReactElement {
   return (
     <div
-      role="status"
+      role="group"
       aria-label={ariaLabel}
       data-studio-status-bar="true"
       className={cn(
-        "pointer-events-auto absolute bottom-3.5 left-3.5 z-[10] flex max-w-[min(100%,44rem)] flex-wrap items-center gap-1.5",
+        "pointer-events-auto absolute bottom-3.5 left-3.5 z-[10] flex max-w-[calc(100%-1.75rem)] flex-nowrap items-center gap-1.5 overflow-x-auto overscroll-x-contain",
+        "touch-pan-x scroll-px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        "sm:max-w-[min(100%,44rem)]",
         "rounded-2xl px-3 py-2 text-[0.68rem] font-semibold tracking-tight text-fg-2",
         className
       )}

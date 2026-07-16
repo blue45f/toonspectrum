@@ -1010,6 +1010,7 @@ export class StudioWebGpuEngine {
     readonly device: GPUDevice;
   } | null = null;
   private webGpuRenderInFlight = false;
+  private webGpuRenderFlightId = 0;
   private pendingWebGpuRender: {
     readonly strokes: readonly StudioGpuStroke[];
     readonly requestId: string;
@@ -1759,6 +1760,10 @@ export class StudioWebGpuEngine {
   private handleDeviceLost(lostDevice: GPUDevice, info: GPUDeviceLostInfo): void {
     if (this.disposed || this.device !== lostDevice) return;
     const recoveryGeneration = ++this.lifecycleGeneration;
+    // `GPUQueue.onSubmittedWorkDone()` is allowed to stay pending while a device transitions to
+    // lost. Detach that obsolete async flight now so a successfully recovered device can submit
+    // immediately; its eventual completion is fenced by `webGpuRenderFlightId` below.
+    this.supersedeWebGpuRenderFlight();
     this.invalidateAuthorityFrame();
     this.destroyReadbackSnapshotPool();
     this.device = null;
@@ -1992,8 +1997,12 @@ export class StudioWebGpuEngine {
     readonly requestId: string;
     readonly frameGeneration: number;
   }): void {
+    const flightId = ++this.webGpuRenderFlightId;
     this.webGpuRenderInFlight = true;
     const finish = () => {
+      // A lost device may complete or reject its submitted-work promise after a recovered device
+      // has already started rendering. Only the current flight owns the shared pending slot/lock.
+      if (flightId !== this.webGpuRenderFlightId) return;
       this.webGpuRenderInFlight = false;
       const pending = this.pendingWebGpuRender;
       this.pendingWebGpuRender = null;
@@ -2024,6 +2033,12 @@ export class StudioWebGpuEngine {
       request.requestId,
       request.frameGeneration
     ).then(finish, finish);
+  }
+
+  private supersedeWebGpuRenderFlight(): void {
+    this.webGpuRenderFlightId += 1;
+    this.webGpuRenderInFlight = false;
+    this.pendingWebGpuRender = null;
   }
 
   private async renderWebGpu(

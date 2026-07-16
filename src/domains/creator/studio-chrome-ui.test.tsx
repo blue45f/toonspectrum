@@ -173,6 +173,13 @@ describe("studio chrome UI", () => {
     expect(html).toContain('aria-pressed="true"');
     expect(html).toContain('data-studio-quick-actions="true"');
     expect(html).toContain('data-studio-status-bar="true"');
+    expect(html).toContain(
+      'role="group" aria-label="캔버스 상태 및 보기" data-studio-status-bar="true"'
+    );
+    expect(html).not.toContain('role="status"');
+    expect(html).toContain("flex-nowrap");
+    expect(html).toContain("overflow-x-auto");
+    expect(html).not.toContain("flex-wrap");
     expect(html).toContain("100%");
   });
 
@@ -217,6 +224,8 @@ describe("studio chrome UI", () => {
     expect(html).toContain("6px · 100%");
     expect(html).toContain("B");
     expect(html).toContain('data-studio-hud-pill="true"');
+    expect(html).toContain("shrink-0");
+    expect(html).toContain("whitespace-nowrap");
     expect(html).toContain("100%");
   });
 });

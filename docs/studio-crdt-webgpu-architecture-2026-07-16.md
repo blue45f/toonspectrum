@@ -90,6 +90,9 @@ rewrites rather than claims that every legacy scene type already runs on the new
 - WebGPU initialization is single-flight and idempotent, lets the browser select a power-aware
   default adapter for mobile battery/thermal stability, destroys late device acquisition after
   cancellation, and invalidates every old-generation resource before device-loss recovery.
+- Device loss also supersedes the old queue flight immediately. Monotonic flight ownership keeps a
+  hung or late `onSubmittedWorkDone()` from blocking the recovered device or releasing its newer
+  pending-render lock.
 - Canvas2D remains the compositor-compatible fallback when WebGPU is unavailable. Konva remains the
   scene/interactions authority for unsupported images, text, bubbles, filters, selections, and 3D
   surfaces until their render contracts move to GPU passes.
@@ -105,6 +108,7 @@ rewrites rather than claims that every legacy scene type already runs on the new
   relay, and distributed leases.
 - WebGPU: retained suffix upload, historical rebuild, visible-only tall-document planning,
   fractional tile edges, high-DPI quality rejection, empty/non-finite rejection, stale receipts,
-  queue serialization/coalescing, device loss, initialization cancellation, and Canvas2D fallback.
+  queue serialization/coalescing, hung-flight device-loss recovery, initialization cancellation,
+  and Canvas2D fallback.
 - UI smoke verification covers desktop and mobile immersive Studio layouts, bounded viewport
   surfaces, exact invalidation, and safe Konva fallback whenever a GPU frame is not authorized.

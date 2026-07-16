@@ -555,6 +555,73 @@ describe("StudioWebGpuEngine", () => {
     expect(fake.buffer.destroy).toHaveBeenCalled();
   });
 
+  it("starts recovered-device rendering without waiting for a hung lost-device flight", async () => {
+    const firstLost = deferred<GPUDeviceLostInfo>();
+    const firstSubmission = deferred<void>();
+    const first = fakeGpuDevice(firstLost.promise, () => firstSubmission.promise);
+    const secondSubmissions = Array.from({ length: 3 }, () => deferred<void>());
+    let secondSubmissionIndex = 0;
+    const second = fakeGpuDevice(
+      new Promise<GPUDeviceLostInfo>(() => undefined),
+      () => secondSubmissions[secondSubmissionIndex++]!.promise
+    );
+    const context = {
+      configure: vi.fn(),
+      unconfigure: vi.fn(),
+      getCurrentTexture: vi.fn(() => ({ createView: vi.fn(() => ({ view: true })) })),
+    } as unknown as GPUCanvasContext;
+    const adapter = {
+      requestDevice: vi.fn()
+        .mockResolvedValueOnce(first.device)
+        .mockResolvedValueOnce(second.device),
+    } as unknown as GPUAdapter;
+    const gpu = {
+      requestAdapter: vi.fn(async () => adapter),
+      getPreferredCanvasFormat: vi.fn(() => "bgra8unorm"),
+    } as unknown as GPU;
+    const onFrameReady = vi.fn((_receipt: StudioGpuFrameReceipt) => undefined);
+    const engine = new StudioWebGpuEngine({
+      canvas: fakeGpuCanvas(context),
+      fallbackCanvas: fakeCanvas2d().canvas,
+      gpu,
+      onFrameReady,
+    });
+    const initialStroke = stroke({ id: "recover-initial", orderKey: "a" });
+    const latestStrokes = [
+      initialStroke,
+      stroke({ id: "recover-latest", orderKey: "b", points: [10, 20, 30, 20] }),
+    ];
+
+    engine.resize({ logicalWidth: 100, logicalHeight: 80 });
+    await expect(engine.initialize()).resolves.toBe("webgpu");
+    await vi.waitFor(() => expect(first.device.queue.onSubmittedWorkDone).toHaveBeenCalledTimes(1));
+    engine.render([initialStroke], "recover:initial");
+
+    firstLost.resolve({ reason: "unknown", message: "hung submission" } as GPUDeviceLostInfo);
+    await vi.waitFor(() => expect(adapter.requestDevice).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(second.device.queue.submit).toHaveBeenCalledTimes(1));
+
+    // A late completion from the lost device must not clear the recovered device's flight lock.
+    firstSubmission.resolve(undefined);
+    await Promise.resolve();
+    await Promise.resolve();
+    engine.render(latestStrokes, "recover:latest");
+    expect(second.device.queue.submit).toHaveBeenCalledTimes(1);
+
+    secondSubmissions[0]!.resolve(undefined);
+    await vi.waitFor(() => expect(second.device.queue.submit).toHaveBeenCalledTimes(2));
+    secondSubmissions[1]!.resolve(undefined);
+    await vi.waitFor(() => expect(second.device.queue.submit).toHaveBeenCalledTimes(3));
+    secondSubmissions[2]!.resolve(undefined);
+
+    await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalledWith(expect.objectContaining({
+      requestId: "recover:latest",
+      backend: "webgpu",
+      complete: true,
+    })));
+    engine.dispose();
+  });
+
   it("drops stale WebGPU queue receipts and authorizes only the latest request", async () => {
     const neverLost = new Promise<GPUDeviceLostInfo>(() => undefined);
     const submitted = Array.from({ length: 4 }, () => deferred<void>());

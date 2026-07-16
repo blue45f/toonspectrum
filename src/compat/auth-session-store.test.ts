@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getAuthSession, persistSession, tossLoginFlow } from "./auth-session-store";
+import {
+  getAuthSession,
+  getAuthToken,
+  persistSession,
+  signOut,
+  tossLoginFlow,
+} from "./auth-session-store";
 
 const apiRaw = vi.hoisted(() => vi.fn());
 
@@ -102,6 +108,23 @@ describe("tossLoginFlow", () => {
     const result = await tossLoginFlow();
 
     expect(result).toMatchObject({ ok: false, error: "toss-server-failed" });
+    expect(getAuthSession()).toBeNull();
+  });
+
+  it("로그아웃은 현재 서명 토큰을 전송한 뒤 API 실패에도 로컬 세션을 정리한다", async () => {
+    persistSession({ user: { id: "toss-user" }, token: "signed-session-token" });
+    apiRaw.mockRejectedValue(new TypeError("network unavailable"));
+
+    await expect(signOut()).resolves.toBeUndefined();
+
+    expect(apiRaw).toHaveBeenCalledWith(
+      "/api/auth/logout",
+      expect.objectContaining({
+        method: "POST",
+        headers: { "x-user-id": "signed-session-token" },
+      }),
+    );
+    expect(getAuthToken()).toBeNull();
     expect(getAuthSession()).toBeNull();
   });
 });

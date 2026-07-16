@@ -736,6 +736,19 @@ body[data-studio-app="true"] .route-stage::before,
     inset 0 1px 0 oklch(0.97 0.01 85 / 0.08);
 }
 
+/* A wrapped HUD can cover several canvas rows on phones. Keep it one line and avoid a costly
+   full-surface backdrop pass while the artist is drawing on a thermally constrained device. */
+@media (max-width: 639px) {
+  [data-studio-status-bar="true"] {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: oklch(0.185 0.009 68 / 0.98);
+    box-shadow:
+      0 4px 18px oklch(0.06 0.01 70 / 0.38),
+      inset 0 1px 0 oklch(0.97 0.01 85 / 0.06);
+  }
+}
+
 /* Krita/Fresco options cluster — glass tool groups */
 [data-studio-draw-options="true"] .studio-opt-cluster,
 [data-studio-quick-actions="true"].studio-opt-cluster,
