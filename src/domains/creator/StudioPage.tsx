@@ -6813,7 +6813,10 @@ function StudioCuttoonEditor() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // PPT식 드래그 다중선택 — 빈 영역에서 사각형을 끌어 겹치는 요소를 한꺼번에 선택.
   const [marqueeIds, setMarqueeIds] = useState<string[]>([]);
-  const [marqueeRect, setMarqueeRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  // 마퀴 박스 프리뷰는 상시 마운트된 Konva Rect 를 임페러티브로 갱신한다 — 드래그 프레임마다
+  // 페이지가 다시 렌더되지 않는다. 상태는 활성 여부(시작/종료 2회)만 승격한다.
+  const [marqueeActive, setMarqueeActive] = useState(false);
+  const marqueeRectNodeRef = useRef<Konva.Rect>(null);
   const marqueeStartRef = useRef<{ x: number; y: number } | null>(null);
   // 다중선택 그룹 이동 — 끄는 노드의 시작·직전 위치로 나머지 선택 노드에 이동량을 함께 적용.
   const groupDragRef = useRef<{ id: string; x0: number; y0: number; lastX: number; lastY: number } | null>(null);
@@ -8946,10 +8949,22 @@ function StudioCuttoonEditor() {
   }
   const scheduleMarqueeRect = (next: { x: number; y: number; w: number; h: number } | null) => {
     pendingMarqueeRectRef.current = next;
+    setMarqueeActive(next !== null); // 같은 값이면 React 가 렌더를 생략 — 시작/종료 2회만 렌더.
     if (marqueeRafRef.current !== null) return;
     marqueeRafRef.current = globalThis.requestAnimationFrame(() => {
       marqueeRafRef.current = null;
-      setMarqueeRect(pendingMarqueeRectRef.current);
+      const rect = pendingMarqueeRectRef.current;
+      const node = marqueeRectNodeRef.current;
+      if (!node) return;
+      if (!rect) {
+        if (node.visible()) {
+          node.visible(false);
+          node.getLayer()?.batchDraw();
+        }
+        return;
+      }
+      node.setAttrs({ x: rect.x, y: rect.y, width: rect.w, height: rect.h, visible: true });
+      node.getLayer()?.batchDraw();
     });
   };
   const clearMarqueePreview = () => {
@@ -8958,7 +8973,12 @@ function StudioCuttoonEditor() {
       globalThis.cancelAnimationFrame(marqueeRafRef.current);
       marqueeRafRef.current = null;
     }
-    setMarqueeRect(null);
+    setMarqueeActive(false);
+    const node = marqueeRectNodeRef.current;
+    if (node && node.visible()) {
+      node.visible(false);
+      node.getLayer()?.batchDraw();
+    }
   };
   useEffect(
     () => () => {
@@ -18232,7 +18252,7 @@ function StudioCuttoonEditor() {
     }
     // 마퀴 드래그 종료: 박스와 겹치는(숨김·아닌) 요소를 한꺼번에 선택.
     if (marqueeStartRef.current) {
-      const rect = pendingMarqueeRectRef.current ?? marqueeRect;
+      const rect = pendingMarqueeRectRef.current;
       marqueeStartRef.current = null;
       clearMarqueePreview();
       if (rect && rect.w > 3 && rect.h > 3) {
@@ -20779,7 +20799,7 @@ function StudioCuttoonEditor() {
     editActive: selectedId !== null || marqueeIds.length > 0 || editing !== null,
     specialDraftActive:
       tool !== "select" || eyedropperActive || timelinePlaying ||
-      marqueeRect !== null || userGuides.length > 0 ||
+      marqueeActive || userGuides.length > 0 ||
       advancedFillArmed || pixelToolArmed || cropArmed || panelSplitArmed ||
       nodeEditArmed || bubbleShapeArmed || smudgeArmed || healCloneArmed ||
       layerMaskPaintArmed || historyBrushArmed || puppetWarpArmed,
@@ -26182,13 +26202,12 @@ function StudioCuttoonEditor() {
                 />
               </Layer>
             )}
-            {!isExporting && marqueeRect && (
+            {/* 마퀴 프리뷰 — 상시 마운트 임페러티브 Rect(드래그 프레임당 페이지 렌더 없음). */}
+            {!isExporting && tool === "select" && (
               <Layer listening={false}>
                 <Rect
-                  x={marqueeRect.x}
-                  y={marqueeRect.y}
-                  width={marqueeRect.w}
-                  height={marqueeRect.h}
+                  ref={marqueeRectNodeRef}
+                  visible={false}
                   fill="rgba(90,140,255,0.12)"
                   stroke="rgba(90,140,255,0.85)"
                   strokeWidth={1 / effScale}
