@@ -103,7 +103,7 @@ import {
   MessageSquare,
   Triangle,
 } from "lucide-react";
-import { Fragment, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ComponentType, type ReactNode } from "react";
+import { Fragment, Suspense, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ComponentType, type ReactNode } from "react";
 import { createPortal, flushSync } from "react-dom";
 import { Stage, Layer, Rect, Text as KText, TextPath as KTextPath, Image as KImage, Line, Group, Star, Ellipse, Circle as KCircle, Path, Transformer, Shape, Arrow, RegularPolygon } from "react-konva/lib/ReactKonvaCore";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -2767,7 +2767,11 @@ function usePatternFillImage(pattern: StudioPatternSpec | undefined): HTMLImageE
   return image;
 }
 
-function StudioDrawNode({ el }: { el: DrawEl }) {
+// memo 는 라이브 드로잉의 핵심 계약이다: 초안이 rAF마다 리렌더를 일으켜도 커밋된 획들은 같은
+// el 참조를 받으므로 여기서 잘린다. memo 가 없으면 모든 커밋 획이 매 프레임 스무딩을 재계산해
+// 새 points 배열을 만들고, react-konva 가 이를 시각 변경으로 보고 메인 레이어 전체를 다시
+// 래스터한다 — 콘텐츠가 쌓일수록 스트로크가 점점 무거워지던 원인.
+const StudioDrawNode = memo(function StudioDrawNode({ el }: { el: DrawEl }) {
   const kind = el.kind ?? "freehand";
   // 패턴 채우기 타일(로드 전 null) — 우선순위: 패턴 > 그라데이션 > 단색(fillPriority).
   const patternImage = usePatternFillImage(el.pattern);
@@ -3542,7 +3546,7 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
       })}
     </>
   );
-}
+});
 
 function PoserLoadingOverlay() {
   return (
@@ -5804,8 +5808,12 @@ function StudioCuttoonEditor() {
   // 레이어 그룹(폴더) — 과거 저장본 호환 위해 미설정 시 빈 배열.
   const groups = activePage.groups ?? EMPTY_LAYER_GROUPS;
   const animTimeline = normalizeAnimationTimelineDoc(activePage.animTimeline);
-  const elementById = new Map<string, El>();
-  for (const element of elements) elementById.set(element.id, element);
+  // 요소 수가 커져도 초안 rAF 리렌더마다 페이지 전체 Map 을 다시 만들지 않는다.
+  const elementById = useMemo(() => {
+    const map = new Map<string, El>();
+    for (const element of elements) map.set(element.id, element);
+    return map;
+  }, [elements]);
   // Long-running pixel jobs validate against the latest active elements rather than their render-time
   // closure, preventing a stale fill result from overwriting an undo, page switch, or source edit.
   const activeElementsRef = useRef(elements);
