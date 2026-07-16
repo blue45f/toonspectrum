@@ -25178,6 +25178,22 @@ function StudioCuttoonEditor() {
                     ? ["top-left", "top-right", "bottom-left", "bottom-right"]
                     : ["top-left", "top-right", "bottom-left", "bottom-right", "middle-left", "middle-right", "top-center", "bottom-center"]
                 }
+                // Konva 기본 파란 사각 핸들 대신 디자인 시스템(persimmon 악센트)의 라운드 핸들.
+                // 그림자를 살짝 깔아 어떤 원고 색 위에서도 핸들이 읽힌다.
+                anchorSize={11}
+                anchorCornerRadius={5.5}
+                anchorStroke="oklch(0.72 0.185 42)"
+                anchorStrokeWidth={1.5}
+                anchorFill="oklch(0.998 0.004 85)"
+                borderStroke="oklch(0.72 0.185 42 / 0.9)"
+                borderStrokeWidth={1.25}
+                rotateAnchorOffset={26}
+                anchorStyleFunc={(anchor) => {
+                  anchor.shadowColor("oklch(0.08 0.01 70)");
+                  anchor.shadowBlur(4);
+                  anchor.shadowOpacity(0.35);
+                  anchor.shadowOffsetY(1);
+                }}
                 boundBoxFunc={(oldBox, newBox) => (newBox.width < 24 || newBox.height < 24 ? oldBox : newBox)}
               />
               {/* 잠긴 선택 요소는 트랜스포머가 안 붙으므로 점선 박스로 '선택됨'을 표시(삭제·잠금해제 안내). */}
@@ -25190,7 +25206,7 @@ function StudioCuttoonEditor() {
                     width={sb.w}
                     height={sb.h}
                     rotation={(selected as { rotation?: number }).rotation ?? 0}
-                    stroke="#7c5cff"
+                    stroke="oklch(0.72 0.185 42 / 0.9)"
                     strokeWidth={1.5 / effScale}
                     dash={[7 / effScale, 4 / effScale]}
                     listening={false}
@@ -29373,7 +29389,7 @@ function StudioCuttoonEditor() {
         {showMobileHint && !mobileSheet && !quickActionsOpen && (
           <div
             role="status"
-            className="fixed inset-x-3 bottom-[calc(7rem+env(safe-area-inset-bottom))] z-[53] mx-auto flex max-w-[32rem] items-start gap-2.5 rounded-2xl border border-accent/30 bg-panel/95 p-3 shadow-2xl backdrop-blur animate-in fade-in slide-in-from-bottom-2 duration-300 lg:hidden"
+            className="fixed inset-x-3 bottom-[calc(7rem+env(safe-area-inset-bottom))] z-[53] mx-auto flex max-w-[32rem] items-start gap-2.5 rounded-2xl border border-accent/30 bg-panel/95 p-3 shadow-2xl backdrop-blur motion-safe:animate-hud-in lg:hidden"
             style={{
               bottom: `calc(7rem + env(safe-area-inset-bottom) + ${mobileKeyboardInset}px)`,
             }}
@@ -30496,7 +30512,7 @@ function StudioCuttoonEditor() {
         // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
         <div
           style={{ top: contextMenu.y, left: contextMenu.x }}
-          className="fixed z-50 min-w-[140px] rounded-lg border border-line bg-panel p-1 shadow-xl animate-in fade-in zoom-in-95 duration-100"
+          className="fixed z-50 min-w-[140px] rounded-lg border border-line bg-panel p-1 shadow-xl motion-safe:animate-fade-in"
           onClick={(e) => e.stopPropagation()}
         >
           {contextMenu.elId ? (

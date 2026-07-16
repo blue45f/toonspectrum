@@ -45,6 +45,10 @@ html[data-studio-canvas-only="true"] body {
   --color-cool: oklch(0.8 0.11 232);
   --color-good: oklch(0.8 0.15 150);
   --color-warn: oklch(0.82 0.15 80);
+  /* `warning`/`warning-soft`은 warn 의 별칭 — 스튜디오 컴포넌트들이 두 이름을 혼용해
+     text-warning/bg-warning-soft 류 17곳이 무색으로 렌더되던 회귀를 복구한다. */
+  --color-warning: var(--color-warn);
+  --color-warning-soft: oklch(0.82 0.15 80 / 0.14);
   --color-bad: oklch(0.66 0.2 25);
 
   /* 타이포 — grotesque=데이터/serif=문학/sans=한국어UI */
@@ -64,6 +68,8 @@ html[data-studio-canvas-only="true"] body {
   /* 애니메이션 */
   --animate-shimmer: shimmer 1.6s linear infinite;
   --animate-fade-up: fade-up 0.5s var(--ease-out-expo) both;
+  --animate-fade-in: fade-in 0.18s var(--ease-out-expo) both;
+  --animate-hud-in: hud-in 0.2s var(--ease-out-expo) both;
   --animate-pulse-soft: pulse-soft 2.4s ease-in-out infinite;
 }
 
@@ -86,6 +92,8 @@ html[data-studio-canvas-only="true"] body {
   --color-cool: oklch(0.52 0.13 232);
   --color-good: oklch(0.5 0.15 150);
   --color-warn: oklch(0.5 0.15 80);
+  --color-warning: var(--color-warn);
+  --color-warning-soft: oklch(0.5 0.15 80 / 0.14);
   --color-bad: oklch(0.51 0.21 25);
 }
 
@@ -117,6 +125,26 @@ html[data-studio-canvas-only="true"] body {
     background-position: 200% 0;
   }
 }
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes hud-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @keyframes fade-up {
   from {
     opacity: 0;
