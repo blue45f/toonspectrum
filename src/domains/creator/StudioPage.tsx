@@ -604,6 +604,10 @@ import {
 } from "./studio-liquify";
 import { projectStudioCanvasCommentPins } from "./studio-live-canvas-overlay-model";
 import {
+  StudioLiveInkOverlayRenderer,
+  type StudioLiveInkSurface,
+} from "./studio-live-ink-overlay";
+import {
   canBeginStudioLiveMutation,
   planStudioLiveHeldResourceClear,
   planStudioLiveHeldResourceReplace,
@@ -2818,6 +2822,36 @@ function drawFreehandPenSegments(
     prevMidY = midY;
   }
 }
+
+/** Magma식 증분 라이브 잉크 표면 — 스크롤/줌 변화만 React 로 동기화하고 픽셀은 임페러티브. */
+const StudioLiveInkOverlayHost = memo(function StudioLiveInkOverlayHost({
+  renderer,
+  left,
+  top,
+  width,
+  height,
+  documentScale,
+  documentWidth,
+  flipX,
+}: StudioLiveInkSurface & { renderer: StudioLiveInkOverlayRenderer }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useLayoutEffect(() => {
+    renderer.attach(canvasRef.current);
+    return () => renderer.attach(null);
+  }, [renderer]);
+  useLayoutEffect(() => {
+    renderer.setSurface({ left, top, width, height, documentScale, documentWidth, flipX });
+  });
+  return (
+    <canvas
+      ref={canvasRef}
+      aria-hidden="true"
+      data-studio-live-ink-overlay="true"
+      className="pointer-events-none absolute z-10"
+      style={{ left, top, width, height }}
+    />
+  );
+});
 
 /** 프레임 단위 필압 통지용 미니 스토어 — StudioPage 리렌더 없이 HUD 미터만 갱신한다. */
 interface StudioLivePressureStore {
@@ -7690,6 +7724,131 @@ function StudioCuttoonEditor() {
   useEffect(() => {
     zoomRef.current = zoom;
   }, [zoom]);
+  // 휠·핀치 줌 제스처는 리렌더 없이 캔버스 호스트에 CSS transform 만 걸어 즉시 반응하고,
+  // 제스처가 잦아들면(마지막 틱 후 ~170ms) 한 번만 zoom 상태로 정착한다. 정착 시에는 제스처
+  // 앵커(포인터 아래 문서점)가 그대로 유지되도록 스크롤을 보정한다. 틱마다 setZoom 을 부르면
+  // 에디터 전체가 틱당 한 번씩 다시 그려져 연속 휠이 초 단위로 밀리는 것을 계측으로 확인했다.
+  const zoomHostRef = useRef<HTMLDivElement | null>(null);
+  const zoomGestureRef = useRef<{
+    baseZoom: number;
+    targetZoom: number;
+    originX: number;
+    originY: number;
+    clientX: number;
+    clientY: number;
+    baseWidth: number;
+    raf: number;
+    settleTimer: ReturnType<typeof setTimeout> | null;
+  } | null>(null);
+  const zoomSettleAnchorRef = useRef<{
+    docX: number;
+    docY: number;
+    clientX: number;
+    clientY: number;
+  } | null>(null);
+  const settleZoomGestureRef = useRef<() => void>(() => {});
+  const stepZoomGestureRef = useRef<
+    (nextTarget: (target: number) => number, clientX: number, clientY: number) => void
+  >(() => {});
+  useEffect(() => {
+    settleZoomGestureRef.current = () => {
+      const gesture = zoomGestureRef.current;
+      zoomGestureRef.current = null;
+      if (!gesture) return;
+      if (gesture.raf) globalThis.cancelAnimationFrame(gesture.raf);
+      if (gesture.settleTimer) globalThis.clearTimeout(gesture.settleTimer);
+      const host = zoomHostRef.current;
+      if (gesture.targetZoom === gesture.baseZoom) {
+        if (host) {
+          host.style.transform = "";
+          host.style.willChange = "";
+        }
+        return;
+      }
+      const effBase = gesture.baseWidth / CANVAS_W;
+      zoomSettleAnchorRef.current = effBase > 0
+        ? {
+            docX: gesture.originX / effBase,
+            docY: gesture.originY / effBase,
+            clientX: gesture.clientX,
+            clientY: gesture.clientY,
+          }
+        : null;
+      setZoom(clampZoom(gesture.targetZoom));
+    };
+    stepZoomGestureRef.current = (nextTarget, clientX, clientY) => {
+      const host = zoomHostRef.current;
+      if (!host) {
+        setZoom((z) => clampZoom(nextTarget(z)));
+        return;
+      }
+      let gesture = zoomGestureRef.current;
+      if (!gesture) {
+        const rect = host.getBoundingClientRect();
+        const baseZoom = zoomRef.current;
+        gesture = {
+          baseZoom,
+          targetZoom: baseZoom,
+          originX: clientX - rect.left,
+          originY: clientY - rect.top,
+          clientX,
+          clientY,
+          baseWidth: rect.width,
+          raf: 0,
+          settleTimer: null,
+        };
+        zoomGestureRef.current = gesture;
+      }
+      gesture.targetZoom = clampZoom(nextTarget(gesture.targetZoom));
+      if (!gesture.raf) {
+        gesture.raf = globalThis.requestAnimationFrame(() => {
+          const active = zoomGestureRef.current;
+          const activeHost = zoomHostRef.current;
+          if (!active) return;
+          active.raf = 0;
+          if (!activeHost) return;
+          const k = active.targetZoom / active.baseZoom;
+          activeHost.style.transformOrigin = `${active.originX}px ${active.originY}px`;
+          activeHost.style.transform = k === 1 ? "" : `scale(${k})`;
+          activeHost.style.willChange = "transform";
+        });
+      }
+      if (gesture.settleTimer) globalThis.clearTimeout(gesture.settleTimer);
+      gesture.settleTimer = globalThis.setTimeout(() => settleZoomGestureRef.current(), 170);
+    };
+  });
+  useLayoutEffect(() => {
+    // 외부 setZoom(버튼/단축키/맞춤)이 제스처 중에 끼어들면 제스처를 취소하고 transform 을 정리한다.
+    const gesture = zoomGestureRef.current;
+    if (gesture) {
+      zoomGestureRef.current = null;
+      if (gesture.raf) globalThis.cancelAnimationFrame(gesture.raf);
+      if (gesture.settleTimer) globalThis.clearTimeout(gesture.settleTimer);
+    }
+    const host = zoomHostRef.current;
+    if (host) {
+      host.style.transform = "";
+      host.style.willChange = "";
+    }
+    const anchor = zoomSettleAnchorRef.current;
+    const wrap = wrapRef.current;
+    if (!anchor) return;
+    zoomSettleAnchorRef.current = null;
+    if (!host || !wrap) return;
+    // 정착 레이아웃에서 제스처 포인터 아래에 같은 문서점이 오도록 스크롤 보정(앵커 보존 줌).
+    const effNow = host.clientWidth / CANVAS_W;
+    if (!(effNow > 0)) return;
+    const wrapRect = wrap.getBoundingClientRect();
+    wrap.scrollLeft = Math.max(0, anchor.docX * effNow - (anchor.clientX - wrapRect.left));
+    wrap.scrollTop = Math.max(0, anchor.docY * effNow - (anchor.clientY - wrapRect.top));
+  }, [zoom]);
+  useEffect(() => () => {
+    const gesture = zoomGestureRef.current;
+    zoomGestureRef.current = null;
+    if (!gesture) return;
+    if (gesture.raf) globalThis.cancelAnimationFrame(gesture.raf);
+    if (gesture.settleTimer) globalThis.clearTimeout(gesture.settleTimer);
+  }, []);
   const effScale = scale * zoom;
   const snapBoundFunc = (pos: { x: number; y: number }) => {
     if (!snapEnabled) return pos;
@@ -7712,7 +7871,8 @@ function StudioCuttoonEditor() {
       if (wheelMode === "zoom") {
         e.preventDefault();
         const dir = (e.deltaY < 0 ? 1 : -1) * (prefs.reverseWheel ? -1 : 1);
-        setZoom((z) => clampZoom(z + dir * 0.15));
+        // 틱마다 리렌더하지 않는다 — 제스처 transform 으로 즉시 반응하고 정착 시 한 번만 커밋.
+        stepZoomGestureRef.current((target) => target + dir * 0.15, e.clientX, e.clientY);
         return;
       }
       if (wheelMode === "brush-size") {
@@ -7744,7 +7904,7 @@ function StudioCuttoonEditor() {
     const arm = (e: TouchEvent) => {
       if (e.touches.length === 2 && !stageRef.current?.isDragging()) {
         pinchStartDist = dist(e.touches);
-        pinchStartZoom = zoomRef.current;
+        pinchStartZoom = zoomGestureRef.current?.targetZoom ?? zoomRef.current;
       } else {
         pinchStartDist = 0;
       }
@@ -7758,14 +7918,22 @@ function StudioCuttoonEditor() {
       if (pinchStartDist === 0) {
         // 두 손가락이 막 모인 첫 프레임 — 기준선만 잡고 이번 프레임은 줌하지 않는다.
         pinchStartDist = dist(e.touches);
-        pinchStartZoom = zoomRef.current;
+        pinchStartZoom = zoomGestureRef.current?.targetZoom ?? zoomRef.current;
         return;
       }
       e.preventDefault(); // 브라우저 페이지 줌 차단
-      setZoom(clampZoom(pinchStartZoom * (dist(e.touches) / pinchStartDist)));
+      const target = clampZoom(pinchStartZoom * (dist(e.touches) / pinchStartDist));
+      const centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      // 프레임마다 리렌더하지 않는다 — 휠 줌과 같은 제스처 transform 경로로 흐른다.
+      stepZoomGestureRef.current(() => target, centerX, centerY);
     };
     const onTouchEnd = (e: TouchEvent) => {
-      if (e.touches.length !== 2) pinchStartDist = 0;
+      if (e.touches.length !== 2) {
+        pinchStartDist = 0;
+        // 손가락이 떨어지면 바로 정착시켜 흐릿한 transform 프리뷰를 즉시 크리스프하게 만든다.
+        settleZoomGestureRef.current();
+      }
     };
     node.addEventListener("touchstart", onTouchStart, { passive: true });
     node.addEventListener("touchmove", onTouchMove, { passive: false });
@@ -8313,19 +8481,19 @@ function StudioCuttoonEditor() {
   // 라이브 잉크 파인닝: 스트로크 시작 시점의 백엔드로 렌더러를 한 번 결정한다(중도 교대 금지).
   const webGpuBackendRef = useRef<StudioGpuBackend | null>(null);
   const webGpuCanvasHandleRef = useRef<StudioWebGpuCanvasHandle | null>(null);
-  const [gpuLiveInkPinned, setGpuLiveInkPinned] = useState(false);
-  // 펜 리프트 핸드오프: 커밋된 Konva 획이 페인트될 때까지(더블 rAF) 마지막 GPU 프레임을 유지한다.
-  const [gpuLiveInkLinger, setGpuLiveInkLinger] = useState(false);
+  // 파인 가시성은 StudioWebGpuCanvas 임페러티브 핸들(setPinnedVisible)로만 흐른다 — 스트로크
+  // 시작/종료가 30k 라인 부모를 다시 렌더하지 않는다. 펜 리프트 핸드오프(마지막 GPU 프레임을
+  // 커밋 페인트까지 유지)도 아래 더블 rAF + 핸들 호출로 처리한다.
   const gpuLingerRafRef = useRef<number>(0);
   const gpuLiveInkPinnedRef = useRef(false);
   // 런타임 자가검증: 파인 직후 첫 GPU 프레임 영수증이 기한 안에 오지 않으면(조용히 실패하는
   // 드라이버/기기) 남은 스트로크를 Konva 초안에 자동 인계한다 — 동선은 어떤 환경에서도 보인다.
   const gpuPinnedFrameSeenRef = useRef(false);
   const gpuPinProbeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // 다이렉트 라이브 초안: 프리핸드 펜 계열은 포인터 프레임마다 React 를 거치지 않고 Konva/GPU 를
-  // 직접 갱신한다(스트로크당 React 렌더는 시작·종료 2회). 30k 라인 컴포넌트 본문이 매 프레임
-  // 재실행되던 것이 대형 페이지 드로잉 버벅임의 마지막 원인이었다.
-  const [liveDraftDirect, setLiveDraftDirect] = useState(false);
+  // 다이렉트 라이브 초안: 프리핸드 펜 계열은 스트로크 수명주기 전체(시작·프레임·종료)에서
+  // React 를 거치지 않는다 — 초안 노드는 상시 마운트된 임페러티브 sceneFunc 이고, 시작은 ref
+  // 무장, 커밋은 아래 지연 파이프라인이 유휴 시 한 번만 동기화한다. 30k 라인 컴포넌트 본문
+  // 렌더(수백 ms)가 스트로크 시작/종료마다 끼어들던 것이 필기감 저하의 마지막 원인이었다.
   const liveDraftDirectRef = useRef(false);
   // Figma식 자유 위치 댓글: 무장 → 캔버스 클릭 한 번 → point 앵커 확정(0..1 정규화 좌표).
   const [commentPinArmed, setCommentPinArmed] = useState(false);
@@ -8337,6 +8505,23 @@ function StudioCuttoonEditor() {
   const liveDraftRafRef = useRef<number | null>(null);
   const liveDraftLayerRef = useRef<Konva.Layer>(null);
   const mainLayerRef = useRef<Konva.Layer>(null);
+  // Magma식 증분 라이브 잉크: 프레임마다 전체 획을 다시 그리지 않고 새 조각만 누적한다.
+  const liveInkOverlayRendererRef = useRef<StudioLiveInkOverlayRenderer>(null as never);
+  liveInkOverlayRendererRef.current ??= new StudioLiveInkOverlayRenderer();
+  const liveInkOverlayClearGenRef = useRef(0);
+  // ── 커밋 지연 파이프라인 ──────────────────────────────────────────────────
+  // 펜을 뗀 획은 라이브 표면(증분 오버레이/GPU 파인 표면)에 잉크를 남긴 채 큐에 쌓고,
+  // 마지막 획 후 짧은 유휴(또는 강제 플러시)에 한 번의 React 커밋으로 동기화한다.
+  // 연속 스트로크가 커밋 렌더(수백 ms)에 절대 막히지 않는다 — 필기감의 구조적 핵심.
+  const pendingStrokeCommitsRef = useRef<{
+    pageId: string;
+    strokes: DrawEl[];
+    timer: ReturnType<typeof setTimeout> | null;
+  } | null>(null);
+  const flushPendingStrokeCommitsRef = useRef<() => void>(() => {});
+  const discardPendingStrokeCommitsRef = useRef<() => void>(() => {});
+  // GPU 파인 획의 지연 표면 유지: 커밋 동기화 전까지 엔진에 함께 공급되는 확정 획들.
+  const pendingGpuStrokesRef = useRef<StudioGpuStroke[]>([]);
   const [studioRasterHandoffCandidate, setStudioRasterHandoffCandidate] =
     useState<StudioRasterHandoffCandidate | null>(null);
   const studioRasterHandoffCandidateRef = useRef<StudioRasterHandoffCandidate | null>(null);
@@ -8401,12 +8586,27 @@ function StudioCuttoonEditor() {
   const flushDirectLiveDraft = () => {
     const next = liveDraftPendingRef.current;
     if (!next || !liveDraftDirectRef.current) return;
+    // Magma식 증분 경로: 스태빌라이즈드 원본 점의 새 접미사만 표면에 누적한다 — 포인트당
+    // O(1). 라이브 중 소급 재구성(progressive postCorrection)은 증분과 비호환이라 이 경로에선
+    // 적용하지 않고, 커밋 시 postCorrection 이 최종 형태를 만든다(스태빌라이저가 라이브를
+    // 이미 부드럽게 유지).
+    const overlay = liveInkOverlayRendererRef.current;
+    if (overlay.isActive && next.mode !== "eraser" && !next.fill) {
+      liveDraftVisualRef.current = next;
+      overlay.appendFrom(next.points, next.pressures);
+      return;
+    }
     const visual = progressiveCorrectDraft(next);
     liveDraftVisualRef.current = visual;
     if (gpuLiveInkPinnedRef.current) {
       const stroke = buildGpuLiveStroke(visual);
       if (stroke) {
-        webGpuCanvasHandleRef.current?.syncPinnedStrokes([stroke]);
+        // 커밋 동기화를 기다리는 확정 획(pendingGpu)도 함께 공급한다 — 지연 커밋 동안
+        // 이전 획의 잉크가 엔진 표면에서 사라지지 않는다.
+        webGpuCanvasHandleRef.current?.syncPinnedStrokes([
+          ...pendingGpuStrokesRef.current,
+          stroke,
+        ]);
         return;
       }
     }
@@ -8416,7 +8616,8 @@ function StudioCuttoonEditor() {
   const exitDirectLiveDraft = () => {
     if (!liveDraftDirectRef.current) return;
     liveDraftDirectRef.current = false;
-    setLiveDraftDirect(false);
+    // 대기 중 커밋 배치를 먼저 동기화한다 — 아래의 즉시 클리어가 그 잉크까지 지우기 때문.
+    flushPendingStrokeCommitsRef.current();
     liveDraftPendingRef.current = null;
     liveDraftVisualRef.current = null;
     if (liveDraftRafRef.current !== null) {
@@ -8427,11 +8628,14 @@ function StudioCuttoonEditor() {
       clearTimeout(gpuPinProbeTimerRef.current);
       gpuPinProbeTimerRef.current = null;
     }
+    liveInkOverlayClearGenRef.current += 1;
+    liveInkOverlayRendererRef.current.clear();
     if (gpuLiveInkPinnedRef.current) {
       gpuLiveInkPinnedRef.current = false;
-      setGpuLiveInkPinned(false);
       webGpuCanvasHandleRef.current?.syncPinnedStrokes(EMPTY_STUDIO_GPU_STROKES);
+      webGpuCanvasHandleRef.current?.setPinnedVisible(false);
     }
+    liveDraftLayerRef.current?.batchDraw();
     mainLayerRef.current?.batchDraw();
   };
   const scheduleDraft = (next: DrawEl | null) => {
@@ -8456,7 +8660,10 @@ function StudioCuttoonEditor() {
       setDraft(pendingDraftRef.current);
     });
   };
-  const clearDraftPreview = () => {
+  const clearDraftPreview = (options?: { preserveInkForDeferredCommit?: boolean }) => {
+    // 지연 커밋 경로: 잉크는 라이브 표면에 남긴다 — 커밋 동기화(flush)가 페인트 뒤에 정리한다.
+    const preserveInk = options?.preserveInkForDeferredCommit === true;
+    const wasDirect = liveDraftDirectRef.current;
     pendingDraftRef.current = null;
     if (draftRafRef.current !== null) {
       globalThis.cancelAnimationFrame(draftRafRef.current);
@@ -8468,31 +8675,104 @@ function StudioCuttoonEditor() {
       globalThis.cancelAnimationFrame(liveDraftRafRef.current);
       liveDraftRafRef.current = null;
     }
-    if (liveDraftDirectRef.current) {
-      liveDraftDirectRef.current = false;
-      setLiveDraftDirect(false);
-    }
+    liveDraftDirectRef.current = false;
     if (gpuPinProbeTimerRef.current) {
       clearTimeout(gpuPinProbeTimerRef.current);
       gpuPinProbeTimerRef.current = null;
     }
+    {
+      const overlay = liveInkOverlayRendererRef.current;
+      if (overlay.isActive) {
+        overlay.end();
+        if (!preserveInk) {
+          // 커밋된 Konva 획이 페인트된 뒤 표면을 비운다(빈 프레임 방지). 그 사이 새 스트로크가
+          // begin 되면 세대가 바뀌어 이 예약은 무효가 된다.
+          const generation = ++liveInkOverlayClearGenRef.current;
+          globalThis.requestAnimationFrame(() => {
+            globalThis.requestAnimationFrame(() => {
+              if (liveInkOverlayClearGenRef.current === generation) overlay.clear();
+            });
+          });
+        }
+      }
+    }
     if (gpuLiveInkPinnedRef.current) {
-      // 펜 리프트 핸드오프: 마지막 GPU 프레임을 더블 rAF 동안 유지해 커밋된 Konva 획이
-      // 페인트되기 전의 빈 프레임을 막는다. 이후 엔진에 EMPTY 를 먹여 표면을 정리한다.
       gpuLiveInkPinnedRef.current = false;
-      setGpuLiveInkPinned(false);
-      setGpuLiveInkLinger(true);
-      if (gpuLingerRafRef.current) globalThis.cancelAnimationFrame(gpuLingerRafRef.current);
-      gpuLingerRafRef.current = globalThis.requestAnimationFrame(() => {
+      if (!preserveInk) {
+        // 펜 리프트 핸드오프: 마지막 GPU 프레임을 더블 rAF 동안 유지해 커밋된 Konva 획이
+        // 페인트되기 전의 빈 프레임을 막는다. 이후 엔진에 EMPTY 를 먹여 표면을 정리한다.
+        if (gpuLingerRafRef.current) globalThis.cancelAnimationFrame(gpuLingerRafRef.current);
         gpuLingerRafRef.current = globalThis.requestAnimationFrame(() => {
-          gpuLingerRafRef.current = 0;
-          setGpuLiveInkLinger(false);
-          webGpuCanvasHandleRef.current?.syncPinnedStrokes(EMPTY_STUDIO_GPU_STROKES);
+          gpuLingerRafRef.current = globalThis.requestAnimationFrame(() => {
+            gpuLingerRafRef.current = 0;
+            if (gpuLiveInkPinnedRef.current) return; // 새 스트로크가 파인을 다시 잡았다
+            webGpuCanvasHandleRef.current?.syncPinnedStrokes(EMPTY_STUDIO_GPU_STROKES);
+            webGpuCanvasHandleRef.current?.setPinnedVisible(false);
+          });
         });
-      });
+      }
+      // preserveInk: 파인 표면은 커밋 동기화가 정리한다(pendingGpuStrokes 에 이미 반영됨).
+    }
+    if (wasDirect && !preserveInk) {
+      // 상시 마운트된 다이렉트 초안 레이어의 마지막 프레임 픽셀을 비운다(visualRef 가 null 이라
+      // sceneFunc 은 아무것도 그리지 않는다). 이전에는 노드 언마운트(렌더)가 담당하던 정리.
+      liveDraftLayerRef.current?.batchDraw();
+      mainLayerRef.current?.batchDraw();
     }
     setDraft(null);
   };
+  /** 마지막 획 후 이 유휴가 지나면 대기 배치를 한 번의 React 커밋으로 동기화한다. */
+  const DEFERRED_STROKE_COMMIT_IDLE_MS = 200;
+  function takePendingStrokeCommits(): { pageId: string; strokes: DrawEl[] } | null {
+    const batch = pendingStrokeCommitsRef.current;
+    if (!batch) return null;
+    pendingStrokeCommitsRef.current = null;
+    if (batch.timer) globalThis.clearTimeout(batch.timer);
+    return { pageId: batch.pageId, strokes: batch.strokes };
+  }
+  /** 커밋 동기화 직후: 커밋 렌더가 페인트된 뒤(더블 rAF) 라이브 표면의 대기 잉크를 비운다. */
+  function settleDeferredStrokeSurfaces() {
+    const overlay = liveInkOverlayRendererRef.current;
+    overlay.dropSettled();
+    if (!overlay.isActive) {
+      const generation = ++liveInkOverlayClearGenRef.current;
+      globalThis.requestAnimationFrame(() => {
+        globalThis.requestAnimationFrame(() => {
+          if (liveInkOverlayClearGenRef.current === generation) overlay.clear();
+        });
+      });
+    }
+    if (pendingGpuStrokesRef.current.length > 0) {
+      pendingGpuStrokesRef.current = [];
+      if (!gpuLiveInkPinnedRef.current) {
+        if (gpuLingerRafRef.current) globalThis.cancelAnimationFrame(gpuLingerRafRef.current);
+        gpuLingerRafRef.current = globalThis.requestAnimationFrame(() => {
+          gpuLingerRafRef.current = globalThis.requestAnimationFrame(() => {
+            gpuLingerRafRef.current = 0;
+            if (gpuLiveInkPinnedRef.current) return; // 새 스트로크가 파인을 다시 잡았다
+            webGpuCanvasHandleRef.current?.syncPinnedStrokes(EMPTY_STUDIO_GPU_STROKES);
+            webGpuCanvasHandleRef.current?.setPinnedVisible(false);
+          });
+        });
+      }
+    }
+  }
+  function queueDeferredStrokeCommit(finished: DrawEl) {
+    const existing = pendingStrokeCommitsRef.current;
+    if (existing && existing.pageId !== activePage.id) {
+      // 페이지가 바뀐 잔여 배치 — 새 배치를 시작하기 전에 원래 페이지로 동기화한다.
+      flushPendingStrokeCommitsRef.current();
+    }
+    const batch =
+      pendingStrokeCommitsRef.current
+      ?? { pageId: activePage.id, strokes: [] as DrawEl[], timer: null };
+    pendingStrokeCommitsRef.current = batch;
+    batch.strokes.push(finished);
+    if (batch.timer) globalThis.clearTimeout(batch.timer);
+    batch.timer = globalThis.setTimeout(() => {
+      flushPendingStrokeCommitsRef.current();
+    }, DEFERRED_STROKE_COMMIT_IDLE_MS);
+  }
   const scheduleMarqueeRect = (next: { x: number; y: number; w: number; h: number } | null) => {
     pendingMarqueeRectRef.current = next;
     if (marqueeRafRef.current !== null) return;
@@ -8513,6 +8793,9 @@ function StudioCuttoonEditor() {
     () => () => {
       if (draftRafRef.current !== null) globalThis.cancelAnimationFrame(draftRafRef.current);
       if (marqueeRafRef.current !== null) globalThis.cancelAnimationFrame(marqueeRafRef.current);
+      const pendingBatch = pendingStrokeCommitsRef.current;
+      if (pendingBatch?.timer) globalThis.clearTimeout(pendingBatch.timer);
+      pendingStrokeCommitsRef.current = null;
       drawingPointerSafetyCleanupRef.current?.();
       drawingPointerSafetyCleanupRef.current = null;
       const pointerSession = drawingPointerSessionRef.current;
@@ -10900,7 +11183,9 @@ function StudioCuttoonEditor() {
   // extraPatch 에 실수로 elements 가 섞여도 항상 nextElements 가 이긴다.
   function commit(
     nextElements: El[],
-    extraPatch?: Partial<Omit<PageState, "id" | "elements">>
+    extraPatch?: Partial<Omit<PageState, "id" | "elements">>,
+    // 지연 커밋 배치가 큐잉 시점의 페이지로 정확히 동기화되도록, 활성 페이지가 아닌 대상도 허용.
+    targetPageId?: string
   ): boolean {
     if (!editorMountedRef.current) return false;
     if (documentSaveInFlightRef.current) {
@@ -10911,7 +11196,12 @@ function StudioCuttoonEditor() {
       setError(collaborationLockMessage());
       return false;
     }
-    const workAssetReason = studioWorkAssetSourceTransitionReason(elements, nextElements);
+    const commitPageId = targetPageId ?? activePage.id;
+    const commitBaseElements =
+      commitPageId === activePage.id
+        ? elements
+        : (pages.find((p) => p.id === commitPageId)?.elements ?? elements);
+    const workAssetReason = studioWorkAssetSourceTransitionReason(commitBaseElements, nextElements);
     if (workAssetReason) {
       setError(workAssetReason);
       return false;
@@ -10931,7 +11221,7 @@ function StudioCuttoonEditor() {
     }
     coalesceKeyRef.current = null; // 일반 커밋은 합치기 체인을 끊는다.
     const localNextPages = pages.map((p) =>
-      p.id === activePage.id ? { ...p, ...extraPatch, elements: resolved } : p
+      p.id === commitPageId ? { ...p, ...extraPatch, elements: resolved } : p
     );
     if (!publishStudioCrdtSceneTransition(pages, localNextPages)) return false;
     const nextPages = mergeStudioCrdtFrontier(localNextPages);
@@ -10990,6 +11280,67 @@ function StudioCuttoonEditor() {
       coalesceKeyRef.current = key;
     }
   }
+  // 커밋 지연 파이프라인의 동기화/폐기 — 타이머·이벤트 핸들러가 stale 클로저 없이 최신
+  // 상태(commit/pages/elements)로 실행되도록 렌더마다 ref 에 재바인딩한다(updateScrollPosRef 패턴).
+  useEffect(() => {
+    flushPendingStrokeCommitsRef.current = () => {
+      const batch = takePendingStrokeCommits();
+      if (!batch || batch.strokes.length === 0) return;
+      const targetPage = pages.find((page) => page.id === batch.pageId);
+      let committed = false;
+      let baseElements: El[] = [];
+      if (targetPage && !masterEditMode) {
+        baseElements = batch.pageId === activePage.id ? elements : targetPage.elements;
+        committed = commit([...baseElements, ...batch.strokes], undefined, batch.pageId);
+      }
+      if (committed) {
+        // 즉시 커밋 경로와 동일한 래스터 승격 — 배치의 각 획을 개별 작업으로 큐잉한다.
+        const rasterWorkId = authorizedWorkAssetScopeId;
+        const rasterDocument = studioCrdtDocumentRef.current;
+        const rasterRuntime = studioCrdtSceneRuntimeRef.current;
+        const rasterActorId = studioAuthUserId;
+        if (
+          STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED &&
+          rasterWorkId && rasterDocument && rasterRuntime && rasterActorId &&
+          studioCrdtOperationSyncReady
+        ) {
+          for (const strokeEl of batch.strokes) {
+            if (containingPanel(strokeEl, baseElements)) continue;
+            const plan = rasterRuntime.planRasterDrawPromotion({
+              element: strokeEl,
+              pageId: batch.pageId,
+              documentWidth: CANVAS_W,
+              documentHeight: canvasH,
+            });
+            if (!plan) continue;
+            queueStudioRasterDrawPromotion({
+              plan,
+              pageId: batch.pageId,
+              layerId: (strokeEl as DrawEl & { groupId?: string }).groupId ?? "page-root",
+              workId: rasterWorkId,
+              actorId: rasterActorId,
+              document: rasterDocument,
+              runtime: rasterRuntime,
+              accessGeneration: collaborationAccessRef.current.accessGeneration,
+            });
+          }
+        }
+      }
+      settleDeferredStrokeSurfaces();
+    };
+    discardPendingStrokeCommitsRef.current = () => {
+      const batch = takePendingStrokeCommits();
+      if (!batch) return;
+      // 아직 히스토리 밖인 대기 획 폐기(펜 리프트 직후의 undo) — 표면에서 즉시 지운다.
+      liveInkOverlayClearGenRef.current += 1;
+      liveInkOverlayRendererRef.current.clear();
+      pendingGpuStrokesRef.current = [];
+      if (!gpuLiveInkPinnedRef.current) {
+        webGpuCanvasHandleRef.current?.syncPinnedStrokes(EMPTY_STUDIO_GPU_STROKES);
+        webGpuCanvasHandleRef.current?.setPinnedVisible(false);
+      }
+    };
+  });
   // 전체 페이지 상태를 직접 커밋하는 헬퍼 (페이지 추가/삭제/이동용)
   function commitPages(nextPages: PageState[], options: { bypassReviewLock?: boolean } = {}): boolean {
     if (!editorMountedRef.current) return false;
@@ -12386,6 +12737,12 @@ function StudioCuttoonEditor() {
   // 마스터 편집 모드에서는 페이지 히스토리 이동을 잠근다 — 마스터 편집은 히스토리 미포함이라 화면과 어긋난다.
   const undo = () => {
     if (masterEditMode || collaborationDocumentLocked) return;
+    // 커밋 동기화를 기다리는 획이 있으면 그것이 "마지막 동작"이다 — 이번 undo 는 대기 획
+    // 폐기로 소비된다(히스토리 밖이므로 redo 로 되살릴 수는 없다).
+    if (pendingStrokeCommitsRef.current) {
+      discardPendingStrokeCommitsRef.current();
+      return;
+    }
     advancedFillRunIdRef.current += 1;
     advancedFillAbortRef.current?.abort();
     advancedFillAbortRef.current = null;
@@ -12399,6 +12756,11 @@ function StudioCuttoonEditor() {
   };
   const redo = () => {
     if (masterEditMode || collaborationDocumentLocked) return;
+    // 대기 획을 먼저 히스토리에 안착시킨다 — 이번 redo 입력은 동기화로 소비된다.
+    if (pendingStrokeCommitsRef.current) {
+      flushPendingStrokeCommitsRef.current();
+      return;
+    }
     advancedFillRunIdRef.current += 1;
     advancedFillAbortRef.current?.abort();
     advancedFillAbortRef.current = null;
@@ -15770,6 +16132,8 @@ function StudioCuttoonEditor() {
     perspectiveRayRef.current = null;
     isometricAxisRayRef.current = null;
     stopQuickShapeTracking();
+    // 취소 정리는 표면을 즉시 지우므로, 커밋 대기 중 획을 먼저 동기화해 잉크 유실을 막는다.
+    flushPendingStrokeCommitsRef.current();
     clearDraftPreview();
     releaseDrawingPointerSession();
     endLiveResourceEdit();
@@ -16393,9 +16757,16 @@ function StudioCuttoonEditor() {
       // 다이렉트 라이브 초안 무장: 이 렌더(스트로크 시작) 이후 pointermove 는 React 를 거치지
       // 않는다. GPU 파인은 백엔드가 이미 준비된 경우에만 스트로크 단위로 한 번 결정한다.
       {
+        // 새 획이 시작되면 대기 배치의 유휴 타이머를 보류한다 — 획 중간에 커밋 렌더(수백 ms)가
+        // 끼어들지 않는다. 이 획이 끝나면 큐잉이 타이머를 다시 잡고, 취소/즉시커밋 경로는
+        // 어차피 배치를 직접 소비한다.
+        const pendingBatch = pendingStrokeCommitsRef.current;
+        if (pendingBatch?.timer) {
+          globalThis.clearTimeout(pendingBatch.timer);
+          pendingBatch.timer = null;
+        }
         const direct = isDirectLiveDraftEl(next);
         liveDraftDirectRef.current = direct;
-        setLiveDraftDirect(direct);
         liveDraftVisualRef.current = direct ? next : null;
         liveDraftPendingRef.current = direct ? next : null;
         // GPU 파인은 낙관적으로 걸되 자가검증 게이트가 지킨다: 첫 프레임 영수증이 기한 안에
@@ -16409,7 +16780,29 @@ function StudioCuttoonEditor() {
           && (next.opacity ?? 1) >= 0.999
           && (next.symmetry?.type ?? "none") === "none";
         gpuLiveInkPinnedRef.current = gpuPin;
-        setGpuLiveInkPinned(gpuPin);
+        // 파인 가시성은 자식 컴포넌트만 갱신한다 — 대기(지연 커밋) GPU 잉크가 있으면 유지.
+        webGpuCanvasHandleRef.current?.setPinnedVisible(
+          gpuPin || pendingGpuStrokesRef.current.length > 0
+        );
+        // Magma식 증분 오버레이: GPU 파인이 아닌 일반 펜/마커(대칭·채움 없음)는 표면에
+        // 새 조각만 누적한다. begin 실패(표면 미준비) 시 Konva 초안이 자연 폴백.
+        liveInkOverlayClearGenRef.current += 1;
+        if (direct && !gpuPin && next.mode !== "eraser" && !next.fill
+          && (next.symmetry?.type ?? "none") === "none") {
+          liveInkOverlayRendererRef.current.begin(
+            {
+              color: next.stroke,
+              strokeWidthDoc: Math.max(1, next.strokeWidth),
+              opacity: next.opacity ?? 1,
+              minDistanceDoc: strokeRenderDistance(next.sampleSpacing),
+            },
+            pos.x,
+            pos.y,
+            next.pressures?.[0] ?? 0.5
+          );
+        } else {
+          liveInkOverlayRendererRef.current.clear();
+        }
         gpuPinnedFrameSeenRef.current = false;
         if (gpuPinProbeTimerRef.current) clearTimeout(gpuPinProbeTimerRef.current);
         gpuPinProbeTimerRef.current = gpuPin
@@ -16418,8 +16811,10 @@ function StudioCuttoonEditor() {
               if (!gpuLiveInkPinnedRef.current || gpuPinnedFrameSeenRef.current) return;
               // fail-once: 이 스트로크의 남은 구간과 이후 스트로크는 Konva 가 전담한다.
               gpuLiveInkPinnedRef.current = false;
-              setGpuLiveInkPinned(false);
               webGpuBackendRef.current = "canvas2d";
+              webGpuCanvasHandleRef.current?.setPinnedVisible(
+                pendingGpuStrokesRef.current.length > 0
+              );
               liveDraftLayerRef.current?.batchDraw();
             }, 300)
           : null;
@@ -16427,9 +16822,13 @@ function StudioCuttoonEditor() {
           globalThis.cancelAnimationFrame(gpuLingerRafRef.current);
           gpuLingerRafRef.current = 0;
         }
-        setGpuLiveInkLinger(false);
+        if (direct) {
+          // 상시 마운트된 임페러티브 초안 노드의 첫 프레임(터치 도트)을 렌더 없이 그린다.
+          (next.mode === "eraser" ? mainLayerRef.current : liveDraftLayerRef.current)?.batchDraw();
+        } else {
+          setDraft(next);
+        }
       }
-      setDraft(next);
       if (drawMode === "pen" && quickShapeActive) startQuickShapeTracking({ x: pos.x, y: pos.y });
       else stopQuickShapeTracking(); // 방어적 — 이전 스트로크 타이머 잔존 방지
       return;
@@ -17195,6 +17594,8 @@ function StudioCuttoonEditor() {
     // Capture hold/lock BEFORE any stopQuickShapeTracking() side-effect from callers/global listeners.
     // Callers historically stopped tracking first and wiped the refs used by release promotion.
     const quickShapeSnapshot = snapshotQuickShapeTracking();
+    // 지연 커밋 경로에서만 true — finally 의 초안 정리가 라이브 잉크를 표면에 남기게 한다.
+    let deferInkCleanup = false;
     try {
       if (drawingRef.current && (drawingRef.current.kind ?? "freehand") === "freehand" && stage) {
         // Pointermove is not guaranteed immediately before pointerup. Consume the release sample
@@ -17307,41 +17708,98 @@ function StudioCuttoonEditor() {
             points: smoothStrokePoints(finished.points, postCorrection, { preserveCorners }),
           };
         }
-        // Plan the bounded raster equivalent before the React commit, but keep the vector as a
-        // durable fallback until a verified replay frame is ready. Panel-clipped/complex brushes
-        // stay entirely on Konva so the migration never changes compositing semantics.
-        const rasterWorkId = authorizedWorkAssetScopeId;
-        const rasterDocument = studioCrdtDocumentRef.current;
-        const rasterRuntime = studioCrdtSceneRuntimeRef.current;
-        const rasterActorId = studioAuthUserId;
-        const rasterPlan =
-          STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED &&
-          !masterEditMode && rasterWorkId && rasterDocument && rasterRuntime && rasterActorId &&
-          studioCrdtOperationSyncReady &&
-          !containingPanel(finished, elements)
-            ? rasterRuntime.planRasterDrawPromotion({
-                element: finished,
+        // 커밋 지연: 다이렉트 라이브 잉크(증분 오버레이/GPU 파인)는 표면에 그대로 남긴 채
+        // 큐에 쌓는다. React 커밋 렌더는 마지막 획 후 짧은 유휴에 한 번만 — 연속 스트로크가
+        // 커밋 렌더에 막히지 않는다. 지우개·비다이렉트 브러시는 기존 즉시 커밋을 유지한다.
+        const overlayRenderer = liveInkOverlayRendererRef.current;
+        const deferCommit =
+          liveDraftDirectRef.current
+          && !masterEditMode
+          && finished.mode !== "eraser"
+          && (overlayRenderer.isActive || gpuLiveInkPinnedRef.current);
+        if (deferCommit) {
+          deferInkCleanup = true;
+          if (gpuLiveInkPinnedRef.current) {
+            const settledGpu = buildGpuLiveStroke(liveDraftVisualRef.current ?? finished);
+            if (settledGpu) {
+              pendingGpuStrokesRef.current = [...pendingGpuStrokesRef.current, settledGpu];
+            }
+          }
+          queueDeferredStrokeCommit(finished);
+        } else {
+          // Plan the bounded raster equivalent before the React commit, but keep the vector as a
+          // durable fallback until a verified replay frame is ready. Panel-clipped/complex brushes
+          // stay entirely on Konva so the migration never changes compositing semantics.
+          const rasterWorkId = authorizedWorkAssetScopeId;
+          const rasterDocument = studioCrdtDocumentRef.current;
+          const rasterRuntime = studioCrdtSceneRuntimeRef.current;
+          const rasterActorId = studioAuthUserId;
+          const rasterPlan =
+            STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED &&
+            !masterEditMode && rasterWorkId && rasterDocument && rasterRuntime && rasterActorId &&
+            studioCrdtOperationSyncReady &&
+            !containingPanel(finished, elements)
+              ? rasterRuntime.planRasterDrawPromotion({
+                  element: finished,
+                  pageId: activePage.id,
+                  documentWidth: CANVAS_W,
+                  documentHeight: canvasH,
+                })
+              : null;
+          // 즉시 커밋 앞에 대기 배치가 있으면(같은 페이지) 같은 커밋에 합쳐 유실을 막는다.
+          if (
+            pendingStrokeCommitsRef.current
+            && pendingStrokeCommitsRef.current.pageId !== activePage.id
+          ) {
+            flushPendingStrokeCommitsRef.current();
+          }
+          const merged = takePendingStrokeCommits();
+          const baseElements = merged ? [...elements, ...merged.strokes] : elements;
+          // Exactly one pointerup owns this single commit, hence one complete stroke equals one undo.
+          const committed = commit([...baseElements, finished]);
+          if (
+            committed && rasterPlan && rasterWorkId && rasterDocument &&
+            rasterRuntime && rasterActorId
+          ) {
+            queueStudioRasterDrawPromotion({
+              plan: rasterPlan,
+              pageId: activePage.id,
+              layerId: (finished as DrawEl & { groupId?: string }).groupId ?? "page-root",
+              workId: rasterWorkId,
+              actorId: rasterActorId,
+              document: rasterDocument,
+              runtime: rasterRuntime,
+              accessGeneration: collaborationAccessRef.current.accessGeneration,
+            });
+          }
+          if (
+            committed && merged &&
+            STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED &&
+            !masterEditMode && rasterWorkId && rasterDocument && rasterRuntime && rasterActorId &&
+            studioCrdtOperationSyncReady
+          ) {
+            for (const strokeEl of merged.strokes) {
+              if (containingPanel(strokeEl, elements)) continue;
+              const plan = rasterRuntime.planRasterDrawPromotion({
+                element: strokeEl,
                 pageId: activePage.id,
                 documentWidth: CANVAS_W,
                 documentHeight: canvasH,
-              })
-            : null;
-        // Exactly one pointerup owns this single commit, hence one complete stroke equals one undo.
-        const committed = commit([...elements, finished]);
-        if (
-          committed && rasterPlan && rasterWorkId && rasterDocument &&
-          rasterRuntime && rasterActorId
-        ) {
-          queueStudioRasterDrawPromotion({
-            plan: rasterPlan,
-            pageId: activePage.id,
-            layerId: (finished as DrawEl & { groupId?: string }).groupId ?? "page-root",
-            workId: rasterWorkId,
-            actorId: rasterActorId,
-            document: rasterDocument,
-            runtime: rasterRuntime,
-            accessGeneration: collaborationAccessRef.current.accessGeneration,
-          });
+              });
+              if (!plan) continue;
+              queueStudioRasterDrawPromotion({
+                plan,
+                pageId: activePage.id,
+                layerId: (strokeEl as DrawEl & { groupId?: string }).groupId ?? "page-root",
+                workId: rasterWorkId,
+                actorId: rasterActorId,
+                document: rasterDocument,
+                runtime: rasterRuntime,
+                accessGeneration: collaborationAccessRef.current.accessGeneration,
+              });
+            }
+          }
+          if (merged) settleDeferredStrokeSurfaces();
         }
       }
     } finally {
@@ -17353,8 +17811,16 @@ function StudioCuttoonEditor() {
       perspectiveRayRef.current = null;
       isometricAxisRayRef.current = null;
       scheduleLiveDrawPressure(null);
-      clearDraftPreview();
+      clearDraftPreview({ preserveInkForDeferredCommit: deferInkCleanup });
       endLiveResourceEdit();
+      // 획 시작이 보류시킨 배치 타이머를 반드시 복원한다(불완전 획으로 끝나도 배치가
+      // 영원히 대기하지 않도록). 큐잉이 방금 타이머를 잡았다면 여기서는 건드리지 않는다.
+      const strandedBatch = pendingStrokeCommitsRef.current;
+      if (strandedBatch && strandedBatch.timer === null) {
+        strandedBatch.timer = globalThis.setTimeout(() => {
+          flushPendingStrokeCommitsRef.current();
+        }, DEFERRED_STROKE_COMMIT_IDLE_MS);
+      }
     }
   }
   // Keep window safety listeners on the latest finish/discard (refs avoid stale `elements`/`commit`).
@@ -24291,6 +24757,7 @@ function StudioCuttoonEditor() {
           {/* 페이지 색보정 미리보기: Stage에 CSS filter, 그 위에 비네트 오버레이(내보내기 때 픽셀로 합성) */}
           {/* 색맹 시뮬레이션은 이미 색보정된 결과 위에 적용되도록 pageGradeCss 뒤에 이어 붙인다(filter 리스트는 좌→우로 순차 적용). */}
           <div
+            ref={zoomHostRef}
             className={cn(
               "relative rounded-sm shadow-[0_0_0_1px_oklch(0.3_0.012_64/0.55),0_18px_50px_oklch(0.08_0.01_70/0.45)]",
               (collaborationDocumentLocked || saving) && "pointer-events-none select-none",
@@ -25382,19 +25849,21 @@ function StudioCuttoonEditor() {
                 );
               })()}
               {/* 지우개 초안만 메인 레이어에 남는다: destination-out 은 이 레이어의 커밋 픽셀과
-                  합성되어야 지워지는 미리보기가 보인다. 나머지 초안은 아래 전용 레이어에서 그린다. */}
-              {draft && liveDraftDirect && draft.mode === "eraser" && (
+                  합성되어야 지워지는 미리보기가 보인다. 나머지 초안은 아래 전용 레이어에서 그린다.
+                  다이렉트 초안 노드는 상시 마운트 — 스트로크 시작이 렌더를 요구하지 않도록
+                  sceneFunc 이 ref 로 스스로 게이트한다. */}
+              {tool === "draw" && (
                 <Shape
                   sceneFunc={(context) => {
                     const el = liveDraftVisualRef.current;
-                    if (!el || el.mode !== "eraser") return;
+                    if (!el || el.mode !== "eraser" || !liveDraftDirectRef.current) return;
                     drawLiveFreehandDraftToContext(context, el);
                   }}
                   listening={false}
                   perfectDrawEnabled={false}
                 />
               )}
-              {draft && !liveDraftDirect && !isolatedDynamicDraft && draft.mode === "eraser"
+              {draft && !isolatedDynamicDraft && draft.mode === "eraser"
                 ? <StudioDrawNode el={draftForRender ?? draft} />
                 : null}
               <Transformer
@@ -25450,12 +25919,20 @@ function StudioCuttoonEditor() {
                 지우개(destination-out)만 위의 메인 레이어 경로를 쓴다.
                 다이렉트 모드(펜/마커/지우개)는 임페러티브 sceneFunc 이 ref 에서 직접 그리므로
                 포인터 프레임에 React 렌더가 없고, 그 외 브러시는 기존 선언적 경로를 유지한다. */}
-            {draft && liveDraftDirect && draft.mode !== "eraser" && (
+            {tool === "draw" && (
               <Layer ref={liveDraftLayerRef} listening={false}>
                 <Shape
                   sceneFunc={(context) => {
                     const el = liveDraftVisualRef.current;
-                    if (!el || el.mode === "eraser" || gpuLiveInkPinnedRef.current) return;
+                    if (
+                      !el
+                      || el.mode === "eraser"
+                      || !liveDraftDirectRef.current
+                      || gpuLiveInkPinnedRef.current
+                      || liveInkOverlayRendererRef.current.isActive
+                    ) {
+                      return;
+                    }
                     drawLiveFreehandDraftToContext(context, el);
                   }}
                   listening={false}
@@ -25463,7 +25940,7 @@ function StudioCuttoonEditor() {
                 />
               </Layer>
             )}
-            {draft && !liveDraftDirect && !isolatedDynamicDraft && draft.mode !== "eraser" && (
+            {draft && !isolatedDynamicDraft && draft.mode !== "eraser" && (
               <Layer listening={false}>
                 <StudioDrawNode el={draftForRender ?? draft} />
               </Layer>
@@ -26073,6 +26550,18 @@ function StudioCuttoonEditor() {
             </Suspense>
           ) : null}
           {webGpuViewportSurface ? (
+            <StudioLiveInkOverlayHost
+              renderer={liveInkOverlayRendererRef.current}
+              left={webGpuViewportSurface.surface.left}
+              top={webGpuViewportSurface.surface.top}
+              width={webGpuViewportSurface.surface.width}
+              height={webGpuViewportSurface.surface.height}
+              documentScale={effScale}
+              documentWidth={CANVAS_W}
+              flipX={canvasFlipH}
+            />
+          ) : null}
+          {webGpuViewportSurface ? (
             <Suspense fallback={null}>
               <StudioWebGpuCanvas
                 className="pointer-events-none z-10"
@@ -26089,7 +26578,6 @@ function StudioCuttoonEditor() {
                 }}
                 strokes={webGpuPreviewStrokes}
                 frameAuthorized={webGpuPreviewAuthorized}
-                pinnedVisible={gpuLiveInkPinned || gpuLiveInkLinger}
                 eagerInitialize
                 onBackendChange={(backend) => {
                   webGpuBackendRef.current = backend;
@@ -26100,7 +26588,9 @@ function StudioCuttoonEditor() {
                   webGpuBackendRef.current = "canvas2d";
                   if (gpuLiveInkPinnedRef.current) {
                     gpuLiveInkPinnedRef.current = false;
-                    setGpuLiveInkPinned(false);
+                    webGpuCanvasHandleRef.current?.setPinnedVisible(
+                      pendingGpuStrokesRef.current.length > 0
+                    );
                     liveDraftLayerRef.current?.batchDraw();
                   }
                 }}

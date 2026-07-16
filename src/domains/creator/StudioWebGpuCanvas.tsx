@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 
 
 import {
@@ -72,6 +72,12 @@ export interface StudioWebGpuCanvasHandle {
    * point; the declarative `strokes` prop remains authoritative outside a pinned stroke.
    */
   readonly syncPinnedStrokes: (strokes: readonly StudioGpuStroke[]) => void;
+  /**
+   * Imperative pinned-visibility toggle. Stroke start/end flips visibility without a parent
+   * render — only this small component re-renders, keeping the stroke hot path free of the
+   * host page's render cost.
+   */
+  readonly setPinnedVisible: (visible: boolean) => void;
 }
 
 interface LatestCanvasProps {
@@ -146,6 +152,8 @@ function StudioWebGpuCanvas({
   onFrameInvalid,
 }: StudioWebGpuCanvasProps, ref) {
   const rootRef = useRef<HTMLDivElement>(null);
+  // 파인 가시성의 임페러티브 사본 — 스트로크 시작/종료가 부모 렌더 없이 이 컴포넌트만 갱신한다.
+  const [pinnedVisibleState, setPinnedVisibleState] = useState(false);
   // Mount-time decision by contract: toggling eager initialization after mount has no meaning
   // (the device either already initialized or will on the first stroke feed).
   const eagerInitializeRef = useRef(eagerInitialize);
@@ -204,6 +212,7 @@ function StudioWebGpuCanvas({
       desiredRequestIdRef.current = requestId;
       issueLatestRequestRef.current?.();
     },
+    setPinnedVisible: (visible) => setPinnedVisibleState(visible),
   }), []);
 
   useEffect(() => {
@@ -340,7 +349,8 @@ function StudioWebGpuCanvas({
   });
 
   // 파인된 스트로크는 임페러티브 피드로만 흐르므로 strokes prop 이 비어 있어도 표시 대상이다.
-  const presentationActive = isStudioWebGpuCanvasActive(strokes) || pinnedVisible;
+  const pinnedShown = pinnedVisible || pinnedVisibleState;
+  const presentationActive = isStudioWebGpuCanvasActive(strokes) || pinnedShown;
 
   return (
     <div
@@ -349,7 +359,7 @@ function StudioWebGpuCanvas({
       className={cn(
         "overflow-hidden",
         surfaceBounds ? "absolute" : "relative h-full w-full",
-        ((!frameAuthorized && !pinnedVisible) || !presentationActive) && "invisible",
+        ((!frameAuthorized && !pinnedShown) || !presentationActive) && "invisible",
         className
       )}
       style={surfaceBounds ? {
@@ -362,7 +372,7 @@ function StudioWebGpuCanvas({
       data-studio-gpu-active={presentationActive ? "true" : "false"}
       data-studio-gpu-readback="disabled"
       data-studio-gpu-frame-authorized={frameAuthorized ? "true" : "false"}
-      data-studio-gpu-pinned={pinnedVisible ? "true" : "false"}
+      data-studio-gpu-pinned={pinnedShown ? "true" : "false"}
       data-studio-gpu-surface-width={surfaceBounds?.width}
       data-studio-gpu-surface-height={surfaceBounds?.height}
     >
