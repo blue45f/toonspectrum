@@ -12,6 +12,24 @@
 
 export type StudioStampBrushKind = "airbrush" | "pencil" | "ink" | "watercolor";
 
+/** 스탬프 엔진을 쓰는 브러시 프리셋 id → 종류. 그 외 id 는 null(기존 패밀리 파이프라인). */
+export function resolveStudioStampBrushKind(
+  brushId: string | undefined
+): StudioStampBrushKind | null {
+  switch (brushId) {
+    case "ink-brush":
+      return "ink";
+    case "airbrush-fine":
+      return "airbrush";
+    case "pencil-grain":
+      return "pencil";
+    case "wash-brush":
+      return "watercolor";
+    default:
+      return null;
+  }
+}
+
 export interface StudioStampBrushStyle {
   readonly kind: StudioStampBrushKind;
   readonly color: string;
@@ -32,7 +50,8 @@ const STAMP_SPACING_RATIO: Record<StudioStampBrushKind, number> = {
   airbrush: 0.16,
   pencil: 0.24,
   ink: 0.32,
-  watercolor: 0.22,
+  // 수채는 dab 이 겹치며 링이 연속된 젖은 경계로 읽히도록 촘촘하게 찍는다.
+  watercolor: 0.11,
 };
 
 /** 종류별 기본 파라미터 — UI 슬라이더의 초기값이자 스타일 미지정 필드의 폴백. */
@@ -106,11 +125,12 @@ function drawDab(
     context.fill();
     if (kind === "watercolor") {
       // 웻엣지: 가장자리에 살짝 진한 링을 얹어 수채 특유의 경계 침전을 흉내낸다.
-      context.globalAlpha = alpha * 0.5;
+      // 링은 은은해야 한다 — 강하면 dab 이 구슬처럼 분리돼 보인다(촘촘한 간격과 세트).
+      context.globalAlpha = alpha * 0.22;
       context.strokeStyle = style.color;
-      context.lineWidth = Math.max(0.4, radius * 0.14);
+      context.lineWidth = Math.max(0.35, radius * 0.1);
       context.beginPath();
-      context.arc(x, y, radius * 0.92, 0, Math.PI * 2);
+      context.arc(x, y, radius * 0.94, 0, Math.PI * 2);
       context.stroke();
     }
     return;

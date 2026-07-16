@@ -35,7 +35,8 @@ export type StudioBrushRenderFamily =
   | "airbrush"
   | "dry-media"
   | "pencil"
-  | "screentone";
+  | "screentone"
+  | "stamp";
 
 /** Map preset id → render family (unknown ids fall back to pen). */
 export const STUDIO_BRUSH_RENDER_FAMILY: Readonly<Record<string, StudioBrushRenderFamily>> = {
@@ -44,6 +45,10 @@ export const STUDIO_BRUSH_RENDER_FAMILY: Readonly<Record<string, StudioBrushRend
   ballpoint: "pen",
   gpen: "gpen",
   liner: "gpen",
+  "ink-brush": "stamp",
+  "airbrush-fine": "stamp",
+  "pencil-grain": "stamp",
+  "wash-brush": "stamp",
   calligraphy: "calligraphy",
   marker: "marker",
   "felt-tip": "marker",
@@ -88,6 +93,7 @@ export const BRUSH_PRESETS: BrushPreset[] = [
   { id: "ballpoint", name: "볼펜", defaultWidth: 3.5, defaultOpacity: 0.95 },
   { id: "gpen", name: "G펜(필압)", defaultWidth: 7, defaultOpacity: 1.0 },
   { id: "liner", name: "잉크 라이너", defaultWidth: 5, defaultOpacity: 1.0 },
+  { id: "ink-brush", name: "잉크 붓(속도)", defaultWidth: 8, defaultOpacity: 1.0 },
   { id: "calligraphy", name: "캘리그래피(펜 기울기)", defaultWidth: 12, defaultOpacity: 1.0 },
   // —— Markers (Canva Draw / Express / Picsart) ——
   { id: "marker", name: "마커(굵고 반투명)", defaultWidth: 16, defaultOpacity: 0.6 },
@@ -106,11 +112,14 @@ export const BRUSH_PRESETS: BrushPreset[] = [
   { id: "ink-wash", name: "수묵 번짐", defaultWidth: 30, defaultOpacity: 0.5 },
   { id: "oil", name: "유화 붓", defaultWidth: 22, defaultOpacity: 0.92 },
   { id: "airbrush", name: "소프트 에어브러시", defaultWidth: 32, defaultOpacity: 0.7 },
+  { id: "airbrush-fine", name: "정밀 에어브러시", defaultWidth: 34, defaultOpacity: 0.85 },
+  { id: "wash-brush", name: "물맛 붓(웻엣지)", defaultWidth: 26, defaultOpacity: 0.8 },
   { id: "soft-brush", name: "소프트 브러시", defaultWidth: 36, defaultOpacity: 0.55 },
   { id: "spray", name: "스프레이", defaultWidth: 40, defaultOpacity: 0.55 },
   // —— Texture / dry media ——
   { id: "pencil", name: "연필", defaultWidth: 2.5, defaultOpacity: 0.85 },
   { id: "soft-pencil", name: "소프트 연필", defaultWidth: 5, defaultOpacity: 0.7 },
+  { id: "pencil-grain", name: "그레인 연필", defaultWidth: 4, defaultOpacity: 0.9 },
   { id: "dry-media", name: "드라이 미디어", defaultWidth: 7, defaultOpacity: 0.92 },
   { id: "crayon", name: "크레용", defaultWidth: 14, defaultOpacity: 0.88 },
   { id: "chalk", name: "초크", defaultWidth: 16, defaultOpacity: 0.8 },

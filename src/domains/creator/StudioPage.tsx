@@ -298,6 +298,12 @@ import {
   studioBrushSlotAt,
   type StudioBrushSlotsState,
 } from "./studio-brush-slots";
+import {
+  drawStampStroke,
+  resolveStudioStampBrushKind,
+  STUDIO_STAMP_BRUSH_DEFAULTS,
+  type StudioStampBrushStyle,
+} from "./studio-brush-stamp-engine";
 import { studioDynamicBrushDabVariations } from "./studio-brush-symmetry";
 import {
   buildStudioBrushTipAlphaMap,
@@ -3153,6 +3159,45 @@ const StudioDrawNode = memo(function StudioDrawNode({ el }: { el: DrawEl }) {
                 listening={false}
               />
             );
+          }
+
+          {
+            // 스탬프 엔진 계열(속도 잉크·정밀 에어브러시·그레인 연필·물맛 붓): 라이브 프리뷰와
+            // 커밋이 같은 결정적 dab 시퀀스를 그린다 — 증분/재생/협업 복원에서 픽셀이 동일하다.
+            const stampKind = el.mode !== "eraser" ? resolveStudioStampBrushKind(brush) : null;
+            if (stampKind) {
+              const stampStyle: StudioStampBrushStyle = {
+                kind: stampKind,
+                color: stroke,
+                size: Math.max(1, strokeWidth),
+                opacity,
+                ...STUDIO_STAMP_BRUSH_DEFAULTS[stampKind],
+              };
+              const stampPoints = processFreehandPoints(points, renderSampleDistance);
+              const stampPressures = resampleStrokePressures(
+                el.pressures ?? [],
+                Math.floor(stampPoints.length / 2),
+                0.5
+              );
+              return (
+                <Shape
+                  key={index}
+                  sceneFunc={(context) => {
+                    context.save();
+                    drawStampStroke(
+                      context as unknown as CanvasRenderingContext2D,
+                      stampStyle,
+                      stampPoints,
+                      stampPressures
+                    );
+                    context.restore();
+                  }}
+                  globalCompositeOperation={composite}
+                  listening={false}
+                  perfectDrawEnabled={false}
+                />
+              );
+            }
           }
 
           if (dynamicBrush && el.mode !== "eraser") {

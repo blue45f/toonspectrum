@@ -95,6 +95,10 @@ const MEDIA_GROUP: Record<string, StudioBrushMediaGroup> = {
   calligraphy: "line",
   pencil: "line",
   "soft-pencil": "line",
+  "ink-brush": "line",
+  "pencil-grain": "line",
+  "airbrush-fine": "paint",
+  "wash-brush": "paint",
   marker: "marker",
   "felt-tip": "marker",
   "marker-bold": "marker",
@@ -152,6 +156,10 @@ const SHORT_NAMES: Record<string, string> = {
   pencil: "연필",
   "soft-pencil": "연연필",
   screentone: "톤",
+  "ink-brush": "잉크붓",
+  "airbrush-fine": "정밀에어",
+  "pencil-grain": "그레인",
+  "wash-brush": "물맛",
 };
 
 const HINTS: Record<string, string> = {
@@ -186,6 +194,10 @@ const HINTS: Record<string, string> = {
   pencil: "가벼운 밑그림 연필",
   "soft-pencil": "부드러운 셰이딩 연필",
   screentone: "만화 스크린톤 도트",
+  "ink-brush": "속도 반응 딥펜 — 빠르게 그으면 가늘어져요",
+  "airbrush-fine": "입자 없는 매끈한 에어브러시 — 부드러운 셰이딩",
+  "pencil-grain": "종이결 그레인 연필 — 러프·해칭",
+  "wash-brush": "플로우가 쌓이는 물붓 — 웻엣지 수채",
 };
 
 const PREVIEW_STYLE: Record<string, StudioBrushPreviewStyle> = {
@@ -220,6 +232,10 @@ const PREVIEW_STYLE: Record<string, StudioBrushPreviewStyle> = {
   charcoal: "texture",
   "ink-particle": "dots",
   screentone: "tone",
+  "ink-brush": "solid",
+  "airbrush-fine": "soft",
+  "pencil-grain": "texture",
+  "wash-brush": "soft",
 };
 
 function previewWeightFor(preset: BrushPreset): number {
