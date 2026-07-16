@@ -728,7 +728,7 @@ export function StudioSmartShapeKindRow({
   highlightKind = null,
 }: {
   className?: string;
-  /** Currently recognized kind — Magma/AutoDraw-class match cue. */
+  /** Currently recognized kind — AutoDraw-class match cue. */
   highlightKind?: StudioShapeKindVisual | null;
 }): ReactElement {
   const kinds: Array<keyof typeof SMART_SHAPE_KIND_LABELS> = [

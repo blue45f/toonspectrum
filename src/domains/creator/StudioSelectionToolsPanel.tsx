@@ -83,12 +83,12 @@ export type StudioSelectionToolsPanelProps = {
   onRotate: (degrees: number) => void;
   /** 선택 마퀴 좌우(x)·상하(y) 반전. */
   onFlip: (axis: "x" | "y") => void;
-  /** 선택 마퀴만 평행 이동(정규화 dx/dy). Magma: 선택 안 드래그와 동일 의미. */
+  /** 선택 마퀴만 평행 이동(정규화 dx/dy). 선택 안 드래그와 동일 의미. */
   onTranslate: (dxNorm: number, dyNorm: number) => void;
   /** 선택 마퀴 중심 기준 스케일. */
   onScale: (factor: number) => void;
   /**
-   * Magma Transform — 선택 안 픽셀을 이동/회전/스케일/반전하고 마퀴도 따라감.
+   * 내용 변형(Transform) — 선택 안 픽셀을 이동/회전/스케일/반전하고 마퀴도 따라감.
    * 파괴적 굽기(원본 src 교체).
    */
   onContentTransform: (transform: SelectionContentTransform) => void;
@@ -406,7 +406,7 @@ export function StudioSelectionToolsPanel({
               type="button"
               disabled={!usable || busy}
               className={buttonClass({ size: "sm", variant: "quiet" })}
-              title={`선택 경계만 ${label}으로 옮깁니다(픽셀 유지 · Magma 마퀴 이동).`}
+              title={`선택 경계만 ${label}으로 옮깁니다(픽셀 유지 · 마퀴 이동).`}
               onClick={() => onTranslate(dx, dy)}
               aria-label={`마퀴 ${label} 이동`}
             >
@@ -434,7 +434,7 @@ export function StudioSelectionToolsPanel({
         </div>
       </div>
 
-      {/* Magma Transform — 선택 안 픽셀 내용 변형(굽기). 마퀴 회전/이동과 구분. */}
+      {/* 내용 변형(Transform) — 선택 안 픽셀 내용 변형(굽기). 마퀴 회전/이동과 구분. */}
       <div className="space-y-1.5 border-t border-line/40 pt-2">
         <p className="text-[0.66rem] font-semibold uppercase tracking-wider text-fg-3">
           내용 변형 (Transform)
@@ -462,7 +462,7 @@ export function StudioSelectionToolsPanel({
             type="button"
             disabled={!usable || busy || (contentScale === 1 && contentRotate === 0)}
             className={buttonClass({ size: "sm", variant: "outline" })}
-            title="선택 안 픽셀을 스케일·회전해 원본에 굽습니다. 마퀴도 같이 따라갑니다. (Magma Shift+T)"
+            title="선택 안 픽셀을 스케일·회전해 원본에 굽습니다. 마퀴도 같이 따라갑니다."
             onClick={() =>
               onContentTransform({
                 scale: contentScale === 1 ? undefined : contentScale,

@@ -1,5 +1,5 @@
 /**
- * Draw UX helpers — Magma / PicsArt / Procreate convenience math.
+ * Draw UX helpers — 상용 드로잉 앱(PicsArt/Procreate) 관례의 편의 계산.
  * Pure, no React.
  */
 
@@ -13,7 +13,7 @@ import {
 export const STUDIO_BRUSH_SIZE_RANGE = { min: 1, max: 80 } as const;
 export const STUDIO_BRUSH_OPACITY_RANGE = { min: 0.05, max: 1 } as const;
 
-/** Magma-style size nudge steps (coarse when large). */
+/** Size nudge steps (coarse when large). */
 export function studioBrushSizeStep(current: number, direction: 1 | -1): number {
   const w = Number.isFinite(current) ? current : 6;
   let step = 1;
@@ -75,7 +75,7 @@ export function studioBrushPresetById(id: unknown): BrushPreset | null {
   return BRUSH_PRESETS.find((preset) => preset.id === id) ?? null;
 }
 
-/** Group chips for Magma/PicsArt brush library sheet. */
+/** Group chips for the brush library sheet. */
 export const STUDIO_BRUSH_LIBRARY_TABS: readonly {
   id: StudioBrushTrayCategory | "favorites" | "recent";
   label: string;

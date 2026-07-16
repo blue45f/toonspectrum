@@ -82,7 +82,7 @@ export function resolveStudioBrushRenderFamily(brushId: unknown): StudioBrushRen
  * Keep legacy ids first so saved documents remain stable.
  */
 export const BRUSH_PRESETS: BrushPreset[] = [
-  // —— Line tools (AutoDraw-adjacent clean ink, Magma/CSP line art) ——
+  // —— Line tools (AutoDraw-adjacent clean ink, CSP-style line art) ——
   { id: "pen", name: "펜(매끈)", defaultWidth: 6, defaultOpacity: 1.0 },
   { id: "fineliner", name: "파인라이너", defaultWidth: 2.2, defaultOpacity: 1.0 },
   { id: "ballpoint", name: "볼펜", defaultWidth: 3.5, defaultOpacity: 0.95 },

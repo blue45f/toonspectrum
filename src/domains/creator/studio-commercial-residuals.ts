@@ -51,7 +51,7 @@ export function studioPresenceOverflowLabel(hiddenCount: number): string | null 
   return `+${hiddenCount}`;
 }
 
-/** Cap avatar stack for Magma-class presence strip density. */
+/** Cap avatar stack for presence strip density. */
 export function studioPresenceVisiblePeerCount(
   totalPeers: number,
   maxVisible = 5
@@ -60,7 +60,7 @@ export function studioPresenceVisiblePeerCount(
   return Math.min(maxVisible, totalPeers);
 }
 
-/** Live collab HUD: peer count chip when room is active (Magma always-on presence cue). */
+/** Live collab HUD: peer count chip when room is active (always-on presence cue). */
 export function studioLivePresenceHudLabel(
   availability: "idle" | "connecting" | "ready" | "unsupported" | "error",
   peerCount: number

@@ -3,7 +3,7 @@
  *
  * Primary editor owns document/undo. Companion is a tools-only window (palette + density
  * + open menus) that mirrors ephemeral UI intent over same-origin BroadcastChannel.
- * Not Magma CRDT — no document merge.
+ * Not a CRDT — no document merge.
  */
 
 export const STUDIO_TOOLS_COMPANION_CHANNEL = "toonspectrum.studio.tools-companion.v1";

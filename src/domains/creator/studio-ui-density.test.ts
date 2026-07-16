@@ -10,11 +10,11 @@ import {
 } from "./studio-ui-density";
 
 describe("studio ui density modes", () => {
-  it("normalizes unknown modes to full and maps Magma layout labels", () => {
+  it("normalizes unknown modes to full and maps layout density labels", () => {
     expect(normalizeStudioUiDensityMode("nope")).toBe("full");
     expect(normalizeStudioUiDensityMode("simple")).toBe("simple");
     expect(studioUiDensityFromImmersive(true)).toBe("focus");
-    // Magma Super Simple / Simple / Full (IA only)
+    // Super Simple / Simple / Full 3단 밀도 라벨
     expect(studioUiDensityLabel("focus")).toBe("슈퍼심플");
     expect(studioUiDensityLabel("simple")).toBe("심플");
     expect(studioUiDensityLabel("full")).toBe("전체");

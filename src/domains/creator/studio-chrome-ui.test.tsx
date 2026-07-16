@@ -153,7 +153,7 @@ describe("studio chrome UI", () => {
     expect(html).not.toContain('title="편집 잠금을 먼저 해제하세요"');
   });
 
-  it("renders Magma-style vertical tool rail, quick actions, and status bar", () => {
+  it("renders the vertical tool rail, quick actions, and status bar", () => {
     const html = renderToStaticMarkup(
       <>
         <StudioVerticalToolRail>

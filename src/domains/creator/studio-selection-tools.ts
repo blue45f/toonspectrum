@@ -170,7 +170,7 @@ export function ellipseSelectionPolygon(
 }
 
 /**
- * Magma 선택 제스처 수정자 — Shift=정사각/정원, Alt=클릭 중심 확장.
+ * 선택 제스처 수정자 — Shift=정사각/정원, Alt=클릭 중심 확장.
  * aspect = 요소 height/width (정규화 공간에서 화면상 정원을 만들기 위함).
  * 반환 { a, b } 는 rect/ellipseSelectionPolygon 에 그대로 넘길 코너.
  */
@@ -215,7 +215,7 @@ export function constrainSelectionDragCorners(
   return { a: { x: ax, y: ay }, b: { x: bx, y: by } };
 }
 
-/** Magma Circle Selection — 드래그 박스를 정원(종횡비 보정)으로 강제. */
+/** 원형 선택 — 드래그 박스를 정원(종횡비 보정)으로 강제. */
 export function circleSelectionPolygon(
   a: SelPoint,
   b: SelPoint,
@@ -598,7 +598,7 @@ export function flipSelection(sel: PixelSelection | null, axis: "x" | "y"): Pixe
 }
 
 /**
- * 선택 마퀴 이동(Magma: 선택 안을 드래그) — 픽셀 내용은 유지하고 경계만 평행 이동.
+ * 선택 마퀴 이동(선택 안을 드래그) — 픽셀 내용은 유지하고 경계만 평행 이동.
  * dx/dy 는 정규화 단위. 전체 반전(서브패스 0)은 이동 의미 없어 그대로 반환.
  */
 export function translateSelection(
@@ -667,7 +667,7 @@ export function scaleSelection(
   return { ...sel!, subpaths: nextSubs };
 }
 
-/** Magma Transform 내용 변형 — 픽셀을 이동/회전/스케일/반전(원본 선택 영역은 지우고 변형본을 얹음). */
+/** 선택 내용 변형(Transform) — 픽셀을 이동/회전/스케일/반전(원본 선택 영역은 지우고 변형본을 얹음). */
 export type SelectionContentTransform = {
   /** 디바이스 px 평행 이동. */
   dxPx?: number;
@@ -729,7 +729,7 @@ export function transformSelectionMarquee(
 /**
  * 원본 + 마스크 + 내용 변형 → 결과 캔버스.
  * 1) 마스크 영역을 원본에서 지우고 2) 마스크로 오린 조각을 중심 기준으로 변형해 다시 그린다.
- * Magma Transform(Scale/Rotate/Flip/Move) 의 비대화형 적용 경로.
+ * 선택 내용 변형(Scale/Rotate/Flip/Move)의 비대화형 적용 경로.
  */
 export function applySelectionContentTransformToCanvas(
   source: MaskImageSource,
@@ -932,7 +932,7 @@ export type SelectionDragState = {
   points: SelPoint[];
   /** 브러시 전용 — 정규화 반경(요소 폭 대비). 다른 도구는 0. */
   brushRadius: number;
-  /** Magma: 정원/정사각 강제 (Circle Selection 도구 또는 Shift). */
+  /** 정원/정사각 강제 (원형 선택 도구 또는 Shift). */
   forceCircle?: boolean;
 };
 

@@ -1,7 +1,7 @@
 /**
- * Magma-class Application Settings modal — tabs:
+ * Application Settings modal — tabs:
  * General · Shortcuts · Mouse · Touch · Toolbar · Grids · Other
- * Warm-ink design tokens only; no Magma brand clone.
+ * Warm-ink design tokens only; no external brand styling.
  */
 import {
   ChevronDown,
@@ -244,7 +244,7 @@ export function StudioAppSettingsPanel({
             {tab === "general" ? (
               <>
                 <SectionLabel>레이아웃</SectionLabel>
-                <Row label="UI 밀도" hint="Magma Super Simple / Simple / Full 에 대응하는 레이아웃 모드">
+                <Row label="UI 밀도" hint="슈퍼심플 / 심플 / 전체 3단 레이아웃 모드">
                   <SelectChipGroup
                     value={settings.general.densityMode}
                     options={STUDIO_UI_DENSITY_MODES.map((m) => ({

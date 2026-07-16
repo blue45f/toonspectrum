@@ -1824,7 +1824,7 @@ function PanelResizeHandle({
 }
 
 type Tool = "select" | "draw" | "hand";
-/** pen/eraser/shape + Magma pixel pencil · lasso fill. */
+/** pen/eraser/shape + 픽셀 펜슬 · lasso fill. */
 type DrawMode = "pen" | "eraser" | "shape" | "pixel" | "lasso-fill";
 type DrawShapeKind = "line" | "rect" | "ellipse" | "star" | "arrow" | "triangle" | "polygon";
 const QUICKSHAPE_KIND_LABELS: Record<string, string> = {
@@ -2823,7 +2823,7 @@ function drawFreehandPenSegments(
   }
 }
 
-/** Magma식 증분 라이브 잉크 표면 — 스크롤/줌 변화만 React 로 동기화하고 픽셀은 임페러티브. */
+/** 증분 라이브 잉크 표면 — 스크롤/줌 변화만 React 로 동기화하고 픽셀은 임페러티브. */
 const StudioLiveInkOverlayHost = memo(function StudioLiveInkOverlayHost({
   renderer,
   left,
@@ -3597,7 +3597,7 @@ const StudioDrawNode = memo(function StudioDrawNode({ el }: { el: DrawEl }) {
           // Default "pen" or "marker" or "eraser"
           const smoothed = processFreehandPoints(points, renderSampleDistance);
           const pressures = el.pressures;
-          // Magma Lasso Brush: fill 이 설정된 프리핸드(라쏘 필)는 궤적을 자동으로 닫아 내부를
+          // 라쏘 브러시: fill 이 설정된 프리핸드(라쏘 필)는 궤적을 자동으로 닫아 내부를
           // 현재 색으로 채운다. 라이브 초안도 같은 경로를 지나므로 그리는 동안 채움이 미리 보인다.
           const freehandFill = el.mode !== "eraser" ? el.fill : undefined;
           if (pressures && pressures.length > 0 && smoothed.length >= 4) {
@@ -3689,6 +3689,113 @@ const StudioDrawNode = memo(function StudioDrawNode({ el }: { el: DrawEl }) {
           </Group>
         );
       })}
+    </>
+  );
+});
+
+/**
+ * 비다이렉트 초안(수채·연필·유화·입자 등 모든 팬시 브러시와 도형 드래그)의 미니 스토어.
+ * 포인터 프레임마다 이 스토어만 갱신되고, 구독자는 아래 StudioDraftPreviewLayers 하나뿐이라
+ * 프레임당 리렌더가 30k 라인 페이지가 아니라 초안 레이어 서브트리로 한정된다 — 모든 브러시가
+ * 펜과 같은 필기감을 갖게 만드는 격리 장치. settled 는 커밋 동기화를 기다리는 확정 획들.
+ */
+interface StudioDraftPreviewSnapshot {
+  readonly active: DrawEl | null;
+  readonly settled: readonly DrawEl[];
+}
+const EMPTY_DRAFT_PREVIEW: StudioDraftPreviewSnapshot = { active: null, settled: [] };
+class StudioDraftPreviewStore {
+  private snapshot: StudioDraftPreviewSnapshot = EMPTY_DRAFT_PREVIEW;
+  private listeners = new Set<() => void>();
+  subscribe = (listener: () => void): (() => void) => {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  };
+  getSnapshot = (): StudioDraftPreviewSnapshot => this.snapshot;
+  get active(): DrawEl | null {
+    return this.snapshot.active;
+  }
+  get hasSettled(): boolean {
+    return this.snapshot.settled.length > 0;
+  }
+  setActive(el: DrawEl | null): void {
+    if (this.snapshot.active === el) return;
+    this.snapshot = { active: el, settled: this.snapshot.settled };
+    this.emit();
+  }
+  /** 펜 리프트: 확정된 최종 형태(finished)를 settled 로 넘겨 커밋 렌더까지 잉크를 유지한다. */
+  settle(el: DrawEl): void {
+    this.snapshot = { active: null, settled: [...this.snapshot.settled, el] };
+    this.emit();
+  }
+  clearSettled(): void {
+    if (this.snapshot.settled.length === 0) return;
+    this.snapshot = { active: this.snapshot.active, settled: [] };
+    this.emit();
+  }
+  clear(): void {
+    if (this.snapshot === EMPTY_DRAFT_PREVIEW) return;
+    this.snapshot = EMPTY_DRAFT_PREVIEW;
+    this.emit();
+  }
+  private emit(): void {
+    for (const listener of this.listeners) listener();
+  }
+}
+
+/** 비다이렉트 초안 전용 격리 레이어 — 스토어 구독으로 페이지 본문 렌더 없이 프레임을 그린다. */
+const StudioDraftPreviewLayers = memo(function StudioDraftPreviewLayers({
+  store,
+  postCorrection,
+  preserveCorners,
+}: {
+  store: StudioDraftPreviewStore;
+  postCorrection: number;
+  preserveCorners: boolean;
+}) {
+  const { active, settled } = useSyncExternalStore(store.subscribe, store.getSnapshot);
+  const isolatedDynamic =
+    active?.mode === "pen" && resolveStudioBrushDynamicsPresetId(active.brush) !== null
+      ? active
+      : null;
+  // 커밋 시점의 postCorrection 재구성이 펜을 뗄 때 선 형태를 '탁' 바꾸지 않도록, 꼬리 몇 점을
+  // 제외한 앞부분에 같은 보정을 라이브로 미리 적용한다. 입자(dynamics) 브러시는 dab 배치가
+  // 점 위치에 민감해 제외한다.
+  const activeForRender = (() => {
+    if (!active || isolatedDynamic || (active.kind ?? "freehand") !== "freehand" || postCorrection <= 0) {
+      return active;
+    }
+    const tailPoints = 8;
+    const pointCount = Math.floor(active.points.length / 2);
+    if (pointCount <= tailPoints + 2) return active;
+    const headCount = pointCount - tailPoints;
+    const smoothedHead = smoothStrokePoints(
+      active.points.slice(0, headCount * 2),
+      postCorrection,
+      { preserveCorners }
+    );
+    return { ...active, points: [...smoothedHead, ...active.points.slice(headCount * 2)] };
+  })();
+  const normalActive = activeForRender && !isolatedDynamic && activeForRender.mode !== "eraser"
+    ? activeForRender
+    : null;
+  return (
+    <>
+      {settled.length > 0 || normalActive ? (
+        <Layer listening={false}>
+          {settled.map((el) => (
+            <StudioDrawNode key={el.id} el={el} />
+          ))}
+          {normalActive ? <StudioDrawNode el={normalActive} /> : null}
+        </Layer>
+      ) : null}
+      {/* 라이브 입자 획은 독립 레이어에서만 다시 그린다 — committed 입자 획이 포인터 RAF마다
+          수천 개의 dab 을 재실행하지 않는다. */}
+      {isolatedDynamic ? (
+        <Layer listening={false}>
+          <StudioDrawNode el={isolatedDynamic} />
+        </Layer>
+      ) : null}
     </>
   );
 });
@@ -5141,7 +5248,7 @@ function StudioCuttoonEditor() {
       typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage
     ).mode
   );
-  // Magma Application Settings — toolbar / shortcuts / mouse / touch / grids / other.
+  // 앱 설정 — toolbar / shortcuts / mouse / touch / grids / other.
   const [appSettings, setAppSettings] = useState<StudioAppSettings>(() =>
     loadStudioAppSettings(studioAppSettingsStorage())
   );
@@ -6769,7 +6876,7 @@ function StudioCuttoonEditor() {
   const [color, setColor] = useState("#7c5cfc");
   /** Photoshop/CSP foreground-background pair — X swaps. */
   const [secondaryColor, setSecondaryColor] = useState("#ffffff");
-  /** View-only horizontal flip for checking drawing balance (Magma/CSP). */
+  /** View-only horizontal flip for checking drawing balance (CSP). */
   const [canvasFlipH, setCanvasFlipH] = useState(false);
   // 최근 사용 색(색상 팝오버 공용) — 색상 선택기를 실제로 열 때만 복원해 초기 Studio 진입을 가볍게 유지한다.
   const [recentColors, setRecentColors] = useState<string[]>([]);
@@ -7860,7 +7967,7 @@ function StudioCuttoonEditor() {
     const snappedLocalY = Math.round(localPos.y / gridSize) * gridSize;
     return stage.getAbsoluteTransform().point({ x: snappedLocalX, y: snappedLocalY });
   };
-  // 휠 동작 — Magma Mouse 설정: 줌 / 팬 / 브러시 크기 (+ 기존 ⌘휠 줌).
+  // 휠 동작 — 마우스 휠 설정: 줌 / 팬 / 브러시 크기 (+ 기존 ⌘휠 줌).
   useEffect(() => {
     const node = wrapRef.current;
     if (!node) return;
@@ -8317,7 +8424,7 @@ function StudioCuttoonEditor() {
     }
   }
 
-  // 화면 드래그 스크롤 핸들러 (Space + Drag · Magma Hand tool)
+  // 화면 드래그 스크롤 핸들러 (Space + Drag · 핸드 툴)
   const onWrapMouseDown = (e: React.MouseEvent) => {
     if (!isSpacePressed && tool !== "hand") return;
     setIsPanning(true);
@@ -8476,7 +8583,12 @@ function StudioCuttoonEditor() {
   const quickShapeLockedRef = useRef<boolean>(false); // 2단계(정비율 고정)를 이미 적용했는지
   // 브러시 커서 프리뷰(Konva 노드 직접 갱신 — hover 리렌더 방지).
   const brushCursorRef = useRef<Konva.Circle>(null);
-  const [draft, setDraft] = useState<DrawEl | null>(null);
+  // 비다이렉트 초안(팬시 브러시·도형 드래그)은 격리 스토어로 흐른다(StudioDraftPreviewLayers).
+  // 포인터 프레임이 이 30k 라인 컴포넌트를 다시 렌더하지 않는다 — 모든 브러시가 펜과 같은
+  // 필기감을 갖는 구조적 토대. 스마트 도형 변환 라벨만 저빈도 상태로 승격한다(변환 시 1회).
+  const draftPreviewStoreRef = useRef<StudioDraftPreviewStore>(null as never);
+  draftPreviewStoreRef.current ??= new StudioDraftPreviewStore();
+  const [liveDraftShapeKind, setLiveDraftShapeKind] = useState<DrawEl["kind"] | null>(null);
   const [webGpuAuthority, setWebGpuAuthority] = useState<StudioWebGpuAuthorityFrame | null>(null);
   // 라이브 잉크 파인닝: 스트로크 시작 시점의 백엔드로 렌더러를 한 번 결정한다(중도 교대 금지).
   const webGpuBackendRef = useRef<StudioGpuBackend | null>(null);
@@ -8505,7 +8617,7 @@ function StudioCuttoonEditor() {
   const liveDraftRafRef = useRef<number | null>(null);
   const liveDraftLayerRef = useRef<Konva.Layer>(null);
   const mainLayerRef = useRef<Konva.Layer>(null);
-  // Magma식 증분 라이브 잉크: 프레임마다 전체 획을 다시 그리지 않고 새 조각만 누적한다.
+  // 증분 라이브 잉크: 프레임마다 전체 획을 다시 그리지 않고 새 조각만 누적한다.
   const liveInkOverlayRendererRef = useRef<StudioLiveInkOverlayRenderer>(null as never);
   liveInkOverlayRendererRef.current ??= new StudioLiveInkOverlayRenderer();
   const liveInkOverlayClearGenRef = useRef(0);
@@ -8586,7 +8698,7 @@ function StudioCuttoonEditor() {
   const flushDirectLiveDraft = () => {
     const next = liveDraftPendingRef.current;
     if (!next || !liveDraftDirectRef.current) return;
-    // Magma식 증분 경로: 스태빌라이즈드 원본 점의 새 접미사만 표면에 누적한다 — 포인트당
+    // 증분 경로: 스태빌라이즈드 원본 점의 새 접미사만 표면에 누적한다 — 포인트당
     // O(1). 라이브 중 소급 재구성(progressive postCorrection)은 증분과 비호환이라 이 경로에선
     // 적용하지 않고, 커밋 시 postCorrection 이 최종 형태를 만든다(스태빌라이저가 라이브를
     // 이미 부드럽게 유지).
@@ -8657,7 +8769,11 @@ function StudioCuttoonEditor() {
     if (draftRafRef.current !== null) return;
     draftRafRef.current = globalThis.requestAnimationFrame(() => {
       draftRafRef.current = null;
-      setDraft(pendingDraftRef.current);
+      const pending = pendingDraftRef.current;
+      draftPreviewStoreRef.current.setActive(pending);
+      // 스마트 도형 변환 라벨: kind 가 실제로 바뀔 때만 상태가 바뀐다(프레임당 렌더 없음).
+      const kind = pending && pending.kind && pending.kind !== "freehand" ? pending.kind : null;
+      setLiveDraftShapeKind((prev) => (prev === kind ? prev : kind));
     });
   };
   const clearDraftPreview = (options?: { preserveInkForDeferredCommit?: boolean }) => {
@@ -8719,7 +8835,9 @@ function StudioCuttoonEditor() {
       liveDraftLayerRef.current?.batchDraw();
       mainLayerRef.current?.batchDraw();
     }
-    setDraft(null);
+    // 비다이렉트 활성 초안 정리 — settled(커밋 대기 잉크)는 flush 의 표면 정리가 담당한다.
+    draftPreviewStoreRef.current.setActive(null);
+    setLiveDraftShapeKind(null);
   };
   /** 마지막 획 후 이 유휴가 지나면 대기 배치를 한 번의 React 커밋으로 동기화한다. */
   const DEFERRED_STROKE_COMMIT_IDLE_MS = 200;
@@ -8739,6 +8857,14 @@ function StudioCuttoonEditor() {
       globalThis.requestAnimationFrame(() => {
         globalThis.requestAnimationFrame(() => {
           if (liveInkOverlayClearGenRef.current === generation) overlay.clear();
+        });
+      });
+    }
+    if (draftPreviewStoreRef.current.hasSettled) {
+      // settled 프리뷰(비다이렉트 대기 잉크)도 커밋 노드가 페인트된 뒤에 비운다.
+      globalThis.requestAnimationFrame(() => {
+        globalThis.requestAnimationFrame(() => {
+          draftPreviewStoreRef.current.clearSettled();
         });
       });
     }
@@ -8833,9 +8959,9 @@ function StudioCuttoonEditor() {
   // "wand"는 이 파일에서만 쓰는 로컬 확장 — StudioSelectionToolsPanel의 activeTool prop은 여전히
   // SelectionToolKind만 받으므로(export 자체는 안 건드림), 그 패널에 넘길 때는 wand를 null로 좁힌다.
   const [pixelTool, setPixelTool] = useState<SelectionToolKind | "wand" | null>(null);
-  /** Magma Circle Selection — ellipse 도구를 정원으로 강제. */
+  /** 원형 선택 — ellipse 도구를 정원으로 강제. */
   const [pixelForceCircle, setPixelForceCircle] = useState(false);
-  /** Magma Liquify push brush. */
+  /** 리퀴파이 푸시 브러시. */
   const [liquifyActive, setLiquifyActive] = useState(false);
   const [liquifyRadius, setLiquifyRadius] = useState(40);
   const [liquifyStrength, setLiquifyStrength] = useState(50);
@@ -11334,6 +11460,7 @@ function StudioCuttoonEditor() {
       // 아직 히스토리 밖인 대기 획 폐기(펜 리프트 직후의 undo) — 표면에서 즉시 지운다.
       liveInkOverlayClearGenRef.current += 1;
       liveInkOverlayRendererRef.current.clear();
+      draftPreviewStoreRef.current.clearSettled();
       pendingGpuStrokesRef.current = [];
       if (!gpuLiveInkPinnedRef.current) {
         webGpuCanvasHandleRef.current?.syncPinnedStrokes(EMPTY_STUDIO_GPU_STROKES);
@@ -12940,7 +13067,7 @@ function StudioCuttoonEditor() {
       if (insideShortcutBoundary) return;
       if (timelapseCapturing) return; // 타임랩스 캡처 중엔 ⌘Z 등 전역 단축키를 막는다(pagesHi 임시 점유 보호)
       const mod = e.metaKey || e.ctrlKey;
-      // Magma Application Settings → Shortcuts: user-bound chords (tool switchers etc.).
+      // 앱 설정 → Shortcuts: user-bound chords (tool switchers etc.).
       const sc = appSettingsRef.current.shortcuts;
       if (matchStudioShortcut(sc["tool-select"], e)) {
         e.preventDefault();
@@ -13010,7 +13137,7 @@ function StudioCuttoonEditor() {
         e.preventDefault();
         redo();
       } else if (mod && (e.key === "d" || e.key === "D") && !e.altKey) {
-        // Magma: 픽셀 선택이 살아 있으면 ⌘D = 선택 해제. 없으면 요소 복제(기존 동작).
+        // 픽셀 선택이 살아 있으면 ⌘D = 선택 해제. 없으면 요소 복제(기존 동작).
         // Custom deselect-pixels chord already handled above when rebound.
         e.preventDefault();
         if (pixelSel || pixelTool) {
@@ -13022,7 +13149,7 @@ function StudioCuttoonEditor() {
           duplicateSelected();
         }
       } else if (mod && e.shiftKey && !e.altKey && (e.key === "i" || e.key === "I")) {
-        // Magma Ctrl+Shift+I — 픽셀 선택 반전(선택이 없으면 빈 선택에서 전체 선택으로 토글).
+        // Ctrl+Shift+I — 픽셀 선택 반전(선택이 없으면 빈 선택에서 전체 선택으로 토글).
         if (selected?.type === "image") {
           e.preventDefault();
           setPixelSel((s) => toggleSelectionInvert(s ?? emptyPixelSelection()));
@@ -13205,7 +13332,7 @@ function StudioCuttoonEditor() {
         (e.key === "h" || e.key === "H") &&
         !(e.target instanceof HTMLElement && e.target.closest("input, textarea, select, [contenteditable=true]"))
       ) {
-        // Magma: flip canvas horizontally (view only).
+        // flip canvas horizontally (view only).
         e.preventDefault();
         setCanvasFlipH((v) => !v);
         announceDrawingShortcut("캔버스 반전");
@@ -15263,7 +15390,7 @@ function StudioCuttoonEditor() {
     }
   }
 
-  // ── Magma Transform — 선택 안 픽셀을 이동/회전/스케일/반전하고 마퀴 기하도 동일 변환으로 맞춤.
+  // ── 선택 변형 — 선택 안 픽셀을 이동/회전/스케일/반전하고 마퀴 기하도 동일 변환으로 맞춤.
   async function applyPixelSelectionContentTransform(transform: SelectionContentTransform) {
     if (pixelBusy || isSelectionContentTransformNoop(transform)) return;
     if (selected?.type !== "image" || !pixelSel || !isSelectionUsable(pixelSel)) return;
@@ -16424,7 +16551,7 @@ function StudioCuttoonEditor() {
       smudgeDragRef.current = { elId: selected.id, frame, points: [canvasPointToNormalized(pos.x, pos.y, frame)] };
       return;
     }
-    // Magma Liquify — 이미지를 드래그하면 픽셀을 밀어 왜곡한다.
+    // 리퀴파이 — 이미지를 드래그하면 픽셀을 밀어 왜곡한다.
     if (
       liquifyActive &&
       !liquifyBusy &&
@@ -16620,7 +16747,7 @@ function StudioCuttoonEditor() {
     }
     if (tool === "draw") {
       const pointerSample = e.evt as PointerEvent;
-      // Magma Touch: one-finger drag = draw | pan | none. Palm rejection ignores touch while pen preferred.
+      // 터치 정책: one-finger drag = draw | pan | none. Palm rejection ignores touch while pen preferred.
       const touchPrefs = appSettingsRef.current.touch;
       if (pointerSample.pointerType === "touch") {
         if (touchPrefs.oneFingerDrag !== "draw") return;
@@ -16707,7 +16834,7 @@ function StudioCuttoonEditor() {
           : {
               ...common,
               kind: "freehand" as const,
-              // Magma: pixel pencil / lasso fill map to pen mode with special fill/width.
+              // pixel pencil / lasso fill map to pen mode with special fill/width.
               mode: (drawMode === "eraser" ? "eraser" : "pen") as "pen" | "eraser",
               points: [pos.x, pos.y],
               strokeWidth: drawMode === "pixel" ? 1 : strokeWidth,
@@ -16731,7 +16858,7 @@ function StudioCuttoonEditor() {
       tryCaptureStudioStrokePointer(drawingPointerCaptureTargetRef.current, pointerSession.pointerId);
       // Window safety net: mouse can release outside the stage when capture fails or is stolen.
       attachDrawingPointerSafetyListeners(pointerSession.pointerId);
-      // Magma pixel pencil: no stabilizer (hard 1px steps). Lasso-fill keeps light smoothing.
+      // 픽셀 펜슬: no stabilizer (hard 1px steps). Lasso-fill keeps light smoothing.
       drawingStabilizerRef.current =
         drawMode === "shape" || drawMode === "pixel"
           ? null
@@ -16784,7 +16911,7 @@ function StudioCuttoonEditor() {
         webGpuCanvasHandleRef.current?.setPinnedVisible(
           gpuPin || pendingGpuStrokesRef.current.length > 0
         );
-        // Magma식 증분 오버레이: GPU 파인이 아닌 일반 펜/마커(대칭·채움 없음)는 표면에
+        // 증분 오버레이: GPU 파인이 아닌 일반 펜/마커(대칭·채움 없음)는 표면에
         // 새 조각만 누적한다. begin 실패(표면 미준비) 시 Konva 초안이 자연 폴백.
         liveInkOverlayClearGenRef.current += 1;
         if (direct && !gpuPin && next.mode !== "eraser" && !next.fill
@@ -16826,7 +16953,9 @@ function StudioCuttoonEditor() {
           // 상시 마운트된 임페러티브 초안 노드의 첫 프레임(터치 도트)을 렌더 없이 그린다.
           (next.mode === "eraser" ? mainLayerRef.current : liveDraftLayerRef.current)?.batchDraw();
         } else {
-          setDraft(next);
+          // 비다이렉트 시작도 격리 스토어로 — 이후 프레임은 scheduleDraft 가 스토어만 갱신한다.
+          draftPreviewStoreRef.current.setActive(next);
+          setLiveDraftShapeKind(next.kind && next.kind !== "freehand" ? next.kind : null);
         }
       }
       if (drawMode === "pen" && quickShapeActive) startQuickShapeTracking({ x: pos.x, y: pos.y });
@@ -17712,13 +17841,20 @@ function StudioCuttoonEditor() {
         // 큐에 쌓는다. React 커밋 렌더는 마지막 획 후 짧은 유휴에 한 번만 — 연속 스트로크가
         // 커밋 렌더에 막히지 않는다. 지우개·비다이렉트 브러시는 기존 즉시 커밋을 유지한다.
         const overlayRenderer = liveInkOverlayRendererRef.current;
+        // 다이렉트: 라이브 표면(오버레이/GPU)이 잉크를 유지할 수 있을 때만 지연.
+        // 비다이렉트(팬시 브러시·도형): settled 프리뷰 레이어가 최종 형태를 유지하므로 항상 지연.
         const deferCommit =
-          liveDraftDirectRef.current
-          && !masterEditMode
+          !masterEditMode
           && finished.mode !== "eraser"
-          && (overlayRenderer.isActive || gpuLiveInkPinnedRef.current);
+          && (liveDraftDirectRef.current
+            ? overlayRenderer.isActive || gpuLiveInkPinnedRef.current
+            : true);
         if (deferCommit) {
           deferInkCleanup = true;
+          if (!liveDraftDirectRef.current) {
+            // 최종 형태(postCorrection·스마트도형 반영)를 settled 프리뷰로 유지한 채 커밋을 미룬다.
+            draftPreviewStoreRef.current.settle(finished);
+          }
           if (gpuLiveInkPinnedRef.current) {
             const settledGpu = buildGpuLiveStroke(liveDraftVisualRef.current ?? finished);
             if (settledGpu) {
@@ -20550,29 +20686,9 @@ function StudioCuttoonEditor() {
   const pendingBrushDelete = pendingBrushDeletes.length > 0
     ? pendingBrushDeletes[pendingBrushDeletes.length - 1]
     : null;
-  const isolatedDynamicDraft = draft?.mode === "pen" && resolveStudioBrushDynamicsPresetId(draft.brush) !== null
-    ? draft
-    : null;
-  // 커밋 시점의 postCorrection 재구성이 펜을 뗄 때 선 형태를 눈에 띄게 '탁' 바꾸던 것을 없앤다:
-  // 꼬리 몇 점을 제외한 앞부분에 같은 보정을 라이브로 미리 적용해 미리보기가 최종 형태에
-  // 수렴하게 한다. smoothStrokePoints 는 점 개수와 양 끝점을 보존하므로 필압 정렬이 유지되고,
-  // 잘린 머리의 마지막 점이 고정되어 꼬리와의 이음매도 연속이다. 입자(dynamics) 브러시는 dab
-  // 배치가 점 위치에 민감해 제외한다.
-  const draftForRender = (() => {
-    if (!draft || isolatedDynamicDraft || (draft.kind ?? "freehand") !== "freehand" || postCorrection <= 0) {
-      return draft;
-    }
-    const tailPoints = 8;
-    const pointCount = Math.floor(draft.points.length / 2);
-    if (pointCount <= tailPoints + 2) return draft;
-    const headCount = pointCount - tailPoints;
-    const smoothedHead = smoothStrokePoints(
-      draft.points.slice(0, headCount * 2),
-      postCorrection,
-      { preserveCorners }
-    );
-    return { ...draft, points: [...smoothedHead, ...draft.points.slice(headCount * 2)] };
-  })();
+  // 비다이렉트 초안 렌더(팬시 브러시·도형 드래그·입자 브러시 격리, progressive postCorrection
+  // 포함)는 StudioDraftPreviewLayers 가 스토어 구독으로 담당한다 — 이 컴포넌트 본문에는
+  // 프레임당 재계산이 남지 않는다.
   // G10b stroke-pinned live ink(다이렉트 모드): 렌더러 소유권은 onStageDown 에서 스트로크 시작에
   // 한 번 결정되고, 이후 포인터 프레임은 scheduleDraft → flushDirectLiveDraft 가 React 렌더 없이
   // Konva batchDraw / syncPinnedStrokes 임페러티브 피드로만 흐른다. 따라서 이 선언적 strokes
@@ -20617,7 +20733,7 @@ function StudioCuttoonEditor() {
     masterEditActive: masterEditMode,
     editActive: selectedId !== null || marqueeIds.length > 0 || editing !== null,
     specialDraftActive:
-      tool !== "select" || draft !== null || eyedropperActive || timelinePlaying ||
+      tool !== "select" || eyedropperActive || timelinePlaying ||
       marqueeRect !== null || userGuides.length > 0 ||
       advancedFillArmed || pixelToolArmed || cropArmed || panelSplitArmed ||
       nodeEditArmed || bubbleShapeArmed || smudgeArmed || healCloneArmed ||
@@ -21426,7 +21542,7 @@ function StudioCuttoonEditor() {
         ) : null}
       </div>
 
-      {/* Commercial draw options — size/opacity/stabilizer/brushes (CSP/Magma properties strip). */}
+      {/* Commercial draw options — size/opacity/stabilizer/brushes (CSP-style properties strip). */}
       {tool === "draw" && !canvasOnlyMode ? (
         <Suspense fallback={<div className="h-10 shrink-0 border-b border-line bg-panel/80" aria-hidden />}>
           <StudioDrawOptionsBar
@@ -21602,7 +21718,7 @@ function StudioCuttoonEditor() {
       >
         {/* 모바일: 가로 스크롤 가능 힌트(좌측 페이드). 데스크톱에선 숨김. */}
         <span aria-hidden className="pointer-events-none sticky left-0 -ml-1 h-8 w-2 shrink-0 self-stretch bg-gradient-to-r from-panel to-transparent lg:hidden" />
-        {/* Magma Quick Actions — undo/redo/history always near the left of the top bar */}
+        {/* Quick Actions — undo/redo/history always near the left of the top bar */}
         {studioUiDensityAllows(uiDensityMode, "quick-actions") ? (
           <StudioQuickActionsBar>
             <button
@@ -22304,7 +22420,7 @@ function StudioCuttoonEditor() {
         </>
         ) : null}
 
-        {/* 모바일 가로 벨트: 데스크톱은 Magma식 좌측 세로 레일로 이동 (lg:hidden). */}
+        {/* 모바일 가로 벨트: 데스크톱은 좌측 세로 레일로 이동 (lg:hidden). */}
         {studioUiDensityAllows(uiDensityMode, "toolbar-draw") ? (
         <>
         <StudioToolbarDivider label="도구" className="lg:hidden" />
@@ -23718,7 +23834,7 @@ function StudioCuttoonEditor() {
           <PanelResizeHandle handleProps={leftResize.handleProps} dragging={leftResize.dragging} label="페이지 목록 너비 조절" />
         )}
 
-        {/* Magma-style left vertical Toolbar — desktop only; mobile uses bottom dock / horizontal belt */}
+        {/* Left vertical toolbar — desktop only; mobile uses bottom dock / horizontal belt */}
         {studioUiDensityAllows(uiDensityMode, "tool-rail") && !canvasOnlyMode ? (
           <StudioVerticalToolRail className={cn(mobileImmersive && "hidden")}>
             {isRailToolVisible("select") ? (
@@ -23738,7 +23854,7 @@ function StudioCuttoonEditor() {
             <StudioRailToolButton
               icon={Hand}
               label="핸드 (팬)"
-              description="캔버스를 드래그해 이동합니다. Space 키와 같은 역할입니다. (Magma Hand)"
+              description="캔버스를 드래그해 이동합니다. Space 키와 같은 역할입니다."
               active={tool === "hand"}
               onClick={() => {
                 setTool((t) => (t === "hand" ? "select" : "hand"));
@@ -23751,7 +23867,7 @@ function StudioCuttoonEditor() {
             <StudioRailToolButton
               icon={Square}
               label="사각 선택 (M)"
-              description="이미지 픽셀을 사각형으로 선택합니다. Shift=정사각, Alt=중심 확장. (Magma Selection)"
+              description="이미지 픽셀을 사각형으로 선택합니다. Shift=정사각, Alt=중심 확장."
               active={pixelTool === "rect" && !pixelForceCircle}
               disabled={selected?.type !== "image" || selectedContentMutationLocked}
               unavailableReason={
@@ -23775,7 +23891,7 @@ function StudioCuttoonEditor() {
             <StudioRailToolButton
               icon={Circle}
               label="원형 선택"
-              description="이미지 픽셀을 정원으로 선택합니다. Alt=중심 확장. (Magma Circle Selection)"
+              description="이미지 픽셀을 정원으로 선택합니다. Alt=중심 확장."
               active={pixelTool === "ellipse" && pixelForceCircle}
               disabled={selected?.type !== "image" || selectedContentMutationLocked}
               unavailableReason={
@@ -23799,7 +23915,7 @@ function StudioCuttoonEditor() {
             <StudioRailToolButton
               icon={Maximize2}
               label="변형 (⇧T)"
-              description="픽셀 선택이 있으면 속성→리터치에서 내용 변형(스케일·회전·뒤집기)을 적용합니다. (Magma Transform)"
+              description="픽셀 선택이 있으면 속성→리터치에서 내용 변형(스케일·회전·뒤집기)을 적용합니다."
               active={false}
               disabled={selected?.type !== "image" || !isSelectionUsable(pixelSel)}
               unavailableReason={
@@ -23837,7 +23953,7 @@ function StudioCuttoonEditor() {
             <StudioRailToolButton
               icon={PenTool}
               label="픽셀 펜 (P)"
-              description="1px 하드 픽셀 펜으로 그립니다. 안티앨리어스·필압 없이 또렷한 선을 남깁니다. (Magma Pixel Pencil)"
+              description="1px 하드 픽셀 펜으로 그립니다. 안티앨리어스·필압 없이 또렷한 선을 남깁니다."
               active={tool === "draw" && drawMode === "pixel"}
               disabled={activeSurfaceReviewLocked}
               unavailableReason={activeSurfaceReviewLocked ? "현재 작업면의 검토 잠금을 먼저 해제하세요." : undefined}
@@ -23870,7 +23986,7 @@ function StudioCuttoonEditor() {
             <StudioRailToolButton
               icon={Wind}
               label="혼합 (스머지)"
-              description="이미지 픽셀을 문질러 색을 섞습니다. (Magma Blend)"
+              description="이미지 픽셀을 문질러 색을 섞습니다."
               active={smudgeActive}
               disabled={selected?.type !== "image" || selectedContentMutationLocked}
               unavailableReason={
@@ -23894,7 +24010,7 @@ function StudioCuttoonEditor() {
             <StudioRailToolButton
               icon={Move}
               label="리퀴파이"
-              description="이미지 위를 밀어 국소 왜곡합니다. (Magma Liquify)"
+              description="이미지 위를 밀어 국소 왜곡합니다."
               active={liquifyActive}
               disabled={selected?.type !== "image" || selectedContentMutationLocked}
               unavailableReason={
@@ -23941,7 +24057,7 @@ function StudioCuttoonEditor() {
             <StudioRailToolButton
               icon={Paintbrush}
               label="라쏘 필"
-              description="닫힌 궤적을 그려 현재 색으로 채웁니다. (Magma Lasso Brush)"
+              description="닫힌 궤적을 그려 현재 색으로 채웁니다."
               active={tool === "draw" && drawMode === "lasso-fill"}
               disabled={activeSurfaceReviewLocked}
               unavailableReason={activeSurfaceReviewLocked ? "현재 작업면의 검토 잠금을 먼저 해제하세요." : undefined}
@@ -23999,7 +24115,7 @@ function StudioCuttoonEditor() {
             <StudioRailToolButton
               icon={MessageSquare}
               label="댓글"
-              description="캔버스에 협업 댓글을 달고 스레드를 관리합니다. (Magma Comment)"
+              description="캔버스에 협업 댓글을 달고 스레드를 관리합니다."
               active={commentsOpen}
               onClick={() => setCommentsOpen((v) => !v)}
             />
@@ -24008,7 +24124,7 @@ function StudioCuttoonEditor() {
             <StudioRailToolButton
               icon={Triangle}
               label="투시도"
-              description="소실점 가이드로 원근을 맞춥니다. (Magma Perspective Grid)"
+              description="소실점 가이드로 원근을 맞춥니다."
               active={perspectiveRulerActive}
               onClick={() => {
                 setPerspectiveRulerActive((v) => !v);
@@ -24035,7 +24151,7 @@ function StudioCuttoonEditor() {
             <StudioRailToolButton
               icon={FlipHorizontal2}
               label="보기 반전"
-              description="캔버스를 좌우로 뒤집어 균형·대칭을 확인합니다. (Magma/CSP flip view)"
+              description="캔버스를 좌우로 뒤집어 균형·대칭을 확인합니다. (CSP flip view)"
               active={canvasFlipH}
               onClick={() => setCanvasFlipH((v) => !v)}
             />
@@ -24178,7 +24294,7 @@ function StudioCuttoonEditor() {
                 onFocus={preloadStudioReferencePanel}
               />
             ) : null}
-            {/* Magma More tools — hidden rail tools + Application Settings */}
+            {/* More tools — hidden rail tools + Application Settings */}
             <div className="relative">
               <StudioRailToolButton
                 icon={Settings2}
@@ -24668,7 +24784,7 @@ function StudioCuttoonEditor() {
             onDragOver={onWrapDragOver}
             onDrop={onWrapDrop}
             className={cn(
-              // Magma-like: canvas fills remaining viewport under thin menubar+toolbelt (~6.5rem).
+              // Canvas fills remaining viewport under thin menubar+toolbelt (~6.5rem).
               "relative min-h-0 flex-1 overflow-auto rounded-none border-0 outline-none",
               "bg-[oklch(0.145_0.008_70)]",
               "[background-image:linear-gradient(oklch(0.162_0.008_70)_1px,transparent_1px),linear-gradient(90deg,oklch(0.162_0.008_70)_1px,transparent_1px)]",
@@ -25863,9 +25979,6 @@ function StudioCuttoonEditor() {
                   perfectDrawEnabled={false}
                 />
               )}
-              {draft && !isolatedDynamicDraft && draft.mode === "eraser"
-                ? <StudioDrawNode el={draftForRender ?? draft} />
-                : null}
               <Transformer
                 ref={trRef}
                 rotateEnabled
@@ -25940,18 +26053,13 @@ function StudioCuttoonEditor() {
                 />
               </Layer>
             )}
-            {draft && !isolatedDynamicDraft && draft.mode !== "eraser" && (
-              <Layer listening={false}>
-                <StudioDrawNode el={draftForRender ?? draft} />
-              </Layer>
-            )}
-            {/* 라이브 입자 획은 독립 레이어에서만 다시 그린다. committed 입자 획이 포인터 RAF마다
-                수천 개의 dab을 재실행하지 않아 모바일 입력 지연과 배터리 사용을 줄인다. */}
-            {isolatedDynamicDraft && (
-              <Layer listening={false}>
-                <StudioDrawNode el={isolatedDynamicDraft} />
-              </Layer>
-            )}
+            {/* 비다이렉트 초안(팬시 브러시·도형·입자) — 스토어 구독 격리 레이어. 포인터
+                프레임은 이 서브트리만 다시 렌더한다. */}
+            <StudioDraftPreviewLayers
+              store={draftPreviewStoreRef.current}
+              postCorrection={postCorrection}
+              preserveCorners={preserveCorners}
+            />
             {/* 브러시 커서 프리뷰: 드로잉 모드에서 포인터를 따라다니는 브러시 크기 원 */}
             {!isExporting && tool === "draw" && (
               <Layer listening={false}>
@@ -29735,8 +29843,8 @@ function StudioCuttoonEditor() {
                     <StudioQuickShapePanel
                       active={quickShapeActive}
                       matchedKindLabel={
-                        tool === "draw" && draft && draft.kind && draft.kind !== "freehand"
-                          ? (QUICKSHAPE_KIND_LABELS[draft.kind] ?? null)
+                        tool === "draw" && liveDraftShapeKind && liveDraftShapeKind !== "freehand"
+                          ? (QUICKSHAPE_KIND_LABELS[liveDraftShapeKind] ?? null)
                           : null
                       }
                       onOpenTutorial={() => openFeatureTutorial("smart-shape")}

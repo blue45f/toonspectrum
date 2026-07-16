@@ -17,7 +17,7 @@ export const STUDIO_ADJUSTMENT_ENGINE_IDS = [
   "channel-mixer",
   "gradient-map",
   "blur",
-  /** Magma-class blur gallery engines (map onto blurFx). */
+  /** Blur gallery engines (map onto blurFx). */
   "gaussian-blur",
   "motion-blur",
   "sharpen",
@@ -227,7 +227,7 @@ export type StudioAdjustmentFilterFields = {
   sharpen?: number;
   noise?: number;
   invert?: boolean;
-  /** Magma gaussian/motion blur gallery — applied via studio-blur Konva filter. */
+  /** Gaussian/motion blur gallery — applied via studio-blur Konva filter. */
   blurFx?: {
     type: "gaussian" | "motion" | "spin" | "zoom";
     strength: number;

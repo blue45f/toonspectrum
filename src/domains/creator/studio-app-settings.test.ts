@@ -17,7 +17,7 @@ import {
 } from "./studio-app-settings";
 
 describe("studio-app-settings", () => {
-  it("defaults include all Magma-style tabs and full rail order", () => {
+  it("defaults include all settings tabs and full rail order", () => {
     expect(STUDIO_APP_SETTINGS_TABS).toEqual([
       "general",
       "shortcuts",

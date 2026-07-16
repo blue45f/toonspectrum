@@ -1,5 +1,5 @@
 /**
- * StudioMainMenu — Magma/CSP/Photopea-style top application menu.
+ * StudioMainMenu — CSP/Photopea-style top application menu.
  * File · Edit · Insert · View · Draw · AI as compact dropdowns.
  * Menus portal to document.body with fixed coords so they never lose to options-strip
  * stacking or menubar overflow clipping.
@@ -242,7 +242,7 @@ function MenuDropdown({
   );
 }
 
-/** Application menu bar — Magma Top Bar menu section. */
+/** Application menu bar — top-bar menu section. */
 export function StudioMainMenu({ groups, className }: StudioMainMenuProps): ReactElement {
   const [openId, setOpenId] = useState<string | null>(null);
   const barActive = openId !== null;

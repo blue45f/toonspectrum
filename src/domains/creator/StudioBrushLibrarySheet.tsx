@@ -1,5 +1,5 @@
 /**
- * StudioBrushLibrarySheet — Magma / PicsArt full brush library popover.
+ * StudioBrushLibrarySheet — PicsArt-style full brush library popover.
  * Search · category · favorites · recent · large preview tiles.
  */
 import { Search, Star, X } from "lucide-react";

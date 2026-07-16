@@ -1,5 +1,5 @@
 /**
- * StudioDrawOptionsBar — Magma / PicsArt / CSP commercial draw chrome.
+ * StudioDrawOptionsBar — PicsArt / CSP-class commercial draw chrome.
  *
  * Primary strip: mode · active brush · library · size · opacity · color · sticky tools
  * Progressive disclosure: advanced (stabilizer / pressure / locks / slots)
@@ -368,7 +368,7 @@ export function StudioDrawOptionsBar({
           </div>
         ) : null}
 
-        {/* Active brush pill + library (PicsArt/Magma) */}
+        {/* Active brush pill + library (PicsArt-class) */}
         {drawMode === "pen" ? (
           <div className="flex shrink-0 items-center gap-0.5">
             <StudioToolHintTarget
@@ -570,7 +570,7 @@ export function StudioDrawOptionsBar({
           </>
         ) : null}
 
-        {/* Advanced toggle — Magma-style progressive disclosure */}
+        {/* Advanced toggle — progressive disclosure */}
         <StudioToolHintTarget
           hint={studioToolHintFromLabel(
             advancedOpen ? "세부 그리기 옵션 접기" : "세부 그리기 옵션",

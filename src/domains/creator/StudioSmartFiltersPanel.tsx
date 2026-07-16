@@ -1,5 +1,5 @@
 /**
- * Magma/Photopea-style reorderable smart filter stack for image elements.
+ * Photopea-style reorderable smart filter stack for image elements.
  * Catalog with rich descriptions + stack management (enable, reorder, delete, params).
  */
 import { ArrowDown, ArrowUp, Eye, EyeOff, Plus, Trash2 } from "lucide-react";
@@ -78,12 +78,12 @@ export function StudioSmartFiltersPanel({
       <div>
         <p className="text-[0.66rem] font-semibold uppercase tracking-wider text-fg-3">필터 관리</p>
         <p className="mt-0.5 text-[0.65rem] leading-relaxed text-fg-3">
-          Magma·Photopea 스타일로 비파괴 필터를 쌓습니다. 가우시안/모션 블러·곡선·레벨 등을 순서대로
+          비파괴 필터를 스택으로 쌓습니다. 가우시안/모션 블러·곡선·레벨 등을 순서대로
           적용하고 눈 아이콘으로 미리 끌 수 있어요.
         </p>
       </div>
 
-      {/* Magma Filter menu style — grouped catalog chips with hover detail */}
+      {/* Filter menu — grouped catalog chips with hover detail */}
       <div className="space-y-2 rounded-xl border border-line/70 bg-card/40 p-2">
         {groups.map((group) => {
           const items = STUDIO_FILTER_CATALOG.filter(
@@ -233,7 +233,7 @@ export function StudioSmartFiltersPanel({
                   </button>
                 </div>
 
-                {/* Magma-style blur param strip when relevant */}
+                {/* Blur param strip when relevant */}
                 {entry.enabled &&
                 (entry.engine === "gaussian-blur" ||
                   entry.engine === "motion-blur" ||

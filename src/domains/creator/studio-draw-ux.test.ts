@@ -10,7 +10,7 @@ import {
 } from "./studio-draw-ux";
 
 describe("studio-draw-ux", () => {
-  it("nudges brush size with Magma-style steps and clamps", () => {
+  it("nudges brush size with coarse-when-large steps and clamps", () => {
     expect(adjustStudioBrushSize(6, studioBrushSizeStep(6, 1))).toBe(7);
     expect(adjustStudioBrushSize(40, studioBrushSizeStep(40, 1))).toBe(44);
     expect(adjustStudioBrushSize(1, -5)).toBe(STUDIO_BRUSH_SIZE_RANGE.min);

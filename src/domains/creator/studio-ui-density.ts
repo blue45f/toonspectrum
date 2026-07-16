@@ -1,7 +1,6 @@
 /**
- * Studio UI density modes — mapped from Magma Super Simple / Simple / Full layout modes.
- * Official Magma docs (IA only, no clone of branding):
- * https://help.magma.com/en/articles/10586978-magma-layout-modes
+ * Studio UI density modes — three-tier layout presets (Super Simple / Simple / Full),
+ * a common commercial drawing-app IA (no branding cloned).
  *
  * Our keys stay simple | full | focus for storage stability:
  * - focus  ≈ Super Simple (minimal chrome, draw tools stay)
@@ -108,12 +107,12 @@ export function studioUiDensityAllows(
     );
   }
 
-  // Simple: core webtoon tools; hide AI/3D-heavy chrome (Magma Simple hides advanced brush props).
+  // Simple: core webtoon tools; hide AI/3D-heavy chrome (advanced brush props stay folded).
   if (region === "toolbar-ai" || region === "toolbar-reference") return false;
   return true;
 }
 
-/** Short UI chip label (Magma Super Simple / Simple / Full). */
+/** Short UI chip label (Super Simple / Simple / Full). */
 export function studioUiDensityLabel(mode: StudioUiDensityMode): string {
   if (mode === "simple") return "심플";
   if (mode === "focus") return "슈퍼심플";
@@ -122,12 +121,12 @@ export function studioUiDensityLabel(mode: StudioUiDensityMode): string {
 
 export function studioUiDensityDescription(mode: StudioUiDensityMode): string {
   if (mode === "simple") {
-    return "Magma Simple에 가깝게 — 핵심 도구와 기본 설정만 보여 입문·집중 작업에 맞춥니다.";
+    return "심플 모드 — 핵심 도구와 기본 설정만 보여 입문·집중 작업에 맞춥니다.";
   }
   if (mode === "focus") {
-    return "Magma Super Simple에 가깝게 — 그리기·삽입(템플릿·에셋·말풍선)과 캔버스 위주, AI·3D·속성 패널은 접습니다.";
+    return "슈퍼심플 모드 — 그리기·삽입(템플릿·에셋·말풍선)과 캔버스 위주, AI·3D·속성 패널은 접습니다.";
   }
-  return "Magma Full에 가깝게 — 모든 메뉴·패널·AI·3D 도구를 표시합니다.";
+  return "전체 모드 — 모든 메뉴·패널·AI·3D 도구를 표시합니다.";
 }
 
 /** Map existing mobile immersive flag into density for unified consumers. */

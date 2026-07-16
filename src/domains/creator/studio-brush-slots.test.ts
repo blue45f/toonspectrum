@@ -10,7 +10,7 @@ import {
 } from "./studio-brush-slots";
 
 describe("studio brush slots", () => {
-  it("remembers recent brushes at the front like Magma quick tools", () => {
+  it("remembers recent brushes at the front for quick recall", () => {
     let state = emptyStudioBrushSlots();
     state = rememberStudioBrushSlot(state, { brushId: "pen", strokeWidth: 6, brushOpacity: 1 });
     state = rememberStudioBrushSlot(state, { brushId: "marker", strokeWidth: 16, brushOpacity: 0.6 });

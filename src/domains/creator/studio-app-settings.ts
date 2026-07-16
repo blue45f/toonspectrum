@@ -1,10 +1,8 @@
 /**
- * Studio Application Settings — Magma-class editor prefs (IA only; no brand clone).
+ * Studio Application Settings — commercial-editor-grade prefs (IA only; no brand clone).
  *
- * Magma Application Settings tabs (public help):
+ * Settings tabs:
  * General · Shortcuts · Mouse · Touch · Toolbar · Grids · Other
- * https://help.magma.com/en/articles/11325963-magma-application-settings
- * https://help.magma.com/en/articles/8398468-custom-toolbar
  *
  * Pure model + localStorage; React UI lives in StudioAppSettingsPanel.
  */
@@ -34,7 +32,7 @@ export const STUDIO_APP_SETTINGS_TABS = [
 ] as const;
 export type StudioAppSettingsTab = (typeof STUDIO_APP_SETTINGS_TABS)[number];
 
-/** Left tool-rail ids that users can reorder/hide (Magma Toolbar tab). */
+/** Left tool-rail ids that users can reorder/hide (Toolbar settings tab). */
 export const STUDIO_RAIL_TOOL_CATALOG = [
   { id: "select", label: "선택", defaultShortcut: "V" },
   { id: "hand", label: "핸드(팬)", defaultShortcut: "H" },
@@ -228,7 +226,7 @@ export function normalizeStudioRailVisibleIds(value: unknown): StudioRailToolId[
       out.push(entry);
     }
   }
-  // Empty list is invalid — fall back to full default (Magma always keeps some tools).
+  // Empty list is invalid — fall back to full default (the rail must always keep some tools).
   // New catalog tools not in the saved list stay "hidden" and surface via More menu.
   if (out.length === 0) return [...DEFAULT_STUDIO_RAIL_TOOL_ORDER];
   return out;

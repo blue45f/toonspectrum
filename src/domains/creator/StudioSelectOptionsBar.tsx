@@ -1,5 +1,5 @@
 /**
- * Select tool options strip — Photoshop / CSP / Magma context actions when elements are selected.
+ * Select tool options strip — Photoshop / CSP-style context actions when elements are selected.
  * Icon-first commercial chrome; labels live in title/aria.
  */
 import {

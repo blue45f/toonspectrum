@@ -1,5 +1,5 @@
 /**
- * Magma-class tool hover copy — short title + longer “what it does” body + optional shortcut.
+ * Rich tool hover copy — short title + longer “what it does” body + optional shortcut.
  * Pure data for StudioToolHint / rail buttons. No brand clones.
  */
 
@@ -8,7 +8,7 @@ import type { StudioToolHintPreviewKind } from "./components/StudioToolHintPrevi
 export type StudioToolHintSpec = {
   id: string;
   title: string;
-  /** Longer description shown under the title (Magma tooltip body). */
+  /** Longer description shown under the title (tooltip body). */
   description: string;
   shortcut?: string;
   /** Purpose-built animated visual that demonstrates the tool rather than decorating it. */

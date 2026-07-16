@@ -92,7 +92,7 @@ const PRODUCTION_MENU_CATALOG: StudioMainMenuGroup[] = [
 ];
 
 describe("StudioMainMenu", () => {
-  it("renders Magma-style application menu groups", () => {
+  it("renders desktop-style application menu groups", () => {
     const html = renderToStaticMarkup(
       <StudioMainMenu
         groups={[

@@ -12,7 +12,7 @@ import {
   studioToolHintFromLabel,
 } from "./studio-tool-hints";
 
-describe("studio tool hints (Magma-class hover copy)", () => {
+describe("studio tool hints (rich hover copy)", () => {
   it("returns rich titles and descriptions for core rail tools", () => {
     const pen = studioToolHint("pen");
     expect(pen?.title).toBe("펜");
@@ -98,7 +98,7 @@ describe("studio tool hints (Magma-class hover copy)", () => {
     );
   });
 
-  it("catalogs Magma blur and tone filters with groups", () => {
+  it("catalogs blur and tone filters with groups", () => {
     expect(studioFilterCatalogEntry("gaussian-blur")?.title).toContain("가우시안");
     expect(studioFilterCatalogEntry("motion-blur")?.description).toMatch(/각도|속도|이동/);
     expect(studioFilterCatalogEntry("curves")?.group).toBe("tone");

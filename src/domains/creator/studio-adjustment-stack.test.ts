@@ -58,7 +58,7 @@ describe("studio adjustment stack", () => {
     expect(fields.invert).toBe(true);
   });
 
-  it("maps Magma-class gaussian and motion blur onto blurFx for live preview", () => {
+  it("maps gaussian and motion blur onto blurFx for live preview", () => {
     let stack = createEmptyStudioAdjustmentStack();
     stack = appendStudioAdjustmentEntry(stack, {
       engine: "gaussian-blur",

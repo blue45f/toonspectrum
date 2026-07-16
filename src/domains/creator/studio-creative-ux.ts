@@ -5,7 +5,7 @@
  * - Canva Draw: beginner-first short brush set + size chips + large starter cards
  * - Picsart Draw: visual brush tray with categories + stroke previews
  * - Adobe Express: digital pencil/marker/brush named for easy pick
- * - Magma: layout density already mapped in studio-ui-density.ts
+ * - 레이아웃 밀도 프리셋은 studio-ui-density.ts 에 매핑돼 있다
  *
  * Pure data + presentation helpers; no document state.
  */
@@ -334,7 +334,7 @@ export const STUDIO_CREATIVE_STARTER_CARDS: readonly StudioCreativeStarterCard[]
     id: "collab-focus",
     label: "캔버스 넓히기",
     hint: "패널 접고 집중 모드",
-    inspiredBy: "Magma Super Simple",
+    inspiredBy: "협업 캔버스 집중 모드",
   },
   {
     id: "example",

@@ -11,14 +11,14 @@ export const STUDIO_FILTER_CATALOG: readonly StudioFilterCatalogEntry[] = [
     engine: "gaussian-blur",
     title: "가우시안 블러",
     description:
-      "픽셀을 고르게 퍼뜨려 부드럽게 만듭니다. 배경을 흐리게 해 초점을 강조할 때 유용해요. (Magma Gaussian Blur)",
+      "픽셀을 고르게 퍼뜨려 부드럽게 만듭니다. 배경을 흐리게 해 초점을 강조할 때 유용해요.",
     group: "blur",
   },
   {
     engine: "motion-blur",
     title: "모션 블러",
     description:
-      "지정한 각도로 선형 잔상을 만들어 속도·이동감을 냅니다. 거리와 각도를 조절하세요. (Magma Motion Blur)",
+      "지정한 각도로 선형 잔상을 만들어 속도·이동감을 냅니다. 거리와 각도를 조절하세요.",
     group: "blur",
   },
   {

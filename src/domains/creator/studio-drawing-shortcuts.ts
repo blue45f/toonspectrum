@@ -8,7 +8,7 @@ export type StudioDrawingShortcut =
   | { type: "toggle-eraser" }
   | { type: "adjust-width"; delta: number }
   | { type: "adjust-opacity"; delta: number }
-  /** Magma-style recent brush slot recall (0–5). */
+  /** Recent brush slot recall (0–5). */
   | { type: "recall-brush-slot"; index: number }
   /** Toggle canvas-first chrome (Backquote; Tab stays native browser navigation). */
   | { type: "toggle-chrome" }

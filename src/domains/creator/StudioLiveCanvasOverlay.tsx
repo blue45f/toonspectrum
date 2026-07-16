@@ -59,7 +59,7 @@ export interface StudioLiveCanvasOverlayProps {
 export interface StudioLivePresenceDockProps {
   connected: boolean;
   operationSyncReady?: boolean;
-  /** Magma always-on: show while connecting/ready even with zero peers. */
+  /** Always-on collab: show while connecting/ready even with zero peers. */
   alwaysOn?: boolean;
   peers: readonly StudioLivePeer[];
   followingSessionId: string | null;
@@ -319,7 +319,7 @@ export function StudioLivePresenceDock({
   onToggleFollow,
   syncSnapshot,
 }: StudioLivePresenceDockProps) {
-  // Always-on collab chrome: parent passes alwaysOn while connecting/ready (Magma presence strip).
+  // Always-on collab chrome: parent passes alwaysOn while connecting/ready (presence strip).
   if (!alwaysOn && !connected && peers.length === 0) return null;
   const visibleCount = studioPresenceVisiblePeerCount(peers.length, 5);
   const visiblePeers = peers.slice(0, visibleCount);

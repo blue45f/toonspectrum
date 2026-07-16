@@ -1,12 +1,10 @@
 /**
  * Studio chrome UI — toolbar, dock, and menu-shell primitives shared by StudioPage.
  *
- * Competitor mapping (names not cloned; IA only from public Magma help):
- * - Magma Editor: Top Bar + left vertical Toolbar + center Canvas + right Properties/Layers
+ * Commercial drawing-app IA (names not cloned):
+ * - Editor shell: Top Bar + left vertical Toolbar + center Canvas + right Properties/Layers
  *   + bottom Status Bar + Quick Actions (undo/redo/zoom/fit)
- *   Layout modes Super Simple / Simple / Full
- *   https://help.magma.com/en/articles/6871160-magma-s-editor-user-interface
- *   https://help.magma.com/en/articles/10586978-magma-layout-modes
+ *   Layout density modes Super Simple / Simple / Full
  * - CSP / Fresco: labeled tool groups
  * - Figma: edge-dock shell
  *
@@ -206,7 +204,7 @@ export function StudioAppMenubar({
       aria-label={ariaLabel}
       data-studio-app-menubar="true"
       className={cn(
-        // Magma/Sumo top bar — denser commercial app chrome, still canvas-max height.
+        // Sumo-class top bar — denser commercial app chrome, still canvas-max height.
         "relative z-[50] h-11 min-h-11 shrink-0 border-b border-line",
         // Critical: do NOT put overflow-x-auto here — it clips File/Edit dropdowns.
         "overflow-visible",
@@ -284,7 +282,7 @@ export function StudioToolButton({
   );
 }
 
-/** Sticky header inside a toolbar group popover (Magma / CSP subtool panel). */
+/** Sticky header inside a toolbar group popover (CSP-style subtool panel). */
 export function StudioMenuPopoverHeader({
   title,
   description,
@@ -574,8 +572,8 @@ export function StudioContextActionButton({
 }
 
 /**
- * Magma/Krita/Ibis left vertical Toolbar — icon-first tools left of the canvas.
- * Grouped tools can show a flyout chevron (Magma Super Simple triangle affordance).
+ * Krita/Ibis-style left vertical Toolbar — icon-first tools left of the canvas.
+ * Grouped tools can show a flyout chevron (triangle affordance signals alternate tools).
  */
 export function StudioVerticalToolRail({
   children,
@@ -825,16 +823,16 @@ export interface StudioRailToolButtonProps
   active?: boolean;
   icon: LucideIcon;
   label: string;
-  /** Magma-style longer body for rich hover tooltip (shown with StudioToolHintTarget). */
+  /** Longer body for the rich hover tooltip (shown with StudioToolHintTarget). */
   description?: string;
-  /** Magma-style group indicator (long-press / alternate tools exist). */
+  /** Group indicator (long-press / alternate tools exist). */
   grouped?: boolean;
   accented?: boolean;
   /** Why the underlying tool is unavailable; remains discoverable from the disabled coach. */
   unavailableReason?: string;
 }
 
-/** Icon-only tool on the left Magma/Ibis-style rail. */
+/** Icon-only tool on the left Ibis-style rail. */
 export function StudioRailToolButton({
   active = false,
   icon: Icon,
@@ -849,7 +847,7 @@ export function StudioRailToolButton({
   title,
   ...rest
 }: StudioRailToolButtonProps): ReactElement {
-  // When a rich description is provided, leave title empty so Magma-style bubble is the only hover UI.
+  // When a rich description is provided, leave title empty so the rich hint bubble is the only hover UI.
   const nativeTitle = description ? undefined : (title ?? label);
   const button = (
     <button
@@ -860,7 +858,7 @@ export function StudioRailToolButton({
       data-studio-tool-description={description ? "true" : undefined}
       aria-pressed={active}
       className={cn(
-        // Fresco/Magma: slightly larger hit, soft radius, no hard bevel.
+        // Fresco-style: slightly larger hit, soft radius, no hard bevel.
         "relative grid size-10 place-items-center rounded-2xl border border-transparent xl:size-11",
         STUDIO_EASE,
         STUDIO_FOCUS_RING,
@@ -921,8 +919,8 @@ export function StudioRailDivider({ className }: { className?: string }): ReactE
 }
 
 /**
- * Magma Top Bar Quick Actions — undo / redo / zoom / fit, icon-first.
- * Lives in the horizontal tool belt center (Magma Quick Actions strip).
+ * Top Bar Quick Actions — undo / redo / zoom / fit, icon-first.
+ * Lives in the horizontal tool belt center (quick actions strip).
  */
 export function StudioQuickActionsBar({
   children,

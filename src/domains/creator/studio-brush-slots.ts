@@ -1,5 +1,5 @@
 /**
- * Magma-style recent brush slots (1–6).
+ * Recent brush slots (1–6).
  * Stores brush id + stroke width + opacity for quick recall.
  * Pure model + localStorage helpers.
  */
@@ -92,7 +92,7 @@ export function saveStudioBrushSlotsState(
   }
 }
 
-/** Push current brush to the front of recent slots (Magma recent tools). */
+/** Push current brush to the front of recent slots (quick recall). */
 export function rememberStudioBrushSlot(
   state: StudioBrushSlotsState,
   next: StudioBrushSlot
