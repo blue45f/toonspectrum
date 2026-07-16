@@ -3459,6 +3459,8 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
                 opacity={opacity}
                 globalCompositeOperation={composite}
                 listening={false}
+                perfectDrawEnabled={false}
+                shadowForStrokeEnabled={false}
               />
             );
           }
@@ -3475,6 +3477,8 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
               tension={0.4}
               globalCompositeOperation={composite}
               listening={false}
+              perfectDrawEnabled={false}
+              shadowForStrokeEnabled={false}
             />
           );
         }
@@ -6729,11 +6733,17 @@ function StudioCuttoonEditor() {
   const liveDrawPressureRef = useRef<number | null>(null);
   const liveDrawPressureRafRef = useRef<number>(0);
   const scheduleLiveDrawPressure = (next: number | null) => {
-    liveDrawPressureRef.current = next;
+    // 1/32 양자화: HUD 게이지가 구분 못 하는 미세 변화로 스트로크 프레임마다 30k 라인
+    // 컴포넌트를 리렌더하지 않는다. 같은 값이면 rAF 예약 자체를 만들지 않는다.
+    const quantized = next === null ? null : Math.round(next * 32) / 32;
+    if (liveDrawPressureRef.current === quantized && !liveDrawPressureRafRef.current) return;
+    liveDrawPressureRef.current = quantized;
     if (liveDrawPressureRafRef.current) return;
     liveDrawPressureRafRef.current = requestAnimationFrame(() => {
       liveDrawPressureRafRef.current = 0;
-      setLiveDrawPressure(liveDrawPressureRef.current);
+      setLiveDrawPressure((prev) =>
+        prev === liveDrawPressureRef.current ? prev : liveDrawPressureRef.current
+      );
     });
   };
   const [stabilizer, setStabilizer] = useState<number>(6);
@@ -19708,44 +19718,15 @@ function StudioCuttoonEditor() {
   const isolatedDynamicDraft = draft?.mode === "pen" && resolveStudioBrushDynamicsPresetId(draft.brush) !== null
     ? draft
     : null;
-  // G10b safe authority slice: latency-sensitive live ink uses the retained WebGPU compositor
-  // (with a silent Canvas2D fallback), while committed pixels remain authoritative in Konva.
-  // Permanent source handoff is intentionally gated until analytic segment parity, every Stage
-  // readback path, native-scroll invalidation, and top interaction planes share one contract.
-  const webGpuDraft = draft && draft.mode !== "eraser"
-    && (draft.kind ?? "freehand") === "freehand" && !isolatedDynamicDraft
-    && resolveStudioBrushRenderFamily(draft.brush ?? "pen") === "pen"
-    && (draft.opacity ?? 1) >= 0.999
-    && (draft.symmetry?.type ?? "none") === "none"
-      ? draft
-      : null;
-  const webGpuPreviewPoints = webGpuDraft
-    ? processFreehandPoints(
-        webGpuDraft.points,
-        strokeRenderDistance(webGpuDraft.sampleSpacing)
-      )
-    : null;
-  const webGpuPreviewPressures = webGpuDraft && webGpuPreviewPoints
-    ? resampleStrokePressures(
-        webGpuDraft.pressures ?? [],
-        Math.floor(webGpuPreviewPoints.length / 2),
-        0.5
-      )
-    : null;
-  const webGpuDraftStroke: StudioGpuStroke | null = webGpuDraft && webGpuPreviewPoints
-    ? {
-        id: webGpuDraft.id,
-        points: webGpuPreviewPoints,
-        pressures: webGpuPreviewPressures ?? undefined,
-        color: webGpuDraft.stroke,
-        size: Math.max(1, webGpuDraft.strokeWidth),
-        opacity: webGpuDraft.opacity,
-        composite: "normal",
-      }
-    : null;
-  const webGpuPreviewStrokes: readonly StudioGpuStroke[] = webGpuDraftStroke
-    ? [webGpuDraftStroke]
-    : EMPTY_STUDIO_GPU_STROKES;
+  // G10b single-renderer live ink: the retained WebGPU compositor stays mounted so device-loss,
+  // resize and viewport lifecycles keep exercising the real pipeline, but the live freehand
+  // draft is never fed to it. The async authority round-trip (every appended point invalidates,
+  // the GPU re-authorizes one or more frames later) alternated draft ownership between this
+  // overlay and the Konva draft node each frame — users saw the stroke flash mid-stroke and at
+  // pen lift, and the two rasterizers differ in antialiasing so even clean handoffs pulsed.
+  // Konva is the sole live-ink renderer until committed-surface parity lands (see
+  // docs/studio-crdt-webgpu-architecture-2026-07-16.md).
+  const webGpuPreviewStrokes: readonly StudioGpuStroke[] = EMPTY_STUDIO_GPU_STROKES;
   const webGpuViewportSurface = planStudioWebGpuViewportSurface({
     documentWidth: CANVAS_W,
     documentHeight: canvasH,
@@ -19756,18 +19737,18 @@ function StudioCuttoonEditor() {
     viewportHeight: scrollPos.height,
     flipX: canvasFlipH,
   });
+  // With no live strokes fed to the compositor this can never authorize a visible GPU frame
+  // (the authority contract requires strokes.length > 0); keeping the real check exercises the
+  // authority state machine for the future committed-surface handoff without a dead-code fork.
   const webGpuPreviewAuthorized = webGpuViewportSurface !== null
     && isStudioWebGpuAuthorityCurrent(webGpuAuthority, {
       strokes: webGpuPreviewStrokes,
       committedElementIds: [],
-      draftElementId: webGpuDraftStroke?.id ?? null,
+      draftElementId: null,
       documentWidth: CANVAS_W,
       documentHeight: canvasH,
       viewport: webGpuViewportSurface,
     });
-  const webGpuDraftAuthorized = webGpuPreviewAuthorized
-    && webGpuAuthority.draftElementId !== null
-    && webGpuAuthority.draftElementId === webGpuDraftStroke?.id;
   const studioRasterOverlayElements: readonly StudioRasterOverlaySourceElement[] =
     elements.map((element) => ({
       ...element,
@@ -24983,7 +24964,9 @@ function StudioCuttoonEditor() {
                   </>
                 );
               })()}
-              {draft && !isolatedDynamicDraft && !webGpuDraftAuthorized
+              {/* 지우개 초안만 메인 레이어에 남는다: destination-out 은 이 레이어의 커밋 픽셀과
+                  합성되어야 지워지는 미리보기가 보인다. 나머지 초안은 아래 전용 레이어에서 그린다. */}
+              {draft && !isolatedDynamicDraft && draft.mode === "eraser"
                 ? <StudioDrawNode el={draft} />
                 : null}
               <Transformer
@@ -25017,6 +25000,15 @@ function StudioCuttoonEditor() {
                 );
               })()}
             </Layer>
+            {/* 라이브 프리핸드 초안은 전용 레이어에서만 다시 그린다: 포인터 프레임마다 메인
+                레이어의 모든 커밋 요소(세그먼트 압력 획·수채 dab 등)를 재래스터하지 않는다.
+                일반 획은 source-over 단일 노드라 별도 캔버스에서 합성해도 시각 결과가 같다.
+                지우개(destination-out)만 위의 메인 레이어 경로를 쓴다. */}
+            {draft && !isolatedDynamicDraft && draft.mode !== "eraser" && (
+              <Layer listening={false}>
+                <StudioDrawNode el={draft} />
+              </Layer>
+            )}
             {/* 라이브 입자 획은 독립 레이어에서만 다시 그린다. committed 입자 획이 포인터 RAF마다
                 수천 개의 dab을 재실행하지 않아 모바일 입력 지연과 배터리 사용을 줄인다. */}
             {isolatedDynamicDraft && (
@@ -25640,7 +25632,7 @@ function StudioCuttoonEditor() {
                   setWebGpuAuthority(snapshotStudioWebGpuAuthority({
                     strokes: webGpuPreviewStrokes,
                     committedElementIds: [],
-                    draftElementId: webGpuDraftStroke?.id ?? null,
+                    draftElementId: null,
                     documentWidth: CANVAS_W,
                     documentHeight: canvasH,
                     viewport: webGpuViewportSurface,
