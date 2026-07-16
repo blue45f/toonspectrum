@@ -19,7 +19,9 @@ const budgets = {
   // 2026-07-16 release planner split + auth graph cleanup: ~2.32 MiB raw / ~768 KiB gzip.
   // 2026-07-16 publication analytics split: ~2.30 MiB raw / ~762 KiB gzip.
   // Preserve the previous headroom while locking in the independently loaded analytics engine.
-  studio: { raw: 2_445_000, gzip: 792_000 },
+  // 2026-07-17 hot-path de-React(제스처 줌·커밋 지연 파이프라인·격리 초안 스토어)+스탬프
+  // 브러시 4종: ~2397 KiB raw / ~775 KiB gzip 관측 — 소폭 상향.
+  studio: { raw: 2_465_000, gzip: 800_000 },
   // Measured after the same build: 443,257 raw / 143,956 gzip.
   app: { raw: 500_000, gzip: 170_000 },
 };
