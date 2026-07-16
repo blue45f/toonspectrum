@@ -12,6 +12,7 @@ import {
   encodeStudioCrdtSyncChunks,
   encodeStudioCrdtUpdate,
   type StudioCrdtSyncRequest,
+  type StudioCrdtUpdateAck,
   type StudioCrdtUpdateRequest,
 } from "./studio-crdt-protocol";
 
@@ -114,6 +115,12 @@ export class StudioCrdtRoomBinding {
   private activeSyncRequestId: string | null = null;
   private clientSequence = 0;
   private localServerSequence = 0;
+  /**
+   * Highest contiguous durable sequence proven to be present in this document. This is only
+   * meaningful for the authenticated socket transport: BroadcastChannel peers each have their
+   * own local counters and therefore cannot provide a room-wide ordering fence.
+   */
+  private authoritativeServerSequence: bigint | null = null;
   private durabilityWarning: string | null = null;
   private started = false;
   private closed = false;
@@ -231,6 +238,7 @@ export class StudioCrdtRoomBinding {
     if (this.closed) return;
     if (response) {
       this.document.applySyncResponse(response);
+      this.advanceAuthoritativeSequenceAfterSync(response.serverSequence);
       const serverVector = decodeStudioCrdtStateVector(response.serverStateVector);
       const localVector = this.document.encodeStateVector();
       // Pending operations already represent the client's unsent frontier. Adding a second
@@ -420,8 +428,9 @@ export class StudioCrdtRoomBinding {
         });
       }
       try {
-        await this.room.publishCrdtUpdate(pending.request);
+        const acknowledgement = await this.room.publishCrdtUpdate(pending.request);
         this.pending.delete(updateId);
+        this.reconcileAuthoritativeAcknowledgement(acknowledgement);
         if (this.outboxScope) {
           void this.outbox
             .remove(this.outboxScope, pending.request.workId, updateId)
@@ -514,8 +523,17 @@ export class StudioCrdtRoomBinding {
   private onCrdtEvent(event: StudioLiveCrdtRoomEvent): void {
     if (this.closed) return;
     if (event.type === "update") {
+      const sequenceState = this.classifyAuthoritativeSequence(event.update.serverSequence);
+      if (sequenceState === "stale") return;
       try {
         this.document.applyUpdateBase64(event.update.update, STUDIO_CRDT_ORIGIN_REMOTE);
+        if (sequenceState === "contiguous") {
+          this.authoritativeServerSequence = BigInt(event.update.serverSequence);
+        } else if (sequenceState === "gap") {
+          this.requestAuthoritativeRepair(
+            "실시간 전달 순서에 누락이 감지되어 서버 원고와 즉시 다시 맞춥니다."
+          );
+        }
       } catch (error) {
         this.emitStatus({
           state: "error",
@@ -536,6 +554,66 @@ export class StudioCrdtRoomBinding {
     if (event.type === "error") {
       this.emitStatus({ state: "retrying", message: event.message });
     }
+  }
+
+  private classifyAuthoritativeSequence(
+    sequence: string
+  ): "untracked" | "stale" | "contiguous" | "gap" {
+    if (this.room.mode !== "server" || this.authoritativeServerSequence === null) {
+      return "untracked";
+    }
+    const candidate = BigInt(sequence);
+    if (candidate <= this.authoritativeServerSequence) return "stale";
+    return candidate === this.authoritativeServerSequence + BigInt(1)
+      ? "contiguous"
+      : "gap";
+  }
+
+  private advanceAuthoritativeSequenceAfterSync(sequence: string): void {
+    if (this.room.mode !== "server") return;
+    const synchronized = BigInt(sequence);
+    if (
+      this.authoritativeServerSequence === null ||
+      synchronized > this.authoritativeServerSequence
+    ) {
+      this.authoritativeServerSequence = synchronized;
+    }
+  }
+
+  private reconcileAuthoritativeAcknowledgement(
+    acknowledgement: StudioCrdtUpdateAck
+  ): void {
+    const sequenceState = this.classifyAuthoritativeSequence(
+      acknowledgement.serverSequence
+    );
+    if (sequenceState === "contiguous") {
+      // The acknowledged operation is already in the local Y.Doc because this client authored it.
+      this.authoritativeServerSequence = BigInt(acknowledgement.serverSequence);
+      return;
+    }
+    if (sequenceState === "gap") {
+      // Another durable operation committed before this ACK but its realtime broadcast was lost.
+      // Repair immediately instead of waiting for the periodic ten-second convergence pass.
+      this.requestAuthoritativeRepair(
+        "서버 승인 순번에서 누락된 팀 편집을 감지해 즉시 복구합니다."
+      );
+    }
+  }
+
+  private requestAuthoritativeRepair(message: string): void {
+    if (this.closed || this.room.mode !== "server") return;
+    this.emitStatus({ state: "retrying", message });
+    if (!this.room.ready || this.syncPromise) {
+      this.scheduleSyncRetry();
+      return;
+    }
+    void this.syncNow().catch((error) => {
+      this.emitStatus({
+        state: "retrying",
+        message: messageFrom(error, "서버 원고의 누락된 편집을 복구하지 못했습니다."),
+      });
+      this.scheduleSyncRetry();
+    });
   }
 
   private respondToPeerSync(request: StudioCrdtSyncRequest, senderSessionId: string): void {

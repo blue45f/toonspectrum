@@ -31,6 +31,9 @@ rewrites rather than claims that every legacy scene type already runs on the new
 
 - `studio:crdt:sync` returns a state-vector-based snapshot/update frontier; `studio:crdt:update`
   appends bounded binary updates and broadcasts accepted updates to the work room.
+- Server-mode clients track the highest contiguous durable `serverSequence`. A gap observed in a
+  remote update or local acknowledgement triggers an immediate state-vector repair; local
+  BroadcastChannel counters are intentionally excluded from this durability check.
 - Each update is at most 48 KiB. Stroke sample, collection, document, and deletion-log limits are
   validated before persistence.
 - A per-work PostgreSQL transaction advisory lock serializes duplicate-receipt lookup, hydration,
@@ -84,8 +87,9 @@ rewrites rather than claims that every legacy scene type already runs on the new
   visible-frame budget, but any visible truncation rejects the frame.
 - Tile physical resolution is capped at 4x. If zoom × device-pixel-ratio needs more than that, the
   GPU path declines authority instead of approving a blurry preview.
-- WebGPU initialization is idempotent, late device acquisition after cancellation is destroyed,
-  and device loss invalidates every old-generation resource before recovery.
+- WebGPU initialization is single-flight and idempotent, lets the browser select a power-aware
+  default adapter for mobile battery/thermal stability, destroys late device acquisition after
+  cancellation, and invalidates every old-generation resource before device-loss recovery.
 - Canvas2D remains the compositor-compatible fallback when WebGPU is unavailable. Konva remains the
   scene/interactions authority for unsupported images, text, bubbles, filters, selections, and 3D
   surfaces until their render contracts move to GPU passes.
@@ -97,7 +101,8 @@ rewrites rather than claims that every legacy scene type already runs on the new
 
 - CRDT: concurrent delivery-order convergence, progressive sample append, delete/edit and
   delete/restore races, mixed scene order, page/group topology, corrupt hydration, duplicate receipt,
-  two-writer transaction rollback, presence gap recovery, cross-node relay, and distributed leases.
+  two-writer transaction rollback, durable sequence-gap repair, presence gap recovery, cross-node
+  relay, and distributed leases.
 - WebGPU: retained suffix upload, historical rebuild, visible-only tall-document planning,
   fractional tile edges, high-DPI quality rejection, empty/non-finite rejection, stale receipts,
   queue serialization/coalescing, device loss, initialization cancellation, and Canvas2D fallback.

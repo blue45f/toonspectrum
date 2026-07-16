@@ -1015,6 +1015,7 @@ export class StudioWebGpuEngine {
     readonly requestId: string;
     readonly frameGeneration: number;
   } | null = null;
+  private initializationPromise: Promise<StudioGpuBackend> | null = null;
   private lifecycleGeneration = 0;
   private disposed = false;
   private viewport = normalizeViewport({ logicalWidth: 1, logicalHeight: 1 });
@@ -1043,9 +1044,13 @@ export class StudioWebGpuEngine {
     return this.backend;
   }
 
-  public async initialize(): Promise<StudioGpuBackend> {
-    if (this.disposed) return this.backend;
-    if (this.backend === "webgpu" && this.device) return this.backend;
+  public initialize(): Promise<StudioGpuBackend> {
+    if (this.disposed) return Promise.resolve(this.backend);
+    if (this.backend === "webgpu" && this.device) return Promise.resolve(this.backend);
+    // React remounts, eager feature warm-up and an explicit retry may all reach this boundary in
+    // the same task. Adapter/device acquisition is not cancellable, so superseding an in-flight
+    // request would allocate a second device only to destroy the first one when it resolves.
+    if (this.initializationPromise) return this.initializationPromise;
     if (this.device) {
       const previousDevice = this.device;
       this.invalidateAuthorityFrame();
@@ -1069,11 +1074,18 @@ export class StudioWebGpuEngine {
     }
     const generation = ++this.lifecycleGeneration;
     this.activateCanvas2d();
-    const ready = await this.initializeWebGpu(generation);
-    if (ready && !this.disposed && generation === this.lifecycleGeneration) {
-      this.render(this.lastStrokes);
-    }
-    return this.backend;
+    const initialization = this.initializeWebGpu(generation)
+      .then((ready) => {
+        if (ready && !this.disposed && generation === this.lifecycleGeneration) {
+          this.render(this.lastStrokes);
+        }
+        return this.backend;
+      })
+      .finally(() => {
+        this.initializationPromise = null;
+      });
+    this.initializationPromise = initialization;
+    return initialization;
   }
 
   public resize(input: StudioGpuViewport): void {
@@ -1595,7 +1607,10 @@ export class StudioWebGpuEngine {
     let device: GPUDevice | null = null;
     let context: GPUCanvasContext | null = null;
     try {
-      const adapter = await gpu.requestAdapter({ powerPreference: "high-performance" });
+      // Let the browser choose its default adapter. The compositor is already viewport-bounded,
+      // while forcing a discrete GPU can cost battery/thermals and make device loss more likely on
+      // portable systems. Browsers may still select the high-performance adapter when appropriate.
+      const adapter = await gpu.requestAdapter();
       if (!adapter || this.disposed || generation !== this.lifecycleGeneration) return false;
       device = await adapter.requestDevice();
       if (this.disposed || generation !== this.lifecycleGeneration) {

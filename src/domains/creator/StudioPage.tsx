@@ -372,18 +372,6 @@ import {
 } from "./studio-chrome-ui";
 import { COLOR_WHEEL_LONG_PRESS_MS, clampWheelCenter, selectWheelColors, shouldCancelLongPress } from "./studio-color-wheel";
 import {
-  assembleComipoPage,
-  type ComipoAssemblySeed,
-} from "./studio-comipo-assembly";
-import {
-  runStudioPageAddDialogueBubbles,
-  runStudioPageAddSceneTemplate,
-  studioSpawnCenter,
-  type StudioElementLike,
-  type StudioPageInsertState,
-  type StudioPageSelectedFrame,
-} from "./studio-comipo-shipped";
-import {
   createEmptyStudioCommentsDocument,
   normalizeStudioCommentsDocument,
   studioCommentAnchorsEqual,
@@ -838,6 +826,7 @@ import {
   normalizeMarqueeRect,
   selectIdsByMarquee,
   unionBounds,
+  viewportSpawnCenter,
 } from "./studio-selection";
 import {
   appendBrushPoint,
@@ -1051,7 +1040,6 @@ import {
   StudioToolHintPreferencesProvider,
   StudioToolHintTarget,
 } from "./StudioToolHint";
-import { StudioUploadPublish } from "./StudioUploadPublish";
 import { StudioWorkspaceMenu } from "./StudioWorkspaceMenu";
 
 import type { AdvancedFillDiagnostics, AdvancedFillMaskLike } from "./studio-advanced-fill";
@@ -1070,6 +1058,12 @@ import type { Clarity } from "./studio-clarity";
 import type { StudioClip } from "./studio-clips";
 import type { ColorBalance } from "./studio-color-balance";
 import type { ColorToAlpha } from "./studio-color-to-alpha";
+import type { ComipoAssemblySeed } from "./studio-comipo-assembly";
+import type {
+  StudioElementLike,
+  StudioPageInsertState,
+  StudioPageSelectedFrame,
+} from "./studio-comipo-shipped";
 import type { StudioCrdtDocument } from "./studio-crdt-document";
 import type { CurvePoint } from "./studio-curves";
 import type { Detail } from "./studio-detail";
@@ -1157,6 +1151,10 @@ const StudioImageAdjustmentsPanel = lazyRetry(
 const StudioWebGpuCanvas = lazyRetry(
   () => import("./StudioWebGpuCanvas").then((mod) => ({ default: mod.StudioWebGpuCanvas })),
   "StudioWebGpuCanvas"
+);
+const StudioUploadPublish = lazyRetry(
+  () => import("./StudioUploadPublish").then((mod) => ({ default: mod.StudioUploadPublish })),
+  "StudioUploadPublish"
 );
 const StudioLivePresenceDockConnected = lazyRetry(
   () => import("./StudioLiveCanvasOverlay").then((mod) => ({ default: mod.StudioLivePresenceDockConnected })),
@@ -1609,6 +1607,28 @@ function loadStudioColorPopover(): Promise<StudioColorPopoverModule> {
 
 const StudioColorPopoverContent = lazyRetry(loadStudioColorPopover, "StudioColorPopover");
 
+type StudioComipoAssemblyModule = typeof import("./studio-comipo-assembly");
+type StudioComipoShippedModule = typeof import("./studio-comipo-shipped");
+
+let studioComipoAssemblyPromise: Promise<StudioComipoAssemblyModule> | null = null;
+let studioComipoShippedPromise: Promise<StudioComipoShippedModule> | null = null;
+
+function loadStudioComipoAssembly(): Promise<StudioComipoAssemblyModule> {
+  studioComipoAssemblyPromise ??= import("./studio-comipo-assembly").catch((error) => {
+    studioComipoAssemblyPromise = null;
+    throw error;
+  });
+  return studioComipoAssemblyPromise;
+}
+
+function loadStudioComipoShipped(): Promise<StudioComipoShippedModule> {
+  studioComipoShippedPromise ??= import("./studio-comipo-shipped").catch((error) => {
+    studioComipoShippedPromise = null;
+    throw error;
+  });
+  return studioComipoShippedPromise;
+}
+
 function preloadStudioColorPopover(): void {
   void loadStudioColorPopover();
 }
@@ -1670,6 +1690,17 @@ function StudioPanelLoading({ label = "패널을 여는 중..." }: { label?: str
   return (
     <div className="rounded-lg border border-line bg-card/70 px-3 py-2 text-xs text-fg-3">
       {label}
+    </div>
+  );
+}
+
+function StudioRouteLoading({ label }: { label: string }) {
+  return (
+    <div className="grid min-h-dvh place-items-center bg-bg px-4" role="status" aria-live="polite">
+      <div className="flex items-center gap-2 rounded-xl border border-line bg-card/90 px-4 py-3 text-sm text-fg-2 shadow-lg">
+        <Loader2 className="animate-spin motion-reduce:animate-none" size={18} aria-hidden />
+        <span>{label}</span>
+      </div>
     </div>
   );
 }
@@ -4820,9 +4851,11 @@ export function StudioPage() {
   );
   if (uploadMode) {
     return (
-      <StudioUploadPublish
-        key={JSON.stringify(["upload", workId ?? "new", draftIdentityScopeRef.current.epoch])}
-      />
+      <Suspense fallback={<StudioRouteLoading label="게시 작업공간을 안전하게 여는 중..." />}>
+        <StudioUploadPublish
+          key={JSON.stringify(["upload", workId ?? "new", draftIdentityScopeRef.current.epoch])}
+        />
+      </Suspense>
     );
   }
   // 저장된 작품은 계정/작품 경계가 바뀌는 즉시 편집기를 새 인스턴스로 만들어 이전 계정 원고가
@@ -5298,6 +5331,7 @@ function StudioCuttoonEditor() {
   pagesHiRef.current = pagesHi;
   const pagesHistoryRef = useRef(pagesHistory);
   pagesHistoryRef.current = pagesHistory;
+  const comipoActionBusyRef = useRef(false);
   const pages = pagesHistory[pagesHi];
 
   const [currentPageId, setCurrentPageId] = useState<string>(pages[0]?.id || "");
@@ -11624,18 +11658,52 @@ function StudioCuttoonEditor() {
       };
     });
   }
-  function startFromExample() {
+  function captureDeferredComipoAction() {
+    return {
+      mutationTicket: captureStudioMutationTicket(),
+      history: pagesHistoryRef.current,
+      historyIndex: pagesHiRef.current,
+    };
+  }
+  function canApplyDeferredComipoAction(
+    action: ReturnType<typeof captureDeferredComipoAction>
+  ): boolean {
+    if (!canApplyStudioMutation(action.mutationTicket)) return false;
+    if (
+      pagesHistoryRef.current !== action.history ||
+      pagesHiRef.current !== action.historyIndex
+    ) {
+      setError("원고가 바뀌어 오래된 템플릿 결과를 적용하지 않았어요. 다시 실행해 주세요.");
+      return false;
+    }
+    return true;
+  }
+  async function startFromExample() {
     if (collaborationDocumentLocked) {
       setError(collaborationLockMessage());
       return;
     }
+    if (comipoActionBusyRef.current) return;
     if (elements.length > 0 && !globalThis.confirm("기존 작업을 지우고 예시를 불러올까요?")) return;
 
-    const assembled = assembleComipoPage({
-      layoutId: "layout_talk_2_bubbles",
-      sceneTemplateId: "confession",
-      dialogueScript: "민수: 스튜디오에 오신 걸 환영해요!\n지영: 3D 캐릭터·말풍선·컷 템플릿을 바로 써 보세요.",
-    });
+    const deferredAction = captureDeferredComipoAction();
+    comipoActionBusyRef.current = true;
+    let assembled: ReturnType<StudioComipoAssemblyModule["assembleComipoPage"]> = null;
+    try {
+      const { assembleComipoPage } = await loadStudioComipoAssembly();
+      if (!canApplyDeferredComipoAction(deferredAction)) return;
+      assembled = assembleComipoPage({
+        layoutId: "layout_talk_2_bubbles",
+        sceneTemplateId: "confession",
+        dialogueScript: "민수: 스튜디오에 오신 걸 환영해요!\n지영: 3D 캐릭터·말풍선·컷 템플릿을 바로 써 보세요.",
+      });
+    } catch (error) {
+      console.error("Failed to load the Studio example assembler:", error);
+      if (!canApplyDeferredComipoAction(deferredAction)) return;
+      setError("고급 예시 장면을 불러오지 못해 기본 컷으로 시작했어요.");
+    } finally {
+      comipoActionBusyRef.current = false;
+    }
     if (!assembled) {
       setCanvasH(QUICK_SAMPLE_CANVAS_H);
       setBg("#ffffff");
@@ -12598,7 +12666,16 @@ function StudioCuttoonEditor() {
   }
   // 새 요소를 놓을 중심: 패널이 선택돼 있으면 그 칸 중앙, 아니면 캔버스 중앙.
   function spawnCenter(): [number, number] {
-    return studioSpawnCenter(studioInsertState());
+    const state = studioInsertState();
+    const selectedRect = state.selected
+      ? {
+          x: state.selected.x,
+          y: state.selected.y,
+          w: state.selected.width,
+          h: state.selected.height,
+        }
+      : null;
+    return viewportSpawnCenter(state.canvasW ?? CANVAS_W, state.canvasH, selectedRect);
   }
   function addText() {
     const [cx, cy] = spawnCenter();
@@ -13758,28 +13835,57 @@ function StudioCuttoonEditor() {
     commit(elements.filter((e) => e.emeresSourceId == null));
   }
   // 장면 템플릿 삽입 — runStudioPageAddSceneTemplate 단일 shipped 경로.
-  function addSceneTemplate(template: SceneTemplate) {
-    setMenu(null);
-    const result = runStudioPageAddSceneTemplate(studioInsertState(), template.id, uid);
-    if (!result.ok) {
-      setError("장면을 이 컷에 맞출 수 없습니다.");
-      return;
+  async function addSceneTemplate(template: SceneTemplate) {
+    if (comipoActionBusyRef.current) return;
+    const deferredAction = captureDeferredComipoAction();
+    comipoActionBusyRef.current = true;
+    try {
+      const { runStudioPageAddSceneTemplate } = await loadStudioComipoShipped();
+      if (!canApplyDeferredComipoAction(deferredAction)) return;
+      const result = runStudioPageAddSceneTemplate(studioInsertState(), template.id, uid);
+      if (!result.ok) {
+        setError("장면을 이 컷에 맞출 수 없습니다.");
+        return;
+      }
+      setMenu(null);
+      commit(result.elements as El[]);
+      setTool("select");
+    } catch (error) {
+      console.error("Failed to load the Studio scene insertion engine:", error);
+      if (canApplyDeferredComipoAction(deferredAction)) {
+        setError("장면 배치 엔진을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      }
+    } finally {
+      comipoActionBusyRef.current = false;
     }
-    commit(result.elements as El[]);
-    setTool("select");
   }
   // 대사 스크립트 일괄 삽입 — runStudioPageAddDialogueBubbles 단일 shipped 경로.
-  function addDialogueBubbles() {
+  async function addDialogueBubbles() {
     if (!dialogueScript.trim()) return;
-    const result = runStudioPageAddDialogueBubbles(studioInsertState(), dialogueScript, uid);
-    if (!result.ok) {
-      setError("대사를 컷 안에 배치하지 못했습니다. 대사 길이를 줄여 보세요.");
-      return;
+    if (comipoActionBusyRef.current) return;
+    const deferredAction = captureDeferredComipoAction();
+    const script = dialogueScript;
+    comipoActionBusyRef.current = true;
+    try {
+      const { runStudioPageAddDialogueBubbles } = await loadStudioComipoShipped();
+      if (!canApplyDeferredComipoAction(deferredAction)) return;
+      const result = runStudioPageAddDialogueBubbles(studioInsertState(), script, uid);
+      if (!result.ok) {
+        setError("대사를 컷 안에 배치하지 못했습니다. 대사 길이를 줄여 보세요.");
+        return;
+      }
+      commit(result.elements as El[]);
+      setDialogueScript("");
+      setMenu(null);
+      setTool("select");
+    } catch (error) {
+      console.error("Failed to load the Studio dialogue insertion engine:", error);
+      if (canApplyDeferredComipoAction(deferredAction)) {
+        setError("대사 배치 엔진을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      }
+    } finally {
+      comipoActionBusyRef.current = false;
     }
-    commit(result.elements as El[]);
-    setDialogueScript("");
-    setMenu(null);
-    setTool("select");
   }
 
   // 배치된 대사 일괄 편집 — 순수 헬퍼가 무변경이면 입력 배열을 그대로 돌려주므로 참조 비교로 빈 커밋을 막는다.
@@ -14035,24 +14141,39 @@ function StudioCuttoonEditor() {
     );
   }
   // 코미Po!식 정형 컷 레이아웃 — assembleComipoPage 로 프레임·대사를 충돌 없이 배치.
-  function applyPanelLayout(layout: PanelLayoutPreset) {
+  async function applyPanelLayout(layout: PanelLayoutPreset) {
+    if (comipoActionBusyRef.current) return;
     if (elements.length > 0 && !globalThis.confirm("기존 작업을 지우고 컷 템플릿을 적용할까요?")) return;
-    const assembled = assembleComipoPage({
-      layoutId: layout.id,
-      dialogueScript: dialogueScript.trim() || undefined,
-    });
-    if (!assembled?.composable) {
-      setError("컷 템플릿을 배치하지 못했습니다. 대사 길이를 줄이거나 레이아웃을 바꿔 보세요.");
-      return;
+    const deferredAction = captureDeferredComipoAction();
+    const script = dialogueScript.trim() || undefined;
+    comipoActionBusyRef.current = true;
+    try {
+      const { assembleComipoPage } = await loadStudioComipoAssembly();
+      if (!canApplyDeferredComipoAction(deferredAction)) return;
+      const assembled = assembleComipoPage({
+        layoutId: layout.id,
+        dialogueScript: script,
+      });
+      if (!assembled?.composable) {
+        setError("컷 템플릿을 배치하지 못했습니다. 대사 길이를 줄이거나 레이아웃을 바꿔 보세요.");
+        return;
+      }
+      setMenu(null);
+      setCanvasH(assembled.canvasH);
+      setBg("#ffffff");
+      setBgGrad(null);
+      setCurrentTemplate(null);
+      commit(comipoSeedsToEls(assembled.seeds));
+      setSelectedId(null);
+      announceDrawingShortcut(`「${layout.label}」컷 템플릿 적용`);
+    } catch (error) {
+      console.error("Failed to load the Studio panel assembly engine:", error);
+      if (canApplyDeferredComipoAction(deferredAction)) {
+        setError("컷 템플릿 엔진을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
+      }
+    } finally {
+      comipoActionBusyRef.current = false;
     }
-    setMenu(null);
-    setCanvasH(assembled.canvasH);
-    setBg("#ffffff");
-    setBgGrad(null);
-    setCurrentTemplate(null);
-    commit(comipoSeedsToEls(assembled.seeds));
-    setSelectedId(null);
-    announceDrawingShortcut(`「${layout.label}」컷 템플릿 적용`);
   }
 
   /** PicsArt-class multi-photo collage — frames + optional cover-fit of existing images. */
@@ -20525,7 +20646,7 @@ function StudioCuttoonEditor() {
                       <button
                         key={layout.id}
                         type="button"
-                        onClick={() => applyPanelLayout(layout)}
+                        onClick={() => void applyPanelLayout(layout)}
                         className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-xs hover:bg-raised"
                       >
                         <span className="font-medium text-fg">{layout.label}</span>
@@ -20747,7 +20868,7 @@ function StudioCuttoonEditor() {
                             <button
                               key={sib.id}
                               type="button"
-                              onClick={() => addSceneTemplate(sib)}
+                              onClick={() => void addSceneTemplate(sib)}
                               className="rounded-lg border border-line bg-card px-2 py-1.5 text-left transition-colors hover:border-accent/50 hover:bg-raised"
                             >
                               <span className="block text-xs font-semibold text-fg">{sib.label}</span>
@@ -20777,7 +20898,7 @@ function StudioCuttoonEditor() {
                                 key={t.id}
                                 className="rounded-lg border border-line bg-card px-2 py-1.5 transition-colors hover:border-accent/50 hover:bg-raised"
                               >
-                                <button type="button" onClick={() => addSceneTemplate(t)} className="block w-full text-left">
+                                <button type="button" onClick={() => void addSceneTemplate(t)} className="block w-full text-left">
                                   <span className="block text-xs font-semibold text-fg">{t.label}</span>
                                   <span className="block text-[0.68rem] text-fg-3">{t.description}</span>
                                 </button>
@@ -25284,7 +25405,7 @@ function StudioCuttoonEditor() {
           {showQuickStart && (
             <QuickStartPanel
               onDismiss={dismissQuickStart}
-              onExample={startFromExample}
+              onExample={() => void startFromExample()}
               onOpenTemplate={() => openQuickStartMenu("template")}
               onOpenCharacter={() => {
                 dismissQuickStart();

@@ -49,6 +49,7 @@ function add(document: StudioCrdtDocument, id: string, x: number): void {
 
 class FakeRoom {
   ready = true;
+  readonly mode: "local" | "server";
   readonly workId = "work-a";
   readonly participant = { sessionId: "self", displayName: "Me", role: "editor" as const };
   readonly crdtListeners = new Set<(event: StudioLiveCrdtRoomEvent) => void>();
@@ -59,9 +60,11 @@ class FakeRoom {
   syncFailuresRemaining = 0;
   hangPublications = false;
   serverSequence = 0;
+  syncRequests = 0;
 
-  constructor(server: StudioCrdtDocument) {
+  constructor(server: StudioCrdtDocument, mode: "local" | "server" = "server") {
     this.server = server;
+    this.mode = mode;
   }
 
   subscribeCrdt(listener: (event: StudioLiveCrdtRoomEvent) => void): () => void {
@@ -75,6 +78,7 @@ class FakeRoom {
   }
 
   async requestCrdtSync(request: StudioCrdtSyncRequest): Promise<StudioCrdtSyncResponse> {
+    this.syncRequests += 1;
     if (this.syncFailuresRemaining > 0) {
       this.syncFailuresRemaining -= 1;
       throw new Error("temporary sync failure");
@@ -197,12 +201,14 @@ describe("StudioCrdtRoomBinding", () => {
     const peer = new StudioCrdtDocument();
     add(peer, "peer-stroke", 30);
     const update = peer.encodeStateAsUpdate();
+    server.applyUpdate(update);
+    fake.serverSequence = 1;
 
     fake.emitRemote({
       protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
       workId: "work-a",
       updateId: "22222222-2222-4222-8222-222222222222",
-      serverSequence: "2",
+      serverSequence: "1",
       update: encodeStudioCrdtUpdate(update),
     });
     await vi.advanceTimersByTimeAsync(100);
@@ -511,6 +517,96 @@ describe("StudioCrdtRoomBinding", () => {
     expect(client.getStroke("missed-cross-instance-broadcast")).not.toBeNull();
 
     binding.close();
+    client.destroy();
+    server.destroy();
+  });
+
+  it("repairs a missed durable update immediately when the next server ACK exposes a gap", async () => {
+    vi.useFakeTimers();
+    const server = new StudioCrdtDocument();
+    const client = new StudioCrdtDocument();
+    const fake = new FakeRoom(server);
+    const binding = new StudioCrdtRoomBinding({ document: client, room: room(fake) });
+    await binding.start();
+    expect(fake.syncRequests).toBe(1);
+
+    // Sequence 1 commits while its realtime broadcast is lost. The client's own edit is then
+    // durably accepted as sequence 2, so the ACK itself becomes an ordering-gap repair signal.
+    add(server, "missed-before-local-ack", 86);
+    fake.serverSequence = 1;
+    add(client, "local-after-missed-broadcast", 87);
+    await vi.advanceTimersByTimeAsync(40);
+
+    expect(fake.syncRequests).toBe(2);
+    expect(client.getStroke("missed-before-local-ack")).not.toBeNull();
+    expect(server.getStroke("local-after-missed-broadcast")).not.toBeNull();
+
+    binding.close();
+    client.destroy();
+    server.destroy();
+  });
+
+  it("uses a remote server-sequence gap to converge without waiting for background sync", async () => {
+    vi.useFakeTimers();
+    const server = new StudioCrdtDocument();
+    const client = new StudioCrdtDocument();
+    const fake = new FakeRoom(server);
+    const binding = new StudioCrdtRoomBinding({ document: client, room: room(fake) });
+    await binding.start();
+
+    add(server, "missed-sequence-one", 88);
+    fake.serverSequence = 1;
+    const peer = new StudioCrdtDocument();
+    add(peer, "received-sequence-two", 89);
+    const secondUpdate = peer.encodeStateAsUpdate();
+    server.applyUpdate(secondUpdate);
+    fake.serverSequence = 2;
+    fake.emitRemote({
+      protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+      workId: "work-a",
+      updateId: "44444444-4444-4444-8444-444444444444",
+      serverSequence: "2",
+      update: encodeStudioCrdtUpdate(secondUpdate),
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(fake.syncRequests).toBe(2);
+    expect(client.getStroke("received-sequence-two")).not.toBeNull();
+    expect(client.getStroke("missed-sequence-one")).not.toBeNull();
+
+    binding.close();
+    peer.destroy();
+    client.destroy();
+    server.destroy();
+  });
+
+  it("does not treat peer-local BroadcastChannel counters as authoritative gaps", async () => {
+    vi.useFakeTimers();
+    const server = new StudioCrdtDocument();
+    const client = new StudioCrdtDocument();
+    const fake = new FakeRoom(server, "local");
+    const binding = new StudioCrdtRoomBinding({ document: client, room: room(fake) });
+    await binding.start();
+    const peer = new StudioCrdtDocument();
+    add(peer, "local-peer-sequence", 89.5);
+
+    fake.emitRemote({
+      protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+      workId: "work-a",
+      updateId: "55555555-5555-4555-8555-555555555555",
+      // Local peer counters are intentionally independent and may jump between senders.
+      serverSequence: "99",
+      update: encodeStudioCrdtUpdate(peer.encodeStateAsUpdate()),
+    });
+    await Promise.resolve();
+
+    expect(fake.syncRequests).toBe(1);
+    expect(client.getStroke("local-peer-sequence")).not.toBeNull();
+    expect(fake.publications).toHaveLength(0);
+
+    binding.close();
+    peer.destroy();
     client.destroy();
     server.destroy();
   });

@@ -15,7 +15,8 @@ const budgets = {
   // 2026-07-15 Magma selection transform (content bake + marquee translate/scale): ~762 KiB gzip.
   // 2026-07-15 bubble path/export + floating tool popovers + insert/tutorial wiring:
   // observed ~2438 KiB raw / ~787 KiB gzip (tutorial hub remains lazy).
-  studio: { raw: 2_520_000, gzip: 820_000 },
+  // 2026-07-16 upload route + scene/panel assembly split: ~2.33 MiB raw / ~771 KiB gzip.
+  studio: { raw: 2_480_000, gzip: 805_000 },
   // Measured after the same build: 443,257 raw / 143,956 gzip.
   app: { raw: 500_000, gzip: 170_000 },
 };
@@ -99,6 +100,16 @@ if (!fs.existsSync(manifestPath)) {
     );
     if (eagerCrdtRuntime.length > 0) {
       fail(`Yjs/CRDT runtime returned to the Studio static graph: ${eagerCrdtRuntime.join(", ")}`);
+    }
+
+    const eagerOptionalStudioWorkflows = matchingEntries(
+      studioKeys,
+      /(?:StudioUploadPublish|studio-(?:comipo-assembly|comipo-shipped|comipo-insert|panel-layouts|scene-templates))/,
+    );
+    if (eagerOptionalStudioWorkflows.length > 0) {
+      fail(
+        `upload/template workflows returned to the Studio static graph: ${eagerOptionalStudioWorkflows.join(", ")}`,
+      );
     }
 
     const eager3dRuntime = matchingEntries(

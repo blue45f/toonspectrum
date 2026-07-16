@@ -1363,6 +1363,75 @@ describe("StudioWebGpuEngine", () => {
     expect(adapter.requestDevice).toHaveBeenCalledTimes(1);
     expect(fake.device.destroy).not.toHaveBeenCalled();
   });
+
+  it("coalesces concurrent initialization and lets the browser choose the power-aware adapter", async () => {
+    const neverLost = new Promise<GPUDeviceLostInfo>(() => undefined);
+    const requestedDevice = deferred<GPUDevice>();
+    const fake = fakeGpuDevice(neverLost);
+    const context = {
+      configure: vi.fn(),
+      unconfigure: vi.fn(),
+      getCurrentTexture: vi.fn(() => ({ createView: vi.fn(() => ({ view: true })) })),
+    } as unknown as GPUCanvasContext;
+    const adapter = {
+      requestDevice: vi.fn(() => requestedDevice.promise),
+    } as unknown as GPUAdapter;
+    const gpu = {
+      requestAdapter: vi.fn(async () => adapter),
+      getPreferredCanvasFormat: vi.fn(() => "bgra8unorm"),
+    } as unknown as GPU;
+    const engine = new StudioWebGpuEngine({
+      canvas: fakeGpuCanvas(context),
+      fallbackCanvas: fakeCanvas2d().canvas,
+      gpu,
+    });
+
+    const first = engine.initialize();
+    const second = engine.initialize();
+
+    expect(second).toBe(first);
+    expect(gpu.requestAdapter).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(gpu.requestAdapter).mock.calls[0]).toEqual([]);
+    await vi.waitFor(() => expect(adapter.requestDevice).toHaveBeenCalledTimes(1));
+
+    requestedDevice.resolve(fake.device);
+
+    await expect(Promise.all([first, second])).resolves.toEqual(["webgpu", "webgpu"]);
+    expect(fake.device.destroy).not.toHaveBeenCalled();
+  });
+
+  it("releases a failed single-flight initialization so a later adapter retry can recover", async () => {
+    const neverLost = new Promise<GPUDeviceLostInfo>(() => undefined);
+    const fake = fakeGpuDevice(neverLost);
+    const context = {
+      configure: vi.fn(),
+      unconfigure: vi.fn(),
+      getCurrentTexture: vi.fn(() => ({ createView: vi.fn(() => ({ view: true })) })),
+    } as unknown as GPUCanvasContext;
+    const adapter = {
+      requestDevice: vi.fn(async () => fake.device),
+    } as unknown as GPUAdapter;
+    let adapterAttempt = 0;
+    const gpu = {
+      requestAdapter: vi.fn(async () => {
+        adapterAttempt += 1;
+        return adapterAttempt === 1 ? null : adapter;
+      }),
+      getPreferredCanvasFormat: vi.fn(() => "bgra8unorm"),
+    } as unknown as GPU;
+    const engine = new StudioWebGpuEngine({
+      canvas: fakeGpuCanvas(context),
+      fallbackCanvas: fakeCanvas2d().canvas,
+      gpu,
+    });
+
+    await expect(engine.initialize()).resolves.toBe("canvas2d");
+    await expect(engine.initialize()).resolves.toBe("webgpu");
+
+    expect(gpu.requestAdapter).toHaveBeenCalledTimes(2);
+    expect(adapter.requestDevice).toHaveBeenCalledTimes(1);
+    expect(engine.getBackend()).toBe("webgpu");
+  });
 });
 
 describe("planStudioGpuDabs", () => {
