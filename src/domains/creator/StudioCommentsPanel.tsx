@@ -45,6 +45,8 @@ export interface StudioCommentsPanelProps {
   currentActor: StudioCommentActor;
   anchorOptions?: readonly StudioCommentAnchorOption[];
   onSelectAnchor?: (anchor: StudioCommentAnchor) => void;
+  /** Figma식 자유 위치 핀: 패널을 닫고 캔버스 클릭 한 번으로 point 앵커를 잡는 모드를 무장한다. */
+  onArmPinPlacement?: () => void;
 }
 
 type CommentFilter = "current" | "all" | "open" | "resolved";
@@ -102,12 +104,14 @@ function shortId(value: string): string {
 function fallbackAnchorLabel(anchor: StudioCommentAnchor): string {
   if (anchor.type === "page") return `페이지 · ${shortId(anchor.pageId)}`;
   if (anchor.type === "frame") return `컷 · ${shortId(anchor.frameId)}`;
+  if (anchor.type === "point") return `위치 · ${Math.round(anchor.x * 100)}%, ${Math.round(anchor.y * 100)}%`;
   return `요소 · ${shortId(anchor.elementId)}`;
 }
 
 function anchorKey(anchor: StudioCommentAnchor): string {
   if (anchor.type === "page") return `page:${anchor.pageId}`;
   if (anchor.type === "frame") return `frame:${anchor.pageId}:${anchor.frameId}`;
+  if (anchor.type === "point") return `point:${anchor.pageId}:${anchor.x.toFixed(4)}:${anchor.y.toFixed(4)}`;
   return `element:${anchor.pageId}:${anchor.frameId ?? ""}:${anchor.elementId}`;
 }
 
@@ -128,6 +132,7 @@ export function StudioCommentsPanel({
   currentActor,
   anchorOptions = [],
   onSelectAnchor,
+  onArmPinPlacement,
 }: StudioCommentsPanelProps) {
   const titleId = useId();
   const descriptionId = useId();
@@ -393,6 +398,16 @@ export function StudioCommentsPanel({
                   연결 위치 · {activeAnchorLabel}
                 </p>
               </div>
+              {onArmPinPlacement && (
+                <button
+                  type="button"
+                  onClick={onArmPinPlacement}
+                  className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border border-accent/40 bg-accent-soft/40 px-2.5 text-xs font-semibold text-accent transition-colors hover:bg-accent-soft/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  title="캔버스의 원하는 지점을 클릭해 그 위치에 댓글을 답니다 (Figma 스타일)"
+                >
+                  <MapPin size={13} aria-hidden="true" /> 캔버스에 핀 찍기
+                </button>
+              )}
               {anchorOptions.length > 0 && onSelectAnchor && (
                 <div className="w-full sm:w-64">
                   <label htmlFor={`${titleId}-anchor`} className="sr-only">댓글 연결 위치</label>

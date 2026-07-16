@@ -72,10 +72,21 @@ const ElementCommentAnchorSchema = z
   })
   .strict();
 
+/** Figma식 자유 위치 핀 — 캔버스 논리 좌표를 0..1 로 정규화해 문서 크기와 무관하게 재투영한다. */
+const PointCommentAnchorSchema = z
+  .object({
+    type: z.literal("point"),
+    pageId: IdSchema,
+    x: z.number().finite().min(0).max(1),
+    y: z.number().finite().min(0).max(1),
+  })
+  .strict();
+
 export const StudioCommentAnchorSchema = z.discriminatedUnion("type", [
   PageCommentAnchorSchema,
   FrameCommentAnchorSchema,
   ElementCommentAnchorSchema,
+  PointCommentAnchorSchema,
 ]);
 
 export type StudioCommentAnchor = z.infer<typeof StudioCommentAnchorSchema>;
@@ -319,6 +330,17 @@ function normalizeAnchor(value: unknown): StudioCommentAnchor | null {
   const rawType = firstValue(source, ["type", "kind", "anchorType", "targetType"]);
   const type = typeof rawType === "string" ? rawType.trim().toLowerCase() : "";
 
+  if (["point", "position", "pin"].includes(type)) {
+    const x = firstValue(source, ["x", "nx"]);
+    const y = firstValue(source, ["y", "ny"]);
+    if (
+      typeof x !== "number" || !Number.isFinite(x) || x < 0 || x > 1 ||
+      typeof y !== "number" || !Number.isFinite(y) || y < 0 || y > 1
+    ) {
+      return null;
+    }
+    return { type: "point", pageId, x, y };
+  }
   if (["element", "layer", "node", "object"].includes(type) || (!type && elementId)) {
     if (!elementId) return null;
     return frameId
@@ -562,9 +584,12 @@ export function studioCommentAnchorsEqual(
   left: StudioCommentAnchor,
   right: StudioCommentAnchor
 ): boolean {
-  return left.type === right.type
-    && left.pageId === right.pageId
-    && (left.type !== "page" && right.type !== "page" ? left.frameId === right.frameId : true)
+  if (left.type !== right.type || left.pageId !== right.pageId) return false;
+  if (left.type === "point" && right.type === "point") {
+    return left.x === right.x && left.y === right.y;
+  }
+  return (left.type === "page" || right.type === "page"
+      || (left.type !== "point" && right.type !== "point" && left.frameId === right.frameId))
     && (left.type === "element" && right.type === "element"
       ? left.elementId === right.elementId
       : true);

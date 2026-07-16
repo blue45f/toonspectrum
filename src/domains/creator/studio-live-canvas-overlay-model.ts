@@ -49,6 +49,8 @@ function clamp(value: number, minimum: number, maximum: number): number {
 function anchorKey(anchor: StudioCommentAnchor): string {
   if (anchor.type === "page") return `page:${anchor.pageId}`;
   if (anchor.type === "frame") return `frame:${anchor.pageId}:${anchor.frameId}`;
+  // 부동소수 미세 차이가 그룹 키를 갈라놓지 않도록 고정 정밀도로 직렬화한다.
+  if (anchor.type === "point") return `point:${anchor.pageId}:${anchor.x.toFixed(4)}:${anchor.y.toFixed(4)}`;
   return `element:${anchor.pageId}:${anchor.elementId}`;
 }
 
@@ -89,8 +91,16 @@ export function projectStudioCanvasCommentPins(options: {
     if (targetId && !bounds) continue;
 
     const pagePinOffset = pins.filter((pin) => pin.anchor.type === "page").length * 42;
-    const rawX = bounds ? bounds.x + bounds.width : 24;
-    const rawY = bounds ? bounds.y : 24 + pagePinOffset;
+    const rawX = group.anchor.type === "point"
+      ? group.anchor.x * options.canvasWidth
+      : bounds
+        ? bounds.x + bounds.width
+        : 24;
+    const rawY = group.anchor.type === "point"
+      ? group.anchor.y * options.canvasHeight
+      : bounds
+        ? bounds.y
+        : 24 + pagePinOffset;
     pins.push({
       key,
       anchor: group.anchor,
@@ -101,7 +111,9 @@ export function projectStudioCanvasCommentPins(options: {
           ? "페이지 댓글"
           : group.anchor.type === "frame"
             ? "컷 댓글"
-            : "요소 댓글"),
+            : group.anchor.type === "point"
+              ? "위치 댓글"
+              : "요소 댓글"),
       x: clamp(rawX, margin, Math.max(margin, options.canvasWidth - margin)),
       y: clamp(rawY, margin, Math.max(margin, options.canvasHeight - margin)),
     });

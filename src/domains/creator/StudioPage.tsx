@@ -8323,6 +8323,11 @@ function StudioCuttoonEditor() {
   // 재실행되던 것이 대형 페이지 드로잉 버벅임의 마지막 원인이었다.
   const [liveDraftDirect, setLiveDraftDirect] = useState(false);
   const liveDraftDirectRef = useRef(false);
+  // Figma식 자유 위치 댓글: 무장 → 캔버스 클릭 한 번 → point 앵커 확정(0..1 정규화 좌표).
+  const [commentPinArmed, setCommentPinArmed] = useState(false);
+  const [pointCommentAnchor, setPointCommentAnchor] = useState<
+    { pageId: string; x: number; y: number } | null
+  >(null);
   const liveDraftVisualRef = useRef<DrawEl | null>(null);
   const liveDraftPendingRef = useRef<DrawEl | null>(null);
   const liveDraftRafRef = useRef<number | null>(null);
@@ -9342,12 +9347,15 @@ function StudioCuttoonEditor() {
     displayName: session?.user?.name?.trim().slice(0, 80) || "로컬 작가",
   };
   const openStudioCommentCount = studioComments.threads.filter((thread) => !thread.resolved).length;
+  // Figma식 자유 위치 핀이 잡혀 있으면 선택 기반 앵커보다 우선한다(현재 페이지에서만 유효).
   const activeCommentAnchor: StudioCommentAnchor =
-    !masterEditMode && selected?.type === "frame"
-      ? { type: "frame", pageId: activePage.id, frameId: selected.id }
-      : !masterEditMode && selected
-        ? { type: "element", pageId: activePage.id, elementId: selected.id }
-        : { type: "page", pageId: activePage.id };
+    pointCommentAnchor && pointCommentAnchor.pageId === activePage.id && !masterEditMode
+      ? { type: "point", ...pointCommentAnchor }
+      : !masterEditMode && selected?.type === "frame"
+        ? { type: "frame", pageId: activePage.id, frameId: selected.id }
+        : !masterEditMode && selected
+          ? { type: "element", pageId: activePage.id, elementId: selected.id }
+          : { type: "page", pageId: activePage.id };
   const studioCommentAnchorOptions = pages.flatMap((page, pageIndex) => {
     const options: Array<{ anchor: StudioCommentAnchor; label: string }> = [
       { anchor: { type: "page", pageId: page.id }, label: pageDisplayName(page, pageIndex) },
@@ -9378,14 +9386,19 @@ function StudioCuttoonEditor() {
       setError("댓글이 연결된 페이지를 현재 문서에서 찾을 수 없어요.");
       return;
     }
-    if (anchor.type !== "page") {
+    if (anchor.type === "point") {
+      setPointCommentAnchor({ pageId: anchor.pageId, x: anchor.x, y: anchor.y });
+      setSelectedId(null);
+    } else if (anchor.type !== "page") {
       const elementId = anchor.type === "frame" ? anchor.frameId : anchor.elementId;
       if (!page.elements.some((element) => element.id === elementId)) {
         setError("댓글이 연결된 컷 또는 요소를 현재 문서에서 찾을 수 없어요.");
         return;
       }
+      setPointCommentAnchor(null);
       setSelectedId(elementId);
     } else {
+      setPointCommentAnchor(null);
       setSelectedId(null);
     }
     setMasterEditMode(false);
@@ -11084,6 +11097,7 @@ function StudioCuttoonEditor() {
     setBubbleShapeEditActive(false); // ← 추가(말풍선 커스텀 모양 점 편집)
     setPuppetWarpActive(false); // ← 추가
     setPuppetWarpPins([]); // ← 추가(핀도 함께 폐기 — 다른 도구로 전환 시 세션 종료)
+    setCommentPinArmed(false); // ← 추가(자유 위치 댓글 핀 무장 해제)
   }
 
   /** 다각형 올가미 세션을 선택에 닫아 넣고 초안을 비운다. 점 <3 이면 폐기. */
@@ -15815,6 +15829,21 @@ function StudioCuttoonEditor() {
     if (e.target.name() === "symmetry-handle" || e.target.name() === "guide-line-handle" || e.target.name() === "vp-handle") {
       return;
     }
+    // Figma식 자유 위치 댓글 핀: 무장 상태의 첫 캔버스 클릭이 point 앵커를 확정하고 소비된다.
+    if (commentPinArmed) {
+      const pos = e.target.getStage()?.getRelativePointerPosition();
+      setCommentPinArmed(false);
+      if (pos && canvasH > 0) {
+        setPointCommentAnchor({
+          pageId: activePage.id,
+          x: Math.min(1, Math.max(0, pos.x / CANVAS_W)),
+          y: Math.min(1, Math.max(0, pos.y / canvasH)),
+        });
+        setSelectedId(null);
+        setCommentsOpen(true);
+      }
+      return;
+    }
     // 색상 휠 롱프레스 무장 — 조건을 전부 만족할 때만 타이머를 건다. 이 블록은 return하지
     // 않는다(관찰만 함) — 아래 기존 분기들(스포이드/크롭/드로잉/마퀴 등)은 오늘과 동일하게
     // 그대로 실행된다. 타이머가 실제로 발화(450ms 정지 유지)했을 때만 openColorWheelAt 이
@@ -16357,7 +16386,12 @@ function StudioCuttoonEditor() {
         setLiveDraftDirect(direct);
         liveDraftVisualRef.current = direct ? next : null;
         liveDraftPendingRef.current = direct ? next : null;
-        const gpuPin = direct
+        // GPU 파인닝은 임페러티브 피드가 픽셀을 내지 못하는 회귀(미드스트로크 GPU 캔버스
+        // ink=0 실측)로 임시 봉인한다 — Konva 다이렉트 경로가 라이브 잉크를 전담한다.
+        // 재활성화 조건: syncPinnedStrokes 경유 렌더의 미드스트로크 픽셀 검증 통과.
+        const GPU_LIVE_INK_PIN_ENABLED = false;
+        const gpuPin = GPU_LIVE_INK_PIN_ENABLED
+          && direct
           && next.mode !== "eraser"
           && webGpuBackendRef.current === "webgpu"
           && !next.fill
@@ -24154,7 +24188,7 @@ function StudioCuttoonEditor() {
               mobileImmersive
                 ? "min-h-0 flex-1 max-h-none rounded-xl overscroll-contain"
                 : "max-h-[calc(100dvh-11rem)] min-h-[12rem] lg:max-h-none",
-              advancedFillArmed && "cursor-crosshair",
+              (advancedFillArmed || commentPinArmed) && "cursor-crosshair",
               isSpacePressed ? (isPanning ? "cursor-grabbing select-none" : "cursor-grab select-none") : ""
             )}
           >
@@ -30311,6 +30345,12 @@ function StudioCuttoonEditor() {
             currentActor={studioCommentActor}
             anchorOptions={studioCommentAnchorOptions}
             onSelectAnchor={selectStudioCommentAnchor}
+            onArmPinPlacement={() => {
+              // 패널을 닫고 다음 캔버스 클릭 한 번으로 point 앵커를 잡는다(Esc/도구 전환 시 해제).
+              disarmAllPixelTools();
+              setCommentsOpen(false);
+              setCommentPinArmed(true);
+            }}
           />
         ) : null}
       </Suspense>
