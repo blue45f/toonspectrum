@@ -3435,25 +3435,42 @@ function StudioDrawNode({ el }: { el: DrawEl }) {
                 key={index}
                 sceneFunc={(context) => {
                   if (smoothed.length < 4) return;
-                  for (let i = 2; i < smoothed.length; i += 2) {
-                    const x0 = smoothed[i - 2]!;
-                    const y0 = smoothed[i - 1]!;
-                    const x1 = smoothed[i]!;
-                    const y1 = smoothed[i + 1]!;
-                    
-                    const idx = Math.floor(i / 2);
+                  // 중점 이차곡선 보간: 정점을 제어점으로 두고 이웃 중점 사이를 곡선으로 잇는다.
+                  // 세그먼트별 직선(lineTo)은 빠른 곡선에서 각진 꺾임이 보였다. 굵기는 정점
+                  // 필압을 그대로 쓰되 각 곡선 조각을 개별 스트로크로 그려 연속 폭 변화를 낸다.
+                  context.lineCap = "round";
+                  context.lineJoin = "round";
+                  context.strokeStyle = stroke;
+                  const widthAt = (idx: number) => {
                     const p = sampledPressures[idx] ?? 0.5;
-                    const w = Math.max(0.5, strokeWidth * (0.3 + p * 1.4));
-                    
+                    return Math.max(0.5, strokeWidth * (0.3 + p * 1.4));
+                  };
+                  const count = smoothed.length / 2;
+                  if (count === 2) {
                     context.beginPath();
-                    context.moveTo(x0, y0);
-                    context.lineTo(x1, y1);
-                    
-                    context.lineWidth = w;
-                    context.lineCap = "round";
-                    context.lineJoin = "round";
-                    context.strokeStyle = stroke;
+                    context.moveTo(smoothed[0]!, smoothed[1]!);
+                    context.lineTo(smoothed[2]!, smoothed[3]!);
+                    context.lineWidth = widthAt(1);
                     context.stroke();
+                    return;
+                  }
+                  let prevMidX = smoothed[0]!;
+                  let prevMidY = smoothed[1]!;
+                  for (let i = 1; i < count; i += 1) {
+                    const cx = smoothed[(i - 1) * 2]!;
+                    const cy = smoothed[(i - 1) * 2 + 1]!;
+                    const x = smoothed[i * 2]!;
+                    const y = smoothed[i * 2 + 1]!;
+                    const isLast = i === count - 1;
+                    const midX = isLast ? x : (cx + x) / 2;
+                    const midY = isLast ? y : (cy + y) / 2;
+                    context.beginPath();
+                    context.moveTo(prevMidX, prevMidY);
+                    context.quadraticCurveTo(cx, cy, midX, midY);
+                    context.lineWidth = widthAt(i);
+                    context.stroke();
+                    prevMidX = midX;
+                    prevMidY = midY;
                   }
                 }}
                 opacity={opacity}
@@ -4203,6 +4220,7 @@ function UrlImage({
   autoFitFrames,
   onInteractionBegin,
   onInteractionEnd,
+  liveStrokeRef,
 }: {
   el: ImageEl;
   draggable: boolean;
@@ -4213,6 +4231,8 @@ function UrlImage({
   autoFitFrames: FrameEl[] | null;
   onInteractionBegin?: () => boolean;
   onInteractionEnd?: () => void;
+  /** 라이브 스트로크가 진행 중이면 GIF 재생 batchDraw 를 쉬어 포인터 프레임 예산을 지킨다. */
+  liveStrokeRef?: { readonly current: unknown };
 }) {
   const [img, setImg] = useState<HTMLImageElement>();
   const [displayImg, setDisplayImg] = useState<CanvasImageSource>();
@@ -4327,7 +4347,9 @@ function UrlImage({
     let raf = 0;
     let lastDrawAt = 0;
     const tick = (now: number) => {
-      if (now - lastDrawAt >= FRAME_INTERVAL_MS) {
+      // 라이브 스트로크 중에는 메인 레이어 전체 batchDraw 를 쉰다 — GIF 한 프레임보다
+      // 포인터 프레임 예산이 우선이고, 스트로크가 끝나면 다음 틱에 자연 재개된다.
+      if (!liveStrokeRef?.current && now - lastDrawAt >= FRAME_INTERVAL_MS) {
         lastDrawAt = now;
         node.getLayer()?.batchDraw();
       }
@@ -4335,7 +4357,7 @@ function UrlImage({
     };
     raf = globalThis.requestAnimationFrame(tick);
     return () => globalThis.cancelAnimationFrame(raf);
-  }, [el.isAnimatedGif, el.frames, displayImg]);
+  }, [el.isAnimatedGif, el.frames, displayImg, liveStrokeRef]);
 
   if (!displayImg) return null;
 
@@ -19718,6 +19740,26 @@ function StudioCuttoonEditor() {
   const isolatedDynamicDraft = draft?.mode === "pen" && resolveStudioBrushDynamicsPresetId(draft.brush) !== null
     ? draft
     : null;
+  // 커밋 시점의 postCorrection 재구성이 펜을 뗄 때 선 형태를 눈에 띄게 '탁' 바꾸던 것을 없앤다:
+  // 꼬리 몇 점을 제외한 앞부분에 같은 보정을 라이브로 미리 적용해 미리보기가 최종 형태에
+  // 수렴하게 한다. smoothStrokePoints 는 점 개수와 양 끝점을 보존하므로 필압 정렬이 유지되고,
+  // 잘린 머리의 마지막 점이 고정되어 꼬리와의 이음매도 연속이다. 입자(dynamics) 브러시는 dab
+  // 배치가 점 위치에 민감해 제외한다.
+  const draftForRender = (() => {
+    if (!draft || isolatedDynamicDraft || (draft.kind ?? "freehand") !== "freehand" || postCorrection <= 0) {
+      return draft;
+    }
+    const tailPoints = 8;
+    const pointCount = Math.floor(draft.points.length / 2);
+    if (pointCount <= tailPoints + 2) return draft;
+    const headCount = pointCount - tailPoints;
+    const smoothedHead = smoothStrokePoints(
+      draft.points.slice(0, headCount * 2),
+      postCorrection,
+      { preserveCorners }
+    );
+    return { ...draft, points: [...smoothedHead, ...draft.points.slice(headCount * 2)] };
+  })();
   // G10b single-renderer live ink: the retained WebGPU compositor stays mounted so device-loss,
   // resize and viewport lifecycles keep exercising the real pipeline, but the live freehand
   // draft is never fed to it. The async authority round-trip (every appended point invalidates,
@@ -24176,6 +24218,7 @@ function StudioCuttoonEditor() {
                         autoFitFrames={autoFitFrames}
                         onInteractionBegin={() => nodeInteractionBegin(el.id)}
                         onInteractionEnd={endLiveResourceEdit}
+                        liveStrokeRef={drawingRef}
                       />
                     </Fragment>
                   );
@@ -24967,7 +25010,7 @@ function StudioCuttoonEditor() {
               {/* 지우개 초안만 메인 레이어에 남는다: destination-out 은 이 레이어의 커밋 픽셀과
                   합성되어야 지워지는 미리보기가 보인다. 나머지 초안은 아래 전용 레이어에서 그린다. */}
               {draft && !isolatedDynamicDraft && draft.mode === "eraser"
-                ? <StudioDrawNode el={draft} />
+                ? <StudioDrawNode el={draftForRender ?? draft} />
                 : null}
               <Transformer
                 ref={trRef}
@@ -25006,7 +25049,7 @@ function StudioCuttoonEditor() {
                 지우개(destination-out)만 위의 메인 레이어 경로를 쓴다. */}
             {draft && !isolatedDynamicDraft && draft.mode !== "eraser" && (
               <Layer listening={false}>
-                <StudioDrawNode el={draft} />
+                <StudioDrawNode el={draftForRender ?? draft} />
               </Layer>
             )}
             {/* 라이브 입자 획은 독립 레이어에서만 다시 그린다. committed 입자 획이 포인터 RAF마다
