@@ -2,6 +2,7 @@ import { fromUint8Array } from "js-base64";
 import { describe, expect, it, vi } from "vitest";
 import * as Y from "yjs";
 
+import { StudioCrdtBackpressureError } from "./studio-crdt.service";
 import {
   STUDIO_LIVE_ADAPTER_DISCOVERY_TIMEOUT_MS,
   STUDIO_LIVE_RELAY_RPC_TIMEOUT_MS,
@@ -3268,6 +3269,33 @@ describe("StudioLiveGateway", () => {
     ).resolves.toMatchObject({ ok: true, data: { duplicate: true, serverSequence: "7" } });
     expect(
       editorHarness.emissions.some((emission) => emission.event === "studio:crdt:update")
+    ).toBe(false);
+  });
+
+  it("ACKs recoverable backpressure without broadcasting an unstarted update", async () => {
+    const harness = createHarness();
+    const editor = harness.socket("backpressured-editor");
+    await connectAndJoin(harness, editor);
+    const request = crdtUpdateRequest(25);
+    const acknowledgement = vi.fn();
+    harness.crdtService.applyUpdate.mockRejectedValueOnce(
+      new StudioCrdtBackpressureError()
+    );
+
+    const response = await harness.gateway.applyCrdtUpdate(
+      editor as never,
+      request,
+      acknowledgement
+    );
+    expect(response).toEqual({
+      ok: false,
+      code: "rate_limited",
+      message: "공동 편집 요청이 밀려 있습니다. 잠시 후 자동으로 다시 시도합니다.",
+    });
+    expect(acknowledgement).toHaveBeenCalledOnce();
+    expect(acknowledgement).toHaveBeenCalledWith(response);
+    expect(
+      harness.emissions.some((emission) => emission.event === "studio:crdt:update")
     ).toBe(false);
   });
 

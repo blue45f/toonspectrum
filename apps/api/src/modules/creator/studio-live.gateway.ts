@@ -24,6 +24,7 @@ import { CreatorService } from "./creator.service";
 import { STUDIO_CRDT_UPDATE_MAX_BYTES } from "./studio-crdt.repository";
 import {
   STUDIO_CRDT_STATE_VECTOR_MAX_BYTES,
+  StudioCrdtBackpressureError,
   StudioCrdtDocumentTooLargeError,
   StudioCrdtInvalidPayloadError,
   StudioCrdtService,
@@ -2531,6 +2532,11 @@ export class StudioLiveGateway
     workId: string,
     operation: "sync" | "update"
   ): StudioLiveFailure {
+    if (error instanceof StudioCrdtBackpressureError) {
+      // Admission failed before a durable mutation started. Surface a recoverable response so the
+      // ordered browser outbox backs off and retries the same update id without reporting data loss.
+      return failure("rate_limited", "공동 편집 요청이 밀려 있습니다. 잠시 후 자동으로 다시 시도합니다.");
+    }
     if (
       error instanceof StudioCrdtInvalidPayloadError ||
       error instanceof StudioCrdtUpdateIdConflictError ||

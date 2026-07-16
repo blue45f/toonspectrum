@@ -21,19 +21,20 @@
 Clip Studio Paint는 객체 목록과 화면 조작기를 함께 제공한다. 객체 또는 부품을 선택하고 이동·회전·크기를 바꾸며, 카메라 회전·이동·줌, 평면 이동, 접지, 3D 스냅을 조작기에서 수행한다. 고급 팔레트에는 Transform, Camera, Lens, Light Source, Fog, Panorama, Outline이 분리되어 있다.
 
 - 공식 매뉴얼: [Editing a 3D material](https://help.clip-studio.com/en-us/manual_en/660_3d/Editing_a_3D_material.htm)
-- ToonSpectrum 현재 강점: 프리미티브·완성형 장면 템플릿, 이동/회전/크기 기즈모, 수치 입력, 카메라 프리셋, undo/redo
-- 남은 격차: 다중 선택, 선택 잠금, 표시/숨김, 접지, 회전 스텝 스냅, 초점 맞춤, 렌즈/평행 투영, 안개, 계층
+- ToonSpectrum 현재 강점: 프리미티브·완성형 장면 템플릿, 이동/회전/크기 기즈모, 수치 입력, 카메라 프리셋, undo/redo, 다중 선택, 표시·잠금, 접지·스텝 스냅, 초점 맞춤, 평행 투영, All Sides View, 부모-자식 계층, 거리 안개
+- 남은 격차: 파노라마 텍스처 authoring, 표면 직접 페인팅, normal map 편집, BVH pose sequence
 
 Clip Studio Paint의 객체 목록은 복제, 표시/숨김, 잠금, 부모-자식 계층 연결, 여러 객체의 개별 피벗/중앙 피벗 변형, 재사용 가능한 3D 소재 등록을 제공한다.
 
 - 공식 매뉴얼: [Useful features for 3D materials](https://help.clip-studio.com/en-us/manual_en/660_3d/Useful_features_for_3D_materials.htm)
-- ToonSpectrum 현재 강점: 객체 복제·삭제, 프리미티브와 업로드 모델 통합 히스토리, 로컬 모델 라이브러리
-- 남은 격차: 잠금/표시 상태 저장, 다중 선택, 부모-자식 계층, 저장 장면을 재사용 소재로 등록, 권리/출처 표시
+- ToonSpectrum 현재 강점: 객체 복제·삭제, 표시·잠금 상태 저장, 다중 선택, 부모-자식 계층, 프리미티브와 업로드 모델 통합 히스토리, 권리 메타데이터가 있는 로컬 모델·장면 라이브러리
+- 남은 격차: 다중 객체 부착점 편집과 물리 기반 충돌·파지
 
 Clip Studio Paint EX의 All Sides View는 원근·정면·측면·상단 뷰와 카메라·초점 객체를 함께 보여주며 캔버스와 원근 뷰를 동기화한다.
 
 - 공식 매뉴얼: [All Sides View palette](https://help.clip-studio.com/en-us/manual_en/660_3d/All_Sides_View_palette.htm)
-- ToonSpectrum 남은 격차: 4분할 직교/원근 뷰, 선택 대상 중심 맞춤, 카메라 프러스텀 표시, 동기화 토글
+- ToonSpectrum 현재 강점: 원근·정면·측면·상단 4분할, 선택 대상 중심 맞춤, 모바일 단일 뷰 전환
+- 남은 격차: 카메라 프러스텀의 직접 편집과 뷰별 독립 표시 옵션
 
 Clip Studio Paint는 3D 객체·배경·프리미티브·파노라마를 소재 팔레트에서 재사용한다. GLB/glTF/OBJ/FBX/VRM 등 다양한 입력을 지원하지만, ToonSpectrum 웹 런타임은 외부 참조와 파서 공격면을 줄이기 위해 신규 사용자 업로드를 자체 포함 GLB 2.0으로 제한한다.
 
@@ -81,6 +82,7 @@ ToonSpectrum은 엔진 로더 호출 전에 다음을 자체 검증한다.
 | 계층 | 부모-자식 연결과 함께 이동 | 구현 완료 | parentId UI 및 Three.js 재귀 렌더링 씬 그래프 연결 완료 |
 | 접지·스냅 | 바닥 접지, 이동/회전 스텝, 객체 스냅 | 구현 완료 | 결정적 순수 함수와 기즈모 QA |
 | 카메라 | position/target/FOV, preset, 초점, 평행 투영 | 구현 완료 | 사용자 카메라 왕복, 재열기 픽셀 근사 일치 |
+| 공간 안개 | 시작·완전 혼합 거리, 대기색, 프리셋, 캡처 반영 | 구현 완료 | 장면 문서 유한 범위 제한, 렌더 경계 순서 보정, declarative R3F fog, 뷰포트·LT 컬러/톤 동시 반영 |
 | All Sides View | 원근+정면+측면+상단 동기화 | 구현 완료 | 선택 중심/카메라 프러스텀/모바일 단일뷰 전환 |
 | 소재 라이브러리 | 장면·객체 재사용, 권리/출처, 검색/즐겨찾기 | 구현 완료 | 권리 경고, hash 중복 제거, 내보내기 포함 정책 |
 
@@ -106,7 +108,7 @@ ToonSpectrum은 엔진 로더 호출 전에 다음을 자체 검증한다.
 
 1. 선화/텍스처 선/톤 분리 삽입과 프리셋
 2. 깊이 기반 외곽선, 스무딩, scale-aware 정확도
-3. 평행 투영·렌즈·안개·파노라마
+3. 평행 투영·렌즈·안개(완료), 파노라마 authoring
 4. 4분할 All Sides View
 5. 부모-자식 계층과 부착 지점
 

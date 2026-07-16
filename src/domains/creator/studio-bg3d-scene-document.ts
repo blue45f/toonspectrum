@@ -723,6 +723,9 @@ function normalizeBackground(value: unknown): StudioBg3dBackgroundSettings {
     panoramaRotation: boundedNumber(candidate.panoramaRotation, 0, -360, 360),
     fogEnabled: normalizedBoolean(candidate.fogEnabled, false),
     fogColor: normalizedColor(candidate.fogColor, "#ffffff"),
+    // Keep each schema-v1 value independently canonical. Older v1 documents were allowed to
+    // persist an inverted pair, so enforcing cross-field ordering here would make their strict
+    // parser reject them. The render/UI boundary repairs ordering without breaking stored scenes.
     fogNear: boundedNumber(candidate.fogNear, 10, 0, MAX_WORLD_COORDINATE),
     fogFar: boundedNumber(candidate.fogFar, 50, 0, MAX_WORLD_COORDINATE * 2),
   };

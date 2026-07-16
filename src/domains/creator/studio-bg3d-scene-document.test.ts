@@ -231,6 +231,31 @@ describe("Studio BG3D scene document normalization", () => {
     expect(parseStudioBg3dSceneDocument(serialized ?? "")).toEqual(normalized);
   });
 
+  it("keeps canonical schema-v1 atmosphere settings parseable when a legacy fog range is inverted", () => {
+    const normalized = normalizeStudioBg3dSceneDocument(
+      currentDocument({
+        background: {
+          mode: "sky-preset",
+          color: "#D8E3ED",
+          skyPresetId: "clear_day",
+          fogEnabled: true,
+          fogColor: "#C9D6DF",
+          fogNear: 70,
+          fogFar: 5,
+        },
+      }),
+    );
+
+    expect(normalized.background).toMatchObject({
+      fogEnabled: true,
+      fogColor: "#c9d6df",
+      fogNear: 70,
+      fogFar: 5,
+    });
+    expect(parseStudioBg3dSceneDocument(serializeStudioBg3dSceneDocument(normalized) ?? "")?.background)
+      .toEqual(normalized.background);
+  });
+
   it("clamps camera, render, quality, output, and budget values to hard product limits", () => {
     const normalized = normalizeStudioBg3dSceneDocument(
       currentDocument({

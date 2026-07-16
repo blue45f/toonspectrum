@@ -1224,7 +1224,8 @@ export class StudioWebGpuEngine {
     this.destroyTileRuntime();
     this.invalidateRenderedFrame();
     this.invalidateAuthorityFrame();
-    this.destroyReadbackSnapshotPool();
+    if (device) this.destroyReadbackSnapshotsForDevice(device);
+    else this.destroyReadbackSnapshotPool();
     safeUnconfigure(this.context);
     this.context = null;
     safeDestroyDevice(device);
@@ -1374,6 +1375,16 @@ export class StudioWebGpuEngine {
   private destroyReadbackSnapshotPool(): void {
     for (const snapshot of this.readbackSnapshotPool.splice(0)) {
       this.destroyFrameSnapshot(snapshot);
+    }
+  }
+
+  private destroyReadbackSnapshotsForDevice(device: GPUDevice): void {
+    // An unpublished presentation snapshot lives only in renderWebGpu's async flight, so it is
+    // neither the authority frame nor reusable pool state while submitted work is pending. Device
+    // loss can leave that promise unresolved indefinitely; release every texture owned by the
+    // lost device now so the recovered device receives the full copy-on-write snapshot budget.
+    for (const snapshot of [...this.readbackSnapshots]) {
+      if (snapshot.device === device) this.destroyFrameSnapshot(snapshot);
     }
   }
 
@@ -1765,7 +1776,7 @@ export class StudioWebGpuEngine {
     // immediately; its eventual completion is fenced by `webGpuRenderFlightId` below.
     this.supersedeWebGpuRenderFlight();
     this.invalidateAuthorityFrame();
-    this.destroyReadbackSnapshotPool();
+    this.destroyReadbackSnapshotsForDevice(lostDevice);
     this.device = null;
     this.normalPipeline = null;
     this.erasePipeline = null;

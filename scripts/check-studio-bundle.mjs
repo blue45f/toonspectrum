@@ -17,7 +17,9 @@ const budgets = {
   // observed ~2438 KiB raw / ~787 KiB gzip (tutorial hub remains lazy).
   // 2026-07-16 upload route + scene/panel assembly split: ~2.33 MiB raw / ~771 KiB gzip.
   // 2026-07-16 release planner split + auth graph cleanup: ~2.32 MiB raw / ~768 KiB gzip.
-  studio: { raw: 2_460_000, gzip: 798_000 },
+  // 2026-07-16 publication analytics split: ~2.30 MiB raw / ~762 KiB gzip.
+  // Preserve the previous headroom while locking in the independently loaded analytics engine.
+  studio: { raw: 2_445_000, gzip: 792_000 },
   // Measured after the same build: 443,257 raw / 143,956 gzip.
   app: { raw: 500_000, gzip: 170_000 },
 };
@@ -119,6 +121,16 @@ if (!fs.existsSync(manifestPath)) {
     );
     if (eagerReleasePlanner.length > 0) {
       fail(`release planning engine returned to the Studio static graph: ${eagerReleasePlanner.join(", ")}`);
+    }
+
+    const eagerPublicationAnalytics = matchingEntries(
+      studioKeys,
+      /studio-publication-analytics(?!-loader)/,
+    );
+    if (eagerPublicationAnalytics.length > 0) {
+      fail(
+        `publication analytics engine returned to the Studio static graph: ${eagerPublicationAnalytics.join(", ")}`,
+      );
     }
 
     const eager3dRuntime = matchingEntries(

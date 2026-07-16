@@ -69,6 +69,11 @@ const DEFAULT_COMPACT_UPDATE_BYTES = 2 * 1_024 * 1_024;
 const DEFAULT_COMPACT_INTERVAL_MS = 5 * 60_000;
 const DEFAULT_IDLE_EVICTION_MS = 5 * 60_000;
 const DEFAULT_EVICTION_SWEEP_MS = 60_000;
+// A queued sync can retain a decoded 256 KiB state vector, so these are intentionally much lower
+// than the gateway's identity-bucket cardinality. The normal 40 Hz/batched drawing path stays well
+// below the room limit while a stalled database cannot retain an unbounded heap of request bodies.
+const DEFAULT_MAX_PENDING_OPERATIONS_PER_WORK = 128;
+const DEFAULT_MAX_PENDING_OPERATIONS_TOTAL = 512;
 const BASE64_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const STUDIO_CRDT_STROKE_SAMPLE_MAX_COUNT = 100_000;
@@ -244,6 +249,8 @@ export interface StudioCrdtServiceOptions {
   compactIntervalMs?: number;
   idleEvictionMs?: number;
   evictionSweepMs?: number;
+  maxPendingOperationsPerWork?: number;
+  maxPendingOperationsTotal?: number;
   scheduleInterval?: (handler: () => void, delay: number) => ReturnType<typeof setInterval>;
   cancelInterval?: (handle: ReturnType<typeof setInterval>) => void;
 }
@@ -289,6 +296,18 @@ export class StudioCrdtDocumentTooLargeError extends Error {
   constructor() {
     super("CRDT document exceeds the server byte budget");
     this.name = "StudioCrdtDocumentTooLargeError";
+  }
+}
+
+/**
+ * The operation was rejected before execution because this API process already has the bounded
+ * amount of CRDT work it can retain safely. Clients may retry the same idempotent request after
+ * backoff; no durable mutation has started when this error is raised.
+ */
+export class StudioCrdtBackpressureError extends Error {
+  constructor() {
+    super("CRDT operation queue is saturated");
+    this.name = "StudioCrdtBackpressureError";
   }
 }
 
@@ -1301,6 +1320,10 @@ export class StudioCrdtService implements OnModuleDestroy {
   private readonly compactUpdateBytes: number;
   private readonly compactIntervalMs: number;
   private readonly idleEvictionMs: number;
+  private readonly maxPendingOperationsPerWork: number;
+  private readonly maxPendingOperationsTotal: number;
+  private readonly pendingOperationsByWork = new Map<string, number>();
+  private pendingOperationCount = 0;
   private readonly cancelInterval: (handle: ReturnType<typeof setInterval>) => void;
   private readonly evictionTimer: ReturnType<typeof setInterval>;
   private destroyed = false;
@@ -1346,6 +1369,18 @@ export class StudioCrdtService implements OnModuleDestroy {
       DEFAULT_IDLE_EVICTION_MS,
       1_000,
       24 * 60 * 60_000
+    );
+    this.maxPendingOperationsPerWork = boundedInteger(
+      options.maxPendingOperationsPerWork,
+      DEFAULT_MAX_PENDING_OPERATIONS_PER_WORK,
+      1,
+      100_000
+    );
+    this.maxPendingOperationsTotal = boundedInteger(
+      options.maxPendingOperationsTotal,
+      DEFAULT_MAX_PENDING_OPERATIONS_TOTAL,
+      1,
+      1_000_000
     );
     this.cancelInterval = options.cancelInterval ?? clearInterval;
     const scheduleInterval = options.scheduleInterval ?? setInterval;
@@ -1474,6 +1509,8 @@ export class StudioCrdtService implements OnModuleDestroy {
     for (const entry of this.documents.values()) entry.doc.destroy();
     this.documents.clear();
     this.workTails.clear();
+    this.pendingOperationsByWork.clear();
+    this.pendingOperationCount = 0;
   }
 
   private async getCaughtUpDocument(workId: string): Promise<CachedStudioCrdtDocument> {
@@ -1801,6 +1838,18 @@ export class StudioCrdtService implements OnModuleDestroy {
 
   private withWorkLock<T>(workId: string, operation: () => Promise<T>): Promise<T> {
     if (this.destroyed) return Promise.reject(new Error("Studio CRDT service is shutting down"));
+    const pendingForWork = this.pendingOperationsByWork.get(workId) ?? 0;
+    if (
+      pendingForWork >= this.maxPendingOperationsPerWork ||
+      this.pendingOperationCount >= this.maxPendingOperationsTotal
+    ) {
+      return Promise.reject(new StudioCrdtBackpressureError());
+    }
+    // Count both the active operation and waiters. This admission check occurs synchronously before
+    // a closure is attached to the work tail, so a stalled database call cannot grow an unbounded
+    // promise/payload backlog through many authenticated editors or rooms in this API process.
+    this.pendingOperationsByWork.set(workId, pendingForWork + 1);
+    this.pendingOperationCount += 1;
     const previous = this.workTails.get(workId) ?? Promise.resolve();
     const run = previous.then(() => {
       if (this.destroyed) throw new Error("Studio CRDT service is shutting down");
@@ -1812,6 +1861,10 @@ export class StudioCrdtService implements OnModuleDestroy {
     );
     this.workTails.set(workId, tail);
     void tail.then(() => {
+      const remainingForWork = (this.pendingOperationsByWork.get(workId) ?? 1) - 1;
+      if (remainingForWork > 0) this.pendingOperationsByWork.set(workId, remainingForWork);
+      else this.pendingOperationsByWork.delete(workId);
+      this.pendingOperationCount = Math.max(0, this.pendingOperationCount - 1);
       if (this.workTails.get(workId) === tail) this.workTails.delete(workId);
     });
     return run;

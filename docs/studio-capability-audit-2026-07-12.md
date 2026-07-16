@@ -190,19 +190,19 @@ announce→request→approved→SDP가 같은 `shareId`를 보존했고, `shareI
 | VRM 0/1 | 완료/강한 부분 | 별도 VRM 포저 제공 |
 | CSP 전용 cs3c/cs3o/cs3s | 미구현 | 공개 사양·라이선스 없이는 동일 호환을 보장할 수 없음 |
 | 객체 이동·회전·크기 | 완료 | TransformControls·수치 입력·undo/redo |
-| camera orbit/pan/zoom/FOV/preset | 완료/부분 | perspective camera 제공. orthographic와 고급 lens는 없음 |
-| 다중 선택·part 선택 | 미구현 | 현재 단일 선택 중심 |
-| 표시/잠금·부모 자식 hierarchy | 미구현/부분 | Studio layer 기능과 별개로 3D scene object authoring이 부족 |
-| 접지·이동/회전/object snap | 미구현 | grid 표시는 있으나 solver 없음 |
-| 선택 대상 focus | 미구현 | model bounds 기반 focus selected 없음 |
-| 광원·그림자 | 완료/부분 | ambient/key/fill directional light와 shadow 제공. fog는 없음 |
+| camera orbit/pan/zoom/FOV/preset | 완료 | perspective·orthographic, FOV, preset, focus selected와 All Sides View 제공 |
+| 다중 선택·part 선택 | 완료/부분 | 객체 다중 선택·함께 변형 제공. GLB 내부 mesh part 직접 선택은 없음 |
+| 표시/잠금·부모 자식 hierarchy | 완료 | 장면 문서 왕복과 재귀 Three scene graph 연결 |
+| 접지·이동/회전/object snap | 완료 | 바닥 접지와 이동·회전 step snap 제공. mesh surface snap은 후속 |
+| 선택 대상 focus | 완료 | 선택 bounds 중심 focus 제공 |
+| 광원·그림자·안개 | 완료 | ambient/key/fill directional light, shadow, 거리 안개 색·시작·완전 혼합 거리 제공 |
 | 기본 도형·복합 배경 템플릿 | 완료/부분 | 블록아웃과 웹툰용 장면 템플릿 제공 |
 | texture/UV/normal map | 미구현 | 사용자 texture upload와 UV/normal authoring 없음 |
 | 3D에 직접 그리기 | 미구현 | texture/projective painting 없음 |
 | 두상·체형·포즈·손가락 | 부분/강한 부분 | VRM 조형·pose는 강하지만 CSP 데생 인형/두상 모델과 동형은 아님 |
 | BVH pose sequence | 미구현 | BVH import·frame range 없음 |
 | panorama/360° | 미구현 | panorama projection authoring 없음 |
-| 사면도 | 미구현 | perspective/정면/측면/상단 동기화 없음 |
+| 사면도 | 완료 | perspective/정면/측면/상단 View와 모바일 단일뷰 전환 제공 |
 | LT 선화·톤 분리 | 완료/부분 | 컬러·톤·텍스처 선·주선을 별도 raster PNG로 삽입. 진짜 vector LT는 아님 |
 | 재사용 3D 소재 생태계 | 부분 | 로컬 scene/model library는 있으나 CSP Assets식 권리·태그·공유 생태계는 아님 |
 

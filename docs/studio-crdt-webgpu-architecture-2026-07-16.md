@@ -36,6 +36,13 @@ rewrites rather than claims that every legacy scene type already runs on the new
   BroadcastChannel counters are intentionally excluded from this durability check.
 - Each update is at most 48 KiB. Stroke sample, collection, document, and deletion-log limits are
   validated before persistence.
+- Each API process bounds the CRDT operation backlog, counting both active operations and queued
+  waiters. The defaults admit at most 128 operations for one work and 512 operations across the
+  process. Admission happens synchronously before the operation is attached to a work queue, so a
+  saturated queue cannot begin a durable mutation or retain an unbounded promise/payload backlog.
+- Saturation returns a recoverable `rate_limited` acknowledgement. The browser's ordered outbox
+  backs off and retries the same idempotent update ID instead of reporting the rejected attempt as
+  data loss or creating a duplicate durable update.
 - A per-work PostgreSQL transaction advisory lock serializes duplicate-receipt lookup, hydration,
   schema validation, receipt insertion, and update insertion. Validation failure rolls the entire
   transaction back, including under concurrent writers on different API nodes.
@@ -57,6 +64,10 @@ rewrites rather than claims that every legacy scene type already runs on the new
   hydration lifecycle before a peer that never held the asset can materialize it.
 - Production multi-instance deployment still requires a configured Socket.IO cluster adapter; the
   application now fails closed and has deterministic adapter-timeout behavior when it is absent.
+- CRDT backlog admission is intentionally process-local. The per-process limits prevent one API
+  instance from retaining an unbounded queue, but they do not enforce one cluster-wide total; a
+  horizontally scaled deployment that needs a global adaptive budget still requires distributed
+  admission accounting such as a Redis-backed counter or queue.
 
 ## G10b: retained WebGPU drawing compositor
 
@@ -93,6 +104,13 @@ rewrites rather than claims that every legacy scene type already runs on the new
 - Device loss also supersedes the old queue flight immediately. Monotonic flight ownership keeps a
   hung or late `onSubmittedWorkDone()` from blocking the recovered device or releasing its newer
   pending-render lock.
+- Device loss destroys every readback snapshot owned by the lost device, including an unpublished
+  presentation snapshot retained only by a hung `onSubmittedWorkDone()` flight. The recovered
+  device therefore receives the full copy-on-write snapshot budget; a late completion is fenced
+  and snapshot destruction remains idempotent.
+- Explicit engine disposal applies the same device-owned snapshot sweep before destroying the
+  device, so closing the editor during a hung queue flight cannot retain unpublished texture
+  ownership in JavaScript bookkeeping.
 - Canvas2D remains the compositor-compatible fallback when WebGPU is unavailable. Konva remains the
   scene/interactions authority for unsupported images, text, bubbles, filters, selections, and 3D
   surfaces until their render contracts move to GPU passes.

@@ -176,12 +176,17 @@ import {
   parseStudioBg3dSceneDocument,
   serializeStudioBg3dSceneDocument,
   type StudioBg3dCameraSettings,
+  type StudioBg3dBackgroundSettings,
   type StudioBg3dLineOutputSettings,
   type StudioBg3dModelAttachment,
   type StudioBg3dSceneBudgets,
   type StudioBg3dSceneDocument,
   type StudioBg3dToneOutputSettings,
 } from "./studio-bg3d-scene-document";
+import {
+  STUDIO_BG3D_FOG_MIN_GAP,
+  STUDIO_BG3D_FOG_PRESETS,
+} from "./studio-bg3d-scene-fog";
 import {
   adaptStudioBg3dRuntimeToDocument,
   hydrateStudioBg3dDocumentToRuntime,
@@ -190,6 +195,7 @@ import {
   createStudioBg3dThreeWebglCaptureAdapter,
   registerStudioBg3dCaptureExcludedObject,
 } from "./studio-bg3d-three-webgl-capture";
+import { StudioBg3dSceneFog } from "./StudioBg3dSceneFog";
 import { StudioBg3dSceneTemplatePanel } from "./StudioBg3dSceneTemplatePanel";
 import { StudioToolHintTarget } from "./StudioToolHint";
 
@@ -2290,6 +2296,17 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     setError(null);
   }
 
+  function updateBackgroundSettings(patch: Partial<StudioBg3dBackgroundSettings>) {
+    setSceneBaseDocument((current) => {
+      const candidate: StudioBg3dSceneDocument = {
+        ...current,
+        background: { ...current.background, ...patch },
+      };
+      return canonicalSceneDocument(candidate) ?? current;
+    });
+    setError(null);
+  }
+
   // 키보드 핸들러가 항상 최신 콜백을 참조하도록 ref로 동기화(렌더 후 매번 갱신).
   const selectedIdsRef = useRef(selectedIds);
   const undoRef = useRef(doUndo);
@@ -2643,6 +2660,15 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
 
   const effectiveIsQuadView = isQuadView && !isCapturing;
   const isMainOrtho = sceneBaseDocument.camera.projection === "orthographic";
+  const fogNear = sceneBaseDocument.background.fogNear ?? 10;
+  const fogFar = Math.max(
+    fogNear + STUDIO_BG3D_FOG_MIN_GAP,
+    sceneBaseDocument.background.fogFar ?? 50,
+  );
+  const fogSliderMax = Math.max(
+    120,
+    Math.ceil(Math.max(fogNear + STUDIO_BG3D_FOG_MIN_GAP, fogFar) / 10) * 10,
+  );
   
   const sceneContent = (
     <Fragment>
@@ -2657,6 +2683,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
         }}
       />
       <SkyClearColorController clearColor={getSkyPreset(skyPresetId).clearColor} />
+      <StudioBg3dSceneFog background={sceneBaseDocument.background} />
       <ambientLight
         color={sceneBaseDocument.lighting.ambientColor}
         intensity={sceneBaseDocument.lighting.ambientIntensity}
@@ -3902,6 +3929,133 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                         {sky.label}
                       </button>
                     ))}
+                  </div>
+                </div>
+
+                <div className="mt-5 border-t border-line pt-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
+                        <CircleDashed size={15} className="text-accent" aria-hidden />
+                        공간 안개
+                      </h3>
+                      <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
+                        멀어지는 건물과 소품을 대기색에 자연스럽게 섞어 웹툰 배경의 깊이감을 만듭니다.
+                      </p>
+                    </div>
+                    <label className="flex min-h-11 shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-line bg-card px-2.5 text-xs font-semibold text-fg-2 sm:min-h-9">
+                      <input
+                        type="checkbox"
+                        aria-label="3D 공간 안개 사용"
+                        checked={sceneBaseDocument.background.fogEnabled ?? false}
+                        onChange={(event) => updateBackgroundSettings({ fogEnabled: event.target.checked })}
+                        className="size-4 accent-accent"
+                      />
+                      {sceneBaseDocument.background.fogEnabled ? "켜짐" : "꺼짐"}
+                    </label>
+                  </div>
+
+                  <div
+                    className={cx(
+                      "mt-3 space-y-3 transition-opacity duration-150 motion-reduce:transition-none",
+                      !sceneBaseDocument.background.fogEnabled && "pointer-events-none opacity-45",
+                    )}
+                    aria-disabled={!sceneBaseDocument.background.fogEnabled}
+                  >
+                    <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      {STUDIO_BG3D_FOG_PRESETS.map((preset) => (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          disabled={!sceneBaseDocument.background.fogEnabled}
+                          className={cx(
+                            CONTROL_BUTTON,
+                            "min-h-10 shrink-0 border-line bg-card px-3 text-fg-2 hover:bg-raised hover:text-fg sm:min-h-9",
+                            sceneBaseDocument.background.fogNear === preset.near &&
+                              sceneBaseDocument.background.fogFar === preset.far &&
+                              "border-accent/60 bg-accent-soft text-accent",
+                          )}
+                          onClick={() => updateBackgroundSettings({
+                            fogEnabled: true,
+                            fogColor: getSkyPreset(skyPresetId).clearColor,
+                            fogNear: preset.near,
+                            fogFar: preset.far,
+                          })}
+                        >
+                          {preset.label}
+                          <span className="text-[0.62rem] font-normal text-fg-3">
+                            {preset.near}–{preset.far}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+
+                    <label className="grid grid-cols-[1fr_auto] items-center gap-3 text-xs font-semibold text-fg-2">
+                      대기색
+                      <input
+                        type="color"
+                        aria-label="3D 공간 안개 색"
+                        value={sceneBaseDocument.background.fogColor ?? sceneBaseDocument.background.color}
+                        disabled={!sceneBaseDocument.background.fogEnabled}
+                        onChange={(event) => updateBackgroundSettings({ fogColor: event.target.value })}
+                        className="size-11 cursor-pointer rounded-lg border border-line bg-transparent p-1 sm:size-9"
+                      />
+                    </label>
+
+                    <label className="block text-xs font-semibold text-fg-2">
+                      <span className="flex items-center justify-between gap-3">
+                        시작 거리
+                        <output className="tabular-nums text-fg">
+                          {round(fogNear, 2)}
+                        </output>
+                      </span>
+                      <input
+                        type="range"
+                        min="0"
+                        max={fogSliderMax}
+                        step="0.25"
+                        value={fogNear}
+                        disabled={!sceneBaseDocument.background.fogEnabled}
+                        onChange={(event) => {
+                          const fogNear = Number(event.target.value);
+                          updateBackgroundSettings({
+                            fogNear,
+                            fogFar: Math.max(
+                              fogNear + STUDIO_BG3D_FOG_MIN_GAP,
+                              sceneBaseDocument.background.fogFar ?? 50,
+                            ),
+                          });
+                        }}
+                        className="mt-2 w-full accent-accent"
+                      />
+                    </label>
+
+                    <label className="block text-xs font-semibold text-fg-2">
+                      <span className="flex items-center justify-between gap-3">
+                        완전 혼합 거리
+                        <output className="tabular-nums text-fg">
+                          {round(fogFar, 2)}
+                        </output>
+                      </span>
+                      <input
+                        type="range"
+                        min={fogNear + STUDIO_BG3D_FOG_MIN_GAP}
+                        max={fogSliderMax}
+                        step="0.25"
+                        value={fogFar}
+                        disabled={!sceneBaseDocument.background.fogEnabled}
+                        onChange={(event) => updateBackgroundSettings({
+                          fogFar: Math.max(
+                            Number(event.target.value),
+                            (sceneBaseDocument.background.fogNear ?? 10) + STUDIO_BG3D_FOG_MIN_GAP,
+                          ),
+                        })}
+                        className="mt-2 w-full accent-accent"
+                      />
+                    </label>
+                    <p className="text-[0.65rem] leading-relaxed text-fg-3">
+                      안개는 뷰포트와 컬러·톤 캡처에 함께 반영되며 선화 레이어의 투명 배경은 유지됩니다.
+                    </p>
                   </div>
                 </div>
               </section>

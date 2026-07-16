@@ -622,6 +622,79 @@ describe("StudioWebGpuEngine", () => {
     engine.dispose();
   });
 
+  it("releases an unpublished presentation snapshot as soon as its device is lost", async () => {
+    const lost = deferred<GPUDeviceLostInfo>();
+    const hungPresentation = deferred<void>();
+    const fake = fakeGpuDevice(lost.promise, () => hungPresentation.promise);
+    const context = {
+      configure: vi.fn(),
+      unconfigure: vi.fn(),
+      getCurrentTexture: vi.fn(() => ({ createView: vi.fn(() => ({ view: true })) })),
+    } as unknown as GPUCanvasContext;
+    const adapter = { requestDevice: vi.fn(async () => fake.device) } as unknown as GPUAdapter;
+    const gpu = {
+      requestAdapter: vi.fn(async () => adapter),
+      getPreferredCanvasFormat: vi.fn(() => "bgra8unorm"),
+    } as unknown as GPU;
+    const engine = new StudioWebGpuEngine({
+      canvas: fakeGpuCanvas(context),
+      fallbackCanvas: fakeCanvas2d().canvas,
+      gpu,
+      autoRecover: false,
+    });
+
+    engine.resize({ logicalWidth: 100, logicalHeight: 80 });
+    await expect(engine.initialize()).resolves.toBe("webgpu");
+    await vi.waitFor(() => expect(fake.textures).toHaveLength(1));
+    expect(fake.textures[0]?.destroy).not.toHaveBeenCalled();
+
+    lost.resolve({ reason: "unknown", message: "hung presentation" } as GPUDeviceLostInfo);
+    await vi.waitFor(() => expect(engine.getBackend()).toBe("canvas2d"));
+
+    // The queue promise intentionally remains pending: device-loss cleanup, not eventual render
+    // completion, must release this unpublished copy-on-write surface.
+    expect(fake.textures[0]?.destroy).toHaveBeenCalledTimes(1);
+
+    engine.dispose();
+    hungPresentation.resolve(undefined);
+    await hungPresentation.promise;
+    await Promise.resolve();
+    expect(fake.textures[0]?.destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it("releases an unpublished presentation snapshot when disposed during a hung queue flight", async () => {
+    const neverLost = new Promise<GPUDeviceLostInfo>(() => undefined);
+    const hungPresentation = deferred<void>();
+    const fake = fakeGpuDevice(neverLost, () => hungPresentation.promise);
+    const context = {
+      configure: vi.fn(),
+      unconfigure: vi.fn(),
+      getCurrentTexture: vi.fn(() => ({ createView: vi.fn(() => ({ view: true })) })),
+    } as unknown as GPUCanvasContext;
+    const adapter = { requestDevice: vi.fn(async () => fake.device) } as unknown as GPUAdapter;
+    const gpu = {
+      requestAdapter: vi.fn(async () => adapter),
+      getPreferredCanvasFormat: vi.fn(() => "bgra8unorm"),
+    } as unknown as GPU;
+    const engine = new StudioWebGpuEngine({
+      canvas: fakeGpuCanvas(context),
+      fallbackCanvas: fakeCanvas2d().canvas,
+      gpu,
+    });
+
+    engine.resize({ logicalWidth: 100, logicalHeight: 80 });
+    await expect(engine.initialize()).resolves.toBe("webgpu");
+    await vi.waitFor(() => expect(fake.textures).toHaveLength(1));
+
+    engine.dispose();
+    expect(fake.textures[0]?.destroy).toHaveBeenCalledTimes(1);
+
+    hungPresentation.resolve(undefined);
+    await hungPresentation.promise;
+    await Promise.resolve();
+    expect(fake.textures[0]?.destroy).toHaveBeenCalledTimes(1);
+  });
+
   it("drops stale WebGPU queue receipts and authorizes only the latest request", async () => {
     const neverLost = new Promise<GPUDeviceLostInfo>(() => undefined);
     const submitted = Array.from({ length: 4 }, () => deferred<void>());

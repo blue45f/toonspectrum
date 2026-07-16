@@ -28,6 +28,7 @@ import {
 import {
   STUDIO_CRDT_SYNC_CHUNK_MAX_BYTES,
   STUDIO_CRDT_ACTIVE_WORK_ASSET_REFERENCE_MAX_COUNT,
+  StudioCrdtBackpressureError,
   StudioCrdtDocumentTooLargeError,
   StudioCrdtInvalidPayloadError,
   type StudioCrdtRasterAssetAdmission,
@@ -2346,6 +2347,106 @@ describe("StudioCrdtService", () => {
     applySync(target, await current.sync("work-1"));
     expect(target.getMap("root").has("lost")).toBe(false);
     target.destroy();
+  });
+
+  it("bounds a stalled work queue and recovers capacity without running the rejected operation", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    let appendCalls = 0;
+    let releaseFirstAppend: (() => void) | undefined;
+    let markFirstAppendStarted: (() => void) | undefined;
+    const firstAppendStarted = new Promise<void>((resolve) => {
+      markFirstAppendStarted = resolve;
+    });
+    repository.beforeAppend = () => {
+      appendCalls += 1;
+      if (appendCalls !== 1) return Promise.resolve();
+      markFirstAppendStarted?.();
+      return new Promise<void>((resolve) => {
+        releaseFirstAppend = resolve;
+      });
+    };
+    const current = service(repository, {
+      maxPendingOperationsPerWork: 2,
+      maxPendingOperationsTotal: 3,
+    });
+    const first = current.applyUpdate({
+      workId: "work-backpressure",
+      updateId: "00000000-0000-4000-8000-000000000301",
+      actorUserId: "editor-a",
+      data: yUpdate("first", "1"),
+    });
+    await firstAppendStarted;
+    const second = current.applyUpdate({
+      workId: "work-backpressure",
+      updateId: "00000000-0000-4000-8000-000000000302",
+      actorUserId: "editor-b",
+      data: yUpdate("second", "2"),
+    });
+
+    await expect(current.sync("work-backpressure")).rejects.toBeInstanceOf(
+      StudioCrdtBackpressureError
+    );
+    expect(appendCalls).toBe(1);
+    // A saturated room does not consume the process-wide capacity reserved for other works.
+    await expect(current.sync("work-neighbour")).resolves.toMatchObject({
+      serverSequence: "0",
+    });
+
+    releaseFirstAppend?.();
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      expect.objectContaining({ serverSequence: "1" }),
+      expect.objectContaining({ serverSequence: "2" }),
+    ]);
+    await expect(current.sync("work-backpressure")).resolves.toMatchObject({
+      serverSequence: "2",
+    });
+    expect(appendCalls).toBe(2);
+  });
+
+  it("bounds the aggregate queue across rooms and releases the process slot after settlement", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    let startedAppendCount = 0;
+    let markBothAppendsStarted: (() => void) | undefined;
+    let releaseAppends: (() => void) | undefined;
+    const bothAppendsStarted = new Promise<void>((resolve) => {
+      markBothAppendsStarted = resolve;
+    });
+    const appendGate = new Promise<void>((resolve) => {
+      releaseAppends = resolve;
+    });
+    repository.beforeAppend = () => {
+      startedAppendCount += 1;
+      if (startedAppendCount === 2) markBothAppendsStarted?.();
+      return appendGate;
+    };
+    const current = service(repository, {
+      maxPendingOperationsPerWork: 2,
+      maxPendingOperationsTotal: 2,
+    });
+    const first = current.applyUpdate({
+      workId: "work-global-a",
+      updateId: "00000000-0000-4000-8000-000000000303",
+      actorUserId: "editor-a",
+      data: yUpdate("first", "1"),
+    });
+    const second = current.applyUpdate({
+      workId: "work-global-b",
+      updateId: "00000000-0000-4000-8000-000000000304",
+      actorUserId: "editor-b",
+      data: yUpdate("second", "2"),
+    });
+    await bothAppendsStarted;
+
+    await expect(current.sync("work-global-c")).rejects.toBeInstanceOf(
+      StudioCrdtBackpressureError
+    );
+    expect(startedAppendCount).toBe(2);
+
+    releaseAppends?.();
+    await Promise.all([first, second]);
+    await expect(current.sync("work-global-c")).resolves.toMatchObject({
+      serverSequence: "0",
+    });
   });
 
   it("deduplicates exact retries and rejects update-id collisions", async () => {

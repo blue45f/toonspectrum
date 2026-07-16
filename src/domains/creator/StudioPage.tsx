@@ -763,10 +763,9 @@ import {
   type StudioProjectFile,
 } from "./studio-project-file";
 import {
-  createEmptyStudioPublicationAnalyticsDocument,
-  normalizeStudioPublicationAnalyticsDocument,
-  type StudioPublicationAnalyticsDocument,
-} from "./studio-publication-analytics";
+  createEmptyStudioPublicationAnalyticsSnapshot,
+  normalizeStudioPublicationAnalyticsDeferred,
+} from "./studio-publication-analytics-loader";
 import {
   normalizeStudioPublishCompliance,
   validateStudioPublishCompliance,
@@ -1087,6 +1086,7 @@ import type { PaletteSuggestion } from "./studio-palette-suggest";
 import type { PanelLayoutPreset } from "./studio-panel-layouts";
 import type { PhotoFilter } from "./studio-photo-filter";
 import type { PsdExportEl, PsdExportResult } from "./studio-psd-export";
+import type { StudioPublicationAnalyticsDocument } from "./studio-publication-analytics";
 import type {
   StudioPublishAiProvenance,
   StudioPublishAiUsage,
@@ -5386,7 +5386,7 @@ function StudioCuttoonEditor() {
     setReleaseScheduleState(next);
   };
   const [publicationAnalytics, setPublicationAnalyticsState] = useState<StudioPublicationAnalyticsDocument>(() =>
-    createEmptyStudioPublicationAnalyticsDocument()
+    createEmptyStudioPublicationAnalyticsSnapshot()
   );
   const setPublicationAnalytics = (next: Parameters<typeof setPublicationAnalyticsState>[0]) => {
     if (!markStudioDocumentChanged()) return;
@@ -7848,7 +7848,13 @@ function StudioCuttoonEditor() {
           }
         }
         const parsed = saved.payload;
-        const { normalizeStudioReleaseSchedule } = await loadStudioReleaseScheduleRuntime();
+        const [
+          { normalizeStudioReleaseSchedule },
+          normalizedPublicationAnalytics,
+        ] = await Promise.all([
+          loadStudioReleaseScheduleRuntime(),
+          normalizeStudioPublicationAnalyticsDeferred(parsed.publicationAnalytics),
+        ]);
         if (!canApplyStudioMutation(mutationTicket)) {
           setError("임시저장본을 준비하는 동안 원고가 변경되어 복구하지 않았어요. 다시 확인해 주세요.");
           return;
@@ -7896,9 +7902,7 @@ function StudioCuttoonEditor() {
         );
         setStudioComments(normalizeStudioCommentsDocument(parsed.comments));
         setReleaseSchedule(normalizeStudioReleaseSchedule(parsed.releaseSchedule));
-        setPublicationAnalytics(
-          normalizeStudioPublicationAnalyticsDocument(parsed.publicationAnalytics)
-        );
+        setPublicationAnalytics(normalizedPublicationAnalytics);
         // 문서 마스터 복구 — 백업에 없으면 빈 마스터(하위호환).
         setMaster(normalizeDocumentMaster(parsed.master) as DocumentMaster<El>);
         setAutosaveRestoreBlockedReason(null);
@@ -9290,8 +9294,14 @@ function StudioCuttoonEditor() {
       };
     }
 
-    void Promise.all([loadStudioWork(), loadStudioReleaseScheduleRuntime()])
-      .then(([{ work: w, remixAuthorName, shared, detail }, { normalizeStudioReleaseSchedule }]) => {
+    void Promise.all([
+      loadStudioWork(),
+      loadStudioReleaseScheduleRuntime(),
+    ])
+      .then(async ([
+        { work: w, remixAuthorName, shared, detail },
+        { normalizeStudioReleaseSchedule },
+      ]) => {
         if (!alive) return;
         if (!isStudioCuttoonSourceFormat(w.format)) {
           setWorkHydrationFailed(true);
@@ -9299,6 +9309,30 @@ function StudioCuttoonEditor() {
           setError("업로드형 작품은 컷툰 편집기로 열 수 없어요. 업로드 편집 화면에서 수정해 주세요.");
           return;
         }
+        const doc = w.doc as {
+          elements?: El[];
+          bg?: string;
+          bgGrad?: string[] | null;
+          height?: number;
+          webtoonTheme?: "classic" | "soft" | "vivid";
+          pagesList?: PageState[];
+          currentPageId?: string;
+          panelGutter?: number;
+          master?: unknown; // 문서 마스터(공통 요소) — studio-master-page 옵셔널 규약(과거 문서 미존재 허용).
+          characterBible?: unknown;
+          writerRoom?: unknown;
+          aiProvenance?: unknown;
+          comments?: unknown;
+          releaseSchedule?: unknown;
+          publicationAnalytics?: unknown;
+          publishPack?: unknown;
+        };
+        const normalizedPublicationAnalytics = remixId
+          ? createEmptyStudioPublicationAnalyticsSnapshot()
+          : await normalizeStudioPublicationAnalyticsDeferred(doc?.publicationAnalytics);
+        // Optional analytics must not make a document without analytics depend on its chunk, and
+        // every async dependency still settles before the single hydration mutation begins.
+        if (!alive) return;
         const hydratedProject = creatorWorkSnapshotToStudioProject(w);
         // Server hydration is one canonical document replacement. Advance the async mutation
         // barrier once, then use the raw React setters so this route-scoped effect does not depend
@@ -9327,24 +9361,6 @@ function StudioCuttoonEditor() {
           setDescriptionState(w.description);
           setTagsTextState((w.tags ?? []).join(", "));
         }
-        const doc = w.doc as {
-          elements?: El[];
-          bg?: string;
-          bgGrad?: string[] | null;
-          height?: number;
-          webtoonTheme?: "classic" | "soft" | "vivid";
-          pagesList?: PageState[];
-          currentPageId?: string;
-          panelGutter?: number;
-          master?: unknown; // 문서 마스터(공통 요소) — studio-master-page 옵셔널 규약(과거 문서 미존재 허용).
-          characterBible?: unknown;
-          writerRoom?: unknown;
-          aiProvenance?: unknown;
-          comments?: unknown;
-          releaseSchedule?: unknown;
-          publicationAnalytics?: unknown;
-          publishPack?: unknown;
-        };
         advancedFillRunIdRef.current += 1;
         advancedFillAbortRef.current?.abort();
         advancedFillAbortRef.current = null;
@@ -9387,11 +9403,7 @@ function StudioCuttoonEditor() {
             ? createEmptyStudioReleaseScheduleSnapshot()
             : normalizeStudioReleaseSchedule(doc?.releaseSchedule)
         );
-        setPublicationAnalyticsState(
-          remixId
-            ? createEmptyStudioPublicationAnalyticsDocument()
-            : normalizeStudioPublicationAnalyticsDocument(doc?.publicationAnalytics)
-        );
+        setPublicationAnalyticsState(normalizedPublicationAnalytics);
         if (doc?.webtoonTheme) setWebtoonThemeState(doc.webtoonTheme);
         if (doc?.panelGutter) setPanelGutterState(doc.panelGutter);
         const publishPack = normalizeStudioPublishPackSettings(doc?.publishPack);
@@ -18845,9 +18857,10 @@ function StudioCuttoonEditor() {
     };
   }
 
-  function applyStudioProjectSnapshotWithReleaseSchedule(
+  function applyStudioProjectSnapshotWithPreparedDocuments(
     projectData: StudioProjectFile,
     normalizeReleaseSchedule: (value: unknown) => StudioReleaseSchedule,
+    publicationAnalyticsDocument: StudioPublicationAnalyticsDocument,
   ): boolean {
     if (!editorMountedRef.current) return false;
     if (documentSaveInFlightRef.current) {
@@ -18898,19 +18911,24 @@ function StudioCuttoonEditor() {
     );
     setStudioComments(normalizeStudioCommentsDocument(projectData.comments));
     setReleaseSchedule(normalizeReleaseSchedule(projectData.releaseSchedule));
-    setPublicationAnalytics(
-      normalizeStudioPublicationAnalyticsDocument(projectData.publicationAnalytics)
-    );
+    setPublicationAnalytics(publicationAnalyticsDocument);
     return true;
   }
 
   async function applyStudioProjectSnapshot(projectData: StudioProjectFile): Promise<boolean> {
     const mutationTicket = captureStudioMutationTicket();
-    const { normalizeStudioReleaseSchedule } = await loadStudioReleaseScheduleRuntime();
+    const [
+      { normalizeStudioReleaseSchedule },
+      publicationAnalyticsDocument,
+    ] = await Promise.all([
+      loadStudioReleaseScheduleRuntime(),
+      normalizeStudioPublicationAnalyticsDeferred(projectData.publicationAnalytics),
+    ]);
     if (!canApplyStudioMutation(mutationTicket)) return false;
-    return applyStudioProjectSnapshotWithReleaseSchedule(
+    return applyStudioProjectSnapshotWithPreparedDocuments(
       projectData,
       normalizeStudioReleaseSchedule,
+      publicationAnalyticsDocument,
     );
   }
 
@@ -19465,15 +19483,18 @@ function StudioCuttoonEditor() {
         rehydrateDataUrls: true,
         limits: isMobile ? MOBILE_PROJECT_ARCHIVE_LIMITS : undefined,
       });
+      const publicationAnalyticsDocument =
+        await normalizeStudioPublicationAnalyticsDeferred(result.project.publicationAnalytics);
       if (!canApplyStudioMutation(mutationTicket)) return;
       let projectApplied = false;
       const installed = await installStudioBg3dProjectArchiveModelsAndApply(
         result,
         (project) => {
           if (!canApplyStudioMutation(mutationTicket)) return;
-          projectApplied = applyStudioProjectSnapshotWithReleaseSchedule(
+          projectApplied = applyStudioProjectSnapshotWithPreparedDocuments(
             project,
             normalizeStudioReleaseSchedule,
+            publicationAnalyticsDocument,
           );
         },
         {
@@ -29767,7 +29788,8 @@ function StudioCuttoonEditor() {
             analyticsDocument={publicationAnalytics}
             onAnalyticsDocumentChange={(value) => {
               if (!collaborationDocumentLocked) {
-                setPublicationAnalytics(normalizeStudioPublicationAnalyticsDocument(value));
+                // The operations panel emits a canonical document from the same deferred runtime.
+                setPublicationAnalytics(value);
                 setSharedDocumentNotice(null);
               }
             }}
