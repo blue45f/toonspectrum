@@ -3433,6 +3433,9 @@ const StudioDrawNode = memo(function StudioDrawNode({ el }: { el: DrawEl }) {
           // Default "pen" or "marker" or "eraser"
           const smoothed = processFreehandPoints(points, renderSampleDistance);
           const pressures = el.pressures;
+          // Magma Lasso Brush: fill 이 설정된 프리핸드(라쏘 필)는 궤적을 자동으로 닫아 내부를
+          // 현재 색으로 채운다. 라이브 초안도 같은 경로를 지나므로 그리는 동안 채움이 미리 보인다.
+          const freehandFill = el.mode !== "eraser" ? el.fill : undefined;
           if (pressures && pressures.length > 0 && smoothed.length >= 4) {
             const sampledPressures = resampleStrokePressures(pressures, Math.floor(smoothed.length / 2));
             return (
@@ -3440,6 +3443,16 @@ const StudioDrawNode = memo(function StudioDrawNode({ el }: { el: DrawEl }) {
                 key={index}
                 sceneFunc={(context) => {
                   if (smoothed.length < 4) return;
+                  if (freehandFill && smoothed.length >= 6) {
+                    context.beginPath();
+                    context.moveTo(smoothed[0]!, smoothed[1]!);
+                    for (let i = 2; i < smoothed.length; i += 2) {
+                      context.lineTo(smoothed[i]!, smoothed[i + 1]!);
+                    }
+                    context.closePath();
+                    context.fillStyle = freehandFill;
+                    context.fill();
+                  }
                   // 중점 이차곡선 보간: 정점을 제어점으로 두고 이웃 중점 사이를 곡선으로 잇는다.
                   // 세그먼트별 직선(lineTo)은 빠른 곡선에서 각진 꺾임이 보였다. 굵기는 정점
                   // 필압을 그대로 쓰되 각 곡선 조각을 개별 스트로크로 그려 연속 폭 변화를 낸다.
@@ -3497,6 +3510,8 @@ const StudioDrawNode = memo(function StudioDrawNode({ el }: { el: DrawEl }) {
               lineCap="round"
               lineJoin="round"
               tension={0.4}
+              closed={Boolean(freehandFill) && smoothed.length >= 6}
+              fill={freehandFill}
               globalCompositeOperation={composite}
               listening={false}
               perfectDrawEnabled={false}
@@ -19789,7 +19804,9 @@ function StudioCuttoonEditor() {
     && (draftForRender.kind ?? "freehand") === "freehand"
     && resolveStudioBrushRenderFamily(draftForRender.brush ?? "pen") === "pen"
     && (draftForRender.opacity ?? 1) >= 0.999
-    && (draftForRender.symmetry?.type ?? "none") === "none";
+    && (draftForRender.symmetry?.type ?? "none") === "none"
+    // 라쏘 필(채움 프리핸드)은 GPU dab 파이프라인이 내부 채움을 모른다 — Konva 초안이 담당.
+    && !draftForRender.fill;
   const gpuLiveInkStroke: StudioGpuStroke | null = gpuLiveInkEligible && draftForRender
     ? (() => {
         const points = processFreehandPoints(
