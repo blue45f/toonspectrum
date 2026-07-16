@@ -66,6 +66,12 @@ export interface StudioWebGpuCanvasHandle {
   readonly captureFrame: (
     request: StudioGpuFrameReadbackRequest
   ) => Promise<StudioGpuFrameReadbackResult>;
+  /**
+   * Stroke-pinned imperative feed: updates the engine without a parent React render. The pinned
+   * live-ink path calls this once per pointer frame so a 30k-line parent never re-renders per
+   * point; the declarative `strokes` prop remains authoritative outside a pinned stroke.
+   */
+  readonly syncPinnedStrokes: (strokes: readonly StudioGpuStroke[]) => void;
 }
 
 interface LatestCanvasProps {
@@ -187,6 +193,17 @@ function StudioWebGpuCanvas({
       status: "rejected",
       reason: "frame-unavailable",
     }),
+    syncPinnedStrokes: (strokes) => {
+      const latest = { ...latestRef.current, strokes };
+      latestRef.current = latest;
+      // 레이아웃 이펙트의 중복 발행 비교 기준도 갱신한다 — 다음 부모 렌더(스트로크 경계)에서
+      // props(EMPTY)와 달라졌음을 감지해 정상적으로 EMPTY 프레임을 재발행하게 된다.
+      lastIssuedRequestRef.current = snapshotCanvasRequest(latest);
+      const requestId = `frame:${requestSequenceRef.current + 1}`;
+      requestSequenceRef.current += 1;
+      desiredRequestIdRef.current = requestId;
+      issueLatestRequestRef.current?.();
+    },
   }), []);
 
   useEffect(() => {
@@ -322,7 +339,8 @@ function StudioWebGpuCanvas({
     issueLatestRequestRef.current?.();
   });
 
-  const presentationActive = isStudioWebGpuCanvasActive(strokes);
+  // 파인된 스트로크는 임페러티브 피드로만 흐르므로 strokes prop 이 비어 있어도 표시 대상이다.
+  const presentationActive = isStudioWebGpuCanvasActive(strokes) || pinnedVisible;
 
   return (
     <div

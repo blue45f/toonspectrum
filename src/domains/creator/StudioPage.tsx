@@ -1124,6 +1124,7 @@ import type { StudioIntegrationsSettingsPanelProps } from "./StudioIntegrationsS
 import type { StudioMainMenuGroup } from "./StudioMainMenu";
 import type { PublishContext } from "./StudioPublishContextBanner";
 import type { StudioStockImagePanelProps } from "./StudioStockImagePanel";
+import type { StudioWebGpuCanvasHandle } from "./StudioWebGpuCanvas";
 import type {
   GeneratedAssetQuality,
   GeneratedAssetSize,
@@ -2768,6 +2769,135 @@ function usePatternFillImage(pattern: StudioPatternSpec | undefined): HTMLImageE
   return image;
 }
 
+/**
+ * Default(pen/marker/eraser) 프리핸드 경로의 공용 래스터라이저 — 중점 이차곡선 + 정점 필압 폭.
+ * StudioDrawNode 의 선언적 Shape 와 다이렉트 라이브 초안(임페러티브 sceneFunc)이 같은 함수를
+ * 그려 미리보기와 커밋 픽셀이 일치한다.
+ */
+function drawFreehandPenSegments(
+  context: Konva.Context,
+  smoothed: number[],
+  sampledPressures: readonly number[] | null,
+  strokeColor: string,
+  strokeWidth: number
+): void {
+  if (smoothed.length < 4) return;
+  context.lineCap = "round";
+  context.lineJoin = "round";
+  context.strokeStyle = strokeColor;
+  const widthAt = (idx: number) => {
+    if (!sampledPressures) return strokeWidth;
+    const p = sampledPressures[idx] ?? 0.5;
+    return Math.max(0.5, strokeWidth * (0.3 + p * 1.4));
+  };
+  const count = smoothed.length / 2;
+  if (count === 2) {
+    context.beginPath();
+    context.moveTo(smoothed[0]!, smoothed[1]!);
+    context.lineTo(smoothed[2]!, smoothed[3]!);
+    context.lineWidth = widthAt(1);
+    context.stroke();
+    return;
+  }
+  let prevMidX = smoothed[0]!;
+  let prevMidY = smoothed[1]!;
+  for (let i = 1; i < count; i += 1) {
+    const cx = smoothed[(i - 1) * 2]!;
+    const cy = smoothed[(i - 1) * 2 + 1]!;
+    const x = smoothed[i * 2]!;
+    const y = smoothed[i * 2 + 1]!;
+    const isLast = i === count - 1;
+    const midX = isLast ? x : (cx + x) / 2;
+    const midY = isLast ? y : (cy + y) / 2;
+    context.beginPath();
+    context.moveTo(prevMidX, prevMidY);
+    context.quadraticCurveTo(cx, cy, midX, midY);
+    context.lineWidth = widthAt(i);
+    context.stroke();
+    prevMidX = midX;
+    prevMidY = midY;
+  }
+}
+
+/** 프레임 단위 필압 통지용 미니 스토어 — StudioPage 리렌더 없이 HUD 미터만 갱신한다. */
+interface StudioLivePressureStore {
+  value: number | null;
+  listeners: Set<() => void>;
+}
+
+function StudioLivePressureHudPill({ store }: { store: StudioLivePressureStore }) {
+  const pressure = useSyncExternalStore(
+    (onStoreChange) => {
+      store.listeners.add(onStoreChange);
+      return () => store.listeners.delete(onStoreChange);
+    },
+    () => store.value
+  );
+  const ratio = studioPressureHudRatio(pressure);
+  if (ratio === null) return null;
+  return (
+    <StudioHudPill title="실시간 필압" accent>
+      <Suspense fallback={null}>
+        <StudioPressureHudMeter ratio={ratio} />
+      </Suspense>
+    </StudioHudPill>
+  );
+}
+
+/**
+ * 다이렉트 라이브 초안 대상인지 — StudioDrawNode 의 Default(pen/marker/eraser) 브랜치와 정확히
+ * 같은 집합만 참이어야 미리보기가 커밋과 픽셀 단위로 일치한다. 지우개는 모든 브러시에서 Default
+ * 경로를 타고, dynamics 프리셋 브러시(mode "pen")는 dab 브랜치라 제외한다.
+ */
+function isDirectLiveDraftEl(el: DrawEl): boolean {
+  if ((el.kind ?? "freehand") !== "freehand") return false;
+  if (el.mode === "eraser") return true;
+  const family = resolveStudioBrushRenderFamily(el.brush ?? "pen");
+  if (family !== "pen" && family !== "marker") return false;
+  return resolveStudioBrushDynamicsPresetId(el.brush) === null;
+}
+
+/** 다이렉트 라이브 초안을 임페러티브로 그린다 — React 렌더 없이 Konva batchDraw 로만 갱신. */
+function drawLiveFreehandDraftToContext(context: Konva.Context, el: DrawEl): void {
+  const isEraser = el.mode === "eraser";
+  const strokeColor = isEraser ? "#16100c" : el.stroke;
+  const strokeWidth = Math.max(1, el.strokeWidth);
+  const renderSampleDistance = strokeRenderDistance(el.sampleSpacing);
+  const variations = getSymmetricPoints(el.points, el.symmetry);
+  context.save();
+  context.globalAlpha = Math.min(1, Math.max(0, el.opacity ?? 1));
+  context.globalCompositeOperation = isEraser ? "destination-out" : "source-over";
+  for (const points of variations) {
+    if (points.length === 2) {
+      const pressure = Math.min(1, Math.max(0, el.pressures?.[0] ?? 0.5));
+      const width = strokeWidth * (0.3 + pressure * 1.4);
+      context.beginPath();
+      context.arc(points[0]!, points[1]!, Math.max(0.35, width / 2), 0, Math.PI * 2);
+      context.fillStyle = strokeColor;
+      context.fill();
+      continue;
+    }
+    const smoothed = processFreehandPoints(points, renderSampleDistance);
+    const fill = !isEraser ? el.fill : undefined;
+    if (fill && smoothed.length >= 6) {
+      context.beginPath();
+      context.moveTo(smoothed[0]!, smoothed[1]!);
+      for (let i = 2; i < smoothed.length; i += 2) {
+        context.lineTo(smoothed[i]!, smoothed[i + 1]!);
+      }
+      context.closePath();
+      context.fillStyle = fill;
+      context.fill();
+    }
+    const pressures = el.pressures;
+    const sampledPressures = pressures && pressures.length > 0 && smoothed.length >= 4
+      ? resampleStrokePressures(pressures, Math.floor(smoothed.length / 2))
+      : null;
+    drawFreehandPenSegments(context, smoothed, sampledPressures, strokeColor, strokeWidth);
+  }
+  context.restore();
+}
+
 // memo 는 라이브 드로잉의 핵심 계약이다: 초안이 rAF마다 리렌더를 일으켜도 커밋된 획들은 같은
 // el 참조를 받으므로 여기서 잘린다. memo 가 없으면 모든 커밋 획이 매 프레임 스무딩을 재계산해
 // 새 points 배열을 만들고, react-konva 가 이를 시각 변경으로 보고 메인 레이어 전체를 다시
@@ -3453,43 +3583,8 @@ const StudioDrawNode = memo(function StudioDrawNode({ el }: { el: DrawEl }) {
                     context.fillStyle = freehandFill;
                     context.fill();
                   }
-                  // 중점 이차곡선 보간: 정점을 제어점으로 두고 이웃 중점 사이를 곡선으로 잇는다.
-                  // 세그먼트별 직선(lineTo)은 빠른 곡선에서 각진 꺾임이 보였다. 굵기는 정점
-                  // 필압을 그대로 쓰되 각 곡선 조각을 개별 스트로크로 그려 연속 폭 변화를 낸다.
-                  context.lineCap = "round";
-                  context.lineJoin = "round";
-                  context.strokeStyle = stroke;
-                  const widthAt = (idx: number) => {
-                    const p = sampledPressures[idx] ?? 0.5;
-                    return Math.max(0.5, strokeWidth * (0.3 + p * 1.4));
-                  };
-                  const count = smoothed.length / 2;
-                  if (count === 2) {
-                    context.beginPath();
-                    context.moveTo(smoothed[0]!, smoothed[1]!);
-                    context.lineTo(smoothed[2]!, smoothed[3]!);
-                    context.lineWidth = widthAt(1);
-                    context.stroke();
-                    return;
-                  }
-                  let prevMidX = smoothed[0]!;
-                  let prevMidY = smoothed[1]!;
-                  for (let i = 1; i < count; i += 1) {
-                    const cx = smoothed[(i - 1) * 2]!;
-                    const cy = smoothed[(i - 1) * 2 + 1]!;
-                    const x = smoothed[i * 2]!;
-                    const y = smoothed[i * 2 + 1]!;
-                    const isLast = i === count - 1;
-                    const midX = isLast ? x : (cx + x) / 2;
-                    const midY = isLast ? y : (cy + y) / 2;
-                    context.beginPath();
-                    context.moveTo(prevMidX, prevMidY);
-                    context.quadraticCurveTo(cx, cy, midX, midY);
-                    context.lineWidth = widthAt(i);
-                    context.stroke();
-                    prevMidX = midX;
-                    prevMidY = midY;
-                  }
+                  // 중점 이차곡선 보간 — 다이렉트 라이브 초안과 같은 래스터라이저를 공유한다.
+                  drawFreehandPenSegments(context, smoothed, sampledPressures, stroke, strokeWidth);
                 }}
                 opacity={opacity}
                 globalCompositeOperation={composite}
@@ -6774,22 +6869,27 @@ function StudioCuttoonEditor() {
   );
   const [drawShape, setDrawShape] = useState<DrawShapeKind>("line");
   const [shapeFill, setShapeFill] = useState(false);
-  /** Live pen pressure for status HUD (Concepts/Krita meter) — rAF-throttled. */
-  const [liveDrawPressure, setLiveDrawPressure] = useState<number | null>(null);
+  /**
+   * Live pen pressure for status HUD (Concepts/Krita meter) — 외부 스토어로 완전 격리.
+   * 실획에서 필압은 프레임마다 변하므로 어떤 양자화로도 setState 를 걸면 StudioPage 전체가
+   * 매 프레임 리렌더된다. 구독자는 HUD 미터 자식 컴포넌트 하나뿐이다.
+   */
+  const liveDrawPressureStoreRef = useRef<StudioLivePressureStore>(null as never);
+  liveDrawPressureStoreRef.current ??= { value: null, listeners: new Set() };
   const liveDrawPressureRef = useRef<number | null>(null);
   const liveDrawPressureRafRef = useRef<number>(0);
   const scheduleLiveDrawPressure = (next: number | null) => {
-    // 1/32 양자화: HUD 게이지가 구분 못 하는 미세 변화로 스트로크 프레임마다 30k 라인
-    // 컴포넌트를 리렌더하지 않는다. 같은 값이면 rAF 예약 자체를 만들지 않는다.
+    // 1/32 양자화: HUD 게이지가 구분 못 하는 미세 변화는 통지 자체를 만들지 않는다.
     const quantized = next === null ? null : Math.round(next * 32) / 32;
     if (liveDrawPressureRef.current === quantized && !liveDrawPressureRafRef.current) return;
     liveDrawPressureRef.current = quantized;
     if (liveDrawPressureRafRef.current) return;
     liveDrawPressureRafRef.current = requestAnimationFrame(() => {
       liveDrawPressureRafRef.current = 0;
-      setLiveDrawPressure((prev) =>
-        prev === liveDrawPressureRef.current ? prev : liveDrawPressureRef.current
-      );
+      const store = liveDrawPressureStoreRef.current;
+      if (store.value === liveDrawPressureRef.current) return;
+      store.value = liveDrawPressureRef.current;
+      for (const listener of store.listeners) listener();
     });
   };
   const [stabilizer, setStabilizer] = useState<number>(6);
@@ -8211,12 +8311,23 @@ function StudioCuttoonEditor() {
   const [draft, setDraft] = useState<DrawEl | null>(null);
   const [webGpuAuthority, setWebGpuAuthority] = useState<StudioWebGpuAuthorityFrame | null>(null);
   // 라이브 잉크 파인닝: 스트로크 시작 시점의 백엔드로 렌더러를 한 번 결정한다(중도 교대 금지).
-  const [webGpuBackend, setWebGpuBackend] = useState<StudioGpuBackend | null>(null);
+  const webGpuBackendRef = useRef<StudioGpuBackend | null>(null);
+  const webGpuCanvasHandleRef = useRef<StudioWebGpuCanvasHandle | null>(null);
+  const [gpuLiveInkPinned, setGpuLiveInkPinned] = useState(false);
   // 펜 리프트 핸드오프: 커밋된 Konva 획이 페인트될 때까지(더블 rAF) 마지막 GPU 프레임을 유지한다.
-  const [gpuLingerStrokes, setGpuLingerStrokes] = useState<readonly StudioGpuStroke[] | null>(null);
-  const lastGpuLiveInkStrokesRef = useRef<readonly StudioGpuStroke[] | null>(null);
+  const [gpuLiveInkLinger, setGpuLiveInkLinger] = useState(false);
   const gpuLingerRafRef = useRef<number>(0);
   const gpuLiveInkPinnedRef = useRef(false);
+  // 다이렉트 라이브 초안: 프리핸드 펜 계열은 포인터 프레임마다 React 를 거치지 않고 Konva/GPU 를
+  // 직접 갱신한다(스트로크당 React 렌더는 시작·종료 2회). 30k 라인 컴포넌트 본문이 매 프레임
+  // 재실행되던 것이 대형 페이지 드로잉 버벅임의 마지막 원인이었다.
+  const [liveDraftDirect, setLiveDraftDirect] = useState(false);
+  const liveDraftDirectRef = useRef(false);
+  const liveDraftVisualRef = useRef<DrawEl | null>(null);
+  const liveDraftPendingRef = useRef<DrawEl | null>(null);
+  const liveDraftRafRef = useRef<number | null>(null);
+  const liveDraftLayerRef = useRef<Konva.Layer>(null);
+  const mainLayerRef = useRef<Konva.Layer>(null);
   const [studioRasterHandoffCandidate, setStudioRasterHandoffCandidate] =
     useState<StudioRasterHandoffCandidate | null>(null);
   const studioRasterHandoffCandidateRef = useRef<StudioRasterHandoffCandidate | null>(null);
@@ -8250,7 +8361,81 @@ function StudioCuttoonEditor() {
   const applySmartGuides = (next: SmartGuideOverlay) => {
     setSmartGuides((prev) => (smartGuideOverlaysEqual(prev, next) ? prev : next));
   };
+  // 커밋과 동일한 postCorrection 을 꼬리 몇 점을 제외하고 라이브에 미리 적용한다(펜 리프트 스냅
+  // 제거). smoothStrokePoints 는 점 개수·양 끝점을 보존해 필압 정렬과 꼬리 이음매가 유지된다.
+  const progressiveCorrectDraft = (el: DrawEl): DrawEl => {
+    if ((el.kind ?? "freehand") !== "freehand" || postCorrection <= 0) return el;
+    const tailPoints = 8;
+    const pointCount = Math.floor(el.points.length / 2);
+    if (pointCount <= tailPoints + 2) return el;
+    const headCount = pointCount - tailPoints;
+    const smoothedHead = smoothStrokePoints(
+      el.points.slice(0, headCount * 2),
+      postCorrection,
+      { preserveCorners }
+    );
+    return { ...el, points: [...smoothedHead, ...el.points.slice(headCount * 2)] };
+  };
+  const buildGpuLiveStroke = (el: DrawEl): StudioGpuStroke | null => {
+    const points = processFreehandPoints(el.points, strokeRenderDistance(el.sampleSpacing));
+    if (points.length < 4) return null;
+    return {
+      id: el.id,
+      points,
+      pressures: resampleStrokePressures(el.pressures ?? [], Math.floor(points.length / 2), 0.5),
+      color: el.stroke,
+      size: Math.max(1, el.strokeWidth),
+      opacity: el.opacity,
+      composite: "normal" as const,
+    };
+  };
+  const flushDirectLiveDraft = () => {
+    const next = liveDraftPendingRef.current;
+    if (!next || !liveDraftDirectRef.current) return;
+    const visual = progressiveCorrectDraft(next);
+    liveDraftVisualRef.current = visual;
+    if (gpuLiveInkPinnedRef.current) {
+      const stroke = buildGpuLiveStroke(visual);
+      if (stroke) {
+        webGpuCanvasHandleRef.current?.syncPinnedStrokes([stroke]);
+        return;
+      }
+    }
+    (next.mode === "eraser" ? mainLayerRef.current : liveDraftLayerRef.current)?.batchDraw();
+  };
+  // quickshape 변환 등으로 다이렉트 대상에서 벗어나면 React 초안 경로로 복귀한다(1회 렌더).
+  const exitDirectLiveDraft = () => {
+    if (!liveDraftDirectRef.current) return;
+    liveDraftDirectRef.current = false;
+    setLiveDraftDirect(false);
+    liveDraftPendingRef.current = null;
+    liveDraftVisualRef.current = null;
+    if (liveDraftRafRef.current !== null) {
+      globalThis.cancelAnimationFrame(liveDraftRafRef.current);
+      liveDraftRafRef.current = null;
+    }
+    if (gpuLiveInkPinnedRef.current) {
+      gpuLiveInkPinnedRef.current = false;
+      setGpuLiveInkPinned(false);
+      webGpuCanvasHandleRef.current?.syncPinnedStrokes(EMPTY_STUDIO_GPU_STROKES);
+    }
+    mainLayerRef.current?.batchDraw();
+  };
   const scheduleDraft = (next: DrawEl | null) => {
+    // 다이렉트 모드: 프리핸드 펜 계열은 React 상태를 거치지 않고 Konva/GPU 를 직접 갱신한다.
+    if (next && liveDraftDirectRef.current) {
+      if (isDirectLiveDraftEl(next)) {
+        liveDraftPendingRef.current = next;
+        if (liveDraftRafRef.current === null) {
+          liveDraftRafRef.current = globalThis.requestAnimationFrame(() => {
+            liveDraftRafRef.current = null;
+            flushDirectLiveDraft();
+          });
+        }
+        return;
+      }
+      exitDirectLiveDraft();
+    }
     pendingDraftRef.current = next;
     if (draftRafRef.current !== null) return;
     draftRafRef.current = globalThis.requestAnimationFrame(() => {
@@ -8263,6 +8448,31 @@ function StudioCuttoonEditor() {
     if (draftRafRef.current !== null) {
       globalThis.cancelAnimationFrame(draftRafRef.current);
       draftRafRef.current = null;
+    }
+    liveDraftPendingRef.current = null;
+    liveDraftVisualRef.current = null;
+    if (liveDraftRafRef.current !== null) {
+      globalThis.cancelAnimationFrame(liveDraftRafRef.current);
+      liveDraftRafRef.current = null;
+    }
+    if (liveDraftDirectRef.current) {
+      liveDraftDirectRef.current = false;
+      setLiveDraftDirect(false);
+    }
+    if (gpuLiveInkPinnedRef.current) {
+      // 펜 리프트 핸드오프: 마지막 GPU 프레임을 더블 rAF 동안 유지해 커밋된 Konva 획이
+      // 페인트되기 전의 빈 프레임을 막는다. 이후 엔진에 EMPTY 를 먹여 표면을 정리한다.
+      gpuLiveInkPinnedRef.current = false;
+      setGpuLiveInkPinned(false);
+      setGpuLiveInkLinger(true);
+      if (gpuLingerRafRef.current) globalThis.cancelAnimationFrame(gpuLingerRafRef.current);
+      gpuLingerRafRef.current = globalThis.requestAnimationFrame(() => {
+        gpuLingerRafRef.current = globalThis.requestAnimationFrame(() => {
+          gpuLingerRafRef.current = 0;
+          setGpuLiveInkLinger(false);
+          webGpuCanvasHandleRef.current?.syncPinnedStrokes(EMPTY_STUDIO_GPU_STROKES);
+        });
+      });
     }
     setDraft(null);
   };
@@ -16139,6 +16349,28 @@ function StudioCuttoonEditor() {
       drawingRef.current = next;
       perspectiveRayRef.current = null; // 새 스트로크마다 원근 락을 다시 잡는다(첫 move에서 재계산).
       isometricAxisRayRef.current = null; // 새 스트로크마다 아이소메트릭 축 락도 다시 잡는다.
+      // 다이렉트 라이브 초안 무장: 이 렌더(스트로크 시작) 이후 pointermove 는 React 를 거치지
+      // 않는다. GPU 파인은 백엔드가 이미 준비된 경우에만 스트로크 단위로 한 번 결정한다.
+      {
+        const direct = isDirectLiveDraftEl(next);
+        liveDraftDirectRef.current = direct;
+        setLiveDraftDirect(direct);
+        liveDraftVisualRef.current = direct ? next : null;
+        liveDraftPendingRef.current = direct ? next : null;
+        const gpuPin = direct
+          && next.mode !== "eraser"
+          && webGpuBackendRef.current === "webgpu"
+          && !next.fill
+          && (next.opacity ?? 1) >= 0.999
+          && (next.symmetry?.type ?? "none") === "none";
+        gpuLiveInkPinnedRef.current = gpuPin;
+        setGpuLiveInkPinned(gpuPin);
+        if (gpuLingerRafRef.current) {
+          globalThis.cancelAnimationFrame(gpuLingerRafRef.current);
+          gpuLingerRafRef.current = 0;
+        }
+        setGpuLiveInkLinger(false);
+      }
       setDraft(next);
       if (drawMode === "pen" && quickShapeActive) startQuickShapeTracking({ x: pos.x, y: pos.y });
       else stopQuickShapeTracking(); // 방어적 — 이전 스트로크 타이머 잔존 방지
@@ -19817,79 +20049,12 @@ function StudioCuttoonEditor() {
     );
     return { ...draft, points: [...smoothedHead, ...draft.points.slice(headCount * 2)] };
   })();
-  // G10b stroke-pinned live ink: 렌더러 소유권은 스트로크 시작에 한 번 결정된다. WebGPU 백엔드가
-  // 이미 준비된 경우 라이브 획은 GPU 오버레이가 전담하고 Konva 초안은 마운트하지 않는다 —
-  // 가시성이 프레임 영수증을 기다리지 않으므로(영수증은 캡처/커밋 핸드오프 전용) 예전의
-  // 프레임 단위 소유권 교대(선 번쩍임)가 구조적으로 불가능하다. GPU 프레임은 입력보다 1프레임
-  // 늦을 수 있지만 항상 획의 유효한 접두사만 보여준다. 디바이스 손실/백엔드 강등은 fail-once:
-  // 남은 스트로크는 Konva 초안이 즉시 이어받고 되돌아가지 않는다.
-  const gpuLiveInkEligible = webGpuBackend === "webgpu"
-    && draftForRender !== null
-    && !isolatedDynamicDraft
-    && draftForRender.mode !== "eraser"
-    && (draftForRender.kind ?? "freehand") === "freehand"
-    && resolveStudioBrushRenderFamily(draftForRender.brush ?? "pen") === "pen"
-    && (draftForRender.opacity ?? 1) >= 0.999
-    && (draftForRender.symmetry?.type ?? "none") === "none"
-    // 라쏘 필(채움 프리핸드)은 GPU dab 파이프라인이 내부 채움을 모른다 — Konva 초안이 담당.
-    && !draftForRender.fill;
-  const gpuLiveInkStroke: StudioGpuStroke | null = gpuLiveInkEligible && draftForRender
-    ? (() => {
-        const points = processFreehandPoints(
-          draftForRender.points,
-          strokeRenderDistance(draftForRender.sampleSpacing)
-        );
-        return {
-          id: draftForRender.id,
-          points,
-          pressures: resampleStrokePressures(
-            draftForRender.pressures ?? [],
-            Math.floor(points.length / 2),
-            0.5
-          ),
-          color: draftForRender.stroke,
-          size: Math.max(1, draftForRender.strokeWidth),
-          opacity: draftForRender.opacity,
-          composite: "normal" as const,
-        };
-      })()
-    : null;
-  const gpuLiveInkActive = gpuLiveInkStroke !== null;
-  const webGpuPreviewStrokes: readonly StudioGpuStroke[] = gpuLiveInkStroke
-    ? [gpuLiveInkStroke]
-    : gpuLingerStrokes ?? EMPTY_STUDIO_GPU_STROKES;
-  const gpuLiveInkVisible = gpuLiveInkActive || gpuLingerStrokes !== null;
-  // 펜 리프트의 빈 프레임 방지: 커밋 렌더(초안 소멸)와 같은 커밋 페이즈에서 마지막 GPU 획을
-  // 린저 상태로 승격해 페인트 전에 다시 렌더한다(useLayoutEffect 의 동기 재렌더 보장). 이후
-  // 더블 rAF — 커밋된 Konva 획의 batchDraw 가 확실히 화면에 나온 뒤 — 오버레이를 내린다.
-  useLayoutEffect(() => {
-    gpuLiveInkPinnedRef.current = gpuLiveInkActive;
-    if (gpuLiveInkStroke) {
-      lastGpuLiveInkStrokesRef.current = [gpuLiveInkStroke];
-      if (gpuLingerRafRef.current) {
-        cancelAnimationFrame(gpuLingerRafRef.current);
-        gpuLingerRafRef.current = 0;
-      }
-      setGpuLingerStrokes((prev) => (prev === null ? prev : null));
-      return;
-    }
-    const last = lastGpuLiveInkStrokesRef.current;
-    if (!last) return;
-    lastGpuLiveInkStrokesRef.current = null;
-    setGpuLingerStrokes(last);
-    gpuLingerRafRef.current = requestAnimationFrame(() => {
-      gpuLingerRafRef.current = requestAnimationFrame(() => {
-        gpuLingerRafRef.current = 0;
-        setGpuLingerStrokes(null);
-      });
-    });
-    return () => {
-      if (gpuLingerRafRef.current) {
-        cancelAnimationFrame(gpuLingerRafRef.current);
-        gpuLingerRafRef.current = 0;
-      }
-    };
-  }, [gpuLiveInkActive, gpuLiveInkStroke]);
+  // G10b stroke-pinned live ink(다이렉트 모드): 렌더러 소유권은 onStageDown 에서 스트로크 시작에
+  // 한 번 결정되고, 이후 포인터 프레임은 scheduleDraft → flushDirectLiveDraft 가 React 렌더 없이
+  // Konva batchDraw / syncPinnedStrokes 임페러티브 피드로만 흐른다. 따라서 이 선언적 strokes
+  // prop 은 항상 비어 있으며(영수증 권한 경로는 캡처/커밋 핸드오프 전용으로 유지), 파인 중
+  // 가시성은 pinnedVisible 이 담당한다.
+  const webGpuPreviewStrokes: readonly StudioGpuStroke[] = EMPTY_STUDIO_GPU_STROKES;
   const webGpuViewportSurface = planStudioWebGpuViewportSurface({
     documentWidth: CANVAS_W,
     documentHeight: canvasH,
@@ -23889,12 +24054,8 @@ function StudioCuttoonEditor() {
                   <PenTool size={12} strokeWidth={1.75} aria-hidden />
                 </StudioHudPill>
               ) : null}
-              {tool === "draw" && drawMode === "pen" && studioPressureHudRatio(liveDrawPressure) !== null ? (
-                <StudioHudPill title="실시간 필압" accent>
-                  <Suspense fallback={null}>
-                    <StudioPressureHudMeter ratio={studioPressureHudRatio(liveDrawPressure)} />
-                  </Suspense>
-                </StudioHudPill>
+              {tool === "draw" && drawMode === "pen" ? (
+                <StudioLivePressureHudPill store={liveDrawPressureStoreRef.current} />
               ) : null}
               {tool === "draw" && drawMode === "shape" && studioShapeFillHudLabel(shapeFill, drawShape) ? (
                 <StudioHudPill accent title="도형 채우기">
@@ -24153,7 +24314,7 @@ function StudioCuttoonEditor() {
                 }
               />
             </Layer>
-            <Layer>
+            <Layer ref={mainLayerRef}>
               {showGrid && (
                 <Group listening={false}>
                   {Array.from({ length: Math.ceil(CANVAS_W / gridSize) }).map((_, i) => (
@@ -25164,7 +25325,18 @@ function StudioCuttoonEditor() {
               })()}
               {/* 지우개 초안만 메인 레이어에 남는다: destination-out 은 이 레이어의 커밋 픽셀과
                   합성되어야 지워지는 미리보기가 보인다. 나머지 초안은 아래 전용 레이어에서 그린다. */}
-              {draft && !isolatedDynamicDraft && draft.mode === "eraser"
+              {draft && liveDraftDirect && draft.mode === "eraser" && (
+                <Shape
+                  sceneFunc={(context) => {
+                    const el = liveDraftVisualRef.current;
+                    if (!el || el.mode !== "eraser") return;
+                    drawLiveFreehandDraftToContext(context, el);
+                  }}
+                  listening={false}
+                  perfectDrawEnabled={false}
+                />
+              )}
+              {draft && !liveDraftDirect && !isolatedDynamicDraft && draft.mode === "eraser"
                 ? <StudioDrawNode el={draftForRender ?? draft} />
                 : null}
               <Transformer
@@ -25217,8 +25389,23 @@ function StudioCuttoonEditor() {
             {/* 라이브 프리핸드 초안은 전용 레이어에서만 다시 그린다: 포인터 프레임마다 메인
                 레이어의 모든 커밋 요소(세그먼트 압력 획·수채 dab 등)를 재래스터하지 않는다.
                 일반 획은 source-over 단일 노드라 별도 캔버스에서 합성해도 시각 결과가 같다.
-                지우개(destination-out)만 위의 메인 레이어 경로를 쓴다. */}
-            {draft && !isolatedDynamicDraft && draft.mode !== "eraser" && !gpuLiveInkActive && (
+                지우개(destination-out)만 위의 메인 레이어 경로를 쓴다.
+                다이렉트 모드(펜/마커/지우개)는 임페러티브 sceneFunc 이 ref 에서 직접 그리므로
+                포인터 프레임에 React 렌더가 없고, 그 외 브러시는 기존 선언적 경로를 유지한다. */}
+            {draft && liveDraftDirect && draft.mode !== "eraser" && (
+              <Layer ref={liveDraftLayerRef} listening={false}>
+                <Shape
+                  sceneFunc={(context) => {
+                    const el = liveDraftVisualRef.current;
+                    if (!el || el.mode === "eraser" || gpuLiveInkPinnedRef.current) return;
+                    drawLiveFreehandDraftToContext(context, el);
+                  }}
+                  listening={false}
+                  perfectDrawEnabled={false}
+                />
+              </Layer>
+            )}
+            {draft && !liveDraftDirect && !isolatedDynamicDraft && draft.mode !== "eraser" && (
               <Layer listening={false}>
                 <StudioDrawNode el={draftForRender ?? draft} />
               </Layer>
@@ -25839,12 +26026,26 @@ function StudioCuttoonEditor() {
                 offsetX={webGpuViewportSurface.transform.offsetX}
                 offsetY={webGpuViewportSurface.transform.offsetY}
                 flipX={webGpuViewportSurface.transform.flipX}
+                ref={(handle) => {
+                  webGpuCanvasHandleRef.current = handle;
+                }}
                 strokes={webGpuPreviewStrokes}
                 frameAuthorized={webGpuPreviewAuthorized}
-                pinnedVisible={gpuLiveInkVisible}
+                pinnedVisible={gpuLiveInkPinned || gpuLiveInkLinger}
                 eagerInitialize
-                onBackendChange={setWebGpuBackend}
-                onDeviceLost={() => setWebGpuBackend("canvas2d")}
+                onBackendChange={(backend) => {
+                  webGpuBackendRef.current = backend;
+                }}
+                onDeviceLost={() => {
+                  // fail-once: 남은 스트로크는 Konva 초안이 즉시 이어받고 이 스트로크 동안
+                  // GPU 로 되돌아가지 않는다.
+                  webGpuBackendRef.current = "canvas2d";
+                  if (gpuLiveInkPinnedRef.current) {
+                    gpuLiveInkPinnedRef.current = false;
+                    setGpuLiveInkPinned(false);
+                    liveDraftLayerRef.current?.batchDraw();
+                  }
+                }}
                 onFrameInvalid={() => setWebGpuAuthority(null)}
                 onFrameReady={() => {
                   // 파인된 라이브 잉크는 영수증으로 가시성을 정하지 않는다 — 프레임당 권한
