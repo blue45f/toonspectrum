@@ -2,7 +2,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { StudioToolHintBubble } from "./components/StudioToolHintBubble";
-import { StudioToolHintTarget } from "./StudioToolHint";
+import bubbleSource from "./components/StudioToolHintBubble.tsx?raw";
+import {
+  StudioToolHintPreferencesProvider,
+  StudioToolHintTarget,
+} from "./StudioToolHint";
 import source from "./StudioToolHint.tsx?raw";
 
 describe("StudioToolHint", () => {
@@ -46,6 +50,40 @@ describe("StudioToolHint", () => {
     expect(html).toContain('data-studio-tool-hint-expanded="false"');
     expect(html).toContain('data-side="left"');
     expect(html).not.toContain("data-studio-tool-hint-preview=");
+  });
+
+  it("renders compact help without promising an expansion that cannot happen", () => {
+    const html = renderToStaticMarkup(
+      <StudioToolHintBubble
+        expanded={false}
+        richPreviewEnabled={false}
+        hint={{
+          id: "compact-eraser",
+          title: "지우개",
+          description: "획을 지웁니다.",
+          preview: "erase",
+        }}
+        anchor={{ left: 20, top: 20, right: 60, bottom: 60, width: 40, height: 40 } as DOMRect}
+      />
+    );
+
+    expect(html).toContain("지우개");
+    expect(html).toContain("획을 지웁니다.");
+    expect(html).not.toContain("잠시 머물러 미리보기");
+    expect(html).not.toContain("동작 미리보기");
+    expect(html).not.toContain("data-studio-tool-hint-preview=");
+  });
+
+  it("keeps the preview implementation behind rich-mode intent", () => {
+    expect(bubbleSource).toContain("studioToolHintPreviewModulePromise ??= import");
+    expect(bubbleSource).not.toMatch(
+      /const studioToolHintPreviewModulePromise\s*=\s*import/u
+    );
+    expect(bubbleSource).toContain("if (!richPreviewEnabled) return;");
+    expect(bubbleSource).toContain("richPreviewEnabled && expanded");
+    expect(bubbleSource).toContain(
+      "reducedMotion={reducedMotion ? true : undefined}"
+    );
   });
 
   it("condenses the coach instead of promising a preview hidden by the short-height layout", () => {
@@ -139,6 +177,30 @@ describe("StudioToolHint", () => {
   it("opens from keyboard and assistive focus without depending on :focus-visible support", () => {
     expect(source).toContain("Pointer focus is already filtered by pointerdown suppression");
     expect(source).not.toContain('matches(":focus-visible")');
-    expect(source).toContain("reveal(true);");
+    expect(source).toContain("reveal(richCoachEnabled);");
+  });
+
+  it("provides compact, rich, and off help modes without changing disabled semantics", () => {
+    const compactHtml = renderToStaticMarkup(
+      <StudioToolHintPreferencesProvider
+        mode="compact"
+        touchHoldDelayMs={640}
+        reduceMotion
+      >
+        <StudioToolHintTarget
+          disabled
+          unavailableReason="이미 첫 번째 프레임이에요."
+          hint={{ id: "frame-reorder", title: "앞으로 이동", description: "프레임 순서를 바꿉니다." }}
+        >
+          <button type="button" disabled>이동</button>
+        </StudioToolHintTarget>
+      </StudioToolHintPreferencesProvider>
+    );
+
+    expect(compactHtml).toContain('aria-disabled="true"');
+    expect(source).toContain('preferences.mode === "off"');
+    expect(source).toContain('const richCoachEnabled = preferences.mode === "rich";');
+    expect(source).toContain("preferences.touchHoldDelayMs");
+    expect(source).toContain("reducedMotion={preferences.reduceMotion}");
   });
 });

@@ -37,6 +37,7 @@ import {
   type StudioAnimFrame,
 } from "./studio-frame-animation";
 import { PANEL_LABEL_ROW, StudioSliderRow, StudioToggleChip } from "./studio-panel-ui";
+import { StudioToolHintTarget } from "./StudioToolHint";
 
 import type { ReactElement } from "react";
 
@@ -145,6 +146,24 @@ export function StudioFrameAnimationPanel({
 
   const atCap = frames.length >= MAX_ANIM_FRAMES;
   const captureReason = captureDisabledReason ?? (atCap ? `프레임은 최대 ${MAX_ANIM_FRAMES}장까지 만들 수 있어요.` : null);
+  const playbackDisabledReason =
+    frames.length < 2 ? "재생하려면 프레임이 2장 이상 필요해요." : undefined;
+  const previousFrameDisabledReason = activeIndex === 0 ? "이미 첫 번째 프레임이에요." : undefined;
+  const duplicateFrameDisabledReason = atCap
+    ? `프레임은 최대 ${MAX_ANIM_FRAMES}장까지 만들 수 있어요.`
+    : undefined;
+  const deleteFrameDisabledReason =
+    frames.length <= 1 ? "애니메이션을 유지하려면 프레임이 최소 1장 필요해요." : undefined;
+  const nextFrameDisabledReason =
+    activeIndex === frames.length - 1 ? "이미 마지막 프레임이에요." : undefined;
+
+  function deleteActiveFrame() {
+    if (!activeFrame) return;
+    const next = removeFrame(frames, activeFrame.id);
+    onFramesChange(next);
+    const fallback = next[Math.min(activeIndex, next.length - 1)];
+    if (fallback) onActiveFrameChange(fallback.id);
+  }
 
   // ── 내보내기(WebM) — StudioMotionExportPanel과 동일한 아코디언 패턴 미러 ──
   const [exportOpen, setExportOpen] = useState(false);
@@ -244,7 +263,7 @@ export function StudioFrameAnimationPanel({
               {frames.map((f, i) => {
                 const isHighlighted = f.id === highlightId;
                 return (
-                  <div key={f.id} className="group relative shrink-0">
+                  <div key={f.id} className="relative shrink-0">
                     <button
                       type="button"
                       role="option"
@@ -261,77 +280,144 @@ export function StudioFrameAnimationPanel({
                     <span className="pointer-events-none absolute left-0.5 top-0.5 rounded bg-canvas/80 px-1 text-[0.6rem] font-semibold tabular-nums text-fg-3">
                       {i + 1}
                     </span>
-                    <div className="absolute inset-x-0 bottom-0.5 flex items-center justify-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-                      <button
-                        type="button"
-                        title="앞으로"
-                        onClick={() => onFramesChange(reorderFrame(frames, f.id, i - 1))}
-                        disabled={i === 0}
-                        className="grid size-4 place-items-center rounded bg-canvas/90 text-fg-2 hover:text-fg disabled:opacity-30"
-                      >
-                        <ChevronLeft size={10} />
-                      </button>
-                      <button
-                        type="button"
-                        title="복제"
-                        onClick={() => onFramesChange(duplicateFrame(frames, f.id, crypto.randomUUID()))}
-                        disabled={atCap}
-                        className="grid size-4 place-items-center rounded bg-canvas/90 text-fg-2 hover:text-fg disabled:opacity-30"
-                      >
-                        <Copy size={10} />
-                      </button>
-                      <button
-                        type="button"
-                        title="삭제"
-                        onClick={() => {
-                          const next = removeFrame(frames, f.id);
-                          onFramesChange(next);
-                          // 삭제한 프레임이 탐색 위치(activeFrameId)였다면 인접 프레임으로 옮긴다 —
-                          // 그대로 두면 activeFrameId가 존재하지 않는 프레임을 계속 가리키게 된다.
-                          if (f.id === element.activeFrameId && next.length > 0) {
-                            const fallback = next[Math.min(i, next.length - 1)];
-                            if (fallback) onActiveFrameChange(fallback.id);
-                          }
-                        }}
-                        disabled={frames.length <= 1}
-                        className="grid size-4 place-items-center rounded bg-canvas/90 text-bad hover:text-bad disabled:opacity-30"
-                      >
-                        <Trash2 size={10} />
-                      </button>
-                      <button
-                        type="button"
-                        title="뒤로"
-                        onClick={() => onFramesChange(reorderFrame(frames, f.id, i + 1))}
-                        disabled={i === frames.length - 1}
-                        className="grid size-4 place-items-center rounded bg-canvas/90 text-fg-2 hover:text-fg disabled:opacity-30"
-                      >
-                        <ChevronRight size={10} />
-                      </button>
-                    </div>
                   </div>
                 );
               })}
             </div>
         )}
 
-        {/* 캡처 버튼 — 프레임이 없어도 항상 보여야 첫 프레임을 만들 수 있다. */}
-        <div className="space-y-1">
+        {activeFrame ? (
+          <div
+            role="toolbar"
+            aria-label={`선택 프레임 ${activeIndex + 1} 작업`}
+            className="grid grid-cols-4 gap-1 rounded-xl border border-line bg-card/45 p-1"
+          >
+            <StudioToolHintTarget
+              className="w-full"
+              disabled={Boolean(previousFrameDisabledReason)}
+              unavailableReason={previousFrameDisabledReason}
+              preferredSide="bottom"
+              hint={{
+                id: "frame-reorder-previous",
+                title: "프레임을 앞으로 이동",
+                description: "선택 프레임을 필름스트립에서 한 칸 앞으로 옮겨 재생 순서를 바꿉니다.",
+                preview: "frame-sequence",
+              }}
+            >
               <button
                 type="button"
-                onClick={onCaptureFrame}
-                disabled={!!captureReason}
-                className={cn(buttonClass({ size: "sm", variant: "solid" }), "w-full gap-1.5")}
-                title="현재 캔버스 내용을 새 프레임으로 캡처합니다."
+                aria-label="프레임을 앞으로 이동"
+                onClick={() => onFramesChange(reorderFrame(frames, activeFrame.id, activeIndex - 1))}
+                disabled={Boolean(previousFrameDisabledReason)}
+                className="flex min-h-11 w-full flex-col items-center justify-center gap-0.5 rounded-lg text-[0.65rem] font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg disabled:opacity-35"
               >
-                <Film size={13} />
-                현재 그림을 새 프레임으로 캡처
+                <ChevronLeft size={14} aria-hidden />
+                앞으로
               </button>
-              {captureReason && (
-                <p className="text-[0.7rem] text-fg-3" role="status">
-                  {captureReason}
-                </p>
-              )}
-            </div>
+            </StudioToolHintTarget>
+            <StudioToolHintTarget
+              className="w-full"
+              disabled={Boolean(duplicateFrameDisabledReason)}
+              unavailableReason={duplicateFrameDisabledReason}
+              preferredSide="bottom"
+              hint={{
+                id: "frame-duplicate",
+                title: "프레임 복제",
+                description: "선택 프레임을 바로 다음 칸에 복제해 이어지는 동작을 빠르게 만듭니다.",
+                preview: "frame-sequence",
+              }}
+            >
+              <button
+                type="button"
+                aria-label="프레임 복제"
+                onClick={() => onFramesChange(duplicateFrame(frames, activeFrame.id, crypto.randomUUID()))}
+                disabled={Boolean(duplicateFrameDisabledReason)}
+                className="flex min-h-11 w-full flex-col items-center justify-center gap-0.5 rounded-lg text-[0.65rem] font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg disabled:opacity-35"
+              >
+                <Copy size={14} aria-hidden />
+                복제
+              </button>
+            </StudioToolHintTarget>
+            <StudioToolHintTarget
+              className="w-full"
+              disabled={Boolean(deleteFrameDisabledReason)}
+              unavailableReason={deleteFrameDisabledReason}
+              preferredSide="bottom"
+              hint={{
+                id: "frame-delete",
+                title: "프레임 삭제",
+                description: "선택 프레임을 애니메이션에서 제거하고 인접 프레임으로 이동합니다.",
+                preview: "frame-sequence",
+              }}
+            >
+              <button
+                type="button"
+                aria-label="프레임 삭제"
+                onClick={deleteActiveFrame}
+                disabled={Boolean(deleteFrameDisabledReason)}
+                className="flex min-h-11 w-full flex-col items-center justify-center gap-0.5 rounded-lg text-[0.65rem] font-semibold text-bad transition-colors hover:bg-bad/10 disabled:opacity-35"
+              >
+                <Trash2 size={14} aria-hidden />
+                삭제
+              </button>
+            </StudioToolHintTarget>
+            <StudioToolHintTarget
+              className="w-full"
+              disabled={Boolean(nextFrameDisabledReason)}
+              unavailableReason={nextFrameDisabledReason}
+              preferredSide="bottom"
+              hint={{
+                id: "frame-reorder-next",
+                title: "프레임을 뒤로 이동",
+                description: "선택 프레임을 필름스트립에서 한 칸 뒤로 옮겨 재생 순서를 바꿉니다.",
+                preview: "frame-sequence",
+              }}
+            >
+              <button
+                type="button"
+                aria-label="프레임을 뒤로 이동"
+                onClick={() => onFramesChange(reorderFrame(frames, activeFrame.id, activeIndex + 1))}
+                disabled={Boolean(nextFrameDisabledReason)}
+                className="flex min-h-11 w-full flex-col items-center justify-center gap-0.5 rounded-lg text-[0.65rem] font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg disabled:opacity-35"
+              >
+                <ChevronRight size={14} aria-hidden />
+                뒤로
+              </button>
+            </StudioToolHintTarget>
+          </div>
+        ) : null}
+
+        {/* 캡처 버튼 — 프레임이 없어도 항상 보여야 첫 프레임을 만들 수 있다. */}
+        <div className="space-y-1">
+          <StudioToolHintTarget
+            className="w-full"
+            disabled={Boolean(captureReason)}
+            unavailableReason={captureReason ?? undefined}
+            preferredSide="left"
+            hint={{
+              id: "frame-capture",
+              title: "현재 그림을 새 프레임으로 캡처",
+              description: "캔버스의 현재 모습을 래스터 프레임으로 저장해 필름스트립 끝에 추가합니다.",
+              preview: "frame-sequence",
+              tip: "새 프레임에서 그림을 조금씩 바꾸고 다시 캡처하면 자연스러운 플립북 동작이 됩니다.",
+            }}
+          >
+            <button
+              type="button"
+              onClick={onCaptureFrame}
+              disabled={Boolean(captureReason)}
+              className={cn(buttonClass({ size: "sm", variant: "solid" }), "w-full gap-1.5")}
+            >
+              <Film size={13} />
+              현재 그림을 새 프레임으로 캡처
+            </button>
+          </StudioToolHintTarget>
+          {captureReason && (
+            <p className="text-[0.7rem] text-fg-3" role="status">
+              {captureReason}
+            </p>
+          )}
+        </div>
 
         {frames.length > 0 && (
           <>
@@ -374,15 +460,29 @@ export function StudioFrameAnimationPanel({
                   {highlightIndex >= 0 ? highlightIndex + 1 : activeIndex + 1} / {frames.length}
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={() => setPlaying((v) => !v)}
-                disabled={frames.length < 2}
-                className={cn(buttonClass({ size: "sm", variant: "outline" }), "w-full gap-1.5")}
+              <StudioToolHintTarget
+                className="w-full"
+                disabled={Boolean(playbackDisabledReason)}
+                unavailableReason={playbackDisabledReason}
+                preferredSide="left"
+                hint={{
+                  id: "frame-playback",
+                  title: "프레임 애니메이션 재생",
+                  description: "필름스트립을 프레임별 시간과 FPS 설정에 맞춰 플립북처럼 미리 재생합니다.",
+                  preview: "frame-sequence",
+                  tip: "각 프레임에 개별 시간을 입력하면 강조할 동작만 더 오래 보여줄 수 있어요.",
+                }}
               >
-                {playing ? <Pause size={13} /> : <Play size={13} />}
-                {playing ? "정지" : "재생"}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setPlaying((v) => !v)}
+                  disabled={Boolean(playbackDisabledReason)}
+                  className={cn(buttonClass({ size: "sm", variant: "outline" }), "w-full gap-1.5")}
+                >
+                  {playing ? <Pause size={13} /> : <Play size={13} />}
+                  {playing ? "정지" : "재생"}
+                </button>
+              </StudioToolHintTarget>
             </div>
 
             {/* 어니언스키닝 */}
@@ -391,49 +491,103 @@ export function StudioFrameAnimationPanel({
                 <Ghost size={12} aria-hidden />
                 어니언스키닝
               </p>
-              <StudioToggleChip
-                active={onionSkin.enabled}
-                onClick={() => onOnionSkinChange({ ...onionSkin, enabled: !onionSkin.enabled })}
-                title="어니언스키닝 사용 켜기/끄기"
+              <StudioToolHintTarget
+                preferredSide="left"
+                hint={{
+                  id: "frame-onion-skin",
+                  title: "어니언스키닝",
+                  description: "현재 프레임 앞뒤 그림을 반투명하게 겹쳐 포즈와 선의 이동 간격을 맞춥니다.",
+                  preview: "onion-skin",
+                  tip: "가까운 프레임 한 장부터 켜고 동작 간격을 잡은 뒤 필요할 때만 범위를 늘려보세요.",
+                }}
               >
-                어니언스키닝 사용
-              </StudioToggleChip>
+                <StudioToggleChip
+                  active={onionSkin.enabled}
+                  onClick={() => onOnionSkinChange({ ...onionSkin, enabled: !onionSkin.enabled })}
+                >
+                  어니언스키닝 사용
+                </StudioToggleChip>
+              </StudioToolHintTarget>
               {onionSkin.enabled && (
                 <>
-                  <StudioSliderRow
-                    label="이전 프레임 수"
-                    min={0}
-                    max={3}
-                    step={1}
-                    value={onionSkin.prevCount}
-                    onChange={(next) => onOnionSkinChange({ ...onionSkin, prevCount: next })}
-                  />
-                  <StudioSliderRow
-                    label="다음 프레임 수"
-                    min={0}
-                    max={3}
-                    step={1}
-                    value={onionSkin.nextCount}
-                    onChange={(next) => onOnionSkinChange({ ...onionSkin, nextCount: next })}
-                  />
-                  <StudioSliderRow
-                    label="투명도"
-                    min={0.1}
-                    max={0.8}
-                    step={0.05}
-                    value={onionSkin.opacity}
-                    onChange={(next) => onOnionSkinChange({ ...onionSkin, opacity: next })}
-                    readout={`${Math.round(onionSkin.opacity * 100)}%`}
-                  />
-                  <label className="flex cursor-pointer items-center gap-1.5 text-xs text-fg-2">
-                    <input
-                      type="checkbox"
-                      checked={onionSkin.tint}
-                      onChange={(e) => onOnionSkinChange({ ...onionSkin, tint: e.target.checked })}
-                      className="size-3.5 cursor-pointer accent-[var(--color-accent)]"
+                  <StudioToolHintTarget
+                    className="w-full [&>*]:w-full"
+                    preferredSide="left"
+                    hint={{
+                      id: "frame-onion-prev-count",
+                      title: "이전 프레임 수",
+                      description: "현재 프레임보다 앞선 그림을 최대 3장까지 겹쳐 표시합니다.",
+                      preview: "onion-skin",
+                    }}
+                  >
+                    <StudioSliderRow
+                      label="이전 프레임 수"
+                      min={0}
+                      max={3}
+                      step={1}
+                      value={onionSkin.prevCount}
+                      onChange={(next) => onOnionSkinChange({ ...onionSkin, prevCount: next })}
                     />
-                    색으로 구분 (이전=빨강 · 다음=파랑)
-                  </label>
+                  </StudioToolHintTarget>
+                  <StudioToolHintTarget
+                    className="w-full [&>*]:w-full"
+                    preferredSide="left"
+                    hint={{
+                      id: "frame-onion-next-count",
+                      title: "다음 프레임 수",
+                      description: "현재 프레임보다 뒤의 그림을 최대 3장까지 겹쳐 표시합니다.",
+                      preview: "onion-skin",
+                    }}
+                  >
+                    <StudioSliderRow
+                      label="다음 프레임 수"
+                      min={0}
+                      max={3}
+                      step={1}
+                      value={onionSkin.nextCount}
+                      onChange={(next) => onOnionSkinChange({ ...onionSkin, nextCount: next })}
+                    />
+                  </StudioToolHintTarget>
+                  <StudioToolHintTarget
+                    className="w-full [&>*]:w-full"
+                    preferredSide="left"
+                    hint={{
+                      id: "frame-onion-opacity",
+                      title: "어니언스킨 투명도",
+                      description: "앞뒤 그림이 현재 프레임을 가리지 않도록 겹침 강도를 조절합니다.",
+                      preview: "onion-skin",
+                    }}
+                  >
+                    <StudioSliderRow
+                      label="투명도"
+                      min={0.1}
+                      max={0.8}
+                      step={0.05}
+                      value={onionSkin.opacity}
+                      onChange={(next) => onOnionSkinChange({ ...onionSkin, opacity: next })}
+                      readout={`${Math.round(onionSkin.opacity * 100)}%`}
+                    />
+                  </StudioToolHintTarget>
+                  <StudioToolHintTarget
+                    className="w-full [&>*]:w-full"
+                    preferredSide="left"
+                    hint={{
+                      id: "frame-onion-tint",
+                      title: "앞뒤 프레임 색 구분",
+                      description: "이전 그림은 빨강, 다음 그림은 파랑으로 표시해 시간 방향을 구분합니다.",
+                      preview: "onion-skin",
+                    }}
+                  >
+                    <label className="flex cursor-pointer items-center gap-1.5 text-xs text-fg-2">
+                      <input
+                        type="checkbox"
+                        checked={onionSkin.tint}
+                        onChange={(e) => onOnionSkinChange({ ...onionSkin, tint: e.target.checked })}
+                        className="size-3.5 cursor-pointer accent-[var(--color-accent)]"
+                      />
+                      색으로 구분 (이전=빨강 · 다음=파랑)
+                    </label>
+                  </StudioToolHintTarget>
                 </>
               )}
             </div>

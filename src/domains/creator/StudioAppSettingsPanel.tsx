@@ -33,6 +33,12 @@ import {
 } from "./studio-app-settings";
 import { StudioToggleChip } from "./studio-panel-ui";
 import {
+  MAX_STUDIO_TOOL_HINT_TOUCH_HOLD_MS,
+  MIN_STUDIO_TOOL_HINT_TOUCH_HOLD_MS,
+  STUDIO_TOOL_HINT_MODES,
+  studioToolHintModeLabel,
+} from "./studio-tool-hint-preferences";
+import {
   STUDIO_UI_DENSITY_MODES,
   studioUiDensityDescription,
   studioUiDensityLabel,
@@ -253,20 +259,20 @@ export function StudioAppSettingsPanel({
                 <p className="text-[0.68rem] text-fg-3">
                   {studioUiDensityDescription(settings.general.densityMode)}
                 </p>
-                <Row label="도구 힌트" hint="아이콘 호버 시 긴 설명을 보여 줍니다">
-                  <StudioToggleChip
-                    active={settings.general.showToolHints}
-                    onClick={() =>
-                      patch({
-                        general: {
-                          ...settings.general,
-                          showToolHints: !settings.general.showToolHints,
-                        },
-                      })
+                <Row
+                  label="도구 도움말"
+                  hint="간단은 이름·설명만, 동작 미리보기는 애니메이션 코치까지 보여 줍니다"
+                >
+                  <SelectChipGroup
+                    value={settings.general.toolHintMode}
+                    options={STUDIO_TOOL_HINT_MODES.map((mode) => ({
+                      id: mode,
+                      label: studioToolHintModeLabel(mode),
+                    }))}
+                    onChange={(toolHintMode) =>
+                      patch({ general: { ...settings.general, toolHintMode } })
                     }
-                  >
-                    {settings.general.showToolHints ? "켜짐" : "꺼짐"}
-                  </StudioToggleChip>
+                  />
                 </Row>
                 <Row label="브러시 커서" hint="캔버스 위 커서 표시 방식">
                   <SelectChipGroup
@@ -446,6 +452,33 @@ export function StudioAppSettingsPanel({
                   >
                     {settings.touch.palmRejection ? "켜짐" : "꺼짐"}
                   </StudioToggleChip>
+                </Row>
+                <Row
+                  label="도움말 길게 누르기"
+                  hint="도구를 실행하지 않고 Motion Coach를 여는 터치 대기 시간"
+                >
+                  <label className="flex items-center gap-2 text-[0.7rem] text-fg-2">
+                    <input
+                      type="range"
+                      min={MIN_STUDIO_TOOL_HINT_TOUCH_HOLD_MS}
+                      max={MAX_STUDIO_TOOL_HINT_TOUCH_HOLD_MS}
+                      step={20}
+                      value={settings.touch.toolHintHoldMs}
+                      onChange={(event) =>
+                        patch({
+                          touch: {
+                            ...settings.touch,
+                            toolHintHoldMs: Number(event.target.value),
+                          },
+                        })
+                      }
+                      className="h-2 w-28 accent-accent"
+                      aria-label="도구 도움말 길게 누르기 시간"
+                    />
+                    <output className="min-w-12 tabular-nums text-fg-3">
+                      {settings.touch.toolHintHoldMs}ms
+                    </output>
+                  </label>
                 </Row>
               </>
             ) : null}
@@ -675,4 +708,3 @@ export function StudioAppSettingsPanel({
 
   return createPortal(body, document.body);
 }
-

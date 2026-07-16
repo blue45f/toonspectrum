@@ -15,7 +15,7 @@ describe("StudioToolHint focus takeover contract", () => {
     const handleFocus = functionBody("handleFocus");
 
     expect(dismissPointerActivation).toContain("pointerDismissed.current = true;");
-    expect(handleFocus).toMatch(/if \(pointerDismissed\.current\) return;/u);
+    expect(handleFocus).toMatch(/if \(pointerDismissed\.current \|\| preferences\.mode === "off"\) return;/u);
   });
 
   it("lets later keyboard or assistive focus clear global pointer suppression and reveal", () => {
@@ -23,9 +23,22 @@ describe("StudioToolHint focus takeover contract", () => {
 
     expect(handleFocus).not.toContain("suppressedPointerHintAt !== null");
     expect(handleFocus).toContain("clearPointerSuppression();");
-    expect(handleFocus).toContain("reveal(true);");
+    expect(handleFocus).toContain("reveal(richCoachEnabled);");
     expect(handleFocus.indexOf("clearPointerSuppression();")).toBeLessThan(
-      handleFocus.indexOf("reveal(true);")
+      handleFocus.indexOf("reveal(richCoachEnabled);")
+    );
+  });
+
+  it("preserves an expanded rich coach when the pointer returns from hoverable content", () => {
+    const reveal = functionBody("reveal");
+    const scheduleShow = functionBody("scheduleShow");
+
+    expect(scheduleShow).toContain("if (open) {");
+    expect(scheduleShow).toContain("reveal(false);");
+    expect(reveal).toContain("if (!richCoachEnabled) {");
+    expect(reveal).toContain("if (expanded) return;");
+    expect(reveal.indexOf("setExpanded(false);")).toBeLessThan(
+      reveal.indexOf("if (expanded) return;")
     );
   });
 

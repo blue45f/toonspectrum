@@ -2,6 +2,7 @@ import { Lightbulb, LockKeyhole, Sparkles } from "lucide-react";
 import {
   Suspense,
   lazy,
+  useEffect,
   useLayoutEffect,
   useRef,
   useState,
@@ -34,6 +35,10 @@ export interface StudioToolHintBubbleProps {
   readonly anchor: HintAnchor;
   readonly id?: string;
   readonly expanded?: boolean;
+  /** Whether this compact first stage can expand into the animated coach. */
+  readonly richPreviewEnabled?: boolean;
+  /** Product-level reduction request; the preview still honors the OS preference when false. */
+  readonly reducedMotion?: boolean;
   readonly unavailableReason?: string;
   readonly preferredSide?: StudioToolHintSide;
   readonly className?: string;
@@ -41,9 +46,12 @@ export interface StudioToolHintBubbleProps {
   readonly onMouseLeave?: MouseEventHandler<HTMLDivElement>;
 }
 
-const studioToolHintPreviewModulePromise = import("./StudioToolHintPreview");
+let studioToolHintPreviewModulePromise:
+  | Promise<typeof import("./StudioToolHintPreview")>
+  | null = null;
 
 function loadStudioToolHintPreviewModule() {
+  studioToolHintPreviewModulePromise ??= import("./StudioToolHintPreview");
   return studioToolHintPreviewModulePromise;
 }
 
@@ -108,6 +116,8 @@ export function StudioToolHintBubble({
   anchor,
   id,
   expanded = true,
+  richPreviewEnabled = true,
+  reducedMotion = false,
   unavailableReason,
   preferredSide,
   className,
@@ -117,7 +127,8 @@ export function StudioToolHintBubble({
   const bubbleRef = useRef<HTMLDivElement>(null);
   const viewportWidth = typeof globalThis.innerWidth === "number" ? globalThis.innerWidth : 1280;
   const viewportHeight = typeof globalThis.innerHeight === "number" ? globalThis.innerHeight : 800;
-  const coachExpanded = expanded && viewportHeight >= MIN_RICH_COACH_VIEWPORT_HEIGHT;
+  const coachExpanded =
+    richPreviewEnabled && expanded && viewportHeight >= MIN_RICH_COACH_VIEWPORT_HEIGHT;
   const [measuredSize, setMeasuredSize] = useState({
     width: coachExpanded ? COACH_WIDTH : COMPACT_WIDTH,
     height: coachExpanded
@@ -135,6 +146,11 @@ export function StudioToolHintBubble({
     viewportPadding: 10,
   });
   const preview = studioToolHintPreview(hint);
+
+  useEffect(() => {
+    if (!richPreviewEnabled) return;
+    void loadStudioToolHintPreviewModule();
+  }, [richPreviewEnabled]);
 
   useLayoutEffect(() => {
     const rect = bubbleRef.current?.getBoundingClientRect();
@@ -181,10 +197,12 @@ export function StudioToolHintBubble({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-[0.8125rem] font-bold leading-tight text-fg">{hint.title}</p>
-          <span className="mt-1 inline-flex items-center gap-1 text-[0.65rem] font-semibold uppercase tracking-[0.1em] text-accent">
-            <Sparkles size={10} strokeWidth={1.8} aria-hidden />
-            {coachExpanded ? "동작 미리보기" : "잠시 머물러 미리보기"}
-          </span>
+          {richPreviewEnabled ? (
+            <span className="mt-1 inline-flex items-center gap-1 text-[0.65rem] font-semibold uppercase tracking-[0.1em] text-accent">
+              <Sparkles size={10} strokeWidth={1.8} aria-hidden />
+              {coachExpanded ? "동작 미리보기" : "잠시 머물러 미리보기"}
+            </span>
+          ) : null}
         </div>
         {hint.shortcut ? (
           <kbd
@@ -202,7 +220,10 @@ export function StudioToolHintBubble({
           className="mt-2 overflow-hidden rounded-md border border-line/60 bg-canvas/70 shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.04)]"
         >
           <Suspense fallback={<StudioToolHintPreviewFallback preview={preview} />}>
-            <LazyStudioToolHintPreview kind={preview} />
+            <LazyStudioToolHintPreview
+              kind={preview}
+              reducedMotion={reducedMotion ? true : undefined}
+            />
           </Suspense>
         </div>
       ) : null}

@@ -26,7 +26,12 @@ const STUDIO_ACTION_PREVIEW_BY_ID: Readonly<Record<string, StudioToolHintPreview
   comment: "bubble",
   image: "image",
   reference: "image",
-  "frame-anim": "image",
+  "frame-anim": "frame-sequence",
+  "frame-capture": "frame-sequence",
+  "frame-playback": "frame-sequence",
+  "frame-reorder": "frame-sequence",
+  "frame-duplicate": "frame-sequence",
+  "frame-delete": "frame-sequence",
   filter: "filter",
   liquify: "filter",
   blend: "filter",
@@ -66,6 +71,39 @@ const STUDIO_ACTION_PREVIEW_BY_ID: Readonly<Record<string, StudioToolHintPreview
   layers: "layer",
   "add-layer": "layer",
   "duplicate-layer": "layer",
+  timeline: "timeline",
+  "animation-timeline": "timeline",
+  playback: "timeline",
+  play: "timeline",
+  pause: "timeline",
+  keyframe: "keyframe",
+  "add-keyframe": "keyframe",
+  "move-keyframe": "keyframe",
+  "remove-keyframe": "keyframe",
+  "onion-skin": "onion-skin",
+  timelapse: "timelapse",
+  "timelapse-record": "timelapse",
+  "motion-fx": "motion-fx",
+  "motion-export": "video-export",
+  "video-export": "video-export",
+  audio: "audio",
+  bgm: "audio",
+  sfx: "audio",
+  "object-3d": "object-3d",
+  "transform-3d": "object-3d",
+  "translate-3d": "object-3d",
+  "rotate-3d": "object-3d",
+  "scale-3d": "object-3d",
+  "pose-3d": "pose-3d",
+  "hand-pose": "pose-3d",
+  "body-pose": "pose-3d",
+  "camera-3d": "camera-3d",
+  "orbit-camera": "camera-3d",
+  "reset-camera": "camera-3d",
+  "quad-view": "camera-3d",
+  "lighting-3d": "lighting-3d",
+  "light-direction": "lighting-3d",
+  "light-intensity": "lighting-3d",
 };
 
 const STUDIO_FILTER_ENGINE_IDS = new Set(
@@ -104,6 +142,16 @@ function previewFromIdentityTokens(tokens: ReadonlySet<string>): StudioToolHintP
   if (tokensIncludeAny(tokens, ["굵기", "brushsize"])) return "brush-size";
   if (tokensIncludeAny(tokens, ["되돌리기", "실행취소", "다시실행", "undo", "redo", "history"])) return "history";
   if (tokensIncludeAny(tokens, ["레이어", "layer", "layers"])) return "layer";
+  if (tokensIncludeAny(tokens, ["키프레임", "keyframe"])) return "keyframe";
+  if (tokensIncludeAny(tokens, ["타임라인", "재생", "timeline", "playback"])) return "timeline";
+  if (tokensIncludeAny(tokens, ["어니언스킨", "onionskin"])) return "onion-skin";
+  if (tokensIncludeAny(tokens, ["타임랩스", "timelapse"])) return "timelapse";
+  if (tokensIncludeAny(tokens, ["내보내기", "영상", "export", "video"])) return "video-export";
+  if (tokensIncludeAny(tokens, ["오디오", "음악", "bgm", "sfx", "audio"])) return "audio";
+  if (tokensIncludeAny(tokens, ["포즈", "관절", "pose", "joint"])) return "pose-3d";
+  if (tokensIncludeAny(tokens, ["조명", "광원", "lighting", "light"])) return "lighting-3d";
+  if (tokensIncludeAny(tokens, ["카메라", "시점", "camera", "orbit"])) return "camera-3d";
+  if (tokensIncludeAny(tokens, ["3d", "오브젝트", "gizmo", "transform3d"])) return "object-3d";
   if (tokensIncludeAny(tokens, ["확대", "축소", "줌", "zoom", "pan"])) return "zoom-view";
   if (tokensIncludeAny(tokens, ["펜", "연필", "브러시", "pen", "pencil", "brush", "ink"])) return "ink";
   if (tokensIncludeAny(tokens, ["말풍선", "대사", "댓글", "bubble", "comment"])) return "bubble";

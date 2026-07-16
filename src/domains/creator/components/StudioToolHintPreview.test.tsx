@@ -26,6 +26,18 @@ const PREVIEW_KINDS = [
   "zoom-view",
   "history",
   "layer",
+  "timeline",
+  "keyframe",
+  "frame-sequence",
+  "onion-skin",
+  "timelapse",
+  "motion-fx",
+  "video-export",
+  "audio",
+  "object-3d",
+  "pose-3d",
+  "camera-3d",
+  "lighting-3d",
 ] as const satisfies readonly StudioToolHintPreviewKind[];
 
 describe("StudioToolHintPreview", () => {

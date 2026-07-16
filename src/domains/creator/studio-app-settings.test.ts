@@ -31,25 +31,45 @@ describe("studio-app-settings", () => {
     expect(d.toolbar.visibleIds).toEqual(DEFAULT_STUDIO_RAIL_TOOL_ORDER);
     expect(Object.keys(d.shortcuts).length).toBe(STUDIO_SHORTCUT_ACTIONS.length);
     expect(d.shortcuts["toggle-chrome"]).toBe("`");
+    expect(d.general.toolHintMode).toBe("rich");
+    expect(d.touch.toolHintHoldMs).toBe(480);
     expect(d.mouse.wheel).toBe("zoom");
     expect(d.touch.oneFingerDrag).toBe("draw");
   });
 
   it("normalizes broken payloads without throwing", () => {
     const n = normalizeStudioAppSettings({
-      general: { densityMode: "nope", showToolHints: "x" },
+      general: { densityMode: "nope", toolHintMode: "cinema", showToolHints: "x" },
       toolbar: { visibleIds: ["pen", "pen", "ghost", "eraser"] },
       grids: { pixelGridSize: 47 },
       other: { pressureCurve: 99 },
       shortcuts: { "tool-pen": " P " },
     });
     expect(n.general.densityMode).toBe("full");
-    expect(n.general.showToolHints).toBe(true);
+    expect(n.general.toolHintMode).toBe("rich");
     expect(n.toolbar.visibleIds).toEqual(["pen", "eraser"]);
     expect(n.grids.pixelGridSize).toBe(50);
     expect(n.other.pressureCurve).toBe(2.5);
     expect(n.shortcuts["tool-pen"]).toBe("P");
     expect(normalizeStudioAppSettings({ shortcuts: { "toggle-chrome": "Tab" } }).shortcuts["toggle-chrome"]).toBe("`");
+  });
+
+  it("migrates legacy tool-hint settings and clamps the touch hold delay", () => {
+    expect(normalizeStudioAppSettings({ general: { showToolHints: false } }).general.toolHintMode).toBe(
+      "off"
+    );
+    expect(
+      normalizeStudioAppSettings({
+        general: { toolHintMode: "compact" },
+        touch: { toolHintHoldMs: 111 },
+      }).general.toolHintMode
+    ).toBe("compact");
+    expect(normalizeStudioAppSettings({ touch: { toolHintHoldMs: 111 } }).touch.toolHintHoldMs).toBe(
+      300
+    );
+    expect(normalizeStudioAppSettings({ touch: { toolHintHoldMs: 999 } }).touch.toolHintHoldMs).toBe(
+      900
+    );
   });
 
   it("rail hide/show/move preserve at least one tool", () => {

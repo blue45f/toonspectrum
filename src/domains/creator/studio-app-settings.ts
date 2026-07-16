@@ -9,9 +9,17 @@
  * Pure model + localStorage; React UI lives in StudioAppSettingsPanel.
  */
 
-import { normalizeStudioUiDensityMode } from "./studio-ui-density";
-
-import type { StudioUiDensityMode } from "./studio-ui-density";
+import {
+  DEFAULT_STUDIO_TOOL_HINT_MODE,
+  DEFAULT_STUDIO_TOOL_HINT_TOUCH_HOLD_MS,
+  normalizeStudioToolHintMode,
+  normalizeStudioToolHintTouchHoldMs,
+  type StudioToolHintMode,
+} from "./studio-tool-hint-preferences";
+import {
+  normalizeStudioUiDensityMode,
+  type StudioUiDensityMode,
+} from "./studio-ui-density";
 
 export const STUDIO_APP_SETTINGS_STORAGE_KEY = "toonspectrum-studio-app-settings:v1";
 
@@ -98,7 +106,7 @@ export type StudioBrushCursorStyle = "outline" | "dot" | "none";
 export type StudioAppSettings = {
   general: {
     densityMode: StudioUiDensityMode;
-    showToolHints: boolean;
+    toolHintMode: StudioToolHintMode;
     brushCursorStyle: StudioBrushCursorStyle;
     confirmBeforeClearLayer: boolean;
   };
@@ -115,6 +123,7 @@ export type StudioAppSettings = {
     twoFinger: StudioTouchTwoFinger;
     threeFinger: StudioTouchThreeFinger;
     palmRejection: boolean;
+    toolHintHoldMs: number;
   };
   toolbar: {
     /** Visible rail tools in order. Hidden tools are catalog ids not in this list. */
@@ -165,7 +174,7 @@ export function defaultStudioAppSettings(): StudioAppSettings {
   return {
     general: {
       densityMode: "full",
-      showToolHints: true,
+      toolHintMode: DEFAULT_STUDIO_TOOL_HINT_MODE,
       brushCursorStyle: "outline",
       confirmBeforeClearLayer: true,
     },
@@ -181,6 +190,7 @@ export function defaultStudioAppSettings(): StudioAppSettings {
       twoFinger: "pan-zoom",
       threeFinger: "undo",
       palmRejection: true,
+      toolHintHoldMs: DEFAULT_STUDIO_TOOL_HINT_TOUCH_HOLD_MS,
     },
     toolbar: {
       visibleIds: [...DEFAULT_STUDIO_RAIL_TOOL_ORDER],
@@ -377,7 +387,7 @@ export function normalizeStudioAppSettings(value?: unknown): StudioAppSettings {
   return {
     general: {
       densityMode: normalizeStudioUiDensityMode(g.densityMode ?? d.general.densityMode),
-      showToolHints: asBool(g.showToolHints, d.general.showToolHints),
+      toolHintMode: normalizeStudioToolHintMode(g.toolHintMode, g.showToolHints),
       brushCursorStyle: asEnum(
         g.brushCursorStyle,
         ["outline", "dot", "none"] as const,
@@ -405,6 +415,7 @@ export function normalizeStudioAppSettings(value?: unknown): StudioAppSettings {
       twoFinger: asEnum(t.twoFinger, ["pan-zoom", "undo-redo"] as const, d.touch.twoFinger),
       threeFinger: asEnum(t.threeFinger, ["undo", "toggle-ui", "none"] as const, d.touch.threeFinger),
       palmRejection: asBool(t.palmRejection, d.touch.palmRejection),
+      toolHintHoldMs: normalizeStudioToolHintTouchHoldMs(t.toolHintHoldMs),
     },
     toolbar: {
       visibleIds: normalizeStudioRailVisibleIds(tb.visibleIds),

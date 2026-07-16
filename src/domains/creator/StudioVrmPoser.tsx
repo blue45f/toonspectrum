@@ -159,6 +159,7 @@ import {
   type TrackingChannels,
   type VrmTrackingData,
 } from "./studio-vrm-webcam-tracking";
+import { StudioToolHintTarget } from "./StudioToolHint";
 import { StudioVrmAvatarForge, countDetectedVrmHairMeshes } from "./StudioVrmAvatarForge";
 import { StudioVrmAvatarForgePanel } from "./StudioVrmAvatarForgePanel";
 import { StudioVrmPropPanel } from "./StudioVrmPropPanel";
@@ -175,6 +176,7 @@ import {
   type VrmLibraryEntry,
 } from "./vrm-library";
 
+import type { StudioToolHintSpec } from "./studio-tool-hints";
 import type { FaceLandmarker, HandLandmarker, PoseLandmarker } from "@mediapipe/tasks-vision";
 import type { VRM, VRMHumanBoneName } from "@pixiv/three-vrm";
 
@@ -493,6 +495,48 @@ const ICON_BUTTON =
   "inline-grid size-11 place-items-center rounded-lg border border-line bg-card text-fg-3 transition-colors hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 const VIEWPORT_BTN =
   "grid size-11 place-items-center rounded-lg border border-line/70 bg-panel/80 text-fg-2 shadow-sm backdrop-blur transition-colors hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+
+const VRM_VIEWPORT_HINTS = {
+  undo: {
+    id: "vrm:history:undo",
+    title: "캐릭터 작업 실행 취소",
+    description: "직전에 적용한 포즈·표정·조형 또는 장면 설정을 한 단계 되돌립니다.",
+    shortcut: "⌘Z",
+    preview: "history",
+  },
+  redo: {
+    id: "vrm:history:redo",
+    title: "캐릭터 작업 다시 실행",
+    description: "실행 취소한 캐릭터 편집을 다시 적용합니다.",
+    shortcut: "⌘⇧Z",
+    preview: "history",
+  },
+  zoomIn: {
+    id: "vrm:camera:zoom-in",
+    title: "캐릭터 화면 확대",
+    description: "카메라를 캐릭터 쪽으로 이동해 얼굴, 손과 의상 디테일을 크게 확인합니다.",
+    preview: "camera-3d",
+  },
+  zoomOut: {
+    id: "vrm:camera:zoom-out",
+    title: "캐릭터 화면 축소",
+    description: "카메라를 뒤로 이동해 전신 포즈와 소품이 프레임 안에 들어오는지 확인합니다.",
+    preview: "camera-3d",
+  },
+  resetView: {
+    id: "vrm:camera:reset",
+    title: "캐릭터 시점 초기화",
+    description: "카메라의 회전과 거리를 선택한 구도 프리셋의 기본 시점으로 되돌립니다.",
+    preview: "camera-3d",
+  },
+  turntable: {
+    id: "vrm:camera:turntable",
+    title: "턴테이블 회전",
+    description: "카메라가 캐릭터 주위를 자동으로 돌아가며 포즈와 소품 결합을 모든 방향에서 보여줍니다.",
+    preview: "camera-3d",
+    tip: "의상 관통이나 뒤쪽 소품 정렬을 빠르게 점검할 때 사용하세요.",
+  },
+} satisfies Record<string, StudioToolHintSpec>;
 
 const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
 
@@ -4965,50 +5009,69 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                 {vrm ? (
                   <>
                     <div className="absolute left-2.5 top-2.5 z-10 flex flex-col gap-1.5">
-                      <button
-                        type="button"
-                        aria-label="실행 취소"
-                        title="실행 취소 (⌘Z)"
+                      <StudioToolHintTarget
+                        hint={VRM_VIEWPORT_HINTS.undo}
                         disabled={!canUndo}
-                        className={cx(VIEWPORT_BTN, "disabled:cursor-not-allowed disabled:opacity-40")}
-                        onClick={doUndo}
+                        unavailableReason={!canUndo ? "되돌릴 캐릭터 변경이 없습니다." : undefined}
+                        preferredSide="right"
                       >
-                        <Undo2 size={16} aria-hidden />
-                      </button>
-                      <button
-                        type="button"
-                        aria-label="다시 실행"
-                        title="다시 실행 (⌘⇧Z)"
+                        <button
+                          type="button"
+                          aria-label="실행 취소"
+                          disabled={!canUndo}
+                          className={cx(VIEWPORT_BTN, "disabled:cursor-not-allowed disabled:opacity-40")}
+                          onClick={doUndo}
+                        >
+                          <Undo2 size={16} aria-hidden />
+                        </button>
+                      </StudioToolHintTarget>
+                      <StudioToolHintTarget
+                        hint={VRM_VIEWPORT_HINTS.redo}
                         disabled={!canRedo}
-                        className={cx(VIEWPORT_BTN, "disabled:cursor-not-allowed disabled:opacity-40")}
-                        onClick={doRedo}
+                        unavailableReason={!canRedo ? "다시 적용할 캐릭터 변경이 없습니다." : undefined}
+                        preferredSide="right"
                       >
-                        <Redo2 size={16} aria-hidden />
-                      </button>
+                        <button
+                          type="button"
+                          aria-label="다시 실행"
+                          disabled={!canRedo}
+                          className={cx(VIEWPORT_BTN, "disabled:cursor-not-allowed disabled:opacity-40")}
+                          onClick={doRedo}
+                        >
+                          <Redo2 size={16} aria-hidden />
+                        </button>
+                      </StudioToolHintTarget>
                     </div>
                     <div className="absolute right-2.5 top-2.5 z-10 flex flex-col gap-1.5">
-                      <button type="button" aria-label="확대" title="확대" className={VIEWPORT_BTN} onClick={() => zoomViewport(0.82)}>
-                        <ZoomIn size={16} aria-hidden />
-                      </button>
-                      <button type="button" aria-label="축소" title="축소" className={VIEWPORT_BTN} onClick={() => zoomViewport(1.22)}>
-                        <ZoomOut size={16} aria-hidden />
-                      </button>
-                      <button type="button" aria-label="시점 초기화" title="시점 초기화" className={VIEWPORT_BTN} onClick={handleViewReset}>
-                        <Maximize2 size={16} aria-hidden />
-                      </button>
-                      <button
-                        type="button"
-                        aria-label="턴테이블 회전"
-                        title="턴테이블 회전"
-                        aria-pressed={turntable}
-                        className={cx(VIEWPORT_BTN, turntable && "border-accent/60 bg-accent text-on-accent hover:bg-accent/90 hover:text-on-accent")}
-                        onClick={() => {
-                          setTurntable((v) => !v);
-                          setViewportHinted(true);
-                        }}
-                      >
-                        <RotateCw size={16} aria-hidden className={turntable ? "animate-spin [animation-duration:3s]" : ""} />
-                      </button>
+                      <StudioToolHintTarget hint={VRM_VIEWPORT_HINTS.zoomIn} preferredSide="left">
+                        <button type="button" aria-label="확대" className={VIEWPORT_BTN} onClick={() => zoomViewport(0.82)}>
+                          <ZoomIn size={16} aria-hidden />
+                        </button>
+                      </StudioToolHintTarget>
+                      <StudioToolHintTarget hint={VRM_VIEWPORT_HINTS.zoomOut} preferredSide="left">
+                        <button type="button" aria-label="축소" className={VIEWPORT_BTN} onClick={() => zoomViewport(1.22)}>
+                          <ZoomOut size={16} aria-hidden />
+                        </button>
+                      </StudioToolHintTarget>
+                      <StudioToolHintTarget hint={VRM_VIEWPORT_HINTS.resetView} preferredSide="left">
+                        <button type="button" aria-label="시점 초기화" className={VIEWPORT_BTN} onClick={handleViewReset}>
+                          <Maximize2 size={16} aria-hidden />
+                        </button>
+                      </StudioToolHintTarget>
+                      <StudioToolHintTarget hint={VRM_VIEWPORT_HINTS.turntable} preferredSide="left">
+                        <button
+                          type="button"
+                          aria-label="턴테이블 회전"
+                          aria-pressed={turntable}
+                          className={cx(VIEWPORT_BTN, turntable && "border-accent/60 bg-accent text-on-accent hover:bg-accent/90 hover:text-on-accent")}
+                          onClick={() => {
+                            setTurntable((v) => !v);
+                            setViewportHinted(true);
+                          }}
+                        >
+                          <RotateCw size={16} aria-hidden className={turntable ? "animate-spin [animation-duration:3s]" : ""} />
+                        </button>
+                      </StudioToolHintTarget>
                     </div>
                     {!viewportHinted ? (
                       <div className="pointer-events-none absolute inset-x-0 bottom-3 z-10 flex justify-center">

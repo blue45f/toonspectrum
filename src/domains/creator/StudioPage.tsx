@@ -1047,7 +1047,10 @@ import { StudioPublishContextBanner, type PublishContext } from "./StudioPublish
 import { StudioPuppetWarpOverlay } from "./StudioPuppetWarpOverlay";
 import { StudioSavedBrushShelf } from "./StudioSavedBrushShelf";
 import { StudioSkewPanel } from "./StudioSkewPanel";
-import { StudioToolHintTarget } from "./StudioToolHint";
+import {
+  StudioToolHintPreferencesProvider,
+  StudioToolHintTarget,
+} from "./StudioToolHint";
 import { StudioUploadPublish } from "./StudioUploadPublish";
 import { StudioWorkspaceMenu } from "./StudioWorkspaceMenu";
 
@@ -19465,6 +19468,11 @@ function StudioCuttoonEditor() {
       onRoomChange={handleStudioLiveRoomChange}
       onCrdtDocumentChange={handleStudioCrdtDocumentChange}
     >
+    <StudioToolHintPreferencesProvider
+      mode={appSettings.general.toolHintMode}
+      touchHoldDelayMs={appSettings.touch.toolHintHoldMs}
+      reduceMotion={appSettings.other.reduceMotion}
+    >
     <div
       ref={studioRootRef}
       data-studio-mobile-immersive={mobileImmersive ? "true" : "false"}
@@ -25409,23 +25417,25 @@ function StudioCuttoonEditor() {
             </Suspense>
           )}
 
-          {shortcutsOpen && (
+          {shortcutsOpen ? (
             <Suspense fallback={null}>
               <StudioShortcutsHelp open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
-              <Suspense fallback={null}>
-                <StudioAppSettingsPanel
-                  open={appSettingsOpen}
-                  settings={appSettings}
-                  onClose={() => setAppSettingsOpen(false)}
-                  onChange={commitAppSettings}
-                  onResetAll={() => {
-                    const next = resetStudioAppSettings(studioAppSettingsStorage());
-                    commitAppSettings(next);
-                  }}
-                />
-              </Suspense>
             </Suspense>
-          )}
+          ) : null}
+          {appSettingsOpen ? (
+            <Suspense fallback={null}>
+              <StudioAppSettingsPanel
+                open={appSettingsOpen}
+                settings={appSettings}
+                onClose={() => setAppSettingsOpen(false)}
+                onChange={commitAppSettings}
+                onResetAll={() => {
+                  const next = resetStudioAppSettings(studioAppSettingsStorage());
+                  commitAppSettings(next);
+                }}
+              />
+            </Suspense>
+          ) : null}
           {historyPanelOpen && (
             <Suspense fallback={null}>
               <StudioHistoryPanel
@@ -30107,6 +30117,7 @@ function StudioCuttoonEditor() {
       </div>
     ) : null}
     </div>
+    </StudioToolHintPreferencesProvider>
     </StudioLiveCollaborationProvider>
   );
 }

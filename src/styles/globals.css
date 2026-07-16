@@ -1074,6 +1074,20 @@ body[data-studio-app="true"] .route-stage::before,
 }
 
 /* Motion-coach hints: meaningful SVG demos with a quiet commercial entrance. */
+.studio-tool-hint-compact {
+  pointer-events: auto;
+  position: fixed;
+  z-index: 200;
+  width: min(15rem, calc(100vw - 1.25rem));
+  padding: 0.625rem;
+  border: 1px solid color-mix(in oklab, var(--color-line) 80%, transparent);
+  border-radius: var(--radius-lg, 0.5rem);
+  background: color-mix(in oklab, var(--color-panel) 98%, transparent);
+  box-shadow: 0 20px 56px oklch(0.06 0.01 70 / 0.66);
+  text-align: left;
+  backdrop-filter: blur(24px);
+}
+
 @keyframes studio-tool-hint-enter {
   from {
     opacity: 0;

@@ -102,7 +102,7 @@ const HINTS: Record<string, StudioToolHintSpec> = {
     id: "frame-anim",
     title: "프레임 애니메이션",
     description: "선택한 이미지에 여러 프레임을 쌓아 간단한 셀 애니메이션을 만듭니다.",
-    preview: "image",
+    preview: "frame-sequence",
   },
   filter: {
     id: "filter",

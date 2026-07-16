@@ -16,6 +16,7 @@ import {
   type TimelapseExportHandle,
   type TimelapseExportProgress,
 } from "./studio-timelapse";
+import { StudioToolHintTarget } from "./StudioToolHint";
 
 import type { HistorySnapshot } from "./studio-history-labels";
 import type { MotionCutImage } from "./studio-motion-export";
@@ -109,7 +110,16 @@ export function StudioTimelapsePanel({
     targetDurationSec: duration.targetDurationSec,
   });
   const exporting = preparing || progress != null;
-  const canRecord = supported && !masterEditMode && hasContent && !exporting;
+  const recordDisabledReason = !supported
+    ? "이 브라우저는 MediaRecorder/WebM 영상 녹화를 지원하지 않아요."
+    : masterEditMode
+      ? "마스터 편집을 종료하면 타임랩스를 만들 수 있어요."
+      : !hasContent
+        ? "이 페이지에 그린 내용이 생기면 타임랩스를 만들 수 있어요."
+        : exporting
+          ? "타임랩스 영상을 만드는 중이에요. 완료되거나 취소한 뒤 다시 실행할 수 있어요."
+          : undefined;
+  const canRecord = recordDisabledReason === undefined;
 
   async function record() {
     if (!canRecord) return;
@@ -287,15 +297,28 @@ export function StudioTimelapsePanel({
           >
             닫기
           </button>
-          <button
-            type="button"
-            onClick={() => void record()}
-            disabled={!canRecord}
-            className={cx(CONTROL_BUTTON, "border-accent/60 bg-accent text-on-accent hover:bg-accent/90")}
+          <StudioToolHintTarget
+            disabled={Boolean(recordDisabledReason)}
+            unavailableReason={recordDisabledReason}
+            preferredSide="top"
+            hint={{
+              id: "timelapse-record",
+              title: "타임랩스 영상 만들기",
+              description: "현재 페이지의 편집 히스토리를 빠르게 재생해 그리기 과정 WebM 영상으로 저장합니다.",
+              preview: "timelapse",
+              tip: "해상도와 목표 길이를 먼저 고르면 기록 단계가 자동으로 압축되어 영상 길이에 맞춰져요.",
+            }}
           >
-            {preparing ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
-            타임랩스 영상 만들기
-          </button>
+            <button
+              type="button"
+              onClick={() => void record()}
+              disabled={!canRecord}
+              className={cx(CONTROL_BUTTON, "border-accent/60 bg-accent text-on-accent hover:bg-accent/90")}
+            >
+              {preparing ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
+              타임랩스 영상 만들기
+            </button>
+          </StudioToolHintTarget>
         </footer>
       </div>
     </div>

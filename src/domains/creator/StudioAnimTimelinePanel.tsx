@@ -23,6 +23,7 @@ import {
 } from "./studio-anim-tracks";
 import { MAX_FRAME_FPS, MIN_FRAME_FPS, type OnionSkinSettings } from "./studio-frame-animation";
 import { PANEL_LABEL_ROW, StudioSliderRow, StudioToggleChip } from "./studio-panel-ui";
+import { StudioToolHintTarget } from "./StudioToolHint";
 
 import type { ReactElement } from "react";
 
@@ -84,6 +85,18 @@ export function StudioAnimTimelinePanel({
 }: StudioAnimTimelinePanelProps): ReactElement {
   const focusedRow = focusedTrackId ? (rows.find((r) => r.id === focusedTrackId) ?? null) : null;
   const focusedTrack = focusedTrackId ? (doc.tracks[focusedTrackId] ?? []) : [];
+  const replacingKeyframe = trackKeyframeIndexOf(focusedTrack, playhead) !== -1;
+  const playbackDisabledReason =
+    doc.frameCount < 2 ? "재생하려면 타임라인이 2프레임 이상이어야 해요." : undefined;
+  const addKeyframeDisabledReason = !focusedRow
+    ? undefined
+    : !focusedRow.eligible
+      ? "이미지 레이어이면서 단일 셀 프레임 애니메이션을 사용하지 않는 레이어에서만 키프레임을 만들 수 있어요."
+      : focusedRow.locked
+        ? "레이어 잠금을 풀면 키프레임을 추가할 수 있어요."
+        : !replacingKeyframe && !canAddKeyframe(doc, focusedRow.id)
+          ? `키프레임은 트랙당 최대 ${MAX_TIMELINE_FRAME_COUNT}장까지 만들 수 있어요.`
+          : undefined;
   // 순수 계산이라 렌더마다 다시 구해도 무방(다른 패널들의 render-time 파생값 관례와 동일 —
   // 예: StudioFrameAnimationPanel의 planFrameAnimationExport). 온스킨 실제 렌더는 캔버스(StudioPage)
   // 몫이지만, "지금 몇 장이 겹쳐 보일지" 미리 안내하는 용도로만 여기서 계산한다.
@@ -154,15 +167,28 @@ export function StudioAnimTimelinePanel({
             />
           </label>
           <div className="flex items-center justify-between gap-2">
-            <button
-              type="button"
-              onClick={onTogglePlay}
-              disabled={doc.frameCount < 2}
-              className={cn(buttonClass({ size: "sm", variant: "outline" }), "gap-1.5")}
+            <StudioToolHintTarget
+              disabled={Boolean(playbackDisabledReason)}
+              unavailableReason={playbackDisabledReason}
+              preferredSide="bottom"
+              hint={{
+                id: "timeline-playback",
+                title: "타임라인 재생",
+                description: "공유 재생헤드를 움직여 모든 레이어의 키프레임을 같은 시간축에서 미리 봅니다.",
+                preview: "timeline",
+                tip: "정지한 뒤 눈금이나 빈 프레임 칸을 눌러 원하는 위치로 스크럽할 수 있어요.",
+              }}
             >
-              {playing ? <Pause size={13} /> : <Play size={13} />}
-              {playing ? "정지" : "재생"}
-            </button>
+              <button
+                type="button"
+                onClick={onTogglePlay}
+                disabled={Boolean(playbackDisabledReason)}
+                className={cn(buttonClass({ size: "sm", variant: "outline" }), "gap-1.5")}
+              >
+                {playing ? <Pause size={13} /> : <Play size={13} />}
+                {playing ? "정지" : "재생"}
+              </button>
+            </StudioToolHintTarget>
             <span className="text-[0.72rem] tabular-nums text-fg-3">
               재생헤드 {playhead + 1} / {doc.frameCount}
             </span>
@@ -362,16 +388,31 @@ export function StudioAnimTimelinePanel({
               </button>
             </div>
 
-            <button
-              type="button"
-              onClick={() => onAddKeyframe(focusedRow.id)}
-              disabled={!focusedRow.eligible || focusedRow.locked || !canAddKeyframe(doc, focusedRow.id)}
-              className={cn(buttonClass({ size: "sm", variant: "solid" }), "w-full gap-1.5")}
-              title="현재 재생헤드 위치에 이 레이어의 키프레임을 캡처합니다."
+            <StudioToolHintTarget
+              className="w-full"
+              disabled={Boolean(addKeyframeDisabledReason)}
+              unavailableReason={addKeyframeDisabledReason}
+              preferredSide="left"
+              hint={{
+                id: "timeline-keyframe-add",
+                title: replacingKeyframe ? "현재 키프레임 갱신" : "현재 위치에 키프레임 추가",
+                description: replacingKeyframe
+                  ? "현재 재생헤드에 있는 키프레임을 레이어의 최신 모습으로 다시 캡처합니다."
+                  : "현재 재생헤드 위치의 레이어 모습을 캡처해 새 키프레임으로 기록합니다.",
+                preview: "keyframe",
+                tip: "다른 프레임으로 이동해 모습을 바꾸고 키프레임을 더하면 타임라인에서 이어 재생할 수 있어요.",
+              }}
             >
-              <GanttChartSquare size={13} />
-              현재 프레임({playhead + 1})에 키프레임 추가
-            </button>
+              <button
+                type="button"
+                onClick={() => onAddKeyframe(focusedRow.id)}
+                disabled={Boolean(addKeyframeDisabledReason)}
+                className={cn(buttonClass({ size: "sm", variant: "solid" }), "w-full gap-1.5")}
+              >
+                <GanttChartSquare size={13} />
+                현재 프레임({playhead + 1}) 키프레임 {replacingKeyframe ? "갱신" : "추가"}
+              </button>
+            </StudioToolHintTarget>
             {!focusedRow.eligible && (
               <p className="text-[0.7rem] text-fg-3" role="status">
                 이미지 레이어이면서 단일-셀 프레임 애니메이션을 쓰지 않을 때만 트랙을 만들 수 있어요.
@@ -410,49 +451,103 @@ export function StudioAnimTimelinePanel({
                 <Ghost size={12} aria-hidden />
                 어니언스키닝
               </p>
-              <StudioToggleChip
-                active={onionSkin.enabled}
-                onClick={() => onOnionSkinChange({ ...onionSkin, enabled: !onionSkin.enabled })}
-                title="어니언스키닝 사용 켜기/끄기"
+              <StudioToolHintTarget
+                preferredSide="left"
+                hint={{
+                  id: "timeline-onion-skin",
+                  title: "어니언스키닝",
+                  description: "현재 키프레임 앞뒤의 레이어 모습을 반투명하게 겹쳐 동작의 간격을 맞춥니다.",
+                  preview: "onion-skin",
+                  tip: "이전 프레임은 빨강, 다음 프레임은 파랑으로 구분하면 움직임 방향을 빠르게 읽을 수 있어요.",
+                }}
               >
-                어니언스키닝 사용
-              </StudioToggleChip>
+                <StudioToggleChip
+                  active={onionSkin.enabled}
+                  onClick={() => onOnionSkinChange({ ...onionSkin, enabled: !onionSkin.enabled })}
+                >
+                  어니언스키닝 사용
+                </StudioToggleChip>
+              </StudioToolHintTarget>
               {onionSkin.enabled && (
                 <>
-                  <StudioSliderRow
-                    label="이전 프레임 수"
-                    min={0}
-                    max={3}
-                    step={1}
-                    value={onionSkin.prevCount}
-                    onChange={(next) => onOnionSkinChange({ ...onionSkin, prevCount: next })}
-                  />
-                  <StudioSliderRow
-                    label="다음 프레임 수"
-                    min={0}
-                    max={3}
-                    step={1}
-                    value={onionSkin.nextCount}
-                    onChange={(next) => onOnionSkinChange({ ...onionSkin, nextCount: next })}
-                  />
-                  <StudioSliderRow
-                    label="투명도"
-                    min={0.1}
-                    max={0.8}
-                    step={0.05}
-                    value={onionSkin.opacity}
-                    onChange={(next) => onOnionSkinChange({ ...onionSkin, opacity: next })}
-                    readout={`${Math.round(onionSkin.opacity * 100)}%`}
-                  />
-                  <label className="flex cursor-pointer items-center gap-1.5 text-xs text-fg-2">
-                    <input
-                      type="checkbox"
-                      checked={onionSkin.tint}
-                      onChange={(e) => onOnionSkinChange({ ...onionSkin, tint: e.target.checked })}
-                      className="size-3.5 cursor-pointer accent-[var(--color-accent)]"
+                  <StudioToolHintTarget
+                    className="w-full [&>*]:w-full"
+                    preferredSide="left"
+                    hint={{
+                      id: "timeline-onion-prev-count",
+                      title: "이전 프레임 수",
+                      description: "현재 위치보다 앞선 키프레임을 최대 3장까지 겹쳐 표시합니다.",
+                      preview: "onion-skin",
+                    }}
+                  >
+                    <StudioSliderRow
+                      label="이전 프레임 수"
+                      min={0}
+                      max={3}
+                      step={1}
+                      value={onionSkin.prevCount}
+                      onChange={(next) => onOnionSkinChange({ ...onionSkin, prevCount: next })}
                     />
-                    색으로 구분 (이전=빨강 · 다음=파랑)
-                  </label>
+                  </StudioToolHintTarget>
+                  <StudioToolHintTarget
+                    className="w-full [&>*]:w-full"
+                    preferredSide="left"
+                    hint={{
+                      id: "timeline-onion-next-count",
+                      title: "다음 프레임 수",
+                      description: "현재 위치보다 뒤의 키프레임을 최대 3장까지 겹쳐 표시합니다.",
+                      preview: "onion-skin",
+                    }}
+                  >
+                    <StudioSliderRow
+                      label="다음 프레임 수"
+                      min={0}
+                      max={3}
+                      step={1}
+                      value={onionSkin.nextCount}
+                      onChange={(next) => onOnionSkinChange({ ...onionSkin, nextCount: next })}
+                    />
+                  </StudioToolHintTarget>
+                  <StudioToolHintTarget
+                    className="w-full [&>*]:w-full"
+                    preferredSide="left"
+                    hint={{
+                      id: "timeline-onion-opacity",
+                      title: "어니언스킨 투명도",
+                      description: "앞뒤 키프레임이 현재 그림을 가리지 않도록 겹침 강도를 조절합니다.",
+                      preview: "onion-skin",
+                    }}
+                  >
+                    <StudioSliderRow
+                      label="투명도"
+                      min={0.1}
+                      max={0.8}
+                      step={0.05}
+                      value={onionSkin.opacity}
+                      onChange={(next) => onOnionSkinChange({ ...onionSkin, opacity: next })}
+                      readout={`${Math.round(onionSkin.opacity * 100)}%`}
+                    />
+                  </StudioToolHintTarget>
+                  <StudioToolHintTarget
+                    className="w-full [&>*]:w-full"
+                    preferredSide="left"
+                    hint={{
+                      id: "timeline-onion-tint",
+                      title: "앞뒤 프레임 색 구분",
+                      description: "이전 키프레임은 빨강, 다음 키프레임은 파랑으로 표시해 시간 방향을 구분합니다.",
+                      preview: "onion-skin",
+                    }}
+                  >
+                    <label className="flex cursor-pointer items-center gap-1.5 text-xs text-fg-2">
+                      <input
+                        type="checkbox"
+                        checked={onionSkin.tint}
+                        onChange={(e) => onOnionSkinChange({ ...onionSkin, tint: e.target.checked })}
+                        className="size-3.5 cursor-pointer accent-[var(--color-accent)]"
+                      />
+                      색으로 구분 (이전=빨강 · 다음=파랑)
+                    </label>
+                  </StudioToolHintTarget>
                   <p className="text-[0.7rem] text-fg-3" role="status">
                     지금 위치 기준 {onionPreview.length}장이 겹쳐 보여요.
                   </p>

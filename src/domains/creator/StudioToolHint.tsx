@@ -4,11 +4,13 @@
  * outside the editor's startup graph.
  */
 import {
+  createContext,
   Fragment,
   Suspense,
   cloneElement,
   isValidElement,
   lazy,
+  useContext,
   useEffect,
   useId,
   useRef,
@@ -20,6 +22,12 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+
+import {
+  DEFAULT_STUDIO_TOOL_HINT_MODE,
+  DEFAULT_STUDIO_TOOL_HINT_TOUCH_HOLD_MS,
+  type StudioToolHintMode,
+} from "./studio-tool-hint-preferences";
 
 import type { StudioToolHintBubbleProps } from "./components/StudioToolHintBubble";
 import type { StudioToolHintSide } from "./studio-tool-hint-position";
@@ -36,7 +44,31 @@ const FALLBACK_WIDTH = 240;
 const FALLBACK_HEIGHT = 92;
 const FALLBACK_GAP = 10;
 const VIEWPORT_PADDING = 10;
-const TOUCH_HOLD_DELAY_MS = 480;
+
+type StudioToolHintPreferences = {
+  mode: StudioToolHintMode;
+  touchHoldDelayMs: number;
+  reduceMotion: boolean;
+};
+
+const StudioToolHintPreferencesContext = createContext<StudioToolHintPreferences>({
+  mode: DEFAULT_STUDIO_TOOL_HINT_MODE,
+  touchHoldDelayMs: DEFAULT_STUDIO_TOOL_HINT_TOUCH_HOLD_MS,
+  reduceMotion: false,
+});
+
+export function StudioToolHintPreferencesProvider({
+  mode,
+  touchHoldDelayMs,
+  reduceMotion,
+  children,
+}: StudioToolHintPreferences & { children: ReactNode }): ReactElement {
+  return (
+    <StudioToolHintPreferencesContext.Provider value={{ mode, touchHoldDelayMs, reduceMotion }}>
+      {children}
+    </StudioToolHintPreferencesContext.Provider>
+  );
+}
 
 // Selecting a tool can synchronously replace its control while the pointer is
 // still parked over it. This guard survives that remount and stays armed until
@@ -145,7 +177,7 @@ function StudioToolHintCompactFallback({
       data-studio-tool-hint="true"
       data-studio-tool-hint-expanded="false"
       data-studio-tool-hint-loading="true"
-      className="pointer-events-auto fixed z-[200] w-[min(15rem,calc(100vw-1.25rem))] rounded-lg border border-line/80 bg-panel/98 p-2.5 text-left shadow-[0_20px_56px_oklch(0.06_0.01_70/0.66)] backdrop-blur-xl"
+      className="studio-tool-hint-compact"
       style={compactFallbackStyle(anchor as DOMRect, preferredSide, Boolean(unavailableReason))}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
@@ -191,6 +223,8 @@ export function StudioToolHintTarget({
   unavailableReason?: string;
   preferredSide?: StudioToolHintSide;
 }): ReactElement {
+  const preferences = useContext(StudioToolHintPreferencesContext);
+  const richCoachEnabled = preferences.mode === "rich";
   const tipId = useId();
   const wrapRef = useRef<HTMLSpanElement>(null);
   const showTimer = useRef<number>(0);
@@ -227,7 +261,7 @@ export function StudioToolHintTarget({
   }
 
   function reveal(expandImmediately: boolean) {
-    if (!hint) return;
+    if (!hint || preferences.mode === "off") return;
     void loadStudioToolHintBubbleModule();
     if (hideTimer.current) {
       globalThis.clearTimeout(hideTimer.current);
@@ -237,10 +271,17 @@ export function StudioToolHintTarget({
     if (!nextAnchor) return;
     setAnchor(nextAnchor);
     setOpen(true);
+    if (!richCoachEnabled) {
+      setExpanded(false);
+      return;
+    }
     if (expandImmediately) {
       setExpanded(true);
       return;
     }
+    // Preserve an already-expanded rich coach while the pointer crosses the
+    // hoverable gap from the bubble back to its target.
+    if (expanded) return;
     if (expandTimer.current) globalThis.clearTimeout(expandTimer.current);
     expandTimer.current = globalThis.setTimeout(() => {
       setExpanded(true);
@@ -249,7 +290,7 @@ export function StudioToolHintTarget({
   }
 
   function scheduleShow() {
-    if (!hint) return;
+    if (!hint || preferences.mode === "off") return;
     if (suppressedPointerHintAt) return;
     void loadStudioToolHintBubbleModule();
     if (hideTimer.current) {
@@ -310,6 +351,7 @@ export function StudioToolHintTarget({
       dismissPointerActivation(event);
       return;
     }
+    if (preferences.mode === "off") return;
 
     clearTimers();
     hideRenderedTooltipImmediately();
@@ -324,8 +366,8 @@ export function StudioToolHintTarget({
       touchHoldOpened.current = true;
       pointerDismissed.current = false;
       clearPointerSuppression();
-      reveal(true);
-    }, TOUCH_HOLD_DELAY_MS) as unknown as number;
+      reveal(richCoachEnabled);
+    }, preferences.touchHoldDelayMs) as unknown as number;
   }
 
   function handlePointerUpCapture(event: ReactPointerEvent<HTMLSpanElement>) {
@@ -385,7 +427,7 @@ export function StudioToolHintTarget({
   }
 
   function handleFocus(event: React.FocusEvent<HTMLSpanElement>) {
-    if (pointerDismissed.current) return;
+    if (pointerDismissed.current || preferences.mode === "off") return;
     // Pointer focus is already filtered by pointerdown suppression. Opening on
     // every remaining focus path clears any suppression left by a previously
     // clicked target. This lets Tab/assistive focus deliberately take over even
@@ -394,7 +436,7 @@ export function StudioToolHintTarget({
     pointerDismissed.current = false;
     clearPointerSuppression();
     describeFocusedControl(event.target);
-    reveal(true);
+    reveal(richCoachEnabled);
   }
 
   function handleMouseLeave(event: ReactMouseEvent<HTMLSpanElement>) {
@@ -420,7 +462,17 @@ export function StudioToolHintTarget({
     scheduleHide();
   }
 
-  useEffect(() => clearTimers, []);
+  useEffect(() => {
+    if (preferences.mode !== "rich") {
+      if (showTimer.current) globalThis.clearTimeout(showTimer.current);
+      showTimer.current = 0;
+      if (expandTimer.current) globalThis.clearTimeout(expandTimer.current);
+      expandTimer.current = 0;
+      setExpanded(false);
+      if (preferences.mode === "off") setOpen(false);
+    }
+    return clearTimers;
+  }, [preferences.mode]);
 
   useEffect(
     () => () => {
@@ -543,6 +595,8 @@ export function StudioToolHintTarget({
                 hint={hint}
                 anchor={anchor}
                 expanded={expanded}
+                richPreviewEnabled={richCoachEnabled}
+                reducedMotion={preferences.reduceMotion}
                 unavailableReason={unavailableReason}
                 preferredSide={preferredSide}
                 onMouseEnter={keepOpenFromBubble}

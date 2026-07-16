@@ -191,6 +191,9 @@ import {
   registerStudioBg3dCaptureExcludedObject,
 } from "./studio-bg3d-three-webgl-capture";
 import { StudioBg3dSceneTemplatePanel } from "./StudioBg3dSceneTemplatePanel";
+import { StudioToolHintTarget } from "./StudioToolHint";
+
+import type { StudioToolHintSpec } from "./studio-tool-hints";
 
 export interface StudioBackground3DLtLayer {
   readonly role: StudioBg3dLtRasterLayerRole;
@@ -542,11 +545,120 @@ const BG_PANEL_TABS: Array<{ id: BgPanelTab; label: string; icon: typeof Boxes; 
   { id: "models", label: "모델", icon: PackageOpen, hint: "업로드 · 배치 · 삭제" },
 ];
 
-const TRANSFORM_MODES: Array<{ id: TransformModeId; label: string; icon: typeof Move; title: string }> = [
-  { id: "translate", label: "이동", icon: Move, title: "이동 (T)" },
-  { id: "rotate", label: "회전", icon: RotateCw, title: "회전 (R)" },
-  { id: "scale", label: "크기", icon: Scaling, title: "크기 (S)" },
+const TRANSFORM_MODES: Array<{
+  id: TransformModeId;
+  label: string;
+  icon: typeof Move;
+  hint: StudioToolHintSpec;
+}> = [
+  {
+    id: "translate",
+    label: "이동",
+    icon: Move,
+    hint: {
+      id: "bg3d:transform:translate",
+      title: "3D 객체 이동",
+      description: "선택한 배경 객체의 축 기즈모를 끌어 장면 안에서 위치를 조정합니다.",
+      shortcut: "T",
+      preview: "object-3d",
+      tip: "스냅을 켜면 현재 이동 간격에 맞춰 정확하게 배치할 수 있어요.",
+    },
+  },
+  {
+    id: "rotate",
+    label: "회전",
+    icon: RotateCw,
+    hint: {
+      id: "bg3d:transform:rotate",
+      title: "3D 객체 회전",
+      description: "선택한 배경 객체의 회전 링을 끌어 X·Y·Z축 방향을 조정합니다.",
+      shortcut: "R",
+      preview: "object-3d",
+      tip: "회전 스냅을 켜면 일정한 각도로 건물과 소품의 방향을 맞출 수 있어요.",
+    },
+  },
+  {
+    id: "scale",
+    label: "크기",
+    icon: Scaling,
+    hint: {
+      id: "bg3d:transform:scale",
+      title: "3D 객체 크기",
+      description: "선택한 배경 객체의 스케일 핸들을 끌어 축별 크기를 조정합니다.",
+      shortcut: "S",
+      preview: "object-3d",
+      tip: "형태가 뒤틀리지 않게 하려면 축 중앙의 균일 크기 핸들을 사용하세요.",
+    },
+  },
 ];
+
+const BG3D_VIEWPORT_HINTS = {
+  quad: {
+    id: "bg3d:view:quad",
+    title: "4분할 뷰",
+    description: "원근·위·앞·오른쪽 시점을 동시에 열어 객체의 깊이와 정렬을 확인합니다.",
+    preview: "camera-3d",
+    tip: "정면과 측면을 함께 보면서 배치하면 원근 화면에서 생기는 겹침을 줄일 수 있어요.",
+  },
+  undo: {
+    id: "bg3d:history:undo",
+    title: "3D 작업 실행 취소",
+    description: "직전에 적용한 3D 장면 편집을 한 단계 되돌립니다.",
+    shortcut: "⌘Z",
+    preview: "history",
+  },
+  redo: {
+    id: "bg3d:history:redo",
+    title: "3D 작업 다시 실행",
+    description: "실행 취소한 3D 장면 편집을 다시 적용합니다.",
+    shortcut: "⌘⇧Z",
+    preview: "history",
+  },
+  snap: {
+    id: "bg3d:transform:snap",
+    title: "변형 스냅",
+    description: "이동과 회전을 설정한 간격에 맞춰 붙여 배경 구조를 반듯하게 정렬합니다.",
+    preview: "object-3d",
+    tip: "세부 간격과 적용 축은 도형 패널의 변형 스냅에서 바꿀 수 있어요.",
+  },
+  ground: {
+    id: "bg3d:object:ground",
+    title: "바닥에 접지",
+    description: "선택한 도형이나 모델의 가장 낮은 지점을 계산해 바닥 높이에 정확히 맞춥니다.",
+    preview: "object-3d",
+  },
+  focus: {
+    id: "bg3d:camera:focus-selection",
+    title: "선택 객체에 초점",
+    description: "카메라의 중심을 선택한 3D 객체로 이동해 바로 확대·회전하며 확인할 수 있게 합니다.",
+    preview: "camera-3d",
+  },
+  zoomIn: {
+    id: "bg3d:camera:zoom-in",
+    title: "3D 화면 확대",
+    description: "카메라를 장면 안쪽으로 이동해 선택한 배경의 세부를 크게 봅니다.",
+    preview: "camera-3d",
+  },
+  zoomOut: {
+    id: "bg3d:camera:zoom-out",
+    title: "3D 화면 축소",
+    description: "카메라를 장면 바깥쪽으로 이동해 배경 전체의 구도와 여백을 확인합니다.",
+    preview: "camera-3d",
+  },
+  resetView: {
+    id: "bg3d:camera:reset",
+    title: "3D 시점 초기화",
+    description: "카메라 위치와 바라보는 지점을 기본 원근 구도로 되돌립니다.",
+    preview: "camera-3d",
+  },
+  linePreview: {
+    id: "bg3d:view:line-preview",
+    title: "선화 미리보기",
+    description: "재질색 대신 외곽선 중심으로 장면을 표시해 웹툰 배경 선화의 밀도를 미리 확인합니다.",
+    preview: "object-3d",
+    tip: "최종 레이어 분리는 LT 탭의 선화·컬러·톤 설정을 사용합니다.",
+  },
+} satisfies Record<string, StudioToolHintSpec>;
 
 const ADD_BUTTONS: Array<{ kind: BgPrimitiveKind; label: string; icon: typeof Boxes }> = [
   { kind: "box", label: "상자 추가", icon: Boxes },
@@ -2450,6 +2562,22 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   const selectedCustomModel = firstSelectedId ? (customModels.find((m) => m.id === firstSelectedId) ?? null) : null;
   const selectedEntity = selectedPrimitive ?? selectedCustomModel;
   const selectedIsLocked = isBgObjectTransformBlocked(selectedEntity);
+  const selectedEntities = Array.from(selectedIds).reduce<Array<BgPrimitive | BgCustomModelInstance>>(
+    (entities, id) => {
+      const entity = primitives.find((primitive) => primitive.id === id) ?? customModels.find((model) => model.id === id);
+      if (entity) entities.push(entity);
+      return entities;
+    },
+    []
+  );
+  const canGroundSelection = selectedEntities.some((entity) => !isBgObjectTransformBlocked(entity));
+  const groundSelectionDisabledReason =
+    selectedEntities.length === 0
+      ? "도형 또는 3D 모델을 먼저 선택하세요."
+      : !canGroundSelection
+        ? "선택한 객체의 잠금을 해제하세요."
+        : undefined;
+  const snapSettingsSummary = studioBg3dSnapSettingsSummary(snapSettings);
   const layerListItems: StudioBg3dLayerListItem[] = [
     ...primitives.map((prim, index) => {
       const kindCountBefore = primitives.slice(0, index).filter((p) => p.kind === prim.kind).length;
@@ -2783,147 +2911,184 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                   )}
                 </Canvas>
 
-                <div className="absolute left-2.5 top-2.5 z-10 flex flex-col gap-1.5">
-                  <div className="flex flex-col gap-1 rounded-lg border border-line/70 bg-panel/80 p-1 shadow-sm backdrop-blur">
+                <div className="absolute left-2 top-2 z-10 grid grid-cols-3 gap-1.5 sm:left-2.5 sm:top-2.5 sm:flex sm:flex-col">
+                  <div className="col-span-3 grid grid-cols-3 gap-1 rounded-lg border border-line/70 bg-panel/80 p-1 shadow-sm backdrop-blur sm:flex sm:flex-col">
                     {TRANSFORM_MODES.map((m) => {
                       const ModeIcon = m.icon;
                       const isActive = transformMode === m.id;
                       return (
-                        <button
-                          key={m.id}
-                          type="button"
-                          aria-label={m.label}
-                          aria-pressed={isActive}
-                          title={m.title}
-                          className={cx(
-                            "grid size-11 place-items-center rounded-md text-fg-2 transition-colors hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:size-8",
-                            isActive && "bg-accent text-on-accent hover:bg-accent/90 hover:text-on-accent"
-                          )}
-                          onClick={() => setTransformMode(m.id)}
-                        >
-                          <ModeIcon size={15} aria-hidden />
-                        </button>
+                        <StudioToolHintTarget key={m.id} hint={m.hint} preferredSide="right">
+                          <button
+                            type="button"
+                            aria-label={m.label}
+                            aria-pressed={isActive}
+                            className={cx(
+                              "grid size-11 place-items-center rounded-md text-fg-2 transition-colors hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:size-8",
+                              isActive && "bg-accent text-on-accent hover:bg-accent/90 hover:text-on-accent"
+                            )}
+                            onClick={() => setTransformMode(m.id)}
+                          >
+                            <ModeIcon size={15} aria-hidden />
+                          </button>
+                        </StudioToolHintTarget>
                       );
                     })}
                   </div>
-                  <button
-                    type="button"
-                    aria-label="4분할 뷰 토글"
-                    title="4분할 뷰 토글"
-                    aria-pressed={isQuadView}
-                    className={cx(
-                      VIEWPORT_BTN,
-                      isQuadView && "bg-accent text-on-accent hover:bg-accent/90 hover:text-on-accent"
-                    )}
-                    onClick={() => setIsQuadView((prev) => !prev)}
-                  >
-                    <LayoutTemplate size={16} aria-hidden />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="실행 취소"
-                    title="실행 취소 (⌘Z)"
+                  <StudioToolHintTarget hint={BG3D_VIEWPORT_HINTS.quad} preferredSide="right">
+                    <button
+                      type="button"
+                      aria-label="4분할 뷰 토글"
+                      aria-pressed={isQuadView}
+                      className={cx(
+                        VIEWPORT_BTN,
+                        isQuadView && "bg-accent text-on-accent hover:bg-accent/90 hover:text-on-accent"
+                      )}
+                      onClick={() => setIsQuadView((prev) => !prev)}
+                    >
+                      <LayoutTemplate size={16} aria-hidden />
+                    </button>
+                  </StudioToolHintTarget>
+                  <StudioToolHintTarget
+                    hint={BG3D_VIEWPORT_HINTS.undo}
                     disabled={!canUndo}
-                    className={cx(VIEWPORT_BTN, "disabled:cursor-not-allowed disabled:opacity-40")}
-                    onClick={doUndo}
+                    unavailableReason={!canUndo ? "되돌릴 3D 장면 변경이 없습니다." : undefined}
+                    preferredSide="right"
                   >
-                    <Undo2 size={16} aria-hidden />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="다시 실행"
-                    title="다시 실행 (⌘⇧Z)"
+                    <button
+                      type="button"
+                      aria-label="실행 취소"
+                      disabled={!canUndo}
+                      className={cx(VIEWPORT_BTN, "disabled:cursor-not-allowed disabled:opacity-40")}
+                      onClick={doUndo}
+                    >
+                      <Undo2 size={16} aria-hidden />
+                    </button>
+                  </StudioToolHintTarget>
+                  <StudioToolHintTarget
+                    hint={BG3D_VIEWPORT_HINTS.redo}
                     disabled={!canRedo}
-                    className={cx(VIEWPORT_BTN, "disabled:cursor-not-allowed disabled:opacity-40")}
-                    onClick={doRedo}
+                    unavailableReason={!canRedo ? "다시 적용할 3D 장면 변경이 없습니다." : undefined}
+                    preferredSide="right"
                   >
-                    <Redo2 size={16} aria-hidden />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={snapSettings.enabled ? "스냅 끄기" : "스냅 켜기"}
-                    title={studioBg3dSnapSettingsSummary(snapSettings)}
-                    aria-pressed={snapSettings.enabled}
-                    className={cx(
-                      VIEWPORT_BTN,
-                      snapSettings.enabled && "border-accent/60 bg-accent text-on-accent hover:bg-accent/90 hover:text-on-accent"
-                    )}
-                    onClick={() =>
-                      setSnapSettings((prev) =>
-                        normalizeStudioBg3dSnapSettings({ ...prev, enabled: !prev.enabled })
-                      )
-                    }
+                    <button
+                      type="button"
+                      aria-label="다시 실행"
+                      disabled={!canRedo}
+                      className={cx(VIEWPORT_BTN, "disabled:cursor-not-allowed disabled:opacity-40")}
+                      onClick={doRedo}
+                    >
+                      <Redo2 size={16} aria-hidden />
+                    </button>
+                  </StudioToolHintTarget>
+                  <StudioToolHintTarget
+                    hint={{
+                      ...BG3D_VIEWPORT_HINTS.snap,
+                      description: `${BG3D_VIEWPORT_HINTS.snap.description} 현재 설정: ${snapSettingsSummary}.`,
+                    }}
+                    preferredSide="right"
                   >
-                    <Magnet size={16} aria-hidden />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="바닥에 접지"
-                    title="선택 객체를 바닥에 붙이기"
-                    disabled={!selectedEntity || selectedIsLocked}
-                    className={cx(VIEWPORT_BTN, "disabled:cursor-not-allowed disabled:opacity-40")}
-                    onClick={groundSelectedEntity}
+                    <button
+                      type="button"
+                      aria-label={`${snapSettings.enabled ? "스냅 끄기" : "스냅 켜기"} · ${snapSettingsSummary}`}
+                      aria-pressed={snapSettings.enabled}
+                      className={cx(
+                        VIEWPORT_BTN,
+                        snapSettings.enabled && "border-accent/60 bg-accent text-on-accent hover:bg-accent/90 hover:text-on-accent"
+                      )}
+                      onClick={() =>
+                        setSnapSettings((prev) =>
+                          normalizeStudioBg3dSnapSettings({ ...prev, enabled: !prev.enabled })
+                        )
+                      }
+                    >
+                      <Magnet size={16} aria-hidden />
+                    </button>
+                  </StudioToolHintTarget>
+                  <StudioToolHintTarget
+                    hint={BG3D_VIEWPORT_HINTS.ground}
+                    disabled={Boolean(groundSelectionDisabledReason)}
+                    unavailableReason={groundSelectionDisabledReason}
+                    preferredSide="right"
                   >
-                    <MoveDown size={16} aria-hidden />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="초점 맞춤"
-                    title="초점 맞춤"
-                    className="flex flex-1 flex-col items-center justify-center gap-1 text-fg-2"
-                    onClick={focusSelectedEntity}
+                    <button
+                      type="button"
+                      aria-label="바닥에 접지"
+                      disabled={Boolean(groundSelectionDisabledReason)}
+                      className={cx(VIEWPORT_BTN, "disabled:cursor-not-allowed disabled:opacity-40")}
+                      onClick={groundSelectedEntity}
+                    >
+                      <MoveDown size={16} aria-hidden />
+                    </button>
+                  </StudioToolHintTarget>
+                  <StudioToolHintTarget
+                    hint={BG3D_VIEWPORT_HINTS.focus}
+                    disabled={!selectedEntity}
+                    unavailableReason={!selectedEntity ? "도형 또는 3D 모델을 먼저 선택하세요." : undefined}
+                    preferredSide="right"
                   >
-                    <ScanLine size={16} aria-hidden />
-                  </button>
+                    <button
+                      type="button"
+                      aria-label="초점 맞춤"
+                      disabled={!selectedEntity}
+                      className={cx(VIEWPORT_BTN, "disabled:cursor-not-allowed disabled:opacity-40")}
+                      onClick={focusSelectedEntity}
+                    >
+                      <ScanLine size={16} aria-hidden />
+                    </button>
+                  </StudioToolHintTarget>
                 </div>
 
-                <div className="absolute right-2.5 top-2.5 z-10 flex flex-col gap-1.5">
-                  <button
-                    type="button"
-                    aria-label="확대"
-                    title="확대"
-                    className={VIEWPORT_BTN}
-                    onClick={() => {
-                      viewportApiRef.current?.zoomBy(0.82);
-                      setViewportHinted(true);
-                    }}
-                  >
-                    <ZoomIn size={16} aria-hidden />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="축소"
-                    title="축소"
-                    className={VIEWPORT_BTN}
-                    onClick={() => {
-                      viewportApiRef.current?.zoomBy(1.22);
-                      setViewportHinted(true);
-                    }}
-                  >
-                    <ZoomOut size={16} aria-hidden />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="시점 초기화"
-                    title="시점 초기화"
-                    className={VIEWPORT_BTN}
-                    onClick={() => {
-                      viewportApiRef.current?.applyPreset("default");
-                      setViewportHinted(true);
-                    }}
-                  >
-                    <Maximize2 size={16} aria-hidden />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="선화로 보기"
-                    title="선화로 보기"
-                    aria-pressed={lineArtPreview}
-                    className={cx(VIEWPORT_BTN, lineArtPreview && "border-accent/60 bg-accent text-on-accent hover:bg-accent/90 hover:text-on-accent")}
-                    onClick={() => setLineArtPreview((v) => !v)}
-                  >
-                    <Boxes size={16} aria-hidden />
-                  </button>
+                <div className="absolute right-2 top-2 z-10 grid grid-cols-2 gap-1.5 sm:right-2.5 sm:top-2.5 sm:flex sm:flex-col">
+                  <StudioToolHintTarget hint={BG3D_VIEWPORT_HINTS.zoomIn} preferredSide="left">
+                    <button
+                      type="button"
+                      aria-label="확대"
+                      className={VIEWPORT_BTN}
+                      onClick={() => {
+                        viewportApiRef.current?.zoomBy(0.82);
+                        setViewportHinted(true);
+                      }}
+                    >
+                      <ZoomIn size={16} aria-hidden />
+                    </button>
+                  </StudioToolHintTarget>
+                  <StudioToolHintTarget hint={BG3D_VIEWPORT_HINTS.zoomOut} preferredSide="left">
+                    <button
+                      type="button"
+                      aria-label="축소"
+                      className={VIEWPORT_BTN}
+                      onClick={() => {
+                        viewportApiRef.current?.zoomBy(1.22);
+                        setViewportHinted(true);
+                      }}
+                    >
+                      <ZoomOut size={16} aria-hidden />
+                    </button>
+                  </StudioToolHintTarget>
+                  <StudioToolHintTarget hint={BG3D_VIEWPORT_HINTS.resetView} preferredSide="left">
+                    <button
+                      type="button"
+                      aria-label="시점 초기화"
+                      className={VIEWPORT_BTN}
+                      onClick={() => {
+                        viewportApiRef.current?.applyPreset("default");
+                        setViewportHinted(true);
+                      }}
+                    >
+                      <Maximize2 size={16} aria-hidden />
+                    </button>
+                  </StudioToolHintTarget>
+                  <StudioToolHintTarget hint={BG3D_VIEWPORT_HINTS.linePreview} preferredSide="left">
+                    <button
+                      type="button"
+                      aria-label="선화로 보기"
+                      aria-pressed={lineArtPreview}
+                      className={cx(VIEWPORT_BTN, lineArtPreview && "border-accent/60 bg-accent text-on-accent hover:bg-accent/90 hover:text-on-accent")}
+                      onClick={() => setLineArtPreview((v) => !v)}
+                    >
+                      <Boxes size={16} aria-hidden />
+                    </button>
+                  </StudioToolHintTarget>
                 </div>
 
                 {!viewportHinted ? (
