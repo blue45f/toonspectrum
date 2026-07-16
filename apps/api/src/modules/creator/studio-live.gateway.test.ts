@@ -2,7 +2,10 @@ import { fromUint8Array } from "js-base64";
 import { describe, expect, it, vi } from "vitest";
 import * as Y from "yjs";
 
-import { StudioCrdtBackpressureError } from "./studio-crdt.service";
+import {
+  StudioCrdtBackpressureError,
+  StudioCrdtStorageCorruptionError,
+} from "./studio-crdt.service";
 import {
   STUDIO_LIVE_ADAPTER_DISCOVERY_TIMEOUT_MS,
   STUDIO_LIVE_RELAY_RPC_TIMEOUT_MS,
@@ -3368,6 +3371,44 @@ describe("StudioLiveGateway", () => {
     });
     expect(acknowledgement).toHaveBeenCalledOnce();
     expect(acknowledgement).toHaveBeenCalledWith(response);
+    expect(
+      harness.emissions.some((emission) => emission.event === "studio:crdt:update")
+    ).toBe(false);
+  });
+
+  it("fails closed with a dedicated permanent ACK when CRDT storage is corrupt", async () => {
+    const harness = createHarness();
+    const editor = harness.socket("corrupt-storage-editor");
+    await connectAndJoin(harness, editor);
+    const message =
+      "서버 원고 저장소의 무결성을 확인하지 못해 공동 편집을 중지했습니다.";
+
+    harness.crdtService.sync.mockRejectedValueOnce(
+      new StudioCrdtStorageCorruptionError("stored snapshot cannot be decoded")
+    );
+    await expect(
+      harness.gateway.syncCrdtDocument(
+        editor as never,
+        {
+          protocolVersion: 1,
+          workId: "work-1",
+          requestId: "corrupt-storage-sync",
+          stateVector: crdtStateVector(),
+        },
+        undefined
+      )
+    ).resolves.toEqual({ ok: false, code: "storage_corruption", message });
+
+    harness.crdtService.applyUpdate.mockRejectedValueOnce(
+      new StudioCrdtStorageCorruptionError("stored update cannot be decoded")
+    );
+    await expect(
+      harness.gateway.applyCrdtUpdate(
+        editor as never,
+        crdtUpdateRequest(26),
+        undefined
+      )
+    ).resolves.toEqual({ ok: false, code: "storage_corruption", message });
     expect(
       harness.emissions.some((emission) => emission.event === "studio:crdt:update")
     ).toBe(false);

@@ -8,8 +8,9 @@ import { STUDIO_RASTER_ASSET_ADMISSION_OPT_IN_TOKEN } from "@/lib/studio-raster-
 export const STUDIO_RASTER_PUBLICATION_EXPERIMENT_TOKEN =
   STUDIO_RASTER_ASSET_ADMISSION_OPT_IN_TOKEN;
 
-// Flip only in the same change that mounts and verifies the authoritative replay surface.
-export const STUDIO_RASTER_VERIFIED_RENDERER_HANDOFF_MOUNTED = false;
+// StudioPage now mounts the verified two-phase replay surface. The experiment token remains a
+// separate deployment opt-in so renderer and server asset admission must be enabled together.
+export const STUDIO_RASTER_VERIFIED_RENDERER_HANDOFF_MOUNTED = true;
 
 export function isStudioAutomaticRasterPublicationEnabled(input: {
   readonly experimentToken: string | undefined;

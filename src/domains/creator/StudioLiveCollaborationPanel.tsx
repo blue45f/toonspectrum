@@ -1,11 +1,13 @@
 import {
   AlertCircle,
   Check,
+  Download,
   Eye,
   LoaderCircle,
   MessageCircle,
   MonitorUp,
   Radio,
+  RefreshCw,
   ScreenShareOff,
   SendHorizontal,
   ShieldCheck,
@@ -18,8 +20,14 @@ import { useEffect, useRef, useState, type FormEvent, type Ref } from "react";
 import {
   useStudioLiveCollaboration,
   type StudioLiveAvailability,
+  type StudioLiveRecoveryState,
 } from "./studio-live-collaboration-context";
 import { STUDIO_LIVE_CHAT_TEXT_MAX_LENGTH } from "./studio-live-collaboration-protocol";
+import {
+  formatStudioLiveLastAck,
+  presentStudioLiveSyncSnapshot,
+  type StudioLiveSyncSnapshot,
+} from "./studio-live-sync-safety";
 import {
   StudioScreenShareController,
   isStudioScreenShareSupported,
@@ -72,6 +80,8 @@ export interface StudioLiveCollaborationPanelViewProps {
   usingLocalFallback: boolean;
   busyAction: string | null;
   error: string | null;
+  syncSnapshot?: StudioLiveSyncSnapshot;
+  recovery?: StudioLiveRecoveryState | null;
   videoRef?: Ref<HTMLVideoElement>;
   onChatDraftChange: (value: string) => void;
   onChatSubmit: () => void;
@@ -79,6 +89,8 @@ export interface StudioLiveCollaborationPanelViewProps {
   onStopShare: () => void;
   onRetryServer: () => void;
   onUseLocalFallback: () => void;
+  onExportRecovery: () => void;
+  onReloadAuthoritative: () => void;
   onApproveRequest: (request: StudioScreenShareRequest) => void;
   onRejectRequest: (request: StudioScreenShareRequest) => void;
   onStopViewer: (viewer: StudioScreenShareViewer) => void;
@@ -96,6 +108,20 @@ function statusCopy(availability: StudioLiveAvailability, mode: StudioLiveTransp
   if (availability === "unsupported") return "브라우저 미지원";
   if (availability === "error") return "연결 오류";
   return mode === "server" ? "팀 서버 연결" : "같은 출처 탭 연결";
+}
+
+function syncStatusToneClass(
+  tone: ReturnType<typeof presentStudioLiveSyncSnapshot>["tone"] | null,
+  ready: boolean,
+  availability: StudioLiveAvailability
+): string {
+  if (tone === "good") return "border-good/35 bg-good/10 text-good";
+  if (tone === "bad") return "border-bad/40 bg-bad/10 text-bad";
+  if (tone === "warn") return "border-warn/40 bg-warn/10 text-warn";
+  if (tone === "cool") return "border-cool/35 bg-cool/10 text-cool";
+  if (ready) return "border-good/35 bg-good/10 text-good";
+  if (availability === "error") return "border-bad/35 bg-bad/10 text-bad";
+  return "border-line bg-card text-fg-3";
 }
 
 function screenItemKey(kind: "approve" | "watch" | "item", sessionId: string, shareId: string) {
@@ -123,6 +149,8 @@ export function StudioLiveCollaborationPanelView({
   usingLocalFallback,
   busyAction,
   error,
+  syncSnapshot,
+  recovery,
   videoRef,
   onChatDraftChange,
   onChatSubmit,
@@ -130,6 +158,8 @@ export function StudioLiveCollaborationPanelView({
   onStopShare,
   onRetryServer,
   onUseLocalFallback,
+  onExportRecovery,
+  onReloadAuthoritative,
   onApproveRequest,
   onRejectRequest,
   onStopViewer,
@@ -140,6 +170,10 @@ export function StudioLiveCollaborationPanelView({
   const watching = screenState.watching;
   const chatLogRef = useRef<HTMLUListElement>(null);
   const chatDraftReady = chatDraft.trim().length > 0;
+  const syncPresentation = syncSnapshot
+    ? presentStudioLiveSyncSnapshot(syncSnapshot)
+    : null;
+  const syncStatusCopy = syncPresentation?.shortLabel ?? statusCopy(availability, mode);
 
   useEffect(() => {
     const log = chatLogRef.current;
@@ -176,16 +210,12 @@ export function StudioLiveCollaborationPanelView({
         </div>
         <span
           aria-atomic="true"
-          aria-live="polite"
+          aria-live={syncPresentation?.assertive ? "assertive" : "polite"}
           className={cn(
             "inline-flex min-h-7 shrink-0 items-center gap-1.5 rounded-full border px-2 text-[0.68rem] font-semibold",
-            ready
-              ? "border-good/35 bg-good/10 text-good"
-              : availability === "error"
-                ? "border-bad/35 bg-bad/10 text-bad"
-                : "border-line bg-card text-fg-3"
+            syncStatusToneClass(syncPresentation?.tone ?? null, ready, availability)
           )}
-          role="status"
+          role={syncPresentation?.assertive ? "alert" : "status"}
         >
           {availability === "connecting" ? (
             <LoaderCircle className="animate-spin motion-reduce:animate-none" size={12} aria-hidden="true" />
@@ -195,7 +225,7 @@ export function StudioLiveCollaborationPanelView({
               className={cn("size-1.5 rounded-full", ready ? "bg-good" : "bg-fg-3")}
             />
           )}
-          {statusCopy(availability, mode)}
+          {syncStatusCopy}
         </span>
       </div>
 
@@ -204,6 +234,60 @@ export function StudioLiveCollaborationPanelView({
           ? "로그인 세션과 작품 권한을 확인한 팀 연결입니다. 화면은 보기를 직접 요청한 피어에게만 전달됩니다."
           : "현재 작품을 이 브라우저의 같은 출처 탭에서 열면 접속 상태와 화면 공유를 시험할 수 있습니다. 인터넷 팀 접속으로 표시하지 않습니다."}
       </p>
+
+      {syncSnapshot && syncPresentation ? (
+        <div
+          className="mt-3 border-y border-line/80 py-3"
+          data-studio-sync-safety-detail={syncSnapshot.phase}
+        >
+          <div className="flex items-start gap-2">
+            {syncPresentation.tone === "bad" ? (
+              <AlertCircle className="mt-0.5 shrink-0 text-bad" size={15} aria-hidden />
+            ) : (
+              <ShieldCheck
+                className={cn(
+                  "mt-0.5 shrink-0",
+                  syncPresentation.tone === "good" ? "text-good" : "text-accent"
+                )}
+                size={15}
+                aria-hidden
+              />
+            )}
+            <p className="text-xs leading-relaxed text-fg-2">{syncPresentation.detail}</p>
+          </div>
+          <dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-1.5 text-[0.7rem] sm:grid-cols-3">
+            <div className="flex min-w-0 items-center justify-between gap-2 sm:block">
+              <dt className="text-fg-3">서버 경로</dt>
+              <dd className="truncate font-semibold text-fg-2">
+                {syncSnapshot.transportReady ? "연결됨" : "연결 대기"}
+              </dd>
+            </div>
+            <div className="flex min-w-0 items-center justify-between gap-2 sm:block">
+              <dt className="text-fg-3">기기 복구 저장소</dt>
+              <dd className="truncate font-semibold text-fg-2">
+                {syncSnapshot.persistenceDurability === "durable"
+                  ? "보호됨"
+                  : syncSnapshot.persistenceDurability === "not-applicable"
+                    ? "열람 전용"
+                    : syncSnapshot.persistenceDurability === "checking"
+                      ? "확인 중"
+                      : "보호 안 됨"}
+              </dd>
+            </div>
+            <div className="flex min-w-0 items-center justify-between gap-2 sm:block">
+              <dt className="text-fg-3">서버 승인</dt>
+              <dd className="truncate font-semibold text-fg-2">
+                {formatStudioLiveLastAck(syncSnapshot.lastAckAt)}
+              </dd>
+            </div>
+          </dl>
+          {syncSnapshot.pendingCount > 0 ? (
+            <p className="mt-2 text-[0.7rem] font-semibold text-warn">
+              아직 서버 승인을 기다리는 변경 {syncSnapshot.pendingCount.toLocaleString("ko-KR")}개
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       {error ? (
         <div
@@ -216,7 +300,61 @@ export function StudioLiveCollaborationPanelView({
         </div>
       ) : null}
 
+      {syncSnapshot?.phase === "recovery-required" && recovery ? (
+        <div
+          className="mt-3 rounded-xl border border-bad/40 bg-bad/10 p-3"
+          data-studio-crdt-recovery-boundary="true"
+        >
+          <div className="flex items-start gap-2">
+            <AlertCircle className="mt-0.5 shrink-0 text-bad" size={16} aria-hidden />
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-fg">거부된 로컬 변경을 먼저 보존해 주세요</p>
+              <p className="mt-1 text-[0.72rem] leading-relaxed text-fg-2">
+                서버 원고와 다른 변경 {recovery.updateCount.toLocaleString("ko-KR")}개를
+                재전송 큐와 분리했습니다. 복구 JSON은 지원팀 또는 검증된 복구 도구가 분석할 수
+                있는 원본 frontier를 포함하며, 현재 원고에 자동으로 다시 적용되지는 않습니다.
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <Button
+              className="min-h-11"
+              disabled={
+                busyAction === "export-recovery" ||
+                !recovery.exportAvailable
+              }
+              type="button"
+              variant="outline"
+              onClick={onExportRecovery}
+            >
+              {busyAction === "export-recovery" ? (
+                <LoaderCircle className="animate-spin motion-reduce:animate-none" size={15} aria-hidden />
+              ) : (
+                <Download size={15} aria-hidden />
+              )}
+              {recovery.exported ? "복구 파일 다시 내보내기" : "복구 파일 내보내기"}
+            </Button>
+            <Button
+              className="min-h-11"
+              disabled={!recovery.exported}
+              title={
+                recovery.exported
+                  ? "현재 낙관적 화면을 버리고 서버 권위 원고를 새로 엽니다."
+                  : "복구 파일을 먼저 내보내야 서버 원고를 다시 열 수 있습니다."
+              }
+              type="button"
+              variant="quiet"
+              onClick={onReloadAuthoritative}
+            >
+              <RefreshCw size={15} aria-hidden /> 서버 원고 다시 열기
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
       {serverAvailable &&
+      syncSnapshot?.phase !== "recovery-required" &&
+      syncSnapshot?.phase !== "revoked" &&
       (usingLocalFallback || (availability === "error" && error && mode === "server")) ? (
         <div className="mt-3 rounded-xl border border-line bg-card/55 p-3">
           <p className="text-xs leading-relaxed text-fg-2">
@@ -736,6 +874,23 @@ export function StudioLiveCollaborationPanel() {
     }
   }
 
+  async function handleExportRecovery() {
+    if (busyAction) return;
+    setBusyAction("export-recovery");
+    setScreenError(null);
+    try {
+      await live.exportRecovery();
+    } catch (recoveryError) {
+      setScreenError(
+        recoveryError instanceof Error
+          ? recoveryError.message
+          : "공동 편집 복구 파일을 내보내지 못했습니다."
+      );
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
   return (
     <StudioLiveCollaborationPanelView
       availability={live.availability}
@@ -745,6 +900,8 @@ export function StudioLiveCollaborationPanel() {
       chatMessages={live.chatMessages}
       chatNotice={chatNotice}
       error={screenError ?? live.error}
+      syncSnapshot={live.sync}
+      recovery={live.recovery}
       mode={live.mode}
       peers={live.peers}
       screenState={screenState}
@@ -764,6 +921,8 @@ export function StudioLiveCollaborationPanel() {
       onStopShare={() => screenControllerRef.current?.stopShare()}
       onRetryServer={live.retryServer}
       onUseLocalFallback={live.useLocalFallback}
+      onExportRecovery={() => void handleExportRecovery()}
+      onReloadAuthoritative={live.reloadAuthoritative}
       onStopViewer={handleStopViewer}
       onStopWatching={() => screenControllerRef.current?.stopWatching()}
       onWatchShare={handleWatchShare}

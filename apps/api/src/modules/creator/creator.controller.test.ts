@@ -86,13 +86,18 @@ describe("CreatorController collaboration collection endpoints", () => {
     ).toMatchObject({ action: "accept" });
 
     const sharedBodyPipe = new ZodValidationPipe(UpdateCreatorSharedDocumentDto);
-    expect(sharedBodyPipe.transform({ baseRevision: 1, doc: {} }, bodyMetadata)).toEqual({
+    expect(sharedBodyPipe.transform({
       baseRevision: 1,
+      crdtServerSequence: "0",
+      doc: {},
+    }, bodyMetadata)).toEqual({
+      baseRevision: 1,
+      crdtServerSequence: "0",
       doc: {},
     });
     expect(() =>
       sharedBodyPipe.transform(
-        { baseRevision: 1, format: "cuttoon", doc: {} },
+        { baseRevision: 1, crdtServerSequence: "0", format: "cuttoon", doc: {} },
         bodyMetadata
       )
     ).toThrow(BadRequestException);
@@ -201,7 +206,11 @@ describe("CreatorController collaboration collection endpoints", () => {
     const document = { workId: "work-1", revision: 7 };
     const meta = { workId: "work-1", revision: 7, capabilities: { view: true, edit: true } };
     const saved = { workId: "work-1", revision: 8 };
-    const patch = { baseRevision: 7, doc: { pagesList: [] } };
+    const patch = {
+      baseRevision: 7,
+      crdtServerSequence: "27",
+      doc: { pagesList: [] },
+    };
     const cursor = "opaque_cursor";
     creatorService.listSharedWorks.mockResolvedValue(works);
     creatorService.getSharedWorkDocument.mockResolvedValue(document);
@@ -246,7 +255,7 @@ describe("CreatorController collaboration collection endpoints", () => {
     await expect(
       createController().saveSharedWorkDocument(
         { id: "work-1" },
-        { baseRevision: 1, doc: {} }
+        { baseRevision: 1, crdtServerSequence: "0", doc: {} }
       )
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(creatorService.listSharedWorks).not.toHaveBeenCalled();

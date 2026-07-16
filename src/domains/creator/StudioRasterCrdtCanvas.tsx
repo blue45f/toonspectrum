@@ -28,6 +28,8 @@ export interface StudioRasterCrdtCanvasProps {
   readonly viewport: Omit<StudioRasterTileViewport, "devicePixelRatio">;
   readonly devicePixelRatio?: number;
   readonly signal?: AbortSignal;
+  /** Show only when the owning commit simultaneously hides the exact Konva fallbacks. */
+  readonly presentationAuthorized?: boolean;
   /** Test/runtime override. Omit to use `navigator.gpu`; pass null to force Canvas2D. */
   readonly gpu?: GPU | null;
   readonly sha256?: StudioRasterTileSha256;
@@ -77,6 +79,7 @@ export const StudioRasterCrdtCanvas = forwardRef<
   viewport,
   devicePixelRatio,
   signal,
+  presentationAuthorized = false,
   gpu,
   sha256,
   onBackendChange,
@@ -191,7 +194,9 @@ export const StudioRasterCrdtCanvas = forwardRef<
         height: bounds.height,
         overflow: "hidden",
         pointerEvents: "none",
+        visibility: presentationAuthorized ? "visible" : "hidden",
       }}
+      data-studio-raster-frame-authorized={presentationAuthorized ? "true" : "false"}
     >
       <canvas
         ref={gpuCanvasRef}

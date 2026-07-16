@@ -6,6 +6,8 @@ import { alias } from "drizzle-orm/pg-core";
 import {
   creatorWorkCollaborationEvents,
   creatorWorkCollaborators,
+  creatorWorkCrdtSnapshots,
+  creatorWorkCrdtUpdates,
   creatorWorkRevisions,
   creatorWorks,
   db,
@@ -23,6 +25,7 @@ import {
   normalizeCreatorCollaborationStatus,
   resolveCreatorCollaborationAccess,
 } from "./creator-collaboration.policy";
+import { studioCrdtWorkAdvisoryLockQuery } from "./studio-crdt.repository";
 
 import type {
   CreatorCollaborationAccess,
@@ -204,6 +207,9 @@ interface UpdateCreatorCollaborationMembershipInput {
 }
 
 export interface CreatorCollaborationUnitOfWork {
+  /** Must be the first lock acquired by a shared-document save transaction. */
+  acquireStudioCrdtWorkAdvisoryLock(workId: string): Promise<void>;
+  getStudioCrdtServerSequence(workId: string): Promise<bigint>;
   findWork(workId: string, lock?: boolean): Promise<CreatorCollaborationWorkRecord | null>;
   findUser(userId: string, lock?: boolean): Promise<CreatorCollaborationUserRecord | null>;
   findMembership(workId: string, userId: string): Promise<CreatorCollaborationMembershipRecord | null>;
@@ -345,6 +351,7 @@ export interface CreatorSharedDocument {
   status: "active";
   capabilities: { view: true; edit: boolean };
   revision: number;
+  crdtServerSequence: string;
   updatedAt: string;
   document: CreatorWorkRevisionSnapshot;
 }
@@ -416,6 +423,16 @@ export class CreatorCollaborationRevisionConflictError extends Error {
   constructor(readonly currentRevision: number) {
     super("creator_work_revision_conflict");
     this.name = "CreatorCollaborationRevisionConflictError";
+  }
+}
+
+export class CreatorCollaborationCrdtSequenceConflictError extends Error {
+  constructor(
+    readonly requestedServerSequence: bigint,
+    readonly currentServerSequence: bigint
+  ) {
+    super("creator_crdt_sequence_conflict");
+    this.name = "CreatorCollaborationCrdtSequenceConflictError";
   }
 }
 
@@ -576,6 +593,37 @@ export function buildCreatorSharedDocumentUpdateQuery(
 }
 
 /**
+ * One statement observes the durable CRDT frontier. A compacted snapshot may be ahead of the
+ * remaining update rows, while post-compaction updates may be ahead of the snapshot; the save
+ * fence therefore compares against their maximum (or zero for a new room).
+ */
+export function buildCreatorCrdtServerSequenceQuery(
+  executor: DrizzleCreatorCollaborationExecutor,
+  workId: string
+) {
+  return executor
+    .select({
+      serverSequence: sql<string>`(
+      greatest(
+        coalesce((
+          select ${creatorWorkCrdtSnapshots.compactedSequence}
+          from ${creatorWorkCrdtSnapshots}
+          where ${creatorWorkCrdtSnapshots.workId} = ${workId}
+          limit 1
+        ), 0::bigint),
+        coalesce((
+          select max(${creatorWorkCrdtUpdates.sequence})
+          from ${creatorWorkCrdtUpdates}
+          where ${creatorWorkCrdtUpdates.workId} = ${workId}
+        ), 0::bigint)
+      )::text
+    )`,
+    })
+    .from(sql`(select 1) as "creator_crdt_sequence_source"`)
+    .limit(1);
+}
+
+/**
  * Complete keyset query for the mixed owned/shared feed. PostgreSQL timestamps can carry
  * microseconds while JavaScript Date cursors carry milliseconds, so ordering and filtering both
  * truncate to the same precision to prevent a boundary row from repeating forever.
@@ -696,6 +744,23 @@ const validCollaborationEventPredicate = sql`(
 
 class DrizzleCreatorCollaborationUnitOfWork implements CreatorCollaborationUnitOfWork {
   constructor(private readonly executor: DrizzleCreatorCollaborationExecutor) {}
+
+  async acquireStudioCrdtWorkAdvisoryLock(workId: string): Promise<void> {
+    await this.executor.execute(studioCrdtWorkAdvisoryLockQuery(workId));
+  }
+
+  async getStudioCrdtServerSequence(workId: string): Promise<bigint> {
+    const rows = await buildCreatorCrdtServerSequenceQuery(this.executor, workId);
+    const value = rows[0]?.serverSequence;
+    if (typeof value !== "string" || !/^(?:0|[1-9]\d{0,18})$/.test(value)) {
+      throw new Error("invalid creator CRDT server sequence");
+    }
+    const sequence = BigInt(value);
+    if (sequence > BigInt("9223372036854775807")) {
+      throw new Error("invalid creator CRDT server sequence");
+    }
+    return sequence;
+  }
 
   async findWork(workId: string, lock = false): Promise<CreatorCollaborationWorkRecord | null> {
     const selectWork = () =>
@@ -1439,7 +1504,8 @@ function sharedWorkProjection(
 
 function sharedDocumentProjection(
   record: CreatorSharedDocumentRecord,
-  actorUserId: string
+  actorUserId: string,
+  crdtServerSequence: bigint
 ): CreatorSharedDocument | null {
   const context = sharedRecordAccess(record, actorUserId);
   const updatedAt = creatorWorkIsoTimestamp(record);
@@ -1457,6 +1523,7 @@ function sharedDocumentProjection(
     status: "active",
     capabilities: { view: true, edit: context.access.edit },
     revision: record.revision,
+    crdtServerSequence: crdtServerSequence.toString(),
     updatedAt,
     document: createCreatorWorkRevisionSnapshot(record),
   };
@@ -1464,7 +1531,8 @@ function sharedDocumentProjection(
 
 function sharedDocumentMetaProjection(
   record: CreatorSharedDocumentMetaRecord,
-  actorUserId: string
+  actorUserId: string,
+  crdtServerSequence: bigint
 ): CreatorSharedDocumentMeta | null {
   const context = sharedRecordAccess(record, actorUserId);
   if (
@@ -1483,6 +1551,7 @@ function sharedDocumentMetaProjection(
     status: "active",
     capabilities: { view: true, edit: context.access.edit },
     revision: record.revision,
+    crdtServerSequence: crdtServerSequence.toString(),
     updatedAt: creatorWorkIsoTimestamp(record),
   };
 }
@@ -1548,7 +1617,8 @@ export class CreatorCollaborationRepository {
         if (!work) throw new CreatorCollaborationNotFoundError("work_not_found");
         throw new CreatorCollaborationForbiddenError("document_access_denied");
       }
-      const document = sharedDocumentProjection(record, actorUserId);
+      const crdtServerSequence = await unit.getStudioCrdtServerSequence(workId);
+      const document = sharedDocumentProjection(record, actorUserId, crdtServerSequence);
       if (!document) throw new Error("invalid creator shared document record");
       return document;
     });
@@ -1565,7 +1635,8 @@ export class CreatorCollaborationRepository {
         if (!work) throw new CreatorCollaborationNotFoundError("work_not_found");
         throw new CreatorCollaborationForbiddenError("document_access_denied");
       }
-      const meta = sharedDocumentMetaProjection(record, actorUserId);
+      const crdtServerSequence = await unit.getStudioCrdtServerSequence(workId);
+      const meta = sharedDocumentMetaProjection(record, actorUserId, crdtServerSequence);
       if (!meta) throw new Error("invalid creator shared document meta record");
       return meta;
     });
@@ -1575,20 +1646,28 @@ export class CreatorCollaborationRepository {
     actorUserId: string,
     workId: string,
     baseRevision: number,
+    crdtServerSequence: bigint,
     patch: CreatorSharedDocumentPatch
   ): Promise<CreatorSharedDocumentSaveResponse> {
     if (
       !Number.isInteger(baseRevision) ||
       baseRevision < 1 ||
       baseRevision > CREATOR_WORK_REVISION_MAX ||
+      typeof crdtServerSequence !== "bigint" ||
+      crdtServerSequence < BigInt(0) ||
+      crdtServerSequence > BigInt("9223372036854775807") ||
       Object.keys(patch).length === 0 ||
       Object.hasOwn(patch, "format")
     ) {
       throw new Error("invalid creator shared document mutation");
     }
     return this.persistence.transaction(async (unit) => {
-      // 모든 멤버 변경도 작품 행을 먼저 잠그므로, 여기서 같은 행을 잠그면 ACL 확인·revision
-      // 비교·저장이 역할 회수와 직렬화된다. owner는 멤버 행 없이 항상 이 경로를 통과한다.
+      // CRDT append/compaction uses this same transaction-scoped per-work lock. It must be the
+      // first lock in this transaction so no CRDT commit can slip between the client's final sync
+      // fence and the REST document commit. The lock remains held through revision snapshot write.
+      await unit.acquireStudioCrdtWorkAdvisoryLock(workId);
+      // 모든 멤버 변경도 작품 행을 먼저 잠그므로, advisory lock 다음에 같은 행을
+      // 잠그면 ACL 확인·revision 비교·저장이 역할 회수와 직렬화된다.
       const context = await this.loadContext(unit, actorUserId, workId, true);
       if (actorUserId !== context.work.ownerUserId) {
         const owner = await unit.findUser(context.work.ownerUserId, true);
@@ -1598,6 +1677,13 @@ export class CreatorCollaborationRepository {
       }
       if (!context.access.edit) {
         throw new CreatorCollaborationForbiddenError("document_edit_denied");
+      }
+      const currentCrdtServerSequence = await unit.getStudioCrdtServerSequence(workId);
+      if (currentCrdtServerSequence !== crdtServerSequence) {
+        throw new CreatorCollaborationCrdtSequenceConflictError(
+          crdtServerSequence,
+          currentCrdtServerSequence
+        );
       }
       // 편집 역할은 원고 콘텐츠를 저장할 수 있지만 작품의 공개 상태와 카탈로그 연결은
       // 소유권 영역이다. DTO는 owner도 같은 endpoint를 쓰므로 필드를 허용하되 여기서 actor와

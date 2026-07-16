@@ -2,6 +2,8 @@ import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef } f
 
 
 import {
+  isStudioWebGpuCanvasActive,
+  routeStudioWebGpuCanvasRequest,
   StudioWebGpuEngine,
   type StudioGpuBackend,
   type StudioGpuFrameReadbackRequest,
@@ -130,6 +132,7 @@ function StudioWebGpuCanvas({
   const requestSequenceRef = useRef(0);
   const desiredRequestIdRef = useRef("frame:0");
   const lastIssuedRequestRef = useRef<LatestCanvasProps | null>(null);
+  const issueLatestRequestRef = useRef<(() => void) | null>(null);
   const latestRef = useRef<LatestCanvasProps>({
     width,
     height,
@@ -173,10 +176,14 @@ function StudioWebGpuCanvas({
     const fallbackCanvas = fallbackCanvasRef.current;
     if (!canvas || !fallbackCanvas) return;
 
-    let active = true;
+    let mounted = true;
+    let initializationRequested = false;
     const engine = new StudioWebGpuEngine({
       canvas,
       fallbackCanvas,
+      // This component is the display-only live-draft path. Avoid one viewport-sized immutable
+      // texture plus a texture copy per pointer frame; direct engine users keep readback by default.
+      retainReadbackSnapshot: false,
       onBackendChange: (backend) => callbacksRef.current.onBackendChange?.(backend),
       onDeviceLost: (info) => callbacksRef.current.onDeviceLost?.(info),
       onFrameInvalid: () => callbacksRef.current.onFrameInvalid?.(),
@@ -186,6 +193,9 @@ function StudioWebGpuCanvas({
       },
     });
     engineRef.current = engine;
+    // Resizing an active engine historically renders its last (initially blank) operation set.
+    // Suspend first so an empty Studio page neither paints a blank frame nor starts WebGPU.
+    engine.suspend(desiredRequestIdRef.current);
     callbacksRef.current.onBackendChange?.(engine.getBackend());
 
     const syncViewport = (observedWidth?: number, observedHeight?: number) => {
@@ -209,16 +219,34 @@ function StudioWebGpuCanvas({
       });
     };
 
-    syncViewport();
-    engine.render(latestRef.current.strokes, desiredRequestIdRef.current);
-    void engine.initialize().then(() => {
-      if (!active) {
-        engine.dispose();
-        return;
-      }
-      syncViewport();
-      engine.render(latestRef.current.strokes, desiredRequestIdRef.current);
-    });
+    const issueLatestRequest = () => {
+      const latest = latestRef.current;
+      const requestId = desiredRequestIdRef.current;
+      routeStudioWebGpuCanvasRequest({
+        engine,
+        strokes: latest.strokes,
+        requestId,
+        syncViewport,
+        requestInitialization: () => {
+          if (initializationRequested) return;
+          initializationRequested = true;
+          void engine.initialize().then(() => {
+            if (!mounted || engineRef.current !== engine) return;
+            const current = latestRef.current;
+            routeStudioWebGpuCanvasRequest({
+              engine,
+              strokes: current.strokes,
+              requestId: desiredRequestIdRef.current,
+              syncViewport,
+              // This initialization attempt already selected WebGPU or the Canvas2D fallback.
+              requestInitialization: () => undefined,
+            });
+          });
+        },
+      });
+    };
+    issueLatestRequestRef.current = issueLatestRequest;
+    issueLatestRequest();
 
     const resizeObserver = typeof ResizeObserver === "undefined"
       ? null
@@ -232,9 +260,12 @@ function StudioWebGpuCanvas({
     globalThis.addEventListener?.("resize", handleWindowResize, { passive: true });
 
     return () => {
-      active = false;
+      mounted = false;
       resizeObserver?.disconnect();
       globalThis.removeEventListener?.("resize", handleWindowResize);
+      if (issueLatestRequestRef.current === issueLatestRequest) {
+        issueLatestRequestRef.current = null;
+      }
       if (engineRef.current === engine) engineRef.current = null;
       engine.dispose();
     };
@@ -253,27 +284,10 @@ function StudioWebGpuCanvas({
     requestSequenceRef.current += 1;
     desiredRequestIdRef.current = requestId;
     callbacksRef.current.onFrameInvalid?.();
-    const engine = engineRef.current;
-    if (!engine) return;
-    const measured = measuredCssSize(
-      rootRef.current,
-      latest.surfaceWidth ?? latest.width,
-      latest.surfaceHeight ?? latest.height
-    );
-    engine.resize({
-      logicalWidth: latest.width,
-      logicalHeight: latest.height,
-      cssWidth: measured.width,
-      cssHeight: measured.height,
-      dpr: devicePixelRatio(),
-      scaleX: latest.scaleX,
-      scaleY: latest.scaleY,
-      offsetX: latest.offsetX,
-      offsetY: latest.offsetY,
-      flipX: latest.flipX,
-    });
-    engine.render(latest.strokes, requestId);
+    issueLatestRequestRef.current?.();
   });
+
+  const presentationActive = isStudioWebGpuCanvasActive(strokes);
 
   return (
     <div
@@ -282,7 +296,7 @@ function StudioWebGpuCanvas({
       className={cn(
         "overflow-hidden",
         surfaceBounds ? "absolute" : "relative h-full w-full",
-        !frameAuthorized && "invisible",
+        (!frameAuthorized || !presentationActive) && "invisible",
         className
       )}
       style={surfaceBounds ? {
@@ -292,6 +306,8 @@ function StudioWebGpuCanvas({
         height: surfaceBounds.height,
       } : undefined}
       data-studio-gpu-compositor="true"
+      data-studio-gpu-active={presentationActive ? "true" : "false"}
+      data-studio-gpu-readback="disabled"
       data-studio-gpu-frame-authorized={frameAuthorized ? "true" : "false"}
       data-studio-gpu-surface-width={surfaceBounds?.width}
       data-studio-gpu-surface-height={surfaceBounds?.height}

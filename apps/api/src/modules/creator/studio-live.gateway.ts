@@ -471,6 +471,7 @@ type StudioLiveFailureCode =
   | "lock_conflict"
   | "lock_limit"
   | "peer_unavailable"
+  | "storage_corruption"
   | "internal_error";
 type StudioLiveFailure = { ok: false; code: StudioLiveFailureCode; message: string };
 export type StudioLiveAck<T> = StudioLiveSuccess<T> | StudioLiveFailure;
@@ -2612,6 +2613,15 @@ export class StudioLiveGateway
       },
       "studio CRDT operation failed"
     );
+    if (corruption) {
+      // Retrying a deterministic failure to decode the authoritative CRDT store cannot heal the
+      // document and can instead keep replaying optimistic browser updates forever. Give clients a
+      // dedicated permanent rejection so both sync and update paths stop at a recovery boundary.
+      return failure(
+        "storage_corruption",
+        "서버 원고 저장소의 무결성을 확인하지 못해 공동 편집을 중지했습니다."
+      );
+    }
     return failure("internal_error", "CRDT 데이터를 안전하게 저장하거나 불러오지 못했습니다.");
   }
 

@@ -10,6 +10,7 @@ const MAX_DESCRIPTION_LENGTH = 2_000;
 const MAX_TAG_LENGTH = 24;
 const MAX_TAGS = 8;
 const MAX_PAGES = 200;
+const POSTGRES_BIGINT_MAX = BigInt("9223372036854775807");
 
 const SHARED_DOCUMENT_MUTABLE_FIELDS = [
   "title",
@@ -24,6 +25,7 @@ const SHARED_DOCUMENT_MUTABLE_FIELDS = [
 
 const SHARED_DOCUMENT_PATCH_FIELDS = new Set<string>([
   "baseRevision",
+  "crdtServerSequence",
   ...SHARED_DOCUMENT_MUTABLE_FIELDS,
 ]);
 
@@ -34,6 +36,7 @@ const SHARED_DOCUMENT_META_FIELDS = [
   "status",
   "capabilities",
   "revision",
+  "crdtServerSequence",
   "updatedAt",
 ] as const;
 const SHARED_DOCUMENT_FULL_FIELDS = [...SHARED_DOCUMENT_META_FIELDS, "document"] as const;
@@ -87,6 +90,7 @@ export interface StudioSharedDocument {
   capabilities: StudioSharedDocumentCapabilities;
   access: StudioSharedDocumentAccess;
   revision: number;
+  crdtServerSequence: string;
   updatedAt: string;
   document: StudioSharedDocumentContent;
 }
@@ -100,6 +104,7 @@ export type StudioSharedDocumentMutableContent = Pick<
 
 export type UpdateStudioSharedDocumentInput = {
   baseRevision: number;
+  crdtServerSequence: string;
 } & Partial<StudioSharedDocumentMutableContent>;
 
 export interface StudioSharedDocumentSaveResponse {
@@ -137,6 +142,16 @@ export class StudioSharedDocumentRevisionConflictError extends Error {
   }
 }
 
+export class StudioSharedDocumentCrdtSequenceConflictError extends Error {
+  readonly currentCrdtServerSequence: string;
+
+  constructor(currentCrdtServerSequence: string) {
+    super("동기화 확인 후 다른 팀 편집이 먼저 저장됐습니다. 최신 원고를 맞춘 뒤 다시 저장해 주세요.");
+    this.name = "StudioSharedDocumentCrdtSequenceConflictError";
+    this.currentCrdtServerSequence = currentCrdtServerSequence;
+  }
+}
+
 export class StudioSharedDocumentAccessError extends Error {
   readonly status: 401 | 403 | 404;
 
@@ -157,6 +172,12 @@ export function isStudioSharedDocumentRevisionConflictError(
   error: unknown
 ): error is StudioSharedDocumentRevisionConflictError {
   return error instanceof StudioSharedDocumentRevisionConflictError;
+}
+
+export function isStudioSharedDocumentCrdtSequenceConflictError(
+  error: unknown
+): error is StudioSharedDocumentCrdtSequenceConflictError {
+  return error instanceof StudioSharedDocumentCrdtSequenceConflictError;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -192,6 +213,16 @@ function revision(value: unknown): number | null {
     value <= MAX_REVISION
     ? value
     : null;
+}
+
+function postgresBigintSequence(value: unknown): string | null {
+  if (
+    typeof value !== "string" ||
+    !/^(?:0|[1-9]\d{0,18})$/.test(value)
+  ) {
+    return null;
+  }
+  return BigInt(value) <= POSTGRES_BIGINT_MAX ? value : null;
 }
 
 function isoDate(value: unknown): string | null {
@@ -350,8 +381,9 @@ function normalizeSharedDocumentBase(
     throw new StudioSharedDocumentResponseContractError("공동 문서 접근 권한 형식이 올바르지 않습니다.");
   }
   const normalizedRevision = revision(value.revision);
+  const crdtServerSequence = postgresBigintSequence(value.crdtServerSequence);
   const updatedAt = isoDate(value.updatedAt);
-  if (!normalizedRevision || !updatedAt) {
+  if (!normalizedRevision || !crdtServerSequence || !updatedAt) {
     throw new StudioSharedDocumentResponseContractError("공동 문서 버전 정보가 올바르지 않습니다.");
   }
 
@@ -365,6 +397,7 @@ function normalizeSharedDocumentBase(
       capabilities: { view: true, edit: access === "edit" },
       access,
       revision: normalizedRevision,
+      crdtServerSequence,
       updatedAt,
     },
   };
@@ -407,11 +440,13 @@ export function normalizeStudioSharedDocumentPatch(
 
   const baseRevision = revision(value.baseRevision);
   if (!baseRevision) inputError("공동 문서 기준 버전이 올바르지 않습니다.");
+  const crdtServerSequence = postgresBigintSequence(value.crdtServerSequence);
+  if (!crdtServerSequence) inputError("공동 문서 CRDT 서버 순번이 올바르지 않습니다.");
   if (!SHARED_DOCUMENT_MUTABLE_FIELDS.some((field) => hasOwn(value, field))) {
     inputError("저장할 공동 문서 변경 사항이 없습니다.");
   }
 
-  const result: UpdateStudioSharedDocumentInput = { baseRevision };
+  const result: UpdateStudioSharedDocumentInput = { baseRevision, crdtServerSequence };
   if (hasOwn(value, "title")) {
     if (typeof value.title !== "string") inputError("공동 문서 제목이 올바르지 않습니다.");
     const title = value.title.trim();
@@ -501,6 +536,20 @@ function revisionConflictFrom(error: unknown): StudioSharedDocumentRevisionConfl
   return currentRevision ? new StudioSharedDocumentRevisionConflictError(currentRevision) : null;
 }
 
+function crdtSequenceConflictFrom(
+  error: unknown
+): StudioSharedDocumentCrdtSequenceConflictError | null {
+  if (!isHttpError(error) || error.response.status !== 409) return null;
+  const payload = error.data;
+  if (!isRecord(payload) || payload.code !== "creator_crdt_sequence_conflict") return null;
+  const currentCrdtServerSequence = postgresBigintSequence(
+    payload.currentCrdtServerSequence
+  );
+  return currentCrdtServerSequence
+    ? new StudioSharedDocumentCrdtSequenceConflictError(currentCrdtServerSequence)
+    : null;
+}
+
 function accessErrorFrom(
   error: unknown,
   message: string
@@ -581,6 +630,8 @@ export async function updateStudioSharedDocument(
   try {
     payload = await api.patch<unknown>(sharedDocumentPath(workId), patch, { signal });
   } catch (error) {
+    const crdtConflict = crdtSequenceConflictFrom(error);
+    if (crdtConflict) throw crdtConflict;
     const conflict = revisionConflictFrom(error);
     if (conflict) throw conflict;
     const accessError = accessErrorFrom(

@@ -49,6 +49,7 @@ import {
 } from "../../../../../lib/server/creator-work-revisions";
 
 import {
+  CreatorCollaborationCrdtSequenceConflictError,
   CreatorCollaborationConflictError,
   CreatorCollaborationForbiddenError,
   CreatorCollaborationInvalidTargetError,
@@ -240,6 +241,7 @@ export class CreatorService {
     const validated = UpdateCreatorSharedDocumentSchema.parse(body);
     const {
       baseRevision,
+      crdtServerSequence,
       title,
       description,
       cover,
@@ -265,6 +267,7 @@ export class CreatorService {
           userId,
           workId,
           baseRevision,
+          BigInt(crdtServerSequence),
           patch
         )
       )
@@ -495,6 +498,14 @@ export class CreatorService {
           code: "creator_work_revision_conflict",
           message: "다른 팀원이 먼저 저장했습니다. 최신 문서를 불러온 뒤 변경 내용을 다시 확인해 주세요.",
           currentRevision: error.currentRevision,
+        });
+      }
+      if (error instanceof CreatorCollaborationCrdtSequenceConflictError) {
+        throw new ConflictException({
+          code: "creator_crdt_sequence_conflict",
+          message:
+            "동기화 확인 후 다른 팀 편집이 먼저 저장됐습니다. 최신 원고를 맞춘 뒤 다시 저장해 주세요.",
+          currentCrdtServerSequence: error.currentServerSequence.toString(),
         });
       }
       if (error instanceof CreatorCollaborationConflictError) {

@@ -1,4 +1,8 @@
 import {
+  classifyStudioCrdtFailure,
+  type StudioCrdtFailureClassification,
+} from "./studio-crdt-operation-error";
+import {
   createStudioCrdtOutbox,
   type StudioCrdtOutbox,
 } from "./studio-crdt-outbox";
@@ -15,6 +19,12 @@ import {
   type StudioCrdtUpdateAck,
   type StudioCrdtUpdateRequest,
 } from "./studio-crdt-protocol";
+import {
+  createStudioCrdtRecoveryVault,
+  type StudioCrdtPermanentRejectionMarker,
+  type StudioCrdtRecoveryVault,
+  type StudioCrdtRecoveryVaultEntry,
+} from "./studio-crdt-recovery-vault";
 
 import type {
   StudioCrdtBatchSubscription,
@@ -26,12 +36,60 @@ import type {
   StudioLiveRoomEvent,
 } from "./studio-live-collaboration-room";
 
-export type StudioCrdtBindingStatus =
+export type StudioCrdtBindingStatusPayload =
   | { state: "idle"; message: string }
   | { state: "syncing"; message: string }
   | { state: "ready"; message: string }
   | { state: "retrying"; message: string }
-  | { state: "error"; message: string; durabilityAtRisk?: boolean };
+  | { state: "repairing"; message: string }
+  | { state: "error"; message: string; durabilityAtRisk?: boolean }
+  | {
+      state: "recovery-required";
+      message: string;
+      code: string;
+      updateId: string;
+      recoveryUpdateCount: number;
+      collaborativeEditsBlocked: true;
+      retryable: false;
+      recoveryVaultId?: string;
+      recoveryExportAvailable: boolean;
+      outboxCleanupAtRisk?: boolean;
+    };
+
+export interface StudioCrdtBindingTelemetry {
+  /** Number of local Yjs update batches awaiting an authoritative acknowledgement or recovery. */
+  pendingCount: number;
+  /** Browser-durable recovery capability, independent from the authoritative server path. */
+  persistenceDurability:
+    | "checking"
+    | "durable"
+    | "degraded"
+    | "unavailable"
+    | "not-applicable";
+  transportReady: boolean;
+  /** Server mutation ACK only; local BroadcastChannel receipts never masquerade as server ACKs. */
+  lastAckAt: number | null;
+  lastAckServerSequence: string | null;
+}
+
+export type StudioCrdtBindingStatus = StudioCrdtBindingStatusPayload &
+  StudioCrdtBindingTelemetry;
+
+export interface StudioCrdtRecoveryRequiredState {
+  code: string;
+  updateId: string;
+  message: string;
+  recoveryUpdateCount: number;
+  outboxCleanupAtRisk: boolean;
+  recoveryVaultId: string | null;
+  recoveryExportAvailable: boolean;
+}
+
+export interface StudioCrdtAuthoritativeAckBarrierResult {
+  /** PostgreSQL bigint decimal sequence observed by a sync started after the final pending drain. */
+  serverSequence: string;
+  acknowledgedAt: number | null;
+}
 
 export interface StudioCrdtRoomBindingOptions {
   document: StudioCrdtDocument;
@@ -41,6 +99,8 @@ export interface StudioCrdtRoomBindingOptions {
   /** Stable authenticated-user scope for browser-durable unsent updates. */
   outboxScope?: string | null;
   outbox?: StudioCrdtOutbox;
+  /** Durable non-retrying store for a server-rejected optimistic frontier. */
+  recoveryVault?: StudioCrdtRecoveryVault;
   randomId?: () => string;
   onStatus?: (status: StudioCrdtBindingStatus) => void;
   /** Bounds a wedged IndexedDB call before the authoritative server fallback is attempted. */
@@ -55,6 +115,8 @@ interface PendingUpdate {
   persistenceState: "pending" | "ready" | "failed";
   /** Resolves false on a surfaced durability failure; it never creates an unhandled rejection. */
   persisted: Promise<boolean>;
+  /** Local BroadcastChannel delivery happened, but no authoritative server ACK exists yet. */
+  localBroadcasted?: boolean;
 }
 
 const EMPTY_UPDATE_BYTE_LENGTH = 2;
@@ -62,6 +124,7 @@ const RETRY_MIN_MS = 300;
 const RETRY_MAX_MS = 5_000;
 const BACKGROUND_SYNC_MS = 10_000;
 const DEFAULT_PERSISTENCE_TIMEOUT_MS = 750;
+const POSTGRES_BIGINT_MAX = BigInt("9223372036854775807");
 
 function defaultRandomId(): string {
   if (typeof crypto === "undefined" || typeof crypto.randomUUID !== "function") {
@@ -98,6 +161,7 @@ export class StudioCrdtRoomBinding {
   private readonly canEdit: boolean;
   private readonly outboxScope: string | null;
   private readonly outbox: StudioCrdtOutbox;
+  private readonly recoveryVault: StudioCrdtRecoveryVault;
   private readonly randomId: () => string;
   private readonly onStatus?: (status: StudioCrdtBindingStatus) => void;
   private readonly persistenceTimeoutMs: number;
@@ -122,6 +186,11 @@ export class StudioCrdtRoomBinding {
    */
   private authoritativeServerSequence: bigint | null = null;
   private durabilityWarning: string | null = null;
+  private persistenceChecked = false;
+  private lastAckAt: number | null = null;
+  private lastAckServerSequence: string | null = null;
+  private recoveryState: StudioCrdtRecoveryRequiredState | null = null;
+  private recoveryTransition = false;
   private started = false;
   private closed = false;
 
@@ -131,6 +200,7 @@ export class StudioCrdtRoomBinding {
     this.canEdit = options.canEdit ?? true;
     this.outboxScope = options.outboxScope?.trim() || null;
     this.outbox = options.outbox ?? createStudioCrdtOutbox();
+    this.recoveryVault = options.recoveryVault ?? createStudioCrdtRecoveryVault();
     this.randomId = options.randomId ?? defaultRandomId;
     this.onStatus = options.onStatus;
     this.persistenceTimeoutMs = Math.max(
@@ -148,6 +218,10 @@ export class StudioCrdtRoomBinding {
     this.started = true;
     if (this.canEdit && this.outboxScope) await this.restoreOutbox();
     if (this.closed) return;
+    if (this.recoveryState) {
+      this.emitRecoveryRequiredStatus();
+      return;
+    }
     this.unsubscribeCrdt = this.room.subscribeCrdt((event) => this.onCrdtEvent(event));
     this.unsubscribeRoom = this.room.subscribe((event) => this.onRoomEvent(event));
     if (this.canEdit) {
@@ -158,10 +232,29 @@ export class StudioCrdtRoomBinding {
     await this.syncNow();
   }
 
+  get recoveryRequired(): boolean {
+    return this.recoveryState !== null;
+  }
+
+  getRecoveryRequiredState(): StudioCrdtRecoveryRequiredState | null {
+    return this.recoveryState ? { ...this.recoveryState } : null;
+  }
+
   syncNow(): Promise<void> {
     if (this.closed) return Promise.reject(new Error("이미 닫힌 CRDT 바인딩입니다."));
+    if (this.recoveryState) {
+      return Promise.reject(new Error(
+        "서버 권위 원고를 다시 불러오기 전에는 CRDT 동기화를 재개할 수 없습니다."
+      ));
+    }
     if (this.syncPromise) return this.syncPromise;
-    const run = this.synchronize().finally(() => {
+    const run = this.synchronize().catch(async (error: unknown) => {
+      const failure = classifyStudioCrdtFailure(error);
+      if (failure.disposition === "permanent" && !this.closed && !this.recoveryState) {
+        await this.enterRecoveryRequired(failure, null);
+      }
+      throw error;
+    }).finally(() => {
       if (this.syncPromise === run) this.syncPromise = null;
     });
     this.syncPromise = run;
@@ -169,8 +262,84 @@ export class StudioCrdtRoomBinding {
   }
 
   flush(): void {
+    if (this.recoveryState) return;
     this.batchSubscription?.flush();
     void this.drainPending();
+  }
+
+  async flushAndWaitForAuthoritativeAck(
+    timeoutMs = 2_000
+  ): Promise<StudioCrdtAuthoritativeAckBarrierResult> {
+    if (this.closed) throw new Error("이미 닫힌 CRDT 바인딩입니다.");
+    if (!this.started) throw new Error("CRDT 바인딩이 아직 시작되지 않았습니다.");
+
+    // Saving must include the final sub-frame stroke, not merely the updates that happened to
+    // leave the 40 ms batch already. enqueueUpdate preserves the same stable IDs across retries.
+    this.batchSubscription?.flush();
+    const deadline = Date.now() + Math.max(100, Math.min(10_000, timeoutMs));
+
+    while (true) {
+      if (this.recoveryState) {
+        throw new Error(this.recoveryState.message);
+      }
+      if (this.room.mode !== "server") {
+        throw new Error("로컬 협업 모드에서는 서버 승인 전 원고를 저장할 수 없습니다.");
+      }
+      if (!this.room.ready) {
+        throw new Error("팀 서버 연결이 끊겨 미승인 변경을 저장할 수 없습니다.");
+      }
+      if (this.pending.size === 0) {
+        // A background/reconnect sync may already be in flight when Save begins. Waiting for
+        // that promise is necessary, but it is not a save fence: its state vector may have been
+        // captured before the final local drain. Join it first, re-check pending work, and only
+        // then initiate (or join) a sync whose request started after that drain.
+        const preExistingSync = this.syncPromise;
+        if (preExistingSync) {
+          await this.completeBeforeDeadline(
+            preExistingSync,
+            deadline,
+            "진행 중인 서버 원고 동기화를 기다리는 시간이 초과됐습니다."
+          );
+          continue;
+        }
+        await this.completeBeforeDeadline(
+          this.syncNow(),
+          deadline,
+          "서버 원고의 최종 순번을 확인하는 시간이 초과됐습니다."
+        );
+        if (this.pending.size > 0) continue;
+        const authoritativeServerSequence = this.authoritativeServerSequence;
+        if (
+          authoritativeServerSequence === null ||
+          authoritativeServerSequence < BigInt(0) ||
+          authoritativeServerSequence > POSTGRES_BIGINT_MAX
+        ) {
+          throw new Error("서버가 저장 경계에 필요한 CRDT 순번을 확인해 주지 않았습니다.");
+        }
+        return {
+          serverSequence: authoritativeServerSequence.toString(),
+          acknowledgedAt: this.lastAckAt,
+        };
+      }
+      if (Date.now() >= deadline) {
+        throw new Error("공동 편집 변경의 서버 승인을 기다리는 시간이 초과됐습니다.");
+      }
+      if (this.retryTimer !== null) {
+        this.cancelTimeout(this.retryTimer);
+        this.retryTimer = null;
+      }
+      const drained = await this.settlesBeforeDeadline(this.drainPending(), deadline);
+      if (!drained) {
+        throw new Error("공동 편집 변경의 서버 승인을 기다리는 시간이 초과됐습니다.");
+      }
+      if (this.pending.size > 0 && !this.recoveryState) {
+        const remaining = deadline - Date.now();
+        if (remaining <= 0) continue;
+        await this.settlesBeforeDeadline(new Promise<void>((resolve) => {
+          this.scheduleTimeout(resolve, Math.min(25, remaining));
+        }), deadline);
+      }
+    }
   }
 
   async closeGracefully(timeoutMs = 750): Promise<void> {
@@ -181,7 +350,12 @@ export class StudioCrdtRoomBinding {
     // A later binding's scoped outbox list is serialized behind this write, so a work switch
     // cannot overtake the pending commit and strand the user's final stroke.
     await this.persistPendingBeforeClose(deadline);
-    while (this.pending.size > 0 && this.room.ready && Date.now() < deadline) {
+    while (
+      this.pending.size > 0 &&
+      this.room.mode === "server" &&
+      this.room.ready &&
+      Date.now() < deadline
+    ) {
       if (this.retryTimer !== null) {
         this.cancelTimeout(this.retryTimer);
         this.retryTimer = null;
@@ -225,6 +399,7 @@ export class StudioCrdtRoomBinding {
   }
 
   private async synchronize(): Promise<void> {
+    if (this.recoveryState) return;
     if (!this.room.ready) throw new Error("CRDT 동기화 채널이 준비되지 않았습니다.");
     this.emitStatus({ state: "syncing", message: "팀 원고의 누락된 획을 맞추는 중입니다." });
     const request: StudioCrdtSyncRequest = {
@@ -235,7 +410,7 @@ export class StudioCrdtRoomBinding {
     };
     this.activeSyncRequestId = request.requestId;
     const response = await this.room.requestCrdtSync(request);
-    if (this.closed) return;
+    if (this.closed || this.recoveryState) return;
     if (response) {
       this.document.applySyncResponse(response);
       this.advanceAuthoritativeSequenceAfterSync(response.serverSequence);
@@ -258,7 +433,7 @@ export class StudioCrdtRoomBinding {
   }
 
   private enqueueUpdate(update: Uint8Array): void {
-    if (this.closed || update.byteLength <= EMPTY_UPDATE_BYTE_LENGTH) return;
+    if (this.closed || this.recoveryState || update.byteLength <= EMPTY_UPDATE_BYTE_LENGTH) return;
     let encoded: string;
     try {
       encoded = encodeStudioCrdtUpdate(update);
@@ -284,6 +459,12 @@ export class StudioCrdtRoomBinding {
       persisted: Promise.resolve(true),
     };
     this.pending.set(updateId, pending);
+    this.emitStatus({
+      state: this.room.ready ? "syncing" : "retrying",
+      message: this.room.ready
+        ? "새 원고 변경을 팀 서버에 보존하는 중입니다."
+        : "서버가 다시 연결될 때까지 새 원고 변경을 복구 저장소에 보관합니다.",
+    });
     if (this.outboxScope) this.beginPendingPersistence(pending);
     void this.drainPending();
   }
@@ -300,11 +481,21 @@ export class StudioCrdtRoomBinding {
     const persisted = this.withPersistenceTimeout(operation).then(
       () => {
         if (pending.persisted === persisted) pending.persistenceState = "ready";
+        this.persistenceChecked = true;
         this.captureOutboxStatus();
+        if (!this.closed && !this.recoveryState) {
+          this.emitStatus({
+            state: this.room.ready ? "syncing" : "retrying",
+            message: this.room.ready
+              ? "로컬 복구 사본을 확인하고 팀 서버 승인을 기다립니다."
+              : "서버 재연결까지 새 변경을 이 기기의 복구 저장소에 보관합니다.",
+          });
+        }
         return true;
       },
       (error: unknown) => {
         if (pending.persisted === persisted) pending.persistenceState = "failed";
+        this.persistenceChecked = true;
         this.durabilityWarning = messageFrom(
           error,
           "오프라인 CRDT 보관함에 획을 저장하지 못했습니다."
@@ -373,6 +564,33 @@ export class StudioCrdtRoomBinding {
     });
   }
 
+  private async completeBeforeDeadline<T>(
+    promise: Promise<T>,
+    deadline: number,
+    timeoutMessage: string
+  ): Promise<T> {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) throw new Error(timeoutMessage);
+    return new Promise<T>((resolve, reject) => {
+      let settled = false;
+      let timeoutHandle: unknown = null;
+      const finish = (callback: () => void) => {
+        if (settled) return;
+        settled = true;
+        if (timeoutHandle !== null) this.cancelTimeout(timeoutHandle);
+        callback();
+      };
+      timeoutHandle = this.scheduleTimeout(
+        () => finish(() => reject(new Error(timeoutMessage))),
+        remaining
+      );
+      void promise.then(
+        (value) => finish(() => resolve(value)),
+        (error: unknown) => finish(() => reject(error))
+      );
+    });
+  }
+
   private async persistPendingBeforeClose(deadline: number): Promise<void> {
     if (!this.outboxScope || this.pending.size === 0) return;
     for (let attempt = 0; attempt < 3 && Date.now() < deadline; attempt += 1) {
@@ -393,7 +611,9 @@ export class StudioCrdtRoomBinding {
   }
 
   private drainPending(): Promise<void> {
-    if (this.closed || this.drainPromise) return this.drainPromise ?? Promise.resolve();
+    if (this.closed || this.recoveryState || this.recoveryTransition || this.drainPromise) {
+      return this.drainPromise ?? Promise.resolve();
+    }
     const run = this.runDrain().finally(() => {
       if (this.drainPromise === run) this.drainPromise = null;
     });
@@ -402,6 +622,7 @@ export class StudioCrdtRoomBinding {
   }
 
   private async runDrain(): Promise<void> {
+    if (this.recoveryState) return;
     if (!this.room.ready) {
       for (const pending of this.pending.values()) {
         if (this.closed) return;
@@ -417,6 +638,7 @@ export class StudioCrdtRoomBinding {
     }
     for (const [updateId, pending] of this.pending) {
       if (this.closed) return;
+      if (this.room.mode === "local" && pending.localBroadcasted) continue;
       const persisted = await this.ensurePendingPersistence(pending);
       if (this.closed) return;
       if (!persisted) {
@@ -429,8 +651,15 @@ export class StudioCrdtRoomBinding {
       }
       try {
         const acknowledgement = await this.room.publishCrdtUpdate(pending.request);
-        this.pending.delete(updateId);
         this.reconcileAuthoritativeAcknowledgement(acknowledgement);
+        if (this.room.mode === "local") {
+          // BroadcastChannel delivery is peer visibility, not durable authority. Keep the request
+          // in both this backlog and the browser outbox so the next server binding can publish the
+          // exact same update id. Mark it delivered only to avoid rebroadcasting on every drain.
+          pending.localBroadcasted = true;
+          continue;
+        }
+        this.pending.delete(updateId);
         if (this.outboxScope) {
           void this.outbox
             .remove(this.outboxScope, pending.request.workId, updateId)
@@ -451,6 +680,11 @@ export class StudioCrdtRoomBinding {
             });
         }
       } catch (error) {
+        const classification = classifyStudioCrdtFailure(error);
+        if (classification.disposition === "permanent") {
+          await this.enterRecoveryRequired(classification, updateId);
+          return;
+        }
         pending.attempts += 1;
         this.emitStatus({
           state: "retrying",
@@ -461,12 +695,20 @@ export class StudioCrdtRoomBinding {
       }
     }
     if (this.started && !this.closed) {
-      this.emitStatus({ state: "ready", message: "팀 원고가 실시간으로 동기화됩니다." });
+      if (this.room.mode === "local" && this.pending.size > 0) {
+        this.emitStatus({
+          state: "retrying",
+          message:
+            "로컬 탭에는 전달됐지만 팀 서버 승인은 아직 없습니다. 서버 재연결까지 이 기기의 복구 저장소에 보관합니다.",
+        });
+      } else {
+        this.emitStatus({ state: "ready", message: "팀 원고가 실시간으로 동기화됩니다." });
+      }
     }
   }
 
   private scheduleRetry(attempt = 1): void {
-    if (this.closed || this.retryTimer !== null) return;
+    if (this.closed || this.recoveryState || this.retryTimer !== null) return;
     const delay = Math.min(RETRY_MAX_MS, RETRY_MIN_MS * 2 ** Math.min(5, attempt - 1));
     this.retryTimer = this.scheduleTimeout(() => {
       this.retryTimer = null;
@@ -475,7 +717,7 @@ export class StudioCrdtRoomBinding {
   }
 
   private scheduleSyncRetry(attempt = 1): void {
-    if (this.closed || this.syncRetryTimer !== null) return;
+    if (this.closed || this.recoveryState || this.syncRetryTimer !== null) return;
     const delay = Math.min(RETRY_MAX_MS, RETRY_MIN_MS * 2 ** Math.min(5, attempt - 1));
     this.syncRetryTimer = this.scheduleTimeout(() => {
       this.syncRetryTimer = null;
@@ -495,7 +737,7 @@ export class StudioCrdtRoomBinding {
   }
 
   private scheduleBackgroundSync(): void {
-    if (this.closed || this.backgroundSyncTimer !== null) return;
+    if (this.closed || this.recoveryState || this.backgroundSyncTimer !== null) return;
     this.backgroundSyncTimer = this.scheduleTimeout(() => {
       this.backgroundSyncTimer = null;
       if (this.closed || !this.room.ready) return;
@@ -510,7 +752,12 @@ export class StudioCrdtRoomBinding {
   }
 
   private onRoomEvent(event: StudioLiveRoomEvent): void {
-    if (event.type !== "transport-status" || event.status.state !== "ready" || this.closed) return;
+    if (
+      event.type !== "transport-status" ||
+      event.status.state !== "ready" ||
+      this.closed ||
+      this.recoveryState
+    ) return;
     void this.syncNow().catch((error) => {
       this.emitStatus({
         state: "retrying",
@@ -521,7 +768,7 @@ export class StudioCrdtRoomBinding {
   }
 
   private onCrdtEvent(event: StudioLiveCrdtRoomEvent): void {
-    if (this.closed) return;
+    if (this.closed || this.recoveryState) return;
     if (event.type === "update") {
       const sequenceState = this.classifyAuthoritativeSequence(event.update.serverSequence);
       if (sequenceState === "stale") return;
@@ -583,6 +830,10 @@ export class StudioCrdtRoomBinding {
   private reconcileAuthoritativeAcknowledgement(
     acknowledgement: StudioCrdtUpdateAck
   ): void {
+    if (this.room.mode === "server") {
+      this.lastAckAt = Date.now();
+      this.lastAckServerSequence = acknowledgement.serverSequence;
+    }
     const sequenceState = this.classifyAuthoritativeSequence(
       acknowledgement.serverSequence
     );
@@ -601,8 +852,8 @@ export class StudioCrdtRoomBinding {
   }
 
   private requestAuthoritativeRepair(message: string): void {
-    if (this.closed || this.room.mode !== "server") return;
-    this.emitStatus({ state: "retrying", message });
+    if (this.closed || this.recoveryState || this.room.mode !== "server") return;
+    this.emitStatus({ state: "repairing", message });
     if (!this.room.ready || this.syncPromise) {
       this.scheduleSyncRetry();
       return;
@@ -648,22 +899,122 @@ export class StudioCrdtRoomBinding {
   private async restoreOutbox(): Promise<void> {
     const scope = this.outboxScope;
     if (!scope) return;
-    let requests: StudioCrdtUpdateRequest[];
+    let recoveryEntries: StudioCrdtRecoveryVaultEntry[];
+    let rejectionMarkers: StudioCrdtPermanentRejectionMarker[];
     try {
-      requests = await this.outbox.list(scope, this.room.workId);
+      recoveryEntries = await this.recoveryVault.list(scope, this.room.workId);
+      rejectionMarkers = await this.recoveryVault.listRejectionMarkers(
+        scope,
+        this.room.workId
+      );
     } catch (error) {
       if (this.closed) return;
+      this.recoveryState = {
+        code: "recovery_vault_unavailable",
+        updateId: "recovery-vault-unavailable",
+        message:
+          "거부된 공동 편집 변경의 복구 저장소를 확인하지 못해 원고를 잠갔습니다. " +
+          messageFrom(error, "복구 저장소를 다시 확인해 주세요."),
+        recoveryUpdateCount: 0,
+        outboxCleanupAtRisk: true,
+        recoveryVaultId: null,
+        recoveryExportAvailable: false,
+      };
+      this.emitRecoveryRequiredStatus();
+      return;
+    }
+    const preservedUpdateIds = new Set(
+      recoveryEntries.flatMap((entry) => entry.updates.map(({ updateId }) => updateId))
+    );
+    const orphanedMarkers = rejectionMarkers.filter(
+      ({ rejectedUpdateId }) => !preservedUpdateIds.has(rejectedUpdateId)
+    );
+    if (orphanedMarkers.length > 0) {
+      const newest = orphanedMarkers.at(-1)!;
+      this.recoveryState = {
+        code: newest.failureCode,
+        updateId: newest.rejectedUpdateId,
+        message:
+          "이 기기에 영구 거절된 공동 편집 표식과 재전송 원본이 남아 있어 원고를 잠갔습니다. " +
+          "복구 frontier 저장이 완료되지 않았으므로 서버 원고를 덮어쓰거나 재전송하지 마세요.",
+        recoveryUpdateCount: orphanedMarkers.reduce(
+          (sum, marker) => sum + marker.recoveryUpdateCount,
+          0
+        ),
+        outboxCleanupAtRisk: true,
+        recoveryVaultId: null,
+        recoveryExportAvailable: false,
+      };
+      this.emitRecoveryRequiredStatus();
+      return;
+    }
+    const pendingRecoveryEntries = recoveryEntries.filter(
+      ({ status }) => status === "pending-export"
+    );
+    if (pendingRecoveryEntries.length > 0) {
+      const newest = pendingRecoveryEntries.at(-1)!;
+      this.recoveryState = {
+        code: newest.failureCode,
+        updateId: newest.rejectedUpdateId,
+        message:
+          "이 기기에 아직 내보내지 않은 공동 편집 복구 frontier가 있습니다. " +
+          "복구 파일을 내보낸 뒤 서버 원고를 명시적으로 다시 열어 주세요.",
+        recoveryUpdateCount: pendingRecoveryEntries.reduce(
+          (sum, entry) => sum + entry.updates.length,
+          0
+        ),
+        outboxCleanupAtRisk: false,
+        recoveryVaultId: newest.vaultId,
+        recoveryExportAvailable: true,
+      };
+      this.emitRecoveryRequiredStatus();
+      return;
+    }
+    // Exported recovery entries remain as an audit/fork source. Their update ids must never return
+    // to the resend queue even if an earlier outbox tombstone write was interrupted.
+    const recoveryUpdateIds = new Set(
+      recoveryEntries.flatMap((entry) => entry.updates.map(({ updateId }) => updateId))
+    );
+    let requests: StudioCrdtUpdateRequest[];
+    try {
+      const storedRequests = await this.outbox.list(scope, this.room.workId);
+      const rejectedRecoveryCopies = storedRequests.filter(({ updateId }) =>
+        recoveryUpdateIds.has(updateId)
+      );
+      requests = storedRequests.filter(({ updateId }) => !recoveryUpdateIds.has(updateId));
+      // The recovery vault is the durable source for these rejected operations. Best-effort
+      // tombstoning keeps an interrupted old outbox cleanup from accumulating resend rows, while
+      // filtering above remains the fail-safe that prevents replay even if cleanup fails again.
+      for (const request of rejectedRecoveryCopies) {
+        this.outbox.removeEmergency?.(scope, request.workId, request.updateId);
+      }
+      await Promise.allSettled(rejectedRecoveryCopies.map((request) =>
+        this.withPersistenceTimeout(
+          this.outbox.remove(scope, request.workId, request.updateId)
+        )
+      ));
+    } catch (error) {
+      if (this.closed) return;
+      this.persistenceChecked = true;
       this.durabilityWarning = messageFrom(
         error,
         "오프라인 CRDT 보관함을 불러오지 못했습니다."
       );
-      this.emitStatus({
-        state: "error",
-        message: messageFrom(error, "오프라인 CRDT 보관함을 불러오지 못했습니다."),
-        durabilityAtRisk: true,
-      });
+      this.recoveryState = {
+        code: "outbox_unreadable",
+        updateId: "outbox-unreadable",
+        message:
+          "미승인 공동 편집 보관함을 신뢰할 수 없어 원고를 잠갔습니다. " +
+          this.durabilityWarning,
+        recoveryUpdateCount: 0,
+        outboxCleanupAtRisk: true,
+        recoveryVaultId: null,
+        recoveryExportAvailable: false,
+      };
+      this.emitRecoveryRequiredStatus();
       return;
     }
+    this.persistenceChecked = true;
     this.captureOutboxStatus();
     if (this.durabilityWarning && !this.closed) {
       this.emitStatus({
@@ -694,16 +1045,213 @@ export class StudioCrdtRoomBinding {
     }
   }
 
-  private emitStatus(status: StudioCrdtBindingStatus): void {
+  private async enterRecoveryRequired(
+    failure: StudioCrdtFailureClassification,
+    rejectedUpdateId: string | null
+  ): Promise<void> {
+    if (this.closed || this.recoveryState) return;
+
+    // A permanent rejection can arrive while a newer local edit is still inside the 40 ms
+    // document batch. Flush that batch while enqueueUpdate is still allowed so the complete
+    // optimistic frontier receives stable update ids and starts durable outbox persistence before
+    // the binding crosses the terminal boundary. recoveryTransition suppresses a new drain when
+    // this terminal failure came from sync rather than an already-running publication.
+    this.recoveryTransition = true;
+    this.batchSubscription?.flush();
+
+    // A rejected operation is already present in this optimistic local Y.Doc. Later queued Yjs
+    // updates may depend on its client clock, so none of the unsent frontier can be published in
+    // isolation. Preserve the entire frontier and require a fresh server-authoritative document
+    // instance instead of pretending a merge-only state-vector sync can subtract the rejected op.
+    const rejectedFrontier = [...this.pending.values()];
+    const effectiveRejectedUpdateId =
+      rejectedUpdateId ??
+      rejectedFrontier[0]?.request.updateId ??
+      `sync-${failure.code}-${this.randomId()}`;
+    const message =
+      `서버가 공동 편집 변경을 영구 거부했습니다. 원고를 서버 기준으로 다시 불러오기 전까지 ` +
+      `공동 편집을 중지합니다. ${failure.message}`;
+    this.recoveryState = {
+      code: failure.code,
+      updateId: effectiveRejectedUpdateId,
+      message,
+      recoveryUpdateCount: Math.max(1, rejectedFrontier.length),
+      outboxCleanupAtRisk: false,
+      recoveryVaultId: null,
+      recoveryExportAvailable: false,
+    };
+    this.recoveryTransition = false;
+
+    if (this.retryTimer !== null) this.cancelTimeout(this.retryTimer);
+    this.retryTimer = null;
+    if (this.syncRetryTimer !== null) this.cancelTimeout(this.syncRetryTimer);
+    this.syncRetryTimer = null;
+    if (this.backgroundSyncTimer !== null) this.cancelTimeout(this.backgroundSyncTimer);
+    this.backgroundSyncTimer = null;
+
+    // The sub-frame batch was synchronously flushed into rejectedFrontier before recoveryState was
+    // set. unsubscribe() now only detaches the local update listener at the terminal boundary.
+    this.batchSubscription?.unsubscribe();
+    this.batchSubscription = null;
+    this.emitRecoveryRequiredStatus();
+
+    const scope = this.outboxScope;
+    if (!scope || rejectedFrontier.length === 0) {
+      this.recoveryState = {
+        ...this.recoveryState,
+        outboxCleanupAtRisk: true,
+        message:
+          `${message} 영구 복구 저장소 범위가 없어 이 탭을 닫기 전에 원고를 별도로 보존해야 합니다.`,
+      };
+      this.emitRecoveryRequiredStatus();
+      return;
+    }
+
+    let rejectionMarkerPreserved = false;
+    let rejectionMarkerError: unknown = null;
+    try {
+      await this.recoveryVault.preserveRejectionMarker({
+        scope,
+        workId: this.room.workId,
+        failureCode: failure.code,
+        failureMessage: failure.message,
+        rejectedUpdateId: effectiveRejectedUpdateId,
+        recoveryUpdateCount: rejectedFrontier.length,
+      });
+      rejectionMarkerPreserved = true;
+    } catch (error) {
+      // The vault implementation still keeps a same-page latch before surfacing this failure.
+      // A successful full-frontier write below is also sufficient to lock future bindings.
+      rejectionMarkerError = error;
+    }
+
+    let recoveryEntry: StudioCrdtRecoveryVaultEntry;
+    try {
+      recoveryEntry = await this.recoveryVault.preserve({
+        scope,
+        workId: this.room.workId,
+        failureCode: failure.code,
+        failureMessage: failure.message,
+        rejectedUpdateId: effectiveRejectedUpdateId,
+        updates: rejectedFrontier.map(({ request }) => request),
+      });
+    } catch (error) {
+      if (this.closed || !this.recoveryState) return;
+      // Do not remove the retry outbox when the independent recovery copy did not commit. The
+      // current binding remains terminal, so these requests cannot be retried in this session.
+      this.recoveryState = {
+        ...this.recoveryState,
+        outboxCleanupAtRisk: true,
+        message:
+          `${message} 거부된 변경을 영구 복구 저장소에 복사하지 못해 재전송 보관함을 그대로 유지합니다. ` +
+          (rejectionMarkerPreserved
+            ? "영구 거절 표식은 보존되어 다음 세션에서도 재전송이 차단됩니다. "
+            : "이 페이지의 재전송은 차단했지만 영구 거절 표식도 저장하지 못했습니다. ") +
+          messageFrom(error, messageFrom(rejectionMarkerError, "복구 저장소를 확인해 주세요.")),
+      };
+      this.emitRecoveryRequiredStatus();
+      return;
+    }
+
+    if (this.closed || !this.recoveryState) return;
+    this.recoveryState = {
+      ...this.recoveryState,
+      recoveryVaultId: recoveryEntry.vaultId,
+      recoveryExportAvailable: true,
+      message:
+        `${message} 거부된 변경 ${recoveryEntry.updates.length}개를 별도 복구 저장소에 보존했습니다. ` +
+        "복구 파일을 내보낸 뒤 서버 원고를 다시 열어 주세요.",
+    };
+    this.pending.clear();
+    this.emitRecoveryRequiredStatus();
+
+    for (const pending of rejectedFrontier) {
+      this.outbox.removeEmergency?.(
+        scope,
+        pending.request.workId,
+        pending.request.updateId
+      );
+    }
+    const cleanupResults = await Promise.allSettled(rejectedFrontier.map(async (pending) => {
+      // Let an already-started put settle before its tombstone/removal. The production serialized
+      // outbox also guards a late put, while this ordering keeps simple adapters correct.
+      await pending.persisted;
+      await this.withPersistenceTimeout(this.outbox.remove(
+        scope,
+        pending.request.workId,
+        pending.request.updateId
+      ));
+    }));
+    const currentRecovery = this.recoveryState;
+    if (
+      this.closed ||
+      !currentRecovery ||
+      !cleanupResults.some((result) => result.status === "rejected")
+    ) return;
+    this.recoveryState = {
+      ...currentRecovery,
+      outboxCleanupAtRisk: true,
+      message:
+        `${message} 별도 복구 저장소에는 안전하게 보존했지만 재전송 보관함 정리를 완료하지 못했습니다. ` +
+        "복구 파일을 내보낸 뒤 서버 원고를 다시 열어 주세요.",
+    };
+    this.emitRecoveryRequiredStatus();
+  }
+
+  private emitRecoveryRequiredStatus(): void {
+    const recovery = this.recoveryState;
+    if (!recovery) return;
+    this.emitStatus({
+      state: "recovery-required",
+      message: recovery.message,
+      code: recovery.code,
+      updateId: recovery.updateId,
+      recoveryUpdateCount: recovery.recoveryUpdateCount,
+      collaborativeEditsBlocked: true,
+      retryable: false,
+      ...(recovery.recoveryVaultId ? { recoveryVaultId: recovery.recoveryVaultId } : {}),
+      recoveryExportAvailable: recovery.recoveryExportAvailable,
+      ...(recovery.outboxCleanupAtRisk ? { outboxCleanupAtRisk: true } : {}),
+    });
+  }
+
+  private emitStatus(status: StudioCrdtBindingStatusPayload): void {
+    const telemetry = this.bindingTelemetry();
     if (status.state === "ready" && this.durabilityWarning) {
       this.onStatus?.({
         state: "error",
         message: `실시간 서버 동기화는 유지되지만 로컬 복구 저장소가 저하되었습니다. ${this.durabilityWarning}`,
         durabilityAtRisk: true,
+        ...telemetry,
       });
       return;
     }
-    this.onStatus?.(status);
+    this.onStatus?.({ ...status, ...telemetry });
+  }
+
+  private bindingTelemetry(): StudioCrdtBindingTelemetry {
+    return {
+      pendingCount: this.pending.size,
+      persistenceDurability: this.persistenceDurability(),
+      transportReady: this.room.ready,
+      lastAckAt: this.lastAckAt,
+      lastAckServerSequence: this.lastAckServerSequence,
+    };
+  }
+
+  private persistenceDurability(): StudioCrdtBindingTelemetry["persistenceDurability"] {
+    if (!this.canEdit) return "not-applicable";
+    if (!this.outboxScope || !this.outbox.getStatus) return "unavailable";
+    if (!this.persistenceChecked) return "checking";
+    if ([...this.pending.values()].some(({ persistenceState }) => persistenceState === "pending")) {
+      return "checking";
+    }
+    if ([...this.pending.values()].some(({ persistenceState }) => persistenceState === "failed")) {
+      return "degraded";
+    }
+    return this.outbox.getStatus().state === "durable" && !this.durabilityWarning
+      ? "durable"
+      : "degraded";
   }
 
   private captureOutboxStatus(): void {

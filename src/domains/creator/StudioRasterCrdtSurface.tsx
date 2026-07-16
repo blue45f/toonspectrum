@@ -1,6 +1,11 @@
 import { useLayoutEffect, useRef, useState } from "react";
 
 import {
+  createStudioRasterHandoffAuthorityKey,
+  type StudioRasterHandoffCandidate,
+} from "./studio-raster-handoff-authority";
+import {
+  studioRasterOperationIntersectsDocumentRect,
   studioRasterTileIntersectsDocumentRect,
   type StudioRasterVisibleDocumentRect,
 } from "./studio-raster-visible-rect";
@@ -8,8 +13,22 @@ import { StudioRasterCrdtCanvas } from "./StudioRasterCrdtCanvas";
 
 import type { StudioCrdtDocument } from "./studio-crdt-document";
 import type { StudioRasterReplayRuntimeResult } from "./studio-crdt-raster-replay-runtime";
-import type { StudioRasterOverlaySourceOperation } from "./studio-crdt-raster-ui-bridge";
+import type {
+  StudioRasterOverlaySourceElement,
+  StudioRasterOverlaySourceOperation,
+} from "./studio-crdt-raster-ui-bridge";
+import type { StudioWebGpuCommittedPlanGates } from "./studio-webgpu-committed-plan";
 import type { StudioWebGpuViewportSurfacePlan } from "./studio-webgpu-viewport";
+
+export interface StudioRasterCrdtHandoffInput {
+  /** Exact scene/gate/viewport identity owned by StudioPage. */
+  readonly baseKey: string;
+  readonly pageId: string;
+  readonly documentWidth: number;
+  readonly documentHeight: number;
+  readonly elements: readonly StudioRasterOverlaySourceElement[];
+  readonly gates?: StudioWebGpuCommittedPlanGates;
+}
 
 export interface StudioRasterCrdtSurfaceProps {
   readonly document: StudioCrdtDocument | null;
@@ -17,10 +36,17 @@ export interface StudioRasterCrdtSurfaceProps {
   readonly surfaceId: string;
   readonly viewport: StudioWebGpuViewportSurfacePlan | null;
   readonly visibleDocumentRect: StudioRasterVisibleDocumentRect | null;
-  readonly sourceOperations: readonly StudioRasterOverlaySourceOperation[];
+  /** Low-level direct source contract retained for isolated non-Studio consumers. */
+  readonly sourceOperations?: readonly StudioRasterOverlaySourceOperation[];
+  /** Product path: recompute the exact eligible front suffix for every CRDT raster revision. */
+  readonly handoff?: StudioRasterCrdtHandoffInput;
+  /** Exact candidate selected in the same React commit that hides the Konva fallbacks. */
+  readonly authorizedAuthorityKey?: string | null;
   readonly hidden?: boolean;
   readonly className?: string;
   readonly onVisibleOperationIdsChange?: (operationIds: readonly string[]) => void;
+  readonly onHandoffCandidateChange?: (candidate: StudioRasterHandoffCandidate | null) => void;
+  readonly onConflict?: (operationIds: readonly string[]) => void;
   readonly onError?: (message: string) => void;
 }
 
@@ -28,10 +54,13 @@ interface ReadyRasterFrame {
   readonly generation: number;
   readonly result: StudioRasterReplayRuntimeResult;
   readonly signal: AbortSignal;
+  readonly candidate: StudioRasterHandoffCandidate;
 }
 
 interface StudioRasterSurfaceCallbacks {
   readonly onVisibleOperationIdsChange?: (operationIds: readonly string[]) => void;
+  readonly onHandoffCandidateChange?: (candidate: StudioRasterHandoffCandidate | null) => void;
+  readonly onConflict?: (operationIds: readonly string[]) => void;
   readonly onError?: (message: string) => void;
 }
 
@@ -53,9 +82,9 @@ function publishStudioRasterVisibleOperationIds(
 }
 
 /**
- * Owns the document subscription, verified asset replay and atomic fallback handoff for one page
- * raster surface. StudioPage receives only a small set of operation IDs after a complete GPU/2D
- * frame; while loading or on any failure, the redundant Konva vectors remain authoritative.
+ * Owns document subscription, verified replay and the two-phase renderer handoff for one page.
+ * The tile presenter prepares a complete hidden frame first. StudioPage then accepts its exact
+ * candidate; only that same commit may hide the redundant Konva vectors and reveal this surface.
  */
 export function StudioRasterCrdtSurface({
   document,
@@ -63,10 +92,14 @@ export function StudioRasterCrdtSurface({
   surfaceId,
   viewport,
   visibleDocumentRect,
-  sourceOperations,
+  sourceOperations = [],
+  handoff,
+  authorizedAuthorityKey = null,
   hidden = false,
   className,
   onVisibleOperationIdsChange,
+  onHandoffCandidateChange,
+  onConflict,
   onError,
 }: StudioRasterCrdtSurfaceProps) {
   const [revision, setRevision] = useState(0);
@@ -74,16 +107,29 @@ export function StudioRasterCrdtSurface({
   const generationRef = useRef(0);
   const visibleOperationIdsRef = useRef<readonly string[]>([]);
   const sourceOperationsRef = useRef(sourceOperations);
+  const handoffRef = useRef(handoff);
   const semanticHashCacheRef = useRef(new Map<string, {
     readonly semanticParameters: string;
     readonly sha256: string;
   }>());
-  const callbacksRef = useRef({ onVisibleOperationIdsChange, onError });
-  callbacksRef.current = { onVisibleOperationIdsChange, onError };
+  const callbacksRef = useRef<StudioRasterSurfaceCallbacks>({
+    onVisibleOperationIdsChange,
+    onHandoffCandidateChange,
+    onConflict,
+    onError,
+  });
+  callbacksRef.current = {
+    onVisibleOperationIdsChange,
+    onHandoffCandidateChange,
+    onConflict,
+    onError,
+  };
   sourceOperationsRef.current = sourceOperations;
+  handoffRef.current = handoff;
   const sourceOperationKey = sourceOperations
     .map(({ operationId, semanticParameters }) => `${operationId}:${semanticParameters}`)
     .join("\u001e");
+  const handoffBaseKey = handoff?.baseKey ?? null;
   const hasViewport = viewport !== null;
   const visibleRectX = visibleDocumentRect?.x ?? null;
   const visibleRectY = visibleDocumentRect?.y ?? null;
@@ -112,6 +158,7 @@ export function StudioRasterCrdtSurface({
     generationRef.current = generation;
     const controller = new AbortController();
     publishStudioRasterVisibleOperationIds(visibleOperationIdsRef, callbacksRef, []);
+    callbacksRef.current.onHandoffCandidateChange?.(null);
     setFrame(null);
     if (
       hidden || !document || !workId || !hasViewport ||
@@ -122,8 +169,13 @@ export function StudioRasterCrdtSurface({
     }
     const log = document.getRasterOperationLog(surfaceId);
     if (!log) return () => controller.abort();
-    const sourceSnapshot = sourceOperationsRef.current.map((source) => ({ ...source }));
-    const sourceById = new Map(sourceSnapshot.map((source) => [source.operationId, source]));
+    const directSourceSnapshot = sourceOperationsRef.current.map((source) => ({ ...source }));
+    const handoffSnapshot = handoffRef.current
+      ? {
+          ...handoffRef.current,
+          elements: handoffRef.current.elements.map((element) => ({ ...element })),
+        }
+      : null;
 
     let active = true;
     void Promise.all([
@@ -131,22 +183,69 @@ export function StudioRasterCrdtSurface({
       import("./studio-raster-asset-client"),
       import("./studio-crdt-raster-ui-bridge"),
     ]).then(async ([runtime, assetClient, bridge]) => {
+      const planned = handoffSnapshot
+        ? bridge.planStudioRasterOverlayHandoff({
+            log,
+            elements: handoffSnapshot.elements,
+            pageId: handoffSnapshot.pageId,
+            documentWidth: handoffSnapshot.documentWidth,
+            documentHeight: handoffSnapshot.documentHeight,
+            gates: handoffSnapshot.gates,
+          })
+        : null;
+      if (handoffSnapshot && planned?.status !== "ready") return;
+      const sourceSnapshot = planned?.status === "ready"
+        ? planned.sourceOperations
+        : directSourceSnapshot;
+      if (sourceSnapshot.length === 0) return;
+      const sourceById = new Map(sourceSnapshot.map((source) => [source.operationId, source]));
+      const operationById = new Map(
+        log.operations.map((operation) => [operation.operationId, operation])
+      );
+      const visibleRect = {
+        x: visibleRectX,
+        y: visibleRectY,
+        width: visibleRectWidth,
+        height: visibleRectHeight,
+      };
+      const visibleSourceSnapshot = sourceSnapshot.filter((source) => {
+        const operation = operationById.get(source.operationId);
+        return operation !== undefined && studioRasterOperationIntersectsDocumentRect(
+          operation,
+          log.surface,
+          visibleRect
+        );
+      });
       const result = await runtime.replayStudioRasterCrdtPixels({
         workId,
         log,
         signal: controller.signal,
         visibleTileFilter: (tile) =>
-          studioRasterTileIntersectsDocumentRect(tile, {
-            x: visibleRectX,
-            y: visibleRectY,
-            width: visibleRectWidth,
-            height: visibleRectHeight,
-          }, log.surface.tileSize),
+          studioRasterTileIntersectsDocumentRect(tile, visibleRect, log.surface.tileSize),
       }, {
         download: async (reference, signal) => (
           await assetClient.downloadStudioRasterAsset(workId, reference, signal)
         ).bytes,
       });
+      if (result.conflictedOperationIds.length > 0) {
+        if (!active || controller.signal.aborted || generationRef.current !== generation) return;
+        callbacksRef.current.onConflict?.(result.conflictedOperationIds);
+        callbacksRef.current.onError?.(
+          `동시 픽셀 편집 ${result.conflictedOperationIds.length}건이 다른 기준 픽셀과 충돌해 벡터 원본으로 복구했습니다.`
+        );
+        return;
+      }
+      if (
+        result.appliedOperationIds.length !== visibleSourceSnapshot.length ||
+        result.appliedOperationIds.some(
+          (operationId, index) => operationId !== visibleSourceSnapshot[index]?.operationId
+        )
+      ) {
+        throw new Error("픽셀 재생 결과가 현재 벡터 원본 순서와 일치하지 않습니다.");
+      }
+      // A viewport with no promoted ink needs no renderer handoff. Keeping every vector mounted is
+      // both cheaper and safer than authorizing a complete but fully transparent tile frame.
+      if (visibleSourceSnapshot.length === 0) return;
       for (const operationId of result.appliedOperationIds) {
         const source = sourceById.get(operationId);
         const operation = log.operations.find((candidate) => candidate.operationId === operationId);
@@ -169,13 +268,25 @@ export function StudioRasterCrdtSurface({
         }
       }
       if (!active || controller.signal.aborted || generationRef.current !== generation) return;
-      setFrame({ generation, result, signal: controller.signal });
+      const baseKey = handoffSnapshot?.baseKey ?? [surfaceId, sourceOperationKey].join("\u001d");
+      const candidate: StudioRasterHandoffCandidate = {
+        baseKey,
+        generation,
+        operationIds: Object.freeze([...result.appliedOperationIds]),
+        authorityKey: createStudioRasterHandoffAuthorityKey({
+          baseKey,
+          generation,
+          sourceOperations: visibleSourceSnapshot,
+        }),
+      };
+      setFrame({ generation, result, signal: controller.signal, candidate });
     }).catch((cause: unknown) => {
       if (
         !active || controller.signal.aborted ||
         (cause instanceof DOMException && cause.name === "AbortError")
       ) return;
       publishStudioRasterVisibleOperationIds(visibleOperationIdsRef, callbacksRef, []);
+      callbacksRef.current.onHandoffCandidateChange?.(null);
       callbacksRef.current.onError?.(
         cause instanceof Error
           ? cause.message
@@ -189,6 +300,7 @@ export function StudioRasterCrdtSurface({
     };
   }, [
     document,
+    handoffBaseKey,
     hasViewport,
     hidden,
     revision,
@@ -201,9 +313,21 @@ export function StudioRasterCrdtSurface({
     workId,
   ]);
 
+  const presentationAuthorized = frame !== null &&
+    authorizedAuthorityKey === frame.candidate.authorityKey;
+
+  useLayoutEffect(() => {
+    publishStudioRasterVisibleOperationIds(
+      visibleOperationIdsRef,
+      callbacksRef,
+      presentationAuthorized && frame ? frame.candidate.operationIds : []
+    );
+  }, [frame, presentationAuthorized]);
+
   useLayoutEffect(() => () => {
     visibleOperationIdsRef.current = [];
     callbacksRef.current.onVisibleOperationIdsChange?.([]);
+    callbacksRef.current.onHandoffCandidateChange?.(null);
   }, []);
 
   if (!frame || !viewport || hidden) return null;
@@ -218,16 +342,14 @@ export function StudioRasterCrdtSurface({
         surfaceBounds: viewport.surface,
       }}
       signal={frame.signal}
+      presentationAuthorized={presentationAuthorized}
       onFrameReady={(generation) => {
         if (generation !== frame.generation || generationRef.current !== generation) return;
-        publishStudioRasterVisibleOperationIds(
-          visibleOperationIdsRef,
-          callbacksRef,
-          frame.result.appliedOperationIds
-        );
+        callbacksRef.current.onHandoffCandidateChange?.(frame.candidate);
       }}
       onFrameInvalid={() => {
         publishStudioRasterVisibleOperationIds(visibleOperationIdsRef, callbacksRef, []);
+        callbacksRef.current.onHandoffCandidateChange?.(null);
       }}
       onPresentationResult={(result) => {
         if (result.status === "ready" || result.status === "stale") return;

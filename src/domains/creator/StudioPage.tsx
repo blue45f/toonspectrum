@@ -104,7 +104,7 @@ import {
   Triangle,
 } from "lucide-react";
 import { Fragment, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ComponentType, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import { Stage, Layer, Rect, Text as KText, TextPath as KTextPath, Image as KImage, Line, Group, Star, Ellipse, Circle as KCircle, Path, Transformer, Shape, Arrow, RegularPolygon } from "react-konva/lib/ReactKonvaCore";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -812,7 +812,14 @@ import {
   STUDIO_RASTER_ASSETS,
   type StudioRasterAsset,
 } from "./studio-raster-assets";
+import {
+  createStudioRasterHandoffBaseKey,
+  readStudioAuthoritativeStageFrame,
+  studioRasterAuthorizedOperationIds,
+  type StudioRasterHandoffCandidate,
+} from "./studio-raster-handoff-authority";
 import { STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED } from "./studio-raster-publication-feature";
+import { studioRasterVisibleDocumentRectFromViewport } from "./studio-raster-visible-rect";
 import {
   createEmptyStudioReleaseScheduleSnapshot,
   loadStudioReleaseScheduleRuntime,
@@ -1006,7 +1013,6 @@ import {
   type CvdMode,
 } from "./StudioColorBlindPreview";
 import { StudioColorPalettePanel } from "./StudioColorPalettePanel";
-import { StudioContinuityMetadataEditor } from "./StudioContinuityMetadataEditor";
 import { StudioFloodFillPanel } from "./StudioFloodFillPanel";
 import { StudioHealCloneOverlay } from "./StudioHealCloneOverlay";
 import { StudioHistoryBrushOverlay } from "./StudioHistoryBrushOverlay";
@@ -1021,6 +1027,7 @@ import { StudioLineCleanupPanel } from "./StudioLineCleanupPanel";
 import { StudioLineCorrectionControls } from "./StudioLineCorrectionControls";
 import {
   StudioLiveCollaborationProvider,
+  type StudioCrdtAuthoritativeSaveBarrier,
   type StudioCrdtSceneGraphRuntime,
 } from "./StudioLiveCollaborationProvider";
 import { StudioMagicResizePanel } from "./StudioMagicResizePanel";
@@ -1030,7 +1037,6 @@ import { StudioPageThumbnail, useStudioPageDnd } from "./StudioPageThumbnails";
 import { StudioPaletteLibraryPanel } from "./StudioPaletteLibraryPanel";
 import { StudioPanelSplitOverlay, StudioPanelSplitPanel } from "./StudioPanelSplitTool";
 import { StudioPerspectiveOverlay } from "./StudioPerspectiveOverlay";
-import { StudioPublishContextBanner, type PublishContext } from "./StudioPublishContextBanner";
 import { StudioPuppetWarpOverlay } from "./StudioPuppetWarpOverlay";
 import { StudioSavedBrushShelf } from "./StudioSavedBrushShelf";
 import { StudioSkewPanel } from "./StudioSkewPanel";
@@ -1063,6 +1069,7 @@ import type {
   StudioPageSelectedFrame,
 } from "./studio-comipo-shipped";
 import type { StudioCrdtDocument } from "./studio-crdt-document";
+import type { StudioRasterOverlaySourceElement } from "./studio-crdt-raster-ui-bridge";
 import type { CurvePoint } from "./studio-curves";
 import type { Detail } from "./studio-detail";
 import type { Distort } from "./studio-distort";
@@ -1114,6 +1121,7 @@ import type { StudioColorPopoverProps } from "./StudioColorPopover";
 import type { StudioExportMenuPanelProps } from "./StudioExportMenuPanel";
 import type { StudioIntegrationsSettingsPanelProps } from "./StudioIntegrationsSettingsPanel";
 import type { StudioMainMenuGroup } from "./StudioMainMenu";
+import type { PublishContext } from "./StudioPublishContextBanner";
 import type { StudioStockImagePanelProps } from "./StudioStockImagePanel";
 import type {
   GeneratedAssetQuality,
@@ -1151,6 +1159,18 @@ const StudioImageAdjustmentsPanel = lazyRetry(
 const StudioWebGpuCanvas = lazyRetry(
   () => import("./StudioWebGpuCanvas").then((mod) => ({ default: mod.StudioWebGpuCanvas })),
   "StudioWebGpuCanvas"
+);
+const StudioRasterCrdtSurface = lazyRetry(
+  () => import("./StudioRasterCrdtSurface").then((mod) => ({ default: mod.StudioRasterCrdtSurface })),
+  "StudioRasterCrdtSurface"
+);
+const StudioPublishContextBanner = lazyRetry(
+  () => import("./StudioPublishContextBanner").then((mod) => ({ default: mod.StudioPublishContextBanner })),
+  "StudioPublishContextBanner"
+);
+const StudioContinuityMetadataEditor = lazyRetry(
+  () => import("./StudioContinuityMetadataEditor").then((mod) => ({ default: mod.StudioContinuityMetadataEditor })),
+  "StudioContinuityMetadataEditor"
 );
 const StudioUploadPublish = lazyRetry(
   () => import("./StudioUploadPublish").then((mod) => ({ default: mod.StudioUploadPublish })),
@@ -4899,6 +4919,8 @@ function StudioCuttoonEditor() {
   // Command-only seam: high-frequency pointer publication does not subscribe this giant editor
   // to live cursor state. The always-mounted provider owns and rotates the actual room.
   const studioLiveRoomRef = useRef<StudioLiveRoom | null>(null);
+  const studioCrdtAuthoritativeSaveBarrierRef =
+    useRef<StudioCrdtAuthoritativeSaveBarrier | null>(null);
   const studioCrdtDocumentRef = useRef<StudioCrdtDocument | null>(null);
   const studioCrdtSceneRuntimeRef = useRef<StudioCrdtSceneGraphRuntime | null>(null);
   const publishStudioCrdtSceneTransitionRef = useRef<(
@@ -5107,6 +5129,11 @@ function StudioCuttoonEditor() {
   const handleStudioLiveRoomChange = useCallback((room: StudioLiveRoom | null) => {
     studioLiveRoomRef.current = room;
   }, []);
+  const handleStudioCrdtAuthoritativeSaveBarrierChange = useCallback((
+    barrier: StudioCrdtAuthoritativeSaveBarrier | null
+  ) => {
+    studioCrdtAuthoritativeSaveBarrierRef.current = barrier;
+  }, []);
   const handleStudioCrdtDocumentChange = useCallback((
     document: StudioCrdtDocument | null,
     runtime: StudioCrdtSceneGraphRuntime | null
@@ -5119,6 +5146,10 @@ function StudioCuttoonEditor() {
     // 새 pair가 도착해도 initial frontier를 React history에 합치기 전에는 편집을 열지 않는다.
     setStudioCrdtReconciledDocument(null);
     setStudioCrdtDocument(readyDocument);
+  }, []);
+  const [studioLiveEditsDurablyProtected, setStudioLiveEditsDurablyProtected] = useState(false);
+  const handleStudioLiveEditSafetyChange = useCallback((editsDurablyProtected: boolean) => {
+    setStudioLiveEditsDurablyProtected(editsDurablyProtected);
   }, []);
   const workAuthScopeKey = workId ? studioAuthUserId : null;
   const autosaveKey = studioAutosaveKey({ userId: studioAuthUserId, workId, remixId });
@@ -5170,7 +5201,7 @@ function StudioCuttoonEditor() {
   const collaborationDocumentUnavailable = expectsSharedDocument && !sharedDocument;
   const collaborationReadOnly = Boolean(sharedDocument && sharedDocument.access !== "edit");
   const sourceHydrationPending = isStudioSourceHydrationPending(workId, remixId, workHydrated);
-  const studioCrdtOperationSyncReady = Boolean(
+  const studioCrdtDocumentReady = Boolean(
     studioCrdtDocument &&
     studioCrdtDocumentRef.current === studioCrdtDocument &&
     studioCrdtSceneRuntimeRef.current &&
@@ -5178,6 +5209,11 @@ function StudioCuttoonEditor() {
   );
   const collaborationOperationSyncRequired = Boolean(
     studioLiveParticipant && !collaborationReadOnly
+  );
+  // A reconciled Y.Doc alone is insufficient: collaborative editing is exposed only while the
+  // authoritative server or the browser-durable outbox can retain the next operation.
+  const studioCrdtOperationSyncReady = studioCrdtDocumentReady && (
+    !collaborationOperationSyncRequired || studioLiveEditsDurablyProtected
   );
   const collaborationOperationSyncPending =
     collaborationOperationSyncRequired && !studioCrdtOperationSyncReady;
@@ -6433,6 +6469,7 @@ function StudioCuttoonEditor() {
   const [scrollPos, setScrollPos] = useState({ left: 0, top: 0, width: 0, height: 0, scrollWidth: 0, scrollHeight: 0 });
   const scrollRafRef = useRef<number | null>(null);
   const updateScrollPosRef = useRef<() => void>(() => {});
+  const revokeStudioRasterHandoffRef = useRef<() => void>(() => {});
 
   // 임시저장 복구 여부 상태
   const [hasAutosave, setHasAutosave] = useState(false);
@@ -7643,8 +7680,16 @@ function StudioCuttoonEditor() {
   useEffect(() => {
     const wrap = wrapRef.current;
     if (!wrap) return;
-    const onScroll = () => updateScrollPosRef.current();
-    const onResize = () => updateScrollPosRef.current();
+    // Native scrolling moves the DOM before the React rAF viewport plan catches up. Revoke the
+    // raster authority synchronously so a stale viewport can never leave a blank newly exposed edge.
+    const onScroll = () => {
+      revokeStudioRasterHandoffRef.current();
+      updateScrollPosRef.current();
+    };
+    const onResize = () => {
+      revokeStudioRasterHandoffRef.current();
+      updateScrollPosRef.current();
+    };
     wrap.addEventListener("scroll", onScroll, { passive: true });
     globalThis.addEventListener("resize", onResize);
     const resizeObserver = typeof ResizeObserver === "undefined"
@@ -8083,6 +8128,15 @@ function StudioCuttoonEditor() {
   const brushCursorRef = useRef<Konva.Circle>(null);
   const [draft, setDraft] = useState<DrawEl | null>(null);
   const [webGpuAuthority, setWebGpuAuthority] = useState<StudioWebGpuAuthorityFrame | null>(null);
+  const [studioRasterHandoffCandidate, setStudioRasterHandoffCandidate] =
+    useState<StudioRasterHandoffCandidate | null>(null);
+  const studioRasterHandoffCandidateRef = useRef<StudioRasterHandoffCandidate | null>(null);
+  studioRasterHandoffCandidateRef.current = studioRasterHandoffCandidate;
+
+  revokeStudioRasterHandoffRef.current = () => {
+    if (!studioRasterHandoffCandidateRef.current) return;
+    flushSync(() => setStudioRasterHandoffCandidate(null));
+  };
   const draftRafRef = useRef<number | null>(null);
   const pendingDraftRef = useRef<DrawEl | null>(null);
   const marqueeRafRef = useRef<number | null>(null);
@@ -10860,7 +10914,17 @@ function StudioCuttoonEditor() {
     setSelectedId(null); // Transformer 핸들 캡처 방지(handleSave와 동일 관행)
     await new Promise((r) => setTimeout(r, 60)); // 재렌더 대기(handleSave와 동일 관행)
     if (!canApplyStudioMutation(mutationTicket)) return;
-    const src = stage.toDataURL({ x: el.x, y: el.y, width: el.width, height: el.height, pixelRatio: 2 / effScale });
+    const src = readStudioAuthoritativeStageFrame({
+      revokeRasterHandoff: () => revokeStudioRasterHandoffRef.current(),
+      drawStage: () => stage.draw(),
+      read: () => stage.toDataURL({
+        x: el.x,
+        y: el.y,
+        width: el.width,
+        height: el.height,
+        pixelRatio: 2 / effScale,
+      }),
+    });
     const newFrameId = uid();
     // 마지막 캡처 이후 새로 추가된 "draw" 타입 요소 중 캡처 bbox와 겹치는 것만 스트로크로 간주해
     // 소거한다(텍스트/말풍선/스티커 등 다른 새 요소는 건드리지 않는다 — flatten은 펜 스크래치만 소비).
@@ -10903,7 +10967,17 @@ function StudioCuttoonEditor() {
     await new Promise((r) => setTimeout(r, 60)); // 재렌더 대기(동일 관행)
     if (!canApplyStudioMutation(mutationTicket)) return;
     const b = elBounds(el);
-    const src = stage.toDataURL({ x: b.x, y: b.y, width: b.w, height: b.h, pixelRatio: 2 / effScale });
+    const src = readStudioAuthoritativeStageFrame({
+      revokeRasterHandoff: () => revokeStudioRasterHandoffRef.current(),
+      drawStage: () => stage.draw(),
+      read: () => stage.toDataURL({
+        x: b.x,
+        y: b.y,
+        width: b.w,
+        height: b.h,
+        pixelRatio: 2 / effScale,
+      }),
+    });
     updateActivePage({ animTimeline: setKeyframe(animTimeline, trackId, frameIndex, { id: uid(), src }) });
   }
   function addEl(el: El) {
@@ -13835,7 +13909,17 @@ function StudioCuttoonEditor() {
     const bounds = elBounds(el);
     setSelectedId(null);
     await new Promise((r) => setTimeout(r, 60));
-    const src = stage.toDataURL({ x: bounds.x, y: bounds.y, width: bounds.w, height: bounds.h, pixelRatio: 2 / effScale });
+    const src = readStudioAuthoritativeStageFrame({
+      revokeRasterHandoff: () => revokeStudioRasterHandoffRef.current(),
+      drawStage: () => stage.draw(),
+      read: () => stage.toDataURL({
+        x: bounds.x,
+        y: bounds.y,
+        width: bounds.w,
+        height: bounds.h,
+        pixelRatio: 2 / effScale,
+      }),
+    });
     const name = globalThis.prompt("틀 이름을 정해주세요", "내 이메레스 틀")?.trim();
     setContextMenu((prev) => ({ ...prev, visible: false }));
     if (!name) return;
@@ -15251,6 +15335,9 @@ function StudioCuttoonEditor() {
   function pickCanvasColorAt(pos: { x: number; y: number }): string | null {
     const stage = stageRef.current;
     if (!stage) return null;
+    revokeStudioRasterHandoffRef.current();
+    // react-konva may otherwise leave the restored fallback in its next batch; eyedropper reads now.
+    stage.draw();
     const canvas = stage.toCanvas({ pixelRatio: 1 / effScale });
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
@@ -17487,7 +17574,26 @@ function StudioCuttoonEditor() {
     const originalMasterEditMode = masterEditMode;
     setMasterEditMode(false);
     setIsExporting(true);
+    let authoritativeCrdtServerSequence: string | null = null;
     try {
+      if (collaborationOperationSyncRequired) {
+        const authoritativeSaveBarrier = studioCrdtAuthoritativeSaveBarrierRef.current;
+        if (!authoritativeSaveBarrier) {
+          throw new Error(
+            "팀 원고의 서버 승인 경계가 준비되지 않아 저장을 시작하지 않았습니다. 연결을 확인해 주세요."
+          );
+        }
+        setSharedDocumentNotice("대기 중인 공동 편집 변경을 서버에 승인받은 뒤 저장합니다.");
+        const barrierResult = await authoritativeSaveBarrier(10_000);
+        authoritativeCrdtServerSequence = barrierResult.serverSequence;
+        if (!saveScopeStillCurrent()) return;
+        if (!canApplyStudioMutation(saveMutationTicket, { allowDuringSave: true })) {
+          throw new Error(
+            "서버 승인 중 원고가 변경되어 저장을 중단했습니다. 최신 원고를 확인한 뒤 다시 저장해 주세요."
+          );
+        }
+        setSharedDocumentNotice(null);
+      }
       const pageImages: string[] = [];
 
       for (const page of pages) {
@@ -17562,8 +17668,14 @@ function StudioCuttoonEditor() {
           !saveScopeStillCurrent() ||
           !canApplyStudioMutation(saveMutationTicket, { allowDuringSave: true })
         ) return;
+        if (authoritativeCrdtServerSequence === null) {
+          throw new Error(
+            "팀 원고의 CRDT 서버 순번을 확인하지 못해 저장을 시작하지 않았습니다."
+          );
+        }
         const sharedPatch = {
           baseRevision: sharedDocument.revision,
+          crdtServerSequence: authoritativeCrdtServerSequence,
           title: payload.title,
           description: payload.description,
           tags: payload.tags,
@@ -18755,12 +18867,34 @@ function StudioCuttoonEditor() {
     if (!ensureSharedDocumentAvailableForExport()) {
       throw new Error("공동 문서를 불러온 뒤 PSD로 내보낼 수 있어요.");
     }
-    const { exportPagePsd } = await loadStudioPsdExportModule();
-    const visible = elements.filter((el) => !isEffectivelyHidden(el, groups));
-    return exportPagePsd(stageRef.current as unknown as Konva.Stage, visible as unknown as PsdExportEl[], CANVAS_W, canvasH, effScale, {
-      scale: exportScale,
-      background: { color: bg, gradient: bgGrad },
-    });
+    const originalMasterEditMode = masterEditMode;
+    setSelectedId(null);
+    setMasterEditMode(false);
+    setIsExporting(true);
+    try {
+      const [stage, { exportPagePsd }] = await Promise.all([
+        captureReadyStageForPage(activePage),
+        loadStudioPsdExportModule(),
+      ]);
+      const pageGroups = activePage.groups ?? EMPTY_LAYER_GROUPS;
+      const visible = activePage.elements.filter(
+        (element) => !isEffectivelyHidden(element, pageGroups)
+      );
+      return exportPagePsd(
+        stage,
+        visible as unknown as PsdExportEl[],
+        CANVAS_W,
+        canvasH,
+        effScale,
+        {
+          scale: exportScale,
+          background: { color: bg, gradient: bgGrad },
+        }
+      );
+    } finally {
+      setMasterEditMode(originalMasterEditMode);
+      setIsExporting(false);
+    }
   }
 
   // 목적지별 Publish Pack 사전검사 결과를 사람이 검토·보관할 수 있는 JSON 보고서로 내보낸다.
@@ -19634,6 +19768,56 @@ function StudioCuttoonEditor() {
   const webGpuDraftAuthorized = webGpuPreviewAuthorized
     && webGpuAuthority.draftElementId !== null
     && webGpuAuthority.draftElementId === webGpuDraftStroke?.id;
+  const studioRasterOverlayElements: readonly StudioRasterOverlaySourceElement[] =
+    elements.map((element) => ({
+      ...element,
+      hidden: isEffectivelyHidden(element, groups),
+      panelClip: !masterEditMode && containingPanel(element, elements)
+        ? "clipped" as const
+        : "none" as const,
+    }));
+  // The first product slice is deliberately idle/select-only. Konva interaction planes such as
+  // brush cursors, rulers and node handles currently live inside the Stage; an HTML raster surface
+  // above the Stage must not cover them until those planes move to a shared top overlay contract.
+  const studioRasterHandoffGates = {
+    exportActive: isExporting || saving || timelapseCapturing,
+    masterEditActive: masterEditMode,
+    editActive: selectedId !== null || marqueeIds.length > 0 || editing !== null,
+    specialDraftActive:
+      tool !== "select" || draft !== null || eyedropperActive || timelinePlaying ||
+      marqueeRect !== null || userGuides.length > 0 ||
+      advancedFillArmed || pixelToolArmed || cropArmed || panelSplitArmed ||
+      nodeEditArmed || bubbleShapeArmed || smudgeArmed || healCloneArmed ||
+      layerMaskPaintArmed || historyBrushArmed || puppetWarpArmed,
+    postProcessingActive: pageGradeActive || colorBlindPreview !== "none",
+  } as const;
+  const studioRasterVisibleDocumentRect = studioRasterVisibleDocumentRectFromViewport({
+    viewport: webGpuViewportSurface,
+    documentWidth: CANVAS_W,
+    documentHeight: canvasH,
+    documentScale: effScale,
+  });
+  const studioRasterHandoffBaseKey = createStudioRasterHandoffBaseKey({
+    pageId: activePage.id,
+    documentWidth: CANVAS_W,
+    documentHeight: canvasH,
+    elements: studioRasterOverlayElements,
+    gates: studioRasterHandoffGates,
+    viewport: webGpuViewportSurface,
+  });
+  const studioRasterHandoffBlocked =
+    !STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED ||
+    !authorizedWorkAssetScopeId || !studioCrdtDocument ||
+    sourceHydrationPending || collaborationDocumentUnavailable ||
+    webGpuViewportSurface === null || studioRasterVisibleDocumentRect === null;
+  const studioRasterHiddenOperationIds = studioRasterAuthorizedOperationIds({
+    candidate: studioRasterHandoffCandidate,
+    currentBaseKey: studioRasterHandoffBaseKey,
+    blocked: studioRasterHandoffBlocked,
+  });
+  const studioRasterAuthorizedAuthorityKey = studioRasterHiddenOperationIds.size > 0
+    ? studioRasterHandoffCandidate?.authorityKey ?? null
+    : null;
 
   return (
     <StudioLiveCollaborationProvider
@@ -19646,6 +19830,8 @@ function StudioCuttoonEditor() {
       serverRequired={Boolean(studioLiveParticipant)}
       onRoomChange={handleStudioLiveRoomChange}
       onCrdtDocumentChange={handleStudioCrdtDocumentChange}
+      onEditSafetyChange={handleStudioLiveEditSafetyChange}
+      onAuthoritativeSaveBarrierChange={handleStudioCrdtAuthoritativeSaveBarrierChange}
     >
     <StudioToolHintPreferencesProvider
       mode={appSettings.general.toolHintMode}
@@ -20398,10 +20584,12 @@ function StudioCuttoonEditor() {
         ) : null}
         {/* 게시·로그인 안내는 드로잉 크롬에 띄우지 않음 — 저장/게시 액션 시점에만 노출. */}
         {(publishContext.series || publishContext.challenge) && !mobileImmersive && !canvasOnlyMode ? (
-          <StudioPublishContextBanner
-            context={publishContext}
-            className="my-1 mb-1 px-2.5 py-1.5 text-xs"
-          />
+          <Suspense fallback={null}>
+            <StudioPublishContextBanner
+              context={publishContext}
+              className="my-1 mb-1 px-2.5 py-1.5 text-xs"
+            />
+          </Suspense>
         ) : null}
       </div>
 
@@ -24716,6 +24904,9 @@ function StudioCuttoonEditor() {
                 ) : null;
                 const mainEls = canvasRenderElements.map((el, idx) => {
                   if (isEffectivelyHidden(el, groups)) return null; // 숨긴 레이어/그룹은 렌더·내보내기에서 제외
+                  // A verified raster frame and these vector fallbacks switch in one React commit.
+                  // Any stale/gated/error frame yields an empty set, restoring Konva immediately.
+                  if (studioRasterHiddenOperationIds.has(el.id)) return null;
                   const base = el.clipBelow && idx > 0 ? canvasRenderElements[idx - 1] : null;
                   // 자기 완결형 마스크(el.maskSrc) — clipBelow와 별개 축, 교집합으로 합성해야 하므로
                   // clipBelow보다 먼저 적용해 "이미 마스크 적용된 노드"를 만든다.
@@ -25406,6 +25597,30 @@ function StudioCuttoonEditor() {
               </Layer>
             )}
           </Stage>
+          {STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED && webGpuViewportSurface ? (
+            <Suspense fallback={null}>
+              <StudioRasterCrdtSurface
+                className="z-[9]"
+                document={studioCrdtDocument}
+                workId={authorizedWorkAssetScopeId}
+                surfaceId={`raster:${activePage.id}:ink`}
+                viewport={webGpuViewportSurface}
+                visibleDocumentRect={studioRasterVisibleDocumentRect}
+                handoff={{
+                  baseKey: studioRasterHandoffBaseKey,
+                  pageId: activePage.id,
+                  documentWidth: CANVAS_W,
+                  documentHeight: canvasH,
+                  elements: studioRasterOverlayElements,
+                  gates: studioRasterHandoffGates,
+                }}
+                authorizedAuthorityKey={studioRasterAuthorizedAuthorityKey}
+                hidden={studioRasterHandoffBlocked}
+                onHandoffCandidateChange={setStudioRasterHandoffCandidate}
+                onError={(message) => setError((current) => current ?? message)}
+              />
+            </Suspense>
+          ) : null}
           {webGpuViewportSurface ? (
             <Suspense fallback={null}>
               <StudioWebGpuCanvas
@@ -27697,15 +27912,17 @@ function StudioCuttoonEditor() {
                             ) : null}
                           </div>
                         ) : null}
-                        <StudioContinuityMetadataEditor
-                          value={selected.storyBeat.continuity ?? {}}
-                          onChange={(continuity) =>
-                            patchEl(selected.id, {
-                              storyBeat: { ...selected.storyBeat!, continuity },
-                            } as Partial<El>)
-                          }
-                          compact
-                        />
+                        <Suspense fallback={<StudioPanelLoading label="연속성 메타 편집기를 여는 중..." />}>
+                          <StudioContinuityMetadataEditor
+                            value={selected.storyBeat.continuity ?? {}}
+                            onChange={(continuity) =>
+                              patchEl(selected.id, {
+                                storyBeat: { ...selected.storyBeat!, continuity },
+                              } as Partial<El>)
+                            }
+                            compact
+                          />
+                        </Suspense>
                       </>
                     ) : (
                       <button

@@ -118,6 +118,12 @@ export interface StudioWebGpuEngineOptions {
   /** Test/embedding override. `null` explicitly disables WebGPU. */
   readonly gpu?: GPU | null;
   readonly autoRecover?: boolean;
+  /**
+   * Retains one immutable presentation texture so `captureFrame()` can read the exact receipt.
+   * Defaults to true for backwards compatibility. Display-only/live-preview consumers should opt
+   * out to avoid a full-surface texture allocation and texture-to-texture copy on every frame.
+   */
+  readonly retainReadbackSnapshot?: boolean;
   readonly onBackendChange?: (backend: StudioGpuBackend) => void;
   readonly onDeviceLost?: (info: GPUDeviceLostInfo) => void;
   /** Fired synchronously before pixels for an older request may no longer be trusted. */
@@ -395,6 +401,34 @@ export function isValidStudioGpuStroke(stroke: StudioGpuStroke): boolean {
     && (stroke.opacity === undefined || (
       Number.isFinite(stroke.opacity) && stroke.opacity >= 0 && stroke.opacity <= 1
     ));
+}
+
+/** A display compositor stays cold until every operation in a non-empty frame is supported. */
+export function isStudioWebGpuCanvasActive(strokes: readonly StudioGpuStroke[]): boolean {
+  return strokes.length > 0 && strokes.every(isValidStudioGpuStroke);
+}
+
+interface StudioWebGpuCanvasRequestTarget {
+  readonly suspend: (requestId?: string) => void;
+  readonly render: (strokes: readonly StudioGpuStroke[], requestId?: string) => void;
+}
+
+/** Pure lifecycle boundary used by the React surface; inactive frames never warm the GPU. */
+export function routeStudioWebGpuCanvasRequest(input: {
+  readonly engine: StudioWebGpuCanvasRequestTarget;
+  readonly strokes: readonly StudioGpuStroke[];
+  readonly requestId: string;
+  readonly syncViewport: () => void;
+  readonly requestInitialization: () => void;
+}): "active" | "suspended" {
+  if (!isStudioWebGpuCanvasActive(input.strokes)) {
+    input.engine.suspend(input.requestId);
+    return "suspended";
+  }
+  input.syncViewport();
+  input.engine.render(input.strokes, input.requestId);
+  input.requestInitialization();
+  return "active";
 }
 
 function dabIntersectsRect(
@@ -864,10 +898,10 @@ function bufferUsage(): number {
   return 0x20 | 0x08;
 }
 
-function presentationTextureUsage(): number {
-  // RENDER_ATTACHMENT (0x10) | COPY_DST (0x02) | COPY_SRC (0x01). COPY_SRC lets the
-  // presentation pass atomically retain the exact receipt-authorized pixels for later readback.
-  return 0x10 | 0x02 | 0x01;
+function presentationTextureUsage(retainReadbackSnapshot: boolean): number {
+  // RENDER_ATTACHMENT (0x10) | COPY_DST (0x02). COPY_SRC (0x01) is requested only when the
+  // consumer opted into immutable receipt readback; live draft presentation never needs it.
+  return 0x10 | 0x02 | (retainReadbackSnapshot ? 0x01 : 0);
 }
 
 function readbackTextureUsage(): number {
@@ -987,6 +1021,7 @@ export class StudioWebGpuEngine {
   private readonly fallbackCanvas: HTMLCanvasElement;
   private readonly options: StudioWebGpuEngineOptions;
   private readonly hasGpuOverride: boolean;
+  private readonly retainReadbackSnapshot: boolean;
 
   private backend: StudioGpuBackend = "canvas2d";
   private fallbackContext: CanvasRenderingContext2D | null = null;
@@ -1019,6 +1054,7 @@ export class StudioWebGpuEngine {
   private initializationPromise: Promise<StudioGpuBackend> | null = null;
   private lifecycleGeneration = 0;
   private disposed = false;
+  private suspended = false;
   private viewport = normalizeViewport({ logicalWidth: 1, logicalHeight: 1 });
   private lastStrokes: readonly StudioGpuStroke[] = [];
   private renderedStrokes: readonly StudioGpuStroke[] | null = null;
@@ -1038,6 +1074,7 @@ export class StudioWebGpuEngine {
     this.canvas = options.canvas;
     this.fallbackCanvas = options.fallbackCanvas;
     this.hasGpuOverride = Object.prototype.hasOwnProperty.call(options, "gpu");
+    this.retainReadbackSnapshot = options.retainReadbackSnapshot !== false;
     this.setSurfaceVisibility("canvas2d");
   }
 
@@ -1077,7 +1114,12 @@ export class StudioWebGpuEngine {
     this.activateCanvas2d();
     const initialization = this.initializeWebGpu(generation)
       .then((ready) => {
-        if (ready && !this.disposed && generation === this.lifecycleGeneration) {
+        if (
+          ready
+          && !this.disposed
+          && !this.suspended
+          && generation === this.lifecycleGeneration
+        ) {
           this.render(this.lastStrokes);
         }
         return this.backend;
@@ -1125,11 +1167,15 @@ export class StudioWebGpuEngine {
     // Resizing discards presentation pixels; transforms also change visible-tile selection/quads.
     this.invalidateRenderedFrame();
     this.configureContext();
-    this.render(this.lastStrokes);
+    if (!this.suspended) this.render(this.lastStrokes);
   }
 
   public render(strokes: readonly StudioGpuStroke[], requestId = this.lastRequestId): void {
     if (this.disposed) return;
+    if (this.suspended) {
+      this.suspended = false;
+      this.setSurfaceVisibility(this.backend);
+    }
     const strokeSnapshot = snapshotStudioGpuStrokes(strokes);
     this.lastStrokes = strokeSnapshot;
     this.lastRequestId = requestId;
@@ -1161,6 +1207,33 @@ export class StudioWebGpuEngine {
 
   public clear(): void {
     this.render([]);
+  }
+
+  /**
+   * Revokes the current presentation without rendering an empty replacement frame. Retained tile
+   * and readback resources are released, while a successfully-created GPU device stays warm for
+   * the next supported stroke. A later `render()` resumes the engine automatically.
+   */
+  public suspend(requestId = this.lastRequestId): void {
+    if (this.disposed) return;
+    const requestChanged = requestId !== this.lastRequestId;
+    const hadPresentation = this.lastStrokes.length > 0
+      || this.renderedStrokes !== null
+      || this.authorityFrame !== null;
+    this.lastStrokes = [];
+    this.lastRequestId = requestId;
+    if (this.suspended && !requestChanged) return;
+
+    this.suspended = true;
+    this.supersedeWebGpuRenderFlight();
+    this.destroyTileRuntime();
+    this.invalidateRenderedFrame();
+    this.invalidateFrameReceipt();
+    // `invalidateFrameReceipt` retires the authority snapshot into this pool when there are no
+    // readers. Destroy it immediately so an inactive live canvas retains no full-surface copy.
+    this.destroyReadbackSnapshotPool();
+    if (hadPresentation && this.backend === "canvas2d") this.clearCanvas2d();
+    this.setSurfaceVisibility(this.backend);
   }
 
   /**
@@ -1306,6 +1379,7 @@ export class StudioWebGpuEngine {
     if (this.readbackSnapshotPool.includes(snapshot)) return;
     if (
       this.disposed
+      || this.suspended
       || !this.isSnapshotCompatible(
         snapshot,
         this.device,
@@ -1734,7 +1808,7 @@ export class StudioWebGpuEngine {
         device,
         format,
         alphaMode: "premultiplied",
-        usage: presentationTextureUsage(),
+        usage: presentationTextureUsage(this.retainReadbackSnapshot),
       });
       if (this.disposed || generation !== this.lifecycleGeneration) {
         safeUnconfigure(context);
@@ -1792,12 +1866,17 @@ export class StudioWebGpuEngine {
     this.destroyTileRuntime();
     safeUnconfigure(this.context);
     this.activateCanvas2d();
-    this.render(this.lastStrokes, this.lastRequestId);
+    if (!this.suspended) this.render(this.lastStrokes, this.lastRequestId);
     this.options.onDeviceLost?.(info);
 
     if (this.options.autoRecover === false) return;
     void this.initializeWebGpu(recoveryGeneration).then((ready) => {
-      if (ready && !this.disposed && recoveryGeneration === this.lifecycleGeneration) {
+      if (
+        ready
+        && !this.disposed
+        && !this.suspended
+        && recoveryGeneration === this.lifecycleGeneration
+      ) {
         this.render(this.lastStrokes);
       }
     });
@@ -1825,7 +1904,12 @@ export class StudioWebGpuEngine {
 
   private setSurfaceVisibility(backend: StudioGpuBackend): void {
     if (this.canvas === this.fallbackCanvas) {
-      this.canvas.style.visibility = "visible";
+      this.canvas.style.visibility = this.suspended ? "hidden" : "visible";
+      return;
+    }
+    if (this.suspended) {
+      this.canvas.style.visibility = "hidden";
+      this.fallbackCanvas.style.visibility = "hidden";
       return;
     }
     this.canvas.style.visibility = backend === "webgpu" ? "visible" : "hidden";
@@ -1839,7 +1923,7 @@ export class StudioWebGpuEngine {
         device: this.device,
         format: this.format,
         alphaMode: "premultiplied",
-        usage: presentationTextureUsage(),
+        usage: presentationTextureUsage(this.retainReadbackSnapshot),
       });
     } catch {
       // Device loss handler will switch to the already-renderable Canvas2D surface.
@@ -2180,12 +2264,14 @@ export class StudioWebGpuEngine {
 
       const encoder = device.createCommandEncoder({ label: "Studio retained tile presentation" });
       const presentationTexture = context.getCurrentTexture();
-      presentationSnapshot = this.acquireFrameSnapshot(
-        device,
-        format,
-        this.canvas.width,
-        this.canvas.height
-      );
+      presentationSnapshot = this.retainReadbackSnapshot
+        ? this.acquireFrameSnapshot(
+            device,
+            format,
+            this.canvas.width,
+            this.canvas.height
+          )
+        : null;
       const pass = encoder.beginRenderPass({
         label: "Studio retained tile presentation",
         colorAttachments: [{

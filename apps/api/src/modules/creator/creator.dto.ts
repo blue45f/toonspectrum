@@ -3,6 +3,18 @@ import { z } from "zod";
 
 const CreatorReferenceIdSchema = z.string().trim().min(1).max(160).nullable();
 const CreatorWorkRevisionSchema = z.number().int().min(1).max(2_147_483_647);
+const CreatorCrdtServerSequenceSchema = z
+  .string()
+  .regex(/^(?:0|[1-9]\d{0,18})$/)
+  .refine((value) => {
+    try {
+      return BigInt(value) <= BigInt("9223372036854775807");
+    } catch {
+      return false;
+    }
+  }, {
+    message: "CRDT server sequence must fit a nonnegative PostgreSQL bigint",
+  });
 const CreatorCollaborationUserIdSchema = z.string().trim().min(1).max(160);
 const CreatorCollaborationRoleSchema = z.enum(["admin", "editor", "commenter", "viewer"]);
 const CreatorCollaborationViewerRoleSchema = z.enum([
@@ -72,7 +84,10 @@ const creatorSharedDocumentFieldNames = Object.keys(
  * 기존 플로우에 남겨, 다른 사용자의 연재 관계를 우회 변경하지 못하게 한다.
  */
 export const UpdateCreatorSharedDocumentSchema = CreatorSharedDocumentMutableFieldsSchema.partial()
-  .extend({ baseRevision: CreatorWorkRevisionSchema })
+  .extend({
+    baseRevision: CreatorWorkRevisionSchema,
+    crdtServerSequence: CreatorCrdtServerSequenceSchema,
+  })
   .strict()
   .superRefine((value, context) => {
     if (!creatorSharedDocumentFieldNames.some((field) => Object.hasOwn(value, field))) {
@@ -123,6 +138,7 @@ export const CreatorSharedDocumentResponseSchema = z
     status: z.literal("active"),
     capabilities: z.object({ view: z.literal(true), edit: z.boolean() }).strict(),
     revision: CreatorWorkRevisionSchema,
+    crdtServerSequence: CreatorCrdtServerSequenceSchema,
     updatedAt: CreatorIsoDateTimeSchema,
     document: CreatorSharedDocumentContentSchema,
   })

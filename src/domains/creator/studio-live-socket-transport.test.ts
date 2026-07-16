@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { StudioCrdtOperationError } from "./studio-crdt-operation-error";
 import {
   encodeStudioCrdtStateVector,
   encodeStudioCrdtSyncChunks,
@@ -1075,6 +1076,118 @@ describe("StudioLiveSocketTransport", () => {
       )
     ).toHaveLength(2);
     expect(ephemeral).toEqual([]);
+    transport.close();
+  });
+
+  it.each([
+    ["invalid_payload", "permanent"],
+    ["forbidden", "permanent"],
+    ["storage_corruption", "permanent"],
+    ["rate_limited", "retryable"],
+    ["internal_error", "retryable"],
+  ] as const)(
+    "preserves the %s CRDT ACK code with a %s retry disposition",
+    async (code, disposition) => {
+      const socket = new FakeSocket({ sessionToken: TOKEN });
+      socket.ackResponses.set("studio:crdt:update", {
+        ok: false,
+        code,
+        message: `server rejected: ${code}`,
+      });
+      const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+        createSocket: () => socket,
+        now: () => NOW,
+      });
+      await transport.connect();
+
+      const failure = await transport.publishCrdtUpdate({
+        protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+        workId: "work-1",
+        updateId: "99999999-9999-4999-8999-999999999999",
+        clientSequence: 1,
+        update: encodeStudioCrdtUpdate(new Uint8Array([9, 9, 9])),
+      }).then(
+        () => null,
+        (error: unknown) => error
+      );
+
+      expect(failure).toBeInstanceOf(StudioCrdtOperationError);
+      expect(failure).toMatchObject({
+        code,
+        disposition,
+        source: "server-ack",
+        message: `server rejected: ${code}`,
+      });
+      transport.close();
+    }
+  );
+
+  it("preserves a permanent storage-corruption rejection on the CRDT sync path", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.ackResponses.set("studio:crdt:sync", {
+      ok: false,
+      code: "storage_corruption",
+      message: "authoritative CRDT storage is corrupt",
+    });
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    await transport.connect();
+
+    const failure = await transport.requestCrdtSync({
+      protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+      workId: "work-1",
+      requestId: "storage-corruption-sync",
+      stateVector: encodeStudioCrdtStateVector(new Uint8Array([0])),
+    }).then(
+      () => null,
+      (error: unknown) => error
+    );
+
+    expect(failure).toBeInstanceOf(StudioCrdtOperationError);
+    expect(failure).toMatchObject({
+      code: "storage_corruption",
+      disposition: "permanent",
+      source: "server-ack",
+      message: "authoritative CRDT storage is corrupt",
+    });
+    transport.close();
+  });
+
+  it("rejects an in-flight durable update as permanent when access is revoked", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.holdEvents.add("studio:crdt:update");
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    await transport.connect();
+    const publication = transport.publishCrdtUpdate({
+      protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
+      workId: "work-1",
+      updateId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      clientSequence: 1,
+      update: encodeStudioCrdtUpdate(new Uint8Array([1, 4, 1])),
+    });
+
+    socket.serverEmit("studio:access:revoked", {
+      workId: "work-1",
+      message: "editing access revoked",
+    });
+    const failure = await publication.then(
+      () => null,
+      (error: unknown) => error
+    );
+
+    expect(failure).toBeInstanceOf(StudioCrdtOperationError);
+    expect(failure).toMatchObject({
+      code: "access_revoked",
+      disposition: "permanent",
+      source: "connection",
+      message: "editing access revoked",
+    });
+    expect(transport.ready).toBe(false);
     transport.close();
   });
 

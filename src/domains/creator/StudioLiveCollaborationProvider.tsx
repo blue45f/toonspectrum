@@ -9,6 +9,7 @@ import {
   StudioLiveCollaborationContext,
   type StudioLiveAvailability,
   type StudioLiveCollaborationContextValue,
+  type StudioLiveRecoveryState,
 } from "./studio-live-collaboration-context";
 import { studioLiveDisplayName, type StudioLiveParticipant } from "./studio-live-collaboration-protocol";
 import {
@@ -22,9 +23,23 @@ import {
   type StudioLiveTransportFactory,
   type StudioLiveTransportMode,
 } from "./studio-live-collaboration-transport";
+import {
+  projectStudioLiveSyncSnapshot,
+  type StudioCrdtSyncTelemetry,
+  type StudioLivePersistenceDurability,
+} from "./studio-live-sync-safety";
 
 import type { StudioCrdtDocument } from "./studio-crdt-document";
-import type { StudioCrdtRoomBinding } from "./studio-crdt-room-binding";
+import type { StudioCrdtRecoveryVaultEntry } from "./studio-crdt-recovery-vault";
+import type {
+  StudioCrdtAuthoritativeAckBarrierResult,
+  StudioCrdtBindingStatus,
+  StudioCrdtRoomBinding,
+} from "./studio-crdt-room-binding";
+
+export type StudioCrdtAuthoritativeSaveBarrier = (
+  timeoutMs?: number
+) => Promise<StudioCrdtAuthoritativeAckBarrierResult>;
 
 export interface StudioCrdtSceneGraphRuntime {
   publish: typeof import("./studio-crdt-scene-publisher").publishStudioCrdtSceneGraphDiff;
@@ -53,6 +68,12 @@ export interface StudioLiveCollaborationProviderProps {
     document: StudioCrdtDocument | null,
     runtime: StudioCrdtSceneGraphRuntime | null
   ) => void;
+  /** Reports whether a new collaborative edit has at least one durable sink right now. */
+  onEditSafetyChange?: (editsDurablyProtected: boolean) => void;
+  /** Exposes a same-generation CRDT drain/ACK fence for REST save and publish operations. */
+  onAuthoritativeSaveBarrierChange?: (
+    barrier: StudioCrdtAuthoritativeSaveBarrier | null
+  ) => void;
 }
 
 function localSessionId(): string {
@@ -64,6 +85,93 @@ function localSessionId(): string {
 
 function messageFrom(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
+}
+
+type StudioCrdtBindingStatusTelemetry = StudioCrdtBindingStatus &
+  Partial<Pick<
+    StudioCrdtSyncTelemetry,
+    | "pendingCount"
+    | "persistenceDurability"
+    | "transportReady"
+    | "lastAckAt"
+    | "lastAckServerSequence"
+  >>;
+
+interface StudioLiveRecoveryBoundaryLatch {
+  scopeKey: string;
+  rejectedUpdateId: string | null;
+  recovery: StudioLiveRecoveryState;
+}
+
+interface StudioLiveRevocationBoundaryLatch {
+  scopeKey: string;
+  mode: StudioLiveTransportMode;
+  message: string;
+}
+
+const RECOVERY_VAULT_REHYDRATION_INITIAL_DELAY_MS = 50;
+const RECOVERY_VAULT_REHYDRATION_MAX_DELAY_MS = 5_000;
+
+function findStudioLiveRecoveryBoundaryEntry(
+  entries: readonly StudioCrdtRecoveryVaultEntry[],
+  boundary: StudioLiveRecoveryBoundaryLatch
+): StudioCrdtRecoveryVaultEntry | null {
+  const { vaultId } = boundary.recovery;
+  if (vaultId) {
+    const exactVault = entries.find((entry) => entry.vaultId === vaultId);
+    if (exactVault) return exactVault;
+  }
+  const rejectedUpdateId = boundary.rejectedUpdateId;
+  if (!rejectedUpdateId) return null;
+  return entries.find((entry) =>
+    entry.rejectedUpdateId === rejectedUpdateId ||
+    entry.updates.some((update) => update.updateId === rejectedUpdateId)
+  ) ?? null;
+}
+
+function canParticipantEdit(role: StudioLiveParticipant["role"] | null): boolean {
+  return role === "owner" || role === "admin" || role === "editor";
+}
+
+function bindingTelemetryState(state: string): StudioCrdtSyncTelemetry["state"] {
+  if (
+    state === "idle" ||
+    state === "syncing" ||
+    state === "ready" ||
+    state === "retrying" ||
+    state === "repairing"
+  ) {
+    return state;
+  }
+  if (state === "recovery-required") return "recovery-required";
+  return "error";
+}
+
+function mergeBindingTelemetry(options: {
+  previous: StudioCrdtSyncTelemetry | null;
+  status: StudioCrdtBindingStatus;
+  transportReady: boolean;
+  outboxConfigured: boolean;
+}): StudioCrdtSyncTelemetry {
+  const { previous, status, transportReady, outboxConfigured } = options;
+  const measured = status as StudioCrdtBindingStatusTelemetry;
+  const persistenceDurability: StudioLivePersistenceDurability =
+    measured.persistenceDurability ??
+    previous?.persistenceDurability ??
+    (outboxConfigured ? "checking" : "unavailable");
+  return {
+    state: bindingTelemetryState(status.state),
+    message: status.message,
+    pendingCount: measured.pendingCount ?? previous?.pendingCount ?? 0,
+    persistenceDurability,
+    transportReady: measured.transportReady ?? transportReady,
+    lastAckAt: measured.lastAckAt ?? previous?.lastAckAt ?? null,
+    lastAckServerSequence:
+      measured.lastAckServerSequence ?? previous?.lastAckServerSequence ?? null,
+    ...(status.state === "error" && status.durabilityAtRisk
+      ? { durabilityAtRisk: true }
+      : {}),
+  };
 }
 
 /**
@@ -81,6 +189,8 @@ export function StudioLiveCollaborationProvider({
   serverRequired = false,
   onRoomChange,
   onCrdtDocumentChange,
+  onEditSafetyChange,
+  onAuthoritativeSaveBarrierChange,
 }: StudioLiveCollaborationProviderProps) {
   const [room, setRoom] = useState<StudioLiveRoom | null>(null);
   const [availability, setAvailability] = useState<StudioLiveAvailability>("idle");
@@ -94,10 +204,28 @@ export function StudioLiveCollaborationProvider({
     serverRequired || transportFactory ? "server" : "local"
   );
   const [transportRetryKey, setTransportRetryKey] = useState(0);
+  const [syncTelemetry, setSyncTelemetry] = useState<StudioCrdtSyncTelemetry | null>(null);
+  const [operationSyncReady, setOperationSyncReady] = useState(false);
+  const [terminalTransportState, setTerminalTransportState] = useState<
+    "revoked" | "recovery-required" | null
+  >(null);
+  const [recovery, setRecovery] = useState<StudioLiveRecoveryState | null>(null);
+  // This latch deliberately survives room/effect generations. Exporting a rejected frontier does
+  // not make the optimistic React history authoritative; only a full document reload may discard
+  // that history and reopen the exported vault entry against the server document.
+  const recoveryBoundaryRef = useRef<StudioLiveRecoveryBoundaryLatch | null>(null);
+  // A permanent authorization failure is also terminal for this mounted document generation.
+  // Token/factory rotation and retry controls must not silently reopen the same work after the
+  // server has explicitly revoked it. Navigating to another work/user scope clears the boundary.
+  const revocationBoundaryRef = useRef<StudioLiveRevocationBoundaryLatch | null>(null);
   const observedTransportPolicyRef = useRef({ transportFactory, serverRequired });
   const previousPageIdRef = useRef(currentPageId);
   const participantName = participant?.displayName ?? null;
   const participantRole = participant?.role ?? null;
+  const participantCanEdit = canParticipantEdit(participantRole);
+  const recoveryBoundaryScopeKey = workId
+    ? JSON.stringify([outboxScope || null, workId])
+    : null;
 
   useEffect(() => {
     const observed = observedTransportPolicyRef.current;
@@ -111,15 +239,131 @@ export function StudioLiveCollaborationProvider({
 
   useEffect(() => {
     let cancelled = false;
+    if (
+      recoveryBoundaryRef.current &&
+      recoveryBoundaryRef.current.scopeKey !== recoveryBoundaryScopeKey
+    ) {
+      // A different work/signed-user scope owns a different editor history generation.
+      recoveryBoundaryRef.current = null;
+    }
+    if (
+      revocationBoundaryRef.current &&
+      revocationBoundaryRef.current.scopeKey !== recoveryBoundaryScopeKey
+    ) {
+      revocationBoundaryRef.current = null;
+    }
+    const latchedRecoveryBoundary =
+      recoveryBoundaryRef.current?.scopeKey === recoveryBoundaryScopeKey
+        ? recoveryBoundaryRef.current
+        : null;
+    const latchedRecovery = latchedRecoveryBoundary?.recovery ?? null;
+    const latchedRevocation =
+      revocationBoundaryRef.current?.scopeKey === recoveryBoundaryScopeKey
+        ? revocationBoundaryRef.current
+        : null;
     setRoom(null);
     setPeers([]);
     setLocks([]);
     setChatMessages([]);
     setError(null);
     setLocalFallbackAllowed(true);
+    setSyncTelemetry(null);
+    setOperationSyncReady(false);
+    onAuthoritativeSaveBarrierChange?.(null);
     // Presence/transport는 동적 CRDT 모듈과 초기 frontier보다 먼저 준비될 수 있다. effect가
     // 새 room 세대로 진입하는 순간 이전 pair를 먼저 폐기해 부모 편집기가 즉시 잠기게 한다.
     onCrdtDocumentChange?.(null, null);
+
+    if (latchedRecovery) {
+      setAvailability("error");
+      setMode(transportPreference);
+      setError(latchedRecovery.message);
+      setTerminalTransportState("recovery-required");
+      setRecovery(latchedRecovery);
+      setLocalFallbackAllowed(false);
+      onRoomChange?.(null);
+      if (
+        latchedRecovery.exportAvailable ||
+        !latchedRecoveryBoundary ||
+        !outboxScope ||
+        !workId
+      ) return;
+
+      let retryTimer: ReturnType<typeof setTimeout> | null = null;
+      const rehydrateRecoveryBoundary = async (retryDelayMs: number): Promise<void> => {
+        try {
+          const recoveryModule = await import("./studio-crdt-recovery-vault");
+          if (cancelled) return;
+          const entries = await recoveryModule
+            .createStudioCrdtRecoveryVault()
+            .list(outboxScope, workId);
+          if (cancelled) return;
+          const matchingEntry = findStudioLiveRecoveryBoundaryEntry(
+            entries,
+            latchedRecoveryBoundary
+          );
+          if (matchingEntry) {
+            const currentBoundary = recoveryBoundaryRef.current;
+            if (
+              currentBoundary?.scopeKey !== recoveryBoundaryScopeKey ||
+              currentBoundary.rejectedUpdateId !== latchedRecoveryBoundary.rejectedUpdateId
+            ) return;
+            const hydratedRecovery: StudioLiveRecoveryState = {
+              ...currentBoundary.recovery,
+              vaultId: matchingEntry.vaultId,
+              updateCount: Math.max(
+                currentBoundary.recovery.updateCount,
+                matchingEntry.updates.length
+              ),
+              exportAvailable: true,
+              exported:
+                currentBoundary.recovery.exported ||
+                entries.every((entry) => entry.status === "exported"),
+            };
+            recoveryBoundaryRef.current = {
+              ...currentBoundary,
+              recovery: hydratedRecovery,
+            };
+            setRecovery(hydratedRecovery);
+            return;
+          }
+        } catch {
+          // The binding may still be committing the manifest, or IndexedDB may be transiently
+          // unavailable. Keep the editor locked; the same recovery boundary must remain capable
+          // of observing a late durable commit even on a slow mobile storage device.
+        }
+        if (cancelled) return;
+        const nextDelayMs = Math.min(
+          RECOVERY_VAULT_REHYDRATION_MAX_DELAY_MS,
+          retryDelayMs * 2
+        );
+        retryTimer = setTimeout(() => {
+          retryTimer = null;
+          void rehydrateRecoveryBoundary(nextDelayMs);
+        }, retryDelayMs);
+      };
+      void rehydrateRecoveryBoundary(RECOVERY_VAULT_REHYDRATION_INITIAL_DELAY_MS);
+      return () => {
+        cancelled = true;
+        if (retryTimer !== null) clearTimeout(retryTimer);
+      };
+    }
+
+    if (latchedRevocation) {
+      setAvailability("error");
+      setMode(latchedRevocation.mode);
+      setError(latchedRevocation.message);
+      setTerminalTransportState("revoked");
+      setRecovery(null);
+      setLocalFallbackAllowed(false);
+      onRoomChange?.(null);
+      return;
+    }
+
+    setError(null);
+    setTerminalTransportState(null);
+    setRecovery(null);
+    setLocalFallbackAllowed(true);
 
     if (!workId || !participantName || !participantRole) {
       setAvailability("idle");
@@ -216,8 +460,23 @@ export function StudioLiveCollaborationProvider({
 
       setMode(nextRoom.mode);
       if (event.status.state === "ready") {
+        setSyncTelemetry((previous) => previous
+          ? { ...previous, transportReady: true }
+          : {
+              state: "syncing",
+              message: "팀 원고의 권위 상태를 확인하는 중입니다.",
+              pendingCount: 0,
+              persistenceDurability:
+                participantCanEdit && outboxScope ? "checking" : participantCanEdit ? "unavailable" : "not-applicable",
+              transportReady: true,
+              lastAckAt: null,
+              lastAckServerSequence: null,
+            });
         exposeReadyRoom(null);
       } else if (event.status.state === "connecting" || event.status.state === "disconnected") {
+        setSyncTelemetry((previous) => previous
+          ? { ...previous, state: "retrying", transportReady: false, message: event.status.message }
+          : previous);
         setAvailability("connecting");
         setError(event.status.message);
       } else if (event.status.state === "error" && nextRoom.ready) {
@@ -229,6 +488,17 @@ export function StudioLiveCollaborationProvider({
       }
 
       if (!event.status.recoverable) {
+        if (recoveryBoundaryScopeKey) {
+          revocationBoundaryRef.current = {
+            scopeKey: recoveryBoundaryScopeKey,
+            mode: nextRoom.mode ?? transportPreference,
+            message: event.status.message,
+          };
+        }
+        setTerminalTransportState("revoked");
+        setOperationSyncReady(false);
+        onAuthoritativeSaveBarrierChange?.(null);
+        onCrdtDocumentChange?.(null, null);
         setPeers([]);
         setLocks([]);
         setChatMessages([]);
@@ -290,6 +560,55 @@ export function StudioLiveCollaborationProvider({
           outboxScope,
           onStatus: (status) => {
             if (cancelled) return;
+            setSyncTelemetry((previous) => mergeBindingTelemetry({
+              previous,
+              status,
+              transportReady: nextRoom.ready,
+              outboxConfigured: participantCanEdit && Boolean(outboxScope),
+            }));
+            if ((status as { state: string }).state === "recovery-required") {
+              const previousBoundary =
+                recoveryBoundaryRef.current?.scopeKey === recoveryBoundaryScopeKey
+                  ? recoveryBoundaryRef.current
+                  : null;
+              const previousRecovery = previousBoundary?.recovery ?? null;
+              const nextRecovery: StudioLiveRecoveryState = {
+                vaultId:
+                  "recoveryVaultId" in status &&
+                  typeof status.recoveryVaultId === "string"
+                    ? status.recoveryVaultId
+                    : previousRecovery?.vaultId ?? null,
+                updateCount:
+                  "recoveryUpdateCount" in status
+                    ? status.recoveryUpdateCount
+                    : previousRecovery?.updateCount ?? 0,
+                exportAvailable:
+                  "recoveryExportAvailable" in status
+                    ? status.recoveryExportAvailable
+                    : previousRecovery?.exportAvailable ?? false,
+                exported: previousRecovery?.exported ?? false,
+                message: status.message,
+              };
+              if (recoveryBoundaryScopeKey) {
+                recoveryBoundaryRef.current = {
+                  scopeKey: recoveryBoundaryScopeKey,
+                  rejectedUpdateId:
+                    "updateId" in status && typeof status.updateId === "string"
+                      ? status.updateId
+                      : previousBoundary?.rejectedUpdateId ?? null,
+                  recovery: nextRecovery,
+                };
+              }
+              setTerminalTransportState("recovery-required");
+              setRecovery(nextRecovery);
+              setOperationSyncReady(false);
+              onAuthoritativeSaveBarrierChange?.(null);
+              onCrdtDocumentChange?.(null, null);
+              setAvailability("error");
+              setError(status.message);
+              setLocalFallbackAllowed(false);
+              return;
+            }
             if (status.state === "error") {
               if (status.durabilityAtRisk) crdtDurabilityWarning = status.message;
               setError(status.message);
@@ -303,6 +622,17 @@ export function StudioLiveCollaborationProvider({
         });
         await crdtBinding.start();
         if (cancelled) return;
+        if (crdtBinding.recoveryRequired) {
+          // A restored optimistic update can be permanently rejected during the initial drain.
+          // Never re-expose that divergent Y.Doc after the terminal status callback locked Studio.
+          onCrdtDocumentChange?.(null, null);
+          setOperationSyncReady(false);
+          return;
+        }
+        const readyBinding = crdtBinding;
+        onAuthoritativeSaveBarrierChange?.((timeoutMs) =>
+          readyBinding.flushAndWaitForAuthoritativeAck(timeoutMs)
+        );
         onCrdtDocumentChange?.(
           crdtDocument,
           {
@@ -319,6 +649,7 @@ export function StudioLiveCollaborationProvider({
               rasterUiBridgeModule.sha256StudioRasterSemanticParameters,
           }
         );
+        setOperationSyncReady(true);
         setMode(nextRoom.mode);
         setPeers(nextRoom.getPeers());
         setLocks(nextRoom.getLocks());
@@ -329,6 +660,8 @@ export function StudioLiveCollaborationProvider({
         const failedDocument = crdtDocument;
         crdtBinding = null;
         crdtDocument = null;
+        setOperationSyncReady(false);
+        onAuthoritativeSaveBarrierChange?.(null);
         failedBinding?.close();
         failedDocument?.destroy();
         stopVisibilityListener();
@@ -350,6 +683,8 @@ export function StudioLiveCollaborationProvider({
       stopVisibilityListener();
       stopRoomSubscription();
       onCrdtDocumentChange?.(null, null);
+      setOperationSyncReady(false);
+      onAuthoritativeSaveBarrierChange?.(null);
       const closingBinding = crdtBinding;
       const closingDocument = crdtDocument;
       crdtBinding = null;
@@ -371,13 +706,16 @@ export function StudioLiveCollaborationProvider({
   }, [
     participantName,
     participantRole,
+    participantCanEdit,
     onCrdtDocumentChange,
+    onAuthoritativeSaveBarrierChange,
     onRoomChange,
     outboxScope,
     transportFactory,
     transportPreference,
     transportRetryKey,
     workId,
+    recoveryBoundaryScopeKey,
   ]);
 
   useEffect(() => {
@@ -390,6 +728,82 @@ export function StudioLiveCollaborationProvider({
       setError(messageFrom(cause, "현재 작업 페이지를 팀에 알리지 못했습니다."));
     }
   }, [currentPageId, currentTool, room]);
+
+  // State updates from the previous room can survive for one render while React tears that room
+  // down. Never project those guarantees onto a different work id.
+  const scopedOperationSyncReady = Boolean(
+    room && room.workId === workId && operationSyncReady
+  );
+  const syncSnapshot = projectStudioLiveSyncSnapshot({
+    availability,
+    mode,
+    canEdit: participantCanEdit,
+    telemetry: syncTelemetry,
+    operationSyncReady: scopedOperationSyncReady,
+    terminalTransportState,
+    transportMessage: error,
+  });
+
+  useEffect(() => {
+    onEditSafetyChange?.(syncSnapshot.editsDurablyProtected);
+  }, [onEditSafetyChange, syncSnapshot.editsDurablyProtected]);
+
+  const exportRecovery = async () => {
+    if (
+      terminalTransportState !== "recovery-required" ||
+      !recovery ||
+      !outboxScope ||
+      !workId
+    ) {
+      throw new Error("내보낼 수 있는 공동 편집 복구 frontier가 없습니다.");
+    }
+    const recoveryModule = await import("./studio-crdt-recovery-vault");
+    const currentBoundary =
+      recoveryBoundaryRef.current?.scopeKey === recoveryBoundaryScopeKey
+        ? recoveryBoundaryRef.current
+        : null;
+    if (!currentBoundary) {
+      throw new Error("현재 공동 편집 복구 경계를 확인할 수 없습니다.");
+    }
+    const vault = recoveryModule.createStudioCrdtRecoveryVault();
+    const entries = await vault.list(outboxScope, workId);
+    const matchingEntry = findStudioLiveRecoveryBoundaryEntry(entries, currentBoundary);
+    if (!matchingEntry) {
+      throw new Error("거부된 변경을 복구 저장소에 보존하는 중입니다. 잠시 뒤 다시 시도해 주세요.");
+    }
+    await recoveryModule.downloadStudioCrdtRecoveryBundle({
+      vault,
+      scope: outboxScope,
+      workId,
+    });
+    const exportedRecovery: StudioLiveRecoveryState = {
+      ...recovery,
+      vaultId: matchingEntry.vaultId,
+      updateCount: Math.max(recovery.updateCount, matchingEntry.updates.length),
+      exportAvailable: true,
+      exported: true,
+    };
+    if (recoveryBoundaryScopeKey) {
+      recoveryBoundaryRef.current = {
+        ...currentBoundary,
+        recovery: exportedRecovery,
+      };
+    }
+    setRecovery(exportedRecovery);
+  };
+
+  const reloadAuthoritative = () => {
+    const latchedRecovery =
+      recoveryBoundaryRef.current?.scopeKey === recoveryBoundaryScopeKey
+        ? recoveryBoundaryRef.current.recovery
+        : recovery;
+    if (
+      terminalTransportState !== "recovery-required" ||
+      !latchedRecovery?.exported ||
+      typeof globalThis.location?.reload !== "function"
+    ) return;
+    globalThis.location.reload();
+  };
 
   const value: StudioLiveCollaborationContextValue = {
     room,
@@ -412,14 +826,22 @@ export function StudioLiveCollaborationProvider({
         return false;
       }
     },
+    sync: syncSnapshot,
+    recovery,
+    exportRecovery,
+    reloadAuthoritative,
     retryServer: () => {
-      if (!transportFactory) return;
+      if (!transportFactory || terminalTransportState !== null) return;
       setError(null);
       setTransportPreference("server");
       setTransportRetryKey((value) => value + 1);
     },
     useLocalFallback: () => {
-      if (!transportFactory || !localFallbackAllowed) return;
+      if (
+        !transportFactory ||
+        !localFallbackAllowed ||
+        terminalTransportState !== null
+      ) return;
       setError(null);
       setTransportPreference("local");
       setTransportRetryKey((value) => value + 1);

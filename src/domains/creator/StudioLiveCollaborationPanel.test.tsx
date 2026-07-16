@@ -15,9 +15,28 @@ import type {
   StudioLiveChatMessage,
   StudioLivePeer,
 } from "./studio-live-collaboration-room";
+import type { StudioLiveSyncSnapshot } from "./studio-live-sync-safety";
 import type { StudioScreenShareState } from "./studio-screen-share";
 
 const noop = () => undefined;
+
+function syncSnapshot(
+  overrides: Partial<StudioLiveSyncSnapshot> = {}
+): StudioLiveSyncSnapshot {
+  return {
+    phase: "synced",
+    pendingCount: 0,
+    persistenceDurability: "durable",
+    transportReady: true,
+    operationSyncReady: true,
+    lastAckAt: 1_000_000,
+    lastAckServerSequence: "18",
+    editsDurablyProtected: true,
+    message: "팀 원고가 실시간으로 동기화됩니다.",
+    mode: "server",
+    ...overrides,
+  };
+}
 
 const peer: StudioLivePeer = {
   sessionId: "private-session-id",
@@ -63,6 +82,8 @@ function renderView(overrides: Partial<StudioLiveCollaborationPanelViewProps> = 
     onStopShare: noop,
     onRetryServer: noop,
     onUseLocalFallback: noop,
+    onExportRecovery: noop,
+    onReloadAuthoritative: noop,
     onStopViewer: noop,
     onWatchShare: noop,
     onStopWatching: noop,
@@ -121,6 +142,29 @@ describe("StudioLiveCollaborationPanelView", () => {
     expect(html).not.toContain("로컬 탭 미리보기");
   });
 
+  it("explains server, local durability, pending operations, and ACK recency without protocol ids", () => {
+    const html = renderView({
+      mode: "server",
+      syncSnapshot: syncSnapshot({
+        phase: "offline-queued",
+        transportReady: false,
+        pendingCount: 4,
+        lastAckAt: null,
+        lastAckServerSequence: "private-sequence-never-render",
+      }),
+    });
+
+    expect(html).toContain('data-studio-sync-safety-detail="offline-queued"');
+    expect(html).toContain("오프라인 · 4개 보관");
+    expect(html).toContain("서버 경로");
+    expect(html).toContain("연결 대기");
+    expect(html).toContain("기기 복구 저장소");
+    expect(html).toContain("보호됨");
+    expect(html).toContain("아직 서버 승인 없음");
+    expect(html).toContain("서버 승인을 기다리는 변경 4개");
+    expect(html).not.toContain("private-sequence-never-render");
+  });
+
   it("offers explicit server retry and local fallback recovery controls", () => {
     const failed = renderView({
       availability: "error",
@@ -138,10 +182,14 @@ describe("StudioLiveCollaborationPanelView", () => {
       serverAvailable: true,
       localFallbackAllowed: false,
       error: "작품 접근 권한이 회수되었습니다.",
+      syncSnapshot: syncSnapshot({
+        phase: "revoked",
+        operationSyncReady: false,
+        editsDurablyProtected: false,
+      }),
     });
-    expect(terminalFailure).toContain("로컬 탭 모드");
-    expect(terminalFailure).toContain("disabled");
-    expect(terminalFailure).toContain("로컬 모드로 우회할 수 없습니다");
+    expect(terminalFailure).not.toContain("팀 서버 다시 연결");
+    expect(terminalFailure).not.toContain("로컬 탭 모드");
 
     const operationFailure = renderView({
       availability: "ready",
@@ -161,6 +209,59 @@ describe("StudioLiveCollaborationPanelView", () => {
     expect(fallback).toContain("현재 같은 출처 로컬 탭 모드");
     expect(fallback).toContain("팀 서버 다시 연결");
     expect(fallback).not.toContain("> 로컬 탭 모드<");
+  });
+
+  it("replaces retry and local-fallback bypasses with an explicit export/reload boundary", () => {
+    const recoveryRequired = renderView({
+      availability: "error",
+      mode: "server",
+      serverAvailable: true,
+      localFallbackAllowed: false,
+      error: "서버가 이 변경을 영구 거부했습니다.",
+      syncSnapshot: syncSnapshot({
+        phase: "recovery-required",
+        operationSyncReady: false,
+        editsDurablyProtected: false,
+      }),
+      recovery: {
+        vaultId: "private-vault-id",
+        updateCount: 3,
+        exportAvailable: true,
+        exported: false,
+        message: "복구 파일을 먼저 내보내야 합니다.",
+      },
+    });
+
+    expect(recoveryRequired).toContain('data-studio-crdt-recovery-boundary="true"');
+    expect(recoveryRequired).toContain("거부된 로컬 변경을 먼저 보존해 주세요");
+    expect(recoveryRequired).toContain("복구 파일 내보내기");
+    expect(recoveryRequired).toContain("서버 원고 다시 열기");
+    expect(recoveryRequired).not.toContain("팀 서버 다시 연결");
+    expect(recoveryRequired).not.toContain("로컬 탭 모드");
+    expect(recoveryRequired).not.toContain("private-vault-id");
+    expect(recoveryRequired).toMatch(
+      /<button[^>]*disabled=""[^>]*title="복구 파일을 먼저 내보내야 서버 원고를 다시 열 수 있습니다\."[^>]*>[\s\S]*?서버 원고 다시 열기/
+    );
+
+    const exported = renderView({
+      availability: "error",
+      mode: "server",
+      serverAvailable: true,
+      syncSnapshot: syncSnapshot({
+        phase: "recovery-required",
+        operationSyncReady: false,
+        editsDurablyProtected: false,
+      }),
+      recovery: {
+        vaultId: "private-vault-id",
+        updateCount: 3,
+        exportAvailable: true,
+        exported: true,
+        message: "복구 파일을 내보냈습니다.",
+      },
+    });
+    expect(exported).toContain("복구 파일 다시 내보내기");
+    expect(exported).toContain("현재 낙관적 화면을 버리고 서버 권위 원고를 새로 엽니다");
   });
 
   it("shows ephemeral tab names and roles without rendering session, page or database ids", () => {

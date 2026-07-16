@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   IndexedDbStudioCrdtOutbox,
   SerializedStudioCrdtOutbox,
+  StudioCrdtOutboxCorruptionError,
+  StudioCrdtOutboxTimeoutError,
   type StudioCrdtOutbox,
 } from "./studio-crdt-outbox";
 import {
@@ -82,7 +84,7 @@ describe("Studio CRDT durable outbox", () => {
     expect(listCalls).toBe(1);
   });
 
-  it("releases the scoped queue and returns an empty degraded fallback when a put never settles", async () => {
+  it("releases the scoped queue and probes durable rows when a put never settles", async () => {
     let listCalls = 0;
     const delegate: StudioCrdtOutbox = {
       async list() {
@@ -103,8 +105,71 @@ describe("Studio CRDT durable outbox", () => {
 
     await expect(writing).rejects.toThrow("시간이 초과");
     await expect(listing).resolves.toEqual([]);
-    expect(replacement.getStatus()).toMatchObject({ state: "degraded" });
-    expect(listCalls).toBe(0);
+    expect(replacement.getStatus()).toMatchObject({ state: "durable" });
+    expect(listCalls).toBe(1);
+  });
+
+  it("does not omit an older durable row while the scoped write circuit is open", async () => {
+    const durable = request(
+      "circuit-read-work-a",
+      "12121212-1212-4212-8212-121212121212"
+    );
+    let listCalls = 0;
+    const delegate: StudioCrdtOutbox = {
+      async list() {
+        listCalls += 1;
+        return [durable];
+      },
+      listEmergency: () => [],
+      put: () => new Promise<void>(() => undefined),
+      async remove() {
+        return undefined;
+      },
+    };
+    const previous = new SerializedStudioCrdtOutbox(delegate, { timeoutMs: 100 });
+    const replacement = new SerializedStudioCrdtOutbox(delegate, { timeoutMs: 100 });
+    const inFlight = request(
+      durable.workId,
+      "13131313-1313-4313-8313-131313131313"
+    );
+
+    await expect(previous.put("circuit-read-user-a", inFlight)).rejects.toBeInstanceOf(
+      StudioCrdtOutboxTimeoutError
+    );
+
+    await expect(replacement.list("circuit-read-user-a", durable.workId)).resolves.toEqual([
+      durable,
+    ]);
+    expect(listCalls).toBe(1);
+  });
+
+  it("still detects a malformed durable row while the scoped write circuit is open", async () => {
+    const scope = "circuit-corrupt-user-a";
+    const workId = "circuit-corrupt-work-a";
+    let listCalls = 0;
+    const delegate: StudioCrdtOutbox = {
+      async list() {
+        listCalls += 1;
+        throw new StudioCrdtOutboxCorruptionError();
+      },
+      listEmergency: () => [],
+      put: () => new Promise<void>(() => undefined),
+      async remove() {
+        return undefined;
+      },
+    };
+    const previous = new SerializedStudioCrdtOutbox(delegate, { timeoutMs: 100 });
+    const replacement = new SerializedStudioCrdtOutbox(delegate, { timeoutMs: 100 });
+
+    await expect(previous.put(
+      scope,
+      request(workId, "14141414-1414-4414-8414-141414141414")
+    )).rejects.toBeInstanceOf(StudioCrdtOutboxTimeoutError);
+
+    await expect(replacement.list(scope, workId)).rejects.toBeInstanceOf(
+      StudioCrdtOutboxCorruptionError
+    );
+    expect(listCalls).toBe(1);
   });
 
   it("does not let a late put resurrect an update after its authoritative ACK", async () => {
@@ -176,7 +241,7 @@ describe("Studio CRDT durable outbox", () => {
 
     await expect(removing).rejects.toThrow("시간이 초과");
     await expect(listing).resolves.toEqual([]);
-    expect(listCalls).toBe(0);
+    expect(listCalls).toBe(1);
   });
 
   it("clears the shared ACK marker when a timed-out remove succeeds late", async () => {
@@ -246,7 +311,38 @@ describe("Studio CRDT durable outbox", () => {
     });
   });
 
-  it("returns the emergency snapshot when an IndexedDB list never settles", async () => {
+  it("fails closed when a scoped IndexedDB row is invalid instead of dropping an unapproved edit", async () => {
+    const scope = "corrupt-row-user-a";
+    const workId = "corrupt-row-work-a";
+    const persistence = {
+      async list() {
+        return [{
+          kind: "update",
+          key: JSON.stringify([scope, workId, "corrupt-update"]),
+          scope,
+          workId,
+          updateId: "corrupt-update",
+          clientSequence: 1,
+          createdAt: 1,
+          request: { invalid: true },
+        }];
+      },
+      async put() {
+        return undefined;
+      },
+      async delete() {
+        return undefined;
+      },
+    };
+    const direct = new IndexedDbStudioCrdtOutbox(persistence);
+    const serialized = new SerializedStudioCrdtOutbox(direct);
+
+    await expect(serialized.list(scope, workId)).rejects.toBeInstanceOf(
+      StudioCrdtOutboxCorruptionError
+    );
+  });
+
+  it("fails closed when an IndexedDB list never settles", async () => {
     const pending = request("emergency-work-a", "44444444-4444-4444-8444-444444444444");
     const delegate: StudioCrdtOutbox = {
       list: () => new Promise<StudioCrdtUpdateRequest[]>(() => undefined),
@@ -260,7 +356,9 @@ describe("Studio CRDT durable outbox", () => {
     };
     const outbox = new SerializedStudioCrdtOutbox(delegate, { timeoutMs: 100 });
 
-    await expect(outbox.list("emergency-user-a", pending.workId)).resolves.toEqual([pending]);
+    await expect(outbox.list("emergency-user-a", pending.workId)).rejects.toBeInstanceOf(
+      StudioCrdtOutboxTimeoutError
+    );
   });
 
   it("shares ACK tombstones across replacement IndexedDB delegate instances", async () => {

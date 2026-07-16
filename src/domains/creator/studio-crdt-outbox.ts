@@ -94,6 +94,14 @@ export class StudioCrdtOutboxTimeoutError extends StudioCrdtOutboxUnavailableErr
   }
 }
 
+/** A scoped row exists but cannot be trusted; falling back to an empty snapshot would lose work. */
+export class StudioCrdtOutboxCorruptionError extends Error {
+  constructor() {
+    super("CRDT outbox에 손상된 미승인 변경이 있어 원고를 안전하게 열 수 없습니다.");
+    this.name = "StudioCrdtOutboxCorruptionError";
+  }
+}
+
 function outboxKey(scope: string, workId: string, updateId: string): string {
   return JSON.stringify([scope, workId, updateId]);
 }
@@ -358,8 +366,12 @@ export class IndexedDbStudioCrdtOutbox implements StudioCrdtOutbox {
     let storedRows: unknown[];
     try {
       storedRows = await this.listStoredRows(scope, workId);
+      if (storedRows.some((row) => !isStoredUpdate(row) && !isStoredTombstone(row))) {
+        throw new StudioCrdtOutboxCorruptionError();
+      }
       this.refreshMemoryDurability(scope, workId);
     } catch (error) {
+      if (error instanceof StudioCrdtOutboxCorruptionError) throw error;
       this.markDegraded(error);
       return this.listEmergency(scope, workId);
     }
@@ -566,23 +578,19 @@ export class SerializedStudioCrdtOutbox implements StudioCrdtOutbox {
   }
 
   list(scope: string, workId: string): Promise<StudioCrdtUpdateRequest[]> {
-    const key = scopeWorkKey(scope, workId);
-    if (isCircuitOpen(key)) {
-      const emergency = this.delegate.listEmergency?.(scope, workId) ?? [];
-      this.markDegraded(
-        new StudioCrdtOutboxUnavailableError("CRDT outbox가 복구 대기 중입니다.")
-      );
-      return Promise.resolve(
-        filterAcknowledged(this.delegateState.acknowledgedUpdates, scope, workId, emergency)
-      );
-    }
+    // A write/remove timeout opens the per-work circuit, but a replacement binding must still
+    // inspect the durable namespace before it exposes a document. Returning only the same-page
+    // emergency snapshot here can omit older IndexedDB rows (or hide a malformed scoped row) and
+    // let Studio save a stale frontier. Reads therefore probe through the circuit exactly like ACK
+    // cleanup. The serialized timeout below still bounds a wedged database.
     return serializeOutboxOperation(
       scope,
       workId,
       () => this.delegate.list(scope, workId),
       this.timeoutMs,
       this.scheduleTimeout,
-      this.cancelTimeout
+      this.cancelTimeout,
+      true
     ).then(
       (requests) => {
         if (this.delegate.getStatus?.().state !== "degraded") this.markDurable();
@@ -594,6 +602,14 @@ export class SerializedStudioCrdtOutbox implements StudioCrdtOutbox {
         );
       },
       (error: unknown) => {
+        if (
+          error instanceof StudioCrdtOutboxCorruptionError ||
+          error instanceof StudioCrdtOutboxTimeoutError
+        ) {
+          // A timed-out durable read is an unknown snapshot, not evidence that the emergency copy
+          // is complete. Propagate it so restoreOutbox enters its terminal fail-closed boundary.
+          throw error;
+        }
         this.markDegraded(error);
         const emergency = this.delegate.listEmergency?.(scope, workId) ?? [];
         return filterAcknowledged(

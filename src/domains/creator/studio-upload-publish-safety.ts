@@ -26,6 +26,7 @@ export interface StudioUploadSharedDocumentIdentity {
   capabilities: { view: true; edit: boolean };
   access: StudioUploadSharedAccess;
   revision: number;
+  crdtServerSequence: string;
   document: { format: string };
 }
 
@@ -36,6 +37,7 @@ export interface StudioUploadSharedMetaIdentity {
   capabilities: { view: true; edit: boolean };
   access: StudioUploadSharedAccess;
   revision: number;
+  crdtServerSequence: string;
 }
 
 export interface StudioUploadSharedSaveIdentity {
@@ -45,6 +47,7 @@ export interface StudioUploadSharedSaveIdentity {
 }
 
 const MAX_REVISION = 2_147_483_647;
+const POSTGRES_BIGINT_MAX = BigInt("9223372036854775807");
 export const STUDIO_UPLOAD_MAX_JSON_BYTES = 15 * 1024 * 1024;
 const STUDIO_UPLOAD_EDIT_ROLES = new Set<StudioUploadSharedRole>([
   "owner",
@@ -148,6 +151,7 @@ export function validateStudioUploadHydratedSharedDocument(
       "작품의 저장 버전을 확인하지 못했습니다. 다시 불러와 주세요."
     );
   }
+  resolveStudioUploadSharedCrdtSaveFence(work);
   const expectedAccess: StudioUploadSharedAccess = STUDIO_UPLOAD_EDIT_ROLES.has(work.role)
     ? "edit"
     : work.role === "commenter"
@@ -180,6 +184,25 @@ export function canPublishStudioUploadSharedDocument(
   meta: StudioUploadSharedMetaIdentity | null
 ): boolean {
   return Boolean(meta?.role === "owner" && canEditStudioUploadSharedDocument(meta));
+}
+
+/**
+ * Upload mode has no live CRDT binding, so it uses the fresh meta response as a server-attested
+ * optimistic fence. The PATCH transaction re-checks this value under the CRDT advisory lock.
+ */
+export function resolveStudioUploadSharedCrdtSaveFence(
+  meta: Pick<StudioUploadSharedMetaIdentity, "crdtServerSequence">
+): string {
+  const sequence = meta.crdtServerSequence;
+  if (
+    !/^(?:0|[1-9]\d{0,18})$/.test(sequence) ||
+    BigInt(sequence) > POSTGRES_BIGINT_MAX
+  ) {
+    throw new StudioUploadPublishSafetyError(
+      "공동 문서 CRDT 저장 순번을 확인하지 못했습니다."
+    );
+  }
+  return sequence;
 }
 
 export function resolveStudioUploadActionLocks({

@@ -15,6 +15,7 @@ import {
   isStudioUploadPublishScopeCurrent,
   isStudioUploadWorkspaceLocked,
   resolveStudioUploadActionLocks,
+  resolveStudioUploadSharedCrdtSaveFence,
   resolveStudioUploadUpdateRevision,
   runStudioUploadPublishStages,
   shouldResetStudioUploadDraft,
@@ -42,6 +43,7 @@ describe("studio upload hydration safety", () => {
       capabilities: { view: true as const, edit: true },
       access: "edit" as const,
       revision: 7,
+      crdtServerSequence: "27",
       document: { format: "upload" },
     };
     expect(validateStudioUploadHydratedSharedDocument(editable, scope)).toBe(7);
@@ -91,6 +93,12 @@ describe("studio upload hydration safety", () => {
         scope
       )
     ).toThrow(/역할과 편집 권한/);
+    expect(() =>
+      validateStudioUploadHydratedSharedDocument(
+        { ...editable, crdtServerSequence: "01" },
+        scope
+      )
+    ).toThrow(/CRDT/);
   });
 
   it("focus/save 직전 meta의 role·권한·revision 변경을 fail-closed 처리한다", () => {
@@ -101,6 +109,7 @@ describe("studio upload hydration safety", () => {
       capabilities: { view: true as const, edit: true },
       access: "edit" as const,
       revision: 7,
+      crdtServerSequence: "27",
     };
     expect(() => assertStudioUploadSharedMetaUnchanged(meta, { ...meta })).not.toThrow();
     for (const fresh of [
@@ -122,6 +131,7 @@ describe("studio upload hydration safety", () => {
       capabilities: { view: true as const, edit: true },
       access: "edit" as const,
       revision: 7,
+      crdtServerSequence: "27",
       updatedAt: "2026-07-12T00:00:00.000Z",
     };
     expect(
@@ -138,6 +148,20 @@ describe("studio upload hydration safety", () => {
         updatedAt: "2026-07-12T00:01:00.000Z",
       })
     ).toThrow(StudioUploadPublishSafetyError);
+  });
+
+  it("공동 upload 저장은 save 직전 fresh meta의 PostgreSQL bigint CRDT fence만 사용한다", () => {
+    expect(resolveStudioUploadSharedCrdtSaveFence({ crdtServerSequence: "0" })).toBe("0");
+    expect(
+      resolveStudioUploadSharedCrdtSaveFence({
+        crdtServerSequence: "9223372036854775807",
+      })
+    ).toBe("9223372036854775807");
+    for (const crdtServerSequence of ["", "-1", "+1", "01", "9223372036854775808"]) {
+      expect(() =>
+        resolveStudioUploadSharedCrdtSaveFence({ crdtServerSequence })
+      ).toThrow(StudioUploadPublishSafetyError);
+    }
   });
 
   it("기존 작품은 ready와 유효 revision 없이는 저장할 수 없고 실패 상태도 잠근다", () => {

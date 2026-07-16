@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   StudioSharedDocumentAccessError,
+  StudioSharedDocumentCrdtSequenceConflictError,
   StudioSharedDocumentInputError,
   StudioSharedDocumentResponseContractError,
   StudioSharedDocumentRevisionConflictError,
@@ -9,6 +10,7 @@ import {
   getStudioSharedDocument,
   getStudioSharedDocumentMeta,
   isStudioSharedDocumentAccessError,
+  isStudioSharedDocumentCrdtSequenceConflictError,
   isStudioSharedDocumentScopeCurrent,
   normalizeStudioSharedDocument,
   normalizeStudioSharedDocumentMeta,
@@ -40,6 +42,7 @@ function response(overrides: Record<string, unknown> = {}) {
     status: "active",
     capabilities: { view: true, edit: true },
     revision: 7,
+    crdtServerSequence: "27",
     updatedAt: "2026-07-12T11:30:00+09:00",
     document: {
       titleId: null,
@@ -77,6 +80,18 @@ function conflictError(currentRevision: unknown) {
   };
 }
 
+function crdtConflictError(currentCrdtServerSequence: unknown) {
+  return {
+    httpError: true,
+    response: { status: 409 },
+    data: {
+      code: "creator_crdt_sequence_conflict",
+      currentCrdtServerSequence,
+      requestedCrdtServerSequence: "private-request-value",
+    },
+  };
+}
+
 function accessError(status: 401 | 403 | 404) {
   return {
     httpError: true,
@@ -102,6 +117,7 @@ describe("normalizeStudioSharedDocument", () => {
       capabilities: { view: true, edit: true },
       access: "edit",
       revision: 7,
+      crdtServerSequence: "27",
       updatedAt: "2026-07-12T02:30:00.000Z",
       document: {
         titleId: null,
@@ -259,6 +275,7 @@ describe("normalizeStudioSharedDocumentMeta", () => {
         capabilities: { view: true, edit: normalizedEdit },
         access,
         revision: 7,
+        crdtServerSequence: "27",
         updatedAt: "2026-07-12T02:30:00.000Z",
       });
       expect(canEditStudioSharedDocument(normalized)).toBe(normalizedEdit);
@@ -320,6 +337,7 @@ describe("normalizeStudioSharedDocumentPatch", () => {
     const pages = ["page-1"];
     const patch = normalizeStudioSharedDocumentPatch({
       baseRevision: 7,
+      crdtServerSequence: "27",
       title: "  수정 제목  ",
       description: "설명 ",
       tags,
@@ -332,6 +350,7 @@ describe("normalizeStudioSharedDocumentPatch", () => {
 
     expect(patch).toEqual({
       baseRevision: 7,
+      crdtServerSequence: "27",
       title: "수정 제목",
       description: "설명 ",
       tags: ["로맨스"],
@@ -347,16 +366,18 @@ describe("normalizeStudioSharedDocumentPatch", () => {
 
   it.each([
     ["입력 객체", null],
-    ["revision", { baseRevision: 0, title: "제목" }],
-    ["빈 변경", { baseRevision: 7 }],
-    ["빈 제목", { baseRevision: 7, title: "   " }],
-    ["긴 설명", { baseRevision: 7, description: "가".repeat(2_001) }],
-    ["긴 태그", { baseRevision: 7, tags: ["가".repeat(25)] }],
-    ["페이지 수", { baseRevision: 7, pages: Array.from({ length: 201 }, () => "page") }],
-    ["doc 배열", { baseRevision: 7, doc: [] }],
-    ["doc 클래스", { baseRevision: 7, doc: new Date() }],
-    ["format 전환", { baseRevision: 7, title: "제목", format: "upload" }],
-    ["unknown 필드", { baseRevision: 7, title: "제목", seriesId: "owner-only" }],
+    ["revision", { baseRevision: 0, crdtServerSequence: "27", title: "제목" }],
+    ["CRDT 순번 누락", { baseRevision: 7, title: "제목" }],
+    ["CRDT 순번 초과", { baseRevision: 7, crdtServerSequence: "9223372036854775808", title: "제목" }],
+    ["빈 변경", { baseRevision: 7, crdtServerSequence: "27" }],
+    ["빈 제목", { baseRevision: 7, crdtServerSequence: "27", title: "   " }],
+    ["긴 설명", { baseRevision: 7, crdtServerSequence: "27", description: "가".repeat(2_001) }],
+    ["긴 태그", { baseRevision: 7, crdtServerSequence: "27", tags: ["가".repeat(25)] }],
+    ["페이지 수", { baseRevision: 7, crdtServerSequence: "27", pages: Array.from({ length: 201 }, () => "page") }],
+    ["doc 배열", { baseRevision: 7, crdtServerSequence: "27", doc: [] }],
+    ["doc 클래스", { baseRevision: 7, crdtServerSequence: "27", doc: new Date() }],
+    ["format 전환", { baseRevision: 7, crdtServerSequence: "27", title: "제목", format: "upload" }],
+    ["unknown 필드", { baseRevision: 7, crdtServerSequence: "27", title: "제목", seriesId: "owner-only" }],
   ])("잘못된 %s을 전송 전에 차단한다", (_label, input) => {
     expect(() => normalizeStudioSharedDocumentPatch(input)).toThrow(
       StudioSharedDocumentInputError
@@ -392,6 +413,7 @@ describe("shared document requests", () => {
       capabilities: { view: true, edit: true },
       access: "edit",
       revision: 7,
+      crdtServerSequence: "27",
       updatedAt: "2026-07-12T02:30:00.000Z",
     });
     expect(apiGet).toHaveBeenCalledWith(
@@ -429,7 +451,7 @@ describe("shared document requests", () => {
       updateStudioSharedDocument(
         "Shared/WORK 01",
         "editor",
-        { baseRevision: 7, title: "  새 제목 " },
+        { baseRevision: 7, crdtServerSequence: "27", title: "  새 제목 " },
         controller.signal
       )
     ).resolves.toEqual({
@@ -439,7 +461,7 @@ describe("shared document requests", () => {
     });
     expect(apiPatch).toHaveBeenCalledWith(
       "/creator/works/Shared%2FWORK%2001/team/document",
-      { baseRevision: 7, title: "새 제목" },
+      { baseRevision: 7, crdtServerSequence: "27", title: "새 제목" },
       { signal: controller.signal }
     );
   });
@@ -478,6 +500,7 @@ describe("shared document requests", () => {
 
     const error = await updateStudioSharedDocument("Shared/WORK 01", "editor", {
       baseRevision: 7,
+      crdtServerSequence: "27",
       title: "수정",
     }).catch((cause: unknown) => cause);
 
@@ -487,10 +510,32 @@ describe("shared document requests", () => {
     expect(toApiError).not.toHaveBeenCalled();
   });
 
+  it("CRDT sequence 409를 현재 decimal 순번만 가진 전용 오류로 변환한다", async () => {
+    apiPatch.mockRejectedValue(crdtConflictError("28"));
+
+    const error = await updateStudioSharedDocument("Shared/WORK 01", "editor", {
+      baseRevision: 7,
+      crdtServerSequence: "27",
+      title: "수정",
+    }).catch((cause: unknown) => cause);
+
+    expect(error).toBeInstanceOf(StudioSharedDocumentCrdtSequenceConflictError);
+    expect(isStudioSharedDocumentCrdtSequenceConflictError(error)).toBe(true);
+    expect(
+      (error as StudioSharedDocumentCrdtSequenceConflictError).currentCrdtServerSequence
+    ).toBe("28");
+    expect(JSON.stringify(error)).not.toContain("private-request-value");
+    expect(toApiError).not.toHaveBeenCalled();
+  });
+
   it("손상된 409와 일반 API 오류는 안전한 오류 경로로 보낸다", async () => {
     apiPatch.mockRejectedValue(conflictError("9"));
     await expect(
-      updateStudioSharedDocument("Shared/WORK 01", "editor", { baseRevision: 7, title: "수정" })
+      updateStudioSharedDocument("Shared/WORK 01", "editor", {
+        baseRevision: 7,
+        crdtServerSequence: "27",
+        title: "수정",
+      })
     ).rejects.toThrow("안전한 API 오류");
 
     apiGet.mockRejectedValue(new Error("raw"));
@@ -514,6 +559,7 @@ describe("shared document requests", () => {
       await expect(
         updateStudioSharedDocument("Shared/WORK 01", "editor", {
           baseRevision: 7,
+          crdtServerSequence: "27",
           title: "수정",
         })
       ).rejects.toBeInstanceOf(StudioSharedDocumentAccessError);
@@ -528,7 +574,11 @@ describe("shared document requests", () => {
       StudioSharedDocumentInputError
     );
     await expect(
-      updateStudioSharedDocument("", "editor", { baseRevision: 7, title: "수정" })
+      updateStudioSharedDocument("", "editor", {
+        baseRevision: 7,
+        crdtServerSequence: "27",
+        title: "수정",
+      })
     ).rejects.toBeInstanceOf(StudioSharedDocumentInputError);
     expect(apiGet).not.toHaveBeenCalled();
     expect(apiPatch).not.toHaveBeenCalled();
@@ -543,6 +593,7 @@ describe("shared document requests", () => {
 
     await updateStudioSharedDocument("Shared/WORK 01", "admin", {
       baseRevision: 7,
+      crdtServerSequence: "27",
       title: "공동 수정",
       titleId: "catalog-owner-only",
       status: "published",
@@ -550,7 +601,7 @@ describe("shared document requests", () => {
 
     expect(apiPatch).toHaveBeenCalledWith(
       "/creator/works/Shared%2FWORK%2001/team/document",
-      { baseRevision: 7, title: "공동 수정" },
+      { baseRevision: 7, crdtServerSequence: "27", title: "공동 수정" },
       { signal: undefined }
     );
   });
@@ -564,13 +615,19 @@ describe("shared document requests", () => {
 
     await updateStudioSharedDocument("Shared/WORK 01", "owner", {
       baseRevision: 7,
+      crdtServerSequence: "27",
       titleId: "catalog-1",
       status: "published",
     });
 
     expect(apiPatch).toHaveBeenCalledWith(
       "/creator/works/Shared%2FWORK%2001/team/document",
-      { baseRevision: 7, titleId: "catalog-1", status: "published" },
+      {
+        baseRevision: 7,
+        crdtServerSequence: "27",
+        titleId: "catalog-1",
+        status: "published",
+      },
       { signal: undefined }
     );
   });

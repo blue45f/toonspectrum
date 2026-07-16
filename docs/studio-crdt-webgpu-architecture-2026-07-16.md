@@ -8,8 +8,8 @@ rewrites rather than claims that every legacy scene type already runs on the new
 
 | Track | Current status | Authority boundary |
 | --- | --- | --- |
-| G9b — realtime CRDT operations | **Shipped vertical slice** | Yjs is authoritative for strokes, scene references, pages, layer groups, mixed order, and delete/restore operations. PostgreSQL is authoritative for durable updates/snapshots and short edit leases. |
-| G10b — WebGPU canvas | **Safe live-input slice** | WebGPU is authoritative only for a matching, complete live-draft frame. Committed document pixels remain authoritative in Konva until pixel parity and every Stage readback path share one contract. |
+| G9b — realtime CRDT operations | **Shipped vector slice + opt-in raster pilot** | Yjs is authoritative for vector/stylus scene operations and the immutable semantic raster log. PostgreSQL is authoritative for durable updates, snapshots, raster assets and short edit leases. The verified round-pen raster path requires paired deployment tokens. |
+| G10b — WebGPU canvas | **Safe live-input + verified raster presentation slice** | WebGPU accelerates matching live drafts and verified raster tiles. Konva remains the durable fallback and interaction/readback authority; an exact idle/select-only front suffix is hidden only in the same commit that authorizes a complete raster frame. |
 
 ## G9b: convergent multi-user document
 
@@ -26,6 +26,10 @@ rewrites rather than claims that every legacy scene type already runs on the new
   separate, preventing one artist's undo from removing another artist's operation.
 - Image, VRM, and 3D content enters the CRDT as a bounded typed reference, not as a data URL or
   model blob. A client materializes it only against a same-ID, same-type local source.
+- Semantic raster operations are immutable, deterministically ordered, and reference
+  content-addressed PNG patch assets. Paint, erase, fill, selection, filter, transform, merge and
+  flatten contracts exist; the first product publisher intentionally emits only exact round,
+  opaque, source-over pen operations.
 
 ### Server durability and multi-node behavior
 
@@ -43,6 +47,35 @@ rewrites rather than claims that every legacy scene type already runs on the new
 - Saturation returns a recoverable `rate_limited` acknowledgement. The browser's ordered outbox
   backs off and retries the same idempotent update ID instead of reporting the rejected attempt as
   data loss or creating a duplicate durable update.
+- Server acknowledgement codes survive the transport boundary. Retryable failures retain the same
+  durable update ID. Permanent invalid/forbidden/revoked failures copy the dependent unsent frontier
+  into a separate, non-retrying IndexedDB recovery vault before removing its resend copy, detach the
+  optimistic document, and enter an explicit recovery-required fail-closed state instead of retrying
+  forever or silently diverging. If the vault write fails, the resend copy is retained but the
+  current binding remains terminal, so the rejected frontier cannot be replayed in that session.
+- A local BroadcastChannel receipt proves only same-origin peer visibility. It never advances the
+  authoritative ACK clock or removes the durable outbox entry; the same update ID stays queued until
+  a server room acknowledges it. Recovery requires an explicit JSON export followed by a full reload
+  of the server-authoritative document, and the normal retry/local-fallback controls are unavailable
+  while that boundary is active.
+- Recovery writes a small permanent-rejection guard before the full frontier. Large frontiers are
+  stored as bounded chunks plus a commit-last manifest instead of failing at a fixed batch count;
+  an orphan guard or malformed IndexedDB row locks reopening before any resend can occur. While a
+  terminal boundary remains active, the provider keeps checking the vault with capped backoff, so a
+  slow IndexedDB write still exposes the recovery export instead of disappearing after a fixed poll
+  count.
+- Shared-document save and publish acquire a client-side authoritative barrier: the final sub-frame
+  batch is flushed, every pending operation must receive a server ACK, and one final state-vector
+  repair must complete before the REST document snapshot is captured. A permanent sync/update
+  rejection cancels that save and detaches the optimistic document.
+- The barrier returns the exact PostgreSQL CRDT sequence and every shared-document PATCH must carry
+  that canonical non-negative bigint value. The API takes the same per-work CRDT advisory lock,
+  recomputes the maximum snapshot/update sequence inside the save transaction, and returns the
+  dedicated `creator_crdt_sequence_conflict` 409 response if another writer advanced the frontier;
+  a REST revision can therefore never silently commit against a stale CRDT snapshot.
+- Deterministic server snapshot/update corruption uses the permanent `storage_corruption` ACK code.
+  It is never collapsed into retryable `internal_error`, preventing an unrecoverable store from
+  replaying the same update indefinitely.
 - A per-work PostgreSQL transaction advisory lock serializes duplicate-receipt lookup, hydration,
   schema validation, receipt insertion, and update insertion. Validation failure rolls the entire
   transaction back, including under concurrent writers on different API nodes.
@@ -59,9 +92,12 @@ rewrites rather than claims that every legacy scene type already runs on the new
 
 ### Intentional limits / next slices
 
-- The shared document currently models drawing as semantic vector/stylus operations. A destructive
-  raster-edit tool that rewrites existing pixels still needs an opaque, chunked tile operation
-  format or conversion into non-destructive operations; it is not falsely merged byte-by-byte.
+- The semantic raster operation, asset, replay and WebGPU/Canvas2D presentation layers exist. Studio
+  currently publishes only exact round opaque pen strokes and authorizes display only for an
+  interaction-free topmost suffix. Erase, fill, selection, filter, transform, merge and flatten are
+  not yet connected to every Studio tool even though their protocol contracts exist.
+- A trusted coordinator is still required to compact the grow-only semantic raster log into stable
+  checkpoint tiles; clients are intentionally forbidden from claiming checkpoint authority.
 - A newly referenced remote image/VRM/3D asset needs a work-scoped upload/fetch and placeholder
   hydration lifecycle before a peer that never held the asset can materialize it.
 - Multi-instance operation requires `STUDIO_LIVE_CLUSTER_ADAPTER=postgres`, a LISTEN-capable direct
@@ -94,11 +130,17 @@ rewrites rather than claims that every legacy scene type already runs on the new
   ratio. It does not allocate a texture the height of a complete scrolling episode.
 - Queue completion carries an opaque request receipt. A stale, superseded, incomplete, lost-device,
   empty, non-finite, or over-budget frame cannot hide the authoritative Konva canvas.
-- A fail-closed committed-suffix planner and exact scene/viewport authority snapshot are implemented,
-  but Studio intentionally does not hide committed Konva nodes yet. The current Konva pressure
-  renderer uses endpoint-width segments while the GPU compositor uses interpolated dabs; treating
-  those as interchangeable would also omit GPU-owned pixels from Stage-only timelapse, animation,
-  eyedropper, and asset-capture readbacks.
+- A fail-closed committed-suffix planner, exact scene/viewport authority key and two-phase raster
+  handoff are mounted behind the paired experiment token. The tile presenter prepares a hidden
+  verified frame; one React commit then reveals it and hides only the exact redundant Konva source
+  IDs. Scroll/resize, scene edits, selection, drawing tools, post-processing, export, device loss,
+  stale frames and replay conflicts immediately restore the vectors.
+- The live draft compositor still uses interpolated dabs while Konva uses endpoint-width segments.
+  Therefore live-draft ownership remains temporary; analytic segment parity and browser golden
+  pixels are required before broader committed vector authority.
+- Studio live drafts disable unused frame-readback snapshots, eliminating the per-frame full-surface
+  texture copy. Empty/invalid stroke sets suspend retained resources and defer GPU initialization
+  while keeping an already acquired device reusable for the next valid stroke.
 
 ### Safety and fallback
 
@@ -122,9 +164,10 @@ rewrites rather than claims that every legacy scene type already runs on the new
 - Canvas2D remains the compositor-compatible fallback when WebGPU is unavailable. Konva remains the
   scene/interactions authority for unsupported images, text, bubbles, filters, selections, and 3D
   surfaces until their render contracts move to GPU passes.
-- Committed ownership will be enabled only after an analytic endpoint-width segment pass, alpha and
-  single-point golden-pixel parity, receipt ownership tokens, native-scroll pre-paint revocation,
-  GPU-aware readback composition, and a top interaction overlay plane all pass together.
+- Broader committed ownership will be enabled only after an analytic endpoint-width segment pass,
+  alpha and single-point golden-pixel parity, GPU-aware readback composition, and a shared top
+  interaction overlay plane all pass together. The current raster pilot already uses receipt
+  authority tokens and native-scroll pre-paint revocation, but remains idle/select-only.
 
 ## Verification contracts
 

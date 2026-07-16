@@ -50,6 +50,7 @@ import {
   isStudioUploadSharedAccessChangedError,
   isStudioUploadWorkspaceLocked,
   resolveStudioUploadActionLocks,
+  resolveStudioUploadSharedCrdtSaveFence,
   resolveStudioUploadUpdateRevision,
   runStudioUploadPublishStages,
   shouldResetStudioUploadDraft,
@@ -604,6 +605,10 @@ export function StudioUploadPublish() {
             }
             const patch = {
               baseRevision,
+              // Upload documents do not mount the live CRDT editor. The fresh server-attested
+              // frontier is still fenced by the PATCH transaction; any append after this GET
+              // produces creator_crdt_sequence_conflict instead of silently crossing the save.
+              crdtServerSequence: resolveStudioUploadSharedCrdtSaveFence(fresh),
               ...editableContent,
               ...(fresh.role === "owner"
                 ? {

@@ -1,4 +1,17 @@
-import { Check, MessageCircle, MousePointer2, Radio, UsersRound, X } from "lucide-react";
+import {
+  Check,
+  CloudOff,
+  LoaderCircle,
+  MessageCircle,
+  MousePointer2,
+  Radio,
+  RefreshCw,
+  ShieldAlert,
+  ShieldCheck,
+  UsersRound,
+  Wrench,
+  X,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import {
@@ -12,6 +25,13 @@ import {
   type StudioCanvasCommentPin,
 } from "./studio-live-canvas-overlay-model";
 import { useStudioLiveCollaboration } from "./studio-live-collaboration-context";
+import {
+  INITIAL_STUDIO_LIVE_SYNC_SNAPSHOT,
+  formatStudioLiveLastAck,
+  presentStudioLiveSyncSnapshot,
+  type StudioLiveSyncPhase,
+  type StudioLiveSyncSnapshot,
+} from "./studio-live-sync-safety";
 
 import type { StudioCommentAnchor } from "./studio-comments";
 import type {
@@ -45,6 +65,7 @@ export interface StudioLivePresenceDockProps {
   followingSessionId: string | null;
   onOpenTeam: () => void;
   onToggleFollow: (sessionId: string) => void;
+  syncSnapshot?: StudioLiveSyncSnapshot;
 }
 
 export interface StudioRemoteCursorOverlayProps {
@@ -78,6 +99,42 @@ function roleLabel(role: StudioLiveParticipant["role"]): string {
   if (role === "editor") return "편집자";
   if (role === "commenter") return "검토자";
   return "열람자";
+}
+
+function syncToneClass(tone: ReturnType<typeof presentStudioLiveSyncSnapshot>["tone"]): string {
+  if (tone === "good") return "border-good/40 bg-good/10 text-good";
+  if (tone === "warn") return "border-warn/45 bg-warn/10 text-warn";
+  if (tone === "bad") return "border-bad/50 bg-bad/12 text-bad";
+  if (tone === "cool") return "border-cool/40 bg-cool/10 text-cool";
+  return "border-line bg-card text-fg-2";
+}
+
+function StudioSyncStatusIcon({ phase }: { phase: StudioLiveSyncPhase }) {
+  if (phase === "synced") return <ShieldCheck size={14} aria-hidden />;
+  if (phase === "offline-queued") return <CloudOff size={14} aria-hidden />;
+  if (phase === "repairing") return <Wrench size={14} aria-hidden />;
+  if (phase === "durability-risk" || phase === "revoked" || phase === "recovery-required") {
+    return <ShieldAlert size={14} aria-hidden />;
+  }
+  if (phase === "retrying") {
+    return (
+      <RefreshCw
+        className="animate-spin [animation-duration:1.4s] motion-reduce:animate-none"
+        size={14}
+        aria-hidden
+      />
+    );
+  }
+  if (phase === "syncing" || phase === "initializing") {
+    return (
+      <LoaderCircle
+        className="animate-spin [animation-duration:1.2s] motion-reduce:animate-none"
+        size={14}
+        aria-hidden
+      />
+    );
+  }
+  return <Radio size={14} aria-hidden />;
 }
 
 export function StudioLiveCanvasOverlay({
@@ -260,6 +317,7 @@ export function StudioLivePresenceDock({
   followingSessionId,
   onOpenTeam,
   onToggleFollow,
+  syncSnapshot,
 }: StudioLivePresenceDockProps) {
   // Always-on collab chrome: parent passes alwaysOn while connecting/ready (Magma presence strip).
   if (!alwaysOn && !connected && peers.length === 0) return null;
@@ -270,42 +328,61 @@ export function StudioLivePresenceDock({
   const mobileOverflow = studioPresenceOverflowLabel(mobileHiddenPeerCount);
   const desktopOverflow = studioPresenceOverflowLabel(desktopHiddenPeerCount);
   const connectionLabel = studioPresenceConnectionLabel(connected);
-  const collaborationLabel = connected
-    ? operationSyncReady
-      ? `${connectionLabel} · 획 동시 편집 준비됨`
-      : `${connectionLabel} · 원고 연산 동기화 중`
-    : connectionLabel;
+  const resolvedSync = syncSnapshot ?? {
+    ...INITIAL_STUDIO_LIVE_SYNC_SNAPSHOT,
+    phase: connected && operationSyncReady ? "syncing" : connected ? "syncing" : "retrying",
+    transportReady: connected,
+    operationSyncReady,
+    message: connected
+      ? operationSyncReady
+        ? "원고 보존 경로를 확인하는 중입니다."
+        : "원고 연산 동기화를 준비하는 중입니다."
+      : connectionLabel,
+  };
+  const syncPresentation = presentStudioLiveSyncSnapshot(resolvedSync);
+  const lastAckLabel = formatStudioLiveLastAck(resolvedSync.lastAckAt);
+  const syncAnnouncement = `${syncPresentation.shortLabel}. ${syncPresentation.detail}`;
+  const collaborationLabel = `${syncAnnouncement} ${lastAckLabel}.`;
   const followedPeer = peers.find((peer) => peer.sessionId === followingSessionId) ?? null;
 
   return (
     <div
       data-studio-presence-dock="true"
-      className="pointer-events-auto flex max-w-[calc(100%-1rem)] flex-wrap items-center justify-end gap-1 rounded-xl border border-line/80 bg-panel/95 p-1.5 shadow-xl backdrop-blur-md"
+      data-studio-sync-phase={resolvedSync.phase}
+      className="pointer-events-auto flex max-w-[calc(100%-1rem)] flex-wrap items-center justify-end gap-1.5 rounded-xl border border-line/80 bg-panel/95 p-1.5 shadow-xl backdrop-blur-md"
     >
+      {syncPresentation.assertive ? (
+        <span aria-atomic="true" aria-live="assertive" className="sr-only" role="alert">
+          {syncAnnouncement}
+        </span>
+      ) : (
+        <span aria-atomic="true" aria-live="polite" className="sr-only" role="status">
+          {syncAnnouncement}
+        </span>
+      )}
       <button
         type="button"
         aria-label="팀 작업 공간 열기"
         title="팀"
-        className="grid size-9 shrink-0 place-items-center rounded-lg border border-line/60 bg-card/80 text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+        className="grid size-11 shrink-0 place-items-center rounded-lg border border-line/60 bg-card/80 text-fg-2 transition-colors duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent motion-reduce:transition-none"
         onClick={onOpenTeam}
       >
         <UsersRound size={16} strokeWidth={1.75} aria-hidden />
       </button>
-      <span
-        aria-label={collaborationLabel}
-        title={collaborationLabel}
-        data-studio-presence-link={connected ? "ready" : "retry"}
+      <button
+        type="button"
+        aria-label={`${collaborationLabel} 팀 작업 공간 열기`}
+        title={`${syncPresentation.detail} · ${lastAckLabel}`}
+        data-studio-presence-link={resolvedSync.phase}
         className={cn(
-          "inline-flex h-7 shrink-0 items-center gap-1 rounded-full border px-1.5",
-          connected
-            ? "border-good/40 bg-good/10 text-good"
-            : "animate-pulse border-warn/40 bg-warn/10 text-warn motion-reduce:animate-none"
+          "inline-flex min-h-11 min-w-0 shrink items-center gap-1.5 rounded-full border px-3 text-[0.7rem] font-bold transition-colors duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent motion-reduce:transition-none",
+          syncToneClass(syncPresentation.tone)
         )}
-        role="status"
+        onClick={onOpenTeam}
       >
-        <Radio size={12} aria-hidden />
-        <span className="sr-only">{collaborationLabel}</span>
-      </span>
+        <StudioSyncStatusIcon phase={resolvedSync.phase} />
+        <span className="max-w-40 truncate sm:max-w-56">{syncPresentation.shortLabel}</span>
+      </button>
 
       <div
         className="flex items-center -space-x-1.5 pl-0.5"
@@ -327,7 +404,7 @@ export function StudioLivePresenceDock({
               }
               aria-pressed={following}
               className={cn(
-                "relative grid size-9 shrink-0 place-items-center rounded-full border-2 text-xs font-black shadow-sm transition-transform hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+                "relative grid size-11 shrink-0 place-items-center rounded-full border-2 text-xs font-black shadow-sm transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent motion-reduce:transform-none motion-reduce:transition-none",
                 // Peer hue is data color; cream ink for contrast (DESIGN: no raw white on accent surfaces).
                 "text-[oklch(0.96_0.01_85)]",
                 following ? "z-10 border-accent ring-2 ring-accent/30" : "border-panel",
@@ -359,7 +436,7 @@ export function StudioLivePresenceDock({
         <button
           type="button"
           aria-label={`추가 팀원 ${mobileHiddenPeerCount}명, 팀 작업 공간 열기`}
-          className="grid size-9 shrink-0 place-items-center rounded-full border border-line bg-raised text-[0.65rem] font-bold text-fg-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent sm:hidden"
+          className="grid size-11 shrink-0 place-items-center rounded-full border border-line bg-raised text-[0.65rem] font-bold text-fg-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent sm:hidden"
           onClick={onOpenTeam}
         >
           {mobileOverflow}
@@ -370,7 +447,7 @@ export function StudioLivePresenceDock({
         <button
           type="button"
           aria-label={`추가 팀원 ${desktopHiddenPeerCount}명, 팀 작업 공간 열기`}
-          className="hidden size-9 shrink-0 place-items-center rounded-full border border-line bg-raised text-[0.65rem] font-bold text-fg-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent sm:grid"
+          className="hidden size-11 shrink-0 place-items-center rounded-full border border-line bg-raised text-[0.65rem] font-bold text-fg-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent sm:grid"
           onClick={onOpenTeam}
         >
           {desktopOverflow}
@@ -381,7 +458,7 @@ export function StudioLivePresenceDock({
         <button
           type="button"
           aria-label={`${followedPeer.displayName} 따라가기 중지`}
-          className="order-last ml-auto inline-flex min-h-9 max-w-full items-center gap-1.5 rounded-lg border border-accent/35 bg-accent-soft px-2.5 text-[0.68rem] font-bold text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent sm:ml-1 sm:max-w-40"
+          className="order-last ml-auto inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-lg border border-accent/35 bg-accent-soft px-2.5 text-[0.68rem] font-bold text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent sm:ml-1 sm:max-w-40"
           onClick={() => onToggleFollow(followedPeer.sessionId)}
         >
           <span className="truncate">{followedPeer.displayName} 따라가기</span>
@@ -399,7 +476,7 @@ export function StudioLivePresenceDockConnected({
   onToggleFollow,
   onFollowPage,
 }: StudioLivePresenceDockConnectedProps) {
-  const { availability, peers } = useStudioLiveCollaboration();
+  const { availability, peers, sync } = useStudioLiveCollaboration();
   const followedPeer = peers.find((peer) => peer.sessionId === followingSessionId) ?? null;
   const alwaysOn = studioLivePresenceAlwaysVisible(availability, peers.length);
 
@@ -422,6 +499,7 @@ export function StudioLivePresenceDockConnected({
       followingSessionId={followingSessionId}
       onOpenTeam={onOpenTeam}
       onToggleFollow={onToggleFollow}
+      syncSnapshot={sync}
     />
   );
 }

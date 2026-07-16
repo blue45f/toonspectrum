@@ -15,6 +15,7 @@ import {
 } from "../../../../../lib/server/creator-work-revisions";
 
 import {
+  CreatorCollaborationCrdtSequenceConflictError,
   CreatorCollaborationConflictError,
   CreatorCollaborationForbiddenError,
   CreatorCollaborationInvalidTargetError,
@@ -321,6 +322,7 @@ describe("CreatorService safety gates", () => {
       status: "active",
       capabilities: { view: true, edit: true },
       revision: 7,
+      crdtServerSequence: "27",
       updatedAt: "2026-07-12T00:00:00.000Z",
       document: {
         titleId: null,
@@ -363,6 +365,7 @@ describe("CreatorService safety gates", () => {
     await expect(
       service.saveSharedWorkDocument("editor", "work-1", {
         baseRevision: 7,
+        crdtServerSequence: "27",
         title: "수정",
         doc: { pagesList: [{ id: "page-2" }] },
       })
@@ -381,6 +384,7 @@ describe("CreatorService safety gates", () => {
       "editor",
       "work-1",
       7,
+      BigInt(27),
       { title: "수정", doc: { pagesList: [{ id: "page-2" }] } }
     );
   });
@@ -390,7 +394,11 @@ describe("CreatorService safety gates", () => {
       new CreatorCollaborationRevisionConflictError(11)
     );
     const error = await createService()
-      .saveSharedWorkDocument("editor", "work-1", { baseRevision: 10, doc: {} })
+      .saveSharedWorkDocument("editor", "work-1", {
+        baseRevision: 10,
+        crdtServerSequence: "27",
+        doc: {},
+      })
       .catch((cause: unknown) => cause);
 
     expect(error).toBeInstanceOf(ConflictException);
@@ -402,6 +410,28 @@ describe("CreatorService safety gates", () => {
     expect(JSON.stringify((error as ConflictException).getResponse())).not.toContain("document");
   });
 
+  it("공유 저장 CRDT fence 충돌을 decimal 순번만 포함한 전용 409로 변환한다", async () => {
+    collaborationRepository.saveSharedDocument.mockRejectedValue(
+      new CreatorCollaborationCrdtSequenceConflictError(BigInt(27), BigInt(28))
+    );
+    const error = await createService()
+      .saveSharedWorkDocument("editor", "work-1", {
+        baseRevision: 10,
+        crdtServerSequence: "27",
+        doc: {},
+      })
+      .catch((cause: unknown) => cause);
+
+    expect(error).toBeInstanceOf(ConflictException);
+    expect((error as ConflictException).getResponse()).toEqual({
+      code: "creator_crdt_sequence_conflict",
+      message:
+        "동기화 확인 후 다른 팀 편집이 먼저 저장됐습니다. 최신 원고를 맞춘 뒤 다시 저장해 주세요.",
+      currentCrdtServerSequence: "28",
+    });
+    expect(JSON.stringify((error as ConflictException).getResponse())).not.toContain("requested");
+  });
+
   it("raw shared format 전환은 repository mutation 전에 strict 거부한다", async () => {
     await expect(
       createService().saveSharedWorkDocument(
@@ -409,6 +439,7 @@ describe("CreatorService safety gates", () => {
         "work-1",
         {
           baseRevision: 7,
+          crdtServerSequence: "27",
           title: "형식 전환 시도",
           format: "upload",
         } as never
@@ -438,11 +469,16 @@ describe("CreatorService safety gates", () => {
       .getSharedWorkDocumentMeta("pending", "work-1")
       .catch((cause: unknown) => cause);
     const writeError = await service
-      .saveSharedWorkDocument("viewer", "work-1", { baseRevision: 1, doc: {} })
+      .saveSharedWorkDocument("viewer", "work-1", {
+        baseRevision: 1,
+        crdtServerSequence: "27",
+        doc: {},
+      })
       .catch((cause: unknown) => cause);
     const ownerFieldError = await service
       .saveSharedWorkDocument("editor", "work-1", {
         baseRevision: 1,
+        crdtServerSequence: "27",
         status: "published",
       })
       .catch((cause: unknown) => cause);

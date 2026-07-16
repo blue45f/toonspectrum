@@ -10,8 +10,8 @@ import {
 } from "./studio-raster-publication-feature";
 
 describe("automatic raster publication feature gate", () => {
-  it("is production-safe while the verified renderer handoff is not mounted", () => {
-    expect(STUDIO_RASTER_VERIFIED_RENDERER_HANDOFF_MOUNTED).toBe(false);
+  it("keeps publication deployment-gated after mounting the verified renderer handoff", () => {
+    expect(STUDIO_RASTER_VERIFIED_RENDERER_HANDOFF_MOUNTED).toBe(true);
     expect(STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED).toBe(false);
     expect(isStudioAutomaticRasterPublicationEnabled({
       experimentToken: STUDIO_RASTER_PUBLICATION_EXPERIMENT_TOKEN,
@@ -42,5 +42,11 @@ describe("automatic raster publication feature gate", () => {
     expect(source).toMatch(
       /STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED\s*&&\s*!masterEditMode/u
     );
+    expect(source).toContain("<StudioRasterCrdtSurface");
+    expect(source).toContain("studioRasterHiddenOperationIds.has(el.id)");
+    expect(source).toContain("authorizedAuthorityKey={studioRasterAuthorizedAuthorityKey}");
+    expect(source).toContain("revokeStudioRasterHandoffRef.current()");
+    expect(source.match(/readStudioAuthoritativeStageFrame\(\{/gu)).toHaveLength(3);
+    expect(source).toMatch(/marqueeRect\s*!==\s*null\s*\|\|\s*userGuides\.length\s*>\s*0/u);
   });
 });

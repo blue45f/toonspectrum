@@ -998,6 +998,167 @@ describe("StudioWebGpuEngine", () => {
     expect(fake.textures).toHaveLength(2);
   });
 
+  it("keeps direct-engine readback opt-in compatible but skips every snapshot cost when disabled", async () => {
+    const neverLost = new Promise<GPUDeviceLostInfo>(() => undefined);
+    const fake = fakeGpuDevice(neverLost);
+    const onFrameReady = vi.fn((_receipt: StudioGpuFrameReceipt) => undefined);
+    const context = {
+      configure: vi.fn(),
+      unconfigure: vi.fn(),
+      getCurrentTexture: vi.fn(() => ({ createView: vi.fn(() => ({ view: true })) })),
+    } as unknown as GPUCanvasContext;
+    const adapter = { requestDevice: vi.fn(async () => fake.device) } as unknown as GPUAdapter;
+    const gpu = {
+      requestAdapter: vi.fn(async () => adapter),
+      getPreferredCanvasFormat: vi.fn(() => "bgra8unorm"),
+    } as unknown as GPU;
+    const engine = new StudioWebGpuEngine({
+      canvas: fakeGpuCanvas(context),
+      fallbackCanvas: fakeCanvas2d().canvas,
+      gpu,
+      retainReadbackSnapshot: false,
+      onFrameReady,
+    });
+    engine.resize({ logicalWidth: 100, logicalHeight: 80 });
+    engine.render([stroke()], "display-only:no-readback");
+    await engine.initialize();
+    await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalledWith(expect.objectContaining({
+      requestId: "display-only:no-readback",
+      backend: "webgpu",
+    })));
+    const receipt = onFrameReady.mock.calls.at(-1)![0];
+
+    expect(vi.mocked(fake.device.createTexture).mock.calls.filter(([descriptor]) => (
+      descriptor.label === "Studio authoritative frame readback snapshot"
+    ))).toHaveLength(0);
+    expect(fake.encoder.copyTextureToTexture).not.toHaveBeenCalled();
+    expect(vi.mocked(context.configure).mock.calls.length).toBeGreaterThan(0);
+    expect(vi.mocked(context.configure).mock.calls.every(([descriptor]) => (
+      (Number(descriptor.usage) & 0x01) === 0
+    ))).toBe(true);
+    await expect(engine.captureFrame({ receipt, area: { kind: "viewport" } })).resolves.toEqual({
+      status: "rejected",
+      reason: "frame-unavailable",
+    });
+  });
+
+  it("suspends without a blank GPU frame, releases retained presentation, and reuses the device", async () => {
+    const neverLost = new Promise<GPUDeviceLostInfo>(() => undefined);
+    const fake = fakeGpuDevice(neverLost);
+    const onFrameInvalid = vi.fn();
+    const onFrameReady = vi.fn((_receipt: StudioGpuFrameReceipt) => undefined);
+    const context = {
+      configure: vi.fn(),
+      unconfigure: vi.fn(),
+      getCurrentTexture: vi.fn(() => ({ createView: vi.fn(() => ({ view: true })) })),
+    } as unknown as GPUCanvasContext;
+    const adapter = { requestDevice: vi.fn(async () => fake.device) } as unknown as GPUAdapter;
+    const gpu = {
+      requestAdapter: vi.fn(async () => adapter),
+      getPreferredCanvasFormat: vi.fn(() => "bgra8unorm"),
+    } as unknown as GPU;
+    const gpuCanvas = fakeGpuCanvas(context);
+    const fallback = fakeCanvas2d();
+    const engine = new StudioWebGpuEngine({
+      canvas: gpuCanvas,
+      fallbackCanvas: fallback.canvas,
+      gpu,
+      onFrameInvalid,
+      onFrameReady,
+    });
+    engine.resize({ logicalWidth: 100, logicalHeight: 80 });
+    engine.render([stroke()], "suspend:active");
+    await engine.initialize();
+    await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalledWith(expect.objectContaining({
+      requestId: "suspend:active",
+      backend: "webgpu",
+    })));
+    const activeReceipt = onFrameReady.mock.calls.at(-1)![0];
+    const snapshotTexture = fake.textures[0]!;
+
+    onFrameInvalid.mockClear();
+    onFrameReady.mockClear();
+    vi.mocked(fake.encoder.beginRenderPass).mockClear();
+    vi.mocked(fake.device.queue.submit).mockClear();
+    engine.suspend("suspend:empty");
+
+    expect(onFrameInvalid).toHaveBeenCalledTimes(1);
+    expect(gpuCanvas.style.visibility).toBe("hidden");
+    expect(fallback.canvas.style.visibility).toBe("hidden");
+    expect(snapshotTexture.destroy).toHaveBeenCalledTimes(1);
+    expect(fake.texture.destroy).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(fake.device.destroy)).not.toHaveBeenCalled();
+    await expect(engine.captureFrame({
+      receipt: activeReceipt,
+      area: { kind: "viewport" },
+    })).resolves.toEqual({ status: "rejected", reason: "stale-frame" });
+
+    engine.resize({
+      logicalWidth: 100,
+      logicalHeight: 80,
+      cssWidth: 120,
+      cssHeight: 96,
+    });
+    await Promise.resolve();
+    expect(fake.encoder.beginRenderPass).not.toHaveBeenCalled();
+    expect(vi.mocked(fake.device.queue.submit)).not.toHaveBeenCalled();
+    expect(onFrameReady).not.toHaveBeenCalled();
+
+    engine.render([stroke({ points: [10, 12, 48, 12] })], "suspend:resumed");
+    await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalledWith(expect.objectContaining({
+      requestId: "suspend:resumed",
+      backend: "webgpu",
+    })));
+    expect(gpu.requestAdapter).toHaveBeenCalledTimes(1);
+    expect(adapter.requestDevice).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(fake.device.destroy)).not.toHaveBeenCalled();
+    expect(gpuCanvas.style.visibility).toBe("visible");
+  });
+
+  it("defers suspended snapshot destruction until an active readback releases its reader", async () => {
+    const neverLost = new Promise<GPUDeviceLostInfo>(() => undefined);
+    const fake = fakeGpuDevice(neverLost);
+    const onFrameReady = vi.fn((_receipt: StudioGpuFrameReceipt) => undefined);
+    const context = {
+      configure: vi.fn(),
+      unconfigure: vi.fn(),
+      getCurrentTexture: vi.fn(() => ({ createView: vi.fn(() => ({ view: true })) })),
+    } as unknown as GPUCanvasContext;
+    const adapter = { requestDevice: vi.fn(async () => fake.device) } as unknown as GPUAdapter;
+    const gpu = {
+      requestAdapter: vi.fn(async () => adapter),
+      getPreferredCanvasFormat: vi.fn(() => "bgra8unorm"),
+    } as unknown as GPU;
+    const engine = new StudioWebGpuEngine({
+      canvas: fakeGpuCanvas(context),
+      fallbackCanvas: fakeCanvas2d().canvas,
+      gpu,
+      onFrameReady,
+    });
+    engine.resize({ logicalWidth: 100, logicalHeight: 80 });
+    engine.render([stroke()], "suspend:reader");
+    await engine.initialize();
+    await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalledWith(expect.objectContaining({
+      requestId: "suspend:reader",
+      backend: "webgpu",
+    })));
+    const receipt = onFrameReady.mock.calls.at(-1)![0];
+    const snapshotTexture = fake.textures[0]!;
+    const readbackWork = deferred<void>();
+    vi.mocked(fake.device.queue.onSubmittedWorkDone).mockImplementationOnce(
+      () => readbackWork.promise
+    );
+    const capture = engine.captureFrame({ receipt, area: { kind: "viewport" } });
+    await vi.waitFor(() => expect(fake.readbackBuffers).toHaveLength(1));
+
+    engine.suspend("suspend:reader-empty");
+    expect(snapshotTexture.destroy).not.toHaveBeenCalled();
+
+    readbackWork.resolve(undefined);
+    await expect(capture).resolves.toEqual({ status: "rejected", reason: "stale-frame" });
+    expect(snapshotTexture.destroy).toHaveBeenCalledTimes(1);
+  });
+
   it("publishes oversized WebGPU display frames without allocating or copying a readback snapshot", async () => {
     const neverLost = new Promise<GPUDeviceLostInfo>(() => undefined);
     const fake = fakeGpuDevice(neverLost, async () => undefined, 8_192);

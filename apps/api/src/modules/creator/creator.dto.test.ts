@@ -161,27 +161,56 @@ describe("creator work zod contracts", () => {
     expect(CreatorTeamListQuerySchema.safeParse({ limit: 20, cursor }).success).toBe(false);
   });
 
-  it("공유 문서 저장은 필수 baseRevision과 strict 콘텐츠 allowlist를 적용한다", () => {
+  it("공유 문서 저장은 revision·CRDT fence와 strict 콘텐츠 allowlist를 적용한다", () => {
     expect(
       UpdateCreatorSharedDocumentSchema.parse({
         baseRevision: 7,
+        crdtServerSequence: "9223372036854775807",
         title: "  팀 수정본  ",
         doc: { pagesList: [] },
       })
-    ).toEqual({ baseRevision: 7, title: "팀 수정본", doc: { pagesList: [] } });
+    ).toEqual({
+      baseRevision: 7,
+      crdtServerSequence: "9223372036854775807",
+      title: "팀 수정본",
+      doc: { pagesList: [] },
+    });
     expect(UpdateCreatorSharedDocumentSchema.safeParse({ title: "revision 없음" }).success).toBe(
       false
     );
     expect(UpdateCreatorSharedDocumentSchema.safeParse({ baseRevision: 7 }).success).toBe(false);
-    expect(UpdateCreatorSharedDocumentSchema.safeParse({ baseRevision: 0, title: "수정" }).success).toBe(
+    expect(UpdateCreatorSharedDocumentSchema.safeParse({
+      baseRevision: 0,
+      crdtServerSequence: "0",
+      title: "수정",
+    }).success).toBe(
       false
     );
-    expect(UpdateCreatorSharedDocumentSchema.safeParse({ baseRevision: 7, title: "   " }).success).toBe(
+    expect(UpdateCreatorSharedDocumentSchema.safeParse({
+      baseRevision: 7,
+      crdtServerSequence: "0",
+      title: "   ",
+    }).success).toBe(
       false
     );
+    for (const crdtServerSequence of [
+      undefined,
+      -1,
+      "-1",
+      "+1",
+      "01",
+      "9223372036854775808",
+    ]) {
+      expect(UpdateCreatorSharedDocumentSchema.safeParse({
+        baseRevision: 7,
+        crdtServerSequence,
+        doc: {},
+      }).success).toBe(false);
+    }
     expect(
       UpdateCreatorSharedDocumentSchema.safeParse({
         baseRevision: 7,
+        crdtServerSequence: "0",
         doc: {},
         seriesId: "owner-only-series",
       }).success
@@ -189,6 +218,7 @@ describe("creator work zod contracts", () => {
     expect(
       UpdateCreatorSharedDocumentSchema.safeParse({
         baseRevision: 7,
+        crdtServerSequence: "0",
         doc: {},
         challengeId: "owner-only-challenge",
       }).success
@@ -196,12 +226,18 @@ describe("creator work zod contracts", () => {
     expect(
       UpdateCreatorSharedDocumentSchema.safeParse({
         baseRevision: 7,
+        crdtServerSequence: "0",
         doc: {},
         format: "upload",
       }).success
     ).toBe(false);
     expect(
-      UpdateCreatorSharedDocumentSchema.safeParse({ baseRevision: 7, doc: {}, hidden: false }).success
+      UpdateCreatorSharedDocumentSchema.safeParse({
+        baseRevision: 7,
+        crdtServerSequence: "0",
+        doc: {},
+        hidden: false,
+      }).success
     ).toBe(false);
   });
 
@@ -249,6 +285,7 @@ describe("creator work zod contracts", () => {
       status: "active",
       capabilities: { view: true, edit: true },
       revision: 3,
+      crdtServerSequence: "19",
       updatedAt: "2026-07-12T00:00:00.000Z",
       document: {
         titleId: null,

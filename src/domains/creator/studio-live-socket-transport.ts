@@ -1,6 +1,12 @@
 import { io } from "socket.io-client";
 
 import {
+  createStudioCrdtPermanentError,
+  createStudioCrdtRetryableError,
+  createStudioCrdtServerAckError,
+  type StudioCrdtOperationError,
+} from "./studio-crdt-operation-error";
+import {
   parseStudioCrdtRemoteUpdate,
   parseStudioCrdtSyncRequest,
   parseStudioCrdtSyncResponse,
@@ -406,7 +412,13 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
 
   requestCrdtSync(request: StudioCrdtSyncRequest): Promise<StudioCrdtSyncResponse | null> {
     const parsed = parseStudioCrdtSyncRequest(request, { expectedWorkId: this.context.workId });
-    if (!parsed) return Promise.reject(new Error("CRDT 동기화 요청이 올바르지 않습니다."));
+    if (!parsed) {
+      return Promise.reject(createStudioCrdtPermanentError(
+        "invalid_payload",
+        "CRDT 동기화 요청이 올바르지 않습니다.",
+        "client-validation"
+      ));
+    }
     return this.emitCrdtWithAck(
       "studio:crdt:sync",
       parsed,
@@ -416,7 +428,13 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
 
   publishCrdtUpdate(request: StudioCrdtUpdateRequest): Promise<StudioCrdtUpdateAck> {
     const parsed = parseStudioCrdtUpdateRequest(request, { expectedWorkId: this.context.workId });
-    if (!parsed) return Promise.reject(new Error("CRDT 업데이트가 올바르지 않습니다."));
+    if (!parsed) {
+      return Promise.reject(createStudioCrdtPermanentError(
+        "invalid_payload",
+        "CRDT 업데이트가 올바르지 않습니다.",
+        "client-validation"
+      ));
+    }
     const pending = this.pendingCrdtPublishes.get(parsed.updateId);
     if (pending) return pending;
     const operation = this.emitCrdtWithAck(
@@ -606,7 +624,11 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.socket.off("studio:chat:message", this.onChatMessage);
     this.socket.off("studio:crdt:sync", this.onCrdtSync);
     this.socket.off("studio:crdt:update", this.onCrdtUpdate);
-    this.rejectPendingCrdtOperations("팀 공동작업 연결이 종료되었습니다.");
+    this.rejectPendingCrdtOperations(createStudioCrdtRetryableError(
+      "connection_closed",
+      "팀 공동작업 연결이 종료되었습니다.",
+      "connection"
+    ));
     this.socket.auth = {};
     this.sessionToken = null;
     this.socket.disconnect();
@@ -651,6 +673,11 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.clearConnectTimeout();
     this.rejectConnect?.(new Error(message));
     this.clearConnectDeferred();
+    this.rejectPendingCrdtOperations(createStudioCrdtPermanentError(
+      "access_revoked",
+      message,
+      "connection"
+    ));
     this.emitStatus({ state: "revoked", message, recoverable: false });
     this.socket.disconnect();
   }
@@ -660,7 +687,11 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.joined = false;
     this.selfConnectionId = null;
     this.pendingPresenceByConnection.clear();
-    this.rejectPendingCrdtOperations("연결이 끊겨 CRDT 작업을 다시 시도해야 합니다.");
+    this.rejectPendingCrdtOperations(createStudioCrdtRetryableError(
+      "disconnected",
+      "연결이 끊겨 CRDT 작업을 다시 시도해야 합니다.",
+      "connection"
+    ));
     this.pendingCrdtPublishes.clear();
     if (this.accessRevoked) return;
     this.emitStatus({
@@ -689,6 +720,11 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.clearConnectTimeout();
     this.rejectConnect?.(new Error(message));
     this.clearConnectDeferred();
+    this.rejectPendingCrdtOperations(createStudioCrdtPermanentError(
+      "access_revoked",
+      message,
+      "connection"
+    ));
     this.emitStatus({ state: "revoked", message, recoverable: false });
     this.socket.disconnect();
   };
@@ -1288,7 +1324,13 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     payload: StudioCrdtSyncRequest | StudioCrdtUpdateRequest,
     parse: (value: unknown, options: { expectedWorkId: string }) => T | null
   ): Promise<T> {
-    if (!this.ready) return Promise.reject(new Error("팀 CRDT 연결이 준비되지 않았습니다."));
+    if (!this.ready) {
+      return Promise.reject(createStudioCrdtRetryableError(
+        "disconnected",
+        "팀 CRDT 연결이 준비되지 않았습니다.",
+        "connection"
+      ));
+    }
     const generation = this.joinGeneration;
     const selfConnectionId = this.selfConnectionId;
     return new Promise<T>((resolve, reject) => {
@@ -1299,7 +1341,11 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       this.pendingCrdtOperations.add(operation);
       operation.timeout = this.scheduleTimeout(() => {
         if (!this.pendingCrdtOperations.delete(operation)) return;
-        const error = new Error("팀 서버의 CRDT 응답 시간이 초과되었습니다.");
+        const error = createStudioCrdtRetryableError(
+          "timeout",
+          "팀 서버의 CRDT 응답 시간이 초과되었습니다.",
+          "timeout"
+        );
         this.emitStatus({ state: "error", message: error.message, recoverable: true });
         reject(error);
       }, CRDT_ACK_TIMEOUT_MS);
@@ -1312,24 +1358,36 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
           generation !== this.joinGeneration ||
           selfConnectionId !== this.selfConnectionId
         ) {
-          reject(new Error("연결이 변경되어 CRDT 작업을 다시 시도해야 합니다."));
+          reject(createStudioCrdtRetryableError(
+            "connection_changed",
+            "연결이 변경되어 CRDT 작업을 다시 시도해야 합니다.",
+            "connection"
+          ));
           return;
         }
         const failure = parseFailure(value);
         if (failure) {
           this.handleFailure(failure, "operation");
-          reject(new Error(failure.message));
+          reject(createStudioCrdtServerAckError(failure.code, failure.message));
           return;
         }
         if (!isRecord(value) || value.ok !== true) {
-          const error = new Error("팀 서버의 CRDT 응답을 확인하지 못했습니다.");
+          const error = createStudioCrdtPermanentError(
+            "invalid_response",
+            "팀 서버의 CRDT 응답을 확인하지 못했습니다.",
+            "server-response"
+          );
           this.emitStatus({ state: "error", message: error.message, recoverable: true });
           reject(error);
           return;
         }
         const parsed = parse(value.data, { expectedWorkId: this.context.workId });
         if (!parsed) {
-          const error = new Error("팀 서버의 CRDT 응답 형식이 올바르지 않습니다.");
+          const error = createStudioCrdtPermanentError(
+            "invalid_response",
+            "팀 서버의 CRDT 응답 형식이 올바르지 않습니다.",
+            "server-response"
+          );
           this.emitStatus({ state: "error", message: error.message, recoverable: true });
           reject(error);
           return;
@@ -1340,7 +1398,11 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
           : (parsed as unknown as StudioCrdtUpdateAck).updateId
             === (payload as StudioCrdtUpdateRequest).updateId;
         if (!responseMatchesRequest) {
-          const error = new Error("팀 서버의 CRDT 응답 식별자가 요청과 일치하지 않습니다.");
+          const error = createStudioCrdtPermanentError(
+            "response_mismatch",
+            "팀 서버의 CRDT 응답 식별자가 요청과 일치하지 않습니다.",
+            "server-response"
+          );
           this.emitStatus({ state: "error", message: error.message, recoverable: true });
           reject(error);
           return;
@@ -1368,8 +1430,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     if (typeof oldest === "string") this.seenCrdtUpdateIds.delete(oldest);
   }
 
-  private rejectPendingCrdtOperations(message: string): void {
-    const error = new Error(message);
+  private rejectPendingCrdtOperations(error: StudioCrdtOperationError): void {
     for (const operation of this.pendingCrdtOperations) {
       this.cancelTimeout(operation.timeout);
       operation.reject(error);

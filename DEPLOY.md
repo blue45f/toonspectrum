@@ -102,6 +102,10 @@ STUDIO_LIVE_CLUSTER_ADAPTER=postgres
 STUDIO_LIVE_POSTGRES_URL=postgresql://USER:PASSWORD@DIRECT_HOST/webdex?sslmode=verify-full&channel_binding=require
 STUDIO_LIVE_POSTGRES_POOL_MAX=2
 API_CORS_ALLOWED_ORIGINS=https://toonspectrum.example.com,https://toonspectrum.apps.tossmini.com
+
+# 검증된 원형 펜 래스터 CRDT 파일럿 — 프런트/서버를 같은 릴리스에서 함께 활성화
+VITE_STUDIO_RASTER_CRDT_AUTO_PUBLICATION=verified-renderer-handoff-v1
+STUDIO_RASTER_ASSET_ADMISSION=verified-renderer-handoff-v1
 ```
 
 먼저 `0009_socket_io_postgres_adapter.sql`을 적용해야 합니다. PostgreSQL 모드는 listener와
@@ -121,6 +125,11 @@ fire-and-forget PubSub lifecycle은 사용하지 않습니다. 로컬 transport�
 client를 폐기한 후 전체 채널을 재구독합니다. 종료는 pending connect/init과 진행 중 작업을 회수하고
 PubSub listener를 닫은 다음 pool을 닫습니다. 장기 실행 서버에는 그래도 프로세스 재시작 정책과
 교차 노드 broadcast/RPC 모니터링을 두고, adapter 버전 변경 시 CI의 2-node integration을 재검증하세요.
+
+래스터 CRDT의 두 토큰은 비밀이 아니라 정확한 운영 opt-in입니다. 둘 중 하나라도 누락되면 원형 펜
+자동 타일 게시가 실행되지 않으며 기존 Yjs 벡터 원본이 계속 화면·내보내기의 권위가 됩니다. 활성화한
+배포에서는 먼저 실제 PostgreSQL migration과 래스터 에셋 업로드 권한을 확인하고, 두 브라우저에서
+동일 획의 `append → broadcast → replay → handoff`와 스크롤·내보내기 즉시 벡터 복구를 점검하세요.
 
 ## 앱인토스 로그인·공유 운영 설정
 

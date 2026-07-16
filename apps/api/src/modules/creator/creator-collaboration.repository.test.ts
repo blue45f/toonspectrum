@@ -3,12 +3,14 @@ import { describe, expect, it } from "vitest";
 import { db } from "../../../../../lib/db";
 
 import {
+  CreatorCollaborationCrdtSequenceConflictError,
   CreatorCollaborationConflictError,
   CreatorCollaborationForbiddenError,
   CreatorCollaborationInvalidTargetError,
   CreatorCollaborationNotFoundError,
   CreatorCollaborationRepository,
   CreatorCollaborationRevisionConflictError,
+  buildCreatorCrdtServerSequenceQuery,
   buildCreatorSharedDocumentMetaQuery,
   buildCreatorSharedDocumentUpdateQuery,
   buildCreatorSharedWorksListQuery,
@@ -160,6 +162,8 @@ class MemoryCollaborationStore
   documentUpdateCount = 0;
   workRevisionAppendCount = 0;
   transactionCount = 0;
+  readonly crdtServerSequences = new Map<string, bigint>();
+  readonly saveLockOrder: string[] = [];
   lockedWorkIds: string[] = [];
   lockedUserIds: string[] = [];
   workReadIds: string[] = [];
@@ -192,9 +196,21 @@ class MemoryCollaborationStore
     }
   }
 
+  async acquireStudioCrdtWorkAdvisoryLock(workId: string): Promise<void> {
+    this.saveLockOrder.push(`crdt-advisory:${workId}`);
+  }
+
+  async getStudioCrdtServerSequence(workId: string): Promise<bigint> {
+    this.saveLockOrder.push(`crdt-sequence:${workId}`);
+    return this.crdtServerSequences.get(workId) ?? BigInt(0);
+  }
+
   async findWork(workId: string, lock = false): Promise<MemoryWork | null> {
     this.workReadIds.push(workId);
-    if (lock) this.lockedWorkIds.push(workId);
+    if (lock) {
+      this.lockedWorkIds.push(workId);
+      this.saveLockOrder.push(`work-row:${workId}`);
+    }
     return this.works.get(workId) ?? null;
   }
 
@@ -681,6 +697,17 @@ describe("CreatorCollaborationRepository", () => {
     expect(query.sql).not.toContain("invitationId");
     expect(query.params).toContain("viewer");
     expect(query.params).toContain("work-1");
+  });
+
+  it("CRDT 저장 fence는 snapshot과 latest update의 최댓값을 한 statement로 조회한다", () => {
+    const query = buildCreatorCrdtServerSequenceQuery(db, "work-1").toSQL();
+
+    expect(query.sql).toContain('from "creator_work_crdt_snapshot"');
+    expect(query.sql).toContain('from "creator_work_crdt_update"');
+    expect(query.sql).toContain("greatest(");
+    expect(query.sql).toContain("max(");
+    expect(query.sql).toContain("0::bigint");
+    expect(query.params.filter((value) => value === "work-1")).toHaveLength(2);
   });
 
   it("소유자에게 owner-first 활성·대기 팀 snapshot과 전체 관리 권한을 반환한다", async () => {
@@ -1526,6 +1553,7 @@ describe("CreatorCollaborationRepository", () => {
         status: "active",
         capabilities: { view: true, edit },
         revision: 1,
+        crdtServerSequence: "0",
         updatedAt: BASE_DATE.toISOString(),
       });
     }
@@ -1542,7 +1570,8 @@ describe("CreatorCollaborationRepository", () => {
       new CreatorCollaborationForbiddenError("document_access_denied")
     );
 
-    const saved = await repository.saveSharedDocument("editor", "work-1", 1, {
+    store.saveLockOrder.length = 0;
+    const saved = await repository.saveSharedDocument("editor", "work-1", 1, BigInt(0), {
       title: "팀 수정본",
       doc: { pagesList: [{ id: "page-2" }] },
     });
@@ -1569,28 +1598,34 @@ describe("CreatorCollaborationRepository", () => {
     });
     expect(store.lockedWorkIds).toContain("work-1");
     expect(store.lockedUserIds).toContain("owner");
+    expect(store.saveLockOrder.slice(0, 3)).toEqual([
+      "crdt-advisory:work-1",
+      "work-row:work-1",
+      "crdt-sequence:work-1",
+    ]);
 
     await expect(
-      repository.saveSharedDocument("editor", "work-1", 2, { status: "published" })
+      repository.saveSharedDocument("editor", "work-1", 2, BigInt(0), { status: "published" })
     ).rejects.toEqual(
       new CreatorCollaborationForbiddenError("document_owner_fields_denied")
     );
     await expect(
-      repository.saveSharedDocument("admin", "work-1", 2, { titleId: "catalog-title" })
+      repository.saveSharedDocument("admin", "work-1", 2, BigInt(0), { titleId: "catalog-title" })
     ).rejects.toEqual(
       new CreatorCollaborationForbiddenError("document_owner_fields_denied")
     );
     await expect(
-      repository.saveSharedDocument("commenter", "work-1", 2, { description: "불가" })
+      repository.saveSharedDocument("commenter", "work-1", 2, BigInt(0), { description: "불가" })
     ).rejects.toEqual(new CreatorCollaborationForbiddenError("document_edit_denied"));
     await expect(
-      repository.saveSharedDocument("viewer", "work-1", 2, { description: "불가" })
+      repository.saveSharedDocument("viewer", "work-1", 2, BigInt(0), { description: "불가" })
     ).rejects.toEqual(new CreatorCollaborationForbiddenError("document_edit_denied"));
     await expect(
       repository.saveSharedDocument(
         "owner",
         "work-1",
         2,
+        BigInt(0),
         { format: "upload" } as unknown as CreatorSharedDocumentPatch
       )
     ).rejects.toThrow("invalid creator shared document mutation");
@@ -1598,11 +1633,36 @@ describe("CreatorCollaborationRepository", () => {
     expect(store.workRevisionAppendCount).toBe(1);
   });
 
+  it("stale CRDT sequence는 advisory lock 안에서 전용 conflict로 저장을 중단한다", async () => {
+    const { repository, store } = createFixture();
+    store.crdtServerSequences.set("work-1", BigInt(42));
+
+    await expect(
+      repository.saveSharedDocument("editor", "work-1", 1, BigInt(41), { title: "stale CRDT" })
+    ).rejects.toEqual(
+      new CreatorCollaborationCrdtSequenceConflictError(BigInt(41), BigInt(42))
+    );
+
+    expect(store.works.get("work-1")?.title).toBe("비밀 프로젝트 1화");
+    expect(store.works.get("work-1")?.revision ?? 1).toBe(1);
+    expect(store.documentUpdateCount).toBe(0);
+    expect(store.workRevisionAppendCount).toBe(0);
+    expect(store.saveLockOrder.slice(0, 3)).toEqual([
+      "crdt-advisory:work-1",
+      "work-row:work-1",
+      "crdt-sequence:work-1",
+    ]);
+
+    await expect(
+      repository.saveSharedDocument("editor", "work-1", 1, BigInt(42), { title: "fenced CRDT" })
+    ).resolves.toMatchObject({ revision: 2 });
+  });
+
   it("게시 상태와 연결 작품은 소유자만 공동 문서 endpoint에서 변경한다", async () => {
     const { repository, store } = createFixture();
 
     await expect(
-      repository.saveSharedDocument("owner", "work-1", 1, {
+      repository.saveSharedDocument("owner", "work-1", 1, BigInt(0), {
         status: "published",
         titleId: "catalog-title",
       })
@@ -1630,14 +1690,14 @@ describe("CreatorCollaborationRepository", () => {
     }
 
     await expect(
-      repository.saveSharedDocument("admin", "work-1", 19, { title: "stale" })
+      repository.saveSharedDocument("admin", "work-1", 19, BigInt(0), { title: "stale" })
     ).rejects.toEqual(new CreatorCollaborationRevisionConflictError(20));
     expect(store.works.get("work-1")?.title).toBe("비밀 프로젝트 1화");
     expect(store.workRevisions).toHaveLength(20);
     expect(store.documentUpdateCount).toBe(0);
     expect(store.workRevisionAppendCount).toBe(0);
 
-    await repository.saveSharedDocument("admin", "work-1", 20, { title: "r21" });
+    await repository.saveSharedDocument("admin", "work-1", 20, BigInt(0), { title: "r21" });
     expect(store.workRevisions).toHaveLength(20);
     expect(store.workRevisions.map(({ revision }) => revision)).toEqual(
       Array.from({ length: 20 }, (_, index) => index + 2)
@@ -1651,7 +1711,7 @@ describe("CreatorCollaborationRepository", () => {
     store.failNextWorkRevision = true;
 
     await expect(
-      repository.saveSharedDocument("editor", "work-1", 1, {
+      repository.saveSharedDocument("editor", "work-1", 1, BigInt(0), {
         title: "롤백되어야 하는 제목",
         doc: { pagesList: [{ id: "rollback" }] },
       })
@@ -1678,7 +1738,7 @@ describe("CreatorCollaborationRepository", () => {
       new CreatorCollaborationForbiddenError("document_access_denied")
     );
     await expect(
-      repository.saveSharedDocument("editor", "work-1", 1, { title: "차단" })
+      repository.saveSharedDocument("editor", "work-1", 1, BigInt(0), { title: "차단" })
     ).rejects.toEqual(new CreatorCollaborationForbiddenError("document_edit_denied"));
     expect(store.lockedUserIds).toContain("owner");
     expect(store.workRevisions).toEqual([]);
@@ -1697,7 +1757,7 @@ describe("CreatorCollaborationRepository", () => {
       capabilities: { view: true, edit: true },
     });
     await expect(
-      repository.saveSharedDocument("owner", "work-1", 1, { title: "소유자 수정" })
+      repository.saveSharedDocument("owner", "work-1", 1, BigInt(0), { title: "소유자 수정" })
     ).resolves.toMatchObject({ revision: 2 });
   });
 

@@ -1,5 +1,10 @@
 import { createContext, useContext } from "react";
 
+import {
+  INITIAL_STUDIO_LIVE_SYNC_SNAPSHOT,
+  type StudioLiveSyncSnapshot,
+} from "./studio-live-sync-safety";
+
 import type {
   StudioLiveChatMessage,
   StudioLiveLock,
@@ -9,6 +14,14 @@ import type {
 import type { StudioLiveTransportMode } from "./studio-live-collaboration-transport";
 
 export type StudioLiveAvailability = "idle" | "connecting" | "ready" | "unsupported" | "error";
+
+export interface StudioLiveRecoveryState {
+  vaultId: string | null;
+  updateCount: number;
+  exportAvailable: boolean;
+  exported: boolean;
+  message: string;
+}
 
 export interface StudioLiveCollaborationContextValue {
   room: StudioLiveRoom | null;
@@ -24,6 +37,11 @@ export interface StudioLiveCollaborationContextValue {
   localFallbackAllowed: boolean;
   usingLocalFallback: boolean;
   sendChatMessage: (text: string) => boolean;
+  /** Structured, fail-closed durability state for always-visible editor chrome. */
+  sync: StudioLiveSyncSnapshot;
+  recovery: StudioLiveRecoveryState | null;
+  exportRecovery: () => Promise<void>;
+  reloadAuthoritative: () => void;
   retryServer: () => void;
   useLocalFallback: () => void;
 }
@@ -41,6 +59,10 @@ export const EMPTY_STUDIO_LIVE_CONTEXT: StudioLiveCollaborationContextValue = {
   localFallbackAllowed: false,
   usingLocalFallback: false,
   sendChatMessage: () => false,
+  sync: INITIAL_STUDIO_LIVE_SYNC_SNAPSHOT,
+  recovery: null,
+  exportRecovery: async () => undefined,
+  reloadAuthoritative: () => undefined,
   retryServer: () => undefined,
   useLocalFallback: () => undefined,
 };
