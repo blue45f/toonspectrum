@@ -1,10 +1,10 @@
 /** Three/WebGL implementation of the renderer-neutral Studio 3D capture contract. */
 
 import * as THREE from "three";
-import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 
 import { captureStudioBg3dThreeDepth } from "./studio-bg3d-lt-three-depth";
 import { normalizeStudioBg3dRgbaReadback } from "./studio-bg3d-readback-normalize";
+import { createStudioBg3dStraightAlphaOutputPass } from "./studio-bg3d-straight-alpha-output-pass";
 
 import type {
   StudioBg3dCaptureAdapter,
@@ -67,6 +67,9 @@ async function captureStudioBg3dThreeWebglColor(input: {
   const previousViewport = renderer.getViewport(new THREE.Vector4());
   const previousScissor = renderer.getScissor(new THREE.Vector4());
   const previousScissorTest = renderer.getScissorTest();
+  const capturedSceneBackground = scene.background;
+  const capturedSceneBackgroundRotation = scene.backgroundRotation.clone();
+  const suppressSceneBackground = request.background.alpha === 0;
   const sceneTarget = new THREE.WebGLRenderTarget(request.width, request.height, {
     depthBuffer: true,
     stencilBuffer: false,
@@ -76,7 +79,8 @@ async function captureStudioBg3dThreeWebglColor(input: {
     magFilter: THREE.LinearFilter,
     generateMipmaps: false,
   });
-  // This is an intermediate working-color buffer. OutputPass owns the one explicit sRGB transfer.
+  // This is an intermediate working-color buffer. The straight-alpha output pass unpremultiplies
+  // linear RGB before owning the one explicit tone-map/sRGB transfer.
   sceneTarget.texture.colorSpace = THREE.NoColorSpace;
   const outputTarget = new THREE.WebGLRenderTarget(request.width, request.height, {
     depthBuffer: false,
@@ -88,7 +92,7 @@ async function captureStudioBg3dThreeWebglColor(input: {
     generateMipmaps: false,
   });
   outputTarget.texture.colorSpace = THREE.NoColorSpace;
-  const outputPass = new OutputPass();
+  const outputPass = createStudioBg3dStraightAlphaOutputPass();
   const packed = new Uint8Array(request.width * request.height * 4);
 
   try {
@@ -99,11 +103,15 @@ async function captureStudioBg3dThreeWebglColor(input: {
       renderer.setClearColor(request.background.color, request.background.alpha);
       renderer.setRenderTarget(sceneTarget);
       renderer.clear(true, true, true);
+      // Pin the background reference and yaw sampled at transaction entry. R3F effects or input
+      // drafts that commit around this call cannot make the raster disagree with its document.
+      scene.background = suppressSceneBackground ? null : capturedSceneBackground;
+      scene.backgroundRotation.copy(capturedSceneBackgroundRotation);
       renderer.render(scene, camera);
 
       // Rendering to a normal WebGLRenderTarget deliberately bypasses Three's final canvas output
-      // transform. OutputPass recreates that transform (tone mapping + output color space) before
-      // the RGBA8 readback so exported LT input remains visually aligned with the viewport.
+      // transform. The output pass first restores straight linear RGB, then recreates tone mapping
+      // and output color space before RGBA8 readback so transparency and viewport color both agree.
       outputPass.render(renderer, outputTarget, sceneTarget, 0, false);
       readback = renderer.readRenderTargetPixelsAsync(
         outputTarget,
@@ -123,6 +131,8 @@ async function captureStudioBg3dThreeWebglColor(input: {
       renderer.setViewport(previousViewport);
       renderer.setScissor(previousScissor);
       renderer.setScissorTest(previousScissorTest);
+      scene.background = capturedSceneBackground;
+      scene.backgroundRotation.copy(capturedSceneBackgroundRotation);
     }
     await readback;
     return normalizeStudioBg3dRgbaReadback({

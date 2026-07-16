@@ -87,6 +87,41 @@ WEB_APP_BASE_URL=https://toonspectrum.example.com
 
 `render.yaml`은 장시간 상시구동 Nest API를 따로 배포하기 위한 보존된 Blueprint입니다. 이 경로를 쓰려면 `vercel.json`의 `/api/:path*` rewrite를 Render API URL로 바꾸거나 `VITE_API_BASE`/프록시 전략을 별도로 정해야 합니다. 현재 기본 배포와 자동 검증은 Vercel serverless 경로를 기준으로 합니다.
 
+### 실시간 협업 Socket.IO를 별도 장기 실행 서버에 배포할 때
+
+Vercel serverless 진입점은 WebSocket 수명주기를 유지하지 않으며 PostgreSQL Socket.IO adapter도
+장착하지 않습니다. SPA의 HTTP API가 Vercel에 남아 있어도 실시간 협업만 OCI/Render/Fly의 Nest
+서버로 보낼 수 있도록 프런트 빌드에 별도 origin을 지정합니다.
+
+```env
+# Vite 빌드 시 공개되는 값 — 경로가 아닌 https origin
+VITE_STUDIO_LIVE_ORIGIN=https://realtime.toonspectrum.example
+
+# 장기 실행 Nest 서버의 비공개 환경변수
+STUDIO_LIVE_CLUSTER_ADAPTER=postgres
+STUDIO_LIVE_POSTGRES_URL=postgresql://USER:PASSWORD@DIRECT_HOST/webdex?sslmode=verify-full&channel_binding=require
+STUDIO_LIVE_POSTGRES_POOL_MAX=2
+API_CORS_ALLOWED_ORIGINS=https://toonspectrum.example.com,https://toonspectrum.apps.tossmini.com
+```
+
+먼저 `0009_socket_io_postgres_adapter.sql`을 적용해야 합니다. PostgreSQL 모드는 listener와
+publisher를 동시에 확보하기 때문에 풀 최솟값이 2이며, `pooler` 호스트나 PgBouncer transaction
+endpoint는 사용할 수 없습니다. 원격/운영 URL은 `sslmode=require`, `verify-ca`, `verify-full` 중
+하나를 명시해야 합니다. 인증서와 호스트 이름을 함께 검증하는 `verify-full`을 권장합니다. URL query는
+node-postgres 해석이 authority/credential/routing을 덮어쓰지 못하도록 소문자 `sslmode`와
+`channel_binding`만 각각 한 번 허용하며, 평문 연결은 production이 아닌 loopback 개발 DB에만
+허용됩니다. 부팅
+사전검사는 별도 세션의 nonce `pg_notify`가 실제 listener에
+도착하는지, attachment 임시 행의 `INSERT → SELECT(bytea) → DELETE` 권한과 롤백 정리를 확인한 뒤에만
+트래픽을 받습니다.
+
+애플리케이션은 `@socket.io/postgres-adapter`의 cluster/heartbeat semantics를 사용하되, 패키지의
+fire-and-forget PubSub lifecycle은 사용하지 않습니다. 로컬 transport가 `/`와 `/studio-live`의 실제
+`LISTEN` 완료를 기다린 뒤에만 ready를 기록하고, 동적 namespace 실패나 연결 단절 시 checked-out
+client를 폐기한 후 전체 채널을 재구독합니다. 종료는 pending connect/init과 진행 중 작업을 회수하고
+PubSub listener를 닫은 다음 pool을 닫습니다. 장기 실행 서버에는 그래도 프로세스 재시작 정책과
+교차 노드 broadcast/RPC 모니터링을 두고, adapter 버전 변경 시 CI의 2-node integration을 재검증하세요.
+
 ## 앱인토스 로그인·공유 운영 설정
 
 토스 로그인 API는 mTLS가 필수입니다. Vercel에는 인증서 파일 경로 대신 PEM 본문을 시크릿으로

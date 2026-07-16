@@ -20,6 +20,14 @@ const envSchema = z.object({
   API_CORS_ALLOWED_ORIGINS: z.string().optional(),
   // PostgreSQL(Neon) 연결 문자열. 미설정 시 로컬 docker 폴백(lib/db).
   DATABASE_URL: z.string().min(1).optional(),
+  // 장기 실행 Nest API의 Socket.IO 다중 인스턴스 adapter. postgres 모드는 LISTEN 가능한
+  // direct PostgreSQL URL과 listener + publisher를 위한 최소 2개 연결을 사용한다.
+  STUDIO_LIVE_CLUSTER_ADAPTER: z.enum(["memory", "postgres"]).optional(),
+  STUDIO_LIVE_POSTGRES_URL: z.string().min(1).optional(),
+  STUDIO_LIVE_POSTGRES_POOL_MAX: z
+    .string()
+    .regex(/^(?:[2-9]|10)$/u, "STUDIO_LIVE_POSTGRES_POOL_MAX must be between 2 and 10")
+    .optional(),
   // 세션 서명 비밀. 운영에선 AUTH_SESSION_SECRET(없으면 AUTH_STATE_SECRET) 권장.
   AUTH_SESSION_SECRET: z.string().min(1).optional(),
   AUTH_STATE_SECRET: z.string().min(1).optional(),
@@ -76,6 +84,7 @@ const SECRET_KEYS: ReadonlyArray<keyof ValidatedEnv> = [
   "AUTH_STATE_SECRET",
   "CATALOG_INGEST_TRIGGER_TOKEN",
   "DATABASE_URL",
+  "STUDIO_LIVE_POSTGRES_URL",
   "OPENAI_API_KEY",
   "DEEPSEEK_API_KEY",
   "DEEPSEEK_USER_ID_SALT",

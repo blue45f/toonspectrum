@@ -48,7 +48,9 @@ rewrites rather than claims that every legacy scene type already runs on the new
   transaction back, including under concurrent writers on different API nodes.
 - Snapshots and incremental updates are staged into a temporary document. A corrupt durable update
   never partially mutates the live cache.
-- Presence discovery uses the Socket.IO adapter across API nodes. WebRTC screen signalling is
+- Presence discovery uses the Socket.IO adapter across API nodes. Long-running Nest deployments can
+  explicitly select the PostgreSQL adapter; boot verifies its migration table and a session-scoped
+  `LISTEN` on a direct PostgreSQL endpoint before accepting traffic. WebRTC screen signalling is
   relayed to the exact target connection through bounded server-side RPC and is revalidated at the
   target node before delivery.
 - Short resource edit leases are stored in `creator_work_live_lock`, use the PostgreSQL clock, and
@@ -62,8 +64,14 @@ rewrites rather than claims that every legacy scene type already runs on the new
   format or conversion into non-destructive operations; it is not falsely merged byte-by-byte.
 - A newly referenced remote image/VRM/3D asset needs a work-scoped upload/fetch and placeholder
   hydration lifecycle before a peer that never held the asset can materialize it.
-- Production multi-instance deployment still requires a configured Socket.IO cluster adapter; the
-  application now fails closed and has deterministic adapter-timeout behavior when it is absent.
+- Multi-instance operation requires `STUDIO_LIVE_CLUSTER_ADAPTER=postgres`, a LISTEN-capable direct
+  `STUDIO_LIVE_POSTGRES_URL`, and migration `0009_socket_io_postgres_adapter.sql`. The adapter uses a
+  bounded dedicated pool and fixed attachment table/channel names, fails boot until both required
+  namespace LISTEN subscriptions are ready, reconnects by replacing the failed listener and
+  resubscribing every namespace, and closes Socket.IO then PubSub then its pool. URL query overrides
+  are fail-closed. Default `memory` mode deliberately remains process-local.
+- The PostgreSQL adapter is attached only by the long-running Nest entrypoint. The Vercel serverless
+  entrypoint deliberately does not claim durable WebSocket or cross-invocation Socket.IO support.
 - CRDT backlog admission is intentionally process-local. The per-process limits prevent one API
   instance from retaining an unbounded queue, but they do not enforce one cluster-wide total; a
   horizontally scaled deployment that needs a global adaptive budget still requires distributed
@@ -120,6 +128,11 @@ rewrites rather than claims that every legacy scene type already runs on the new
 
 ## Verification contracts
 
+- PostgreSQL adapter: query-authority rejection against node-postgres parsing, LISTEN/table preflight,
+  max-two-pool listener failure recovery, pending-init cancellation, namespace resubscription,
+  credential redaction, fixed transport identifiers, and close ordering run without a DB. CI always
+  supplies `STUDIO_LIVE_POSTGRES_INTEGRATION_URL`, applies migration 0009, and gates on two-node
+  broadcast/attachment/discovery/server-RPC behavior against its direct PostgreSQL service.
 - CRDT: concurrent delivery-order convergence, progressive sample append, delete/edit and
   delete/restore races, mixed scene order, page/group topology, corrupt hydration, duplicate receipt,
   two-writer transaction rollback, durable sequence-gap repair, presence gap recovery, cross-node

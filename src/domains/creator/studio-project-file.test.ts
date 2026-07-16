@@ -149,6 +149,43 @@ describe("studio project file", () => {
     expect(JSON.parse(serializeStudioProjectFile(parsed)).pagesList[0].elements[0].bg3dScene).toEqual(scene);
   });
 
+  it("schema-v1 파노라마 URL만 제거하고 3D 편집 원본을 보존해 가져온다", () => {
+    const scene = createDefaultStudioBg3dSceneDocument();
+    const historicalScene = {
+      ...scene,
+      camera: { ...scene.camera, position: [8, 4, 6] },
+      background: {
+        ...scene.background,
+        skyPresetId: "sunset",
+        panoramaRotation: 35,
+        panoramaUrl: "https://private.invalid/legacy.webp?access_token=secret",
+      },
+    };
+    const parsed = parseStudioProjectFile({
+      version: 2,
+      pagesList: [{
+        ...page,
+        elements: [{
+          id: "image-1",
+          type: "image",
+          src: "data:image/png;base64,AA==",
+          bg3dScene: historicalScene,
+        }],
+      }],
+    });
+    const image = parsed.pagesList[0].elements[0] as Record<string, unknown>;
+    const migrated = image.bg3dScene as typeof scene;
+
+    expect(migrated.camera.position).toEqual([8, 4, 6]);
+    expect(migrated.background).toMatchObject({
+      panoramaRotation: 35,
+      skyPresetId: "sunset",
+    });
+    expect(JSON.stringify(migrated)).not.toContain("panoramaUrl");
+    expect(JSON.stringify(migrated)).not.toContain("private.invalid");
+    expect(JSON.stringify(migrated)).not.toContain("access_token");
+  });
+
   it("3D 장면의 알 수 없는 런타임 필드를 조용히 제거하지 않고 가져오기를 거부한다", () => {
     const scene = {
       ...createDefaultStudioBg3dSceneDocument(),

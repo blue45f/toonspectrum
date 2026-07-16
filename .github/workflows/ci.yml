@@ -30,6 +30,9 @@ jobs:
           --health-retries 20
     env:
       DATABASE_URL: postgres://webdex@localhost:5432/webdex
+      # 같은 direct PostgreSQL에 Socket.IO adapter migration을 적용한 뒤 2-node integration을
+      # 필수 실행한다. 이 값이 있으면 해당 테스트는 skip이 아니라 CI gate가 된다.
+      STUDIO_LIVE_POSTGRES_INTEGRATION_URL: postgres://webdex@localhost:5432/webdex
       # StudioPage.tsx 등 초대형 모듈 ESLint/tsc 힙 고갈 방지 (GitHub-hosted ~7GB 한도 내).
       NODE_OPTIONS: --max-old-space-size=8192
     steps:
@@ -47,6 +50,8 @@ jobs:
       - run: pnpm run typecheck
       # 테스트 전에 스키마를 provision(Drizzle) — DB-backed 테스트가 의존.
       - run: pnpm exec drizzle-kit push --force
+      # 배포 migration 자체도 idempotent하게 적용되는지 검증한 뒤 realtime integration을 실행한다.
+      - run: psql "$STUDIO_LIVE_POSTGRES_INTEGRATION_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0009_socket_io_postgres_adapter.sql
       - run: pnpm run test
       - run: pnpm run build
       - run: pnpm run check:studio-bundle

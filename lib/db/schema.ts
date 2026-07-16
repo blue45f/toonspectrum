@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   bigint,
+  bigserial,
   boolean,
   check,
   customType,
@@ -19,6 +20,21 @@ import {
 const bytea = customType<{ data: Uint8Array; driverData: Uint8Array }>({
   dataType: () => "bytea",
 });
+
+// Socket.IO PostgreSQL cluster adapter의 8 KiB 초과·binary packet 임시 본문. 실제 room/presence
+// 권위 상태가 아니라 LISTEN/NOTIFY 전달 보조 저장소이며 adapter cleanup 주기 이후 제거된다.
+// 이름과 컬럼은 lifecycle-safe PostgreSQL transport의 고정 SQL 계약과 정확히 일치해야 한다.
+export const socketIoAttachments = pgTable(
+  "socket_io_attachments",
+  {
+    id: bigserial("id", { mode: "bigint" }).primaryKey(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    payload: bytea("payload").notNull(),
+  },
+  (t) => [index("idx_socket_io_attachments_created_at").on(t.createdAt)]
+);
 
 // libSQL(SQLite) → PostgreSQL(Neon) 마이그레이션:
 //  - integer{mode:"timestamp_ms"} → timestamp({mode:"date"})  (Drizzle가 Date로 주고받음)

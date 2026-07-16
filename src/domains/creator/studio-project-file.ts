@@ -5,6 +5,9 @@ import {
   type StudioAiProvenanceDocument,
 } from "./studio-ai-provenance";
 import {
+  STUDIO_BG3D_SCENE_DOCUMENT_KIND,
+  STUDIO_BG3D_SCENE_DOCUMENT_VERSION,
+  migrateStudioBg3dSceneDocument,
   parseStudioBg3dSceneDocument,
   serializeStudioBg3dSceneDocument,
 } from "./studio-bg3d-scene-document";
@@ -80,7 +83,13 @@ function canonicalizeBg3dSceneElement(value: unknown): unknown {
   if (!isRecord(value) || value.type !== "image" || value.bg3dScene === undefined) {
     return value;
   }
-  const serialized = serializeStudioBg3dSceneDocument(value.bg3dScene);
+  const migrated =
+    isRecord(value.bg3dScene) &&
+    value.bg3dScene.kind === STUDIO_BG3D_SCENE_DOCUMENT_KIND &&
+    value.bg3dScene.version === STUDIO_BG3D_SCENE_DOCUMENT_VERSION
+      ? migrateStudioBg3dSceneDocument(value.bg3dScene)
+      : null;
+  const serialized = serializeStudioBg3dSceneDocument(migrated);
   const scene = serialized ? parseStudioBg3dSceneDocument(serialized) : null;
   if (!scene) {
     throw new Error("3D 배경 장면 데이터가 손상되었거나 지원하지 않는 버전입니다.");

@@ -100,6 +100,7 @@ describe("Studio BG3D scene document defaults", () => {
     expect(document.output.line.layerType).toBe("raster");
     expect(document.output.line.hiddenLineRemoval).toBe(true);
     expect(document.output.tone).toMatchObject({ mode: "flat", type: "color", opacity: 1 });
+    expect(document.background.panoramaRotation).toBe(0);
     expect(document.budgets.complexity.maxNodes).toBe(256);
     expect(Object.isFrozen(document)).toBe(true);
     expect(Object.isFrozen(document.camera.position)).toBe(true);
@@ -155,7 +156,12 @@ describe("Studio BG3D scene document normalization", () => {
           colorSpace: "display-p3",
           renderer: "babylon",
         },
-        background: { mode: "color", color: "#ABCDEF", skyPresetId: "night" },
+        background: {
+          mode: "color",
+          color: "#ABCDEF",
+          skyPresetId: "night",
+          panoramaRotation: 135,
+        },
         lighting: {
           ambientColor: "#eeeeee",
           ambientIntensity: 0.5,
@@ -207,6 +213,7 @@ describe("Studio BG3D scene document normalization", () => {
       colorSpace: "srgb",
     });
     expect(normalized.background.color).toBe("#abcdef");
+    expect(normalized.background.panoramaRotation).toBe(135);
     expect(normalized.lighting.key.direction).toEqual([0, 1, 0]);
     expect(normalized.output.line).toMatchObject({
       layerType: "raster",
@@ -557,6 +564,30 @@ describe("Studio BG3D scene document normalization", () => {
     expect(serialized).not.toContain("polluted");
     expect(serialized).not.toContain("secret");
     expect(({} as { polluted?: boolean }).polluted).toBeUndefined();
+  });
+
+  it("strips nested panorama URLs leniently and rejects them at strict persistence boundaries", () => {
+    const panoramaUrl = "https://private.invalid/sky.webp?access_token=secret";
+    const hostile = currentDocument({
+      background: {
+        ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.background,
+        skyPresetId: "sunset",
+        panoramaRotation: -75,
+        panoramaUrl,
+      },
+    });
+    const normalized = normalizeStudioBg3dSceneDocument(hostile);
+    const normalizedJson = JSON.stringify(normalized);
+
+    expect(normalized.background).toMatchObject({
+      skyPresetId: "sunset",
+      panoramaRotation: -75,
+    });
+    expect(normalizedJson).not.toContain("panoramaUrl");
+    expect(normalizedJson).not.toContain("private.invalid");
+    expect(normalizedJson).not.toContain("access_token");
+    expect(parseStudioBg3dSceneDocument(JSON.stringify(hostile))).toBeNull();
+    expect(serializeStudioBg3dSceneDocument(hostile)).toBeNull();
   });
 });
 
@@ -913,6 +944,61 @@ describe("Studio BG3D scene migration and serialization", () => {
       STUDIO_BG3D_SCENE_DOCUMENT_KIND
     );
     expect(migrateStudioBg3dSceneDocument({ tool: "vrm-poser", primitives: [] })).toBeNull();
+  });
+
+  it("explicitly migrates the historical schema-v1 panorama URL without losing edit data", () => {
+    const original = currentDocument({
+      camera: {
+        ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera,
+        position: [7, 5, 9],
+      },
+      background: {
+        ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.background,
+        skyPresetId: "sunset",
+        panoramaRotation: 72,
+        panoramaUrl: "https://private.invalid/legacy-sky.webp?access_token=secret",
+      },
+      nodes: [primitiveNode(1)],
+    });
+
+    expect(parseStudioBg3dSceneDocument(JSON.stringify(original))).toBeNull();
+    expect(serializeStudioBg3dSceneDocument(original)).toBeNull();
+
+    const migrated = migrateStudioBg3dSceneDocument(original);
+    expect(migrated).not.toBeNull();
+    expect(migrated?.camera.position).toEqual([7, 5, 9]);
+    expect(migrated?.background).toMatchObject({
+      skyPresetId: "sunset",
+      panoramaRotation: 72,
+    });
+    expect(migrated?.nodes).toHaveLength(1);
+    const serialized = serializeStudioBg3dSceneDocument(migrated);
+    expect(serialized).not.toBeNull();
+    expect(serialized).not.toContain("panoramaUrl");
+    expect(serialized).not.toContain("private.invalid");
+    expect(serialized).not.toContain("access_token");
+  });
+
+  it("rejects schema-v1 panorama migration when any unrelated lossy rewrite is required", () => {
+    const historical = currentDocument({
+      background: {
+        ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.background,
+        panoramaUrl: "https://private.invalid/legacy-sky.webp",
+      },
+    });
+
+    expect(
+      migrateStudioBg3dSceneDocument({ ...historical, runtimeUrl: "blob:hostile" })
+    ).toBeNull();
+    expect(
+      migrateStudioBg3dSceneDocument({
+        ...historical,
+        background: {
+          ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.background,
+          panoramaUrl: 42,
+        },
+      })
+    ).toBeNull();
   });
 
   it("never lets schema-marked payloads fall through to legacy migration", () => {

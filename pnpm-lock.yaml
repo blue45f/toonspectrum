@@ -246,6 +246,9 @@ importers:
       '@libsql/client':
         specifier: ^0.17.3
         version: 0.17.3
+      '@msgpack/msgpack':
+        specifier: ^2.8.0
+        version: 2.8.0
       '@nestjs/common':
         specifier: ^11.1.24
         version: 11.1.24(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -261,6 +264,9 @@ importers:
       '@nestjs/websockets':
         specifier: ^11.1.28
         version: 11.1.28(@nestjs/common@11.1.24(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.24)(@nestjs/platform-socket.io@11.1.28)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@socket.io/postgres-adapter':
+        specifier: ^0.5.0
+        version: 0.5.0(socket.io-adapter@2.5.8)
       '@toonspectrum/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -1648,6 +1654,10 @@ packages:
     peerDependencies:
       three: '>= 0.159.0'
 
+  '@msgpack/msgpack@2.8.0':
+    resolution: {integrity: sha512-h9u4u/jiIRKbq25PM+zymTyW6bhTzELvOoUd+AvYriWOAKpLGnIamaET3pnHYoI5iYphAHBI4ayx0MehR+VVPQ==}
+    engines: {node: '>= 10'}
+
   '@napi-rs/wasm-runtime@1.1.4':
     resolution: {integrity: sha512-3NQNNgA1YSlJb/kMH1ildASP9HW7/7kYnRI2szWJaofaS1hWmbGI4H+d3+22aGzXXN9IJ+n+GiFVcGipJP18ow==}
     peerDependencies:
@@ -2481,6 +2491,12 @@ packages:
 
   '@socket.io/component-emitter@3.1.2':
     resolution: {integrity: sha512-9BCxFwvbGg/RsZK9tjXd8s4UcwR0MWeFQ1XEKIQVVvAGJyINdrqKMcTRyLoK8Rse1GjzLV9cwjWV1olXRWEXVA==}
+
+  '@socket.io/postgres-adapter@0.5.0':
+    resolution: {integrity: sha512-s1vFsatB4lS429ZbeAi8ju+mZMgtgdSmi9UsZsdcEG++vVtX5z10yDEt4TV8saePscvvGjs6uXvJfMCxz8+M2Q==}
+    engines: {node: '>=12.0.0'}
+    peerDependencies:
+      socket.io-adapter: ^2.5.4
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
@@ -3406,6 +3422,15 @@ packages:
 
   debug@3.2.7:
     resolution: {integrity: sha512-CFjzYYAi4ThfiQvizrFQevTTXHtnCqWfe7x1AhgEscTz6ZbLbfoLRLPugTQyBth6f8ZERVUSyWHFD/7Wu4t1XQ==}
+    peerDependencies:
+      supports-color: '*'
+    peerDependenciesMeta:
+      supports-color:
+        optional: true
+
+  debug@4.3.7:
+    resolution: {integrity: sha512-Er2nc/H7RrMXZBFCEim6TCmMk02Z8vLC2Rbi1KEBggpo0fS6l0S1nnapwmIi3yW/+GOJap1Krg4w0Hg80oCqgQ==}
+    engines: {node: '>=6.0'}
     peerDependencies:
       supports-color: '*'
     peerDependenciesMeta:
@@ -7250,6 +7275,8 @@ snapshots:
       promise-worker-transferable: 1.0.4
       three: 0.184.0
 
+  '@msgpack/msgpack@2.8.0': {}
+
   '@napi-rs/wasm-runtime@1.1.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)':
     dependencies:
       '@emnapi/core': 1.10.0
@@ -7998,6 +8025,17 @@ snapshots:
   '@simple-libs/stream-utils@1.2.0': {}
 
   '@socket.io/component-emitter@3.1.2': {}
+
+  '@socket.io/postgres-adapter@0.5.0(socket.io-adapter@2.5.8)':
+    dependencies:
+      '@msgpack/msgpack': 2.8.0
+      '@types/pg': 8.20.0
+      debug: 4.3.7
+      pg: 8.21.0
+      socket.io-adapter: 2.5.8
+    transitivePeerDependencies:
+      - pg-native
+      - supports-color
 
   '@standard-schema/spec@1.1.0': {}
 
@@ -8920,6 +8958,10 @@ snapshots:
       ms: 2.0.0
 
   debug@3.2.7:
+    dependencies:
+      ms: 2.1.3
+
+  debug@4.3.7:
     dependencies:
       ms: 2.1.3
 

@@ -1,6 +1,7 @@
 # ToonSpectrum Studio 3D 상용 기능 벤치마크
 
 - 기준일: 2026-07-12
+- 최신 구현 반영: 2026-07-16 (거리 안개/절차적 360° 환경/캡처 경계)
 - 범위: 웹툰 배경 블록아웃, 안전한 3D 자산 반입, 카메라, 객체 관리, 선화·톤 출력, 모바일 성능
 - 엔진 결정: [Babylon.js 도입 평가](./studio-babylonjs-adoption-evaluation-2026-07-11.md)에 따라 현재 Three.js + R3F를 유지한다.
 
@@ -21,8 +22,8 @@
 Clip Studio Paint는 객체 목록과 화면 조작기를 함께 제공한다. 객체 또는 부품을 선택하고 이동·회전·크기를 바꾸며, 카메라 회전·이동·줌, 평면 이동, 접지, 3D 스냅을 조작기에서 수행한다. 고급 팔레트에는 Transform, Camera, Lens, Light Source, Fog, Panorama, Outline이 분리되어 있다.
 
 - 공식 매뉴얼: [Editing a 3D material](https://help.clip-studio.com/en-us/manual_en/660_3d/Editing_a_3D_material.htm)
-- ToonSpectrum 현재 강점: 프리미티브·완성형 장면 템플릿, 이동/회전/크기 기즈모, 수치 입력, 카메라 프리셋, undo/redo, 다중 선택, 표시·잠금, 접지·스텝 스냅, 초점 맞춤, 평행 투영, All Sides View, 부모-자식 계층, 거리 안개
-- 남은 격차: 파노라마 텍스처 authoring, 표면 직접 페인팅, normal map 편집, BVH pose sequence
+- ToonSpectrum 현재 강점: 프리미티브·완성형 장면 템플릿, 이동/회전/크기 기즈모, 수치 입력, 카메라 프리셋, undo/redo, 다중 선택, 표시·잠금, 접지·스텝 스냅, 초점 맞춤, 평행 투영, All Sides View, 트리 UI, 거리 안개, URL 없는 절차적 360° 환경과 수평 회전
+- 남은 격차: 사용자 equirectangular image import·fisheye/UV authoring, 실제 parent transform 계층, 표면 직접 페인팅, normal map 편집, BVH pose sequence
 
 Clip Studio Paint의 객체 목록은 복제, 표시/숨김, 잠금, 부모-자식 계층 연결, 여러 객체의 개별 피벗/중앙 피벗 변형, 재사용 가능한 3D 소재 등록을 제공한다.
 
@@ -83,6 +84,7 @@ ToonSpectrum은 엔진 로더 호출 전에 다음을 자체 검증한다.
 | 접지·스냅 | 바닥 접지, 이동/회전 스텝, 객체 스냅 | 구현 완료 | 결정적 순수 함수와 기즈모 QA |
 | 카메라 | position/target/FOV, preset, 초점, 평행 투영 | 구현 완료 | 사용자 카메라 왕복, 재열기 픽셀 근사 일치 |
 | 공간 안개 | 시작·완전 혼합 거리, 대기색, 프리셋, 캡처 반영 | 구현 완료 | 장면 문서 유한 범위 제한, 렌더 경계 순서 보정, declarative R3F fog, 뷰포트·LT 컬러/톤 동시 반영 |
+| 360° 환경 | equirectangular 배경, 회전, 캡처·투명/깊이 경계 | 절차적 프리셋 제품 연결 · 외부 이미지 authoring은 후속 | URL 없는 낮·노을·밤 DataTexture, 회전 왕복, 불투명 color/LT 포함, 투명·depth pass 제외, strict 문서에서 panorama URL 거부 |
 | All Sides View | 원근+정면+측면+상단 동기화 | 구현 완료 | 선택 중심/카메라 프러스텀/모바일 단일뷰 전환 |
 | 소재 라이브러리 | 장면·객체 재사용, 권리/출처, 검색/즐겨찾기 | 구현 완료 | 권리 경고, hash 중복 제거, 내보내기 포함 정책 |
 
@@ -108,7 +110,7 @@ ToonSpectrum은 엔진 로더 호출 전에 다음을 자체 검증한다.
 
 1. 선화/텍스처 선/톤 분리 삽입과 프리셋
 2. 깊이 기반 외곽선, 스무딩, scale-aware 정확도
-3. 평행 투영·렌즈·안개(완료), 파노라마 authoring
+3. 평행 투영·렌즈·안개·절차적 360° 환경(완료), 사용자 파노라마 import·fisheye/UV authoring
 4. 4분할 All Sides View
 5. 부모-자식 계층과 부착 지점
 

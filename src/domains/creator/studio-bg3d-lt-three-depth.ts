@@ -41,6 +41,8 @@ export async function captureStudioBg3dThreeDepth(
 
   const previousTarget = renderer.getRenderTarget();
   const previousOverrideMaterial = scene.overrideMaterial;
+  const previousSceneBackground = scene.background;
+  const previousSceneBackgroundRotation = scene.backgroundRotation.clone();
   const previousClearColor = renderer.getClearColor(new THREE.Color());
   const previousClearAlpha = renderer.getClearAlpha();
   const previousAutoClear = renderer.autoClear;
@@ -71,6 +73,9 @@ export async function captureStudioBg3dThreeDepth(
       renderer.setRenderTarget(target);
       renderer.setClearColor(0xffffff, 1);
       renderer.clear(true, true, true);
+      // Equirectangular scene backgrounds are color-only environment decoration. Pin a null
+      // background immediately before submission so no full-frame fake depth surface is packed.
+      scene.background = null;
       renderer.render(scene, camera);
       // Three submits readPixels/fence work synchronously before returning this Promise. Restore
       // the live R3F renderer immediately so subsequent frames cannot render into the depth target
@@ -78,6 +83,8 @@ export async function captureStudioBg3dThreeDepth(
       readback = renderer.readRenderTargetPixelsAsync(target, 0, 0, width, height, packed);
     } finally {
       scene.overrideMaterial = previousOverrideMaterial;
+      scene.background = previousSceneBackground;
+      scene.backgroundRotation.copy(previousSceneBackgroundRotation);
       renderer.setRenderTarget(previousTarget);
       renderer.setClearColor(previousClearColor, previousClearAlpha);
       renderer.autoClear = previousAutoClear;

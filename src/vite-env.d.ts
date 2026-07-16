@@ -1,6 +1,8 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
+  // 장기 실행 Nest Socket.IO origin. Vercel serverless HTTP API와 realtime을 분리할 때 사용.
+  readonly VITE_STUDIO_LIVE_ORIGIN?: string;
   // DeskCloud 네이티브 통합(@heejun/deskcloud) — 각 desk 의 API 베이스 URL.
   // 미설정 시 해당 통합을 마운트하지 않는다(앱 무영향). 선택 VITE_*_PK 는 publishable 키
   // (pk_…, 미설정 시 'pk_demo' 폴백, 브라우저 노출 안전).

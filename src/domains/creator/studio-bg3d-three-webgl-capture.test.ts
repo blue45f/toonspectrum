@@ -156,8 +156,8 @@ describe("Three WebGL Studio 3D capture adapter", () => {
       includeDepth: false,
     });
 
-    // The first pass is the scene's linear target; the second is OutputPass's tone-mapped/sRGB
-    // target. No sourceCanvas ownerDocument, drawImage, or getImageData is involved.
+    // The first pass is the scene's premultiplied linear target; the second restores straight alpha
+    // before tone mapping/sRGB. No sourceCanvas ownerDocument, drawImage, or getImageData is involved.
     expect(f.renderer.render).toHaveBeenCalledTimes(2);
     expect(f.renderer.render).toHaveBeenNthCalledWith(1, f.scene, f.camera);
     const sceneTarget = vi.mocked(f.renderer.setRenderTarget).mock.calls[0]?.[0];
@@ -167,6 +167,11 @@ describe("Three WebGL Studio 3D capture adapter", () => {
     expect(sceneTarget).not.toBe(outputTarget);
     expect(sceneTarget).toMatchObject({ depthBuffer: true, height: 2, width: 2 });
     expect(outputTarget).toMatchObject({ depthBuffer: false, height: 2, width: 2 });
+    const outputMesh = vi.mocked(f.renderer.render).mock.calls[1]?.[0] as THREE.Mesh;
+    const outputMaterial = outputMesh.material as THREE.ShaderMaterial;
+    expect(outputMaterial.fragmentShader.indexOf("gl_FragColor.rgb /= gl_FragColor.a;")).toBeLessThan(
+      outputMaterial.fragmentShader.indexOf("// tone mapping")
+    );
     expect(f.renderer.clear).toHaveBeenCalledWith(true, true, true);
     expect(f.renderer.readRenderTargetPixelsAsync).toHaveBeenCalledWith(
       outputTarget,
@@ -188,6 +193,34 @@ describe("Three WebGL Studio 3D capture adapter", () => {
     expect(targetDispose).toHaveBeenCalledTimes(2);
   });
 
+  it("keeps a procedural scene background in opaque color captures", async () => {
+    const f = fixture();
+    const panorama = new THREE.DataTexture();
+    const reentrantBackground = new THREE.Color("#abcdef");
+    f.scene.background = panorama;
+    f.scene.backgroundRotation.set(0.1, 0.75, 0.2);
+    const initialRotation = f.scene.backgroundRotation.clone();
+    vi.mocked(f.renderer.clear).mockImplementationOnce(() => {
+      f.scene.background = reentrantBackground;
+      f.scene.backgroundRotation.set(1, 2, 3);
+    });
+    vi.mocked(f.renderer.render).mockImplementation((renderedScene) => {
+      if (renderedScene !== f.scene) return;
+      expect(f.scene.background).toBe(panorama);
+      expect(f.scene.backgroundRotation).toEqual(initialRotation);
+    });
+
+    await captureStudioBg3dRaster(f.adapter, {
+      width: 2,
+      height: 2,
+      background: { color: "#ffffff", alpha: 1 },
+      includeDepth: false,
+    });
+
+    expect(f.scene.background).toBe(panorama);
+    expect(f.scene.backgroundRotation).toEqual(initialRotation);
+  });
+
   it("restores renderer and helper visibility before color/depth GPU fences settle", async () => {
     const colorReadback = deferred<THREE.TypedArray>();
     const depthReadback = deferred<Float32Array>();
@@ -200,8 +233,11 @@ describe("Three WebGL Studio 3D capture adapter", () => {
     const importedLookingNode = new THREE.Group();
     importedLookingNode.userData.studioCaptureExcluded = true;
     f.scene.add(visibleHelper, alreadyHiddenHelper, importedLookingNode);
+    const panorama = new THREE.DataTexture();
+    f.scene.background = panorama;
     vi.mocked(f.renderer.render).mockImplementation((renderedScene) => {
       if (renderedScene !== f.scene) return;
+      expect(f.scene.background).toBeNull();
       expect(visibleHelper.visible).toBe(false);
       expect(alreadyHiddenHelper.visible).toBe(false);
       expect(importedLookingNode.visible).toBe(true);
@@ -228,6 +264,7 @@ describe("Three WebGL Studio 3D capture adapter", () => {
       height: 2,
     });
     expectLiveRendererStateRestored(f);
+    expect(f.scene.background).toBe(panorama);
     expect(visibleHelper.visible).toBe(true);
     expect(alreadyHiddenHelper.visible).toBe(false);
     expect(importedLookingNode.visible).toBe(true);

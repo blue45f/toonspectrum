@@ -8,6 +8,10 @@ import { AppModule } from "./app.module";
 import { ZodValidationPipe } from "./common/zod-validation.pipe";
 import { configureCors } from "./config/cors";
 import { validateEnv } from "./config/env";
+import {
+  createStudioLivePostgresIoAdapter,
+  type StudioLivePostgresIoAdapter,
+} from "./realtime/studio-postgres-io.adapter";
 import { sessionAuth } from "./session-middleware";
 
 async function bootstrap() {
@@ -17,6 +21,7 @@ async function bootstrap() {
   // bufferLogs: nestjs-pino 로거가 준비되기 전 로그를 버퍼링했다가 useLogger 이후 flush 한다.
   const app = await NestFactory.create(AppModule, { bodyParser: false, bufferLogs: true });
   app.useLogger(app.get(Logger)); // 전역 로거를 nestjs-pino 로 교체(예외 필터의 5xx 로깅도 이걸 사용)
+  app.enableShutdownHooks();
   configureCors(app); // 앱인토스 공개/QR 테스트 Origin의 preflight를 로컬·서버리스에서 동일하게 처리
   app.use(json({ limit: "16mb" }));
   app.use(urlencoded({ extended: true, limit: "16mb" }));
@@ -25,10 +30,29 @@ async function bootstrap() {
   // 표준 Zod 검증 파이프. createZodDto DTO 만 검증하고 그 외(@Body() body: unknown)는 통과.
   app.useGlobalPipes(new ZodValidationPipe());
 
-  // PaaS(Render/Railway/Fly 등)는 PORT를 주입한다. 로컬은 NEST_API_PORT, 둘 다 없으면 4001.
-  const port = Number(process.env.PORT ?? process.env.NEST_API_PORT ?? "4001");
-  await app.listen(port, "0.0.0.0"); // 외부 트래픽 수신을 위해 모든 인터페이스에 바인딩
-  console.log(`Nest backend started on port ${port}`);
+  let studioLiveAdapter: StudioLivePostgresIoAdapter | null = null;
+  try {
+    // 명시적으로 postgres 모드를 선택한 장기 실행 API에서만 클러스터 adapter를 장착한다.
+    // Vercel serverless 경로(serverless.ts)는 WebSocket 수명주기가 다르므로 이 factory를 호출하지 않는다.
+    studioLiveAdapter = await createStudioLivePostgresIoAdapter(app, process.env, {
+      logger: app.get(Logger),
+    });
+    if (studioLiveAdapter) app.useWebSocketAdapter(studioLiveAdapter);
+
+    // PaaS(Render/Railway/Fly 등)는 PORT를 주입한다. 로컬은 NEST_API_PORT, 둘 다 없으면 4001.
+    const port = Number(process.env.PORT ?? process.env.NEST_API_PORT ?? "4001");
+    await app.listen(port, "0.0.0.0"); // 외부 트래픽 수신을 위해 모든 인터페이스에 바인딩
+    console.log(`Nest backend started on port ${port}`);
+  } catch (error) {
+    // app.close()가 이미 adapter.close()를 호출했더라도 disposePool()은 멱등이다. listen 이전
+    // 실패에서도 preflight용 전용 풀을 남기지 않는다.
+    try {
+      await app.close();
+    } finally {
+      await studioLiveAdapter?.disposePool();
+    }
+    throw error;
+  }
 }
 
 void bootstrap();

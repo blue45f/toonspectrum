@@ -27,6 +27,7 @@ import {
   type StudioLiveScreenAccessPayload,
   type StudioLiveWebRtcIcePayload,
 } from "./studio-live-collaboration-protocol";
+import { resolveStudioLiveSocketEndpoint } from "./studio-live-socket-endpoint";
 
 import type {
   StudioLiveAuthoritativeLockEvent,
@@ -37,7 +38,8 @@ import type {
   StudioLiveTransportStatus,
 } from "./studio-live-collaboration-transport";
 
-const SOCKET_NAMESPACE = "/studio-live";
+import { getRuntimeApiBase } from "@/src/infrastructure/runtime-api-base";
+
 const SOCKET_PATH = "/socket.io";
 const CONNECT_TIMEOUT_MS = 10_000;
 const CRDT_ACK_TIMEOUT_MS = 10_000;
@@ -101,13 +103,22 @@ export interface StudioLiveSocketTransportDependencies {
 }
 
 function defaultCreateSocket(auth: { sessionToken: string }): StudioLiveSocketLike {
-  return io(SOCKET_NAMESPACE, {
-    path: SOCKET_PATH,
-    transports: ["websocket"],
-    autoConnect: false,
-    reconnection: true,
-    auth,
-  }) as unknown as StudioLiveSocketLike;
+  return io(
+    resolveStudioLiveSocketEndpoint({
+      explicitOrigin: import.meta.env.VITE_STUDIO_LIVE_ORIGIN,
+      viteApiBase: import.meta.env.VITE_API_BASE,
+      runtimeApiBase: getRuntimeApiBase(),
+      locationOrigin: globalThis.location?.origin,
+      allowInsecureLoopback: import.meta.env.DEV,
+    }),
+    {
+      path: SOCKET_PATH,
+      transports: ["websocket"],
+      autoConnect: false,
+      reconnection: true,
+      auth,
+    }
+  ) as unknown as StudioLiveSocketLike;
 }
 
 function defaultSetTimeout(handler: () => void, delay: number): unknown {

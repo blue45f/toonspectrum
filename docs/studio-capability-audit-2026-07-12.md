@@ -1,6 +1,7 @@
 # ToonSpectrum Studio 기능 완성도 감사
 
 - 기준일: 2026-07-12
+- 최신 구현 반영: 2026-07-16 (CRDT/WebGPU/다중 서버 adapter/절차적 360° 환경)
 - 감사 범위: 첨부 요구사항, 최근 대화 요청, 상용 드로잉·웹툰·3D·협업 제품의 공식 기능
 - 판정 원칙: UI가 보이는 것만으로 완료로 세지 않고, 실행 경로·저장/복원·권한·오류 처리·테스트까지 연결되어야 완료로 판정한다.
 
@@ -15,20 +16,21 @@
 - AI 세계관·시나리오·구도·대사·번역·팔레트 보조
 - reference image와 캐릭터 바이블을 사용한 장면 연속성 보조
 - VRM 포즈·표정·손가락·조명·spring bone·웹캠 추적
-- GLB 2.0 기반 3D 배경, 카메라·조명·객체 변형, 컬러/톤/선화 분리 삽입
-- 서버 팀 역할·초대·활동 이력·revision 충돌 방지·복원
+- GLB 2.0 기반 3D 배경, 카메라·조명·객체 변형, 절차적 360° 환경, 컬러/톤/선화 분리 삽입
+- 서버 팀 역할·초대·활동 이력·revision 충돌 방지·복원과 Yjs 기반 동시 편집 vertical slice
+- 실제 pressure stroke를 표시하는 retained WebGPU live-draft compositor와 Canvas2D/Konva 안전 폴백
 
 다음 영역은 아직 부분 구현이거나 제품 실행 경로에 연결되지 않았다.
 
 - 의미 영역 분할과 색 힌트를 사용하는 AI 자동 채색
 - 인증 Socket.IO 세션을 팀 패널 밖에서도 유지하는 항상 켜진 Studio live room
 - 캔버스 원격 커서, 선택 영역, 실제 편집 mutation을 막는 서버 권위 잠금
-- CRDT/OT 또는 요소 operation stream 기반 동시 편집
+- 파괴적 raster tile 편집까지 포함하는 완전한 pixel CRDT와 모든 도구의 CRDT 변환
 - 움직이는 배경·인물의 transform tween, parallax, 본/카메라 트랙
-- WebGPU 제품 런타임
+- Konva의 committed scene/readback까지 대체하는 전면 WebGPU authority
 - VRM/3D 모델 전체 라이브러리의 사전 생성 썸네일
 - AI 텍스트/이미지→3D mesh 생성·repair·리깅
-- Clip Studio Paint 3D의 다중 선택·계층·접지·스냅·사면도·파노라마·BVH·texture painting
+- Clip Studio Paint 3D의 mesh surface snap, 실제 parent transform 계층, 외부 파노라마/UV 저작, BVH·texture painting
 - Google Drive·Dropbox·Notion 같은 외부 클라우드 연동
 - Firefly·D5·Artbreeder 등 특정 상용 서비스의 직접 API·라이선스 보증
 
@@ -150,10 +152,10 @@ announce→request→approved→SDP가 같은 `shareId`를 보존했고, `shareI
 | Studio UI↔Socket.IO adapter | 완료(팀 패널 범위) | 인증 join·재접속·권한 회수·event 변환·명시적 로컬 fallback까지 연결. 현재 room 수명은 팀 패널 마운트에 종속 |
 | 원격 커서 overlay | 기반 | room 코어는 있으나 Konva Stage에 렌더하지 않음 |
 | 실제 mutation 잠금 | 기반 | soft-lock 상태가 HTTP 공유 문서 저장이나 요소 편집 guard를 강제하지 않음 |
-| operation stream/CRDT | 미구현 | 현재 저장은 revision 기반 전체 문서 snapshot |
+| operation stream/CRDT | 부분·제품 연결 | Yjs stroke·scene reference·page·layer group·삭제/복구 operation과 PostgreSQL update/snapshot, sequence-gap repair를 연결. 파괴적 pixel rewrite는 아직 tile operation이 아님 |
 | 서버 앵커 댓글 | 미구현 | 현재 Studio 댓글은 문서 포함 local-first 데이터 |
 | 인터넷 WebRTC 안정성 | 외부 필요 | STUN/TURN 단기 자격 증명과 운영 장기 실행 Socket.IO 호스트가 필요 |
-| 다중 API 인스턴스 | 외부 필요 | Redis adapter, 분산 presence, 원자적 Redis lease가 필요 |
+| 다중 API 인스턴스 | 부분·배포 설정 필요 | 장기 실행 Nest에서 PostgreSQL Socket.IO adapter와 DB 기반 lease/CRDT durability를 사용 가능. direct PostgreSQL URL·migration이 필요하며 cluster-wide admission budget은 아직 process-local |
 | 음성·영상 회의·채팅 | 미구현 | 화면 영상만 범위에 포함하고 오디오는 의도적으로 제외 |
 
 현재 Vercel serverless 함수는 장기 WebSocket 업그레이드 서버가 아니다. 운영 실시간 협업은 OCI 등 장기 실행 Nest 서버 또는 별도 realtime 서비스와 리버스 프록시가 필요하다.
@@ -192,7 +194,7 @@ announce→request→approved→SDP가 같은 `shareId`를 보존했고, `shareI
 | 객체 이동·회전·크기 | 완료 | TransformControls·수치 입력·undo/redo |
 | camera orbit/pan/zoom/FOV/preset | 완료 | perspective·orthographic, FOV, preset, focus selected와 All Sides View 제공 |
 | 다중 선택·part 선택 | 완료/부분 | 객체 다중 선택·함께 변형 제공. GLB 내부 mesh part 직접 선택은 없음 |
-| 표시/잠금·부모 자식 hierarchy | 완료 | 장면 문서 왕복과 재귀 Three scene graph 연결 |
+| 표시/잠금·부모 자식 hierarchy | 부분 | 표시·잠금과 `parentId` 저장/트리 UI는 제공하지만 런타임 transform은 아직 완전한 재귀 parent scene graph로 결합되지 않음 |
 | 접지·이동/회전/object snap | 완료 | 바닥 접지와 이동·회전 step snap 제공. mesh surface snap은 후속 |
 | 선택 대상 focus | 완료 | 선택 bounds 중심 focus 제공 |
 | 광원·그림자·안개 | 완료 | ambient/key/fill directional light, shadow, 거리 안개 색·시작·완전 혼합 거리 제공 |
@@ -201,7 +203,7 @@ announce→request→approved→SDP가 같은 `shareId`를 보존했고, `shareI
 | 3D에 직접 그리기 | 미구현 | texture/projective painting 없음 |
 | 두상·체형·포즈·손가락 | 부분/강한 부분 | VRM 조형·pose는 강하지만 CSP 데생 인형/두상 모델과 동형은 아님 |
 | BVH pose sequence | 미구현 | BVH import·frame range 없음 |
-| panorama/360° | 미구현 | panorama projection authoring 없음 |
+| panorama/360° | 부분 | URL 없는 절차적 낮·노을·밤 equirectangular 환경과 수평 회전, 불투명 LT 캡처를 제공. 사용자 이미지 import·fisheye/UV 저작은 없음 |
 | 사면도 | 완료 | perspective/정면/측면/상단 View와 모바일 단일뷰 전환 제공 |
 | LT 선화·톤 분리 | 완료/부분 | 컬러·톤·텍스처 선·주선을 별도 raster PNG로 삽입. 진짜 vector LT는 아님 |
 | 재사용 3D 소재 생태계 | 부분 | 로컬 scene/model library는 있으나 CSP Assets식 권리·태그·공유 생태계는 아님 |
@@ -213,7 +215,9 @@ announce→request→approved→SDP가 같은 `shareId`를 보존했고, `shareI
 ## 7. WebGL·WebGPU·Babylon.js
 
 - 3D 배경과 VRM은 Three.js + React Three Fiber의 WebGL 제품 경로다.
-- WebGPU 제품 렌더러는 아직 없다.
+- WebGPU retained live-draft compositor는 pressure normal/erase dab, viewport tile cache, device-loss 복구와
+  Canvas2D fallback까지 제품 경로에 연결됐다. 다만 committed Konva scene과 모든 readback의 최종 authority는
+  pixel parity가 충족될 때까지 이전하지 않는다.
 - Babylon.js 병행 도입은 VRM의 Three 생태계를 제거하지 못하면서 별도 엔진 비용을 만든다.
 - WebGPU는 Babylon에 종속되지 않는다. Three WebGPU renderer를 격리된 대표 장면에서 WebGL fallback과 비교하는 편이 현재 구조에 맞다.
 - 결정과 번들 측정은 [Babylon.js 도입 평가](./studio-babylonjs-adoption-evaluation-2026-07-11.md)에 기록한다.
@@ -227,7 +231,7 @@ announce→request→approved→SDP가 같은 `shareId`를 보존했고, `shareI
 - GLB/glTF/OBJ/FBX import와 scene hierarchy
 - orthographic camera, four-view, panorama, snapping
 - texture painting, BVH playback, transform/camera timeline
-- WebGPU renderer + WebGL fallback
+- WebGPU live-draft renderer + Canvas2D/Konva fallback의 점진적 확대
 - parallax·레이어 animation·VRM motion clip
 
 ### 별도 인프라가 사실상 필요한 영역
@@ -236,7 +240,7 @@ announce→request→approved→SDP가 같은 `shareId`를 보존했고, `shareI
 - LoRA/IP-Adapter급 캐릭터 일관성
 - 고품질 AI 3D mesh 생성·repair·rigging
 - 인터넷 WebRTC TURN relay
-- 다중 인스턴스 CRDT/operation persistence·Redis lease
+- cluster-wide CRDT admission budget·운영 지연 기반 adaptive throttling
 - Google Drive·Dropbox·Notion OAuth
 - Firefly·D5·Artbreeder 등 특정 상용 API
 
@@ -250,15 +254,15 @@ announce→request→approved→SDP가 같은 `shareId`를 보존했고, `shareI
 
 ## 9. 다음 구현 우선순위
 
-1. 인증된 Socket.IO frontend adapter와 서버 participant identity 연결
-2. 캔버스 원격 커서 overlay와 follow viewport
-3. 서버 lease ack를 실제 selection/drag/text mutation guard에 연결
+1. 캔버스 원격 커서 overlay와 follow viewport
+2. 서버 lease ack를 실제 selection/drag/text mutation guard에 연결
+3. 파괴적 raster 도구의 chunked tile operation과 cluster-wide adaptive admission
 4. deployment-owned TURN 단기 credential과 운영 장기 실행 realtime host
 5. VRM·3D 모델 전체 poster thumbnail 사전 생성
 6. 색 힌트 scribble + semantic mask 기반 AI 자동 채색
 7. transform tween·parallax·camera/VRM motion track 기반 동적 웹툰
-8. 3D multi-select, visibility/lock, grounding/snapping, focus selected
-9. orthographic/four-view, panorama, BVH, texture painting
-10. WebGPU 격리 벤치마크와 WebGL fallback
+8. 3D mesh surface snap, 실제 parent transform 계층, 외부 panorama/UV·BVH·texture painting
+9. WebGPU analytic segment parity와 GPU-aware readback composition
+10. 실기기·실제 다중 서버/다중 사용자 장시간 soak 및 장애 복구 검증
 
 이 문서는 기능을 많이 보이게 만드는 목록이 아니라, 완료를 과장하지 않고 다음 상용화 순서를 고정하는 제품 계약으로 유지한다.

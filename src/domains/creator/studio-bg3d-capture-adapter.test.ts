@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  acquireStudioBg3dCaptureAdapterAfterViewTransition,
   captureStudioBg3dRaster,
   getStudioBg3dCaptureSourceSize,
   type StudioBg3dCaptureAdapter,
@@ -36,6 +37,41 @@ function adapter(
 }
 
 describe("Studio 3D capture adapter contract", () => {
+  it("binds the replacement single-View adapter only after two paint boundaries", async () => {
+    const quadAdapter = adapter();
+    const singleViewAdapter = adapter();
+    let currentAdapter: StudioBg3dCaptureAdapter | null = quadAdapter;
+    let paintCount = 0;
+    const readAdapter = vi.fn(() => currentAdapter);
+
+    const acquired = await acquireStudioBg3dCaptureAdapterAfterViewTransition({
+      isActive: () => true,
+      readAdapter,
+      waitForPaintFrame: async () => {
+        paintCount += 1;
+        if (paintCount === 1) currentAdapter = singleViewAdapter;
+      },
+    });
+
+    expect(paintCount).toBe(2);
+    expect(readAdapter).toHaveBeenCalledOnce();
+    expect(acquired).toBe(singleViewAdapter);
+    expect(acquired).not.toBe(quadAdapter);
+  });
+
+  it("does not read a replacement adapter after the editor session closes", async () => {
+    const readAdapter = vi.fn(() => adapter());
+
+    await expect(
+      acquireStudioBg3dCaptureAdapterAfterViewTransition({
+        isActive: () => false,
+        readAdapter,
+        waitForPaintFrame: async () => undefined,
+      })
+    ).resolves.toBeNull();
+    expect(readAdapter).not.toHaveBeenCalled();
+  });
+
   it("awaits a backend and returns validated Studio-owned raster copies", async () => {
     const backendRaster = validRaster();
     const capture = vi.fn(async (request: StudioBg3dCaptureRequest) => {

@@ -32,6 +32,7 @@ import {
   Pyramid,
   Redo2,
   RectangleHorizontal,
+  RotateCcw,
   RotateCw,
   Save,
   ScanLine,
@@ -112,12 +113,22 @@ import {
   instantiateSceneTemplate,
   type BgSceneTemplateCategory,
 } from "./studio-background-3d-scene-templates";
-import { BG_SKY_PRESETS, DEFAULT_SKY_PRESET_ID, getSkyPreset } from "./studio-background-3d-sky";
 import {
+  BG_SKY_PRESETS,
+  clampPanoramaRotationDegrees,
+  getSkyPreset,
+  normalizePanoramaRotationDegrees,
+} from "./studio-background-3d-sky";
+import {
+  acquireStudioBg3dCaptureAdapterAfterViewTransition,
   captureStudioBg3dRaster,
   getStudioBg3dCaptureSourceSize,
   type StudioBg3dCaptureAdapter,
 } from "./studio-bg3d-capture-adapter";
+import {
+  createStudioBg3dCaptureBackgroundSnapshot,
+  type StudioBg3dCaptureBackgroundSnapshot,
+} from "./studio-bg3d-capture-background";
 import {
   deriveStudioBg3dGlbValidationPolicy,
   resolveStudioBg3dDeviceQuality,
@@ -173,6 +184,7 @@ import {
 } from "./studio-bg3d-object-ops";
 import {
   DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+  migrateStudioBg3dSceneDocument,
   parseStudioBg3dSceneDocument,
   serializeStudioBg3dSceneDocument,
   type StudioBg3dCameraSettings,
@@ -196,6 +208,7 @@ import {
   registerStudioBg3dCaptureExcludedObject,
 } from "./studio-bg3d-three-webgl-capture";
 import { StudioBg3dSceneFog } from "./StudioBg3dSceneFog";
+import { StudioBg3dScenePanorama } from "./StudioBg3dScenePanorama";
 import { StudioBg3dSceneTemplatePanel } from "./StudioBg3dSceneTemplatePanel";
 import { StudioToolHintTarget } from "./StudioToolHint";
 
@@ -237,6 +250,24 @@ type LtUserPresetNotice = {
   readonly message: string;
 };
 type CaptureState = { adapter: StudioBg3dCaptureAdapter | null };
+
+interface StudioBg3dHistorySnapshot {
+  readonly primitives: BgPrimitive[];
+  readonly customModels: BgCustomModelInstance[];
+  readonly document: StudioBg3dSceneDocument;
+}
+
+function createStudioBg3dHistorySnapshot(input: {
+  readonly primitives: readonly BgPrimitive[];
+  readonly customModels: readonly BgCustomModelInstance[];
+  readonly document: StudioBg3dSceneDocument;
+}): StudioBg3dHistorySnapshot {
+  return {
+    primitives: clonePrimitives([...input.primitives]),
+    customModels: cloneBgCustomModelInstances([...input.customModels]),
+    document: input.document,
+  };
+}
 type ModelRootCacheEntry = Pick<StudioBg3dThreeLoadSuccess, "root" | "dispose"> & {
   readonly record: Bg3dVerifiedStoredRecord;
   readonly metrics: StudioBg3dThreeLoadSuccess["metrics"];
@@ -424,6 +455,76 @@ function LtRangeControl({
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
       />
+    </label>
+  );
+}
+
+interface PanoramaRotationNumberFieldProps {
+  readonly disabled?: boolean;
+  readonly onCommit: (value: number) => void;
+  readonly value: number;
+}
+
+/** Keeps incomplete mobile/keyboard drafts local and commits one clamped degree value on blur. */
+function PanoramaRotationNumberField({
+  disabled = false,
+  onCommit,
+  value,
+}: PanoramaRotationNumberFieldProps) {
+  const cancelCommitRef = useRef(false);
+  const [editState, setEditState] = useState<{
+    readonly draft: string;
+    readonly sourceValue: number;
+  } | null>(null);
+  const draft = editState?.sourceValue === value ? editState.draft : String(value);
+
+  const commitDraft = () => {
+    if (cancelCommitRef.current) {
+      cancelCommitRef.current = false;
+      setEditState(null);
+      return;
+    }
+    const parsed = Number(draft.trim());
+    setEditState(null);
+    if (!draft.trim() || !Number.isFinite(parsed)) return;
+    const committed = Math.round(clampPanoramaRotationDegrees(parsed));
+    if (committed !== value) onCommit(committed);
+  };
+
+  return (
+    <label className="flex min-h-11 items-center gap-2 rounded-lg border border-line bg-panel px-3 text-xs font-semibold text-fg-2 sm:min-h-9">
+      <span className="shrink-0">각도</span>
+      <input
+        type="text"
+        inputMode="decimal"
+        role="spinbutton"
+        aria-label="360도 환경 배경 수평 회전 각도"
+        aria-valuemax={180}
+        aria-valuemin={-180}
+        aria-valuenow={
+          draft.trim().length > 0 && Number.isFinite(Number(draft)) ? Number(draft) : undefined
+        }
+        autoComplete="off"
+        disabled={disabled}
+        value={draft}
+        onBlur={commitDraft}
+        onChange={(event) => {
+          setEditState({ draft: event.target.value, sourceValue: value });
+        }}
+        onFocus={() => {
+          cancelCommitRef.current = false;
+          setEditState({ draft: String(value), sourceValue: value });
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") event.currentTarget.blur();
+          if (event.key === "Escape") {
+            cancelCommitRef.current = true;
+            event.currentTarget.blur();
+          }
+        }}
+        className="min-w-0 flex-1 bg-transparent text-right tabular-nums text-fg outline-none disabled:cursor-not-allowed disabled:opacity-45"
+      />
+      <span className="text-fg-3">°</span>
     </label>
   );
 }
@@ -730,7 +831,8 @@ interface ModelBindingMaps {
 
 function canonicalSceneDocument(raw: StudioBg3dSceneDocument | undefined): StudioBg3dSceneDocument | null {
   if (!raw) return null;
-  const serialized = serializeStudioBg3dSceneDocument(raw);
+  const migrated = migrateStudioBg3dSceneDocument(raw);
+  const serialized = serializeStudioBg3dSceneDocument(migrated);
   return serialized ? parseStudioBg3dSceneDocument(serialized) : null;
 }
 
@@ -941,8 +1043,7 @@ function CaptureBridge({
   return null;
 }
 
-/* 뷰포트 하늘색 프리셋 적용. 화면과 비투명 LT 톤 입력에 같은 색을 쓰되, 장면 문서에는 캡처 직전
-   canonical background 설정으로 반영한다. CaptureBridge와 동일하게 Canvas 내부 gl을 잇는 다리다. */
+/* 장면 배경이 없는 흰색 모드와 절차적 파노라마 생성 전 프레임의 안전한 clear color를 적용한다. */
 function SkyClearColorController({ clearColor }: { clearColor: string }) {
   const gl = useThree((s) => s.gl);
   useEffect(() => {
@@ -1267,19 +1368,12 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   const [viewportHinted, setViewportHinted] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
-  // 뷰포트 전용 하늘색 — BgSceneState/undo 히스토리 밖(§SkyClearColorController 참고).
-  const [skyPresetId, setSkyPresetId] = useState(DEFAULT_SKY_PRESET_ID);
   // 복합 오브젝트 프리셋 그리드 카테고리 필터. null=전체.
   const [compositeCategory, setCompositeCategory] = useState<BgCompositeCategory | null>(null);
   // 씬 템플릿 그리드 카테고리 필터. null=전체. compositeCategory와 동형이지만 별개 상태 —
   // BgSceneTemplateCategory와 BgCompositeCategory는 서로 다른 타입이라 공유할 수 없다("공간 종류" vs
   // "물체 종류"라는 다른 축, studio-background-3d-scene-templates.ts 상단 주석 참고).
   const [sceneTemplateCategory, setSceneTemplateCategory] = useState<BgSceneTemplateCategory | null>(null);
-  // 배경(하늘색)을 캡처에서 빼고 오브젝트만 알파 채널로 남길지 — 다른 배경/레이어와 자유롭게
-  // 합성할 수 있는 PNG를 만들기 위함. 뷰포트 표시 자체(하늘색 프리셋)는 계속 그대로 보여주고,
-  // 실제로 alpha=0 clearColor 로 바꾸는 건 handleInsert 캡처 순간뿐이다(사용자가 작업 중엔 여전히
-  // 하늘색 배경을 보면서 구도를 잡을 수 있게).
-  const [transparentInsert, setTransparentInsert] = useState(false);
   // CSP-style move/rotate step snap + 레이어 목록 검색.
   const [snapSettings, setSnapSettings] = useState<StudioBg3dSnapSettings>(() => ({
     ...DEFAULT_STUDIO_BG3D_SNAP_SETTINGS,
@@ -1338,7 +1432,13 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   const [sceneBaseDocument, setSceneBaseDocument] = useState<StudioBg3dSceneDocument>(
     () => canonicalSceneDocument(initialScene) ?? DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT
   );
+  const [captureBackgroundSnapshot, setCaptureBackgroundSnapshot] =
+    useState<StudioBg3dCaptureBackgroundSnapshot | null>(null);
   const [deviceSignals, setDeviceSignals] = useState<StudioBg3dDeviceSignals>(() => collectDeviceSignals());
+  const skyPresetId = sceneBaseDocument.background.skyPresetId;
+  const transparentInsert =
+    sceneBaseDocument.output.transparentBackground ||
+    sceneBaseDocument.background.mode === "transparent";
 
   const captureRef = useRef<CaptureState>({ adapter: null });
   const viewportApiRef = useRef<BgViewportApi | null>(null);
@@ -1355,11 +1455,11 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   const attachmentByStorageModelIdRef = useRef<Map<string, StudioBg3dModelAttachment>>(new Map());
   const storageModelIdByAttachmentIdRef = useRef<Map<string, string>>(new Map());
   const componentActiveRef = useRef(false);
+  const captureInFlightRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const historyRef = useRef<{ primitives: BgPrimitive[]; customModels: BgCustomModelInstance[] }[]>([]);
+  const historyRef = useRef<StudioBg3dHistorySnapshot[]>([]);
   const historyIndexRef = useRef(-1);
-  const isRestoringRef = useRef(false);
 
   const deviceQuality = resolveStudioBg3dDeviceQuality({
     document: sceneBaseDocument,
@@ -1494,6 +1594,10 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     setSelectedIds(new Set());
     setFailedCloneIds(new Set());
     setReadyCloneIds(new Set());
+    historyRef.current = [];
+    historyIndexRef.current = -1;
+    setCanUndo(false);
+    setCanRedo(false);
     disposeModelCache(modelRootCacheRef.current);
     modelLoadPendingRef.current.clear();
     attachmentByStorageModelIdRef.current.clear();
@@ -1503,6 +1607,12 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
       const canonicalInitial = canonicalSceneDocument(initialScene);
       if (initialScene && !canonicalInitial) {
         if (!cancelled) {
+          historyRef.current = [createStudioBg3dHistorySnapshot({
+            primitives: [],
+            customModels: [],
+            document: DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+          })];
+          historyIndexRef.current = 0;
           setPrimitives([]);
           setCustomModels([]);
           setSceneBaseDocument(DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT);
@@ -1514,10 +1624,6 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
 
       if (canonicalInitial) {
         setSceneBaseDocument(canonicalInitial);
-        setTransparentInsert(
-          canonicalInitial.output.transparentBackground || canonicalInitial.background.mode === "transparent"
-        );
-        setSkyPresetId(canonicalInitial.background.skyPresetId);
         pendingInitialCameraRef.current = canonicalInitial.camera;
         viewportApiRef.current?.applyView(canonicalInitial.camera);
 
@@ -1554,6 +1660,12 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
           storageModelIdByAttachmentId: storageModelIdByAttachmentIdRef.current,
         });
         if (cancelled) return;
+        historyRef.current = [createStudioBg3dHistorySnapshot({
+          primitives: hydrated.primitives,
+          customModels: hydrated.customModels,
+          document: canonicalInitial,
+        })];
+        historyIndexRef.current = 0;
         setPrimitives(hydrated.primitives);
         setCustomModels(hydrated.customModels);
         if (
@@ -1566,19 +1678,22 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
           setSceneRecoveryError("일부 3D 모델의 원본 또는 무결성을 확인하지 못했습니다. 기존 PNG를 보존하기 위해 업데이트를 막았습니다.");
         }
         setRefTick((n) => n + 1);
-        isRestoringRef.current = true;
         setIsRestoringScene(false);
         return;
       }
 
       const parsed = parseBg3dSceneWithModelsFromDataUrl(initialDataUrl);
       setSceneBaseDocument(DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT);
-      setTransparentInsert(false);
-      setSkyPresetId(DEFAULT_SKY_PRESET_ID);
       pendingInitialCameraRef.current = DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera;
       viewportApiRef.current?.applyView(DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera);
       const nextPrimitives = parsed?.primitives ?? [];
       const nextModels = parsed?.customModels ?? [];
+      historyRef.current = [createStudioBg3dHistorySnapshot({
+        primitives: nextPrimitives,
+        customModels: nextModels,
+        document: DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+      })];
+      historyIndexRef.current = 0;
       setPrimitives(nextPrimitives);
       setCustomModels(nextModels);
 
@@ -1617,7 +1732,6 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
       }
       if (cancelled) return;
       setRefTick((n) => n + 1);
-      isRestoringRef.current = true;
       setIsRestoringScene(false);
     })();
     return () => {
@@ -1625,18 +1739,17 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     };
   }, [open, initialDataUrl, initialScene]);
 
-  // 편집이 멈추면(디바운스) 스냅샷을 히스토리에 적재 — VRM 포저의 undo 스택과 동일한 패턴.
-  // 도형(primitives)과 커스텀 모델(customModels)을 하나의 타임라인 튜플로 묶어 "실행 취소 한 번 =
-  // 도형이든 모델이든 씬 전체가 한 스텝 되돌아간다"는 사용자 기대를 지킨다 — 독립된 undo 스택 두 개를
-  // 두지 않는다. customModels가 항상 빈 배열인(모델을 한 번도 추가하지 않은) 씬에서는 이 필드가
-  // 매 스냅샷 [] 로만 남아 기존 도형 전용 undo/redo 동작과 동일하게 작동한다.
+  // 편집이 멈추면(디바운스) 스냅샷을 히스토리에 적재한다. 도형·커스텀 모델·장면 문서를 한 타임라인에
+  // 묶어 배경/조명/LT 설정도 도형과 같은 Ctrl+Z 계약을 따른다. 카메라 Orbit의 매 프레임 임시 시점은
+  // sceneBaseDocument에 쓰지 않으므로 히스토리를 과도하게 채우지 않는다.
   useEffect(() => {
-    if (isRestoringRef.current) {
-      isRestoringRef.current = false;
-      return;
-    }
+    if (isRestoringScene) return;
     const timer = setTimeout(() => {
-      const snap = { primitives: clonePrimitives(primitives), customModels: cloneBgCustomModelInstances(customModels) };
+      const snap = createStudioBg3dHistorySnapshot({
+        primitives,
+        customModels,
+        document: sceneBaseDocument,
+      });
       const base = historyRef.current.slice(0, historyIndexRef.current + 1);
       const last = base[base.length - 1];
       if (last && JSON.stringify(last) === JSON.stringify(snap)) return;
@@ -1648,25 +1761,25 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
       setCanRedo(false);
     }, 400);
     return () => clearTimeout(timer);
-  }, [primitives, customModels]);
+  }, [customModels, isRestoringScene, primitives, sceneBaseDocument]);
 
   const doUndo = () => {
     if (historyIndexRef.current <= 0) return;
     historyIndexRef.current -= 1;
-    isRestoringRef.current = true;
     const snap = historyRef.current[historyIndexRef.current];
     setPrimitives(clonePrimitives(snap.primitives));
     setCustomModels(cloneBgCustomModelInstances(snap.customModels));
+    setSceneBaseDocument(snap.document);
     setCanUndo(historyIndexRef.current > 0);
     setCanRedo(historyIndexRef.current < historyRef.current.length - 1);
   };
   const doRedo = () => {
     if (historyIndexRef.current >= historyRef.current.length - 1) return;
     historyIndexRef.current += 1;
-    isRestoringRef.current = true;
     const snap = historyRef.current[historyIndexRef.current];
     setPrimitives(clonePrimitives(snap.primitives));
     setCustomModels(cloneBgCustomModelInstances(snap.customModels));
+    setSceneBaseDocument(snap.document);
     setCanUndo(historyIndexRef.current > 0);
     setCanRedo(historyIndexRef.current < historyRef.current.length - 1);
   };
@@ -2307,6 +2420,24 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     setError(null);
   }
 
+  function updateBackgroundTransparency(transparent: boolean) {
+    setSceneBaseDocument((current) => {
+      const candidate: StudioBg3dSceneDocument = {
+        ...current,
+        background: {
+          ...current.background,
+          mode: transparent ? "transparent" : "sky-preset",
+        },
+        output: {
+          ...current.output,
+          transparentBackground: transparent,
+        },
+      };
+      return canonicalSceneDocument(candidate) ?? current;
+    });
+    setError(null);
+  }
+
   // 키보드 핸들러가 항상 최신 콜백을 참조하도록 ref로 동기화(렌더 후 매번 갱신).
   const selectedIdsRef = useRef(selectedIds);
   const undoRef = useRef(doUndo);
@@ -2327,6 +2458,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
       const target = e.target as HTMLElement | null;
       const typing = !!target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
       if (typing) return;
+      if (captureInFlightRef.current) return;
 
       if (e.key === "Escape") {
         if (selectedIdsRef.current.size > 0) setSelectedIds(new Set());
@@ -2374,28 +2506,33 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     }
   };
 
+  function requestUserClose() {
+    // The header sits outside the inert editor grid, so the ref is the synchronous authority for
+    // the click that can arrive before React commits `isCapturing`. Successful insertion closes via
+    // `onClose` directly after its transaction has completed.
+    if (captureInFlightRef.current) return;
+    onClose();
+  }
+
   async function handleSaveToLibrary() {
-    if (isCapturing || insertBlocked) return;
+    if (captureInFlightRef.current || isCapturing || insertBlocked) return;
     const currentCapture = captureRef.current;
     if (!currentCapture.adapter) {
       setError("캡처할 3D 장면이 아직 준비되지 않았습니다.");
       return;
     }
-    const captureAdapter = currentCapture.adapter;
-    const sky = getSkyPreset(skyPresetId);
+    const backgroundSnapshot = createStudioBg3dCaptureBackgroundSnapshot({
+      background: sceneBaseDocument.background,
+      transparent: transparentInsert,
+    });
     const currentView = viewportApiRef.current?.readView() ?? sceneBaseDocument.camera;
     const currentBaseDocument: StudioBg3dSceneDocument = {
       ...sceneBaseDocument,
       camera: currentView,
-      background: {
-        ...sceneBaseDocument.background,
-        mode: transparentInsert ? "transparent" : "sky-preset",
-        color: sky.clearColor,
-        skyPresetId: sky.id as StudioBg3dSceneDocument["background"]["skyPresetId"],
-      },
+      background: backgroundSnapshot.background,
       output: {
         ...sceneBaseDocument.output,
-        transparentBackground: transparentInsert,
+        transparentBackground: backgroundSnapshot.transparent,
       },
     };
     const adapted = adaptStudioBg3dRuntimeToDocument({
@@ -2417,17 +2554,30 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     }
 
     const previousLineArtPreview = lineArtPreview;
+    captureInFlightRef.current = true;
+    setCaptureBackgroundSnapshot(backgroundSnapshot);
     setLineArtPreview(false);
     setIsCapturing(true);
     try {
-      await waitForStudioBg3dPaintFrame();
-      await waitForStudioBg3dPaintFrame();
-      if (!componentActiveRef.current || captureRef.current.adapter !== captureAdapter) return;
+      const captureAdapter = await acquireStudioBg3dCaptureAdapterAfterViewTransition({
+        isActive: () => componentActiveRef.current,
+        readAdapter: () => captureRef.current.adapter,
+        waitForPaintFrame: waitForStudioBg3dPaintFrame,
+      });
+      if (!captureAdapter) {
+        if (componentActiveRef.current) {
+          setError("캡처할 단일 3D 시점을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+        }
+        return;
+      }
 
       const captured = await captureStudioBg3dRaster(captureAdapter, {
         width: 320,
         height: 320,
-        background: { color: sky.clearColor, alpha: transparentInsert ? 0 : 1 },
+        background: {
+          color: backgroundSnapshot.clearColor,
+          alpha: backgroundSnapshot.transparent ? 0 : 1,
+        },
         includeDepth: false,
       });
       if (!componentActiveRef.current || captureRef.current.adapter !== captureAdapter) return;
@@ -2453,13 +2603,17 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     } catch (_e) {
       setError("소재 라이브러리 저장 중 오류가 발생했습니다.");
     } finally {
-      setIsCapturing(false);
-      setLineArtPreview(previousLineArtPreview);
+      captureInFlightRef.current = false;
+      if (componentActiveRef.current) {
+        setCaptureBackgroundSnapshot(null);
+        setIsCapturing(false);
+        setLineArtPreview(previousLineArtPreview);
+      }
     }
   }
 
   async function handleInsert() {
-    if (isCapturing) return;
+    if (captureInFlightRef.current || isCapturing) return;
     if (insertBlocked) {
       setError("3D 장면 복원과 모델 렌더 준비를 모두 마친 뒤 추가할 수 있습니다.");
       return;
@@ -2469,21 +2623,18 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
       setError("캡처할 3D 장면이 아직 준비되지 않았습니다.");
       return;
     }
-    const captureAdapter = currentCapture.adapter;
-    const sky = getSkyPreset(skyPresetId);
+    const backgroundSnapshot = createStudioBg3dCaptureBackgroundSnapshot({
+      background: sceneBaseDocument.background,
+      transparent: transparentInsert,
+    });
     const currentView = viewportApiRef.current?.readView() ?? sceneBaseDocument.camera;
     const currentBaseDocument: StudioBg3dSceneDocument = {
       ...sceneBaseDocument,
       camera: currentView,
-      background: {
-        ...sceneBaseDocument.background,
-        mode: transparentInsert ? "transparent" : "sky-preset",
-        color: sky.clearColor,
-        skyPresetId: sky.id as StudioBg3dSceneDocument["background"]["skyPresetId"],
-      },
+      background: backgroundSnapshot.background,
       output: {
         ...sceneBaseDocument.output,
-        transparentBackground: transparentInsert,
+        transparentBackground: backgroundSnapshot.transparent,
       },
     };
     const adapted = adaptStudioBg3dRuntimeToDocument({
@@ -2507,13 +2658,23 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     // LT 검출은 깨끗한 셰이딩 캡처를 입력으로 삼는다. 캡처 중에는 그리드·변환 핸들·프리미티브의
     // 뷰포트용 edge overlay를 숨기고, 순수 래스터 단계가 주선·재질선·톤을 독립적으로 계산한다.
     const previousLineArtPreview = lineArtPreview;
+    captureInFlightRef.current = true;
+    setCaptureBackgroundSnapshot(backgroundSnapshot);
     setLineArtPreview(false);
     setIsCapturing(true);
     try {
       // React/R3F가 캡처 전용 visibility와 셰이딩 상태를 반영할 시간을 보장한다.
-      await waitForStudioBg3dPaintFrame();
-      await waitForStudioBg3dPaintFrame();
-      if (!componentActiveRef.current || captureRef.current.adapter !== captureAdapter) return;
+      const captureAdapter = await acquireStudioBg3dCaptureAdapterAfterViewTransition({
+        isActive: () => componentActiveRef.current,
+        readAdapter: () => captureRef.current.adapter,
+        waitForPaintFrame: waitForStudioBg3dPaintFrame,
+      });
+      if (!captureAdapter) {
+        if (componentActiveRef.current) {
+          setError("캡처할 단일 3D 시점을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+        }
+        return;
+      }
 
       const sourceSize = getStudioBg3dCaptureSourceSize(captureAdapter);
       const captureSize = resolveStudioBg3dLtCaptureSize({
@@ -2528,7 +2689,10 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
       const captured = await captureStudioBg3dRaster(captureAdapter, {
         width: captureSize.width,
         height: captureSize.height,
-        background: { color: sky.clearColor, alpha: transparentInsert ? 0 : 1 },
+        background: {
+          color: backgroundSnapshot.clearColor,
+          alpha: backgroundSnapshot.transparent ? 0 : 1,
+        },
         includeDepth: adapted.document.output.line.depthEnabled,
       });
       if (!componentActiveRef.current || captureRef.current.adapter !== captureAdapter) return;
@@ -2565,7 +2729,9 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     } catch {
       setError("3D 장면을 LT 레이어로 변환하지 못했습니다. 출력 해상도와 브라우저 그래픽 상태를 확인해 주세요.");
     } finally {
+      captureInFlightRef.current = false;
       if (componentActiveRef.current) {
+        setCaptureBackgroundSnapshot(null);
         setLineArtPreview(previousLineArtPreview);
         setIsCapturing(false);
       }
@@ -2660,6 +2826,15 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
 
   const effectiveIsQuadView = isQuadView && !isCapturing;
   const isMainOrtho = sceneBaseDocument.camera.projection === "orthographic";
+  const selectedSky = getSkyPreset(skyPresetId);
+  const panoramaRotation = normalizePanoramaRotationDegrees(
+    sceneBaseDocument.background.panoramaRotation,
+  );
+  const renderedSkyPresetId = captureBackgroundSnapshot?.skyPresetId ?? skyPresetId;
+  const renderedPanoramaRotation =
+    captureBackgroundSnapshot?.panoramaRotation ?? panoramaRotation;
+  const renderedBackgroundSettings =
+    captureBackgroundSnapshot?.background ?? sceneBaseDocument.background;
   const fogNear = sceneBaseDocument.background.fogNear ?? 10;
   const fogFar = Math.max(
     fogNear + STUDIO_BG3D_FOG_MIN_GAP,
@@ -2682,8 +2857,12 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
           }
         }}
       />
-      <SkyClearColorController clearColor={getSkyPreset(skyPresetId).clearColor} />
-      <StudioBg3dSceneFog background={sceneBaseDocument.background} />
+      <SkyClearColorController clearColor={getSkyPreset(renderedSkyPresetId).clearColor} />
+      <StudioBg3dScenePanorama
+        presetId={renderedSkyPresetId}
+        rotationDegrees={renderedPanoramaRotation}
+      />
+      <StudioBg3dSceneFog background={renderedBackgroundSettings} />
       <ambientLight
         color={sceneBaseDocument.lighting.ambientColor}
         intensity={sceneBaseDocument.lighting.ambientIntensity}
@@ -2845,7 +3024,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
       enableDamping
       dampingFactor={0.08}
       enablePan
-      enabled={!isTransforming}
+      enabled={!isTransforming && !isCapturing}
       minDistance={2}
       maxDistance={60}
     />
@@ -2871,12 +3050,23 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
             <h2 className="mt-1 truncate text-lg font-bold tracking-tight text-fg sm:text-xl">3D 배경 블록아웃 만들기</h2>
             <p className="mt-1 line-clamp-1 text-xs text-fg-3">상자·모델로 구조를 잡고 컬러·선화 레이어로 추출해 패널에 추가</p>
           </div>
-          <button type="button" aria-label="닫기" title="닫기 (Esc)" className={ICON_BUTTON} onClick={onClose}>
+          <button
+            type="button"
+            aria-label="닫기"
+            title={isCapturing ? "캡처가 끝난 뒤 닫을 수 있습니다" : "닫기 (Esc)"}
+            className={ICON_BUTTON}
+            disabled={isCapturing}
+            onClick={requestUserClose}
+          >
             <X size={17} aria-hidden />
           </button>
         </header>
 
-        <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,44dvh)_minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_360px] lg:grid-rows-1">
+        <div
+          aria-busy={isCapturing || undefined}
+          inert={isCapturing}
+          className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,44dvh)_minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_360px] lg:grid-rows-1"
+        >
           <section className="relative min-h-0 overflow-hidden bg-[oklch(0.98_0_0)] lg:min-h-0">
             <div className="relative mx-auto flex h-full max-h-full min-h-0 w-full max-w-[min(92vw,960px)] items-center justify-center p-2 sm:p-5 lg:max-h-[calc(100dvh-12rem)] lg:min-h-[420px]">
               <div
@@ -2903,7 +3093,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                   dpr={deviceQuality.effectiveDpr}
                   shadows={{ enabled: deviceQuality.shadows, type: THREE.PCFShadowMap }}
                   gl={{ antialias: sceneBaseDocument.render.antialias, alpha: true }}
-                  onCreated={({ gl }) => gl.setClearColor(getSkyPreset(skyPresetId).clearColor, 1)}
+                  onCreated={({ gl }) => gl.setClearColor(getSkyPreset(renderedSkyPresetId).clearColor, 1)}
                   onPointerMissed={() => setSelectedIds(new Set())}
                 >
                   {effectiveIsQuadView ? (
@@ -2911,17 +3101,17 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                       <View track={viewTopRef as unknown as React.RefObject<HTMLElement>}>
                         <OrthographicCamera makeDefault position={[0, 15, 0]} rotation={[-Math.PI / 2, 0, 0]} zoom={40} near={-100} far={100} />
                         {sceneContent}
-                        <OrbitControls makeDefault enableRotate={false} enableDamping dampingFactor={0.08} enablePan enabled={!isTransforming} />
+                        <OrbitControls makeDefault enableRotate={false} enableDamping dampingFactor={0.08} enablePan enabled={!isTransforming && !isCapturing} />
                       </View>
                       <View track={viewFrontRef as unknown as React.RefObject<HTMLElement>}>
                         <OrthographicCamera makeDefault position={[0, 0, 15]} rotation={[0, 0, 0]} zoom={40} near={-100} far={100} />
                         {sceneContent}
-                        <OrbitControls makeDefault enableRotate={false} enableDamping dampingFactor={0.08} enablePan enabled={!isTransforming} />
+                        <OrbitControls makeDefault enableRotate={false} enableDamping dampingFactor={0.08} enablePan enabled={!isTransforming && !isCapturing} />
                       </View>
                       <View track={viewRightRef as unknown as React.RefObject<HTMLElement>}>
                         <OrthographicCamera makeDefault position={[15, 0, 0]} rotation={[0, Math.PI / 2, 0]} zoom={40} near={-100} far={100} />
                         {sceneContent}
-                        <OrbitControls makeDefault enableRotate={false} enableDamping dampingFactor={0.08} enablePan enabled={!isTransforming} />
+                        <OrbitControls makeDefault enableRotate={false} enableDamping dampingFactor={0.08} enablePan enabled={!isTransforming && !isCapturing} />
                       </View>
                       <View track={viewPerspRef as unknown as React.RefObject<HTMLElement>}>
                         {mainCameraNode}
@@ -3859,6 +4049,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                   <button
                     type="button"
                     className={cx(CONTROL_BUTTON, "flex-1 border-line bg-card text-fg-2 hover:bg-raised hover:text-fg")}
+                    disabled={isCapturing}
                     onClick={() => viewportApiRef.current?.zoomBy(0.82)}
                   >
                     <ZoomIn size={14} aria-hidden />
@@ -3867,6 +4058,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                   <button
                     type="button"
                     className={cx(CONTROL_BUTTON, "flex-1 border-line bg-card text-fg-2 hover:bg-raised hover:text-fg")}
+                    disabled={isCapturing}
                     onClick={() => viewportApiRef.current?.zoomBy(1.22)}
                   >
                     <ZoomOut size={14} aria-hidden />
@@ -3879,6 +4071,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                     <input
                       type="checkbox"
                       checked={lineArtPreview}
+                      disabled={isCapturing}
                       onChange={(e) => setLineArtPreview(e.target.checked)}
                       className="mt-0.5 size-4 accent-accent"
                     />
@@ -3894,7 +4087,8 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                     <input
                       type="checkbox"
                       checked={transparentInsert}
-                      onChange={(e) => setTransparentInsert(e.target.checked)}
+                      disabled={isCapturing}
+                      onChange={(e) => updateBackgroundTransparency(e.target.checked)}
                       className="mt-0.5 size-4 accent-accent"
                     />
                     <span className="block text-xs font-bold text-fg">
@@ -3908,28 +4102,89 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                 </div>
 
                 <div className="mt-5 border-t border-line pt-4">
-                  <h3 className="mb-2 text-sm font-bold text-fg">뷰포트 하늘색</h3>
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
+                      <Globe size={15} className="text-accent" aria-hidden />
+                      360° 환경 배경
+                    </h3>
+                    <span className="rounded-full border border-line bg-card px-2 py-1 text-[0.62rem] font-semibold text-fg-3">
+                      절차적 생성
+                    </span>
+                  </div>
                   <p className="mb-2.5 text-[0.68rem] leading-relaxed text-fg-3">
-                    작업 화면 분위기와 LT 입력 배경색입니다. 위 투명 추출을 끄고 톤을 출력하면 하늘색의
-                    명암도 톤 레이어에 포함되며, 주선·질감선 레이어 자체는 계속 투명합니다.
+                    외부 이미지 없이 생성되어 장면과 함께 안전하게 재현됩니다. 투명 추출에서는 빠지고,
+                    불투명 LT 톤에는 현재 보이는 환경이 포함됩니다.
                   </p>
                   <div className="grid grid-cols-2 gap-2">
                     {BG_SKY_PRESETS.map((sky) => (
                       <button
                         key={sky.id}
                         type="button"
+                        aria-pressed={skyPresetId === sky.id}
+                        disabled={isCapturing}
+                        title={sky.description}
                         className={cx(
                           CONTROL_BUTTON,
-                          "gap-1.5 border-line bg-card text-fg-2 hover:bg-raised hover:text-fg",
+                          "justify-start gap-2 border-line bg-card text-left text-fg-2 hover:bg-raised hover:text-fg",
                           skyPresetId === sky.id && "border-accent/60 bg-accent-soft text-accent"
                         )}
-                        onClick={() => setSkyPresetId(sky.id)}
+                        onClick={() => {
+                          updateBackgroundSettings({
+                            mode: transparentInsert ? "transparent" : "sky-preset",
+                            color: sky.clearColor,
+                            skyPresetId: sky.id,
+                          });
+                        }}
                       >
-                        <span className="inline-block size-3.5 rounded-full border border-line/50" style={{ backgroundColor: sky.clearColor }} aria-hidden />
-                        {sky.label}
+                        <span
+                          className="inline-block size-4 shrink-0 rounded-full border border-line/50 shadow-inner"
+                          style={{ backgroundColor: sky.clearColor }}
+                          aria-hidden
+                        />
+                        <span className="truncate">{sky.label}</span>
                       </button>
                     ))}
                   </div>
+                  <p className="mt-2 text-[0.66rem] leading-relaxed text-fg-3" aria-live="polite">
+                    {selectedSky.description}
+                  </p>
+
+                  {selectedSky.kind === "procedural-panorama" ? (
+                    <div className="mt-3 rounded-xl border border-line bg-card/70 px-3 py-2">
+                      <LtRangeControl
+                        id="bg3d-panorama-rotation"
+                        label="수평 회전"
+                        min={-180}
+                        max={180}
+                        step={1}
+                        value={panoramaRotation}
+                        valueText={`${panoramaRotation}°`}
+                        disabled={isCapturing}
+                        onChange={(value) => updateBackgroundSettings({
+                          panoramaRotation: normalizePanoramaRotationDegrees(value),
+                        })}
+                      />
+                      <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+                        <PanoramaRotationNumberField
+                          disabled={isCapturing}
+                          value={panoramaRotation}
+                          onCommit={(value) => updateBackgroundSettings({ panoramaRotation: value })}
+                        />
+                        <button
+                          type="button"
+                          className={cx(
+                            CONTROL_BUTTON,
+                            "border-line bg-panel px-3 text-fg-2 hover:bg-raised hover:text-fg",
+                          )}
+                          disabled={isCapturing || panoramaRotation === 0}
+                          onClick={() => updateBackgroundSettings({ panoramaRotation: 0 })}
+                        >
+                          <RotateCcw size={14} aria-hidden />
+                          정면 초기화
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="mt-5 border-t border-line pt-4">
@@ -4854,7 +5109,12 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
 
             <footer className="flex shrink-0 items-center justify-between gap-2 border-t border-line px-4 py-3 sm:px-5">
               <div className="flex items-center gap-2">
-                <button type="button" className={cx(CONTROL_BUTTON, "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg")} onClick={onClose}>
+                <button
+                  type="button"
+                  className={cx(CONTROL_BUTTON, "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg")}
+                  disabled={isCapturing}
+                  onClick={requestUserClose}
+                >
                   닫기
                 </button>
                 <button

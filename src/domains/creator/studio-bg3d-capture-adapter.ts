@@ -35,6 +35,15 @@ export interface StudioBg3dCaptureAdapter {
   capture(request: StudioBg3dCaptureRequest): Promise<StudioBg3dCapturedRaster>;
 }
 
+export interface AcquireStudioBg3dCaptureAdapterAfterViewTransitionInput {
+  /** Reads the adapter owned by the View that is current after React commits the transition. */
+  readonly readAdapter: () => StudioBg3dCaptureAdapter | null;
+  /** Returns false when the editor session closed while the transition was settling. */
+  readonly isActive: () => boolean;
+  /** One browser paint boundary; two are required for R3F View teardown and passive effects. */
+  readonly waitForPaintFrame: () => Promise<void>;
+}
+
 const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/iu;
 const BACKEND_SET = new Set<StudioBg3dCaptureBackend>(["three-webgl", "three-webgpu"]);
 
@@ -65,6 +74,32 @@ function assertAdapter(adapter: unknown): asserts adapter is StudioBg3dCaptureAd
   if (typeof candidate.getSourceSize !== "function" || typeof candidate.capture !== "function") {
     throw new TypeError("3D capture adapter methods are unavailable.");
   }
+}
+
+/**
+ * A quad-to-single capture transition replaces every R3F View and therefore its capture adapter.
+ * Never retain the pre-transition adapter: wait for the replacement View to commit, then bind the
+ * identity that owns the actual offscreen capture transaction.
+ */
+export async function acquireStudioBg3dCaptureAdapterAfterViewTransition(
+  input: AcquireStudioBg3dCaptureAdapterAfterViewTransitionInput
+): Promise<StudioBg3dCaptureAdapter | null> {
+  if (
+    !input ||
+    typeof input !== "object" ||
+    typeof input.readAdapter !== "function" ||
+    typeof input.isActive !== "function" ||
+    typeof input.waitForPaintFrame !== "function"
+  ) {
+    throw new TypeError("3D capture View transition callbacks are required.");
+  }
+  await input.waitForPaintFrame();
+  await input.waitForPaintFrame();
+  if (!input.isActive()) return null;
+  const adapter = input.readAdapter();
+  if (!adapter) return null;
+  assertAdapter(adapter);
+  return adapter;
 }
 
 function assertRequest(request: unknown): asserts request is StudioBg3dCaptureRequest {

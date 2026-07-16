@@ -34,7 +34,8 @@ export const STUDIO_BG3D_PRIMITIVE_KINDS = [
 
 export type StudioBg3dPrimitiveKind = (typeof STUDIO_BG3D_PRIMITIVE_KINDS)[number];
 export type StudioBg3dBackgroundMode = "color" | "sky-preset" | "transparent";
-export type StudioBg3dSkyPresetId = "blank" | "clear_day" | "sunset" | "night";
+export const STUDIO_BG3D_SKY_PRESET_IDS = ["blank", "clear_day", "sunset", "night"] as const;
+export type StudioBg3dSkyPresetId = (typeof STUDIO_BG3D_SKY_PRESET_IDS)[number];
 export type StudioBg3dToneMapping = "none" | "neutral" | "aces";
 export type StudioBg3dToneMode = "none" | "flat" | "cel" | "screentone";
 export type StudioBg3dLineLayerType = "raster" | "vector";
@@ -71,6 +72,8 @@ export interface StudioBg3dBackgroundSettings {
   readonly mode: StudioBg3dBackgroundMode;
   readonly color: string;
   readonly skyPresetId: StudioBg3dSkyPresetId;
+  /** Horizontal rotation of the allowlisted procedural equirectangular sky, in degrees. */
+  readonly panoramaRotation: number;
   readonly fogEnabled?: boolean;
   readonly fogColor?: string;
   readonly fogNear?: number;
@@ -321,7 +324,7 @@ const SENSITIVE_REFERENCE_PATTERN =
 const FORBIDDEN_ID_SET = new Set(["constructor", "prototype", "__proto__"]);
 const PRIMITIVE_KIND_SET = new Set<string>(STUDIO_BG3D_PRIMITIVE_KINDS);
 const BACKGROUND_MODE_SET = new Set<string>(["color", "sky-preset", "transparent"]);
-const SKY_PRESET_SET = new Set<string>(["blank", "clear_day", "sunset", "night"]);
+const SKY_PRESET_SET = new Set<string>(STUDIO_BG3D_SKY_PRESET_IDS);
 const TONE_MAPPING_SET = new Set<string>(["none", "neutral", "aces"]);
 const TONE_MODE_SET = new Set<string>(["none", "flat", "cel", "screentone"]);
 const LINE_LAYER_TYPE_SET = new Set<string>(["raster", "vector"]);
@@ -716,7 +719,7 @@ function normalizeRender(value: unknown): StudioBg3dRenderSettings {
 
 function normalizeBackground(value: unknown): StudioBg3dBackgroundSettings {
   const candidate = isRecord(value) ? value : {};
-  const result: Record<string, unknown> = {
+  return {
     mode: normalizedEnum(candidate.mode, BACKGROUND_MODE_SET, "sky-preset"),
     color: normalizedColor(candidate.color, "#ffffff"),
     skyPresetId: normalizedEnum(candidate.skyPresetId, SKY_PRESET_SET, "blank"),
@@ -729,10 +732,6 @@ function normalizeBackground(value: unknown): StudioBg3dBackgroundSettings {
     fogNear: boundedNumber(candidate.fogNear, 10, 0, MAX_WORLD_COORDINATE),
     fogFar: boundedNumber(candidate.fogFar, 50, 0, MAX_WORLD_COORDINATE * 2),
   };
-  if (typeof candidate.panoramaUrl === "string") {
-    result.panoramaUrl = candidate.panoramaUrl;
-  }
-  return result as unknown as StudioBg3dBackgroundSettings;
 }
 
 function normalizeDirectionalLight(
@@ -1224,6 +1223,28 @@ function migrateDecodedLegacyDocument(
   });
 }
 
+/**
+ * Schema v1 briefly persisted an optional `background.panoramaUrl`. The URL is no longer part of
+ * the persistence contract, but rejecting the whole marked document would also discard its camera,
+ * nodes, attachments, and LT settings. Migrate only that exact historical shape: remove the URL,
+ * then require every remaining field to pass the current strict v1 boundary without any other
+ * lossy rewrite. This is intentionally separate from the unversioned legacy payload migration.
+ */
+function migrateDecodedSchemaV1PanoramaDocument(
+  value: unknown
+): StudioBg3dSceneDocument | null {
+  if (
+    !hasCompleteCurrentRootShape(value) ||
+    !isRecord(value.background) ||
+    !hasOwn(value.background, "panoramaUrl") ||
+    typeof value.background.panoramaUrl !== "string"
+  ) {
+    return null;
+  }
+  const { panoramaUrl: _discardedPanoramaUrl, ...background } = value.background;
+  return normalizeDecodedCurrentDocument({ ...value, background }, "strict");
+}
+
 /** Returns a new, deeply frozen default document on every call. */
 export function createDefaultStudioBg3dSceneDocument(): StudioBg3dSceneDocument {
   const document = normalizeDecodedCurrentDocument(DEFAULT_RAW_DOCUMENT);
@@ -1273,6 +1294,8 @@ export function migrateStudioBg3dSceneDocument(
   const decoded = decodeBoundedJson(raw);
   const current = normalizeDecodedCurrentDocument(decoded, "strict");
   if (current) return current;
+  const schemaV1Panorama = migrateDecodedSchemaV1PanoramaDocument(decoded);
+  if (schemaV1Panorama) return schemaV1Panorama;
   if (
     rawHasSchemaMarker ||
     (isRecord(decoded) && (hasOwn(decoded, "kind") || hasOwn(decoded, "version")))

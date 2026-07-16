@@ -18,16 +18,81 @@ describe("Studio 3D asynchronous capture integration boundary", () => {
     expect(bridge).not.toContain("[camera, gl, scene, onCaptureUpdate]");
   });
 
-  it("checks adapter identity both before and after asynchronous capture", () => {
+  it("rebinds the adapter after the quad-to-single View transition, then guards that identity", () => {
+    const saveStart = background3dSource.indexOf("async function handleSaveToLibrary()");
+    const insertStart = background3dSource.indexOf("async function handleInsert()");
+    const handleEnd = background3dSource.indexOf("// 선택된 것이 도형", insertStart);
+    const handlers = [
+      background3dSource.slice(saveStart, insertStart),
+      background3dSource.slice(insertStart, handleEnd),
+    ];
+    const staleGuard = "captureRef.current.adapter !== captureAdapter";
+
+    expect(saveStart).toBeGreaterThanOrEqual(0);
+    expect(insertStart).toBeGreaterThan(saveStart);
+    expect(handleEnd).toBeGreaterThan(insertStart);
+    for (const handler of handlers) {
+      const transitionStart = handler.indexOf("setIsCapturing(true)");
+      const adapterAcquire = handler.indexOf(
+        "await acquireStudioBg3dCaptureAdapterAfterViewTransition"
+      );
+      const rasterCapture = handler.indexOf("await captureStudioBg3dRaster(captureAdapter");
+      expect(transitionStart).toBeGreaterThanOrEqual(0);
+      expect(adapterAcquire).toBeGreaterThan(transitionStart);
+      expect(rasterCapture).toBeGreaterThan(adapterAcquire);
+      expect(handler.split(staleGuard)).toHaveLength(2);
+    }
+  });
+
+  it("pins one background snapshot and rejects capture re-entry until cleanup", () => {
     const handleStart = background3dSource.indexOf("async function handleInsert()");
     const handleEnd = background3dSource.indexOf("// 선택된 것이 도형", handleStart);
     const handleInsert = background3dSource.slice(handleStart, handleEnd);
-    const staleGuard = "captureRef.current.adapter !== captureAdapter";
 
-    expect(handleStart).toBeGreaterThanOrEqual(0);
-    expect(handleEnd).toBeGreaterThan(handleStart);
-    expect(handleInsert.split(staleGuard)).toHaveLength(3);
-    expect(handleInsert).toContain("await captureStudioBg3dRaster(captureAdapter");
+    expect(handleInsert).toContain("captureInFlightRef.current || isCapturing");
+    expect(handleInsert).toContain("createStudioBg3dCaptureBackgroundSnapshot");
+    expect(handleInsert).toContain("setCaptureBackgroundSnapshot(backgroundSnapshot)");
+    expect(handleInsert).toContain("color: backgroundSnapshot.clearColor");
+    expect(handleInsert).toContain("alpha: backgroundSnapshot.transparent ? 0 : 1");
+    expect(handleInsert).toContain("captureInFlightRef.current = false");
+    expect(background3dSource).toContain("inert={isCapturing}");
+    expect(background3dSource).toContain("aria-busy={isCapturing || undefined}");
+    expect(background3dSource).toContain(
+      "captureBackgroundSnapshot?.skyPresetId ?? skyPresetId"
+    );
+    expect(background3dSource).toContain(
+      "captureBackgroundSnapshot?.panoramaRotation ?? panoramaRotation"
+    );
+  });
+
+  it("blocks every user close control while a capture transaction owns the renderer", () => {
+    const closeGuardStart = background3dSource.indexOf("function requestUserClose()");
+    const closeGuardEnd = background3dSource.indexOf(
+      "async function handleSaveToLibrary()",
+      closeGuardStart
+    );
+    const closeGuard = background3dSource.slice(closeGuardStart, closeGuardEnd);
+
+    expect(closeGuardStart).toBeGreaterThanOrEqual(0);
+    expect(closeGuardEnd).toBeGreaterThan(closeGuardStart);
+    expect(closeGuard).toContain("if (captureInFlightRef.current) return;");
+    expect(closeGuard).toContain("onClose();");
+    expect(background3dSource.match(/disabled=\{isCapturing\}[\s\S]{0,120}onClick=\{requestUserClose\}/gu))
+      .toHaveLength(2);
+  });
+
+  it("keeps document settings in the same debounced scene undo timeline", () => {
+    const historyStart = background3dSource.indexOf("// 편집이 멈추면(디바운스)");
+    const historyEnd = background3dSource.indexOf("const addPrimitive", historyStart);
+    const history = background3dSource.slice(historyStart, historyEnd);
+
+    expect(history).toContain("document: sceneBaseDocument");
+    expect(history).toContain(
+      "[customModels, isRestoringScene, primitives, sceneBaseDocument]"
+    );
+    expect(history.match(/setSceneBaseDocument\(snap\.document\)/gu)).toHaveLength(2);
+    expect(background3dSource).not.toContain("setSkyPresetId");
+    expect(background3dSource).not.toContain("setTransparentInsert");
   });
 
   it("returns insertion rejection so stale, locked, or failed plans keep the modal open", () => {

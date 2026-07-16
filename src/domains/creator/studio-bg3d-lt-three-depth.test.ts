@@ -70,7 +70,19 @@ describe("captureStudioBg3dThreeDepth", () => {
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera();
     const originalOverride = new THREE.MeshBasicMaterial();
+    const originalBackground = new THREE.DataTexture();
     scene.overrideMaterial = originalOverride;
+    scene.background = originalBackground;
+    scene.backgroundRotation.set(0.1, 0.8, 0.2);
+    const originalBackgroundRotation = scene.backgroundRotation.clone();
+    vi.mocked(fixture.renderer.clear).mockImplementationOnce(() => {
+      scene.background = new THREE.Color("#abcdef");
+      scene.backgroundRotation.set(1, 2, 3);
+    });
+    vi.mocked(fixture.renderer.render).mockImplementation((renderedScene) => {
+      expect(renderedScene).toBe(scene);
+      expect(scene.background).toBeNull();
+    });
     const targetDispose = vi.spyOn(THREE.WebGLRenderTarget.prototype, "dispose");
     const materialDispose = vi.spyOn(THREE.MeshDepthMaterial.prototype, "dispose");
 
@@ -83,6 +95,8 @@ describe("captureStudioBg3dThreeDepth", () => {
     });
 
     expect(scene.overrideMaterial).toBe(originalOverride);
+    expect(scene.background).toBe(originalBackground);
+    expect(scene.backgroundRotation).toEqual(originalBackgroundRotation);
     expect(fixture.renderer.autoClear).toBe(false);
     expect(fixture.renderer.xr.enabled).toBe(true);
     expect(fixture.current().renderTarget).toBeNull();
@@ -104,6 +118,11 @@ describe("captureStudioBg3dThreeDepth", () => {
     const fixture = rendererFixture(readback.promise);
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera();
+    const originalBackground = new THREE.Color("#102030");
+    scene.background = originalBackground;
+    vi.mocked(fixture.renderer.render).mockImplementation(() => {
+      expect(scene.background).toBeNull();
+    });
     const targetDispose = vi.spyOn(THREE.WebGLRenderTarget.prototype, "dispose");
     const materialDispose = vi.spyOn(THREE.MeshDepthMaterial.prototype, "dispose");
     const pending = captureStudioBg3dThreeDepth({
@@ -115,6 +134,7 @@ describe("captureStudioBg3dThreeDepth", () => {
     });
 
     expect(scene.overrideMaterial).toBeNull();
+    expect(scene.background).toBe(originalBackground);
     expect(fixture.current().renderTarget).toBeNull();
     readback.reject(failure);
 
@@ -128,7 +148,10 @@ describe("captureStudioBg3dThreeDepth", () => {
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera();
     const failure = new Error("render failed");
+    const originalBackground = new THREE.DataTexture();
+    scene.background = originalBackground;
     vi.mocked(fixture.renderer.render).mockImplementation(() => {
+      expect(scene.background).toBeNull();
       throw failure;
     });
     const targetDispose = vi.spyOn(THREE.WebGLRenderTarget.prototype, "dispose");
@@ -145,6 +168,7 @@ describe("captureStudioBg3dThreeDepth", () => {
     ).rejects.toBe(failure);
 
     expect(scene.overrideMaterial).toBeNull();
+    expect(scene.background).toBe(originalBackground);
     expect(fixture.renderer.autoClear).toBe(false);
     expect(fixture.renderer.xr.enabled).toBe(true);
     expect(fixture.current().renderTarget).toBeNull();

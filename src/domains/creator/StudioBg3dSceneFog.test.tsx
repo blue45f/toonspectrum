@@ -16,6 +16,7 @@ function background(
     mode: "sky-preset",
     color: "#d8e3ed",
     skyPresetId: "clear_day",
+    panoramaRotation: 0,
     fogEnabled: true,
     fogColor: "#c9d6df",
     fogNear: 8,
