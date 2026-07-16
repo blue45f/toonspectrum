@@ -1246,4 +1246,58 @@ describe("StudioLiveSocketTransport", () => {
     expect(socket.emitted.filter(({ event }) => event === "studio:crdt:sync")).toHaveLength(2);
     room.close();
   });
+
+  it("maps session chat between the protocol envelope and the server chat events", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    const received: StudioLiveEnvelope[] = [];
+    transport.subscribe((value) => received.push(value as StudioLiveEnvelope));
+    await transport.connect();
+    activate(transport);
+    received.length = 0;
+
+    expect(
+      transport.send(
+        envelope("chat:message", { messageId: "chat-1", text: "이 장면 톤 어때요?" }, 2)
+      )
+    ).toBe(true);
+    expect(socket.emitted.at(-1)).toEqual({
+      event: "studio:chat:send",
+      payload: { workId: "work-1", messageId: "chat-1", text: "이 장면 톤 어때요?" },
+    });
+
+    socket.serverEmit("studio:chat:message", {
+      fromConnectionId: remote.connectionId,
+      fromName: remote.name,
+      messageId: "chat-2",
+      text: "좋아요. 대사만 조금 줄여요.",
+      sentAt: new Date(NOW).toISOString(),
+    });
+    socket.serverEmit("studio:chat:message", {
+      fromConnectionId: remote.connectionId,
+      fromName: remote.name,
+      messageId: "chat-control",
+      text: "제어문자\u0007포함",
+      sentAt: new Date(NOW).toISOString(),
+    });
+    socket.serverEmit("studio:chat:message", {
+      fromConnectionId: "unknown-connection",
+      fromName: "미지의 피어",
+      messageId: "chat-unknown",
+      text: "무시되어야 합니다",
+      sentAt: new Date(NOW).toISOString(),
+    });
+
+    expect(received.map((value) => value.kind)).toEqual(["chat:message"]);
+    expect(received[0]?.payload).toEqual({
+      messageId: "chat-2",
+      text: "좋아요. 대사만 조금 줄여요.",
+    });
+    expect(received[0]?.sender.sessionId).toBe(remote.connectionId);
+    expect(received[0]?.targetSessionId).toBeNull();
+    transport.close();
+  });
 });

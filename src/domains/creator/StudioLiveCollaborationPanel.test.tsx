@@ -11,7 +11,10 @@ import {
   type StudioLiveCollaborationPanelViewProps,
 } from "./StudioLiveCollaborationPanel";
 
-import type { StudioLivePeer } from "./studio-live-collaboration-room";
+import type {
+  StudioLiveChatMessage,
+  StudioLivePeer,
+} from "./studio-live-collaboration-room";
 import type { StudioScreenShareState } from "./studio-screen-share";
 
 const noop = () => undefined;
@@ -41,6 +44,10 @@ function renderView(overrides: Partial<StudioLiveCollaborationPanelViewProps> = 
     availability: "ready",
     mode: "local",
     peers: [],
+    chatMessages: [],
+    canChat: true,
+    chatDraft: "",
+    chatNotice: null,
     screenState: screenState(),
     screenSupported: true,
     serverAvailable: false,
@@ -49,6 +56,8 @@ function renderView(overrides: Partial<StudioLiveCollaborationPanelViewProps> = 
     busyAction: null,
     error: null,
     onApproveRequest: noop,
+    onChatDraftChange: noop,
+    onChatSubmit: noop,
     onRejectRequest: noop,
     onStartShare: noop,
     onStopShare: noop,
@@ -239,6 +248,52 @@ describe("StudioLiveCollaborationPanelView", () => {
     expect(live).toContain("<video");
     expect(live).toContain('aria-label="서윤 · 이 탭 공유 화면"');
     expect(live).toContain('playsInline=""');
+  });
+
+  it("renders ephemeral session chat with sender names, times and no ids", () => {
+    const messages: StudioLiveChatMessage[] = [
+      {
+        id: "chat-message-private-id-1",
+        participant: peer,
+        text: "이 컷 배경 톤 조금만 밝게 갈까요?",
+        sentAt: Date.UTC(2026, 6, 16, 3, 24),
+        self: false,
+      },
+      {
+        id: "chat-message-private-id-2",
+        participant: { sessionId: "self-session", displayName: "나의 탭", role: "owner" },
+        text: "좋아요, 지금 바로 반영할게요.",
+        sentAt: Date.UTC(2026, 6, 16, 3, 25),
+        self: true,
+      },
+    ];
+    const html = renderView({ chatMessages: messages });
+
+    expect(html).toContain("세션 채팅");
+    expect(html).toContain("기록에 저장되지 않음");
+    expect(html).toContain('role="log"');
+    expect(html).toContain("이 컷 배경 톤 조금만 밝게 갈까요?");
+    expect(html).toContain("좋아요, 지금 바로 반영할게요.");
+    expect(html).toContain("민호 · 이 탭");
+    expect(html).toContain(">나<");
+    expect(html).not.toContain("chat-message-private-id-1");
+    expect(html).not.toContain(peer.sessionId);
+  });
+
+  it("keeps chat input usable only for roles that may write", () => {
+    const writable = renderView({ chatDraft: "안녕하세요" });
+    expect(writable).toContain('id="studio-live-chat-input"');
+    expect(writable).toContain('aria-label="채팅 메시지 보내기"');
+    expect(writable).not.toContain("열람자 권한은 채팅을 보낼 수 없습니다");
+
+    const readOnly = renderView({ canChat: false });
+    expect(readOnly).toContain("열람자 권한은 채팅을 보낼 수 없습니다");
+    expect(readOnly).toContain("disabled");
+
+    const notice = renderView({
+      chatNotice: "채팅 메시지를 보내지 못했습니다. 연결 상태를 확인해 주세요.",
+    });
+    expect(notice).toContain("채팅 메시지를 보내지 못했습니다");
   });
 
   it("discloses consent, no-audio, memory-only signaling and deterministic cleanup", () => {

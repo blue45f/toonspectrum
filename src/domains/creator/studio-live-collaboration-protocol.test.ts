@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  STUDIO_LIVE_CHAT_TEXT_MAX_LENGTH,
   STUDIO_LIVE_ICE_CANDIDATE_MAX_LENGTH,
   STUDIO_LIVE_LOCK_MAX_LEASE_MS,
   STUDIO_LIVE_MESSAGE_MAX_AGE_MS,
@@ -376,6 +377,44 @@ describe("studio live collaboration protocol", () => {
     expect(parse({ ...presence, payload: { ...presence.payload, pageId: "page\u0000other" } })).toBeNull();
     expect(
       parse({ ...offer, payload: { ...offer.payload, sdp: "v=0\r\no=peer\u0000tail" } })
+    ).toBeNull();
+  });
+
+  it("accepts a bounded broadcast chat line and rejects unsafe or targeted chat", () => {
+    const value = message("chat:message", {
+      messageId: "chat-1",
+      text: "이 컷 대사만 조금 줄여 볼까요?",
+    });
+    expect(parse(value)).toEqual(value);
+    expect(
+      parse(
+        message("chat:message", {
+          messageId: "chat-max",
+          text: "가".repeat(STUDIO_LIVE_CHAT_TEXT_MAX_LENGTH),
+        })
+      )
+    ).not.toBeNull();
+
+    expect(() =>
+      message("chat:message", {
+        messageId: "chat-too-long",
+        text: "가".repeat(STUDIO_LIVE_CHAT_TEXT_MAX_LENGTH + 1),
+      })
+    ).toThrow(StudioLiveProtocolError);
+    expect(() =>
+      message("chat:message", { messageId: "chat-blank", text: "   " })
+    ).toThrow(StudioLiveProtocolError);
+    expect(() =>
+      message("chat:message", { messageId: "chat-control", text: `안녕${"\u0000"}하세요` })
+    ).toThrow(StudioLiveProtocolError);
+    expect(() =>
+      message("chat:message", { messageId: "chat-targeted", text: "귓속말" }, "session-local")
+    ).toThrow(StudioLiveProtocolError);
+    expect(
+      parse({
+        ...value,
+        payload: { messageId: "chat-extra", text: "안녕하세요", extra: true },
+      })
     ).toBeNull();
   });
 

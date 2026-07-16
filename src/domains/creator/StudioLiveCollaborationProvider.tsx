@@ -13,6 +13,7 @@ import {
 import { studioLiveDisplayName, type StudioLiveParticipant } from "./studio-live-collaboration-protocol";
 import {
   StudioLiveRoom,
+  type StudioLiveChatMessage,
   type StudioLiveLock,
   type StudioLivePeer,
 } from "./studio-live-collaboration-room";
@@ -86,6 +87,7 @@ export function StudioLiveCollaborationProvider({
   const [mode, setMode] = useState<StudioLiveTransportMode | null>(null);
   const [peers, setPeers] = useState<StudioLivePeer[]>([]);
   const [locks, setLocks] = useState<StudioLiveLock[]>([]);
+  const [chatMessages, setChatMessages] = useState<StudioLiveChatMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [localFallbackAllowed, setLocalFallbackAllowed] = useState(true);
   const [transportPreference, setTransportPreference] = useState<"server" | "local">(
@@ -112,6 +114,7 @@ export function StudioLiveCollaborationProvider({
     setRoom(null);
     setPeers([]);
     setLocks([]);
+    setChatMessages([]);
     setError(null);
     setLocalFallbackAllowed(true);
     // Presence/transport는 동적 CRDT 모듈과 초기 frontier보다 먼저 준비될 수 있다. effect가
@@ -200,6 +203,11 @@ export function StudioLiveCollaborationProvider({
         setLocks(event.locks);
         return;
       }
+      if (event.type === "chat") {
+        // The room already bounds its own history; mirror it so late panel mounts see context.
+        setChatMessages(nextRoom.getChatMessages());
+        return;
+      }
       if (event.type === "transport-error") {
         setError(event.message);
         return;
@@ -223,6 +231,7 @@ export function StudioLiveCollaborationProvider({
       if (!event.status.recoverable) {
         setPeers([]);
         setLocks([]);
+        setChatMessages([]);
         setLocalFallbackAllowed(false);
       }
     });
@@ -330,6 +339,7 @@ export function StudioLiveCollaborationProvider({
         setRoom(null);
         setPeers([]);
         setLocks([]);
+        setChatMessages([]);
         setAvailability("error");
         setError(messageFrom(cause, "공동작업 채널에 연결하지 못했습니다."));
       }
@@ -387,10 +397,21 @@ export function StudioLiveCollaborationProvider({
     mode,
     peers,
     locks,
+    chatMessages,
+    canChat: participantRole !== null && participantRole !== "viewer",
     error,
     serverAvailable: transportFactory !== undefined,
     localFallbackAllowed,
     usingLocalFallback: transportFactory !== undefined && transportPreference === "local",
+    sendChatMessage: (text: string) => {
+      if (!room || participantRole === null || participantRole === "viewer") return false;
+      try {
+        return room.sendChatMessage(text) !== null;
+      } catch (cause) {
+        setError(messageFrom(cause, "채팅 메시지를 보내지 못했습니다."));
+        return false;
+      }
+    },
     retryServer: () => {
       if (!transportFactory) return;
       setError(null);

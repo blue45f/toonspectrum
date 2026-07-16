@@ -4,6 +4,7 @@ import {
   createStudioLiveEnvelope,
   parseStudioLiveEnvelope,
   studioLocalLiveChannelName,
+  type StudioLiveChatMessagePayload,
   type StudioLiveCursorPayload,
   type StudioLiveEnvelope,
   type StudioLiveLockClaimPayload,
@@ -39,6 +40,7 @@ const DEFAULT_HEARTBEAT_MS = 10_000;
 const DEFAULT_PRESENCE_TTL_MS = 30_000;
 const DEFAULT_LOCK_LEASE_MS = 15_000;
 const DEFAULT_CURSOR_INTERVAL_MS = 40;
+export const STUDIO_LIVE_CHAT_HISTORY_LIMIT = 200;
 
 type StudioLiveSignalKind =
   | "screen:announce"
@@ -65,6 +67,15 @@ export interface StudioLiveLock {
   leaseUntil: number;
 }
 
+/** One ephemeral session chat line. History lives only in room memory and dies with the room. */
+export interface StudioLiveChatMessage {
+  id: string;
+  participant: StudioLiveParticipant;
+  text: string;
+  sentAt: number;
+  self: boolean;
+}
+
 export type StudioLiveRoomEvent =
   | { type: "presence"; peers: StudioLivePeer[] }
   | {
@@ -73,6 +84,7 @@ export type StudioLiveRoomEvent =
       cursor: StudioLiveCursorPayload;
     }
   | { type: "locks"; locks: StudioLiveLock[] }
+  | { type: "chat"; message: StudioLiveChatMessage }
   | { type: "signal"; envelope: StudioLiveSignalEnvelope }
   | { type: "transport-status"; status: StudioLiveTransportStatus }
   | { type: "transport-error"; message: string };
@@ -150,6 +162,7 @@ export class StudioLiveRoom {
   private readonly crdtListeners = new Set<(event: StudioLiveCrdtRoomEvent) => void>();
   private readonly peers = new Map<string, StudioLivePeer>();
   private readonly locks = new Map<string, StudioLiveLock>();
+  private readonly chatMessages: StudioLiveChatMessage[] = [];
   private readonly lastSequenceBySession = new Map<string, number>();
   private transport: StudioLiveTransport | null = null;
   private unsubscribeTransport: (() => void) | null = null;
@@ -288,6 +301,44 @@ export class StudioLiveRoom {
       ...lock,
       owner: copyParticipant(lock.owner),
     })).sort((a, b) => a.resource.localeCompare(b.resource));
+  }
+
+  getChatMessages(): StudioLiveChatMessage[] {
+    return this.chatMessages.map((message) => ({
+      ...message,
+      participant: copyParticipant(message.participant),
+    }));
+  }
+
+  /**
+   * Sends one ephemeral chat line and echoes it locally. Neither BroadcastChannel nor the server
+   * room broadcast loops a message back to its sender, so the local echo is the sender's record.
+   */
+  sendChatMessage(text: string): StudioLiveChatMessage | null {
+    if (!this.ready) return null;
+    const trimmed = text.trim();
+    if (!trimmed) return null;
+    const now = this.now();
+    const payload: StudioLiveChatMessagePayload = {
+      messageId: this.randomId(),
+      text: trimmed,
+    };
+    // Envelope creation also runs the protocol validator (length/control-character contract).
+    const envelope = this.buildEnvelope("chat:message", payload, null, now);
+    if (!this.sendEnvelope(envelope)) return null;
+    const message: StudioLiveChatMessage = {
+      id: payload.messageId,
+      participant: copyParticipant(this.participant),
+      text: trimmed,
+      sentAt: now,
+      self: true,
+    };
+    this.appendChatMessage(message);
+    this.emit({
+      type: "chat",
+      message: { ...message, participant: copyParticipant(message.participant) },
+    });
+    return { ...message, participant: copyParticipant(message.participant) };
   }
 
   updatePresence(patch: Partial<StudioLivePresencePayload>): void {
@@ -458,9 +509,17 @@ export class StudioLiveRoom {
     this.transport = null;
     this.peers.clear();
     this.locks.clear();
+    this.chatMessages.length = 0;
     this.lastSequenceBySession.clear();
     this.listeners.clear();
     this.crdtListeners.clear();
+  }
+
+  private appendChatMessage(message: StudioLiveChatMessage): void {
+    this.chatMessages.push(message);
+    if (this.chatMessages.length > STUDIO_LIVE_CHAT_HISTORY_LIMIT) {
+      this.chatMessages.splice(0, this.chatMessages.length - STUDIO_LIVE_CHAT_HISTORY_LIMIT);
+    }
   }
 
   private onHeartbeat(): void {
@@ -586,6 +645,22 @@ export class StudioLiveRoom {
       case "lock:release":
         this.applyLockRelease(envelope as StudioLiveEnvelope<"lock:release">);
         return;
+      case "chat:message": {
+        const payload = envelope.payload as StudioLiveChatMessagePayload;
+        const message: StudioLiveChatMessage = {
+          id: payload.messageId,
+          participant: copyParticipant(envelope.sender),
+          text: payload.text,
+          sentAt: envelope.sentAt,
+          self: false,
+        };
+        this.appendChatMessage(message);
+        this.emit({
+          type: "chat",
+          message: { ...message, participant: copyParticipant(message.participant) },
+        });
+        return;
+      }
       case "screen:announce":
       case "screen:request":
       case "screen:access":
@@ -605,6 +680,7 @@ export class StudioLiveRoom {
         const hadLocks = this.locks.size > 0;
         this.peers.clear();
         this.locks.clear();
+        this.chatMessages.length = 0;
         this.lastSequenceBySession.clear();
         if (hadPeers) this.emitPresence();
         if (hadLocks) this.emitLocks();

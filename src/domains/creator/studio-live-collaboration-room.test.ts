@@ -17,6 +17,7 @@ import {
   type StudioLiveParticipant,
 } from "./studio-live-collaboration-protocol";
 import {
+  STUDIO_LIVE_CHAT_HISTORY_LIMIT,
   StudioLiveRoom,
   type StudioLiveRoomDependencies,
   type StudioLiveRoomEvent,
@@ -590,5 +591,73 @@ describe("StudioLiveRoom", () => {
     ]);
     expect(ephemeral).toEqual([]);
     room.close();
+  });
+  it("exchanges bounded ephemeral session chat and echoes the sender locally", async () => {
+    const test = harness();
+    let chatCounter = 0;
+    const roomA = test.room(alice, { randomId: () => `chat-a-${++chatCounter}` });
+    const roomB = test.room(bob, { randomId: () => "chat-b-1" });
+    await roomA.start();
+    await roomB.start();
+
+    const eventsA: StudioLiveRoomEvent[] = [];
+    const eventsB: StudioLiveRoomEvent[] = [];
+    roomA.subscribe((event) => eventsA.push(event));
+    roomB.subscribe((event) => eventsB.push(event));
+
+    const sent = roomA.sendChatMessage("  이 컷 배경 톤 조금 밝게 갈까요?  ");
+    expect(sent).toMatchObject({
+      text: "이 컷 배경 톤 조금 밝게 갈까요?",
+      self: true,
+      participant: expect.objectContaining({ sessionId: alice.sessionId }),
+    });
+    expect(roomA.getChatMessages()).toHaveLength(1);
+    const isChatEvent = (
+      event: StudioLiveRoomEvent
+    ): event is Extract<StudioLiveRoomEvent, { type: "chat" }> => event.type === "chat";
+    expect(eventsA.filter(isChatEvent).map((event) => event.message.self)).toEqual([true]);
+
+    const receivedB = eventsB.filter(isChatEvent);
+    expect(receivedB).toHaveLength(1);
+    expect(receivedB[0]?.message).toMatchObject({
+      id: sent?.id,
+      text: "이 컷 배경 톤 조금 밝게 갈까요?",
+      self: false,
+      participant: expect.objectContaining({ sessionId: alice.sessionId }),
+    });
+    expect(roomB.getChatMessages()).toHaveLength(1);
+
+    expect(roomA.sendChatMessage("   ")).toBeNull();
+    expect(() => roomA.sendChatMessage("가".repeat(501))).toThrow();
+    expect(roomA.getChatMessages()).toHaveLength(1);
+
+    roomA.close();
+    expect(roomA.sendChatMessage("닫힌 뒤에는 보낼 수 없습니다")).toBeNull();
+    roomB.close();
+    expect(roomB.getChatMessages()).toEqual([]);
+  });
+
+  it("caps session chat history at the newest 200 lines", async () => {
+    const test = harness();
+    let chatCounter = 0;
+    const roomA = test.room(alice, { randomId: () => `chat-${++chatCounter}` });
+    const roomB = test.room(bob);
+    await roomA.start();
+    await roomB.start();
+
+    for (let index = 1; index <= STUDIO_LIVE_CHAT_HISTORY_LIMIT + 5; index += 1) {
+      expect(roomA.sendChatMessage(`메시지 ${index}`)).not.toBeNull();
+    }
+
+    const historyA = roomA.getChatMessages();
+    const historyB = roomB.getChatMessages();
+    expect(historyA).toHaveLength(STUDIO_LIVE_CHAT_HISTORY_LIMIT);
+    expect(historyB).toHaveLength(STUDIO_LIVE_CHAT_HISTORY_LIMIT);
+    expect(historyA[0]?.text).toBe("메시지 6");
+    expect(historyA.at(-1)?.text).toBe(`메시지 ${STUDIO_LIVE_CHAT_HISTORY_LIMIT + 5}`);
+    expect(historyB[0]?.text).toBe("메시지 6");
+
+    roomA.close();
+    roomB.close();
   });
 });

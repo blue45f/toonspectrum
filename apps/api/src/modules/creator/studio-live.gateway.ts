@@ -184,6 +184,22 @@ export const StudioLiveScreenStopSchema = z
   })
   .strict();
 
+// Mirrors STUDIO_LIVE_CHAT_TEXT_MAX_LENGTH in the browser protocol module.
+const STUDIO_LIVE_CHAT_TEXT_MAX_LENGTH = 500;
+
+export const StudioLiveChatSchema = z
+  .object({
+    workId: WorkIdSchema,
+    messageId: boundedIdentifier(160),
+    text: z
+      .string()
+      .trim()
+      .min(1)
+      .max(STUDIO_LIVE_CHAT_TEXT_MAX_LENGTH)
+      .refine(noControlCharacters, "control characters are not allowed"),
+  })
+  .strict();
+
 const StudioLiveSessionDescriptionSchema = z
   .object({
     type: z.enum(["offer", "answer"]),
@@ -368,6 +384,7 @@ type StudioLiveScreenAccessInput = z.infer<typeof StudioLiveScreenAccessSchema>;
 type StudioLiveScreenAnnounceInput = z.infer<typeof StudioLiveScreenAnnounceSchema>;
 type StudioLiveScreenRequestInput = z.infer<typeof StudioLiveScreenRequestSchema>;
 type StudioLiveScreenStopInput = z.infer<typeof StudioLiveScreenStopSchema>;
+type StudioLiveChatInput = z.infer<typeof StudioLiveChatSchema>;
 type StudioLiveSignalInput = z.infer<typeof StudioLiveSignalSchema>;
 type StudioLiveInterServerRelayEvent = z.infer<
   typeof StudioLiveInterServerRelayEventSchema
@@ -1607,6 +1624,47 @@ export class StudioLiveGateway
       return reply(ack, failure("not_joined", "실시간 작업실에 다시 참여해 주세요."));
     }
     return reply(ack, { ok: true, data: { delivered: true } });
+  }
+
+  @SubscribeMessage("studio:chat:send")
+  async sendChatMessage(
+    @ConnectedSocket() client: StudioLiveSocket,
+    @MessageBody() body: StudioLiveChatInput,
+    @Ack() ack?: StudioLiveAckCallback<{ delivered: true; sentAt: string }>
+  ) {
+    const parsed = StudioLiveChatSchema.safeParse(body);
+    if (!parsed.success) {
+      return reply(ack, failure("invalid_payload", "채팅 메시지가 올바르지 않습니다."));
+    }
+    if (!this.consumeRateLimit(client.id, "chat", 20, 10_000)) {
+      return reply(ack, failure("rate_limited", "채팅 메시지를 너무 빨리 보내고 있습니다."));
+    }
+    const authorized = await this.runWithAuthorizedParticipant(
+      client,
+      parsed.data.workId,
+      false,
+      false,
+      (participant) => {
+        // Chat is a write action: a view-only role must not broadcast text into the room.
+        if (!participant.capabilities.comment && !participant.capabilities.edit) return null;
+        const sentAt = new Date().toISOString();
+        client.to(studioLiveRoom(participant.workId)).emit("studio:chat:message", {
+          fromConnectionId: participant.connectionId,
+          fromName: participant.name,
+          messageId: parsed.data.messageId,
+          text: parsed.data.text,
+          sentAt,
+        });
+        return sentAt;
+      }
+    );
+    if (!authorized) {
+      return reply(ack, failure("not_joined", "실시간 작업실에 다시 참여해 주세요."));
+    }
+    if (authorized.value === null) {
+      return reply(ack, failure("forbidden", "이 작품에서 채팅을 보낼 권한이 없습니다."));
+    }
+    return reply(ack, { ok: true, data: { delivered: true, sentAt: authorized.value } });
   }
 
   @SubscribeMessage("studio:signal")

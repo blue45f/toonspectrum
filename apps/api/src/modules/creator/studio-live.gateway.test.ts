@@ -1208,6 +1208,80 @@ describe("StudioLiveGateway", () => {
     });
   });
 
+  it("broadcasts bounded session chat only from roles that may write", async () => {
+    const harness = createHarness(async (userId, workId) =>
+      teamSnapshot(userId, workId, userId === "viewer" ? { role: "viewer" } : {})
+    );
+    const editor = harness.socket("editor");
+    const viewer = harness.socket("viewer");
+    await connectAndJoin(harness, editor);
+    await connectAndJoin(harness, viewer);
+
+    const delivered = await harness.gateway.sendChatMessage(
+      editor as never,
+      { workId: "work-1", messageId: "chat-1", text: "  이 컷 먼저 볼까요?  " },
+      undefined
+    );
+    expect(delivered).toMatchObject({ ok: true, data: { delivered: true } });
+    expect(harness.emissions).toContainEqual({
+      target: "from:editor:studio-live:work-1",
+      event: "studio:chat:message",
+      payload: expect.objectContaining({
+        fromConnectionId: "editor",
+        fromName: "어시스턴트",
+        messageId: "chat-1",
+        text: "이 컷 먼저 볼까요?",
+      }),
+    });
+
+    const forbidden = await harness.gateway.sendChatMessage(
+      viewer as never,
+      { workId: "work-1", messageId: "chat-2", text: "열람 전용 역할의 메시지" },
+      undefined
+    );
+    expect(forbidden).toMatchObject({ ok: false, code: "forbidden" });
+    expect(
+      harness.emissions.filter(
+        (emission) =>
+          emission.event === "studio:chat:message" &&
+          (emission.payload as { messageId?: string }).messageId === "chat-2"
+      )
+    ).toHaveLength(0);
+
+    const oversized = await harness.gateway.sendChatMessage(
+      editor as never,
+      { workId: "work-1", messageId: "chat-3", text: "x".repeat(501) },
+      undefined
+    );
+    expect(oversized).toMatchObject({ ok: false, code: "invalid_payload" });
+    const controlCharacter = await harness.gateway.sendChatMessage(
+      editor as never,
+      { workId: "work-1", messageId: "chat-4", text: `안녕${String.fromCharCode(7)}하세요` },
+      undefined
+    );
+    expect(controlCharacter).toMatchObject({ ok: false, code: "invalid_payload" });
+  });
+
+  it("rate limits chat bursts per connection without failing earlier messages", async () => {
+    const harness = createHarness();
+    const socket = harness.socket("editor");
+    await connectAndJoin(harness, socket);
+
+    let limited = 0;
+    for (let index = 0; index < 25; index += 1) {
+      const response = await harness.gateway.sendChatMessage(
+        socket as never,
+        { workId: "work-1", messageId: `chat-${index}`, text: `메시지 ${index}` },
+        undefined
+      );
+      if (!response.ok && response.code === "rate_limited") limited += 1;
+    }
+    expect(limited).toBe(5);
+    expect(
+      harness.emissions.filter((emission) => emission.event === "studio:chat:message")
+    ).toHaveLength(20);
+  });
+
   it("grants renewable edit leases and rejects a competing editor", async () => {
     const harness = createHarness();
     const first = harness.socket("editor-a");

@@ -13,6 +13,7 @@ import {
   type StudioCrdtUpdateRequest,
 } from "./studio-crdt-protocol";
 import {
+  STUDIO_LIVE_CHAT_TEXT_MAX_LENGTH,
   STUDIO_LIVE_ICE_CANDIDATE_MAX_LENGTH,
   STUDIO_LIVE_SDP_MAX_LENGTH,
   STUDIO_LIVE_SDP_MID_MAX_LENGTH,
@@ -351,6 +352,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.socket.on("studio:screen:request", this.onScreenRequest);
     this.socket.on("studio:screen:access", this.onScreenAccess);
     this.socket.on("studio:screen:stop", this.onScreenStop);
+    this.socket.on("studio:chat:message", this.onChatMessage);
     this.socket.on("studio:crdt:sync", this.onCrdtSync);
     this.socket.on("studio:crdt:update", this.onCrdtUpdate);
   }
@@ -547,6 +549,15 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
           });
           return true;
         }
+        case "chat:message": {
+          const payload = envelope.payload as StudioLivePayloadMap["chat:message"];
+          this.emitWithAck("studio:chat:send", {
+            workId: this.context.workId,
+            messageId: payload.messageId,
+            text: payload.text,
+          });
+          return true;
+        }
         case "screen:stop": {
           const payload = envelope.payload as StudioLivePayloadMap["screen:stop"];
           this.emitWithAck("studio:screen:stop", {
@@ -592,6 +603,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.socket.off("studio:screen:request", this.onScreenRequest);
     this.socket.off("studio:screen:access", this.onScreenAccess);
     this.socket.off("studio:screen:stop", this.onScreenStop);
+    this.socket.off("studio:chat:message", this.onChatMessage);
     this.socket.off("studio:crdt:sync", this.onCrdtSync);
     this.socket.off("studio:crdt:update", this.onCrdtUpdate);
     this.rejectPendingCrdtOperations("팀 공동작업 연결이 종료되었습니다.");
@@ -940,6 +952,24 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     if (this.shareIdByConnection.get(relay.participant.connectionId) === relay.shareId) {
       this.shareIdByConnection.delete(relay.participant.connectionId);
     }
+  };
+
+  private readonly onChatMessage = (value: unknown) => {
+    if (!this.ready) return;
+    if (
+      !isRecord(value) ||
+      !safeString(value.fromConnectionId, 128) ||
+      !safeString(value.messageId, 160) ||
+      !safeString(value.text, STUDIO_LIVE_CHAT_TEXT_MAX_LENGTH)
+    ) {
+      return;
+    }
+    const participant = this.remoteParticipant(value.fromConnectionId);
+    if (!participant) return;
+    this.deliver(participant, "chat:message", {
+      messageId: value.messageId,
+      text: value.text,
+    });
   };
 
   private readonly onCrdtSync = (value: unknown) => {

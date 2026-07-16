@@ -23,6 +23,7 @@ export const STUDIO_LIVE_SDP_MAX_LENGTH = 48 * 1024;
 export const STUDIO_LIVE_ICE_CANDIDATE_MAX_LENGTH = 8 * 1024;
 export const STUDIO_LIVE_SDP_MID_MAX_LENGTH = 128;
 export const STUDIO_LIVE_USERNAME_FRAGMENT_MAX_LENGTH = 256;
+export const STUDIO_LIVE_CHAT_TEXT_MAX_LENGTH = 500;
 
 export interface StudioLiveParticipant {
   sessionId: string;
@@ -87,6 +88,12 @@ export interface StudioLiveScreenStopPayload {
   shareId: string;
 }
 
+/** Ephemeral session chat line. Never persisted to the document, the server DB or storage. */
+export interface StudioLiveChatMessagePayload {
+  messageId: string;
+  text: string;
+}
+
 export interface StudioLivePayloadMap {
   "presence:hello": StudioLivePresencePayload;
   "presence:heartbeat": StudioLivePresencePayload;
@@ -100,6 +107,7 @@ export interface StudioLivePayloadMap {
   "webrtc:description": StudioLiveWebRtcDescriptionPayload;
   "webrtc:ice": StudioLiveWebRtcIcePayload;
   "screen:stop": StudioLiveScreenStopPayload;
+  "chat:message": StudioLiveChatMessagePayload;
 }
 
 export type StudioLiveMessageKind = keyof StudioLivePayloadMap;
@@ -392,6 +400,15 @@ function isScreenStopPayload(value: unknown): value is StudioLiveScreenStopPaylo
   return isShareRequestPayload(value);
 }
 
+function isChatMessagePayload(value: unknown): value is StudioLiveChatMessagePayload {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ["messageId", "text"]) &&
+    exactString(value.messageId, MAX_ID_LENGTH) &&
+    exactString(value.text, STUDIO_LIVE_CHAT_TEXT_MAX_LENGTH)
+  );
+}
+
 const MESSAGE_KINDS = new Set<StudioLiveMessageKind>([
   "presence:hello",
   "presence:heartbeat",
@@ -405,6 +422,7 @@ const MESSAGE_KINDS = new Set<StudioLiveMessageKind>([
   "webrtc:description",
   "webrtc:ice",
   "screen:stop",
+  "chat:message",
 ]);
 
 function isKind(value: unknown): value is StudioLiveMessageKind {
@@ -440,6 +458,8 @@ function payloadMatchesKind(
       return isIcePayload(payload);
     case "screen:stop":
       return isScreenStopPayload(payload);
+    case "chat:message":
+      return isChatMessagePayload(payload);
   }
 }
 

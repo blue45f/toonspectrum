@@ -1,6 +1,7 @@
 import { createContext, useContext } from "react";
 
 import type {
+  StudioLiveChatMessage,
   StudioLiveLock,
   StudioLivePeer,
   StudioLiveRoom,
@@ -15,10 +16,14 @@ export interface StudioLiveCollaborationContextValue {
   mode: StudioLiveTransportMode | null;
   peers: StudioLivePeer[];
   locks: StudioLiveLock[];
+  chatMessages: StudioLiveChatMessage[];
+  /** UX gate only. The server rejects chat from roles without comment/edit capability anyway. */
+  canChat: boolean;
   error: string | null;
   serverAvailable: boolean;
   localFallbackAllowed: boolean;
   usingLocalFallback: boolean;
+  sendChatMessage: (text: string) => boolean;
   retryServer: () => void;
   useLocalFallback: () => void;
 }
@@ -29,10 +34,13 @@ export const EMPTY_STUDIO_LIVE_CONTEXT: StudioLiveCollaborationContextValue = {
   mode: null,
   peers: [],
   locks: [],
+  chatMessages: [],
+  canChat: false,
   error: null,
   serverAvailable: false,
   localFallbackAllowed: false,
   usingLocalFallback: false,
+  sendChatMessage: () => false,
   retryServer: () => undefined,
   useLocalFallback: () => undefined,
 };

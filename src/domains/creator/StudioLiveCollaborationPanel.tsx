@@ -3,20 +3,23 @@ import {
   Check,
   Eye,
   LoaderCircle,
+  MessageCircle,
   MonitorUp,
   Radio,
   ScreenShareOff,
+  SendHorizontal,
   ShieldCheck,
   UserMinus,
   UsersRound,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState, type Ref } from "react";
+import { useEffect, useRef, useState, type FormEvent, type Ref } from "react";
 
 import {
   useStudioLiveCollaboration,
   type StudioLiveAvailability,
 } from "./studio-live-collaboration-context";
+import { STUDIO_LIVE_CHAT_TEXT_MAX_LENGTH } from "./studio-live-collaboration-protocol";
 import {
   StudioScreenShareController,
   isStudioScreenShareSupported,
@@ -27,7 +30,11 @@ import {
   type StudioScreenShareViewer,
 } from "./studio-screen-share";
 
-import type { StudioLivePeer } from "./studio-live-collaboration-room";
+
+import type {
+  StudioLiveChatMessage,
+  StudioLivePeer,
+} from "./studio-live-collaboration-room";
 import type { StudioLiveTransportMode } from "./studio-live-collaboration-transport";
 import type { StudioTeamRole } from "./studio-team-client";
 
@@ -54,6 +61,10 @@ export interface StudioLiveCollaborationPanelViewProps {
   availability: StudioLiveAvailability;
   mode: StudioLiveTransportMode | null;
   peers: StudioLivePeer[];
+  chatMessages: StudioLiveChatMessage[];
+  canChat: boolean;
+  chatDraft: string;
+  chatNotice: string | null;
   screenState: StudioScreenShareState;
   screenSupported: boolean;
   serverAvailable: boolean;
@@ -62,6 +73,8 @@ export interface StudioLiveCollaborationPanelViewProps {
   busyAction: string | null;
   error: string | null;
   videoRef?: Ref<HTMLVideoElement>;
+  onChatDraftChange: (value: string) => void;
+  onChatSubmit: () => void;
   onStartShare: () => void;
   onStopShare: () => void;
   onRetryServer: () => void;
@@ -89,10 +102,20 @@ function screenItemKey(kind: "approve" | "watch" | "item", sessionId: string, sh
   return JSON.stringify([kind, sessionId, shareId]);
 }
 
+function chatTimeLabel(sentAt: number): string {
+  const time = new Date(sentAt);
+  if (!Number.isFinite(time.getTime())) return "";
+  return time.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+}
+
 export function StudioLiveCollaborationPanelView({
   availability,
   mode,
   peers,
+  chatMessages,
+  canChat,
+  chatDraft,
+  chatNotice,
   screenState,
   screenSupported,
   serverAvailable,
@@ -101,6 +124,8 @@ export function StudioLiveCollaborationPanelView({
   busyAction,
   error,
   videoRef,
+  onChatDraftChange,
+  onChatSubmit,
   onStartShare,
   onStopShare,
   onRetryServer,
@@ -113,6 +138,19 @@ export function StudioLiveCollaborationPanelView({
 }: StudioLiveCollaborationPanelViewProps) {
   const ready = availability === "ready";
   const watching = screenState.watching;
+  const chatLogRef = useRef<HTMLUListElement>(null);
+  const chatDraftReady = chatDraft.trim().length > 0;
+
+  useEffect(() => {
+    const log = chatLogRef.current;
+    if (!log) return;
+    log.scrollTop = log.scrollHeight;
+  }, [chatMessages]);
+
+  function handleChatSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    onChatSubmit();
+  }
 
   return (
     <section
@@ -252,6 +290,90 @@ export function StudioLiveCollaborationPanelView({
         ) : ready ? (
           <p className="mt-2 text-xs leading-relaxed text-fg-3">
             같은 작품을 다른 탭에서 열고 팀 패널의 같이 보기를 켜 보세요.
+          </p>
+        ) : null}
+      </div>
+
+      <div
+        aria-labelledby="studio-live-chat-title"
+        className="mt-3 rounded-xl border border-line bg-card/55 p-3"
+        data-studio-live-chat
+        role="group"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <MessageCircle className="shrink-0 text-accent" size={16} aria-hidden="true" />
+            <h4 className="text-xs font-semibold text-fg" id="studio-live-chat-title">
+              세션 채팅
+            </h4>
+          </div>
+          <span className="text-[0.68rem] text-fg-3">기록에 저장되지 않음</span>
+        </div>
+        {chatMessages.length > 0 ? (
+          <ul
+            aria-label="세션 채팅 메시지"
+            className="mt-2 max-h-48 space-y-1.5 overflow-y-auto pr-1"
+            ref={chatLogRef}
+            role="log"
+          >
+            {chatMessages.map((message) => (
+              <li
+                className={cn(
+                  "rounded-lg border border-line px-2.5 py-1.5 text-xs leading-relaxed",
+                  message.self ? "bg-accent-soft/40" : "bg-panel"
+                )}
+                key={message.id}
+              >
+                <span className="flex items-baseline justify-between gap-2">
+                  <strong className="min-w-0 truncate font-semibold text-fg">
+                    {message.self ? "나" : message.participant.displayName}
+                  </strong>
+                  <time className="shrink-0 text-[0.62rem] text-fg-3">
+                    {chatTimeLabel(message.sentAt)}
+                  </time>
+                </span>
+                <span className="mt-0.5 block whitespace-pre-wrap break-words text-fg-2">
+                  {message.text}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-2 text-xs leading-relaxed text-fg-3">
+            {ready
+              ? "함께 작업 중인 팀에게 첫 메시지를 보내 보세요."
+              : "연결이 준비되면 채팅을 시작할 수 있습니다."}
+          </p>
+        )}
+        <form className="mt-2 flex items-center gap-2" onSubmit={handleChatSubmit}>
+          <label className="sr-only" htmlFor="studio-live-chat-input">
+            채팅 메시지
+          </label>
+          <input
+            autoComplete="off"
+            className="min-h-11 min-w-0 flex-1 rounded-xl border border-line bg-card px-3 text-xs text-fg placeholder:text-fg-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+            disabled={!ready || !canChat}
+            id="studio-live-chat-input"
+            maxLength={STUDIO_LIVE_CHAT_TEXT_MAX_LENGTH}
+            placeholder={canChat ? "메시지 입력" : "열람자 권한은 채팅을 보낼 수 없습니다"}
+            type="text"
+            value={chatDraft}
+            onChange={(event) => onChatDraftChange(event.target.value)}
+          />
+          <Button
+            aria-label="채팅 메시지 보내기"
+            className="min-h-11 shrink-0"
+            disabled={!ready || !canChat || !chatDraftReady}
+            size="sm"
+            type="submit"
+            variant="outline"
+          >
+            <SendHorizontal size={14} aria-hidden="true" /> 보내기
+          </Button>
+        </form>
+        {chatNotice ? (
+          <p aria-live="polite" className="mt-1.5 text-[0.68rem] text-bad" role="status">
+            {chatNotice}
           </p>
         ) : null}
       </div>
@@ -486,6 +608,8 @@ export function StudioLiveCollaborationPanel() {
   const [screenState, setScreenState] = useState<StudioScreenShareState>(EMPTY_SCREEN_STATE);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [screenError, setScreenError] = useState<string | null>(null);
+  const [chatDraft, setChatDraft] = useState("");
+  const [chatNotice, setChatNotice] = useState<string | null>(null);
 
   useEffect(() => {
     const room = live.room;
@@ -493,6 +617,8 @@ export function StudioLiveCollaborationPanel() {
     setBusyAction(null);
     setScreenState(EMPTY_SCREEN_STATE);
     setScreenError(null);
+    setChatDraft("");
+    setChatNotice(null);
     if (!room) return;
 
     const screenController = new StudioScreenShareController(room);
@@ -590,6 +716,17 @@ export function StudioLiveCollaborationPanel() {
     }
   }
 
+  function handleChatSubmit() {
+    const text = chatDraft.trim();
+    if (!text) return;
+    if (live.sendChatMessage(text)) {
+      setChatDraft("");
+      setChatNotice(null);
+      return;
+    }
+    setChatNotice("채팅 메시지를 보내지 못했습니다. 연결 상태를 확인해 주세요.");
+  }
+
   function handleStopViewer(viewerState: StudioScreenShareViewer) {
     const controller = screenControllerRef.current;
     if (!controller || busyAction) return;
@@ -603,6 +740,10 @@ export function StudioLiveCollaborationPanel() {
     <StudioLiveCollaborationPanelView
       availability={live.availability}
       busyAction={busyAction}
+      canChat={live.canChat}
+      chatDraft={chatDraft}
+      chatMessages={live.chatMessages}
+      chatNotice={chatNotice}
       error={screenError ?? live.error}
       mode={live.mode}
       peers={live.peers}
@@ -613,6 +754,11 @@ export function StudioLiveCollaborationPanel() {
       usingLocalFallback={live.usingLocalFallback}
       videoRef={videoRef}
       onApproveRequest={(request) => void handleApproveRequest(request)}
+      onChatDraftChange={(value) => {
+        setChatDraft(value);
+        if (chatNotice) setChatNotice(null);
+      }}
+      onChatSubmit={handleChatSubmit}
       onRejectRequest={handleRejectRequest}
       onStartShare={() => void handleStartShare()}
       onStopShare={() => screenControllerRef.current?.stopShare()}
