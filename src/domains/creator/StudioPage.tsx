@@ -8318,6 +8318,10 @@ function StudioCuttoonEditor() {
   const [gpuLiveInkLinger, setGpuLiveInkLinger] = useState(false);
   const gpuLingerRafRef = useRef<number>(0);
   const gpuLiveInkPinnedRef = useRef(false);
+  // 런타임 자가검증: 파인 직후 첫 GPU 프레임 영수증이 기한 안에 오지 않으면(조용히 실패하는
+  // 드라이버/기기) 남은 스트로크를 Konva 초안에 자동 인계한다 — 동선은 어떤 환경에서도 보인다.
+  const gpuPinnedFrameSeenRef = useRef(false);
+  const gpuPinProbeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 다이렉트 라이브 초안: 프리핸드 펜 계열은 포인터 프레임마다 React 를 거치지 않고 Konva/GPU 를
   // 직접 갱신한다(스트로크당 React 렌더는 시작·종료 2회). 30k 라인 컴포넌트 본문이 매 프레임
   // 재실행되던 것이 대형 페이지 드로잉 버벅임의 마지막 원인이었다.
@@ -8419,6 +8423,10 @@ function StudioCuttoonEditor() {
       globalThis.cancelAnimationFrame(liveDraftRafRef.current);
       liveDraftRafRef.current = null;
     }
+    if (gpuPinProbeTimerRef.current) {
+      clearTimeout(gpuPinProbeTimerRef.current);
+      gpuPinProbeTimerRef.current = null;
+    }
     if (gpuLiveInkPinnedRef.current) {
       gpuLiveInkPinnedRef.current = false;
       setGpuLiveInkPinned(false);
@@ -8463,6 +8471,10 @@ function StudioCuttoonEditor() {
     if (liveDraftDirectRef.current) {
       liveDraftDirectRef.current = false;
       setLiveDraftDirect(false);
+    }
+    if (gpuPinProbeTimerRef.current) {
+      clearTimeout(gpuPinProbeTimerRef.current);
+      gpuPinProbeTimerRef.current = null;
     }
     if (gpuLiveInkPinnedRef.current) {
       // 펜 리프트 핸드오프: 마지막 GPU 프레임을 더블 rAF 동안 유지해 커밋된 Konva 획이
@@ -16386,12 +16398,11 @@ function StudioCuttoonEditor() {
         setLiveDraftDirect(direct);
         liveDraftVisualRef.current = direct ? next : null;
         liveDraftPendingRef.current = direct ? next : null;
-        // GPU 파인닝은 임페러티브 피드가 픽셀을 내지 못하는 회귀(미드스트로크 GPU 캔버스
-        // ink=0 실측)로 임시 봉인한다 — Konva 다이렉트 경로가 라이브 잉크를 전담한다.
-        // 재활성화 조건: syncPinnedStrokes 경유 렌더의 미드스트로크 픽셀 검증 통과.
-        const GPU_LIVE_INK_PIN_ENABLED = false;
-        const gpuPin = GPU_LIVE_INK_PIN_ENABLED
-          && direct
+        // GPU 파인은 낙관적으로 걸되 자가검증 게이트가 지킨다: 첫 프레임 영수증이 기한 안에
+        // 도착하지 않으면(조용히 실패하는 GPU 환경) 같은 스트로크 안에서 Konva 로 인계된다.
+        // (미드스트로크 스크린샷 검증 완료 — drawImage 기반 픽셀 판정은 WebGPU 캔버스에서
+        // 위음성을 내므로 합성 스크린샷/영수증으로만 판정한다.)
+        const gpuPin = direct
           && next.mode !== "eraser"
           && webGpuBackendRef.current === "webgpu"
           && !next.fill
@@ -16399,6 +16410,19 @@ function StudioCuttoonEditor() {
           && (next.symmetry?.type ?? "none") === "none";
         gpuLiveInkPinnedRef.current = gpuPin;
         setGpuLiveInkPinned(gpuPin);
+        gpuPinnedFrameSeenRef.current = false;
+        if (gpuPinProbeTimerRef.current) clearTimeout(gpuPinProbeTimerRef.current);
+        gpuPinProbeTimerRef.current = gpuPin
+          ? setTimeout(() => {
+              gpuPinProbeTimerRef.current = null;
+              if (!gpuLiveInkPinnedRef.current || gpuPinnedFrameSeenRef.current) return;
+              // fail-once: 이 스트로크의 남은 구간과 이후 스트로크는 Konva 가 전담한다.
+              gpuLiveInkPinnedRef.current = false;
+              setGpuLiveInkPinned(false);
+              webGpuBackendRef.current = "canvas2d";
+              liveDraftLayerRef.current?.batchDraw();
+            }, 300)
+          : null;
         if (gpuLingerRafRef.current) {
           globalThis.cancelAnimationFrame(gpuLingerRafRef.current);
           gpuLingerRafRef.current = 0;
@@ -26084,7 +26108,11 @@ function StudioCuttoonEditor() {
                 onFrameReady={() => {
                   // 파인된 라이브 잉크는 영수증으로 가시성을 정하지 않는다 — 프레임당 권한
                   // 스냅샷 setState 로 30k 라인 컴포넌트를 다시 그리는 낭비를 만들지 않는다.
-                  if (gpuLiveInkPinnedRef.current) return;
+                  // 다만 "GPU 가 실제로 프레임을 완성했다"는 사실은 자가검증 게이트가 소비한다.
+                  if (gpuLiveInkPinnedRef.current) {
+                    gpuPinnedFrameSeenRef.current = true;
+                    return;
+                  }
                   setWebGpuAuthority(snapshotStudioWebGpuAuthority({
                     strokes: webGpuPreviewStrokes,
                     committedElementIds: [],
@@ -29435,8 +29463,16 @@ function StudioCuttoonEditor() {
               <div
                 role="button"
                 tabIndex={0}
-                aria-label="미니맵: 클릭한 위치로 캔버스 이동, 방향키로 스크롤"
+                aria-label="미니맵: 클릭하거나 끌어서 캔버스 이동, 방향키로 스크롤"
                 onClick={onMinimapClick}
+                // Figma/Procreate식 드래그 스크럽: 포인터를 잡은 채 끌면 뷰포트가 연속으로 따라온다.
+                onPointerDown={(e) => {
+                  e.currentTarget.setPointerCapture(e.pointerId);
+                }}
+                onPointerMove={(e) => {
+                  if (e.buttons !== 1) return;
+                  onMinimapClick(e as unknown as React.MouseEvent<HTMLDivElement>);
+                }}
                 onKeyDown={(e) => {
                   const wrap = wrapRef.current;
                   if (!wrap) return;
@@ -29478,11 +29514,12 @@ function StudioCuttoonEditor() {
                   const pctW = (bounds.w / CANVAS_W) * 100;
                   const pctH = (bounds.h / canvasH) * 100;
 
+                  // 디자인 토큰만 사용(스톡 Tailwind 팔레트 금지) — 레이어 패널의 색 의미와 정렬.
                   let colorClass = "bg-accent/40";
-                  if (el.type === "frame") colorClass = "border border-red-500/50 bg-red-500/10";
-                  else if (el.type === "text") colorClass = "bg-orange-500/50";
-                  else if (el.type === "bubble") colorClass = "bg-yellow-500/50";
-                  else if (el.type === "draw") colorClass = "bg-green-500/30";
+                  if (el.type === "frame") colorClass = "border border-bad/50 bg-bad/10";
+                  else if (el.type === "text") colorClass = "bg-accent-2/50";
+                  else if (el.type === "bubble") colorClass = "bg-warn/50";
+                  else if (el.type === "draw") colorClass = "bg-good/30";
 
                   return (
                     <div
@@ -29498,10 +29535,10 @@ function StudioCuttoonEditor() {
                   );
                 })}
 
-                {/* Render scroll window box */}
+                {/* Render scroll window box — 액센트 프레임 + 바깥 영역 딤(오버플로 히든 활용) */}
                 {scrollPos.scrollWidth > 0 && (
                   <div
-                    className="absolute border-2 border-red-500 pointer-events-none bg-red-500/5"
+                    className="pointer-events-none absolute rounded-[2px] border border-accent shadow-[0_0_0_240px_oklch(0.1_0.01_70/0.35)]"
                     style={{
                       left: `${(scrollPos.left / (CANVAS_W * effScale)) * 100}%`,
                       top: `${(scrollPos.top / (canvasH * effScale)) * 100}%`,

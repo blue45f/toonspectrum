@@ -5,6 +5,7 @@ import {
   studioBrushPreviewDashArray,
   studioBrushPreviewDotCenters,
   studioBrushPreviewPathD,
+  studioBrushPreviewRibbonD,
   studioBrushPreviewStrokeWidth,
 } from "./studio-brush-visual";
 
@@ -39,5 +40,39 @@ describe("studio brush commercial visuals", () => {
     expect(spray.length).toBeGreaterThan(3);
     expect(tone.length).toBeGreaterThan(spray.length);
     expect(studioBrushPreviewDotCenters("solid")).toHaveLength(0);
+  });
+
+  it("builds a closed pressure-taper ribbon that swells mid-stroke and thins at both ends", () => {
+    const ribbon = studioBrushPreviewRibbonD("solid", 36, 16, 0.9);
+    expect(ribbon).toBeTruthy();
+    expect(ribbon!.startsWith("M")).toBe(true);
+    expect(ribbon!.endsWith("Z")).toBe(true);
+    // 좌표를 되읽어 리본 반폭(상·하 경계 거리)의 형태를 검증한다: 양 끝이 가늘고 중간이 최대.
+    const coords = ribbon!
+      .replace(/[MLZ]/g, " ")
+      .trim()
+      .split(/\s+/)
+      .map(Number);
+    const pointCount = coords.length / 2;
+    const half = pointCount / 2;
+    const widthAt = (index: number) => {
+      const ux = coords[index * 2]!;
+      const uy = coords[index * 2 + 1]!;
+      // lower 배열은 역순 — 같은 t 의 짝은 반대편 끝에서 센다.
+      const lx = coords[(pointCount - 1 - index) * 2]!;
+      const ly = coords[(pointCount - 1 - index) * 2 + 1]!;
+      return Math.hypot(ux - lx, uy - ly);
+    };
+    const startWidth = widthAt(0);
+    const midWidth = widthAt(Math.floor(half / 2));
+    const endWidth = widthAt(Math.floor(half) - 1);
+    expect(midWidth).toBeGreaterThan(startWidth * 1.5);
+    expect(midWidth).toBeGreaterThan(endWidth * 1.5);
+    // 칼리그래피는 고정 촉 — 폭이 거의 일정하다.
+    const chisel = studioBrushPreviewRibbonD("calligraphy", 36, 16, 0.9);
+    expect(chisel).toBeTruthy();
+    // 리본 미지원 스타일은 기존 스트로크 프리뷰를 유지한다.
+    expect(studioBrushPreviewRibbonD("soft")).toBeNull();
+    expect(studioBrushPreviewRibbonD("dots")).toBeNull();
   });
 });

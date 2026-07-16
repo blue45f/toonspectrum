@@ -21,6 +21,7 @@ import {
   studioBrushPreviewDashArray,
   studioBrushPreviewDotCenters,
   studioBrushPreviewPathD,
+  studioBrushPreviewRibbonD,
   studioBrushPreviewStrokeWidth,
 } from "./studio-brush-visual";
 import {
@@ -73,6 +74,13 @@ function BrushPreviewGlyph({
   const pathD = studioBrushPreviewPathD(item.previewStyle, PREVIEW_W, PREVIEW_H);
   const dash = studioBrushPreviewDashArray(item.previewStyle);
   const dots = studioBrushPreviewDotCenters(item.previewStyle, PREVIEW_W, PREVIEW_H);
+  // 필압 테이퍼 리본: 균일 선 아이콘 대신 실제 획감(얇게 시작→부풀고→빠짐)을 보여준다.
+  const ribbonD = studioBrushPreviewRibbonD(
+    item.previewStyle,
+    PREVIEW_W,
+    PREVIEW_H,
+    item.previewWeight
+  );
   const ink = active ? "currentColor" : surface.ink;
   const glow = item.previewStyle === "neon" || item.previewStyle === "glow";
 
@@ -147,16 +155,20 @@ function BrushPreviewGlyph({
               transform="translate(0 1.2)"
             />
           )}
-          <path
-            d={pathD}
-            fill="none"
-            stroke={ink}
-            strokeWidth={strokeW}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeDasharray={dash}
-            opacity={active ? 0.98 : 0.88}
-          />
+          {ribbonD ? (
+            <path d={ribbonD} fill={ink} opacity={active ? 0.98 : 0.88} />
+          ) : (
+            <path
+              d={pathD}
+              fill="none"
+              stroke={ink}
+              strokeWidth={strokeW}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeDasharray={dash}
+              opacity={active ? 0.98 : 0.88}
+            />
+          )}
         </>
       )}
     </svg>
