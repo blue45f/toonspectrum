@@ -41,6 +41,19 @@ export interface StudioWebGpuCanvasProps extends StudioGpuViewTransform {
   readonly strokes?: readonly StudioGpuStroke[];
   /** Must match the parent's authoritative-canvas handoff state for an atomic show/hide commit. */
   readonly frameAuthorized?: boolean;
+  /**
+   * Stroke-scoped live-ink pinning: while true, presentation does not wait for per-frame
+   * receipts. A trailing frame only ever shows a valid prefix of the pinned stroke, so the
+   * overlay may lag input by a frame but can never alternate with the Konva draft. Receipts
+   * remain the sole authority for readback capture and committed handoff.
+   */
+  readonly pinnedVisible?: boolean;
+  /**
+   * Initialize the GPU device on mount instead of on the first non-empty stroke feed, so the
+   * backend is already resolved when the first stroke starts (live-ink pinning decides its
+   * renderer at stroke start and never mid-stroke).
+   */
+  readonly eagerInitialize?: boolean;
   readonly onBackendChange?: (backend: StudioGpuBackend) => void;
   readonly onDeviceLost?: (info: GPUDeviceLostInfo) => void;
   /** A matching receipt is the only safe signal for hiding the authoritative Konva preview. */
@@ -114,6 +127,8 @@ function StudioWebGpuCanvas({
   surfaceBounds,
   strokes = EMPTY_STROKES,
   frameAuthorized = false,
+  pinnedVisible = false,
+  eagerInitialize = false,
   scaleX,
   scaleY,
   offsetX,
@@ -125,6 +140,9 @@ function StudioWebGpuCanvas({
   onFrameInvalid,
 }: StudioWebGpuCanvasProps, ref) {
   const rootRef = useRef<HTMLDivElement>(null);
+  // Mount-time decision by contract: toggling eager initialization after mount has no meaning
+  // (the device either already initialized or will on the first stroke feed).
+  const eagerInitializeRef = useRef(eagerInitialize);
   const gpuCanvasRef = useRef<HTMLCanvasElement>(null);
   const fallbackCanvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<StudioWebGpuEngine | null>(null);
@@ -248,6 +266,23 @@ function StudioWebGpuCanvas({
     issueLatestRequestRef.current = issueLatestRequest;
     issueLatestRequest();
 
+    // Live-ink pinning decides its renderer at stroke start; resolving the backend at mount keeps
+    // the very first stroke of a session from silently landing on the not-yet-initialized path.
+    if (eagerInitializeRef.current && !initializationRequested) {
+      initializationRequested = true;
+      void engine.initialize().then(() => {
+        if (!mounted || engineRef.current !== engine) return;
+        const current = latestRef.current;
+        routeStudioWebGpuCanvasRequest({
+          engine,
+          strokes: current.strokes,
+          requestId: desiredRequestIdRef.current,
+          syncViewport,
+          requestInitialization: () => undefined,
+        });
+      });
+    }
+
     const resizeObserver = typeof ResizeObserver === "undefined"
       ? null
       : new ResizeObserver((entries) => {
@@ -296,7 +331,7 @@ function StudioWebGpuCanvas({
       className={cn(
         "overflow-hidden",
         surfaceBounds ? "absolute" : "relative h-full w-full",
-        (!frameAuthorized || !presentationActive) && "invisible",
+        ((!frameAuthorized && !pinnedVisible) || !presentationActive) && "invisible",
         className
       )}
       style={surfaceBounds ? {
@@ -309,6 +344,7 @@ function StudioWebGpuCanvas({
       data-studio-gpu-active={presentationActive ? "true" : "false"}
       data-studio-gpu-readback="disabled"
       data-studio-gpu-frame-authorized={frameAuthorized ? "true" : "false"}
+      data-studio-gpu-pinned={pinnedVisible ? "true" : "false"}
       data-studio-gpu-surface-width={surfaceBounds?.width}
       data-studio-gpu-surface-height={surfaceBounds?.height}
     >

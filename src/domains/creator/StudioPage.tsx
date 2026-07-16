@@ -1110,6 +1110,7 @@ import type { StudioStockImageCredit, StudioStockPhoto } from "./studio-stock-im
 import type { Stylize } from "./studio-stylize";
 import type { SvgExportEl, SvgExportResult } from "./studio-svg-export";
 import type { Vibrance } from "./studio-vibrance";
+import type { StudioGpuBackend } from "./studio-webgpu-engine";
 import type { StudioGpuStroke } from "./studio-webgpu-stroke";
 import type {
   StudioAssetMenuPanelProps,
@@ -8168,6 +8169,13 @@ function StudioCuttoonEditor() {
   const brushCursorRef = useRef<Konva.Circle>(null);
   const [draft, setDraft] = useState<DrawEl | null>(null);
   const [webGpuAuthority, setWebGpuAuthority] = useState<StudioWebGpuAuthorityFrame | null>(null);
+  // 라이브 잉크 파인닝: 스트로크 시작 시점의 백엔드로 렌더러를 한 번 결정한다(중도 교대 금지).
+  const [webGpuBackend, setWebGpuBackend] = useState<StudioGpuBackend | null>(null);
+  // 펜 리프트 핸드오프: 커밋된 Konva 획이 페인트될 때까지(더블 rAF) 마지막 GPU 프레임을 유지한다.
+  const [gpuLingerStrokes, setGpuLingerStrokes] = useState<readonly StudioGpuStroke[] | null>(null);
+  const lastGpuLiveInkStrokesRef = useRef<readonly StudioGpuStroke[] | null>(null);
+  const gpuLingerRafRef = useRef<number>(0);
+  const gpuLiveInkPinnedRef = useRef(false);
   const [studioRasterHandoffCandidate, setStudioRasterHandoffCandidate] =
     useState<StudioRasterHandoffCandidate | null>(null);
   const studioRasterHandoffCandidateRef = useRef<StudioRasterHandoffCandidate | null>(null);
@@ -19768,15 +19776,77 @@ function StudioCuttoonEditor() {
     );
     return { ...draft, points: [...smoothedHead, ...draft.points.slice(headCount * 2)] };
   })();
-  // G10b single-renderer live ink: the retained WebGPU compositor stays mounted so device-loss,
-  // resize and viewport lifecycles keep exercising the real pipeline, but the live freehand
-  // draft is never fed to it. The async authority round-trip (every appended point invalidates,
-  // the GPU re-authorizes one or more frames later) alternated draft ownership between this
-  // overlay and the Konva draft node each frame — users saw the stroke flash mid-stroke and at
-  // pen lift, and the two rasterizers differ in antialiasing so even clean handoffs pulsed.
-  // Konva is the sole live-ink renderer until committed-surface parity lands (see
-  // docs/studio-crdt-webgpu-architecture-2026-07-16.md).
-  const webGpuPreviewStrokes: readonly StudioGpuStroke[] = EMPTY_STUDIO_GPU_STROKES;
+  // G10b stroke-pinned live ink: 렌더러 소유권은 스트로크 시작에 한 번 결정된다. WebGPU 백엔드가
+  // 이미 준비된 경우 라이브 획은 GPU 오버레이가 전담하고 Konva 초안은 마운트하지 않는다 —
+  // 가시성이 프레임 영수증을 기다리지 않으므로(영수증은 캡처/커밋 핸드오프 전용) 예전의
+  // 프레임 단위 소유권 교대(선 번쩍임)가 구조적으로 불가능하다. GPU 프레임은 입력보다 1프레임
+  // 늦을 수 있지만 항상 획의 유효한 접두사만 보여준다. 디바이스 손실/백엔드 강등은 fail-once:
+  // 남은 스트로크는 Konva 초안이 즉시 이어받고 되돌아가지 않는다.
+  const gpuLiveInkEligible = webGpuBackend === "webgpu"
+    && draftForRender !== null
+    && !isolatedDynamicDraft
+    && draftForRender.mode !== "eraser"
+    && (draftForRender.kind ?? "freehand") === "freehand"
+    && resolveStudioBrushRenderFamily(draftForRender.brush ?? "pen") === "pen"
+    && (draftForRender.opacity ?? 1) >= 0.999
+    && (draftForRender.symmetry?.type ?? "none") === "none";
+  const gpuLiveInkStroke: StudioGpuStroke | null = gpuLiveInkEligible && draftForRender
+    ? (() => {
+        const points = processFreehandPoints(
+          draftForRender.points,
+          strokeRenderDistance(draftForRender.sampleSpacing)
+        );
+        return {
+          id: draftForRender.id,
+          points,
+          pressures: resampleStrokePressures(
+            draftForRender.pressures ?? [],
+            Math.floor(points.length / 2),
+            0.5
+          ),
+          color: draftForRender.stroke,
+          size: Math.max(1, draftForRender.strokeWidth),
+          opacity: draftForRender.opacity,
+          composite: "normal" as const,
+        };
+      })()
+    : null;
+  const gpuLiveInkActive = gpuLiveInkStroke !== null;
+  const webGpuPreviewStrokes: readonly StudioGpuStroke[] = gpuLiveInkStroke
+    ? [gpuLiveInkStroke]
+    : gpuLingerStrokes ?? EMPTY_STUDIO_GPU_STROKES;
+  const gpuLiveInkVisible = gpuLiveInkActive || gpuLingerStrokes !== null;
+  // 펜 리프트의 빈 프레임 방지: 커밋 렌더(초안 소멸)와 같은 커밋 페이즈에서 마지막 GPU 획을
+  // 린저 상태로 승격해 페인트 전에 다시 렌더한다(useLayoutEffect 의 동기 재렌더 보장). 이후
+  // 더블 rAF — 커밋된 Konva 획의 batchDraw 가 확실히 화면에 나온 뒤 — 오버레이를 내린다.
+  useLayoutEffect(() => {
+    gpuLiveInkPinnedRef.current = gpuLiveInkActive;
+    if (gpuLiveInkStroke) {
+      lastGpuLiveInkStrokesRef.current = [gpuLiveInkStroke];
+      if (gpuLingerRafRef.current) {
+        cancelAnimationFrame(gpuLingerRafRef.current);
+        gpuLingerRafRef.current = 0;
+      }
+      setGpuLingerStrokes((prev) => (prev === null ? prev : null));
+      return;
+    }
+    const last = lastGpuLiveInkStrokesRef.current;
+    if (!last) return;
+    lastGpuLiveInkStrokesRef.current = null;
+    setGpuLingerStrokes(last);
+    gpuLingerRafRef.current = requestAnimationFrame(() => {
+      gpuLingerRafRef.current = requestAnimationFrame(() => {
+        gpuLingerRafRef.current = 0;
+        setGpuLingerStrokes(null);
+      });
+    });
+    return () => {
+      if (gpuLingerRafRef.current) {
+        cancelAnimationFrame(gpuLingerRafRef.current);
+        gpuLingerRafRef.current = 0;
+      }
+    };
+  }, [gpuLiveInkActive, gpuLiveInkStroke]);
   const webGpuViewportSurface = planStudioWebGpuViewportSurface({
     documentWidth: CANVAS_W,
     documentHeight: canvasH,
@@ -25055,7 +25125,7 @@ function StudioCuttoonEditor() {
                 레이어의 모든 커밋 요소(세그먼트 압력 획·수채 dab 등)를 재래스터하지 않는다.
                 일반 획은 source-over 단일 노드라 별도 캔버스에서 합성해도 시각 결과가 같다.
                 지우개(destination-out)만 위의 메인 레이어 경로를 쓴다. */}
-            {draft && !isolatedDynamicDraft && draft.mode !== "eraser" && (
+            {draft && !isolatedDynamicDraft && draft.mode !== "eraser" && !gpuLiveInkActive && (
               <Layer listening={false}>
                 <StudioDrawNode el={draftForRender ?? draft} />
               </Layer>
@@ -25678,8 +25748,15 @@ function StudioCuttoonEditor() {
                 flipX={webGpuViewportSurface.transform.flipX}
                 strokes={webGpuPreviewStrokes}
                 frameAuthorized={webGpuPreviewAuthorized}
+                pinnedVisible={gpuLiveInkVisible}
+                eagerInitialize
+                onBackendChange={setWebGpuBackend}
+                onDeviceLost={() => setWebGpuBackend("canvas2d")}
                 onFrameInvalid={() => setWebGpuAuthority(null)}
                 onFrameReady={() => {
+                  // 파인된 라이브 잉크는 영수증으로 가시성을 정하지 않는다 — 프레임당 권한
+                  // 스냅샷 setState 로 30k 라인 컴포넌트를 다시 그리는 낭비를 만들지 않는다.
+                  if (gpuLiveInkPinnedRef.current) return;
                   setWebGpuAuthority(snapshotStudioWebGpuAuthority({
                     strokes: webGpuPreviewStrokes,
                     committedElementIds: [],
