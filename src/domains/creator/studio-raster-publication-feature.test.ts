@@ -47,6 +47,7 @@ describe("automatic raster publication feature gate", () => {
     expect(source).toContain("authorizedAuthorityKey={studioRasterAuthorizedAuthorityKey}");
     expect(source).toContain("revokeStudioRasterHandoffRef.current()");
     expect(source.match(/readStudioAuthoritativeStageFrame\(\{/gu)).toHaveLength(3);
-    expect(source).toMatch(/marqueeRect\s*!==\s*null\s*\|\|\s*userGuides\.length\s*>\s*0/u);
+    // 마퀴 프리뷰는 임페러티브 Konva Rect 로 옮겨졌고, 게이트는 저빈도 활성 불리언만 본다.
+    expect(source).toMatch(/marqueeActive\s*\|\|\s*userGuides\.length\s*>\s*0/u);
   });
 });

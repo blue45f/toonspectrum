@@ -32,9 +32,11 @@ export const STUDIO_BRUSH_ICON_BY_ID: Readonly<Record<string, StudioBrushIconId>
   ballpoint: "pen",
   gpen: "pen-line",
   liner: "pen-line",
+  "ink-brush": "paintbrush",
   calligraphy: "a-large-small",
   pencil: "pencil",
   "soft-pencil": "pencil",
+  "pencil-grain": "pencil",
   // Marker
   marker: "highlighter",
   "felt-tip": "highlighter",
@@ -52,6 +54,8 @@ export const STUDIO_BRUSH_ICON_BY_ID: Readonly<Record<string, StudioBrushIconId>
   "ink-wash": "droplets",
   oil: "paintbrush",
   airbrush: "wind",
+  "airbrush-fine": "wind",
+  "wash-brush": "droplets",
   "soft-brush": "brush",
   spray: "spray-can",
   // Texture
