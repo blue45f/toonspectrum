@@ -114,6 +114,20 @@ describe("studio chrome UI", () => {
     expect(html).toContain("펜");
   });
 
+  it("offers motion-coach intent targets on mobile dock controls", () => {
+    const html = renderToStaticMarkup(
+      <StudioDockButton
+        icon={Pencil}
+        label="펜"
+        hintShortcut="B"
+        hintDescription="필압과 보정이 적용되는 자유선을 그립니다."
+      />
+    );
+    expect(html).toContain('data-studio-tool-hint-target="true"');
+    expect(html).toContain("min-w-0 flex-1");
+    expect(html).toContain("min-h-11");
+  });
+
   it("renders Magma-style vertical tool rail, quick actions, and status bar", () => {
     const html = renderToStaticMarkup(
       <>

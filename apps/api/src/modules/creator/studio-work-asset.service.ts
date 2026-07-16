@@ -1,0 +1,655 @@
+import { createHash } from "node:crypto";
+
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  PayloadTooLargeException,
+} from "@nestjs/common";
+
+import {
+  parseStudioWorkAssetDescriptor,
+  isStudioWorkAssetAdmissionOptedIn,
+  STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK,
+  STUDIO_WORK_ASSET_MAX_BYTES_BY_TYPE,
+  STUDIO_WORK_ASSET_MAX_IMAGE_AXIS,
+  STUDIO_WORK_ASSET_MAX_IMAGE_DECODED_BYTES,
+  STUDIO_WORK_ASSET_MAX_IMAGE_PIXELS,
+  StudioWorkAssetManifestSchema,
+  StudioWorkAssetReferenceSchema,
+} from "../../../../../lib/studio-work-asset-contract";
+
+import {
+  STUDIO_WORK_ASSET_REPOSITORY,
+  StudioWorkAssetCleanupOwnershipError,
+  StudioWorkAssetForbiddenError,
+  StudioWorkAssetImmutableConflictError,
+  StudioWorkAssetNotFoundError,
+  StudioWorkAssetQuotaError,
+  StudioWorkAssetReferencedError,
+  StudioWorkAssetTypeConflictError,
+} from "./studio-work-asset.repository";
+
+import type { DrizzleStudioCrdtTransaction } from "./studio-crdt.repository";
+import type {
+  StudioWorkAssetContent,
+  StudioWorkAssetRepository,
+} from "./studio-work-asset.repository";
+import type {
+  StudioWorkAssetDescriptor,
+  StudioWorkAssetManifest,
+  StudioWorkAssetIntrinsicImage,
+  StudioWorkAssetReference,
+  StudioWorkAssetType,
+} from "../../../../../lib/studio-work-asset-contract";
+
+const GLB_HEADER_BYTES = 12;
+const GLB_CHUNK_HEADER_BYTES = 8;
+const GLB_MAGIC = 0x46546c67;
+const GLB_VERSION = 2;
+const GLB_JSON_CHUNK = 0x4e4f534a;
+const GLB_BIN_CHUNK = 0x004e4942;
+const GLB_MAX_JSON_BYTES = 2 * 1024 * 1024;
+
+const IMAGE_MIME_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+]);
+const GLB_UPLOAD_MIME_TYPES = new Set([
+  "model/gltf-binary",
+  "application/octet-stream",
+  "application/vrm",
+  "model/vrm",
+]);
+const JPEG_START_OF_FRAME_MARKERS = new Set([
+  0xc0, 0xc1, 0xc2, 0xc3,
+  0xc5, 0xc6, 0xc7,
+  0xc9, 0xca, 0xcb,
+  0xcd, 0xce, 0xcf,
+]);
+
+export interface StudioWorkAssetUploadFile {
+  buffer: Buffer;
+  mimetype: string;
+  size: number;
+}
+
+export interface AdmittedStudioWorkAssetPayload {
+  mimeType: StudioWorkAssetManifest["mimeType"];
+  payload: Uint8Array;
+  sha256: string;
+  intrinsicImage: StudioWorkAssetIntrinsicImage | null;
+}
+
+function bytesEqual(bytes: Uint8Array, offset: number, expected: readonly number[]): boolean {
+  return expected.every((value, index) => bytes[offset + index] === value);
+}
+
+type SniffedImageMime = Extract<StudioWorkAssetManifest["mimeType"], `image/${string}`> | "image/gif";
+
+function sniffImageMime(bytes: Uint8Array): SniffedImageMime | null {
+  if (bytesEqual(bytes, 0, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) {
+    return "image/png";
+  }
+  if (bytesEqual(bytes, 0, [0xff, 0xd8, 0xff])) return "image/jpeg";
+  if (
+    bytesEqual(bytes, 0, [0x52, 0x49, 0x46, 0x46]) &&
+    bytesEqual(bytes, 8, [0x57, 0x45, 0x42, 0x50])
+  ) {
+    return "image/webp";
+  }
+  if (
+    bytesEqual(bytes, 0, [0x47, 0x49, 0x46, 0x38, 0x37, 0x61]) ||
+    bytesEqual(bytes, 0, [0x47, 0x49, 0x46, 0x38, 0x39, 0x61])
+  ) {
+    return "image/gif";
+  }
+  return null;
+}
+
+export interface StudioWorkAssetImageDimensions {
+  width: number;
+  height: number;
+}
+
+function checkedImageDimensions(width: number, height: number): StudioWorkAssetImageDimensions {
+  if (
+    !Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0 ||
+    width > STUDIO_WORK_ASSET_MAX_IMAGE_AXIS || height > STUDIO_WORK_ASSET_MAX_IMAGE_AXIS ||
+    width * height > STUDIO_WORK_ASSET_MAX_IMAGE_PIXELS
+  ) {
+    throw new Error(
+      `이미지는 한 변 ${STUDIO_WORK_ASSET_MAX_IMAGE_AXIS.toLocaleString("en-US")}px, ` +
+      `총 ${Math.floor(STUDIO_WORK_ASSET_MAX_IMAGE_PIXELS / 1024 / 1024)}MP 이하만 사용할 수 있습니다.`
+    );
+  }
+  return { width, height };
+}
+
+function intrinsicImageFrom(
+  dimensions: StudioWorkAssetImageDimensions
+): StudioWorkAssetIntrinsicImage {
+  const decodedRgbaBytes = dimensions.width * dimensions.height * 4;
+  if (
+    !Number.isSafeInteger(decodedRgbaBytes) ||
+    decodedRgbaBytes > STUDIO_WORK_ASSET_MAX_IMAGE_DECODED_BYTES
+  ) {
+    throw new Error("이미지 RGBA 디코드 크기가 안전 한도를 넘었습니다.");
+  }
+  return { ...dimensions, decodedRgbaBytes };
+}
+
+function chunkName(bytes: Uint8Array, offset: number): string {
+  return String.fromCharCode(
+    bytes[offset] ?? 0,
+    bytes[offset + 1] ?? 0,
+    bytes[offset + 2] ?? 0,
+    bytes[offset + 3] ?? 0
+  );
+}
+
+function assertStaticPng(bytes: Uint8Array): void {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let offset = 8;
+  let chunkIndex = 0;
+  let ended = false;
+  while (offset < bytes.byteLength) {
+    if (bytes.byteLength - offset < 12) throw new Error("PNG 내부 블록이 잘렸습니다.");
+    const length = view.getUint32(offset, false);
+    const typeOffset = offset + 4;
+    const type = chunkName(bytes, typeOffset);
+    const chunkEnd = typeOffset + 4 + length + 4;
+    if (!Number.isSafeInteger(chunkEnd) || chunkEnd > bytes.byteLength) {
+      throw new Error("PNG 내부 블록 경계가 올바르지 않습니다.");
+    }
+    if (chunkIndex === 0 && (type !== "IHDR" || length !== 13)) {
+      throw new Error("PNG IHDR 헤더가 올바르지 않습니다.");
+    }
+    if (type === "acTL") {
+      throw new Error("움직이는 APNG는 협업 에셋으로 사용할 수 없습니다. 정적 PNG로 변환해 주세요.");
+    }
+    if (type === "IEND") {
+      if (length !== 0 || chunkEnd !== bytes.byteLength) {
+        throw new Error("PNG 종료 블록이 올바르지 않습니다.");
+      }
+      ended = true;
+      break;
+    }
+    offset = chunkEnd;
+    chunkIndex += 1;
+  }
+  if (!ended) throw new Error("PNG 종료 블록을 찾을 수 없습니다.");
+}
+
+function assertStaticWebp(bytes: Uint8Array): void {
+  if (bytes.byteLength < 20) throw new Error("WebP 헤더가 잘렸습니다.");
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const declaredLength = view.getUint32(4, true) + 8;
+  if (declaredLength !== bytes.byteLength) throw new Error("WebP 파일 길이가 올바르지 않습니다.");
+  let offset = 12;
+  while (offset < bytes.byteLength) {
+    if (bytes.byteLength - offset < 8) throw new Error("WebP 내부 블록이 잘렸습니다.");
+    const type = chunkName(bytes, offset);
+    const length = view.getUint32(offset + 4, true);
+    const chunkEnd = offset + 8 + length + (length % 2);
+    if (!Number.isSafeInteger(chunkEnd) || chunkEnd > bytes.byteLength) {
+      throw new Error("WebP 내부 블록 경계가 올바르지 않습니다.");
+    }
+    if (
+      type === "ANIM" || type === "ANMF" ||
+      (type === "VP8X" && length >= 1 && ((bytes[offset + 8] ?? 0) & 0x02) !== 0)
+    ) {
+      throw new Error("움직이는 WebP는 협업 에셋으로 사용할 수 없습니다. 정적 이미지로 변환해 주세요.");
+    }
+    offset = chunkEnd;
+  }
+  if (offset !== bytes.byteLength) throw new Error("WebP 내부 블록 경계가 올바르지 않습니다.");
+}
+
+function jpegDimensions(bytes: Uint8Array): StudioWorkAssetImageDimensions {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let offset = 2;
+  while (offset < bytes.byteLength) {
+    if (bytes[offset] !== 0xff) throw new Error("JPEG 헤더가 올바르지 않습니다.");
+    while (offset < bytes.byteLength && bytes[offset] === 0xff) offset += 1;
+    if (offset >= bytes.byteLength) break;
+    const marker = bytes[offset++]!;
+    if (marker === 0x00) throw new Error("JPEG 헤더가 올바르지 않습니다.");
+    if (marker === 0xd9 || marker === 0xda) break;
+    if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) continue;
+    if (offset + 2 > bytes.byteLength) break;
+    const segmentLength = view.getUint16(offset, false);
+    if (segmentLength < 2 || offset + segmentLength > bytes.byteLength) {
+      throw new Error("JPEG 헤더가 잘렸습니다.");
+    }
+    if (JPEG_START_OF_FRAME_MARKERS.has(marker)) {
+      if (segmentLength < 7) throw new Error("JPEG 크기 헤더가 올바르지 않습니다.");
+      return checkedImageDimensions(
+        view.getUint16(offset + 5, false),
+        view.getUint16(offset + 3, false)
+      );
+    }
+    offset += segmentLength;
+  }
+  throw new Error("JPEG 크기 헤더를 찾을 수 없습니다.");
+}
+
+function webpDimensions(bytes: Uint8Array): StudioWorkAssetImageDimensions {
+  if (bytes.byteLength < 20) throw new Error("WebP 헤더가 잘렸습니다.");
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const declaredLength = view.getUint32(4, true) + 8;
+  const chunkLength = view.getUint32(16, true);
+  if (
+    declaredLength < 20 || declaredLength > bytes.byteLength ||
+    chunkLength > declaredLength - 20
+  ) {
+    throw new Error("WebP 파일 길이가 올바르지 않습니다.");
+  }
+  if (bytesEqual(bytes, 12, [0x56, 0x50, 0x38, 0x58])) {
+    if (chunkLength < 10 || bytes.byteLength < 30) throw new Error("WebP VP8X 헤더가 잘렸습니다.");
+    const width = 1 + bytes[24]! + (bytes[25]! << 8) + (bytes[26]! << 16);
+    const height = 1 + bytes[27]! + (bytes[28]! << 8) + (bytes[29]! << 16);
+    return checkedImageDimensions(width, height);
+  }
+  if (bytesEqual(bytes, 12, [0x56, 0x50, 0x38, 0x20])) {
+    if (
+      chunkLength < 10 || bytes.byteLength < 30 ||
+      !bytesEqual(bytes, 23, [0x9d, 0x01, 0x2a])
+    ) {
+      throw new Error("WebP VP8 헤더가 올바르지 않습니다.");
+    }
+    return checkedImageDimensions(
+      view.getUint16(26, true) & 0x3fff,
+      view.getUint16(28, true) & 0x3fff
+    );
+  }
+  if (bytesEqual(bytes, 12, [0x56, 0x50, 0x38, 0x4c])) {
+    if (chunkLength < 5 || bytes.byteLength < 25 || bytes[20] !== 0x2f) {
+      throw new Error("WebP VP8L 헤더가 올바르지 않습니다.");
+    }
+    const width = 1 + bytes[21]! + ((bytes[22]! & 0x3f) << 8);
+    const height = 1 + ((bytes[22]! & 0xc0) >> 6) + (bytes[23]! << 2) +
+      ((bytes[24]! & 0x0f) << 10);
+    return checkedImageDimensions(width, height);
+  }
+  throw new Error("지원하지 않는 WebP 이미지 헤더입니다.");
+}
+
+export function readStudioWorkAssetImageDimensions(
+  mimeType: Extract<StudioWorkAssetManifest["mimeType"], `image/${string}`>,
+  bytes: Uint8Array
+): StudioWorkAssetImageDimensions {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (mimeType === "image/png") {
+    if (
+      bytes.byteLength < 33 || view.getUint32(8, false) !== 13 ||
+      !bytesEqual(bytes, 12, [0x49, 0x48, 0x44, 0x52])
+    ) {
+      throw new Error("PNG IHDR 헤더가 잘렸거나 올바르지 않습니다.");
+    }
+    assertStaticPng(bytes);
+    return checkedImageDimensions(view.getUint32(16, false), view.getUint32(20, false));
+  }
+  if (mimeType === "image/jpeg") return jpegDimensions(bytes);
+  if (mimeType === "image/webp") {
+    assertStaticWebp(bytes);
+    return webpDimensions(bytes);
+  }
+  throw new Error("지원하지 않는 이미지 형식입니다.");
+}
+
+function plainRecord(value: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function parseGlbJson(bytes: Uint8Array): Record<string, unknown> {
+  if (bytes.byteLength < GLB_HEADER_BYTES + GLB_CHUNK_HEADER_BYTES) {
+    throw new Error("3D 에셋 파일이 완전하지 않습니다.");
+  }
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (view.getUint32(0, true) !== GLB_MAGIC || view.getUint32(4, true) !== GLB_VERSION) {
+    throw new Error("GLB 2.0 형식만 사용할 수 있습니다.");
+  }
+  if (view.getUint32(8, true) !== bytes.byteLength) {
+    throw new Error("3D 에셋의 선언 길이와 실제 크기가 다릅니다.");
+  }
+  let chunkOffset = GLB_HEADER_BYTES;
+  let jsonChunks = 0;
+  let binaryChunks = 0;
+  while (chunkOffset < bytes.byteLength) {
+    if (bytes.byteLength - chunkOffset < GLB_CHUNK_HEADER_BYTES) {
+      throw new Error("3D 에셋 내부 블록이 완전하지 않습니다.");
+    }
+    const chunkLength = view.getUint32(chunkOffset, true);
+    const chunkType = view.getUint32(chunkOffset + 4, true);
+    const chunkEnd = chunkOffset + GLB_CHUNK_HEADER_BYTES + chunkLength;
+    if (chunkLength % 4 !== 0 || chunkEnd > bytes.byteLength) {
+      throw new Error("3D 에셋 내부 블록 경계가 올바르지 않습니다.");
+    }
+    if (chunkType === GLB_JSON_CHUNK) jsonChunks += 1;
+    else if (chunkType === GLB_BIN_CHUNK) binaryChunks += 1;
+    else throw new Error("지원하지 않는 3D 에셋 내부 블록이 있습니다.");
+    if (
+      jsonChunks > 1 ||
+      binaryChunks > 1 ||
+      (chunkOffset === GLB_HEADER_BYTES && chunkType !== GLB_JSON_CHUNK)
+    ) {
+      throw new Error("3D 에셋 내부 블록 구성이 올바르지 않습니다.");
+    }
+    chunkOffset = chunkEnd;
+  }
+  if (chunkOffset !== bytes.byteLength || jsonChunks !== 1) {
+    throw new Error("3D 에셋 장면 블록이 없습니다.");
+  }
+  const jsonLength = view.getUint32(GLB_HEADER_BYTES, true);
+  const jsonType = view.getUint32(GLB_HEADER_BYTES + 4, true);
+  if (
+    jsonType !== GLB_JSON_CHUNK ||
+    jsonLength < 2 ||
+    jsonLength > GLB_MAX_JSON_BYTES ||
+    GLB_HEADER_BYTES + GLB_CHUNK_HEADER_BYTES + jsonLength > bytes.byteLength
+  ) {
+    throw new Error("3D 에셋 장면 설명이 올바르지 않습니다.");
+  }
+  let decoded: string;
+  try {
+    decoded = new TextDecoder("utf-8", { fatal: true })
+      .decode(bytes.subarray(GLB_HEADER_BYTES + GLB_CHUNK_HEADER_BYTES, GLB_HEADER_BYTES + GLB_CHUNK_HEADER_BYTES + jsonLength));
+    let contentEnd = decoded.length;
+    while (contentEnd > 0) {
+      const code = decoded.charCodeAt(contentEnd - 1);
+      if (code !== 0 && code !== 32) break;
+      contentEnd -= 1;
+    }
+    decoded = decoded.slice(0, contentEnd);
+  } catch {
+    throw new Error("3D 에셋 장면 설명의 인코딩이 올바르지 않습니다.");
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(decoded);
+  } catch {
+    throw new Error("3D 에셋 장면 설명을 해석할 수 없습니다.");
+  }
+  if (!plainRecord(parsed) || !plainRecord(parsed.asset) || parsed.asset.version !== "2.0") {
+    throw new Error("GLB 2.0 장면 정보가 없습니다.");
+  }
+  for (const collectionName of ["buffers", "images"] as const) {
+    const collection = parsed[collectionName];
+    if (!Array.isArray(collection)) continue;
+    if (collection.some((entry) => plainRecord(entry) && typeof entry.uri === "string")) {
+      throw new Error("외부 리소스를 참조하는 3D 에셋은 사용할 수 없습니다.");
+    }
+  }
+  return parsed;
+}
+
+function isVrmDocument(document: Record<string, unknown>): boolean {
+  const extensionsUsed = Array.isArray(document.extensionsUsed)
+    ? document.extensionsUsed.filter((value): value is string => typeof value === "string")
+    : [];
+  const extensions = plainRecord(document.extensions) ? document.extensions : {};
+  return (
+    extensionsUsed.includes("VRM") ||
+    extensionsUsed.includes("VRMC_vrm") ||
+    Object.hasOwn(extensions, "VRM") ||
+    Object.hasOwn(extensions, "VRMC_vrm")
+  );
+}
+
+export function admitStudioWorkAssetPayload(
+  elementType: StudioWorkAssetType,
+  declaredMimeType: string,
+  input: Uint8Array
+): AdmittedStudioWorkAssetPayload {
+  const maximumBytes = STUDIO_WORK_ASSET_MAX_BYTES_BY_TYPE[elementType];
+  if (input.byteLength < 1 || input.byteLength > maximumBytes) {
+    throw new Error(`에셋은 ${Math.floor(maximumBytes / 1024 / 1024)}MB 이하만 사용할 수 있습니다.`);
+  }
+  const payload = new Uint8Array(input);
+  let mimeType: StudioWorkAssetManifest["mimeType"];
+  let intrinsicImage: StudioWorkAssetIntrinsicImage | null = null;
+  if (elementType === "image") {
+    const sniffed = sniffImageMime(payload);
+    if (sniffed === "image/gif") {
+      throw new Error("움직일 수 있는 GIF는 협업 에셋으로 사용할 수 없습니다. 정적 PNG, JPEG 또는 WebP로 변환해 주세요.");
+    }
+    if (!sniffed || (!IMAGE_MIME_TYPES.has(declaredMimeType) && declaredMimeType !== "application/octet-stream")) {
+      throw new Error("정적 PNG, JPEG, WebP 이미지 파일만 사용할 수 있습니다.");
+    }
+    if (declaredMimeType !== "application/octet-stream" && declaredMimeType !== sniffed) {
+      throw new Error("이미지 MIME 형식과 실제 파일 내용이 다릅니다.");
+    }
+    intrinsicImage = intrinsicImageFrom(readStudioWorkAssetImageDimensions(sniffed, payload));
+    mimeType = sniffed;
+  } else {
+    if (!GLB_UPLOAD_MIME_TYPES.has(declaredMimeType)) {
+      throw new Error("VRM과 3D 배경은 내장 리소스가 포함된 GLB 파일만 사용할 수 있습니다.");
+    }
+    const document = parseGlbJson(payload);
+    if (elementType === "vrm" && !isVrmDocument(document)) {
+      throw new Error("VRM 확장 정보가 없는 모델입니다.");
+    }
+    mimeType = "model/gltf-binary";
+  }
+  return {
+    mimeType,
+    payload,
+    sha256: createHash("sha256").update(payload).digest("hex"),
+    intrinsicImage,
+  };
+}
+
+function parseDescriptorJson(
+  raw: string,
+  expected: { assetId: string; elementType: StudioWorkAssetType }
+): StudioWorkAssetDescriptor {
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    throw new BadRequestException("에셋 요소 설명이 올바른 JSON이 아닙니다.");
+  }
+  try {
+    return parseStudioWorkAssetDescriptor(value, expected);
+  } catch (error) {
+    throw new BadRequestException(error instanceof Error ? error.message : "에셋 요소 설명이 올바르지 않습니다.");
+  }
+}
+
+@Injectable()
+export class StudioWorkAssetService {
+  constructor(
+    @Inject(STUDIO_WORK_ASSET_REPOSITORY)
+    private readonly repository: StudioWorkAssetRepository
+  ) {}
+
+  async upload(
+    actorUserId: string,
+    workId: string,
+    assetId: string,
+    elementType: StudioWorkAssetType,
+    descriptorJson: string,
+    file: StudioWorkAssetUploadFile | undefined
+  ): Promise<StudioWorkAssetManifest> {
+    if (!isStudioWorkAssetAdmissionOptedIn(
+      process.env.STUDIO_WORK_ASSET_ADMISSION
+    )) {
+      throw new ForbiddenException(
+        "협업 에셋 입장은 안전한 버전 교체 기능을 준비하는 동안 비활성화되어 있습니다."
+      );
+    }
+    if (!file || !Buffer.isBuffer(file.buffer) || file.size !== file.buffer.byteLength) {
+      throw new BadRequestException("업로드할 에셋 파일이 필요합니다.");
+    }
+    const descriptor = parseDescriptorJson(descriptorJson, { assetId, elementType });
+    let admitted: AdmittedStudioWorkAssetPayload;
+    try {
+      admitted = admitStudioWorkAssetPayload(elementType, file.mimetype, file.buffer);
+    } catch (error) {
+      throw new BadRequestException(error instanceof Error ? error.message : "에셋 파일이 올바르지 않습니다.");
+    }
+    return this.run(() => this.repository.upsert(actorUserId, {
+      workId,
+      assetId,
+      elementType,
+      descriptor,
+      ...admitted,
+    }));
+  }
+
+  getManifest(
+    actorUserId: string,
+    workId: string,
+    assetId: string,
+    elementType: StudioWorkAssetType
+  ): Promise<StudioWorkAssetManifest> {
+    return this.run(() => this.repository.getManifest(actorUserId, workId, assetId, elementType));
+  }
+
+  getContent(
+    actorUserId: string,
+    workId: string,
+    assetId: string,
+    elementType: StudioWorkAssetType
+  ): Promise<StudioWorkAssetContent> {
+    return this.run(async () => {
+      const content = await this.repository.getContent(actorUserId, workId, assetId, elementType);
+      const manifest = StudioWorkAssetManifestSchema.parse(content.manifest);
+      const storedSha256 = createHash("sha256").update(content.payload).digest("hex");
+      if (
+        content.payload.byteLength !== manifest.byteSize ||
+        storedSha256 !== manifest.sha256
+      ) {
+        throw new Error("stored studio work asset payload integrity mismatch");
+      }
+      return { manifest, payload: content.payload };
+    });
+  }
+
+  deleteUnreferencedUpload(
+    actorUserId: string,
+    workId: string,
+    assetId: string,
+    elementType: StudioWorkAssetType,
+    expectedSha256: string
+  ): Promise<boolean> {
+    return this.run(() => this.repository.deleteUnreferencedUpload(
+      actorUserId,
+      workId,
+      assetId,
+      elementType,
+      expectedSha256
+    ));
+  }
+
+  /**
+   * Durable CRDT admission seam. References only contain immutable `(assetId, elementType)`
+   * identities, so one authorized batch read is sufficient and avoids N per-reference work-access
+   * queries on a collaboration append.
+   */
+  async assertReferencesStored(
+    actorUserId: string,
+    workId: string,
+    references: readonly StudioWorkAssetReference[],
+    transaction?: DrizzleStudioCrdtTransaction
+  ): Promise<void> {
+    if (references.length > 0 && !isStudioWorkAssetAdmissionOptedIn(
+      process.env.STUDIO_WORK_ASSET_ADMISSION
+    )) {
+      throw new ForbiddenException(
+        "협업 에셋 참조 입장은 안전한 버전 교체 기능을 준비하는 동안 비활성화되어 있습니다."
+      );
+    }
+    if (references.length > STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK) {
+      throw new BadRequestException("한 작품에서 활성화할 수 있는 에셋 참조가 너무 많습니다.");
+    }
+    const expectedById = new Map<string, StudioWorkAssetReference>();
+    try {
+      for (const value of references) {
+        const reference = StudioWorkAssetReferenceSchema.parse(value);
+        const existing = expectedById.get(reference.assetId);
+        if (existing && existing.elementType !== reference.elementType) {
+          throw new Error("같은 작품 에셋 ID가 서로 다른 타입을 가리킵니다.");
+        }
+        expectedById.set(reference.assetId, reference);
+      }
+    } catch (error) {
+      throw new BadRequestException(
+        error instanceof Error ? error.message : "작품 에셋 참조가 올바르지 않습니다."
+      );
+    }
+    if (expectedById.size === 0) return;
+
+    const assetIds = [...expectedById.keys()];
+    const manifests = await this.run(() => transaction
+      ? this.repository.getManifestsInTransaction(
+          transaction,
+          actorUserId,
+          workId,
+          assetIds
+        )
+      : this.repository.getManifests(actorUserId, workId, assetIds));
+    const storedById = new Map(manifests.map((value) => {
+      const stored = StudioWorkAssetManifestSchema.parse(value);
+      return [stored.assetId, stored] as const;
+    }));
+    for (const reference of expectedById.values()) {
+      const stored = storedById.get(reference.assetId);
+      if (!stored || stored.elementType !== reference.elementType) {
+        throw new BadRequestException("저장되지 않았거나 타입이 다른 작품 에셋 참조가 있습니다.");
+      }
+    }
+  }
+
+  private async run<T>(operation: () => Promise<T>): Promise<T> {
+    try {
+      const result = await operation();
+      if (result && typeof result === "object" && Object.hasOwn(result, "assetId")) {
+        return StudioWorkAssetManifestSchema.parse(result) as T;
+      }
+      return result;
+    } catch (error) {
+      if (error instanceof StudioWorkAssetNotFoundError) {
+        throw new NotFoundException("작품 에셋을 찾을 수 없습니다.");
+      }
+      if (error instanceof StudioWorkAssetForbiddenError) {
+        throw new ForbiddenException(
+          error.operation === "edit"
+            ? "이 작품의 에셋을 변경할 권한이 없습니다."
+            : "이 작품의 에셋을 볼 권한이 없습니다."
+        );
+      }
+      if (error instanceof StudioWorkAssetCleanupOwnershipError) {
+        throw new ForbiddenException("직접 업로드한 미사용 작품 에셋만 정리할 수 있습니다.");
+      }
+      if (error instanceof StudioWorkAssetReferencedError) {
+        throw new ConflictException(
+          "이미 팀 문서에 기록된 작품 에셋은 자동 정리할 수 없습니다."
+        );
+      }
+      if (error instanceof StudioWorkAssetTypeConflictError) {
+        throw new ConflictException("같은 ID의 다른 타입 에셋이 이미 존재합니다.");
+      }
+      if (error instanceof StudioWorkAssetImmutableConflictError) {
+        throw new ConflictException("이미 동기화된 에셋 ID는 변경할 수 없습니다. 새 ID로 추가해 주세요.");
+      }
+      if (error instanceof StudioWorkAssetQuotaError) {
+        throw new PayloadTooLargeException(
+          error.quota === "count"
+            ? "작품에 연결할 수 있는 에셋 수를 초과했습니다."
+            : error.quota === "bytes"
+              ? "작품 에셋의 전체 저장 용량을 초과했습니다."
+              : "이 작품에서 삭제할 수 있는 에셋 ID 수를 초과했습니다. 작품을 복제해 정리해 주세요."
+        );
+      }
+      throw error;
+    }
+  }
+}

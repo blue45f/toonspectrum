@@ -25,10 +25,15 @@ import {
 import type { StudioCrdtDocument } from "./studio-crdt-document";
 import type { StudioCrdtRoomBinding } from "./studio-crdt-room-binding";
 
-interface StudioCrdtSceneGraphRuntime {
+export interface StudioCrdtSceneGraphRuntime {
   publish: typeof import("./studio-crdt-scene-publisher").publishStudioCrdtSceneGraphDiff;
   reconcileHistory: typeof import("./studio-crdt-history").reconcileStudioCrdtSceneGraphHistory;
   reconcilePages: typeof import("./studio-crdt-page-bridge").reconcileStudioCrdtSceneGraphPages;
+  nextRasterLogicalClock: typeof import("./studio-crdt-raster-ui-bridge").nextStudioRasterLogicalClock;
+  planRasterDrawPromotion: typeof import("./studio-crdt-raster-ui-bridge").planStudioRasterDrawPromotion;
+  rasterDrawPromotionSourceMatches: typeof import("./studio-crdt-raster-ui-bridge").studioRasterDrawPromotionSourceMatches;
+  publishRasterHistoryTransition: typeof import("./studio-crdt-raster-ui-bridge").publishStudioRasterHistoryTransition;
+  sha256RasterSemanticParameters: typeof import("./studio-crdt-raster-ui-bridge").sha256StudioRasterSemanticParameters;
 }
 
 export interface StudioLiveCollaborationProviderProps {
@@ -258,12 +263,14 @@ export function StudioLiveCollaborationProvider({
           scenePublisherModule,
           sceneHistoryModule,
           scenePageBridgeModule,
+          rasterUiBridgeModule,
         ] = await Promise.all([
           import("./studio-crdt-document"),
           import("./studio-crdt-room-binding"),
           import("./studio-crdt-scene-publisher"),
           import("./studio-crdt-history"),
           import("./studio-crdt-page-bridge"),
+          import("./studio-crdt-raster-ui-bridge"),
         ]);
         if (cancelled) return;
         crdtDocument = new documentModule.StudioCrdtDocument();
@@ -293,6 +300,14 @@ export function StudioLiveCollaborationProvider({
             publish: scenePublisherModule.publishStudioCrdtSceneGraphDiff,
             reconcileHistory: sceneHistoryModule.reconcileStudioCrdtSceneGraphHistory,
             reconcilePages: scenePageBridgeModule.reconcileStudioCrdtSceneGraphPages,
+            nextRasterLogicalClock: rasterUiBridgeModule.nextStudioRasterLogicalClock,
+            planRasterDrawPromotion: rasterUiBridgeModule.planStudioRasterDrawPromotion,
+            rasterDrawPromotionSourceMatches:
+              rasterUiBridgeModule.studioRasterDrawPromotionSourceMatches,
+            publishRasterHistoryTransition:
+              rasterUiBridgeModule.publishStudioRasterHistoryTransition,
+            sha256RasterSemanticParameters:
+              rasterUiBridgeModule.sha256StudioRasterSemanticParameters,
           }
         );
         setMode(nextRoom.mode);

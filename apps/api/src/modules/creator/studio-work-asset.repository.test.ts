@@ -1,0 +1,238 @@
+import { getTableConfig } from "drizzle-orm/pg-core";
+import { describe, expect, it } from "vitest";
+import * as Y from "yjs";
+
+import {
+  creatorWorkAssets,
+  creatorWorkAssetTombstones,
+} from "../../../../../lib/db/schema";
+import {
+  STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK,
+  STUDIO_WORK_ASSET_MAX_TOMBSTONES_PER_WORK,
+  STUDIO_WORK_ASSET_MAX_TOTAL_BYTES_PER_WORK,
+} from "../../../../../lib/studio-work-asset-contract";
+
+import {
+  assertStudioWorkAssetIdNotReserved,
+  DrizzleStudioWorkAssetRepository,
+  isStudioWorkAssetIdempotentReplay,
+  planStudioWorkAssetOrphanCleanup,
+  planStudioWorkAssetDeletion,
+  resolveStudioWorkAssetAccess,
+  STUDIO_WORK_ASSET_REPOSITORY,
+  studioCrdtHydrationReferencesWorkAsset,
+  StudioWorkAssetCleanupOwnershipError,
+  StudioWorkAssetImmutableConflictError,
+  StudioWorkAssetQuotaError,
+  StudioWorkAssetReferencedError,
+  studioWorkAssetRepositoryProvider,
+} from "./studio-work-asset.repository";
+
+function names(values: readonly { name?: string; config?: { name?: string } }[]): string[] {
+  return values.flatMap((value) => {
+    const name = value.name ?? value.config?.name;
+    return name ? [name] : [];
+  }).sort();
+}
+
+describe("studio work-scoped asset persistence contract", () => {
+  it("ties opaque asset IDs and bounded payloads to the work lifecycle", () => {
+    const table = getTableConfig(creatorWorkAssets);
+    expect(table.name).toBe("creator_work_asset");
+    expect(table.primaryKeys.map((key) => key.getName())).toEqual(["creator_work_asset_pkey"]);
+    expect(table.foreignKeys.map((key) => key.getName()).sort()).toEqual([
+      "creator_work_asset_uploaded_by_fkey",
+      "creator_work_asset_work_fkey",
+    ]);
+    expect(names(table.indexes)).toEqual(["idx_creator_work_asset_uploader_updated"]);
+    expect(names(table.checks)).toEqual([
+      "creator_work_asset_byte_size_check",
+      "creator_work_asset_descriptor_check",
+      "creator_work_asset_element_type_check",
+      "creator_work_asset_id_check",
+      "creator_work_asset_intrinsic_image_check",
+      "creator_work_asset_media_contract_check",
+      "creator_work_asset_payload_size_check",
+      "creator_work_asset_sha256_check",
+    ]);
+    expect(STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK).toBe(250);
+    expect(STUDIO_WORK_ASSET_MAX_TOTAL_BYTES_PER_WORK).toBe(256 * 1024 * 1024);
+  });
+
+  it("permanently reserves deleted IDs inside the work lifecycle", () => {
+    const table = getTableConfig(creatorWorkAssetTombstones);
+    expect(table.name).toBe("creator_work_asset_tombstone");
+    expect(table.primaryKeys.map((key) => key.getName())).toEqual([
+      "creator_work_asset_tombstone_pkey",
+    ]);
+    expect(table.foreignKeys.map((key) => key.getName()).sort()).toEqual([
+      "creator_work_asset_tombstone_deleted_by_fkey",
+      "creator_work_asset_tombstone_work_fkey",
+    ]);
+    expect(names(table.indexes)).toEqual([
+      "idx_creator_work_asset_tombstone_deleted_by",
+    ]);
+    expect(names(table.checks)).toEqual([
+      "creator_work_asset_tombstone_element_type_check",
+      "creator_work_asset_tombstone_id_check",
+    ]);
+    expect(STUDIO_WORK_ASSET_MAX_TOMBSTONES_PER_WORK).toBe(5_000);
+  });
+
+  it("exposes a swappable repository provider", () => {
+    expect(studioWorkAssetRepositoryProvider.provide).toBe(STUDIO_WORK_ASSET_REPOSITORY);
+    expect(studioWorkAssetRepositoryProvider.useFactory()).toBeInstanceOf(
+      DrizzleStudioWorkAssetRepository
+    );
+  });
+
+  it("exposes only receipt-bound orphan cleanup plus the trusted maintenance seam", () => {
+    expect(DrizzleStudioWorkAssetRepository.prototype).not.toHaveProperty("delete");
+    expect(DrizzleStudioWorkAssetRepository.prototype)
+      .toHaveProperty("deleteInternalForTrustedGarbageCollection");
+    expect(DrizzleStudioWorkAssetRepository.prototype)
+      .toHaveProperty("deleteUnreferencedUpload");
+  });
+
+  it("grants reads to active viewers but mutations only to owner/admin/editor", () => {
+    expect(resolveStudioWorkAssetAccess({
+      actorUserId: "owner",
+      ownerUserId: "owner",
+    })).toEqual({ view: true, edit: true });
+    expect(resolveStudioWorkAssetAccess({
+      actorUserId: "editor",
+      ownerUserId: "owner",
+      membership: { userId: "editor", role: "editor", status: "active" },
+    })).toEqual({ view: true, edit: true });
+    expect(resolveStudioWorkAssetAccess({
+      actorUserId: "viewer",
+      ownerUserId: "owner",
+      membership: { userId: "viewer", role: "viewer", status: "active" },
+    })).toEqual({ view: true, edit: false });
+    expect(resolveStudioWorkAssetAccess({
+      actorUserId: "invitee",
+      ownerUserId: "owner",
+      membership: { userId: "invitee", role: "editor", status: "pending" },
+    })).toEqual({ view: false, edit: false });
+    expect(resolveStudioWorkAssetAccess({
+      actorUserId: "intruder",
+      ownerUserId: "owner",
+      membership: { userId: "someone-else", role: "admin", status: "active" },
+    })).toEqual({ view: false, edit: false });
+  });
+
+  it("allows exact retry deduplication but keeps every asset ID immutable", () => {
+    const descriptor = {
+      version: 1 as const,
+      element: {
+        id: "asset-1",
+        type: "image" as const,
+        x: 0,
+        y: 0,
+        width: 10,
+        height: 10,
+        rotation: 0,
+      },
+    };
+    const existing = { elementType: "image" as const, sha256: "a".repeat(64), descriptor };
+    const intrinsicImage = { width: 10, height: 10, decodedRgbaBytes: 400 };
+    const existingWithIntrinsic = { ...existing, intrinsicImage };
+    expect(isStudioWorkAssetIdempotentReplay(existingWithIntrinsic, structuredClone(existingWithIntrinsic))).toBe(true);
+    expect(isStudioWorkAssetIdempotentReplay(existingWithIntrinsic, {
+      ...existingWithIntrinsic,
+      sha256: "b".repeat(64),
+    })).toBe(false);
+    expect(isStudioWorkAssetIdempotentReplay(existingWithIntrinsic, {
+      ...existingWithIntrinsic,
+      descriptor: {
+        ...descriptor,
+        element: { ...descriptor.element, x: 1 },
+      },
+    })).toBe(false);
+    expect(isStudioWorkAssetIdempotentReplay(existingWithIntrinsic, {
+      ...existingWithIntrinsic,
+      intrinsicImage: { ...intrinsicImage, decodedRgbaBytes: 399 },
+    })).toBe(false);
+    expect(() => assertStudioWorkAssetIdNotReserved(true))
+      .toThrow(StudioWorkAssetImmutableConflictError);
+    expect(() => assertStudioWorkAssetIdNotReserved(false)).not.toThrow();
+  });
+
+  it("reserves before physical deletion and fails closed at the tombstone cap", () => {
+    expect(planStudioWorkAssetDeletion(null, "image", 0)).toBe(false);
+    expect(planStudioWorkAssetDeletion("vrm", "image", 0)).toBe(false);
+    expect(planStudioWorkAssetDeletion("image", "image", 4_999)).toBe(true);
+    expect(() => planStudioWorkAssetDeletion("image", "image", 5_000))
+      .toThrow(StudioWorkAssetQuotaError);
+    expect(() => planStudioWorkAssetDeletion("image", "image", Number.NaN))
+      .toThrow(StudioWorkAssetQuotaError);
+  });
+
+  it("allows compensation only for the exact uploader receipt and no durable reference", () => {
+    const existing = {
+      elementType: "image",
+      sha256: "a".repeat(64),
+      uploadedBy: "editor-1",
+    };
+    expect(planStudioWorkAssetOrphanCleanup({
+      existing,
+      actorUserId: "editor-1",
+      elementType: "image",
+      expectedSha256: "a".repeat(64),
+      durablyReferenced: false,
+    })).toBe(true);
+    expect(planStudioWorkAssetOrphanCleanup({
+      existing,
+      actorUserId: "editor-1",
+      elementType: "image",
+      expectedSha256: "b".repeat(64),
+      durablyReferenced: false,
+    })).toBe(false);
+    expect(() => planStudioWorkAssetOrphanCleanup({
+      existing,
+      actorUserId: "editor-2",
+      elementType: "image",
+      expectedSha256: "a".repeat(64),
+      durablyReferenced: false,
+    })).toThrow(StudioWorkAssetCleanupOwnershipError);
+    expect(() => planStudioWorkAssetOrphanCleanup({
+      existing,
+      actorUserId: "editor-1",
+      elementType: "image",
+      expectedSha256: "a".repeat(64),
+      durablyReferenced: true,
+    })).toThrow(StudioWorkAssetReferencedError);
+  });
+
+  it("retains materialized asset references even after the scene element is deleted", () => {
+    const document = new Y.Doc();
+    document.getMap("scene-elements").set("asset-1", true);
+    const reference = document.getMap(`scene-element:${encodeURIComponent("asset-1")}`);
+    reference.set("type", "reference");
+    reference.set("deleted", true);
+    const state = {
+      snapshot: {
+        workId: "work-1",
+        snapshot: Y.encodeStateAsUpdate(document),
+        compactedSequence: 1n,
+        updatedAt: new Date(0),
+      },
+      updates: [],
+    };
+    document.destroy();
+
+    expect(studioCrdtHydrationReferencesWorkAsset(state, "asset-1")).toBe(true);
+    expect(studioCrdtHydrationReferencesWorkAsset(state, "asset-2")).toBe(false);
+    expect(() => studioCrdtHydrationReferencesWorkAsset({
+      snapshot: null,
+      updates: [{
+        workId: "work-1",
+        sequence: 1n,
+        updateId: "update-1",
+        actorUserId: "editor-1",
+        payload: Uint8Array.of(255),
+        createdAt: new Date(0),
+      }],
+    }, "asset-1")).toThrow();
+  });
+});

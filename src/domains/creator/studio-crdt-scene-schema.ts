@@ -1,3 +1,10 @@
+import {
+  STUDIO_WORK_ASSET_BOOLEAN_EDIT_KEYS,
+  STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS,
+  STUDIO_WORK_ASSET_SCALAR_FILTER_RANGES,
+  STUDIO_WORK_ASSET_TYPES,
+} from "@/lib/studio-work-asset-contract";
+
 export const STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION = 1 as const;
 export const STUDIO_CRDT_SCENE_ELEMENT_MAX_BYTES = 16 * 1024;
 export const STUDIO_CRDT_PAGE_PAYLOAD_VERSION = 1 as const;
@@ -15,9 +22,9 @@ export const STUDIO_CRDT_PAYLOAD_SCENE_ELEMENT_TYPES = [
 ] as const;
 
 /**
- * `reference` is a wire-only topology envelope for asset-backed or future Studio element types.
- * It intentionally carries only the authored element type: raster/VRM/3D sources remain in the
- * project asset document while page, group, tombstone, and z-order converge through CRDT.
+ * `reference` keeps the deployed v1 topology envelope (`elementType` only) readable forever.
+ * Server-admitted assets extend the same bounded envelope with placement/filter properties, but
+ * legacy documents are never forced through that opt-in storage contract during hydration.
  */
 export const STUDIO_CRDT_SCENE_ELEMENT_TYPES = [
   ...STUDIO_CRDT_PAYLOAD_SCENE_ELEMENT_TYPES,
@@ -62,6 +69,7 @@ const MAX_JSON_DEPTH = 10;
 const MAX_JSON_ENTRIES = 4_096;
 const MAX_JSON_STRING_LENGTH = 64 * 1024;
 const TEXT_ENCODER = new TextEncoder();
+const STUDIO_WORK_ASSET_TYPE_SET = new Set<string>(STUDIO_WORK_ASSET_TYPES);
 
 function exactIdentifier(value: unknown): value is string {
   if (typeof value !== "string" || value.length === 0 || value.length > MAX_ID_LENGTH) return false;
@@ -129,7 +137,7 @@ export const STUDIO_CRDT_SCENE_ELEMENT_KEYS_BY_TYPE: Record<
     "x", "y", "width", "height", "lineCount", "direction", "stroke", "strokeWidth",
     "noise", "rotation",
   ]),
-  reference: new Set(["elementType"]),
+  reference: new Set(["elementType", ...STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS]),
 };
 
 export const STUDIO_CRDT_REQUIRED_SCENE_ELEMENT_KEYS: Record<
@@ -171,6 +179,18 @@ export function isStudioCrdtPayloadSceneElementType(
 ): value is StudioCrdtPayloadSceneElementType {
   return typeof value === "string" &&
     (STUDIO_CRDT_PAYLOAD_SCENE_ELEMENT_TYPES as readonly string[]).includes(value);
+}
+
+function isLegacyStudioCrdtReferenceType(value: unknown): value is string {
+  return exactIdentifier(value) && value !== "draw" && !isStudioCrdtSceneElementType(value);
+}
+
+export function isStudioCrdtLegacyReferencePayload(
+  payload: Pick<StudioCrdtSceneElementPayload, "type" | "props">
+): boolean {
+  return payload.type === "reference" &&
+    Object.keys(payload.props).length === 1 &&
+    isLegacyStudioCrdtReferenceType(payload.props.elementType);
 }
 
 function cloneJson(
@@ -241,20 +261,32 @@ export function validateStudioCrdtSceneElementPayload(
   for (const key of STUDIO_CRDT_REQUIRED_SCENE_ELEMENT_KEYS[payload.type]) {
     if (!(key in props)) throw new Error(`${payload.type} 요소의 ${key} 속성이 필요합니다.`);
   }
-  if (
-    payload.type === "reference" &&
-    (
-      !exactIdentifier(props.elementType) || props.elementType === "draw" ||
-      isStudioCrdtSceneElementType(props.elementType)
-    )
-  ) {
-    throw new Error("참조 요소의 원본 타입이 올바르지 않습니다.");
+  const legacyReference = isStudioCrdtLegacyReferencePayload({
+    type: payload.type,
+    props,
+  });
+  if (payload.type === "reference") {
+    if (!isLegacyStudioCrdtReferenceType(props.elementType)) {
+      throw new Error("참조 요소의 원본 타입이 올바르지 않습니다.");
+    }
+    if (!legacyReference) {
+      if (!STUDIO_WORK_ASSET_TYPE_SET.has(props.elementType as string)) {
+        throw new Error("승인된 참조 요소 타입이 올바르지 않습니다.");
+      }
+      for (const key of ["x", "y", "width", "height", "rotation"] as const) {
+        if (!(key in props)) throw new Error(`reference 요소의 ${key} 속성이 필요합니다.`);
+      }
+    }
   }
   for (const key of ["x", "y"] as const) {
     if (key in props) finiteRange(props[key], -MAX_COORDINATE, MAX_COORDINATE, key);
   }
   for (const key of ["width", "height", "fontSize", "strokeWidth"] as const) {
     if (key in props) finiteRange(props[key], 0, MAX_COORDINATE, key);
+  }
+  if (payload.type === "reference" && !legacyReference) {
+    finiteRange(props.width, Number.MIN_VALUE, MAX_COORDINATE, "width");
+    finiteRange(props.height, Number.MIN_VALUE, MAX_COORDINATE, "height");
   }
   for (const key of [
     "letterSpacing", "lineHeight", "shadowBlur", "shadowOffsetX", "shadowOffsetY",
@@ -265,13 +297,21 @@ export function validateStudioCrdtSceneElementPayload(
     if (key in props) finiteRange(props[key], -MAX_COORDINATE, MAX_COORDINATE, key);
   }
   if ("rotation" in props) finiteRange(props.rotation, -1_000_000, 1_000_000, "rotation");
+  if (payload.type === "reference" && !legacyReference) {
+    finiteRange(props.rotation, -360_000, 360_000, "rotation");
+  }
   if ("opacity" in props) finiteRange(props.opacity, 0, 1, "opacity");
   for (const key of [
     "hidden", "locked", "noClip", "lockAspect", "clipBelow", "alphaLocked", "maskEnabled",
-    "vertical", "autoShrinkText",
+    "vertical", "autoShrinkText", ...STUDIO_WORK_ASSET_BOOLEAN_EDIT_KEYS,
   ] as const) {
     if (key in props && typeof props[key] !== "boolean") {
       throw new Error(`장면 요소의 ${key} 값이 올바르지 않습니다.`);
+    }
+  }
+  if (payload.type === "reference") {
+    for (const [key, range] of Object.entries(STUDIO_WORK_ASSET_SCALAR_FILTER_RANGES)) {
+      if (key in props) finiteRange(props[key], range.minimum, range.maximum, key);
     }
   }
   if ("text" in props && !boundedString(props.text)) {

@@ -7,7 +7,10 @@ if (!databaseUrl) {
 
 // PostgreSQL(Neon). 로컬 검증은 docker postgres(:55432), 원격은 Neon(DATABASE_URL, sslmode=require).
 export default defineConfig({
-  schema: "./lib/db/schema.ts",
+  schema: [
+    "./lib/db/schema.ts",
+    "./lib/db/studio-raster-asset.schema.ts",
+  ],
   out: "./lib/db/migrations",
   dialect: "postgresql",
   dbCredentials: {

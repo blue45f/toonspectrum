@@ -10,6 +10,7 @@ import {
   replayStudioRasterOperationLog,
   studioRasterUndoneOperationIds,
   type StudioRasterAssetReference,
+  type StudioRasterAssetMediaType,
   type StudioRasterOperation,
   type StudioRasterOperationLog,
   type StudioRasterTilePatch,
@@ -19,6 +20,12 @@ import {
 
 const sha = (character: string) => character.repeat(64);
 const uuid = (value: number) => `00000000-0000-4000-8000-${String(value).padStart(12, "0")}`;
+const persistedV1RasterMediaTypes = [
+  "image/png",
+  "image/webp",
+  "application/x-toonspectrum-rgba-zstd",
+  "application/x-toonspectrum-alpha-zstd",
+] as const satisfies readonly StudioRasterAssetMediaType[];
 
 const surface = {
   version: STUDIO_RASTER_CRDT_VERSION,
@@ -39,7 +46,7 @@ function asset(
     assetId: id,
     sha256: digest,
     byteLength: 1_024,
-    mediaType: "application/x-toonspectrum-rgba-zstd",
+    mediaType: "image/png",
     width,
     height,
   };
@@ -138,6 +145,27 @@ describe("semantic raster CRDT operations", () => {
 
     expect(() => createStudioRasterOperationLog(log({ operations: [invalid as unknown as StudioRasterOperation] })))
       .toThrowError(StudioRasterContractError);
+  });
+
+  it.each(persistedV1RasterMediaTypes)(
+    "keeps persisted CRDT v1 %s asset references readable",
+    (mediaType) => {
+      const persisted = clone(operation({ id: 1 }));
+      (persisted.patches[0]!.effect.payload as { mediaType: StudioRasterAssetMediaType })
+        .mediaType = mediaType;
+
+      const result = createStudioRasterOperationLog(log({ operations: [persisted] }));
+      expect(result.operations[0]?.patches[0]?.effect.payload.mediaType).toBe(mediaType);
+    }
+  );
+
+  it("still rejects media types that were never part of the CRDT v1 contract", () => {
+    const unsupported = clone(operation({ id: 1 }));
+    (unsupported.patches[0]!.effect.payload as unknown as { mediaType: string }).mediaType =
+      "image/jpeg";
+
+    expect(() => createStudioRasterOperationLog(log({ operations: [unsupported] })))
+      .toThrow(/mediaType/u);
   });
 
   it("enforces per-asset bytes, edge-tile bounds, and exact payload dimensions", () => {

@@ -5,6 +5,7 @@ import {
   studioFilterCatalogEntry,
   studioFilterGroupLabel,
   studioToolHint,
+  studioToolHintPreview,
 } from "./studio-tool-hints";
 
 describe("studio tool hints (Magma-class hover copy)", () => {
@@ -13,7 +14,26 @@ describe("studio tool hints (Magma-class hover copy)", () => {
     expect(pen?.title).toBe("펜");
     expect(pen?.description.length).toBeGreaterThan(20);
     expect(pen?.shortcut).toBe("B");
+    expect(pen?.preview).toBe("ink");
+    expect(pen?.tip).toMatch(/\[|크기/u);
     expect(studioToolHint("missing")).toBeNull();
+  });
+
+  it("infers purposeful visuals for dynamic rail tools", () => {
+    expect(
+      studioToolHintPreview({
+        id: "liquify",
+        title: "액체화",
+        description: "이미지 위를 밀어 국소 왜곡합니다.",
+      })
+    ).toBe("filter");
+    expect(
+      studioToolHintPreview({
+        id: "comment",
+        title: "댓글",
+        description: "캔버스에 협업 댓글을 남깁니다.",
+      })
+    ).toBe("bubble");
   });
 
   it("catalogs Magma blur and tone filters with groups", () => {

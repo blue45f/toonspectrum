@@ -2,6 +2,7 @@ import {
   STUDIO_CRDT_LAYER_GROUP_PAYLOAD_VERSION,
   STUDIO_CRDT_PAGE_PAYLOAD_VERSION,
   STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION,
+  isStudioCrdtLegacyReferencePayload,
   isStudioCrdtPayloadSceneElementType,
   studioCrdtLayerGroupKey,
   validateStudioCrdtLayerGroupPayload,
@@ -22,6 +23,13 @@ import type {
 } from "./studio-crdt-document";
 import type { StudioCrdtCompatibleDrawElement } from "./studio-crdt-draw-bridge";
 
+import {
+  STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS,
+  STUDIO_WORK_ASSET_TYPES,
+  parseStudioWorkAssetSourceUri,
+  studioWorkAssetSourceUri,
+} from "@/lib/studio-work-asset-contract";
+
 export {
   isStudioCrdtPayloadSceneElementType,
   isStudioCrdtSceneElementType,
@@ -31,6 +39,8 @@ export {
   studioDrawElementToCrdtStroke,
 } from "./studio-crdt-draw-bridge";
 export type { StudioCrdtCompatibleDrawElement } from "./studio-crdt-draw-bridge";
+
+const STUDIO_WORK_ASSET_TYPE_SET = new Set<string>(STUDIO_WORK_ASSET_TYPES);
 
 export interface StudioCrdtCompatibleElement {
   id: string;
@@ -55,6 +65,22 @@ export interface StudioCrdtCompatibleSceneElement extends StudioCrdtCompatibleEl
   type: StudioCrdtPayloadSceneElementType;
   groupId?: string;
   [key: string]: unknown;
+}
+
+export function isStudioCrdtWorkAssetElement(
+  element: StudioCrdtCompatibleElement
+): boolean {
+  return STUDIO_WORK_ASSET_TYPE_SET.has(element.type);
+}
+
+export function isStudioCrdtAdmittedWorkAssetElement(
+  element: StudioCrdtCompatibleElement
+): boolean {
+  if (!isStudioCrdtWorkAssetElement(element)) return false;
+  const src = (element as StudioCrdtCompatibleElement & { src?: unknown }).src;
+  if (typeof src !== "string") return false;
+  const reference = parseStudioWorkAssetSourceUri(src);
+  return reference?.assetId === element.id && reference.elementType === element.type;
 }
 
 const EXTENSION_KEYS = [
@@ -192,6 +218,14 @@ export function studioElementToCrdtSceneElement(
       element as StudioCrdtCompatibleSceneElement
     );
   }
+  const props: StudioCrdtJsonObject = { elementType: element.type };
+  if (isStudioCrdtAdmittedWorkAssetElement(element)) {
+    const source = element as StudioCrdtCompatibleElement & Record<string, unknown>;
+    for (const key of STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS) {
+      const normalized = jsonValue(source[key]);
+      if (normalized !== undefined) props[key] = normalized;
+    }
+  }
   return {
     id: element.id,
     pageId,
@@ -199,7 +233,7 @@ export function studioElementToCrdtSceneElement(
     payload: validateStudioCrdtSceneElementPayload({
       version: STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION,
       type: "reference",
-      props: { elementType: element.type },
+      props,
     }),
   };
 }
@@ -218,7 +252,21 @@ export function studioCrdtElementToSceneElement<
     ) {
       throw new Error("참조 장면 요소를 복원할 원본 에셋 요소가 없습니다.");
     }
-    const element = { ...referenceSource } as TElement & { groupId?: string };
+    const referenceProps = { ...record.payload.props };
+    delete referenceProps.elementType;
+    const legacyReference = isStudioCrdtLegacyReferencePayload(record.payload);
+    const element = {
+      ...referenceSource,
+      ...referenceProps,
+      id: record.id,
+      type: elementType,
+      ...(!legacyReference ? {
+        src: studioWorkAssetSourceUri({
+          assetId: record.id,
+          elementType: elementType as (typeof STUDIO_WORK_ASSET_TYPES)[number],
+        }),
+      } : {}),
+    } as TElement & { groupId?: string };
     if (record.layerId === "page-root") delete element.groupId;
     else element.groupId = record.layerId;
     return element;
@@ -406,7 +454,8 @@ export function reconcileStudioCrdtSceneGraphPages<
   sceneElements: readonly StudioCrdtSceneElementRecord[],
   pageRecords: readonly StudioCrdtPageRecord[],
   layerGroupRecords: readonly StudioCrdtLayerGroupRecord[] = [],
-  authority?: StudioCrdtSceneGraphAuthority
+  authority?: StudioCrdtSceneGraphAuthority,
+  referenceSources?: ReadonlyMap<string, TElement>
 ): StudioCrdtPageReconcileResult<TPage> {
   const sourcePageById = new Map(pages.map((page) => [page.id, page]));
   const materializePage = (record: StudioCrdtPageRecord): TPage => {
@@ -547,7 +596,46 @@ export function reconcileStudioCrdtSceneGraphPages<
   for (const record of sceneElements) {
     const authoritative = authority === undefined || authority.sceneElementIds.has(record.id);
     if (authoritative) managedElementIds.add(record.id);
-    const source = sourceElementById.get(record.id);
+    const localSource = sourceElementById.get(record.id);
+    const expectedReferenceType =
+      record.payload.type === "reference" &&
+      typeof record.payload.props.elementType === "string"
+        ? record.payload.props.elementType
+        : null;
+    const legacyReference = record.payload.type === "reference" &&
+      isStudioCrdtLegacyReferencePayload(record.payload);
+    const canonicalLocalSource =
+      expectedReferenceType &&
+      localSource?.element.id === record.id && localSource.element.type === expectedReferenceType &&
+      (legacyReference || (
+        STUDIO_WORK_ASSET_TYPE_SET.has(expectedReferenceType) &&
+        isStudioCrdtAdmittedWorkAssetElement(localSource.element)
+      ))
+        ? localSource
+        : undefined;
+    const hydratedSource = authoritative && expectedReferenceType && !legacyReference
+      ? referenceSources?.get(record.id)
+      : undefined;
+    const exactHydratedSource =
+      hydratedSource?.id === record.id &&
+      hydratedSource.type === expectedReferenceType
+        ? hydratedSource
+        : undefined;
+    const source = record.payload.type !== "reference"
+      ? localSource
+      : exactHydratedSource
+        ? {
+            pageId: record.pageId,
+            // Keep rich local-only editing metadata where it exists, but let the admitted server
+            // descriptor provide the durable fallback. The exact local stable element may add rich
+            // editing metadata, and studioCrdtElementToSceneElement applies realtime reference props
+            // last so immutable upload geometry can never reset a collaborator's later move.
+            element: {
+              ...exactHydratedSource,
+              ...(canonicalLocalSource?.element ?? {}),
+            } as TElement,
+          }
+        : canonicalLocalSource;
     if (!authoritative && !source) continue;
     if (!authoritative) managedElementIds.add(record.id);
     if (authoritative && record.deleted) continue;

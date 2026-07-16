@@ -488,7 +488,7 @@ export function StudioPressureHudMeter({
   );
 }
 
-export type StudioSymmetryVisual = "none" | "vertical" | "horizontal" | "radial";
+export type StudioSymmetryVisual = "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope";
 
 /** Symmetry mode glyphs for the options strip (CSP mirror tools). */
 export function StudioSymmetryGlyph({
@@ -567,6 +567,21 @@ export function StudioSymmetryGlyph({
               transform={`rotate(${deg} 7 7)`}
             />
           ))}
+        </>
+      )}
+      {mode === "kaleidoscope" && (
+        <>
+          <circle cx={7} cy={7} r={1.45} fill="currentColor" opacity={0.85} />
+          {[0, 60, 120].map((deg) => (
+            <path
+              key={deg}
+              d="M7 7 6.05 2.15 7.95 2.15Z"
+              fill="currentColor"
+              opacity={deg === 0 ? 0.95 : 0.62}
+              transform={`rotate(${deg} 7 7)`}
+            />
+          ))}
+          <circle cx={7} cy={7} r={4.85} fill="none" stroke="currentColor" strokeWidth={0.75} opacity={0.45} />
         </>
       )}
     </svg>

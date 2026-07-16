@@ -98,10 +98,12 @@ describe("studio creative visuals", () => {
       <>
         <StudioSymmetryGlyph mode="vertical" />
         <StudioSymmetryGlyph mode="radial" />
+        <StudioSymmetryGlyph mode="kaleidoscope" />
       </>
     );
     expect(html).toContain('data-studio-symmetry-glyph="vertical"');
     expect(html).toContain('data-studio-symmetry-glyph="radial"');
+    expect(html).toContain('data-studio-symmetry-glyph="kaleidoscope"');
   });
 
   it("renders starter card art headers for each creative entry", () => {

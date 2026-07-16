@@ -25,6 +25,7 @@ import {
   studioSegmentChipClass,
   studioToolButtonClass,
 } from "./studio-panel-ui";
+import { studioToolHintFromLabel } from "./studio-tool-hints";
 import { StudioToolHintTarget } from "./StudioToolHint";
 
 import type { LucideIcon } from "lucide-react";
@@ -122,16 +123,22 @@ export function StudioToolbarCluster({
 export function StudioToolBelt({
   children,
   className,
+  inert,
+  "aria-hidden": ariaHidden,
   "aria-label": ariaLabel = "스튜디오 도구",
 }: {
   children: ReactNode;
   className?: string;
+  inert?: boolean;
+  "aria-hidden"?: boolean;
   "aria-label"?: string;
 }): ReactElement {
   return (
     <div
       role="toolbar"
       aria-label={ariaLabel}
+      aria-hidden={ariaHidden}
+      inert={inert ? true : undefined}
       data-studio-tool-belt="true"
       className={cn(
         // Single-row draw-app belt (Figma/CSP): horizontal scroll, never multi-row wrap.
@@ -210,7 +217,7 @@ export function StudioAppMenubar({
         data-studio-app-menubar-scroll="true"
         className={cn(
           "flex h-full min-h-11 w-full flex-nowrap items-center gap-2 px-2.5 sm:gap-2.5 sm:px-3",
-          "overflow-x-auto overflow-y-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          "overflow-hidden"
         )}
       >
         {children}
@@ -426,6 +433,8 @@ export const StudioDockButton = forwardRef<
     danger?: boolean;
     swatch?: ReactNode;
     className?: string;
+    hintDescription?: string;
+    hintShortcut?: string;
   } & Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children">
 >(function StudioDockButton(
   {
@@ -437,11 +446,13 @@ export const StudioDockButton = forwardRef<
     disabled,
     type = "button",
     swatch,
+    hintDescription,
+    hintShortcut,
     ...rest
   },
   ref
 ): ReactElement {
-  return (
+  const button = (
     <button
       ref={ref}
       type={type}
@@ -467,6 +478,18 @@ export const StudioDockButton = forwardRef<
         ) : null)}
       <span>{label}</span>
     </button>
+  );
+
+  if (!hintDescription) return button;
+  return (
+    <StudioToolHintTarget
+      disabled={disabled}
+      preferredSide="top"
+      className="min-w-0 flex-1"
+      hint={studioToolHintFromLabel(label, hintDescription, hintShortcut)}
+    >
+      {button}
+    </StudioToolHintTarget>
   );
 });
 
@@ -678,7 +701,7 @@ export function StudioDualColorWell({
       className={cn("flex shrink-0 items-center gap-1.5", className)}
       aria-label="색상"
     >
-      {recent.slice(0, 5).map((swatch) => (
+      {recent.slice(0, 5).map((swatch, index) => (
         <button
           key={swatch}
           type="button"
@@ -687,6 +710,7 @@ export function StudioDualColorWell({
           onClick={() => onPrimaryChange(swatch)}
           className={cn(
             "size-5 rounded-md border shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.12)] transition-transform hover:scale-110",
+            index >= 3 && "max-xl:hidden",
             STUDIO_FOCUS_RING,
             primary.toLowerCase() === swatch.toLowerCase()
               ? "ring-2 ring-accent ring-offset-1 ring-offset-panel"
@@ -854,15 +878,11 @@ export function StudioRailToolButton({
   return (
     <StudioToolHintTarget
       disabled={disabled}
-      hint={{
-        id: label,
-        title: label.replace(/\s*\([^)]*\)\s*$/, "").trim() || label,
+      hint={studioToolHintFromLabel(
+        label,
         description,
-        shortcut: (() => {
-          const m = label.match(/\(([^)]+)\)\s*$/);
-          return m?.[1];
-        })(),
-      }}
+        label.match(/\(([^)]+)\)\s*$/u)?.[1]
+      )}
     >
       {button}
     </StudioToolHintTarget>

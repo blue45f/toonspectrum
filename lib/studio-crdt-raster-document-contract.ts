@@ -74,6 +74,7 @@ export interface StudioCrdtRasterAppendedActorEvent {
   readonly eventId: string;
   readonly kind: Exclude<StudioCrdtRasterIdentityKind, "checkpoint">;
   readonly actorId: string;
+  readonly logicalClock: string;
 }
 
 export class StudioCrdtRasterDocumentContractError extends Error {
@@ -478,45 +479,115 @@ export function preservesStudioCrdtRasterRoots(
  * This parser is fail-closed: both the before snapshot and the resulting document must satisfy the
  * complete raster contract before any event is returned.
  */
+function inspectStudioCrdtRasterAppendedActorEvents(
+  snapshot: StudioCrdtRasterRootSnapshot | null,
+  doc: Y.Doc
+): {
+  readonly appended: readonly StudioCrdtRasterAppendedActorEvent[];
+  readonly durableMaximumClock: string;
+} {
+  if (!snapshot) fail("래스터 actor 검증을 위한 durable root snapshot이 올바르지 않습니다.");
+  const parsed = readStudioCrdtRasterDocument(doc);
+  const appended: StudioCrdtRasterAppendedActorEvent[] = [];
+  let durableMaximumClock = "0";
+  const inspect = (
+    event: {
+      readonly order: { readonly actorId: string; readonly logicalClock: string };
+    },
+    eventId: string,
+    kind: StudioCrdtRasterAppendedActorEvent["kind"],
+    existed: boolean
+  ) => {
+    if (existed) {
+      const clock = event.order.logicalClock;
+      if (
+        clock.length > durableMaximumClock.length ||
+        (clock.length === durableMaximumClock.length && clock > durableMaximumClock)
+      ) {
+        durableMaximumClock = clock;
+      }
+      return;
+    }
+    appended.push({
+      eventId,
+      kind,
+      actorId: event.order.actorId,
+      logicalClock: event.order.logicalClock,
+    });
+  };
+  for (const log of parsed.logs.values()) {
+    for (const operation of log.operations) {
+      inspect(
+        operation,
+        operation.operationId,
+        "operation",
+        snapshot.operations.has(operation.operationId)
+      );
+    }
+    for (const undoOperation of log.undoOperations) {
+      inspect(
+        undoOperation,
+        undoOperation.undoOperationId,
+        "undo-operation",
+        snapshot.undoOperations.has(undoOperation.undoOperationId)
+      );
+    }
+    for (const acknowledgement of log.undoAcknowledgements) {
+      inspect(
+        acknowledgement,
+        acknowledgement.acknowledgementId,
+        "undo-acknowledgement",
+        snapshot.undoAcknowledgements.has(acknowledgement.acknowledgementId)
+      );
+    }
+  }
+  return {
+    appended: appended.sort((left, right) => (
+      left.eventId < right.eventId ? -1 : left.eventId > right.eventId ? 1 : 0
+    )),
+    durableMaximumClock,
+  };
+}
+
 export function appendedStudioCrdtRasterActorEvents(
   snapshot: StudioCrdtRasterRootSnapshot | null,
   doc: Y.Doc
 ): readonly StudioCrdtRasterAppendedActorEvent[] {
-  if (!snapshot) fail("래스터 actor 검증을 위한 durable root snapshot이 올바르지 않습니다.");
+  return inspectStudioCrdtRasterAppendedActorEvents(snapshot, doc).appended;
+}
+
+/**
+ * Returns the immutable asset manifests introduced by truly new operations only. Retransmitted
+ * durable operations are excluded, while references reused by several new patches are returned
+ * once in stable asset-id order. Client checkpoints are rejected at a separate trust boundary.
+ */
+export function appendedStudioCrdtRasterAssetReferences(
+  snapshot: StudioCrdtRasterRootSnapshot | null,
+  doc: Y.Doc
+): readonly StudioRasterAssetReference[] {
+  if (!snapshot) fail("래스터 자산 검증을 위한 durable root snapshot이 올바르지 않습니다.");
   const parsed = readStudioCrdtRasterDocument(doc);
-  const appended: StudioCrdtRasterAppendedActorEvent[] = [];
+  const assets = new Map<string, StudioRasterAssetReference>();
+  const add = (reference: StudioRasterAssetReference) => {
+    const existing = assets.get(reference.assetId);
+    if (
+      existing &&
+      canonicalStudioRasterJson(existing) !== canonicalStudioRasterJson(reference)
+    ) {
+      fail("새 래스터 작업이 같은 assetId에 서로 다른 메타데이터를 사용합니다.");
+    }
+    assets.set(reference.assetId, reference);
+  };
   for (const log of parsed.logs.values()) {
     for (const operation of log.operations) {
-      if (!snapshot.operations.has(operation.operationId)) {
-        appended.push({
-          eventId: operation.operationId,
-          kind: "operation",
-          actorId: operation.order.actorId,
-        });
-      }
-    }
-    for (const undoOperation of log.undoOperations) {
-      if (!snapshot.undoOperations.has(undoOperation.undoOperationId)) {
-        appended.push({
-          eventId: undoOperation.undoOperationId,
-          kind: "undo-operation",
-          actorId: undoOperation.order.actorId,
-        });
-      }
-    }
-    for (const acknowledgement of log.undoAcknowledgements) {
-      if (!snapshot.undoAcknowledgements.has(acknowledgement.acknowledgementId)) {
-        appended.push({
-          eventId: acknowledgement.acknowledgementId,
-          kind: "undo-acknowledgement",
-          actorId: acknowledgement.order.actorId,
-        });
+      if (snapshot.operations.has(operation.operationId)) continue;
+      for (const patch of operation.patches) {
+        add(patch.effect.payload);
+        if (patch.selectionMask) add(patch.selectionMask);
       }
     }
   }
-  return appended.sort((left, right) => (
-    left.eventId < right.eventId ? -1 : left.eventId > right.eventId ? 1 : 0
-  ));
+  return [...assets.values()].sort((left, right) => left.assetId.localeCompare(right.assetId));
 }
 
 /** Binds every truly new raster event to the authenticated user performing the durable append. */
@@ -529,6 +600,57 @@ export function assertStudioCrdtRasterAppendedEventActors(
   if (appended.some(({ actorId }) => actorId !== actorUserId)) {
     fail("새 래스터 이벤트 actorId가 인증된 사용자와 일치하지 않습니다.");
   }
+}
+
+/**
+ * Bounds an offline batch's Lamport advance by the number of immutable events it actually adds.
+ * Legitimate batches may contain clocks `durableMax + 1 .. durableMax + N`; a single forged event
+ * cannot jump to uint64 max and permanently sort every later collaborator behind itself.
+ */
+export function assertStudioCrdtRasterAppendedEventAdmission(
+  snapshot: StudioCrdtRasterRootSnapshot | null,
+  doc: Y.Doc,
+  actorUserId: string
+): void {
+  const inspected = inspectStudioCrdtRasterAppendedActorEvents(snapshot, doc);
+  if (inspected.appended.some(({ actorId }) => actorId !== actorUserId)) {
+    fail("새 래스터 이벤트 actorId가 인증된 사용자와 일치하지 않습니다.");
+  }
+  const maximumAcceptedClock = addStudioRasterClockAdvance(
+    inspected.durableMaximumClock,
+    inspected.appended.length
+  );
+  if (
+    inspected.appended.some(({ logicalClock }) => (
+      logicalClock.length > maximumAcceptedClock.length ||
+      (logicalClock.length === maximumAcceptedClock.length && logicalClock > maximumAcceptedClock)
+    ))
+  ) {
+    fail("새 래스터 이벤트 Lamport clock이 durable frontier를 비정상적으로 건너뜁니다.");
+  }
+}
+
+const MAX_STUDIO_RASTER_CLOCK = "18446744073709551615";
+
+/** Adds a small validated event count without requiring an ES2020 BigInt runtime. */
+function addStudioRasterClockAdvance(clock: string, advance: number): string {
+  if (advance <= 0) return clock;
+  const digits = clock.split("").map((digit) => digit.charCodeAt(0) - 48);
+  let carry = advance;
+  for (let index = digits.length - 1; index >= 0 && carry > 0; index -= 1) {
+    const sum = digits[index]! + carry;
+    digits[index] = sum % 10;
+    carry = Math.floor(sum / 10);
+  }
+  while (carry > 0) {
+    digits.unshift(carry % 10);
+    carry = Math.floor(carry / 10);
+  }
+  const result = digits.join("");
+  return result.length > MAX_STUDIO_RASTER_CLOCK.length ||
+    (result.length === MAX_STUDIO_RASTER_CLOCK.length && result > MAX_STUDIO_RASTER_CLOCK)
+    ? MAX_STUDIO_RASTER_CLOCK
+    : result;
 }
 
 function mapConflictsWithSnapshot(

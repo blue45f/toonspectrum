@@ -125,8 +125,8 @@ export function StudioBrushLibrarySheet({
   return (
     <div
       role="dialog"
-      aria-modal="true"
       aria-labelledby={titleId}
+      aria-describedby={`${titleId}-description`}
       data-studio-brush-library="true"
       className={cn(
         "absolute left-2 top-[calc(100%+0.35rem)] z-[60] w-[min(22rem,calc(100vw-1rem))] overflow-hidden rounded-2xl border border-line bg-panel shadow-[0_16px_48px_oklch(0.12_0.02_70/0.55)]",
@@ -138,7 +138,9 @@ export function StudioBrushLibrarySheet({
           <p id={titleId} className="text-sm font-bold text-fg">
             브러시 라이브러리
           </p>
-          <p className="text-[0.62rem] text-fg-3">Magma·PicsArt식 전체 키트 · 검색·즐겨찾기</p>
+          <p id={`${titleId}-description`} className="text-[0.62rem] text-fg-3">
+            전체 브러시 키트 · 검색·즐겨찾기
+          </p>
         </div>
         <button
           type="button"

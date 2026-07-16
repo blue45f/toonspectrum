@@ -93,7 +93,8 @@ export function reconcileStudioCrdtSceneGraphHistory<
   history: TPage[][],
   currentIndex: number,
   frontier: StudioCrdtSceneGraphFrontier,
-  changedIds: StudioCrdtSceneGraphChangedIds | null
+  changedIds: StudioCrdtSceneGraphChangedIds | null,
+  referenceSources?: ReadonlyMap<string, TElement>
 ): StudioCrdtHistoryReconcileResult<TPage> {
   if (history.length === 0) return { history, changed: false };
   if (
@@ -121,7 +122,8 @@ export function reconcileStudioCrdtSceneGraphHistory<
       frontier.sceneElements,
       frontier.pages,
       frontier.layerGroups,
-      changedIds ?? undefined
+      changedIds ?? undefined,
+      referenceSources
     );
     if (reconciled.changed) replaceSnapshot(index, reconciled.pages);
   }
@@ -135,7 +137,9 @@ export function reconcileStudioCrdtSceneGraphHistory<
         frontier.strokes,
         frontier.sceneElements,
         frontier.pages,
-        frontier.layerGroups
+        frontier.layerGroups,
+        undefined,
+        referenceSources
       );
       if (current.changed) replaceSnapshot(boundedCurrentIndex, current.pages);
     }

@@ -15,6 +15,7 @@ import {
   STUDIO_RASTER_KERNEL,
   canonicalStudioRasterJson,
   createStudioRasterOperationLog,
+  type StudioRasterAssetReference,
   type StudioRasterOperation,
   type StudioRasterUndoAcknowledgement,
   type StudioRasterUndoOperation,
@@ -26,8 +27,11 @@ import {
 } from "./studio-crdt.repository";
 import {
   STUDIO_CRDT_SYNC_CHUNK_MAX_BYTES,
+  STUDIO_CRDT_ACTIVE_WORK_ASSET_REFERENCE_MAX_COUNT,
   StudioCrdtDocumentTooLargeError,
   StudioCrdtInvalidPayloadError,
+  type StudioCrdtRasterAssetAdmission,
+  type StudioCrdtWorkAssetAdmission,
   StudioCrdtService,
   StudioCrdtStorageCorruptionError,
   StudioCrdtUpdateIdConflictError,
@@ -40,6 +44,7 @@ import type {
   AppendStudioCrdtUpdateInput,
   AppendStudioCrdtUpdateResult,
   CompactStudioCrdtInput,
+  DrizzleStudioCrdtTransaction,
   StudioCrdtHydrationState,
   StudioCrdtRepository,
   StudioCrdtSnapshotRecord,
@@ -47,6 +52,7 @@ import type {
   StudioCrdtUpdateRecord,
   ValidateStudioCrdtAppend,
 } from "./studio-crdt.repository";
+import type { StudioWorkAssetReference } from "../../../../../lib/studio-work-asset-contract";
 
 function copyBytes(value: Uint8Array): Uint8Array {
   return Uint8Array.from(value);
@@ -64,6 +70,7 @@ class MemoryStudioCrdtRepository implements StudioCrdtRepository {
   failAppend = false;
   compactCalls = 0;
   beforeAppend: (() => Promise<void>) | null = null;
+  readonly validationTransaction = {} as DrizzleStudioCrdtTransaction;
   private readonly mutationTails = new Map<string, Promise<void>>();
 
   private async withWorkMutation<T>(workId: string, operation: () => Promise<T>): Promise<T> {
@@ -140,7 +147,10 @@ class MemoryStudioCrdtRepository implements StudioCrdtRepository {
           },
         };
       }
-      await validate(await this.loadDocument(input.workId));
+      await validate(
+        await this.loadDocument(input.workId),
+        this.validationTransaction
+      );
       const rows = this.updates.get(input.workId) ?? [];
       const update: StudioCrdtUpdateRecord = {
         workId: input.workId,
@@ -197,11 +207,30 @@ class MemoryStudioCrdtRepository implements StudioCrdtRepository {
 
 const services: StudioCrdtService[] = [];
 
+const allowStoredRasterAssetReferences: StudioCrdtRasterAssetAdmission = {
+  async assertReferencesStored() {
+    // Unit tests outside the storage-admission cases exercise the CRDT contract in isolation.
+  },
+};
+
+const allowStoredWorkAssetReferences: StudioCrdtWorkAssetAdmission = {
+  async assertReferencesStored() {
+    // Unit tests outside work-asset storage admission exercise the CRDT contract in isolation.
+  },
+};
+
 function service(
   repository: MemoryStudioCrdtRepository,
-  options: ConstructorParameters<typeof StudioCrdtService>[1] = {}
+  options: ConstructorParameters<typeof StudioCrdtService>[3] = {},
+  rasterAssetAdmission: StudioCrdtRasterAssetAdmission = allowStoredRasterAssetReferences,
+  workAssetAdmission: StudioCrdtWorkAssetAdmission = allowStoredWorkAssetReferences
 ): StudioCrdtService {
-  const created = new StudioCrdtService(repository, options);
+  const created = new StudioCrdtService(
+    repository,
+    rasterAssetAdmission,
+    workAssetAdmission,
+    options
+  );
   services.push(created);
   return created;
 }
@@ -288,7 +317,7 @@ function rasterAsset(assetId: string, width = 16, height = 16) {
     assetId,
     sha256: "a".repeat(64),
     byteLength: 1_024,
-    mediaType: "application/x-toonspectrum-rgba-zstd" as const,
+    mediaType: "image/png" as const,
     width,
     height,
   };
@@ -297,12 +326,13 @@ function rasterAsset(assetId: string, width = 16, height = 16) {
 function rasterOperation(
   operationId = RASTER_OPERATION_ID,
   semanticParametersSha256 = "b".repeat(64),
-  actorId = "editor"
+  actorId = "editor",
+  logicalClock = "1"
 ): StudioRasterOperation {
   return {
     version: STUDIO_RASTER_CRDT_VERSION,
     operationId,
-    order: { logicalClock: "1", actorId },
+    order: { logicalClock, actorId },
     pageId: "page-1",
     layerId: "layer-ink",
     intent: "paint",
@@ -319,6 +349,104 @@ function rasterOperation(
       },
     }],
   };
+}
+
+function rasterOperationUsingAsset(
+  reference: StudioRasterAssetReference,
+  operationId: string,
+  semanticParametersSha256 = "b".repeat(64),
+  actorId = "editor",
+  logicalClock = "1"
+): StudioRasterOperation {
+  const operation = rasterOperation(
+    operationId,
+    semanticParametersSha256,
+    actorId,
+    logicalClock
+  );
+  const [patch] = operation.patches;
+  if (!patch) throw new Error("raster operation fixture requires one patch");
+  return {
+    ...operation,
+    patches: [{
+      ...patch,
+      effect: {
+        kind: "composite",
+        blendMode: "source-over",
+        payload: reference,
+      },
+    }],
+  };
+}
+
+class ExactRasterAssetAdmission implements StudioCrdtRasterAssetAdmission {
+  readonly calls: Array<{
+    actorUserId: string;
+    workId: string;
+    references: readonly StudioRasterAssetReference[];
+  }> = [];
+  readonly transactions: Array<DrizzleStudioCrdtTransaction | undefined> = [];
+  private readonly stored = new Map<string, string>();
+
+  constructor(references: readonly StudioRasterAssetReference[]) {
+    for (const reference of references) {
+      this.stored.set(reference.assetId, canonicalStudioRasterJson(reference));
+    }
+  }
+
+  async assertReferencesStored(
+    actorUserId: string,
+    workId: string,
+    references: readonly StudioRasterAssetReference[],
+    transaction?: DrizzleStudioCrdtTransaction
+  ): Promise<void> {
+    this.transactions.push(transaction);
+    this.calls.push({
+      actorUserId,
+      workId,
+      references: references.map((reference) => ({ ...reference })),
+    });
+    for (const reference of references) {
+      if (this.stored.get(reference.assetId) !== canonicalStudioRasterJson(reference)) {
+        throw new Error("missing or mismatched raster asset");
+      }
+    }
+  }
+}
+
+class ExactWorkAssetAdmission implements StudioCrdtWorkAssetAdmission {
+  readonly calls: Array<{
+    actorUserId: string;
+    workId: string;
+    references: readonly StudioWorkAssetReference[];
+  }> = [];
+  readonly transactions: Array<DrizzleStudioCrdtTransaction | undefined> = [];
+  private readonly stored = new Set<string>();
+
+  constructor(references: readonly StudioWorkAssetReference[]) {
+    for (const reference of references) {
+      this.stored.add(JSON.stringify([reference.assetId, reference.elementType]));
+    }
+  }
+
+  async assertReferencesStored(
+    actorUserId: string,
+    workId: string,
+    references: readonly StudioWorkAssetReference[],
+    transaction?: DrizzleStudioCrdtTransaction
+  ): Promise<void> {
+    this.transactions.push(transaction);
+    this.calls.push({
+      actorUserId,
+      workId,
+      references: references.map((reference) => ({ ...reference })),
+    });
+    for (const reference of references) {
+      if (!this.stored.has(JSON.stringify([reference.assetId, reference.elementType]))) {
+        throw new Error("missing or mismatched work asset");
+      }
+    }
+  }
 }
 
 interface RasterDocumentFixtureOptions {
@@ -461,6 +589,56 @@ function createReferenceTopologyDocument(elementType = "image"): Y.Doc {
     }
   }
   scene.set("prop:elementType", elementType);
+  scene.set("prop:x", 10);
+  scene.set("prop:y", 20);
+  scene.set("prop:width", 300);
+  scene.set("prop:height", 400);
+  scene.set("prop:rotation", 0);
+  return doc;
+}
+
+function createLegacyReferenceTopologyDocument(elementType = "image"): Y.Doc {
+  const doc = createReferenceTopologyDocument(elementType);
+  const scene = doc.getMap<unknown>("scene-element:scene-1");
+  for (const key of [...scene.keys()]) {
+    if (
+      (key.startsWith("base:") || key.startsWith("prop:") || key.startsWith("unset:")) &&
+      key !== "prop:elementType"
+    ) {
+      scene.delete(key);
+    }
+  }
+  return doc;
+}
+
+function createReferenceTopologyFloodDocument(activeReferenceCount: number): Y.Doc {
+  const doc = createReferenceTopologyDocument();
+  const index = doc.getMap<boolean>("scene-elements");
+  const order = doc.getArray<Y.Map<unknown>>("stroke-order");
+  for (let position = 2; position <= activeReferenceCount; position += 1) {
+    const id = `asset-${position}`;
+    index.set(id, true);
+    const scene = doc.getMap<unknown>(`scene-element:${id}`);
+    scene.set("id", id);
+    scene.set("pageId", "page-1");
+    scene.set("layerId", "layer-1");
+    scene.set("payloadVersion", 1);
+    scene.set("type", "reference");
+    scene.set("deleted", false);
+    scene.set("prop:elementType", "image");
+    scene.set("prop:x", position * 10);
+    scene.set("prop:y", 20);
+    scene.set("prop:width", 300);
+    scene.set("prop:height", 400);
+    scene.set("prop:rotation", 0);
+    const sceneOrder = new Y.Map<unknown>();
+    sceneOrder.set("elementId", id);
+    sceneOrder.set("pageId", "page-1");
+    sceneOrder.set("layerId", "layer-1");
+    sceneOrder.set("kind", "scene");
+    sceneOrder.set("active", true);
+    order.push([sceneOrder]);
+  }
   return doc;
 }
 
@@ -914,6 +1092,381 @@ describe("StudioCrdtService", () => {
 
     authored.destroy();
     hydrated.destroy();
+  });
+
+  it("validates a newly introduced raster asset exactly and skips durable retransmissions", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const reference = {
+      ...rasterAsset("a".repeat(64)),
+      sha256: "a".repeat(64),
+    };
+    const admission = new ExactRasterAssetAdmission([reference]);
+    const current = service(repository, {}, admission);
+    const authored = createRasterDocument({
+      operation: rasterOperationUsingAsset(
+        reference,
+        "30000000-0000-4000-8000-000000000482"
+      ),
+    });
+    const data = fromUint8Array(Y.encodeStateAsUpdate(authored));
+
+    await expect(current.applyUpdate({
+      workId: "work-raster-asset-exact",
+      updateId: "30000000-0000-4000-8000-000000000483",
+      actorUserId: "editor",
+      data,
+    })).resolves.toMatchObject({ duplicate: false, serverSequence: "1" });
+    expect(admission.calls).toEqual([{
+      actorUserId: "editor",
+      workId: "work-raster-asset-exact",
+      references: [reference],
+    }]);
+    expect(admission.transactions).toEqual([repository.validationTransaction]);
+
+    // A full-state retransmission contains the durable operation but introduces no new reference.
+    await expect(current.applyUpdate({
+      workId: "work-raster-asset-exact",
+      updateId: "30000000-0000-4000-8000-000000000484",
+      actorUserId: "editor",
+      data,
+    })).resolves.toMatchObject({ duplicate: false, serverSequence: "2" });
+    expect(admission.calls).toHaveLength(1);
+    expect(repository.updates.get("work-raster-asset-exact")).toHaveLength(2);
+    expect(repository.receipts.size).toBe(2);
+
+    authored.destroy();
+  });
+
+  it("atomically rejects a newly introduced raster operation with a missing asset", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const admission = new ExactRasterAssetAdmission([]);
+    const current = service(repository, {}, admission);
+    const missingReference = {
+      ...rasterAsset("c".repeat(64)),
+      sha256: "c".repeat(64),
+    };
+    const authored = createRasterDocument({
+      operation: rasterOperationUsingAsset(
+        missingReference,
+        "30000000-0000-4000-8000-000000000485"
+      ),
+    });
+
+    await expect(current.applyUpdate({
+      workId: "work-raster-asset-missing",
+      updateId: "30000000-0000-4000-8000-000000000486",
+      actorUserId: "editor",
+      data: fromUint8Array(Y.encodeStateAsUpdate(authored)),
+    })).rejects.toBeInstanceOf(StudioCrdtInvalidPayloadError);
+    expect(admission.calls).toHaveLength(1);
+    expect(repository.updates.get("work-raster-asset-missing") ?? []).toHaveLength(0);
+    expect(repository.receipts.size).toBe(0);
+
+    authored.destroy();
+  });
+
+  it("atomically rejects a raster reference whose immutable metadata differs from storage", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const storedReference = {
+      ...rasterAsset("d".repeat(64)),
+      sha256: "d".repeat(64),
+    };
+    const admission = new ExactRasterAssetAdmission([storedReference]);
+    const current = service(repository, {}, admission);
+    const mismatchedReference = { ...storedReference, byteLength: 2_048 };
+    const authored = createRasterDocument({
+      operation: rasterOperationUsingAsset(
+        mismatchedReference,
+        "30000000-0000-4000-8000-000000000487"
+      ),
+    });
+
+    await expect(current.applyUpdate({
+      workId: "work-raster-asset-mismatch",
+      updateId: "30000000-0000-4000-8000-000000000488",
+      actorUserId: "editor",
+      data: fromUint8Array(Y.encodeStateAsUpdate(authored)),
+    })).rejects.toBeInstanceOf(StudioCrdtInvalidPayloadError);
+    expect(admission.calls).toHaveLength(1);
+    expect(repository.updates.get("work-raster-asset-mismatch") ?? []).toHaveLength(0);
+    expect(repository.receipts.size).toBe(0);
+
+    authored.destroy();
+  });
+
+  it("admits a newly activated work-asset reference only after authorized storage validation", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const reference = { assetId: "scene-1", elementType: "image" } as const;
+    const admission = new ExactWorkAssetAdmission([reference]);
+    const current = service(
+      repository,
+      {},
+      allowStoredRasterAssetReferences,
+      admission
+    );
+    const authored = createReferenceTopologyDocument();
+
+    await expect(current.applyUpdate({
+      workId: "work-reference-admitted",
+      updateId: "30000000-0000-4000-8000-000000000491",
+      actorUserId: "editor",
+      data: fromUint8Array(Y.encodeStateAsUpdate(authored)),
+    })).resolves.toMatchObject({ duplicate: false, serverSequence: "1" });
+    expect(admission.calls).toEqual([{
+      actorUserId: "editor",
+      workId: "work-reference-admitted",
+      references: [reference],
+    }]);
+    expect(admission.transactions).toEqual([repository.validationTransaction]);
+    expect(repository.updates.get("work-reference-admitted")).toHaveLength(1);
+
+    authored.destroy();
+  });
+
+  it("hydrates the deployed elementType-only reference envelope without storage admission", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const admission = new ExactWorkAssetAdmission([]);
+    const current = service(
+      repository,
+      {},
+      allowStoredRasterAssetReferences,
+      admission
+    );
+    const legacy = createLegacyReferenceTopologyDocument();
+    expect(hasValidStudioCrdtRootSchema(legacy)).toBe(true);
+
+    await expect(current.applyUpdate({
+      workId: "work-reference-legacy-v1",
+      updateId: "30000000-0000-4000-8000-000000000497",
+      actorUserId: "editor",
+      data: fromUint8Array(Y.encodeStateAsUpdate(legacy)),
+    })).resolves.toMatchObject({ duplicate: false, serverSequence: "1" });
+    expect(admission.calls).toHaveLength(0);
+
+    const hydrated = new Y.Doc();
+    applySync(hydrated, await current.sync("work-reference-legacy-v1"));
+    expect(hydrated.getMap("scene-element:scene-1").get("prop:elementType"))
+      .toBe("image");
+    expect(hasValidStudioCrdtRootSchema(hydrated)).toBe(true);
+    legacy.destroy();
+    hydrated.destroy();
+  });
+
+  it("rejects rewriting a durable admitted reference into another scene type", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const reference = { assetId: "scene-1", elementType: "image" } as const;
+    const admission = new ExactWorkAssetAdmission([reference]);
+    const current = service(
+      repository,
+      {},
+      allowStoredRasterAssetReferences,
+      admission
+    );
+    const authored = createReferenceTopologyDocument();
+    await current.applyUpdate({
+      workId: "work-reference-identity-grow-only",
+      updateId: "30000000-0000-4000-8000-000000000498",
+      actorUserId: "editor",
+      data: fromUint8Array(Y.encodeStateAsUpdate(authored)),
+    });
+
+    const beforeRewrite = Y.encodeStateVector(authored);
+    const scene = authored.getMap<unknown>("scene-element:scene-1");
+    scene.set("type", "text");
+    for (const key of [...scene.keys()]) {
+      if (key.startsWith("base:") || key.startsWith("prop:") || key.startsWith("unset:")) {
+        scene.delete(key);
+      }
+    }
+    scene.set("prop:text", "reference rewrite");
+    scene.set("prop:x", 10);
+    scene.set("prop:y", 20);
+    scene.set("prop:width", 300);
+    scene.set("prop:fontSize", 20);
+    scene.set("prop:fill", "#111111");
+    scene.set("prop:rotation", 0);
+    expect(hasValidStudioCrdtRootSchema(authored)).toBe(true);
+
+    await expect(current.applyUpdate({
+      workId: "work-reference-identity-grow-only",
+      updateId: "30000000-0000-4000-8000-000000000499",
+      actorUserId: "editor",
+      data: fromUint8Array(Y.encodeStateAsUpdate(authored, beforeRewrite)),
+    })).rejects.toBeInstanceOf(StudioCrdtInvalidPayloadError);
+    expect(repository.updates.get("work-reference-identity-grow-only")).toHaveLength(1);
+    expect(admission.calls).toHaveLength(1);
+    authored.destroy();
+  });
+
+  it("rejects downgrading a durable admitted reference to the legacy props-only envelope", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const reference = { assetId: "scene-1", elementType: "image" } as const;
+    const admission = new ExactWorkAssetAdmission([reference]);
+    const current = service(
+      repository,
+      {},
+      allowStoredRasterAssetReferences,
+      admission
+    );
+    const authored = createReferenceTopologyDocument();
+    await current.applyUpdate({
+      workId: "work-reference-no-admission-downgrade",
+      updateId: "30000000-0000-4000-8000-00000000049a",
+      actorUserId: "editor",
+      data: fromUint8Array(Y.encodeStateAsUpdate(authored)),
+    });
+
+    const beforeDowngrade = Y.encodeStateVector(authored);
+    const scene = authored.getMap<unknown>("scene-element:scene-1");
+    for (const key of [...scene.keys()]) {
+      if (
+        (key.startsWith("base:") || key.startsWith("prop:") || key.startsWith("unset:")) &&
+        key !== "prop:elementType"
+      ) {
+        scene.delete(key);
+      }
+    }
+    expect(hasValidStudioCrdtRootSchema(authored)).toBe(true);
+
+    await expect(current.applyUpdate({
+      workId: "work-reference-no-admission-downgrade",
+      updateId: "30000000-0000-4000-8000-00000000049b",
+      actorUserId: "editor",
+      data: fromUint8Array(Y.encodeStateAsUpdate(authored, beforeDowngrade)),
+    })).rejects.toBeInstanceOf(StudioCrdtInvalidPayloadError);
+    expect(repository.updates.get("work-reference-no-admission-downgrade")).toHaveLength(1);
+    expect(admission.calls).toHaveLength(1);
+    authored.destroy();
+  });
+
+  it("atomically rejects a newly activated work-asset reference missing from authorized storage", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const admission = new ExactWorkAssetAdmission([]);
+    const current = service(
+      repository,
+      {},
+      allowStoredRasterAssetReferences,
+      admission
+    );
+    const authored = createReferenceTopologyDocument();
+
+    await expect(current.applyUpdate({
+      workId: "work-reference-missing",
+      updateId: "30000000-0000-4000-8000-000000000492",
+      actorUserId: "editor",
+      data: fromUint8Array(Y.encodeStateAsUpdate(authored)),
+    })).rejects.toBeInstanceOf(StudioCrdtInvalidPayloadError);
+    expect(admission.calls).toHaveLength(1);
+    expect(repository.updates.get("work-reference-missing") ?? []).toHaveLength(0);
+    expect(repository.receipts.size).toBe(0);
+
+    authored.destroy();
+  });
+
+  it("rejects a fake work-asset identity even when it is introduced already tombstoned", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const admission = new ExactWorkAssetAdmission([]);
+    const current = service(
+      repository,
+      {},
+      allowStoredRasterAssetReferences,
+      admission
+    );
+    const authored = createReferenceTopologyDocument();
+    authored.getMap<unknown>("scene-element:scene-1").set("deleted", true);
+
+    await expect(current.applyUpdate({
+      workId: "work-reference-fake-tombstone",
+      updateId: "30000000-0000-4000-8000-000000000496",
+      actorUserId: "editor",
+      data: fromUint8Array(Y.encodeStateAsUpdate(authored)),
+    })).rejects.toBeInstanceOf(StudioCrdtInvalidPayloadError);
+    expect(admission.calls).toHaveLength(1);
+    expect(repository.updates.get("work-reference-fake-tombstone") ?? []).toHaveLength(0);
+
+    authored.destroy();
+  });
+
+  it("rejects more than 250 active work-asset references before storage admission or append", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const admission = new ExactWorkAssetAdmission([]);
+    const current = service(
+      repository,
+      {},
+      allowStoredRasterAssetReferences,
+      admission
+    );
+    const authored = createReferenceTopologyFloodDocument(
+      STUDIO_CRDT_ACTIVE_WORK_ASSET_REFERENCE_MAX_COUNT + 1
+    );
+
+    await expect(current.applyUpdate({
+      workId: "work-reference-over-cap",
+      updateId: "30000000-0000-4000-8000-000000000493",
+      actorUserId: "editor",
+      data: fromUint8Array(Y.encodeStateAsUpdate(authored)),
+    })).rejects.toBeInstanceOf(StudioCrdtInvalidPayloadError);
+    expect(admission.calls).toHaveLength(0);
+    expect(repository.updates.get("work-reference-over-cap") ?? []).toHaveLength(0);
+    expect(repository.receipts.size).toBe(0);
+
+    authored.destroy();
+  });
+
+  it("does not revalidate an existing active work-asset reference on ordinary property edits", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const reference = { assetId: "scene-1", elementType: "image" } as const;
+    const admission = new ExactWorkAssetAdmission([reference]);
+    const current = service(
+      repository,
+      {},
+      allowStoredRasterAssetReferences,
+      admission
+    );
+    const authored = createReferenceTopologyDocument();
+    await current.applyUpdate({
+      workId: "work-reference-existing",
+      updateId: "30000000-0000-4000-8000-000000000494",
+      actorUserId: "editor",
+      data: fromUint8Array(Y.encodeStateAsUpdate(authored)),
+    });
+    const currentVector = Y.encodeStateVector(authored);
+    authored.getMap<unknown>("scene-element:scene-1").set("prop:x", 42);
+
+    await expect(current.applyUpdate({
+      workId: "work-reference-existing",
+      updateId: "30000000-0000-4000-8000-000000000495",
+      actorUserId: "editor",
+      data: fromUint8Array(Y.encodeStateAsUpdate(authored, currentVector)),
+    })).resolves.toMatchObject({ duplicate: false, serverSequence: "2" });
+    expect(admission.calls).toHaveLength(1);
+    expect(repository.updates.get("work-reference-existing")).toHaveLength(2);
+
+    authored.destroy();
+  });
+
+  it("atomically rejects a single raster event that jumps the durable Lamport frontier", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const current = service(repository);
+    const jumped = createRasterDocument({
+      operation: rasterOperation(
+        "30000000-0000-4000-8000-000000000480",
+        "d".repeat(64),
+        "editor",
+        "18446744073709551615"
+      ),
+    });
+
+    await expect(current.applyUpdate({
+      workId: "work-raster-clock-jump",
+      updateId: "30000000-0000-4000-8000-000000000481",
+      actorUserId: "editor",
+      data: fromUint8Array(Y.encodeStateAsUpdate(jumped)),
+    })).rejects.toBeInstanceOf(StudioCrdtInvalidPayloadError);
+    expect(repository.updates.get("work-raster-clock-jump") ?? []).toHaveLength(0);
+    expect(repository.receipts.size).toBe(0);
+
+    jumped.destroy();
   });
 
   it("allows an aggregate update to retransmit an existing other-actor event", async () => {
@@ -1455,14 +2008,20 @@ describe("StudioCrdtService", () => {
     aggregateEntryOverflow.destroy();
   });
 
-  it("accepts topology-only asset references and rejects payload smuggling or reserved types", () => {
-    for (const elementType of ["image", "vrm", "background3d", "toString"]) {
+  it("accepts bounded admitted-asset reference state and rejects payload smuggling or unsupported types", () => {
+    for (const elementType of ["image", "vrm", "background3d"]) {
       const valid = createReferenceTopologyDocument(elementType);
+      const scene = valid.getMap<unknown>("scene-element:scene-1");
+      scene.set("prop:opacity", 0.5);
+      scene.set("prop:flippedY", true);
+      scene.set("prop:blur", 8);
       expect(hasValidStudioCrdtRootSchema(valid)).toBe(true);
       valid.destroy();
     }
 
-    for (const elementType of ["draw", "text", "reference", "bad\u0007type", "x".repeat(161)]) {
+    for (const elementType of [
+      "draw", "text", "reference", "toString", "bad\u0007type", "x".repeat(161),
+    ]) {
       const invalid = createReferenceTopologyDocument(elementType);
       expect(hasValidStudioCrdtRootSchema(invalid)).toBe(false);
       invalid.destroy();
@@ -1484,6 +2043,23 @@ describe("StudioCrdtService", () => {
       .set("base:elementType", "x".repeat(1_000));
     expect(hasValidStudioCrdtRootSchema(hiddenBaseline)).toBe(false);
     hiddenBaseline.destroy();
+
+    const invalidPlacement = createReferenceTopologyDocument();
+    invalidPlacement.getMap<unknown>("scene-element:scene-1").set("prop:width", 0);
+    expect(hasValidStudioCrdtRootSchema(invalidPlacement)).toBe(false);
+    invalidPlacement.destroy();
+
+    const invalidFilter = createReferenceTopologyDocument();
+    invalidFilter.getMap<unknown>("scene-element:scene-1").set("prop:blur", 31);
+    expect(hasValidStudioCrdtRootSchema(invalidFilter)).toBe(false);
+    invalidFilter.destroy();
+
+    const hiddenInvalidFilter = createReferenceTopologyDocument();
+    const hiddenFilterScene = hiddenInvalidFilter.getMap<unknown>("scene-element:scene-1");
+    hiddenFilterScene.set("base:blur", -1);
+    hiddenFilterScene.set("prop:blur", 4);
+    expect(hasValidStudioCrdtRootSchema(hiddenInvalidFilter)).toBe(false);
+    hiddenInvalidFilter.destroy();
 
     const prototypeType = createReferenceTopologyDocument();
     prototypeType.getMap<unknown>("scene-element:scene-1").set("type", "toString");

@@ -15,7 +15,7 @@ export const STUDIO_CRDT_SNAPSHOT_MAX_BYTES = 16 * 1_024 * 1_024;
 export const STUDIO_CRDT_ADVISORY_LOCK_NAMESPACE =
   "toonspectrum:creator-work-crdt:v1:";
 
-type DrizzleStudioCrdtTransaction = Parameters<
+export type DrizzleStudioCrdtTransaction = Parameters<
   Parameters<typeof db.transaction>[0]
 >[0];
 
@@ -91,7 +91,8 @@ export interface AppendStudioCrdtUpdateResult {
  * document, but before the candidate update is inserted. Throwing aborts the whole transaction.
  */
 export type ValidateStudioCrdtAppend = (
-  current: StudioCrdtHydrationState
+  current: StudioCrdtHydrationState,
+  transaction: DrizzleStudioCrdtTransaction
 ) => void | Promise<void>;
 
 export interface CompactStudioCrdtInput {
@@ -156,7 +157,7 @@ function receiptRecord(
   };
 }
 
-async function loadDocumentInTransaction(
+export async function loadStudioCrdtDocumentInTransaction(
   transaction: DrizzleStudioCrdtTransaction,
   workId: string
 ): Promise<StudioCrdtHydrationState> {
@@ -189,7 +190,7 @@ async function loadDocumentInTransaction(
 export class DrizzleStudioCrdtRepository implements StudioCrdtRepository {
   async loadDocument(workId: string): Promise<StudioCrdtHydrationState> {
     return db.transaction(
-      (transaction) => loadDocumentInTransaction(transaction, workId),
+      (transaction) => loadStudioCrdtDocumentInTransaction(transaction, workId),
       { isolationLevel: "repeatable read", accessMode: "read only" }
     );
   }
@@ -275,7 +276,10 @@ export class DrizzleStudioCrdtRepository implements StudioCrdtRepository {
 
         // This read and the candidate insert share one lock/transaction. A later API process must
         // validate against this commit, not against its stale process-local Y.Doc cache.
-        await validate(await loadDocumentInTransaction(transaction, input.workId));
+        await validate(
+          await loadStudioCrdtDocumentInTransaction(transaction, input.workId),
+          transaction
+        );
 
         // Claim the durable dedupe key after merged validation. The unique conflict fallback is
         // defense in depth for a writer that does not yet participate in this lock protocol.

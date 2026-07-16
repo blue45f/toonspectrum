@@ -625,6 +625,160 @@ export const creatorWorkLiveLocks = pgTable(
   ]
 );
 
+// CRDT scene topology stores only `(assetId, elementType)`. The authored binary body and the
+// bounded placement descriptor live here, scoped to the private work and removed with it. Keeping
+// this separate from creator_asset is deliberate: creator_asset is a public image/data-URL
+// marketplace, while these rows may contain private raster, VRM, or embedded-background GLB data.
+export const creatorWorkAssets = pgTable(
+  "creator_work_asset",
+  {
+    workId: text("workId").notNull(),
+    assetId: text("assetId").notNull(),
+    elementType: text("elementType").notNull(),
+    mimeType: text("mimeType").notNull(),
+    descriptor: jsonb("descriptor")
+      .$type<{
+        version: 1;
+        element: {
+          id: string;
+          type: "image" | "vrm" | "background3d";
+          x: number;
+          y: number;
+          width: number;
+          height: number;
+          rotation: number;
+          name?: string;
+          opacity?: number;
+          hidden?: boolean;
+          locked?: boolean;
+          noClip?: boolean;
+        };
+      }>()
+      .notNull(),
+    payload: bytea("payload").notNull(),
+    byteSize: integer("byteSize").notNull(),
+    sha256: text("sha256").notNull(),
+    intrinsicWidth: integer("intrinsicWidth"),
+    intrinsicHeight: integer("intrinsicHeight"),
+    decodedRgbaBytes: integer("decodedRgbaBytes"),
+    uploadedBy: text("uploadedBy"),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({
+      name: "creator_work_asset_work_fkey",
+      columns: [t.workId],
+      foreignColumns: [creatorWorks.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "creator_work_asset_uploaded_by_fkey",
+      columns: [t.uploadedBy],
+      foreignColumns: [users.id],
+    }).onDelete("set null"),
+    primaryKey({
+      name: "creator_work_asset_pkey",
+      columns: [t.workId, t.assetId],
+    }),
+    index("idx_creator_work_asset_uploader_updated").on(t.uploadedBy, t.updatedAt.desc()),
+    check(
+      "creator_work_asset_id_check",
+      sql`length(${t.assetId}) between 1 and 160`
+    ),
+    check(
+      "creator_work_asset_element_type_check",
+      sql`${t.elementType} in ('image', 'vrm', 'background3d')`
+    ),
+    check(
+      "creator_work_asset_media_contract_check",
+      sql`(
+          ${t.elementType} = 'image'
+          and ${t.mimeType} in ('image/png', 'image/jpeg', 'image/webp')
+          and ${t.byteSize} <= 8388608
+        ) or (
+          ${t.elementType} in ('vrm', 'background3d')
+          and ${t.mimeType} = 'model/gltf-binary'
+          and ${t.byteSize} <= 12582912
+        )`
+    ),
+    check(
+      "creator_work_asset_byte_size_check",
+      sql`${t.byteSize} between 1 and 12582912`
+    ),
+    check(
+      "creator_work_asset_payload_size_check",
+      sql`octet_length(${t.payload}) = ${t.byteSize}`
+    ),
+    check(
+      "creator_work_asset_intrinsic_image_check",
+      sql`((
+          ${t.elementType} = 'image'
+          and ${t.intrinsicWidth} between 1 and 16384
+          and ${t.intrinsicHeight} between 1 and 16384
+          and ${t.decodedRgbaBytes} between 4 and 67108864
+          and ${t.decodedRgbaBytes}::bigint =
+            ${t.intrinsicWidth}::bigint * ${t.intrinsicHeight}::bigint * 4
+        ) or (
+          ${t.elementType} in ('vrm', 'background3d')
+          and ${t.intrinsicWidth} is null
+          and ${t.intrinsicHeight} is null
+          and ${t.decodedRgbaBytes} is null
+        )) is true`
+    ),
+    check(
+      "creator_work_asset_sha256_check",
+      sql`${t.sha256} ~ '^[0-9a-f]{64}$'`
+    ),
+    check(
+      "creator_work_asset_descriptor_check",
+      sql`(jsonb_typeof(${t.descriptor}) = 'object'
+        and ${t.descriptor}->>'version' = '1'
+        and jsonb_typeof(${t.descriptor}->'element') = 'object'
+        and ${t.descriptor}->'element'->>'id' = ${t.assetId}
+        and ${t.descriptor}->'element'->>'type' = ${t.elementType}) is true`
+    ),
+  ]
+);
+
+// Asset IDs are permanent CRDT identities, not reusable storage slots. Physical payload deletion
+// writes this lightweight reservation in the same transaction so an old offline reference can
+// never resolve to unrelated bytes after reconnect. Reservations share the work lifecycle.
+export const creatorWorkAssetTombstones = pgTable(
+  "creator_work_asset_tombstone",
+  {
+    workId: text("workId").notNull(),
+    assetId: text("assetId").notNull(),
+    elementType: text("elementType").notNull(),
+    deletedBy: text("deletedBy"),
+    deletedAt: timestamp("deletedAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({
+      name: "creator_work_asset_tombstone_work_fkey",
+      columns: [t.workId],
+      foreignColumns: [creatorWorks.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "creator_work_asset_tombstone_deleted_by_fkey",
+      columns: [t.deletedBy],
+      foreignColumns: [users.id],
+    }).onDelete("set null"),
+    primaryKey({
+      name: "creator_work_asset_tombstone_pkey",
+      columns: [t.workId, t.assetId],
+    }),
+    index("idx_creator_work_asset_tombstone_deleted_by").on(t.deletedBy, t.deletedAt.desc()),
+    check(
+      "creator_work_asset_tombstone_id_check",
+      sql`length(${t.assetId}) between 1 and 160`
+    ),
+    check(
+      "creator_work_asset_tombstone_element_type_check",
+      sql`${t.elementType} in ('image', 'vrm', 'background3d')`
+    ),
+  ]
+);
+
 // 작품 소유자는 creator_work.userId로 판정하며 이 테이블에는 넣지 않는다. 멤버 행은 초대부터
 // 수락/거절까지의 상태를 보존해 팀 관리 API와 이후 실시간 presence 권한의 단일 근거로 사용한다.
 export const creatorWorkCollaborators = pgTable(

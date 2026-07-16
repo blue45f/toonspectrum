@@ -1,0 +1,44 @@
+import { createZodDto } from "nestjs-zod";
+import { z } from "zod";
+
+import { StudioWorkAssetTypeSchema } from "../../../../../lib/studio-work-asset-contract";
+
+const ExactAssetIdSchema = z
+  .string()
+  .min(1)
+  .max(160)
+  .refine((value) => value.trim().length > 0, "에셋 식별자가 비어 있습니다.")
+  .refine(
+    (value) => ![...value].some((character) => {
+      const codePoint = character.codePointAt(0) ?? 0;
+      return codePoint <= 31 || (codePoint >= 127 && codePoint <= 159);
+    }),
+    "에셋 식별자에 제어 문자를 사용할 수 없습니다."
+  );
+
+export const StudioWorkAssetParamsSchema = z
+  .object({
+    id: z.string().trim().min(1).max(160),
+    assetId: ExactAssetIdSchema,
+  })
+  .strict();
+
+export const StudioWorkAssetTypeQuerySchema = z
+  .object({ elementType: StudioWorkAssetTypeSchema })
+  .strict();
+
+export const DeleteStudioWorkAssetQuerySchema = StudioWorkAssetTypeQuerySchema
+  .extend({ expectedSha256: z.string().regex(/^[0-9a-f]{64}$/u) })
+  .strict();
+
+export const UploadStudioWorkAssetSchema = z
+  .object({
+    elementType: StudioWorkAssetTypeSchema,
+    descriptor: z.string().min(2).max(4_096),
+  })
+  .strict();
+
+export class StudioWorkAssetParamsDto extends createZodDto(StudioWorkAssetParamsSchema) {}
+export class StudioWorkAssetTypeQueryDto extends createZodDto(StudioWorkAssetTypeQuerySchema) {}
+export class DeleteStudioWorkAssetQueryDto extends createZodDto(DeleteStudioWorkAssetQuerySchema) {}
+export class UploadStudioWorkAssetDto extends createZodDto(UploadStudioWorkAssetSchema) {}

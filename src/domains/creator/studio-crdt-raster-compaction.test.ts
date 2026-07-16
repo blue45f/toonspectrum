@@ -31,7 +31,7 @@ function asset(id: string, width = 128, height = 128): StudioRasterAssetReferenc
     assetId: id,
     sha256: sha("a"),
     byteLength: 2_048,
-    mediaType: "application/x-toonspectrum-rgba-zstd",
+    mediaType: "image/png",
     width,
     height,
   };

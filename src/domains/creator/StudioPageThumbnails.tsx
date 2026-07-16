@@ -29,6 +29,7 @@ import {
   type ThumbPageLike,
 } from "./studio-page-thumbs";
 
+import { parseStudioWorkAssetSourceUri } from "@/lib/studio-work-asset-contract";
 import { cn } from "@/lib/utils";
 
 // ── 썸네일 ──────────────────────────────────────────────────────────────────────────
@@ -111,6 +112,37 @@ function renderThumbNode(node: ThumbNode): ReactElement {
         />
       );
     case "image":
+      if (parseStudioWorkAssetSourceUri(node.src)) {
+        return (
+          <g
+            key={node.key}
+            data-work-asset-placeholder="true"
+            transform={transform}
+            opacity={node.opacity}
+          >
+            <title>팀 에셋을 안전하게 불러오는 중</title>
+            <rect
+              x={node.x}
+              y={node.y}
+              width={node.w}
+              height={node.h}
+              rx={10}
+              fill="rgb(99 102 241 / 0.08)"
+              stroke="rgb(99 102 241 / 0.55)"
+              strokeWidth={3}
+              strokeDasharray="12 8"
+            />
+            <path
+              d={`M ${node.x + node.w * 0.2} ${node.y + node.h * 0.62} L ${node.x + node.w * 0.42} ${node.y + node.h * 0.4} L ${node.x + node.w * 0.56} ${node.y + node.h * 0.54} L ${node.x + node.w * 0.78} ${node.y + node.h * 0.3}`}
+              fill="none"
+              stroke="rgb(99 102 241 / 0.7)"
+              strokeWidth={Math.max(3, Math.min(node.w, node.h) * 0.025)}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </g>
+        );
+      }
       return (
         <image
           key={node.key}

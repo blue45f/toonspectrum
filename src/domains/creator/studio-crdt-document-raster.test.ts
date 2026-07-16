@@ -23,6 +23,7 @@ import {
   canonicalStudioRasterJson,
   createStudioRasterOperationLog,
   type StudioRasterAssetReference,
+  type StudioRasterAssetMediaType,
   type StudioRasterOperation,
   type StudioRasterOperationLog,
   type StudioRasterSurfaceSpec,
@@ -32,6 +33,12 @@ import {
 
 const sha = (character: string) => character.repeat(64);
 const uuid = (value: number) => `20000000-0000-4000-8000-${String(value).padStart(12, "0")}`;
+const persistedV1RasterMediaTypes = [
+  "image/png",
+  "image/webp",
+  "application/x-toonspectrum-rgba-zstd",
+  "application/x-toonspectrum-alpha-zstd",
+] as const satisfies readonly StudioRasterAssetMediaType[];
 
 const surface = {
   version: STUDIO_RASTER_CRDT_VERSION,
@@ -53,13 +60,17 @@ function asset(
     assetId,
     sha256: digest,
     byteLength,
-    mediaType: "application/x-toonspectrum-rgba-zstd",
+    mediaType: "image/png",
     width,
     height,
   };
 }
 
-function operation(id: number, logicalClock = String(id)): StudioRasterOperation {
+function operation(
+  id: number,
+  logicalClock = String(id),
+  mediaType: StudioRasterAssetMediaType = "image/png"
+): StudioRasterOperation {
   return {
     version: STUDIO_RASTER_CRDT_VERSION,
     operationId: uuid(id),
@@ -76,7 +87,10 @@ function operation(id: number, logicalClock = String(id)): StudioRasterOperation
       effect: {
         kind: "composite",
         blendMode: "source-over",
-        payload: asset(`patch-${id}`, 16, 16, sha("c")),
+        payload: {
+          ...asset(`patch-${id}`, 16, 16, sha("c")),
+          mediaType,
+        },
       },
     }],
   };
@@ -162,6 +176,26 @@ function changedIds(changes: readonly StudioCrdtChange[], field: keyof Pick<
 }
 
 describe("StudioCrdtDocument semantic raster roots", () => {
+  it.each(persistedV1RasterMediaTypes.map((mediaType, index) => [mediaType, index] as const))(
+    "hydrates persisted CRDT v1 %s references without rewriting their immutable metadata",
+    (mediaType, index) => {
+      const source = new StudioCrdtDocument();
+      const hydrated = new StudioCrdtDocument();
+      const persisted = operation(100 + index, String(100 + index), mediaType);
+
+      source.mergeRasterOperationLog(operationLog({ operations: [persisted] }));
+      hydrated.applyUpdate(source.encodeStateAsUpdate());
+
+      expect(
+        hydrated.getRasterOperationLog(surface.surfaceId)
+          ?.operations[0]?.patches[0]?.effect.payload.mediaType
+      ).toBe(mediaType);
+
+      source.destroy();
+      hydrated.destroy();
+    }
+  );
+
   it("converges concurrent raster operations by immutable set union", () => {
     const left = new StudioCrdtDocument();
     const right = new StudioCrdtDocument();

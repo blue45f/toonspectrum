@@ -1,10 +1,11 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
+import { StudioBrushLibrarySheet } from "./StudioBrushLibrarySheet";
 import { StudioDrawOptionsBar } from "./StudioDrawOptionsBar";
 
 describe("StudioDrawOptionsBar", () => {
-  it("renders size, opacity, stabilizer, and smart-shape controls", () => {
+  it("renders a compact primary dock with continuous size, opacity, and smart-shape controls", () => {
     const html = renderToStaticMarkup(
       <StudioDrawOptionsBar
         drawMode="pen"
@@ -33,26 +34,22 @@ describe("StudioDrawOptionsBar", () => {
     expect(html).toContain('aria-label="브러시 크기"');
     expect(html).toContain('aria-label="브러시 불투명도"');
     expect(html).toContain('data-studio-draw-options-end="true"');
-    expect(html).toContain("브러시 크기 프리셋");
-    expect(html).toContain('data-studio-size-chip-glyph=');
-    expect(html).toContain('data-studio-size-chip="');
-    expect(html).toContain('data-studio-tool-identity="true"');
-    expect(html).toContain('data-studio-tool-identity-icon-first="true"');
+    expect(html).not.toContain("브러시 크기 프리셋");
+    expect(html).not.toContain('data-studio-size-chip="');
     expect(html).toContain('aria-pressed="true"');
     // CSP/Photopea dual well on the commercial options strip
     expect(html).toContain('data-studio-dual-color-well="true"');
     expect(html).toContain('data-studio-color-swap="true"');
     expect(html).toContain('data-studio-size-preview="true"');
     expect(html).toContain('data-studio-opacity-glyph="true"');
-    // Magma/PicsArt: active brush pill + size nudge + advanced disclosure
+    // Active brush pill + continuous controls + progressive disclosure
     expect(html).toContain('data-studio-brush-active-pill="true"');
-    expect(html).toContain('aria-label="브러시 크기 줄이기"');
     expect(html).toContain('data-studio-draw-advanced-toggle="true"');
   });
 
-  it("exposes advanced stabilizer controls when expanded via static advanced props", () => {
+  it("keeps the full brush library reachable from the compact active-brush control", () => {
     // Advanced row is closed by default; stabilizer lives behind toggle.
-    // Library pill and size chips remain always visible.
+    // The library pill and two continuous controls remain visible; preset chips are progressive.
     const html = renderToStaticMarkup(
       <StudioDrawOptionsBar
         drawMode="pen"
@@ -70,14 +67,13 @@ describe("StudioDrawOptionsBar", () => {
         onToggleQuickShape={vi.fn()}
         favoriteBrushIds={["neon", "pen"]}
         onToggleFavoriteBrush={vi.fn()}
-        onSelectRecentBrush={vi.fn()}
       />
     );
     expect(html).toContain("브러시 라이브러리");
     expect(html).toContain("네온");
   });
 
-  it("renders symmetry chips on the primary strip; slots stay behind advanced", () => {
+  it("keeps symmetry and slots behind the advanced disclosure", () => {
     const html = renderToStaticMarkup(
       <StudioDrawOptionsBar
         drawMode="pen"
@@ -110,9 +106,8 @@ describe("StudioDrawOptionsBar", () => {
     // Progressive disclosure: slots only when advanced is open
     expect(html).not.toContain("브러시 슬롯 1");
     expect(html).toContain('data-studio-draw-advanced-toggle="true"');
-    expect(html).toContain("대칭 그리기");
-    expect(html).toContain('data-studio-symmetry-glyph="vertical"');
-    expect(html).toContain('aria-label="대칭 세로"');
+    expect(html).not.toContain("대칭 그리기");
+    expect(html).not.toContain('aria-label="대칭 세로"');
   });
 
   it("renders commercial shape strip and fill when shape mode is active", () => {
@@ -142,5 +137,46 @@ describe("StudioDrawOptionsBar", () => {
     expect(html).toContain("도형 채우기");
     expect(html).toContain("도형");
     expect(html).toContain('aria-label="그리기 모드"');
+  });
+
+  it("keeps the fixed dock inside the canvas column when desktop panels are open", () => {
+    const html = renderToStaticMarkup(
+      <StudioDrawOptionsBar
+        docked
+        dockInsets={{ left: 308, right: 420 }}
+        drawMode="pen"
+        brushId="pen"
+        strokeWidth={6}
+        brushOpacity={1}
+        stabilizer={4}
+        color="#112233"
+        quickShapeActive={false}
+        onSelectBrush={vi.fn()}
+        onStrokeWidthChange={vi.fn()}
+        onOpacityChange={vi.fn()}
+        onStabilizerChange={vi.fn()}
+        onColorChange={vi.fn()}
+        onToggleQuickShape={vi.fn()}
+      />
+    );
+    expect(html).toContain('data-studio-draw-options-dock-left="308"');
+    expect(html).toContain('data-studio-draw-options-dock-right="420"');
+    expect(html).toContain("100vw - 752px");
+    expect(html).toContain("max(calc(100vw - 752px), 20rem)");
+    expect(html).toContain("clamp(10.75rem");
+  });
+
+  it("keeps the brush library a keyboard-friendly non-modal popover", () => {
+    const html = renderToStaticMarkup(
+      <StudioBrushLibrarySheet
+        open
+        activeBrushId="pen"
+        onClose={vi.fn()}
+        onSelect={vi.fn()}
+      />
+    );
+    expect(html).toContain('role="dialog"');
+    expect(html).toContain('aria-describedby="');
+    expect(html).not.toContain('aria-modal="true"');
   });
 });

@@ -49,6 +49,13 @@ export const STUDIO_RASTER_INTENTS = [
 
 export type StudioRasterIntent = (typeof STUDIO_RASTER_INTENTS)[number];
 
+/**
+ * Immutable CRDT v1 read/validation compatibility list.
+ *
+ * Do not use this as the admission list for newly uploaded or published assets. New storage is
+ * intentionally PNG-only and is governed by `studio-raster-asset-contract.ts`. Removing a codec
+ * here would make already persisted v1 Yjs documents unreadable even when no new asset is written.
+ */
 export const STUDIO_RASTER_ASSET_MEDIA_TYPES = [
   "image/png",
   "image/webp",

@@ -3,13 +3,23 @@ import { fromUint8Array, toUint8Array } from "js-base64";
 import * as Y from "yjs";
 
 import {
+  appendedStudioCrdtRasterAssetReferences,
   appendsStudioCrdtRasterCheckpoint,
-  assertStudioCrdtRasterAppendedEventActors,
+  assertStudioCrdtRasterAppendedEventAdmission,
   conflictsWithStudioCrdtRasterRootSnapshot,
   hasValidStudioCrdtRasterDocument,
   preservesStudioCrdtRasterRoots,
   snapshotStudioCrdtRasterRoots,
 } from "../../../../../lib/studio-crdt-raster-document-contract";
+import {
+  STUDIO_WORK_ASSET_BOOLEAN_EDIT_KEYS,
+  STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK,
+  STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS,
+  STUDIO_WORK_ASSET_SCALAR_FILTER_RANGES,
+  STUDIO_WORK_ASSET_TYPES,
+  StudioWorkAssetElementSchema,
+  studioWorkAssetReferenceKey,
+} from "../../../../../lib/studio-work-asset-contract";
 
 import {
   STUDIO_CRDT_REPOSITORY,
@@ -17,17 +27,42 @@ import {
   STUDIO_CRDT_UPDATE_MAX_BYTES,
   studioCrdtPayloadHash,
 } from "./studio-crdt.repository";
+import { StudioRasterAssetService } from "./studio-raster-asset.service";
+import { StudioWorkAssetService } from "./studio-work-asset.service";
 
 import type {
+  DrizzleStudioCrdtTransaction,
   StudioCrdtHydrationState,
   StudioCrdtRepository,
   StudioCrdtUpdateRecord,
 } from "./studio-crdt.repository";
+import type { StudioRasterAssetReference } from "../../../../../lib/studio-crdt-raster-ops";
+import type { StudioWorkAssetReference } from "../../../../../lib/studio-work-asset-contract";
+
+export interface StudioCrdtRasterAssetAdmission {
+  assertReferencesStored(
+    actorUserId: string,
+    workId: string,
+    references: readonly StudioRasterAssetReference[],
+    transaction?: DrizzleStudioCrdtTransaction
+  ): Promise<void>;
+}
+
+export interface StudioCrdtWorkAssetAdmission {
+  assertReferencesStored(
+    actorUserId: string,
+    workId: string,
+    references: readonly StudioWorkAssetReference[],
+    transaction?: DrizzleStudioCrdtTransaction
+  ): Promise<void>;
+}
 
 export const STUDIO_CRDT_SERVICE_OPTIONS = Symbol("STUDIO_CRDT_SERVICE_OPTIONS");
 export const STUDIO_CRDT_STATE_VECTOR_MAX_BYTES = 256 * 1_024;
 export const STUDIO_CRDT_SYNC_DIFF_MAX_BYTES = STUDIO_CRDT_SNAPSHOT_MAX_BYTES;
 export const STUDIO_CRDT_SYNC_CHUNK_MAX_BYTES = 40 * 1_024;
+export const STUDIO_CRDT_ACTIVE_WORK_ASSET_REFERENCE_MAX_COUNT =
+  STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK;
 
 const DEFAULT_COMPACT_UPDATE_COUNT = 512;
 const DEFAULT_COMPACT_UPDATE_BYTES = 2 * 1_024 * 1_024;
@@ -99,6 +134,10 @@ const STUDIO_CRDT_JSON_MAX_STRING_LENGTH = 64 * 1_024;
 const STUDIO_CRDT_MAX_COORDINATE = 10_000_000;
 const STUDIO_CRDT_DELETION_TARGET_MAX_LENGTH = 384;
 const STUDIO_CRDT_TEXT_ENCODER = new TextEncoder();
+const STUDIO_WORK_ASSET_TYPE_SET = new Set<string>(STUDIO_WORK_ASSET_TYPES);
+const STUDIO_WORK_ASSET_BOOLEAN_EDIT_KEY_SET = new Set<string>(
+  STUDIO_WORK_ASSET_BOOLEAN_EDIT_KEYS
+);
 
 type StudioCrdtDeletionTarget =
   | { kind: "stroke"; id: string }
@@ -161,9 +200,9 @@ const STUDIO_CRDT_SCENE_KEYS_BY_TYPE = {
     "x", "y", "width", "height", "lineCount", "direction", "stroke", "strokeWidth",
     "noise", "rotation",
   ]),
-  // Wire-only topology for image/VRM/3D and future asset-backed elements. Asset payloads stay in
-  // project storage; this record owns page/layer while the flat delete-wins roots own tombstones.
-  reference: new Set(["elementType"]),
+  // Wire-only topology and bounded edit state for admitted image/VRM/3D bodies. Source bytes stay
+  // in work-scoped private storage; this record owns placement, filters, page/layer, and tombstone.
+  reference: new Set(["elementType", ...STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS]),
 } as const;
 
 type StudioCrdtSceneType = keyof typeof STUDIO_CRDT_SCENE_KEYS_BY_TYPE;
@@ -445,6 +484,53 @@ function boundedExactText(value: unknown, maximum: number): value is string {
   return true;
 }
 
+function isValidStudioWorkAssetReferenceCandidate(
+  property: string,
+  value: unknown
+): boolean {
+  if (property === "elementType") {
+    return isValidLegacyStudioCrdtReferenceType(value);
+  }
+  if (property === "x" || property === "y") {
+    return finiteNumberInRange(value, -STUDIO_CRDT_MAX_COORDINATE, STUDIO_CRDT_MAX_COORDINATE);
+  }
+  if (property === "width" || property === "height") {
+    return finiteNumberInRange(value, Number.MIN_VALUE, STUDIO_CRDT_MAX_COORDINATE);
+  }
+  if (property === "rotation") return finiteNumberInRange(value, -360_000, 360_000);
+  if (property === "opacity") return finiteNumberInRange(value, 0, 1);
+  if (STUDIO_WORK_ASSET_BOOLEAN_EDIT_KEY_SET.has(property)) return typeof value === "boolean";
+  const range = STUDIO_WORK_ASSET_SCALAR_FILTER_RANGES[
+    property as keyof typeof STUDIO_WORK_ASSET_SCALAR_FILTER_RANGES
+  ];
+  return Boolean(range && finiteNumberInRange(value, range.minimum, range.maximum));
+}
+
+function isValidLegacyStudioCrdtReferenceType(value: unknown): value is string {
+  return boundedExactText(value, 160) && value !== "draw" && !isStudioCrdtSceneType(value);
+}
+
+function hasLegacyStudioCrdtReferenceProps(
+  props: Record<string, unknown>
+): boolean {
+  return Object.keys(props).length === 1 &&
+    isValidLegacyStudioCrdtReferenceType(props.elementType);
+}
+
+function hasValidStudioWorkAssetReferenceProps(
+  id: string,
+  props: Record<string, unknown>
+): boolean {
+  if (hasLegacyStudioCrdtReferenceProps(props)) return true;
+  const { elementType, ...editProps } = props;
+  return typeof elementType === "string" && STUDIO_WORK_ASSET_TYPE_SET.has(elementType) &&
+    StudioWorkAssetElementSchema.safeParse({
+      id,
+      type: elementType,
+      ...editProps,
+    }).success;
+}
+
 function isStudioCrdtSceneType(value: unknown): value is StudioCrdtSceneType {
   return typeof value === "string" && Object.hasOwn(STUDIO_CRDT_SCENE_KEYS_BY_TYPE, value);
 }
@@ -479,6 +565,55 @@ function readReservedProperties(
   // counter would allow several individually-small values to exceed the shared 4,096-entry limit
   // and create a durable document that every conforming client refuses to materialize.
   return isBoundedJsonValue(effective) ? effective : null;
+}
+
+interface StudioCrdtWorkAssetReferenceSnapshot {
+  identities: ReadonlyMap<string, string>;
+  admittedReferences: ReadonlyMap<string, StudioWorkAssetReference>;
+  activeCount: number;
+}
+
+/** Returns every materialized identity plus the non-tombstoned count in a valid document. */
+function snapshotStudioWorkAssetReferences(
+  doc: Y.Doc
+): StudioCrdtWorkAssetReferenceSnapshot {
+  const identities = new Map<string, string>();
+  const admittedReferences = new Map<string, StudioWorkAssetReference>();
+  const index = materializeExistingMapRoot(doc, STUDIO_CRDT_SCENE_INDEX_ROOT);
+  if (!(index instanceof Y.Map)) return { identities, admittedReferences, activeCount: 0 };
+  let activeCount = 0;
+  const metadataKeys = new Set(["id", "pageId", "layerId", "payloadVersion", "type", "deleted"]);
+  for (const [id, tracked] of index) {
+    if (tracked !== true) continue;
+    const record = materializeExistingMapRoot(
+      doc,
+      `${STUDIO_CRDT_SCENE_ROOT_PREFIX}${encodeURIComponent(id)}`
+    );
+    if (
+      !(record instanceof Y.Map) ||
+      record.get("type") !== "reference"
+    ) continue;
+    const props = readReservedProperties(
+      record,
+      STUDIO_CRDT_SCENE_KEYS_BY_TYPE.reference,
+      metadataKeys
+    );
+    if (!props) continue;
+    const elementType = props.elementType;
+    if (!isValidLegacyStudioCrdtReferenceType(elementType)) continue;
+    identities.set(id, elementType);
+    if (
+      hasLegacyStudioCrdtReferenceProps(props) ||
+      !STUDIO_WORK_ASSET_TYPE_SET.has(elementType)
+    ) continue;
+    const reference = {
+      assetId: id,
+      elementType: elementType as StudioWorkAssetReference["elementType"],
+    };
+    admittedReferences.set(studioWorkAssetReferenceKey(reference), reference);
+    if (record.get("deleted") !== true) activeCount += 1;
+  }
+  return { identities, admittedReferences, activeCount };
 }
 
 function canonicalReservedRootId(rootName: string, prefix: string): string | null {
@@ -699,20 +834,20 @@ function validateSceneElementRoot(id: string, record: Y.Map<unknown>): boolean {
   }
   if (
     type === "reference" &&
-    (
-      !boundedExactText(props.elementType, 160) || props.elementType === "draw" ||
-      isStudioCrdtSceneType(props.elementType)
-    )
+    !hasValidStudioWorkAssetReferenceProps(id, props)
   ) return false;
   if (type === "reference") {
-    // Validate losing baseline/override candidates too. Otherwise a small effective `prop:` value
-    // could hide an oversized or reserved `base:` candidate in the durable Y.Map.
+    // Validate losing baseline/override candidates too. Otherwise a valid effective `prop:` value
+    // could hide an invalid `base:` candidate which becomes active after a later unset operation.
     for (const [key, value] of record) {
-      if (key !== "base:elementType" && key !== "prop:elementType") continue;
-      if (
-        !boundedExactText(value, 160) || value === "draw" ||
-        isStudioCrdtSceneType(value)
-      ) return false;
+      const prefix = key.startsWith("base:")
+        ? "base:"
+        : key.startsWith("prop:")
+          ? "prop:"
+          : null;
+      if (!prefix) continue;
+      const property = key.slice(prefix.length);
+      if (!isValidStudioWorkAssetReferenceCandidate(property, value)) return false;
     }
   }
   for (const key of ["x", "y"]) {
@@ -1173,6 +1308,10 @@ export class StudioCrdtService implements OnModuleDestroy {
   constructor(
     @Inject(STUDIO_CRDT_REPOSITORY)
     private readonly repository: StudioCrdtRepository,
+    @Inject(StudioRasterAssetService)
+    private readonly rasterAssetAdmission: StudioCrdtRasterAssetAdmission,
+    @Inject(StudioWorkAssetService)
+    private readonly workAssetAdmission: StudioCrdtWorkAssetAdmission,
     @Optional()
     @Inject(STUDIO_CRDT_SERVICE_OPTIONS)
     options: StudioCrdtServiceOptions = {}
@@ -1278,11 +1417,12 @@ export class StudioCrdtService implements OnModuleDestroy {
           payload: update,
           createdAt: this.now(),
         },
-        (current) => this.validateUpdateAgainstHydration(
+        (current, transaction) => this.validateUpdateAgainstHydration(
           input.workId,
           current,
           update,
-          input.actorUserId
+          input.actorUserId,
+          transaction
         )
       );
       if (
@@ -1485,15 +1625,18 @@ export class StudioCrdtService implements OnModuleDestroy {
     }
   }
 
-  private validateUpdateAgainstDocument(
+  private async validateUpdateAgainstDocument(
+    workId: string,
     doc: Y.Doc,
     update: Uint8Array,
-    actorUserId: string
-  ): void {
+    actorUserId: string,
+    transaction?: DrizzleStudioCrdtTransaction
+  ): Promise<void> {
     const probe = new Y.Doc();
     const candidate = new Y.Doc();
     const deletionRootsBefore = snapshotStudioCrdtDeletionRoots(doc);
     const rasterRootsBefore = snapshotStudioCrdtRasterRoots(doc);
+    const workAssetReferencesBefore = snapshotStudioWorkAssetReferences(doc);
     try {
       Y.applyUpdate(candidate, update, "server-validation-candidate");
       if (conflictsWithStudioCrdtRasterRootSnapshot(rasterRootsBefore, candidate)) {
@@ -1521,12 +1664,70 @@ export class StudioCrdtService implements OnModuleDestroy {
           "client updates cannot publish unverified Studio raster checkpoints"
         );
       }
-      assertStudioCrdtRasterAppendedEventActors(rasterRootsBefore, probe, actorUserId);
+      assertStudioCrdtRasterAppendedEventAdmission(rasterRootsBefore, probe, actorUserId);
+      const workAssetReferences = snapshotStudioWorkAssetReferences(probe);
+      for (const [id, elementType] of workAssetReferencesBefore.identities) {
+        if (workAssetReferences.identities.get(id) !== elementType) {
+          throw new StudioCrdtInvalidPayloadError(
+            "update cannot replace a durable Studio reference identity"
+          );
+        }
+      }
+      for (const key of workAssetReferencesBefore.admittedReferences.keys()) {
+        if (!workAssetReferences.admittedReferences.has(key)) {
+          throw new StudioCrdtInvalidPayloadError(
+            "update cannot downgrade a durable admitted Studio reference"
+          );
+        }
+      }
+      if (
+        workAssetReferences.activeCount >
+        STUDIO_CRDT_ACTIVE_WORK_ASSET_REFERENCE_MAX_COUNT
+      ) {
+        throw new StudioCrdtInvalidPayloadError(
+          "update exceeds the active Studio work-asset reference limit"
+        );
+      }
       if (Y.encodeStateAsUpdate(probe).byteLength > STUDIO_CRDT_SNAPSHOT_MAX_BYTES) {
         throw new StudioCrdtDocumentTooLargeError();
       }
       if (Y.encodeStateVector(probe).byteLength > this.stateVectorMaxBytes) {
         throw new StudioCrdtDocumentTooLargeError();
+      }
+      const appendedAssetReferences = appendedStudioCrdtRasterAssetReferences(
+        rasterRootsBefore,
+        probe
+      );
+      if (appendedAssetReferences.length > 0) {
+        try {
+          await this.rasterAssetAdmission.assertReferencesStored(
+            actorUserId,
+            workId,
+            appendedAssetReferences,
+            transaction
+          );
+        } catch {
+          throw new StudioCrdtInvalidPayloadError(
+            "update references a missing or mismatched Studio raster asset"
+          );
+        }
+      }
+      const appendedWorkAssetReferences = [...workAssetReferences.admittedReferences]
+        .filter(([key]) => !workAssetReferencesBefore.admittedReferences.has(key))
+        .map(([, reference]) => reference);
+      if (appendedWorkAssetReferences.length > 0) {
+        try {
+          await this.workAssetAdmission.assertReferencesStored(
+            actorUserId,
+            workId,
+            appendedWorkAssetReferences,
+            transaction
+          );
+        } catch {
+          throw new StudioCrdtInvalidPayloadError(
+            "update references a missing or mismatched Studio work asset"
+          );
+        }
       }
     } catch (error) {
       if (
@@ -1540,15 +1741,22 @@ export class StudioCrdtService implements OnModuleDestroy {
     }
   }
 
-  private validateUpdateAgainstHydration(
+  private async validateUpdateAgainstHydration(
     workId: string,
     current: StudioCrdtHydrationState,
     update: Uint8Array,
-    actorUserId: string
-  ): void {
+    actorUserId: string,
+    transaction: DrizzleStudioCrdtTransaction
+  ): Promise<void> {
     const durable = this.createCachedDocument(workId, current);
     try {
-      this.validateUpdateAgainstDocument(durable.doc, update, actorUserId);
+      await this.validateUpdateAgainstDocument(
+        workId,
+        durable.doc,
+        update,
+        actorUserId,
+        transaction
+      );
     } finally {
       durable.doc.destroy();
     }

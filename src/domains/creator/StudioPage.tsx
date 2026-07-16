@@ -103,7 +103,7 @@ import {
   MessageSquare,
   Triangle,
 } from "lucide-react";
-import { Fragment, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
+import { Fragment, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ComponentType, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Stage, Layer, Rect, Text as KText, TextPath as KTextPath, Image as KImage, Line, Group, Star, Ellipse, Circle as KCircle, Path, Transformer, Shape, Arrow, RegularPolygon } from "react-konva/lib/ReactKonvaCore";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -824,6 +824,7 @@ import {
   STUDIO_RASTER_ASSETS,
   type StudioRasterAsset,
 } from "./studio-raster-assets";
+import { STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED } from "./studio-raster-publication-feature";
 import {
   createEmptyStudioReleaseSchedule,
   normalizeStudioReleaseSchedule,
@@ -959,6 +960,27 @@ import {
 } from "./studio-webgpu-authority";
 import { planStudioWebGpuViewportSurface } from "./studio-webgpu-viewport";
 import {
+  StudioWorkAssetAdmissionCoordinator,
+  replaceStudioWorkAssetSourceAcrossHistory,
+} from "./studio-work-asset-admission";
+import {
+  studioWorkAssetDestructiveEditReason,
+  studioWorkAssetDocumentSourceTransitionReason,
+  studioWorkAssetSourceReplacementReason,
+  studioWorkAssetSourceTransitionReason,
+} from "./studio-work-asset-edit-guard";
+import { StudioWorkAssetHydrator } from "./studio-work-asset-hydrator";
+import {
+  areStudioWorkAssetSceneReferencesEqual,
+  collectStudioWorkAssetSceneReferences,
+  projectStudioWorkAssetPageForReadOnlyPreview,
+  projectStudioWorkAssetPageForRender,
+  resolveStudioWorkAssetReadableImageSource,
+  resolveStudioWorkAssetHydrationScope,
+  type StudioWorkAssetRenderPlaceholder,
+  type StudioWorkAssetSceneReference,
+} from "./studio-work-asset-render-projection";
+import {
   STUDIO_WORKSPACE_LEFT_PANEL_WIDTH,
   STUDIO_WORKSPACE_RIGHT_PANEL_WIDTH,
   areStudioWorkspaceLayoutsEqual,
@@ -987,7 +1009,6 @@ import {
   type StudioWriterRoomCanvasProjectionResult,
 } from "./studio-writer-room-canvas-projection";
 import { StudioBgRemoveButton } from "./StudioBgRemoveButton";
-import { StudioBrushStudio } from "./StudioBrushStudio";
 import { StudioBubbleShapePanel } from "./StudioBubbleShapePanel";
 import { StudioBubbleVariantGlyph } from "./StudioBubbleVariantGlyph";
 import {
@@ -1010,7 +1031,10 @@ import {
 } from "./StudioLayerNavigator";
 import { StudioLineCleanupPanel } from "./StudioLineCleanupPanel";
 import { StudioLineCorrectionControls } from "./StudioLineCorrectionControls";
-import { StudioLiveCollaborationProvider } from "./StudioLiveCollaborationProvider";
+import {
+  StudioLiveCollaborationProvider,
+  type StudioCrdtSceneGraphRuntime,
+} from "./StudioLiveCollaborationProvider";
 import { StudioMagicResizePanel } from "./StudioMagicResizePanel";
 import { StudioMagicWandPanel } from "./StudioMagicWandPanel";
 import { StudioNodeEditPanel } from "./StudioNodeEditPanel";
@@ -1107,15 +1131,10 @@ import { buttonClass } from "@/components/ui/button-utils";
 import { useIsMobile } from "@/components/use-media-query";
 import { useResizable } from "@/components/use-resizable";
 import { lazyRetry } from "@/lib/lazy-retry";
+import { STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK } from "@/lib/studio-work-asset-contract";
 import { cn } from "@/lib/utils";
 import { resolveAssetUrl } from "@/src/catalog-static";
 import { useSession } from "@/src/compat/auth-session-store";
-
-interface StudioCrdtSceneGraphRuntime {
-  publish: typeof import("./studio-crdt-scene-publisher").publishStudioCrdtSceneGraphDiff;
-  reconcileHistory: typeof import("./studio-crdt-history").reconcileStudioCrdtSceneGraphHistory;
-  reconcilePages: typeof import("./studio-crdt-page-bridge").reconcileStudioCrdtSceneGraphPages;
-}
 
 const KonvaRuntime = KonvaCore as unknown as typeof Konva;
 KonvaRuntime.Filters = KonvaRuntime.Filters ?? {};
@@ -1349,6 +1368,11 @@ const StudioDrawOptionsBar = lazyRetry(
   () => import("./StudioDrawOptionsBar").then((mod) => ({ default: mod.StudioDrawOptionsBar })),
   "StudioDrawOptionsBar"
 );
+const loadStudioBrushStudio = () => import("./StudioBrushStudio");
+const StudioBrushStudio = lazyRetry(
+  () => loadStudioBrushStudio().then((mod) => ({ default: mod.StudioBrushStudio })),
+  "StudioBrushStudio"
+);
 /** Glyph UI kept out of StudioPage static graph (bundle budget). */
 const StudioStarterCardArt = lazyRetry(
   () => import("./studio-creative-visuals").then((mod) => ({ default: mod.StudioStarterCardArt })),
@@ -1358,10 +1382,6 @@ const StudioShapePickerGrid = lazyRetry(
   () => import("./studio-creative-visuals").then((mod) => ({ default: mod.StudioShapePickerGrid })),
   "StudioShapePickerGrid"
 );
-const StudioShapePickerStrip = lazyRetry(
-  () => import("./studio-creative-visuals").then((mod) => ({ default: mod.StudioShapePickerStrip })),
-  "StudioShapePickerStrip"
-);
 const StudioPressureHudMeter = lazyRetry(
   () => import("./studio-creative-visuals").then((mod) => ({ default: mod.StudioPressureHudMeter })),
   "StudioPressureHudMeter"
@@ -1369,10 +1389,6 @@ const StudioPressureHudMeter = lazyRetry(
 const StudioSelectOptionsBar = lazyRetry(
   () => import("./StudioSelectOptionsBar").then((mod) => ({ default: mod.StudioSelectOptionsBar })),
   "StudioSelectOptionsBar"
-);
-const StudioBrushTray = lazyRetry(
-  () => import("./StudioBrushTray").then((mod) => ({ default: mod.StudioBrushTray })),
-  "StudioBrushTray"
 );
 const StudioBrushLibraryPanel = lazyRetry(
   () => import("./StudioBrushLibraryPanel").then((mod) => ({ default: mod.StudioBrushLibraryPanel })),
@@ -1650,6 +1666,67 @@ function StudioPanelLoading({ label = "패널을 여는 중..." }: { label?: str
     <div className="rounded-lg border border-line bg-card/70 px-3 py-2 text-xs text-fg-3">
       {label}
     </div>
+  );
+}
+
+function StudioWorkAssetPlaceholderNode({
+  placeholder,
+  scale,
+}: {
+  placeholder: StudioWorkAssetRenderPlaceholder;
+  scale: number;
+}) {
+  const palette = placeholder.status === "error"
+    ? { fill: "#450a0a", stroke: "#ef4444", title: "#fecaca", detail: "#fca5a5" }
+    : placeholder.status === "ready"
+      ? { fill: "#052e16", stroke: "#22c55e", title: "#bbf7d0", detail: "#86efac" }
+      : { fill: "#1e1b4b", stroke: "#8b5cf6", title: "#ddd6fe", detail: "#c4b5fd" };
+  const padding = Math.min(18, Math.max(8, placeholder.width * 0.05));
+  return (
+    <Group
+      key={`work-asset-placeholder:${placeholder.elementType}:${placeholder.assetId}`}
+      x={placeholder.x}
+      y={placeholder.y}
+      rotation={placeholder.rotation}
+      listening={false}
+    >
+      <Rect
+        width={placeholder.width}
+        height={placeholder.height}
+        fill={palette.fill}
+        opacity={0.88}
+        stroke={palette.stroke}
+        strokeWidth={1.5 / Math.max(0.1, scale)}
+        dash={[8 / Math.max(0.1, scale), 5 / Math.max(0.1, scale)]}
+        cornerRadius={10}
+      />
+      <KText
+        x={padding}
+        y={Math.max(10, placeholder.height * 0.28)}
+        width={Math.max(24, placeholder.width - padding * 2)}
+        text={placeholder.label}
+        fill={palette.title}
+        fontFamily="Pretendard, sans-serif"
+        fontStyle="bold"
+        fontSize={Math.min(18, Math.max(11, placeholder.width / 18))}
+        align="center"
+      />
+      {placeholder.message ? (
+        <KText
+          x={padding}
+          y={Math.max(32, placeholder.height * 0.54)}
+          width={Math.max(24, placeholder.width - padding * 2)}
+          height={Math.max(18, placeholder.height * 0.32)}
+          text={placeholder.message}
+          fill={palette.detail}
+          fontFamily="Pretendard, sans-serif"
+          fontSize={Math.min(13, Math.max(9, placeholder.width / 24))}
+          align="center"
+          ellipsis
+          wrap="word"
+        />
+      ) : null}
+    </Group>
   );
 }
 
@@ -2006,6 +2083,17 @@ export type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl | F
    *  일괄 삭제 대상이 된다. */
   emeresSourceId?: string;
 };
+
+function readyStudioWorkAssetImageSources(
+  hydrator: StudioWorkAssetHydrator
+): Map<string, El> {
+  const sources = new Map<string, El>();
+  for (const [assetId, source] of hydrator.readySources()) {
+    if (source.type === "image") sources.set(assetId, source as El);
+  }
+  return sources;
+}
+
 const EMPTY_LAYER_GROUPS: LayerGroup[] = [];
 type StudioMenu = "template" | "collage" | "bubble" | "sticker" | "elements" | "char" | "bgScene" | "bgFill" | "asset" | "emeres" | "tone" | "scene" | "clip" | "palette" | "brandKit" | "stockImage" | "aiAssist" | "integrations";
 // 2026-07-05 툴바 그룹화 — 20개 이상의 플랫한 툴바 버튼을 논리 그룹 4개로 묶는다(선택/펜/지우개/
@@ -4775,9 +4863,43 @@ function StudioCuttoonEditor() {
   const studioLiveRoomRef = useRef<StudioLiveRoom | null>(null);
   const studioCrdtDocumentRef = useRef<StudioCrdtDocument | null>(null);
   const studioCrdtSceneRuntimeRef = useRef<StudioCrdtSceneGraphRuntime | null>(null);
+  const publishStudioCrdtSceneTransitionRef = useRef<(
+    previousPages: readonly PageState[],
+    nextPages: readonly PageState[],
+    registerNewDraws?: boolean
+  ) => boolean>(() => false);
+  // Completed raster publications are serialized per editor actor. This keeps Lamport allocation
+  // strictly increasing even when a fast artist finishes another stroke while the previous PNG
+  // tiles are still uploading. Each controller is also an account/work teardown boundary.
+  const studioRasterPublicationTailRef = useRef<Promise<void>>(Promise.resolve());
+  const studioRasterPublicationControllersRef = useRef(new Set<AbortController>());
   const [studioCrdtDocument, setStudioCrdtDocument] = useState<StudioCrdtDocument | null>(null);
   const [studioCrdtReconciledDocument, setStudioCrdtReconciledDocument] =
     useState<StudioCrdtDocument | null>(null);
+  // StudioPage's outer editor key rotates on both auth and work scope. This per-instance owner is
+  // therefore incapable of carrying private Blob URLs or in-flight responses across identities.
+  const [studioWorkAssetHydrator] = useState(
+    () => new StudioWorkAssetHydrator(null)
+  );
+  const [studioWorkAssetAdmissionCoordinator] = useState(
+    () => new StudioWorkAssetAdmissionCoordinator()
+  );
+  const studioWorkAssetHydrationRevision = useSyncExternalStore(
+    studioWorkAssetHydrator.subscribe,
+    studioWorkAssetHydrator.getVersion,
+    studioWorkAssetHydrator.getVersion
+  );
+  const [studioWorkAssetReferences, setStudioWorkAssetReferences] =
+    useState<StudioWorkAssetSceneReference[]>([]);
+  const [studioWorkAssetLimitExceeded, setStudioWorkAssetLimitExceeded] = useState(false);
+  useLayoutEffect(() => () => {
+    for (const controller of studioRasterPublicationControllersRef.current) {
+      controller.abort(new DOMException("래스터 편집 세션이 종료되었습니다.", "AbortError"));
+    }
+    studioRasterPublicationControllersRef.current.clear();
+    studioWorkAssetAdmissionCoordinator.dispose();
+    studioWorkAssetHydrator.dispose();
+  }, [studioWorkAssetAdmissionCoordinator, studioWorkAssetHydrator]);
   const studioLiveHeldResourcesRef = useRef<string[]>([]);
   const [uiDensityMode, setUiDensityMode] = useState<StudioUiDensityMode>(() =>
     loadStudioUiDensityState(
@@ -4993,6 +5115,20 @@ function StudioCuttoonEditor() {
   // 로그인한 기존 작품은 owner도 같은 팀 문서 계약을 사용한다. 응답 전·오류 상태 역시 잠가
   // 빈 초기 캔버스가 실제 원고 위로 저장되는 경쟁 상태를 막는다.
   const expectsSharedDocument = Boolean(workAuthScopeKey && workId && !remixId);
+  const authorizedWorkAssetScopeId = resolveStudioWorkAssetHydrationScope({
+    workId,
+    authUserId: studioAuthUserId,
+    remixId,
+    documentStatus: expectsSharedDocument ? sharedDocument?.status : null,
+    canView: Boolean(sharedDocument?.capabilities.view),
+  });
+  useLayoutEffect(() => {
+    studioWorkAssetHydrator.setWorkId(authorizedWorkAssetScopeId);
+    if (authorizedWorkAssetScopeId) return;
+    studioWorkAssetHydrator.observe([]);
+    setStudioWorkAssetReferences((current) => current.length === 0 ? current : []);
+    setStudioWorkAssetLimitExceeded(false);
+  }, [authorizedWorkAssetScopeId, studioWorkAssetHydrator]);
   const collaborationDocumentUnavailable = expectsSharedDocument && !sharedDocument;
   const collaborationReadOnly = Boolean(sharedDocument && sharedDocument.access !== "edit");
   const sourceHydrationPending = isStudioSourceHydrationPending(workId, remixId, workHydrated);
@@ -5155,6 +5291,8 @@ function StudioCuttoonEditor() {
   };
   const pagesHiRef = useRef(pagesHi);
   pagesHiRef.current = pagesHi;
+  const pagesHistoryRef = useRef(pagesHistory);
+  pagesHistoryRef.current = pagesHistory;
   const pages = pagesHistory[pagesHi];
 
   const [currentPageId, setCurrentPageId] = useState<string>(pages[0]?.id || "");
@@ -5232,6 +5370,131 @@ function StudioCuttoonEditor() {
   const activeSurfaceReviewLocked =
     collaborationDocumentLocked || (pageEditLocked && !masterEditMode);
 
+  const studioWorkAssetAdmissionEnabled = Boolean(
+    authorizedWorkAssetScopeId &&
+    studioAuthUserId &&
+    sharedDocument?.access === "edit" &&
+    sharedDocument.capabilities.edit &&
+    studioCrdtOperationSyncReady &&
+    !collaborationDocumentLocked
+  );
+  useLayoutEffect(() => {
+    studioWorkAssetAdmissionCoordinator.sync({
+      workId: authorizedWorkAssetScopeId,
+      authUserId: studioAuthUserId,
+      editable: studioWorkAssetAdmissionEnabled,
+      pages,
+      onAdmitted: (receipt) => {
+        const access = collaborationAccessRef.current;
+        if (
+          !editorMountedRef.current ||
+          access.authScopeKey !== studioAuthUserId ||
+          access.workId !== authorizedWorkAssetScopeId ||
+          access.locked ||
+          studioCrdtDocumentRef.current !== studioCrdtDocument
+        ) {
+          return false;
+        }
+        const history = pagesHistoryRef.current;
+        const currentIndex = Math.max(0, Math.min(pagesHiRef.current, history.length - 1));
+        const currentSnapshot = history[currentIndex] ?? [];
+        const stillOwnsSource = currentSnapshot.some((page) =>
+          page.elements.some((element) =>
+            element.id === receipt.assetId &&
+            element.type === "image" &&
+            element.src === receipt.source
+          )
+        );
+        // A source edit wins over a late upload. Do not rewrite older undo snapshots with a receipt
+        // that no longer belongs to the visible current element.
+        if (!stillOwnsSource) return false;
+        const admitted = replaceStudioWorkAssetSourceAcrossHistory({
+          history,
+          currentIndex,
+          assetId: receipt.assetId,
+          expectedSource: receipt.source,
+          canonicalSource: receipt.canonicalSource,
+        });
+        if (!admitted.changed) return false;
+        if (!markStudioDocumentChanged()) {
+          throw new Error("저장 중이라 승인된 이미지 참조 전환을 잠시 미뤘습니다.");
+        }
+        if (!publishStudioCrdtSceneTransitionRef.current(
+          admitted.previousCurrentPages,
+          admitted.nextCurrentPages
+        )) {
+          throw new Error("승인된 이미지 참조를 실시간 팀 문서에 반영하지 못했습니다.");
+        }
+        // Every undo snapshot switches source identity in one React update. Placement/filter edits
+        // remain snapshot-specific; only the exact local source is replaced by the opaque URI.
+        pagesHistoryRef.current = admitted.history;
+        setPagesHistoryState(admitted.history);
+        return true;
+      },
+      onError: (message) => {
+        const access = collaborationAccessRef.current;
+        if (
+          !editorMountedRef.current ||
+          access.authScopeKey !== studioAuthUserId ||
+          access.workId !== authorizedWorkAssetScopeId
+        ) return;
+        setError(`공동 작업 이미지 업로드: ${message} 로컬 이미지는 캔버스에 그대로 유지됩니다.`);
+      },
+    });
+  }, [
+    authorizedWorkAssetScopeId,
+    pages,
+    studioAuthUserId,
+    studioCrdtDocument,
+    studioWorkAssetAdmissionCoordinator,
+    studioWorkAssetAdmissionEnabled,
+  ]);
+
+  useLayoutEffect(() => {
+    const observeSceneElements = (
+      sceneElements: ReturnType<StudioCrdtDocument["getSceneElements"]>
+    ) => {
+      const references = collectStudioWorkAssetSceneReferences(sceneElements);
+      const limitExceeded = references.length > STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK;
+      setStudioWorkAssetLimitExceeded((current) =>
+        current === limitExceeded ? current : limitExceeded
+      );
+      if (limitExceeded) {
+        studioWorkAssetHydrator.observe([]);
+        setStudioWorkAssetReferences((current) => current.length === 0 ? current : []);
+        return;
+      }
+      const activePageReferences = references
+        .filter((candidate) => candidate.pageId === activePage.id)
+        .map((candidate) => candidate.reference);
+      const backgroundReferences = references
+        .filter((candidate) => candidate.pageId !== activePage.id)
+        .map((candidate) => candidate.reference);
+      studioWorkAssetHydrator.observe(
+        [...activePageReferences, ...backgroundReferences],
+        { priorityReferences: activePageReferences }
+      );
+      setStudioWorkAssetReferences((current) =>
+        areStudioWorkAssetSceneReferencesEqual(current, references) ? current : references
+      );
+    };
+
+    if (!studioCrdtDocument || !authorizedWorkAssetScopeId) {
+      studioWorkAssetHydrator.observe([]);
+      setStudioWorkAssetReferences((current) => current.length === 0 ? current : []);
+      setStudioWorkAssetLimitExceeded(false);
+      return;
+    }
+    observeSceneElements(studioCrdtDocument.getSceneElements({ includeDeleted: true }));
+    return studioCrdtDocument.subscribeChanges(
+      (change) => observeSceneElements(change.sceneElements),
+      // Asset observation is origin-agnostic. Local upload/publish paths and remote peers must
+      // converge on exactly the same active reference set even though scene reconciliation keeps
+      // local-origin operations out of the remote undo path.
+      { includeOrigin: () => true }
+    );
+  }, [activePage.id, authorizedWorkAssetScopeId, studioCrdtDocument, studioWorkAssetHydrator]);
+
   useLayoutEffect(() => {
     if (!studioCrdtDocument || sourceHydrationPending) return;
     const applyFrontier = (
@@ -5266,7 +5529,8 @@ function StudioCuttoonEditor() {
           history,
           pagesHiRef.current,
           frontier,
-          changedIds
+          changedIds,
+          readyStudioWorkAssetImageSources(studioWorkAssetHydrator)
         );
         return reconciled?.changed ? reconciled.history : history;
       });
@@ -5295,7 +5559,51 @@ function StudioCuttoonEditor() {
       }),
       { includeOrigin: (origin) => origin !== STUDIO_CRDT_ORIGIN_LOCAL }
     );
-  }, [sourceHydrationPending, studioCrdtDocument]);
+  }, [sourceHydrationPending, studioCrdtDocument, studioWorkAssetHydrator]);
+
+  useLayoutEffect(() => {
+    if (!studioCrdtDocument || sourceHydrationPending) return;
+    const referenceSources = readyStudioWorkAssetImageSources(studioWorkAssetHydrator);
+    if (referenceSources.size === 0) return;
+    const readyReferenceIds = new Set(
+      studioWorkAssetReferences
+        .filter((candidate) =>
+          candidate.reference.elementType === "image" &&
+          referenceSources.has(candidate.reference.assetId)
+        )
+        .map((candidate) => candidate.reference.assetId)
+    );
+    if (readyReferenceIds.size === 0) return;
+    const runtime = studioCrdtSceneRuntimeRef.current;
+    if (!runtime) return;
+    const frontier = {
+      strokes: studioCrdtDocument.getStrokes({ includeDeleted: true }),
+      sceneElements: studioCrdtDocument.getSceneElements({ includeDeleted: true }),
+      pages: studioCrdtDocument.getPages(true),
+      layerGroups: studioCrdtDocument.getLayerGroups({ includeDeleted: true }),
+    };
+    setPagesHistoryState((history) => {
+      const reconciled = runtime.reconcileHistory(
+        history,
+        pagesHiRef.current,
+        frontier,
+        {
+          strokeIds: new Set<string>(),
+          sceneElementIds: readyReferenceIds,
+          pageIds: new Set<string>(),
+          layerGroupIds: new Set<string>(),
+        },
+        referenceSources
+      );
+      return reconciled.changed ? reconciled.history : history;
+    });
+  }, [
+    sourceHydrationPending,
+    studioCrdtDocument,
+    studioWorkAssetHydrator,
+    studioWorkAssetHydrationRevision,
+    studioWorkAssetReferences,
+  ]);
 
   function collaborationLockMessage(): string {
     if (documentReloadRequired) {
@@ -5359,6 +5667,35 @@ function StudioCuttoonEditor() {
   const bg = activePage.bg;
   const bgGrad = activePage.bgGrad;
   const canvasH = activePage.canvasH;
+  const studioWorkAssetRenderProjection = projectStudioWorkAssetPageForRender<El>({
+    pageId: activePage.id,
+    elements: activePage.elements,
+    references: studioWorkAssetReferences,
+    hydrationRevision: studioWorkAssetHydrationRevision,
+    resolveState: (reference) => studioWorkAssetHydrator.get(reference),
+  });
+  function composeWorkAssetPreviewPage(page: PageState): PageState {
+    return projectStudioWorkAssetPageForReadOnlyPreview({
+      page: composeThumbPage(master, page),
+      hydrationRevision: studioWorkAssetHydrationRevision,
+      resolveState: (reference) => studioWorkAssetHydrator.get(reference),
+    });
+  }
+  const studioWorkAssetRenderPlaceholders: StudioWorkAssetRenderPlaceholder[] =
+    studioWorkAssetLimitExceeded
+      ? [{
+          assetId: "reference-limit",
+          elementType: "image",
+          status: "error",
+          x: 36,
+          y: 36,
+          width: CANVAS_W - 72,
+          height: 120,
+          rotation: 0,
+          label: "공동 작업 에셋 참조가 너무 많습니다",
+          message: `한 작품에서 동시에 복원할 수 있는 에셋은 ${STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK}개입니다.`,
+        }]
+      : studioWorkAssetRenderProjection.placeholders;
   // 현재 페이지의 색보정(과거 저장본 안전 정규화) + 미리보기용 CSS filter 문자열.
   const pageGrade = normalizePageGrade(activePage.grade);
   const pageGradeCss = pageGradeToCssFilter(pageGrade);
@@ -5704,6 +6041,12 @@ function StudioCuttoonEditor() {
     if (!isMobile) return;
     if (!mobileSheet) {
       mobileSheetAutofocusTargetRef.current = "default";
+      // Initial mobile mount is not a sheet-close transition. Do not jump focus to the brush dock
+      // (which would also open its rich keyboard tooltip before the artist asks for it).
+      if (!previousMobileSheetRef.current) {
+        sheetReturnFocusRef.current = null;
+        return;
+      }
       const returnTarget = sheetReturnFocusRef.current;
       const focusTarget = returnTarget?.isConnected && !returnTarget.closest("[inert]")
         ? returnTarget
@@ -6529,7 +6872,6 @@ function StudioCuttoonEditor() {
   const [isometricOriginY, setIsometricOriginY] = useState<number>(() => canvasH / 2);
   const [eyedropperActive, setEyedropperActive] = useState(false);
   const [bubbleAnchorPickActive, setBubbleAnchorPickActive] = useState(false);
-  const [drawAdvancedOpen, setDrawAdvancedOpen] = useState(false);
   const [studioOptionalAssets, setStudioOptionalAssets] = useState<StudioOptionalAssetPacks>(
     EMPTY_STUDIO_OPTIONAL_ASSETS
   );
@@ -7467,8 +7809,16 @@ function StudioCuttoonEditor() {
         }
         const parsed = saved.payload;
         if (parsed.pagesList.length > 0) {
-          resetAdvancedFillForDocumentReplacement();
           const restoredPages = parsed.pagesList as PageState[];
+          const workAssetReason = studioWorkAssetDocumentSourceTransitionReason(
+            pages,
+            restoredPages
+          );
+          if (workAssetReason) {
+            setError(workAssetReason);
+            return;
+          }
+          resetAdvancedFillForDocumentReplacement();
           setPagesHistory([restoredPages]);
           setPagesHi(0);
           const restoredCurrentId = restoredPages.some((page) => page.id === parsed.currentPageId)
@@ -8536,6 +8886,14 @@ function StudioCuttoonEditor() {
   }, [menu]);
 
   const selected = selectedId ? (elementById.get(selectedId) ?? null) : null;
+  const selectedWorkAssetDestructiveEditReason =
+    studioWorkAssetDestructiveEditReason(selected);
+  const selectedReadableImageSource = selected?.type === "image"
+    ? resolveStudioWorkAssetReadableImageSource(
+        selected,
+        (reference) => studioWorkAssetHydrator.get(reference)
+      )
+    : null;
   const layerNavigatorItems: StudioLayerNavigatorItem[] = elements.map((element, zIndex) => ({
     id: element.id,
     type: element.type,
@@ -8713,8 +9071,10 @@ function StudioCuttoonEditor() {
       ? "마스터 편집을 끝낸 뒤 페이지 래스터를 채울 수 있어요."
       : pageEditLocked
         ? "검토 잠금을 해제한 뒤 채울 수 있어요."
-        : selected?.type !== "image"
+          : selected?.type !== "image"
           ? "래스터 이미지 레이어를 먼저 선택하세요."
+          : selectedWorkAssetDestructiveEditReason
+            ? selectedWorkAssetDestructiveEditReason
           : isEffectivelyLocked(selected, groups)
             ? "잠긴 레이어는 채울 수 없어요."
             : isEffectivelyHidden(selected, groups)
@@ -8731,7 +9091,8 @@ function StudioCuttoonEditor() {
   const advancedFillArmed =
     advancedFillActive && tool === "select" && selected?.type === "image" && advancedFillUnsupportedReason === null;
   const selectedContentMutationLocked =
-    activeSurfaceReviewLocked || (selected !== null && isEffectivelyLocked(selected, groups));
+    activeSurfaceReviewLocked || selectedWorkAssetDestructiveEditReason !== null ||
+    (selected !== null && isEffectivelyLocked(selected, groups));
   // 픽셀 선택 도구가 실제로 무장된 상태(이미지 요소 선택 + 도구 on).
   // 무장 중엔 캔버스 드래그를 픽셀 선택으로 가로채므로 요소 드래그/클릭 선택 전환을 함께 잠근다.
   const pixelToolArmed =
@@ -10042,32 +10403,43 @@ function StudioCuttoonEditor() {
     previousPages: readonly PageState[],
     nextPages: readonly PageState[],
     registerNewDraws = true
-  ): void {
+  ): boolean {
     const document = studioCrdtDocumentRef.current;
     const runtime = studioCrdtSceneRuntimeRef.current;
-    if (!document || !runtime) return;
+    if (!document && !runtime) return true;
+    if (!document || !runtime) return false;
     try {
+      if (STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED && studioAuthUserId) {
+        runtime.publishRasterHistoryTransition({
+          document,
+          previousPages,
+          nextPages,
+          actorId: studioAuthUserId,
+        });
+      }
       runtime.publish(
         document,
         previousPages,
         nextPages,
         { registerNewDraws }
       );
+      return true;
     } catch (cause) {
       setError(
         cause instanceof Error
           ? `실시간 장면 동기화: ${cause.message}`
           : "장면 요소와 페이지 순서를 팀 문서에 반영하지 못했습니다."
       );
+      return false;
     }
   }
+  publishStudioCrdtSceneTransitionRef.current = publishStudioCrdtSceneTransition;
 
   function publishStudioCrdtHistoryTransition(
     previousPages: readonly PageState[],
     nextPages: readonly PageState[]
-  ): void {
-    if (!studioCrdtDocumentRef.current) return;
-    publishStudioCrdtSceneTransition(previousPages, nextPages, false);
+  ): boolean {
+    return publishStudioCrdtSceneTransition(previousPages, nextPages, false);
   }
 
   function mergeStudioCrdtFrontier(nextPages: PageState[]): PageState[] {
@@ -10089,25 +10461,33 @@ function StudioCuttoonEditor() {
   // 함께 커밋하기 위한 옵셔널 2번째 파라미터(하위호환 — 기존 15곳 이상의 commit(nextElements)
   // 단일 인자 호출은 전부 그대로 동작한다). extraPatch 스프레드 뒤에 elements 를 마지막에 둬서
   // extraPatch 에 실수로 elements 가 섞여도 항상 nextElements 가 이긴다.
-  function commit(nextElements: El[], extraPatch?: Partial<Omit<PageState, "id" | "elements">>) {
-    if (!editorMountedRef.current) return;
+  function commit(
+    nextElements: El[],
+    extraPatch?: Partial<Omit<PageState, "id" | "elements">>
+  ): boolean {
+    if (!editorMountedRef.current) return false;
     if (documentSaveInFlightRef.current) {
       setError("저장 중에는 원고를 변경할 수 없어요. 저장이 끝난 뒤 다시 시도해 주세요.");
-      return;
+      return false;
     }
     if (collaborationAccessRef.current.locked) {
       setError(collaborationLockMessage());
-      return;
+      return false;
+    }
+    const workAssetReason = studioWorkAssetSourceTransitionReason(elements, nextElements);
+    if (workAssetReason) {
+      setError(workAssetReason);
+      return false;
     }
     setSharedDocumentNotice(null);
     const resolved = applyBubbleAnchors(nextElements);
     if (masterEditMode) {
       setMaster((m) => withMasterElements(m, resolved)); // extraPatch는 마스터엔 개념 없음 — 무시
-      return;
+      return true;
     }
     if (pageEditLocked) {
       setError("이 페이지는 검토 잠금 상태예요. 페이지 검토에서 잠금을 해제한 뒤 편집해 주세요.");
-      return;
+      return false;
     }
     if (!advancedFillApplyingRef.current) {
       invalidateAdvancedFillWork("문서가 바뀌어 진행 중인 계산과 채우기 미리보기를 취소했습니다.");
@@ -10116,12 +10496,13 @@ function StudioCuttoonEditor() {
     const localNextPages = pages.map((p) =>
       p.id === activePage.id ? { ...p, ...extraPatch, elements: resolved } : p
     );
-    publishStudioCrdtSceneTransition(pages, localNextPages);
+    if (!publishStudioCrdtSceneTransition(pages, localNextPages)) return false;
     const nextPages = mergeStudioCrdtFrontier(localNextPages);
     const h = pagesHistory.slice(0, pagesHi + 1);
     h.push(nextPages);
     setPagesHistory(h);
     setPagesHi(h.length - 1);
+    return true;
   }
   // 같은 key의 연속 동작이면 새 히스토리 항목 대신 최상단을 교체(undo 1회로 합침).
   function commitCoalesced(nextElements: El[], key: string) {
@@ -10132,6 +10513,11 @@ function StudioCuttoonEditor() {
     }
     if (collaborationAccessRef.current.locked) {
       setError(collaborationLockMessage());
+      return;
+    }
+    const workAssetReason = studioWorkAssetSourceTransitionReason(elements, nextElements);
+    if (workAssetReason) {
+      setError(workAssetReason);
       return;
     }
     setSharedDocumentNotice(null);
@@ -10151,7 +10537,7 @@ function StudioCuttoonEditor() {
     const localNextPages = pages.map((p) =>
       p.id === activePage.id ? { ...p, elements: resolved } : p
     );
-    publishStudioCrdtSceneTransition(pages, localNextPages);
+    if (!publishStudioCrdtSceneTransition(pages, localNextPages)) return;
     const nextPages = mergeStudioCrdtFrontier(localNextPages);
     if (coalesceKeyRef.current === key && pagesHi === pagesHistory.length - 1) {
       setPagesHistory((h) => {
@@ -10178,6 +10564,11 @@ function StudioCuttoonEditor() {
       setError(collaborationLockMessage());
       return false;
     }
+    const workAssetReason = studioWorkAssetDocumentSourceTransitionReason(pages, nextPages);
+    if (workAssetReason) {
+      setError(workAssetReason);
+      return false;
+    }
     setSharedDocumentNotice(null);
     if (!options.bypassReviewLock) {
       const changedLockedPageId = findChangedLockedPageId(pages, nextPages);
@@ -10192,7 +10583,7 @@ function StudioCuttoonEditor() {
     const document = studioCrdtDocumentRef.current;
     let resolvedPages = nextPages;
     if (document) {
-      publishStudioCrdtSceneTransition(pages, nextPages);
+      if (!publishStudioCrdtSceneTransition(pages, nextPages)) return false;
       resolvedPages = mergeStudioCrdtFrontier(nextPages);
     }
     coalesceKeyRef.current = null;
@@ -10226,6 +10617,14 @@ function StudioCuttoonEditor() {
   function patchEl(id: string, patch: Partial<El>) {
     const target = elementById.get(id);
     if (target && isEffectivelyLocked(target, groups) && !isLayerMetadataPatch(patch)) return;
+    const workAssetReason = studioWorkAssetSourceReplacementReason(
+      target ?? null,
+      patch as Record<string, unknown>
+    );
+    if (workAssetReason) {
+      setError(workAssetReason);
+      return;
+    }
     maybeRecordMacroFromPatch(patch);
     commit(elements.map((e) => (e.id === id ? ({ ...e, ...patch } as El) : e)));
   }
@@ -11503,7 +11902,7 @@ function StudioCuttoonEditor() {
     setAdvancedFillStatus(null);
     const nextIndex = Math.max(0, pagesHi - 1);
     const nextSnapshot = pagesHistory[nextIndex];
-    if (nextSnapshot) publishStudioCrdtHistoryTransition(pages, nextSnapshot);
+    if (nextSnapshot && !publishStudioCrdtHistoryTransition(pages, nextSnapshot)) return;
     setPagesHi(nextIndex);
   };
   const redo = () => {
@@ -11516,7 +11915,7 @@ function StudioCuttoonEditor() {
     setAdvancedFillStatus(null);
     const nextIndex = Math.min(pagesHistory.length - 1, pagesHi + 1);
     const nextSnapshot = pagesHistory[nextIndex];
-    if (nextSnapshot) publishStudioCrdtHistoryTransition(pages, nextSnapshot);
+    if (nextSnapshot && !publishStudioCrdtHistoryTransition(pages, nextSnapshot)) return;
     setPagesHi(nextIndex);
   };
   function fitCanvasToWidth() {
@@ -11642,7 +12041,7 @@ function StudioCuttoonEditor() {
     setAdvancedFillStatus(null);
     const nextIndex = Math.max(0, Math.min(pagesHistory.length - 1, index));
     const nextSnapshot = pagesHistory[nextIndex];
-    if (nextSnapshot) publishStudioCrdtHistoryTransition(pages, nextSnapshot);
+    if (nextSnapshot && !publishStudioCrdtHistoryTransition(pages, nextSnapshot)) return;
     setPagesHi(nextIndex);
   };
 
@@ -16032,6 +16431,139 @@ function StudioCuttoonEditor() {
     }
     return true;
   }
+
+  function queueStudioRasterDrawPromotion(input: {
+    plan: NonNullable<ReturnType<StudioCrdtSceneGraphRuntime["planRasterDrawPromotion"]>>;
+    pageId: string;
+    layerId: string;
+    workId: string;
+    actorId: string;
+    document: StudioCrdtDocument;
+    runtime: StudioCrdtSceneGraphRuntime;
+    accessGeneration: number;
+  }): void {
+    const controller = new AbortController();
+    studioRasterPublicationControllersRef.current.add(controller);
+    const scopeIsCurrent = () => {
+      const access = collaborationAccessRef.current;
+      return editorMountedRef.current &&
+        !documentSaveInFlightRef.current &&
+        !access.locked &&
+        access.authScopeKey === input.actorId &&
+        access.workId === input.workId &&
+        access.accessGeneration === input.accessGeneration &&
+        studioCrdtDocumentRef.current === input.document &&
+        studioCrdtSceneRuntimeRef.current === input.runtime;
+    };
+    const abortForStaleScope = (): never => {
+      throw new DOMException("작품 또는 공동 편집 권한이 변경되었습니다.", "AbortError");
+    };
+    const sourceVectorIsCurrent = () => {
+      const history = pagesHistoryRef.current;
+      const currentIndex = Math.max(0, Math.min(pagesHiRef.current, history.length - 1));
+      const page = history[currentIndex]?.find(({ id }) => id === input.pageId);
+      const element = page?.elements.find(({ id }) => id === input.plan.operationId) ?? null;
+      return input.runtime.rasterDrawPromotionSourceMatches({
+        plan: input.plan,
+        element: element?.type === "draw" ? element : null,
+        pageId: input.pageId,
+        layerId: input.layerId,
+        documentWidth: CANVAS_W,
+        documentHeight: page?.canvasH ?? input.plan.surface.height,
+        panelClipped: Boolean(
+          element?.type === "draw" && page && containingPanel(element, page.elements)
+        ),
+      });
+    };
+
+    const run = async () => {
+      if (!scopeIsCurrent()) abortForStaleScope();
+      if (input.document.getRasterOperationLogs().some((log) =>
+        log.operations.some(({ operationId }) => operationId === input.plan.operationId)
+      )) return;
+
+      const [captureModule, publisherModule, assetClientModule, semanticParametersSha256] =
+        await Promise.all([
+          import("./studio-crdt-raster-stroke-capture"),
+          import("./studio-crdt-raster-patch-publisher"),
+          import("./studio-raster-asset-client"),
+          input.runtime.sha256RasterSemanticParameters(
+            input.plan.semanticParameters,
+            controller.signal
+          ),
+      ]);
+      if (!scopeIsCurrent()) abortForStaleScope();
+      if (!sourceVectorIsCurrent()) {
+        throw new DOMException("원본 벡터 획이 게시 전에 변경되었습니다.", "AbortError");
+      }
+      const captured = captureModule.captureStudioRasterStroke({
+        stroke: input.plan.stroke,
+        documentWidth: input.plan.surface.width,
+        documentHeight: input.plan.surface.height,
+      });
+      const encoder = publisherModule.createStudioRasterBrowserPngEncoder();
+      const logicalClock = input.runtime.nextRasterLogicalClock(
+        input.document.getRasterOperationLogs()
+      );
+      await publisherModule.publishStudioRasterPatch({
+        surface: input.plan.surface,
+        operationId: input.plan.operationId,
+        actorId: input.actorId,
+        logicalClock,
+        pageId: input.pageId,
+        layerId: input.layerId,
+        intent: input.plan.intent,
+        semanticParametersSha256,
+        rect: captured.bounds,
+        pixels: captured.pixels,
+      }, {
+        encode: encoder,
+        upload: ({ reference, bytes, signal }) =>
+          assetClientModule.uploadStudioRasterAsset(
+            input.workId,
+            reference,
+            bytes,
+            signal
+          ),
+        append: (log) => {
+          if (!scopeIsCurrent()) abortForStaleScope();
+          if (!sourceVectorIsCurrent()) {
+            throw new DOMException("원본 벡터 획이 게시 중 변경되었습니다.", "AbortError");
+          }
+          input.document.mergeRasterOperationLog(log);
+        },
+        compensate: ({ reference, signal }) =>
+          assetClientModule.deleteUnreferencedStudioRasterAssetUpload(
+            input.workId,
+            reference,
+            signal
+          ),
+      }, { signal: controller.signal });
+    };
+
+    const task = studioRasterPublicationTailRef.current
+      .catch(() => undefined)
+      .then(run);
+    studioRasterPublicationTailRef.current = task.then(
+      () => undefined,
+      () => undefined
+    );
+    void task.catch((cause: unknown) => {
+      if (
+        controller.signal.aborted ||
+        (cause instanceof DOMException && cause.name === "AbortError") ||
+        !scopeIsCurrent()
+      ) return;
+      setError(
+        cause instanceof Error
+          ? `실시간 픽셀 획 게시: ${cause.message} 기존 벡터 획은 안전하게 유지됩니다.`
+          : "실시간 픽셀 획을 게시하지 못해 기존 벡터 획을 유지했습니다."
+      );
+    }).finally(() => {
+      studioRasterPublicationControllersRef.current.delete(controller);
+    });
+  }
+
   function finishDrawingPointer(stage: Konva.Stage | null, pointerEvent: PointerEvent) {
     // Idempotent: Stage pointerup and the window safety listener can both observe the same release.
     if (!drawingRef.current && !drawingPointerSessionRef.current) return;
@@ -16150,8 +16682,42 @@ function StudioCuttoonEditor() {
             points: smoothStrokePoints(finished.points, postCorrection, { preserveCorners }),
           };
         }
+        // Plan the bounded raster equivalent before the React commit, but keep the vector as a
+        // durable fallback until a verified replay frame is ready. Panel-clipped/complex brushes
+        // stay entirely on Konva so the migration never changes compositing semantics.
+        const rasterWorkId = authorizedWorkAssetScopeId;
+        const rasterDocument = studioCrdtDocumentRef.current;
+        const rasterRuntime = studioCrdtSceneRuntimeRef.current;
+        const rasterActorId = studioAuthUserId;
+        const rasterPlan =
+          STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED &&
+          !masterEditMode && rasterWorkId && rasterDocument && rasterRuntime && rasterActorId &&
+          studioCrdtOperationSyncReady &&
+          !containingPanel(finished, elements)
+            ? rasterRuntime.planRasterDrawPromotion({
+                element: finished,
+                pageId: activePage.id,
+                documentWidth: CANVAS_W,
+                documentHeight: canvasH,
+              })
+            : null;
         // Exactly one pointerup owns this single commit, hence one complete stroke equals one undo.
-        commit([...elements, finished]);
+        const committed = commit([...elements, finished]);
+        if (
+          committed && rasterPlan && rasterWorkId && rasterDocument &&
+          rasterRuntime && rasterActorId
+        ) {
+          queueStudioRasterDrawPromotion({
+            plan: rasterPlan,
+            pageId: activePage.id,
+            layerId: (finished as DrawEl & { groupId?: string }).groupId ?? "page-root",
+            workId: rasterWorkId,
+            actorId: rasterActorId,
+            document: rasterDocument,
+            runtime: rasterRuntime,
+            accessGeneration: collaborationAccessRef.current.accessGeneration,
+          });
+        }
       }
     } finally {
       // Always clear the hold timer after commit/promote so a second pointerup cannot re-use it.
@@ -18144,6 +18710,11 @@ function StudioCuttoonEditor() {
     }
     setSharedDocumentNotice(null);
     const restoredPages = projectData.pagesList as PageState[];
+    const workAssetReason = studioWorkAssetDocumentSourceTransitionReason(pages, restoredPages);
+    if (workAssetReason) {
+      setError(workAssetReason);
+      return;
+    }
     resetAdvancedFillForDocumentReplacement();
     // 히스토리에 새 페이지 상태를 추가해 JSON/복구 지점 복원도 ⌘Z 흐름과 충돌하지 않게 한다.
     const nextHistory = pagesHistory.slice(0, pagesHi + 1);
@@ -18950,7 +19521,7 @@ function StudioCuttoonEditor() {
       size="wide"
       className={cn(
         // Canvas-max draw-app shell: full-bleed, no marketing padding or max-width cap.
-        "flex min-h-0 flex-1 flex-col max-w-none px-0 py-0",
+        "flex min-h-0 flex-1 flex-col !max-w-none !px-0 py-0",
         (isFullscreen || maximized) && "min-h-0"
       )}
     >
@@ -18958,18 +19529,26 @@ function StudioCuttoonEditor() {
         aria-label="문서 메뉴"
         className={cn(
           canvasOnlyMode && "hidden",
-          mobileImmersive && "min-h-8 gap-1 px-1.5 py-0.5"
+          mobileImmersive &&
+            "min-h-8 gap-1 py-0.5 [&_[data-studio-app-menubar-scroll]]:px-1"
         )}
       >
-        {/* Magma/Figma-style: document name + workspace only — no marketing product title. */}
         <div
+          data-studio-menubar-primary="true"
           className={cn(
-            "flex min-w-0 shrink-0 items-center gap-1.5",
+            "flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
             mobileImmersive && "hidden"
           )}
         >
+          {/* Document context and application commands may compress; publish actions never do. */}
+          <div
+            className={cn(
+              "flex min-w-0 shrink items-center gap-1.5",
+              mobileImmersive && "hidden"
+            )}
+          >
           <h1
-            className="min-w-0 max-w-[12rem] truncate text-[0.8125rem] font-semibold tracking-tight text-fg lg:max-w-[18rem]"
+            className="min-w-0 max-w-[8rem] truncate text-[0.8125rem] font-semibold tracking-tight text-fg xl:max-w-[16rem]"
             title={title.trim() || "무제"}
           >
             {title.trim() || "무제"}
@@ -19005,26 +19584,24 @@ function StudioCuttoonEditor() {
               {workspaceSyncNotice}
             </span>
           ) : null}
-        </div>
-        <span aria-hidden className="mx-0.5 hidden h-4 w-px shrink-0 bg-line sm:block" />
-        {/* Magma/CSP application menu — desktop; replaces the cluttered horizontal toolbelt IA */}
-        <Suspense fallback={null}>
-          <StudioMainMenu
-            groups={studioMainMenuGroups}
-            // md+: tablet landscape and up — Magma/Photopea-class menus stay discoverable
-            // without waiting for desktop-only lg; still hidden in mobile immersive shell.
-            className={cn("hidden min-w-0 md:flex", mobileImmersive && "!hidden")}
-          />
-        </Suspense>
-        {/* 데스크톱: 툴벨트가 파킹되므로 삽입 핵심을 메뉴바에서 직접 연다. */}
-        <div
-          className={cn(
-            "hidden min-w-0 items-center gap-0.5 md:flex",
-            mobileImmersive && "!hidden"
-          )}
-          role="group"
-          aria-label="삽입 바로가기"
-        >
+          </div>
+          <span aria-hidden className="mx-0.5 hidden h-4 w-px shrink-0 bg-line md:block" />
+          {/* Desktop application commands live in the compressible center lane. */}
+          <Suspense fallback={null}>
+            <StudioMainMenu
+              groups={studioMainMenuGroups}
+              className={cn("hidden min-w-0 md:flex", mobileImmersive && "!hidden")}
+            />
+          </Suspense>
+          {/* Wide layouts expose high-frequency insert shortcuts; narrower widths use Insert. */}
+          <div
+            className={cn(
+              "hidden min-w-0 items-center gap-0.5 xl:flex",
+              mobileImmersive && "!hidden"
+            )}
+            role="group"
+            aria-label="삽입 바로가기"
+          >
           <button
             type="button"
             onClick={() => {
@@ -19056,13 +19633,15 @@ function StudioCuttoonEditor() {
             <MessageCircle size={14} aria-hidden />
             말풍선
           </button>
+          </div>
+          <span aria-hidden className="mx-0.5 hidden h-4 w-px shrink-0 bg-line xl:block" />
         </div>
-        <span aria-hidden className="mx-0.5 hidden h-4 w-px shrink-0 bg-line lg:block" />
         {/* 파일·내보내기 — 드로잉 앱 메뉴바 */}
         <div
+          data-studio-menubar-actions="true"
           className={cn(
-            "flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-            mobileImmersive && "w-full gap-0.5"
+            "flex shrink-0 flex-nowrap items-center gap-1",
+            mobileImmersive && "min-w-0 w-full gap-0.5"
           )}
         >
           {isMobile ? (
@@ -19102,14 +19681,14 @@ function StudioCuttoonEditor() {
             <>
               <h1 className="sr-only">드로잉 전체화면</h1>
               <span
-                className="min-w-24 max-w-40 shrink-0 truncate px-1 text-xs font-semibold text-fg-2"
+                className="min-w-0 max-w-40 flex-1 truncate px-1 text-xs font-semibold text-fg-2"
                 title={`${title.trim() || "무제"} · ${pageDisplayName(activePage, activePageIndex)}`}
               >
                 {title.trim() || "무제"} · {pageDisplayName(activePage, activePageIndex)}
               </span>
             </>
           ) : null}
-          <div ref={exportMenuRef} className="relative flex shrink-0 items-center">
+          <div ref={exportMenuRef} className="relative flex shrink-0 items-center max-sm:hidden">
             <button
               type="button"
               onClick={() => handleDownload()}
@@ -19119,8 +19698,8 @@ function StudioCuttoonEditor() {
               )}
               title={`현재 페이지를 ${exportScale}× ${exportFormat.toUpperCase()}로 다운로드${exportTransparent && exportFormat === "png" ? " (투명 배경)" : ""}`}
             >
-              <Download size={14} /> 다운로드
-              <span className="text-[10px] font-semibold tabular-nums text-fg-3">
+              <Download size={14} /> <span className="max-xl:sr-only">다운로드</span>
+              <span className="text-[10px] font-semibold tabular-nums text-fg-3 max-xl:hidden">
                 {exportScale}× {exportFormat.toUpperCase()}
               </span>
             </button>
@@ -19183,7 +19762,7 @@ function StudioCuttoonEditor() {
                 )
               : null}
           </div>
-          <div ref={projectActionsRef} className="relative shrink-0">
+          <div ref={projectActionsRef} className="relative shrink-0 max-sm:hidden">
             <button
               type="button"
               onClick={() => {
@@ -19200,7 +19779,7 @@ function StudioCuttoonEditor() {
               })}
               title="백업·복구·기획·검토·연재·게시 도구"
             >
-              <Folder size={14} aria-hidden /> 프로젝트
+              <Folder size={14} aria-hidden /> <span className="max-xl:sr-only">프로젝트</span>
               <ChevronDown
                 size={13}
                 className={cn("transition-transform", projectActionsOpen && "rotate-180")}
@@ -19628,7 +20207,21 @@ function StudioCuttoonEditor() {
       {tool === "draw" && !canvasOnlyMode ? (
         <Suspense fallback={<div className="h-10 shrink-0 border-b border-line bg-panel/80" aria-hidden />}>
           <StudioDrawOptionsBar
-            className={cn(mobileImmersive && "order-first")}
+            docked
+            dockInsets={{
+              left:
+                (visibleLeftPanelOpen
+                  ? leftResize.width + 8
+                  : presentationPanelsHidden
+                    ? 0
+                    : 32) +
+                (studioUiDensityAllows(uiDensityMode, "tool-rail") ? 52 : 0),
+              right: visibleRightPanelOpen
+                ? rightResize.width + 8
+                : presentationPanelsHidden
+                  ? 0
+                  : 32,
+            }}
             drawMode={drawMode === "shape" ? "shape" : drawMode === "eraser" ? "eraser" : "pen"}
             brushId={brush}
             strokeWidth={strokeWidth}
@@ -19641,7 +20234,6 @@ function StudioCuttoonEditor() {
             brushSlots={brushSlotsState.slots}
             symmetryType={symmetryType}
             quickShapeActive={quickShapeActive}
-            compactBrushes={uiDensityMode !== "full"}
             onSelectBrush={(item) => {
               const preset = BRUSH_PRESETS.find((candidate) => candidate.id === item.id);
               if (preset) applyBuiltInBrushPreset(preset);
@@ -19664,6 +20256,7 @@ function StudioCuttoonEditor() {
             canvasFlipH={canvasFlipH}
             onToggleCanvasFlipH={() => setCanvasFlipH((v) => !v)}
             onOpenBrushStudio={() => {
+              void loadStudioBrushStudio();
               setTool("draw");
               setDrawMode("pen");
               setRightPanelOpen(true);
@@ -19741,10 +20334,6 @@ function StudioCuttoonEditor() {
                 return next;
               });
             }}
-            onSelectRecentBrush={(brushId) => {
-              const preset = BRUSH_PRESETS.find((candidate) => candidate.id === brushId);
-              if (preset) applyBuiltInBrushPreset(preset);
-            }}
             onCycleStabilizer={() => {
               setStabilizer((prev) => {
                 const next = cycleStudioStabilizerStrength(prev);
@@ -19777,6 +20366,8 @@ function StudioCuttoonEditor() {
       {/* Legacy tool belt: primary on mobile. Desktop menubar owns discovery; belt is a zero-size
           host for triggers (popovers portal to body — never nest fixed UI under backdrop-filter). */}
       <StudioToolBelt
+        inert={!isMobile}
+        aria-hidden={!isMobile}
         className={cn(
           canvasOnlyMode && "hidden",
           mobileImmersive && "shrink-0",
@@ -21273,168 +21864,7 @@ function StudioCuttoonEditor() {
         </StudioToolbarCluster>
         </>
         ) : null}
-        {tool === "draw" && (
-          // 모바일: 이 인라인 브러시 바는 하단 드로잉 도구막대 + "브러시" 시트가 대체하므로 숨긴다(가로 스크롤 폭 절약·캔버스 우선).
-          <div className="hidden max-w-full flex-wrap items-center gap-2 rounded-xl border border-line/70 bg-card/65 px-3 py-1.5 shadow-md lg:flex">
-            {/* Brush Presets Group — 펜 전용. 지우개/도형에선 invisible로 '같은 너비·높이'를 유지해
-                상위 스티키 툴바의 줄바꿈이 변하지 않게 한다(펜↔지우개 전환 시 캔버스 점프 방지).
-                visibility:hidden이라 탭 포커스에서도 제외됨. */}
-            {tool === "draw" && (
-              <>
-                <div
-                  className={cn(
-                    "min-w-0 max-w-[min(36rem,55vw)]",
-                    drawMode !== "pen" && "invisible pointer-events-none"
-                  )}
-                  aria-hidden={drawMode !== "pen"}
-                >
-                  <Suspense fallback={null}>
-                    <StudioBrushTray
-                      activeBrushId={brush}
-                      compact={uiDensityMode === "simple" || uiDensityMode === "focus"}
-                      onSelect={(item) => {
-                        const preset = BRUSH_PRESETS.find((candidate) => candidate.id === item.id);
-                        if (preset) applyBuiltInBrushPreset(preset);
-                      }}
-                    />
-                  </Suspense>
-                </div>
-                <div className={cn("mx-0.5 h-5 w-px bg-line/60", drawMode !== "pen" && "invisible")} />
-              </>
-            )}
-
-            {/* Colors Group — 지우개에선 색이 의미 없지만 invisible로 너비·높이를 유지(툴바 점프 방지). */}
-            {tool === "draw" && (
-              <>
-                <div
-                  className={cn("flex items-center gap-1", drawMode === "eraser" && "invisible pointer-events-none")}
-                  aria-label="브러시 색상 설정"
-                  aria-hidden={drawMode === "eraser"}
-                >
-                  <div className="flex items-center gap-0.5" aria-label="빠른 색상">
-                    {DRAW_COLOR_SWATCHES.map((swatch) => (
-                      <button
-                        key={swatch}
-                        type="button"
-                        onClick={() => setColor(swatch)}
-                        title={swatch}
-                        aria-label={`색상 ${swatch}`}
-                        className={cn(
-                          "size-5 rounded transition-transform hover:scale-110 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
-                          color.toLowerCase() === swatch.toLowerCase() ? "ring-2 ring-accent ring-offset-1 ring-offset-panel" : "border border-line/60"
-                        )}
-                        style={{ background: swatch }}
-                      />
-                    ))}
-                  </div>
-                  <div className="mx-0.5 h-4 w-px bg-line/60" />
-                  <label
-                    className="relative flex items-center justify-center cursor-pointer size-6 rounded-md border border-line shadow-sm overflow-hidden"
-                    title="사용자 정의 색상"
-                    style={{ background: color }}
-                  >
-                    <input
-                      type="color"
-                      value={color}
-                      onChange={(e) => setColor(e.target.value)}
-                      className="absolute inset-0 opacity-0 cursor-pointer size-full"
-                    />
-                    <span className="text-[9px] mix-blend-difference text-white font-bold select-none">C</span>
-                  </label>
-                </div>
-                <div className={cn("mx-0.5 h-5 w-px bg-line/60", drawMode === "eraser" && "invisible")} />
-              </>
-            )}
-
-            {/* Size & Opacity Controls */}
-            <div className="flex items-center gap-3">
-              <label className="inline-flex items-center gap-1.5 text-xs text-fg-3 font-medium">
-                <span className="select-none">크기</span>
-                <input
-                  type="range"
-                  min={1}
-                  max={80}
-                  value={strokeWidth}
-                  onChange={(e) => setStrokeWidth(Number(e.target.value))}
-                  className="w-20 sm:w-24 accent-accent cursor-pointer"
-                />
-                <span className="numeral w-8 text-right text-[10px] text-fg-2 font-mono">{strokeWidth}px</span>
-              </label>
-
-              <label className="inline-flex items-center gap-1.5 text-xs text-fg-3 font-medium">
-                <span className="select-none">투명도</span>
-                <input
-                  type="range"
-                  min={10}
-                  max={100}
-                  step={5}
-                  value={Math.round(brushOpacity * 100)}
-                  onChange={(e) => setBrushOpacity(Number(e.target.value) / 100)}
-                  className="w-20 sm:w-24 accent-accent cursor-pointer"
-                />
-                <span className="numeral w-8 text-right text-[10px] text-fg-2 font-mono">{Math.round(brushOpacity * 100)}%</span>
-              </label>
-            </div>
-
-            <div className="mx-0.5 h-5 w-px bg-line/60" />
-
-            {/* Shapes Toggle — icon-first */}
-            <button
-              type="button"
-              onClick={() => setDrawAdvancedOpen((open) => !open)}
-              className={cn(
-                "grid h-8 w-8 place-items-center rounded-lg border transition-all cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
-                drawAdvancedOpen || drawMode === "shape" ? "border-accent bg-accent-soft text-fg" : "border-line text-fg-2 hover:bg-raised"
-              )}
-              aria-expanded={drawAdvancedOpen}
-              aria-label="도형 도구"
-              title="도형 도구"
-            >
-              <Shapes size={14} strokeWidth={1.75} aria-hidden />
-            </button>
-
-            {/* Shapes Options Dropdown — Photopea/Canva glyph strip */}
-            {drawAdvancedOpen && (
-              <div className="flex basis-full flex-wrap items-center gap-2 border-t border-line/70 pt-2 mt-1">
-                <Suspense fallback={<div className="h-8 w-40 rounded-lg bg-raised/50" aria-hidden />}>
-                  <StudioShapePickerStrip
-                    activeKind={drawShape}
-                    filled={shapeFill}
-                    showLabels={false}
-                    onSelect={(kind) => {
-                      setTool("draw");
-                      setDrawMode("shape");
-                      setDrawShape(kind as DrawShapeKind);
-                      setMenu(null);
-                    }}
-                  />
-                </Suspense>
-                <div className="mx-1 h-4 w-px bg-line/60" />
-                <label
-                  className={cn(
-                    "inline-flex size-8 items-center justify-center rounded-lg border transition-colors cursor-pointer",
-                    drawShape === "line" || drawShape === "arrow"
-                      ? "border-line bg-card text-fg-3 opacity-50 cursor-not-allowed"
-                      : shapeFill
-                      ? "border-accent/60 bg-accent-soft/50 text-fg"
-                      : "border-line bg-card text-fg-2 hover:bg-raised"
-                  )}
-                  title="채우기"
-                >
-                  <input
-                    type="checkbox"
-                    checked={shapeFill}
-                    disabled={drawShape === "line" || drawShape === "arrow"}
-                    onChange={(e) => setShapeFill(e.target.checked)}
-                    className="sr-only"
-                    aria-label="도형 채우기"
-                  />
-                  <PaintBucket size={14} aria-hidden />
-                </label>
-              </div>
-            )}
-          </div>
-        )}
+        {/* 펜 옵션은 캔버스 하단 StudioDrawOptionsBar 한 곳에서만 제공합니다. */}
         <span className="mx-0.5 h-5 w-px bg-line" />
         <button
           type="button"
@@ -21895,7 +22325,7 @@ function StudioCuttoonEditor() {
                   </div>
                   {/* 실내용 미니 썸네일 — 마스터 요소를 페이지 요소 아래에 합성해 경량 SVG 프록시로 축소 렌더.
                       마스터 없음/페이지 숨김이면 원본 page 를 동일 참조로 넘겨 RC 메모이제이션을 보존한다. */}
-                  <StudioPageThumbnail page={composeThumbPage(master, p)} />
+                  <StudioPageThumbnail page={composeWorkAssetPreviewPage(p)} />
                   {metaEditPageId === p.id ? (
                     // 인라인 편집 입력은 늘린 선택 버튼(z-10) 위로 올려 포커스·타이핑을 받게 한다.
                     <div className="relative z-20 flex flex-col gap-1 pt-1">
@@ -22112,7 +22542,7 @@ function StudioCuttoonEditor() {
             <StudioRailToolButton
               icon={Pencil}
               label={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 펜을 사용할 수 있어요" : "펜 (B)"}
-              description="자유선으로 그립니다. 필압·보정·브러시 프리셋은 상단 옵션 막대와 브러시 스튜디오에서 조절해요."
+              description="자유선으로 그립니다. 필압·보정·브러시 프리셋은 하단 옵션 도크와 브러시 스튜디오에서 조절해요."
               active={tool === "draw" && drawMode === "pen"}
               disabled={activeSurfaceReviewLocked}
               grouped
@@ -22755,7 +23185,12 @@ function StudioCuttoonEditor() {
           <StudioColorBlindFilterDefs />
           {/* Sketchbook/Krita/Concepts status — zoom HUD + tool metrics over canvas */}
           {!canvasOnlyMode ? (
-            <StudioStatusBar className={cn(mobileImmersive && "bottom-[calc(5.5rem+env(safe-area-inset-bottom))]")}>
+            <StudioStatusBar
+              className={cn(
+                tool === "draw" && !isMobile && "bottom-[4.75rem]",
+                mobileImmersive && "bottom-[calc(5.5rem+env(safe-area-inset-bottom))]"
+              )}
+            >
               <StudioHudPill title="배율">
                 <button
                   type="button"
@@ -22911,6 +23346,7 @@ function StudioCuttoonEditor() {
           <div
             ref={wrapRef}
             data-studio-canvas-viewport
+            data-studio-draw-dock-safe-area={tool === "draw" && !canvasOnlyMode ? "true" : undefined}
             // 스크롤 뷰포트를 키보드 포커스 가능하게 해 방향키 스크롤 허용(WCAG scrollable-region) — focusable 은 의도적.
             // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
             tabIndex={0}
@@ -23137,10 +23573,16 @@ function StudioCuttoonEditor() {
                   );
                 })()}
               {(() => {
+                // Only this paint-time array may contain ephemeral Blob URLs. The authored
+                // `elements`, page history, autosave, revisions, and CRDT publisher continue to
+                // see stable work-asset URIs.
+                const canvasRenderElements = masterEditMode
+                  ? elements
+                  : studioWorkAssetRenderProjection.elements;
                 // 다중 레이어 타임라인 재생 미리보기 — 재생 중에만 계산(커밋 없이 렌더 시점 override).
                 // 정지 상태(timelinePlaying=false)면 항상 null이라 기존 렌더 경로와 100% 동일.
                 const timelineComposite = timelinePlaying
-                  ? resolveTimelineComposite(animTimeline, elements.map((e) => e.id), timelinePreviewFrame)
+                  ? resolveTimelineComposite(animTimeline, canvasRenderElements.map((e) => e.id), timelinePreviewFrame)
                   : null;
                 // Preview-only transform tween (display offsets; does not commit to history).
                 const timelineTransformFrame = timelinePlaying ? timelinePreviewFrame : timelinePlayhead;
@@ -23148,7 +23590,7 @@ function StudioCuttoonEditor() {
                   timelineOpen || timelinePlaying
                     ? resolveTimelineTransforms(
                         animTimeline,
-                        elements.map((e) => e.id),
+                        canvasRenderElements.map((e) => e.id),
                         timelineTransformFrame
                       )
                     : null;
@@ -23158,7 +23600,7 @@ function StudioCuttoonEditor() {
                 // 기대므로 대상이 일치해야 한다). locked 프레임은 제외하지 않는다(containingPanel()도
                 // 프레임의 locked 여부를 보지 않는다 — "잠금"은 프레임 자체가 옮겨지지 않게 하는 것이지
                 // 다른 요소가 그 위에 도킹되는 걸 막는 개념이 아니다).
-                const autoFitFrameCandidates = elements.filter((e): e is FrameEl => e.type === "frame" && !e.hidden);
+                const autoFitFrameCandidates = canvasRenderElements.filter((e): e is FrameEl => e.type === "frame" && !e.hidden);
                 // 한 요소를 렌더하는 함수. opts.asMask=클리핑 마스크의 베이스 사본(비상호작용),
                 // opts.compositeOverride=알파 클리핑 자식의 "source-in" 합성.
                 const renderEl = (el: El, idx: number, opts: { asMask?: boolean; compositeOverride?: string } = {}) => {
@@ -23205,7 +23647,7 @@ function StudioCuttoonEditor() {
                       nodeRefs.current[el.id] = n;
                     };
                 // 패널 내부 콘텐츠 클리핑(들어간 패널 영역). 아래 레이어 클리핑 마스크는 ClipMaskGroup이 알파로 처리한다.
-                const panelClip = el.noClip ? null : containingPanel(el, elements);
+                const panelClip = el.noClip ? null : containingPanel(el, canvasRenderElements);
                 const clip = panelClip
                   ? { x: panelClip.x, y: panelClip.y, width: panelClip.width, height: panelClip.height }
                   : null;
@@ -24009,14 +24451,14 @@ function StudioCuttoonEditor() {
                 // 마스터 편집 모드 — 현재 페이지의 일반 요소를 반투명 잠금 고스트로 위에 겹쳐 위치 참고용으로만 보여준다.
                 const pageGhost = masterEditMode ? (
                   <Group listening={false} opacity={MASTER_EDIT_GHOST_OPACITY}>
-                    {activePage.elements
+                    {studioWorkAssetRenderProjection.elements
                       .filter((pel) => !isEffectivelyHidden(pel, activePage.groups ?? []))
                       .map((pel, pIdx) => renderEl(pel, pIdx, { asMask: true }))}
                   </Group>
                 ) : null;
-                const mainEls = elements.map((el, idx) => {
+                const mainEls = canvasRenderElements.map((el, idx) => {
                   if (isEffectivelyHidden(el, groups)) return null; // 숨긴 레이어/그룹은 렌더·내보내기에서 제외
-                  const base = el.clipBelow && idx > 0 ? elements[idx - 1] : null;
+                  const base = el.clipBelow && idx > 0 ? canvasRenderElements[idx - 1] : null;
                   // 자기 완결형 마스크(el.maskSrc) — clipBelow와 별개 축, 교집합으로 합성해야 하므로
                   // clipBelow보다 먼저 적용해 "이미 마스크 적용된 노드"를 만든다.
                   const maskOn = el.type === "image" && shouldApplyLayerMask(el as ImageEl);
@@ -24079,6 +24521,15 @@ function StudioCuttoonEditor() {
                   <>
                     {masterUnderlay}
                     {mainEls}
+                    {!masterEditMode
+                      ? studioWorkAssetRenderPlaceholders.map((placeholder) => (
+                          <StudioWorkAssetPlaceholderNode
+                            key={`${placeholder.elementType}:${placeholder.assetId}`}
+                            placeholder={placeholder}
+                            scale={effScale}
+                          />
+                        ))
+                      : null}
                     {pageGhost}
                   </>
                 );
@@ -24795,6 +25246,11 @@ function StudioCuttoonEditor() {
 
           <div
             className="pointer-events-none absolute bottom-16 left-1/2 z-40 -translate-x-1/2"
+            style={
+              tool === "draw" && !canvasOnlyMode
+                ? { bottom: "calc(var(--studio-draw-options-height, 3.75rem) + 0.75rem)" }
+                : undefined
+            }
             role="status"
             aria-live="polite"
             aria-atomic="true"
@@ -24822,6 +25278,11 @@ function StudioCuttoonEditor() {
               "absolute bottom-3 right-3 z-30 hidden size-9 place-items-center rounded-lg border border-line bg-panel/90 text-xs font-bold text-fg-2 shadow-md backdrop-blur transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:grid",
               canvasOnlyMode && "!hidden"
             )}
+            style={
+              tool === "draw" && !canvasOnlyMode
+                ? { bottom: "calc(var(--studio-draw-options-height, 3.75rem) + 1.25rem)" }
+                : undefined
+            }
             aria-label="도구 빠른 실행"
             aria-expanded={showQuickStart}
             title="도구 빠른 실행"
@@ -24836,6 +25297,11 @@ function StudioCuttoonEditor() {
               "absolute bottom-3 right-14 z-30 hidden size-9 place-items-center rounded-lg border border-line bg-panel/90 text-sm text-fg-2 shadow-md backdrop-blur transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:grid",
               canvasOnlyMode && "!hidden"
             )}
+            style={
+              tool === "draw" && !canvasOnlyMode
+                ? { bottom: "calc(var(--studio-draw-options-height, 3.75rem) + 1.25rem)" }
+                : undefined
+            }
             aria-label="단축키"
             title="단축키"
           >
@@ -24849,6 +25315,11 @@ function StudioCuttoonEditor() {
               "absolute bottom-3 right-[6.5rem] z-30 hidden size-9 place-items-center rounded-lg border border-line bg-panel/90 text-fg-2 shadow-md backdrop-blur transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent lg:grid",
               canvasOnlyMode && "!hidden"
             )}
+            style={
+              tool === "draw" && !canvasOnlyMode
+                ? { bottom: "calc(var(--studio-draw-options-height, 3.75rem) + 1.25rem)" }
+                : undefined
+            }
             aria-label="기능 튜토리얼"
             aria-expanded={tutorialHubOpen}
             title="기능 튜토리얼"
@@ -27136,6 +27607,14 @@ function StudioCuttoonEditor() {
 
               {selected.type === "image" && (
                 <>
+                  {selectedWorkAssetDestructiveEditReason ? (
+                    <p
+                      role="status"
+                      className="rounded-lg border border-accent/35 bg-accent/10 px-3 py-2 text-xs leading-relaxed text-fg-2"
+                    >
+                      {selectedWorkAssetDestructiveEditReason}
+                    </p>
+                  ) : null}
                   <div
                     hidden={
                       inspectorLayout.primary !== "properties" ||
@@ -27143,18 +27622,22 @@ function StudioCuttoonEditor() {
                     }
                     className="space-y-3"
                   >
-                      <StudioBgRemoveButton
-                        src={selected.src}
-                        onResult={(dataUrl) => patchEl(selected.id, { src: dataUrl })}
-                      />
-                      <StudioAiColorizePanel
-                        configured={isStudioAiConfigured(aiSettings)}
-                        prompt={aiColorizePrompt}
-                        onPromptChange={setAiColorizePrompt}
-                        busy={aiColorizeBusy}
-                        error={aiColorizeError}
-                        onColorize={onColorizeSelected}
-                      />
+                      {!selectedWorkAssetDestructiveEditReason ? (
+                        <>
+                          <StudioBgRemoveButton
+                            src={selected.src}
+                            onResult={(dataUrl) => patchEl(selected.id, { src: dataUrl })}
+                          />
+                          <StudioAiColorizePanel
+                            configured={isStudioAiConfigured(aiSettings)}
+                            prompt={aiColorizePrompt}
+                            onPromptChange={setAiColorizePrompt}
+                            busy={aiColorizeBusy}
+                            error={aiColorizeError}
+                            onColorize={onColorizeSelected}
+                          />
+                        </>
+                      ) : null}
                       {selected.stockImageCredit && (
                         <p className="rounded-md border border-line bg-card/50 px-2 py-1 text-[0.6rem] leading-relaxed text-fg-3">
                           출처:{" "}
@@ -27178,7 +27661,12 @@ function StudioCuttoonEditor() {
                         </p>
                       )}
                       {/* 주요 색상 추출 — 스와치를 누르면 브러시·도형 색(전역 color 상태)으로 지정된다. */}
-                      <StudioColorPalettePanel src={selected.src} onPickColor={(hex) => setColor(hex)} />
+                      {selectedReadableImageSource ? (
+                        <StudioColorPalettePanel
+                          src={selectedReadableImageSource}
+                          onPickColor={(hex) => setColor(hex)}
+                        />
+                      ) : null}
                   </div>
                   <div
                     hidden={
@@ -27214,10 +27702,12 @@ function StudioCuttoonEditor() {
                       updateAdvancedFillSettings({ ...DEFAULT_STUDIO_ADVANCED_FILL_SETTINGS })
                     }
                   />
-                  <StudioLineCleanupPanel
-                    src={selected.src}
-                    onResult={(dataUrl) => patchEl(selected.id, { src: dataUrl })}
-                  />
+                  {!selectedWorkAssetDestructiveEditReason ? (
+                    <StudioLineCleanupPanel
+                      src={selected.src}
+                      onResult={(dataUrl) => patchEl(selected.id, { src: dataUrl })}
+                    />
+                  ) : null}
                   </div>
                   <div
                     hidden={
@@ -27825,26 +28315,28 @@ function StudioCuttoonEditor() {
                 )}
 
                 {drawMode !== "shape" ? (
-                  <StudioBrushStudio
-                    brushId={brush}
-                    strokeWidth={strokeWidth}
-                    color={color}
-                    settings={brushDynamics}
-                    onSettingsChange={setBrushDynamics}
-                    onSelectDynamicsPreset={applyDynamicsPreset}
-                    useVelocityPressure={useVelocityPressure}
-                    onUseVelocityPressureChange={setUseVelocityPressure}
-                    velocitySensitivity={velocitySensitivity}
-                    onVelocitySensitivityChange={setVelocitySensitivity}
-                    pressureCurve={pressureCurve}
-                    onPressureCurveChange={setPressureCurve}
-                    tiltEnabled={tiltEnabled}
-                    onTiltEnabledChange={setTiltEnabled}
-                    tipAngle={tipAngle}
-                    onTipAngleChange={setTipAngle}
-                    tipRoundness={tipRoundness}
-                    onTipRoundnessChange={setTipRoundness}
-                  />
+                  <Suspense fallback={<div className="h-40 animate-pulse rounded-xl bg-raised/35 motion-reduce:animate-none" aria-hidden />}>
+                    <StudioBrushStudio
+                      brushId={brush}
+                      strokeWidth={strokeWidth}
+                      color={color}
+                      settings={brushDynamics}
+                      onSettingsChange={setBrushDynamics}
+                      onSelectDynamicsPreset={applyDynamicsPreset}
+                      useVelocityPressure={useVelocityPressure}
+                      onUseVelocityPressureChange={setUseVelocityPressure}
+                      velocitySensitivity={velocitySensitivity}
+                      onVelocitySensitivityChange={setVelocitySensitivity}
+                      pressureCurve={pressureCurve}
+                      onPressureCurveChange={setPressureCurve}
+                      tiltEnabled={tiltEnabled}
+                      onTiltEnabledChange={setTiltEnabled}
+                      tipAngle={tipAngle}
+                      onTipAngleChange={setTipAngle}
+                      tipRoundness={tipRoundness}
+                      onTipRoundnessChange={setTipRoundness}
+                    />
+                  </Suspense>
                 ) : null}
 
                 {/* 대칭 그리기 자 (Symmetry Ruler) */}
@@ -28513,27 +29005,29 @@ function StudioCuttoonEditor() {
                   preserveCorners={preserveCorners}
                   onPreserveCornersChange={setPreserveCorners}
                 />
-                <StudioBrushStudio
-                  density="touch"
-                  brushId={brush}
-                  strokeWidth={strokeWidth}
-                  color={color}
-                  settings={brushDynamics}
-                  onSettingsChange={setBrushDynamics}
-                  onSelectDynamicsPreset={applyDynamicsPreset}
-                  useVelocityPressure={useVelocityPressure}
-                  onUseVelocityPressureChange={setUseVelocityPressure}
-                  velocitySensitivity={velocitySensitivity}
-                  onVelocitySensitivityChange={setVelocitySensitivity}
-                  pressureCurve={pressureCurve}
-                  onPressureCurveChange={setPressureCurve}
-                  tiltEnabled={tiltEnabled}
-                  onTiltEnabledChange={setTiltEnabled}
-                  tipAngle={tipAngle}
-                  onTipAngleChange={setTipAngle}
-                  tipRoundness={tipRoundness}
-                  onTipRoundnessChange={setTipRoundness}
-                />
+                <Suspense fallback={<div className="h-48 animate-pulse rounded-xl bg-raised/35 motion-reduce:animate-none" aria-hidden />}>
+                  <StudioBrushStudio
+                    density="touch"
+                    brushId={brush}
+                    strokeWidth={strokeWidth}
+                    color={color}
+                    settings={brushDynamics}
+                    onSettingsChange={setBrushDynamics}
+                    onSelectDynamicsPreset={applyDynamicsPreset}
+                    useVelocityPressure={useVelocityPressure}
+                    onUseVelocityPressureChange={setUseVelocityPressure}
+                    velocitySensitivity={velocitySensitivity}
+                    onVelocitySensitivityChange={setVelocitySensitivity}
+                    pressureCurve={pressureCurve}
+                    onPressureCurveChange={setPressureCurve}
+                    tiltEnabled={tiltEnabled}
+                    onTiltEnabledChange={setTiltEnabled}
+                    tipAngle={tipAngle}
+                    onTipAngleChange={setTipAngle}
+                    tipRoundness={tipRoundness}
+                    onTipRoundnessChange={setTipRoundness}
+                  />
+                </Suspense>
               </>
             ) : null}
 
@@ -28592,6 +29086,8 @@ function StudioCuttoonEditor() {
               <StudioDockButton
                 icon={MousePointer2}
                 label="선택"
+                hintDescription="요소를 선택해 이동·크기 조절·정렬하고 속성 패널에서 세부 값을 편집합니다."
+                hintShortcut="V"
                 active={tool === "select"}
                 onClick={() => {
                   setTool("select");
@@ -28604,6 +29100,8 @@ function StudioCuttoonEditor() {
               <StudioDockButton
                 icon={Pencil}
                 label="펜"
+                hintDescription="필압과 보정이 적용되는 자유선을 그립니다. 다시 누르면 브러시 설정이 열립니다."
+                hintShortcut="B"
                 active={tool === "draw" && drawMode === "pen"}
                 disabled={activeSurfaceReviewLocked}
                 title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 펜을 사용할 수 있어요" : "펜 (B)"}
@@ -28622,6 +29120,8 @@ function StudioCuttoonEditor() {
               <StudioDockButton
                 icon={Eraser}
                 label="지우개"
+                hintDescription="현재 레이어의 획을 지웁니다. 브러시 크기와 불투명도 설정을 그대로 활용합니다."
+                hintShortcut="E"
                 active={tool === "draw" && drawMode === "eraser"}
                 disabled={activeSurfaceReviewLocked}
                 title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 지우개를 사용할 수 있어요" : "지우개 (E)"}
@@ -28636,6 +29136,7 @@ function StudioCuttoonEditor() {
               <StudioDockButton
                 icon={Square}
                 label="도형"
+                hintDescription="선·사각형·타원·화살표를 정돈된 벡터 도형으로 빠르게 배치합니다."
                 active={tool === "draw" && drawMode === "shape"}
                 disabled={activeSurfaceReviewLocked}
                 title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 도형을 사용할 수 있어요" : "도형"}
@@ -28655,6 +29156,7 @@ function StudioCuttoonEditor() {
               <StudioDockButton
                 icon={Undo2}
                 label="되돌리기"
+                hintDescription="마지막 편집을 한 단계 되돌립니다. 공동 작업 변경 이력과 함께 안전하게 이동합니다."
                 disabled={hi === 0 || collaborationDocumentLocked}
                 onClick={undo}
                 aria-label="실행취소"
@@ -28662,6 +29164,7 @@ function StudioCuttoonEditor() {
               <StudioDockButton
                 icon={Redo2}
                 label="다시"
+                hintDescription="되돌린 편집을 한 단계 다시 적용합니다."
                 disabled={hi >= history.length - 1 || collaborationDocumentLocked}
                 onClick={redo}
                 aria-label="다시실행"
@@ -28670,10 +29173,14 @@ function StudioCuttoonEditor() {
               <StudioDockButton
                 ref={mobileBrushDockButtonRef}
                 label="브러시"
+                hintDescription="굵기·불투명도·색·보정·프리셋을 한곳에서 조절합니다."
                 active={mobileSheet === "draw" || mobileSheet === "brushes"}
                 aria-pressed={mobileSheet === "draw" || mobileSheet === "brushes"}
                 aria-label="브러시 설정 (굵기·색·프리셋)"
+                onPointerEnter={() => void loadStudioBrushStudio()}
+                onFocus={() => void loadStudioBrushStudio()}
                 onClick={() => {
+                  void loadStudioBrushStudio();
                   if (tool !== "draw") {
                     setTool("draw");
                     setDrawMode("pen");
@@ -28850,7 +29357,7 @@ function StudioCuttoonEditor() {
           <StudioStoryboardGridPanel
             open
             onClose={() => setStoryboardGridOpen(false)}
-            pages={pages.map((p) => composeThumbPage(master, p))}
+            pages={pages.map(composeWorkAssetPreviewPage)}
             currentPageId={currentPageId}
             dnd={pageDnd}
             onSelectPage={(id) => {
@@ -28940,7 +29447,7 @@ function StudioCuttoonEditor() {
           <StudioScrollPreviewPanel
             open
             onClose={() => setScrollPreviewOpen(false)}
-            pages={pages.map((p) => composeThumbPage(master, p))}
+            pages={pages.map(composeWorkAssetPreviewPage)}
             currentPageId={currentPageId}
             onSelectPage={(id) => {
               setCurrentPageId(id);
