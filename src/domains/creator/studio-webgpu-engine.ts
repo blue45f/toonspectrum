@@ -1,3 +1,7 @@
+import {
+  isStudioInkPressureModel,
+  resolveStudioInkPressure,
+} from "./studio-ink-pressure-model";
 import { parseStudioGpuColor } from "./studio-webgpu-color";
 import {
   copyStudioGpuReadbackRows,
@@ -302,7 +306,7 @@ function normalizeViewport(input: StudioGpuViewport): NormalizedStudioGpuViewpor
 }
 
 function pointPressure(stroke: StudioGpuStroke, index: number): number {
-  return clamp(finiteOr(stroke.pressures?.[index], 1), 0, 1);
+  return resolveStudioInkPressure(stroke.pressures?.[index], stroke.pressureModel);
 }
 
 function stableFingerprintNumber(value: number): string {
@@ -367,6 +371,9 @@ export function fingerprintStudioGpuFrame(
     ]) {
       hash = updateFingerprint(hash, value);
     }
+    if (stroke.pressureModel !== undefined) {
+      hash = updateFingerprint(hash, `pressure-model:${stroke.pressureModel}`);
+    }
     for (const point of stroke.points) hash = updateFingerprint(hash, point);
     hash = updateFingerprint(hash, stroke.pressures?.length);
     for (const pressure of stroke.pressures ?? []) hash = updateFingerprint(hash, pressure);
@@ -408,6 +415,7 @@ export function isValidStudioGpuStroke(stroke: StudioGpuStroke): boolean {
       && Number.isFinite(stroke.size)
       && stroke.size > 0
       && stroke.size <= STUDIO_GPU_MAX_BRUSH_SIZE
+      && (stroke.pressureModel === undefined || isStudioInkPressureModel(stroke.pressureModel))
       && (stroke.opacity === undefined || (
         Number.isFinite(stroke.opacity) && stroke.opacity >= 0 && stroke.opacity <= 1
       ));
@@ -424,6 +432,7 @@ export function isValidStudioGpuStroke(stroke: StudioGpuStroke): boolean {
     && Number.isFinite(stroke.size)
     && stroke.size > 0
     && stroke.size <= STUDIO_GPU_MAX_BRUSH_SIZE
+    && (stroke.pressureModel === undefined || isStudioInkPressureModel(stroke.pressureModel))
     && (stroke.opacity === undefined || (
       Number.isFinite(stroke.opacity) && stroke.opacity >= 0 && stroke.opacity <= 1
     ));
@@ -574,7 +583,7 @@ function planStudioGpuDabsInternal(
         invalidStroke = true;
         return;
       }
-      const radius = studioGpuPressureRadius(size, pressure);
+      const radius = studioGpuPressureRadius(size, pressure, stroke.pressureModel);
       if (clipRect !== null && !dabIntersectsRect(x, y, radius, clipRect)) return;
       if (dabs.length >= maximumDabs) {
         complete = false;
@@ -623,8 +632,8 @@ function planStudioGpuDabsInternal(
       const spacing = Math.max(
         0.5,
         Math.min(
-          studioGpuPressureRadius(size, p0),
-          studioGpuPressureRadius(size, p1)
+          studioGpuPressureRadius(size, p0, stroke.pressureModel),
+          studioGpuPressureRadius(size, p1, stroke.pressureModel)
         ) * 0.45
       );
       const steps = Math.max(1, Math.ceil(distance / spacing));
@@ -642,8 +651,8 @@ function planStudioGpuDabsInternal(
           break;
         }
         const maximumRadius = Math.max(
-          studioGpuPressureRadius(size, p0),
-          studioGpuPressureRadius(size, p1)
+          studioGpuPressureRadius(size, p0, stroke.pressureModel),
+          studioGpuPressureRadius(size, p1, stroke.pressureModel)
         );
         const clipped = clipStudioGpuSegment(
           x0!,

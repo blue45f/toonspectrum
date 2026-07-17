@@ -399,6 +399,15 @@ import {
   type StudioCommentAnchor,
   type StudioCommentsDocument,
 } from "./studio-comments";
+import {
+  createStudioCommittedInkSurfaceHandoff,
+  sumStudioCommittedInkHandoffSurfaceCounts,
+  transitionStudioCommittedInkHandoffHead,
+  type StudioCommittedInkAuthorityEvidence,
+  type StudioCommittedInkSurfaceCounts,
+  type StudioCommittedInkSurfaceHandoff,
+  type StudioCommittedInkVisibleDrawReceipt,
+} from "./studio-committed-ink-handoff-coordinator";
 import { bakeContentAwareFillToCanvas } from "./studio-content-aware-fill";
 import {
   lintStudioContinuity,
@@ -560,6 +569,11 @@ import {
   HISTORY_BRUSH_RADIUS_DEFAULT,
 } from "./studio-history-brush";
 import { createCanvasImageElement } from "./studio-image-placement";
+import {
+  STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+  studioInkFallbackPressure,
+  type StudioInkPressureModel,
+} from "./studio-ink-pressure-model";
 import {
   navigateStudioInspector,
   type StudioInspectorLayout,
@@ -2117,6 +2131,8 @@ interface DrawEl {
   pattern?: StudioPatternSpec;
   brush?: string;
   pressures?: number[];
+  /** Versioned pressure→diameter semantics. Omitted persisted strokes retain the legacy curve. */
+  pressureModel?: StudioInkPressureModel;
   /** 새 획을 만들 때의 논리 좌표 샘플 간격. 미설정 legacy 획은 과거 3px 렌더 규칙을 유지한다. */
   sampleSpacing?: number;
   /** 포인트별 PointerEvent 스타일러스 메타데이터. 캘리그래피·입자 브러시에서 저장한다. */
@@ -2892,13 +2908,15 @@ function drawStudioCausalInkDabs(
   pressures: readonly number[] | undefined,
   strokeColor: string,
   strokeWidth: number,
-  minDistance: number
+  minDistance: number,
+  pressureModel?: StudioInkPressureModel
 ): void {
   const plan = planStudioCausalInk({
     points,
     pressures,
     minDistance,
     size: strokeWidth,
+    pressureModel,
   });
   if (plan.dabs.length === 0) return;
   context.fillStyle = strokeColor;
@@ -3025,7 +3043,8 @@ function drawLiveFreehandDraftToContext(context: Konva.Context, el: DrawEl): voi
         el.pressures,
         strokeColor,
         strokeWidth,
-        el.sampleSpacing
+        el.sampleSpacing,
+        el.pressureModel
       );
       continue;
     }
@@ -3776,7 +3795,8 @@ const StudioDrawNode = memo(function StudioDrawNode({ el }: { el: DrawEl }) {
                     el.pressures,
                     stroke,
                     strokeWidth,
-                    el.sampleSpacing ?? 0
+                    el.sampleSpacing ?? 0,
+                    el.pressureModel
                   );
                 }}
                 opacity={opacity}
@@ -3943,14 +3963,6 @@ class StudioDraftPreviewStore {
   private emit(): void {
     for (const listener of this.listeners) listener();
   }
-}
-
-interface StudioCommittedInkSurfaceHandoff {
-  readonly pageId: string;
-  readonly strokeIds: readonly string[];
-  readonly overlaySettledCount: number;
-  readonly draftSettledCount: number;
-  readonly gpuSettledCount: number;
 }
 
 /** 비다이렉트 초안 전용 격리 레이어 — 스토어 구독으로 페이지 본문 렌더 없이 프레임을 그린다. */
@@ -6101,13 +6113,14 @@ function StudioCuttoonEditor() {
     }
     observeSceneElements(studioCrdtDocument.getSceneElements({ includeDeleted: true }));
     return studioCrdtDocument.subscribeChanges(
-      (change) => observeSceneElements(change.sceneElements),
+      (change) => observeSceneElements(change.snapshot.sceneElements),
       // Asset observation is origin-agnostic. Local upload/publish paths and remote peers must
       // converge on exactly the same active reference set even though scene reconciliation keeps
       // local-origin operations out of the remote undo path.
       {
         includeOrigin: () => true,
         includeChange: ({ changedSceneElementIds }) => changedSceneElementIds.size > 0,
+        snapshotFields: ["sceneElements"] as const,
       }
     );
   }, [activePage.id, authorizedWorkAssetScopeId, studioCrdtDocument, studioWorkAssetHydrator]);
@@ -6164,10 +6177,10 @@ function StudioCuttoonEditor() {
     setStudioCrdtReconciledDocument(studioCrdtDocument);
     return studioCrdtDocument.subscribeChanges(
       (change) => applyFrontier({
-        strokes: change.strokes,
-        sceneElements: change.sceneElements,
-        pages: change.pages,
-        layerGroups: change.layerGroups,
+        strokes: change.snapshot.strokes,
+        sceneElements: change.snapshot.sceneElements,
+        pages: change.snapshot.pages,
+        layerGroups: change.snapshot.layerGroups,
       }, {
         strokeIds: change.changedStrokeIds,
         sceneElementIds: change.changedSceneElementIds,
@@ -6186,6 +6199,7 @@ function StudioCuttoonEditor() {
           changedSceneElementIds.size > 0 ||
           changedPageIds.size > 0 ||
           changedLayerGroupIds.size > 0,
+        snapshotFields: ["strokes", "sceneElements", "pages", "layerGroups"] as const,
       }
     );
   }, [sourceHydrationPending, studioCrdtDocument, studioWorkAssetHydrator]);
@@ -9048,6 +9062,9 @@ function StudioCuttoonEditor() {
   const liveInkOverlayClearGenRef = useRef(0);
   /** React 상태 예약이 아니라 실제 Konva draw 영수증 뒤에만 라이브 표면을 넘긴다. */
   const committedInkSurfaceHandoffsRef = useRef<StudioCommittedInkSurfaceHandoff[]>([]);
+  /** Draw 실패 재시도는 StudioPage 전체 렌더가 아니라 bounded rAF coordinator로만 진행한다. */
+  const committedInkSurfaceHandoffRafRef = useRef(0);
+  const processCommittedInkSurfaceHandoffsRef = useRef<() => void>(() => undefined);
   // ── 커밋 지연 파이프라인 ──────────────────────────────────────────────────
   // 펜을 뗀 획은 라이브 표면(증분 오버레이/GPU 파인 표면)에 잉크를 남긴 채 큐에 쌓고,
   // 마지막 획 후 짧은 유휴(또는 강제 플러시)에 한 번의 React 커밋으로 동기화한다.
@@ -9098,6 +9115,7 @@ function StudioCuttoonEditor() {
   const liveInkStyleFor = (el: DrawEl) => ({
     color: el.stroke,
     strokeWidthDoc: Math.max(1, el.strokeWidth),
+    pressureModel: el.pressureModel,
     opacity: el.opacity ?? 1,
     minDistanceDoc: el.sampleSpacing ?? strokeRenderDistance(el.sampleSpacing),
   });
@@ -9276,6 +9294,7 @@ function StudioCuttoonEditor() {
       pressures: samples.map(({ pressure }) => pressure),
       color: el.stroke,
       size: Math.max(1, el.strokeWidth),
+      pressureModel: el.pressureModel,
       opacity: el.opacity,
       composite: "normal" as const,
     });
@@ -9292,6 +9311,7 @@ function StudioCuttoonEditor() {
       pressures: el.pressures,
       color: el.stroke,
       size: Math.max(1, el.strokeWidth),
+      pressureModel: el.pressureModel,
       opacity: el.opacity,
       composite: "normal",
     };
@@ -9512,14 +9532,7 @@ function StudioCuttoonEditor() {
    */
   function queueCommittedStrokeSurfaceHandoff(pageId: string, strokeIds: readonly string[]) {
     const pending = committedInkSurfaceHandoffsRef.current;
-    const reserved = pending.reduce(
-      (counts, handoff) => ({
-        overlay: counts.overlay + handoff.overlaySettledCount,
-        draft: counts.draft + handoff.draftSettledCount,
-        gpu: counts.gpu + handoff.gpuSettledCount,
-      }),
-      { overlay: 0, draft: 0, gpu: 0 }
-    );
+    const reserved = sumStudioCommittedInkHandoffSurfaceCounts(pending);
     const overlaySettledCount = Math.max(
       0,
       liveInkOverlayRendererRef.current.settledStrokeCount - reserved.overlay
@@ -9535,13 +9548,14 @@ function StudioCuttoonEditor() {
     if (overlaySettledCount + draftSettledCount + gpuSettledCount === 0) return;
     committedInkSurfaceHandoffsRef.current = [
       ...pending,
-      {
+      createStudioCommittedInkSurfaceHandoff({
         pageId,
         strokeIds: [...new Set(strokeIds)],
         overlaySettledCount,
         draftSettledCount,
         gpuSettledCount,
-      },
+        queuedRevision: studioRevisionProjectGenerationRef.current,
+      }),
     ];
   }
   function queueDeferredStrokeCommit(finished: DrawEl) {
@@ -12266,46 +12280,71 @@ function StudioCuttoonEditor() {
       }
     };
   });
-  useLayoutEffect(() => {
-    const pending = committedInkSurfaceHandoffsRef.current;
-    if (pending.length === 0) return;
-
-    let readyCount = 0;
-    let needsVisibleMainDraw = false;
-    for (const handoff of pending) {
-      const page = pages.find((candidate) => candidate.id === handoff.pageId);
-      if (!page) break;
-      const pageElements = handoff.pageId === activePage.id ? elements : page.elements;
-      const elementIds = new Set(pageElements.map((element) => element.id));
-      if (!handoff.strokeIds.every((strokeId) => elementIds.has(strokeId))) break;
-      readyCount += 1;
-      if (handoff.pageId === activePage.id) needsVisibleMainDraw = true;
-    }
-    if (readyCount === 0) return;
-
-    // React/reconciler mutation은 끝났지만 Konva의 batchDraw는 별도 rAF일 수 있다. 동기 draw가
-    // 반환된 순간 scene canvas 픽셀이 실제 준비됐으므로, 아래 live clear/replay까지 브라우저가
-    // 한 프레임도 합성하지 못한다. draw가 불가능하면 fail-visible로 overlay를 계속 유지한다.
-    if (needsVisibleMainDraw) {
-      const mainLayer = mainLayerRef.current;
-      if (!mainLayer) return;
-      try {
-        mainLayer.draw();
-      } catch {
-        return;
+  function committedInkAuthorityFor(
+    handoff: StudioCommittedInkSurfaceHandoff
+  ): StudioCommittedInkAuthorityEvidence {
+    const revision = studioRevisionProjectGenerationRef.current;
+    const pageIds = new Set(pages.map((page) => page.id));
+    const strokePageIds = new Map<string, string>();
+    for (const page of pages) {
+      const pageElements = page.id === activePage.id ? elements : page.elements;
+      for (const element of pageElements) {
+        if (element.type === "draw") strokePageIds.set(element.id, page.id);
       }
     }
 
-    const ready = pending.slice(0, readyCount);
-    committedInkSurfaceHandoffsRef.current = pending.slice(readyCount);
-    const released = ready.reduce(
-      (counts, handoff) => ({
-        overlay: counts.overlay + handoff.overlaySettledCount,
-        draft: counts.draft + handoff.draftSettledCount,
-        gpu: counts.gpu + handoff.gpuSettledCount,
-      }),
-      { overlay: 0, draft: 0, gpu: 0 }
-    );
+    const pageTombstoneIds = new Set<string>();
+    const strokeTombstoneIds = new Set<string>();
+    const strokeReparents = new Map<string, { fromPageId: string; toPageId: string }>();
+    const document = studioCrdtDocumentRef.current;
+    if (document) {
+      // Durable CRDT deletion/reparent operations are the only authority allowed to turn a
+      // temporarily missing projection into a release. An absent record alone remains fail-visible.
+      for (const page of document.getPages(true)) {
+        if (page.deleted) pageTombstoneIds.add(page.id);
+      }
+      for (const strokeId of handoff.strokeIds) {
+        const record = document.getStroke(strokeId, true);
+        if (!record) continue;
+        if (record.deleted) {
+          strokeTombstoneIds.add(strokeId);
+        } else if (record.pageId !== handoff.pageId) {
+          strokeReparents.set(strokeId, {
+            fromPageId: handoff.pageId,
+            toPageId: record.pageId,
+          });
+        }
+      }
+    } else if (revision > handoff.queuedRevision) {
+      // Without a shared Y.Doc, the post-commit local history is itself authoritative. Require a
+      // strictly newer revision so the queue cannot mistake its own not-yet-projected commit for
+      // an undo/delete operation in the same React commit.
+      if (!pageIds.has(handoff.pageId)) pageTombstoneIds.add(handoff.pageId);
+      for (const strokeId of handoff.strokeIds) {
+        const projectedPageId = strokePageIds.get(strokeId);
+        if (projectedPageId === undefined) strokeTombstoneIds.add(strokeId);
+        else if (projectedPageId !== handoff.pageId) {
+          strokeReparents.set(strokeId, {
+            fromPageId: handoff.pageId,
+            toPageId: projectedPageId,
+          });
+        }
+      }
+    }
+
+    return {
+      revision,
+      visiblePageId: activePage.id,
+      pageIds,
+      strokePageIds,
+      pageTombstoneIds,
+      strokeTombstoneIds,
+      strokeReparents,
+    };
+  }
+
+  function releaseCommittedInkSurfaceCounts(released: StudioCommittedInkSurfaceCounts): void {
+    if (released.overlay === 0 && released.draft === 0 && released.gpu === 0) return;
     liveInkOverlayRendererRef.current.releaseSettledPrefix(released.overlay);
     draftPreviewStoreRef.current.releaseSettledPrefix(released.draft);
 
@@ -12326,7 +12365,76 @@ function StudioCuttoonEditor() {
         ? activeGpuStroke.points.length / 2
         : 0;
     }
+  }
+
+  function scheduleCommittedInkSurfaceHandoffRetry(): void {
+    if (committedInkSurfaceHandoffRafRef.current || !editorMountedRef.current) return;
+    committedInkSurfaceHandoffRafRef.current = globalThis.requestAnimationFrame(() => {
+      committedInkSurfaceHandoffRafRef.current = 0;
+      processCommittedInkSurfaceHandoffsRef.current();
+    });
+  }
+
+  processCommittedInkSurfaceHandoffsRef.current = () => {
+    let queue: readonly StudioCommittedInkSurfaceHandoff[] =
+      committedInkSurfaceHandoffsRef.current;
+    if (queue.length === 0 || !editorMountedRef.current) return;
+
+    let released: StudioCommittedInkSurfaceCounts = { overlay: 0, draft: 0, gpu: 0 };
+    let retryVisibleDraw = false;
+    while (queue.length > 0) {
+      const handoff = queue[0]!;
+      const authority = committedInkAuthorityFor(handoff);
+      let transition = transitionStudioCommittedInkHandoffHead(queue, authority);
+      if (!transition) break;
+
+      if (transition.status === "wait" && transition.drawRequest) {
+        const request = transition.drawRequest;
+        let outcome: StudioCommittedInkVisibleDrawReceipt["outcome"] = "failed";
+        const mainLayer = mainLayerRef.current;
+        if (mainLayer) {
+          try {
+            // The exact synchronous draw return is the receipt boundary. Overlay release happens
+            // below in the same task, before the browser can composite an uncovered frame.
+            mainLayer.draw();
+            outcome = "drawn";
+          } catch {
+            outcome = "failed";
+          }
+        }
+        transition = transitionStudioCommittedInkHandoffHead(
+          transition.queue,
+          authority,
+          { drawReceipt: { token: request.token, outcome } }
+        );
+        if (!transition) break;
+      }
+
+      queue = transition.queue;
+      if (transition.status === "wait") {
+        retryVisibleDraw = transition.drawRequest !== null;
+        break;
+      }
+      released = {
+        overlay: released.overlay + transition.accounting.released.overlay,
+        draft: released.draft + transition.accounting.released.draft,
+        gpu: released.gpu + transition.accounting.released.gpu,
+      };
+    }
+
+    committedInkSurfaceHandoffsRef.current = [...queue];
+    releaseCommittedInkSurfaceCounts(released);
+    if (retryVisibleDraw) scheduleCommittedInkSurfaceHandoffRetry();
+  };
+
+  useLayoutEffect(() => {
+    processCommittedInkSurfaceHandoffsRef.current();
   });
+  useEffect(() => () => {
+    if (!committedInkSurfaceHandoffRafRef.current) return;
+    globalThis.cancelAnimationFrame(committedInkSurfaceHandoffRafRef.current);
+    committedInkSurfaceHandoffRafRef.current = 0;
+  }, []);
   // 전체 페이지 상태를 직접 커밋하는 헬퍼 (페이지 추가/삭제/이동용)
   function commitPages(nextPages: PageState[], options: { bypassReviewLock?: boolean } = {}): boolean {
     if (!editorMountedRef.current) return false;
@@ -17644,6 +17752,14 @@ function StudioCuttoonEditor() {
       }
       setSelectedId(null);
 
+      const fixedRateBrushFamily = resolveStudioBrushRenderFamily(brush);
+      const pressureModel = (
+        drawMode === "eraser" ||
+        drawMode === "pixel" ||
+        (drawMode === "pen" && (
+          fixedRateBrushFamily === "pen" || fixedRateBrushFamily === "marker"
+        ))
+      ) ? STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 : undefined;
       const pressure = resolveBrushPressureSample({
         pointerType: pointerSample.pointerType,
         rawPressure: pointerSample.pressure,
@@ -17653,9 +17769,10 @@ function StudioCuttoonEditor() {
         velocityFallbackEnabled: false,
         velocitySensitivity,
         pressureCurve,
-        // pressure=0.5 is the renderer's nominal-width point: mouse/touch without hardware
-        // pressure now match the visible brush-size cursor instead of starting 42% thicker.
-        fallbackPressure: 0.5,
+        // The versioned linear model treats the selected size as the full-pressure diameter, so
+        // mouse/touch use p=1 exactly like the traced reference. Specialty/legacy brush engines
+        // retain their historical nominal p=.5 contract.
+        fallbackPressure: pressureModel ? 1 : 0.5,
       });
       if (drawMode === "pen") scheduleLiveDrawPressure(pressure);
       const stylus = normalizeCalligraphyStylusInput(pointerSample);
@@ -17664,7 +17781,6 @@ function StudioCuttoonEditor() {
       const tangentialPressure = Number.isFinite(pointerSample.tangentialPressure)
         ? Math.min(1, Math.max(-1, pointerSample.tangentialPressure))
         : 0;
-      const fixedRateBrushFamily = resolveStudioBrushRenderFamily(brush);
       const fixedRateInkEnabled = stabilizerMode === "standard"
         && stabilizer > 0
         && (drawMode === "pen" || drawMode === "eraser")
@@ -17716,6 +17832,7 @@ function StudioCuttoonEditor() {
               strokeWidth: drawMode === "pixel" ? 1 : strokeWidth,
               fill: drawMode === "lasso-fill" ? color : undefined,
               pressures: [drawMode === "pixel" ? 1 : pressure],
+              pressureModel,
               sampleSpacing:
                 drawMode === "pixel"
                   ? 1
@@ -17842,7 +17959,7 @@ function StudioCuttoonEditor() {
               liveInkStyle,
               pos.x,
               pos.y,
-              next.pressures?.[0] ?? 0.5
+              next.pressures?.[0] ?? studioInkFallbackPressure(next.pressureModel)
             );
           }
         } else {
@@ -18381,7 +18498,12 @@ function StudioCuttoonEditor() {
       )) continue;
       const pointCount = Math.floor(next.points.length / 2);
       next.points.push(sample.x, sample.y);
-      next.pressures = appendAligned(next.pressures, pointCount, sample.pressure, 0.5);
+      next.pressures = appendAligned(
+        next.pressures,
+        pointCount,
+        sample.pressure,
+        studioInkFallbackPressure(next.pressureModel)
+      );
       if (captureStylus && stylus) {
         next.tiltXs = appendAligned(next.tiltXs, pointCount, sample.tiltX, 0);
         next.tiltYs = appendAligned(next.tiltYs, pointCount, sample.tiltY, 0);
@@ -18427,7 +18549,7 @@ function StudioCuttoonEditor() {
           velocityFallbackEnabled: useVelocityPressure,
           velocitySensitivity,
           pressureCurve,
-          fallbackPressure: 0.5,
+          fallbackPressure: current.pressureModel ? 1 : 0.5,
         });
     if (!drawingPredictionPreviewRef.current) scheduleLiveDrawPressure(pressure);
 
@@ -18550,7 +18672,10 @@ function StudioCuttoonEditor() {
     if (canAppendDirectly) {
       current.points.push(targetX, targetY);
       if (!current.pressures) {
-        current.pressures = Array.from({ length: previousPointCount }, () => 0.5);
+        current.pressures = Array.from(
+          { length: previousPointCount },
+          () => studioInkFallbackPressure(current.pressureModel)
+        );
       }
       current.pressures.push(pressure);
       drawingRef.current = current;
@@ -18834,7 +18959,8 @@ function StudioCuttoonEditor() {
     let authoritativeLiveStroke: DrawEl | null = null;
     let immediateSurfaceHandoff: { pageId: string; strokeIds: string[] } | null = null;
     try {
-      const releaseLastContactPressure = drawingRef.current?.pressures?.at(-1) ?? 0.5;
+      const releaseLastContactPressure = drawingRef.current?.pressures?.at(-1)
+        ?? studioInkFallbackPressure(drawingRef.current?.pressureModel);
       if (
         options.consumeReleaseSample !== false
         && drawingRef.current
@@ -18894,7 +19020,8 @@ function StudioCuttoonEditor() {
             const lastY = current.points[current.points.length - 1] ?? y;
             if (Math.hypot(x - lastX, y - lastY) > 1e-6) {
               const pointCount = Math.floor(current.points.length / 2);
-              const lastPressure = current.pressures?.at(-1) ?? 0.5;
+              const lastPressure = current.pressures?.at(-1)
+                ?? studioInkFallbackPressure(current.pressureModel);
               const pressure = pointerEvent.pointerType === "pen"
                 ? resolveBrushReleasePressureSample({
                     pointerType: "pen",
@@ -18911,14 +19038,22 @@ function StudioCuttoonEditor() {
               const tangentialPressure = Number.isFinite(pointerEvent.tangentialPressure)
                 ? Math.min(1, Math.max(-1, pointerEvent.tangentialPressure))
                 : (current.tangentialPressures?.at(-1) ?? 0);
-              const appendAligned = (values: number[] | undefined, value: number): number[] => [
-                ...Array.from({ length: pointCount }, (_, index) => values?.[index] ?? 0),
+              const appendAligned = (
+                values: number[] | undefined,
+                value: number,
+                fallback = 0
+              ): number[] => [
+                ...Array.from({ length: pointCount }, (_, index) => values?.[index] ?? fallback),
                 value,
               ];
               drawingRef.current = {
                 ...current,
                 points: [...current.points, x, y],
-                pressures: appendAligned(current.pressures, pressure),
+                pressures: appendAligned(
+                  current.pressures,
+                  pressure,
+                  studioInkFallbackPressure(current.pressureModel)
+                ),
                 tiltXs: stylus ? appendAligned(current.tiltXs, stylus.tiltX) : current.tiltXs,
                 tiltYs: stylus ? appendAligned(current.tiltYs, stylus.tiltY) : current.tiltYs,
                 twists: stylus ? appendAligned(current.twists, stylus.twist) : current.twists,

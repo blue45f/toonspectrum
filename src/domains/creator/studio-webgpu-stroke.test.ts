@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 } from "./studio-ink-pressure-model";
 import { planStudioGpuDabUpdate } from "./studio-webgpu-engine";
 import {
   buildStudioGpuLiveStroke,
@@ -99,6 +100,47 @@ describe("studio WebGPU stroke authority helpers", () => {
     expect(planStudioGpuDabUpdate([tap!], [moved!]).mode).toBe("append");
   });
 
+  it("threads the versioned pressure model through live snapshots and authority equality", () => {
+    const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1;
+    const live = buildStudioGpuLiveStroke({
+      id: "linear-live",
+      points: [1, 2, 3, 4],
+      pressures: [0, 1],
+      color: "#000000",
+      size: 12,
+      pressureModel,
+    });
+
+    expect(live?.pressureModel).toBe(pressureModel);
+    expect(snapshotStudioGpuStrokes([live!])[0]?.pressureModel).toBe(pressureModel);
+    expect(sameStudioGpuStroke(live!, { ...live!, pressureModel: undefined })).toBe(false);
+    expect(planStudioGpuDabUpdate(
+      [{ ...live!, pressureModel: undefined }],
+      [live!]
+    ).mode).toBe("rebuild");
+  });
+
+  it("fills short live pressure arrays with model-specific nominal pressure", () => {
+    const linear = buildStudioGpuLiveStroke({
+      id: "linear-short",
+      points: [0, 0, 10, 0],
+      pressures: [0],
+      color: "#000000",
+      size: 10,
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+    });
+    const legacy = buildStudioGpuLiveStroke({
+      id: "legacy-short",
+      points: [0, 0, 10, 0],
+      pressures: [0],
+      color: "#000000",
+      size: 10,
+    });
+
+    expect(linear?.pressures).toEqual([0, 1]);
+    expect(legacy?.pressures).toEqual([0, 0.5]);
+  });
+
   it("accepts independently allocated but exactly equivalent operations", () => {
     expect(sameStudioGpuStroke(stroke(), stroke({
       points: [0, 0, 12, 8],
@@ -110,6 +152,7 @@ describe("studio WebGPU stroke authority helpers", () => {
   it.each([
     ["point", stroke({ points: [0, 0, 12, 9] })],
     ["pressure", stroke({ pressures: [0.25, 0.8] })],
+    ["pressure model", stroke({ pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 })],
     ["style", stroke({ opacity: 0.99 })],
     ["order", stroke({ orderKey: "front" })],
   ] as const)("rejects a changed %s without relying on fingerprints", (_label, changed) => {

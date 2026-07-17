@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 } from "./studio-ink-pressure-model";
 import {
   fingerprintStudioGpuFrame,
   isValidStudioGpuStroke,
@@ -323,6 +324,53 @@ describe("StudioWebGpuEngine", () => {
     engine.render([stroke({ size: Number.MAX_VALUE })], "invalid:overflow");
 
     expect(onFrameReady).not.toHaveBeenCalled();
+  });
+
+  it("renders linear-full pressure as zero to the selected diameter and fingerprints the model", () => {
+    const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1;
+    const linear = stroke({
+      points: [0, 0, 5, 0, 10, 0],
+      pressures: [0, 0.5, 1],
+      size: 10,
+      pressureModel,
+    });
+    const plan = planStudioGpuDabs([linear]);
+
+    expect(plan.complete).toBe(true);
+    expect(plan.dabs[0]).toMatchObject({ x: 0, y: 0, radius: 0 });
+    expect(plan.dabs.find(({ x }) => x === 5)).toMatchObject({ radius: 2.5 });
+    expect(plan.dabs.at(-1)).toMatchObject({ x: 10, y: 0, radius: 5 });
+    expect(fingerprintStudioGpuFrame([linear], {
+      logicalWidth: 100,
+      logicalHeight: 80,
+    }, 100, 80)).not.toBe(fingerprintStudioGpuFrame([
+      { ...linear, pressureModel: undefined },
+    ], {
+      logicalWidth: 100,
+      logicalHeight: 80,
+    }, 100, 80));
+    expect(isValidStudioGpuStroke(linear)).toBe(true);
+    expect(isValidStudioGpuStroke({
+      ...linear,
+      pressureModel: "future-model",
+    } as unknown as StudioGpuStroke)).toBe(false);
+  });
+
+  it("uses full nominal pressure for short linear arrays and half pressure for legacy arrays", () => {
+    const linear = planStudioGpuDabs([stroke({
+      points: [0, 0],
+      pressures: [],
+      size: 10,
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+    })]);
+    const legacy = planStudioGpuDabs([stroke({
+      points: [0, 0],
+      pressures: [],
+      size: 10,
+    })]);
+
+    expect(linear.dabs[0]?.radius).toBe(5);
+    expect(legacy.dabs[0]?.radius).toBe(5);
   });
 
   it("renders normal and erase strokes through the silent Canvas2D fallback", async () => {

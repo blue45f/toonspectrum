@@ -6,6 +6,7 @@ import {
   selectStudioCausalInkSamples,
   STUDIO_CAUSAL_INK_DEFAULT_PRESSURE,
 } from "./studio-causal-ink";
+import { STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 } from "./studio-ink-pressure-model";
 import { planStudioGpuDabs } from "./studio-webgpu-engine";
 import { studioGpuPressureRadius } from "./studio-webgpu-stroke";
 
@@ -94,6 +95,21 @@ describe("studio causal ink", () => {
     ]);
   });
 
+  it("uses full pressure for missing linear samples while preserving legacy half pressure", () => {
+    const points = [0, 0, 10, 0];
+    expect(selectStudioCausalInkSamples({
+      points,
+      pressures: [],
+      minDistance: 0,
+    }).map(({ pressure }) => pressure)).toEqual([0.5, 0.5]);
+    expect(selectStudioCausalInkSamples({
+      points,
+      pressures: [],
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+      minDistance: 0,
+    }).map(({ pressure }) => pressure)).toEqual([1, 1]);
+  });
+
   it("plans the initial dab and pressure-linear segment dabs with the GPU spacing formula", () => {
     const samples = [
       { x: 0, y: 0, pressure: 0.25, sourceIndex: 0 },
@@ -173,6 +189,31 @@ describe("studio causal ink", () => {
 
     expect(causal.complete).toBe(true);
     expect(gpu.complete).toBe(true);
+    expect(causal.dabs.map(({ x, y, radius }) => ({ x, y, radius }))).toEqual(
+      gpu.dabs.map(({ x, y, radius }) => ({ x, y, radius }))
+    );
+  });
+
+  it("shares the linear-full zero-to-selected-diameter contract with the GPU planner", () => {
+    const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1;
+    const samples = [
+      { x: 0, y: 0, pressure: 0, sourceIndex: 0 },
+      { x: 5, y: 0, pressure: 0.5, sourceIndex: 1 },
+      { x: 10, y: 0, pressure: 1, sourceIndex: 2 },
+    ] as const;
+    const causal = planStudioCausalInkDabs({ samples, size: 10, pressureModel });
+    const gpu = planStudioGpuDabs([{
+      id: "linear-parity",
+      points: samples.flatMap(({ x, y }) => [x, y]),
+      pressures: samples.map(({ pressure }) => pressure),
+      color: "#000000",
+      size: 10,
+      pressureModel,
+    }]);
+
+    expect(causal.dabs[0]?.radius).toBe(0);
+    expect(causal.dabs.find(({ pressure }) => pressure === 0.5)?.radius).toBe(2.5);
+    expect(causal.dabs.at(-1)?.radius).toBe(5);
     expect(causal.dabs.map(({ x, y, radius }) => ({ x, y, radius }))).toEqual(
       gpu.dabs.map(({ x, y, radius }) => ({ x, y, radius }))
     );

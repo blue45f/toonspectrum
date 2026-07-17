@@ -62,7 +62,7 @@ function finiteDab(dab: StudioGpuDab): boolean {
   return Number.isFinite(dab.x)
     && Number.isFinite(dab.y)
     && Number.isFinite(dab.radius)
-    && dab.radius > 0
+    && dab.radius >= 0
     && Number.isFinite(dab.red)
     && Number.isFinite(dab.green)
     && Number.isFinite(dab.blue)
@@ -86,7 +86,10 @@ export function planStudioRasterStrokeCapture(input: {
   if (!planned.complete || planned.dabs.some((dab) => !finiteDab(dab))) {
     fail("invalid-stroke", "래스터 획이 WebGPU 브러시 안전 한도를 벗어났습니다.");
   }
-  if (planned.dabs.length === 0) {
+  // A linear-full pressure-zero dab is a valid semantic sample with exactly zero coverage. It is
+  // retained by the shared planner as an interpolation anchor but must not allocate a pixel patch.
+  const coverageDabs = planned.dabs.filter((dab) => dab.radius > 0 && dab.alpha > 0);
+  if (coverageDabs.length === 0) {
     fail("empty-stroke", "픽셀을 만드는 브러시 샘플이 없습니다.");
   }
 
@@ -94,7 +97,7 @@ export function planStudioRasterStrokeCapture(input: {
   let top = Number.POSITIVE_INFINITY;
   let right = Number.NEGATIVE_INFINITY;
   let bottom = Number.NEGATIVE_INFINITY;
-  for (const dab of planned.dabs) {
+  for (const dab of coverageDabs) {
     left = Math.min(left, dab.x - dab.radius - 1);
     top = Math.min(top, dab.y - dab.radius - 1);
     right = Math.max(right, dab.x + dab.radius + 1);
@@ -117,7 +120,7 @@ export function planStudioRasterStrokeCapture(input: {
   }
   return {
     bounds: { x, y, width, height },
-    dabs: planned.dabs,
+    dabs: coverageDabs,
     intent: input.stroke.composite === "erase" ? "erase" : "paint",
   };
 }

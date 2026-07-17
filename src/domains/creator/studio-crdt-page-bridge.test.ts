@@ -97,6 +97,7 @@ describe("studio CRDT page bridge", () => {
       mode: "pen",
       points: [1, 2, 3, 4],
       pressures: [0.75],
+      pressureModel: "linear-full-v1",
       stroke: "#abcdef",
       strokeWidth: 12,
       opacity: 0.6,
@@ -119,6 +120,7 @@ describe("studio CRDT page bridge", () => {
       layerColor: "blue",
       emeresSourceId: "custom:underlay-a",
       stamp: { flow: 0.4, hardness: 0.9, minSize: 0.2 },
+      pressureModel: "linear-full-v1",
     });
 
     const decoded = studioCrdtStrokeToDrawElement({
@@ -134,9 +136,54 @@ describe("studio CRDT page bridge", () => {
       hidden: true,
       brush: "calligraphy",
       opacity: 0.6,
+      pressureModel: "linear-full-v1",
       emeresSourceId: "custom:underlay-a",
       stamp: { flow: 0.4, hardness: 0.9, minSize: 0.2 },
     });
+  });
+
+  it("preserves omitted legacy pressure semantics and ignores unknown pressure models", () => {
+    const legacy: StudioCrdtCompatibleDrawElement = {
+      id: "stroke-legacy-pressure",
+      type: "draw",
+      points: [0, 0],
+      pressures: [0.5],
+      stroke: "#000000",
+      strokeWidth: 8,
+    };
+
+    const encodedLegacy = studioDrawElementToCrdtStroke("page-a", legacy);
+    expect(encodedLegacy.payload.extensions).toBeUndefined();
+    const decodedLegacy = studioCrdtStrokeToDrawElement({
+      ...record("stroke-legacy-pressure", "page-a", 0),
+      ...encodedLegacy,
+      orderIndex: 0,
+      status: "finalized",
+      deleted: false,
+    });
+    expect(decodedLegacy.pressureModel).toBeUndefined();
+    expect("pressureModel" in decodedLegacy).toBe(false);
+
+    const encodedUnknown = studioDrawElementToCrdtStroke("page-a", {
+      ...legacy,
+      id: "stroke-unknown-pressure-write",
+      pressureModel: "future-pressure-v2",
+    } as unknown as StudioCrdtCompatibleDrawElement);
+    expect(encodedUnknown.payload.extensions).toBeUndefined();
+
+    const decodedUnknown = studioCrdtStrokeToDrawElement(record(
+      "stroke-unknown-pressure-read",
+      "page-a",
+      0,
+      {
+        payload: {
+          ...record("source", "page-a", 0).payload,
+          extensions: { pressureModel: "future-pressure-v2" },
+        },
+      }
+    ));
+    expect(decodedUnknown.pressureModel).toBeUndefined();
+    expect("pressureModel" in decodedUnknown).toBe(false);
   });
 
   it("aligns only the requested streaming suffix and never reads prior dynamics", () => {

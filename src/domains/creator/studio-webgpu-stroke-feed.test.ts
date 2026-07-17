@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 } from "./studio-ink-pressure-model";
 import { STUDIO_GPU_STROKE_FEED_REVISION, type StudioGpuStroke } from "./studio-webgpu-stroke";
 import {
   advanceStudioGpuStrokeFeed,
@@ -156,5 +157,55 @@ describe("Studio WebGPU append-only stroke feed", () => {
         suffixStrokes: [nextOperation],
       },
     });
+  });
+
+  it("binds linear pressure semantics into feed style, suffixes, and accumulated bounds", () => {
+    const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1;
+    const tap = stroke({
+      points: [10, 20],
+      pressures: [0],
+      size: 10,
+      pressureModel,
+    });
+    const baseline = createStudioGpuStrokeFeedBaseline([tap], "linear-feed")!;
+    expect(baseline[0]?.[STUDIO_GPU_STROKE_FEED_REVISION]).toMatchObject({
+      minimumX: 10,
+      maximumX: 10,
+      minimumY: 20,
+      maximumY: 20,
+    });
+
+    const extended = [stroke({
+      points: [10, 20, 30, 20],
+      pressures: [0, 1],
+      size: 10,
+      pressureModel,
+    })];
+    const advanced = advanceStudioGpuStrokeFeed(
+      baseline,
+      patch(extended, 1, [30, 20], [1])
+    );
+    expect(advanced.status).toBe("appended");
+    expect(advanced.strokes[0]?.[STUDIO_GPU_STROKE_FEED_REVISION]).toMatchObject({
+      minimumX: 10,
+      maximumX: 35,
+      minimumY: 15,
+      maximumY: 25,
+    });
+    expect(studioGpuStrokeFeedSuffixFromPointCount(advanced.strokes[0]!, 1))
+      .toMatchObject({ pressureModel });
+    expect(planStudioGpuPinnedStrokeFeedUpdate(baseline, [{ ...extended[0]!, pressureModel: undefined }]))
+      .toMatchObject({ mode: "replace" });
+  });
+
+  it("records model-specific nominal pressure when a baseline sample is missing", () => {
+    const linear = createStudioGpuStrokeFeedBaseline([stroke({
+      pressures: [],
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+    })], "linear-missing")!;
+    const legacy = createStudioGpuStrokeFeedBaseline([stroke({ pressures: [] })], "legacy-missing")!;
+
+    expect(linear[0]?.[STUDIO_GPU_STROKE_FEED_REVISION]?.lastPressure).toBe(1);
+    expect(legacy[0]?.[STUDIO_GPU_STROKE_FEED_REVISION]?.lastPressure).toBe(0.5);
   });
 });

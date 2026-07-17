@@ -1,4 +1,8 @@
 import { STUDIO_CRDT_STROKE_PAYLOAD_VERSION } from "./studio-crdt-protocol";
+import {
+  isStudioInkPressureModel,
+  type StudioInkPressureModel,
+} from "./studio-ink-pressure-model";
 
 import type {
   StudioCrdtDrawStrokePayload,
@@ -22,6 +26,7 @@ export interface StudioCrdtCompatibleDrawElement {
   pattern?: unknown;
   brush?: string;
   pressures?: number[];
+  pressureModel?: StudioInkPressureModel;
   sampleSpacing?: number;
   tiltXs?: number[];
   tiltYs?: number[];
@@ -130,6 +135,11 @@ function extensionsOf(element: StudioCrdtCompatibleDrawElement): StudioCrdtJsonO
   for (const key of EXTENSION_KEYS) {
     const normalized = jsonValue(element[key]);
     if (normalized !== undefined) extensions[key] = normalized;
+  }
+  // Keep this versioned opt-in out of the generic JSON whitelist: an unknown future string must
+  // never be persisted as if this client knew how to render its pressure semantics.
+  if (isStudioInkPressureModel(element.pressureModel)) {
+    extensions.pressureModel = element.pressureModel;
   }
   return Object.keys(extensions).length > 0 ? extensions : undefined;
 }

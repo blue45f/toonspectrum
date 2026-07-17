@@ -10,6 +10,7 @@ import {
   studioRasterDrawPromotionSourceMatches,
   studioRasterBrushSurface,
 } from "./studio-crdt-raster-ui-bridge";
+import { STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 } from "./studio-ink-pressure-model";
 
 import {
   STUDIO_RASTER_CRDT_VERSION,
@@ -130,6 +131,54 @@ describe("studio CRDT raster UI bridge", () => {
     })).toBeNull();
   });
 
+  it("binds the exact pressure model into GPU pixels and canonical raster semantics", () => {
+    const id = uuid(13);
+    const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1;
+    const plan = planStudioRasterDrawPromotion({
+      element: {
+        id,
+        type: "draw",
+        kind: "freehand",
+        mode: "pen",
+        points: [10, 10, 30, 30],
+        pressures: [0],
+        stroke: "#112233",
+        strokeWidth: 8,
+        opacity: 1,
+        brush: "pen",
+        pressureModel,
+      },
+      pageId: "page-a",
+      documentWidth: 800,
+      documentHeight: 1_200,
+    });
+    const legacy = planStudioRasterDrawPromotion({
+      element: {
+        id,
+        type: "draw",
+        kind: "freehand",
+        mode: "pen",
+        points: [10, 10, 30, 30],
+        pressures: [0, 1],
+        stroke: "#112233",
+        strokeWidth: 8,
+        opacity: 1,
+        brush: "pen",
+      },
+      pageId: "page-a",
+      documentWidth: 800,
+      documentHeight: 1_200,
+    });
+
+    expect(plan?.stroke.pressureModel).toBe(pressureModel);
+    expect(plan?.stroke.pressures).toEqual([0, 1]);
+    expect(JSON.parse(plan!.semanticParameters).stroke.pressureModel).toBe(pressureModel);
+    expect(Object.hasOwn(legacy!.stroke, "pressureModel")).toBe(false);
+    expect(JSON.parse(legacy!.semanticParameters).stroke.pressureModel)
+      .toBe("studio-gpu-pressure-radius-v1");
+    expect(plan?.semanticParameters).not.toBe(legacy?.semanticParameters);
+  });
+
   it("cancels an async promotion after the fallback is deleted, edited, clipped, or regrouped", () => {
     const id = uuid(12);
     const element = {
@@ -167,6 +216,12 @@ describe("studio CRDT raster UI bridge", () => {
     expect(matches({ element: { ...element, points: [10, 10, 40, 40] } })).toBe(false);
     expect(matches({ panelClipped: true })).toBe(false);
     expect(matches({ element: { ...element, groupId: "ink" } })).toBe(false);
+    expect(matches({
+      element: {
+        ...element,
+        pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+      },
+    })).toBe(false);
   });
 
   it("hands off only an exact topmost scene suffix in deterministic raster replay order", () => {

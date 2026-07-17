@@ -287,6 +287,55 @@ describe("도형 직렬화", () => {
     expect(skipped).toEqual([]);
   });
 
+  it("linear-full-v1 기본 펜 — 압력 0/.5/1을 지름 0/.5x/1x로 내보낸다", () => {
+    const pen = rectEl({
+      id: "linear-pressure-pen-svg",
+      kind: "freehand",
+      points: [0, 0, 10, 0, 20, 0],
+      pressures: [0, 0.5, 1],
+      pressureModel: "linear-full-v1",
+      sampleSpacing: 1,
+      stroke: "#654321",
+      strokeWidth: 10,
+      fill: undefined,
+    });
+    const { svg, skipped } = exportPageToSvg(page([pen]));
+
+    expect(svg).toContain('<circle cx="0" cy="0" r="0" fill="#654321"');
+    expect(svg).toContain('<circle cx="10" cy="0" r="2.5" fill="#654321"');
+    expect(svg).toContain('<circle cx="20" cy="0" r="5" fill="#654321"');
+    expect(skipped).toEqual([]);
+  });
+
+  it("명시적 선형 압력 모델은 sampleSpacing이 없는 탭과 레거시 지오메트리도 재해석한다", () => {
+    const tap = rectEl({
+      id: "linear-zero-tap-svg",
+      kind: "freehand",
+      points: [12, 34],
+      pressures: [0],
+      pressureModel: "linear-full-v1",
+      stroke: "#123456",
+      strokeWidth: 10,
+      fill: undefined,
+    });
+    const line = rectEl({
+      id: "linear-no-spacing-svg",
+      kind: "freehand",
+      points: [0, 0, 10, 0],
+      pressures: [0],
+      pressureModel: "linear-full-v1",
+      stroke: "#654321",
+      strokeWidth: 10,
+      fill: undefined,
+    });
+    const { svg, skipped } = exportPageToSvg(page([tap, line]));
+
+    expect(svg).toContain('<circle cx="12" cy="34" r="0" fill="#123456"');
+    expect(svg).toContain('<circle cx="0" cy="0" r="0" fill="#654321"');
+    expect(svg).toContain('<circle cx="10" cy="0" r="5" fill="#654321"');
+    expect(skipped).toEqual([]);
+  });
+
   it("수채 번짐 — 결정적 core/diffuse dab과 방사 그라데이션을 보존한다", () => {
     const watercolor = rectEl({
       id: "watercolor-svg-1",

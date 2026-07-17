@@ -5,6 +5,11 @@ import {
 } from "./studio-brush";
 import { selectStudioCausalInkSamples } from "./studio-causal-ink";
 import {
+  studioInkFallbackPressure,
+  resolveStudioInkPressureSamples,
+  type StudioInkPressureModel,
+} from "./studio-ink-pressure-model";
+import {
   planStudioWebGpuCommittedSuffix,
   type StudioWebGpuCommittedElementInput,
   type StudioWebGpuCommittedPlan,
@@ -37,13 +42,17 @@ function committedElementToGpuStroke(
   // The planner has already validated these fields. Re-running StudioDrawNode's exact point and
   // pressure pipeline here keeps the GPU handoff pixel-compatible with the source renderer.
   const sourcePoints = element.points as readonly number[];
-  const sourcePressures = element.pressures as readonly number[];
+  const sourcePressures = Array.isArray(element.pressures)
+    ? element.pressures as readonly number[]
+    : undefined;
+  const pressureModel = element.pressureModel as StudioInkPressureModel | undefined;
   const usesCausalGeometry = typeof element.sampleSpacing === "number"
     && Number.isFinite(element.sampleSpacing);
   const causalSamples = usesCausalGeometry
     ? selectStudioCausalInkSamples({
         points: sourcePoints,
         pressures: sourcePressures,
+        pressureModel,
         minDistance: element.sampleSpacing as number,
       })
     : null;
@@ -55,7 +64,17 @@ function committedElementToGpuStroke(
       );
   const pressures = causalSamples
     ? causalSamples.map(({ pressure }) => pressure)
-    : resampleStrokePressures(sourcePressures, points.length / 2, 0.5);
+    : resampleStrokePressures(
+        pressureModel === undefined
+          ? sourcePressures
+          : resolveStudioInkPressureSamples(
+              sourcePressures,
+              sourcePoints.length / 2,
+              pressureModel
+            ),
+        points.length / 2,
+        studioInkFallbackPressure(pressureModel)
+      );
 
   return {
     id: element.id,
@@ -64,6 +83,9 @@ function committedElementToGpuStroke(
     color: element.stroke as string,
     // StudioDrawNode clamps legacy sub-pixel widths to one logical pixel before pressure scaling.
     size: Math.max(1, element.strokeWidth as number),
+    ...(pressureModel === undefined
+      ? {}
+      : { pressureModel }),
     opacity: element.opacity as number | undefined,
     composite: "normal",
   };

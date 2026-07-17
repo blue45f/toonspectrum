@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 } from "./studio-ink-pressure-model";
 import {
   boundsForStudioGpuStroke,
   diffStudioGpuTileStates,
@@ -40,6 +41,34 @@ describe("studio WebGPU tile planning", () => {
     expect(states[0]).toMatchObject({ width: 512, height: 512 });
     expect(states[1]).toMatchObject({ x: 512, width: 288, height: 512 });
     expect(states.every((state) => state.operations[0]?.id === crossing.id)).toBe(true);
+  });
+
+  it("uses zero-radius linear pressure in bounds and operation identity", () => {
+    const linear = stroke({
+      points: [40, 40],
+      pressures: [0],
+      size: 10,
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+    });
+    const legacy = { ...linear, pressureModel: undefined };
+
+    expect(boundsForStudioGpuStroke(linear)).toEqual({
+      x: 38,
+      y: 38,
+      width: 4,
+      height: 4,
+    });
+    expect(boundsForStudioGpuStroke(legacy)).toEqual({
+      x: 36.5,
+      y: 36.5,
+      width: 7,
+      height: 7,
+    });
+    expect(fingerprintStudioGpuStroke(linear)).not.toBe(fingerprintStudioGpuStroke(legacy));
+    expect(diffStudioGpuTileStates(
+      planStudioGpuTileStates([legacy], DOCUMENT),
+      planStudioGpuTileStates([linear], DOCUMENT)
+    )[0]?.mode).toBe("rebuild");
   });
 
   it("selects only viewport tiles and one-row overscan for a very tall document", () => {
@@ -176,6 +205,10 @@ describe("studio WebGPU tile planning", () => {
     expect(fingerprintStudioGpuStroke({ ...base, orderKey: "after" })).not.toBe(
       fingerprintStudioGpuStroke(base)
     );
+    expect(fingerprintStudioGpuStroke({
+      ...base,
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+    })).not.toBe(fingerprintStudioGpuStroke(base));
   });
 
   it("rebuilds when document, partial-tile, tile-size, or bleed geometry changes", () => {

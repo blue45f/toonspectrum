@@ -35,6 +35,7 @@ const AUTHORITY_ELEMENT_KEYS = [
   "pressures",
   "stroke",
   "strokeWidth",
+  "pressureModel",
   "opacity",
   "brush",
   "blendMode",

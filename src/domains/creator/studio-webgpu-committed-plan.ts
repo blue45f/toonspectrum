@@ -1,3 +1,4 @@
+import { isStudioInkPressureModel } from "./studio-ink-pressure-model";
 import { isStudioGpuColorSupported } from "./studio-webgpu-color";
 
 /**
@@ -27,6 +28,7 @@ export interface StudioWebGpuCommittedElementInput {
   readonly pressures?: unknown;
   readonly stroke?: unknown;
   readonly strokeWidth?: unknown;
+  readonly pressureModel?: unknown;
   readonly opacity?: unknown;
   readonly brush?: unknown;
   readonly blendMode?: unknown;
@@ -63,6 +65,7 @@ export type StudioWebGpuCommittedBarrierReason =
   | "non-freehand"
   | "non-pen-mode"
   | "unsupported-brush"
+  | "unsupported-pressure-model"
   | "invalid-geometry"
   | "opacity"
   | "blend-mode"
@@ -156,11 +159,29 @@ export function studioWebGpuCommittedBarrierReason(
   // renderer's generic pen fallback, because that would opt future brush families into GPU output.
   const brush = element.brush === undefined ? "pen" : element.brush;
   if (typeof brush !== "string" || !SUPPORTED_BRUSHES.has(brush)) return "unsupported-brush";
-
   if (
-    !finitePointArray(element.points)
-    || !finitePressureArray(element.pressures)
-    || element.pressures.length !== element.points.length / 2
+    element.pressureModel !== undefined
+    && !isStudioInkPressureModel(element.pressureModel)
+  ) {
+    return "unsupported-pressure-model";
+  }
+
+  if (!finitePointArray(element.points)) return "invalid-geometry";
+  const pointCount = element.points.length / 2;
+  const pressureSamplesValid = element.pressureModel === undefined
+    ? finitePressureArray(element.pressures) && element.pressures.length === pointCount
+    : (element.pressures === undefined || (
+        Array.isArray(element.pressures)
+        && element.pressures.length <= pointCount
+        && element.pressures.every((pressure) => (
+          typeof pressure === "number"
+          && Number.isFinite(pressure)
+          && pressure >= 0
+          && pressure <= 1
+        ))
+      ));
+  if (
+    !pressureSamplesValid
     || !isStudioGpuColorSupported(element.stroke)
     || typeof element.strokeWidth !== "number"
     || !Number.isFinite(element.strokeWidth)

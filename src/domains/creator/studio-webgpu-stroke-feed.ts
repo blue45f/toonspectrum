@@ -1,3 +1,4 @@
+import { resolveStudioInkPressure } from "./studio-ink-pressure-model";
 import {
   STUDIO_GPU_STROKE_FEED_REVISION,
   sameStudioGpuStroke,
@@ -44,16 +45,12 @@ export interface StudioGpuStrokeFeedAdvance {
   readonly strokes: readonly StudioGpuStroke[];
 }
 
-function finiteOr(value: unknown, fallback: number): number {
-  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
-}
-
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
 }
 
 function pressureAt(stroke: StudioGpuStroke, index: number): number {
-  return clamp(finiteOr(stroke.pressures?.[index], 1), 0, 1);
+  return resolveStudioInkPressure(stroke.pressures?.[index], stroke.pressureModel);
 }
 
 function stableNumber(value: number): string {
@@ -71,7 +68,7 @@ function semanticToken(value: string | number | undefined): string {
 }
 
 export function studioGpuStrokeFeedStyleSignature(stroke: StudioGpuStroke): string {
-  return [
+  const legacySignature = [
     stroke.id,
     stroke.color,
     stroke.size,
@@ -79,6 +76,9 @@ export function studioGpuStrokeFeedStyleSignature(stroke: StudioGpuStroke): stri
     stroke.composite,
     stroke.orderKey,
   ].map((value) => semanticToken(value)).join("");
+  return stroke.pressureModel === undefined
+    ? legacySignature
+    : `${legacySignature}${semanticToken(`pressure-model:${stroke.pressureModel}`)}`;
 }
 
 export function sameStudioGpuStrokeFeedStyle(
@@ -88,6 +88,7 @@ export function sameStudioGpuStrokeFeedStyle(
   return left.id === right.id
     && left.color === right.color
     && Object.is(left.size, right.size)
+    && left.pressureModel === right.pressureModel
     && Object.is(left.opacity ?? 1, right.opacity ?? 1)
     && (left.composite ?? "normal") === (right.composite ?? "normal")
     && left.orderKey === right.orderKey;
@@ -97,9 +98,10 @@ function boundsForPoint(
   size: number,
   x: number,
   y: number,
-  pressure: number
+  pressure: number,
+  pressureModel: StudioGpuStroke["pressureModel"]
 ): readonly [number, number, number, number] {
-  const radius = studioGpuPressureRadius(size, pressure);
+  const radius = studioGpuPressureRadius(size, pressure, pressureModel);
   return [x - radius, y - radius, x + radius, y + radius];
 }
 
@@ -121,7 +123,8 @@ function baseFeedRevision(
       stroke.size,
       x!,
       y!,
-      pressureAt(stroke, index)
+      pressureAt(stroke, index),
+      stroke.pressureModel
     );
     minimumX = Math.min(minimumX, left);
     minimumY = Math.min(minimumY, top);
@@ -290,7 +293,8 @@ export function advanceStudioGpuStrokeFeed(
       previous.size,
       x,
       y,
-      suffixPressures[index]!
+      suffixPressures[index]!,
+      previous.pressureModel
     );
     minimumX = Math.min(minimumX, left);
     minimumY = Math.min(minimumY, top);
@@ -365,6 +369,7 @@ export function studioGpuStrokeFeedSuffixFromPointCount(
     pressures,
     color: stroke.color,
     size: stroke.size,
+    ...(stroke.pressureModel === undefined ? {} : { pressureModel: stroke.pressureModel }),
     opacity: stroke.opacity,
     composite: stroke.composite,
     orderKey: stroke.orderKey,

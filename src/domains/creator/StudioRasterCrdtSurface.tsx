@@ -142,7 +142,7 @@ export function StudioRasterCrdtSurface({
     return document.subscribeChanges((change) => {
       if (
         change.changedRasterSurfaceIds.has(surfaceId) ||
-        change.rasterOperationLogs.some((log) => log.surface.surfaceId === surfaceId) && (
+        change.snapshot.rasterOperationLogs.some((log) => log.surface.surfaceId === surfaceId) && (
           change.changedRasterOperationIds.size > 0 ||
           change.changedRasterUndoOperationIds.size > 0 ||
           change.changedRasterUndoAcknowledgementIds.size > 0
@@ -164,6 +164,7 @@ export function StudioRasterCrdtSurface({
         changedRasterUndoOperationIds.size > 0 ||
         changedRasterUndoAcknowledgementIds.size > 0 ||
         changedRasterCheckpointIds.size > 0,
+      snapshotFields: ["rasterOperationLogs"] as const,
     });
   }, [document, surfaceId]);
 

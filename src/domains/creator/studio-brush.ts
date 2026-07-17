@@ -383,13 +383,14 @@ export function sanitizeCalligraphyTipSettings(
 }
 
 /**
- * 펜의 유효한 하드웨어 필압을 우선하고, 그렇지 않은 포인터만 이동 거리 기반 의사 필압을 쓴다.
- * 브라우저가 마우스에 관례적으로 주는 0.5는 실제 펜(pointerType=pen)에서만 유효 필압이다.
+ * 펜/터치의 유효한 하드웨어 필압을 우선하고, 그렇지 않은 포인터만 이동 거리 기반 의사 필압을
+ * 쓴다. 브라우저가 마우스에 관례적으로 주는 0.5만 하드웨어 필압에서 제외한다.
  */
 export function resolveBrushPressureSample(input: BrushPressureSampleInput = {}): number {
   const pointerType = normalizePointerType(input.pointerType);
   const rawPressure = finiteNumber(input.rawPressure, Number.NaN);
-  const hasHardwarePressure = pointerType === "pen" && rawPressure >= 0 && rawPressure <= 1;
+  const hasHardwarePressure = (pointerType === "pen" || pointerType === "touch")
+    && rawPressure >= 0 && rawPressure <= 1;
 
   let basePressure: number;
   let applyPressureCurve = false;

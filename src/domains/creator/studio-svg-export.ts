@@ -84,6 +84,13 @@ import {
   type GradientBBox,
   type StudioGradientSpec,
 } from "./studio-gradient-engine";
+import {
+  resolveStudioInkPressure,
+  studioInkFallbackPressure,
+  studioInkPressureDiameter,
+  studioInkPressureRadius,
+  type StudioInkPressureModel,
+} from "./studio-ink-pressure-model";
 import { getKaleidoscopePoints } from "./studio-kaleidoscope";
 import { hasActiveImageFilters, type ImageFilterFields } from "./studio-konva-filter-fields";
 import { isEffectivelyHidden, type LayerGroup } from "./studio-layers";
@@ -251,6 +258,7 @@ export interface SvgDrawElLike extends SvgElMeta {
   pattern?: StudioPatternSpec;
   brush?: string;
   pressures?: number[];
+  pressureModel?: StudioInkPressureModel;
   sampleSpacing?: number;
   tiltXs?: number[];
   tiltYs?: number[];
@@ -845,13 +853,16 @@ function serializeFreehand(
     brushFamily !== "pastel" &&
     !dynamicBrush
   ) {
-    const pressure = Math.min(1, Math.max(0, el.pressures?.[0] ?? 0.5));
+    const pressure = resolveStudioInkPressure(el.pressures?.[0], el.pressureModel);
     const pressureAware = brushFamily === "pen"
       || brushFamily === "gpen"
       || brushFamily === "calligraphy"
       || brushFamily === "marker";
     const width = pressureAware ? strokeWidth * (0.3 + pressure * 1.4) : strokeWidth;
-    return `<circle cx="${fmt(points[0])}" cy="${fmt(points[1])}" r="${fmt(Math.max(0.35, width / 2))}" fill="${escapeXml(stroke)}"${opacityAttr}/>`;
+    const radius = pressureAware && el.pressureModel !== undefined
+      ? studioInkPressureRadius(strokeWidth, pressure, el.pressureModel)
+      : Math.max(0.35, width / 2);
+    return `<circle cx="${fmt(points[0])}" cy="${fmt(points[1])}" r="${fmt(radius)}" fill="${escapeXml(stroke)}"${opacityAttr}/>`;
   }
 
   if (dynamicBrush && dynamicsPresetId) {
@@ -1073,14 +1084,15 @@ function serializeFreehand(
 
   // 새 기본 펜/마커 — live Canvas, WebGPU, Konva가 공유하는 round-dab footprint 그대로.
   if (
-    el.sampleSpacing !== undefined
+    (el.sampleSpacing !== undefined || el.pressureModel !== undefined)
     && !el.fill
     && (brushFamily === "pen" || brushFamily === "marker")
   ) {
     const plan = planStudioCausalInk({
       points,
       pressures: el.pressures,
-      minDistance: el.sampleSpacing,
+      pressureModel: el.pressureModel,
+      minDistance: el.sampleSpacing ?? 0,
       size: strokeWidth,
     });
     const dabs = plan.dabs.map((dab) => (
@@ -1093,11 +1105,20 @@ function serializeFreehand(
   const smoothed = processFreehandPoints(points, renderSampleDistance);
   const pressures = el.pressures;
   if (pressures && pressures.length > 0 && smoothed.length >= 4) {
-    const sampledPressures = resampleStrokePressures(pressures, Math.floor(smoothed.length / 2));
+    const sampledPressures = resampleStrokePressures(
+      pressures,
+      Math.floor(smoothed.length / 2),
+      studioInkFallbackPressure(el.pressureModel)
+    );
     const segs: string[] = [];
     for (let i = 2; i < smoothed.length; i += 2) {
-      const p = sampledPressures[Math.floor(i / 2)] ?? 0.5;
-      const w = Math.max(0.5, strokeWidth * (0.3 + p * 1.4));
+      const p = resolveStudioInkPressure(
+        sampledPressures[Math.floor(i / 2)],
+        el.pressureModel
+      );
+      const w = el.pressureModel === undefined
+        ? Math.max(0.5, strokeWidth * (0.3 + p * 1.4))
+        : studioInkPressureDiameter(strokeWidth, p, el.pressureModel);
       segs.push(
         `<path d="M ${fmt(smoothed[i - 2])} ${fmt(smoothed[i - 1])} L ${fmt(smoothed[i])} ${fmt(smoothed[i + 1])}" stroke="${escapeXml(stroke)}" stroke-width="${fmt(w)}" stroke-linecap="round" fill="none"/>`
       );

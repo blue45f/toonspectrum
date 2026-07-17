@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 } from "./studio-ink-pressure-model";
 import {
   StudioLiveInkOverlayRenderer,
   StudioLiveInkPredictionRenderer,
@@ -106,6 +107,47 @@ afterEach(() => {
 });
 
 describe("StudioLiveInkOverlayRenderer", () => {
+  it("uses the linear-full style for live, settled, and replayed dab radii", () => {
+    const style = {
+      ...STYLE,
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+    } as const;
+    const recording = recordingCanvas();
+    const renderer = new StudioLiveInkOverlayRenderer();
+    renderer.attach(recording.canvas);
+    renderer.setSurface(SURFACE);
+    expect(renderer.begin(style, 0, 0, 0)).toBe(true);
+    renderer.appendFrom([0, 0, 5, 0, 10, 0], [0, 0.5, 1]);
+    renderer.end();
+    const final = recording.dabs.map((dab) => ({ ...dab }));
+
+    expect(final[0]?.radius).toBe(0);
+    expect(final.find(({ x }) => x === 5)?.radius).toBe(2.5);
+    expect(final.at(-1)?.radius).toBe(5);
+
+    recording.dabs.splice(0);
+    renderer.setSurface({ ...SURFACE, width: 101 });
+    expect(recording.dabs).toEqual(final);
+  });
+
+  it("resolves missing live samples to full linear pressure and legacy half pressure", () => {
+    const linear = recordingCanvas();
+    const linearRenderer = new StudioLiveInkOverlayRenderer();
+    linearRenderer.attach(linear.canvas);
+    linearRenderer.setSurface(SURFACE);
+    expect(linearRenderer.begin({
+      ...STYLE,
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+    }, 0, 0, Number.NaN)).toBe(true);
+    linearRenderer.appendFrom([0, 0, 10, 0], []);
+    expect(linear.dabs[0]?.radius).toBe(5);
+    expect(linear.dabs.at(-1)?.radius).toBe(5);
+
+    const legacy = setup();
+    legacy.renderer.appendFrom([0, 0, 10, 0], []);
+    expect(legacy.dabs.at(-1)?.radius).toBe(5);
+  });
+
   it("appends only causal suffix dabs and reaches the active pointer endpoint", () => {
     const { renderer, clearRect, dabs } = setup();
     renderer.appendFrom([0, 0, 10, 0, 20, 10], [0.25, 0.5, 0.75]);

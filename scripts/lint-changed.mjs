@@ -8,6 +8,14 @@ const staged = args.includes("--staged");
 const baseArgument = args.find((argument) => argument.startsWith("--base="));
 const base = baseArgument?.slice("--base=".length).trim();
 
+if (staged && fix) {
+  process.stderr.write(
+    "lint:quick — --staged와 --fix는 함께 사용할 수 없습니다. ESLint --fix는 Git 인덱스가 아니라 작업 트리를 수정합니다.\n" +
+    "먼저 작업 트리에 --fix를 실행한 뒤 변경을 다시 스테이징하세요.\n"
+  );
+  process.exit(2);
+}
+
 function gitLines(gitArgs) {
   const result = spawnSync("git", gitArgs, {
     cwd: process.cwd(),

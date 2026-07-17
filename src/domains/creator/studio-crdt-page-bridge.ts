@@ -12,6 +12,7 @@ import {
   type StudioCrdtJsonValue,
   type StudioCrdtPayloadSceneElementType,
 } from "./studio-crdt-scene-schema";
+import { isStudioInkPressureModel } from "./studio-ink-pressure-model";
 
 import type {
   StudioCrdtLayerGroupInput,
@@ -172,6 +173,8 @@ export function studioCrdtStrokeToDrawElement(
     const value = extensions[key];
     if (value !== undefined) Object.assign(result, { [key]: value });
   }
+  const pressureModel = extensions.pressureModel;
+  if (isStudioInkPressureModel(pressureModel)) result.pressureModel = pressureModel;
   if (!result.groupId && record.layerId !== "page-root") result.groupId = record.layerId;
   return result;
 }

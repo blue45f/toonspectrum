@@ -1,3 +1,4 @@
+import { resolveStudioInkPressure } from "./studio-ink-pressure-model";
 import {
   STUDIO_GPU_STROKE_FEED_REVISION,
   orderStudioGpuStrokes,
@@ -156,11 +157,11 @@ function sequenceSignature(values: readonly number[]): string {
 }
 
 function effectiveStrokePressure(stroke: StudioGpuStroke, index: number): number {
-  return clamp(finiteOr(stroke.pressures?.[index], 1), 0, 1);
+  return resolveStudioInkPressure(stroke.pressures?.[index], stroke.pressureModel);
 }
 
 function strokeStyleSignature(stroke: StudioGpuStroke): string {
-  return [
+  const legacySignature = [
     stroke.id,
     stroke.color,
     stroke.size,
@@ -168,6 +169,9 @@ function strokeStyleSignature(stroke: StudioGpuStroke): string {
     stroke.composite,
     stroke.orderKey,
   ].map((value) => semanticToken(value)).join("");
+  return stroke.pressureModel === undefined
+    ? legacySignature
+    : `${legacySignature}${semanticToken(`pressure-model:${stroke.pressureModel}`)}`;
 }
 
 function operationForStudioGpuStroke(stroke: StudioGpuStroke): StudioGpuTileOperation {
@@ -212,6 +216,9 @@ export function signatureStudioGpuStroke(stroke: StudioGpuStroke): string {
   write(stroke.opacity);
   write(stroke.composite);
   write(stroke.orderKey);
+  if (stroke.pressureModel !== undefined) {
+    write(`pressure-model:${stroke.pressureModel}`);
+  }
   write(stroke.points.length);
   for (const point of stroke.points) write(point);
   write(stroke.pressures?.length);
@@ -233,6 +240,9 @@ export function fingerprintStudioGpuStroke(stroke: StudioGpuStroke): string {
   write(stroke.opacity);
   write(stroke.composite);
   write(stroke.orderKey);
+  if (stroke.pressureModel !== undefined) {
+    write(`pressure-model:${stroke.pressureModel}`);
+  }
   write(stroke.points.length);
   for (const point of stroke.points) write(point);
   write(stroke.pressures?.length);
@@ -268,8 +278,11 @@ export function boundsForStudioGpuStroke(
     const x = stroke.points[index * 2];
     const y = stroke.points[index * 2 + 1];
     if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-    const rawPressure = finiteOr(stroke.pressures?.[index], 1);
-    const radius = studioGpuPressureRadius(size, clamp(rawPressure, 0, 1)) + edgeBleed;
+    const radius = studioGpuPressureRadius(
+      size,
+      resolveStudioInkPressure(stroke.pressures?.[index], stroke.pressureModel),
+      stroke.pressureModel
+    ) + edgeBleed;
     minimumX = Math.min(minimumX, x! - radius);
     minimumY = Math.min(minimumY, y! - radius);
     maximumX = Math.max(maximumX, x! + radius);

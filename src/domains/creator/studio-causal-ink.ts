@@ -1,4 +1,8 @@
-import { studioGpuPressureRadius } from "./studio-webgpu-stroke";
+import {
+  resolveStudioInkPressure,
+  studioInkPressureRadius,
+  type StudioInkPressureModel,
+} from "./studio-ink-pressure-model";
 
 /** Nominal-width pressure used by the live mouse/touch and GPU stroke contracts. */
 export const STUDIO_CAUSAL_INK_DEFAULT_PRESSURE = 0.5;
@@ -20,6 +24,7 @@ export interface StudioCausalInkSample {
 export interface StudioCausalInkSampleInput {
   readonly points: readonly number[];
   readonly pressures?: readonly number[];
+  readonly pressureModel?: StudioInkPressureModel;
   readonly minDistance: number;
   /**
    * `true` (default) promotes the last finite, distinct source point even when it is nearer than
@@ -39,6 +44,7 @@ export interface StudioCausalInkDab {
 export interface StudioCausalInkDabInput {
   readonly samples: readonly StudioCausalInkSample[];
   readonly size: number;
+  readonly pressureModel?: StudioInkPressureModel;
   readonly maximumDabs?: number;
 }
 
@@ -50,6 +56,7 @@ export interface StudioCausalInkDabPlan {
 
 export interface StudioCausalInkPlanInput extends StudioCausalInkSampleInput {
   readonly size: number;
+  readonly pressureModel?: StudioInkPressureModel;
   readonly maximumDabs?: number;
 }
 
@@ -59,17 +66,6 @@ export interface StudioCausalInkPlan extends StudioCausalInkDabPlan {
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
-}
-
-function pressureAt(pressures: readonly number[] | undefined, sourceIndex: number): number {
-  const value = pressures?.[sourceIndex];
-  return clamp(
-    typeof value === "number" && Number.isFinite(value)
-      ? value
-      : STUDIO_CAUSAL_INK_DEFAULT_PRESSURE,
-    0,
-    1
-  );
 }
 
 function normalizedMinDistance(value: number): number {
@@ -87,7 +83,7 @@ function finiteSourcePrefix(input: StudioCausalInkSampleInput): StudioCausalInkS
     samples.push({
       x: x!,
       y: y!,
-      pressure: pressureAt(input.pressures, sourceIndex),
+      pressure: resolveStudioInkPressure(input.pressures?.[sourceIndex], input.pressureModel),
       sourceIndex,
     });
   }
@@ -163,7 +159,7 @@ export function planStudioCausalInkDabs(
       x,
       y,
       pressure: safePressure,
-      radius: studioGpuPressureRadius(input.size, safePressure),
+      radius: studioInkPressureRadius(input.size, safePressure, input.pressureModel),
     });
     return true;
   };
@@ -188,8 +184,8 @@ export function planStudioCausalInkDabs(
     const spacing = Math.max(
       0.5,
       Math.min(
-        studioGpuPressureRadius(input.size, startPressure),
-        studioGpuPressureRadius(input.size, endPressure)
+        studioInkPressureRadius(input.size, startPressure, input.pressureModel),
+        studioInkPressureRadius(input.size, endPressure, input.pressureModel)
       ) * 0.45
     );
     const steps = Math.max(1, Math.ceil(distance / spacing));
@@ -215,6 +211,7 @@ export function planStudioCausalInk(input: StudioCausalInkPlanInput): StudioCaus
   const dabPlan = planStudioCausalInkDabs({
     samples,
     size: input.size,
+    pressureModel: input.pressureModel,
     maximumDabs: input.maximumDabs,
   });
   return { samples, ...dabPlan };

@@ -22,6 +22,10 @@ import {
   type StudioCausalInkDab,
   type StudioCausalInkSample,
 } from "./studio-causal-ink";
+import {
+  resolveStudioInkPressure,
+  type StudioInkPressureModel,
+} from "./studio-ink-pressure-model";
 
 import type {
   StudioPredictedInkSample,
@@ -45,6 +49,8 @@ export interface StudioLiveInkStrokeStyle {
   readonly color: string;
   /** 문서 픽셀 기준 기본 획 굵기. */
   readonly strokeWidthDoc: number;
+  /** Omitted strokes retain the legacy 0.3 + 1.4p diameter contract. */
+  readonly pressureModel?: StudioInkPressureModel;
   readonly opacity: number;
   /** 입력 sampler와 동일한 thinning 최소 간격(문서 px). */
   readonly minDistanceDoc: number;
@@ -143,17 +149,18 @@ export class StudioLiveInkOverlayRenderer {
 
   begin(style: StudioLiveInkStrokeStyle, x: number, y: number, pressure: number): boolean {
     if (!this.context || !this.surface) return false;
+    const resolvedPressure = resolveStudioInkPressure(pressure, style.pressureModel);
     this.style = style;
     this.keptX = [x];
     this.keptY = [y];
-    this.keptP = [pressure];
+    this.keptP = [resolvedPressure];
     this.latestSourceX = x;
     this.latestSourceY = y;
-    this.latestSourceP = pressure;
+    this.latestSourceP = resolvedPressure;
     this.consumedSourcePoints = 1;
     this.active = true;
     // settled 잉크는 유지한다 — 커밋 동기화 전의 연속 스트로크가 서로를 지우지 않는다.
-    this.drawDot(style, x, y, pressure);
+    this.drawDot(style, x, y, resolvedPressure);
     return true;
   }
 
@@ -183,7 +190,10 @@ export class StudioLiveInkOverlayRenderer {
     for (let localIndex = 0; localIndex < sampleCount; localIndex += 1) {
       const x = points[localIndex * 2]!;
       const y = points[localIndex * 2 + 1]!;
-      const pressure = pressures?.[startSampleIndex + localIndex] ?? 0.5;
+      const pressure = resolveStudioInkPressure(
+        pressures?.[startSampleIndex + localIndex],
+        this.style.pressureModel
+      );
       this.latestSourceX = x;
       this.latestSourceY = y;
       this.latestSourceP = pressure;
@@ -209,7 +219,7 @@ export class StudioLiveInkOverlayRenderer {
     for (let index = this.consumedSourcePoints; index < total; index += 1) {
       const x = points[index * 2]!;
       const y = points[index * 2 + 1]!;
-      const pressure = pressures?.[index] ?? 0.5;
+      const pressure = resolveStudioInkPressure(pressures?.[index], this.style.pressureModel);
       this.latestSourceX = x;
       this.latestSourceY = y;
       this.latestSourceP = pressure;
@@ -343,6 +353,7 @@ export class StudioLiveInkOverlayRenderer {
     this.drawDabs(style, planStudioCausalInkDabs({
       samples,
       size: style.strokeWidthDoc,
+      pressureModel: style.pressureModel,
     }).dabs.slice(1));
   }
 
@@ -350,6 +361,7 @@ export class StudioLiveInkOverlayRenderer {
     this.drawDabs(style, planStudioCausalInkDabs({
       samples: [{ x, y, pressure, sourceIndex: 0 }],
       size: style.strokeWidthDoc,
+      pressureModel: style.pressureModel,
     }).dabs);
   }
 
@@ -363,12 +375,13 @@ export class StudioLiveInkOverlayRenderer {
     const samples: StudioCausalInkSample[] = xs.map((x, sourceIndex) => ({
       x,
       y: ys[sourceIndex]!,
-      pressure: ps[sourceIndex] ?? 0.5,
+      pressure: resolveStudioInkPressure(ps[sourceIndex], style.pressureModel),
       sourceIndex,
     }));
     this.drawDabs(style, planStudioCausalInkDabs({
       samples,
       size: style.strokeWidthDoc,
+      pressureModel: style.pressureModel,
     }).dabs);
   }
 
@@ -585,9 +598,7 @@ export class StudioLiveInkPredictionRenderer {
       samples.push({
         x: x!,
         y: y!,
-        pressure: typeof rawPressure === "number" && Number.isFinite(rawPressure)
-          ? Math.min(1, Math.max(0, rawPressure))
-          : 0.5,
+        pressure: resolveStudioInkPressure(rawPressure, style.pressureModel),
       });
     }
     if (samples.length === 0) {
@@ -601,9 +612,7 @@ export class StudioLiveInkPredictionRenderer {
       anchor: update.anchor
         ? {
             ...update.anchor,
-            pressure: typeof anchorPressure === "number" && Number.isFinite(anchorPressure)
-              ? Math.min(1, Math.max(0, anchorPressure))
-              : 0.5,
+            pressure: resolveStudioInkPressure(anchorPressure, style.pressureModel),
           }
         : null,
       samples,
@@ -640,6 +649,7 @@ export class StudioLiveInkPredictionRenderer {
     const dabs = planStudioCausalInkDabs({
       samples,
       size: style.strokeWidthDoc,
+      pressureModel: style.pressureModel,
     }).dabs.slice(tail.anchor ? 1 : 0);
     if (dabs.length === 0) return;
 
