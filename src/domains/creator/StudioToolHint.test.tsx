@@ -180,6 +180,23 @@ describe("StudioToolHint", () => {
     expect(source).toContain("reveal(richCoachEnabled);");
   });
 
+  it("keeps rich help exclusive and removes a competing native title tooltip", () => {
+    const html = renderToStaticMarkup(
+      <StudioToolHintTarget
+        hint={{ id: "exclusive-pen", title: "펜", description: "자유선을 그립니다." }}
+      >
+        <button type="button" title="펜 도구">펜</button>
+      </StudioToolHintTarget>
+    );
+
+    expect(html).not.toContain('title="펜 도구"');
+    expect(html).toContain('aria-label="펜 도구"');
+    expect(source).toContain("coordinator.claim(tipId)");
+    expect(source).toContain("coordinator.release(tipId)");
+    expect(source).toContain("const open = useSyncExternalStore(");
+    expect(source).toContain("dismissToolHintsImmediately(coordinator)");
+  });
+
   it("provides compact, rich, and off help modes without changing disabled semantics", () => {
     const compactHtml = renderToStaticMarkup(
       <StudioToolHintPreferencesProvider
