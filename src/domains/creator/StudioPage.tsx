@@ -103,7 +103,7 @@ import {
   MessageSquare,
   Triangle,
 } from "lucide-react";
-import { Fragment, Suspense, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ComponentType, type ReactNode } from "react";
+import { Fragment, Profiler, Suspense, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ComponentType, type ReactNode } from "react";
 import { createPortal, flushSync } from "react-dom";
 import { Stage, Layer, Rect, Text as KText, TextPath as KTextPath, Image as KImage, Line, Group, Star, Ellipse, Circle as KCircle, Path, Transformer, Shape, Arrow, RegularPolygon } from "react-konva/lib/ReactKonvaCore";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -5177,6 +5177,30 @@ type StudioAdvancedFillPreview = {
   regionCount: number;
 };
 
+/**
+ * 커밋 렌더 원가 계측(개발 전용): window.__studioRenderProfile 링버퍼.
+ * 정착 커밋 1회의 비용을 영역(id)별로 귀속시켜, 본문 분할이 추측이 아니라 실측 근거로
+ * 진행되게 한다. 프로덕션 빌드에서는 기록하지 않는다(Profiler 자체 오버헤드는 미미).
+ */
+function recordStudioRenderProfile(
+  id: string,
+  phase: "mount" | "update" | "nested-update",
+  actualDuration: number
+): void {
+  if (!import.meta.env.DEV) return;
+  const target = globalThis as typeof globalThis & {
+    __studioRenderProfile?: { id: string; phase: string; ms: number; at: number }[];
+  };
+  const buffer = (target.__studioRenderProfile ??= []);
+  buffer.push({
+    id,
+    phase,
+    ms: Math.round(actualDuration * 10) / 10,
+    at: Math.round(performance.now()),
+  });
+  if (buffer.length > 80) buffer.splice(0, buffer.length - 80);
+}
+
 export function StudioPage() {
   const [params] = useSearchParams();
   const { data: session } = useSession();
@@ -5217,7 +5241,11 @@ export function StudioPage() {
     remixId,
     draftSessionEpoch: draftIdentityScopeRef.current.epoch,
   });
-  return <StudioCuttoonEditor key={editorScopeKey} />;
+  return (
+    <Profiler id="studio:editor" onRender={recordStudioRenderProfile}>
+      <StudioCuttoonEditor key={editorScopeKey} />
+    </Profiler>
+  );
 }
 
 function StudioCuttoonEditor() {
@@ -8859,6 +8887,7 @@ function StudioCuttoonEditor() {
     // 지연 커밋 경로: 잉크는 라이브 표면에 남긴다 — 커밋 동기화(flush)가 페인트 뒤에 정리한다.
     const preserveInk = options?.preserveInkForDeferredCommit === true;
     const wasDirect = liveDraftDirectRef.current;
+    const wasEraser = liveDraftVisualRef.current?.mode === "eraser";
     pendingDraftRef.current = null;
     if (draftRafRef.current !== null) {
       globalThis.cancelAnimationFrame(draftRafRef.current);
@@ -8912,7 +8941,9 @@ function StudioCuttoonEditor() {
       // 상시 마운트된 다이렉트 초안 레이어의 마지막 프레임 픽셀을 비운다(visualRef 가 null 이라
       // sceneFunc 은 아무것도 그리지 않는다). 이전에는 노드 언마운트(렌더)가 담당하던 정리.
       liveDraftLayerRef.current?.batchDraw();
-      mainLayerRef.current?.batchDraw();
+      // 메인 레이어 전체 재래스터는 지우개 프리뷰 정리에만 필요하다 — 펜 계열까지 매번 돌리면
+      // 문서가 커질수록 펜업마다 커밋 획 전부(스탬프 dab·수채 계획 포함)를 다시 그리게 된다.
+      if (wasEraser) mainLayerRef.current?.batchDraw();
     }
     // 비다이렉트 활성 초안 정리 — settled(커밋 대기 잉크)는 flush 의 표면 정리가 담당한다.
     draftPreviewStoreRef.current.setActive(null);
@@ -25001,6 +25032,7 @@ function StudioCuttoonEditor() {
             className="relative"
             style={{ filter: [pageGradeCss, colorBlindFilterStyle(colorBlindPreview).filter].filter(Boolean).join(" ") || undefined }}
           >
+          <Profiler id="studio:stage" onRender={recordStudioRenderProfile}>
           <Stage
             ref={stageRef}
             width={CANVAS_W * effScale}
@@ -26748,6 +26780,7 @@ function StudioCuttoonEditor() {
               </Layer>
             )}
           </Stage>
+          </Profiler>
           {STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED && webGpuViewportSurface ? (
             <Suspense fallback={null}>
               <StudioRasterCrdtSurface
