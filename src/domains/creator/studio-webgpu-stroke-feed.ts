@@ -1,4 +1,14 @@
 import {
+  advanceStudioResidualInk,
+  startStudioResidualInk,
+  STUDIO_CAUSAL_INK_MAX_DABS,
+  type StudioResidualInkState,
+} from "./studio-causal-ink";
+import {
+  resolveStudioInkPressure,
+  studioInkUsesResidualDabSpacing,
+} from "./studio-ink-pressure-model";
+import {
   STUDIO_GPU_STROKE_FEED_REVISION,
   sameStudioGpuStroke,
   studioGpuPressureRadius,
@@ -44,16 +54,12 @@ export interface StudioGpuStrokeFeedAdvance {
   readonly strokes: readonly StudioGpuStroke[];
 }
 
-function finiteOr(value: unknown, fallback: number): number {
-  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
-}
-
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
 }
 
 function pressureAt(stroke: StudioGpuStroke, index: number): number {
-  return clamp(finiteOr(stroke.pressures?.[index], 1), 0, 1);
+  return resolveStudioInkPressure(stroke.pressures?.[index], stroke.pressureModel);
 }
 
 function stableNumber(value: number): string {
@@ -71,7 +77,7 @@ function semanticToken(value: string | number | undefined): string {
 }
 
 export function studioGpuStrokeFeedStyleSignature(stroke: StudioGpuStroke): string {
-  return [
+  const legacySignature = [
     stroke.id,
     stroke.color,
     stroke.size,
@@ -79,6 +85,9 @@ export function studioGpuStrokeFeedStyleSignature(stroke: StudioGpuStroke): stri
     stroke.composite,
     stroke.orderKey,
   ].map((value) => semanticToken(value)).join("");
+  return stroke.pressureModel === undefined
+    ? legacySignature
+    : `${legacySignature}${semanticToken(`pressure-model:${stroke.pressureModel}`)}`;
 }
 
 export function sameStudioGpuStrokeFeedStyle(
@@ -88,6 +97,7 @@ export function sameStudioGpuStrokeFeedStyle(
   return left.id === right.id
     && left.color === right.color
     && Object.is(left.size, right.size)
+    && left.pressureModel === right.pressureModel
     && Object.is(left.opacity ?? 1, right.opacity ?? 1)
     && (left.composite ?? "normal") === (right.composite ?? "normal")
     && left.orderKey === right.orderKey;
@@ -97,10 +107,23 @@ function boundsForPoint(
   size: number,
   x: number,
   y: number,
-  pressure: number
+  pressure: number,
+  pressureModel: StudioGpuStroke["pressureModel"]
 ): readonly [number, number, number, number] {
-  const radius = studioGpuPressureRadius(size, pressure);
+  const radius = studioGpuPressureRadius(size, pressure, pressureModel);
   return [x - radius, y - radius, x + radius, y + radius];
+}
+
+function includeResidualDabBounds(
+  dabs: readonly { x: number; y: number; radius: number }[],
+  bounds: { minimumX: number; minimumY: number; maximumX: number; maximumY: number }
+): void {
+  for (const dab of dabs) {
+    bounds.minimumX = Math.min(bounds.minimumX, dab.x - dab.radius);
+    bounds.minimumY = Math.min(bounds.minimumY, dab.y - dab.radius);
+    bounds.maximumX = Math.max(bounds.maximumX, dab.x + dab.radius);
+    bounds.maximumY = Math.max(bounds.maximumY, dab.y + dab.radius);
+  }
 }
 
 function baseFeedRevision(
@@ -113,6 +136,8 @@ function baseFeedRevision(
   let minimumY = Number.POSITIVE_INFINITY;
   let maximumX = Number.NEGATIVE_INFINITY;
   let maximumY = Number.NEGATIVE_INFINITY;
+  let residualInkState: StudioResidualInkState | undefined;
+  let residualDabCount: number | undefined;
   for (let index = 0; index < pointCount; index += 1) {
     const x = stroke.points[index * 2];
     const y = stroke.points[index * 2 + 1];
@@ -121,12 +146,45 @@ function baseFeedRevision(
       stroke.size,
       x!,
       y!,
-      pressureAt(stroke, index)
+      pressureAt(stroke, index),
+      stroke.pressureModel
     );
     minimumX = Math.min(minimumX, left);
     minimumY = Math.min(minimumY, top);
     maximumX = Math.max(maximumX, right);
     maximumY = Math.max(maximumY, bottom);
+    if (studioInkUsesResidualDabSpacing(stroke.pressureModel) && stroke.pressureModel) {
+      const sample = { x: x!, y: y!, pressure: pressureAt(stroke, index), sourceIndex: index };
+      if (index === 0) {
+        const started = startStudioResidualInk(
+          sample,
+          stroke.size,
+          stroke.pressureModel,
+          STUDIO_CAUSAL_INK_MAX_DABS
+        );
+        if (!started.complete) return null;
+        residualInkState = started.state;
+        residualDabCount = started.dabs.length;
+        const bounds = { minimumX, minimumY, maximumX, maximumY };
+        includeResidualDabBounds(started.dabs, bounds);
+        ({ minimumX, minimumY, maximumX, maximumY } = bounds);
+      } else {
+        if (!residualInkState || residualDabCount === undefined) return null;
+        const advanced = advanceStudioResidualInk(
+          residualInkState,
+          sample,
+          stroke.size,
+          stroke.pressureModel,
+          STUDIO_CAUSAL_INK_MAX_DABS - residualDabCount
+        );
+        if (!advanced.complete) return null;
+        residualInkState = advanced.state;
+        residualDabCount += advanced.dabs.length;
+        const bounds = { minimumX, minimumY, maximumX, maximumY };
+        includeResidualDabBounds(advanced.dabs, bounds);
+        ({ minimumX, minimumY, maximumX, maximumY } = bounds);
+      }
+    }
   }
   const lastIndex = pointCount - 1;
   return Object.freeze({
@@ -141,6 +199,9 @@ function baseFeedRevision(
     lastX: stroke.points[lastIndex * 2]!,
     lastY: stroke.points[lastIndex * 2 + 1]!,
     lastPressure: pressureAt(stroke, lastIndex),
+    ...(residualInkState === undefined
+      ? {}
+      : { residualInkState, residualDabCount: residualDabCount! }),
     minimumX,
     minimumY,
     maximumX,
@@ -283,6 +344,8 @@ export function advanceStudioGpuStrokeFeed(
   let minimumY = parent.minimumY;
   let maximumX = parent.maximumX;
   let maximumY = parent.maximumY;
+  let residualInkState = parent.residualInkState;
+  let residualDabCount = parent.residualDabCount;
   for (let index = 0; index < suffixPressures.length; index += 1) {
     const x = suffixPoints[index * 2]!;
     const y = suffixPoints[index * 2 + 1]!;
@@ -290,12 +353,36 @@ export function advanceStudioGpuStrokeFeed(
       previous.size,
       x,
       y,
-      suffixPressures[index]!
+      suffixPressures[index]!,
+      previous.pressureModel
     );
     minimumX = Math.min(minimumX, left);
     minimumY = Math.min(minimumY, top);
     maximumX = Math.max(maximumX, right);
     maximumY = Math.max(maximumY, bottom);
+    if (studioInkUsesResidualDabSpacing(previous.pressureModel) && previous.pressureModel) {
+      if (!residualInkState || residualDabCount === undefined) {
+        return { status: "rejected", strokes: previousStrokes };
+      }
+      const advanced = advanceStudioResidualInk(
+        residualInkState,
+        {
+          x,
+          y,
+          pressure: suffixPressures[index]!,
+          sourceIndex: parent.pointCount + index,
+        },
+        previous.size,
+        previous.pressureModel,
+        STUDIO_CAUSAL_INK_MAX_DABS - residualDabCount
+      );
+      if (!advanced.complete) return { status: "rejected", strokes: previousStrokes };
+      residualInkState = advanced.state;
+      residualDabCount += advanced.dabs.length;
+      const bounds = { minimumX, minimumY, maximumX, maximumY };
+      includeResidualDabBounds(advanced.dabs, bounds);
+      ({ minimumX, minimumY, maximumX, maximumY } = bounds);
+    }
   }
   const pointCount = parent.pointCount + suffixPressures.length;
   const revisionNumber = parent.revision + 1;
@@ -311,6 +398,9 @@ export function advanceStudioGpuStrokeFeed(
     lastX: suffixPoints.at(-2)!,
     lastY: suffixPoints.at(-1)!,
     lastPressure: suffixPressures.at(-1)!,
+    ...(residualInkState === undefined
+      ? {}
+      : { residualInkState, residualDabCount: residualDabCount! }),
     minimumX,
     minimumY,
     maximumX,
@@ -365,10 +455,23 @@ export function studioGpuStrokeFeedSuffixFromPointCount(
     pressures,
     color: stroke.color,
     size: stroke.size,
+    ...(stroke.pressureModel === undefined ? {} : { pressureModel: stroke.pressureModel }),
     opacity: stroke.opacity,
     composite: stroke.composite,
     orderKey: stroke.orderKey,
   };
+}
+
+/** Finds the immutable feed revision that owns exactly one retained source-point prefix. */
+export function studioGpuStrokeFeedRevisionAtPointCount(
+  stroke: StudioGpuStroke,
+  pointCount: number
+): StudioGpuStrokeFeedRevision | null {
+  const latest = stroke[STUDIO_GPU_STROKE_FEED_REVISION];
+  if (!latest || !Number.isSafeInteger(pointCount) || pointCount < 1) return null;
+  let cursor: StudioGpuStrokeFeedRevision | null = latest;
+  while (cursor && cursor.pointCount > pointCount) cursor = cursor.parent;
+  return cursor?.pointCount === pointCount && cursor.lineage === latest.lineage ? cursor : null;
 }
 
 function exactPrefixReferences(

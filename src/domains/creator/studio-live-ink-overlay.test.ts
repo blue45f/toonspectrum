@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+  STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
+} from "./studio-ink-pressure-model";
+import {
   StudioLiveInkOverlayRenderer,
   StudioLiveInkPredictionRenderer,
   type StudioLiveInkStrokeStyle,
@@ -106,6 +110,100 @@ afterEach(() => {
 });
 
 describe("StudioLiveInkOverlayRenderer", () => {
+  it("carries residual spacing across live appends and replays the identical settled footprint", () => {
+    const style = {
+      ...STYLE,
+      strokeWidthDoc: 16,
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
+    } as const;
+    const recording = recordingCanvas();
+    const renderer = new StudioLiveInkOverlayRenderer();
+    renderer.attach(recording.canvas);
+    renderer.setSurface(SURFACE);
+    expect(renderer.begin(style, 0, 0, 1)).toBe(true);
+    renderer.appendFrom([0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0], [1, 1, 1, 1, 1, 1]);
+    const firstPrefix = recording.dabs.map((dab) => ({ ...dab }));
+    expect(firstPrefix.map(({ x }) => x)).toEqual([0, 3.2]);
+
+    renderer.appendFrom(
+      [0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8, 0, 9, 0, 10, 0, 11, 0, 12, 0],
+      Array.from({ length: 13 }, () => 1)
+    );
+    expect(recording.dabs.slice(0, firstPrefix.length)).toEqual(firstPrefix);
+    expect(recording.dabs.map(({ x }) => x)).toEqual([0, 3.2, 6.4, 9.6]);
+    renderer.end();
+    const settled = recording.dabs.map((dab) => ({ ...dab }));
+
+    recording.dabs.splice(0);
+    renderer.setSurface({ ...SURFACE, width: 101 });
+    expect(recording.dabs).toEqual(settled);
+  });
+
+  it("finishes residual ink synchronously without scheduling a post-release reveal", () => {
+    const requestAnimationFrame = vi.fn(() => 1);
+    vi.stubGlobal("requestAnimationFrame", requestAnimationFrame);
+    const style = {
+      ...STYLE,
+      strokeWidthDoc: 16,
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
+    } as const;
+    const recording = recordingCanvas();
+    const renderer = new StudioLiveInkOverlayRenderer();
+    renderer.attach(recording.canvas);
+    renderer.setSurface(SURFACE);
+    addStroke(
+      renderer,
+      [0, 0, 4, 0, 8, 0, 12, 0],
+      [1, 1, 1, 1],
+      style
+    );
+    const afterPointerUp = recording.dabs.map((dab) => ({ ...dab }));
+
+    expect(requestAnimationFrame).not.toHaveBeenCalled();
+    expect(recording.dabs).toEqual(afterPointerUp);
+  });
+
+  it("uses the linear-full style for live, settled, and replayed dab radii", () => {
+    const style = {
+      ...STYLE,
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+    } as const;
+    const recording = recordingCanvas();
+    const renderer = new StudioLiveInkOverlayRenderer();
+    renderer.attach(recording.canvas);
+    renderer.setSurface(SURFACE);
+    expect(renderer.begin(style, 0, 0, 0)).toBe(true);
+    renderer.appendFrom([0, 0, 5, 0, 10, 0], [0, 0.5, 1]);
+    renderer.end();
+    const final = recording.dabs.map((dab) => ({ ...dab }));
+
+    expect(final[0]?.radius).toBe(0);
+    expect(final.find(({ x }) => x === 5)?.radius).toBe(2.5);
+    expect(final.at(-1)?.radius).toBe(5);
+
+    recording.dabs.splice(0);
+    renderer.setSurface({ ...SURFACE, width: 101 });
+    expect(recording.dabs).toEqual(final);
+  });
+
+  it("resolves missing live samples to full linear pressure and legacy half pressure", () => {
+    const linear = recordingCanvas();
+    const linearRenderer = new StudioLiveInkOverlayRenderer();
+    linearRenderer.attach(linear.canvas);
+    linearRenderer.setSurface(SURFACE);
+    expect(linearRenderer.begin({
+      ...STYLE,
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+    }, 0, 0, Number.NaN)).toBe(true);
+    linearRenderer.appendFrom([0, 0, 10, 0], []);
+    expect(linear.dabs[0]?.radius).toBe(5);
+    expect(linear.dabs.at(-1)?.radius).toBe(5);
+
+    const legacy = setup();
+    legacy.renderer.appendFrom([0, 0, 10, 0], []);
+    expect(legacy.dabs.at(-1)?.radius).toBe(5);
+  });
+
   it("appends only causal suffix dabs and reaches the active pointer endpoint", () => {
     const { renderer, clearRect, dabs } = setup();
     renderer.appendFrom([0, 0, 10, 0, 20, 10], [0.25, 0.5, 0.75]);

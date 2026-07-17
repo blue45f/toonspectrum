@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 } from "./studio-ink-pressure-model";
 import {
   planStudioWebGpuCommittedSuffix,
   studioWebGpuCommittedBarrierReason,
@@ -124,6 +125,7 @@ describe("planStudioWebGpuCommittedSuffix", () => {
     ["malformed symmetry", { symmetry: null }, "symmetry"],
     ["unknown brush", { brush: "future-super-brush" }, "unsupported-brush"],
     ["dynamic brush", { brush: "ink-particle" }, "unsupported-brush"],
+    ["unknown pressure model", { pressureModel: "linear-full-v2" }, "unsupported-pressure-model"],
     ["fill metadata", { fill: "#ff0000" }, "unsupported-style"],
   ] as const)("treats %s as a hard front barrier", (_label, overrides, reason) => {
     const blocked = draw("blocked", overrides);
@@ -161,6 +163,23 @@ describe("planStudioWebGpuCommittedSuffix", () => {
     expect(studioWebGpuCommittedBarrierReason(draw("fineliner", { brush: "fineliner" }))).toBeNull();
     expect(studioWebGpuCommittedBarrierReason(draw("legacy", { brush: undefined }))).toBeNull();
     expect(studioWebGpuCommittedBarrierReason(draw("null", { brush: null }))).toBe("unsupported-brush");
+  });
+
+  it("allows only the explicit versioned pressure model or omitted legacy semantics", () => {
+    expect(studioWebGpuCommittedBarrierReason(draw("legacy"))).toBeNull();
+    expect(studioWebGpuCommittedBarrierReason(draw("linear", {
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+    }))).toBeNull();
+    expect(studioWebGpuCommittedBarrierReason(draw("linear-missing", {
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+      pressures: undefined,
+    }))).toBeNull();
+    expect(studioWebGpuCommittedBarrierReason(draw("linear-short", {
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+      pressures: [0],
+    }))).toBeNull();
+    expect(studioWebGpuCommittedBarrierReason(draw("null", { pressureModel: null })))
+      .toBe("unsupported-pressure-model");
   });
 
   it("accepts only color forms with exact compositor parser parity", () => {

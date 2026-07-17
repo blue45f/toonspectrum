@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 } from "./studio-ink-pressure-model";
 import {
   createStudioRasterHandoffAuthorityKey,
   createStudioRasterHandoffBaseKey,
@@ -64,6 +65,20 @@ describe("studio raster handoff authority", () => {
     expect(baseKey({ viewport: { ...viewport, surface: { ...viewport.surface, left: 11 } } }))
       .not.toBe(current);
     expect(baseKey({ gates: { exportActive: true } })).not.toBe(current);
+    expect(baseKey({ elements: [{
+      id: "draw-a",
+      type: "draw",
+      kind: "freehand",
+      mode: "pen",
+      points: [1, 2, 3, 4],
+      pressures: [0.5, 0.6],
+      stroke: "#123456",
+      strokeWidth: 4,
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+      opacity: 1,
+      brush: "pen",
+      panelClip: "none",
+    }] })).not.toBe(current);
     expect(baseKey({ elements: [{
       id: "draw-a",
       type: "draw",

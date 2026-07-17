@@ -1,6 +1,5 @@
 import * as Y from "yjs";
 
-
 import {
   decodeStudioCrdtStateVector,
   decodeStudioCrdtSyncChunks,
@@ -33,6 +32,11 @@ import {
   type StudioCrdtPagePayload,
   type StudioCrdtSceneElementPayload,
 } from "./studio-crdt-scene-schema";
+import {
+  isStudioInkPressureModel,
+  studioInkFallbackPressure,
+  type StudioInkPressureModel,
+} from "./studio-ink-pressure-model";
 
 import type { StudioRasterCompactionCheckpoint } from "@/lib/studio-crdt-raster-compaction";
 
@@ -344,41 +348,63 @@ export interface StudioCrdtStrokePatch {
   changedPayloadKeys?: readonly StudioCrdtStrokePayloadKey[];
 }
 
-export interface StudioCrdtChange {
+export interface StudioCrdtChangeSummary {
   origin: unknown;
   local: boolean;
   /** Exact IDs touched by record/sample operations; order-only corruption may conservatively widen. */
   changedStrokeIds: ReadonlySet<string>;
-  strokes: StudioCrdtStrokeRecord[];
   changedSceneElementIds: ReadonlySet<string>;
-  sceneElements: StudioCrdtSceneElementRecord[];
   changedPageIds: ReadonlySet<string>;
-  pages: StudioCrdtPageRecord[];
   changedLayerGroupIds: ReadonlySet<string>;
-  layerGroups: StudioCrdtLayerGroupRecord[];
   /** Exact immutable raster identities touched by this transaction. */
   changedRasterSurfaceIds: ReadonlySet<string>;
   changedRasterOperationIds: ReadonlySet<string>;
   changedRasterUndoOperationIds: ReadonlySet<string>;
   changedRasterUndoAcknowledgementIds: ReadonlySet<string>;
   changedRasterCheckpointIds: ReadonlySet<string>;
+}
+
+export interface StudioCrdtChangeSnapshot {
+  strokes: StudioCrdtStrokeRecord[];
+  sceneElements: StudioCrdtSceneElementRecord[];
+  pages: StudioCrdtPageRecord[];
+  layerGroups: StudioCrdtLayerGroupRecord[];
   /** Only complete, exact-schema logs/checkpoints are materialized; malformed remote roots fail closed. */
   rasterOperationLogs: StudioRasterOperationLog[];
   rasterCheckpoints: StudioRasterCompactionCheckpoint[];
 }
 
-export interface StudioCrdtChangeSummary {
-  origin: unknown;
-  local: boolean;
-  changedStrokeIds: ReadonlySet<string>;
-  changedSceneElementIds: ReadonlySet<string>;
-  changedPageIds: ReadonlySet<string>;
-  changedLayerGroupIds: ReadonlySet<string>;
-  changedRasterSurfaceIds: ReadonlySet<string>;
-  changedRasterOperationIds: ReadonlySet<string>;
-  changedRasterUndoOperationIds: ReadonlySet<string>;
-  changedRasterUndoAcknowledgementIds: ReadonlySet<string>;
-  changedRasterCheckpointIds: ReadonlySet<string>;
+export const STUDIO_CRDT_CHANGE_SNAPSHOT_FIELDS = Object.freeze([
+  "strokes",
+  "sceneElements",
+  "pages",
+  "layerGroups",
+  "rasterOperationLogs",
+  "rasterCheckpoints",
+] as const satisfies readonly (keyof StudioCrdtChangeSnapshot)[]);
+
+export type StudioCrdtChangeSnapshotField =
+  (typeof STUDIO_CRDT_CHANGE_SNAPSHOT_FIELDS)[number];
+const STUDIO_CRDT_CHANGE_SNAPSHOT_FIELD_SET: ReadonlySet<string> =
+  new Set(STUDIO_CRDT_CHANGE_SNAPSHOT_FIELDS);
+
+/**
+ * Backward-compatible complete transaction frontier. Every snapshot field is eagerly fixed while
+ * the Yjs `afterTransaction` callback is still running and remains enumerable at the top level.
+ */
+export interface StudioCrdtChange extends StudioCrdtChangeSummary, StudioCrdtChangeSnapshot {}
+
+/**
+ * Explicitly projected transaction frontier. Unrequested snapshot fields are absent from both the
+ * runtime `snapshot` object and its type instead of being represented by misleading empty arrays.
+ */
+export interface StudioCrdtProjectedChange<
+  Fields extends readonly StudioCrdtChangeSnapshotField[] =
+    readonly StudioCrdtChangeSnapshotField[]
+> extends StudioCrdtChangeSummary {
+  snapshotMode: "projected";
+  snapshotFields: Readonly<Fields>;
+  snapshot: Readonly<Pick<StudioCrdtChangeSnapshot, Fields[number]>>;
 }
 
 export interface StudioCrdtChangeSubscriptionOptions {
@@ -386,10 +412,24 @@ export interface StudioCrdtChangeSubscriptionOptions {
   includeOrigin?: (origin: unknown) => boolean;
   /** Summary filtering happens before any complete document frontier is materialized. */
   includeChange?: (summary: StudioCrdtChangeSummary) => boolean;
+  /** Omitted for the backward-compatible complete transaction frontier. */
+  snapshotFields?: undefined;
 }
+
+export type StudioCrdtProjectedChangeSubscriptionOptions<
+  Fields extends readonly StudioCrdtChangeSnapshotField[] =
+    readonly StudioCrdtChangeSnapshotField[]
+> = Omit<StudioCrdtChangeSubscriptionOptions, "snapshotFields"> & {
+  /** Only these fields are eagerly fixed at transaction time and exposed under `change.snapshot`. */
+  snapshotFields: Fields;
+};
 
 export type StudioCrdtUpdateHandler = (update: Uint8Array, origin: unknown) => void;
 export type StudioCrdtChangeHandler = (change: StudioCrdtChange) => void;
+export type StudioCrdtProjectedChangeHandler<
+  Fields extends readonly StudioCrdtChangeSnapshotField[] =
+    readonly StudioCrdtChangeSnapshotField[]
+> = (change: StudioCrdtProjectedChange<Fields>) => void;
 
 export interface StudioCrdtBatchedUpdate {
   update: Uint8Array;
@@ -687,11 +727,28 @@ function sampleCount(samples: StudioCrdtStrokeSamples, allowEmpty: boolean): num
   return count;
 }
 
-function normalizedSamples(samples: StudioCrdtStrokeSamples, allowEmpty: boolean) {
+function normalizedSamples(
+  samples: StudioCrdtStrokeSamples,
+  allowEmpty: boolean,
+  storedPressureModel?: StudioInkPressureModel
+) {
   const count = sampleCount(samples, allowEmpty);
+  const extensions = "extensions" in samples && samples.extensions
+    && typeof samples.extensions === "object"
+    && !Array.isArray(samples.extensions)
+    ? samples.extensions
+    : undefined;
+  const pressureModelValue = extensions && "pressureModel" in extensions
+    ? extensions.pressureModel
+    : undefined;
+  const pressureModel = storedPressureModel ?? (isStudioInkPressureModel(pressureModelValue)
+    ? pressureModelValue
+    : undefined);
   return {
     points: [...samples.points],
-    pressures: [...(samples.pressures ?? Array<number>(count).fill(0.5))],
+    pressures: [
+      ...(samples.pressures ?? Array<number>(count).fill(studioInkFallbackPressure(pressureModel))),
+    ],
     tiltXs: [...(samples.tiltXs ?? Array<number>(count).fill(0))],
     tiltYs: [...(samples.tiltYs ?? Array<number>(count).fill(0))],
     twists: [...(samples.twists ?? Array<number>(count).fill(0))],
@@ -714,7 +771,10 @@ function validatePayload(payload: StudioCrdtDrawStrokePayload, allowEmpty: boole
   assertFiniteRange(payload.strokeWidth, 0.01, MAX_STROKE_WIDTH, "획 굵기");
   if (payload.opacity !== undefined) assertFiniteRange(payload.opacity, 0, 1, "불투명도");
   if (payload.sampleSpacing !== undefined) {
-    assertFiniteRange(payload.sampleSpacing, 0.01, MAX_STROKE_WIDTH, "샘플 간격");
+    // Zero is the intentional fixed-rate contract: the 5 ms input filter already owns thinning,
+    // so the renderer must not apply a second distance gate. Undefined still identifies legacy
+    // geometry; a finite zero therefore cannot be normalized away or rejected at the wire edge.
+    assertFiniteRange(payload.sampleSpacing, 0, MAX_STROKE_WIDTH, "샘플 간격");
   }
   for (const key of OPTIONAL_STRING_PAYLOAD_KEYS) {
     const value = payload[key];
@@ -1305,11 +1365,34 @@ export class StudioCrdtDocument {
     return unsubscribe;
   }
 
+  subscribeChanges<const Fields extends readonly StudioCrdtChangeSnapshotField[]>(
+    handler: StudioCrdtProjectedChangeHandler<Fields>,
+    options: StudioCrdtProjectedChangeSubscriptionOptions<Fields>
+  ): () => void;
   subscribeChanges(
     handler: StudioCrdtChangeHandler,
-    options: StudioCrdtChangeSubscriptionOptions = {}
+    options?: StudioCrdtChangeSubscriptionOptions
+  ): () => void;
+  subscribeChanges<const Fields extends readonly StudioCrdtChangeSnapshotField[]>(
+    handler: StudioCrdtChangeHandler | StudioCrdtProjectedChangeHandler<Fields>,
+    options:
+      | StudioCrdtChangeSubscriptionOptions
+      | StudioCrdtProjectedChangeSubscriptionOptions<Fields> = {}
   ): () => void {
     this.assertAlive();
+    const projectionFields: Readonly<Fields> | null = options.snapshotFields === undefined
+      ? null
+      : Object.freeze([...options.snapshotFields]) as unknown as Readonly<Fields>;
+    const projectionFieldSet = projectionFields === null
+      ? null
+      : new Set<StudioCrdtChangeSnapshotField>(projectionFields);
+    if (projectionFields !== null) {
+      for (const field of projectionFields) {
+        if (!STUDIO_CRDT_CHANGE_SNAPSHOT_FIELD_SET.has(field)) {
+          throw new Error(`지원하지 않는 CRDT 변경 스냅샷 필드입니다: ${field}`);
+        }
+      }
+    }
     const listener = (transaction: Y.Transaction) => {
       if (options.includeOrigin && !options.includeOrigin(transaction.origin)) return;
       const summary: StudioCrdtChangeSummary = {
@@ -1340,8 +1423,18 @@ export class StudioCrdtDocument {
         ),
       };
       if (options.includeChange && !options.includeChange(summary)) return;
+      if (projectionFields !== null && projectionFieldSet !== null) {
+        const change: StudioCrdtProjectedChange<Fields> = {
+          ...summary,
+          snapshotMode: "projected",
+          snapshotFields: projectionFields,
+          snapshot: this.materializeChangeSnapshotProjection<Fields>(projectionFieldSet),
+        };
+        (handler as StudioCrdtProjectedChangeHandler<Fields>)(change);
+        return;
+      }
       const rasterSnapshot = this.tryReadExactRasterDocumentSnapshot();
-      handler({
+      (handler as StudioCrdtChangeHandler)({
         ...summary,
         strokes: this.getStrokes({ includeDeleted: true }),
         sceneElements: this.getSceneElements({ includeDeleted: true }),
@@ -1370,6 +1463,50 @@ export class StudioCrdtDocument {
     };
     this.cleanup.add(unsubscribe);
     return unsubscribe;
+  }
+
+  private materializeChangeSnapshotProjection<
+    Fields extends readonly StudioCrdtChangeSnapshotField[]
+  >(
+    fields: ReadonlySet<StudioCrdtChangeSnapshotField>
+  ): Readonly<Pick<StudioCrdtChangeSnapshot, Fields[number]>> {
+    const snapshot: Partial<StudioCrdtChangeSnapshot> = {};
+    if (fields.has("strokes")) {
+      snapshot.strokes = this.getStrokes({ includeDeleted: true });
+    }
+    if (fields.has("sceneElements")) {
+      snapshot.sceneElements = this.getSceneElements({ includeDeleted: true });
+    }
+    if (fields.has("pages")) {
+      snapshot.pages = this.getPages(true);
+    }
+    if (fields.has("layerGroups")) {
+      snapshot.layerGroups = this.getLayerGroups({ includeDeleted: true });
+    }
+    const needsRasterSnapshot = fields.has("rasterOperationLogs") ||
+      fields.has("rasterCheckpoints");
+    if (needsRasterSnapshot) {
+      const rasterSnapshot = this.tryReadExactRasterDocumentSnapshot();
+      if (fields.has("rasterOperationLogs")) {
+        snapshot.rasterOperationLogs = rasterSnapshot
+          ? [...rasterSnapshot.logs.values()].sort((left, right) => (
+              left.surface.surfaceId < right.surface.surfaceId ? -1 :
+              left.surface.surfaceId > right.surface.surfaceId ? 1 : 0
+            ))
+          : [];
+      }
+      if (fields.has("rasterCheckpoints")) {
+        snapshot.rasterCheckpoints = rasterSnapshot
+          ? [...rasterSnapshot.checkpoints].sort((left, right) => {
+              const order = compareStudioRasterEventOrder(left.through, right.through);
+              if (order !== 0) return order;
+              return left.checkpointId < right.checkpointId ? -1 :
+                left.checkpointId > right.checkpointId ? 1 : 0;
+            })
+          : [];
+      }
+    }
+    return snapshot as Pick<StudioCrdtChangeSnapshot, Fields[number]>;
   }
 
   subscribeBatchedUpdates(
@@ -1451,16 +1588,20 @@ export class StudioCrdtDocument {
   appendStrokeSamples(id: string, samples: StudioCrdtStrokeSamples): number {
     this.assertAlive();
     assertId(id, "획");
-    const normalized = normalizedSamples(samples, false);
-    const appendedCount = normalized.points.length / 2;
-    if (appendedCount > STUDIO_CRDT_APPEND_MAX_SAMPLES) {
-      throw new Error("한 번에 추가할 수 있는 획 샘플 수를 초과했습니다.");
-    }
     const record = this.strokes.get(id);
     if (!(record instanceof Y.Map) || this.isDeleted(record, strokeDeletionTarget(id))) {
       throw new Error("추가할 획을 찾을 수 없습니다.");
     }
     if (record.get("status") !== "drawing") throw new Error("완료된 획에는 샘플을 추가할 수 없습니다.");
+    const extensions = readJsonObject(record, "extensions");
+    const pressureModel = isStudioInkPressureModel(extensions?.pressureModel)
+      ? extensions.pressureModel
+      : undefined;
+    const normalized = normalizedSamples(samples, false, pressureModel);
+    const appendedCount = normalized.points.length / 2;
+    if (appendedCount > STUDIO_CRDT_APPEND_MAX_SAMPLES) {
+      throw new Error("한 번에 추가할 수 있는 획 샘플 수를 초과했습니다.");
+    }
     const currentCount = (yArray(record, "points")?.length ?? 0) / 2;
     if (currentCount + appendedCount > STUDIO_CRDT_STROKE_MAX_SAMPLES) {
       throw new Error("획 샘플 수가 최대 한도를 초과합니다.");

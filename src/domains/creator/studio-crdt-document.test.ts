@@ -17,6 +17,7 @@ import {
   type StudioCrdtChangeSummary,
   type StudioCrdtDrawStrokePayload,
   type StudioCrdtPageInput,
+  type StudioCrdtProjectedChange,
   type StudioCrdtSceneElementInput,
   type StudioCrdtStrokeInput,
 } from "./studio-crdt-document";
@@ -119,6 +120,55 @@ function setYjsClientId(document: StudioCrdtDocument, clientId: number): void {
 }
 
 describe("StudioCrdtDocument", () => {
+  it("uses full fallback pressure for sparse residual V2 payloads", () => {
+    const document = new StudioCrdtDocument();
+    const record = document.addStroke({
+      ...stroke("residual-sparse", "page-a"),
+      payload: payload([0, 0, 4, 0, 8, 0], {
+        pressures: undefined,
+        extensions: { pressureModel: "linear-residual-v2" },
+      }),
+    });
+
+    expect(record.payload.pressures).toEqual([1, 1, 1]);
+    document.destroy();
+  });
+
+  it("uses the stored pressure model when streamed samples omit pressures", () => {
+    const document = new StudioCrdtDocument();
+    document.beginStroke({
+      ...stroke("residual-stream", "page-a", []),
+      payload: payload([], {
+        pressures: undefined,
+        extensions: { pressureModel: "linear-residual-v2" },
+      }),
+    });
+    document.appendStrokeSamples("residual-stream", { points: [0, 0, 4, 0, 8, 0] });
+
+    document.beginStroke({
+      ...stroke("legacy-stream", "page-a", []),
+      payload: payload([], { pressures: undefined }),
+    });
+    document.appendStrokeSamples("legacy-stream", { points: [0, 0, 4, 0, 8, 0] });
+
+    expect(document.finalizeStroke("residual-stream").payload.pressures).toEqual([1, 1, 1]);
+    expect(document.finalizeStroke("legacy-stream").payload.pressures).toEqual([0.5, 0.5, 0.5]);
+    document.destroy();
+  });
+
+  it("preserves zero sample spacing for fixed-rate causal ink", () => {
+    const document = new StudioCrdtDocument();
+
+    const record = document.addStroke({
+      ...stroke("fixed-rate", "page-a"),
+      payload: payload([10, 20, 11, 21], { sampleSpacing: 0 }),
+    });
+
+    expect(record.payload.sampleSpacing).toBe(0);
+    expect(document.getStroke("fixed-rate")?.payload.sampleSpacing).toBe(0);
+    document.destroy();
+  });
+
   it("streams aligned pointer samples and finalizes one immutable drawing operation", () => {
     const document = new StudioCrdtDocument();
 
@@ -908,6 +958,121 @@ describe("StudioCrdtDocument", () => {
       "first-stroke",
       "second-stroke",
     ]);
+  });
+
+  it("materializes only projected snapshot fields after summary filtering", () => {
+    const document = new StudioCrdtDocument();
+    document.addStroke(stroke("projected-existing", "page-a"));
+    document.addPage(page("projected-page"));
+    const getStrokes = vi.spyOn(document, "getStrokes");
+    const getSceneElements = vi.spyOn(document, "getSceneElements");
+    const getPages = vi.spyOn(document, "getPages");
+    const getLayerGroups = vi.spyOn(document, "getLayerGroups");
+    const readRasterSnapshot = vi.spyOn(
+      document as unknown as { tryReadExactRasterDocumentSnapshot(): unknown },
+      "tryReadExactRasterDocumentSnapshot"
+    );
+    const changes: StudioCrdtProjectedChange<readonly ["strokes", "pages"]>[] = [];
+    document.subscribeChanges((change) => changes.push(change), {
+      includeChange: ({ changedSceneElementIds }) => changedSceneElementIds.size > 0,
+      snapshotFields: ["strokes", "pages"],
+    });
+
+    document.addStroke(stroke("projected-filtered", "page-a"));
+
+    expect(changes).toEqual([]);
+    expect(getStrokes).not.toHaveBeenCalled();
+    expect(getSceneElements).not.toHaveBeenCalled();
+    expect(getPages).not.toHaveBeenCalled();
+    expect(getLayerGroups).not.toHaveBeenCalled();
+    expect(readRasterSnapshot).not.toHaveBeenCalled();
+
+    document.addSceneElement(textElement("projected-included"));
+
+    expect(changes).toHaveLength(1);
+    expect(getStrokes).toHaveBeenCalledTimes(1);
+    expect(getPages).toHaveBeenCalledTimes(1);
+    expect(getSceneElements).not.toHaveBeenCalled();
+    expect(getLayerGroups).not.toHaveBeenCalled();
+    expect(readRasterSnapshot).not.toHaveBeenCalled();
+    const includedChange = changes[0]!;
+    expect(includedChange.snapshotMode).toBe("projected");
+    expect(includedChange.snapshotFields).toEqual(["strokes", "pages"]);
+    expect(Object.isFrozen(includedChange.snapshotFields)).toBe(true);
+    expect(Object.keys(includedChange.snapshot)).toEqual(["strokes", "pages"]);
+    expect(includedChange.snapshot.strokes.map(({ id }) => id)).toEqual([
+      "projected-existing",
+      "projected-filtered",
+    ]);
+    expect(includedChange.snapshot.pages.map(({ id }) => id)).toEqual(["projected-page"]);
+    expect("sceneElements" in includedChange.snapshot).toBe(false);
+    expect("strokes" in includedChange).toBe(false);
+    type SnapshotHasNoSceneElements = "sceneElements" extends
+      keyof typeof includedChange.snapshot ? never : true;
+    type ChangeHasNoTopLevelStrokes = "strokes" extends keyof typeof includedChange ? never : true;
+    const snapshotHasNoSceneElements: SnapshotHasNoSceneElements = true;
+    const changeHasNoTopLevelStrokes: ChangeHasNoTopLevelStrokes = true;
+    expect(snapshotHasNoSceneElements).toBe(true);
+    expect(changeHasNoTopLevelStrokes).toBe(true);
+    document.destroy();
+  });
+
+  it("keeps projected frontiers exact after later transactions and document destruction", () => {
+    const document = new StudioCrdtDocument();
+    const changes: StudioCrdtProjectedChange<readonly ["strokes"]>[] = [];
+    document.subscribeChanges((change) => changes.push(change), {
+      includeChange: ({ changedStrokeIds }) => changedStrokeIds.size > 0,
+      snapshotFields: ["strokes"],
+    });
+
+    document.addStroke(stroke("projected-first", "page-a"));
+    const firstChange = changes.at(-1)!;
+    document.addStroke(stroke("projected-second", "page-a"));
+    const secondChange = changes.at(-1)!;
+    document.destroy();
+
+    expect(firstChange.snapshot.strokes.map(({ id }) => id)).toEqual(["projected-first"]);
+    expect(secondChange.snapshot.strokes.map(({ id }) => id)).toEqual([
+      "projected-first",
+      "projected-second",
+    ]);
+  });
+
+  it("reads one shared raster frontier for projected raster fields", () => {
+    const document = new StudioCrdtDocument();
+    const getStrokes = vi.spyOn(document, "getStrokes");
+    const getSceneElements = vi.spyOn(document, "getSceneElements");
+    const getPages = vi.spyOn(document, "getPages");
+    const getLayerGroups = vi.spyOn(document, "getLayerGroups");
+    const readRasterSnapshot = vi.spyOn(
+      document as unknown as { tryReadExactRasterDocumentSnapshot(): unknown },
+      "tryReadExactRasterDocumentSnapshot"
+    );
+    const changes = vi.fn();
+    document.subscribeChanges(changes, {
+      snapshotFields: [
+        "rasterOperationLogs",
+        "rasterCheckpoints",
+        "rasterOperationLogs",
+      ],
+    });
+
+    document.addSceneElement(textElement("projected-raster-trigger"));
+
+    expect(changes).toHaveBeenCalledTimes(1);
+    expect(readRasterSnapshot).toHaveBeenCalledTimes(1);
+    expect(getStrokes).not.toHaveBeenCalled();
+    expect(getSceneElements).not.toHaveBeenCalled();
+    expect(getPages).not.toHaveBeenCalled();
+    expect(getLayerGroups).not.toHaveBeenCalled();
+    const change = changes.mock.calls[0]?.[0];
+    expect(Object.keys(change.snapshot)).toEqual([
+      "rasterOperationLogs",
+      "rasterCheckpoints",
+    ]);
+    expect(change.snapshot.rasterOperationLogs).toEqual([]);
+    expect(change.snapshot.rasterCheckpoints).toEqual([]);
+    document.destroy();
   });
 
   it("reports exact scene and page IDs introduced by one remote update", () => {

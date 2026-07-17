@@ -1,3 +1,13 @@
+import {
+  advanceStudioResidualInk,
+  planStudioCausalInkDabs,
+  startStudioResidualInk,
+} from "./studio-causal-ink";
+import {
+  isStudioInkPressureModel,
+  resolveStudioInkPressure,
+  studioInkUsesResidualDabSpacing,
+} from "./studio-ink-pressure-model";
 import { parseStudioGpuColor } from "./studio-webgpu-color";
 import {
   copyStudioGpuReadbackRows,
@@ -22,6 +32,7 @@ import {
   appendStudioGpuStrokeFeedOperations,
   createStudioGpuStrokeFeedBaseline,
   sameStudioGpuStrokeFeedStyle,
+  studioGpuStrokeFeedRevisionAtPointCount,
   studioGpuStrokeFeedSuffixFromPointCount,
   type StudioGpuStrokeOperationsAppendPatch,
   type StudioGpuStrokeSuffixPatch,
@@ -302,7 +313,7 @@ function normalizeViewport(input: StudioGpuViewport): NormalizedStudioGpuViewpor
 }
 
 function pointPressure(stroke: StudioGpuStroke, index: number): number {
-  return clamp(finiteOr(stroke.pressures?.[index], 1), 0, 1);
+  return resolveStudioInkPressure(stroke.pressures?.[index], stroke.pressureModel);
 }
 
 function stableFingerprintNumber(value: number): string {
@@ -367,6 +378,9 @@ export function fingerprintStudioGpuFrame(
     ]) {
       hash = updateFingerprint(hash, value);
     }
+    if (stroke.pressureModel !== undefined) {
+      hash = updateFingerprint(hash, `pressure-model:${stroke.pressureModel}`);
+    }
     for (const point of stroke.points) hash = updateFingerprint(hash, point);
     hash = updateFingerprint(hash, stroke.pressures?.length);
     for (const pressure of stroke.pressures ?? []) hash = updateFingerprint(hash, pressure);
@@ -408,6 +422,7 @@ export function isValidStudioGpuStroke(stroke: StudioGpuStroke): boolean {
       && Number.isFinite(stroke.size)
       && stroke.size > 0
       && stroke.size <= STUDIO_GPU_MAX_BRUSH_SIZE
+      && (stroke.pressureModel === undefined || isStudioInkPressureModel(stroke.pressureModel))
       && (stroke.opacity === undefined || (
         Number.isFinite(stroke.opacity) && stroke.opacity >= 0 && stroke.opacity <= 1
       ));
@@ -424,6 +439,7 @@ export function isValidStudioGpuStroke(stroke: StudioGpuStroke): boolean {
     && Number.isFinite(stroke.size)
     && stroke.size > 0
     && stroke.size <= STUDIO_GPU_MAX_BRUSH_SIZE
+    && (stroke.pressureModel === undefined || isStudioInkPressureModel(stroke.pressureModel))
     && (stroke.opacity === undefined || (
       Number.isFinite(stroke.opacity) && stroke.opacity >= 0 && stroke.opacity <= 1
     ));
@@ -574,7 +590,7 @@ function planStudioGpuDabsInternal(
         invalidStroke = true;
         return;
       }
-      const radius = studioGpuPressureRadius(size, pressure);
+      const radius = studioGpuPressureRadius(size, pressure, stroke.pressureModel);
       if (clipRect !== null && !dabIntersectsRect(x, y, radius, clipRect)) return;
       if (dabs.length >= maximumDabs) {
         complete = false;
@@ -593,89 +609,117 @@ function planStudioGpuDabsInternal(
       });
     };
 
-    const firstX = stroke.points[0];
-    const firstY = stroke.points[1];
-    if (!Number.isFinite(firstX) || !Number.isFinite(firstY)) continue;
-    if (includeInitialDab) pushDab(firstX!, firstY!, pointPressure(stroke, 0));
+    if (studioInkUsesResidualDabSpacing(stroke.pressureModel) && stroke.pressureModel) {
+      const residualPlan = planStudioCausalInkDabs({
+        samples: Array.from({ length: pointCount }, (_, sourceIndex) => ({
+          x: stroke.points[sourceIndex * 2]!,
+          y: stroke.points[sourceIndex * 2 + 1]!,
+          pressure: pointPressure(stroke, sourceIndex),
+          sourceIndex,
+        })),
+        size,
+        pressureModel: stroke.pressureModel,
+        maximumDabs: STUDIO_GPU_MAX_DABS,
+      });
+      if (!residualPlan.complete) {
+        complete = false;
+        invalidStroke = true;
+      } else {
+        const initialPressure = pointPressure(stroke, 0);
+        const startIndex = includeInitialDab || initialPressure <= 0 ? 0 : 1;
+        for (
+          let index = startIndex;
+          index < residualPlan.dabs.length && !capacityExceeded && !invalidStroke;
+          index += 1
+        ) {
+          const dab = residualPlan.dabs[index]!;
+          pushDab(dab.x, dab.y, dab.pressure);
+        }
+      }
+    } else {
+      const firstX = stroke.points[0];
+      const firstY = stroke.points[1];
+      if (!Number.isFinite(firstX) || !Number.isFinite(firstY)) continue;
+      if (includeInitialDab) pushDab(firstX!, firstY!, pointPressure(stroke, 0));
 
-    for (
-      let pointIndex = 1;
-      pointIndex < pointCount && !capacityExceeded && !invalidStroke;
-      pointIndex += 1
-    ) {
-      const x0 = stroke.points[(pointIndex - 1) * 2];
-      const y0 = stroke.points[(pointIndex - 1) * 2 + 1];
-      const x1 = stroke.points[pointIndex * 2];
-      const y1 = stroke.points[pointIndex * 2 + 1];
-      if (![x0, y0, x1, y1].every((coordinate) => Number.isFinite(coordinate))) continue;
-      const dx = x1! - x0!;
-      const dy = y1! - y0!;
-      const distance = Math.hypot(dx, dy);
-      if (![dx, dy, distance].every(Number.isFinite)) {
-        complete = false;
-        invalidStroke = true;
-        break;
-      }
-      if (distance <= 1e-6) continue;
-      const p0 = pointPressure(stroke, pointIndex - 1);
-      const p1 = pointPressure(stroke, pointIndex);
-      // Overlapping circular dabs form an anti-aliased round-cap stroke without geometry cracks.
-      const spacing = Math.max(
-        0.5,
-        Math.min(
-          studioGpuPressureRadius(size, p0),
-          studioGpuPressureRadius(size, p1)
-        ) * 0.45
-      );
-      const steps = Math.max(1, Math.ceil(distance / spacing));
-      if (!Number.isFinite(spacing) || !Number.isFinite(steps)) {
-        complete = false;
-        invalidStroke = true;
-        break;
-      }
-      let firstStep = 1;
-      let lastStep = steps;
-      if (clipRect !== null) {
-        if (!Number.isSafeInteger(steps)) {
-          complete = false;
-          invalidStroke = true;
-          break;
-        }
-        const maximumRadius = Math.max(
-          studioGpuPressureRadius(size, p0),
-          studioGpuPressureRadius(size, p1)
-        );
-        const clipped = clipStudioGpuSegment(
-          x0!,
-          y0!,
-          dx,
-          dy,
-          maximumRadius,
-          clipRect
-        );
-        if (!clipped.valid) {
-          complete = false;
-          invalidStroke = true;
-          break;
-        }
-        if (!clipped.interval) continue;
-        const [minimumAmount, maximumAmount] = clipped.interval;
-        // Expand by one sample on both ends, then use the exact circle test in `pushDab`. This
-        // avoids losing a boundary dab to floating-point rounding without scanning the segment.
-        firstStep = Math.max(1, Math.floor(minimumAmount * steps) - 1);
-        lastStep = Math.min(steps, Math.ceil(maximumAmount * steps) + 1);
-      }
       for (
-        let step = firstStep;
-        step <= lastStep && !capacityExceeded && !invalidStroke;
-        step += 1
+        let pointIndex = 1;
+        pointIndex < pointCount && !capacityExceeded && !invalidStroke;
+        pointIndex += 1
       ) {
-        const amount = step / steps;
-        pushDab(
-          x0! + dx * amount,
-          y0! + dy * amount,
-          p0 + (p1 - p0) * amount
+        const x0 = stroke.points[(pointIndex - 1) * 2];
+        const y0 = stroke.points[(pointIndex - 1) * 2 + 1];
+        const x1 = stroke.points[pointIndex * 2];
+        const y1 = stroke.points[pointIndex * 2 + 1];
+        if (![x0, y0, x1, y1].every((coordinate) => Number.isFinite(coordinate))) continue;
+        const dx = x1! - x0!;
+        const dy = y1! - y0!;
+        const distance = Math.hypot(dx, dy);
+        if (![dx, dy, distance].every(Number.isFinite)) {
+          complete = false;
+          invalidStroke = true;
+          break;
+        }
+        if (distance <= 1e-6) continue;
+        const p0 = pointPressure(stroke, pointIndex - 1);
+        const p1 = pointPressure(stroke, pointIndex);
+        // Frozen V1/legacy spacing contract for already-persisted strokes.
+        const spacing = Math.max(
+          0.5,
+          Math.min(
+            studioGpuPressureRadius(size, p0, stroke.pressureModel),
+            studioGpuPressureRadius(size, p1, stroke.pressureModel)
+          ) * 0.45
         );
+        const steps = Math.max(1, Math.ceil(distance / spacing));
+        if (!Number.isFinite(spacing) || !Number.isFinite(steps)) {
+          complete = false;
+          invalidStroke = true;
+          break;
+        }
+        let firstStep = 1;
+        let lastStep = steps;
+        if (clipRect !== null) {
+          if (!Number.isSafeInteger(steps)) {
+            complete = false;
+            invalidStroke = true;
+            break;
+          }
+          const maximumRadius = Math.max(
+            studioGpuPressureRadius(size, p0, stroke.pressureModel),
+            studioGpuPressureRadius(size, p1, stroke.pressureModel)
+          );
+          const clipped = clipStudioGpuSegment(
+            x0!,
+            y0!,
+            dx,
+            dy,
+            maximumRadius,
+            clipRect
+          );
+          if (!clipped.valid) {
+            complete = false;
+            invalidStroke = true;
+            break;
+          }
+          if (!clipped.interval) continue;
+          const [minimumAmount, maximumAmount] = clipped.interval;
+          // Expand by one sample on both ends, then use the exact circle test in `pushDab`.
+          firstStep = Math.max(1, Math.floor(minimumAmount * steps) - 1);
+          lastStep = Math.min(steps, Math.ceil(maximumAmount * steps) + 1);
+        }
+        for (
+          let step = firstStep;
+          step <= lastStep && !capacityExceeded && !invalidStroke;
+          step += 1
+        ) {
+          const amount = step / steps;
+          pushDab(
+            x0! + dx * amount,
+            y0! + dy * amount,
+            p0 + (p1 - p0) * amount
+          );
+        }
       }
     }
 
@@ -696,6 +740,115 @@ function planStudioGpuDabsInternal(
   }
 
   return { dabs, batches, complete };
+}
+
+/**
+ * Plans a residual V2 suffix from its cached feed phase. Non-feed callers reconstruct the phase
+ * once from the retained prefix; the live WebGPU path reads no historical point coordinates.
+ */
+function planStudioGpuResidualStrokeExtensionInternal(
+  stroke: StudioGpuStroke,
+  previousPointCount: number,
+  clipRect: StudioGpuRect | null,
+  maximumDabs: number
+): PlannedStudioGpuDabs {
+  const pointCount = stroke.points.length / 2;
+  if (
+    !studioInkUsesResidualDabSpacing(stroke.pressureModel)
+    || !stroke.pressureModel
+    || !isValidStudioGpuStroke(stroke)
+    || !Number.isSafeInteger(previousPointCount)
+    || previousPointCount < 1
+    || previousPointCount >= pointCount
+    || !Number.isSafeInteger(maximumDabs)
+    || maximumDabs < 0
+    || (clipRect !== null && !validClipRect(clipRect))
+  ) {
+    return { dabs: [], batches: [], complete: false };
+  }
+  const parsedColor = parseStudioGpuColor(stroke.color);
+  if (!parsedColor) return { dabs: [], batches: [], complete: false };
+  const [red, green, blue, colorAlpha] = parsedColor;
+  const composite: StudioGpuComposite = stroke.composite === "erase" ? "erase" : "normal";
+  const alpha = (stroke.opacity ?? 1) * (composite === "erase" ? 1 : colorAlpha);
+  if (alpha <= 0) return { dabs: [], batches: [], complete: true };
+
+  const cached = studioGpuStrokeFeedRevisionAtPointCount(stroke, previousPointCount);
+  let state = cached?.residualInkState;
+  let totalDabCount = cached?.residualDabCount;
+  if (!state || totalDabCount === undefined) {
+    const started = startStudioResidualInk(
+      {
+        x: stroke.points[0]!,
+        y: stroke.points[1]!,
+        pressure: pointPressure(stroke, 0),
+        sourceIndex: 0,
+      },
+      stroke.size,
+      stroke.pressureModel,
+      STUDIO_GPU_MAX_DABS
+    );
+    if (!started.complete) return { dabs: [], batches: [], complete: false };
+    state = started.state;
+    totalDabCount = started.dabs.length;
+    for (let sourceIndex = 1; sourceIndex < previousPointCount; sourceIndex += 1) {
+      const advanced = advanceStudioResidualInk(
+        state,
+        {
+          x: stroke.points[sourceIndex * 2]!,
+          y: stroke.points[sourceIndex * 2 + 1]!,
+          pressure: pointPressure(stroke, sourceIndex),
+          sourceIndex,
+        },
+        stroke.size,
+        stroke.pressureModel,
+        STUDIO_GPU_MAX_DABS - totalDabCount
+      );
+      if (!advanced.complete) return { dabs: [], batches: [], complete: false };
+      state = advanced.state;
+      totalDabCount += advanced.dabs.length;
+    }
+  }
+
+  const dabs: StudioGpuDab[] = [];
+  for (let sourceIndex = previousPointCount; sourceIndex < pointCount; sourceIndex += 1) {
+    const advanced = advanceStudioResidualInk(
+      state,
+      {
+        x: stroke.points[sourceIndex * 2]!,
+        y: stroke.points[sourceIndex * 2 + 1]!,
+        pressure: pointPressure(stroke, sourceIndex),
+        sourceIndex,
+      },
+      stroke.size,
+      stroke.pressureModel,
+      STUDIO_GPU_MAX_DABS - totalDabCount
+    );
+    if (!advanced.complete) return { dabs, batches: [], complete: false };
+    state = advanced.state;
+    totalDabCount += advanced.dabs.length;
+    for (const dab of advanced.dabs) {
+      if (clipRect !== null && !dabIntersectsRect(dab.x, dab.y, dab.radius, clipRect)) continue;
+      if (dabs.length >= maximumDabs) return { dabs, batches: [], complete: false };
+      dabs.push({
+        x: dab.x,
+        y: dab.y,
+        radius: dab.radius,
+        red,
+        green,
+        blue,
+        alpha,
+        composite,
+      });
+    }
+  }
+  return {
+    dabs,
+    batches: dabs.length === 0
+      ? []
+      : [{ composite, firstInstance: 0, instanceCount: dabs.length }],
+    complete: true,
+  };
 }
 
 /** CPU planning is shared by Canvas2D and non-tiled callers with identical geometry and ordering. */
@@ -737,6 +890,14 @@ export function planStudioGpuStrokeExtensionInRect(
     || previousPointCount >= pointCount
   ) {
     return { dabs: [], batches: [], complete: false };
+  }
+  if (studioInkUsesResidualDabSpacing(stroke.pressureModel)) {
+    return planStudioGpuResidualStrokeExtensionInternal(
+      stroke,
+      previousPointCount,
+      clipRect,
+      maximumDabs
+    );
   }
   const feedSuffix = studioGpuStrokeFeedSuffixFromPointCount(stroke, previousPointCount);
   if (feedSuffix) {
@@ -893,6 +1054,24 @@ export function planStudioGpuDabUpdate(
     && sameStrokeStyle(previousTerminal, nextTerminal)
     && isStrictPointPrefix(previousTerminal, nextTerminal)
   ) {
+    if (studioInkUsesResidualDabSpacing(nextTerminal.pressureModel)) {
+      const residualSuffix = planStudioGpuResidualStrokeExtensionInternal(
+        nextTerminal,
+        previousTerminal.points.length / 2,
+        null,
+        STUDIO_GPU_MAX_DABS
+      );
+      if (!residualSuffix.complete) {
+        return { mode: "rebuild", ...planStudioGpuDabs(nextOrdered) };
+      }
+      return {
+        mode: "append",
+        ...concatenateStudioGpuDabPlans([
+          residualSuffix,
+          planStudioGpuDabs(nextOrdered.slice(previousOrdered.length)),
+        ]),
+      };
+    }
     const previousPointCount = previousTerminal.points.length / 2;
     const feedSuffix = studioGpuStrokeFeedSuffixFromPointCount(
       nextTerminal,

@@ -314,7 +314,22 @@ describe("deterministic event batching", () => {
       duplicateSamples.slice(3),
     ]);
     expect(split.emitted).toEqual(together.emitted);
-    expect(split.emitted.find((sample) => sample.timeStamp === 10)?.sourceTimeStamp).toBe(10);
+    // Strict ZOH boundary: a raw sample at t=10 becomes eligible after, not at, the t=10 tick.
+    expect(split.emitted.find((sample) => sample.timeStamp === 10)?.sourceTimeStamp).toBe(4);
+  });
+
+  it("uses the previous hold on an exact tick and the last equal-time sample on the next tick", () => {
+    const started = createFixedRateStrokeFilter({ x: 0, y: 0, timeStamp: 0 }, 3.4);
+    const atFour = append(started.state, [{ x: 4, y: 0, timeStamp: 4 }]);
+    const atBoundary = append(atFour.state, [
+      { x: 8, y: 0, timeStamp: 10 },
+      { x: 10, y: 0, timeStamp: 10 },
+    ]);
+    const nextTick = advance(atBoundary.state, 15);
+
+    expect(atBoundary.emitted.find(({ timeStamp }) => timeStamp === 10)?.sourceTimeStamp).toBe(4);
+    expect(nextTick.emitted.find(({ timeStamp }) => timeStamp === 15)?.sourceTimeStamp).toBe(10);
+    expect(nextTick.state.heldSample.x).toBe(10);
   });
 
   it("does not mutate a previously emitted prefix or prior state", () => {
@@ -383,47 +398,47 @@ describe("representative stroke fixtures", () => {
         { tick: 0, x: 0, y: 0, pressure: 0.399804, tiltX: 0, tiltY: -10 },
         {
           tick: 4,
-          x: 1.471747,
-          y: 0.828175,
-          pressure: 0.411137,
-          tiltX: 0.771941,
-          tiltY: -9.909543,
+          x: 1.441514,
+          y: 0.820617,
+          pressure: 0.410989,
+          tiltX: 0.758714,
+          tiltY: -9.916345,
         },
         {
           tick: 8,
-          x: 12.118803,
-          y: 5.284809,
-          pressure: 0.479053,
-          tiltX: 5.912743,
-          tiltY: -8.434558,
+          x: 11.535184,
+          y: 5.159312,
+          pressure: 0.476425,
+          tiltX: 5.665724,
+          tiltY: -8.568895,
         },
         {
           tick: 12,
-          x: 32.494527,
-          y: 7.571816,
-          pressure: 0.545298,
-          tiltX: 13.500952,
-          tiltY: -3.804409,
+          x: 31.42924,
+          y: 7.702838,
+          pressure: 0.544587,
+          tiltX: 13.205966,
+          tiltY: -4.099059,
         },
         {
           tick: 16,
-          x: 56.594716,
-          y: 1.449895,
-          pressure: 0.505308,
-          tiltX: 17.22801,
-          tiltY: 2.687634,
+          x: 55.38034,
+          y: 1.911754,
+          pressure: 0.510308,
+          tiltX: 17.202255,
+          tiltY: 2.381086,
         },
       ]);
     expect(fixturePoint(result.finished.endpoint)).toEqual({
       tick: 30,
-      x: 99.609966,
-      y: -11.444771,
-      pressure: 0.250929,
-      tiltX: 9.26567,
-      tiltY: 9.787981,
+      x: 99.53274,
+      y: -11.445738,
+      pressure: 0.251397,
+      tiltX: 9.297953,
+      tiltY: 9.788029,
     });
     expect(result.finished.releaseDrainTicks).toBe(14);
-    expect(round(result.state.lastStagePositionDelta)).toBe(0.667895);
+    expect(round(result.state.lastStagePositionDelta)).toBe(0.782284);
   });
 
   it("locks a sharp-turn response without allowing future samples to rewrite its prefix", () => {
@@ -455,7 +470,7 @@ describe("representative stroke fixtures", () => {
       .toEqual([
         {
           tick: 8,
-          x: 19.390085,
+          x: 18.456294,
           y: 0,
           pressure: 0.500489,
           tiltX: 0,
@@ -463,7 +478,7 @@ describe("representative stroke fixtures", () => {
         },
         {
           tick: 9,
-          x: 26.421602,
+          x: 25.236442,
           y: 0.048373,
           pressure: 0.500489,
           tiltX: 0,
@@ -471,31 +486,31 @@ describe("representative stroke fixtures", () => {
         },
         {
           tick: 12,
-          x: 49.636448,
-          y: 2.354795,
+          x: 47.980362,
+          y: 2.306422,
           pressure: 0.500489,
           tiltX: 0,
           tiltY: 0,
         },
         {
           tick: 16,
-          x: 71.161461,
-          y: 19.390085,
+          x: 70.15225,
+          y: 18.456294,
           pressure: 0.500489,
           tiltX: 0,
           tiltY: 0,
         },
       ]);
     expect(fixturePoint(finished.endpoint)).toEqual({
-      tick: 30,
-      x: 79.993235,
-      y: 79.38271,
+      tick: 31,
+      x: 79.995314,
+      y: 79.553883,
       pressure: 0.500489,
       tiltX: 0,
       tiltY: 0,
     });
-    expect(finished.releaseDrainTicks).toBe(14);
-    expect(round(finished.state.lastStagePositionDelta)).toBe(0.936082);
+    expect(finished.releaseDrainTicks).toBe(15);
+    expect(round(finished.state.lastStagePositionDelta)).toBe(0.676204);
   });
 
   it("drains one held release endpoint until total stage |dx| + |dy| is at most one", () => {

@@ -1,4 +1,10 @@
-import { studioGpuPressureRadius } from "./studio-webgpu-stroke";
+import {
+  resolveStudioInkPressure,
+  studioInkPressureDiameter,
+  studioInkPressureRadius,
+  studioInkUsesResidualDabSpacing,
+  type StudioInkPressureModel,
+} from "./studio-ink-pressure-model";
 
 /** Nominal-width pressure used by the live mouse/touch and GPU stroke contracts. */
 export const STUDIO_CAUSAL_INK_DEFAULT_PRESSURE = 0.5;
@@ -7,6 +13,9 @@ export const STUDIO_CAUSAL_INK_DEFAULT_PRESSURE = 0.5;
 export const STUDIO_CAUSAL_INK_MAX_DABS = 100_000;
 
 const STUDIO_CAUSAL_INK_MIN_SEGMENT_DISTANCE = 1e-6;
+const STUDIO_RESIDUAL_INK_SPACING_RATIO = 0.2;
+const STUDIO_RESIDUAL_INK_MIN_SPACING = 0.5;
+const STUDIO_RESIDUAL_INK_MAX_SPACING = 10;
 
 export interface StudioCausalInkSample {
   readonly x: number;
@@ -20,6 +29,7 @@ export interface StudioCausalInkSample {
 export interface StudioCausalInkSampleInput {
   readonly points: readonly number[];
   readonly pressures?: readonly number[];
+  readonly pressureModel?: StudioInkPressureModel;
   readonly minDistance: number;
   /**
    * `true` (default) promotes the last finite, distinct source point even when it is nearer than
@@ -39,6 +49,7 @@ export interface StudioCausalInkDab {
 export interface StudioCausalInkDabInput {
   readonly samples: readonly StudioCausalInkSample[];
   readonly size: number;
+  readonly pressureModel?: StudioInkPressureModel;
   readonly maximumDabs?: number;
 }
 
@@ -48,8 +59,25 @@ export interface StudioCausalInkDabPlan {
   readonly complete: boolean;
 }
 
+/** Immutable cursor for Magma-compatible, cross-segment residual dab placement. */
+export interface StudioResidualInkState {
+  readonly previousX: number;
+  readonly previousY: number;
+  readonly previousPressure: number;
+  readonly lastDabX: number;
+  readonly lastDabY: number;
+  readonly distanceRemainder: number;
+}
+
+export interface StudioResidualInkAdvance {
+  readonly state: StudioResidualInkState;
+  readonly dabs: readonly StudioCausalInkDab[];
+  readonly complete: boolean;
+}
+
 export interface StudioCausalInkPlanInput extends StudioCausalInkSampleInput {
   readonly size: number;
+  readonly pressureModel?: StudioInkPressureModel;
   readonly maximumDabs?: number;
 }
 
@@ -59,17 +87,6 @@ export interface StudioCausalInkPlan extends StudioCausalInkDabPlan {
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
-}
-
-function pressureAt(pressures: readonly number[] | undefined, sourceIndex: number): number {
-  const value = pressures?.[sourceIndex];
-  return clamp(
-    typeof value === "number" && Number.isFinite(value)
-      ? value
-      : STUDIO_CAUSAL_INK_DEFAULT_PRESSURE,
-    0,
-    1
-  );
 }
 
 function normalizedMinDistance(value: number): number {
@@ -87,7 +104,7 @@ function finiteSourcePrefix(input: StudioCausalInkSampleInput): StudioCausalInkS
     samples.push({
       x: x!,
       y: y!,
-      pressure: pressureAt(input.pressures, sourceIndex),
+      pressure: resolveStudioInkPressure(input.pressures?.[sourceIndex], input.pressureModel),
       sourceIndex,
     });
   }
@@ -136,6 +153,198 @@ function normalizedMaximumDabs(value: number | undefined): number | null {
   return Number.isSafeInteger(maximum) && maximum >= 0 ? maximum : null;
 }
 
+function residualInkDab(
+  x: number,
+  y: number,
+  pressure: number,
+  size: number,
+  pressureModel: StudioInkPressureModel
+): StudioCausalInkDab {
+  const safePressure = clamp(pressure, 0, 1);
+  return {
+    x,
+    y,
+    pressure: safePressure,
+    radius: studioInkPressureRadius(size, safePressure, pressureModel),
+  };
+}
+
+/** Starts the exact residual-spacing stream. Zero-pressure starts intentionally paint no dot. */
+export function startStudioResidualInk(
+  sample: StudioCausalInkSample,
+  size: number,
+  pressureModel: StudioInkPressureModel,
+  maximumDabs = STUDIO_CAUSAL_INK_MAX_DABS
+): StudioResidualInkAdvance {
+  const pressure = clamp(sample.pressure, 0, 1);
+  const state: StudioResidualInkState = {
+    previousX: sample.x,
+    previousY: sample.y,
+    previousPressure: pressure,
+    lastDabX: sample.x,
+    lastDabY: sample.y,
+    distanceRemainder: 0,
+  };
+  if (
+    ![sample.x, sample.y, pressure].every(Number.isFinite)
+    || !Number.isSafeInteger(maximumDabs)
+    || maximumDabs < 0
+  ) {
+    return { state, dabs: [], complete: false };
+  }
+  if (pressure <= 0) return { state, dabs: [], complete: true };
+  if (maximumDabs === 0) return { state, dabs: [], complete: false };
+  return {
+    state,
+    dabs: [residualInkDab(sample.x, sample.y, pressure, size, pressureModel)],
+    complete: true,
+  };
+}
+
+/**
+ * Advances one Magma-compatible brush sample.
+ *
+ * `distanceRemainder` is path length carried across source segments. Spacing is based on selected
+ * diameter × 0.2 × the average endpoint pressure and clamped to 0.5–10 document pixels. Source
+ * endpoints are not forced, and a stationary sample never paints another dab.
+ */
+export function advanceStudioResidualInk(
+  state: StudioResidualInkState,
+  sample: StudioCausalInkSample,
+  size: number,
+  pressureModel: StudioInkPressureModel,
+  maximumDabs = STUDIO_CAUSAL_INK_MAX_DABS
+): StudioResidualInkAdvance {
+  const pressure = clamp(sample.pressure, 0, 1);
+  const inputDx = sample.x - state.previousX;
+  const inputDy = sample.y - state.previousY;
+  const inputDistance = Math.hypot(inputDx, inputDy);
+  if (
+    ![
+      sample.x,
+      sample.y,
+      pressure,
+      state.previousX,
+      state.previousY,
+      state.previousPressure,
+      state.lastDabX,
+      state.lastDabY,
+      state.distanceRemainder,
+      inputDx,
+      inputDy,
+      inputDistance,
+    ].every(Number.isFinite)
+    || !Number.isSafeInteger(maximumDabs)
+    || maximumDabs < 0
+  ) {
+    return { state, dabs: [], complete: false };
+  }
+
+  // Pressure-only hardware samples must not consume a distance remainder accumulated by an
+  // earlier move. Re-evaluating that remainder against a newly smaller pressure spacing would
+  // otherwise stamp a dab behind the pointer and visibly rewrite an already-drawn prefix.
+  if (inputDistance <= 1e-6) {
+    return {
+      state: {
+        ...state,
+        previousX: sample.x,
+        previousY: sample.y,
+        previousPressure: pressure,
+      },
+      dabs: [],
+      complete: true,
+    };
+  }
+
+  let distanceRemainder = state.distanceRemainder + inputDistance;
+  const selectedDiameter = studioInkPressureDiameter(size, 1, pressureModel);
+  const averagePressure = (state.previousPressure + pressure) * 0.5;
+  const spacing = clamp(
+    selectedDiameter * STUDIO_RESIDUAL_INK_SPACING_RATIO * averagePressure,
+    STUDIO_RESIDUAL_INK_MIN_SPACING,
+    STUDIO_RESIDUAL_INK_MAX_SPACING
+  );
+  let lastDabX = state.lastDabX;
+  let lastDabY = state.lastDabY;
+  const toEndpointX = sample.x - lastDabX;
+  const toEndpointY = sample.y - lastDabY;
+  const toEndpointDistance = Math.hypot(toEndpointX, toEndpointY);
+  const dabs: StudioCausalInkDab[] = [];
+  let complete = true;
+  const pushDab = (x: number, y: number, dabPressure: number): boolean => {
+    if (dabs.length >= maximumDabs) {
+      complete = false;
+      return false;
+    }
+    dabs.push(residualInkDab(x, y, dabPressure, size, pressureModel));
+    return true;
+  };
+
+  if (distanceRemainder >= spacing) {
+    if (toEndpointDistance < spacing) {
+      if (pushDab(sample.x, sample.y, pressure)) {
+        lastDabX = sample.x;
+        lastDabY = sample.y;
+        distanceRemainder -= spacing;
+      }
+    } else {
+      const pressureStep = (pressure - state.previousPressure) * (spacing / distanceRemainder);
+      const unitX = toEndpointX / toEndpointDistance;
+      const unitY = toEndpointY / toEndpointDistance;
+      let interpolatedPressure = state.previousPressure;
+      while (distanceRemainder >= spacing) {
+        if (!pushDab(
+          lastDabX + unitX * spacing,
+          lastDabY + unitY * spacing,
+          Math.max(0, interpolatedPressure + pressureStep)
+        )) break;
+        lastDabX += unitX * spacing;
+        lastDabY += unitY * spacing;
+        interpolatedPressure = clamp(interpolatedPressure + pressureStep, 0, 1);
+        distanceRemainder -= spacing;
+      }
+    }
+  }
+
+  return {
+    state: {
+      previousX: sample.x,
+      previousY: sample.y,
+      previousPressure: pressure,
+      lastDabX,
+      lastDabY,
+      distanceRemainder,
+    },
+    dabs,
+    complete,
+  };
+}
+
+function planStudioResidualInkDabs(input: StudioCausalInkDabInput): StudioCausalInkDabPlan {
+  const maximumDabs = normalizedMaximumDabs(input.maximumDabs);
+  if (maximumDabs === null) return { dabs: [], complete: false };
+  const first = input.samples[0];
+  if (!first || !input.pressureModel) return { dabs: [], complete: first === undefined };
+
+  const started = startStudioResidualInk(first, input.size, input.pressureModel, maximumDabs);
+  const dabs = [...started.dabs];
+  let state = started.state;
+  let complete = started.complete;
+  for (let index = 1; index < input.samples.length && complete; index += 1) {
+    const advanced = advanceStudioResidualInk(
+      state,
+      input.samples[index]!,
+      input.size,
+      input.pressureModel,
+      maximumDabs - dabs.length
+    );
+    dabs.push(...advanced.dabs);
+    state = advanced.state;
+    complete = advanced.complete;
+  }
+  return { dabs, complete };
+}
+
 /**
  * Plans an initial round dab and straight-segment dabs with the exact current GPU radius/spacing
  * contract: pressure-linear segments, `min(endpoint radii) * 0.45`, and a 0.5px spacing floor.
@@ -143,6 +352,9 @@ function normalizedMaximumDabs(value: number | undefined): number | null {
 export function planStudioCausalInkDabs(
   input: StudioCausalInkDabInput
 ): StudioCausalInkDabPlan {
+  if (studioInkUsesResidualDabSpacing(input.pressureModel)) {
+    return planStudioResidualInkDabs(input);
+  }
   const maximumDabs = normalizedMaximumDabs(input.maximumDabs);
   if (maximumDabs === null) return { dabs: [], complete: false };
   if (input.samples.length === 0) return { dabs: [], complete: true };
@@ -163,7 +375,7 @@ export function planStudioCausalInkDabs(
       x,
       y,
       pressure: safePressure,
-      radius: studioGpuPressureRadius(input.size, safePressure),
+      radius: studioInkPressureRadius(input.size, safePressure, input.pressureModel),
     });
     return true;
   };
@@ -188,8 +400,8 @@ export function planStudioCausalInkDabs(
     const spacing = Math.max(
       0.5,
       Math.min(
-        studioGpuPressureRadius(input.size, startPressure),
-        studioGpuPressureRadius(input.size, endPressure)
+        studioInkPressureRadius(input.size, startPressure, input.pressureModel),
+        studioInkPressureRadius(input.size, endPressure, input.pressureModel)
       ) * 0.45
     );
     const steps = Math.max(1, Math.ceil(distance / spacing));
@@ -215,6 +427,7 @@ export function planStudioCausalInk(input: StudioCausalInkPlanInput): StudioCaus
   const dabPlan = planStudioCausalInkDabs({
     samples,
     size: input.size,
+    pressureModel: input.pressureModel,
     maximumDabs: input.maximumDabs,
   });
   return { samples, ...dabPlan };

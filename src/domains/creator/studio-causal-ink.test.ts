@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  advanceStudioResidualInk,
   planStudioCausalInk,
   planStudioCausalInkDabs,
   selectStudioCausalInkSamples,
+  startStudioResidualInk,
   STUDIO_CAUSAL_INK_DEFAULT_PRESSURE,
 } from "./studio-causal-ink";
+import {
+  STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+  STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
+} from "./studio-ink-pressure-model";
 import { planStudioGpuDabs } from "./studio-webgpu-engine";
 import { studioGpuPressureRadius } from "./studio-webgpu-stroke";
 
@@ -94,6 +100,21 @@ describe("studio causal ink", () => {
     ]);
   });
 
+  it("uses full pressure for missing linear samples while preserving legacy half pressure", () => {
+    const points = [0, 0, 10, 0];
+    expect(selectStudioCausalInkSamples({
+      points,
+      pressures: [],
+      minDistance: 0,
+    }).map(({ pressure }) => pressure)).toEqual([0.5, 0.5]);
+    expect(selectStudioCausalInkSamples({
+      points,
+      pressures: [],
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+      minDistance: 0,
+    }).map(({ pressure }) => pressure)).toEqual([1, 1]);
+  });
+
   it("plans the initial dab and pressure-linear segment dabs with the GPU spacing formula", () => {
     const samples = [
       { x: 0, y: 0, pressure: 0.25, sourceIndex: 0 },
@@ -175,6 +196,154 @@ describe("studio causal ink", () => {
     expect(gpu.complete).toBe(true);
     expect(causal.dabs.map(({ x, y, radius }) => ({ x, y, radius }))).toEqual(
       gpu.dabs.map(({ x, y, radius }) => ({ x, y, radius }))
+    );
+  });
+
+  it("shares the linear-full zero-to-selected-diameter contract with the GPU planner", () => {
+    const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1;
+    const samples = [
+      { x: 0, y: 0, pressure: 0, sourceIndex: 0 },
+      { x: 5, y: 0, pressure: 0.5, sourceIndex: 1 },
+      { x: 10, y: 0, pressure: 1, sourceIndex: 2 },
+    ] as const;
+    const causal = planStudioCausalInkDabs({ samples, size: 10, pressureModel });
+    const gpu = planStudioGpuDabs([{
+      id: "linear-parity",
+      points: samples.flatMap(({ x, y }) => [x, y]),
+      pressures: samples.map(({ pressure }) => pressure),
+      color: "#000000",
+      size: 10,
+      pressureModel,
+    }]);
+
+    expect(causal.dabs[0]?.radius).toBe(0);
+    expect(causal.dabs.find(({ pressure }) => pressure === 0.5)?.radius).toBe(2.5);
+    expect(causal.dabs.at(-1)?.radius).toBe(5);
+    expect(causal.dabs.map(({ x, y, radius }) => ({ x, y, radius }))).toEqual(
+      gpu.dabs.map(({ x, y, radius }) => ({ x, y, radius }))
+    );
+  });
+
+  it("matches Magma's residual centers and does not force each source endpoint", () => {
+    const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2;
+    const samples = Array.from({ length: 13 }, (_, sourceIndex) => ({
+      x: sourceIndex,
+      y: 0,
+      pressure: 1,
+      sourceIndex,
+    }));
+    const subdivided = planStudioCausalInkDabs({ samples, size: 16, pressureModel });
+    const singleSegment = planStudioCausalInkDabs({
+      samples: [samples[0]!, samples.at(-1)!],
+      size: 16,
+      pressureModel,
+    });
+
+    expect(subdivided.complete).toBe(true);
+    expect(subdivided.dabs.map(({ x }) => x)).toHaveLength(4);
+    subdivided.dabs.forEach((dab, index) => {
+      expect(dab.x).toBeCloseTo(index * 3.2, 12);
+      expect(dab.y).toBe(0);
+      expect(dab.radius).toBe(8);
+    });
+    expect(subdivided.dabs.at(-1)?.x).toBeCloseTo(9.6, 12);
+    expect(subdivided.dabs.at(-1)?.x).not.toBe(12);
+    expect(singleSegment.dabs).toEqual(subdivided.dabs);
+  });
+
+  it("produces the full residual plan as immutable incremental suffixes", () => {
+    const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2;
+    const samples = [
+      { x: 0, y: 0, pressure: 1, sourceIndex: 0 },
+      { x: 1, y: 0, pressure: 1, sourceIndex: 1 },
+      { x: 4, y: 0, pressure: 0.75, sourceIndex: 2 },
+      { x: 9, y: 2, pressure: 0.5, sourceIndex: 3 },
+      { x: 12, y: 2, pressure: 1, sourceIndex: 4 },
+    ] as const;
+    const started = startStudioResidualInk(samples[0], 16, pressureModel);
+    const incremental = [...started.dabs];
+    const prefix = incremental.map((dab) => ({ ...dab }));
+    let state = started.state;
+    for (const sample of samples.slice(1)) {
+      const advanced = advanceStudioResidualInk(state, sample, 16, pressureModel);
+      expect(advanced.complete).toBe(true);
+      state = advanced.state;
+      incremental.push(...advanced.dabs);
+      expect(incremental.slice(0, prefix.length)).toEqual(prefix);
+    }
+    const full = planStudioCausalInkDabs({ samples, size: 16, pressureModel });
+    expect(incremental).toEqual(full.dabs);
+  });
+
+  it("omits a zero-pressure start and never stamps a stationary pressure-only sample", () => {
+    const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2;
+    const first = { x: 4, y: 6, pressure: 0, sourceIndex: 0 } as const;
+    const started = startStudioResidualInk(first, 16, pressureModel);
+    const stationary = advanceStudioResidualInk(
+      started.state,
+      { x: 4, y: 6, pressure: 1, sourceIndex: 1 },
+      16,
+      pressureModel
+    );
+    expect(started.dabs).toEqual([]);
+    expect(stationary.dabs).toEqual([]);
+    expect(stationary.state.distanceRemainder).toBe(0);
+  });
+
+  it("does not spend a carried remainder when stationary pressure narrows the spacing", () => {
+    const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2;
+    const started = startStudioResidualInk(
+      { x: 0, y: 0, pressure: 1, sourceIndex: 0 },
+      50,
+      pressureModel
+    );
+    const moved = advanceStudioResidualInk(
+      started.state,
+      { x: 9, y: 0, pressure: 1, sourceIndex: 1 },
+      50,
+      pressureModel
+    );
+    const pressureOnly = advanceStudioResidualInk(
+      moved.state,
+      { x: 9, y: 0, pressure: 0, sourceIndex: 2 },
+      50,
+      pressureModel
+    );
+
+    expect(moved.dabs).toEqual([]);
+    expect(moved.state.distanceRemainder).toBe(9);
+    expect(pressureOnly.dabs).toEqual([]);
+    expect(pressureOnly.state).toMatchObject({
+      previousX: 9,
+      previousY: 0,
+      previousPressure: 0,
+      lastDabX: 0,
+      lastDabY: 0,
+      distanceRemainder: 9,
+    });
+  });
+
+  it("shares residual V2 centers and radii exactly with the GPU planner", () => {
+    const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2;
+    const samples = [
+      { x: 0, y: 0, pressure: 1, sourceIndex: 0 },
+      { x: 1, y: 0, pressure: 1, sourceIndex: 1 },
+      { x: 5, y: 1, pressure: 0.6, sourceIndex: 2 },
+      { x: 12, y: 2, pressure: 1, sourceIndex: 3 },
+    ] as const;
+    const causal = planStudioCausalInkDabs({ samples, size: 16, pressureModel });
+    const gpu = planStudioGpuDabs([{
+      id: "residual-parity",
+      points: samples.flatMap(({ x, y }) => [x, y]),
+      pressures: samples.map(({ pressure }) => pressure),
+      color: "#000000",
+      size: 16,
+      pressureModel,
+    }]);
+    expect(causal.complete).toBe(true);
+    expect(gpu.complete).toBe(true);
+    expect(gpu.dabs.map(({ x, y, radius }) => ({ x, y, radius }))).toEqual(
+      causal.dabs.map(({ x, y, radius }) => ({ x, y, radius }))
     );
   });
 

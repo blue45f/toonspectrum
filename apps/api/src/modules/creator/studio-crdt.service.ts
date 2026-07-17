@@ -1081,7 +1081,7 @@ function validateStrokeRoot(id: string, record: Y.Map<unknown>): boolean {
   const sampleSpacing = record.get("sampleSpacing");
   if (
     record.has("sampleSpacing") &&
-    !finiteNumberInRange(sampleSpacing, 0.01, STUDIO_CRDT_STROKE_WIDTH_MAX)
+    !finiteNumberInRange(sampleSpacing, 0, STUDIO_CRDT_STROKE_WIDTH_MAX)
   ) return false;
   for (const key of STUDIO_CRDT_STROKE_OPTIONAL_STRING_KEYS) {
     const value = record.get(key);

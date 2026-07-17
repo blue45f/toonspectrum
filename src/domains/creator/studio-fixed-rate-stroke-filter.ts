@@ -346,40 +346,6 @@ function cascadeWouldChange(state: FixedRateStrokeFilterState): boolean {
   return false;
 }
 
-function advanceBefore(
-  initialState: FixedRateStrokeFilterState,
-  exclusiveTimeStamp: number
-): {
-  readonly state: FixedRateStrokeFilterState;
-  readonly emitted: readonly FixedRateStrokeFilteredSample[];
-} {
-  let state = initialState;
-  const emitted: FixedRateStrokeFilteredSample[] = [];
-  while (logicalTickTime(state) < exclusiveTimeStamp) {
-    if (!cascadeWouldChange(state)) {
-      // Once another cascade tick cannot change any IEEE-754 stage value, later ticks only repeat
-      // identical geometry (the numerical fixed point may differ by a few ulps from the raw hold).
-      // Jump to the first non-eligible logical tick so resuming a background tab cannot allocate
-      // an unbounded duplicate suffix while preserving the original 5ms grid.
-      state = {
-        ...state,
-        nextLogicalTick: Math.max(
-          state.nextLogicalTick,
-          Math.ceil(
-            (exclusiveTimeStamp - state.originTimeStamp)
-              / FIXED_RATE_STROKE_FILTER_TICK_MS
-          )
-        ),
-      };
-      break;
-    }
-    const tick = evaluateLogicalTick(state);
-    state = tick.state;
-    emitted.push(tick.emitted);
-  }
-  return { state, emitted };
-}
-
 function advanceThrough(
   initialState: FixedRateStrokeFilterState,
   inclusiveTimeStamp: number
@@ -424,7 +390,10 @@ function ingestSample(
     ...quantized,
     timeStamp: Math.max(initialState.heldSample.timeStamp, quantized.timeStamp),
   };
-  const advanced = advanceBefore(initialState, sample.timeStamp);
+  // The traced sampler switches raw targets only when `sample.timeStamp < logicalTickTime`.
+  // Therefore a sample landing exactly on a 5 ms boundary becomes eligible on the *next* tick;
+  // evaluate the boundary tick with the previous hold before installing this sample.
+  const advanced = advanceThrough(initialState, sample.timeStamp);
   return {
     state: { ...advanced.state, heldSample: sample },
     emitted: advanced.emitted,
@@ -494,10 +463,11 @@ function releaseFilter(
 /**
  * Applies an input, logical-clock, or release command without mutating prior state or emissions.
  *
- * Append transitions advance ticks strictly before the newest raw timestamp. Holding the boundary
- * tick until a later timestamp (or release) lets the last sample win when equal timestamps are
- * split across browser event batches. At every evaluated tick, the last raw sample whose timestamp
- * is eligible is supplied unchanged to the cascade (zero-order hold).
+ * Append transitions advance ticks through the newest raw timestamp using the previous hold, then
+ * install the sample. This implements the traced strict `sample.timeStamp < logicalTickTime`
+ * boundary while still letting the last equal-timestamp sample win on the next tick. At every
+ * evaluated tick, the last eligible raw sample is supplied unchanged to the cascade (zero-order
+ * hold).
  */
 export function transitionFixedRateStrokeFilter(
   state: FixedRateStrokeFilterState,

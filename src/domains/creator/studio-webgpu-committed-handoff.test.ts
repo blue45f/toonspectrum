@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { selectStudioCausalInkSamples } from "./studio-causal-ink";
+import { STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 } from "./studio-ink-pressure-model";
 import {
   createStudioWebGpuCommittedHandoff,
   type StudioWebGpuCommittedHandoffElement,
@@ -64,6 +65,54 @@ describe("createStudioWebGpuCommittedHandoff", () => {
       opacity: 1,
       composite: "normal",
     }]);
+  });
+
+  it("carries an explicit linear pressure model without changing legacy handoffs", () => {
+    const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1;
+    const linear = createStudioWebGpuCommittedHandoff({
+      elements: [draw("linear", { pressureModel })],
+    });
+    const legacy = createStudioWebGpuCommittedHandoff({ elements: [draw("legacy")] });
+
+    expect(linear.strokes[0]?.pressureModel).toBe(pressureModel);
+    expect(Object.hasOwn(legacy.strokes[0]!, "pressureModel")).toBe(false);
+  });
+
+  it("treats missing linear-model samples as nominal full pressure", () => {
+    const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1;
+    const handoff = createStudioWebGpuCommittedHandoff({
+      elements: [draw("linear-short", {
+        points: [0, 0, 10, 0],
+        pressures: [0],
+        pressureModel,
+        sampleSpacing: 0,
+      })],
+    });
+
+    expect(handoff.strokes[0]).toMatchObject({
+      points: [0, 0, 10, 0],
+      pressures: [0, 1],
+      pressureModel,
+    });
+  });
+
+  it("keeps no-spacing explicit-model geometry causal instead of legacy smoothing", () => {
+    const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1;
+    const points = [0, 0, 1, 1, 8, 4, 15, 10];
+    const handoff = createStudioWebGpuCommittedHandoff({
+      elements: [draw("linear-no-spacing", {
+        points,
+        pressures: [0],
+        pressureModel,
+        sampleSpacing: undefined,
+      })],
+    });
+
+    expect(handoff.strokes[0]).toMatchObject({
+      points,
+      pressures: [0, 1, 1, 1],
+      pressureModel,
+    });
   });
 
   it("keeps all committed pixels on Konva while an editor-wide gate is active", () => {

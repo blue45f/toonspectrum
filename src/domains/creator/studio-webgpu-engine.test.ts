@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+  STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
+} from "./studio-ink-pressure-model";
+import {
   fingerprintStudioGpuFrame,
   isValidStudioGpuStroke,
   planStudioGpuDabUpdate,
@@ -325,6 +329,53 @@ describe("StudioWebGpuEngine", () => {
     expect(onFrameReady).not.toHaveBeenCalled();
   });
 
+  it("renders linear-full pressure as zero to the selected diameter and fingerprints the model", () => {
+    const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1;
+    const linear = stroke({
+      points: [0, 0, 5, 0, 10, 0],
+      pressures: [0, 0.5, 1],
+      size: 10,
+      pressureModel,
+    });
+    const plan = planStudioGpuDabs([linear]);
+
+    expect(plan.complete).toBe(true);
+    expect(plan.dabs[0]).toMatchObject({ x: 0, y: 0, radius: 0 });
+    expect(plan.dabs.find(({ x }) => x === 5)).toMatchObject({ radius: 2.5 });
+    expect(plan.dabs.at(-1)).toMatchObject({ x: 10, y: 0, radius: 5 });
+    expect(fingerprintStudioGpuFrame([linear], {
+      logicalWidth: 100,
+      logicalHeight: 80,
+    }, 100, 80)).not.toBe(fingerprintStudioGpuFrame([
+      { ...linear, pressureModel: undefined },
+    ], {
+      logicalWidth: 100,
+      logicalHeight: 80,
+    }, 100, 80));
+    expect(isValidStudioGpuStroke(linear)).toBe(true);
+    expect(isValidStudioGpuStroke({
+      ...linear,
+      pressureModel: "future-model",
+    } as unknown as StudioGpuStroke)).toBe(false);
+  });
+
+  it("uses full nominal pressure for short linear arrays and half pressure for legacy arrays", () => {
+    const linear = planStudioGpuDabs([stroke({
+      points: [0, 0],
+      pressures: [],
+      size: 10,
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+    })]);
+    const legacy = planStudioGpuDabs([stroke({
+      points: [0, 0],
+      pressures: [],
+      size: 10,
+    })]);
+
+    expect(linear.dabs[0]?.radius).toBe(5);
+    expect(legacy.dabs[0]?.radius).toBe(5);
+  });
+
   it("renders normal and erase strokes through the silent Canvas2D fallback", async () => {
     const gpuSurface = fakeGpuCanvas(null);
     const fallback = fakeCanvas2d();
@@ -472,6 +523,52 @@ describe("StudioWebGpuEngine", () => {
     }, "feed:sealed")).toBe("appended");
     expect(fallback.arcs.length).toBeGreaterThan(arcsAfterMove);
     expect(fallback.clearRect).toHaveBeenCalledTimes(clearsAfterTap);
+  });
+
+  it("appends residual V2 feed dabs from cached phase without rereading retained coordinates", () => {
+    const gpuSurface = fakeGpuCanvas(null);
+    const fallback = fakeCanvas2d();
+    const engine = new StudioWebGpuEngine({
+      canvas: gpuSurface,
+      fallbackCanvas: fallback.canvas,
+      gpu: null,
+    });
+    const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2;
+    const tap = stroke({
+      points: [0, 0],
+      pressures: [1],
+      size: 16,
+      pressureModel,
+    });
+    engine.resize({ logicalWidth: 100, logicalHeight: 80 });
+    engine.replaceStrokeFeed([tap], "residual:tap");
+    const clearsAfterTap = fallback.clearRect.mock.calls.length;
+
+    const extendedPoints = new Proxy([0, 0, 4, 0], {
+      get(target, property, receiver) {
+        if (property === "0" || property === "1") {
+          throw new Error("residual feed reread retained tap coordinates");
+        }
+        return Reflect.get(target, property, receiver);
+      },
+    });
+    const extended = stroke({
+      points: extendedPoints,
+      pressures: [1, 1],
+      size: 16,
+      pressureModel,
+    });
+    expect(engine.appendStrokeFeedSuffix({
+      strokeIndex: 0,
+      previousPointCount: 1,
+      suffixPoints: [4, 0],
+      suffixPressures: [1],
+      nextStroke: extended,
+      fallbackStrokes: [extended],
+    }, "residual:move")).toBe("appended");
+
+    expect(fallback.clearRect).toHaveBeenCalledTimes(clearsAfterTap);
+    expect(fallback.arcs.map(({ x }) => x)).toEqual([0, 3.2]);
   });
 
   it("falls back to a full rebuild when an append patch has stale lineage", () => {
@@ -1874,6 +1971,59 @@ describe("StudioWebGpuEngine", () => {
 });
 
 describe("planStudioGpuDabs", () => {
+  it("uses Magma residual placement for V2 regardless of source subdivision", () => {
+    const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2;
+    const subdivided = planStudioGpuDabs([stroke({
+      points: Array.from({ length: 13 }, (_, index) => [index, 0]).flat(),
+      pressures: Array.from({ length: 13 }, () => 1),
+      size: 16,
+      pressureModel,
+    })]);
+    const singleSegment = planStudioGpuDabs([stroke({
+      points: [0, 0, 12, 0],
+      pressures: [1, 1],
+      size: 16,
+      pressureModel,
+    })]);
+
+    expect(subdivided.complete).toBe(true);
+    expect(subdivided.dabs.map(({ x }) => x)).toEqual([0, 3.2, 6.4, 9.600000000000001]);
+    expect(singleSegment.dabs).toEqual(subdivided.dabs);
+  });
+
+  it("appends only the exact residual V2 suffix for full-frame and tiled feeds", () => {
+    const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2;
+    const initial = stroke({
+      points: [0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0],
+      pressures: [1, 1, 1, 1, 1, 1],
+      size: 16,
+      pressureModel,
+    });
+    const extended = stroke({
+      points: [0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8, 0, 9, 0, 10, 0, 11, 0, 12, 0],
+      pressures: Array.from({ length: 13 }, () => 1),
+      size: 16,
+      pressureModel,
+    });
+    const retained = planStudioGpuDabs([initial]);
+    const complete = planStudioGpuDabs([extended]);
+    const append = planStudioGpuDabUpdate([initial], [extended]);
+    const tiled = planStudioGpuStrokeExtensionInRect(
+      extended,
+      initial.points.length / 2,
+      { x: -100, y: -100, width: 300, height: 300 }
+    );
+
+    expect(append.mode).toBe("append");
+    expect(retained.dabs.concat(append.dabs)).toEqual(complete.dabs);
+    expect(append.dabs.map(({ x }) => x)).toEqual([6.4, 9.600000000000001]);
+    expect(tiled).toEqual({
+      complete: true,
+      dabs: append.dabs,
+      batches: append.batches,
+    });
+  });
+
   it("plans only the bridge and new samples for a retained point suffix", () => {
     const initial = stroke({
       points: [0, 0, 20, 0],
@@ -1926,6 +2076,19 @@ describe("planStudioGpuDabs", () => {
 
     expect(planned.complete).toBe(false);
     expect(planned.dabs).toHaveLength(STUDIO_GPU_MAX_DABS);
+  });
+
+  it("fails closed at the V2 residual cap instead of authorizing blank GPU coverage", () => {
+    const planned = planStudioGpuDabs([stroke({
+      points: [0, 0, 50_001, 0],
+      pressures: [1, 1],
+      size: 1,
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
+    })]);
+
+    expect(planned.complete).toBe(false);
+    // V2 discards the partial operation atomically; `complete:false` prevents frame authority.
+    expect(planned.dabs).toHaveLength(0);
   });
 
   it("uses locale-independent operation order and color-independent erase coverage", () => {

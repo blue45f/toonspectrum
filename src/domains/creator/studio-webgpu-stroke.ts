@@ -1,3 +1,12 @@
+import {
+  STUDIO_INK_MAX_BRUSH_SIZE,
+  resolveStudioInkPressure,
+  studioInkPressureRadius,
+  type StudioInkPressureModel,
+} from "./studio-ink-pressure-model";
+
+import type { StudioResidualInkState } from "./studio-causal-ink";
+
 export type StudioGpuComposite = "normal" | "erase";
 
 /**
@@ -18,6 +27,9 @@ export interface StudioGpuStrokeFeedRevision {
   readonly lastX: number;
   readonly lastY: number;
   readonly lastPressure: number;
+  /** Cached append-only brush phase for residual V2; absent for frozen legacy/V1 strokes. */
+  readonly residualInkState?: StudioResidualInkState;
+  readonly residualDabCount?: number;
   /** Round-dab bounds before the caller-specific tile bleed is added. */
   readonly minimumX: number;
   readonly minimumY: number;
@@ -37,6 +49,7 @@ export interface StudioGpuStroke {
   readonly pressures?: readonly number[];
   readonly color: string;
   readonly size: number;
+  readonly pressureModel?: StudioInkPressureModel;
   readonly opacity?: number;
   readonly composite?: StudioGpuComposite;
   readonly orderKey?: string;
@@ -54,11 +67,12 @@ export interface StudioGpuLiveStrokeInput {
   readonly pressures?: readonly number[];
   readonly color: string;
   readonly size: number;
+  readonly pressureModel?: StudioInkPressureModel;
   readonly opacity?: number;
   readonly composite?: StudioGpuComposite;
 }
 
-export const STUDIO_GPU_MAX_BRUSH_SIZE = 8_192;
+export const STUDIO_GPU_MAX_BRUSH_SIZE = STUDIO_INK_MAX_BRUSH_SIZE;
 
 export function sameStudioGpuNumberArray(
   left: readonly number[] | undefined,
@@ -88,6 +102,7 @@ export function sameStudioGpuStroke(left: StudioGpuStroke, right: StudioGpuStrok
   return left.id === right.id
     && left.color === right.color
     && Object.is(left.size, right.size)
+    && left.pressureModel === right.pressureModel
     && Object.is(left.opacity, right.opacity)
     && left.composite === right.composite
     && left.orderKey === right.orderKey
@@ -120,14 +135,6 @@ export function snapshotStudioGpuStrokes(
   return strokes.map(snapshotStudioGpuStroke);
 }
 
-function finiteOr(value: unknown, fallback: number): number {
-  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
-}
-
-function clamp(value: number, minimum: number, maximum: number): number {
-  return Math.min(maximum, Math.max(minimum, value));
-}
-
 /**
  * Snapshots an append-only live stroke for the WebGPU renderer.
  *
@@ -153,7 +160,7 @@ export function buildStudioGpuLiveStroke(
   const pointCount = points.length / 2;
   const pressures = Array.from(
     { length: pointCount },
-    (_, index) => clamp(finiteOr(input.pressures?.[index], 0.5), 0, 1)
+    (_, index) => resolveStudioInkPressure(input.pressures?.[index], input.pressureModel)
   );
 
   return {
@@ -162,16 +169,18 @@ export function buildStudioGpuLiveStroke(
     pressures,
     color: input.color,
     size: input.size,
+    ...(input.pressureModel === undefined ? {} : { pressureModel: input.pressureModel }),
     opacity: input.opacity,
     composite: input.composite,
   };
 }
 
-export function studioGpuPressureRadius(size: number, pressure: number): number {
-  // Exact default-pen width contract used by StudioDrawNode after pressure resampling.
-  const safeSize = clamp(finiteOr(size, 1), 0.01, STUDIO_GPU_MAX_BRUSH_SIZE);
-  const safePressure = clamp(finiteOr(pressure, 1), 0, 1);
-  return Math.max(0.25, (safeSize * (0.3 + safePressure * 1.4)) / 2);
+export function studioGpuPressureRadius(
+  size: number,
+  pressure: number,
+  pressureModel?: StudioInkPressureModel
+): number {
+  return studioInkPressureRadius(size, pressure, pressureModel);
 }
 
 function compareCodeUnits(left: string, right: string): number {

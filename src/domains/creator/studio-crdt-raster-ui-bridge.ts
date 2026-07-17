@@ -5,6 +5,11 @@ import {
 } from "./studio-brush";
 import { selectStudioCausalInkSamples } from "./studio-causal-ink";
 import {
+  resolveStudioInkPressureSamples,
+  studioInkFallbackPressure,
+  type StudioInkPressureModel,
+} from "./studio-ink-pressure-model";
+import {
   planStudioWebGpuCommittedSuffix,
   studioWebGpuCommittedBarrierReason,
   type StudioWebGpuCommittedElementInput,
@@ -161,14 +166,21 @@ export function planStudioRasterDrawPromotion(input: {
   if (barrier !== null) return null;
 
   const sourcePoints = element.points as readonly number[];
-  const sourcePressures = element.pressures as readonly number[];
-  const usesCausalGeometry = typeof element.sampleSpacing === "number"
-    && Number.isFinite(element.sampleSpacing);
+  const sourcePressures = Array.isArray(element.pressures)
+    ? element.pressures as readonly number[]
+    : undefined;
+  const pressureModel = element.pressureModel as StudioInkPressureModel | undefined;
+  const causalSampleSpacing = typeof element.sampleSpacing === "number"
+    && Number.isFinite(element.sampleSpacing)
+    ? element.sampleSpacing
+    : null;
+  const usesCausalGeometry = causalSampleSpacing !== null || pressureModel !== undefined;
   const causalSamples = usesCausalGeometry
     ? selectStudioCausalInkSamples({
         points: sourcePoints,
         pressures: sourcePressures,
-        minDistance: element.sampleSpacing as number,
+        pressureModel,
+        minDistance: causalSampleSpacing ?? 0,
       })
     : null;
   const points = causalSamples
@@ -179,13 +191,26 @@ export function planStudioRasterDrawPromotion(input: {
       );
   const pressures = causalSamples
     ? causalSamples.map(({ pressure }) => pressure)
-    : resampleStrokePressures(sourcePressures, points.length / 2, 0.5);
+    : resampleStrokePressures(
+        pressureModel === undefined
+          ? sourcePressures
+          : resolveStudioInkPressureSamples(
+              sourcePressures,
+              sourcePoints.length / 2,
+              pressureModel
+            ),
+        points.length / 2,
+        studioInkFallbackPressure(pressureModel)
+      );
   const stroke: StudioGpuStroke = {
     id: element.id,
     points,
     pressures,
     color: element.stroke as string,
     size: Math.max(1, element.strokeWidth as number),
+    ...(pressureModel === undefined
+      ? {}
+      : { pressureModel }),
     opacity: element.opacity as number | undefined,
     composite: "normal",
   };
@@ -201,7 +226,7 @@ export function planStudioRasterDrawPromotion(input: {
       size: stroke.size,
       opacity: stroke.opacity ?? 1,
       composite: stroke.composite,
-      pressureModel: "studio-gpu-pressure-radius-v1",
+      pressureModel: stroke.pressureModel ?? "studio-gpu-pressure-radius-v1",
       pointPipeline: usesCausalGeometry ? "studio-causal-dabs-v1" : "studio-freehand-v1",
     },
   });

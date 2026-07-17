@@ -6,6 +6,7 @@ import {
   captureStudioRasterStroke,
   planStudioRasterStrokeCapture,
 } from "./studio-crdt-raster-stroke-capture";
+import { STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 } from "./studio-ink-pressure-model";
 
 import type { StudioGpuStroke } from "./studio-webgpu-engine";
 
@@ -70,6 +71,34 @@ describe("studio raster stroke capture", () => {
     expect(fake.context.globalCompositeOperation).toBe("source-over");
     expect(fake.context.fillStyle).toMatch(/^rgba\(255, 255, 255,/u);
     expect(result.pixels.byteLength).toBe(result.bounds.width * result.bounds.height * 4);
+  });
+
+  it("treats linear pressure zero as zero coverage without rejecting a later visible suffix", () => {
+    const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1;
+    expect(() => planStudioRasterStrokeCapture({
+      stroke: stroke({ points: [20, 20], pressures: [0], pressureModel }),
+      documentWidth: 100,
+      documentHeight: 80,
+    })).toThrow(/픽셀을 만드는/u);
+
+    const visible = planStudioRasterStrokeCapture({
+      stroke: stroke({
+        points: [20, 20, 40, 20],
+        pressures: [0, 1],
+        pressureModel,
+      }),
+      documentWidth: 100,
+      documentHeight: 80,
+    });
+    expect(visible.dabs.length).toBeGreaterThan(0);
+    expect(visible.dabs.every(({ radius }) => radius > 0)).toBe(true);
+
+    const legacy = planStudioRasterStrokeCapture({
+      stroke: stroke({ points: [20, 20], pressures: [0] }),
+      documentWidth: 100,
+      documentHeight: 80,
+    });
+    expect(legacy.dabs[0]?.radius).toBe(1.5);
   });
 
   it("keeps paint color/opacity in the uploaded pixels and offsets document dabs locally", () => {

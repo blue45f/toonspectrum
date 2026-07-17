@@ -18,10 +18,19 @@
  */
 
 import {
+  advanceStudioResidualInk,
   planStudioCausalInkDabs,
+  startStudioResidualInk,
+  STUDIO_CAUSAL_INK_MAX_DABS,
   type StudioCausalInkDab,
   type StudioCausalInkSample,
+  type StudioResidualInkState,
 } from "./studio-causal-ink";
+import {
+  resolveStudioInkPressure,
+  studioInkUsesResidualDabSpacing,
+  type StudioInkPressureModel,
+} from "./studio-ink-pressure-model";
 
 import type {
   StudioPredictedInkSample,
@@ -45,6 +54,8 @@ export interface StudioLiveInkStrokeStyle {
   readonly color: string;
   /** 문서 픽셀 기준 기본 획 굵기. */
   readonly strokeWidthDoc: number;
+  /** Omitted strokes retain the legacy 0.3 + 1.4p diameter contract. */
+  readonly pressureModel?: StudioInkPressureModel;
   readonly opacity: number;
   /** 입력 sampler와 동일한 thinning 최소 간격(문서 px). */
   readonly minDistanceDoc: number;
@@ -93,20 +104,12 @@ export class StudioLiveInkOverlayRenderer {
   private latestSourceP = 0.5;
   /** 원본 draft.points 에서 이미 소비한 포인트 수(중복 append 방지). */
   private consumedSourcePoints = 0;
+  /** Exact cross-segment spacing cursor for new versioned ink; legacy strokes keep pair planning. */
+  private residualInkState: StudioResidualInkState | null = null;
+  private residualDabCount = 0;
   private active = false;
   /** 펜을 뗐지만 React 커밋 동기화 전이라 표면에 유지 중인 획들. */
   private settled: SettledLiveInkStroke[] = [];
-  /**
-   * 릴리즈 드레인 페이싱 — 고정레이트 스태빌라이저의 잔여 지연이 pointerup 한 프레임에
-   * 통째로 방출되면 꼬리가 "튀어" 보인다. 캡처 중 dab 페인트만 큐로 돌려 몇 프레임에 나눠
-   * 칠한다. 재생 데이터(kept/settled)·소비 오프셋은 항상 동기 완성되므로 커밋/설정 계약은
-   * 변하지 않고, replay()/clear()는 큐를 즉시 대체·폐기한다.
-   */
-  private revealCapture = false;
-  private revealQueue: { style: StudioLiveInkStrokeStyle; dabs: StudioCausalInkDab[] }[] = [];
-  private revealRaf: number | null = null;
-  private revealDabsPerFrame = 0;
-
   attach(canvas: HTMLCanvasElement | null): void {
     this.canvas = canvas;
     this.context = canvas?.getContext("2d") ?? null;
@@ -143,17 +146,18 @@ export class StudioLiveInkOverlayRenderer {
 
   begin(style: StudioLiveInkStrokeStyle, x: number, y: number, pressure: number): boolean {
     if (!this.context || !this.surface) return false;
+    const resolvedPressure = resolveStudioInkPressure(pressure, style.pressureModel);
     this.style = style;
     this.keptX = [x];
     this.keptY = [y];
-    this.keptP = [pressure];
+    this.keptP = [resolvedPressure];
     this.latestSourceX = x;
     this.latestSourceY = y;
-    this.latestSourceP = pressure;
+    this.latestSourceP = resolvedPressure;
     this.consumedSourcePoints = 1;
     this.active = true;
     // settled 잉크는 유지한다 — 커밋 동기화 전의 연속 스트로크가 서로를 지우지 않는다.
-    this.drawDot(style, x, y, pressure);
+    this.drawFirstPoint(style, x, y, resolvedPressure);
     return true;
   }
 
@@ -168,6 +172,8 @@ export class StudioLiveInkOverlayRenderer {
     this.latestSourceY = 0;
     this.latestSourceP = 0.5;
     this.consumedSourcePoints = 0;
+    this.residualInkState = null;
+    this.residualDabCount = 0;
     this.active = true;
     return true;
   }
@@ -183,7 +189,10 @@ export class StudioLiveInkOverlayRenderer {
     for (let localIndex = 0; localIndex < sampleCount; localIndex += 1) {
       const x = points[localIndex * 2]!;
       const y = points[localIndex * 2 + 1]!;
-      const pressure = pressures?.[startSampleIndex + localIndex] ?? 0.5;
+      const pressure = resolveStudioInkPressure(
+        pressures?.[startSampleIndex + localIndex],
+        this.style.pressureModel
+      );
       this.latestSourceX = x;
       this.latestSourceY = y;
       this.latestSourceP = pressure;
@@ -191,7 +200,7 @@ export class StudioLiveInkOverlayRenderer {
         this.keptX.push(x);
         this.keptY.push(y);
         this.keptP.push(pressure);
-        this.drawDot(this.style, x, y, pressure);
+        this.drawFirstPoint(this.style, x, y, pressure);
       } else {
         this.appendPoint(x, y, pressure);
       }
@@ -209,7 +218,7 @@ export class StudioLiveInkOverlayRenderer {
     for (let index = this.consumedSourcePoints; index < total; index += 1) {
       const x = points[index * 2]!;
       const y = points[index * 2 + 1]!;
-      const pressure = pressures?.[index] ?? 0.5;
+      const pressure = resolveStudioInkPressure(pressures?.[index], this.style.pressureModel);
       this.latestSourceX = x;
       this.latestSourceY = y;
       this.latestSourceP = pressure;
@@ -288,7 +297,6 @@ export class StudioLiveInkOverlayRenderer {
   }
 
   clear(): void {
-    this.cancelPacedReveal();
     this.resetActiveState();
     this.settled = [];
     this.clearRect();
@@ -304,6 +312,8 @@ export class StudioLiveInkOverlayRenderer {
     this.latestSourceY = 0;
     this.latestSourceP = 0.5;
     this.consumedSourcePoints = 0;
+    this.residualInkState = null;
+    this.residualDabCount = 0;
   }
 
   private appendPoint(x: number, y: number, pressure: number): void {
@@ -338,18 +348,58 @@ export class StudioLiveInkOverlayRenderer {
         sourceIndex: n - 1,
       },
     ];
-    // The previous endpoint was already painted. The shared planner includes it as its initial dab,
-    // so only the newly planned suffix is appended to preserve retained pixels exactly.
+    if (studioInkUsesResidualDabSpacing(style.pressureModel)) {
+      const state = this.residualInkState;
+      if (!state || !style.pressureModel) return;
+      if (this.residualDabCount >= STUDIO_CAUSAL_INK_MAX_DABS) return;
+      const advanced = advanceStudioResidualInk(
+        state,
+        samples[1]!,
+        style.strokeWidthDoc,
+        style.pressureModel,
+        STUDIO_CAUSAL_INK_MAX_DABS - this.residualDabCount
+      );
+      this.residualInkState = advanced.state;
+      this.residualDabCount += advanced.dabs.length;
+      this.drawDabs(style, advanced.dabs);
+      return;
+    }
+    // The previous endpoint was already painted. The legacy shared planner includes it as its
+    // initial dab, so only the newly planned suffix is appended.
     this.drawDabs(style, planStudioCausalInkDabs({
       samples,
       size: style.strokeWidthDoc,
+      pressureModel: style.pressureModel,
     }).dabs.slice(1));
+  }
+
+  private drawFirstPoint(
+    style: StudioLiveInkStrokeStyle,
+    x: number,
+    y: number,
+    pressure: number
+  ): void {
+    if (studioInkUsesResidualDabSpacing(style.pressureModel) && style.pressureModel) {
+      const started = startStudioResidualInk(
+        { x, y, pressure, sourceIndex: 0 },
+        style.strokeWidthDoc,
+        style.pressureModel
+      );
+      this.residualInkState = started.state;
+      this.residualDabCount = started.dabs.length;
+      this.drawDabs(style, started.dabs);
+      return;
+    }
+    this.residualInkState = null;
+    this.residualDabCount = 0;
+    this.drawDot(style, x, y, pressure);
   }
 
   private drawDot(style: StudioLiveInkStrokeStyle, x: number, y: number, pressure: number): void {
     this.drawDabs(style, planStudioCausalInkDabs({
       samples: [{ x, y, pressure, sourceIndex: 0 }],
       size: style.strokeWidthDoc,
+      pressureModel: style.pressureModel,
     }).dabs);
   }
 
@@ -363,21 +413,18 @@ export class StudioLiveInkOverlayRenderer {
     const samples: StudioCausalInkSample[] = xs.map((x, sourceIndex) => ({
       x,
       y: ys[sourceIndex]!,
-      pressure: ps[sourceIndex] ?? 0.5,
+      pressure: resolveStudioInkPressure(ps[sourceIndex], style.pressureModel),
       sourceIndex,
     }));
     this.drawDabs(style, planStudioCausalInkDabs({
       samples,
       size: style.strokeWidthDoc,
+      pressureModel: style.pressureModel,
     }).dabs);
   }
 
   private drawDabs(style: StudioLiveInkStrokeStyle, dabs: readonly StudioCausalInkDab[]): void {
     if (dabs.length === 0) return;
-    if (this.revealCapture) {
-      this.revealQueue.push({ style, dabs: [...dabs] });
-      return;
-    }
     this.paintDabs(style, dabs);
   }
 
@@ -394,52 +441,8 @@ export class StudioLiveInkOverlayRenderer {
     context.restore();
   }
 
-  /** 이후의 dab 페인트를 큐에 담는다 — 릴리즈 드레인 구간 전용(동기 블록 안에서만 사용). */
-  beginPacedTailReveal(): void {
-    this.revealCapture = true;
-  }
-
-  /** 캡처를 끝내고 큐를 최대 durationFrames 프레임에 나눠 칠한다(잉크가 끝점까지 따라잡는 연출). */
-  commitPacedTailReveal(durationFrames: number): void {
-    this.revealCapture = false;
-    const totalDabs = this.revealQueue.reduce((sum, batch) => sum + batch.dabs.length, 0);
-    if (totalDabs === 0) return;
-    const frames = Math.max(1, Math.min(10, Math.floor(durationFrames)));
-    this.revealDabsPerFrame = Math.max(1, Math.ceil(totalDabs / frames));
-    this.scheduleRevealFrame();
-  }
-
-  private scheduleRevealFrame(): void {
-    if (this.revealRaf !== null) return;
-    this.revealRaf = globalThis.requestAnimationFrame(() => {
-      this.revealRaf = null;
-      let budget = this.revealDabsPerFrame;
-      while (budget > 0 && this.revealQueue.length > 0) {
-        const batch = this.revealQueue[0]!;
-        const take = Math.min(budget, batch.dabs.length);
-        this.paintDabs(batch.style, batch.dabs.slice(0, take));
-        batch.dabs = batch.dabs.slice(take);
-        if (batch.dabs.length === 0) this.revealQueue.shift();
-        budget -= take;
-      }
-      if (this.revealQueue.length > 0) this.scheduleRevealFrame();
-    });
-  }
-
-  /** replay()/clear() 가 전체를 다시 그리거나 폐기할 때 남은 리빌 큐를 정리한다. */
-  private cancelPacedReveal(): void {
-    this.revealCapture = false;
-    this.revealQueue = [];
-    if (this.revealRaf !== null) {
-      globalThis.cancelAnimationFrame(this.revealRaf);
-      this.revealRaf = null;
-    }
-  }
-
   /** 뷰포트 이동/줌/반전 등 표면 변화 시에만 전체 재생한다(빈도 낮음). */
   private replay(): void {
-    // 전체 재생은 kept/settled 데이터를 다 그리므로 진행 중 리빌 큐는 그대로 대체된다.
-    this.cancelPacedReveal();
     this.clearRect();
     for (const stroke of this.settled) {
       this.drawStrokePath(stroke.style, stroke.xs, stroke.ys, stroke.ps);
@@ -585,9 +588,7 @@ export class StudioLiveInkPredictionRenderer {
       samples.push({
         x: x!,
         y: y!,
-        pressure: typeof rawPressure === "number" && Number.isFinite(rawPressure)
-          ? Math.min(1, Math.max(0, rawPressure))
-          : 0.5,
+        pressure: resolveStudioInkPressure(rawPressure, style.pressureModel),
       });
     }
     if (samples.length === 0) {
@@ -601,9 +602,7 @@ export class StudioLiveInkPredictionRenderer {
       anchor: update.anchor
         ? {
             ...update.anchor,
-            pressure: typeof anchorPressure === "number" && Number.isFinite(anchorPressure)
-              ? Math.min(1, Math.max(0, anchorPressure))
-              : 0.5,
+            pressure: resolveStudioInkPressure(anchorPressure, style.pressureModel),
           }
         : null,
       samples,
@@ -640,6 +639,7 @@ export class StudioLiveInkPredictionRenderer {
     const dabs = planStudioCausalInkDabs({
       samples,
       size: style.strokeWidthDoc,
+      pressureModel: style.pressureModel,
     }).dabs.slice(tail.anchor ? 1 : 0);
     if (dabs.length === 0) return;
 

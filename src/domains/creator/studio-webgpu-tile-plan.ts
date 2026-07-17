@@ -1,3 +1,8 @@
+import { planStudioCausalInkDabs } from "./studio-causal-ink";
+import {
+  resolveStudioInkPressure,
+  studioInkUsesResidualDabSpacing,
+} from "./studio-ink-pressure-model";
 import {
   STUDIO_GPU_STROKE_FEED_REVISION,
   orderStudioGpuStrokes,
@@ -156,11 +161,11 @@ function sequenceSignature(values: readonly number[]): string {
 }
 
 function effectiveStrokePressure(stroke: StudioGpuStroke, index: number): number {
-  return clamp(finiteOr(stroke.pressures?.[index], 1), 0, 1);
+  return resolveStudioInkPressure(stroke.pressures?.[index], stroke.pressureModel);
 }
 
 function strokeStyleSignature(stroke: StudioGpuStroke): string {
-  return [
+  const legacySignature = [
     stroke.id,
     stroke.color,
     stroke.size,
@@ -168,6 +173,9 @@ function strokeStyleSignature(stroke: StudioGpuStroke): string {
     stroke.composite,
     stroke.orderKey,
   ].map((value) => semanticToken(value)).join("");
+  return stroke.pressureModel === undefined
+    ? legacySignature
+    : `${legacySignature}${semanticToken(`pressure-model:${stroke.pressureModel}`)}`;
 }
 
 function operationForStudioGpuStroke(stroke: StudioGpuStroke): StudioGpuTileOperation {
@@ -212,6 +220,9 @@ export function signatureStudioGpuStroke(stroke: StudioGpuStroke): string {
   write(stroke.opacity);
   write(stroke.composite);
   write(stroke.orderKey);
+  if (stroke.pressureModel !== undefined) {
+    write(`pressure-model:${stroke.pressureModel}`);
+  }
   write(stroke.points.length);
   for (const point of stroke.points) write(point);
   write(stroke.pressures?.length);
@@ -233,6 +244,9 @@ export function fingerprintStudioGpuStroke(stroke: StudioGpuStroke): string {
   write(stroke.opacity);
   write(stroke.composite);
   write(stroke.orderKey);
+  if (stroke.pressureModel !== undefined) {
+    write(`pressure-model:${stroke.pressureModel}`);
+  }
   write(stroke.points.length);
   for (const point of stroke.points) write(point);
   write(stroke.pressures?.length);
@@ -264,12 +278,77 @@ export function boundsForStudioGpuStroke(
   let maximumX = Number.NEGATIVE_INFINITY;
   let maximumY = Number.NEGATIVE_INFINITY;
 
+  if (studioInkUsesResidualDabSpacing(stroke.pressureModel) && stroke.pressureModel) {
+    const samples = Array.from({ length: pointCount }, (_, sourceIndex) => ({
+        x: stroke.points[sourceIndex * 2]!,
+        y: stroke.points[sourceIndex * 2 + 1]!,
+        pressure: resolveStudioInkPressure(
+          stroke.pressures?.[sourceIndex],
+          stroke.pressureModel
+        ),
+        sourceIndex,
+      }));
+    const plan = planStudioCausalInkDabs({
+      samples,
+      size,
+      pressureModel: stroke.pressureModel,
+    });
+    if (!plan.complete) {
+      // A cap-exceeding residual stroke must never become an apparently complete blank tile frame.
+      // Magma's chord quirk can overshoot the source envelope, but no dab can travel farther than
+      // the stroke's total source path length from it. Use that rare conservative bound so the
+      // tile dab planner can reject the frame as incomplete instead of omitting its operation.
+      let pathLength = 0;
+      for (let index = 1; index < samples.length; index += 1) {
+        pathLength += Math.hypot(
+          samples[index]!.x - samples[index - 1]!.x,
+          samples[index]!.y - samples[index - 1]!.y
+        );
+      }
+      if (!Number.isFinite(pathLength)) {
+        const extent = Number.MAX_SAFE_INTEGER / 4;
+        return { x: -extent, y: -extent, width: extent * 2, height: extent * 2 };
+      }
+      const maximumRadius = studioGpuPressureRadius(size, 1, stroke.pressureModel)
+        + edgeBleed + pathLength;
+      for (const sample of samples) {
+        minimumX = Math.min(minimumX, sample.x - maximumRadius);
+        minimumY = Math.min(minimumY, sample.y - maximumRadius);
+        maximumX = Math.max(maximumX, sample.x + maximumRadius);
+        maximumY = Math.max(maximumY, sample.y + maximumRadius);
+      }
+      return {
+        x: minimumX,
+        y: minimumY,
+        width: Math.max(0, maximumX - minimumX),
+        height: Math.max(0, maximumY - minimumY),
+      };
+    }
+    if (plan.dabs.length === 0) return null;
+    for (const dab of plan.dabs) {
+      const radius = dab.radius + edgeBleed;
+      minimumX = Math.min(minimumX, dab.x - radius);
+      minimumY = Math.min(minimumY, dab.y - radius);
+      maximumX = Math.max(maximumX, dab.x + radius);
+      maximumY = Math.max(maximumY, dab.y + radius);
+    }
+    return {
+      x: minimumX,
+      y: minimumY,
+      width: Math.max(0, maximumX - minimumX),
+      height: Math.max(0, maximumY - minimumY),
+    };
+  }
+
   for (let index = 0; index < pointCount; index += 1) {
     const x = stroke.points[index * 2];
     const y = stroke.points[index * 2 + 1];
     if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-    const rawPressure = finiteOr(stroke.pressures?.[index], 1);
-    const radius = studioGpuPressureRadius(size, clamp(rawPressure, 0, 1)) + edgeBleed;
+    const radius = studioGpuPressureRadius(
+      size,
+      resolveStudioInkPressure(stroke.pressures?.[index], stroke.pressureModel),
+      stroke.pressureModel
+    ) + edgeBleed;
     minimumX = Math.min(minimumX, x! - radius);
     minimumY = Math.min(minimumY, y! - radius);
     maximumX = Math.max(maximumX, x! + radius);

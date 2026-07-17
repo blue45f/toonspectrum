@@ -1,4 +1,9 @@
 import { STUDIO_CRDT_STROKE_PAYLOAD_VERSION } from "./studio-crdt-protocol";
+import {
+  isStudioInkPressureModel,
+  studioInkFallbackPressure,
+  type StudioInkPressureModel,
+} from "./studio-ink-pressure-model";
 
 import type {
   StudioCrdtDrawStrokePayload,
@@ -22,6 +27,7 @@ export interface StudioCrdtCompatibleDrawElement {
   pattern?: unknown;
   brush?: string;
   pressures?: number[];
+  pressureModel?: StudioInkPressureModel;
   sampleSpacing?: number;
   tiltXs?: number[];
   tiltYs?: number[];
@@ -131,6 +137,11 @@ function extensionsOf(element: StudioCrdtCompatibleDrawElement): StudioCrdtJsonO
     const normalized = jsonValue(element[key]);
     if (normalized !== undefined) extensions[key] = normalized;
   }
+  // Keep this versioned opt-in out of the generic JSON whitelist: an unknown future string must
+  // never be persisted as if this client knew how to render its pressure semantics.
+  if (isStudioInkPressureModel(element.pressureModel)) {
+    extensions.pressureModel = element.pressureModel;
+  }
   return Object.keys(extensions).length > 0 ? extensions : undefined;
 }
 
@@ -139,6 +150,11 @@ export function studioDrawElementToCrdtStroke(
   element: StudioCrdtCompatibleDrawElement
 ): StudioCrdtStrokeInput {
   const sampleCount = Math.floor(element.points.length / 2);
+  const pressureFallback = studioInkFallbackPressure(element.pressureModel);
+  const pressures = element.pressures === undefined
+    && isStudioInkPressureModel(element.pressureModel)
+    ? Array<number>(sampleCount).fill(pressureFallback)
+    : aligned(element.pressures, sampleCount, pressureFallback);
   const payload: StudioCrdtDrawStrokePayload = {
     version: STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
     type: "draw",
@@ -149,7 +165,7 @@ export function studioDrawElementToCrdtStroke(
     strokeWidth: element.strokeWidth,
   };
   Object.assign(payload, {
-    pressures: aligned(element.pressures, sampleCount, 0.5),
+    pressures,
     tiltXs: aligned(element.tiltXs, sampleCount, 0),
     tiltYs: aligned(element.tiltYs, sampleCount, 0),
     twists: aligned(element.twists, sampleCount, 0),
@@ -187,9 +203,14 @@ export function studioDrawElementSampleSlice(
     ? 0
     : Math.max(0, Math.min(sampleCount, truncatedStart));
   if (start >= sampleCount) return null;
+  const pressureFallback = studioInkFallbackPressure(element.pressureModel);
+  const pressures = element.pressures === undefined
+    && isStudioInkPressureModel(element.pressureModel)
+    ? Array<number>(sampleCount - start).fill(pressureFallback)
+    : alignedSlice(element.pressures, sampleCount, start, pressureFallback);
   return {
     points: element.points.slice(start * 2, sampleCount * 2),
-    pressures: alignedSlice(element.pressures, sampleCount, start, 0.5),
+    pressures,
     tiltXs: alignedSlice(element.tiltXs, sampleCount, start, 0),
     tiltYs: alignedSlice(element.tiltYs, sampleCount, start, 0),
     twists: alignedSlice(element.twists, sampleCount, start, 0),

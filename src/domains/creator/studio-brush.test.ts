@@ -212,6 +212,17 @@ describe("resolveBrushPressureSample", () => {
     ).toBeCloseTo(pressure, 10);
   });
 
+  it("uses touch hardware pressure instead of mouse-style fallback pressure", () => {
+    expect(resolveBrushPressureSample({
+      pointerType: "touch",
+      rawPressure: 0.4,
+      velocityFallbackEnabled: true,
+      velocitySensitivity: 1,
+      pressureCurve: 2,
+      fallbackPressure: 1,
+    })).toBeCloseTo(0.16, 10);
+  });
+
   it("does not mistake the conventional mouse 0.5 for hardware pressure", () => {
     expect(
       resolveBrushPressureSample({
@@ -255,7 +266,12 @@ describe("resolveBrushPressureSample", () => {
   it("applies the pressure curve to real pen pressure but not a fixed mouse/touch fallback", () => {
     expect(resolveBrushPressureSample({ pointerType: "pen", rawPressure: 0.5, pressureCurve: 2 })).toBeCloseTo(0.25, 10);
     expect(resolveBrushPressureSample({ pointerType: "mouse", fallbackPressure: 0.5, pressureCurve: 0.5 })).toBe(0.5);
-    expect(resolveBrushPressureSample({ pointerType: "touch", fallbackPressure: 0.25, pressureCurve: 8 })).toBe(0.25);
+    expect(resolveBrushPressureSample({
+      pointerType: "touch",
+      rawPressure: Number.NaN,
+      fallbackPressure: 0.25,
+      pressureCurve: 8,
+    })).toBe(0.25);
     expect(resolveBrushPressureSample({
       pointerType: "pen",
       rawPressure: Number.NaN,
