@@ -318,6 +318,34 @@ function evaluateLogicalTick(
   };
 }
 
+/** True only when one more held-input tick can change a stage at JavaScript number precision. */
+function cascadeWouldChange(state: FixedRateStrokeFilterState): boolean {
+  let inputX = state.heldSample.x;
+  let inputY = state.heldSample.y;
+  let inputPressure = state.heldSample.pressure;
+  let inputTiltX = state.heldSample.tiltX;
+  let inputTiltY = state.heldSample.tiltY;
+  const alpha = state.parameters.alpha;
+  for (const previous of state.stages) {
+    const nextX = weightedChannel(previous.x, inputX, alpha);
+    const nextY = weightedChannel(previous.y, inputY, alpha);
+    const nextPressure = weightedChannel(previous.pressure, inputPressure, alpha);
+    const nextTiltX = weightedChannel(previous.tiltX, inputTiltX, alpha);
+    const nextTiltY = weightedChannel(previous.tiltY, inputTiltY, alpha);
+    if (
+      nextX !== previous.x || nextY !== previous.y ||
+      nextPressure !== previous.pressure ||
+      nextTiltX !== previous.tiltX || nextTiltY !== previous.tiltY
+    ) return true;
+    inputX = nextX;
+    inputY = nextY;
+    inputPressure = nextPressure;
+    inputTiltX = nextTiltX;
+    inputTiltY = nextTiltY;
+  }
+  return false;
+}
+
 function advanceBefore(
   initialState: FixedRateStrokeFilterState,
   exclusiveTimeStamp: number
@@ -328,6 +356,23 @@ function advanceBefore(
   let state = initialState;
   const emitted: FixedRateStrokeFilteredSample[] = [];
   while (logicalTickTime(state) < exclusiveTimeStamp) {
+    if (!cascadeWouldChange(state)) {
+      // Once another cascade tick cannot change any IEEE-754 stage value, later ticks only repeat
+      // identical geometry (the numerical fixed point may differ by a few ulps from the raw hold).
+      // Jump to the first non-eligible logical tick so resuming a background tab cannot allocate
+      // an unbounded duplicate suffix while preserving the original 5ms grid.
+      state = {
+        ...state,
+        nextLogicalTick: Math.max(
+          state.nextLogicalTick,
+          Math.ceil(
+            (exclusiveTimeStamp - state.originTimeStamp)
+              / FIXED_RATE_STROKE_FILTER_TICK_MS
+          )
+        ),
+      };
+      break;
+    }
     const tick = evaluateLogicalTick(state);
     state = tick.state;
     emitted.push(tick.emitted);
@@ -345,6 +390,19 @@ function advanceThrough(
   let state = initialState;
   const emitted: FixedRateStrokeFilteredSample[] = [];
   while (logicalTickTime(state) <= inclusiveTimeStamp) {
+    if (!cascadeWouldChange(state)) {
+      state = {
+        ...state,
+        nextLogicalTick: Math.max(
+          state.nextLogicalTick,
+          Math.floor(
+            (inclusiveTimeStamp - state.originTimeStamp)
+              / FIXED_RATE_STROKE_FILTER_TICK_MS
+          ) + 1
+        ),
+      };
+      break;
+    }
     const tick = evaluateLogicalTick(state);
     state = tick.state;
     emitted.push(tick.emitted);

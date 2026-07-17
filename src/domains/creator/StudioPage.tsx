@@ -6129,7 +6129,10 @@ function StudioCuttoonEditor() {
       // Asset observation is origin-agnostic. Local upload/publish paths and remote peers must
       // converge on exactly the same active reference set even though scene reconciliation keeps
       // local-origin operations out of the remote undo path.
-      { includeOrigin: () => true }
+      {
+        includeOrigin: () => true,
+        includeChange: ({ changedSceneElementIds }) => changedSceneElementIds.size > 0,
+      }
     );
   }, [activePage.id, authorizedWorkAssetScopeId, studioCrdtDocument, studioWorkAssetHydrator]);
 
@@ -6195,7 +6198,19 @@ function StudioCuttoonEditor() {
         pageIds: change.changedPageIds,
         layerGroupIds: change.changedLayerGroupIds,
       }),
-      { includeOrigin: (origin) => origin !== STUDIO_CRDT_ORIGIN_LOCAL }
+      {
+        includeOrigin: (origin) => origin !== STUDIO_CRDT_ORIGIN_LOCAL,
+        includeChange: ({
+          changedStrokeIds,
+          changedSceneElementIds,
+          changedPageIds,
+          changedLayerGroupIds,
+        }) =>
+          changedStrokeIds.size > 0 ||
+          changedSceneElementIds.size > 0 ||
+          changedPageIds.size > 0 ||
+          changedLayerGroupIds.size > 0,
+      }
     );
   }, [sourceHydrationPending, studioCrdtDocument, studioWorkAssetHydrator]);
 
@@ -18540,6 +18555,23 @@ function StudioCuttoonEditor() {
     drawingRef.current = next;
     if (!drawingPredictionPreviewRef.current) scheduleDraft(next);
   }
+  function appendDrawingCrdtSampleSuffix(drawing: DrawEl, startSample: number): void {
+    const crdtDocument = studioCrdtDocumentRef.current;
+    if (!crdtDocument || !drawingCrdtStrokeActiveRef.current) return;
+    const samples = studioDrawElementSampleSlice(drawing, startSample);
+    if (!samples) return;
+    try {
+      crdtDocument.appendStrokeSamples(drawing.id, samples);
+    } catch (cause) {
+      // 한 번 실패한 세션은 이후 포인터 배치마다 동일한 append/오류를 반복하지 않는다.
+      drawingCrdtStrokeActiveRef.current = false;
+      setError(
+        cause instanceof Error
+          ? `실시간 획 전송: ${cause.message}`
+          : "실시간 획 샘플을 팀 문서에 추가하지 못했습니다."
+      );
+    }
+  }
   function consumeFreehandPointerBatch(
     stage: Konva.Stage,
     pointerEvent: PointerEvent,
@@ -18573,22 +18605,8 @@ function StudioCuttoonEditor() {
       }
 
       const authoritativeForCrdt = drawingRef.current;
-      const crdtDocument = studioCrdtDocumentRef.current;
-      if (authoritativeForCrdt && crdtDocument && drawingCrdtStrokeActiveRef.current) {
-        const samples = studioDrawElementSampleSlice(authoritativeForCrdt, crdtSampleStart);
-        if (samples) {
-          try {
-            crdtDocument.appendStrokeSamples(authoritativeForCrdt.id, samples);
-          } catch (cause) {
-            // 한 번 실패한 세션은 이후 포인터 배치마다 전체 stroke 조회/동일 오류를 반복하지 않는다.
-            drawingCrdtStrokeActiveRef.current = false;
-            setError(
-              cause instanceof Error
-                ? `실시간 획 전송: ${cause.message}`
-                : "실시간 획 샘플을 팀 문서에 추가하지 못했습니다."
-            );
-          }
-        }
+      if (authoritativeForCrdt) {
+        appendDrawingCrdtSampleSuffix(authoritativeForCrdt, crdtSampleStart);
       }
 
       const authoritativeDrawing = drawingRef.current;
@@ -18819,6 +18837,10 @@ function StudioCuttoonEditor() {
         });
       }
       if (drawingRef.current && (drawingRef.current.kind ?? "freehand") === "freehand") {
+        // The dispatched/coalesced release batch above has already been published. Stabilizer
+        // endpoint/drain samples are created below, so remember the exact suffix boundary and
+        // publish that locally generated tail once before finalizing the shared stroke.
+        const crdtReleaseSampleStart = Math.floor(drawingRef.current.points.length / 2);
         const fixedRateState = drawingFixedRateFilterRef.current;
         if (fixedRateState) {
           const released = transitionFixedRateStrokeFilter(fixedRateState, { type: "release" });
@@ -18873,6 +18895,9 @@ function StudioCuttoonEditor() {
               };
             }
           }
+        }
+        if (drawingRef.current) {
+          appendDrawingCrdtSampleSuffix(drawingRef.current, crdtReleaseSampleStart);
         }
         const causalPostCorrection = causalPostCorrectionStateRef.current;
         if (drawingRef.current && causalPostCorrection?.phase === "active") {
@@ -36700,7 +36725,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
               flipX={canvasFlipH}
             />
           ) : null}
-          {webGpuViewportSurface ? (
+          {STUDIO_POINTER_PREDICTION_ENABLED && webGpuViewportSurface ? (
             <StudioLiveInkPredictionHost
               renderer={liveInkPredictionRenderer}
               left={webGpuViewportSurface.surface.left}

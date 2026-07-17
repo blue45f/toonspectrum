@@ -150,7 +150,21 @@ export function StudioRasterCrdtSurface({
       ) {
         setRevision((value) => value + 1);
       }
-    }, { includeOrigin: () => true });
+    }, {
+      includeOrigin: () => true,
+      includeChange: ({
+        changedRasterSurfaceIds,
+        changedRasterOperationIds,
+        changedRasterUndoOperationIds,
+        changedRasterUndoAcknowledgementIds,
+        changedRasterCheckpointIds,
+      }) =>
+        changedRasterSurfaceIds.size > 0 ||
+        changedRasterOperationIds.size > 0 ||
+        changedRasterUndoOperationIds.size > 0 ||
+        changedRasterUndoAcknowledgementIds.size > 0 ||
+        changedRasterCheckpointIds.size > 0,
+    });
   }, [document, surfaceId]);
 
   useLayoutEffect(() => {

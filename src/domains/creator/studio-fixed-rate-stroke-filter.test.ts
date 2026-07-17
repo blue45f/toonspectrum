@@ -187,19 +187,17 @@ describe("fixed logical clock and zero-order hold", () => {
     });
   });
 
-  it("anchors the fixed grid to a non-zero initial timestamp without cumulative drift", () => {
+  it("anchors the fixed grid and skips settled duplicate geometry without drift", () => {
     const started = createFixedRateStrokeFilter({ x: 0, y: 0, timeStamp: 10.25 }, 3.4);
     const result = append(started.state, [{ x: 20, y: 0, timeStamp: 36 }]);
-    expect(result.emitted.map((sample) => sample.timeStamp)).toEqual([
-      15.25,
-      20.25,
-      25.25,
-      30.25,
-      35.25,
-    ]);
-    expect(result.emitted.every((sample, index) => (
-      sample.logicalTick === index + 1
-    ))).toBe(true);
+    expect(result.emitted).toEqual([]);
+    expect(result.state.nextLogicalTick).toBe(6);
+
+    const evaluated = advance(result.state, 40.25);
+    expect(evaluated.emitted.map(({ logicalTick, timeStamp }) => ({
+      logicalTick,
+      timeStamp,
+    }))).toEqual([{ logicalTick: 6, timeStamp: 40.25 }]);
   });
 
   it("advances a stationary clock by holding the latest eligible raw sample", () => {
@@ -218,6 +216,17 @@ describe("fixed logical clock and zero-order hold", () => {
       { tick: 3, timeStamp: 15, sourceTimeStamp: 4 },
     ]);
     expect(advance(settled.state, 14).emitted).toEqual([]);
+  });
+
+  it("bounds long background catch-up after the held cascade settles", () => {
+    const started = createFixedRateStrokeFilter({ x: 0, y: 0, timeStamp: 0 }, 10);
+    const moved = append(started.state, [{ x: 100, y: 20, timeStamp: 1 }]);
+    const resumed = advance(moved.state, 10 * 60 * 1_000);
+
+    expect(resumed.emitted.length).toBeLessThan(4_096);
+    expect(resumed.state.nextLogicalTick).toBe(120_001);
+    expect(resumed.endpoint.x).toBeCloseTo(100, 10);
+    expect(resumed.endpoint.y).toBeCloseTo(20, 10);
   });
 
   it("cascades x, y, pressure, and both tilt channels through every stage", () => {
