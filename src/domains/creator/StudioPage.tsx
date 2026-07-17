@@ -398,8 +398,12 @@ import {
 } from "./studio-chrome-ui";
 import { COLOR_WHEEL_LONG_PRESS_MS, clampWheelCenter, selectWheelColors, shouldCancelLongPress } from "./studio-color-wheel";
 import {
+  addStudioCommentReply,
   createEmptyStudioCommentsDocument,
   normalizeStudioCommentsDocument,
+  reopenStudioCommentThread,
+  resolveStudioCommentThread,
+  STUDIO_COMMENTS_MAX_DISPLAY_NAME_LENGTH,
   studioCommentAnchorsEqual,
   type StudioCommentActor,
   type StudioCommentAnchor,
@@ -1001,6 +1005,21 @@ import {
   type StudioStabilizerMode,
   type StudioStrokeStabilizerState,
 } from "./studio-stroke-stabilizer";
+import {
+  addStudioTeamCommentReply,
+  createStudioTeamCommentThread,
+  listAllStudioTeamComments,
+  markAllStudioTeamCommentsRead,
+  markStudioTeamCommentRead,
+  reopenStudioTeamCommentThread,
+  resolveStudioTeamCommentThread,
+  studioTeamCommentMessageToLocalReply,
+  studioTeamCommentThreadToLocalThread,
+  studioTeamCommentUserToLocalActor,
+  studioTeamCommentsToLocalDocument,
+  type StudioTeamCommentCapabilities,
+} from "./studio-team-comment-client";
+import { planStudioTeamCommentMutation } from "./studio-team-comment-mutation-plan";
 import { buildTextPathData, normalizeTextPath, isFlatTextPath, type TextPathConfig } from "./studio-text-path";
 import {
   buildStudioCompanionHello,
@@ -2529,6 +2548,7 @@ const STUDIO_POINTER_PREDICTION_ENABLED = false;
 // 모바일 첫 사용 안내(하단 도구막대 + 두 손가락 이동/확대) 1회만 노출.
 const MOBILE_HINT_DISMISSED_KEY = "toonspectrum-studio-mobile-hint-dismissed";
 const WATERMARK_KEY = "toonspectrum-studio-watermark";
+const COMMENT_PINS_HIDDEN_KEY = "toonspectrum-studio-comment-pins-hidden";
 // 생성형 AI(이미지 생성) 최초 사용 고지 — 정책상 사용자가 처음 쓸 때 "생성형 AI를 활용한다"는
 // 사실을 인지하도록 알려야 한다(앱인토스 서비스 오픈 정책). 1회 확인하면 localStorage 에 저장.
 const AI_ASSET_NOTICE_ACK_KEY = "toonspectrum-studio-ai-notice-ack";
@@ -6070,6 +6090,17 @@ function StudioCuttoonEditor() {
   const [studioComments, setStudioCommentsState] = useState<StudioCommentsDocument>(() =>
     createEmptyStudioCommentsDocument()
   );
+  const [studioTeamComments, setStudioTeamCommentsState] = useState<StudioCommentsDocument>(() =>
+    createEmptyStudioCommentsDocument()
+  );
+  const [studioTeamCommentCapabilities, setStudioTeamCommentCapabilities] =
+    useState<StudioTeamCommentCapabilities | null>(null);
+  const [studioCommentSyncError, setStudioCommentSyncError] = useState<string | null>(null);
+  const [studioTeamUnreadCommentIds, setStudioTeamUnreadCommentIds] = useState<string[]>([]);
+  const studioTeamCommentsLoadGenerationRef = useRef(0);
+  const studioTeamCommentsScopeRef = useRef<string | null>(null);
+  const studioTeamCommentActivitySequenceRef = useRef<Map<string, bigint>>(new Map());
+  const studioTeamCommentReadSequenceRef = useRef<Map<string, bigint>>(new Map());
   const setStudioComments = (next: Parameters<typeof setStudioCommentsState>[0]) => {
     if (!markStudioDocumentChanged()) return;
     setStudioCommentsState(next);
@@ -6622,16 +6653,198 @@ function StudioCuttoonEditor() {
     : null;
   const [pageReviewOpen, setPageReviewOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [studioCommentPinsHidden, setStudioCommentPinsHidden] = useState(() => {
+    try {
+      return globalThis.localStorage.getItem(COMMENT_PINS_HIDDEN_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      globalThis.localStorage.setItem(
+        COMMENT_PINS_HIDDEN_KEY,
+        studioCommentPinsHidden ? "1" : "0"
+      );
+    } catch {
+      // Storage-restricted embeds still keep the preference for this tab session.
+    }
+  }, [studioCommentPinsHidden]);
+  const [sharedDocumentNotice, setSharedDocumentNotice] = useState<string | null>(null);
   const [teamPanelOpen, setTeamPanelOpen] = useState(false);
   const [followingStudioSessionId, setFollowingStudioSessionId] = useState<string | null>(null);
   const [productionInsightsOpen, setProductionInsightsOpen] = useState(false);
   const [publicationOperationsOpen, setPublicationOperationsOpen] = useState(false);
+  const studioTeamCommentsWorkId =
+    workHydrated && workId && studioAuthUserId
+      ? workId
+      : null;
+  // Server-owned review comments never enter the persisted work document. The panel/overlay gets
+  // a projection that keeps pre-server document comments as explicitly read-only archive rows.
+  const studioCommentViewDocument = useMemo(() => {
+    if (!studioTeamCommentsWorkId) return studioComments;
+    const remoteThreadIds = new Set(studioTeamComments.threads.map((thread) => thread.id));
+    return normalizeStudioCommentsDocument({
+      version: 1,
+      threads: [
+        ...studioTeamComments.threads,
+        ...studioComments.threads.filter((thread) => !remoteThreadIds.has(thread.id)),
+      ],
+    });
+  }, [studioComments, studioTeamComments, studioTeamCommentsWorkId]);
+  const studioCommentViewDocumentRef = useRef(studioCommentViewDocument);
+  studioCommentViewDocumentRef.current = studioCommentViewDocument;
+  const studioLegacyCommentThreadIdSet = useMemo(() => {
+    if (!studioTeamCommentsWorkId) return new Set<string>();
+    const remoteThreadIds = new Set(studioTeamComments.threads.map((thread) => thread.id));
+    return new Set(
+      studioComments.threads
+        .filter((thread) => !remoteThreadIds.has(thread.id))
+        .map((thread) => thread.id)
+    );
+  }, [studioComments.threads, studioTeamComments.threads, studioTeamCommentsWorkId]);
+  useEffect(() => {
+    const handleCommentVisibilityShortcut = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (
+        event.code !== "KeyC"
+        || !event.shiftKey
+        || event.metaKey
+        || event.ctrlKey
+        || event.altKey
+        || target?.isContentEditable
+        || target?.tagName === "INPUT"
+        || target?.tagName === "TEXTAREA"
+        || target?.tagName === "SELECT"
+      ) {
+        return;
+      }
+      event.preventDefault();
+      setStudioCommentPinsHidden((hidden) => !hidden);
+    };
+    globalThis.addEventListener("keydown", handleCommentVisibilityShortcut);
+    return () => globalThis.removeEventListener("keydown", handleCommentVisibilityShortcut);
+  }, []);
+  useEffect(() => {
+    const generation = studioTeamCommentsLoadGenerationRef.current + 1;
+    studioTeamCommentsLoadGenerationRef.current = generation;
+    if (!studioTeamCommentsWorkId) {
+      studioTeamCommentsScopeRef.current = null;
+      studioTeamCommentActivitySequenceRef.current.clear();
+      studioTeamCommentReadSequenceRef.current.clear();
+      setStudioTeamCommentsState((current) =>
+        current.threads.length === 0 ? current : createEmptyStudioCommentsDocument()
+      );
+      setStudioTeamUnreadCommentIds((current) => current.length === 0 ? current : []);
+      setStudioTeamCommentCapabilities(null);
+      setStudioCommentSyncError(null);
+      return;
+    }
+    if (studioTeamCommentsScopeRef.current !== studioTeamCommentsWorkId) {
+      studioTeamCommentsScopeRef.current = studioTeamCommentsWorkId;
+      studioTeamCommentActivitySequenceRef.current.clear();
+      studioTeamCommentReadSequenceRef.current.clear();
+      setStudioTeamCommentsState(createEmptyStudioCommentsDocument());
+      setStudioTeamUnreadCommentIds([]);
+      setStudioTeamCommentCapabilities(null);
+      setStudioCommentSyncError(null);
+    }
+    const controller = new AbortController();
+    let inFlight = false;
+
+    const load = async () => {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        const snapshot = await listAllStudioTeamComments(
+          studioTeamCommentsWorkId,
+          controller.signal
+        );
+        const projected = studioTeamCommentsToLocalDocument(snapshot, {
+          unfilteredSnapshotComplete: true,
+        });
+        if (!projected) throw new Error("팀 댓글 전체 기록을 안전하게 투영하지 못했어요.");
+        if (
+          controller.signal.aborted
+          || studioTeamCommentsLoadGenerationRef.current !== generation
+        ) {
+          return;
+        }
+        const acceptedSnapshotThreadIds = new Set<string>();
+        const acceptedUnreadThreadIds: string[] = [];
+        for (const thread of snapshot.items) {
+          const incomingSequence = BigInt(thread.latestActivitySequence);
+          const currentSequence = studioTeamCommentActivitySequenceRef.current.get(thread.id);
+          if (currentSequence !== undefined && incomingSequence < currentSequence) continue;
+          acceptedSnapshotThreadIds.add(thread.id);
+          studioTeamCommentActivitySequenceRef.current.set(thread.id, incomingSequence);
+          const currentReadSequence =
+            studioTeamCommentReadSequenceRef.current.get(thread.id) ?? BigInt(-1);
+          if (!thread.unread) {
+            studioTeamCommentReadSequenceRef.current.set(
+              thread.id,
+              incomingSequence > currentReadSequence ? incomingSequence : currentReadSequence
+            );
+          } else if (currentReadSequence < incomingSequence) {
+            acceptedUnreadThreadIds.push(thread.id);
+          }
+        }
+        setStudioTeamCommentsState((current) => {
+          const currentById = new Map(current.threads.map((thread) => [thread.id, thread]));
+          const projectedIds = new Set(projected.threads.map((thread) => thread.id));
+          return normalizeStudioCommentsDocument({
+            version: 1,
+            // Per-thread activity sequence is a monotonic merge clock. A slow poll cannot replace
+            // a reply/resolve already confirmed by a newer mutation response.
+            threads: [
+              ...projected.threads.map((thread) =>
+                acceptedSnapshotThreadIds.has(thread.id)
+                  ? thread
+                  : currentById.get(thread.id) ?? thread
+              ),
+              // Cursor omissions are not deletions; the server has no delete operation in v1.
+              ...current.threads.filter((thread) => !projectedIds.has(thread.id)),
+            ],
+          });
+        });
+        setStudioTeamUnreadCommentIds((current) => [...new Set([
+          ...current.filter((threadId) => !acceptedSnapshotThreadIds.has(threadId)),
+          ...acceptedUnreadThreadIds,
+        ])].sort());
+        setStudioTeamCommentCapabilities((current) =>
+          current?.view === snapshot.capabilities.view
+          && current.comment === snapshot.capabilities.comment
+          && current.resolve === snapshot.capabilities.resolve
+            ? current
+            : snapshot.capabilities
+        );
+        setStudioCommentSyncError(null);
+      } catch (cause) {
+        if (controller.signal.aborted) return;
+        setStudioTeamCommentCapabilities(null);
+        setStudioCommentSyncError(
+          cause instanceof Error ? cause.message : "팀 댓글을 불러오지 못했어요."
+        );
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    void load();
+    const intervalId = globalThis.setInterval(
+      () => void load(),
+      commentsOpen ? 5_000 : 30_000
+    );
+    return () => {
+      controller.abort();
+      globalThis.clearInterval(intervalId);
+    };
+  }, [commentsOpen, studioTeamCommentsWorkId]);
   useEffect(() => {
     if (!collaborationDocumentLocked) return;
     // 역할이 편집자에서 열람자로 바뀐 직후에도 이미 열린 로컬 편집 패널이 상태를 바꾸지 못하게 한다.
     setMasterEditMode(false);
     setMasterPanelOpen(false);
-    setCommentsOpen(false);
     setCharacterBibleOpen(false);
     setWriterRoomOpen(false);
     setPublicationOperationsOpen(false);
@@ -8004,7 +8217,6 @@ function StudioCuttoonEditor() {
   };
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sharedDocumentNotice, setSharedDocumentNotice] = useState<string | null>(null);
 
   function collectPublishPreflightProvenance(): StudioPublishAiProvenance[] {
     return pages.flatMap((page) =>
@@ -8060,7 +8272,8 @@ function StudioCuttoonEditor() {
         provenance,
       },
       editorial: {
-        openCommentThreads: studioComments.threads.filter((thread) => !thread.resolved).length,
+        openCommentThreads: studioCommentViewDocument.threads
+          .filter((thread) => !thread.resolved).length,
       },
     };
   }
@@ -8162,7 +8375,7 @@ function StudioCuttoonEditor() {
               severity: issue.severity,
               resolved: false,
             })),
-            ...studioComments.threads.map((thread) => ({
+            ...studioCommentViewDocument.threads.map((thread) => ({
               severity: "warning" as const,
               resolved: thread.resolved,
             })),
@@ -9177,6 +9390,14 @@ function StudioCuttoonEditor() {
   const [pointCommentAnchor, setPointCommentAnchor] = useState<
     { pageId: string; x: number; y: number } | null
   >(null);
+  useEffect(() => {
+    if (
+      pointCommentAnchor
+      && (selectedId !== null || pointCommentAnchor.pageId !== currentPageId)
+    ) {
+      setPointCommentAnchor(null);
+    }
+  }, [currentPageId, pointCommentAnchor, selectedId]);
   const liveDraftVisualRef = useRef<DrawEl | null>(null);
   const liveDraftPendingRef = useRef<DrawEl | null>(null);
   const liveDraftRafRef = useRef<number | null>(null);
@@ -10656,7 +10877,8 @@ function StudioCuttoonEditor() {
       })
     : null;
   // useMemo: 패널 스택 memo 자식 prop 안정성 — 댓글 액터/앵커/옵션은 입력이 바뀔 때만 재구성.
-  const studioCommentActorName = session?.user?.name?.trim().slice(0, 80) || "로컬 작가";
+  const studioCommentActorName = session?.user?.name?.trim()
+    .slice(0, STUDIO_COMMENTS_MAX_DISPLAY_NAME_LENGTH) || "로컬 작가";
   const studioCommentActor: StudioCommentActor = useMemo(
     () => ({
       ...(studioAuthUserId ? { id: studioAuthUserId } : {}),
@@ -10664,16 +10886,206 @@ function StudioCuttoonEditor() {
     }),
     [studioAuthUserId, studioCommentActorName]
   );
-  const openStudioCommentCount = studioComments.threads.filter((thread) => !thread.resolved).length;
+  async function applyStudioCommentsPanelChange(
+    value: StudioCommentsDocument
+  ): Promise<boolean> {
+    const nextDocument = normalizeStudioCommentsDocument(value);
+    if (!studioTeamCommentsWorkId) {
+      if (collaborationDocumentLocked) return false;
+      setStudioComments(nextDocument);
+      setStudioCommentSyncError(null);
+      return true;
+    }
+
+    const plan = planStudioTeamCommentMutation(
+      studioCommentViewDocumentRef.current,
+      nextDocument
+    );
+    if (!plan) {
+      throw new Error("팀 댓글에서 아직 지원하지 않는 변경이에요. 새 댓글·답글·해결 상태만 동기화할 수 있어요.");
+    }
+    const canComment = studioTeamCommentCapabilities?.comment === true;
+    if ((plan.kind === "create" || plan.kind === "reply") && !canComment) {
+      throw new Error("현재 팀 역할로는 댓글을 작성할 수 없어요.");
+    }
+    if ((plan.kind === "resolve" || plan.kind === "reopen") && !studioTeamCommentCapabilities?.resolve) {
+      throw new Error("해결 상태는 소유자·관리자·편집자만 변경할 수 있어요.");
+    }
+
+    if (plan.kind === "create") {
+      const remoteThread = await createStudioTeamCommentThread(studioTeamCommentsWorkId, {
+        anchor: plan.anchor,
+        body: plan.body,
+      });
+      studioTeamCommentActivitySequenceRef.current.set(
+        remoteThread.id,
+        BigInt(remoteThread.latestActivitySequence)
+      );
+      studioTeamCommentReadSequenceRef.current.set(
+        remoteThread.id,
+        BigInt(remoteThread.latestActivitySequence)
+      );
+      const localThread = studioTeamCommentThreadToLocalThread(remoteThread);
+      if (!localThread) throw new Error("등록된 팀 댓글을 화면에 안전하게 반영하지 못했어요.");
+      setStudioTeamCommentsState((current) => normalizeStudioCommentsDocument({
+        version: 1,
+        threads: current.threads.some((thread) =>
+          thread.id === localThread.id
+          || thread.replies.some((reply) => reply.id === localThread.id)
+        )
+          ? current.threads
+          : [localThread, ...current.threads],
+      }));
+      setStudioTeamUnreadCommentIds((current) => remoteThread.unread
+        ? current.includes(localThread.id)
+          ? current
+          : [...current, localThread.id].sort()
+        : current.filter((threadId) => threadId !== localThread.id));
+      return true;
+    }
+
+    if (plan.kind === "reply") {
+      const response = await addStudioTeamCommentReply(
+        studioTeamCommentsWorkId,
+        plan.threadId,
+        { body: plan.body }
+      );
+      studioTeamCommentActivitySequenceRef.current.set(
+        plan.threadId,
+        BigInt(response.latestActivitySequence)
+      );
+      studioTeamCommentReadSequenceRef.current.set(
+        plan.threadId,
+        BigInt(response.latestActivitySequence)
+      );
+      const reply = studioTeamCommentMessageToLocalReply(response.message);
+      if (!reply) throw new Error("등록된 팀 답글을 화면에 안전하게 반영하지 못했어요.");
+      setStudioTeamCommentsState((current) => {
+        // Polling snapshot can win the race with this POST response. Treat the server message ID
+        // as an idempotency key so a duplicate immutable insert never escapes a React updater.
+        const alreadyProjected = current.threads.some((thread) =>
+          thread.id === reply.id || thread.replies.some((candidate) => candidate.id === reply.id)
+        );
+        return alreadyProjected
+          ? current
+          : addStudioCommentReply(current, plan.threadId, {
+              id: reply.id,
+              author: reply.author,
+              body: reply.body,
+              mentions: reply.mentions,
+            }, new Date(reply.createdAt));
+      });
+      setStudioTeamUnreadCommentIds((current) => current.filter(
+        (threadId) => threadId !== plan.threadId
+      ));
+      return true;
+    }
+
+    if (plan.kind === "resolve") {
+      const response = await resolveStudioTeamCommentThread(
+        studioTeamCommentsWorkId,
+        plan.threadId
+      );
+      studioTeamCommentActivitySequenceRef.current.set(
+        plan.threadId,
+        BigInt(response.latestActivitySequence)
+      );
+      studioTeamCommentReadSequenceRef.current.set(
+        plan.threadId,
+        BigInt(response.latestActivitySequence)
+      );
+      const resolver = response.resolvedBy
+        ? studioTeamCommentUserToLocalActor(response.resolvedBy)
+        : null;
+      if (!resolver || !response.resolvedAt) {
+        throw new Error("팀 댓글 해결 정보를 화면에 안전하게 반영하지 못했어요.");
+      }
+      setStudioTeamCommentsState((current) => resolveStudioCommentThread(
+        current,
+        plan.threadId,
+        resolver,
+        new Date(response.resolvedAt as string)
+      ));
+      setStudioTeamUnreadCommentIds((current) => current.filter(
+        (threadId) => threadId !== plan.threadId
+      ));
+      return true;
+    }
+
+    const response = await reopenStudioTeamCommentThread(
+      studioTeamCommentsWorkId,
+      plan.threadId
+    );
+    studioTeamCommentActivitySequenceRef.current.set(
+      plan.threadId,
+      BigInt(response.latestActivitySequence)
+    );
+    studioTeamCommentReadSequenceRef.current.set(
+      plan.threadId,
+      BigInt(response.latestActivitySequence)
+    );
+    setStudioTeamCommentsState((current) => reopenStudioCommentThread(
+      current,
+      plan.threadId,
+      new Date(response.updatedAt)
+    ));
+    setStudioTeamUnreadCommentIds((current) => current.filter(
+      (threadId) => threadId !== plan.threadId
+    ));
+    return true;
+  }
+  async function markStudioCommentThreadRead(threadId: string): Promise<boolean> {
+    if (!studioTeamCommentsWorkId || !studioTeamUnreadCommentIds.includes(threadId)) return true;
+    try {
+      const response = await markStudioTeamCommentRead(studioTeamCommentsWorkId, threadId);
+      studioTeamCommentReadSequenceRef.current.set(
+        threadId,
+        BigInt(response.lastReadActivitySequence)
+      );
+      setStudioTeamUnreadCommentIds((current) => current.filter(
+        (candidate) => candidate !== threadId
+      ));
+      setStudioCommentSyncError(null);
+      return true;
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "댓글을 읽음 처리하지 못했어요.";
+      setStudioCommentSyncError(message);
+      throw new Error(message, { cause });
+    }
+  }
+  async function markAllStudioCommentThreadsRead(): Promise<boolean> {
+    if (!studioTeamCommentsWorkId || studioTeamUnreadCommentIds.length === 0) return true;
+    try {
+      await markAllStudioTeamCommentsRead(studioTeamCommentsWorkId);
+      for (const [threadId, sequence] of studioTeamCommentActivitySequenceRef.current) {
+        studioTeamCommentReadSequenceRef.current.set(threadId, sequence);
+      }
+      setStudioTeamUnreadCommentIds([]);
+      setStudioCommentSyncError(null);
+      return true;
+    } catch (cause) {
+      const message = cause instanceof Error
+        ? cause.message
+        : "모든 팀 댓글을 읽음 처리하지 못했어요.";
+      setStudioCommentSyncError(message);
+      throw new Error(message, { cause });
+    }
+  }
+  const openStudioCommentCount = studioCommentViewDocument.threads
+    .filter((thread) => !thread.resolved).length;
+  const studioTeamUnreadCommentIdSet = useMemo(
+    () => new Set(studioTeamUnreadCommentIds),
+    [studioTeamUnreadCommentIds]
+  );
   // Figma식 자유 위치 핀이 잡혀 있으면 선택 기반 앵커보다 우선한다(현재 페이지에서만 유효).
   const activeCommentAnchor: StudioCommentAnchor = useMemo(
     () =>
-      pointCommentAnchor && pointCommentAnchor.pageId === activePage.id && !masterEditMode
-        ? { type: "point", ...pointCommentAnchor }
-        : !masterEditMode && selected?.type === "frame"
+      !masterEditMode && selected?.type === "frame"
           ? { type: "frame", pageId: activePage.id, frameId: selected.id }
           : !masterEditMode && selected
             ? { type: "element", pageId: activePage.id, elementId: selected.id }
+            : pointCommentAnchor && pointCommentAnchor.pageId === activePage.id && !masterEditMode
+              ? { type: "point", ...pointCommentAnchor }
             : { type: "page", pageId: activePage.id },
     [pointCommentAnchor, activePage.id, masterEditMode, selected]
   );
@@ -10701,8 +11113,14 @@ function StudioCuttoonEditor() {
         label: `${pageDisplayName(activePage, activePageIndex)} · ${elementLabel(selected)}`,
       });
     }
+    if (pointCommentAnchor && pointCommentAnchor.pageId === activePage.id && !masterEditMode) {
+      all.push({
+        anchor: { type: "point", ...pointCommentAnchor },
+        label: `${pageDisplayName(activePage, activePageIndex)} · 위치 ${Math.round(pointCommentAnchor.x * 100)}%, ${Math.round(pointCommentAnchor.y * 100)}%`,
+      });
+    }
     return all;
-  }, [pages, masterEditMode, selected, activePage, activePageIndex]);
+  }, [pages, masterEditMode, selected, pointCommentAnchor, activePage, activePageIndex]);
 
   function selectStudioCommentAnchor(anchor: StudioCommentAnchor) {
     const page = pages.find((candidate) => candidate.id === anchor.pageId);
@@ -10732,12 +11150,16 @@ function StudioCuttoonEditor() {
   }
   const studioOpenCanvasThreads = useMemo(
     () =>
-      collaborationDocumentLocked || masterEditMode
+      studioCommentPinsHidden
+      || (studioTeamCommentsWorkId
+        ? studioTeamCommentCapabilities?.view !== true
+        : expectsSharedDocument && !sharedDocument?.capabilities.view)
+      || masterEditMode
         ? []
-        : studioComments.threads.filter(
+        : studioCommentViewDocument.threads.filter(
             (thread) => !thread.resolved && thread.anchor.pageId === activePage.id
           ),
-    [collaborationDocumentLocked, masterEditMode, studioComments.threads, activePage.id]
+    [studioCommentPinsHidden, studioTeamCommentsWorkId, studioTeamCommentCapabilities?.view, expectsSharedDocument, sharedDocument?.capabilities.view, masterEditMode, studioCommentViewDocument.threads, activePage.id]
   );
   const studioCanvasCommentBounds = useMemo(() => {
     const targetIds = new Set(
@@ -10766,6 +11188,7 @@ function StudioCuttoonEditor() {
         canvasWidth: CANVAS_W,
         canvasHeight: canvasH,
         boundsByElementId: studioCanvasCommentBounds,
+        unreadThreadIds: studioTeamUnreadCommentIdSet,
         labelForAnchor: (anchor) =>
           studioCommentAnchorOptions.find((option) =>
             studioCommentAnchorsEqual(option.anchor, anchor)
@@ -10774,9 +11197,11 @@ function StudioCuttoonEditor() {
             ? "페이지 댓글"
             : anchor.type === "frame"
               ? "컷 댓글"
-              : "요소 댓글"),
+              : anchor.type === "point"
+                ? "위치 댓글"
+                : "요소 댓글"),
       })
-    : [], [studioOpenCanvasThreads, activePage.id, canvasH, studioCanvasCommentBounds, studioCommentAnchorOptions]);
+    : [], [studioOpenCanvasThreads, activePage.id, canvasH, studioCanvasCommentBounds, studioCommentAnchorOptions, studioTeamUnreadCommentIdSet]);
   const advancedFillRasterLayers: StudioFillReferenceLayer[] = elements
     .filter((element): element is ImageEl & El => element.type === "image")
     .map((element) => ({
@@ -21936,9 +22361,11 @@ function StudioCuttoonEditor() {
         provenance: publishPreflightProvenance,
       },
       editorial: {
-        commentThreads: studioComments.threads.length,
-        openCommentThreads: studioComments.threads.filter((thread) => !thread.resolved).length,
-        resolvedCommentThreads: studioComments.threads.filter((thread) => thread.resolved).length,
+        commentThreads: studioCommentViewDocument.threads.length,
+        openCommentThreads: studioCommentViewDocument.threads
+          .filter((thread) => !thread.resolved).length,
+        resolvedCommentThreads: studioCommentViewDocument.threads
+          .filter((thread) => thread.resolved).length,
         plannedReleaseItems: releaseSchedule.items.length,
         importedAnalyticsRecords: publicationAnalytics.records.length,
       },
@@ -22984,6 +23411,9 @@ function StudioCuttoonEditor() {
   const studioLazyPanelStackHandlers = useStudioStableHandlers<StudioLazyPanelStackHandlers>({
     addPage,
     addRenderedImage,
+    applyStudioCommentsPanelChange,
+    markAllStudioCommentThreadsRead,
+    markStudioCommentThreadRead,
     applyBg3dRenderedImage,
     applyWriterRoomAiReview,
     applyWriterRoomCanvasPlan,
@@ -23032,7 +23462,6 @@ function StudioCuttoonEditor() {
     setPublishPackageCredits,
     setPublishProfile,
     setReleaseSchedule,
-    setStudioComments,
     setWriterRoom,
     startMacroRecord,
     stopMacroRecord,
@@ -23155,6 +23584,7 @@ function StudioCuttoonEditor() {
     restoreAutosave,
     selectDialogueElement,
     selectStudioCommentAnchor,
+    markStudioCommentThreadRead,
     setMaster,
     setStudioUiDensity,
     startFromExample,
@@ -24418,6 +24848,12 @@ function StudioCuttoonEditor() {
           colorWheelCenter={colorWheelCenter}
           colorWheelOpen={colorWheelOpen}
           commentsOpen={commentsOpen}
+          studioCommentSyncError={studioCommentSyncError}
+          studioCommentPinsHidden={studioCommentPinsHidden}
+          studioLegacyCommentThreadIdSet={studioLegacyCommentThreadIdSet}
+          studioTeamCommentCapabilities={studioTeamCommentCapabilities}
+          studioTeamCommentsWorkId={studioTeamCommentsWorkId}
+          studioTeamUnreadCommentIdSet={studioTeamUnreadCommentIdSet}
           composeWorkAssetPreviewPage={composeWorkAssetPreviewPage}
           continuityIssues={continuityIssues}
           continuityOpen={continuityOpen}
@@ -24491,6 +24927,7 @@ function StudioCuttoonEditor() {
           setColorWheelOpen={setColorWheelOpen}
           setCommentPinArmed={setCommentPinArmed}
           setCommentsOpen={setCommentsOpen}
+          setStudioCommentPinsHidden={setStudioCommentPinsHidden}
           setContinuityOpen={setContinuityOpen}
           setCurrentPageId={setCurrentPageId}
           setFxPanelOpen={setFxPanelOpen}
@@ -24525,7 +24962,7 @@ function StudioCuttoonEditor() {
           studioAuthUserId={studioAuthUserId}
           studioCommentActor={studioCommentActor}
           studioCommentAnchorOptions={studioCommentAnchorOptions}
-          studioComments={studioComments}
+          studioComments={studioCommentViewDocument}
           studioRevisionProjectGenerationRef={studioRevisionProjectGenerationRef}
           teamPanelOpen={teamPanelOpen}
           textAiConfigured={textAiConfigured}
@@ -31178,16 +31615,16 @@ const StudioToolBeltContent = memo(function StudioToolBeltContent({
             setTeamPanelOpen(false);
             setCommentsOpen(true);
           }}
-          disabled={collaborationDocumentLocked}
+          disabled={collaborationDocumentLocked && !sharedDocument?.capabilities.view}
           aria-pressed={commentsOpen}
           aria-label={`문서 댓글${openStudioCommentCount > 0 ? `, 열림 ${openStudioCommentCount}개` : ""}`}
           className={cn(toolBtn(commentsOpen), "relative disabled:cursor-not-allowed disabled:opacity-50")}
           title={
-            collaborationDocumentLocked
-              ? sharedDocument?.role === "commenter"
-                ? "검토자 서버 댓글은 다음 단계에서 제공됩니다. 현재 로컬 댓글은 공동 문서에 쓸 수 없어요."
-                : collaborationLockMessage()
-              : `페이지·컷·요소에 문서 댓글 남기기 · 공동 편집 저장에 포함${
+            collaborationDocumentLocked && !sharedDocument?.capabilities.view
+              ? collaborationLockMessage()
+              : sharedDocument?.access === "view"
+                ? `팀 댓글 열람 · 위치 이동${openStudioCommentCount > 0 ? ` · 열림 ${openStudioCommentCount}개` : ""}`
+                : `페이지·컷·요소에 ${sharedDocument ? "팀 댓글 남기기 · 서버 동기화" : "문서 댓글 남기기 · 프로젝트 저장"}${
                   openStudioCommentCount > 0 ? ` · 열림 ${openStudioCommentCount}개` : ""
                 }`
           }
@@ -32112,6 +32549,9 @@ const StudioMenubarContent = memo(function StudioMenubarContent({
 interface StudioLazyPanelStackHandlers {
   addPage: () => void;
   addRenderedImage: (src: string, width: number, height: number, aiProvenance?: StudioPublishAiProvenance) => void;
+  applyStudioCommentsPanelChange: (value: StudioCommentsDocument) => Promise<boolean>;
+  markAllStudioCommentThreadsRead: () => Promise<boolean>;
+  markStudioCommentThreadRead: (threadId: string) => Promise<boolean>;
   applyBg3dRenderedImage: (result: StudioBackground3DInsertResult, targetElementId?: string) => boolean;
   applyWriterRoomAiReview: () => void;
   applyWriterRoomCanvasPlan: () => void;
@@ -32165,7 +32605,6 @@ interface StudioLazyPanelStackHandlers {
   setPublishPackageCredits: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<string>>>[0]) => void;
   setPublishProfile: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<StudioPublishProfile>>>[0]) => void;
   setReleaseSchedule: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<{ version: 1; items: { id: string; kind: "episode" | "milestone"; title: string; destination: "generic" | "webtoon" | "tapas"; localDate: string; localTime: string; timeZone: string; status: "draft" | "review" | "ready" | "scheduled" | "published"; notes?: string | undefined; }[]; }>>>[0]) => void;
-  setStudioComments: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<{ version: 1; threads: { anchor: { type: "page"; pageId: string; } | { type: "frame"; pageId: string; frameId: string; } | { type: "element"; pageId: string; elementId: string; frameId?: string | undefined; } | { type: "point"; pageId: string; x: number; y: number; }; replies: { id: string; author: { displayName: string; id?: string | undefined; }; body: string; mentions: { displayName: string; id?: string | undefined; }[]; createdAt: string; updatedAt: string; }[]; resolved: boolean; id: string; author: { displayName: string; id?: string | undefined; }; body: string; mentions: { displayName: string; id?: string | undefined; }[]; createdAt: string; updatedAt: string; resolvedAt?: string | undefined; resolvedBy?: { displayName: string; id?: string | undefined; } | undefined; assignee?: { displayName: string; id?: string | undefined; } | undefined; }[]; }>>>[0]) => void;
   setWriterRoom: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<{ version: 1; stages: { premise: { text: string; characterIds: string[]; }; synopsis: { text: string; characterIds: string[]; }; "episode-outline": { title: string; summary: string; characterIds: string[]; }; beats: { items: { id: string; order: number; title: string; summary: string; characterIds: string[]; }[]; }; scenes: { items: { id: string; order: number; beatIds: string[]; heading: string; summary: string; location: string; time: string; characterIds: string[]; }[]; }; "panel-plan": { items: { id: string; order: number; sceneId: string; shot: string; action: string; characterIds: string[]; }[]; }; "dialogue-sfx": { dialogue: { id: string; order: number; panelId: string; characterId: string | null; text: string; }[]; sfx: { id: string; order: number; panelId: string; presetId: string | null; customText: string; style: { emphasis: "quiet" | "normal" | "strong"; scale: "small" | "medium" | "large"; }; }[]; }; }; completion: { premise: boolean; synopsis: boolean; "episode-outline": boolean; beats: boolean; scenes: boolean; "panel-plan": boolean; "dialogue-sfx": boolean; }; suggestions: { id: string; targetPath: string; currentValue: string | number | boolean | string[] | null; proposedValue: string | number | boolean | string[] | null; rationale: string; status: "pending" | "accepted" | "rejected"; createdAt: string; provenanceRef?: string | undefined; resolvedAt?: string | undefined; }[]; lastDecision?: { kind: "accept" | "reject"; suggestionStates: { id: string; status: "pending" | "accepted" | "rejected"; resolvedAt?: string | undefined; }[]; targetValues: { targetPath: string; value: string | number | boolean | string[] | null; }[]; decidedAt: string; } | undefined; }>>>[0]) => void;
   startMacroRecord: () => void;
   stopMacroRecord: () => Promise<void>;
@@ -32201,6 +32640,12 @@ interface StudioLazyPanelStackProps {
   colorWheelCenter: { x: number; y: number; } | null;
   colorWheelOpen: boolean;
   commentsOpen: boolean;
+  studioCommentSyncError: string | null;
+  studioCommentPinsHidden: boolean;
+  studioLegacyCommentThreadIdSet: ReadonlySet<string>;
+  studioTeamCommentCapabilities: StudioTeamCommentCapabilities | null;
+  studioTeamCommentsWorkId: string | null;
+  studioTeamUnreadCommentIdSet: ReadonlySet<string>;
   composeWorkAssetPreviewPage: (page: PageState) => PageState;
   continuityIssues: StudioContinuityIssue[];
   continuityOpen: boolean;
@@ -32274,6 +32719,7 @@ interface StudioLazyPanelStackProps {
   setColorWheelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setCommentPinArmed: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setCommentsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setStudioCommentPinsHidden: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setContinuityOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setCurrentPageId: import("react").Dispatch<import("react").SetStateAction<string>>;
   setFxPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
@@ -32354,6 +32800,12 @@ const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
   colorWheelCenter,
   colorWheelOpen,
   commentsOpen,
+  studioCommentSyncError,
+  studioCommentPinsHidden,
+  studioLegacyCommentThreadIdSet,
+  studioTeamCommentCapabilities,
+  studioTeamCommentsWorkId,
+  studioTeamUnreadCommentIdSet,
   composeWorkAssetPreviewPage,
   continuityIssues,
   continuityOpen,
@@ -32427,6 +32879,7 @@ const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
   setColorWheelOpen,
   setCommentPinArmed,
   setCommentsOpen,
+  setStudioCommentPinsHidden,
   setContinuityOpen,
   setCurrentPageId,
   setFxPanelOpen,
@@ -32480,6 +32933,9 @@ const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
   const {
     addPage,
     addRenderedImage,
+    applyStudioCommentsPanelChange,
+    markAllStudioCommentThreadsRead,
+    markStudioCommentThreadRead,
     applyBg3dRenderedImage,
     applyWriterRoomAiReview,
     applyWriterRoomCanvasPlan,
@@ -32528,7 +32984,6 @@ const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
     setPublishPackageCredits,
     setPublishProfile,
     setReleaseSchedule,
-    setStudioComments,
     setWriterRoom,
     startMacroRecord,
     stopMacroRecord,
@@ -32669,12 +33124,7 @@ const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
             open
             onClose={() => setCommentsOpen(false)}
             document={studioComments}
-            onChange={(value) => {
-              if (!collaborationDocumentLocked) {
-                setStudioComments(normalizeStudioCommentsDocument(value));
-                setSharedDocumentNotice(null);
-              }
-            }}
+            onChange={applyStudioCommentsPanelChange}
             activeAnchor={activeCommentAnchor}
             currentActor={studioCommentActor}
             anchorOptions={studioCommentAnchorOptions}
@@ -32685,6 +33135,40 @@ const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
               setCommentsOpen(false);
               setCommentPinArmed(true);
             }}
+            capabilities={workId
+              ? {
+                  create: studioTeamCommentCapabilities?.comment === true,
+                  reply: studioTeamCommentCapabilities?.comment === true,
+                  editOwn: false,
+                  deleteOwn: false,
+                  resolve: studioTeamCommentCapabilities?.resolve === true,
+                  assign: false,
+                }
+              : {
+                  create: !collaborationDocumentLocked,
+                  reply: !collaborationDocumentLocked,
+                  editOwn: !collaborationDocumentLocked,
+                  deleteOwn: !collaborationDocumentLocked,
+                  resolve: !collaborationDocumentLocked,
+                  assign: !collaborationDocumentLocked,
+                }}
+            mutationDisabledReason={workId && !studioTeamCommentCapabilities
+              ? "팀 댓글 권한과 기록을 확인하는 중이에요."
+              : workId && !studioTeamCommentCapabilities?.comment
+                ? "열람자는 댓글을 읽고 위치로 이동할 수 있지만 작성할 수는 없어요."
+                : undefined}
+            syncError={studioCommentSyncError ?? undefined}
+            storageMode={workId ? "team" : "document"}
+            unreadThreadIds={studioTeamUnreadCommentIdSet}
+            readOnlyThreadIds={studioLegacyCommentThreadIdSet}
+            pinsHidden={studioCommentPinsHidden}
+            onTogglePinsHidden={() => setStudioCommentPinsHidden((hidden) => !hidden)}
+            onMarkThreadRead={studioTeamCommentsWorkId && studioTeamCommentCapabilities?.view
+              ? markStudioCommentThreadRead
+              : undefined}
+            onMarkAllRead={studioTeamCommentsWorkId && studioTeamCommentCapabilities?.view
+              ? markAllStudioCommentThreadsRead
+              : undefined}
           />
         ) : null}
       </Suspense>
@@ -34715,6 +35199,7 @@ interface StudioCanvasViewportHandlers {
   restoreAutosave: () => Promise<void>;
   selectDialogueElement: (pageId: string, elId: string) => void;
   selectStudioCommentAnchor: (anchor: StudioCommentAnchor) => void;
+  markStudioCommentThreadRead: (threadId: string) => Promise<boolean>;
   setMaster: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<DocumentMaster<El>>>>[0]) => void;
   setStudioUiDensity: (mode: StudioUiDensityMode) => void;
   snapBoundFunc: (pos: { x: number; y: number; }) => { x: number; y: number; };
@@ -35264,6 +35749,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
     restoreAutosave,
     selectDialogueElement,
     selectStudioCommentAnchor,
+    markStudioCommentThreadRead,
     setMaster,
     setStudioUiDensity,
     startFromExample,
@@ -37603,11 +38089,17 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 canvasWidth={CANVAS_W}
                 canvasHeight={canvasH}
                 hidden={isExporting || sourceHydrationPending || collaborationDocumentUnavailable}
-                commentPins={collaborationDocumentLocked ? [] : studioCanvasCommentPins}
-                onCommentPinClick={(anchor) => {
+                commentPins={studioCanvasCommentPins}
+                flipX={canvasFlipH}
+                onCommentPinClick={(anchor, threadIds) => {
                   selectStudioCommentAnchor(anchor);
                   setTeamPanelOpen(false);
                   setCommentsOpen(true);
+                  if (threadIds) {
+                    void Promise.all(threadIds.map((threadId) =>
+                      markStudioCommentThreadRead(threadId).catch(() => false)
+                    ));
+                  }
                 }}
               />
             </Suspense>

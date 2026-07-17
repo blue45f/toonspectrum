@@ -1,0 +1,124 @@
+import {
+  addStudioCommentReply,
+  addStudioCommentThread,
+  reopenStudioCommentThread,
+  resolveStudioCommentThread,
+  StudioCommentsDocumentSchema,
+  type StudioCommentAnchor,
+  type StudioCommentsDocument,
+} from "./studio-comments";
+
+export type StudioTeamCommentMutationPlan =
+  | { kind: "create"; anchor: StudioCommentAnchor; body: string }
+  | { kind: "reply"; threadId: string; body: string }
+  | { kind: "resolve"; threadId: string }
+  | { kind: "reopen"; threadId: string };
+
+function documentsEqual(
+  left: StudioCommentsDocument,
+  right: StudioCommentsDocument
+): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+/**
+ * Converts one local panel transition into an allow-listed server command.
+ *
+ * Exact replay through the pure v1 operations ensures a remote panel cannot smuggle edits,
+ * deletes, assignments, re-anchors, or multiple mutations through the generic document callback.
+ */
+export function planStudioTeamCommentMutation(
+  previousValue: StudioCommentsDocument,
+  nextValue: StudioCommentsDocument
+): StudioTeamCommentMutationPlan | null {
+  const previous = StudioCommentsDocumentSchema.safeParse(previousValue);
+  const next = StudioCommentsDocumentSchema.safeParse(nextValue);
+  if (!previous.success || !next.success) return null;
+
+  if (next.data.threads.length === previous.data.threads.length + 1) {
+    const previousIds = new Set(previous.data.threads.map((thread) => thread.id));
+    const added = next.data.threads.filter((thread) => !previousIds.has(thread.id));
+    if (added.length !== 1) return null;
+    const thread = added[0];
+    if (thread.mentions.length > 0) return null;
+    try {
+      const replayed = addStudioCommentThread(previous.data, {
+        id: thread.id,
+        anchor: thread.anchor,
+        author: thread.author,
+        body: thread.body,
+        mentions: thread.mentions,
+      }, new Date(thread.createdAt));
+      return documentsEqual(replayed, next.data)
+        ? { kind: "create", anchor: thread.anchor, body: thread.body }
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  if (next.data.threads.length !== previous.data.threads.length) return null;
+  for (const previousThread of previous.data.threads) {
+    const nextThread = next.data.threads.find((thread) => thread.id === previousThread.id);
+    if (!nextThread || documentsEqual(
+      { version: 1, threads: [previousThread] },
+      { version: 1, threads: [nextThread] }
+    )) {
+      continue;
+    }
+
+    if (nextThread.replies.length === previousThread.replies.length + 1) {
+      const previousReplyIds = new Set(previousThread.replies.map((reply) => reply.id));
+      const addedReplies = nextThread.replies.filter((reply) => !previousReplyIds.has(reply.id));
+      if (addedReplies.length !== 1) return null;
+      const reply = addedReplies[0];
+      if (reply.mentions.length > 0) return null;
+      try {
+        const replayed = addStudioCommentReply(previous.data, previousThread.id, {
+          id: reply.id,
+          author: reply.author,
+          body: reply.body,
+          mentions: reply.mentions,
+        }, new Date(reply.createdAt));
+        return documentsEqual(replayed, next.data)
+          ? { kind: "reply", threadId: previousThread.id, body: reply.body }
+          : null;
+      } catch {
+        return null;
+      }
+    }
+
+    if (!previousThread.resolved && nextThread.resolved && nextThread.resolvedAt) {
+      try {
+        const replayed = resolveStudioCommentThread(
+          previous.data,
+          previousThread.id,
+          nextThread.resolvedBy ?? null,
+          new Date(nextThread.resolvedAt)
+        );
+        return documentsEqual(replayed, next.data)
+          ? { kind: "resolve", threadId: previousThread.id }
+          : null;
+      } catch {
+        return null;
+      }
+    }
+
+    if (previousThread.resolved && !nextThread.resolved) {
+      try {
+        const replayed = reopenStudioCommentThread(
+          previous.data,
+          previousThread.id,
+          new Date(nextThread.updatedAt)
+        );
+        return documentsEqual(replayed, next.data)
+          ? { kind: "reopen", threadId: previousThread.id }
+          : null;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+  return null;
+}

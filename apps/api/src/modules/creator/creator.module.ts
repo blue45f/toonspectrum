@@ -18,6 +18,9 @@ import {
 import { StudioRasterAssetController } from "./studio-raster-asset.controller";
 import { studioRasterAssetRepositoryProvider } from "./studio-raster-asset.repository";
 import { StudioRasterAssetService } from "./studio-raster-asset.service";
+import { StudioTeamCommentController } from "./studio-team-comment.controller";
+import { studioTeamCommentRepositoryProvider } from "./studio-team-comment.repository";
+import { StudioTeamCommentService } from "./studio-team-comment.service";
 import { StudioWorkAssetController } from "./studio-work-asset.controller";
 import { studioWorkAssetRepositoryProvider } from "./studio-work-asset.repository";
 import { StudioWorkAssetService } from "./studio-work-asset.service";
@@ -26,6 +29,7 @@ import { StudioWorkAssetService } from "./studio-work-asset.service";
   controllers: [
     CreatorController,
     StudioRasterAssetController,
+    StudioTeamCommentController,
     StudioWorkAssetController,
   ],
   providers: [
@@ -33,9 +37,11 @@ import { StudioWorkAssetService } from "./studio-work-asset.service";
     studioCrdtRepositoryProvider,
     studioLiveLockRepositoryProvider,
     studioRasterAssetRepositoryProvider,
+    studioTeamCommentRepositoryProvider,
     studioWorkAssetRepositoryProvider,
     CreatorService,
     StudioRasterAssetService,
+    StudioTeamCommentService,
     StudioWorkAssetService,
     StudioRasterAssetUploadGuard,
     StudioWorkAssetUploadGuard,

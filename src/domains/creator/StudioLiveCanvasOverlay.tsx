@@ -53,7 +53,8 @@ export interface StudioLiveCanvasOverlayProps {
   canvasHeight: number;
   cursors: readonly StudioLiveCanvasCursor[];
   commentPins: readonly StudioCanvasCommentPin[];
-  onCommentPinClick: (anchor: StudioCommentAnchor) => void;
+  onCommentPinClick: (anchor: StudioCommentAnchor, threadIds?: readonly string[]) => void;
+  flipX?: boolean;
 }
 
 export interface StudioLivePresenceDockProps {
@@ -74,7 +75,8 @@ export interface StudioRemoteCursorOverlayProps {
   canvasHeight: number;
   hidden?: boolean;
   commentPins: readonly StudioCanvasCommentPin[];
-  onCommentPinClick: (anchor: StudioCommentAnchor) => void;
+  onCommentPinClick: (anchor: StudioCommentAnchor, threadIds?: readonly string[]) => void;
+  flipX?: boolean;
 }
 
 export interface StudioLivePresenceDockConnectedProps {
@@ -143,6 +145,7 @@ export function StudioLiveCanvasOverlay({
   cursors,
   commentPins,
   onCommentPinClick,
+  flipX = false,
 }: StudioLiveCanvasOverlayProps) {
   return (
     <div
@@ -154,16 +157,27 @@ export function StudioLiveCanvasOverlay({
         <button
           key={pin.key}
           type="button"
-          aria-label={`${pin.label}, 열림 댓글 ${pin.count}개`}
-          className="pointer-events-auto absolute grid size-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-white bg-accent text-[0.65rem] font-black tabular-nums text-on-accent shadow-[0_4px_14px_oklch(0.12_0.03_270/0.38)] transition-transform hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          aria-label={`${pin.label}, ${pin.unreadCount ? `읽지 않은 댓글 ${pin.unreadCount}개, ` : ""}열림 댓글 ${pin.count}개`}
+          className={cn(
+            "pointer-events-auto absolute grid size-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-white bg-accent text-[0.65rem] font-black tabular-nums text-on-accent shadow-[0_4px_14px_oklch(0.12_0.03_270/0.38)] transition-transform hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+            pin.unreadCount ? "ring-4 ring-accent/30" : null
+          )}
           style={{
-            left: `${(pin.x / canvasWidth) * 100}%`,
-            top: `${(pin.y / canvasHeight) * 100}%`,
+            left: `clamp(1rem, ${(((flipX ? canvasWidth - pin.x : pin.x) / canvasWidth) * 100).toFixed(4)}%, calc(100% - 1rem))`,
+            top: `clamp(1rem, ${((pin.y / canvasHeight) * 100).toFixed(4)}%, calc(100% - 1rem))`,
+            marginLeft: pin.screenOffsetX ?? 0,
+            marginTop: pin.screenOffsetY ?? 0,
           }}
-          title={`${pin.label} · 열림 ${pin.count}개`}
-          onClick={() => onCommentPinClick(pin.anchor)}
+          title={`${pin.label} · ${pin.unreadCount ? `읽지 않음 ${pin.unreadCount}개 · ` : ""}열림 ${pin.count}개`}
+          onClick={() => onCommentPinClick(pin.anchor, pin.threadIds)}
         >
           {pin.count > 1 ? pin.count : <MessageCircle size={14} aria-hidden />}
+          {pin.unreadCount ? (
+            <span
+              aria-hidden
+              className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-white bg-warn shadow-sm"
+            />
+          ) : null}
         </button>
       ))}
 
@@ -174,7 +188,7 @@ export function StudioLiveCanvasOverlay({
             key={participant.sessionId}
             className="absolute left-0 top-0 motion-safe:transition-[left,top] motion-safe:duration-75"
             style={{
-              left: `${clamp(cursor.x, 0, 1) * 100}%`,
+              left: `${(flipX ? 1 - clamp(cursor.x, 0, 1) : clamp(cursor.x, 0, 1)) * 100}%`,
               top: `${clamp(cursor.y, 0, 1) * 100}%`,
             }}
           >
@@ -211,6 +225,7 @@ export function StudioRemoteCursorOverlay({
   hidden = false,
   commentPins,
   onCommentPinClick,
+  flipX = false,
 }: StudioRemoteCursorOverlayProps) {
   const { room } = useStudioLiveCollaboration();
   const cursorMapRef = useRef(new Map<string, StudioLiveCanvasCursor>());
@@ -305,6 +320,7 @@ export function StudioRemoteCursorOverlay({
       cursors={cursors.filter((value) => value.cursor.pageId === pageId)}
       commentPins={commentPins}
       onCommentPinClick={onCommentPinClick}
+      flipX={flipX}
     />
   );
 }
