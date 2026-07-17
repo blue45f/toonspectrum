@@ -5,11 +5,12 @@ import {
   resolveBrushReleasePressureSample,
 } from "./studio-brush";
 import {
-  createCanonicalFixedRateStrokeFilter,
   createFixedRateStrokeFilter,
+  quantizeFixedRateStrokeSample,
   transitionFixedRateStrokeFilter,
   type FixedRateStrokeFilteredSample,
   type FixedRateStrokeFilterState,
+  type FixedRateStrokeQuantizedSample,
 } from "./studio-fixed-rate-stroke-filter";
 import {
   beginStudioStrokePointerSession,
@@ -19,7 +20,6 @@ import {
 } from "./studio-pointer-input";
 
 type TestPointerType = "mouse" | "pen";
-type TestFilterMode = "canonical-zero" | "filtered-3.4";
 
 interface TestPointerSample extends StudioPointerEventLike {
   pointerId: number;
@@ -63,19 +63,14 @@ function resolvedPressure(sample: TestPointerSample): number {
   });
 }
 
-function startFilter(
-  sample: TestPointerSample,
-  mode: TestFilterMode
-): FixedRateStrokeFilterState {
+function startFilter(sample: TestPointerSample): FixedRateStrokeFilterState {
   const initial = {
     x: sample.clientX,
     y: sample.clientY,
     pressure: resolvedPressure(sample),
     timeStamp: sample.timeStamp,
   };
-  return mode === "canonical-zero"
-    ? createCanonicalFixedRateStrokeFilter(initial).state
-    : createFixedRateStrokeFilter(initial, 3.4).state;
+  return createFixedRateStrokeFilter(initial, 3.4).state;
 }
 
 function appendBatch(
@@ -97,13 +92,10 @@ function finishFilter(state: FixedRateStrokeFilterState) {
   return transitionFixedRateStrokeFilter(state, { type: "release" });
 }
 
-function runMouseParentDeliveries(
-  samples: readonly TestPointerSample[],
-  mode: TestFilterMode
-) {
+function runMouseParentDeliveries(samples: readonly TestPointerSample[]) {
   const down = pointerSample("mouse", 0);
   let session = beginStudioStrokePointerSession(down)!;
-  let state = startFilter(down, mode);
+  let state = startFilter(down);
   const emitted: FixedRateStrokeFilteredSample[] = [];
 
   for (const sample of samples) {
@@ -121,12 +113,11 @@ function runMouseParentDeliveries(
 
 function runPenCoalescedDeliveries(
   samples: readonly TestPointerSample[],
-  batchSize: number,
-  mode: TestFilterMode
+  batchSize: number
 ) {
   const down = pointerSample("pen", 0);
   let session: StudioStrokePointerSession = beginStudioStrokePointerSession(down)!;
-  let state = startFilter(down, mode);
+  let state = startFilter(down);
   const emitted: FixedRateStrokeFilteredSample[] = [];
 
   for (let index = 0; index < samples.length; index += batchSize) {
@@ -150,28 +141,91 @@ function runPenCoalescedDeliveries(
   return { emitted, state: finished.state };
 }
 
-describe("fixed-rate mouse and pen input parity", () => {
-  it.each<TestFilterMode>(["canonical-zero", "filtered-3.4"])(
-    "%s produces one identical logical stream for parent events and arbitrarily coalesced pen input",
-    (mode) => {
-      const mouseSamples = Array.from({ length: 48 }, (_, index) => (
-        pointerSample("mouse", (index + 1) * 4)
-      ));
-      const penSamples = mouseSamples.map((sample) => pointerSample("pen", sample.timeStamp, {
-        clientX: sample.clientX,
-        clientY: sample.clientY,
-      }));
+function quantizeImmediateInput(
+  sample: TestPointerSample,
+  fallback?: FixedRateStrokeQuantizedSample
+): FixedRateStrokeQuantizedSample {
+  return quantizeFixedRateStrokeSample({
+    x: sample.clientX,
+    y: sample.clientY,
+    pressure: resolvedPressure(sample),
+    tiltX: sample.tiltX as number,
+    tiltY: sample.tiltY as number,
+    timeStamp: sample.timeStamp,
+  }, fallback);
+}
 
-      const mouse = runMouseParentDeliveries(mouseSamples, mode);
-      const penByTwo = runPenCoalescedDeliveries(penSamples, 2, mode);
-      const penByEight = runPenCoalescedDeliveries(penSamples, 8, mode);
-
-      expect(penByTwo.emitted).toEqual(mouse.emitted);
-      expect(penByEight.emitted).toEqual(mouse.emitted);
-      expect(penByTwo.state).toEqual(mouse.state);
-      expect(penByEight.state).toEqual(mouse.state);
+function runImmediateMouseParentDeliveries(samples: readonly TestPointerSample[]) {
+  const down = pointerSample("mouse", 0);
+  let session = beginStudioStrokePointerSession(down)!;
+  let fallback = quantizeImmediateInput(down);
+  const emitted = [fallback];
+  for (const sample of samples) {
+    const batch = collectStudioStrokePointerBatch(session, sample);
+    session = batch.session;
+    for (const authoritative of batch.authoritative as readonly TestPointerSample[]) {
+      fallback = quantizeImmediateInput(authoritative, fallback);
+      emitted.push(fallback);
     }
-  );
+  }
+  return emitted;
+}
+
+function runImmediatePenCoalescedDeliveries(
+  samples: readonly TestPointerSample[],
+  batchSize: number
+) {
+  const down = pointerSample("pen", 0);
+  let session = beginStudioStrokePointerSession(down)!;
+  let fallback = quantizeImmediateInput(down);
+  const emitted = [fallback];
+  for (let index = 0; index < samples.length; index += batchSize) {
+    const coalesced = samples.slice(index, index + batchSize);
+    const parent = pointerSample("pen", coalesced.at(-1)?.timeStamp ?? 0, {
+      clientX: (coalesced.at(-1)?.clientX ?? 0) + 99,
+      clientY: (coalesced.at(-1)?.clientY ?? 0) + 99,
+      getCoalescedEvents: () => coalesced,
+    });
+    const batch = collectStudioStrokePointerBatch(session, parent);
+    session = batch.session;
+    for (const authoritative of batch.authoritative as readonly TestPointerSample[]) {
+      fallback = quantizeImmediateInput(authoritative, fallback);
+      emitted.push(fallback);
+    }
+  }
+  return emitted;
+}
+
+describe("processed mouse and pen input parity", () => {
+  const mouseSamples = Array.from({ length: 48 }, (_, index) => (
+    pointerSample("mouse", (index + 1) * 4)
+  ));
+  const penSamples = mouseSamples.map((sample) => pointerSample("pen", sample.timeStamp, {
+    clientX: sample.clientX,
+    clientY: sample.clientY,
+  }));
+
+  it("positive stabilization produces one stream for parent and coalesced delivery", () => {
+    const mouse = runMouseParentDeliveries(mouseSamples);
+    const penByTwo = runPenCoalescedDeliveries(penSamples, 2);
+    const penByEight = runPenCoalescedDeliveries(penSamples, 8);
+
+    expect(penByTwo.emitted).toEqual(mouse.emitted);
+    expect(penByEight.emitted).toEqual(mouse.emitted);
+    expect(penByTwo.state).toEqual(mouse.state);
+    expect(penByEight.state).toEqual(mouse.state);
+  });
+
+  it("zero stabilization quantizes every coalesced sample immediately without a 5ms clock", () => {
+    const mouse = runImmediateMouseParentDeliveries(mouseSamples);
+    const penByTwo = runImmediatePenCoalescedDeliveries(penSamples, 2);
+    const penByEight = runImmediatePenCoalescedDeliveries(penSamples, 8);
+
+    expect(penByTwo).toEqual(mouse);
+    expect(penByEight).toEqual(mouse);
+    expect(mouse).toHaveLength(mouseSamples.length + 1);
+    expect(mouse[1]?.timeStamp).toBe(mouseSamples[0]?.timeStamp);
+  });
 
   it("keeps a non-contact pen release at the last contact pressure used by nominal mouse ink", () => {
     const mousePressure = resolveBrushReleasePressureSample({

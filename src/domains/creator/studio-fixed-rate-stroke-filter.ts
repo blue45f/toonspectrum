@@ -132,10 +132,9 @@ function quantizePressure(value: number): number {
 /**
  * Converts a public 0..10 strength into the fixed cascade parameters.
  *
- * `response / 4` is a fractional ideal stage count. A positive half-up nearest-integer round is
- * used because it minimizes response error when one discrete stage represents four response
- * units; unlike floor/ceil it has no systematic weak/strong bias and preserves 20 -> 5 and
- * 80 -> 20 exactly.
+ * Magma's public cascade runs `for (index = 0; index < response / 4; index += 1)`, so a fractional
+ * quotient creates the same number of stages as `ceil(response / 4)`. Preserve that exact
+ * discrete behavior rather than rounding to the nearest stage.
  */
 export function resolveFixedRateStrokeFilterParameters(
   requestedStrength: number
@@ -146,7 +145,7 @@ export function resolveFixedRateStrokeFilterParameters(
     clamp(normalizedStrength, MIN_NORMALIZED_STRENGTH, 1) - MIN_NORMALIZED_STRENGTH
   ) / (1 - MIN_NORMALIZED_STRENGTH);
   const response = MIN_RESPONSE + RESPONSE_RANGE * normalizedResponse;
-  const stageCount = Math.floor(response / RESPONSE_STAGE_WIDTH + 0.5);
+  const stageCount = Math.ceil(response / RESPONSE_STAGE_WIDTH);
   const alpha = 1 - clamp(response / 100, 0, MAX_ALPHA_COMPLEMENT);
   return { strength, normalizedStrength, response, stageCount, alpha };
 }
@@ -253,27 +252,6 @@ export function createFixedRateStrokeFilter(
 ): FixedRateStrokeFilterTransition {
   const parameters = resolveFixedRateStrokeFilterParameters(strength);
   return createFixedRateStrokeFilterState(initialSample, parameters);
-}
-
-/**
- * Starts the deterministic 5 ms sampler without applying the stabilizer's low-pass cascade.
- *
- * This is the semantic counterpart of an input-stabilization value of zero: coordinates and
- * pointer channels are still quantized and assigned to the same strict fixed-grid ZOH clock, but
- * the one-stage alpha=1 cascade publishes the eligible held sample unchanged. Keep this separate
- * from `resolveFixedRateStrokeFilterParameters(0)`, whose traced minimum response remains part of
- * the commercial stabilizer curve and is intentionally not redefined here.
- */
-export function createCanonicalFixedRateStrokeFilter(
-  initialSample: FixedRateStrokeRawSample
-): FixedRateStrokeFilterTransition {
-  return createFixedRateStrokeFilterState(initialSample, {
-    strength: 0,
-    normalizedStrength: 0,
-    response: 0,
-    stageCount: 1,
-    alpha: 1,
-  });
 }
 
 function logicalTickTime(state: FixedRateStrokeFilterState): number {

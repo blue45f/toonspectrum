@@ -520,10 +520,12 @@ import {
   composeStudioFillReferenceImage,
   type StudioFillReferenceLayer,
 } from "./studio-fill-reference";
-import { isStudioFixedRateInputEligible } from "./studio-fixed-rate-input-eligibility";
 import {
-  createCanonicalFixedRateStrokeFilter,
+  resolveStudioCausalInkInputPlan,
+} from "./studio-fixed-rate-input-eligibility";
+import {
   createFixedRateStrokeFilter,
+  quantizeFixedRateStrokeSample,
   transitionFixedRateStrokeFilter,
   type FixedRateStrokeFilterState,
   type FixedRateStrokeFilteredSample,
@@ -9041,6 +9043,10 @@ function StudioCuttoonEditor() {
   const drawingRef = useRef<DrawEl | null>(null);
   const drawingStabilizerRef = useRef<StudioStrokeStabilizerState | null>(null);
   const drawingFixedRateFilterRef = useRef<FixedRateStrokeFilterState | null>(null);
+  /** Strength-zero Magma input: quantized coalesced samples with no fixed-clock latency. */
+  const drawingImmediateCausalInputRef = useRef(false);
+  /** One processed/coalesced batch may mutate its private draft clone before publishing once. */
+  const drawingImmediateBatchMutationRef = useRef(false);
   const drawingFixedRatePumpRef = useRef<FixedRateStrokeFramePump | null>(null);
   const drawingFixedRatePumpClockRef = useRef<FixedRateStrokeFrameClockState | null>(null);
   const drawingFixedRateSampleClockRef = useRef<FixedRateStrokeSampleClockState | null>(null);
@@ -17333,15 +17339,13 @@ function StudioCuttoonEditor() {
       const pointerEvent = event as PointerEvent;
       const session = drawingPointerSessionRef.current;
       if (!session || session.pointerId !== pointerId) return;
-      // A processed mouse hover with buttons=0 is still the only recovery signal when capture and
-      // pointerup were both lost. Let the current consumer close it even after raw became ink owner.
+      // A processed mouse hover with buttons=0 is the recovery signal when capture and pointerup
+      // were both lost. Its coordinates are never consumed as ink.
       if (shouldEndStudioStrokeForReleasedContact(session, pointerEvent)) {
         drawingPointerGlobalMoveRef.current(pointerEvent);
         return;
       }
-      const eventType = event.type === "pointerrawupdate"
-        ? "pointerrawupdate"
-        : "pointermove";
+      const eventType = event.type === "pointermove" ? "pointermove" : "pointerrawupdate";
       const claim = claimStudioStrokeMoveTransport(session, pointerEvent, eventType);
       drawingPointerSessionRef.current = claim.session;
       if (!claim.accepted) return;
@@ -17368,11 +17372,9 @@ function StudioCuttoonEditor() {
       if (Number.isFinite(lostPointerId) && lostPointerId !== pointerId) return;
       onGlobalAbort();
     };
-    // Capture phase makes this the one authoritative freehand transport before Konva performs
-    // cursor/hit-test work. The first raw update permanently suppresses duplicate pointermoves;
-    // browsers without raw updates naturally remain on the pointermove fallback.
+    // Capture phase makes processed pointermove + its coalesced hardware samples the one
+    // authoritative freehand transport before Konva performs cursor/hit-test work.
     globalThis.addEventListener("pointermove", onGlobalMove, true);
-    globalThis.addEventListener("pointerrawupdate", onGlobalMove, true);
     // Still receive release when a chrome overlay stops propagation.
     globalThis.addEventListener("pointerup", onGlobalEnd, true);
     globalThis.addEventListener("pointercancel", onGlobalEnd, true);
@@ -17382,7 +17384,6 @@ function StudioCuttoonEditor() {
     captureTarget?.addEventListener("lostpointercapture", onLostPointerCapture, true);
     drawingPointerSafetyCleanupRef.current = () => {
       globalThis.removeEventListener("pointermove", onGlobalMove, true);
-      globalThis.removeEventListener("pointerrawupdate", onGlobalMove, true);
       globalThis.removeEventListener("pointerup", onGlobalEnd, true);
       globalThis.removeEventListener("pointercancel", onGlobalEnd, true);
       globalThis.removeEventListener("blur", onGlobalAbort, true);
@@ -17450,6 +17451,8 @@ function StudioCuttoonEditor() {
     drawingPredictionPreviewRef.current = false;
     drawingStabilizerRef.current = null;
     drawingFixedRateFilterRef.current = null;
+    drawingImmediateCausalInputRef.current = false;
+    drawingImmediateBatchMutationRef.current = false;
     drawingFixedRateSampleClockRef.current = null;
     drawingLastAuthoritativePointerRef.current = null;
     drawingVelocityRef.current = null;
@@ -18049,6 +18052,18 @@ function StudioCuttoonEditor() {
       const activeCausalWatercolor = drawMode === "pen"
         && fixedRateBrushFamily === "watercolor";
       const hasBrushDynamics = resolveStudioBrushDynamicsPresetId(brush) !== null;
+      const causalInputPolicy = {
+        stabilizerMode,
+        stabilizerStrength: stabilizer,
+        drawMode,
+        brushFamily: fixedRateBrushFamily,
+        hasBrushDynamics,
+        causalStampV2: activeStampKind !== null,
+        causalWatercolorV2: activeCausalWatercolor,
+      };
+      const causalInkInputPlan = resolveStudioCausalInkInputPlan(causalInputPolicy);
+      const causalInkInputEnabled = causalInkInputPlan.sampleSpacing === 0;
+      const fixedRateInkEnabled = causalInkInputPlan.usesFixedRateClock;
       const linearPressureEligible = (
         drawMode === "eraser" ||
         drawMode === "pixel" ||
@@ -18069,7 +18084,7 @@ function StudioCuttoonEditor() {
               : STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1
           )
         : undefined;
-      const pressure = resolveBrushPressureSample({
+      const resolvedPressure = resolveBrushPressureSample({
         pointerType: pointerSample.pointerType,
         rawPressure: pointerSample.pressure,
         distance: 0,
@@ -18083,23 +18098,30 @@ function StudioCuttoonEditor() {
         // retain their historical nominal p=.5 contract.
         fallbackPressure: pressureModel ? 1 : 0.5,
       });
-      if (drawMode === "pen") scheduleLiveDrawPressure(pressure);
       const stylus = normalizeCalligraphyStylusInput(pointerSample);
+      // Magma quantizes the processed/coalesced input before either the immediate walker or the
+      // positive-strength cascade. Doing the same for pointerdown prevents a sub-pixel jump when
+      // the first move arrives on the quantized path.
+      const causalInitialSample = causalInkInputEnabled
+        ? quantizeFixedRateStrokeSample({
+            x: pos.x,
+            y: pos.y,
+            pressure: resolvedPressure,
+            tiltX: stylus.tiltX,
+            tiltY: stylus.tiltY,
+            timeStamp: pointerSample.timeStamp,
+          })
+        : null;
+      const strokeOrigin = causalInitialSample
+        ? { x: causalInitialSample.x, y: causalInitialSample.y }
+        : pos;
+      const pressure = causalInitialSample?.pressure ?? resolvedPressure;
+      if (drawMode === "pen") scheduleLiveDrawPressure(pressure);
       const capturePointerDynamics = drawMode === "pen" && hasBrushDynamics;
       const captureStylus = drawMode === "pen" && (brush === "calligraphy" || capturePointerDynamics);
       const tangentialPressure = Number.isFinite(pointerSample.tangentialPressure)
         ? Math.min(1, Math.max(-1, pointerSample.tangentialPressure))
         : 0;
-      const fixedRateInkEnabled = isStudioFixedRateInputEligible({
-        stabilizerMode,
-        stabilizerStrength: stabilizer,
-        drawMode,
-        brushFamily: fixedRateBrushFamily,
-        hasBrushDynamics,
-        causalStampV2: activeStampKind !== null,
-        causalWatercolorV2: activeCausalWatercolor,
-      });
-
       const common = {
         id: uid(),
         type: "draw" as const,
@@ -18145,7 +18167,7 @@ function StudioCuttoonEditor() {
               kind: "freehand" as const,
               // pixel pencil / lasso fill map to pen mode with special fill/width.
               mode: (drawMode === "eraser" ? "eraser" : "pen") as "pen" | "eraser",
-              points: [pos.x, pos.y],
+              points: [strokeOrigin.x, strokeOrigin.y],
               strokeWidth: drawMode === "pixel" ? 1 : strokeWidth,
               fill: drawMode === "lasso-fill" ? color : undefined,
               pressures: [drawMode === "pixel" ? 1 : pressure],
@@ -18153,9 +18175,8 @@ function StudioCuttoonEditor() {
               sampleSpacing:
                 drawMode === "pixel"
                   ? 1
-                  : fixedRateInkEnabled
-                    ? 0
-                    : strokeSampleDistanceForScale(effScale),
+                  : causalInkInputPlan.sampleSpacing
+                    ?? strokeSampleDistanceForScale(effScale),
               tiltXs: captureStylus && drawMode === "pen" ? [stylus.tiltX] : undefined,
               tiltYs: captureStylus && drawMode === "pen" ? [stylus.tiltY] : undefined,
               twists: captureStylus && drawMode === "pen" ? [stylus.twist] : undefined,
@@ -18172,32 +18193,27 @@ function StudioCuttoonEditor() {
       tryCaptureStudioStrokePointer(drawingPointerCaptureTargetRef.current, pointerSession.pointerId);
       // Window safety net: mouse can release outside the stage when capture fails or is stolen.
       attachDrawingPointerSafetyListeners(pointerSession.pointerId);
-      // 픽셀 펜슬: no stabilizer (hard 1px steps). Lasso-fill keeps light smoothing.
+      drawingImmediateCausalInputRef.current = causalInkInputPlan.quantizeImmediately;
+      // Pixel pencil has no stabilizer. Positive standard strength uses the exact 5ms cascade;
+      // strength zero bypasses both sampler and low-pass and is normalized in appendFreehand.
       drawingFixedRateFilterRef.current = fixedRateInkEnabled
-        ? (
-            stabilizer > 0
-              ? createFixedRateStrokeFilter({
-                  x: pos.x,
-                  y: pos.y,
-                  pressure,
-                  tiltX: stylus.tiltX,
-                  tiltY: stylus.tiltY,
-                  timeStamp: pointerSample.timeStamp,
-                }, stabilizer)
-              : createCanonicalFixedRateStrokeFilter({
-                  x: pos.x,
-                  y: pos.y,
-                  pressure,
-                  tiltX: stylus.tiltX,
-                  tiltY: stylus.tiltY,
-                  timeStamp: pointerSample.timeStamp,
-                })
-          ).state
+        ? createFixedRateStrokeFilter({
+            x: strokeOrigin.x,
+            y: strokeOrigin.y,
+            pressure,
+            tiltX: causalInitialSample?.tiltX ?? stylus.tiltX,
+            tiltY: causalInitialSample?.tiltY ?? stylus.tiltY,
+            timeStamp: pointerSample.timeStamp,
+          }, stabilizer).state
         : null;
       drawingStabilizerRef.current =
-        drawMode === "shape" || drawMode === "pixel" || fixedRateInkEnabled
+        drawMode === "shape" || drawMode === "pixel" || causalInkInputEnabled
           ? null
-          : createStudioStrokeStabilizerState({ x: pos.x, y: pos.y, timeStamp: pointerSample.timeStamp });
+          : createStudioStrokeStabilizerState({
+              x: strokeOrigin.x,
+              y: strokeOrigin.y,
+              timeStamp: pointerSample.timeStamp,
+            });
       drawingVelocityRef.current =
         drawMode === "shape" || drawMode === "pixel"
           ? null
@@ -18256,8 +18272,8 @@ function StudioCuttoonEditor() {
               },
               next.stamp
             ),
-            pos.x,
-            pos.y,
+            next.points[0] ?? strokeOrigin.x,
+            next.points[1] ?? strokeOrigin.y,
             next.pressures?.[0] ?? 0.5
           )
         );
@@ -18307,8 +18323,8 @@ function StudioCuttoonEditor() {
           } else {
             liveInkOverlayRendererRef.current.begin(
               liveInkStyle,
-              pos.x,
-              pos.y,
+              next.points[0] ?? strokeOrigin.x,
+              next.points[1] ?? strokeOrigin.y,
               next.pressures?.[0] ?? studioInkFallbackPressure(next.pressureModel)
             );
           }
@@ -18347,7 +18363,7 @@ function StudioCuttoonEditor() {
         }
       }
       startFixedRateStrokePump(pointerSample, pointerDownFrameTimeStamp);
-      if (drawMode === "pen" && quickShapeActive) startQuickShapeTracking({ x: pos.x, y: pos.y });
+      if (drawMode === "pen" && quickShapeActive) startQuickShapeTracking(strokeOrigin);
       else stopQuickShapeTracking(); // 방어적 — 이전 스트로크 타이머 잔존 방지
       return;
     }
@@ -18914,7 +18930,7 @@ function StudioCuttoonEditor() {
     const previousVelocity = drawingVelocityRef.current ?? createStudioPointerVelocityState(timingSample);
     const velocitySample = sampleStudioPointerVelocity(previousVelocity, timingSample);
     drawingVelocityRef.current = velocitySample.state;
-    const pressure = typeof pressureOverride === "number" && Number.isFinite(pressureOverride)
+    let pressure = typeof pressureOverride === "number" && Number.isFinite(pressureOverride)
       ? Math.min(1, Math.max(0, pressureOverride))
       : resolveBrushPressureSample({
           pointerType: pointerSample.pointerType,
@@ -18926,18 +18942,35 @@ function StudioCuttoonEditor() {
           pressureCurve,
           fallbackPressure: current.pressureModel ? 1 : 0.5,
         });
-    if (!drawingPredictionPreviewRef.current) scheduleLiveDrawPressure(pressure);
-
     let targetX = pos.x;
     let targetY = pos.y;
+    if (
+      drawingImmediateCausalInputRef.current
+      || drawingFixedRateFilterRef.current !== null
+    ) {
+      const stylus = normalizeCalligraphyStylusInput(pointerSample);
+      const quantized = quantizeFixedRateStrokeSample({
+        x: targetX,
+        y: targetY,
+        pressure,
+        tiltX: stylus.tiltX,
+        tiltY: stylus.tiltY,
+        timeStamp: sampleTimeStamp,
+      });
+      targetX = quantized.x;
+      targetY = quantized.y;
+      pressure = quantized.pressure;
+    }
+    if (!drawingPredictionPreviewRef.current) scheduleLiveDrawPressure(pressure);
+
     // Commercial freehand + Shift: force a clean straight line from stroke origin (0/45/90°).
     // Applied before perspective/isometric so the artist's explicit Shift intent wins.
-      if (pointerSample.shiftKey && current.mode !== "eraser" && current.points.length >= 2) {
+    if (pointerSample.shiftKey && current.mode !== "eraser" && current.points.length >= 2) {
       const transition = resolveShiftFreehandTransition({
         currentPoints: current.points,
         currentPressures: current.pressures,
-        endX: pos.x,
-        endY: pos.y,
+        endX: targetX,
+        endY: targetY,
         pressure,
       });
       const nextShift: DrawEl = {
@@ -18963,6 +18996,10 @@ function StudioCuttoonEditor() {
       // making the stroke run backwards. Recreate it lazily only if a later unconstrained move
       // resumes the freehand gesture.
       drawingStabilizerRef.current = transition.stabilizerState;
+      // A replace-in-place Shift gesture cannot retain the old fixed-clock history. If the artist
+      // releases Shift within the same contact, continue on the causal immediate path instead of
+      // silently switching to the unrelated legacy stabilizer engine.
+      if (drawingFixedRateFilterRef.current) drawingImmediateCausalInputRef.current = true;
       drawingFixedRateFilterRef.current = null;
       stopFixedRateStrokePump();
       drawingRef.current = nextShift;
@@ -19004,22 +19041,31 @@ function StudioCuttoonEditor() {
       appendFixedRateStrokeSamples(transition.emitted, pointerSample, velocitySample.speed);
       return;
     }
-    const liveStabilizerState = drawingStabilizerRef.current
-      ?? createStudioStrokeStabilizerState({
-        x: rawLastX,
-        y: rawLastY,
-        timeStamp: sampleTimeStamp,
-      });
-    const stabilized = stabilizeStudioStrokeSample(
-      liveStabilizerState,
-      { x: targetX, y: targetY, timeStamp: sampleTimeStamp },
-      { strength: stabilizer, mode: stabilizerMode, coordinateScale: effScale }
-    );
-    drawingStabilizerRef.current = stabilized.state;
-    [targetX, targetY] = stabilized.point;
+    if (!drawingImmediateCausalInputRef.current) {
+      const liveStabilizerState = drawingStabilizerRef.current
+        ?? createStudioStrokeStabilizerState({
+          x: rawLastX,
+          y: rawLastY,
+          timeStamp: sampleTimeStamp,
+        });
+      const stabilized = stabilizeStudioStrokeSample(
+        liveStabilizerState,
+        { x: targetX, y: targetY, timeStamp: sampleTimeStamp },
+        { strength: stabilizer, mode: stabilizerMode, coordinateScale: effScale }
+      );
+      drawingStabilizerRef.current = stabilized.state;
+      [targetX, targetY] = stabilized.point;
+    }
 
     const lastX = current.points[current.points.length - 2] ?? targetX;
     const lastY = current.points[current.points.length - 1] ?? targetY;
+    const pointDistance = Math.hypot(targetX - lastX, targetY - lastY);
+    const lastPressure = current.pressures?.at(-1)
+      ?? studioInkFallbackPressure(current.pressureModel);
+    // Repeated browser samples that collapse to the same 1/16 coordinate and 10-bit pressure add
+    // no information. A pressure-only change is retained so the incremental dab walker can update
+    // interpolation state without repainting the stationary prefix.
+    if (pointDistance <= 1e-9 && pressure === lastPressure) return;
     if (!shouldAppendStrokePoint(
       lastX,
       lastY,
@@ -19041,12 +19087,26 @@ function StudioCuttoonEditor() {
       );
       return [...aligned, value];
     };
+    const appendMutableStylusValue = (
+      values: number[] | undefined,
+      value: number
+    ): number[] => {
+      const aligned = values ?? [];
+      if (aligned.length > previousPointCount) aligned.length = previousPointCount;
+      while (aligned.length < previousPointCount) aligned.push(0);
+      aligned.push(value);
+      return aligned;
+    };
     // Canvas2D authoritative overlay는 ref 전용 draft를 소비한다. 이 경로에서는 배열 참조를
     // React 상태/히스토리에 게시하지 않으므로 접미 샘플을 제자리 추가해 긴 획의 매 포인트
     // 전체 points/pressure 복사(O(N²))를 없앤다. GPU/예측/비다이렉트 경로는 immutable 유지.
     const canAppendDirectly = (
       (liveDraftDirectRef.current && liveInkOverlayRendererRef.current.isActive)
       || (liveStampDraftDirectRef.current && liveStampOverlayRendererRef.current.isActive)
+      || (
+        drawingImmediateBatchMutationRef.current
+        && drawingImmediateCausalInputRef.current
+      )
     )
       && !gpuLiveInkPinnedRef.current
       && !drawingPredictionPreviewRef.current;
@@ -19059,8 +19119,20 @@ function StudioCuttoonEditor() {
         );
       }
       current.pressures.push(pressure);
+      if (stylus) {
+        current.tiltXs = appendMutableStylusValue(current.tiltXs, stylus.tiltX);
+        current.tiltYs = appendMutableStylusValue(current.tiltYs, stylus.tiltY);
+        current.twists = appendMutableStylusValue(current.twists, stylus.twist);
+      }
+      if (capturePointerDynamics) {
+        current.speeds = appendMutableStylusValue(current.speeds, velocitySample.speed);
+        current.tangentialPressures = appendMutableStylusValue(
+          current.tangentialPressures,
+          tangentialPressure
+        );
+      }
       drawingRef.current = current;
-      scheduleDraft(current);
+      if (!drawingImmediateBatchMutationRef.current) scheduleDraft(current);
       return;
     }
     const next: DrawEl = {
@@ -19131,6 +19203,30 @@ function StudioCuttoonEditor() {
       drawingFixedRateSampleClockRef.current = sampleClockTransition.state;
     }
     const crdtSampleStart = Math.floor((drawingRef.current?.points.length ?? 0) / 2);
+    const immediateBatchMutation = drawingImmediateCausalInputRef.current
+      && !gpuLiveInkPinnedRef.current
+      && !liveDraftDirectRef.current
+      && !liveStampDraftDirectRef.current
+      && batch.authoritative.length > 0;
+    if (immediateBatchMutation && drawingRef.current) {
+      const current = drawingRef.current;
+      // Clone once per browser delivery, then append every coalesced sample into that private
+      // draft. Non-overlay eraser/watercolor paths therefore stay O(events × points), not
+      // O(hardwareSamples × points), while the previously published draft remains immutable.
+      drawingRef.current = {
+        ...current,
+        points: [...current.points],
+        pressures: current.pressures ? [...current.pressures] : undefined,
+        tiltXs: current.tiltXs ? [...current.tiltXs] : undefined,
+        tiltYs: current.tiltYs ? [...current.tiltYs] : undefined,
+        twists: current.twists ? [...current.twists] : undefined,
+        speeds: current.speeds ? [...current.speeds] : undefined,
+        tangentialPressures: current.tangentialPressures
+          ? [...current.tangentialPressures]
+          : undefined,
+      };
+      drawingImmediateBatchMutationRef.current = true;
+    }
     try {
       // Konva derives canvas coordinates from client coordinates. Temporarily feeding each restored
       // hardware event through the public pointer API avoids duplicating its transform math.
@@ -19147,9 +19243,18 @@ function StudioCuttoonEditor() {
           );
         }
       }
+      drawingImmediateBatchMutationRef.current = false;
 
       const authoritativeDrawing = publishAuthoritativeFreehandSuffix(crdtSampleStart);
       const authoritativePointCount = Math.floor((authoritativeDrawing?.points.length ?? 0) / 2);
+      if (
+        immediateBatchMutation
+        && authoritativePointCount > crdtSampleStart
+        && !liveDraftDirectRef.current
+        && !liveStampDraftDirectRef.current
+      ) {
+        scheduleDraft(authoritativeDrawing);
+      }
       if (
         authoritativeDrawing
         && batch.predicted.length > 0
@@ -19189,6 +19294,7 @@ function StudioCuttoonEditor() {
         }
       }
     } finally {
+      drawingImmediateBatchMutationRef.current = false;
       // Other Stage consumers (cursor, hit testing, collaboration) must observe the real latest
       // pointer rather than a coalesced or future estimate after this handler returns.
       stage.setPointersPositions(pointerEvent);

@@ -4,7 +4,6 @@ import {
   FIXED_RATE_STROKE_FILTER_TICK_MS,
   FIXED_RATE_STROKE_PRESSURE_STEPS,
   FIXED_RATE_STROKE_RELEASE_POSITION_EPSILON,
-  createCanonicalFixedRateStrokeFilter,
   createFixedRateStrokeFilter,
   quantizeFixedRateStrokeSample,
   resolveFixedRateStrokeFilterParameters,
@@ -105,11 +104,15 @@ describe("fixed-rate stroke filter parameters", () => {
     });
   });
 
-  it("rounds the positive fractional stage count to nearest, with half-up ties", () => {
+  it("uses the public cascade loop's ceiling for fractional stage counts", () => {
     const parameters = resolveFixedRateStrokeFilterParameters(0.43);
     expect(parameters.response).toBeCloseTo(22, 12);
     expect(parameters.response / 4).toBeCloseTo(5.5, 12);
     expect(parameters.stageCount).toBe(6);
+
+    const nonTie = resolveFixedRateStrokeFilterParameters(0.265);
+    expect(nonTie.response / 4).toBeCloseTo(5.25, 12);
+    expect(nonTie.stageCount).toBe(6);
   });
 });
 
@@ -160,123 +163,24 @@ describe("fixed-rate stroke input quantization", () => {
     });
     expect(quantizeFixedRateStrokeSample({ x: 0, y: 0, pressure: 5 }).pressure).toBe(1);
   });
-});
 
-describe("canonical zero-strength fixed-rate sampler", () => {
-  it("keeps the traced strength-zero curve separate from the pass-through sampler", () => {
-    expect(resolveFixedRateStrokeFilterParameters(0)).toMatchObject({
-      response: 20,
-      stageCount: 5,
-      alpha: 0.8,
+  it("preserves the public half-step rounding and 10-bit pressure boundary", () => {
+    const halfStep = quantizeFixedRateStrokeSample({
+      x: 1 / 32,
+      y: -1 / 32,
+      pressure: 0.5,
     });
+    expect(halfStep.x).toBe(1 / 16);
+    expect(halfStep.y).toBe(0);
+    expect(Object.is(halfStep.y, -0)).toBe(false);
+    expect(halfStep.pressure).toBe(512 / FIXED_RATE_STROKE_PRESSURE_STEPS);
 
-    const started = createCanonicalFixedRateStrokeFilter({ x: 0, y: 0, timeStamp: 2.5 });
-    expect(started.state.parameters).toEqual({
-      strength: 0,
-      normalizedStrength: 0,
-      response: 0,
-      stageCount: 1,
-      alpha: 1,
-    });
-    expect(started.state.stages).toHaveLength(1);
-  });
-
-  it("publishes each eligible quantized pointer sample unchanged on the 5ms grid", () => {
-    const started = createCanonicalFixedRateStrokeFilter({
-      x: 0.01,
-      y: -0.01,
-      pressure: 0.2,
-      tiltX: 0,
-      tiltY: 0,
-      timeStamp: 2.5,
-    });
-    const firstRaw = {
-      x: 12.34,
-      y: -4.52,
-      pressure: 0.6789,
-      tiltX: 11.11,
-      tiltY: -7.77,
-      timeStamp: 6,
-    } as const;
-    const receivedFirst = append(started.state, [firstRaw]);
-    expect(receivedFirst.emitted).toEqual([]);
-
-    const firstTick = advance(receivedFirst.state, 7.5);
-    const firstExpected = quantizeFixedRateStrokeSample(firstRaw);
-    expect(firstTick.emitted).toEqual([{
-      x: firstExpected.x,
-      y: firstExpected.y,
-      pressure: firstExpected.pressure,
-      tiltX: firstExpected.tiltX,
-      tiltY: firstExpected.tiltY,
-      timeStamp: 7.5,
-      sourceTimeStamp: 6,
-      logicalTick: 1,
-    }]);
-
-    const secondRaw = {
-      x: 19.91,
-      y: 8.08,
-      pressure: 0.321,
-      tiltX: -3.14,
-      tiltY: 6.28,
-      timeStamp: 9,
-    } as const;
-    const receivedSecond = append(firstTick.state, [secondRaw]);
-    const secondTick = advance(receivedSecond.state, 12.5);
-    const secondExpected = quantizeFixedRateStrokeSample(secondRaw, firstExpected);
-    expect(secondTick.endpoint).toMatchObject({
-      x: secondExpected.x,
-      y: secondExpected.y,
-      pressure: secondExpected.pressure,
-      tiltX: secondExpected.tiltX,
-      tiltY: secondExpected.tiltY,
-      timeStamp: 12.5,
-      sourceTimeStamp: 9,
-      logicalTick: 2,
-    });
-    expect([...firstTick.emitted, ...secondTick.emitted].every((sample) => (
-      sample.timeStamp === 2.5 + sample.logicalTick * FIXED_RATE_STROKE_FILTER_TICK_MS
-    ))).toBe(true);
-  });
-
-  it("releases at the exact quantized endpoint with at most one pass-through drain tick", () => {
-    const started = createCanonicalFixedRateStrokeFilter({
-      x: 2,
-      y: 3,
-      pressure: 0.4,
-      timeStamp: 2.5,
-    });
-    const finalRaw = {
-      x: 41.03,
-      y: -12.04,
-      pressure: 0.901,
-      tiltX: 8.03,
-      tiltY: -5.02,
-      timeStamp: 9,
-    } as const;
-    const received = append(started.state, [finalRaw]);
-    const finished = release(received.state);
-    const expected = quantizeFixedRateStrokeSample(finalRaw);
-
-    expect(finished.releaseDrainTicks).toBe(1);
-    expect(finished.endpoint).toMatchObject({
-      x: expected.x,
-      y: expected.y,
-      pressure: expected.pressure,
-      tiltX: expected.tiltX,
-      tiltY: expected.tiltY,
-      timeStamp: 12.5,
-      sourceTimeStamp: 9,
-      logicalTick: 2,
-    });
-    expect(finished.state.closed).toBe(true);
-    expect(finished.state.lastStagePositionDelta).toBe(
-      Math.abs(expected.x - 2) + Math.abs(expected.y - 3)
-    );
-    expect(finished.emitted.every((sample) => (
-      sample.timeStamp === 2.5 + sample.logicalTick * FIXED_RATE_STROKE_FILTER_TICK_MS
-    ))).toBe(true);
+    const fallback = quantizeFixedRateStrokeSample({ x: 0, y: 0, pressure: 0.75 });
+    expect(quantizeFixedRateStrokeSample({
+      x: 1,
+      y: 1,
+      pressure: Number.NaN,
+    }, fallback).pressure).toBe(fallback.pressure);
   });
 });
 

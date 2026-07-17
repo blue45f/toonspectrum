@@ -13,7 +13,7 @@ export const STUDIO_STABILIZER_MODES = [
   {
     id: "standard",
     label: "고정 주기",
-    description: "5ms 고정 입력과 단계식 필터로 기기·이벤트 묶음과 무관한 선을 만듭니다.",
+    description: "보정 0은 코얼레스트 입력을 즉시 반영하고, 0보다 크면 5ms 단계식 필터를 적용합니다.",
   },
   {
     id: "adaptive",

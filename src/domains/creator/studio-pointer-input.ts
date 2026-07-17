@@ -32,10 +32,10 @@ export interface StudioStrokePointerSession {
   readonly pointerId: number;
   readonly pointerType: "pen" | "touch" | "mouse" | "unknown";
   /**
-   * Exactly one native move stream may own durable ink. Browsers that deliver raw updates switch
-   * permanently to that higher-rate stream; ordinary pointermove remains the no-UA-sniff fallback.
+   * Durable ink follows the processed Pointer Events stream. Its coalesced list restores hardware
+   * samples without the extra jitter/duplicate topology of a parallel raw-update subscription.
    */
-  readonly moveTransport: "pointermove" | "pointerrawupdate";
+  readonly moveTransport: "pointermove";
   /** Exact signature of the last stored hardware sample, used only for adjacent deduplication. */
   readonly lastAuthoritativeSignature: string;
 }
@@ -186,12 +186,10 @@ export function shouldCancelStudioFingerStrokeForAdditionalContact(
 }
 
 /**
- * Arbitrates the two browser move streams without relying on UA or feature detection.
- *
- * Pointer Events guarantees that a raw update for a platform sample is dispatched before the
- * corresponding processed pointermove. Once a matching raw update is observed, accepting later
- * pointermove/coalesced batches as ink would replay the same hardware samples and can visibly run
- * the stroke backwards. Browsers that never dispatch raw updates stay on pointermove forever.
+ * Keeps durable ink on processed pointermove. `pointerrawupdate` can arrive at a different cadence
+ * from the processed/coalesced stream and must never poison a session or suppress its next move.
+ * This mirrors Magma's public input path and leaves raw updates available for future preview-only
+ * telemetry without allowing two native transports to own the same pixels.
  */
 export function claimStudioStrokeMoveTransport(
   session: StudioStrokePointerSession,
@@ -201,16 +199,8 @@ export function claimStudioStrokeMoveTransport(
   if (!isStudioStrokePointerEvent(session, event)) {
     return { accepted: false, session };
   }
-  if (eventType === "pointerrawupdate") {
-    return {
-      accepted: true,
-      session: session.moveTransport === "pointerrawupdate"
-        ? session
-        : { ...session, moveTransport: "pointerrawupdate" },
-    };
-  }
   return {
-    accepted: session.moveTransport === "pointermove",
+    accepted: eventType === "pointermove",
     session,
   };
 }

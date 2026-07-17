@@ -222,7 +222,7 @@ describe("studio pointer input", () => {
     ]);
   });
 
-  it("uses one exclusive move transport and permanently prefers the first matching raw update", () => {
+  it("keeps durable ink on processed pointermove and ignores raw updates without poisoning it", () => {
     const initial = beginStudioStrokePointerSession(sample(1))!;
     const moveA = sample(2);
     const fallback = claimStudioStrokeMoveTransport(initial, moveA, "pointermove");
@@ -238,16 +238,21 @@ describe("studio pointer input", () => {
 
     const rawB = sample(3);
     const raw = claimStudioStrokeMoveTransport(fallback.session, rawB, "pointerrawupdate");
-    expect(raw.accepted).toBe(true);
-    expect(raw.session.moveTransport).toBe("pointerrawupdate");
+    expect(raw).toEqual({ accepted: false, session: fallback.session });
 
-    const duplicatedMove = sample(4, { getCoalescedEvents: () => [moveA, rawB, sample(4)] });
+    const final = sample(4);
+    const duplicatedMove = sample(4, { getCoalescedEvents: () => [moveA, rawB, final] });
+    const processed = claimStudioStrokeMoveTransport(raw.session, duplicatedMove, "pointermove");
+    expect(processed.accepted).toBe(true);
+    const recovered = collectStudioStrokePointerBatch(processed.session, duplicatedMove);
+    expect(recovered.authoritative).toEqual([moveA, rawB, final]);
     expect(
-      claimStudioStrokeMoveTransport(raw.session, duplicatedMove, "pointermove").accepted
-    ).toBe(false);
+      collectStudioStrokePointerBatch(recovered.session, final).authoritative
+    ).toEqual([]);
     expect(
       claimStudioStrokeMoveTransport(raw.session, sample(5), "pointerrawupdate").accepted
-    ).toBe(true);
+    ).toBe(false);
+    expect(raw.session.moveTransport).toBe("pointermove");
   });
 
   it("lets release own exactly one parent endpoint even when move history is coalesced", () => {
