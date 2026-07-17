@@ -7,6 +7,7 @@ import {
   Download,
   Pencil,
   Pin,
+  RefreshCw,
   Save,
   Trash2,
   Upload,
@@ -26,6 +27,7 @@ import {
   saveBrushWithResult,
   sortBrushesForLibrary,
   toggleBrushPinnedWithResult,
+  updateBrushSnapshotWithResult,
   writeBrushJson,
   type DeletedBrushRecord,
   type StudioBrushSnapshot,
@@ -113,6 +115,19 @@ export function StudioBrushLibraryPanel({
       return;
     }
     if (result.status === "updated") onBrushesChange(result.brushes);
+  }
+
+  function handleOverwrite(brush: StudioSavedBrush) {
+    setError(null);
+    setDoneMsg(null);
+    const result = updateBrushSnapshotWithResult(browserBrushLibraryStorage(), brush.id, currentSnapshot);
+    if (result.status === "storage-error" || result.status === "library-unreadable") {
+      setMutationError(result.status);
+      return;
+    }
+    if (result.status !== "updated") return;
+    onBrushesChange(result.brushes);
+    setDoneMsg(`"${brush.name}" 브러시를 지금 설정으로 덮어썼어요.`);
   }
 
   function handleDuplicate(id: string) {
@@ -377,7 +392,10 @@ export function StudioBrushLibraryPanel({
                 </span>
               </button>
 
-              <div className="mt-1.5 grid grid-cols-4 gap-1 border-t border-line/50 pt-1.5">
+              <div className="mt-1.5 grid grid-cols-5 gap-1 border-t border-line/50 pt-1.5">
+                <button type="button" onClick={() => handleOverwrite(brush)} aria-label={`${brush.name} 브러시를 지금 설정으로 덮어쓰기`} title="지금 설정으로 덮어쓰기 (같은 브러시에 저장)" className="flex min-h-11 items-center justify-center gap-1 rounded-lg text-[0.6rem] font-medium text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8">
+                  <RefreshCw size={12} aria-hidden /> 덮어쓰기
+                </button>
                 <button type="button" onClick={() => handleDuplicate(brush.id)} aria-label={`${brush.name} 복제`} className="flex min-h-11 items-center justify-center gap-1 rounded-lg text-[0.6rem] font-medium text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8">
                   <Copy size={12} aria-hidden /> 복제
                 </button>

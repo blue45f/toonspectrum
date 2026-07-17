@@ -32,6 +32,7 @@ import {
   selectQuickBrushes,
   sortBrushesForLibrary,
   toggleBrushPinned,
+  updateBrushSnapshotWithResult,
   writeBrushJson,
   type StudioBrushSnapshot,
   type StudioSavedBrush,
@@ -509,6 +510,61 @@ describe("saveBrush", () => {
     const s = fakeStorage();
     saveBrush(s, brush("a"));
     expect(listBrushes(s).map((b) => b.id)).toEqual(["a"]);
+  });
+});
+
+describe("updateBrushSnapshotWithResult", () => {
+  it("id·이름·고정·생성 시각은 보존하고 그리기 설정만 갱신한다", () => {
+    const s = fakeStorage();
+    const original = { ...brush("a", 1), name: "내 G펜", pinned: true };
+    saveBrush(s, original);
+    const changed: StudioBrushSnapshot = { ...validSnapshot, strokeWidth: 30, color: "#00ff00" };
+
+    const result = updateBrushSnapshotWithResult(s, "a", changed);
+
+    expect(result.status).toBe("updated");
+    expect(result.brushes).toHaveLength(1);
+    expect(result.brushes[0]).toMatchObject({
+      id: "a",
+      name: "내 G펜",
+      pinned: true,
+      createdAt: 1,
+      strokeWidth: 30,
+      color: "#00ff00",
+    });
+    expect(result.brushes[0].updatedAt).toBeGreaterThanOrEqual(1);
+  });
+
+  it("모르는 id는 missing을 반환하고 목록을 바꾸지 않는다", () => {
+    const s = fakeStorage();
+    saveBrush(s, brush("a"));
+    const result = updateBrushSnapshotWithResult(s, "not-real", validSnapshot);
+    expect(result.status).toBe("missing");
+    expect(result.brushes.map((b) => b.id)).toEqual(["a"]);
+  });
+
+  it("범위를 벗어난 스냅샷 값도 clamp해 절대 던지지 않는다", () => {
+    const s = fakeStorage();
+    saveBrush(s, brush("a"));
+    const result = updateBrushSnapshotWithResult(s, "a", {
+      ...validSnapshot,
+      strokeWidth: 9_999,
+    } as StudioBrushSnapshot);
+    expect(result.status).toBe("updated");
+    expect(result.brushes[0].strokeWidth).toBeLessThanOrEqual(BRUSH_STROKE_WIDTH_RANGE[1]);
+  });
+
+  it("저장소 쓰기가 실패하면 원본 목록을 유지한다", () => {
+    const s = fakeStorage();
+    saveBrush(s, brush("a"));
+    const failing = {
+      getItem: s.getItem,
+      setItem: () => {
+        throw new Error("quota");
+      },
+    };
+    const result = updateBrushSnapshotWithResult(failing, "a", validSnapshot);
+    expect(result.status).toBe("storage-error");
   });
 });
 

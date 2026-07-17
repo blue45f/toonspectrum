@@ -492,6 +492,31 @@ export function saveBrush(storage: BrushLibraryStorage | null | undefined, brush
   return saveBrushWithResult(storage, brush).brushes;
 }
 
+/**
+ * 기존 브러시의 id·이름·고정·생성 시각은 그대로 두고 그리기 설정(snapshot)만 지금 값으로
+ * 덮어쓴다. saveBrushWithResult가 이미 "같은 id면 교체" 동작을 지원하므로 그걸 그대로 쓴다 —
+ * 지금까지 이 경로로 오는 호출이 없었을 뿐이다(항상 createBrush로 새 id를 만들어 저장했다).
+ */
+export function updateBrushSnapshotWithResult(
+  storage: BrushLibraryStorage | null | undefined,
+  id: string,
+  snapshot: StudioBrushSnapshot
+): BrushUpdateResult {
+  const read = readBrushLibrary(storage);
+  const readFailure = mutationFailureStatus(read.status);
+  if (readFailure) return { brushes: read.brushes, status: readFailure };
+  const existing = read.brushes.find((b) => b.id === id);
+  if (!existing) return { brushes: read.brushes, status: "missing" };
+  const { snapshot: safe } = sanitizeBrushSnapshot(snapshot);
+  const updated: StudioSavedBrush = { ...existing, ...safe, updatedAt: Date.now() };
+  const result = saveBrushWithResult(storage, updated);
+  // "full" can't happen here — replacesExisting is always true for an id already found above.
+  if (result.status === "storage-error" || result.status === "library-unreadable") {
+    return { brushes: result.brushes, status: result.status };
+  }
+  return { brushes: result.brushes, status: "updated" };
+}
+
 /** 이름 변경(목록 순서는 유지 — 저장과 달리 맨 앞으로 옮기지 않는다). 빈 이름은 무시(원본 목록 그대로 반환). */
 export function renameBrush(storage: BrushLibraryStorage | null | undefined, id: string, name: string): StudioSavedBrush[] {
   return renameBrushWithResult(storage, id, name).brushes;
