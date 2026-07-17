@@ -930,6 +930,7 @@ import {
   type SmartGuideOverlay,
 } from "./studio-smart-guides";
 import { SMUDGE_RADIUS_DEFAULT, SMUDGE_STRENGTH_DEFAULT, smudgeStrokeImage } from "./studio-smudge";
+import { useStudioStableHandlers } from "./studio-stable-handlers";
 import {
   SCENARIO_BEAT_LABELS,
   SCENARIO_BEAT_TYPES,
@@ -5315,31 +5316,6 @@ function recordStudioRenderProfile(
   if (buffer.length > 80) buffer.splice(0, buffer.length - 80);
 }
 
-// Identity-stable event-handler bundle for memoized region children of the (compiler-bailed)
-// editor. Wrappers are created once and read the latest closures from a ref refreshed in a
-// layout effect, so a memo child never re-renders because a handler was re-declared. Only safe
-// for event-time invocation (never call these during render — the ref lags one commit there).
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- variadic handler bag
-type StudioStableHandlerBag = Record<string, (...args: any[]) => unknown>;
-function useStudioStableHandlers<T extends { [K in keyof T]: (...args: never[]) => unknown }>(
-  handlers: T
-): T {
-  "use no memo";
-  const latestRef = useRef(handlers);
-  useLayoutEffect(() => {
-    latestRef.current = handlers;
-  });
-  const [stable] = useState(() => {
-    const out: StudioStableHandlerBag = {};
-    for (const key of Object.keys(handlers)) {
-      out[key] = (...args: unknown[]) =>
-        (latestRef.current as unknown as StudioStableHandlerBag)[key](...args);
-    }
-    return out as unknown as T;
-  });
-  return stable;
-}
-
 export function StudioPage() {
   const [params] = useSearchParams();
   const { data: session } = useSession();
@@ -6781,18 +6757,31 @@ function StudioCuttoonEditor() {
     !densityHidesPageStrip;
   const visibleRightPanelOpen =
     rightPanelOpen && !presentationPanelsHidden && !densityHidesRightPanel;
-  const liveWorkspaceLayout = normalizeStudioWorkspaceLayout(
-    {
-      inspector: inspectorLayout,
-      desktop: {
-        leftPanelOpen,
-        rightPanelOpen,
-        leftPanelWidth: leftResize.width,
-        rightPanelWidth: rightResize.width,
-      },
-      quickActions: quickActionsPreferences,
-    },
-    workspaceState.liveLayout
+  // useMemo: 렌더마다 새 정규화 객체가 메뉴바 memo 자식(작업공간 메뉴)을 재렌더시키지 않게.
+  const liveWorkspaceLayout = useMemo(
+    () =>
+      normalizeStudioWorkspaceLayout(
+        {
+          inspector: inspectorLayout,
+          desktop: {
+            leftPanelOpen,
+            rightPanelOpen,
+            leftPanelWidth: leftResize.width,
+            rightPanelWidth: rightResize.width,
+          },
+          quickActions: quickActionsPreferences,
+        },
+        workspaceState.liveLayout
+      ),
+    [
+      inspectorLayout,
+      leftPanelOpen,
+      rightPanelOpen,
+      leftResize.width,
+      rightResize.width,
+      quickActionsPreferences,
+      workspaceState.liveLayout,
+    ]
   );
   const workspacePersistenceRef = useRef(workspacePersistence);
   const liveWorkspaceLayoutRef = useRef(liveWorkspaceLayout);
@@ -10374,34 +10363,64 @@ function StudioCuttoonEditor() {
         (reference) => studioWorkAssetHydrator.get(reference)
       )
     : null;
-  const layerNavigatorItems: StudioLayerNavigatorItem[] = useMemo(() => elements.map((element, zIndex) => ({
-    id: element.id,
-    type: element.type,
-    label: element.name?.trim() || elementLabel(element),
-    textContent:
-      element.type === "text" || element.type === "bubble" || element.type === "sticker"
-        ? element.text
-        : element.type === "frame"
-          ? element.storyBeat?.summary
-          : undefined,
-    zIndex,
-    groupId: masterEditMode ? undefined : element.groupId,
-    hidden: element.hidden,
-    locked: element.locked,
-    alphaLocked: element.alphaLocked,
-    fillReference: element.type === "image" ? element.fillReference : undefined,
-    masked: Boolean(element.maskSrc),
-    maskEnabled: element.maskEnabled,
-    aiGenerated:
-      ((element.type === "image" || element.type === "frame") && Boolean(element.aiProvenance)) ||
-      (element.type === "frame" && Boolean(element.storyBeat?.textAiProvenance)),
-    clipBelow: element.clipBelow,
-    animated:
-      element.type === "image" &&
-      (element.isAnimatedGif === true || (element.frames?.length ?? 0) > 1 || hasTrack(animTimeline, element.id)),
-    role: normalizeStudioLayerRole(element.layerRole),
-    color: normalizeStudioLayerColor(element.layerColor),
-  })), [elements, masterEditMode, animTimeline]);
+  // 요소 객체가 커밋을 넘어 reference-stable(불변 업데이트)인 점을 이용해 아이템 객체도
+  // 요소별로 재사용한다 — 레이어 내비게이터 행 memo가 "새 획 1개 추가" 커밋에서 기존 행을
+  // 전부 다시 그리지 않게 하는 열쇠(입력이 같으면 같은 참조를 돌려준다).
+  const layerNavigatorItemCacheRef = useRef(
+    new WeakMap<
+      El,
+      {
+        zIndex: number;
+        masterEditMode: boolean;
+        animTimeline: typeof animTimeline;
+        item: StudioLayerNavigatorItem;
+      }
+    >()
+  );
+  const layerNavigatorItems: StudioLayerNavigatorItem[] = useMemo(() => {
+    const cache = layerNavigatorItemCacheRef.current;
+    return elements.map((element, zIndex) => {
+      const cached = cache.get(element);
+      if (
+        cached &&
+        cached.zIndex === zIndex &&
+        cached.masterEditMode === masterEditMode &&
+        cached.animTimeline === animTimeline
+      ) {
+        return cached.item;
+      }
+      const item: StudioLayerNavigatorItem = {
+        id: element.id,
+        type: element.type,
+        label: element.name?.trim() || elementLabel(element),
+        textContent:
+          element.type === "text" || element.type === "bubble" || element.type === "sticker"
+            ? element.text
+            : element.type === "frame"
+              ? element.storyBeat?.summary
+              : undefined,
+        zIndex,
+        groupId: masterEditMode ? undefined : element.groupId,
+        hidden: element.hidden,
+        locked: element.locked,
+        alphaLocked: element.alphaLocked,
+        fillReference: element.type === "image" ? element.fillReference : undefined,
+        masked: Boolean(element.maskSrc),
+        maskEnabled: element.maskEnabled,
+        aiGenerated:
+          ((element.type === "image" || element.type === "frame") && Boolean(element.aiProvenance)) ||
+          (element.type === "frame" && Boolean(element.storyBeat?.textAiProvenance)),
+        clipBelow: element.clipBelow,
+        animated:
+          element.type === "image" &&
+          (element.isAnimatedGif === true || (element.frames?.length ?? 0) > 1 || hasTrack(animTimeline, element.id)),
+        role: normalizeStudioLayerRole(element.layerRole),
+        color: normalizeStudioLayerColor(element.layerColor),
+      };
+      cache.set(element, { zIndex, masterEditMode, animTimeline, item });
+      return item;
+    });
+  }, [elements, masterEditMode, animTimeline]);
   const selectedBubbleTailGeometry = selected?.type === "bubble"
     ? computeBubbleShapeGeometry({
         width: selected.width,
@@ -19705,9 +19724,17 @@ function StudioCuttoonEditor() {
   // 존재한다(별도 open 상태 없음). null이면 그룹 팝오버뿐 아니라 개별 팝오버도 전부 닫힌 상태.
   const activeToolbarGroup: StudioToolbarGroupId | null = menu ? (STUDIO_TOOLBAR_GROUP_OF[menu] ?? null) : null;
 
+  // 커밋마다 메뉴 그룹 useMemo가 무효화되지 않도록 elements 읽기는 이벤트 시점 번들로 승격.
+  function selectAllElements() {
+    setTool("select");
+    setEyedropperActive(false);
+    setSelectedId(null);
+    setMarqueeIds(elements.map((el) => el.id));
+  }
   // 메뉴 항목 onSelect 클로저가 참조하는 에디터 핸들러의 안정 번들 — 그룹 배열 useMemo가
   // 렌더마다 무효화되지 않게 하고, 이벤트 시점엔 항상 최신 클로저를 호출한다.
   const studioMainMenuActions = useStudioStableHandlers({
+    selectAllElements,
     addPage,
     addText,
     announceDrawingShortcut,
@@ -19727,6 +19754,13 @@ function StudioCuttoonEditor() {
     undo,
   });
 
+  // 메뉴 그룹 표시용 원시값 — elements/history/selection 객체 대신 불리언만 deps 로 삼아
+  // 정착 커밋·선택 변경마다 메뉴바 memo 자식이 재렌더되지 않게 한다.
+  const menuDocumentEmpty = elements.length === 0;
+  const menuUndoDisabled = hi === 0 || collaborationDocumentLocked;
+  const menuRedoDisabled = hi >= history.length - 1 || collaborationDocumentLocked;
+  const menuNoSelection = !selected && marqueeIds.length === 0;
+  const menuSharedNonOwnerSave = Boolean(sharedDocument && sharedDocument.role !== "owner");
   const studioMainMenuGroups: StudioMainMenuGroup[] = useMemo(() => [
     {
       id: "file",
@@ -19752,7 +19786,7 @@ function StudioCuttoonEditor() {
         },
         {
           id: "save-draft",
-          label: sharedDocument && sharedDocument.role !== "owner" ? "공동 저장" : "임시저장",
+          label: menuSharedNonOwnerSave ? "공동 저장" : "임시저장",
           icon: Bookmark,
           shortcut: "⌘S",
           disabled: saving || collaborationDocumentLocked,
@@ -19767,7 +19801,7 @@ function StudioCuttoonEditor() {
           disabled:
             saving ||
             collaborationDocumentLocked ||
-            Boolean(sharedDocument && sharedDocument.role !== "owner"),
+            menuSharedNonOwnerSave,
           separatorAfter: true,
           onSelect: () => {
             void studioMainMenuActions.handleSave("published");
@@ -19823,7 +19857,7 @@ function StudioCuttoonEditor() {
           label: "실행취소",
           icon: Undo2,
           shortcut: "⌘Z",
-          disabled: hi === 0 || collaborationDocumentLocked,
+          disabled: menuUndoDisabled,
           onSelect: () => studioMainMenuActions.undo(),
         },
         {
@@ -19831,7 +19865,7 @@ function StudioCuttoonEditor() {
           label: "다시실행",
           icon: Redo2,
           shortcut: "⌘⇧Z",
-          disabled: hi >= history.length - 1 || collaborationDocumentLocked,
+          disabled: menuRedoDisabled,
           onSelect: () => studioMainMenuActions.redo(),
           separatorAfter: true,
         },
@@ -19840,7 +19874,7 @@ function StudioCuttoonEditor() {
           label: "복사",
           icon: Copy,
           shortcut: "⌘C",
-          disabled: !selected && marqueeIds.length === 0,
+          disabled: menuNoSelection,
           onSelect: () => {
             studioMainMenuActions.copySelectedElements();
           },
@@ -19853,7 +19887,7 @@ function StudioCuttoonEditor() {
           disabled:
             collaborationDocumentLocked ||
             activePageMutationLocked ||
-            (!selected && marqueeIds.length === 0),
+            menuNoSelection,
           onSelect: () => studioMainMenuActions.duplicateSelected(),
         },
         {
@@ -19865,7 +19899,7 @@ function StudioCuttoonEditor() {
           disabled:
             collaborationDocumentLocked ||
             activePageMutationLocked ||
-            (!selected && marqueeIds.length === 0),
+            menuNoSelection,
           onSelect: () => studioMainMenuActions.removeSelected(),
           separatorAfter: true,
         },
@@ -19874,20 +19908,15 @@ function StudioCuttoonEditor() {
           label: "모두 선택",
           icon: LayoutGrid,
           shortcut: "⌘A",
-          disabled: elements.length === 0,
-          onSelect: () => {
-            setTool("select");
-            setEyedropperActive(false);
-            setSelectedId(null);
-            setMarqueeIds(elements.map((el) => el.id));
-          },
+          disabled: menuDocumentEmpty,
+          onSelect: () => studioMainMenuActions.selectAllElements(),
         },
         {
           id: "deselect",
           label: "선택 해제",
           icon: X,
           shortcut: "Esc",
-          disabled: !selected && marqueeIds.length === 0,
+          disabled: menuNoSelection,
           onSelect: () => {
             setSelectedId(null);
             setMarqueeIds([]);
@@ -20210,18 +20239,17 @@ function StudioCuttoonEditor() {
   ], [
     activePageMutationLocked,
     collaborationDocumentLocked,
-    elements,
-    hi,
-    history,
+    menuDocumentEmpty,
+    menuUndoDisabled,
+    menuRedoDisabled,
     isFullscreen,
     leftPanelOpen,
-    marqueeIds,
+    menuNoSelection,
     projectArchiveBusy,
     psdImportBusy,
     rightPanelOpen,
     saving,
-    selected,
-    sharedDocument,
+    menuSharedNonOwnerSave,
     workId,
     studioMainMenuActions,
   ]);
@@ -27196,8 +27224,10 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
                 }}
                 className="rounded border border-line shadow-inner"
               >
-                {/* Render panels/frames */}
-                {elements.map((el) => {
+                {/* Render panels/frames — hidden 탭패널일 땐 요소별 박스 생성을 건너뛴다
+                    (요소 수에 비례하는 커밋당 jsxDEV 비용이 미니맵을 안 보는 동안에도 나가던 것). */}
+                {inspectorLayout.primary === "document" && inspectorLayout.document === "navigator"
+                  ? elements.map((el) => {
                   if (isEffectivelyHidden(el, groups)) return null;
                   const bounds = elBounds(el);
                   const pctX = (bounds.x / CANVAS_W) * 100;
@@ -27224,7 +27254,8 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
                       }}
                     />
                   );
-                })}
+                })
+                  : null}
 
                 {/* Render scroll window box — 액센트 프레임 + 바깥 영역 딤(오버플로 히든 활용) */}
                 {scrollPos.scrollWidth > 0 && (

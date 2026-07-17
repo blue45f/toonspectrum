@@ -33,12 +33,14 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import {
+  memo,
   useEffect,
   useId,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
+  type ReactNode,
 } from "react";
 
 import {
@@ -66,6 +68,7 @@ import {
   type StudioLayerRole,
   type StudioLayerSelectionMode,
 } from "./studio-layer-navigator";
+import { useStudioStableHandlers } from "./studio-stable-handlers";
 import { StudioToolHintTarget } from "./StudioToolHint";
 
 import type { LayerGroup } from "./studio-layers";
@@ -210,6 +213,183 @@ function selectionModeFromPointer(
 function isLayerRowControl(target: EventTarget | null): boolean {
   return target instanceof Element && target.closest("[data-layer-row-control]") !== null;
 }
+
+
+interface LayerNavigatorRowHandlers {
+  onRowFocus: (key: string) => void;
+  onRowKeyDown: (event: ReactKeyboardEvent<HTMLElement>, key: string) => void;
+  onRowClick: (event: ReactMouseEvent<HTMLElement>, itemId: string) => void;
+  onRowDoubleClick: (event: ReactMouseEvent<HTMLElement>, itemId: string, label: string) => void;
+  onToggleItemHidden: (itemId: string, hidden: boolean) => void;
+  onOpenItemActionMenu: (event: ReactMouseEvent<HTMLButtonElement>, itemId: string) => void;
+  registerRowRef: (key: string, node: HTMLElement | null) => void;
+}
+
+interface LayerNavigatorItemRowProps {
+  item: StudioLayerNavigatorItem;
+  rowKey: string;
+  level: number;
+  kind: Exclude<StudioLayerKind, "all">;
+  groupName: string | null;
+  effectivelyHidden: boolean;
+  statusLabel: string;
+  selected: boolean;
+  tabStop: boolean;
+  renameInput: ReactNode | null;
+  mobileMultiSelect: boolean;
+  readOnly: boolean;
+  hiddenByGroup: boolean;
+  actionOpen: boolean;
+  actionPopoverId: string;
+  stableHandlers: LayerNavigatorRowHandlers;
+}
+
+// 행 단위 memo: 커밋마다 items 배열이 갈려도 요소별 item 참조(StudioPage WeakMap 캐시)와
+// 원시값 props 가 같으면 행 JSX 재생성을 건너뛴다 — 무거운 문서 정착 커밋의 최대 비용이던
+// 전 행 재구성(~75ms/커밋)을 "바뀐 행만"으로 줄인다.
+const LayerNavigatorItemRow = memo(function LayerNavigatorItemRow({
+  item,
+  rowKey,
+  level,
+  kind,
+  groupName,
+  effectivelyHidden,
+  statusLabel,
+  selected,
+  tabStop,
+  renameInput,
+  mobileMultiSelect,
+  readOnly,
+  hiddenByGroup,
+  actionOpen,
+  actionPopoverId,
+  stableHandlers,
+}: LayerNavigatorItemRowProps) {
+  const Icon = KIND_ICONS[kind];
+  const accessibleMetadata = [
+    STUDIO_LAYER_KIND_LABELS[kind],
+    groupName ? `그룹 ${groupName}` : null,
+    item.role ? `역할 ${STUDIO_LAYER_ROLE_LABELS[item.role]}` : null,
+    item.color ? `색 라벨 ${STUDIO_LAYER_COLOR_LABELS[item.color]}` : null,
+    statusLabel || null,
+  ].filter(Boolean).join(", ");
+  return (
+    <li role="none">
+      <div
+        id={`studio-layer-${item.id}`}
+        ref={(node) => stableHandlers.registerRowRef(rowKey, node)}
+        role="treeitem"
+        aria-level={level}
+        aria-selected={selected}
+        aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Home End Enter Space F2 Shift+F10 Control+A Meta+A"
+        aria-label={`${item.label}, ${accessibleMetadata}`}
+        tabIndex={tabStop ? 0 : -1}
+        onFocus={() => stableHandlers.onRowFocus(rowKey)}
+        onKeyDown={(event) => stableHandlers.onRowKeyDown(event, rowKey)}
+        onClick={(event) => stableHandlers.onRowClick(event, item.id)}
+        onDoubleClick={(event) => stableHandlers.onRowDoubleClick(event, item.id, item.label)}
+        className={cn(
+          "group/layer relative flex min-h-9 items-center gap-1 rounded-lg border px-1 py-0.5 text-left [contain-intrinsic-size:44px] [content-visibility:auto] max-lg:min-h-11 pointer-coarse:min-h-11",
+          selected
+            ? "border-accent/55 bg-accent-soft/45 shadow-[inset_0_0_0_1px_oklch(0.72_0.185_42/0.12)]"
+            : "border-transparent hover:border-line/80 hover:bg-raised/60",
+          focusRing
+        )}
+        title={statusLabel || undefined}
+        data-studio-layer-row="true"
+        data-studio-layer-selected={selected ? "true" : "false"}
+      >
+        {mobileMultiSelect ? (
+          <span
+            aria-hidden
+            className={cn(
+              "grid size-5 shrink-0 place-items-center rounded border",
+              selected ? "border-accent bg-accent text-on-accent" : "border-line bg-card"
+            )}
+          >
+            {selected ? <Check size={13} /> : null}
+          </span>
+        ) : null}
+        {item.color ? (
+          <span
+            aria-label={`색 라벨 ${STUDIO_LAYER_COLOR_LABELS[item.color]}`}
+            className={cn("h-5 w-1.5 shrink-0 rounded-full shadow-sm", COLOR_DOT_CLASS[item.color])}
+          />
+        ) : null}
+        <span
+          className={cn(
+            "grid size-7 shrink-0 place-items-center rounded-lg border border-line/50 bg-[linear-gradient(160deg,oklch(0.24_0.01_66),oklch(0.19_0.009_68))] text-fg-3 shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.05)]",
+            effectivelyHidden && "opacity-55",
+            selected && "border-accent/35 text-accent"
+          )}
+          aria-hidden
+        >
+          <Icon size={13} strokeWidth={1.75} />
+        </span>
+        <span className={cn("flex min-w-0 flex-1 items-center gap-1.5 px-0.5", effectivelyHidden && "opacity-55")}>
+          {renameInput ?? (
+            <span className="min-w-0 flex-1">
+              <span className={cn("block truncate text-[0.72rem] font-semibold", item.hidden && "line-through")}>
+                {item.label}
+              </span>
+              <span className="flex min-w-0 items-center gap-1 text-[0.68rem] text-fg-3 lg:text-[0.58rem]">
+                <span className="truncate">{groupName ?? STUDIO_LAYER_KIND_LABELS[kind]}</span>
+                {item.role ? (
+                  <span className="shrink-0 rounded bg-raised px-1 py-0.5">
+                    {STUDIO_LAYER_ROLE_LABELS[item.role]}
+                  </span>
+                ) : null}
+              </span>
+            </span>
+          )}
+        </span>
+        <span className="hidden shrink-0 items-center gap-0.5 min-[330px]:flex" aria-hidden>
+          {item.fillReference ? <ScanLine size={12} className="text-cool" /> : null}
+          {item.alphaLocked ? <Grid2X2 size={12} className="text-accent" /> : null}
+          {item.masked ? <Layers3 size={12} className={item.maskEnabled === false ? "text-fg-3/45" : "text-good"} /> : null}
+          {item.aiGenerated ? <Sparkles size={12} className="text-accent" /> : null}
+          {item.animated ? <Film size={12} className="text-cool" /> : null}
+        </span>
+        <button
+          type="button"
+          tabIndex={-1}
+          data-layer-row-control
+          onClick={(event) => {
+            event.stopPropagation();
+            stableHandlers.onToggleItemHidden(item.id, !item.hidden);
+          }}
+          disabled={readOnly || hiddenByGroup}
+          className={cn(
+            "grid size-8 shrink-0 place-items-center rounded text-fg-3 transition-colors hover:bg-raised hover:text-fg disabled:opacity-35",
+            coarseTarget,
+            focusRing
+          )}
+          aria-label={hiddenByGroup ? `${item.label}, 그룹에서 숨김` : item.hidden ? `${item.label} 표시` : `${item.label} 숨김`}
+          title={hiddenByGroup ? "상위 그룹이 숨겨져 있어 그룹을 먼저 표시해야 해요" : undefined}
+        >
+          {effectivelyHidden ? <EyeOff size={13} /> : <Eye size={13} />}
+        </button>
+        <button
+          type="button"
+          tabIndex={-1}
+          data-layer-row-control
+          onClick={(event) => stableHandlers.onOpenItemActionMenu(event, item.id)}
+          aria-haspopup="dialog"
+          aria-expanded={actionOpen}
+          aria-controls={actionPopoverId}
+          className={cn(
+            "grid size-8 shrink-0 place-items-center rounded text-fg-3 transition-colors hover:bg-raised hover:text-fg",
+            coarseTarget,
+            focusRing
+          )}
+          aria-label={`${item.label} 레이어 작업`}
+        >
+          <MoreHorizontal size={15} />
+        </button>
+      </div>
+    </li>
+  );
+});
 
 export function StudioLayerNavigator({
   items,
@@ -651,6 +831,33 @@ export function StudioLayerNavigator({
     });
   }
 
+  // 행 memo 를 깨지 않는 identity-stable 이벤트 브리지 — 이벤트 시점에 최신 클로저를 읽는다.
+  const rowHandlers = useStudioStableHandlers<LayerNavigatorRowHandlers>({
+    onRowFocus: (key) => setFocusedKey(key),
+    onRowKeyDown: (event, key) => {
+      const target = focusTargets.find((candidate) => candidate.key === key);
+      if (target) handleTreeItemKeyDown(event, target);
+    },
+    onRowClick: (event, itemId) => {
+      if (isLayerRowControl(event.target)) return;
+      applyItemSelection(itemId, selectionModeFromPointer(event, mobileMultiSelect));
+    },
+    onRowDoubleClick: (event, itemId, label) => {
+      if (isLayerRowControl(event.target)) return;
+      beginRename("item", itemId, label);
+    },
+    onToggleItemHidden: (itemId, hidden) => {
+      onAction({ type: "set-items-hidden", ids: [itemId], hidden });
+    },
+    onOpenItemActionMenu: (event, itemId) => {
+      openActionMenu(event, { kind: "item", id: itemId });
+    },
+    registerRowRef: (key, node) => {
+      if (node) rowRefs.current.set(key, node);
+      else rowRefs.current.delete(key);
+    },
+  });
+
   function renderRenameInput(target: RenameTarget, focusKey: string) {
     return (
       <input
@@ -672,145 +879,27 @@ export function StudioLayerNavigator({
 
   function renderItemRow(entry: StudioLayerNavigatorResult, key: string, level: number) {
     const item = entry.item;
-    const selected = selectedIdSet.has(item.id);
-    const Icon = KIND_ICONS[entry.kind];
-    const statusLabel = itemStatusLabel(entry);
-    const hiddenByGroup = entry.group?.hidden === true && item.hidden !== true;
     const editing = renameTarget?.kind === "item" && renameTarget.id === item.id;
-    const target: FocusTarget = { key, kind: "item", entry };
-    const accessibleMetadata = [
-      STUDIO_LAYER_KIND_LABELS[entry.kind],
-      entry.group?.name ? `그룹 ${entry.group.name}` : null,
-      item.role ? `역할 ${STUDIO_LAYER_ROLE_LABELS[item.role]}` : null,
-      item.color ? `색 라벨 ${STUDIO_LAYER_COLOR_LABELS[item.color]}` : null,
-      statusLabel || null,
-    ].filter(Boolean).join(", ");
     return (
-      <li key={key} role="none">
-        <div
-          id={`studio-layer-${item.id}`}
-          ref={(node) => {
-            if (node) rowRefs.current.set(key, node);
-            else rowRefs.current.delete(key);
-          }}
-          role="treeitem"
-          aria-level={level}
-          aria-selected={selected}
-          aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Home End Enter Space F2 Shift+F10 Control+A Meta+A"
-          aria-label={`${item.label}, ${accessibleMetadata}`}
-          tabIndex={tabStopKey === key ? 0 : -1}
-          onFocus={() => setFocusedKey(key)}
-          onKeyDown={(event) => handleTreeItemKeyDown(event, target)}
-          onClick={(event) => {
-            if (isLayerRowControl(event.target)) return;
-            applyItemSelection(item.id, selectionModeFromPointer(event, mobileMultiSelect));
-          }}
-          onDoubleClick={(event) => {
-            if (isLayerRowControl(event.target)) return;
-            beginRename("item", item.id, item.label);
-          }}
-          className={cn(
-            "group/layer relative flex min-h-9 items-center gap-1 rounded-lg border px-1 py-0.5 text-left [contain-intrinsic-size:44px] [content-visibility:auto] max-lg:min-h-11 pointer-coarse:min-h-11",
-            selected
-              ? "border-accent/55 bg-accent-soft/45 shadow-[inset_0_0_0_1px_oklch(0.72_0.185_42/0.12)]"
-              : "border-transparent hover:border-line/80 hover:bg-raised/60",
-            focusRing
-          )}
-          title={statusLabel || undefined}
-          data-studio-layer-row="true"
-          data-studio-layer-selected={selected ? "true" : "false"}
-        >
-          {mobileMultiSelect ? (
-            <span
-              aria-hidden
-              className={cn(
-                "grid size-5 shrink-0 place-items-center rounded border",
-                selected ? "border-accent bg-accent text-on-accent" : "border-line bg-card"
-              )}
-            >
-              {selected ? <Check size={13} /> : null}
-            </span>
-          ) : null}
-          {item.color ? (
-            <span
-              aria-label={`색 라벨 ${STUDIO_LAYER_COLOR_LABELS[item.color]}`}
-              className={cn("h-5 w-1.5 shrink-0 rounded-full shadow-sm", COLOR_DOT_CLASS[item.color])}
-            />
-          ) : null}
-          <span
-            className={cn(
-              "grid size-7 shrink-0 place-items-center rounded-lg border border-line/50 bg-[linear-gradient(160deg,oklch(0.24_0.01_66),oklch(0.19_0.009_68))] text-fg-3 shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.05)]",
-              entry.effectivelyHidden && "opacity-55",
-              selected && "border-accent/35 text-accent"
-            )}
-            aria-hidden
-          >
-            <Icon size={13} strokeWidth={1.75} />
-          </span>
-          <span className={cn("flex min-w-0 flex-1 items-center gap-1.5 px-0.5", entry.effectivelyHidden && "opacity-55")}>
-            {editing && renameTarget
-              ? renderRenameInput(renameTarget, key)
-              : (
-                  <span className="min-w-0 flex-1">
-                    <span className={cn("block truncate text-[0.72rem] font-semibold", item.hidden && "line-through")}>
-                      {item.label}
-                    </span>
-                    <span className="flex min-w-0 items-center gap-1 text-[0.68rem] text-fg-3 lg:text-[0.58rem]">
-                      <span className="truncate">{entry.group?.name ?? STUDIO_LAYER_KIND_LABELS[entry.kind]}</span>
-                      {item.role ? (
-                        <span className="shrink-0 rounded bg-raised px-1 py-0.5">
-                          {STUDIO_LAYER_ROLE_LABELS[item.role]}
-                        </span>
-                      ) : null}
-                    </span>
-                  </span>
-                )}
-          </span>
-          <span className="hidden shrink-0 items-center gap-0.5 min-[330px]:flex" aria-hidden>
-            {item.fillReference ? <ScanLine size={12} className="text-cool" /> : null}
-            {item.alphaLocked ? <Grid2X2 size={12} className="text-accent" /> : null}
-            {item.masked ? <Layers3 size={12} className={item.maskEnabled === false ? "text-fg-3/45" : "text-good"} /> : null}
-            {item.aiGenerated ? <Sparkles size={12} className="text-accent" /> : null}
-            {item.animated ? <Film size={12} className="text-cool" /> : null}
-          </span>
-          <button
-            type="button"
-            tabIndex={-1}
-            data-layer-row-control
-            onClick={(event) => {
-              event.stopPropagation();
-              onAction({ type: "set-items-hidden", ids: [item.id], hidden: !item.hidden });
-            }}
-            disabled={readOnly || hiddenByGroup}
-            className={cn(
-              "grid size-8 shrink-0 place-items-center rounded text-fg-3 transition-colors hover:bg-raised hover:text-fg disabled:opacity-35",
-              coarseTarget,
-              focusRing
-            )}
-            aria-label={hiddenByGroup ? `${item.label}, 그룹에서 숨김` : item.hidden ? `${item.label} 표시` : `${item.label} 숨김`}
-            title={hiddenByGroup ? "상위 그룹이 숨겨져 있어 그룹을 먼저 표시해야 해요" : undefined}
-          >
-            {entry.effectivelyHidden ? <EyeOff size={13} /> : <Eye size={13} />}
-          </button>
-          <button
-            type="button"
-            tabIndex={-1}
-            data-layer-row-control
-            onClick={(event) => openActionMenu(event, { kind: "item", id: item.id })}
-            aria-haspopup="dialog"
-            aria-expanded={actionTarget?.kind === "item" && actionTarget.id === item.id}
-            aria-controls={actionPopoverId}
-            className={cn(
-              "grid size-8 shrink-0 place-items-center rounded text-fg-3 transition-colors hover:bg-raised hover:text-fg",
-              coarseTarget,
-              focusRing
-            )}
-            aria-label={`${item.label} 레이어 작업`}
-          >
-            <MoreHorizontal size={15} />
-          </button>
-        </div>
-      </li>
+      <LayerNavigatorItemRow
+        key={key}
+        rowKey={key}
+        item={item}
+        level={level}
+        kind={entry.kind}
+        groupName={entry.group?.name ?? null}
+        effectivelyHidden={entry.effectivelyHidden}
+        statusLabel={itemStatusLabel(entry)}
+        selected={selectedIdSet.has(item.id)}
+        tabStop={tabStopKey === key}
+        renameInput={editing && renameTarget ? renderRenameInput(renameTarget, key) : null}
+        mobileMultiSelect={mobileMultiSelect}
+        readOnly={readOnly}
+        hiddenByGroup={entry.group?.hidden === true && item.hidden !== true}
+        actionOpen={actionTarget?.kind === "item" && actionTarget.id === item.id}
+        actionPopoverId={actionPopoverId}
+        stableHandlers={rowHandlers}
+      />
     );
   }
 
