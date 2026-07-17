@@ -523,6 +523,17 @@ import {
   type FixedRateStrokeFilteredSample,
 } from "./studio-fixed-rate-stroke-filter";
 import {
+  advanceFixedRateStrokeFrameClock,
+  advanceFixedRateStrokeSampleClockFloor,
+  createFixedRateStrokeFrameClock,
+  createFixedRateStrokeFramePump,
+  createFixedRateStrokeSampleClock,
+  normalizeFixedRateStrokeSampleTimeStamps,
+  type FixedRateStrokeFrameClockState,
+  type FixedRateStrokeFramePump,
+  type FixedRateStrokeSampleClockState,
+} from "./studio-fixed-rate-stroke-frame-pump";
+import {
   clampFrameIndex,
   DEFAULT_FRAME_FPS,
   DEFAULT_ONION_SKIN,
@@ -782,6 +793,7 @@ import {
 } from "./studio-perspective-guide";
 import {
   beginStudioStrokePointerSession,
+  claimStudioStrokeMoveTransport,
   collectStudioStrokePointerBatch,
   isStudioStrokePointerEvent,
   shouldEndStudioStrokeForReleasedContact,
@@ -8952,13 +8964,12 @@ function StudioCuttoonEditor() {
   const drawingRef = useRef<DrawEl | null>(null);
   const drawingStabilizerRef = useRef<StudioStrokeStabilizerState | null>(null);
   const drawingFixedRateFilterRef = useRef<FixedRateStrokeFilterState | null>(null);
+  const drawingFixedRatePumpRef = useRef<FixedRateStrokeFramePump | null>(null);
+  const drawingFixedRatePumpClockRef = useRef<FixedRateStrokeFrameClockState | null>(null);
+  const drawingFixedRateSampleClockRef = useRef<FixedRateStrokeSampleClockState | null>(null);
+  const drawingFixedRatePumpFrameRef = useRef<(frameTimeStamp: number) => boolean>(() => false);
+  const drawingLastAuthoritativePointerRef = useRef<PointerEvent | null>(null);
   const drawingVelocityRef = useRef<StudioPointerVelocityState | null>(null);
-  // 고정레이트(매끈 펜) 캐스케이드는 append(pointermove 실샘플)에서만 전진했다 — 실샘플 사이엔
-  // 완전히 멈춰있다가 다음 샘플에서 몇 틱씩 한꺼번에 튀어나오고, 릴리즈는 그 중 가장 큰 마지막
-  // 뭉치였다("간격을 두고 따라오다 릴리즈에 훅 채워지는" 체감의 원인). rAF로 advance 를 계속
-  // 흘려 실샘플이 없는 프레임에도 마지막 held 위치를 향해 매 프레임 자연스럽게 수렴시킨다.
-  const drawingFixedRateAdvanceRafRef = useRef<number | null>(null);
-  const drawingLastPointerSampleRef = useRef<PointerEvent | null>(null);
   // A stroke belongs to exactly one pointer from down through up/cancel. Keeping this high-rate
   // ownership outside React state prevents palm/second-finger events from ending the pen stroke.
   const drawingPointerSessionRef = useRef<StudioStrokePointerSession | null>(null);
@@ -8976,6 +8987,11 @@ function StudioCuttoonEditor() {
   const drawingPointerGlobalEndRef = useRef<(pointerEvent: PointerEvent, cancelled: boolean) => void>(
     () => undefined
   );
+  const drawingPointerGlobalMoveRef = useRef<(pointerEvent: PointerEvent) => void>(() => undefined);
+  const drawingPointerGlobalCancelRef = useRef<() => void>(() => undefined);
+  const drawingUnmountCleanupRef = useRef<() => void>(() => undefined);
+  /** A capture-phase native release must not fall through into an unrelated Stage tool branch. */
+  const drawingHandledNativeEndEventsRef = useRef(new WeakSet<PointerEvent>());
   const perspectiveRayRef = useRef<PerspectiveRay | null>(null);
   const isometricAxisRayRef = useRef<IsometricAxisRay | null>(null);
   const quickShapeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -9623,17 +9639,10 @@ function StudioCuttoonEditor() {
     () => () => {
       if (draftRafRef.current !== null) globalThis.cancelAnimationFrame(draftRafRef.current);
       if (marqueeRafRef.current !== null) globalThis.cancelAnimationFrame(marqueeRafRef.current);
+      drawingUnmountCleanupRef.current();
       const pendingBatch = pendingStrokeCommitsRef.current;
       if (pendingBatch?.timer) globalThis.clearTimeout(pendingBatch.timer);
       pendingStrokeCommitsRef.current = null;
-      drawingPointerSafetyCleanupRef.current?.();
-      drawingPointerSafetyCleanupRef.current = null;
-      const pointerSession = drawingPointerSessionRef.current;
-      if (pointerSession) {
-        tryReleaseStudioStrokePointer(drawingPointerCaptureTargetRef.current, pointerSession.pointerId);
-      }
-      drawingPointerSessionRef.current = null;
-      drawingPointerCaptureTargetRef.current = null;
     },
     []
   );
@@ -17206,23 +17215,117 @@ function StudioCuttoonEditor() {
 
   function attachDrawingPointerSafetyListeners(pointerId: number) {
     clearDrawingPointerSafetyListeners();
+    const captureTarget = drawingPointerCaptureTargetRef.current as EventTarget | null;
+    const onGlobalMove = (event: Event) => {
+      const pointerEvent = event as PointerEvent;
+      const session = drawingPointerSessionRef.current;
+      if (!session || session.pointerId !== pointerId) return;
+      // A processed mouse hover with buttons=0 is still the only recovery signal when capture and
+      // pointerup were both lost. Let the current consumer close it even after raw became ink owner.
+      if (shouldEndStudioStrokeForReleasedContact(session, pointerEvent)) {
+        drawingPointerGlobalMoveRef.current(pointerEvent);
+        return;
+      }
+      const eventType = event.type === "pointerrawupdate"
+        ? "pointerrawupdate"
+        : "pointermove";
+      const claim = claimStudioStrokeMoveTransport(session, pointerEvent, eventType);
+      drawingPointerSessionRef.current = claim.session;
+      if (!claim.accepted) return;
+      drawingPointerGlobalMoveRef.current(pointerEvent);
+    };
     const onGlobalEnd = (event: Event) => {
       const pointerEvent = event as PointerEvent;
       if (!Number.isFinite(pointerEvent.pointerId) || pointerEvent.pointerId !== pointerId) return;
       const session = drawingPointerSessionRef.current;
       if (!session || session.pointerId !== pointerId) return;
+      drawingHandledNativeEndEventsRef.current.add(pointerEvent);
       drawingPointerGlobalEndRef.current(pointerEvent, event.type === "pointercancel");
     };
-    // Capture phase: still receive release when a chrome overlay stops propagation.
+    const onGlobalAbort = () => {
+      const session = drawingPointerSessionRef.current;
+      if (!session || session.pointerId !== pointerId) return;
+      drawingPointerGlobalCancelRef.current();
+    };
+    const onVisibilityChange = () => {
+      if (globalThis.document.visibilityState !== "visible") onGlobalAbort();
+    };
+    const onLostPointerCapture = (event: Event) => {
+      const lostPointerId = (event as PointerEvent).pointerId;
+      if (Number.isFinite(lostPointerId) && lostPointerId !== pointerId) return;
+      onGlobalAbort();
+    };
+    // Capture phase makes this the one authoritative freehand transport before Konva performs
+    // cursor/hit-test work. The first raw update permanently suppresses duplicate pointermoves;
+    // browsers without raw updates naturally remain on the pointermove fallback.
+    globalThis.addEventListener("pointermove", onGlobalMove, true);
+    globalThis.addEventListener("pointerrawupdate", onGlobalMove, true);
+    // Still receive release when a chrome overlay stops propagation.
     globalThis.addEventListener("pointerup", onGlobalEnd, true);
     globalThis.addEventListener("pointercancel", onGlobalEnd, true);
+    globalThis.addEventListener("blur", onGlobalAbort, true);
+    globalThis.addEventListener("pagehide", onGlobalAbort, true);
+    globalThis.document.addEventListener("visibilitychange", onVisibilityChange, true);
+    captureTarget?.addEventListener("lostpointercapture", onLostPointerCapture, true);
     drawingPointerSafetyCleanupRef.current = () => {
+      globalThis.removeEventListener("pointermove", onGlobalMove, true);
+      globalThis.removeEventListener("pointerrawupdate", onGlobalMove, true);
       globalThis.removeEventListener("pointerup", onGlobalEnd, true);
       globalThis.removeEventListener("pointercancel", onGlobalEnd, true);
+      globalThis.removeEventListener("blur", onGlobalAbort, true);
+      globalThis.removeEventListener("pagehide", onGlobalAbort, true);
+      globalThis.document.removeEventListener("visibilitychange", onVisibilityChange, true);
+      captureTarget?.removeEventListener("lostpointercapture", onLostPointerCapture, true);
     };
   }
 
+  function fixedRateStrokePump(): FixedRateStrokeFramePump {
+    drawingFixedRatePumpRef.current ??= createFixedRateStrokeFramePump({
+      requestFrame: (callback) => globalThis.requestAnimationFrame(callback),
+      cancelFrame: (handle) => globalThis.cancelAnimationFrame(handle),
+      // The retained pump never captures render-local drawing settings. This indirection always
+      // invokes the current render's consumer and its generation guard rejects stale callbacks.
+      onFrame: (frameTimeStamp) => drawingFixedRatePumpFrameRef.current(frameTimeStamp),
+      // A scheduler/consumer exception must not escape from rAF and poison the editor event loop.
+      // Fall back to direct samples for the remainder of this stroke.
+      onError: () => {
+        drawingFixedRateFilterRef.current = null;
+        drawingFixedRatePumpClockRef.current = null;
+        drawingFixedRateSampleClockRef.current = null;
+      },
+    });
+    return drawingFixedRatePumpRef.current;
+  }
+
+  function stopFixedRateStrokePump() {
+    drawingFixedRatePumpRef.current?.stop();
+    drawingFixedRatePumpClockRef.current = null;
+  }
+
+  function startFixedRateStrokePump(
+    pointerEvent: PointerEvent,
+    pointerDownFrameTimeStamp: number
+  ) {
+    stopFixedRateStrokePump();
+    if (!drawingFixedRateFilterRef.current) {
+      drawingFixedRateSampleClockRef.current = null;
+      return;
+    }
+    const frameOrigin = pointerDownFrameTimeStamp;
+    drawingFixedRatePumpClockRef.current = createFixedRateStrokeFrameClock(
+      pointerEvent.timeStamp,
+      frameOrigin
+    );
+    drawingFixedRateSampleClockRef.current = createFixedRateStrokeSampleClock(
+      pointerEvent.timeStamp,
+      frameOrigin
+    );
+    drawingLastAuthoritativePointerRef.current = pointerEvent;
+    fixedRateStrokePump().start();
+  }
+
   function releaseDrawingPointerSession() {
+    stopFixedRateStrokePump();
     clearDrawingPointerSafetyListeners();
     const session = drawingPointerSessionRef.current;
     if (session) {
@@ -17234,9 +17337,9 @@ function StudioCuttoonEditor() {
     drawingPredictionPreviewRef.current = false;
     drawingStabilizerRef.current = null;
     drawingFixedRateFilterRef.current = null;
+    drawingFixedRateSampleClockRef.current = null;
+    drawingLastAuthoritativePointerRef.current = null;
     drawingVelocityRef.current = null;
-    drawingLastPointerSampleRef.current = null;
-    stopFixedRateAdvanceTicker();
   }
   function discardDrawingPointerSession() {
     const discardedId = drawingRef.current?.id;
@@ -17255,9 +17358,55 @@ function StudioCuttoonEditor() {
     // 취소 정리는 표면을 즉시 지우므로, 커밋 대기 중 획을 먼저 동기화해 잉크 유실을 막는다.
     flushPendingStrokeCommitsRef.current();
     clearDraftPreview();
+    scheduleLiveDrawPressure(null);
     releaseDrawingPointerSession();
     endLiveResourceEdit();
   }
+  // The mount-only effect above must not capture an old render's room/document. Keep its cleanup
+  // entry current so a route/work-key remount deletes an in-progress CRDT draft before releasing
+  // pointer capture and the collaboration lease. This path intentionally avoids React state work.
+  drawingUnmountCleanupRef.current = () => {
+    const discardedId = drawingRef.current?.id;
+    if (discardedId) {
+      try {
+        studioCrdtDocumentRef.current?.deleteStroke(discardedId);
+      } catch {
+        // The room may already be closing; local refs and leases still need deterministic cleanup.
+      }
+    }
+    drawingRef.current = null;
+    perspectiveRayRef.current = null;
+    isometricAxisRayRef.current = null;
+    stopQuickShapeTracking();
+    releaseDrawingPointerSession();
+    pendingDraftRef.current = null;
+    liveDraftPendingRef.current = null;
+    liveDraftVisualRef.current = null;
+    if (liveDraftRafRef.current !== null) {
+      globalThis.cancelAnimationFrame(liveDraftRafRef.current);
+      liveDraftRafRef.current = null;
+    }
+    if (gpuPinProbeTimerRef.current) {
+      globalThis.clearTimeout(gpuPinProbeTimerRef.current);
+      gpuPinProbeTimerRef.current = null;
+    }
+    if (gpuLingerRafRef.current) {
+      globalThis.cancelAnimationFrame(gpuLingerRafRef.current);
+      gpuLingerRafRef.current = 0;
+    }
+    liveDraftDirectRef.current = false;
+    gpuLiveInkPinnedRef.current = false;
+    gpuPinnedLivePointCountRef.current = 0;
+    liveInkOverlayRendererRef.current.resetActive();
+    endPredictedInkTail();
+    if (liveDrawPressureRafRef.current) {
+      globalThis.cancelAnimationFrame(liveDrawPressureRafRef.current);
+      liveDrawPressureRafRef.current = 0;
+    }
+    liveDrawPressureRef.current = null;
+    liveDrawPressureStoreRef.current.value = null;
+    endLiveResourceEdit();
+  };
   function noteQuickShapePointerMoved(pos: { x: number; y: number }) {
     const anchor = quickShapeStillAnchorRef.current;
     if (!anchor) return; // 무장 안 됨 — 저비용 no-op
@@ -17308,6 +17457,8 @@ function StudioCuttoonEditor() {
         quickShapeLockedRef.current = true;
       }
       drawingRef.current = next;
+      stopFixedRateStrokePump();
+      drawingFixedRateFilterRef.current = null;
       scheduleDraft(next);
       return;
     }
@@ -17740,6 +17891,9 @@ function StudioCuttoonEditor() {
     }
     if (tool === "draw") {
       const pointerSample = e.evt as PointerEvent;
+      // Capture the frame-clock anchor alongside pointerdown, before CRDT/render setup can add
+      // device-dependent latency. The pump later maps this elapsed time back to the event clock.
+      const pointerDownFrameTimeStamp = globalThis.performance?.now?.() ?? pointerSample.timeStamp;
       // 터치 정책: one-finger drag = draw | pan | none. Palm rejection ignores touch while pen preferred.
       const touchPrefs = appSettingsRef.current.touch;
       if (pointerSample.pointerType === "touch") {
@@ -17902,9 +18056,6 @@ function StudioCuttoonEditor() {
             timeStamp: pointerSample.timeStamp,
           }, stabilizer).state
         : null;
-      drawingLastPointerSampleRef.current = pointerSample;
-      stopFixedRateAdvanceTicker(); // 이전 스트로크의 잔여 ticker(있었다면)를 먼저 확실히 취소.
-      if (fixedRateInkEnabled) startFixedRateAdvanceTicker();
       drawingStabilizerRef.current =
         drawMode === "shape" || drawMode === "pixel" || fixedRateInkEnabled
           ? null
@@ -18036,6 +18187,7 @@ function StudioCuttoonEditor() {
           setLiveDraftShapeKind(next.kind && next.kind !== "freehand" ? next.kind : null);
         }
       }
+      startFixedRateStrokePump(pointerSample, pointerDownFrameTimeStamp);
       if (drawMode === "pen" && quickShapeActive) startQuickShapeTracking({ x: pos.x, y: pos.y });
       else stopQuickShapeTracking(); // 방어적 — 이전 스트로크 타이머 잔존 방지
       return;
@@ -18084,6 +18236,63 @@ function StudioCuttoonEditor() {
     if (!cursor.visible()) cursor.visible(true);
     cursor.getLayer()?.batchDraw();
   }
+  function updateActiveShapeEndpoint(
+    stage: Konva.Stage,
+    pointerEvent: PointerEvent,
+    schedulePreview: boolean
+  ): boolean {
+    const current = drawingRef.current;
+    const kind = current?.kind ?? "freehand";
+    if (
+      !current
+      || kind === "freehand"
+      || !isStudioStrokePointerEvent(drawingPointerSessionRef.current, pointerEvent)
+    ) return false;
+
+    // Capture-phase pointerup runs before Konva updates its pointer position. Feed the native event
+    // through Konva's public coordinate path so a fast drag commits the actual lift point.
+    stage.setPointersPositions(pointerEvent);
+    const pos = stage.getRelativePointerPosition();
+    if (!pos) return false;
+    const x0 = current.points[0] ?? pos.x;
+    const y0 = current.points[1] ?? pos.y;
+    let x1 = pos.x;
+    let y1 = pos.y;
+    // Shift is the explicit gesture and therefore wins over perspective/isometric ruler locks.
+    if (perspectiveRulerActive && kind === "line" && !pointerEvent.shiftKey && vanishingPoints.length > 0) {
+      if (!perspectiveRayRef.current) {
+        perspectiveRayRef.current = resolvePerspectiveRay(vanishingPoints, x0, y0, x1, y1);
+      }
+      [x1, y1] = snapStrokePointToPerspective(x1, y1, perspectiveRayRef.current);
+    } else if (isometricGridActive && kind === "line" && !pointerEvent.shiftKey) {
+      if (!isometricAxisRayRef.current) {
+        isometricAxisRayRef.current = resolveIsometricAxisRay(isometricAngleDeg, x0, y0, x1, y1);
+      }
+      [x1, y1] = snapStrokePointToIsometricGrid(x1, y1, isometricAxisRayRef.current);
+    }
+    if (pointerEvent.shiftKey) {
+      const dx = x1 - x0;
+      const dy = y1 - y0;
+      if (kind === "line") {
+        if (Math.abs(dx) > Math.abs(dy) * 2) y1 = y0;
+        else if (Math.abs(dy) > Math.abs(dx) * 2) x1 = x0;
+        else {
+          const size = Math.max(Math.abs(dx), Math.abs(dy));
+          x1 = x0 + Math.sign(dx || 1) * size;
+          y1 = y0 + Math.sign(dy || 1) * size;
+        }
+      } else {
+        const size = Math.max(Math.abs(dx), Math.abs(dy));
+        x1 = x0 + Math.sign(dx || 1) * size;
+        y1 = y0 + Math.sign(dy || 1) * size;
+      }
+    }
+    const next = { ...current, points: [x0, y0, x1, y1] };
+    drawingRef.current = next;
+    if (schedulePreview) scheduleDraft(next);
+    return true;
+  }
+
   function onStageMove(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
     // Figma-style multiplayer cursor publication must run before every tool-specific early return.
     // StudioLiveRoom performs the 40ms wire throttle; this path never writes React state.
@@ -18426,86 +18635,12 @@ function StudioCuttoonEditor() {
       if (qsPos) noteQuickShapePointerMoved(qsPos);
     }
     if (kind === "freehand") {
-      const stage = e.target.getStage();
-      if (!stage) return;
-      // 기준 필기 엔진처럼 coalesced 하드웨어 샘플만 사용한다. 브라우저별 predicted route는
-      // 다음 실제 배치에서 교체되며 팁의 방향/곡률이 달라져 마우스 필기감을 이질적으로 만든다.
-      consumeFreehandPointerBatch(stage, pointerEvent, STUDIO_POINTER_PREDICTION_ENABLED);
+      // Active freehand ink is consumed once by the native capture listener. This Stage event is
+      // the processed duplicate and remains responsible only for cursor/presence/QuickShape UI.
       return;
     }
-    const pos = e.target.getStage()?.getRelativePointerPosition();
-    if (!pos) return;
-    const current = drawingRef.current;
-    const x0 = current.points[0] ?? pos.x;
-    const y0 = current.points[1] ?? pos.y;
-    let x1 = pos.x;
-    let y1 = pos.y;
-    // 원근자: 직선 도구에서만, Shift 스냅과는 배타적(Shift가 우선 — 수평/수직/45°는 사용자의
-    // 명시적 의도이므로 원근 락보다 존중한다).
-    if (perspectiveRulerActive && kind === "line" && !e.evt.shiftKey && vanishingPoints.length > 0) {
-      if (!perspectiveRayRef.current) {
-        perspectiveRayRef.current = resolvePerspectiveRay(vanishingPoints, x0, y0, x1, y1);
-      }
-      [x1, y1] = snapStrokePointToPerspective(x1, y1, perspectiveRayRef.current);
-    } else if (isometricGridActive && kind === "line" && !e.evt.shiftKey) {
-      // 아이소메트릭 그리드: 원근자와 동일한 우선순위 관례(Shift가 최우선). 축 방향은 원점과
-      // 무관하게 고정이라 원근자의 vanishingPoints.length > 0 같은 가드는 필요 없다.
-      if (!isometricAxisRayRef.current) {
-        isometricAxisRayRef.current = resolveIsometricAxisRay(isometricAngleDeg, x0, y0, x1, y1);
-      }
-      [x1, y1] = snapStrokePointToIsometricGrid(x1, y1, isometricAxisRayRef.current);
-    }
-    // Shift: 정사각형/정원/정별, 선은 수평·수직·45° 스냅.
-    if (e.evt.shiftKey) {
-      const dx = x1 - x0;
-      const dy = y1 - y0;
-      if (kind === "line") {
-        if (Math.abs(dx) > Math.abs(dy) * 2) y1 = y0;
-        else if (Math.abs(dy) > Math.abs(dx) * 2) x1 = x0;
-        else {
-          const s = Math.max(Math.abs(dx), Math.abs(dy));
-          x1 = x0 + Math.sign(dx || 1) * s;
-          y1 = y0 + Math.sign(dy || 1) * s;
-        }
-      } else {
-        const s = Math.max(Math.abs(dx), Math.abs(dy));
-        x1 = x0 + Math.sign(dx || 1) * s;
-        y1 = y0 + Math.sign(dy || 1) * s;
-      }
-    }
-    const next = { ...current, points: [x0, y0, x1, y1] };
-    drawingRef.current = next;
-    scheduleDraft(next);
-  }
-  function stopFixedRateAdvanceTicker() {
-    if (drawingFixedRateAdvanceRafRef.current !== null) {
-      globalThis.cancelAnimationFrame(drawingFixedRateAdvanceRafRef.current);
-      drawingFixedRateAdvanceRafRef.current = null;
-    }
-  }
-  function tickFixedRateAdvance() {
-    drawingFixedRateAdvanceRafRef.current = null;
-    const state = drawingFixedRateFilterRef.current;
-    const pointerSample = drawingLastPointerSampleRef.current;
-    // 실샘플이 이미 이 held 위치까지의 모든 틱을 소비했으면 advance 는 조용히 no-op(멱등) —
-    // pointermove 와 같은 프레임에 겹쳐 호출돼도 이중 방출이 없다.
-    if (!state || !pointerSample || !liveDraftDirectRef.current) return;
-    const transition = transitionFixedRateStrokeFilter(state, {
-      type: "advance",
-      timeStamp: performance.now(),
-    });
-    drawingFixedRateFilterRef.current = transition.state;
-    if (transition.emitted.length > 0) {
-      // 유휴 캐치업 틱이라 새 원본 샘플이 없다 — speed=0(새 이동 없음 자체가 사실), 나머지
-      // 보조 채널(twist/원심 압력)은 최근 실샘플 값을 그대로 유지한다(appendFixedRateStrokeSamples
-      // 의 기존 계약과 동일: 한 배치 안 모든 틱에 단일 보조값을 적용).
-      appendFixedRateStrokeSamples(transition.emitted, pointerSample, 0);
-    }
-    drawingFixedRateAdvanceRafRef.current = globalThis.requestAnimationFrame(tickFixedRateAdvance);
-  }
-  function startFixedRateAdvanceTicker() {
-    if (drawingFixedRateAdvanceRafRef.current !== null) return;
-    drawingFixedRateAdvanceRafRef.current = globalThis.requestAnimationFrame(tickFixedRateAdvance);
+    const stage = e.target.getStage();
+    if (stage) updateActiveShapeEndpoint(stage, pointerEvent, true);
   }
   function appendFixedRateStrokeSamples(
     samples: readonly FixedRateStrokeFilteredSample[],
@@ -18600,14 +18735,23 @@ function StudioCuttoonEditor() {
   function appendFreehandStrokePoint(
     pos: { x: number; y: number },
     pointerSample: PointerEvent,
-    pressureOverride?: number
+    pressureOverride?: number,
+    canonicalTimeStamp?: number
   ) {
     const current = drawingRef.current;
     if (!current) return;
     const rawLastX = current.points[current.points.length - 2] ?? pos.x;
     const rawLastY = current.points[current.points.length - 1] ?? pos.y;
-    const previousVelocity = drawingVelocityRef.current ?? createStudioPointerVelocityState(pointerSample);
-    const velocitySample = sampleStudioPointerVelocity(previousVelocity, pointerSample);
+    const sampleTimeStamp = typeof canonicalTimeStamp === "number" && Number.isFinite(canonicalTimeStamp)
+      ? canonicalTimeStamp
+      : pointerSample.timeStamp;
+    const timingSample = {
+      clientX: pointerSample.clientX,
+      clientY: pointerSample.clientY,
+      timeStamp: sampleTimeStamp,
+    };
+    const previousVelocity = drawingVelocityRef.current ?? createStudioPointerVelocityState(timingSample);
+    const velocitySample = sampleStudioPointerVelocity(previousVelocity, timingSample);
     drawingVelocityRef.current = velocitySample.state;
     const pressure = typeof pressureOverride === "number" && Number.isFinite(pressureOverride)
       ? Math.min(1, Math.max(0, pressureOverride))
@@ -18656,7 +18800,7 @@ function StudioCuttoonEditor() {
       // resumes the freehand gesture.
       drawingStabilizerRef.current = transition.stabilizerState;
       drawingFixedRateFilterRef.current = null;
-      stopFixedRateAdvanceTicker();
+      stopFixedRateStrokePump();
       drawingRef.current = nextShift;
       if (!drawingPredictionPreviewRef.current) scheduleDraft(nextShift);
       return;
@@ -18689,7 +18833,7 @@ function StudioCuttoonEditor() {
           pressure,
           tiltX: stylus.tiltX,
           tiltY: stylus.tiltY,
-          timeStamp: pointerSample.timeStamp,
+          timeStamp: sampleTimeStamp,
         }],
       });
       drawingFixedRateFilterRef.current = transition.state;
@@ -18700,11 +18844,11 @@ function StudioCuttoonEditor() {
       ?? createStudioStrokeStabilizerState({
         x: rawLastX,
         y: rawLastY,
-        timeStamp: pointerSample.timeStamp,
+        timeStamp: sampleTimeStamp,
       });
     const stabilized = stabilizeStudioStrokeSample(
       liveStabilizerState,
-      { x: targetX, y: targetY, timeStamp: pointerSample.timeStamp },
+      { x: targetX, y: targetY, timeStamp: sampleTimeStamp },
       { strength: stabilizer, mode: stabilizerMode, coordinateScale: effScale }
     );
     drawingStabilizerRef.current = stabilized.state;
@@ -18791,7 +18935,10 @@ function StudioCuttoonEditor() {
     stage: Konva.Stage,
     pointerEvent: PointerEvent,
     includePredicted: boolean,
-    options: { dispatchedPressureOverride?: number } = {}
+    options: {
+      dispatchedPressureOverride?: number;
+      authoritativeSource?: "coalesced-or-parent" | "parent-only";
+    } = {}
   ): boolean {
     const session = drawingPointerSessionRef.current;
     if (!session || !isStudioStrokePointerEvent(session, pointerEvent)) return false;
@@ -18801,49 +18948,42 @@ function StudioCuttoonEditor() {
     const predictionIsReplaceable = includePredicted && !pointerEvent.shiftKey;
     const batch = collectStudioStrokePointerBatch(session, pointerEvent, {
       includePredicted: predictionIsReplaceable,
+      authoritativeSource: options.authoritativeSource,
     });
     drawingPointerSessionRef.current = batch.session;
+    const sampleClock = drawingFixedRateSampleClockRef.current;
+    const sampleClockTransition = sampleClock
+      ? normalizeFixedRateStrokeSampleTimeStamps(
+          sampleClock,
+          batch.authoritative.map((sample) => (
+            typeof sample.timeStamp === "number" ? sample.timeStamp : pointerEvent.timeStamp
+          )),
+          globalThis.performance?.now?.() ?? pointerEvent.timeStamp
+        )
+      : null;
+    if (sampleClockTransition) {
+      drawingFixedRateSampleClockRef.current = sampleClockTransition.state;
+    }
     const crdtSampleStart = Math.floor((drawingRef.current?.points.length ?? 0) / 2);
     try {
       // Konva derives canvas coordinates from client coordinates. Temporarily feeding each restored
       // hardware event through the public pointer API avoids duplicating its transform math.
-      for (const sample of batch.authoritative) {
+      for (const [sampleIndex, sample] of batch.authoritative.entries()) {
         stage.setPointersPositions(sample);
         const point = stage.getRelativePointerPosition();
         if (point) {
-          // 실샘플만 유휴 advance ticker 의 보조 채널 소스로 삼는다 — predicted 샘플(현재
-          // STUDIO_POINTER_PREDICTION_ENABLED=false 라 항상 비어 있음)이 미래 추정 좌표로
-          // 이 ref 를 오염시키지 않도록 authoritative 루프에서만 갱신한다.
-          drawingLastPointerSampleRef.current = sample;
+          drawingLastAuthoritativePointerRef.current = sample;
           appendFreehandStrokePoint(
             point,
             sample,
-            sample === pointerEvent ? options.dispatchedPressureOverride : undefined
+            sample === pointerEvent ? options.dispatchedPressureOverride : undefined,
+            sampleClockTransition?.timeStamps[sampleIndex]
           );
         }
       }
 
-      const authoritativeForCrdt = drawingRef.current;
-      if (authoritativeForCrdt) {
-        appendDrawingCrdtSampleSuffix(authoritativeForCrdt, crdtSampleStart);
-      }
-
-      const authoritativeDrawing = drawingRef.current;
+      const authoritativeDrawing = publishAuthoritativeFreehandSuffix(crdtSampleStart);
       const authoritativePointCount = Math.floor((authoritativeDrawing?.points.length ?? 0) / 2);
-      if (authoritativeDrawing && liveDraftDirectRef.current) {
-        if (causalPostCorrectionStateRef.current) {
-          appendCausalPostCorrectionState(authoritativeDrawing, crdtSampleStart);
-        } else if (predictedInkTailStateRef.current) {
-          // Every real browser batch invalidates the previous estimate first. Only the new durable
-          // suffix advances this state; the append-only live surface is never cleared or replaced.
-          appendAuthoritativePredictedInkState(authoritativeDrawing, crdtSampleStart);
-        }
-      }
-      if (authoritativeDrawing && liveInkOverlayRendererRef.current.isActive) {
-        // Canvas2D append is already O(batch suffix). Publish it in the pointer task rather than
-        // adding a full display-frame of latency; the GPU path keeps its rAF back-pressure gate.
-        flushDirectLiveDraftNow(authoritativeDrawing);
-      }
       if (authoritativeDrawing && batch.predicted.length > 0) {
         // Predictions make the tip feel closer to the pen, but never advance drawingRef/history.
         // Ruler locks are also restored so an estimate cannot choose the permanent perspective ray.
@@ -18885,6 +19025,97 @@ function StudioCuttoonEditor() {
     }
     return true;
   }
+
+  function publishAuthoritativeFreehandSuffix(startSample: number): DrawEl | null {
+    const authoritativeDrawing = drawingRef.current;
+    if (!authoritativeDrawing) return null;
+    appendDrawingCrdtSampleSuffix(authoritativeDrawing, startSample);
+    if (liveDraftDirectRef.current) {
+      if (causalPostCorrectionStateRef.current) {
+        appendCausalPostCorrectionState(authoritativeDrawing, startSample);
+      } else if (predictedInkTailStateRef.current) {
+        // Every real browser suffix invalidates the previous estimate first. Only the new durable
+        // suffix advances this state; the append-only live surface is never cleared or replaced.
+        appendAuthoritativePredictedInkState(authoritativeDrawing, startSample);
+      }
+      // The pointer task or frame pump already owns the earliest available presentation slot.
+      // Publish Canvas/WebGPU suffixes now instead of adding another display frame of latency.
+      flushDirectLiveDraftNow(authoritativeDrawing);
+    }
+    return authoritativeDrawing;
+  }
+
+  drawingFixedRatePumpFrameRef.current = (frameTimeStamp) => {
+    const drawing = drawingRef.current;
+    const session = drawingPointerSessionRef.current;
+    const filter = drawingFixedRateFilterRef.current;
+    const clock = drawingFixedRatePumpClockRef.current;
+    const pointerSample = drawingLastAuthoritativePointerRef.current;
+    if (
+      !drawing
+      || !session
+      || !filter
+      || !clock
+      || !pointerSample
+      || (drawing.kind ?? "freehand") !== "freehand"
+      || !isStudioStrokePointerEvent(session, pointerSample)
+    ) return false;
+
+    const frameClock = advanceFixedRateStrokeFrameClock(clock, frameTimeStamp);
+    drawingFixedRatePumpClockRef.current = frameClock.state;
+    const sampleClock = drawingFixedRateSampleClockRef.current;
+    if (sampleClock) {
+      drawingFixedRateSampleClockRef.current = advanceFixedRateStrokeSampleClockFloor(
+        sampleClock,
+        frameClock.watermark
+      );
+    }
+    const crdtSampleStart = Math.floor(drawing.points.length / 2);
+    const transition = transitionFixedRateStrokeFilter(filter, {
+      type: "advance",
+      timeStamp: frameClock.watermark,
+    });
+    drawingFixedRateFilterRef.current = transition.state;
+    appendFixedRateStrokeSamples(transition.emitted, pointerSample, 0);
+    const nextSampleCount = Math.floor((drawingRef.current?.points.length ?? 0) / 2);
+    if (nextSampleCount > crdtSampleStart) {
+      publishAuthoritativeFreehandSuffix(crdtSampleStart);
+    }
+    return true;
+  };
+
+  drawingPointerGlobalMoveRef.current = (pointerEvent) => {
+    const session = drawingPointerSessionRef.current;
+    const drawing = drawingRef.current;
+    if (
+      tool !== "draw"
+      || !session
+      || !drawing
+      || (drawing.kind ?? "freehand") !== "freehand"
+      || !isStudioStrokePointerEvent(session, pointerEvent)
+    ) return;
+    if (shouldEndStudioStrokeForReleasedContact(session, pointerEvent)) {
+      if (colorWheelTimerRef.current) {
+        clearTimeout(colorWheelTimerRef.current);
+        colorWheelTimerRef.current = null;
+      }
+      // A hover event with buttons=0 only closes a lost mouse contact; its coordinates are not ink.
+      finishDrawingPointer(stageRef.current, pointerEvent, { consumeReleaseSample: false });
+      return;
+    }
+    const stage = stageRef.current;
+    if (!stage) return;
+    consumeFreehandPointerBatch(stage, pointerEvent, STUDIO_POINTER_PREDICTION_ENABLED);
+    if (drawMode === "pen") {
+      const point = stage.getRelativePointerPosition();
+      if (point) noteQuickShapePointerMoved(point);
+    }
+  };
+
+  drawingPointerGlobalCancelRef.current = () => {
+    if (!drawingRef.current && !drawingPointerSessionRef.current) return;
+    discardDrawingPointerSession();
+  };
 
   function queueStudioRasterDrawPromotion(input: {
     plan: NonNullable<ReturnType<StudioCrdtSceneGraphRuntime["planRasterDrawPromotion"]>>;
@@ -19025,6 +19256,8 @@ function StudioCuttoonEditor() {
   ) {
     // Idempotent: Stage pointerup and the window safety listener can both observe the same release.
     if (!drawingRef.current && !drawingPointerSessionRef.current) return;
+    // No scheduled frame may race the final hardware sample or continue changing released pixels.
+    stopFixedRateStrokePump();
     // Capture hold/lock BEFORE any stopQuickShapeTracking() side-effect from callers/global listeners.
     // Callers historically stopped tracking first and wiped the refs used by release promotion.
     const quickShapeSnapshot = snapshotQuickShapeTracking();
@@ -19034,6 +19267,14 @@ function StudioCuttoonEditor() {
     let authoritativeLiveStroke: DrawEl | null = null;
     let immediateSurfaceHandoff: { pageId: string; strokeIds: string[] } | null = null;
     try {
+      if (
+        options.consumeReleaseSample !== false
+        && drawingRef.current
+        && (drawingRef.current.kind ?? "freehand") !== "freehand"
+        && stage
+      ) {
+        updateActiveShapeEndpoint(stage, pointerEvent, false);
+      }
       const releaseLastContactPressure = drawingRef.current?.pressures?.at(-1)
         ?? studioInkFallbackPressure(drawingRef.current?.pressureModel);
       if (
@@ -19054,6 +19295,7 @@ function StudioCuttoonEditor() {
                 fallbackPressure: releaseLastContactPressure,
               })
             : undefined,
+          authoritativeSource: "parent-only",
         });
       }
       if (drawingRef.current && (drawingRef.current.kind ?? "freehand") === "freehand") {
@@ -19390,6 +19632,7 @@ function StudioCuttoonEditor() {
   };
   function onStagePointerCancel(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
     const pointerEvent = e.evt as PointerEvent;
+    if (drawingHandledNativeEndEventsRef.current.delete(pointerEvent)) return;
     const pointerId = Number.isFinite(pointerEvent.pointerId) ? pointerEvent.pointerId : 1;
     // Drawing owns its matching cancel before any stale tool session can early-return. A foreign
     // pointer (typically a palm) cannot cancel the pen that opened the stroke.
@@ -19415,6 +19658,7 @@ function StudioCuttoonEditor() {
 
   function onStageUp(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
     const pointerEvent = e.evt as PointerEvent;
+    if (drawingHandledNativeEndEventsRef.current.delete(pointerEvent)) return;
     const drawingPointerSession = drawingPointerSessionRef.current;
     if (drawingRef.current || drawingPointerSession) {
       if (!drawingPointerSession) {

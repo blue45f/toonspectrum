@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   beginStudioStrokePointerSession,
+  claimStudioStrokeMoveTransport,
   collectStudioStrokePointerBatch,
   isStudioLeftContactDown,
   isStudioStrokePointerEvent,
@@ -128,7 +129,7 @@ describe("studio pointer input", () => {
     ).toBe(false);
   });
 
-  it("preserves coalesced delivery order and appends a missing current event exactly once", () => {
+  it("preserves coalesced delivery order without inventing a processed parent sample", () => {
     const down = sample(1);
     const session = beginStudioStrokePointerSession(down)!;
     const a = sample(2);
@@ -136,7 +137,7 @@ describe("studio pointer input", () => {
     const current = sample(4, { getCoalescedEvents: () => [a, b] });
 
     const batch = collectStudioStrokePointerBatch(session, current);
-    expect(batch.authoritative).toEqual([a, b, current]);
+    expect(batch.authoritative).toEqual([a, b]);
 
     const includesCurrent = sample(5);
     includesCurrent.getCoalescedEvents = () => [includesCurrent];
@@ -156,7 +157,6 @@ describe("studio pointer input", () => {
     expect(collectStudioStrokePointerBatch(session, current).authoritative).toEqual([
       firstDelivered,
       secondDelivered,
-      current,
     ]);
   });
 
@@ -219,8 +219,46 @@ describe("studio pointer input", () => {
       angleChange,
       twistChange,
       contactChange,
-      current,
     ]);
+  });
+
+  it("uses one exclusive move transport and permanently prefers the first matching raw update", () => {
+    const initial = beginStudioStrokePointerSession(sample(1))!;
+    const moveA = sample(2);
+    const fallback = claimStudioStrokeMoveTransport(initial, moveA, "pointermove");
+    expect(fallback.accepted).toBe(true);
+    expect(fallback.session.moveTransport).toBe("pointermove");
+
+    const foreignRaw = claimStudioStrokeMoveTransport(
+      fallback.session,
+      sample(3, { pointerId: 99 }),
+      "pointerrawupdate"
+    );
+    expect(foreignRaw).toEqual({ accepted: false, session: fallback.session });
+
+    const rawB = sample(3);
+    const raw = claimStudioStrokeMoveTransport(fallback.session, rawB, "pointerrawupdate");
+    expect(raw.accepted).toBe(true);
+    expect(raw.session.moveTransport).toBe("pointerrawupdate");
+
+    const duplicatedMove = sample(4, { getCoalescedEvents: () => [moveA, rawB, sample(4)] });
+    expect(
+      claimStudioStrokeMoveTransport(raw.session, duplicatedMove, "pointermove").accepted
+    ).toBe(false);
+    expect(
+      claimStudioStrokeMoveTransport(raw.session, sample(5), "pointerrawupdate").accepted
+    ).toBe(true);
+  });
+
+  it("lets release own exactly one parent endpoint even when move history is coalesced", () => {
+    const session = beginStudioStrokePointerSession(sample(1))!;
+    const prior = sample(2);
+    const release = sample(3, { getCoalescedEvents: () => [prior] });
+    expect(
+      collectStudioStrokePointerBatch(session, release, {
+        authoritativeSource: "parent-only",
+      }).authoritative
+    ).toEqual([release]);
   });
 
   it("deduplicates only an adjacent final sample across batches, not a later loop-back", () => {
@@ -282,7 +320,7 @@ describe("studio pointer input", () => {
       getPredictedEvents: () => [foreign, predicted],
     });
     const batch = collectStudioStrokePointerBatch(session, current, { includePredicted: true });
-    expect(batch.authoritative).toEqual([a, current]);
+    expect(batch.authoritative).toEqual([a]);
     expect(batch.predicted).toEqual([predicted]);
   });
 

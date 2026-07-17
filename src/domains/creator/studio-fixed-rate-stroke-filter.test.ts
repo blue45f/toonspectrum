@@ -218,6 +218,42 @@ describe("fixed logical clock and zero-order hold", () => {
     expect(advance(settled.state, 14).emitted).toEqual([]);
   });
 
+  it("publishes sparse held motion frame-by-frame without changing the final logical stream", () => {
+    const started = createFixedRateStrokeFilter({ x: 0, y: 0, timeStamp: 0 }, 3.4);
+    const sparseMove = append(started.state, [{ x: 50, y: 0, timeStamp: 50 }]);
+    expect(sparseMove.emitted).toEqual([]);
+
+    const frame66 = advance(sparseMove.state, 66);
+    const frame83 = advance(frame66.state, 83);
+    const oneShot = advance(sparseMove.state, 83);
+
+    expect(frame66.emitted.map(({ logicalTick }) => logicalTick)).toEqual([11, 12, 13]);
+    expect(frame66.emitted.map(({ x }) => Number(x.toFixed(6)))).toEqual([
+      0.302331,
+      1.511654,
+      4.172166,
+    ]);
+    expect([...frame66.emitted, ...frame83.emitted]).toEqual(oneShot.emitted);
+    expect(frame83.state).toEqual(oneShot.state);
+  });
+
+  it("keeps an emitted prefix immutable when a late coalesced sample follows a frame watermark", () => {
+    const started = createFixedRateStrokeFilter({ x: 0, y: 0, timeStamp: 0 }, 3.4);
+    const early = append(started.state, [{ x: 10, y: 0, timeStamp: 4 }]);
+    const presented = advance(early.state, 15);
+    const prefix = structuredClone(presented.emitted);
+
+    const late = append(presented.state, [{ x: 20, y: 5, timeStamp: 8 }]);
+    const next = advance(late.state, 20);
+
+    expect(presented.emitted).toEqual(prefix);
+    expect(late.emitted).toEqual([]);
+    expect(next.emitted).toHaveLength(1);
+    expect(next.emitted[0]).toMatchObject({ logicalTick: 4, timeStamp: 20 });
+    expect(new Set([...prefix, ...next.emitted].map(({ logicalTick }) => logicalTick)).size)
+      .toBe(prefix.length + next.emitted.length);
+  });
+
   it("bounds long background catch-up after the held cascade settles", () => {
     const started = createFixedRateStrokeFilter({ x: 0, y: 0, timeStamp: 0 }, 10);
     const moved = append(started.state, [{ x: 100, y: 20, timeStamp: 1 }]);
@@ -349,7 +385,7 @@ describe("deterministic event batching", () => {
     expect([...prefix, ...second.emitted, ...finished.emitted]).toEqual(oneBatch.emitted);
   });
 
-  it("is identical for 60, 120, and 240Hz browser delivery of one 240Hz raw stream", () => {
+  it("is invariant to 60, 120, and 240Hz delivery batches of one 240Hz raw stream", () => {
     const raw240Hz = Array.from({ length: 72 }, (_, index) => {
       const timeStamp = ((index + 1) * 1_000) / 240;
       return {

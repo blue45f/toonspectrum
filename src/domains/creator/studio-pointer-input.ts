@@ -31,6 +31,11 @@ export interface StudioPointerEventLike {
 export interface StudioStrokePointerSession {
   readonly pointerId: number;
   readonly pointerType: "pen" | "touch" | "mouse" | "unknown";
+  /**
+   * Exactly one native move stream may own durable ink. Browsers that deliver raw updates switch
+   * permanently to that higher-rate stream; ordinary pointermove remains the no-UA-sniff fallback.
+   */
+  readonly moveTransport: "pointermove" | "pointerrawupdate";
   /** Exact signature of the last stored hardware sample, used only for adjacent deduplication. */
   readonly lastAuthoritativeSignature: string;
 }
@@ -47,6 +52,11 @@ export interface StudioPointerCaptureTarget {
   setPointerCapture?: (pointerId: number) => void;
   hasPointerCapture?: (pointerId: number) => boolean;
   releasePointerCapture?: (pointerId: number) => void;
+}
+
+export interface StudioStrokeMoveTransportClaim {
+  readonly accepted: boolean;
+  readonly session: StudioStrokePointerSession;
 }
 
 const LEGACY_POINTER_ID = 1;
@@ -137,6 +147,7 @@ export function beginStudioStrokePointerSession(
   return {
     pointerId,
     pointerType: pointerTypeOf(event),
+    moveTransport: "pointermove",
     lastAuthoritativeSignature: pointerSampleSignature(event, pointerId),
   };
 }
@@ -175,8 +186,39 @@ export function shouldCancelStudioFingerStrokeForAdditionalContact(
 }
 
 /**
- * Restores coalesced hardware samples, appends the dispatched event when it is not already the
- * same final sample, and keeps predicted samples on a separate preview-only channel.
+ * Arbitrates the two browser move streams without relying on UA or feature detection.
+ *
+ * Pointer Events guarantees that a raw update for a platform sample is dispatched before the
+ * corresponding processed pointermove. Once a matching raw update is observed, accepting later
+ * pointermove/coalesced batches as ink would replay the same hardware samples and can visibly run
+ * the stroke backwards. Browsers that never dispatch raw updates stay on pointermove forever.
+ */
+export function claimStudioStrokeMoveTransport(
+  session: StudioStrokePointerSession,
+  event: StudioPointerEventLike,
+  eventType: "pointermove" | "pointerrawupdate"
+): StudioStrokeMoveTransportClaim {
+  if (!isStudioStrokePointerEvent(session, event)) {
+    return { accepted: false, session };
+  }
+  if (eventType === "pointerrawupdate") {
+    return {
+      accepted: true,
+      session: session.moveTransport === "pointerrawupdate"
+        ? session
+        : { ...session, moveTransport: "pointerrawupdate" },
+    };
+  }
+  return {
+    accepted: session.moveTransport === "pointermove",
+    session,
+  };
+}
+
+/**
+ * Restores either coalesced hardware samples or the dispatched-event fallback, and keeps predicted
+ * samples on a separate preview-only channel. The processed parent is never treated as an extra
+ * hardware point when a coalesced list exists.
  *
  * Browser delivery order is preserved rather than timestamp-sorted. Reduced timer precision can
  * produce equal timestamps, while reordering those points would visibly kink the stroke.
@@ -184,7 +226,11 @@ export function shouldCancelStudioFingerStrokeForAdditionalContact(
 export function collectStudioStrokePointerBatch<T extends StudioPointerEventLike>(
   session: StudioStrokePointerSession,
   event: T,
-  options: { includePredicted?: boolean } = {}
+  options: {
+    includePredicted?: boolean;
+    /** Pointer-up owns one final endpoint and must not replay raw/coalesced move history. */
+    authoritativeSource?: "coalesced-or-parent" | "parent-only";
+  } = {}
 ): StudioStrokePointerBatch<T> {
   if (!isStudioStrokePointerEvent(session, event)) {
     return { authoritative: [], predicted: [], session };
@@ -192,10 +238,13 @@ export function collectStudioStrokePointerBatch<T extends StudioPointerEventLike
 
   const authoritative: T[] = [];
   let previousSignature = session.lastAuthoritativeSignature;
-  const coalesced = safeRelatedEvents(event, "getCoalescedEvents");
-  // Always include the dispatched event. Some engines include it in getCoalescedEvents(), others
-  // return only the samples preceding it; adjacent signature deduplication handles both contracts.
-  for (const candidate of [...coalesced, event]) {
+  const coalesced = options.authoritativeSource === "parent-only"
+    ? []
+    : safeRelatedEvents(event, "getCoalescedEvents");
+  // A trusted parent pointer event is the processed aggregate of its coalesced list, not an extra
+  // hardware sample. Consume one representation only; empty/throwing APIs fall back to parent.
+  const candidates = coalesced.length > 0 ? coalesced : [event];
+  for (const candidate of candidates) {
     if (!isStudioStrokePointerEvent(session, candidate)) continue;
     const signature = pointerSampleSignature(candidate, session.pointerId);
     if (signature === previousSignature) continue;
