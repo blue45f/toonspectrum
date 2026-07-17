@@ -38,6 +38,7 @@ export interface StudioCrdtCompatibleDrawElement {
   brushTip?: unknown;
   stamp?: unknown;
   stampPipeline?: "causal-walker-v2";
+  watercolorPipeline?: "causal-walker-v2";
   strokeStyle?: unknown;
   shapeParams?: unknown;
   symmetry?: unknown;
@@ -61,6 +62,7 @@ const EXTENSION_KEYS = [
   // 스탬프 브러시 튜닝(flow/hardness/minSize) — 확장 봉투로 무손실 왕복한다.
   "stamp",
   "stampPipeline",
+  "watercolorPipeline",
   "name",
   "hidden",
   "locked",

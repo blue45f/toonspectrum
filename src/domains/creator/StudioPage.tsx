@@ -358,6 +358,10 @@ import {
   type StudioCausalPostCorrectionTransition,
 } from "./studio-causal-post-correction";
 import {
+  DEFAULT_STUDIO_CAUSAL_WATERCOLOR_MAX_DABS,
+  planCausalWatercolorBrushDabs,
+} from "./studio-causal-watercolor-brush";
+import {
   buildStudioCharacterBiblePromptContext,
   normalizeStudioCharacterBible,
   type StudioCharacterBible,
@@ -516,6 +520,7 @@ import {
   composeStudioFillReferenceImage,
   type StudioFillReferenceLayer,
 } from "./studio-fill-reference";
+import { isStudioFixedRateInputEligible } from "./studio-fixed-rate-input-eligibility";
 import {
   createCanonicalFixedRateStrokeFilter,
   createFixedRateStrokeFilter,
@@ -2169,6 +2174,8 @@ interface DrawEl {
   stamp?: StudioStampBrushTuning;
   /** 새 스탬프 획의 append-only raw accepted-sample 재생 규약. 미설정 획은 legacy smoothing. */
   stampPipeline?: "causal-walker-v2";
+  /** 새 수채/수묵 획의 prefix-stable pigment station 규약. 미설정 획은 legacy 재배치 플래너. */
+  watercolorPipeline?: "causal-walker-v2";
   // 스트로크 스타일(점선/선 끝/화살촉) — 도형·선 전용. 미설정 시 기본(실선·둥근 끝).
   strokeStyle?: StrokeStyle;
   // 도형 파라미터(별 꼭짓점/다각형 변/모서리 반경) — 미설정 시 기존 하드코딩과 동일한 기본값.
@@ -3139,7 +3146,14 @@ function drawLiveFreehandDraftToContext(context: Konva.Context, el: DrawEl): voi
 // el 참조를 받으므로 여기서 잘린다. memo 가 없으면 모든 커밋 획이 매 프레임 스무딩을 재계산해
 // 새 points 배열을 만들고, react-konva 가 이를 시각 변경으로 보고 메인 레이어 전체를 다시
 // 래스터한다 — 콘텐츠가 쌓일수록 스트로크가 점점 무거워지던 원인.
-const StudioDrawNode = memo(function StudioDrawNode({ el }: { el: DrawEl }) {
+const StudioDrawNode = memo(function StudioDrawNode({
+  el,
+  activeDraft = false,
+}: {
+  el: DrawEl;
+  /** 활성 수채 초안은 움직이는 종점 pigment를 영구 station으로 굳히지 않는다. */
+  activeDraft?: boolean;
+}) {
   const kind = el.kind ?? "freehand";
   // 패턴 채우기 타일(로드 전 null) — 우선순위: 패턴 > 그라데이션 > 단색(fillPriority).
   const patternImage = usePatternFillImage(el.pattern);
@@ -3549,17 +3563,26 @@ const StudioDrawNode = memo(function StudioDrawNode({ el }: { el: DrawEl }) {
           }
 
           if (brushFamily === "watercolor" && el.mode !== "eraser") {
-            // 수채는 매 렌더에서 스트로크 id/필압/점열로 dab 계획을 다시 계산한다. 계획 자체가
-            // 순수·결정적이라 히스토리 복원, 협업 동기화, 내보내기에서도 번짐 위치가 흔들리지 않는다.
-            const dabs = planWatercolorBrushDabs({
-              points: processFreehandPoints(points, renderSampleDistance),
+            const causalWatercolor = el.watercolorPipeline === "causal-walker-v2";
+            // Legacy documents retain their fitted whole-stroke stations. New strokes use raw,
+            // already-accepted samples and a residual arc-length cursor, so extending a prefix can
+            // append pigment but can never move pigment that was already visible.
+            const watercolorInput = {
+              points: causalWatercolor
+                ? points
+                : processFreehandPoints(points, renderSampleDistance),
               pressures: el.pressures,
               baseWidth: strokeWidth,
               seed: watercolorBrushSeedFromKey(el.id),
-              // 길고 촘촘한 스트로크도 editor 재렌더마다 작업량이 폭증하지 않게 한 획당 cap을 둔다.
-              // cap에 걸려도 플래너가 첫/끝 core와 경로 연속성을 우선 보존한다.
-              maxDabs: 512,
-            });
+              // Causal stations do not redistribute at the cap, so they need the larger shared
+              // bound. Legacy documents keep their historical 512-dab fit and exact old pixels.
+              maxDabs: causalWatercolor
+                ? DEFAULT_STUDIO_CAUSAL_WATERCOLOR_MAX_DABS
+                : 512,
+            };
+            const dabs = causalWatercolor
+              ? planCausalWatercolorBrushDabs(watercolorInput, !activeDraft)
+              : planWatercolorBrushDabs(watercolorInput);
             return (
               <Shape
                 key={index}
@@ -4057,7 +4080,7 @@ const StudioDraftPreviewLayers = memo(function StudioDraftPreviewLayers({
           {settled.map((el) => (
             <StudioDrawNode key={el.id} el={el} />
           ))}
-          {normalActive ? <StudioDrawNode el={normalActive} /> : null}
+          {normalActive ? <StudioDrawNode el={normalActive} activeDraft /> : null}
         </Layer>
       ) : null}
       {/* 라이브 입자 획은 독립 레이어에서만 다시 그린다 — committed 입자 획이 포인터 RAF마다
@@ -18023,6 +18046,9 @@ function StudioCuttoonEditor() {
 
       const fixedRateBrushFamily = resolveStudioBrushRenderFamily(brush);
       const activeStampKind = drawMode === "pen" ? resolveStudioStampBrushKind(brush) : null;
+      const activeCausalWatercolor = drawMode === "pen"
+        && fixedRateBrushFamily === "watercolor";
+      const hasBrushDynamics = resolveStudioBrushDynamicsPresetId(brush) !== null;
       const linearPressureEligible = (
         drawMode === "eraser" ||
         drawMode === "pixel" ||
@@ -18059,18 +18085,20 @@ function StudioCuttoonEditor() {
       });
       if (drawMode === "pen") scheduleLiveDrawPressure(pressure);
       const stylus = normalizeCalligraphyStylusInput(pointerSample);
-      const capturePointerDynamics = drawMode === "pen" && resolveStudioBrushDynamicsPresetId(brush) !== null;
+      const capturePointerDynamics = drawMode === "pen" && hasBrushDynamics;
       const captureStylus = drawMode === "pen" && (brush === "calligraphy" || capturePointerDynamics);
       const tangentialPressure = Number.isFinite(pointerSample.tangentialPressure)
         ? Math.min(1, Math.max(-1, pointerSample.tangentialPressure))
         : 0;
-      const fixedRateInkEnabled = stabilizerMode === "standard"
-        && (stabilizer > 0 || activeStampKind !== null)
-        && (drawMode === "pen" || drawMode === "eraser")
-        && resolveStudioBrushDynamicsPresetId(brush) === null
-        && (drawMode === "eraser" || (
-          fixedRateBrushFamily === "pen" || fixedRateBrushFamily === "marker" || activeStampKind !== null
-        ));
+      const fixedRateInkEnabled = isStudioFixedRateInputEligible({
+        stabilizerMode,
+        stabilizerStrength: stabilizer,
+        drawMode,
+        brushFamily: fixedRateBrushFamily,
+        hasBrushDynamics,
+        causalStampV2: activeStampKind !== null,
+        causalWatercolorV2: activeCausalWatercolor,
+      });
 
       const common = {
         id: uid(),
@@ -18087,6 +18115,9 @@ function StudioCuttoonEditor() {
           ? { ...stampTuning }
           : undefined,
         stampPipeline: drawMode === "pen" && activeStampKind
+          ? "causal-walker-v2" as const
+          : undefined,
+        watercolorPipeline: activeCausalWatercolor
           ? "causal-walker-v2" as const
           : undefined,
         brushDynamics: capturePointerDynamics
@@ -19555,6 +19586,7 @@ function StudioCuttoonEditor() {
               brushTip: undefined,
               stamp: undefined,
               stampPipeline: undefined,
+              watercolorPipeline: undefined,
               fill: undefined,
               points: promoted.points,
               shapeParams:
@@ -19584,6 +19616,7 @@ function StudioCuttoonEditor() {
           (finished.kind ?? "freehand") === "freehand"
           && postCorrection > 0
           && finished.stampPipeline !== "causal-walker-v2"
+          && finished.watercolorPipeline !== "causal-walker-v2"
           && causalPostCorrectionStateRef.current?.phase !== "sealed"
         ) {
           finished = {

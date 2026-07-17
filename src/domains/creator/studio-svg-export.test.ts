@@ -379,6 +379,50 @@ describe("도형 직렬화", () => {
     expect(first.skipped).toEqual([]);
   });
 
+  it("causal 수채 v2는 전체 평활화 없이 raw accepted points를 결정적으로 내보낸다", () => {
+    const base = rectEl({
+      id: "watercolor-causal-svg-1",
+      kind: "freehand",
+      brush: "watercolor",
+      points: [0, 0, 0, 10, 10, 10],
+      pressures: [0.25, 0.6, 0.9],
+      sampleSpacing: 128,
+      stroke: "#315f73",
+      strokeWidth: 10,
+      fill: undefined,
+    });
+    const legacy = exportPageToSvg(page([base]));
+    const causal = exportPageToSvg(page([{
+      ...base,
+      watercolorPipeline: "causal-walker-v2",
+    }]));
+    const repeated = exportPageToSvg(page([{
+      ...base,
+      watercolorPipeline: "causal-walker-v2",
+    }]));
+
+    // width 10의 causal 기본 spacing은 3.4px이다. 첫 raw 수직 구간을 보존할 때만 이 core가
+    // 생긴다. legacy는 sampleSpacing=128로 중간점을 제거해 대각선 전체 계획을 유지한다.
+    expect(causal.svg).toMatch(/<circle cx="0" cy="3\.4"[^>]+fill="#315f73"/);
+    expect(legacy.svg).not.toMatch(/<circle cx="0" cy="3\.4"[^>]+fill="#315f73"/);
+    expect(causal.svg).toContain('<circle cx="10" cy="10"');
+    expect(causal.svg).not.toBe(legacy.svg);
+    expect(repeated.svg).toBe(causal.svg);
+    expect(causal.skipped).toEqual([]);
+
+    const longStroke = exportPageToSvg(page([{
+      ...base,
+      id: "watercolor-causal-svg-long",
+      points: [0, 0, 5_000, 0],
+      pressures: [0.5, 0.5],
+      watercolorPipeline: "causal-walker-v2",
+    }]));
+    const longStrokeDabCount = (longStroke.svg.match(/<circle\b/g) ?? []).length;
+    expect(longStrokeDabCount).toBeGreaterThan(512);
+    expect(longStrokeDabCount).toBeLessThanOrEqual(8_192);
+    expect(longStroke.svg).toContain('<circle cx="5000" cy="0"');
+  });
+
   it("입자 브러시 — Canvas와 같은 결정적 타원형 dab·회전·유량을 SVG로 보존한다", () => {
     const dynamic = rectEl({
       id: "dynamic-svg-1",

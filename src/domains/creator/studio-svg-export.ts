@@ -69,6 +69,10 @@ import {
 } from "./studio-bubble-path";
 import { planStudioCausalInk } from "./studio-causal-ink";
 import {
+  DEFAULT_STUDIO_CAUSAL_WATERCOLOR_MAX_DABS,
+  planCausalWatercolorBrushDabs,
+} from "./studio-causal-watercolor-brush";
+import {
   fxBrushSeedFromKey,
   planGlitterBrushParticles,
   planGlowBrushPasses,
@@ -260,6 +264,7 @@ export interface SvgDrawElLike extends SvgElMeta {
   pressures?: number[];
   pressureModel?: StudioInkPressureModel;
   sampleSpacing?: number;
+  watercolorPipeline?: "causal-walker-v2";
   tiltXs?: number[];
   tiltYs?: number[];
   twists?: number[];
@@ -897,13 +902,21 @@ function serializeFreehand(
   }
 
   if (brushFamily === "watercolor") {
-    const dabs = planWatercolorBrushDabs({
-      points: processFreehandPoints(points, renderSampleDistance),
-      pressures: el.pressures,
-      baseWidth: strokeWidth,
-      seed: watercolorBrushSeedFromKey(el.id),
-      maxDabs: 512,
-    });
+    const dabs = el.watercolorPipeline === "causal-walker-v2"
+      ? planCausalWatercolorBrushDabs({
+          points,
+          pressures: el.pressures,
+          baseWidth: strokeWidth,
+          seed: watercolorBrushSeedFromKey(el.id),
+          maxDabs: DEFAULT_STUDIO_CAUSAL_WATERCOLOR_MAX_DABS,
+        }, true)
+      : planWatercolorBrushDabs({
+          points: processFreehandPoints(points, renderSampleDistance),
+          pressures: el.pressures,
+          baseWidth: strokeWidth,
+          seed: watercolorBrushSeedFromKey(el.id),
+          maxDabs: 512,
+        });
     if (dabs.length === 0) return "";
     const diffuseId = nextId(ctx, "sw");
     ctx.defs.push(

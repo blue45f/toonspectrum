@@ -145,6 +145,41 @@ describe("studio CRDT page bridge", () => {
     });
   });
 
+  it("round-trips the causal watercolor pipeline as an explicit CRDT extension", () => {
+    const element: StudioCrdtCompatibleDrawElement = {
+      id: "watercolor-v2",
+      type: "draw",
+      kind: "freehand",
+      mode: "pen",
+      points: [0, 0, 12, 4, 24, 0],
+      pressures: [0.2, 0.6, 0.9],
+      stroke: "#315f73",
+      strokeWidth: 24,
+      brush: "watercolor",
+      watercolorPipeline: "causal-walker-v2",
+    };
+
+    const encoded = studioDrawElementToCrdtStroke("page-a", element);
+    expect(encoded.payload.extensions).toEqual({
+      watercolorPipeline: "causal-walker-v2",
+    });
+
+    const decoded = studioCrdtStrokeToDrawElement({
+      ...record(element.id, "page-a", 0),
+      ...encoded,
+      orderIndex: 0,
+      status: "finalized",
+      deleted: false,
+    });
+    expect(decoded).toMatchObject({
+      id: element.id,
+      brush: "watercolor",
+      points: element.points,
+      pressures: element.pressures,
+      watercolorPipeline: "causal-walker-v2",
+    });
+  });
+
   it("preserves omitted legacy pressure semantics and ignores unknown pressure models", () => {
     const legacy: StudioCrdtCompatibleDrawElement = {
       id: "stroke-legacy-pressure",
@@ -168,6 +203,8 @@ describe("studio CRDT page bridge", () => {
     expect("pressureModel" in decodedLegacy).toBe(false);
     expect(decodedLegacy.stampPipeline).toBeUndefined();
     expect("stampPipeline" in decodedLegacy).toBe(false);
+    expect(decodedLegacy.watercolorPipeline).toBeUndefined();
+    expect("watercolorPipeline" in decodedLegacy).toBe(false);
 
     const encodedUnknown = studioDrawElementToCrdtStroke("page-a", {
       ...legacy,
