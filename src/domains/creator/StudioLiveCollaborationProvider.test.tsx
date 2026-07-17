@@ -369,6 +369,17 @@ vi.mock("./studio-crdt-page-bridge", () => ({
   reconcileStudioCrdtSceneGraphPages: () => ({ pages: [], changed: false }),
 }));
 
+vi.mock("./studio-crdt-raster-ui-bridge", () => ({
+  nextStudioRasterLogicalClock: () => "1",
+  planStudioRasterDrawPromotion: () => null,
+  studioRasterDrawPromotionSourceMatches: () => false,
+  publishStudioRasterHistoryTransition: () => ({
+    undoOperationIds: [],
+    acknowledgementIds: [],
+  }),
+  sha256StudioRasterSemanticParameters: async () => "0".repeat(64),
+}));
+
 const participant: Omit<StudioLiveParticipant, "sessionId"> = {
   displayName: "민지",
   role: "editor",

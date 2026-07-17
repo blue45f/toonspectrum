@@ -42,6 +42,17 @@ describe("StudioToolHint focus takeover contract", () => {
     );
   });
 
+  it("atomically transfers ownership and guards the next target from a stale hide timer", () => {
+    const reveal = functionBody("reveal");
+    const scheduleHide = functionBody("scheduleHide");
+
+    expect(reveal).toContain("coordinator.claim(tipId)");
+    expect(reveal).toContain("hideRenderedTooltipImmediately(previousHintId);");
+    expect(scheduleHide).toContain("coordinator.release(tipId);");
+    expect(source).toContain("coordinator.getActiveHintId() === tipId");
+    expect(source).toContain("const dismissEpoch = useSyncExternalStore(");
+  });
+
   it("keeps unavailable descendants inert without disabling their focus-only coach wrapper", () => {
     const handleClickCapture = functionBody("handleClickCapture");
     const disabledGuard = handleClickCapture.slice(handleClickCapture.indexOf("if (disabled)"));

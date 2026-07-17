@@ -6,6 +6,7 @@ import {
   collectStudioStrokePointerBatch,
   isStudioLeftContactDown,
   isStudioStrokePointerEvent,
+  resolveStudioStrokeReleaseSource,
   shouldCancelStudioFingerStrokeForAdditionalContact,
   shouldEndStudioStrokeForReleasedContact,
   tryCaptureStudioStrokePointer,
@@ -255,15 +256,34 @@ describe("studio pointer input", () => {
     expect(raw.session.moveTransport).toBe("pointermove");
   });
 
-  it("lets release own exactly one parent endpoint even when move history is coalesced", () => {
-    const session = beginStudioStrokePointerSession(sample(1))!;
-    const prior = sample(2);
-    const release = sample(3, { getCoalescedEvents: () => [prior] });
+  it("seals at the last processed sample instead of extending geometry to pointerup", () => {
+    const down = sample(1);
+    const session = beginStudioStrokePointerSession(down)!;
+    const move = sample(10);
+    const release = sample(20, { pressure: 0, buttons: 0 });
+
+    expect(resolveStudioStrokeReleaseSource(session, release, move)).toEqual({
+      event: move,
+      kind: "retained-contact",
+    });
+    expect(resolveStudioStrokeReleaseSource(session, release, down)).toEqual({
+      event: down,
+      kind: "retained-contact",
+    });
     expect(
-      collectStudioStrokePointerBatch(session, release, {
-        authoritativeSource: "parent-only",
-      }).authoritative
-    ).toEqual([release]);
+      resolveStudioStrokeReleaseSource(
+        session,
+        release,
+        sample(30, { pointerId: 99 })
+      )
+    ).toEqual({ event: release, kind: "release-fallback" });
+    expect(
+      resolveStudioStrokeReleaseSource(
+        session,
+        sample(20, { pointerId: 99, pressure: 0, buttons: 0 }),
+        move
+      )
+    ).toBeNull();
   });
 
   it("deduplicates only an adjacent final sample across batches, not a later loop-back", () => {

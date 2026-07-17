@@ -149,15 +149,15 @@ export const BRUSH_TIP_ROUNDNESS_RANGE = [0.08, 1] as const;
 /**
  * 새 캔버스와 누락 필드를 가진 레거시 브러시가 공유하는 기본 필기감.
  *
- * 기본 펜은 상용 협업 캔버스와 같은 5ms 고정 주기·10단 cascade 응답(3.4)을 사용한다.
- * 브라우저가 coalesced 이벤트를 어떤 묶음으로 전달해도 동일한 궤적을 만들며, 후보정은 끈다.
+ * 기본 펜은 현재 비교 보드의 0 설정처럼 안정화·후보정을 모두 끈다. 이는 제품 전체의 과거
+ * 기본값을 복제하는 것이 아니라, 처리된 pointermove/coalesced 샘플을 지연 없이 따르는 선택이다.
  */
 export const DEFAULT_STUDIO_BRUSH_SNAPSHOT: StudioBrushSnapshot = {
   brushId: "pen",
   strokeWidth: 6,
   brushOpacity: 1,
   color: "#7c5cfc",
-  stabilizer: 3.4,
+  stabilizer: 0,
   stabilizerMode: "standard",
   postCorrection: 0,
   preserveCorners: true,

@@ -90,7 +90,7 @@ describe("sanitizeBrushSnapshot", () => {
     const { snapshot, adjustedFields } = sanitizeBrushSnapshot(null);
     expect(snapshot.brushId).toBe("pen");
     expect(snapshot.color).toBe("#7c5cfc");
-    expect(snapshot.stabilizer).toBe(3.4);
+    expect(snapshot.stabilizer).toBe(0);
     expect(snapshot.postCorrection).toBe(0);
     expect(snapshot.useVelocityPressure).toBe(false);
     expect(adjustedFields).toContain("brushId");
@@ -134,7 +134,7 @@ describe("sanitizeBrushSnapshot", () => {
       pressureCurve: "1.0" as unknown as number,
     });
     expect(snapshot.strokeWidth).toBe(6);
-    expect(snapshot.stabilizer).toBe(3.4);
+    expect(snapshot.stabilizer).toBe(0);
     expect(snapshot.pressureCurve).toBe(1.0);
     expect(adjustedFields).toEqual(["strokeWidth", "stabilizer", "pressureCurve"]);
   });

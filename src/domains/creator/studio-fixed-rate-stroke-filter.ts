@@ -24,6 +24,8 @@ const MAX_ALPHA_COMPLEMENT = 0.95;
 export interface FixedRateStrokeRawSample {
   readonly x: number;
   readonly y: number;
+  /** CSS surface pixels per document unit; positions retain a 1/16 CSS px input grid. */
+  readonly positionScale?: number;
   readonly pressure?: number;
   readonly tiltX?: number;
   readonly tiltY?: number;
@@ -129,6 +131,14 @@ function quantizePressure(value: number): number {
     / FIXED_RATE_STROKE_PRESSURE_STEPS;
 }
 
+function positionQuantum(positionScale: unknown): number {
+  const finiteScale = finiteNumber(positionScale, 1);
+  const normalizedScale = finiteScale === 0
+    ? 1
+    : clamp(Math.abs(finiteScale), 0.01, 64);
+  return FIXED_RATE_STROKE_POSITION_QUANTUM / normalizedScale;
+}
+
 /**
  * Converts a public 0..10 strength into the fixed cascade parameters.
  *
@@ -162,14 +172,15 @@ export function quantizeFixedRateStrokeSample(
   const fallbackTiltY = fallback?.tiltY ?? 0;
   const fallbackTimeStamp = fallback?.timeStamp ?? 0;
   const timeStamp = Math.max(0, finiteNumber(sample.timeStamp, fallbackTimeStamp));
+  const documentPositionQuantum = positionQuantum(sample.positionScale);
   return {
     x: quantize(
       finiteNumber(sample.x, fallbackX),
-      FIXED_RATE_STROKE_POSITION_QUANTUM
+      documentPositionQuantum
     ),
     y: quantize(
       finiteNumber(sample.y, fallbackY),
-      FIXED_RATE_STROKE_POSITION_QUANTUM
+      documentPositionQuantum
     ),
     pressure: quantizePressure(finiteNumber(sample.pressure, fallbackPressure)),
     tiltX: quantize(

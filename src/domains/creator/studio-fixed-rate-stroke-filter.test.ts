@@ -137,6 +137,59 @@ describe("fixed-rate stroke input quantization", () => {
     });
   });
 
+  it("maps the 1/16 CSS pixel position grid into document space", () => {
+    expect(quantizeFixedRateStrokeSample({
+      x: 1.03,
+      y: 1.03,
+      positionScale: 2,
+    })).toMatchObject({ x: 1.03125, y: 1.03125 });
+
+    expect(quantizeFixedRateStrokeSample({
+      x: 1.03,
+      y: 1.03,
+      positionScale: 0.25,
+    })).toMatchObject({ x: 1, y: 1 });
+
+    const legacy = quantizeFixedRateStrokeSample({ x: 1.03, y: -1.04 });
+    expect(quantizeFixedRateStrokeSample({
+      x: 1.03,
+      y: -1.04,
+      positionScale: 1,
+    })).toEqual(legacy);
+  });
+
+  it("uses an absolute clamped scale and falls back to scale one for invalid values", () => {
+    const legacy = quantizeFixedRateStrokeSample({ x: 1.03, y: -1.04 });
+    for (const positionScale of [0, Number.NaN, Infinity, -Infinity]) {
+      expect(quantizeFixedRateStrokeSample({
+        x: 1.03,
+        y: -1.04,
+        positionScale,
+      })).toEqual(legacy);
+    }
+
+    expect(quantizeFixedRateStrokeSample({
+      x: 1.03,
+      y: 1.03,
+      positionScale: -2,
+    })).toEqual(quantizeFixedRateStrokeSample({
+      x: 1.03,
+      y: 1.03,
+      positionScale: 2,
+    }));
+
+    expect(quantizeFixedRateStrokeSample({
+      x: 3.2,
+      y: 3.2,
+      positionScale: 0.001,
+    })).toMatchObject({ x: 6.25, y: 6.25 });
+    expect(quantizeFixedRateStrokeSample({
+      x: 1 / 2_048,
+      y: 1 / 2_048,
+      positionScale: 100,
+    })).toMatchObject({ x: 1 / 1_024, y: 1 / 1_024 });
+  });
+
   it("clamps pressure and uses the previous finite channels for malformed samples", () => {
     const fallback = quantizeFixedRateStrokeSample({
       x: 7,
