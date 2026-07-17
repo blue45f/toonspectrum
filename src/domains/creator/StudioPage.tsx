@@ -5826,13 +5826,19 @@ function StudioCuttoonEditor() {
   // 페이지 캔버스/썸네일에 깔 마스터 합성 목록(숨김 제외 · 잠금/노클립 강제 · 비상호작용).
   const masterRenderEls = composeMasterRenderElements(master);
   const activePageIndex = Math.max(0, pages.findIndex((p) => p.id === currentPageId));
-  const activePage = pages[activePageIndex] || pages[0] || {
-    id: currentPageId,
-    elements: [],
-    bg: "#ffffff",
-    bgGrad: null,
-    canvasH: 1080,
-  };
+  // useMemo: 폴백 리터럴이 렌더마다 새 객체가 되지 않도록(memo 자식 prop 안정성).
+  const activePage = useMemo(
+    () =>
+      pages[activePageIndex] ||
+      pages[0] || {
+        id: currentPageId,
+        elements: [],
+        bg: "#ffffff",
+        bgGrad: null,
+        canvasH: 1080,
+      },
+    [pages, activePageIndex, currentPageId]
+  );
   const pageEditLocked = isPageReviewLocked(activePage.review);
   const activePageMutationLocked = pageEditLocked || collaborationDocumentLocked;
   const activeSurfaceReviewLocked =
@@ -6150,13 +6156,16 @@ function StudioCuttoonEditor() {
     hydrationRevision: studioWorkAssetHydrationRevision,
     resolveState: (reference) => studioWorkAssetHydrator.get(reference),
   });
-  function composeWorkAssetPreviewPage(page: PageState): PageState {
-    return projectStudioWorkAssetPageForReadOnlyPreview({
-      page: composeThumbPage(master, page),
-      hydrationRevision: studioWorkAssetHydrationRevision,
-      resolveState: (reference) => studioWorkAssetHydrator.get(reference),
-    });
-  }
+  // useCallback: 페이지 목록/패널 memo 자식에서 렌더 중 호출 — prop 안정성 유지.
+  const composeWorkAssetPreviewPage = useCallback(
+    (page: PageState): PageState =>
+      projectStudioWorkAssetPageForReadOnlyPreview({
+        page: composeThumbPage(master, page),
+        hydrationRevision: studioWorkAssetHydrationRevision,
+        resolveState: (reference) => studioWorkAssetHydrator.get(reference),
+      }),
+    [master, studioWorkAssetHydrationRevision, studioWorkAssetHydrator]
+  );
   const studioWorkAssetRenderPlaceholders: StudioWorkAssetRenderPlaceholder[] =
     studioWorkAssetLimitExceeded
       ? [{
@@ -7511,7 +7520,8 @@ function StudioCuttoonEditor() {
   const [storyboardGridOpen, setStoryboardGridOpen] = useState(false);
   const [scrollPreviewOpen, setScrollPreviewOpen] = useState(false);
   const [continuityOpen, setContinuityOpen] = useState(false);
-  const continuityScenes = continuityOpen || productionInsightsOpen
+  // useMemo: 패널 스택 memo 자식 prop 안정성(패널 닫힘 시 빈 배열 상수, 열림 시 pages 기준 재계산).
+  const continuityScenes = useMemo(() => continuityOpen || productionInsightsOpen
     ? pages.flatMap((page, pageIndex) =>
         page.elements
           .filter((element): element is FrameEl => element.type === "frame" && !!element.storyBeat)
@@ -7529,8 +7539,8 @@ function StudioCuttoonEditor() {
             } satisfies StudioStoryBeat,
           }))
       )
-    : [];
-  const continuityIssues: StudioContinuityIssue[] = continuityOpen || productionInsightsOpen
+    : [], [continuityOpen, productionInsightsOpen, pages]);
+  const continuityIssues: StudioContinuityIssue[] = useMemo(() => continuityOpen || productionInsightsOpen
     ? lintStudioContinuity({
         characters: characterBible.characters.map((character) => ({
           name: character.name,
@@ -7540,7 +7550,7 @@ function StudioCuttoonEditor() {
         })),
         beats: continuityScenes.map((scene) => scene.beat),
       })
-    : [];
+    : [], [continuityOpen, productionInsightsOpen, characterBible.characters, continuityScenes]);
   const [timelapseCapturing, setTimelapseCapturing] = useState(false);
   const timelapseOriginalHiRef = useRef(0);
   const timelapseOriginalPageIdRef = useRef("");
@@ -7778,7 +7788,8 @@ function StudioCuttoonEditor() {
     setPublishAiDisclosure(normalized.aiDisclosure);
     setSharedDocumentNotice(null);
   }
-  function currentPublishPackageCreditsText(): string {
+  // useCallback: 패널 스택 memo 자식에서 렌더 중 호출 — prop 안정성 유지.
+  const currentPublishPackageCreditsText = useCallback((): string => {
     if (publishPackageCredits.trim()) return publishPackageCredits.trim();
     const stockCredits = new Map<string, string>();
     for (const page of pages) {
@@ -7792,7 +7803,7 @@ function StudioCuttoonEditor() {
       }
     }
     return [...stockCredits.values()].join("\n");
-  }
+  }, [publishPackageCredits, pages]);
   const publishPackagePlan: StudioPublishPackagePlan | null = publishPackageOpen
     ? (() => {
         const canvases = pages.map((page) => ({ id: page.id, width: CANVAS_W, height: page.canvasH }));
@@ -9976,43 +9987,54 @@ function StudioCuttoonEditor() {
         tailBend: selected.tailBend,
       })
     : null;
-  const studioCommentActor: StudioCommentActor = {
-    ...(studioAuthUserId ? { id: studioAuthUserId } : {}),
-    displayName: session?.user?.name?.trim().slice(0, 80) || "로컬 작가",
-  };
+  // useMemo: 패널 스택 memo 자식 prop 안정성 — 댓글 액터/앵커/옵션은 입력이 바뀔 때만 재구성.
+  const studioCommentActorName = session?.user?.name?.trim().slice(0, 80) || "로컬 작가";
+  const studioCommentActor: StudioCommentActor = useMemo(
+    () => ({
+      ...(studioAuthUserId ? { id: studioAuthUserId } : {}),
+      displayName: studioCommentActorName,
+    }),
+    [studioAuthUserId, studioCommentActorName]
+  );
   const openStudioCommentCount = studioComments.threads.filter((thread) => !thread.resolved).length;
   // Figma식 자유 위치 핀이 잡혀 있으면 선택 기반 앵커보다 우선한다(현재 페이지에서만 유효).
-  const activeCommentAnchor: StudioCommentAnchor =
-    pointCommentAnchor && pointCommentAnchor.pageId === activePage.id && !masterEditMode
-      ? { type: "point", ...pointCommentAnchor }
-      : !masterEditMode && selected?.type === "frame"
-        ? { type: "frame", pageId: activePage.id, frameId: selected.id }
-        : !masterEditMode && selected
-          ? { type: "element", pageId: activePage.id, elementId: selected.id }
-          : { type: "page", pageId: activePage.id };
-  const studioCommentAnchorOptions = pages.flatMap((page, pageIndex) => {
-    const options: Array<{ anchor: StudioCommentAnchor; label: string }> = [
-      { anchor: { type: "page", pageId: page.id }, label: pageDisplayName(page, pageIndex) },
-    ];
-    let frameIndex = 0;
-    for (const element of page.elements) {
-      if (element.type !== "frame") continue;
-      frameIndex += 1;
-      options.push({
-        anchor: { type: "frame", pageId: page.id, frameId: element.id },
-        label: `${pageDisplayName(page, pageIndex)} · 컷 ${frameIndex}${
-          element.storyBeat?.summary ? ` — ${element.storyBeat.summary.slice(0, 32)}` : ""
-        }`,
+  const activeCommentAnchor: StudioCommentAnchor = useMemo(
+    () =>
+      pointCommentAnchor && pointCommentAnchor.pageId === activePage.id && !masterEditMode
+        ? { type: "point", ...pointCommentAnchor }
+        : !masterEditMode && selected?.type === "frame"
+          ? { type: "frame", pageId: activePage.id, frameId: selected.id }
+          : !masterEditMode && selected
+            ? { type: "element", pageId: activePage.id, elementId: selected.id }
+            : { type: "page", pageId: activePage.id },
+    [pointCommentAnchor, activePage.id, masterEditMode, selected]
+  );
+  const studioCommentAnchorOptions = useMemo(() => {
+    const all = pages.flatMap((page, pageIndex) => {
+      const options: Array<{ anchor: StudioCommentAnchor; label: string }> = [
+        { anchor: { type: "page", pageId: page.id }, label: pageDisplayName(page, pageIndex) },
+      ];
+      let frameIndex = 0;
+      for (const element of page.elements) {
+        if (element.type !== "frame") continue;
+        frameIndex += 1;
+        options.push({
+          anchor: { type: "frame", pageId: page.id, frameId: element.id },
+          label: `${pageDisplayName(page, pageIndex)} · 컷 ${frameIndex}${
+            element.storyBeat?.summary ? ` — ${element.storyBeat.summary.slice(0, 32)}` : ""
+          }`,
+        });
+      }
+      return options;
+    });
+    if (!masterEditMode && selected && selected.type !== "frame") {
+      all.push({
+        anchor: { type: "element", pageId: activePage.id, elementId: selected.id },
+        label: `${pageDisplayName(activePage, activePageIndex)} · ${elementLabel(selected)}`,
       });
     }
-    return options;
-  });
-  if (!masterEditMode && selected && selected.type !== "frame") {
-    studioCommentAnchorOptions.push({
-      anchor: { type: "element", pageId: activePage.id, elementId: selected.id },
-      label: `${pageDisplayName(activePage, activePageIndex)} · ${elementLabel(selected)}`,
-    });
-  }
+    return all;
+  }, [pages, masterEditMode, selected, activePage, activePageIndex]);
 
   function selectStudioCommentAnchor(anchor: StudioCommentAnchor) {
     const page = pages.find((candidate) => candidate.id === anchor.pageId);
@@ -19659,26 +19681,39 @@ function StudioCuttoonEditor() {
       "flex min-h-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-1 text-[0.6875rem] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
       active ? "bg-accent-soft/60 text-accent" : "text-fg-2 hover:bg-raised"
     );
-  const quickActionsDisabledActions = new Set<StudioQuickActionId>();
-  if (hi === 0 || masterEditMode || collaborationDocumentLocked) quickActionsDisabledActions.add("undo");
-  if (hi >= history.length - 1 || masterEditMode || collaborationDocumentLocked) quickActionsDisabledActions.add("redo");
-  if (!selected && marqueeIds.length === 0) {
-    quickActionsDisabledActions.add("duplicate");
-    quickActionsDisabledActions.add("delete");
-  }
-  if (!selected || marqueeIds.length > 0) quickActionsDisabledActions.add("bring-front");
-  if (activePageMutationLocked) {
-    quickActionsDisabledActions.add("pen");
-    quickActionsDisabledActions.add("eraser");
-    quickActionsDisabledActions.add("duplicate");
-    quickActionsDisabledActions.add("delete");
-    quickActionsDisabledActions.add("bring-front");
-    quickActionsDisabledActions.add("add-bubble");
-  }
-  if (advancedFillUnsupportedReason) quickActionsDisabledActions.add("advanced-fill");
+  const quickActionsDisabledActions = useMemo(() => {
+    const disabled = new Set<StudioQuickActionId>();
+    if (hi === 0 || masterEditMode || collaborationDocumentLocked) disabled.add("undo");
+    if (hi >= history.length - 1 || masterEditMode || collaborationDocumentLocked) disabled.add("redo");
+    if (!selected && marqueeIds.length === 0) {
+      disabled.add("duplicate");
+      disabled.add("delete");
+    }
+    if (!selected || marqueeIds.length > 0) disabled.add("bring-front");
+    if (activePageMutationLocked) {
+      disabled.add("pen");
+      disabled.add("eraser");
+      disabled.add("duplicate");
+      disabled.add("delete");
+      disabled.add("bring-front");
+      disabled.add("add-bubble");
+    }
+    if (advancedFillUnsupportedReason) disabled.add("advanced-fill");
+    return disabled;
+  }, [
+    hi,
+    masterEditMode,
+    collaborationDocumentLocked,
+    history.length,
+    selected,
+    marqueeIds,
+    activePageMutationLocked,
+    advancedFillUnsupportedReason,
+  ]);
   // 모바일 한 손 모드에서 퀵 메뉴 트리거 자체를 DOM 순서로 좌/우 끝에 옮긴다.
   // flex-row-reverse를 쓰지 않아 보이는 순서와 키보드/스위치 제어 순서가 항상 일치한다.
-  const mobileQuickActionsButton: ReactNode = (
+  // useMemo: 모바일 독 memo 자식 prop 안정성 — 클로저가 stable setter만 사용한다.
+  const mobileQuickActionsButton: ReactNode = useMemo(() => (
     <button
       type="button"
       onClick={(event) => {
@@ -19701,7 +19736,7 @@ function StudioCuttoonEditor() {
       <Command size={17} aria-hidden />
       <span>퀵 메뉴</span>
     </button>
-  );
+  ), [quickActionsOpen, workspaceState.mobileControlSide]);
 
   async function handleDownload() {
     if (!ensureSharedDocumentAvailableForExport()) return;
@@ -21268,6 +21303,114 @@ function StudioCuttoonEditor() {
     handleCapturePagesForPreset,
   });
 
+  const studioLazyPanelStackHandlers = useStudioStableHandlers<StudioLazyPanelStackHandlers>({
+    addPage,
+    addRenderedImage,
+    applyBg3dRenderedImage,
+    applyWriterRoomAiReview,
+    applyWriterRoomCanvasPlan,
+    canApplyStudioMutation,
+    cancelAutoAction,
+    cancelWriterRoomAi,
+    changeAutoActionScope,
+    changeAutoActionSelectedPages,
+    commitShotTag,
+    createNamedCheckpoint,
+    deletePage,
+    disarmAllPixelTools,
+    downloadAiPublicSummary,
+    downloadPublishPackageManifest,
+    downloadPublishPreflightReport,
+    duplicatePage,
+    executeAutoAction,
+    executePublishPackageExport,
+    executeQuickAction,
+    exportAutoActionJson,
+    handleTimelapseRecordingEnd,
+    handleTimelapseRecordingStart,
+    importAutoActionJson,
+    onApplyScenarioPreview,
+    onCancelScenario,
+    onChangeScenarioScene,
+    onDiscardScenarioPreview,
+    onGenerateScenario,
+    onGenerateScenarioImages,
+    onRegenerateScenarioImage,
+    onRemoveScenarioScene,
+    onScenarioApplyTargetChange,
+    patchEl,
+    patchPageReview,
+    planAutoAction,
+    rememberColor,
+    removeNamedCheckpoint,
+    restoreNamedCheckpoint,
+    selectStudioCommentAnchor,
+    setAiProvenance,
+    setCharacterBible,
+    setPublicationAnalytics,
+    setPublishAiDisclosure,
+    setPublishAiUsage,
+    setPublishCompliance,
+    setPublishPackageCredits,
+    setPublishProfile,
+    setReleaseSchedule,
+    setStudioComments,
+    setWriterRoom,
+    startMacroRecord,
+    stopMacroRecord,
+    updatePublishPackageSettings,
+    captureTimelapseStep,
+    currentStudioProjectSnapshot,
+    reloadServerRevisions,
+    requestWriterRoomAiDraft,
+    restoreServerRevision,
+  });
+
+  const studioMobileEditingDockHandlers = useStudioStableHandlers<StudioMobileEditingDockHandlers>({
+    applyBuiltInBrushPreset,
+    applyDynamicsPreset,
+    applySavedBrush,
+    dismissMobileHint,
+    duplicateSelected,
+    fitCanvasToWidth,
+    openInspectorRoute,
+    queueBrushDelete,
+    redo,
+    removeSelected,
+    reorder,
+    toggleAdvancedFill,
+    undo,
+  });
+
+  const studioPageListPaneHandlers = useStudioStableHandlers<StudioPageListPaneHandlers>({
+    addPage,
+    applyBgToAll,
+    applyGradeToAll,
+    clearPageFor,
+    commitPageMeta,
+    deletePage,
+    duplicatePage,
+    duplicatePageMirrored,
+    insertPageAfter,
+    insertPageBefore,
+    movePageDown,
+    movePageToBottom,
+    movePageToTop,
+    movePageUp,
+  });
+
+  const studioOptionsBarsHandlers = useStudioStableHandlers<StudioOptionsBarsHandlers>({
+    announceDrawingShortcut,
+    applyBrushSlot,
+    applyBuiltInBrushPreset,
+    disarmAllPixelTools,
+    duplicateSelected,
+    openInspectorRoute,
+    removeSelected,
+    reorder,
+    patchEl,
+  });
+
   return (
     <StudioLiveCollaborationProvider
       workId={workId}
@@ -21518,167 +21661,60 @@ function StudioCuttoonEditor() {
         ) : null}
       </div>
 
-      {/* Commercial draw options — size/opacity/stabilizer/brushes (CSP-style properties strip). */}
-      {tool === "draw" && !canvasOnlyMode ? (
-        <Suspense fallback={<div className="h-10 shrink-0 border-b border-line bg-panel/80" aria-hidden />}>
-          <StudioDrawOptionsBar
-            docked
-            dockInsets={{
-              left:
-                (visibleLeftPanelOpen
-                  ? leftResize.width + 8
-                  : presentationPanelsHidden
-                    ? 0
-                    : 32) +
-                (studioUiDensityAllows(uiDensityMode, "tool-rail") ? 52 : 0),
-              right: visibleRightPanelOpen
-                ? rightResize.width + 8
-                : presentationPanelsHidden
-                  ? 0
-                  : 32,
-            }}
-            drawMode={drawMode === "shape" ? "shape" : drawMode === "eraser" ? "eraser" : "pen"}
-            brushId={brush}
-            strokeWidth={strokeWidth}
-            brushOpacity={brushOpacity}
-            stabilizer={stabilizer}
-            stabilizerMode={stabilizerMode}
-            onStabilizerModeChange={setStabilizerMode}
-            color={color}
-            recentSwatches={DRAW_COLOR_SWATCHES}
-            brushSlots={brushSlotsState.slots}
-            symmetryType={symmetryType}
-            quickShapeActive={quickShapeActive}
-            onSelectBrush={(item) => {
-              const preset = BRUSH_PRESETS.find((candidate) => candidate.id === item.id);
-              if (preset) applyBuiltInBrushPreset(preset);
-            }}
-            onStrokeWidthChange={setStrokeWidth}
-            onOpacityChange={setBrushOpacity}
-            onStabilizerChange={setStabilizer}
-            postCorrection={postCorrection}
-            onPostCorrectionChange={setPostCorrection}
-            pressureCurveId={pressureCurvePresetId(pressureCurve)}
-            onPressureCurveChange={(id) => setPressureCurve(pressureCurveValueForPreset(id))}
-            stampTuning={stampTuning}
-            onStampTuningChange={setStampTuning}
-            onColorChange={setColor}
-            secondaryColor={secondaryColor}
-            onSecondaryColorChange={setSecondaryColor}
-            onSwapColors={() => {
-              setColor(secondaryColor);
-              setSecondaryColor(color);
-              announceDrawingShortcut("색 교체");
-            }}
-            canvasFlipH={canvasFlipH}
-            onToggleCanvasFlipH={() => setCanvasFlipH((v) => !v)}
-            onOpenBrushStudio={() => {
-              void loadStudioBrushStudio();
-              setTool("draw");
-              setDrawMode("pen");
-              setRightPanelOpen(true);
-              setMobileSheet(isMobile ? "draw" : null);
-              openInspectorRoute({ primary: "properties" });
-            }}
-            onToggleQuickShape={() => {
-              const next = !quickShapeActive;
-              if (next) {
-                disarmAllPixelTools();
-                setTool("draw");
-                setDrawMode("pen");
-                setEyedropperActive(false);
-                announceDrawingShortcut("스마트 도형 켜짐 · 그려서 손을 떼면 다듬어요");
-              } else {
-                announceDrawingShortcut("스마트 도형 꺼짐");
-              }
-              setQuickShapeActive(next);
-            }}
-            onSetDrawMode={(mode) => {
-              setTool("draw");
-              setDrawMode(mode);
-              setEyedropperActive(false);
-            }}
-            shapeKind={drawShape}
-            onShapeKindChange={(kind) => setDrawShape(kind as DrawShapeKind)}
-            shapeFill={shapeFill}
-            onShapeFillChange={setShapeFill}
-            onRecallBrushSlot={(index) => {
-              const slot = studioBrushSlotAt(brushSlotsState, index);
-              if (slot) applyBrushSlot(slot);
-            }}
-            onAssignBrushSlot={(index) => {
-              setBrushSlotsState((prev) => {
-                const next = assignStudioBrushSlot(prev, index, {
-                  brushId: brush,
-                  strokeWidth,
-                  brushOpacity,
-                });
-                saveStudioBrushSlotsState(
-                  typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage,
-                  next
-                );
-                return next;
-              });
-              announceDrawingShortcut(`슬롯 ${index + 1}에 저장`);
-            }}
-            onSymmetryTypeChange={setSymmetryType}
-            sizeLocked={proDrawPrefs.sizeLocked}
-            opacityLocked={proDrawPrefs.opacityLocked}
-            onToggleSizeLock={() => {
-              setProDrawPrefs((prev) => {
-                const next = { ...prev, sizeLocked: !prev.sizeLocked };
-                saveStudioProDrawPrefs(studioProDrawStorage(), next);
-                announceDrawingShortcut(next.sizeLocked ? "크기 잠금" : "크기 잠금 해제");
-                return next;
-              });
-            }}
-            onToggleOpacityLock={() => {
-              setProDrawPrefs((prev) => {
-                const next = { ...prev, opacityLocked: !prev.opacityLocked };
-                saveStudioProDrawPrefs(studioProDrawStorage(), next);
-                announceDrawingShortcut(next.opacityLocked ? "불투명 잠금" : "불투명 잠금 해제");
-                return next;
-              });
-            }}
-            recentBrushIds={proDrawPrefs.recentBrushIds}
-            favoriteBrushIds={proDrawPrefs.favoriteBrushIds}
-            onToggleFavoriteBrush={(brushId) => {
-              setProDrawPrefs((prev) => {
-                const next = toggleFavoriteBrushId(prev, brushId);
-                saveStudioProDrawPrefs(studioProDrawStorage(), next);
-                const nowFav = next.favoriteBrushIds.includes(brushId);
-                announceDrawingShortcut(nowFav ? "즐겨찾기 추가" : "즐겨찾기 해제");
-                return next;
-              });
-            }}
-            onCycleStabilizer={() => {
-              setStabilizer((prev) => {
-                const next = cycleStudioStabilizerStrength(prev);
-                announceDrawingShortcut(`보정 ${next}`);
-                return next;
-              });
-            }}
-          />
-        </Suspense>
-      ) : null}
-      {tool === "select" && !canvasOnlyMode && (selectedId || marqueeIds.length > 0) ? (
-        <Suspense fallback={null}>
-          <StudioSelectOptionsBar
-            selectionCount={marqueeIds.length > 0 ? marqueeIds.length : selectedId ? 1 : 0}
-            selectionLabel={selected ? elementLabel(selected) : null}
-            locked={Boolean(selected?.locked)}
-            onDuplicate={duplicateSelected}
-            onDelete={removeSelected}
-            onBringFront={() => reorder("front")}
-            onSendBack={() => reorder("back")}
-            onToggleLock={
-              selected
-                ? () => patchEl(selected.id, { locked: !selected.locked })
-                : undefined
-            }
-          />
-        </Suspense>
-      ) : null}
+      <StudioOptionsBars
+        brush={brush}
+        brushOpacity={brushOpacity}
+        brushSlotsState={brushSlotsState}
+        canvasFlipH={canvasFlipH}
+        canvasOnlyMode={canvasOnlyMode}
+        color={color}
+        drawMode={drawMode}
+        drawShape={drawShape}
+        isMobile={isMobile}
+        leftResize={leftResize}
+        marqueeIds={marqueeIds}
+        postCorrection={postCorrection}
+        presentationPanelsHidden={presentationPanelsHidden}
+        pressureCurve={pressureCurve}
+        proDrawPrefs={proDrawPrefs}
+        quickShapeActive={quickShapeActive}
+        rightResize={rightResize}
+        secondaryColor={secondaryColor}
+        selected={selected}
+        selectedId={selectedId}
+        setBrushOpacity={setBrushOpacity}
+        setBrushSlotsState={setBrushSlotsState}
+        setCanvasFlipH={setCanvasFlipH}
+        setColor={setColor}
+        setDrawMode={setDrawMode}
+        setDrawShape={setDrawShape}
+        setEyedropperActive={setEyedropperActive}
+        setMobileSheet={setMobileSheet}
+        setPostCorrection={setPostCorrection}
+        setPressureCurve={setPressureCurve}
+        setProDrawPrefs={setProDrawPrefs}
+        setQuickShapeActive={setQuickShapeActive}
+        setRightPanelOpen={setRightPanelOpen}
+        setSecondaryColor={setSecondaryColor}
+        setShapeFill={setShapeFill}
+        setStabilizer={setStabilizer}
+        setStabilizerMode={setStabilizerMode}
+        setStampTuning={setStampTuning}
+        setStrokeWidth={setStrokeWidth}
+        setSymmetryType={setSymmetryType}
+        setTool={setTool}
+        shapeFill={shapeFill}
+        stabilizer={stabilizer}
+        stabilizerMode={stabilizerMode}
+        stampTuning={stampTuning}
+        strokeWidth={strokeWidth}
+        symmetryType={symmetryType}
+        tool={tool}
+        uiDensityMode={uiDensityMode}
+        visibleLeftPanelOpen={visibleLeftPanelOpen}
+        visibleRightPanelOpen={visibleRightPanelOpen}
+        stableHandlers={studioOptionsBarsHandlers}
+      />
 
       {/* Legacy tool belt: primary on mobile. Desktop menubar owns discovery; belt is a zero-size
           host for triggers (popovers portal to body — never nest fixed UI under backdrop-filter). */}
@@ -21941,356 +21977,31 @@ function StudioCuttoonEditor() {
           />
         )}
         {/* 왼쪽: 페이지 목록 — 접히면 아이콘 엣지 레일 */}
-        {!visibleLeftPanelOpen && !presentationPanelsHidden && (
-          <StudioEdgeRailButton
-            side="left"
-            label="페이지"
-            icon={LayoutTemplate}
-            onClick={() => setLeftPanelOpen(true)}
-            title="페이지 목록 펼치기"
-          />
-        )}
-        <div
-          ref={pagesSheetRef}
-          role={isMobile ? "dialog" : undefined}
-          aria-modal={isMobile && mobileSheet === "pages" ? true : undefined}
-          data-studio-mobile-sheet={isMobile && mobileSheet === "pages" ? "true" : undefined}
-          aria-label={isMobile ? "페이지 목록" : undefined}
-          inert={isMobile && mobileSheet !== "pages" ? true : undefined}
-          className={cn(
-            "flex flex-col gap-1.5 border border-line p-2",
-            // 모바일: 하단에서 올라오는 바텀시트
-            "fixed inset-x-0 bottom-0 z-50 max-h-[72vh] overflow-y-auto rounded-t-3xl bg-panel pb-[calc(7rem+env(safe-area-inset-bottom))] shadow-2xl transition-transform duration-300 ease-out",
-            // 데스크톱: 엣지 도크(라운드·여백 최소, 캔버스 폭 최대)
-            "lg:static lg:z-auto lg:max-h-none lg:min-h-0 lg:overflow-hidden lg:rounded-none lg:border-y-0 lg:border-l-0 lg:bg-panel/50 lg:pb-2 lg:shadow-none lg:transition-none lg:translate-y-0",
-            mobileSheet === "pages" ? "translate-y-0" : "translate-y-full",
-            !visibleLeftPanelOpen && "lg:hidden"
-          )}
-          style={
-            isMobile
-              ? { bottom: mobileKeyboardInset }
-              : { width: leftResize.width, minWidth: 128 }
-          }
-        >
-          {/* 모바일 시트 손잡이 */}
-          <div className="mx-auto -mt-1 mb-1 h-1 w-10 shrink-0 rounded-full bg-line lg:hidden" />
-          <div className="flex flex-wrap items-center justify-between gap-1 border-b border-line/50 pb-1.5">
-            <span className="flex items-center gap-1 text-[0.7rem] font-bold text-fg-2">
-              <button
-                type="button"
-                onClick={() => setLeftPanelOpen(false)}
-                className="hidden text-fg-3 transition-colors hover:text-fg lg:inline-flex"
-                title="페이지 목록 접기"
-              >
-                <ChevronLeft size={13} />
-              </button>
-              페이지
-              <button
-                type="button"
-                onClick={() => setMobileSheet(null)}
-                className="ml-1 rounded p-0.5 text-fg-3 hover:bg-raised lg:hidden"
-                aria-label="페이지 시트 닫기"
-                data-autofocus
-              >
-                <X size={14} />
-              </button>
-            </span>
-            <button
-              type="button"
-              data-testid="studio-add-page"
-              onClick={addPage}
-              className="flex items-center gap-1 rounded bg-accent px-2 py-1 text-[10px] font-semibold text-on-accent hover:bg-accent-hover"
-            >
-              <Plus size={10} /> 추가
-            </button>
-            <button
-              type="button"
-              onClick={applyGradeToAll}
-              className="rounded border border-line px-1.5 py-0.5 text-[10px] text-fg-3 hover:bg-raised"
-              title="현재 페이지의 색보정을 모든 페이지에 적용"
-            >
-              그레이드 전체
-            </button>
-            <button
-              type="button"
-              onClick={applyBgToAll}
-              className="rounded border border-line px-1.5 py-0.5 text-[10px] text-fg-3 hover:bg-raised"
-              title="현재 페이지의 배경을 모든 페이지에 적용"
-            >
-              배경 전체
-            </button>
-            <button
-              type="button"
-              onClick={() => setMasterPanelOpen((v) => !v)}
-              disabled={collaborationDocumentLocked}
-              aria-pressed={masterPanelOpen}
-              className={cn(
-                "rounded border px-1.5 py-0.5 text-[10px] transition-colors disabled:cursor-not-allowed disabled:opacity-50",
-                masterEditMode
-                  ? "border-accent bg-accent-soft/50 text-accent"
-                  : masterPanelOpen
-                    ? "border-accent/60 text-fg-2 hover:bg-raised"
-                    : "border-line text-fg-3 hover:bg-raised"
-              )}
-              title={collaborationDocumentLocked ? collaborationLockMessage() : "마스터 페이지(모든 페이지 공통 요소) 관리"}
-            >
-              마스터{master.elements.length > 0 ? ` ${master.elements.length}` : ""}
-            </button>
-          </div>
-          <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto max-h-[56vh] pr-0.5 lg:max-h-none">
-            {pages.map((p, idx) => {
-              const isActive = p.id === currentPageId;
-              const dropIndicator = pageDnd.indicatorFor(idx);
-              return (
-                <div
-                  key={p.id}
-                  data-testid="studio-page-item"
-                  {...pageDnd.itemProps(idx)}
-                  title="드래그하여 순서 변경"
-                  className={cn(
-                    "relative flex w-full flex-col gap-0.5 rounded-lg border p-1.5 transition-all hover:bg-raised/50",
-                    isActive ? "border-accent bg-accent-soft/40" : "border-line bg-card",
-                    pageDnd.dragIndex === idx && "opacity-50"
-                  )}
-                >
-                  {/* 페이지 선택 — 접근성: 카드를 role=button 으로 만들면 내부 액션 버튼(편집·이동)이
-                      중첩 인터랙티브가 되어 위반이므로, 카드 전체를 덮는 "늘린 버튼"으로 선택을 처리하고
-                      액션 버튼은 z-index 로 그 위에 띄운다. 카드 div 는 드래그 정렬(draggable) 컨테이너로 유지. */}
-                  <button
-                    type="button"
-                    onClick={() => setCurrentPageId(p.id)}
-                    aria-label={`${pageDisplayName(p, idx)} 선택`}
-                    aria-pressed={isActive}
-                    className="absolute inset-0 z-10 cursor-pointer rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                  />
-                  {/* 드롭 삽입선(PPT식) — 카드 위/아래 절반 판정 결과 시각화. overflow 클리핑 없게 카드 가장자리에 겹쳐 그린다. */}
-                  {dropIndicator && (
-                    <span
-                      aria-hidden
-                      className={cn(
-                        "pointer-events-none absolute inset-x-1 z-10 h-[3px] rounded-full bg-accent",
-                        dropIndicator === "before" ? "top-0" : "bottom-0"
-                      )}
-                    />
-                  )}
-                  <div className="flex items-center justify-between gap-1">
-                    <span className="min-w-0 truncate text-[10px] font-bold text-fg-2" title={pageDisplayName(p, idx)}>
-                      {pageDisplayName(p, idx)}
-                    </span>
-                    {shotTagBadgeText(p) ? (
-                      <span
-                        className="shrink-0 rounded bg-accent-soft px-1 py-0.5 text-[8px] font-semibold text-accent"
-                        title={shotTagBadgeTitle(p) ?? undefined}
-                      >
-                        {shotTagBadgeText(p)}
-                      </span>
-                    ) : null}
-                    {/* 액션 버튼은 늘린 선택 버튼(z-10) 위로 띄운다. */}
-                    <div className="relative z-20 flex items-center gap-0.5">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setMetaEditPageId((v) => (v === p.id ? null : p.id));
-                        }}
-                        className={cn("rounded p-0.5 hover:bg-raised", metaEditPageId === p.id ? "text-accent" : "text-fg-3")}
-                        title="이름·콘티 메모 편집"
-                        aria-label={`${pageDisplayName(p, idx)} 이름·콘티 메모 편집`}
-                        aria-expanded={metaEditPageId === p.id}
-                      >
-                        <Pencil size={10} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          movePageUp(p.id);
-                        }}
-                        disabled={idx === 0}
-                        className="rounded p-0.5 text-fg-3 hover:bg-raised disabled:opacity-30"
-                        title="위로 이동"
-                        aria-label="위로 이동"
-                      >
-                        <ChevronUp size={10} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          movePageDown(p.id);
-                        }}
-                        disabled={idx === pages.length - 1}
-                        className="rounded p-0.5 text-fg-3 hover:bg-raised disabled:opacity-30"
-                        title="아래로 이동"
-                        aria-label="아래로 이동"
-                      >
-                        <ChevronDown size={10} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          movePageToTop(p.id);
-                        }}
-                        disabled={idx === 0}
-                        className="rounded p-0.5 text-fg-3 hover:bg-raised disabled:opacity-30"
-                        title="맨 위로"
-                        aria-label="맨 위로 이동"
-                      >
-                        <span aria-hidden="true">⇧</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          movePageToBottom(p.id);
-                        }}
-                        disabled={idx === pages.length - 1}
-                        className="rounded p-0.5 text-fg-3 hover:bg-raised disabled:opacity-30"
-                        title="맨 아래로"
-                        aria-label="맨 아래로 이동"
-                      >
-                        <span aria-hidden="true">⇩</span>
-                      </button>
-                    </div>
-                  </div>
-                  {/* 실내용 미니 썸네일 — 마스터 요소를 페이지 요소 아래에 합성해 경량 SVG 프록시로 축소 렌더.
-                      마스터 없음/페이지 숨김이면 원본 page 를 동일 참조로 넘겨 RC 메모이제이션을 보존한다. */}
-                  <StudioPageThumbnail page={composeWorkAssetPreviewPage(p)} />
-                  {metaEditPageId === p.id ? (
-                    // 인라인 편집 입력은 늘린 선택 버튼(z-10) 위로 올려 포커스·타이핑을 받게 한다.
-                    <div className="relative z-20 flex flex-col gap-1 pt-1">
-                      <input
-                        // eslint-disable-next-line jsx-a11y/no-autofocus -- 연필 버튼 클릭으로만 열리는 인라인 편집 — 열릴 때 이름란 포커스가 올바른 패턴(기존 텍스트 편집 모달과 동일)
-                        autoFocus
-                        type="text"
-                        defaultValue={p.name ?? ""}
-                        placeholder={autoPageName(idx)}
-                        maxLength={PAGE_NAME_MAX}
-                        aria-label="페이지 이름"
-                        className="w-full rounded border border-line bg-card px-1.5 py-1 text-[10px] font-semibold text-fg placeholder:text-fg-3 focus:border-accent focus:outline-none"
-                        onClick={(e) => e.stopPropagation()}
-                        onKeyDown={(e) => {
-                          e.stopPropagation();
-                          if (e.key === "Enter") {
-                            commitPageMeta(p.id, { name: e.currentTarget.value });
-                            setMetaEditPageId(null);
-                          } else if (e.key === "Escape") {
-                            setMetaEditPageId(null);
-                          }
-                        }}
-                        onBlur={(e) => commitPageMeta(p.id, { name: e.target.value })}
-                      />
-                      <textarea
-                        rows={2}
-                        defaultValue={p.note ?? ""}
-                        placeholder="콘티 메모 (장면·대사 아이디어)"
-                        maxLength={PAGE_NOTE_MAX}
-                        spellCheck
-                        aria-label="콘티 메모"
-                        className="w-full resize-none rounded border border-line bg-card px-1.5 py-1 text-[9px] leading-tight text-fg placeholder:text-fg-3 focus:border-accent focus:outline-none"
-                        onClick={(e) => e.stopPropagation()}
-                        onKeyDown={(e) => e.stopPropagation()}
-                        onBlur={(e) => commitPageMeta(p.id, { note: e.target.value })}
-                      />
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setMetaEditPageId(null);
-                        }}
-                        className="self-end rounded bg-accent px-2 py-0.5 text-[9px] font-semibold text-on-accent hover:bg-accent-hover"
-                      >
-                        완료
-                      </button>
-                    </div>
-                  ) : p.note ? (
-                    <p className="line-clamp-2 whitespace-pre-wrap text-[9px] leading-tight text-fg-3" title={p.note}>
-                      {p.note}
-                    </p>
-                  ) : null}
-                  <div className="flex items-center justify-end gap-1.5 pt-1">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        insertPageBefore(p.id);
-                      }}
-                      className="rounded p-0.5 text-fg-3 hover:bg-raised"
-                      title="이 앞에 빈 페이지 삽입"
-                    >
-                      <Plus size={10} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        insertPageAfter(p.id);
-                      }}
-                      className="rounded p-0.5 text-fg-3 hover:bg-raised"
-                      title="이 뒤에 빈 페이지 삽입"
-                    >
-                      <Plus size={10} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        duplicatePage(p.id);
-                      }}
-                      className="rounded p-0.5 text-fg-3 hover:bg-raised"
-                      title="페이지 복제"
-                    >
-                      <Copy size={10} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        duplicatePageMirrored(p.id);
-                      }}
-                      className="rounded p-0.5 text-fg-3 hover:bg-raised"
-                      title="미러 복제 (좌우 반전)"
-                    >
-                      <FlipHorizontal2 size={10} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        clearPageFor(p.id);
-                      }}
-                      className="rounded p-0.5 text-fg-3 hover:bg-raised"
-                      title="이 페이지 내용 비우기"
-                    >
-                      <Eraser size={10} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (pages.length <= 1) return;
-                        if (globalThis.confirm(`${idx + 1}페이지를 삭제할까요?`)) {
-                          deletePage(p.id);
-                        }
-                      }}
-                      disabled={pages.length <= 1}
-                      className="rounded p-0.5 text-bad hover:bg-bad-soft/20 disabled:opacity-30"
-                      title="페이지 삭제"
-                    >
-                      <Trash2 size={10} />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* 페이지 목록 ↔ 캔버스 너비 스플리터(데스크톱) */}
-        {visibleLeftPanelOpen && (
-          <PanelResizeHandle handleProps={leftResize.handleProps} dragging={leftResize.dragging} label="페이지 목록 너비 조절" />
-        )}
+        <StudioPageListPane
+          collaborationDocumentLocked={collaborationDocumentLocked}
+          collaborationLockMessage={collaborationLockMessage}
+          composeWorkAssetPreviewPage={composeWorkAssetPreviewPage}
+          currentPageId={currentPageId}
+          isMobile={isMobile}
+          leftResize={leftResize}
+          master={master}
+          masterEditMode={masterEditMode}
+          masterPanelOpen={masterPanelOpen}
+          metaEditPageId={metaEditPageId}
+          mobileKeyboardInset={mobileKeyboardInset}
+          mobileSheet={mobileSheet}
+          pageDnd={pageDnd}
+          pages={pages}
+          pagesSheetRef={pagesSheetRef}
+          presentationPanelsHidden={presentationPanelsHidden}
+          setCurrentPageId={setCurrentPageId}
+          setLeftPanelOpen={setLeftPanelOpen}
+          setMasterPanelOpen={setMasterPanelOpen}
+          setMetaEditPageId={setMetaEditPageId}
+          setMobileSheet={setMobileSheet}
+          visibleLeftPanelOpen={visibleLeftPanelOpen}
+          stableHandlers={studioPageListPaneHandlers}
+        />
 
         {/* Left vertical toolbar — desktop only; mobile uses bottom dock / horizontal belt */}
         <StudioLeftToolRail
@@ -25394,1191 +25105,229 @@ function StudioCuttoonEditor() {
           stableHandlers={studioInspectorAsideHandlers}
         />
 
-        {/* Photoshop Mobile식 선택 문맥 작업바. 속성 패널까지 왕복하지 않고 가장 빈번한 후속 행동을
-            엄지 영역에 노출한다. 선택이 없거나 시트/첫 안내가 열리면 캔버스를 가리지 않도록 숨긴다. */}
-        {isMobile && !mobileSheet && !quickActionsOpen && !showMobileHint && (selected || marqueeIds.length > 0) ? (
-          <div
-            role="toolbar"
-            aria-label="선택 항목 빠른 작업"
-            className="fixed inset-x-2 bottom-[calc(6.45rem+env(safe-area-inset-bottom))] z-[53] mx-auto flex max-w-[34rem] items-center gap-1 overflow-x-auto rounded-2xl border border-line bg-panel/95 p-1.5 shadow-2xl backdrop-blur [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:hidden"
-            style={{
-              bottom: `calc(6.45rem + env(safe-area-inset-bottom) + ${mobileKeyboardInset}px)`,
-            }}
-          >
-            <div className="w-[4.75rem] shrink-0 px-2">
-              <p className="truncate text-[0.68rem] font-bold text-fg">
-                {marqueeIds.length > 0
-                  ? `${marqueeIds.length}개 선택`
-                  : selected
-                    ? elementLabel(selected)
-                    : "선택"}
-              </p>
-              <p className="text-[0.58rem] font-medium uppercase tracking-wide text-fg-3">빠른 작업</p>
-            </div>
-            <span aria-hidden className="h-8 w-px shrink-0 bg-line" />
-            <StudioContextActionButton
-              icon={SlidersHorizontal}
-              label="속성"
-              onClick={() => {
-                openInspectorRoute({ primary: "properties" });
-                setMobileSheet("props");
-              }}
-            />
-            {selected?.type === "image" && marqueeIds.length === 0 ? (
-              <StudioContextActionButton
-                icon={PaintBucket}
-                label="채우기"
-                active={advancedFillActive}
-                disabled={!advancedFillActive && advancedFillUnsupportedReason !== null}
-                onClick={toggleAdvancedFill}
-              />
-            ) : null}
-            <StudioContextActionButton icon={Copy} label="복제" onClick={duplicateSelected} />
-            {selected && marqueeIds.length === 0 ? (
-              <>
-                <StudioContextActionButton icon={ArrowUpToLine} label="앞으로" onClick={() => reorder("front")} />
-                <StudioContextActionButton icon={ArrowDownToLine} label="뒤로" onClick={() => reorder("back")} />
-              </>
-            ) : null}
-            <StudioContextActionButton icon={Trash2} label="삭제" danger onClick={removeSelected} />
-            <StudioContextActionButton
-              icon={X}
-              label="해제"
-              onClick={() => {
-                setSelectedId(null);
-                setMarqueeIds([]);
-              }}
-            />
-          </div>
-        ) : null}
-
-        {/* 모바일 첫 사용 안내 — 하단 도구막대 + 두 손가락 이동/확대를 한 줄로. 1회만, 시트가 떠 있지 않을 때만. */}
-        {showMobileHint && !mobileSheet && !quickActionsOpen && (
-          <div
-            role="status"
-            className="fixed inset-x-3 bottom-[calc(7rem+env(safe-area-inset-bottom))] z-[53] mx-auto flex max-w-[32rem] items-start gap-2.5 rounded-2xl border border-accent/30 bg-panel/95 p-3 shadow-2xl backdrop-blur motion-safe:animate-hud-in lg:hidden"
-            style={{
-              bottom: `calc(7rem + env(safe-area-inset-bottom) + ${mobileKeyboardInset}px)`,
-            }}
-          >
-            <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent">
-              <Hand size={15} aria-hidden />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-[0.8rem] font-semibold text-fg">한 손으로 그려보세요</p>
-              <p className="mt-0.5 text-[0.72rem] leading-snug text-fg-3">
-                아래 막대에서 <span className="font-medium text-fg-2">펜·지우개·도형</span>을 고르고,{" "}
-                <span className="font-medium text-fg-2">브러시</span>를 눌러 굵기·색을 바꿔요. 두 손가락으로
-                이동·확대하고, 짧게 두 손가락 톡은 되돌리기·세 손가락 톡은 다시 실행이에요.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={dismissMobileHint}
-              className="grid size-7 shrink-0 place-items-center rounded-lg text-fg-3 hover:bg-raised"
-              aria-label="안내 닫기"
-            >
-              <X size={15} aria-hidden />
-            </button>
-          </div>
-        )}
-
-        {/* 모바일 전용 브러시 관리자 — 일반 속성 패널을 거치지 않고 저장·고정·복제·내보내기에 바로 접근한다. */}
-        {isMobile && mobileSheet === "brushes" ? (
-          <div
-            ref={brushManagerSheetRef}
-            role="dialog"
-            aria-modal="true"
-            data-studio-mobile-sheet="true"
-            aria-label="내 브러시 관리"
-            data-studio-shortcut-boundary="true"
-            className="fixed inset-x-0 z-50 mx-auto max-w-[34rem] overflow-y-auto overscroll-contain rounded-t-3xl border border-line bg-panel px-3 pb-[calc(7rem+env(safe-area-inset-bottom))] shadow-2xl lg:hidden"
-            style={{
-              bottom: mobileKeyboardInset,
-              maxHeight: `calc(100dvh - 1rem - ${mobileKeyboardInset}px)`,
-            }}
-          >
-            <div className="sticky top-0 z-10 -mx-3 mb-2 flex min-h-14 items-center justify-between border-b border-line bg-panel/95 px-3 backdrop-blur">
-              <div>
-                <p className="text-sm font-bold text-fg">내 브러시 관리</p>
-                <p className="text-[0.68rem] text-fg-3">저장·고정·복제·이름 변경·내보내기</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setMobileSheet("draw")}
-                className="grid size-11 place-items-center rounded-xl text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-                aria-label="브러시 관리 닫기"
-                data-autofocus
-              >
-                <X size={18} aria-hidden />
-              </button>
-            </div>
-            <Suspense fallback={<p className="py-6 text-center text-xs text-fg-3">브러시를 불러오는 중…</p>}>
-              <StudioBrushLibraryPanel
-                currentSnapshot={currentBrushSnapshot}
-                brushes={savedBrushes}
-                activeBrushId={activeSavedBrushId}
-                onBrushesChange={setSavedBrushes}
-                onApplyBrush={applySavedBrush}
-                onBrushDeleted={queueBrushDelete}
-              />
-            </Suspense>
-          </div>
-        ) : null}
-
-        {/* 모바일 브러시 설정 시트 — 드로잉 도크 바로 위에 떠서 도구를 보며 굵기·색·프리셋·도형을 조절한다.
-            도크(z-55)는 가리지 않게 그 위쪽에 앉히고, 캔버스는 계속 보이게 반투명 배경. 데스크톱엔 인라인 브러시 바가 있으므로 모바일 전용. */}
-        {isMobile && (
-          <div
-            ref={drawSheetRef}
-            role="dialog"
-            aria-label="브러시 설정"
-            aria-modal={false}
-            className={cn(
-              "fixed inset-x-0 bottom-[calc(7rem+env(safe-area-inset-bottom))] z-[54] mx-auto max-w-[34rem] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel/95 p-3 shadow-2xl backdrop-blur transition-all duration-200 ease-out lg:hidden",
-              mobileSheet === "draw"
-                ? "pointer-events-auto translate-y-0 opacity-100"
-                : "pointer-events-none translate-y-3 opacity-0"
-            )}
-            inert={mobileSheet === "draw" ? undefined : true}
-            style={{
-              bottom: `calc(7rem + env(safe-area-inset-bottom) + ${mobileKeyboardInset}px)`,
-              maxHeight: `min(56dvh, calc(100dvh - 8rem - env(safe-area-inset-bottom) - ${mobileKeyboardInset}px))`,
-            }}
-          >
-            <div className="sticky -top-3 z-10 -mx-3 -mt-3 mb-2 flex min-h-14 items-center justify-between border-b border-line/70 bg-panel/95 px-3 backdrop-blur">
-              <p className="text-sm font-semibold text-fg">
-                {drawMode === "eraser" ? "지우개" : drawMode === "shape" ? "도형" : "브러시"} 설정
-              </p>
-              <button
-                type="button"
-                onClick={() => setMobileSheet(null)}
-                className="grid size-11 place-items-center rounded-xl text-fg-3 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-                aria-label="브러시 설정 닫기"
-                data-autofocus
-              >
-                <X size={16} aria-hidden />
-              </button>
-            </div>
-
-            {/* 모드 전환 — icon-first (펜↔지우개↔도형) */}
-            <div className="mb-2.5 grid grid-cols-3 gap-1 rounded-xl border border-line bg-card/60 p-1" role="group" aria-label="그리기 모드">
-              {([
-                { v: "pen" as const, label: "펜", icon: Pencil },
-                { v: "eraser" as const, label: "지우개", icon: Eraser },
-                { v: "shape" as const, label: "도형", icon: Shapes },
-              ]).map((m) => {
-                const Icon = m.icon;
-                const active = drawMode === m.v;
-                return (
-                  <button
-                    key={m.v}
-                    type="button"
-                    onClick={() => {
-                      setTool("draw");
-                      setDrawMode(m.v);
-                    }}
-                    aria-pressed={active}
-                    aria-label={m.label}
-                    title={m.label}
-                    className={cn(
-                      "grid min-h-11 place-items-center rounded-lg transition-colors",
-                      active ? "bg-accent text-on-accent shadow-sm" : "text-fg-2 hover:bg-raised"
-                    )}
-                  >
-                    <Icon size={18} strokeWidth={1.75} aria-hidden />
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* 펜 프리셋 — 가로 스크롤 칩(굵기·투명도·색 기본값 적용) */}
-            {drawMode === "pen" && (
-              <>
-                <StudioSavedBrushShelf
-                  brushes={savedBrushes}
-                  activeBrushId={activeSavedBrushId}
-                  onApply={applySavedBrush}
-                  onManage={() => setMobileSheet("brushes")}
-                />
-                <div className="mb-2.5">
-                  <p className="mb-1 text-[0.7rem] font-medium text-fg-3">기본 브러시</p>
-                  <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    {BRUSH_PRESETS.map((p) => {
-                      const active = brush === p.id;
-                      return (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => applyBuiltInBrushPreset(p)}
-                          aria-pressed={active}
-                          className={cn(
-                            "min-h-[2.75rem] shrink-0 whitespace-nowrap rounded-lg border px-3 text-xs font-semibold transition-colors",
-                            active ? "border-accent bg-accent-soft text-fg" : "border-line bg-card text-fg-2 hover:bg-raised"
-                          )}
-                        >
-                          {p.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* 색상 — 지우개에선 의미 없으니 숨김 */}
-            {drawMode !== "eraser" && (
-              <div className="mb-2.5">
-                <p className="mb-1 text-[0.7rem] font-medium text-fg-3">색상</p>
-                <div className="flex flex-wrap items-center gap-2">
-                  {DRAW_COLOR_SWATCHES.map((swatch) => (
-                    <button
-                      key={swatch}
-                      type="button"
-                      onClick={() => setColor(swatch)}
-                      aria-label={`색상 ${swatch}`}
-                      aria-pressed={color.toLowerCase() === swatch.toLowerCase()}
-                      className={cn(
-                        "size-11 rounded-xl transition-transform active:scale-95",
-                        color.toLowerCase() === swatch.toLowerCase()
-                          ? "ring-2 ring-accent ring-offset-2 ring-offset-panel"
-                          : "border border-line/60"
-                      )}
-                      style={{ background: swatch }}
-                    />
-                  ))}
-                  <label
-                    className="relative grid size-11 cursor-pointer place-items-center overflow-hidden rounded-xl border border-line shadow-sm"
-                    title="사용자 정의 색상"
-                    style={{ background: color }}
-                  >
-                    <input
-                      type="color"
-                      value={color}
-                      onChange={(e) => setColor(e.target.value)}
-                      aria-label="사용자 정의 브러시 색상"
-                      className="absolute inset-0 size-full cursor-pointer opacity-0"
-                    />
-                    <Palette size={14} className="text-white mix-blend-difference" aria-hidden />
-                  </label>
-                </div>
-              </div>
-            )}
-
-            {/* 굵기 + 투명도 — 큰 터치 슬라이더 */}
-            <div className="space-y-2.5">
-              <div>
-                <span className="mb-1 flex items-center justify-between text-[0.7rem] font-medium text-fg-3">
-                  <span>{drawMode === "eraser" ? "지우개 굵기" : "굵기"}</span>
-                  <span className="tabular-nums text-fg-2">{strokeWidth}px</span>
-                </span>
-                <div className="grid grid-cols-[minmax(0,1fr)_4.5rem_2.5rem] items-center gap-2">
-                  <input
-                    type="range"
-                    min={1}
-                    max={80}
-                    value={strokeWidth}
-                    onChange={(e) => setStrokeWidth(Number(e.target.value))}
-                    className="h-11 w-full accent-accent"
-                    aria-label="브러시 굵기 슬라이더"
-                  />
-                  <label className="sr-only" htmlFor="mobile-brush-width">브러시 굵기 숫자</label>
-                  <input
-                    id="mobile-brush-width"
-                    type="number"
-                    min={1}
-                    max={80}
-                    inputMode="numeric"
-                    value={strokeWidth}
-                    onChange={(event) =>
-                      setStrokeWidth(Math.min(80, Math.max(1, Number(event.target.value) || 1)))
-                    }
-                    className="min-h-11 w-full rounded-lg border border-line bg-card px-2 text-center text-xs tabular-nums text-fg outline-none focus:border-accent"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setStrokeWidth(drawMode === "eraser" ? 18 : 4)}
-                    className="min-h-11 rounded-lg border border-line bg-card text-[0.65rem] font-semibold text-fg-3 hover:bg-raised"
-                    aria-label="브러시 굵기 기본값으로 초기화"
-                  >
-                    초기화
-                  </button>
-                </div>
-              </div>
-              {drawMode !== "eraser" && (
-                <div>
-                  <span className="mb-1 flex items-center justify-between text-[0.7rem] font-medium text-fg-3">
-                    <span>투명도</span>
-                    <span className="tabular-nums text-fg-2">{Math.round(brushOpacity * 100)}%</span>
-                  </span>
-                  <div className="grid grid-cols-[minmax(0,1fr)_4.5rem_2.5rem] items-center gap-2">
-                    <input
-                      type="range"
-                      min={10}
-                      max={100}
-                      step={5}
-                      value={Math.round(brushOpacity * 100)}
-                      onChange={(e) => setBrushOpacity(Number(e.target.value) / 100)}
-                      className="h-11 w-full accent-accent"
-                      aria-label="브러시 투명도 슬라이더"
-                    />
-                    <label className="sr-only" htmlFor="mobile-brush-opacity">브러시 투명도 숫자</label>
-                    <input
-                      id="mobile-brush-opacity"
-                      type="number"
-                      min={10}
-                      max={100}
-                      step={5}
-                      inputMode="numeric"
-                      value={Math.round(brushOpacity * 100)}
-                      onChange={(event) =>
-                        setBrushOpacity(Math.min(100, Math.max(10, Number(event.target.value) || 10)) / 100)
-                      }
-                      className="min-h-11 w-full rounded-lg border border-line bg-card px-2 text-center text-xs tabular-nums text-fg outline-none focus:border-accent"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setBrushOpacity(1)}
-                      className="min-h-11 rounded-lg border border-line bg-card text-[0.65rem] font-semibold text-fg-3 hover:bg-raised"
-                      aria-label="브러시 투명도 100퍼센트로 초기화"
-                    >
-                      초기화
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {drawMode !== "shape" ? (
-              <>
-                <StudioLineCorrectionControls
-                  density="touch"
-                  stabilizer={stabilizer}
-                  onStabilizerChange={setStabilizer}
-                  mode={stabilizerMode}
-                  onModeChange={setStabilizerMode}
-                  postCorrection={postCorrection}
-                  onPostCorrectionChange={setPostCorrection}
-                  preserveCorners={preserveCorners}
-                  onPreserveCornersChange={setPreserveCorners}
-                />
-                <Suspense fallback={<div className="h-48 animate-pulse rounded-xl bg-raised/35 motion-reduce:animate-none" aria-hidden />}>
-                  <StudioBrushStudio
-                    density="touch"
-                    brushId={brush}
-                    strokeWidth={strokeWidth}
-                    color={color}
-                    settings={brushDynamics}
-                    onSettingsChange={setBrushDynamics}
-                    onSelectDynamicsPreset={applyDynamicsPreset}
-                    useVelocityPressure={useVelocityPressure}
-                    onUseVelocityPressureChange={setUseVelocityPressure}
-                    velocitySensitivity={velocitySensitivity}
-                    onVelocitySensitivityChange={setVelocitySensitivity}
-                    pressureCurve={pressureCurve}
-                    onPressureCurveChange={setPressureCurve}
-                    tiltEnabled={tiltEnabled}
-                    onTiltEnabledChange={setTiltEnabled}
-                    tipAngle={tipAngle}
-                    onTipAngleChange={setTipAngle}
-                    tipRoundness={tipRoundness}
-                    onTipRoundnessChange={setTipRoundness}
-                  />
-                </Suspense>
-              </>
-            ) : null}
-
-            {/* 도형 모양 + 채우기 — Photopea/Canva glyph strip (mobile touch) */}
-            {drawMode === "shape" && (
-              <div className="mt-2.5 border-t border-line/60 pt-2.5">
-                <p className="mb-1.5 text-[0.7rem] font-semibold uppercase tracking-wider text-fg-3">
-                  도형 모양
-                </p>
-                <Suspense fallback={<div className="h-24 rounded-xl bg-raised/40" aria-hidden />}>
-                  <StudioShapePickerGrid
-                    activeKind={drawShape}
-                    filled={shapeFill}
-                    onSelect={(kind) => {
-                      setTool("draw");
-                      setDrawMode("shape");
-                      setDrawShape(kind as DrawShapeKind);
-                    }}
-                    kinds={STUDIO_DRAW_SHAPE_PICKER_KINDS}
-                    className="grid-cols-4"
-                  />
-                </Suspense>
-                <button
-                  type="button"
-                  aria-pressed={shapeFill}
-                  disabled={drawShape === "line" || drawShape === "arrow"}
-                  title="채우기"
-                  aria-label="도형 채우기"
-                  onClick={() => setShapeFill((v) => !v)}
-                  className={cn(
-                    "mt-2 grid min-h-11 w-full place-items-center rounded-lg border transition-colors",
-                    drawShape === "line" || drawShape === "arrow"
-                      ? "cursor-not-allowed border-line bg-card text-fg-3 opacity-50"
-                      : shapeFill
-                        ? "border-accent/60 bg-accent-soft/50 text-accent"
-                        : "border-line bg-card text-fg-2"
-                  )}
-                >
-                  <PaintBucket size={18} aria-hidden />
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* 모바일 하단 드로잉 도크 — 한 손으로 그리기 위한 핵심 도구를 thumb 사정권에.
-            1행: 그리기 도구(선택·펜·지우개·도형·실행취소·다시·브러시). 2행: 보조 내비(페이지·추가·속성·줌). */}
-        {isMobile && (
-          <nav
-            aria-label="스튜디오 모바일 도구막대"
-            className="fixed inset-x-0 bottom-0 z-[55] flex flex-col gap-1 border-t border-line bg-panel/95 pb-[max(0.35rem,env(safe-area-inset-bottom))] pl-[max(0.375rem,env(safe-area-inset-left))] pr-[max(0.375rem,env(safe-area-inset-right))] pt-1.5 backdrop-blur lg:hidden"
-            style={{ bottom: mobileKeyboardInset }}
-          >
-            {/* 1행: 핵심 드로잉 도구 — 선택 | 펜/지우개/도형 | 히스토리 | 브러시 (CSP/Procreate 도크 IA) */}
-            <div className="flex items-stretch gap-1" role="toolbar" aria-label="드로잉 도구">
-              <StudioDockButton
-                icon={MousePointer2}
-                label="선택"
-                hintDescription="요소를 선택해 이동·크기 조절·정렬하고 속성 패널에서 세부 값을 편집합니다."
-                hintShortcut="V"
-                active={tool === "select"}
-                onClick={() => {
-                  setTool("select");
-                  setMenu(null);
-                  setMobileSheet(null);
-                }}
-                aria-pressed={tool === "select"}
-              />
-              <span aria-hidden className="my-1 w-px self-stretch bg-line/70" />
-              <StudioDockButton
-                icon={Pencil}
-                label="펜"
-                hintDescription="필압과 보정이 적용되는 자유선을 그립니다. 다시 누르면 브러시 설정이 열립니다."
-                hintShortcut="B"
-                active={tool === "draw" && drawMode === "pen"}
-                disabled={activeSurfaceReviewLocked}
-                title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 펜을 사용할 수 있어요" : "펜 (B)"}
-                onClick={() => {
-                  if (tool === "draw" && drawMode === "pen") {
-                    setMobileSheet((s) => (s === "draw" ? null : "draw"));
-                    return;
-                  }
-                  setTool("draw");
-                  setDrawMode("pen");
-                  setMenu(null);
-                  setMobileSheet(null);
-                }}
-                aria-pressed={tool === "draw" && drawMode === "pen"}
-              />
-              <StudioDockButton
-                icon={Eraser}
-                label="지우개"
-                hintDescription="현재 레이어의 획을 지웁니다. 브러시 크기와 불투명도 설정을 그대로 활용합니다."
-                hintShortcut="E"
-                active={tool === "draw" && drawMode === "eraser"}
-                disabled={activeSurfaceReviewLocked}
-                title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 지우개를 사용할 수 있어요" : "지우개 (E)"}
-                onClick={() => {
-                  setTool("draw");
-                  setDrawMode("eraser");
-                  setMenu(null);
-                  setMobileSheet(null);
-                }}
-                aria-pressed={tool === "draw" && drawMode === "eraser"}
-              />
-              <StudioDockButton
-                icon={Square}
-                label="도형"
-                hintDescription="선·사각형·타원·화살표를 정돈된 벡터 도형으로 빠르게 배치합니다."
-                active={tool === "draw" && drawMode === "shape"}
-                disabled={activeSurfaceReviewLocked}
-                title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 도형을 사용할 수 있어요" : "도형"}
-                onClick={() => {
-                  if (tool === "draw" && drawMode === "shape") {
-                    setMobileSheet((s) => (s === "draw" ? null : "draw"));
-                    return;
-                  }
-                  setTool("draw");
-                  setDrawMode("shape");
-                  setMenu(null);
-                  setMobileSheet(null);
-                }}
-                aria-pressed={tool === "draw" && drawMode === "shape"}
-              />
-              <span aria-hidden className="my-1 w-px self-stretch bg-line/70" />
-              <StudioDockButton
-                icon={Undo2}
-                label="되돌리기"
-                hintDescription="마지막 편집을 한 단계 되돌립니다. 공동 작업 변경 이력과 함께 안전하게 이동합니다."
-                disabled={hi === 0 || collaborationDocumentLocked}
-                hintUnavailableReason={
-                  collaborationDocumentLocked
-                    ? "공동 작업 문서 잠금을 해제한 뒤 편집 기록을 이동할 수 있어요."
-                    : hi === 0
-                      ? "아직 되돌릴 편집 기록이 없어요."
-                      : undefined
-                }
-                onClick={undo}
-                aria-label="실행취소"
-              />
-              <StudioDockButton
-                icon={Redo2}
-                label="다시"
-                hintDescription="되돌린 편집을 한 단계 다시 적용합니다."
-                disabled={hi >= history.length - 1 || collaborationDocumentLocked}
-                hintUnavailableReason={
-                  collaborationDocumentLocked
-                    ? "공동 작업 문서 잠금을 해제한 뒤 편집 기록을 이동할 수 있어요."
-                    : hi >= history.length - 1
-                      ? "다시 적용할 편집 기록이 없어요."
-                      : undefined
-                }
-                onClick={redo}
-                aria-label="다시실행"
-              />
-              <span aria-hidden className="my-1 w-px self-stretch bg-line/70" />
-              <StudioDockButton
-                ref={mobileBrushDockButtonRef}
-                label="브러시"
-                hintDescription="굵기·불투명도·색·보정·프리셋을 한곳에서 조절합니다."
-                active={mobileSheet === "draw" || mobileSheet === "brushes"}
-                aria-pressed={mobileSheet === "draw" || mobileSheet === "brushes"}
-                aria-label="브러시 설정 (굵기·색·프리셋)"
-                onPointerEnter={() => void loadStudioBrushStudio()}
-                onFocus={() => void loadStudioBrushStudio()}
-                onClick={() => {
-                  void loadStudioBrushStudio();
-                  if (tool !== "draw") {
-                    setTool("draw");
-                    setDrawMode("pen");
-                    setMenu(null);
-                  }
-                  setMobileSheet((s) => (s === "draw" ? null : "draw"));
-                }}
-                swatch={(
-                  <span
-                    aria-hidden
-                    className="size-[19px] rounded-full border-2 border-current"
-                    style={drawMode === "eraser" ? undefined : { backgroundColor: color, borderColor: "oklch(0.95 0.01 85 / 0.45)" }}
-                  />
-                )}
-              />
-            </div>
-
-            {/* 2행: 보조 내비 — 페이지·추가·6방향 퀵 메뉴·속성(레이어)·줌 */}
-            <div className="flex items-stretch gap-0.5 border-t border-line/60 pt-1" role="toolbar" aria-label="작업 공간">
-              {workspaceState.mobileControlSide === "left"
-                ? mobileQuickActionsButton
-                : null}
-              <StudioDockNavButton
-                icon={Files}
-                label="페이지"
-                active={mobileSheet === "pages"}
-                aria-pressed={mobileSheet === "pages"}
-                onClick={() => setMobileSheet((s) => (s === "pages" ? null : "pages"))}
-              />
-              <StudioDockNavButton
-                icon={Plus}
-                label="추가"
-                onClick={() => {
-                  setMobileSheet(null);
-                  setQuickStartOpen(true);
-                }}
-              />
-              <StudioDockNavButton
-                icon={Layers}
-                label="작업"
-                active={mobileSheet === "props"}
-                aria-pressed={mobileSheet === "props"}
-                onClick={() => {
-                  if (mobileSheet === "props") {
-                    setMobileSheet(null);
-                    return;
-                  }
-                  openInspectorRoute({ primary: selected ? "properties" : "layers" });
-                  setMobileSheet("props");
-                }}
-              />
-              <div className="flex w-[8.25rem] flex-none items-center justify-center">
-                <button
-                  type="button"
-                  onClick={() => setZoom((z) => clampZoom(z - 0.25))}
-                  disabled={zoom <= ZOOM_MIN}
-                  className="grid size-11 place-items-center rounded-lg text-fg-2 transition-colors hover:bg-raised disabled:opacity-40"
-                  aria-label="축소"
-                >
-                  <Minus size={16} aria-hidden />
-                </button>
-                <button
-                  type="button"
-                  onClick={fitCanvasToWidth}
-                  className="min-h-11 min-w-11 flex-1 rounded-lg px-1 py-2 text-center text-[0.7rem] font-semibold tabular-nums text-fg transition-colors hover:bg-raised"
-                  aria-label="화면 폭에 맞춤"
-                >
-                  {Math.round(zoom * 100)}%
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setZoom((z) => clampZoom(z + 0.25))}
-                  disabled={zoom >= ZOOM_MAX}
-                  className="grid size-11 place-items-center rounded-lg text-fg-2 transition-colors hover:bg-raised disabled:opacity-40"
-                  aria-label="확대"
-                >
-                  <Plus size={16} aria-hidden />
-                </button>
-              </div>
-              {workspaceState.mobileControlSide === "right"
-                ? mobileQuickActionsButton
-                : null}
-            </div>
-          </nav>
-        )}
-
-        <Suspense fallback={null}>
-          {isMobile ? (
-            <StudioQuickActionsMenu
-              open={quickActionsOpen}
-              anchor={quickActionsAnchor}
-              preferences={quickActionsPreferences}
-              disabledActions={[...quickActionsDisabledActions]}
-              onExecute={executeQuickAction}
-              onPreferencesChange={setQuickActionsPreferences}
-              onClose={() => setQuickActionsOpen(false)}
-            />
-          ) : null}
-        </Suspense>
+        <StudioMobileEditingDock
+          activeSavedBrushId={activeSavedBrushId}
+          activeSurfaceReviewLocked={activeSurfaceReviewLocked}
+          advancedFillActive={advancedFillActive}
+          advancedFillUnsupportedReason={advancedFillUnsupportedReason}
+          brush={brush}
+          brushDynamics={brushDynamics}
+          brushManagerSheetRef={brushManagerSheetRef}
+          brushOpacity={brushOpacity}
+          collaborationDocumentLocked={collaborationDocumentLocked}
+          color={color}
+          currentBrushSnapshot={currentBrushSnapshot}
+          drawMode={drawMode}
+          drawShape={drawShape}
+          drawSheetRef={drawSheetRef}
+          hi={hi}
+          history={history}
+          isMobile={isMobile}
+          marqueeIds={marqueeIds}
+          mobileBrushDockButtonRef={mobileBrushDockButtonRef}
+          mobileKeyboardInset={mobileKeyboardInset}
+          mobileQuickActionsButton={mobileQuickActionsButton}
+          mobileSheet={mobileSheet}
+          postCorrection={postCorrection}
+          preserveCorners={preserveCorners}
+          pressureCurve={pressureCurve}
+          quickActionsOpen={quickActionsOpen}
+          savedBrushes={savedBrushes}
+          selected={selected}
+          setBrushDynamics={setBrushDynamics}
+          setBrushOpacity={setBrushOpacity}
+          setColor={setColor}
+          setDrawMode={setDrawMode}
+          setDrawShape={setDrawShape}
+          setMarqueeIds={setMarqueeIds}
+          setMenu={setMenu}
+          setMobileSheet={setMobileSheet}
+          setPostCorrection={setPostCorrection}
+          setPreserveCorners={setPreserveCorners}
+          setPressureCurve={setPressureCurve}
+          setQuickStartOpen={setQuickStartOpen}
+          setSavedBrushes={setSavedBrushes}
+          setSelectedId={setSelectedId}
+          setShapeFill={setShapeFill}
+          setStabilizer={setStabilizer}
+          setStabilizerMode={setStabilizerMode}
+          setStrokeWidth={setStrokeWidth}
+          setTiltEnabled={setTiltEnabled}
+          setTipAngle={setTipAngle}
+          setTipRoundness={setTipRoundness}
+          setTool={setTool}
+          setUseVelocityPressure={setUseVelocityPressure}
+          setVelocitySensitivity={setVelocitySensitivity}
+          setZoom={setZoom}
+          shapeFill={shapeFill}
+          showMobileHint={showMobileHint}
+          stabilizer={stabilizer}
+          stabilizerMode={stabilizerMode}
+          strokeWidth={strokeWidth}
+          tiltEnabled={tiltEnabled}
+          tipAngle={tipAngle}
+          tipRoundness={tipRoundness}
+          tool={tool}
+          useVelocityPressure={useVelocityPressure}
+          velocitySensitivity={velocitySensitivity}
+          workspaceState={workspaceState}
+          zoom={zoom}
+          stableHandlers={studioMobileEditingDockHandlers}
+        />
       </div>
 
-      <Suspense fallback={<PoserLoadingOverlay />}>
-        {poserVrmOpen ? (
-          <StudioVrmPoser
-            open
-            initialDataUrl={poserInitialDataUrl}
-            onClose={() => {
-              setPoserVrmOpen(false);
-              setPoserInitialDataUrl(undefined);
-              setPoserInitialElementId(undefined);
-            }}
-            onInsert={(src, w, h) => {
-              const mutationTicket = poserMutationTicketRef.current;
-              if (!mutationTicket || !canApplyStudioMutation(mutationTicket)) return;
-              if (poserInitialElementId) {
-                const targetEl = elementById.get(poserInitialElementId);
-                if (targetEl && targetEl.type === "image") {
-                  const targetWidth = targetEl.width;
-                  const targetHeight = Math.round(targetWidth * (h / w));
-                  patchEl(poserInitialElementId, {
-                    src,
-                    height: targetHeight,
-                  });
-                } else {
-                  patchEl(poserInitialElementId, { src });
-                }
-              } else {
-                addRenderedImage(src, w, h);
-              }
-            }}
-          />
-        ) : null}
-      </Suspense>
-
-      <Suspense fallback={<Bg3DLoadingOverlay />}>
-        {bg3dOpen ? (
-          <StudioBackground3D
-            open
-            initialDataUrl={bg3dInitialDataUrl}
-            initialScene={bg3dInitialScene}
-            onClose={() => {
-              setBg3dOpen(false);
-              setBg3dInitialDataUrl(undefined);
-              setBg3dInitialScene(undefined);
-              setBg3dInitialElementId(undefined);
-            }}
-            onInsert={(result) => {
-              const mutationTicket = bg3dMutationTicketRef.current;
-              if (!mutationTicket || !canApplyStudioMutation(mutationTicket)) return false;
-              return applyBg3dRenderedImage(result, bg3dInitialElementId);
-            }}
-          />
-        ) : null}
-      </Suspense>
-
-      <Suspense fallback={<TimelapseLoadingOverlay />}>
-        {timelapseOpen ? (
-          <StudioTimelapsePanel
-            open
-            onClose={() => setTimelapseOpen(false)}
-            pageId={activePage.id}
-            history={pagesHistory.slice(0, pagesHi + 1)}
-            title={title}
-            masterEditMode={masterEditMode}
-            captureStep={captureTimelapseStep}
-            onRecordingStart={handleTimelapseRecordingStart}
-            onRecordingEnd={handleTimelapseRecordingEnd}
-          />
-        ) : null}
-      </Suspense>
-
-      <Suspense fallback={<StoryboardGridLoadingOverlay />}>
-        {storyboardGridOpen ? (
-          <StudioStoryboardGridPanel
-            open
-            onClose={() => setStoryboardGridOpen(false)}
-            pages={pages.map(composeWorkAssetPreviewPage)}
-            currentPageId={currentPageId}
-            dnd={pageDnd}
-            onSelectPage={(id) => {
-              setCurrentPageId(id);
-              setStoryboardGridOpen(false);
-            }}
-            onAddPage={addPage}
-            onDuplicatePage={duplicatePage}
-            onDeletePage={deletePage}
-            canDelete={pages.length > 1}
-            onShotTagChange={(pageId, patch) => commitShotTag(pageId, patch)}
-          />
-        ) : null}
-      </Suspense>
-
-      <Suspense fallback={null}>
-        {pageReviewOpen ? (
-          <StudioPageReviewPanel
-            open
-            onClose={() => setPageReviewOpen(false)}
-            pages={pages.map((page, index) => ({
-              id: page.id,
-              label: pageDisplayName(page, index),
-              review: page.review,
-            }))}
-            currentPageId={currentPageId}
-            onSelectPage={setCurrentPageId}
-            onPatchReview={patchPageReview}
-          />
-        ) : null}
-      </Suspense>
-
-      <Suspense fallback={null}>
-        {commentsOpen ? (
-          <StudioCommentsPanel
-            open
-            onClose={() => setCommentsOpen(false)}
-            document={studioComments}
-            onChange={(value) => {
-              if (!collaborationDocumentLocked) {
-                setStudioComments(normalizeStudioCommentsDocument(value));
-                setSharedDocumentNotice(null);
-              }
-            }}
-            activeAnchor={activeCommentAnchor}
-            currentActor={studioCommentActor}
-            anchorOptions={studioCommentAnchorOptions}
-            onSelectAnchor={selectStudioCommentAnchor}
-            onArmPinPlacement={() => {
-              // 패널을 닫고 다음 캔버스 클릭 한 번으로 point 앵커를 잡는다(Esc/도구 전환 시 해제).
-              disarmAllPixelTools();
-              setCommentsOpen(false);
-              setCommentPinArmed(true);
-            }}
-          />
-        ) : null}
-      </Suspense>
-
-      <Suspense fallback={null}>
-        {teamPanelOpen ? (
-          <StudioTeamPanel
-            key={studioAuthUserId ?? "guest"}
-            open
-            authScopeKey={studioAuthUserId}
-            onClose={() => setTeamPanelOpen(false)}
-            workId={workId}
-            loggedIn={loggedIn}
-          />
-        ) : null}
-      </Suspense>
-
-      <Suspense fallback={null}>
-        {continuityOpen ? (
-          <StudioContinuityPanel
-            open
-            onClose={() => setContinuityOpen(false)}
-            issues={continuityIssues}
-            scenes={continuityScenes.map((scene) => ({ id: scene.id, label: scene.label }))}
-            onSelectScene={(sceneId) => {
-              const scene = continuityScenes.find((item) => item.id === sceneId);
-              if (!scene) return;
-              setCurrentPageId(scene.pageId);
-              setTool("select");
-              setSelectedId(scene.frameId);
-              setContinuityOpen(false);
-            }}
-          />
-        ) : null}
-      </Suspense>
-
-      <Suspense fallback={<ScrollPreviewLoadingOverlay />}>
-        {scrollPreviewOpen ? (
-          <StudioScrollPreviewPanel
-            open
-            onClose={() => setScrollPreviewOpen(false)}
-            pages={pages.map(composeWorkAssetPreviewPage)}
-            currentPageId={currentPageId}
-            onSelectPage={(id) => {
-              setCurrentPageId(id);
-              setScrollPreviewOpen(false);
-            }}
-          />
-        ) : null}
-      </Suspense>
-
-      <Suspense fallback={<ScenarioAutoLayoutLoadingOverlay />}>
-        {scenarioOpen ? (
-          <StudioScenarioAutoLayoutPanel
-            open
-            onClose={() => setScenarioOpen(false)}
-            textConfigured={textAiConfigured}
-            imageConfigured={isStudioAiConfigured(aiSettings)}
-            storyText={scenarioStoryText}
-            onStoryTextChange={setScenarioStoryText}
-            sceneCountHint={scenarioSceneCountHint}
-            onSceneCountHintChange={setScenarioSceneCountHint}
-            applyTarget={scenarioApplyTarget}
-            onApplyTargetChange={onScenarioApplyTargetChange}
-            busy={scenarioBusy}
-            stageLabel={scenarioStageLabel}
-            progress={scenarioProgress}
-            error={scenarioError}
-            preview={scenarioResult?.items ?? null}
-            textProvenance={scenarioResult?.textAiProvenance ?? null}
-            onGenerate={onGenerateScenario}
-            onGenerateImages={onGenerateScenarioImages}
-            onChangeScene={onChangeScenarioScene}
-            onRemoveScene={onRemoveScenarioScene}
-            onRegenerateScene={onRegenerateScenarioImage}
-            regeneratingIndex={scenarioRegeneratingIndex}
-            onCancel={onCancelScenario}
-            onApply={onApplyScenarioPreview}
-            onDiscard={onDiscardScenarioPreview}
-          />
-        ) : null}
-      </Suspense>
-
-      <Suspense fallback={null}>
-        {productionInsightsOpen && productionInsightsResult ? (
-          <StudioProductionInsightsPanel
-            open
-            onClose={() => setProductionInsightsOpen(false)}
-            insights={productionInsightsResult}
-          />
-        ) : null}
-      </Suspense>
-
-      <Suspense fallback={null}>
-        {publicationOperationsOpen ? (
-          <StudioPublicationOperationsPanel
-            open
-            onClose={() => setPublicationOperationsOpen(false)}
-            schedule={releaseSchedule}
-            onScheduleChange={(value) => {
-              if (!collaborationDocumentLocked) {
-                setReleaseSchedule(value);
-                setSharedDocumentNotice(null);
-              }
-            }}
-            analyticsDocument={publicationAnalytics}
-            onAnalyticsDocumentChange={(value) => {
-              if (!collaborationDocumentLocked) {
-                // The operations panel emits a canonical document from the same deferred runtime.
-                setPublicationAnalytics(value);
-                setSharedDocumentNotice(null);
-              }
-            }}
-          />
-        ) : null}
-      </Suspense>
-
-      <Suspense fallback={null}>
-        {publishPreflightOpen && publishPreflightResult ? (
-          <StudioPublishPreflightPanel
-            open
-            onClose={() => setPublishPreflightOpen(false)}
-            profile={publishProfile}
-            onProfileChange={(value) => {
-              if (!collaborationDocumentLocked) {
-                setPublishProfile(value);
-                setSharedDocumentNotice(null);
-              }
-            }}
-            aiUsage={publishAiUsage}
-            onAiUsageChange={(value) => {
-              if (!collaborationDocumentLocked) {
-                setPublishAiUsage(value);
-                setSharedDocumentNotice(null);
-              }
-            }}
-            disclosure={publishAiDisclosure}
-            onDisclosureChange={(value) => {
-              if (!collaborationDocumentLocked) {
-                setPublishAiDisclosure(value);
-                setSharedDocumentNotice(null);
-              }
-            }}
-            compliance={publishCompliance}
-            onComplianceChange={(value) => {
-              if (!collaborationDocumentLocked) {
-                setPublishCompliance(normalizeStudioPublishCompliance(value));
-                setSharedDocumentNotice(null);
-              }
-            }}
-            complianceResult={publishComplianceResult}
-            result={publishPreflightResult}
-            onDownloadReport={downloadPublishPreflightReport}
-          />
-        ) : null}
-      </Suspense>
-
-      <Suspense fallback={null}>
-        {publishPackageOpen && publishPackagePlan ? (
-          <StudioPublishPackagePanel
-            open
-            onClose={() => setPublishPackageOpen(false)}
-            settings={effectivePublishPackageSettings}
-            onSettingsChange={updatePublishPackageSettings}
-            plan={publishPackagePlan}
-            creditsText={currentPublishPackageCreditsText()}
-            onCreditsTextChange={(value) => {
-              if (!collaborationDocumentLocked) {
-                setPublishPackageCredits(value);
-                setSharedDocumentNotice(null);
-              }
-            }}
-            onDownloadManifest={() => void downloadPublishPackageManifest()}
-            onBeginExport={() => void executePublishPackageExport()}
-            exportBusy={publishPackageExportBusy}
-            exportProgress={publishPackageExportProgress}
-            exportStatus={publishPackageExportStatus}
-          />
-        ) : null}
-      </Suspense>
-
-      <Suspense fallback={null}>
-        {aiProvenanceOpen ? (
-          <StudioAiProvenancePanel
-            open
-            onClose={() => setAiProvenanceOpen(false)}
-            document={aiProvenance}
-            onExportPublicSummary={(summary) => downloadAiPublicSummary(summary)}
-            onClearHistory={() => {
-              if (!collaborationDocumentLocked) {
-                setAiProvenance(createEmptyStudioAiProvenanceDocument());
-                setSharedDocumentNotice(null);
-              }
-            }}
-          />
-        ) : null}
-      </Suspense>
-
-      <Suspense fallback={null}>
-        {writerRoomOpen ? (
-          <StudioWriterRoomPanel
-            open
-            onClose={() => setWriterRoomOpen(false)}
-            document={writerRoom}
-            onChange={(value) => {
-              if (!collaborationDocumentLocked) {
-                setWriterRoom(normalizeStudioWriterRoomDocument(value));
-                setSharedDocumentNotice(null);
-              }
-            }}
-            characters={characterBible.characters}
-            onOpenCharacterBible={() => {
-              setWriterRoomOpen(false);
-              setCharacterBibleOpen(true);
-            }}
-            onRequestAi={textAiConfigured ? requestWriterRoomAiDraft : undefined}
-            aiBusy={writerRoomAiBusy}
-            aiError={writerRoomAiError}
-            aiDirection={writerRoomAiDirection}
-            onAiDirectionChange={setWriterRoomAiDirection}
-            aiReview={writerRoomAiReview ? {
-              stage: writerRoomAiReview.stage,
-              rationale: writerRoomAiReview.rationale,
-              draft: writerRoomAiReview.draft,
-              provider: writerRoomAiReview.textProvenance.provider,
-              model: writerRoomAiReview.textProvenance.model,
-              totalTokens: writerRoomAiReview.textProvenance.usage?.totalTokens,
-              failover: writerRoomAiReview.textProvenance.failover,
-            } : null}
-            onApplyAiReview={applyWriterRoomAiReview}
-            onDiscardAiReview={() => setWriterRoomAiReview(null)}
-            onCancelAi={cancelWriterRoomAi}
-            canvasPlan={writerRoomCanvasPlan ? {
-              canApply: writerRoomCanvasPlan.applyReadiness.canApply,
-              pageCount: writerRoomCanvasPlan.pageGrouping.pages.length,
-              panelCount: writerRoomCanvasPlan.panels.length,
-              errorCount: writerRoomCanvasPlan.applyReadiness.errorCount,
-              warningCount: writerRoomCanvasPlan.applyReadiness.warningCount,
-              diagnosticMessages: writerRoomCanvasPlan.diagnostics.map(({ message }) => message),
-            } : undefined}
-            onApplyCanvasPlan={applyWriterRoomCanvasPlan}
-          />
-        ) : null}
-      </Suspense>
-
-      <Suspense fallback={null}>
-        {characterBibleOpen ? (
-          <StudioCharacterBiblePanel
-            open
-            onClose={() => setCharacterBibleOpen(false)}
-            bible={characterBible}
-            onChange={(value) => {
-              if (!collaborationDocumentLocked) {
-                setCharacterBible(value);
-                setSharedDocumentNotice(null);
-              }
-            }}
-          />
-        ) : null}
-      </Suspense>
-
-      <Suspense fallback={null}>
-        {autoActionsOpen ? (
-          <StudioAutoActionsPanel
-            open
-            actionSet={autoActionSet}
-            scope={autoActionScope}
-            pageOptions={pages.map((page, pageIndex) => ({
-              id: page.id,
-              label: pageDisplayName(page, pageIndex),
-            }))}
-            selectedPageIds={autoActionSelectedPageIds}
-            plan={autoActionPlan}
-            progress={autoActionProgress}
-            status={autoActionStatus}
-            busy={autoActionBusy}
-            error={autoActionError}
-            macroRecording={macroSession.recording}
-            macroCommandCount={macroSession.commands.length}
-            onStartMacroRecord={startMacroRecord}
-            onStopMacroRecord={() => void stopMacroRecord()}
-            onClose={() => {
-              if (!autoActionBusy) setAutoActionsOpen(false);
-            }}
-            onScopeChange={changeAutoActionScope}
-            onSelectedPageIdsChange={changeAutoActionSelectedPages}
-            onImportJson={importAutoActionJson}
-            onExportJson={() => void exportAutoActionJson()}
-            onRequestPlan={() => void planAutoAction()}
-            onExecute={() => void executeAutoAction()}
-            onCancel={cancelAutoAction}
-          />
-        ) : null}
-      </Suspense>
-
-      <Suspense fallback={null}>
-        {checkpointPanelOpen ? (
-          <StudioCheckpointPanel
-            open
-            onClose={() => setCheckpointPanelOpen(false)}
-            checkpoints={checkpoints}
-            error={checkpointError}
-            onCreate={createNamedCheckpoint}
-            onRestore={restoreNamedCheckpoint}
-            onDelete={removeNamedCheckpoint}
-            serverRevisions={serverRevisions}
-            serverCurrentRevision={sharedDocument?.role === "owner" ? serverCurrentRevision : undefined}
-            serverLoading={serverRevisionLoading}
-            serverError={serverRevisionError}
-            serverWorkId={workId ?? undefined}
-            getCurrentProject={() => parseStudioProjectFile(currentStudioProjectSnapshot())}
-            getCurrentProjectGeneration={() => studioRevisionProjectGenerationRef.current}
-            onReloadServer={workId && serverCurrentRevision && sharedDocument?.role === "owner" && loggedIn ? () => void reloadServerRevisions() : undefined}
-            onRestoreServer={workId && serverCurrentRevision && sharedDocument?.role === "owner" && loggedIn
-              ? restoreServerRevision
-              : undefined}
-            onNavigateServerChange={({ pageId, elementId }) => {
-              const targetPage = pages.find((page) => page.id === pageId);
-              if (!targetPage) return;
-              setCurrentPageId(pageId);
-              setSelectedId(
-                elementId && targetPage.elements.some((element) => element.id === elementId)
-                  ? elementId
-                  : null
-              );
-            }}
-          />
-        ) : null}
-      </Suspense>
-
-      {fxPanelOpen && loadedWork ? (
-        <div
-          aria-modal="true"
-          role="dialog"
-          className="fixed inset-0 z-[80] grid place-items-center bg-[oklch(0.08_0.01_70/0.72)] p-3 backdrop-blur-sm"
-          style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))", paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
-        >
-          <div className="flex max-h-full w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-[0_24px_80px_oklch(0.05_0.01_70/0.55)]">
-            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-4 py-3">
-              <h2 className="text-sm font-bold text-fg">애니메이션 연출</h2>
-              <button
-                type="button"
-                aria-label="닫기"
-                title="닫기"
-                className="grid size-8 place-items-center rounded-lg border border-line bg-card text-fg-3 transition-colors hover:bg-accent-soft hover:text-accent"
-                onClick={() => setFxPanelOpen(false)}
-              >
-                <X size={15} aria-hidden />
-              </button>
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-              <Suspense fallback={<div className="py-8 text-center text-xs text-fg-3">불러오는 중…</div>}>
-                <WorkFxPanel
-                  work={loadedWork}
-                  onUpdated={(doc, revision) => {
-                    setLoadedWork((prev) => prev ? { ...prev, doc, revision: revision ?? prev.revision } : prev);
-                    if (revision) {
-                      setSharedDocumentScope((current) =>
-                        current && current.workId === workId && current.authScopeKey === studioAuthUserId
-                          ? {
-                              ...current,
-                              value: {
-                                ...current.value,
-                                revision,
-                                document: { ...current.value.document, doc },
-                              },
-                            }
-                          : current
-                      );
-                    }
-                  }}
-                />
-              </Suspense>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      <Suspense fallback={null}>
-        {referencePanelOpen ? <StudioReferencePanel open onClose={() => setReferencePanelOpen(false)} /> : null}
-      </Suspense>
-
-      <Suspense fallback={null}>
-        {colorWheelOpen ? (
-          <StudioColorWheelOverlay
-            open={colorWheelOpen}
-            center={colorWheelCenter}
-            colors={selectWheelColors(recentColors)}
-            onSelect={(c) => {
-              setColor(c);
-              rememberColor(c);
-            }}
-            onClose={() => setColorWheelOpen(false)}
-          />
-        ) : null}
-      </Suspense>
+        <StudioLazyPanelStack
+          activeCommentAnchor={activeCommentAnchor}
+          activePage={activePage}
+          aiProvenance={aiProvenance}
+          aiProvenanceOpen={aiProvenanceOpen}
+          aiSettings={aiSettings}
+          autoActionBusy={autoActionBusy}
+          autoActionError={autoActionError}
+          autoActionPlan={autoActionPlan}
+          autoActionProgress={autoActionProgress}
+          autoActionScope={autoActionScope}
+          autoActionSelectedPageIds={autoActionSelectedPageIds}
+          autoActionSet={autoActionSet}
+          autoActionsOpen={autoActionsOpen}
+          autoActionStatus={autoActionStatus}
+          bg3dInitialDataUrl={bg3dInitialDataUrl}
+          bg3dInitialElementId={bg3dInitialElementId}
+          bg3dInitialScene={bg3dInitialScene}
+          bg3dMutationTicketRef={bg3dMutationTicketRef}
+          bg3dOpen={bg3dOpen}
+          characterBible={characterBible}
+          characterBibleOpen={characterBibleOpen}
+          checkpointError={checkpointError}
+          checkpointPanelOpen={checkpointPanelOpen}
+          checkpoints={checkpoints}
+          collaborationDocumentLocked={collaborationDocumentLocked}
+          colorWheelCenter={colorWheelCenter}
+          colorWheelOpen={colorWheelOpen}
+          commentsOpen={commentsOpen}
+          composeWorkAssetPreviewPage={composeWorkAssetPreviewPage}
+          continuityIssues={continuityIssues}
+          continuityOpen={continuityOpen}
+          continuityScenes={continuityScenes}
+          currentPageId={currentPageId}
+          currentPublishPackageCreditsText={currentPublishPackageCreditsText}
+          effectivePublishPackageSettings={effectivePublishPackageSettings}
+          elementById={elementById}
+          fxPanelOpen={fxPanelOpen}
+          isMobile={isMobile}
+          loadedWork={loadedWork}
+          loggedIn={loggedIn}
+          macroSession={macroSession}
+          masterEditMode={masterEditMode}
+          pageDnd={pageDnd}
+          pageReviewOpen={pageReviewOpen}
+          pages={pages}
+          pagesHi={pagesHi}
+          pagesHistory={pagesHistory}
+          poserInitialDataUrl={poserInitialDataUrl}
+          poserInitialElementId={poserInitialElementId}
+          poserMutationTicketRef={poserMutationTicketRef}
+          poserVrmOpen={poserVrmOpen}
+          productionInsightsOpen={productionInsightsOpen}
+          productionInsightsResult={productionInsightsResult}
+          publicationAnalytics={publicationAnalytics}
+          publicationOperationsOpen={publicationOperationsOpen}
+          publishAiDisclosure={publishAiDisclosure}
+          publishAiUsage={publishAiUsage}
+          publishCompliance={publishCompliance}
+          publishComplianceResult={publishComplianceResult}
+          publishPackageExportBusy={publishPackageExportBusy}
+          publishPackageExportProgress={publishPackageExportProgress}
+          publishPackageExportStatus={publishPackageExportStatus}
+          publishPackageOpen={publishPackageOpen}
+          publishPackagePlan={publishPackagePlan}
+          publishPreflightOpen={publishPreflightOpen}
+          publishPreflightResult={publishPreflightResult}
+          publishProfile={publishProfile}
+          quickActionsAnchor={quickActionsAnchor}
+          quickActionsDisabledActions={quickActionsDisabledActions}
+          quickActionsOpen={quickActionsOpen}
+          quickActionsPreferences={quickActionsPreferences}
+          recentColors={recentColors}
+          referencePanelOpen={referencePanelOpen}
+          releaseSchedule={releaseSchedule}
+          scenarioApplyTarget={scenarioApplyTarget}
+          scenarioBusy={scenarioBusy}
+          scenarioError={scenarioError}
+          scenarioOpen={scenarioOpen}
+          scenarioProgress={scenarioProgress}
+          scenarioRegeneratingIndex={scenarioRegeneratingIndex}
+          scenarioResult={scenarioResult}
+          scenarioSceneCountHint={scenarioSceneCountHint}
+          scenarioStageLabel={scenarioStageLabel}
+          scenarioStoryText={scenarioStoryText}
+          scrollPreviewOpen={scrollPreviewOpen}
+          serverCurrentRevision={serverCurrentRevision}
+          serverRevisionError={serverRevisionError}
+          serverRevisionLoading={serverRevisionLoading}
+          serverRevisions={serverRevisions}
+          setAiProvenanceOpen={setAiProvenanceOpen}
+          setAutoActionsOpen={setAutoActionsOpen}
+          setBg3dInitialDataUrl={setBg3dInitialDataUrl}
+          setBg3dInitialElementId={setBg3dInitialElementId}
+          setBg3dInitialScene={setBg3dInitialScene}
+          setBg3dOpen={setBg3dOpen}
+          setCharacterBibleOpen={setCharacterBibleOpen}
+          setCheckpointPanelOpen={setCheckpointPanelOpen}
+          setColor={setColor}
+          setColorWheelOpen={setColorWheelOpen}
+          setCommentPinArmed={setCommentPinArmed}
+          setCommentsOpen={setCommentsOpen}
+          setContinuityOpen={setContinuityOpen}
+          setCurrentPageId={setCurrentPageId}
+          setFxPanelOpen={setFxPanelOpen}
+          setLoadedWork={setLoadedWork}
+          setPageReviewOpen={setPageReviewOpen}
+          setPoserInitialDataUrl={setPoserInitialDataUrl}
+          setPoserInitialElementId={setPoserInitialElementId}
+          setPoserVrmOpen={setPoserVrmOpen}
+          setProductionInsightsOpen={setProductionInsightsOpen}
+          setPublicationOperationsOpen={setPublicationOperationsOpen}
+          setPublishPackageOpen={setPublishPackageOpen}
+          setPublishPreflightOpen={setPublishPreflightOpen}
+          setQuickActionsOpen={setQuickActionsOpen}
+          setQuickActionsPreferences={setQuickActionsPreferences}
+          setReferencePanelOpen={setReferencePanelOpen}
+          setScenarioOpen={setScenarioOpen}
+          setScenarioSceneCountHint={setScenarioSceneCountHint}
+          setScenarioStoryText={setScenarioStoryText}
+          setScrollPreviewOpen={setScrollPreviewOpen}
+          setSelectedId={setSelectedId}
+          setSharedDocumentNotice={setSharedDocumentNotice}
+          setSharedDocumentScope={setSharedDocumentScope}
+          setStoryboardGridOpen={setStoryboardGridOpen}
+          setTeamPanelOpen={setTeamPanelOpen}
+          setTimelapseOpen={setTimelapseOpen}
+          setTool={setTool}
+          setWriterRoomAiDirection={setWriterRoomAiDirection}
+          setWriterRoomAiReview={setWriterRoomAiReview}
+          setWriterRoomOpen={setWriterRoomOpen}
+          sharedDocument={sharedDocument}
+          storyboardGridOpen={storyboardGridOpen}
+          studioAuthUserId={studioAuthUserId}
+          studioCommentActor={studioCommentActor}
+          studioCommentAnchorOptions={studioCommentAnchorOptions}
+          studioComments={studioComments}
+          studioRevisionProjectGenerationRef={studioRevisionProjectGenerationRef}
+          teamPanelOpen={teamPanelOpen}
+          textAiConfigured={textAiConfigured}
+          timelapseOpen={timelapseOpen}
+          title={title}
+          workId={workId}
+          writerRoom={writerRoom}
+          writerRoomAiBusy={writerRoomAiBusy}
+          writerRoomAiDirection={writerRoomAiDirection}
+          writerRoomAiError={writerRoomAiError}
+          writerRoomAiReview={writerRoomAiReview}
+          writerRoomCanvasPlan={writerRoomCanvasPlan}
+          writerRoomOpen={writerRoomOpen}
+          stableHandlers={studioLazyPanelStackHandlers}
+        />
 
       {contextMenu.visible && (
         // onClick은 사용자 액션이 아니라 window의 바깥-클릭 닫기로의 버블링만 막는 용도(stopPropagation)이며, 실제 동작은 내부 <button> 메뉴 항목이 담당하는 false positive다.
@@ -34140,6 +32889,2540 @@ const StudioMenubarContent = memo(function StudioMenubarContent({
             </button>
           ) : null}
         </div>
+    </>
+  );
+});
+
+interface StudioLazyPanelStackHandlers {
+  addPage: () => void;
+  addRenderedImage: (src: string, width: number, height: number, aiProvenance?: StudioPublishAiProvenance) => void;
+  applyBg3dRenderedImage: (result: StudioBackground3DInsertResult, targetElementId?: string) => boolean;
+  applyWriterRoomAiReview: () => void;
+  applyWriterRoomCanvasPlan: () => void;
+  canApplyStudioMutation: (ticket: ReturnType<() => { authScopeKey: string | null; workId: string | null; accessGeneration: number; documentGeneration: number; }>, options?: { allowDuringSave?: boolean; }) => boolean;
+  cancelAutoAction: () => void;
+  cancelWriterRoomAi: () => void;
+  captureTimelapseStep: (historyIndex: number, targetWidth: number) => Promise<MotionCutImage>;
+  changeAutoActionScope: (scope: StudioAutoActionScope) => void;
+  changeAutoActionSelectedPages: (pageIds: readonly string[]) => void;
+  commitShotTag: (pageId: string, patch: { shotType?: string | null; cameraAngle?: string | null; }) => void;
+  createNamedCheckpoint: (name: string) => void;
+  currentStudioProjectSnapshot: () => { version: 2; savedAt: string; title: string; description: string; tagsText: string; linkedTitleId: string | null | undefined; linkedSeriesId: string | null | undefined; linkedChallengeId: string | null | undefined; pagesList: PageState[]; master: { elements: El[]; } | undefined; characterBible: { version: 1; characters: { id: string; name: string; role: string; appearance: string; costume: string; colors: string[]; voice: string; goal: string; relationships: string[]; props: string[]; lockedFields: ("name" | "colors" | "relationships" | "props" | "role" | "appearance" | "costume" | "voice" | "goal")[]; }[]; }; writerRoom: { version: 1; stages: { premise: { text: string; characterIds: string[]; }; synopsis: { text: string; characterIds: string[]; }; "episode-outline": { title: string; summary: string; characterIds: string[]; }; beats: { items: { id: string; order: number; title: string; summary: string; characterIds: string[]; }[]; }; scenes: { items: { id: string; order: number; beatIds: string[]; heading: string; summary: string; location: string; time: string; characterIds: string[]; }[]; }; "panel-plan": { items: { id: string; order: number; sceneId: string; shot: string; action: string; characterIds: string[]; }[]; }; "dialogue-sfx": { dialogue: { id: string; order: number; panelId: string; characterId: string | null; text: string; }[]; sfx: { id: string; order: number; panelId: string; presetId: string | null; customText: string; style: { emphasis: "quiet" | "normal" | "strong"; scale: "small" | "medium" | "large"; }; }[]; }; }; completion: { premise: boolean; synopsis: boolean; "episode-outline": boolean; beats: boolean; scenes: boolean; "panel-plan": boolean; "dialogue-sfx": boolean; }; suggestions: { id: string; targetPath: string; currentValue: string | number | boolean | string[] | null; proposedValue: string | number | boolean | string[] | null; rationale: string; status: "pending" | "accepted" | "rejected"; createdAt: string; provenanceRef?: string | undefined; resolvedAt?: string | undefined; }[]; lastDecision?: { kind: "accept" | "reject"; suggestionStates: { id: string; status: "pending" | "accepted" | "rejected"; resolvedAt?: string | undefined; }[]; targetValues: { targetPath: string; value: string | number | boolean | string[] | null; }[]; decidedAt: string; } | undefined; }; aiProvenance: { version: 1; operations: { id: string; kind: "text" | "image"; task: "composition" | "scenario" | "translation" | "dialogue" | "palette" | "text-other" | "background-image" | "character-image" | "image-edit" | "colorize" | "line-cleanup" | "image-other"; provider: string; model: string; transport: "server" | "byok" | "local" | "other"; promptVersion: number; prompt: { sha256: string; summary: string; retention: "hash-only" | "raw-opt-in"; characterCount?: number | undefined; raw?: string | undefined; }; status: "pending" | "succeeded" | "failed" | "cancelled"; createdAt: string; updatedAt: string; references: { assetId?: string | undefined; sha256?: string | undefined; }[]; revisedPrompt?: { sha256: string; summary: string; retention: "hash-only" | "raw-opt-in"; characterCount?: number | undefined; raw?: string | undefined; } | undefined; usage?: { promptTokens?: number | undefined; completionTokens?: number | undefined; totalTokens?: number | undefined; } | undefined; target?: { pageId: string; frameId?: string | undefined; elementId?: string | undefined; } | undefined; requestedSize?: { width: number; height: number; } | undefined; seed?: string | undefined; requestId?: string | undefined; error?: { category: "unknown" | "provider" | "cancelled" | "configuration" | "network" | "policy"; code: string; message: string; retriable: boolean; } | undefined; }[]; }; comments: { version: 1; threads: { anchor: { type: "page"; pageId: string; } | { type: "frame"; pageId: string; frameId: string; } | { type: "element"; pageId: string; elementId: string; frameId?: string | undefined; } | { type: "point"; pageId: string; x: number; y: number; }; replies: { id: string; author: { displayName: string; id?: string | undefined; }; body: string; mentions: { displayName: string; id?: string | undefined; }[]; createdAt: string; updatedAt: string; }[]; resolved: boolean; id: string; author: { displayName: string; id?: string | undefined; }; body: string; mentions: { displayName: string; id?: string | undefined; }[]; createdAt: string; updatedAt: string; resolvedAt?: string | undefined; resolvedBy?: { displayName: string; id?: string | undefined; } | undefined; assignee?: { displayName: string; id?: string | undefined; } | undefined; }[]; }; releaseSchedule: { version: 1; items: { id: string; kind: "episode" | "milestone"; title: string; destination: "generic" | "webtoon" | "tapas"; localDate: string; localTime: string; timeZone: string; status: "draft" | "review" | "ready" | "scheduled" | "published"; notes?: string | undefined; }[]; }; publicationAnalytics: StudioPublicationAnalyticsDocument; currentPageId: string; webtoonTheme: "classic" | "soft" | "vivid"; panelGutter: number; publishPack: { profile: StudioPublishProfile; aiUsage: StudioPublishAiUsage; disclosure: string; compliance: import("./studio-publish-compliance").StudioPublishComplianceChecklist; packageSettings: StudioPublishPackageSettings; packageCredits: string; }; };
+  deletePage: (pageId: string) => void;
+  disarmAllPixelTools: () => void;
+  downloadAiPublicSummary: (summary: unknown) => Promise<void>;
+  downloadPublishPackageManifest: () => Promise<void>;
+  downloadPublishPreflightReport: () => Promise<void>;
+  duplicatePage: (pageId: string) => void;
+  executeAutoAction: () => Promise<void>;
+  executePublishPackageExport: () => Promise<void>;
+  executeQuickAction: (action: StudioQuickActionId) => void;
+  exportAutoActionJson: () => Promise<void>;
+  handleTimelapseRecordingEnd: () => void;
+  handleTimelapseRecordingStart: () => void;
+  importAutoActionJson: (json: string, fileName: string) => Promise<void>;
+  onApplyScenarioPreview: () => void;
+  onCancelScenario: () => void;
+  onChangeScenarioScene: (index: number, patch: { beatType?: ScenarioBeatType; summary?: string; imagePrompt?: string; dialogue?: string; continuity?: ScenarioPreviewItem["continuity"]; }) => void;
+  onDiscardScenarioPreview: () => void;
+  onGenerateScenario: () => void;
+  onGenerateScenarioImages: () => void;
+  onRegenerateScenarioImage: (index: number) => void;
+  onRemoveScenarioScene: (index: number) => void;
+  onScenarioApplyTargetChange: (target: "current-page" | "new-page") => void;
+  patchEl: (id: string, patch: Partial<El>) => void;
+  patchPageReview: (pageId: string, patch: Partial<Omit<PageReviewState, "updatedAt">>) => void;
+  planAutoAction: () => Promise<void>;
+  reloadServerRevisions: () => Promise<void>;
+  rememberColor: (c: string) => void;
+  removeNamedCheckpoint: (checkpoint: StudioCheckpoint) => Promise<void>;
+  requestWriterRoomAiDraft: (stage: StudioWriterRoomStage) => Promise<void>;
+  restoreNamedCheckpoint: (checkpoint: StudioCheckpoint) => Promise<void>;
+  restoreServerRevision: (revision: WorkRevisionSummary, comparedBaseRevision: number) => Promise<boolean>;
+  selectStudioCommentAnchor: (anchor: StudioCommentAnchor) => void;
+  setAiProvenance: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<{ version: 1; operations: { id: string; kind: "text" | "image"; task: "composition" | "scenario" | "translation" | "dialogue" | "palette" | "text-other" | "background-image" | "character-image" | "image-edit" | "colorize" | "line-cleanup" | "image-other"; provider: string; model: string; transport: "server" | "byok" | "local" | "other"; promptVersion: number; prompt: { sha256: string; summary: string; retention: "hash-only" | "raw-opt-in"; characterCount?: number | undefined; raw?: string | undefined; }; status: "pending" | "succeeded" | "failed" | "cancelled"; createdAt: string; updatedAt: string; references: { assetId?: string | undefined; sha256?: string | undefined; }[]; revisedPrompt?: { sha256: string; summary: string; retention: "hash-only" | "raw-opt-in"; characterCount?: number | undefined; raw?: string | undefined; } | undefined; usage?: { promptTokens?: number | undefined; completionTokens?: number | undefined; totalTokens?: number | undefined; } | undefined; target?: { pageId: string; frameId?: string | undefined; elementId?: string | undefined; } | undefined; requestedSize?: { width: number; height: number; } | undefined; seed?: string | undefined; requestId?: string | undefined; error?: { category: "unknown" | "provider" | "cancelled" | "configuration" | "network" | "policy"; code: string; message: string; retriable: boolean; } | undefined; }[]; }>>>[0]) => void;
+  setCharacterBible: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<{ version: 1; characters: { id: string; name: string; role: string; appearance: string; costume: string; colors: string[]; voice: string; goal: string; relationships: string[]; props: string[]; lockedFields: ("name" | "colors" | "relationships" | "props" | "role" | "appearance" | "costume" | "voice" | "goal")[]; }[]; }>>>[0]) => void;
+  setPublicationAnalytics: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<StudioPublicationAnalyticsDocument>>>[0]) => void;
+  setPublishAiDisclosure: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<string>>>[0]) => void;
+  setPublishAiUsage: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<StudioPublishAiUsage>>>[0]) => void;
+  setPublishCompliance: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<import("./studio-publish-compliance").StudioPublishComplianceChecklist>>>[0]) => void;
+  setPublishPackageCredits: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<string>>>[0]) => void;
+  setPublishProfile: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<StudioPublishProfile>>>[0]) => void;
+  setReleaseSchedule: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<{ version: 1; items: { id: string; kind: "episode" | "milestone"; title: string; destination: "generic" | "webtoon" | "tapas"; localDate: string; localTime: string; timeZone: string; status: "draft" | "review" | "ready" | "scheduled" | "published"; notes?: string | undefined; }[]; }>>>[0]) => void;
+  setStudioComments: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<{ version: 1; threads: { anchor: { type: "page"; pageId: string; } | { type: "frame"; pageId: string; frameId: string; } | { type: "element"; pageId: string; elementId: string; frameId?: string | undefined; } | { type: "point"; pageId: string; x: number; y: number; }; replies: { id: string; author: { displayName: string; id?: string | undefined; }; body: string; mentions: { displayName: string; id?: string | undefined; }[]; createdAt: string; updatedAt: string; }[]; resolved: boolean; id: string; author: { displayName: string; id?: string | undefined; }; body: string; mentions: { displayName: string; id?: string | undefined; }[]; createdAt: string; updatedAt: string; resolvedAt?: string | undefined; resolvedBy?: { displayName: string; id?: string | undefined; } | undefined; assignee?: { displayName: string; id?: string | undefined; } | undefined; }[]; }>>>[0]) => void;
+  setWriterRoom: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<{ version: 1; stages: { premise: { text: string; characterIds: string[]; }; synopsis: { text: string; characterIds: string[]; }; "episode-outline": { title: string; summary: string; characterIds: string[]; }; beats: { items: { id: string; order: number; title: string; summary: string; characterIds: string[]; }[]; }; scenes: { items: { id: string; order: number; beatIds: string[]; heading: string; summary: string; location: string; time: string; characterIds: string[]; }[]; }; "panel-plan": { items: { id: string; order: number; sceneId: string; shot: string; action: string; characterIds: string[]; }[]; }; "dialogue-sfx": { dialogue: { id: string; order: number; panelId: string; characterId: string | null; text: string; }[]; sfx: { id: string; order: number; panelId: string; presetId: string | null; customText: string; style: { emphasis: "quiet" | "normal" | "strong"; scale: "small" | "medium" | "large"; }; }[]; }; }; completion: { premise: boolean; synopsis: boolean; "episode-outline": boolean; beats: boolean; scenes: boolean; "panel-plan": boolean; "dialogue-sfx": boolean; }; suggestions: { id: string; targetPath: string; currentValue: string | number | boolean | string[] | null; proposedValue: string | number | boolean | string[] | null; rationale: string; status: "pending" | "accepted" | "rejected"; createdAt: string; provenanceRef?: string | undefined; resolvedAt?: string | undefined; }[]; lastDecision?: { kind: "accept" | "reject"; suggestionStates: { id: string; status: "pending" | "accepted" | "rejected"; resolvedAt?: string | undefined; }[]; targetValues: { targetPath: string; value: string | number | boolean | string[] | null; }[]; decidedAt: string; } | undefined; }>>>[0]) => void;
+  startMacroRecord: () => void;
+  stopMacroRecord: () => Promise<void>;
+  updatePublishPackageSettings: (value: StudioPublishPackageSettings) => void;
+}
+
+interface StudioLazyPanelStackProps {
+  activeCommentAnchor: { type: "page"; pageId: string; } | { type: "frame"; pageId: string; frameId: string; } | { type: "element"; pageId: string; elementId: string; frameId?: string | undefined; } | { type: "point"; pageId: string; x: number; y: number; };
+  activePage: PageState;
+  aiProvenance: { version: 1; operations: { id: string; kind: "text" | "image"; task: "composition" | "scenario" | "translation" | "dialogue" | "palette" | "text-other" | "background-image" | "character-image" | "image-edit" | "colorize" | "line-cleanup" | "image-other"; provider: string; model: string; transport: "server" | "byok" | "local" | "other"; promptVersion: number; prompt: { sha256: string; summary: string; retention: "hash-only" | "raw-opt-in"; characterCount?: number | undefined; raw?: string | undefined; }; status: "pending" | "succeeded" | "failed" | "cancelled"; createdAt: string; updatedAt: string; references: { assetId?: string | undefined; sha256?: string | undefined; }[]; revisedPrompt?: { sha256: string; summary: string; retention: "hash-only" | "raw-opt-in"; characterCount?: number | undefined; raw?: string | undefined; } | undefined; usage?: { promptTokens?: number | undefined; completionTokens?: number | undefined; totalTokens?: number | undefined; } | undefined; target?: { pageId: string; frameId?: string | undefined; elementId?: string | undefined; } | undefined; requestedSize?: { width: number; height: number; } | undefined; seed?: string | undefined; requestId?: string | undefined; error?: { category: "unknown" | "provider" | "cancelled" | "configuration" | "network" | "policy"; code: string; message: string; retriable: boolean; } | undefined; }[]; };
+  aiProvenanceOpen: boolean;
+  aiSettings: StudioAiSettings;
+  autoActionBusy: boolean;
+  autoActionError: string | null;
+  autoActionPlan: StudioAutoActionPlan | null;
+  autoActionProgress: StudioAutoActionExecutionProgress | null;
+  autoActionScope: { kind: "current"; } | { kind: "selected-pages"; pageIds: string[]; } | { kind: "all"; };
+  autoActionSelectedPageIds: string[];
+  autoActionSet: { kind: "toonspectrum-studio-auto-actions"; version: 1; id: string; name: string; commands: ({ type: "lettering.set-font"; font: string; id: string; enabled: boolean; filter?: { elementTypes?: ("text" | "bubble")[] | undefined; name?: { mode: "exact" | "contains" | "starts-with" | "ends-with"; value: string; caseSensitive: boolean; } | undefined; } | undefined; } | { type: "lettering.set-size"; fontSize: number; id: string; enabled: boolean; filter?: { elementTypes?: ("text" | "bubble")[] | undefined; name?: { mode: "exact" | "contains" | "starts-with" | "ends-with"; value: string; caseSensitive: boolean; } | undefined; } | undefined; } | { type: "lettering.set-color"; color: string; id: string; enabled: boolean; filter?: { elementTypes?: ("text" | "bubble")[] | undefined; name?: { mode: "exact" | "contains" | "starts-with" | "ends-with"; value: string; caseSensitive: boolean; } | undefined; } | undefined; } | { type: "element.set-opacity"; opacity: number; id: string; enabled: boolean; filter?: { elementTypes?: ("frame" | "text" | "image" | "bubble" | "sticker" | "draw" | "focusLines" | "speedLines")[] | undefined; name?: { mode: "exact" | "contains" | "starts-with" | "ends-with"; value: string; caseSensitive: boolean; } | undefined; } | undefined; } | { type: "element.set-blend-mode"; blendMode: "color" | "source-over" | "multiply" | "screen" | "overlay" | "darken" | "lighten" | "color-dodge" | "color-burn" | "hard-light" | "soft-light" | "difference" | "exclusion" | "hue" | "saturation" | "luminosity"; id: string; enabled: boolean; filter?: { elementTypes?: ("frame" | "text" | "image" | "bubble" | "sticker" | "draw" | "focusLines" | "speedLines")[] | undefined; name?: { mode: "exact" | "contains" | "starts-with" | "ends-with"; value: string; caseSensitive: boolean; } | undefined; } | undefined; } | { type: "element.set-hidden"; hidden: boolean; id: string; enabled: boolean; filter?: { elementTypes?: ("frame" | "text" | "image" | "bubble" | "sticker" | "draw" | "focusLines" | "speedLines")[] | undefined; name?: { mode: "exact" | "contains" | "starts-with" | "ends-with"; value: string; caseSensitive: boolean; } | undefined; } | undefined; } | { type: "element.set-locked"; locked: boolean; id: string; enabled: boolean; filter?: { elementTypes?: ("frame" | "text" | "image" | "bubble" | "sticker" | "draw" | "focusLines" | "speedLines")[] | undefined; name?: { mode: "exact" | "contains" | "starts-with" | "ends-with"; value: string; caseSensitive: boolean; } | undefined; } | undefined; } | { type: "page.set-background"; background: { kind: "solid"; color: string; } | { kind: "gradient"; colors: [string, string]; }; id: string; enabled: boolean; } | { type: "page.apply-grade-preset"; preset: "neutral" | "recall" | "night" | "dawn" | "dusk" | "horror" | "dreamy" | "mono-manuscript" | "rainy" | "warm-afternoon"; id: string; enabled: boolean; })[]; description?: string | undefined; } | null;
+  autoActionsOpen: boolean;
+  autoActionStatus: string | null;
+  bg3dInitialDataUrl: string | undefined;
+  bg3dInitialElementId: string | undefined;
+  bg3dInitialScene: StudioBg3dSceneDocument | undefined;
+  bg3dMutationTicketRef: import("react").RefObject<{ authScopeKey: string | null; workId: string | null; accessGeneration: number; documentGeneration: number; } | null>;
+  bg3dOpen: boolean;
+  characterBible: { version: 1; characters: { id: string; name: string; role: string; appearance: string; costume: string; colors: string[]; voice: string; goal: string; relationships: string[]; props: string[]; lockedFields: ("name" | "colors" | "relationships" | "props" | "role" | "appearance" | "costume" | "voice" | "goal")[]; }[]; };
+  characterBibleOpen: boolean;
+  checkpointError: string | null;
+  checkpointPanelOpen: boolean;
+  checkpoints: { id: string; name: string; createdAt: string; payload: unknown; }[];
+  collaborationDocumentLocked: boolean;
+  colorWheelCenter: { x: number; y: number; } | null;
+  colorWheelOpen: boolean;
+  commentsOpen: boolean;
+  composeWorkAssetPreviewPage: (page: PageState) => PageState;
+  continuityIssues: StudioContinuityIssue[];
+  continuityOpen: boolean;
+  continuityScenes: { id: string; frameId: string; pageId: string; label: string; beat: { props?: import("./studio-continuity").StudioContinuityNamedValues | undefined; characterNames?: readonly string[] | undefined; location?: string | null | undefined; time?: string | null | undefined; costumes?: import("./studio-continuity").StudioContinuityNamedValues | undefined; transitionExplanations?: import("./studio-continuity").StudioContinuityTransitionExplanations | undefined; sceneId: string; }; }[];
+  currentPageId: string;
+  currentPublishPackageCreditsText: () => string;
+  effectivePublishPackageSettings: StudioPublishPackageSettings;
+  elementById: Map<string, El>;
+  fxPanelOpen: boolean;
+  isMobile: boolean;
+  loadedWork: WorkDetail | null;
+  loggedIn: boolean;
+  macroSession: StudioMacroSession;
+  masterEditMode: boolean;
+  pageDnd: import("./StudioPageThumbnails").StudioPageDnd;
+  pageReviewOpen: boolean;
+  pages: PageState[];
+  pagesHi: number;
+  pagesHistory: PageState[][];
+  poserInitialDataUrl: string | undefined;
+  poserInitialElementId: string | undefined;
+  poserMutationTicketRef: import("react").RefObject<{ authScopeKey: string | null; workId: string | null; accessGeneration: number; documentGeneration: number; } | null>;
+  poserVrmOpen: boolean;
+  productionInsightsOpen: boolean;
+  productionInsightsResult: import("./studio-production-insights").StudioProductionInsights | null;
+  publicationAnalytics: StudioPublicationAnalyticsDocument;
+  publicationOperationsOpen: boolean;
+  publishAiDisclosure: string;
+  publishAiUsage: StudioPublishAiUsage;
+  publishCompliance: import("./studio-publish-compliance").StudioPublishComplianceChecklist;
+  publishComplianceResult: import("./studio-publish-compliance").StudioPublishComplianceResult;
+  publishPackageExportBusy: boolean;
+  publishPackageExportProgress: { done: number; total: number; } | null;
+  publishPackageExportStatus: { tone: "info" | "good" | "bad"; text: string; } | null;
+  publishPackageOpen: boolean;
+  publishPackagePlan: StudioPublishPackagePlan | null;
+  publishPreflightOpen: boolean;
+  publishPreflightResult: import("./studio-publish-preflight").StudioPublishPreflightResult | null;
+  publishProfile: StudioPublishProfile;
+  quickActionsAnchor: { x: number; y: number; };
+  quickActionsDisabledActions: Set<"undo" | "redo" | "select" | "pen" | "eraser" | "eyedropper" | "properties" | "duplicate" | "delete" | "bring-front" | "fit-width" | "add-bubble" | "advanced-fill">;
+  quickActionsOpen: boolean;
+  quickActionsPreferences: StudioQuickActionsPreferences;
+  recentColors: string[];
+  referencePanelOpen: boolean;
+  releaseSchedule: { version: 1; items: { id: string; kind: "episode" | "milestone"; title: string; destination: "generic" | "webtoon" | "tapas"; localDate: string; localTime: string; timeZone: string; status: "draft" | "review" | "ready" | "scheduled" | "published"; notes?: string | undefined; }[]; };
+  scenarioApplyTarget: "current-page" | "new-page";
+  scenarioBusy: boolean;
+  scenarioError: string | null;
+  scenarioOpen: boolean;
+  scenarioProgress: { done: number; total: number; } | null;
+  scenarioRegeneratingIndex: number | null;
+  scenarioResult: { items: ScenarioPreviewItem[]; nextCanvasH: number; characterDescription: string; textAiProvenance: StudioTextAiProvenance; } | null;
+  scenarioSceneCountHint: number | undefined;
+  scenarioStageLabel: string | null;
+  scenarioStoryText: string;
+  scrollPreviewOpen: boolean;
+  serverCurrentRevision: number | undefined;
+  serverRevisionError: string | null;
+  serverRevisionLoading: boolean;
+  serverRevisions: WorkRevisionSummary[];
+  setAiProvenanceOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setAutoActionsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setBg3dInitialDataUrl: import("react").Dispatch<import("react").SetStateAction<string | undefined>>;
+  setBg3dInitialElementId: import("react").Dispatch<import("react").SetStateAction<string | undefined>>;
+  setBg3dInitialScene: import("react").Dispatch<import("react").SetStateAction<StudioBg3dSceneDocument | undefined>>;
+  setBg3dOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setCharacterBibleOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setCheckpointPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setColor: import("react").Dispatch<import("react").SetStateAction<string>>;
+  setColorWheelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setCommentPinArmed: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setCommentsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setContinuityOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setCurrentPageId: import("react").Dispatch<import("react").SetStateAction<string>>;
+  setFxPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setLoadedWork: import("react").Dispatch<import("react").SetStateAction<WorkDetail | null>>;
+  setPageReviewOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setPoserInitialDataUrl: import("react").Dispatch<import("react").SetStateAction<string | undefined>>;
+  setPoserInitialElementId: import("react").Dispatch<import("react").SetStateAction<string | undefined>>;
+  setPoserVrmOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setProductionInsightsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setPublicationOperationsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setPublishPackageOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setPublishPreflightOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setQuickActionsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setQuickActionsPreferences: import("react").Dispatch<import("react").SetStateAction<StudioQuickActionsPreferences>>;
+  setReferencePanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setScenarioOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setScenarioSceneCountHint: import("react").Dispatch<import("react").SetStateAction<number | undefined>>;
+  setScenarioStoryText: import("react").Dispatch<import("react").SetStateAction<string>>;
+  setScrollPreviewOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setSelectedId: import("react").Dispatch<import("react").SetStateAction<string | null>>;
+  setSharedDocumentNotice: import("react").Dispatch<import("react").SetStateAction<string | null>>;
+  setSharedDocumentScope: import("react").Dispatch<import("react").SetStateAction<{ authScopeKey: string; workId: string; value: StudioSharedDocument; } | null>>;
+  setStoryboardGridOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setTeamPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setTimelapseOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setTool: import("react").Dispatch<import("react").SetStateAction<Tool>>;
+  setWriterRoomAiDirection: import("react").Dispatch<import("react").SetStateAction<string>>;
+  setWriterRoomAiReview: import("react").Dispatch<import("react").SetStateAction<{ stage: StudioWriterRoomStage; rationale: string; draft: unknown; textProvenance: StudioTextAiProvenance; } | null>>;
+  setWriterRoomOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  sharedDocument: StudioSharedDocument | null;
+  storyboardGridOpen: boolean;
+  studioAuthUserId: string | null;
+  studioCommentActor: { displayName: string; id?: string | undefined; };
+  studioCommentAnchorOptions: { anchor: StudioCommentAnchor; label: string; }[];
+  studioComments: { version: 1; threads: { anchor: { type: "page"; pageId: string; } | { type: "frame"; pageId: string; frameId: string; } | { type: "element"; pageId: string; elementId: string; frameId?: string | undefined; } | { type: "point"; pageId: string; x: number; y: number; }; replies: { id: string; author: { displayName: string; id?: string | undefined; }; body: string; mentions: { displayName: string; id?: string | undefined; }[]; createdAt: string; updatedAt: string; }[]; resolved: boolean; id: string; author: { displayName: string; id?: string | undefined; }; body: string; mentions: { displayName: string; id?: string | undefined; }[]; createdAt: string; updatedAt: string; resolvedAt?: string | undefined; resolvedBy?: { displayName: string; id?: string | undefined; } | undefined; assignee?: { displayName: string; id?: string | undefined; } | undefined; }[]; };
+  studioRevisionProjectGenerationRef: import("react").RefObject<number>;
+  teamPanelOpen: boolean;
+  textAiConfigured: boolean;
+  timelapseOpen: boolean;
+  title: string;
+  workId: string | null;
+  writerRoom: { version: 1; stages: { premise: { text: string; characterIds: string[]; }; synopsis: { text: string; characterIds: string[]; }; "episode-outline": { title: string; summary: string; characterIds: string[]; }; beats: { items: { id: string; order: number; title: string; summary: string; characterIds: string[]; }[]; }; scenes: { items: { id: string; order: number; beatIds: string[]; heading: string; summary: string; location: string; time: string; characterIds: string[]; }[]; }; "panel-plan": { items: { id: string; order: number; sceneId: string; shot: string; action: string; characterIds: string[]; }[]; }; "dialogue-sfx": { dialogue: { id: string; order: number; panelId: string; characterId: string | null; text: string; }[]; sfx: { id: string; order: number; panelId: string; presetId: string | null; customText: string; style: { emphasis: "quiet" | "normal" | "strong"; scale: "small" | "medium" | "large"; }; }[]; }; }; completion: { premise: boolean; synopsis: boolean; "episode-outline": boolean; beats: boolean; scenes: boolean; "panel-plan": boolean; "dialogue-sfx": boolean; }; suggestions: { id: string; targetPath: string; currentValue: string | number | boolean | string[] | null; proposedValue: string | number | boolean | string[] | null; rationale: string; status: "pending" | "accepted" | "rejected"; createdAt: string; provenanceRef?: string | undefined; resolvedAt?: string | undefined; }[]; lastDecision?: { kind: "accept" | "reject"; suggestionStates: { id: string; status: "pending" | "accepted" | "rejected"; resolvedAt?: string | undefined; }[]; targetValues: { targetPath: string; value: string | number | boolean | string[] | null; }[]; decidedAt: string; } | undefined; };
+  writerRoomAiBusy: boolean;
+  writerRoomAiDirection: string;
+  writerRoomAiError: string | null;
+  writerRoomAiReview: { stage: StudioWriterRoomStage; rationale: string; draft: unknown; textProvenance: StudioTextAiProvenance; } | null;
+  writerRoomCanvasPlan: StudioWriterRoomCanvasProjectionResult | null;
+  writerRoomOpen: boolean;
+  stableHandlers: StudioLazyPanelStackHandlers;
+}
+
+const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
+  activeCommentAnchor,
+  activePage,
+  aiProvenance,
+  aiProvenanceOpen,
+  aiSettings,
+  autoActionBusy,
+  autoActionError,
+  autoActionPlan,
+  autoActionProgress,
+  autoActionScope,
+  autoActionSelectedPageIds,
+  autoActionSet,
+  autoActionsOpen,
+  autoActionStatus,
+  bg3dInitialDataUrl,
+  bg3dInitialElementId,
+  bg3dInitialScene,
+  bg3dMutationTicketRef,
+  bg3dOpen,
+  characterBible,
+  characterBibleOpen,
+  checkpointError,
+  checkpointPanelOpen,
+  checkpoints,
+  collaborationDocumentLocked,
+  colorWheelCenter,
+  colorWheelOpen,
+  commentsOpen,
+  composeWorkAssetPreviewPage,
+  continuityIssues,
+  continuityOpen,
+  continuityScenes,
+  currentPageId,
+  currentPublishPackageCreditsText,
+  effectivePublishPackageSettings,
+  elementById,
+  fxPanelOpen,
+  isMobile,
+  loadedWork,
+  loggedIn,
+  macroSession,
+  masterEditMode,
+  pageDnd,
+  pageReviewOpen,
+  pages,
+  pagesHi,
+  pagesHistory,
+  poserInitialDataUrl,
+  poserInitialElementId,
+  poserMutationTicketRef,
+  poserVrmOpen,
+  productionInsightsOpen,
+  productionInsightsResult,
+  publicationAnalytics,
+  publicationOperationsOpen,
+  publishAiDisclosure,
+  publishAiUsage,
+  publishCompliance,
+  publishComplianceResult,
+  publishPackageExportBusy,
+  publishPackageExportProgress,
+  publishPackageExportStatus,
+  publishPackageOpen,
+  publishPackagePlan,
+  publishPreflightOpen,
+  publishPreflightResult,
+  publishProfile,
+  quickActionsAnchor,
+  quickActionsDisabledActions,
+  quickActionsOpen,
+  quickActionsPreferences,
+  recentColors,
+  referencePanelOpen,
+  releaseSchedule,
+  scenarioApplyTarget,
+  scenarioBusy,
+  scenarioError,
+  scenarioOpen,
+  scenarioProgress,
+  scenarioRegeneratingIndex,
+  scenarioResult,
+  scenarioSceneCountHint,
+  scenarioStageLabel,
+  scenarioStoryText,
+  scrollPreviewOpen,
+  serverCurrentRevision,
+  serverRevisionError,
+  serverRevisionLoading,
+  serverRevisions,
+  setAiProvenanceOpen,
+  setAutoActionsOpen,
+  setBg3dInitialDataUrl,
+  setBg3dInitialElementId,
+  setBg3dInitialScene,
+  setBg3dOpen,
+  setCharacterBibleOpen,
+  setCheckpointPanelOpen,
+  setColor,
+  setColorWheelOpen,
+  setCommentPinArmed,
+  setCommentsOpen,
+  setContinuityOpen,
+  setCurrentPageId,
+  setFxPanelOpen,
+  setLoadedWork,
+  setPageReviewOpen,
+  setPoserInitialDataUrl,
+  setPoserInitialElementId,
+  setPoserVrmOpen,
+  setProductionInsightsOpen,
+  setPublicationOperationsOpen,
+  setPublishPackageOpen,
+  setPublishPreflightOpen,
+  setQuickActionsOpen,
+  setQuickActionsPreferences,
+  setReferencePanelOpen,
+  setScenarioOpen,
+  setScenarioSceneCountHint,
+  setScenarioStoryText,
+  setScrollPreviewOpen,
+  setSelectedId,
+  setSharedDocumentNotice,
+  setSharedDocumentScope,
+  setStoryboardGridOpen,
+  setTeamPanelOpen,
+  setTimelapseOpen,
+  setTool,
+  setWriterRoomAiDirection,
+  setWriterRoomAiReview,
+  setWriterRoomOpen,
+  sharedDocument,
+  storyboardGridOpen,
+  studioAuthUserId,
+  studioCommentActor,
+  studioCommentAnchorOptions,
+  studioComments,
+  studioRevisionProjectGenerationRef,
+  teamPanelOpen,
+  textAiConfigured,
+  timelapseOpen,
+  title,
+  workId,
+  writerRoom,
+  writerRoomAiBusy,
+  writerRoomAiDirection,
+  writerRoomAiError,
+  writerRoomAiReview,
+  writerRoomCanvasPlan,
+  writerRoomOpen,
+  stableHandlers,
+}: StudioLazyPanelStackProps) {
+  const {
+    addPage,
+    addRenderedImage,
+    applyBg3dRenderedImage,
+    applyWriterRoomAiReview,
+    applyWriterRoomCanvasPlan,
+    canApplyStudioMutation,
+    cancelAutoAction,
+    cancelWriterRoomAi,
+    changeAutoActionScope,
+    changeAutoActionSelectedPages,
+    commitShotTag,
+    createNamedCheckpoint,
+    deletePage,
+    disarmAllPixelTools,
+    downloadAiPublicSummary,
+    downloadPublishPackageManifest,
+    downloadPublishPreflightReport,
+    duplicatePage,
+    executeAutoAction,
+    executePublishPackageExport,
+    executeQuickAction,
+    exportAutoActionJson,
+    handleTimelapseRecordingEnd,
+    handleTimelapseRecordingStart,
+    importAutoActionJson,
+    onApplyScenarioPreview,
+    onCancelScenario,
+    onChangeScenarioScene,
+    onDiscardScenarioPreview,
+    onGenerateScenario,
+    onGenerateScenarioImages,
+    onRegenerateScenarioImage,
+    onRemoveScenarioScene,
+    onScenarioApplyTargetChange,
+    patchEl,
+    patchPageReview,
+    planAutoAction,
+    rememberColor,
+    removeNamedCheckpoint,
+    restoreNamedCheckpoint,
+    selectStudioCommentAnchor,
+    setAiProvenance,
+    setCharacterBible,
+    setPublicationAnalytics,
+    setPublishAiDisclosure,
+    setPublishAiUsage,
+    setPublishCompliance,
+    setPublishPackageCredits,
+    setPublishProfile,
+    setReleaseSchedule,
+    setStudioComments,
+    setWriterRoom,
+    startMacroRecord,
+    stopMacroRecord,
+    updatePublishPackageSettings,
+    captureTimelapseStep,
+    currentStudioProjectSnapshot,
+    reloadServerRevisions,
+    requestWriterRoomAiDraft,
+    restoreServerRevision,
+  } = stableHandlers;
+  return (
+    <>
+        <Suspense fallback={null}>
+          {isMobile ? (
+            <StudioQuickActionsMenu
+              open={quickActionsOpen}
+              anchor={quickActionsAnchor}
+              preferences={quickActionsPreferences}
+              disabledActions={[...quickActionsDisabledActions]}
+              onExecute={executeQuickAction}
+              onPreferencesChange={setQuickActionsPreferences}
+              onClose={() => setQuickActionsOpen(false)}
+            />
+          ) : null}
+        </Suspense>
+
+      <Suspense fallback={<PoserLoadingOverlay />}>
+        {poserVrmOpen ? (
+          <StudioVrmPoser
+            open
+            initialDataUrl={poserInitialDataUrl}
+            onClose={() => {
+              setPoserVrmOpen(false);
+              setPoserInitialDataUrl(undefined);
+              setPoserInitialElementId(undefined);
+            }}
+            onInsert={(src, w, h) => {
+              const mutationTicket = poserMutationTicketRef.current;
+              if (!mutationTicket || !canApplyStudioMutation(mutationTicket)) return;
+              if (poserInitialElementId) {
+                const targetEl = elementById.get(poserInitialElementId);
+                if (targetEl && targetEl.type === "image") {
+                  const targetWidth = targetEl.width;
+                  const targetHeight = Math.round(targetWidth * (h / w));
+                  patchEl(poserInitialElementId, {
+                    src,
+                    height: targetHeight,
+                  });
+                } else {
+                  patchEl(poserInitialElementId, { src });
+                }
+              } else {
+                addRenderedImage(src, w, h);
+              }
+            }}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={<Bg3DLoadingOverlay />}>
+        {bg3dOpen ? (
+          <StudioBackground3D
+            open
+            initialDataUrl={bg3dInitialDataUrl}
+            initialScene={bg3dInitialScene}
+            onClose={() => {
+              setBg3dOpen(false);
+              setBg3dInitialDataUrl(undefined);
+              setBg3dInitialScene(undefined);
+              setBg3dInitialElementId(undefined);
+            }}
+            onInsert={(result) => {
+              const mutationTicket = bg3dMutationTicketRef.current;
+              if (!mutationTicket || !canApplyStudioMutation(mutationTicket)) return false;
+              return applyBg3dRenderedImage(result, bg3dInitialElementId);
+            }}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={<TimelapseLoadingOverlay />}>
+        {timelapseOpen ? (
+          <StudioTimelapsePanel
+            open
+            onClose={() => setTimelapseOpen(false)}
+            pageId={activePage.id}
+            history={pagesHistory.slice(0, pagesHi + 1)}
+            title={title}
+            masterEditMode={masterEditMode}
+            captureStep={captureTimelapseStep}
+            onRecordingStart={handleTimelapseRecordingStart}
+            onRecordingEnd={handleTimelapseRecordingEnd}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={<StoryboardGridLoadingOverlay />}>
+        {storyboardGridOpen ? (
+          <StudioStoryboardGridPanel
+            open
+            onClose={() => setStoryboardGridOpen(false)}
+            pages={pages.map(composeWorkAssetPreviewPage)}
+            currentPageId={currentPageId}
+            dnd={pageDnd}
+            onSelectPage={(id) => {
+              setCurrentPageId(id);
+              setStoryboardGridOpen(false);
+            }}
+            onAddPage={addPage}
+            onDuplicatePage={duplicatePage}
+            onDeletePage={deletePage}
+            canDelete={pages.length > 1}
+            onShotTagChange={(pageId, patch) => commitShotTag(pageId, patch)}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {pageReviewOpen ? (
+          <StudioPageReviewPanel
+            open
+            onClose={() => setPageReviewOpen(false)}
+            pages={pages.map((page, index) => ({
+              id: page.id,
+              label: pageDisplayName(page, index),
+              review: page.review,
+            }))}
+            currentPageId={currentPageId}
+            onSelectPage={setCurrentPageId}
+            onPatchReview={patchPageReview}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {commentsOpen ? (
+          <StudioCommentsPanel
+            open
+            onClose={() => setCommentsOpen(false)}
+            document={studioComments}
+            onChange={(value) => {
+              if (!collaborationDocumentLocked) {
+                setStudioComments(normalizeStudioCommentsDocument(value));
+                setSharedDocumentNotice(null);
+              }
+            }}
+            activeAnchor={activeCommentAnchor}
+            currentActor={studioCommentActor}
+            anchorOptions={studioCommentAnchorOptions}
+            onSelectAnchor={selectStudioCommentAnchor}
+            onArmPinPlacement={() => {
+              // 패널을 닫고 다음 캔버스 클릭 한 번으로 point 앵커를 잡는다(Esc/도구 전환 시 해제).
+              disarmAllPixelTools();
+              setCommentsOpen(false);
+              setCommentPinArmed(true);
+            }}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {teamPanelOpen ? (
+          <StudioTeamPanel
+            key={studioAuthUserId ?? "guest"}
+            open
+            authScopeKey={studioAuthUserId}
+            onClose={() => setTeamPanelOpen(false)}
+            workId={workId}
+            loggedIn={loggedIn}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {continuityOpen ? (
+          <StudioContinuityPanel
+            open
+            onClose={() => setContinuityOpen(false)}
+            issues={continuityIssues}
+            scenes={continuityScenes.map((scene) => ({ id: scene.id, label: scene.label }))}
+            onSelectScene={(sceneId) => {
+              const scene = continuityScenes.find((item) => item.id === sceneId);
+              if (!scene) return;
+              setCurrentPageId(scene.pageId);
+              setTool("select");
+              setSelectedId(scene.frameId);
+              setContinuityOpen(false);
+            }}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={<ScrollPreviewLoadingOverlay />}>
+        {scrollPreviewOpen ? (
+          <StudioScrollPreviewPanel
+            open
+            onClose={() => setScrollPreviewOpen(false)}
+            pages={pages.map(composeWorkAssetPreviewPage)}
+            currentPageId={currentPageId}
+            onSelectPage={(id) => {
+              setCurrentPageId(id);
+              setScrollPreviewOpen(false);
+            }}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={<ScenarioAutoLayoutLoadingOverlay />}>
+        {scenarioOpen ? (
+          <StudioScenarioAutoLayoutPanel
+            open
+            onClose={() => setScenarioOpen(false)}
+            textConfigured={textAiConfigured}
+            imageConfigured={isStudioAiConfigured(aiSettings)}
+            storyText={scenarioStoryText}
+            onStoryTextChange={setScenarioStoryText}
+            sceneCountHint={scenarioSceneCountHint}
+            onSceneCountHintChange={setScenarioSceneCountHint}
+            applyTarget={scenarioApplyTarget}
+            onApplyTargetChange={onScenarioApplyTargetChange}
+            busy={scenarioBusy}
+            stageLabel={scenarioStageLabel}
+            progress={scenarioProgress}
+            error={scenarioError}
+            preview={scenarioResult?.items ?? null}
+            textProvenance={scenarioResult?.textAiProvenance ?? null}
+            onGenerate={onGenerateScenario}
+            onGenerateImages={onGenerateScenarioImages}
+            onChangeScene={onChangeScenarioScene}
+            onRemoveScene={onRemoveScenarioScene}
+            onRegenerateScene={onRegenerateScenarioImage}
+            regeneratingIndex={scenarioRegeneratingIndex}
+            onCancel={onCancelScenario}
+            onApply={onApplyScenarioPreview}
+            onDiscard={onDiscardScenarioPreview}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {productionInsightsOpen && productionInsightsResult ? (
+          <StudioProductionInsightsPanel
+            open
+            onClose={() => setProductionInsightsOpen(false)}
+            insights={productionInsightsResult}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {publicationOperationsOpen ? (
+          <StudioPublicationOperationsPanel
+            open
+            onClose={() => setPublicationOperationsOpen(false)}
+            schedule={releaseSchedule}
+            onScheduleChange={(value) => {
+              if (!collaborationDocumentLocked) {
+                setReleaseSchedule(value);
+                setSharedDocumentNotice(null);
+              }
+            }}
+            analyticsDocument={publicationAnalytics}
+            onAnalyticsDocumentChange={(value) => {
+              if (!collaborationDocumentLocked) {
+                // The operations panel emits a canonical document from the same deferred runtime.
+                setPublicationAnalytics(value);
+                setSharedDocumentNotice(null);
+              }
+            }}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {publishPreflightOpen && publishPreflightResult ? (
+          <StudioPublishPreflightPanel
+            open
+            onClose={() => setPublishPreflightOpen(false)}
+            profile={publishProfile}
+            onProfileChange={(value) => {
+              if (!collaborationDocumentLocked) {
+                setPublishProfile(value);
+                setSharedDocumentNotice(null);
+              }
+            }}
+            aiUsage={publishAiUsage}
+            onAiUsageChange={(value) => {
+              if (!collaborationDocumentLocked) {
+                setPublishAiUsage(value);
+                setSharedDocumentNotice(null);
+              }
+            }}
+            disclosure={publishAiDisclosure}
+            onDisclosureChange={(value) => {
+              if (!collaborationDocumentLocked) {
+                setPublishAiDisclosure(value);
+                setSharedDocumentNotice(null);
+              }
+            }}
+            compliance={publishCompliance}
+            onComplianceChange={(value) => {
+              if (!collaborationDocumentLocked) {
+                setPublishCompliance(normalizeStudioPublishCompliance(value));
+                setSharedDocumentNotice(null);
+              }
+            }}
+            complianceResult={publishComplianceResult}
+            result={publishPreflightResult}
+            onDownloadReport={downloadPublishPreflightReport}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {publishPackageOpen && publishPackagePlan ? (
+          <StudioPublishPackagePanel
+            open
+            onClose={() => setPublishPackageOpen(false)}
+            settings={effectivePublishPackageSettings}
+            onSettingsChange={updatePublishPackageSettings}
+            plan={publishPackagePlan}
+            creditsText={currentPublishPackageCreditsText()}
+            onCreditsTextChange={(value) => {
+              if (!collaborationDocumentLocked) {
+                setPublishPackageCredits(value);
+                setSharedDocumentNotice(null);
+              }
+            }}
+            onDownloadManifest={() => void downloadPublishPackageManifest()}
+            onBeginExport={() => void executePublishPackageExport()}
+            exportBusy={publishPackageExportBusy}
+            exportProgress={publishPackageExportProgress}
+            exportStatus={publishPackageExportStatus}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {aiProvenanceOpen ? (
+          <StudioAiProvenancePanel
+            open
+            onClose={() => setAiProvenanceOpen(false)}
+            document={aiProvenance}
+            onExportPublicSummary={(summary) => downloadAiPublicSummary(summary)}
+            onClearHistory={() => {
+              if (!collaborationDocumentLocked) {
+                setAiProvenance(createEmptyStudioAiProvenanceDocument());
+                setSharedDocumentNotice(null);
+              }
+            }}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {writerRoomOpen ? (
+          <StudioWriterRoomPanel
+            open
+            onClose={() => setWriterRoomOpen(false)}
+            document={writerRoom}
+            onChange={(value) => {
+              if (!collaborationDocumentLocked) {
+                setWriterRoom(normalizeStudioWriterRoomDocument(value));
+                setSharedDocumentNotice(null);
+              }
+            }}
+            characters={characterBible.characters}
+            onOpenCharacterBible={() => {
+              setWriterRoomOpen(false);
+              setCharacterBibleOpen(true);
+            }}
+            onRequestAi={textAiConfigured ? requestWriterRoomAiDraft : undefined}
+            aiBusy={writerRoomAiBusy}
+            aiError={writerRoomAiError}
+            aiDirection={writerRoomAiDirection}
+            onAiDirectionChange={setWriterRoomAiDirection}
+            aiReview={writerRoomAiReview ? {
+              stage: writerRoomAiReview.stage,
+              rationale: writerRoomAiReview.rationale,
+              draft: writerRoomAiReview.draft,
+              provider: writerRoomAiReview.textProvenance.provider,
+              model: writerRoomAiReview.textProvenance.model,
+              totalTokens: writerRoomAiReview.textProvenance.usage?.totalTokens,
+              failover: writerRoomAiReview.textProvenance.failover,
+            } : null}
+            onApplyAiReview={applyWriterRoomAiReview}
+            onDiscardAiReview={() => setWriterRoomAiReview(null)}
+            onCancelAi={cancelWriterRoomAi}
+            canvasPlan={writerRoomCanvasPlan ? {
+              canApply: writerRoomCanvasPlan.applyReadiness.canApply,
+              pageCount: writerRoomCanvasPlan.pageGrouping.pages.length,
+              panelCount: writerRoomCanvasPlan.panels.length,
+              errorCount: writerRoomCanvasPlan.applyReadiness.errorCount,
+              warningCount: writerRoomCanvasPlan.applyReadiness.warningCount,
+              diagnosticMessages: writerRoomCanvasPlan.diagnostics.map(({ message }) => message),
+            } : undefined}
+            onApplyCanvasPlan={applyWriterRoomCanvasPlan}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {characterBibleOpen ? (
+          <StudioCharacterBiblePanel
+            open
+            onClose={() => setCharacterBibleOpen(false)}
+            bible={characterBible}
+            onChange={(value) => {
+              if (!collaborationDocumentLocked) {
+                setCharacterBible(value);
+                setSharedDocumentNotice(null);
+              }
+            }}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {autoActionsOpen ? (
+          <StudioAutoActionsPanel
+            open
+            actionSet={autoActionSet}
+            scope={autoActionScope}
+            pageOptions={pages.map((page, pageIndex) => ({
+              id: page.id,
+              label: pageDisplayName(page, pageIndex),
+            }))}
+            selectedPageIds={autoActionSelectedPageIds}
+            plan={autoActionPlan}
+            progress={autoActionProgress}
+            status={autoActionStatus}
+            busy={autoActionBusy}
+            error={autoActionError}
+            macroRecording={macroSession.recording}
+            macroCommandCount={macroSession.commands.length}
+            onStartMacroRecord={startMacroRecord}
+            onStopMacroRecord={() => void stopMacroRecord()}
+            onClose={() => {
+              if (!autoActionBusy) setAutoActionsOpen(false);
+            }}
+            onScopeChange={changeAutoActionScope}
+            onSelectedPageIdsChange={changeAutoActionSelectedPages}
+            onImportJson={importAutoActionJson}
+            onExportJson={() => void exportAutoActionJson()}
+            onRequestPlan={() => void planAutoAction()}
+            onExecute={() => void executeAutoAction()}
+            onCancel={cancelAutoAction}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {checkpointPanelOpen ? (
+          <StudioCheckpointPanel
+            open
+            onClose={() => setCheckpointPanelOpen(false)}
+            checkpoints={checkpoints}
+            error={checkpointError}
+            onCreate={createNamedCheckpoint}
+            onRestore={restoreNamedCheckpoint}
+            onDelete={removeNamedCheckpoint}
+            serverRevisions={serverRevisions}
+            serverCurrentRevision={sharedDocument?.role === "owner" ? serverCurrentRevision : undefined}
+            serverLoading={serverRevisionLoading}
+            serverError={serverRevisionError}
+            serverWorkId={workId ?? undefined}
+            getCurrentProject={() => parseStudioProjectFile(currentStudioProjectSnapshot())}
+            getCurrentProjectGeneration={() => studioRevisionProjectGenerationRef.current}
+            onReloadServer={workId && serverCurrentRevision && sharedDocument?.role === "owner" && loggedIn ? () => void reloadServerRevisions() : undefined}
+            onRestoreServer={workId && serverCurrentRevision && sharedDocument?.role === "owner" && loggedIn
+              ? restoreServerRevision
+              : undefined}
+            onNavigateServerChange={({ pageId, elementId }) => {
+              const targetPage = pages.find((page) => page.id === pageId);
+              if (!targetPage) return;
+              setCurrentPageId(pageId);
+              setSelectedId(
+                elementId && targetPage.elements.some((element) => element.id === elementId)
+                  ? elementId
+                  : null
+              );
+            }}
+          />
+        ) : null}
+      </Suspense>
+
+      {fxPanelOpen && loadedWork ? (
+        <div
+          aria-modal="true"
+          role="dialog"
+          className="fixed inset-0 z-[80] grid place-items-center bg-[oklch(0.08_0.01_70/0.72)] p-3 backdrop-blur-sm"
+          style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))", paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+        >
+          <div className="flex max-h-full w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-[0_24px_80px_oklch(0.05_0.01_70/0.55)]">
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-4 py-3">
+              <h2 className="text-sm font-bold text-fg">애니메이션 연출</h2>
+              <button
+                type="button"
+                aria-label="닫기"
+                title="닫기"
+                className="grid size-8 place-items-center rounded-lg border border-line bg-card text-fg-3 transition-colors hover:bg-accent-soft hover:text-accent"
+                onClick={() => setFxPanelOpen(false)}
+              >
+                <X size={15} aria-hidden />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+              <Suspense fallback={<div className="py-8 text-center text-xs text-fg-3">불러오는 중…</div>}>
+                <WorkFxPanel
+                  work={loadedWork}
+                  onUpdated={(doc, revision) => {
+                    setLoadedWork((prev) => prev ? { ...prev, doc, revision: revision ?? prev.revision } : prev);
+                    if (revision) {
+                      setSharedDocumentScope((current) =>
+                        current && current.workId === workId && current.authScopeKey === studioAuthUserId
+                          ? {
+                              ...current,
+                              value: {
+                                ...current.value,
+                                revision,
+                                document: { ...current.value.document, doc },
+                              },
+                            }
+                          : current
+                      );
+                    }
+                  }}
+                />
+              </Suspense>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <Suspense fallback={null}>
+        {referencePanelOpen ? <StudioReferencePanel open onClose={() => setReferencePanelOpen(false)} /> : null}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {colorWheelOpen ? (
+          <StudioColorWheelOverlay
+            open={colorWheelOpen}
+            center={colorWheelCenter}
+            colors={selectWheelColors(recentColors)}
+            onSelect={(c) => {
+              setColor(c);
+              rememberColor(c);
+            }}
+            onClose={() => setColorWheelOpen(false)}
+          />
+        ) : null}
+      </Suspense>
+    </>
+  );
+});
+
+interface StudioMobileEditingDockHandlers {
+  applyBuiltInBrushPreset: (preset: BrushPreset) => void;
+  applyDynamicsPreset: (id: StudioBrushDynamicsPresetId, settings: NormalizedStudioBrushDynamicsSettings) => void;
+  applySavedBrush: (saved: StudioSavedBrush) => void;
+  dismissMobileHint: () => void;
+  duplicateSelected: () => void;
+  fitCanvasToWidth: () => void;
+  openInspectorRoute: (route: StudioInspectorRoute) => void;
+  queueBrushDelete: (deleted: DeletedBrushRecord) => void;
+  redo: () => void;
+  removeSelected: () => void;
+  reorder: (dir: "front" | "back" | "forward" | "backward") => void;
+  toggleAdvancedFill: () => void;
+  undo: () => void;
+}
+
+interface StudioMobileEditingDockProps {
+  activeSavedBrushId: string | null;
+  activeSurfaceReviewLocked: boolean;
+  advancedFillActive: boolean;
+  advancedFillUnsupportedReason: string | null;
+  brush: string;
+  brushDynamics: NormalizedStudioBrushDynamicsSettings;
+  brushManagerSheetRef: import("react").RefObject<HTMLDivElement | null>;
+  brushOpacity: number;
+  collaborationDocumentLocked: boolean;
+  color: string;
+  currentBrushSnapshot: StudioBrushSnapshot;
+  drawMode: DrawMode;
+  drawShape: DrawShapeKind;
+  drawSheetRef: import("react").RefObject<HTMLDivElement | null>;
+  hi: number;
+  history: PageState[][];
+  isMobile: boolean;
+  marqueeIds: string[];
+  mobileBrushDockButtonRef: import("react").RefObject<HTMLButtonElement | null>;
+  mobileKeyboardInset: number;
+  mobileQuickActionsButton: ReactNode;
+  mobileSheet: "draw" | "pages" | "props" | "brushes" | null;
+  postCorrection: number;
+  preserveCorners: boolean;
+  pressureCurve: number;
+  quickActionsOpen: boolean;
+  savedBrushes: StudioSavedBrush[];
+  selected: El | null;
+  setBrushDynamics: import("react").Dispatch<import("react").SetStateAction<NormalizedStudioBrushDynamicsSettings>>;
+  setBrushOpacity: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setColor: import("react").Dispatch<import("react").SetStateAction<string>>;
+  setDrawMode: import("react").Dispatch<import("react").SetStateAction<DrawMode>>;
+  setDrawShape: import("react").Dispatch<import("react").SetStateAction<DrawShapeKind>>;
+  setMarqueeIds: import("react").Dispatch<import("react").SetStateAction<string[]>>;
+  setMenu: import("react").Dispatch<import("react").SetStateAction<StudioMenu | null>>;
+  setMobileSheet: import("react").Dispatch<import("react").SetStateAction<"draw" | "pages" | "props" | "brushes" | null>>;
+  setPostCorrection: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setPreserveCorners: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setPressureCurve: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setQuickStartOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setSavedBrushes: import("react").Dispatch<import("react").SetStateAction<StudioSavedBrush[]>>;
+  setSelectedId: import("react").Dispatch<import("react").SetStateAction<string | null>>;
+  setShapeFill: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setStabilizer: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setStabilizerMode: import("react").Dispatch<import("react").SetStateAction<"standard" | "adaptive" | "precision">>;
+  setStrokeWidth: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setTiltEnabled: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setTipAngle: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setTipRoundness: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setTool: import("react").Dispatch<import("react").SetStateAction<Tool>>;
+  setUseVelocityPressure: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setVelocitySensitivity: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setZoom: import("react").Dispatch<import("react").SetStateAction<number>>;
+  shapeFill: boolean;
+  showMobileHint: boolean;
+  stabilizer: number;
+  stabilizerMode: "standard" | "adaptive" | "precision";
+  strokeWidth: number;
+  tiltEnabled: boolean;
+  tipAngle: number;
+  tipRoundness: number;
+  tool: Tool;
+  useVelocityPressure: boolean;
+  velocitySensitivity: number;
+  workspaceState: StudioWorkspaceState;
+  zoom: number;
+  stableHandlers: StudioMobileEditingDockHandlers;
+}
+
+const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
+  activeSavedBrushId,
+  activeSurfaceReviewLocked,
+  advancedFillActive,
+  advancedFillUnsupportedReason,
+  brush,
+  brushDynamics,
+  brushManagerSheetRef,
+  brushOpacity,
+  collaborationDocumentLocked,
+  color,
+  currentBrushSnapshot,
+  drawMode,
+  drawShape,
+  drawSheetRef,
+  hi,
+  history,
+  isMobile,
+  marqueeIds,
+  mobileBrushDockButtonRef,
+  mobileKeyboardInset,
+  mobileQuickActionsButton,
+  mobileSheet,
+  postCorrection,
+  preserveCorners,
+  pressureCurve,
+  quickActionsOpen,
+  savedBrushes,
+  selected,
+  setBrushDynamics,
+  setBrushOpacity,
+  setColor,
+  setDrawMode,
+  setDrawShape,
+  setMarqueeIds,
+  setMenu,
+  setMobileSheet,
+  setPostCorrection,
+  setPreserveCorners,
+  setPressureCurve,
+  setQuickStartOpen,
+  setSavedBrushes,
+  setSelectedId,
+  setShapeFill,
+  setStabilizer,
+  setStabilizerMode,
+  setStrokeWidth,
+  setTiltEnabled,
+  setTipAngle,
+  setTipRoundness,
+  setTool,
+  setUseVelocityPressure,
+  setVelocitySensitivity,
+  setZoom,
+  shapeFill,
+  showMobileHint,
+  stabilizer,
+  stabilizerMode,
+  strokeWidth,
+  tiltEnabled,
+  tipAngle,
+  tipRoundness,
+  tool,
+  useVelocityPressure,
+  velocitySensitivity,
+  workspaceState,
+  zoom,
+  stableHandlers,
+}: StudioMobileEditingDockProps) {
+  const {
+    applyBuiltInBrushPreset,
+    applyDynamicsPreset,
+    applySavedBrush,
+    dismissMobileHint,
+    duplicateSelected,
+    fitCanvasToWidth,
+    openInspectorRoute,
+    queueBrushDelete,
+    redo,
+    removeSelected,
+    reorder,
+    toggleAdvancedFill,
+    undo,
+  } = stableHandlers;
+  return (
+    <>
+        {/* Photoshop Mobile식 선택 문맥 작업바. 속성 패널까지 왕복하지 않고 가장 빈번한 후속 행동을
+            엄지 영역에 노출한다. 선택이 없거나 시트/첫 안내가 열리면 캔버스를 가리지 않도록 숨긴다. */}
+        {isMobile && !mobileSheet && !quickActionsOpen && !showMobileHint && (selected || marqueeIds.length > 0) ? (
+          <div
+            role="toolbar"
+            aria-label="선택 항목 빠른 작업"
+            className="fixed inset-x-2 bottom-[calc(6.45rem+env(safe-area-inset-bottom))] z-[53] mx-auto flex max-w-[34rem] items-center gap-1 overflow-x-auto rounded-2xl border border-line bg-panel/95 p-1.5 shadow-2xl backdrop-blur [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:hidden"
+            style={{
+              bottom: `calc(6.45rem + env(safe-area-inset-bottom) + ${mobileKeyboardInset}px)`,
+            }}
+          >
+            <div className="w-[4.75rem] shrink-0 px-2">
+              <p className="truncate text-[0.68rem] font-bold text-fg">
+                {marqueeIds.length > 0
+                  ? `${marqueeIds.length}개 선택`
+                  : selected
+                    ? elementLabel(selected)
+                    : "선택"}
+              </p>
+              <p className="text-[0.58rem] font-medium uppercase tracking-wide text-fg-3">빠른 작업</p>
+            </div>
+            <span aria-hidden className="h-8 w-px shrink-0 bg-line" />
+            <StudioContextActionButton
+              icon={SlidersHorizontal}
+              label="속성"
+              onClick={() => {
+                openInspectorRoute({ primary: "properties" });
+                setMobileSheet("props");
+              }}
+            />
+            {selected?.type === "image" && marqueeIds.length === 0 ? (
+              <StudioContextActionButton
+                icon={PaintBucket}
+                label="채우기"
+                active={advancedFillActive}
+                disabled={!advancedFillActive && advancedFillUnsupportedReason !== null}
+                onClick={toggleAdvancedFill}
+              />
+            ) : null}
+            <StudioContextActionButton icon={Copy} label="복제" onClick={duplicateSelected} />
+            {selected && marqueeIds.length === 0 ? (
+              <>
+                <StudioContextActionButton icon={ArrowUpToLine} label="앞으로" onClick={() => reorder("front")} />
+                <StudioContextActionButton icon={ArrowDownToLine} label="뒤로" onClick={() => reorder("back")} />
+              </>
+            ) : null}
+            <StudioContextActionButton icon={Trash2} label="삭제" danger onClick={removeSelected} />
+            <StudioContextActionButton
+              icon={X}
+              label="해제"
+              onClick={() => {
+                setSelectedId(null);
+                setMarqueeIds([]);
+              }}
+            />
+          </div>
+        ) : null}
+
+        {/* 모바일 첫 사용 안내 — 하단 도구막대 + 두 손가락 이동/확대를 한 줄로. 1회만, 시트가 떠 있지 않을 때만. */}
+        {showMobileHint && !mobileSheet && !quickActionsOpen && (
+          <div
+            role="status"
+            className="fixed inset-x-3 bottom-[calc(7rem+env(safe-area-inset-bottom))] z-[53] mx-auto flex max-w-[32rem] items-start gap-2.5 rounded-2xl border border-accent/30 bg-panel/95 p-3 shadow-2xl backdrop-blur motion-safe:animate-hud-in lg:hidden"
+            style={{
+              bottom: `calc(7rem + env(safe-area-inset-bottom) + ${mobileKeyboardInset}px)`,
+            }}
+          >
+            <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent">
+              <Hand size={15} aria-hidden />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[0.8rem] font-semibold text-fg">한 손으로 그려보세요</p>
+              <p className="mt-0.5 text-[0.72rem] leading-snug text-fg-3">
+                아래 막대에서 <span className="font-medium text-fg-2">펜·지우개·도형</span>을 고르고,{" "}
+                <span className="font-medium text-fg-2">브러시</span>를 눌러 굵기·색을 바꿔요. 두 손가락으로
+                이동·확대하고, 짧게 두 손가락 톡은 되돌리기·세 손가락 톡은 다시 실행이에요.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={dismissMobileHint}
+              className="grid size-7 shrink-0 place-items-center rounded-lg text-fg-3 hover:bg-raised"
+              aria-label="안내 닫기"
+            >
+              <X size={15} aria-hidden />
+            </button>
+          </div>
+        )}
+
+        {/* 모바일 전용 브러시 관리자 — 일반 속성 패널을 거치지 않고 저장·고정·복제·내보내기에 바로 접근한다. */}
+        {isMobile && mobileSheet === "brushes" ? (
+          <div
+            ref={brushManagerSheetRef}
+            role="dialog"
+            aria-modal="true"
+            data-studio-mobile-sheet="true"
+            aria-label="내 브러시 관리"
+            data-studio-shortcut-boundary="true"
+            className="fixed inset-x-0 z-50 mx-auto max-w-[34rem] overflow-y-auto overscroll-contain rounded-t-3xl border border-line bg-panel px-3 pb-[calc(7rem+env(safe-area-inset-bottom))] shadow-2xl lg:hidden"
+            style={{
+              bottom: mobileKeyboardInset,
+              maxHeight: `calc(100dvh - 1rem - ${mobileKeyboardInset}px)`,
+            }}
+          >
+            <div className="sticky top-0 z-10 -mx-3 mb-2 flex min-h-14 items-center justify-between border-b border-line bg-panel/95 px-3 backdrop-blur">
+              <div>
+                <p className="text-sm font-bold text-fg">내 브러시 관리</p>
+                <p className="text-[0.68rem] text-fg-3">저장·고정·복제·이름 변경·내보내기</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMobileSheet("draw")}
+                className="grid size-11 place-items-center rounded-xl text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                aria-label="브러시 관리 닫기"
+                data-autofocus
+              >
+                <X size={18} aria-hidden />
+              </button>
+            </div>
+            <Suspense fallback={<p className="py-6 text-center text-xs text-fg-3">브러시를 불러오는 중…</p>}>
+              <StudioBrushLibraryPanel
+                currentSnapshot={currentBrushSnapshot}
+                brushes={savedBrushes}
+                activeBrushId={activeSavedBrushId}
+                onBrushesChange={setSavedBrushes}
+                onApplyBrush={applySavedBrush}
+                onBrushDeleted={queueBrushDelete}
+              />
+            </Suspense>
+          </div>
+        ) : null}
+
+        {/* 모바일 브러시 설정 시트 — 드로잉 도크 바로 위에 떠서 도구를 보며 굵기·색·프리셋·도형을 조절한다.
+            도크(z-55)는 가리지 않게 그 위쪽에 앉히고, 캔버스는 계속 보이게 반투명 배경. 데스크톱엔 인라인 브러시 바가 있으므로 모바일 전용. */}
+        {isMobile && (
+          <div
+            ref={drawSheetRef}
+            role="dialog"
+            aria-label="브러시 설정"
+            aria-modal={false}
+            className={cn(
+              "fixed inset-x-0 bottom-[calc(7rem+env(safe-area-inset-bottom))] z-[54] mx-auto max-w-[34rem] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel/95 p-3 shadow-2xl backdrop-blur transition-all duration-200 ease-out lg:hidden",
+              mobileSheet === "draw"
+                ? "pointer-events-auto translate-y-0 opacity-100"
+                : "pointer-events-none translate-y-3 opacity-0"
+            )}
+            inert={mobileSheet === "draw" ? undefined : true}
+            style={{
+              bottom: `calc(7rem + env(safe-area-inset-bottom) + ${mobileKeyboardInset}px)`,
+              maxHeight: `min(56dvh, calc(100dvh - 8rem - env(safe-area-inset-bottom) - ${mobileKeyboardInset}px))`,
+            }}
+          >
+            <div className="sticky -top-3 z-10 -mx-3 -mt-3 mb-2 flex min-h-14 items-center justify-between border-b border-line/70 bg-panel/95 px-3 backdrop-blur">
+              <p className="text-sm font-semibold text-fg">
+                {drawMode === "eraser" ? "지우개" : drawMode === "shape" ? "도형" : "브러시"} 설정
+              </p>
+              <button
+                type="button"
+                onClick={() => setMobileSheet(null)}
+                className="grid size-11 place-items-center rounded-xl text-fg-3 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                aria-label="브러시 설정 닫기"
+                data-autofocus
+              >
+                <X size={16} aria-hidden />
+              </button>
+            </div>
+
+            {/* 모드 전환 — icon-first (펜↔지우개↔도형) */}
+            <div className="mb-2.5 grid grid-cols-3 gap-1 rounded-xl border border-line bg-card/60 p-1" role="group" aria-label="그리기 모드">
+              {([
+                { v: "pen" as const, label: "펜", icon: Pencil },
+                { v: "eraser" as const, label: "지우개", icon: Eraser },
+                { v: "shape" as const, label: "도형", icon: Shapes },
+              ]).map((m) => {
+                const Icon = m.icon;
+                const active = drawMode === m.v;
+                return (
+                  <button
+                    key={m.v}
+                    type="button"
+                    onClick={() => {
+                      setTool("draw");
+                      setDrawMode(m.v);
+                    }}
+                    aria-pressed={active}
+                    aria-label={m.label}
+                    title={m.label}
+                    className={cn(
+                      "grid min-h-11 place-items-center rounded-lg transition-colors",
+                      active ? "bg-accent text-on-accent shadow-sm" : "text-fg-2 hover:bg-raised"
+                    )}
+                  >
+                    <Icon size={18} strokeWidth={1.75} aria-hidden />
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* 펜 프리셋 — 가로 스크롤 칩(굵기·투명도·색 기본값 적용) */}
+            {drawMode === "pen" && (
+              <>
+                <StudioSavedBrushShelf
+                  brushes={savedBrushes}
+                  activeBrushId={activeSavedBrushId}
+                  onApply={applySavedBrush}
+                  onManage={() => setMobileSheet("brushes")}
+                />
+                <div className="mb-2.5">
+                  <p className="mb-1 text-[0.7rem] font-medium text-fg-3">기본 브러시</p>
+                  <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    {BRUSH_PRESETS.map((p) => {
+                      const active = brush === p.id;
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => applyBuiltInBrushPreset(p)}
+                          aria-pressed={active}
+                          className={cn(
+                            "min-h-[2.75rem] shrink-0 whitespace-nowrap rounded-lg border px-3 text-xs font-semibold transition-colors",
+                            active ? "border-accent bg-accent-soft text-fg" : "border-line bg-card text-fg-2 hover:bg-raised"
+                          )}
+                        >
+                          {p.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* 색상 — 지우개에선 의미 없으니 숨김 */}
+            {drawMode !== "eraser" && (
+              <div className="mb-2.5">
+                <p className="mb-1 text-[0.7rem] font-medium text-fg-3">색상</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  {DRAW_COLOR_SWATCHES.map((swatch) => (
+                    <button
+                      key={swatch}
+                      type="button"
+                      onClick={() => setColor(swatch)}
+                      aria-label={`색상 ${swatch}`}
+                      aria-pressed={color.toLowerCase() === swatch.toLowerCase()}
+                      className={cn(
+                        "size-11 rounded-xl transition-transform active:scale-95",
+                        color.toLowerCase() === swatch.toLowerCase()
+                          ? "ring-2 ring-accent ring-offset-2 ring-offset-panel"
+                          : "border border-line/60"
+                      )}
+                      style={{ background: swatch }}
+                    />
+                  ))}
+                  <label
+                    className="relative grid size-11 cursor-pointer place-items-center overflow-hidden rounded-xl border border-line shadow-sm"
+                    title="사용자 정의 색상"
+                    style={{ background: color }}
+                  >
+                    <input
+                      type="color"
+                      value={color}
+                      onChange={(e) => setColor(e.target.value)}
+                      aria-label="사용자 정의 브러시 색상"
+                      className="absolute inset-0 size-full cursor-pointer opacity-0"
+                    />
+                    <Palette size={14} className="text-white mix-blend-difference" aria-hidden />
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* 굵기 + 투명도 — 큰 터치 슬라이더 */}
+            <div className="space-y-2.5">
+              <div>
+                <span className="mb-1 flex items-center justify-between text-[0.7rem] font-medium text-fg-3">
+                  <span>{drawMode === "eraser" ? "지우개 굵기" : "굵기"}</span>
+                  <span className="tabular-nums text-fg-2">{strokeWidth}px</span>
+                </span>
+                <div className="grid grid-cols-[minmax(0,1fr)_4.5rem_2.5rem] items-center gap-2">
+                  <input
+                    type="range"
+                    min={1}
+                    max={80}
+                    value={strokeWidth}
+                    onChange={(e) => setStrokeWidth(Number(e.target.value))}
+                    className="h-11 w-full accent-accent"
+                    aria-label="브러시 굵기 슬라이더"
+                  />
+                  <label className="sr-only" htmlFor="mobile-brush-width">브러시 굵기 숫자</label>
+                  <input
+                    id="mobile-brush-width"
+                    type="number"
+                    min={1}
+                    max={80}
+                    inputMode="numeric"
+                    value={strokeWidth}
+                    onChange={(event) =>
+                      setStrokeWidth(Math.min(80, Math.max(1, Number(event.target.value) || 1)))
+                    }
+                    className="min-h-11 w-full rounded-lg border border-line bg-card px-2 text-center text-xs tabular-nums text-fg outline-none focus:border-accent"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setStrokeWidth(drawMode === "eraser" ? 18 : 4)}
+                    className="min-h-11 rounded-lg border border-line bg-card text-[0.65rem] font-semibold text-fg-3 hover:bg-raised"
+                    aria-label="브러시 굵기 기본값으로 초기화"
+                  >
+                    초기화
+                  </button>
+                </div>
+              </div>
+              {drawMode !== "eraser" && (
+                <div>
+                  <span className="mb-1 flex items-center justify-between text-[0.7rem] font-medium text-fg-3">
+                    <span>투명도</span>
+                    <span className="tabular-nums text-fg-2">{Math.round(brushOpacity * 100)}%</span>
+                  </span>
+                  <div className="grid grid-cols-[minmax(0,1fr)_4.5rem_2.5rem] items-center gap-2">
+                    <input
+                      type="range"
+                      min={10}
+                      max={100}
+                      step={5}
+                      value={Math.round(brushOpacity * 100)}
+                      onChange={(e) => setBrushOpacity(Number(e.target.value) / 100)}
+                      className="h-11 w-full accent-accent"
+                      aria-label="브러시 투명도 슬라이더"
+                    />
+                    <label className="sr-only" htmlFor="mobile-brush-opacity">브러시 투명도 숫자</label>
+                    <input
+                      id="mobile-brush-opacity"
+                      type="number"
+                      min={10}
+                      max={100}
+                      step={5}
+                      inputMode="numeric"
+                      value={Math.round(brushOpacity * 100)}
+                      onChange={(event) =>
+                        setBrushOpacity(Math.min(100, Math.max(10, Number(event.target.value) || 10)) / 100)
+                      }
+                      className="min-h-11 w-full rounded-lg border border-line bg-card px-2 text-center text-xs tabular-nums text-fg outline-none focus:border-accent"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setBrushOpacity(1)}
+                      className="min-h-11 rounded-lg border border-line bg-card text-[0.65rem] font-semibold text-fg-3 hover:bg-raised"
+                      aria-label="브러시 투명도 100퍼센트로 초기화"
+                    >
+                      초기화
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {drawMode !== "shape" ? (
+              <>
+                <StudioLineCorrectionControls
+                  density="touch"
+                  stabilizer={stabilizer}
+                  onStabilizerChange={setStabilizer}
+                  mode={stabilizerMode}
+                  onModeChange={setStabilizerMode}
+                  postCorrection={postCorrection}
+                  onPostCorrectionChange={setPostCorrection}
+                  preserveCorners={preserveCorners}
+                  onPreserveCornersChange={setPreserveCorners}
+                />
+                <Suspense fallback={<div className="h-48 animate-pulse rounded-xl bg-raised/35 motion-reduce:animate-none" aria-hidden />}>
+                  <StudioBrushStudio
+                    density="touch"
+                    brushId={brush}
+                    strokeWidth={strokeWidth}
+                    color={color}
+                    settings={brushDynamics}
+                    onSettingsChange={setBrushDynamics}
+                    onSelectDynamicsPreset={applyDynamicsPreset}
+                    useVelocityPressure={useVelocityPressure}
+                    onUseVelocityPressureChange={setUseVelocityPressure}
+                    velocitySensitivity={velocitySensitivity}
+                    onVelocitySensitivityChange={setVelocitySensitivity}
+                    pressureCurve={pressureCurve}
+                    onPressureCurveChange={setPressureCurve}
+                    tiltEnabled={tiltEnabled}
+                    onTiltEnabledChange={setTiltEnabled}
+                    tipAngle={tipAngle}
+                    onTipAngleChange={setTipAngle}
+                    tipRoundness={tipRoundness}
+                    onTipRoundnessChange={setTipRoundness}
+                  />
+                </Suspense>
+              </>
+            ) : null}
+
+            {/* 도형 모양 + 채우기 — Photopea/Canva glyph strip (mobile touch) */}
+            {drawMode === "shape" && (
+              <div className="mt-2.5 border-t border-line/60 pt-2.5">
+                <p className="mb-1.5 text-[0.7rem] font-semibold uppercase tracking-wider text-fg-3">
+                  도형 모양
+                </p>
+                <Suspense fallback={<div className="h-24 rounded-xl bg-raised/40" aria-hidden />}>
+                  <StudioShapePickerGrid
+                    activeKind={drawShape}
+                    filled={shapeFill}
+                    onSelect={(kind) => {
+                      setTool("draw");
+                      setDrawMode("shape");
+                      setDrawShape(kind as DrawShapeKind);
+                    }}
+                    kinds={STUDIO_DRAW_SHAPE_PICKER_KINDS}
+                    className="grid-cols-4"
+                  />
+                </Suspense>
+                <button
+                  type="button"
+                  aria-pressed={shapeFill}
+                  disabled={drawShape === "line" || drawShape === "arrow"}
+                  title="채우기"
+                  aria-label="도형 채우기"
+                  onClick={() => setShapeFill((v) => !v)}
+                  className={cn(
+                    "mt-2 grid min-h-11 w-full place-items-center rounded-lg border transition-colors",
+                    drawShape === "line" || drawShape === "arrow"
+                      ? "cursor-not-allowed border-line bg-card text-fg-3 opacity-50"
+                      : shapeFill
+                        ? "border-accent/60 bg-accent-soft/50 text-accent"
+                        : "border-line bg-card text-fg-2"
+                  )}
+                >
+                  <PaintBucket size={18} aria-hidden />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 모바일 하단 드로잉 도크 — 한 손으로 그리기 위한 핵심 도구를 thumb 사정권에.
+            1행: 그리기 도구(선택·펜·지우개·도형·실행취소·다시·브러시). 2행: 보조 내비(페이지·추가·속성·줌). */}
+        {isMobile && (
+          <nav
+            aria-label="스튜디오 모바일 도구막대"
+            className="fixed inset-x-0 bottom-0 z-[55] flex flex-col gap-1 border-t border-line bg-panel/95 pb-[max(0.35rem,env(safe-area-inset-bottom))] pl-[max(0.375rem,env(safe-area-inset-left))] pr-[max(0.375rem,env(safe-area-inset-right))] pt-1.5 backdrop-blur lg:hidden"
+            style={{ bottom: mobileKeyboardInset }}
+          >
+            {/* 1행: 핵심 드로잉 도구 — 선택 | 펜/지우개/도형 | 히스토리 | 브러시 (CSP/Procreate 도크 IA) */}
+            <div className="flex items-stretch gap-1" role="toolbar" aria-label="드로잉 도구">
+              <StudioDockButton
+                icon={MousePointer2}
+                label="선택"
+                hintDescription="요소를 선택해 이동·크기 조절·정렬하고 속성 패널에서 세부 값을 편집합니다."
+                hintShortcut="V"
+                active={tool === "select"}
+                onClick={() => {
+                  setTool("select");
+                  setMenu(null);
+                  setMobileSheet(null);
+                }}
+                aria-pressed={tool === "select"}
+              />
+              <span aria-hidden className="my-1 w-px self-stretch bg-line/70" />
+              <StudioDockButton
+                icon={Pencil}
+                label="펜"
+                hintDescription="필압과 보정이 적용되는 자유선을 그립니다. 다시 누르면 브러시 설정이 열립니다."
+                hintShortcut="B"
+                active={tool === "draw" && drawMode === "pen"}
+                disabled={activeSurfaceReviewLocked}
+                title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 펜을 사용할 수 있어요" : "펜 (B)"}
+                onClick={() => {
+                  if (tool === "draw" && drawMode === "pen") {
+                    setMobileSheet((s) => (s === "draw" ? null : "draw"));
+                    return;
+                  }
+                  setTool("draw");
+                  setDrawMode("pen");
+                  setMenu(null);
+                  setMobileSheet(null);
+                }}
+                aria-pressed={tool === "draw" && drawMode === "pen"}
+              />
+              <StudioDockButton
+                icon={Eraser}
+                label="지우개"
+                hintDescription="현재 레이어의 획을 지웁니다. 브러시 크기와 불투명도 설정을 그대로 활용합니다."
+                hintShortcut="E"
+                active={tool === "draw" && drawMode === "eraser"}
+                disabled={activeSurfaceReviewLocked}
+                title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 지우개를 사용할 수 있어요" : "지우개 (E)"}
+                onClick={() => {
+                  setTool("draw");
+                  setDrawMode("eraser");
+                  setMenu(null);
+                  setMobileSheet(null);
+                }}
+                aria-pressed={tool === "draw" && drawMode === "eraser"}
+              />
+              <StudioDockButton
+                icon={Square}
+                label="도형"
+                hintDescription="선·사각형·타원·화살표를 정돈된 벡터 도형으로 빠르게 배치합니다."
+                active={tool === "draw" && drawMode === "shape"}
+                disabled={activeSurfaceReviewLocked}
+                title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 도형을 사용할 수 있어요" : "도형"}
+                onClick={() => {
+                  if (tool === "draw" && drawMode === "shape") {
+                    setMobileSheet((s) => (s === "draw" ? null : "draw"));
+                    return;
+                  }
+                  setTool("draw");
+                  setDrawMode("shape");
+                  setMenu(null);
+                  setMobileSheet(null);
+                }}
+                aria-pressed={tool === "draw" && drawMode === "shape"}
+              />
+              <span aria-hidden className="my-1 w-px self-stretch bg-line/70" />
+              <StudioDockButton
+                icon={Undo2}
+                label="되돌리기"
+                hintDescription="마지막 편집을 한 단계 되돌립니다. 공동 작업 변경 이력과 함께 안전하게 이동합니다."
+                disabled={hi === 0 || collaborationDocumentLocked}
+                hintUnavailableReason={
+                  collaborationDocumentLocked
+                    ? "공동 작업 문서 잠금을 해제한 뒤 편집 기록을 이동할 수 있어요."
+                    : hi === 0
+                      ? "아직 되돌릴 편집 기록이 없어요."
+                      : undefined
+                }
+                onClick={undo}
+                aria-label="실행취소"
+              />
+              <StudioDockButton
+                icon={Redo2}
+                label="다시"
+                hintDescription="되돌린 편집을 한 단계 다시 적용합니다."
+                disabled={hi >= history.length - 1 || collaborationDocumentLocked}
+                hintUnavailableReason={
+                  collaborationDocumentLocked
+                    ? "공동 작업 문서 잠금을 해제한 뒤 편집 기록을 이동할 수 있어요."
+                    : hi >= history.length - 1
+                      ? "다시 적용할 편집 기록이 없어요."
+                      : undefined
+                }
+                onClick={redo}
+                aria-label="다시실행"
+              />
+              <span aria-hidden className="my-1 w-px self-stretch bg-line/70" />
+              <StudioDockButton
+                ref={mobileBrushDockButtonRef}
+                label="브러시"
+                hintDescription="굵기·불투명도·색·보정·프리셋을 한곳에서 조절합니다."
+                active={mobileSheet === "draw" || mobileSheet === "brushes"}
+                aria-pressed={mobileSheet === "draw" || mobileSheet === "brushes"}
+                aria-label="브러시 설정 (굵기·색·프리셋)"
+                onPointerEnter={() => void loadStudioBrushStudio()}
+                onFocus={() => void loadStudioBrushStudio()}
+                onClick={() => {
+                  void loadStudioBrushStudio();
+                  if (tool !== "draw") {
+                    setTool("draw");
+                    setDrawMode("pen");
+                    setMenu(null);
+                  }
+                  setMobileSheet((s) => (s === "draw" ? null : "draw"));
+                }}
+                swatch={(
+                  <span
+                    aria-hidden
+                    className="size-[19px] rounded-full border-2 border-current"
+                    style={drawMode === "eraser" ? undefined : { backgroundColor: color, borderColor: "oklch(0.95 0.01 85 / 0.45)" }}
+                  />
+                )}
+              />
+            </div>
+
+            {/* 2행: 보조 내비 — 페이지·추가·6방향 퀵 메뉴·속성(레이어)·줌 */}
+            <div className="flex items-stretch gap-0.5 border-t border-line/60 pt-1" role="toolbar" aria-label="작업 공간">
+              {workspaceState.mobileControlSide === "left"
+                ? mobileQuickActionsButton
+                : null}
+              <StudioDockNavButton
+                icon={Files}
+                label="페이지"
+                active={mobileSheet === "pages"}
+                aria-pressed={mobileSheet === "pages"}
+                onClick={() => setMobileSheet((s) => (s === "pages" ? null : "pages"))}
+              />
+              <StudioDockNavButton
+                icon={Plus}
+                label="추가"
+                onClick={() => {
+                  setMobileSheet(null);
+                  setQuickStartOpen(true);
+                }}
+              />
+              <StudioDockNavButton
+                icon={Layers}
+                label="작업"
+                active={mobileSheet === "props"}
+                aria-pressed={mobileSheet === "props"}
+                onClick={() => {
+                  if (mobileSheet === "props") {
+                    setMobileSheet(null);
+                    return;
+                  }
+                  openInspectorRoute({ primary: selected ? "properties" : "layers" });
+                  setMobileSheet("props");
+                }}
+              />
+              <div className="flex w-[8.25rem] flex-none items-center justify-center">
+                <button
+                  type="button"
+                  onClick={() => setZoom((z) => clampZoom(z - 0.25))}
+                  disabled={zoom <= ZOOM_MIN}
+                  className="grid size-11 place-items-center rounded-lg text-fg-2 transition-colors hover:bg-raised disabled:opacity-40"
+                  aria-label="축소"
+                >
+                  <Minus size={16} aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  onClick={fitCanvasToWidth}
+                  className="min-h-11 min-w-11 flex-1 rounded-lg px-1 py-2 text-center text-[0.7rem] font-semibold tabular-nums text-fg transition-colors hover:bg-raised"
+                  aria-label="화면 폭에 맞춤"
+                >
+                  {Math.round(zoom * 100)}%
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setZoom((z) => clampZoom(z + 0.25))}
+                  disabled={zoom >= ZOOM_MAX}
+                  className="grid size-11 place-items-center rounded-lg text-fg-2 transition-colors hover:bg-raised disabled:opacity-40"
+                  aria-label="확대"
+                >
+                  <Plus size={16} aria-hidden />
+                </button>
+              </div>
+              {workspaceState.mobileControlSide === "right"
+                ? mobileQuickActionsButton
+                : null}
+            </div>
+          </nav>
+        )}
+    </>
+  );
+});
+
+interface StudioPageListPaneHandlers {
+  addPage: () => void;
+  applyBgToAll: () => void;
+  applyGradeToAll: () => void;
+  clearPageFor: (pageId: string) => void;
+  commitPageMeta: (pageId: string, patch: { name?: string | null; note?: string | null; }) => void;
+  deletePage: (pageId: string) => void;
+  duplicatePage: (pageId: string) => void;
+  duplicatePageMirrored: (pageId: string) => void;
+  insertPageAfter: (pageId: string) => void;
+  insertPageBefore: (pageId: string) => void;
+  movePageDown: (pageId: string) => void;
+  movePageToBottom: (pageId: string) => void;
+  movePageToTop: (pageId: string) => void;
+  movePageUp: (pageId: string) => void;
+}
+
+interface StudioPageListPaneProps {
+  collaborationDocumentLocked: boolean;
+  collaborationLockMessage: () => string;
+  composeWorkAssetPreviewPage: (page: PageState) => PageState;
+  currentPageId: string;
+  isMobile: boolean;
+  leftResize: import("@/components/use-resizable").Resizable;
+  master: DocumentMaster<El>;
+  masterEditMode: boolean;
+  masterPanelOpen: boolean;
+  metaEditPageId: string | null;
+  mobileKeyboardInset: number;
+  mobileSheet: "pages" | "props" | "draw" | "brushes" | null;
+  pageDnd: import("./StudioPageThumbnails").StudioPageDnd;
+  pages: PageState[];
+  pagesSheetRef: import("react").RefObject<HTMLDivElement | null>;
+  presentationPanelsHidden: boolean;
+  setCurrentPageId: import("react").Dispatch<import("react").SetStateAction<string>>;
+  setLeftPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setMasterPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setMetaEditPageId: import("react").Dispatch<import("react").SetStateAction<string | null>>;
+  setMobileSheet: import("react").Dispatch<import("react").SetStateAction<"pages" | "props" | "draw" | "brushes" | null>>;
+  visibleLeftPanelOpen: boolean;
+  stableHandlers: StudioPageListPaneHandlers;
+}
+
+const StudioPageListPane = memo(function StudioPageListPane({
+  collaborationDocumentLocked,
+  collaborationLockMessage,
+  composeWorkAssetPreviewPage,
+  currentPageId,
+  isMobile,
+  leftResize,
+  master,
+  masterEditMode,
+  masterPanelOpen,
+  metaEditPageId,
+  mobileKeyboardInset,
+  mobileSheet,
+  pageDnd,
+  pages,
+  pagesSheetRef,
+  presentationPanelsHidden,
+  setCurrentPageId,
+  setLeftPanelOpen,
+  setMasterPanelOpen,
+  setMetaEditPageId,
+  setMobileSheet,
+  visibleLeftPanelOpen,
+  stableHandlers,
+}: StudioPageListPaneProps) {
+  const {
+    addPage,
+    applyBgToAll,
+    applyGradeToAll,
+    clearPageFor,
+    commitPageMeta,
+    deletePage,
+    duplicatePage,
+    duplicatePageMirrored,
+    insertPageAfter,
+    insertPageBefore,
+    movePageDown,
+    movePageToBottom,
+    movePageToTop,
+    movePageUp,
+  } = stableHandlers;
+  return (
+    <>
+        {!visibleLeftPanelOpen && !presentationPanelsHidden && (
+          <StudioEdgeRailButton
+            side="left"
+            label="페이지"
+            icon={LayoutTemplate}
+            onClick={() => setLeftPanelOpen(true)}
+            title="페이지 목록 펼치기"
+          />
+        )}
+        <div
+          ref={pagesSheetRef}
+          role={isMobile ? "dialog" : undefined}
+          aria-modal={isMobile && mobileSheet === "pages" ? true : undefined}
+          data-studio-mobile-sheet={isMobile && mobileSheet === "pages" ? "true" : undefined}
+          aria-label={isMobile ? "페이지 목록" : undefined}
+          inert={isMobile && mobileSheet !== "pages" ? true : undefined}
+          className={cn(
+            "flex flex-col gap-1.5 border border-line p-2",
+            // 모바일: 하단에서 올라오는 바텀시트
+            "fixed inset-x-0 bottom-0 z-50 max-h-[72vh] overflow-y-auto rounded-t-3xl bg-panel pb-[calc(7rem+env(safe-area-inset-bottom))] shadow-2xl transition-transform duration-300 ease-out",
+            // 데스크톱: 엣지 도크(라운드·여백 최소, 캔버스 폭 최대)
+            "lg:static lg:z-auto lg:max-h-none lg:min-h-0 lg:overflow-hidden lg:rounded-none lg:border-y-0 lg:border-l-0 lg:bg-panel/50 lg:pb-2 lg:shadow-none lg:transition-none lg:translate-y-0",
+            mobileSheet === "pages" ? "translate-y-0" : "translate-y-full",
+            !visibleLeftPanelOpen && "lg:hidden"
+          )}
+          style={
+            isMobile
+              ? { bottom: mobileKeyboardInset }
+              : { width: leftResize.width, minWidth: 128 }
+          }
+        >
+          {/* 모바일 시트 손잡이 */}
+          <div className="mx-auto -mt-1 mb-1 h-1 w-10 shrink-0 rounded-full bg-line lg:hidden" />
+          <div className="flex flex-wrap items-center justify-between gap-1 border-b border-line/50 pb-1.5">
+            <span className="flex items-center gap-1 text-[0.7rem] font-bold text-fg-2">
+              <button
+                type="button"
+                onClick={() => setLeftPanelOpen(false)}
+                className="hidden text-fg-3 transition-colors hover:text-fg lg:inline-flex"
+                title="페이지 목록 접기"
+              >
+                <ChevronLeft size={13} />
+              </button>
+              페이지
+              <button
+                type="button"
+                onClick={() => setMobileSheet(null)}
+                className="ml-1 rounded p-0.5 text-fg-3 hover:bg-raised lg:hidden"
+                aria-label="페이지 시트 닫기"
+                data-autofocus
+              >
+                <X size={14} />
+              </button>
+            </span>
+            <button
+              type="button"
+              data-testid="studio-add-page"
+              onClick={addPage}
+              className="flex items-center gap-1 rounded bg-accent px-2 py-1 text-[10px] font-semibold text-on-accent hover:bg-accent-hover"
+            >
+              <Plus size={10} /> 추가
+            </button>
+            <button
+              type="button"
+              onClick={applyGradeToAll}
+              className="rounded border border-line px-1.5 py-0.5 text-[10px] text-fg-3 hover:bg-raised"
+              title="현재 페이지의 색보정을 모든 페이지에 적용"
+            >
+              그레이드 전체
+            </button>
+            <button
+              type="button"
+              onClick={applyBgToAll}
+              className="rounded border border-line px-1.5 py-0.5 text-[10px] text-fg-3 hover:bg-raised"
+              title="현재 페이지의 배경을 모든 페이지에 적용"
+            >
+              배경 전체
+            </button>
+            <button
+              type="button"
+              onClick={() => setMasterPanelOpen((v) => !v)}
+              disabled={collaborationDocumentLocked}
+              aria-pressed={masterPanelOpen}
+              className={cn(
+                "rounded border px-1.5 py-0.5 text-[10px] transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                masterEditMode
+                  ? "border-accent bg-accent-soft/50 text-accent"
+                  : masterPanelOpen
+                    ? "border-accent/60 text-fg-2 hover:bg-raised"
+                    : "border-line text-fg-3 hover:bg-raised"
+              )}
+              title={collaborationDocumentLocked ? collaborationLockMessage() : "마스터 페이지(모든 페이지 공통 요소) 관리"}
+            >
+              마스터{master.elements.length > 0 ? ` ${master.elements.length}` : ""}
+            </button>
+          </div>
+          <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto max-h-[56vh] pr-0.5 lg:max-h-none">
+            {pages.map((p, idx) => {
+              const isActive = p.id === currentPageId;
+              const dropIndicator = pageDnd.indicatorFor(idx);
+              return (
+                <div
+                  key={p.id}
+                  data-testid="studio-page-item"
+                  {...pageDnd.itemProps(idx)}
+                  title="드래그하여 순서 변경"
+                  className={cn(
+                    "relative flex w-full flex-col gap-0.5 rounded-lg border p-1.5 transition-all hover:bg-raised/50",
+                    isActive ? "border-accent bg-accent-soft/40" : "border-line bg-card",
+                    pageDnd.dragIndex === idx && "opacity-50"
+                  )}
+                >
+                  {/* 페이지 선택 — 접근성: 카드를 role=button 으로 만들면 내부 액션 버튼(편집·이동)이
+                      중첩 인터랙티브가 되어 위반이므로, 카드 전체를 덮는 "늘린 버튼"으로 선택을 처리하고
+                      액션 버튼은 z-index 로 그 위에 띄운다. 카드 div 는 드래그 정렬(draggable) 컨테이너로 유지. */}
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPageId(p.id)}
+                    aria-label={`${pageDisplayName(p, idx)} 선택`}
+                    aria-pressed={isActive}
+                    className="absolute inset-0 z-10 cursor-pointer rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  />
+                  {/* 드롭 삽입선(PPT식) — 카드 위/아래 절반 판정 결과 시각화. overflow 클리핑 없게 카드 가장자리에 겹쳐 그린다. */}
+                  {dropIndicator && (
+                    <span
+                      aria-hidden
+                      className={cn(
+                        "pointer-events-none absolute inset-x-1 z-10 h-[3px] rounded-full bg-accent",
+                        dropIndicator === "before" ? "top-0" : "bottom-0"
+                      )}
+                    />
+                  )}
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="min-w-0 truncate text-[10px] font-bold text-fg-2" title={pageDisplayName(p, idx)}>
+                      {pageDisplayName(p, idx)}
+                    </span>
+                    {shotTagBadgeText(p) ? (
+                      <span
+                        className="shrink-0 rounded bg-accent-soft px-1 py-0.5 text-[8px] font-semibold text-accent"
+                        title={shotTagBadgeTitle(p) ?? undefined}
+                      >
+                        {shotTagBadgeText(p)}
+                      </span>
+                    ) : null}
+                    {/* 액션 버튼은 늘린 선택 버튼(z-10) 위로 띄운다. */}
+                    <div className="relative z-20 flex items-center gap-0.5">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setMetaEditPageId((v) => (v === p.id ? null : p.id));
+                        }}
+                        className={cn("rounded p-0.5 hover:bg-raised", metaEditPageId === p.id ? "text-accent" : "text-fg-3")}
+                        title="이름·콘티 메모 편집"
+                        aria-label={`${pageDisplayName(p, idx)} 이름·콘티 메모 편집`}
+                        aria-expanded={metaEditPageId === p.id}
+                      >
+                        <Pencil size={10} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          movePageUp(p.id);
+                        }}
+                        disabled={idx === 0}
+                        className="rounded p-0.5 text-fg-3 hover:bg-raised disabled:opacity-30"
+                        title="위로 이동"
+                        aria-label="위로 이동"
+                      >
+                        <ChevronUp size={10} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          movePageDown(p.id);
+                        }}
+                        disabled={idx === pages.length - 1}
+                        className="rounded p-0.5 text-fg-3 hover:bg-raised disabled:opacity-30"
+                        title="아래로 이동"
+                        aria-label="아래로 이동"
+                      >
+                        <ChevronDown size={10} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          movePageToTop(p.id);
+                        }}
+                        disabled={idx === 0}
+                        className="rounded p-0.5 text-fg-3 hover:bg-raised disabled:opacity-30"
+                        title="맨 위로"
+                        aria-label="맨 위로 이동"
+                      >
+                        <span aria-hidden="true">⇧</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          movePageToBottom(p.id);
+                        }}
+                        disabled={idx === pages.length - 1}
+                        className="rounded p-0.5 text-fg-3 hover:bg-raised disabled:opacity-30"
+                        title="맨 아래로"
+                        aria-label="맨 아래로 이동"
+                      >
+                        <span aria-hidden="true">⇩</span>
+                      </button>
+                    </div>
+                  </div>
+                  {/* 실내용 미니 썸네일 — 마스터 요소를 페이지 요소 아래에 합성해 경량 SVG 프록시로 축소 렌더.
+                      마스터 없음/페이지 숨김이면 원본 page 를 동일 참조로 넘겨 RC 메모이제이션을 보존한다. */}
+                  <StudioPageThumbnail page={composeWorkAssetPreviewPage(p)} />
+                  {metaEditPageId === p.id ? (
+                    // 인라인 편집 입력은 늘린 선택 버튼(z-10) 위로 올려 포커스·타이핑을 받게 한다.
+                    <div className="relative z-20 flex flex-col gap-1 pt-1">
+                      <input
+                        // eslint-disable-next-line jsx-a11y/no-autofocus -- 연필 버튼 클릭으로만 열리는 인라인 편집 — 열릴 때 이름란 포커스가 올바른 패턴(기존 텍스트 편집 모달과 동일)
+                        autoFocus
+                        type="text"
+                        defaultValue={p.name ?? ""}
+                        placeholder={autoPageName(idx)}
+                        maxLength={PAGE_NAME_MAX}
+                        aria-label="페이지 이름"
+                        className="w-full rounded border border-line bg-card px-1.5 py-1 text-[10px] font-semibold text-fg placeholder:text-fg-3 focus:border-accent focus:outline-none"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => {
+                          e.stopPropagation();
+                          if (e.key === "Enter") {
+                            commitPageMeta(p.id, { name: e.currentTarget.value });
+                            setMetaEditPageId(null);
+                          } else if (e.key === "Escape") {
+                            setMetaEditPageId(null);
+                          }
+                        }}
+                        onBlur={(e) => commitPageMeta(p.id, { name: e.target.value })}
+                      />
+                      <textarea
+                        rows={2}
+                        defaultValue={p.note ?? ""}
+                        placeholder="콘티 메모 (장면·대사 아이디어)"
+                        maxLength={PAGE_NOTE_MAX}
+                        spellCheck
+                        aria-label="콘티 메모"
+                        className="w-full resize-none rounded border border-line bg-card px-1.5 py-1 text-[9px] leading-tight text-fg placeholder:text-fg-3 focus:border-accent focus:outline-none"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        onBlur={(e) => commitPageMeta(p.id, { note: e.target.value })}
+                      />
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setMetaEditPageId(null);
+                        }}
+                        className="self-end rounded bg-accent px-2 py-0.5 text-[9px] font-semibold text-on-accent hover:bg-accent-hover"
+                      >
+                        완료
+                      </button>
+                    </div>
+                  ) : p.note ? (
+                    <p className="line-clamp-2 whitespace-pre-wrap text-[9px] leading-tight text-fg-3" title={p.note}>
+                      {p.note}
+                    </p>
+                  ) : null}
+                  <div className="flex items-center justify-end gap-1.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        insertPageBefore(p.id);
+                      }}
+                      className="rounded p-0.5 text-fg-3 hover:bg-raised"
+                      title="이 앞에 빈 페이지 삽입"
+                    >
+                      <Plus size={10} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        insertPageAfter(p.id);
+                      }}
+                      className="rounded p-0.5 text-fg-3 hover:bg-raised"
+                      title="이 뒤에 빈 페이지 삽입"
+                    >
+                      <Plus size={10} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        duplicatePage(p.id);
+                      }}
+                      className="rounded p-0.5 text-fg-3 hover:bg-raised"
+                      title="페이지 복제"
+                    >
+                      <Copy size={10} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        duplicatePageMirrored(p.id);
+                      }}
+                      className="rounded p-0.5 text-fg-3 hover:bg-raised"
+                      title="미러 복제 (좌우 반전)"
+                    >
+                      <FlipHorizontal2 size={10} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        clearPageFor(p.id);
+                      }}
+                      className="rounded p-0.5 text-fg-3 hover:bg-raised"
+                      title="이 페이지 내용 비우기"
+                    >
+                      <Eraser size={10} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (pages.length <= 1) return;
+                        if (globalThis.confirm(`${idx + 1}페이지를 삭제할까요?`)) {
+                          deletePage(p.id);
+                        }
+                      }}
+                      disabled={pages.length <= 1}
+                      className="rounded p-0.5 text-bad hover:bg-bad-soft/20 disabled:opacity-30"
+                      title="페이지 삭제"
+                    >
+                      <Trash2 size={10} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 페이지 목록 ↔ 캔버스 너비 스플리터(데스크톱) */}
+        {visibleLeftPanelOpen && (
+          <PanelResizeHandle handleProps={leftResize.handleProps} dragging={leftResize.dragging} label="페이지 목록 너비 조절" />
+        )}
+    </>
+  );
+});
+
+interface StudioOptionsBarsHandlers {
+  announceDrawingShortcut: (message: string) => void;
+  applyBrushSlot: (slot: { brushId: string; strokeWidth: number; brushOpacity: number; }) => void;
+  applyBuiltInBrushPreset: (preset: BrushPreset) => void;
+  disarmAllPixelTools: () => void;
+  duplicateSelected: () => void;
+  openInspectorRoute: (route: StudioInspectorRoute) => void;
+  patchEl: (id: string, patch: Partial<El>) => void;
+  removeSelected: () => void;
+  reorder: (dir: "front" | "back" | "forward" | "backward") => void;
+}
+
+interface StudioOptionsBarsProps {
+  brush: string;
+  brushOpacity: number;
+  brushSlotsState: StudioBrushSlotsState;
+  canvasFlipH: boolean;
+  canvasOnlyMode: boolean;
+  color: string;
+  drawMode: DrawMode;
+  drawShape: DrawShapeKind;
+  isMobile: boolean;
+  leftResize: import("@/components/use-resizable").Resizable;
+  marqueeIds: string[];
+  postCorrection: number;
+  presentationPanelsHidden: boolean;
+  pressureCurve: number;
+  proDrawPrefs: StudioProDrawPrefs;
+  quickShapeActive: boolean;
+  rightResize: import("@/components/use-resizable").Resizable;
+  secondaryColor: string;
+  selected: El | null;
+  selectedId: string | null;
+  setBrushOpacity: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setBrushSlotsState: import("react").Dispatch<import("react").SetStateAction<StudioBrushSlotsState>>;
+  setCanvasFlipH: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setColor: import("react").Dispatch<import("react").SetStateAction<string>>;
+  setDrawMode: import("react").Dispatch<import("react").SetStateAction<DrawMode>>;
+  setDrawShape: import("react").Dispatch<import("react").SetStateAction<DrawShapeKind>>;
+  setEyedropperActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setMobileSheet: import("react").Dispatch<import("react").SetStateAction<"draw" | "pages" | "props" | "brushes" | null>>;
+  setPostCorrection: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setPressureCurve: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setProDrawPrefs: import("react").Dispatch<import("react").SetStateAction<StudioProDrawPrefs>>;
+  setQuickShapeActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setRightPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setSecondaryColor: import("react").Dispatch<import("react").SetStateAction<string>>;
+  setShapeFill: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setStabilizer: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setStabilizerMode: import("react").Dispatch<import("react").SetStateAction<"standard" | "adaptive" | "precision">>;
+  setStampTuning: import("react").Dispatch<import("react").SetStateAction<{ flow: number; hardness: number; minSize: number; } | null>>;
+  setStrokeWidth: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setSymmetryType: import("react").Dispatch<import("react").SetStateAction<"none" | "vertical" | "horizontal" | "radial" | "kaleidoscope">>;
+  setTool: import("react").Dispatch<import("react").SetStateAction<Tool>>;
+  shapeFill: boolean;
+  stabilizer: number;
+  stabilizerMode: "standard" | "adaptive" | "precision";
+  stampTuning: { flow: number; hardness: number; minSize: number; } | null;
+  strokeWidth: number;
+  symmetryType: "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope";
+  tool: Tool;
+  uiDensityMode: "simple" | "full" | "focus";
+  visibleLeftPanelOpen: boolean;
+  visibleRightPanelOpen: boolean;
+  stableHandlers: StudioOptionsBarsHandlers;
+}
+
+const StudioOptionsBars = memo(function StudioOptionsBars({
+  brush,
+  brushOpacity,
+  brushSlotsState,
+  canvasFlipH,
+  canvasOnlyMode,
+  color,
+  drawMode,
+  drawShape,
+  isMobile,
+  leftResize,
+  marqueeIds,
+  postCorrection,
+  presentationPanelsHidden,
+  pressureCurve,
+  proDrawPrefs,
+  quickShapeActive,
+  rightResize,
+  secondaryColor,
+  selected,
+  selectedId,
+  setBrushOpacity,
+  setBrushSlotsState,
+  setCanvasFlipH,
+  setColor,
+  setDrawMode,
+  setDrawShape,
+  setEyedropperActive,
+  setMobileSheet,
+  setPostCorrection,
+  setPressureCurve,
+  setProDrawPrefs,
+  setQuickShapeActive,
+  setRightPanelOpen,
+  setSecondaryColor,
+  setShapeFill,
+  setStabilizer,
+  setStabilizerMode,
+  setStampTuning,
+  setStrokeWidth,
+  setSymmetryType,
+  setTool,
+  shapeFill,
+  stabilizer,
+  stabilizerMode,
+  stampTuning,
+  strokeWidth,
+  symmetryType,
+  tool,
+  uiDensityMode,
+  visibleLeftPanelOpen,
+  visibleRightPanelOpen,
+  stableHandlers,
+}: StudioOptionsBarsProps) {
+  const {
+    announceDrawingShortcut,
+    applyBrushSlot,
+    applyBuiltInBrushPreset,
+    disarmAllPixelTools,
+    duplicateSelected,
+    openInspectorRoute,
+    removeSelected,
+    reorder,
+    patchEl,
+  } = stableHandlers;
+  return (
+    <>
+      {/* Commercial draw options — size/opacity/stabilizer/brushes (CSP-style properties strip). */}
+      {tool === "draw" && !canvasOnlyMode ? (
+        <Suspense fallback={<div className="h-10 shrink-0 border-b border-line bg-panel/80" aria-hidden />}>
+          <StudioDrawOptionsBar
+            docked
+            dockInsets={{
+              left:
+                (visibleLeftPanelOpen
+                  ? leftResize.width + 8
+                  : presentationPanelsHidden
+                    ? 0
+                    : 32) +
+                (studioUiDensityAllows(uiDensityMode, "tool-rail") ? 52 : 0),
+              right: visibleRightPanelOpen
+                ? rightResize.width + 8
+                : presentationPanelsHidden
+                  ? 0
+                  : 32,
+            }}
+            drawMode={drawMode === "shape" ? "shape" : drawMode === "eraser" ? "eraser" : "pen"}
+            brushId={brush}
+            strokeWidth={strokeWidth}
+            brushOpacity={brushOpacity}
+            stabilizer={stabilizer}
+            stabilizerMode={stabilizerMode}
+            onStabilizerModeChange={setStabilizerMode}
+            color={color}
+            recentSwatches={DRAW_COLOR_SWATCHES}
+            brushSlots={brushSlotsState.slots}
+            symmetryType={symmetryType}
+            quickShapeActive={quickShapeActive}
+            onSelectBrush={(item) => {
+              const preset = BRUSH_PRESETS.find((candidate) => candidate.id === item.id);
+              if (preset) applyBuiltInBrushPreset(preset);
+            }}
+            onStrokeWidthChange={setStrokeWidth}
+            onOpacityChange={setBrushOpacity}
+            onStabilizerChange={setStabilizer}
+            postCorrection={postCorrection}
+            onPostCorrectionChange={setPostCorrection}
+            pressureCurveId={pressureCurvePresetId(pressureCurve)}
+            onPressureCurveChange={(id) => setPressureCurve(pressureCurveValueForPreset(id))}
+            stampTuning={stampTuning}
+            onStampTuningChange={setStampTuning}
+            onColorChange={setColor}
+            secondaryColor={secondaryColor}
+            onSecondaryColorChange={setSecondaryColor}
+            onSwapColors={() => {
+              setColor(secondaryColor);
+              setSecondaryColor(color);
+              announceDrawingShortcut("색 교체");
+            }}
+            canvasFlipH={canvasFlipH}
+            onToggleCanvasFlipH={() => setCanvasFlipH((v) => !v)}
+            onOpenBrushStudio={() => {
+              void loadStudioBrushStudio();
+              setTool("draw");
+              setDrawMode("pen");
+              setRightPanelOpen(true);
+              setMobileSheet(isMobile ? "draw" : null);
+              openInspectorRoute({ primary: "properties" });
+            }}
+            onToggleQuickShape={() => {
+              const next = !quickShapeActive;
+              if (next) {
+                disarmAllPixelTools();
+                setTool("draw");
+                setDrawMode("pen");
+                setEyedropperActive(false);
+                announceDrawingShortcut("스마트 도형 켜짐 · 그려서 손을 떼면 다듬어요");
+              } else {
+                announceDrawingShortcut("스마트 도형 꺼짐");
+              }
+              setQuickShapeActive(next);
+            }}
+            onSetDrawMode={(mode) => {
+              setTool("draw");
+              setDrawMode(mode);
+              setEyedropperActive(false);
+            }}
+            shapeKind={drawShape}
+            onShapeKindChange={(kind) => setDrawShape(kind as DrawShapeKind)}
+            shapeFill={shapeFill}
+            onShapeFillChange={setShapeFill}
+            onRecallBrushSlot={(index) => {
+              const slot = studioBrushSlotAt(brushSlotsState, index);
+              if (slot) applyBrushSlot(slot);
+            }}
+            onAssignBrushSlot={(index) => {
+              setBrushSlotsState((prev) => {
+                const next = assignStudioBrushSlot(prev, index, {
+                  brushId: brush,
+                  strokeWidth,
+                  brushOpacity,
+                });
+                saveStudioBrushSlotsState(
+                  typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage,
+                  next
+                );
+                return next;
+              });
+              announceDrawingShortcut(`슬롯 ${index + 1}에 저장`);
+            }}
+            onSymmetryTypeChange={setSymmetryType}
+            sizeLocked={proDrawPrefs.sizeLocked}
+            opacityLocked={proDrawPrefs.opacityLocked}
+            onToggleSizeLock={() => {
+              setProDrawPrefs((prev) => {
+                const next = { ...prev, sizeLocked: !prev.sizeLocked };
+                saveStudioProDrawPrefs(studioProDrawStorage(), next);
+                announceDrawingShortcut(next.sizeLocked ? "크기 잠금" : "크기 잠금 해제");
+                return next;
+              });
+            }}
+            onToggleOpacityLock={() => {
+              setProDrawPrefs((prev) => {
+                const next = { ...prev, opacityLocked: !prev.opacityLocked };
+                saveStudioProDrawPrefs(studioProDrawStorage(), next);
+                announceDrawingShortcut(next.opacityLocked ? "불투명 잠금" : "불투명 잠금 해제");
+                return next;
+              });
+            }}
+            recentBrushIds={proDrawPrefs.recentBrushIds}
+            favoriteBrushIds={proDrawPrefs.favoriteBrushIds}
+            onToggleFavoriteBrush={(brushId) => {
+              setProDrawPrefs((prev) => {
+                const next = toggleFavoriteBrushId(prev, brushId);
+                saveStudioProDrawPrefs(studioProDrawStorage(), next);
+                const nowFav = next.favoriteBrushIds.includes(brushId);
+                announceDrawingShortcut(nowFav ? "즐겨찾기 추가" : "즐겨찾기 해제");
+                return next;
+              });
+            }}
+            onCycleStabilizer={() => {
+              setStabilizer((prev) => {
+                const next = cycleStudioStabilizerStrength(prev);
+                announceDrawingShortcut(`보정 ${next}`);
+                return next;
+              });
+            }}
+          />
+        </Suspense>
+      ) : null}
+      {tool === "select" && !canvasOnlyMode && (selectedId || marqueeIds.length > 0) ? (
+        <Suspense fallback={null}>
+          <StudioSelectOptionsBar
+            selectionCount={marqueeIds.length > 0 ? marqueeIds.length : selectedId ? 1 : 0}
+            selectionLabel={selected ? elementLabel(selected) : null}
+            locked={Boolean(selected?.locked)}
+            onDuplicate={duplicateSelected}
+            onDelete={removeSelected}
+            onBringFront={() => reorder("front")}
+            onSendBack={() => reorder("back")}
+            onToggleLock={
+              selected
+                ? () => patchEl(selected.id, { locked: !selected.locked })
+                : undefined
+            }
+          />
+        </Suspense>
+      ) : null}
     </>
   );
 });
