@@ -4417,6 +4417,7 @@ function bakeGradeIntoCanvas(src: HTMLCanvasElement, grade: PageGrade): HTMLCanv
 
 const IMAGE_FILTER_BUILD_CACHE_LIMIT = 200;
 type StudioKonvaFiltersModule = typeof import("./studio-konva-filters");
+type StudioImageFilterWorkerClientModule = typeof import("./studio-image-filter-worker-client");
 type ImageFilterBuild = ReturnType<StudioKonvaFiltersModule["buildImageFilters"]>;
 const EMPTY_IMAGE_FILTER_BUILD: ImageFilterBuild = { filters: [], attrs: {}, cachePad: 0 };
 const imageFilterBuildCache = new Map<string, ImageFilterBuild>();
@@ -4789,7 +4790,13 @@ function UrlImage({
   const [img, setImg] = useState<HTMLImageElement>();
   const [displayImg, setDisplayImg] = useState<CanvasImageSource>();
   const [filterModule, setFilterModule] = useState<StudioKonvaFiltersModule | null>(null);
+  const [filterWorkerClient, setFilterWorkerClient] = useState<StudioImageFilterWorkerClientModule | null>(null);
+  const [workerFilteredCanvas, setWorkerFilteredCanvas] = useState<HTMLCanvasElement | undefined>(undefined);
   const imageRef = useRef<Konva.Image | null>(null);
+  // 최신 el을 담아두는 ref — 아래 Worker 필터 effect가 좌표 드래그 등 필터와 무관한 el 변경마다
+  // 재실행되지 않도록(의존성은 filterCacheKey/width/height만) 최신 값만 읽어들이는 용도.
+  const elRef = useRef(el);
+  elRef.current = el;
 
   useEffect(() => {
     const im = new globalThis.Image();
@@ -4852,6 +4859,23 @@ function UrlImage({
     };
   }, [filterModule, hasFilters]);
 
+  // Worker 클라이언트도 같은 조건에서 지연 로드 — 별도 청크라 이 모듈을 먼저 열지 않는 페이지의
+  // 첫 청크 예산에 영향을 주지 않는다(loadStudioKonvaFilters와 동일한 이유).
+  useEffect(() => {
+    if (!hasFilters || filterWorkerClient) return;
+    let active = true;
+    import("./studio-image-filter-worker-client")
+      .then((mod) => {
+        if (active) setFilterWorkerClient(mod);
+      })
+      .catch((error) => {
+        console.error("Failed to load studio image filter worker client:", error);
+      });
+    return () => {
+      active = false;
+    };
+  }, [filterWorkerClient, hasFilters]);
+
   // 보정값 → Konva 필터 배열 + 노드 속성. 캐시 의존성은 직렬화 키로 비교(좌표 드래그 시 재캐시 방지).
   const built = hasFilters && filterModule
     ? cachedBuildImageFilters(el, filterCacheKey, filterModule)
@@ -4862,12 +4886,77 @@ function UrlImage({
   const filterAttrs = built.attrs;
   const cachePad = built.cachePad; // 테두리(outline)가 실루엣 밖으로 자라도록 캐시에 추가할 여백(px).
 
+  // Worker 오프로드 경로 — cachePad>0(테두리 필터 활성)은 Konva의 cache({offset}) 위치 보정을
+  // 정확히 복제하기 까다로워 제외하고 기존 Konva 내장 cache+filters 경로로 둔다. 애니메이션 GIF도
+  // 기존과 동일하게 필터 미적용(아래 cache effect의 조건과 일치, 새 동작 아님).
+  const useWorkerFilterPath =
+    hasFilters && !!filterModule && !!filterWorkerClient && cachePad === 0 && !el.isAnimatedGif;
+
+  // 슬라이더 드래그 매 틱마다 픽셀 루프를 메인 스레드에서 도는 대신, 여기서 Worker에 위임한다.
+  // 새 틱이 오면 React의 effect cleanup이 이전 컨트롤러를 abort → 진행 중이던 Worker를 즉시
+  // terminate하므로 항상 최신 요청 하나만 실제로 끝까지 계산된다(오래된 결과가 늦게 도착해 화면을
+  // 덮어쓰는 일이 없다). 첫 틱(아직 워커 결과 없음)은 아래 cache effect가 Konva 내장 경로로
+  // 즉시 필터링해 보여주므로 깜빡임 없이 완료되는 대로 이 캔버스로 자연스럽게 교체된다.
+  useEffect(() => {
+    if (!useWorkerFilterPath || !displayImg || !filterWorkerClient) {
+      setWorkerFilteredCanvas(undefined);
+      return;
+    }
+    const width = Math.max(1, Math.round(el.width));
+    const height = Math.max(1, Math.round(el.height));
+    const sourceCanvas = document.createElement("canvas");
+    sourceCanvas.width = width;
+    sourceCanvas.height = height;
+    const sourceCtx = sourceCanvas.getContext("2d");
+    if (!sourceCtx) return;
+    sourceCtx.drawImage(displayImg, 0, 0, width, height);
+    const imageData = sourceCtx.getImageData(0, 0, width, height);
+
+    const controller = new AbortController();
+    let cancelled = false;
+    filterWorkerClient
+      .runStudioImageFilterWorker({ imageData, el: elRef.current }, { signal: controller.signal })
+      .then((result) => {
+        if (cancelled) return;
+        const outCanvas = document.createElement("canvas");
+        outCanvas.width = result.imageData.width;
+        outCanvas.height = result.imageData.height;
+        const outCtx = outCanvas.getContext("2d");
+        if (!outCtx) return;
+        // ImageData 생성자는 ArrayBuffer 백업 뷰만 받는다 — postMessage 전송은 항상 진짜
+        // ArrayBuffer라 안전하지만(SharedArrayBuffer 아님) 타입상 Uint8ClampedArray<ArrayBufferLike>
+        // 로 넓혀져 있어 새 뷰로 감싸 좁힌다.
+        outCtx.putImageData(
+          new ImageData(
+            new Uint8ClampedArray(result.imageData.data),
+            result.imageData.width,
+            result.imageData.height,
+          ),
+          0,
+          0,
+        );
+        setWorkerFilteredCanvas(outCanvas);
+      })
+      .catch((error) => {
+        if ((error as { name?: string })?.name === "AbortError") return;
+        console.error("[studio] image filter worker failed, keeping last preview:", error);
+      });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [useWorkerFilterPath, displayImg, filterCacheKey, filterWorkerClient, el.width, el.height]);
+
+  const showWorkerCanvas = useWorkerFilterPath && !!workerFilteredCanvas;
+
   useEffect(() => {
     const node = imageRef.current;
     if (!node) return;
     if (displayImg) {
       node.clearCache();
-      if (hasFilters && filterModule && !el.isAnimatedGif) {
+      // Worker 캔버스로 이미 교체됐으면 픽셀이 최종 상태라 Konva 재캐시가 낭비다 — 건너뛴다.
+      if (hasFilters && filterModule && !el.isAnimatedGif && !showWorkerCanvas) {
         // 테두리가 있으면 offset만큼 캐시 캔버스를 키워 실루엣 바깥에 테두리를 그릴 자리를 만든다.
         // isAnimatedGif는 캐시를 만들지 않는다 — Konva 캐시는 "그 순간의 정적 스냅샷"이라
         // 애니메이션 GIF에 캐시를 씌우면 그 프레임에 멈춘다(필터는 조용히 미적용, 알려진 한계).
@@ -4875,7 +4964,7 @@ function UrlImage({
       }
       node.getLayer()?.batchDraw();
     }
-  }, [displayImg, el.width, el.height, filterCacheKey, hasFilters, filterModule, cachePad, el.isAnimatedGif]);
+  }, [displayImg, el.width, el.height, filterCacheKey, hasFilters, filterModule, cachePad, el.isAnimatedGif, showWorkerCanvas]);
 
   // 애니메이션 GIF 주기적 리렌더 — 브라우저가 img(HTMLImageElement)를 내부적으로 계속
   // 디코딩·재생하지만(studio-gif-element.ts 헤더 참고), Konva는 그리기 시점의 스냅샷만 캔버스에
@@ -4913,6 +5002,12 @@ function UrlImage({
 
   if (!displayImg) return null;
 
+  // Worker가 이미 최종 픽셀을 계산해 뒀으면 그 캔버스를 그대로 그린다(filters/filterAttrs는
+  // 비워 Konva가 다시 필터링하지 않게 한다) — 아니면 기존과 동일하게 원본 + Konva 필터.
+  const imageSource: CanvasImageSource = showWorkerCanvas ? workerFilteredCanvas! : displayImg;
+  const activeFilters: Konva.NodeConfig["filters"] = showWorkerCanvas ? undefined : filters;
+  const activeFilterAttrs = showWorkerCanvas ? {} : filterAttrs;
+
   return (
     <KImage
       studioElementId={el.id}
@@ -4920,15 +5015,15 @@ function UrlImage({
         imageRef.current = n;
         innerRef(n);
       }}
-      image={displayImg}
+      image={imageSource}
       x={el.x}
       y={el.y}
       width={el.width}
       height={el.height}
       rotation={el.rotation}
       opacity={el.opacity ?? 1}
-      filters={filters}
-      {...filterAttrs}
+      filters={activeFilters}
+      {...activeFilterAttrs}
       shadowColor={el.shadowColor}
       shadowEnabled={!!el.shadowColor}
       shadowBlur={el.shadowBlur ?? 0}
@@ -14222,6 +14317,37 @@ function StudioCuttoonEditor() {
           clearPolyLassoDraft();
           disarmAllPixelTools();
           setPixelTool("lasso");
+        }
+        return;
+      }
+      // 설정 화면(STUDIO_SHORTCUT_ACTIONS)에는 나열돼 있지만 실제 배선이 없던 3개 —
+      // 각 도구의 레일 버튼 onClick과 동일한 상태 전이를 재사용한다(rail 버튼 근처 참고).
+      if (matchStudioShortcut(sc["tool-pixel"], e)) {
+        e.preventDefault();
+        if (!activeSurfaceReviewLocked) {
+          setTool("draw");
+          setDrawMode("pixel");
+          setStrokeWidth(1);
+          setEyedropperActive(false);
+        }
+        return;
+      }
+      if (matchStudioShortcut(sc["tool-marquee"], e)) {
+        e.preventDefault();
+        if (selected?.type === "image" && !selectedContentMutationLocked) {
+          setTool("select");
+          clearPolyLassoDraft();
+          disarmAllPixelTools();
+          setPixelForceCircle(false);
+          setPixelTool((t) => (t === "rect" ? null : "rect"));
+        }
+        return;
+      }
+      if (matchStudioShortcut(sc["tool-transform"], e)) {
+        e.preventDefault();
+        if (selected?.type === "image" && isSelectionUsable(pixelSel)) {
+          setRightPanelOpen(true);
+          announceDrawingShortcut("리터치 패널에서 내용 변형을 적용하세요");
         }
         return;
       }
