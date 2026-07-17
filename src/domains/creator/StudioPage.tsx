@@ -8938,6 +8938,12 @@ function StudioCuttoonEditor() {
   const drawingStabilizerRef = useRef<StudioStrokeStabilizerState | null>(null);
   const drawingFixedRateFilterRef = useRef<FixedRateStrokeFilterState | null>(null);
   const drawingVelocityRef = useRef<StudioPointerVelocityState | null>(null);
+  // 고정레이트(매끈 펜) 캐스케이드는 append(pointermove 실샘플)에서만 전진했다 — 실샘플 사이엔
+  // 완전히 멈춰있다가 다음 샘플에서 몇 틱씩 한꺼번에 튀어나오고, 릴리즈는 그 중 가장 큰 마지막
+  // 뭉치였다("간격을 두고 따라오다 릴리즈에 훅 채워지는" 체감의 원인). rAF로 advance 를 계속
+  // 흘려 실샘플이 없는 프레임에도 마지막 held 위치를 향해 매 프레임 자연스럽게 수렴시킨다.
+  const drawingFixedRateAdvanceRafRef = useRef<number | null>(null);
+  const drawingLastPointerSampleRef = useRef<PointerEvent | null>(null);
   // A stroke belongs to exactly one pointer from down through up/cancel. Keeping this high-rate
   // ownership outside React state prevents palm/second-finger events from ending the pen stroke.
   const drawingPointerSessionRef = useRef<StudioStrokePointerSession | null>(null);
@@ -17106,6 +17112,8 @@ function StudioCuttoonEditor() {
     drawingStabilizerRef.current = null;
     drawingFixedRateFilterRef.current = null;
     drawingVelocityRef.current = null;
+    drawingLastPointerSampleRef.current = null;
+    stopFixedRateAdvanceTicker();
   }
   function discardDrawingPointerSession() {
     const discardedId = drawingRef.current?.id;
@@ -17749,6 +17757,9 @@ function StudioCuttoonEditor() {
             timeStamp: pointerSample.timeStamp,
           }, stabilizer).state
         : null;
+      drawingLastPointerSampleRef.current = pointerSample;
+      stopFixedRateAdvanceTicker(); // 이전 스트로크의 잔여 ticker(있었다면)를 먼저 확실히 취소.
+      if (fixedRateInkEnabled) startFixedRateAdvanceTicker();
       drawingStabilizerRef.current =
         drawMode === "shape" || drawMode === "pixel" || fixedRateInkEnabled
           ? null
@@ -18320,6 +18331,36 @@ function StudioCuttoonEditor() {
     drawingRef.current = next;
     scheduleDraft(next);
   }
+  function stopFixedRateAdvanceTicker() {
+    if (drawingFixedRateAdvanceRafRef.current !== null) {
+      globalThis.cancelAnimationFrame(drawingFixedRateAdvanceRafRef.current);
+      drawingFixedRateAdvanceRafRef.current = null;
+    }
+  }
+  function tickFixedRateAdvance() {
+    drawingFixedRateAdvanceRafRef.current = null;
+    const state = drawingFixedRateFilterRef.current;
+    const pointerSample = drawingLastPointerSampleRef.current;
+    // 실샘플이 이미 이 held 위치까지의 모든 틱을 소비했으면 advance 는 조용히 no-op(멱등) —
+    // pointermove 와 같은 프레임에 겹쳐 호출돼도 이중 방출이 없다.
+    if (!state || !pointerSample || !liveDraftDirectRef.current) return;
+    const transition = transitionFixedRateStrokeFilter(state, {
+      type: "advance",
+      timeStamp: performance.now(),
+    });
+    drawingFixedRateFilterRef.current = transition.state;
+    if (transition.emitted.length > 0) {
+      // 유휴 캐치업 틱이라 새 원본 샘플이 없다 — speed=0(새 이동 없음 자체가 사실), 나머지
+      // 보조 채널(twist/원심 압력)은 최근 실샘플 값을 그대로 유지한다(appendFixedRateStrokeSamples
+      // 의 기존 계약과 동일: 한 배치 안 모든 틱에 단일 보조값을 적용).
+      appendFixedRateStrokeSamples(transition.emitted, pointerSample, 0);
+    }
+    drawingFixedRateAdvanceRafRef.current = globalThis.requestAnimationFrame(tickFixedRateAdvance);
+  }
+  function startFixedRateAdvanceTicker() {
+    if (drawingFixedRateAdvanceRafRef.current !== null) return;
+    drawingFixedRateAdvanceRafRef.current = globalThis.requestAnimationFrame(tickFixedRateAdvance);
+  }
   function appendFixedRateStrokeSamples(
     samples: readonly FixedRateStrokeFilteredSample[],
     pointerSample: PointerEvent,
@@ -18464,6 +18505,7 @@ function StudioCuttoonEditor() {
       // resumes the freehand gesture.
       drawingStabilizerRef.current = transition.stabilizerState;
       drawingFixedRateFilterRef.current = null;
+      stopFixedRateAdvanceTicker();
       drawingRef.current = nextShift;
       if (!drawingPredictionPreviewRef.current) scheduleDraft(nextShift);
       return;
@@ -18615,6 +18657,10 @@ function StudioCuttoonEditor() {
         stage.setPointersPositions(sample);
         const point = stage.getRelativePointerPosition();
         if (point) {
+          // 실샘플만 유휴 advance ticker 의 보조 채널 소스로 삼는다 — predicted 샘플(현재
+          // STUDIO_POINTER_PREDICTION_ENABLED=false 라 항상 비어 있음)이 미래 추정 좌표로
+          // 이 ref 를 오염시키지 않도록 authoritative 루프에서만 갱신한다.
+          drawingLastPointerSampleRef.current = sample;
           appendFreehandStrokePoint(
             point,
             sample,
