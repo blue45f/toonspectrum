@@ -2,6 +2,7 @@ import {
   resolveStudioInkPressure,
   studioInkPressureDiameter,
   studioInkPressureRadius,
+  studioInkUsesPathResidualDabSpacing,
   studioInkUsesResidualDabSpacing,
   type StudioInkPressureModel,
 } from "./studio-ink-pressure-model";
@@ -66,7 +67,10 @@ export interface StudioResidualInkState {
   readonly previousPressure: number;
   readonly lastDabX: number;
   readonly lastDabY: number;
+  /** Frozen V2 path-length remainder. V3 keeps this at zero for structural compatibility. */
   readonly distanceRemainder: number;
+  /** V3's normalized integral remainder in [0, 1); omitted by persisted-compatible V2. */
+  readonly spacingPhase?: number;
 }
 
 export interface StudioResidualInkAdvance {
@@ -85,6 +89,17 @@ export interface StudioCausalInkPlan extends StudioCausalInkDabPlan {
   readonly samples: readonly StudioCausalInkSample[];
 }
 
+export interface StudioCausalInkSampleAdmissionInput {
+  readonly lastX: number;
+  readonly lastY: number;
+  readonly lastPressure: number;
+  readonly nextX: number;
+  readonly nextY: number;
+  readonly nextPressure: number;
+  readonly minDistance: number;
+  readonly pressureModel?: StudioInkPressureModel;
+}
+
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
 }
@@ -93,6 +108,22 @@ function normalizedMinDistance(value: number): number {
   return typeof value === "number" && Number.isFinite(value)
     ? Math.max(0, value)
     : 0;
+}
+
+/** Shares duplicate/stationary-pressure admission between immediate and fixed-rate V3 input. */
+export function shouldAppendStudioCausalInkSample(
+  input: StudioCausalInkSampleAdmissionInput
+): boolean {
+  const distance = Math.hypot(input.nextX - input.lastX, input.nextY - input.lastY);
+  if (!Number.isFinite(distance)) return false;
+  if (distance <= STUDIO_CAUSAL_INK_MIN_SEGMENT_DISTANCE) {
+    return studioInkUsesPathResidualDabSpacing(input.pressureModel)
+      && !Object.is(
+        resolveStudioInkPressure(input.nextPressure, input.pressureModel),
+        resolveStudioInkPressure(input.lastPressure, input.pressureModel)
+      );
+  }
+  return distance >= normalizedMinDistance(input.minDistance);
 }
 
 function finiteSourcePrefix(input: StudioCausalInkSampleInput): StudioCausalInkSample[] {
@@ -115,6 +146,10 @@ function samePoint(left: StudioCausalInkSample, right: StudioCausalInkSample): b
   return left.x === right.x && left.y === right.y;
 }
 
+function samePressure(left: StudioCausalInkSample, right: StudioCausalInkSample): boolean {
+  return Object.is(left.pressure, right.pressure);
+}
+
 /**
  * Selects a one-pass, source-index-preserving causal sample sequence.
  *
@@ -135,6 +170,17 @@ export function selectStudioCausalInkSamples(
   for (let sourceIndex = 1; sourceIndex < source.length; sourceIndex += 1) {
     const candidate = source[sourceIndex]!;
     const previous = retained[retained.length - 1]!;
+    // V3 treats a stationary pressure change as state, not geometry. Keeping it in the causal
+    // source stream makes live append and sealed replay update the next segment from the same
+    // pressure without painting another dot at this coordinate. V1/V2 selection stays frozen.
+    if (
+      studioInkUsesPathResidualDabSpacing(input.pressureModel)
+      && samePoint(candidate, previous)
+      && !samePressure(candidate, previous)
+    ) {
+      retained.push(candidate);
+      continue;
+    }
     const distance = Math.hypot(candidate.x - previous.x, candidate.y - previous.y);
     if (distance > 0 && distance >= minimumDistance) retained.push(candidate);
   }
@@ -184,6 +230,7 @@ export function startStudioResidualInk(
     lastDabX: sample.x,
     lastDabY: sample.y,
     distanceRemainder: 0,
+    ...(studioInkUsesPathResidualDabSpacing(pressureModel) ? { spacingPhase: 0 } : {}),
   };
   if (
     ![sample.x, sample.y, pressure].every(Number.isFinite)
@@ -204,9 +251,9 @@ export function startStudioResidualInk(
 /**
  * Advances one Magma-compatible brush sample.
  *
- * `distanceRemainder` is path length carried across source segments. Spacing is based on selected
- * diameter × 0.2 × the average endpoint pressure and clamped to 0.5–10 document pixels. Source
- * endpoints are not forced, and a stationary sample never paints another dab.
+ * V2 carries physical path length while retaining its historical chord projection. V3 carries the
+ * exact normalized phase integral `∫ ds / spacing(pressure)` and consumes it on each actual source
+ * segment. Source endpoints are not forced, and a stationary sample never paints another dab.
  */
 export function advanceStudioResidualInk(
   state: StudioResidualInkState,
@@ -216,6 +263,7 @@ export function advanceStudioResidualInk(
   maximumDabs = STUDIO_CAUSAL_INK_MAX_DABS
 ): StudioResidualInkAdvance {
   const pressure = clamp(sample.pressure, 0, 1);
+  const spacingPhase = state.spacingPhase ?? 0;
   const inputDx = sample.x - state.previousX;
   const inputDy = sample.y - state.previousY;
   const inputDistance = Math.hypot(inputDx, inputDy);
@@ -230,10 +278,13 @@ export function advanceStudioResidualInk(
       state.lastDabX,
       state.lastDabY,
       state.distanceRemainder,
+      spacingPhase,
       inputDx,
       inputDy,
       inputDistance,
     ].every(Number.isFinite)
+    || (studioInkUsesPathResidualDabSpacing(pressureModel)
+      && (spacingPhase < 0 || spacingPhase >= 1))
     || !Number.isSafeInteger(maximumDabs)
     || maximumDabs < 0
   ) {
@@ -256,7 +307,6 @@ export function advanceStudioResidualInk(
     };
   }
 
-  let distanceRemainder = state.distanceRemainder + inputDistance;
   const selectedDiameter = studioInkPressureDiameter(size, 1, pressureModel);
   const averagePressure = (state.previousPressure + pressure) * 0.5;
   const spacing = clamp(
@@ -266,9 +316,6 @@ export function advanceStudioResidualInk(
   );
   let lastDabX = state.lastDabX;
   let lastDabY = state.lastDabY;
-  const toEndpointX = sample.x - lastDabX;
-  const toEndpointY = sample.y - lastDabY;
-  const toEndpointDistance = Math.hypot(toEndpointX, toEndpointY);
   const dabs: StudioCausalInkDab[] = [];
   let complete = true;
   const pushDab = (x: number, y: number, dabPressure: number): boolean => {
@@ -279,6 +326,111 @@ export function advanceStudioResidualInk(
     dabs.push(residualInkDab(x, y, dabPressure, size, pressureModel));
     return true;
   };
+
+  if (studioInkUsesPathResidualDabSpacing(pressureModel)) {
+    const pressureSlope = (pressure - state.previousPressure) / inputDistance;
+    const spacingScale = selectedDiameter * STUDIO_RESIDUAL_INK_SPACING_RATIO;
+    const lowerPressure = STUDIO_RESIDUAL_INK_MIN_SPACING / spacingScale;
+    const upperPressure = STUDIO_RESIDUAL_INK_MAX_SPACING / spacingScale;
+    const breakpoints = [0, inputDistance];
+    for (const threshold of [lowerPressure, upperPressure]) {
+      if (
+        pressureSlope !== 0
+        && threshold > Math.min(state.previousPressure, pressure)
+        && threshold < Math.max(state.previousPressure, pressure)
+      ) {
+        breakpoints.push((threshold - state.previousPressure) / pressureSlope);
+      }
+    }
+    breakpoints.sort((left, right) => left - right);
+
+    let phase = spacingPhase;
+    const phaseEpsilon = 1e-12;
+    for (let sectionIndex = 1; sectionIndex < breakpoints.length && complete; sectionIndex += 1) {
+      let sectionStart = breakpoints[sectionIndex - 1]!;
+      const sectionEnd = breakpoints[sectionIndex]!;
+      const midpointPressure = state.previousPressure
+        + pressureSlope * ((sectionStart + sectionEnd) * 0.5);
+      const fixedSpacing = spacingScale * midpointPressure <= STUDIO_RESIDUAL_INK_MIN_SPACING
+        ? STUDIO_RESIDUAL_INK_MIN_SPACING
+        : spacingScale * midpointPressure >= STUDIO_RESIDUAL_INK_MAX_SPACING
+          ? STUDIO_RESIDUAL_INK_MAX_SPACING
+          : null;
+      const phaseCapacity = (from: number, to: number): number => {
+        if (fixedSpacing !== null || Math.abs(pressureSlope) <= Number.EPSILON) {
+          const localSpacing = fixedSpacing ?? clamp(
+            spacingScale * midpointPressure,
+            STUDIO_RESIDUAL_INK_MIN_SPACING,
+            STUDIO_RESIDUAL_INK_MAX_SPACING
+          );
+          return (to - from) / localSpacing;
+        }
+        const fromPressure = state.previousPressure + pressureSlope * from;
+        const toPressure = state.previousPressure + pressureSlope * to;
+        return Math.log(toPressure / fromPressure) / (spacingScale * pressureSlope);
+      };
+      const distanceForPhase = (from: number, targetPhase: number): number => {
+        if (fixedSpacing !== null || Math.abs(pressureSlope) <= Number.EPSILON) {
+          const localSpacing = fixedSpacing ?? clamp(
+            spacingScale * midpointPressure,
+            STUDIO_RESIDUAL_INK_MIN_SPACING,
+            STUDIO_RESIDUAL_INK_MAX_SPACING
+          );
+          return from + targetPhase * localSpacing;
+        }
+        const fromPressure = state.previousPressure + pressureSlope * from;
+        return from
+          + (fromPressure * Math.expm1(targetPhase * spacingScale * pressureSlope))
+            / pressureSlope;
+      };
+
+      while (sectionStart < sectionEnd && complete) {
+        const remainingPhase = phaseCapacity(sectionStart, sectionEnd);
+        const phaseToDab = 1 - phase;
+        if (remainingPhase + phaseEpsilon < phaseToDab) {
+          phase += remainingPhase;
+          if (phase >= 1 && phase < 1 + phaseEpsilon) phase = 1 - Number.EPSILON;
+          break;
+        }
+        const dabDistance = clamp(
+          distanceForPhase(sectionStart, Math.min(phaseToDab, remainingPhase)),
+          sectionStart,
+          sectionEnd
+        );
+        const amount = clamp(dabDistance / inputDistance, 0, 1);
+        const dabX = state.previousX + inputDx * amount;
+        const dabY = state.previousY + inputDy * amount;
+        const dabPressure = state.previousPressure
+          + (pressure - state.previousPressure) * amount;
+        if (!pushDab(dabX, dabY, dabPressure)) break;
+        lastDabX = dabX;
+        lastDabY = dabY;
+        phase = 0;
+        sectionStart = dabDistance;
+        if (sectionEnd - sectionStart <= phaseEpsilon) break;
+      }
+    }
+    return {
+      state: {
+        previousX: sample.x,
+        previousY: sample.y,
+        previousPressure: pressure,
+        lastDabX,
+        lastDabY,
+        distanceRemainder: 0,
+        spacingPhase: phase,
+      },
+      dabs,
+      complete,
+    };
+  }
+
+  // Frozen V2 persistence contract. Do not redirect this chord walker: stored V2 source samples
+  // and raster semantic hashes depend on its historical pixels.
+  let distanceRemainder = state.distanceRemainder + inputDistance;
+  const toEndpointX = sample.x - lastDabX;
+  const toEndpointY = sample.y - lastDabY;
+  const toEndpointDistance = Math.hypot(toEndpointX, toEndpointY);
 
   if (distanceRemainder >= spacing) {
     if (toEndpointDistance < spacing) {

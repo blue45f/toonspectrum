@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+  STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
   STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
 } from "./studio-ink-pressure-model";
 import { STUDIO_GPU_STROKE_FEED_REVISION, type StudioGpuStroke } from "./studio-webgpu-stroke";
@@ -246,6 +247,67 @@ describe("Studio WebGPU append-only stroke feed", () => {
       },
     });
     expect(revision?.residualInkState?.distanceRemainder).toBeCloseTo(0.8, 12);
+  });
+
+  it("carries V3 normalized phase through a stationary pressure-only feed suffix", () => {
+    const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3;
+    const moved = stroke({
+      points: [0, 0, 9, 0],
+      pressures: [1, 1],
+      size: 50,
+      pressureModel,
+    });
+    const baseline = createStudioGpuStrokeFeedBaseline([moved], "residual-v3-feed")!;
+    expect(baseline[0]?.[STUDIO_GPU_STROKE_FEED_REVISION]).toMatchObject({
+      residualDabCount: 1,
+      residualInkState: {
+        previousX: 9,
+        previousPressure: 1,
+        lastDabX: 0,
+        distanceRemainder: 0,
+        spacingPhase: 0.9,
+      },
+    });
+
+    const pressureOnly = stroke({
+      points: [0, 0, 9, 0, 9, 0],
+      pressures: [1, 1, 0],
+      size: 50,
+      pressureModel,
+    });
+    const stationary = advanceStudioGpuStrokeFeed(
+      baseline,
+      patch([pressureOnly], 2, [9, 0], [0])
+    );
+    expect(stationary.status).toBe("appended");
+    expect(stationary.strokes[0]?.[STUDIO_GPU_STROKE_FEED_REVISION]).toMatchObject({
+      residualDabCount: 1,
+      residualInkState: { previousPressure: 0, lastDabX: 0, spacingPhase: 0.9 },
+    });
+
+    const released = stroke({
+      points: [0, 0, 9, 0, 9, 0, 10, 0],
+      pressures: [1, 1, 0, 0],
+      size: 50,
+      pressureModel,
+    });
+    const advanced = advanceStudioGpuStrokeFeed(
+      stationary.strokes,
+      patch([released], 3, [10, 0], [0])
+    );
+    expect(advanced.status).toBe("appended");
+    expect(advanced.strokes[0]?.[STUDIO_GPU_STROKE_FEED_REVISION]).toMatchObject({
+      residualDabCount: 3,
+      residualInkState: {
+        previousX: 10,
+        previousPressure: 0,
+        lastDabX: 9.55,
+      },
+    });
+    expect(
+      advanced.strokes[0]?.[STUDIO_GPU_STROKE_FEED_REVISION]
+        ?.residualInkState?.spacingPhase
+    ).toBeCloseTo(0.9, 12);
   });
 
   it("expands feed bounds for residual V2 backtrack dabs outside source-point bounds", () => {

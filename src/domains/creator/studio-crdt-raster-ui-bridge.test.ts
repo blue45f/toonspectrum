@@ -10,7 +10,11 @@ import {
   studioRasterDrawPromotionSourceMatches,
   studioRasterBrushSurface,
 } from "./studio-crdt-raster-ui-bridge";
-import { STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 } from "./studio-ink-pressure-model";
+import {
+  STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+  STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
+  STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
+} from "./studio-ink-pressure-model";
 
 import {
   STUDIO_RASTER_CRDT_VERSION,
@@ -209,6 +213,58 @@ describe("studio CRDT raster UI bridge", () => {
     });
     expect(JSON.parse(plan!.semanticParameters).stroke.pointPipeline)
       .toBe("studio-causal-dabs-v1");
+  });
+
+  it("versions V3 path-phase pixels separately from the frozen V2 raster pipeline", () => {
+    const id = uuid(15);
+    const element = {
+      id,
+      type: "draw" as const,
+      kind: "freehand",
+      mode: "pen" as const,
+      points: [0, 0, 4, 0, 4, 4],
+      pressures: [1, 1, 1],
+      stroke: "#112233",
+      strokeWidth: 16,
+      opacity: 1,
+      brush: "pen",
+      sampleSpacing: 0,
+    };
+    const dimensions = { pageId: "page-a", documentWidth: 800, documentHeight: 1_200 };
+    const v2Element = {
+      ...element,
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
+    };
+    const v3Element = {
+      ...element,
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
+    };
+    const v2 = planStudioRasterDrawPromotion({ element: v2Element, ...dimensions })!;
+    const v3 = planStudioRasterDrawPromotion({ element: v3Element, ...dimensions })!;
+
+    expect(JSON.parse(v2.semanticParameters).stroke).toMatchObject({
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
+      pointPipeline: "studio-causal-dabs-v1",
+    });
+    expect(JSON.parse(v3.semanticParameters).stroke).toMatchObject({
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
+      pointPipeline: "studio-causal-polyline-residual-v3",
+    });
+    expect(v3.semanticParameters).not.toBe(v2.semanticParameters);
+    expect(studioRasterDrawPromotionSourceMatches({
+      plan: v3,
+      element: v3Element,
+      ...dimensions,
+      layerId: "page-root",
+      panelClipped: false,
+    })).toBe(true);
+    expect(studioRasterDrawPromotionSourceMatches({
+      plan: v3,
+      element: v2Element,
+      ...dimensions,
+      layerId: "page-root",
+      panelClipped: false,
+    })).toBe(false);
   });
 
   it("cancels an async promotion after the fallback is deleted, edited, clipped, or regrouped", () => {

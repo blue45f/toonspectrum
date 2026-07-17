@@ -20,6 +20,17 @@ import {
 export const STUDIO_POST_CORRECTION_MIN_TAIL_SAMPLES = 8;
 export const STUDIO_POST_CORRECTION_MAX_TAIL_SAMPLES = 16;
 
+/**
+ * Interaction policy: post-correction is a release-time document transform.
+ *
+ * A replaceable live tail makes already-visible pixels crawl under the pen and contradicts the
+ * "after release" control label. Keep the causal tail engine for deterministic offline/release
+ * planning, but never expose its replace surface while pointer contact is active.
+ */
+export function studioPostCorrectionRunsDuringPointerContact(): boolean {
+  return false;
+}
+
 const EMPTY_POINTS: readonly number[] = Object.freeze([]);
 const KEEP_TAIL_SURFACE: StudioPostCorrectionTailSurfaceUpdate = Object.freeze({ kind: "keep" });
 const CLEAR_TAIL_SURFACE: StudioPostCorrectionTailSurfaceUpdate = Object.freeze({ kind: "clear" });

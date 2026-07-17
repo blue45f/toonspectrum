@@ -15,10 +15,21 @@ export const STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 = "linear-full-v1" as cons
  * segments, so extending a stroke can only append pixels.
  */
 export const STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2 = "linear-residual-v2" as const;
+/**
+ * Path-faithful residual placement for new ink.
+ *
+ * V2 is retained verbatim for persisted-document compatibility. Its carried path distance was
+ * projected onto the chord from the last dab to the newest pointer, which could place a later dab
+ * across a corner. V3 consumes that distance on each actual source segment, so sample subdivision
+ * cannot move a constant-pressure dab off the pointer polyline or alter an already-visible prefix.
+ */
+export const STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3 =
+  "linear-residual-path-v3" as const;
 
 export type StudioInkPressureModel =
   | typeof STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1
-  | typeof STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2;
+  | typeof STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2
+  | typeof STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3;
 
 export const STUDIO_INK_MAX_BRUSH_SIZE = 8_192;
 export const STUDIO_INK_LEGACY_FALLBACK_PRESSURE = 0.5;
@@ -34,16 +45,26 @@ function clamp(value: number, minimum: number, maximum: number): number {
 
 export function isStudioInkPressureModel(value: unknown): value is StudioInkPressureModel {
   return value === STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1
-    || value === STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2;
+    || value === STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2
+    || value === STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3;
 }
 
 export function studioInkUsesResidualDabSpacing(model?: StudioInkPressureModel): boolean {
-  return model === STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2;
+  return model === STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2
+    || model === STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3;
+}
+
+/** Whether residual path distance must be consumed on the actual source polyline. */
+export function studioInkUsesPathResidualDabSpacing(
+  model?: StudioInkPressureModel
+): boolean {
+  return model === STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3;
 }
 
 function isLinearFullPressureModel(model?: StudioInkPressureModel): boolean {
   return model === STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1
-    || model === STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2;
+    || model === STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2
+    || model === STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3;
 }
 
 /** Missing hardware samples retain legacy 0.5, while Magma-compatible ink is full-size at 1. */

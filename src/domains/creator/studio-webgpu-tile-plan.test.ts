@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+  STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
   STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
 } from "./studio-ink-pressure-model";
 import {
@@ -88,6 +89,33 @@ describe("studio WebGPU tile planning", () => {
     expect(bounds?.width).toBeCloseTo(26.4, 12);
     expect(bounds).toMatchObject({ y: 110, height: 20 });
     expect(states.map(({ id }) => id)).toEqual(["0:0", "1:0"]);
+  });
+
+  it("binds V3 path-phase geometry to distinct tile identity without chord overshoot", () => {
+    const common = {
+      points: [500, 120, 504, 120, 504, 124, 508, 124],
+      pressures: [1, 1, 1, 1],
+      size: 16,
+    } as const;
+    const v2 = stroke({
+      ...common,
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
+    });
+    const v3 = stroke({
+      ...common,
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
+    });
+    const bounds = boundsForStudioGpuStroke(v3)!;
+
+    expect(fingerprintStudioGpuStroke(v3)).not.toBe(fingerprintStudioGpuStroke(v2));
+    expect(bounds.x).toBe(490);
+    expect(bounds.y).toBe(110);
+    expect(bounds.x + bounds.width).toBeCloseTo(515.6, 12);
+    expect(bounds.y + bounds.height).toBe(134);
+    expect(diffStudioGpuTileStates(
+      planStudioGpuTileStates([v2], DOCUMENT),
+      planStudioGpuTileStates([v3], DOCUMENT)
+    ).every(({ mode }) => mode === "rebuild")).toBe(true);
   });
 
   it("keeps cap-exceeding residual V2 strokes in tile tasks for fail-closed rendering", () => {

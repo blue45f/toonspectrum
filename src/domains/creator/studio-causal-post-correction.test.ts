@@ -10,6 +10,7 @@ import {
   resolveStudioPostCorrectionTailSamples,
   sealStudioCausalPostCorrection,
   studioPostCorrectionDependencySamples,
+  studioPostCorrectionRunsDuringPointerContact,
   type StudioCausalPostCorrectionState,
 } from "./studio-causal-post-correction";
 
@@ -42,6 +43,10 @@ function appendInChunks(
 }
 
 describe("studio causal post-correction", () => {
+  it("keeps replaceable correction tails off the canvas until pointer release", () => {
+    expect(studioPostCorrectionRunsDuringPointerContact()).toBe(false);
+  });
+
   it("derives an exact dependency lag while keeping the replaceable budget inside 8..16", () => {
     expect(studioPostCorrectionDependencySamples(0, true)).toBe(0);
     expect(studioPostCorrectionDependencySamples(5, false)).toBe(2);

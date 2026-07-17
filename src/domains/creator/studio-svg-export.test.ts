@@ -331,6 +331,30 @@ describe("도형 직렬화", () => {
     expect(skipped).toEqual([]);
   });
 
+  it("linear-residual-path-v3 펜은 급회전에서 이전 chord를 다시 칠하지 않는다", () => {
+    const pen = rectEl({
+      id: "residual-path-v3-pen-svg",
+      kind: "freehand",
+      points: [0, 0, 4, 0, 4, 4, 8, 4],
+      pressures: [1, 1, 1, 1],
+      pressureModel: "linear-residual-path-v3",
+      sampleSpacing: 0,
+      stroke: "#654321",
+      strokeWidth: 16,
+      fill: undefined,
+    });
+    const { svg, skipped } = exportPageToSvg(page([pen]));
+    const circles = svg.match(/<circle /g) ?? [];
+
+    expect(circles).toHaveLength(4);
+    expect(svg).toContain('<circle cx="0" cy="0" r="8" fill="#654321"');
+    expect(svg).toContain('<circle cx="3.2" cy="0" r="8" fill="#654321"');
+    expect(svg).toContain('<circle cx="4" cy="2.4" r="8" fill="#654321"');
+    expect(svg).toContain('<circle cx="5.6" cy="4" r="8" fill="#654321"');
+    expect(svg).not.toContain('cx="4" cy="0"');
+    expect(skipped).toEqual([]);
+  });
+
   it("명시적 선형 압력 모델은 sampleSpacing이 없는 탭과 레거시 지오메트리도 재해석한다", () => {
     const tap = rectEl({
       id: "linear-zero-tap-svg",

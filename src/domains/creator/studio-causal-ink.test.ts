@@ -5,17 +5,66 @@ import {
   planStudioCausalInk,
   planStudioCausalInkDabs,
   selectStudioCausalInkSamples,
+  shouldAppendStudioCausalInkSample,
   startStudioResidualInk,
   STUDIO_CAUSAL_INK_DEFAULT_PRESSURE,
 } from "./studio-causal-ink";
 import {
   STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+  STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
   STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
 } from "./studio-ink-pressure-model";
 import { planStudioGpuDabs } from "./studio-webgpu-engine";
 import { studioGpuPressureRadius } from "./studio-webgpu-stroke";
 
+function expectDabsClose(
+  actual: readonly { x: number; y: number; pressure: number; radius: number }[],
+  expected: readonly { x: number; y: number; pressure: number; radius: number }[]
+): void {
+  expect(actual).toHaveLength(expected.length);
+  actual.forEach((dab, index) => {
+    expect(dab.x).toBeCloseTo(expected[index]!.x, 11);
+    expect(dab.y).toBeCloseTo(expected[index]!.y, 11);
+    expect(dab.pressure).toBeCloseTo(expected[index]!.pressure, 11);
+    expect(dab.radius).toBeCloseTo(expected[index]!.radius, 11);
+  });
+}
+
 describe("studio causal ink", () => {
+  it("admits only meaningful V3 stationary pressure state through every input rate", () => {
+    const common = {
+      lastX: 9,
+      lastY: 4,
+      nextX: 9,
+      nextY: 4,
+      minDistance: 2,
+    } as const;
+    expect(shouldAppendStudioCausalInkSample({
+      ...common,
+      lastPressure: 1,
+      nextPressure: 0,
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
+    })).toBe(true);
+    expect(shouldAppendStudioCausalInkSample({
+      ...common,
+      lastPressure: 1,
+      nextPressure: 1,
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
+    })).toBe(false);
+    expect(shouldAppendStudioCausalInkSample({
+      ...common,
+      lastPressure: 1,
+      nextPressure: 0,
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
+    })).toBe(false);
+    expect(shouldAppendStudioCausalInkSample({
+      ...common,
+      lastPressure: 1,
+      nextPressure: 1,
+      nextX: 11,
+    })).toBe(true);
+  });
+
   it("consumes only the longest finite coordinate-pair prefix", () => {
     const samples = selectStudioCausalInkSamples({
       points: [0, 1, 4, 5, Number.NaN, 8, 20, 30, 99],
@@ -249,6 +298,155 @@ describe("studio causal ink", () => {
     expect(subdivided.dabs.at(-1)?.x).toBeCloseTo(9.6, 12);
     expect(subdivided.dabs.at(-1)?.x).not.toBe(12);
     expect(singleSegment.dabs).toEqual(subdivided.dabs);
+  });
+
+  it("keeps V3 residual dabs on the pointer polyline across coarse and subdivided corners", () => {
+    const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3;
+    const coarse = [
+      { x: 0, y: 0, pressure: 1, sourceIndex: 0 },
+      { x: 4, y: 0, pressure: 1, sourceIndex: 1 },
+      { x: 4, y: 4, pressure: 1, sourceIndex: 2 },
+      { x: 8, y: 4, pressure: 1, sourceIndex: 3 },
+    ] as const;
+    const subdivided = [
+      { x: 0, y: 0, pressure: 1, sourceIndex: 0 },
+      { x: 2, y: 0, pressure: 1, sourceIndex: 1 },
+      { x: 4, y: 0, pressure: 1, sourceIndex: 2 },
+      { x: 4, y: 2, pressure: 1, sourceIndex: 3 },
+      { x: 4, y: 4, pressure: 1, sourceIndex: 4 },
+      { x: 6, y: 4, pressure: 1, sourceIndex: 5 },
+      { x: 8, y: 4, pressure: 1, sourceIndex: 6 },
+    ] as const;
+    const coarsePlan = planStudioCausalInkDabs({ samples: coarse, size: 16, pressureModel });
+    const subdividedPlan = planStudioCausalInkDabs({
+      samples: subdivided,
+      size: 16,
+      pressureModel,
+    });
+    const expectedCenters = [[0, 0], [3.2, 0], [4, 2.4], [5.6, 4]] as const;
+
+    expect(coarsePlan.complete).toBe(true);
+    expect(subdividedPlan.complete).toBe(true);
+    expect(coarsePlan.dabs).toHaveLength(expectedCenters.length);
+    coarsePlan.dabs.forEach((dab, index) => {
+      expect(dab.x).toBeCloseTo(expectedCenters[index]![0], 12);
+      expect(dab.y).toBeCloseTo(expectedCenters[index]![1], 12);
+      expect(dab.radius).toBe(8);
+    });
+    expectDabsClose(subdividedPlan.dabs, coarsePlan.dabs);
+  });
+
+  it("carries V3 corner phase as immutable incremental suffixes", () => {
+    const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3;
+    const samples = [
+      { x: 0, y: 0, pressure: 1, sourceIndex: 0 },
+      { x: 4, y: 0, pressure: 1, sourceIndex: 1 },
+      { x: 4, y: 4, pressure: 1, sourceIndex: 2 },
+      { x: 8, y: 4, pressure: 1, sourceIndex: 3 },
+    ] as const;
+    const expectedPhases = [0.25, 0.5, 0.75] as const;
+    const started = startStudioResidualInk(samples[0], 16, pressureModel);
+    const incremental = [...started.dabs];
+    let state = started.state;
+
+    for (const [index, sample] of samples.slice(1).entries()) {
+      const prefix = incremental.map((dab) => ({ ...dab }));
+      const advanced = advanceStudioResidualInk(state, sample, 16, pressureModel);
+      expect(advanced.complete).toBe(true);
+      state = advanced.state;
+      incremental.push(...advanced.dabs);
+      expect(incremental.slice(0, prefix.length)).toEqual(prefix);
+      expect(state.distanceRemainder).toBe(0);
+      expect(state.spacingPhase).toBeCloseTo(expectedPhases[index]!, 12);
+    }
+
+    const full = planStudioCausalInkDabs({ samples, size: 16, pressureModel });
+    expectDabsClose(incremental, full.dabs);
+  });
+
+  it("integrates V3 pressure phase independently of source sample density", () => {
+    const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3;
+    const coarse = [
+      { x: 0, y: 0, pressure: 0.25, sourceIndex: 0 },
+      { x: 20, y: 0, pressure: 1, sourceIndex: 1 },
+    ] as const;
+    const subdivided = Array.from({ length: 5 }, (_, sourceIndex) => ({
+      x: sourceIndex * 5,
+      y: 0,
+      pressure: 0.25 + sourceIndex * 0.1875,
+      sourceIndex,
+    }));
+    const coarsePlan = planStudioCausalInkDabs({ samples: coarse, size: 16, pressureModel });
+    const subdividedPlan = planStudioCausalInkDabs({
+      samples: subdivided,
+      size: 16,
+      pressureModel,
+    });
+    const firstPressure = 0.25 * Math.exp((3.2 * 0.75) / 20);
+    const firstX = ((firstPressure - 0.25) * 20) / 0.75;
+
+    expect(coarsePlan.complete).toBe(true);
+    expect(subdividedPlan.complete).toBe(true);
+    expect(coarsePlan.dabs[1]?.x).toBeCloseTo(firstX, 11);
+    expect(coarsePlan.dabs[1]?.pressure).toBeCloseTo(firstPressure, 11);
+    expectDabsClose(subdividedPlan.dabs, coarsePlan.dabs);
+  });
+
+  it("keeps V3 density invariant while pressure crosses both spacing clamps", () => {
+    const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3;
+    const coarse = [
+      { x: 0, y: 0, pressure: 0, sourceIndex: 0 },
+      { x: 40, y: 0, pressure: 1, sourceIndex: 1 },
+    ] as const;
+    const subdividedPressures = [0, 0.025, 0.2, 0.5, 0.75, 1] as const;
+    const subdivided = subdividedPressures.map((pressure, sourceIndex) => ({
+      x: pressure * 40,
+      y: 0,
+      pressure,
+      sourceIndex,
+    }));
+    const coarsePlan = planStudioCausalInkDabs({ samples: coarse, size: 100, pressureModel });
+    const subdividedPlan = planStudioCausalInkDabs({
+      samples: subdivided,
+      size: 100,
+      pressureModel,
+    });
+
+    expect(coarsePlan.complete).toBe(true);
+    expect(subdividedPlan.complete).toBe(true);
+    expectDabsClose(subdividedPlan.dabs, coarsePlan.dabs);
+  });
+
+  it("preserves stationary V3 pressure state across live advance and sealed planning", () => {
+    const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3;
+    const samples = selectStudioCausalInkSamples({
+      points: [0, 0, 9, 0, 9, 0, 10, 0],
+      pressures: [1, 1, 0, 0],
+      pressureModel,
+      minDistance: 0,
+    });
+    expect(samples.map(({ sourceIndex }) => sourceIndex)).toEqual([0, 1, 2, 3]);
+
+    const started = startStudioResidualInk(samples[0]!, 50, pressureModel);
+    const incremental = [...started.dabs];
+    let state = started.state;
+    for (const sample of samples.slice(1)) {
+      const advanced = advanceStudioResidualInk(state, sample, 50, pressureModel);
+      expect(advanced.complete).toBe(true);
+      state = advanced.state;
+      incremental.push(...advanced.dabs);
+    }
+    const full = planStudioCausalInk({
+      points: [0, 0, 9, 0, 9, 0, 10, 0],
+      pressures: [1, 1, 0, 0],
+      pressureModel,
+      minDistance: 0,
+      size: 50,
+    });
+
+    expect(incremental.map(({ x }) => x)).toEqual([0, 9.05, 9.55]);
+    expect(incremental.slice(1).every(({ radius }) => radius === 0)).toBe(true);
+    expectDabsClose(full.dabs, incremental);
   });
 
   it("produces the full residual plan as immutable incremental suffixes", () => {

@@ -264,7 +264,6 @@ import {
   resolveStudioBrushRenderFamily,
   screentoneDotRadius,
   screentoneDotsForStroke,
-  shouldAppendStrokePoint,
   smoothStrokePoints,
   strokeRenderDistance,
   strokeSampleDistanceForScale,
@@ -349,11 +348,13 @@ import {
 import {
   planStudioCausalInk,
   selectStudioCausalInkSamples,
+  shouldAppendStudioCausalInkSample,
 } from "./studio-causal-ink";
 import {
   appendStudioCausalPostCorrection,
   createStudioCausalPostCorrectionState,
   sealStudioCausalPostCorrection,
+  studioPostCorrectionRunsDuringPointerContact,
   type StudioCausalPostCorrectionState,
   type StudioCausalPostCorrectionTransition,
 } from "./studio-causal-post-correction";
@@ -590,7 +591,7 @@ import {
 import { createCanvasImageElement } from "./studio-image-placement";
 import {
   STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
-  STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
+  STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
   studioInkFallbackPressure,
   type StudioInkPressureModel,
 } from "./studio-ink-pressure-model";
@@ -9490,6 +9491,7 @@ function StudioCuttoonEditor() {
     const samples = selectStudioCausalInkSamples({
       points: el.points,
       pressures: el.pressures,
+      pressureModel: el.pressureModel,
       minDistance: el.sampleSpacing ?? 0,
       // An in-progress retained GPU feed must never retract an already published endpoint when a
       // later sample arrives. Pointer-up explicitly seals the final endpoint below.
@@ -18198,15 +18200,13 @@ function StudioCuttoonEditor() {
         ))
       );
       const residualPressureEligible = drawMode === "pen"
-        && (fixedRateBrushFamily === "pen" || fixedRateBrushFamily === "marker")
-        && postCorrection <= 0;
+        && (fixedRateBrushFamily === "pen" || fixedRateBrushFamily === "marker");
       const pressureModel = linearPressureEligible
         ? (
-            // The fixed-lag post-correction surface owns a replaceable tail and therefore cannot
-            // carry one append-only residual phase yet. Pixel/eraser also retain their frozen V1
-            // placement; the default reference pen/marker use residual V2.
+            // Pixel/eraser retain their frozen V1 placement. Default pen/marker ink uses the V3
+            // path-phase contract even when release-only post-correction is enabled.
             residualPressureEligible
-              ? STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2
+              ? STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3
               : STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1
           )
         : undefined;
@@ -18372,18 +18372,17 @@ function StudioCuttoonEditor() {
           globalThis.clearTimeout(pendingBatch.timer);
           pendingBatch.timer = null;
         }
-        // Opaque default ink may use fixed-lag post-correction: a settled head is append-only while
-        // only its bounded tail is replaceable. Translucent/specialty paths stay on the isolated
-        // draft surface because overlapping retained pixels would still create an alpha flash.
-        const causalPostCorrectionEligible = isDirectLiveDraftEl(next)
+        // Pointer contact always shows the raw append-only stroke. The fixed-lag engine remains
+        // gated for future experiments, while production post-correction runs once on release.
+        // Translucent/specialty paths stay isolated because retained overlap can flash alpha.
+        const causalPostCorrectionEligible = studioPostCorrectionRunsDuringPointerContact()
+          && isDirectLiveDraftEl(next)
           && postCorrection > 0
           && (next.opacity ?? 1) === 1
           && next.mode !== "eraser"
           && !next.fill
           && (next.symmetry?.type ?? "none") === "none";
-        const direct = isDirectLiveDraftEl(next)
-          && (postCorrection <= 0 || causalPostCorrectionEligible)
-          && (next.opacity ?? 1) === 1;
+        const direct = isDirectLiveDraftEl(next) && (next.opacity ?? 1) === 1;
         const stampKind = resolveStudioStampBrushKind(next.brush);
         const stampDirect = Boolean(
           stampKind
@@ -18995,16 +18994,20 @@ function StudioCuttoonEditor() {
     for (const sample of samples) {
       const lastX = next.points[next.points.length - 2] ?? sample.x;
       const lastY = next.points[next.points.length - 1] ?? sample.y;
-      const distance = Math.hypot(sample.x - lastX, sample.y - lastY);
+      const pointCount = Math.floor(next.points.length / 2);
+      const lastPressure = next.pressures?.[pointCount - 1]
+        ?? studioInkFallbackPressure(next.pressureModel);
       const minimumDistance = next.sampleSpacing ?? strokeSampleDistanceForScale(effScale);
-      if (distance <= 1e-9 || !shouldAppendStrokePoint(
+      if (!shouldAppendStudioCausalInkSample({
         lastX,
         lastY,
-        sample.x,
-        sample.y,
-        minimumDistance
-      )) continue;
-      const pointCount = Math.floor(next.points.length / 2);
+        lastPressure,
+        nextX: sample.x,
+        nextY: sample.y,
+        nextPressure: sample.pressure,
+        minDistance: minimumDistance,
+        pressureModel: next.pressureModel,
+      })) continue;
       next.points.push(sample.x, sample.y);
       next.pressures = appendAligned(
         next.pressures,
@@ -19185,20 +19188,21 @@ function StudioCuttoonEditor() {
 
     const lastX = current.points[current.points.length - 2] ?? targetX;
     const lastY = current.points[current.points.length - 1] ?? targetY;
-    const pointDistance = Math.hypot(targetX - lastX, targetY - lastY);
     const lastPressure = current.pressures?.at(-1)
       ?? studioInkFallbackPressure(current.pressureModel);
     // Repeated browser samples that collapse to the same 1/16 coordinate and 10-bit pressure add
     // no information. A pressure-only change is retained so the incremental dab walker can update
     // interpolation state without repainting the stationary prefix.
-    if (pointDistance <= 1e-9 && pressure === lastPressure) return;
-    if (!shouldAppendStrokePoint(
+    if (!shouldAppendStudioCausalInkSample({
       lastX,
       lastY,
-      targetX,
-      targetY,
-      current.sampleSpacing ?? strokeSampleDistanceForScale(effScale)
-    )) return;
+      lastPressure,
+      nextX: targetX,
+      nextY: targetY,
+      nextPressure: pressure,
+      minDistance: current.sampleSpacing ?? strokeSampleDistanceForScale(effScale),
+      pressureModel: current.pressureModel,
+    })) return;
     const capturePointerDynamics = current.mode === "pen" && resolveStudioBrushDynamicsPresetId(current.brush) !== null;
     const captureStylus = current.mode === "pen" && (current.brush === "calligraphy" || capturePointerDynamics);
     const previousPointCount = Math.floor(current.points.length / 2);

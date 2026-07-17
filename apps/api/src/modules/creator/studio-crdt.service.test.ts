@@ -1916,6 +1916,40 @@ describe("StudioCrdtService", () => {
     source.destroy();
   });
 
+  it("admits the V3 path-phase extension and stationary pressure samples", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const current = service(repository);
+    const source = createStrokeDocument();
+    const stroke = source.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!;
+    stroke.set("sampleSpacing", 0);
+    stroke.set("extensions", { pressureModel: "linear-residual-path-v3" });
+    (stroke.get("points") as Y.Array<number>).push([0, 0, 9, 0, 9, 0, 10, 0]);
+    (stroke.get("pressures") as Y.Array<number>).push([1, 1, 0, 0]);
+    for (const key of ["tiltXs", "tiltYs", "twists", "speeds", "tangentialPressures"]) {
+      (stroke.get(key) as Y.Array<number>).push([0, 0, 0, 0]);
+    }
+
+    expect(hasValidStudioCrdtRootSchema(source)).toBe(true);
+    await expect(current.applyUpdate({
+      workId: "work-residual-path-v3",
+      updateId: "00000000-0000-4000-8000-000000000109",
+      actorUserId: "editor",
+      data: fromUint8Array(Y.encodeStateAsUpdate(source)),
+    })).resolves.toMatchObject({ duplicate: false });
+
+    const hydrated = new Y.Doc();
+    applySync(hydrated, await current.sync("work-residual-path-v3"));
+    const restored = hydrated.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!;
+    expect(restored.get("extensions")).toEqual({
+      pressureModel: "linear-residual-path-v3",
+    });
+    expect((restored.get("points") as Y.Array<number>).toArray())
+      .toEqual([0, 0, 9, 0, 9, 0, 10, 0]);
+    expect((restored.get("pressures") as Y.Array<number>).toArray()).toEqual([1, 1, 0, 0]);
+    hydrated.destroy();
+    source.destroy();
+  });
+
   it("rejects stroke metadata and pointer samples the browser cannot decode", () => {
     const invalidPressure = createStrokeDocument();
     const pressureStroke = invalidPressure.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!;

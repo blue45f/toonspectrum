@@ -7,6 +7,7 @@ import { selectStudioCausalInkSamples } from "./studio-causal-ink";
 import {
   resolveStudioInkPressureSamples,
   studioInkFallbackPressure,
+  studioInkUsesPathResidualDabSpacing,
   type StudioInkPressureModel,
 } from "./studio-ink-pressure-model";
 import {
@@ -227,7 +228,11 @@ export function planStudioRasterDrawPromotion(input: {
       opacity: stroke.opacity ?? 1,
       composite: stroke.composite,
       pressureModel: stroke.pressureModel ?? "studio-gpu-pressure-radius-v1",
-      pointPipeline: usesCausalGeometry ? "studio-causal-dabs-v1" : "studio-freehand-v1",
+      pointPipeline: studioInkUsesPathResidualDabSpacing(pressureModel)
+        ? "studio-causal-polyline-residual-v3"
+        : usesCausalGeometry
+          ? "studio-causal-dabs-v1"
+          : "studio-freehand-v1",
     },
   });
   return {
