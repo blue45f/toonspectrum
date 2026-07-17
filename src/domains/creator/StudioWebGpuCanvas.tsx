@@ -3,7 +3,6 @@ import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, us
 import { resolveStudioWebGpuCanvasStrokes } from "./studio-webgpu-canvas-authority";
 import {
   isStudioWebGpuCanvasActive,
-  routeStudioWebGpuCanvasRequest,
   StudioWebGpuEngine,
   type StudioGpuBackend,
   type StudioGpuFrameReadbackRequest,
@@ -16,6 +15,11 @@ import {
   sameStudioGpuStrokes,
   snapshotStudioGpuStrokes,
 } from "./studio-webgpu-stroke";
+import {
+  planStudioGpuPinnedStrokeFeedUpdate,
+  type StudioGpuStrokeOperationsAppendPatch,
+  type StudioGpuStrokeSuffixPatch,
+} from "./studio-webgpu-stroke-feed";
 
 import type { StudioWebGpuSurfaceBounds } from "./studio-webgpu-viewport";
 
@@ -72,6 +76,14 @@ export interface StudioWebGpuCanvasHandle {
    * point; the declarative `strokes` prop remains authoritative outside a pinned stroke.
    */
   readonly syncPinnedStrokes: (strokes: readonly StudioGpuStroke[]) => void;
+  /** Explicit zero-history-copy hot path for callers that already own a proven point suffix. */
+  readonly appendPinnedStrokeSuffix: (patch: StudioGpuStrokeSuffixPatch) => void;
+  /** Appends newly-started operations while retaining earlier normal/erase pixels in place. */
+  readonly appendPinnedStrokeOperations: (patch: StudioGpuStrokeOperationsAppendPatch) => void;
+  /** Replaces the pinned baseline and deliberately pays one full validation/snapshot cost. */
+  readonly replacePinnedStrokes: (strokes: readonly StudioGpuStroke[]) => void;
+  /** Clears pinned pixels while keeping the initialized backend warm. */
+  readonly resetPinnedStrokes: () => void;
   /**
    * Imperative pinned-visibility toggle. Stroke start/end flips visibility without a parent
    * render — only this small component re-renders, keeping the stroke hot path free of the
@@ -94,6 +106,14 @@ interface LatestCanvasProps {
   surfaceWidth: number | undefined;
   surfaceHeight: number | undefined;
 }
+
+type StudioGpuEngineFeedCommand =
+  | { readonly mode: "full" }
+  | { readonly mode: "replace" }
+  | { readonly mode: "append-operations"; readonly patch: StudioGpuStrokeOperationsAppendPatch }
+  | { readonly mode: "append"; readonly patch: StudioGpuStrokeSuffixPatch }
+  | { readonly mode: "retain" }
+  | { readonly mode: "reset" };
 
 function sameCanvasRequest(left: LatestCanvasProps, right: LatestCanvasProps): boolean {
   return Object.is(left.width, right.width)
@@ -165,6 +185,7 @@ function StudioWebGpuCanvas({
   const desiredRequestIdRef = useRef("frame:0");
   const lastIssuedRequestRef = useRef<LatestCanvasProps | null>(null);
   const issueLatestRequestRef = useRef<(() => void) | null>(null);
+  const pendingEngineCommandRef = useRef<StudioGpuEngineFeedCommand>({ mode: "full" });
   const pinnedStrokesRef = useRef<readonly StudioGpuStroke[] | null>(null);
   const declarativeRequestRef = useRef<LatestCanvasProps>({
     width,
@@ -206,23 +227,55 @@ function StudioWebGpuCanvas({
     ),
   };
 
+  const queuePinnedRequest = (
+    nextStrokes: readonly StudioGpuStroke[],
+    command: StudioGpuEngineFeedCommand
+  ) => {
+    pinnedStrokesRef.current = nextStrokes;
+    latestEffectiveRequestRef.current = {
+      ...declarativeRequestRef.current,
+      strokes: nextStrokes,
+    };
+    pendingEngineCommandRef.current = command;
+    requestSequenceRef.current += 1;
+    desiredRequestIdRef.current = `frame:${requestSequenceRef.current}`;
+    issueLatestRequestRef.current?.();
+  };
+
   useImperativeHandle(ref, () => ({
     captureFrame: (request) => engineRef.current?.captureFrame(request) ?? Promise.resolve({
       status: "rejected",
       reason: "frame-unavailable",
     }),
-    syncPinnedStrokes: (strokes) => {
-      pinnedStrokesRef.current = strokes;
-      const latest = { ...declarativeRequestRef.current, strokes };
-      latestEffectiveRequestRef.current = latest;
-      // 레이아웃 이펙트의 중복 발행 비교 기준도 갱신한다. 부모가 리렌더되어 선언형 EMPTY 를
-      // 다시 전달해도 파인 권한이 살아 있는 동안에는 이 임페러티브 획이 계속 우선한다.
-      lastIssuedRequestRef.current = snapshotCanvasRequest(latest);
-      const requestId = `frame:${requestSequenceRef.current + 1}`;
-      requestSequenceRef.current += 1;
-      desiredRequestIdRef.current = requestId;
-      issueLatestRequestRef.current?.();
+    syncPinnedStrokes: (nextStrokes) => {
+      const update = planStudioGpuPinnedStrokeFeedUpdate(
+        pinnedStrokesRef.current,
+        nextStrokes
+      );
+      if (update.mode === "append") {
+        queuePinnedRequest(nextStrokes, { mode: "append", patch: update.patch });
+      } else if (update.mode === "append-operations") {
+        queuePinnedRequest(nextStrokes, { mode: "append-operations", patch: update.patch });
+      } else if (update.mode === "retain") {
+        queuePinnedRequest(nextStrokes, { mode: "retain" });
+      } else if (update.mode === "reset") {
+        queuePinnedRequest(nextStrokes, { mode: "reset" });
+      } else {
+        queuePinnedRequest(nextStrokes, { mode: "replace" });
+      }
     },
+    appendPinnedStrokeSuffix: (patch) => {
+      queuePinnedRequest(patch.fallbackStrokes, { mode: "append", patch });
+    },
+    appendPinnedStrokeOperations: (patch) => {
+      queuePinnedRequest(patch.fallbackStrokes, { mode: "append-operations", patch });
+    },
+    replacePinnedStrokes: (nextStrokes) => {
+      queuePinnedRequest(nextStrokes, nextStrokes.length > 0
+        ? { mode: "replace" }
+        : { mode: "reset" });
+    },
+    resetPinnedStrokes: () => queuePinnedRequest(EMPTY_STROKES, { mode: "reset" }),
     setPinnedVisible: (visible) => {
       if (!visible && pinnedStrokesRef.current !== null) {
         // Pin release is an authority transition, not just a CSS visibility change. Restore the
@@ -231,15 +284,12 @@ function StudioWebGpuCanvas({
         pinnedStrokesRef.current = null;
         const latest = declarativeRequestRef.current;
         latestEffectiveRequestRef.current = latest;
-        if (!lastIssuedRequestRef.current
-          || !sameCanvasRequest(lastIssuedRequestRef.current, latest)) {
-          lastIssuedRequestRef.current = snapshotCanvasRequest(latest);
-          const requestId = `frame:${requestSequenceRef.current + 1}`;
-          requestSequenceRef.current += 1;
-          desiredRequestIdRef.current = requestId;
-          callbacksRef.current.onFrameInvalid?.();
-          issueLatestRequestRef.current?.();
-        }
+        lastIssuedRequestRef.current = snapshotCanvasRequest(latest);
+        pendingEngineCommandRef.current = { mode: "full" };
+        requestSequenceRef.current += 1;
+        desiredRequestIdRef.current = `frame:${requestSequenceRef.current}`;
+        callbacksRef.current.onFrameInvalid?.();
+        issueLatestRequestRef.current?.();
       }
       setPinnedVisibleState(visible);
     },
@@ -293,31 +343,45 @@ function StudioWebGpuCanvas({
       });
     };
 
+    const requestInitialization = () => {
+      if (initializationRequested) return;
+      initializationRequested = true;
+      void engine.initialize().then(() => {
+        if (!mounted || engineRef.current !== engine) return;
+        const current = latestEffectiveRequestRef.current;
+        pendingEngineCommandRef.current = pinnedStrokesRef.current !== null
+          ? (current.strokes.length > 0 ? { mode: "replace" } : { mode: "reset" })
+          : { mode: "full" };
+        issueLatestRequestRef.current?.();
+      });
+    };
+
     const issueLatestRequest = () => {
       const latest = latestEffectiveRequestRef.current;
       const requestId = desiredRequestIdRef.current;
-      routeStudioWebGpuCanvasRequest({
-        engine,
-        strokes: latest.strokes,
-        requestId,
-        syncViewport,
-        requestInitialization: () => {
-          if (initializationRequested) return;
-          initializationRequested = true;
-          void engine.initialize().then(() => {
-            if (!mounted || engineRef.current !== engine) return;
-            const current = latestEffectiveRequestRef.current;
-            routeStudioWebGpuCanvasRequest({
-              engine,
-              strokes: current.strokes,
-              requestId: desiredRequestIdRef.current,
-              syncViewport,
-              // This initialization attempt already selected WebGPU or the Canvas2D fallback.
-              requestInitialization: () => undefined,
-            });
-          });
-        },
-      });
+      const command = pendingEngineCommandRef.current;
+      pendingEngineCommandRef.current = { mode: "full" };
+      const requiresFullValidation = command.mode === "full" || command.mode === "replace";
+      if (
+        command.mode === "reset"
+        || (requiresFullValidation && !isStudioWebGpuCanvasActive(latest.strokes))
+      ) {
+        engine.resetStrokeFeed(requestId);
+        return;
+      }
+      syncViewport();
+      if (command.mode === "append") {
+        engine.appendStrokeFeedSuffix(command.patch, requestId);
+      } else if (command.mode === "append-operations") {
+        engine.appendStrokeFeedOperations(command.patch, requestId);
+      } else if (command.mode === "retain") {
+        engine.retainStrokeFeed(requestId);
+      } else if (command.mode === "replace") {
+        engine.replaceStrokeFeed(latest.strokes, requestId);
+      } else {
+        engine.render(latest.strokes, requestId);
+      }
+      requestInitialization();
     };
     issueLatestRequestRef.current = issueLatestRequest;
     issueLatestRequest();
@@ -329,13 +393,10 @@ function StudioWebGpuCanvas({
       void engine.initialize().then(() => {
         if (!mounted || engineRef.current !== engine) return;
         const current = latestEffectiveRequestRef.current;
-        routeStudioWebGpuCanvasRequest({
-          engine,
-          strokes: current.strokes,
-          requestId: desiredRequestIdRef.current,
-          syncViewport,
-          requestInitialization: () => undefined,
-        });
+        pendingEngineCommandRef.current = pinnedStrokesRef.current !== null
+          ? (current.strokes.length > 0 ? { mode: "replace" } : { mode: "reset" })
+          : { mode: "full" };
+        issueLatestRequest();
       });
     }
 
@@ -366,6 +427,9 @@ function StudioWebGpuCanvas({
   // same layout phase. This semantic comparison deliberately avoids a hash collision becoming an
   // authority decision and also tolerates parents rebuilding equivalent stroke arrays.
   useLayoutEffect(() => {
+    // Imperative pinning owns both pixels and request sequencing. Skipping this comparison avoids
+    // copying/comparing the growing live point arrays when an unrelated parent render occurs.
+    if (pinnedStrokesRef.current !== null) return;
     const latest = latestEffectiveRequestRef.current;
     if (lastIssuedRequestRef.current && sameCanvasRequest(lastIssuedRequestRef.current, latest)) {
       return;
@@ -374,6 +438,7 @@ function StudioWebGpuCanvas({
     const requestId = `frame:${requestSequenceRef.current + 1}`;
     requestSequenceRef.current += 1;
     desiredRequestIdRef.current = requestId;
+    pendingEngineCommandRef.current = { mode: "full" };
     callbacksRef.current.onFrameInvalid?.();
     issueLatestRequestRef.current?.();
   });

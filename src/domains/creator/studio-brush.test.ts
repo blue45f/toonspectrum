@@ -18,6 +18,7 @@ import {
   pressureCurveValueForPreset,
   resampleStrokePressures,
   resolveBrushPressureSample,
+  resolveBrushReleasePressureSample,
   resolveStudioBrushRenderFamily,
   sanitizeCalligraphyTipSettings,
   screentoneDotRadius,
@@ -303,6 +304,50 @@ describe("resolveBrushPressureSample", () => {
       velocitySensitivity: 1,
       pressureCurve: 1,
     })).toBeCloseTo(0.625, 10);
+  });
+});
+
+describe("resolveBrushReleasePressureSample", () => {
+  it("reuses the last curved contact pressure for a pen pointerup that reports non-contact zero", () => {
+    expect(resolveBrushReleasePressureSample({
+      pointerType: "pen",
+      rawPressure: 0,
+      lastContactPressure: 0.6,
+      pressureCurve: 2,
+      fallbackPressure: 0.5,
+    })).toBe(0.6);
+  });
+
+  it("does not change the ordinary in-contact zero-pressure contract", () => {
+    expect(resolveBrushPressureSample({
+      pointerType: "pen",
+      rawPressure: 0,
+      pressureCurve: 2,
+    })).toBe(0);
+  });
+
+  it("still resolves a usable non-zero pen release sample through the configured curve", () => {
+    expect(resolveBrushReleasePressureSample({
+      pointerType: "pen",
+      rawPressure: 0.7,
+      lastContactPressure: 0.2,
+      pressureCurve: 2,
+    })).toBeCloseTo(0.49, 10);
+  });
+
+  it("sanitizes a malformed last contact value and leaves non-pen fallback behavior unchanged", () => {
+    expect(resolveBrushReleasePressureSample({
+      pointerType: "pen",
+      rawPressure: 0,
+      lastContactPressure: Number.NaN,
+      fallbackPressure: 0.4,
+    })).toBe(0.4);
+    expect(resolveBrushReleasePressureSample({
+      pointerType: "mouse",
+      rawPressure: 0,
+      lastContactPressure: 0.9,
+      fallbackPressure: 0.5,
+    })).toBe(0.5);
   });
 });
 

@@ -1,4 +1,5 @@
 import {
+  STUDIO_GPU_STROKE_FEED_REVISION,
   orderStudioGpuStrokes,
   studioGpuPressureRadius,
   type StudioGpuStroke,
@@ -24,13 +25,16 @@ export interface StudioGpuTileOperation {
   readonly id: string;
   /** Fast cache precheck only; exact equality must also compare `signature`. */
   readonly fingerprint: string;
-  /** Collision-free length-prefixed semantic snapshot of every render-affecting stroke field. */
+  /** Collision-free semantic snapshot, or a process-unique trusted feed revision identity. */
   readonly signature: string;
   /** Exact metadata used only to prove that the terminal live stroke is an immutable point suffix. */
   readonly strokeStyleSignature?: string;
   readonly pointSamplesSignature?: string;
   readonly pressureSamplesSignature?: string;
   readonly pointCount?: number;
+  /** Trusted in-process lineage; equal lineage plus a larger point count proves an append. */
+  readonly feedLineage?: string;
+  readonly feedRevisionToken?: string;
 }
 
 export interface StudioGpuTileStrokeExtension {
@@ -167,6 +171,20 @@ function strokeStyleSignature(stroke: StudioGpuStroke): string {
 }
 
 function operationForStudioGpuStroke(stroke: StudioGpuStroke): StudioGpuTileOperation {
+  const feed = stroke[STUDIO_GPU_STROKE_FEED_REVISION];
+  if (feed) {
+    return {
+      id: stroke.id,
+      fingerprint: `feed:${feed.token}`,
+      signature: `feed:${feed.token}`,
+      strokeStyleSignature: feed.styleSignature,
+      pointSamplesSignature: `feed:${feed.token}:points`,
+      pressureSamplesSignature: `feed:${feed.token}:pressures`,
+      pointCount: feed.pointCount,
+      feedLineage: feed.lineage,
+      feedRevisionToken: feed.token,
+    };
+  }
   const pointCount = Math.floor(stroke.points.length / 2);
   return {
     id: stroke.id,
@@ -182,8 +200,10 @@ function operationForStudioGpuStroke(stroke: StudioGpuStroke): StudioGpuTileOper
   };
 }
 
-/** Exact, immutable operation snapshot. Length prefixes make adjacent fields unambiguous. */
+/** Exact immutable operation identity. Full strokes use unambiguous length-prefixed fields. */
 export function signatureStudioGpuStroke(stroke: StudioGpuStroke): string {
+  const feed = stroke[STUDIO_GPU_STROKE_FEED_REVISION];
+  if (feed) return `feed:${feed.token}`;
   const tokens: string[] = [];
   const write = (value: string | number | undefined) => tokens.push(semanticToken(value));
   write(stroke.id);
@@ -201,6 +221,8 @@ export function signatureStudioGpuStroke(stroke: StudioGpuStroke): string {
 
 /** Stable, locale-independent precheck; callers must retain the exact signature beside it. */
 export function fingerprintStudioGpuStroke(stroke: StudioGpuStroke): string {
+  const feed = stroke[STUDIO_GPU_STROKE_FEED_REVISION];
+  if (feed) return `feed:${feed.token}`;
   let hash = fnv1a(stroke.id);
   const write = (value: string | number | undefined) => {
     const token = typeof value === "number" ? stableNumber(value) : value ?? "<undefined>";
@@ -223,6 +245,16 @@ export function boundsForStudioGpuStroke(
   stroke: StudioGpuStroke,
   bleed = STUDIO_GPU_TILE_BLEED
 ): StudioGpuRect | null {
+  const feed = stroke[STUDIO_GPU_STROKE_FEED_REVISION];
+  if (feed) {
+    const edgeBleed = Math.max(0, finiteOr(bleed, STUDIO_GPU_TILE_BLEED));
+    return {
+      x: feed.minimumX - edgeBleed,
+      y: feed.minimumY - edgeBleed,
+      width: Math.max(0, feed.maximumX - feed.minimumX + edgeBleed * 2),
+      height: Math.max(0, feed.maximumY - feed.minimumY + edgeBleed * 2),
+    };
+  }
   const pointCount = Math.floor(stroke.points.length / 2);
   if (pointCount < 1) return null;
   const size = positiveOr(stroke.size, 1);
@@ -418,6 +450,18 @@ function terminalStrokeExtension(
   }
   const before = previous[terminalIndex]!;
   const after = next[terminalIndex]!;
+  const trustedFeedExtension = before.id === after.id
+    && before.feedLineage !== undefined
+    && after.feedLineage === before.feedLineage
+    && before.strokeStyleSignature !== undefined
+    && after.strokeStyleSignature === before.strokeStyleSignature
+    && before.pointCount !== undefined
+    && after.pointCount !== undefined
+    && Number.isSafeInteger(before.pointCount)
+    && Number.isSafeInteger(after.pointCount)
+    && before.pointCount >= 1
+    && after.pointCount > before.pointCount;
+  if (trustedFeedExtension) return { previous: before, next: after };
   if (
     before.id !== after.id
     || before.strokeStyleSignature === undefined

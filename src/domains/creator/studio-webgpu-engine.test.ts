@@ -12,6 +12,8 @@ import {
   type StudioGpuStroke,
 } from "./studio-webgpu-engine";
 
+import type { StudioGpuStrokeSuffixPatch } from "./studio-webgpu-stroke-feed";
+
 interface Deferred<Value> {
   promise: Promise<Value>;
   resolve: (value: Value) => void;
@@ -415,6 +417,124 @@ describe("StudioWebGpuEngine", () => {
     expect(fallback.clearRect).toHaveBeenCalledTimes(clearsAfterInitial + 2);
   });
 
+  it("feeds a tap, pointer suffix, and final seal without rereading retained point history", () => {
+    const gpuSurface = fakeGpuCanvas(null);
+    const fallback = fakeCanvas2d();
+    const engine = new StudioWebGpuEngine({
+      canvas: gpuSurface,
+      fallbackCanvas: fallback.canvas,
+      gpu: null,
+    });
+    const tap = stroke({ points: [2, 3], pressures: [0.5] });
+    engine.resize({ logicalWidth: 100, logicalHeight: 80 });
+    engine.replaceStrokeFeed([tap], "feed:tap");
+    expect(fallback.arcs).toHaveLength(1);
+    const clearsAfterTap = fallback.clearRect.mock.calls.length;
+
+    const movedPoints = new Proxy([2, 3, 9, 7], {
+      get(target, property, receiver) {
+        if (property === "0" || property === "1") {
+          throw new Error("retained tap history was read");
+        }
+        return Reflect.get(target, property, receiver);
+      },
+    });
+    const moved = stroke({ points: movedPoints, pressures: [0.5, 0.8] });
+    const movedPatch: StudioGpuStrokeSuffixPatch = {
+      strokeIndex: 0,
+      previousPointCount: 1,
+      suffixPoints: [9, 7],
+      suffixPressures: [0.8],
+      nextStroke: moved,
+      fallbackStrokes: [moved],
+    };
+    expect(engine.appendStrokeFeedSuffix(movedPatch, "feed:moved")).toBe("appended");
+    const arcsAfterMove = fallback.arcs.length;
+    expect(arcsAfterMove).toBeGreaterThan(1);
+    expect(fallback.clearRect).toHaveBeenCalledTimes(clearsAfterTap);
+
+    const sealedPoints = new Proxy([2, 3, 9, 7, 10, 8], {
+      get(target, property, receiver) {
+        if (["0", "1", "2", "3"].includes(String(property))) {
+          throw new Error("retained move history was read");
+        }
+        return Reflect.get(target, property, receiver);
+      },
+    });
+    const sealed = stroke({ points: sealedPoints, pressures: [0.5, 0.8, 0.7] });
+    expect(engine.appendStrokeFeedSuffix({
+      strokeIndex: 0,
+      previousPointCount: 2,
+      suffixPoints: [10, 8],
+      suffixPressures: [0.7],
+      nextStroke: sealed,
+      fallbackStrokes: [sealed],
+    }, "feed:sealed")).toBe("appended");
+    expect(fallback.arcs.length).toBeGreaterThan(arcsAfterMove);
+    expect(fallback.clearRect).toHaveBeenCalledTimes(clearsAfterTap);
+  });
+
+  it("falls back to a full rebuild when an append patch has stale lineage", () => {
+    const gpuSurface = fakeGpuCanvas(null);
+    const fallback = fakeCanvas2d();
+    const engine = new StudioWebGpuEngine({
+      canvas: gpuSurface,
+      fallbackCanvas: fallback.canvas,
+      gpu: null,
+    });
+    const initial = stroke({ points: [0, 0, 10, 0], pressures: [0.4, 0.6] });
+    engine.resize({ logicalWidth: 100, logicalHeight: 80 });
+    engine.replaceStrokeFeed([initial], "feed:initial");
+    const clearsAfterInitial = fallback.clearRect.mock.calls.length;
+    const replacement = stroke({
+      points: [0, 0, 9, 1, 14, 2],
+      pressures: [0.4, 0.7, 0.8],
+    });
+
+    expect(engine.appendStrokeFeedSuffix({
+      strokeIndex: 0,
+      previousPointCount: 1,
+      suffixPoints: [14, 2],
+      suffixPressures: [0.8],
+      nextStroke: replacement,
+      fallbackStrokes: [replacement],
+    }, "feed:rebuild")).toBe("rebuilt");
+    expect(fallback.clearRect).toHaveBeenCalledTimes(clearsAfterInitial + 1);
+  });
+
+  it("appends a newly-started operation without replaying retained strokes", () => {
+    const gpuSurface = fakeGpuCanvas(null);
+    const fallback = fakeCanvas2d();
+    const engine = new StudioWebGpuEngine({
+      canvas: gpuSurface,
+      fallbackCanvas: fallback.canvas,
+      gpu: null,
+    });
+    const completed = stroke({ id: "completed", points: [0, 0, 10, 0] });
+    engine.resize({ logicalWidth: 100, logicalHeight: 80 });
+    engine.replaceStrokeFeed([completed], "feed:completed");
+    const clearsAfterCompleted = fallback.clearRect.mock.calls.length;
+    const arcsAfterCompleted = fallback.arcs.length;
+    const next = stroke({ id: "next", points: [20, 20], pressures: [0.6] });
+
+    expect(engine.appendStrokeFeedOperations({
+      previousStrokeCount: 1,
+      suffixStrokes: [next],
+      fallbackStrokes: [completed, next],
+    }, "feed:next")).toBe("appended");
+    expect(fallback.clearRect).toHaveBeenCalledTimes(clearsAfterCompleted);
+    expect(fallback.arcs).toHaveLength(arcsAfterCompleted + 1);
+
+    const editedCompleted = stroke({ id: "completed", points: [0, 0, 9, 1] });
+    const third = stroke({ id: "third", points: [30, 30], pressures: [0.7] });
+    expect(engine.appendStrokeFeedOperations({
+      previousStrokeCount: 2,
+      suffixStrokes: [third],
+      fallbackStrokes: [editedCompleted, next, third],
+    }, "feed:edited-prefix")).toBe("rebuilt");
+    expect(fallback.clearRect).toHaveBeenCalledTimes(clearsAfterCompleted + 1);
+  });
+
   it("snapshots retained operations so an in-place pointer tail cannot receive a stale receipt", () => {
     const gpuSurface = fakeGpuCanvas(null);
     const fallback = fakeCanvas2d();
@@ -792,12 +912,23 @@ describe("StudioWebGpuEngine", () => {
       points: [0, 10, 20, 10],
       pressures: [0.5, 0.6],
     });
-    const extended = stroke({
+    const expectedExtended = stroke({
       points: [0, 10, 20, 10, 40, 10],
       pressures: [0.5, 0.6, 0.8],
     });
+    const extended = stroke({
+      points: new Proxy([0, 10, 20, 10, 40, 10], {
+        get(target, property, receiver) {
+          if (["0", "1", "2", "3"].includes(String(property))) {
+            throw new Error("WebGPU feed reread retained point history");
+          }
+          return Reflect.get(target, property, receiver);
+        },
+      }),
+      pressures: [0.5, 0.6, 0.8],
+    });
     engine.resize({ logicalWidth: 100, logicalHeight: 80 });
-    engine.render([initial], "suffix:initial");
+    engine.replaceStrokeFeed([initial], "suffix:initial");
     await engine.initialize();
     await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalledWith(expect.objectContaining({
       backend: "webgpu",
@@ -806,12 +937,19 @@ describe("StudioWebGpuEngine", () => {
 
     vi.mocked(fake.device.queue.writeBuffer).mockClear();
     vi.mocked(fake.encoder.beginRenderPass).mockClear();
-    engine.render([extended], "suffix:extended");
+    expect(engine.appendStrokeFeedSuffix({
+      strokeIndex: 0,
+      previousPointCount: 2,
+      suffixPoints: [40, 10],
+      suffixPressures: [0.8],
+      nextStroke: extended,
+      fallbackStrokes: [extended],
+    }, "suffix:extended")).toBe("appended");
     await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalledWith(expect.objectContaining({
       requestId: "suffix:extended",
     })));
 
-    const suffix = planStudioGpuDabUpdate([initial], [extended]);
+    const suffix = planStudioGpuDabUpdate([initial], [expectedExtended]);
     expect(renderPassDescriptors(fake).some((descriptor) => (
       descriptor.colorAttachments.some((attachment) => attachment?.loadOp === "load")
     ))).toBe(true);
