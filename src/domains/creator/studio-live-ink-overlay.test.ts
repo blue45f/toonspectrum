@@ -76,6 +76,31 @@ function setup(style: StudioLiveInkStrokeStyle = STYLE) {
   return { renderer, ...recording };
 }
 
+function addStroke(
+  renderer: StudioLiveInkOverlayRenderer,
+  points: readonly number[],
+  pressures: readonly number[],
+  style: StudioLiveInkStrokeStyle = STYLE
+): void {
+  expect(points.length).toBeGreaterThanOrEqual(2);
+  expect(renderer.begin(style, points[0]!, points[1]!, pressures[0] ?? 0.5)).toBe(true);
+  renderer.appendFrom(points, pressures);
+  renderer.end();
+}
+
+function canonicalStrokeDabs(
+  points: readonly number[],
+  pressures: readonly number[],
+  style: StudioLiveInkStrokeStyle = STYLE
+): readonly RecordedDab[] {
+  const recording = recordingCanvas();
+  const renderer = new StudioLiveInkOverlayRenderer();
+  renderer.attach(recording.canvas);
+  renderer.setSurface(SURFACE);
+  addStroke(renderer, points, pressures, style);
+  return recording.dabs;
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -158,6 +183,129 @@ describe("StudioLiveInkOverlayRenderer", () => {
     expect(recording.dabs.slice(0, stablePrefix.length)).toEqual(stablePrefix);
     expect(recording.dabs.at(-1)).toMatchObject({ x: 20, y: 4, radius: 6.75 });
   });
+
+  it("releases only the committed settled prefix and exactly replays newer settled ink", () => {
+    const recording = recordingCanvas();
+    const renderer = new StudioLiveInkOverlayRenderer();
+    renderer.attach(recording.canvas);
+    renderer.setSurface(SURFACE);
+    const first = [0, 4, 12, 4, 20, 8];
+    const second = [30, 10, 38, 14, 46, 10];
+    const third = [58, 16, 66, 20, 78, 18];
+    const pressures = [0.25, 0.5, 0.75];
+    addStroke(renderer, first, pressures);
+    addStroke(renderer, second, pressures);
+    addStroke(renderer, third, pressures);
+    expect(renderer.settledStrokeCount).toBe(3);
+
+    const beforeRelease = recording.dabs.length;
+    recording.clearRect.mockClear();
+    expect(renderer.releaseSettledPrefix(2)).toBe(2);
+
+    expect(renderer.settledStrokeCount).toBe(1);
+    expect(renderer.hasSettledStrokes).toBe(true);
+    expect(recording.clearRect).toHaveBeenCalledTimes(1);
+    expect(recording.clearRect).toHaveBeenLastCalledWith(
+      0,
+      0,
+      recording.canvas.width,
+      recording.canvas.height
+    );
+    expect(recording.dabs.slice(beforeRelease)).toEqual(
+      canonicalStrokeDabs(third, pressures)
+    );
+  });
+
+  it("preserves and exactly replays an active stroke while its settled prefix is released", () => {
+    const recording = recordingCanvas();
+    const renderer = new StudioLiveInkOverlayRenderer();
+    renderer.attach(recording.canvas);
+    renderer.setSurface(SURFACE);
+    addStroke(renderer, [0, 0, 10, 0, 18, 4], [0.25, 0.5, 0.75]);
+
+    const activePoints = [40, 24, 48, 24, 56, 30];
+    const activePressures = [0.4, 0.6, 0.8];
+    expect(renderer.begin(
+      STYLE,
+      activePoints[0]!,
+      activePoints[1]!,
+      activePressures[0]!
+    )).toBe(true);
+    renderer.appendFrom(activePoints, activePressures);
+    const expectedActive = canonicalStrokeDabs(activePoints, activePressures);
+    const beforeRelease = recording.dabs.length;
+    recording.clearRect.mockClear();
+
+    expect(renderer.clearSettled()).toBe(1);
+
+    expect(renderer.isActive).toBe(true);
+    expect(renderer.settledStrokeCount).toBe(0);
+    expect(recording.clearRect).toHaveBeenCalledTimes(1);
+    expect(recording.dabs.slice(beforeRelease)).toEqual(expectedActive);
+
+    const stableReplay = recording.dabs.slice(beforeRelease).map((dab) => ({ ...dab }));
+    renderer.appendFrom(
+      [...activePoints, 68, 34],
+      [...activePressures, 1]
+    );
+    expect(recording.dabs.slice(beforeRelease, beforeRelease + stableReplay.length)).toEqual(
+      stableReplay
+    );
+    expect(recording.dabs.at(-1)).toMatchObject({ x: 68, y: 34, radius: 8.5 });
+  });
+
+  it("treats a zero release as a no-op and clamps an excess release without orphan pixels", () => {
+    const recording = recordingCanvas();
+    const renderer = new StudioLiveInkOverlayRenderer();
+    renderer.attach(recording.canvas);
+    renderer.setSurface(SURFACE);
+    addStroke(renderer, [4, 6, 12, 6], [0.3, 0.6]);
+    addStroke(renderer, [30, 8, 42, 12], [0.5, 0.9]);
+    const beforeNoop = recording.dabs.map((dab) => ({ ...dab }));
+    recording.clearRect.mockClear();
+
+    expect(renderer.releaseSettledPrefix(0)).toBe(0);
+    expect(renderer.releaseSettledPrefix(Number.NaN)).toBe(0);
+    expect(renderer.releaseSettledPrefix(-2)).toBe(0);
+    expect(renderer.settledStrokeCount).toBe(2);
+    expect(recording.clearRect).not.toHaveBeenCalled();
+    expect(recording.dabs).toEqual(beforeNoop);
+
+    const beforeExcessRelease = recording.dabs.length;
+    expect(renderer.releaseSettledPrefix(99)).toBe(2);
+    expect(renderer.settledStrokeCount).toBe(0);
+    expect(renderer.hasSettledStrokes).toBe(false);
+    expect(recording.clearRect).toHaveBeenCalledTimes(1);
+    // With no newer settled or active ink, replay must leave the cleared backing empty.
+    expect(recording.dabs.slice(beforeExcessRelease)).toEqual([]);
+  });
+
+  it("resets only active ink and replays settled ink without losing its exact footprint", () => {
+    const recording = recordingCanvas();
+    const renderer = new StudioLiveInkOverlayRenderer();
+    renderer.attach(recording.canvas);
+    renderer.setSurface(SURFACE);
+    const settledPoints = [6, 50, 18, 46, 28, 52];
+    const settledPressures = [0.25, 0.55, 0.85];
+    addStroke(renderer, settledPoints, settledPressures);
+    expect(renderer.begin(STYLE, 50, 50, 0.5)).toBe(true);
+    renderer.appendFrom([50, 50, 60, 44, 72, 48], [0.5, 0.7, 1]);
+    const beforeReset = recording.dabs.length;
+    recording.clearRect.mockClear();
+
+    expect(renderer.resetActive()).toBe(true);
+
+    expect(renderer.isActive).toBe(false);
+    expect(renderer.settledStrokeCount).toBe(1);
+    expect(recording.clearRect).toHaveBeenCalledTimes(1);
+    expect(recording.dabs.slice(beforeReset)).toEqual(
+      canonicalStrokeDabs(settledPoints, settledPressures)
+    );
+
+    recording.clearRect.mockClear();
+    expect(renderer.resetActive()).toBe(false);
+    expect(recording.clearRect).not.toHaveBeenCalled();
+  });
 });
 
 describe("StudioLiveInkPredictionRenderer", () => {
@@ -195,14 +343,14 @@ describe("StudioLiveInkPredictionRenderer", () => {
     expect(recording.dabs.slice(firstTailDabCount).at(-1)).toMatchObject({ x: 12, y: 8 });
   });
 
-  it("uses the same capped DPR transform and clears predictions without touching a full viewport", () => {
+  it("matches the committed DPR transform and clears predictions without touching a full viewport", () => {
     vi.stubGlobal("devicePixelRatio", 3);
     const recording = recordingCanvas();
     const renderer = new StudioLiveInkPredictionRenderer();
     renderer.attach(recording.canvas);
     renderer.setSurface(SURFACE);
-    expect(recording.canvas.width).toBe(SURFACE.width * 2);
-    expect(recording.canvas.height).toBe(SURFACE.height * 2);
+    expect(recording.canvas.width).toBe(SURFACE.width * 3);
+    expect(recording.canvas.height).toBe(SURFACE.height * 3);
     recording.clearRect.mockClear();
 
     renderer.apply({

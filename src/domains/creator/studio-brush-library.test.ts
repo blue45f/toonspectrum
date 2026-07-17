@@ -89,7 +89,7 @@ describe("sanitizeBrushSnapshot", () => {
     const { snapshot, adjustedFields } = sanitizeBrushSnapshot(null);
     expect(snapshot.brushId).toBe("pen");
     expect(snapshot.color).toBe("#7c5cfc");
-    expect(snapshot.stabilizer).toBe(0);
+    expect(snapshot.stabilizer).toBe(3.4);
     expect(snapshot.postCorrection).toBe(0);
     expect(snapshot.useVelocityPressure).toBe(false);
     expect(adjustedFields).toContain("brushId");
@@ -133,7 +133,7 @@ describe("sanitizeBrushSnapshot", () => {
       pressureCurve: "1.0" as unknown as number,
     });
     expect(snapshot.strokeWidth).toBe(6);
-    expect(snapshot.stabilizer).toBe(0);
+    expect(snapshot.stabilizer).toBe(3.4);
     expect(snapshot.pressureCurve).toBe(1.0);
     expect(adjustedFields).toEqual(["strokeWidth", "stabilizer", "pressureCurve"]);
   });
@@ -163,7 +163,7 @@ describe("sanitizeBrushSnapshot", () => {
       postCorrection: 999,
       preserveCorners: "yes",
     });
-    expect(snapshot.stabilizerMode).toBe("adaptive");
+    expect(snapshot.stabilizerMode).toBe("standard");
     expect(snapshot.postCorrection).toBe(10);
     expect(snapshot.preserveCorners).toBe(true);
     expect(adjustedFields).toEqual(["postCorrection", "stabilizerMode", "preserveCorners"]);
@@ -348,7 +348,7 @@ describe("listBrushes", () => {
     const s = fakeStorage({ [BRUSH_LIBRARY_KEY]: JSON.stringify([legacy]) });
     expect(listBrushes(s)[0]).toMatchObject({
       id: "legacy-v2",
-      stabilizerMode: "adaptive",
+      stabilizerMode: "standard",
       postCorrection: 0,
       preserveCorners: true,
     });

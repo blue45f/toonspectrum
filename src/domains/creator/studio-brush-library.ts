@@ -149,16 +149,16 @@ export const BRUSH_TIP_ROUNDNESS_RANGE = [0.08, 1] as const;
 /**
  * 새 캔버스와 누락 필드를 가진 레거시 브러시가 공유하는 기본 필기감.
  *
- * 속도 기반 마우스 필압과 강한 이중 보정은 실제 포인터보다 굵고 늦은 선을 만들기 때문에
- * opt-in 고급 설정으로 남긴다. 기본값은 명목 브러시 크기와 포인터 궤적을 우선한다.
+ * 기본 펜은 상용 협업 캔버스와 같은 5ms 고정 주기·10단 cascade 응답(3.4)을 사용한다.
+ * 브라우저가 coalesced 이벤트를 어떤 묶음으로 전달해도 동일한 궤적을 만들며, 후보정은 끈다.
  */
 export const DEFAULT_STUDIO_BRUSH_SNAPSHOT: StudioBrushSnapshot = {
   brushId: "pen",
   strokeWidth: 6,
   brushOpacity: 1,
   color: "#7c5cfc",
-  stabilizer: 0,
-  stabilizerMode: "adaptive",
+  stabilizer: 3.4,
+  stabilizerMode: "standard",
   postCorrection: 0,
   preserveCorners: true,
   pressureCurve: 1.0,

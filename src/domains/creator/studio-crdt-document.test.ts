@@ -13,6 +13,7 @@ import {
   STUDIO_CRDT_SCENE_ELEMENT_MAX_BYTES,
   STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION,
   StudioCrdtDocument,
+  type StudioCrdtChange,
   type StudioCrdtDrawStrokePayload,
   type StudioCrdtPageInput,
   type StudioCrdtSceneElementInput,
@@ -820,6 +821,87 @@ describe("StudioCrdtDocument", () => {
     const streamedChange = remoteOnly.mock.calls.at(-1)?.[0];
     expect([...streamedChange.changedStrokeIds]).toEqual(["remote-stream"]);
     document.destroy();
+    remote.destroy();
+  });
+
+  it("materializes enumerable change snapshots only when each field is read and caches them", () => {
+    const receiver = new StudioCrdtDocument();
+    const remote = new StudioCrdtDocument();
+    remote.addStroke(stroke("lazy-stroke", "page-a"));
+    remote.addSceneElement(textElement("lazy-text"));
+    remote.addPage(page("page-a"));
+
+    const getStrokes = vi.spyOn(receiver, "getStrokes");
+    const getSceneElements = vi.spyOn(receiver, "getSceneElements");
+    const getPages = vi.spyOn(receiver, "getPages");
+    const getLayerGroups = vi.spyOn(receiver, "getLayerGroups");
+    const readRasterSnapshot = vi.spyOn(
+      receiver as unknown as { tryReadExactRasterDocumentSnapshot(): unknown },
+      "tryReadExactRasterDocumentSnapshot"
+    );
+    let captured: StudioCrdtChange | undefined;
+    receiver.subscribeChanges((change) => {
+      captured = change;
+      void change.changedStrokeIds.size;
+    }, {
+      includeOrigin: (origin) => origin === STUDIO_CRDT_ORIGIN_REMOTE,
+    });
+
+    receiver.applyUpdate(remote.encodeStateAsUpdate(), STUDIO_CRDT_ORIGIN_REMOTE);
+
+    expect(captured).toBeDefined();
+    expect(Object.keys(captured!)).toEqual([
+      "origin",
+      "local",
+      "changedStrokeIds",
+      "strokes",
+      "changedSceneElementIds",
+      "sceneElements",
+      "changedPageIds",
+      "pages",
+      "changedLayerGroupIds",
+      "layerGroups",
+      "changedRasterSurfaceIds",
+      "changedRasterOperationIds",
+      "changedRasterUndoOperationIds",
+      "changedRasterUndoAcknowledgementIds",
+      "changedRasterCheckpointIds",
+      "rasterOperationLogs",
+      "rasterCheckpoints",
+    ]);
+    expect(getStrokes).not.toHaveBeenCalled();
+    expect(getSceneElements).not.toHaveBeenCalled();
+    expect(getPages).not.toHaveBeenCalled();
+    expect(getLayerGroups).not.toHaveBeenCalled();
+    expect(readRasterSnapshot).not.toHaveBeenCalled();
+
+    const strokes = captured!.strokes;
+    expect(strokes.map(({ id }) => id)).toEqual(["lazy-stroke"]);
+    expect(captured!.strokes).toBe(strokes);
+    expect(getStrokes).toHaveBeenCalledTimes(1);
+
+    const sceneElements = captured!.sceneElements;
+    expect(sceneElements.map(({ id }) => id)).toEqual(["lazy-text"]);
+    expect(captured!.sceneElements).toBe(sceneElements);
+    expect(getSceneElements).toHaveBeenCalledTimes(1);
+
+    const pages = captured!.pages;
+    expect(pages.map(({ id }) => id)).toEqual(["page-a"]);
+    expect(captured!.pages).toBe(pages);
+    expect(getPages).toHaveBeenCalledTimes(1);
+
+    const layerGroups = captured!.layerGroups;
+    expect(layerGroups).toEqual([]);
+    expect(captured!.layerGroups).toBe(layerGroups);
+    expect(getLayerGroups).toHaveBeenCalledTimes(1);
+
+    const rasterOperationLogs = captured!.rasterOperationLogs;
+    expect(rasterOperationLogs).toEqual([]);
+    expect(captured!.rasterOperationLogs).toBe(rasterOperationLogs);
+    expect(captured!.rasterCheckpoints).toEqual([]);
+    expect(readRasterSnapshot).toHaveBeenCalledTimes(1);
+
+    receiver.destroy();
     remote.destroy();
   });
 

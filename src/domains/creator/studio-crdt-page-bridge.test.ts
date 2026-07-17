@@ -5,6 +5,7 @@ import {
   reconcileStudioCrdtSceneGraphPages,
   studioCrdtElementToSceneElement,
   studioCrdtStrokeToDrawElement,
+  studioDrawElementSampleSlice,
   studioDrawElementToCrdtStroke,
   studioPageToCrdtPage,
   studioSceneElementToCrdtElement,
@@ -135,6 +136,64 @@ describe("studio CRDT page bridge", () => {
       opacity: 0.6,
       emeresSourceId: "custom:underlay-a",
       stamp: { flow: 0.4, hardness: 0.9, minSize: 0.2 },
+    });
+  });
+
+  it("aligns only the requested streaming suffix and never reads prior dynamics", () => {
+    const accessedIndices: number[] = [];
+    const pressures = new Proxy([0.1, 0.2, 0.3, 0.8, 0.9], {
+      get(target, key, receiver) {
+        const index = typeof key === "string" ? Number(key) : Number.NaN;
+        if (Number.isInteger(index)) {
+          if (index < 3) throw new Error("streaming suffix read historical pressure data");
+          accessedIndices.push(index);
+        }
+        return Reflect.get(target, key, receiver);
+      },
+    });
+    const element: StudioCrdtCompatibleDrawElement = {
+      id: "stroke-stream",
+      type: "draw",
+      points: [0, 0, 1, 1, 2, 2, 3, 3, 4, 4],
+      pressures,
+      stroke: "#000000",
+      strokeWidth: 4,
+    };
+
+    expect(studioDrawElementSampleSlice(element, 3)).toEqual({
+      points: [3, 3, 4, 4],
+      pressures: [0.8, 0.9],
+      tiltXs: undefined,
+      tiltYs: undefined,
+      twists: undefined,
+      speeds: undefined,
+      tangentialPressures: undefined,
+    });
+    expect(accessedIndices).toEqual([3, 4]);
+  });
+
+  it("fills sparse, missing, and non-finite dynamics inside the requested suffix", () => {
+    const tiltXs = [11, 12] as number[];
+    tiltXs[3] = 33;
+    const element: StudioCrdtCompatibleDrawElement = {
+      id: "stroke-sparse",
+      type: "draw",
+      points: [0, 0, 1, 1, 2, 2, 3, 3, 4, 4],
+      pressures: [0.1, 0.2, Number.NaN, 0.8],
+      tiltXs,
+      twists: [1, 2, Number.POSITIVE_INFINITY, 4, 5],
+      stroke: "#000000",
+      strokeWidth: 4,
+    };
+
+    expect(studioDrawElementSampleSlice(element, 2)).toEqual({
+      points: [2, 2, 3, 3, 4, 4],
+      pressures: [0.5, 0.8, 0.5],
+      tiltXs: [0, 33, 0],
+      tiltYs: undefined,
+      twists: [0, 4, 5],
+      speeds: undefined,
+      tangentialPressures: undefined,
     });
   });
 

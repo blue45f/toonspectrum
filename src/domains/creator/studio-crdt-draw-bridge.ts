@@ -104,6 +104,27 @@ function aligned(values: number[] | undefined, count: number, fallback: number):
   });
 }
 
+/**
+ * Aligns only the append suffix that is about to enter the CRDT. Long in-progress strokes call
+ * this for every pointer batch, so aligning the complete history here would turn streaming into
+ * quadratic work even though the CRDT consumes only samples after `start`.
+ */
+function alignedSlice(
+  values: number[] | undefined,
+  count: number,
+  start: number,
+  fallback: number
+): number[] | undefined {
+  if (!values) return undefined;
+  const result = new Array<number>(count - start);
+  for (let sourceIndex = start, resultIndex = 0; sourceIndex < count; sourceIndex += 1) {
+    const value = values[sourceIndex];
+    result[resultIndex] = typeof value === "number" && Number.isFinite(value) ? value : fallback;
+    resultIndex += 1;
+  }
+  return result;
+}
+
 function extensionsOf(element: StudioCrdtCompatibleDrawElement): StudioCrdtJsonObject | undefined {
   const extensions: StudioCrdtJsonObject = {};
   for (const key of EXTENSION_KEYS) {
@@ -161,15 +182,18 @@ export function studioDrawElementSampleSlice(
   startSample: number
 ): StudioCrdtStrokeSamples | null {
   const sampleCount = Math.floor(element.points.length / 2);
-  const start = Math.max(0, Math.min(sampleCount, Math.trunc(startSample)));
+  const truncatedStart = Math.trunc(startSample);
+  const start = Number.isNaN(truncatedStart)
+    ? 0
+    : Math.max(0, Math.min(sampleCount, truncatedStart));
   if (start >= sampleCount) return null;
   return {
     points: element.points.slice(start * 2, sampleCount * 2),
-    pressures: aligned(element.pressures, sampleCount, 0.5)?.slice(start),
-    tiltXs: aligned(element.tiltXs, sampleCount, 0)?.slice(start),
-    tiltYs: aligned(element.tiltYs, sampleCount, 0)?.slice(start),
-    twists: aligned(element.twists, sampleCount, 0)?.slice(start),
-    speeds: aligned(element.speeds, sampleCount, 0)?.slice(start),
-    tangentialPressures: aligned(element.tangentialPressures, sampleCount, 0)?.slice(start),
+    pressures: alignedSlice(element.pressures, sampleCount, start, 0.5),
+    tiltXs: alignedSlice(element.tiltXs, sampleCount, start, 0),
+    tiltYs: alignedSlice(element.tiltYs, sampleCount, start, 0),
+    twists: alignedSlice(element.twists, sampleCount, start, 0),
+    speeds: alignedSlice(element.speeds, sampleCount, start, 0),
+    tangentialPressures: alignedSlice(element.tangentialPressures, sampleCount, start, 0),
   };
 }

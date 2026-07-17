@@ -375,6 +375,26 @@ export interface StudioCrdtChangeSubscriptionOptions {
 export type StudioCrdtUpdateHandler = (update: Uint8Array, origin: unknown) => void;
 export type StudioCrdtChangeHandler = (change: StudioCrdtChange) => void;
 
+function defineCachedEnumerableProperty<TValue>(
+  target: object,
+  key: PropertyKey,
+  materialize: () => TValue
+): void {
+  let resolved = false;
+  let cached: TValue | undefined;
+  Object.defineProperty(target, key, {
+    enumerable: true,
+    configurable: false,
+    get: () => {
+      if (!resolved) {
+        cached = materialize();
+        resolved = true;
+      }
+      return cached as TValue;
+    },
+  });
+}
+
 export interface StudioCrdtBatchedUpdate {
   update: Uint8Array;
   origins: ReadonlySet<unknown>;
@@ -1296,22 +1316,42 @@ export class StudioCrdtDocument {
     this.assertAlive();
     const listener = (transaction: Y.Transaction) => {
       if (options.includeOrigin && !options.includeOrigin(transaction.origin)) return;
-      const rasterSnapshot = this.tryReadExactRasterDocumentSnapshot();
-      handler({
+      const change = {} as StudioCrdtChange;
+      Object.assign(change, {
         origin: transaction.origin,
         local: transaction.local || transaction.origin === STUDIO_CRDT_ORIGIN_LOCAL,
         changedStrokeIds: new Set(this.changedStrokeIdsByTransaction.get(transaction) ?? []),
-        strokes: this.getStrokes({ includeDeleted: true }),
+      });
+      defineCachedEnumerableProperty(
+        change,
+        "strokes",
+        () => this.getStrokes({ includeDeleted: true })
+      );
+      Object.assign(change, {
         changedSceneElementIds: new Set(
           this.changedSceneElementIdsByTransaction.get(transaction) ?? []
         ),
-        sceneElements: this.getSceneElements({ includeDeleted: true }),
+      });
+      defineCachedEnumerableProperty(
+        change,
+        "sceneElements",
+        () => this.getSceneElements({ includeDeleted: true })
+      );
+      Object.assign(change, {
         changedPageIds: new Set(this.changedPageIdsByTransaction.get(transaction) ?? []),
-        pages: this.getPages(true),
+      });
+      defineCachedEnumerableProperty(change, "pages", () => this.getPages(true));
+      Object.assign(change, {
         changedLayerGroupIds: new Set(
           this.changedLayerGroupIdsByTransaction.get(transaction) ?? []
         ),
-        layerGroups: this.getLayerGroups({ includeDeleted: true }),
+      });
+      defineCachedEnumerableProperty(
+        change,
+        "layerGroups",
+        () => this.getLayerGroups({ includeDeleted: true })
+      );
+      Object.assign(change, {
         changedRasterSurfaceIds: new Set(
           this.changedRasterSurfaceIdsByTransaction.get(transaction) ?? []
         ),
@@ -1327,21 +1367,37 @@ export class StudioCrdtDocument {
         changedRasterCheckpointIds: new Set(
           this.changedRasterCheckpointIdsByTransaction.get(transaction) ?? []
         ),
-        rasterOperationLogs: rasterSnapshot
-          ? [...rasterSnapshot.logs.values()].sort((left, right) => (
+      });
+      let rasterSnapshot: StudioCrdtRasterDocumentSnapshot | null | undefined;
+      let rasterSnapshotResolved = false;
+      const exactRasterSnapshot = () => {
+        if (!rasterSnapshotResolved) {
+          rasterSnapshot = this.tryReadExactRasterDocumentSnapshot();
+          rasterSnapshotResolved = true;
+        }
+        return rasterSnapshot;
+      };
+      defineCachedEnumerableProperty(change, "rasterOperationLogs", () => {
+        const snapshot = exactRasterSnapshot();
+        return snapshot
+          ? [...snapshot.logs.values()].sort((left, right) => (
               left.surface.surfaceId < right.surface.surfaceId ? -1 :
               left.surface.surfaceId > right.surface.surfaceId ? 1 : 0
             ))
-          : [],
-        rasterCheckpoints: rasterSnapshot
-          ? [...rasterSnapshot.checkpoints].sort((left, right) => {
+          : [];
+      });
+      defineCachedEnumerableProperty(change, "rasterCheckpoints", () => {
+        const snapshot = exactRasterSnapshot();
+        return snapshot
+          ? [...snapshot.checkpoints].sort((left, right) => {
               const order = compareStudioRasterEventOrder(left.through, right.through);
               if (order !== 0) return order;
               return left.checkpointId < right.checkpointId ? -1 :
                 left.checkpointId > right.checkpointId ? 1 : 0;
             })
-          : [],
+          : [];
       });
+      handler(change);
     };
     this.doc.on("afterTransaction", listener);
     const unsubscribe = () => {
