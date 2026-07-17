@@ -7,13 +7,8 @@
  * 픽셀 수학과 상수는 studio-filters / 기존 StudioPage 구현 그대로(verbatim).
  */
 
-import { Blur } from "konva/lib/filters/Blur";
-import { Brighten } from "konva/lib/filters/Brighten";
-import { Contrast } from "konva/lib/filters/Contrast";
 import { Grayscale } from "konva/lib/filters/Grayscale";
-import { HSL } from "konva/lib/filters/HSL";
 import { Invert } from "konva/lib/filters/Invert";
-import { Pixelate } from "konva/lib/filters/Pixelate";
 import { Sepia } from "konva/lib/filters/Sepia";
 
 import { autoAdjustKonvaFilter, normalizeAutoAdjust, isIdentityAutoAdjust } from "./studio-auto-adjust";
@@ -31,6 +26,13 @@ import { gradientMapKonvaFilter, normalizeGradientMap, gradientMapToFlat } from 
 import { grainKonvaFilter, normalizeGrain, isIdentityGrain } from "./studio-grain";
 import { halftoneKonvaFilter, normalizeHalftone, isIdentityHalftone } from "./studio-halftone";
 import { inkWashKonvaFilter, normalizeInkWash, isIdentityInkWash } from "./studio-ink-wash";
+import {
+  nativeBlur,
+  nativeBrighten,
+  nativeContrast,
+  nativeHSL,
+  nativePixelate,
+} from "./studio-konva-native-filters";
 import { levelsKonvaFilter, normalizeLevels, normalizeLevelsChannels, isIdentityLevels, isIdentityLevelsChannels, levelsToFlat } from "./studio-levels";
 import { lightKonvaFilter, normalizeLight, isIdentityLight } from "./studio-light";
 import { outlineKonvaFilter, normalizeOutline, isIdentityOutline, outlineCachePad } from "./studio-outline";
@@ -168,14 +170,17 @@ export type KonvaLike = {
   };
 };
 
+// Blur/Brighten/Contrast/HSL/Pixelate는 attrs 기반 순수 포팅(studio-konva-native-filters) —
+// 실제 Konva 노드가 this일 때도 this.attrs로 동일한 값을 읽으므로 결과는 동일하다(패리티
+// 테스트로 검증됨). Grayscale/Sepia/Invert는 this를 전혀 쓰지 않아 그대로 재사용한다.
 const BUILT_IN_KONVA_FILTERS: Record<string, unknown> = {
-  Blur,
-  Brighten,
-  Contrast,
+  Blur: nativeBlur,
+  Brighten: nativeBrighten,
+  Contrast: nativeContrast,
   Grayscale,
-  HSL,
+  HSL: nativeHSL,
   Invert,
-  Pixelate,
+  Pixelate: nativePixelate,
   Sepia,
 };
 
@@ -193,6 +198,8 @@ function isActiveNumber(value: number | undefined): boolean {
 export function registerStudioKonvaFilters(konva: KonvaLike): void {
   const F = konva.Filters;
 
+  // 진짜 konva 패키지가 제공하는 레지스트리(F.Blur 등이 이미 있음)에는 이 블록이 손대지 않는다 —
+  // Worker처럼 빈 레지스트리로 호출될 때만 attrs 기반 순수 포팅(nativeBlur 등)이 채워진다.
   for (const [name, filter] of Object.entries(BUILT_IN_KONVA_FILTERS)) {
     if (!F[name]) F[name] = filter;
   }
@@ -718,6 +725,21 @@ export function buildImageFilters(
   }
 
   return { filters, attrs, cachePad };
+}
+
+/**
+ * buildImageFilters가 돌려준 {filters, attrs}를 실제 픽셀에 순서대로 적용한다 — Konva가
+ * `_getCachedSceneCanvas` 내부에서 하는 `filter.call(this, imageData)` 루프와 동일하다
+ * (studio-konva-filters.test.ts에서 병행 검증). Konva 노드 없이도 동작하므로 메인 스레드
+ * 동기 폴백과 Worker 양쪽에서 이 함수 하나를 공유한다.
+ */
+export function applyImageFilters(
+  imageData: StudioImageDataLike,
+  filters: ReadonlyArray<(imageData: StudioImageDataLike) => void>,
+  attrs: Record<string, unknown>,
+): void {
+  const filterThis: FilterThis = { attrs };
+  for (const filter of filters) filter.call(filterThis, imageData);
 }
 
 /**
