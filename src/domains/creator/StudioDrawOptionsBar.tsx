@@ -70,6 +70,9 @@ export interface StudioDrawOptionsBarProps {
   stabilizerMode?: StudioStabilizerModeUi;
   postCorrection?: number;
   pressureCurveId?: StudioPressureCurveUi;
+  /** 스탬프 계열 브러시(잉크붓·정밀에어·그레인연필·물맛붓)일 때만 non-null. */
+  stampTuning?: { flow: number; hardness: number; minSize: number } | null;
+  onStampTuningChange?: (tuning: { flow: number; hardness: number; minSize: number }) => void;
   color: string;
   secondaryColor?: string;
   recentSwatches?: readonly string[];
@@ -164,6 +167,8 @@ export function StudioDrawOptionsBar({
   stabilizerMode = "adaptive",
   postCorrection = 0,
   pressureCurveId = "linear",
+  stampTuning = null,
+  onStampTuningChange,
   color,
   secondaryColor = "#ffffff",
   recentSwatches = [],
@@ -754,6 +759,47 @@ export function StudioDrawOptionsBar({
               </button>
             ) : null}
           </div>
+
+          {drawMode === "pen" && stampTuning && onStampTuningChange ? (
+            <div
+              className="studio-opt-cluster shrink-0 items-center gap-2 px-1.5"
+              role="group"
+              aria-label="스탬프 브러시 세부 조절"
+              data-studio-stamp-tuning="true"
+            >
+              {(
+                [
+                  { key: "flow", label: "흐름" },
+                  { key: "hardness", label: "경도" },
+                  { key: "minSize", label: "최소" },
+                ] as const
+              ).map((item) => (
+                <label
+                  key={item.key}
+                  className="flex items-center gap-1 text-[0.62rem] font-semibold text-fg-3"
+                >
+                  <span className="shrink-0">{item.label}</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={Math.round(stampTuning[item.key] * 100)}
+                    aria-label={`브러시 ${item.label} 조절`}
+                    onChange={(event) =>
+                      onStampTuningChange({
+                        ...stampTuning,
+                        [item.key]: Number(event.target.value) / 100,
+                      })}
+                    className="h-1 w-14 cursor-pointer accent-accent"
+                  />
+                  <span className="w-6 text-right tabular-nums text-fg-2">
+                    {Math.round(stampTuning[item.key] * 100)}
+                  </span>
+                </label>
+              ))}
+            </div>
+          ) : null}
 
           <div className="studio-opt-cluster shrink-0" role="group" aria-label="브러시 불투명도 프리셋">
             {STUDIO_BRUSH_OPACITY_CHIPS.map((chip) => {

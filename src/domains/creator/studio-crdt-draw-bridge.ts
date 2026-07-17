@@ -30,6 +30,7 @@ export interface StudioCrdtCompatibleDrawElement {
   tangentialPressures?: number[];
   brushDynamics?: unknown;
   brushTip?: unknown;
+  stamp?: unknown;
   strokeStyle?: unknown;
   shapeParams?: unknown;
   symmetry?: unknown;
@@ -50,6 +51,8 @@ export interface StudioCrdtCompatibleDrawElement {
 }
 
 const EXTENSION_KEYS = [
+  // 스탬프 브러시 튜닝(flow/hardness/minSize) — 확장 봉투로 무손실 왕복한다.
+  "stamp",
   "name",
   "hidden",
   "locked",

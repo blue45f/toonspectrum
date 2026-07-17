@@ -302,8 +302,9 @@ import {
 import {
   drawStampStroke,
   resolveStudioStampBrushKind,
+  resolveStudioStampBrushStyle,
   STUDIO_STAMP_BRUSH_DEFAULTS,
-  type StudioStampBrushStyle,
+  type StudioStampBrushTuning,
 } from "./studio-brush-stamp-engine";
 import { studioDynamicBrushDabVariations } from "./studio-brush-symmetry";
 import {
@@ -2102,6 +2103,8 @@ interface DrawEl {
     angleDeg: number;
     roundness: number;
   };
+  /** 스탬프 브러시 튜닝 스냅샷(흐름/경도/최소 굵기) — 미설정 시 종류별 기본값. */
+  stamp?: StudioStampBrushTuning;
   // 스트로크 스타일(점선/선 끝/화살촉) — 도형·선 전용. 미설정 시 기본(실선·둥근 끝).
   strokeStyle?: StrokeStyle;
   // 도형 파라미터(별 꼭짓점/다각형 변/모서리 반경) — 미설정 시 기존 하드코딩과 동일한 기본값.
@@ -3168,13 +3171,11 @@ const StudioDrawNode = memo(function StudioDrawNode({ el }: { el: DrawEl }) {
             // 커밋이 같은 결정적 dab 시퀀스를 그린다 — 증분/재생/협업 복원에서 픽셀이 동일하다.
             const stampKind = el.mode !== "eraser" ? resolveStudioStampBrushKind(brush) : null;
             if (stampKind) {
-              const stampStyle: StudioStampBrushStyle = {
-                kind: stampKind,
-                color: stroke,
-                size: Math.max(1, strokeWidth),
-                opacity,
-                ...STUDIO_STAMP_BRUSH_DEFAULTS[stampKind],
-              };
+              const stampStyle = resolveStudioStampBrushStyle(
+                stampKind,
+                { color: stroke, size: Math.max(1, strokeWidth), opacity },
+                el.stamp
+              );
               const stampPoints = processFreehandPoints(points, renderSampleDistance);
               const stampPressures = resampleStrokePressures(
                 el.pressures ?? [],
@@ -7049,6 +7050,25 @@ function StudioCuttoonEditor() {
   const [drawMode, setDrawMode] = useState<DrawMode>("pen");
   const [brushOpacity, setBrushOpacity] = useState(1);
   const [brush, setBrush] = useState<string>("pen");
+  // 스탬프 브러시(잉크붓/정밀에어/그레인연필/물맛붓) 튜닝 — 브러시를 바꾸면 그 종류의
+  // 기본값으로 리셋되고, 슬라이더 조정값은 획에 스냅샷(el.stamp)으로 영속화된다.
+  const [stampTuning, setStampTuning] = useState<{
+    flow: number;
+    hardness: number;
+    minSize: number;
+  } | null>(null);
+  useEffect(() => {
+    const kind = resolveStudioStampBrushKind(brush);
+    setStampTuning(
+      kind
+        ? {
+            flow: STUDIO_STAMP_BRUSH_DEFAULTS[kind].flow,
+            hardness: STUDIO_STAMP_BRUSH_DEFAULTS[kind].hardness,
+            minSize: STUDIO_STAMP_BRUSH_DEFAULTS[kind].minSizeRatio,
+          }
+        : null
+    );
+  }, [brush]);
   const [brushSlotsState, setBrushSlotsState] = useState<StudioBrushSlotsState>(() =>
     loadStudioBrushSlotsState(
       typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage
@@ -16889,6 +16909,10 @@ function StudioCuttoonEditor() {
         brushTip: drawMode === "pen" && brush === "calligraphy"
           ? { tiltEnabled, angleDeg: tipAngle, roundness: tipRoundness }
           : undefined,
+        // 스탬프 브러시 튜닝은 획 시작 시점 값으로 스냅샷 — 협업/재생/내보내기에서 재현된다.
+        stamp: drawMode === "pen" && stampTuning && resolveStudioStampBrushKind(brush)
+          ? { ...stampTuning }
+          : undefined,
         brushDynamics: capturePointerDynamics
           ? normalizeStudioBrushDynamicsSettings(brushDynamics)
           : undefined,
@@ -21674,6 +21698,8 @@ function StudioCuttoonEditor() {
             onPostCorrectionChange={setPostCorrection}
             pressureCurveId={pressureCurvePresetId(pressureCurve)}
             onPressureCurveChange={(id) => setPressureCurve(pressureCurveValueForPreset(id))}
+            stampTuning={stampTuning}
+            onStampTuningChange={setStampTuning}
             onColorChange={setColor}
             secondaryColor={secondaryColor}
             onSecondaryColorChange={setSecondaryColor}
@@ -29915,6 +29941,42 @@ function StudioCuttoonEditor() {
                     <span className="w-8 text-right text-xs tabular-nums text-fg-3">{Math.round(brushOpacity * 100)}%</span>
                   </span>
                 </label>
+
+                {/* 스탬프 브러시 세부 조절(흐름·경도·최소 굵기) — 스탬프 계열 선택 시에만 노출 */}
+                {stampTuning
+                  ? (
+                    [
+                      { key: "flow", label: "흐름" },
+                      { key: "hardness", label: "경도" },
+                      { key: "minSize", label: "최소 굵기" },
+                    ] as const
+                  ).map((item) => (
+                    <label
+                      key={item.key}
+                      className="flex items-center justify-between gap-2 text-sm text-fg-2"
+                    >
+                      <span>{item.label}</span>
+                      <span className="flex items-center gap-1.5">
+                        <input
+                          type="range"
+                          min={0}
+                          max={100}
+                          step={1}
+                          value={Math.round(stampTuning[item.key] * 100)}
+                          onChange={(e) =>
+                            setStampTuning({
+                              ...stampTuning,
+                              [item.key]: Number(e.target.value) / 100,
+                            })}
+                          className="w-24 accent-accent cursor-pointer"
+                        />
+                        <span className="w-8 text-right text-xs tabular-nums text-fg-3">
+                          {Math.round(stampTuning[item.key] * 100)}%
+                        </span>
+                      </span>
+                    </label>
+                  ))
+                  : null}
 
                 <StudioLineCorrectionControls
                   stabilizer={stabilizer}

@@ -65,6 +65,36 @@ export const STUDIO_STAMP_BRUSH_DEFAULTS: Record<
   watercolor: { flow: 0.3, hardness: 0.35, minSizeRatio: 0.6 },
 };
 
+/** 사용자 조절 가능한 스탬프 파라미터(부분 지정) — DrawEl.stamp 로 획에 영속화된다. */
+export interface StudioStampBrushTuning {
+  readonly flow?: number;
+  readonly hardness?: number;
+  readonly minSize?: number;
+}
+
+/** 종류별 기본값 위에 획 단위 튜닝을 얹어 최종 스타일을 만든다(값은 0..1 로 클램프). */
+export function resolveStudioStampBrushStyle(
+  kind: StudioStampBrushKind,
+  base: { color: string; size: number; opacity: number },
+  tuning?: StudioStampBrushTuning | null
+): StudioStampBrushStyle {
+  const defaults = STUDIO_STAMP_BRUSH_DEFAULTS[kind];
+  const pick = (value: number | undefined, fallback: number): number =>
+    typeof value === "number" && Number.isFinite(value)
+      ? Math.min(1, Math.max(0, value))
+      : fallback;
+  return {
+    kind,
+    color: base.color,
+    size: Math.max(1, base.size),
+    opacity: Math.min(1, Math.max(0, base.opacity)),
+    // flow 0 은 아무것도 안 그려진다 — 슬라이더 최솟값에서도 희미하게는 남게 바닥을 둔다.
+    flow: Math.max(0.03, pick(tuning?.flow, defaults.flow)),
+    hardness: pick(tuning?.hardness, defaults.hardness),
+    minSizeRatio: pick(tuning?.minSize, defaults.minSizeRatio),
+  };
+}
+
 /** 스탬프 인덱스 → [0,1) 결정적 지터. 증분/재생 동일성을 위해 Math.random 금지. */
 export function stampJitter(seed: number, salt: number): number {
   let h = (Math.imul(seed + 1, 374761393) + Math.imul(salt + 1, 668265263)) | 0;

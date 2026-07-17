@@ -101,6 +101,7 @@ describe("studio CRDT page bridge", () => {
       opacity: 0.6,
       brush: "calligraphy",
       brushTip: { tiltEnabled: true, angleDeg: 45, roundness: 0.7 },
+      stamp: { flow: 0.4, hardness: 0.9, minSize: 0.2 },
       symmetry: { type: "vertical", centerX: 400, centerY: 600 },
       groupId: "inks",
       hidden: true,
@@ -116,6 +117,7 @@ describe("studio CRDT page bridge", () => {
       hidden: true,
       layerColor: "blue",
       emeresSourceId: "custom:underlay-a",
+      stamp: { flow: 0.4, hardness: 0.9, minSize: 0.2 },
     });
 
     const decoded = studioCrdtStrokeToDrawElement({
@@ -132,6 +134,7 @@ describe("studio CRDT page bridge", () => {
       brush: "calligraphy",
       opacity: 0.6,
       emeresSourceId: "custom:underlay-a",
+      stamp: { flow: 0.4, hardness: 0.9, minSize: 0.2 },
     });
   });
 
