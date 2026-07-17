@@ -9072,6 +9072,10 @@ function StudioCuttoonEditor() {
   /** Draw 실패 재시도는 StudioPage 전체 렌더가 아니라 bounded rAF coordinator로만 진행한다. */
   const committedInkSurfaceHandoffRafRef = useRef(0);
   const processCommittedInkSurfaceHandoffsRef = useRef<() => void>(() => undefined);
+  // 재시도 예산 소진(반복 draw 실패)은 화면은 계속 정상 표시(fail-visible)되지만 표면 계정 정리가
+  // 무기한 멎는다 — 다음 문서 편집이 revision을 올릴 때까지 진단 흔적이 전혀 없었다. 이 헤드에
+  // 대해 한 번만 경고하고(무한 재렌더 스팸 방지), revision이 바뀌면(=예산 리셋) 다시 경고 가능.
+  const committedInkHandoffStallWarnedKeyRef = useRef<string | null>(null);
   // ── 커밋 지연 파이프라인 ──────────────────────────────────────────────────
   // 펜을 뗀 획은 라이브 표면(증분 오버레이/GPU 파인 표면)에 잉크를 남긴 채 큐에 쌓고,
   // 마지막 획 후 짧은 유휴(또는 강제 플러시)에 한 번의 React 커밋으로 동기화한다.
@@ -12420,6 +12424,16 @@ function StudioCuttoonEditor() {
       queue = transition.queue;
       if (transition.status === "wait") {
         retryVisibleDraw = transition.drawRequest !== null;
+        if (transition.reason === "visible-draw-failed-visible") {
+          const stallKey = `${transition.head.pageId}:${transition.head.strokeIds.join(",")}:${transition.head.drawAttemptRevision}`;
+          if (committedInkHandoffStallWarnedKeyRef.current !== stallKey) {
+            committedInkHandoffStallWarnedKeyRef.current = stallKey;
+            console.warn(
+              "[studio] committed-ink handoff stalled after repeated draw failures — settled ink stays visible, but surface-count release is paused until the next document edit bumps the scene revision.",
+              { pageId: transition.head.pageId, strokeIds: transition.head.strokeIds, revision: transition.head.drawAttemptRevision }
+            );
+          }
+        }
         break;
       }
       released = {

@@ -2024,6 +2024,32 @@ describe("planStudioGpuDabs", () => {
     });
   });
 
+  it("keeps dabs/batches paired when a residual V2 extension is cut short by the dab budget", () => {
+    // Regression: the truncated-by-budget early returns used to pair non-empty dabs with an
+    // empty batches array, unlike the legacy planner which always commits a trailing batch for
+    // whatever dabs it already pushed. No current caller reads a partial (complete:false) result,
+    // but the pairing itself must stay internally consistent for any future caller that does.
+    const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2;
+    const extended = stroke({
+      points: [0, 0, 4, 0, 8, 0, 12, 0, 16, 0, 20, 0],
+      pressures: Array.from({ length: 6 }, () => 1),
+      size: 16,
+      pressureModel,
+    });
+    const truncated = planStudioGpuStrokeExtensionInRect(
+      extended,
+      1,
+      { x: -100, y: -100, width: 300, height: 300 },
+      2
+    );
+
+    expect(truncated.complete).toBe(false);
+    expect(truncated.dabs.length).toBeGreaterThan(0);
+    expect(truncated.batches).toEqual([
+      { composite: "normal", firstInstance: 0, instanceCount: truncated.dabs.length },
+    ]);
+  });
+
   it("plans only the bridge and new samples for a retained point suffix", () => {
     const initial = stroke({
       points: [0, 0, 20, 0],

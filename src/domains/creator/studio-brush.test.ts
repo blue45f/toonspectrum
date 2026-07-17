@@ -236,6 +236,19 @@ describe("resolveBrushPressureSample", () => {
     ).toBeCloseTo(0.25, 10);
   });
 
+  it("does not mistake the conventional touch 0.5 (no force sensor) for hardware pressure", () => {
+    // A non-force-sensing touchscreen reports pressure=0.5 while in contact, same as a mouse.
+    // The pressure curve must not apply to it (fallback path returns the flat fallback untouched).
+    expect(
+      resolveBrushPressureSample({
+        pointerType: "touch",
+        rawPressure: 0.5,
+        fallbackPressure: 1,
+        pressureCurve: 1.8,
+      })
+    ).toBe(1);
+  });
+
   it("uses the configured initial fallback instead of treating zero travel as maximum pressure", () => {
     expect(resolveBrushPressureSample({
       pointerType: "mouse",

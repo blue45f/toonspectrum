@@ -810,6 +810,14 @@ function planStudioGpuResidualStrokeExtensionInternal(
     }
   }
 
+  // 예산 초과로 조기 반환할 때도 dabs/batches 쌍은 legacy 플래너(planStudioGpuDabsInternal)와
+  // 동일 계약을 유지한다 — 이미 쌓인 dabs 만큼은 항상 유효한 batch 로 커밋해 반환한다. 현재
+  // 두 호출부 모두 complete=false 면 결과 전체를 버리므로 지금 당장 관측되는 차이는 없지만,
+  // 부분 결과를 살리려는 향후 호출부가 비어 있는 batches 를 만나 픽셀을 조용히 누락시키는
+  // 함정을 없앤다.
+  const batchesFor = (list: readonly StudioGpuDab[]) =>
+    list.length === 0 ? [] : [{ composite, firstInstance: 0, instanceCount: list.length }];
+
   const dabs: StudioGpuDab[] = [];
   for (let sourceIndex = previousPointCount; sourceIndex < pointCount; sourceIndex += 1) {
     const advanced = advanceStudioResidualInk(
@@ -824,12 +832,12 @@ function planStudioGpuResidualStrokeExtensionInternal(
       stroke.pressureModel,
       STUDIO_GPU_MAX_DABS - totalDabCount
     );
-    if (!advanced.complete) return { dabs, batches: [], complete: false };
+    if (!advanced.complete) return { dabs, batches: batchesFor(dabs), complete: false };
     state = advanced.state;
     totalDabCount += advanced.dabs.length;
     for (const dab of advanced.dabs) {
       if (clipRect !== null && !dabIntersectsRect(dab.x, dab.y, dab.radius, clipRect)) continue;
-      if (dabs.length >= maximumDabs) return { dabs, batches: [], complete: false };
+      if (dabs.length >= maximumDabs) return { dabs, batches: batchesFor(dabs), complete: false };
       dabs.push({
         x: dab.x,
         y: dab.y,
@@ -842,13 +850,7 @@ function planStudioGpuResidualStrokeExtensionInternal(
       });
     }
   }
-  return {
-    dabs,
-    batches: dabs.length === 0
-      ? []
-      : [{ composite, firstInstance: 0, instanceCount: dabs.length }],
-    complete: true,
-  };
+  return { dabs, batches: batchesFor(dabs), complete: true };
 }
 
 /** CPU planning is shared by Canvas2D and non-tiled callers with identical geometry and ordering. */

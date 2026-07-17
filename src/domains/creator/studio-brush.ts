@@ -384,13 +384,17 @@ export function sanitizeCalligraphyTipSettings(
 
 /**
  * 펜/터치의 유효한 하드웨어 필압을 우선하고, 그렇지 않은 포인터만 이동 거리 기반 의사 필압을
- * 쓴다. 브라우저가 마우스에 관례적으로 주는 0.5만 하드웨어 필압에서 제외한다.
+ * 쓴다. Pointer Events 스펙상 압력 센서가 없는 포인터(마우스는 항상, 힘 감지가 없는 터치스크린도
+ * 접촉 중엔)는 관례적으로 정확히 0.5를 보고한다 — 이 값은 마우스뿐 아니라 터치에서도 하드웨어
+ * 필압에서 제외해야, 실제 힘 감지가 없는 터치 사용자가 굵기 곡선 프리셋(연/강)을 걸어둔 채
+ * 그리면 매 획이 이 관례값(0.5)에 곡선이 적용돼 일괄적으로 가늘거나 굵게 나오는 걸 막는다.
  */
 export function resolveBrushPressureSample(input: BrushPressureSampleInput = {}): number {
   const pointerType = normalizePointerType(input.pointerType);
   const rawPressure = finiteNumber(input.rawPressure, Number.NaN);
   const hasHardwarePressure = (pointerType === "pen" || pointerType === "touch")
-    && rawPressure >= 0 && rawPressure <= 1;
+    && rawPressure >= 0 && rawPressure <= 1
+    && (pointerType === "pen" || rawPressure !== 0.5);
 
   let basePressure: number;
   let applyPressureCurve = false;
