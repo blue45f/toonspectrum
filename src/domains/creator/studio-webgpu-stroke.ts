@@ -101,8 +101,9 @@ export function buildStudioGpuLiveStroke(
     points.push(x!, y!);
   }
 
-  // A single point has no GPU segment. Canvas2D remains responsible for the initial tap preview.
-  if (points.length < 4) return null;
+  // The engine plans an initial dab for a single coordinate pair. Keeping that tap here is
+  // important: while WebGPU owns the live surface, the Canvas/Konva draft is intentionally hidden.
+  if (points.length < 2) return null;
 
   const pointCount = points.length / 2;
   const pressures = Array.from(

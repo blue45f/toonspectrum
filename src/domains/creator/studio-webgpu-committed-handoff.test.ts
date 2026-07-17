@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  processFreehandPoints,
-  resampleStrokePressures,
-  strokeRenderDistance,
-} from "./studio-brush";
+import { selectStudioCausalInkSamples } from "./studio-causal-ink";
 import {
   createStudioWebGpuCommittedHandoff,
   type StudioWebGpuCommittedHandoffElement,
@@ -52,19 +48,17 @@ describe("createStudioWebGpuCommittedHandoff", () => {
   it("uses StudioDrawNode's point, pressure, and minimum-width contracts exactly", () => {
     const element = draw("ink");
     const handoff = createStudioWebGpuCommittedHandoff({ elements: [element] });
-    const expectedPoints = processFreehandPoints(
-      [...element.points as number[]],
-      strokeRenderDistance(element.sampleSpacing)
-    );
+    const expectedSamples = selectStudioCausalInkSamples({
+      points: element.points as number[],
+      pressures: element.pressures as number[],
+      minDistance: element.sampleSpacing as number,
+    });
+    const expectedPoints = expectedSamples.flatMap(({ x, y }) => [x, y]);
 
     expect(handoff.strokes).toEqual([{
       id: "ink",
       points: expectedPoints,
-      pressures: resampleStrokePressures(
-        element.pressures as number[],
-        expectedPoints.length / 2,
-        0.5
-      ),
+      pressures: expectedSamples.map(({ pressure }) => pressure),
       color: "#24180f",
       size: 1,
       opacity: 1,

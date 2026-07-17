@@ -3,6 +3,7 @@ import {
   resampleStrokePressures,
   strokeRenderDistance,
 } from "./studio-brush";
+import { selectStudioCausalInkSamples } from "./studio-causal-ink";
 import {
   planStudioWebGpuCommittedSuffix,
   type StudioWebGpuCommittedElementInput,
@@ -37,11 +38,24 @@ function committedElementToGpuStroke(
   // pressure pipeline here keeps the GPU handoff pixel-compatible with the source renderer.
   const sourcePoints = element.points as readonly number[];
   const sourcePressures = element.pressures as readonly number[];
-  const points = processFreehandPoints(
-    [...sourcePoints],
-    strokeRenderDistance(element.sampleSpacing)
-  );
-  const pressures = resampleStrokePressures(sourcePressures, points.length / 2, 0.5);
+  const usesCausalGeometry = typeof element.sampleSpacing === "number"
+    && Number.isFinite(element.sampleSpacing);
+  const causalSamples = usesCausalGeometry
+    ? selectStudioCausalInkSamples({
+        points: sourcePoints,
+        pressures: sourcePressures,
+        minDistance: element.sampleSpacing as number,
+      })
+    : null;
+  const points = causalSamples
+    ? causalSamples.flatMap(({ x, y }) => [x, y])
+    : processFreehandPoints(
+        [...sourcePoints],
+        strokeRenderDistance(element.sampleSpacing)
+      );
+  const pressures = causalSamples
+    ? causalSamples.map(({ pressure }) => pressure)
+    : resampleStrokePressures(sourcePressures, points.length / 2, 0.5);
 
   return {
     id: element.id,

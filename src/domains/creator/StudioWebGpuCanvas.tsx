@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 
-
+import { resolveStudioWebGpuCanvasStrokes } from "./studio-webgpu-canvas-authority";
 import {
   isStudioWebGpuCanvasActive,
   routeStudioWebGpuCanvasRequest,
@@ -165,7 +165,8 @@ function StudioWebGpuCanvas({
   const desiredRequestIdRef = useRef("frame:0");
   const lastIssuedRequestRef = useRef<LatestCanvasProps | null>(null);
   const issueLatestRequestRef = useRef<(() => void) | null>(null);
-  const latestRef = useRef<LatestCanvasProps>({
+  const pinnedStrokesRef = useRef<readonly StudioGpuStroke[] | null>(null);
+  const declarativeRequestRef = useRef<LatestCanvasProps>({
     width,
     height,
     strokes,
@@ -179,9 +180,10 @@ function StudioWebGpuCanvas({
     surfaceWidth: surfaceBounds?.width,
     surfaceHeight: surfaceBounds?.height,
   });
+  const latestEffectiveRequestRef = useRef<LatestCanvasProps>(declarativeRequestRef.current);
 
   callbacksRef.current = { onBackendChange, onDeviceLost, onFrameReady, onFrameInvalid };
-  latestRef.current = {
+  const declarativeRequest: LatestCanvasProps = {
     width,
     height,
     strokes,
@@ -195,6 +197,14 @@ function StudioWebGpuCanvas({
     surfaceWidth: surfaceBounds?.width,
     surfaceHeight: surfaceBounds?.height,
   };
+  declarativeRequestRef.current = declarativeRequest;
+  latestEffectiveRequestRef.current = {
+    ...declarativeRequest,
+    strokes: resolveStudioWebGpuCanvasStrokes(
+      declarativeRequest.strokes,
+      pinnedStrokesRef.current
+    ),
+  };
 
   useImperativeHandle(ref, () => ({
     captureFrame: (request) => engineRef.current?.captureFrame(request) ?? Promise.resolve({
@@ -202,17 +212,37 @@ function StudioWebGpuCanvas({
       reason: "frame-unavailable",
     }),
     syncPinnedStrokes: (strokes) => {
-      const latest = { ...latestRef.current, strokes };
-      latestRef.current = latest;
-      // 레이아웃 이펙트의 중복 발행 비교 기준도 갱신한다 — 다음 부모 렌더(스트로크 경계)에서
-      // props(EMPTY)와 달라졌음을 감지해 정상적으로 EMPTY 프레임을 재발행하게 된다.
+      pinnedStrokesRef.current = strokes;
+      const latest = { ...declarativeRequestRef.current, strokes };
+      latestEffectiveRequestRef.current = latest;
+      // 레이아웃 이펙트의 중복 발행 비교 기준도 갱신한다. 부모가 리렌더되어 선언형 EMPTY 를
+      // 다시 전달해도 파인 권한이 살아 있는 동안에는 이 임페러티브 획이 계속 우선한다.
       lastIssuedRequestRef.current = snapshotCanvasRequest(latest);
       const requestId = `frame:${requestSequenceRef.current + 1}`;
       requestSequenceRef.current += 1;
       desiredRequestIdRef.current = requestId;
       issueLatestRequestRef.current?.();
     },
-    setPinnedVisible: (visible) => setPinnedVisibleState(visible),
+    setPinnedVisible: (visible) => {
+      if (!visible && pinnedStrokesRef.current !== null) {
+        // Pin release is an authority transition, not just a CSS visibility change. Restore the
+        // newest declarative request immediately even when React can bail out of an unchanged
+        // `false` state update (for example, a GPU failover before visibility state commits).
+        pinnedStrokesRef.current = null;
+        const latest = declarativeRequestRef.current;
+        latestEffectiveRequestRef.current = latest;
+        if (!lastIssuedRequestRef.current
+          || !sameCanvasRequest(lastIssuedRequestRef.current, latest)) {
+          lastIssuedRequestRef.current = snapshotCanvasRequest(latest);
+          const requestId = `frame:${requestSequenceRef.current + 1}`;
+          requestSequenceRef.current += 1;
+          desiredRequestIdRef.current = requestId;
+          callbacksRef.current.onFrameInvalid?.();
+          issueLatestRequestRef.current?.();
+        }
+      }
+      setPinnedVisibleState(visible);
+    },
   }), []);
 
   useEffect(() => {
@@ -243,7 +273,7 @@ function StudioWebGpuCanvas({
     callbacksRef.current.onBackendChange?.(engine.getBackend());
 
     const syncViewport = (observedWidth?: number, observedHeight?: number) => {
-      const latest = latestRef.current;
+      const latest = latestEffectiveRequestRef.current;
       const measured = measuredCssSize(
         rootRef.current,
         latest.surfaceWidth ?? latest.width,
@@ -264,7 +294,7 @@ function StudioWebGpuCanvas({
     };
 
     const issueLatestRequest = () => {
-      const latest = latestRef.current;
+      const latest = latestEffectiveRequestRef.current;
       const requestId = desiredRequestIdRef.current;
       routeStudioWebGpuCanvasRequest({
         engine,
@@ -276,7 +306,7 @@ function StudioWebGpuCanvas({
           initializationRequested = true;
           void engine.initialize().then(() => {
             if (!mounted || engineRef.current !== engine) return;
-            const current = latestRef.current;
+            const current = latestEffectiveRequestRef.current;
             routeStudioWebGpuCanvasRequest({
               engine,
               strokes: current.strokes,
@@ -298,7 +328,7 @@ function StudioWebGpuCanvas({
       initializationRequested = true;
       void engine.initialize().then(() => {
         if (!mounted || engineRef.current !== engine) return;
-        const current = latestRef.current;
+        const current = latestEffectiveRequestRef.current;
         routeStudioWebGpuCanvasRequest({
           engine,
           strokes: current.strokes,
@@ -336,7 +366,7 @@ function StudioWebGpuCanvas({
   // same layout phase. This semantic comparison deliberately avoids a hash collision becoming an
   // authority decision and also tolerates parents rebuilding equivalent stroke arrays.
   useLayoutEffect(() => {
-    const latest = latestRef.current;
+    const latest = latestEffectiveRequestRef.current;
     if (lastIssuedRequestRef.current && sameCanvasRequest(lastIssuedRequestRef.current, latest)) {
       return;
     }

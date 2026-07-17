@@ -384,8 +384,10 @@ export function resolveBrushPressureSample(input: BrushPressureSampleInput = {})
   const hasHardwarePressure = pointerType === "pen" && rawPressure >= 0 && rawPressure <= 1;
 
   let basePressure: number;
+  let applyPressureCurve = false;
   if (hasHardwarePressure) {
     basePressure = rawPressure;
+    applyPressureCurve = true;
   } else if (input.velocityFallbackEnabled) {
     const distance = Math.max(0, finiteNumber(input.distance, 0));
     const elapsedMs = finiteNumber(input.elapsedMs, Number.NaN);
@@ -394,10 +396,16 @@ export function resolveBrushPressureSample(input: BrushPressureSampleInput = {})
       : clamp01(distance / Math.max(0.001, finiteNumber(input.maxDistance, 28)));
     const sensitivity = clamp01(finiteNumber(input.velocitySensitivity, 0.65));
     basePressure = 1 - speedRatio * sensitivity * 0.75;
+    applyPressureCurve = true;
   } else {
     basePressure = clamp01(finiteNumber(input.fallbackPressure, 0.5));
   }
 
+  // A fixed mouse/touch fallback represents the nominal brush width, not simulated pressure.
+  // Applying the stylus curve here would make the same cursor render 19% thicker (soft) or 30%
+  // thinner (firm). Curves belong only to real pen pressure or the explicitly enabled velocity
+  // pressure channel.
+  if (!applyPressureCurve) return clamp01(basePressure);
   const curve = clamp(finiteNumber(input.pressureCurve, 1), 0.05, 8);
   return clamp01(Math.pow(clamp01(basePressure), curve));
 }

@@ -67,6 +67,7 @@ import {
   thoughtBubbleBodyPath,
   type BubbleTailSpec,
 } from "./studio-bubble-path";
+import { planStudioCausalInk } from "./studio-causal-ink";
 import {
   fxBrushSeedFromKey,
   planGlitterBrushParticles,
@@ -833,6 +834,9 @@ function serializeFreehand(
 
   if (
     points.length === 2 &&
+    (el.sampleSpacing === undefined || el.fill !== undefined || (
+      brushFamily !== "pen" && brushFamily !== "marker"
+    )) &&
     brushFamily !== "watercolor" &&
     brushFamily !== "screentone" &&
     brushFamily !== "glow" &&
@@ -1067,7 +1071,25 @@ function serializeFreehand(
     return `<g${opacityAttr}>${circles}</g>`;
   }
 
-  // 기본 펜/마커 — 필압 배열이 있으면 세그먼트별 굵기(캔버스 산식 0.3+p×1.4)로 재현.
+  // 새 기본 펜/마커 — live Canvas, WebGPU, Konva가 공유하는 round-dab footprint 그대로.
+  if (
+    el.sampleSpacing !== undefined
+    && !el.fill
+    && (brushFamily === "pen" || brushFamily === "marker")
+  ) {
+    const plan = planStudioCausalInk({
+      points,
+      pressures: el.pressures,
+      minDistance: el.sampleSpacing,
+      size: strokeWidth,
+    });
+    const dabs = plan.dabs.map((dab) => (
+      `<circle cx="${fmt(dab.x)}" cy="${fmt(dab.y)}" r="${fmt(dab.radius)}" fill="${escapeXml(stroke)}"${opacityAttr}/>`
+    )).join("");
+    return `<g>${dabs}</g>`;
+  }
+
+  // 레거시 기본 펜/마커 — 필압 배열이 있으면 세그먼트별 굵기 산식으로 재현.
   const smoothed = processFreehandPoints(points, renderSampleDistance);
   const pressures = el.pressures;
   if (pressures && pressures.length > 0 && smoothed.length >= 4) {

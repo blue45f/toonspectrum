@@ -251,12 +251,26 @@ describe("resolveBrushPressureSample", () => {
     expect(resolveBrushPressureSample({ pointerType: "touch", fallbackPressure: 9 })).toBe(1);
   });
 
-  it("applies the pressure curve only after resolving and clamping the base sample", () => {
+  it("applies the pressure curve to real pen pressure but not a fixed mouse/touch fallback", () => {
     expect(resolveBrushPressureSample({ pointerType: "pen", rawPressure: 0.5, pressureCurve: 2 })).toBeCloseTo(0.25, 10);
-    expect(resolveBrushPressureSample({ pointerType: "mouse", fallbackPressure: 0.5, pressureCurve: 0.5 })).toBeCloseTo(
-      Math.sqrt(0.5),
-      10
-    );
+    expect(resolveBrushPressureSample({ pointerType: "mouse", fallbackPressure: 0.5, pressureCurve: 0.5 })).toBe(0.5);
+    expect(resolveBrushPressureSample({ pointerType: "touch", fallbackPressure: 0.25, pressureCurve: 8 })).toBe(0.25);
+    expect(resolveBrushPressureSample({
+      pointerType: "pen",
+      rawPressure: Number.NaN,
+      fallbackPressure: 0.4,
+      pressureCurve: 2,
+    })).toBe(0.4);
+  });
+
+  it("applies the pressure curve to explicitly enabled velocity pressure", () => {
+    expect(resolveBrushPressureSample({
+      pointerType: "mouse",
+      distance: 28,
+      velocityFallbackEnabled: true,
+      velocitySensitivity: 1,
+      pressureCurve: 2,
+    })).toBeCloseTo(0.25 ** 2, 10);
   });
 
   it("uses real px/ms speed when elapsed time is available", () => {

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildShiftConstrainedFreehandPoints,
   classifyStrokeAngleSnap,
+  resolveShiftFreehandTransition,
   snapStrokeEndpointToCardinalOrDiagonal,
   studioStrokeAngleSnapLabel,
 } from "./studio-stroke-constrain";
@@ -29,5 +30,19 @@ describe("studio stroke constrain (Shift freehand)", () => {
 
   it("builds a two-point polyline for freehand Shift strokes", () => {
     expect(buildShiftConstrainedFreehandPoints(0, 0, 100, 5)).toEqual([0, 0, 100, 0]);
+  });
+
+  it("replaces the suffix and invalidates the stale stabilizer endpoint", () => {
+    expect(resolveShiftFreehandTransition({
+      currentPoints: [0, 0, 20, 3, 40, 6],
+      currentPressures: [0.4, 0.5, 0.6],
+      endX: 100,
+      endY: 5,
+      pressure: 0.8,
+    })).toEqual({
+      points: [0, 0, 100, 0],
+      pressures: [0.4, 0.8],
+      stabilizerState: null,
+    });
   });
 });

@@ -266,6 +266,27 @@ describe("도형 직렬화", () => {
     expect(skipped).toEqual([]);
   });
 
+  it("새 기본 펜 — 라이브/WebGPU와 같은 causal round-dab 시퀀스로 보존한다", () => {
+    const pen = rectEl({
+      id: "causal-pen-svg",
+      kind: "freehand",
+      points: [0, 0, 8, 0, 16, 8],
+      pressures: [0.25, 0.5, 1],
+      sampleSpacing: 1.5,
+      stroke: "#123456",
+      strokeWidth: 10,
+      fill: undefined,
+    });
+    const { svg, skipped } = exportPageToSvg(page([pen]));
+    const circles = svg.match(/<circle /g) ?? [];
+
+    expect(circles.length).toBeGreaterThan(3);
+    expect(svg).toContain('<circle cx="0" cy="0" r="3.25" fill="#123456"');
+    expect(svg).toContain('<circle cx="16" cy="8" r="8.5" fill="#123456"');
+    expect(svg).not.toContain('<path d="M 0 0 Q');
+    expect(skipped).toEqual([]);
+  });
+
   it("수채 번짐 — 결정적 core/diffuse dab과 방사 그라데이션을 보존한다", () => {
     const watercolor = rectEl({
       id: "watercolor-svg-1",
