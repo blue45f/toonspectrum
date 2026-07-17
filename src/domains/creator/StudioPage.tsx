@@ -33363,7 +33363,10 @@ const StudioOptionsBars = memo(function StudioOptionsBars({
     <>
       {/* Commercial draw options — size/opacity/stabilizer/brushes (CSP-style properties strip). */}
       {tool === "draw" && !canvasOnlyMode ? (
-        <Suspense fallback={<div className="h-10 shrink-0 border-b border-line bg-panel/80" aria-hidden />}>
+        // fallback은 반드시 레이아웃 중립이어야 한다: docked 바는 fixed(플로우 0px)인데 인플로우
+        // 40px 스트립을 폴백으로 쓰면 레이지 로드가 끝나는 순간(첫 스트로크 중·펜업 직후) 캔버스가
+        // 40px 튀어 오른다 — 릴리즈 때 "선이 튀는" 증상의 원인.
+        <Suspense fallback={null}>
           <StudioDrawOptionsBar
             docked
             dockInsets={{
