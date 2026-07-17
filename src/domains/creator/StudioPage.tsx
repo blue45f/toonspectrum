@@ -864,7 +864,6 @@ import {
   type StudioPublishPackagePlan,
   type StudioPublishPackageSettings,
 } from "./studio-publish-package";
-import { renderStudioPublishPackageImages } from "./studio-publish-package-renderer";
 import { normalizeStudioPublishPackSettings, validateStudioPublishPreflight } from "./studio-publish-preflight";
 import {
   addPuppetPin,
@@ -1005,21 +1004,6 @@ import {
   type StudioStabilizerMode,
   type StudioStrokeStabilizerState,
 } from "./studio-stroke-stabilizer";
-import {
-  addStudioTeamCommentReply,
-  createStudioTeamCommentThread,
-  listAllStudioTeamComments,
-  markAllStudioTeamCommentsRead,
-  markStudioTeamCommentRead,
-  reopenStudioTeamCommentThread,
-  resolveStudioTeamCommentThread,
-  studioTeamCommentMessageToLocalReply,
-  studioTeamCommentThreadToLocalThread,
-  studioTeamCommentUserToLocalActor,
-  studioTeamCommentsToLocalDocument,
-  type StudioTeamCommentCapabilities,
-} from "./studio-team-comment-client";
-import { planStudioTeamCommentMutation } from "./studio-team-comment-mutation-plan";
 import { buildTextPathData, normalizeTextPath, isFlatTextPath, type TextPathConfig } from "./studio-text-path";
 import {
   buildStudioCompanionHello,
@@ -1206,6 +1190,7 @@ import type { Sketch } from "./studio-sketch";
 import type { StudioStockImageCredit, StudioStockPhoto } from "./studio-stock-image-client";
 import type { Stylize } from "./studio-stylize";
 import type { SvgExportEl, SvgExportResult } from "./studio-svg-export";
+import type { StudioTeamCommentCapabilities } from "./studio-team-comment-client";
 import type { Vibrance } from "./studio-vibrance";
 import type { StudioGpuBackend } from "./studio-webgpu-engine";
 import type { StudioGpuStroke } from "./studio-webgpu-stroke";
@@ -1612,6 +1597,13 @@ const StudioCommentsPanel = lazyRetry(
     })),
   "StudioCommentsPanel"
 );
+
+// Review networking and mutation verification are not part of the first-paint drawing path.
+// Keep them in optional chunks while retaining the lightweight persisted comment model needed
+// for canvas pins and project compatibility in the static Studio graph.
+const loadStudioTeamCommentClient = () => import("./studio-team-comment-client");
+const loadStudioTeamCommentMutationPlanner = () =>
+  import("./studio-team-comment-mutation-plan");
 const StudioTeamPanel = lazyRetry(
   () =>
     import("./StudioTeamPanel").then((mod) => ({
@@ -6756,11 +6748,12 @@ function StudioCuttoonEditor() {
       if (inFlight) return;
       inFlight = true;
       try {
-        const snapshot = await listAllStudioTeamComments(
+        const commentClient = await loadStudioTeamCommentClient();
+        const snapshot = await commentClient.listAllStudioTeamComments(
           studioTeamCommentsWorkId,
           controller.signal
         );
-        const projected = studioTeamCommentsToLocalDocument(snapshot, {
+        const projected = commentClient.studioTeamCommentsToLocalDocument(snapshot, {
           unfilteredSnapshotComplete: true,
         });
         if (!projected) throw new Error("팀 댓글 전체 기록을 안전하게 투영하지 못했어요.");
@@ -10897,6 +10890,7 @@ function StudioCuttoonEditor() {
       return true;
     }
 
+    const { planStudioTeamCommentMutation } = await loadStudioTeamCommentMutationPlanner();
     const plan = planStudioTeamCommentMutation(
       studioCommentViewDocumentRef.current,
       nextDocument
@@ -10911,9 +10905,10 @@ function StudioCuttoonEditor() {
     if ((plan.kind === "resolve" || plan.kind === "reopen") && !studioTeamCommentCapabilities?.resolve) {
       throw new Error("해결 상태는 소유자·관리자·편집자만 변경할 수 있어요.");
     }
+    const commentClient = await loadStudioTeamCommentClient();
 
     if (plan.kind === "create") {
-      const remoteThread = await createStudioTeamCommentThread(studioTeamCommentsWorkId, {
+      const remoteThread = await commentClient.createStudioTeamCommentThread(studioTeamCommentsWorkId, {
         anchor: plan.anchor,
         body: plan.body,
       });
@@ -10925,7 +10920,7 @@ function StudioCuttoonEditor() {
         remoteThread.id,
         BigInt(remoteThread.latestActivitySequence)
       );
-      const localThread = studioTeamCommentThreadToLocalThread(remoteThread);
+      const localThread = commentClient.studioTeamCommentThreadToLocalThread(remoteThread);
       if (!localThread) throw new Error("등록된 팀 댓글을 화면에 안전하게 반영하지 못했어요.");
       setStudioTeamCommentsState((current) => normalizeStudioCommentsDocument({
         version: 1,
@@ -10945,7 +10940,7 @@ function StudioCuttoonEditor() {
     }
 
     if (plan.kind === "reply") {
-      const response = await addStudioTeamCommentReply(
+      const response = await commentClient.addStudioTeamCommentReply(
         studioTeamCommentsWorkId,
         plan.threadId,
         { body: plan.body }
@@ -10958,7 +10953,7 @@ function StudioCuttoonEditor() {
         plan.threadId,
         BigInt(response.latestActivitySequence)
       );
-      const reply = studioTeamCommentMessageToLocalReply(response.message);
+      const reply = commentClient.studioTeamCommentMessageToLocalReply(response.message);
       if (!reply) throw new Error("등록된 팀 답글을 화면에 안전하게 반영하지 못했어요.");
       setStudioTeamCommentsState((current) => {
         // Polling snapshot can win the race with this POST response. Treat the server message ID
@@ -10982,7 +10977,7 @@ function StudioCuttoonEditor() {
     }
 
     if (plan.kind === "resolve") {
-      const response = await resolveStudioTeamCommentThread(
+      const response = await commentClient.resolveStudioTeamCommentThread(
         studioTeamCommentsWorkId,
         plan.threadId
       );
@@ -10995,7 +10990,7 @@ function StudioCuttoonEditor() {
         BigInt(response.latestActivitySequence)
       );
       const resolver = response.resolvedBy
-        ? studioTeamCommentUserToLocalActor(response.resolvedBy)
+        ? commentClient.studioTeamCommentUserToLocalActor(response.resolvedBy)
         : null;
       if (!resolver || !response.resolvedAt) {
         throw new Error("팀 댓글 해결 정보를 화면에 안전하게 반영하지 못했어요.");
@@ -11012,7 +11007,7 @@ function StudioCuttoonEditor() {
       return true;
     }
 
-    const response = await reopenStudioTeamCommentThread(
+    const response = await commentClient.reopenStudioTeamCommentThread(
       studioTeamCommentsWorkId,
       plan.threadId
     );
@@ -11037,7 +11032,11 @@ function StudioCuttoonEditor() {
   async function markStudioCommentThreadRead(threadId: string): Promise<boolean> {
     if (!studioTeamCommentsWorkId || !studioTeamUnreadCommentIds.includes(threadId)) return true;
     try {
-      const response = await markStudioTeamCommentRead(studioTeamCommentsWorkId, threadId);
+      const commentClient = await loadStudioTeamCommentClient();
+      const response = await commentClient.markStudioTeamCommentRead(
+        studioTeamCommentsWorkId,
+        threadId
+      );
       studioTeamCommentReadSequenceRef.current.set(
         threadId,
         BigInt(response.lastReadActivitySequence)
@@ -11056,7 +11055,8 @@ function StudioCuttoonEditor() {
   async function markAllStudioCommentThreadsRead(): Promise<boolean> {
     if (!studioTeamCommentsWorkId || studioTeamUnreadCommentIds.length === 0) return true;
     try {
-      await markAllStudioTeamCommentsRead(studioTeamCommentsWorkId);
+      const commentClient = await loadStudioTeamCommentClient();
+      await commentClient.markAllStudioTeamCommentsRead(studioTeamCommentsWorkId);
       for (const [threadId, sequence] of studioTeamCommentActivitySequenceRef.current) {
         studioTeamCommentReadSequenceRef.current.set(threadId, sequence);
       }
@@ -22085,6 +22085,9 @@ function StudioCuttoonEditor() {
       if (captured.length !== pages.length) {
         throw new Error("일부 페이지를 캡처하지 못해 패키지 생성을 중단했어요.");
       }
+      const { renderStudioPublishPackageImages } = await import(
+        "./studio-publish-package-renderer"
+      );
       const sources = captured.map((canvas, index) => ({ id: pages[index].id, canvas }));
       const rendered = await renderStudioPublishPackageImages({
         settings: effectivePublishPackageSettings,
