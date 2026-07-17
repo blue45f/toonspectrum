@@ -14240,6 +14240,21 @@ function StudioCuttoonEditor() {
     setPagesHi(nextIndex);
   };
 
+  // 화면 리셋 — 줌·너비맞춤 스케일·좌우 반전(뷰 전용, 문서 데이터 아님)을 기본값으로,
+  // 스크롤 위치도 좌상단으로 되돌린다. "100%"/"맞춤" 버튼은 줌만 건드리고 반전·스크롤은
+  // 그대로 둬서, 확대·회전한 채로 자리를 잃었을 때 한 번에 돌아올 방법이 없었다.
+  function resetView() {
+    const wrap = wrapRef.current;
+    if (wrap) {
+      const w = wrap.clientWidth;
+      setScale(Math.min(isFullscreen ? 4 : 2.5, Math.max(0.1, w / CANVAS_W)));
+      wrap.scrollLeft = 0;
+      wrap.scrollTop = 0;
+    }
+    setZoom(1);
+    setCanvasFlipH(false);
+  }
+
   // 키보드 단축키: ⌘Z 실행취소 · ⌘⇧Z/⌘Y 다시실행 · G 고급 채우기 · ⌘D 복제 · Delete/Backspace 삭제 · Esc 메뉴 닫기/선택해제.
   // 최신 클로저를 ref로 흘려 리스너 재등록 없이(빈 deps) 항상 현재 상태를 참조.
   const shortcutRef = useRef<(e: KeyboardEvent) => void>(() => {});
@@ -14352,6 +14367,12 @@ function StudioCuttoonEditor() {
           setRightPanelOpen(true);
           announceDrawingShortcut("리터치 패널에서 내용 변형을 적용하세요");
         }
+        return;
+      }
+      if (matchStudioShortcut(sc["reset-view"], e)) {
+        e.preventDefault();
+        resetView();
+        announceDrawingShortcut("화면 리셋");
         return;
       }
       if (matchStudioShortcut(sc["deselect-pixels"], e)) {
@@ -23017,6 +23038,7 @@ function StudioCuttoonEditor() {
     redo,
     rememberColor,
     removeEmeresUnderlays,
+    resetView,
     saveSelectionAsClip,
     saveSuggestedPaletteToLibrary,
     setCanvasH,
@@ -29212,6 +29234,7 @@ interface StudioToolBeltContentHandlers {
   redo: () => void;
   rememberColor: (c: string) => void;
   removeEmeresUnderlays: () => void;
+  resetView: () => void;
   saveSelectionAsClip: () => Promise<void>;
   saveSuggestedPaletteToLibrary: (suggestion: PaletteSuggestion) => void;
   setCanvasH: (newH: number | ((prev: number) => number)) => void;
@@ -29690,6 +29713,7 @@ const StudioToolBeltContent = memo(function StudioToolBeltContent({
     redo,
     rememberColor,
     removeEmeresUnderlays,
+    resetView,
     saveSelectionAsClip,
     saveSuggestedPaletteToLibrary,
     setCanvasH,
@@ -31367,6 +31391,14 @@ const StudioToolBeltContent = memo(function StudioToolBeltContent({
             title="너비에 맞춤"
           >
             맞춤
+          </button>
+          <button
+            type="button"
+            onClick={resetView}
+            className={cn(toolBtn(false), "h-8 px-1.5 text-[0.62rem] font-semibold")}
+            title="화면 리셋 — 줌·좌우 반전·스크롤 위치를 기본값으로 (Shift+0)"
+          >
+            리셋
           </button>
           <StudioToolbarDivider />
           <button

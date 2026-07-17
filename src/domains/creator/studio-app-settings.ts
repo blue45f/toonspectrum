@@ -89,6 +89,7 @@ export const STUDIO_SHORTCUT_ACTIONS = [
   { id: "brush-smaller", label: "브러시 작게", defaultKeys: "[" },
   { id: "brush-larger", label: "브러시 크게", defaultKeys: "]" },
   { id: "flip-canvas", label: "캔버스 좌우 반전(보기)", defaultKeys: "H" },
+  { id: "reset-view", label: "화면 리셋(줌·위치·반전)", defaultKeys: "Shift+0" },
   { id: "shortcuts-help", label: "단축키 도움말", defaultKeys: "?" },
 ] as const;
 
