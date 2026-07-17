@@ -103,7 +103,7 @@ import {
   MessageSquare,
   Triangle,
 } from "lucide-react";
-import { Fragment, Profiler, Suspense, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ComponentType, type ProfilerOnRenderCallback, type ReactNode } from "react";
+import { Fragment, Profiler, Suspense, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ComponentType, type ReactNode } from "react";
 import { createPortal, flushSync } from "react-dom";
 import { Stage, Layer, Rect, Text as KText, TextPath as KTextPath, Image as KImage, Line, Group, Star, Ellipse, Circle as KCircle, Path, Transformer, Shape, Arrow, RegularPolygon } from "react-konva/lib/ReactKonvaCore";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -260,6 +260,7 @@ import {
   processPencilPoints,
   resampleStrokePressures,
   resolveBrushPressureSample,
+  resolveBrushReleasePressureSample,
   resolveStudioBrushRenderFamily,
   screentoneDotRadius,
   screentoneDotsForStroke,
@@ -345,6 +346,17 @@ import {
   collectStudioCaptureAssetSources,
   waitForStudioCaptureReady,
 } from "./studio-capture-readiness";
+import {
+  planStudioCausalInk,
+  selectStudioCausalInkSamples,
+} from "./studio-causal-ink";
+import {
+  appendStudioCausalPostCorrection,
+  createStudioCausalPostCorrectionState,
+  sealStudioCausalPostCorrection,
+  type StudioCausalPostCorrectionState,
+  type StudioCausalPostCorrectionTransition,
+} from "./studio-causal-post-correction";
 import {
   buildStudioCharacterBiblePromptContext,
   normalizeStudioCharacterBible,
@@ -613,6 +625,7 @@ import {
 import { projectStudioCanvasCommentPins } from "./studio-live-canvas-overlay-model";
 import {
   StudioLiveInkOverlayRenderer,
+  StudioLiveInkPredictionRenderer,
   type StudioLiveInkSurface,
 } from "./studio-live-ink-overlay";
 import {
@@ -677,6 +690,7 @@ import {
   type NodeEditTool,
 } from "./studio-node-edit";
 import { resizableNodeProps, textNodeProps } from "./studio-node-props";
+import { useStudioPageDnd } from "./studio-page-dnd";
 import {
   isDefaultPageGrade,
   normalizePageGrade,
@@ -756,6 +770,13 @@ import {
   type StudioPointerCaptureTarget,
   type StudioStrokePointerSession,
 } from "./studio-pointer-input";
+import {
+  appendStudioAuthoritativeInk,
+  createStudioPredictedInkTailState,
+  endStudioPredictedInkTail,
+  replaceStudioPredictedInkTail,
+  type StudioPredictedInkTailState,
+} from "./studio-predicted-ink-tail";
 import {
   applyBrushPresetWithLocks,
   cycleStudioStabilizerStrength,
@@ -914,7 +935,7 @@ import {
   SCENARIO_BEAT_TYPES,
   type ScenarioBeatType,
 } from "./studio-story-beats";
-import { buildShiftConstrainedFreehandPoints } from "./studio-stroke-constrain";
+import { resolveShiftFreehandTransition } from "./studio-stroke-constrain";
 import {
   DEFAULT_SHAPE_PARAMS,
   effectiveCornerRadius,
@@ -1046,7 +1067,6 @@ import {
 import { StudioMagicResizePanel } from "./StudioMagicResizePanel";
 import { StudioMagicWandPanel } from "./StudioMagicWandPanel";
 import { StudioNodeEditPanel } from "./StudioNodeEditPanel";
-import { StudioPageThumbnail, useStudioPageDnd } from "./StudioPageThumbnails";
 import { StudioPaletteLibraryPanel } from "./StudioPaletteLibraryPanel";
 import { StudioPanelSplitOverlay, StudioPanelSplitPanel } from "./StudioPanelSplitTool";
 import { StudioPerspectiveOverlay } from "./StudioPerspectiveOverlay";
@@ -1170,6 +1190,10 @@ const BUBBLE_TEXT_MEASURER = createCanvasBubbleTextMeasurer();
 const StudioImageAdjustmentsPanel = lazyRetry(
   () => import("./StudioImageAdjustmentsPanel").then((mod) => ({ default: mod.StudioImageAdjustmentsPanel })),
   "StudioImageAdjustmentsPanel"
+);
+const StudioPageThumbnail = lazyRetry(
+  () => import("./StudioPageThumbnails").then((mod) => ({ default: mod.StudioPageThumbnail })),
+  "StudioPageThumbnail"
 );
 const StudioWebGpuCanvas = lazyRetry(
   () => import("./StudioWebGpuCanvas").then((mod) => ({ default: mod.StudioWebGpuCanvas })),
@@ -2442,6 +2466,13 @@ function bubbleAutoShrinkPreview(
 }
 const DRAW_COLOR_SWATCHES = ["#16100c", "#71717a", "#f8f2df", "#ff3b30", "#ff9500", "#ffcc00", "#4caf50", "#2196f3", "#9c27b0", "#ff6fb1", "#8a5a44", "#ffffff"];
 const QUICK_START_DISMISSED_KEY = "toonspectrum-studio-quick-start-dismissed";
+/**
+ * Canvas2D is the visible low-latency front buffer by default because it shares the exact browser
+ * rasterizer with committed Konva ink. WebGPU remains available for retained/committed surfaces
+ * and can be benchmarked explicitly without reintroducing a live→commit edge-thickness jump.
+ */
+const STUDIO_VISIBLE_LIVE_INK_BACKEND =
+  import.meta.env.VITE_STUDIO_LIVE_INK_BACKEND === "webgpu" ? "webgpu" : "canvas2d";
 // 모바일 첫 사용 안내(하단 도구막대 + 두 손가락 이동/확대) 1회만 노출.
 const MOBILE_HINT_DISMISSED_KEY = "toonspectrum-studio-mobile-hint-dismissed";
 const WATERMARK_KEY = "toonspectrum-studio-watermark";
@@ -2845,6 +2876,30 @@ function drawFreehandPenSegments(
   }
 }
 
+/** Canonical new-stroke rasterizer shared with the Canvas live overlay and retained WebGPU path. */
+function drawStudioCausalInkDabs(
+  context: Konva.Context,
+  points: readonly number[],
+  pressures: readonly number[] | undefined,
+  strokeColor: string,
+  strokeWidth: number,
+  minDistance: number
+): void {
+  const plan = planStudioCausalInk({
+    points,
+    pressures,
+    minDistance,
+    size: strokeWidth,
+  });
+  if (plan.dabs.length === 0) return;
+  context.fillStyle = strokeColor;
+  for (const dab of plan.dabs) {
+    context.beginPath();
+    context.arc(dab.x, dab.y, dab.radius, 0, Math.PI * 2);
+    context.fill();
+  }
+}
+
 /** 증분 라이브 잉크 표면 — 스크롤/줌 변화만 React 로 동기화하고 픽셀은 임페러티브. */
 const StudioLiveInkOverlayHost = memo(function StudioLiveInkOverlayHost({
   renderer,
@@ -2870,6 +2925,36 @@ const StudioLiveInkOverlayHost = memo(function StudioLiveInkOverlayHost({
       aria-hidden="true"
       data-studio-live-ink-overlay="true"
       className="pointer-events-none absolute z-10"
+      style={{ left, top, width, height }}
+    />
+  );
+});
+
+/** 교체 가능한 예측 꼬리 전용 표면 — 확정 잉크 canvas와 물리적으로 분리한다. */
+const StudioLiveInkPredictionHost = memo(function StudioLiveInkPredictionHost({
+  renderer,
+  left,
+  top,
+  width,
+  height,
+  documentScale,
+  documentWidth,
+  flipX,
+}: StudioLiveInkSurface & { renderer: StudioLiveInkPredictionRenderer }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useLayoutEffect(() => {
+    renderer.attach(canvasRef.current);
+    return () => renderer.attach(null);
+  }, [renderer]);
+  useLayoutEffect(() => {
+    renderer.setSurface({ left, top, width, height, documentScale, documentWidth, flipX });
+  });
+  return (
+    <canvas
+      ref={canvasRef}
+      aria-hidden="true"
+      data-studio-live-ink-prediction="true"
+      className="pointer-events-none absolute z-[11]"
       style={{ left, top, width, height }}
     />
   );
@@ -2924,6 +3009,17 @@ function drawLiveFreehandDraftToContext(context: Konva.Context, el: DrawEl): voi
   context.globalAlpha = Math.min(1, Math.max(0, el.opacity ?? 1));
   context.globalCompositeOperation = isEraser ? "destination-out" : "source-over";
   for (const points of variations) {
+    if (el.sampleSpacing !== undefined && !el.fill) {
+      drawStudioCausalInkDabs(
+        context,
+        points,
+        el.pressures,
+        strokeColor,
+        strokeWidth,
+        el.sampleSpacing
+      );
+      continue;
+    }
     if (points.length === 2) {
       const pressure = Math.min(1, Math.max(0, el.pressures?.[0] ?? 0.5));
       const width = strokeWidth * (0.3 + pressure * 1.4);
@@ -3146,6 +3242,9 @@ const StudioDrawNode = memo(function StudioDrawNode({ el }: { el: DrawEl }) {
 
           if (
             points.length === 2 &&
+            (el.sampleSpacing === undefined || (
+              el.mode !== "eraser" && brushFamily !== "pen" && brushFamily !== "marker"
+            )) &&
             brushFamily !== "watercolor" &&
             brushFamily !== "screentone" &&
             brushFamily !== "glow" &&
@@ -3654,11 +3753,33 @@ const StudioDrawNode = memo(function StudioDrawNode({ el }: { el: DrawEl }) {
           }
 
           // Default "pen" or "marker" or "eraser"
-          const smoothed = processFreehandPoints(points, renderSampleDistance);
-          const pressures = el.pressures;
           // 라쏘 브러시: fill 이 설정된 프리핸드(라쏘 필)는 궤적을 자동으로 닫아 내부를
           // 현재 색으로 채운다. 라이브 초안도 같은 경로를 지나므로 그리는 동안 채움이 미리 보인다.
           const freehandFill = el.mode !== "eraser" ? el.fill : undefined;
+          if (el.sampleSpacing !== undefined && !freehandFill) {
+            return (
+              <Shape
+                key={index}
+                sceneFunc={(context) => {
+                  drawStudioCausalInkDabs(
+                    context,
+                    points,
+                    el.pressures,
+                    stroke,
+                    strokeWidth,
+                    el.sampleSpacing ?? 0
+                  );
+                }}
+                opacity={opacity}
+                globalCompositeOperation={composite}
+                listening={false}
+                perfectDrawEnabled={false}
+                shadowForStrokeEnabled={false}
+              />
+            );
+          }
+          const smoothed = processFreehandPoints(points, renderSampleDistance);
+          const pressures = el.pressures;
           if (pressures && pressures.length > 0 && smoothed.length >= 4) {
             const sampledPressures = resampleStrokePressures(pressures, Math.floor(smoothed.length / 2));
             return (
@@ -3805,38 +3926,20 @@ class StudioDraftPreviewStore {
 /** 비다이렉트 초안 전용 격리 레이어 — 스토어 구독으로 페이지 본문 렌더 없이 프레임을 그린다. */
 const StudioDraftPreviewLayers = memo(function StudioDraftPreviewLayers({
   store,
-  postCorrection,
-  preserveCorners,
 }: {
   store: StudioDraftPreviewStore;
-  postCorrection: number;
-  preserveCorners: boolean;
 }) {
   const { active, settled } = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const isolatedDynamic =
     active?.mode === "pen" && resolveStudioBrushDynamicsPresetId(active.brush) !== null
       ? active
       : null;
-  // 커밋 시점의 postCorrection 재구성이 펜을 뗄 때 선 형태를 '탁' 바꾸지 않도록, 꼬리 몇 점을
-  // 제외한 앞부분에 같은 보정을 라이브로 미리 적용한다. 입자(dynamics) 브러시는 dab 배치가
-  // 점 위치에 민감해 제외한다.
-  const activeForRender = (() => {
-    if (!active || isolatedDynamic || (active.kind ?? "freehand") !== "freehand" || postCorrection <= 0) {
-      return active;
-    }
-    const tailPoints = 8;
-    const pointCount = Math.floor(active.points.length / 2);
-    if (pointCount <= tailPoints + 2) return active;
-    const headCount = pointCount - tailPoints;
-    const smoothedHead = smoothStrokePoints(
-      active.points.slice(0, headCount * 2),
-      postCorrection,
-      { preserveCorners }
-    );
-    return { ...active, points: [...smoothedHead, ...active.points.slice(headCount * 2)] };
-  })();
-  const normalActive = activeForRender && !isolatedDynamic && activeForRender.mode !== "eraser"
-    ? activeForRender
+  // Non-direct specialty brushes retain their exact accepted coordinates while the pointer is
+  // down. The former growing-prefix smoother recalculated already-visible points every frame.
+  // Default opaque pens now use the fixed-lag two-surface causal path; specialty brushes prefer a
+  // single release-time correction over visibly crawling historical geometry.
+  const normalActive = active && !isolatedDynamic && active.mode !== "eraser"
+    ? active
     : null;
   return (
     <>
@@ -5188,21 +5291,29 @@ type StudioAdvancedFillPreview = {
   regionCount: number;
 };
 
-// Dev-only render tap: accumulates per-commit {id, phase, ms} so a real-browser console can
-// read window.__studioRenderProfile to measure settle-commit render cost without devtools.
-interface StudioRenderProfileEntry {
-  id: string;
-  phase: string;
-  ms: number;
-  at: number;
-}
-const recordStudioRenderProfile: ProfilerOnRenderCallback = (id, phase, actualDuration) => {
+/**
+ * 커밋 렌더 원가 계측(개발 전용): window.__studioRenderProfile 링버퍼.
+ * 정착 커밋 1회의 비용을 영역(id)별로 귀속시켜, 본문 분할이 추측이 아니라 실측 근거로
+ * 진행되게 한다. 프로덕션 빌드에서는 기록하지 않는다(Profiler 자체 오버헤드는 미미).
+ */
+function recordStudioRenderProfile(
+  id: string,
+  phase: "mount" | "update" | "nested-update",
+  actualDuration: number
+): void {
   if (!import.meta.env.DEV) return;
-  const holder = window as unknown as { __studioRenderProfile?: StudioRenderProfileEntry[] };
-  const log = holder.__studioRenderProfile ?? (holder.__studioRenderProfile = []);
-  log.push({ id, phase, ms: actualDuration, at: performance.now() });
-  if (log.length > 500) log.splice(0, log.length - 500);
-};
+  const target = globalThis as typeof globalThis & {
+    __studioRenderProfile?: { id: string; phase: string; ms: number; at: number }[];
+  };
+  const buffer = (target.__studioRenderProfile ??= []);
+  buffer.push({
+    id,
+    phase,
+    ms: Math.round(actualDuration * 10) / 10,
+    at: Math.round(performance.now()),
+  });
+  if (buffer.length > 80) buffer.splice(0, buffer.length - 80);
+}
 
 // Identity-stable event-handler bundle for memoized region children of the (compiler-bailed)
 // editor. Wrappers are created once and read the latest closures from a ref refreshed in a
@@ -8796,6 +8907,8 @@ function StudioCuttoonEditor() {
   // A stroke belongs to exactly one pointer from down through up/cancel. Keeping this high-rate
   // ownership outside React state prevents palm/second-finger events from ending the pen stroke.
   const drawingPointerSessionRef = useRef<StudioStrokePointerSession | null>(null);
+  /** Predicted samples may simulate the drawing pipeline, but must never schedule durable ink. */
+  const drawingPredictionPreviewRef = useRef(false);
   const drawingPointerCaptureTargetRef = useRef<StudioPointerCaptureTarget | null>(null);
   /** Detach window-level pointerup/cancel armed for the active stroke (mouse leaves canvas). */
   const drawingPointerSafetyCleanupRef = useRef<(() => void) | null>(null);
@@ -8838,6 +8951,7 @@ function StudioCuttoonEditor() {
     webGpuBackendRef.current = "canvas2d";
     if (gpuLiveInkPinnedRef.current) {
       gpuLiveInkPinnedRef.current = false;
+      gpuPinnedLivePointCountRef.current = 0;
       webGpuCanvasHandleRef.current?.setPinnedVisible(
         pendingGpuStrokesRef.current.length > 0
       );
@@ -8871,6 +8985,8 @@ function StudioCuttoonEditor() {
   // 드라이버/기기) 남은 스트로크를 Konva 초안에 자동 인계한다 — 동선은 어떤 환경에서도 보인다.
   const gpuPinnedFrameSeenRef = useRef(false);
   const gpuPinProbeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Point revision already published to the explicit WebGPU suffix feed for the active stroke. */
+  const gpuPinnedLivePointCountRef = useRef(0);
   // 다이렉트 라이브 초안: 프리핸드 펜 계열은 스트로크 수명주기 전체(시작·프레임·종료)에서
   // React 를 거치지 않는다 — 초안 노드는 상시 마운트된 임페러티브 sceneFunc 이고, 시작은 ref
   // 무장, 커밋은 아래 지연 파이프라인이 유휴 시 한 번만 동기화한다. 30k 라인 컴포넌트 본문
@@ -8889,6 +9005,10 @@ function StudioCuttoonEditor() {
   // 증분 라이브 잉크: 프레임마다 전체 획을 다시 그리지 않고 새 조각만 누적한다.
   const liveInkOverlayRendererRef = useRef<StudioLiveInkOverlayRenderer>(null as never);
   liveInkOverlayRendererRef.current ??= new StudioLiveInkOverlayRenderer();
+  const liveInkPredictionRendererRef = useRef<StudioLiveInkPredictionRenderer>(null as never);
+  liveInkPredictionRendererRef.current ??= new StudioLiveInkPredictionRenderer();
+  const predictedInkTailStateRef = useRef<StudioPredictedInkTailState | null>(null);
+  const causalPostCorrectionStateRef = useRef<StudioCausalPostCorrectionState | null>(null);
   const liveInkOverlayClearGenRef = useRef(0);
   // ── 커밋 지연 파이프라인 ──────────────────────────────────────────────────
   // 펜을 뗀 획은 라이브 표면(증분 오버레이/GPU 파인 표면)에 잉크를 남긴 채 큐에 쌓고,
@@ -8898,6 +9018,7 @@ function StudioCuttoonEditor() {
     pageId: string;
     strokes: DrawEl[];
     timer: ReturnType<typeof setTimeout> | null;
+    retryCount: number;
   } | null>(null);
   const flushPendingStrokeCommitsRef = useRef<() => void>(() => {});
   const discardPendingStrokeCommitsRef = useRef<() => void>(() => {});
@@ -8936,29 +9057,217 @@ function StudioCuttoonEditor() {
   const applySmartGuides = (next: SmartGuideOverlay) => {
     setSmartGuides((prev) => (smartGuideOverlaysEqual(prev, next) ? prev : next));
   };
-  const buildGpuLiveStroke = (el: DrawEl): StudioGpuStroke | null => {
+  const liveInkStyleFor = (el: DrawEl) => ({
+    color: el.stroke,
+    strokeWidthDoc: Math.max(1, el.strokeWidth),
+    opacity: el.opacity ?? 1,
+    minDistanceDoc: el.sampleSpacing ?? strokeRenderDistance(el.sampleSpacing),
+  });
+  const restoreCausalPostCorrectionTail = (el: DrawEl) => {
+    const state = causalPostCorrectionStateRef.current;
+    if (!state || state.phase !== "active") return;
+    liveInkPredictionRendererRef.current.applyPointTail(
+      state.tailPoints.length > 0
+        ? {
+            kind: "replace",
+            anchor: state.settledEndpoint,
+            startSampleIndex: state.settledSampleCount,
+            points: state.tailPoints,
+          }
+        : { kind: "clear" },
+      liveInkStyleFor(el),
+      el.pressures
+    );
+  };
+  const appendCausalPostCorrectionState = (el: DrawEl, startPointIndex: number) => {
+    const state = causalPostCorrectionStateRef.current;
+    if (!state || state.phase !== "active") return;
+    const transition = appendStudioCausalPostCorrection(
+      state,
+      el.points.slice(startPointIndex * 2)
+    );
+    causalPostCorrectionStateRef.current = transition.state;
+    if (transition.settledSpan.points.length > 0) {
+      liveInkOverlayRendererRef.current.appendSettledSpan(
+        transition.settledSpan.points,
+        el.pressures,
+        transition.settledSpan.startSampleIndex
+      );
+    }
+    // Reapply even for an empty/duplicate authoritative batch so an old speculative route cannot
+    // survive the next real pointer event.
+    restoreCausalPostCorrectionTail(el);
+  };
+  const previewCausalPostCorrectionTail = (
+    el: DrawEl,
+    authoritativePointCount: number
+  ) => {
+    const state = causalPostCorrectionStateRef.current;
+    if (!state || state.phase !== "active") return;
+    const speculative = appendStudioCausalPostCorrection(
+      state,
+      el.points.slice(authoritativePointCount * 2)
+    );
+    if (speculative.state === state) {
+      restoreCausalPostCorrectionTail(el);
+      return;
+    }
+    const speculativeTailPoints = [
+      ...speculative.settledSpan.points,
+      ...(speculative.tailSurface.kind === "replace" ? speculative.tailSurface.points : []),
+    ];
+    liveInkPredictionRendererRef.current.applyPointTail(
+      speculativeTailPoints.length > 0
+        ? {
+            kind: "replace",
+            anchor: state.settledEndpoint,
+            startSampleIndex: state.settledSampleCount,
+            points: speculativeTailPoints,
+          }
+        : { kind: "clear" },
+      liveInkStyleFor(el),
+      el.pressures
+    );
+  };
+  const sealCausalPostCorrectionState = (el: DrawEl): DrawEl => {
+    const state = causalPostCorrectionStateRef.current;
+    if (!state) return el;
+    const transition: StudioCausalPostCorrectionTransition =
+      sealStudioCausalPostCorrection(state);
+    causalPostCorrectionStateRef.current = transition.state;
+    if (transition.settledSpan.points.length > 0) {
+      liveInkOverlayRendererRef.current.appendSettledSpan(
+        transition.settledSpan.points,
+        el.pressures,
+        transition.settledSpan.startSampleIndex
+      );
+    }
+    liveInkPredictionRendererRef.current.applyPointTail(
+      transition.tailSurface,
+      liveInkStyleFor(el),
+      el.pressures
+    );
+    return transition.finalPoints
+      ? { ...el, points: [...transition.finalPoints] }
+      : el;
+  };
+  const startCausalPostCorrection = (el: DrawEl) => {
+    predictedInkTailStateRef.current = null;
+    const transition = appendStudioCausalPostCorrection(
+      createStudioCausalPostCorrectionState({
+        strength: postCorrection,
+        preserveCorners,
+      }),
+      el.points
+    );
+    causalPostCorrectionStateRef.current = transition.state;
+    restoreCausalPostCorrectionTail(el);
+  };
+  const startPredictedInkTail = (el: DrawEl) => {
+    causalPostCorrectionStateRef.current = null;
+    const initial = appendStudioAuthoritativeInk(createStudioPredictedInkTailState(), {
+      points: el.points.slice(0, 2),
+      pressures: el.pressures?.slice(0, 1),
+    });
+    predictedInkTailStateRef.current = initial.state;
+    liveInkPredictionRendererRef.current.apply(initial.predictionSurface, liveInkStyleFor(el));
+  };
+  const appendAuthoritativePredictedInkState = (el: DrawEl, startPointIndex: number) => {
+    const state = predictedInkTailStateRef.current;
+    if (!state) return;
+    const transition = appendStudioAuthoritativeInk(state, {
+      points: el.points.slice(startPointIndex * 2),
+      pressures: el.pressures?.slice(startPointIndex),
+    });
+    predictedInkTailStateRef.current = transition.state;
+    liveInkPredictionRendererRef.current.apply(
+      transition.predictionSurface,
+      liveInkStyleFor(el)
+    );
+  };
+  const replacePredictedInkTail = (el: DrawEl, authoritativePointCount: number) => {
+    const state = predictedInkTailStateRef.current;
+    if (!state) return;
+    const transition = replaceStudioPredictedInkTail(state, {
+      points: el.points.slice(authoritativePointCount * 2),
+      pressures: el.pressures?.slice(authoritativePointCount),
+    });
+    predictedInkTailStateRef.current = transition.state;
+    liveInkPredictionRendererRef.current.apply(
+      transition.predictionSurface,
+      liveInkStyleFor(el)
+    );
+  };
+  const endPredictedInkTail = () => {
+    causalPostCorrectionStateRef.current = null;
+    const state = predictedInkTailStateRef.current;
+    if (!state) {
+      liveInkPredictionRendererRef.current.clear();
+      return;
+    }
+    const transition = endStudioPredictedInkTail(state);
+    predictedInkTailStateRef.current = transition.state;
+    // Style is immaterial for clear/keep, but the active stroke keeps the exact canonical values.
+    const active = drawingRef.current ?? liveDraftVisualRef.current;
+    if (active) {
+      liveInkPredictionRendererRef.current.apply(
+        transition.predictionSurface,
+        liveInkStyleFor(active)
+      );
+    } else {
+      liveInkPredictionRendererRef.current.clear();
+    }
+  };
+  const buildGpuLiveStroke = (
+    el: DrawEl,
+    options: { sealEndpoint?: boolean } = {}
+  ): StudioGpuStroke | null => {
+    const samples = selectStudioCausalInkSamples({
+      points: el.points,
+      pressures: el.pressures,
+      minDistance: el.sampleSpacing ?? 0,
+      // An in-progress retained GPU feed must never retract an already published endpoint when a
+      // later sample arrives. Pointer-up explicitly seals the final endpoint below.
+      sealEndpoint: options.sealEndpoint ?? false,
+    });
     return buildStudioGpuLiveStroke({
       id: el.id,
       // 입력 단계에서 이미 거리 필터·스태빌라이저를 통과했다. 라이브 GPU 경계에서 다시
       // smoothing/resampling하면 새 점 하나가 과거 좌표와 필압을 바꿔 전체 texture rebuild가 된다.
-      points: el.points,
-      pressures: el.pressures,
+      points: samples.flatMap(({ x, y }) => [x, y]),
+      pressures: samples.map(({ pressure }) => pressure),
       color: el.stroke,
       size: Math.max(1, el.strokeWidth),
       opacity: el.opacity,
       composite: "normal" as const,
     });
   };
+  const buildGpuLiveStrokeView = (el: DrawEl): StudioGpuStroke | null => {
+    const pointCount = Math.floor(el.points.length / 2);
+    if (pointCount < 1 || el.points.length !== pointCount * 2) return null;
+    if (!el.pressures || el.pressures.length < pointCount) return null;
+    return {
+      id: el.id,
+      // The drawing model replaces these arrays rather than mutating them. The explicit suffix
+      // feed validates only the new range and retains this object solely as a recovery fallback.
+      points: el.points,
+      pressures: el.pressures,
+      color: el.stroke,
+      size: Math.max(1, el.strokeWidth),
+      opacity: el.opacity,
+      composite: "normal",
+    };
+  };
   const flushDirectLiveDraft = () => {
     const next = liveDraftPendingRef.current;
     if (!next || !liveDraftDirectRef.current) return;
-    // 증분 경로: 스태빌라이즈드 원본 점의 새 접미사만 표면에 누적한다 — 포인트당
-    // O(1). 라이브 중 소급 재구성(progressive postCorrection)은 증분과 비호환이라 이 경로에선
-    // 적용하지 않고, 커밋 시 postCorrection 이 최종 형태를 만든다(스태빌라이저가 라이브를
-    // 이미 부드럽게 유지).
+    // 증분 경로: 스태빌라이즈드 원본 점의 새 접미사만 표면에 누적한다 — 포인트당 O(1).
+    // 후보정 획은 위 fixed-lag 모델이 확정 head만 별도로 append하므로 raw draft를 여기서
+    // 중복 공급하지 않는다.
     const overlay = liveInkOverlayRendererRef.current;
     if (overlay.isActive && next.mode !== "eraser" && !next.fill) {
       liveDraftVisualRef.current = next;
+      if (causalPostCorrectionStateRef.current) return;
       overlay.appendFrom(next.points, next.pressures);
       return;
     }
@@ -8966,15 +9275,34 @@ function StudioCuttoonEditor() {
     // 명시적 문서 처리이며 라이브 중 이미 칠한 픽셀을 소급 수정하지 않는다.
     liveDraftVisualRef.current = next;
     if (gpuLiveInkPinnedRef.current) {
-      const stroke = buildGpuLiveStroke(next);
-      if (stroke) {
-        // 커밋 동기화를 기다리는 확정 획(pendingGpu)도 함께 공급한다 — 지연 커밋 동안
-        // 이전 획의 잉크가 엔진 표면에서 사라지지 않는다.
-        webGpuCanvasHandleRef.current?.syncPinnedStrokes([
-          ...pendingGpuStrokesRef.current,
-          stroke,
-        ]);
-        return;
+      const handle = webGpuCanvasHandleRef.current;
+      const strokeView = buildGpuLiveStrokeView(next);
+      if (handle && strokeView) {
+        const pointCount = strokeView.points.length / 2;
+        const previousPointCount = gpuPinnedLivePointCountRef.current;
+        const fallbackStrokes = [...pendingGpuStrokesRef.current, strokeView];
+        if (previousPointCount > 0 && pointCount > previousPointCount) {
+          handle.appendPinnedStrokeSuffix({
+            strokeIndex: pendingGpuStrokesRef.current.length,
+            previousPointCount,
+            suffixPoints: strokeView.points.slice(previousPointCount * 2),
+            suffixPressures: strokeView.pressures!.slice(previousPointCount, pointCount),
+            nextStroke: strokeView,
+            fallbackStrokes,
+          });
+          gpuPinnedLivePointCountRef.current = pointCount;
+          return;
+        }
+        if (previousPointCount === pointCount && pointCount > 0) return;
+
+        // First tap (or a defensive non-prefix replacement) establishes one validated baseline.
+        // Subsequent pointer frames use only the explicit suffix above.
+        const baselineStroke = buildGpuLiveStroke(next);
+        if (baselineStroke) {
+          handle.syncPinnedStrokes([...pendingGpuStrokesRef.current, baselineStroke]);
+          gpuPinnedLivePointCountRef.current = baselineStroke.points.length / 2;
+          return;
+        }
       }
     }
     (next.mode === "eraser" ? mainLayerRef.current : liveDraftLayerRef.current)?.batchDraw();
@@ -8996,6 +9324,8 @@ function StudioCuttoonEditor() {
   const exitDirectLiveDraft = () => {
     if (!liveDraftDirectRef.current) return;
     liveDraftDirectRef.current = false;
+    gpuPinnedLivePointCountRef.current = 0;
+    endPredictedInkTail();
     // 대기 중 커밋 배치를 먼저 동기화한다 — 아래의 즉시 클리어가 그 잉크까지 지우기 때문.
     flushPendingStrokeCommitsRef.current();
     liveDraftPendingRef.current = null;
@@ -9048,6 +9378,8 @@ function StudioCuttoonEditor() {
     // 지연 커밋 경로: 잉크는 라이브 표면에 남긴다 — 커밋 동기화(flush)가 페인트 뒤에 정리한다.
     const preserveInk = options?.preserveInkForDeferredCommit === true;
     const wasDirect = liveDraftDirectRef.current;
+    const wasEraser = liveDraftVisualRef.current?.mode === "eraser";
+    endPredictedInkTail();
     pendingDraftRef.current = null;
     if (draftRafRef.current !== null) {
       globalThis.cancelAnimationFrame(draftRafRef.current);
@@ -9060,6 +9392,7 @@ function StudioCuttoonEditor() {
       liveDraftRafRef.current = null;
     }
     liveDraftDirectRef.current = false;
+    gpuPinnedLivePointCountRef.current = 0;
     if (gpuPinProbeTimerRef.current) {
       clearTimeout(gpuPinProbeTimerRef.current);
       gpuPinProbeTimerRef.current = null;
@@ -9101,7 +9434,9 @@ function StudioCuttoonEditor() {
       // 상시 마운트된 다이렉트 초안 레이어의 마지막 프레임 픽셀을 비운다(visualRef 가 null 이라
       // sceneFunc 은 아무것도 그리지 않는다). 이전에는 노드 언마운트(렌더)가 담당하던 정리.
       liveDraftLayerRef.current?.batchDraw();
-      mainLayerRef.current?.batchDraw();
+      // 메인 레이어 전체 재래스터는 지우개 프리뷰 정리에만 필요하다 — 펜 계열까지 매번 돌리면
+      // 문서가 커질수록 펜업마다 커밋 획 전부(스탬프 dab·수채 계획 포함)를 다시 그리게 된다.
+      if (wasEraser) mainLayerRef.current?.batchDraw();
     }
     // 비다이렉트 활성 초안 정리 — settled(커밋 대기 잉크)는 flush 의 표면 정리가 담당한다.
     draftPreviewStoreRef.current.setActive(null);
@@ -9109,12 +9444,38 @@ function StudioCuttoonEditor() {
   };
   /** 마지막 획 후 이 유휴가 지나면 대기 배치를 한 번의 React 커밋으로 동기화한다. */
   const DEFERRED_STROKE_COMMIT_IDLE_MS = 200;
-  function takePendingStrokeCommits(): { pageId: string; strokes: DrawEl[] } | null {
+  const DEFERRED_STROKE_COMMIT_RETRY_MS = 500;
+  const DEFERRED_STROKE_COMMIT_MAX_RETRIES = 4;
+  type PendingStrokeCommitBatch = {
+    pageId: string;
+    strokes: DrawEl[];
+    retryCount: number;
+  };
+  function takePendingStrokeCommits(): PendingStrokeCommitBatch | null {
     const batch = pendingStrokeCommitsRef.current;
     if (!batch) return null;
     pendingStrokeCommitsRef.current = null;
     if (batch.timer) globalThis.clearTimeout(batch.timer);
-    return { pageId: batch.pageId, strokes: batch.strokes };
+    return {
+      pageId: batch.pageId,
+      strokes: batch.strokes,
+      retryCount: batch.retryCount,
+    };
+  }
+  /** A rejected scene commit must keep both its vector payload and settled pixels recoverable. */
+  function restorePendingStrokeCommits(batch: PendingStrokeCommitBatch): void {
+    const retryCount = batch.retryCount + 1;
+    const restored = {
+      ...batch,
+      retryCount,
+      timer: null as ReturnType<typeof setTimeout> | null,
+    };
+    pendingStrokeCommitsRef.current = restored;
+    if (retryCount <= DEFERRED_STROKE_COMMIT_MAX_RETRIES) {
+      restored.timer = globalThis.setTimeout(() => {
+        flushPendingStrokeCommitsRef.current();
+      }, DEFERRED_STROKE_COMMIT_RETRY_MS);
+    }
   }
   /** 커밋 동기화 직후: 커밋 렌더가 페인트된 뒤(더블 rAF) 라이브 표면의 대기 잉크를 비운다. */
   function settleDeferredStrokeSurfaces() {
@@ -9159,9 +9520,10 @@ function StudioCuttoonEditor() {
     }
     const batch =
       pendingStrokeCommitsRef.current
-      ?? { pageId: activePage.id, strokes: [] as DrawEl[], timer: null };
+      ?? { pageId: activePage.id, strokes: [] as DrawEl[], timer: null, retryCount: 0 };
     pendingStrokeCommitsRef.current = batch;
     batch.strokes.push(finished);
+    batch.retryCount = 0;
     if (batch.timer) globalThis.clearTimeout(batch.timer);
     batch.timer = globalThis.setTimeout(() => {
       flushPendingStrokeCommitsRef.current();
@@ -11785,37 +12147,42 @@ function StudioCuttoonEditor() {
         baseElements = batch.pageId === activePage.id ? elements : targetPage.elements;
         committed = commit([...baseElements, ...batch.strokes], undefined, batch.pageId);
       }
-      if (committed) {
-        // 즉시 커밋 경로와 동일한 래스터 승격 — 배치의 각 획을 개별 작업으로 큐잉한다.
-        const rasterWorkId = authorizedWorkAssetScopeId;
-        const rasterDocument = studioCrdtDocumentRef.current;
-        const rasterRuntime = studioCrdtSceneRuntimeRef.current;
-        const rasterActorId = studioAuthUserId;
-        if (
-          STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED &&
-          rasterWorkId && rasterDocument && rasterRuntime && rasterActorId &&
-          studioCrdtOperationSyncReady
-        ) {
-          for (const strokeEl of batch.strokes) {
-            if (containingPanel(strokeEl, baseElements)) continue;
-            const plan = rasterRuntime.planRasterDrawPromotion({
-              element: strokeEl,
-              pageId: batch.pageId,
-              documentWidth: CANVAS_W,
-              documentHeight: canvasH,
-            });
-            if (!plan) continue;
-            queueStudioRasterDrawPromotion({
-              plan,
-              pageId: batch.pageId,
-              layerId: (strokeEl as DrawEl & { groupId?: string }).groupId ?? "page-root",
-              workId: rasterWorkId,
-              actorId: rasterActorId,
-              document: rasterDocument,
-              runtime: rasterRuntime,
-              accessGeneration: collaborationAccessRef.current.accessGeneration,
-            });
-          }
+      if (!committed) {
+        // Never drop the only authoritative copy merely because a save/lock/scope transition
+        // rejected this particular attempt. Keep the settled surface visible and retry briefly;
+        // after the bounded retries, the next stroke/scope flush can retry without a busy loop.
+        restorePendingStrokeCommits(batch);
+        return;
+      }
+      // 즉시 커밋 경로와 동일한 래스터 승격 — 배치의 각 획을 개별 작업으로 큐잉한다.
+      const rasterWorkId = authorizedWorkAssetScopeId;
+      const rasterDocument = studioCrdtDocumentRef.current;
+      const rasterRuntime = studioCrdtSceneRuntimeRef.current;
+      const rasterActorId = studioAuthUserId;
+      if (
+        STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED &&
+        rasterWorkId && rasterDocument && rasterRuntime && rasterActorId &&
+        studioCrdtOperationSyncReady
+      ) {
+        for (const strokeEl of batch.strokes) {
+          if (containingPanel(strokeEl, baseElements)) continue;
+          const plan = rasterRuntime.planRasterDrawPromotion({
+            element: strokeEl,
+            pageId: batch.pageId,
+            documentWidth: CANVAS_W,
+            documentHeight: canvasH,
+          });
+          if (!plan) continue;
+          queueStudioRasterDrawPromotion({
+            plan,
+            pageId: batch.pageId,
+            layerId: (strokeEl as DrawEl & { groupId?: string }).groupId ?? "page-root",
+            workId: rasterWorkId,
+            actorId: rasterActorId,
+            document: rasterDocument,
+            runtime: rasterRuntime,
+            accessGeneration: collaborationAccessRef.current.accessGeneration,
+          });
         }
       }
       settleDeferredStrokeSurfaces();
@@ -16608,6 +16975,7 @@ function StudioCuttoonEditor() {
     }
     drawingPointerSessionRef.current = null;
     drawingPointerCaptureTargetRef.current = null;
+    drawingPredictionPreviewRef.current = false;
     drawingStabilizerRef.current = null;
     drawingVelocityRef.current = null;
   }
@@ -17264,21 +17632,45 @@ function StudioCuttoonEditor() {
           globalThis.clearTimeout(pendingBatch.timer);
           pendingBatch.timer = null;
         }
-        const direct = isDirectLiveDraftEl(next);
+        // Opaque default ink may use fixed-lag post-correction: a settled head is append-only while
+        // only its bounded tail is replaceable. Translucent/specialty paths stay on the isolated
+        // draft surface because overlapping retained pixels would still create an alpha flash.
+        const causalPostCorrectionEligible = isDirectLiveDraftEl(next)
+          && postCorrection > 0
+          && next.mode !== "eraser"
+          && !next.fill
+          && (next.symmetry?.type ?? "none") === "none";
+        const direct = isDirectLiveDraftEl(next)
+          && (postCorrection <= 0 || causalPostCorrectionEligible)
+          && (next.opacity ?? 1) === 1;
         liveDraftDirectRef.current = direct;
         liveDraftVisualRef.current = direct ? next : null;
         liveDraftPendingRef.current = direct ? next : null;
+        const predictionTailEligible = direct
+          && next.mode !== "eraser"
+          && !next.fill
+          && (next.symmetry?.type ?? "none") === "none";
+        if (causalPostCorrectionEligible) startCausalPostCorrection(next);
+        else if (predictionTailEligible) startPredictedInkTail(next);
+        else {
+          causalPostCorrectionStateRef.current = null;
+          predictedInkTailStateRef.current = null;
+          liveInkPredictionRendererRef.current.clear();
+        }
         // GPU 파인은 낙관적으로 걸되 자가검증 게이트가 지킨다: 첫 프레임 영수증이 기한 안에
         // 도착하지 않으면(조용히 실패하는 GPU 환경) 같은 스트로크 안에서 Konva 로 인계된다.
         // (미드스트로크 스크린샷 검증 완료 — drawImage 기반 픽셀 판정은 WebGPU 캔버스에서
         // 위음성을 내므로 합성 스크린샷/영수증으로만 판정한다.)
-        const gpuPin = direct
+        const gpuPin = STUDIO_VISIBLE_LIVE_INK_BACKEND === "webgpu"
+          && direct
+          && !causalPostCorrectionEligible
           && next.mode !== "eraser"
           && webGpuBackendRef.current === "webgpu"
           && !next.fill
           && (next.opacity ?? 1) >= 0.999
           && (next.symmetry?.type ?? "none") === "none";
         gpuLiveInkPinnedRef.current = gpuPin;
+        gpuPinnedLivePointCountRef.current = 0;
         // 파인 가시성은 자식 컴포넌트만 갱신한다 — 대기(지연 커밋) GPU 잉크가 있으면 유지.
         webGpuCanvasHandleRef.current?.setPinnedVisible(
           gpuPin || pendingGpuStrokesRef.current.length > 0
@@ -17288,17 +17680,17 @@ function StudioCuttoonEditor() {
         liveInkOverlayClearGenRef.current += 1;
         if (direct && !gpuPin && next.mode !== "eraser" && !next.fill
           && (next.symmetry?.type ?? "none") === "none") {
-          liveInkOverlayRendererRef.current.begin(
-            {
-              color: next.stroke,
-              strokeWidthDoc: Math.max(1, next.strokeWidth),
-              opacity: next.opacity ?? 1,
-              minDistanceDoc: strokeRenderDistance(next.sampleSpacing),
-            },
-            pos.x,
-            pos.y,
-            next.pressures?.[0] ?? 0.5
-          );
+          const liveInkStyle = liveInkStyleFor(next);
+          if (causalPostCorrectionEligible) {
+            liveInkOverlayRendererRef.current.beginDeferred(liveInkStyle);
+          } else {
+            liveInkOverlayRendererRef.current.begin(
+              liveInkStyle,
+              pos.x,
+              pos.y,
+              next.pressures?.[0] ?? 0.5
+            );
+          }
         } else {
           liveInkOverlayRendererRef.current.clear();
         }
@@ -17310,6 +17702,7 @@ function StudioCuttoonEditor() {
               if (!gpuLiveInkPinnedRef.current || gpuPinnedFrameSeenRef.current) return;
               // fail-once: 이 스트로크의 남은 구간과 이후 스트로크는 Konva 가 전담한다.
               gpuLiveInkPinnedRef.current = false;
+              gpuPinnedLivePointCountRef.current = 0;
               webGpuBackendRef.current = "canvas2d";
               webGpuCanvasHandleRef.current?.setPinnedVisible(
                 pendingGpuStrokesRef.current.length > 0
@@ -17322,8 +17715,9 @@ function StudioCuttoonEditor() {
           gpuLingerRafRef.current = 0;
         }
         if (direct) {
-          // 상시 마운트된 임페러티브 초안 노드의 첫 프레임(터치 도트)을 렌더 없이 그린다.
-          (next.mode === "eraser" ? mainLayerRef.current : liveDraftLayerRef.current)?.batchDraw();
+          // Emit the initial tap immediately. In particular, a WebGPU pin suppresses the Konva
+          // draft, so waiting for the first pointermove used to leave a click invisible.
+          flushDirectLiveDraftNow(next);
         } else {
           // 비다이렉트 시작도 격리 스토어로 — 이후 프레임은 scheduleDraft 가 스토어만 갱신한다.
           draftPreviewStoreRef.current.setActive(next);
@@ -17706,7 +18100,9 @@ function StudioCuttoonEditor() {
         clearTimeout(colorWheelTimerRef.current);
         colorWheelTimerRef.current = null;
       }
-      finishDrawingPointer(e.target.getStage(), pointerEvent);
+      // This is a non-contact hover event used only to detect a lost mouse release. Consuming its
+      // current coordinates would connect the last ink sample to wherever the mouse re-entered.
+      finishDrawingPointer(e.target.getStage(), pointerEvent, { consumeReleaseSample: false });
       return;
     }
     const kind = drawingRef.current.kind ?? "freehand";
@@ -17770,7 +18166,11 @@ function StudioCuttoonEditor() {
   // 자유선 스트로크에 점 하나를 추가한다(압력 계산 + 원근 스냅 + 손떨림 보정 + 최소간격 필터) —
   // onStageMove 에서 getCoalescedEvents 로 얻은 이벤트마다 이 함수를 반복 호출해 여러 점을
   // 한 번에 누적한다(단일 pointermove 당 한 번 호출해도 기존과 동일하게 동작).
-  function appendFreehandStrokePoint(pos: { x: number; y: number }, pointerSample: PointerEvent) {
+  function appendFreehandStrokePoint(
+    pos: { x: number; y: number },
+    pointerSample: PointerEvent,
+    pressureOverride?: number
+  ) {
     const current = drawingRef.current;
     if (!current) return;
     const rawLastX = current.points[current.points.length - 2] ?? pos.x;
@@ -17778,33 +18178,36 @@ function StudioCuttoonEditor() {
     const previousVelocity = drawingVelocityRef.current ?? createStudioPointerVelocityState(pointerSample);
     const velocitySample = sampleStudioPointerVelocity(previousVelocity, pointerSample);
     drawingVelocityRef.current = velocitySample.state;
-    const pressure = resolveBrushPressureSample({
-      pointerType: pointerSample.pointerType,
-      rawPressure: pointerSample.pressure,
-      distance: velocitySample.distance,
-      elapsedMs: velocitySample.elapsedMs,
-      velocityFallbackEnabled: useVelocityPressure,
-      velocitySensitivity,
-      pressureCurve,
-      fallbackPressure: 0.5,
-    });
-    scheduleLiveDrawPressure(pressure);
+    const pressure = typeof pressureOverride === "number" && Number.isFinite(pressureOverride)
+      ? Math.min(1, Math.max(0, pressureOverride))
+      : resolveBrushPressureSample({
+          pointerType: pointerSample.pointerType,
+          rawPressure: pointerSample.pressure,
+          distance: velocitySample.distance,
+          elapsedMs: velocitySample.elapsedMs,
+          velocityFallbackEnabled: useVelocityPressure,
+          velocitySensitivity,
+          pressureCurve,
+          fallbackPressure: 0.5,
+        });
+    if (!drawingPredictionPreviewRef.current) scheduleLiveDrawPressure(pressure);
 
     let targetX = pos.x;
     let targetY = pos.y;
     // Commercial freehand + Shift: force a clean straight line from stroke origin (0/45/90°).
     // Applied before perspective/isometric so the artist's explicit Shift intent wins.
-    if (pointerSample.shiftKey && current.mode !== "eraser" && current.points.length >= 2) {
-      const startX = current.points[0] ?? pos.x;
-      const startY = current.points[1] ?? pos.y;
-      const constrained = buildShiftConstrainedFreehandPoints(startX, startY, pos.x, pos.y);
-      const endX = constrained[2] ?? pos.x;
-      const endY = constrained[3] ?? pos.y;
-      const startPressure = current.pressures?.[0] ?? pressure;
+      if (pointerSample.shiftKey && current.mode !== "eraser" && current.points.length >= 2) {
+      const transition = resolveShiftFreehandTransition({
+        currentPoints: current.points,
+        currentPressures: current.pressures,
+        endX: pos.x,
+        endY: pos.y,
+        pressure,
+      });
       const nextShift: DrawEl = {
         ...current,
-        points: [startX, startY, endX, endY],
-        pressures: [startPressure, pressure],
+        points: transition.points,
+        pressures: transition.pressures,
         // Straight-line preview is two points — drop variable-length stylus sample arrays.
         tiltXs: undefined,
         tiltYs: undefined,
@@ -17812,8 +18215,17 @@ function StudioCuttoonEditor() {
         speeds: undefined,
         tangentialPressures: undefined,
       };
+      // Shift replaces the endpoint instead of appending samples. Retained Canvas/WebGPU surfaces
+      // cannot erase the previous preview safely, so hand this gesture to the replaceable draft
+      // layer before publishing its first constrained line.
+      if (liveDraftDirectRef.current && !drawingPredictionPreviewRef.current) exitDirectLiveDraft();
+      // The Shift gesture replaces the whole freehand suffix. A pre-constraint stabilizer still
+      // points at the old raw sample and would be flushed after the snapped endpoint on pointer-up,
+      // making the stroke run backwards. Recreate it lazily only if a later unconstrained move
+      // resumes the freehand gesture.
+      drawingStabilizerRef.current = transition.stabilizerState;
       drawingRef.current = nextShift;
-      scheduleDraft(nextShift);
+      if (!drawingPredictionPreviewRef.current) scheduleDraft(nextShift);
       return;
     }
     if (perspectiveRulerActive && current.mode !== "eraser" && vanishingPoints.length > 0) {
@@ -17885,20 +18297,20 @@ function StudioCuttoonEditor() {
         : current.tangentialPressures,
     };
     drawingRef.current = next;
-    scheduleDraft(next);
+    if (!drawingPredictionPreviewRef.current) scheduleDraft(next);
   }
   function consumeFreehandPointerBatch(
     stage: Konva.Stage,
     pointerEvent: PointerEvent,
-    includePredicted: boolean
+    includePredicted: boolean,
+    options: { dispatchedPressureOverride?: number } = {}
   ): boolean {
     const session = drawingPointerSessionRef.current;
     if (!session || !isStudioStrokePointerEvent(session, pointerEvent)) return false;
 
-    // Retained Canvas/WebGPU ink is append-only. A predicted point cannot be baked there because
-    // the next hardware sample may replace it and already-painted pixels cannot be rolled back.
-    // Fancy/non-direct previews remain replaceable and may still use the prediction channel.
-    const predictionIsReplaceable = includePredicted && !liveDraftDirectRef.current;
+    // Predictions are always routed to a physically separate replaceable surface. Shift gestures
+    // replace the whole path rather than a suffix, so they intentionally stay hardware-only.
+    const predictionIsReplaceable = includePredicted && !pointerEvent.shiftKey;
     const batch = collectStudioStrokePointerBatch(session, pointerEvent, {
       includePredicted: predictionIsReplaceable,
     });
@@ -17910,7 +18322,13 @@ function StudioCuttoonEditor() {
       for (const sample of batch.authoritative) {
         stage.setPointersPositions(sample);
         const point = stage.getRelativePointerPosition();
-        if (point) appendFreehandStrokePoint(point, sample);
+        if (point) {
+          appendFreehandStrokePoint(
+            point,
+            sample,
+            sample === pointerEvent ? options.dispatchedPressureOverride : undefined
+          );
+        }
       }
 
       const authoritativeForCrdt = drawingRef.current;
@@ -17931,6 +18349,21 @@ function StudioCuttoonEditor() {
       }
 
       const authoritativeDrawing = drawingRef.current;
+      const authoritativePointCount = Math.floor((authoritativeDrawing?.points.length ?? 0) / 2);
+      if (authoritativeDrawing && liveDraftDirectRef.current) {
+        if (causalPostCorrectionStateRef.current) {
+          appendCausalPostCorrectionState(authoritativeDrawing, crdtSampleStart);
+        } else if (predictedInkTailStateRef.current) {
+          // Every real browser batch invalidates the previous estimate first. Only the new durable
+          // suffix advances this state; the append-only live surface is never cleared or replaced.
+          appendAuthoritativePredictedInkState(authoritativeDrawing, crdtSampleStart);
+        }
+      }
+      if (authoritativeDrawing && liveInkOverlayRendererRef.current.isActive) {
+        // Canvas2D append is already O(batch suffix). Publish it in the pointer task rather than
+        // adding a full display-frame of latency; the GPU path keeps its rAF back-pressure gate.
+        flushDirectLiveDraftNow(authoritativeDrawing);
+      }
       if (authoritativeDrawing && batch.predicted.length > 0) {
         // Predictions make the tip feel closer to the pen, but never advance drawingRef/history.
         // Ruler locks are also restored so an estimate cannot choose the permanent perspective ray.
@@ -17939,6 +18372,7 @@ function StudioCuttoonEditor() {
         const authoritativeStabilizer = drawingStabilizerRef.current;
         const authoritativeVelocity = drawingVelocityRef.current;
         try {
+          drawingPredictionPreviewRef.current = true;
           for (const sample of batch.predicted) {
             stage.setPointersPositions(sample);
             const point = stage.getRelativePointerPosition();
@@ -17946,8 +18380,17 @@ function StudioCuttoonEditor() {
           }
           const predictedPreview = drawingRef.current;
           drawingRef.current = authoritativeDrawing;
-          if (predictedPreview !== authoritativeDrawing) scheduleDraft(predictedPreview);
+          if (predictedPreview && predictedPreview !== authoritativeDrawing) {
+            if (liveDraftDirectRef.current && causalPostCorrectionStateRef.current) {
+              previewCausalPostCorrectionTail(predictedPreview, authoritativePointCount);
+            } else if (liveDraftDirectRef.current && predictedInkTailStateRef.current) {
+              replacePredictedInkTail(predictedPreview, authoritativePointCount);
+            } else {
+              scheduleDraft(predictedPreview);
+            }
+          }
         } finally {
+          drawingPredictionPreviewRef.current = false;
           drawingRef.current = authoritativeDrawing;
           perspectiveRayRef.current = authoritativePerspectiveRay;
           isometricAxisRayRef.current = authoritativeIsometricRay;
@@ -18095,7 +18538,11 @@ function StudioCuttoonEditor() {
     });
   }
 
-  function finishDrawingPointer(stage: Konva.Stage | null, pointerEvent: PointerEvent) {
+  function finishDrawingPointer(
+    stage: Konva.Stage | null,
+    pointerEvent: PointerEvent,
+    options: { consumeReleaseSample?: boolean } = {}
+  ) {
     // Idempotent: Stage pointerup and the window safety listener can both observe the same release.
     if (!drawingRef.current && !drawingPointerSessionRef.current) return;
     // Capture hold/lock BEFORE any stopQuickShapeTracking() side-effect from callers/global listeners.
@@ -18106,10 +18553,26 @@ function StudioCuttoonEditor() {
     // GPU 지연 표면에는 후보정 이전의, 실제 라이브 표면과 동일한 권위 획을 유지한다.
     let authoritativeLiveStroke: DrawEl | null = null;
     try {
-      if (drawingRef.current && (drawingRef.current.kind ?? "freehand") === "freehand" && stage) {
+      const releaseLastContactPressure = drawingRef.current?.pressures?.at(-1) ?? 0.5;
+      if (
+        options.consumeReleaseSample !== false
+        && drawingRef.current
+        && (drawingRef.current.kind ?? "freehand") === "freehand"
+        && stage
+      ) {
         // Pointermove is not guaranteed immediately before pointerup. Consume the release sample
         // authoritatively so a fast flick keeps its final tail; predictions remain preview-only.
-        consumeFreehandPointerBatch(stage, pointerEvent, false);
+        consumeFreehandPointerBatch(stage, pointerEvent, false, {
+          dispatchedPressureOverride: pointerEvent.pointerType === "pen"
+            ? resolveBrushReleasePressureSample({
+                pointerType: "pen",
+                rawPressure: pointerEvent.pressure,
+                lastContactPressure: releaseLastContactPressure,
+                pressureCurve,
+                fallbackPressure: releaseLastContactPressure,
+              })
+            : undefined,
+        });
       }
       if (drawingRef.current && (drawingRef.current.kind ?? "freehand") === "freehand") {
         const liveState = drawingStabilizerRef.current;
@@ -18125,9 +18588,10 @@ function StudioCuttoonEditor() {
             const pointCount = Math.floor(current.points.length / 2);
             const lastPressure = current.pressures?.at(-1) ?? 0.5;
             const pressure = pointerEvent.pointerType === "pen"
-              ? resolveBrushPressureSample({
+              ? resolveBrushReleasePressureSample({
                   pointerType: "pen",
                   rawPressure: pointerEvent.pressure,
+                  lastContactPressure: lastPressure,
                   velocityFallbackEnabled: false,
                   pressureCurve,
                   fallbackPressure: lastPressure,
@@ -18158,6 +18622,17 @@ function StudioCuttoonEditor() {
                 : current.tangentialPressures,
             };
           }
+        }
+        const causalPostCorrection = causalPostCorrectionStateRef.current;
+        if (drawingRef.current && causalPostCorrection?.phase === "active") {
+          const sourceSampleCount = Math.floor(drawingRef.current.points.length / 2);
+          if (sourceSampleCount > causalPostCorrection.sourceSampleCount) {
+            appendCausalPostCorrectionState(
+              drawingRef.current,
+              causalPostCorrection.sourceSampleCount
+            );
+          }
+          drawingRef.current = sealCausalPostCorrectionState(drawingRef.current);
         }
         authoritativeLiveStroke = drawingRef.current;
         // release/coalesced sample과 stabilizer endpoint를 live surface에 동기적으로 반영한다.
@@ -18215,7 +18690,11 @@ function StudioCuttoonEditor() {
         }
         // 라이브 입력 안정화와 독립된 후보정. 각점 보존을 켜면 말풍선·의상 모서리처럼 의도적인
         // 방향 전환은 그대로 두고 고주파 떨림만 정리한다(점 개수·필압 정렬은 보존).
-        if ((finished.kind ?? "freehand") === "freehand" && postCorrection > 0) {
+        if (
+          (finished.kind ?? "freehand") === "freehand"
+          && postCorrection > 0
+          && causalPostCorrectionStateRef.current?.phase !== "sealed"
+        ) {
           finished = {
             ...finished,
             points: smoothStrokePoints(finished.points, postCorrection, { preserveCorners }),
@@ -18230,6 +18709,9 @@ function StudioCuttoonEditor() {
         const deferCommit =
           !masterEditMode
           && finished.mode !== "eraser"
+          // A translucent settled preview would overlap the newly committed node for the handoff
+          // frames and temporarily darken to 1-(1-a)^2. Commit it atomically instead.
+          && (finished.opacity ?? 1) === 1
           && (liveDraftDirectRef.current
             ? overlayRenderer.isActive || gpuLiveInkPinnedRef.current
             : true);
@@ -18240,9 +18722,15 @@ function StudioCuttoonEditor() {
             draftPreviewStoreRef.current.settle(finished);
           }
           if (gpuLiveInkPinnedRef.current) {
-            const settledGpu = buildGpuLiveStroke(authoritativeLiveStroke ?? finished);
+            const settledGpu = buildGpuLiveStroke(authoritativeLiveStroke ?? finished, {
+              sealEndpoint: true,
+            });
             if (settledGpu) {
               pendingGpuStrokesRef.current = [...pendingGpuStrokesRef.current, settledGpu];
+              // Publish the sealed endpoint before preserveInk releases the active draft. Without
+              // this sync, a short final stabilizer sample would exist only in the later Konva
+              // commit and visibly pop in after the deferred interval.
+              webGpuCanvasHandleRef.current?.syncPinnedStrokes(pendingGpuStrokesRef.current);
             }
           }
           queueDeferredStrokeCommit(finished);
@@ -21111,12 +21599,12 @@ function StudioCuttoonEditor() {
   const pendingBrushDelete = pendingBrushDeletes.length > 0
     ? pendingBrushDeletes[pendingBrushDeletes.length - 1]
     : null;
-  // 비다이렉트 초안 렌더(팬시 브러시·도형 드래그·입자 브러시 격리, progressive postCorrection
-  // 포함)는 StudioDraftPreviewLayers 가 스토어 구독으로 담당한다 — 이 컴포넌트 본문에는
-  // 프레임당 재계산이 남지 않는다.
+  // 비다이렉트 초안 렌더(팬시 브러시·도형 드래그·입자 브러시 격리)는
+  // StudioDraftPreviewLayers 가 스토어 구독으로 담당한다. 기본 펜 후보정은 별도 fixed-lag
+  // head/tail 표면이 처리하므로 이 컴포넌트 본문에는 프레임당 재계산이 남지 않는다.
   // G10b stroke-pinned live ink(다이렉트 모드): 렌더러 소유권은 onStageDown 에서 스트로크 시작에
   // 한 번 결정되고, 이후 포인터 프레임은 scheduleDraft → flushDirectLiveDraft 가 React 렌더 없이
-  // Konva batchDraw / syncPinnedStrokes 임페러티브 피드로만 흐른다. 따라서 이 선언적 strokes
+  // Konva batchDraw / WebGPU suffix 임페러티브 피드로만 흐른다. 따라서 이 선언적 strokes
   // prop 은 항상 비어 있으며(영수증 권한 경로는 캡처/커밋 핸드오프 전용으로 유지), 파인 중
   // 가시성은 pinnedVisible 이 담당한다.
   const webGpuPreviewStrokes: readonly StudioGpuStroke[] = EMPTY_STUDIO_GPU_STROKES;
@@ -21485,6 +21973,7 @@ function StudioCuttoonEditor() {
   const liveDrawPressureStore = liveDrawPressureStoreRef.current;
   const draftPreviewStore = draftPreviewStoreRef.current;
   const liveInkOverlayRenderer = liveInkOverlayRendererRef.current;
+  const liveInkPredictionRenderer = liveInkPredictionRendererRef.current;
   const nodeEditActiveHandleIndex = nodeEditDragRef.current?.session.pointIndex ?? null;
   const bubbleShapeActiveHandleIndex = bubbleShapeDragRef.current?.session.pointIndex ?? null;
 
@@ -22207,6 +22696,7 @@ function StudioCuttoonEditor() {
 
         {/* 중앙: 캔버스 영역 (editor shell) — fills remaining viewport */}
         <StudioCanvasViewport
+          liveInkPredictionRenderer={liveInkPredictionRenderer}
           bubbleShapeActiveHandleIndex={bubbleShapeActiveHandleIndex}
           draftPreviewStore={draftPreviewStore}
           liveDrawPressureStore={liveDrawPressureStore}
@@ -22325,8 +22815,6 @@ function StudioCuttoonEditor() {
           pixelToolArmed={pixelToolArmed}
           polyLassoHover={polyLassoHover}
           polyLassoSession={polyLassoSession}
-          postCorrection={postCorrection}
-          preserveCorners={preserveCorners}
           pressureCurve={pressureCurve}
           puppetWarpArmed={puppetWarpArmed}
           puppetWarpBusy={puppetWarpBusy}
@@ -32591,7 +33079,16 @@ const StudioPageListPane = memo(function StudioPageListPane({
                   </div>
                   {/* 실내용 미니 썸네일 — 마스터 요소를 페이지 요소 아래에 합성해 경량 SVG 프록시로 축소 렌더.
                       마스터 없음/페이지 숨김이면 원본 page 를 동일 참조로 넘겨 RC 메모이제이션을 보존한다. */}
-                  <StudioPageThumbnail page={composeWorkAssetPreviewPage(p)} />
+                  <Suspense
+                    fallback={(
+                      <div
+                        aria-hidden="true"
+                        className="h-24 animate-pulse rounded border border-line/60 bg-raised/40"
+                      />
+                    )}
+                  >
+                    <StudioPageThumbnail page={composeWorkAssetPreviewPage(p)} />
+                  </Suspense>
                   {metaEditPageId === p.id ? (
                     // 인라인 편집 입력은 늘린 선택 버튼(z-10) 위로 올려 포커스·타이핑을 받게 한다.
                     <div className="relative z-20 flex flex-col gap-1 pt-1">
@@ -33100,6 +33597,7 @@ interface StudioCanvasViewportHandlers {
 }
 
 interface StudioCanvasViewportProps {
+  liveInkPredictionRenderer: StudioLiveInkPredictionRenderer;
   bubbleShapeActiveHandleIndex: number | null;
   draftPreviewStore: StudioDraftPreviewStore;
   liveDrawPressureStore: StudioLivePressureStore;
@@ -33218,8 +33716,6 @@ interface StudioCanvasViewportProps {
   pixelToolArmed: boolean;
   polyLassoHover: SelPoint | null;
   polyLassoSession: PolyLassoSession | null;
-  postCorrection: number;
-  preserveCorners: boolean;
   pressureCurve: number;
   puppetWarpArmed: boolean;
   puppetWarpBusy: boolean;
@@ -33345,6 +33841,7 @@ interface StudioCanvasViewportProps {
 }
 
 const StudioCanvasViewport = memo(function StudioCanvasViewport({
+  liveInkPredictionRenderer,
   bubbleShapeActiveHandleIndex,
   draftPreviewStore,
   liveDrawPressureStore,
@@ -33463,8 +33960,6 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   pixelToolArmed,
   polyLassoHover,
   polyLassoSession,
-  postCorrection,
-  preserveCorners,
   pressureCurve,
   puppetWarpArmed,
   puppetWarpBusy,
@@ -35306,8 +35801,6 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 프레임은 이 서브트리만 다시 렌더한다. */}
             <StudioDraftPreviewLayers
               store={draftPreviewStore}
-              postCorrection={postCorrection}
-              preserveCorners={preserveCorners}
             />
             {/* 브러시 커서 프리뷰: 드로잉 모드에서 포인터를 따라다니는 브러시 크기 원 */}
             {!isExporting && tool === "draw" && (
@@ -35909,6 +36402,18 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
           {webGpuViewportSurface ? (
             <StudioLiveInkOverlayHost
               renderer={liveInkOverlayRenderer}
+              left={webGpuViewportSurface.surface.left}
+              top={webGpuViewportSurface.surface.top}
+              width={webGpuViewportSurface.surface.width}
+              height={webGpuViewportSurface.surface.height}
+              documentScale={effScale}
+              documentWidth={CANVAS_W}
+              flipX={canvasFlipH}
+            />
+          ) : null}
+          {webGpuViewportSurface ? (
+            <StudioLiveInkPredictionHost
+              renderer={liveInkPredictionRenderer}
               left={webGpuViewportSurface.surface.left}
               top={webGpuViewportSurface.surface.top}
               width={webGpuViewportSurface.surface.width}

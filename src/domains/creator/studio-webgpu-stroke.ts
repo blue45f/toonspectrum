@@ -1,5 +1,36 @@
 export type StudioGpuComposite = "normal" | "erase";
 
+/**
+ * Opaque lineage carried only by the imperative live-stroke feed. A revision proves that the
+ * current samples were produced by appending the recorded suffix to its parent revision; normal
+ * document strokes never receive this metadata and continue through exact full-array comparison.
+ */
+export interface StudioGpuStrokeFeedRevision {
+  readonly lineage: string;
+  readonly revision: number;
+  readonly token: string;
+  readonly pointCount: number;
+  readonly parent: StudioGpuStrokeFeedRevision | null;
+  readonly parentPointCount: number;
+  /** Newly appended coordinate pairs only; the parent endpoint is kept separately. */
+  readonly suffixPoints: readonly number[];
+  readonly suffixPressures: readonly number[];
+  readonly lastX: number;
+  readonly lastY: number;
+  readonly lastPressure: number;
+  /** Round-dab bounds before the caller-specific tile bleed is added. */
+  readonly minimumX: number;
+  readonly minimumY: number;
+  readonly maximumX: number;
+  readonly maximumY: number;
+  readonly styleSignature: string;
+  readonly trustedImmutable: true;
+}
+
+export const STUDIO_GPU_STROKE_FEED_REVISION: unique symbol = Symbol(
+  "StudioGpuStrokeFeedRevision"
+);
+
 export interface StudioGpuStroke {
   readonly id: string;
   readonly points: readonly number[];
@@ -9,6 +40,8 @@ export interface StudioGpuStroke {
   readonly opacity?: number;
   readonly composite?: StudioGpuComposite;
   readonly orderKey?: string;
+  /** Internal append-only proof. It does not alter paint semantics or serialized document data. */
+  readonly [STUDIO_GPU_STROKE_FEED_REVISION]?: StudioGpuStrokeFeedRevision;
 }
 
 /**
@@ -41,6 +74,17 @@ export function sameStudioGpuNumberArray(
  * A hash is intentionally insufficient here: a collision must never hide the source pixels.
  */
 export function sameStudioGpuStroke(left: StudioGpuStroke, right: StudioGpuStroke): boolean {
+  const leftRevision = left[STUDIO_GPU_STROKE_FEED_REVISION];
+  const rightRevision = right[STUDIO_GPU_STROKE_FEED_REVISION];
+  if (
+    leftRevision
+    && rightRevision
+    && leftRevision.token === rightRevision.token
+    && left.points === right.points
+    && left.pressures === right.pressures
+  ) {
+    return true;
+  }
   return left.id === right.id
     && left.color === right.color
     && Object.is(left.size, right.size)
@@ -62,6 +106,7 @@ export function sameStudioGpuStrokes(
 }
 
 export function snapshotStudioGpuStroke(stroke: StudioGpuStroke): StudioGpuStroke {
+  if (stroke[STUDIO_GPU_STROKE_FEED_REVISION]?.trustedImmutable) return stroke;
   return {
     ...stroke,
     points: [...stroke.points],
@@ -101,8 +146,9 @@ export function buildStudioGpuLiveStroke(
     points.push(x!, y!);
   }
 
-  // A single point has no GPU segment. Canvas2D remains responsible for the initial tap preview.
-  if (points.length < 4) return null;
+  // The engine plans an initial dab for a single coordinate pair. Keeping that tap here is
+  // important: while WebGPU owns the live surface, the Canvas/Konva draft is intentionally hidden.
+  if (points.length < 2) return null;
 
   const pointCount = points.length / 2;
   const pressures = Array.from(

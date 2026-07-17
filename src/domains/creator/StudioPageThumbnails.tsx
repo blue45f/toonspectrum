@@ -9,8 +9,6 @@
  * 실제 순서 변경은 호출 측이 studio-pages.reorderPages 순수 함수로 수행한다.
  * 키보드/터치 대체 수단은 기존 이동 버튼(위/아래/맨위/맨아래)을 그대로 유지한다(a11y).
  */
-import { useState, type DragEvent, type ReactElement } from "react";
-
 import { CANVAS_W } from "./studio-assets";
 import {
   isDefaultPageGrade,
@@ -21,16 +19,16 @@ import {
 } from "./studio-page-grade";
 import {
   buildThumbNodes,
-  computeDropSlot,
-  dropIndicatorFor,
-  dropSlotToReorderTarget,
-  isNoopDropSlot,
   type ThumbNode,
   type ThumbPageLike,
 } from "./studio-page-thumbs";
 
+import type { ReactElement } from "react";
+
 import { parseStudioWorkAssetSourceUri } from "@/lib/studio-work-asset-contract";
 import { cn } from "@/lib/utils";
+
+export type { StudioPageDnd, StudioPageDndItemProps } from "./studio-page-dnd";
 
 // ── 썸네일 ──────────────────────────────────────────────────────────────────────────
 
@@ -244,93 +242,4 @@ export function StudioPageThumbnail({
       ) : null}
     </div>
   );
-}
-
-// ── 드래그 재배열 훅 ─────────────────────────────────────────────────────────────────
-
-export interface StudioPageDndItemProps {
-  draggable: boolean;
-  onDragStart: (e: DragEvent<HTMLElement>) => void;
-  onDragOver: (e: DragEvent<HTMLElement>) => void;
-  onDrop: (e: DragEvent<HTMLElement>) => void;
-  onDragEnd: () => void;
-}
-
-export interface StudioPageDnd {
-  /** 드래그 중인 카드 index(스타일 흐리기용). 드래그 없으면 null. */
-  dragIndex: number | null;
-  /** 현재 드롭 슬롯(카드 사이 틈 0..count). 드래그 없으면 null. */
-  dropSlot: number | null;
-  /** 각 페이지 카드에 스프레드할 DnD props. */
-  itemProps: (index: number) => StudioPageDndItemProps;
-  /** index 카드에 그릴 삽입선("before"=카드 위 / "after"=카드 아래 / null=없음). */
-  indicatorFor: (index: number) => "before" | "after" | null;
-}
-
-// 페이지 카드 전용 커스텀 MIME — 파일 드롭 등 외부 드래그와 섞이지 않게 표식.
-const PAGE_DND_MIME = "application/x-toonspectrum-studio-page";
-
-/**
- * 페이지 스트립 HTML5 드래그 재배열 훅(PPT 방식).
- * 카드 위/아래 절반 판정으로 삽입 슬롯을 계산하고, 드롭 시 onReorder(from, to)를 호출한다.
- * to 는 studio-pages.reorderPages 의 "제거 후 삽입" 의미로 보정된 최종 인덱스.
- * 드래그 불가 환경(키보드·터치)은 기존 이동 버튼이 대체 수단으로 유지된다.
- *
- * 썸네일 컴포넌트와 강결합된 페어라 한 파일에 둔다(이 파일 편집 시 fast-refresh 대신 풀 리로드 — 의도적).
- */
-// eslint-disable-next-line react-refresh/only-export-components
-export function useStudioPageDnd(
-  count: number,
-  onReorder: (fromIndex: number, toIndex: number) => void
-): StudioPageDnd {
-  const [dragIndex, setDragIndex] = useState<number | null>(null);
-  const [dropSlot, setDropSlot] = useState<number | null>(null);
-
-  const reset = () => {
-    setDragIndex(null);
-    setDropSlot(null);
-  };
-
-  const slotFromEvent = (index: number, e: DragEvent<HTMLElement>): number => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const ratio = rect.height > 0 ? (e.clientY - rect.top) / rect.height : 0;
-    return computeDropSlot(index, ratio);
-  };
-
-  const itemProps = (index: number): StudioPageDndItemProps => ({
-    draggable: true,
-    onDragStart: (e) => {
-      e.dataTransfer.effectAllowed = "move";
-      // Firefox 는 setData 가 없으면 드래그를 시작하지 않는다.
-      e.dataTransfer.setData(PAGE_DND_MIME, String(index));
-      e.dataTransfer.setData("text/plain", String(index));
-      setDragIndex(index);
-      setDropSlot(null);
-    },
-    onDragOver: (e) => {
-      if (dragIndex === null) return; // 외부 드래그(파일 등)에는 관여하지 않음
-      e.preventDefault(); // 드롭 허용
-      e.dataTransfer.dropEffect = "move";
-      const slot = slotFromEvent(index, e);
-      setDropSlot((prev) => (prev === slot ? prev : slot));
-    },
-    onDrop: (e) => {
-      if (dragIndex === null) return;
-      e.preventDefault();
-      // 상태(dropSlot) 대신 드롭 이벤트 좌표로 즉석 계산 — 마지막 dragover 와의 타이밍 경합 제거.
-      const slot = slotFromEvent(index, e);
-      if (!isNoopDropSlot(dragIndex, slot)) {
-        onReorder(dragIndex, dropSlotToReorderTarget(dragIndex, slot));
-      }
-      reset();
-    },
-    onDragEnd: reset, // 드롭 성공/취소(ESC·영역 밖) 모두 정리
-  });
-
-  return {
-    dragIndex,
-    dropSlot,
-    itemProps,
-    indicatorFor: (index: number) => dropIndicatorFor(index, count, dragIndex, dropSlot),
-  };
 }

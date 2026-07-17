@@ -55,6 +55,39 @@ export function buildShiftConstrainedFreehandPoints(
   return [startX, startY, end.x, end.y];
 }
 
+export interface StudioShiftFreehandTransition {
+  readonly points: number[];
+  readonly pressures: number[];
+  /** Replacement geometry invalidates any endpoint retained by the prior freehand stabilizer. */
+  readonly stabilizerState: null;
+}
+
+/**
+ * Replace an arbitrary freehand suffix with one constrained line and explicitly invalidate the
+ * old stabilizer endpoint. Keeping this lifecycle decision next to the geometry prevents a later
+ * pointer-up flush from appending a stale pre-Shift point behind the snapped endpoint.
+ */
+export function resolveShiftFreehandTransition(input: {
+  readonly currentPoints: readonly number[];
+  readonly currentPressures?: readonly number[];
+  readonly endX: number;
+  readonly endY: number;
+  readonly pressure: number;
+}): StudioShiftFreehandTransition {
+  const startX = input.currentPoints[0] ?? input.endX;
+  const startY = input.currentPoints[1] ?? input.endY;
+  return {
+    points: buildShiftConstrainedFreehandPoints(
+      startX,
+      startY,
+      input.endX,
+      input.endY
+    ),
+    pressures: [input.currentPressures?.[0] ?? input.pressure, input.pressure],
+    stabilizerState: null,
+  };
+}
+
 /**
  * Classify the snap mode for UI status ("가로 직선" etc.).
  */

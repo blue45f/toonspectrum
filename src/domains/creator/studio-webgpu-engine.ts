@@ -9,12 +9,23 @@ import {
   type StudioGpuReadbackPixelRect,
 } from "./studio-webgpu-readback";
 import {
+  STUDIO_GPU_STROKE_FEED_REVISION,
   orderStudioGpuStrokes,
+  snapshotStudioGpuStrokes,
   studioGpuPressureRadius,
   STUDIO_GPU_MAX_BRUSH_SIZE,
   type StudioGpuComposite,
   type StudioGpuStroke,
 } from "./studio-webgpu-stroke";
+import {
+  advanceStudioGpuStrokeFeed,
+  appendStudioGpuStrokeFeedOperations,
+  createStudioGpuStrokeFeedBaseline,
+  sameStudioGpuStrokeFeedStyle,
+  studioGpuStrokeFeedSuffixFromPointCount,
+  type StudioGpuStrokeOperationsAppendPatch,
+  type StudioGpuStrokeSuffixPatch,
+} from "./studio-webgpu-stroke-feed";
 import {
   packStudioGpuTileDabs,
   planStudioGpuTilePresentation,
@@ -189,6 +200,7 @@ const DEFAULT_MAX_TEXTURE_DIMENSION = 8_192;
 const STUDIO_GPU_TILE_TEXTURE_FORMAT = "rgba8unorm" as const;
 const PRESENTATION_VERTEX_FLOATS = 4;
 const PRESENTATION_VERTEX_BYTES = PRESENTATION_VERTEX_FLOATS * Float32Array.BYTES_PER_ELEMENT;
+let studioGpuEngineInstanceSequence = 0;
 
 const STUDIO_GPU_BRUSH_SHADER = /* wgsl */ `
   struct VertexOutput {
@@ -312,16 +324,6 @@ function updateFingerprint(hash: number, value: string | number | boolean | unde
   return Math.imul(next, 0x01000193) >>> 0;
 }
 
-function snapshotStudioGpuStrokes(
-  strokes: readonly StudioGpuStroke[]
-): readonly StudioGpuStroke[] {
-  return strokes.map((stroke) => ({
-    ...stroke,
-    points: [...stroke.points],
-    pressures: stroke.pressures ? [...stroke.pressures] : undefined,
-  }));
-}
-
 export function fingerprintStudioGpuFrame(
   strokes: readonly StudioGpuStroke[],
   viewport: StudioGpuViewport,
@@ -349,6 +351,11 @@ export function fingerprintStudioGpuFrame(
   const ordered = orderStudioGpuStrokes(strokes);
   hash = updateFingerprint(hash, ordered.length);
   for (const stroke of ordered) {
+    const feed = stroke[STUDIO_GPU_STROKE_FEED_REVISION];
+    if (feed) {
+      hash = updateFingerprint(hash, `feed:${feed.token}`);
+      continue;
+    }
     for (const value of [
       stroke.id,
       stroke.color,
@@ -386,6 +393,25 @@ function validClipRect(rect: StudioGpuRect): boolean {
 
 /** Shared fail-closed validation for both full-frame and tiled render paths. */
 export function isValidStudioGpuStroke(stroke: StudioGpuStroke): boolean {
+  const feed = stroke[STUDIO_GPU_STROKE_FEED_REVISION];
+  if (feed) {
+    return feed.trustedImmutable
+      && feed.pointCount >= 1
+      && stroke.points.length === feed.pointCount * 2
+      && feed.styleSignature.length > 0
+      && Number.isFinite(feed.minimumX)
+      && Number.isFinite(feed.minimumY)
+      && Number.isFinite(feed.maximumX)
+      && Number.isFinite(feed.maximumY)
+      && typeof stroke.color === "string"
+      && parseStudioGpuColor(stroke.color) !== null
+      && Number.isFinite(stroke.size)
+      && stroke.size > 0
+      && stroke.size <= STUDIO_GPU_MAX_BRUSH_SIZE
+      && (stroke.opacity === undefined || (
+        Number.isFinite(stroke.opacity) && stroke.opacity >= 0 && stroke.opacity <= 1
+      ));
+  }
   return Array.isArray(stroke.points)
     && stroke.points.length >= 2
     && stroke.points.length % 2 === 0
@@ -712,6 +738,14 @@ export function planStudioGpuStrokeExtensionInRect(
   ) {
     return { dabs: [], batches: [], complete: false };
   }
+  const feedSuffix = studioGpuStrokeFeedSuffixFromPointCount(stroke, previousPointCount);
+  if (feedSuffix) {
+    return planStudioGpuDabsInternal([feedSuffix], {
+      clipRect,
+      maximumDabs,
+      includeInitialDab: false,
+    });
+  }
   const suffixStart = previousPointCount - 1;
   const suffixPointCount = pointCount - suffixStart;
   const suffix: StudioGpuStroke = {
@@ -730,15 +764,16 @@ export function planStudioGpuStrokeExtensionInRect(
 }
 
 function sameStrokeStyle(previous: StudioGpuStroke, next: StudioGpuStroke): boolean {
-  return previous.id === next.id
-    && previous.color === next.color
-    && Object.is(previous.size, next.size)
-    && Object.is(previous.opacity ?? 1, next.opacity ?? 1)
-    && (previous.composite ?? "normal") === (next.composite ?? "normal")
-    && previous.orderKey === next.orderKey;
+  return sameStudioGpuStrokeFeedStyle(previous, next);
 }
 
 function isStrictPointPrefix(previous: StudioGpuStroke, next: StudioGpuStroke): boolean {
+  const previousFeed = previous[STUDIO_GPU_STROKE_FEED_REVISION];
+  const nextFeed = next[STUDIO_GPU_STROKE_FEED_REVISION];
+  if (previousFeed && nextFeed) {
+    return previousFeed.lineage === nextFeed.lineage
+      && previousFeed.pointCount < nextFeed.pointCount;
+  }
   if (previous.points.length < 2 || previous.points.length % 2 !== 0) return false;
   if (next.points.length <= previous.points.length || next.points.length % 2 !== 0) return false;
   for (let index = 0; index < previous.points.length; index += 1) {
@@ -753,6 +788,13 @@ function isStrictPointPrefix(previous: StudioGpuStroke, next: StudioGpuStroke): 
 }
 
 function isExactStrokeMatch(previous: StudioGpuStroke, next: StudioGpuStroke): boolean {
+  const previousFeed = previous[STUDIO_GPU_STROKE_FEED_REVISION];
+  const nextFeed = next[STUDIO_GPU_STROKE_FEED_REVISION];
+  if (previousFeed && nextFeed) {
+    return previousFeed.token === nextFeed.token
+      && previous.points === next.points
+      && previous.pressures === next.pressures;
+  }
   if (!sameStrokeStyle(previous, next) || previous.points.length !== next.points.length) {
     return false;
   }
@@ -852,9 +894,13 @@ export function planStudioGpuDabUpdate(
     && isStrictPointPrefix(previousTerminal, nextTerminal)
   ) {
     const previousPointCount = previousTerminal.points.length / 2;
+    const feedSuffix = studioGpuStrokeFeedSuffixFromPointCount(
+      nextTerminal,
+      previousPointCount
+    );
     const suffixStart = previousPointCount - 1;
     const suffixPointCount = nextTerminal.points.length / 2 - suffixStart;
-    const suffix: StudioGpuStroke = {
+    const suffix: StudioGpuStroke = feedSuffix ?? {
       ...nextTerminal,
       points: nextTerminal.points.slice(suffixStart * 2),
       pressures: Array.from(
@@ -1022,6 +1068,7 @@ export class StudioWebGpuEngine {
   private readonly options: StudioWebGpuEngineOptions;
   private readonly hasGpuOverride: boolean;
   private readonly retainReadbackSnapshot: boolean;
+  private readonly strokeFeedEngineId = ++studioGpuEngineInstanceSequence;
 
   private backend: StudioGpuBackend = "canvas2d";
   private fallbackContext: CanvasRenderingContext2D | null = null;
@@ -1064,6 +1111,7 @@ export class StudioWebGpuEngine {
   private renderedFrameInvalid = true;
   private frameGeneration = 0;
   private lastRequestId = "initial";
+  private strokeFeedSequence = 0;
   private authorityFrame: StudioGpuAuthorityFrame | null = null;
   private readonly readbackSnapshotPool: StudioGpuFrameSnapshot[] = [];
   private readonly readbackSnapshots = new Set<StudioGpuFrameSnapshot>();
@@ -1172,11 +1220,95 @@ export class StudioWebGpuEngine {
 
   public render(strokes: readonly StudioGpuStroke[], requestId = this.lastRequestId): void {
     if (this.disposed) return;
+    this.renderPreparedStrokes(snapshotStudioGpuStrokes(strokes), requestId);
+  }
+
+  /**
+   * Starts/replaces an imperative feed. This is the sole full-array baseline cost; subsequent
+   * accepted suffixes use `appendStrokeFeedSuffix` and retain this immutable revision lineage.
+   */
+  public replaceStrokeFeed(
+    strokes: readonly StudioGpuStroke[],
+    requestId = this.lastRequestId
+  ): void {
+    if (this.disposed) return;
+    this.strokeFeedSequence += 1;
+    if (!strokes.every(isValidStudioGpuStroke)) {
+      this.render(strokes, requestId);
+      return;
+    }
+    const baseline = createStudioGpuStrokeFeedBaseline(
+      strokes,
+      `engine:${this.strokeFeedEngineId}:feed:${this.strokeFeedSequence}`
+    );
+    if (!baseline) {
+      this.render(strokes, requestId);
+      return;
+    }
+    this.renderPreparedStrokes(baseline, requestId);
+  }
+
+  /**
+   * Appends only new point pairs. A stale index/count, style change, malformed suffix, or missing
+   * lineage automatically falls back to the authoritative full replacement carried by the patch.
+   */
+  public appendStrokeFeedSuffix(
+    patch: StudioGpuStrokeSuffixPatch,
+    requestId = this.lastRequestId
+  ): "appended" | "rebuilt" {
+    if (this.disposed) return "rebuilt";
+    const advanced = advanceStudioGpuStrokeFeed(this.lastStrokes, patch);
+    if (advanced.status === "rejected") {
+      this.replaceStrokeFeed(patch.fallbackStrokes, requestId);
+      return "rebuilt";
+    }
+    this.renderPreparedStrokes(advanced.strokes, requestId);
+    return "appended";
+  }
+
+  /** Adds newly-started normal/erase operations without replaying retained operation history. */
+  public appendStrokeFeedOperations(
+    patch: StudioGpuStrokeOperationsAppendPatch,
+    requestId = this.lastRequestId
+  ): "appended" | "rebuilt" {
+    if (this.disposed) return "rebuilt";
+    if (!patch.suffixStrokes.every(isValidStudioGpuStroke)) {
+      this.replaceStrokeFeed(patch.fallbackStrokes, requestId);
+      return "rebuilt";
+    }
+    this.strokeFeedSequence += 1;
+    const advanced = appendStudioGpuStrokeFeedOperations(
+      this.lastStrokes,
+      patch,
+      `engine:${this.strokeFeedEngineId}:feed:${this.strokeFeedSequence}`
+    );
+    if (!advanced) {
+      this.replaceStrokeFeed(patch.fallbackStrokes, requestId);
+      return "rebuilt";
+    }
+    this.renderPreparedStrokes(advanced, requestId);
+    return "appended";
+  }
+
+  /** Issues a new request/receipt for unchanged pinned pixels without inspecting point history. */
+  public retainStrokeFeed(requestId = this.lastRequestId): void {
+    if (this.disposed) return;
+    this.renderPreparedStrokes(this.lastStrokes, requestId);
+  }
+
+  /** Clears pinned feed authority without allocating or submitting an empty replacement frame. */
+  public resetStrokeFeed(requestId = this.lastRequestId): void {
+    this.suspend(requestId);
+  }
+
+  private renderPreparedStrokes(
+    strokeSnapshot: readonly StudioGpuStroke[],
+    requestId: string
+  ): void {
     if (this.suspended) {
       this.suspended = false;
       this.setSurfaceVisibility(this.backend);
     }
-    const strokeSnapshot = snapshotStudioGpuStrokes(strokes);
     this.lastStrokes = strokeSnapshot;
     this.lastRequestId = requestId;
     const frameGeneration = this.invalidateFrameReceipt();

@@ -1,63 +1,40 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   StudioLiveInkOverlayRenderer,
+  StudioLiveInkPredictionRenderer,
   type StudioLiveInkStrokeStyle,
   type StudioLiveInkSurface,
 } from "./studio-live-ink-overlay";
 
-interface RecordedSegment {
-  readonly from: readonly [number, number];
-  readonly control: readonly [number, number];
-  readonly to: readonly [number, number];
-  readonly width: number;
+interface RecordedDab {
+  readonly x: number;
+  readonly y: number;
+  readonly radius: number;
 }
 
 function rounded(value: number): number {
   return Number(value.toFixed(6));
 }
 
-/** Canvas 픽셀 대신 중점 이차곡선 조각과 clear 호출을 기록한다. */
+/** Records the exact round-dab footprint without depending on a native canvas implementation. */
 function recordingCanvas() {
-  const segments: RecordedSegment[] = [];
+  const dabs: RecordedDab[] = [];
   const clearRect = vi.fn();
-  let from: [number, number] | null = null;
-  let control: [number, number] | null = null;
-  let to: [number, number] | null = null;
-  let lineWidth = 1;
+  let current: RecordedDab | null = null;
   const context = {
     save: () => undefined,
     restore: () => undefined,
     setTransform: () => undefined,
     clearRect,
     beginPath: () => {
-      from = null;
-      control = null;
-      to = null;
+      current = null;
     },
-    moveTo: (x: number, y: number) => {
-      from = [x, y];
+    arc: (x: number, y: number, radius: number) => {
+      current = { x: rounded(x), y: rounded(y), radius: rounded(radius) };
     },
-    quadraticCurveTo: (cx: number, cy: number, x: number, y: number) => {
-      control = [cx, cy];
-      to = [x, y];
-    },
-    stroke: () => {
-      if (!from || !control || !to) return;
-      segments.push({
-        from: [rounded(from[0]), rounded(from[1])],
-        control: [rounded(control[0]), rounded(control[1])],
-        to: [rounded(to[0]), rounded(to[1])],
-        width: rounded(lineWidth),
-      });
-    },
-    arc: () => undefined,
-    fill: () => undefined,
-    set lineWidth(value: number) {
-      lineWidth = value;
-    },
-    get lineWidth() {
-      return lineWidth;
+    fill: () => {
+      if (current) dabs.push(current);
     },
     lineCap: "butt",
     lineJoin: "miter",
@@ -70,7 +47,7 @@ function recordingCanvas() {
     height: 0,
     getContext: () => context,
   } as unknown as HTMLCanvasElement;
-  return { canvas, clearRect, segments };
+  return { canvas, clearRect, dabs };
 }
 
 const SURFACE: StudioLiveInkSurface = {
@@ -99,11 +76,15 @@ function setup(style: StudioLiveInkStrokeStyle = STYLE) {
   return { renderer, ...recording };
 }
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 describe("StudioLiveInkOverlayRenderer", () => {
-  it("appends only one new causal segment without clearing or repainting its finalized prefix", () => {
-    const { renderer, clearRect, segments } = setup();
+  it("appends only causal suffix dabs and reaches the active pointer endpoint", () => {
+    const { renderer, clearRect, dabs } = setup();
     renderer.appendFrom([0, 0, 10, 0, 20, 10], [0.25, 0.5, 0.75]);
-    const finalizedPrefix = segments.map((segment) => ({ ...segment }));
+    const finalizedPrefix = dabs.map((dab) => ({ ...dab }));
     const clearsBeforeAppend = clearRect.mock.calls.length;
 
     renderer.appendFrom(
@@ -112,70 +93,166 @@ describe("StudioLiveInkOverlayRenderer", () => {
     );
 
     expect(clearRect).toHaveBeenCalledTimes(clearsBeforeAppend);
-    expect(segments.slice(0, finalizedPrefix.length)).toEqual(finalizedPrefix);
-    expect(segments.slice(finalizedPrefix.length)).toEqual([{
-      from: [15, 5],
-      control: [20, 10],
-      to: [25, 10],
-      width: 17,
-    }]);
+    expect(dabs.slice(0, finalizedPrefix.length)).toEqual(finalizedPrefix);
+    expect(dabs.length).toBeGreaterThan(finalizedPrefix.length);
+    expect(dabs.at(-1)).toMatchObject({ x: 30, y: 10, radius: 8.5 });
 
-    const segmentCount = segments.length;
+    const dabCount = dabs.length;
     renderer.appendFrom(
       [0, 0, 10, 0, 20, 10, 30, 10],
       [0.25, 0.5, 0.75, 1]
     );
-    expect(segments).toHaveLength(segmentCount);
+    expect(dabs).toHaveLength(dabCount);
   });
 
-  it("synchronously seals the terminal half-segment at the raw pointerup endpoint", () => {
-    const { renderer, clearRect, segments } = setup({ ...STYLE, minDistanceDoc: 5 });
-    // 12px 끝점은 직전 kept 점에서 2px뿐이라 라이브 thinning 에서는 일단 생략된다.
+  it("synchronously seals a skipped raw pointerup endpoint without repainting its prefix", () => {
+    const { renderer, clearRect, dabs } = setup({ ...STYLE, minDistanceDoc: 5 });
+    // 12px is only 2px from the last retained point, so live thinning defers it until end().
     renderer.appendFrom([0, 0, 10, 0, 12, 0], [0.25, 0.5, 1]);
-    const prefixBeforeEnd = segments.map((segment) => ({ ...segment }));
+    const prefixBeforeEnd = dabs.map((dab) => ({ ...dab }));
+    expect(dabs.at(-1)).toMatchObject({ x: 10, y: 0 });
 
     renderer.end();
 
     expect(clearRect).not.toHaveBeenCalled();
-    expect(segments.slice(0, prefixBeforeEnd.length)).toEqual(prefixBeforeEnd);
-    expect(segments.slice(prefixBeforeEnd.length)).toEqual([
-      {
-        from: [5, 0],
-        control: [10, 0],
-        to: [11, 0],
-        width: 17,
-      },
-      {
-        from: [11, 0],
-        control: [12, 0],
-        to: [12, 0],
-        width: 17,
-      },
-    ]);
-    expect(segments.at(-1)?.to).toEqual([12, 0]);
+    expect(dabs.slice(0, prefixBeforeEnd.length)).toEqual(prefixBeforeEnd);
+    expect(dabs.at(-1)).toMatchObject({ x: 12, y: 0, radius: 8.5 });
     expect(renderer.isActive).toBe(false);
     expect(renderer.hasSettledStrokes).toBe(true);
 
-    const sealedCount = segments.length;
+    const sealedCount = dabs.length;
     renderer.end();
-    expect(segments).toHaveLength(sealedCount);
+    expect(dabs).toHaveLength(sealedCount);
   });
 
-  it("replays a settled stroke with the exact incremental-plus-terminal segment sequence", () => {
-    const { renderer, clearRect, segments } = setup();
+  it("replays a settled stroke with the exact same canonical dab sequence", () => {
+    const { renderer, clearRect, dabs } = setup();
     renderer.appendFrom(
       [0, 0, 10, 0, 20, 10, 30, 10],
       [0.25, 0.5, 0.75, 1]
     );
     renderer.end();
-    const finalized = segments.map((segment) => ({ ...segment }));
-    expect(finalized.at(-1)?.to).toEqual([30, 10]);
+    const finalized = dabs.map((dab) => ({ ...dab }));
+    expect(finalized.at(-1)).toMatchObject({ x: 30, y: 10 });
 
-    segments.splice(0);
+    dabs.splice(0);
     clearRect.mockClear();
     renderer.setSurface({ ...SURFACE, width: 120 });
 
     expect(clearRect).toHaveBeenCalledTimes(1);
-    expect(segments).toEqual(finalized);
+    expect(dabs).toEqual(finalized);
+  });
+
+  it("accepts fixed-lag corrected spans without drawing or rewriting a premature head", () => {
+    const recording = recordingCanvas();
+    const renderer = new StudioLiveInkOverlayRenderer();
+    renderer.attach(recording.canvas);
+    renderer.setSurface(SURFACE);
+
+    expect(renderer.beginDeferred(STYLE)).toBe(true);
+    expect(recording.dabs).toEqual([]);
+    renderer.appendSettledSpan([0, 0, 10, 2], [0.25, 0.5, 0.75], 1);
+    const stablePrefix = recording.dabs.map((dab) => ({ ...dab }));
+    renderer.appendSettledSpan([20, 4], [0.25, 0.5, 0.75], 2);
+
+    expect(recording.dabs.slice(0, stablePrefix.length)).toEqual(stablePrefix);
+    expect(recording.dabs.at(-1)).toMatchObject({ x: 20, y: 4, radius: 6.75 });
+  });
+});
+
+describe("StudioLiveInkPredictionRenderer", () => {
+  it("replaces only its transient tail and clears a bounded dirty rectangle", () => {
+    const recording = recordingCanvas();
+    const renderer = new StudioLiveInkPredictionRenderer();
+    renderer.attach(recording.canvas);
+    renderer.setSurface(SURFACE);
+    recording.clearRect.mockClear();
+
+    renderer.apply({
+      kind: "replace",
+      anchor: { x: 0, y: 0, pressure: 0.25 },
+      samples: [
+        { x: 10, y: 0, pressure: 0.5 },
+        { x: 20, y: 0, pressure: 0.75 },
+      ],
+    }, STYLE);
+    const firstTailDabCount = recording.dabs.length;
+    expect(recording.dabs.at(-1)).toMatchObject({ x: 20, y: 0 });
+
+    renderer.apply({
+      kind: "replace",
+      anchor: { x: 0, y: 0, pressure: 0.25 },
+      samples: [
+        { x: 8, y: 4, pressure: 0.45 },
+        { x: 12, y: 8, pressure: 0.6 },
+      ],
+    }, STYLE);
+
+    expect(recording.clearRect).toHaveBeenCalledTimes(1);
+    const [, , clearedWidth, clearedHeight] = recording.clearRect.mock.calls[0]!;
+    expect(clearedWidth).toBeLessThan(recording.canvas.width);
+    expect(clearedHeight).toBeLessThan(recording.canvas.height);
+    expect(recording.dabs.slice(firstTailDabCount).at(-1)).toMatchObject({ x: 12, y: 8 });
+  });
+
+  it("uses the same capped DPR transform and clears predictions without touching a full viewport", () => {
+    vi.stubGlobal("devicePixelRatio", 3);
+    const recording = recordingCanvas();
+    const renderer = new StudioLiveInkPredictionRenderer();
+    renderer.attach(recording.canvas);
+    renderer.setSurface(SURFACE);
+    expect(recording.canvas.width).toBe(SURFACE.width * 2);
+    expect(recording.canvas.height).toBe(SURFACE.height * 2);
+    recording.clearRect.mockClear();
+
+    renderer.apply({
+      kind: "replace",
+      anchor: { x: 40, y: 40, pressure: 0.5 },
+      samples: [{ x: 45, y: 45, pressure: 0.75 }],
+    }, STYLE);
+    renderer.apply({ kind: "clear" }, STYLE);
+
+    expect(recording.clearRect).toHaveBeenCalledTimes(1);
+    const [left, top, width, height] = recording.clearRect.mock.calls[0]!;
+    expect(left).toBeGreaterThan(0);
+    expect(top).toBeGreaterThan(0);
+    expect(width).toBeLessThan(recording.canvas.width);
+    expect(height).toBeLessThan(recording.canvas.height);
+  });
+
+  it("treats keep as a true no-op for a late prediction event", () => {
+    const recording = recordingCanvas();
+    const renderer = new StudioLiveInkPredictionRenderer();
+    renderer.attach(recording.canvas);
+    renderer.setSurface(SURFACE);
+    renderer.apply({
+      kind: "replace",
+      anchor: { x: 0, y: 0, pressure: 0.5 },
+      samples: [{ x: 10, y: 10, pressure: 0.75 }],
+    }, STYLE);
+    recording.clearRect.mockClear();
+    const dabCount = recording.dabs.length;
+
+    renderer.apply({ kind: "keep" }, STYLE);
+
+    expect(recording.clearRect).not.toHaveBeenCalled();
+    expect(recording.dabs).toHaveLength(dabCount);
+  });
+
+  it("renders a complete short corrected tail before any settled anchor exists", () => {
+    const recording = recordingCanvas();
+    const renderer = new StudioLiveInkPredictionRenderer();
+    renderer.attach(recording.canvas);
+    renderer.setSurface(SURFACE);
+
+    renderer.applyPointTail({
+      kind: "replace",
+      anchor: null,
+      startSampleIndex: 0,
+      points: [4, 6, 12, 10],
+    }, STYLE, [0.25, 0.75]);
+
+    expect(recording.dabs[0]).toMatchObject({ x: 4, y: 6, radius: 3.25 });
+    expect(recording.dabs.at(-1)).toMatchObject({ x: 12, y: 10, radius: 6.75 });
   });
 });

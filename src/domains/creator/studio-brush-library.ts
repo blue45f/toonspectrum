@@ -157,7 +157,7 @@ export const DEFAULT_STUDIO_BRUSH_SNAPSHOT: StudioBrushSnapshot = {
   strokeWidth: 6,
   brushOpacity: 1,
   color: "#7c5cfc",
-  stabilizer: 1,
+  stabilizer: 0,
   stabilizerMode: "adaptive",
   postCorrection: 0,
   preserveCorners: true,

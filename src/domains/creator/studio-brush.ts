@@ -295,6 +295,14 @@ export interface BrushPressureSampleInput {
   fallbackPressure?: unknown;
 }
 
+/**
+ * pointerup 전용 필압 입력. `lastContactPressure`는 이미 사용자 곡선까지 적용되어 문서에
+ * 저장된 마지막 접촉 필압이므로 다시 곡선을 적용하지 않는다.
+ */
+export interface BrushReleasePressureSampleInput extends BrushPressureSampleInput {
+  lastContactPressure?: unknown;
+}
+
 const CALLIGRAPHY_MIN_ROUNDNESS = 0.08;
 const DEFAULT_CALLIGRAPHY_SETTINGS: CalligraphyTipSettings = {
   tiltEnabled: true,
@@ -384,8 +392,10 @@ export function resolveBrushPressureSample(input: BrushPressureSampleInput = {})
   const hasHardwarePressure = pointerType === "pen" && rawPressure >= 0 && rawPressure <= 1;
 
   let basePressure: number;
+  let applyPressureCurve = false;
   if (hasHardwarePressure) {
     basePressure = rawPressure;
+    applyPressureCurve = true;
   } else if (input.velocityFallbackEnabled) {
     const distance = Math.max(0, finiteNumber(input.distance, 0));
     const elapsedMs = finiteNumber(input.elapsedMs, Number.NaN);
@@ -394,12 +404,36 @@ export function resolveBrushPressureSample(input: BrushPressureSampleInput = {})
       : clamp01(distance / Math.max(0.001, finiteNumber(input.maxDistance, 28)));
     const sensitivity = clamp01(finiteNumber(input.velocitySensitivity, 0.65));
     basePressure = 1 - speedRatio * sensitivity * 0.75;
+    applyPressureCurve = true;
   } else {
     basePressure = clamp01(finiteNumber(input.fallbackPressure, 0.5));
   }
 
+  // A fixed mouse/touch fallback represents the nominal brush width, not simulated pressure.
+  // Applying the stylus curve here would make the same cursor render 19% thicker (soft) or 30%
+  // thinner (firm). Curves belong only to real pen pressure or the explicitly enabled velocity
+  // pressure channel.
+  if (!applyPressureCurve) return clamp01(basePressure);
   const curve = clamp(finiteNumber(input.pressureCurve, 1), 0.05, 8);
   return clamp01(Math.pow(clamp01(basePressure), curve));
+}
+
+/**
+ * 펜이 화면에서 떨어진 pointerup은 Pointer Events 규약상 `pressure=0`을 보고한다. 릴리스
+ * 좌표 자체는 빠른 획의 마지막 꼬리로 채택하되, 이 비접촉 0이 실제 마지막 접촉 필압을
+ * 덮어쓰지 않게 한다. 일반 pointermove는 계속 `resolveBrushPressureSample`을 사용하므로
+ * 접촉 중 장치가 보고한 진짜 0 필압은 그대로 보존된다.
+ */
+export function resolveBrushReleasePressureSample(
+  input: BrushReleasePressureSampleInput = {}
+): number {
+  const pointerType = normalizePointerType(input.pointerType);
+  const rawPressure = finiteNumber(input.rawPressure, Number.NaN);
+  if (pointerType === "pen" && rawPressure === 0) {
+    const fallbackPressure = clamp01(finiteNumber(input.fallbackPressure, 0.5));
+    return clamp01(finiteNumber(input.lastContactPressure, fallbackPressure));
+  }
+  return resolveBrushPressureSample(input);
 }
 
 /**

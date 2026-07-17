@@ -872,39 +872,11 @@ export function buildThumbNodes(page: ThumbPageLike, opts: ThumbBuildOptions = {
   return { nodes, skipped };
 }
 
-// ── 드래그 재배열 슬롯 산술(순수) ─────────────────────────────────────────────────────
-// "슬롯"은 카드 사이 틈 인덱스(0..count). 카드 위쪽 절반에 드롭하면 그 카드 앞(slot=index),
-// 아래쪽 절반이면 그 카드 뒤(slot=index+1)에 끼워 넣는 PPT 방식.
-
-/** 호버 중인 카드 index 와 카드 내 세로 위치 비율(0~1)로 드롭 슬롯을 계산. */
-export function computeDropSlot(targetIndex: number, offsetRatio: number): number {
-  if (targetIndex < 0) return 0;
-  return offsetRatio < 0.5 ? targetIndex : targetIndex + 1;
-}
-
-/** 제자리 드롭(순서 변화 없음) 여부 — 자기 앞/뒤 슬롯. */
-export function isNoopDropSlot(fromIndex: number, slot: number): boolean {
-  return slot === fromIndex || slot === fromIndex + 1;
-}
-
-/** 슬롯 → reorderPages(from, to) 의 to 인덱스(제거 후 삽입 의미 보정). */
-export function dropSlotToReorderTarget(fromIndex: number, slot: number): number {
-  return slot > fromIndex ? slot - 1 : slot;
-}
-
-/**
- * index 카드에 그릴 삽입선 위치. 슬롯 s 는 카드 s 의 "앞"(before)으로 그리되,
- * 맨 끝 슬롯(count)만 마지막 카드의 "뒤"(after)로 그린다. 제자리 드롭은 표시하지 않는다.
- */
-export function dropIndicatorFor(
-  index: number,
-  count: number,
-  dragIndex: number | null,
-  dropSlot: number | null
-): "before" | "after" | null {
-  if (dragIndex === null || dropSlot === null) return null;
-  if (isNoopDropSlot(dragIndex, dropSlot)) return null;
-  if (dropSlot === index) return "before";
-  if (index === count - 1 && dropSlot === count) return "after";
-  return null;
-}
+// 기존 순수 썸네일 API 호환. 실제 구현은 초기 Studio 그래프가 SVG 렌더러를 끌어오지 않도록
+// 작은 DnD 모듈에 둔다.
+export {
+  computeDropSlot,
+  dropIndicatorFor,
+  dropSlotToReorderTarget,
+  isNoopDropSlot,
+} from "./studio-page-dnd";

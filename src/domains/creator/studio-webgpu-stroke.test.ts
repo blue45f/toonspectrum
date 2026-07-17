@@ -54,14 +54,17 @@ describe("studio WebGPU stroke authority helpers", () => {
     expect(planStudioGpuDabUpdate([before!], [after!]).mode).toBe("append");
   });
 
-  it("copies only the finite coordinate-pair prefix and rejects a one-point stroke", () => {
+  it("copies only the finite coordinate-pair prefix and keeps a one-point tap", () => {
     expect(buildStudioGpuLiveStroke({
       id: "tap",
       points: [4, 7, 12],
       pressures: [0.8],
       color: "#000000",
       size: 4,
-    })).toBeNull();
+    })).toMatchObject({
+      points: [4, 7],
+      pressures: [0.8],
+    });
 
     expect(buildStudioGpuLiveStroke({
       id: "finite-prefix",
@@ -73,6 +76,27 @@ describe("studio WebGPU stroke authority helpers", () => {
       points: [0, 0, 4, 6],
       pressures: [0.75, 0.5],
     });
+  });
+
+  it("extends a one-point tap through the append-only GPU update path", () => {
+    const tap = buildStudioGpuLiveStroke({
+      id: "tap",
+      points: [4, 7],
+      pressures: [0.8],
+      color: "#000000",
+      size: 4,
+    });
+    const moved = buildStudioGpuLiveStroke({
+      id: "tap",
+      points: [4, 7, 12, 9],
+      pressures: [0.8, 0.6],
+      color: "#000000",
+      size: 4,
+    });
+
+    expect(tap).not.toBeNull();
+    expect(moved).not.toBeNull();
+    expect(planStudioGpuDabUpdate([tap!], [moved!]).mode).toBe("append");
   });
 
   it("accepts independently allocated but exactly equivalent operations", () => {

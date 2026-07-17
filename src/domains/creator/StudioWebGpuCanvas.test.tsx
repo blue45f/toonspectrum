@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
+import { resolveStudioWebGpuCanvasStrokes } from "./studio-webgpu-canvas-authority";
 import {
   isStudioWebGpuCanvasActive,
   routeStudioWebGpuCanvasRequest,
@@ -15,6 +16,34 @@ const supportedStroke = {
 } as const;
 
 describe("StudioWebGpuCanvas", () => {
+  it("keeps pinned strokes authoritative across parent renders until the pin is released", () => {
+    const initialDeclarative = [supportedStroke] as const;
+    const pinned = [{
+      ...supportedStroke,
+      id: "pinned-live-stroke",
+      points: [10, 10, 80, 90],
+    }] as const;
+
+    expect(resolveStudioWebGpuCanvasStrokes(initialDeclarative, pinned)).toBe(pinned);
+
+    // StudioPage normally re-renders this child with a shared declarative EMPTY list while the
+    // imperative live-ink feed is pinned. That render must not suspend or replace the pinned feed.
+    const declarativeAfterParentRender = [] as const;
+    expect(resolveStudioWebGpuCanvasStrokes(declarativeAfterParentRender, pinned)).toBe(pinned);
+
+    // Releasing authority restores the newest declarative value, not the value from pin start.
+    expect(resolveStudioWebGpuCanvasStrokes(declarativeAfterParentRender, null))
+      .toBe(declarativeAfterParentRender);
+  });
+
+  it("treats an empty pinned feed as an authoritative clear rather than a released pin", () => {
+    const declarative = [supportedStroke] as const;
+    const pinnedClear = [] as const;
+
+    expect(resolveStudioWebGpuCanvasStrokes(declarative, pinnedClear)).toBe(pinnedClear);
+    expect(resolveStudioWebGpuCanvasStrokes(declarative, null)).toBe(declarative);
+  });
+
   it("renders transparent WebGPU and Canvas2D surfaces without an unsupported warning overlay", () => {
     const html = renderToStaticMarkup(
       <StudioWebGpuCanvas

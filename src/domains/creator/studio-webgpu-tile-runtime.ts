@@ -366,9 +366,17 @@ function validateState(
         operation.pointCount,
       ];
       const hasExtensionMetadata = extensionMetadata.some((value) => value !== undefined);
+      const hasFeedMetadata = operation.feedLineage !== undefined
+        || operation.feedRevisionToken !== undefined;
       return typeof operation.id === "string"
         && typeof operation.fingerprint === "string"
         && typeof operation.signature === "string"
+        && (!hasFeedMetadata || (
+          typeof operation.feedLineage === "string"
+          && operation.feedLineage.length > 0
+          && typeof operation.feedRevisionToken === "string"
+          && operation.feedRevisionToken.length > 0
+        ))
         && (!hasExtensionMetadata || (
           typeof operation.strokeStyleSignature === "string"
           && typeof operation.pointSamplesSignature === "string"
