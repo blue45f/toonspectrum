@@ -11445,34 +11445,52 @@ function StudioCuttoonEditor() {
       });
   }, [menu, studioEmeresAssetsLoaded]);
 
-  const shouldLoadStudioFonts =
-    menu === "bubble" || elements.some((el) => el.type === "text" || el.type === "bubble");
-
-  // 스튜디오 전용 구글폰트 로드 — 텍스트/말풍선을 쓰기 전에는 stylesheet를 주입하지 않는다.
-  // 한 번 로드한 뒤에는 id 가드로 중복 주입을 막고 폰트 캐시는 유지한다. Konva 캔버스 텍스트는 DOM과
-  // 달리 폰트 스왑을 스스로 감지하지 못하므로, 폰트가 도착하는 시점에 스테이지를 한 번씩 다시 그린다.
+  // 스튜디오 전용 구글폰트 로드 — 텍스트/말풍선은 웹툰 원고 대부분에서 쓰이므로 "첫 사용 시점까지
+  // 기다렸다 로드"하면 정확히 그 첫 사용 순간에 폴백 폰트로 잠깐 그려졌다가 폰트 도착 후 다시
+  // 그려지는 깜빡임이 났다(Konva 캔버스 텍스트는 DOM과 달리 폰트 스왑을 스스로 감지하지 못해
+  // 수동 재도색이 필요). 대신 마운트 시 requestIdleCallback으로 첫 페인트와 경합 없이 백그라운드
+  // 프리로드해, 사용자가 실제로 텍스트를 추가할 즈음엔 대개 이미 도착해 있게 한다.
+  // 한 번 로드한 뒤에는 id 가드로 중복 주입을 막고 폰트 캐시는 유지한다.
   useEffect(() => {
-    if (!shouldLoadStudioFonts) return;
-    if (!document.getElementById(STUDIO_FONTS_LINK_ID)) {
-      const link = document.createElement("link");
-      link.id = STUDIO_FONTS_LINK_ID;
-      link.rel = "stylesheet";
-      link.href = STUDIO_FONTS_CSS2_URL;
-      document.head.appendChild(link);
-    }
-    const redrawStage = () => stageRef.current?.batchDraw();
     let mounted = true;
-    // 진행 중이던 로드(전역 폰트 포함)가 정리된 뒤 일회 보정 — 이미 캐시돼 있으면 즉시 실행된다.
-    document.fonts.ready.then(() => {
-      if (mounted) redrawStage();
-    });
-    // display=swap 특성상 폰트는 실제 사용 시점(글꼴 패널 노출 등)에 늦게 도착할 수 있다 — 도착할 때마다 보정.
-    document.fonts.addEventListener("loadingdone", redrawStage);
+    let idleHandle: number | null = null;
+    let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+    let removeLoadingDoneListener: (() => void) | null = null;
+
+    const startLoad = () => {
+      if (!mounted) return;
+      if (!document.getElementById(STUDIO_FONTS_LINK_ID)) {
+        const link = document.createElement("link");
+        link.id = STUDIO_FONTS_LINK_ID;
+        link.rel = "stylesheet";
+        link.href = STUDIO_FONTS_CSS2_URL;
+        document.head.appendChild(link);
+      }
+      const redrawStage = () => stageRef.current?.batchDraw();
+      // 진행 중이던 로드(전역 폰트 포함)가 정리된 뒤 일회 보정 — 이미 캐시돼 있으면 즉시 실행된다.
+      document.fonts.ready.then(() => {
+        if (mounted) redrawStage();
+      });
+      // display=swap 특성상 폰트는 늦게 도착할 수 있다 — 도착할 때마다 보정.
+      document.fonts.addEventListener("loadingdone", redrawStage);
+      removeLoadingDoneListener = () => document.fonts.removeEventListener("loadingdone", redrawStage);
+    };
+
+    const ric = (globalThis as { requestIdleCallback?: (cb: () => void) => number }).requestIdleCallback;
+    if (typeof ric === "function") {
+      idleHandle = ric(startLoad);
+    } else {
+      timeoutHandle = setTimeout(startLoad, 300);
+    }
+
     return () => {
       mounted = false;
-      document.fonts.removeEventListener("loadingdone", redrawStage);
+      const cic = (globalThis as { cancelIdleCallback?: (handle: number) => void }).cancelIdleCallback;
+      if (idleHandle !== null && typeof cic === "function") cic(idleHandle);
+      if (timeoutHandle !== null) clearTimeout(timeoutHandle);
+      removeLoadingDoneListener?.();
     };
-  }, [shouldLoadStudioFonts]);
+  }, []);
 
   // 커스텀 에셋 라이브러리 목록 불러오기 및 관리
   const loadAssetsList = async () => {
