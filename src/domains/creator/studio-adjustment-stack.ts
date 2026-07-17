@@ -27,6 +27,30 @@ export const STUDIO_ADJUSTMENT_ENGINE_IDS = [
 
 export type StudioAdjustmentEngineId = (typeof STUDIO_ADJUSTMENT_ENGINE_IDS)[number];
 
+/**
+ * Engines still worth offering in the "add filter" catalog. The other 9 (blur family,
+ * brightness-contrast, hue-saturation, levels, sharpen, noise, invert) each duplicate a
+ * dedicated panel elsewhere that already has live sliders this stack doesn't render — adding
+ * them here is a second, strictly weaker control over the same underlying field. Existing
+ * stacks that already contain one of the 9 keep loading/rendering normally (see ENGINE_SET
+ * below); this list only narrows what a user can newly add going forward.
+ */
+export const STUDIO_ADJUSTMENT_ADDABLE_ENGINE_IDS = [
+  "curves",
+  "color-balance",
+  "channel-mixer",
+  "gradient-map",
+] as const satisfies readonly StudioAdjustmentEngineId[];
+
+const ENGINES_WITHOUT_LIVE_PREVIEW = new Set<StudioAdjustmentEngineId>(
+  STUDIO_ADJUSTMENT_ADDABLE_ENGINE_IDS
+);
+
+/** True once a dedicated compositor lands for this engine; false for the 4 stack-only ones. */
+export function studioAdjustmentEngineHasLivePreview(engine: StudioAdjustmentEngineId): boolean {
+  return !ENGINES_WITHOUT_LIVE_PREVIEW.has(engine);
+}
+
 export interface StudioAdjustmentEntry {
   id: string;
   engine: StudioAdjustmentEngineId;
@@ -315,16 +339,5 @@ export function studioAdjustmentStackToFilterFields(
 
 /** True when the stack has at least one enabled entry that maps to live filter fields. */
 export function studioAdjustmentStackHasLivePreview(stack: unknown): boolean {
-  return listEnabledStudioAdjustmentEngines(stack).some(
-    (engine) =>
-      engine === "blur" ||
-      engine === "gaussian-blur" ||
-      engine === "motion-blur" ||
-      engine === "brightness-contrast" ||
-      engine === "hue-saturation" ||
-      engine === "levels" ||
-      engine === "sharpen" ||
-      engine === "noise" ||
-      engine === "invert"
-  );
+  return listEnabledStudioAdjustmentEngines(stack).some(studioAdjustmentEngineHasLivePreview);
 }

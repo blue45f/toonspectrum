@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  STUDIO_ADJUSTMENT_ADDABLE_ENGINE_IDS,
+  STUDIO_ADJUSTMENT_ENGINE_IDS,
   appendStudioAdjustmentEntry,
   createEmptyStudioAdjustmentStack,
   listEnabledStudioAdjustmentEngines,
@@ -8,6 +10,8 @@ import {
   removeStudioAdjustmentEntry,
   reorderStudioAdjustmentEntry,
   setStudioAdjustmentEntryEnabled,
+  studioAdjustmentEngineHasLivePreview,
+  studioAdjustmentStackHasLivePreview,
   studioAdjustmentStackToFilterFields,
 } from "./studio-adjustment-stack";
 
@@ -83,5 +87,41 @@ describe("studio adjustment stack", () => {
       radius: 20,
       angle: 45,
     });
+  });
+
+  it("only exposes the 4 engines with no dedicated live-preview panel as addable", () => {
+    expect(STUDIO_ADJUSTMENT_ADDABLE_ENGINE_IDS).toEqual([
+      "curves",
+      "color-balance",
+      "channel-mixer",
+      "gradient-map",
+    ]);
+    // Every addable engine must also be a recognized engine id (no drift between the two lists).
+    for (const engine of STUDIO_ADJUSTMENT_ADDABLE_ENGINE_IDS) {
+      expect(STUDIO_ADJUSTMENT_ENGINE_IDS).toContain(engine);
+    }
+  });
+
+  it("flags exactly the addable engines as having no live preview", () => {
+    for (const engine of STUDIO_ADJUSTMENT_ENGINE_IDS) {
+      const expected = !(STUDIO_ADJUSTMENT_ADDABLE_ENGINE_IDS as readonly string[]).includes(engine);
+      expect(studioAdjustmentEngineHasLivePreview(engine)).toBe(expected);
+    }
+  });
+
+  it("studioAdjustmentStackHasLivePreview stays true for the 9 live engines, false for the 4 stack-only ones", () => {
+    const liveStack = appendStudioAdjustmentEntry(createEmptyStudioAdjustmentStack(), {
+      engine: "brightness-contrast",
+      params: { brightness: 0.1 },
+    });
+    expect(studioAdjustmentStackHasLivePreview(liveStack)).toBe(true);
+
+    const deadStack = appendStudioAdjustmentEntry(createEmptyStudioAdjustmentStack(), {
+      engine: "channel-mixer",
+      params: {},
+    });
+    expect(studioAdjustmentStackHasLivePreview(deadStack)).toBe(false);
+
+    expect(studioAdjustmentStackHasLivePreview(createEmptyStudioAdjustmentStack())).toBe(false);
   });
 });

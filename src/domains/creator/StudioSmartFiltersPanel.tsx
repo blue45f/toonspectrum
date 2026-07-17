@@ -5,12 +5,14 @@
 import { ArrowDown, ArrowUp, Eye, EyeOff, Plus, Trash2 } from "lucide-react";
 
 import {
+  STUDIO_ADJUSTMENT_ADDABLE_ENGINE_IDS,
   STUDIO_ADJUSTMENT_ENGINE_IDS,
   appendStudioAdjustmentEntry,
   normalizeStudioAdjustmentStack,
   removeStudioAdjustmentEntry,
   reorderStudioAdjustmentEntry,
   setStudioAdjustmentEntryEnabled,
+  studioAdjustmentEngineHasLivePreview,
   studioAdjustmentEngineLabel,
   type StudioAdjustmentEngineId,
   type StudioAdjustmentStack,
@@ -78,8 +80,9 @@ export function StudioSmartFiltersPanel({
       <div>
         <p className="text-[0.66rem] font-semibold uppercase tracking-wider text-fg-3">필터 관리</p>
         <p className="mt-0.5 text-[0.65rem] leading-relaxed text-fg-3">
-          비파괴 필터를 스택으로 쌓습니다. 가우시안/모션 블러·곡선·레벨 등을 순서대로
-          적용하고 눈 아이콘으로 미리 끌 수 있어요.
+          곡선·색 균형·채널 믹서·그라디언트 맵 전용 비파괴 스택입니다. 블러·밝기/대비·색조/채도
+          등은 왼쪽 전용 패널의 실시간 슬라이더를 쓰세요 — 이 4개는 아직 캔버스 실시간 미리보기가
+          없어 저장 후 다시 열어야 반영 여부를 확인할 수 있어요.
         </p>
       </div>
 
@@ -89,7 +92,7 @@ export function StudioSmartFiltersPanel({
           const items = STUDIO_FILTER_CATALOG.filter(
             (entry) =>
               entry.group === group &&
-              STUDIO_ADJUSTMENT_ENGINE_IDS.includes(entry.engine as StudioAdjustmentEngineId)
+              (STUDIO_ADJUSTMENT_ADDABLE_ENGINE_IDS as readonly string[]).includes(entry.engine)
           );
           if (items.length === 0) return null;
           return (
@@ -146,7 +149,7 @@ export function StudioSmartFiltersPanel({
             <option value="" disabled>
               전체 필터 목록…
             </option>
-            {STUDIO_ADJUSTMENT_ENGINE_IDS.map((engine) => (
+            {STUDIO_ADJUSTMENT_ADDABLE_ENGINE_IDS.map((engine) => (
               <option key={engine} value={engine}>
                 {studioAdjustmentEngineLabel(engine)}
               </option>
@@ -179,8 +182,16 @@ export function StudioSmartFiltersPanel({
                     {index + 1}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[0.72rem] font-semibold text-fg">
+                    <p className="flex items-center gap-1 truncate text-[0.72rem] font-semibold text-fg">
                       {studioAdjustmentEngineLabel(entry.engine)}
+                      {!studioAdjustmentEngineHasLivePreview(entry.engine) ? (
+                        <span
+                          className="shrink-0 rounded bg-warning-soft px-1 py-px text-[0.55rem] font-bold uppercase tracking-wide text-warning"
+                          title="아직 캔버스에 실시간으로 반영되지 않아요 — 저장 후 다시 열어야 확인할 수 있어요."
+                        >
+                          미리보기 없음
+                        </span>
+                      ) : null}
                     </p>
                     {catalog ? (
                       <p className="truncate text-[0.58rem] text-fg-3" title={catalog.description}>
