@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+  STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
   STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
 } from "./studio-ink-pressure-model";
 import {
@@ -1971,6 +1972,86 @@ describe("StudioWebGpuEngine", () => {
 });
 
 describe("planStudioGpuDabs", () => {
+  it("keeps V3 corner dabs on-path and appends only the retained suffix", () => {
+    const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3;
+    const initial = stroke({
+      points: [0, 0, 4, 0],
+      pressures: [1, 1],
+      size: 16,
+      pressureModel,
+    });
+    const extended = stroke({
+      points: [0, 0, 4, 0, 4, 4, 8, 4],
+      pressures: [1, 1, 1, 1],
+      size: 16,
+      pressureModel,
+    });
+    const subdivided = stroke({
+      points: [0, 0, 2, 0, 4, 0, 4, 2, 4, 4, 6, 4, 8, 4],
+      pressures: Array.from({ length: 7 }, () => 1),
+      size: 16,
+      pressureModel,
+    });
+    const retained = planStudioGpuDabs([initial]);
+    const complete = planStudioGpuDabs([extended]);
+    const fine = planStudioGpuDabs([subdivided]);
+    const append = planStudioGpuDabUpdate([initial], [extended]);
+    const tiled = planStudioGpuStrokeExtensionInRect(
+      extended,
+      initial.points.length / 2,
+      { x: -100, y: -100, width: 300, height: 300 }
+    );
+    const rounded = (dabs: typeof complete.dabs) => dabs.map(({ x, y, radius }) => ({
+      x: Number(x.toFixed(10)),
+      y: Number(y.toFixed(10)),
+      radius: Number(radius.toFixed(10)),
+    }));
+
+    expect(complete.complete).toBe(true);
+    expect(rounded(complete.dabs)).toEqual([
+      { x: 0, y: 0, radius: 8 },
+      { x: 3.2, y: 0, radius: 8 },
+      { x: 4, y: 2.4, radius: 8 },
+      { x: 5.6, y: 4, radius: 8 },
+    ]);
+    expect(rounded(fine.dabs)).toEqual(rounded(complete.dabs));
+    expect(append.mode).toBe("append");
+    expect(rounded(retained.dabs.concat(append.dabs))).toEqual(rounded(complete.dabs));
+    expect(rounded(tiled.dabs)).toEqual(rounded(append.dabs));
+    expect(fingerprintStudioGpuFrame([extended], {
+      logicalWidth: 100,
+      logicalHeight: 80,
+    }, 100, 80)).not.toBe(fingerprintStudioGpuFrame([{
+      ...extended,
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
+    }], {
+      logicalWidth: 100,
+      logicalHeight: 80,
+    }, 100, 80));
+  });
+
+  it("matches V3 variable-pressure planning across coarse and dense source samples", () => {
+    const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3;
+    const coarse = planStudioGpuDabs([stroke({
+      points: [0, 0, 20, 0],
+      pressures: [0.25, 1],
+      size: 16,
+      pressureModel,
+    })]);
+    const fine = planStudioGpuDabs([stroke({
+      points: [0, 0, 5, 0, 10, 0, 15, 0, 20, 0],
+      pressures: [0.25, 0.4375, 0.625, 0.8125, 1],
+      size: 16,
+      pressureModel,
+    })]);
+
+    expect(fine.dabs).toHaveLength(coarse.dabs.length);
+    fine.dabs.forEach((dab, index) => {
+      expect(dab.x).toBeCloseTo(coarse.dabs[index]!.x, 11);
+      expect(dab.radius).toBeCloseTo(coarse.dabs[index]!.radius, 11);
+    });
+  });
+
   it("uses Magma residual placement for V2 regardless of source subdivision", () => {
     const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2;
     const subdivided = planStudioGpuDabs([stroke({

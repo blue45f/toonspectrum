@@ -156,6 +156,33 @@ describe("StudioCrdtDocument", () => {
     document.destroy();
   });
 
+  it("streams V3 stationary pressure state without dropping or upgrading samples", () => {
+    const document = new StudioCrdtDocument();
+    document.beginStroke({
+      ...stroke("residual-path-v3-stream", "page-a", []),
+      payload: payload([], {
+        pressures: undefined,
+        sampleSpacing: 0,
+        extensions: { pressureModel: "linear-residual-path-v3" },
+      }),
+    });
+    document.appendStrokeSamples("residual-path-v3-stream", {
+      points: [0, 0, 9, 0],
+      pressures: [1, 1],
+    });
+    document.appendStrokeSamples("residual-path-v3-stream", {
+      points: [9, 0, 10, 0],
+      pressures: [0, 0],
+    });
+    const finalized = document.finalizeStroke("residual-path-v3-stream");
+
+    expect(finalized.payload.points).toEqual([0, 0, 9, 0, 9, 0, 10, 0]);
+    expect(finalized.payload.pressures).toEqual([1, 1, 0, 0]);
+    expect(finalized.payload.sampleSpacing).toBe(0);
+    expect(finalized.payload.extensions?.pressureModel).toBe("linear-residual-path-v3");
+    document.destroy();
+  });
+
   it("preserves zero sample spacing for fixed-rate causal ink", () => {
     const document = new StudioCrdtDocument();
 

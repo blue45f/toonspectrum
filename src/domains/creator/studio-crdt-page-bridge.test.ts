@@ -258,6 +258,35 @@ describe("studio CRDT page bridge", () => {
     expect(decoded.pressures).toEqual([0, 1, 1]);
   });
 
+  it("round-trips V3 path-phase ink without upgrading or weakening its model", () => {
+    const element: StudioCrdtCompatibleDrawElement = {
+      id: "stroke-residual-path-v3",
+      type: "draw",
+      kind: "freehand",
+      mode: "pen",
+      points: [0, 0, 9, 0, 9, 0, 10, 0],
+      pressures: [1, 1, 0, 0],
+      pressureModel: "linear-residual-path-v3",
+      sampleSpacing: 0,
+      stroke: "#123456",
+      strokeWidth: 50,
+    };
+    const encoded = studioDrawElementToCrdtStroke("page-a", element);
+    expect(encoded.payload.extensions?.pressureModel).toBe("linear-residual-path-v3");
+    expect(encoded.payload.pressures).toEqual([1, 1, 0, 0]);
+
+    const decoded = studioCrdtStrokeToDrawElement({
+      ...record(element.id, "page-a", 0),
+      ...encoded,
+      orderIndex: 0,
+      status: "finalized",
+      deleted: false,
+    });
+    expect(decoded.pressureModel).toBe("linear-residual-path-v3");
+    expect(decoded.sampleSpacing).toBe(0);
+    expect(decoded.pressures).toEqual([1, 1, 0, 0]);
+  });
+
   it("streams explicit-model fallback pressure through begin and append while legacy stays 0.5", () => {
     const document = new StudioCrdtDocument();
     const residual: StudioCrdtCompatibleDrawElement = {

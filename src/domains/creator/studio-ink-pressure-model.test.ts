@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   STUDIO_INK_MAX_BRUSH_SIZE,
   STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+  STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
   STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
   isStudioInkPressureModel,
   resolveStudioInkPressure,
@@ -10,6 +11,7 @@ import {
   studioInkFallbackPressure,
   studioInkPressureDiameter,
   studioInkPressureRadius,
+  studioInkUsesPathResidualDabSpacing,
   studioInkUsesResidualDabSpacing,
 } from "./studio-ink-pressure-model";
 
@@ -45,22 +47,31 @@ describe("studio ink pressure model", () => {
   it("accepts only the exact persisted model identifier", () => {
     expect(isStudioInkPressureModel(STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1)).toBe(true);
     expect(isStudioInkPressureModel(STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2)).toBe(true);
+    expect(isStudioInkPressureModel(STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3)).toBe(true);
     expect(isStudioInkPressureModel(undefined)).toBe(false);
     expect(isStudioInkPressureModel("linear-full-v2")).toBe(false);
     expect(isStudioInkPressureModel({ model: "linear-full-v1" })).toBe(false);
   });
 
-  it("keeps V2 pressure geometry equal to V1 while versioning residual placement", () => {
+  it("keeps residual pressure geometry equal to V1 while versioning placement", () => {
     const v1 = STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1;
     const v2 = STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2;
+    const v3 = STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3;
     for (const pressure of [0, 0.25, 0.5, 1]) {
       expect(studioInkPressureDiameter(16, pressure, v2)).toBe(
         studioInkPressureDiameter(16, pressure, v1)
       );
+      expect(studioInkPressureDiameter(16, pressure, v3)).toBe(
+        studioInkPressureDiameter(16, pressure, v1)
+      );
     }
     expect(studioInkFallbackPressure(v2)).toBe(1);
+    expect(studioInkFallbackPressure(v3)).toBe(1);
     expect(studioInkUsesResidualDabSpacing(v1)).toBe(false);
     expect(studioInkUsesResidualDabSpacing(v2)).toBe(true);
+    expect(studioInkUsesResidualDabSpacing(v3)).toBe(true);
+    expect(studioInkUsesPathResidualDabSpacing(v2)).toBe(false);
+    expect(studioInkUsesPathResidualDabSpacing(v3)).toBe(true);
   });
 
   it("resolves missing samples to legacy half pressure or linear full pressure", () => {

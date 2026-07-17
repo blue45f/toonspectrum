@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+  STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
   STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
 } from "./studio-ink-pressure-model";
 import {
@@ -161,6 +162,39 @@ describe("StudioLiveInkOverlayRenderer", () => {
 
     expect(requestAnimationFrame).not.toHaveBeenCalled();
     expect(recording.dabs).toEqual(afterPointerUp);
+  });
+
+  it("keeps V3 stationary pressure state append-only and identical after replay", () => {
+    const style = {
+      ...STYLE,
+      strokeWidthDoc: 50,
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
+    } as const;
+    const recording = recordingCanvas();
+    const renderer = new StudioLiveInkOverlayRenderer();
+    renderer.attach(recording.canvas);
+    renderer.setSurface(SURFACE);
+    expect(renderer.begin(style, 0, 0, 1)).toBe(true);
+    renderer.appendFrom([0, 0, 9, 0], [1, 1]);
+    const paintedPrefix = recording.dabs.map((dab) => ({ ...dab }));
+    renderer.appendFrom([0, 0, 9, 0, 9, 0, 10, 0], [1, 1, 0, 0]);
+    renderer.end();
+
+    expect(recording.dabs.slice(0, paintedPrefix.length)).toEqual(paintedPrefix);
+    expect(recording.dabs).toEqual([
+      { x: 0, y: 0, radius: 25 },
+      { x: 9.05, y: 0, radius: 0 },
+      { x: 9.55, y: 0, radius: 0 },
+    ]);
+    const settled = recording.dabs.map((dab) => ({ ...dab }));
+    recording.dabs.splice(0);
+    renderer.setSurface({ ...SURFACE, width: 101 });
+    expect(recording.dabs).toEqual(settled);
+    expect(canonicalStrokeDabs(
+      [0, 0, 9, 0, 9, 0, 10, 0],
+      [1, 1, 0, 0],
+      style
+    )).toEqual(settled);
   });
 
   it("uses the linear-full style for live, settled, and replayed dab radii", () => {
