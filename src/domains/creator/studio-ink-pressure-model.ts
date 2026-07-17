@@ -7,9 +7,18 @@
  */
 
 export const STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 = "linear-full-v1" as const;
+/**
+ * Magma-compatible pressure and dab-placement contract.
+ *
+ * V1 remains frozen because its persisted strokes place an endpoint dab per source segment. V2
+ * keeps the same pressure-to-diameter mapping while carrying residual brush spacing across source
+ * segments, so extending a stroke can only append pixels.
+ */
+export const STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2 = "linear-residual-v2" as const;
 
 export type StudioInkPressureModel =
-  typeof STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1;
+  | typeof STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1
+  | typeof STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2;
 
 export const STUDIO_INK_MAX_BRUSH_SIZE = 8_192;
 export const STUDIO_INK_LEGACY_FALLBACK_PRESSURE = 0.5;
@@ -24,12 +33,22 @@ function clamp(value: number, minimum: number, maximum: number): number {
 }
 
 export function isStudioInkPressureModel(value: unknown): value is StudioInkPressureModel {
-  return value === STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1;
+  return value === STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1
+    || value === STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2;
+}
+
+export function studioInkUsesResidualDabSpacing(model?: StudioInkPressureModel): boolean {
+  return model === STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2;
+}
+
+function isLinearFullPressureModel(model?: StudioInkPressureModel): boolean {
+  return model === STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1
+    || model === STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2;
 }
 
 /** Missing hardware samples retain legacy 0.5, while Magma-compatible ink is full-size at 1. */
 export function studioInkFallbackPressure(model?: StudioInkPressureModel): number {
-  return model === STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1
+  return isLinearFullPressureModel(model)
     ? STUDIO_INK_LINEAR_FULL_FALLBACK_PRESSURE
     : STUDIO_INK_LEGACY_FALLBACK_PRESSURE;
 }
@@ -77,7 +96,7 @@ export function studioInkPressureRadius(
 ): number {
   const safeSize = clamp(finiteOr(size, 1), 0.01, STUDIO_INK_MAX_BRUSH_SIZE);
   const safePressure = clamp(finiteOr(pressure, 1), 0, 1);
-  if (model === STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1) {
+  if (isLinearFullPressureModel(model)) {
     return (safeSize * safePressure) / 2;
   }
   return Math.max(0.25, (safeSize * (0.3 + safePressure * 1.4)) / 2);

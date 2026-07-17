@@ -5,6 +5,8 @@ import {
   type StudioInkPressureModel,
 } from "./studio-ink-pressure-model";
 
+import type { StudioResidualInkState } from "./studio-causal-ink";
+
 export type StudioGpuComposite = "normal" | "erase";
 
 /**
@@ -25,6 +27,9 @@ export interface StudioGpuStrokeFeedRevision {
   readonly lastX: number;
   readonly lastY: number;
   readonly lastPressure: number;
+  /** Cached append-only brush phase for residual V2; absent for frozen legacy/V1 strokes. */
+  readonly residualInkState?: StudioResidualInkState;
+  readonly residualDabCount?: number;
   /** Round-dab bounds before the caller-specific tile bleed is added. */
   readonly minimumX: number;
   readonly minimumY: number;

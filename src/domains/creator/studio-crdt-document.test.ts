@@ -120,6 +120,42 @@ function setYjsClientId(document: StudioCrdtDocument, clientId: number): void {
 }
 
 describe("StudioCrdtDocument", () => {
+  it("uses full fallback pressure for sparse residual V2 payloads", () => {
+    const document = new StudioCrdtDocument();
+    const record = document.addStroke({
+      ...stroke("residual-sparse", "page-a"),
+      payload: payload([0, 0, 4, 0, 8, 0], {
+        pressures: undefined,
+        extensions: { pressureModel: "linear-residual-v2" },
+      }),
+    });
+
+    expect(record.payload.pressures).toEqual([1, 1, 1]);
+    document.destroy();
+  });
+
+  it("uses the stored pressure model when streamed samples omit pressures", () => {
+    const document = new StudioCrdtDocument();
+    document.beginStroke({
+      ...stroke("residual-stream", "page-a", []),
+      payload: payload([], {
+        pressures: undefined,
+        extensions: { pressureModel: "linear-residual-v2" },
+      }),
+    });
+    document.appendStrokeSamples("residual-stream", { points: [0, 0, 4, 0, 8, 0] });
+
+    document.beginStroke({
+      ...stroke("legacy-stream", "page-a", []),
+      payload: payload([], { pressures: undefined }),
+    });
+    document.appendStrokeSamples("legacy-stream", { points: [0, 0, 4, 0, 8, 0] });
+
+    expect(document.finalizeStroke("residual-stream").payload.pressures).toEqual([1, 1, 1]);
+    expect(document.finalizeStroke("legacy-stream").payload.pressures).toEqual([0.5, 0.5, 0.5]);
+    document.destroy();
+  });
+
   it("preserves zero sample spacing for fixed-rate causal ink", () => {
     const document = new StudioCrdtDocument();
 

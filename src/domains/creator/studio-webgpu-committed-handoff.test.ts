@@ -96,6 +96,25 @@ describe("createStudioWebGpuCommittedHandoff", () => {
     });
   });
 
+  it("keeps no-spacing explicit-model geometry causal instead of legacy smoothing", () => {
+    const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1;
+    const points = [0, 0, 1, 1, 8, 4, 15, 10];
+    const handoff = createStudioWebGpuCommittedHandoff({
+      elements: [draw("linear-no-spacing", {
+        points,
+        pressures: [0],
+        pressureModel,
+        sampleSpacing: undefined,
+      })],
+    });
+
+    expect(handoff.strokes[0]).toMatchObject({
+      points,
+      pressures: [0, 1, 1, 1],
+      pressureModel,
+    });
+  });
+
   it("keeps all committed pixels on Konva while an editor-wide gate is active", () => {
     const handoff = createStudioWebGpuCommittedHandoff({
       elements: [draw("ink")],

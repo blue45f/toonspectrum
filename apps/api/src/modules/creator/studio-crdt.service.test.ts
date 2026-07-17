@@ -1893,6 +1893,29 @@ describe("StudioCrdtService", () => {
     source.destroy();
   });
 
+  it("accepts zero sample spacing for fixed-rate causal ink", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const current = service(repository);
+    const source = createStrokeDocument();
+    source.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!.set("sampleSpacing", 0);
+
+    expect(hasValidStudioCrdtRootSchema(source)).toBe(true);
+    await expect(current.applyUpdate({
+      workId: "work-fixed-rate-zero-spacing",
+      updateId: "00000000-0000-4000-8000-000000000108",
+      actorUserId: "editor",
+      data: fromUint8Array(Y.encodeStateAsUpdate(source)),
+    })).resolves.toMatchObject({ duplicate: false });
+
+    const hydrated = new Y.Doc();
+    applySync(hydrated, await current.sync("work-fixed-rate-zero-spacing"));
+    expect(hasValidStudioCrdtRootSchema(hydrated)).toBe(true);
+    expect(hydrated.getMap<Y.Map<unknown>>("strokes").get("stroke-1")?.get("sampleSpacing"))
+      .toBe(0);
+    hydrated.destroy();
+    source.destroy();
+  });
+
   it("rejects stroke metadata and pointer samples the browser cannot decode", () => {
     const invalidPressure = createStrokeDocument();
     const pressureStroke = invalidPressure.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!;

@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 } from "./studio-ink-pressure-model";
+import {
+  STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+  STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
+} from "./studio-ink-pressure-model";
 import {
   StudioLiveInkOverlayRenderer,
   StudioLiveInkPredictionRenderer,
@@ -107,6 +110,59 @@ afterEach(() => {
 });
 
 describe("StudioLiveInkOverlayRenderer", () => {
+  it("carries residual spacing across live appends and replays the identical settled footprint", () => {
+    const style = {
+      ...STYLE,
+      strokeWidthDoc: 16,
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
+    } as const;
+    const recording = recordingCanvas();
+    const renderer = new StudioLiveInkOverlayRenderer();
+    renderer.attach(recording.canvas);
+    renderer.setSurface(SURFACE);
+    expect(renderer.begin(style, 0, 0, 1)).toBe(true);
+    renderer.appendFrom([0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0], [1, 1, 1, 1, 1, 1]);
+    const firstPrefix = recording.dabs.map((dab) => ({ ...dab }));
+    expect(firstPrefix.map(({ x }) => x)).toEqual([0, 3.2]);
+
+    renderer.appendFrom(
+      [0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8, 0, 9, 0, 10, 0, 11, 0, 12, 0],
+      Array.from({ length: 13 }, () => 1)
+    );
+    expect(recording.dabs.slice(0, firstPrefix.length)).toEqual(firstPrefix);
+    expect(recording.dabs.map(({ x }) => x)).toEqual([0, 3.2, 6.4, 9.6]);
+    renderer.end();
+    const settled = recording.dabs.map((dab) => ({ ...dab }));
+
+    recording.dabs.splice(0);
+    renderer.setSurface({ ...SURFACE, width: 101 });
+    expect(recording.dabs).toEqual(settled);
+  });
+
+  it("finishes residual ink synchronously without scheduling a post-release reveal", () => {
+    const requestAnimationFrame = vi.fn(() => 1);
+    vi.stubGlobal("requestAnimationFrame", requestAnimationFrame);
+    const style = {
+      ...STYLE,
+      strokeWidthDoc: 16,
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
+    } as const;
+    const recording = recordingCanvas();
+    const renderer = new StudioLiveInkOverlayRenderer();
+    renderer.attach(recording.canvas);
+    renderer.setSurface(SURFACE);
+    addStroke(
+      renderer,
+      [0, 0, 4, 0, 8, 0, 12, 0],
+      [1, 1, 1, 1],
+      style
+    );
+    const afterPointerUp = recording.dabs.map((dab) => ({ ...dab }));
+
+    expect(requestAnimationFrame).not.toHaveBeenCalled();
+    expect(recording.dabs).toEqual(afterPointerUp);
+  });
+
   it("uses the linear-full style for live, settled, and replayed dab radii", () => {
     const style = {
       ...STYLE,

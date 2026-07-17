@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 } from "./studio-ink-pressure-model";
+import {
+  STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+  STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
+} from "./studio-ink-pressure-model";
 import { STUDIO_GPU_STROKE_FEED_REVISION, type StudioGpuStroke } from "./studio-webgpu-stroke";
 import {
   advanceStudioGpuStrokeFeed,
@@ -207,5 +210,56 @@ describe("Studio WebGPU append-only stroke feed", () => {
 
     expect(linear[0]?.[STUDIO_GPU_STROKE_FEED_REVISION]?.lastPressure).toBe(1);
     expect(legacy[0]?.[STUDIO_GPU_STROKE_FEED_REVISION]?.lastPressure).toBe(0.5);
+  });
+
+  it("carries the residual V2 brush phase on each immutable feed revision", () => {
+    const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2;
+    const tap = stroke({
+      points: [0, 0],
+      pressures: [1],
+      size: 16,
+      pressureModel,
+    });
+    const baseline = createStudioGpuStrokeFeedBaseline([tap], "residual-feed")!;
+    expect(baseline[0]?.[STUDIO_GPU_STROKE_FEED_REVISION]).toMatchObject({
+      residualDabCount: 1,
+      residualInkState: { distanceRemainder: 0, lastDabX: 0, lastDabY: 0 },
+    });
+
+    const extended = [stroke({
+      points: [0, 0, 4, 0],
+      pressures: [1, 1],
+      size: 16,
+      pressureModel,
+    })];
+    const advanced = advanceStudioGpuStrokeFeed(
+      baseline,
+      patch(extended, 1, [4, 0], [1])
+    );
+    expect(advanced.status).toBe("appended");
+    const revision = advanced.strokes[0]?.[STUDIO_GPU_STROKE_FEED_REVISION];
+    expect(revision).toMatchObject({
+      residualDabCount: 2,
+      residualInkState: {
+        previousX: 4,
+        lastDabX: 3.2,
+      },
+    });
+    expect(revision?.residualInkState?.distanceRemainder).toBeCloseTo(0.8, 12);
+  });
+
+  it("expands feed bounds for residual V2 backtrack dabs outside source-point bounds", () => {
+    const baseline = createStudioGpuStrokeFeedBaseline([stroke({
+      points: [0, 0, 5, 0, 0, 0],
+      pressures: [1, 1, 1],
+      size: 16,
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
+    })], "residual-bounds")!;
+    const revision = baseline[0]?.[STUDIO_GPU_STROKE_FEED_REVISION];
+
+    expect(revision?.minimumX).toBeCloseTo(-11.2, 12);
+    expect(revision?.maximumX).toBeCloseTo(13, 12);
+    expect(revision?.minimumY).toBe(-8);
+    expect(revision?.maximumY).toBe(8);
   });
 });

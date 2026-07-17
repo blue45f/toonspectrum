@@ -46,14 +46,17 @@ function committedElementToGpuStroke(
     ? element.pressures as readonly number[]
     : undefined;
   const pressureModel = element.pressureModel as StudioInkPressureModel | undefined;
-  const usesCausalGeometry = typeof element.sampleSpacing === "number"
-    && Number.isFinite(element.sampleSpacing);
+  const causalSampleSpacing = typeof element.sampleSpacing === "number"
+    && Number.isFinite(element.sampleSpacing)
+    ? element.sampleSpacing
+    : null;
+  const usesCausalGeometry = causalSampleSpacing !== null || pressureModel !== undefined;
   const causalSamples = usesCausalGeometry
     ? selectStudioCausalInkSamples({
         points: sourcePoints,
         pressures: sourcePressures,
         pressureModel,
-        minDistance: element.sampleSpacing as number,
+        minDistance: causalSampleSpacing ?? 0,
       })
     : null;
   const points = causalSamples

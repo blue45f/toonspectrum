@@ -179,6 +179,38 @@ describe("studio CRDT raster UI bridge", () => {
     expect(plan?.semanticParameters).not.toBe(legacy?.semanticParameters);
   });
 
+  it("promotes no-spacing explicit-model points without legacy smoothing", () => {
+    const id = uuid(14);
+    const pressureModel = STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1;
+    const points = [0, 0, 1, 1, 8, 4, 15, 10];
+    const plan = planStudioRasterDrawPromotion({
+      element: {
+        id,
+        type: "draw",
+        kind: "freehand",
+        mode: "pen",
+        points,
+        pressures: [0],
+        stroke: "#112233",
+        strokeWidth: 8,
+        opacity: 1,
+        brush: "pen",
+        pressureModel,
+      },
+      pageId: "page-a",
+      documentWidth: 800,
+      documentHeight: 1_200,
+    });
+
+    expect(plan?.stroke).toMatchObject({
+      points,
+      pressures: [0, 1, 1, 1],
+      pressureModel,
+    });
+    expect(JSON.parse(plan!.semanticParameters).stroke.pointPipeline)
+      .toBe("studio-causal-dabs-v1");
+  });
+
   it("cancels an async promotion after the fallback is deleted, edited, clipped, or regrouped", () => {
     const id = uuid(12);
     const element = {

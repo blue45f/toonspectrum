@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  StudioCrdtDocument,
+  type StudioCrdtPageRecord,
+  type StudioCrdtJsonObject,
+  type StudioCrdtSceneElementRecord,
+  type StudioCrdtStrokeRecord,
+} from "./studio-crdt-document";
+import {
   reconcileStudioCrdtPages,
   reconcileStudioCrdtSceneGraphPages,
   studioCrdtElementToSceneElement,
@@ -12,13 +19,6 @@ import {
   type StudioCrdtCompatibleDrawElement,
   type StudioCrdtCompatibleSceneElement,
 } from "./studio-crdt-page-bridge";
-
-import type {
-  StudioCrdtPageRecord,
-  StudioCrdtJsonObject,
-  StudioCrdtSceneElementRecord,
-  StudioCrdtStrokeRecord,
-} from "./studio-crdt-document";
 
 function record(
   id: string,
@@ -113,7 +113,7 @@ describe("studio CRDT page bridge", () => {
 
     const encoded = studioDrawElementToCrdtStroke("page-a", element);
     expect(encoded.layerId).toBe("inks");
-    expect(encoded.payload.pressures).toEqual([0.75, 0.5]);
+    expect(encoded.payload.pressures).toEqual([0.75, 1]);
     expect(encoded.payload.extensions).toMatchObject({
       groupId: "inks",
       hidden: true,
@@ -184,6 +184,75 @@ describe("studio CRDT page bridge", () => {
     ));
     expect(decodedUnknown.pressureModel).toBeUndefined();
     expect("pressureModel" in decodedUnknown).toBe(false);
+  });
+
+  it("round-trips the residual V2 ink contract as an explicit CRDT extension", () => {
+    const element: StudioCrdtCompatibleDrawElement = {
+      id: "stroke-residual-v2",
+      type: "draw",
+      kind: "freehand",
+      mode: "pen",
+      points: [0, 0, 4, 0, 8, 0],
+      pressures: [0],
+      pressureModel: "linear-residual-v2",
+      sampleSpacing: 0,
+      stroke: "#123456",
+      strokeWidth: 16,
+    };
+    const encoded = studioDrawElementToCrdtStroke("page-a", element);
+    expect(encoded.payload.extensions?.pressureModel).toBe("linear-residual-v2");
+    expect(encoded.payload.sampleSpacing).toBe(0);
+    expect(encoded.payload.pressures).toEqual([0, 1, 1]);
+
+    const decoded = studioCrdtStrokeToDrawElement({
+      ...record("stroke-residual-v2", "page-a", 0),
+      ...encoded,
+      orderIndex: 0,
+      status: "finalized",
+      deleted: false,
+    });
+    expect(decoded.pressureModel).toBe("linear-residual-v2");
+    expect(decoded.sampleSpacing).toBe(0);
+    expect(decoded.pressures).toEqual([0, 1, 1]);
+  });
+
+  it("streams explicit-model fallback pressure through begin and append while legacy stays 0.5", () => {
+    const document = new StudioCrdtDocument();
+    const residual: StudioCrdtCompatibleDrawElement = {
+      id: "stroke-residual-stream",
+      type: "draw",
+      kind: "freehand",
+      mode: "pen",
+      points: [0, 0],
+      pressures: undefined,
+      pressureModel: "linear-residual-v2",
+      sampleSpacing: 0,
+      stroke: "#123456",
+      strokeWidth: 16,
+    };
+    const legacy: StudioCrdtCompatibleDrawElement = {
+      ...residual,
+      id: "stroke-legacy-stream",
+      pressureModel: undefined,
+    };
+
+    document.beginStroke(studioDrawElementToCrdtStroke("page-a", residual));
+    document.appendStrokeSamples(
+      residual.id,
+      studioDrawElementSampleSlice({ ...residual, points: [0, 0, 4, 0, 8, 0] }, 1)!
+    );
+    document.finalizeStroke(residual.id);
+
+    document.beginStroke(studioDrawElementToCrdtStroke("page-a", legacy));
+    document.appendStrokeSamples(
+      legacy.id,
+      studioDrawElementSampleSlice({ ...legacy, points: [0, 0, 4, 0, 8, 0] }, 1)!
+    );
+    document.finalizeStroke(legacy.id);
+
+    expect(document.getStroke(residual.id)?.payload.pressures).toEqual([1, 1, 1]);
+    expect(document.getStroke(legacy.id)?.payload.pressures).toEqual([0.5, 0.5, 0.5]);
+    document.destroy();
   });
 
   it("aligns only the requested streaming suffix and never reads prior dynamics", () => {

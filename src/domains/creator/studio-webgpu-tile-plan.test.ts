@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 } from "./studio-ink-pressure-model";
+import {
+  STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+  STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
+} from "./studio-ink-pressure-model";
 import {
   boundsForStudioGpuStroke,
   diffStudioGpuTileStates,
@@ -69,6 +72,37 @@ describe("studio WebGPU tile planning", () => {
       planStudioGpuTileStates([legacy], DOCUMENT),
       planStudioGpuTileStates([linear], DOCUMENT)
     )[0]?.mode).toBe("rebuild");
+  });
+
+  it("includes residual V2 backtrack overshoot in adjacent tile coverage", () => {
+    const residual = stroke({
+      points: [522, 120, 527, 120, 522, 120],
+      pressures: [1, 1, 1],
+      size: 16,
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
+    });
+    const bounds = boundsForStudioGpuStroke(residual);
+    const states = planStudioGpuTileStates([residual], DOCUMENT);
+
+    expect(bounds?.x).toBeCloseTo(508.8, 12);
+    expect(bounds?.width).toBeCloseTo(26.4, 12);
+    expect(bounds).toMatchObject({ y: 110, height: 20 });
+    expect(states.map(({ id }) => id)).toEqual(["0:0", "1:0"]);
+  });
+
+  it("keeps cap-exceeding residual V2 strokes in tile tasks for fail-closed rendering", () => {
+    const oversized = stroke({
+      points: [0, 120, 50_001, 120],
+      pressures: [1, 1],
+      size: 1,
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
+    });
+    const bounds = boundsForStudioGpuStroke(oversized);
+    const states = planStudioGpuTileStates([oversized], DOCUMENT);
+
+    expect(bounds).not.toBeNull();
+    expect(states.length).toBeGreaterThan(0);
+    expect(states.every((state) => state.operations.some(({ id }) => id === oversized.id))).toBe(true);
   });
 
   it("selects only viewport tiles and one-row overscan for a very tall document", () => {

@@ -571,6 +571,7 @@ import {
 import { createCanvasImageElement } from "./studio-image-placement";
 import {
   STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+  STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
   studioInkFallbackPressure,
   type StudioInkPressureModel,
 } from "./studio-ink-pressure-model";
@@ -3036,14 +3037,14 @@ function drawLiveFreehandDraftToContext(context: Konva.Context, el: DrawEl): voi
   context.globalAlpha = Math.min(1, Math.max(0, el.opacity ?? 1));
   context.globalCompositeOperation = isEraser ? "destination-out" : "source-over";
   for (const points of variations) {
-    if (el.sampleSpacing !== undefined && !el.fill) {
+    if ((el.sampleSpacing !== undefined || el.pressureModel !== undefined) && !el.fill) {
       drawStudioCausalInkDabs(
         context,
         points,
         el.pressures,
         strokeColor,
         strokeWidth,
-        el.sampleSpacing,
+        el.sampleSpacing ?? 0,
         el.pressureModel
       );
       continue;
@@ -3270,7 +3271,7 @@ const StudioDrawNode = memo(function StudioDrawNode({ el }: { el: DrawEl }) {
 
           if (
             points.length === 2 &&
-            (el.sampleSpacing === undefined || (
+            ((el.sampleSpacing === undefined && el.pressureModel === undefined) || (
               el.mode !== "eraser" && brushFamily !== "pen" && brushFamily !== "marker"
             )) &&
             brushFamily !== "watercolor" &&
@@ -3784,7 +3785,7 @@ const StudioDrawNode = memo(function StudioDrawNode({ el }: { el: DrawEl }) {
           // 라쏘 브러시: fill 이 설정된 프리핸드(라쏘 필)는 궤적을 자동으로 닫아 내부를
           // 현재 색으로 채운다. 라이브 초안도 같은 경로를 지나므로 그리는 동안 채움이 미리 보인다.
           const freehandFill = el.mode !== "eraser" ? el.fill : undefined;
-          if (el.sampleSpacing !== undefined && !freehandFill) {
+          if ((el.sampleSpacing !== undefined || el.pressureModel !== undefined) && !freehandFill) {
             return (
               <Shape
                 key={index}
@@ -17753,13 +17754,26 @@ function StudioCuttoonEditor() {
       setSelectedId(null);
 
       const fixedRateBrushFamily = resolveStudioBrushRenderFamily(brush);
-      const pressureModel = (
+      const linearPressureEligible = (
         drawMode === "eraser" ||
         drawMode === "pixel" ||
         (drawMode === "pen" && (
           fixedRateBrushFamily === "pen" || fixedRateBrushFamily === "marker"
         ))
-      ) ? STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 : undefined;
+      );
+      const residualPressureEligible = drawMode === "pen"
+        && (fixedRateBrushFamily === "pen" || fixedRateBrushFamily === "marker")
+        && postCorrection <= 0;
+      const pressureModel = linearPressureEligible
+        ? (
+            // The fixed-lag post-correction surface owns a replaceable tail and therefore cannot
+            // carry one append-only residual phase yet. Pixel/eraser also retain their frozen V1
+            // placement; the default reference pen/marker use residual V2.
+            residualPressureEligible
+              ? STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2
+              : STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1
+          )
+        : undefined;
       const pressure = resolveBrushPressureSample({
         pointerType: pointerSample.pointerType,
         rawPressure: pointerSample.pressure,
@@ -17907,6 +17921,7 @@ function StudioCuttoonEditor() {
         // draft surface because overlapping retained pixels would still create an alpha flash.
         const causalPostCorrectionEligible = isDirectLiveDraftEl(next)
           && postCorrection > 0
+          && (next.opacity ?? 1) === 1
           && next.mode !== "eraser"
           && !next.fill
           && (next.symmetry?.type ?? "none") === "none";
@@ -18990,24 +19005,9 @@ function StudioCuttoonEditor() {
         if (fixedRateState) {
           const released = transitionFixedRateStrokeFilter(fixedRateState, { type: "release" });
           drawingFixedRateFilterRef.current = released.state;
-          // 매끈(고정레이트 스태빌라이저) 펜의 릴리즈 드레인은 잔여 지연(빠른 획에서 ~100px+)을
-          // 한 프레임에 통째로 방출해 "선이 튀는" 느낌을 만든다. 페인트만 몇 프레임에 나눠
-          // 잉크가 끝점까지 따라잡듯 흐르게 한다 — 재생 데이터·CRDT·커밋 지오메트리는 기존과
-          // 동일하게 이 태스크 안에서 동기 완성된다.
-          const releaseOverlay = liveInkOverlayRendererRef.current;
-          const paceTailReveal = releaseOverlay.isActive
-            && liveDraftDirectRef.current
-            && !gpuLiveInkPinnedRef.current
-            && drawingRef.current.mode !== "eraser"
-            && !drawingRef.current.fill
-            && released.releaseDrainTicks > 1;
-          if (paceTailReveal) releaseOverlay.beginPacedTailReveal();
+          // Geometry and paint complete in the pointerup task. Deferring only the pixels across
+          // rAF made a released stroke continue changing while the next stroke had already begun.
           appendFixedRateStrokeSamples(released.emitted, pointerEvent, 0);
-          if (paceTailReveal) {
-            const drained = drawingRef.current;
-            if (drained) flushDirectLiveDraftNow(drained);
-            releaseOverlay.commitPacedTailReveal(6);
-          }
         } else {
           const liveState = drawingStabilizerRef.current;
           if (liveState) {

@@ -1,6 +1,5 @@
 import * as Y from "yjs";
 
-
 import {
   decodeStudioCrdtStateVector,
   decodeStudioCrdtSyncChunks,
@@ -33,6 +32,11 @@ import {
   type StudioCrdtPagePayload,
   type StudioCrdtSceneElementPayload,
 } from "./studio-crdt-scene-schema";
+import {
+  isStudioInkPressureModel,
+  studioInkFallbackPressure,
+  type StudioInkPressureModel,
+} from "./studio-ink-pressure-model";
 
 import type { StudioRasterCompactionCheckpoint } from "@/lib/studio-crdt-raster-compaction";
 
@@ -723,11 +727,28 @@ function sampleCount(samples: StudioCrdtStrokeSamples, allowEmpty: boolean): num
   return count;
 }
 
-function normalizedSamples(samples: StudioCrdtStrokeSamples, allowEmpty: boolean) {
+function normalizedSamples(
+  samples: StudioCrdtStrokeSamples,
+  allowEmpty: boolean,
+  storedPressureModel?: StudioInkPressureModel
+) {
   const count = sampleCount(samples, allowEmpty);
+  const extensions = "extensions" in samples && samples.extensions
+    && typeof samples.extensions === "object"
+    && !Array.isArray(samples.extensions)
+    ? samples.extensions
+    : undefined;
+  const pressureModelValue = extensions && "pressureModel" in extensions
+    ? extensions.pressureModel
+    : undefined;
+  const pressureModel = storedPressureModel ?? (isStudioInkPressureModel(pressureModelValue)
+    ? pressureModelValue
+    : undefined);
   return {
     points: [...samples.points],
-    pressures: [...(samples.pressures ?? Array<number>(count).fill(0.5))],
+    pressures: [
+      ...(samples.pressures ?? Array<number>(count).fill(studioInkFallbackPressure(pressureModel))),
+    ],
     tiltXs: [...(samples.tiltXs ?? Array<number>(count).fill(0))],
     tiltYs: [...(samples.tiltYs ?? Array<number>(count).fill(0))],
     twists: [...(samples.twists ?? Array<number>(count).fill(0))],
@@ -1567,16 +1588,20 @@ export class StudioCrdtDocument {
   appendStrokeSamples(id: string, samples: StudioCrdtStrokeSamples): number {
     this.assertAlive();
     assertId(id, "획");
-    const normalized = normalizedSamples(samples, false);
-    const appendedCount = normalized.points.length / 2;
-    if (appendedCount > STUDIO_CRDT_APPEND_MAX_SAMPLES) {
-      throw new Error("한 번에 추가할 수 있는 획 샘플 수를 초과했습니다.");
-    }
     const record = this.strokes.get(id);
     if (!(record instanceof Y.Map) || this.isDeleted(record, strokeDeletionTarget(id))) {
       throw new Error("추가할 획을 찾을 수 없습니다.");
     }
     if (record.get("status") !== "drawing") throw new Error("완료된 획에는 샘플을 추가할 수 없습니다.");
+    const extensions = readJsonObject(record, "extensions");
+    const pressureModel = isStudioInkPressureModel(extensions?.pressureModel)
+      ? extensions.pressureModel
+      : undefined;
+    const normalized = normalizedSamples(samples, false, pressureModel);
+    const appendedCount = normalized.points.length / 2;
+    if (appendedCount > STUDIO_CRDT_APPEND_MAX_SAMPLES) {
+      throw new Error("한 번에 추가할 수 있는 획 샘플 수를 초과했습니다.");
+    }
     const currentCount = (yArray(record, "points")?.length ?? 0) / 2;
     if (currentCount + appendedCount > STUDIO_CRDT_STROKE_MAX_SAMPLES) {
       throw new Error("획 샘플 수가 최대 한도를 초과합니다.");
