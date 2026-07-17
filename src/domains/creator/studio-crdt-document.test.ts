@@ -13,6 +13,8 @@ import {
   STUDIO_CRDT_SCENE_ELEMENT_MAX_BYTES,
   STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION,
   StudioCrdtDocument,
+  type StudioCrdtChange,
+  type StudioCrdtChangeSummary,
   type StudioCrdtDrawStrokePayload,
   type StudioCrdtPageInput,
   type StudioCrdtSceneElementInput,
@@ -821,6 +823,91 @@ describe("StudioCrdtDocument", () => {
     expect([...streamedChange.changedStrokeIds]).toEqual(["remote-stream"]);
     document.destroy();
     remote.destroy();
+  });
+
+  it("filters transaction summaries before materializing an enumerable change frontier", () => {
+    const document = new StudioCrdtDocument();
+    const getStrokes = vi.spyOn(document, "getStrokes");
+    const getSceneElements = vi.spyOn(document, "getSceneElements");
+    const getPages = vi.spyOn(document, "getPages");
+    const getLayerGroups = vi.spyOn(document, "getLayerGroups");
+    const readRasterSnapshot = vi.spyOn(
+      document as unknown as { tryReadExactRasterDocumentSnapshot(): unknown },
+      "tryReadExactRasterDocumentSnapshot"
+    );
+    const includeChange = vi.fn(
+      (summary: StudioCrdtChangeSummary) => summary.changedSceneElementIds.size > 0
+    );
+    const changes: StudioCrdtChange[] = [];
+    document.subscribeChanges((change) => changes.push(change), {
+      includeOrigin: () => true,
+      includeChange,
+    });
+
+    document.addStroke(stroke("filtered-stroke", "page-a"));
+
+    expect(includeChange).toHaveBeenCalled();
+    expect(changes).toEqual([]);
+    expect(getStrokes).not.toHaveBeenCalled();
+    expect(getSceneElements).not.toHaveBeenCalled();
+    expect(getPages).not.toHaveBeenCalled();
+    expect(getLayerGroups).not.toHaveBeenCalled();
+    expect(readRasterSnapshot).not.toHaveBeenCalled();
+    includeChange.mockClear();
+
+    document.addSceneElement(textElement("included-text"));
+
+    expect(includeChange).toHaveBeenCalled();
+    expect(changes).not.toHaveLength(0);
+    const includedChange = changes.at(-1)!;
+    expect(includedChange.sceneElements.map(({ id }) => id)).toEqual(["included-text"]);
+    expect(new Set(Object.keys(includedChange))).toEqual(new Set([
+      "origin",
+      "local",
+      "changedStrokeIds",
+      "strokes",
+      "changedSceneElementIds",
+      "sceneElements",
+      "changedPageIds",
+      "pages",
+      "changedLayerGroupIds",
+      "layerGroups",
+      "changedRasterSurfaceIds",
+      "changedRasterOperationIds",
+      "changedRasterUndoOperationIds",
+      "changedRasterUndoAcknowledgementIds",
+      "changedRasterCheckpointIds",
+      "rasterOperationLogs",
+      "rasterCheckpoints",
+    ]));
+    expect(getStrokes).toHaveBeenCalledTimes(1);
+    expect(getSceneElements).toHaveBeenCalledTimes(1);
+    expect(getPages).toHaveBeenCalledTimes(1);
+    expect(getLayerGroups).toHaveBeenCalledTimes(1);
+    expect(readRasterSnapshot).toHaveBeenCalledTimes(1);
+
+    document.destroy();
+  });
+
+  it("keeps each accepted change frontier fixed at its transaction", () => {
+    const document = new StudioCrdtDocument();
+    const changes: StudioCrdtChange[] = [];
+    document.subscribeChanges((change) => changes.push(change), {
+      includeOrigin: () => true,
+      includeChange: ({ changedStrokeIds }) => changedStrokeIds.size > 0,
+    });
+
+    document.addStroke(stroke("first-stroke", "page-a"));
+    const firstChange = changes.at(-1);
+    document.addStroke(stroke("second-stroke", "page-a"));
+    const secondChange = changes.at(-1);
+    document.destroy();
+
+    expect(firstChange?.strokes.map(({ id }) => id)).toEqual(["first-stroke"]);
+    expect(secondChange?.strokes.map(({ id }) => id)).toEqual([
+      "first-stroke",
+      "second-stroke",
+    ]);
   });
 
   it("reports exact scene and page IDs introduced by one remote update", () => {

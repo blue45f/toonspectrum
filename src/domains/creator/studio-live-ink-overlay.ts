@@ -3,7 +3,7 @@
  *
  * 라이브 획을 매 프레임 전체 폴리라인으로 다시 그리는 대신(스트로크가 길어질수록 프레임당
  * O(N)) 새로 확정된 세그먼트만 뷰포트 크기 표면에 누적한다 — 포인트당 O(1). 라이브 프리뷰
- * 백킹은 DPR 을 캡해 필레이트를 아낀다.
+ * 백킹은 커밋 Konva surface와 같은 DPR을 써 handoff AA coverage를 일치시킨다.
  *
  * 픽셀 규약은 Konva Default(pen/marker)와 WebGPU가 공유하는 causal round-dab 계획을 쓴다.
  * 새 샘플은 과거 픽셀을 다시 쓰지 않고 직전 권위 점에서 현재 점까지 즉시 도달한다. 지우개
@@ -11,8 +11,10 @@
  * 이 오버레이 대상이 아니다 — 각각 메인 레이어/Konva 초안 경로가 담당한다.
  *
  * 커밋 지연 파이프라인과 짝을 이룬다: end() 된 획은 settled 목록으로 넘어가 React 동기화가
- * 일어날 때까지 표면에 남고(replay 포함), 동기화가 커밋을 마치면 dropSettled()/clear() 로
- * 정리된다. 그래서 연속 스트로크 사이에 커밋 렌더를 기다리는 빈 프레임이 없다.
+ * 일어날 때까지 표면에 남고(replay 포함), 동기화가 커밋을 마치면
+ * releaseSettledPrefix()/clearSettled() 로 원자적으로 정리된다. 정리 시 backing canvas 를
+ * 비운 뒤 아직 커밋되지 않은 settled 획과 현재 active 획을 즉시 재생하므로, 연속 입력 중에도
+ * 새 잉크를 지우거나 이미 버린 잉크 픽셀을 고아로 남기지 않는다.
  */
 
 import {
@@ -65,8 +67,12 @@ interface SettledLiveInkStroke {
   readonly ps: readonly number[];
 }
 
-/** 라이브 프리뷰 백킹 DPR 캡 — 커밋 화질은 그대로 두고 미리보기 필레이트만 아낀다. */
-const LIVE_INK_MAX_DPR = 2;
+/** Konva scene canvas와 동일한 DPR을 써 handoff 순간의 AA coverage/선명도 변화를 없앤다. */
+function liveInkDevicePixelRatio(): number {
+  return typeof globalThis.devicePixelRatio === "number" && Number.isFinite(globalThis.devicePixelRatio)
+    ? Math.max(1, globalThis.devicePixelRatio)
+    : 1;
+}
 
 export class StudioLiveInkOverlayRenderer {
   private canvas: HTMLCanvasElement | null = null;
@@ -119,6 +125,10 @@ export class StudioLiveInkOverlayRenderer {
 
   get hasSettledStrokes(): boolean {
     return this.settled.length > 0;
+  }
+
+  get settledStrokeCount(): number {
+    return this.settled.length;
   }
 
   begin(style: StudioLiveInkStrokeStyle, x: number, y: number, pressure: number): boolean {
@@ -198,7 +208,7 @@ export class StudioLiveInkOverlayRenderer {
     this.consumedSourcePoints = Math.max(this.consumedSourcePoints, total);
   }
 
-  /** 획 종료 — 잉크와 재생 데이터는 커밋 동기화(dropSettled/clear)까지 표면에 유지된다. */
+  /** 획 종료 — 잉크와 재생 데이터는 커밋 draw receipt 뒤의 settled release까지 유지된다. */
   end(): void {
     if (this.active && this.style && this.keptX.length > 0) {
       const lastIndex = this.keptX.length - 1;
@@ -220,23 +230,60 @@ export class StudioLiveInkOverlayRenderer {
         ps: this.keptP,
       });
     }
-    this.active = false;
-    this.style = null;
-    this.keptX = [];
-    this.keptY = [];
-    this.keptP = [];
-    this.latestSourceX = 0;
-    this.latestSourceY = 0;
-    this.latestSourceP = 0.5;
-    this.consumedSourcePoints = 0;
+    this.resetActiveState();
   }
 
-  /** 커밋이 반영된 settled 획의 재생 데이터만 버린다(픽셀은 그대로 — 클리어는 별도 예약). */
+  /**
+   * FIFO 커밋이 실제 메인 표면에 그려진 settled 획 수만큼 앞에서 제거한다.
+   *
+   * backing canvas 를 같은 호출 안에서 지우고 남은 settled/active 획을 재생한다. 따라서 호출자가
+   * 별도 rAF clear 를 예약할 필요가 없고, 그 사이 시작된 새 active 획이 늦은 clear 에 지워지는
+   * 세대 경합도 생기지 않는다. 반환값은 실제로 제거된 획 수다.
+   */
+  releaseSettledPrefix(count: number): number {
+    const requested = count === Number.POSITIVE_INFINITY
+      ? this.settled.length
+      : Number.isFinite(count)
+        ? Math.max(0, Math.floor(count))
+        : 0;
+    const released = Math.min(requested, this.settled.length);
+    if (released === 0) return 0;
+    this.settled = this.settled.slice(released);
+    this.replay();
+    return released;
+  }
+
+  /** 모든 settled 획을 원자적으로 제거하고, 존재하는 active 획만 backing 에 다시 그린다. */
+  clearSettled(): number {
+    return this.releaseSettledPrefix(this.settled.length);
+  }
+
+  /**
+   * @deprecated clearSettled() 또는 releaseSettledPrefix()를 사용한다.
+   * 과거처럼 재생 데이터만 버리지 않고 픽셀까지 같은 호출에서 안전하게 정리한다.
+   */
   dropSettled(): void {
-    this.settled = [];
+    this.clearSettled();
+  }
+
+  /**
+   * 현재 active 획만 취소한다. 이미 끝난 settled 획은 보존하고 backing 에 즉시 재생한다.
+   * 새 도구/입력 세션을 시작할 때 clear() 대신 사용하면 커밋 대기 중인 이전 획이 사라지지 않는다.
+   */
+  resetActive(): boolean {
+    if (!this.active) return false;
+    this.resetActiveState();
+    this.replay();
+    return true;
   }
 
   clear(): void {
+    this.resetActiveState();
+    this.settled = [];
+    this.clearRect();
+  }
+
+  private resetActiveState(): void {
     this.active = false;
     this.style = null;
     this.keptX = [];
@@ -246,8 +293,6 @@ export class StudioLiveInkOverlayRenderer {
     this.latestSourceY = 0;
     this.latestSourceP = 0.5;
     this.consumedSourcePoints = 0;
-    this.settled = [];
-    this.clearRect();
   }
 
   private appendPoint(x: number, y: number, pressure: number): void {
@@ -370,12 +415,7 @@ export class StudioLiveInkOverlayRenderer {
     const canvas = this.canvas;
     const surface = this.surface;
     if (!canvas || !surface) return;
-    this.dpr = Math.min(
-      LIVE_INK_MAX_DPR,
-      typeof globalThis.devicePixelRatio === "number" && Number.isFinite(globalThis.devicePixelRatio)
-        ? Math.max(1, globalThis.devicePixelRatio)
-        : 1
-    );
+    this.dpr = liveInkDevicePixelRatio();
     const width = Math.max(1, Math.round(surface.width * this.dpr));
     const height = Math.max(1, Math.round(surface.height * this.dpr));
     if (canvas.width !== width) canvas.width = width;
@@ -601,12 +641,7 @@ export class StudioLiveInkPredictionRenderer {
     const canvas = this.canvas;
     const surface = this.surface;
     if (!canvas || !surface) return;
-    this.dpr = Math.min(
-      LIVE_INK_MAX_DPR,
-      typeof globalThis.devicePixelRatio === "number" && Number.isFinite(globalThis.devicePixelRatio)
-        ? Math.max(1, globalThis.devicePixelRatio)
-        : 1
-    );
+    this.dpr = liveInkDevicePixelRatio();
     const width = Math.max(1, Math.round(surface.width * this.dpr));
     const height = Math.max(1, Math.round(surface.height * this.dpr));
     if (canvas.width !== width) canvas.width = width;

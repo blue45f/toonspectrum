@@ -367,9 +367,25 @@ export interface StudioCrdtChange {
   rasterCheckpoints: StudioRasterCompactionCheckpoint[];
 }
 
+export interface StudioCrdtChangeSummary {
+  origin: unknown;
+  local: boolean;
+  changedStrokeIds: ReadonlySet<string>;
+  changedSceneElementIds: ReadonlySet<string>;
+  changedPageIds: ReadonlySet<string>;
+  changedLayerGroupIds: ReadonlySet<string>;
+  changedRasterSurfaceIds: ReadonlySet<string>;
+  changedRasterOperationIds: ReadonlySet<string>;
+  changedRasterUndoOperationIds: ReadonlySet<string>;
+  changedRasterUndoAcknowledgementIds: ReadonlySet<string>;
+  changedRasterCheckpointIds: ReadonlySet<string>;
+}
+
 export interface StudioCrdtChangeSubscriptionOptions {
-  /** Filtering happens before materializing `strokes`, so callers can cheaply ignore local echoes. */
+  /** Origin filtering happens before collecting the transaction summary. */
   includeOrigin?: (origin: unknown) => boolean;
+  /** Summary filtering happens before any complete document frontier is materialized. */
+  includeChange?: (summary: StudioCrdtChangeSummary) => boolean;
 }
 
 export type StudioCrdtUpdateHandler = (update: Uint8Array, origin: unknown) => void;
@@ -1296,22 +1312,17 @@ export class StudioCrdtDocument {
     this.assertAlive();
     const listener = (transaction: Y.Transaction) => {
       if (options.includeOrigin && !options.includeOrigin(transaction.origin)) return;
-      const rasterSnapshot = this.tryReadExactRasterDocumentSnapshot();
-      handler({
+      const summary: StudioCrdtChangeSummary = {
         origin: transaction.origin,
         local: transaction.local || transaction.origin === STUDIO_CRDT_ORIGIN_LOCAL,
         changedStrokeIds: new Set(this.changedStrokeIdsByTransaction.get(transaction) ?? []),
-        strokes: this.getStrokes({ includeDeleted: true }),
         changedSceneElementIds: new Set(
           this.changedSceneElementIdsByTransaction.get(transaction) ?? []
         ),
-        sceneElements: this.getSceneElements({ includeDeleted: true }),
         changedPageIds: new Set(this.changedPageIdsByTransaction.get(transaction) ?? []),
-        pages: this.getPages(true),
         changedLayerGroupIds: new Set(
           this.changedLayerGroupIdsByTransaction.get(transaction) ?? []
         ),
-        layerGroups: this.getLayerGroups({ includeDeleted: true }),
         changedRasterSurfaceIds: new Set(
           this.changedRasterSurfaceIdsByTransaction.get(transaction) ?? []
         ),
@@ -1327,6 +1338,15 @@ export class StudioCrdtDocument {
         changedRasterCheckpointIds: new Set(
           this.changedRasterCheckpointIdsByTransaction.get(transaction) ?? []
         ),
+      };
+      if (options.includeChange && !options.includeChange(summary)) return;
+      const rasterSnapshot = this.tryReadExactRasterDocumentSnapshot();
+      handler({
+        ...summary,
+        strokes: this.getStrokes({ includeDeleted: true }),
+        sceneElements: this.getSceneElements({ includeDeleted: true }),
+        pages: this.getPages(true),
+        layerGroups: this.getLayerGroups({ includeDeleted: true }),
         rasterOperationLogs: rasterSnapshot
           ? [...rasterSnapshot.logs.values()].sort((left, right) => (
               left.surface.surfaceId < right.surface.surfaceId ? -1 :

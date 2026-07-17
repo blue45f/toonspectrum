@@ -12,8 +12,8 @@ import { STABILIZER_MAX } from "./studio-brush";
 export const STUDIO_STABILIZER_MODES = [
   {
     id: "standard",
-    label: "표준",
-    description: "속도와 관계없이 일정한 강도로 입력을 부드럽게 보정합니다.",
+    label: "고정 주기",
+    description: "5ms 고정 입력과 단계식 필터로 기기·이벤트 묶음과 무관한 선을 만듭니다.",
   },
   {
     id: "adaptive",
