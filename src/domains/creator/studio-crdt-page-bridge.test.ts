@@ -104,6 +104,7 @@ describe("studio CRDT page bridge", () => {
       brush: "calligraphy",
       brushTip: { tiltEnabled: true, angleDeg: 45, roundness: 0.7 },
       stamp: { flow: 0.4, hardness: 0.9, minSize: 0.2 },
+      stampPipeline: "causal-walker-v2",
       symmetry: { type: "vertical", centerX: 400, centerY: 600 },
       groupId: "inks",
       hidden: true,
@@ -120,6 +121,7 @@ describe("studio CRDT page bridge", () => {
       layerColor: "blue",
       emeresSourceId: "custom:underlay-a",
       stamp: { flow: 0.4, hardness: 0.9, minSize: 0.2 },
+      stampPipeline: "causal-walker-v2",
       pressureModel: "linear-full-v1",
     });
 
@@ -139,6 +141,7 @@ describe("studio CRDT page bridge", () => {
       pressureModel: "linear-full-v1",
       emeresSourceId: "custom:underlay-a",
       stamp: { flow: 0.4, hardness: 0.9, minSize: 0.2 },
+      stampPipeline: "causal-walker-v2",
     });
   });
 
@@ -163,6 +166,8 @@ describe("studio CRDT page bridge", () => {
     });
     expect(decodedLegacy.pressureModel).toBeUndefined();
     expect("pressureModel" in decodedLegacy).toBe(false);
+    expect(decodedLegacy.stampPipeline).toBeUndefined();
+    expect("stampPipeline" in decodedLegacy).toBe(false);
 
     const encodedUnknown = studioDrawElementToCrdtStroke("page-a", {
       ...legacy,

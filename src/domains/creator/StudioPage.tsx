@@ -517,6 +517,7 @@ import {
   type StudioFillReferenceLayer,
 } from "./studio-fill-reference";
 import {
+  createCanonicalFixedRateStrokeFilter,
   createFixedRateStrokeFilter,
   transitionFixedRateStrokeFilter,
   type FixedRateStrokeFilterState,
@@ -667,6 +668,7 @@ import {
   studioLiveMutationResources,
 } from "./studio-live-mutation-guard";
 import { createStudioServerLiveTransportFactory } from "./studio-live-socket-transport";
+import { StudioLiveStampOverlayRenderer } from "./studio-live-stamp-overlay";
 import {
   createStudioMacroSession,
   recordStudioMacroCommand,
@@ -2165,6 +2167,8 @@ interface DrawEl {
   };
   /** 스탬프 브러시 튜닝 스냅샷(흐름/경도/최소 굵기) — 미설정 시 종류별 기본값. */
   stamp?: StudioStampBrushTuning;
+  /** 새 스탬프 획의 append-only raw accepted-sample 재생 규약. 미설정 획은 legacy smoothing. */
+  stampPipeline?: "causal-walker-v2";
   // 스트로크 스타일(점선/선 끝/화살촉) — 도형·선 전용. 미설정 시 기본(실선·둥근 끝).
   strokeStyle?: StrokeStyle;
   // 도형 파라미터(별 꼭짓점/다각형 변/모서리 반경) — 미설정 시 기존 하드코딩과 동일한 기본값.
@@ -2970,6 +2974,36 @@ const StudioLiveInkOverlayHost = memo(function StudioLiveInkOverlayHost({
   );
 });
 
+/** 저투명 스탬프 dab을 과거 픽셀 재계산 없이 누적하는 독립 표면. */
+const StudioLiveStampOverlayHost = memo(function StudioLiveStampOverlayHost({
+  renderer,
+  left,
+  top,
+  width,
+  height,
+  documentScale,
+  documentWidth,
+  flipX,
+}: StudioLiveInkSurface & { renderer: StudioLiveStampOverlayRenderer }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useLayoutEffect(() => {
+    renderer.attach(canvasRef.current);
+    return () => renderer.attach(null);
+  }, [renderer]);
+  useLayoutEffect(() => {
+    renderer.setSurface({ left, top, width, height, documentScale, documentWidth, flipX });
+  });
+  return (
+    <canvas
+      ref={canvasRef}
+      aria-hidden="true"
+      data-studio-live-stamp-overlay="true"
+      className="pointer-events-none absolute z-10"
+      style={{ left, top, width, height }}
+    />
+  );
+});
+
 /** 교체 가능한 예측 꼬리 전용 표면 — 확정 잉크 canvas와 물리적으로 분리한다. */
 const StudioLiveInkPredictionHost = memo(function StudioLiveInkPredictionHost({
   renderer,
@@ -3036,6 +3070,16 @@ function isDirectLiveDraftEl(el: DrawEl): boolean {
   const family = resolveStudioBrushRenderFamily(el.brush ?? "pen");
   if (family !== "pen" && family !== "marker") return false;
   return resolveStudioBrushDynamicsPresetId(el.brush) === null;
+}
+
+/** v2 스탬프는 raw accepted point 접미사를 자체 walker에 공급한다(대칭은 후속 compositor 범위). */
+function isDirectLiveStampDraftEl(el: DrawEl): boolean {
+  return (el.kind ?? "freehand") === "freehand"
+    && el.mode === "pen"
+    && !el.fill
+    && el.stampPipeline === "causal-walker-v2"
+    && resolveStudioStampBrushKind(el.brush) !== null
+    && (el.symmetry?.type ?? "none") === "none";
 }
 
 /** 다이렉트 라이브 초안을 임페러티브로 그린다 — React 렌더 없이 Konva batchDraw 로만 갱신. */
@@ -3278,6 +3322,8 @@ const StudioDrawNode = memo(function StudioDrawNode({ el }: { el: DrawEl }) {
         if (kind === "freehand") {
           const brush = el.brush ?? "pen";
           const brushFamily = resolveStudioBrushRenderFamily(brush);
+          const causalStampBrush = el.stampPipeline === "causal-walker-v2"
+            && resolveStudioStampBrushKind(brush) !== null;
           const dynamicBrush = dynamicBrushId !== null;
           const renderSampleDistance = strokeRenderDistance(el.sampleSpacing);
 
@@ -3292,6 +3338,7 @@ const StudioDrawNode = memo(function StudioDrawNode({ el }: { el: DrawEl }) {
             brushFamily !== "glitter" &&
             brushFamily !== "oil" &&
             brushFamily !== "pastel" &&
+            !causalStampBrush &&
             !dynamicBrush
           ) {
             const pressure = Math.min(1, Math.max(0, el.pressures?.[0] ?? 0.5));
@@ -3327,12 +3374,19 @@ const StudioDrawNode = memo(function StudioDrawNode({ el }: { el: DrawEl }) {
                 { color: stroke, size: Math.max(1, strokeWidth), opacity },
                 el.stamp
               );
-              const stampPoints = processFreehandPoints(points, renderSampleDistance);
-              const stampPressures = resampleStrokePressures(
-                el.pressures ?? [],
-                Math.floor(stampPoints.length / 2),
-                0.5
-              );
+              // v2 stores the already accepted/stabilized point stream as its rendering contract.
+              // Re-smoothing a growing prefix would move or delete dabs that were already visible.
+              const causalStamp = el.stampPipeline === "causal-walker-v2";
+              const stampPoints = causalStamp
+                ? points
+                : processFreehandPoints(points, renderSampleDistance);
+              const stampPressures = causalStamp
+                ? el.pressures
+                : resampleStrokePressures(
+                    el.pressures ?? [],
+                    Math.floor(stampPoints.length / 2),
+                    0.5
+                  );
               return (
                 <Shape
                   key={index}
@@ -9073,6 +9127,10 @@ function StudioCuttoonEditor() {
   const liveDraftVisualRef = useRef<DrawEl | null>(null);
   const liveDraftPendingRef = useRef<DrawEl | null>(null);
   const liveDraftRafRef = useRef<number | null>(null);
+  /** 스탬프 v2는 별도 Canvas2D walker가 raw accepted-point 접미사만 누적한다. */
+  const liveStampDraftDirectRef = useRef(false);
+  const liveStampOverlayRendererRef = useRef<StudioLiveStampOverlayRenderer>(null as never);
+  liveStampOverlayRendererRef.current ??= new StudioLiveStampOverlayRenderer();
   const liveDraftLayerRef = useRef<Konva.Layer>(null);
   const mainLayerRef = useRef<Konva.Layer>(null);
   // 증분 라이브 잉크: 프레임마다 전체 획을 다시 그리지 않고 새 조각만 누적한다.
@@ -9345,7 +9403,16 @@ function StudioCuttoonEditor() {
   };
   const flushDirectLiveDraft = () => {
     const next = liveDraftPendingRef.current;
-    if (!next || !liveDraftDirectRef.current) return;
+    if (!next) return;
+    if (liveStampDraftDirectRef.current) {
+      if (!isDirectLiveStampDraftEl(next) || !liveStampOverlayRendererRef.current.isActive) {
+        return;
+      }
+      liveDraftVisualRef.current = next;
+      liveStampOverlayRendererRef.current.appendFrom(next.points, next.pressures);
+      return;
+    }
+    if (!liveDraftDirectRef.current) return;
     // 증분 경로: 스태빌라이즈드 원본 점의 새 접미사만 표면에 누적한다 — 포인트당 O(1).
     // 후보정 획은 위 fixed-lag 모델이 확정 head만 별도로 append하므로 raw draft를 여기서
     // 중복 공급하지 않는다.
@@ -9397,7 +9464,10 @@ function StudioCuttoonEditor() {
    * 취소하면 라이브 표면에는 한 프레임 전 꼬리가 남고 200ms 뒤 커밋에서 선끝이 점프한다.
    */
   const flushDirectLiveDraftNow = (next: DrawEl | null) => {
-    if (!next || !liveDraftDirectRef.current || !isDirectLiveDraftEl(next)) return;
+    if (!next) return;
+    const directInk = liveDraftDirectRef.current && isDirectLiveDraftEl(next);
+    const directStamp = liveStampDraftDirectRef.current && isDirectLiveStampDraftEl(next);
+    if (!directInk && !directStamp) return;
     liveDraftPendingRef.current = next;
     if (liveDraftRafRef.current !== null) {
       globalThis.cancelAnimationFrame(liveDraftRafRef.current);
@@ -9407,8 +9477,9 @@ function StudioCuttoonEditor() {
   };
   // quickshape 변환 등으로 다이렉트 대상에서 벗어나면 React 초안 경로로 복귀한다(1회 렌더).
   const exitDirectLiveDraft = () => {
-    if (!liveDraftDirectRef.current) return;
+    if (!liveDraftDirectRef.current && !liveStampDraftDirectRef.current) return;
     liveDraftDirectRef.current = false;
+    liveStampDraftDirectRef.current = false;
     gpuPinnedLivePointCountRef.current = 0;
     endPredictedInkTail();
     // 대기 중 커밋 배치를 먼저 동기화한다 — 아래의 즉시 클리어가 그 잉크까지 지우기 때문.
@@ -9425,6 +9496,7 @@ function StudioCuttoonEditor() {
     }
     liveInkOverlayClearGenRef.current += 1;
     liveInkOverlayRendererRef.current.resetActive();
+    liveStampOverlayRendererRef.current.resetActive();
     if (gpuLiveInkPinnedRef.current) {
       gpuLiveInkPinnedRef.current = false;
       const pendingGpu = pendingGpuStrokesRef.current;
@@ -9435,6 +9507,19 @@ function StudioCuttoonEditor() {
     mainLayerRef.current?.batchDraw();
   };
   const scheduleDraft = (next: DrawEl | null) => {
+    if (next && liveStampDraftDirectRef.current) {
+      if (isDirectLiveStampDraftEl(next)) {
+        liveDraftPendingRef.current = next;
+        if (liveDraftRafRef.current === null) {
+          liveDraftRafRef.current = globalThis.requestAnimationFrame(() => {
+            liveDraftRafRef.current = null;
+            flushDirectLiveDraft();
+          });
+        }
+        return;
+      }
+      exitDirectLiveDraft();
+    }
     // 다이렉트 모드: 프리핸드 펜 계열은 React 상태를 거치지 않고 Konva/GPU 를 직접 갱신한다.
     if (next && liveDraftDirectRef.current) {
       if (isDirectLiveDraftEl(next)) {
@@ -9463,7 +9548,8 @@ function StudioCuttoonEditor() {
   const clearDraftPreview = (options?: { preserveInkForDeferredCommit?: boolean }) => {
     // 지연 커밋 경로: 잉크는 라이브 표면에 남긴다 — 커밋 동기화(flush)가 페인트 뒤에 정리한다.
     const preserveInk = options?.preserveInkForDeferredCommit === true;
-    const wasDirect = liveDraftDirectRef.current;
+    const wasStampDirect = liveStampDraftDirectRef.current;
+    const wasDirect = liveDraftDirectRef.current || wasStampDirect;
     const wasEraser = liveDraftVisualRef.current?.mode === "eraser";
     endPredictedInkTail();
     pendingDraftRef.current = null;
@@ -9478,6 +9564,7 @@ function StudioCuttoonEditor() {
       liveDraftRafRef.current = null;
     }
     liveDraftDirectRef.current = false;
+    liveStampDraftDirectRef.current = false;
     gpuPinnedLivePointCountRef.current = 0;
     if (gpuPinProbeTimerRef.current) {
       clearTimeout(gpuPinProbeTimerRef.current);
@@ -9492,6 +9579,9 @@ function StudioCuttoonEditor() {
         else overlay.resetActive();
       }
     }
+    // 스탬프는 pointerup에서 exact raw replay를 draft settled layer로 원자 교체한다. 저투명
+    // dab을 두 표면에 동시에 남기면 농도가 두 배가 되므로 active overlay는 즉시 제거한다.
+    if (wasStampDirect) liveStampOverlayRendererRef.current.resetActive();
     if (gpuLiveInkPinnedRef.current) {
       gpuLiveInkPinnedRef.current = false;
       if (!preserveInk) {
@@ -17395,9 +17485,11 @@ function StudioCuttoonEditor() {
       gpuLingerRafRef.current = 0;
     }
     liveDraftDirectRef.current = false;
+    liveStampDraftDirectRef.current = false;
     gpuLiveInkPinnedRef.current = false;
     gpuPinnedLivePointCountRef.current = 0;
     liveInkOverlayRendererRef.current.resetActive();
+    liveStampOverlayRendererRef.current.resetActive();
     endPredictedInkTail();
     if (liveDrawPressureRafRef.current) {
       globalThis.cancelAnimationFrame(liveDrawPressureRafRef.current);
@@ -17930,6 +18022,7 @@ function StudioCuttoonEditor() {
       setSelectedId(null);
 
       const fixedRateBrushFamily = resolveStudioBrushRenderFamily(brush);
+      const activeStampKind = drawMode === "pen" ? resolveStudioStampBrushKind(brush) : null;
       const linearPressureEligible = (
         drawMode === "eraser" ||
         drawMode === "pixel" ||
@@ -17972,11 +18065,11 @@ function StudioCuttoonEditor() {
         ? Math.min(1, Math.max(-1, pointerSample.tangentialPressure))
         : 0;
       const fixedRateInkEnabled = stabilizerMode === "standard"
-        && stabilizer > 0
+        && (stabilizer > 0 || activeStampKind !== null)
         && (drawMode === "pen" || drawMode === "eraser")
         && resolveStudioBrushDynamicsPresetId(brush) === null
         && (drawMode === "eraser" || (
-          fixedRateBrushFamily === "pen" || fixedRateBrushFamily === "marker"
+          fixedRateBrushFamily === "pen" || fixedRateBrushFamily === "marker" || activeStampKind !== null
         ));
 
       const common = {
@@ -17990,8 +18083,11 @@ function StudioCuttoonEditor() {
           ? { tiltEnabled, angleDeg: tipAngle, roundness: tipRoundness }
           : undefined,
         // 스탬프 브러시 튜닝은 획 시작 시점 값으로 스냅샷 — 협업/재생/내보내기에서 재현된다.
-        stamp: drawMode === "pen" && stampTuning && resolveStudioStampBrushKind(brush)
+        stamp: drawMode === "pen" && stampTuning && activeStampKind
           ? { ...stampTuning }
+          : undefined,
+        stampPipeline: drawMode === "pen" && activeStampKind
+          ? "causal-walker-v2" as const
           : undefined,
         brushDynamics: capturePointerDynamics
           ? normalizeStudioBrushDynamicsSettings(brushDynamics)
@@ -18047,14 +18143,25 @@ function StudioCuttoonEditor() {
       attachDrawingPointerSafetyListeners(pointerSession.pointerId);
       // 픽셀 펜슬: no stabilizer (hard 1px steps). Lasso-fill keeps light smoothing.
       drawingFixedRateFilterRef.current = fixedRateInkEnabled
-        ? createFixedRateStrokeFilter({
-            x: pos.x,
-            y: pos.y,
-            pressure,
-            tiltX: stylus.tiltX,
-            tiltY: stylus.tiltY,
-            timeStamp: pointerSample.timeStamp,
-          }, stabilizer).state
+        ? (
+            stabilizer > 0
+              ? createFixedRateStrokeFilter({
+                  x: pos.x,
+                  y: pos.y,
+                  pressure,
+                  tiltX: stylus.tiltX,
+                  tiltY: stylus.tiltY,
+                  timeStamp: pointerSample.timeStamp,
+                }, stabilizer)
+              : createCanonicalFixedRateStrokeFilter({
+                  x: pos.x,
+                  y: pos.y,
+                  pressure,
+                  tiltX: stylus.tiltX,
+                  tiltY: stylus.tiltY,
+                  timeStamp: pointerSample.timeStamp,
+                })
+          ).state
         : null;
       drawingStabilizerRef.current =
         drawMode === "shape" || drawMode === "pixel" || fixedRateInkEnabled
@@ -18104,9 +18211,30 @@ function StudioCuttoonEditor() {
         const direct = isDirectLiveDraftEl(next)
           && (postCorrection <= 0 || causalPostCorrectionEligible)
           && (next.opacity ?? 1) === 1;
+        const stampKind = resolveStudioStampBrushKind(next.brush);
+        const stampDirect = Boolean(
+          stampKind
+          && isDirectLiveStampDraftEl(next)
+          && liveStampOverlayRendererRef.current.begin(
+            resolveStudioStampBrushStyle(
+              stampKind,
+              {
+                color: next.stroke,
+                size: Math.max(1, next.strokeWidth),
+                opacity: next.opacity ?? 1,
+              },
+              next.stamp
+            ),
+            pos.x,
+            pos.y,
+            next.pressures?.[0] ?? 0.5
+          )
+        );
         liveDraftDirectRef.current = direct;
-        liveDraftVisualRef.current = direct ? next : null;
-        liveDraftPendingRef.current = direct ? next : null;
+        liveStampDraftDirectRef.current = stampDirect;
+        if (!stampDirect) liveStampOverlayRendererRef.current.resetActive();
+        liveDraftVisualRef.current = direct || stampDirect ? next : null;
+        liveDraftPendingRef.current = direct || stampDirect ? next : null;
         const predictionTailEligible = STUDIO_POINTER_PREDICTION_ENABLED
           && direct
           && next.mode !== "eraser"
@@ -18177,9 +18305,9 @@ function StudioCuttoonEditor() {
           globalThis.cancelAnimationFrame(gpuLingerRafRef.current);
           gpuLingerRafRef.current = 0;
         }
-        if (direct) {
+        if (direct || stampDirect) {
           // Emit the initial tap immediately. In particular, a WebGPU pin suppresses the Konva
-          // draft, so waiting for the first pointermove used to leave a click invisible.
+          // draft, and the stamp renderer owns its dot at begin, so neither waits for pointermove.
           flushDirectLiveDraftNow(next);
         } else {
           // 비다이렉트 시작도 격리 스토어로 — 이후 프레임은 scheduleDraft 가 스토어만 갱신한다.
@@ -18657,8 +18785,10 @@ function StudioCuttoonEditor() {
     const tangentialPressure = Number.isFinite(pointerSample.tangentialPressure)
       ? Math.min(1, Math.max(-1, pointerSample.tangentialPressure))
       : 0;
-    const mutateDirectly = liveDraftDirectRef.current
-      && liveInkOverlayRendererRef.current.isActive
+    const mutateDirectly = (
+      (liveDraftDirectRef.current && liveInkOverlayRendererRef.current.isActive)
+      || (liveStampDraftDirectRef.current && liveStampOverlayRendererRef.current.isActive)
+    )
       && !gpuLiveInkPinnedRef.current
       && !drawingPredictionPreviewRef.current;
     const next: DrawEl = mutateDirectly
@@ -18793,7 +18923,10 @@ function StudioCuttoonEditor() {
       // Shift replaces the endpoint instead of appending samples. Retained Canvas/WebGPU surfaces
       // cannot erase the previous preview safely, so hand this gesture to the replaceable draft
       // layer before publishing its first constrained line.
-      if (liveDraftDirectRef.current && !drawingPredictionPreviewRef.current) exitDirectLiveDraft();
+      if (
+        (liveDraftDirectRef.current || liveStampDraftDirectRef.current)
+        && !drawingPredictionPreviewRef.current
+      ) exitDirectLiveDraft();
       // The Shift gesture replaces the whole freehand suffix. A pre-constraint stabilizer still
       // points at the old raw sample and would be flushed after the snapped endpoint on pointer-up,
       // making the stroke run backwards. Recreate it lazily only if a later unconstrained move
@@ -18880,8 +19013,10 @@ function StudioCuttoonEditor() {
     // Canvas2D authoritative overlay는 ref 전용 draft를 소비한다. 이 경로에서는 배열 참조를
     // React 상태/히스토리에 게시하지 않으므로 접미 샘플을 제자리 추가해 긴 획의 매 포인트
     // 전체 points/pressure 복사(O(N²))를 없앤다. GPU/예측/비다이렉트 경로는 immutable 유지.
-    const canAppendDirectly = liveDraftDirectRef.current
-      && liveInkOverlayRendererRef.current.isActive
+    const canAppendDirectly = (
+      (liveDraftDirectRef.current && liveInkOverlayRendererRef.current.isActive)
+      || (liveStampDraftDirectRef.current && liveStampOverlayRendererRef.current.isActive)
+    )
       && !gpuLiveInkPinnedRef.current
       && !drawingPredictionPreviewRef.current;
     if (canAppendDirectly) {
@@ -18984,7 +19119,11 @@ function StudioCuttoonEditor() {
 
       const authoritativeDrawing = publishAuthoritativeFreehandSuffix(crdtSampleStart);
       const authoritativePointCount = Math.floor((authoritativeDrawing?.points.length ?? 0) / 2);
-      if (authoritativeDrawing && batch.predicted.length > 0) {
+      if (
+        authoritativeDrawing
+        && batch.predicted.length > 0
+        && !liveStampDraftDirectRef.current
+      ) {
         // Predictions make the tip feel closer to the pen, but never advance drawingRef/history.
         // Ruler locks are also restored so an estimate cannot choose the permanent perspective ray.
         const authoritativePerspectiveRay = perspectiveRayRef.current;
@@ -19030,7 +19169,7 @@ function StudioCuttoonEditor() {
     const authoritativeDrawing = drawingRef.current;
     if (!authoritativeDrawing) return null;
     appendDrawingCrdtSampleSuffix(authoritativeDrawing, startSample);
-    if (liveDraftDirectRef.current) {
+    if (liveDraftDirectRef.current || liveStampDraftDirectRef.current) {
       if (causalPostCorrectionStateRef.current) {
         appendCausalPostCorrectionState(authoritativeDrawing, startSample);
       } else if (predictedInkTailStateRef.current) {
@@ -19414,6 +19553,8 @@ function StudioCuttoonEditor() {
               tiltYs: undefined,
               twists: undefined,
               brushTip: undefined,
+              stamp: undefined,
+              stampPipeline: undefined,
               fill: undefined,
               points: promoted.points,
               shapeParams:
@@ -19442,6 +19583,7 @@ function StudioCuttoonEditor() {
         if (
           (finished.kind ?? "freehand") === "freehand"
           && postCorrection > 0
+          && finished.stampPipeline !== "causal-walker-v2"
           && causalPostCorrectionStateRef.current?.phase !== "sealed"
         ) {
           finished = {
@@ -22769,6 +22911,7 @@ function StudioCuttoonEditor() {
   const draftPreviewStore = draftPreviewStoreRef.current;
   const liveInkOverlayRenderer = liveInkOverlayRendererRef.current;
   const liveInkPredictionRenderer = liveInkPredictionRendererRef.current;
+  const liveStampOverlayRenderer = liveStampOverlayRendererRef.current;
   const nodeEditActiveHandleIndex = nodeEditDragRef.current?.session.pointIndex ?? null;
   const bubbleShapeActiveHandleIndex = bubbleShapeDragRef.current?.session.pointIndex ?? null;
 
@@ -23492,6 +23635,7 @@ function StudioCuttoonEditor() {
         {/* 중앙: 캔버스 영역 (editor shell) — fills remaining viewport */}
         <StudioCanvasViewport
           liveInkPredictionRenderer={liveInkPredictionRenderer}
+          liveStampOverlayRenderer={liveStampOverlayRenderer}
           bubbleShapeActiveHandleIndex={bubbleShapeActiveHandleIndex}
           draftPreviewStore={draftPreviewStore}
           liveDrawPressureStore={liveDrawPressureStore}
@@ -34399,6 +34543,7 @@ interface StudioCanvasViewportHandlers {
 
 interface StudioCanvasViewportProps {
   liveInkPredictionRenderer: StudioLiveInkPredictionRenderer;
+  liveStampOverlayRenderer: StudioLiveStampOverlayRenderer;
   bubbleShapeActiveHandleIndex: number | null;
   draftPreviewStore: StudioDraftPreviewStore;
   liveDrawPressureStore: StudioLivePressureStore;
@@ -34643,6 +34788,7 @@ interface StudioCanvasViewportProps {
 
 const StudioCanvasViewport = memo(function StudioCanvasViewport({
   liveInkPredictionRenderer,
+  liveStampOverlayRenderer,
   bubbleShapeActiveHandleIndex,
   draftPreviewStore,
   liveDrawPressureStore,
@@ -37203,6 +37349,18 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
           {webGpuViewportSurface ? (
             <StudioLiveInkOverlayHost
               renderer={liveInkOverlayRenderer}
+              left={webGpuViewportSurface.surface.left}
+              top={webGpuViewportSurface.surface.top}
+              width={webGpuViewportSurface.surface.width}
+              height={webGpuViewportSurface.surface.height}
+              documentScale={effScale}
+              documentWidth={CANVAS_W}
+              flipX={canvasFlipH}
+            />
+          ) : null}
+          {webGpuViewportSurface ? (
+            <StudioLiveStampOverlayHost
+              renderer={liveStampOverlayRenderer}
               left={webGpuViewportSurface.surface.left}
               top={webGpuViewportSurface.surface.top}
               width={webGpuViewportSurface.surface.width}

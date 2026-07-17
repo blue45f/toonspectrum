@@ -211,19 +211,11 @@ function filteredSample(
   };
 }
 
-/**
- * Starts a stroke with every stage pinned to the first quantized sample.
- *
- * The first pointerdown sample is the atomic stroke origin and is emitted immediately. Subsequent
- * equal-timestamp samples are supported by `transitionFixedRateStrokeFilter`; the caller should
- * pass all coalesced pointerdown candidates when choosing this origin if they differ.
- */
-export function createFixedRateStrokeFilter(
+function createFixedRateStrokeFilterState(
   initialSample: FixedRateStrokeRawSample,
-  strength: number
+  parameters: FixedRateStrokeFilterParameters
 ): FixedRateStrokeFilterTransition {
   const heldSample = quantizeFixedRateStrokeSample(initialSample);
-  const parameters = resolveFixedRateStrokeFilterParameters(strength);
   const initialStage = stageFromSample(heldSample);
   const stages = Array.from(
     { length: parameters.stageCount },
@@ -246,6 +238,42 @@ export function createFixedRateStrokeFilter(
     closed: false,
   };
   return { state, emitted: [lastOutput], endpoint: lastOutput, releaseDrainTicks: 0 };
+}
+
+/**
+ * Starts a stroke with every stage pinned to the first quantized sample.
+ *
+ * The first pointerdown sample is the atomic stroke origin and is emitted immediately. Subsequent
+ * equal-timestamp samples are supported by `transitionFixedRateStrokeFilter`; the caller should
+ * pass all coalesced pointerdown candidates when choosing this origin if they differ.
+ */
+export function createFixedRateStrokeFilter(
+  initialSample: FixedRateStrokeRawSample,
+  strength: number
+): FixedRateStrokeFilterTransition {
+  const parameters = resolveFixedRateStrokeFilterParameters(strength);
+  return createFixedRateStrokeFilterState(initialSample, parameters);
+}
+
+/**
+ * Starts the deterministic 5 ms sampler without applying the stabilizer's low-pass cascade.
+ *
+ * This is the semantic counterpart of an input-stabilization value of zero: coordinates and
+ * pointer channels are still quantized and assigned to the same strict fixed-grid ZOH clock, but
+ * the one-stage alpha=1 cascade publishes the eligible held sample unchanged. Keep this separate
+ * from `resolveFixedRateStrokeFilterParameters(0)`, whose traced minimum response remains part of
+ * the commercial stabilizer curve and is intentionally not redefined here.
+ */
+export function createCanonicalFixedRateStrokeFilter(
+  initialSample: FixedRateStrokeRawSample
+): FixedRateStrokeFilterTransition {
+  return createFixedRateStrokeFilterState(initialSample, {
+    strength: 0,
+    normalizedStrength: 0,
+    response: 0,
+    stageCount: 1,
+    alpha: 1,
+  });
 }
 
 function logicalTickTime(state: FixedRateStrokeFilterState): number {
@@ -447,6 +475,7 @@ function releaseFilter(
       emitted.push(tick.emitted);
       releaseDrainTicks += 1;
     } while (
+      channelsNeedDrain(state) &&
       state.lastStagePositionDelta > FIXED_RATE_STROKE_RELEASE_POSITION_EPSILON
     );
   }

@@ -87,6 +87,7 @@ export function isStudioCrdtAdmittedWorkAssetElement(
 const EXTENSION_KEYS = [
   // 스탬프 브러시 튜닝 — draw-bridge 의 쓰기 목록과 짝을 이루는 읽기 목록.
   "stamp",
+  "stampPipeline",
   "name",
   "hidden",
   "locked",
