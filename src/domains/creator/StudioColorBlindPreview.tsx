@@ -16,9 +16,14 @@ import { cn } from "@/lib/utils";
 // 청색맹(tritanopia)은 단일 행렬로는 구조적 한계가 있다(Brettel 1997의 2-행렬+픽셀별 부호판정이 정확하지만
 // 단일 CSS filter로는 표현 불가) — 실제 배포되는 도구들이 쓰는 최선의 단일행렬 근사치이며, 셋 중 신뢰도가
 // 가장 낮음을 UI 문구(title)에 "근사치"로 명시한다.
-export type CvdMode = "none" | "protanopia" | "deuteranopia" | "tritanopia";
+//
+// "grayscale"은 색각이상 시뮬레이션이 아니라 명암/값(value)만 확인하려는 일반 그리기 워크플로용이다 —
+// 원본 요소는 전혀 건드리지 않고 같은 Stage CSS filter 합성 자리에 끼워 넣는 것만으로 충분해 이 모듈의
+// 기존 "비파괴 뷰 시뮬레이션" 인프라(상태 하나, 토글 버튼 그룹, style.filter 합성)를 그대로 재사용한다.
+// 지금까지는 그레이스케일이 Look 프리셋(요소에 커밋되는 방식)으로만 존재했다.
+export type CvdMode = "none" | "protanopia" | "deuteranopia" | "tritanopia" | "grayscale";
 
-const CVD_MATRIX: Record<Exclude<CvdMode, "none">, string> = {
+const CVD_MATRIX: Record<Exclude<CvdMode, "none" | "grayscale">, string> = {
   protanopia:
     "0.10889,0.89111,-0.00000,0,0 0.10889,0.89111,0.00000,0,0 0.00447,-0.00447,1.00000,0,0 0,0,0,1,0",
   deuteranopia:
@@ -54,11 +59,17 @@ export function StudioColorBlindFilterDefs() {
 // eslint-disable-next-line react-refresh/only-export-components
 export function colorBlindFilterStyle(mode: CvdMode): CSSProperties {
   if (mode === "none") return {};
+  if (mode === "grayscale") return { filter: "grayscale(1)" };
   return { filter: `url(#cvd-${mode})` };
 }
 
 const CVD_OPTIONS: { mode: CvdMode; label: string; title: string }[] = [
-  { mode: "none", label: "없음", title: "색맹 시뮬레이션 미리보기 끄기" },
+  { mode: "none", label: "없음", title: "미리보기 끄기" },
+  {
+    mode: "grayscale",
+    label: "흑백",
+    title: "흑백(그레이스케일) 미리보기 — 명암·값만 확인, 원본 색은 그대로 보존돼요",
+  },
   {
     mode: "protanopia",
     label: "적색맹",
@@ -94,7 +105,7 @@ export function StudioColorBlindPreviewToggle({
   onChange: (mode: CvdMode) => void;
 }) {
   return (
-    <div role="group" aria-label="색맹 시뮬레이션 미리보기" className="flex items-center gap-1">
+    <div role="group" aria-label="흑백·색맹 시뮬레이션 미리보기" className="flex items-center gap-1">
       {CVD_OPTIONS.map(({ mode, label, title }) => (
         <button
           key={mode}
