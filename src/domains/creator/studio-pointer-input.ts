@@ -59,6 +59,12 @@ export interface StudioStrokeMoveTransportClaim {
   readonly session: StudioStrokePointerSession;
 }
 
+export interface StudioStrokeReleaseSource<T extends StudioPointerEventLike> {
+  readonly event: T;
+  /** Contact samples use ordinary pressure semantics; only the fallback can be a non-contact up. */
+  readonly kind: "retained-contact" | "release-fallback";
+}
+
 const LEGACY_POINTER_ID = 1;
 
 function finiteNumber(value: unknown, fallback: number): number {
@@ -218,8 +224,6 @@ export function collectStudioStrokePointerBatch<T extends StudioPointerEventLike
   event: T,
   options: {
     includePredicted?: boolean;
-    /** Pointer-up owns one final endpoint and must not replay raw/coalesced move history. */
-    authoritativeSource?: "coalesced-or-parent" | "parent-only";
   } = {}
 ): StudioStrokePointerBatch<T> {
   if (!isStudioStrokePointerEvent(session, event)) {
@@ -228,9 +232,7 @@ export function collectStudioStrokePointerBatch<T extends StudioPointerEventLike
 
   const authoritative: T[] = [];
   let previousSignature = session.lastAuthoritativeSignature;
-  const coalesced = options.authoritativeSource === "parent-only"
-    ? []
-    : safeRelatedEvents(event, "getCoalescedEvents");
+  const coalesced = safeRelatedEvents(event, "getCoalescedEvents");
   // A trusted parent pointer event is the processed aggregate of its coalesced list, not an extra
   // hardware sample. Consume one representation only; empty/throwing APIs fall back to parent.
   const candidates = coalesced.length > 0 ? coalesced : [event];
@@ -260,6 +262,26 @@ export function collectStudioStrokePointerBatch<T extends StudioPointerEventLike
   }
 
   return { authoritative, predicted, session: nextSession };
+}
+
+/**
+ * Chooses metadata for release-time stabilizer draining without inventing another geometry sample.
+ *
+ * A dispatched `pointerup` can be several CSS pixels beyond the browser's last processed move.
+ * Treating that coordinate as ink makes a fast flick leave the cursor route at the very end. The
+ * durable path therefore seals at its retained down/move sample; the release event remains only a
+ * lifecycle signal. This matches the processed-input contract used by the comparison canvas.
+ */
+export function resolveStudioStrokeReleaseSource<T extends StudioPointerEventLike>(
+  session: StudioStrokePointerSession | null | undefined,
+  releaseEvent: T,
+  lastAuthoritativeEvent: T | null | undefined
+): StudioStrokeReleaseSource<T> | null {
+  if (!session || !isStudioStrokePointerEvent(session, releaseEvent)) return null;
+  if (lastAuthoritativeEvent && isStudioStrokePointerEvent(session, lastAuthoritativeEvent)) {
+    return { event: lastAuthoritativeEvent, kind: "retained-contact" };
+  }
+  return { event: releaseEvent, kind: "release-fallback" };
 }
 
 /** Pointer capture is a progressive enhancement; unsupported/detached DOM nodes fail closed. */

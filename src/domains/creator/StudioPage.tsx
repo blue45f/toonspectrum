@@ -806,6 +806,7 @@ import {
   claimStudioStrokeMoveTransport,
   collectStudioStrokePointerBatch,
   isStudioStrokePointerEvent,
+  resolveStudioStrokeReleaseSource,
   shouldEndStudioStrokeForReleasedContact,
   shouldCancelStudioFingerStrokeForAdditionalContact,
   tryCaptureStudioStrokePointer,
@@ -18103,10 +18104,11 @@ function StudioCuttoonEditor() {
       // positive-strength cascade. Doing the same for pointerdown prevents a sub-pixel jump when
       // the first move arrives on the quantized path.
       const causalInitialSample = causalInkInputEnabled
-        ? quantizeFixedRateStrokeSample({
-            x: pos.x,
-            y: pos.y,
-            pressure: resolvedPressure,
+          ? quantizeFixedRateStrokeSample({
+              x: pos.x,
+              y: pos.y,
+              positionScale: effScale,
+              pressure: resolvedPressure,
             tiltX: stylus.tiltX,
             tiltY: stylus.tiltY,
             timeStamp: pointerSample.timeStamp,
@@ -18185,6 +18187,9 @@ function StudioCuttoonEditor() {
                 capturePointerDynamics && drawMode === "pen" ? [tangentialPressure] : undefined,
             };
       drawingPointerSessionRef.current = pointerSession;
+      // Pointer-up is a lifecycle signal, not a new freehand coordinate. Retain pointer-down now
+      // so a tap and a stroke with no delivered move still have authoritative release metadata.
+      drawingLastAuthoritativePointerRef.current = pointerSample;
       // Capture on Konva content/canvas (not outer container) so Stage keeps receiving moves after leave.
       drawingPointerCaptureTargetRef.current = resolveDrawingPointerCaptureTarget(
         e.target.getStage(),
@@ -18197,10 +18202,11 @@ function StudioCuttoonEditor() {
       // Pixel pencil has no stabilizer. Positive standard strength uses the exact 5ms cascade;
       // strength zero bypasses both sampler and low-pass and is normalized in appendFreehand.
       drawingFixedRateFilterRef.current = fixedRateInkEnabled
-        ? createFixedRateStrokeFilter({
-            x: strokeOrigin.x,
-            y: strokeOrigin.y,
-            pressure,
+          ? createFixedRateStrokeFilter({
+              x: strokeOrigin.x,
+              y: strokeOrigin.y,
+              positionScale: effScale,
+              pressure,
             tiltX: causalInitialSample?.tiltX ?? stylus.tiltX,
             tiltY: causalInitialSample?.tiltY ?? stylus.tiltY,
             timeStamp: pointerSample.timeStamp,
@@ -18915,7 +18921,6 @@ function StudioCuttoonEditor() {
   function appendFreehandStrokePoint(
     pos: { x: number; y: number },
     pointerSample: PointerEvent,
-    pressureOverride?: number,
     canonicalTimeStamp?: number
   ) {
     const current = drawingRef.current;
@@ -18933,18 +18938,16 @@ function StudioCuttoonEditor() {
     const previousVelocity = drawingVelocityRef.current ?? createStudioPointerVelocityState(timingSample);
     const velocitySample = sampleStudioPointerVelocity(previousVelocity, timingSample);
     drawingVelocityRef.current = velocitySample.state;
-    let pressure = typeof pressureOverride === "number" && Number.isFinite(pressureOverride)
-      ? Math.min(1, Math.max(0, pressureOverride))
-      : resolveBrushPressureSample({
-          pointerType: pointerSample.pointerType,
-          rawPressure: pointerSample.pressure,
-          distance: velocitySample.distance,
-          elapsedMs: velocitySample.elapsedMs,
-          velocityFallbackEnabled: useVelocityPressure,
-          velocitySensitivity,
-          pressureCurve,
-          fallbackPressure: current.pressureModel ? 1 : 0.5,
-        });
+    let pressure = resolveBrushPressureSample({
+      pointerType: pointerSample.pointerType,
+      rawPressure: pointerSample.pressure,
+      distance: velocitySample.distance,
+      elapsedMs: velocitySample.elapsedMs,
+      velocityFallbackEnabled: useVelocityPressure,
+      velocitySensitivity,
+      pressureCurve,
+      fallbackPressure: current.pressureModel ? 1 : 0.5,
+    });
     let targetX = pos.x;
     let targetY = pos.y;
     if (
@@ -18955,6 +18958,7 @@ function StudioCuttoonEditor() {
       const quantized = quantizeFixedRateStrokeSample({
         x: targetX,
         y: targetY,
+        positionScale: effScale,
         pressure,
         tiltX: stylus.tiltX,
         tiltY: stylus.tiltY,
@@ -19034,6 +19038,7 @@ function StudioCuttoonEditor() {
         samples: [{
           x: targetX,
           y: targetY,
+          positionScale: effScale,
           pressure,
           tiltX: stylus.tiltX,
           tiltY: stylus.tiltY,
@@ -19176,11 +19181,7 @@ function StudioCuttoonEditor() {
   function consumeFreehandPointerBatch(
     stage: Konva.Stage,
     pointerEvent: PointerEvent,
-    includePredicted: boolean,
-    options: {
-      dispatchedPressureOverride?: number;
-      authoritativeSource?: "coalesced-or-parent" | "parent-only";
-    } = {}
+    includePredicted: boolean
   ): boolean {
     const session = drawingPointerSessionRef.current;
     if (!session || !isStudioStrokePointerEvent(session, pointerEvent)) return false;
@@ -19190,7 +19191,6 @@ function StudioCuttoonEditor() {
     const predictionIsReplaceable = includePredicted && !pointerEvent.shiftKey;
     const batch = collectStudioStrokePointerBatch(session, pointerEvent, {
       includePredicted: predictionIsReplaceable,
-      authoritativeSource: options.authoritativeSource,
     });
     drawingPointerSessionRef.current = batch.session;
     const sampleClock = drawingFixedRateSampleClockRef.current;
@@ -19242,7 +19242,6 @@ function StudioCuttoonEditor() {
           appendFreehandStrokePoint(
             point,
             sample,
-            sample === pointerEvent ? options.dispatchedPressureOverride : undefined,
             sampleClockTransition?.timeStamps[sampleIndex]
           );
         }
@@ -19547,6 +19546,12 @@ function StudioCuttoonEditor() {
     let authoritativeLiveStroke: DrawEl | null = null;
     let immediateSurfaceHandoff: { pageId: string; strokeIds: string[] } | null = null;
     try {
+      const resolvedReleaseSource = resolveStudioStrokeReleaseSource(
+        drawingPointerSessionRef.current,
+        pointerEvent,
+        drawingLastAuthoritativePointerRef.current
+      );
+      const releaseSourceEvent = resolvedReleaseSource?.event ?? pointerEvent;
       if (
         options.consumeReleaseSample !== false
         && drawingRef.current
@@ -19555,33 +19560,9 @@ function StudioCuttoonEditor() {
       ) {
         updateActiveShapeEndpoint(stage, pointerEvent, false);
       }
-      const releaseLastContactPressure = drawingRef.current?.pressures?.at(-1)
-        ?? studioInkFallbackPressure(drawingRef.current?.pressureModel);
-      if (
-        options.consumeReleaseSample !== false
-        && drawingRef.current
-        && (drawingRef.current.kind ?? "freehand") === "freehand"
-        && stage
-      ) {
-        // Pointermove is not guaranteed immediately before pointerup. Consume the release sample
-        // authoritatively so a fast flick keeps its final tail; predictions remain preview-only.
-        consumeFreehandPointerBatch(stage, pointerEvent, false, {
-          dispatchedPressureOverride: pointerEvent.pointerType === "pen"
-            ? resolveBrushReleasePressureSample({
-                pointerType: "pen",
-                rawPressure: pointerEvent.pressure,
-                lastContactPressure: releaseLastContactPressure,
-                pressureCurve,
-                fallbackPressure: releaseLastContactPressure,
-              })
-            : undefined,
-          authoritativeSource: "parent-only",
-        });
-      }
       if (drawingRef.current && (drawingRef.current.kind ?? "freehand") === "freehand") {
-        // The dispatched/coalesced release batch above has already been published. Stabilizer
-        // endpoint/drain samples are created below, so remember the exact suffix boundary and
-        // publish that locally generated tail once before finalizing the shared stroke.
+        // pointerup never contributes geometry. Stabilizer endpoint/drain samples use the retained
+        // processed down/move metadata, then publish only their locally generated suffix.
         const crdtReleaseSampleStart = Math.floor(drawingRef.current.points.length / 2);
         const fixedRateState = drawingFixedRateFilterRef.current;
         if (fixedRateState) {
@@ -19589,7 +19570,7 @@ function StudioCuttoonEditor() {
           drawingFixedRateFilterRef.current = released.state;
           // Geometry and paint complete in the pointerup task. Deferring only the pixels across
           // rAF made a released stroke continue changing while the next stroke had already begun.
-          appendFixedRateStrokeSamples(released.emitted, pointerEvent, 0);
+          appendFixedRateStrokeSamples(released.emitted, releaseSourceEvent, 0);
         } else {
           const liveState = drawingStabilizerRef.current;
           if (liveState) {
@@ -19604,21 +19585,29 @@ function StudioCuttoonEditor() {
               const pointCount = Math.floor(current.points.length / 2);
               const lastPressure = current.pressures?.at(-1)
                 ?? studioInkFallbackPressure(current.pressureModel);
-              const pressure = pointerEvent.pointerType === "pen"
-                ? resolveBrushReleasePressureSample({
-                    pointerType: "pen",
-                    rawPressure: pointerEvent.pressure,
-                    lastContactPressure: lastPressure,
-                    velocityFallbackEnabled: false,
-                    pressureCurve,
-                    fallbackPressure: lastPressure,
-                  })
+              const pressure = releaseSourceEvent.pointerType === "pen"
+                ? resolvedReleaseSource?.kind === "retained-contact"
+                  ? resolveBrushPressureSample({
+                      pointerType: "pen",
+                      rawPressure: releaseSourceEvent.pressure,
+                      velocityFallbackEnabled: false,
+                      pressureCurve,
+                      fallbackPressure: lastPressure,
+                    })
+                  : resolveBrushReleasePressureSample({
+                      pointerType: "pen",
+                      rawPressure: releaseSourceEvent.pressure,
+                      lastContactPressure: lastPressure,
+                      velocityFallbackEnabled: false,
+                      pressureCurve,
+                      fallbackPressure: lastPressure,
+                    })
                 : lastPressure;
               const capturePointerDynamics = current.mode === "pen" && resolveStudioBrushDynamicsPresetId(current.brush) !== null;
               const captureStylus = current.mode === "pen" && (current.brush === "calligraphy" || capturePointerDynamics);
-              const stylus = captureStylus ? normalizeCalligraphyStylusInput(pointerEvent) : null;
-              const tangentialPressure = Number.isFinite(pointerEvent.tangentialPressure)
-                ? Math.min(1, Math.max(-1, pointerEvent.tangentialPressure))
+              const stylus = captureStylus ? normalizeCalligraphyStylusInput(releaseSourceEvent) : null;
+              const tangentialPressure = Number.isFinite(releaseSourceEvent.tangentialPressure)
+                ? Math.min(1, Math.max(-1, releaseSourceEvent.tangentialPressure))
                 : (current.tangentialPressures?.at(-1) ?? 0);
               const appendAligned = (
                 values: number[] | undefined,
