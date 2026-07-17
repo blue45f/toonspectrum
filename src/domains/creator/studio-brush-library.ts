@@ -146,23 +146,31 @@ export const BRUSH_VELOCITY_SENSITIVITY_RANGE = [0.1, 1] as const;
 export const BRUSH_TIP_ANGLE_RANGE = [-180, 180] as const;
 export const BRUSH_TIP_ROUNDNESS_RANGE = [0.08, 1] as const;
 
-const DEFAULT_SNAPSHOT: StudioBrushSnapshot = {
+/**
+ * 새 캔버스와 누락 필드를 가진 레거시 브러시가 공유하는 기본 필기감.
+ *
+ * 속도 기반 마우스 필압과 강한 이중 보정은 실제 포인터보다 굵고 늦은 선을 만들기 때문에
+ * opt-in 고급 설정으로 남긴다. 기본값은 명목 브러시 크기와 포인터 궤적을 우선한다.
+ */
+export const DEFAULT_STUDIO_BRUSH_SNAPSHOT: StudioBrushSnapshot = {
   brushId: "pen",
   strokeWidth: 6,
   brushOpacity: 1,
   color: "#7c5cfc",
-  stabilizer: 6,
+  stabilizer: 1,
   stabilizerMode: "adaptive",
-  postCorrection: 4,
+  postCorrection: 0,
   preserveCorners: true,
   pressureCurve: 1.0,
-  useVelocityPressure: true,
+  useVelocityPressure: false,
   velocitySensitivity: 0.65,
   tiltEnabled: true,
   tipAngle: -30,
   tipRoundness: 0.24,
   brushDynamics: DEFAULT_STUDIO_BRUSH_DYNAMICS_SETTINGS,
 };
+
+const DEFAULT_SNAPSHOT = DEFAULT_STUDIO_BRUSH_SNAPSHOT;
 
 function isKnownBrushId(id: unknown): id is string {
   return typeof id === "string" && BRUSH_PRESETS.some((p) => p.id === id);

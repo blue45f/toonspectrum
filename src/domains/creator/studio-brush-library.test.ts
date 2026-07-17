@@ -89,6 +89,9 @@ describe("sanitizeBrushSnapshot", () => {
     const { snapshot, adjustedFields } = sanitizeBrushSnapshot(null);
     expect(snapshot.brushId).toBe("pen");
     expect(snapshot.color).toBe("#7c5cfc");
+    expect(snapshot.stabilizer).toBe(1);
+    expect(snapshot.postCorrection).toBe(0);
+    expect(snapshot.useVelocityPressure).toBe(false);
     expect(adjustedFields).toContain("brushId");
     expect(adjustedFields).toContain("color");
     expect(adjustedFields).toContain("useVelocityPressure");
@@ -130,7 +133,7 @@ describe("sanitizeBrushSnapshot", () => {
       pressureCurve: "1.0" as unknown as number,
     });
     expect(snapshot.strokeWidth).toBe(6);
-    expect(snapshot.stabilizer).toBe(6);
+    expect(snapshot.stabilizer).toBe(1);
     expect(snapshot.pressureCurve).toBe(1.0);
     expect(adjustedFields).toEqual(["strokeWidth", "stabilizer", "pressureCurve"]);
   });
@@ -147,9 +150,9 @@ describe("sanitizeBrushSnapshot", () => {
     expect(adjustedFields).toEqual([]);
   });
 
-  it("useVelocityPressure가 boolean이 아니면 기본값(true)으로 대체한다", () => {
+  it("useVelocityPressure가 boolean이 아니면 포인터 일치 기본값(false)으로 대체한다", () => {
     const { snapshot, adjustedFields } = sanitizeBrushSnapshot({ ...validSnapshot, useVelocityPressure: "yes" });
-    expect(snapshot.useVelocityPressure).toBe(true);
+    expect(snapshot.useVelocityPressure).toBe(false);
     expect(adjustedFields).toEqual(["useVelocityPressure"]);
   });
 
@@ -346,7 +349,7 @@ describe("listBrushes", () => {
     expect(listBrushes(s)[0]).toMatchObject({
       id: "legacy-v2",
       stabilizerMode: "adaptive",
-      postCorrection: 4,
+      postCorrection: 0,
       preserveCorners: true,
     });
   });

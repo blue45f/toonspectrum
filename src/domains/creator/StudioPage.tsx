@@ -283,6 +283,7 @@ import {
   browserBrushLibraryStorage,
   brushMatchesSnapshot,
   BRUSH_LIBRARY_KEY,
+  DEFAULT_STUDIO_BRUSH_SNAPSHOT,
   listBrushes,
   markBrushUsedWithResult,
   restoreDeletedBrush,
@@ -963,6 +964,7 @@ import {
   snapshotStudioWebGpuAuthority,
   type StudioWebGpuAuthorityFrame,
 } from "./studio-webgpu-authority";
+import { buildStudioGpuLiveStroke } from "./studio-webgpu-stroke";
 import { planStudioWebGpuViewportSurface } from "./studio-webgpu-viewport";
 import {
   StudioWorkAssetAdmissionCoordinator,
@@ -7081,14 +7083,24 @@ function StudioCuttoonEditor() {
       for (const listener of store.listeners) listener();
     });
   };
-  const [stabilizer, setStabilizer] = useState<number>(6);
-  const [stabilizerMode, setStabilizerMode] = useState<StudioStabilizerMode>("adaptive");
-  const [postCorrection, setPostCorrection] = useState<number>(4);
-  const [preserveCorners, setPreserveCorners] = useState<boolean>(true);
+  const [stabilizer, setStabilizer] = useState<number>(
+    DEFAULT_STUDIO_BRUSH_SNAPSHOT.stabilizer
+  );
+  const [stabilizerMode, setStabilizerMode] = useState<StudioStabilizerMode>(
+    DEFAULT_STUDIO_BRUSH_SNAPSHOT.stabilizerMode
+  );
+  const [postCorrection, setPostCorrection] = useState<number>(
+    DEFAULT_STUDIO_BRUSH_SNAPSHOT.postCorrection
+  );
+  const [preserveCorners, setPreserveCorners] = useState<boolean>(
+    DEFAULT_STUDIO_BRUSH_SNAPSHOT.preserveCorners
+  );
   const [pressureCurve, setPressureCurve] = useState<number>(
     () => loadStudioAppSettings(studioAppSettingsStorage()).other.pressureCurve
   );
-  const [useVelocityPressure, setUseVelocityPressure] = useState<boolean>(true);
+  const [useVelocityPressure, setUseVelocityPressure] = useState<boolean>(
+    DEFAULT_STUDIO_BRUSH_SNAPSHOT.useVelocityPressure
+  );
   const [velocitySensitivity, setVelocitySensitivity] = useState<number>(0.65);
   const [tiltEnabled, setTiltEnabled] = useState<boolean>(true);
   const [tipAngle, setTipAngle] = useState<number>(-30);
@@ -8715,33 +8727,18 @@ function StudioCuttoonEditor() {
   const applySmartGuides = (next: SmartGuideOverlay) => {
     setSmartGuides((prev) => (smartGuideOverlaysEqual(prev, next) ? prev : next));
   };
-  // 커밋과 동일한 postCorrection 을 꼬리 몇 점을 제외하고 라이브에 미리 적용한다(펜 리프트 스냅
-  // 제거). smoothStrokePoints 는 점 개수·양 끝점을 보존해 필압 정렬과 꼬리 이음매가 유지된다.
-  const progressiveCorrectDraft = (el: DrawEl): DrawEl => {
-    if ((el.kind ?? "freehand") !== "freehand" || postCorrection <= 0) return el;
-    const tailPoints = 8;
-    const pointCount = Math.floor(el.points.length / 2);
-    if (pointCount <= tailPoints + 2) return el;
-    const headCount = pointCount - tailPoints;
-    const smoothedHead = smoothStrokePoints(
-      el.points.slice(0, headCount * 2),
-      postCorrection,
-      { preserveCorners }
-    );
-    return { ...el, points: [...smoothedHead, ...el.points.slice(headCount * 2)] };
-  };
   const buildGpuLiveStroke = (el: DrawEl): StudioGpuStroke | null => {
-    const points = processFreehandPoints(el.points, strokeRenderDistance(el.sampleSpacing));
-    if (points.length < 4) return null;
-    return {
+    return buildStudioGpuLiveStroke({
       id: el.id,
-      points,
-      pressures: resampleStrokePressures(el.pressures ?? [], Math.floor(points.length / 2), 0.5),
+      // 입력 단계에서 이미 거리 필터·스태빌라이저를 통과했다. 라이브 GPU 경계에서 다시
+      // smoothing/resampling하면 새 점 하나가 과거 좌표와 필압을 바꿔 전체 texture rebuild가 된다.
+      points: el.points,
+      pressures: el.pressures,
       color: el.stroke,
       size: Math.max(1, el.strokeWidth),
       opacity: el.opacity,
       composite: "normal" as const,
-    };
+    });
   };
   const flushDirectLiveDraft = () => {
     const next = liveDraftPendingRef.current;
@@ -8756,10 +8753,11 @@ function StudioCuttoonEditor() {
       overlay.appendFrom(next.points, next.pressures);
       return;
     }
-    const visual = progressiveCorrectDraft(next);
-    liveDraftVisualRef.current = visual;
+    // retained GPU texture는 권위 샘플의 strict prefix만 받는다. 후보정은 펜을 놓은 뒤의
+    // 명시적 문서 처리이며 라이브 중 이미 칠한 픽셀을 소급 수정하지 않는다.
+    liveDraftVisualRef.current = next;
     if (gpuLiveInkPinnedRef.current) {
-      const stroke = buildGpuLiveStroke(visual);
+      const stroke = buildGpuLiveStroke(next);
       if (stroke) {
         // 커밋 동기화를 기다리는 확정 획(pendingGpu)도 함께 공급한다 — 지연 커밋 동안
         // 이전 획의 잉크가 엔진 표면에서 사라지지 않는다.
@@ -8771,6 +8769,19 @@ function StudioCuttoonEditor() {
       }
     }
     (next.mode === "eraser" ? mainLayerRef.current : liveDraftLayerRef.current)?.batchDraw();
+  };
+  /**
+   * pointerup은 마지막 하드웨어 샘플을 rAF보다 먼저 확정해야 한다. 예약 프레임을 그대로
+   * 취소하면 라이브 표면에는 한 프레임 전 꼬리가 남고 200ms 뒤 커밋에서 선끝이 점프한다.
+   */
+  const flushDirectLiveDraftNow = (next: DrawEl | null) => {
+    if (!next || !liveDraftDirectRef.current || !isDirectLiveDraftEl(next)) return;
+    liveDraftPendingRef.current = next;
+    if (liveDraftRafRef.current !== null) {
+      globalThis.cancelAnimationFrame(liveDraftRafRef.current);
+      liveDraftRafRef.current = null;
+    }
+    flushDirectLiveDraft();
   };
   // quickshape 변환 등으로 다이렉트 대상에서 벗어나면 React 초안 경로로 복귀한다(1회 렌더).
   const exitDirectLiveDraft = () => {
@@ -16856,7 +16867,9 @@ function StudioCuttoonEditor() {
         velocityFallbackEnabled: false,
         velocitySensitivity,
         pressureCurve,
-        fallbackPressure: 0.8,
+        // pressure=0.5 is the renderer's nominal-width point: mouse/touch without hardware
+        // pressure now match the visible brush-size cursor instead of starting 42% thicker.
+        fallbackPressure: 0.5,
       });
       if (drawMode === "pen") scheduleLiveDrawPressure(pressure);
       const stylus = normalizeCalligraphyStylusInput(pointerSample);
@@ -17588,7 +17601,13 @@ function StudioCuttoonEditor() {
     const session = drawingPointerSessionRef.current;
     if (!session || !isStudioStrokePointerEvent(session, pointerEvent)) return false;
 
-    const batch = collectStudioStrokePointerBatch(session, pointerEvent, { includePredicted });
+    // Retained Canvas/WebGPU ink is append-only. A predicted point cannot be baked there because
+    // the next hardware sample may replace it and already-painted pixels cannot be rolled back.
+    // Fancy/non-direct previews remain replaceable and may still use the prediction channel.
+    const predictionIsReplaceable = includePredicted && !liveDraftDirectRef.current;
+    const batch = collectStudioStrokePointerBatch(session, pointerEvent, {
+      includePredicted: predictionIsReplaceable,
+    });
     drawingPointerSessionRef.current = batch.session;
     const crdtSampleStart = Math.floor((drawingRef.current?.points.length ?? 0) / 2);
     try {
@@ -17790,6 +17809,8 @@ function StudioCuttoonEditor() {
     const quickShapeSnapshot = snapshotQuickShapeTracking();
     // 지연 커밋 경로에서만 true — finally 의 초안 정리가 라이브 잉크를 표면에 남기게 한다.
     let deferInkCleanup = false;
+    // GPU 지연 표면에는 후보정 이전의, 실제 라이브 표면과 동일한 권위 획을 유지한다.
+    let authoritativeLiveStroke: DrawEl | null = null;
     try {
       if (drawingRef.current && (drawingRef.current.kind ?? "freehand") === "freehand" && stage) {
         // Pointermove is not guaranteed immediately before pointerup. Consume the release sample
@@ -17844,6 +17865,10 @@ function StudioCuttoonEditor() {
             };
           }
         }
+        authoritativeLiveStroke = drawingRef.current;
+        // release/coalesced sample과 stabilizer endpoint를 live surface에 동기적으로 반영한다.
+        // clearDraftPreview가 예약 rAF를 취소하기 전에 이 호출이 반드시 완료되어야 한다.
+        flushDirectLiveDraftNow(authoritativeLiveStroke);
       }
       if (drawingRef.current && isCompleteStudioDrawOp(drawingRef.current)) {
         let finished = drawingRef.current;
@@ -17921,7 +17946,7 @@ function StudioCuttoonEditor() {
             draftPreviewStoreRef.current.settle(finished);
           }
           if (gpuLiveInkPinnedRef.current) {
-            const settledGpu = buildGpuLiveStroke(liveDraftVisualRef.current ?? finished);
+            const settledGpu = buildGpuLiveStroke(authoritativeLiveStroke ?? finished);
             if (settledGpu) {
               pendingGpuStrokesRef.current = [...pendingGpuStrokesRef.current, settledGpu];
             }

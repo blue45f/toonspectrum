@@ -62,6 +62,13 @@ export class StudioLiveInkOverlayRenderer {
   private keptX: number[] = [];
   private keptY: number[] = [];
   private keptP: number[] = [];
+  /**
+   * 가장 최근에 소비한 원본 샘플. 라이브 thinning 에서 너무 가까워 건너뛴 점도 pointerup
+   * 끝점일 수 있으므로 별도로 기억했다가 end() 에서 최종 kept 점으로 승격한다.
+   */
+  private latestSourceX = 0;
+  private latestSourceY = 0;
+  private latestSourceP = 0.5;
   /** 원본 draft.points 에서 이미 소비한 포인트 수(중복 append 방지). */
   private consumedSourcePoints = 0;
   private active = false;
@@ -104,6 +111,9 @@ export class StudioLiveInkOverlayRenderer {
     this.keptX = [x];
     this.keptY = [y];
     this.keptP = [pressure];
+    this.latestSourceX = x;
+    this.latestSourceY = y;
+    this.latestSourceP = pressure;
     this.consumedSourcePoints = 1;
     this.active = true;
     // settled 잉크는 유지한다 — 커밋 동기화 전의 연속 스트로크가 서로를 지우지 않는다.
@@ -122,6 +132,9 @@ export class StudioLiveInkOverlayRenderer {
       const x = points[index * 2]!;
       const y = points[index * 2 + 1]!;
       const pressure = pressures?.[index] ?? 0.5;
+      this.latestSourceX = x;
+      this.latestSourceY = y;
+      this.latestSourceP = pressure;
       this.appendPoint(x, y, pressure);
     }
     this.consumedSourcePoints = Math.max(this.consumedSourcePoints, total);
@@ -130,6 +143,21 @@ export class StudioLiveInkOverlayRenderer {
   /** 획 종료 — 잉크와 재생 데이터는 커밋 동기화(dropSettled/clear)까지 표면에 유지된다. */
   end(): void {
     if (this.active && this.style && this.keptX.length > 0) {
+      const lastIndex = this.keptX.length - 1;
+      // processFreehandPoints 와 같은 "마지막 원본 점은 항상 보존" 계약. 마지막 포인터 샘플이
+      // thinning 간격보다 가까워 appendPoint 에서 생략됐더라도 펜을 놓은 정확한 곳까지 채운다.
+      if (
+        this.keptX[lastIndex] !== this.latestSourceX ||
+        this.keptY[lastIndex] !== this.latestSourceY
+      ) {
+        this.keptX.push(this.latestSourceX);
+        this.keptY.push(this.latestSourceY);
+        this.keptP.push(this.latestSourceP);
+        this.drawLatestPiece();
+      }
+      // 새 점이 도착할 때는 이전 중점까지만 확정한다. pointerup 에서 마지막 중점→원시 끝점
+      // 반쪽을 별도 곡선으로 더해야 이미 그린 prefix 를 고치지 않고도 실제 끝점까지 도달한다.
+      this.drawTerminalCap();
       this.settled.push({
         style: this.style,
         xs: this.keptX,
@@ -142,6 +170,9 @@ export class StudioLiveInkOverlayRenderer {
     this.keptX = [];
     this.keptY = [];
     this.keptP = [];
+    this.latestSourceX = 0;
+    this.latestSourceY = 0;
+    this.latestSourceP = 0.5;
     this.consumedSourcePoints = 0;
   }
 
@@ -156,6 +187,9 @@ export class StudioLiveInkOverlayRenderer {
     this.keptX = [];
     this.keptY = [];
     this.keptP = [];
+    this.latestSourceX = 0;
+    this.latestSourceY = 0;
+    this.latestSourceP = 0.5;
     this.consumedSourcePoints = 0;
     this.settled = [];
     this.clearRect();
@@ -200,6 +234,25 @@ export class StudioLiveInkOverlayRenderer {
     context.restore();
   }
 
+  /** 마지막 중점에서 마지막 원본 점까지 남은 반쪽을 prefix 수정 없이 닫는다. */
+  private drawTerminalCap(): void {
+    const style = this.style;
+    const n = this.keptX.length;
+    if (!style || n < 2) return;
+    const context = this.prepared(style);
+    if (!context) return;
+    const previousX = this.keptX[n - 2]!;
+    const previousY = this.keptY[n - 2]!;
+    const lastX = this.keptX[n - 1]!;
+    const lastY = this.keptY[n - 1]!;
+    context.beginPath();
+    context.moveTo((previousX + lastX) / 2, (previousY + lastY) / 2);
+    context.quadraticCurveTo(lastX, lastY, lastX, lastY);
+    context.lineWidth = pressureWidthDoc(style.strokeWidthDoc, this.keptP[n - 1]!);
+    context.stroke();
+    context.restore();
+  }
+
   private drawDot(style: StudioLiveInkStrokeStyle, x: number, y: number, pressure: number): void {
     const context = this.prepared(style);
     if (!context) return;
@@ -214,7 +267,8 @@ export class StudioLiveInkOverlayRenderer {
     style: StudioLiveInkStrokeStyle,
     xs: readonly number[],
     ys: readonly number[],
-    ps: readonly number[]
+    ps: readonly number[],
+    terminal: boolean
   ): void {
     if (xs.length === 0) return;
     this.drawDot(style, xs[0]!, ys[0]!, ps[0]!);
@@ -227,9 +281,8 @@ export class StudioLiveInkOverlayRenderer {
       const controlY = ys[i - 1]!;
       const currentX = xs[i]!;
       const currentY = ys[i]!;
-      const isLast = i === xs.length - 1;
-      const midX = isLast ? currentX : (controlX + currentX) / 2;
-      const midY = isLast ? currentY : (controlY + currentY) / 2;
+      const midX = (controlX + currentX) / 2;
+      const midY = (controlY + currentY) / 2;
       context.beginPath();
       context.moveTo(fromX, fromY);
       context.quadraticCurveTo(controlX, controlY, midX, midY);
@@ -238,6 +291,16 @@ export class StudioLiveInkOverlayRenderer {
       fromX = midX;
       fromY = midY;
     }
+    if (terminal && xs.length >= 2) {
+      const lastIndex = xs.length - 1;
+      const lastX = xs[lastIndex]!;
+      const lastY = ys[lastIndex]!;
+      context.beginPath();
+      context.moveTo(fromX, fromY);
+      context.quadraticCurveTo(lastX, lastY, lastX, lastY);
+      context.lineWidth = pressureWidthDoc(style.strokeWidthDoc, ps[lastIndex]!);
+      context.stroke();
+    }
     context.restore();
   }
 
@@ -245,11 +308,12 @@ export class StudioLiveInkOverlayRenderer {
   private replay(): void {
     this.clearRect();
     for (const stroke of this.settled) {
-      this.drawStrokePath(stroke.style, stroke.xs, stroke.ys, stroke.ps);
+      this.drawStrokePath(stroke.style, stroke.xs, stroke.ys, stroke.ps, true);
     }
     const style = this.style;
     if (!this.active || !style) return;
-    this.drawStrokePath(style, this.keptX, this.keptY, this.keptP);
+    // 진행 중 획은 마지막 중점까지만 확정된 상태다. terminal cap 은 end() 에서만 추가한다.
+    this.drawStrokePath(style, this.keptX, this.keptY, this.keptP, false);
   }
 
   /** save + 문서좌표 변환 + 공통 스트로크 상태를 세팅한 컨텍스트를 돌려준다(restore 는 호출측). */

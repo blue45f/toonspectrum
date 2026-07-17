@@ -11,6 +11,20 @@ export interface StudioGpuStroke {
   readonly orderKey?: string;
 }
 
+/**
+ * Already-sampled live drawing input. The caller owns distance filtering and stabilization; this
+ * boundary only snapshots GPU-safe samples so extending a stroke can never rewrite its history.
+ */
+export interface StudioGpuLiveStrokeInput {
+  readonly id: string;
+  readonly points: readonly number[];
+  readonly pressures?: readonly number[];
+  readonly color: string;
+  readonly size: number;
+  readonly opacity?: number;
+  readonly composite?: StudioGpuComposite;
+}
+
 export const STUDIO_GPU_MAX_BRUSH_SIZE = 8_192;
 
 export function sameStudioGpuNumberArray(
@@ -67,6 +81,44 @@ function finiteOr(value: unknown, fallback: number): number {
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
+}
+
+/**
+ * Snapshots an append-only live stroke for the WebGPU renderer.
+ *
+ * Points have already passed the pointer sampler/stabilizer and are deliberately not smoothed or
+ * resampled here. Copying only the longest finite pair prefix, and resolving pressure by the same
+ * point index, guarantees that appending a new sample leaves every historical GPU sample exact.
+ */
+export function buildStudioGpuLiveStroke(
+  input: StudioGpuLiveStrokeInput
+): StudioGpuStroke | null {
+  const points: number[] = [];
+  for (let index = 0; index + 1 < input.points.length; index += 2) {
+    const x = input.points[index];
+    const y = input.points[index + 1];
+    if (!Number.isFinite(x) || !Number.isFinite(y)) break;
+    points.push(x!, y!);
+  }
+
+  // A single point has no GPU segment. Canvas2D remains responsible for the initial tap preview.
+  if (points.length < 4) return null;
+
+  const pointCount = points.length / 2;
+  const pressures = Array.from(
+    { length: pointCount },
+    (_, index) => clamp(finiteOr(input.pressures?.[index], 0.5), 0, 1)
+  );
+
+  return {
+    id: input.id,
+    points,
+    pressures,
+    color: input.color,
+    size: input.size,
+    opacity: input.opacity,
+    composite: input.composite,
+  };
 }
 
 export function studioGpuPressureRadius(size: number, pressure: number): number {
