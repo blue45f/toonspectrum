@@ -2169,6 +2169,16 @@ function readyStudioWorkAssetImageSources(
 
 const EMPTY_LAYER_GROUPS: LayerGroup[] = [];
 const EMPTY_NODE_EDIT_HANDLES: NodeEditHandle[] = [];
+const toolBtn = (active: boolean) => studioToolButtonClass(active, { dense: true });
+// 그룹 팝오버 — z-[70] (toolPopover). Menubar menus sit at 60; full modals at 80+.
+// Always `fixed` so they still paint when the legacy toolbelt is parked off-screen on desktop.
+const groupPopoverClass = (width: "w-72" | "w-80") =>
+  cn(
+    // data-studio-tool-popover is set via class list attribute pattern in markup where needed.
+    // Default scrolls as one body; AI group overrides to overflow-hidden + flex for nested scroll.
+    "fixed inset-x-2 top-[6.5rem] z-[70] max-h-[min(78dvh,36rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-2xl lg:inset-x-auto lg:left-3 lg:w-auto lg:max-w-[min(28rem,calc(100vw-1.5rem))]",
+    width === "w-72" ? "lg:w-72" : "lg:w-80"
+  );
 type StudioMenu = "template" | "collage" | "bubble" | "sticker" | "elements" | "char" | "bgScene" | "bgFill" | "asset" | "emeres" | "tone" | "scene" | "clip" | "palette" | "brandKit" | "stockImage" | "aiAssist" | "integrations";
 // 2026-07-05 툴바 그룹화 — 20개 이상의 플랫한 툴바 버튼을 논리 그룹 4개로 묶는다(선택/펜/지우개/
 // 텍스트/말풍선처럼 사용 빈도가 높은 핵심 도구는 그룹화 대상에서 제외하고 그대로 1줄 유지).
@@ -5267,6 +5277,11 @@ export function StudioPage() {
 }
 
 function StudioCuttoonEditor() {
+  // React Compiler는 이 컴포넌트를 구조적으로 컴파일하지 못한다(본문 dynamic import 40+,
+  // try/finally 다수). 명시적으로 옵트아웃하고, 무거운 JSX 영역은 컴파일되는 memo 자식
+  // (StudioInspectorAside/StudioToolBeltContent/StudioMenubarContent/StudioLeftToolRail 등)으로
+  // 옮겨 정착 커밋 렌더 비용을 자식 캐시로 흡수한다.
+  "use no memo";
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const { data: session } = useSession();
@@ -5385,9 +5400,11 @@ function StudioCuttoonEditor() {
     if (next.grids.snapToPixelGrid) setSnapEnabled(true);
     if (next.grids.showIsometricOnDraw) setIsometricGridActive(true);
   }
-  function isRailToolVisible(id: StudioRailToolId): boolean {
-    return appSettings.toolbar.visibleIds.includes(id);
-  }
+  // useCallback: 좌측 레일 memo 자식에서 렌더 중 호출 — prop 안정성 유지.
+  const isRailToolVisible = useCallback(
+    (id: StudioRailToolId): boolean => appSettings.toolbar.visibleIds.includes(id),
+    [appSettings.toolbar.visibleIds]
+  );
   function persistEffectFavoriteState(next: StudioEffectFavoriteState) {
     setEffectFavoriteState(next);
     saveStudioEffectFavoriteState(
@@ -6056,7 +6073,8 @@ function StudioCuttoonEditor() {
     studioWorkAssetReferences,
   ]);
 
-  function collaborationLockMessage(): string {
+  // useCallback: 렌더 중 호출되는 메시지 헬퍼 — memo 자식(메뉴바/툴벨트)의 prop 안정성 유지.
+  const collaborationLockMessage = useCallback((): string => {
     if (documentReloadRequired) {
       return "서버 문서가 변경되어 안전하게 잠갔어요. 로컬 원고를 내보낸 뒤 페이지를 다시 불러와 주세요.";
     }
@@ -6080,7 +6098,14 @@ function StudioCuttoonEditor() {
       return "열람 전용 권한입니다. 원고 편집과 저장은 할 수 없지만 스크롤과 내보내기는 계속 사용할 수 있어요.";
     }
     return "현재 서버 권한이 열람 전용입니다. 원고 편집과 저장은 할 수 없지만 스크롤과 내보내기는 계속 사용할 수 있어요.";
-  }
+  }, [
+    documentReloadRequired,
+    sourceHydrationPending,
+    workHydrationFailed,
+    sharedDocument,
+    workHydrated,
+    collaborationOperationSyncPending,
+  ]);
 
   function collaborationRoleLabel(): string {
     switch (sharedDocument?.role) {
@@ -7526,6 +7551,23 @@ function StudioCuttoonEditor() {
   const [frameAnimTargetId, setFrameAnimTargetId] = useState<string | null>(null);
   const [onionSkin, setOnionSkin] = useState<OnionSkinSettings>(DEFAULT_ONION_SKIN);
   const capturedElementIdsRef = useRef<Set<string>>(new Set());
+  // 자식(레일/툴벨트)에서 capturedElementIdsRef(prop)를 직접 변이하지 않도록 프레임 애니메이션
+  // 진입을 에디터 핸들러로 승격 — 두 도구 버튼이 같은 로직을 공유한다.
+  function openFrameAnimationForSelected() {
+    if (!selected || selected.type !== "image") return;
+    if (!selected.frames || selected.frames.length === 0) {
+      const firstId = uid();
+      patchEl(selected.id, {
+        frames: [{ id: firstId, src: selected.src }],
+        frameFps: DEFAULT_FRAME_FPS,
+        frameLoop: true,
+        activeFrameId: firstId,
+      });
+    }
+    capturedElementIdsRef.current = new Set(elements.map((e) => e.id));
+    setFrameAnimTargetId(selected.id);
+    setFrameAnimOpen((v) => (frameAnimTargetId === selected.id ? !v : true));
+  }
   const frameAnimTarget = frameAnimTargetId ? elementById.get(frameAnimTargetId) : null;
   const frameAnimEl = frameAnimTarget && frameAnimTarget.type === "image" ? (frameAnimTarget as ImageEl) : null;
   // 대상 요소가 삭제되거나(다른 페이지 이동 포함, elementById가 활성 페이지 기준이라 자동 반영)
@@ -10768,7 +10810,10 @@ function StudioCuttoonEditor() {
   } | null>(null);
   const writerRoomAiAbortRef = useRef<AbortController | null>(null);
   useEffect(() => () => writerRoomAiAbortRef.current?.abort(), []);
-  const configuredServerAiProviders = serverAiStatus?.providers.filter((provider) => provider.configured) ?? [];
+  const configuredServerAiProviders = useMemo(
+    () => serverAiStatus?.providers.filter((provider) => provider.configured) ?? [],
+    [serverAiStatus]
+  );
   const activeServerAiProviderLabel =
     textAiTransport.mode !== "server"
       ? "내 API"
@@ -11280,26 +11325,52 @@ function StudioCuttoonEditor() {
   const bgSceneMenuOpen = menu === "bgScene";
   const emeresMenuOpen = menu === "emeres";
   const fxQuery = fxMenuOpen ? fxSearchQuery.trim().toLowerCase() : "";
-  const fxSectionVisible = (section: Exclude<FxPickerSection, "all">) =>
-    fxPickerSection === "all" || fxPickerSection === section;
-  const fxSfxFiltered = fxMenuOpen ? filterSfxPresets(studioSfx.presets, fxSearchQuery) : EMPTY_STUDIO_SFX_PACKS.presets;
-  const fxRasterFiltered = fxMenuOpen
-    ? filterStudioRasterAssets(STUDIO_RASTER_ASSETS, { query: fxSearchQuery })
-    : [];
+  // useCallback/useMemo: FX 피커 파생값 — 툴벨트 memo 자식의 prop 안정성 유지(검색/팩 변경 시에만 재계산).
+  const fxSectionVisible = useCallback(
+    (section: Exclude<FxPickerSection, "all">) => fxPickerSection === "all" || fxPickerSection === section,
+    [fxPickerSection]
+  );
+  const fxSfxFiltered = useMemo(
+    () => (fxMenuOpen ? filterSfxPresets(studioSfx.presets, fxSearchQuery) : EMPTY_STUDIO_SFX_PACKS.presets),
+    [fxMenuOpen, studioSfx.presets, fxSearchQuery]
+  );
+  const fxRasterFiltered = useMemo(
+    () => (fxMenuOpen ? filterStudioRasterAssets(STUDIO_RASTER_ASSETS, { query: fxSearchQuery }) : []),
+    [fxMenuOpen, fxSearchQuery]
+  );
   const fxEmojisFiltered = fxMenuOpen && !fxQuery ? EFFECT_EMOJIS : EMPTY_EFFECT_EMOJIS; // 이모지는 라벨이 없어 검색 중에는 제외
-  const fxComicFiltered = fxMenuOpen
-    ? filterAssetsByLabel(studioOptionalAssets.comicVectorStickers, fxSearchQuery)
-    : EMPTY_STUDIO_OPTIONAL_ASSETS.comicVectorStickers;
-  const fxCreatureFiltered = fxMenuOpen
-    ? filterAssetsByLabel(studioOptionalAssets.creatureStickers, fxSearchQuery)
-    : EMPTY_STUDIO_OPTIONAL_ASSETS.creatureStickers;
-  const fxPropFiltered = fxMenuOpen
-    ? filterAssetsByLabel(studioOptionalAssets.propStickers, fxSearchQuery)
-    : EMPTY_STUDIO_OPTIONAL_ASSETS.propStickers;
-  const fxLinePresetsFiltered = fxMenuOpen ? filterAssetsByLabel(FX_LINE_PRESETS, fxSearchQuery) : EMPTY_FX_LINE_PRESETS;
-  const fxOverlaysFiltered = fxMenuOpen
-    ? filterAssetsByLabel(studioOptionalAssets.fxOverlays, fxSearchQuery)
-    : EMPTY_STUDIO_OPTIONAL_ASSETS.fxOverlays;
+  const fxComicFiltered = useMemo(
+    () =>
+      fxMenuOpen
+        ? filterAssetsByLabel(studioOptionalAssets.comicVectorStickers, fxSearchQuery)
+        : EMPTY_STUDIO_OPTIONAL_ASSETS.comicVectorStickers,
+    [fxMenuOpen, studioOptionalAssets.comicVectorStickers, fxSearchQuery]
+  );
+  const fxCreatureFiltered = useMemo(
+    () =>
+      fxMenuOpen
+        ? filterAssetsByLabel(studioOptionalAssets.creatureStickers, fxSearchQuery)
+        : EMPTY_STUDIO_OPTIONAL_ASSETS.creatureStickers,
+    [fxMenuOpen, studioOptionalAssets.creatureStickers, fxSearchQuery]
+  );
+  const fxPropFiltered = useMemo(
+    () =>
+      fxMenuOpen
+        ? filterAssetsByLabel(studioOptionalAssets.propStickers, fxSearchQuery)
+        : EMPTY_STUDIO_OPTIONAL_ASSETS.propStickers,
+    [fxMenuOpen, studioOptionalAssets.propStickers, fxSearchQuery]
+  );
+  const fxLinePresetsFiltered = useMemo(
+    () => (fxMenuOpen ? filterAssetsByLabel(FX_LINE_PRESETS, fxSearchQuery) : EMPTY_FX_LINE_PRESETS),
+    [fxMenuOpen, fxSearchQuery]
+  );
+  const fxOverlaysFiltered = useMemo(
+    () =>
+      fxMenuOpen
+        ? filterAssetsByLabel(studioOptionalAssets.fxOverlays, fxSearchQuery)
+        : EMPTY_STUDIO_OPTIONAL_ASSETS.fxOverlays,
+    [fxMenuOpen, studioOptionalAssets.fxOverlays, fxSearchQuery]
+  );
   const fxPickerHasResults = fxMenuOpen && (
     (fxSectionVisible("raster") && fxRasterFiltered.length > 0) ||
     (fxSectionVisible("sfx") && fxSfxFiltered.length > 0) ||
@@ -11311,14 +11382,24 @@ function StudioCuttoonEditor() {
     (fxSectionVisible("overlay") && fxOverlaysFiltered.length > 0)
   );
 
-  const bgSceneSectionsFiltered = bgSceneMenuOpen
-    ? filterBgSceneSections(
-        bgSceneGenreFilter === "all"
-          ? studioOptionalAssets.bgSceneSections
-          : studioOptionalAssets.bgSceneGenreGroups.filter((group) => group.genre === bgSceneGenreFilter),
-        bgSceneSearchQuery
-      )
-    : EMPTY_STUDIO_OPTIONAL_ASSETS.bgSceneSections;
+  const bgSceneSectionsFiltered = useMemo(
+    () =>
+      bgSceneMenuOpen
+        ? filterBgSceneSections(
+            bgSceneGenreFilter === "all"
+              ? studioOptionalAssets.bgSceneSections
+              : studioOptionalAssets.bgSceneGenreGroups.filter((group) => group.genre === bgSceneGenreFilter),
+            bgSceneSearchQuery
+          )
+        : EMPTY_STUDIO_OPTIONAL_ASSETS.bgSceneSections,
+    [
+      bgSceneMenuOpen,
+      bgSceneGenreFilter,
+      studioOptionalAssets.bgSceneSections,
+      studioOptionalAssets.bgSceneGenreGroups,
+      bgSceneSearchQuery,
+    ]
+  );
 
   // 이메레스(스케치 밑그림) 피커 검색/카테고리 상태
   const [emeresSearchQuery, setEmeresSearchQuery] = useState("");
@@ -11328,27 +11409,40 @@ function StudioCuttoonEditor() {
   // null이면 스트립을 숨긴다. 카드별로 독립된 open/close가 아니라 피커당 슬롯 1개를 공유한다(한 번에
   // 하나만 보여준다 — 다른 카드에서 다시 누르면 그 카드 기준으로 갈아탄다).
   const [emeresSimilarAnchorId, setEmeresSimilarAnchorId] = useState<string | null>(null);
-  const emeresSectionsFiltered = emeresMenuOpen
-    ? studioOptionalAssets.emeresSections
-        .filter((section) => emeresCategoryFilter === "all" || section.category === emeresCategoryFilter)
-        .map((section) => ({ ...section, templates: filterAssetsByLabel(section.templates, emeresSearchQuery) }))
-        .filter((section) => section.templates.length > 0)
-    : EMPTY_STUDIO_OPTIONAL_ASSETS.emeresSections;
+  const emeresSectionsFiltered = useMemo(
+    () =>
+      emeresMenuOpen
+        ? studioOptionalAssets.emeresSections
+            .filter((section) => emeresCategoryFilter === "all" || section.category === emeresCategoryFilter)
+            .map((section) => ({ ...section, templates: filterAssetsByLabel(section.templates, emeresSearchQuery) }))
+            .filter((section) => section.templates.length > 0)
+        : EMPTY_STUDIO_OPTIONAL_ASSETS.emeresSections,
+    [emeresMenuOpen, studioOptionalAssets.emeresSections, emeresCategoryFilter, emeresSearchQuery]
+  );
 
   // 비슷한 스타일 더보기 — emeresSections는 카테고리별로 이미 그룹돼 있어 평평한 배열로 한 번 풀어야
   // sameCategoryItems 제네릭 헬퍼(studio-similar-style.ts)에 그대로 넘길 수 있다.
-  const emeresFlatCatalog = studioOptionalAssets.emeresSections.flatMap((section) => section.templates);
+  const emeresFlatCatalog = useMemo(
+    () => studioOptionalAssets.emeresSections.flatMap((section) => section.templates),
+    [studioOptionalAssets.emeresSections]
+  );
   const emeresSimilarAnchor = emeresSimilarAnchorId
     ? (emeresFlatCatalog.find((t) => t.id === emeresSimilarAnchorId) ?? null)
     : null;
-  const emeresSimilarSiblings = emeresSimilarAnchor ? sameCategoryItems(emeresFlatCatalog, emeresSimilarAnchor.id, 8) : [];
+  const emeresSimilarSiblings = useMemo(
+    () => (emeresSimilarAnchor ? sameCategoryItems(emeresFlatCatalog, emeresSimilarAnchor.id, 8) : []),
+    [emeresSimilarAnchor, emeresFlatCatalog]
+  );
 
   // 장면 템플릿 피커 — 이메레스와 동일한 패턴의 "비슷한 스타일" 앵커 state + 파생 값.
   const [sceneSimilarAnchorId, setSceneSimilarAnchorId] = useState<string | null>(null);
   const sceneSimilarAnchor = sceneSimilarAnchorId
     ? (sceneTemplates.templates.find((t) => t.id === sceneSimilarAnchorId) ?? null)
     : null;
-  const sceneSimilarSiblings = sceneSimilarAnchor ? sameCategoryItems(sceneTemplates.templates, sceneSimilarAnchor.id, 8) : [];
+  const sceneSimilarSiblings = useMemo(
+    () => (sceneSimilarAnchor ? sameCategoryItems(sceneTemplates.templates, sceneSimilarAnchor.id, 8) : []),
+    [sceneSimilarAnchor, sceneTemplates.templates]
+  );
 
   // ── 커뮤니티 공유 에셋 ────────────────────────────────────────────────
   const loadSharedAssets = async () => {
@@ -19034,22 +19128,33 @@ function StudioCuttoonEditor() {
   // 터치 기기(작은 폰)에서는 도구 버튼을 키워 thumb 로 누르기 쉽게 한다(pointer-coarse: h-10).
   // 데스크톱(fine pointer)은 기존 컴팩트 h-9 유지 — 정밀 조작·공간 효율.
   // 시각 토큰은 studio-panel-ui / studio-chrome-ui 와 공유한다(경쟁사 수준의 일관 어포던스).
-  const toolBtn = (active: boolean) => studioToolButtonClass(active, { dense: true });
-
   // 툴바 그룹(배경/에셋/스타일/AI 연동) — 현재 열린 그룹은 `menu`가 그 그룹 멤버 중 하나일 때만
   // 존재한다(별도 open 상태 없음). null이면 그룹 팝오버뿐 아니라 개별 팝오버도 전부 닫힌 상태.
   const activeToolbarGroup: StudioToolbarGroupId | null = menu ? (STUDIO_TOOLBAR_GROUP_OF[menu] ?? null) : null;
-  // 그룹 팝오버 — z-[70] (toolPopover). Menubar menus sit at 60; full modals at 80+.
-  // Always `fixed` so they still paint when the legacy toolbelt is parked off-screen on desktop.
-  const groupPopoverClass = (width: "w-72" | "w-80") =>
-    cn(
-      // data-studio-tool-popover is set via class list attribute pattern in markup where needed.
-      // Default scrolls as one body; AI group overrides to overflow-hidden + flex for nested scroll.
-      "fixed inset-x-2 top-[6.5rem] z-[70] max-h-[min(78dvh,36rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-2xl lg:inset-x-auto lg:left-3 lg:w-auto lg:max-w-[min(28rem,calc(100vw-1.5rem))]",
-      width === "w-72" ? "lg:w-72" : "lg:w-80"
-    );
 
-  const studioMainMenuGroups: StudioMainMenuGroup[] = [
+  // 메뉴 항목 onSelect 클로저가 참조하는 에디터 핸들러의 안정 번들 — 그룹 배열 useMemo가
+  // 렌더마다 무효화되지 않게 하고, 이벤트 시점엔 항상 최신 클로저를 호출한다.
+  const studioMainMenuActions = useStudioStableHandlers({
+    addPage,
+    addText,
+    announceDrawingShortcut,
+    copySelectedElements,
+    duplicateSelected,
+    enterCanvasOnlyMode,
+    handleCopyToClipboard,
+    handleExportProject,
+    handleExportProjectArchive,
+    handleSave,
+    openFeatureTutorial,
+    redo,
+    removeSelected,
+    setStudioUiDensity,
+    toggleAdvancedFill,
+    toggleFullscreen,
+    undo,
+  });
+
+  const studioMainMenuGroups: StudioMainMenuGroup[] = useMemo(() => [
     {
       id: "file",
       label: "파일",
@@ -19068,7 +19173,7 @@ function StudioCuttoonEditor() {
           label: "이미지를 클립보드로",
           icon: Copy,
           onSelect: () => {
-            void handleCopyToClipboard();
+            void studioMainMenuActions.handleCopyToClipboard();
           },
           separatorAfter: true,
         },
@@ -19079,7 +19184,7 @@ function StudioCuttoonEditor() {
           shortcut: "⌘S",
           disabled: saving || collaborationDocumentLocked,
           onSelect: () => {
-            void handleSave("draft");
+            void studioMainMenuActions.handleSave("draft");
           },
         },
         {
@@ -19092,14 +19197,14 @@ function StudioCuttoonEditor() {
             Boolean(sharedDocument && sharedDocument.role !== "owner"),
           separatorAfter: true,
           onSelect: () => {
-            void handleSave("published");
+            void studioMainMenuActions.handleSave("published");
           },
         },
         {
           id: "export-json",
           label: "백업 (.json)",
           icon: Download,
-          onSelect: () => handleExportProject(),
+          onSelect: () => studioMainMenuActions.handleExportProject(),
         },
         {
           id: "export-archive",
@@ -19107,7 +19212,7 @@ function StudioCuttoonEditor() {
           icon: Package,
           disabled: projectArchiveBusy,
           onSelect: () => {
-            void handleExportProjectArchive();
+            void studioMainMenuActions.handleExportProjectArchive();
           },
         },
         {
@@ -19141,20 +19246,20 @@ function StudioCuttoonEditor() {
       label: "편집",
       items: [
         {
-          id: "undo",
+          id: "studioMainMenuActions.undo",
           label: "실행취소",
           icon: Undo2,
           shortcut: "⌘Z",
           disabled: hi === 0 || collaborationDocumentLocked,
-          onSelect: () => undo(),
+          onSelect: () => studioMainMenuActions.undo(),
         },
         {
-          id: "redo",
+          id: "studioMainMenuActions.redo",
           label: "다시실행",
           icon: Redo2,
           shortcut: "⌘⇧Z",
           disabled: hi >= history.length - 1 || collaborationDocumentLocked,
-          onSelect: () => redo(),
+          onSelect: () => studioMainMenuActions.redo(),
           separatorAfter: true,
         },
         {
@@ -19164,7 +19269,7 @@ function StudioCuttoonEditor() {
           shortcut: "⌘C",
           disabled: !selected && marqueeIds.length === 0,
           onSelect: () => {
-            copySelectedElements();
+            studioMainMenuActions.copySelectedElements();
           },
         },
         {
@@ -19176,7 +19281,7 @@ function StudioCuttoonEditor() {
             collaborationDocumentLocked ||
             activePageMutationLocked ||
             (!selected && marqueeIds.length === 0),
-          onSelect: () => duplicateSelected(),
+          onSelect: () => studioMainMenuActions.duplicateSelected(),
         },
         {
           id: "delete",
@@ -19188,7 +19293,7 @@ function StudioCuttoonEditor() {
             collaborationDocumentLocked ||
             activePageMutationLocked ||
             (!selected && marqueeIds.length === 0),
-          onSelect: () => removeSelected(),
+          onSelect: () => studioMainMenuActions.removeSelected(),
           separatorAfter: true,
         },
         {
@@ -19280,7 +19385,7 @@ function StudioCuttoonEditor() {
           id: "text",
           label: "텍스트",
           icon: TypeIcon,
-          onSelect: () => addText(),
+          onSelect: () => studioMainMenuActions.addText(),
         },
         {
           id: "image",
@@ -19319,7 +19424,7 @@ function StudioCuttoonEditor() {
           label: "새 페이지",
           icon: Plus,
           disabled: collaborationDocumentLocked,
-          onSelect: () => addPage(),
+          onSelect: () => studioMainMenuActions.addPage(),
         },
       ],
     },
@@ -19332,7 +19437,7 @@ function StudioCuttoonEditor() {
           label: "슈퍼심플 레이아웃",
           icon: Minimize2,
           onSelect: () => {
-            setStudioUiDensity("focus");
+            studioMainMenuActions.setStudioUiDensity("focus");
             setLeftPanelOpen(false);
             setRightPanelOpen(false);
           },
@@ -19341,7 +19446,7 @@ function StudioCuttoonEditor() {
           id: "density-full",
           label: "전체 레이아웃",
           icon: LayoutGrid,
-          onSelect: () => setStudioUiDensity("full"),
+          onSelect: () => studioMainMenuActions.setStudioUiDensity("full"),
         },
         {
           id: "wide",
@@ -19359,10 +19464,10 @@ function StudioCuttoonEditor() {
           onSelect: () => {
             const win = openStudioToolsCompanionWindow();
             if (!win) {
-              announceDrawingShortcut("팝업이 차단됐습니다. 브라우저에서 팝업을 허용해 주세요.");
+              studioMainMenuActions.announceDrawingShortcut("팝업이 차단됐습니다. 브라우저에서 팝업을 허용해 주세요.");
               return;
             }
-            announceDrawingShortcut("도구 창을 열었습니다 · 다른 모니터로 옮겨 쓰세요");
+            studioMainMenuActions.announceDrawingShortcut("도구 창을 열었습니다 · 다른 모니터로 옮겨 쓰세요");
             // 연결 핸드셰이크는 companion channel effect 가 처리한다.
           },
         },
@@ -19404,14 +19509,14 @@ function StudioCuttoonEditor() {
           id: "fullscreen",
           label: isFullscreen ? "창 모드" : "전체화면",
           icon: isFullscreen ? Minimize2 : Maximize2,
-          onSelect: () => toggleFullscreen(),
+          onSelect: () => studioMainMenuActions.toggleFullscreen(),
         },
         {
           id: "canvas-only",
           label: "캔버스만",
           icon: Square,
           shortcut: "`",
-          onSelect: () => enterCanvasOnlyMode(),
+          onSelect: () => studioMainMenuActions.enterCanvasOnlyMode(),
           separatorAfter: true,
         },
         {
@@ -19430,7 +19535,7 @@ function StudioCuttoonEditor() {
           id: "feature-tutorials",
           label: "기능 튜토리얼",
           icon: BookOpen,
-          onSelect: () => openFeatureTutorial(null),
+          onSelect: () => studioMainMenuActions.openFeatureTutorial(null),
         },
         {
           id: "shortcuts",
@@ -19476,7 +19581,7 @@ function StudioCuttoonEditor() {
           label: "채우기",
           icon: PaintBucket,
           shortcut: "G",
-          onSelect: () => toggleAdvancedFill(),
+          onSelect: () => studioMainMenuActions.toggleAdvancedFill(),
         },
         {
           id: "smart-shape",
@@ -19529,7 +19634,24 @@ function StudioCuttoonEditor() {
         },
       ],
     },
-  ];
+  ], [
+    activePageMutationLocked,
+    collaborationDocumentLocked,
+    elements,
+    hi,
+    history,
+    isFullscreen,
+    leftPanelOpen,
+    marqueeIds,
+    projectArchiveBusy,
+    psdImportBusy,
+    rightPanelOpen,
+    saving,
+    selected,
+    sharedDocument,
+    workId,
+    studioMainMenuActions,
+  ]);
   // 모바일 하단 보조 막대 버튼(페이지/추가/속성/줌) — 아이콘 + 작은 라벨 세로 스택.
   // 서브탭 칩·드로잉 도구 칩은 studioSegmentChipClass / studioToolButtonClass 로 이관됨.
   const mobileBarBtn = (active: boolean) =>
@@ -21042,6 +21164,110 @@ function StudioCuttoonEditor() {
     updateAdvancedFillSettings,
   });
 
+  const studioLeftToolRailHandlers = useStudioStableHandlers<StudioLeftToolRailHandlers>({
+    openFrameAnimationForSelected,
+    addBubble,
+    addText,
+    announceDrawingShortcut,
+    clearPolyLassoDraft,
+    commitAppSettings,
+    disarmAllPixelTools,
+    onPickImage,
+    toggleAdvancedFill,
+  });
+
+  const studioToolBeltContentHandlers = useStudioStableHandlers<StudioToolBeltContentHandlers>({
+    openFrameAnimationForSelected,
+    addBgScene,
+    addBubble,
+    addBuiltinRasterAsset,
+    addCatalogElement,
+    addDiagonalSplit,
+    addDialogueBubbles,
+    addDialogueSuggestionToScript,
+    addEmeresLibraryItem,
+    addEmeresTemplate,
+    addFocusLines,
+    addFrame,
+    addFxOverlay,
+    addRenderedImage,
+    addSceneTemplate,
+    addSfxPreset,
+    addSpeedLines,
+    addSticker,
+    addText,
+    addTone,
+    announceDrawingShortcut,
+    applyAiAssistPresetPrompt,
+    applyBrandKitFont,
+    applyBrandKitLogo,
+    applyCollage,
+    applyMagicResizePreset,
+    applyPanelLayout,
+    applyStudioBackgroundFill,
+    applyTemplate,
+    beginTrackedStudioAiOperation,
+    deleteClip,
+    ensureRecentColorsLoaded,
+    enterCanvasOnlyMode,
+    executeSuggestColorPalette,
+    executeSuggestDialogueLines,
+    insertAiCompositionNote,
+    insertClip,
+    insertDialogueSuggestionToSelected,
+    insertStockImage,
+    onDeleteAsset,
+    onDeleteSharedAsset,
+    onGenerateAiBackground,
+    onGenerateAiCharacter,
+    onGenerateAsset,
+    onPickImage,
+    onShareAsset,
+    onUploadAsset,
+    onUseSharedAsset,
+    openFeatureTutorial,
+    pendingTextAiProviderContext,
+    redo,
+    rememberColor,
+    removeEmeresUnderlays,
+    saveSelectionAsClip,
+    saveSuggestedPaletteToLibrary,
+    setCanvasH,
+    settleTrackedTextAiOperation,
+    toggleAdvancedFill,
+    toggleAssetFavorite,
+    toggleFullscreen,
+    toggleMaximize,
+    toggleSelectedFrameDiagonal,
+    undo,
+    updateAiSettings,
+    updateServerAiProvider,
+    handleRenameAsset,
+    loadSharedAssets,
+  });
+
+  const studioMenubarContentHandlers = useStudioStableHandlers<StudioMenubarContentHandlers>({
+    applyStudioWorkspaceLayout,
+    changeMobileImmersiveMode,
+    ensureWatermarkLoaded,
+    handleCopyToClipboard,
+    handleDownload,
+    handleDownloadAll,
+    handleExportProject,
+    handleExportProjectArchive,
+    handleImportProject,
+    handleImportProjectArchive,
+    handleImportPsd,
+    handleSave,
+    openAutoActions,
+    openOwnerFxPanel,
+    persistStudioWorkspaceState,
+    setWatermark,
+    exportCurrentPageToPsd,
+    exportCurrentPageToSvg,
+    handleCapturePagesForPreset,
+  });
+
   return (
     <StudioLiveCollaborationProvider
       workId={workId}
@@ -21144,592 +21370,68 @@ function StudioCuttoonEditor() {
             "min-h-8 gap-1 py-0.5 [&_[data-studio-app-menubar-scroll]]:px-1"
         )}
       >
-        <div
-          data-studio-menubar-primary="true"
-          className={cn(
-            "flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-            mobileImmersive && "hidden"
-          )}
-        >
-          {/* Document context and application commands may compress; publish actions never do. */}
-          <div
-            className={cn(
-              "flex min-w-0 shrink items-center gap-1.5",
-              mobileImmersive && "hidden"
-            )}
-          >
-          <h1
-            className="min-w-0 max-w-[8rem] truncate text-[0.8125rem] font-semibold tracking-tight text-fg xl:max-w-[16rem]"
-            title={title.trim() || "무제"}
-          >
-            {title.trim() || "무제"}
-          </h1>
-          <span className="hidden shrink-0 rounded-md border border-line/60 bg-canvas/40 px-1.5 py-0.5 text-[0.62rem] font-medium tabular-nums text-fg-3 sm:inline">
-            {pageDisplayName(activePage, activePageIndex)}
-          </span>
-          {displayLinkedTitleId ? (
-            <span className="hidden rounded-full border border-accent/30 bg-accent-soft/40 px-1.5 py-0.5 text-[0.6rem] font-semibold text-accent sm:inline">
-              링크됨
-            </span>
-          ) : null}
-          {workspacePersistence.ownerScope === currentWorkspaceOwnerScope ? (
-            <StudioWorkspaceMenu
-              key={`${currentWorkspaceOwnerScope}:${workspaceMenuEpoch}`}
-              state={workspaceState}
-              liveLayout={liveWorkspaceLayout}
-              persistence={workspacePersistence}
-              onStateChange={persistStudioWorkspaceState}
-              onApplyLayout={applyStudioWorkspaceLayout}
-            />
-          ) : (
-            <span role="status" className="inline-flex min-h-8 items-center text-[0.65rem] text-fg-3">
-              전환 중…
-            </span>
-          )}
-          {workspaceSyncNotice && workspacePersistence.ownerScope === currentWorkspaceOwnerScope ? (
-            <span
-              role="status"
-              title={workspaceSyncNotice}
-              className="max-w-40 truncate text-[0.62rem] font-medium text-cool"
-            >
-              {workspaceSyncNotice}
-            </span>
-          ) : null}
-          </div>
-          <span aria-hidden className="mx-0.5 hidden h-4 w-px shrink-0 bg-line md:block" />
-          {/* Desktop application commands live in the compressible center lane. */}
-          <Suspense fallback={null}>
-            <StudioMainMenu
-              groups={studioMainMenuGroups}
-              className={cn("hidden min-w-0 md:flex", mobileImmersive && "!hidden")}
-            />
-          </Suspense>
-          {/* Wide layouts expose high-frequency insert shortcuts; narrower widths use Insert. */}
-          <div
-            className={cn(
-              "hidden min-w-0 items-center gap-0.5 xl:flex",
-              mobileImmersive && "!hidden"
-            )}
-            role="group"
-            aria-label="삽입 바로가기"
-          >
-          <button
-            type="button"
-            onClick={() => {
-              preloadStudioAssetMenuPanel();
-              setMenu(activeToolbarGroup === "assetGroup" ? null : "template");
-            }}
-            aria-haspopup="menu"
-            aria-expanded={activeToolbarGroup === "assetGroup"}
-            className={cn(
-              buttonClass({ size: "sm", variant: activeToolbarGroup === "assetGroup" ? "solid" : "quiet" }),
-              "min-h-9 gap-1.5 px-2.5 text-[0.72rem]"
-            )}
-            title="템플릿 · 콜라주 · 요소 · 장면 · 클립 · 효과 · 내 에셋"
-          >
-            <Folder size={14} aria-hidden />
-            템플릿·에셋
-          </button>
-          <button
-            type="button"
-            onClick={() => setMenu(menu === "bubble" ? null : "bubble")}
-            aria-haspopup="menu"
-            aria-expanded={menu === "bubble"}
-            className={cn(
-              buttonClass({ size: "sm", variant: menu === "bubble" ? "solid" : "quiet" }),
-              "min-h-9 gap-1.5 px-2.5 text-[0.72rem]"
-            )}
-            title="말풍선 라이브러리"
-          >
-            <MessageCircle size={14} aria-hidden />
-            말풍선
-          </button>
-          </div>
-          <span aria-hidden className="mx-0.5 hidden h-4 w-px shrink-0 bg-line xl:block" />
-        </div>
-        {/* 파일·내보내기 — 드로잉 앱 메뉴바 */}
-        <div
-          data-studio-menubar-actions="true"
-          className={cn(
-            "flex shrink-0 flex-nowrap items-center gap-1",
-            mobileImmersive && "min-w-0 w-full gap-0.5"
-          )}
-        >
-          {isMobile ? (
-            <button
-              type="button"
-              onClick={() => changeMobileImmersiveMode(!mobileImmersive)}
-              aria-pressed={mobileImmersive}
-              aria-label={
-                mobileImmersive
-                  ? "전체 화면 드로잉 종료"
-                  : "전체 화면 드로잉"
-              }
-              data-studio-mobile-app-mode
-              className={cn(
-                buttonClass({
-                  size: "sm",
-                  variant: mobileImmersive ? "solid" : "quiet",
-                  className: "min-h-11 shrink-0 gap-1.5 whitespace-nowrap",
-                }),
-                "sticky left-0 z-20 shadow-[0_0_0_4px_var(--color-canvas)]"
-              )}
-              title={
-                mobileImmersive
-                  ? "일반 화면으로 복원"
-                  : "전체 화면으로 그리기"
-              }
-            >
-              {mobileImmersive ? (
-                <Minimize2 size={15} aria-hidden />
-              ) : (
-                <Maximize2 size={15} aria-hidden />
-              )}
-              {mobileImmersive ? "종료" : "전체화면"}
-            </button>
-          ) : null}
-          {mobileImmersive ? (
-            <>
-              <h1 className="sr-only">드로잉 전체화면</h1>
-              <span
-                className="min-w-0 max-w-40 flex-1 truncate px-1 text-xs font-semibold text-fg-2"
-                title={`${title.trim() || "무제"} · ${pageDisplayName(activePage, activePageIndex)}`}
-              >
-                {title.trim() || "무제"} · {pageDisplayName(activePage, activePageIndex)}
-              </span>
-            </>
-          ) : null}
-          <div ref={exportMenuRef} className="relative flex shrink-0 items-center max-sm:hidden">
-            <button
-              type="button"
-              onClick={() => handleDownload()}
-              className={cn(
-                buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5 pr-2" }),
-                isMobile && "min-h-11"
-              )}
-              title={`현재 페이지를 ${exportScale}× ${exportFormat.toUpperCase()}로 다운로드${exportTransparent && exportFormat === "png" ? " (투명 배경)" : ""}`}
-            >
-              <Download size={14} /> <span className="max-xl:sr-only">다운로드</span>
-              <span className="text-[10px] font-semibold tabular-nums text-fg-3 max-xl:hidden">
-                {exportScale}× {exportFormat.toUpperCase()}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                preloadStudioExportMenuPanel();
-                ensureWatermarkLoaded();
-                setProjectActionsOpen(false);
-                setExportMenuOpen((open) => !open);
-              }}
-              onMouseEnter={preloadStudioExportMenuPanel}
-              onFocus={preloadStudioExportMenuPanel}
-              aria-expanded={exportMenuOpen}
-              aria-label="내보내기 옵션"
-              className={cn(
-                buttonClass({ size: "sm", variant: "quiet", className: "px-1.5" }),
-                isMobile && "min-h-11 min-w-11"
-              )}
-              title="내보내기 옵션 (배율·포맷·투명 배경)"
-            >
-              <ChevronDown size={13} className={cn("transition-transform", exportMenuOpen && "rotate-180")} />
-            </button>
-            {exportMenuOpen && typeof document !== "undefined"
-              ? createPortal(
-                  <Suspense
-                    fallback={
-                      <div
-                        data-studio-export-menu-panel="true"
-                        className="fixed inset-x-2 top-12 z-[100] max-h-[calc(100dvh-4rem)] overflow-y-auto rounded-xl border border-line bg-panel p-3 text-xs text-fg-3 shadow-2xl sm:inset-x-auto sm:right-3 sm:w-72"
-                      >
-                        내보내기 옵션을 여는 중...
-                      </div>
-                    }
-                  >
-                    <StudioExportMenuPanel
-                      canvasWidth={CANVAS_W}
-                      canvasHeight={canvasH}
-                      exportScale={exportScale}
-                      exportFormat={exportFormat}
-                      exportTransparent={exportTransparent}
-                      exportPresetId={exportPresetId}
-                      watermark={watermark}
-                      isExporting={isExporting}
-                      exportTitle={title}
-                      pageCount={pages.length}
-                      pageLabels={pages.map((p, idx) => pageDisplayName(p, idx))}
-                      capturePagesForPreset={handleCapturePagesForPreset}
-                      exportCurrentPageToSvg={exportCurrentPageToSvg}
-                      exportCurrentPageToPsd={exportCurrentPageToPsd}
-                      setExportScale={setExportScale}
-                      setExportFormat={setExportFormat}
-                      setExportTransparent={setExportTransparent}
-                      setExportPresetId={setExportPresetId}
-                      setWatermark={setWatermark}
-                      onCopyToClipboard={handleCopyToClipboard}
-                    />
-                  </Suspense>,
-                  document.body
-                )
-              : null}
-          </div>
-          <div ref={projectActionsRef} className="relative shrink-0 max-sm:hidden">
-            <button
-              type="button"
-              onClick={() => {
-                setExportMenuOpen(false);
-                setProjectActionsOpen((open) => !open);
-              }}
-              aria-haspopup="dialog"
-              aria-expanded={projectActionsOpen}
-              aria-controls="studio-project-actions-menu"
-              className={buttonClass({
-                size: "sm",
-                variant: "quiet",
-                className: "min-h-11 shrink-0 gap-1.5 whitespace-nowrap",
-              })}
-              title="백업·복구·기획·검토·연재·게시 도구"
-            >
-              <Folder size={14} aria-hidden /> <span className="max-xl:sr-only">프로젝트</span>
-              <ChevronDown
-                size={13}
-                className={cn("transition-transform", projectActionsOpen && "rotate-180")}
-                aria-hidden
-              />
-            </button>
-            {projectActionsOpen && typeof document !== "undefined"
-              ? createPortal(
-              <div
-                id="studio-project-actions-menu"
-                data-studio-project-actions-menu="true"
-                role="dialog"
-                aria-label="프로젝트 작업"
-                onClickCapture={(event) => {
-                  const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button");
-                  if (button && !button.dataset.projectKeepOpen) {
-                    globalThis.setTimeout(() => setProjectActionsOpen(false), 0);
-                  }
-                }}
-                className="fixed inset-x-2 top-12 z-[100] grid max-h-[calc(100dvh-4rem)] grid-cols-2 gap-1.5 overflow-y-auto overscroll-contain rounded-xl border border-line bg-panel p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-2xl [scrollbar-gutter:stable] sm:grid-cols-3 sm:inset-x-auto sm:right-3 sm:w-[min(36rem,calc(100vw-1.5rem))] [&>button]:min-h-11 [&>button]:justify-start [&>label]:min-h-11 [&>label]:justify-start"
-              >
-                <div className="col-span-2 flex items-center justify-between gap-3 border-b border-line/60 px-2 py-2 sm:col-span-3">
-                  <span>
-                    <span className="block text-xs font-bold text-fg">파일 · 프로젝트</span>
-                    <span className="mt-0.5 block text-[0.65rem] text-fg-3">백업 · 복구 · 검토 · 내보내기</span>
-                  </span>
-                  <span className="flex shrink-0 items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setProjectActionsOpen(false)}
-                      aria-label="프로젝트 작업 닫기"
-                      className="grid size-11 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg"
-                    >
-                      <X size={17} aria-hidden />
-                    </button>
-                  </span>
-                </div>
-          {pages.length > 1 && (
-            <button
-              type="button"
-              onClick={() => handleDownloadAll(24)}
-              className={buttonClass({
-                size: "sm",
-                variant: "quiet",
-                className: "shrink-0 whitespace-nowrap gap-1.5 bg-accent/10 text-accent hover:bg-accent/20 border-accent/25 border",
-              })}
-              title="모든 페이지를 긴 세로 스크롤 웹툰으로 이어 붙여 다운로드 (내보내기 옵션의 배율·포맷 적용)"
-            >
-              <Download size={14} /> 웹툰 연합 스크롤
-            </button>
-          )}
-          <button type="button" onClick={handleExportProject} className={buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5" })} title="빠른 가독형 백업입니다. 로컬 3D 모델 GLB는 포함되지 않으므로 다른 기기 이동·장기 보관에는 아카이브 백업을 사용하세요.">
-            <Download size={14} /> 백업 (.json)
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleExportProjectArchive()}
-            data-project-keep-open
-            disabled={projectArchiveBusy}
-            className={buttonClass({
-              size: "sm",
-              variant: "quiet",
-              className: "min-h-11 shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-wait disabled:opacity-60",
-            })}
-            title="프로젝트 JSON과 이미지·마스크를 SHA-256 중복 제거·무결성 검증형 단일 archive로 저장"
-          >
-            {projectArchiveBusy ? <Loader2 size={14} className="animate-spin" /> : <Package size={14} />}
-            아카이브 백업
-          </button>
-          <button
-            type="button"
-            onClick={() => setWriterRoomOpen(true)}
-            disabled={collaborationDocumentLocked}
-            className={buttonClass({
-              size: "sm",
-              variant: "quiet",
-              className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
-            })}
-            title={collaborationDocumentLocked ? collaborationLockMessage() : "한 줄 기획부터 시놉시스·비트·장면·컷·대사까지 한 흐름으로 설계하고 AI 초안을 검토"}
-          >
-            <Clapperboard size={14} /> Writer Room
-            {studioWriterRoomHasContent(writerRoom) ? (
-              <span className="rounded-full bg-accent-soft px-1.5 text-[0.65rem] font-bold text-accent">
-                {Object.values(writerRoom.completion).filter(Boolean).length}/7
-              </span>
-            ) : null}
-          </button>
-          <button
-            type="button"
-            onClick={() => setAiProvenanceOpen(true)}
-            className={buttonClass({
-              size: "sm",
-              variant: "quiet",
-              className: "shrink-0 whitespace-nowrap gap-1.5",
-            })}
-            title="AI 작업의 공급자·모델·상태·토큰 사용량을 확인하고 공개 가능한 요약만 내보내기"
-          >
-            <ClipboardCheck size={14} /> AI 작업 이력
-            {aiProvenance.operations.length > 0 ? (
-              <span className="rounded-full bg-cool/10 px-1.5 text-[0.65rem] font-bold text-cool">
-                {aiProvenance.operations.length}
-              </span>
-            ) : null}
-          </button>
-          <button
-            type="button"
-            onClick={() => setCharacterBibleOpen(true)}
-            disabled={collaborationDocumentLocked}
-            className={buttonClass({
-              size: "sm",
-              variant: "quiet",
-              className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
-            })}
-            title={collaborationDocumentLocked ? collaborationLockMessage() : "캐릭터 외형·의상·말투·관계와 AI 고정 제약을 문서에 저장"}
-          >
-            <Bookmark size={14} /> 캐릭터 바이블
-            {characterBible.characters.length > 0 ? (
-              <span className="rounded-full bg-accent-soft px-1.5 text-[0.65rem] font-bold text-accent">
-                {characterBible.characters.length}
-              </span>
-            ) : null}
-          </button>
-          <button
-            type="button"
-            onClick={() => setCheckpointPanelOpen(true)}
-            className={buttonClass({
-              size: "sm",
-              variant: "quiet",
-              className: "shrink-0 whitespace-nowrap gap-1.5",
-            })}
-            title="현재 문서를 이름 있는 복구 지점으로 브라우저에 저장하거나 이전 시점을 복원"
-          >
-            <HistoryIcon size={14} /> 버전
-          </button>
-          <button
-            type="button"
-            onClick={() => void openAutoActions()}
-            disabled={collaborationDocumentLocked}
-            className={buttonClass({
-              size: "sm",
-              variant: "quiet",
-              className: "min-h-11 shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
-            })}
-            title={collaborationDocumentLocked ? collaborationLockMessage() : "허용된 반복 편집 명령을 현재·선택·전체 페이지에 dry run 후 한 번의 실행취소 단계로 적용"}
-          >
-            <WandSparkles size={14} /> Auto Actions
-          </button>
-          <button
-            type="button"
-            data-project-keep-open
-            onClick={() => projectImportInputRef.current?.click()}
-            disabled={collaborationDocumentLocked}
-            className={buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50" })}
-            title={collaborationDocumentLocked ? collaborationLockMessage() : "빠른 .json 백업을 복구합니다. 포함되지 않은 로컬 3D 모델은 원래 기기의 검증 라이브러리에 있어야 합니다."}
-          >
-            <Upload size={14} /> 복구 (.json)
-          </button>
-          <input
-            ref={projectImportInputRef}
-            type="file"
-            accept=".json"
-            className="hidden"
-            disabled={collaborationDocumentLocked}
-            onChange={(event) => {
-              const hasFile = Boolean(event.currentTarget.files?.[0]);
-              handleImportProject(event);
-              if (hasFile) setProjectActionsOpen(false);
-            }}
-          />
-          <button
-            type="button"
-            data-project-keep-open
-            onClick={() => projectArchiveImportInputRef.current?.click()}
-            disabled={projectArchiveBusy || collaborationDocumentLocked}
-            className={cn(
-              buttonClass({
-                size: "sm",
-                variant: "quiet",
-                className: "min-h-11 shrink-0 whitespace-nowrap gap-1.5",
-              }),
-              projectArchiveBusy && "cursor-wait opacity-60",
-              collaborationDocumentLocked && "cursor-not-allowed opacity-50"
-            )}
-            title={collaborationDocumentLocked ? collaborationLockMessage() : "무결성 검증형 .toonproject.zip에서 프로젝트와 포함 자산을 복구"}
-          >
-            <FileUp size={14} /> 아카이브 복구
-          </button>
-          <input
-            ref={projectArchiveImportInputRef}
-            type="file"
-            accept=".toonproject.zip,.zip,application/zip,application/vnd.toonspectrum.project+zip"
-            className="hidden"
-            disabled={projectArchiveBusy || collaborationDocumentLocked}
-            onChange={(event) => void handleImportProjectArchive(event)}
-          />
-          {projectArchiveStatus ? (
-            <span
-              role="status"
-              className={cn(
-                "max-w-80 shrink-0 rounded-lg border px-2 py-1 text-[0.68rem] leading-relaxed",
-                projectArchiveStatus.tone === "good"
-                  ? "border-good/30 bg-good-soft/20 text-good"
-                  : projectArchiveStatus.tone === "warn"
-                    ? "border-warning/30 bg-warning-soft/20 text-warning"
-                    : "border-bad/30 bg-bad-soft/20 text-bad"
-              )}
-            >
-              {projectArchiveStatus.text}
-            </span>
-          ) : null}
-          <button
-            type="button"
-            data-project-keep-open
-            onClick={() => psdImportInputRef.current?.click()}
-            disabled={psdImportBusy || collaborationDocumentLocked}
-            className={cn(
-              buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5" }),
-              psdImportBusy && "cursor-wait opacity-60",
-              collaborationDocumentLocked && "cursor-not-allowed opacity-50"
-            )}
-            title={collaborationDocumentLocked ? collaborationLockMessage() : "포토샵(.psd) 파일의 레이어를 이미지 요소로 가져와요(래스터 평탄화, 편집 가능한 텍스트/조정 레이어는 재현되지 않음)"}
-          >
-            {psdImportBusy ? <Loader2 size={14} className="animate-spin" /> : <FileUp size={14} />}
-            PSD 가져오기
-          </button>
-          <input
-            ref={psdImportInputRef}
-            type="file"
-            accept=".psd,image/vnd.adobe.photoshop"
-            className="hidden"
-            disabled={psdImportBusy || collaborationDocumentLocked}
-            onChange={(event) => void handleImportPsd(event)}
-          />
-          {psdImportStatus && (
-            <span
-              className={cn(
-                "shrink-0 whitespace-nowrap rounded-md border px-2 py-1 text-[10px] leading-snug",
-                psdImportStatus.tone === "good" && "border-good/40 bg-good/10 text-good",
-                psdImportStatus.tone === "warn" && "border-warn/40 bg-warn/10 text-warn"
-              )}
-            >
-              {psdImportStatus.text}
-            </span>
-          )}
-          {sharedDocument?.role === "owner" || loadedWork ? (
-            <button
-              type="button"
-              onClick={() => void openOwnerFxPanel()}
-              disabled={fxPanelLoading}
-              className={buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-wait disabled:opacity-60" })}
-              title="이미 게시된 이 작품의 배경음악·스크롤 모션·컷별 애니메이션 연출을 설정합니다"
-            >
-              {fxPanelLoading ? <Loader2 size={14} className="animate-spin" /> : <Music4 size={14} />}
-              애니메이션 연출
-            </button>
-          ) : null}
-          <button
-            type="button"
-            onClick={() => setProductionInsightsOpen(true)}
-            className={buttonClass({
-              size: "sm",
-              variant: "quiet",
-              className: "shrink-0 whitespace-nowrap gap-1.5",
-            })}
-            title="현재 문서 구조에서 제작 분량·검토·AI 에셋·미해결 항목을 계산"
-          >
-            <GanttChartSquare size={14} /> 제작 인사이트
-          </button>
-          <button
-            type="button"
-            onClick={() => setPublicationOperationsOpen(true)}
-            disabled={collaborationDocumentLocked}
-            className={buttonClass({
-              size: "sm",
-              variant: "quiet",
-              className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
-            })}
-            title={collaborationDocumentLocked ? collaborationLockMessage() : "외부 자동 게시 없이 릴리스 일정과 직접 가져온 성과 기록을 관리"}
-          >
-            <Package size={14} /> 연재 운영
-          </button>
-          <button
-            type="button"
-            onClick={() => setPublishPreflightOpen(true)}
-            className={buttonClass({
-              size: "sm",
-              variant: "quiet",
-              className: "shrink-0 whitespace-nowrap gap-1.5",
-            })}
-            title="WEBTOON·Tapas·일반 게시 패키지의 구조와 AI 사용 고지를 미리 검사"
-          >
-            <ShieldCheck size={14} /> 게시 사전검사
-          </button>
-          <button
-            type="button"
-            onClick={() => setPublishPackageOpen(true)}
-            className={buttonClass({
-              size: "sm",
-              variant: "quiet",
-              className: "shrink-0 whitespace-nowrap gap-1.5",
-            })}
-            title="WEBTOON·Tapas·범용 목적지별 이미지 분할·썸네일·크레딧·검증 매니페스트를 계획"
-          >
-            <Files size={14} /> 게시 패키지
-          </button>
-              </div>,
-              document.body
-            )
-            : null}
-          </div>
-          <button
-            type="button"
-            onClick={() => handleSave("draft")}
-            disabled={saving || collaborationDocumentLocked}
-            title={collaborationDocumentLocked ? collaborationLockMessage() : "현재 원고를 임시저장"}
-            className={cn(
-              buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50" }),
-              isMobile && "min-h-11"
-            )}
-          >
-            {saving ? <Loader2 size={14} className="animate-spin" /> : null}
-            {sharedDocument && sharedDocument.role !== "owner" ? "공동 저장" : "임시저장"}
-          </button>
-          {!sharedDocument || sharedDocument.role === "owner" ? (
-            <button
-              type="button"
-              onClick={() => handleSave("published")}
-              disabled={saving || collaborationDocumentLocked}
-              title={collaborationDocumentLocked ? collaborationLockMessage() : "게시 상태로 저장"}
-              className={cn(
-                buttonClass({ size: "sm", variant: "solid", className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50" }),
-                isMobile && "min-h-11"
-              )}
-            >
-              {saving ? <Loader2 size={14} className="animate-spin" /> : null}
-              {workId ? "수정 게시" : "게시하기"}
-            </button>
-          ) : null}
-        </div>
+        <StudioMenubarContent
+          activePage={activePage}
+          activePageIndex={activePageIndex}
+          activeToolbarGroup={activeToolbarGroup}
+          aiProvenance={aiProvenance}
+          canvasH={canvasH}
+          characterBible={characterBible}
+          collaborationDocumentLocked={collaborationDocumentLocked}
+          collaborationLockMessage={collaborationLockMessage}
+          currentWorkspaceOwnerScope={currentWorkspaceOwnerScope}
+          displayLinkedTitleId={displayLinkedTitleId}
+          exportFormat={exportFormat}
+          exportMenuOpen={exportMenuOpen}
+          exportMenuRef={exportMenuRef}
+          exportPresetId={exportPresetId}
+          exportScale={exportScale}
+          exportTransparent={exportTransparent}
+          fxPanelLoading={fxPanelLoading}
+          isExporting={isExporting}
+          isMobile={isMobile}
+          liveWorkspaceLayout={liveWorkspaceLayout}
+          loadedWork={loadedWork}
+          menu={menu}
+          mobileImmersive={mobileImmersive}
+          pages={pages}
+          projectActionsOpen={projectActionsOpen}
+          projectActionsRef={projectActionsRef}
+          projectArchiveBusy={projectArchiveBusy}
+          projectArchiveImportInputRef={projectArchiveImportInputRef}
+          projectArchiveStatus={projectArchiveStatus}
+          projectImportInputRef={projectImportInputRef}
+          psdImportBusy={psdImportBusy}
+          psdImportInputRef={psdImportInputRef}
+          psdImportStatus={psdImportStatus}
+          saving={saving}
+          setAiProvenanceOpen={setAiProvenanceOpen}
+          setCharacterBibleOpen={setCharacterBibleOpen}
+          setCheckpointPanelOpen={setCheckpointPanelOpen}
+          setExportFormat={setExportFormat}
+          setExportMenuOpen={setExportMenuOpen}
+          setExportPresetId={setExportPresetId}
+          setExportScale={setExportScale}
+          setExportTransparent={setExportTransparent}
+          setMenu={setMenu}
+          setProductionInsightsOpen={setProductionInsightsOpen}
+          setProjectActionsOpen={setProjectActionsOpen}
+          setPublicationOperationsOpen={setPublicationOperationsOpen}
+          setPublishPackageOpen={setPublishPackageOpen}
+          setPublishPreflightOpen={setPublishPreflightOpen}
+          setWriterRoomOpen={setWriterRoomOpen}
+          sharedDocument={sharedDocument}
+          studioMainMenuGroups={studioMainMenuGroups}
+          title={title}
+          watermark={watermark}
+          workId={workId}
+          workspaceMenuEpoch={workspaceMenuEpoch}
+          workspacePersistence={workspacePersistence}
+          workspaceState={workspaceState}
+          workspaceSyncNotice={workspaceSyncNotice}
+          writerRoom={writerRoom}
+          stableHandlers={studioMenubarContentHandlers}
+        />
       </StudioAppMenubar>
 
       <div
@@ -21992,1731 +21694,211 @@ function StudioCuttoonEditor() {
           "max-lg:pointer-events-auto"
         )}
       >
-        {/* 모바일: 가로 스크롤 가능 힌트(좌측 페이드). 데스크톱에선 숨김. */}
-        <span aria-hidden className="pointer-events-none sticky left-0 -ml-1 h-8 w-2 shrink-0 self-stretch bg-gradient-to-r from-panel to-transparent lg:hidden" />
-        {/* Quick Actions — undo/redo/history always near the left of the top bar */}
-        {studioUiDensityAllows(uiDensityMode, "quick-actions") ? (
-          <StudioQuickActionsBar>
-            <button
-              type="button"
-              onClick={undo}
-              disabled={hi === 0 || collaborationDocumentLocked}
-              className={cn(toolBtn(false), "h-8 px-1.5 disabled:opacity-40")}
-              title="실행취소 (⌘Z)"
-              aria-label="실행취소"
-            >
-              <Undo2 size={15} strokeWidth={1.75} />
-            </button>
-            <button
-              type="button"
-              onClick={redo}
-              disabled={hi >= history.length - 1 || collaborationDocumentLocked}
-              className={cn(toolBtn(false), "h-8 px-1.5 disabled:opacity-40")}
-              title="다시실행 (⌘⇧Z)"
-              aria-label="다시실행"
-            >
-              <Redo2 size={15} strokeWidth={1.75} />
-            </button>
-            <button
-              type="button"
-              onClick={() => setHistoryPanelOpen((v) => !v)}
-              aria-pressed={historyPanelOpen}
-              className={cn(toolBtn(historyPanelOpen), "h-8 px-1.5")}
-              title="작업 내역"
-              aria-label="작업 내역"
-            >
-              <HistoryIcon size={15} strokeWidth={1.75} />
-            </button>
-          </StudioQuickActionsBar>
-        ) : null}
-        <StudioToolbarDivider />
-        {/* Main-menu can open these groups even when density hides the belt trigger — keep host mounted.
-            트리거만 sr-hide: 클러스터 전체에 lg:sr-only 를 주면 fixed 팝오버까지 잘려 메뉴가 안 보인다. */}
-        {(studioUiDensityAllows(uiDensityMode, "toolbar-assets") || activeToolbarGroup === "assetGroup") ? (
-        <StudioToolbarCluster
-          label="에셋 라이브러리"
-          className={cn(!studioUiDensityAllows(uiDensityMode, "toolbar-assets") && "border-0 bg-transparent p-0 shadow-none")}
-        >
-        <div ref={activeToolbarGroup === "assetGroup" ? menuRef : undefined} className="relative">
-          <button
-            type="button"
-            onClick={() => {
-              preloadStudioAssetMenuPanel();
-              setMenu(activeToolbarGroup === "assetGroup" ? null : "template");
-            }}
-            onMouseEnter={preloadStudioAssetMenuPanel}
-            onFocus={preloadStudioAssetMenuPanel}
-            aria-haspopup="menu"
-            aria-expanded={activeToolbarGroup === "assetGroup"}
-            className={cn(
-              toolBtn(activeToolbarGroup === "assetGroup"),
-              !studioUiDensityAllows(uiDensityMode, "toolbar-assets") && "sr-only"
-            )}
-            title="템플릿 · 콜라주 · 요소 · 장면 · 클립 · 효과 · 내 에셋"
-          >
-            <Folder size={15} aria-hidden /> 템플릿·에셋
-            <ChevronDown size={12} aria-hidden className={cn("transition-transform duration-150", activeToolbarGroup === "assetGroup" && "rotate-180")} />
-          </button>
-          <StudioFloatingToolPopover
-            open={activeToolbarGroup === "assetGroup"}
-            id="asset-group"
-            className={cn(groupPopoverClass("w-80"), "lg:w-[22rem] lg:max-w-[min(24rem,calc(100vw-1.5rem))]")}
-          >
-              <StudioMenuPopoverHeader
-                icon={Folder}
-                title="템플릿 · 에셋"
-                description="컷 템플릿·콜라주·요소·장면·클립·효과·내 에셋을 한 메뉴에서 고릅니다."
-              />
-              <StudioMenuSubtabs
-                aria-label="에셋 메뉴 구역"
-                activeId={menu}
-                onSelect={(id) => {
-                  if (id === "asset") preloadStudioAssetMenuPanel();
-                  setMenu(id as StudioMenu);
-                }}
-                items={[
-                  { id: "template", label: "템플릿", icon: LayoutTemplate, title: "캔버스·컷 레이아웃 템플릿" },
-                  { id: "collage", label: "콜라주", icon: Grid2x2, title: "이미지 콜라주 배치" },
-                  { id: "elements", label: "요소", icon: Shapes, title: "도형·장식 요소" },
-                  { id: "emeres", label: "이메레스", icon: PenTool, title: "스케치 밑그림 틀" },
-                  { id: "scene", label: "장면", icon: Clapperboard, title: "장면 템플릿" },
-                  { id: "clip", label: "클립", icon: Bookmark, title: "저장된 클립" },
-                  { id: "sticker", label: "효과", icon: StickerIcon, title: "만화 효과·스티커" },
-                  { id: "asset", label: "내 에셋", icon: Library, title: "업로드·생성한 에셋" },
-                ]}
-              />
-              {menu === "template" && (
-                <div className="grid gap-1.5 lg:max-h-80 lg:overflow-y-auto lg:pr-1">
-                  <p className="px-1 text-[0.66rem] font-medium text-fg-3">캔버스 템플릿</p>
-                  {TEMPLATE_GROUPS.map((group) => (
-                    <div key={group.group} className="grid gap-1">
-                      <p className="px-1 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">{group.group}</p>
-                      {group.templates.map((t) => (
-                        <button
-                          key={t.id}
-                          type="button"
-                          onClick={() => applyTemplate(t)}
-                          className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-xs hover:bg-raised"
-                        >
-                          <span className="font-medium text-fg">{t.label}</span>
-                          <span className="text-fg-3">{t.hint}</span>
-                        </button>
-                      ))}
-                    </div>
-                  ))}
-                  {/* 코미Po!식 정형 컷 레이아웃 — 프레임(+말풍선)을 한 번에 배치 */}
-                  <div className="grid gap-1 border-t border-line pt-1.5">
-                    <p className="px-1 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">컷 템플릿 · 정형 레이아웃</p>
-                    {panelLayoutsLoading && panelLayoutPresets.length === 0 && (
-                      <p className="rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">컷 레이아웃을 불러오는 중...</p>
-                    )}
-                    {panelLayoutsError && (
-                      <p className="rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">{panelLayoutsError}</p>
-                    )}
-                    {panelLayoutPresets.map((layout) => (
-                      <button
-                        key={layout.id}
-                        type="button"
-                        onClick={() => void applyPanelLayout(layout)}
-                        className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-xs hover:bg-raised"
-                      >
-                        <span className="font-medium text-fg">{layout.label}</span>
-                        <span className="text-fg-3">{layout.hint}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {menu === "collage" && (
-                <Suspense fallback={<StudioPanelLoading label="콜라주 패널을 여는 중..." />}>
-                  <StudioCollagePanel
-                    canvasW={CANVAS_W}
-                    availableImages={elements
-                      .filter((el): el is ImageEl => el.type === "image" && !el.hidden)
-                      .map((el) => ({
-                        id: el.id,
-                        width: el.width,
-                        height: el.height,
-                      }))}
-                    onApply={applyCollage}
-                  />
-                </Suspense>
-              )}
-              {menu === "elements" && (
-                <Suspense fallback={<StudioPanelLoading label="요소 패널을 여는 중..." />}>
-                  <StudioElementsPanel
-                    onAdd={(item) => {
-                      addCatalogElement(item);
-                    }}
-                  />
-                </Suspense>
-              )}
-              {menu === "emeres" && (
-                <>
-                  <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">이메레스 · 스케치 밑그림 틀</p>
-                  <p className="mb-2 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.66rem] leading-snug text-fg-3">
-                    선택한 틀이 반투명·잠금 밑그림으로 깔리고 펜 모드로 바뀌어요. 그 위에 따라 그린 뒤, 레이어 패널에서 밑그림을 숨기거나 지우세요.
-                  </p>
-                  {emeresUnderlayCount > 0 && (
-                    <button
-                      type="button"
-                      onClick={removeEmeresUnderlays}
-                      className="mb-2 flex w-full items-center justify-center gap-1 rounded-lg border border-bad/40 py-1 text-[0.64rem] font-semibold text-bad transition-colors hover:bg-bad/10"
-                    >
-                      <Trash2 size={11} /> 밑그림 전부 지우기 ({emeresUnderlayCount})
-                    </button>
-                  )}
-                  <div className="mb-2 flex rounded-lg border border-line bg-card p-0.5">
-                    {(["catalog", "mine"] as const).map((tab) => (
-                      <button
-                        key={tab}
-                        type="button"
-                        onClick={() => setEmeresTab(tab)}
-                        aria-pressed={emeresTab === tab}
-                        className={cn(
-                          "flex-1 rounded-md py-1 text-[0.64rem] font-semibold transition-colors",
-                          emeresTab === tab ? "bg-accent text-white" : "text-fg-3 hover:bg-raised"
-                        )}
-                      >
-                        {tab === "catalog" ? "기본 틀" : "내가 만든 틀"}
-                      </button>
-                    ))}
-                  </div>
-                  {emeresTab === "catalog" ? (
-                    <>
-                      {emeresSimilarAnchor && (
-                        <div id="emeres-similar-strip" className="mb-2 rounded-lg border border-accent/30 bg-accent/5 p-2">
-                          <div className="mb-1 flex items-center justify-between gap-2">
-                            <p className="truncate text-[0.66rem] font-semibold text-fg-2">
-                              &ldquo;{emeresSimilarAnchor.label}&rdquo;과(와) 비슷한 스타일
-                            </p>
-                            <button
-                              type="button"
-                              onClick={() => setEmeresSimilarAnchorId(null)}
-                              aria-label="비슷한 스타일 닫기"
-                              className="shrink-0 p-0.5 text-fg-3 hover:text-fg-2"
-                            >
-                              <X size={12} />
-                            </button>
-                          </div>
-                          {emeresSimilarSiblings.length === 0 ? (
-                            <p className="text-[0.64rem] text-fg-3">같은 카테고리의 다른 틀이 없어요.</p>
-                          ) : (
-                            <div className="flex gap-1.5 overflow-x-auto pb-1">
-                              {emeresSimilarSiblings.map((sib) => (
-                                <button
-                                  key={sib.id}
-                                  type="button"
-                                  title={`${sib.label} — ${sib.tip}`}
-                                  onClick={() => addEmeresTemplate(sib)}
-                                  className="w-16 shrink-0 overflow-hidden rounded-lg border border-line bg-card p-1 hover:border-accent/50"
-                                >
-                                  <div className="flex h-12 w-full items-center justify-center overflow-hidden rounded bg-[oklch(0.96_0.006_78)]">
-                                    <img src={svgToDataUrl(sib.svg)} alt={sib.label} className="h-full w-full object-contain" />
-                                  </div>
-                                  <span className="mt-0.5 block truncate text-center text-[0.58rem] text-fg-3">{sib.label}</span>
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      <div className="relative mb-2">
-                        <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-3" />
-                        <input
-                          type="text"
-                          placeholder="이메레스 검색..."
-                          value={emeresSearchQuery}
-                          onChange={(e) => setEmeresSearchQuery(e.target.value)}
-                          className="w-full rounded-lg border border-line bg-card py-1 pl-6 pr-5 text-[0.65rem] placeholder:text-fg-3 outline-none focus:border-accent focus:ring-1 focus:ring-accent/40 transition-colors"
-                        />
-                        {emeresSearchQuery && (
-                          <button
-                            type="button"
-                            onClick={() => setEmeresSearchQuery("")}
-                            aria-label="검색어 지우기" className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-fg-3 hover:text-fg-2 transition-colors"
-                          >
-                            <X size={12} />
-                          </button>
-                        )}
-                      </div>
-                      {studioOptionalAssets.emeresSections.length > 0 && (
-                        <div className="mb-2 flex flex-wrap gap-1">
-                          {["all", ...studioOptionalAssets.emeresSections.map((section) => section.category)].map((category) => (
-                            <button
-                              key={category}
-                              type="button"
-                              onClick={() => setEmeresCategoryFilter(category)}
-                              aria-pressed={emeresCategoryFilter === category}
-                              className={cn(
-                                "rounded-full border px-2 py-0.5 text-[0.66rem] font-medium transition-colors",
-                                emeresCategoryFilter === category ? "border-accent bg-accent text-white" : "border-line bg-card text-fg-3 hover:bg-raised"
-                              )}
-                            >
-                              {category === "all" ? "전체" : category}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                      <div className="max-h-64 space-y-2.5 overflow-y-auto pr-1">
-                        {studioEmeresAssetsLoading && !studioEmeresAssetsLoaded && (
-                          <p className="rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">이메레스 틀을 불러오는 중...</p>
-                        )}
-                        {studioEmeresAssetsError && (
-                          <p className="rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">{studioEmeresAssetsError}</p>
-                        )}
-                        {studioOptionalAssets.emeresSections.length > 0 && emeresSectionsFiltered.length === 0 && (
-                          <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
-                            <p className="text-xs text-fg-3">검색 결과가 없습니다.</p>
-                            <p className="mt-1 text-[0.66rem] text-fg-3 leading-normal">다른 검색어로 찾아보세요.</p>
-                          </div>
-                        )}
-                        {emeresSectionsFiltered.map((section) => (
-                          <div key={section.category}>
-                            <p className="mb-1 px-0.5 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">{section.category}</p>
-                            <div className="grid grid-cols-2 gap-1.5">
-                              {section.templates.map((t) => (
-                                <div
-                                  key={t.id}
-                                  className="group relative overflow-hidden rounded-lg border border-line bg-card p-1 text-left hover:border-accent/50"
-                                >
-                                  <button type="button" title={`${t.label} — ${t.tip}`} onClick={() => addEmeresTemplate(t)} className="block w-full">
-                                    <div className="flex h-20 w-full items-center justify-center overflow-hidden rounded bg-[oklch(0.96_0.006_78)] p-1">
-                                      <img src={svgToDataUrl(t.svg)} alt={t.label} className="h-full w-full object-contain transition-transform group-hover:scale-105" />
-                                    </div>
-                                    <span className="mt-1 block truncate text-center text-[0.66rem] font-medium text-fg-2">{t.label}</span>
-                                  </button>
-                                  {hasSameCategorySiblings(emeresFlatCatalog, t.id) && (
-                                    <button
-                                      type="button"
-                                      onClick={() => setEmeresSimilarAnchorId(t.id)}
-                                      aria-controls="emeres-similar-strip"
-                                      className="mt-0.5 block w-full truncate text-center text-[0.6rem] font-medium text-accent hover:underline"
-                                    >
-                                      비슷한 스타일 더보기
-                                    </button>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  ) : (
-                    <Suspense fallback={<StudioPanelLoading label="내가 만든 틀을 여는 중..." />}>
-                      <StudioEmeresLibraryPanel onPickItem={addEmeresLibraryItem} />
-                    </Suspense>
-                  )}
-                </>
-              )}
-              {menu === "scene" && (
-                <>
-                  <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">장면 템플릿 · 한 번에 깔기</p>
-                  <p className="mb-2 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.66rem] leading-snug text-fg-3">
-                    프레임·말풍선·효과를 미리 조합한 연출을 한 번에 추가해요. 추가한 뒤 대사와 위치만 다듬으면 끝나요.
-                  </p>
-                  {sceneSimilarAnchor && (
-                    <div id="scene-similar-strip" className="mb-2 rounded-lg border border-accent/30 bg-accent/5 p-2">
-                      <div className="mb-1 flex items-center justify-between gap-2">
-                        <p className="truncate text-[0.66rem] font-semibold text-fg-2">
-                          &ldquo;{sceneSimilarAnchor.label}&rdquo;과(와) 비슷한 장면
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => setSceneSimilarAnchorId(null)}
-                          aria-label="비슷한 스타일 닫기"
-                          className="shrink-0 p-0.5 text-fg-3 hover:text-fg-2"
-                        >
-                          <X size={12} />
-                        </button>
-                      </div>
-                      {sceneSimilarSiblings.length === 0 ? (
-                        <p className="text-[0.64rem] text-fg-3">같은 카테고리의 다른 장면 템플릿이 없어요.</p>
-                      ) : (
-                        <div className="grid gap-1">
-                          {sceneSimilarSiblings.map((sib) => (
-                            <button
-                              key={sib.id}
-                              type="button"
-                              onClick={() => void addSceneTemplate(sib)}
-                              className="rounded-lg border border-line bg-card px-2 py-1.5 text-left transition-colors hover:border-accent/50 hover:bg-raised"
-                            >
-                              <span className="block text-xs font-semibold text-fg">{sib.label}</span>
-                              <span className="block text-[0.68rem] text-fg-3">{sib.description}</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
-                    {sceneTemplatesLoading && sceneTemplates.templates.length === 0 && (
-                      <p className="rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">장면 템플릿을 불러오는 중...</p>
-                    )}
-                    {sceneTemplatesError && (
-                      <p className="rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">{sceneTemplatesError}</p>
-                    )}
-                    {sceneTemplates.categories.map((cat) => {
-                      const items = sceneTemplates.templates.filter((template) => template.category === cat.id);
-                      if (items.length === 0) return null;
-                      return (
-                        <div key={cat.id}>
-                          <p className="mb-1 px-0.5 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">{cat.label}</p>
-                          <div className="grid gap-1">
-                            {items.map((t) => (
-                              <div
-                                key={t.id}
-                                className="rounded-lg border border-line bg-card px-2 py-1.5 transition-colors hover:border-accent/50 hover:bg-raised"
-                              >
-                                <button type="button" onClick={() => void addSceneTemplate(t)} className="block w-full text-left">
-                                  <span className="block text-xs font-semibold text-fg">{t.label}</span>
-                                  <span className="block text-[0.68rem] text-fg-3">{t.description}</span>
-                                </button>
-                                {hasSameCategorySiblings(sceneTemplates.templates, t.id) && (
-                                  <button
-                                    type="button"
-                                    onClick={() => setSceneSimilarAnchorId(t.id)}
-                                    aria-controls="scene-similar-strip"
-                                    className="mt-1 block text-[0.62rem] font-medium text-accent hover:underline"
-                                  >
-                                    비슷한 스타일 더보기
-                                  </button>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-              {menu === "clip" && (
-                <>
-                  <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">재사용 클립 보관함</p>
-                  <button
-                    type="button"
-                    onClick={() => void saveSelectionAsClip()}
-                    disabled={!selected}
-                    className={cn(
-                      "mb-2 w-full rounded-lg py-1.5 text-xs font-semibold transition-colors",
-                      selected ? "bg-accent text-on-accent hover:opacity-90" : "cursor-not-allowed bg-card text-fg-3"
-                    )}
-                    title={selected ? "선택한 요소(그룹)를 클립으로 저장" : "먼저 캔버스에서 요소를 선택하세요"}
-                  >
-                    + 선택을 클립으로 저장
-                  </button>
-                  {clips.length === 0 ? (
-                    <p className="rounded-lg border border-dashed border-line px-2 py-4 text-center text-[0.66rem] leading-relaxed text-fg-3">
-                      저장된 클립이 없어요. 포즈 캐릭터나 말풍선 세트를 저장해 다른 컷·회차에서 재사용하세요.
-                    </p>
-                  ) : (
-                    <div className="max-h-64 space-y-1 overflow-y-auto pr-1">
-                      {clips.map((c) => (
-                        <div key={c.id} className="flex items-center gap-1 rounded-lg border border-line bg-card px-2 py-1.5">
-                          <button
-                            type="button"
-                            onClick={() => insertClip(c)}
-                            className="min-w-0 flex-1 truncate text-left text-xs font-medium text-fg transition-colors hover:text-accent"
-                            title="이 클립을 캔버스에 넣기"
-                          >
-                            {c.name}
-                            <span className="ml-1 text-[0.66rem] text-fg-3">{(c.els as unknown[]).length}개</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void deleteClip(c.id)}
-                            aria-label={`${c.name} 클립 삭제`}
-                            className="shrink-0 text-fg-3 transition-colors hover:text-bad"
-                          >
-                            <X size={12} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
-              {menu === "sticker" && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setMenu("elements")}
-                    className="mb-2 flex w-full items-center justify-between gap-2 rounded-lg border border-line bg-card px-2.5 py-2 text-left text-xs hover:border-accent/40 hover:bg-raised"
-                  >
-                    <span className="inline-flex items-center gap-1.5 font-semibold text-fg">
-                      <Shapes size={13} className="text-accent" aria-hidden />
-                      도형 · 프레임 · 배지 요소
-                    </span>
-                    <span className="text-[0.62rem] text-fg-3">요소 탭 →</span>
-                  </button>
-                  <div className="relative mb-2">
-                    <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-3" />
-                    <input
-                      type="text"
-                      placeholder="효과 검색..."
-                      value={fxSearchQuery}
-                      onChange={(e) => setFxSearchQuery(e.target.value)}
-                      className="min-h-11 w-full rounded-lg border border-line bg-card py-1 pl-8 pr-11 text-xs placeholder:text-fg-3 outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/40"
-                    />
-                    {fxSearchQuery && (
-                      <button
-                        type="button"
-                        onClick={() => setFxSearchQuery("")}
-                        aria-label="검색어 지우기" className="absolute right-0 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg-2"
-                      >
-                        <X size={12} />
-                      </button>
-                    )}
-                  </div>
-                  <div className="mb-2 flex flex-wrap gap-1">
-                    {FX_PICKER_SECTIONS.map((section) => (
-                      <button
-                        key={section.id}
-                        type="button"
-                        onClick={() => setFxPickerSection(section.id)}
-                        aria-pressed={fxPickerSection === section.id}
-                        className={cn(
-                          "min-h-8 rounded-full border px-2 text-[0.66rem] font-medium transition-colors pointer-coarse:min-h-11 pointer-coarse:px-3",
-                          fxPickerSection === section.id ? "border-accent bg-accent text-white" : "border-line bg-card text-fg-3 hover:bg-raised"
-                        )}
-                      >
-                        {section.label}
-                      </button>
-                    ))}
-                  </div>
-                  {fxSectionVisible("raster") && fxRasterFiltered.length > 0 && (
-                    <Suspense fallback={<StudioPanelLoading label="장면 소품을 여는 중..." />}>
-                      <StudioRasterAssetGrid
-                        assets={fxRasterFiltered}
-                        busyId={builtinRasterBusyId}
-                        onAdd={(asset) => void addBuiltinRasterAsset(asset)}
-                        favoriteState={assetFavoriteState}
-                        favoriteOnly={rasterFavoriteOnly}
-                        setFavoriteOnly={setRasterFavoriteOnly}
-                        onToggleFavorite={toggleAssetFavorite}
-                      />
-                    </Suspense>
-                  )}
-                  {sfxLoading && !sfxPacks && fxSectionVisible("sfx") && (
-                    <p className="mb-2 rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">효과음을 불러오는 중...</p>
-                  )}
-                  {sfxError && fxSectionVisible("sfx") && (
-                    <p className="mb-2 rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">{sfxError}</p>
-                  )}
-                  {fxSectionVisible("sfx") && fxSfxFiltered.length > 0 && (
-                    <>
-                      <p className="mb-1 text-[0.66rem] font-medium text-fg-3">효과음</p>
-                      <div className="mb-2 flex flex-wrap gap-1">
-                        {fxSfxFiltered.map((s) => (
-                          <button
-                            key={s.id}
-                            type="button"
-                            onClick={() => void addSfxPreset(s)}
-                            title={`${s.label} · ${studioSfx.categories.find((category) => category.id === s.category)?.label ?? ""}`}
-                            className="min-h-9 rounded-md border border-line px-2 text-xs font-bold text-fg hover:bg-raised pointer-coarse:min-h-11"
-                          >
-                            {s.text}
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                  {fxSectionVisible("emoji") && fxEmojisFiltered.length > 0 && (
-                    <>
-                      <p className="mb-1 text-[0.66rem] font-medium text-fg-3">이모지</p>
-                      <div className="grid grid-cols-8 gap-1 mb-2">
-                        {fxEmojisFiltered.map((em) => (
-                          <button
-                            key={em}
-                            type="button"
-                            onClick={() => addSticker(em)}
-                            draggable
-                            onDragStart={(event) => {
-                              event.dataTransfer.setData(
-                                "application/json-insert",
-                                JSON.stringify({ kind: "sticker", emoji: em })
-                              );
-                              event.dataTransfer.effectAllowed = "copy";
-                            }}
-                            title="클릭해 추가하거나 캔버스로 끌어다 원하는 위치에 놓으세요"
-                            className="grid size-9 place-items-center rounded-md text-lg hover:bg-raised pointer-coarse:size-11"
-                          >
-                            {em}
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                  {studioStickerAssetsLoading && !studioStickerAssetsLoaded && (
-                    <p className="mb-2 rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">스티커 에셋을 불러오는 중...</p>
-                  )}
-                  {studioStickerAssetsError && (
-                    <p className="mb-2 rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">
-                      {studioStickerAssetsError}
-                    </p>
-                  )}
-                  <Suspense fallback={<StudioPanelLoading label="스티커 패널을 여는 중..." />}>
-                    {fxSectionVisible("comic") && fxComicFiltered.length > 0 && (
-                      <StudioStickerGrid title="만화 스티커" items={fxComicFiltered} onAdd={addFxOverlay} />
-                    )}
-                    {fxSectionVisible("creature") && fxCreatureFiltered.length > 0 && (
-                      <StudioStickerGrid title="동물·캐릭터" items={fxCreatureFiltered} onAdd={addFxOverlay} />
-                    )}
-                    {fxSectionVisible("prop") && fxPropFiltered.length > 0 && (
-                      <StudioStickerGrid title="소품·오브젝트" items={fxPropFiltered} onAdd={addFxOverlay} />
-                    )}
-                  </Suspense>
-                  {fxSectionVisible("lines") && fxLinePresetsFiltered.length > 0 && (
-                    <>
-                      <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">만화 선 효과</p>
-                      <div className="grid grid-cols-2 gap-2 mb-2">
-                        {fxLinePresetsFiltered.map((preset) => (
-                          <button
-                            key={preset.id}
-                            type="button"
-                            onClick={() => {
-                              if (preset.id === "focus") addFocusLines();
-                              else addSpeedLines();
-                              setMenu(null);
-                            }}
-                            className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-line bg-card px-2 text-xs font-semibold hover:border-accent/50 hover:bg-raised"
-                          >
-                            {preset.id === "focus" ? <ScanLine size={15} aria-hidden /> : <Wind size={15} aria-hidden />}
-                            {preset.label}
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                  {fxSectionVisible("overlay") && fxOverlaysFiltered.length > 0 && (
-                    <>
-                      <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">만화 특수 효과</p>
-                      <div className="grid grid-cols-4 gap-1 max-h-40 overflow-y-auto pr-1">
-                        {fxOverlaysFiltered.map((fx) => (
-                          <button
-                            key={fx.id}
-                            type="button"
-                            title={fx.label}
-                            onClick={() => addFxOverlay(fx.svg, fx.width, fx.height)}
-                            className="group flex flex-col items-center justify-center rounded-lg border border-line bg-card p-1 hover:border-accent/50"
-                          >
-                            <div className="h-10 w-full overflow-hidden bg-neutral-100 dark:bg-neutral-800 rounded flex items-center justify-center p-0.5">
-                              <img src={svgToDataUrl(fx.svg)} alt={fx.label} className="h-full w-full object-contain transition-transform group-hover:scale-105" />
-                            </div>
-                            <span className="block text-center text-[0.55rem] text-fg-3 mt-0.5 truncate w-full">{fx.label}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                  {!fxPickerHasResults && fxQuery !== "" && (
-                    <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
-                      <p className="text-xs text-fg-3">검색 결과가 없습니다.</p>
-                      <p className="mt-1 text-[0.66rem] text-fg-3 leading-normal">다른 검색어로 찾아보세요.</p>
-                    </div>
-                  )}
-                </>
-              )}
-              {menu === "asset" && (
-                <Suspense fallback={<StudioPanelLoading label="에셋 보관함을 여는 중..." />}>
-                  <StudioAssetMenuPanel
-                    assetTab={assetTab}
-                    setAssetTab={setAssetTab}
-                    onUploadAsset={onUploadAsset}
-                    assetPrompt={assetPrompt}
-                    setAssetPrompt={setAssetPrompt}
-                    assetPromptName={assetPromptName}
-                    setAssetPromptName={setAssetPromptName}
-                    assetPromptSize={assetPromptSize}
-                    setAssetPromptSize={setAssetPromptSize}
-                    assetPromptQuality={assetPromptQuality}
-                    setAssetPromptQuality={setAssetPromptQuality}
-                    assetGenerating={assetGenerating}
-                    onGenerateAsset={onGenerateAsset}
-                    assetSearchQuery={assetSearchQuery}
-                    setAssetSearchQuery={setAssetSearchQuery}
-                    assetSortOrder={assetSortOrder}
-                    setAssetSortOrder={setAssetSortOrder}
-                    favoriteState={assetFavoriteState}
-                    favoriteOnly={assetFavoriteOnly}
-                    setFavoriteOnly={setAssetFavoriteOnly}
-                    onToggleFavorite={toggleAssetFavorite}
-                    assets={assets}
-                    assetsLoading={assetsLoading}
-                    renamingAssetId={renamingAssetId}
-                    setRenamingAssetId={setRenamingAssetId}
-                    renamingAssetName={renamingAssetName}
-                    setRenamingAssetName={setRenamingAssetName}
-                    handleRenameAsset={handleRenameAsset}
-                    onUseLocalAsset={(asset) => {
-                      addRenderedImage(asset.dataUrl, asset.width, asset.height);
-                      setMenu(null);
-                    }}
-                    onShareAsset={onShareAsset}
-                    onDeleteAsset={onDeleteAsset}
-                    publishingId={publishingId}
-                    shared={shared}
-                    sharedLoading={sharedLoading}
-                    sharedError={sharedError}
-                    loadSharedAssets={loadSharedAssets}
-                    onUseSharedAsset={onUseSharedAsset}
-                    onDeleteSharedAsset={onDeleteSharedAsset}
-                  />
-                </Suspense>
-              )}
-          </StudioFloatingToolPopover>
-        </div>
-        </StudioToolbarCluster>
-        ) : null}
-
-        {studioUiDensityAllows(uiDensityMode, "toolbar-cut") ? (
-        <>
-        <StudioToolbarDivider label="컷" />
-        <StudioToolbarCluster label="컷 배치">
-        <button type="button" onClick={addFrame} className={toolBtn(false)} title="새 패널 프레임 추가">
-          <Plus size={15} aria-hidden /> 패널
-        </button>
-        <button type="button" onClick={addDiagonalSplit} className={toolBtn(false)} title="기울어진 분할선의 두 패널을 한 번에 추가">
-          <SquareSplitHorizontal size={15} aria-hidden /> 사선 컷
-        </button>
-        {selected?.type === "frame" && (
-          <button
-            type="button"
-            onClick={toggleSelectedFrameDiagonal}
-            className={toolBtn(Boolean(selected.points))}
-            title="선택한 패널을 사선(평행사변형)↔사각형으로"
-          >
-            <SquareSplitHorizontal size={15} aria-hidden className="opacity-90" />
-            {selected.points ? "직선화" : "사선화"}
-          </button>
-        )}
-        </StudioToolbarCluster>
-        </>
-        ) : null}
-
-        {/* 모바일 가로 벨트: 데스크톱은 좌측 세로 레일로 이동 (lg:hidden). */}
-        {studioUiDensityAllows(uiDensityMode, "toolbar-draw") ? (
-        <>
-        <StudioToolbarDivider label="도구" className="lg:hidden" />
-        <StudioToolbarCluster label="그리기 도구" className="lg:hidden">
-        <button type="button" onClick={() => setTool("select")} className={toolBtn(tool === "select")} aria-pressed={tool === "select"} title="선택 (V)">
-          <MousePointer2 size={15} aria-hidden /> 선택
-        </button>
-        <button
-          type="button"
-          disabled={activeSurfaceReviewLocked}
-          title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 펜을 사용할 수 있어요" : "펜 (B)"}
-          onClick={() => {
-            setTool("draw");
-            setDrawMode("pen");
-            setMenu(null);
-          }}
-          className={cn(toolBtn(tool === "draw" && drawMode === "pen"), "disabled:cursor-not-allowed disabled:opacity-40")}
-          aria-pressed={tool === "draw" && drawMode === "pen"}
-        >
-          <Pencil size={15} aria-hidden /> 펜
-        </button>
-        <button
-          type="button"
-          disabled={activeSurfaceReviewLocked}
-          title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 지우개를 사용할 수 있어요" : "지우개 (E)"}
-          onClick={() => {
-            setTool("draw");
-            setDrawMode("eraser");
-            setMenu(null);
-          }}
-          className={cn(toolBtn(tool === "draw" && drawMode === "eraser"), "disabled:cursor-not-allowed disabled:opacity-40")}
-          aria-pressed={tool === "draw" && drawMode === "eraser"}
-        >
-          <Eraser size={15} aria-hidden /> 지우개
-        </button>
-        <button
-          type="button"
-          onClick={toggleAdvancedFill}
-          disabled={!advancedFillActive && advancedFillUnsupportedReason !== null}
-          className={cn(toolBtn(advancedFillActive), "disabled:cursor-not-allowed disabled:opacity-40")}
-          aria-pressed={advancedFillActive}
-          title={advancedFillUnsupportedReason ?? "선택 래스터의 닫힌 영역을 참조 경계로 채우기 (G)"}
-        >
-          <PaintBucket size={15} aria-hidden /> 채우기
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            if (!selected || selected.type !== "image") return;
-            if (!selected.frames || selected.frames.length === 0) {
-              const firstId = uid();
-              patchEl(selected.id, {
-                frames: [{ id: firstId, src: selected.src }],
-                frameFps: DEFAULT_FRAME_FPS,
-                frameLoop: true,
-                activeFrameId: firstId,
-              });
-            }
-            capturedElementIdsRef.current = new Set(elements.map((e) => e.id));
-            setFrameAnimTargetId(selected.id);
-            setFrameAnimOpen((v) => (frameAnimTargetId === selected.id ? !v : true));
-          }}
-          disabled={selected?.type !== "image"}
-          className={cn(toolBtn(frameAnimOpen && frameAnimTargetId === selected?.id), "disabled:opacity-40")}
-          title={selected?.type !== "image" ? "이미지를 선택하면 프레임 애니메이션을 만들 수 있어요" : "선택한 이미지를 프레임별로 그려 애니메이션으로 만들기"}
-        >
-          <Film size={15} aria-hidden /> 프레임
-        </button>
-        </StudioToolbarCluster>
-        </>
-        ) : null}
-
-        {studioUiDensityAllows(uiDensityMode, "toolbar-reference") ? (
-        <>
-        <StudioToolbarDivider label="참조" />
-        <StudioToolbarCluster label="참조·3D">
-        <button
-          type="button"
-          onClick={() => setPoserVrmOpen(true)}
-          className={cn(toolBtn(poserVrmOpen), "border-accent/25 bg-accent-soft/25 text-accent hover:bg-accent-soft/40")}
-          title="무료 베이스 캐릭터를 골라 포즈·표정·의상·색상까지 만들고 투명 배경으로 추가하기"
-        >
-          <UsersRound size={15} aria-hidden /> 3D 캐릭터
-        </button>
-        <button
-          type="button"
-          onClick={() => setReferencePanelOpen((v) => !v)}
-          onMouseEnter={preloadStudioReferencePanel}
-          onFocus={preloadStudioReferencePanel}
-          className={cn(toolBtn(referencePanelOpen), "border-accent/25 bg-accent-soft/25 text-accent hover:bg-accent-soft/40")}
-          aria-pressed={referencePanelOpen}
-          title="참고 이미지 패널 — 그리는 동안 옆에 이미지를 띄워두기"
-        >
-          <PictureInPicture2 size={15} aria-hidden /> 참고
-        </button>
-        </StudioToolbarCluster>
-        </>
-        ) : null}
-
-        {(studioUiDensityAllows(uiDensityMode, "toolbar-scene") || activeToolbarGroup === "bgGroup") ? (
-        <>
-        {studioUiDensityAllows(uiDensityMode, "toolbar-scene") ? <StudioToolbarDivider label="장면" /> : null}
-        <StudioToolbarCluster
-          label="배경·톤"
-          className={cn(!studioUiDensityAllows(uiDensityMode, "toolbar-scene") && "border-0 bg-transparent p-0 shadow-none")}
-        >
-        <div ref={activeToolbarGroup === "bgGroup" ? menuRef : undefined} className="relative">
-          <button
-            type="button"
-            onClick={() => setMenu(activeToolbarGroup === "bgGroup" ? null : "bgFill")}
-            aria-haspopup="menu"
-            aria-expanded={activeToolbarGroup === "bgGroup"}
-            className={cn(
-              toolBtn(activeToolbarGroup === "bgGroup"),
-              !studioUiDensityAllows(uiDensityMode, "toolbar-scene") && "sr-only"
-            )}
-          >
-            <Mountain size={15} aria-hidden /> 배경
-            <ChevronDown size={12} aria-hidden className={cn("transition-transform duration-150", activeToolbarGroup === "bgGroup" && "rotate-180")} />
-          </button>
-          <StudioFloatingToolPopover
-            open={activeToolbarGroup === "bgGroup"}
-            id="bg-group"
-            className={groupPopoverClass("w-80")}
-          >
-              <StudioMenuPopoverHeader
-                icon={Mountain}
-                title="배경 편집"
-                description="채우기·캔버스 크기, 2D 씬, 톤, 3D를 한곳에서 고르세요."
-              />
-              <StudioMenuSubtabs
-                aria-label="배경 메뉴 구역"
-                activeId={
-                  menu === "bgScene" || menu === "tone" || menu === "bgFill" ? menu : "bgFill"
-                }
-                onSelect={(id) => {
-                  if (id === "bg3d") {
-                    setBg3dInitialScene(undefined);
-                    setBg3dInitialDataUrl(undefined);
-                    setBg3dInitialElementId(undefined);
-                    setBg3dOpen(true);
-                    setMenu(null);
-                    return;
-                  }
-                  setMenu(id as StudioMenu);
-                }}
-                items={[
-                  { id: "bgFill", label: "편집", icon: Droplets, title: "채우기·크기·비율 리사이저" },
-                  { id: "bgScene", label: "씬", icon: ImageIcon, title: "2D 배경 씬" },
-                  { id: "tone", label: "톤", icon: Grid2x2, title: "만화 스크린톤" },
-                  { id: "bg3d", label: "3D", icon: Boxes, title: "3D 배경 블록아웃" },
-                ]}
-              />
-              {menu === "bgFill" && (
-                <Suspense fallback={<StudioPanelLoading label="배경 편집기를 여는 중..." />}>
-                  <StudioBackgroundPanel
-                    canvasW={CANVAS_W}
-                    canvasH={canvasH}
-                    currentBg={bg}
-                    currentBgGrad={bgGrad}
-                    onApply={(payload) => {
-                      void applyStudioBackgroundFill(payload);
-                    }}
-                    sizeSlot={
-                      <StudioCanvasResizer
-                        canvasW={CANVAS_W}
-                        canvasH={canvasH}
-                        strategy={magicResizeStrategy}
-                        onStrategyChange={setMagicResizeStrategy}
-                        disabled={masterEditMode}
-                        onSetHeight={(height) => {
-                          if (masterEditMode) return;
-                          setCanvasH(height);
-                          announceDrawingShortcut(`캔버스 높이 ${height}px`);
-                        }}
-                        onMagicResizePreset={(preset) => {
-                          applyMagicResizePreset(preset);
-                          announceDrawingShortcut(`${preset.label} 규격 적용`);
-                        }}
-                      />
-                    }
-                  />
-                </Suspense>
-              )}
-              {menu === "bgScene" && (
-                <>
-                  <div className="mb-2 flex items-start gap-2 rounded-xl border border-line bg-card px-2.5 py-2">
-                    <ImageIcon size={14} className="mt-0.5 shrink-0 text-accent" aria-hidden />
-                    <div className="min-w-0">
-                      <p className="text-[0.72rem] font-bold text-fg">2D 배경 씬</p>
-                      <p className="text-[0.62rem] leading-snug text-fg-3">
-                        탭하면 모든 패널에 깔려요. 한 컷만 바꾸려면 그 패널을 먼저 선택한 뒤 골라 주세요.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="relative mb-2">
-                    <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-3" />
-                    <input
-                      type="text"
-                      placeholder="배경 씬 검색..."
-                      value={bgSceneSearchQuery}
-                      onChange={(e) => setBgSceneSearchQuery(e.target.value)}
-                      className="w-full rounded-lg border border-line bg-card py-1 pl-6 pr-5 text-[0.65rem] placeholder:text-fg-3 outline-none focus:border-accent focus:ring-1 focus:ring-accent/40 transition-colors"
-                    />
-                    {bgSceneSearchQuery && (
-                      <button
-                        type="button"
-                        onClick={() => setBgSceneSearchQuery("")}
-                        aria-label="검색어 지우기" className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-fg-3 hover:text-fg-2 transition-colors"
-                      >
-                        <X size={12} />
-                      </button>
-                    )}
-                  </div>
-                  {studioOptionalAssets.bgSceneSections.length > 0 && (
-                    <div className="mb-2 flex flex-wrap gap-1">
-                      {["all", ...studioOptionalAssets.bgSceneSections.map((group) => group.genre)].map((genre) => (
-                        <button
-                          key={genre}
-                          type="button"
-                          onClick={() => setBgSceneGenreFilter(genre)}
-                          aria-pressed={bgSceneGenreFilter === genre}
-                          className={cn(
-                            "rounded-full border px-2 py-0.5 text-[0.66rem] font-medium transition-colors",
-                            bgSceneGenreFilter === genre ? "border-accent bg-accent text-on-accent" : "border-line bg-card text-fg-3 hover:bg-raised"
-                          )}
-                        >
-                          {genre === "all" ? "전체" : genre}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <div className="max-h-64 space-y-2.5 overflow-y-auto pr-1">
-                    {studioBgSceneAssetsLoading && !studioBgSceneAssetsLoaded && (
-                      <p className="rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">배경 씬을 불러오는 중...</p>
-                    )}
-                    {studioBgSceneAssetsError && (
-                      <p className="rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">
-                        {studioBgSceneAssetsError}
-                      </p>
-                    )}
-                    {studioOptionalAssets.bgSceneSections.length > 0 && bgSceneSectionsFiltered.length === 0 && (
-                      <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
-                        <p className="text-xs text-fg-3">검색 결과가 없습니다.</p>
-                        <p className="mt-1 text-[0.66rem] text-fg-3 leading-normal">다른 검색어로 찾아보세요.</p>
-                      </div>
-                    )}
-                    {bgSceneSectionsFiltered.map((group) => (
-                      <div key={group.genre}>
-                        <p className="mb-1 px-0.5 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">{group.genre}</p>
-                        <div className="grid grid-cols-3 gap-1.5">
-                          {group.scenes.map((bg) => (
-                            <button
-                              key={bg.id}
-                              type="button"
-                              title={bg.label}
-                              onClick={() => addBgScene(bg)}
-                              className="group relative overflow-hidden rounded-lg border border-line bg-card p-1 text-left hover:border-accent/50"
-                            >
-                              <div className="h-16 w-full overflow-hidden rounded bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
-                                <img src={resolveAssetUrl(bg.imgSrc || svgToDataUrl(bg.svg || ""))} alt={bg.label} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
-                              </div>
-                              <span className="block text-center text-[0.66rem] text-fg-2 font-medium mt-1 truncate">{bg.label}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-              {menu === "tone" && (
-                <>
-                  <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">만화 스크린톤</p>
-                  <p className="mb-2 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.66rem] leading-snug text-fg-3">
-                    톤을 누르면 캔버스에 깔려요. 패널을 먼저 선택하면 그 칸을 덮고, 망점 크기는 칸에 맞춰 일정하게 유지됩니다.
-                  </p>
-                  <div className="relative mb-2">
-                    <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-3" />
-                    <input
-                      type="text"
-                      placeholder="톤 검색 (망점·선·교차선...)"
-                      value={toneSearchQuery}
-                      onChange={(e) => setToneSearchQuery(e.target.value)}
-                      className="w-full rounded-lg border border-line bg-card py-1 pl-6 pr-5 text-[0.65rem] placeholder:text-fg-3 outline-none focus:border-accent focus:ring-1 focus:ring-accent/40 transition-colors"
-                    />
-                    {toneSearchQuery && (
-                      <button
-                        type="button"
-                        onClick={() => setToneSearchQuery("")}
-                        aria-label="검색어 지우기" className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-fg-3 hover:text-fg-2 transition-colors"
-                      >
-                        <X size={12} />
-                      </button>
-                    )}
-                  </div>
-                  <div className="max-h-72 overflow-y-auto pr-1">
-                    <Suspense fallback={<StudioPanelLoading label="톤 패널을 여는 중..." />}>
-                      <StudioTonePanel onPick={(svg) => void addTone(svg)} query={toneSearchQuery} />
-                    </Suspense>
-                  </div>
-                </>
-              )}
-          </StudioFloatingToolPopover>
-        </div>
-        </StudioToolbarCluster>
-        </>
-        ) : null}
-
-        {(studioUiDensityAllows(uiDensityMode, "toolbar-style") || activeToolbarGroup === "styleGroup") ? (
-        <StudioToolbarCluster
-          label="스타일"
-          className={cn(!studioUiDensityAllows(uiDensityMode, "toolbar-style") && "border-0 bg-transparent p-0 shadow-none")}
-        >
-        <div ref={activeToolbarGroup === "styleGroup" ? menuRef : undefined} className="relative">
-          <button
-            type="button"
-            onClick={() => setMenu(activeToolbarGroup === "styleGroup" ? null : "palette")}
-            aria-haspopup="menu"
-            aria-expanded={activeToolbarGroup === "styleGroup"}
-            className={cn(
-              toolBtn(activeToolbarGroup === "styleGroup"),
-              !studioUiDensityAllows(uiDensityMode, "toolbar-style") && "sr-only"
-            )}
-            title="색상 팔레트 · 브랜드 킷(글꼴·로고)"
-          >
-            <Palette size={15} aria-hidden /> 스타일
-            <ChevronDown size={12} aria-hidden className={cn("transition-transform duration-150", activeToolbarGroup === "styleGroup" && "rotate-180")} />
-          </button>
-          <StudioFloatingToolPopover
-            open={activeToolbarGroup === "styleGroup"}
-            id="style-group"
-            className={groupPopoverClass("w-72")}
-          >
-              <StudioMenuPopoverHeader
-                icon={Palette}
-                title="스타일"
-                description="팔레트와 브랜드 킷으로 작품 톤을 고정합니다."
-              />
-              <StudioMenuSubtabs
-                aria-label="스타일 메뉴 구역"
-                activeId={menu === "palette" || menu === "brandKit" ? menu : "palette"}
-                onSelect={(id) => setMenu(id as StudioMenu)}
-                items={[
-                  { id: "palette", label: "팔레트", icon: Palette, title: "색상 팔레트 저장·가져오기(.gpl)·내보내기" },
-                  { id: "brandKit", label: "브랜드 킷", icon: Package, title: "팔레트·글꼴·로고를 묶은 브랜드 킷 저장·적용" },
-                ]}
-              />
-              {menu === "palette" && <StudioPaletteLibraryPanel onPickColor={(hex) => setColor(hex)} seedColors={recentColors} />}
-              {menu === "brandKit" && (
-                <Suspense fallback={<StudioPanelLoading label="브랜드 킷 패널을 여는 중..." />}>
-                  <StudioBrandKitPanel
-                    onPickColor={(hex) => setColor(hex)}
-                    canApplyFont={!!selected && (selected.type === "text" || selected.type === "bubble")}
-                    onApplyFont={applyBrandKitFont}
-                    onApplyLogo={applyBrandKitLogo}
-                  />
-                </Suspense>
-              )}
-          </StudioFloatingToolPopover>
-        </div>
-        </StudioToolbarCluster>
-        ) : null}
-
-        {(studioUiDensityAllows(uiDensityMode, "toolbar-ai") || activeToolbarGroup === "aiGroup") ? (
-        <>
-        {studioUiDensityAllows(uiDensityMode, "toolbar-ai") ? <StudioToolbarDivider label="AI" /> : null}
-        <StudioToolbarCluster
-          label="AI 연동"
-          className={cn(!studioUiDensityAllows(uiDensityMode, "toolbar-ai") && "border-0 bg-transparent p-0 shadow-none")}
-        >
-        <div ref={activeToolbarGroup === "aiGroup" ? menuRef : undefined} className="relative">
-          <button
-            type="button"
-            onClick={() => setMenu(activeToolbarGroup === "aiGroup" ? null : "aiAssist")}
-            aria-haspopup="menu"
-            aria-expanded={activeToolbarGroup === "aiGroup"}
-            className={cn(
-              toolBtn(activeToolbarGroup === "aiGroup"),
-              !studioUiDensityAllows(uiDensityMode, "toolbar-ai") && "sr-only"
-            )}
-            title="AI 어시스트 · 시나리오 설계 · 스톡 사진 · 연동 설정 — Z.ai/DeepSeek 서버 텍스트 또는 내 API 연동"
-          >
-            <WandSparkles size={15} aria-hidden /> AI
-            <ChevronDown size={12} aria-hidden className={cn("transition-transform duration-150", activeToolbarGroup === "aiGroup" && "rotate-180")} />
-          </button>
-          <StudioFloatingToolPopover
-            open={activeToolbarGroup === "aiGroup"}
-            id="ai-group"
-            className={cn(
-              groupPopoverClass("w-80"),
-              // Fixed flex column: nested max-heights previously clipped generate buttons.
-              "flex h-[min(78dvh,36rem)] max-h-[min(78dvh,36rem)] flex-col overflow-hidden lg:w-96 lg:max-w-[min(24rem,calc(100vw-1.5rem))]"
-            )}
-          >
-              <StudioMenuPopoverHeader
-                icon={WandSparkles}
-                title="AI 연동"
-                description="초안·스톡·시나리오를 연결하고, 키 설정은 연동 탭에서 관리합니다."
-                className="shrink-0"
-              />
-              <StudioMenuSubtabs
-                aria-label="AI 메뉴 구역"
-                className="shrink-0"
-                activeId={
-                  menu === "aiAssist" || menu === "stockImage" || menu === "integrations"
-                    ? menu
-                    : "aiAssist"
-                }
-                onSelect={(id) => {
-                  if (id === "scenario") {
-                    if (masterEditMode) return;
-                    setScenarioOpen(true);
-                    setMenu(null);
-                    return;
-                  }
-                  if (id === "stockImage") preloadStudioStockImagePanel();
-                  if (id === "integrations") preloadStudioIntegrationsSettingsPanel();
-                  setMenu(id as StudioMenu);
-                }}
-                items={[
-                  { id: "aiAssist", label: "어시스트", icon: Sparkles, title: "BYOK 배경·캐릭터·구도 제안" },
-                  { id: "scenario", label: "시나리오", icon: Clapperboard, disabled: masterEditMode, title: masterEditMode ? "마스터 편집 중에는 사용할 수 없어요" : "시나리오 설계" },
-                  { id: "stockImage", label: "스톡", icon: Images, title: "Unsplash 무료 사진" },
-                  { id: "integrations", label: "설정", icon: Settings2, title: "API 키·연동 설정" },
-                ]}
-              />
-              {menu === "aiAssist" && (
-                <div className="flex min-h-0 flex-1 flex-col">
-                <Suspense fallback={<StudioPanelLoading label="AI 어시스트 패널을 여는 중..." />}>
-                  <StudioAiAssistHub
-                    className="min-h-0 flex-1"
-                    activeTool={aiAssistTool}
-                    onToolChange={setAiAssistTool}
-                    imageConfigured={isStudioAiConfigured(aiSettings)}
-                    textConfigured={textAiConfigured}
-                    connectionOk={textAiConfigured || isStudioAiConfigured(aiSettings)}
-                    connectionLabel={
-                      textAiConfigured
-                        ? textAiTransport.mode === "server"
-                          ? `${activeServerAiProviderLabel} 연결됨`
-                          : "내 API 연결됨"
-                        : isStudioAiConfigured(aiSettings)
-                          ? "이미지 API 연결됨"
-                          : serverAiStatus?.configured
-                            ? "로그인 또는 API 키 필요"
-                            : "API 키 등록 필요"
-                    }
-                    onOpenSettings={() => {
-                      preloadStudioIntegrationsSettingsPanel();
-                      setMenu("integrations");
-                    }}
-                    onPreloadSettings={preloadStudioIntegrationsSettingsPanel}
-                    recentState={aiRecentPrompts}
-                    onApplyPresetPrompt={applyAiAssistPresetPrompt}
-                    providerSlot={
-                      textAiTransport.mode === "server" && configuredServerAiProviders.length > 0 ? (
-                        <div className="rounded-xl border border-line bg-card/35 p-2.5">
-                          <label className="flex items-center justify-between gap-2 text-xs font-semibold text-fg-2">
-                            <span>텍스트 AI 제공자</span>
-                            <select
-                              value={serverAiProvider}
-                              onChange={(event) =>
-                                updateServerAiProvider(event.target.value as StudioServerAiProviderPreference)
-                              }
-                              className="min-h-11 min-w-0 rounded-lg border border-line bg-panel px-2 text-xs text-fg outline-none focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/25"
-                              aria-label="서버 텍스트 AI 제공자"
-                            >
-                              <option value="auto">자동 전환</option>
-                              <option
-                                value="zai"
-                                disabled={!configuredServerAiProviders.some((provider) => provider.id === "zai")}
-                              >
-                                Z.ai
-                              </option>
-                              <option
-                                value="deepseek"
-                                disabled={!configuredServerAiProviders.some((provider) => provider.id === "deepseek")}
-                              >
-                                DeepSeek
-                              </option>
-                            </select>
-                          </label>
-                          <p className="mt-1.5 text-[0.65rem] leading-relaxed text-fg-3">
-                            잔액·패키지 한도 소진 시 다른 제공자로 전환합니다. 일반 오류는 이중 과금을 막기 위해
-                            자동 재전송하지 않아요.
-                          </p>
-                        </div>
-                      ) : null
-                    }
-                    toolPanel={
-                      <>
-                        {aiAssistTool === "background" ? (
-                          <StudioAiBackgroundPanel
-                            configured={isStudioAiConfigured(aiSettings)}
-                            prompt={aiBgPrompt}
-                            onPromptChange={setAiBgPrompt}
-                            size={aiBgSize}
-                            onSizeChange={setAiBgSize}
-                            busy={aiBgBusy}
-                            error={aiBgError}
-                            onGenerate={onGenerateAiBackground}
-                          />
-                        ) : null}
-                        {aiAssistTool === "character" ? (
-                          <StudioAiCharacterConsistencyPanel
-                            configured={isStudioAiConfigured(aiSettings)}
-                            hasReference={selected?.type === "image"}
-                            referenceThumbnail={selected?.type === "image" ? selected.src : null}
-                            prompt={aiCharacterPrompt}
-                            onPromptChange={setAiCharacterPrompt}
-                            busy={aiCharacterBusy}
-                            error={aiCharacterError}
-                            onGenerate={() => {
-                              const prompt = aiCharacterPrompt.trim();
-                              if (prompt) {
-                                setAiRecentPrompts(
-                                  pushStudioAiRecentPrompt(globalThis.localStorage, "character", prompt)
-                                );
-                              }
-                              onGenerateAiCharacter();
-                            }}
-                          />
-                        ) : null}
-                        {aiAssistTool === "composition" ? (
-                          <StudioAiCompositionPanel
-                            settings={aiSettings}
-                            transport={textAiTransport}
-                            configured={textAiConfigured}
-                            sceneText={aiCompositionDraft}
-                            onSceneTextChange={setAiCompositionDraft}
-                            onInsertAsNote={insertAiCompositionNote}
-                            onOperationStart={(prompt) => {
-                              setAiRecentPrompts(
-                                pushStudioAiRecentPrompt(globalThis.localStorage, "composition", prompt)
-                              );
-                              const provider = pendingTextAiProviderContext();
-                              return beginTrackedStudioAiOperation("composition", {
-                                kind: "text",
-                                task: "composition",
-                                provider: provider.provider,
-                                model: provider.model,
-                                transport: provider.transport,
-                                promptVersion: 1,
-                                prompt,
-                                target: { pageId: activePage.id },
-                                references: [],
-                              });
-                            }}
-                            onOperationSettled={({ operationId, result, textProvenance }) => {
-                              settleTrackedTextAiOperation(operationId, result, textProvenance);
-                            }}
-                          />
-                        ) : null}
-                        {aiAssistTool === "dialogue" ? (
-                          <StudioDialogueSuggestPanel
-                            configured={textAiConfigured}
-                            situationText={aiDialogueSuggestSituation}
-                            onSituationTextChange={setAiDialogueSuggestSituation}
-                            hasContext={activePage.elements.some(
-                              (el) => (el.type === "bubble" || el.type === "text") && el.text.trim().length > 0
-                            )}
-                            includeContext={aiDialogueSuggestIncludeContext}
-                            onIncludeContextChange={setAiDialogueSuggestIncludeContext}
-                            busy={aiDialogueSuggestBusy}
-                            error={aiDialogueSuggestError}
-                            candidates={aiDialogueSuggestCandidates}
-                            onGenerate={() => {
-                              const prompt = aiDialogueSuggestSituation.trim();
-                              if (prompt) {
-                                setAiRecentPrompts(
-                                  pushStudioAiRecentPrompt(globalThis.localStorage, "dialogue", prompt)
-                                );
-                              }
-                              void executeSuggestDialogueLines();
-                            }}
-                            canInsertToSelected={
-                              !!selected && (selected.type === "bubble" || selected.type === "text")
-                            }
-                            onAddToScript={addDialogueSuggestionToScript}
-                            onInsertToSelected={insertDialogueSuggestionToSelected}
-                          />
-                        ) : null}
-                        {aiAssistTool === "palette" ? (
-                          <StudioPaletteSuggestPanel
-                            configured={textAiConfigured}
-                            moodText={aiPaletteSuggestMood}
-                            onMoodTextChange={setAiPaletteSuggestMood}
-                            busy={aiPaletteSuggestBusy}
-                            error={aiPaletteSuggestError}
-                            suggestion={aiPaletteSuggestion}
-                            savedMessage={aiPaletteSuggestSavedMsg}
-                            onGenerate={() => {
-                              const prompt = aiPaletteSuggestMood.trim();
-                              if (prompt) {
-                                setAiRecentPrompts(
-                                  pushStudioAiRecentPrompt(globalThis.localStorage, "palette", prompt)
-                                );
-                              }
-                              void executeSuggestColorPalette();
-                            }}
-                            onSaveToLibrary={saveSuggestedPaletteToLibrary}
-                          />
-                        ) : null}
-                      </>
-                    }
-                  />
-                </Suspense>
-                </div>
-              )}
-              {menu === "stockImage" && (
-                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-                  <Suspense fallback={<StudioPanelLoading label="스톡 사진 패널을 여는 중..." />}>
-                    <StudioStockImagePanel
-                      onInsert={insertStockImage}
-                      onOpenSettings={() => {
-                        preloadStudioIntegrationsSettingsPanel();
-                        setMenu("integrations");
-                      }}
-                    />
-                  </Suspense>
-                </div>
-              )}
-              {menu === "integrations" && (
-                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-                  <Suspense fallback={<StudioPanelLoading label="연동 설정 패널을 여는 중..." />}>
-                    <StudioIntegrationsSettingsPanel aiSettings={aiSettings} onAiSettingsChange={updateAiSettings} />
-                  </Suspense>
-                </div>
-              )}
-          </StudioFloatingToolPopover>
-        </div>
-        </StudioToolbarCluster>
-        </>
-        ) : null}
-
-        {/* 삽입 코어 — 밀도 모드와 무관하게 항상 노출(텍스트·말풍선은 예전에 AI 클러스터에 묶여
-            simple/focus 에서 통째로 사라지던 회귀를 분리). */}
-        {studioUiDensityAllows(uiDensityMode, "toolbar-insert") ? (
-        <>
-        <StudioToolbarDivider label="삽입" />
-        <StudioToolbarCluster label="삽입·대사">
-        <button
-          type="button"
-          onClick={() => addText()}
-          draggable
-          onDragStart={(event) => {
-            event.dataTransfer.setData("application/json-insert", JSON.stringify({ kind: "text" }));
-            event.dataTransfer.effectAllowed = "copy";
-          }}
-          className={toolBtn(false)}
-          title="텍스트 넣기 — 클릭해 추가하거나 캔버스로 끌어다 원하는 위치에 놓으세요"
-        >
-          <TypeIcon size={14} aria-hidden /> 텍스트
-        </button>
-        <div ref={menu === "bubble" ? menuRef : undefined} className="relative">
-          <button
-            type="button"
-            onClick={() => setMenu(menu === "bubble" ? null : "bubble")}
-            aria-haspopup="menu"
-            aria-expanded={menu === "bubble"}
-            className={toolBtn(menu === "bubble")}
-            title="말풍선 라이브러리"
-          >
-            <MessageCircle size={14} aria-hidden /> 말풍선
-          </button>
-          <StudioFloatingToolPopover
-            open={menu === "bubble"}
-            id="bubble-menu"
-            className="fixed inset-x-2 top-[4.5rem] z-[70] max-h-[calc(100dvh-13rem)] w-auto overflow-y-auto rounded-2xl border border-line/70 bg-panel p-0 shadow-xl lg:inset-x-auto lg:left-3 lg:top-[4.5rem] lg:max-h-[min(42rem,calc(100dvh-7rem))] lg:w-[22rem] lg:max-w-[calc(100vw-1.5rem)]"
-          >
-              <div className="relative overflow-hidden border-b border-line/50 bg-gradient-to-br from-accent-soft/35 via-card/60 to-panel px-3 pb-3 pt-3">
-                <div
-                  aria-hidden
-                  className="pointer-events-none absolute -right-4 -top-6 size-20 rounded-full bg-accent/10 blur-2xl"
-                />
-                <div className="relative flex items-start gap-2.5">
-                  <span className="grid size-10 shrink-0 place-items-center rounded-2xl border border-accent/25 bg-accent-soft text-accent shadow-[inset_0_1px_0_oklch(0.95_0.02_85_/_0.12)]">
-                    <MessageCircle size={18} aria-hidden strokeWidth={1.75} />
-                  </span>
-                  <div className="min-w-0 pt-0.5">
-                    <p className="text-[0.9rem] font-semibold tracking-tight text-fg">말풍선 골라 넣기</p>
-                    <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
-                      장면에 맞는 목소리를 고르면 돼요. 대충 골라도 나중에 바꿀 수 있어요.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMenu(null);
-                        openFeatureTutorial("bubble");
-                      }}
-                      className="mt-1.5 text-[0.65rem] font-medium text-accent/90 underline-offset-2 transition-colors hover:text-accent hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                    >
-                      말풍선 튜토리얼 보기
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-3 p-2.5" role="menu" aria-label="말풍선 종류">
-                {groupBubbleVariants().map((section) => (
-                  <div key={section.group}>
-                    <p className="mb-1.5 flex items-center gap-1.5 px-1 text-[0.62rem] font-semibold text-fg-3">
-                      <span className="inline-block size-1 rounded-full bg-accent/55" aria-hidden />
-                      {section.group}
-                    </p>
-                    <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-                      {section.variants.map((v) => (
-                        <button
-                          key={v.id}
-                          type="button"
-                          role="menuitem"
-                          onClick={() => addBubble(v.id)}
-                          // 클릭=중앙/패널 규칙, 드래그=캔버스 드롭 지점 배치(onWrapDrop 이 처리).
-                          draggable
-                          onDragStart={(event) => {
-                            event.dataTransfer.setData(
-                              "application/json-insert",
-                              JSON.stringify({ kind: "bubble", variant: v.id })
-                            );
-                            event.dataTransfer.effectAllowed = "copy";
-                          }}
-                          title={`${v.label} — 클릭해 추가하거나 캔버스로 끌어다 원하는 위치에 놓으세요`}
-                          className="group flex min-h-[5.75rem] flex-col rounded-2xl border border-line/55 bg-gradient-to-b from-card/90 to-canvas/30 p-2 text-left shadow-[inset_0_1px_0_oklch(0.95_0.02_85_/_0.04)] transition-[border-color,background,transform,box-shadow] duration-200 ease-out hover:-translate-y-px hover:border-accent/40 hover:bg-raised/80 hover:shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:translate-y-0"
-                        >
-                          <span className="flex h-12 items-center justify-center rounded-xl bg-canvas/45 ring-1 ring-line/35 transition-colors group-hover:bg-accent-soft/25 group-hover:ring-accent/20">
-                            <StudioBubbleVariantGlyph
-                              variant={v.id}
-                              className="h-10 w-full text-fg-2 transition-colors duration-200 group-hover:text-accent"
-                            />
-                          </span>
-                          <span className="mt-1.5 block text-[0.78rem] font-semibold tracking-tight text-fg">
-                            {v.label}
-                          </span>
-                          <span className="mt-0.5 block text-[0.6rem] leading-snug text-fg-3">{v.hint}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="space-y-2 border-t border-line/50 bg-canvas/25 px-2.5 py-2.5">
-                <div>
-                  <p className="text-[0.72rem] font-semibold text-fg-2">대사를 한 번에</p>
-                  <p className="mt-0.5 text-[0.64rem] leading-snug text-fg-3">
-                    한 줄에 한 마디. <span className="text-fg-2">이름: 대사</span>면 화자 자동,
-                    <span className="text-fg-2"> (지문)</span>은 나레이션.
-                  </p>
-                </div>
-                <textarea
-                  value={dialogueScript}
-                  onChange={(e) => setDialogueScript(e.target.value)}
-                  placeholder={"민수: 안녕?\n지영: 오랜만이야\n(잠시 후)"}
-                  spellCheck
-                  rows={4}
-                  className="w-full resize-y rounded-xl border border-line/60 bg-card/80 px-2.5 py-2 text-[0.7rem] leading-relaxed text-fg outline-none transition-colors placeholder:text-fg-3/80 focus:border-accent/45 focus:bg-card"
-                />
-                <button
-                  type="button"
-                  onClick={() => void addDialogueBubbles()}
-                  disabled={!dialogueScript.trim()}
-                  className={cn(
-                    "w-full rounded-xl py-2 text-xs font-semibold transition-[opacity,transform,background] duration-150",
-                    dialogueScript.trim()
-                      ? "bg-accent text-on-accent shadow-sm hover:opacity-95 active:scale-[0.99]"
-                      : "cursor-not-allowed bg-card text-fg-3 ring-1 ring-line/50"
-                  )}
-                >
-                  말풍선으로 한 번에 넣기
-                </button>
-                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMenu(null);
-                      setDialogueBatchOpen(true);
-                    }}
-                    className="rounded-xl border border-line/60 bg-card/70 py-1.5 text-[0.7rem] font-medium text-fg-2 transition-colors hover:bg-raised"
-                  >
-                    배치 대사 편집
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMenu(null);
-                      setDialogueBatchOpen(false);
-                      setDialogueTranslateOpen(true);
-                    }}
-                    className="rounded-xl border border-line/60 bg-card/70 py-1.5 text-[0.7rem] font-medium text-fg-2 transition-colors hover:bg-raised"
-                  >
-                    번역 (내 API 키)
-                  </button>
-                </div>
-              </div>
-          </StudioFloatingToolPopover>
-        </div>
-        <label className={cn(toolBtn(false), "cursor-pointer")} title="이미지 추가 (⌘V로 클립보드 이미지 붙여넣기 가능)">
-          <ImagePlus size={15} aria-hidden /> 이미지
-          <input type="file" accept="image/*" className="hidden" onChange={onPickImage} />
-        </label>
-        <span className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-2 text-xs text-fg-2 pointer-coarse:h-11">
-          <Palette size={14} aria-hidden className="text-fg-3" />
-          <span className="sr-only sm:not-sr-only sm:inline">색</span>
-          <LazyStudioColorPopover
-            value={color}
-            onChange={setColor}
-            recentColors={recentColors}
-            onUseColor={rememberColor}
-            onLoadRecentColors={ensureRecentColorsLoaded}
-            title="브러시·도형 색상"
-          />
-        </span>
-        </StudioToolbarCluster>
-        </>
-        ) : null}
-        {/* 펜 옵션은 캔버스 하단 StudioDrawOptionsBar 한 곳에서만 제공합니다. */}
-        <span className="mx-0.5 h-5 w-px bg-line" />
-        <button
-          type="button"
-          onClick={() => setTimelapseOpen(true)}
-          disabled={masterEditMode}
-          aria-label="타임랩스 녹화 (그리기 과정 영상화)"
-          className={cn(toolBtn(false), "disabled:opacity-40")}
-          title={masterEditMode ? "마스터 편집 중에는 사용할 수 없어요" : "타임랩스 녹화 (그리기 과정 영상화)"}
-        >
-          <Video size={14} />
-        </button>
-        <button
-          type="button"
-          onClick={() => setStoryboardGridOpen(true)}
-          aria-label="스토리보드 그리드 보기 (전체 페이지 한눈에 비교)"
-          className={toolBtn(false)}
-          title="스토리보드 그리드 보기 — 전체 페이지를 격자로 한눈에 비교"
-        >
-          <LayoutGrid size={14} />
-        </button>
-        <button
-          type="button"
-          onClick={() => setPageReviewOpen(true)}
-          aria-pressed={pageReviewOpen}
-          aria-label="페이지 검토와 편집 잠금"
-          className={toolBtn(pageReviewOpen || pageEditLocked)}
-          title={pageEditLocked ? "현재 페이지가 검토 잠금 상태예요" : "페이지별 승인 상태·담당·메모와 편집 잠금 관리"}
-        >
-          <ClipboardCheck size={14} />
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setTeamPanelOpen(false);
-            setCommentsOpen(true);
-          }}
-          disabled={collaborationDocumentLocked}
-          aria-pressed={commentsOpen}
-          aria-label={`문서 댓글${openStudioCommentCount > 0 ? `, 열림 ${openStudioCommentCount}개` : ""}`}
-          className={cn(toolBtn(commentsOpen), "relative disabled:cursor-not-allowed disabled:opacity-50")}
-          title={
-            collaborationDocumentLocked
-              ? sharedDocument?.role === "commenter"
-                ? "검토자 서버 댓글은 다음 단계에서 제공됩니다. 현재 로컬 댓글은 공동 문서에 쓸 수 없어요."
-                : collaborationLockMessage()
-              : `페이지·컷·요소에 문서 댓글 남기기 · 공동 편집 저장에 포함${
-                  openStudioCommentCount > 0 ? ` · 열림 ${openStudioCommentCount}개` : ""
-                }`
-          }
-        >
-          <MessageCircle size={14} />
-          {openStudioCommentCount > 0 ? (
-            <span className="absolute -right-1.5 -top-1.5 min-w-4 rounded-full bg-accent px-1 text-[0.58rem] font-bold leading-4 text-on-accent">
-              {Math.min(openStudioCommentCount, 99)}
-            </span>
-          ) : null}
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setCommentsOpen(false);
-            setTeamPanelOpen(true);
-          }}
-          aria-pressed={teamPanelOpen}
-          aria-label="팀 작업 공간"
-          className={toolBtn(teamPanelOpen)}
-          title="작품 팀원 초대·역할·서버 권한 관리"
-        >
-          <UsersRound size={14} />
-        </button>
-        <button
-          type="button"
-          onClick={() => setContinuityOpen(true)}
-          aria-pressed={continuityOpen}
-          aria-label="이야기 연속성 검사"
-          className={toolBtn(continuityOpen)}
-          title="캐릭터 바이블과 장면 비트의 인물·장소·시간·의상·소품 연속성 검사"
-        >
-          <CheckCircle2 size={14} />
-        </button>
-        <button
-          type="button"
-          onClick={() => setScrollPreviewOpen(true)}
-          aria-label="세로 스크롤 미리보기 (모바일 폭으로 이어서 확인)"
-          className={toolBtn(false)}
-          title="세로 스크롤 미리보기 — 실제 독자처럼 좁은 폭에서 이어서 확인"
-        >
-          <Smartphone size={14} />
-        </button>
-        <button
-          type="button"
-          onClick={() => setTimelineOpen((v) => !v)}
-          disabled={masterEditMode}
-          aria-pressed={timelineOpen}
-          aria-label="다중 레이어 타임라인"
-          className={cn(toolBtn(timelineOpen), "disabled:opacity-40")}
-          title={masterEditMode ? "마스터 편집 중에는 사용할 수 없어요" : "다중 레이어 타임라인"}
-        >
-          <GanttChartSquare size={14} />
-        </button>
-        <span className="mx-0.5 hidden h-5 w-px bg-line lg:block" />
-        {/* 줌·화면 맞춤·캔버스 최대화 — 모바일은 하단 도구막대가 대체 */}
-        <StudioToolbarCluster label="화면·캔버스" className="ml-auto hidden lg:flex">
-          <button
-            type="button"
-            onClick={() => setZoom((z) => clampZoom(z - 0.1))}
-            disabled={zoom <= ZOOM_MIN}
-            className={cn(toolBtn(false), "h-8 px-1.5 disabled:opacity-40")}
-            title="축소"
-            aria-label="축소"
-          >
-            <Minus size={13} strokeWidth={1.75} />
-          </button>
-          <span className="w-9 text-center text-[0.62rem] font-bold tabular-nums text-fg-3">
-            {Math.round(zoom * 100)}%
-          </span>
-          <button
-            type="button"
-            onClick={() => setZoom((z) => clampZoom(z + 0.1))}
-            disabled={zoom >= ZOOM_MAX}
-            className={cn(toolBtn(false), "h-8 px-1.5 disabled:opacity-40")}
-            title="확대"
-            aria-label="확대"
-          >
-            <Plus size={13} strokeWidth={1.75} />
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setScale(1);
-              setZoom(1);
-            }}
-            className={cn(toolBtn(false), "h-8 px-1.5 text-[0.62rem] font-semibold")}
-            title="화면 100% 맞춤"
-          >
-            100%
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              const wrap = wrapRef.current;
-              if (wrap) {
-                const w = wrap.clientWidth;
-                setScale(Math.min(isFullscreen ? 4 : 2.5, Math.max(0.1, w / CANVAS_W)));
-                setZoom(1);
-              }
-            }}
-            className={cn(toolBtn(false), "h-8 px-1.5 text-[0.62rem] font-semibold")}
-            title="너비에 맞춤"
-          >
-            맞춤
-          </button>
-          <StudioToolbarDivider />
-          <button
-            type="button"
-            onClick={() => {
-              const anyOpen = leftPanelOpen || rightPanelOpen;
-              setLeftPanelOpen(!anyOpen);
-              setRightPanelOpen(!anyOpen);
-            }}
-            disabled={presentationPanelsHidden}
-            aria-pressed={!visibleLeftPanelOpen && !visibleRightPanelOpen}
-            className={cn(
-              toolBtn(!visibleLeftPanelOpen && !visibleRightPanelOpen),
-              "h-8 gap-1 px-1.5 text-[0.62rem] font-semibold disabled:cursor-not-allowed disabled:opacity-45"
-            )}
-            title={
-              presentationPanelsHidden
-                ? "전체화면·브라우저 맞춤에서는 작업공간 패널을 임시로 숨깁니다"
-                : "집중 모드 — 좌우 패널을 접어 캔버스를 넓게 사용"
-            }
-          >
-            <Maximize2 size={13} strokeWidth={1.75} /> 넓게
-          </button>
-          <button
-            type="button"
-            onClick={toggleMaximize}
-            aria-pressed={maximized}
-            className={cn(toolBtn(maximized), "h-8 px-1.5 text-[0.62rem] font-semibold")}
-            title="브라우저 맞춤 — 브라우저 창을 꽉 채워 작업 (ESC로 복원)"
-          >
-            {maximized ? "복원" : "맞춤창"}
-          </button>
-          <button
-            type="button"
-            onClick={toggleFullscreen}
-            aria-pressed={isFullscreen}
-            className={cn(toolBtn(isFullscreen), "h-8 px-1.5 text-[0.62rem] font-semibold")}
-            title="전체화면 (ESC로 종료)"
-          >
-            {isFullscreen ? "창" : "전체"}
-          </button>
-          <button
-            type="button"
-            onClick={enterCanvasOnlyMode}
-            aria-pressed={canvasOnlyMode}
-            className={cn(toolBtn(canvasOnlyMode), "h-8 gap-1 px-1.5 text-[0.62rem] font-semibold")}
-            title="캔버스만 보기 — 제목·툴바·양쪽 패널을 잠시 숨기고 Esc로 복원"
-          >
-            <Minimize2 size={13} strokeWidth={1.75} /> 캔버스
-          </button>
-          <StudioColorBlindPreviewToggle value={colorBlindPreview} onChange={setColorBlindPreview} />
-        </StudioToolbarCluster>
+        <StudioToolBeltContent
+          activePage={activePage}
+          activeServerAiProviderLabel={activeServerAiProviderLabel}
+          activeSurfaceReviewLocked={activeSurfaceReviewLocked}
+          activeToolbarGroup={activeToolbarGroup}
+          advancedFillActive={advancedFillActive}
+          advancedFillUnsupportedReason={advancedFillUnsupportedReason}
+          aiAssistTool={aiAssistTool}
+          aiBgBusy={aiBgBusy}
+          aiBgError={aiBgError}
+          aiBgPrompt={aiBgPrompt}
+          aiBgSize={aiBgSize}
+          aiCharacterBusy={aiCharacterBusy}
+          aiCharacterError={aiCharacterError}
+          aiCharacterPrompt={aiCharacterPrompt}
+          aiCompositionDraft={aiCompositionDraft}
+          aiDialogueSuggestBusy={aiDialogueSuggestBusy}
+          aiDialogueSuggestCandidates={aiDialogueSuggestCandidates}
+          aiDialogueSuggestError={aiDialogueSuggestError}
+          aiDialogueSuggestIncludeContext={aiDialogueSuggestIncludeContext}
+          aiDialogueSuggestSituation={aiDialogueSuggestSituation}
+          aiPaletteSuggestBusy={aiPaletteSuggestBusy}
+          aiPaletteSuggestError={aiPaletteSuggestError}
+          aiPaletteSuggestion={aiPaletteSuggestion}
+          aiPaletteSuggestMood={aiPaletteSuggestMood}
+          aiPaletteSuggestSavedMsg={aiPaletteSuggestSavedMsg}
+          aiRecentPrompts={aiRecentPrompts}
+          aiSettings={aiSettings}
+          assetFavoriteOnly={assetFavoriteOnly}
+          assetFavoriteState={assetFavoriteState}
+          assetGenerating={assetGenerating}
+          assetPrompt={assetPrompt}
+          assetPromptName={assetPromptName}
+          assetPromptQuality={assetPromptQuality}
+          assetPromptSize={assetPromptSize}
+          assets={assets}
+          assetSearchQuery={assetSearchQuery}
+          assetsLoading={assetsLoading}
+          assetSortOrder={assetSortOrder}
+          assetTab={assetTab}
+          bg={bg}
+          bgGrad={bgGrad}
+          bgSceneGenreFilter={bgSceneGenreFilter}
+          bgSceneSearchQuery={bgSceneSearchQuery}
+          bgSceneSectionsFiltered={bgSceneSectionsFiltered}
+          builtinRasterBusyId={builtinRasterBusyId}
+          canvasH={canvasH}
+          canvasOnlyMode={canvasOnlyMode}
+          clips={clips}
+          collaborationDocumentLocked={collaborationDocumentLocked}
+          collaborationLockMessage={collaborationLockMessage}
+          color={color}
+          colorBlindPreview={colorBlindPreview}
+          commentsOpen={commentsOpen}
+          configuredServerAiProviders={configuredServerAiProviders}
+          continuityOpen={continuityOpen}
+          dialogueScript={dialogueScript}
+          drawMode={drawMode}
+          elements={elements}
+          emeresCategoryFilter={emeresCategoryFilter}
+          emeresFlatCatalog={emeresFlatCatalog}
+          emeresSearchQuery={emeresSearchQuery}
+          emeresSectionsFiltered={emeresSectionsFiltered}
+          emeresSimilarAnchor={emeresSimilarAnchor}
+          emeresSimilarSiblings={emeresSimilarSiblings}
+          emeresTab={emeresTab}
+          emeresUnderlayCount={emeresUnderlayCount}
+          frameAnimOpen={frameAnimOpen}
+          frameAnimTargetId={frameAnimTargetId}
+          fxComicFiltered={fxComicFiltered}
+          fxCreatureFiltered={fxCreatureFiltered}
+          fxEmojisFiltered={fxEmojisFiltered}
+          fxLinePresetsFiltered={fxLinePresetsFiltered}
+          fxOverlaysFiltered={fxOverlaysFiltered}
+          fxPickerHasResults={fxPickerHasResults}
+          fxPickerSection={fxPickerSection}
+          fxPropFiltered={fxPropFiltered}
+          fxQuery={fxQuery}
+          fxRasterFiltered={fxRasterFiltered}
+          fxSearchQuery={fxSearchQuery}
+          fxSectionVisible={fxSectionVisible}
+          fxSfxFiltered={fxSfxFiltered}
+          hi={hi}
+          history={history}
+          historyPanelOpen={historyPanelOpen}
+          isFullscreen={isFullscreen}
+          leftPanelOpen={leftPanelOpen}
+          magicResizeStrategy={magicResizeStrategy}
+          masterEditMode={masterEditMode}
+          maximized={maximized}
+          menu={menu}
+          menuRef={menuRef}
+          openStudioCommentCount={openStudioCommentCount}
+          pageEditLocked={pageEditLocked}
+          pageReviewOpen={pageReviewOpen}
+          panelLayoutPresets={panelLayoutPresets}
+          panelLayoutsError={panelLayoutsError}
+          panelLayoutsLoading={panelLayoutsLoading}
+          poserVrmOpen={poserVrmOpen}
+          presentationPanelsHidden={presentationPanelsHidden}
+          publishingId={publishingId}
+          rasterFavoriteOnly={rasterFavoriteOnly}
+          recentColors={recentColors}
+          referencePanelOpen={referencePanelOpen}
+          renamingAssetId={renamingAssetId}
+          renamingAssetName={renamingAssetName}
+          rightPanelOpen={rightPanelOpen}
+          sceneSimilarAnchor={sceneSimilarAnchor}
+          sceneSimilarSiblings={sceneSimilarSiblings}
+          sceneTemplates={sceneTemplates}
+          sceneTemplatesError={sceneTemplatesError}
+          sceneTemplatesLoading={sceneTemplatesLoading}
+          selected={selected}
+          serverAiProvider={serverAiProvider}
+          serverAiStatus={serverAiStatus}
+          setAiAssistTool={setAiAssistTool}
+          setAiBgPrompt={setAiBgPrompt}
+          setAiBgSize={setAiBgSize}
+          setAiCharacterPrompt={setAiCharacterPrompt}
+          setAiCompositionDraft={setAiCompositionDraft}
+          setAiDialogueSuggestIncludeContext={setAiDialogueSuggestIncludeContext}
+          setAiDialogueSuggestSituation={setAiDialogueSuggestSituation}
+          setAiPaletteSuggestMood={setAiPaletteSuggestMood}
+          setAiRecentPrompts={setAiRecentPrompts}
+          setAssetFavoriteOnly={setAssetFavoriteOnly}
+          setAssetPrompt={setAssetPrompt}
+          setAssetPromptName={setAssetPromptName}
+          setAssetPromptQuality={setAssetPromptQuality}
+          setAssetPromptSize={setAssetPromptSize}
+          setAssetSearchQuery={setAssetSearchQuery}
+          setAssetSortOrder={setAssetSortOrder}
+          setAssetTab={setAssetTab}
+          setBg3dInitialDataUrl={setBg3dInitialDataUrl}
+          setBg3dInitialElementId={setBg3dInitialElementId}
+          setBg3dInitialScene={setBg3dInitialScene}
+          setBg3dOpen={setBg3dOpen}
+          setBgSceneGenreFilter={setBgSceneGenreFilter}
+          setBgSceneSearchQuery={setBgSceneSearchQuery}
+          setColor={setColor}
+          setColorBlindPreview={setColorBlindPreview}
+          setCommentsOpen={setCommentsOpen}
+          setContinuityOpen={setContinuityOpen}
+          setDialogueBatchOpen={setDialogueBatchOpen}
+          setDialogueScript={setDialogueScript}
+          setDialogueTranslateOpen={setDialogueTranslateOpen}
+          setDrawMode={setDrawMode}
+          setEmeresCategoryFilter={setEmeresCategoryFilter}
+          setEmeresSearchQuery={setEmeresSearchQuery}
+          setEmeresSimilarAnchorId={setEmeresSimilarAnchorId}
+          setEmeresTab={setEmeresTab}
+          setFxPickerSection={setFxPickerSection}
+          setFxSearchQuery={setFxSearchQuery}
+          setHistoryPanelOpen={setHistoryPanelOpen}
+          setLeftPanelOpen={setLeftPanelOpen}
+          setMagicResizeStrategy={setMagicResizeStrategy}
+          setMenu={setMenu}
+          setPageReviewOpen={setPageReviewOpen}
+          setPoserVrmOpen={setPoserVrmOpen}
+          setRasterFavoriteOnly={setRasterFavoriteOnly}
+          setReferencePanelOpen={setReferencePanelOpen}
+          setRenamingAssetId={setRenamingAssetId}
+          setRenamingAssetName={setRenamingAssetName}
+          setRightPanelOpen={setRightPanelOpen}
+          setScale={setScale}
+          setScenarioOpen={setScenarioOpen}
+          setSceneSimilarAnchorId={setSceneSimilarAnchorId}
+          setScrollPreviewOpen={setScrollPreviewOpen}
+          setStoryboardGridOpen={setStoryboardGridOpen}
+          setTeamPanelOpen={setTeamPanelOpen}
+          setTimelapseOpen={setTimelapseOpen}
+          setTimelineOpen={setTimelineOpen}
+          setToneSearchQuery={setToneSearchQuery}
+          setTool={setTool}
+          setZoom={setZoom}
+          sfxError={sfxError}
+          sfxLoading={sfxLoading}
+          sfxPacks={sfxPacks}
+          shared={shared}
+          sharedDocument={sharedDocument}
+          sharedError={sharedError}
+          sharedLoading={sharedLoading}
+          studioBgSceneAssetsError={studioBgSceneAssetsError}
+          studioBgSceneAssetsLoaded={studioBgSceneAssetsLoaded}
+          studioBgSceneAssetsLoading={studioBgSceneAssetsLoading}
+          studioEmeresAssetsError={studioEmeresAssetsError}
+          studioEmeresAssetsLoaded={studioEmeresAssetsLoaded}
+          studioEmeresAssetsLoading={studioEmeresAssetsLoading}
+          studioOptionalAssets={studioOptionalAssets}
+          studioSfx={studioSfx}
+          studioStickerAssetsError={studioStickerAssetsError}
+          studioStickerAssetsLoaded={studioStickerAssetsLoaded}
+          studioStickerAssetsLoading={studioStickerAssetsLoading}
+          teamPanelOpen={teamPanelOpen}
+          textAiConfigured={textAiConfigured}
+          textAiTransport={textAiTransport}
+          timelineOpen={timelineOpen}
+          toneSearchQuery={toneSearchQuery}
+          tool={tool}
+          uiDensityMode={uiDensityMode}
+          visibleLeftPanelOpen={visibleLeftPanelOpen}
+          visibleRightPanelOpen={visibleRightPanelOpen}
+          wrapRef={wrapRef}
+          zoom={zoom}
+          stableHandlers={studioToolBeltContentHandlers}
+        />
       </StudioToolBelt>
 
       {pageEditLocked && !masterEditMode ? (
@@ -24111,548 +22293,59 @@ function StudioCuttoonEditor() {
         )}
 
         {/* Left vertical toolbar — desktop only; mobile uses bottom dock / horizontal belt */}
-        {studioUiDensityAllows(uiDensityMode, "tool-rail") && !canvasOnlyMode ? (
-          <StudioVerticalToolRail className={cn(mobileImmersive && "hidden")}>
-            {isRailToolVisible("select") ? (
-            <StudioRailToolButton
-              icon={MousePointer2}
-              label="선택 (V)"
-              description="캔버스 위 요소를 클릭·드래그로 고르고 옮기거나 크기를 바꿉니다. 여러 개를 드래그해 함께 선택할 수 있어요."
-              active={tool === "select" && !advancedFillActive && !eyedropperActive}
-              onClick={() => {
-                setTool("select");
-                setEyedropperActive(false);
-                setMenu(null);
-              }}
-            />
-            ) : null}
-            {isRailToolVisible("hand") ? (
-            <StudioRailToolButton
-              icon={Hand}
-              label="핸드 (팬)"
-              description="캔버스를 드래그해 이동합니다. Space 키와 같은 역할입니다."
-              active={tool === "hand"}
-              onClick={() => {
-                setTool((t) => (t === "hand" ? "select" : "hand"));
-                setEyedropperActive(false);
-                setMenu(null);
-              }}
-            />
-            ) : null}
-            {isRailToolVisible("marquee-rect") ? (
-            <StudioRailToolButton
-              icon={Square}
-              label="사각 선택 (M)"
-              description="이미지 픽셀을 사각형으로 선택합니다. Shift=정사각, Alt=중심 확장."
-              active={pixelTool === "rect" && !pixelForceCircle}
-              disabled={selected?.type !== "image" || selectedContentMutationLocked}
-              unavailableReason={
-                selected?.type !== "image"
-                  ? "픽셀을 선택할 이미지 레이어를 먼저 고르세요."
-                  : selectedContentMutationLocked
-                    ? "선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요."
-                    : undefined
-              }
-              onClick={() => {
-                if (selected?.type !== "image" || selectedContentMutationLocked) return;
-                setTool("select");
-                clearPolyLassoDraft();
-                disarmAllPixelTools();
-                setPixelForceCircle(false);
-                setPixelTool((t) => (t === "rect" ? null : "rect"));
-              }}
-            />
-            ) : null}
-            {isRailToolVisible("marquee-circle") ? (
-            <StudioRailToolButton
-              icon={Circle}
-              label="원형 선택"
-              description="이미지 픽셀을 정원으로 선택합니다. Alt=중심 확장."
-              active={pixelTool === "ellipse" && pixelForceCircle}
-              disabled={selected?.type !== "image" || selectedContentMutationLocked}
-              unavailableReason={
-                selected?.type !== "image"
-                  ? "픽셀을 선택할 이미지 레이어를 먼저 고르세요."
-                  : selectedContentMutationLocked
-                    ? "선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요."
-                    : undefined
-              }
-              onClick={() => {
-                if (selected?.type !== "image" || selectedContentMutationLocked) return;
-                setTool("select");
-                clearPolyLassoDraft();
-                disarmAllPixelTools();
-                setPixelForceCircle(true);
-                setPixelTool((t) => (t === "ellipse" && pixelForceCircle ? null : "ellipse"));
-              }}
-            />
-            ) : null}
-            {isRailToolVisible("transform") ? (
-            <StudioRailToolButton
-              icon={Maximize2}
-              label="변형 (⇧T)"
-              description="픽셀 선택이 있으면 속성→리터치에서 내용 변형(스케일·회전·뒤집기)을 적용합니다."
-              active={false}
-              disabled={selected?.type !== "image" || !isSelectionUsable(pixelSel)}
-              unavailableReason={
-                selected?.type !== "image"
-                  ? "변형할 이미지 레이어를 먼저 고르세요."
-                  : !isSelectionUsable(pixelSel)
-                    ? "이미지 안에서 변형할 픽셀 영역을 먼저 선택하세요."
-                    : undefined
-              }
-              onClick={() => {
-                if (!isSelectionUsable(pixelSel)) return;
-                setRightPanelOpen(true);
-                announceDrawingShortcut("리터치 패널에서 내용 변형을 적용하세요");
-              }}
-            />
-            ) : null}
-            {isRailToolVisible("pen") ? (
-            <StudioRailToolButton
-              icon={Pencil}
-              label="펜 (B)"
-              description="자유선으로 그립니다. 필압·보정·브러시 프리셋은 하단 옵션 도크와 브러시 스튜디오에서 조절해요."
-              active={tool === "draw" && drawMode === "pen"}
-              disabled={activeSurfaceReviewLocked}
-              unavailableReason={activeSurfaceReviewLocked ? "현재 작업면의 검토 잠금을 먼저 해제하세요." : undefined}
-              grouped
-              onClick={() => {
-                setTool("draw");
-                setDrawMode("pen");
-                setEyedropperActive(false);
-                setMenu(null);
-              }}
-            />
-            ) : null}
-            {isRailToolVisible("pixel-pencil") ? (
-            <StudioRailToolButton
-              icon={PenTool}
-              label="픽셀 펜 (P)"
-              description="1px 하드 픽셀 펜으로 그립니다. 안티앨리어스·필압 없이 또렷한 선을 남깁니다."
-              active={tool === "draw" && drawMode === "pixel"}
-              disabled={activeSurfaceReviewLocked}
-              unavailableReason={activeSurfaceReviewLocked ? "현재 작업면의 검토 잠금을 먼저 해제하세요." : undefined}
-              onClick={() => {
-                setTool("draw");
-                setDrawMode("pixel");
-                setStrokeWidth(1);
-                setEyedropperActive(false);
-                setMenu(null);
-              }}
-            />
-            ) : null}
-            {isRailToolVisible("eraser") ? (
-            <StudioRailToolButton
-              icon={Eraser}
-              label="지우개 (E)"
-              description="현재 레이어/획 위를 지웁니다. 굵기는 펜과 같은 크기 칩으로 맞출 수 있어요."
-              active={tool === "draw" && drawMode === "eraser"}
-              disabled={activeSurfaceReviewLocked}
-              unavailableReason={activeSurfaceReviewLocked ? "현재 작업면의 검토 잠금을 먼저 해제하세요." : undefined}
-              onClick={() => {
-                setTool("draw");
-                setDrawMode("eraser");
-                setEyedropperActive(false);
-                setMenu(null);
-              }}
-            />
-            ) : null}
-            {isRailToolVisible("blend") ? (
-            <StudioRailToolButton
-              icon={Wind}
-              label="혼합 (스머지)"
-              description="이미지 픽셀을 문질러 색을 섞습니다."
-              active={smudgeActive}
-              disabled={selected?.type !== "image" || selectedContentMutationLocked}
-              unavailableReason={
-                selected?.type !== "image"
-                  ? "색을 섞을 이미지 레이어를 먼저 고르세요."
-                  : selectedContentMutationLocked
-                    ? "선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요."
-                    : undefined
-              }
-              onClick={() => {
-                if (selected?.type !== "image") return;
-                setSmudgeActive((v) => {
-                  const next = !v;
-                  if (next) disarmAllPixelTools();
-                  return next;
-                });
-              }}
-            />
-            ) : null}
-            {isRailToolVisible("liquify") ? (
-            <StudioRailToolButton
-              icon={Move}
-              label="리퀴파이"
-              description="이미지 위를 밀어 국소 왜곡합니다."
-              active={liquifyActive}
-              disabled={selected?.type !== "image" || selectedContentMutationLocked}
-              unavailableReason={
-                selected?.type !== "image"
-                  ? "왜곡할 이미지 레이어를 먼저 고르세요."
-                  : selectedContentMutationLocked
-                    ? "선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요."
-                    : undefined
-              }
-              onClick={() => {
-                if (selected?.type !== "image") return;
-                setLiquifyActive((v) => {
-                  const next = !v;
-                  if (next) disarmAllPixelTools();
-                  return next;
-                });
-              }}
-            />
-            ) : null}
-            {isRailToolVisible("fill") ? (
-            <StudioRailToolButton
-              icon={PaintBucket}
-              label="채우기 (G)"
-              description="선 안을 탭해 색을 채웁니다. 경계 인식과 참조 레이어 설정은 속성 패널에서 조정해요."
-              active={advancedFillActive}
-              disabled={!advancedFillActive && advancedFillUnsupportedReason !== null}
-              unavailableReason={advancedFillUnsupportedReason ?? undefined}
-              onClick={toggleAdvancedFill}
-            />
-            ) : null}
-            {isRailToolVisible("eyedropper") ? (
-            <StudioRailToolButton
-              icon={Pipette}
-              label="스포이드 (I / Alt+클릭)"
-              description="캔버스 색을 샘플링해 주 색으로 가져옵니다. 펜으로 그리는 중엔 Alt+클릭으로도 동작해요."
-              active={eyedropperActive}
-              onClick={() => {
-                setEyedropperActive((v) => !v);
-                setMenu(null);
-              }}
-            />
-            ) : null}
-            {isRailToolVisible("lasso-fill") ? (
-            <StudioRailToolButton
-              icon={Paintbrush}
-              label="라쏘 필"
-              description="닫힌 궤적을 그려 현재 색으로 채웁니다."
-              active={tool === "draw" && drawMode === "lasso-fill"}
-              disabled={activeSurfaceReviewLocked}
-              unavailableReason={activeSurfaceReviewLocked ? "현재 작업면의 검토 잠금을 먼저 해제하세요." : undefined}
-              onClick={() => {
-                setTool("draw");
-                setDrawMode("lasso-fill");
-                setEyedropperActive(false);
-                setMenu(null);
-              }}
-            />
-            ) : null}
-            {isRailToolVisible("lasso") ? (
-            <StudioRailToolButton
-              icon={Lasso}
-              label={
-                pixelTool === "lasso"
-                    ? "자유 올가미 끄기"
-                    : pixelTool === "poly-lasso"
-                      ? "다각형 올가미 사용 중 · 다시 누르면 자유 올가미"
-                      : "올가미 선택"
-              }
-              description="이미지 픽셀을 자유 올가미(드래그) 또는 다각형 올가미(클릭)로 선택합니다."
-              active={(pixelTool === "lasso" || pixelTool === "poly-lasso") && !pixelForceCircle}
-              disabled={selected?.type !== "image" || selectedContentMutationLocked}
-              unavailableReason={
-                selected?.type !== "image"
-                  ? "픽셀을 고를 이미지 레이어를 먼저 선택하세요."
-                  : selectedContentMutationLocked
-                    ? "선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요."
-                    : undefined
-              }
-              onClick={() => {
-                if (selected?.type !== "image" || selectedContentMutationLocked) return;
-                setTool("select");
-                setMenu(null);
-                setPixelForceCircle(false);
-                if (pixelTool === "lasso") {
-                  clearPolyLassoDraft();
-                  disarmAllPixelTools();
-                  setPixelTool("poly-lasso");
-                  return;
-                }
-                if (pixelTool === "poly-lasso") {
-                  clearPolyLassoDraft();
-                  setPixelTool(null);
-                  return;
-                }
-                clearPolyLassoDraft();
-                disarmAllPixelTools();
-                setPixelTool("lasso");
-              }}
-            />
-            ) : null}
-            {isRailToolVisible("comment") ? (
-            <StudioRailToolButton
-              icon={MessageSquare}
-              label="댓글"
-              description="캔버스에 협업 댓글을 달고 스레드를 관리합니다."
-              active={commentsOpen}
-              onClick={() => setCommentsOpen((v) => !v)}
-            />
-            ) : null}
-            {isRailToolVisible("perspective") ? (
-            <StudioRailToolButton
-              icon={Triangle}
-              label="투시도"
-              description="소실점 가이드로 원근을 맞춥니다."
-              active={perspectiveRulerActive}
-              onClick={() => {
-                setPerspectiveRulerActive((v) => !v);
-                setTool("draw");
-              }}
-            />
-            ) : null}
-            {isRailToolVisible("zoom-fit") ? (
-            <StudioRailToolButton
-              icon={ScanLine}
-              label="화면 맞춤"
-              description="캔버스 폭에 맞춰 확대·축소합니다."
-              onClick={() => {
-                const wrap = wrapRef.current;
-                if (wrap) {
-                  const w = wrap.clientWidth;
-                  setScale(Math.min(isFullscreen ? 4 : 2.5, Math.max(0.1, w / CANVAS_W)));
-                  setZoom(1);
-                }
-              }}
-            />
-            ) : null}
-            {isRailToolVisible("rotate-view") ? (
-            <StudioRailToolButton
-              icon={FlipHorizontal2}
-              label="보기 반전"
-              description="캔버스를 좌우로 뒤집어 균형·대칭을 확인합니다. (CSP flip view)"
-              active={canvasFlipH}
-              onClick={() => setCanvasFlipH((v) => !v)}
-            />
-            ) : null}
-            {isRailToolVisible("smart-shape") ? (
-            <StudioRailToolButton
-              icon={Shapes}
-              label="스마트 도형"
-              description="낙서를 잠시 멈추면 선·원·사각형 등 깔끔한 도형으로 자동 다듬어요."
-              active={quickShapeActive}
-              accented
-              onClick={() => {
-                const next = !quickShapeActive;
-                if (next) {
-                  disarmAllPixelTools();
-                  setTool("draw");
-                  setDrawMode("pen");
-                  setEyedropperActive(false);
-                  announceDrawingShortcut("스마트 도형 켜짐 · 그려서 손을 떼면 다듬어요");
-                } else {
-                  announceDrawingShortcut("스마트 도형 꺼짐");
-                }
-                setQuickShapeActive(next);
-                setMenu(null);
-              }}
-            />
-            ) : null}
-            {isRailToolVisible("shape-rect") ? (
-            <StudioRailToolButton
-              icon={Square}
-              label="사각형 도형"
-              description="드래그로 사각형을 그립니다. Shift를 누르면 정사각형으로 맞출 수 있어요."
-              active={tool === "draw" && drawMode === "shape" && drawShape === "rect"}
-              onClick={() => {
-                setTool("draw");
-                setDrawMode("shape");
-                setDrawShape("rect");
-                setEyedropperActive(false);
-                setMenu(null);
-              }}
-            />
-            ) : null}
-            {isRailToolVisible("shape-ellipse") ? (
-            <StudioRailToolButton
-              icon={Circle}
-              label="타원 도형"
-              description="드래그로 타원을 그립니다. Shift를 누르면 정원으로 맞출 수 있어요."
-              active={tool === "draw" && drawMode === "shape" && drawShape === "ellipse"}
-              onClick={() => {
-                setTool("draw");
-                setDrawMode("shape");
-                setDrawShape("ellipse");
-                setEyedropperActive(false);
-                setMenu(null);
-              }}
-            />
-            ) : null}
-            <StudioRailDivider />
-            {isRailToolVisible("text") ? (
-            <StudioRailToolButton
-              icon={TypeIcon}
-              label="텍스트 추가"
-              description="캔버스에 글자 상자를 추가합니다. 폰트·정렬·효과는 우측 속성에서 편집해요."
-              onClick={() => {
-                addText();
-              }}
-            />
-            ) : null}
-            {isRailToolVisible("bubble") ? (
-            <StudioRailToolButton
-              icon={MessageCircle}
-              label="말풍선 추가"
-              description="만화 말풍선을 넣습니다. 꼬리 위치·스타일 프리셋은 말풍선 패널에서 바꿀 수 있어요."
-              onClick={() => {
-                addBubble("speech");
-              }}
-            />
-            ) : null}
-            {isRailToolVisible("image") ? (
-            <StudioToolHintTarget
-              hint={{
-                id: "image",
-                title: "이미지 추가",
-                description: "파일에서 그림을 불러와 캔버스에 배치합니다. 이후 비파괴 필터·블러·픽셀 선택을 적용할 수 있어요.",
-                preview: "image",
-                tip: "클립보드의 이미지는 ⌘V 또는 Ctrl+V로 바로 붙여넣을 수도 있어요.",
-              }}
-            >
-              <label className="relative grid size-9 cursor-pointer place-items-center rounded-md border border-transparent text-fg-2 hover:border-line hover:bg-raised hover:text-fg">
-                <ImagePlus size={16} strokeWidth={1.75} aria-hidden />
-                <span className="sr-only">이미지 추가</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="absolute inset-0 cursor-pointer opacity-0"
-                  onChange={onPickImage}
-                  aria-label="이미지 추가"
-                />
-              </label>
-            </StudioToolHintTarget>
-            ) : null}
-            <StudioRailDivider />
-            {isRailToolVisible("frame-anim") ? (
-            <StudioRailToolButton
-              icon={Film}
-              label="프레임 애니메이션"
-              description="선택한 이미지에 여러 프레임을 쌓아 간단한 셀 애니메이션을 만듭니다."
-              active={frameAnimOpen && frameAnimTargetId === selected?.id}
-              disabled={selected?.type !== "image"}
-              unavailableReason={selected?.type !== "image" ? "애니메이션으로 편집할 이미지 레이어를 먼저 선택하세요." : undefined}
-              onClick={() => {
-                if (!selected || selected.type !== "image") return;
-                if (!selected.frames || selected.frames.length === 0) {
-                  const firstId = uid();
-                  patchEl(selected.id, {
-                    frames: [{ id: firstId, src: selected.src }],
-                    frameFps: DEFAULT_FRAME_FPS,
-                    frameLoop: true,
-                    activeFrameId: firstId,
-                  });
-                }
-                capturedElementIdsRef.current = new Set(elements.map((e) => e.id));
-                setFrameAnimTargetId(selected.id);
-                setFrameAnimOpen((v) => (frameAnimTargetId === selected.id ? !v : true));
-              }}
-            />
-            ) : null}
-            {studioUiDensityAllows(uiDensityMode, "toolbar-reference") && isRailToolVisible("reference") ? (
-              <StudioRailToolButton
-                icon={PictureInPicture2}
-                label="참고 이미지"
-                description="캔버스와 분리된 참고 이미지를 띄워 구도·색·의상을 보면서 작업합니다. 완성 원고에는 포함되지 않아요."
-                active={referencePanelOpen}
-                accented
-                onClick={() => {
-                  preloadStudioReferencePanel();
-                  setReferencePanelOpen((v) => !v);
-                }}
-                onMouseEnter={preloadStudioReferencePanel}
-                onFocus={preloadStudioReferencePanel}
-              />
-            ) : null}
-            {/* More tools — hidden rail tools + Application Settings */}
-            <div className="relative">
-              <StudioRailToolButton
-                icon={Settings2}
-                label="더보기 · 툴바 설정"
-                description="숨긴 도구를 열거나 애플리케이션 설정에서 툴바·단축키·마우스·터치를 맞춤 설정합니다."
-                active={railMoreOpen || appSettingsOpen}
-                onClick={() => setRailMoreOpen((v) => !v)}
-              />
-              {railMoreOpen ? (
-                <div className="absolute left-full top-0 z-[80] ml-1 w-48 rounded-xl border border-line bg-panel p-1.5 shadow-2xl">
-                  <p className="px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-wider text-fg-3">
-                    숨긴 도구
-                  </p>
-                  {appSettings.toolbar.visibleIds.length >= 26 ? (
-                    <p className="px-2 py-1.5 text-[0.68rem] text-fg-3">모두 표시 중</p>
-                  ) : (
-                    (
-                      [
-                        "select",
-                        "hand",
-                        "pen",
-                        "pixel-pencil",
-                        "eraser",
-                        "blend",
-                        "liquify",
-                        "fill",
-                        "lasso-fill",
-                        "eyedropper",
-                        "marquee-rect",
-                        "marquee-circle",
-                        "lasso",
-                        "transform",
-                        "smart-shape",
-                        "shape-rect",
-                        "shape-ellipse",
-                        "text",
-                        "bubble",
-                        "image",
-                        "comment",
-                        "perspective",
-                        "zoom-fit",
-                        "rotate-view",
-                        "frame-anim",
-                        "reference",
-                      ] as StudioRailToolId[]
-                    )
-                      .filter((id) => !isRailToolVisible(id))
-                      .map((id) => (
-                        <button
-                          key={id}
-                          type="button"
-                          className="flex w-full rounded-lg px-2 py-1.5 text-left text-xs text-fg hover:bg-raised"
-                          onClick={() => {
-                            commitAppSettings({
-                              ...appSettings,
-                              toolbar: {
-                                visibleIds: [...appSettings.toolbar.visibleIds, id],
-                              },
-                            });
-                            setRailMoreOpen(false);
-                          }}
-                        >
-                          {studioRailToolLabel(id)}
-                        </button>
-                      ))
-                  )}
-                  <button
-                    type="button"
-                    className="mt-1 flex w-full items-center gap-1 rounded-lg border border-line px-2 py-1.5 text-left text-xs font-medium text-accent hover:bg-accent-soft"
-                    onClick={() => {
-                      setRailMoreOpen(false);
-                      setAppSettingsOpen(true);
-                    }}
-                  >
-                    <Settings2 className="size-3.5" aria-hidden />
-                    애플리케이션 설정
-                  </button>
-                </div>
-              ) : null}
-            </div>
-          </StudioVerticalToolRail>
-        ) : null}
+        <StudioLeftToolRail
+          activeSurfaceReviewLocked={activeSurfaceReviewLocked}
+          advancedFillActive={advancedFillActive}
+          advancedFillUnsupportedReason={advancedFillUnsupportedReason}
+          appSettings={appSettings}
+          appSettingsOpen={appSettingsOpen}
+          canvasFlipH={canvasFlipH}
+          canvasOnlyMode={canvasOnlyMode}
+          commentsOpen={commentsOpen}
+          drawMode={drawMode}
+          drawShape={drawShape}
+          eyedropperActive={eyedropperActive}
+          frameAnimOpen={frameAnimOpen}
+          frameAnimTargetId={frameAnimTargetId}
+          isFullscreen={isFullscreen}
+          isRailToolVisible={isRailToolVisible}
+          liquifyActive={liquifyActive}
+          mobileImmersive={mobileImmersive}
+          perspectiveRulerActive={perspectiveRulerActive}
+          pixelForceCircle={pixelForceCircle}
+          pixelSel={pixelSel}
+          pixelTool={pixelTool}
+          quickShapeActive={quickShapeActive}
+          railMoreOpen={railMoreOpen}
+          referencePanelOpen={referencePanelOpen}
+          selected={selected}
+          selectedContentMutationLocked={selectedContentMutationLocked}
+          setAppSettingsOpen={setAppSettingsOpen}
+          setCanvasFlipH={setCanvasFlipH}
+          setCommentsOpen={setCommentsOpen}
+          setDrawMode={setDrawMode}
+          setDrawShape={setDrawShape}
+          setEyedropperActive={setEyedropperActive}
+          setLiquifyActive={setLiquifyActive}
+          setMenu={setMenu}
+          setPerspectiveRulerActive={setPerspectiveRulerActive}
+          setPixelForceCircle={setPixelForceCircle}
+          setPixelTool={setPixelTool}
+          setQuickShapeActive={setQuickShapeActive}
+          setRailMoreOpen={setRailMoreOpen}
+          setReferencePanelOpen={setReferencePanelOpen}
+          setRightPanelOpen={setRightPanelOpen}
+          setScale={setScale}
+          setSmudgeActive={setSmudgeActive}
+          setStrokeWidth={setStrokeWidth}
+          setTool={setTool}
+          setZoom={setZoom}
+          smudgeActive={smudgeActive}
+          tool={tool}
+          uiDensityMode={uiDensityMode}
+          wrapRef={wrapRef}
+          stableHandlers={studioLeftToolRailHandlers}
+        />
 
         {/* 중앙: 캔버스 영역 (editor shell) — fills remaining viewport */}
         <div
@@ -32757,5 +30450,3696 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
             />
           </div>
         </aside>
+  );
+});
+
+interface StudioLeftToolRailHandlers {
+  openFrameAnimationForSelected: () => void;
+  addBubble: (variant: BubbleVariant, at?: { x: number; y: number; }) => void;
+  addText: (at?: { x: number; y: number; }) => void;
+  announceDrawingShortcut: (message: string) => void;
+  clearPolyLassoDraft: () => void;
+  commitAppSettings: (next: StudioAppSettings) => void;
+  disarmAllPixelTools: () => void;
+  onPickImage: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
+  toggleAdvancedFill: () => void;
+}
+
+interface StudioLeftToolRailProps {
+  activeSurfaceReviewLocked: boolean;
+  advancedFillActive: boolean;
+  advancedFillUnsupportedReason: string | null;
+  appSettings: StudioAppSettings;
+  appSettingsOpen: boolean;
+  canvasFlipH: boolean;
+  canvasOnlyMode: boolean;
+  commentsOpen: boolean;
+  drawMode: DrawMode;
+  drawShape: DrawShapeKind;
+  eyedropperActive: boolean;
+  frameAnimOpen: boolean;
+  frameAnimTargetId: string | null;
+  isFullscreen: boolean;
+  isRailToolVisible: (id: StudioRailToolId) => boolean;
+  liquifyActive: boolean;
+  mobileImmersive: boolean;
+  perspectiveRulerActive: boolean;
+  pixelForceCircle: boolean;
+  pixelSel: PixelSelection | null;
+  pixelTool: SelectionToolKind | "wand" | null;
+  quickShapeActive: boolean;
+  railMoreOpen: boolean;
+  referencePanelOpen: boolean;
+  selected: El | null;
+  selectedContentMutationLocked: boolean;
+  setAppSettingsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setCanvasFlipH: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setCommentsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setDrawMode: import("react").Dispatch<import("react").SetStateAction<DrawMode>>;
+  setDrawShape: import("react").Dispatch<import("react").SetStateAction<DrawShapeKind>>;
+  setEyedropperActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setLiquifyActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setMenu: import("react").Dispatch<import("react").SetStateAction<StudioMenu | null>>;
+  setPerspectiveRulerActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setPixelForceCircle: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setPixelTool: import("react").Dispatch<import("react").SetStateAction<SelectionToolKind | "wand" | null>>;
+  setQuickShapeActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setRailMoreOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setReferencePanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setRightPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setScale: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setSmudgeActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setStrokeWidth: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setTool: import("react").Dispatch<import("react").SetStateAction<Tool>>;
+  setZoom: import("react").Dispatch<import("react").SetStateAction<number>>;
+  smudgeActive: boolean;
+  tool: Tool;
+  uiDensityMode: "simple" | "full" | "focus";
+  wrapRef: import("react").RefObject<HTMLDivElement | null>;
+  stableHandlers: StudioLeftToolRailHandlers;
+}
+
+const StudioLeftToolRail = memo(function StudioLeftToolRail({
+  activeSurfaceReviewLocked,
+  advancedFillActive,
+  advancedFillUnsupportedReason,
+  appSettings,
+  appSettingsOpen,
+  canvasFlipH,
+  canvasOnlyMode,
+  commentsOpen,
+  drawMode,
+  drawShape,
+  eyedropperActive,
+  frameAnimOpen,
+  frameAnimTargetId,
+  isFullscreen,
+  isRailToolVisible,
+  liquifyActive,
+  mobileImmersive,
+  perspectiveRulerActive,
+  pixelForceCircle,
+  pixelSel,
+  pixelTool,
+  quickShapeActive,
+  railMoreOpen,
+  referencePanelOpen,
+  selected,
+  selectedContentMutationLocked,
+  setAppSettingsOpen,
+  setCanvasFlipH,
+  setCommentsOpen,
+  setDrawMode,
+  setDrawShape,
+  setEyedropperActive,
+  setLiquifyActive,
+  setMenu,
+  setPerspectiveRulerActive,
+  setPixelForceCircle,
+  setPixelTool,
+  setQuickShapeActive,
+  setRailMoreOpen,
+  setReferencePanelOpen,
+  setRightPanelOpen,
+  setScale,
+  setSmudgeActive,
+  setStrokeWidth,
+  setTool,
+  setZoom,
+  smudgeActive,
+  tool,
+  uiDensityMode,
+  wrapRef,
+  stableHandlers,
+}: StudioLeftToolRailProps) {
+  const {
+    addBubble,
+    addText,
+    announceDrawingShortcut,
+    clearPolyLassoDraft,
+    commitAppSettings,
+    disarmAllPixelTools,
+    onPickImage,
+    toggleAdvancedFill,
+    openFrameAnimationForSelected,
+  } = stableHandlers;
+  return (
+    <>
+        {studioUiDensityAllows(uiDensityMode, "tool-rail") && !canvasOnlyMode ? (
+          <StudioVerticalToolRail className={cn(mobileImmersive && "hidden")}>
+            {isRailToolVisible("select") ? (
+            <StudioRailToolButton
+              icon={MousePointer2}
+              label="선택 (V)"
+              description="캔버스 위 요소를 클릭·드래그로 고르고 옮기거나 크기를 바꿉니다. 여러 개를 드래그해 함께 선택할 수 있어요."
+              active={tool === "select" && !advancedFillActive && !eyedropperActive}
+              onClick={() => {
+                setTool("select");
+                setEyedropperActive(false);
+                setMenu(null);
+              }}
+            />
+            ) : null}
+            {isRailToolVisible("hand") ? (
+            <StudioRailToolButton
+              icon={Hand}
+              label="핸드 (팬)"
+              description="캔버스를 드래그해 이동합니다. Space 키와 같은 역할입니다."
+              active={tool === "hand"}
+              onClick={() => {
+                setTool((t) => (t === "hand" ? "select" : "hand"));
+                setEyedropperActive(false);
+                setMenu(null);
+              }}
+            />
+            ) : null}
+            {isRailToolVisible("marquee-rect") ? (
+            <StudioRailToolButton
+              icon={Square}
+              label="사각 선택 (M)"
+              description="이미지 픽셀을 사각형으로 선택합니다. Shift=정사각, Alt=중심 확장."
+              active={pixelTool === "rect" && !pixelForceCircle}
+              disabled={selected?.type !== "image" || selectedContentMutationLocked}
+              unavailableReason={
+                selected?.type !== "image"
+                  ? "픽셀을 선택할 이미지 레이어를 먼저 고르세요."
+                  : selectedContentMutationLocked
+                    ? "선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요."
+                    : undefined
+              }
+              onClick={() => {
+                if (selected?.type !== "image" || selectedContentMutationLocked) return;
+                setTool("select");
+                clearPolyLassoDraft();
+                disarmAllPixelTools();
+                setPixelForceCircle(false);
+                setPixelTool((t) => (t === "rect" ? null : "rect"));
+              }}
+            />
+            ) : null}
+            {isRailToolVisible("marquee-circle") ? (
+            <StudioRailToolButton
+              icon={Circle}
+              label="원형 선택"
+              description="이미지 픽셀을 정원으로 선택합니다. Alt=중심 확장."
+              active={pixelTool === "ellipse" && pixelForceCircle}
+              disabled={selected?.type !== "image" || selectedContentMutationLocked}
+              unavailableReason={
+                selected?.type !== "image"
+                  ? "픽셀을 선택할 이미지 레이어를 먼저 고르세요."
+                  : selectedContentMutationLocked
+                    ? "선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요."
+                    : undefined
+              }
+              onClick={() => {
+                if (selected?.type !== "image" || selectedContentMutationLocked) return;
+                setTool("select");
+                clearPolyLassoDraft();
+                disarmAllPixelTools();
+                setPixelForceCircle(true);
+                setPixelTool((t) => (t === "ellipse" && pixelForceCircle ? null : "ellipse"));
+              }}
+            />
+            ) : null}
+            {isRailToolVisible("transform") ? (
+            <StudioRailToolButton
+              icon={Maximize2}
+              label="변형 (⇧T)"
+              description="픽셀 선택이 있으면 속성→리터치에서 내용 변형(스케일·회전·뒤집기)을 적용합니다."
+              active={false}
+              disabled={selected?.type !== "image" || !isSelectionUsable(pixelSel)}
+              unavailableReason={
+                selected?.type !== "image"
+                  ? "변형할 이미지 레이어를 먼저 고르세요."
+                  : !isSelectionUsable(pixelSel)
+                    ? "이미지 안에서 변형할 픽셀 영역을 먼저 선택하세요."
+                    : undefined
+              }
+              onClick={() => {
+                if (!isSelectionUsable(pixelSel)) return;
+                setRightPanelOpen(true);
+                announceDrawingShortcut("리터치 패널에서 내용 변형을 적용하세요");
+              }}
+            />
+            ) : null}
+            {isRailToolVisible("pen") ? (
+            <StudioRailToolButton
+              icon={Pencil}
+              label="펜 (B)"
+              description="자유선으로 그립니다. 필압·보정·브러시 프리셋은 하단 옵션 도크와 브러시 스튜디오에서 조절해요."
+              active={tool === "draw" && drawMode === "pen"}
+              disabled={activeSurfaceReviewLocked}
+              unavailableReason={activeSurfaceReviewLocked ? "현재 작업면의 검토 잠금을 먼저 해제하세요." : undefined}
+              grouped
+              onClick={() => {
+                setTool("draw");
+                setDrawMode("pen");
+                setEyedropperActive(false);
+                setMenu(null);
+              }}
+            />
+            ) : null}
+            {isRailToolVisible("pixel-pencil") ? (
+            <StudioRailToolButton
+              icon={PenTool}
+              label="픽셀 펜 (P)"
+              description="1px 하드 픽셀 펜으로 그립니다. 안티앨리어스·필압 없이 또렷한 선을 남깁니다."
+              active={tool === "draw" && drawMode === "pixel"}
+              disabled={activeSurfaceReviewLocked}
+              unavailableReason={activeSurfaceReviewLocked ? "현재 작업면의 검토 잠금을 먼저 해제하세요." : undefined}
+              onClick={() => {
+                setTool("draw");
+                setDrawMode("pixel");
+                setStrokeWidth(1);
+                setEyedropperActive(false);
+                setMenu(null);
+              }}
+            />
+            ) : null}
+            {isRailToolVisible("eraser") ? (
+            <StudioRailToolButton
+              icon={Eraser}
+              label="지우개 (E)"
+              description="현재 레이어/획 위를 지웁니다. 굵기는 펜과 같은 크기 칩으로 맞출 수 있어요."
+              active={tool === "draw" && drawMode === "eraser"}
+              disabled={activeSurfaceReviewLocked}
+              unavailableReason={activeSurfaceReviewLocked ? "현재 작업면의 검토 잠금을 먼저 해제하세요." : undefined}
+              onClick={() => {
+                setTool("draw");
+                setDrawMode("eraser");
+                setEyedropperActive(false);
+                setMenu(null);
+              }}
+            />
+            ) : null}
+            {isRailToolVisible("blend") ? (
+            <StudioRailToolButton
+              icon={Wind}
+              label="혼합 (스머지)"
+              description="이미지 픽셀을 문질러 색을 섞습니다."
+              active={smudgeActive}
+              disabled={selected?.type !== "image" || selectedContentMutationLocked}
+              unavailableReason={
+                selected?.type !== "image"
+                  ? "색을 섞을 이미지 레이어를 먼저 고르세요."
+                  : selectedContentMutationLocked
+                    ? "선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요."
+                    : undefined
+              }
+              onClick={() => {
+                if (selected?.type !== "image") return;
+                setSmudgeActive((v) => {
+                  const next = !v;
+                  if (next) disarmAllPixelTools();
+                  return next;
+                });
+              }}
+            />
+            ) : null}
+            {isRailToolVisible("liquify") ? (
+            <StudioRailToolButton
+              icon={Move}
+              label="리퀴파이"
+              description="이미지 위를 밀어 국소 왜곡합니다."
+              active={liquifyActive}
+              disabled={selected?.type !== "image" || selectedContentMutationLocked}
+              unavailableReason={
+                selected?.type !== "image"
+                  ? "왜곡할 이미지 레이어를 먼저 고르세요."
+                  : selectedContentMutationLocked
+                    ? "선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요."
+                    : undefined
+              }
+              onClick={() => {
+                if (selected?.type !== "image") return;
+                setLiquifyActive((v) => {
+                  const next = !v;
+                  if (next) disarmAllPixelTools();
+                  return next;
+                });
+              }}
+            />
+            ) : null}
+            {isRailToolVisible("fill") ? (
+            <StudioRailToolButton
+              icon={PaintBucket}
+              label="채우기 (G)"
+              description="선 안을 탭해 색을 채웁니다. 경계 인식과 참조 레이어 설정은 속성 패널에서 조정해요."
+              active={advancedFillActive}
+              disabled={!advancedFillActive && advancedFillUnsupportedReason !== null}
+              unavailableReason={advancedFillUnsupportedReason ?? undefined}
+              onClick={toggleAdvancedFill}
+            />
+            ) : null}
+            {isRailToolVisible("eyedropper") ? (
+            <StudioRailToolButton
+              icon={Pipette}
+              label="스포이드 (I / Alt+클릭)"
+              description="캔버스 색을 샘플링해 주 색으로 가져옵니다. 펜으로 그리는 중엔 Alt+클릭으로도 동작해요."
+              active={eyedropperActive}
+              onClick={() => {
+                setEyedropperActive((v) => !v);
+                setMenu(null);
+              }}
+            />
+            ) : null}
+            {isRailToolVisible("lasso-fill") ? (
+            <StudioRailToolButton
+              icon={Paintbrush}
+              label="라쏘 필"
+              description="닫힌 궤적을 그려 현재 색으로 채웁니다."
+              active={tool === "draw" && drawMode === "lasso-fill"}
+              disabled={activeSurfaceReviewLocked}
+              unavailableReason={activeSurfaceReviewLocked ? "현재 작업면의 검토 잠금을 먼저 해제하세요." : undefined}
+              onClick={() => {
+                setTool("draw");
+                setDrawMode("lasso-fill");
+                setEyedropperActive(false);
+                setMenu(null);
+              }}
+            />
+            ) : null}
+            {isRailToolVisible("lasso") ? (
+            <StudioRailToolButton
+              icon={Lasso}
+              label={
+                pixelTool === "lasso"
+                    ? "자유 올가미 끄기"
+                    : pixelTool === "poly-lasso"
+                      ? "다각형 올가미 사용 중 · 다시 누르면 자유 올가미"
+                      : "올가미 선택"
+              }
+              description="이미지 픽셀을 자유 올가미(드래그) 또는 다각형 올가미(클릭)로 선택합니다."
+              active={(pixelTool === "lasso" || pixelTool === "poly-lasso") && !pixelForceCircle}
+              disabled={selected?.type !== "image" || selectedContentMutationLocked}
+              unavailableReason={
+                selected?.type !== "image"
+                  ? "픽셀을 고를 이미지 레이어를 먼저 선택하세요."
+                  : selectedContentMutationLocked
+                    ? "선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요."
+                    : undefined
+              }
+              onClick={() => {
+                if (selected?.type !== "image" || selectedContentMutationLocked) return;
+                setTool("select");
+                setMenu(null);
+                setPixelForceCircle(false);
+                if (pixelTool === "lasso") {
+                  clearPolyLassoDraft();
+                  disarmAllPixelTools();
+                  setPixelTool("poly-lasso");
+                  return;
+                }
+                if (pixelTool === "poly-lasso") {
+                  clearPolyLassoDraft();
+                  setPixelTool(null);
+                  return;
+                }
+                clearPolyLassoDraft();
+                disarmAllPixelTools();
+                setPixelTool("lasso");
+              }}
+            />
+            ) : null}
+            {isRailToolVisible("comment") ? (
+            <StudioRailToolButton
+              icon={MessageSquare}
+              label="댓글"
+              description="캔버스에 협업 댓글을 달고 스레드를 관리합니다."
+              active={commentsOpen}
+              onClick={() => setCommentsOpen((v) => !v)}
+            />
+            ) : null}
+            {isRailToolVisible("perspective") ? (
+            <StudioRailToolButton
+              icon={Triangle}
+              label="투시도"
+              description="소실점 가이드로 원근을 맞춥니다."
+              active={perspectiveRulerActive}
+              onClick={() => {
+                setPerspectiveRulerActive((v) => !v);
+                setTool("draw");
+              }}
+            />
+            ) : null}
+            {isRailToolVisible("zoom-fit") ? (
+            <StudioRailToolButton
+              icon={ScanLine}
+              label="화면 맞춤"
+              description="캔버스 폭에 맞춰 확대·축소합니다."
+              onClick={() => {
+                const wrap = wrapRef.current;
+                if (wrap) {
+                  const w = wrap.clientWidth;
+                  setScale(Math.min(isFullscreen ? 4 : 2.5, Math.max(0.1, w / CANVAS_W)));
+                  setZoom(1);
+                }
+              }}
+            />
+            ) : null}
+            {isRailToolVisible("rotate-view") ? (
+            <StudioRailToolButton
+              icon={FlipHorizontal2}
+              label="보기 반전"
+              description="캔버스를 좌우로 뒤집어 균형·대칭을 확인합니다. (CSP flip view)"
+              active={canvasFlipH}
+              onClick={() => setCanvasFlipH((v) => !v)}
+            />
+            ) : null}
+            {isRailToolVisible("smart-shape") ? (
+            <StudioRailToolButton
+              icon={Shapes}
+              label="스마트 도형"
+              description="낙서를 잠시 멈추면 선·원·사각형 등 깔끔한 도형으로 자동 다듬어요."
+              active={quickShapeActive}
+              accented
+              onClick={() => {
+                const next = !quickShapeActive;
+                if (next) {
+                  disarmAllPixelTools();
+                  setTool("draw");
+                  setDrawMode("pen");
+                  setEyedropperActive(false);
+                  announceDrawingShortcut("스마트 도형 켜짐 · 그려서 손을 떼면 다듬어요");
+                } else {
+                  announceDrawingShortcut("스마트 도형 꺼짐");
+                }
+                setQuickShapeActive(next);
+                setMenu(null);
+              }}
+            />
+            ) : null}
+            {isRailToolVisible("shape-rect") ? (
+            <StudioRailToolButton
+              icon={Square}
+              label="사각형 도형"
+              description="드래그로 사각형을 그립니다. Shift를 누르면 정사각형으로 맞출 수 있어요."
+              active={tool === "draw" && drawMode === "shape" && drawShape === "rect"}
+              onClick={() => {
+                setTool("draw");
+                setDrawMode("shape");
+                setDrawShape("rect");
+                setEyedropperActive(false);
+                setMenu(null);
+              }}
+            />
+            ) : null}
+            {isRailToolVisible("shape-ellipse") ? (
+            <StudioRailToolButton
+              icon={Circle}
+              label="타원 도형"
+              description="드래그로 타원을 그립니다. Shift를 누르면 정원으로 맞출 수 있어요."
+              active={tool === "draw" && drawMode === "shape" && drawShape === "ellipse"}
+              onClick={() => {
+                setTool("draw");
+                setDrawMode("shape");
+                setDrawShape("ellipse");
+                setEyedropperActive(false);
+                setMenu(null);
+              }}
+            />
+            ) : null}
+            <StudioRailDivider />
+            {isRailToolVisible("text") ? (
+            <StudioRailToolButton
+              icon={TypeIcon}
+              label="텍스트 추가"
+              description="캔버스에 글자 상자를 추가합니다. 폰트·정렬·효과는 우측 속성에서 편집해요."
+              onClick={() => {
+                addText();
+              }}
+            />
+            ) : null}
+            {isRailToolVisible("bubble") ? (
+            <StudioRailToolButton
+              icon={MessageCircle}
+              label="말풍선 추가"
+              description="만화 말풍선을 넣습니다. 꼬리 위치·스타일 프리셋은 말풍선 패널에서 바꿀 수 있어요."
+              onClick={() => {
+                addBubble("speech");
+              }}
+            />
+            ) : null}
+            {isRailToolVisible("image") ? (
+            <StudioToolHintTarget
+              hint={{
+                id: "image",
+                title: "이미지 추가",
+                description: "파일에서 그림을 불러와 캔버스에 배치합니다. 이후 비파괴 필터·블러·픽셀 선택을 적용할 수 있어요.",
+                preview: "image",
+                tip: "클립보드의 이미지는 ⌘V 또는 Ctrl+V로 바로 붙여넣을 수도 있어요.",
+              }}
+            >
+              <label className="relative grid size-9 cursor-pointer place-items-center rounded-md border border-transparent text-fg-2 hover:border-line hover:bg-raised hover:text-fg">
+                <ImagePlus size={16} strokeWidth={1.75} aria-hidden />
+                <span className="sr-only">이미지 추가</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="absolute inset-0 cursor-pointer opacity-0"
+                  onChange={onPickImage}
+                  aria-label="이미지 추가"
+                />
+              </label>
+            </StudioToolHintTarget>
+            ) : null}
+            <StudioRailDivider />
+            {isRailToolVisible("frame-anim") ? (
+            <StudioRailToolButton
+              icon={Film}
+              label="프레임 애니메이션"
+              description="선택한 이미지에 여러 프레임을 쌓아 간단한 셀 애니메이션을 만듭니다."
+              active={frameAnimOpen && frameAnimTargetId === selected?.id}
+              disabled={selected?.type !== "image"}
+              unavailableReason={selected?.type !== "image" ? "애니메이션으로 편집할 이미지 레이어를 먼저 선택하세요." : undefined}
+              onClick={openFrameAnimationForSelected}
+            />
+            ) : null}
+            {studioUiDensityAllows(uiDensityMode, "toolbar-reference") && isRailToolVisible("reference") ? (
+              <StudioRailToolButton
+                icon={PictureInPicture2}
+                label="참고 이미지"
+                description="캔버스와 분리된 참고 이미지를 띄워 구도·색·의상을 보면서 작업합니다. 완성 원고에는 포함되지 않아요."
+                active={referencePanelOpen}
+                accented
+                onClick={() => {
+                  preloadStudioReferencePanel();
+                  setReferencePanelOpen((v) => !v);
+                }}
+                onMouseEnter={preloadStudioReferencePanel}
+                onFocus={preloadStudioReferencePanel}
+              />
+            ) : null}
+            {/* More tools — hidden rail tools + Application Settings */}
+            <div className="relative">
+              <StudioRailToolButton
+                icon={Settings2}
+                label="더보기 · 툴바 설정"
+                description="숨긴 도구를 열거나 애플리케이션 설정에서 툴바·단축키·마우스·터치를 맞춤 설정합니다."
+                active={railMoreOpen || appSettingsOpen}
+                onClick={() => setRailMoreOpen((v) => !v)}
+              />
+              {railMoreOpen ? (
+                <div className="absolute left-full top-0 z-[80] ml-1 w-48 rounded-xl border border-line bg-panel p-1.5 shadow-2xl">
+                  <p className="px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-wider text-fg-3">
+                    숨긴 도구
+                  </p>
+                  {appSettings.toolbar.visibleIds.length >= 26 ? (
+                    <p className="px-2 py-1.5 text-[0.68rem] text-fg-3">모두 표시 중</p>
+                  ) : (
+                    (
+                      [
+                        "select",
+                        "hand",
+                        "pen",
+                        "pixel-pencil",
+                        "eraser",
+                        "blend",
+                        "liquify",
+                        "fill",
+                        "lasso-fill",
+                        "eyedropper",
+                        "marquee-rect",
+                        "marquee-circle",
+                        "lasso",
+                        "transform",
+                        "smart-shape",
+                        "shape-rect",
+                        "shape-ellipse",
+                        "text",
+                        "bubble",
+                        "image",
+                        "comment",
+                        "perspective",
+                        "zoom-fit",
+                        "rotate-view",
+                        "frame-anim",
+                        "reference",
+                      ] as StudioRailToolId[]
+                    )
+                      .filter((id) => !isRailToolVisible(id))
+                      .map((id) => (
+                        <button
+                          key={id}
+                          type="button"
+                          className="flex w-full rounded-lg px-2 py-1.5 text-left text-xs text-fg hover:bg-raised"
+                          onClick={() => {
+                            commitAppSettings({
+                              ...appSettings,
+                              toolbar: {
+                                visibleIds: [...appSettings.toolbar.visibleIds, id],
+                              },
+                            });
+                            setRailMoreOpen(false);
+                          }}
+                        >
+                          {studioRailToolLabel(id)}
+                        </button>
+                      ))
+                  )}
+                  <button
+                    type="button"
+                    className="mt-1 flex w-full items-center gap-1 rounded-lg border border-line px-2 py-1.5 text-left text-xs font-medium text-accent hover:bg-accent-soft"
+                    onClick={() => {
+                      setRailMoreOpen(false);
+                      setAppSettingsOpen(true);
+                    }}
+                  >
+                    <Settings2 className="size-3.5" aria-hidden />
+                    애플리케이션 설정
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          </StudioVerticalToolRail>
+        ) : null}
+    </>
+  );
+});
+
+interface StudioToolBeltContentHandlers {
+  openFrameAnimationForSelected: () => void;
+  addBgScene: (bg: StudioBgScene) => void;
+  addBubble: (variant: BubbleVariant, at?: { x: number; y: number; }) => void;
+  addBuiltinRasterAsset: (asset: StudioRasterAsset) => Promise<void>;
+  addCatalogElement: (item: { svg: string; width: number; height: number; label: string; }) => void;
+  addDiagonalSplit: () => void;
+  addDialogueBubbles: () => Promise<void>;
+  addDialogueSuggestionToScript: (candidate: DialogueSuggestionCandidate) => void;
+  addEmeresLibraryItem: (item: StudioEmeresLibraryItem) => void;
+  addEmeresTemplate: (t: StudioEmeresTemplate) => void;
+  addFocusLines: () => void;
+  addFrame: () => void;
+  addFxOverlay: (svgMarkup: string, w: number, h: number) => void;
+  addRenderedImage: (src: string, width: number, height: number, aiProvenance?: StudioPublishAiProvenance) => void;
+  addSceneTemplate: (template: SceneTemplate) => Promise<void>;
+  addSfxPreset: (preset: SfxPreset) => Promise<void>;
+  addSpeedLines: () => void;
+  addSticker: (emoji: string, at?: { x: number; y: number; }) => void;
+  addText: (at?: { x: number; y: number; }) => void;
+  addTone: (svg: string) => Promise<void>;
+  announceDrawingShortcut: (message: string) => void;
+  applyAiAssistPresetPrompt: (tool: StudioAiAssistToolId, prompt: string) => void;
+  applyBrandKitFont: (font: string) => void;
+  applyBrandKitLogo: (kit: BrandKit) => void;
+  applyCollage: (payload: { canvasH: number; canvasBg: string; frames: readonly { x: number; y: number; width: number; height: number; bg: string; stroke: string; strokeWidth: number; name: string; groupId: string; }[]; groupId: string; imagePlacements: readonly { imageId: string; slotIndex: number; x: number; y: number; width: number; height: number; }[]; replaceExisting: boolean; }) => void;
+  applyMagicResizePreset: (preset: MagicResizePreset) => void;
+  applyPanelLayout: (layout: PanelLayoutPreset) => Promise<void>;
+  applyStudioBackgroundFill: (payload: { kind: "solid" | "gradient" | "svg"; color?: string; stops?: string[]; direction?: "vertical" | "horizontal"; svg?: string; width?: number; height?: number; label?: string; presetId?: string; }) => Promise<void>;
+  applyTemplate: (tpl: TemplateSpec) => void;
+  beginTrackedStudioAiOperation: (scope: string, input: Omit<StudioAiPendingOperationInput, "id">) => string;
+  deleteClip: (id: string) => Promise<void>;
+  ensureRecentColorsLoaded: () => void;
+  enterCanvasOnlyMode: () => void;
+  executeSuggestColorPalette: () => Promise<void>;
+  executeSuggestDialogueLines: () => Promise<void>;
+  handleRenameAsset: (id: string) => Promise<void>;
+  insertAiCompositionNote: (text: string) => void;
+  insertClip: (clip: StudioClip) => void;
+  insertDialogueSuggestionToSelected: (candidate: DialogueSuggestionCandidate) => void;
+  insertStockImage: (photo: StudioStockPhoto, dataUrl: string, width: number, height: number) => void;
+  loadSharedAssets: () => Promise<void>;
+  onDeleteAsset: (id: string) => Promise<void>;
+  onDeleteSharedAsset: (id: string) => Promise<void>;
+  onGenerateAiBackground: () => void;
+  onGenerateAiCharacter: () => void;
+  onGenerateAsset: () => Promise<void>;
+  onPickImage: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
+  onShareAsset: (asset: StudioAsset) => Promise<void>;
+  onUploadAsset: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
+  onUseSharedAsset: (asset: SharedAsset) => void;
+  openFeatureTutorial: (tutorialId?: string | null) => void;
+  pendingTextAiProviderContext: () => import("./studio-ai-provenance-recorder").StudioAiOperationProviderContext;
+  redo: () => void;
+  rememberColor: (c: string) => void;
+  removeEmeresUnderlays: () => void;
+  saveSelectionAsClip: () => Promise<void>;
+  saveSuggestedPaletteToLibrary: (suggestion: PaletteSuggestion) => void;
+  setCanvasH: (newH: number | ((prev: number) => number)) => void;
+  settleTrackedTextAiOperation: (operationId: string, result: StudioAiObservableResult, textProvenance?: StudioTextAiProvenance, aborted?: boolean) => void;
+  toggleAdvancedFill: () => void;
+  toggleAssetFavorite: (id: StudioAssetFavoriteId) => void;
+  toggleFullscreen: () => void;
+  toggleMaximize: () => void;
+  toggleSelectedFrameDiagonal: () => void;
+  undo: () => void;
+  updateAiSettings: (next: StudioAiSettings) => void;
+  updateServerAiProvider: (next: StudioServerAiProviderPreference) => void;
+}
+
+interface StudioToolBeltContentProps {
+  activePage: PageState;
+  activeServerAiProviderLabel: string;
+  activeSurfaceReviewLocked: boolean;
+  activeToolbarGroup: StudioToolbarGroupId | null;
+  advancedFillActive: boolean;
+  advancedFillUnsupportedReason: string | null;
+  aiAssistTool: StudioAiAssistToolId;
+  aiBgBusy: boolean;
+  aiBgError: string | null;
+  aiBgPrompt: string;
+  aiBgSize: StudioAiImageSize;
+  aiCharacterBusy: boolean;
+  aiCharacterError: string | null;
+  aiCharacterPrompt: string;
+  aiCompositionDraft: string;
+  aiDialogueSuggestBusy: boolean;
+  aiDialogueSuggestCandidates: DialogueSuggestionCandidate[] | null;
+  aiDialogueSuggestError: string | null;
+  aiDialogueSuggestIncludeContext: boolean;
+  aiDialogueSuggestSituation: string;
+  aiPaletteSuggestBusy: boolean;
+  aiPaletteSuggestError: string | null;
+  aiPaletteSuggestion: PaletteSuggestion | null;
+  aiPaletteSuggestMood: string;
+  aiPaletteSuggestSavedMsg: string | null;
+  aiRecentPrompts: StudioAiRecentPromptsState;
+  aiSettings: StudioAiSettings;
+  assetFavoriteOnly: boolean;
+  assetFavoriteState: StudioAssetFavoriteState;
+  assetGenerating: boolean;
+  assetPrompt: string;
+  assetPromptName: string;
+  assetPromptQuality: GeneratedAssetQuality;
+  assetPromptSize: GeneratedAssetSize;
+  assets: StudioAsset[];
+  assetSearchQuery: string;
+  assetsLoading: boolean;
+  assetSortOrder: StudioAssetSortOrder;
+  assetTab: StudioAssetTab;
+  bg: string;
+  bgGrad: string[] | null;
+  bgSceneGenreFilter: string;
+  bgSceneSearchQuery: string;
+  bgSceneSectionsFiltered: { genre: string; scenes: StudioBgScene[]; }[];
+  builtinRasterBusyId: string | null;
+  canvasH: number;
+  canvasOnlyMode: boolean;
+  clips: StudioClip[];
+  collaborationDocumentLocked: boolean;
+  collaborationLockMessage: () => string;
+  color: string;
+  colorBlindPreview: CvdMode;
+  commentsOpen: boolean;
+  configuredServerAiProviders: { id: import("./studio-server-ai-client").StudioServerAiProvider; label: string; configured: boolean; model: string; }[];
+  continuityOpen: boolean;
+  dialogueScript: string;
+  drawMode: DrawMode;
+  elements: El[];
+  emeresCategoryFilter: string;
+  emeresFlatCatalog: StudioEmeresTemplate[];
+  emeresSearchQuery: string;
+  emeresSectionsFiltered: { category: string; templates: StudioEmeresTemplate[]; }[];
+  emeresSimilarAnchor: StudioEmeresTemplate | null;
+  emeresSimilarSiblings: StudioEmeresTemplate[];
+  emeresTab: "mine" | "catalog";
+  emeresUnderlayCount: number;
+  frameAnimOpen: boolean;
+  frameAnimTargetId: string | null;
+  fxComicFiltered: StudioFxAsset[];
+  fxCreatureFiltered: StudioFxAsset[];
+  fxEmojisFiltered: string[];
+  fxLinePresetsFiltered: { id: "focus" | "speed"; label: string; }[];
+  fxOverlaysFiltered: StudioFxAsset[];
+  fxPickerHasResults: boolean;
+  fxPickerSection: FxPickerSection;
+  fxPropFiltered: StudioFxAsset[];
+  fxQuery: string;
+  fxRasterFiltered: readonly StudioRasterAsset[];
+  fxSearchQuery: string;
+  fxSectionVisible: (section: Exclude<FxPickerSection, "all">) => boolean;
+  fxSfxFiltered: SfxPreset[];
+  hi: number;
+  history: PageState[][];
+  historyPanelOpen: boolean;
+  isFullscreen: boolean;
+  leftPanelOpen: boolean;
+  magicResizeStrategy: MagicResizeStrategy;
+  masterEditMode: boolean;
+  maximized: boolean;
+  menu: StudioMenu | null;
+  menuRef: import("react").RefObject<HTMLDivElement | null>;
+  openStudioCommentCount: number;
+  pageEditLocked: boolean;
+  pageReviewOpen: boolean;
+  panelLayoutPresets: PanelLayoutPreset[];
+  panelLayoutsError: string | null;
+  panelLayoutsLoading: boolean;
+  poserVrmOpen: boolean;
+  presentationPanelsHidden: boolean;
+  publishingId: string | null;
+  rasterFavoriteOnly: boolean;
+  recentColors: string[];
+  referencePanelOpen: boolean;
+  renamingAssetId: string | null;
+  renamingAssetName: string;
+  rightPanelOpen: boolean;
+  sceneSimilarAnchor: SceneTemplate | null;
+  sceneSimilarSiblings: SceneTemplate[];
+  sceneTemplates: StudioSceneTemplatePacks;
+  sceneTemplatesError: string | null;
+  sceneTemplatesLoading: boolean;
+  selected: El | null;
+  serverAiProvider: StudioServerAiProviderPreference;
+  serverAiStatus: StudioServerAiStatus | null;
+  setAiAssistTool: import("react").Dispatch<import("react").SetStateAction<StudioAiAssistToolId>>;
+  setAiBgPrompt: import("react").Dispatch<import("react").SetStateAction<string>>;
+  setAiBgSize: import("react").Dispatch<import("react").SetStateAction<StudioAiImageSize>>;
+  setAiCharacterPrompt: import("react").Dispatch<import("react").SetStateAction<string>>;
+  setAiCompositionDraft: import("react").Dispatch<import("react").SetStateAction<string>>;
+  setAiDialogueSuggestIncludeContext: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setAiDialogueSuggestSituation: import("react").Dispatch<import("react").SetStateAction<string>>;
+  setAiPaletteSuggestMood: import("react").Dispatch<import("react").SetStateAction<string>>;
+  setAiRecentPrompts: import("react").Dispatch<import("react").SetStateAction<StudioAiRecentPromptsState>>;
+  setAssetFavoriteOnly: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setAssetPrompt: import("react").Dispatch<import("react").SetStateAction<string>>;
+  setAssetPromptName: import("react").Dispatch<import("react").SetStateAction<string>>;
+  setAssetPromptQuality: import("react").Dispatch<import("react").SetStateAction<GeneratedAssetQuality>>;
+  setAssetPromptSize: import("react").Dispatch<import("react").SetStateAction<GeneratedAssetSize>>;
+  setAssetSearchQuery: import("react").Dispatch<import("react").SetStateAction<string>>;
+  setAssetSortOrder: import("react").Dispatch<import("react").SetStateAction<StudioAssetSortOrder>>;
+  setAssetTab: import("react").Dispatch<import("react").SetStateAction<StudioAssetTab>>;
+  setBg3dInitialDataUrl: import("react").Dispatch<import("react").SetStateAction<string | undefined>>;
+  setBg3dInitialElementId: import("react").Dispatch<import("react").SetStateAction<string | undefined>>;
+  setBg3dInitialScene: import("react").Dispatch<import("react").SetStateAction<StudioBg3dSceneDocument | undefined>>;
+  setBg3dOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setBgSceneGenreFilter: import("react").Dispatch<import("react").SetStateAction<string>>;
+  setBgSceneSearchQuery: import("react").Dispatch<import("react").SetStateAction<string>>;
+  setColor: import("react").Dispatch<import("react").SetStateAction<string>>;
+  setColorBlindPreview: import("react").Dispatch<import("react").SetStateAction<CvdMode>>;
+  setCommentsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setContinuityOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setDialogueBatchOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setDialogueScript: import("react").Dispatch<import("react").SetStateAction<string>>;
+  setDialogueTranslateOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setDrawMode: import("react").Dispatch<import("react").SetStateAction<DrawMode>>;
+  setEmeresCategoryFilter: import("react").Dispatch<import("react").SetStateAction<string>>;
+  setEmeresSearchQuery: import("react").Dispatch<import("react").SetStateAction<string>>;
+  setEmeresSimilarAnchorId: import("react").Dispatch<import("react").SetStateAction<string | null>>;
+  setEmeresTab: import("react").Dispatch<import("react").SetStateAction<"mine" | "catalog">>;
+  setFxPickerSection: import("react").Dispatch<import("react").SetStateAction<FxPickerSection>>;
+  setFxSearchQuery: import("react").Dispatch<import("react").SetStateAction<string>>;
+  setHistoryPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setLeftPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setMagicResizeStrategy: import("react").Dispatch<import("react").SetStateAction<MagicResizeStrategy>>;
+  setMenu: import("react").Dispatch<import("react").SetStateAction<StudioMenu | null>>;
+  setPageReviewOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setPoserVrmOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setRasterFavoriteOnly: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setReferencePanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setRenamingAssetId: import("react").Dispatch<import("react").SetStateAction<string | null>>;
+  setRenamingAssetName: import("react").Dispatch<import("react").SetStateAction<string>>;
+  setRightPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setScale: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setScenarioOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setSceneSimilarAnchorId: import("react").Dispatch<import("react").SetStateAction<string | null>>;
+  setScrollPreviewOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setStoryboardGridOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setTeamPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setTimelapseOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setTimelineOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setToneSearchQuery: import("react").Dispatch<import("react").SetStateAction<string>>;
+  setTool: import("react").Dispatch<import("react").SetStateAction<Tool>>;
+  setZoom: import("react").Dispatch<import("react").SetStateAction<number>>;
+  sfxError: string | null;
+  sfxLoading: boolean;
+  sfxPacks: StudioSfxPacks | null;
+  shared: SharedAsset[];
+  sharedDocument: StudioSharedDocument | null;
+  sharedError: string | null;
+  sharedLoading: boolean;
+  studioBgSceneAssetsError: string | null;
+  studioBgSceneAssetsLoaded: boolean;
+  studioBgSceneAssetsLoading: boolean;
+  studioEmeresAssetsError: string | null;
+  studioEmeresAssetsLoaded: boolean;
+  studioEmeresAssetsLoading: boolean;
+  studioOptionalAssets: StudioOptionalAssetPacks;
+  studioSfx: StudioSfxPacks;
+  studioStickerAssetsError: string | null;
+  studioStickerAssetsLoaded: boolean;
+  studioStickerAssetsLoading: boolean;
+  teamPanelOpen: boolean;
+  textAiConfigured: boolean;
+  textAiTransport: StudioTextAiTransport;
+  timelineOpen: boolean;
+  toneSearchQuery: string;
+  tool: Tool;
+  uiDensityMode: "focus" | "simple" | "full";
+  visibleLeftPanelOpen: boolean;
+  visibleRightPanelOpen: boolean;
+  wrapRef: import("react").RefObject<HTMLDivElement | null>;
+  zoom: number;
+  stableHandlers: StudioToolBeltContentHandlers;
+}
+
+const StudioToolBeltContent = memo(function StudioToolBeltContent({
+  activePage,
+  activeServerAiProviderLabel,
+  activeSurfaceReviewLocked,
+  activeToolbarGroup,
+  advancedFillActive,
+  advancedFillUnsupportedReason,
+  aiAssistTool,
+  aiBgBusy,
+  aiBgError,
+  aiBgPrompt,
+  aiBgSize,
+  aiCharacterBusy,
+  aiCharacterError,
+  aiCharacterPrompt,
+  aiCompositionDraft,
+  aiDialogueSuggestBusy,
+  aiDialogueSuggestCandidates,
+  aiDialogueSuggestError,
+  aiDialogueSuggestIncludeContext,
+  aiDialogueSuggestSituation,
+  aiPaletteSuggestBusy,
+  aiPaletteSuggestError,
+  aiPaletteSuggestion,
+  aiPaletteSuggestMood,
+  aiPaletteSuggestSavedMsg,
+  aiRecentPrompts,
+  aiSettings,
+  assetFavoriteOnly,
+  assetFavoriteState,
+  assetGenerating,
+  assetPrompt,
+  assetPromptName,
+  assetPromptQuality,
+  assetPromptSize,
+  assets,
+  assetSearchQuery,
+  assetsLoading,
+  assetSortOrder,
+  assetTab,
+  bg,
+  bgGrad,
+  bgSceneGenreFilter,
+  bgSceneSearchQuery,
+  bgSceneSectionsFiltered,
+  builtinRasterBusyId,
+  canvasH,
+  canvasOnlyMode,
+  clips,
+  collaborationDocumentLocked,
+  collaborationLockMessage,
+  color,
+  colorBlindPreview,
+  commentsOpen,
+  configuredServerAiProviders,
+  continuityOpen,
+  dialogueScript,
+  drawMode,
+  elements,
+  emeresCategoryFilter,
+  emeresFlatCatalog,
+  emeresSearchQuery,
+  emeresSectionsFiltered,
+  emeresSimilarAnchor,
+  emeresSimilarSiblings,
+  emeresTab,
+  emeresUnderlayCount,
+  frameAnimOpen,
+  frameAnimTargetId,
+  fxComicFiltered,
+  fxCreatureFiltered,
+  fxEmojisFiltered,
+  fxLinePresetsFiltered,
+  fxOverlaysFiltered,
+  fxPickerHasResults,
+  fxPickerSection,
+  fxPropFiltered,
+  fxQuery,
+  fxRasterFiltered,
+  fxSearchQuery,
+  fxSectionVisible,
+  fxSfxFiltered,
+  hi,
+  history,
+  historyPanelOpen,
+  isFullscreen,
+  leftPanelOpen,
+  magicResizeStrategy,
+  masterEditMode,
+  maximized,
+  menu,
+  menuRef,
+  openStudioCommentCount,
+  pageEditLocked,
+  pageReviewOpen,
+  panelLayoutPresets,
+  panelLayoutsError,
+  panelLayoutsLoading,
+  poserVrmOpen,
+  presentationPanelsHidden,
+  publishingId,
+  rasterFavoriteOnly,
+  recentColors,
+  referencePanelOpen,
+  renamingAssetId,
+  renamingAssetName,
+  rightPanelOpen,
+  sceneSimilarAnchor,
+  sceneSimilarSiblings,
+  sceneTemplates,
+  sceneTemplatesError,
+  sceneTemplatesLoading,
+  selected,
+  serverAiProvider,
+  serverAiStatus,
+  setAiAssistTool,
+  setAiBgPrompt,
+  setAiBgSize,
+  setAiCharacterPrompt,
+  setAiCompositionDraft,
+  setAiDialogueSuggestIncludeContext,
+  setAiDialogueSuggestSituation,
+  setAiPaletteSuggestMood,
+  setAiRecentPrompts,
+  setAssetFavoriteOnly,
+  setAssetPrompt,
+  setAssetPromptName,
+  setAssetPromptQuality,
+  setAssetPromptSize,
+  setAssetSearchQuery,
+  setAssetSortOrder,
+  setAssetTab,
+  setBg3dInitialDataUrl,
+  setBg3dInitialElementId,
+  setBg3dInitialScene,
+  setBg3dOpen,
+  setBgSceneGenreFilter,
+  setBgSceneSearchQuery,
+  setColor,
+  setColorBlindPreview,
+  setCommentsOpen,
+  setContinuityOpen,
+  setDialogueBatchOpen,
+  setDialogueScript,
+  setDialogueTranslateOpen,
+  setDrawMode,
+  setEmeresCategoryFilter,
+  setEmeresSearchQuery,
+  setEmeresSimilarAnchorId,
+  setEmeresTab,
+  setFxPickerSection,
+  setFxSearchQuery,
+  setHistoryPanelOpen,
+  setLeftPanelOpen,
+  setMagicResizeStrategy,
+  setMenu,
+  setPageReviewOpen,
+  setPoserVrmOpen,
+  setRasterFavoriteOnly,
+  setReferencePanelOpen,
+  setRenamingAssetId,
+  setRenamingAssetName,
+  setRightPanelOpen,
+  setScale,
+  setScenarioOpen,
+  setSceneSimilarAnchorId,
+  setScrollPreviewOpen,
+  setStoryboardGridOpen,
+  setTeamPanelOpen,
+  setTimelapseOpen,
+  setTimelineOpen,
+  setToneSearchQuery,
+  setTool,
+  setZoom,
+  sfxError,
+  sfxLoading,
+  sfxPacks,
+  shared,
+  sharedDocument,
+  sharedError,
+  sharedLoading,
+  studioBgSceneAssetsError,
+  studioBgSceneAssetsLoaded,
+  studioBgSceneAssetsLoading,
+  studioEmeresAssetsError,
+  studioEmeresAssetsLoaded,
+  studioEmeresAssetsLoading,
+  studioOptionalAssets,
+  studioSfx,
+  studioStickerAssetsError,
+  studioStickerAssetsLoaded,
+  studioStickerAssetsLoading,
+  teamPanelOpen,
+  textAiConfigured,
+  textAiTransport,
+  timelineOpen,
+  toneSearchQuery,
+  tool,
+  uiDensityMode,
+  visibleLeftPanelOpen,
+  visibleRightPanelOpen,
+  wrapRef,
+  zoom,
+  stableHandlers,
+}: StudioToolBeltContentProps) {
+  const {
+    addBgScene,
+    addBubble,
+    addBuiltinRasterAsset,
+    addCatalogElement,
+    addDiagonalSplit,
+    addDialogueBubbles,
+    addDialogueSuggestionToScript,
+    addEmeresLibraryItem,
+    addEmeresTemplate,
+    addFocusLines,
+    addFrame,
+    addFxOverlay,
+    addRenderedImage,
+    addSceneTemplate,
+    addSfxPreset,
+    addSpeedLines,
+    addSticker,
+    addText,
+    addTone,
+    announceDrawingShortcut,
+    applyAiAssistPresetPrompt,
+    applyBrandKitFont,
+    applyBrandKitLogo,
+    applyCollage,
+    applyMagicResizePreset,
+    applyPanelLayout,
+    applyStudioBackgroundFill,
+    applyTemplate,
+    beginTrackedStudioAiOperation,
+    deleteClip,
+    ensureRecentColorsLoaded,
+    enterCanvasOnlyMode,
+    executeSuggestColorPalette,
+    executeSuggestDialogueLines,
+    insertAiCompositionNote,
+    insertClip,
+    insertDialogueSuggestionToSelected,
+    insertStockImage,
+    onDeleteAsset,
+    onDeleteSharedAsset,
+    onGenerateAiBackground,
+    onGenerateAiCharacter,
+    onGenerateAsset,
+    onPickImage,
+    onShareAsset,
+    onUploadAsset,
+    onUseSharedAsset,
+    openFeatureTutorial,
+    pendingTextAiProviderContext,
+    redo,
+    rememberColor,
+    removeEmeresUnderlays,
+    saveSelectionAsClip,
+    saveSuggestedPaletteToLibrary,
+    setCanvasH,
+    settleTrackedTextAiOperation,
+    toggleAdvancedFill,
+    toggleAssetFavorite,
+    toggleFullscreen,
+    toggleMaximize,
+    toggleSelectedFrameDiagonal,
+    undo,
+    updateAiSettings,
+    updateServerAiProvider,
+    handleRenameAsset,
+    loadSharedAssets,
+    openFrameAnimationForSelected,
+  } = stableHandlers;
+  return (
+    <>
+        {/* 모바일: 가로 스크롤 가능 힌트(좌측 페이드). 데스크톱에선 숨김. */}
+        <span aria-hidden className="pointer-events-none sticky left-0 -ml-1 h-8 w-2 shrink-0 self-stretch bg-gradient-to-r from-panel to-transparent lg:hidden" />
+        {/* Quick Actions — undo/redo/history always near the left of the top bar */}
+        {studioUiDensityAllows(uiDensityMode, "quick-actions") ? (
+          <StudioQuickActionsBar>
+            <button
+              type="button"
+              onClick={undo}
+              disabled={hi === 0 || collaborationDocumentLocked}
+              className={cn(toolBtn(false), "h-8 px-1.5 disabled:opacity-40")}
+              title="실행취소 (⌘Z)"
+              aria-label="실행취소"
+            >
+              <Undo2 size={15} strokeWidth={1.75} />
+            </button>
+            <button
+              type="button"
+              onClick={redo}
+              disabled={hi >= history.length - 1 || collaborationDocumentLocked}
+              className={cn(toolBtn(false), "h-8 px-1.5 disabled:opacity-40")}
+              title="다시실행 (⌘⇧Z)"
+              aria-label="다시실행"
+            >
+              <Redo2 size={15} strokeWidth={1.75} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setHistoryPanelOpen((v) => !v)}
+              aria-pressed={historyPanelOpen}
+              className={cn(toolBtn(historyPanelOpen), "h-8 px-1.5")}
+              title="작업 내역"
+              aria-label="작업 내역"
+            >
+              <HistoryIcon size={15} strokeWidth={1.75} />
+            </button>
+          </StudioQuickActionsBar>
+        ) : null}
+        <StudioToolbarDivider />
+        {/* Main-menu can open these groups even when density hides the belt trigger — keep host mounted.
+            트리거만 sr-hide: 클러스터 전체에 lg:sr-only 를 주면 fixed 팝오버까지 잘려 메뉴가 안 보인다. */}
+        {(studioUiDensityAllows(uiDensityMode, "toolbar-assets") || activeToolbarGroup === "assetGroup") ? (
+        <StudioToolbarCluster
+          label="에셋 라이브러리"
+          className={cn(!studioUiDensityAllows(uiDensityMode, "toolbar-assets") && "border-0 bg-transparent p-0 shadow-none")}
+        >
+        <div ref={activeToolbarGroup === "assetGroup" ? menuRef : undefined} className="relative">
+          <button
+            type="button"
+            onClick={() => {
+              preloadStudioAssetMenuPanel();
+              setMenu(activeToolbarGroup === "assetGroup" ? null : "template");
+            }}
+            onMouseEnter={preloadStudioAssetMenuPanel}
+            onFocus={preloadStudioAssetMenuPanel}
+            aria-haspopup="menu"
+            aria-expanded={activeToolbarGroup === "assetGroup"}
+            className={cn(
+              toolBtn(activeToolbarGroup === "assetGroup"),
+              !studioUiDensityAllows(uiDensityMode, "toolbar-assets") && "sr-only"
+            )}
+            title="템플릿 · 콜라주 · 요소 · 장면 · 클립 · 효과 · 내 에셋"
+          >
+            <Folder size={15} aria-hidden /> 템플릿·에셋
+            <ChevronDown size={12} aria-hidden className={cn("transition-transform duration-150", activeToolbarGroup === "assetGroup" && "rotate-180")} />
+          </button>
+          <StudioFloatingToolPopover
+            open={activeToolbarGroup === "assetGroup"}
+            id="asset-group"
+            className={cn(groupPopoverClass("w-80"), "lg:w-[22rem] lg:max-w-[min(24rem,calc(100vw-1.5rem))]")}
+          >
+              <StudioMenuPopoverHeader
+                icon={Folder}
+                title="템플릿 · 에셋"
+                description="컷 템플릿·콜라주·요소·장면·클립·효과·내 에셋을 한 메뉴에서 고릅니다."
+              />
+              <StudioMenuSubtabs
+                aria-label="에셋 메뉴 구역"
+                activeId={menu}
+                onSelect={(id) => {
+                  if (id === "asset") preloadStudioAssetMenuPanel();
+                  setMenu(id as StudioMenu);
+                }}
+                items={[
+                  { id: "template", label: "템플릿", icon: LayoutTemplate, title: "캔버스·컷 레이아웃 템플릿" },
+                  { id: "collage", label: "콜라주", icon: Grid2x2, title: "이미지 콜라주 배치" },
+                  { id: "elements", label: "요소", icon: Shapes, title: "도형·장식 요소" },
+                  { id: "emeres", label: "이메레스", icon: PenTool, title: "스케치 밑그림 틀" },
+                  { id: "scene", label: "장면", icon: Clapperboard, title: "장면 템플릿" },
+                  { id: "clip", label: "클립", icon: Bookmark, title: "저장된 클립" },
+                  { id: "sticker", label: "효과", icon: StickerIcon, title: "만화 효과·스티커" },
+                  { id: "asset", label: "내 에셋", icon: Library, title: "업로드·생성한 에셋" },
+                ]}
+              />
+              {menu === "template" && (
+                <div className="grid gap-1.5 lg:max-h-80 lg:overflow-y-auto lg:pr-1">
+                  <p className="px-1 text-[0.66rem] font-medium text-fg-3">캔버스 템플릿</p>
+                  {TEMPLATE_GROUPS.map((group) => (
+                    <div key={group.group} className="grid gap-1">
+                      <p className="px-1 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">{group.group}</p>
+                      {group.templates.map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => applyTemplate(t)}
+                          className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-xs hover:bg-raised"
+                        >
+                          <span className="font-medium text-fg">{t.label}</span>
+                          <span className="text-fg-3">{t.hint}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                  {/* 코미Po!식 정형 컷 레이아웃 — 프레임(+말풍선)을 한 번에 배치 */}
+                  <div className="grid gap-1 border-t border-line pt-1.5">
+                    <p className="px-1 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">컷 템플릿 · 정형 레이아웃</p>
+                    {panelLayoutsLoading && panelLayoutPresets.length === 0 && (
+                      <p className="rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">컷 레이아웃을 불러오는 중...</p>
+                    )}
+                    {panelLayoutsError && (
+                      <p className="rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">{panelLayoutsError}</p>
+                    )}
+                    {panelLayoutPresets.map((layout) => (
+                      <button
+                        key={layout.id}
+                        type="button"
+                        onClick={() => void applyPanelLayout(layout)}
+                        className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-xs hover:bg-raised"
+                      >
+                        <span className="font-medium text-fg">{layout.label}</span>
+                        <span className="text-fg-3">{layout.hint}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {menu === "collage" && (
+                <Suspense fallback={<StudioPanelLoading label="콜라주 패널을 여는 중..." />}>
+                  <StudioCollagePanel
+                    canvasW={CANVAS_W}
+                    availableImages={elements
+                      .filter((el): el is ImageEl => el.type === "image" && !el.hidden)
+                      .map((el) => ({
+                        id: el.id,
+                        width: el.width,
+                        height: el.height,
+                      }))}
+                    onApply={applyCollage}
+                  />
+                </Suspense>
+              )}
+              {menu === "elements" && (
+                <Suspense fallback={<StudioPanelLoading label="요소 패널을 여는 중..." />}>
+                  <StudioElementsPanel
+                    onAdd={(item) => {
+                      addCatalogElement(item);
+                    }}
+                  />
+                </Suspense>
+              )}
+              {menu === "emeres" && (
+                <>
+                  <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">이메레스 · 스케치 밑그림 틀</p>
+                  <p className="mb-2 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.66rem] leading-snug text-fg-3">
+                    선택한 틀이 반투명·잠금 밑그림으로 깔리고 펜 모드로 바뀌어요. 그 위에 따라 그린 뒤, 레이어 패널에서 밑그림을 숨기거나 지우세요.
+                  </p>
+                  {emeresUnderlayCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={removeEmeresUnderlays}
+                      className="mb-2 flex w-full items-center justify-center gap-1 rounded-lg border border-bad/40 py-1 text-[0.64rem] font-semibold text-bad transition-colors hover:bg-bad/10"
+                    >
+                      <Trash2 size={11} /> 밑그림 전부 지우기 ({emeresUnderlayCount})
+                    </button>
+                  )}
+                  <div className="mb-2 flex rounded-lg border border-line bg-card p-0.5">
+                    {(["catalog", "mine"] as const).map((tab) => (
+                      <button
+                        key={tab}
+                        type="button"
+                        onClick={() => setEmeresTab(tab)}
+                        aria-pressed={emeresTab === tab}
+                        className={cn(
+                          "flex-1 rounded-md py-1 text-[0.64rem] font-semibold transition-colors",
+                          emeresTab === tab ? "bg-accent text-white" : "text-fg-3 hover:bg-raised"
+                        )}
+                      >
+                        {tab === "catalog" ? "기본 틀" : "내가 만든 틀"}
+                      </button>
+                    ))}
+                  </div>
+                  {emeresTab === "catalog" ? (
+                    <>
+                      {emeresSimilarAnchor && (
+                        <div id="emeres-similar-strip" className="mb-2 rounded-lg border border-accent/30 bg-accent/5 p-2">
+                          <div className="mb-1 flex items-center justify-between gap-2">
+                            <p className="truncate text-[0.66rem] font-semibold text-fg-2">
+                              &ldquo;{emeresSimilarAnchor.label}&rdquo;과(와) 비슷한 스타일
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setEmeresSimilarAnchorId(null)}
+                              aria-label="비슷한 스타일 닫기"
+                              className="shrink-0 p-0.5 text-fg-3 hover:text-fg-2"
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                          {emeresSimilarSiblings.length === 0 ? (
+                            <p className="text-[0.64rem] text-fg-3">같은 카테고리의 다른 틀이 없어요.</p>
+                          ) : (
+                            <div className="flex gap-1.5 overflow-x-auto pb-1">
+                              {emeresSimilarSiblings.map((sib) => (
+                                <button
+                                  key={sib.id}
+                                  type="button"
+                                  title={`${sib.label} — ${sib.tip}`}
+                                  onClick={() => addEmeresTemplate(sib)}
+                                  className="w-16 shrink-0 overflow-hidden rounded-lg border border-line bg-card p-1 hover:border-accent/50"
+                                >
+                                  <div className="flex h-12 w-full items-center justify-center overflow-hidden rounded bg-[oklch(0.96_0.006_78)]">
+                                    <img src={svgToDataUrl(sib.svg)} alt={sib.label} className="h-full w-full object-contain" />
+                                  </div>
+                                  <span className="mt-0.5 block truncate text-center text-[0.58rem] text-fg-3">{sib.label}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      <div className="relative mb-2">
+                        <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-3" />
+                        <input
+                          type="text"
+                          placeholder="이메레스 검색..."
+                          value={emeresSearchQuery}
+                          onChange={(e) => setEmeresSearchQuery(e.target.value)}
+                          className="w-full rounded-lg border border-line bg-card py-1 pl-6 pr-5 text-[0.65rem] placeholder:text-fg-3 outline-none focus:border-accent focus:ring-1 focus:ring-accent/40 transition-colors"
+                        />
+                        {emeresSearchQuery && (
+                          <button
+                            type="button"
+                            onClick={() => setEmeresSearchQuery("")}
+                            aria-label="검색어 지우기" className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-fg-3 hover:text-fg-2 transition-colors"
+                          >
+                            <X size={12} />
+                          </button>
+                        )}
+                      </div>
+                      {studioOptionalAssets.emeresSections.length > 0 && (
+                        <div className="mb-2 flex flex-wrap gap-1">
+                          {["all", ...studioOptionalAssets.emeresSections.map((section) => section.category)].map((category) => (
+                            <button
+                              key={category}
+                              type="button"
+                              onClick={() => setEmeresCategoryFilter(category)}
+                              aria-pressed={emeresCategoryFilter === category}
+                              className={cn(
+                                "rounded-full border px-2 py-0.5 text-[0.66rem] font-medium transition-colors",
+                                emeresCategoryFilter === category ? "border-accent bg-accent text-white" : "border-line bg-card text-fg-3 hover:bg-raised"
+                              )}
+                            >
+                              {category === "all" ? "전체" : category}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <div className="max-h-64 space-y-2.5 overflow-y-auto pr-1">
+                        {studioEmeresAssetsLoading && !studioEmeresAssetsLoaded && (
+                          <p className="rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">이메레스 틀을 불러오는 중...</p>
+                        )}
+                        {studioEmeresAssetsError && (
+                          <p className="rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">{studioEmeresAssetsError}</p>
+                        )}
+                        {studioOptionalAssets.emeresSections.length > 0 && emeresSectionsFiltered.length === 0 && (
+                          <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
+                            <p className="text-xs text-fg-3">검색 결과가 없습니다.</p>
+                            <p className="mt-1 text-[0.66rem] text-fg-3 leading-normal">다른 검색어로 찾아보세요.</p>
+                          </div>
+                        )}
+                        {emeresSectionsFiltered.map((section) => (
+                          <div key={section.category}>
+                            <p className="mb-1 px-0.5 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">{section.category}</p>
+                            <div className="grid grid-cols-2 gap-1.5">
+                              {section.templates.map((t) => (
+                                <div
+                                  key={t.id}
+                                  className="group relative overflow-hidden rounded-lg border border-line bg-card p-1 text-left hover:border-accent/50"
+                                >
+                                  <button type="button" title={`${t.label} — ${t.tip}`} onClick={() => addEmeresTemplate(t)} className="block w-full">
+                                    <div className="flex h-20 w-full items-center justify-center overflow-hidden rounded bg-[oklch(0.96_0.006_78)] p-1">
+                                      <img src={svgToDataUrl(t.svg)} alt={t.label} className="h-full w-full object-contain transition-transform group-hover:scale-105" />
+                                    </div>
+                                    <span className="mt-1 block truncate text-center text-[0.66rem] font-medium text-fg-2">{t.label}</span>
+                                  </button>
+                                  {hasSameCategorySiblings(emeresFlatCatalog, t.id) && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setEmeresSimilarAnchorId(t.id)}
+                                      aria-controls="emeres-similar-strip"
+                                      className="mt-0.5 block w-full truncate text-center text-[0.6rem] font-medium text-accent hover:underline"
+                                    >
+                                      비슷한 스타일 더보기
+                                    </button>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <Suspense fallback={<StudioPanelLoading label="내가 만든 틀을 여는 중..." />}>
+                      <StudioEmeresLibraryPanel onPickItem={addEmeresLibraryItem} />
+                    </Suspense>
+                  )}
+                </>
+              )}
+              {menu === "scene" && (
+                <>
+                  <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">장면 템플릿 · 한 번에 깔기</p>
+                  <p className="mb-2 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.66rem] leading-snug text-fg-3">
+                    프레임·말풍선·효과를 미리 조합한 연출을 한 번에 추가해요. 추가한 뒤 대사와 위치만 다듬으면 끝나요.
+                  </p>
+                  {sceneSimilarAnchor && (
+                    <div id="scene-similar-strip" className="mb-2 rounded-lg border border-accent/30 bg-accent/5 p-2">
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <p className="truncate text-[0.66rem] font-semibold text-fg-2">
+                          &ldquo;{sceneSimilarAnchor.label}&rdquo;과(와) 비슷한 장면
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setSceneSimilarAnchorId(null)}
+                          aria-label="비슷한 스타일 닫기"
+                          className="shrink-0 p-0.5 text-fg-3 hover:text-fg-2"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                      {sceneSimilarSiblings.length === 0 ? (
+                        <p className="text-[0.64rem] text-fg-3">같은 카테고리의 다른 장면 템플릿이 없어요.</p>
+                      ) : (
+                        <div className="grid gap-1">
+                          {sceneSimilarSiblings.map((sib) => (
+                            <button
+                              key={sib.id}
+                              type="button"
+                              onClick={() => void addSceneTemplate(sib)}
+                              className="rounded-lg border border-line bg-card px-2 py-1.5 text-left transition-colors hover:border-accent/50 hover:bg-raised"
+                            >
+                              <span className="block text-xs font-semibold text-fg">{sib.label}</span>
+                              <span className="block text-[0.68rem] text-fg-3">{sib.description}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+                    {sceneTemplatesLoading && sceneTemplates.templates.length === 0 && (
+                      <p className="rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">장면 템플릿을 불러오는 중...</p>
+                    )}
+                    {sceneTemplatesError && (
+                      <p className="rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">{sceneTemplatesError}</p>
+                    )}
+                    {sceneTemplates.categories.map((cat) => {
+                      const items = sceneTemplates.templates.filter((template) => template.category === cat.id);
+                      if (items.length === 0) return null;
+                      return (
+                        <div key={cat.id}>
+                          <p className="mb-1 px-0.5 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">{cat.label}</p>
+                          <div className="grid gap-1">
+                            {items.map((t) => (
+                              <div
+                                key={t.id}
+                                className="rounded-lg border border-line bg-card px-2 py-1.5 transition-colors hover:border-accent/50 hover:bg-raised"
+                              >
+                                <button type="button" onClick={() => void addSceneTemplate(t)} className="block w-full text-left">
+                                  <span className="block text-xs font-semibold text-fg">{t.label}</span>
+                                  <span className="block text-[0.68rem] text-fg-3">{t.description}</span>
+                                </button>
+                                {hasSameCategorySiblings(sceneTemplates.templates, t.id) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setSceneSimilarAnchorId(t.id)}
+                                    aria-controls="scene-similar-strip"
+                                    className="mt-1 block text-[0.62rem] font-medium text-accent hover:underline"
+                                  >
+                                    비슷한 스타일 더보기
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+              {menu === "clip" && (
+                <>
+                  <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">재사용 클립 보관함</p>
+                  <button
+                    type="button"
+                    onClick={() => void saveSelectionAsClip()}
+                    disabled={!selected}
+                    className={cn(
+                      "mb-2 w-full rounded-lg py-1.5 text-xs font-semibold transition-colors",
+                      selected ? "bg-accent text-on-accent hover:opacity-90" : "cursor-not-allowed bg-card text-fg-3"
+                    )}
+                    title={selected ? "선택한 요소(그룹)를 클립으로 저장" : "먼저 캔버스에서 요소를 선택하세요"}
+                  >
+                    + 선택을 클립으로 저장
+                  </button>
+                  {clips.length === 0 ? (
+                    <p className="rounded-lg border border-dashed border-line px-2 py-4 text-center text-[0.66rem] leading-relaxed text-fg-3">
+                      저장된 클립이 없어요. 포즈 캐릭터나 말풍선 세트를 저장해 다른 컷·회차에서 재사용하세요.
+                    </p>
+                  ) : (
+                    <div className="max-h-64 space-y-1 overflow-y-auto pr-1">
+                      {clips.map((c) => (
+                        <div key={c.id} className="flex items-center gap-1 rounded-lg border border-line bg-card px-2 py-1.5">
+                          <button
+                            type="button"
+                            onClick={() => insertClip(c)}
+                            className="min-w-0 flex-1 truncate text-left text-xs font-medium text-fg transition-colors hover:text-accent"
+                            title="이 클립을 캔버스에 넣기"
+                          >
+                            {c.name}
+                            <span className="ml-1 text-[0.66rem] text-fg-3">{(c.els as unknown[]).length}개</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void deleteClip(c.id)}
+                            aria-label={`${c.name} 클립 삭제`}
+                            className="shrink-0 text-fg-3 transition-colors hover:text-bad"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+              {menu === "sticker" && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setMenu("elements")}
+                    className="mb-2 flex w-full items-center justify-between gap-2 rounded-lg border border-line bg-card px-2.5 py-2 text-left text-xs hover:border-accent/40 hover:bg-raised"
+                  >
+                    <span className="inline-flex items-center gap-1.5 font-semibold text-fg">
+                      <Shapes size={13} className="text-accent" aria-hidden />
+                      도형 · 프레임 · 배지 요소
+                    </span>
+                    <span className="text-[0.62rem] text-fg-3">요소 탭 →</span>
+                  </button>
+                  <div className="relative mb-2">
+                    <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-3" />
+                    <input
+                      type="text"
+                      placeholder="효과 검색..."
+                      value={fxSearchQuery}
+                      onChange={(e) => setFxSearchQuery(e.target.value)}
+                      className="min-h-11 w-full rounded-lg border border-line bg-card py-1 pl-8 pr-11 text-xs placeholder:text-fg-3 outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/40"
+                    />
+                    {fxSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setFxSearchQuery("")}
+                        aria-label="검색어 지우기" className="absolute right-0 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg-2"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                  <div className="mb-2 flex flex-wrap gap-1">
+                    {FX_PICKER_SECTIONS.map((section) => (
+                      <button
+                        key={section.id}
+                        type="button"
+                        onClick={() => setFxPickerSection(section.id)}
+                        aria-pressed={fxPickerSection === section.id}
+                        className={cn(
+                          "min-h-8 rounded-full border px-2 text-[0.66rem] font-medium transition-colors pointer-coarse:min-h-11 pointer-coarse:px-3",
+                          fxPickerSection === section.id ? "border-accent bg-accent text-white" : "border-line bg-card text-fg-3 hover:bg-raised"
+                        )}
+                      >
+                        {section.label}
+                      </button>
+                    ))}
+                  </div>
+                  {fxSectionVisible("raster") && fxRasterFiltered.length > 0 && (
+                    <Suspense fallback={<StudioPanelLoading label="장면 소품을 여는 중..." />}>
+                      <StudioRasterAssetGrid
+                        assets={fxRasterFiltered}
+                        busyId={builtinRasterBusyId}
+                        onAdd={(asset) => void addBuiltinRasterAsset(asset)}
+                        favoriteState={assetFavoriteState}
+                        favoriteOnly={rasterFavoriteOnly}
+                        setFavoriteOnly={setRasterFavoriteOnly}
+                        onToggleFavorite={toggleAssetFavorite}
+                      />
+                    </Suspense>
+                  )}
+                  {sfxLoading && !sfxPacks && fxSectionVisible("sfx") && (
+                    <p className="mb-2 rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">효과음을 불러오는 중...</p>
+                  )}
+                  {sfxError && fxSectionVisible("sfx") && (
+                    <p className="mb-2 rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">{sfxError}</p>
+                  )}
+                  {fxSectionVisible("sfx") && fxSfxFiltered.length > 0 && (
+                    <>
+                      <p className="mb-1 text-[0.66rem] font-medium text-fg-3">효과음</p>
+                      <div className="mb-2 flex flex-wrap gap-1">
+                        {fxSfxFiltered.map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => void addSfxPreset(s)}
+                            title={`${s.label} · ${studioSfx.categories.find((category) => category.id === s.category)?.label ?? ""}`}
+                            className="min-h-9 rounded-md border border-line px-2 text-xs font-bold text-fg hover:bg-raised pointer-coarse:min-h-11"
+                          >
+                            {s.text}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {fxSectionVisible("emoji") && fxEmojisFiltered.length > 0 && (
+                    <>
+                      <p className="mb-1 text-[0.66rem] font-medium text-fg-3">이모지</p>
+                      <div className="grid grid-cols-8 gap-1 mb-2">
+                        {fxEmojisFiltered.map((em) => (
+                          <button
+                            key={em}
+                            type="button"
+                            onClick={() => addSticker(em)}
+                            draggable
+                            onDragStart={(event) => {
+                              event.dataTransfer.setData(
+                                "application/json-insert",
+                                JSON.stringify({ kind: "sticker", emoji: em })
+                              );
+                              event.dataTransfer.effectAllowed = "copy";
+                            }}
+                            title="클릭해 추가하거나 캔버스로 끌어다 원하는 위치에 놓으세요"
+                            className="grid size-9 place-items-center rounded-md text-lg hover:bg-raised pointer-coarse:size-11"
+                          >
+                            {em}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {studioStickerAssetsLoading && !studioStickerAssetsLoaded && (
+                    <p className="mb-2 rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">스티커 에셋을 불러오는 중...</p>
+                  )}
+                  {studioStickerAssetsError && (
+                    <p className="mb-2 rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">
+                      {studioStickerAssetsError}
+                    </p>
+                  )}
+                  <Suspense fallback={<StudioPanelLoading label="스티커 패널을 여는 중..." />}>
+                    {fxSectionVisible("comic") && fxComicFiltered.length > 0 && (
+                      <StudioStickerGrid title="만화 스티커" items={fxComicFiltered} onAdd={addFxOverlay} />
+                    )}
+                    {fxSectionVisible("creature") && fxCreatureFiltered.length > 0 && (
+                      <StudioStickerGrid title="동물·캐릭터" items={fxCreatureFiltered} onAdd={addFxOverlay} />
+                    )}
+                    {fxSectionVisible("prop") && fxPropFiltered.length > 0 && (
+                      <StudioStickerGrid title="소품·오브젝트" items={fxPropFiltered} onAdd={addFxOverlay} />
+                    )}
+                  </Suspense>
+                  {fxSectionVisible("lines") && fxLinePresetsFiltered.length > 0 && (
+                    <>
+                      <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">만화 선 효과</p>
+                      <div className="grid grid-cols-2 gap-2 mb-2">
+                        {fxLinePresetsFiltered.map((preset) => (
+                          <button
+                            key={preset.id}
+                            type="button"
+                            onClick={() => {
+                              if (preset.id === "focus") addFocusLines();
+                              else addSpeedLines();
+                              setMenu(null);
+                            }}
+                            className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-line bg-card px-2 text-xs font-semibold hover:border-accent/50 hover:bg-raised"
+                          >
+                            {preset.id === "focus" ? <ScanLine size={15} aria-hidden /> : <Wind size={15} aria-hidden />}
+                            {preset.label}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {fxSectionVisible("overlay") && fxOverlaysFiltered.length > 0 && (
+                    <>
+                      <p className="mb-1 mt-2 text-[0.66rem] font-medium text-fg-3 border-t border-line pt-2">만화 특수 효과</p>
+                      <div className="grid grid-cols-4 gap-1 max-h-40 overflow-y-auto pr-1">
+                        {fxOverlaysFiltered.map((fx) => (
+                          <button
+                            key={fx.id}
+                            type="button"
+                            title={fx.label}
+                            onClick={() => addFxOverlay(fx.svg, fx.width, fx.height)}
+                            className="group flex flex-col items-center justify-center rounded-lg border border-line bg-card p-1 hover:border-accent/50"
+                          >
+                            <div className="h-10 w-full overflow-hidden bg-neutral-100 dark:bg-neutral-800 rounded flex items-center justify-center p-0.5">
+                              <img src={svgToDataUrl(fx.svg)} alt={fx.label} className="h-full w-full object-contain transition-transform group-hover:scale-105" />
+                            </div>
+                            <span className="block text-center text-[0.55rem] text-fg-3 mt-0.5 truncate w-full">{fx.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {!fxPickerHasResults && fxQuery !== "" && (
+                    <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
+                      <p className="text-xs text-fg-3">검색 결과가 없습니다.</p>
+                      <p className="mt-1 text-[0.66rem] text-fg-3 leading-normal">다른 검색어로 찾아보세요.</p>
+                    </div>
+                  )}
+                </>
+              )}
+              {menu === "asset" && (
+                <Suspense fallback={<StudioPanelLoading label="에셋 보관함을 여는 중..." />}>
+                  <StudioAssetMenuPanel
+                    assetTab={assetTab}
+                    setAssetTab={setAssetTab}
+                    onUploadAsset={onUploadAsset}
+                    assetPrompt={assetPrompt}
+                    setAssetPrompt={setAssetPrompt}
+                    assetPromptName={assetPromptName}
+                    setAssetPromptName={setAssetPromptName}
+                    assetPromptSize={assetPromptSize}
+                    setAssetPromptSize={setAssetPromptSize}
+                    assetPromptQuality={assetPromptQuality}
+                    setAssetPromptQuality={setAssetPromptQuality}
+                    assetGenerating={assetGenerating}
+                    onGenerateAsset={onGenerateAsset}
+                    assetSearchQuery={assetSearchQuery}
+                    setAssetSearchQuery={setAssetSearchQuery}
+                    assetSortOrder={assetSortOrder}
+                    setAssetSortOrder={setAssetSortOrder}
+                    favoriteState={assetFavoriteState}
+                    favoriteOnly={assetFavoriteOnly}
+                    setFavoriteOnly={setAssetFavoriteOnly}
+                    onToggleFavorite={toggleAssetFavorite}
+                    assets={assets}
+                    assetsLoading={assetsLoading}
+                    renamingAssetId={renamingAssetId}
+                    setRenamingAssetId={setRenamingAssetId}
+                    renamingAssetName={renamingAssetName}
+                    setRenamingAssetName={setRenamingAssetName}
+                    handleRenameAsset={handleRenameAsset}
+                    onUseLocalAsset={(asset) => {
+                      addRenderedImage(asset.dataUrl, asset.width, asset.height);
+                      setMenu(null);
+                    }}
+                    onShareAsset={onShareAsset}
+                    onDeleteAsset={onDeleteAsset}
+                    publishingId={publishingId}
+                    shared={shared}
+                    sharedLoading={sharedLoading}
+                    sharedError={sharedError}
+                    loadSharedAssets={loadSharedAssets}
+                    onUseSharedAsset={onUseSharedAsset}
+                    onDeleteSharedAsset={onDeleteSharedAsset}
+                  />
+                </Suspense>
+              )}
+          </StudioFloatingToolPopover>
+        </div>
+        </StudioToolbarCluster>
+        ) : null}
+
+        {studioUiDensityAllows(uiDensityMode, "toolbar-cut") ? (
+        <>
+        <StudioToolbarDivider label="컷" />
+        <StudioToolbarCluster label="컷 배치">
+        <button type="button" onClick={addFrame} className={toolBtn(false)} title="새 패널 프레임 추가">
+          <Plus size={15} aria-hidden /> 패널
+        </button>
+        <button type="button" onClick={addDiagonalSplit} className={toolBtn(false)} title="기울어진 분할선의 두 패널을 한 번에 추가">
+          <SquareSplitHorizontal size={15} aria-hidden /> 사선 컷
+        </button>
+        {selected?.type === "frame" && (
+          <button
+            type="button"
+            onClick={toggleSelectedFrameDiagonal}
+            className={toolBtn(Boolean(selected.points))}
+            title="선택한 패널을 사선(평행사변형)↔사각형으로"
+          >
+            <SquareSplitHorizontal size={15} aria-hidden className="opacity-90" />
+            {selected.points ? "직선화" : "사선화"}
+          </button>
+        )}
+        </StudioToolbarCluster>
+        </>
+        ) : null}
+
+        {/* 모바일 가로 벨트: 데스크톱은 좌측 세로 레일로 이동 (lg:hidden). */}
+        {studioUiDensityAllows(uiDensityMode, "toolbar-draw") ? (
+        <>
+        <StudioToolbarDivider label="도구" className="lg:hidden" />
+        <StudioToolbarCluster label="그리기 도구" className="lg:hidden">
+        <button type="button" onClick={() => setTool("select")} className={toolBtn(tool === "select")} aria-pressed={tool === "select"} title="선택 (V)">
+          <MousePointer2 size={15} aria-hidden /> 선택
+        </button>
+        <button
+          type="button"
+          disabled={activeSurfaceReviewLocked}
+          title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 펜을 사용할 수 있어요" : "펜 (B)"}
+          onClick={() => {
+            setTool("draw");
+            setDrawMode("pen");
+            setMenu(null);
+          }}
+          className={cn(toolBtn(tool === "draw" && drawMode === "pen"), "disabled:cursor-not-allowed disabled:opacity-40")}
+          aria-pressed={tool === "draw" && drawMode === "pen"}
+        >
+          <Pencil size={15} aria-hidden /> 펜
+        </button>
+        <button
+          type="button"
+          disabled={activeSurfaceReviewLocked}
+          title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 지우개를 사용할 수 있어요" : "지우개 (E)"}
+          onClick={() => {
+            setTool("draw");
+            setDrawMode("eraser");
+            setMenu(null);
+          }}
+          className={cn(toolBtn(tool === "draw" && drawMode === "eraser"), "disabled:cursor-not-allowed disabled:opacity-40")}
+          aria-pressed={tool === "draw" && drawMode === "eraser"}
+        >
+          <Eraser size={15} aria-hidden /> 지우개
+        </button>
+        <button
+          type="button"
+          onClick={toggleAdvancedFill}
+          disabled={!advancedFillActive && advancedFillUnsupportedReason !== null}
+          className={cn(toolBtn(advancedFillActive), "disabled:cursor-not-allowed disabled:opacity-40")}
+          aria-pressed={advancedFillActive}
+          title={advancedFillUnsupportedReason ?? "선택 래스터의 닫힌 영역을 참조 경계로 채우기 (G)"}
+        >
+          <PaintBucket size={15} aria-hidden /> 채우기
+        </button>
+        <button
+          type="button"
+          onClick={openFrameAnimationForSelected}
+          disabled={selected?.type !== "image"}
+          className={cn(toolBtn(frameAnimOpen && frameAnimTargetId === selected?.id), "disabled:opacity-40")}
+          title={selected?.type !== "image" ? "이미지를 선택하면 프레임 애니메이션을 만들 수 있어요" : "선택한 이미지를 프레임별로 그려 애니메이션으로 만들기"}
+        >
+          <Film size={15} aria-hidden /> 프레임
+        </button>
+        </StudioToolbarCluster>
+        </>
+        ) : null}
+
+        {studioUiDensityAllows(uiDensityMode, "toolbar-reference") ? (
+        <>
+        <StudioToolbarDivider label="참조" />
+        <StudioToolbarCluster label="참조·3D">
+        <button
+          type="button"
+          onClick={() => setPoserVrmOpen(true)}
+          className={cn(toolBtn(poserVrmOpen), "border-accent/25 bg-accent-soft/25 text-accent hover:bg-accent-soft/40")}
+          title="무료 베이스 캐릭터를 골라 포즈·표정·의상·색상까지 만들고 투명 배경으로 추가하기"
+        >
+          <UsersRound size={15} aria-hidden /> 3D 캐릭터
+        </button>
+        <button
+          type="button"
+          onClick={() => setReferencePanelOpen((v) => !v)}
+          onMouseEnter={preloadStudioReferencePanel}
+          onFocus={preloadStudioReferencePanel}
+          className={cn(toolBtn(referencePanelOpen), "border-accent/25 bg-accent-soft/25 text-accent hover:bg-accent-soft/40")}
+          aria-pressed={referencePanelOpen}
+          title="참고 이미지 패널 — 그리는 동안 옆에 이미지를 띄워두기"
+        >
+          <PictureInPicture2 size={15} aria-hidden /> 참고
+        </button>
+        </StudioToolbarCluster>
+        </>
+        ) : null}
+
+        {(studioUiDensityAllows(uiDensityMode, "toolbar-scene") || activeToolbarGroup === "bgGroup") ? (
+        <>
+        {studioUiDensityAllows(uiDensityMode, "toolbar-scene") ? <StudioToolbarDivider label="장면" /> : null}
+        <StudioToolbarCluster
+          label="배경·톤"
+          className={cn(!studioUiDensityAllows(uiDensityMode, "toolbar-scene") && "border-0 bg-transparent p-0 shadow-none")}
+        >
+        <div ref={activeToolbarGroup === "bgGroup" ? menuRef : undefined} className="relative">
+          <button
+            type="button"
+            onClick={() => setMenu(activeToolbarGroup === "bgGroup" ? null : "bgFill")}
+            aria-haspopup="menu"
+            aria-expanded={activeToolbarGroup === "bgGroup"}
+            className={cn(
+              toolBtn(activeToolbarGroup === "bgGroup"),
+              !studioUiDensityAllows(uiDensityMode, "toolbar-scene") && "sr-only"
+            )}
+          >
+            <Mountain size={15} aria-hidden /> 배경
+            <ChevronDown size={12} aria-hidden className={cn("transition-transform duration-150", activeToolbarGroup === "bgGroup" && "rotate-180")} />
+          </button>
+          <StudioFloatingToolPopover
+            open={activeToolbarGroup === "bgGroup"}
+            id="bg-group"
+            className={groupPopoverClass("w-80")}
+          >
+              <StudioMenuPopoverHeader
+                icon={Mountain}
+                title="배경 편집"
+                description="채우기·캔버스 크기, 2D 씬, 톤, 3D를 한곳에서 고르세요."
+              />
+              <StudioMenuSubtabs
+                aria-label="배경 메뉴 구역"
+                activeId={
+                  menu === "bgScene" || menu === "tone" || menu === "bgFill" ? menu : "bgFill"
+                }
+                onSelect={(id) => {
+                  if (id === "bg3d") {
+                    setBg3dInitialScene(undefined);
+                    setBg3dInitialDataUrl(undefined);
+                    setBg3dInitialElementId(undefined);
+                    setBg3dOpen(true);
+                    setMenu(null);
+                    return;
+                  }
+                  setMenu(id as StudioMenu);
+                }}
+                items={[
+                  { id: "bgFill", label: "편집", icon: Droplets, title: "채우기·크기·비율 리사이저" },
+                  { id: "bgScene", label: "씬", icon: ImageIcon, title: "2D 배경 씬" },
+                  { id: "tone", label: "톤", icon: Grid2x2, title: "만화 스크린톤" },
+                  { id: "bg3d", label: "3D", icon: Boxes, title: "3D 배경 블록아웃" },
+                ]}
+              />
+              {menu === "bgFill" && (
+                <Suspense fallback={<StudioPanelLoading label="배경 편집기를 여는 중..." />}>
+                  <StudioBackgroundPanel
+                    canvasW={CANVAS_W}
+                    canvasH={canvasH}
+                    currentBg={bg}
+                    currentBgGrad={bgGrad}
+                    onApply={(payload) => {
+                      void applyStudioBackgroundFill(payload);
+                    }}
+                    sizeSlot={
+                      <StudioCanvasResizer
+                        canvasW={CANVAS_W}
+                        canvasH={canvasH}
+                        strategy={magicResizeStrategy}
+                        onStrategyChange={setMagicResizeStrategy}
+                        disabled={masterEditMode}
+                        onSetHeight={(height) => {
+                          if (masterEditMode) return;
+                          setCanvasH(height);
+                          announceDrawingShortcut(`캔버스 높이 ${height}px`);
+                        }}
+                        onMagicResizePreset={(preset) => {
+                          applyMagicResizePreset(preset);
+                          announceDrawingShortcut(`${preset.label} 규격 적용`);
+                        }}
+                      />
+                    }
+                  />
+                </Suspense>
+              )}
+              {menu === "bgScene" && (
+                <>
+                  <div className="mb-2 flex items-start gap-2 rounded-xl border border-line bg-card px-2.5 py-2">
+                    <ImageIcon size={14} className="mt-0.5 shrink-0 text-accent" aria-hidden />
+                    <div className="min-w-0">
+                      <p className="text-[0.72rem] font-bold text-fg">2D 배경 씬</p>
+                      <p className="text-[0.62rem] leading-snug text-fg-3">
+                        탭하면 모든 패널에 깔려요. 한 컷만 바꾸려면 그 패널을 먼저 선택한 뒤 골라 주세요.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="relative mb-2">
+                    <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-3" />
+                    <input
+                      type="text"
+                      placeholder="배경 씬 검색..."
+                      value={bgSceneSearchQuery}
+                      onChange={(e) => setBgSceneSearchQuery(e.target.value)}
+                      className="w-full rounded-lg border border-line bg-card py-1 pl-6 pr-5 text-[0.65rem] placeholder:text-fg-3 outline-none focus:border-accent focus:ring-1 focus:ring-accent/40 transition-colors"
+                    />
+                    {bgSceneSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setBgSceneSearchQuery("")}
+                        aria-label="검색어 지우기" className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-fg-3 hover:text-fg-2 transition-colors"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                  {studioOptionalAssets.bgSceneSections.length > 0 && (
+                    <div className="mb-2 flex flex-wrap gap-1">
+                      {["all", ...studioOptionalAssets.bgSceneSections.map((group) => group.genre)].map((genre) => (
+                        <button
+                          key={genre}
+                          type="button"
+                          onClick={() => setBgSceneGenreFilter(genre)}
+                          aria-pressed={bgSceneGenreFilter === genre}
+                          className={cn(
+                            "rounded-full border px-2 py-0.5 text-[0.66rem] font-medium transition-colors",
+                            bgSceneGenreFilter === genre ? "border-accent bg-accent text-on-accent" : "border-line bg-card text-fg-3 hover:bg-raised"
+                          )}
+                        >
+                          {genre === "all" ? "전체" : genre}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="max-h-64 space-y-2.5 overflow-y-auto pr-1">
+                    {studioBgSceneAssetsLoading && !studioBgSceneAssetsLoaded && (
+                      <p className="rounded-lg border border-line bg-card px-2 py-2 text-xs text-fg-3">배경 씬을 불러오는 중...</p>
+                    )}
+                    {studioBgSceneAssetsError && (
+                      <p className="rounded-lg border border-bad/40 bg-bad/10 px-2 py-2 text-xs text-bad">
+                        {studioBgSceneAssetsError}
+                      </p>
+                    )}
+                    {studioOptionalAssets.bgSceneSections.length > 0 && bgSceneSectionsFiltered.length === 0 && (
+                      <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-dashed border-line p-4 text-center">
+                        <p className="text-xs text-fg-3">검색 결과가 없습니다.</p>
+                        <p className="mt-1 text-[0.66rem] text-fg-3 leading-normal">다른 검색어로 찾아보세요.</p>
+                      </div>
+                    )}
+                    {bgSceneSectionsFiltered.map((group) => (
+                      <div key={group.genre}>
+                        <p className="mb-1 px-0.5 text-[0.66rem] font-semibold uppercase tracking-wide text-fg-3">{group.genre}</p>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {group.scenes.map((bg) => (
+                            <button
+                              key={bg.id}
+                              type="button"
+                              title={bg.label}
+                              onClick={() => addBgScene(bg)}
+                              className="group relative overflow-hidden rounded-lg border border-line bg-card p-1 text-left hover:border-accent/50"
+                            >
+                              <div className="h-16 w-full overflow-hidden rounded bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
+                                <img src={resolveAssetUrl(bg.imgSrc || svgToDataUrl(bg.svg || ""))} alt={bg.label} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+                              </div>
+                              <span className="block text-center text-[0.66rem] text-fg-2 font-medium mt-1 truncate">{bg.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+              {menu === "tone" && (
+                <>
+                  <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">만화 스크린톤</p>
+                  <p className="mb-2 rounded-lg border border-line bg-card px-2 py-1.5 text-[0.66rem] leading-snug text-fg-3">
+                    톤을 누르면 캔버스에 깔려요. 패널을 먼저 선택하면 그 칸을 덮고, 망점 크기는 칸에 맞춰 일정하게 유지됩니다.
+                  </p>
+                  <div className="relative mb-2">
+                    <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-3" />
+                    <input
+                      type="text"
+                      placeholder="톤 검색 (망점·선·교차선...)"
+                      value={toneSearchQuery}
+                      onChange={(e) => setToneSearchQuery(e.target.value)}
+                      className="w-full rounded-lg border border-line bg-card py-1 pl-6 pr-5 text-[0.65rem] placeholder:text-fg-3 outline-none focus:border-accent focus:ring-1 focus:ring-accent/40 transition-colors"
+                    />
+                    {toneSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setToneSearchQuery("")}
+                        aria-label="검색어 지우기" className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-fg-3 hover:text-fg-2 transition-colors"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-72 overflow-y-auto pr-1">
+                    <Suspense fallback={<StudioPanelLoading label="톤 패널을 여는 중..." />}>
+                      <StudioTonePanel onPick={(svg) => void addTone(svg)} query={toneSearchQuery} />
+                    </Suspense>
+                  </div>
+                </>
+              )}
+          </StudioFloatingToolPopover>
+        </div>
+        </StudioToolbarCluster>
+        </>
+        ) : null}
+
+        {(studioUiDensityAllows(uiDensityMode, "toolbar-style") || activeToolbarGroup === "styleGroup") ? (
+        <StudioToolbarCluster
+          label="스타일"
+          className={cn(!studioUiDensityAllows(uiDensityMode, "toolbar-style") && "border-0 bg-transparent p-0 shadow-none")}
+        >
+        <div ref={activeToolbarGroup === "styleGroup" ? menuRef : undefined} className="relative">
+          <button
+            type="button"
+            onClick={() => setMenu(activeToolbarGroup === "styleGroup" ? null : "palette")}
+            aria-haspopup="menu"
+            aria-expanded={activeToolbarGroup === "styleGroup"}
+            className={cn(
+              toolBtn(activeToolbarGroup === "styleGroup"),
+              !studioUiDensityAllows(uiDensityMode, "toolbar-style") && "sr-only"
+            )}
+            title="색상 팔레트 · 브랜드 킷(글꼴·로고)"
+          >
+            <Palette size={15} aria-hidden /> 스타일
+            <ChevronDown size={12} aria-hidden className={cn("transition-transform duration-150", activeToolbarGroup === "styleGroup" && "rotate-180")} />
+          </button>
+          <StudioFloatingToolPopover
+            open={activeToolbarGroup === "styleGroup"}
+            id="style-group"
+            className={groupPopoverClass("w-72")}
+          >
+              <StudioMenuPopoverHeader
+                icon={Palette}
+                title="스타일"
+                description="팔레트와 브랜드 킷으로 작품 톤을 고정합니다."
+              />
+              <StudioMenuSubtabs
+                aria-label="스타일 메뉴 구역"
+                activeId={menu === "palette" || menu === "brandKit" ? menu : "palette"}
+                onSelect={(id) => setMenu(id as StudioMenu)}
+                items={[
+                  { id: "palette", label: "팔레트", icon: Palette, title: "색상 팔레트 저장·가져오기(.gpl)·내보내기" },
+                  { id: "brandKit", label: "브랜드 킷", icon: Package, title: "팔레트·글꼴·로고를 묶은 브랜드 킷 저장·적용" },
+                ]}
+              />
+              {menu === "palette" && <StudioPaletteLibraryPanel onPickColor={(hex) => setColor(hex)} seedColors={recentColors} />}
+              {menu === "brandKit" && (
+                <Suspense fallback={<StudioPanelLoading label="브랜드 킷 패널을 여는 중..." />}>
+                  <StudioBrandKitPanel
+                    onPickColor={(hex) => setColor(hex)}
+                    canApplyFont={!!selected && (selected.type === "text" || selected.type === "bubble")}
+                    onApplyFont={applyBrandKitFont}
+                    onApplyLogo={applyBrandKitLogo}
+                  />
+                </Suspense>
+              )}
+          </StudioFloatingToolPopover>
+        </div>
+        </StudioToolbarCluster>
+        ) : null}
+
+        {(studioUiDensityAllows(uiDensityMode, "toolbar-ai") || activeToolbarGroup === "aiGroup") ? (
+        <>
+        {studioUiDensityAllows(uiDensityMode, "toolbar-ai") ? <StudioToolbarDivider label="AI" /> : null}
+        <StudioToolbarCluster
+          label="AI 연동"
+          className={cn(!studioUiDensityAllows(uiDensityMode, "toolbar-ai") && "border-0 bg-transparent p-0 shadow-none")}
+        >
+        <div ref={activeToolbarGroup === "aiGroup" ? menuRef : undefined} className="relative">
+          <button
+            type="button"
+            onClick={() => setMenu(activeToolbarGroup === "aiGroup" ? null : "aiAssist")}
+            aria-haspopup="menu"
+            aria-expanded={activeToolbarGroup === "aiGroup"}
+            className={cn(
+              toolBtn(activeToolbarGroup === "aiGroup"),
+              !studioUiDensityAllows(uiDensityMode, "toolbar-ai") && "sr-only"
+            )}
+            title="AI 어시스트 · 시나리오 설계 · 스톡 사진 · 연동 설정 — Z.ai/DeepSeek 서버 텍스트 또는 내 API 연동"
+          >
+            <WandSparkles size={15} aria-hidden /> AI
+            <ChevronDown size={12} aria-hidden className={cn("transition-transform duration-150", activeToolbarGroup === "aiGroup" && "rotate-180")} />
+          </button>
+          <StudioFloatingToolPopover
+            open={activeToolbarGroup === "aiGroup"}
+            id="ai-group"
+            className={cn(
+              groupPopoverClass("w-80"),
+              // Fixed flex column: nested max-heights previously clipped generate buttons.
+              "flex h-[min(78dvh,36rem)] max-h-[min(78dvh,36rem)] flex-col overflow-hidden lg:w-96 lg:max-w-[min(24rem,calc(100vw-1.5rem))]"
+            )}
+          >
+              <StudioMenuPopoverHeader
+                icon={WandSparkles}
+                title="AI 연동"
+                description="초안·스톡·시나리오를 연결하고, 키 설정은 연동 탭에서 관리합니다."
+                className="shrink-0"
+              />
+              <StudioMenuSubtabs
+                aria-label="AI 메뉴 구역"
+                className="shrink-0"
+                activeId={
+                  menu === "aiAssist" || menu === "stockImage" || menu === "integrations"
+                    ? menu
+                    : "aiAssist"
+                }
+                onSelect={(id) => {
+                  if (id === "scenario") {
+                    if (masterEditMode) return;
+                    setScenarioOpen(true);
+                    setMenu(null);
+                    return;
+                  }
+                  if (id === "stockImage") preloadStudioStockImagePanel();
+                  if (id === "integrations") preloadStudioIntegrationsSettingsPanel();
+                  setMenu(id as StudioMenu);
+                }}
+                items={[
+                  { id: "aiAssist", label: "어시스트", icon: Sparkles, title: "BYOK 배경·캐릭터·구도 제안" },
+                  { id: "scenario", label: "시나리오", icon: Clapperboard, disabled: masterEditMode, title: masterEditMode ? "마스터 편집 중에는 사용할 수 없어요" : "시나리오 설계" },
+                  { id: "stockImage", label: "스톡", icon: Images, title: "Unsplash 무료 사진" },
+                  { id: "integrations", label: "설정", icon: Settings2, title: "API 키·연동 설정" },
+                ]}
+              />
+              {menu === "aiAssist" && (
+                <div className="flex min-h-0 flex-1 flex-col">
+                <Suspense fallback={<StudioPanelLoading label="AI 어시스트 패널을 여는 중..." />}>
+                  <StudioAiAssistHub
+                    className="min-h-0 flex-1"
+                    activeTool={aiAssistTool}
+                    onToolChange={setAiAssistTool}
+                    imageConfigured={isStudioAiConfigured(aiSettings)}
+                    textConfigured={textAiConfigured}
+                    connectionOk={textAiConfigured || isStudioAiConfigured(aiSettings)}
+                    connectionLabel={
+                      textAiConfigured
+                        ? textAiTransport.mode === "server"
+                          ? `${activeServerAiProviderLabel} 연결됨`
+                          : "내 API 연결됨"
+                        : isStudioAiConfigured(aiSettings)
+                          ? "이미지 API 연결됨"
+                          : serverAiStatus?.configured
+                            ? "로그인 또는 API 키 필요"
+                            : "API 키 등록 필요"
+                    }
+                    onOpenSettings={() => {
+                      preloadStudioIntegrationsSettingsPanel();
+                      setMenu("integrations");
+                    }}
+                    onPreloadSettings={preloadStudioIntegrationsSettingsPanel}
+                    recentState={aiRecentPrompts}
+                    onApplyPresetPrompt={applyAiAssistPresetPrompt}
+                    providerSlot={
+                      textAiTransport.mode === "server" && configuredServerAiProviders.length > 0 ? (
+                        <div className="rounded-xl border border-line bg-card/35 p-2.5">
+                          <label className="flex items-center justify-between gap-2 text-xs font-semibold text-fg-2">
+                            <span>텍스트 AI 제공자</span>
+                            <select
+                              value={serverAiProvider}
+                              onChange={(event) =>
+                                updateServerAiProvider(event.target.value as StudioServerAiProviderPreference)
+                              }
+                              className="min-h-11 min-w-0 rounded-lg border border-line bg-panel px-2 text-xs text-fg outline-none focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/25"
+                              aria-label="서버 텍스트 AI 제공자"
+                            >
+                              <option value="auto">자동 전환</option>
+                              <option
+                                value="zai"
+                                disabled={!configuredServerAiProviders.some((provider) => provider.id === "zai")}
+                              >
+                                Z.ai
+                              </option>
+                              <option
+                                value="deepseek"
+                                disabled={!configuredServerAiProviders.some((provider) => provider.id === "deepseek")}
+                              >
+                                DeepSeek
+                              </option>
+                            </select>
+                          </label>
+                          <p className="mt-1.5 text-[0.65rem] leading-relaxed text-fg-3">
+                            잔액·패키지 한도 소진 시 다른 제공자로 전환합니다. 일반 오류는 이중 과금을 막기 위해
+                            자동 재전송하지 않아요.
+                          </p>
+                        </div>
+                      ) : null
+                    }
+                    toolPanel={
+                      <>
+                        {aiAssistTool === "background" ? (
+                          <StudioAiBackgroundPanel
+                            configured={isStudioAiConfigured(aiSettings)}
+                            prompt={aiBgPrompt}
+                            onPromptChange={setAiBgPrompt}
+                            size={aiBgSize}
+                            onSizeChange={setAiBgSize}
+                            busy={aiBgBusy}
+                            error={aiBgError}
+                            onGenerate={onGenerateAiBackground}
+                          />
+                        ) : null}
+                        {aiAssistTool === "character" ? (
+                          <StudioAiCharacterConsistencyPanel
+                            configured={isStudioAiConfigured(aiSettings)}
+                            hasReference={selected?.type === "image"}
+                            referenceThumbnail={selected?.type === "image" ? selected.src : null}
+                            prompt={aiCharacterPrompt}
+                            onPromptChange={setAiCharacterPrompt}
+                            busy={aiCharacterBusy}
+                            error={aiCharacterError}
+                            onGenerate={() => {
+                              const prompt = aiCharacterPrompt.trim();
+                              if (prompt) {
+                                setAiRecentPrompts(
+                                  pushStudioAiRecentPrompt(globalThis.localStorage, "character", prompt)
+                                );
+                              }
+                              onGenerateAiCharacter();
+                            }}
+                          />
+                        ) : null}
+                        {aiAssistTool === "composition" ? (
+                          <StudioAiCompositionPanel
+                            settings={aiSettings}
+                            transport={textAiTransport}
+                            configured={textAiConfigured}
+                            sceneText={aiCompositionDraft}
+                            onSceneTextChange={setAiCompositionDraft}
+                            onInsertAsNote={insertAiCompositionNote}
+                            onOperationStart={(prompt) => {
+                              setAiRecentPrompts(
+                                pushStudioAiRecentPrompt(globalThis.localStorage, "composition", prompt)
+                              );
+                              const provider = pendingTextAiProviderContext();
+                              return beginTrackedStudioAiOperation("composition", {
+                                kind: "text",
+                                task: "composition",
+                                provider: provider.provider,
+                                model: provider.model,
+                                transport: provider.transport,
+                                promptVersion: 1,
+                                prompt,
+                                target: { pageId: activePage.id },
+                                references: [],
+                              });
+                            }}
+                            onOperationSettled={({ operationId, result, textProvenance }) => {
+                              settleTrackedTextAiOperation(operationId, result, textProvenance);
+                            }}
+                          />
+                        ) : null}
+                        {aiAssistTool === "dialogue" ? (
+                          <StudioDialogueSuggestPanel
+                            configured={textAiConfigured}
+                            situationText={aiDialogueSuggestSituation}
+                            onSituationTextChange={setAiDialogueSuggestSituation}
+                            hasContext={activePage.elements.some(
+                              (el) => (el.type === "bubble" || el.type === "text") && el.text.trim().length > 0
+                            )}
+                            includeContext={aiDialogueSuggestIncludeContext}
+                            onIncludeContextChange={setAiDialogueSuggestIncludeContext}
+                            busy={aiDialogueSuggestBusy}
+                            error={aiDialogueSuggestError}
+                            candidates={aiDialogueSuggestCandidates}
+                            onGenerate={() => {
+                              const prompt = aiDialogueSuggestSituation.trim();
+                              if (prompt) {
+                                setAiRecentPrompts(
+                                  pushStudioAiRecentPrompt(globalThis.localStorage, "dialogue", prompt)
+                                );
+                              }
+                              void executeSuggestDialogueLines();
+                            }}
+                            canInsertToSelected={
+                              !!selected && (selected.type === "bubble" || selected.type === "text")
+                            }
+                            onAddToScript={addDialogueSuggestionToScript}
+                            onInsertToSelected={insertDialogueSuggestionToSelected}
+                          />
+                        ) : null}
+                        {aiAssistTool === "palette" ? (
+                          <StudioPaletteSuggestPanel
+                            configured={textAiConfigured}
+                            moodText={aiPaletteSuggestMood}
+                            onMoodTextChange={setAiPaletteSuggestMood}
+                            busy={aiPaletteSuggestBusy}
+                            error={aiPaletteSuggestError}
+                            suggestion={aiPaletteSuggestion}
+                            savedMessage={aiPaletteSuggestSavedMsg}
+                            onGenerate={() => {
+                              const prompt = aiPaletteSuggestMood.trim();
+                              if (prompt) {
+                                setAiRecentPrompts(
+                                  pushStudioAiRecentPrompt(globalThis.localStorage, "palette", prompt)
+                                );
+                              }
+                              void executeSuggestColorPalette();
+                            }}
+                            onSaveToLibrary={saveSuggestedPaletteToLibrary}
+                          />
+                        ) : null}
+                      </>
+                    }
+                  />
+                </Suspense>
+                </div>
+              )}
+              {menu === "stockImage" && (
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                  <Suspense fallback={<StudioPanelLoading label="스톡 사진 패널을 여는 중..." />}>
+                    <StudioStockImagePanel
+                      onInsert={insertStockImage}
+                      onOpenSettings={() => {
+                        preloadStudioIntegrationsSettingsPanel();
+                        setMenu("integrations");
+                      }}
+                    />
+                  </Suspense>
+                </div>
+              )}
+              {menu === "integrations" && (
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                  <Suspense fallback={<StudioPanelLoading label="연동 설정 패널을 여는 중..." />}>
+                    <StudioIntegrationsSettingsPanel aiSettings={aiSettings} onAiSettingsChange={updateAiSettings} />
+                  </Suspense>
+                </div>
+              )}
+          </StudioFloatingToolPopover>
+        </div>
+        </StudioToolbarCluster>
+        </>
+        ) : null}
+
+        {/* 삽입 코어 — 밀도 모드와 무관하게 항상 노출(텍스트·말풍선은 예전에 AI 클러스터에 묶여
+            simple/focus 에서 통째로 사라지던 회귀를 분리). */}
+        {studioUiDensityAllows(uiDensityMode, "toolbar-insert") ? (
+        <>
+        <StudioToolbarDivider label="삽입" />
+        <StudioToolbarCluster label="삽입·대사">
+        <button
+          type="button"
+          onClick={() => addText()}
+          draggable
+          onDragStart={(event) => {
+            event.dataTransfer.setData("application/json-insert", JSON.stringify({ kind: "text" }));
+            event.dataTransfer.effectAllowed = "copy";
+          }}
+          className={toolBtn(false)}
+          title="텍스트 넣기 — 클릭해 추가하거나 캔버스로 끌어다 원하는 위치에 놓으세요"
+        >
+          <TypeIcon size={14} aria-hidden /> 텍스트
+        </button>
+        <div ref={menu === "bubble" ? menuRef : undefined} className="relative">
+          <button
+            type="button"
+            onClick={() => setMenu(menu === "bubble" ? null : "bubble")}
+            aria-haspopup="menu"
+            aria-expanded={menu === "bubble"}
+            className={toolBtn(menu === "bubble")}
+            title="말풍선 라이브러리"
+          >
+            <MessageCircle size={14} aria-hidden /> 말풍선
+          </button>
+          <StudioFloatingToolPopover
+            open={menu === "bubble"}
+            id="bubble-menu"
+            className="fixed inset-x-2 top-[4.5rem] z-[70] max-h-[calc(100dvh-13rem)] w-auto overflow-y-auto rounded-2xl border border-line/70 bg-panel p-0 shadow-xl lg:inset-x-auto lg:left-3 lg:top-[4.5rem] lg:max-h-[min(42rem,calc(100dvh-7rem))] lg:w-[22rem] lg:max-w-[calc(100vw-1.5rem)]"
+          >
+              <div className="relative overflow-hidden border-b border-line/50 bg-gradient-to-br from-accent-soft/35 via-card/60 to-panel px-3 pb-3 pt-3">
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute -right-4 -top-6 size-20 rounded-full bg-accent/10 blur-2xl"
+                />
+                <div className="relative flex items-start gap-2.5">
+                  <span className="grid size-10 shrink-0 place-items-center rounded-2xl border border-accent/25 bg-accent-soft text-accent shadow-[inset_0_1px_0_oklch(0.95_0.02_85_/_0.12)]">
+                    <MessageCircle size={18} aria-hidden strokeWidth={1.75} />
+                  </span>
+                  <div className="min-w-0 pt-0.5">
+                    <p className="text-[0.9rem] font-semibold tracking-tight text-fg">말풍선 골라 넣기</p>
+                    <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                      장면에 맞는 목소리를 고르면 돼요. 대충 골라도 나중에 바꿀 수 있어요.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenu(null);
+                        openFeatureTutorial("bubble");
+                      }}
+                      className="mt-1.5 text-[0.65rem] font-medium text-accent/90 underline-offset-2 transition-colors hover:text-accent hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                    >
+                      말풍선 튜토리얼 보기
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3 p-2.5" role="menu" aria-label="말풍선 종류">
+                {groupBubbleVariants().map((section) => (
+                  <div key={section.group}>
+                    <p className="mb-1.5 flex items-center gap-1.5 px-1 text-[0.62rem] font-semibold text-fg-3">
+                      <span className="inline-block size-1 rounded-full bg-accent/55" aria-hidden />
+                      {section.group}
+                    </p>
+                    <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                      {section.variants.map((v) => (
+                        <button
+                          key={v.id}
+                          type="button"
+                          role="menuitem"
+                          onClick={() => addBubble(v.id)}
+                          // 클릭=중앙/패널 규칙, 드래그=캔버스 드롭 지점 배치(onWrapDrop 이 처리).
+                          draggable
+                          onDragStart={(event) => {
+                            event.dataTransfer.setData(
+                              "application/json-insert",
+                              JSON.stringify({ kind: "bubble", variant: v.id })
+                            );
+                            event.dataTransfer.effectAllowed = "copy";
+                          }}
+                          title={`${v.label} — 클릭해 추가하거나 캔버스로 끌어다 원하는 위치에 놓으세요`}
+                          className="group flex min-h-[5.75rem] flex-col rounded-2xl border border-line/55 bg-gradient-to-b from-card/90 to-canvas/30 p-2 text-left shadow-[inset_0_1px_0_oklch(0.95_0.02_85_/_0.04)] transition-[border-color,background,transform,box-shadow] duration-200 ease-out hover:-translate-y-px hover:border-accent/40 hover:bg-raised/80 hover:shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:translate-y-0"
+                        >
+                          <span className="flex h-12 items-center justify-center rounded-xl bg-canvas/45 ring-1 ring-line/35 transition-colors group-hover:bg-accent-soft/25 group-hover:ring-accent/20">
+                            <StudioBubbleVariantGlyph
+                              variant={v.id}
+                              className="h-10 w-full text-fg-2 transition-colors duration-200 group-hover:text-accent"
+                            />
+                          </span>
+                          <span className="mt-1.5 block text-[0.78rem] font-semibold tracking-tight text-fg">
+                            {v.label}
+                          </span>
+                          <span className="mt-0.5 block text-[0.6rem] leading-snug text-fg-3">{v.hint}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-2 border-t border-line/50 bg-canvas/25 px-2.5 py-2.5">
+                <div>
+                  <p className="text-[0.72rem] font-semibold text-fg-2">대사를 한 번에</p>
+                  <p className="mt-0.5 text-[0.64rem] leading-snug text-fg-3">
+                    한 줄에 한 마디. <span className="text-fg-2">이름: 대사</span>면 화자 자동,
+                    <span className="text-fg-2"> (지문)</span>은 나레이션.
+                  </p>
+                </div>
+                <textarea
+                  value={dialogueScript}
+                  onChange={(e) => setDialogueScript(e.target.value)}
+                  placeholder={"민수: 안녕?\n지영: 오랜만이야\n(잠시 후)"}
+                  spellCheck
+                  rows={4}
+                  className="w-full resize-y rounded-xl border border-line/60 bg-card/80 px-2.5 py-2 text-[0.7rem] leading-relaxed text-fg outline-none transition-colors placeholder:text-fg-3/80 focus:border-accent/45 focus:bg-card"
+                />
+                <button
+                  type="button"
+                  onClick={() => void addDialogueBubbles()}
+                  disabled={!dialogueScript.trim()}
+                  className={cn(
+                    "w-full rounded-xl py-2 text-xs font-semibold transition-[opacity,transform,background] duration-150",
+                    dialogueScript.trim()
+                      ? "bg-accent text-on-accent shadow-sm hover:opacity-95 active:scale-[0.99]"
+                      : "cursor-not-allowed bg-card text-fg-3 ring-1 ring-line/50"
+                  )}
+                >
+                  말풍선으로 한 번에 넣기
+                </button>
+                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenu(null);
+                      setDialogueBatchOpen(true);
+                    }}
+                    className="rounded-xl border border-line/60 bg-card/70 py-1.5 text-[0.7rem] font-medium text-fg-2 transition-colors hover:bg-raised"
+                  >
+                    배치 대사 편집
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenu(null);
+                      setDialogueBatchOpen(false);
+                      setDialogueTranslateOpen(true);
+                    }}
+                    className="rounded-xl border border-line/60 bg-card/70 py-1.5 text-[0.7rem] font-medium text-fg-2 transition-colors hover:bg-raised"
+                  >
+                    번역 (내 API 키)
+                  </button>
+                </div>
+              </div>
+          </StudioFloatingToolPopover>
+        </div>
+        <label className={cn(toolBtn(false), "cursor-pointer")} title="이미지 추가 (⌘V로 클립보드 이미지 붙여넣기 가능)">
+          <ImagePlus size={15} aria-hidden /> 이미지
+          <input type="file" accept="image/*" className="hidden" onChange={onPickImage} />
+        </label>
+        <span className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-2 text-xs text-fg-2 pointer-coarse:h-11">
+          <Palette size={14} aria-hidden className="text-fg-3" />
+          <span className="sr-only sm:not-sr-only sm:inline">색</span>
+          <LazyStudioColorPopover
+            value={color}
+            onChange={setColor}
+            recentColors={recentColors}
+            onUseColor={rememberColor}
+            onLoadRecentColors={ensureRecentColorsLoaded}
+            title="브러시·도형 색상"
+          />
+        </span>
+        </StudioToolbarCluster>
+        </>
+        ) : null}
+        {/* 펜 옵션은 캔버스 하단 StudioDrawOptionsBar 한 곳에서만 제공합니다. */}
+        <span className="mx-0.5 h-5 w-px bg-line" />
+        <button
+          type="button"
+          onClick={() => setTimelapseOpen(true)}
+          disabled={masterEditMode}
+          aria-label="타임랩스 녹화 (그리기 과정 영상화)"
+          className={cn(toolBtn(false), "disabled:opacity-40")}
+          title={masterEditMode ? "마스터 편집 중에는 사용할 수 없어요" : "타임랩스 녹화 (그리기 과정 영상화)"}
+        >
+          <Video size={14} />
+        </button>
+        <button
+          type="button"
+          onClick={() => setStoryboardGridOpen(true)}
+          aria-label="스토리보드 그리드 보기 (전체 페이지 한눈에 비교)"
+          className={toolBtn(false)}
+          title="스토리보드 그리드 보기 — 전체 페이지를 격자로 한눈에 비교"
+        >
+          <LayoutGrid size={14} />
+        </button>
+        <button
+          type="button"
+          onClick={() => setPageReviewOpen(true)}
+          aria-pressed={pageReviewOpen}
+          aria-label="페이지 검토와 편집 잠금"
+          className={toolBtn(pageReviewOpen || pageEditLocked)}
+          title={pageEditLocked ? "현재 페이지가 검토 잠금 상태예요" : "페이지별 승인 상태·담당·메모와 편집 잠금 관리"}
+        >
+          <ClipboardCheck size={14} />
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setTeamPanelOpen(false);
+            setCommentsOpen(true);
+          }}
+          disabled={collaborationDocumentLocked}
+          aria-pressed={commentsOpen}
+          aria-label={`문서 댓글${openStudioCommentCount > 0 ? `, 열림 ${openStudioCommentCount}개` : ""}`}
+          className={cn(toolBtn(commentsOpen), "relative disabled:cursor-not-allowed disabled:opacity-50")}
+          title={
+            collaborationDocumentLocked
+              ? sharedDocument?.role === "commenter"
+                ? "검토자 서버 댓글은 다음 단계에서 제공됩니다. 현재 로컬 댓글은 공동 문서에 쓸 수 없어요."
+                : collaborationLockMessage()
+              : `페이지·컷·요소에 문서 댓글 남기기 · 공동 편집 저장에 포함${
+                  openStudioCommentCount > 0 ? ` · 열림 ${openStudioCommentCount}개` : ""
+                }`
+          }
+        >
+          <MessageCircle size={14} />
+          {openStudioCommentCount > 0 ? (
+            <span className="absolute -right-1.5 -top-1.5 min-w-4 rounded-full bg-accent px-1 text-[0.58rem] font-bold leading-4 text-on-accent">
+              {Math.min(openStudioCommentCount, 99)}
+            </span>
+          ) : null}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setCommentsOpen(false);
+            setTeamPanelOpen(true);
+          }}
+          aria-pressed={teamPanelOpen}
+          aria-label="팀 작업 공간"
+          className={toolBtn(teamPanelOpen)}
+          title="작품 팀원 초대·역할·서버 권한 관리"
+        >
+          <UsersRound size={14} />
+        </button>
+        <button
+          type="button"
+          onClick={() => setContinuityOpen(true)}
+          aria-pressed={continuityOpen}
+          aria-label="이야기 연속성 검사"
+          className={toolBtn(continuityOpen)}
+          title="캐릭터 바이블과 장면 비트의 인물·장소·시간·의상·소품 연속성 검사"
+        >
+          <CheckCircle2 size={14} />
+        </button>
+        <button
+          type="button"
+          onClick={() => setScrollPreviewOpen(true)}
+          aria-label="세로 스크롤 미리보기 (모바일 폭으로 이어서 확인)"
+          className={toolBtn(false)}
+          title="세로 스크롤 미리보기 — 실제 독자처럼 좁은 폭에서 이어서 확인"
+        >
+          <Smartphone size={14} />
+        </button>
+        <button
+          type="button"
+          onClick={() => setTimelineOpen((v) => !v)}
+          disabled={masterEditMode}
+          aria-pressed={timelineOpen}
+          aria-label="다중 레이어 타임라인"
+          className={cn(toolBtn(timelineOpen), "disabled:opacity-40")}
+          title={masterEditMode ? "마스터 편집 중에는 사용할 수 없어요" : "다중 레이어 타임라인"}
+        >
+          <GanttChartSquare size={14} />
+        </button>
+        <span className="mx-0.5 hidden h-5 w-px bg-line lg:block" />
+        {/* 줌·화면 맞춤·캔버스 최대화 — 모바일은 하단 도구막대가 대체 */}
+        <StudioToolbarCluster label="화면·캔버스" className="ml-auto hidden lg:flex">
+          <button
+            type="button"
+            onClick={() => setZoom((z) => clampZoom(z - 0.1))}
+            disabled={zoom <= ZOOM_MIN}
+            className={cn(toolBtn(false), "h-8 px-1.5 disabled:opacity-40")}
+            title="축소"
+            aria-label="축소"
+          >
+            <Minus size={13} strokeWidth={1.75} />
+          </button>
+          <span className="w-9 text-center text-[0.62rem] font-bold tabular-nums text-fg-3">
+            {Math.round(zoom * 100)}%
+          </span>
+          <button
+            type="button"
+            onClick={() => setZoom((z) => clampZoom(z + 0.1))}
+            disabled={zoom >= ZOOM_MAX}
+            className={cn(toolBtn(false), "h-8 px-1.5 disabled:opacity-40")}
+            title="확대"
+            aria-label="확대"
+          >
+            <Plus size={13} strokeWidth={1.75} />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setScale(1);
+              setZoom(1);
+            }}
+            className={cn(toolBtn(false), "h-8 px-1.5 text-[0.62rem] font-semibold")}
+            title="화면 100% 맞춤"
+          >
+            100%
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const wrap = wrapRef.current;
+              if (wrap) {
+                const w = wrap.clientWidth;
+                setScale(Math.min(isFullscreen ? 4 : 2.5, Math.max(0.1, w / CANVAS_W)));
+                setZoom(1);
+              }
+            }}
+            className={cn(toolBtn(false), "h-8 px-1.5 text-[0.62rem] font-semibold")}
+            title="너비에 맞춤"
+          >
+            맞춤
+          </button>
+          <StudioToolbarDivider />
+          <button
+            type="button"
+            onClick={() => {
+              const anyOpen = leftPanelOpen || rightPanelOpen;
+              setLeftPanelOpen(!anyOpen);
+              setRightPanelOpen(!anyOpen);
+            }}
+            disabled={presentationPanelsHidden}
+            aria-pressed={!visibleLeftPanelOpen && !visibleRightPanelOpen}
+            className={cn(
+              toolBtn(!visibleLeftPanelOpen && !visibleRightPanelOpen),
+              "h-8 gap-1 px-1.5 text-[0.62rem] font-semibold disabled:cursor-not-allowed disabled:opacity-45"
+            )}
+            title={
+              presentationPanelsHidden
+                ? "전체화면·브라우저 맞춤에서는 작업공간 패널을 임시로 숨깁니다"
+                : "집중 모드 — 좌우 패널을 접어 캔버스를 넓게 사용"
+            }
+          >
+            <Maximize2 size={13} strokeWidth={1.75} /> 넓게
+          </button>
+          <button
+            type="button"
+            onClick={toggleMaximize}
+            aria-pressed={maximized}
+            className={cn(toolBtn(maximized), "h-8 px-1.5 text-[0.62rem] font-semibold")}
+            title="브라우저 맞춤 — 브라우저 창을 꽉 채워 작업 (ESC로 복원)"
+          >
+            {maximized ? "복원" : "맞춤창"}
+          </button>
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            aria-pressed={isFullscreen}
+            className={cn(toolBtn(isFullscreen), "h-8 px-1.5 text-[0.62rem] font-semibold")}
+            title="전체화면 (ESC로 종료)"
+          >
+            {isFullscreen ? "창" : "전체"}
+          </button>
+          <button
+            type="button"
+            onClick={enterCanvasOnlyMode}
+            aria-pressed={canvasOnlyMode}
+            className={cn(toolBtn(canvasOnlyMode), "h-8 gap-1 px-1.5 text-[0.62rem] font-semibold")}
+            title="캔버스만 보기 — 제목·툴바·양쪽 패널을 잠시 숨기고 Esc로 복원"
+          >
+            <Minimize2 size={13} strokeWidth={1.75} /> 캔버스
+          </button>
+          <StudioColorBlindPreviewToggle value={colorBlindPreview} onChange={setColorBlindPreview} />
+        </StudioToolbarCluster>
+    </>
+  );
+});
+
+interface StudioMenubarContentHandlers {
+  applyStudioWorkspaceLayout: (layout: StudioWorkspaceLayout) => void;
+  changeMobileImmersiveMode: (enabled: boolean) => void;
+  ensureWatermarkLoaded: () => WatermarkSettings;
+  exportCurrentPageToPsd: () => Promise<PsdExportResult>;
+  exportCurrentPageToSvg: () => Promise<SvgExportResult>;
+  handleCapturePagesForPreset: (scope: "current" | "all") => Promise<HTMLCanvasElement[]>;
+  handleCopyToClipboard: () => Promise<void>;
+  handleDownload: () => Promise<void>;
+  handleDownloadAll: (spacing?: number) => Promise<void>;
+  handleExportProject: () => void;
+  handleExportProjectArchive: () => Promise<void>;
+  handleImportProject: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleImportProjectArchive: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
+  handleImportPsd: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
+  handleSave: (status: "published" | "draft") => Promise<void>;
+  openAutoActions: () => Promise<void>;
+  openOwnerFxPanel: () => Promise<void>;
+  persistStudioWorkspaceState: (nextState: StudioWorkspaceState) => StudioWorkspaceSaveResult;
+  setWatermark: (next: WatermarkSettings) => void;
+}
+
+interface StudioMenubarContentProps {
+  activePage: PageState;
+  activePageIndex: number;
+  activeToolbarGroup: StudioToolbarGroupId | null;
+  aiProvenance: { version: 1; operations: { id: string; kind: "text" | "image"; task: "composition" | "scenario" | "translation" | "dialogue" | "palette" | "text-other" | "background-image" | "character-image" | "image-edit" | "colorize" | "line-cleanup" | "image-other"; provider: string; model: string; transport: "server" | "byok" | "local" | "other"; promptVersion: number; prompt: { sha256: string; summary: string; retention: "hash-only" | "raw-opt-in"; characterCount?: number | undefined; raw?: string | undefined; }; status: "pending" | "succeeded" | "failed" | "cancelled"; createdAt: string; updatedAt: string; references: { assetId?: string | undefined; sha256?: string | undefined; }[]; revisedPrompt?: { sha256: string; summary: string; retention: "hash-only" | "raw-opt-in"; characterCount?: number | undefined; raw?: string | undefined; } | undefined; usage?: { promptTokens?: number | undefined; completionTokens?: number | undefined; totalTokens?: number | undefined; } | undefined; target?: { pageId: string; frameId?: string | undefined; elementId?: string | undefined; } | undefined; requestedSize?: { width: number; height: number; } | undefined; seed?: string | undefined; requestId?: string | undefined; error?: { category: "provider" | "cancelled" | "unknown" | "configuration" | "network" | "policy"; code: string; message: string; retriable: boolean; } | undefined; }[]; };
+  canvasH: number;
+  characterBible: { version: 1; characters: { id: string; name: string; role: string; appearance: string; costume: string; colors: string[]; voice: string; goal: string; relationships: string[]; props: string[]; lockedFields: ("colors" | "relationships" | "props" | "name" | "role" | "appearance" | "costume" | "voice" | "goal")[]; }[]; };
+  collaborationDocumentLocked: boolean;
+  collaborationLockMessage: () => string;
+  currentWorkspaceOwnerScope: string;
+  displayLinkedTitleId: string | null | undefined;
+  exportFormat: ExportFormat;
+  exportMenuOpen: boolean;
+  exportMenuRef: import("react").RefObject<HTMLDivElement | null>;
+  exportPresetId: string | null;
+  exportScale: number;
+  exportTransparent: boolean;
+  fxPanelLoading: boolean;
+  isExporting: boolean;
+  isMobile: boolean;
+  liveWorkspaceLayout: StudioWorkspaceLayout;
+  loadedWork: WorkDetail | null;
+  menu: StudioMenu | null;
+  mobileImmersive: boolean;
+  pages: PageState[];
+  projectActionsOpen: boolean;
+  projectActionsRef: import("react").RefObject<HTMLDivElement | null>;
+  projectArchiveBusy: boolean;
+  projectArchiveImportInputRef: import("react").RefObject<HTMLInputElement | null>;
+  projectArchiveStatus: { tone: "good" | "warn" | "bad"; text: string; } | null;
+  projectImportInputRef: import("react").RefObject<HTMLInputElement | null>;
+  psdImportBusy: boolean;
+  psdImportInputRef: import("react").RefObject<HTMLInputElement | null>;
+  psdImportStatus: { tone: "good" | "warn"; text: string; } | null;
+  saving: boolean;
+  setAiProvenanceOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setCharacterBibleOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setCheckpointPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setExportFormat: import("react").Dispatch<import("react").SetStateAction<ExportFormat>>;
+  setExportMenuOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setExportPresetId: import("react").Dispatch<import("react").SetStateAction<string | null>>;
+  setExportScale: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setExportTransparent: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setMenu: import("react").Dispatch<import("react").SetStateAction<StudioMenu | null>>;
+  setProductionInsightsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setProjectActionsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setPublicationOperationsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setPublishPackageOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setPublishPreflightOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setWriterRoomOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  sharedDocument: StudioSharedDocument | null;
+  studioMainMenuGroups: StudioMainMenuGroup[];
+  title: string;
+  watermark: WatermarkSettings;
+  workId: string | null;
+  workspaceMenuEpoch: number;
+  workspacePersistence: StudioWorkspaceLoadResult;
+  workspaceState: StudioWorkspaceState;
+  workspaceSyncNotice: string | null;
+  writerRoom: { version: 1; stages: { premise: { text: string; characterIds: string[]; }; synopsis: { text: string; characterIds: string[]; }; "episode-outline": { title: string; summary: string; characterIds: string[]; }; beats: { items: { id: string; order: number; title: string; summary: string; characterIds: string[]; }[]; }; scenes: { items: { id: string; order: number; beatIds: string[]; heading: string; summary: string; location: string; time: string; characterIds: string[]; }[]; }; "panel-plan": { items: { id: string; order: number; sceneId: string; shot: string; action: string; characterIds: string[]; }[]; }; "dialogue-sfx": { dialogue: { id: string; order: number; panelId: string; characterId: string | null; text: string; }[]; sfx: { id: string; order: number; panelId: string; presetId: string | null; customText: string; style: { emphasis: "quiet" | "normal" | "strong"; scale: "small" | "medium" | "large"; }; }[]; }; }; completion: { premise: boolean; synopsis: boolean; "episode-outline": boolean; beats: boolean; scenes: boolean; "panel-plan": boolean; "dialogue-sfx": boolean; }; suggestions: { id: string; targetPath: string; currentValue: string | number | boolean | string[] | null; proposedValue: string | number | boolean | string[] | null; rationale: string; status: "pending" | "accepted" | "rejected"; createdAt: string; provenanceRef?: string | undefined; resolvedAt?: string | undefined; }[]; lastDecision?: { kind: "accept" | "reject"; suggestionStates: { id: string; status: "pending" | "accepted" | "rejected"; resolvedAt?: string | undefined; }[]; targetValues: { targetPath: string; value: string | number | boolean | string[] | null; }[]; decidedAt: string; } | undefined; };
+  stableHandlers: StudioMenubarContentHandlers;
+}
+
+const StudioMenubarContent = memo(function StudioMenubarContent({
+  activePage,
+  activePageIndex,
+  activeToolbarGroup,
+  aiProvenance,
+  canvasH,
+  characterBible,
+  collaborationDocumentLocked,
+  collaborationLockMessage,
+  currentWorkspaceOwnerScope,
+  displayLinkedTitleId,
+  exportFormat,
+  exportMenuOpen,
+  exportMenuRef,
+  exportPresetId,
+  exportScale,
+  exportTransparent,
+  fxPanelLoading,
+  isExporting,
+  isMobile,
+  liveWorkspaceLayout,
+  loadedWork,
+  menu,
+  mobileImmersive,
+  pages,
+  projectActionsOpen,
+  projectActionsRef,
+  projectArchiveBusy,
+  projectArchiveImportInputRef,
+  projectArchiveStatus,
+  projectImportInputRef,
+  psdImportBusy,
+  psdImportInputRef,
+  psdImportStatus,
+  saving,
+  setAiProvenanceOpen,
+  setCharacterBibleOpen,
+  setCheckpointPanelOpen,
+  setExportFormat,
+  setExportMenuOpen,
+  setExportPresetId,
+  setExportScale,
+  setExportTransparent,
+  setMenu,
+  setProductionInsightsOpen,
+  setProjectActionsOpen,
+  setPublicationOperationsOpen,
+  setPublishPackageOpen,
+  setPublishPreflightOpen,
+  setWriterRoomOpen,
+  sharedDocument,
+  studioMainMenuGroups,
+  title,
+  watermark,
+  workId,
+  workspaceMenuEpoch,
+  workspacePersistence,
+  workspaceState,
+  workspaceSyncNotice,
+  writerRoom,
+  stableHandlers,
+}: StudioMenubarContentProps) {
+  const {
+    applyStudioWorkspaceLayout,
+    changeMobileImmersiveMode,
+    ensureWatermarkLoaded,
+    handleCopyToClipboard,
+    handleDownload,
+    handleDownloadAll,
+    handleExportProject,
+    handleExportProjectArchive,
+    handleImportProject,
+    handleImportProjectArchive,
+    handleImportPsd,
+    handleSave,
+    openAutoActions,
+    openOwnerFxPanel,
+    persistStudioWorkspaceState,
+    setWatermark,
+    exportCurrentPageToPsd,
+    exportCurrentPageToSvg,
+    handleCapturePagesForPreset,
+  } = stableHandlers;
+  return (
+    <>
+        <div
+          data-studio-menubar-primary="true"
+          className={cn(
+            "flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+            mobileImmersive && "hidden"
+          )}
+        >
+          {/* Document context and application commands may compress; publish actions never do. */}
+          <div
+            className={cn(
+              "flex min-w-0 shrink items-center gap-1.5",
+              mobileImmersive && "hidden"
+            )}
+          >
+          <h1
+            className="min-w-0 max-w-[8rem] truncate text-[0.8125rem] font-semibold tracking-tight text-fg xl:max-w-[16rem]"
+            title={title.trim() || "무제"}
+          >
+            {title.trim() || "무제"}
+          </h1>
+          <span className="hidden shrink-0 rounded-md border border-line/60 bg-canvas/40 px-1.5 py-0.5 text-[0.62rem] font-medium tabular-nums text-fg-3 sm:inline">
+            {pageDisplayName(activePage, activePageIndex)}
+          </span>
+          {displayLinkedTitleId ? (
+            <span className="hidden rounded-full border border-accent/30 bg-accent-soft/40 px-1.5 py-0.5 text-[0.6rem] font-semibold text-accent sm:inline">
+              링크됨
+            </span>
+          ) : null}
+          {workspacePersistence.ownerScope === currentWorkspaceOwnerScope ? (
+            <StudioWorkspaceMenu
+              key={`${currentWorkspaceOwnerScope}:${workspaceMenuEpoch}`}
+              state={workspaceState}
+              liveLayout={liveWorkspaceLayout}
+              persistence={workspacePersistence}
+              onStateChange={persistStudioWorkspaceState}
+              onApplyLayout={applyStudioWorkspaceLayout}
+            />
+          ) : (
+            <span role="status" className="inline-flex min-h-8 items-center text-[0.65rem] text-fg-3">
+              전환 중…
+            </span>
+          )}
+          {workspaceSyncNotice && workspacePersistence.ownerScope === currentWorkspaceOwnerScope ? (
+            <span
+              role="status"
+              title={workspaceSyncNotice}
+              className="max-w-40 truncate text-[0.62rem] font-medium text-cool"
+            >
+              {workspaceSyncNotice}
+            </span>
+          ) : null}
+          </div>
+          <span aria-hidden className="mx-0.5 hidden h-4 w-px shrink-0 bg-line md:block" />
+          {/* Desktop application commands live in the compressible center lane. */}
+          <Suspense fallback={null}>
+            <StudioMainMenu
+              groups={studioMainMenuGroups}
+              className={cn("hidden min-w-0 md:flex", mobileImmersive && "!hidden")}
+            />
+          </Suspense>
+          {/* Wide layouts expose high-frequency insert shortcuts; narrower widths use Insert. */}
+          <div
+            className={cn(
+              "hidden min-w-0 items-center gap-0.5 xl:flex",
+              mobileImmersive && "!hidden"
+            )}
+            role="group"
+            aria-label="삽입 바로가기"
+          >
+          <button
+            type="button"
+            onClick={() => {
+              preloadStudioAssetMenuPanel();
+              setMenu(activeToolbarGroup === "assetGroup" ? null : "template");
+            }}
+            aria-haspopup="menu"
+            aria-expanded={activeToolbarGroup === "assetGroup"}
+            className={cn(
+              buttonClass({ size: "sm", variant: activeToolbarGroup === "assetGroup" ? "solid" : "quiet" }),
+              "min-h-9 gap-1.5 px-2.5 text-[0.72rem]"
+            )}
+            title="템플릿 · 콜라주 · 요소 · 장면 · 클립 · 효과 · 내 에셋"
+          >
+            <Folder size={14} aria-hidden />
+            템플릿·에셋
+          </button>
+          <button
+            type="button"
+            onClick={() => setMenu(menu === "bubble" ? null : "bubble")}
+            aria-haspopup="menu"
+            aria-expanded={menu === "bubble"}
+            className={cn(
+              buttonClass({ size: "sm", variant: menu === "bubble" ? "solid" : "quiet" }),
+              "min-h-9 gap-1.5 px-2.5 text-[0.72rem]"
+            )}
+            title="말풍선 라이브러리"
+          >
+            <MessageCircle size={14} aria-hidden />
+            말풍선
+          </button>
+          </div>
+          <span aria-hidden className="mx-0.5 hidden h-4 w-px shrink-0 bg-line xl:block" />
+        </div>
+        {/* 파일·내보내기 — 드로잉 앱 메뉴바 */}
+        <div
+          data-studio-menubar-actions="true"
+          className={cn(
+            "flex shrink-0 flex-nowrap items-center gap-1",
+            mobileImmersive && "min-w-0 w-full gap-0.5"
+          )}
+        >
+          {isMobile ? (
+            <button
+              type="button"
+              onClick={() => changeMobileImmersiveMode(!mobileImmersive)}
+              aria-pressed={mobileImmersive}
+              aria-label={
+                mobileImmersive
+                  ? "전체 화면 드로잉 종료"
+                  : "전체 화면 드로잉"
+              }
+              data-studio-mobile-app-mode
+              className={cn(
+                buttonClass({
+                  size: "sm",
+                  variant: mobileImmersive ? "solid" : "quiet",
+                  className: "min-h-11 shrink-0 gap-1.5 whitespace-nowrap",
+                }),
+                "sticky left-0 z-20 shadow-[0_0_0_4px_var(--color-canvas)]"
+              )}
+              title={
+                mobileImmersive
+                  ? "일반 화면으로 복원"
+                  : "전체 화면으로 그리기"
+              }
+            >
+              {mobileImmersive ? (
+                <Minimize2 size={15} aria-hidden />
+              ) : (
+                <Maximize2 size={15} aria-hidden />
+              )}
+              {mobileImmersive ? "종료" : "전체화면"}
+            </button>
+          ) : null}
+          {mobileImmersive ? (
+            <>
+              <h1 className="sr-only">드로잉 전체화면</h1>
+              <span
+                className="min-w-0 max-w-40 flex-1 truncate px-1 text-xs font-semibold text-fg-2"
+                title={`${title.trim() || "무제"} · ${pageDisplayName(activePage, activePageIndex)}`}
+              >
+                {title.trim() || "무제"} · {pageDisplayName(activePage, activePageIndex)}
+              </span>
+            </>
+          ) : null}
+          <div ref={exportMenuRef} className="relative flex shrink-0 items-center max-sm:hidden">
+            <button
+              type="button"
+              onClick={() => handleDownload()}
+              className={cn(
+                buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5 pr-2" }),
+                isMobile && "min-h-11"
+              )}
+              title={`현재 페이지를 ${exportScale}× ${exportFormat.toUpperCase()}로 다운로드${exportTransparent && exportFormat === "png" ? " (투명 배경)" : ""}`}
+            >
+              <Download size={14} /> <span className="max-xl:sr-only">다운로드</span>
+              <span className="text-[10px] font-semibold tabular-nums text-fg-3 max-xl:hidden">
+                {exportScale}× {exportFormat.toUpperCase()}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                preloadStudioExportMenuPanel();
+                ensureWatermarkLoaded();
+                setProjectActionsOpen(false);
+                setExportMenuOpen((open) => !open);
+              }}
+              onMouseEnter={preloadStudioExportMenuPanel}
+              onFocus={preloadStudioExportMenuPanel}
+              aria-expanded={exportMenuOpen}
+              aria-label="내보내기 옵션"
+              className={cn(
+                buttonClass({ size: "sm", variant: "quiet", className: "px-1.5" }),
+                isMobile && "min-h-11 min-w-11"
+              )}
+              title="내보내기 옵션 (배율·포맷·투명 배경)"
+            >
+              <ChevronDown size={13} className={cn("transition-transform", exportMenuOpen && "rotate-180")} />
+            </button>
+            {exportMenuOpen && typeof document !== "undefined"
+              ? createPortal(
+                  <Suspense
+                    fallback={
+                      <div
+                        data-studio-export-menu-panel="true"
+                        className="fixed inset-x-2 top-12 z-[100] max-h-[calc(100dvh-4rem)] overflow-y-auto rounded-xl border border-line bg-panel p-3 text-xs text-fg-3 shadow-2xl sm:inset-x-auto sm:right-3 sm:w-72"
+                      >
+                        내보내기 옵션을 여는 중...
+                      </div>
+                    }
+                  >
+                    <StudioExportMenuPanel
+                      canvasWidth={CANVAS_W}
+                      canvasHeight={canvasH}
+                      exportScale={exportScale}
+                      exportFormat={exportFormat}
+                      exportTransparent={exportTransparent}
+                      exportPresetId={exportPresetId}
+                      watermark={watermark}
+                      isExporting={isExporting}
+                      exportTitle={title}
+                      pageCount={pages.length}
+                      pageLabels={pages.map((p, idx) => pageDisplayName(p, idx))}
+                      capturePagesForPreset={handleCapturePagesForPreset}
+                      exportCurrentPageToSvg={exportCurrentPageToSvg}
+                      exportCurrentPageToPsd={exportCurrentPageToPsd}
+                      setExportScale={setExportScale}
+                      setExportFormat={setExportFormat}
+                      setExportTransparent={setExportTransparent}
+                      setExportPresetId={setExportPresetId}
+                      setWatermark={setWatermark}
+                      onCopyToClipboard={handleCopyToClipboard}
+                    />
+                  </Suspense>,
+                  document.body
+                )
+              : null}
+          </div>
+          <div ref={projectActionsRef} className="relative shrink-0 max-sm:hidden">
+            <button
+              type="button"
+              onClick={() => {
+                setExportMenuOpen(false);
+                setProjectActionsOpen((open) => !open);
+              }}
+              aria-haspopup="dialog"
+              aria-expanded={projectActionsOpen}
+              aria-controls="studio-project-actions-menu"
+              className={buttonClass({
+                size: "sm",
+                variant: "quiet",
+                className: "min-h-11 shrink-0 gap-1.5 whitespace-nowrap",
+              })}
+              title="백업·복구·기획·검토·연재·게시 도구"
+            >
+              <Folder size={14} aria-hidden /> <span className="max-xl:sr-only">프로젝트</span>
+              <ChevronDown
+                size={13}
+                className={cn("transition-transform", projectActionsOpen && "rotate-180")}
+                aria-hidden
+              />
+            </button>
+            {projectActionsOpen && typeof document !== "undefined"
+              ? createPortal(
+              <div
+                id="studio-project-actions-menu"
+                data-studio-project-actions-menu="true"
+                role="dialog"
+                aria-label="프로젝트 작업"
+                onClickCapture={(event) => {
+                  const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button");
+                  if (button && !button.dataset.projectKeepOpen) {
+                    globalThis.setTimeout(() => setProjectActionsOpen(false), 0);
+                  }
+                }}
+                className="fixed inset-x-2 top-12 z-[100] grid max-h-[calc(100dvh-4rem)] grid-cols-2 gap-1.5 overflow-y-auto overscroll-contain rounded-xl border border-line bg-panel p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-2xl [scrollbar-gutter:stable] sm:grid-cols-3 sm:inset-x-auto sm:right-3 sm:w-[min(36rem,calc(100vw-1.5rem))] [&>button]:min-h-11 [&>button]:justify-start [&>label]:min-h-11 [&>label]:justify-start"
+              >
+                <div className="col-span-2 flex items-center justify-between gap-3 border-b border-line/60 px-2 py-2 sm:col-span-3">
+                  <span>
+                    <span className="block text-xs font-bold text-fg">파일 · 프로젝트</span>
+                    <span className="mt-0.5 block text-[0.65rem] text-fg-3">백업 · 복구 · 검토 · 내보내기</span>
+                  </span>
+                  <span className="flex shrink-0 items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setProjectActionsOpen(false)}
+                      aria-label="프로젝트 작업 닫기"
+                      className="grid size-11 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg"
+                    >
+                      <X size={17} aria-hidden />
+                    </button>
+                  </span>
+                </div>
+          {pages.length > 1 && (
+            <button
+              type="button"
+              onClick={() => handleDownloadAll(24)}
+              className={buttonClass({
+                size: "sm",
+                variant: "quiet",
+                className: "shrink-0 whitespace-nowrap gap-1.5 bg-accent/10 text-accent hover:bg-accent/20 border-accent/25 border",
+              })}
+              title="모든 페이지를 긴 세로 스크롤 웹툰으로 이어 붙여 다운로드 (내보내기 옵션의 배율·포맷 적용)"
+            >
+              <Download size={14} /> 웹툰 연합 스크롤
+            </button>
+          )}
+          <button type="button" onClick={handleExportProject} className={buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5" })} title="빠른 가독형 백업입니다. 로컬 3D 모델 GLB는 포함되지 않으므로 다른 기기 이동·장기 보관에는 아카이브 백업을 사용하세요.">
+            <Download size={14} /> 백업 (.json)
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleExportProjectArchive()}
+            data-project-keep-open
+            disabled={projectArchiveBusy}
+            className={buttonClass({
+              size: "sm",
+              variant: "quiet",
+              className: "min-h-11 shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-wait disabled:opacity-60",
+            })}
+            title="프로젝트 JSON과 이미지·마스크를 SHA-256 중복 제거·무결성 검증형 단일 archive로 저장"
+          >
+            {projectArchiveBusy ? <Loader2 size={14} className="animate-spin" /> : <Package size={14} />}
+            아카이브 백업
+          </button>
+          <button
+            type="button"
+            onClick={() => setWriterRoomOpen(true)}
+            disabled={collaborationDocumentLocked}
+            className={buttonClass({
+              size: "sm",
+              variant: "quiet",
+              className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
+            })}
+            title={collaborationDocumentLocked ? collaborationLockMessage() : "한 줄 기획부터 시놉시스·비트·장면·컷·대사까지 한 흐름으로 설계하고 AI 초안을 검토"}
+          >
+            <Clapperboard size={14} /> Writer Room
+            {studioWriterRoomHasContent(writerRoom) ? (
+              <span className="rounded-full bg-accent-soft px-1.5 text-[0.65rem] font-bold text-accent">
+                {Object.values(writerRoom.completion).filter(Boolean).length}/7
+              </span>
+            ) : null}
+          </button>
+          <button
+            type="button"
+            onClick={() => setAiProvenanceOpen(true)}
+            className={buttonClass({
+              size: "sm",
+              variant: "quiet",
+              className: "shrink-0 whitespace-nowrap gap-1.5",
+            })}
+            title="AI 작업의 공급자·모델·상태·토큰 사용량을 확인하고 공개 가능한 요약만 내보내기"
+          >
+            <ClipboardCheck size={14} /> AI 작업 이력
+            {aiProvenance.operations.length > 0 ? (
+              <span className="rounded-full bg-cool/10 px-1.5 text-[0.65rem] font-bold text-cool">
+                {aiProvenance.operations.length}
+              </span>
+            ) : null}
+          </button>
+          <button
+            type="button"
+            onClick={() => setCharacterBibleOpen(true)}
+            disabled={collaborationDocumentLocked}
+            className={buttonClass({
+              size: "sm",
+              variant: "quiet",
+              className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
+            })}
+            title={collaborationDocumentLocked ? collaborationLockMessage() : "캐릭터 외형·의상·말투·관계와 AI 고정 제약을 문서에 저장"}
+          >
+            <Bookmark size={14} /> 캐릭터 바이블
+            {characterBible.characters.length > 0 ? (
+              <span className="rounded-full bg-accent-soft px-1.5 text-[0.65rem] font-bold text-accent">
+                {characterBible.characters.length}
+              </span>
+            ) : null}
+          </button>
+          <button
+            type="button"
+            onClick={() => setCheckpointPanelOpen(true)}
+            className={buttonClass({
+              size: "sm",
+              variant: "quiet",
+              className: "shrink-0 whitespace-nowrap gap-1.5",
+            })}
+            title="현재 문서를 이름 있는 복구 지점으로 브라우저에 저장하거나 이전 시점을 복원"
+          >
+            <HistoryIcon size={14} /> 버전
+          </button>
+          <button
+            type="button"
+            onClick={() => void openAutoActions()}
+            disabled={collaborationDocumentLocked}
+            className={buttonClass({
+              size: "sm",
+              variant: "quiet",
+              className: "min-h-11 shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
+            })}
+            title={collaborationDocumentLocked ? collaborationLockMessage() : "허용된 반복 편집 명령을 현재·선택·전체 페이지에 dry run 후 한 번의 실행취소 단계로 적용"}
+          >
+            <WandSparkles size={14} /> Auto Actions
+          </button>
+          <button
+            type="button"
+            data-project-keep-open
+            onClick={() => projectImportInputRef.current?.click()}
+            disabled={collaborationDocumentLocked}
+            className={buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50" })}
+            title={collaborationDocumentLocked ? collaborationLockMessage() : "빠른 .json 백업을 복구합니다. 포함되지 않은 로컬 3D 모델은 원래 기기의 검증 라이브러리에 있어야 합니다."}
+          >
+            <Upload size={14} /> 복구 (.json)
+          </button>
+          <input
+            ref={projectImportInputRef}
+            type="file"
+            accept=".json"
+            className="hidden"
+            disabled={collaborationDocumentLocked}
+            onChange={(event) => {
+              const hasFile = Boolean(event.currentTarget.files?.[0]);
+              handleImportProject(event);
+              if (hasFile) setProjectActionsOpen(false);
+            }}
+          />
+          <button
+            type="button"
+            data-project-keep-open
+            onClick={() => projectArchiveImportInputRef.current?.click()}
+            disabled={projectArchiveBusy || collaborationDocumentLocked}
+            className={cn(
+              buttonClass({
+                size: "sm",
+                variant: "quiet",
+                className: "min-h-11 shrink-0 whitespace-nowrap gap-1.5",
+              }),
+              projectArchiveBusy && "cursor-wait opacity-60",
+              collaborationDocumentLocked && "cursor-not-allowed opacity-50"
+            )}
+            title={collaborationDocumentLocked ? collaborationLockMessage() : "무결성 검증형 .toonproject.zip에서 프로젝트와 포함 자산을 복구"}
+          >
+            <FileUp size={14} /> 아카이브 복구
+          </button>
+          <input
+            ref={projectArchiveImportInputRef}
+            type="file"
+            accept=".toonproject.zip,.zip,application/zip,application/vnd.toonspectrum.project+zip"
+            className="hidden"
+            disabled={projectArchiveBusy || collaborationDocumentLocked}
+            onChange={(event) => void handleImportProjectArchive(event)}
+          />
+          {projectArchiveStatus ? (
+            <span
+              role="status"
+              className={cn(
+                "max-w-80 shrink-0 rounded-lg border px-2 py-1 text-[0.68rem] leading-relaxed",
+                projectArchiveStatus.tone === "good"
+                  ? "border-good/30 bg-good-soft/20 text-good"
+                  : projectArchiveStatus.tone === "warn"
+                    ? "border-warning/30 bg-warning-soft/20 text-warning"
+                    : "border-bad/30 bg-bad-soft/20 text-bad"
+              )}
+            >
+              {projectArchiveStatus.text}
+            </span>
+          ) : null}
+          <button
+            type="button"
+            data-project-keep-open
+            onClick={() => psdImportInputRef.current?.click()}
+            disabled={psdImportBusy || collaborationDocumentLocked}
+            className={cn(
+              buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5" }),
+              psdImportBusy && "cursor-wait opacity-60",
+              collaborationDocumentLocked && "cursor-not-allowed opacity-50"
+            )}
+            title={collaborationDocumentLocked ? collaborationLockMessage() : "포토샵(.psd) 파일의 레이어를 이미지 요소로 가져와요(래스터 평탄화, 편집 가능한 텍스트/조정 레이어는 재현되지 않음)"}
+          >
+            {psdImportBusy ? <Loader2 size={14} className="animate-spin" /> : <FileUp size={14} />}
+            PSD 가져오기
+          </button>
+          <input
+            ref={psdImportInputRef}
+            type="file"
+            accept=".psd,image/vnd.adobe.photoshop"
+            className="hidden"
+            disabled={psdImportBusy || collaborationDocumentLocked}
+            onChange={(event) => void handleImportPsd(event)}
+          />
+          {psdImportStatus && (
+            <span
+              className={cn(
+                "shrink-0 whitespace-nowrap rounded-md border px-2 py-1 text-[10px] leading-snug",
+                psdImportStatus.tone === "good" && "border-good/40 bg-good/10 text-good",
+                psdImportStatus.tone === "warn" && "border-warn/40 bg-warn/10 text-warn"
+              )}
+            >
+              {psdImportStatus.text}
+            </span>
+          )}
+          {sharedDocument?.role === "owner" || loadedWork ? (
+            <button
+              type="button"
+              onClick={() => void openOwnerFxPanel()}
+              disabled={fxPanelLoading}
+              className={buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-wait disabled:opacity-60" })}
+              title="이미 게시된 이 작품의 배경음악·스크롤 모션·컷별 애니메이션 연출을 설정합니다"
+            >
+              {fxPanelLoading ? <Loader2 size={14} className="animate-spin" /> : <Music4 size={14} />}
+              애니메이션 연출
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => setProductionInsightsOpen(true)}
+            className={buttonClass({
+              size: "sm",
+              variant: "quiet",
+              className: "shrink-0 whitespace-nowrap gap-1.5",
+            })}
+            title="현재 문서 구조에서 제작 분량·검토·AI 에셋·미해결 항목을 계산"
+          >
+            <GanttChartSquare size={14} /> 제작 인사이트
+          </button>
+          <button
+            type="button"
+            onClick={() => setPublicationOperationsOpen(true)}
+            disabled={collaborationDocumentLocked}
+            className={buttonClass({
+              size: "sm",
+              variant: "quiet",
+              className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
+            })}
+            title={collaborationDocumentLocked ? collaborationLockMessage() : "외부 자동 게시 없이 릴리스 일정과 직접 가져온 성과 기록을 관리"}
+          >
+            <Package size={14} /> 연재 운영
+          </button>
+          <button
+            type="button"
+            onClick={() => setPublishPreflightOpen(true)}
+            className={buttonClass({
+              size: "sm",
+              variant: "quiet",
+              className: "shrink-0 whitespace-nowrap gap-1.5",
+            })}
+            title="WEBTOON·Tapas·일반 게시 패키지의 구조와 AI 사용 고지를 미리 검사"
+          >
+            <ShieldCheck size={14} /> 게시 사전검사
+          </button>
+          <button
+            type="button"
+            onClick={() => setPublishPackageOpen(true)}
+            className={buttonClass({
+              size: "sm",
+              variant: "quiet",
+              className: "shrink-0 whitespace-nowrap gap-1.5",
+            })}
+            title="WEBTOON·Tapas·범용 목적지별 이미지 분할·썸네일·크레딧·검증 매니페스트를 계획"
+          >
+            <Files size={14} /> 게시 패키지
+          </button>
+              </div>,
+              document.body
+            )
+            : null}
+          </div>
+          <button
+            type="button"
+            onClick={() => handleSave("draft")}
+            disabled={saving || collaborationDocumentLocked}
+            title={collaborationDocumentLocked ? collaborationLockMessage() : "현재 원고를 임시저장"}
+            className={cn(
+              buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50" }),
+              isMobile && "min-h-11"
+            )}
+          >
+            {saving ? <Loader2 size={14} className="animate-spin" /> : null}
+            {sharedDocument && sharedDocument.role !== "owner" ? "공동 저장" : "임시저장"}
+          </button>
+          {!sharedDocument || sharedDocument.role === "owner" ? (
+            <button
+              type="button"
+              onClick={() => handleSave("published")}
+              disabled={saving || collaborationDocumentLocked}
+              title={collaborationDocumentLocked ? collaborationLockMessage() : "게시 상태로 저장"}
+              className={cn(
+                buttonClass({ size: "sm", variant: "solid", className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50" }),
+                isMobile && "min-h-11"
+              )}
+            >
+              {saving ? <Loader2 size={14} className="animate-spin" /> : null}
+              {workId ? "수정 게시" : "게시하기"}
+            </button>
+          ) : null}
+        </div>
+    </>
   );
 });

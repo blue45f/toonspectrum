@@ -62,6 +62,18 @@ export default defineConfig(
     },
   },
 
+  // StudioPage 예외: StudioCuttoonEditor 는 구조적으로 React Compiler 를 탈락("use no memo"
+  // 명시)하고, memo 자식들의 prop 안정성을 위한 수동 useMemo/useCallback 을 대량 유지한다.
+  // v7 컴파일러 기반 진단 두 개는 탈락 컴포넌트의 수동 메모를 "보존 불가"로, 이벤트 핸들러의
+  // Date.now 등을 "렌더 중 불순 호출"로 오탐하므로 이 파일에서만 끈다(다른 파일은 그대로).
+  {
+    files: ['src/domains/creator/StudioPage.tsx'],
+    rules: {
+      'react-hooks/preserve-manual-memoization': 'off',
+      'react-hooks/purity': 'off',
+    },
+  },
+
   // src/ 계층 경계 — 개발가이드의 app/domains/shared/infrastructure 4계층.
   // ToonSpectrum 은 Vite 앱이 레포 루트라 계층은 src/ 아래에만 둔다(루트 components/·lib/ 는
   // 대규모 공용 트리라 이번 패스에서 물리 이동하지 않고 boundaries files 스코프 밖으로 남긴다
