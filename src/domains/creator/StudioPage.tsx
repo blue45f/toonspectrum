@@ -262,6 +262,7 @@ import {
   resolveBrushPressureSample,
   resolveBrushReleasePressureSample,
   resolveStudioBrushRenderFamily,
+  resolveStudioFreehandRenderPath,
   screentoneDotRadius,
   screentoneDotsForStroke,
   smoothStrokePoints,
@@ -806,7 +807,6 @@ import {
   claimStudioStrokeMoveTransport,
   collectStudioStrokePointerBatch,
   isStudioStrokePointerEvent,
-  resolveStudioStrokeReleaseSource,
   shouldEndStudioStrokeForReleasedContact,
   shouldCancelStudioFingerStrokeForAdditionalContact,
   tryCaptureStudioStrokePointer,
@@ -3685,7 +3685,12 @@ const StudioDrawNode = memo(function StudioDrawNode({
           }
 
           if (brushFamily === "pencil" && el.mode !== "eraser") {
-            const jittered = processPencilPoints(points);
+            const renderPath = resolveStudioFreehandRenderPath(points, {
+              sampleSpacing: el.sampleSpacing,
+              legacyMinDistance: renderSampleDistance,
+              legacyTension: 0.2,
+            });
+            const jittered = processPencilPoints(renderPath.points);
             return (
               <Line
                 key={index}
@@ -3695,7 +3700,7 @@ const StudioDrawNode = memo(function StudioDrawNode({
                 opacity={opacity}
                 lineCap="round"
                 lineJoin="round"
-                tension={0.2}
+                tension={renderPath.tension}
                 globalCompositeOperation={composite}
                 listening={false}
               />
@@ -3703,17 +3708,21 @@ const StudioDrawNode = memo(function StudioDrawNode({
           }
 
           if (brushFamily === "highlighter" && el.mode !== "eraser") {
-            const smoothed = processFreehandPoints(points, renderSampleDistance);
+            const renderPath = resolveStudioFreehandRenderPath(points, {
+              sampleSpacing: el.sampleSpacing,
+              legacyMinDistance: renderSampleDistance,
+              legacyTension: 0.4,
+            });
             return (
               <Line
                 key={index}
-                points={smoothed}
+                points={renderPath.points}
                 stroke={stroke}
                 strokeWidth={strokeWidth}
                 opacity={opacity}
                 lineCap="square"
                 lineJoin="miter"
-                tension={0.4}
+                tension={renderPath.tension}
                 globalCompositeOperation="multiply"
                 listening={false}
               />
@@ -3721,17 +3730,21 @@ const StudioDrawNode = memo(function StudioDrawNode({
           }
 
           if (brushFamily === "neon" && el.mode !== "eraser") {
-            const smoothed = processFreehandPoints(points, renderSampleDistance);
+            const renderPath = resolveStudioFreehandRenderPath(points, {
+              sampleSpacing: el.sampleSpacing,
+              legacyMinDistance: renderSampleDistance,
+              legacyTension: 0.35,
+            });
             return (
               <Line
                 key={index}
-                points={smoothed}
+                points={renderPath.points}
                 stroke={stroke}
                 strokeWidth={strokeWidth}
                 opacity={opacity}
                 lineCap="round"
                 lineJoin="round"
-                tension={0.35}
+                tension={renderPath.tension}
                 // Screen-style glow on dark panels — Express/Picsart neon marker affordance.
                 globalCompositeOperation="lighter"
                 listening={false}
@@ -3740,7 +3753,11 @@ const StudioDrawNode = memo(function StudioDrawNode({
           }
 
           if (brushFamily === "glow" && el.mode !== "eraser") {
-            const smoothed = processFreehandPoints(points, renderSampleDistance);
+            const renderPath = resolveStudioFreehandRenderPath(points, {
+              sampleSpacing: el.sampleSpacing,
+              legacyMinDistance: renderSampleDistance,
+              legacyTension: 0.35,
+            });
             const soft = (el.brush ?? "glow") === "soft-glow";
             const passes = planGlowBrushPasses(strokeWidth, soft);
             return (
@@ -3748,13 +3765,13 @@ const StudioDrawNode = memo(function StudioDrawNode({
                 {passes.map((pass, passIndex) => (
                   <Line
                     key={passIndex}
-                    points={smoothed}
+                    points={renderPath.points}
                     stroke={stroke}
                     strokeWidth={Math.max(0.5, strokeWidth * pass.widthScale)}
                     opacity={pass.opacity}
                     lineCap="round"
                     lineJoin="round"
-                    tension={0.35}
+                    tension={renderPath.tension}
                     globalCompositeOperation="lighter"
                     listening={false}
                   />
@@ -3901,7 +3918,12 @@ const StudioDrawNode = memo(function StudioDrawNode({
               />
             );
           }
-          const smoothed = processFreehandPoints(points, renderSampleDistance);
+          const renderPath = resolveStudioFreehandRenderPath(points, {
+            sampleSpacing: el.sampleSpacing,
+            legacyMinDistance: renderSampleDistance,
+            legacyTension: 0.4,
+          });
+          const smoothed = renderPath.points;
           const pressures = el.pressures;
           if (pressures && pressures.length > 0 && smoothed.length >= 4) {
             const sampledPressures = resampleStrokePressures(pressures, Math.floor(smoothed.length / 2));
@@ -3941,7 +3963,7 @@ const StudioDrawNode = memo(function StudioDrawNode({
               opacity={opacity}
               lineCap="round"
               lineJoin="round"
-              tension={0.4}
+              tension={renderPath.tension}
               closed={Boolean(freehandFill) && smoothed.length >= 6}
               fill={freehandFill}
               globalCompositeOperation={composite}
@@ -18239,6 +18261,9 @@ function StudioCuttoonEditor() {
         );
       }
       drawingRef.current = next;
+      // A translucent cursor disc/shadow over fresh ink makes stable pixels look as if they are
+      // still darkening. Hide the hover-only size preview for the entire pointer contact.
+      hideBrushCursor();
       perspectiveRayRef.current = null; // 새 스트로크마다 원근 락을 다시 잡는다(첫 move에서 재계산).
       isometricAxisRayRef.current = null; // 새 스트로크마다 아이소메트릭 축 락도 다시 잡는다.
       // 다이렉트 라이브 초안 무장: 이 렌더(스트로크 시작) 이후 pointermove 는 React 를 거치지
@@ -18785,9 +18810,16 @@ function StudioCuttoonEditor() {
       const cursorPos = e.target.getStage()?.getRelativePointerPosition();
       const cursorNode = brushCursorRef.current;
       if (cursorPos && cursorNode) {
-        cursorNode.position(cursorPos);
-        if (!cursorNode.visible()) cursorNode.visible(true);
-        cursorNode.getLayer()?.batchDraw();
+        if (drawingRef.current) {
+          if (cursorNode.visible()) {
+            cursorNode.visible(false);
+            cursorNode.getLayer()?.batchDraw();
+          }
+        } else {
+          cursorNode.position(cursorPos);
+          if (!cursorNode.visible()) cursorNode.visible(true);
+          cursorNode.getLayer()?.batchDraw();
+        }
       }
     }
     if (tool !== "draw" || !drawingRef.current) return;
@@ -18921,6 +18953,7 @@ function StudioCuttoonEditor() {
   function appendFreehandStrokePoint(
     pos: { x: number; y: number },
     pointerSample: PointerEvent,
+    pressureOverride?: number,
     canonicalTimeStamp?: number
   ) {
     const current = drawingRef.current;
@@ -18938,16 +18971,18 @@ function StudioCuttoonEditor() {
     const previousVelocity = drawingVelocityRef.current ?? createStudioPointerVelocityState(timingSample);
     const velocitySample = sampleStudioPointerVelocity(previousVelocity, timingSample);
     drawingVelocityRef.current = velocitySample.state;
-    let pressure = resolveBrushPressureSample({
-      pointerType: pointerSample.pointerType,
-      rawPressure: pointerSample.pressure,
-      distance: velocitySample.distance,
-      elapsedMs: velocitySample.elapsedMs,
-      velocityFallbackEnabled: useVelocityPressure,
-      velocitySensitivity,
-      pressureCurve,
-      fallbackPressure: current.pressureModel ? 1 : 0.5,
-    });
+    let pressure = typeof pressureOverride === "number" && Number.isFinite(pressureOverride)
+      ? Math.min(1, Math.max(0, pressureOverride))
+      : resolveBrushPressureSample({
+          pointerType: pointerSample.pointerType,
+          rawPressure: pointerSample.pressure,
+          distance: velocitySample.distance,
+          elapsedMs: velocitySample.elapsedMs,
+          velocityFallbackEnabled: useVelocityPressure,
+          velocitySensitivity,
+          pressureCurve,
+          fallbackPressure: current.pressureModel ? 1 : 0.5,
+        });
     let targetX = pos.x;
     let targetY = pos.y;
     if (
@@ -19181,7 +19216,11 @@ function StudioCuttoonEditor() {
   function consumeFreehandPointerBatch(
     stage: Konva.Stage,
     pointerEvent: PointerEvent,
-    includePredicted: boolean
+    includePredicted: boolean,
+    options: {
+      dispatchedPressureOverride?: number;
+      authoritativeSource?: "coalesced-or-parent" | "parent-only";
+    } = {}
   ): boolean {
     const session = drawingPointerSessionRef.current;
     if (!session || !isStudioStrokePointerEvent(session, pointerEvent)) return false;
@@ -19191,6 +19230,7 @@ function StudioCuttoonEditor() {
     const predictionIsReplaceable = includePredicted && !pointerEvent.shiftKey;
     const batch = collectStudioStrokePointerBatch(session, pointerEvent, {
       includePredicted: predictionIsReplaceable,
+      authoritativeSource: options.authoritativeSource,
     });
     drawingPointerSessionRef.current = batch.session;
     const sampleClock = drawingFixedRateSampleClockRef.current;
@@ -19242,6 +19282,7 @@ function StudioCuttoonEditor() {
           appendFreehandStrokePoint(
             point,
             sample,
+            sample === pointerEvent ? options.dispatchedPressureOverride : undefined,
             sampleClockTransition?.timeStamps[sampleIndex]
           );
         }
@@ -19546,12 +19587,6 @@ function StudioCuttoonEditor() {
     let authoritativeLiveStroke: DrawEl | null = null;
     let immediateSurfaceHandoff: { pageId: string; strokeIds: string[] } | null = null;
     try {
-      const resolvedReleaseSource = resolveStudioStrokeReleaseSource(
-        drawingPointerSessionRef.current,
-        pointerEvent,
-        drawingLastAuthoritativePointerRef.current
-      );
-      const releaseSourceEvent = resolvedReleaseSource?.event ?? pointerEvent;
       if (
         options.consumeReleaseSample !== false
         && drawingRef.current
@@ -19560,9 +19595,34 @@ function StudioCuttoonEditor() {
       ) {
         updateActiveShapeEndpoint(stage, pointerEvent, false);
       }
+      const releaseLastContactPressure = drawingRef.current?.pressures?.at(-1)
+        ?? studioInkFallbackPressure(drawingRef.current?.pressureModel);
+      if (
+        options.consumeReleaseSample !== false
+        && drawingRef.current
+        && (drawingRef.current.kind ?? "freehand") === "freehand"
+        && stage
+      ) {
+        // A final pointermove is not guaranteed before pointerup. Consume exactly the dispatched
+        // release coordinate once so a fast mouse/stylus flick reaches the visible pointer route.
+        // A pen commonly reports pressure=0 after contact, so geometry uses the release position
+        // while width retains the last real contact pressure.
+        consumeFreehandPointerBatch(stage, pointerEvent, false, {
+          dispatchedPressureOverride: pointerEvent.pointerType === "pen"
+            ? resolveBrushReleasePressureSample({
+                pointerType: "pen",
+                rawPressure: pointerEvent.pressure,
+                lastContactPressure: releaseLastContactPressure,
+                pressureCurve,
+                fallbackPressure: releaseLastContactPressure,
+              })
+            : undefined,
+          authoritativeSource: "parent-only",
+        });
+      }
       if (drawingRef.current && (drawingRef.current.kind ?? "freehand") === "freehand") {
-        // pointerup never contributes geometry. Stabilizer endpoint/drain samples use the retained
-        // processed down/move metadata, then publish only their locally generated suffix.
+        // The release coordinate above has already been published. Stabilizer endpoint/drain
+        // samples are locally generated, so publish only that suffix before finalizing the stroke.
         const crdtReleaseSampleStart = Math.floor(drawingRef.current.points.length / 2);
         const fixedRateState = drawingFixedRateFilterRef.current;
         if (fixedRateState) {
@@ -19570,7 +19630,7 @@ function StudioCuttoonEditor() {
           drawingFixedRateFilterRef.current = released.state;
           // Geometry and paint complete in the pointerup task. Deferring only the pixels across
           // rAF made a released stroke continue changing while the next stroke had already begun.
-          appendFixedRateStrokeSamples(released.emitted, releaseSourceEvent, 0);
+          appendFixedRateStrokeSamples(released.emitted, pointerEvent, 0);
         } else {
           const liveState = drawingStabilizerRef.current;
           if (liveState) {
@@ -19585,29 +19645,21 @@ function StudioCuttoonEditor() {
               const pointCount = Math.floor(current.points.length / 2);
               const lastPressure = current.pressures?.at(-1)
                 ?? studioInkFallbackPressure(current.pressureModel);
-              const pressure = releaseSourceEvent.pointerType === "pen"
-                ? resolvedReleaseSource?.kind === "retained-contact"
-                  ? resolveBrushPressureSample({
-                      pointerType: "pen",
-                      rawPressure: releaseSourceEvent.pressure,
-                      velocityFallbackEnabled: false,
-                      pressureCurve,
-                      fallbackPressure: lastPressure,
-                    })
-                  : resolveBrushReleasePressureSample({
-                      pointerType: "pen",
-                      rawPressure: releaseSourceEvent.pressure,
-                      lastContactPressure: lastPressure,
-                      velocityFallbackEnabled: false,
-                      pressureCurve,
-                      fallbackPressure: lastPressure,
-                    })
+              const pressure = pointerEvent.pointerType === "pen"
+                ? resolveBrushReleasePressureSample({
+                    pointerType: "pen",
+                    rawPressure: pointerEvent.pressure,
+                    lastContactPressure: lastPressure,
+                    velocityFallbackEnabled: false,
+                    pressureCurve,
+                    fallbackPressure: lastPressure,
+                  })
                 : lastPressure;
               const capturePointerDynamics = current.mode === "pen" && resolveStudioBrushDynamicsPresetId(current.brush) !== null;
               const captureStylus = current.mode === "pen" && (current.brush === "calligraphy" || capturePointerDynamics);
-              const stylus = captureStylus ? normalizeCalligraphyStylusInput(releaseSourceEvent) : null;
-              const tangentialPressure = Number.isFinite(releaseSourceEvent.tangentialPressure)
-                ? Math.min(1, Math.max(-1, releaseSourceEvent.tangentialPressure))
+              const stylus = captureStylus ? normalizeCalligraphyStylusInput(pointerEvent) : null;
+              const tangentialPressure = Number.isFinite(pointerEvent.tangentialPressure)
+                ? Math.min(1, Math.max(-1, pointerEvent.tangentialPressure))
                 : (current.tangentialPressures?.at(-1) ?? 0);
               const appendAligned = (
                 values: number[] | undefined,

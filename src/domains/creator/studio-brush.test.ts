@@ -19,6 +19,7 @@ import {
   resampleStrokePressures,
   resolveBrushPressureSample,
   resolveBrushReleasePressureSample,
+  resolveStudioFreehandRenderPath,
   resolveStudioBrushRenderFamily,
   sanitizeCalligraphyTipSettings,
   screentoneDotRadius,
@@ -730,6 +731,59 @@ describe("legacy point processors stay intact", () => {
     expect(legacy.slice(0, 2)).toEqual([0, 0]);
     expect(legacy.slice(-2)).toEqual([4, 0]);
     expect(detailed.slice(-2)).toEqual([4, 0]);
+  });
+
+  it.each([0, 0.75, -1])(
+    "keeps accepted points causal for a finite sampleSpacing of %s",
+    (sampleSpacing) => {
+      const prefix = [0, 0, 1, 1, 2, 1, 3, 2];
+      const extended = [...prefix, 4, 3, 5, 3];
+      const prefixPath = resolveStudioFreehandRenderPath(prefix, {
+        sampleSpacing,
+        legacyMinDistance: 3,
+        legacyTension: 0.4,
+      });
+      const extendedPath = resolveStudioFreehandRenderPath(extended, {
+        sampleSpacing,
+        legacyMinDistance: 3,
+        legacyTension: 0.4,
+      });
+
+      expect(prefixPath.points).toBe(prefix);
+      expect(extendedPath.points).toBe(extended);
+      expect(extendedPath.points.slice(0, prefix.length)).toEqual(prefixPath.points);
+      expect(prefixPath.tension).toBe(0);
+      expect(extendedPath.tension).toBe(0);
+    }
+  );
+
+  it.each([undefined, Number.NaN, Number.POSITIVE_INFINITY, "1.5"])(
+    "preserves legacy point processing and tension for sampleSpacing %s",
+    (sampleSpacing) => {
+      const points = [0, 0, 1, 0, 2, 0, 3, 0, 4, 0];
+      const legacyMinDistance = 2;
+      const legacyTension = 0.35;
+      const path = resolveStudioFreehandRenderPath(points, {
+        sampleSpacing,
+        legacyMinDistance,
+        legacyTension,
+      });
+
+      expect(path.points).toEqual(processFreehandPoints(points, legacyMinDistance));
+      expect(path.points).not.toBe(points);
+      expect(path.tension).toBe(legacyTension);
+    }
+  );
+
+  it("uses the historical render distance when a legacy caller omits one", () => {
+    const points = [0, 0, 1, 0, 2, 0, 3, 0, 4, 0];
+    const path = resolveStudioFreehandRenderPath(points, {
+      sampleSpacing: undefined,
+      legacyTension: 0.2,
+    });
+
+    expect(path.points).toEqual(processFreehandPoints(points));
+    expect(path.tension).toBe(0.2);
   });
 
   it("processPencilPoints applies bounded deterministic jitter", () => {

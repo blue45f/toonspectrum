@@ -6,7 +6,6 @@ import {
   collectStudioStrokePointerBatch,
   isStudioLeftContactDown,
   isStudioStrokePointerEvent,
-  resolveStudioStrokeReleaseSource,
   shouldCancelStudioFingerStrokeForAdditionalContact,
   shouldEndStudioStrokeForReleasedContact,
   tryCaptureStudioStrokePointer,
@@ -256,34 +255,26 @@ describe("studio pointer input", () => {
     expect(raw.session.moveTransport).toBe("pointermove");
   });
 
-  it("seals at the last processed sample instead of extending geometry to pointerup", () => {
-    const down = sample(1);
-    const session = beginStudioStrokePointerSession(down)!;
-    const move = sample(10);
-    const release = sample(20, { pressure: 0, buttons: 0 });
+  it("lets normal pointerup own one final parent endpoint even when stale move history is exposed", () => {
+    const session = beginStudioStrokePointerSession(sample(1))!;
+    const priorMove = sample(50);
+    const release = sample(100, {
+      pressure: 0,
+      buttons: 0,
+      getCoalescedEvents: () => [priorMove],
+    });
 
-    expect(resolveStudioStrokeReleaseSource(session, release, move)).toEqual({
-      event: move,
-      kind: "retained-contact",
+    const batch = collectStudioStrokePointerBatch(session, release, {
+      authoritativeSource: "parent-only",
     });
-    expect(resolveStudioStrokeReleaseSource(session, release, down)).toEqual({
-      event: down,
-      kind: "retained-contact",
-    });
+
+    expect(batch.authoritative).toEqual([release]);
+    expect(batch.authoritative.at(-1)?.clientX).toBe(100);
     expect(
-      resolveStudioStrokeReleaseSource(
-        session,
-        release,
-        sample(30, { pointerId: 99 })
-      )
-    ).toEqual({ event: release, kind: "release-fallback" });
-    expect(
-      resolveStudioStrokeReleaseSource(
-        session,
-        sample(20, { pointerId: 99, pressure: 0, buttons: 0 }),
-        move
-      )
-    ).toBeNull();
+      collectStudioStrokePointerBatch(batch.session, release, {
+        authoritativeSource: "parent-only",
+      }).authoritative
+    ).toEqual([]);
   });
 
   it("deduplicates only an adjacent final sample across batches, not a later loop-back", () => {

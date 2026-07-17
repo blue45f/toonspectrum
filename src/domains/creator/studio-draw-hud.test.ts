@@ -32,6 +32,7 @@ describe("studio draw HUD labels", () => {
     expect(studioSymmetryHudLabel("none")).toBeNull();
     expect(studioSymmetryHudLabel("vertical")).toBe("대칭 세로");
     expect(studioStabilizerHudLabel(6, "adaptive")).toContain("6");
+    expect(studioStabilizerHudLabel(3.4, "standard")).toBe("보정 3.4 · 표준");
     expect(studioStabilizerHudLabel(4, "precision")).toContain("정밀");
   });
 

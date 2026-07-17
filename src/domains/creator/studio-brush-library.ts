@@ -149,15 +149,15 @@ export const BRUSH_TIP_ROUNDNESS_RANGE = [0.08, 1] as const;
 /**
  * 새 캔버스와 누락 필드를 가진 레거시 브러시가 공유하는 기본 필기감.
  *
- * 기본 펜은 현재 비교 보드의 0 설정처럼 안정화·후보정을 모두 끈다. 이는 제품 전체의 과거
- * 기본값을 복제하는 것이 아니라, 처리된 pointermove/coalesced 샘플을 지연 없이 따르는 선택이다.
+ * 비교 보드의 기본 안정기 34를 내부 0..10 눈금의 3.4로 환산한다. 이 값은 5ms 고정 주기와
+ * 10단 cascade 응답을 사용하며, 후보정은 꺼서 접촉 중 확정된 prefix를 다시 움직이지 않는다.
  */
 export const DEFAULT_STUDIO_BRUSH_SNAPSHOT: StudioBrushSnapshot = {
   brushId: "pen",
   strokeWidth: 6,
   brushOpacity: 1,
   color: "#7c5cfc",
-  stabilizer: 0,
+  stabilizer: 3.4,
   stabilizerMode: "standard",
   postCorrection: 0,
   preserveCorners: true,

@@ -53,7 +53,10 @@ export function studioStabilizerHudLabel(
 ): string {
   const modeKo =
     mode === "standard" ? "표준" : mode === "precision" ? "정밀" : "적응";
-  return `보정 ${Math.round(strength)} · ${modeKo}`;
+  // 내부 0..10 값은 0.1 단위로 조절된다. 정수 반올림은 기본 3.4를 시각적으로 3이라고
+  // 잘못 읽게 만들어, 실제 입력 지연과 HUD 설명이 서로 다른 설정처럼 보였다.
+  const displayedStrength = Math.round(strength * 10) / 10;
+  return `보정 ${displayedStrength} · ${modeKo}`;
 }
 
 /** Clamp displayed pressure 0–1 for HUD meter width. */
