@@ -18864,7 +18864,24 @@ function StudioCuttoonEditor() {
         if (fixedRateState) {
           const released = transitionFixedRateStrokeFilter(fixedRateState, { type: "release" });
           drawingFixedRateFilterRef.current = released.state;
+          // 매끈(고정레이트 스태빌라이저) 펜의 릴리즈 드레인은 잔여 지연(빠른 획에서 ~100px+)을
+          // 한 프레임에 통째로 방출해 "선이 튀는" 느낌을 만든다. 페인트만 몇 프레임에 나눠
+          // 잉크가 끝점까지 따라잡듯 흐르게 한다 — 재생 데이터·CRDT·커밋 지오메트리는 기존과
+          // 동일하게 이 태스크 안에서 동기 완성된다.
+          const releaseOverlay = liveInkOverlayRendererRef.current;
+          const paceTailReveal = releaseOverlay.isActive
+            && liveDraftDirectRef.current
+            && !gpuLiveInkPinnedRef.current
+            && drawingRef.current.mode !== "eraser"
+            && !drawingRef.current.fill
+            && released.releaseDrainTicks > 1;
+          if (paceTailReveal) releaseOverlay.beginPacedTailReveal();
           appendFixedRateStrokeSamples(released.emitted, pointerEvent, 0);
+          if (paceTailReveal) {
+            const drained = drawingRef.current;
+            if (drained) flushDirectLiveDraftNow(drained);
+            releaseOverlay.commitPacedTailReveal(6);
+          }
         } else {
           const liveState = drawingStabilizerRef.current;
           if (liveState) {

@@ -96,6 +96,16 @@ export class StudioLiveInkOverlayRenderer {
   private active = false;
   /** 펜을 뗐지만 React 커밋 동기화 전이라 표면에 유지 중인 획들. */
   private settled: SettledLiveInkStroke[] = [];
+  /**
+   * 릴리즈 드레인 페이싱 — 고정레이트 스태빌라이저의 잔여 지연이 pointerup 한 프레임에
+   * 통째로 방출되면 꼬리가 "튀어" 보인다. 캡처 중 dab 페인트만 큐로 돌려 몇 프레임에 나눠
+   * 칠한다. 재생 데이터(kept/settled)·소비 오프셋은 항상 동기 완성되므로 커밋/설정 계약은
+   * 변하지 않고, replay()/clear()는 큐를 즉시 대체·폐기한다.
+   */
+  private revealCapture = false;
+  private revealQueue: { style: StudioLiveInkStrokeStyle; dabs: StudioCausalInkDab[] }[] = [];
+  private revealRaf: number | null = null;
+  private revealDabsPerFrame = 0;
 
   attach(canvas: HTMLCanvasElement | null): void {
     this.canvas = canvas;
@@ -278,6 +288,7 @@ export class StudioLiveInkOverlayRenderer {
   }
 
   clear(): void {
+    this.cancelPacedReveal();
     this.resetActiveState();
     this.settled = [];
     this.clearRect();
@@ -363,6 +374,15 @@ export class StudioLiveInkOverlayRenderer {
 
   private drawDabs(style: StudioLiveInkStrokeStyle, dabs: readonly StudioCausalInkDab[]): void {
     if (dabs.length === 0) return;
+    if (this.revealCapture) {
+      this.revealQueue.push({ style, dabs: [...dabs] });
+      return;
+    }
+    this.paintDabs(style, dabs);
+  }
+
+  private paintDabs(style: StudioLiveInkStrokeStyle, dabs: readonly StudioCausalInkDab[]): void {
+    if (dabs.length === 0) return;
     const context = this.prepared(style);
     if (!context) return;
     context.fillStyle = style.color;
@@ -374,8 +394,52 @@ export class StudioLiveInkOverlayRenderer {
     context.restore();
   }
 
+  /** 이후의 dab 페인트를 큐에 담는다 — 릴리즈 드레인 구간 전용(동기 블록 안에서만 사용). */
+  beginPacedTailReveal(): void {
+    this.revealCapture = true;
+  }
+
+  /** 캡처를 끝내고 큐를 최대 durationFrames 프레임에 나눠 칠한다(잉크가 끝점까지 따라잡는 연출). */
+  commitPacedTailReveal(durationFrames: number): void {
+    this.revealCapture = false;
+    const totalDabs = this.revealQueue.reduce((sum, batch) => sum + batch.dabs.length, 0);
+    if (totalDabs === 0) return;
+    const frames = Math.max(1, Math.min(10, Math.floor(durationFrames)));
+    this.revealDabsPerFrame = Math.max(1, Math.ceil(totalDabs / frames));
+    this.scheduleRevealFrame();
+  }
+
+  private scheduleRevealFrame(): void {
+    if (this.revealRaf !== null) return;
+    this.revealRaf = globalThis.requestAnimationFrame(() => {
+      this.revealRaf = null;
+      let budget = this.revealDabsPerFrame;
+      while (budget > 0 && this.revealQueue.length > 0) {
+        const batch = this.revealQueue[0]!;
+        const take = Math.min(budget, batch.dabs.length);
+        this.paintDabs(batch.style, batch.dabs.slice(0, take));
+        batch.dabs = batch.dabs.slice(take);
+        if (batch.dabs.length === 0) this.revealQueue.shift();
+        budget -= take;
+      }
+      if (this.revealQueue.length > 0) this.scheduleRevealFrame();
+    });
+  }
+
+  /** replay()/clear() 가 전체를 다시 그리거나 폐기할 때 남은 리빌 큐를 정리한다. */
+  private cancelPacedReveal(): void {
+    this.revealCapture = false;
+    this.revealQueue = [];
+    if (this.revealRaf !== null) {
+      globalThis.cancelAnimationFrame(this.revealRaf);
+      this.revealRaf = null;
+    }
+  }
+
   /** 뷰포트 이동/줌/반전 등 표면 변화 시에만 전체 재생한다(빈도 낮음). */
   private replay(): void {
+    // 전체 재생은 kept/settled 데이터를 다 그리므로 진행 중 리빌 큐는 그대로 대체된다.
+    this.cancelPacedReveal();
     this.clearRect();
     for (const stroke of this.settled) {
       this.drawStrokePath(stroke.style, stroke.xs, stroke.ys, stroke.ps);
