@@ -342,9 +342,13 @@ import {
   BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT,
   bubbleHorizontalPadding,
   bubbleVerticalPadding,
-  createCanvasBubbleTextMeasurer,
   fitBubbleFontSize,
 } from "./studio-bubble-text-fit";
+import {
+  BUBBLE_TEXT_MEASURER,
+  bubbleAutoShrinkPreview,
+  formatVerticalText,
+} from "./studio-bubble-text-runtime";
 import { clampStudioCanvasHeight } from "./studio-canvas-size";
 import {
   collectStudioCaptureAssetSources,
@@ -801,7 +805,6 @@ import {
   StudioCharacterBiblePanel,
   StudioCheckpointPanel,
   StudioCollagePanel,
-  StudioColorPopoverContent,
   StudioColorWheelOverlay,
   StudioCommentsPanel,
   StudioContinuityMetadataEditor,
@@ -883,7 +886,6 @@ import {
   loadStudioTeamCommentMutationPlanner,
   loadStudioWebtoonGuides,
   preloadStudioAssetMenuPanel,
-  preloadStudioColorPopover,
   preloadStudioExportMenuPanel,
   preloadStudioIntegrationsSettingsPanel,
   preloadStudioReferencePanel,
@@ -1294,6 +1296,7 @@ import {
   type CvdMode,
 } from "./StudioColorBlindPreview";
 import { StudioInspectorNavigator } from "./StudioInspectorNavigator";
+import { LazyStudioColorPopover } from "./StudioLazyColorPopover";
 import { StudioPanelLoading, StudioRouteLoading } from "./StudioLazySurfaceFallback";
 import { StudioLineCleanupPanel } from "./StudioLineCleanupPanel";
 import { StudioLineCorrectionControls } from "./StudioLineCorrectionControls";
@@ -1393,7 +1396,6 @@ import type {
   StudioAssetTab,
 } from "./StudioAssetMenuPanel";
 import type { StudioBackground3DInsertResult } from "./StudioBackground3D";
-import type { StudioColorPopoverProps } from "./StudioColorPopover";
 import type { StudioLayerNavigatorAction } from "./StudioLayerNavigator";
 import type { StudioLivePressureStore } from "./StudioLiveInkHosts";
 import type { StudioMainMenuGroup } from "./StudioMainMenu";
@@ -1421,10 +1423,6 @@ import { useSession } from "@/src/compat/auth-session-store";
 
 const KonvaRuntime = KonvaCore as unknown as typeof Konva;
 KonvaRuntime.Filters = KonvaRuntime.Filters ?? {};
-
-// 말풍선 자동 축소(studio-bubble-text-fit) 실측 캔버스 측정기 — 모듈 스코프에 1회만 생성한다
-// (내부 공유 <canvas>를 감싸는 얇은 래퍼라 element/렌더별로 새로 만들 이유가 없다).
-const BUBBLE_TEXT_MEASURER = createCanvasBubbleTextMeasurer();
 
 function studioPatchValuesEqual(left: unknown, right: unknown): boolean {
   if (Object.is(left, right)) return true;
@@ -1564,62 +1562,6 @@ interface PendingBrushDelete {
   deleted: DeletedBrushRecord;
   expiresAt: number;
 }
-type LazyStudioColorPopoverProps = Omit<StudioColorPopoverProps, "initialOpen"> & {
-  onLoadRecentColors?: () => void;
-};
-function StudioColorPopoverFallback({
-  value,
-  title,
-  className,
-  onWarm,
-  onActivate,
-  busy = false,
-}: Pick<LazyStudioColorPopoverProps, "value" | "title" | "className"> & {
-  onWarm?: () => void;
-  onActivate?: () => void;
-  busy?: boolean;
-}) {
-  const warm = () => {
-    preloadStudioColorPopover();
-    onWarm?.();
-  };
-
-  return (
-    <span className={className ? `relative inline-block ${className}` : "relative inline-block"}>
-      <button
-        type="button"
-        aria-label={title ?? "색상 선택"}
-        aria-expanded={false}
-        aria-busy={busy || undefined}
-        title={title ?? "색상 선택"}
-        onClick={onActivate}
-        onFocus={warm}
-        onMouseEnter={warm}
-        className="h-7 w-7 rounded border border-line cursor-pointer"
-        style={{ background: value }}
-      />
-    </span>
-  );
-}
-
-function LazyStudioColorPopover({ onLoadRecentColors, ...props }: LazyStudioColorPopoverProps) {
-  const [activated, setActivated] = useState(false);
-  const activate = () => {
-    onLoadRecentColors?.();
-    setActivated(true);
-  };
-
-  if (!activated) {
-    return <StudioColorPopoverFallback {...props} onWarm={onLoadRecentColors} onActivate={activate} />;
-  }
-
-  return (
-    <Suspense fallback={<StudioColorPopoverFallback {...props} busy />}>
-      <StudioColorPopoverContent {...props} initialOpen />
-    </Suspense>
-  );
-}
-
 function StudioWorkAssetPlaceholderNode({
   placeholder,
   scale,
@@ -1895,31 +1837,6 @@ function studioElementIdOf(node: Konva.Node | null): string | null {
   return null;
 }
 
-// 말풍선 "크기 고정" 미리보기 — 인스펙터가 StudioBubbleAutoShrinkPanel에 넘길 계산된 폰트 크기/
-// 오버플로 여부. autoShrinkText가 꺼져 있으면 계산 자체를 하지 않는다(null).
-//
-// lineHeight를 인자로 받는 이유: 이 함수는 elementLabel(...) 근처의 모듈 스코프(StudioPage
-// 컴포넌트 함수 바깥)에 있어 webtoonTheme(컴포넌트 useState)에 접근할 수 없다 — 실제 렌더가 쓰는
-// bubbleLineHeight와 정확히 같은 값을 호출부(컴포넌트 스코프)가 계산해 넘겨야 한다.
-function bubbleAutoShrinkPreview(
-  el: BubbleEl,
-  lineHeight: number
-): { fontSize: number; overflow: boolean } | null {
-  if (!el.autoShrinkText) return null;
-  return fitBubbleFontSize(
-    {
-      text: el.vertical ? formatVerticalText(el.text) : el.text,
-      boxWidth: el.width,
-      boxHeight: el.height,
-      maxFontSize: el.fontSize ?? 24,
-      minFontSize: el.autoShrinkMinFontSize ?? BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT,
-      fontFamily: el.font ?? "Pretendard, sans-serif",
-      fontStyle: el.fontStyle ?? "bold",
-      lineHeight,
-    },
-    BUBBLE_TEXT_MEASURER
-  );
-}
 const QUICK_START_DISMISSED_KEY = "toonspectrum-studio-quick-start-dismissed";
 /**
  * Canvas2D is the visible low-latency front buffer by default because it shares the exact browser
@@ -4171,21 +4088,6 @@ function seededRandom(seedStr: string) {
     const x = Math.sin(hash++) * 10000;
     return x - Math.floor(x);
   };
-}
-
-function formatVerticalText(text: string): string {
-  const lines = text.split("\n");
-  const maxLen = Math.max(...lines.map((l) => l.length));
-  const resultLines: string[] = [];
-  for (let charIdx = 0; charIdx < maxLen; charIdx++) {
-    const rowChars: string[] = [];
-    for (let lineIdx = lines.length - 1; lineIdx >= 0; lineIdx--) {
-      const char = lines[lineIdx]?.[charIdx] ?? "　";
-      rowChars.push(char);
-    }
-    resultLines.push(rowChars.join("  "));
-  }
-  return resultLines.join("\n");
 }
 
 function FocusLinesNode({
