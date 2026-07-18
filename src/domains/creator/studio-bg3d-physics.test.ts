@@ -55,6 +55,19 @@ const DOCUMENT = normalizeStudioBg3dSceneDocument({
   ],
 });
 
+const TWO_DYNAMIC_DOCUMENT = normalizeStudioBg3dSceneDocument({
+  ...DOCUMENT,
+  nodes: [
+    ...DOCUMENT.nodes,
+    {
+      ...DOCUMENT.nodes[0]!,
+      id: "second-root-box",
+      name: "Second Root",
+      transform: { position: [6, 1, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+    },
+  ],
+});
+
 describe("Studio BG3D physics boundary", () => {
   it("creates bounded colliders and refuses dynamic parented nodes", () => {
     const world = createStudioBg3dPhysicsWorld(DOCUMENT, new Set(["root-box"]));
@@ -191,14 +204,65 @@ describe("Studio BG3D physics boundary", () => {
     }], world)).toBeNull();
   });
 
-  it("rejects duplicate, non-finite, oversized, and zero-quaternion bake samples", () => {
+  it("requires every dynamic body exactly once while leaving static bodies unsampled", () => {
+    const world = createStudioBg3dPhysicsWorld(
+      TWO_DYNAMIC_DOCUMENT,
+      new Set(["root-box", "second-root-box"]),
+    )!;
+    const first = {
+      nodeId: "root-box",
+      position: [1, 2, 3],
+      rotation: [0, 0, 0, 1],
+    };
+    const second = {
+      nodeId: "second-root-box",
+      position: [7, 8, 9],
+      rotation: [0, 0, 0, 1],
+    };
+
+    // Worker delivery order is not part of the contract; identity is nodeId-based.
+    const result = applyStudioBg3dPhysicsTransforms(
+      TWO_DYNAMIC_DOCUMENT,
+      [second, first],
+      world,
+    );
+    expect(result?.nodes.find((node) => node.id === "root-box")?.transform.position)
+      .toEqual([1, 2, 3]);
+    expect(result?.nodes.find((node) => node.id === "second-root-box")?.transform.position)
+      .toEqual([7, 8, 9]);
+    expect(result?.nodes.find((node) => node.id === "parent-box")?.transform.position)
+      .toEqual([0, 0, 0]);
+
+    expect(applyStudioBg3dPhysicsTransforms(TWO_DYNAMIC_DOCUMENT, [], world)).toBeNull();
+    expect(applyStudioBg3dPhysicsTransforms(TWO_DYNAMIC_DOCUMENT, [first], world)).toBeNull();
+    expect(applyStudioBg3dPhysicsTransforms(TWO_DYNAMIC_DOCUMENT, [first, first], world)).toBeNull();
+    expect(applyStudioBg3dPhysicsTransforms(TWO_DYNAMIC_DOCUMENT, [first, {
+      ...second,
+      nodeId: "unknown-node",
+    }], world)).toBeNull();
+    expect(applyStudioBg3dPhysicsTransforms(TWO_DYNAMIC_DOCUMENT, [first, {
+      ...second,
+      nodeId: "parent-box",
+    }], world)).toBeNull();
+
+    const staticWorld = createStudioBg3dPhysicsWorld(DOCUMENT, new Set())!;
+    const staticOnlyResult = applyStudioBg3dPhysicsTransforms(DOCUMENT, [], staticWorld);
+    expect(staticOnlyResult?.nodes.map((node) => node.transform)).toEqual(
+      DOCUMENT.nodes.map((node) => node.transform),
+    );
+    expect(applyStudioBg3dPhysicsTransforms(DOCUMENT, [{
+      ...first,
+      nodeId: "root-box",
+    }], staticWorld)).toBeNull();
+  });
+
+  it("rejects non-finite, oversized, and zero-quaternion bake samples", () => {
     const world = createStudioBg3dPhysicsWorld(DOCUMENT, new Set(["root-box"]))!;
     const valid = {
       nodeId: "root-box",
       position: [0, 0, 0],
       rotation: [0, 0, 0, 1],
     };
-    expect(applyStudioBg3dPhysicsTransforms(DOCUMENT, [valid, valid], world)).toBeNull();
     expect(applyStudioBg3dPhysicsTransforms(DOCUMENT, [{
       ...valid,
       position: [10_001, 0, 0],
@@ -210,6 +274,14 @@ describe("Studio BG3D physics boundary", () => {
     expect(applyStudioBg3dPhysicsTransforms(DOCUMENT, [{
       ...valid,
       rotation: [0, 0, 0, 0],
+    }], world)).toBeNull();
+    expect(applyStudioBg3dPhysicsTransforms(DOCUMENT, [{
+      ...valid,
+      rotation: [0, Number.NaN, 0, 1],
+    }], world)).toBeNull();
+    expect(applyStudioBg3dPhysicsTransforms(DOCUMENT, [{
+      ...valid,
+      rotation: [0, 1_000_001, 0, 1],
     }], world)).toBeNull();
   });
 });

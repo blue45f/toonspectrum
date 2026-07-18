@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -10,6 +13,10 @@ import {
   type StudioBg3dGlbFailureCode,
   type StudioBg3dGlbValidationOptions,
 } from "./studio-bg3d-glb-validation";
+import {
+  attestStudioBg3dKtx2TranscoderAssets,
+  type StudioBg3dKtx2TranscoderCapability,
+} from "./studio-bg3d-ktx2-transcoder-contract";
 
 const JSON_CHUNK = 0x4e4f534a;
 const BIN_CHUNK = 0x004e4942;
@@ -291,6 +298,20 @@ async function validate(
   overrides: Partial<StudioBg3dGlbValidationOptions> = {},
 ) {
   return validateStudioBg3dGlb(bytes, await optionsFor(bytes, overrides));
+}
+
+async function attestInstalledBasisTranscoder(): Promise<StudioBg3dKtx2TranscoderCapability> {
+  const directory = path.resolve(
+    process.cwd(),
+    "node_modules/three/examples/jsm/libs/basis",
+  );
+  const capability = await attestStudioBg3dKtx2TranscoderAssets({
+    javascript: Uint8Array.from(readFileSync(path.join(directory, "basis_transcoder.js"))),
+    wasm: Uint8Array.from(readFileSync(path.join(directory, "basis_transcoder.wasm"))),
+  });
+  expect(capability).not.toBeNull();
+  if (!capability) throw new Error("Pinned Three Basis transcoder integrity mismatch.");
+  return capability;
 }
 
 async function expectFailure(
@@ -579,12 +600,17 @@ describe("validateStudioBg3dGlb self-contained resource policy", () => {
     });
   });
 
-  it("keeps required KHR_texture_basisu fail-closed unless the renderer explicitly allowlists it", async () => {
+  it("requires both renderer support and a same-realm transcoder attestation for required Basis", async () => {
     const bytes = basisTextureGlb({ fallback: false, required: true });
 
     await expectFailure(bytes, "unsupported-required-extension");
+    await expectFailure(bytes, "unsupported-required-extension", {
+      supportedRequiredExtensions: ["KHR_texture_basisu"],
+    });
+    const basisTranscoderCapability = await attestInstalledBasisTranscoder();
     const result = await validate(bytes, {
       supportedRequiredExtensions: ["KHR_texture_basisu"],
+      basisTranscoderCapability,
     });
     expect(result).toMatchObject({
       ok: true,
@@ -595,6 +621,11 @@ describe("validateStudioBg3dGlb self-contained resource policy", () => {
         estimatedDecodedImageBytes: 64,
         maxImageDimension: 4,
       },
+    });
+
+    await expectFailure(bytes, "unsupported-required-extension", {
+      supportedRequiredExtensions: ["KHR_texture_basisu"],
+      basisTranscoderCapability: Object.freeze({ ...basisTranscoderCapability }),
     });
   });
 
@@ -640,13 +671,17 @@ describe("validateStudioBg3dGlb self-contained resource policy", () => {
   });
 
   it("validates extension-set and sampler references before renderer admission", async () => {
+    const basisTranscoderCapability = await attestInstalledBasisTranscoder();
     await expectFailure(basisTextureGlb({
       rootOverrides: { extensionsUsed: ["KHR_texture_basisu", "KHR_texture_basisu"] },
     }), "invalid-gltf-root");
     await expectFailure(basisTextureGlb({
       required: true,
       rootOverrides: { extensionsRequired: ["KHR_texture_basisu", "KHR_texture_basisu"] },
-    }), "invalid-gltf-root", { supportedRequiredExtensions: ["KHR_texture_basisu"] });
+    }), "invalid-gltf-root", {
+      supportedRequiredExtensions: ["KHR_texture_basisu"],
+      basisTranscoderCapability,
+    });
     await expectFailure(basisTextureGlb({
       rootOverrides: {
         extensionsRequired: ["KHR_draco_mesh_compression"],

@@ -177,4 +177,61 @@ describe("Studio BG3D rig control quality", () => {
       "모델 리그를 준비하는 중입니다. 준비가 끝나면 포즈로 구울 수 있습니다.",
     );
   });
+
+  it("binds pose, aim, and IK mutations to model-owned canonical selections", () => {
+    expect(background3dSource).toContain("resolveStudioBg3dRigSelection({");
+    expect(background3dSource).toContain("mutateStudioBg3dPoseOverride({");
+    expect(background3dSource).toContain("mutateStudioBg3dAimConstraint({");
+    expect(background3dSource).toContain("mutateStudioBg3dTwoBoneIkConstraint({");
+    expect(background3dSource).toContain("modelId: selectedCustomModel.id");
+    expect(background3dSource).not.toContain(
+      "current.aims.filter((aim) => aim.jointKey !== selectedPoseJointKey)",
+    );
+    expect(background3dSource).not.toContain(
+      "if (ik.endJointKey !== selectedIkEndJointKey) return ik;",
+    );
+  });
+
+  it("shows live animation time without committing mixer ticks into scene history", () => {
+    const playheadEffect = sourceSlice(
+      background3dSource,
+      "function BgAnimationPlayhead({",
+      "export function StudioBackground3D",
+    );
+
+    expect(playheadEffect).toContain("globalThis.setInterval");
+    expect(playheadEffect).toContain("setLiveSample");
+    expect(playheadEffect).not.toContain("setCustomModels");
+    expect(playheadEffect).not.toContain("commitImmediateHistoryTransition");
+    expect(playheadEffect).toContain("value={displayTime}");
+    expect(background3dSource).toContain('active={open && activePanelTab === "models"}');
+    expect(background3dSource).toContain("현재 애니메이션 시간");
+    expect(background3dSource).toContain("createStudioBg3dRigPoseBakeHistoryTransition(");
+    expect(background3dSource).toContain("customModels: beforeCustomModels");
+  });
+});
+
+describe("Studio BG3D physics transaction boundary", () => {
+  it("rejects stale Worker and bake results against the exact editor source token", () => {
+    expect(background3dSource).toContain("createStudioBg3dPhysicsSessionSourceToken({");
+    expect(background3dSource.match(/isStudioBg3dPhysicsSessionSourceCurrent\(/g)?.length ?? 0)
+      .toBeGreaterThanOrEqual(2);
+    expect(background3dSource).toContain("readonly sourceToken: string;");
+    expect(background3dSource).toContain("sourceToken,");
+    expect(background3dSource).toContain(
+      "물리 계산 중 장면이 변경되어 오래된 결과를 폐기했습니다. 다시 실행해 주세요.",
+    );
+    expect(background3dSource).toContain(
+      "물리 미리보기 시작 뒤 장면이 변경되어 현재 자세를 적용하지 않았습니다.",
+    );
+  });
+
+  it("fails closed when any visible deforming model would have a stale static collider", () => {
+    expect(background3dSource).toContain("const unsupportedVisibleModel = customModels.find");
+    expect(background3dSource).toContain("model.animation !== undefined");
+    expect(background3dSource).toContain("(cacheEntry?.metrics.skins ?? 0) > 0");
+    expect(background3dSource).toContain(
+      "보이는 리그·애니메이션·모프 모델은 현재 자세와 충돌체가 어긋날 수 있습니다.",
+    );
+  });
 });

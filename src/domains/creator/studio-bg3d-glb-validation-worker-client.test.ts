@@ -16,6 +16,8 @@ import {
   type StudioBg3dGlbWorkerRequest,
 } from "./studio-bg3d-glb-validation-worker-protocol";
 
+import type { StudioBg3dKtx2TranscoderCapability } from "./studio-bg3d-ktx2-transcoder-contract";
+
 const OPTIONS: StudioBg3dGlbValidationOptions = {
   declared: {
     byteSize: 4,
@@ -281,6 +283,29 @@ describe("StudioBg3dValidationWorkerClient", () => {
 
     await expect(pending).rejects.toMatchObject({ code: "aborted" });
     releaseDigest?.(new Uint8Array(32));
+  });
+
+  it("rejects a main-realm Basis capability until the validation worker can self-attest", async () => {
+    const workers: FakeWorker[] = [];
+    class BrowserWorkerFake extends FakeWorker {
+      constructor() {
+        super();
+        workers.push(this);
+      }
+    }
+    vi.stubGlobal("Worker", BrowserWorkerFake);
+    const outcome = validateStudioBg3dGlbOffMainThread(
+      new Uint8Array([1, 2, 3, 4]),
+      {
+        ...OPTIONS,
+        basisTranscoderCapability: Object.freeze({}) as StudioBg3dKtx2TranscoderCapability,
+      },
+    );
+
+    await expect(outcome).rejects.toMatchObject({
+      code: "basis-worker-attestation-required",
+    });
+    expect(workers).toHaveLength(0);
   });
 
   it("recreates the shared browser worker after a protocol failure", async () => {

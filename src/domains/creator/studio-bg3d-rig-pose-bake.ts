@@ -29,6 +29,13 @@ export interface StudioBg3dRigPoseBakeCommitPatch {
   readonly constraints: undefined;
 }
 
+export interface StudioBg3dRigPoseBakeHistoryTransition {
+  /** Exact live playback state immediately before the destructive constraint bake. */
+  readonly beforeAnimation: StudioBg3dAnimationPlayback | undefined;
+  /** Paused animation, canonical baked pose, and removed procedural constraints. */
+  readonly patch: StudioBg3dRigPoseBakeCommitPatch;
+}
+
 function normalizeJointKey(value: unknown): string | null {
   if (typeof value !== "string") return null;
   for (const character of value) {
@@ -167,4 +174,36 @@ export function createStudioBg3dRigPoseBakeCommitPatch(
     animation = normalizedAnimation;
   }
   return Object.freeze({ animation, pose, constraints: undefined });
+}
+
+/**
+ * Builds both halves of one atomic history command.
+ *
+ * A playing mixer advances without writing every frame into SceneDocument. Capturing only the
+ * stored playback would therefore make Undo jump back to the last edited timestamp. For playing
+ * mixers the before half keeps `playing` while replacing its timestamp with the sampled frame.
+ * Paused playback retains its exact authored timestamp (which can intentionally lie outside a
+ * looping clip); the after half always pauses at the rendered sample through the normal bake patch.
+ */
+export function createStudioBg3dRigPoseBakeHistoryTransition(
+  currentAnimation: StudioBg3dAnimationPlayback | undefined,
+  snapshot: StudioBg3dRigPoseBakeSnapshot,
+): StudioBg3dRigPoseBakeHistoryTransition | null {
+  const patch = createStudioBg3dRigPoseBakeCommitPatch(currentAnimation, snapshot);
+  if (!patch) return null;
+
+  let beforeAnimation: StudioBg3dAnimationPlayback | undefined;
+  if (currentAnimation) {
+    if (!currentAnimation.playing) {
+      beforeAnimation = currentAnimation;
+    } else {
+      const normalizedBeforeAnimation = normalizeStudioBg3dAnimationPlayback({
+        ...currentAnimation,
+        timeSeconds: snapshot.sampledTimeSeconds,
+      });
+      if (!normalizedBeforeAnimation) return null;
+      beforeAnimation = normalizedBeforeAnimation;
+    }
+  }
+  return Object.freeze({ beforeAnimation, patch });
 }

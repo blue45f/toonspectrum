@@ -49,7 +49,14 @@ export interface StudioBg3dValidationWorkerClientOptions {
 }
 
 export class StudioBg3dValidationWorkerError extends Error {
-  constructor(readonly code: "aborted" | "disposed" | "protocol" | "timeout" | "worker-failed") {
+  constructor(readonly code:
+    | "aborted"
+    | "basis-worker-attestation-required"
+    | "disposed"
+    | "protocol"
+    | "timeout"
+    | "worker-failed"
+  ) {
     super(`studio-bg3d-validation-worker:${code}`);
     this.name = "StudioBg3dValidationWorkerError";
   }
@@ -62,10 +69,14 @@ function copyToOwnedBuffer(input: ArrayBuffer | Uint8Array): ArrayBuffer {
   return Uint8Array.from(source).buffer;
 }
 
-function withoutDigest(
+function serializableValidationOptions(
   options: StudioBg3dGlbValidationOptions,
-): Omit<StudioBg3dGlbValidationOptions, "digest"> {
-  const { digest: _digest, ...serializable } = options;
+): Omit<StudioBg3dGlbValidationOptions, "basisTranscoderCapability" | "digest"> {
+  const {
+    basisTranscoderCapability: _basisTranscoderCapability,
+    digest: _digest,
+    ...serializable
+  } = options;
   return serializable;
 }
 
@@ -132,7 +143,7 @@ export class StudioBg3dValidationWorkerClient {
         kind: "validate",
         requestId,
         bytes,
-        options: withoutDigest(options),
+        options: serializableValidationOptions(options),
       };
       try {
         requestPosted = true;
@@ -299,7 +310,10 @@ function maximumBrowserValidationWorkers(): number {
 }
 
 function canUseBrowserWorker(options: StudioBg3dGlbValidationOptions): boolean {
-  return options.digest === undefined && typeof Worker === "function";
+  // A same-realm runtime attestation is deliberately not structured-cloneable proof.
+  return options.digest === undefined &&
+    options.basisTranscoderCapability === undefined &&
+    typeof Worker === "function";
 }
 
 function abortedValidationError(): StudioBg3dValidationWorkerError {
@@ -344,6 +358,12 @@ export async function validateStudioBg3dGlbOffMainThread(
   options: StudioBg3dGlbValidationOptions,
   signal?: AbortSignal,
 ): Promise<StudioBg3dGlbWorkerValidationOutcome> {
+  // Never move a potentially 100 MiB required-Basis validation job onto the UI thread merely to
+  // preserve a main-realm capability. The dedicated Worker must fetch and attest its own runtime
+  // before this path can be enabled.
+  if (options.basisTranscoderCapability !== undefined) {
+    throw new StudioBg3dValidationWorkerError("basis-worker-attestation-required");
+  }
   if (!canUseBrowserWorker(options)) {
     return validateStudioBg3dGlbOnMainThread(input, options, signal);
   }

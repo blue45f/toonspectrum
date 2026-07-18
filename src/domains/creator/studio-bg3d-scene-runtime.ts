@@ -6,7 +6,6 @@
 
 import {
   DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
-  STUDIO_BG3D_MAX_TWO_BONE_IK_CONSTRAINTS,
   STUDIO_BG3D_PRIMITIVE_KINDS,
   STUDIO_BG3D_SCENE_DOCUMENT_MAX_ATTACHMENTS,
   STUDIO_BG3D_SCENE_DOCUMENT_MAX_NODES,
@@ -45,6 +44,7 @@ export type StudioBg3dRuntimeAdapterDiagnosticCode =
   | "input-scan-limit-exceeded"
   | "invalid-primitive"
   | "invalid-custom-model"
+  | "lossy-custom-model-normalization"
   | "duplicate-node-id"
   | "node-budget-exceeded"
   | "unresolved-storage-model"
@@ -123,6 +123,19 @@ interface StrictRoundTrip {
   readonly serialized: string;
 }
 
+type RuntimePayloadNormalization<Value> =
+  | { readonly status: "valid"; readonly value: Value }
+  | { readonly status: "invalid" | "lossy" };
+
+type RuntimeModelNodeResult =
+  | { readonly node: StudioBg3dSceneNode; readonly diagnosticCode?: never }
+  | {
+    readonly node: null;
+    readonly diagnosticCode:
+      | "invalid-custom-model"
+      | "lossy-custom-model-normalization";
+  };
+
 const NODE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._~-]{0,79}$/u;
 const COLOR_PATTERN = /^#[a-f0-9]{6}$/iu;
 const FORBIDDEN_ID_SET = new Set(["constructor", "prototype", "__proto__"]);
@@ -192,6 +205,69 @@ function isSafeStorageModelId(value: unknown): value is string {
     if (point <= 0x1f || point === 0x7f) return false;
   }
   return true;
+}
+
+function isJsonRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Capture the exact JSON value seen by the persistence normalizers before inspecting it. Besides
+ * making getters/toJSON run at most once, this preserves JSON boundary semantics for NaN and
+ * Infinity (`null`) and lets us distinguish a valid canonical payload from a lenient repair.
+ */
+function snapshotJsonValue(value: unknown):
+  | { readonly ok: true; readonly value: unknown }
+  | { readonly ok: false } {
+  try {
+    const serialized = JSON.stringify(value);
+    if (serialized === undefined) return { ok: false };
+    return { ok: true, value: JSON.parse(serialized) as unknown };
+  } catch {
+    return { ok: false };
+  }
+}
+
+function jsonStructuresEqual(left: unknown, right: unknown): boolean {
+  if (left === right) return true;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) {
+      return false;
+    }
+    return left.every((item, index) => jsonStructuresEqual(item, right[index]));
+  }
+  if (!isJsonRecord(left) || !isJsonRecord(right)) return false;
+  const leftKeys = Object.keys(left).sort();
+  const rightKeys = Object.keys(right).sort();
+  if (leftKeys.length !== rightKeys.length) return false;
+  return leftKeys.every((key, index) => (
+    key === rightKeys[index] && jsonStructuresEqual(left[key], right[key])
+  ));
+}
+
+function normalizeRuntimePayloadLosslessly<Value>(
+  raw: unknown,
+  normalize: (value: unknown) => Value | null,
+  upgrade?: (value: unknown) => unknown,
+): RuntimePayloadNormalization<Value> {
+  const snapshot = snapshotJsonValue(raw);
+  if (!snapshot.ok) return { status: "invalid" };
+  const input = upgrade ? upgrade(snapshot.value) : snapshot.value;
+  const normalized = normalize(input);
+  if (!normalized) return { status: "invalid" };
+  if (!jsonStructuresEqual(input, normalized)) return { status: "lossy" };
+  return { status: "valid", value: normalized };
+}
+
+function upgradeAimOnlyV2ConstraintLayer(value: unknown): unknown {
+  if (
+    isJsonRecord(value) &&
+    Array.isArray(value.aims) &&
+    !Object.prototype.hasOwnProperty.call(value, "twoBoneIks")
+  ) {
+    return { ...value, twoBoneIks: [] };
+  }
+  return value;
 }
 
 function strictRoundTrip(raw: unknown): StrictRoundTrip | null {
@@ -281,81 +357,84 @@ function primitiveNodeFromRuntime(value: BgPrimitive): StudioBg3dSceneNode | nul
 function modelNodeFromRuntime(
   value: BgCustomModelInstance,
   attachmentId: string
-): StudioBg3dSceneNode | null {
+): RuntimeModelNodeResult {
   if (
     !isSafeNodeId(value?.id) ||
     !isFiniteVec3(value.position) ||
     !isFiniteVec3(value.rotation) ||
     !isFiniteVec3(value.scale)
   ) {
-    return null;
+    return { node: null, diagnosticCode: "invalid-custom-model" };
   }
-  const materialOverride = value.materialOverride === undefined
-    ? undefined
-    : normalizeStudioBg3dMaterialOverride(value.materialOverride);
-  if (value.materialOverride !== undefined && !materialOverride) return null;
-  const animation = value.animation === undefined
-    ? undefined
-    : normalizeStudioBg3dAnimationPlayback(value.animation);
-  if (value.animation !== undefined && !animation) return null;
-  const pose = value.pose === undefined
-    ? undefined
-    : normalizeStudioBg3dPoseLayer(value.pose);
-  if (value.pose !== undefined && !pose) return null;
-  const morph = value.morph === undefined
-    ? undefined
-    : normalizeStudioBg3dMorphLayer(value.morph);
-  if (value.morph !== undefined && !morph) return null;
-  const constraints = value.constraints === undefined
-    ? undefined
-    : normalizeStudioBg3dConstraintLayer(value.constraints);
-  const sourceConstraintRecord = typeof value.constraints === "object" && value.constraints !== null
-    ? value.constraints
-    : null;
-  const sourceConstraintAims = sourceConstraintRecord
-    ? Reflect.get(sourceConstraintRecord, "aims")
-    : undefined;
-  const sourceConstraintTwoBoneIks = sourceConstraintRecord
-    ? Reflect.get(sourceConstraintRecord, "twoBoneIks")
-    : undefined;
-  const sourceAimCount = Array.isArray(sourceConstraintAims)
-    ? sourceConstraintAims.length
-    : -1;
-  // Aim-only v2 runtime objects are still valid in memory during HMR and legacy hydration. Treat a
-  // missing v3 collection as the canonical empty list, but fail closed for every other bad shape.
-  const sourceTwoBoneIkCount = sourceConstraintTwoBoneIks === undefined
-    ? 0
-    : Array.isArray(sourceConstraintTwoBoneIks)
-      ? sourceConstraintTwoBoneIks.length
-      : -1;
-  if (
-    value.constraints !== undefined && (
-      !constraints ||
-      sourceTwoBoneIkCount > STUDIO_BG3D_MAX_TWO_BONE_IK_CONSTRAINTS ||
-      constraints.aims.length !== sourceAimCount ||
-      constraints.twoBoneIks.length !== sourceTwoBoneIkCount
-    )
-  ) return null;
+
+  const rawMaterialOverride = value.materialOverride;
+  const rawAnimation = value.animation;
+  const rawPose = value.pose;
+  const rawMorph = value.morph;
+  const rawConstraints = value.constraints;
+  const payloads = [
+    rawMaterialOverride === undefined
+      ? undefined
+      : normalizeRuntimePayloadLosslessly(
+        rawMaterialOverride,
+        normalizeStudioBg3dMaterialOverride,
+      ),
+    rawAnimation === undefined
+      ? undefined
+      : normalizeRuntimePayloadLosslessly(
+        rawAnimation,
+        normalizeStudioBg3dAnimationPlayback,
+      ),
+    rawPose === undefined
+      ? undefined
+      : normalizeRuntimePayloadLosslessly(rawPose, normalizeStudioBg3dPoseLayer),
+    rawMorph === undefined
+      ? undefined
+      : normalizeRuntimePayloadLosslessly(rawMorph, normalizeStudioBg3dMorphLayer),
+    rawConstraints === undefined
+      ? undefined
+      : normalizeRuntimePayloadLosslessly(
+        rawConstraints,
+        normalizeStudioBg3dConstraintLayer,
+        upgradeAimOnlyV2ConstraintLayer,
+      ),
+  ] as const;
+  const invalidPayload = payloads.find((payload) => payload?.status === "invalid");
+  if (invalidPayload) {
+    return { node: null, diagnosticCode: "invalid-custom-model" };
+  }
+  const lossyPayload = payloads.find((payload) => payload?.status === "lossy");
+  if (lossyPayload) {
+    return { node: null, diagnosticCode: "lossy-custom-model-normalization" };
+  }
+
+  const materialOverride = payloads[0]?.status === "valid" ? payloads[0].value : undefined;
+  const animation = payloads[1]?.status === "valid" ? payloads[1].value : undefined;
+  const pose = payloads[2]?.status === "valid" ? payloads[2].value : undefined;
+  const morph = payloads[3]?.status === "valid" ? payloads[3].value : undefined;
+  const constraints = payloads[4]?.status === "valid" ? payloads[4].value : undefined;
   return {
-    id: value.id,
-    name: value.name || "GLB 모델",
-    kind: "model",
-    attachmentId,
-    transform: {
-      position: [...value.position],
-      rotation: [...value.rotation],
-      scale: [...value.scale],
+    node: {
+      id: value.id,
+      name: value.name || "GLB 모델",
+      kind: "model",
+      attachmentId,
+      transform: {
+        position: [...value.position],
+        rotation: [...value.rotation],
+        scale: [...value.scale],
+      },
+      visible: value.visible !== false,
+      locked: value.locked === true,
+      castsShadow: true,
+      receivesShadow: true,
+      parentId: value.parentId ?? null,
+      ...(materialOverride ? { materialOverride } : {}),
+      ...(animation ? { animation } : {}),
+      ...(pose ? { pose } : {}),
+      ...(morph ? { morph } : {}),
+      ...(constraints ? { constraints } : {}),
     },
-    visible: value.visible !== false,
-    locked: value.locked === true,
-    castsShadow: true,
-    receivesShadow: true,
-    parentId: value.parentId ?? null,
-    ...(materialOverride ? { materialOverride } : {}),
-    ...(animation ? { animation } : {}),
-    ...(pose ? { pose } : {}),
-    ...(morph ? { morph } : {}),
-    ...(constraints ? { constraints } : {}),
   };
 }
 
@@ -567,13 +646,16 @@ export function adaptStudioBg3dRuntimeToDocument(
       cumulativeModelBytes += attachment.byteSize;
     }
 
-    const node = modelNodeFromRuntime(instance, attachment.id);
-    if (!node) {
-      diagnostics.add("invalid-custom-model", "custom-model", { sourceIndex: index });
+    const modelNode = modelNodeFromRuntime(instance, attachment.id);
+    if (!modelNode.node) {
+      diagnostics.add(modelNode.diagnosticCode, "custom-model", {
+        sourceIndex: index,
+        nodeId: instance.id,
+      });
       continue;
     }
-    pending.push({ node, source: "custom-model", sourceIndex: index });
-    nodeIds.add(node.id);
+    pending.push({ node: modelNode.node, source: "custom-model", sourceIndex: index });
+    nodeIds.add(modelNode.node.id);
   }
   if (customModels.length > customModelScanCount) {
     diagnostics.add("input-scan-limit-exceeded", "custom-model", {

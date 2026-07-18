@@ -3,6 +3,10 @@ export interface StudioBg3dHierarchyEntity {
   readonly parentId?: string | null;
 }
 
+export interface StudioBg3dVisibleHierarchyEntity extends StudioBg3dHierarchyEntity {
+  readonly visible?: boolean;
+}
+
 export interface StudioBg3dResolvedHierarchy {
   readonly roots: readonly string[];
   readonly childrenByParent: ReadonlyMap<string, readonly string[]>;
@@ -102,6 +106,30 @@ export function normalizeStudioBg3dHierarchyParents<T extends StudioBg3dHierarch
     const parentId = resolved.parentById.get(entity.id) ?? null;
     return (entity.parentId ?? null) === parentId ? entity : { ...entity, parentId };
   });
+}
+
+/** Returns exactly the entities visible through the same repaired hierarchy used for rendering. */
+export function collectStudioBg3dEffectivelyVisibleEntityIds(
+  entities: readonly StudioBg3dVisibleHierarchyEntity[],
+): ReadonlySet<string> {
+  const hierarchy = resolveStudioBg3dHierarchy(entities);
+  const entityById = new Map(entities.map((entity) => [entity.id, entity] as const));
+  const visibleIds = new Set<string>();
+  const pending = hierarchy.roots.map((id) => ({ id, ancestorsVisible: true }));
+  while (pending.length > 0) {
+    const entry = pending.pop();
+    if (!entry) break;
+    const entity = entityById.get(entry.id);
+    if (!entity) continue;
+    const visible = entry.ancestorsVisible && entity.visible !== false;
+    if (visible) visibleIds.add(entry.id);
+    const children = hierarchy.childrenByParent.get(entry.id) ?? [];
+    for (let index = children.length - 1; index >= 0; index -= 1) {
+      const childId = children[index];
+      if (childId) pending.push({ id: childId, ancestorsVisible: visible });
+    }
+  }
+  return visibleIds;
 }
 
 export function canSetStudioBg3dParent(
