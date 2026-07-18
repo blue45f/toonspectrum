@@ -1,6 +1,6 @@
 import { disposeStudioBg3dThreeResources } from "./studio-background-3d-model";
 import { STUDIO_BG3D_GLB_MAX_BYTES } from "./studio-bg3d-glb-validation";
-import { loadStudioBg3dMeshoptDecoder } from "./studio-bg3d-meshopt";
+import { STUDIO_BG3D_MESHOPT_EXTENSION } from "./studio-bg3d-meshopt";
 
 import type { Bg3dModelUploadSource } from "./bg3d-model-library";
 import type * as THREE from "three";
@@ -130,7 +130,13 @@ const SAFE_DATA_URI_PATTERN = /^data:(?:application\/(?:octet-stream|gltf-buffer
 const UNSUPPORTED_REQUIRED_GLTF_EXTENSIONS = new Set([
   "KHR_draco_mesh_compression",
   "KHR_texture_basisu",
+  STUDIO_BG3D_MESHOPT_EXTENSION,
+  "KHR_meshopt_compression",
 ]);
+const JSON_GLTF_MESHOPT_EXTENSIONS = [
+  STUDIO_BG3D_MESHOPT_EXTENSION,
+  "KHR_meshopt_compression",
+] as const;
 
 function importError(code: StudioBg3dModelImportErrorCode): StudioBg3dModelImportError {
   return new StudioBg3dModelImportError(code);
@@ -151,6 +157,10 @@ function isSafeDataResourceUri(value: string): boolean {
 
 function throwIfAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted) throw importError("aborted");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function extensionOf(path: string): string {
@@ -553,16 +563,36 @@ async function preflightCompanionImageMemory(
   }
 }
 
+function rejectJsonGltfMeshoptBufferViews(root: Record<string, unknown>): void {
+  const bufferViews = root.bufferViews;
+  if (bufferViews === undefined) return;
+  if (!Array.isArray(bufferViews)) throw importError("parse-failed");
+  for (const bufferView of bufferViews) {
+    if (!isRecord(bufferView)) throw importError("parse-failed");
+    const extensions = bufferView.extensions;
+    if (extensions === undefined) continue;
+    if (!isRecord(extensions)) throw importError("parse-failed");
+    if (JSON_GLTF_MESHOPT_EXTENSIONS.some((extension) => Object.hasOwn(extensions, extension))) {
+      throw importError("unsupported-extension");
+    }
+  }
+}
+
 function gltfResourceUris(root: unknown): readonly string[] {
-  if (typeof root !== "object" || root === null || Array.isArray(root)) throw importError("parse-failed");
+  if (!isRecord(root)) throw importError("parse-failed");
   const candidate = root as {
     readonly asset?: { readonly version?: unknown };
     readonly buffers?: readonly { readonly uri?: unknown }[];
     readonly images?: readonly { readonly uri?: unknown }[];
-    readonly extensionsRequired?: readonly unknown[];
+    readonly extensionsRequired?: unknown;
   };
   if (candidate.asset?.version !== "2.0") throw importError("parse-failed");
-  for (const extension of candidate.extensionsRequired ?? []) {
+  rejectJsonGltfMeshoptBufferViews(root);
+  const extensionsRequired = candidate.extensionsRequired;
+  if (extensionsRequired !== undefined && !Array.isArray(extensionsRequired)) {
+    throw importError("parse-failed");
+  }
+  for (const extension of extensionsRequired ?? []) {
     if (typeof extension !== "string") throw importError("parse-failed");
     if (UNSUPPORTED_REQUIRED_GLTF_EXTENSIONS.has(extension)) throw importError("unsupported-extension");
   }
@@ -609,12 +639,9 @@ async function parseGltfImport(
   }
   const tracked = await createTrackedLoadingManager(resolver);
   throwIfAborted(signal);
-  const [{ GLTFLoader }, meshoptDecoder] = await Promise.all([
-    import("three/examples/jsm/loaders/GLTFLoader.js"),
-    loadStudioBg3dMeshoptDecoder(),
-  ]);
+  const { GLTFLoader } = await import("three/examples/jsm/loaders/GLTFLoader.js");
   throwIfAborted(signal);
-  const loader = new GLTFLoader(tracked.manager).setMeshoptDecoder(meshoptDecoder);
+  const loader = new GLTFLoader(tracked.manager);
   let parsedRoot: THREE.Object3D | null = null;
   try {
     const gltf = await new Promise<import("three/examples/jsm/loaders/GLTFLoader.js").GLTF>((resolve, reject) => {

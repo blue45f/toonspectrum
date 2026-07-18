@@ -2,10 +2,11 @@ import { z } from "zod";
 
 import { deriveStudioBg3dGlbBudgetProfiles } from "./studio-bg3d-device-quality";
 import {
-  validateStudioBg3dGlb,
   type StudioBg3dGlbBudgetProfiles,
   type StudioBg3dGlbValidationSuccess,
 } from "./studio-bg3d-glb-validation";
+import { validateStudioBg3dGlbOffMainThread } from "./studio-bg3d-glb-validation-worker-client";
+import { STUDIO_BG3D_CANONICAL_REQUIRED_GLTF_EXTENSIONS } from "./studio-bg3d-meshopt";
 import {
   STUDIO_BG3D_GLB_MIME,
   STUDIO_BG3D_PRIMITIVE_KINDS,
@@ -1629,7 +1630,7 @@ async function validateBg3dArchiveGlb(
   usedBytes: number,
   maximumBytes: number
 ): Promise<StudioBg3dGlbValidationSuccess> {
-  const result = await validateStudioBg3dGlb(bytes, {
+  const validationOutcome = await validateStudioBg3dGlbOffMainThread(bytes, {
     declared: {
       byteSize: attachment.byteSize,
       sha256: attachment.sha256,
@@ -1638,7 +1639,12 @@ async function validateBg3dArchiveGlb(
     cumulative: { usedBytes, maximumBytes },
     profile: "desktop",
     budgets: attachment.validationBudgets,
-  });
+    supportedRequiredExtensions: STUDIO_BG3D_CANONICAL_REQUIRED_GLTF_EXTENSIONS,
+  }).catch(() => fail(
+    "MIME_SIGNATURE_MISMATCH",
+    "3D 배경 GLB의 무결성·내장 리소스·복잡도 안전 검사를 실행하지 못했습니다."
+  ));
+  const result = validationOutcome.result;
   if (!result.ok) {
     fail(
       "MIME_SIGNATURE_MISMATCH",

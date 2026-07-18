@@ -7,6 +7,11 @@ import {
   applyFullState,
   planFullStateRestore,
   buildFullVrmStateFromSharedDataUrl,
+  canRestoreFullVrmHistoryState,
+  normalizeVrmBodyRotation,
+  serializeFullVrmState,
+  buildVrmPoseDataUrlMetadata,
+  createFullStateLoadHandlers,
   applyVrmMaterialFx,
   hasVrmMToonMaterial,
   DEFAULT_VRM_MATERIAL_FX,
@@ -102,6 +107,77 @@ function addMesh(parent: THREE.Object3D, name: string, material: THREE.Material)
 }
 
 describe("studio-vrm-poser-utils unified pipeline", () => {
+  it("serializes a bounded body rotation and explicit model owner while rejecting unsafe values", () => {
+    const serialized = serializeFullVrmState({
+      modelId: "model-a",
+      bodyRotation: Math.PI / 3,
+    });
+    expect(serialized.modelId).toBe("model-a");
+    expect(serialized.bodyRotation).toBeCloseTo(Math.PI / 3);
+
+    const transported = JSON.parse(JSON.stringify(serialized)) as FullVrmState;
+    const restorePlan = planFullStateRestore(transported);
+    expect(restorePlan.modelId).toBe("model-a");
+    expect(restorePlan.bodyRotation).toBeCloseTo(Math.PI / 3);
+
+    expect(serializeFullVrmState({ bodyRotation: Number.POSITIVE_INFINITY }).bodyRotation).toBe(0);
+    expect(serializeFullVrmState({ bodyRotation: Math.PI * 4 }).bodyRotation).toBe(Math.PI);
+    expect(serializeFullVrmState({ bodyRotation: -Math.PI * 4 }).bodyRotation).toBe(-Math.PI);
+    expect(serializeFullVrmState({ modelId: "bad\u0000id" }).modelId).toBeUndefined();
+    expect(serializeFullVrmState({ modelId: " model-a " }).modelId).toBeUndefined();
+    expect(serializeFullVrmState({ modelId: "x".repeat(257) }).modelId).toBeUndefined();
+    expect(normalizeVrmBodyRotation(Number.NaN)).toBe(0);
+  });
+
+  it("allows undo/redo only for an explicitly matching model owner", () => {
+    const owned = serializeFullVrmState({ modelId: "model-a" });
+    const legacy = serializeFullVrmState({});
+
+    expect(canRestoreFullVrmHistoryState(owned, "model-a")).toBe(true);
+    expect(canRestoreFullVrmHistoryState(owned, "model-b")).toBe(false);
+    expect(canRestoreFullVrmHistoryState(legacy, "model-a")).toBe(false);
+    expect(canRestoreFullVrmHistoryState(owned, "")).toBe(false);
+  });
+
+  it("builds one canonical PNG metadata payload for share and re-edit", () => {
+    const metadata = buildVrmPoseDataUrlMetadata({
+      modelId: "model-a",
+      bones: { hips: { rotation: [0, 0.1, 0] } },
+      bodyRotation: Math.PI / 6,
+      props: { version: 1, items: [] },
+    }, "Model A");
+
+    expect(metadata.tool).toBe("vrm-poser");
+    expect(metadata.modelName).toBe("Model A");
+    expect(metadata.modelId).toBe("model-a");
+    expect(metadata.bodyRotation).toBeCloseTo(Math.PI / 6);
+    expect(metadata.vrmProps).toEqual({ version: 1, items: [] });
+    expect("props" in metadata).toBe(false);
+
+    const restored = buildFullVrmStateFromSharedDataUrl(
+      `data:image/png;base64,AA#${encodeURIComponent(JSON.stringify(metadata))}`,
+    );
+    expect(restored?.modelId).toBe("model-a");
+    expect(restored?.bodyRotation).toBeCloseTo(Math.PI / 6);
+    expect(planFullStateRestore(restored as FullVrmState).bodyRotation).toBeCloseTo(Math.PI / 6);
+  });
+
+  it("keeps explicit full-state load as an intentional cross-model transfer", () => {
+    const saved = serializeFullVrmState({
+      modelId: "source-model",
+      bodyRotation: 0.4,
+    });
+    const committed: FullVrmState[] = [];
+    const handlers = createFullStateLoadHandlers({
+      savedFullStates: { saved },
+      commitFullStateRestore: (state) => committed.push(state),
+      vrmRef: { current: null },
+    });
+
+    handlers.handleLoadFullLocal("saved");
+    expect(committed).toEqual([saved]);
+  });
+
   it("stripFingerBones removes finger entries", () => {
     const bones: PoseBoneMap = {
       hips: { rotation: [0, 0, 0] },
@@ -179,11 +255,13 @@ describe("studio-vrm-poser-utils unified pipeline", () => {
   it("planFullStateRestore returns complete plan with stripped bones for maximal AC2 input", () => {
     const input: FullVrmState = {
       version: 2,
+      modelId: "model-a",
       bones: {
         hips: { rotation: [0, 0, 0] },
         leftIndexProximal: { rotation: [0, 0, 0.3] },
       },
       yOffset: 0.1,
+      bodyRotation: Math.PI / 4,
       expressionWeights: { happy: 0.8 },
       bodyScale: { height: 1.2, width: 0.95 },
       lighting: { intensity: 1.5, colorTemp: 0.7, directionDeg: 45 },
@@ -217,6 +295,8 @@ describe("studio-vrm-poser-utils unified pipeline", () => {
     expect("leftIndexProximal" in plan.strippedBones).toBe(false);
     expect("hips" in plan.strippedBones).toBe(true);
     expect(plan.yOffset).toBe(0.1);
+    expect(plan.modelId).toBe("model-a");
+    expect(plan.bodyRotation).toBeCloseTo(Math.PI / 4);
     expect(plan.expressionWeights.happy).toBe(0.8);
     expect(plan.bodyScale?.height).toBe(1.2);
     expect(plan.lighting?.intensity).toBe(1.5);
@@ -249,14 +329,17 @@ describe("studio-vrm-poser-utils unified pipeline", () => {
     expect(corrupted.propsItems[0]?.position[0]).toBe(1);
 
     const absent = planFullStateRestore({ version: 2, bones: {}, yOffset: 0 });
+    expect(absent.bodyRotation).toBe(0);
     expect(absent.propsItems).toEqual([]);
     expect(absent.sceneProps.active).toEqual([]);
   });
 
   it("restores wardrobe, material effects and avatar forge state from shared PNG metadata", () => {
     const metadata = {
+      modelId: "model-shared",
       bones: { hips: { rotation: [0, 0, 0] } },
       yOffset: 0.04,
+      bodyRotation: -Math.PI / 2,
       wardrobe: { version: 1, slots: { top: { itemId: "lab-coat" } } },
       sceneProps: {
         version: 1,
@@ -271,6 +354,8 @@ describe("studio-vrm-poser-utils unified pipeline", () => {
     );
 
     expect(state?.wardrobe).toEqual(metadata.wardrobe);
+    expect(state?.modelId).toBe("model-shared");
+    expect(state?.bodyRotation).toBeCloseTo(-Math.PI / 2);
     expect(state?.sceneProps).toEqual(metadata.sceneProps);
     expect(state?.materialFx).toEqual(metadata.materialFx);
     expect(state?.avatarForge).toEqual(metadata.avatarForge);

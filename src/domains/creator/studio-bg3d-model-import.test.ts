@@ -198,9 +198,69 @@ describe("convertStudioBg3dModelFilesToGlb", () => {
       gltf({ buffers: [{ byteLength: 4, uri: "model.bin" }] }),
     ])).rejects.toMatchObject({ code: "missing-resource" });
 
-    await expect(convertStudioBg3dModelFilesToGlb([
-      gltf({ extensionsRequired: ["KHR_draco_mesh_compression"] }),
-    ])).rejects.toMatchObject({ code: "unsupported-extension" });
+    for (const extension of [
+      "KHR_draco_mesh_compression",
+      "EXT_meshopt_compression",
+      "KHR_meshopt_compression",
+    ]) {
+      await expect(convertStudioBg3dModelFilesToGlb([
+        gltf({ extensionsRequired: [extension] }),
+      ])).rejects.toMatchObject({ code: "unsupported-extension" });
+    }
+  });
+
+  it("rejects optional, undeclared, and malformed Meshopt buffer views before Three parses them", async () => {
+    const gltf = (extensionPayload: unknown, extension = "EXT_meshopt_compression") => sourceFile(
+      "scene.gltf",
+      JSON.stringify({
+        asset: { version: "2.0" },
+        scenes: [{ nodes: [] }],
+        scene: 0,
+        bufferViews: [{
+          buffer: 0,
+          byteLength: 4,
+          extensions: { [extension]: extensionPayload },
+        }],
+      }),
+    );
+
+    for (const file of [
+      gltf({
+        buffer: 0,
+        byteOffset: 0,
+        byteLength: 1,
+        byteStride: 4,
+        count: 1,
+        mode: "ATTRIBUTES",
+      }),
+      gltf(null),
+      gltf({}, "KHR_meshopt_compression"),
+    ]) {
+      const stages: string[] = [];
+      await expect(convertStudioBg3dModelFilesToGlb([file], {
+        onProgress: ({ stage }) => stages.push(stage),
+      })).rejects.toMatchObject({ code: "unsupported-extension" });
+      expect(stages).toEqual(["planning", "reading", "parsing"]);
+    }
+  });
+
+  it("rejects malformed glTF extension and buffer-view containers at the JSON boundary", async () => {
+    const gltf = (root: object) => sourceFile("scene.gltf", JSON.stringify({
+      asset: { version: "2.0" },
+      scenes: [{ nodes: [] }],
+      scene: 0,
+      ...root,
+    }));
+
+    for (const file of [
+      gltf({ extensionsRequired: {} }),
+      gltf({ bufferViews: {} }),
+      gltf({ bufferViews: [{ extensions: [] }] }),
+    ]) {
+      await expect(convertStudioBg3dModelFilesToGlb([file])).rejects.toMatchObject({
+        code: "parse-failed",
+      });
+    }
   });
 
   it("honors cancellation before files are read", async () => {

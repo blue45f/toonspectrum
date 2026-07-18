@@ -1043,9 +1043,16 @@ export type EnvVariant = "none" | "floor" | "wall" | "room" | "outdoor";
 
 export type FullVrmState = {
   version: 2;
+  /**
+   * 이 상태를 캡처한 VRM 라이브러리 엔트리. 저장 상태의 명시적 모델 간 이식은 허용하지만,
+   * 편집 undo/redo는 이 소유권이 현재 모델과 일치할 때만 복원한다.
+   */
+  modelId?: string;
   poseId?: string;
   bones: PoseBoneMap;
   yOffset: number;
+  /** 캐릭터 루트의 사용자 Y축 회전(라디안, -PI~PI). */
+  bodyRotation?: number;
   expressionId?: string;
   expressionWeights?: Record<string, number>;
   costume?: unknown;
@@ -1066,12 +1073,46 @@ export type FullVrmState = {
   customColors?: Record<string, string>;
 };
 
+const MAX_VRM_MODEL_ID_LENGTH = 256;
+
+/** 외부 저장/공유 데이터가 NaN, Infinity, 과도한 회전을 React/Three 상태에 주입하지 못하게 한다. */
+export function normalizeVrmBodyRotation(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return 0;
+  return Math.max(-Math.PI, Math.min(Math.PI, value));
+}
+
+/**
+ * 모델 ID는 opaque storage key로 취급하되, 히스토리 소유권 비교에 부적합한 빈 값·제어문자·
+ * 과도한 문자열은 보존하지 않는다.
+ */
+export function normalizeFullVrmModelId(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  if (!value || value.length > MAX_VRM_MODEL_ID_LENGTH || value !== value.trim()) return undefined;
+  for (const character of value) {
+    const codePoint = character.codePointAt(0) ?? 0;
+    if (codePoint <= 0x1f || codePoint === 0x7f) return undefined;
+  }
+  return value;
+}
+
+/**
+ * Undo/redo는 명시적 포즈 이식이 아니다. 소유권이 없거나 현재 모델과 다르면 fail closed한다.
+ * 구버전 저장 상태는 명시적 불러오기 경로에서는 계속 사용할 수 있다.
+ */
+export function canRestoreFullVrmHistoryState(state: FullVrmState, activeModelId: unknown): boolean {
+  const stateModelId = normalizeFullVrmModelId(state.modelId);
+  const currentModelId = normalizeFullVrmModelId(activeModelId);
+  return stateModelId !== undefined && currentModelId !== undefined && stateModelId === currentModelId;
+}
+
 export function serializeFullVrmState(state: Partial<FullVrmState>): FullVrmState {
   return {
     version: 2,
+    modelId: normalizeFullVrmModelId(state.modelId),
     poseId: state.poseId,
     bones: state.bones || {},
     yOffset: state.yOffset ?? 0,
+    bodyRotation: normalizeVrmBodyRotation(state.bodyRotation),
     expressionId: state.expressionId,
     expressionWeights: state.expressionWeights,
     costume: state.costume,
@@ -1145,8 +1186,10 @@ export function applyPoserVisualState(
  * Returns a plan object with every React state field + stripped bones.
  */
 export function planFullStateRestore(state: FullVrmState): {
+  modelId?: string;
   strippedBones: PoseBoneMap;
   yOffset: number;
+  bodyRotation: number;
   expressionWeights: Record<string, number>;
   bodyScale?: BodyScale;
   lighting?: LightingParams;
@@ -1163,8 +1206,10 @@ export function planFullStateRestore(state: FullVrmState): {
   customColors?: Record<string, string>;
 } {
   return {
+    modelId: normalizeFullVrmModelId(state.modelId),
     strippedBones: stripFingerBones(state.bones || {}),
     yOffset: state.yOffset ?? 0,
+    bodyRotation: normalizeVrmBodyRotation(state.bodyRotation),
     expressionWeights: state.expressionWeights || {},
     bodyScale: state.bodyScale,
     lighting: state.lighting,
@@ -1182,6 +1227,20 @@ export function planFullStateRestore(state: FullVrmState): {
 }
 
 /**
+ * 공유 PNG와 캔버스 삽입 PNG가 동일한 authoritative full-state 직렬화를 사용하게 한다.
+ * 기존 재편집 payload가 기대하는 `vrmProps` 별칭은 유지한다.
+ */
+export function buildVrmPoseDataUrlMetadata(state: Partial<FullVrmState>, modelName: string) {
+  const { props, ...fullState } = serializeFullVrmState(state);
+  return {
+    tool: "vrm-poser" as const,
+    ...fullState,
+    modelName,
+    vrmProps: props,
+  };
+}
+
+/**
  * Pure helpers so component handlers can delegate.
  * Tests import and call these (aliased as handle*) to drive the exact shipped restore logic.
  */
@@ -1192,10 +1251,13 @@ export function buildFullVrmStateFromSharedDataUrl(dataUrl: string): FullVrmStat
     const hashStr = dataUrl.substring(hashIndex + 1);
     const poseData = JSON.parse(decodeURIComponent(hashStr));
 
-    return {
-      version: 2,
+    return serializeFullVrmState({
+      modelId: poseData.modelId,
+      poseId: poseData.poseId,
       bones: poseData.bones || {},
       yOffset: typeof poseData.yOffset === "number" ? poseData.yOffset : 0,
+      bodyRotation: poseData.bodyRotation,
+      expressionId: poseData.expressionId,
       expressionWeights: poseData.expressionWeights || {},
       bodyScale: poseData.bodyScale,
       fingerOverrides: poseData.fingerOverrides,
@@ -1213,7 +1275,7 @@ export function buildFullVrmStateFromSharedDataUrl(dataUrl: string): FullVrmStat
       materialFx: poseData.materialFx,
       avatarForge: poseData.avatarForge,
       customColors: poseData.customColors,
-    };
+    });
   } catch {
     return null;
   }

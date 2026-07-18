@@ -4,6 +4,7 @@ import {
   appendStudioAiOperation,
   createEmptyStudioAiProvenanceDocument,
 } from "./studio-ai-provenance";
+import { createStudioBg3dMeshoptCompressedTriangleGlbFixture } from "./studio-bg3d-meshopt.test-fixture";
 import {
   STUDIO_BG3D_GLB_MIME,
   createDefaultStudioBg3dSceneDocument,
@@ -575,6 +576,69 @@ describe("studio-project-archive", () => {
     await expectArchiveError(
       buildStudioProjectArchive({ project: mismatchedProject, attachments: [attachment] }),
       "DOCUMENT_REFERENCE_MISMATCH"
+    );
+  });
+
+  it("required Meshopt GLB를 canonical 정책으로 archive build/import 왕복한다", async () => {
+    const pointer = "/pagesList/0/elements/0/bg3dScene/attachments/0/hash";
+    const archiveInputFor = async (glb: Uint8Array, id: string) => {
+      const digest = await sha256(glb);
+      const scene = {
+        ...createDefaultStudioBg3dSceneDocument(),
+        attachments: [{
+          id,
+          name: `${id}.glb`,
+          mime: STUDIO_BG3D_GLB_MIME,
+          byteSize: glb.byteLength,
+          hash: `sha256:${digest}`,
+          rights: {
+            status: "owned" as const,
+            commercialUse: true,
+            attributionRequired: false,
+          },
+          source: "upload" as const,
+        }],
+      };
+      return {
+        digest,
+        input: {
+          project: projectWith([{
+            id: `${id}-render`,
+            type: "image",
+            src: "render-pending",
+            bg3dScene: scene,
+          }]),
+          attachments: [{
+            kind: "glb" as const,
+            data: glb,
+            mimeType: STUDIO_BG3D_GLB_MIME,
+            documentReferences: [{ pointer, usage: "glb" as const, mode: "sha256-prefixed" as const }],
+          }],
+        },
+      };
+    };
+
+    const compressed = createStudioBg3dMeshoptCompressedTriangleGlbFixture();
+    const { digest, input } = await archiveInputFor(compressed, "meshopt-triangle");
+    const built = await buildStudioProjectArchive(input);
+    const imported = await importStudioProjectArchive(built.blob);
+    const importedScene = (imported.project.pagesList[0]?.elements[0] as {
+      bg3dScene: { attachments: Array<{ hash: string }> };
+    }).bg3dScene;
+
+    expect(importedScene.attachments[0]?.hash).toBe(`sha256:${digest}`);
+    expect(imported.attachments.get(digest)?.blob.type).toBe(STUDIO_BG3D_GLB_MIME);
+    expect(new Uint8Array(await imported.attachments.get(digest)!.blob.arrayBuffer())).toEqual(compressed);
+
+    const unsupported = glbDocumentBytes({
+      asset: { version: "2.0" },
+      extensionsUsed: ["KHR_draco_mesh_compression"],
+      extensionsRequired: ["KHR_draco_mesh_compression"],
+    });
+    const unsupportedInput = await archiveInputFor(unsupported, "unsupported-draco");
+    await expectArchiveError(
+      buildStudioProjectArchive(unsupportedInput.input),
+      "MIME_SIGNATURE_MISMATCH",
     );
   });
 

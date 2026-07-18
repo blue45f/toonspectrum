@@ -20,7 +20,6 @@ import {
   COSTUME_PALETTES,
   parseCostumeState,
   tintColor,
-  serializeCostume,
   type CostumeState,
   type CostumeSlot,
 } from "./studio-vrm-costume";
@@ -51,6 +50,8 @@ import {
   applyPoserVisualState,
   planFullStateRestore,
   createFullStateLoadHandlers,
+  buildVrmPoseDataUrlMetadata,
+  normalizeFullVrmModelId,
   DEFAULT_VRM_MATERIAL_FX,
   type PoseBone,
   type PoseBoneMap,
@@ -107,6 +108,12 @@ import {
   serializeSceneProps,
   type ScenePropAttachmentConfig as PropAttachmentConfig,
 } from "./studio-vrm-scene-props";
+import {
+  appendStudioVrmFullStateHistory,
+  createStudioVrmFullStateHistory,
+  resetStudioVrmFullStateHistory,
+  stepStudioVrmFullStateHistory,
+} from "./studio-vrm-state-history";
 import {
   applyCalibration,
   CALIBRATION_STORAGE_KEY,
@@ -2858,8 +2865,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   const [viewportHinted, setViewportHinted] = useState(false);
   const viewportApiRef = useRef<ViewportApi | null>(null);
   // 편집 되돌리기/다시실행 — 전체 포저 상태 스냅샷 히스토리(직렬화 재사용).
-  const historyRef = useRef<FullVrmState[]>([]);
-  const historyIndexRef = useRef(-1);
+  const fullStateHistoryRef = useRef(createStudioVrmFullStateHistory());
   const isRestoringRef = useRef(false);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
@@ -3025,10 +3031,12 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   const captureFullState = useCallback(
     (): FullVrmState =>
       serializeFullVrmState({
+        modelId: activeModelId,
         poseId: activePoseId,
         expressionId: activeExpressionId,
         bones: customBones,
         yOffset: customYOffset,
+        bodyRotation,
         expressionWeights,
         costume: costumeState,
         wardrobe: serializeWardrobe(wardrobeState),
@@ -3043,28 +3051,44 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         materialFx,
         avatarForge: serializeAvatarForgeState(avatarForgeState),
       }),
-    [activePoseId, activeExpressionId, customBones, customYOffset, expressionWeights, costumeState, wardrobeState, vrmPropItems, activeProps, propAttachments, vrmPhysics, bodyScale, lighting, envVariant, fingerEdits, customColors, materialFx, avatarForgeState]
+    [activeModelId, activePoseId, activeExpressionId, customBones, customYOffset, bodyRotation, expressionWeights, costumeState, wardrobeState, vrmPropItems, activeProps, propAttachments, vrmPhysics, bodyScale, lighting, envVariant, fingerEdits, customColors, materialFx, avatarForgeState]
   );
 
-  const restoreHistoryAt = (index: number) => {
-    const snap = historyRef.current[index];
-    if (!snap) return;
+  const resetFullStateHistory = useCallback(() => {
+    fullStateHistoryRef.current = resetStudioVrmFullStateHistory(fullStateHistoryRef.current);
+    isRestoringRef.current = false;
+    setCanUndo(false);
+    setCanRedo(false);
+  }, []);
+
+  const restoreHistoryStep = (direction: -1 | 1) => {
+    const currentVrm = vrmRef.current;
+    if (!currentVrm) {
+      resetFullStateHistory();
+      return;
+    }
+    const transition = stepStudioVrmFullStateHistory(
+      fullStateHistoryRef.current,
+      direction,
+      activeModelId,
+    );
+    fullStateHistoryRef.current = transition.history;
+    const snap = transition.snapshot;
+    if (!snap) {
+      setCanUndo(transition.history.index > 0);
+      setCanRedo(transition.history.index < transition.history.entries.length - 1);
+      return;
+    }
     isRestoringRef.current = true;
-    commitFullStateRestore(snap, vrmRef.current);
-    setActivePoseId(snap.poseId ?? "default");
-    setActiveExpressionId(snap.expressionId ?? "neutral");
-    setCanUndo(index > 0);
-    setCanRedo(index < historyRef.current.length - 1);
+    commitFullStateRestore(snap, currentVrm);
+    setCanUndo(transition.history.index > 0);
+    setCanRedo(transition.history.index < transition.history.entries.length - 1);
   };
   const doUndo = () => {
-    if (historyIndexRef.current <= 0) return;
-    historyIndexRef.current -= 1;
-    restoreHistoryAt(historyIndexRef.current);
+    restoreHistoryStep(-1);
   };
   const doRedo = () => {
-    if (historyIndexRef.current >= historyRef.current.length - 1) return;
-    historyIndexRef.current += 1;
-    restoreHistoryAt(historyIndexRef.current);
+    restoreHistoryStep(1);
   };
 
   // 편집이 멈추면(디바운스) 스냅샷을 히스토리에 적재. 복원 중 변경은 건너뛴다.
@@ -3074,20 +3098,23 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
       isRestoringRef.current = false;
       return;
     }
+    const historyGeneration = fullStateHistoryRef.current.generation;
     const timer = setTimeout(() => {
       const snap = JSON.parse(JSON.stringify(captureFullState())) as FullVrmState;
-      const base = historyRef.current.slice(0, historyIndexRef.current + 1);
-      const last = base[base.length - 1];
-      if (last && JSON.stringify(last) === JSON.stringify(snap)) return;
-      base.push(snap);
-      if (base.length > 60) base.shift();
-      historyRef.current = base;
-      historyIndexRef.current = base.length - 1;
-      setCanUndo(historyIndexRef.current > 0);
+      const currentHistory = fullStateHistoryRef.current;
+      const nextHistory = appendStudioVrmFullStateHistory(
+        currentHistory,
+        snap,
+        historyGeneration,
+        activeModelId,
+      );
+      if (nextHistory === currentHistory) return;
+      fullStateHistoryRef.current = nextHistory;
+      setCanUndo(nextHistory.index > 0);
       setCanRedo(false);
     }, 450);
     return () => clearTimeout(timer);
-  }, [vrm, captureFullState]);
+  }, [activeModelId, vrm, captureFullState]);
 
   // 키보드 핸들러가 항상 최신 undo/redo를 호출하도록 ref 동기화(렌더 후).
   const undoRef = useRef(doUndo);
@@ -3240,8 +3267,11 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   const hasUploadedModels = libraryEntries.some((entry) => entry.source === "indexed-db");
   const displayModelName = vrm ? modelName : "";
   interface PendingPoseData {
+    poseId?: string;
     bones?: PoseBoneMap;
     yOffset?: number;
+    bodyRotation?: number;
+    expressionId?: string;
     expressionWeights?: Record<string, number>;
     customColors?: Record<string, string>;
     materialFx?: VrmMaterialFx;
@@ -3268,10 +3298,15 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         const hashIndex = initialDataUrl.indexOf("#");
         if (hashIndex !== -1) {
           const hashStr = initialDataUrl.substring(hashIndex + 1);
-          const poseData = JSON.parse(decodeURIComponent(hashStr)) as PendingPoseData;
-          pendingPoseDataRef.current = poseData;
-          if (poseData.modelId) {
-            setActiveModelId(poseData.modelId);
+          const parsedPoseData: unknown = JSON.parse(decodeURIComponent(hashStr));
+          if (typeof parsedPoseData !== "object" || parsedPoseData === null || Array.isArray(parsedPoseData)) {
+            throw new Error("Invalid VRM pose metadata");
+          }
+          const poseData = parsedPoseData as PendingPoseData;
+          const pendingModelId = normalizeFullVrmModelId(poseData.modelId);
+          pendingPoseDataRef.current = { ...poseData, modelId: pendingModelId };
+          if (pendingModelId) {
+            setActiveModelId(pendingModelId);
           }
         }
       } catch (e) {
@@ -3279,8 +3314,9 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
       }
     } else if (!open) {
       pendingPoseDataRef.current = null;
+      resetFullStateHistory();
     }
-  }, [open, initialDataUrl]);
+  }, [open, initialDataUrl, resetFullStateHistory]);
 
   useEffect(() => {
     const stored = localStorage.getItem("studio_custom_poses");
@@ -3825,7 +3861,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   // 풀 스테이트 copy/paste + local save/load (새 기능)
   function handleCopyFullState() {
     try {
-      const full: FullVrmState = serializeFullVrmState({ bones: customBones, yOffset: customYOffset, expressionWeights, costume: costumeState, wardrobe: serializeWardrobe(wardrobeState), props: serializeVrmProps(vrmPropItems), sceneProps: serializeSceneProps(activeProps, propAttachments), physics: vrmPhysics, bodyScale, lighting, env: envVariant, fingerOverrides: fingerEdits, customColors, materialFx, avatarForge: serializeAvatarForgeState(avatarForgeState) });
+      const full = captureFullState();
       const json = JSON.stringify(full);
       navigator.clipboard.writeText(json).then(() => alert("전체 포저 상태 복사됨")).catch(() => { localStorage.setItem("studio_vrm_full_clip", json); alert("로컬에 전체 상태 저장"); });
     } catch { alert("전체 상태 복사 실패"); }
@@ -3841,7 +3877,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   }
   function handleSaveFullLocal() {
     const name = (fullStateName || `full-${Date.now()}`).slice(0,24);
-    const full = serializeFullVrmState({bones:customBones, yOffset:customYOffset, expressionWeights, costume:costumeState, wardrobe: serializeWardrobe(wardrobeState), props:serializeVrmProps(vrmPropItems), sceneProps:serializeSceneProps(activeProps, propAttachments), physics:vrmPhysics, bodyScale, lighting, env:envVariant, fingerOverrides:fingerEdits, customColors, materialFx, avatarForge: serializeAvatarForgeState(avatarForgeState)});
+    const full = captureFullState();
     const next = { ...savedFullStates, [name]: full };
     setSavedFullStates(next);
     localStorage.setItem("studio_vrm_full_states", JSON.stringify(next));
@@ -3854,6 +3890,9 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     const restoredWardrobe = parseWardrobe(plan.wardrobe);
     setCustomBones(plan.strippedBones);
     setCustomYOffset(plan.yOffset);
+    setBodyRotation(plan.bodyRotation);
+    setActivePoseId(s.poseId ?? "default");
+    setActiveExpressionId(s.expressionId ?? "neutral");
     setExpressionWeights(plan.expressionWeights);
     if (plan.bodyScale) setBodyScale(plan.bodyScale);
     if (plan.lighting) setLighting(plan.lighting);
@@ -3900,6 +3939,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         applyMaterialFx: (fx) => applyVrmMaterialFx(vrm, fx),
         applyCustomColors: (colors) => applyVrmCustomColors(vrm, colors),
       });
+      applyRotationToVrm(vrm, plan.bodyRotation);
       if (!plan.customColors) applyVrmCustomColors(vrm, DEFAULT_VRM_CUSTOM_COLORS);
     } else {
       setCostumeState(restoredCostume);
@@ -4028,28 +4068,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
       const baseDataUrl = gl.domElement.toDataURL("image/png");
       const { width, height } = roundExportSize(gl.domElement);
 
-      const poseMetadata = {
-        tool: "vrm-poser" as const,
-        yOffset: customYOffset,
-        bones: customBones,
-        expressionWeights: expressionWeights,
-        customColors: customColors,
-        materialFx: materialFx,
-        modelName: modelName,
-        modelId: activeModelId,
-        // full AC2 for uniform restore via commit
-        bodyScale,
-        fingerOverrides: fingerEdits,
-        lighting,
-        env: envVariant,
-        avatarForge: serializeAvatarForgeState(avatarForgeState),
-        // 옵셔널 — 기존 문서 하위호환(없으면 불러올 때 기본값).
-        vrmProps: serializeVrmProps(vrmPropItems),
-        sceneProps: serializeSceneProps(activeProps, propAttachments),
-        costume: serializeCostume(costumeState),
-        wardrobe: serializeWardrobe(wardrobeState),
-        physics: vrmPhysics,
-      };
+      const poseMetadata = buildVrmPoseDataUrlMetadata(captureFullState(), modelName);
 
       const hashPayload = encodeURIComponent(JSON.stringify(poseMetadata));
       const fullDataUrl = `${baseDataUrl}#${hashPayload}`;
@@ -4223,6 +4242,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   }
 
   function installVrm(nextVrm: VRM, nextModelName: string, nextModelId: string) {
+    resetFullStateHistory();
     clearCurrentVrm();
     vrmRef.current = nextVrm;
     setVrm(nextVrm);
@@ -4242,8 +4262,12 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
 
       const pendingFull: FullVrmState = {
         version: 2,
+        modelId: nextModelId,
+        poseId: pending.poseId,
         bones: bones,
         yOffset,
+        bodyRotation: pending.bodyRotation,
+        expressionId: pending.expressionId,
         expressionWeights,
         bodyScale: pending.bodyScale,
         fingerOverrides: pending.fingerOverrides,
@@ -4269,6 +4293,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
       setActiveExpressionId("neutral");
       setExpressionWeights({});
       setBodyRotation(0);
+      applyRotationToVrm(nextVrm, 0);
       setCustomColors({ ...DEFAULT_VRM_CUSTOM_COLORS });
       setMaterialFx(DEFAULT_VRM_MATERIAL_FX);
       setAvatarForgeState(createAvatarForgeState());
@@ -4301,6 +4326,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   }
 
   function beginModelLoad(nextModelId: string) {
+    resetFullStateHistory();
     const requestId = loadRequestRef.current + 1;
     loadRequestRef.current = requestId;
     thumbnailRequestRef.current += 1;
@@ -4850,28 +4876,9 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
       setIsCapturing(false);
       if (groundShadow) groundShadow.visible = true;
 
-      const poseMetadata = {
-        // "3D 배경" 도구도 같은 #해시 방식으로 재편집 메타를 싣기 시작해, src만 보고는 어느 모달을
-        // 다시 열지 구분할 수 없다 — parseStudio3dTool()이 이 필드로 분기한다.
-        tool: "vrm-poser" as const,
-        yOffset: customYOffset,
-        bones: customBones,
-        expressionWeights: expressionWeights,
-        customColors: customColors,
-        materialFx: materialFx,
-        modelName: modelName,
-        modelId: activeModelId,
-        bodyScale,
-        fingerOverrides: fingerEdits,
-        lighting,
-        env: envVariant,
-        avatarForge: serializeAvatarForgeState(avatarForgeState),
-        vrmProps: serializeVrmProps(vrmPropItems),
-        sceneProps: serializeSceneProps(activeProps, propAttachments),
-        costume: serializeCostume(costumeState),
-        wardrobe: serializeWardrobe(wardrobeState),
-        physics: vrmPhysics,
-      };
+      // "3D 배경" 도구도 같은 #해시 방식으로 재편집 메타를 싣는다. 공용 builder가 tool 식별자와
+      // full-state 필드를 한 번에 직렬화해 공유/삽입 경로가 다시 어긋나지 않게 한다.
+      const poseMetadata = buildVrmPoseDataUrlMetadata(captureFullState(), modelName);
       const hashPayload = encodeURIComponent(JSON.stringify(poseMetadata));
       const fullDataUrl = `${baseDataUrl}#${hashPayload}`;
 
