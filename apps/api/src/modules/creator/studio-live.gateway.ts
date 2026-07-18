@@ -49,9 +49,12 @@ export const STUDIO_LIVE_RELAY_RPC_TIMEOUT_MS = 2_000;
 const STUDIO_LIVE_INTER_SERVER_RELAY_EVENT = "studio:internal:peer-relay:v1";
 const STUDIO_LIVE_CANDIDATE_AUTHORIZATION_CACHE_MS = 2_000;
 const STUDIO_LIVE_CANDIDATE_AUTHORIZATION_CACHE_LIMIT = 512;
+const STUDIO_LIVE_VOICE_SIGNAL_DEDUPE_TTL_MS = 10_000;
+const STUDIO_LIVE_VOICE_SIGNAL_DEDUPE_LIMIT = 4_096;
 const STUDIO_LIVE_MAX_HTTP_BUFFER_SIZE = 384 * 1_024;
 const STUDIO_LIVE_SIGNAL_SDP_MAX_LENGTH = 48 * 1_024;
 const STUDIO_LIVE_SIGNAL_CANDIDATE_MAX_LENGTH = 8 * 1_024;
+export const STUDIO_LIVE_VOICE_MAX_PARTICIPANTS = 6;
 const STUDIO_CRDT_OPERATION_BURST = 120;
 const STUDIO_CRDT_OPERATIONS_PER_SECOND = 40;
 const STUDIO_CRDT_BYTE_BURST = 2 * 1_024 * 1_024;
@@ -84,7 +87,12 @@ const fitsSignalStringByteContract = (value: string, maximumBytes: number): bool
   return Buffer.byteLength(serialized, "utf8") - 2 <= maximumBytes;
 };
 const boundedIdentifier = (maximum: number) =>
-  z.string().trim().min(1).max(maximum).refine(noControlCharacters, "control characters are not allowed");
+  z
+    .string()
+    .min(1)
+    .max(maximum)
+    .refine((value) => value === value.trim(), "identifier must be canonical")
+    .refine(noControlCharacters, "control characters are not allowed");
 
 const WorkIdSchema = boundedIdentifier(160);
 const ClientInstanceIdSchema = boundedIdentifier(80);
@@ -93,6 +101,7 @@ const ResourceIdSchema = boundedIdentifier(200);
 const ConnectionIdSchema = boundedIdentifier(128);
 const ScreenShareIdSchema = boundedIdentifier(160);
 const ScreenShareLabelSchema = boundedIdentifier(80);
+const VoiceCallIdSchema = boundedIdentifier(160);
 const STUDIO_CRDT_PROTOCOL_VERSION = 2 as const;
 const StudioCrdtProtocolVersionSchema = z.literal(STUDIO_CRDT_PROTOCOL_VERSION);
 const StudioCrdtRequestIdSchema = boundedIdentifier(160);
@@ -182,6 +191,23 @@ export const StudioLiveScreenStopSchema = z
   .object({
     workId: WorkIdSchema,
     shareId: ScreenShareIdSchema,
+  })
+  .strict();
+
+export const StudioLiveVoiceJoinSchema = z
+  .object({
+    workId: WorkIdSchema,
+    callId: VoiceCallIdSchema,
+    muted: z.boolean(),
+  })
+  .strict();
+
+export const StudioLiveVoiceStateSchema = StudioLiveVoiceJoinSchema;
+
+export const StudioLiveVoiceLeaveSchema = z
+  .object({
+    workId: WorkIdSchema,
+    callId: VoiceCallIdSchema,
   })
   .strict();
 
@@ -277,6 +303,35 @@ export const StudioLiveSignalSchema = z.discriminatedUnion("kind", [
     .strict(),
 ]);
 
+export const StudioLiveVoiceSignalSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      workId: WorkIdSchema,
+      targetConnectionId: ConnectionIdSchema,
+      callId: VoiceCallIdSchema,
+      kind: z.literal("description"),
+      description: StudioLiveSessionDescriptionSchema,
+    })
+    .strict(),
+  z
+    .object({
+      workId: WorkIdSchema,
+      targetConnectionId: ConnectionIdSchema,
+      callId: VoiceCallIdSchema,
+      kind: z.literal("candidate"),
+      candidate: StudioLiveIceCandidateSchema,
+    })
+    .strict(),
+]);
+
+const StudioLiveVoiceMemberSchema = z
+  .object({
+    connectionId: ConnectionIdSchema,
+    callId: VoiceCallIdSchema,
+    muted: z.boolean(),
+  })
+  .strict();
+
 const StudioLivePublicParticipantSchema = z
   .object({
     connectionId: ConnectionIdSchema,
@@ -340,6 +395,24 @@ const StudioLiveInterServerRelayEventSchema = z.union([
       kind: z.literal("bye"),
     })
     .strict(),
+  z
+    .object({
+      type: z.literal("voice-signal"),
+      signalId: z.uuid(),
+      callId: VoiceCallIdSchema,
+      kind: z.literal("description"),
+      description: StudioLiveSessionDescriptionSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("voice-signal"),
+      signalId: z.uuid(),
+      callId: VoiceCallIdSchema,
+      kind: z.literal("candidate"),
+      candidate: StudioLiveIceCandidateSchema,
+    })
+    .strict(),
 ]);
 
 const StudioLiveInterServerRelayRequestSchema = z
@@ -387,6 +460,10 @@ type StudioLiveScreenRequestInput = z.infer<typeof StudioLiveScreenRequestSchema
 type StudioLiveScreenStopInput = z.infer<typeof StudioLiveScreenStopSchema>;
 type StudioLiveChatInput = z.infer<typeof StudioLiveChatSchema>;
 type StudioLiveSignalInput = z.infer<typeof StudioLiveSignalSchema>;
+type StudioLiveVoiceJoinInput = z.infer<typeof StudioLiveVoiceJoinSchema>;
+type StudioLiveVoiceStateInput = z.infer<typeof StudioLiveVoiceStateSchema>;
+type StudioLiveVoiceLeaveInput = z.infer<typeof StudioLiveVoiceLeaveSchema>;
+type StudioLiveVoiceSignalInput = z.infer<typeof StudioLiveVoiceSignalSchema>;
 type StudioLiveInterServerRelayEvent = z.infer<
   typeof StudioLiveInterServerRelayEventSchema
 >;
@@ -462,6 +539,28 @@ export interface StudioLiveLock {
   expiresAt: string;
 }
 
+export interface StudioLiveVoiceMember {
+  connectionId: string;
+  callId: string;
+  muted: boolean;
+}
+
+interface StudioLiveVoiceMemberInternal extends StudioLiveVoiceMember {
+  workId: string;
+}
+
+interface StudioLiveVoiceRelayDiscovery {
+  sender: StudioLiveParticipant;
+  target: StudioLiveParticipant;
+}
+
+type StudioLiveVoiceLeaveReason =
+  | "left"
+  | "capacity"
+  | "revoked"
+  | "switched"
+  | "removed";
+
 type StudioLiveSuccess<T> = { ok: true; data: T };
 type StudioLiveFailureCode =
   | "unauthenticated"
@@ -472,6 +571,7 @@ type StudioLiveFailureCode =
   | "lock_conflict"
   | "lock_limit"
   | "peer_unavailable"
+  | "temporarily_unavailable"
   | "storage_corruption"
   | "internal_error";
 type StudioLiveFailure = { ok: false; code: StudioLiveFailureCode; message: string };
@@ -495,11 +595,10 @@ interface StudioLiveJoinResult {
   self: StudioLiveParticipant;
   participants: StudioLiveParticipant[];
   locks: StudioLiveLock[];
+  voiceMembers: StudioLiveVoiceMember[];
 }
 
 interface StudioLiveSocketData {
-  authUserId?: string;
-  authPrincipal?: StudioLiveAuthPrincipal;
   /**
    * Adapter-visible, public-only presence record. Shared Socket.IO adapters expose `socket.data`
    * through `fetchSockets()`, so this is the cluster-safe discovery surface. Never place the
@@ -507,6 +606,7 @@ interface StudioLiveSocketData {
    */
   studioParticipant?: StudioLiveParticipant;
   studioWorkId?: string;
+  studioVoiceMember?: StudioLiveVoiceMember;
 }
 
 interface StudioLiveClientToServerEvents {
@@ -742,6 +842,13 @@ export class StudioLiveGateway
     string,
     StudioLiveCandidateRelayAuthorization
   >();
+  /**
+   * Authentication is gateway-private. Socket.IO adapters can serialize `socket.data` across the
+   * cluster, so session principals must never be stored on that adapter-visible object.
+   */
+  private readonly authPrincipalsBySocket = new Map<StudioLiveSocket, StudioLiveAuthPrincipal>();
+  private readonly voiceMembershipBySocket = new Map<string, StudioLiveVoiceMemberInternal>();
+  private readonly deliveredInterServerVoiceSignals = new Map<string, number>();
   private accessRecheckTimer: ReturnType<typeof setInterval> | null = null;
   private interServerNamespace: StudioLiveNamespace | null = null;
   private readonly interServerRelayListener = (
@@ -833,12 +940,17 @@ export class StudioLiveGateway
     this.joinTransitionTails.clear();
     this.participantAuthorizationRechecks.clear();
     this.candidateRelayAuthorizations.clear();
+    this.authPrincipalsBySocket.clear();
+    this.voiceMembershipBySocket.clear();
+    this.deliveredInterServerVoiceSignals.clear();
   }
 
   async handleConnection(client: StudioLiveSocket): Promise<void> {
     // Runtime connections have already passed the namespace middleware. The fallback keeps direct
     // gateway tests and non-standard adapters fail-closed without weakening the runtime ordering.
-    if (client.data.authUserId && client.data.authPrincipal) return;
+    const principal = this.authPrincipalsBySocket.get(client);
+    if (principal && principal.expiresAt > Date.now()) return;
+    this.clearSocketAuthentication(client);
     if (!(await this.authenticateSocket(client))) {
       client.emit("studio:error", failure("unauthenticated", "로그인 세션을 확인할 수 없습니다."));
       client.disconnect(true);
@@ -846,6 +958,7 @@ export class StudioLiveGateway
   }
 
   handleDisconnect(client: StudioLiveSocket): void {
+    this.clearSocketAuthentication(client);
     this.joinTransitionSequences.delete(client.id);
     this.participantAuthorizationRechecks.delete(client.id);
     this.deleteCandidateRelayAuthorizationsForSocket(client.id);
@@ -905,8 +1018,8 @@ export class StudioLiveGateway
     if (!this.isCurrentJoinTransition(client, transitionSequence)) {
       return reply(ack, failure("not_joined", "더 최신 작업실 참가 요청으로 대체되었습니다."));
     }
-    const userId = authenticated ? client.data.authUserId : null;
-    const principal = authenticated ? client.data.authPrincipal : undefined;
+    const principal = authenticated ? this.authPrincipalsBySocket.get(client) : undefined;
+    const userId = principal?.userId ?? null;
     if (!userId || !principal || !this.isSocketPrincipalCurrent(client, principal, userId)) {
       return rejectInvalidSession();
     }
@@ -1003,6 +1116,7 @@ export class StudioLiveGateway
       this.participantAuthorizationRechecks.delete(client.id);
       this.deleteCandidateRelayAuthorizationsForSocket(client.id);
       this.participantsBySocket.set(client.id, participant);
+      if (participant.role === "viewer") this.removeVoiceMembership(client.id, "revoked");
       const roomSockets = this.socketIdsByWork.get(input.workId) ?? new Set<string>();
       roomSockets.add(client.id);
       this.socketIdsByWork.set(input.workId, roomSockets);
@@ -1013,9 +1127,10 @@ export class StudioLiveGateway
       this.server
         .to(studioLiveRoom(input.workId))
         .emit("studio:presence:update", safeParticipant);
-      const [participants, locks] = await Promise.all([
+      const [participants, locks, voiceMembers] = await Promise.all([
         this.listParticipants(input.workId),
         this.listLocks(input.workId),
+        this.listVoiceMembers(input.workId),
       ]);
       if (
         !this.isCurrentJoinTransition(client, transitionSequence) ||
@@ -1032,6 +1147,7 @@ export class StudioLiveGateway
           self: safeParticipant,
           participants,
           locks,
+          voiceMembers,
         },
       });
     } catch {
@@ -1628,6 +1744,188 @@ export class StudioLiveGateway
     return reply(ack, { ok: true, data: { delivered: true } });
   }
 
+  @SubscribeMessage("studio:voice:join")
+  async joinVoice(
+    @ConnectedSocket() client: StudioLiveSocket,
+    @MessageBody() body: StudioLiveVoiceJoinInput,
+    @Ack() ack?: StudioLiveAckCallback<{ members: StudioLiveVoiceMember[] }>
+  ) {
+    const parsed = StudioLiveVoiceJoinSchema.safeParse(body);
+    if (!parsed.success) {
+      return reply(ack, failure("invalid_payload", "음성 대화 참가 정보가 올바르지 않습니다."));
+    }
+    if (!this.consumeRateLimit(client.id, "voice-join", 20, 60_000)) {
+      return reply(ack, failure("rate_limited", "음성 대화 참가 요청이 너무 많습니다."));
+    }
+    const authorized = await this.runWithAuthorizedParticipant(
+      client,
+      parsed.data.workId,
+      false,
+      true,
+      (participant) => participant.role === "viewer" ? null : participant
+    );
+    if (!authorized) {
+      return reply(ack, failure("not_joined", "실시간 작업실에 다시 참여해 주세요."));
+    }
+    if (!authorized.value) {
+      return reply(ack, failure("forbidden", "보기 전용 권한으로는 음성 대화에 참여할 수 없습니다."));
+    }
+    type VoiceAdmission =
+      | { status: "admitted"; membership: StudioLiveVoiceMemberInternal; members: StudioLiveVoiceMember[] }
+      | { status: "full" }
+      | { status: "changed" };
+    let admission: VoiceAdmission;
+    try {
+      admission = await this.studioLiveLockRepository.withWorkMutation(
+        parsed.data.workId,
+        async (): Promise<VoiceAdmission> => {
+          const participant = authorized.value;
+          if (
+            this.participantsBySocket.get(client.id) !== participant ||
+            !this.isParticipantAuthorizationCurrent(client, participant, false) ||
+            participant.role === "viewer"
+          ) {
+            return { status: "changed" };
+          }
+          const current = this.voiceMembershipBySocket.get(client.id);
+          const discovered = await this.listVoiceMembers(
+            parsed.data.workId,
+            parsed.data.callId,
+            { fallbackToLocal: false }
+          );
+          const otherMembers = discovered.filter((member) => member.connectionId !== client.id);
+          if (otherMembers.length >= STUDIO_LIVE_VOICE_MAX_PARTICIPANTS) {
+            if (current?.callId === parsed.data.callId) {
+              this.removeVoiceMembership(client.id, "capacity");
+            }
+            return { status: "full" };
+          }
+          const membership: StudioLiveVoiceMemberInternal = {
+            workId: participant.workId,
+            connectionId: participant.connectionId,
+            callId: parsed.data.callId,
+            muted: parsed.data.muted,
+          };
+          if (current && current.callId !== membership.callId) {
+            this.emitVoiceLeave(current, "switched");
+          }
+          this.voiceMembershipBySocket.set(client.id, membership);
+          client.data.studioVoiceMember = this.publicVoiceMember(membership);
+          const members = [...otherMembers, this.publicVoiceMember(membership)]
+            .sort((left, right) => left.connectionId.localeCompare(right.connectionId));
+          return { status: "admitted", membership, members };
+        }
+      );
+    } catch (error) {
+      this.logger.warn(
+        {
+          workId: parsed.data.workId,
+          callId: parsed.data.callId,
+          error: error instanceof Error ? error.message : "unknown",
+        },
+        "studio voice admission failed closed"
+      );
+      return reply(
+        ack,
+        failure("temporarily_unavailable", "음성 작업실 정원을 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.")
+      );
+    }
+    if (admission.status === "changed") {
+      return reply(ack, failure("not_joined", "음성 대화 참가 상태가 변경되었습니다."));
+    }
+    if (admission.status === "full") {
+      return reply(ack, failure("rate_limited", "음성 대화 정원은 최대 6명입니다."));
+    }
+    client.to(studioLiveRoom(parsed.data.workId)).emit("studio:voice:join", {
+      connectionId: admission.membership.connectionId,
+      callId: admission.membership.callId,
+      muted: admission.membership.muted,
+    });
+    client.emit("studio:voice:snapshot", {
+      workId: parsed.data.workId,
+      callId: parsed.data.callId,
+      members: admission.members,
+    });
+    return reply(ack, { ok: true, data: { members: admission.members } });
+  }
+
+  @SubscribeMessage("studio:voice:state")
+  async updateVoiceState(
+    @ConnectedSocket() client: StudioLiveSocket,
+    @MessageBody() body: StudioLiveVoiceStateInput,
+    @Ack() ack?: StudioLiveAckCallback<{ member: StudioLiveVoiceMember }>
+  ) {
+    const parsed = StudioLiveVoiceStateSchema.safeParse(body);
+    if (!parsed.success) {
+      return reply(ack, failure("invalid_payload", "음성 대화 상태가 올바르지 않습니다."));
+    }
+    if (!this.consumeRateLimit(client.id, "voice-state", 90, 60_000)) {
+      return reply(ack, failure("rate_limited", "음성 대화 상태 변경이 너무 빠릅니다."));
+    }
+    const authorized = await this.runWithAuthorizedParticipant(
+      client,
+      parsed.data.workId,
+      false,
+      false,
+      (participant) => {
+        const current = this.voiceMembershipBySocket.get(client.id);
+        if (
+          participant.role === "viewer" ||
+          !current ||
+          current.workId !== participant.workId ||
+          current.callId !== parsed.data.callId
+        ) return null;
+        current.muted = parsed.data.muted;
+        const member = this.publicVoiceMember(current);
+        client.data.studioVoiceMember = member;
+        client.to(studioLiveRoom(participant.workId)).emit("studio:voice:state", member);
+        return member;
+      }
+    );
+    if (!authorized) {
+      return reply(ack, failure("not_joined", "실시간 작업실에 다시 참여해 주세요."));
+    }
+    if (!authorized.value) {
+      return reply(ack, failure("forbidden", "현재 음성 대화의 상태만 변경할 수 있습니다."));
+    }
+    return reply(ack, { ok: true, data: { member: authorized.value } });
+  }
+
+  @SubscribeMessage("studio:voice:leave")
+  async leaveVoice(
+    @ConnectedSocket() client: StudioLiveSocket,
+    @MessageBody() body: StudioLiveVoiceLeaveInput,
+    @Ack() ack?: StudioLiveAckCallback<{ left: true }>
+  ) {
+    const parsed = StudioLiveVoiceLeaveSchema.safeParse(body);
+    if (!parsed.success) {
+      return reply(ack, failure("invalid_payload", "음성 대화 종료 정보가 올바르지 않습니다."));
+    }
+    const authorized = await this.runWithAuthorizedParticipant(
+      client,
+      parsed.data.workId,
+      false,
+      false,
+      (participant) => {
+        const current = this.voiceMembershipBySocket.get(client.id);
+        if (
+          !current ||
+          current.workId !== participant.workId ||
+          current.callId !== parsed.data.callId
+        ) return false;
+        this.removeVoiceMembership(client.id, "left");
+        return true;
+      }
+    );
+    if (!authorized) {
+      return reply(ack, failure("not_joined", "실시간 작업실에 다시 참여해 주세요."));
+    }
+    if (!authorized.value) {
+      return reply(ack, failure("invalid_payload", "현재 참가 중인 음성 대화와 일치하지 않습니다."));
+    }
+    return reply(ack, { ok: true, data: { left: true } });
+  }
+
   @SubscribeMessage("studio:chat:send")
   async sendChatMessage(
     @ConnectedSocket() client: StudioLiveSocket,
@@ -1667,6 +1965,75 @@ export class StudioLiveGateway
       return reply(ack, failure("forbidden", "이 작품에서 채팅을 보낼 권한이 없습니다."));
     }
     return reply(ack, { ok: true, data: { delivered: true, sentAt: authorized.value } });
+  }
+
+  @SubscribeMessage("studio:voice:signal")
+  async relayVoiceSignal(
+    @ConnectedSocket() client: StudioLiveSocket,
+    @MessageBody() body: StudioLiveVoiceSignalInput,
+    @Ack() ack?: StudioLiveAckCallback<{ delivered: true; signalId: string }>
+  ) {
+    const parsed = StudioLiveVoiceSignalSchema.safeParse(body);
+    if (!parsed.success) {
+      return reply(ack, failure("invalid_payload", "음성 WebRTC 연결 정보가 올바르지 않습니다."));
+    }
+    if (!this.consumeRateLimit(client.id, "voice-signal", 240, 60_000)) {
+      return reply(ack, failure("rate_limited", "음성 WebRTC 연결 요청이 너무 많습니다."));
+    }
+    const signalId = crypto.randomUUID();
+    const relay = this.voiceSignalRelayEvent(signalId, parsed.data);
+    if (!this.hasLocalRelayTarget(parsed.data.targetConnectionId)) {
+      const sender = await this.authorizeRemoteRelaySender(
+        client,
+        parsed.data.workId,
+        parsed.data.targetConnectionId,
+        "본인에게 음성 WebRTC 연결 정보를 보낼 수 없습니다."
+      );
+      if (!sender.ok) return reply(ack, sender.response);
+      const membership = this.voiceMembershipBySocket.get(sender.sender.connectionId);
+      if (
+        sender.sender.role === "viewer" ||
+        !membership ||
+        membership.workId !== parsed.data.workId ||
+        membership.callId !== parsed.data.callId
+      ) {
+        return reply(ack, failure("forbidden", "같은 음성 대화에 참가한 팀원만 연결할 수 있습니다."));
+      }
+      const delivered = await this.sendInterServerRelay(
+        sender.sender,
+        parsed.data.workId,
+        parsed.data.targetConnectionId,
+        relay
+      );
+      if (!delivered) {
+        return reply(ack, failure("peer_unavailable", "같은 음성 대화에 참가한 팀원이 없습니다."));
+      }
+      return reply(ack, { ok: true, data: { delivered: true, signalId } });
+    }
+
+    let authorization = await this.authorizeRelayPeers(
+      client,
+      parsed.data.workId,
+      parsed.data.targetConnectionId,
+      "본인에게 음성 WebRTC 연결 정보를 보낼 수 없습니다."
+    );
+    while (authorization.ok && !this.isRelayAuthorizationCurrent(authorization)) {
+      authorization = await this.authorizeRelayPeers(
+        client,
+        parsed.data.workId,
+        parsed.data.targetConnectionId,
+        "본인에게 음성 WebRTC 연결 정보를 보낼 수 없습니다.",
+        "rebase"
+      );
+    }
+    if (!authorization.ok) return reply(ack, authorization.response);
+    if (!this.voiceRelayPeersMatch(authorization, parsed.data.callId)) {
+      return reply(ack, failure("forbidden", "같은 음성 대화에 참가한 팀원만 연결할 수 있습니다."));
+    }
+    if (!this.emitAuthorizedLocalRelay(authorization, relay)) {
+      return reply(ack, failure("peer_unavailable", "연결할 팀원이 작업실에 없습니다."));
+    }
+    return reply(ack, { ok: true, data: { delivered: true, signalId } });
   }
 
   @SubscribeMessage("studio:signal")
@@ -1886,14 +2253,60 @@ export class StudioLiveGateway
     );
     if (Date.now() >= deadlineAt || target !== expectedTarget) return false;
 
-    // This is the target-only counterpart of authorizeRelayPeers' strong rebase loop. No await is
-    // allowed between the final current-generation snapshot and the direct local socket emit.
+    // This is the target-only counterpart of authorizeRelayPeers' strong rebase loop. Voice relays
+    // perform distributed discovery next and then take one more no-await target snapshot before emit.
     while (true) {
       const current = await this.authorizedParticipant(targetSocket, workId, false);
       if (Date.now() >= deadlineAt || current !== target) return false;
       if (this.isParticipantAuthorizationCurrent(targetSocket, target, false)) break;
     }
     if (Date.now() >= deadlineAt) return false;
+
+    let relaySender = sender;
+    if (relay.type === "voice-signal") {
+      const targetVoice = this.voiceMembershipBySocket.get(target.connectionId);
+      if (
+        sender.role === "viewer" ||
+        target.role === "viewer" ||
+        !targetVoice ||
+        targetVoice.workId !== workId ||
+        targetVoice.callId !== relay.callId
+      ) return false;
+
+      // The origin node authorized the sender before issuing this RPC, but authorization and voice
+      // membership can be revoked while the relay crosses the adapter. Re-read the adapter-visible,
+      // public discovery records on the target node and fail closed if either exact socket
+      // generation is no longer in this work/call. There is intentionally no local fallback.
+      const discovered = await this.discoverVoiceRelayPeers(
+        workId,
+        sender,
+        target,
+        relay.callId,
+        deadlineAt
+      );
+      if (!discovered || Date.now() >= deadlineAt) return false;
+
+      // No await is allowed from this final target authorization/membership snapshot through the
+      // direct socket emit. It closes target-side ACL, room-switch, leave, and duplicate races.
+      const finalTargetVoice = this.voiceMembershipBySocket.get(target.connectionId);
+      if (
+        this.participantsBySocket.get(target.connectionId) !== target ||
+        !this.isParticipantAuthorizationCurrent(targetSocket, target, false) ||
+        !finalTargetVoice ||
+        finalTargetVoice.workId !== workId ||
+        finalTargetVoice.callId !== relay.callId ||
+        discovered.target.clientInstanceId !== target.clientInstanceId ||
+        discovered.target.joinedAt !== target.joinedAt ||
+        !this.consumeInterServerVoiceSignal(
+          workId,
+          discovered.sender.connectionId,
+          target.connectionId,
+          relay.callId,
+          relay.signalId
+        )
+      ) return false;
+      relaySender = discovered.sender;
+    }
 
     if (
       relay.type === "screen-access" &&
@@ -1914,7 +2327,119 @@ export class StudioLiveGateway
       );
     }
 
-    this.emitRelayToSocket(targetSocket, sender, relay);
+    this.emitRelayToSocket(targetSocket, relaySender, relay);
+    return true;
+  }
+
+  private async discoverVoiceRelayPeers(
+    workId: string,
+    expectedSender: StudioLiveParticipant,
+    expectedTarget: StudioLiveParticipantInternal,
+    callId: string,
+    deadlineAt: number
+  ): Promise<StudioLiveVoiceRelayDiscovery | null> {
+    const timeoutMs = Math.min(
+      STUDIO_LIVE_ADAPTER_DISCOVERY_TIMEOUT_MS,
+      deadlineAt - Date.now()
+    );
+    if (timeoutMs <= 0) return null;
+    let discoveryTimeout: ReturnType<typeof setTimeout> | null = null;
+    try {
+      const sockets = await Promise.race([
+        this.server.in(studioLiveRoom(workId)).fetchSockets(),
+        new Promise<never>((_resolve, reject) => {
+          discoveryTimeout = setTimeout(
+            () => reject(new Error("studio voice relay discovery timed out")),
+            timeoutMs
+          );
+          discoveryTimeout.unref?.();
+        }),
+      ]);
+      let sender: StudioLiveParticipant | null = null;
+      let target: StudioLiveParticipant | null = null;
+      for (const socket of sockets) {
+        if (
+          socket.id !== expectedSender.connectionId &&
+          socket.id !== expectedTarget.connectionId
+        ) continue;
+        const data = socket.data as StudioLiveSocketData;
+        const participant = StudioLivePublicParticipantSchema.safeParse(data.studioParticipant);
+        const voice = StudioLiveVoiceMemberSchema.safeParse(data.studioVoiceMember);
+        if (
+          data.studioWorkId !== workId ||
+          !participant.success ||
+          participant.data.connectionId !== socket.id ||
+          participant.data.role === "viewer" ||
+          !voice.success ||
+          voice.data.connectionId !== socket.id ||
+          voice.data.callId !== callId
+        ) continue;
+        if (socket.id === expectedSender.connectionId) {
+          if (
+            sender ||
+            participant.data.clientInstanceId !== expectedSender.clientInstanceId ||
+            participant.data.joinedAt !== expectedSender.joinedAt
+          ) return null;
+          sender = participant.data;
+        } else {
+          if (
+            target ||
+            participant.data.clientInstanceId !== expectedTarget.clientInstanceId ||
+            participant.data.joinedAt !== expectedTarget.joinedAt
+          ) return null;
+          target = participant.data;
+        }
+      }
+      return sender && target ? { sender, target } : null;
+    } catch (error) {
+      this.logger.warn(
+        {
+          workId,
+          callId,
+          senderConnectionId: expectedSender.connectionId,
+          targetConnectionId: expectedTarget.connectionId,
+          error: error instanceof Error ? error.message : "unknown",
+        },
+        "studio voice relay adapter discovery failed closed"
+      );
+      return null;
+    } finally {
+      if (discoveryTimeout) clearTimeout(discoveryTimeout);
+    }
+  }
+
+  private consumeInterServerVoiceSignal(
+    workId: string,
+    senderConnectionId: string,
+    targetConnectionId: string,
+    callId: string,
+    signalId: string
+  ): boolean {
+    const now = Date.now();
+    for (const [key, expiresAt] of this.deliveredInterServerVoiceSignals) {
+      if (expiresAt <= now) this.deliveredInterServerVoiceSignals.delete(key);
+    }
+    const key = JSON.stringify([
+      workId,
+      senderConnectionId,
+      targetConnectionId,
+      callId,
+      signalId,
+    ]);
+    if (this.deliveredInterServerVoiceSignals.has(key)) return false;
+    while (
+      this.deliveredInterServerVoiceSignals.size >= STUDIO_LIVE_VOICE_SIGNAL_DEDUPE_LIMIT
+    ) {
+      const oldestKey = this.deliveredInterServerVoiceSignals.keys().next().value as
+        | string
+        | undefined;
+      if (!oldestKey) break;
+      this.deliveredInterServerVoiceSignals.delete(oldestKey);
+    }
+    this.deliveredInterServerVoiceSignals.set(
+      key,
+      now + STUDIO_LIVE_VOICE_SIGNAL_DEDUPE_TTL_MS
+    );
     return true;
   }
 
@@ -1937,6 +2462,15 @@ export class StudioLiveGateway
         fromName: sender.name,
         shareId: relay.shareId,
         decision: relay.decision,
+      });
+      return;
+    }
+    if (relay.type === "voice-signal") {
+      const { type: _type, ...signal } = relay;
+      targetSocket.emit("studio:voice:signal", {
+        fromConnectionId: sender.connectionId,
+        fromName: sender.name,
+        ...signal,
       });
       return;
     }
@@ -1991,6 +2525,48 @@ export class StudioLiveGateway
     };
   }
 
+  private voiceSignalRelayEvent(
+    signalId: string,
+    signal: StudioLiveVoiceSignalInput
+  ): StudioLiveInterServerRelayEvent {
+    if (signal.kind === "description") {
+      return {
+        type: "voice-signal",
+        signalId,
+        callId: signal.callId,
+        kind: signal.kind,
+        description: signal.description,
+      };
+    }
+    return {
+      type: "voice-signal",
+      signalId,
+      callId: signal.callId,
+      kind: signal.kind,
+      candidate: signal.candidate,
+    };
+  }
+
+  private voiceRelayPeersMatch(
+    authorization: Extract<StudioLivePeerRelayAuthorization, { ok: true }>,
+    callId: string
+  ): boolean {
+    if (
+      authorization.sender.role === "viewer" ||
+      authorization.target.role === "viewer"
+    ) return false;
+    const sender = this.voiceMembershipBySocket.get(authorization.sender.connectionId);
+    const target = this.voiceMembershipBySocket.get(authorization.target.connectionId);
+    return Boolean(
+      sender &&
+      target &&
+      sender.workId === authorization.sender.workId &&
+      target.workId === authorization.target.workId &&
+      sender.callId === callId &&
+      target.callId === callId
+    );
+  }
+
   private candidateRelayAuthorizationKey(
     workId: string,
     shareId: string,
@@ -2039,8 +2615,12 @@ export class StudioLiveGateway
     const rightSocket = this.server.sockets.get(right.connectionId) as
       | StudioLiveSocket
       | undefined;
-    const leftPrincipal = leftSocket?.data.authPrincipal;
-    const rightPrincipal = rightSocket?.data.authPrincipal;
+    const leftPrincipal = leftSocket
+      ? this.authPrincipalsBySocket.get(leftSocket)
+      : undefined;
+    const rightPrincipal = rightSocket
+      ? this.authPrincipalsBySocket.get(rightSocket)
+      : undefined;
     const leftRecheck = this.participantAuthorizationRechecks.get(left.connectionId);
     const rightRecheck = this.participantAuthorizationRechecks.get(right.connectionId);
     const valid =
@@ -2057,8 +2637,6 @@ export class StudioLiveGateway
       Boolean(rightPrincipal && rightPrincipal.expiresAt > now) &&
       leftPrincipal?.userId === left.userId &&
       rightPrincipal?.userId === right.userId &&
-      leftSocket?.data.authUserId === left.userId &&
-      rightSocket?.data.authUserId === right.userId &&
       this.isSocketCurrent(leftSocket as StudioLiveSocket) &&
       this.isSocketCurrent(rightSocket as StudioLiveSocket) &&
       leftRecheck?.participant !== left &&
@@ -2090,8 +2668,12 @@ export class StudioLiveGateway
     const targetSocket = this.server.sockets.get(target.connectionId) as
       | StudioLiveSocket
       | undefined;
-    const senderPrincipal = senderSocket?.data.authPrincipal;
-    const targetPrincipal = targetSocket?.data.authPrincipal;
+    const senderPrincipal = senderSocket
+      ? this.authPrincipalsBySocket.get(senderSocket)
+      : undefined;
+    const targetPrincipal = targetSocket
+      ? this.authPrincipalsBySocket.get(targetSocket)
+      : undefined;
     const now = Date.now();
     if (
       !senderSocket ||
@@ -2102,8 +2684,6 @@ export class StudioLiveGateway
       targetPrincipal.expiresAt <= now ||
       senderPrincipal.userId !== sender.userId ||
       targetPrincipal.userId !== target.userId ||
-      senderSocket.data.authUserId !== sender.userId ||
-      targetSocket.data.authUserId !== target.userId ||
       sender.workId !== target.workId ||
       this.participantsBySocket.get(sender.connectionId) !== sender ||
       this.participantsBySocket.get(target.connectionId) !== target ||
@@ -2156,8 +2736,12 @@ export class StudioLiveGateway
     const rightSocket = this.server.sockets.get(right.connectionId) as
       | StudioLiveSocket
       | undefined;
-    const leftPrincipal = leftSocket?.data.authPrincipal;
-    const rightPrincipal = rightSocket?.data.authPrincipal;
+    const leftPrincipal = leftSocket
+      ? this.authPrincipalsBySocket.get(leftSocket)
+      : undefined;
+    const rightPrincipal = rightSocket
+      ? this.authPrincipalsBySocket.get(rightSocket)
+      : undefined;
     const now = Date.now();
     if (
       !leftSocket ||
@@ -2360,6 +2944,23 @@ export class StudioLiveGateway
     return this.server.sockets.get(client.id) === client;
   }
 
+  private clearSocketAuthentication(client: StudioLiveSocket): void {
+    this.authPrincipalsBySocket.delete(client);
+  }
+
+  private clearSocketAuthenticationById(
+    socketId: string,
+    currentSocket?: StudioLiveSocket
+  ): void {
+    if (currentSocket) {
+      this.clearSocketAuthentication(currentSocket);
+      return;
+    }
+    for (const socket of this.authPrincipalsBySocket.keys()) {
+      if (socket.id === socketId) this.authPrincipalsBySocket.delete(socket);
+    }
+  }
+
   private isSocketPrincipalCurrent(
     client: StudioLiveSocket,
     principal: StudioLiveAuthPrincipal,
@@ -2367,8 +2968,7 @@ export class StudioLiveGateway
   ): boolean {
     return (
       this.isSocketCurrent(client) &&
-      client.data.authPrincipal === principal &&
-      client.data.authUserId === userId &&
+      this.authPrincipalsBySocket.get(client) === principal &&
       principal.userId === userId &&
       principal.expiresAt > Date.now()
     );
@@ -2379,7 +2979,7 @@ export class StudioLiveGateway
     workId: string
   ): StudioLiveParticipantInternal | null {
     const participant = this.participantsBySocket.get(client.id);
-    const principal = client.data.authPrincipal;
+    const principal = this.authPrincipalsBySocket.get(client);
     if (
       !participant ||
       participant.workId !== workId ||
@@ -2395,6 +2995,7 @@ export class StudioLiveGateway
     // A reconnect may reuse the Socket.IO id while speculative adapter cleanup is pending. Never
     // tear down that replacement socket or its participant when this join belongs to the old one.
     if (!this.isSocketCurrent(client)) {
+      this.clearSocketAuthentication(client);
       client.disconnect(true);
       return;
     }
@@ -2406,8 +3007,7 @@ export class StudioLiveGateway
     this.participantAuthorizationRechecks.delete(client.id);
     this.deleteCandidateRelayAuthorizationsForSocket(client.id);
     this.rateLimits.delete(client.id);
-    delete client.data.authUserId;
-    delete client.data.authPrincipal;
+    this.clearSocketAuthentication(client);
     client.disconnect(true);
   }
 
@@ -2424,6 +3024,7 @@ export class StudioLiveGateway
     } catch {
       // An adapter that cannot undo a speculative join cannot guarantee room isolation. Closing
       // the socket lets Socket.IO discard every adapter room instead of keeping a ghost listener.
+      this.clearSocketAuthentication(client);
       client.disconnect(true);
     }
   }
@@ -2440,38 +3041,31 @@ export class StudioLiveGateway
   private async authenticateSocket(client: StudioLiveSocket): Promise<boolean> {
     const token = extractHandshakeToken(client);
     if (!token) {
-      delete client.data.authUserId;
-      delete client.data.authPrincipal;
+      this.clearSocketAuthentication(client);
       return false;
     }
     try {
       const principal = await this.authenticateSession(token);
       if (!principal || principal.expiresAt <= Date.now()) {
-        delete client.data.authUserId;
-        delete client.data.authPrincipal;
+        this.clearSocketAuthentication(client);
         return false;
       }
-      client.data.authUserId = principal.userId;
-      client.data.authPrincipal = { ...principal };
+      this.authPrincipalsBySocket.set(client, { ...principal });
+      return true;
+    } catch {
+      this.clearSocketAuthentication(client);
+      return false;
+    } finally {
       const auth = client.handshake.auth;
       if (auth && typeof auth === "object") {
         delete (auth as Record<string, unknown>).sessionToken;
       }
-      return true;
-    } catch {
-      delete client.data.authUserId;
-      delete client.data.authPrincipal;
-      return false;
     }
   }
 
   private async revalidateSocketSession(client: StudioLiveSocket): Promise<boolean> {
-    const principal = client.data.authPrincipal;
-    if (
-      !principal ||
-      principal.userId !== client.data.authUserId ||
-      principal.expiresAt <= Date.now()
-    ) {
+    const principal = this.authPrincipalsBySocket.get(client);
+    if (!principal || principal.expiresAt <= Date.now()) {
       return false;
     }
     try {
@@ -2631,13 +3225,12 @@ export class StudioLiveGateway
     participant: StudioLiveParticipantInternal,
     requireEdit: boolean
   ): boolean {
-    const principal = client.data.authPrincipal;
+    const principal = this.authPrincipalsBySocket.get(client);
     const recheck = this.participantAuthorizationRechecks.get(client.id);
     return Boolean(
       principal &&
       principal.expiresAt > Date.now() &&
       principal.userId === participant.userId &&
-      client.data.authUserId === participant.userId &&
       this.participantsBySocket.get(client.id) === participant &&
       this.isSocketCurrent(client) &&
       recheck?.participant !== participant &&
@@ -2693,12 +3286,11 @@ export class StudioLiveGateway
       if (
         !participant ||
         participant.workId !== workId ||
-        participant.userId !== client.data.authUserId ||
         !this.isSocketCurrent(client)
       ) {
         return null;
       }
-      const principal = client.data.authPrincipal;
+      const principal = this.authPrincipalsBySocket.get(client);
       if (
         !principal ||
         principal.userId !== participant.userId ||
@@ -2733,13 +3325,12 @@ export class StudioLiveGateway
       if (
         refreshed !== participant ||
         refreshed.workId !== workId ||
-        refreshed.userId !== client.data.authUserId ||
         !this.isSocketCurrent(client)
       ) {
         return null;
       }
       if (
-        client.data.authPrincipal !== principal ||
+        this.authPrincipalsBySocket.get(client) !== principal ||
         principal.expiresAt <= Date.now() ||
         principal.userId !== participant.userId
       ) {
@@ -2785,7 +3376,9 @@ export class StudioLiveGateway
       this.participantsBySocket.get(socketId) === participant &&
       participant.authorizationSequence === authorizationSequence;
     const socket = this.server.sockets.get(socketId) as StudioLiveSocket | undefined;
-    const principal = socket?.data.authPrincipal;
+    const principal = socket
+      ? this.authPrincipalsBySocket.get(socket)
+      : undefined;
     let sessionAllowed: boolean;
     try {
       sessionAllowed = principal ? await this.revalidateSession(principal) : false;
@@ -2802,8 +3395,7 @@ export class StudioLiveGateway
       !principal ||
       !sessionAllowed ||
       principal.expiresAt <= Date.now() ||
-      principal.userId !== participant.userId ||
-      socket.data.authUserId !== participant.userId
+      principal.userId !== participant.userId
     ) {
       this.disconnectInvalidSession(socketId, participant);
       return null;
@@ -2814,10 +3406,9 @@ export class StudioLiveGateway
         return null;
       }
       if (
-        socket.data.authPrincipal !== principal ||
+        this.authPrincipalsBySocket.get(socket) !== principal ||
         principal.expiresAt <= Date.now() ||
-        principal.userId !== participant.userId ||
-        socket.data.authUserId !== participant.userId
+        principal.userId !== participant.userId
       ) {
         this.disconnectInvalidSession(socketId, participant);
         return null;
@@ -2849,6 +3440,7 @@ export class StudioLiveGateway
       participant.updatedAt = new Date().toISOString();
       const safeParticipant = this.publishParticipantToSocketData(socket, participant);
       if (!participant.capabilities.edit) this.releaseSocketLocks(participant);
+      if (participant.role === "viewer") this.removeVoiceMembership(socketId, "revoked");
       if (
         previousRole !== participant.role ||
         previousComment !== participant.capabilities.comment ||
@@ -2906,9 +3498,8 @@ export class StudioLiveGateway
     }
     this.removeParticipant(socketId, "revoked");
     this.rateLimits.delete(socketId);
+    this.clearSocketAuthenticationById(socketId, socket);
     if (socket) {
-      delete socket.data.authUserId;
-      delete socket.data.authPrincipal;
       socket.disconnect(true);
     }
   }
@@ -2933,9 +3524,8 @@ export class StudioLiveGateway
     this.removeParticipant(socketId, "revoked");
     this.rateLimits.delete(socketId);
     this.joinTransitionSequences.delete(socketId);
+    this.clearSocketAuthenticationById(socketId, socket);
     if (socket) {
-      delete socket.data.authUserId;
-      delete socket.data.authPrincipal;
       socket.disconnect(true);
     }
   }
@@ -2943,6 +3533,10 @@ export class StudioLiveGateway
   private removeParticipant(socketId: string, reason: "disconnect" | "switch" | "revoked"): void {
     const participant = this.participantsBySocket.get(socketId);
     if (!participant) return;
+    this.removeVoiceMembership(
+      socketId,
+      reason === "revoked" ? "revoked" : "removed"
+    );
     this.participantsBySocket.delete(socketId);
     const socket = this.server.sockets.get(socketId) as StudioLiveSocket | undefined;
     if (socket) {
@@ -3024,6 +3618,106 @@ export class StudioLiveGateway
     socket.data.studioWorkId = participant.workId;
     socket.data.studioParticipant = safe;
     return safe;
+  }
+
+  private publicVoiceMember(member: StudioLiveVoiceMemberInternal): StudioLiveVoiceMember {
+    return {
+      connectionId: member.connectionId,
+      callId: member.callId,
+      muted: member.muted,
+    };
+  }
+
+  private emitVoiceLeave(
+    member: StudioLiveVoiceMemberInternal,
+    reason: StudioLiveVoiceLeaveReason = "removed"
+  ): void {
+    this.server.to(studioLiveRoom(member.workId)).emit("studio:voice:leave", {
+      connectionId: member.connectionId,
+      callId: member.callId,
+      reason,
+    });
+  }
+
+  private removeVoiceMembership(
+    socketId: string,
+    reason: StudioLiveVoiceLeaveReason = "removed"
+  ): void {
+    const member = this.voiceMembershipBySocket.get(socketId);
+    if (!member) return;
+    this.voiceMembershipBySocket.delete(socketId);
+    const socket = this.server.sockets.get(socketId) as StudioLiveSocket | undefined;
+    if (socket) delete socket.data.studioVoiceMember;
+    this.emitVoiceLeave(member, reason);
+  }
+
+  private localVoiceMembers(workId: string, callId?: string): StudioLiveVoiceMember[] {
+    return [...this.voiceMembershipBySocket.values()]
+      .filter((member) =>
+        member.workId === workId && (callId === undefined || member.callId === callId)
+      )
+      .filter((member) => this.participantsBySocket.get(member.connectionId)?.role !== "viewer")
+      .sort((left, right) => {
+        const leftJoined = this.participantsBySocket.get(left.connectionId)?.joinedAt ?? "";
+        const rightJoined = this.participantsBySocket.get(right.connectionId)?.joinedAt ?? "";
+        return leftJoined.localeCompare(rightJoined) ||
+          left.connectionId.localeCompare(right.connectionId);
+      })
+      .map((member) => this.publicVoiceMember(member));
+  }
+
+  private async listVoiceMembers(
+    workId: string,
+    callId?: string,
+    options: { fallbackToLocal?: boolean } = {}
+  ): Promise<StudioLiveVoiceMember[]> {
+    let discoveryTimeout: ReturnType<typeof setTimeout> | null = null;
+    try {
+      const sockets = await Promise.race([
+        this.server.in(studioLiveRoom(workId)).fetchSockets(),
+        new Promise<never>((_resolve, reject) => {
+          discoveryTimeout = setTimeout(
+            () => reject(new Error("studio voice adapter discovery timed out")),
+            STUDIO_LIVE_ADAPTER_DISCOVERY_TIMEOUT_MS
+          );
+          discoveryTimeout.unref?.();
+        }),
+      ]);
+      const candidates: Array<{ member: StudioLiveVoiceMember; joinedAt: string }> = [];
+      for (const socket of sockets) {
+        const data = socket.data as StudioLiveSocketData;
+        const parsed = StudioLiveVoiceMemberSchema.safeParse(data.studioVoiceMember);
+        const participant = data.studioParticipant;
+        if (
+          data.studioWorkId !== workId ||
+          !parsed.success ||
+          parsed.data.connectionId !== socket.id ||
+          (callId !== undefined && parsed.data.callId !== callId) ||
+          !participant ||
+          participant.connectionId !== socket.id ||
+          participant.role === "viewer"
+        ) continue;
+        candidates.push({
+          member: parsed.data,
+          joinedAt: participant.joinedAt,
+        });
+      }
+      return candidates
+        .sort((left, right) =>
+          left.joinedAt.localeCompare(right.joinedAt) ||
+          left.member.connectionId.localeCompare(right.member.connectionId)
+        )
+        .map(({ member }) => member);
+    } catch (error) {
+      this.logger.warn(
+        { workId, callId, error: error instanceof Error ? error.message : "unknown" },
+        "studio voice adapter discovery failed"
+      );
+      if (options.fallbackToLocal === false) throw error;
+      return this.localVoiceMembers(workId, callId);
+    } finally {
+      if (discoveryTimeout) clearTimeout(discoveryTimeout);
+    }
   }
 
   /**

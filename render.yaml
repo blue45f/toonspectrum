@@ -35,6 +35,18 @@ services:
       # (운영에서 둘 다 없으면 토큰 발급이 거부되어 약한 폴백 비밀로의 세션 위조를 차단한다.)
       - key: AUTH_SESSION_SECRET
         generateValue: true
+      # Studio 음성은 production에서 실제 TURN을 필수로 사용한다. Render API는 단기 자격증명만
+      # 발급하며 미디어 릴레이는 공인 IP를 가진 별도 coturn/관리형 TURN이 담당한다.
+      - key: STUDIO_VOICE_STUN_URLS
+        sync: false
+      - key: STUDIO_VOICE_TURN_URLS
+        sync: false
+      - key: STUDIO_VOICE_TURN_SHARED_SECRET
+        sync: false
+      - key: STUDIO_VOICE_TURN_REQUIRED
+        value: "true"
+      - key: STUDIO_VOICE_TURN_TTL_SECONDS
+        value: "900"
       # 앱인토스 토스 로그인 서버 간 API용 mTLS PEM — 콘솔에서 발급한 인증서/키를 대시보드에 입력.
       - key: TOSS_MTLS_CERT
         sync: false

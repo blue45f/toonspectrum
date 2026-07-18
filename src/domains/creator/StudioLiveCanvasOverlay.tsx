@@ -12,7 +12,7 @@ import {
   Wrench,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import {
   studioLivePresenceAlwaysVisible,
@@ -32,6 +32,7 @@ import {
   type StudioLiveSyncPhase,
   type StudioLiveSyncSnapshot,
 } from "./studio-live-sync-safety";
+import { StudioVoiceCallMiniDock } from "./StudioVoiceCallControls";
 
 import type { StudioCommentAnchor } from "./studio-comments";
 import type {
@@ -71,6 +72,7 @@ export interface StudioLivePresenceDockProps {
   onOpenTeam: () => void;
   onToggleFollow: (sessionId: string) => void;
   syncSnapshot?: StudioLiveSyncSnapshot;
+  voiceControls?: ReactNode;
 }
 
 export interface StudioRemoteCursorOverlayProps {
@@ -349,6 +351,7 @@ export function StudioLivePresenceDock({
   onOpenTeam,
   onToggleFollow,
   syncSnapshot,
+  voiceControls,
 }: StudioLivePresenceDockProps) {
   // Always-on collab chrome: parent passes alwaysOn while connecting/ready (presence strip).
   if (!alwaysOn && !connected && peers.length === 0) return null;
@@ -414,6 +417,8 @@ export function StudioLivePresenceDock({
         <StudioSyncStatusIcon phase={resolvedSync.phase} />
         <span className="max-w-40 truncate sm:max-w-56">{syncPresentation.shortLabel}</span>
       </button>
+
+      {voiceControls}
 
       <div
         className="flex items-center -space-x-1.5 pl-0.5"
@@ -507,7 +512,8 @@ export function StudioLivePresenceDockConnected({
   onToggleFollow,
   onFollowPage,
 }: StudioLivePresenceDockConnectedProps) {
-  const { availability, peers, sync } = useStudioLiveCollaboration();
+  const live = useStudioLiveCollaboration();
+  const { availability, peers, sync } = live;
   const followedPeer = peers.find((peer) => peer.sessionId === followingSessionId) ?? null;
   const alwaysOn = studioLivePresenceAlwaysVisible(availability, peers.length);
 
@@ -531,6 +537,19 @@ export function StudioLivePresenceDockConnected({
       onOpenTeam={onOpenTeam}
       onToggleFollow={onToggleFollow}
       syncSnapshot={sync}
+      voiceControls={(
+        <StudioVoiceCallMiniDock
+          ready={availability === "ready" && live.voice.ready}
+          supported={live.voice.supported}
+          allowed={live.voice.allowed}
+          state={live.voice.state}
+          error={live.voice.error}
+          onJoin={live.voice.join}
+          onLeave={live.voice.leave}
+          onMutedChange={live.voice.setMuted}
+          onOpenDetails={onOpenTeam}
+        />
+      )}
     />
   );
 }

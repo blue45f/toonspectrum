@@ -380,6 +380,54 @@ describe("studio live collaboration protocol", () => {
     ).toBeNull();
   });
 
+  it("isolates strict broadcast voice membership from targeted audio WebRTC signaling", () => {
+    const join = message("voice:join", { callId: "voice-main", muted: false });
+    const state = message("voice:state", { callId: "voice-main", muted: true });
+    const leave = message("voice:leave", { callId: "voice-main" });
+    const offer = message(
+      "voice:description",
+      { callId: "voice-main", type: "offer", sdp: "v=0\r\n" },
+      LOCAL_SESSION
+    );
+    const ice = message(
+      "voice:ice",
+      {
+        callId: "voice-main",
+        candidate: "candidate:1 1 UDP 1 127.0.0.1 5000 typ host",
+        sdpMid: "0",
+        sdpMLineIndex: 0,
+        usernameFragment: null,
+      },
+      LOCAL_SESSION
+    );
+
+    expect(parse(join)).toEqual(join);
+    expect(parse(state)).toEqual(state);
+    expect(parse(leave)).toEqual(leave);
+    expect(parse(offer)).toEqual(offer);
+    expect(parse(ice)).toEqual(ice);
+    expect(parse({ ...join, targetSessionId: LOCAL_SESSION })).toBeNull();
+    expect(parse({ ...offer, targetSessionId: null })).toBeNull();
+    expect(parse({ ...ice, targetSessionId: "session-other" })).toBeNull();
+    expect(parse({ ...join, payload: { ...join.payload, muted: "false" } })).toBeNull();
+    expect(parse({ ...join, payload: { ...join.payload, callId: " voice-main " } })).toBeNull();
+    expect(parse({ ...offer, payload: { ...offer.payload, shareId: "screen-1" } })).toBeNull();
+  });
+
+  it("rejects non-canonical identifiers instead of silently rewriting room boundaries", () => {
+    expect(parse({ ...message("voice:leave", { callId: "voice-main" }), workId: ` ${WORK_ID}` }))
+      .toBeNull();
+    expect(
+      parse({
+        ...message("voice:leave", { callId: "voice-main" }),
+        sender: { ...participant, sessionId: `${participant.sessionId} ` },
+      })
+    ).toBeNull();
+    expect(() => studioLocalLiveChannelName(` ${WORK_ID}`)).toThrow(
+      "유효한 작품 ID가 필요합니다."
+    );
+  });
+
   it("accepts a bounded broadcast chat line and rejects unsafe or targeted chat", () => {
     const value = message("chat:message", {
       messageId: "chat-1",

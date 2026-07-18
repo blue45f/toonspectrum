@@ -155,7 +155,7 @@ async function countVisibleSvgs(page: Page, selector: string): Promise<number> {
 async function main() {
   const port = await findFreePort();
   let child: ChildProcess | null = null;
-  let exitCode = 1;
+  let exitCode: number;
 
   try {
     child = spawn(

@@ -85,7 +85,9 @@ describe("StudioInspectorNavigator", () => {
       document: "navigator",
     });
 
-    expect(html.match(/pointer-coarse:min-h-11/g)?.length).toBeGreaterThanOrEqual(9);
+    // 모바일 44px 계약은 기본값(`min-h-11`/`size-11`)으로 제공하고 일부 보조 탭만
+    // coarse-pointer 보강을 함께 둔다. 구현 방식이 아니라 실제 최소 터치 크기 토큰을 센다.
+    expect(html.match(/(?:min-h-11|size-11)/g)?.length).toBeGreaterThanOrEqual(9);
     expect(html).toContain("sticky top-0");
     expect(html).toContain("overflow-x-auto");
   });

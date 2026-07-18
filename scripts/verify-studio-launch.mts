@@ -19,16 +19,17 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { chromium, type Browser, type Page } from "playwright";
+import { chromium, type Browser, type Locator, type Page } from "playwright";
 
 const SCRATCH = process.env.TOONSPECTRUM_VERIFY_DIR ?? join(tmpdir(), "toonspectrum-studio-launch");
 const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
 // 이 검증기는 `vite preview`만 띄우므로 Nest API를 의도적으로 기동하지 않는다. 아래 두 요청은
-// UI 부트에 필수가 아닌 best-effort 작업(카탈로그 병합·AI 제공자 상태)이고, API 부재가 Studio
+// UI 부트에 필수가 아닌 best-effort 작업(카탈로그 병합·AI 제공자 상태·방문 집계)이고, API 부재가 Studio
 // 렌더/상호작용 회귀처럼 strict gate를 막아서는 안 된다. 다른 console error는 계속 실패 처리한다.
 const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
   "/api/kmas/merge-on-access",
   "/api/studio-ai/status",
+  "/api/v1/apps/toonspectrum/visits/ping",
 ] as const;
 
 function isExpectedStaticPreviewApiError(message: string): boolean {
@@ -62,6 +63,55 @@ interface MobileRunResult {
   shot: string;
   dotShot: string;
 }
+
+interface MobileDockLayoutResult {
+  width: number;
+  ok: boolean;
+  primaryTargetCount: number;
+  secondaryTargetCount: number;
+  targetsReady: boolean;
+  primaryScrollable: boolean;
+  noDocumentOverflow: boolean;
+  historyFocusReady: boolean;
+  drawSheetCanvasInteractive: boolean;
+  sheets: MobileSheetContractResult[];
+  errCount: number;
+  shot: string;
+}
+
+interface MobileSheetContractResult {
+  id: "pages" | "props" | "brushes";
+  ok: boolean;
+  opened: boolean;
+  initialFocusReady: boolean;
+  initialFocusTargetReady: boolean;
+  backgroundIsolated: boolean;
+  tabTrapReady: boolean;
+  handleTargetReady: boolean;
+  insufficientDragStayed: boolean;
+  backdropDismissed: boolean;
+  keyboardHandleDismissed: boolean;
+  tapHandleDismissed: boolean;
+  escapeFocusRestored: boolean;
+  thresholdDragDismissed: boolean;
+  dragFocusRestored: boolean;
+  noHorizontalOverflow: boolean;
+  shot: string;
+}
+
+const VERIFY_FOCUSABLE_SELECTOR = [
+  "a[href]",
+  "area[href]",
+  "button:not([disabled])",
+  "input:not([disabled]):not([type='hidden'])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  "iframe",
+  "audio[controls]",
+  "video[controls]",
+  "[contenteditable='true']",
+  "[tabindex]:not([tabindex='-1'])",
+].join(",");
 
 function log(msg: string) {
   const line = `[verify-studio] ${msg}`;
@@ -232,7 +282,9 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
   });
 
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 15000 });
-  const dock = page.getByRole("navigation", { name: "스튜디오 모바일 도구막대" });
+  // A modal sheet correctly makes this navigation aria-hidden/inert. Keep a DOM-stable CSS
+  // locator so isolation checks can still inspect it while accessibility locators exclude it.
+  const dock = page.locator('nav[aria-label="스튜디오 모바일 도구막대"]');
   await dock.waitFor({ state: "visible", timeout: 8000 });
   const editorRoot = page.locator('[data-studio-editor="true"]');
   await page
@@ -245,9 +297,17 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
 
   const lineCorrection = sheet.getByRole("region", { name: "선 보정" });
   await lineCorrection.scrollIntoViewIfNeeded();
-  const airbrushPreset = sheet.getByRole("button", { name: "소프트 에어브러시", exact: true });
-  await airbrushPreset.click();
-  const dynamicBrushReady = await airbrushPreset.getAttribute("aria-pressed") === "true";
+  // The unified picker intentionally keeps only starter/favorite/recent presets in the quick row.
+  // Exercise the shipped catalog path for an expressive brush instead of depending on tray order.
+  await sheet.getByRole("button", { name: "전체 브러시 보기", exact: true }).click();
+  const builtInBrushCatalog = page.getByRole("dialog", { name: "기본 브러시 카탈로그" });
+  await builtInBrushCatalog.waitFor({ state: "visible", timeout: 3000 });
+  await builtInBrushCatalog.getByRole("tab", { name: "페인트", exact: true }).click();
+  await builtInBrushCatalog.getByRole("button", { name: "소프트 에어브러시 선택", exact: true }).click();
+  await builtInBrushCatalog.waitFor({ state: "detached", timeout: 3000 });
+  const airbrushPreset = sheet.locator('[data-studio-brush-chip="airbrush"]');
+  await airbrushPreset.waitFor({ state: "visible", timeout: 3000 });
+  const dynamicBrushReady = await airbrushPreset.getAttribute("aria-selected") === "true";
   const brushStudioLaunchers = sheet
     .locator('button[aria-haspopup="dialog"]')
     .filter({ hasText: /^\s*브러시 스튜디오/ });
@@ -290,7 +350,7 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
     (await lineCorrection.count()) === 1 &&
     (await pressureInput.count()) === 1 &&
     await sheet.getByRole("combobox", { name: "보정 방식" }).isEnabled() &&
-    await brushStudio.getByRole("combobox", { name: "필압 반응" }).isEnabled();
+    await brushStudio.getByRole("slider", { name: "필압 반응 강도" }).isEnabled();
 
   const mobileImmersiveValue = await editorRoot.getAttribute("data-studio-mobile-immersive");
   const mobileImmersivePreference = await page.evaluate(() =>
@@ -339,7 +399,7 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
     (launcher) => document.activeElement === launcher
   );
 
-  await sheet.getByRole("button", { name: "브러시 설정 닫기" }).click();
+  await sheet.getByRole("button", { name: "브러시 설정 닫기", exact: true }).click();
   const stage = page.locator(".konvajs-content").first();
   const stageBox = await stage.boundingBox();
   const stageBeforeDot = stageBox ? await stage.screenshot() : null;
@@ -404,6 +464,481 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
   };
 }
 
+async function awaitElementAnimations(locator: Locator): Promise<void> {
+  await locator.evaluate(async (element) => {
+    await Promise.all(element.getAnimations().map(async (animation) => {
+      try { await animation.finished; } catch {}
+    }));
+  });
+}
+
+async function waitForSheetInactive(
+  page: Page,
+  id: MobileSheetContractResult["id"],
+): Promise<boolean> {
+  return page.waitForFunction((sheetId) => {
+    const sheet = document.querySelector<HTMLElement>(
+      `[data-studio-sheet-id="${sheetId}"]`,
+    );
+    return !sheet ||
+      sheet.getAttribute("aria-modal") !== "true" ||
+      sheet.getAttribute("data-studio-mobile-sheet") !== "true";
+  }, id, { timeout: 3000 }).then(() => true).catch(() => false);
+}
+
+async function waitForLocatorFocus(page: Page, locator: Locator): Promise<boolean> {
+  const handle = await locator.elementHandle();
+  if (!handle) return false;
+  return page.waitForFunction(
+    (element) => document.activeElement === element,
+    handle,
+    { timeout: 3000 },
+  ).then(() => true).catch(() => false);
+}
+
+async function verifyTabTrap(page: Page, dialog: Locator): Promise<boolean> {
+  const count = await dialog.evaluate((element, selector) => {
+    const focusable = [...element.querySelectorAll<HTMLElement>(selector)].filter((candidate) => {
+      const style = getComputedStyle(candidate);
+      return candidate.tabIndex >= 0 &&
+        candidate.getClientRects().length > 0 &&
+        style.display !== "none" &&
+        style.visibility !== "hidden" &&
+        !candidate.closest("[hidden], [inert], [aria-hidden='true']");
+    });
+    focusable.at(-1)?.focus();
+    return focusable.length;
+  }, VERIFY_FOCUSABLE_SELECTOR);
+  if (count === 0) return false;
+
+  await page.keyboard.press("Tab");
+  const wrappedForward = await dialog.evaluate((element, selector) => {
+    const focusable = [...element.querySelectorAll<HTMLElement>(selector)].filter((candidate) => {
+      const style = getComputedStyle(candidate);
+      return candidate.tabIndex >= 0 &&
+        candidate.getClientRects().length > 0 &&
+        style.display !== "none" &&
+        style.visibility !== "hidden" &&
+        !candidate.closest("[hidden], [inert], [aria-hidden='true']");
+    });
+    return document.activeElement === focusable[0];
+  }, VERIFY_FOCUSABLE_SELECTOR);
+  await page.keyboard.press("Shift+Tab");
+  const wrappedBackward = await dialog.evaluate((element, selector) => {
+    const focusable = [...element.querySelectorAll<HTMLElement>(selector)].filter((candidate) => {
+      const style = getComputedStyle(candidate);
+      return candidate.tabIndex >= 0 &&
+        candidate.getClientRects().length > 0 &&
+        style.display !== "none" &&
+        style.visibility !== "hidden" &&
+        !candidate.closest("[hidden], [inert], [aria-hidden='true']");
+    });
+    return document.activeElement === focusable.at(-1);
+  }, VERIFY_FOCUSABLE_SELECTOR);
+  return wrappedForward && wrappedBackward;
+}
+
+async function dragSheetHandle(
+  page: Page,
+  handle: Locator,
+  deltaY: 24 | 140,
+): Promise<boolean> {
+  const box = await handle.boundingBox();
+  if (!box) return false;
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  if (deltaY === 24) await page.waitForTimeout(100);
+  await page.mouse.move(x, y + deltaY, { steps: deltaY === 24 ? 4 : 6 });
+  if (deltaY === 24) await page.waitForTimeout(100);
+  await page.mouse.up();
+  return true;
+}
+
+interface VerifyMobileModalSheetOptions {
+  dialog: Locator;
+  dock: Locator;
+  id: MobileSheetContractResult["id"];
+  initialFocus: Locator;
+  launcher: Locator;
+  open: () => Promise<void>;
+  page: Page;
+  shot: string;
+}
+
+async function verifyMobileModalSheet({
+  dialog,
+  dock,
+  id,
+  initialFocus,
+  launcher,
+  open,
+  page,
+  shot,
+}: VerifyMobileModalSheetOptions): Promise<MobileSheetContractResult> {
+  await open();
+  await dialog.waitFor({ state: "visible", timeout: 3000 });
+  await awaitElementAnimations(dialog);
+
+  const opened =
+    await dialog.getAttribute("aria-modal") === "true" &&
+    await dialog.getAttribute("data-studio-mobile-sheet") === "true";
+  const initialFocusReady = await initialFocus.evaluate(
+    (control) => document.activeElement === control,
+  );
+  const initialFocusBox = await initialFocus.boundingBox();
+  const initialFocusTargetReady = Boolean(
+    initialFocusBox && initialFocusBox.width >= 44 && initialFocusBox.height >= 44,
+  );
+  const canvasInert = await page.locator(".konvajs-content").first().evaluate(
+    (canvas) => Boolean(canvas.closest("[inert]")),
+  );
+  const dockInert = await dock.evaluate((toolbar) => Boolean(toolbar.closest("[inert]")));
+  const backdrop = page.locator('[data-studio-modal-backdrop="true"]');
+  const backdropReady = await backdrop.count() === 1 && await backdrop.evaluate((element) =>
+    element.getAttribute("aria-hidden") === "true" && !element.hasAttribute("inert")
+  );
+  const backgroundIsolated = canvasInert && dockInert && backdropReady;
+  const tabTrapReady = await verifyTabTrap(page, dialog);
+  const handle = dialog.locator('[data-studio-sheet-drag-handle="true"]');
+  const handleBox = await handle.boundingBox();
+  const handleTargetReady = Boolean(
+    handleBox && handleBox.width >= 44 && handleBox.height >= 44,
+  );
+  const beforeDragBox = await dialog.boundingBox();
+  const noSheetOverflow = await dialog.evaluate(
+    (element) => element.scrollWidth <= element.clientWidth + 1,
+  );
+  await page.screenshot({ path: shot, fullPage: false });
+
+  const insufficientStarted = await dragSheetHandle(page, handle, 24);
+  await page.waitForTimeout(220);
+  const afterDragBox = await dialog.boundingBox();
+  const insufficientDragStayed = Boolean(
+    insufficientStarted &&
+    beforeDragBox &&
+    afterDragBox &&
+    Math.abs(beforeDragBox.y - afterDragBox.y) <= 1.5 &&
+    await dialog.getAttribute("aria-modal") === "true" &&
+    await dialog.getAttribute("data-studio-mobile-sheet") === "true",
+  );
+
+  await backdrop.click({ position: { x: 8, y: 8 } });
+  const backdropClosed = await waitForSheetInactive(page, id);
+  const backdropFocusRestored = backdropClosed && await waitForLocatorFocus(page, launcher);
+  const backdropDismissed = backdropClosed && backdropFocusRestored;
+
+  await open();
+  await dialog.waitFor({ state: "visible", timeout: 3000 });
+  await awaitElementAnimations(dialog);
+  const keyboardHandle = dialog.locator('[data-studio-sheet-drag-handle="true"]');
+  await keyboardHandle.focus();
+  await page.keyboard.press("Enter");
+  const keyboardClosed = await waitForSheetInactive(page, id);
+  const keyboardFocusRestored = keyboardClosed && await waitForLocatorFocus(page, launcher);
+  const keyboardHandleDismissed = keyboardClosed && keyboardFocusRestored;
+
+  await open();
+  await dialog.waitFor({ state: "visible", timeout: 3000 });
+  await awaitElementAnimations(dialog);
+  await dialog.locator('[data-studio-sheet-drag-handle="true"]').tap();
+  const tapClosed = await waitForSheetInactive(page, id);
+  const tapFocusRestored = tapClosed && await waitForLocatorFocus(page, launcher);
+  const tapHandleDismissed = tapClosed && tapFocusRestored;
+
+  await open();
+  await dialog.waitFor({ state: "visible", timeout: 3000 });
+  await awaitElementAnimations(dialog);
+  await page.keyboard.press("Escape");
+  const escapeClosed = await waitForSheetInactive(page, id);
+  const escapeFocusRestored = escapeClosed && await waitForLocatorFocus(page, launcher);
+
+  await open();
+  await dialog.waitFor({ state: "visible", timeout: 3000 });
+  await awaitElementAnimations(dialog);
+  const thresholdStarted = await dragSheetHandle(
+    page,
+    dialog.locator('[data-studio-sheet-drag-handle="true"]'),
+    140,
+  );
+  const thresholdDragDismissed = thresholdStarted && await waitForSheetInactive(page, id);
+  const dragFocusRestored = thresholdDragDismissed && await waitForLocatorFocus(page, launcher);
+  const thresholdState = await page.locator(`[data-studio-sheet-id="${id}"]`).evaluate((element) => ({
+    ariaModal: element.getAttribute("aria-modal"),
+    mobileSheet: element.getAttribute("data-studio-mobile-sheet"),
+    transform: (element as HTMLElement).style.transform,
+  })).catch(() => null);
+  if (!thresholdDragDismissed) {
+    await page.keyboard.press("Escape");
+    await waitForSheetInactive(page, id);
+  }
+  const noHorizontalOverflow = await page.evaluate(() =>
+    document.documentElement.scrollWidth === window.innerWidth &&
+    document.body.scrollWidth <= window.innerWidth
+  ) && noSheetOverflow;
+  const ok =
+    opened &&
+    initialFocusReady &&
+    initialFocusTargetReady &&
+    backgroundIsolated &&
+    tabTrapReady &&
+    handleTargetReady &&
+    insufficientDragStayed &&
+    backdropDismissed &&
+    keyboardHandleDismissed &&
+    tapHandleDismissed &&
+    escapeFocusRestored &&
+    thresholdDragDismissed &&
+    dragFocusRestored &&
+    noHorizontalOverflow;
+
+  log(
+    `mobile-sheet-${id}: opened=${opened} focus=${initialFocusReady} focusTarget=${initialFocusTargetReady} ` +
+    `isolated=${backgroundIsolated} tabTrap=${tabTrapReady} handle=${handleTargetReady} ` +
+    `snapback=${insufficientDragStayed} backdrop=${backdropDismissed} ` +
+    `keyboardHandle=${keyboardHandleDismissed} tapHandle=${tapHandleDismissed} ` +
+    `escapeFocus=${escapeFocusRestored} ` +
+    `dragDismiss=${thresholdDragDismissed} dragFocus=${dragFocusRestored} ` +
+    `thresholdState=${JSON.stringify(thresholdState)} noHorizontalOverflow=${noHorizontalOverflow}`,
+  );
+  return {
+    id,
+    ok,
+    opened,
+    initialFocusReady,
+    initialFocusTargetReady,
+    backgroundIsolated,
+    tabTrapReady,
+    handleTargetReady,
+    insufficientDragStayed,
+    backdropDismissed,
+    keyboardHandleDismissed,
+    tapHandleDismissed,
+    escapeFocusRestored,
+    thresholdDragDismissed,
+    dragFocusRestored,
+    noHorizontalOverflow,
+    shot,
+  };
+}
+
+async function runMobileDockLayout(
+  browser: Browser,
+  url: string,
+  width: 320 | 360 | 390,
+): Promise<MobileDockLayoutResult> {
+  const shot = join(SCRATCH, `studio-launch-mobile-dock-${width}.png`);
+  const ctx = await browser.newContext({
+    hasTouch: true,
+    isMobile: true,
+    viewport: { width, height: 844 },
+  });
+  const page = await ctx.newPage();
+  const consoleErrors: string[] = [];
+
+  page.on("console", (message) => {
+    if (message.type() !== "error") return;
+    const location = message.location().url;
+    const value = location ? `${message.text()} @ ${location}` : message.text();
+    if (!isExpectedStaticPreviewApiError(value)) consoleErrors.push(value);
+  });
+  page.on("pageerror", (error) => consoleErrors.push(String(error)));
+  await page.addInitScript(({ quickStartKey, mobileHintKey }) => {
+    try {
+      window.localStorage.setItem(quickStartKey, "1");
+      window.localStorage.setItem(mobileHintKey, "1");
+    } catch {}
+  }, {
+    quickStartKey: QUICKSTART_KEY,
+    mobileHintKey: "toonspectrum-studio-mobile-hint-dismissed",
+  });
+
+  await page.goto(url, { waitUntil: "domcontentloaded", timeout: 15000 });
+  // Sheet isolation deliberately removes the dock from the accessibility tree while open.
+  const dock = page.locator('nav[aria-label="스튜디오 모바일 도구막대"]');
+  await dock.waitFor({ state: "visible", timeout: 8000 });
+  const primary = dock.locator('[data-studio-mobile-dock-scroll="primary"]');
+  const secondary = dock.locator('[data-studio-mobile-dock-scroll="secondary"]');
+  const primaryTargets = primary.locator(
+    ':scope > button, :scope > [data-studio-tool-hint-target="true"]',
+  );
+  const secondaryTargets = secondary.locator(":scope > button, :scope > div > button");
+  const primaryWidths = await primaryTargets.evaluateAll((targets) =>
+    targets.map((target) => target.getBoundingClientRect().width)
+  );
+  const secondaryWidths = await secondaryTargets.evaluateAll((targets) =>
+    targets.map((target) => target.getBoundingClientRect().width)
+  );
+  const primaryTargetCount = primaryWidths.length;
+  const secondaryTargetCount = secondaryWidths.length;
+  const targetsReady =
+    primaryTargetCount === 7 &&
+    secondaryTargetCount === 7 &&
+    [...primaryWidths, ...secondaryWidths].every((targetWidth) => targetWidth >= 44);
+  const scrollGeometry = await primary.evaluate((toolbar) => ({
+    clientWidth: toolbar.clientWidth,
+    scrollWidth: toolbar.scrollWidth,
+  }));
+  const primaryScrollable = scrollGeometry.scrollWidth > scrollGeometry.clientWidth;
+  const noDocumentOverflow = await page.evaluate(() =>
+    document.documentElement.scrollWidth === window.innerWidth &&
+    document.body.scrollWidth <= window.innerWidth
+  );
+
+  let historyFocusReady = true;
+  for (const label of ["실행취소", "다시실행"] as const) {
+    // Fresh documents expose the disabled-reason coach wrapper as the keyboard target while the
+    // native button is aria-hidden. Locate that wrapper through its stable child command label.
+    const target = primary.locator(
+      `[data-studio-tool-hint-target="true"]:has(> button[aria-label="${label}"])`,
+    );
+    await target.scrollIntoViewIfNeeded();
+    await target.focus();
+    const visible = await target.evaluate((element) => {
+      const targetRect = element.getBoundingClientRect();
+      const toolbarRect = element
+        .closest("[data-studio-mobile-dock-scroll]")
+        ?.getBoundingClientRect();
+      return Boolean(
+        toolbarRect &&
+        targetRect.left >= toolbarRect.left - 0.5 &&
+        targetRect.right <= toolbarRect.right + 0.5
+      );
+    });
+    historyFocusReady &&= visible;
+  }
+
+  const pagesLauncher = dock.getByRole("button", { name: "페이지", exact: true });
+  const propsLauncher = dock.getByRole("button", { name: "작업", exact: true });
+  const brushDockLauncher = dock.getByRole("button", {
+    name: "브러시 설정 (굵기·색·프리셋)",
+    exact: true,
+  });
+  const pagesDialog = page.locator('[data-studio-sheet-id="pages"]');
+  const propsDialog = page.locator('[data-studio-sheet-id="props"]');
+  const sheets: MobileSheetContractResult[] = [];
+  sheets.push(await verifyMobileModalSheet({
+    dialog: pagesDialog,
+    dock,
+    id: "pages",
+    initialFocus: pagesDialog.getByRole("button", { name: "페이지 시트 닫기", exact: true }),
+    launcher: pagesLauncher,
+    open: async () => {
+      await pagesLauncher.scrollIntoViewIfNeeded();
+      await pagesLauncher.click();
+    },
+    page,
+    shot: join(SCRATCH, `studio-launch-mobile-sheet-pages-${width}.png`),
+  }));
+  sheets.push(await verifyMobileModalSheet({
+    dialog: propsDialog,
+    dock,
+    id: "props",
+    initialFocus: propsDialog.getByRole("button", { name: "속성 시트 닫기", exact: true }),
+    launcher: propsLauncher,
+    open: async () => {
+      await propsLauncher.scrollIntoViewIfNeeded();
+      await propsLauncher.click();
+    },
+    page,
+    shot: join(SCRATCH, `studio-launch-mobile-sheet-props-${width}.png`),
+  }));
+
+  await brushDockLauncher.scrollIntoViewIfNeeded();
+  await brushDockLauncher.click();
+  const drawDialog = page.locator('[data-studio-sheet-id="draw"]');
+  await page.waitForFunction(() =>
+    document.querySelector('[data-studio-sheet-id="draw"]')
+      ?.getAttribute("data-studio-mobile-sheet") === "draw"
+  );
+  await page.waitForTimeout(240);
+  const drawHandleBox = await drawDialog
+    .locator('[data-studio-sheet-drag-handle="true"]')
+    .boundingBox();
+  const drawSheetCanvasInteractive =
+    await drawDialog.getAttribute("aria-modal") === "false" &&
+    await drawDialog.getAttribute("data-studio-mobile-sheet") === "draw" &&
+    await page.locator('[data-studio-modal-backdrop="true"]').count() === 0 &&
+    !await page.locator(".konvajs-content").first().evaluate(
+      (canvas) => Boolean(canvas.closest("[inert]")),
+    ) &&
+    !await dock.evaluate((toolbar) => Boolean(toolbar.closest("[inert]"))) &&
+    Boolean(drawHandleBox && drawHandleBox.width >= 44 && drawHandleBox.height >= 44);
+  const managerLauncher = drawDialog.getByRole("button", { name: "저장·관리", exact: true });
+  const brushesDialog = page.locator('[data-studio-sheet-id="brushes"]');
+  sheets.push(await verifyMobileModalSheet({
+    dialog: brushesDialog,
+    dock,
+    id: "brushes",
+    initialFocus: brushesDialog.getByRole("button", { name: "브러시 관리 닫기", exact: true }),
+    launcher: managerLauncher,
+    open: async () => {
+      await managerLauncher.scrollIntoViewIfNeeded();
+      const managerHandle = await managerLauncher.elementHandle();
+      if (!managerHandle) throw new Error("brush manager launcher did not mount");
+      // `visible` alone includes opacity-only and clipped states. Require the shipped control to
+      // win actual hit testing so this remains a real touch-path check rather than a forced click.
+      await page.waitForFunction((control) => {
+        const bounds = control.getBoundingClientRect();
+        const hit = document.elementFromPoint(
+          bounds.left + bounds.width / 2,
+          bounds.top + bounds.height / 2,
+        );
+        return hit === control || control.contains(hit);
+      }, managerHandle, { timeout: 3000 });
+      await managerLauncher.click();
+    },
+    page,
+    shot: join(SCRATCH, `studio-launch-mobile-sheet-brushes-${width}.png`),
+  }));
+  await drawDialog.getByRole("button", { name: "브러시 설정 닫기", exact: true }).click();
+  await page.waitForFunction(() =>
+    document.querySelector('[data-studio-sheet-id="draw"]')
+      ?.getAttribute("data-studio-mobile-sheet") !== "draw"
+  );
+  const drawFocusRestored = await waitForLocatorFocus(page, brushDockLauncher);
+
+  await page.screenshot({ path: shot, fullPage: false });
+  const ok =
+    targetsReady &&
+    (width !== 320 || primaryScrollable) &&
+    noDocumentOverflow &&
+    historyFocusReady &&
+    drawSheetCanvasInteractive &&
+    drawFocusRestored &&
+    sheets.every((sheet) => sheet.ok) &&
+    consoleErrors.length === 0;
+  log(
+    `mobile-dock-${width}: targets=${primaryTargetCount}+${secondaryTargetCount} ` +
+    `widths=${[...primaryWidths, ...secondaryWidths].join(",")} ` +
+    `primaryScrollable=${primaryScrollable} documentOverflow=${!noDocumentOverflow} ` +
+    `historyFocusReady=${historyFocusReady} drawInteractive=${drawSheetCanvasInteractive} ` +
+    `drawFocus=${drawFocusRestored} sheets=${sheets.map((sheet) => `${sheet.id}:${sheet.ok}`).join(",")} ` +
+    `consoleErrors=${consoleErrors.length}`,
+  );
+  if (!ok) {
+    for (const [index, message] of consoleErrors.slice(0, 8).entries()) {
+      log(`mobile-dock-${width} consoleError[${index}]: ${message}`);
+    }
+  }
+  await ctx.close();
+  return {
+    width,
+    ok,
+    primaryTargetCount,
+    secondaryTargetCount,
+    targetsReady,
+    primaryScrollable,
+    noDocumentOverflow,
+    historyFocusReady,
+    drawSheetCanvasInteractive,
+    sheets,
+    errCount: consoleErrors.length,
+    shot,
+  };
+}
+
 async function main() {
   mkdirSync(SCRATCH, { recursive: true });
   const port = await findFreePort();
@@ -445,12 +980,29 @@ async function main() {
       throw new Error("studio mobile drawing verification failed");
     }
 
+    const mobileDocks: MobileDockLayoutResult[] = [];
+    for (const width of [320, 360, 390] as const) {
+      const result = await runMobileDockLayout(browser, url, width);
+      mobileDocks.push(result);
+      if (!result.ok) {
+        throw new Error(`studio mobile dock verification failed at ${width}px`);
+      }
+    }
+
     await browser.close();
     browser = null;
 
     log("DESKTOP AND MOBILE RUNS OK");
-    log(`screenshots: ${[...results.map(r => r.shot), mobile.shot, mobile.dotShot].join(" ")}`);
-    console.log(JSON.stringify({ runs: results, mobile }, null, 2));
+    log(
+      `screenshots: ${[
+        ...results.map(r => r.shot),
+        mobile.shot,
+        mobile.dotShot,
+        ...mobileDocks.map((result) => result.shot),
+        ...mobileDocks.flatMap((result) => result.sheets.map((sheet) => sheet.shot)),
+      ].join(" ")}`,
+    );
+    console.log(JSON.stringify({ runs: results, mobile, mobileDocks }, null, 2));
   } finally {
     if (browser) await browser.close().catch(() => undefined);
     try { server.kill("SIGKILL"); } catch {}

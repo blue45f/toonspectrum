@@ -97,6 +97,18 @@ rewrite 하든 무관하다. 실제 네트워크를 타는 동적 fetch(리뷰·
 - 컷오버: §8 적용 후 리뷰 작성·로그인·커뮤니티 글쓰기 E2E 확인.
 - 롤백: `vercel.json` rewrite를 `/api/index` 로 되돌리고 재배포 → 즉시 기존 서버리스+Neon 경로 복귀.
 
+## 10. Studio 음성 TURN 데이터 플레인(선택, 운영 음성에는 필수)
+
+Nest API는 짧은 수명의 TURN 자격증명만 발급하고 미디어를 릴레이하지 않는다. 운영 음성 작업실은
+공인 고정 IP·전용 DNS·TLS 인증서·UDP relay 포트를 가진 coturn/관리형 TURN이 별도로 필요하다.
+저장소의 `deploy/coturn` 스택은 기본 비활성이며 `--profile turn`을 명시해야만 시작한다.
+
+같은 OCI VM을 사용할 때 VCN Security List와 호스트 방화벽에 TCP/UDP 3478, TCP/UDP 5349,
+UDP 49160–49259를 추가하고, 443은 기존 Caddy가 계속 소유하게 둔다. 실제 변수, secret 생성·교체,
+TLS 갱신, 외부 smoke와 forced-relay 브라우저 승인 절차는
+[`deploy/coturn/README.md`](../deploy/coturn/README.md)를 따른다. VM 한 대에 API·DB·TURN을 함께
+두는 구성은 비용 최적화일 뿐 고가용성이 아니므로 장애 도메인과 egress 한도를 별도로 감시한다.
+
 ## 부록 A. OCI CLI 로 프로비저닝 자동화(선택)
 콘솔 대신 자동화하려면 로컬에 OCI CLI를 설치/인증한다(이 명령들은 사용자가 직접 실행 — 대화형 인증 필요):
 ```bash

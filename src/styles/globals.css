@@ -1101,7 +1101,23 @@ body[data-studio-app="true"] .route-stage::before,
     var(--color-canvas, oklch(0.155 0.008 70));
 }
 
+/* One shared safe-area contract for every mobile surface that sits above the editing dock. */
+@media (max-width: 63.999rem) {
+  [data-studio-editor="true"] {
+    --studio-canvas-bottom-inset: calc(7rem + env(safe-area-inset-bottom));
+  }
+
+  [data-studio-mobile-immersive="true"] [data-studio-status-bar="true"] {
+    display: none;
+  }
+}
+
 /* End cluster on draw options — cleaner sticky dock */
+[data-studio-draw-options-dock="true"] {
+  container-name: studio-draw-options;
+  container-type: inline-size;
+}
+
 [data-studio-draw-options-end="true"] {
   border-left-color: oklch(0.36 0.013 64 / 0.55) !important;
   background:
@@ -1112,6 +1128,64 @@ body[data-studio-app="true"] .route-stage::before,
       oklch(0.175 0.009 68 / 0.98) 100%
     ) !important;
   box-shadow: -12px 0 18px -10px oklch(0.08 0.01 70 / 0.55);
+}
+
+/* Adaptive canvas chrome. Core controls own an explicit, keyboard-navigable horizontal viewport;
+   its permanently styled track keeps overflow discoverable while color, disclosure and utilities
+   stay pinned at the end. Secondary decoration progressively yields to drawable canvas width. */
+[data-studio-draw-options-primary="true"] {
+  scroll-padding-inline: 0.5rem;
+  scrollbar-width: auto;
+  scrollbar-color: oklch(0.55 0.035 64 / 0.82) oklch(0.13 0.008 68 / 0.82);
+}
+
+[data-studio-draw-options-primary="true"]::-webkit-scrollbar {
+  height: 0.5rem;
+}
+
+[data-studio-draw-options-primary="true"]::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: oklch(0.13 0.008 68 / 0.82);
+  box-shadow: inset 0 0 0 1px oklch(0.42 0.014 64 / 0.34);
+}
+
+[data-studio-draw-options-primary="true"]::-webkit-scrollbar-thumb {
+  min-width: 2.75rem;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: oklch(0.55 0.035 64 / 0.82);
+  background-clip: padding-box;
+}
+
+[data-studio-draw-options-primary="true"]:focus-within {
+  border-radius: 0.375rem;
+  outline: 2px solid color-mix(in oklab, var(--color-accent) 88%, white);
+  outline-offset: -2px;
+}
+
+/* 320px 도크는 타깃을 44px 아래로 줄이지 않고 행 자체만 짧게 수평 이동한다.
+   컨테이너 가장자리에서도 포커스 링이 잘리지 않도록 이 두 툴바에만 안쪽 오프셋을 쓴다. */
+[data-studio-mobile-dock-scroll] :focus-visible {
+  outline-offset: -2px;
+}
+
+@container studio-draw-options (max-width: 60rem) {
+  [data-studio-draw-options="true"] [data-studio-recent-color="true"],
+  [data-studio-draw-options="true"] [data-studio-draw-secondary-action="favorite"],
+  [data-studio-draw-options="true"] [data-studio-draw-size-preview="true"] {
+    display: none;
+  }
+}
+
+@container studio-draw-options (max-width: 46rem) {
+  [data-studio-draw-options="true"] [data-studio-brush-active-pill="true"] {
+    max-width: 6.75rem;
+  }
+
+  [data-studio-draw-options="true"] [data-studio-draw-primary-control="size"] input[type="range"],
+  [data-studio-draw-options="true"] [data-studio-draw-primary-control="opacity"] input[type="range"] {
+    width: 3.5rem;
+  }
 }
 
 /* Motion-coach hints: meaningful SVG demos with a quiet commercial entrance. */

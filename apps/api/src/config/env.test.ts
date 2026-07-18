@@ -85,3 +85,40 @@ describe("Studio live cluster environment validation", () => {
     expect(logger.error).not.toHaveBeenCalled();
   });
 });
+
+describe("Studio voice TURN environment validation", () => {
+  it("accepts TURN settings while keeping the shared secret out of diagnostics", () => {
+    const logger = { warn: vi.fn(), error: vi.fn() };
+    const secret = "voice-turn-secret-at-least-thirty-two-characters";
+
+    const result = validateEnv(
+      {
+        NODE_ENV: "test",
+        STUDIO_VOICE_STUN_URLS: "stun:voice.example.com:3478",
+        STUDIO_VOICE_TURN_URLS:
+          "turn:voice.example.com:3478?transport=udp,turns:voice.example.com:5349?transport=tcp",
+        STUDIO_VOICE_TURN_SHARED_SECRET: secret,
+        STUDIO_VOICE_TURN_REQUIRED: "true",
+        STUDIO_VOICE_TURN_TTL_SECONDS: "900",
+      },
+      logger
+    );
+
+    expect(result).toMatchObject({
+      STUDIO_VOICE_TURN_REQUIRED: "true",
+      STUDIO_VOICE_TURN_TTL_SECONDS: "900",
+    });
+    expect(logger.warn).not.toHaveBeenCalled();
+    expect(JSON.stringify(logger)).not.toContain(secret);
+  });
+
+  it("warns non-fatally for a weak shared secret in the generic env audit", () => {
+    const logger = { warn: vi.fn(), error: vi.fn() };
+
+    expect(validateEnv({
+      NODE_ENV: "test",
+      STUDIO_VOICE_TURN_SHARED_SECRET: "weak",
+    }, logger)).toBeNull();
+    expect(logger.warn).toHaveBeenCalledOnce();
+  });
+});

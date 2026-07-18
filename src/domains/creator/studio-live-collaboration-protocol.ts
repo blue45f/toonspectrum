@@ -88,6 +88,35 @@ export interface StudioLiveScreenStopPayload {
   shareId: string;
 }
 
+/** One ephemeral audio huddle within a work room. Voice media itself never crosses this protocol. */
+export interface StudioLiveVoiceJoinPayload {
+  callId: string;
+  muted: boolean;
+}
+
+export interface StudioLiveVoiceStatePayload {
+  callId: string;
+  muted: boolean;
+}
+
+export interface StudioLiveVoiceLeavePayload {
+  callId: string;
+}
+
+export interface StudioLiveVoiceDescriptionPayload {
+  callId: string;
+  type: "offer" | "answer";
+  sdp: string;
+}
+
+export interface StudioLiveVoiceIcePayload {
+  callId: string;
+  candidate: string;
+  sdpMid: string | null;
+  sdpMLineIndex: number | null;
+  usernameFragment: string | null;
+}
+
 /** Ephemeral session chat line. Never persisted to the document, the server DB or storage. */
 export interface StudioLiveChatMessagePayload {
   messageId: string;
@@ -107,6 +136,11 @@ export interface StudioLivePayloadMap {
   "webrtc:description": StudioLiveWebRtcDescriptionPayload;
   "webrtc:ice": StudioLiveWebRtcIcePayload;
   "screen:stop": StudioLiveScreenStopPayload;
+  "voice:join": StudioLiveVoiceJoinPayload;
+  "voice:state": StudioLiveVoiceStatePayload;
+  "voice:leave": StudioLiveVoiceLeavePayload;
+  "voice:description": StudioLiveVoiceDescriptionPayload;
+  "voice:ice": StudioLiveVoiceIcePayload;
   "chat:message": StudioLiveChatMessagePayload;
 }
 
@@ -228,6 +262,10 @@ function exactString(value: unknown, maximum: number, allowEmpty = false): value
   );
 }
 
+function exactIdentifier(value: unknown, maximum: number): value is string {
+  return exactString(value, maximum) && value === value.trim();
+}
+
 function exactSdpString(value: unknown): value is string {
   return (
     typeof value === "string" &&
@@ -240,7 +278,7 @@ function exactSdpString(value: unknown): value is string {
 }
 
 function nullableId(value: unknown): value is string | null {
-  return value === null || exactString(value, MAX_ID_LENGTH);
+  return value === null || exactIdentifier(value, MAX_ID_LENGTH);
 }
 
 function isRole(value: unknown): value is StudioTeamRole {
@@ -254,7 +292,7 @@ function isParticipant(value: unknown): value is StudioLiveParticipant {
   return (
     isRecord(value) &&
     hasExactKeys(value, ["sessionId", "displayName", "role"]) &&
-    exactString(value.sessionId, MAX_ID_LENGTH) &&
+    exactIdentifier(value.sessionId, MAX_ID_LENGTH) &&
     exactString(value.displayName, STUDIO_LIVE_DISPLAY_NAME_MAX_LENGTH) &&
     isRole(value.role)
   );
@@ -280,7 +318,7 @@ function isPresencePayload(value: unknown): value is StudioLivePresencePayload {
       hasExactKeys(value, ["visibility", "pageId", "tool"])) &&
     (value.visibility === "active" || value.visibility === "idle") &&
     nullableId(value.pageId) &&
-    (value.tool === undefined || value.tool === null || exactString(value.tool, MAX_TOOL_LENGTH))
+    (value.tool === undefined || value.tool === null || exactIdentifier(value.tool, MAX_TOOL_LENGTH))
   );
 }
 
@@ -295,7 +333,7 @@ function isCursorPayload(value: unknown): value is StudioLiveCursorPayload {
     isNormalizedRatio(value.x) &&
     isNormalizedRatio(value.y) &&
     nullableId(value.pageId) &&
-    (value.tool === null || exactString(value.tool, MAX_TOOL_LENGTH))
+    (value.tool === null || exactIdentifier(value.tool, MAX_TOOL_LENGTH))
   );
 }
 
@@ -315,8 +353,8 @@ function isLockClaimPayload(
   return (
     isRecord(value) &&
     hasExactKeys(value, ["resource", "claimId", "leaseUntil"]) &&
-    exactString(value.resource, STUDIO_LIVE_RESOURCE_MAX_LENGTH) &&
-    exactString(value.claimId, MAX_ID_LENGTH) &&
+    exactIdentifier(value.resource, STUDIO_LIVE_RESOURCE_MAX_LENGTH) &&
+    exactIdentifier(value.claimId, MAX_ID_LENGTH) &&
     typeof value.leaseUntil === "number" &&
     Number.isSafeInteger(value.leaseUntil) &&
     value.leaseUntil > sentAt &&
@@ -328,8 +366,8 @@ function isLockReleasePayload(value: unknown): value is StudioLiveLockReleasePay
   return (
     isRecord(value) &&
     hasExactKeys(value, ["resource", "claimId"]) &&
-    exactString(value.resource, STUDIO_LIVE_RESOURCE_MAX_LENGTH) &&
-    exactString(value.claimId, MAX_ID_LENGTH)
+    exactIdentifier(value.resource, STUDIO_LIVE_RESOURCE_MAX_LENGTH) &&
+    exactIdentifier(value.claimId, MAX_ID_LENGTH)
   );
 }
 
@@ -337,8 +375,8 @@ function isShareAnnouncePayload(value: unknown): value is StudioLiveScreenAnnoun
   return (
     isRecord(value) &&
     hasExactKeys(value, ["shareId", "label"]) &&
-    exactString(value.shareId, MAX_ID_LENGTH) &&
-    exactString(value.label, MAX_SHARE_LABEL_LENGTH)
+    exactIdentifier(value.shareId, MAX_ID_LENGTH) &&
+    exactIdentifier(value.label, MAX_SHARE_LABEL_LENGTH)
   );
 }
 
@@ -346,7 +384,7 @@ function isShareRequestPayload(value: unknown): value is StudioLiveScreenRequest
   return (
     isRecord(value) &&
     hasExactKeys(value, ["shareId"]) &&
-    exactString(value.shareId, MAX_ID_LENGTH)
+    exactIdentifier(value.shareId, MAX_ID_LENGTH)
   );
 }
 
@@ -354,7 +392,7 @@ function isScreenAccessPayload(value: unknown): value is StudioLiveScreenAccessP
   return (
     isRecord(value) &&
     hasExactKeys(value, ["shareId", "decision"]) &&
-    exactString(value.shareId, MAX_ID_LENGTH) &&
+    exactIdentifier(value.shareId, MAX_ID_LENGTH) &&
     (value.decision === "approved" ||
       value.decision === "rejected" ||
       value.decision === "ended")
@@ -365,7 +403,7 @@ function isDescriptionPayload(value: unknown): value is StudioLiveWebRtcDescript
   return (
     isRecord(value) &&
     hasExactKeys(value, ["shareId", "type", "sdp"]) &&
-    exactString(value.shareId, MAX_ID_LENGTH) &&
+    exactIdentifier(value.shareId, MAX_ID_LENGTH) &&
     (value.type === "offer" || value.type === "answer") &&
     exactSdpString(value.sdp)
   );
@@ -381,7 +419,7 @@ function isIcePayload(value: unknown): value is StudioLiveWebRtcIcePayload {
       "sdpMLineIndex",
       "usernameFragment",
     ]) &&
-    exactString(value.shareId, MAX_ID_LENGTH) &&
+    exactIdentifier(value.shareId, MAX_ID_LENGTH) &&
     exactString(value.candidate, STUDIO_LIVE_ICE_CANDIDATE_MAX_LENGTH) &&
     studioLiveStringFitsByteContract(
       value.candidate,
@@ -400,11 +438,69 @@ function isScreenStopPayload(value: unknown): value is StudioLiveScreenStopPaylo
   return isShareRequestPayload(value);
 }
 
+function isVoiceJoinPayload(value: unknown): value is StudioLiveVoiceJoinPayload {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ["callId", "muted"]) &&
+    exactIdentifier(value.callId, MAX_ID_LENGTH) &&
+    typeof value.muted === "boolean"
+  );
+}
+
+function isVoiceStatePayload(value: unknown): value is StudioLiveVoiceStatePayload {
+  return isVoiceJoinPayload(value);
+}
+
+function isVoiceLeavePayload(value: unknown): value is StudioLiveVoiceLeavePayload {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ["callId"]) &&
+    exactIdentifier(value.callId, MAX_ID_LENGTH)
+  );
+}
+
+function isVoiceDescriptionPayload(
+  value: unknown
+): value is StudioLiveVoiceDescriptionPayload {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ["callId", "type", "sdp"]) &&
+    exactIdentifier(value.callId, MAX_ID_LENGTH) &&
+    (value.type === "offer" || value.type === "answer") &&
+    exactSdpString(value.sdp)
+  );
+}
+
+function isVoiceIcePayload(value: unknown): value is StudioLiveVoiceIcePayload {
+  if (!isRecord(value)) return false;
+  return (
+    hasExactKeys(value, [
+      "callId",
+      "candidate",
+      "sdpMid",
+      "sdpMLineIndex",
+      "usernameFragment",
+    ]) &&
+    exactIdentifier(value.callId, MAX_ID_LENGTH) &&
+    exactString(value.candidate, STUDIO_LIVE_ICE_CANDIDATE_MAX_LENGTH) &&
+    studioLiveStringFitsByteContract(
+      value.candidate,
+      STUDIO_LIVE_ICE_CANDIDATE_MAX_LENGTH
+    ) &&
+    (value.sdpMid === null ||
+      exactString(value.sdpMid, STUDIO_LIVE_SDP_MID_MAX_LENGTH, true)) &&
+    (value.sdpMLineIndex === null ||
+      isFiniteInteger(value.sdpMLineIndex, 0, 65_535)) &&
+    (value.usernameFragment === null ||
+      exactString(value.usernameFragment, STUDIO_LIVE_USERNAME_FRAGMENT_MAX_LENGTH, true))
+  );
+}
+
 function isChatMessagePayload(value: unknown): value is StudioLiveChatMessagePayload {
   return (
     isRecord(value) &&
     hasExactKeys(value, ["messageId", "text"]) &&
-    exactString(value.messageId, MAX_ID_LENGTH) &&
+    exactIdentifier(value.messageId, MAX_ID_LENGTH) &&
     exactString(value.text, STUDIO_LIVE_CHAT_TEXT_MAX_LENGTH)
   );
 }
@@ -422,6 +518,11 @@ const MESSAGE_KINDS = new Set<StudioLiveMessageKind>([
   "webrtc:description",
   "webrtc:ice",
   "screen:stop",
+  "voice:join",
+  "voice:state",
+  "voice:leave",
+  "voice:description",
+  "voice:ice",
   "chat:message",
 ]);
 
@@ -458,6 +559,16 @@ function payloadMatchesKind(
       return isIcePayload(payload);
     case "screen:stop":
       return isScreenStopPayload(payload);
+    case "voice:join":
+      return isVoiceJoinPayload(payload);
+    case "voice:state":
+      return isVoiceStatePayload(payload);
+    case "voice:leave":
+      return isVoiceLeavePayload(payload);
+    case "voice:description":
+      return isVoiceDescriptionPayload(payload);
+    case "voice:ice":
+      return isVoiceIcePayload(payload);
     case "chat:message":
       return isChatMessagePayload(payload);
   }
@@ -468,7 +579,9 @@ function targetMatchesKind(kind: StudioLiveMessageKind, targetSessionId: string 
     kind === "screen:request" ||
     kind === "screen:access" ||
     kind === "webrtc:description" ||
-    kind === "webrtc:ice";
+    kind === "webrtc:ice" ||
+    kind === "voice:description" ||
+    kind === "voice:ice";
   return targeted ? targetSessionId !== null : targetSessionId === null;
 }
 
@@ -504,7 +617,7 @@ export function parseStudioLiveEnvelope(
       "payload",
     ]) ||
     value.version !== STUDIO_LIVE_PROTOCOL_VERSION ||
-    !exactString(value.workId, MAX_ID_LENGTH) ||
+    !exactIdentifier(value.workId, MAX_ID_LENGTH) ||
     value.workId !== options.expectedWorkId ||
     !isParticipant(value.sender) ||
     !isFiniteInteger(value.sentAt, 0, Number.MAX_SAFE_INTEGER) ||
@@ -565,7 +678,7 @@ export function createStudioLiveEnvelope<K extends StudioLiveMessageKind>(
 
 /** Stable, non-secret room name. Work-id collision is still rejected by the envelope parser. */
 export function studioLocalLiveChannelName(workId: string): string {
-  if (!exactString(workId, MAX_ID_LENGTH)) {
+  if (!exactIdentifier(workId, MAX_ID_LENGTH)) {
     throw new StudioLiveProtocolError("유효한 작품 ID가 필요합니다.");
   }
   let hash = 2_166_136_261;

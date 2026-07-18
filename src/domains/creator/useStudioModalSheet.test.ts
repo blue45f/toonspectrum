@@ -202,6 +202,77 @@ describe("activateStudioModalSheet", () => {
     expect(fixture.document.listenerCount("focusin")).toBe(0);
   });
 
+  it("keeps the aria-hidden pointer scrim interactive while isolating the canvas", () => {
+    const fixture = modalFixture();
+    const backdrop = new InteractionElement(fixture.document, "backdrop");
+    backdrop.setAttribute("aria-hidden", "true");
+    backdrop.setAttribute("data-studio-modal-backdrop", "true");
+    fixture.workspace.append(backdrop);
+
+    const deactivate = activateStudioModalSheet({
+      dialog: asElement(fixture.dialog),
+      document: asDocument(fixture.document),
+      onDismiss: vi.fn(),
+      root: asElement(fixture.root),
+    });
+
+    expect(backdrop.getAttribute("aria-hidden")).toBe("true");
+    expect(backdrop.hasAttribute("inert")).toBe(false);
+    expect(fixture.canvas.getAttribute("inert")).toBe("");
+
+    deactivate();
+    expect(backdrop.getAttribute("aria-hidden")).toBe("true");
+    expect(backdrop.hasAttribute("inert")).toBe(false);
+  });
+
+  it("falls back to the persistent dock trigger when the original launcher disappears", () => {
+    const fixture = modalFixture();
+    const persistentDockTrigger = new InteractionElement(fixture.document, "dock-trigger");
+    persistentDockTrigger.tabIndex = 0;
+    fixture.toolbar.append(persistentDockTrigger);
+
+    const deactivate = activateStudioModalSheet({
+      dialog: asElement(fixture.dialog),
+      document: asDocument(fixture.document),
+      fallbackReturnFocus: asElement(persistentDockTrigger),
+      onDismiss: vi.fn(),
+      returnFocus: asElement(fixture.trigger),
+      root: asElement(fixture.root),
+    });
+
+    fixture.trigger.isConnected = false;
+    deactivate();
+
+    expect(fixture.document.activeElement).toBe(persistentDockTrigger);
+  });
+
+  it("does not resurrect a sibling inert state that React removed during modal close", () => {
+    const fixture = modalFixture();
+    const nestedLauncher = new InteractionElement(fixture.document, "nested-launcher");
+    nestedLauncher.tabIndex = 0;
+    fixture.canvas.append(nestedLauncher);
+    fixture.canvas.setAttribute("inert", "");
+
+    const deactivate = activateStudioModalSheet({
+      dialog: asElement(fixture.dialog),
+      document: asDocument(fixture.document),
+      onDismiss: vi.fn(),
+      returnFocus: asElement(nestedLauncher),
+      root: asElement(fixture.root),
+    });
+
+    expect(fixture.canvas.getAttribute("aria-hidden")).toBe("true");
+    expect(fixture.canvas.getAttribute("inert")).toBe("");
+    // The next React commit promotes this previously hidden sibling into the active non-modal
+    // sheet before the old modal layout effect runs its cleanup.
+    fixture.canvas.removeAttribute("inert");
+    deactivate();
+
+    expect(fixture.canvas.hasAttribute("inert")).toBe(false);
+    expect(fixture.canvas.hasAttribute("aria-hidden")).toBe(false);
+    expect(fixture.document.activeElement).toBe(nestedLauncher);
+  });
+
   it("wraps Tab and Shift+Tab and rebounds programmatic focus that escapes the sheet", () => {
     const fixture = modalFixture();
     const deactivate = activateStudioModalSheet({

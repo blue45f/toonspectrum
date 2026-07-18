@@ -6,6 +6,7 @@ import {
   createStudioLiveEnvelope,
   studioLiveDisplayName,
 } from "./studio-live-collaboration-protocol";
+import { createEmptyStudioVoiceCallState } from "./studio-voice-call-model";
 import {
   StudioLiveCollaborationPanelView,
   type StudioLiveCollaborationPanelViewProps,
@@ -67,6 +68,20 @@ function renderView(overrides: Partial<StudioLiveCollaborationPanelViewProps> = 
     canChat: true,
     chatDraft: "",
     chatNotice: null,
+    voice: {
+      ready: true,
+      supported: true,
+      allowed: true,
+      networkMode: "direct",
+      state: createEmptyStudioVoiceCallState(),
+      error: null,
+      join: async () => true,
+      leave: noop,
+      setMuted: () => true,
+      setPushToTalk: () => true,
+      setPushToTalkPressed: () => true,
+      retryRemoteAudio: async () => true,
+    },
     screenState: screenState(),
     screenSupported: true,
     serverAvailable: false,
@@ -291,6 +306,16 @@ describe("StudioLiveCollaborationPanelView", () => {
     expect(unsupported).toContain("브라우저 미지원");
     expect(unsupported).toContain("이 브라우저는 화면 공유를 지원하지 않음");
     expect(unsupported).toContain("disabled");
+  });
+
+  it("integrates an explicit, ephemeral voice workspace independently from screen audio", () => {
+    const html = renderView();
+
+    expect(html).toContain('data-studio-voice-call="true"');
+    expect(html).toContain("음성 작업실");
+    expect(html).toContain("버튼을 누른 뒤에만 브라우저가 마이크 권한을 요청");
+    expect(html).toContain("영상만 · 오디오는 캡처하지 않음");
+    expect(html).toContain("녹음·문서·DB·로컬 저장소에 보존하지 않음");
   });
 
   it("renders host approval and current-viewer termination controls without leaking ids", () => {

@@ -47,6 +47,8 @@ export interface ReleaseStudioLiveLockInput {
 }
 
 export interface StudioLiveLockRepository {
+  /** Cross-node, per-work critical section for ephemeral collaboration admission decisions. */
+  withWorkMutation<T>(workId: string, operation: () => Promise<T>): Promise<T>;
   acquire(input: AcquireStudioLiveLockInput): Promise<AcquireStudioLiveLockResult>;
   release(input: ReleaseStudioLiveLockInput): Promise<StudioLiveLockRecord | null>;
   rollbackAcquire(
@@ -91,6 +93,12 @@ function toRecord(
  * application-node clock skew.
  */
 export class DrizzleStudioLiveLockRepository implements StudioLiveLockRepository {
+  async withWorkMutation<T>(workId: string, operation: () => Promise<T>): Promise<T> {
+    return db.transaction((transaction) =>
+      withStudioLiveLockWorkMutation(transaction, workId, operation)
+    );
+  }
+
   async acquire(input: AcquireStudioLiveLockInput): Promise<AcquireStudioLiveLockResult> {
     return db.transaction((transaction) =>
       withStudioLiveLockWorkMutation(transaction, input.workId, async () => {

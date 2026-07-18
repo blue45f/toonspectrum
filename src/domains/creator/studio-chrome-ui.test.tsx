@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   StudioAppMenubar,
   StudioDockButton,
+  StudioDockNavButton,
   StudioDualColorWell,
   StudioEdgeRailButton,
   StudioHudPill,
@@ -104,11 +105,12 @@ describe("studio chrome UI", () => {
     expect(html).toContain("text-on-accent");
   });
 
-  it("keeps mobile dock targets at least 44px and marks active state", () => {
+  it("keeps mobile dock targets at least 44px in both axes and marks active state", () => {
     const html = renderToStaticMarkup(
       <StudioDockButton icon={Pencil} label="펜" active />
     );
     expect(html).toContain("min-h-11");
+    expect(html).toContain("min-w-11");
     expect(html).toContain("bg-accent");
     expect(html).toContain("text-on-accent");
     expect(html).toContain("펜");
@@ -124,8 +126,16 @@ describe("studio chrome UI", () => {
       />
     );
     expect(html).toContain('data-studio-tool-hint-target="true"');
-    expect(html).toContain("min-w-0 flex-1");
+    expect(html).toContain("min-w-11 flex-1");
     expect(html).toContain("min-h-11");
+  });
+
+  it("keeps secondary mobile navigation targets at least 44px in both axes", () => {
+    const html = renderToStaticMarkup(
+      <StudioDockNavButton icon={Folder} label="페이지" />
+    );
+    expect(html).toContain("min-h-11");
+    expect(html).toContain("min-w-11");
   });
 
   it("keeps disabled dock and rail coaches focusable without duplicate native titles", () => {
@@ -150,6 +160,7 @@ describe("studio chrome UI", () => {
     expect(html.match(/data-studio-tool-hint-unavailable="true"/g)).toHaveLength(2);
     expect(html.match(/aria-disabled="true"/g)).toHaveLength(2);
     expect(html.match(/tabindex="0"/g)).toHaveLength(2);
+    expect(html).toContain("min-w-11 flex-1");
     expect(html).not.toContain('title="편집 잠금을 먼저 해제하세요"');
   });
 

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -5,6 +7,9 @@ import {
   shouldStartStudioMobileImmersive,
   STUDIO_MOBILE_IMMERSIVE_SESSION_KEY,
 } from "./studio-mobile-immersive";
+
+const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const studioGlobalsSource = readFileSync(new URL("../../styles/globals.css", import.meta.url), "utf8");
 
 function memoryStorage(initial?: string) {
   const values = new Map<string, string>();
@@ -46,5 +51,28 @@ describe("Studio mobile immersive preference", () => {
 
     expect(shouldStartStudioMobileImmersive(blocked)).toBe(true);
     expect(() => saveStudioMobileImmersivePreference(blocked, false)).not.toThrow();
+  });
+
+  it("uses one adaptive canvas lane instead of stacking duplicate mobile chrome", () => {
+    expect(studioPageSource).toContain('mobileImmersive && "max-lg:hidden"');
+    expect(studioPageSource).toContain("!canvasOnlyMode && !isMobile");
+    expect(studioPageSource).toContain('data-studio-mobile-editing-dock="true"');
+    expect(studioPageSource).toContain('data-studio-canvas-transient="coach"');
+    expect(studioPageSource).toContain("!hasAutosave &&");
+    expect(studioPageSource).toContain("drawingShortcutNotice === null");
+    expect(studioGlobalsSource).toContain("--studio-canvas-bottom-inset");
+  });
+
+  it("keeps every 320px dock target at 44px and scrolls only the two tool rows", () => {
+    expect(studioPageSource).toContain(
+      '"flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center',
+    );
+    expect(studioPageSource).toContain('data-studio-mobile-dock-scroll="primary"');
+    expect(studioPageSource).toContain('data-studio-mobile-dock-scroll="secondary"');
+    expect(studioPageSource.match(/touch-pan-x/g)).toHaveLength(2);
+    expect(studioPageSource).toContain("gap-0.5 overflow-x-auto");
+    expect(studioPageSource).toContain("gap-0 overflow-x-auto");
+    expect(studioGlobalsSource).toContain("[data-studio-mobile-dock-scroll] :focus-visible");
+    expect(studioGlobalsSource).toContain("outline-offset: -2px");
   });
 });

@@ -2,13 +2,15 @@ import { Check, Pin, SlidersHorizontal } from "lucide-react";
 
 import { selectQuickBrushes, type StudioSavedBrush } from "./studio-brush-library";
 
+import type { MouseEventHandler } from "react";
+
 import { cx } from "@/lib/cx";
 
 export interface StudioSavedBrushShelfProps {
   brushes: readonly StudioSavedBrush[];
   activeBrushId?: string | null;
   onApply: (brush: StudioSavedBrush) => void;
-  onManage?: () => void;
+  onManage?: MouseEventHandler<HTMLButtonElement>;
 }
 
 /** 모바일 브러시 시트에서 엄지 한 번으로 고정/최근 브러시를 적용하는 최대 8개 선반. */
@@ -31,6 +33,7 @@ export function StudioSavedBrushShelf({
         {onManage ? (
           <button
             type="button"
+            data-studio-brush-manager-launcher="true"
             onClick={onManage}
             className="flex min-h-11 items-center gap-1 rounded-lg px-3 text-[0.68rem] font-semibold text-fg-2 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
           >
@@ -41,6 +44,7 @@ export function StudioSavedBrushShelf({
       {quickBrushes.length === 0 ? (
         <button
           type="button"
+          data-studio-brush-manager-launcher="true"
           onClick={onManage}
           className="flex min-h-14 w-full items-center justify-center rounded-xl border border-dashed border-line px-3 text-center text-[0.68rem] leading-relaxed text-fg-3 hover:border-accent/60 hover:bg-accent-soft/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
         >

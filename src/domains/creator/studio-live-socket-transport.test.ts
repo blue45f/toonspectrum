@@ -26,7 +26,10 @@ import {
   type StudioLiveSocketLike,
 } from "./studio-live-socket-transport";
 
-import type { StudioLiveTransportContext } from "./studio-live-collaboration-transport";
+import type {
+  StudioLiveTransportContext,
+  StudioLiveTransportControlEvent,
+} from "./studio-live-collaboration-transport";
 
 const NOW = 2_000_000;
 const TOKEN = "signed-session-token-value";
@@ -220,6 +223,56 @@ describe("StudioLiveSocketTransport", () => {
 
     transport.close();
     expect(socket.auth).toEqual({});
+    expect(
+      (transport as unknown as { sessionToken: string | null }).sessionToken
+    ).toBeNull();
+  });
+
+  it.each([
+    {
+      name: "an explicit access revocation",
+      trigger: (socket: FakeSocket) => socket.serverEmit("studio:access:revoked", {
+        workId: "work-1",
+        message: "팀 권한이 회수되었습니다.",
+      }),
+    },
+    {
+      name: "an unauthenticated server failure",
+      trigger: (socket: FakeSocket) => socket.serverEmit("studio:error", {
+        ok: false,
+        code: "unauthenticated",
+        message: "로그인 세션이 만료되었습니다.",
+      }),
+    },
+    {
+      name: "a terminal reconnect rejection",
+      trigger: (socket: FakeSocket) => {
+        socket.serverDisconnect();
+        socket.serverEmit(
+          "connect_error",
+          Object.assign(new Error("로그인 세션이 만료되었습니다."), {
+            data: { code: "unauthenticated" },
+          })
+        );
+      },
+    },
+  ])("scrubs in-memory credentials after $name", async ({ trigger }) => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    await transport.connect();
+
+    trigger(socket);
+
+    expect(transport.ready).toBe(false);
+    expect(socket.connected).toBe(false);
+    expect(socket.auth).toEqual({});
+    expect(
+      (transport as unknown as { sessionToken: string | null }).sessionToken
+    ).toBeNull();
+    transport.close();
   });
 
   it("replays bounded pre-ACK presence deltas over the adapter snapshot", async () => {
@@ -969,6 +1022,7 @@ describe("StudioLiveSocketTransport", () => {
     socket.serverDisconnect();
     socket.serverEmit("connect_error", new Error("temporary network failure"));
     expect(room.ready).toBe(false);
+    expect(socket.auth).toEqual({ sessionToken: TOKEN });
     expect(statuses.at(-1)).toEqual(
       expect.objectContaining({
         status: {
@@ -981,6 +1035,7 @@ describe("StudioLiveSocketTransport", () => {
 
     socket.serverReconnect();
     expect(room.ready).toBe(true);
+    expect(socket.auth).toEqual({ sessionToken: TOKEN });
     expect(statuses.at(-1)).toEqual(
       expect.objectContaining({ status: expect.objectContaining({ state: "ready" }) })
     );
@@ -1001,6 +1056,10 @@ describe("StudioLiveSocketTransport", () => {
 
     await expect(transport.connect()).rejects.toThrow("참여할 권한");
     expect(transport.ready).toBe(false);
+    expect(socket.auth).toEqual({});
+    expect(
+      (transport as unknown as { sessionToken: string | null }).sessionToken
+    ).toBeNull();
     expect(JSON.stringify(socket.emitted)).not.toContain(TOKEN);
     transport.close();
   });
@@ -1358,6 +1417,810 @@ describe("StudioLiveSocketTransport", () => {
     });
     expect(socket.emitted.filter(({ event }) => event === "studio:crdt:sync")).toHaveLength(2);
     room.close();
+  });
+
+  it("maps a dedicated voice room without mixing screen WebRTC identifiers", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.joinResponse = joinSuccess({
+      voiceMembers: [
+        { connectionId: remote.connectionId, callId: "voice-main", muted: true },
+      ],
+    });
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    const received: StudioLiveEnvelope[] = [];
+    transport.subscribe((value) => received.push(value as StudioLiveEnvelope));
+    await transport.connect();
+    activate(transport);
+    expect(received).toContainEqual(
+      expect.objectContaining({
+        kind: "voice:join",
+        payload: { callId: "voice-main", muted: true },
+      })
+    );
+
+    expect(
+      transport.send(envelope("voice:join", { callId: "voice-main", muted: false }, 2))
+    ).toBe(true);
+    expect(socket.emitted.at(-1)).toEqual({
+      event: "studio:voice:join",
+      payload: { workId: "work-1", callId: "voice-main", muted: false },
+    });
+    socket.serverEmit("studio:voice:snapshot", {
+      workId: "work-1",
+      members: [
+        { connectionId: self.connectionId, callId: "voice-main", muted: false },
+        { connectionId: remote.connectionId, callId: "voice-main", muted: true },
+      ],
+    });
+    expect(received.at(-1)).toEqual(
+      expect.objectContaining({
+        kind: "voice:join",
+        sender: expect.objectContaining({ sessionId: remote.connectionId }),
+        payload: { callId: "voice-main", muted: true },
+      })
+    );
+    expect(
+      transport.send(
+        envelope(
+          "voice:description",
+          { callId: "voice-main", type: "offer", sdp: "v=0" },
+          3,
+          remote.connectionId
+        )
+      )
+    ).toBe(true);
+    expect(socket.emitted.at(-1)).toEqual({
+      event: "studio:voice:signal",
+      payload: {
+        workId: "work-1",
+        targetConnectionId: remote.connectionId,
+        callId: "voice-main",
+        kind: "description",
+        description: { type: "offer", sdp: "v=0" },
+      },
+    });
+    expect(
+      transport.send(
+        envelope(
+          "voice:description",
+          { callId: "share-screen", type: "offer", sdp: "v=0" },
+          4,
+          remote.connectionId
+        )
+      )
+    ).toBe(false);
+
+    socket.serverEmit("studio:voice:signal", {
+      fromConnectionId: remote.connectionId,
+      callId: "voice-main",
+      kind: "description",
+      description: { type: "answer", sdp: "v=0" },
+    });
+    expect(received.at(-1)).toEqual(
+      expect.objectContaining({
+        kind: "voice:description",
+        payload: { callId: "voice-main", type: "answer", sdp: "v=0" },
+      })
+    );
+    socket.serverEmit("studio:voice:signal", {
+      fromConnectionId: remote.connectionId,
+      callId: "share-screen",
+      kind: "description",
+      description: { type: "answer", sdp: "v=0" },
+    });
+    expect(received.at(-1)?.payload).toEqual({
+      callId: "voice-main",
+      type: "answer",
+      sdp: "v=0",
+    });
+    transport.close();
+  });
+
+  it("holds voice offers and ICE until the correlated authoritative join ACK succeeds", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.joinResponse = joinSuccess({
+      voiceMembers: [
+        { connectionId: remote.connectionId, callId: "voice-authoritative", muted: false },
+      ],
+    });
+    socket.holdEvents.add("studio:voice:join");
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    await transport.connect();
+    activate(transport);
+
+    expect(transport.send(envelope("voice:join", {
+      callId: "voice-authoritative",
+      muted: false,
+    }, 2))).toBe(true);
+    socket.serverEmit("studio:voice:snapshot", {
+      workId: "work-1",
+      callId: "voice-authoritative",
+      members: [
+        { connectionId: self.connectionId, callId: "voice-authoritative", muted: false },
+        { connectionId: remote.connectionId, callId: "voice-authoritative", muted: false },
+      ],
+    });
+    expect(
+      (transport as unknown as {
+        voiceMemberByConnection: Map<string, unknown>;
+      }).voiceMemberByConnection.has(self.connectionId)
+    ).toBe(false);
+
+    expect(transport.send(envelope(
+      "voice:description",
+      { callId: "voice-authoritative", type: "offer", sdp: "v=0\r\nold-offer" },
+      3,
+      remote.connectionId
+    ))).toBe(true);
+    expect(transport.send(envelope(
+      "voice:ice",
+      {
+        callId: "voice-authoritative",
+        candidate: "candidate:queued",
+        sdpMid: "0",
+        sdpMLineIndex: 0,
+        usernameFragment: null,
+      },
+      4,
+      remote.connectionId
+    ))).toBe(true);
+    expect(socket.emitted.filter(({ event }) => event === "studio:voice:signal")).toEqual([]);
+
+    socket.reply("studio:voice:join", {
+      ok: true,
+      data: {
+        members: [
+          { connectionId: self.connectionId, callId: "voice-authoritative", muted: false },
+          { connectionId: remote.connectionId, callId: "voice-authoritative", muted: false },
+        ],
+      },
+    });
+    expect(socket.emitted.filter(({ event }) => event === "studio:voice:signal")).toEqual([
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          kind: "description",
+          callId: "voice-authoritative",
+        }),
+      }),
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          kind: "candidate",
+          callId: "voice-authoritative",
+        }),
+      }),
+    ]);
+    expect(
+      (transport as unknown as {
+        voiceMemberByConnection: Map<string, unknown>;
+      }).voiceMemberByConnection.has(self.connectionId)
+    ).toBe(true);
+    transport.close();
+  });
+
+  it("coalesces pending mute changes and publishes only the latest state after join admission", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.joinResponse = joinSuccess({
+      voiceMembers: [
+        { connectionId: remote.connectionId, callId: "voice-muted", muted: false },
+      ],
+    });
+    socket.holdEvents.add("studio:voice:join");
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    await transport.connect();
+    activate(transport);
+
+    expect(transport.send(envelope("voice:join", {
+      callId: "voice-muted",
+      muted: false,
+    }, 2))).toBe(true);
+    expect(transport.send(envelope("voice:state", {
+      callId: "voice-muted",
+      muted: true,
+    }, 3))).toBe(true);
+    expect(socket.emitted.filter(({ event }) => event === "studio:voice:state")).toEqual([]);
+
+    socket.reply("studio:voice:join", {
+      ok: true,
+      data: {
+        members: [
+          { connectionId: self.connectionId, callId: "voice-muted", muted: false },
+          { connectionId: remote.connectionId, callId: "voice-muted", muted: false },
+        ],
+      },
+    });
+    expect(socket.emitted.filter(({ event }) => event === "studio:voice:state")).toEqual([
+      {
+        event: "studio:voice:state",
+        payload: { workId: "work-1", callId: "voice-muted", muted: true },
+      },
+    ]);
+    expect(
+      (transport as unknown as {
+        voiceMemberByConnection: Map<string, { muted: boolean }>;
+      }).voiceMemberByConnection.get(self.connectionId)?.muted
+    ).toBe(true);
+    transport.close();
+  });
+
+  it("fails closed when a pending voice attempt exceeds its bounded signal queue", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.joinResponse = joinSuccess({
+      voiceMembers: [
+        { connectionId: remote.connectionId, callId: "voice-overflow", muted: false },
+      ],
+    });
+    socket.holdEvents.add("studio:voice:join");
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    const controls: StudioLiveTransportControlEvent[] = [];
+    transport.subscribeControl((event) => controls.push(event));
+    await transport.connect();
+    activate(transport);
+    expect(transport.send(envelope("voice:join", {
+      callId: "voice-overflow",
+      muted: false,
+    }, 2))).toBe(true);
+
+    for (let index = 0; index < 256; index += 1) {
+      expect(transport.send(envelope(
+        "voice:ice",
+        {
+          callId: "voice-overflow",
+          candidate: `candidate:queued-${index}`,
+          sdpMid: "0",
+          sdpMLineIndex: 0,
+          usernameFragment: null,
+        },
+        index + 3,
+        remote.connectionId
+      ))).toBe(true);
+    }
+    expect(transport.send(envelope(
+      "voice:ice",
+      {
+        callId: "voice-overflow",
+        candidate: "candidate:overflow",
+        sdpMid: "0",
+        sdpMLineIndex: 0,
+        usernameFragment: null,
+      },
+      259,
+      remote.connectionId
+    ))).toBe(false);
+
+    expect(controls).toContainEqual({
+      type: "voice-removed",
+      callId: "voice-overflow",
+      reason: "rejected",
+      message: "음성 연결 신호가 너무 많이 대기해 참가를 안전하게 취소했습니다. 다시 참가해 주세요.",
+    });
+    expect(socket.emitted.filter(({ event }) => event === "studio:voice:signal")).toEqual([]);
+    socket.reply("studio:voice:join", { ok: true, data: { members: [] } });
+    expect(socket.emitted.filter(({ event }) => event === "studio:voice:signal")).toEqual([]);
+    transport.close();
+  });
+
+  it("times out an unacknowledged voice admission and never flushes its queued signals", async () => {
+    vi.useFakeTimers();
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.joinResponse = joinSuccess({
+      voiceMembers: [
+        { connectionId: remote.connectionId, callId: "voice-timeout", muted: false },
+      ],
+    });
+    socket.holdEvents.add("studio:voice:join");
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+      voiceJoinAckTimeoutMs: 250,
+    });
+    const controls: StudioLiveTransportControlEvent[] = [];
+    transport.subscribeControl((event) => controls.push(event));
+    await transport.connect();
+    activate(transport);
+
+    expect(transport.send(envelope("voice:join", {
+      callId: "voice-timeout",
+      muted: false,
+    }, 2))).toBe(true);
+    expect(transport.send(envelope(
+      "voice:description",
+      { callId: "voice-timeout", type: "offer", sdp: "v=0" },
+      3,
+      remote.connectionId
+    ))).toBe(true);
+    await vi.advanceTimersByTimeAsync(250);
+
+    expect(controls).toContainEqual({
+      type: "voice-removed",
+      callId: "voice-timeout",
+      reason: "rejected",
+      message: "음성 작업실 참가 응답 시간이 초과되었습니다. 다시 참가해 주세요.",
+    });
+    expect(socket.emitted.filter(({ event }) => event === "studio:voice:signal")).toEqual([]);
+    expect(
+      (transport as unknown as { pendingVoiceAdmission: unknown }).pendingVoiceAdmission
+    ).toBeNull();
+
+    socket.reply("studio:voice:join", { ok: true, data: { members: [] } });
+    expect(socket.emitted.filter(({ event }) => event === "studio:voice:signal")).toEqual([]);
+    expect(socket.emitted.filter(
+      ({ event, payload }) =>
+        event === "studio:voice:leave" &&
+        (payload as { callId?: string }).callId === "voice-timeout"
+    ).length).toBeGreaterThanOrEqual(2);
+    transport.close();
+  });
+
+  it("isolates voice admission queues across reconnect generations", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.joinResponse = joinSuccess({
+      voiceMembers: [
+        { connectionId: remote.connectionId, callId: "voice-generation", muted: false },
+      ],
+    });
+    socket.holdEvents.add("studio:voice:join");
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    await transport.connect();
+    activate(transport);
+
+    expect(transport.send(envelope("voice:join", {
+      callId: "voice-generation",
+      muted: false,
+    }, 2))).toBe(true);
+    expect(transport.send(envelope(
+      "voice:description",
+      { callId: "voice-generation", type: "offer", sdp: "v=0\r\nstale" },
+      3,
+      remote.connectionId
+    ))).toBe(true);
+
+    socket.serverDisconnect();
+    socket.joinResponse = joinSuccess({
+      voiceMembers: [
+        { connectionId: self.connectionId, callId: "voice-generation", muted: false },
+        { connectionId: remote.connectionId, callId: "voice-generation", muted: false },
+      ],
+    });
+    socket.serverReconnect();
+    expect(
+      (transport as unknown as {
+        voiceMemberByConnection: Map<string, unknown>;
+      }).voiceMemberByConnection.has(self.connectionId)
+    ).toBe(false);
+    expect(transport.send(envelope("voice:join", {
+      callId: "voice-generation",
+      muted: false,
+    }, 4))).toBe(true);
+    expect(transport.send(envelope(
+      "voice:description",
+      { callId: "voice-generation", type: "offer", sdp: "v=0\r\nfresh" },
+      5,
+      remote.connectionId
+    ))).toBe(true);
+
+    socket.reply("studio:voice:join", { ok: true, data: { members: [] } });
+    expect(socket.emitted.filter(({ event }) => event === "studio:voice:signal")).toEqual([]);
+    socket.reply("studio:voice:join", {
+      ok: true,
+      data: {
+        members: [
+          { connectionId: self.connectionId, callId: "voice-generation", muted: false },
+          { connectionId: remote.connectionId, callId: "voice-generation", muted: false },
+        ],
+      },
+    });
+    expect(socket.emitted.filter(({ event }) => event === "studio:voice:signal")).toEqual([
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          description: { type: "offer", sdp: "v=0\r\nfresh" },
+        }),
+      }),
+    ]);
+    transport.close();
+  });
+
+  it("rolls back a capacity-rejected admission without publishing queued media signals", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.joinResponse = joinSuccess({
+      voiceMembers: [
+        { connectionId: remote.connectionId, callId: "voice-full", muted: false },
+      ],
+    });
+    socket.holdEvents.add("studio:voice:join");
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    const controls: StudioLiveTransportControlEvent[] = [];
+    transport.subscribeControl((event) => controls.push(event));
+    await transport.connect();
+    activate(transport);
+
+    expect(transport.send(envelope("voice:join", {
+      callId: "voice-full",
+      muted: false,
+    }, 2))).toBe(true);
+    expect(transport.send(envelope(
+      "voice:description",
+      { callId: "voice-full", type: "offer", sdp: "v=0" },
+      3,
+      remote.connectionId
+    ))).toBe(true);
+    socket.reply("studio:voice:join", {
+      ok: false,
+      code: "rate_limited",
+      message: "음성 대화 정원은 최대 6명입니다.",
+    });
+
+    expect(controls).toContainEqual({
+      type: "voice-removed",
+      callId: "voice-full",
+      reason: "rejected",
+      message: "음성 대화 정원은 최대 6명입니다.",
+    });
+    expect(socket.emitted.filter(({ event }) => event === "studio:voice:signal")).toEqual([]);
+    expect(
+      (transport as unknown as {
+        voiceMemberByConnection: Map<string, unknown>;
+      }).voiceMemberByConnection.has(self.connectionId)
+    ).toBe(false);
+    transport.close();
+  });
+
+  it("reconciles a voice join that arrives while the room ACL acknowledgement is pending", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.holdEvents.add("studio:join");
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    const received: StudioLiveEnvelope[] = [];
+    transport.subscribe((value) => received.push(value as StudioLiveEnvelope));
+    const connecting = transport.connect();
+    socket.serverEmit("studio:voice:join", {
+      connectionId: remote.connectionId,
+      callId: "voice-main",
+      muted: false,
+    });
+    socket.reply("studio:join", joinSuccess({ voiceMembers: [] }));
+    await connecting;
+    activate(transport);
+    expect(received).toContainEqual(
+      expect.objectContaining({
+        kind: "voice:join",
+        sender: expect.objectContaining({ sessionId: remote.connectionId }),
+        payload: { callId: "voice-main", muted: false },
+      })
+    );
+    transport.close();
+  });
+
+  it("replays coalesced voice join and snapshot state exactly once when presence arrives later", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.joinResponse = joinSuccess({ participants: [self], voiceMembers: [] });
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    const received: StudioLiveEnvelope[] = [];
+    transport.subscribe((value) => received.push(value as StudioLiveEnvelope));
+    await transport.connect();
+    activate(transport);
+
+    socket.serverEmit("studio:voice:join", {
+      connectionId: remote.connectionId,
+      callId: "voice-late-presence",
+      muted: true,
+    });
+    socket.serverEmit("studio:voice:snapshot", {
+      workId: "work-1",
+      callId: "voice-late-presence",
+      members: [{
+        connectionId: remote.connectionId,
+        callId: "voice-late-presence",
+        muted: false,
+      }],
+    });
+    expect(received.filter(({ kind }) => kind === "voice:join")).toEqual([]);
+
+    socket.serverEmit("studio:presence:update", {
+      ...remote,
+      updatedAt: new Date(NOW + 1).toISOString(),
+    });
+    socket.serverEmit("studio:presence:update", {
+      ...remote,
+      state: "idle",
+      updatedAt: new Date(NOW + 2).toISOString(),
+    });
+    socket.serverEmit("studio:voice:snapshot", {
+      workId: "work-1",
+      callId: "voice-late-presence",
+      members: [{
+        connectionId: remote.connectionId,
+        callId: "voice-late-presence",
+        muted: false,
+      }],
+    });
+
+    expect(received.filter(({ kind }) => kind === "voice:join")).toEqual([
+      expect.objectContaining({
+        sender: expect.objectContaining({ sessionId: remote.connectionId }),
+        payload: { callId: "voice-late-presence", muted: false },
+      }),
+    ]);
+    transport.close();
+  });
+
+  it("treats a voice state that races ahead of identity as the latest pending membership", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.joinResponse = joinSuccess({ participants: [self], voiceMembers: [] });
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    const received: StudioLiveEnvelope[] = [];
+    transport.subscribe((value) => received.push(value as StudioLiveEnvelope));
+    await transport.connect();
+    activate(transport);
+
+    socket.serverEmit("studio:voice:state", {
+      connectionId: remote.connectionId,
+      callId: "voice-state-first",
+      muted: true,
+    });
+    expect(received.filter(({ kind }) => kind.startsWith("voice:"))).toEqual([]);
+
+    socket.serverEmit("studio:presence:update", {
+      ...remote,
+      updatedAt: new Date(NOW + 1).toISOString(),
+    });
+    expect(received.filter(({ kind }) => kind === "voice:join")).toEqual([
+      expect.objectContaining({
+        payload: { callId: "voice-state-first", muted: true },
+      }),
+    ]);
+    transport.close();
+  });
+
+  it("keeps a voice leave tombstone from being revived by a stale snapshot before presence", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.joinResponse = joinSuccess({ participants: [self], voiceMembers: [] });
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    const received: StudioLiveEnvelope[] = [];
+    transport.subscribe((value) => received.push(value as StudioLiveEnvelope));
+    await transport.connect();
+    activate(transport);
+
+    const member = {
+      connectionId: remote.connectionId,
+      callId: "voice-tombstone",
+      muted: false,
+    };
+    socket.serverEmit("studio:voice:join", member);
+    socket.serverEmit("studio:voice:leave", {
+      connectionId: remote.connectionId,
+      callId: "voice-tombstone",
+    });
+    socket.serverEmit("studio:voice:snapshot", {
+      workId: "work-1",
+      callId: "voice-tombstone",
+      members: [member],
+    });
+    socket.serverEmit("studio:presence:update", {
+      ...remote,
+      updatedAt: new Date(NOW + 1).toISOString(),
+    });
+    socket.serverEmit("studio:presence:update", {
+      ...remote,
+      state: "idle",
+      updatedAt: new Date(NOW + 2).toISOString(),
+    });
+    expect(received.filter(({ kind }) => kind.startsWith("voice:"))).toEqual([]);
+
+    socket.serverEmit("studio:voice:join", { ...member, muted: true });
+    expect(received.filter(({ kind }) => kind === "voice:join")).toEqual([
+      expect.objectContaining({
+        payload: { callId: "voice-tombstone", muted: true },
+      }),
+    ]);
+    transport.close();
+  });
+
+  it("keeps a leave tombstone after presence so a later stale snapshot cannot revive it", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.joinResponse = joinSuccess({ participants: [self], voiceMembers: [] });
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    const received: StudioLiveEnvelope[] = [];
+    transport.subscribe((value) => received.push(value as StudioLiveEnvelope));
+    await transport.connect();
+    activate(transport);
+    const member = {
+      connectionId: remote.connectionId,
+      callId: "voice-late-stale-snapshot",
+      muted: false,
+    };
+
+    socket.serverEmit("studio:voice:join", member);
+    socket.serverEmit("studio:voice:leave", {
+      connectionId: member.connectionId,
+      callId: member.callId,
+    });
+    socket.serverEmit("studio:presence:update", {
+      ...remote,
+      updatedAt: new Date(NOW + 1).toISOString(),
+    });
+    socket.serverEmit("studio:voice:snapshot", {
+      workId: "work-1",
+      callId: member.callId,
+      members: [member],
+    });
+    expect(received.filter(({ kind }) => kind.startsWith("voice:"))).toEqual([]);
+
+    socket.serverEmit("studio:voice:join", { ...member, muted: true });
+    expect(received.filter(({ kind }) => kind === "voice:join")).toEqual([
+      expect.objectContaining({
+        payload: { callId: member.callId, muted: true },
+      }),
+    ]);
+    transport.close();
+  });
+
+  it("cleans up a late successful join acknowledgement after the user already left", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.holdEvents.add("studio:voice:join");
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    await transport.connect();
+    activate(transport);
+
+    expect(transport.send(envelope("voice:join", {
+      callId: "voice-late-ack",
+      muted: false,
+    }, 2))).toBe(true);
+    expect(transport.send(envelope("voice:leave", { callId: "voice-late-ack" }, 3))).toBe(true);
+
+    socket.serverEmit("studio:voice:snapshot", {
+      workId: "work-1",
+      callId: "voice-late-ack",
+      members: [{
+        connectionId: self.connectionId,
+        callId: "voice-late-ack",
+        muted: false,
+      }],
+    });
+    socket.reply("studio:voice:join", { ok: true, data: { members: [] } });
+
+    const leaveRequests = socket.emitted.filter(
+      ({ event, payload }) =>
+        event === "studio:voice:leave" &&
+        (payload as { callId?: string }).callId === "voice-late-ack"
+    );
+    expect(leaveRequests.length).toBeGreaterThanOrEqual(2);
+    expect(
+      (transport as unknown as {
+        voiceMemberByConnection: Map<string, unknown>;
+      }).voiceMemberByConnection.has(self.connectionId)
+    ).toBe(false);
+    transport.close();
+  });
+
+  it("reconciles voice-before-presence and presence-before-voice orderings across reconnects", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.joinResponse = joinSuccess({ participants: [self], voiceMembers: [] });
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    const received: StudioLiveEnvelope[] = [];
+    transport.subscribe((value) => received.push(value as StudioLiveEnvelope));
+    await transport.connect();
+    activate(transport);
+    socket.holdEvents.add("studio:join");
+
+    socket.serverDisconnect();
+    socket.serverReconnect();
+    socket.serverEmit("studio:voice:join", {
+      connectionId: remote.connectionId,
+      callId: "voice-reconnect",
+      muted: false,
+    });
+    socket.reply("studio:join", joinSuccess({ participants: [self], voiceMembers: [] }));
+    expect(received.filter(({ kind }) => kind === "voice:join")).toEqual([]);
+    socket.serverEmit("studio:presence:update", {
+      ...remote,
+      updatedAt: new Date(NOW + 1).toISOString(),
+    });
+    expect(received.filter(({ kind }) => kind === "voice:join")).toHaveLength(1);
+
+    socket.serverDisconnect();
+    socket.serverReconnect();
+    socket.serverEmit("studio:presence:update", {
+      ...remote,
+      state: "idle",
+      updatedAt: new Date(NOW + 2).toISOString(),
+    });
+    socket.serverEmit("studio:voice:snapshot", {
+      workId: "work-1",
+      callId: "voice-reconnect",
+      members: [{
+        connectionId: remote.connectionId,
+        callId: "voice-reconnect",
+        muted: true,
+      }],
+    });
+    socket.reply("studio:join", joinSuccess({ participants: [self], voiceMembers: [] }));
+
+    expect(received.filter(({ kind }) => kind === "voice:join")).toEqual([
+      expect.objectContaining({ payload: { callId: "voice-reconnect", muted: false } }),
+      expect.objectContaining({ payload: { callId: "voice-reconnect", muted: true } }),
+    ]);
+    transport.close();
+  });
+
+  it("bounds unresolved voice identities and only replays entries retained in the pending window", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.joinResponse = joinSuccess({ participants: [self], voiceMembers: [] });
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    const received: StudioLiveEnvelope[] = [];
+    transport.subscribe((value) => received.push(value as StudioLiveEnvelope));
+    await transport.connect();
+    activate(transport);
+
+    for (let index = 0; index <= 256; index += 1) {
+      socket.serverEmit("studio:voice:join", {
+        connectionId: `voice-pending-${index}`,
+        callId: "voice-bounded",
+        muted: false,
+      });
+    }
+    expect(
+      (transport as unknown as {
+        pendingVoiceByConnection: Map<string, unknown>;
+      }).pendingVoiceByConnection.size
+    ).toBe(256);
+
+    socket.serverEmit(
+      "studio:presence:update",
+      serverParticipant("voice-pending-0", "client-pending-0", "먼저 온 팀원")
+    );
+    expect(received.filter(({ kind }) => kind === "voice:join")).toEqual([]);
+    socket.serverEmit(
+      "studio:presence:update",
+      serverParticipant("voice-pending-256", "client-pending-256", "마지막 팀원")
+    );
+    expect(received.filter(({ kind }) => kind === "voice:join")).toEqual([
+      expect.objectContaining({
+        sender: expect.objectContaining({ sessionId: "voice-pending-256" }),
+        payload: { callId: "voice-bounded", muted: false },
+      }),
+    ]);
+    transport.close();
   });
 
   it("maps session chat between the protocol envelope and the server chat events", async () => {

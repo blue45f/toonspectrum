@@ -366,7 +366,7 @@ async function main() {
   const port = await findFreePort();
   const url = `http://127.0.0.1:${port}/studio`;
   let child: ChildProcess | null = null;
-  let exitCode = 1;
+  let exitCode: number;
 
   try {
     child = spawn(
