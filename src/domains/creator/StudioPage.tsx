@@ -977,7 +977,8 @@ import {
   type GuideBox,
   type SmartGuideOverlay,
 } from "./studio-smart-guides";
-import { SMUDGE_RADIUS_DEFAULT, SMUDGE_STRENGTH_DEFAULT, smudgeStrokeImage } from "./studio-smudge";
+import { SMUDGE_RADIUS_DEFAULT, SMUDGE_STRENGTH_DEFAULT } from "./studio-smudge";
+import { smudgeStrokeImage } from "./studio-smudge-browser";
 import { useStudioStableHandlers } from "./studio-stable-handlers";
 import {
   SCENARIO_BEAT_LABELS,

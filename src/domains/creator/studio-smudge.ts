@@ -4,14 +4,11 @@
  * 블렌드를 만든다. studio-brush.ts 의 점 처리 관례(리샘플·최소 간격)를 따르고,
  * studio-flood-fill.ts/studio-magic-wand.ts 의 로더·좌표 반전 헬퍼를 재사용한다(중복 금지).
  *
- * DOM 의존성: smudgeStrokeImage 만 캔버스/Image 를 만진다(studio-flood-fill.ts 의 floodFillImage,
- * studio-magic-wand-browser.ts 의 magicWandScanFromImage 와 동일한 수준·동일한 이유로 테스트 안
- * 됨). 그 외 함수는 전부 순수 — Uint8ClampedArray 를 직접 만들어 유닛 테스트할 수 있다.
+ * DOM 의존성 없음 — 이 파일 전체가 순수하다. 캔버스/Image/Worker 오케스트레이션(smudgeStrokeImage)은
+ * studio-smudge-browser.ts 가 담당한다(studio-magic-wand.ts/studio-magic-wand-browser.ts 와
+ * 동일한 분리 — Worker 클라이언트가 이 파일을 폴백용으로 import해야 하는데, 오케스트레이션
+ * 함수가 여기 있으면 다시 Worker 클라이언트를 import해 순환 참조가 된다).
  */
-import { loadFloodFillSourceImage } from "./studio-flood-fill";
-import { flipNormalizedPoint } from "./studio-magic-wand";
-
-import type { SelPoint } from "./studio-selection-tools";
 
 // 픽셀 공간(원본 자연 해상도) 좌표 — SelPoint(정규화 0..1)와는 다른 개념이니 재사용 금지.
 export type SmudgePixelPoint = { x: number; y: number };
@@ -178,56 +175,4 @@ export function smudgeStroke(
   }
 
   return data;
-}
-
-// ---------------------------------------------------------------------------
-// DOM 경계 — floodFillImage/magicWandScanFromImage 와 동일 수준의(테스트되지 않는) 캔버스 orchestration.
-// ---------------------------------------------------------------------------
-
-/**
- * 문지르기 브러시 — src 이미지에 정규화 스트로크(요소 로컬 0..1, canvasPointToNormalized 로 만든
- * SelPoint 그대로, 화면에 표시된 대로 — 반전 포함)를 적용한 PNG data URL 을 반환한다.
- * strokePoints.length < 2 또는 strength <= 0 이면 캔버스 작업 자체를 생략하고 src 를 그대로
- * 반환한다(floodFillImage 의 NEAR_IDENTICAL2 조기 반환과 동일한 관례 — 무변화 히스토리 방지).
- *
- * @param radiusNorm 요소 "폭" 대비 정규화 반경(캔버스 px ÷ 요소 폭) — SelectionBrushSubpath 와 동일 규약.
- * @param strength 0..1 (StudioPage 가 smudgeStrength(%)/100 로 변환해서 넘긴다).
- * @param opts.flipX/flipY target.flipped/target.flippedY — flipNormalizedPoint 로 스트로크 점을
- *   원본(비반전) 방향으로 되돌린 뒤 자연 해상도로 스케일해 smudgeStroke 에 넘긴다.
- */
-export async function smudgeStrokeImage(
-  src: string,
-  strokePoints: readonly SelPoint[],
-  radiusNorm: number,
-  strength: number,
-  opts?: { flipX?: boolean; flipY?: boolean },
-): Promise<string> {
-  if (strokePoints.length < 2 || strength <= 0) return src;
-
-  const img = await loadFloodFillSourceImage(src);
-  const w = img.naturalWidth || img.width;
-  const h = img.naturalHeight || img.height;
-  if (!w || !h) throw new Error("이미지 크기를 확인할 수 없습니다.");
-
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("캔버스를 만들 수 없습니다.");
-  ctx.drawImage(img, 0, 0, w, h);
-  const imageData = ctx.getImageData(0, 0, w, h);
-  const data = imageData.data;
-
-  const flipX = opts?.flipX ?? false;
-  const flipY = opts?.flipY ?? false;
-  const pixelPoints: SmudgePixelPoint[] = strokePoints.map((p) => {
-    const unflipped = flipNormalizedPoint(p, flipX, flipY);
-    return { x: unflipped.x * w, y: unflipped.y * h };
-  });
-
-  const radiusPx = Number.isFinite(radiusNorm) ? Math.max(1, radiusNorm * w) : 1;
-  smudgeStroke(data, w, h, pixelPoints, radiusPx, strength);
-
-  ctx.putImageData(imageData, 0, 0);
-  return canvas.toDataURL("image/png");
 }
