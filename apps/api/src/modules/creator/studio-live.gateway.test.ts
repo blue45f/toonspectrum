@@ -1078,6 +1078,9 @@ describe("StudioLiveGateway", () => {
       });
       const joining = connectAndJoin(harness, harness.socket("owner"));
 
+      // A brand-new arrival now bounds two stalled discoveries in sequence: the pre-join
+      // occupancy cap check, then the post-join participant list for the ack response.
+      await vi.advanceTimersByTimeAsync(STUDIO_LIVE_ADAPTER_DISCOVERY_TIMEOUT_MS);
       await vi.advanceTimersByTimeAsync(STUDIO_LIVE_ADAPTER_DISCOVERY_TIMEOUT_MS);
       const response = await joining;
 
@@ -1308,6 +1311,37 @@ describe("StudioLiveGateway", () => {
         undefined
       )
     ).resolves.toEqual({ ok: true, data: { accepted: true } });
+  });
+
+  it("admits the first 30 room arrivals and rejects the 31st with rate_limited", async () => {
+    const harness = createHarness();
+    const sockets = Array.from({ length: 31 }, (_, index) => harness.socket(`room-cap-${index}`));
+
+    for (const socket of sockets.slice(0, 30)) {
+      await expect(connectAndJoin(harness, socket)).resolves.toMatchObject({ ok: true });
+    }
+    await expect(connectAndJoin(harness, sockets[30]!)).resolves.toMatchObject({
+      ok: false,
+      code: "rate_limited",
+    });
+
+    expect(sockets[30]?.data.studioParticipant).toBeUndefined();
+    expect(sockets.slice(0, 30).every((socket) => socket.data.studioParticipant?.connectionId === socket.id))
+      .toBe(true);
+  });
+
+  it("never blocks an already-admitted participant re-joining the same, now-full room", async () => {
+    const harness = createHarness();
+    const sockets = Array.from({ length: 30 }, (_, index) => harness.socket(`room-rejoin-${index}`));
+    for (const socket of sockets) await connectAndJoin(harness, socket);
+
+    await expect(
+      harness.gateway.join(
+        sockets[0] as never,
+        { workId: "work-1", clientInstanceId: `client-${sockets[0]!.id}-again` },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: true });
   });
 
   it("relays normalized cursor positions only to the joined work room", async () => {

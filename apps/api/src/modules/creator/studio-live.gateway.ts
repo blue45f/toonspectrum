@@ -55,6 +55,11 @@ const STUDIO_LIVE_MAX_HTTP_BUFFER_SIZE = 384 * 1_024;
 const STUDIO_LIVE_SIGNAL_SDP_MAX_LENGTH = 48 * 1_024;
 const STUDIO_LIVE_SIGNAL_CANDIDATE_MAX_LENGTH = 8 * 1_024;
 export const STUDIO_LIVE_VOICE_MAX_PARTICIPANTS = 6;
+// Soft, approximate cap: read via the same cluster-wide fetchSockets() discovery as
+// listParticipants, not a Postgres advisory lock like voice/lock admission. A join is low
+// frequency (once per session) so this trades a small race window (two nodes briefly both
+// admitting near the boundary) for avoiding a DB round-trip on every room join.
+export const STUDIO_LIVE_ROOM_MAX_PARTICIPANTS = 30;
 const STUDIO_CRDT_OPERATION_BURST = 120;
 const STUDIO_CRDT_OPERATIONS_PER_SECOND = 40;
 const STUDIO_CRDT_BYTE_BURST = 2 * 1_024 * 1_024;
@@ -1044,6 +1049,20 @@ export class StudioLiveGateway
       const existingBeforeRoomJoin = this.participantsBySocket.get(client.id);
       const nextRoom = studioLiveRoom(input.workId);
       const joinedNewRoom = existingBeforeRoomJoin?.workId !== input.workId;
+
+      // Soft occupancy cap — only for a genuinely new arrival, never for an existing participant
+      // re-sending a join (they're already counted in listParticipants and must not be able to
+      // lock themselves out). Checked before the adapter join so this socket isn't in the room
+      // yet and can't double-count itself.
+      if (joinedNewRoom) {
+        const roomOccupancy = await this.listParticipants(input.workId);
+        if (
+          this.isCurrentJoinTransition(client, transitionSequence) &&
+          roomOccupancy.length >= STUDIO_LIVE_ROOM_MAX_PARTICIPANTS
+        ) {
+          return reply(ack, failure("rate_limited", "작업실 정원은 최대 30명입니다."));
+        }
+      }
 
       // Join the adapter room before committing authoritative in-memory state. If an adapter
       // rejects, the socket keeps its previous valid participant instead of becoming a ghost that
