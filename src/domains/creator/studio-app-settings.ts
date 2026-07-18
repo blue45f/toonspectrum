@@ -82,7 +82,7 @@ export const STUDIO_SHORTCUT_ACTIONS = [
   { id: "tool-transform", label: "변형", defaultKeys: "Shift+T" },
   { id: "undo", label: "실행취소", defaultKeys: "Mod+Z" },
   { id: "redo", label: "다시실행", defaultKeys: "Mod+Shift+Z" },
-  { id: "deselect-pixels", label: "픽셀 선택 해제", defaultKeys: "Mod+D" },
+  { id: "deselect-pixels", label: "선택 해제", defaultKeys: "Mod+D" },
   { id: "invert-pixels", label: "픽셀 선택 반전", defaultKeys: "Mod+Shift+I" },
   { id: "toggle-chrome", label: "캔버스만 보기", defaultKeys: "`" },
   { id: "swap-colors", label: "주·보조 색 교체", defaultKeys: "X" },

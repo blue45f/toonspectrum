@@ -2,6 +2,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  STUDIO_EDIT_MENU_COMMAND_ORDER,
+  STUDIO_EDIT_MENU_COMMANDS,
+} from "./studio-edit-controls";
+import {
   resolveStudioMainMenuItemIndex,
   StudioMainMenu,
   type StudioMainMenuGroup,
@@ -29,16 +33,35 @@ const PRODUCTION_MENU_CATALOG: StudioMainMenuGroup[] = [
     id: "edit",
     label: "편집",
     items: [
-      { id: "undo", label: "실행취소", shortcut: "⌘Z", onSelect: vi.fn() },
-      { id: "redo", label: "다시실행", shortcut: "⌘⇧Z", onSelect: vi.fn(), separatorAfter: true },
-      { id: "copy", label: "복사", shortcut: "⌘C", onSelect: vi.fn() },
-      { id: "duplicate", label: "복제", shortcut: "⌘D", onSelect: vi.fn() },
-      { id: "delete", label: "삭제", shortcut: "⌫", onSelect: vi.fn(), danger: true, separatorAfter: true },
-      { id: "select-all", label: "모두 선택", shortcut: "⌘A", onSelect: vi.fn() },
-      { id: "deselect", label: "선택 해제", shortcut: "Esc", onSelect: vi.fn(), separatorAfter: true },
-      { id: "history", label: "작업 내역", onSelect: vi.fn() },
-      { id: "select", label: "선택 도구", shortcut: "V", onSelect: vi.fn() },
-      { id: "eyedropper", label: "스포이드", shortcut: "I", onSelect: vi.fn() },
+      { ...STUDIO_EDIT_MENU_COMMANDS.undo, onSelect: vi.fn() },
+      { ...STUDIO_EDIT_MENU_COMMANDS.redo, onSelect: vi.fn(), separatorAfter: true },
+      { ...STUDIO_EDIT_MENU_COMMANDS.cut, onSelect: vi.fn() },
+      { ...STUDIO_EDIT_MENU_COMMANDS.copy, onSelect: vi.fn() },
+      { ...STUDIO_EDIT_MENU_COMMANDS.paste, onSelect: vi.fn() },
+      { ...STUDIO_EDIT_MENU_COMMANDS["paste-in-place"], onSelect: vi.fn() },
+      { ...STUDIO_EDIT_MENU_COMMANDS["paste-file"], onSelect: vi.fn(), separatorAfter: true },
+      { ...STUDIO_EDIT_MENU_COMMANDS["select-all"], onSelect: vi.fn() },
+      { ...STUDIO_EDIT_MENU_COMMANDS.deselect, onSelect: vi.fn() },
+      { ...STUDIO_EDIT_MENU_COMMANDS["invert-selection"], onSelect: vi.fn() },
+      {
+        ...STUDIO_EDIT_MENU_COMMANDS["clear-selection"],
+        onSelect: vi.fn(),
+        danger: true,
+        separatorAfter: true,
+      },
+      { ...STUDIO_EDIT_MENU_COMMANDS.duplicate, onSelect: vi.fn(), separatorAfter: true },
+      { ...STUDIO_EDIT_MENU_COMMANDS["bring-front"], onSelect: vi.fn() },
+      { ...STUDIO_EDIT_MENU_COMMANDS["bring-forward"], onSelect: vi.fn() },
+      { ...STUDIO_EDIT_MENU_COMMANDS["send-back"], onSelect: vi.fn() },
+      {
+        ...STUDIO_EDIT_MENU_COMMANDS["send-backward"],
+        onSelect: vi.fn(),
+        separatorAfter: true,
+      },
+      { ...STUDIO_EDIT_MENU_COMMANDS["crop-layer"], onSelect: vi.fn(), separatorAfter: true },
+      { ...STUDIO_EDIT_MENU_COMMANDS.history, onSelect: vi.fn() },
+      { ...STUDIO_EDIT_MENU_COMMANDS["pen-pressure"], onSelect: vi.fn() },
+      { ...STUDIO_EDIT_MENU_COMMANDS["app-settings"], onSelect: vi.fn() },
     ],
   },
   {
@@ -220,12 +243,23 @@ describe("StudioMainMenu", () => {
       "프로젝트 가져오기…",
       "PSD 가져오기…",
       "프로젝트 도구…",
+      "잘라내기",
       "복사",
+      "붙여넣기",
+      "현재 위치에 붙여넣기",
+      "이미지 파일 붙여넣기…",
       "복제",
-      "삭제",
       "모두 선택",
       "선택 해제",
-      "스포이드",
+      "선택 반전",
+      "선택 제거",
+      "레이어 · 맨 위로",
+      "레이어 · 위로",
+      "레이어 · 맨 뒤로",
+      "레이어 · 뒤로",
+      "레이어 자르기…",
+      "펜 압력 설정…",
+      "애플리케이션 설정…",
       "템플릿 · 에셋",
       "3D 배경",
       "새 페이지",
@@ -273,5 +307,15 @@ describe("StudioMainMenu", () => {
       ["reset-local-visibility", null],
       ["production-insights", null],
     ]);
+  });
+
+  it("keeps the Magma-style Edit command order and shortcuts explicit", () => {
+    const edit = PRODUCTION_MENU_CATALOG.find((group) => group.id === "edit");
+    expect(edit?.items.map((item) => [item.id, item.shortcut ?? null])).toEqual(
+      STUDIO_EDIT_MENU_COMMAND_ORDER.map((id) => {
+        const command = STUDIO_EDIT_MENU_COMMANDS[id];
+        return [id, "shortcut" in command ? command.shortcut : null];
+      })
+    );
   });
 });

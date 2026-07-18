@@ -5,6 +5,12 @@ import {
   PAGE_NOTE_MAX,
   PASTE_OFFSET,
   CLIPBOARD_FALLBACK_KEY,
+  STUDIO_CLIPBOARD_MAX_ELEMENTS,
+  STUDIO_CLIPBOARD_MAX_ID_CHARS,
+  STUDIO_CLIPBOARD_MAX_IMAGE_AXIS,
+  STUDIO_CLIPBOARD_MAX_IMAGE_PIXELS,
+  STUDIO_CLIPBOARD_MAX_POINT_VALUES,
+  STUDIO_CLIPBOARD_MAX_SOURCE_CHARS,
   STUDIO_CLIPBOARD_KIND,
   STUDIO_CLIPBOARD_VERSION,
   autoPageName,
@@ -13,7 +19,9 @@ import {
   normalizePageMeta,
   withPageMeta,
   buildClipboardPayload,
+  clipboardPayloadMatchesMembers,
   serializeClipboardPayload,
+  studioClipboardFallbackStorageKey,
   parseClipboardPayload,
   isClipboardPayload,
   collectCopyElements,
@@ -193,6 +201,17 @@ describe("buildClipboardPayload", () => {
     expect((p.els[0].points as number[])[0]).toBe(10);
   });
 
+  it("정상 내부 요소의 undefined optional key는 JSON 복사에서 자연스럽게 생략", () => {
+    const payload = buildClipboardPayload([{
+      ...textEl("optional"),
+      groupId: undefined,
+      gradient: undefined,
+    }], SRC, 1);
+    expect(payload.els).toHaveLength(1);
+    expect(payload.els[0]).not.toHaveProperty("groupId");
+    expect(payload.els[0]).not.toHaveProperty("gradient");
+  });
+
   it("id 없는 항목·비객체는 걸러낸다", () => {
     const p = buildClipboardPayload([textEl("ok"), { type: "text" }, null, "junk", 42], SRC, 1);
     expect(p.els.map((e) => e.id)).toEqual(["ok"]);
@@ -204,12 +223,79 @@ describe("buildClipboardPayload", () => {
     expect(p.source.canvasH).toBeGreaterThan(0);
     expect("pageId" in p.source).toBe(false);
   });
+
+  it("Cut은 모든 원본 멤버가 안전 페이로드에 보존된 경우에만 허용", () => {
+    const valid = buildClipboardPayload([textEl("a"), drawEl("b")], SRC, 1);
+    expect(clipboardPayloadMatchesMembers(valid, ["a", "b"])).toBe(true);
+    expect(clipboardPayloadMatchesMembers(valid, ["b", "a"])).toBe(false);
+
+    const rejectedId = "x".repeat(STUDIO_CLIPBOARD_MAX_ID_CHARS + 1);
+    const rejected = buildClipboardPayload([textEl(rejectedId)], SRC, 1);
+    expect(clipboardPayloadMatchesMembers(rejected, [rejectedId])).toBe(false);
+  });
+
+  it("선택 그룹 메타데이터와 애니메이션 트랙만 함께 캡처하고 Cut 관계 완전성을 검사", () => {
+    const payload = buildClipboardPayload(
+      [{ ...textEl("a"), groupId: "dialogue" }, textEl("b")],
+      SRC,
+      10,
+      {
+        groups: [
+          { id: "dialogue", name: "주인공 대사", collapsed: true, hidden: true, locked: true },
+          { id: "unselected", name: "미선택 그룹" },
+        ],
+        animationTimeline: {
+          frameCount: 12,
+          tracks: {
+            a: [{ frameIndex: 2, frame: { id: "frame-a", src: "data:image/png;base64,AA==" } }],
+            outside: [{ frameIndex: 1, frame: { id: "outside", src: "data:image/png;base64,AA==" } }],
+          },
+        },
+      }
+    );
+
+    expect(payload.groups?.map((group) => group.id)).toEqual(["dialogue"]);
+    expect(Object.keys(payload.animation?.tracks ?? {})).toEqual(["a"]);
+    expect(clipboardPayloadMatchesMembers(payload, ["a", "b"], {
+      groupIds: ["dialogue"],
+      trackIds: ["a"],
+    })).toBe(true);
+    expect(clipboardPayloadMatchesMembers(payload, ["a", "b"], {
+      groupIds: ["dialogue"],
+      trackIds: ["a", "b"],
+    })).toBe(false);
+  });
 });
 
 describe("serialize/parse round trip", () => {
   it("직렬화 → 파싱 왕복이 동일 페이로드", () => {
     const p = buildClipboardPayload([textEl("e1"), drawEl("e2")], SRC, 55);
     expect(parseClipboardPayload(serializeClipboardPayload(p))).toEqual(p);
+  });
+
+  it("지원하는 8개 production 요소의 최소 렌더 계약을 모두 왕복", () => {
+    const fixtures: ClipboardElementLike[] = [
+      { id: "image", type: "image", src: "data:image/png;base64,AA==", x: 1, y: 2, width: 30, height: 40, rotation: 0 },
+      textEl("text"),
+      { id: "bubble", type: "bubble", variant: "speech", text: "안녕", x: 1, y: 2, width: 100, height: 80, fill: "#fff", textFill: "#111", rotation: 0 },
+      { id: "sticker", type: "sticker", text: "✨", x: 1, y: 2, fontSize: 32, rotation: 0 },
+      drawEl("draw"),
+      { id: "frame", type: "frame", x: 1, y: 2, width: 300, height: 200 },
+      { id: "focus", type: "focusLines", x: 1, y: 2, width: 300, height: 200, lineCount: 24, innerRadius: 20, outerRadius: 100, stroke: "#111", strokeWidth: 2, noise: 0, rotation: 0 },
+      { id: "speed", type: "speedLines", x: 1, y: 2, width: 300, height: 200, lineCount: 24, direction: "horizontal", stroke: "#111", strokeWidth: 2, rotation: 0 },
+    ];
+    const payload = buildClipboardPayload(fixtures, SRC, 55);
+    expect(payload.els).toHaveLength(fixtures.length);
+    const parsed = parseClipboardPayload(serializeClipboardPayload(payload));
+    expect(parsed?.els).toEqual(fixtures);
+    const plan = parsed && planClipboardPaste(
+      parsed,
+      { canvasW: 720, canvasH: 1080, pageId: "page-2" },
+      seqId("copy")
+    );
+    expect(plan?.els.map((element) => element.type)).toEqual(
+      fixtures.map((element) => element.type)
+    );
   });
 
   it("일반 텍스트/타 JSON/깨진 JSON 은 null (무해 통과)", () => {
@@ -228,6 +314,172 @@ describe("serialize/parse round trip", () => {
     expect(isClipboardPayload({ ...p, els: "not-array" })).toBe(false);
     expect(isClipboardPayload({ ...p, source: { canvasW: 0, canvasH: 1080 } })).toBe(false);
     expect(isClipboardPayload({ ...p, copiedAt: "yesterday" })).toBe(false);
+    expect(isClipboardPayload({ ...p, version: 1 })).toBe(true);
+  });
+
+  it("알 수 없는 요소, 필수 필드 누락, 중복 ID를 외부 페이로드에서 거부", () => {
+    const payload = buildClipboardPayload([textEl("e1")], SRC, 1);
+    expect(isClipboardPayload({ ...payload, els: [{ id: "x", type: "script" }] })).toBe(false);
+    expect(isClipboardPayload({ ...payload, els: [{ id: "x", type: "image", src: "data:image/png;base64,AA==" }] })).toBe(false);
+    expect(isClipboardPayload({ ...payload, els: [textEl("same"), textEl("same")] })).toBe(false);
+  });
+
+  it("요소 수·ID·점 배열·이미지 문자열 안전 예산을 강제", () => {
+    const payload = buildClipboardPayload([textEl("e1")], SRC, 1);
+    const tooMany = Array.from(
+      { length: STUDIO_CLIPBOARD_MAX_ELEMENTS + 1 },
+      (_, index) => textEl(`e-${index}`)
+    );
+    expect(isClipboardPayload({ ...payload, els: tooMany })).toBe(false);
+    expect(isClipboardPayload({
+      ...payload,
+      els: [textEl("x".repeat(STUDIO_CLIPBOARD_MAX_ID_CHARS + 1))],
+    })).toBe(false);
+    expect(isClipboardPayload({
+      ...payload,
+      els: [drawEl("draw", new Array(STUDIO_CLIPBOARD_MAX_POINT_VALUES + 2).fill(0))],
+    })).toBe(false);
+    expect(isClipboardPayload({
+      ...payload,
+      els: [{
+        id: "image",
+        type: "image",
+        src: "x".repeat(STUDIO_CLIPBOARD_MAX_SOURCE_CHARS + 1),
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
+        rotation: 0,
+      }],
+    })).toBe(false);
+  });
+
+  it("고위험 optional 배열과 중첩 필드의 잘못된 타입을 거부", () => {
+    const payload = buildClipboardPayload([textEl("e1")], SRC, 1);
+    const image = {
+      id: "image",
+      type: "image",
+      src: "data:image/png;base64,AA==",
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      rotation: 0,
+    };
+    expect(isClipboardPayload({ ...payload, els: [{ ...image, frames: "not-an-array" }] })).toBe(false);
+    expect(isClipboardPayload({ ...payload, els: [{ ...image, bg3dScene: "not-an-object" }] })).toBe(false);
+    expect(isClipboardPayload({ ...payload, els: [{
+      id: "bubble",
+      type: "bubble",
+      variant: "speech",
+      text: "안녕",
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      fill: "#fff",
+      textFill: "#111",
+      rotation: 0,
+      customShapePoints: [0, "bad"],
+    }] })).toBe(false);
+  });
+
+  it("렌더 루프를 직접 결정하는 집중선·스피드선 개수 상한을 강제", () => {
+    const payload = buildClipboardPayload([textEl("e1")], SRC, 1);
+    const focus = {
+      id: "focus",
+      type: "focusLines",
+      x: 0,
+      y: 0,
+      width: 300,
+      height: 200,
+      lineCount: 200,
+      innerRadius: 20,
+      outerRadius: 100,
+      stroke: "#111",
+      strokeWidth: 2,
+      noise: 0,
+      rotation: 0,
+    };
+    const speed = {
+      id: "speed",
+      type: "speedLines",
+      x: 0,
+      y: 0,
+      width: 300,
+      height: 200,
+      lineCount: 150,
+      direction: "horizontal",
+      stroke: "#111",
+      strokeWidth: 2,
+      rotation: 0,
+    };
+    expect(isClipboardPayload({ ...payload, els: [focus] })).toBe(true);
+    expect(isClipboardPayload({ ...payload, els: [{ ...focus, lineCount: 201 }] })).toBe(false);
+    expect(isClipboardPayload({ ...payload, els: [speed] })).toBe(true);
+    expect(isClipboardPayload({ ...payload, els: [{ ...speed, lineCount: 151 }] })).toBe(false);
+    expect(isClipboardPayload({ ...payload, els: [{ ...speed, lineCount: 10.5 }] })).toBe(false);
+  });
+
+  it("이미지 캔버스 축·픽셀 예산과 스케일 증폭 공격을 렌더 전에 거부", () => {
+    const payload = buildClipboardPayload([textEl("e1")], SRC, 1);
+    const image = {
+      id: "image",
+      type: "image",
+      src: "data:image/png;base64,AA==",
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 100,
+      rotation: 0,
+    };
+    expect(isClipboardPayload({
+      ...payload,
+      els: [{ ...image, width: STUDIO_CLIPBOARD_MAX_IMAGE_AXIS + 1, height: 1 }],
+    })).toBe(false);
+    expect(isClipboardPayload({
+      ...payload,
+      els: [{ ...image, width: 5_000, height: Math.floor(STUDIO_CLIPBOARD_MAX_IMAGE_PIXELS / 5_000) + 1 }],
+    })).toBe(false);
+
+    const amplified = buildClipboardPayload(
+      [image],
+      { canvasW: 1, canvasH: 1, pageId: "hostile" },
+      1
+    );
+    expect(planClipboardPaste(
+      amplified,
+      { canvasW: 720, canvasH: 1080, pageId: "target" },
+      seqId()
+    )).toBeNull();
+  });
+
+  it("잘못된 그룹 이름과 타임라인 관계는 외부 페이로드에서 거부", () => {
+    const base = buildClipboardPayload([{ ...textEl("e1"), groupId: "g1" }], SRC, 1);
+    expect(isClipboardPayload({ ...base, groups: [{ id: "g1", name: "" }] })).toBe(false);
+    expect(isClipboardPayload({ ...base, groups: [{ id: "g1", name: "bad\u0007name" }] })).toBe(false);
+    expect(isClipboardPayload({ ...base, groups: [{ id: "unreferenced", name: "유령" }] })).toBe(false);
+    expect(isClipboardPayload({
+      ...base,
+      animation: {
+        frameCount: 12,
+        tracks: {
+          missing: [{ frameIndex: 0, frame: { id: "f", src: "data:image/png;base64,AA==" } }],
+        },
+      },
+    })).toBe(false);
+    expect(isClipboardPayload({
+      ...base,
+      animation: {
+        frameCount: 12,
+        tracks: {
+          e1: [{
+            frameIndex: 12,
+            frame: { id: "f", src: "data:image/png;base64,AA==" },
+          }],
+        },
+      },
+    })).toBe(false);
   });
 
   it("알 수 없는 추가 필드는 허용(전방 호환)", () => {
@@ -296,6 +548,71 @@ describe("planClipboardPaste", () => {
     expect(c.groupId).not.toBe("g2");
   });
 
+  it("말풍선 내부 앵커·사용자 그룹명·타임라인을 새 ID로 함께 재매핑", () => {
+    const payload = buildClipboardPayload(
+      [
+        { ...textEl("anchor"), groupId: "dialogue" },
+        {
+          id: "bubble",
+          type: "bubble",
+          variant: "speech",
+          text: "안녕",
+          x: 200,
+          y: 300,
+          width: 180,
+          height: 100,
+          fill: "#fff",
+          textFill: "#111",
+          rotation: 0,
+          groupId: "dialogue",
+          tailAnchorId: "anchor",
+        },
+      ],
+      SRC,
+      1,
+      {
+        groups: [{ id: "dialogue", name: "주인공 대사", collapsed: true, hidden: true, locked: true }],
+        animationTimeline: {
+          frameCount: 24,
+          tracks: {
+            bubble: [{
+              frameIndex: 4,
+              frame: { id: "frame-source", src: "data:image/png;base64,AA==", durationMs: 80 },
+              transform: { x: 5, y: -3, rotation: 10, scaleX: 1.1, scaleY: 0.9 },
+              ease: "ease-in-out",
+            }],
+          },
+        },
+      }
+    );
+    const plan = planClipboardPaste(
+      payload,
+      { canvasW: 1440, canvasH: 2160, pageId: "page-2" },
+      seqId("copy")
+    )!;
+
+    expect(plan.ids).toEqual(["copy-1", "copy-2"]);
+    expect(plan.els[1]).toMatchObject({
+      id: "copy-2",
+      groupId: "copy-3",
+      tailAnchorId: "copy-1",
+    });
+    expect(plan.groups).toEqual([{
+      id: "copy-3",
+      name: "주인공 대사",
+      collapsed: false,
+      hidden: false,
+      locked: false,
+    }]);
+    expect(plan.animationFrameCount).toBe(24);
+    expect(plan.animationTracks["copy-2"]).toEqual([{
+      frameIndex: 4,
+      frame: { id: "copy-4", src: "data:image/png;base64,AA==", durationMs: 80 },
+      transform: { x: 10, y: -6, rotation: 10, scaleX: 1.1, scaleY: 0.9 },
+      ease: "ease-in-out",
+    }]);
+  });
+
   it("같은 페이지 → PASTE_OFFSET 겹침 방지, draw 는 points 로 이동", () => {
     const p = buildClipboardPayload([textEl("e1", 100, 200), drawEl("e2", [10, 20, 30, 40])], SRC, 1);
     const plan = planClipboardPaste(p, { canvasW: 720, canvasH: 1080, pageId: "page-1" }, seqId())!;
@@ -332,7 +649,7 @@ describe("planClipboardPaste", () => {
   it("대상 캔버스에서 완전히 벗어난 묶음만 안으로 구조(짧은 페이지로 붙여넣기)", () => {
     // 긴 페이지(y=3000)에서 복사 → 1080 높이 페이지: 완전 이탈이므로 하단에 맞춤
     const tall = buildClipboardPayload(
-      [{ id: "e1", type: "image", x: 100, y: 3000, width: 200, height: 100 }],
+      [{ id: "e1", type: "image", src: "data:image/png;base64,AA==", x: 100, y: 3000, width: 200, height: 100, rotation: 0 }],
       { canvasW: 720, canvasH: 4000, pageId: "page-1" },
       1
     );
@@ -342,7 +659,7 @@ describe("planClipboardPaste", () => {
 
     // 부분 겹침(절반 걸침)은 의도 존중 — 보정하지 않음
     const partial = buildClipboardPayload(
-      [{ id: "e1", type: "image", x: 600, y: 1000, width: 300, height: 300 }],
+      [{ id: "e1", type: "image", src: "data:image/png;base64,AA==", x: 600, y: 1000, width: 300, height: 300, rotation: 0 }],
       SRC,
       1
     );
@@ -352,7 +669,7 @@ describe("planClipboardPaste", () => {
 
   it("캔버스보다 큰 묶음은 시작 모서리(0)에 맞춘다", () => {
     const p = buildClipboardPayload(
-      [{ id: "e1", type: "image", x: 800, y: 0, width: 2000, height: 100 }],
+      [{ id: "e1", type: "image", src: "data:image/png;base64,AA==", x: 800, y: 0, width: 2000, height: 100, rotation: 0 }],
       { canvasW: 720, canvasH: 1080 },
       1
     );
@@ -404,5 +721,18 @@ describe("clipboard fallback storage", () => {
     };
     expect(() => writeClipboardFallback(throwing, buildClipboardPayload([textEl("e1")], SRC, 1))).not.toThrow();
     writeClipboardFallback(null, buildClipboardPayload([textEl("e1")], SRC, 1)); // no-op
+  });
+
+  it("계정과 작품이 다른 세션 폴백을 서로 읽지 않는다", () => {
+    const storage = fakeStorage();
+    const payload = buildClipboardPayload([textEl("private")], SRC, 1);
+    const first = studioClipboardFallbackStorageKey({ authScopeKey: "user-a", workId: "work-a" });
+    const otherUser = studioClipboardFallbackStorageKey({ authScopeKey: "user-b", workId: "work-a" });
+    const otherWork = studioClipboardFallbackStorageKey({ authScopeKey: "user-a", workId: "work-b" });
+
+    writeClipboardFallback(storage, payload, first);
+    expect(readClipboardFallback(storage, first)).toEqual(payload);
+    expect(readClipboardFallback(storage, otherUser)).toBeNull();
+    expect(readClipboardFallback(storage, otherWork)).toBeNull();
   });
 });

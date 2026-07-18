@@ -332,8 +332,9 @@ export function duplicateAnimationTracks(
     if (!sourceTrack || sourceTrack.length === 0 || !copyId || copyId === sourceId) continue;
     tracks ??= { ...doc.tracks };
     tracks[copyId] = sourceTrack.map((keyframe) => ({
-      frameIndex: keyframe.frameIndex,
+      ...keyframe,
       frame: { ...keyframe.frame, id: createFrameId() },
+      ...(keyframe.transform ? { transform: { ...keyframe.transform } } : {}),
     }));
   }
   return tracks ? { ...doc, tracks } : doc;

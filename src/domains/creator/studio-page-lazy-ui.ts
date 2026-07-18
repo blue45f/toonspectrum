@@ -1,0 +1,675 @@
+import { loadStudioBackground3DModule } from "./studio-background-3d-loader";
+
+import type { StudioAssetMenuPanelProps } from "./StudioAssetMenuPanel";
+import type { StudioColorPopoverProps } from "./StudioColorPopover";
+import type { StudioExportMenuPanelProps } from "./StudioExportMenuPanel";
+import type { StudioIntegrationsSettingsPanelProps } from "./StudioIntegrationsSettingsPanel";
+import type { StudioStockImagePanelProps } from "./StudioStockImagePanel";
+import type { ComponentType } from "react";
+
+import { lazyRetry } from "@/lib/lazy-retry";
+
+/**
+ * Optional Studio surfaces live in this explicit registry so StudioPage stays focused on
+ * orchestration. Every feature keeps a literal import() boundary for Vite/Rolldown analysis.
+ */
+const StudioPageThumbnail = lazyRetry(
+  () => import("./StudioPageThumbnails").then((mod) => ({ default: mod.StudioPageThumbnail })),
+  "StudioPageThumbnail"
+);
+const StudioWebGpuCanvas = lazyRetry(
+  () => import("./StudioWebGpuCanvas").then((mod) => ({ default: mod.StudioWebGpuCanvas })),
+  "StudioWebGpuCanvas"
+);
+const StudioRasterCrdtSurface = lazyRetry(
+  () => import("./StudioRasterCrdtSurface").then((mod) => ({ default: mod.StudioRasterCrdtSurface })),
+  "StudioRasterCrdtSurface"
+);
+const StudioPublishContextBanner = lazyRetry(
+  () => import("./StudioPublishContextBanner").then((mod) => ({ default: mod.StudioPublishContextBanner })),
+  "StudioPublishContextBanner"
+);
+const StudioContinuityMetadataEditor = lazyRetry(
+  () => import("./StudioContinuityMetadataEditor").then((mod) => ({ default: mod.StudioContinuityMetadataEditor })),
+  "StudioContinuityMetadataEditor"
+);
+const StudioUploadPublish = lazyRetry(
+  () => import("./StudioUploadPublish").then((mod) => ({ default: mod.StudioUploadPublish })),
+  "StudioUploadPublish"
+);
+const StudioLivePresenceDockConnected = lazyRetry(
+  () => import("./StudioLiveCanvasOverlay").then((mod) => ({ default: mod.StudioLivePresenceDockConnected })),
+  "StudioLivePresenceDockConnected"
+);
+const StudioRemoteCursorOverlay = lazyRetry(
+  () => import("./StudioLiveCanvasOverlay").then((mod) => ({ default: mod.StudioRemoteCursorOverlay })),
+  "StudioRemoteCursorOverlay"
+);
+const StudioPageGradePanel = lazyRetry(
+  () => import("./StudioPageGradePanel").then((mod) => ({ default: mod.StudioPageGradePanel })),
+  "StudioPageGradePanel"
+);
+const StudioBubbleStylePresetPanel = lazyRetry(
+  () => import("./StudioBubbleStylePresetPanel").then((mod) => ({ default: mod.StudioBubbleStylePresetPanel })),
+  "StudioBubbleStylePresetPanel"
+);
+const StudioBubbleAutoShrinkPanel = lazyRetry(
+  () => import("./StudioBubbleAutoShrinkPanel").then((mod) => ({ default: mod.StudioBubbleAutoShrinkPanel })),
+  "StudioBubbleAutoShrinkPanel"
+);
+const StudioDialogueBatchPanel = lazyRetry(
+  () => import("./StudioDialogueBatchPanel").then((mod) => ({ default: mod.StudioDialogueBatchPanel })),
+  "StudioDialogueBatchPanel"
+);
+const StudioQuickActionsMenu = lazyRetry(
+  () => import("./StudioQuickActionsMenu").then((mod) => ({ default: mod.StudioQuickActionsMenu })),
+  "StudioQuickActionsMenu"
+);
+const StudioHistoryPanel = lazyRetry(
+  () => import("./StudioHistoryPanel").then((mod) => ({ default: mod.StudioHistoryPanel })),
+  "StudioHistoryPanel"
+);
+const StudioCheckpointPanel = lazyRetry(
+  () => import("./StudioCheckpointPanel").then((mod) => ({ default: mod.StudioCheckpointPanel })),
+  "StudioCheckpointPanel"
+);
+const StudioAutoActionsPanel = lazyRetry(
+  () => import("./StudioAutoActionsPanel").then((mod) => ({ default: mod.StudioAutoActionsPanel })),
+  "StudioAutoActionsPanel"
+);
+const StudioCharacterBiblePanel = lazyRetry(
+  () => import("./StudioCharacterBiblePanel").then((mod) => ({ default: mod.StudioCharacterBiblePanel })),
+  "StudioCharacterBiblePanel"
+);
+const StudioWriterRoomPanel = lazyRetry(
+  () => import("./StudioWriterRoomPanel").then((mod) => ({ default: mod.StudioWriterRoomPanel })),
+  "StudioWriterRoomPanel"
+);
+const StudioAiProvenancePanel = lazyRetry(
+  () =>
+    import("./StudioAiProvenancePanel").then((mod) => ({
+      default: mod.StudioAiProvenancePanel,
+    })),
+  "StudioAiProvenancePanel"
+);
+const StudioPageReviewPanel = lazyRetry(
+  () => import("./StudioPageReviewPanel").then((mod) => ({ default: mod.StudioPageReviewPanel })),
+  "StudioPageReviewPanel"
+);
+const StudioContinuityPanel = lazyRetry(
+  () => import("./StudioContinuityPanel").then((mod) => ({ default: mod.StudioContinuityPanel })),
+  "StudioContinuityPanel"
+);
+const StudioFrameAnimationPanel = lazyRetry(
+  () => import("./StudioFrameAnimationPanel").then((mod) => ({ default: mod.StudioFrameAnimationPanel })),
+  "StudioFrameAnimationPanel"
+);
+const StudioAnimTimelinePanel = lazyRetry(
+  () => import("./StudioAnimTimelinePanel").then((mod) => ({ default: mod.StudioAnimTimelinePanel })),
+  "StudioAnimTimelinePanel"
+);
+const StudioMasterPagePanel = lazyRetry(
+  () => import("./StudioMasterPagePanel").then((mod) => ({ default: mod.StudioMasterPagePanel })),
+  "StudioMasterPagePanel"
+);
+const StudioStoryboardGridPanel = lazyRetry(
+  () => import("./StudioStoryboardGridPanel").then((mod) => ({ default: mod.StudioStoryboardGridPanel })),
+  "StudioStoryboardGridPanel"
+);
+const StudioShortcutsHelp = lazyRetry(
+  () => import("./StudioShortcutsHelp").then((mod) => ({ default: mod.StudioShortcutsHelp })),
+  "StudioShortcutsHelp"
+);
+const StudioStickerGrid = lazyRetry(
+  () => import("./studio-sticker-grid").then((mod) => ({ default: mod.StudioStickerGrid })),
+  "StudioStickerGrid"
+);
+const StudioCollagePanel = lazyRetry(
+  () => import("./StudioCollagePanel").then((mod) => ({ default: mod.StudioCollagePanel })),
+  "StudioCollagePanel"
+);
+const StudioElementsPanel = lazyRetry(
+  () => import("./StudioElementsPanel").then((mod) => ({ default: mod.StudioElementsPanel })),
+  "StudioElementsPanel"
+);
+const StudioBackgroundPanel = lazyRetry(
+  () => import("./StudioBackgroundPanel").then((mod) => ({ default: mod.StudioBackgroundPanel })),
+  "StudioBackgroundPanel"
+);
+const StudioCanvasResizer = lazyRetry(
+  () => import("./StudioCanvasResizer").then((mod) => ({ default: mod.StudioCanvasResizer })),
+  "StudioCanvasResizer"
+);
+const StudioRasterAssetGrid = lazyRetry(
+  () => import("./StudioRasterAssetGrid").then((mod) => ({ default: mod.StudioRasterAssetGrid })),
+  "StudioRasterAssetGrid"
+);
+const StudioTextEffectPanel = lazyRetry(
+  () => import("./StudioTextEffectPanel").then((mod) => ({ default: mod.StudioTextEffectPanel })),
+  "StudioTextEffectPanel"
+);
+const StudioGradientEnginePanel = lazyRetry(
+  () => import("./StudioGradientEnginePanel").then((mod) => ({ default: mod.StudioGradientEnginePanel })),
+  "StudioGradientEnginePanel"
+);
+const StudioPatternFillPanel = lazyRetry(
+  () => import("./StudioPatternFillPanel").then((mod) => ({ default: mod.StudioPatternFillPanel })),
+  "StudioPatternFillPanel"
+);
+const StudioTextPathPanel = lazyRetry(
+  () => import("./StudioTextPathPanel").then((mod) => ({ default: mod.StudioTextPathPanel })),
+  "StudioTextPathPanel"
+);
+const StudioTonePanel = lazyRetry(
+  () => import("./StudioTonePanel").then((mod) => ({ default: mod.StudioTonePanel })),
+  "StudioTonePanel"
+);
+const StudioStrokeShapePanel = lazyRetry(
+  () => import("./StudioStrokeShapePanel").then((mod) => ({ default: mod.StudioStrokeShapePanel })),
+  "StudioStrokeShapePanel"
+);
+const StudioSelectionToolsPanel = lazyRetry(
+  () => import("./StudioSelectionToolsPanel").then((mod) => ({ default: mod.StudioSelectionToolsPanel })),
+  "StudioSelectionToolsPanel"
+);
+const StudioCropPanel = lazyRetry(
+  () => import("./StudioCropPanel").then((mod) => ({ default: mod.StudioCropPanel })),
+  "StudioCropPanel"
+);
+const StudioPerspectivePanel = lazyRetry(
+  () => import("./StudioPerspectivePanel").then((mod) => ({ default: mod.StudioPerspectivePanel })),
+  "StudioPerspectivePanel"
+);
+const StudioIsometricGridPanel = lazyRetry(
+  () => import("./StudioIsometricGridPanel").then((mod) => ({ default: mod.StudioIsometricGridPanel })),
+  "StudioIsometricGridPanel"
+);
+const StudioVrmPoser = lazyRetry(
+  () => import("./StudioVrmPoser").then((mod) => ({ default: mod.StudioVrmPoser })),
+  "StudioVrmPoser"
+);
+const StudioBackground3D = lazyRetry(
+  () => loadStudioBackground3DModule().then((mod) => ({ default: mod.StudioBackground3D })),
+  "StudioBackground3D"
+);
+const StudioTimelapsePanel = lazyRetry(
+  () => import("./StudioTimelapsePanel").then((mod) => ({ default: mod.StudioTimelapsePanel })),
+  "StudioTimelapsePanel"
+);
+const WorkFxPanel = lazyRetry(
+  () => import("./WorkFxPanel").then((mod) => ({ default: mod.WorkFxPanel })),
+  "WorkFxPanel"
+);
+const StudioBrandKitPanel = lazyRetry(
+  () => import("./StudioBrandKitPanel").then((mod) => ({ default: mod.StudioBrandKitPanel })),
+  "StudioBrandKitPanel"
+);
+const StudioBubbleAnchorPanel = lazyRetry(
+  () => import("./StudioBubbleAnchorPanel").then((mod) => ({ default: mod.StudioBubbleAnchorPanel })),
+  "StudioBubbleAnchorPanel"
+);
+const StudioBubbleTailControls = lazyRetry(
+  () => import("./StudioBubbleTailControls").then((mod) => ({ default: mod.StudioBubbleTailControls })),
+  "StudioBubbleTailControls"
+);
+const StudioSmudgePanel = lazyRetry(
+  () => import("./StudioSmudgePanel").then((mod) => ({ default: mod.StudioSmudgePanel })),
+  "StudioSmudgePanel"
+);
+const StudioLiquifyPanel = lazyRetry(
+  () => import("./StudioLiquifyPanel").then((mod) => ({ default: mod.StudioLiquifyPanel })),
+  "StudioLiquifyPanel"
+);
+const StudioHealClonePanel = lazyRetry(
+  () => import("./StudioHealClonePanel").then((mod) => ({ default: mod.StudioHealClonePanel })),
+  "StudioHealClonePanel"
+);
+const StudioHistoryBrushPanel = lazyRetry(
+  () => import("./StudioHistoryBrushPanel").then((mod) => ({ default: mod.StudioHistoryBrushPanel })),
+  "StudioHistoryBrushPanel"
+);
+const StudioLayerMaskPanel = lazyRetry(
+  () => import("./StudioLayerMaskPanel").then((mod) => ({ default: mod.StudioLayerMaskPanel })),
+  "StudioLayerMaskPanel"
+);
+const StudioPuppetWarpPanel = lazyRetry(
+  () => import("./StudioPuppetWarpPanel").then((mod) => ({ default: mod.StudioPuppetWarpPanel })),
+  "StudioPuppetWarpPanel"
+);
+const StudioQuickShapePanel = lazyRetry(
+  () => import("./StudioQuickShapePanel").then((mod) => ({ default: mod.StudioQuickShapePanel })),
+  "StudioQuickShapePanel"
+);
+const StudioFeatureTutorialHub = lazyRetry(
+  () => import("./StudioFeatureTutorialHub").then((mod) => ({ default: mod.StudioFeatureTutorialHub })),
+  "StudioFeatureTutorialHub"
+);
+const StudioMainMenu = lazyRetry(
+  () => import("./StudioMainMenu").then((mod) => ({ default: mod.StudioMainMenu })),
+  "StudioMainMenu"
+);
+const StudioDrawOptionsBar = lazyRetry(
+  () => import("./StudioDrawOptionsBar").then((mod) => ({ default: mod.StudioDrawOptionsBar })),
+  "StudioDrawOptionsBar"
+);
+const StudioUnifiedBrushPicker = lazyRetry(
+  () => import("./StudioUnifiedBrushPicker").then((mod) => ({ default: mod.StudioUnifiedBrushPicker })),
+  "StudioUnifiedBrushPicker"
+);
+const StudioBrushCatalogPortal = lazyRetry(
+  () => import("./StudioBrushLibrarySheet").then((mod) => ({ default: mod.StudioBrushCatalogPortal })),
+  "StudioBrushCatalogPortal"
+);
+const StudioSelectionAntsOverlay = lazyRetry(
+  () => import("./StudioSelectionOverlays").then((mod) => ({ default: mod.StudioSelectionAntsOverlay })),
+  "StudioSelectionAntsOverlay"
+);
+const StudioCropOverlay = lazyRetry(
+  () => import("./StudioSelectionOverlays").then((mod) => ({ default: mod.StudioCropOverlay })),
+  "StudioCropOverlay"
+);
+const StudioNodeEditOverlay = lazyRetry(
+  () => import("./StudioSelectionOverlays").then((mod) => ({ default: mod.StudioNodeEditOverlay })),
+  "StudioNodeEditOverlay"
+);
+const StudioBubbleShapeOverlay = lazyRetry(
+  () => import("./StudioSelectionOverlays").then((mod) => ({ default: mod.StudioBubbleShapeOverlay })),
+  "StudioBubbleShapeOverlay"
+);
+const StudioOnionSkinImage = lazyRetry(
+  () => import("./StudioSelectionOverlays").then((mod) => ({ default: mod.StudioOnionSkinImage })),
+  "StudioOnionSkinImage"
+);
+const StudioLiveInkOverlayHost = lazyRetry(
+  () => import("./StudioLiveInkHosts").then((mod) => ({ default: mod.StudioLiveInkOverlayHost })),
+  "StudioLiveInkOverlayHost"
+);
+const StudioLiveStampOverlayHost = lazyRetry(
+  () => import("./StudioLiveInkHosts").then((mod) => ({ default: mod.StudioLiveStampOverlayHost })),
+  "StudioLiveStampOverlayHost"
+);
+const StudioLiveInkPredictionHost = lazyRetry(
+  () => import("./StudioLiveInkHosts").then((mod) => ({ default: mod.StudioLiveInkPredictionHost })),
+  "StudioLiveInkPredictionHost"
+);
+const StudioLivePressureHudPill = lazyRetry(
+  () => import("./StudioLiveInkHosts").then((mod) => ({ default: mod.StudioLivePressureHudPill })),
+  "StudioLivePressureHudPill"
+);
+const loadStudioBrushStudio = () => import("./StudioBrushStudio");
+const StudioBrushStudio = lazyRetry(
+  () => loadStudioBrushStudio().then((mod) => ({ default: mod.StudioBrushStudio })),
+  "StudioBrushStudio"
+);
+const QuickStartPanel = lazyRetry(
+  () =>
+    import("./StudioQuickStartPanel").then((module) => ({
+      default: module.StudioQuickStartPanel,
+    })),
+  "StudioQuickStartPanel"
+);
+const StudioShapePickerGrid = lazyRetry(
+  () => import("./studio-creative-visuals").then((mod) => ({ default: mod.StudioShapePickerGrid })),
+  "StudioShapePickerGrid"
+);
+const StudioSelectOptionsBar = lazyRetry(
+  () => import("./StudioSelectOptionsBar").then((mod) => ({ default: mod.StudioSelectOptionsBar })),
+  "StudioSelectOptionsBar"
+);
+const StudioBrushLibraryPanel = lazyRetry(
+  () => import("./StudioBrushLibraryPanel").then((mod) => ({ default: mod.StudioBrushLibraryPanel })),
+  "StudioBrushLibraryPanel"
+);
+
+const StudioScrollPreviewPanel = lazyRetry(
+  () => import("./StudioScrollPreviewPanel").then((mod) => ({ default: mod.StudioScrollPreviewPanel })),
+  "StudioScrollPreviewPanel"
+);
+const StudioEmeresLibraryPanel = lazyRetry(
+  () => import("./StudioEmeresLibraryPanel").then((mod) => ({ default: mod.StudioEmeresLibraryPanel })),
+  "StudioEmeresLibraryPanel"
+);
+const StudioAiAssistHub = lazyRetry(
+  () => import("./StudioAiAssistHub").then((mod) => ({ default: mod.StudioAiAssistHub })),
+  "StudioAiAssistHub"
+);
+const StudioAiBackgroundPanel = lazyRetry(
+  () => import("./StudioAiBackgroundPanel").then((mod) => ({ default: mod.StudioAiBackgroundPanel })),
+  "StudioAiBackgroundPanel"
+);
+const StudioAiColorizePanel = lazyRetry(
+  () => import("./StudioAiColorizePanel").then((mod) => ({ default: mod.StudioAiColorizePanel })),
+  "StudioAiColorizePanel"
+);
+const StudioAiCompositionPanel = lazyRetry(
+  () => import("./StudioAiCompositionPanel").then((mod) => ({ default: mod.StudioAiCompositionPanel })),
+  "StudioAiCompositionPanel"
+);
+const StudioAiCharacterConsistencyPanel = lazyRetry(
+  () =>
+    import("./StudioAiCharacterConsistencyPanel").then((mod) => ({
+      default: mod.StudioAiCharacterConsistencyPanel,
+    })),
+  "StudioAiCharacterConsistencyPanel"
+);
+const StudioDialogueSuggestPanel = lazyRetry(
+  () => import("./StudioDialogueSuggestPanel").then((mod) => ({ default: mod.StudioDialogueSuggestPanel })),
+  "StudioDialogueSuggestPanel"
+);
+const StudioPaletteSuggestPanel = lazyRetry(
+  () => import("./StudioPaletteSuggestPanel").then((mod) => ({ default: mod.StudioPaletteSuggestPanel })),
+  "StudioPaletteSuggestPanel"
+);
+const StudioDialogueTranslatePanel = lazyRetry(
+  () => import("./StudioDialogueTranslatePanel").then((mod) => ({ default: mod.StudioDialogueTranslatePanel })),
+  "StudioDialogueTranslatePanel"
+);
+const StudioScenarioAutoLayoutPanel = lazyRetry(
+  () =>
+    import("./StudioScenarioAutoLayoutPanel").then((mod) => ({
+      default: mod.StudioScenarioAutoLayoutPanel,
+    })),
+  "StudioScenarioAutoLayoutPanel"
+);
+const StudioPublishPreflightPanel = lazyRetry(
+  () =>
+    import("./StudioPublishPreflightPanel").then((mod) => ({
+      default: mod.StudioPublishPreflightPanel,
+    })),
+  "StudioPublishPreflightPanel"
+);
+const StudioPublishPackagePanel = lazyRetry(
+  () =>
+    import("./StudioPublishPackagePanel").then((mod) => ({
+      default: mod.StudioPublishPackagePanel,
+    })),
+  "StudioPublishPackagePanel"
+);
+const StudioProductionInsightsPanel = lazyRetry(
+  () =>
+    import("./StudioProductionInsightsPanel").then((mod) => ({
+      default: mod.StudioProductionInsightsPanel,
+    })),
+  "StudioProductionInsightsPanel"
+);
+const StudioPublicationOperationsPanel = lazyRetry(
+  () =>
+    import("./StudioPublicationOperationsPanel").then((mod) => ({
+      default: mod.StudioPublicationOperationsPanel,
+    })),
+  "StudioPublicationOperationsPanel"
+);
+const StudioCommentsPanel = lazyRetry(
+  () =>
+    import("./StudioCommentsPanel").then((mod) => ({
+      default: mod.StudioCommentsPanel,
+    })),
+  "StudioCommentsPanel"
+);
+
+// Review networking and mutation verification are not part of the first-paint drawing path.
+// Keep them in optional chunks while retaining the lightweight persisted comment model needed
+// for canvas pins and project compatibility in the static Studio graph.
+const loadStudioTeamCommentClient = () => import("./studio-team-comment-client");
+const loadStudioTeamCommentMutationPlanner = () =>
+  import("./studio-team-comment-mutation-plan");
+const StudioTeamPanel = lazyRetry(
+  () =>
+    import("./StudioTeamPanel").then((mod) => ({
+      default: mod.StudioTeamPanel,
+    })),
+  "StudioTeamPanel"
+);
+function loadStudioReferencePanel() {
+  return import("./StudioReferencePanel").then((mod) => ({ default: mod.StudioReferencePanel }));
+}
+const StudioReferencePanel = lazyRetry(loadStudioReferencePanel, "StudioReferencePanel");
+function preloadStudioReferencePanel(): void {
+  void loadStudioReferencePanel();
+}
+function loadStudioColorWheelOverlay() {
+  return import("./StudioColorWheelOverlay").then((mod) => ({ default: mod.StudioColorWheelOverlay }));
+}
+const StudioColorWheelOverlay = lazyRetry(loadStudioColorWheelOverlay, "StudioColorWheelOverlay");
+
+type StudioAssetMenuPanelModule = { default: ComponentType<StudioAssetMenuPanelProps> };
+let studioAssetMenuPanelPromise: Promise<StudioAssetMenuPanelModule> | null = null;
+
+function loadStudioAssetMenuPanel(): Promise<StudioAssetMenuPanelModule> {
+  studioAssetMenuPanelPromise ??= import("./StudioAssetMenuPanel").then((mod) => ({
+    default: mod.StudioAssetMenuPanel,
+  }));
+  return studioAssetMenuPanelPromise;
+}
+
+const StudioAssetMenuPanel = lazyRetry(loadStudioAssetMenuPanel, "StudioAssetMenuPanel");
+
+function preloadStudioAssetMenuPanel(): void {
+  void loadStudioAssetMenuPanel();
+}
+
+type StudioStockImagePanelModule = { default: ComponentType<StudioStockImagePanelProps> };
+let studioStockImagePanelPromise: Promise<StudioStockImagePanelModule> | null = null;
+
+function loadStudioStockImagePanel(): Promise<StudioStockImagePanelModule> {
+  studioStockImagePanelPromise ??= import("./StudioStockImagePanel").then((mod) => ({
+    default: mod.StudioStockImagePanel,
+  }));
+  return studioStockImagePanelPromise;
+}
+
+const StudioStockImagePanel = lazyRetry(loadStudioStockImagePanel, "StudioStockImagePanel");
+
+function preloadStudioStockImagePanel(): void {
+  void loadStudioStockImagePanel();
+}
+
+type StudioIntegrationsSettingsPanelModule = { default: ComponentType<StudioIntegrationsSettingsPanelProps> };
+let studioIntegrationsSettingsPanelPromise: Promise<StudioIntegrationsSettingsPanelModule> | null = null;
+
+function loadStudioIntegrationsSettingsPanel(): Promise<StudioIntegrationsSettingsPanelModule> {
+  studioIntegrationsSettingsPanelPromise ??= import("./StudioIntegrationsSettingsPanel").then((mod) => ({
+    default: mod.StudioIntegrationsSettingsPanel,
+  }));
+  return studioIntegrationsSettingsPanelPromise;
+}
+
+const StudioIntegrationsSettingsPanel = lazyRetry(
+  loadStudioIntegrationsSettingsPanel,
+  "StudioIntegrationsSettingsPanel"
+);
+
+function preloadStudioIntegrationsSettingsPanel(): void {
+  void loadStudioIntegrationsSettingsPanel();
+}
+
+const StudioAppSettingsPanel = lazyRetry(
+  () => import("./StudioAppSettingsPanel").then((mod) => ({ default: mod.StudioAppSettingsPanel })),
+  "StudioAppSettingsPanel"
+);
+
+type StudioExportMenuPanelModule = { default: ComponentType<StudioExportMenuPanelProps> };
+let studioExportMenuPanelPromise: Promise<StudioExportMenuPanelModule> | null = null;
+
+function loadStudioExportMenuPanel(): Promise<StudioExportMenuPanelModule> {
+  studioExportMenuPanelPromise ??= import("./StudioExportMenuPanel").then((mod) => ({
+    default: mod.StudioExportMenuPanel,
+  }));
+  return studioExportMenuPanelPromise;
+}
+
+const StudioExportMenuPanel = lazyRetry(loadStudioExportMenuPanel, "StudioExportMenuPanel");
+
+function preloadStudioExportMenuPanel(): void {
+  void loadStudioExportMenuPanel();
+}
+
+type StudioWebtoonGuidesModule = typeof import("./studio-webtoon-guides");
+let studioWebtoonGuidesPromise: Promise<StudioWebtoonGuidesModule> | null = null;
+
+function loadStudioWebtoonGuides(): Promise<StudioWebtoonGuidesModule> {
+  studioWebtoonGuidesPromise ??= import("./studio-webtoon-guides").catch((error) => {
+    studioWebtoonGuidesPromise = null;
+    throw error;
+  });
+  return studioWebtoonGuidesPromise;
+}
+
+type StudioColorPopoverModule = { default: ComponentType<StudioColorPopoverProps> };
+
+let studioColorPopoverPromise: Promise<StudioColorPopoverModule> | null = null;
+
+function loadStudioColorPopover(): Promise<StudioColorPopoverModule> {
+  studioColorPopoverPromise ??= import("./StudioColorPopover").then((mod) => ({
+    default: mod.StudioColorPopover,
+  }));
+  return studioColorPopoverPromise;
+}
+
+const StudioColorPopoverContent = lazyRetry(loadStudioColorPopover, "StudioColorPopover");
+
+type StudioComipoAssemblyModule = typeof import("./studio-comipo-assembly");
+type StudioComipoShippedModule = typeof import("./studio-comipo-shipped");
+
+let studioComipoAssemblyPromise: Promise<StudioComipoAssemblyModule> | null = null;
+let studioComipoShippedPromise: Promise<StudioComipoShippedModule> | null = null;
+
+function loadStudioComipoAssembly(): Promise<StudioComipoAssemblyModule> {
+  studioComipoAssemblyPromise ??= import("./studio-comipo-assembly").catch((error) => {
+    studioComipoAssemblyPromise = null;
+    throw error;
+  });
+  return studioComipoAssemblyPromise;
+}
+
+function loadStudioComipoShipped(): Promise<StudioComipoShippedModule> {
+  studioComipoShippedPromise ??= import("./studio-comipo-shipped").catch((error) => {
+    studioComipoShippedPromise = null;
+    throw error;
+  });
+  return studioComipoShippedPromise;
+}
+
+function preloadStudioColorPopover(): void {
+  void loadStudioColorPopover();
+}
+
+export {
+  StudioAiAssistHub,
+  StudioAiBackgroundPanel,
+  StudioAiCharacterConsistencyPanel,
+  StudioAiColorizePanel,
+  StudioAiCompositionPanel,
+  StudioAiProvenancePanel,
+  StudioAnimTimelinePanel,
+  StudioAppSettingsPanel,
+  StudioAssetMenuPanel,
+  StudioAutoActionsPanel,
+  StudioBackground3D,
+  StudioBackgroundPanel,
+  StudioBrandKitPanel,
+  StudioBrushCatalogPortal,
+  StudioBrushLibraryPanel,
+  StudioBrushStudio,
+  StudioBubbleAnchorPanel,
+  StudioBubbleAutoShrinkPanel,
+  StudioBubbleShapeOverlay,
+  StudioBubbleStylePresetPanel,
+  StudioBubbleTailControls,
+  StudioCanvasResizer,
+  StudioCharacterBiblePanel,
+  StudioCheckpointPanel,
+  StudioCollagePanel,
+  StudioColorPopoverContent,
+  StudioColorWheelOverlay,
+  StudioCommentsPanel,
+  StudioContinuityMetadataEditor,
+  StudioContinuityPanel,
+  StudioCropOverlay,
+  StudioCropPanel,
+  StudioDialogueBatchPanel,
+  StudioDialogueSuggestPanel,
+  StudioDialogueTranslatePanel,
+  StudioDrawOptionsBar,
+  StudioElementsPanel,
+  StudioEmeresLibraryPanel,
+  StudioExportMenuPanel,
+  StudioFeatureTutorialHub,
+  StudioFrameAnimationPanel,
+  StudioGradientEnginePanel,
+  StudioHealClonePanel,
+  StudioHistoryBrushPanel,
+  StudioHistoryPanel,
+  StudioIntegrationsSettingsPanel,
+  StudioIsometricGridPanel,
+  StudioLayerMaskPanel,
+  StudioLiquifyPanel,
+  StudioLiveInkOverlayHost,
+  StudioLiveInkPredictionHost,
+  StudioLivePresenceDockConnected,
+  StudioLivePressureHudPill,
+  StudioLiveStampOverlayHost,
+  StudioMainMenu,
+  StudioMasterPagePanel,
+  StudioNodeEditOverlay,
+  StudioOnionSkinImage,
+  StudioPageGradePanel,
+  StudioPageReviewPanel,
+  StudioPageThumbnail,
+  StudioPaletteSuggestPanel,
+  StudioPatternFillPanel,
+  StudioPerspectivePanel,
+  StudioProductionInsightsPanel,
+  StudioPublicationOperationsPanel,
+  StudioPublishContextBanner,
+  StudioPublishPackagePanel,
+  StudioPublishPreflightPanel,
+  StudioPuppetWarpPanel,
+  StudioQuickActionsMenu,
+  StudioQuickShapePanel,
+  StudioRasterAssetGrid,
+  StudioRasterCrdtSurface,
+  StudioReferencePanel,
+  StudioRemoteCursorOverlay,
+  StudioScenarioAutoLayoutPanel,
+  StudioScrollPreviewPanel,
+  StudioSelectOptionsBar,
+  StudioSelectionAntsOverlay,
+  StudioSelectionToolsPanel,
+  StudioShapePickerGrid,
+  StudioShortcutsHelp,
+  StudioSmudgePanel,
+  QuickStartPanel,
+  StudioStickerGrid,
+  StudioStockImagePanel,
+  StudioStoryboardGridPanel,
+  StudioStrokeShapePanel,
+  StudioTeamPanel,
+  StudioTextEffectPanel,
+  StudioTextPathPanel,
+  StudioTimelapsePanel,
+  StudioTonePanel,
+  StudioUnifiedBrushPicker,
+  StudioUploadPublish,
+  StudioVrmPoser,
+  StudioWebGpuCanvas,
+  StudioWriterRoomPanel,
+  WorkFxPanel,
+  loadStudioBrushStudio,
+  loadStudioComipoAssembly,
+  loadStudioComipoShipped,
+  loadStudioTeamCommentClient,
+  loadStudioTeamCommentMutationPlanner,
+  loadStudioWebtoonGuides,
+  preloadStudioAssetMenuPanel,
+  preloadStudioColorPopover,
+  preloadStudioExportMenuPanel,
+  preloadStudioIntegrationsSettingsPanel,
+  preloadStudioReferencePanel,
+  preloadStudioStockImagePanel,
+};
+
+export type {
+  StudioComipoAssemblyModule,
+  StudioWebtoonGuidesModule,
+};

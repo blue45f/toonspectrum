@@ -107,7 +107,7 @@ export function resolveStudioDrawingShortcut(
     return { type: "toggle-chrome" };
   }
 
-  // CSP / Photoshop color keys (no modifiers — Cmd+D remains duplicate).
+  // CSP / Photoshop color keys (no modifiers — Cmd+D remains the Edit deselect command).
   if (code === "KeyX" && !event.altKey && !event.shiftKey && !event.repeat) {
     return { type: "swap-colors" };
   }

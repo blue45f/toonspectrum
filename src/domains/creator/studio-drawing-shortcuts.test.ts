@@ -120,7 +120,7 @@ describe("resolveStudioDrawingShortcut", () => {
       type: "toggle-opacity-lock",
     });
     expect(resolveStudioDrawingShortcut({ code: "KeyF" })).toEqual({ type: "toggle-canvas-flip-h" });
-    // Cmd+D is document duplicate — not default colors
+    // Cmd+D is the document deselect command — not default colors.
     expect(resolveStudioDrawingShortcut({ code: "KeyD", metaKey: true })).toBeNull();
   });
 });

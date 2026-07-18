@@ -22,6 +22,8 @@ import {
   CheckCircle2,
   Clapperboard,
   ClipboardCheck,
+  ClipboardPaste,
+  Crop,
   Music4,
   Package,
   Pipette,
@@ -74,7 +76,6 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Grid2x2,
-  Smile,
   Sparkles,
   WandSparkles,
   Square,
@@ -83,6 +84,7 @@ import {
   Undo2,
   Search,
   ScanLine,
+  Scissors,
   Sticker as StickerIcon,
   X,
   Layers,
@@ -103,7 +105,7 @@ import {
   MessageSquare,
   Triangle,
 } from "lucide-react";
-import { Fragment, Profiler, Suspense, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ComponentType, type ReactNode } from "react";
+import { Fragment, Profiler, Suspense, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal, flushSync } from "react-dom";
 import { Stage, Layer, Rect, Text as KText, TextPath as KTextPath, Image as KImage, Line, Group, Star, Ellipse, Circle as KCircle, Path, Transformer, Shape, Arrow } from "react-konva/lib/ReactKonvaCore";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -241,7 +243,6 @@ import {
   type StudioPendingStrokeDurabilityReason,
 } from "./studio-autosave";
 import {
-  loadStudioBackground3DModule,
   preloadStudioBackground3D,
 } from "./studio-background-3d-loader";
 import { parseStudio3dTool } from "./studio-background-3d-metadata";
@@ -508,6 +509,13 @@ import {
   shouldPreserveStudioTabNavigation,
 } from "./studio-drawing-shortcuts";
 import {
+  isStudioPasteScopeCurrent,
+  resolveStudioEditAvailability,
+  resolveStudioEditShortcut,
+  shouldHandleStudioEditEvent,
+  STUDIO_EDIT_MENU_COMMANDS,
+} from "./studio-edit-controls";
+import {
   advanceStudioDraftIdentityScope,
   createStudioDraftIdentityScope,
   invalidateStudioOwnerDetailAfterSharedSave,
@@ -660,6 +668,7 @@ import {
 } from "./studio-layer-navigator";
 import {
   createLayerGroup,
+  emptyGroupIds,
   groupItems,
   groupOfItem,
   insertLayerCopiesAdjacent,
@@ -758,18 +767,137 @@ import {
   type PageGrade,
 } from "./studio-page-grade";
 import {
+  StudioAiAssistHub,
+  StudioAiBackgroundPanel,
+  StudioAiCharacterConsistencyPanel,
+  StudioAiColorizePanel,
+  StudioAiCompositionPanel,
+  StudioAiProvenancePanel,
+  StudioAnimTimelinePanel,
+  StudioAppSettingsPanel,
+  StudioAssetMenuPanel,
+  StudioAutoActionsPanel,
+  StudioBackground3D,
+  StudioBackgroundPanel,
+  StudioBrandKitPanel,
+  StudioBrushCatalogPortal,
+  StudioBrushLibraryPanel,
+  StudioBrushStudio,
+  StudioBubbleAnchorPanel,
+  StudioBubbleAutoShrinkPanel,
+  StudioBubbleShapeOverlay,
+  StudioBubbleStylePresetPanel,
+  StudioBubbleTailControls,
+  StudioCanvasResizer,
+  StudioCharacterBiblePanel,
+  StudioCheckpointPanel,
+  StudioCollagePanel,
+  StudioColorPopoverContent,
+  StudioColorWheelOverlay,
+  StudioCommentsPanel,
+  StudioContinuityMetadataEditor,
+  StudioContinuityPanel,
+  StudioCropOverlay,
+  StudioCropPanel,
+  StudioDialogueBatchPanel,
+  StudioDialogueSuggestPanel,
+  StudioDialogueTranslatePanel,
+  StudioDrawOptionsBar,
+  StudioElementsPanel,
+  StudioEmeresLibraryPanel,
+  StudioExportMenuPanel,
+  StudioFeatureTutorialHub,
+  StudioFrameAnimationPanel,
+  StudioGradientEnginePanel,
+  StudioHealClonePanel,
+  StudioHistoryBrushPanel,
+  StudioHistoryPanel,
+  StudioIntegrationsSettingsPanel,
+  StudioIsometricGridPanel,
+  StudioLayerMaskPanel,
+  StudioLiquifyPanel,
+  StudioLiveInkOverlayHost,
+  StudioLiveInkPredictionHost,
+  StudioLivePresenceDockConnected,
+  StudioLivePressureHudPill,
+  StudioLiveStampOverlayHost,
+  StudioMainMenu,
+  StudioMasterPagePanel,
+  StudioNodeEditOverlay,
+  StudioOnionSkinImage,
+  StudioPageGradePanel,
+  StudioPageReviewPanel,
+  StudioPageThumbnail,
+  StudioPaletteSuggestPanel,
+  StudioPatternFillPanel,
+  StudioPerspectivePanel,
+  StudioProductionInsightsPanel,
+  StudioPublicationOperationsPanel,
+  StudioPublishContextBanner,
+  StudioPublishPackagePanel,
+  StudioPublishPreflightPanel,
+  StudioPuppetWarpPanel,
+  StudioQuickActionsMenu,
+  StudioQuickShapePanel,
+  StudioRasterAssetGrid,
+  StudioRasterCrdtSurface,
+  StudioReferencePanel,
+  StudioRemoteCursorOverlay,
+  StudioScenarioAutoLayoutPanel,
+  StudioScrollPreviewPanel,
+  StudioSelectOptionsBar,
+  StudioSelectionAntsOverlay,
+  StudioSelectionToolsPanel,
+  StudioShapePickerGrid,
+  StudioShortcutsHelp,
+  StudioSmudgePanel,
+  QuickStartPanel,
+  StudioStickerGrid,
+  StudioStockImagePanel,
+  StudioStoryboardGridPanel,
+  StudioStrokeShapePanel,
+  StudioTeamPanel,
+  StudioTextEffectPanel,
+  StudioTextPathPanel,
+  StudioTimelapsePanel,
+  StudioTonePanel,
+  StudioUnifiedBrushPicker,
+  StudioUploadPublish,
+  StudioVrmPoser,
+  StudioWebGpuCanvas,
+  StudioWriterRoomPanel,
+  WorkFxPanel,
+  loadStudioBrushStudio,
+  loadStudioComipoAssembly,
+  loadStudioComipoShipped,
+  loadStudioTeamCommentClient,
+  loadStudioTeamCommentMutationPlanner,
+  loadStudioWebtoonGuides,
+  preloadStudioAssetMenuPanel,
+  preloadStudioColorPopover,
+  preloadStudioExportMenuPanel,
+  preloadStudioIntegrationsSettingsPanel,
+  preloadStudioReferencePanel,
+  preloadStudioStockImagePanel,
+  type StudioComipoAssemblyModule,
+  type StudioWebtoonGuidesModule,
+} from "./studio-page-lazy-ui";
+import {
   PAGE_NAME_MAX,
   PAGE_NOTE_MAX,
   autoPageName,
   buildClipboardPayload,
+  clipboardPayloadMatchesMembers,
   collectCopyElements,
   pageDisplayName,
   parseClipboardPayload,
   planClipboardPaste,
   readClipboardFallback,
   serializeClipboardPayload,
+  studioClipboardFallbackStorageKey,
   withPageMeta,
   writeClipboardFallback,
+  type StudioClipboardPayload,
 } from "./studio-page-meta";
 import {
   findChangedLockedPageId,
@@ -1056,6 +1184,11 @@ import {
   type StudioUiDensityMode,
 } from "./studio-ui-density";
 import {
+  inspectStudioUploadSourceImage,
+  selectStudioUploadDecodedPixelLimit,
+  STUDIO_UPLOAD_MAX_SOURCE_FILE_BYTES,
+} from "./studio-upload-image-safety";
+import {
   captureStudioView,
   fitStudioViewToWidth,
   planStudioViewRestore,
@@ -1232,19 +1365,15 @@ import type { Vibrance } from "./studio-vibrance";
 import type { StudioGpuBackend } from "./studio-webgpu-engine";
 import type { StudioGpuStroke } from "./studio-webgpu-stroke";
 import type {
-  StudioAssetMenuPanelProps,
   StudioAssetSortOrder,
   StudioAssetTab,
 } from "./StudioAssetMenuPanel";
 import type { StudioBackground3DInsertResult } from "./StudioBackground3D";
 import type { StudioColorPopoverProps } from "./StudioColorPopover";
-import type { StudioExportMenuPanelProps } from "./StudioExportMenuPanel";
-import type { StudioIntegrationsSettingsPanelProps } from "./StudioIntegrationsSettingsPanel";
 import type { StudioLayerNavigatorAction } from "./StudioLayerNavigator";
 import type { StudioLivePressureStore } from "./StudioLiveInkHosts";
 import type { StudioMainMenuGroup } from "./StudioMainMenu";
 import type { PublishContext } from "./StudioPublishContextBanner";
-import type { StudioStockImagePanelProps } from "./StudioStockImagePanel";
 import type { StudioWebGpuCanvasHandle } from "./StudioWebGpuCanvas";
 import type {
   GeneratedAssetQuality,
@@ -1360,312 +1489,6 @@ const StudioLayerNavigator = lazyRetry(
   () => import("./StudioLayerNavigator").then((mod) => ({ default: mod.StudioLayerNavigator })),
   "StudioLayerNavigator"
 );
-const StudioPageThumbnail = lazyRetry(
-  () => import("./StudioPageThumbnails").then((mod) => ({ default: mod.StudioPageThumbnail })),
-  "StudioPageThumbnail"
-);
-const StudioWebGpuCanvas = lazyRetry(
-  () => import("./StudioWebGpuCanvas").then((mod) => ({ default: mod.StudioWebGpuCanvas })),
-  "StudioWebGpuCanvas"
-);
-const StudioRasterCrdtSurface = lazyRetry(
-  () => import("./StudioRasterCrdtSurface").then((mod) => ({ default: mod.StudioRasterCrdtSurface })),
-  "StudioRasterCrdtSurface"
-);
-const StudioPublishContextBanner = lazyRetry(
-  () => import("./StudioPublishContextBanner").then((mod) => ({ default: mod.StudioPublishContextBanner })),
-  "StudioPublishContextBanner"
-);
-const StudioContinuityMetadataEditor = lazyRetry(
-  () => import("./StudioContinuityMetadataEditor").then((mod) => ({ default: mod.StudioContinuityMetadataEditor })),
-  "StudioContinuityMetadataEditor"
-);
-const StudioUploadPublish = lazyRetry(
-  () => import("./StudioUploadPublish").then((mod) => ({ default: mod.StudioUploadPublish })),
-  "StudioUploadPublish"
-);
-const StudioLivePresenceDockConnected = lazyRetry(
-  () => import("./StudioLiveCanvasOverlay").then((mod) => ({ default: mod.StudioLivePresenceDockConnected })),
-  "StudioLivePresenceDockConnected"
-);
-const StudioRemoteCursorOverlay = lazyRetry(
-  () => import("./StudioLiveCanvasOverlay").then((mod) => ({ default: mod.StudioRemoteCursorOverlay })),
-  "StudioRemoteCursorOverlay"
-);
-const StudioPageGradePanel = lazyRetry(
-  () => import("./StudioPageGradePanel").then((mod) => ({ default: mod.StudioPageGradePanel })),
-  "StudioPageGradePanel"
-);
-const StudioBubbleStylePresetPanel = lazyRetry(
-  () => import("./StudioBubbleStylePresetPanel").then((mod) => ({ default: mod.StudioBubbleStylePresetPanel })),
-  "StudioBubbleStylePresetPanel"
-);
-const StudioBubbleAutoShrinkPanel = lazyRetry(
-  () => import("./StudioBubbleAutoShrinkPanel").then((mod) => ({ default: mod.StudioBubbleAutoShrinkPanel })),
-  "StudioBubbleAutoShrinkPanel"
-);
-const StudioDialogueBatchPanel = lazyRetry(
-  () => import("./StudioDialogueBatchPanel").then((mod) => ({ default: mod.StudioDialogueBatchPanel })),
-  "StudioDialogueBatchPanel"
-);
-const StudioQuickActionsMenu = lazyRetry(
-  () => import("./StudioQuickActionsMenu").then((mod) => ({ default: mod.StudioQuickActionsMenu })),
-  "StudioQuickActionsMenu"
-);
-const StudioHistoryPanel = lazyRetry(
-  () => import("./StudioHistoryPanel").then((mod) => ({ default: mod.StudioHistoryPanel })),
-  "StudioHistoryPanel"
-);
-const StudioCheckpointPanel = lazyRetry(
-  () => import("./StudioCheckpointPanel").then((mod) => ({ default: mod.StudioCheckpointPanel })),
-  "StudioCheckpointPanel"
-);
-const StudioAutoActionsPanel = lazyRetry(
-  () => import("./StudioAutoActionsPanel").then((mod) => ({ default: mod.StudioAutoActionsPanel })),
-  "StudioAutoActionsPanel"
-);
-const StudioCharacterBiblePanel = lazyRetry(
-  () => import("./StudioCharacterBiblePanel").then((mod) => ({ default: mod.StudioCharacterBiblePanel })),
-  "StudioCharacterBiblePanel"
-);
-const StudioWriterRoomPanel = lazyRetry(
-  () => import("./StudioWriterRoomPanel").then((mod) => ({ default: mod.StudioWriterRoomPanel })),
-  "StudioWriterRoomPanel"
-);
-const StudioAiProvenancePanel = lazyRetry(
-  () =>
-    import("./StudioAiProvenancePanel").then((mod) => ({
-      default: mod.StudioAiProvenancePanel,
-    })),
-  "StudioAiProvenancePanel"
-);
-const StudioPageReviewPanel = lazyRetry(
-  () => import("./StudioPageReviewPanel").then((mod) => ({ default: mod.StudioPageReviewPanel })),
-  "StudioPageReviewPanel"
-);
-const StudioContinuityPanel = lazyRetry(
-  () => import("./StudioContinuityPanel").then((mod) => ({ default: mod.StudioContinuityPanel })),
-  "StudioContinuityPanel"
-);
-const StudioFrameAnimationPanel = lazyRetry(
-  () => import("./StudioFrameAnimationPanel").then((mod) => ({ default: mod.StudioFrameAnimationPanel })),
-  "StudioFrameAnimationPanel"
-);
-const StudioAnimTimelinePanel = lazyRetry(
-  () => import("./StudioAnimTimelinePanel").then((mod) => ({ default: mod.StudioAnimTimelinePanel })),
-  "StudioAnimTimelinePanel"
-);
-const StudioMasterPagePanel = lazyRetry(
-  () => import("./StudioMasterPagePanel").then((mod) => ({ default: mod.StudioMasterPagePanel })),
-  "StudioMasterPagePanel"
-);
-const StudioStoryboardGridPanel = lazyRetry(
-  () => import("./StudioStoryboardGridPanel").then((mod) => ({ default: mod.StudioStoryboardGridPanel })),
-  "StudioStoryboardGridPanel"
-);
-const StudioShortcutsHelp = lazyRetry(
-  () => import("./StudioShortcutsHelp").then((mod) => ({ default: mod.StudioShortcutsHelp })),
-  "StudioShortcutsHelp"
-);
-const StudioStickerGrid = lazyRetry(
-  () => import("./studio-sticker-grid").then((mod) => ({ default: mod.StudioStickerGrid })),
-  "StudioStickerGrid"
-);
-const StudioCollagePanel = lazyRetry(
-  () => import("./StudioCollagePanel").then((mod) => ({ default: mod.StudioCollagePanel })),
-  "StudioCollagePanel"
-);
-const StudioElementsPanel = lazyRetry(
-  () => import("./StudioElementsPanel").then((mod) => ({ default: mod.StudioElementsPanel })),
-  "StudioElementsPanel"
-);
-const StudioBackgroundPanel = lazyRetry(
-  () => import("./StudioBackgroundPanel").then((mod) => ({ default: mod.StudioBackgroundPanel })),
-  "StudioBackgroundPanel"
-);
-const StudioCanvasResizer = lazyRetry(
-  () => import("./StudioCanvasResizer").then((mod) => ({ default: mod.StudioCanvasResizer })),
-  "StudioCanvasResizer"
-);
-const StudioRasterAssetGrid = lazyRetry(
-  () => import("./StudioRasterAssetGrid").then((mod) => ({ default: mod.StudioRasterAssetGrid })),
-  "StudioRasterAssetGrid"
-);
-const StudioTextEffectPanel = lazyRetry(
-  () => import("./StudioTextEffectPanel").then((mod) => ({ default: mod.StudioTextEffectPanel })),
-  "StudioTextEffectPanel"
-);
-const StudioGradientEnginePanel = lazyRetry(
-  () => import("./StudioGradientEnginePanel").then((mod) => ({ default: mod.StudioGradientEnginePanel })),
-  "StudioGradientEnginePanel"
-);
-const StudioPatternFillPanel = lazyRetry(
-  () => import("./StudioPatternFillPanel").then((mod) => ({ default: mod.StudioPatternFillPanel })),
-  "StudioPatternFillPanel"
-);
-const StudioTextPathPanel = lazyRetry(
-  () => import("./StudioTextPathPanel").then((mod) => ({ default: mod.StudioTextPathPanel })),
-  "StudioTextPathPanel"
-);
-const StudioTonePanel = lazyRetry(
-  () => import("./StudioTonePanel").then((mod) => ({ default: mod.StudioTonePanel })),
-  "StudioTonePanel"
-);
-const StudioStrokeShapePanel = lazyRetry(
-  () => import("./StudioStrokeShapePanel").then((mod) => ({ default: mod.StudioStrokeShapePanel })),
-  "StudioStrokeShapePanel"
-);
-const StudioSelectionToolsPanel = lazyRetry(
-  () => import("./StudioSelectionToolsPanel").then((mod) => ({ default: mod.StudioSelectionToolsPanel })),
-  "StudioSelectionToolsPanel"
-);
-const StudioCropPanel = lazyRetry(
-  () => import("./StudioCropPanel").then((mod) => ({ default: mod.StudioCropPanel })),
-  "StudioCropPanel"
-);
-const StudioPerspectivePanel = lazyRetry(
-  () => import("./StudioPerspectivePanel").then((mod) => ({ default: mod.StudioPerspectivePanel })),
-  "StudioPerspectivePanel"
-);
-const StudioIsometricGridPanel = lazyRetry(
-  () => import("./StudioIsometricGridPanel").then((mod) => ({ default: mod.StudioIsometricGridPanel })),
-  "StudioIsometricGridPanel"
-);
-const StudioVrmPoser = lazyRetry(
-  () => import("./StudioVrmPoser").then((mod) => ({ default: mod.StudioVrmPoser })),
-  "StudioVrmPoser"
-);
-const StudioBackground3D = lazyRetry(
-  () => loadStudioBackground3DModule().then((mod) => ({ default: mod.StudioBackground3D })),
-  "StudioBackground3D"
-);
-const StudioTimelapsePanel = lazyRetry(
-  () => import("./StudioTimelapsePanel").then((mod) => ({ default: mod.StudioTimelapsePanel })),
-  "StudioTimelapsePanel"
-);
-const WorkFxPanel = lazyRetry(
-  () => import("./WorkFxPanel").then((mod) => ({ default: mod.WorkFxPanel })),
-  "WorkFxPanel"
-);
-const StudioBrandKitPanel = lazyRetry(
-  () => import("./StudioBrandKitPanel").then((mod) => ({ default: mod.StudioBrandKitPanel })),
-  "StudioBrandKitPanel"
-);
-const StudioBubbleAnchorPanel = lazyRetry(
-  () => import("./StudioBubbleAnchorPanel").then((mod) => ({ default: mod.StudioBubbleAnchorPanel })),
-  "StudioBubbleAnchorPanel"
-);
-const StudioBubbleTailControls = lazyRetry(
-  () => import("./StudioBubbleTailControls").then((mod) => ({ default: mod.StudioBubbleTailControls })),
-  "StudioBubbleTailControls"
-);
-const StudioSmudgePanel = lazyRetry(
-  () => import("./StudioSmudgePanel").then((mod) => ({ default: mod.StudioSmudgePanel })),
-  "StudioSmudgePanel"
-);
-const StudioLiquifyPanel = lazyRetry(
-  () => import("./StudioLiquifyPanel").then((mod) => ({ default: mod.StudioLiquifyPanel })),
-  "StudioLiquifyPanel"
-);
-const StudioHealClonePanel = lazyRetry(
-  () => import("./StudioHealClonePanel").then((mod) => ({ default: mod.StudioHealClonePanel })),
-  "StudioHealClonePanel"
-);
-const StudioHistoryBrushPanel = lazyRetry(
-  () => import("./StudioHistoryBrushPanel").then((mod) => ({ default: mod.StudioHistoryBrushPanel })),
-  "StudioHistoryBrushPanel"
-);
-const StudioLayerMaskPanel = lazyRetry(
-  () => import("./StudioLayerMaskPanel").then((mod) => ({ default: mod.StudioLayerMaskPanel })),
-  "StudioLayerMaskPanel"
-);
-const StudioPuppetWarpPanel = lazyRetry(
-  () => import("./StudioPuppetWarpPanel").then((mod) => ({ default: mod.StudioPuppetWarpPanel })),
-  "StudioPuppetWarpPanel"
-);
-const StudioQuickShapePanel = lazyRetry(
-  () => import("./StudioQuickShapePanel").then((mod) => ({ default: mod.StudioQuickShapePanel })),
-  "StudioQuickShapePanel"
-);
-const StudioFeatureTutorialHub = lazyRetry(
-  () => import("./StudioFeatureTutorialHub").then((mod) => ({ default: mod.StudioFeatureTutorialHub })),
-  "StudioFeatureTutorialHub"
-);
-const StudioMainMenu = lazyRetry(
-  () => import("./StudioMainMenu").then((mod) => ({ default: mod.StudioMainMenu })),
-  "StudioMainMenu"
-);
-const StudioDrawOptionsBar = lazyRetry(
-  () => import("./StudioDrawOptionsBar").then((mod) => ({ default: mod.StudioDrawOptionsBar })),
-  "StudioDrawOptionsBar"
-);
-const StudioUnifiedBrushPicker = lazyRetry(
-  () => import("./StudioUnifiedBrushPicker").then((mod) => ({ default: mod.StudioUnifiedBrushPicker })),
-  "StudioUnifiedBrushPicker"
-);
-const StudioBrushCatalogPortal = lazyRetry(
-  () => import("./StudioBrushLibrarySheet").then((mod) => ({ default: mod.StudioBrushCatalogPortal })),
-  "StudioBrushCatalogPortal"
-);
-const StudioSelectionAntsOverlay = lazyRetry(
-  () => import("./StudioSelectionOverlays").then((mod) => ({ default: mod.StudioSelectionAntsOverlay })),
-  "StudioSelectionAntsOverlay"
-);
-const StudioCropOverlay = lazyRetry(
-  () => import("./StudioSelectionOverlays").then((mod) => ({ default: mod.StudioCropOverlay })),
-  "StudioCropOverlay"
-);
-const StudioNodeEditOverlay = lazyRetry(
-  () => import("./StudioSelectionOverlays").then((mod) => ({ default: mod.StudioNodeEditOverlay })),
-  "StudioNodeEditOverlay"
-);
-const StudioBubbleShapeOverlay = lazyRetry(
-  () => import("./StudioSelectionOverlays").then((mod) => ({ default: mod.StudioBubbleShapeOverlay })),
-  "StudioBubbleShapeOverlay"
-);
-const StudioOnionSkinImage = lazyRetry(
-  () => import("./StudioSelectionOverlays").then((mod) => ({ default: mod.StudioOnionSkinImage })),
-  "StudioOnionSkinImage"
-);
-const StudioLiveInkOverlayHost = lazyRetry(
-  () => import("./StudioLiveInkHosts").then((mod) => ({ default: mod.StudioLiveInkOverlayHost })),
-  "StudioLiveInkOverlayHost"
-);
-const StudioLiveStampOverlayHost = lazyRetry(
-  () => import("./StudioLiveInkHosts").then((mod) => ({ default: mod.StudioLiveStampOverlayHost })),
-  "StudioLiveStampOverlayHost"
-);
-const StudioLiveInkPredictionHost = lazyRetry(
-  () => import("./StudioLiveInkHosts").then((mod) => ({ default: mod.StudioLiveInkPredictionHost })),
-  "StudioLiveInkPredictionHost"
-);
-const StudioLivePressureHudPill = lazyRetry(
-  () => import("./StudioLiveInkHosts").then((mod) => ({ default: mod.StudioLivePressureHudPill })),
-  "StudioLivePressureHudPill"
-);
-const loadStudioBrushStudio = () => import("./StudioBrushStudio");
-const StudioBrushStudio = lazyRetry(
-  () => loadStudioBrushStudio().then((mod) => ({ default: mod.StudioBrushStudio })),
-  "StudioBrushStudio"
-);
-/** Glyph UI kept out of StudioPage static graph (bundle budget). */
-const StudioStarterCardArt = lazyRetry(
-  () => import("./studio-creative-visuals").then((mod) => ({ default: mod.StudioStarterCardArt })),
-  "StudioStarterCardArt"
-);
-const StudioShapePickerGrid = lazyRetry(
-  () => import("./studio-creative-visuals").then((mod) => ({ default: mod.StudioShapePickerGrid })),
-  "StudioShapePickerGrid"
-);
-const StudioSelectOptionsBar = lazyRetry(
-  () => import("./StudioSelectOptionsBar").then((mod) => ({ default: mod.StudioSelectOptionsBar })),
-  "StudioSelectOptionsBar"
-);
-const StudioBrushLibraryPanel = lazyRetry(
-  () => import("./StudioBrushLibraryPanel").then((mod) => ({ default: mod.StudioBrushLibraryPanel })),
-  "StudioBrushLibraryPanel"
-);
-
 const studioPaletteLibraryPanelLoader = createStudioIntentLazyLoader(() =>
   import("./StudioPaletteLibraryPanel").then((mod) => ({
     default: mod.StudioPaletteLibraryPanel,
@@ -1717,242 +1540,9 @@ interface PendingBrushDelete {
   deleted: DeletedBrushRecord;
   expiresAt: number;
 }
-const StudioScrollPreviewPanel = lazyRetry(
-  () => import("./StudioScrollPreviewPanel").then((mod) => ({ default: mod.StudioScrollPreviewPanel })),
-  "StudioScrollPreviewPanel"
-);
-const StudioEmeresLibraryPanel = lazyRetry(
-  () => import("./StudioEmeresLibraryPanel").then((mod) => ({ default: mod.StudioEmeresLibraryPanel })),
-  "StudioEmeresLibraryPanel"
-);
-const StudioAiAssistHub = lazyRetry(
-  () => import("./StudioAiAssistHub").then((mod) => ({ default: mod.StudioAiAssistHub })),
-  "StudioAiAssistHub"
-);
-const StudioAiBackgroundPanel = lazyRetry(
-  () => import("./StudioAiBackgroundPanel").then((mod) => ({ default: mod.StudioAiBackgroundPanel })),
-  "StudioAiBackgroundPanel"
-);
-const StudioAiColorizePanel = lazyRetry(
-  () => import("./StudioAiColorizePanel").then((mod) => ({ default: mod.StudioAiColorizePanel })),
-  "StudioAiColorizePanel"
-);
-const StudioAiCompositionPanel = lazyRetry(
-  () => import("./StudioAiCompositionPanel").then((mod) => ({ default: mod.StudioAiCompositionPanel })),
-  "StudioAiCompositionPanel"
-);
-const StudioAiCharacterConsistencyPanel = lazyRetry(
-  () =>
-    import("./StudioAiCharacterConsistencyPanel").then((mod) => ({
-      default: mod.StudioAiCharacterConsistencyPanel,
-    })),
-  "StudioAiCharacterConsistencyPanel"
-);
-const StudioDialogueSuggestPanel = lazyRetry(
-  () => import("./StudioDialogueSuggestPanel").then((mod) => ({ default: mod.StudioDialogueSuggestPanel })),
-  "StudioDialogueSuggestPanel"
-);
-const StudioPaletteSuggestPanel = lazyRetry(
-  () => import("./StudioPaletteSuggestPanel").then((mod) => ({ default: mod.StudioPaletteSuggestPanel })),
-  "StudioPaletteSuggestPanel"
-);
-const StudioDialogueTranslatePanel = lazyRetry(
-  () => import("./StudioDialogueTranslatePanel").then((mod) => ({ default: mod.StudioDialogueTranslatePanel })),
-  "StudioDialogueTranslatePanel"
-);
-const StudioScenarioAutoLayoutPanel = lazyRetry(
-  () =>
-    import("./StudioScenarioAutoLayoutPanel").then((mod) => ({
-      default: mod.StudioScenarioAutoLayoutPanel,
-    })),
-  "StudioScenarioAutoLayoutPanel"
-);
-const StudioPublishPreflightPanel = lazyRetry(
-  () =>
-    import("./StudioPublishPreflightPanel").then((mod) => ({
-      default: mod.StudioPublishPreflightPanel,
-    })),
-  "StudioPublishPreflightPanel"
-);
-const StudioPublishPackagePanel = lazyRetry(
-  () =>
-    import("./StudioPublishPackagePanel").then((mod) => ({
-      default: mod.StudioPublishPackagePanel,
-    })),
-  "StudioPublishPackagePanel"
-);
-const StudioProductionInsightsPanel = lazyRetry(
-  () =>
-    import("./StudioProductionInsightsPanel").then((mod) => ({
-      default: mod.StudioProductionInsightsPanel,
-    })),
-  "StudioProductionInsightsPanel"
-);
-const StudioPublicationOperationsPanel = lazyRetry(
-  () =>
-    import("./StudioPublicationOperationsPanel").then((mod) => ({
-      default: mod.StudioPublicationOperationsPanel,
-    })),
-  "StudioPublicationOperationsPanel"
-);
-const StudioCommentsPanel = lazyRetry(
-  () =>
-    import("./StudioCommentsPanel").then((mod) => ({
-      default: mod.StudioCommentsPanel,
-    })),
-  "StudioCommentsPanel"
-);
-
-// Review networking and mutation verification are not part of the first-paint drawing path.
-// Keep them in optional chunks while retaining the lightweight persisted comment model needed
-// for canvas pins and project compatibility in the static Studio graph.
-const loadStudioTeamCommentClient = () => import("./studio-team-comment-client");
-const loadStudioTeamCommentMutationPlanner = () =>
-  import("./studio-team-comment-mutation-plan");
-const StudioTeamPanel = lazyRetry(
-  () =>
-    import("./StudioTeamPanel").then((mod) => ({
-      default: mod.StudioTeamPanel,
-    })),
-  "StudioTeamPanel"
-);
-function loadStudioReferencePanel() {
-  return import("./StudioReferencePanel").then((mod) => ({ default: mod.StudioReferencePanel }));
-}
-const StudioReferencePanel = lazyRetry(loadStudioReferencePanel, "StudioReferencePanel");
-function preloadStudioReferencePanel(): void {
-  void loadStudioReferencePanel();
-}
-function loadStudioColorWheelOverlay() {
-  return import("./StudioColorWheelOverlay").then((mod) => ({ default: mod.StudioColorWheelOverlay }));
-}
-const StudioColorWheelOverlay = lazyRetry(loadStudioColorWheelOverlay, "StudioColorWheelOverlay");
-
-type StudioAssetMenuPanelModule = { default: ComponentType<StudioAssetMenuPanelProps> };
-let studioAssetMenuPanelPromise: Promise<StudioAssetMenuPanelModule> | null = null;
-
-function loadStudioAssetMenuPanel(): Promise<StudioAssetMenuPanelModule> {
-  studioAssetMenuPanelPromise ??= import("./StudioAssetMenuPanel").then((mod) => ({
-    default: mod.StudioAssetMenuPanel,
-  }));
-  return studioAssetMenuPanelPromise;
-}
-
-const StudioAssetMenuPanel = lazyRetry(loadStudioAssetMenuPanel, "StudioAssetMenuPanel");
-
-function preloadStudioAssetMenuPanel(): void {
-  void loadStudioAssetMenuPanel();
-}
-
-type StudioStockImagePanelModule = { default: ComponentType<StudioStockImagePanelProps> };
-let studioStockImagePanelPromise: Promise<StudioStockImagePanelModule> | null = null;
-
-function loadStudioStockImagePanel(): Promise<StudioStockImagePanelModule> {
-  studioStockImagePanelPromise ??= import("./StudioStockImagePanel").then((mod) => ({
-    default: mod.StudioStockImagePanel,
-  }));
-  return studioStockImagePanelPromise;
-}
-
-const StudioStockImagePanel = lazyRetry(loadStudioStockImagePanel, "StudioStockImagePanel");
-
-function preloadStudioStockImagePanel(): void {
-  void loadStudioStockImagePanel();
-}
-
-type StudioIntegrationsSettingsPanelModule = { default: ComponentType<StudioIntegrationsSettingsPanelProps> };
-let studioIntegrationsSettingsPanelPromise: Promise<StudioIntegrationsSettingsPanelModule> | null = null;
-
-function loadStudioIntegrationsSettingsPanel(): Promise<StudioIntegrationsSettingsPanelModule> {
-  studioIntegrationsSettingsPanelPromise ??= import("./StudioIntegrationsSettingsPanel").then((mod) => ({
-    default: mod.StudioIntegrationsSettingsPanel,
-  }));
-  return studioIntegrationsSettingsPanelPromise;
-}
-
-const StudioIntegrationsSettingsPanel = lazyRetry(
-  loadStudioIntegrationsSettingsPanel,
-  "StudioIntegrationsSettingsPanel"
-);
-
-function preloadStudioIntegrationsSettingsPanel(): void {
-  void loadStudioIntegrationsSettingsPanel();
-}
-
-const StudioAppSettingsPanel = lazyRetry(
-  () => import("./StudioAppSettingsPanel").then((mod) => ({ default: mod.StudioAppSettingsPanel })),
-  "StudioAppSettingsPanel"
-);
-
-type StudioExportMenuPanelModule = { default: ComponentType<StudioExportMenuPanelProps> };
-let studioExportMenuPanelPromise: Promise<StudioExportMenuPanelModule> | null = null;
-
-function loadStudioExportMenuPanel(): Promise<StudioExportMenuPanelModule> {
-  studioExportMenuPanelPromise ??= import("./StudioExportMenuPanel").then((mod) => ({
-    default: mod.StudioExportMenuPanel,
-  }));
-  return studioExportMenuPanelPromise;
-}
-
-const StudioExportMenuPanel = lazyRetry(loadStudioExportMenuPanel, "StudioExportMenuPanel");
-
-function preloadStudioExportMenuPanel(): void {
-  void loadStudioExportMenuPanel();
-}
-
-type StudioWebtoonGuidesModule = typeof import("./studio-webtoon-guides");
-let studioWebtoonGuidesPromise: Promise<StudioWebtoonGuidesModule> | null = null;
-
-function loadStudioWebtoonGuides(): Promise<StudioWebtoonGuidesModule> {
-  studioWebtoonGuidesPromise ??= import("./studio-webtoon-guides").catch((error) => {
-    studioWebtoonGuidesPromise = null;
-    throw error;
-  });
-  return studioWebtoonGuidesPromise;
-}
-
 type LazyStudioColorPopoverProps = Omit<StudioColorPopoverProps, "initialOpen"> & {
   onLoadRecentColors?: () => void;
 };
-type StudioColorPopoverModule = { default: ComponentType<StudioColorPopoverProps> };
-
-let studioColorPopoverPromise: Promise<StudioColorPopoverModule> | null = null;
-
-function loadStudioColorPopover(): Promise<StudioColorPopoverModule> {
-  studioColorPopoverPromise ??= import("./StudioColorPopover").then((mod) => ({
-    default: mod.StudioColorPopover,
-  }));
-  return studioColorPopoverPromise;
-}
-
-const StudioColorPopoverContent = lazyRetry(loadStudioColorPopover, "StudioColorPopover");
-
-type StudioComipoAssemblyModule = typeof import("./studio-comipo-assembly");
-type StudioComipoShippedModule = typeof import("./studio-comipo-shipped");
-
-let studioComipoAssemblyPromise: Promise<StudioComipoAssemblyModule> | null = null;
-let studioComipoShippedPromise: Promise<StudioComipoShippedModule> | null = null;
-
-function loadStudioComipoAssembly(): Promise<StudioComipoAssemblyModule> {
-  studioComipoAssemblyPromise ??= import("./studio-comipo-assembly").catch((error) => {
-    studioComipoAssemblyPromise = null;
-    throw error;
-  });
-  return studioComipoAssemblyPromise;
-}
-
-function loadStudioComipoShipped(): Promise<StudioComipoShippedModule> {
-  studioComipoShippedPromise ??= import("./studio-comipo-shipped").catch((error) => {
-    studioComipoShippedPromise = null;
-    throw error;
-  });
-  return studioComipoShippedPromise;
-}
-
-function preloadStudioColorPopover(): void {
-  void loadStudioColorPopover();
-}
-
 function StudioColorPopoverFallback({
   value,
   title,
@@ -2825,187 +2415,6 @@ function createQuickSampleFrames(): FrameEl[] {
     width: CANVAS_W - QUICK_SAMPLE_MARGIN * 2,
     height,
   }));
-}
-
-function QuickStartPanel({
-  onDismiss,
-  onExample,
-  onOpenTemplate,
-  onOpenCharacter,
-  onOpenBackground3d,
-  onOpenBubble,
-  onSmartShape,
-  onStartDraw,
-  onBrushKit,
-  onCollabFocus,
-  onOpenTutorials,
-}: {
-  onDismiss: () => void;
-  onExample: () => void;
-  onOpenTemplate: () => void;
-  onOpenCharacter: () => void;
-  onOpenBackground3d: () => void;
-  onOpenBubble: () => void;
-  onSmartShape: () => void;
-  onStartDraw: () => void;
-  onBrushKit: () => void;
-  onCollabFocus: () => void;
-  onOpenTutorials: () => void;
-}) {
-  // Drawing-first tools only — Canva-style visual starter cards (no marketing copy).
-  const steps: {
-    id: "draw" | "smart-shape" | "brush-kit" | "template" | "collab-focus" | "character" | "background-3d" | "bubble";
-    label: string;
-    hint: string;
-    icon: typeof Pencil;
-    onClick: () => void;
-  }[] = [
-    {
-      id: "draw",
-      label: "펜으로 그리기",
-      hint: "바로 스케치 시작",
-      icon: Pencil,
-      onClick: onStartDraw,
-    },
-    {
-      id: "smart-shape",
-      label: "스마트 도형",
-      hint: "낙서 → 선·원·사각형",
-      icon: Shapes,
-      onClick: onSmartShape,
-    },
-    {
-      id: "brush-kit",
-      label: "브러시",
-      hint: "연필·마커·붓·형광펜",
-      icon: Palette,
-      onClick: onBrushKit,
-    },
-    {
-      id: "template",
-      label: "컷 템플릿",
-      hint: "패널 레이아웃 배치",
-      icon: LayoutTemplate,
-      onClick: onOpenTemplate,
-    },
-    {
-      id: "collab-focus",
-      label: "캔버스 넓히기",
-      hint: "패널 접고 집중 모드",
-      icon: Maximize2,
-      onClick: onCollabFocus,
-    },
-    {
-      id: "character",
-      label: "캐릭터",
-      hint: "2D / 3D 포즈",
-      icon: Smile,
-      onClick: onOpenCharacter,
-    },
-    {
-      id: "background-3d",
-      label: "3D 배경",
-      hint: "장면 배치 · 물리 낙하",
-      icon: Boxes,
-      onClick: onOpenBackground3d,
-    },
-    {
-      id: "bubble",
-      label: "말풍선",
-      hint: "대사 넣기",
-      icon: MessageCircle,
-      onClick: onOpenBubble,
-    },
-  ];
-
-  return (
-    <div
-      data-studio-creative-starter="true"
-      className="absolute inset-x-2 top-2 z-50 mx-auto max-h-[calc(100%-1rem)] max-w-xl overflow-y-auto rounded-2xl border border-line bg-panel/95 p-3 text-fg shadow-2xl backdrop-blur-md sm:top-4 sm:p-3.5"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-bold tracking-tight">도구 빠른 실행</p>
-          <p className="mt-0.5 max-w-[40ch] text-[0.7rem] leading-snug text-fg-3">
-            그릴 준비 완료. 아래에서 바로 도구를 고르세요.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onDismiss}
-          className="grid size-8 shrink-0 place-items-center rounded-lg border border-line text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-          aria-label="닫기"
-          title="닫기"
-        >
-          <X size={15} aria-hidden />
-        </button>
-      </div>
-
-      <div className="mt-2.5 flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={onExample}
-          className={cn(
-            buttonClass({ size: "sm", variant: "solid" }),
-            "min-h-9 justify-center gap-1.5 px-3 text-sm"
-          )}
-        >
-          <Sparkles size={15} aria-hidden />
-          예시 캔버스
-        </button>
-        <button
-          type="button"
-          onClick={onStartDraw}
-          className={cn(
-            buttonClass({ size: "sm", variant: "quiet" }),
-            "min-h-9 justify-center gap-1.5 px-3 text-sm"
-          )}
-        >
-          <Pencil size={15} aria-hidden />
-          빈 캔버스에서 그리기
-        </button>
-        <button
-          type="button"
-          onClick={onOpenTutorials}
-          className={cn(
-            buttonClass({ size: "sm", variant: "outline" }),
-            "min-h-9 justify-center gap-1.5 px-3 text-sm"
-          )}
-        >
-          <BookOpen size={15} aria-hidden />
-          기능 튜토리얼
-        </button>
-      </div>
-
-      <div className="mt-2.5 grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {steps.map((step) => {
-          const Icon = step.icon;
-          return (
-            <button
-              key={step.id}
-              type="button"
-              onClick={step.onClick}
-              data-studio-starter-card={step.id}
-              className="group flex min-h-[5.5rem] flex-col items-stretch gap-1.5 rounded-xl border border-line bg-card p-1.5 text-left shadow-sm transition-[border-color,background,transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:border-accent/55 hover:bg-raised hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-            >
-              <Suspense fallback={<div className="h-11 w-full rounded-lg bg-raised/60" aria-hidden />}>
-                <StudioStarterCardArt id={step.id} />
-              </Suspense>
-              <span className="flex min-w-0 items-start gap-1.5 px-1 pb-0.5">
-                <span className="grid size-6 shrink-0 place-items-center rounded-md bg-accent-soft text-accent ring-1 ring-accent/15">
-                  <Icon size={13} aria-hidden />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-xs font-bold tracking-tight text-fg">{step.label}</span>
-                  <span className="mt-0.5 block text-[0.62rem] leading-snug text-fg-3">{step.hint}</span>
-                </span>
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
 }
 
 function drawBounds(points: number[]) {
@@ -4424,8 +3833,37 @@ function AiAssetNotice({ onCancel, onAcknowledge }: { onCancel: () => void; onAc
   return createPortal(notice, document.body);
 }
 
-// data-URL 이미지를 maxDim 이하로 축소해 전송 크기를 제한한다.
+function studioCanvasDecodedPixelLimit(): number {
+  const navigatorWithMemory = globalThis.navigator as Navigator & { deviceMemory?: number };
+  return selectStudioUploadDecodedPixelLimit({
+    coarsePointer: globalThis.matchMedia?.("(pointer: coarse)").matches ?? false,
+    deviceMemoryGb: navigatorWithMemory.deviceMemory,
+  });
+}
+
+function assertStudioCanvasDecodedImageSize(
+  width: number,
+  height: number,
+  maximumPixels: number
+): void {
+  const pixels = width * height;
+  if (
+    !Number.isSafeInteger(width) ||
+    !Number.isSafeInteger(height) ||
+    width < 1 ||
+    height < 1 ||
+    !Number.isSafeInteger(pixels) ||
+    pixels > maximumPixels
+  ) {
+    const megapixels = Math.max(1, Math.floor(maximumPixels / 1_000_000));
+    throw new Error(`이미지 해상도가 안전 한도(${megapixels}MP)를 초과합니다.`);
+  }
+}
+
+// data-URL 이미지를 maxDim 이하로 축소해 전송 크기를 제한한다. 디코드 직후 픽셀 예산을 다시
+// 확인해, 파일 헤더와 브라우저 디코더 결과가 어긋나도 거대한 캔버스를 만들지 않는다.
 function downscaleImageFile(file: File, maxDim = 1280, quality = 0.85) {
+  const maximumPixels = studioCanvasDecodedPixelLimit();
   return new Promise<{ src: string; width: number; height: number }>((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error("이미지를 읽지 못했습니다."));
@@ -4433,6 +3871,12 @@ function downscaleImageFile(file: File, maxDim = 1280, quality = 0.85) {
       const img = new globalThis.Image();
       img.onerror = () => reject(new Error("이미지를 불러오지 못했습니다."));
       img.onload = () => {
+        try {
+          assertStudioCanvasDecodedImageSize(img.width, img.height, maximumPixels);
+        } catch (error) {
+          reject(error);
+          return;
+        }
         const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
         const width = Math.round(img.width * scale);
         const height = Math.round(img.height * scale);
@@ -4466,7 +3910,15 @@ function readGifFileAsDataUrl(file: File): Promise<string> {
 async function loadImageFileForCanvas(
   file: File
 ): Promise<{ src: string; width: number; height: number; isAnimatedGif: boolean }> {
+  const maximumPixels = studioCanvasDecodedPixelLimit();
+  if (!Number.isSafeInteger(file.size) || file.size < 1) {
+    throw new Error("이미지 파일이 비어 있거나 크기를 확인할 수 없습니다.");
+  }
+  if (file.size > STUDIO_UPLOAD_MAX_SOURCE_FILE_BYTES) {
+    throw new Error("이미지 원본이 12MB를 초과합니다. 먼저 크기를 줄여 주세요.");
+  }
   if (!isGifFile(file)) {
+    await inspectStudioUploadSourceImage(file, maximumPixels);
     const r = await downscaleImageFile(file);
     return { ...r, isAnimatedGif: false };
   }
@@ -4486,6 +3938,7 @@ async function loadImageFileForCanvas(
       img.src = rawDataUrl;
     }
   );
+  assertStudioCanvasDecodedImageSize(naturalWidth, naturalHeight, maximumPixels);
   return { src: rawDataUrl, width: naturalWidth, height: naturalHeight, isAnimatedGif: true };
 }
 
@@ -5538,6 +4991,7 @@ function StudioCuttoonEditor() {
     loadStudioAppSettings(studioAppSettingsStorage())
   );
   const [appSettingsOpen, setAppSettingsOpen] = useState(false);
+  const [appSettingsInitialTab, setAppSettingsInitialTab] = useState<"general" | "other">("general");
   const [railMoreOpen, setRailMoreOpen] = useState(false);
   const appSettingsRef = useRef(appSettings);
   appSettingsRef.current = appSettings;
@@ -6058,6 +5512,8 @@ function StudioCuttoonEditor() {
     setPublicationAnalyticsState(next);
   };
   const [masterEditMode, setMasterEditMode] = useState(false);
+  const masterEditModeRef = useRef(masterEditMode);
+  masterEditModeRef.current = masterEditMode;
   const [masterPanelOpen, setMasterPanelOpen] = useState(false);
   // 페이지 캔버스/썸네일에 깔 마스터 합성 목록(숨김 제외 · 잠금/노클립 강제 · 비상호작용).
   // useMemo: 캔버스 memo 자식 prop 안정성 — master 변경 시에만 재합성.
@@ -8837,7 +8293,7 @@ function StudioCuttoonEditor() {
   // Space 키 누름에 따른 화면 팬(Pan) 모드 활성화 리스너
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
+      const target = e.target instanceof HTMLElement ? e.target : null;
       const typing = !!target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
       if (typing || editing) return;
       if (e.code === "Space" && !isSpacePressed) {
@@ -9431,7 +8887,7 @@ function StudioCuttoonEditor() {
     }
 
     // 드롭 지점(스테이지 좌표) → 거기에 중앙을 맞춰 배치한다.
-    const placeAt = (src: string, width: number, height: number) => {
+    const placeAt = (src: string, width: number, height: number, isAnimatedGif = false) => {
       const rect = wrap.getBoundingClientRect();
       const x = (cx - rect.left + wrap.scrollLeft) / effScale;
       const y = (cy - rect.top + wrap.scrollTop) / effScale;
@@ -9439,15 +8895,34 @@ function StudioCuttoonEditor() {
       const targetW = Math.round(width * fit);
       const targetH = Math.round(height * fit);
       setError(null);
-      addEl({ id: uid(), type: "image", src, x: x - targetW / 2, y: y - targetH / 2, width: targetW, height: targetH, rotation: 0 });
+      addEl({
+        id: uid(),
+        type: "image",
+        src,
+        x: x - targetW / 2,
+        y: y - targetH / 2,
+        width: targetW,
+        height: targetH,
+        rotation: 0,
+        ...(isAnimatedGif ? { isAnimatedGif: true } : {}),
+      });
     };
 
     // 1) 외부 이미지 파일 드롭(데스크톱에서 끌어다 놓기) — ⌘V 붙여넣기와 동일하게 추가.
     if (imageFile) {
+      const targetPageId = activePage.id;
+      const targetMasterEditMode = masterEditMode;
       try {
-        const { src, width, height } = await downscaleImageFile(imageFile);
-        if (!canApplyStudioMutation(mutationTicket)) return;
-        placeAt(src, width, height);
+        const { src, width, height, isAnimatedGif } = await loadImageFileForCanvas(imageFile);
+        if (!isStudioPasteScopeCurrent({
+          mutationAllowed: canApplyStudioMutation(mutationTicket),
+          reviewLocked: activeSurfaceReviewLockedRef.current,
+          targetPageId,
+          currentPageId: currentPageIdRef.current,
+          targetMasterEditMode,
+          currentMasterEditMode: masterEditModeRef.current,
+        })) return;
+        placeAt(src, width, height, isAnimatedGif);
       } catch (err) {
         setError(err instanceof Error ? err.message : "이미지를 추가하지 못했어요.");
       }
@@ -10820,6 +10295,7 @@ function StudioCuttoonEditor() {
   };
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const projectActionsRef = useRef<HTMLDivElement>(null);
+  const editMenuImageInputRef = useRef<HTMLInputElement>(null);
   const projectImportInputRef = useRef<HTMLInputElement>(null);
   const projectArchiveImportInputRef = useRef<HTMLInputElement>(null);
   const psdImportInputRef = useRef<HTMLInputElement>(null);
@@ -12192,7 +11668,7 @@ function StudioCuttoonEditor() {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      const { src, width, height } = await downscaleImageFile(file);
+      const { src, width, height } = await loadImageFileForCanvas(file);
       const { saveAsset } = await import("./studio-asset-library");
       await saveAsset({ name: file.name, dataUrl: src, width, height });
       await loadAssetsList();
@@ -14152,7 +13628,8 @@ function StudioCuttoonEditor() {
     src: string,
     width: number,
     height: number,
-    aiProvenance?: StudioPublishAiProvenance
+    aiProvenance?: StudioPublishAiProvenance,
+    isAnimatedGif = false
   ) {
     setError(null);
     const element = createCanvasImageElement({
@@ -14163,7 +13640,11 @@ function StudioCuttoonEditor() {
         sourceWidth: width,
         sourceHeight: height,
       });
-    addEl({ ...element, ...(aiProvenance ? { aiProvenance } : {}) });
+    addEl({
+      ...element,
+      ...(aiProvenance ? { aiProvenance } : {}),
+      ...(isAnimatedGif ? { isAnimatedGif: true } : {}),
+    });
   }
   function applyBg3dRenderedImage(
     result: StudioBackground3DInsertResult,
@@ -14626,10 +14107,10 @@ function StudioCuttoonEditor() {
   function deleteLayerElements(ids: readonly string[]) {
     if (activeSurfaceReviewLocked) {
       setError("이 페이지는 검토 잠금 상태예요. 잠금을 해제한 뒤 레이어를 삭제해 주세요.");
-      return;
+      return false;
     }
     const removal = removeLayerItems(elements, ids);
-    if (removal.removedIds.length === 0) return;
+    if (removal.removedIds.length === 0) return false;
     const idSet = new Set(removal.removedIds);
     const trackedDeleted = removal.removedIds.filter((id) => hasTrack(animTimeline, id));
     const nextTimeline = trackedDeleted.reduce(
@@ -14640,12 +14121,28 @@ function StudioCuttoonEditor() {
       elements,
       removal.items
     );
-    commit(
-      nextItems,
-      trackedDeleted.length > 0 ? { animTimeline: nextTimeline } : undefined
+    const removedGroupIds = new Set(
+      elements
+        .filter((element) => idSet.has(element.id) && element.groupId)
+        .map((element) => element.groupId as string)
     );
+    const emptyAfterRemoval = new Set(emptyGroupIds(nextItems, groups));
+    const groupsEmptiedByRemoval = new Set(
+      [...removedGroupIds].filter((groupId) => emptyAfterRemoval.has(groupId))
+    );
+    const committed = commit(
+      nextItems,
+      {
+        ...(trackedDeleted.length > 0 ? { animTimeline: nextTimeline } : {}),
+        ...(groupsEmptiedByRemoval.size > 0
+          ? { groups: groups.filter((group) => !groupsEmptiedByRemoval.has(group.id)) }
+          : {}),
+      }
+    );
+    if (!committed) return false;
     if (selectedId && idSet.has(selectedId)) setSelectedId(null);
     setMarqueeIds((current) => current.filter((id) => !idSet.has(id)));
+    return true;
   }
   function removeSelected() {
     if (marqueeIds.length > 0) {
@@ -15160,9 +14657,8 @@ function StudioCuttoonEditor() {
         target.isContentEditable ||
         target.getAttribute("role") === "textbox"
       );
-      const insideShortcutBoundary =
-        target instanceof Element
-        && target.closest("[data-studio-shortcut-boundary='true'], [aria-modal='true']") !== null;
+      const insideShortcutBoundary = target !== null &&
+        target.closest("[data-studio-shortcut-boundary='true'], [aria-modal='true']") !== null;
       // 포커스를 아직 모달 안으로 옮기지 못한 첫 프레임에도 Delete/Undo/B/E가 뒤 원고에 닿지 않게,
       // 이벤트 target뿐 아니라 열린 modal 자체를 전역 파괴 명령의 경계로 취급한다.
       const openModals = typeof document === "undefined"
@@ -15170,7 +14666,6 @@ function StudioCuttoonEditor() {
         : [...document.querySelectorAll<HTMLElement>("[aria-modal='true']")].filter(
             (modal) => !modal.hidden && !modal.inert && modal.getClientRects().length > 0
           );
-      if (typing || editing) return;
       if (openModals.length > 0) {
         if (
           e.key === "Escape"
@@ -15182,8 +14677,12 @@ function StudioCuttoonEditor() {
         }
         return;
       }
-      if (insideShortcutBoundary) return;
-      if (timelapseCapturing) return; // 타임랩스 캡처 중엔 ⌘Z 등 전역 단축키를 막는다(pagesHi 임시 점유 보호)
+      if (!shouldHandleStudioEditEvent({
+        typing,
+        editing: Boolean(editing),
+        insideShortcutBoundary,
+        timelapseCapturing,
+      })) return;
       const mod = e.metaKey || e.ctrlKey;
       // 앱 설정 → Shortcuts: user-bound chords (tool switchers etc.).
       const sc = appSettingsRef.current.shortcuts;
@@ -15266,16 +14765,16 @@ function StudioCuttoonEditor() {
       }
       if (matchStudioShortcut(sc["deselect-pixels"], e)) {
         e.preventDefault();
-        setPixelTool(null);
-        setPixelSel(null);
-        clearPolyLassoDraft();
-        announceDrawingShortcut("픽셀 선택 해제");
+        deselectForEdit();
         return;
       }
-      if (matchStudioShortcut(sc["invert-pixels"], e) && selected?.type === "image") {
+      if (
+        matchStudioShortcut(sc["invert-pixels"], e)
+        && selected?.type === "image"
+        && isSelectionUsable(pixelSel)
+      ) {
         e.preventDefault();
-        setPixelSel((s) => toggleSelectionInvert(s ?? emptyPixelSelection()));
-        announceDrawingShortcut("선택 반전");
+        invertSelectionForEdit();
         return;
       }
       if (matchStudioShortcut(sc["shortcuts-help"], e)) {
@@ -15313,6 +14812,7 @@ function StudioCuttoonEditor() {
         }
         return;
       }
+      const editShortcut = resolveStudioEditShortcut(e);
       const drawingShortcut = resolveStudioDrawingShortcut(e);
       const filterShortcut = mod && e.shiftKey && !e.altKey
         ? STUDIO_FILTER_SHORTCUTS[e.code]
@@ -15327,34 +14827,37 @@ function StudioCuttoonEditor() {
       } else if (mod && (e.key === "y" || e.key === "Y")) {
         e.preventDefault();
         redo();
-      } else if (mod && (e.key === "d" || e.key === "D") && !e.altKey) {
-        // 픽셀 선택이 살아 있으면 ⌘D = 선택 해제. 없으면 요소 복제(기존 동작).
-        // Custom deselect-pixels chord already handled above when rebound.
-        e.preventDefault();
-        if (pixelSel || pixelTool) {
-          setPixelTool(null);
-          setPixelSel(null);
-          clearPolyLassoDraft();
-          announceDrawingShortcut("픽셀 선택 해제");
-        } else {
-          duplicateSelected();
-        }
-      } else if (mod && e.shiftKey && !e.altKey && (e.key === "i" || e.key === "I")) {
-        // Ctrl+Shift+I — 픽셀 선택 반전(선택이 없으면 빈 선택에서 전체 선택으로 토글).
-        if (selected?.type === "image") {
-          e.preventDefault();
-          setPixelSel((s) => toggleSelectionInvert(s ?? emptyPixelSelection()));
-          announceDrawingShortcut("선택 반전");
-        }
-      } else if (mod && (e.key === "c" || e.key === "C") && !e.shiftKey && !e.altKey) {
-        // 요소 복사(⌘C): 선택이 있을 때만 가로챈다 — 없으면 브라우저 기본 복사 유지.
+      } else if (editShortcut === "cut") {
+        if (cutSelectedElements()) e.preventDefault();
+      } else if (editShortcut === "copy") {
         if (copySelectedElements()) e.preventDefault();
-      } else if (mod && e.key === "]") {
+      } else if (editShortcut === "paste-in-place") {
         e.preventDefault();
-        reorder("front");
-      } else if (mod && e.key === "[") {
+        void pasteStudioElementsFromClipboard("in-place");
+      } else if (editShortcut === "select-all") {
         e.preventDefault();
-        reorder("back");
+        selectAllForEdit();
+      } else if (editShortcut === "deselect") {
+        e.preventDefault();
+        deselectForEdit();
+      } else if (editShortcut === "invert-selection") {
+        e.preventDefault();
+        invertSelectionForEdit();
+      } else if (editShortcut === "duplicate") {
+        e.preventDefault();
+        if (!activeSurfaceReviewLocked) duplicateSelected();
+      } else if (editShortcut === "bring-front") {
+        e.preventDefault();
+        if (!activeSurfaceReviewLocked) reorder("front");
+      } else if (editShortcut === "bring-forward") {
+        e.preventDefault();
+        if (!activeSurfaceReviewLocked) reorder("forward");
+      } else if (editShortcut === "send-back") {
+        e.preventDefault();
+        if (!activeSurfaceReviewLocked) reorder("back");
+      } else if (editShortcut === "send-backward") {
+        e.preventDefault();
+        if (!activeSurfaceReviewLocked) reorder("backward");
       } else if (mod && (e.key === "=" || e.key === "+")) {
         e.preventDefault();
         setZoom((z) => clampZoom(z + 0.25));
@@ -15521,11 +15024,13 @@ function StudioCuttoonEditor() {
       } else if ((e.key === "Delete" || e.key === "Backspace") && (selectedId || marqueeIds.length > 0)) {
         e.preventDefault();
         // 픽셀 선택이 살아 있으면 요소 삭제 대신 선택 영역 픽셀 삭제(포토샵과 동일한 기대).
-        if (selected?.type === "image" && isSelectionUsable(pixelSel) && !pixelBusy) {
-          void applyPixelSelectionAdjust(planSelectionAdjust("delete"));
-        } else {
-          removeSelected();
+        if (selected?.type === "image" && isSelectionUsable(pixelSel)) {
+          if (!pixelBusy && !selectedContentMutationLocked) {
+            void applyPixelSelectionAdjust(planSelectionAdjust("delete"));
+          }
+          return;
         }
+        removeSelected();
       } else if (e.key === "?") {
         e.preventDefault();
         setShortcutsOpen((v) => !v);
@@ -15604,19 +15109,6 @@ function StudioCuttoonEditor() {
       ) {
         e.preventDefault();
         finishPolyLassoSession();
-      } else if (
-        mod &&
-        !e.altKey &&
-        !e.shiftKey &&
-        !e.repeat &&
-        (e.key === "a" || e.key === "A") &&
-        selected?.type === "image" &&
-        (pixelTool || pixelSel)
-      ) {
-        // 픽셀 도구/선택이 살아 있을 때 ⌘A = 이미지 전체 픽셀 선택(요소 전체 선택과 구분).
-        e.preventDefault();
-        setPixelSel((s) => selectAllPixels(s));
-        clearPolyLassoDraft();
       } else if ((selectedId || marqueeIds.length > 0) && e.key.startsWith("Arrow")) {
         // 방향키 미세이동: 1px, Shift 동반 시 10px.
         e.preventDefault();
@@ -15650,15 +15142,232 @@ function StudioCuttoonEditor() {
   }
   // 연속 붙여넣기 캐스케이드(PPT식 계단 배치) 카운터 — 페이로드·대상 페이지 조합별로 초기화.
   const pasteSeqRef = useRef<{ key: string; count: number }>({ key: "", count: 0 });
-  // 선택 요소 복사(⌘C): 시스템 클립보드는 best-effort, localStorage 폴백은 항상 기록해 ⌘V를 보장.
-  function copySelectedElements(): boolean {
-    const members = collectCopyElements(elements, selectedId, marqueeIds);
-    if (members.length === 0) return false;
-    const payload = buildClipboardPayload(members, { canvasW: CANVAS_W, canvasH, pageId: activePage.id });
-    writeClipboardFallback(globalThis.localStorage, payload);
-    void navigator.clipboard?.writeText(serializeClipboardPayload(payload)).catch(() => {});
+  // 시스템 클립보드 권한이 막혀도 이 편집기 세션 안에서 Cut/Paste가 반드시 왕복하도록 메모리 사본을
+  // 보존한다. 영구 localStorage 대신 탭 sessionStorage를 써 로그아웃 뒤 다른 계정으로 새지 않게 한다.
+  const studioClipboardPayloadRef = useRef<StudioClipboardPayload | null>(null);
+  const studioClipboardScopeKey = studioClipboardFallbackStorageKey({
+    authScopeKey: studioAuthUserId,
+    workId,
+  });
+  const studioClipboardScopeRef = useRef(studioClipboardScopeKey);
+  if (studioClipboardScopeRef.current !== studioClipboardScopeKey) {
+    studioClipboardScopeRef.current = studioClipboardScopeKey;
+    studioClipboardPayloadRef.current = null;
     pasteSeqRef.current = { key: "", count: 0 };
+  }
+
+  function studioClipboardSessionStorage(): Storage | null {
+    try {
+      return typeof globalThis.sessionStorage === "undefined" ? null : globalThis.sessionStorage;
+    } catch {
+      // Sandboxed/blocked storage contexts still retain the in-memory clipboard below.
+      return null;
+    }
+  }
+
+  function captureSelectedStudioClipboard(): {
+    payload: StudioClipboardPayload;
+    memberIds: string[];
+  } | null {
+    const members = collectCopyElements(elements, selectedId, marqueeIds);
+    if (members.length === 0) return null;
+    const memberIds = members.map((member) => member.id);
+    const expectedGroupIds = [...new Set(
+      members.flatMap((member) =>
+        member.groupId && groups.some((group) => group.id === member.groupId)
+          ? [member.groupId]
+          : []
+      )
+    )];
+    const expectedTrackIds = memberIds.filter((id) => hasTrack(animTimeline, id));
+    const payload = buildClipboardPayload(members, {
+        canvasW: CANVAS_W,
+        canvasH,
+        pageId: activePage.id,
+      }, Date.now(), {
+        groups,
+        animationTimeline: animTimeline,
+      });
+    if (!clipboardPayloadMatchesMembers(payload, memberIds, {
+      groupIds: expectedGroupIds,
+      trackIds: expectedTrackIds,
+    })) {
+      setError("선택한 레이어 중 안전하게 복사할 수 없는 데이터가 있어 작업을 취소했습니다.");
+      return null;
+    }
+    return {
+      payload,
+      memberIds,
+    };
+  }
+
+  function persistStudioClipboardPayload(payload: StudioClipboardPayload) {
+    studioClipboardPayloadRef.current = payload;
+    writeClipboardFallback(
+      studioClipboardSessionStorage(),
+      payload,
+      studioClipboardScopeKey
+    );
+    void globalThis.navigator?.clipboard
+      ?.writeText(serializeClipboardPayload(payload))
+      .catch(() => {});
+    pasteSeqRef.current = { key: "", count: 0 };
+  }
+
+  // 선택 요소 복사(⌘C): 그룹 단일 선택은 collectCopyElements 계약대로 그룹 전체를 복사한다.
+  function copySelectedElements(): boolean {
+    const captured = captureSelectedStudioClipboard();
+    if (!captured) return false;
+    persistStudioClipboardPayload(captured.payload);
     return true;
+  }
+
+  // 잘라내기는 복사한 정확한 멤버 ID를 한 번의 commit으로 제거한다. 그룹 안의 한 멤버만 지워지는
+  // copySelectedElements()+removeSelected 조합을 피하고, 시스템 clipboard 실패에도 메모리 사본을 보장한다.
+  function cutSelectedElements(): boolean {
+    if (activeSurfaceReviewLocked) return false;
+    const captured = captureSelectedStudioClipboard();
+    if (!captured) return false;
+    persistStudioClipboardPayload(captured.payload);
+    if (!deleteLayerElements(captured.memberIds)) return false;
+    announceDrawingShortcut("잘라내기");
+    return true;
+  }
+
+  function applyStudioClipboardPayload(
+    payload: StudioClipboardPayload,
+    placement: "cascade" | "in-place"
+  ): boolean {
+    if (activeSurfaceReviewLocked) return false;
+    const samePage = payload.source.pageId === activePage.id;
+    const seqKey = `${payload.copiedAt}:${activePage.id}`;
+    let nextPasteSequence: { key: string; count: number } | null = null;
+    let offsetSteps: number | undefined;
+    if (placement === "in-place") {
+      offsetSteps = 0;
+    } else if (samePage) {
+      const count = pasteSeqRef.current.key === seqKey ? pasteSeqRef.current.count + 1 : 1;
+      nextPasteSequence = { key: seqKey, count };
+      offsetSteps = count;
+    }
+    const plan = planClipboardPaste(
+      payload,
+      { canvasW: CANVAS_W, canvasH, pageId: activePage.id },
+      uid,
+      offsetSteps === undefined ? undefined : { offsetSteps }
+    );
+    if (!plan) return false;
+    const plannedElements = plan.els as unknown as El[];
+    const insertedElements = remapStudioBg3dLtCopiedBundles(plannedElements, masterEditMode);
+    const insertedGroupIds = new Set(
+      insertedElements.flatMap((element) => element.groupId ? [element.groupId] : [])
+    );
+    const preservedPastedGroups = plan.groups.filter((group) => insertedGroupIds.has(group.id));
+    const pastedGroups = masterEditMode
+      ? []
+      : [
+          ...preservedPastedGroups,
+          ...missingLayerGroupIds(insertedElements, [...groups, ...preservedPastedGroups]).map(
+            (groupId, index) =>
+              createLayerGroup(
+                groupId,
+                `붙여넣은 그룹 ${groups.length + preservedPastedGroups.length + index + 1}`
+              )
+          ),
+        ];
+    const hasPastedAnimationTracks = !masterEditMode && Object.keys(plan.animationTracks).length > 0;
+    const nextAnimationTimeline = hasPastedAnimationTracks
+      ? normalizeAnimationTimelineDoc({
+          ...animTimeline,
+          frameCount: Math.max(animTimeline.frameCount, plan.animationFrameCount ?? 1),
+          tracks: { ...animTimeline.tracks, ...plan.animationTracks },
+        })
+      : animTimeline;
+    const extraPatch: Partial<Omit<PageState, "id" | "elements">> = {
+      ...(pastedGroups.length > 0 ? { groups: [...groups, ...pastedGroups] } : {}),
+      ...(hasPastedAnimationTracks ? { animTimeline: nextAnimationTimeline } : {}),
+    };
+    if (!commit(
+      [...elements, ...insertedElements],
+      Object.keys(extraPatch).length > 0 ? extraPatch : undefined
+    )) return false;
+    if (nextPasteSequence) pasteSeqRef.current = nextPasteSequence;
+    setMarqueeIds(plan.ids.length > 1 ? plan.ids : []);
+    setSelectedId(plan.ids.length === 1 ? plan.ids[0] : null);
+    setTool("select");
+    announceDrawingShortcut(
+      placement === "in-place" ? "현재 위치에 붙여넣기" : "붙여넣기"
+    );
+    return true;
+  }
+
+  async function pasteStudioElementsFromClipboard(
+    placement: "cascade" | "in-place"
+  ): Promise<boolean> {
+    if (activeSurfaceReviewLocked) {
+      setError(
+        collaborationDocumentLocked
+          ? collaborationLockMessage()
+          : "이 페이지는 검토 잠금 상태예요. 잠금을 해제한 뒤 붙여넣어 주세요."
+      );
+      return false;
+    }
+    const mutationTicket = captureStudioMutationTicket();
+    const targetPageId = activePage.id;
+    const targetMasterEditMode = masterEditMode;
+
+    let systemInspected = false;
+    let unsupportedSystemContent = false;
+    let systemPayload: StudioClipboardPayload | null = null;
+    const clipboard = globalThis.navigator?.clipboard;
+    try {
+      if (clipboard && typeof clipboard.read === "function") {
+        const items = await clipboard.read();
+        systemInspected = true;
+        for (const item of items) {
+          if (item.types.includes("text/plain")) {
+            const text = await (await item.getType("text/plain")).text();
+            systemPayload = parseClipboardPayload(text);
+            if (!systemPayload && text.trim()) unsupportedSystemContent = true;
+          }
+          if (item.types.some((type) => type.startsWith("image/"))) {
+            unsupportedSystemContent = true;
+          }
+          if (systemPayload) break;
+        }
+      } else if (clipboard && typeof clipboard.readText === "function") {
+        const text = await clipboard.readText();
+        systemInspected = true;
+        systemPayload = parseClipboardPayload(text);
+        unsupportedSystemContent = !systemPayload && text.trim().length > 0;
+      }
+    } catch {
+      // Clipboard read permission is optional. The in-memory/session fallback remains authoritative.
+    }
+
+    if (!isStudioPasteScopeCurrent({
+      mutationAllowed: canApplyStudioMutation(mutationTicket),
+      reviewLocked: activeSurfaceReviewLockedRef.current,
+      targetPageId,
+      currentPageId: currentPageIdRef.current,
+      targetMasterEditMode,
+      currentMasterEditMode: masterEditModeRef.current,
+    })) {
+      announceDrawingShortcut("페이지나 원고 상태가 바뀌어 붙여넣기를 취소했습니다");
+      return false;
+    }
+
+    if (systemPayload) return applyStudioClipboardPayload(systemPayload, placement);
+    if (systemInspected && unsupportedSystemContent) {
+      announceDrawingShortcut("외부 이미지·텍스트는 ⌘V 또는 이미지 파일 붙여넣기를 사용하세요");
+      return false;
+    }
+    const fallback =
+      studioClipboardPayloadRef.current ??
+      readClipboardFallback(studioClipboardSessionStorage(), studioClipboardScopeKey);
+    if (fallback) return applyStudioClipboardPayload(fallback, placement);
+    announceDrawingShortcut("붙여넣을 Studio 요소가 없습니다");
+    return false;
   }
 
   // 클립보드 이미지 붙여넣기(⌘V): 스크린샷·외부 그림을 바로 캔버스에 추가.
@@ -15666,48 +15375,48 @@ function StudioCuttoonEditor() {
   const pasteRef = useRef<(e: ClipboardEvent) => void>(() => {});
   useEffect(() => {
     pasteRef.current = (e: ClipboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      const typing = !!target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
-      if (typing || editing) return;
-      // 스튜디오 요소 붙여넣기: 복사 페이로드(텍스트) 우선. 이미지가 없을 때만 localStorage 폴백
+      const target = e.target instanceof HTMLElement ? e.target : null;
+      const typing = !!target && (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.tagName === "SELECT" ||
+        target.isContentEditable ||
+        target.getAttribute("role") === "textbox"
+      );
+      const insideShortcutBoundary = target !== null &&
+        target.closest("[data-studio-shortcut-boundary='true'], [aria-modal='true']") !== null;
+      const modalOpen = typeof document !== "undefined" && [
+        ...document.querySelectorAll<HTMLElement>("[aria-modal='true']"),
+      ].some((modal) => !modal.hidden && !modal.inert && modal.getClientRects().length > 0);
+      if (
+        !e.isTrusted ||
+        !shouldHandleStudioEditEvent({
+          defaultPrevented: e.defaultPrevented,
+          typing,
+          editing: Boolean(editing),
+          insideShortcutBoundary,
+          modalOpen,
+          timelapseCapturing,
+        })
+      ) {
+        return;
+      }
+      // 스튜디오 요소 붙여넣기: 복사 페이로드(텍스트) 우선. 이미지가 없을 때만 세션 폴백
       // (시스템 클립보드 기록이 차단된 환경) — 외부에서 복사한 이미지 붙여넣기는 그대로 존중한다.
+      const clipboardText = e.clipboardData?.getData("text/plain") ?? "";
+      const clipboardItems = Array.from(e.clipboardData?.items ?? []);
+      const hasClipboardImage = clipboardItems.some((item) => item.type.startsWith("image/"));
       const elementPayload =
-        parseClipboardPayload(e.clipboardData?.getData("text/plain")) ??
-        (Array.from(e.clipboardData?.items ?? []).some((it) => it.type.startsWith("image/"))
+        parseClipboardPayload(clipboardText) ??
+        (clipboardText.trim() || hasClipboardImage
           ? null
-          : readClipboardFallback(globalThis.localStorage));
-      if (elementPayload) {
-        const samePage = elementPayload.source.pageId === activePage.id;
-        const seqKey = `${elementPayload.copiedAt}:${activePage.id}`;
-        if (pasteSeqRef.current.key !== seqKey) pasteSeqRef.current = { key: seqKey, count: 0 };
-        pasteSeqRef.current.count += 1;
-        const plan = planClipboardPaste(
-          elementPayload,
-          { canvasW: CANVAS_W, canvasH, pageId: activePage.id },
-          uid,
-          samePage ? { offsetSteps: pasteSeqRef.current.count } : undefined
-        );
-        if (plan) {
-          e.preventDefault();
-          const plannedElements = plan.els as unknown as El[];
-          const insertedElements = remapStudioBg3dLtCopiedBundles(
-            plannedElements,
-            masterEditMode
-          );
-          const pastedGroups = masterEditMode
-            ? []
-            : missingLayerGroupIds(insertedElements, groups).map((groupId, index) =>
-                createLayerGroup(groupId, `붙여넣은 그룹 ${groups.length + index + 1}`)
-              );
-          commit(
-            [...elements, ...insertedElements],
-            pastedGroups.length > 0 ? { groups: [...groups, ...pastedGroups] } : undefined
-          );
-          setMarqueeIds(plan.ids.length > 1 ? plan.ids : []);
-          setSelectedId(plan.ids.length === 1 ? plan.ids[0] : null);
-          setTool("select");
-          return;
-        }
+          : studioClipboardPayloadRef.current ?? readClipboardFallback(
+              studioClipboardSessionStorage(),
+              studioClipboardScopeKey
+            ));
+      if (elementPayload && applyStudioClipboardPayload(elementPayload, "cascade")) {
+        e.preventDefault();
+        return;
       }
       const items = e.clipboardData?.items;
       if (!items) return;
@@ -15718,11 +15427,20 @@ function StudioCuttoonEditor() {
         if (!file) continue;
         e.preventDefault();
         const mutationTicket = captureStudioMutationTicket();
+        const targetPageId = activePage.id;
+        const targetMasterEditMode = masterEditMode;
         void (async () => {
           try {
-            const { src, width, height } = await downscaleImageFile(file);
-            if (!canApplyStudioMutation(mutationTicket)) return;
-            addRenderedImage(src, width, height);
+            const { src, width, height, isAnimatedGif } = await loadImageFileForCanvas(file);
+            if (!isStudioPasteScopeCurrent({
+              mutationAllowed: canApplyStudioMutation(mutationTicket),
+              reviewLocked: activeSurfaceReviewLockedRef.current,
+              targetPageId,
+              currentPageId: currentPageIdRef.current,
+              targetMasterEditMode,
+              currentMasterEditMode: masterEditModeRef.current,
+            })) return;
+            addRenderedImage(src, width, height, undefined, isAnimatedGif);
           } catch (err) {
             setError(err instanceof Error ? err.message : "이미지 붙여넣기 실패");
           }
@@ -17484,9 +17202,18 @@ function StudioCuttoonEditor() {
     e.target.value = "";
     if (!file) return;
     const mutationTicket = captureStudioMutationTicket();
+    const targetPageId = activePage.id;
+    const targetMasterEditMode = masterEditMode;
     try {
       const { src, width, height, isAnimatedGif } = await loadImageFileForCanvas(file);
-      if (!canApplyStudioMutation(mutationTicket)) return;
+      if (!isStudioPasteScopeCurrent({
+        mutationAllowed: canApplyStudioMutation(mutationTicket),
+        reviewLocked: activeSurfaceReviewLockedRef.current,
+        targetPageId,
+        currentPageId: currentPageIdRef.current,
+        targetMasterEditMode,
+        currentMasterEditMode: masterEditModeRef.current,
+      })) return;
       const fit = Math.min(1, (CANVAS_W - 80) / width);
       setError(null);
       addEl({
@@ -22093,6 +21820,57 @@ function StudioCuttoonEditor() {
     setSelectedId(null);
     setMarqueeIds(elements.map((el) => el.id));
   }
+  function selectAllForEdit() {
+    if (selected?.type === "image" && (pixelTool || pixelSel)) {
+      setPixelSel((current) => selectAllPixels(current));
+      clearPolyLassoDraft();
+      announceDrawingShortcut("이미지 픽셀 모두 선택");
+      return;
+    }
+    selectAllElements();
+    announceDrawingShortcut("모든 레이어 선택");
+  }
+  function deselectForEdit() {
+    if (pixelTool || pixelSel) {
+      setPixelTool(null);
+      setPixelSel(null);
+      clearPolyLassoDraft();
+      announceDrawingShortcut("픽셀 선택 해제");
+      return;
+    }
+    setSelectedId(null);
+    setMarqueeIds([]);
+    setEyedropperActive(false);
+    announceDrawingShortcut("선택 해제");
+  }
+  function invertSelectionForEdit() {
+    if (selected?.type !== "image" || !isSelectionUsable(pixelSel)) return;
+    setPixelSel((current) => toggleSelectionInvert(current ?? emptyPixelSelection()));
+    announceDrawingShortcut("선택 반전");
+  }
+  function clearSelectionForEdit() {
+    if (selected?.type === "image" && isSelectionUsable(pixelSel)) {
+      if (!pixelBusy && !selectedContentMutationLocked) {
+        void applyPixelSelectionAdjust(planSelectionAdjust("delete"));
+      }
+      return;
+    }
+    removeSelected();
+  }
+  function openSelectedLayerCrop() {
+    if (selected?.type !== "image" || selectedContentMutationLocked) return;
+    setTool("select");
+    setEyedropperActive(false);
+    disarmAllPixelTools();
+    setPixelSel(null);
+    setCropRect(initialCropRect());
+    openInspectorRoute({ primary: "properties", image: "transform" });
+    setRightPanelOpen(true);
+    announceDrawingShortcut("레이어 자르기");
+  }
+  function openImagePastePicker() {
+    editMenuImageInputRef.current?.click();
+  }
   function closeStudioFilterDialog() {
     setStudioFilterSession(null);
     setStudioFilterPreview(null);
@@ -22122,11 +21900,13 @@ function StudioCuttoonEditor() {
   // 메뉴 항목 onSelect 클로저가 참조하는 에디터 핸들러의 안정 번들 — 그룹 배열 useMemo가
   // 렌더마다 무효화되지 않게 하고, 이벤트 시점엔 항상 최신 클로저를 호출한다.
   const studioMainMenuActions = useStudioStableHandlers({
-    selectAllElements,
     addPage,
     addText,
     announceDrawingShortcut,
+    clearSelectionForEdit,
     copySelectedElements,
+    cutSelectedElements,
+    deselectForEdit,
     duplicateSelected,
     enterCanvasOnlyMode,
     fitCanvasToWidth,
@@ -22134,12 +21914,18 @@ function StudioCuttoonEditor() {
     handleExportProject,
     handleExportProjectArchive,
     handleSave,
+    invertSelectionForEdit,
+    openImagePastePicker,
+    openSelectedLayerCrop,
     openStudioFilter,
     openFeatureTutorial,
+    pasteStudioElementsFromClipboard,
     redo,
+    reorder,
     removeSelected,
     restoreSavedStudioView,
     saveCurrentStudioView,
+    selectAllForEdit,
     setActualPixelView,
     setStudioUiDensity,
     showAllLocallyHiddenLayers,
@@ -22154,9 +21940,38 @@ function StudioCuttoonEditor() {
   // 메뉴 그룹 표시용 원시값 — elements/history/selection 객체 대신 불리언만 deps 로 삼아
   // 정착 커밋·선택 변경마다 메뉴바 memo 자식이 재렌더되지 않게 한다.
   const menuDocumentEmpty = elements.length === 0;
-  const menuUndoDisabled = hi === 0 || collaborationDocumentLocked;
-  const menuRedoDisabled = hi >= history.length - 1 || collaborationDocumentLocked;
-  const menuNoSelection = !selected && marqueeIds.length === 0;
+  const menuHasElementSelection = Boolean(selected || marqueeIds.length > 0);
+  const menuHasSingleElementSelection = Boolean(selectedId && marqueeIds.length === 0);
+  const menuHasPixelSelection = isSelectionUsable(pixelSel);
+  const menuHasPixelEditing = Boolean(pixelTool || pixelSel);
+  const {
+    undoDisabled: menuEditUndoDisabled,
+    redoDisabled: menuEditRedoDisabled,
+    cutDisabled: menuEditCutDisabled,
+    copyDisabled: menuEditCopyDisabled,
+    pasteDisabled: menuEditPasteDisabled,
+    selectAllDisabled: menuEditSelectAllDisabled,
+    deselectDisabled: menuEditDeselectDisabled,
+    invertSelectionDisabled: menuEditInvertDisabled,
+    clearSelectionDisabled: menuEditClearDisabled,
+    duplicateDisabled: menuEditDuplicateDisabled,
+    reorderDisabled: menuEditReorderDisabled,
+    cropLayerDisabled: menuEditCropDisabled,
+  } = resolveStudioEditAvailability({
+    historyIndex: pagesHi,
+    historyLength: pagesHistory.length,
+    documentEmpty: menuDocumentEmpty,
+    hasElementSelection: menuHasElementSelection,
+    hasSingleElementSelection: menuHasSingleElementSelection,
+    hasPixelSelection: menuHasPixelSelection,
+    hasPixelEditing: menuHasPixelEditing,
+    pixelBusy,
+    selectedImage: selected?.type === "image",
+    interactionLocked: timelapseCapturing,
+    mutationLocked: activeSurfaceReviewLocked || timelapseCapturing,
+    selectedContentMutationLocked: selectedContentMutationLocked || timelapseCapturing,
+    masterEditMode,
+  });
   const menuFilterDisabled = selected?.type !== "image" || selectedContentMutationLocked;
   const menuSharedNonOwnerSave = Boolean(sharedDocument && sharedDocument.role !== "owner");
   const menuHasSavedView = savedStudioView?.pageId === activePage.id;
@@ -22253,101 +22068,141 @@ function StudioCuttoonEditor() {
       label: "편집",
       items: [
         {
-          id: "studioMainMenuActions.undo",
-          label: "실행취소",
+          ...STUDIO_EDIT_MENU_COMMANDS.undo,
           icon: Undo2,
-          shortcut: "⌘Z",
-          disabled: menuUndoDisabled,
+          disabled: menuEditUndoDisabled,
           onSelect: () => studioMainMenuActions.undo(),
         },
         {
-          id: "studioMainMenuActions.redo",
-          label: "다시실행",
+          ...STUDIO_EDIT_MENU_COMMANDS.redo,
           icon: Redo2,
-          shortcut: "⌘⇧Z",
-          disabled: menuRedoDisabled,
+          disabled: menuEditRedoDisabled,
           onSelect: () => studioMainMenuActions.redo(),
           separatorAfter: true,
         },
         {
-          id: "copy",
-          label: "복사",
+          ...STUDIO_EDIT_MENU_COMMANDS.cut,
+          icon: Scissors,
+          disabled: menuEditCutDisabled,
+          onSelect: () => {
+            studioMainMenuActions.cutSelectedElements();
+          },
+        },
+        {
+          ...STUDIO_EDIT_MENU_COMMANDS.copy,
           icon: Copy,
-          shortcut: "⌘C",
-          disabled: menuNoSelection,
+          disabled: menuEditCopyDisabled,
           onSelect: () => {
             studioMainMenuActions.copySelectedElements();
           },
         },
         {
-          id: "duplicate",
-          label: "복제",
-          icon: Files,
-          shortcut: "⌘D",
-          disabled:
-            collaborationDocumentLocked ||
-            activePageMutationLocked ||
-            menuNoSelection,
-          onSelect: () => studioMainMenuActions.duplicateSelected(),
-        },
-        {
-          id: "delete",
-          label: "삭제",
-          icon: Trash2,
-          shortcut: "⌫",
-          danger: true,
-          disabled:
-            collaborationDocumentLocked ||
-            activePageMutationLocked ||
-            menuNoSelection,
-          onSelect: () => studioMainMenuActions.removeSelected(),
-          separatorAfter: true,
-        },
-        {
-          id: "select-all",
-          label: "모두 선택",
-          icon: LayoutGrid,
-          shortcut: "⌘A",
-          disabled: menuDocumentEmpty,
-          onSelect: () => studioMainMenuActions.selectAllElements(),
-        },
-        {
-          id: "deselect",
-          label: "선택 해제",
-          icon: X,
-          shortcut: "Esc",
-          disabled: menuNoSelection,
+          ...STUDIO_EDIT_MENU_COMMANDS.paste,
+          icon: ClipboardPaste,
+          disabled: menuEditPasteDisabled,
           onSelect: () => {
-            setSelectedId(null);
-            setMarqueeIds([]);
-            setEyedropperActive(false);
+            void studioMainMenuActions.pasteStudioElementsFromClipboard("cascade");
           },
+        },
+        {
+          ...STUDIO_EDIT_MENU_COMMANDS["paste-in-place"],
+          icon: ClipboardCheck,
+          disabled: menuEditPasteDisabled,
+          onSelect: () => {
+            void studioMainMenuActions.pasteStudioElementsFromClipboard("in-place");
+          },
+        },
+        {
+          ...STUDIO_EDIT_MENU_COMMANDS["paste-file"],
+          icon: ImagePlus,
+          disabled: menuEditPasteDisabled,
+          onSelect: () => studioMainMenuActions.openImagePastePicker(),
           separatorAfter: true,
         },
         {
-          id: "history",
-          label: "작업 내역",
+          ...STUDIO_EDIT_MENU_COMMANDS["select-all"],
+          icon: LayoutGrid,
+          disabled: menuEditSelectAllDisabled,
+          onSelect: () => studioMainMenuActions.selectAllForEdit(),
+        },
+        {
+          ...STUDIO_EDIT_MENU_COMMANDS.deselect,
+          icon: X,
+          disabled: menuEditDeselectDisabled,
+          onSelect: () => studioMainMenuActions.deselectForEdit(),
+        },
+        {
+          ...STUDIO_EDIT_MENU_COMMANDS["invert-selection"],
+          icon: Lasso,
+          disabled: menuEditInvertDisabled,
+          onSelect: () => studioMainMenuActions.invertSelectionForEdit(),
+        },
+        {
+          ...STUDIO_EDIT_MENU_COMMANDS["clear-selection"],
+          icon: Trash2,
+          danger: true,
+          disabled: menuEditClearDisabled,
+          onSelect: () => studioMainMenuActions.clearSelectionForEdit(),
+          separatorAfter: true,
+        },
+        {
+          ...STUDIO_EDIT_MENU_COMMANDS.duplicate,
+          icon: Files,
+          disabled: menuEditDuplicateDisabled,
+          onSelect: () => studioMainMenuActions.duplicateSelected(),
+          separatorAfter: true,
+        },
+        {
+          ...STUDIO_EDIT_MENU_COMMANDS["bring-front"],
+          icon: ArrowUpToLine,
+          disabled: menuEditReorderDisabled,
+          onSelect: () => studioMainMenuActions.reorder("front"),
+        },
+        {
+          ...STUDIO_EDIT_MENU_COMMANDS["bring-forward"],
+          icon: ChevronUp,
+          disabled: menuEditReorderDisabled,
+          onSelect: () => studioMainMenuActions.reorder("forward"),
+        },
+        {
+          ...STUDIO_EDIT_MENU_COMMANDS["send-back"],
+          icon: ArrowDownToLine,
+          disabled: menuEditReorderDisabled,
+          onSelect: () => studioMainMenuActions.reorder("back"),
+        },
+        {
+          ...STUDIO_EDIT_MENU_COMMANDS["send-backward"],
+          icon: ChevronDown,
+          disabled: menuEditReorderDisabled,
+          onSelect: () => studioMainMenuActions.reorder("backward"),
+          separatorAfter: true,
+        },
+        {
+          ...STUDIO_EDIT_MENU_COMMANDS["crop-layer"],
+          icon: Crop,
+          disabled: menuEditCropDisabled,
+          onSelect: () => studioMainMenuActions.openSelectedLayerCrop(),
+          separatorAfter: true,
+        },
+        {
+          ...STUDIO_EDIT_MENU_COMMANDS.history,
           icon: HistoryIcon,
           onSelect: () => setHistoryPanelOpen((v) => !v),
         },
         {
-          id: "select",
-          label: "선택 도구",
-          icon: MousePointer2,
-          shortcut: "V",
+          ...STUDIO_EDIT_MENU_COMMANDS["pen-pressure"],
+          icon: SlidersHorizontal,
           onSelect: () => {
-            setTool("select");
-            setEyedropperActive(false);
+            setAppSettingsInitialTab("other");
+            setAppSettingsOpen(true);
           },
         },
         {
-          id: "eyedropper",
-          label: "스포이드",
-          icon: Pipette,
-          shortcut: "I",
+          ...STUDIO_EDIT_MENU_COMMANDS["app-settings"],
+          icon: Settings2,
           onSelect: () => {
-            setTool("select");
-            setEyedropperActive(true);
+            setAppSettingsInitialTab("general");
+            setAppSettingsOpen(true);
           },
         },
       ],
@@ -22760,19 +22615,26 @@ function StudioCuttoonEditor() {
       ],
     },
   ], [
-    activePageMutationLocked,
     canvasFlipH,
     collaborationDocumentLocked,
     colorBlindPreview,
     isFullscreen,
     lastStudioFilterDraft,
-    menuDocumentEmpty,
     menuFilterDisabled,
     menuHasLocallyHiddenLayers,
     menuHasSavedView,
-    menuNoSelection,
-    menuUndoDisabled,
-    menuRedoDisabled,
+    menuEditClearDisabled,
+    menuEditCopyDisabled,
+    menuEditCropDisabled,
+    menuEditCutDisabled,
+    menuEditDeselectDisabled,
+    menuEditDuplicateDisabled,
+    menuEditInvertDisabled,
+    menuEditPasteDisabled,
+    menuEditRedoDisabled,
+    menuEditReorderDisabled,
+    menuEditSelectAllDisabled,
+    menuEditUndoDisabled,
     leftPanelOpen,
     perspectiveRulerActive,
     projectArchiveBusy,
@@ -24785,6 +24647,14 @@ function StudioCuttoonEditor() {
           : undefined
       }
     >
+    <input
+      ref={editMenuImageInputRef}
+      type="file"
+      accept="image/*"
+      className="hidden"
+      aria-label="편집 메뉴에서 이미지 파일 붙여넣기"
+      onChange={onPickImage}
+    />
     {pendingBrushDelete ? (
       <div
         ref={brushUndoToastRef}
@@ -25431,6 +25301,7 @@ function StudioCuttoonEditor() {
           aiNoticeOpen={aiNoticeOpen}
           animTimeline={animTimeline}
           appSettings={appSettings}
+          appSettingsInitialTab={appSettingsInitialTab}
           appSettingsOpen={appSettingsOpen}
           authorizedWorkAssetScopeId={authorizedWorkAssetScopeId}
           autosaveRestoreBlockedReason={autosaveRestoreBlockedReason}
@@ -25549,6 +25420,7 @@ function StudioCuttoonEditor() {
           selected={selected}
           selectedId={selectedId}
           setAiNoticeOpen={setAiNoticeOpen}
+          setAppSettingsInitialTab={setAppSettingsInitialTab}
           setAppSettingsOpen={setAppSettingsOpen}
           setBg3dOpen={setBg3dOpen}
           setCanvasOnlyMode={setCanvasOnlyMode}
@@ -26260,7 +26132,7 @@ function StudioCuttoonEditor() {
                 className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-fg hover:bg-raised"
               >
                 <Copy size={12} />
-                복제하기 (⌘D)
+                복제하기 (⌘J)
               </button>
               <div className="my-1 h-px bg-line" />
               <button
@@ -29486,7 +29358,7 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
                 <button type="button" onClick={() => alignSelected("bottom")} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })} title="아래쪽 정렬">
                   <AlignEndHorizontal size={14} />
                 </button>
-                <button type="button" onClick={duplicateSelected} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })} title="복제 (⌘D)">
+                <button type="button" onClick={duplicateSelected} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1" })} title="복제 (⌘J)">
                   <Copy size={14} />
                 </button>
                 <button type="button" onClick={removeSelected} className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1 text-bad" })} title="삭제 (Delete)">
@@ -36659,6 +36531,7 @@ interface StudioCanvasViewportProps {
   aiNoticeOpen: boolean;
   animTimeline: AnimationTimelineDoc;
   appSettings: StudioAppSettings;
+  appSettingsInitialTab: "general" | "other";
   appSettingsOpen: boolean;
   authorizedWorkAssetScopeId: string | null;
   autosaveRestoreBlockedReason: "legacy-unversioned" | "work-mismatch" | "revision-mismatch" | null;
@@ -36777,6 +36650,7 @@ interface StudioCanvasViewportProps {
   selected: El | null;
   selectedId: string | null;
   setAiNoticeOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setAppSettingsInitialTab: import("react").Dispatch<import("react").SetStateAction<"general" | "other">>;
   setAppSettingsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setBg3dOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setCanvasOnlyMode: import("react").Dispatch<import("react").SetStateAction<boolean>>;
@@ -36911,6 +36785,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   aiNoticeOpen,
   animTimeline,
   appSettings,
+  appSettingsInitialTab,
   appSettingsOpen,
   authorizedWorkAssetScopeId,
   autosaveRestoreBlockedReason,
@@ -37028,6 +36903,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   selected,
   selectedId,
   setAiNoticeOpen,
+  setAppSettingsInitialTab,
   setAppSettingsOpen,
   setBg3dOpen,
   setCanvasOnlyMode,
@@ -39638,8 +39514,9 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
           </div>
           </div>
 
-          {showQuickStart && (
-            <QuickStartPanel
+          {showQuickStart ? (
+            <Suspense fallback={null}>
+              <QuickStartPanel
               onDismiss={dismissQuickStart}
               onExample={() => void startFromExample()}
               onOpenTemplate={() => openQuickStartMenu("template")}
@@ -39681,8 +39558,9 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 dismissQuickStart();
                 openFeatureTutorial(null);
               }}
-            />
-          )}
+              />
+            </Suspense>
+          ) : null}
 
           <div
             className="pointer-events-none absolute bottom-16 left-1/2 z-40 -translate-x-1/2"
@@ -39788,7 +39666,11 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
               <StudioAppSettingsPanel
                 open={appSettingsOpen}
                 settings={appSettings}
-                onClose={() => setAppSettingsOpen(false)}
+                initialTab={appSettingsInitialTab}
+                onClose={() => {
+                  setAppSettingsOpen(false);
+                  setAppSettingsInitialTab("general");
+                }}
                 onChange={commitAppSettings}
                 onResetAll={() => {
                   const next = resetStudioAppSettings(studioAppSettingsStorage());

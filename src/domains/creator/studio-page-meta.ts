@@ -15,6 +15,16 @@
  * studio-pages.ts 는 다른 소유라 수정하지 않는다 — 이 모듈은 합성으로만 동작한다.
  */
 
+import {
+  MAX_TIMELINE_FRAME_COUNT,
+  MAX_TRACK_KEYFRAMES,
+  type AnimationTimelineDoc,
+  type StudioAnimKeyframe,
+} from "./studio-anim-tracks";
+import { STUDIO_UPLOAD_DESKTOP_MAX_DECODED_PIXELS } from "./studio-upload-image-safety";
+
+import type { LayerGroup } from "./studio-layers";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 1) 페이지 메타 (이름 · 콘티 메모)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -118,11 +128,37 @@ export function withPageMeta<P extends PageMetaCarrier>(
 /** 페이로드 식별 마커 — 일반 텍스트/타 앱 JSON 과 구분. */
 export const STUDIO_CLIPBOARD_KIND = "toonspectrum/studio-elements";
 /** 페이로드 버전 — 상위 버전 페이로드는 거부(미래 포맷 오독 방지). */
-export const STUDIO_CLIPBOARD_VERSION = 1;
-/** 시스템 클립보드가 막힌 환경(권한 차단·구형 브라우저)용 localStorage 폴백 키. */
+export const STUDIO_CLIPBOARD_VERSION = 2;
+/** 시스템 클립보드가 막힌 환경(권한 차단·구형 브라우저)용 storage 폴백 키. */
 export const CLIPBOARD_FALLBACK_KEY = "toonspectrum-studio-clipboard";
-/** 같은 페이지 붙여넣기 시 겹침 방지 오프셋(px) — 복제(⌘D)와 동일 감각. */
+/** 같은 페이지 붙여넣기 시 겹침 방지 오프셋(px) — 복제(⌘J)와 동일 감각. */
 export const PASTE_OFFSET = 16;
+/** External clipboard admission budgets. They bound JSON parsing/render work without truncation. */
+export const STUDIO_CLIPBOARD_MAX_SERIALIZED_CHARS = 64 * 1024 * 1024;
+export const STUDIO_CLIPBOARD_MAX_ELEMENTS = 10_000;
+export const STUDIO_CLIPBOARD_MAX_ID_CHARS = 256;
+export const STUDIO_CLIPBOARD_MAX_SOURCE_CHARS = 20 * 1024 * 1024;
+export const STUDIO_CLIPBOARD_MAX_POINT_VALUES = 200_000;
+/** Canvas/filter paths allocate by displayed image dimensions, so bound both axes and area. */
+export const STUDIO_CLIPBOARD_MAX_IMAGE_AXIS = 16_384;
+export const STUDIO_CLIPBOARD_MAX_IMAGE_PIXELS = STUDIO_UPLOAD_DESKTOP_MAX_DECODED_PIXELS;
+const STUDIO_CLIPBOARD_MAX_TEXT_CHARS = 1_000_000;
+const STUDIO_CLIPBOARD_MAX_STYLE_CHARS = 4_096;
+const STUDIO_CLIPBOARD_MAX_GROUP_NAME_CHARS = 512;
+const STUDIO_CLIPBOARD_MAX_ABS_NUMBER = 10_000_000;
+const STUDIO_CLIPBOARD_MAX_JSON_DEPTH = 32;
+const STUDIO_CLIPBOARD_MAX_JSON_NODES = 1_000_000;
+const STUDIO_CLIPBOARD_MAX_OBJECT_KEYS = 512;
+const STUDIO_CLIPBOARD_ELEMENT_TYPES = new Set([
+  "image",
+  "text",
+  "bubble",
+  "sticker",
+  "draw",
+  "frame",
+  "focusLines",
+  "speedLines",
+]);
 
 /** 직렬화된 스튜디오 요소 최소 형태 — 메인 루프가 El 로 캐스팅한다. */
 export interface ClipboardElementLike {
@@ -145,6 +181,18 @@ export interface StudioClipboardPayload {
   copiedAt: number;
   source: ClipboardSourceInfo;
   els: ClipboardElementLike[];
+  /** Selected group metadata. Optional so v1 clipboard payloads keep parsing. */
+  groups?: LayerGroup[];
+  /** Selected layer tracks. Target pages keep their own fps and grow frameCount when needed. */
+  animation?: {
+    frameCount: number;
+    tracks: Record<string, StudioAnimKeyframe[]>;
+  };
+}
+
+export interface BuildClipboardPayloadExtras {
+  groups?: readonly LayerGroup[];
+  animationTimeline?: Pick<AnimationTimelineDoc, "frameCount" | "tracks">;
 }
 
 /** 붙여넣기 대상 페이지 정보. */
@@ -158,6 +206,9 @@ export interface ClipboardPasteTarget {
 export interface ClipboardPastePlan {
   els: ClipboardElementLike[];
   ids: string[];
+  groups: LayerGroup[];
+  animationTracks: Record<string, StudioAnimKeyframe[]>;
+  animationFrameCount?: number;
 }
 
 /** localStorage 호환 폴백 저장소(주입식 — 테스트/SSR 안전). */
@@ -166,12 +217,301 @@ export interface ClipboardFallbackStorage {
   setItem(key: string, value: string): void;
 }
 
+/** Account/work-scoped key prevents a copied draft from crossing an auth or document boundary. */
+export function studioClipboardFallbackStorageKey(scope: {
+  authScopeKey?: string | null;
+  workId?: string | null;
+}): string {
+  const auth = scope.authScopeKey?.trim() || "anonymous";
+  const work = scope.workId?.trim() || "local";
+  return `${CLIPBOARD_FALLBACK_KEY}:${encodeURIComponent(auth)}:${encodeURIComponent(work)}`;
+}
+
 function isPositiveFinite(v: unknown): v is number {
   return typeof v === "number" && Number.isFinite(v) && v > 0;
 }
 
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return !!v && typeof v === "object" && !Array.isArray(v);
+}
+
+function isBoundedString(v: unknown, max: number, allowEmpty = true): v is string {
+  return typeof v === "string" && (allowEmpty || v.length > 0) && v.length <= max;
+}
+
+function isFiniteClipboardNumber(v: unknown, positive = false): v is number {
+  return typeof v === "number" && Number.isFinite(v) &&
+    Math.abs(v) <= STUDIO_CLIPBOARD_MAX_ABS_NUMBER && (!positive || v > 0);
+}
+
+function isSafeClipboardLineCount(v: unknown, max: number): v is number {
+  return isFiniteClipboardNumber(v, true) && Number.isInteger(v) && v <= max;
+}
+
+function hasSafeClipboardImageDimensions(value: Record<string, unknown>): boolean {
+  const width = value.width;
+  const height = value.height;
+  if (
+    !isFiniteClipboardNumber(width, true) ||
+    !isFiniteClipboardNumber(height, true) ||
+    width > STUDIO_CLIPBOARD_MAX_IMAGE_AXIS ||
+    height > STUDIO_CLIPBOARD_MAX_IMAGE_AXIS
+  ) {
+    return false;
+  }
+  const pixels = Math.ceil(width) * Math.ceil(height);
+  return Number.isSafeInteger(pixels) && pixels <= STUDIO_CLIPBOARD_MAX_IMAGE_PIXELS;
+}
+
+function hasFiniteFields(
+  value: Record<string, unknown>,
+  fields: readonly string[],
+  positiveFields: readonly string[] = []
+): boolean {
+  const positive = new Set(positiveFields);
+  return fields.every((field) => isFiniteClipboardNumber(value[field], positive.has(field)));
+}
+
+function isBoundedNumberArray(value: unknown, exactLength?: number): value is number[] {
+  if (!Array.isArray(value)) return false;
+  if (exactLength !== undefined && value.length !== exactLength) return false;
+  if (value.length > STUDIO_CLIPBOARD_MAX_POINT_VALUES) return false;
+  return value.every((entry) => isFiniteClipboardNumber(entry));
+}
+
+function hasSafeClipboardJsonComplexity(root: unknown): boolean {
+  const stack: Array<{ value: unknown; depth: number; exit?: boolean; inArray?: boolean }> = [
+    { value: root, depth: 0 },
+  ];
+  const activePath = new WeakSet<object>();
+  let nodes = 0;
+  while (stack.length > 0) {
+    const current = stack.pop()!;
+    if (current.exit) {
+      activePath.delete(current.value as object);
+      continue;
+    }
+    nodes += 1;
+    if (nodes > STUDIO_CLIPBOARD_MAX_JSON_NODES || current.depth > STUDIO_CLIPBOARD_MAX_JSON_DEPTH) {
+      return false;
+    }
+    const value = current.value;
+    if (value === undefined) {
+      // JSON.stringify drops undefined object properties, but coerces array entries to null.
+      if (current.inArray) return false;
+      continue;
+    }
+    if (value === null || typeof value === "boolean") continue;
+    if (typeof value === "number") {
+      if (!Number.isFinite(value)) return false;
+      continue;
+    }
+    if (typeof value === "string") {
+      if (value.length > STUDIO_CLIPBOARD_MAX_SOURCE_CHARS) return false;
+      continue;
+    }
+    if (typeof value !== "object" || activePath.has(value)) return false;
+    activePath.add(value);
+    stack.push({ value, depth: current.depth, exit: true });
+    if (Array.isArray(value)) {
+      if (value.length > STUDIO_CLIPBOARD_MAX_POINT_VALUES) return false;
+      for (const entry of value) {
+        stack.push({ value: entry, depth: current.depth + 1, inArray: true });
+      }
+      continue;
+    }
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (entries.length > STUDIO_CLIPBOARD_MAX_OBJECT_KEYS) return false;
+    for (const [key, entry] of entries) {
+      if (key.length > STUDIO_CLIPBOARD_MAX_ID_CHARS) return false;
+      stack.push({ value: entry, depth: current.depth + 1, inArray: false });
+    }
+  }
+  return true;
+}
+
+function hasSafeImageClipboardOptionals(value: Record<string, unknown>): boolean {
+  if (value.maskSrc !== undefined && !isBoundedString(value.maskSrc, STUDIO_CLIPBOARD_MAX_SOURCE_CHARS)) {
+    return false;
+  }
+  if (value.bg3dScene !== undefined && !isRecord(value.bg3dScene)) return false;
+  if (value.smartFilters !== undefined && !isRecord(value.smartFilters)) return false;
+  if (value.frames !== undefined) {
+    if (!Array.isArray(value.frames) || value.frames.length > 60) return false;
+    for (const frame of value.frames) {
+      if (
+        !isRecord(frame) ||
+        !isBoundedString(frame.id, STUDIO_CLIPBOARD_MAX_ID_CHARS, false) ||
+        !isBoundedString(frame.src, STUDIO_CLIPBOARD_MAX_SOURCE_CHARS, false) ||
+        (frame.durationMs !== undefined && !isFiniteClipboardNumber(frame.durationMs, true))
+      ) return false;
+    }
+  }
+  return true;
+}
+
+function hasSafeDrawClipboardOptionals(value: Record<string, unknown>): boolean {
+  for (const field of [
+    "pressures",
+    "tiltXs",
+    "tiltYs",
+    "twists",
+    "speeds",
+    "tangentialPressures",
+  ]) {
+    if (value[field] !== undefined && !isBoundedNumberArray(value[field])) return false;
+  }
+  return true;
+}
+
+function hasSafeCommonClipboardFields(value: Record<string, unknown>): boolean {
+  if (!isBoundedString(value.id, STUDIO_CLIPBOARD_MAX_ID_CHARS, false)) return false;
+  if (!isBoundedString(value.type, 32, false) || !STUDIO_CLIPBOARD_ELEMENT_TYPES.has(value.type)) {
+    return false;
+  }
+  if (value.groupId !== undefined && !isBoundedString(value.groupId, STUDIO_CLIPBOARD_MAX_ID_CHARS, false)) {
+    return false;
+  }
+  if (value.name !== undefined && !isBoundedString(value.name, STUDIO_CLIPBOARD_MAX_TEXT_CHARS)) {
+    return false;
+  }
+  if (value.opacity !== undefined && !isFiniteClipboardNumber(value.opacity)) return false;
+  return true;
+}
+
+function isClipboardLayerGroup(value: unknown): value is LayerGroup {
+  if (!isRecord(value) || !hasSafeClipboardJsonComplexity(value)) return false;
+  if (!isBoundedString(value.id, STUDIO_CLIPBOARD_MAX_ID_CHARS, false)) return false;
+  if (
+    !isBoundedString(value.name, STUDIO_CLIPBOARD_MAX_GROUP_NAME_CHARS, false) ||
+    [...value.name].some((character) => {
+      const codePoint = character.codePointAt(0) ?? 0;
+      return codePoint <= 31 || (codePoint >= 127 && codePoint <= 159);
+    })
+  ) return false;
+  for (const field of ["collapsed", "hidden", "locked"] as const) {
+    if (value[field] !== undefined && typeof value[field] !== "boolean") return false;
+  }
+  return true;
+}
+
+function isClipboardAnimationKeyframe(
+  value: unknown,
+  frameCount: number
+): value is StudioAnimKeyframe {
+  if (!isRecord(value) || !hasSafeClipboardJsonComplexity(value)) return false;
+  if (
+    typeof value.frameIndex !== "number" ||
+    !Number.isInteger(value.frameIndex) ||
+    value.frameIndex < 0 ||
+    value.frameIndex >= frameCount
+  ) return false;
+  const frame = value.frame;
+  if (
+    !isRecord(frame) ||
+    !isBoundedString(frame.id, STUDIO_CLIPBOARD_MAX_ID_CHARS, false) ||
+    !isBoundedString(frame.src, STUDIO_CLIPBOARD_MAX_SOURCE_CHARS, false) ||
+    (frame.durationMs !== undefined && (
+      !isFiniteClipboardNumber(frame.durationMs, true) || frame.durationMs > 60_000
+    ))
+  ) return false;
+  if (value.ease !== undefined && value.ease !== "linear" && value.ease !== "ease-in-out") {
+    return false;
+  }
+  if (value.transform !== undefined) {
+    if (!isRecord(value.transform)) return false;
+    if (!hasFiniteFields(value.transform, ["x", "y", "rotation", "scaleX", "scaleY"], ["scaleX", "scaleY"])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function isClipboardAnimation(
+  value: unknown,
+  elementIds: ReadonlySet<string>
+): value is NonNullable<StudioClipboardPayload["animation"]> {
+  if (!isRecord(value) || !hasSafeClipboardJsonComplexity(value)) return false;
+  const frameCount = value.frameCount;
+  if (
+    typeof frameCount !== "number" ||
+    !Number.isInteger(frameCount) ||
+    frameCount < 1 ||
+    frameCount > MAX_TIMELINE_FRAME_COUNT ||
+    !isRecord(value.tracks)
+  ) return false;
+  const tracks = Object.entries(value.tracks);
+  if (tracks.length > elementIds.size) return false;
+  for (const [trackId, keyframes] of tracks) {
+    if (!elementIds.has(trackId) || !Array.isArray(keyframes) || keyframes.length < 1 || keyframes.length > MAX_TRACK_KEYFRAMES) {
+      return false;
+    }
+    let previousFrameIndex = -1;
+    for (const keyframe of keyframes) {
+      if (!isClipboardAnimationKeyframe(keyframe, frameCount) || keyframe.frameIndex <= previousFrameIndex) {
+        return false;
+      }
+      previousFrameIndex = keyframe.frameIndex;
+    }
+  }
+  return true;
+}
+
+/** Validate the minimum render contract before an external JSON value is ever cast to Studio El. */
 function isClipboardElement(v: unknown): v is ClipboardElementLike {
-  return !!v && typeof v === "object" && typeof (v as { id?: unknown }).id === "string";
+  if (
+    !isRecord(v) ||
+    !hasSafeClipboardJsonComplexity(v) ||
+    !hasSafeCommonClipboardFields(v)
+  ) return false;
+  switch (v.type) {
+    case "image":
+      return isBoundedString(v.src, STUDIO_CLIPBOARD_MAX_SOURCE_CHARS, false) &&
+        hasFiniteFields(v, ["x", "y", "rotation"]) &&
+        hasSafeClipboardImageDimensions(v) &&
+        hasSafeImageClipboardOptionals(v);
+    case "text":
+      return isBoundedString(v.text, STUDIO_CLIPBOARD_MAX_TEXT_CHARS) &&
+        isBoundedString(v.fill, STUDIO_CLIPBOARD_MAX_STYLE_CHARS, false) &&
+        hasFiniteFields(v, ["x", "y", "width", "fontSize", "rotation"], ["width", "fontSize"]);
+    case "bubble":
+      return isBoundedString(v.variant, 64, false) &&
+        isBoundedString(v.text, STUDIO_CLIPBOARD_MAX_TEXT_CHARS) &&
+        isBoundedString(v.fill, STUDIO_CLIPBOARD_MAX_STYLE_CHARS, false) &&
+        isBoundedString(v.textFill, STUDIO_CLIPBOARD_MAX_STYLE_CHARS, false) &&
+        hasFiniteFields(v, ["x", "y", "width", "height", "rotation"], ["width", "height"]) &&
+        (v.tailAnchorId === undefined || isBoundedString(v.tailAnchorId, STUDIO_CLIPBOARD_MAX_ID_CHARS, false)) &&
+        (v.customShapePoints === undefined || isBoundedNumberArray(v.customShapePoints));
+    case "sticker":
+      return isBoundedString(v.text, STUDIO_CLIPBOARD_MAX_TEXT_CHARS) &&
+        hasFiniteFields(v, ["x", "y", "fontSize", "rotation"], ["fontSize"]);
+    case "draw":
+      return isBoundedNumberArray(v.points) && v.points.length >= 2 && v.points.length % 2 === 0 &&
+        isBoundedString(v.stroke, STUDIO_CLIPBOARD_MAX_STYLE_CHARS, false) &&
+        isFiniteClipboardNumber(v.strokeWidth, true) && hasSafeDrawClipboardOptionals(v);
+    case "frame":
+      return hasFiniteFields(v, ["x", "y", "width", "height"], ["width", "height"]) &&
+        (v.points === undefined || isBoundedNumberArray(v.points, 8));
+    case "focusLines":
+      return isBoundedString(v.stroke, STUDIO_CLIPBOARD_MAX_STYLE_CHARS, false) &&
+        isSafeClipboardLineCount(v.lineCount, 200) &&
+        hasFiniteFields(
+          v,
+          ["x", "y", "width", "height", "innerRadius", "outerRadius", "strokeWidth", "noise", "rotation"],
+          ["width", "height", "outerRadius", "strokeWidth"]
+        );
+    case "speedLines":
+      return (v.direction === "horizontal" || v.direction === "vertical") &&
+        isBoundedString(v.stroke, STUDIO_CLIPBOARD_MAX_STYLE_CHARS, false) &&
+        isSafeClipboardLineCount(v.lineCount, 150) &&
+        hasFiniteFields(
+          v,
+          ["x", "y", "width", "height", "strokeWidth", "rotation"],
+          ["width", "height", "strokeWidth"]
+        );
+    default:
+      return false;
+  }
 }
 
 /** 페이로드 형식 검증 — kind/version/source/els 전부 맞아야 통과. */
@@ -187,12 +527,38 @@ export function isClipboardPayload(v: unknown): v is StudioClipboardPayload {
   ) {
     return false;
   }
-  if (typeof o.copiedAt !== "number") return false;
+  if (typeof o.copiedAt !== "number" || !Number.isFinite(o.copiedAt) || o.copiedAt < 0) {
+    return false;
+  }
   const src = o.source as Record<string, unknown> | null | undefined;
   if (!src || typeof src !== "object") return false;
   if (!isPositiveFinite(src.canvasW) || !isPositiveFinite(src.canvasH)) return false;
-  if (src.pageId !== undefined && typeof src.pageId !== "string") return false;
-  return Array.isArray(o.els) && o.els.every(isClipboardElement);
+  if (
+    src.pageId !== undefined &&
+    !isBoundedString(src.pageId, STUDIO_CLIPBOARD_MAX_ID_CHARS, false)
+  ) return false;
+  if (!Array.isArray(o.els) || o.els.length > STUDIO_CLIPBOARD_MAX_ELEMENTS) return false;
+  const ids = new Set<string>();
+  const referencedGroupIds = new Set<string>();
+  for (const element of o.els) {
+    if (!isClipboardElement(element) || ids.has(element.id)) return false;
+    ids.add(element.id);
+    if (typeof element.groupId === "string") referencedGroupIds.add(element.groupId);
+  }
+  if (o.groups !== undefined) {
+    if (!Array.isArray(o.groups) || o.groups.length > referencedGroupIds.size) return false;
+    const groupIds = new Set<string>();
+    for (const group of o.groups) {
+      if (
+        !isClipboardLayerGroup(group) ||
+        !referencedGroupIds.has(group.id) ||
+        groupIds.has(group.id)
+      ) return false;
+      groupIds.add(group.id);
+    }
+  }
+  if (o.animation !== undefined && !isClipboardAnimation(o.animation, ids)) return false;
+  return true;
 }
 
 /** JSON 왕복 깊은 복사 — 원본 요소와 참조를 완전히 분리(undefined 키는 자연 탈락). */
@@ -207,7 +573,8 @@ function deepCopyJson<T>(value: T): T {
 export function buildClipboardPayload(
   els: readonly unknown[],
   source: ClipboardSourceInfo,
-  now: number = Date.now()
+  now: number = Date.now(),
+  extras?: BuildClipboardPayloadExtras
 ): StudioClipboardPayload {
   const valid = els.filter(isClipboardElement);
   const src: ClipboardSourceInfo = {
@@ -215,13 +582,63 @@ export function buildClipboardPayload(
     canvasH: isPositiveFinite(source.canvasH) ? source.canvasH : 1,
   };
   if (typeof source.pageId === "string" && source.pageId) src.pageId = source.pageId;
-  return {
+  const payload: StudioClipboardPayload = {
     kind: STUDIO_CLIPBOARD_KIND,
     version: STUDIO_CLIPBOARD_VERSION,
     copiedAt: now,
     source: src,
     els: deepCopyJson(valid),
   };
+  const elementIds = new Set(valid.map((element) => element.id));
+  const referencedGroupIds = new Set(
+    valid.flatMap((element) => typeof element.groupId === "string" ? [element.groupId] : [])
+  );
+  const selectedGroups = (extras?.groups ?? []).filter(
+    (group) => referencedGroupIds.has(group.id) && isClipboardLayerGroup(group)
+  );
+  if (selectedGroups.length > 0) payload.groups = deepCopyJson(selectedGroups);
+
+  if (extras?.animationTimeline) {
+    const tracks: Record<string, StudioAnimKeyframe[]> = {};
+    for (const elementId of elementIds) {
+      const track = extras.animationTimeline.tracks[elementId];
+      if (track?.length) tracks[elementId] = deepCopyJson(track);
+    }
+    const animation = {
+      frameCount: extras.animationTimeline.frameCount,
+      tracks,
+    };
+    if (Object.keys(tracks).length > 0 && isClipboardAnimation(animation, elementIds)) {
+      payload.animation = animation;
+    }
+  }
+  return payload;
+}
+
+/** Cut safety gate: every captured member must survive admission in the exact document order. */
+export function clipboardPayloadMatchesMembers(
+  payload: StudioClipboardPayload,
+  memberIds: readonly string[],
+  expectedRelations?: {
+    groupIds?: readonly string[];
+    trackIds?: readonly string[];
+  }
+): boolean {
+  if (
+    !isClipboardPayload(payload) ||
+    payload.els.length !== memberIds.length ||
+    !payload.els.every((element, index) => element.id === memberIds[index])
+  ) return false;
+  const expectedGroups = new Set(expectedRelations?.groupIds ?? []);
+  const payloadGroups = new Set(payload.groups?.map((group) => group.id) ?? []);
+  if (
+    payloadGroups.size !== expectedGroups.size ||
+    [...expectedGroups].some((id) => !payloadGroups.has(id))
+  ) return false;
+  const expectedTracks = new Set(expectedRelations?.trackIds ?? []);
+  const payloadTracks = new Set(Object.keys(payload.animation?.tracks ?? {}));
+  return payloadTracks.size === expectedTracks.size &&
+    [...expectedTracks].every((id) => payloadTracks.has(id));
 }
 
 /** 페이로드 → JSON 문자열(시스템 클립보드 text/plain 및 폴백 저장용). */
@@ -232,6 +649,7 @@ export function serializeClipboardPayload(payload: StudioClipboardPayload): stri
 /** JSON 문자열 → 페이로드. 우리 형식이 아니거나 파싱 실패면 null(일반 텍스트 무해 통과). */
 export function parseClipboardPayload(raw: string | null | undefined): StudioClipboardPayload | null {
   if (typeof raw !== "string") return null;
+  if (raw.length > STUDIO_CLIPBOARD_MAX_SERIALIZED_CHARS) return null;
   const text = raw.trim();
   // 빠른 배제: JSON 객체 형태가 아니면 파싱 시도조차 하지 않는다(일반 텍스트 대량 붙여넣기 대비).
   if (!text.startsWith("{") || !text.includes(STUDIO_CLIPBOARD_KIND)) return null;
@@ -399,6 +817,11 @@ export function planClipboardPaste(
 
   // 1) 깊은 복사 + 스케일 보정
   const scaled = payload.els.map((el) => scaleElement(deepCopyJson(el), scale));
+  // External source metadata can claim a tiny canvas and force a huge target scale. Reject the
+  // resulting allocation before any Image/Konva filter path can create a browser canvas.
+  if (scaled.some((el) => el.type === "image" && !hasSafeClipboardImageDimensions(el))) {
+    return null;
+  }
 
   // 2) 같은 페이지 겹침 방지 오프셋(캐스케이드)
   const samePage =
@@ -417,21 +840,64 @@ export function planClipboardPaste(
     dy += rescueAxis(bounds.y + dy, bounds.h, tgtH);
   }
 
-  // 4) 이동 적용 + id 재발급 + groupId 재매핑 + hidden/locked 해제
-  const groupMap = new Map<string, string>();
-  const ids: string[] = [];
-  const els = scaled.map((el) => {
+  // 4) 이동 적용 + 관계 id 재발급 + hidden/locked 해제. Element IDs are allocated first so
+  // bubble tail anchors can be remapped without depending on element order.
+  const idMap = new Map<string, string>();
+  const ids = scaled.map((el) => {
     const id = makeId();
-    ids.push(id);
+    idMap.set(el.id, id);
+    return id;
+  });
+  const groupMap = new Map<string, string>();
+  const els = scaled.map((el, index) => {
+    const id = ids[index]!;
     const next: ClipboardElementLike = { ...shiftLooseElement(el, dx, dy), id, hidden: false, locked: false };
     const group = el.groupId;
     if (typeof group === "string" && group) {
       if (!groupMap.has(group)) groupMap.set(group, makeId());
       next.groupId = groupMap.get(group);
     }
+    if (el.type === "bubble" && typeof el.tailAnchorId === "string") {
+      const copiedAnchorId = idMap.get(el.tailAnchorId);
+      if (copiedAnchorId) next.tailAnchorId = copiedAnchorId;
+    }
     return next;
   });
-  return { els, ids };
+
+  // Preserve user-authored group names, but pasted content always starts expanded, visible and
+  // unlocked just like its member elements. Missing v1 metadata is recreated by StudioPage.
+  const groups = (payload.groups ?? []).flatMap((group) => {
+    const id = groupMap.get(group.id);
+    return id
+      ? [{ ...deepCopyJson(group), id, collapsed: false, hidden: false, locked: false }]
+      : [];
+  });
+
+  const animationTracks: Record<string, StudioAnimKeyframe[]> = {};
+  for (const [sourceElementId, keyframes] of Object.entries(payload.animation?.tracks ?? {})) {
+    const targetElementId = idMap.get(sourceElementId);
+    if (!targetElementId) continue;
+    animationTracks[targetElementId] = keyframes.map((keyframe) => ({
+      ...deepCopyJson(keyframe),
+      frame: { ...deepCopyJson(keyframe.frame), id: makeId() },
+      ...(keyframe.transform
+        ? {
+            transform: {
+              ...deepCopyJson(keyframe.transform),
+              x: round2(keyframe.transform.x * scale),
+              y: round2(keyframe.transform.y * scale),
+            },
+          }
+        : {}),
+    }));
+  }
+  return {
+    els,
+    ids,
+    groups,
+    animationTracks,
+    ...(payload.animation ? { animationFrameCount: payload.animation.frameCount } : {}),
+  };
 }
 
 // ── localStorage 폴백 ────────────────────────────────────────────────────────
@@ -439,11 +905,12 @@ export function planClipboardPaste(
 /** 폴백 저장 — 시스템 클립보드 기록 성공 여부와 무관하게 항상 함께 남겨 ⌘V 를 보장한다. */
 export function writeClipboardFallback(
   storage: ClipboardFallbackStorage | null | undefined,
-  payload: StudioClipboardPayload
+  payload: StudioClipboardPayload,
+  storageKey: string = CLIPBOARD_FALLBACK_KEY
 ): void {
   if (!storage) return;
   try {
-    storage.setItem(CLIPBOARD_FALLBACK_KEY, serializeClipboardPayload(payload));
+    storage.setItem(storageKey, serializeClipboardPayload(payload));
   } catch {
     // 저장 불가(쿼터 초과·시크릿 모드) — 무시
   }
@@ -451,11 +918,12 @@ export function writeClipboardFallback(
 
 /** 폴백 읽기 — 저장소 부재·파싱 실패·형식 불일치는 null. */
 export function readClipboardFallback(
-  storage: ClipboardFallbackStorage | null | undefined
+  storage: ClipboardFallbackStorage | null | undefined,
+  storageKey: string = CLIPBOARD_FALLBACK_KEY
 ): StudioClipboardPayload | null {
   if (!storage) return null;
   try {
-    return parseClipboardPayload(storage.getItem(CLIPBOARD_FALLBACK_KEY));
+    return parseClipboardPayload(storage.getItem(storageKey));
   } catch {
     return null;
   }

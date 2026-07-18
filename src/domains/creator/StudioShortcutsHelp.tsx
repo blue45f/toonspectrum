@@ -35,9 +35,12 @@ const GROUPS: ShortcutGroup[] = [
     rows: [
       { keys: "⌘Z", label: "실행취소" },
       { keys: "⌘⇧Z · ⌘Y", label: "다시실행" },
-      { keys: "⌘D", label: "픽셀 선택 해제 · 없으면 요소 복제" },
+      { keys: "⌘X · ⌘C", label: "잘라내기 · 복사" },
+      { keys: "⌘V · ⌘⇧V", label: "붙여넣기 · 현재 위치에 붙여넣기" },
+      { keys: "⌘A", label: "모두 선택" },
+      { keys: "⌘D", label: "선택 해제" },
       { keys: "⌘⇧I", label: "픽셀 선택 반전" },
-      { keys: "⌘V", label: "클립보드 이미지 붙여넣기" },
+      { keys: "⌘J", label: "요소 복제" },
       { keys: "G", label: "고급 채우기 켜기·끄기" },
       { keys: "Delete · ⌫", label: "픽셀 선택 삭제 · 없으면 요소 삭제" },
       { keys: "Esc", label: "선택 해제" },
@@ -46,8 +49,8 @@ const GROUPS: ShortcutGroup[] = [
   {
     title: "정렬 · 레이어",
     rows: [
-      { keys: "⌘]", label: "맨 앞으로" },
-      { keys: "⌘[", label: "맨 뒤로" },
+      { keys: "⌘] · ⌘⇧]", label: "한 단계 앞으로 · 맨 앞으로" },
+      { keys: "⌘[ · ⌘⇧[", label: "맨 뒤로 · 한 단계 뒤로" },
       { keys: "방향키", label: "1px 이동" },
       { keys: "⇧ + 방향키", label: "10px 이동" },
     ],
