@@ -72,6 +72,7 @@ function createHandlers(): StudioMobileEditingDockHandlers {
     applyBuiltInBrushPreset: vi.fn(),
     applyDynamicsPreset: vi.fn(),
     applySavedBrush: vi.fn(),
+    dismissBrushManager: vi.fn(),
     dismissMobileHint: vi.fn(),
     duplicateSelected: vi.fn(),
     fitCanvasToWidth: vi.fn(),
@@ -109,7 +110,6 @@ function createProps(
     collaborationDocumentLocked: false,
     color: "#111111",
     currentBrushSnapshot: {} as StudioBrushSnapshot,
-    dismissBrushManager: vi.fn(),
     drawMode: "pen",
     drawShape: "rect",
     drawSheetRef: { current: null },
@@ -213,5 +213,72 @@ describe("StudioMobileEditingDock", () => {
     dock = screen.getByRole("navigation", { name: "스튜디오 모바일 도구막대" });
     expect(within(dock).getByRole<HTMLButtonElement>("button", { name: "실행취소" }).disabled).toBe(true);
     expect(within(dock).getByRole<HTMLButtonElement>("button", { name: "다시실행" }).disabled).toBe(true);
+  });
+
+  it("preserves the draw and brush-manager dialog contracts through stable handlers", () => {
+    const stableHandlers = createHandlers();
+    const view = render(
+      <StudioMobileEditingDock
+        {...createProps({ isMobile: true, mobileSheet: "draw", stableHandlers })}
+      />,
+    );
+
+    const drawSheet = screen.getByRole("dialog", { name: "브러시 설정" });
+    expect(drawSheet.getAttribute("data-studio-sheet-id")).toBe("draw");
+    expect(drawSheet.getAttribute("aria-modal")).toBe("false");
+
+    view.rerender(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          mobileKeyboardInset: 22,
+          mobileSheet: "brushes",
+          stableHandlers,
+        })}
+      />,
+    );
+
+    const brushManager = screen.getByRole("dialog", { name: "내 브러시 관리" });
+    expect(brushManager.getAttribute("data-studio-sheet-id")).toBe("brushes");
+    expect(brushManager.getAttribute("aria-modal")).toBe("true");
+    expect(brushManager.style.bottom).toBe("22px");
+    within(brushManager).getByRole("button", { name: "브러시 관리 닫기" }).click();
+    expect(stableHandlers.dismissBrushManager).toHaveBeenCalledOnce();
+  });
+
+  it("delegates selection toolbar actions without moving controller state into the dock", () => {
+    const stableHandlers = createHandlers();
+    const setMarqueeIds = vi.fn();
+    const setMobileSheet = vi.fn();
+    const setSelectedId = vi.fn();
+    render(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          selected: { id: "image-1", type: "image" } as StudioMobileEditingDockProps["selected"],
+          setMarqueeIds,
+          setMobileSheet,
+          setSelectedId,
+          stableHandlers,
+        })}
+      />,
+    );
+
+    const toolbar = screen.getByRole("toolbar", { name: "선택 항목 빠른 작업" });
+    within(toolbar).getByRole("button", { name: "속성" }).click();
+    within(toolbar).getByRole("button", { name: "복제" }).click();
+    within(toolbar).getByRole("button", { name: "앞으로" }).click();
+    within(toolbar).getByRole("button", { name: "뒤로" }).click();
+    within(toolbar).getByRole("button", { name: "삭제" }).click();
+    within(toolbar).getByRole("button", { name: "해제" }).click();
+
+    expect(stableHandlers.openInspectorRoute).toHaveBeenCalledWith({ primary: "properties" });
+    expect(setMobileSheet).toHaveBeenCalledWith("props");
+    expect(stableHandlers.duplicateSelected).toHaveBeenCalledOnce();
+    expect(stableHandlers.reorder).toHaveBeenNthCalledWith(1, "front");
+    expect(stableHandlers.reorder).toHaveBeenNthCalledWith(2, "back");
+    expect(stableHandlers.removeSelected).toHaveBeenCalledOnce();
+    expect(setSelectedId).toHaveBeenCalledWith(null);
+    expect(setMarqueeIds).toHaveBeenCalledWith([]);
   });
 });

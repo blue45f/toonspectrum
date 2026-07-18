@@ -100,6 +100,7 @@ export interface StudioMobileEditingDockHandlers {
   applyBuiltInBrushPreset: (preset: BrushPreset) => void;
   applyDynamicsPreset: (id: StudioBrushDynamicsPresetId, settings: NormalizedStudioBrushDynamicsSettings) => void;
   applySavedBrush: (saved: StudioSavedBrush) => void;
+  dismissBrushManager: () => void;
   dismissMobileHint: () => void;
   duplicateSelected: () => void;
   fitCanvasToWidth: () => void;
@@ -131,7 +132,6 @@ export interface StudioMobileEditingDockProps {
   drawMode: DrawMode;
   drawShape: DrawShapeKind;
   drawSheetRef: import("react").RefObject<HTMLDivElement | null>;
-  dismissBrushManager: () => void;
   filterMutationLocked: boolean;
   hi: number;
   history: PageState[][];
@@ -208,7 +208,6 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   drawMode,
   drawShape,
   drawSheetRef,
-  dismissBrushManager,
   filterMutationLocked,
   hi,
   history,
@@ -271,6 +270,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
     applyBuiltInBrushPreset,
     applyDynamicsPreset,
     applySavedBrush,
+    dismissBrushManager,
     dismissMobileHint,
     duplicateSelected,
     fitCanvasToWidth,
@@ -1013,5 +1013,4 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
     </>
   );
 });
-
 

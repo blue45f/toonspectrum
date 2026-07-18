@@ -24620,6 +24620,7 @@ function StudioCuttoonEditor() {
     applyBuiltInBrushPreset,
     applyDynamicsPreset,
     applySavedBrush,
+    dismissBrushManager: dismissBrushManagerToDraw,
     dismissMobileHint,
     duplicateSelected,
     fitCanvasToWidth,
@@ -26123,7 +26124,6 @@ function StudioCuttoonEditor() {
           drawMode={drawMode}
           drawShape={drawShape}
           drawSheetRef={drawSheetRef}
-          dismissBrushManager={dismissBrushManagerToDraw}
           filterMutationLocked={selectedContentMutationLocked}
           hi={hi}
           history={history}

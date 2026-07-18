@@ -164,5 +164,7 @@ describe("Studio mobile editing dock module boundary", () => {
     }
     expect(dock.source).not.toContain("useState(");
     expect(dock.source).not.toContain("useStudioModalSheet");
+    expect(page.source).toContain("dismissBrushManager: dismissBrushManagerToDraw,");
+    expect(page.source).not.toContain("dismissBrushManager={dismissBrushManagerToDraw}");
   });
 });
