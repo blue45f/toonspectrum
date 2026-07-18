@@ -21,6 +21,7 @@ import {
   type StudioRasterUndoOperation,
 } from "../../../../../lib/studio-crdt-raster-ops";
 
+import { hasValidStudioCrdtRootSchema } from "./studio-crdt-root-schema";
 import {
   STUDIO_CRDT_UPDATE_MAX_BYTES,
   studioCrdtPayloadHash,
@@ -38,7 +39,6 @@ import {
   StudioCrdtUpdateIdConflictError,
   chunkStudioCrdtSyncDiff,
   encodeStudioCrdtServerStateVector,
-  hasValidStudioCrdtRootSchema,
 } from "./studio-crdt.service";
 
 import type { StudioCrdtClusterLoadRepository } from "./studio-crdt-cluster-load.repository";
