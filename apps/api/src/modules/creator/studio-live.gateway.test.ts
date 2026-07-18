@@ -21,6 +21,10 @@ import {
   StudioLiveScreenRequestSchema,
   StudioLiveScreenStopSchema,
   StudioLiveSignalSchema,
+  StudioLiveVoiceJoinSchema,
+  StudioLiveVoiceLeaveSchema,
+  StudioLiveVoiceSignalSchema,
+  StudioLiveVoiceStateSchema,
   isStudioLiveOriginAllowed,
   studioLiveAllowRequest,
 } from "./studio-live.gateway";
@@ -60,10 +64,9 @@ type FakeInterServerListener = (
 interface FakeSocket {
   id: string;
   data: {
-    authUserId?: string;
-    authPrincipal?: StudioLiveAuthPrincipal;
     studioParticipant?: StudioLiveParticipant;
     studioWorkId?: string;
+    studioVoiceMember?: { connectionId: string; callId: string; muted: boolean };
   };
   handshake: { auth: Record<string, unknown> };
   joined: Set<string>;
@@ -83,9 +86,29 @@ type FakeNamespaceMiddleware = (
 
 class MemoryStudioLiveLockRepository implements StudioLiveLockRepository {
   private readonly locks = new Map<string, StudioLiveLockRecord>();
+  private readonly workMutationTails = new Map<string, Promise<void>>();
 
   private key(workId: string, resourceId: string): string {
     return JSON.stringify([workId, resourceId]);
+  }
+
+  async withWorkMutation<T>(workId: string, operation: () => Promise<T>): Promise<T> {
+    const previous = this.workMutationTails.get(workId) ?? Promise.resolve();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const tail = previous.then(() => gate);
+    this.workMutationTails.set(workId, tail);
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      release();
+      if (this.workMutationTails.get(workId) === tail) {
+        this.workMutationTails.delete(workId);
+      }
+    }
   }
 
   async acquire(input: AcquireStudioLiveLockInput) {
@@ -352,7 +375,17 @@ function connectFakeInterServerBus(
 ) {
   const emissions: InterServerEmission[] = [];
   let stalled = false;
+  const originalDiscovery = harnesses.map((harness) => harness.namespace.in);
   for (const [origin, harness] of harnesses.entries()) {
+    // A shared Socket.IO adapter exposes matching sockets from every API node to fetchSockets().
+    // Keep the fake inter-server bus faithful to that discovery contract.
+    harness.namespace.in = (room: string) => ({
+      async fetchSockets() {
+        return harnesses.flatMap((candidate) =>
+          [...candidate.sockets.values()].filter((socket) => socket.joined.has(room))
+        );
+      },
+    });
     harness.namespace.serverSideEmitWithAck = async (event, payload) => {
       emissions.push({ origin, event, payload });
       if (stalled) return new Promise<never>(() => undefined);
@@ -383,9 +416,24 @@ function connectFakeInterServerBus(
       stalled = value;
     },
     destroy() {
-      for (const harness of harnesses) harness.gateway.onModuleDestroy();
+      for (const [index, harness] of harnesses.entries()) {
+        harness.namespace.in = originalDiscovery[index] ?? harness.namespace.in;
+        harness.gateway.onModuleDestroy();
+      }
     },
   };
+}
+
+function deliverFakeInterServerRelay(
+  harness: ReturnType<typeof createHarness>,
+  event: string,
+  payload: unknown
+): Promise<unknown> {
+  const listener = harness.interServerListeners.get(event)?.values().next().value as
+    | FakeInterServerListener
+    | undefined;
+  if (!listener) throw new Error(`missing fake inter-server listener for ${event}`);
+  return new Promise((resolve) => listener(payload, resolve));
 }
 
 async function connectAndJoin(
@@ -399,6 +447,21 @@ async function connectAndJoin(
     { workId, clientInstanceId: `client-${socket.id}` },
     undefined
   );
+}
+
+function privateAuthPrincipal(
+  harness: ReturnType<typeof createHarness>,
+  socket: FakeSocket
+): StudioLiveAuthPrincipal | undefined {
+  const internals = harness.gateway as unknown as {
+    authPrincipalsBySocket: Map<FakeSocket, StudioLiveAuthPrincipal>;
+  };
+  return internals.authPrincipalsBySocket.get(socket);
+}
+
+function expectNoAdapterVisibleAuthentication(socket: FakeSocket): void {
+  expect(socket.data).not.toHaveProperty("authUserId");
+  expect(socket.data).not.toHaveProperty("authPrincipal");
 }
 
 function crdtStateVector(): string {
@@ -463,6 +526,48 @@ describe("studio live protocol", () => {
         shareId: "share-1",
         kind: "description",
         description: { type: "offer", sdp: "s".repeat(48 * 1_024 + 1) },
+      }).success
+    ).toBe(false);
+    expect(
+      StudioLiveVoiceJoinSchema.safeParse({
+        workId: "work-1",
+        callId: "voice-main",
+        muted: false,
+      }).success
+    ).toBe(true);
+    expect(
+      StudioLiveVoiceJoinSchema.safeParse({
+        workId: "work-1",
+        callId: " voice-main ",
+        muted: false,
+      }).success
+    ).toBe(false);
+    expect(
+      StudioLiveVoiceJoinSchema.safeParse({
+        workId: " work-1 ",
+        callId: "voice-main",
+        muted: false,
+      }).success
+    ).toBe(false);
+    expect(
+      StudioLiveVoiceStateSchema.safeParse({
+        workId: "work-1",
+        callId: "voice-main",
+        muted: "false",
+      }).success
+    ).toBe(false);
+    expect(
+      StudioLiveVoiceLeaveSchema.safeParse({ workId: "work-1", callId: "voice-main", extra: true })
+        .success
+    ).toBe(false);
+    expect(
+      StudioLiveVoiceSignalSchema.safeParse({
+        workId: "work-1",
+        targetConnectionId: "peer",
+        callId: "voice-main",
+        shareId: "screen-channel-must-not-mix",
+        kind: "description",
+        description: { type: "offer", sdp: "v=0" },
       }).success
     ).toBe(false);
   });
@@ -792,10 +897,15 @@ describe("StudioLiveGateway", () => {
       expiresAt: Date.now() + 60_000,
     });
     await vi.waitFor(() => expect(next).toHaveBeenCalledWith());
-    expect(socket.data.authUserId).toBe("owner");
-    expect(socket.data.authPrincipal?.userId).toBe("owner");
+    expect(privateAuthPrincipal(harness, socket)?.userId).toBe("owner");
+    expectNoAdapterVisibleAuthentication(socket);
     expect(socket.handshake.auth).not.toHaveProperty("sessionToken");
+    const authInternals = harness.gateway as unknown as {
+      authPrincipalsBySocket: Map<FakeSocket, StudioLiveAuthPrincipal>;
+    };
+    expect(authInternals.authPrincipalsBySocket.size).toBe(1);
     harness.gateway.onModuleDestroy();
+    expect(authInternals.authPrincipalsBySocket.size).toBe(0);
   });
 
   it("disconnects sockets without a verified session", async () => {
@@ -805,7 +915,9 @@ describe("StudioLiveGateway", () => {
     await harness.gateway.handleConnection(socket as never);
 
     expect(socket.disconnected).toBe(true);
-    expect(socket.data.authUserId).toBeUndefined();
+    expect(privateAuthPrincipal(harness, socket)).toBeUndefined();
+    expectNoAdapterVisibleAuthentication(socket);
+    expect(socket.handshake.auth).not.toHaveProperty("sessionToken");
     expect(harness.emissions).toContainEqual({
       target: "guest",
       event: "studio:error",
@@ -836,18 +948,26 @@ describe("StudioLiveGateway", () => {
     expect(response.data.self).not.toHaveProperty("workId");
     expect(socket.joined).toContain("studio-live:work-1");
     expect(harness.service.getWorkTeam).toHaveBeenCalledWith("owner", "work-1");
+    expectNoAdapterVisibleAuthentication(socket);
+    expect(Object.keys(socket.data).sort()).toEqual([
+      "studioParticipant",
+      "studioWorkId",
+    ]);
   });
 
   it("discovers adapter-visible participants across nodes without leaking socket-private data", async () => {
     const harness = createHarness();
     const remote = harness.socket("remote", "valid:remote-user");
     remote.joined.add("studio-live:work-1");
-    remote.data.authUserId = "remote-database-user";
-    remote.data.authPrincipal = {
+    const remotePrivatePrincipal = {
       userId: "remote-database-user",
       sessionVersion: 7,
       expiresAt: Date.now() + 60_000,
     };
+    Object.assign(remote.data as Record<string, unknown>, {
+      authUserId: "remote-database-user",
+      authPrincipal: remotePrivatePrincipal,
+    });
     remote.data.studioWorkId = "work-1";
     remote.data.studioParticipant = {
       connectionId: "remote",
@@ -870,7 +990,7 @@ describe("StudioLiveGateway", () => {
     Object.assign(remote.data.studioParticipant, {
       userId: "must-not-leak",
       workId: "must-not-leak",
-      authPrincipal: remote.data.authPrincipal,
+      authPrincipal: remotePrivatePrincipal,
     });
     const local = harness.socket("owner");
 
@@ -1030,8 +1150,9 @@ describe("StudioLiveGateway", () => {
       undefined
     );
     await vi.waitFor(() => expect(harness.service.getWorkTeam).toHaveBeenCalledTimes(1));
-    if (!socket.data.authPrincipal) throw new Error("expected authenticated principal");
-    socket.data.authPrincipal.expiresAt = Date.now() - 1;
+    const principal = privateAuthPrincipal(harness, socket);
+    if (!principal) throw new Error("expected authenticated principal");
+    principal.expiresAt = Date.now() - 1;
     resolveTeam?.(teamSnapshot("editor", "work-1"));
 
     await expect(joining).resolves.toMatchObject({ ok: false, code: "unauthenticated" });
@@ -1041,8 +1162,8 @@ describe("StudioLiveGateway", () => {
     };
     expect(socket.disconnected).toBe(true);
     expect(socket.joined.size).toBe(0);
-    expect(socket.data.authUserId).toBeUndefined();
-    expect(socket.data.authPrincipal).toBeUndefined();
+    expect(privateAuthPrincipal(harness, socket)).toBeUndefined();
+    expectNoAdapterVisibleAuthentication(socket);
     expect(internals.participantsBySocket.has(socket.id)).toBe(false);
     expect(internals.socketIdsByWork.has("work-1")).toBe(false);
   });
@@ -1066,8 +1187,9 @@ describe("StudioLiveGateway", () => {
       undefined
     );
     await vi.waitFor(() => expect(socket.join).toHaveBeenCalledWith("studio-live:work-1"));
-    if (!socket.data.authPrincipal) throw new Error("expected authenticated principal");
-    socket.data.authPrincipal.expiresAt = Date.now() - 1;
+    const principal = privateAuthPrincipal(harness, socket);
+    if (!principal) throw new Error("expected authenticated principal");
+    principal.expiresAt = Date.now() - 1;
     releaseAdapterJoin?.();
 
     await expect(joining).resolves.toMatchObject({ ok: false, code: "unauthenticated" });
@@ -1103,8 +1225,9 @@ describe("StudioLiveGateway", () => {
       undefined
     );
     await vi.waitFor(() => expect(socket.join).toHaveBeenCalledWith("studio-live:work-1"));
-    if (!socket.data.authPrincipal) throw new Error("expected authenticated principal");
-    socket.data.authPrincipal.expiresAt = Date.now() - 1;
+    const principal = privateAuthPrincipal(harness, socket);
+    if (!principal) throw new Error("expected authenticated principal");
+    principal.expiresAt = Date.now() - 1;
     releaseAdapterJoin?.();
 
     await expect(joining).resolves.toMatchObject({ ok: false, code: "unauthenticated" });
@@ -1114,8 +1237,8 @@ describe("StudioLiveGateway", () => {
     };
     expect(socket.disconnected).toBe(true);
     expect(socket.leave).toHaveBeenCalledWith("studio-live:work-1");
-    expect(socket.data.authUserId).toBeUndefined();
-    expect(socket.data.authPrincipal).toBeUndefined();
+    expect(privateAuthPrincipal(harness, socket)).toBeUndefined();
+    expectNoAdapterVisibleAuthentication(socket);
     expect(internals.participantsBySocket.has(socket.id)).toBe(false);
     expect(internals.socketIdsByWork.has("work-1")).toBe(false);
   });
@@ -1858,8 +1981,8 @@ describe("StudioLiveGateway", () => {
     await revalidator.revalidateAllParticipants();
 
     expect(socket.disconnected).toBe(true);
-    expect(socket.data.authUserId).toBeUndefined();
-    expect(socket.data.authPrincipal).toBeUndefined();
+    expect(privateAuthPrincipal(harness, socket)).toBeUndefined();
+    expectNoAdapterVisibleAuthentication(socket);
     expect(harness.emissions).toContainEqual({
       target: "editor",
       event: "studio:access:revoked",
@@ -1894,8 +2017,8 @@ describe("StudioLiveGateway", () => {
     await revalidator.revalidateAllParticipants();
 
     expect(socket.disconnected).toBe(true);
-    expect(socket.data.authUserId).toBeUndefined();
-    expect(socket.data.authPrincipal).toBeUndefined();
+    expect(privateAuthPrincipal(harness, socket)).toBeUndefined();
+    expectNoAdapterVisibleAuthentication(socket);
     expect(socket.left).toContain("studio-live:work-1");
     expect(revalidator.participantsBySocket.has("editor")).toBe(false);
     expect(harness.emissions).toContainEqual({
@@ -1934,8 +2057,8 @@ describe("StudioLiveGateway", () => {
     await revocation;
 
     expect(leave).toHaveBeenCalledWith("studio-live:work-1");
-    expect(socket.data.authUserId).toBeUndefined();
-    expect(socket.data.authPrincipal).toBeUndefined();
+    expect(privateAuthPrincipal(harness, socket)).toBeUndefined();
+    expectNoAdapterVisibleAuthentication(socket);
     expect(revalidator.participantsBySocket.has("viewer")).toBe(false);
   });
 
@@ -1943,8 +2066,9 @@ describe("StudioLiveGateway", () => {
     const harness = createHarness();
     const socket = harness.socket("editor");
     await connectAndJoin(harness, socket);
-    if (!socket.data.authPrincipal) throw new Error("missing auth principal");
-    socket.data.authPrincipal.expiresAt = Date.now() - 1;
+    const principal = privateAuthPrincipal(harness, socket);
+    if (!principal) throw new Error("missing auth principal");
+    principal.expiresAt = Date.now() - 1;
 
     const response = await harness.gateway.updateCursor(
       socket as never,
@@ -1954,8 +2078,8 @@ describe("StudioLiveGateway", () => {
 
     expect(response).toMatchObject({ ok: false, code: "not_joined" });
     expect(socket.disconnected).toBe(true);
-    expect(socket.data.authUserId).toBeUndefined();
-    expect(socket.data.authPrincipal).toBeUndefined();
+    expect(privateAuthPrincipal(harness, socket)).toBeUndefined();
+    expectNoAdapterVisibleAuthentication(socket);
     expect(harness.emissions).toContainEqual({
       target: "editor",
       event: "studio:access:revoked",
@@ -1980,8 +2104,9 @@ describe("StudioLiveGateway", () => {
       throw new Error("adapter leave failed");
     });
     socket.leave = leave;
-    if (!socket.data.authPrincipal) throw new Error("missing auth principal");
-    socket.data.authPrincipal.expiresAt = Date.now() - 1;
+    const principal = privateAuthPrincipal(harness, socket);
+    if (!principal) throw new Error("missing auth principal");
+    principal.expiresAt = Date.now() - 1;
 
     const response = await harness.gateway.updateCursor(
       socket as never,
@@ -1995,8 +2120,8 @@ describe("StudioLiveGateway", () => {
     expect(response).toMatchObject({ ok: false, code: "not_joined" });
     expect(leave).toHaveBeenCalledWith("studio-live:work-1");
     expect(socket.disconnected).toBe(true);
-    expect(socket.data.authUserId).toBeUndefined();
-    expect(socket.data.authPrincipal).toBeUndefined();
+    expect(privateAuthPrincipal(harness, socket)).toBeUndefined();
+    expectNoAdapterVisibleAuthentication(socket);
     expect(internals.participantsBySocket.has("editor")).toBe(false);
   });
 
@@ -2006,8 +2131,9 @@ describe("StudioLiveGateway", () => {
     await connectAndJoin(harness, socket);
     const leave = vi.fn(() => Promise.reject(new Error("adapter leave rejected")));
     socket.leave = leave;
-    if (!socket.data.authPrincipal) throw new Error("missing auth principal");
-    socket.data.authPrincipal.expiresAt = Date.now() - 1;
+    const principal = privateAuthPrincipal(harness, socket);
+    if (!principal) throw new Error("missing auth principal");
+    principal.expiresAt = Date.now() - 1;
 
     const response = await harness.gateway.updateCursor(
       socket as never,
@@ -2022,8 +2148,8 @@ describe("StudioLiveGateway", () => {
     expect(response).toMatchObject({ ok: false, code: "not_joined" });
     expect(leave).toHaveBeenCalledWith("studio-live:work-1");
     expect(socket.disconnected).toBe(true);
-    expect(socket.data.authUserId).toBeUndefined();
-    expect(socket.data.authPrincipal).toBeUndefined();
+    expect(privateAuthPrincipal(harness, socket)).toBeUndefined();
+    expectNoAdapterVisibleAuthentication(socket);
     expect(internals.participantsBySocket.has("editor")).toBe(false);
   });
 
@@ -2049,14 +2175,15 @@ describe("StudioLiveGateway", () => {
       undefined
     );
     await vi.waitFor(() => expect(teamReads).toBe(2));
-    if (!socket.data.authPrincipal) throw new Error("missing auth principal");
-    socket.data.authPrincipal.expiresAt = Date.now() - 1;
+    const principal = privateAuthPrincipal(harness, socket);
+    if (!principal) throw new Error("missing auth principal");
+    principal.expiresAt = Date.now() - 1;
     resolveRecheck?.(teamSnapshot("owner", "work-1"));
 
     await expect(announcement).resolves.toMatchObject({ ok: false, code: "not_joined" });
     expect(socket.disconnected).toBe(true);
-    expect(socket.data.authUserId).toBeUndefined();
-    expect(socket.data.authPrincipal).toBeUndefined();
+    expect(privateAuthPrincipal(harness, socket)).toBeUndefined();
+    expectNoAdapterVisibleAuthentication(socket);
     expect(harness.emissions).toContainEqual({
       target: "owner",
       event: "studio:access:revoked",
@@ -2501,6 +2628,520 @@ describe("StudioLiveGateway", () => {
 
     expect(response).toMatchObject({ ok: false, code: "rate_limited" });
     expect(harness.service.getWorkTeam).toHaveBeenCalledTimes(teamReadsBefore);
+  });
+
+  it("authorizes a bounded voice huddle and isolates work, call, role and signaling channels", async () => {
+    const harness = createHarness(async (userId, workId) =>
+      teamSnapshot(userId, workId, {
+        role: userId === "viewer" ? "viewer" : "editor",
+        edit: userId !== "viewer",
+      })
+    );
+    const first = harness.socket("first");
+    const second = harness.socket("second");
+    const viewer = harness.socket("viewer");
+    const otherWork = harness.socket("other-work");
+    await connectAndJoin(harness, first);
+    await connectAndJoin(harness, second);
+    await connectAndJoin(harness, viewer);
+    await connectAndJoin(harness, otherWork, "work-2");
+
+    await expect(
+      harness.gateway.joinVoice(
+        viewer as never,
+        { workId: "work-1", callId: "voice-main", muted: false },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: false, code: "forbidden" });
+    await expect(
+      harness.gateway.joinVoice(
+        first as never,
+        { workId: "work-1", callId: "voice-main", muted: false },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: true });
+    expectNoAdapterVisibleAuthentication(first);
+    expect(Object.keys(first.data).sort()).toEqual([
+      "studioParticipant",
+      "studioVoiceMember",
+      "studioWorkId",
+    ]);
+    await expect(
+      harness.gateway.joinVoice(
+        second as never,
+        { workId: "work-1", callId: "voice-main", muted: true },
+        undefined
+      )
+    ).resolves.toMatchObject({
+      ok: true,
+      data: {
+        members: expect.arrayContaining([
+          { connectionId: "first", callId: "voice-main", muted: false },
+          { connectionId: "second", callId: "voice-main", muted: true },
+        ]),
+      },
+    });
+    await expect(
+      harness.gateway.joinVoice(
+        otherWork as never,
+        { workId: "work-2", callId: "voice-main", muted: false },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: true });
+
+    await expect(
+      harness.gateway.updateVoiceState(
+        first as never,
+        { workId: "work-1", callId: "voice-other", muted: true },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: false, code: "forbidden" });
+    await expect(
+      harness.gateway.relayVoiceSignal(
+        first as never,
+        {
+          workId: "work-1",
+          targetConnectionId: "second",
+          callId: "voice-main",
+          kind: "description",
+          description: { type: "offer", sdp: "v=0\r\n" },
+        },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: true });
+    expect(harness.emissions).toContainEqual(
+      expect.objectContaining({
+        target: "second",
+        event: "studio:voice:signal",
+        payload: expect.objectContaining({
+          fromConnectionId: "first",
+          callId: "voice-main",
+          kind: "description",
+        }),
+      })
+    );
+    await expect(
+      harness.gateway.relayVoiceSignal(
+        first as never,
+        {
+          workId: "work-1",
+          targetConnectionId: "second",
+          callId: "voice-other",
+          kind: "description",
+          description: { type: "offer", sdp: "v=0" },
+        },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: false, code: "forbidden" });
+    await expect(
+      harness.gateway.relayVoiceSignal(
+        first as never,
+        {
+          workId: "work-1",
+          targetConnectionId: "other-work",
+          callId: "voice-main",
+          kind: "candidate",
+          candidate: {
+            candidate: "candidate:1 1 UDP 1 127.0.0.1 5000 typ host",
+            sdpMid: "0",
+            sdpMLineIndex: 0,
+            usernameFragment: null,
+          },
+        },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: false, code: "peer_unavailable" });
+
+    harness.gateway.handleDisconnect(second as never);
+    expect(harness.emissions).toContainEqual({
+      target: "studio-live:work-1",
+      event: "studio:voice:leave",
+      payload: { connectionId: "second", callId: "voice-main", reason: "removed" },
+    });
+  });
+
+  it("caps one mesh voice huddle at six authenticated participants", async () => {
+    const harness = createHarness();
+    const sockets = Array.from({ length: 7 }, (_, index) => harness.socket(`voice-${index}`));
+    for (const socket of sockets) await connectAndJoin(harness, socket);
+    const responses = [];
+    for (const socket of sockets) {
+      responses.push(
+        await harness.gateway.joinVoice(
+          socket as never,
+          { workId: "work-1", callId: "voice-main", muted: false },
+          undefined
+        )
+      );
+    }
+    expect(responses.slice(0, 6)).toEqual(
+      expect.arrayContaining(Array.from({ length: 6 }, () => expect.objectContaining({ ok: true })))
+    );
+    expect(responses[6]).toMatchObject({ ok: false, code: "rate_limited" });
+  });
+
+  it("keeps all six incumbents when the earliest Studio entrant joins voice seventh", async () => {
+    const harness = createHarness();
+    const sockets = Array.from({ length: 7 }, (_, index) => harness.socket(`voice-order-${index}`));
+    for (const socket of sockets) await connectAndJoin(harness, socket);
+
+    for (const socket of sockets.slice(1)) {
+      await expect(harness.gateway.joinVoice(
+        socket as never,
+        { workId: "work-1", callId: "voice-main", muted: false },
+        undefined
+      )).resolves.toMatchObject({ ok: true });
+    }
+    await expect(harness.gateway.joinVoice(
+      sockets[0] as never,
+      { workId: "work-1", callId: "voice-main", muted: false },
+      undefined
+    )).resolves.toMatchObject({ ok: false, code: "rate_limited" });
+
+    expect(sockets[0]?.data.studioVoiceMember).toBeUndefined();
+    expect(sockets.slice(1).map((socket) => socket.data.studioVoiceMember?.connectionId))
+      .toEqual(sockets.slice(1).map((socket) => socket.id));
+  });
+
+  it("serializes the sixth seat across API nodes and rejects the concurrent seventh", async () => {
+    const sharedRepository = new MemoryStudioLiveLockRepository();
+    const teamLookup = async (userId: string, workId: string) => teamSnapshot(userId, workId);
+    const authenticate: StudioLiveSessionAuthenticator = async (token) => token.startsWith("valid:")
+      ? { userId: token.slice(6), sessionVersion: 1, expiresAt: Date.now() + 60_000 }
+      : null;
+    const revalidate: StudioLiveSessionRevalidator = async (principal) =>
+      principal.expiresAt > Date.now();
+    const firstNode = createHarness(teamLookup, authenticate, revalidate, sharedRepository);
+    const secondNode = createHarness(teamLookup, authenticate, revalidate, sharedRepository);
+    const bus = connectFakeInterServerBus(firstNode, secondNode);
+    try {
+      const incumbents = [
+        firstNode.socket("voice-cluster-1"),
+        firstNode.socket("voice-cluster-2"),
+        firstNode.socket("voice-cluster-3"),
+        secondNode.socket("voice-cluster-4"),
+        secondNode.socket("voice-cluster-5"),
+      ];
+      const candidates = [
+        firstNode.socket("voice-cluster-6"),
+        secondNode.socket("voice-cluster-7"),
+      ];
+      for (const socket of incumbents.slice(0, 3)) await connectAndJoin(firstNode, socket);
+      for (const socket of incumbents.slice(3)) await connectAndJoin(secondNode, socket);
+      await connectAndJoin(firstNode, candidates[0]!);
+      await connectAndJoin(secondNode, candidates[1]!);
+      for (const [index, socket] of incumbents.entries()) {
+        const node = index < 3 ? firstNode : secondNode;
+        await node.gateway.joinVoice(
+          socket as never,
+          { workId: "work-1", callId: "voice-main", muted: false },
+          undefined
+        );
+      }
+
+      const results = await Promise.all([
+        firstNode.gateway.joinVoice(
+          candidates[0] as never,
+          { workId: "work-1", callId: "voice-main", muted: false },
+          undefined
+        ),
+        secondNode.gateway.joinVoice(
+          candidates[1] as never,
+          { workId: "work-1", callId: "voice-main", muted: false },
+          undefined
+        ),
+      ]);
+      expect(results.filter((result) => result.ok)).toHaveLength(1);
+      expect(results.filter((result) => !result.ok)).toEqual([
+        expect.objectContaining({ code: "rate_limited" }),
+      ]);
+      expect([...incumbents, ...candidates].filter(
+        (socket) => socket.data.studioVoiceMember?.callId === "voice-main"
+      )).toHaveLength(6);
+    } finally {
+      bus.destroy();
+    }
+  });
+
+  it("fails voice admission closed when cluster membership discovery is unavailable", async () => {
+    const harness = createHarness();
+    const socket = harness.socket("voice-discovery-failure");
+    await connectAndJoin(harness, socket);
+    harness.namespace.in = () => ({
+      async fetchSockets() {
+        throw new Error("adapter unavailable");
+      },
+    });
+
+    await expect(harness.gateway.joinVoice(
+      socket as never,
+      { workId: "work-1", callId: "voice-main", muted: false },
+      undefined
+    )).resolves.toMatchObject({ ok: false, code: "temporarily_unavailable" });
+    expect(socket.data.studioVoiceMember).toBeUndefined();
+  });
+
+  it("relays dedicated voice SDP across API nodes without exposing private session data", async () => {
+    const firstNode = createHarness();
+    const secondNode = createHarness();
+    const bus = connectFakeInterServerBus(firstNode, secondNode);
+    const first = firstNode.socket("voice-first");
+    const second = secondNode.socket("voice-second");
+    await connectAndJoin(firstNode, first);
+    await connectAndJoin(secondNode, second);
+    await firstNode.gateway.joinVoice(
+      first as never,
+      { workId: "work-1", callId: "voice-main", muted: false },
+      undefined
+    );
+    await secondNode.gateway.joinVoice(
+      second as never,
+      { workId: "work-1", callId: "voice-main", muted: true },
+      undefined
+    );
+
+    await expect(
+      firstNode.gateway.relayVoiceSignal(
+        first as never,
+        {
+          workId: "work-1",
+          targetConnectionId: "voice-second",
+          callId: "voice-main",
+          kind: "description",
+          description: { type: "offer", sdp: "v=0\r\n" },
+        },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: true });
+    expect(secondNode.emissions).toContainEqual(
+      expect.objectContaining({
+        target: "voice-second",
+        event: "studio:voice:signal",
+        payload: expect.objectContaining({
+          fromConnectionId: "voice-first",
+          callId: "voice-main",
+          kind: "description",
+        }),
+      })
+    );
+    expect(JSON.stringify(bus.emissions)).not.toContain("authPrincipal");
+    expect(JSON.stringify(bus.emissions)).not.toContain("authUserId");
+    expect(JSON.stringify(bus.emissions)).not.toContain("sessionToken");
+    bus.destroy();
+  });
+
+  it("rechecks inter-server voice sender discovery after the sender leaves", async () => {
+    const firstNode = createHarness();
+    const secondNode = createHarness();
+    const bus = connectFakeInterServerBus(firstNode, secondNode);
+    const first = firstNode.socket("voice-race-first");
+    const second = secondNode.socket("voice-race-second");
+    try {
+      await connectAndJoin(firstNode, first);
+      await connectAndJoin(secondNode, second);
+      await firstNode.gateway.joinVoice(
+        first as never,
+        { workId: "work-1", callId: "voice-race", muted: false },
+        undefined
+      );
+      await secondNode.gateway.joinVoice(
+        second as never,
+        { workId: "work-1", callId: "voice-race", muted: false },
+        undefined
+      );
+      await expect(
+        firstNode.gateway.relayVoiceSignal(
+          first as never,
+          {
+            workId: "work-1",
+            targetConnectionId: second.id,
+            callId: "voice-race",
+            kind: "candidate",
+            candidate: { candidate: "candidate:before-leave" },
+          },
+          undefined
+        )
+      ).resolves.toMatchObject({ ok: true });
+      const original = bus.emissions.at(-1);
+      if (!original) throw new Error("missing inter-server voice relay request");
+      const request = original.payload as {
+        deadlineAt: number;
+        relay: { signalId: string };
+      } & Record<string, unknown>;
+      const deliveredBeforeLeave = secondNode.emissions.filter(
+        ({ target, event }) => target === second.id && event === "studio:voice:signal"
+      ).length;
+      expect(deliveredBeforeLeave).toBe(1);
+
+      firstNode.gateway.handleDisconnect(first as never);
+      const replayAfterLeave = {
+        ...request,
+        deadlineAt: Date.now() + STUDIO_LIVE_RELAY_RPC_TIMEOUT_MS,
+        relay: {
+          ...request.relay,
+          signalId: crypto.randomUUID(),
+        },
+      };
+      await expect(
+        deliverFakeInterServerRelay(secondNode, original.event, replayAfterLeave)
+      ).resolves.toEqual({ delivered: false });
+      expect(
+        secondNode.emissions.filter(
+          ({ target, event }) => target === second.id && event === "studio:voice:signal"
+        )
+      ).toHaveLength(deliveredBeforeLeave);
+    } finally {
+      bus.destroy();
+    }
+  });
+
+  it("fails closed when strict adapter discovery cannot verify an inter-server voice sender", async () => {
+    const firstNode = createHarness();
+    const secondNode = createHarness();
+    const bus = connectFakeInterServerBus(firstNode, secondNode);
+    const first = firstNode.socket("voice-discovery-first");
+    const second = secondNode.socket("voice-discovery-second");
+    try {
+      await connectAndJoin(firstNode, first);
+      await connectAndJoin(secondNode, second);
+      await firstNode.gateway.joinVoice(
+        first as never,
+        { workId: "work-1", callId: "voice-discovery", muted: false },
+        undefined
+      );
+      await secondNode.gateway.joinVoice(
+        second as never,
+        { workId: "work-1", callId: "voice-discovery", muted: false },
+        undefined
+      );
+      secondNode.namespace.in = () => ({
+        async fetchSockets() {
+          throw new Error("adapter discovery unavailable");
+        },
+      });
+
+      await expect(
+        firstNode.gateway.relayVoiceSignal(
+          first as never,
+          {
+            workId: "work-1",
+            targetConnectionId: second.id,
+            callId: "voice-discovery",
+            kind: "candidate",
+            candidate: { candidate: "candidate:must-not-deliver" },
+          },
+          undefined
+        )
+      ).resolves.toMatchObject({ ok: false, code: "peer_unavailable" });
+      expect(
+        secondNode.emissions.some(
+          ({ target, event }) => target === second.id && event === "studio:voice:signal"
+        )
+      ).toBe(false);
+    } finally {
+      bus.destroy();
+    }
+  });
+
+  it("deduplicates repeated inter-server voice signal ids before the final socket emit", async () => {
+    const firstNode = createHarness();
+    const secondNode = createHarness();
+    const bus = connectFakeInterServerBus(firstNode, secondNode);
+    const first = firstNode.socket("voice-dedupe-first");
+    const second = secondNode.socket("voice-dedupe-second");
+    try {
+      await connectAndJoin(firstNode, first);
+      await connectAndJoin(secondNode, second);
+      await firstNode.gateway.joinVoice(
+        first as never,
+        { workId: "work-1", callId: "voice-dedupe", muted: false },
+        undefined
+      );
+      await secondNode.gateway.joinVoice(
+        second as never,
+        { workId: "work-1", callId: "voice-dedupe", muted: false },
+        undefined
+      );
+      await firstNode.gateway.relayVoiceSignal(
+        first as never,
+        {
+          workId: "work-1",
+          targetConnectionId: second.id,
+          callId: "voice-dedupe",
+          kind: "description",
+          description: { type: "offer", sdp: "v=0\r\ns=dedupe\r\n" },
+        },
+        undefined
+      );
+      const original = bus.emissions.at(-1);
+      if (!original) throw new Error("missing inter-server voice relay request");
+
+      await expect(
+        deliverFakeInterServerRelay(secondNode, original.event, original.payload)
+      ).resolves.toEqual({ delivered: false });
+      expect(
+        secondNode.emissions.filter(
+          ({ target, event }) => target === second.id && event === "studio:voice:signal"
+        )
+      ).toHaveLength(1);
+      const internals = secondNode.gateway as unknown as {
+        deliveredInterServerVoiceSignals: Map<string, number>;
+      };
+      expect(internals.deliveredInterServerVoiceSignals.size).toBe(1);
+    } finally {
+      bus.destroy();
+    }
+  });
+
+  it("bounds and expires the inter-server voice signal dedupe cache", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-18T00:00:00.000Z"));
+    const harness = createHarness();
+    const internals = harness.gateway as unknown as {
+      deliveredInterServerVoiceSignals: Map<string, number>;
+      consumeInterServerVoiceSignal(
+        workId: string,
+        senderConnectionId: string,
+        targetConnectionId: string,
+        callId: string,
+        signalId: string
+      ): boolean;
+    };
+    try {
+      for (let index = 0; index <= 4_096; index += 1) {
+        expect(
+          internals.consumeInterServerVoiceSignal(
+            "work-1",
+            "sender",
+            "target",
+            "voice-main",
+            `signal-${index}`
+          )
+        ).toBe(true);
+      }
+      expect(internals.deliveredInterServerVoiceSignals.size).toBe(4_096);
+      expect(
+        internals.deliveredInterServerVoiceSignals.has(
+          JSON.stringify(["work-1", "sender", "target", "voice-main", "signal-0"])
+        )
+      ).toBe(false);
+
+      vi.advanceTimersByTime(10_001);
+      expect(
+        internals.consumeInterServerVoiceSignal(
+          "work-1",
+          "sender",
+          "target",
+          "voice-main",
+          "signal-after-ttl"
+        )
+      ).toBe(true);
+      expect(internals.deliveredInterServerVoiceSignals.size).toBe(1);
+      harness.gateway.onModuleDestroy();
+      expect(internals.deliveredInterServerVoiceSignals.size).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("updates screen-sharing presence without accepting a media stream on the server", async () => {
@@ -3134,8 +3775,9 @@ describe("StudioLiveGateway", () => {
     const target = harness.socket("target");
     await connectAndJoin(harness, sender);
     await connectAndJoin(harness, target);
-    if (!target.data.authPrincipal) throw new Error("missing target auth principal");
-    target.data.authPrincipal.expiresAt = Date.now() - 1;
+    const principal = privateAuthPrincipal(harness, target);
+    if (!principal) throw new Error("missing target auth principal");
+    principal.expiresAt = Date.now() - 1;
 
     const response = await harness.gateway.relaySignal(
       sender as never,
@@ -3181,7 +3823,8 @@ describe("StudioLiveGateway", () => {
 
     expect(response).toMatchObject({ ok: false, code: "peer_unavailable" });
     expect(target.disconnected).toBe(true);
-    expect(target.data.authUserId).toBeUndefined();
+    expect(privateAuthPrincipal(harness, target)).toBeUndefined();
+    expectNoAdapterVisibleAuthentication(target);
     expect(
       harness.emissions.some((emission) => emission.event === "studio:signal")
     ).toBe(false);
@@ -3707,6 +4350,8 @@ describe("StudioLiveGateway", () => {
 
     harness.gateway.handleDisconnect(socket as never);
 
+    expect(privateAuthPrincipal(harness, socket)).toBeUndefined();
+    expectNoAdapterVisibleAuthentication(socket);
     expect(socket.data.studioParticipant).toBeUndefined();
     expect(socket.data.studioWorkId).toBeUndefined();
 
