@@ -15,6 +15,7 @@ import {
   type StudioCrdtSyncResponse,
   type StudioCrdtStrokePayloadVersion,
 } from "./studio-crdt-protocol";
+import { runStudioCrdtRasterWorker } from "./studio-crdt-raster-worker-client";
 import {
   STUDIO_CRDT_LAYER_GROUP_PAYLOAD_VERSION,
   STUDIO_CRDT_LAYER_GROUP_PROPERTY_KEYS,
@@ -51,6 +52,7 @@ import {
   STUDIO_CRDT_RASTER_SURFACES_ROOT,
   STUDIO_CRDT_RASTER_UNDO_ACKS_ROOT,
   STUDIO_CRDT_RASTER_UNDO_OPERATIONS_ROOT,
+  extractStudioCrdtRasterRawRoots,
   readStudioCrdtRasterDocument,
   type StudioCrdtRasterDocumentSnapshot,
   type StudioCrdtRasterIdentityKind,
@@ -2601,6 +2603,24 @@ export class StudioCrdtDocument {
     return this.tryReadExactRasterDocumentSnapshot()?.logs.get(surfaceId) ?? null;
   }
 
+  /**
+   * getRasterOperationLog 와 동일하지만 파싱·검증(JSON.parse + canonical 재직렬화 비교, exact-schema
+   * 검증)을 Worker에서 실행한다 — 화면에 보이는 surface 하나만 필요한 렌더 경로(예:
+   * StudioRasterCrdtSurface)가 원격 협업자 트랜잭션마다 메인 스레드를 막지 않도록. Y.Doc에서 각
+   * 래스터 root의 원시 항목만 동기로 뽑아내고(가벼움 — JSON 파싱 없음), 무거운 파싱은 Worker(또는
+   * 폴백 시 동일 로직의 동기 실행)로 넘긴다. mergeRasterOperationLog 의 로컬 쓰기 프리플라이트처럼
+   * Yjs 트랜잭션 준비 도중 동기 결과가 필요한 호출부는 계속 getRasterOperationLog 를 써야 한다.
+   */
+  async getRasterOperationLogAsync(
+    surfaceId: string,
+    options: { signal?: AbortSignal } = {}
+  ): Promise<StudioRasterOperationLog | null> {
+    this.assertAlive();
+    assertRasterSafeId(surfaceId, "래스터 surface");
+    const snapshot = await this.tryReadExactRasterDocumentSnapshotAsync(options.signal);
+    return snapshot?.logs.get(surfaceId) ?? null;
+  }
+
   getRasterOperationLogs(): StudioRasterOperationLog[] {
     this.assertAlive();
     const snapshot = this.tryReadExactRasterDocumentSnapshot();
@@ -2847,6 +2867,20 @@ export class StudioCrdtDocument {
   private tryReadExactRasterDocumentSnapshot(): StudioCrdtRasterDocumentSnapshot | null {
     try {
       return this.readExactRasterDocumentSnapshot();
+    } catch {
+      return null;
+    }
+  }
+
+  /** Worker-backed counterpart of tryReadExactRasterDocumentSnapshot — see getRasterOperationLogAsync. */
+  private async tryReadExactRasterDocumentSnapshotAsync(
+    signal?: AbortSignal
+  ): Promise<StudioCrdtRasterDocumentSnapshot | null> {
+    try {
+      const roots = extractStudioCrdtRasterRawRoots(this.doc);
+      if (!roots) return null;
+      const { snapshot } = await runStudioCrdtRasterWorker(roots, { signal });
+      return snapshot;
     } catch {
       return null;
     }

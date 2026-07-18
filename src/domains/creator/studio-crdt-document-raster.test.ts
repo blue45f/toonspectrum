@@ -473,4 +473,53 @@ describe("StudioCrdtDocument semantic raster roots", () => {
     attacker.destroy();
     document.destroy();
   });
+
+  // task #23: getRasterOperationLogAsync offloads parse/validate to a Web Worker (direct-fallback in
+  // this test environment, since no real Worker exists) via extractStudioCrdtRasterRawRoots +
+  // parseStudioCrdtRasterDocumentRoots. It must return byte-for-byte the same result as the
+  // synchronous getRasterOperationLog for identical document state.
+  describe("getRasterOperationLogAsync", () => {
+    it("matches the synchronous getRasterOperationLog for a real multi-operation log", async () => {
+      const document = new StudioCrdtDocument();
+      document.mergeRasterOperationLog(
+        operationLog({ operations: [operation(1, "1"), operation(2, "2")] })
+      );
+
+      const sync = document.getRasterOperationLog(surface.surfaceId);
+      const async = await document.getRasterOperationLogAsync(surface.surfaceId);
+
+      expect(sync).not.toBeNull();
+      expect(async).toEqual(sync);
+
+      document.destroy();
+    });
+
+    it("returns null for an unknown surface, matching the synchronous accessor", async () => {
+      const document = new StudioCrdtDocument();
+      document.mergeRasterOperationLog(operationLog({ operations: [operation(3, "1")] }));
+
+      expect(document.getRasterOperationLog("no-such-surface")).toBeNull();
+      expect(await document.getRasterOperationLogAsync("no-such-surface")).toBeNull();
+
+      document.destroy();
+    });
+
+    it("fails closed to null (not a rejection) when aborted, matching the try*-family null-safety contract", async () => {
+      // getRasterOperationLogAsync is the async counterpart of getRasterOperationLog, which never
+      // throws for missing/invalid data (tryReadExactRasterDocumentSnapshot swallows everything) --
+      // the async version preserves that contract by swallowing an abort into null too, rather than
+      // rejecting. Downstream (StudioRasterCrdtSurface) already treats a null log as "nothing to
+      // render" regardless of the reason, so this keeps both call sites uniform.
+      const document = new StudioCrdtDocument();
+      document.mergeRasterOperationLog(operationLog({ operations: [operation(4, "1")] }));
+      const controller = new AbortController();
+      controller.abort();
+
+      await expect(
+        document.getRasterOperationLogAsync(surface.surfaceId, { signal: controller.signal })
+      ).resolves.toBeNull();
+
+      document.destroy();
+    });
+  });
 });

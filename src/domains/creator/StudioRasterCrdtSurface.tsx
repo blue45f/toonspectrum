@@ -182,8 +182,6 @@ export function StudioRasterCrdtSurface({
     ) {
       return () => controller.abort();
     }
-    const log = document.getRasterOperationLog(surfaceId);
-    if (!log) return () => controller.abort();
     const directSourceSnapshot = sourceOperationsRef.current.map((source) => ({ ...source }));
     const handoffSnapshot = handoffRef.current
       ? {
@@ -193,11 +191,15 @@ export function StudioRasterCrdtSurface({
       : null;
 
     let active = true;
+    // 파싱/검증(readRasterOperationLog 계약)을 Worker로 넘기는 async 읽기 — 이미 async였던 동적
+    // import들과 나란히 Promise.all에 넣어 병렬로 대기한다(순차 대기보다 빠르거나 최소 동일).
     void Promise.all([
+      document.getRasterOperationLogAsync(surfaceId, { signal: controller.signal }),
       import("./studio-crdt-raster-replay-runtime"),
       import("./studio-raster-asset-client"),
       import("./studio-crdt-raster-ui-bridge"),
-    ]).then(async ([runtime, assetClient, bridge]) => {
+    ]).then(async ([log, runtime, assetClient, bridge]) => {
+      if (!log) return;
       const planned = handoffSnapshot
         ? bridge.planStudioRasterOverlayHandoff({
             log,

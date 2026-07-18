@@ -245,15 +245,43 @@ function assertCheckpointMatchesLog(
   }
 }
 
+/** Plain [id, value][] entries per reserved raster root — everything parseStudioCrdtRasterDocumentRoots
+ * needs, with no Y.Doc/Yjs dependency. Structured-clone-safe, so it can cross a postMessage boundary
+ * to a Worker (or a Node worker_thread) unlike a live Y.Doc. */
+export interface StudioCrdtRasterRawRoots {
+  readonly surfaces: readonly (readonly [string, unknown])[];
+  readonly operations: readonly (readonly [string, unknown])[];
+  readonly undoOperations: readonly (readonly [string, unknown])[];
+  readonly undoAcknowledgements: readonly (readonly [string, unknown])[];
+  readonly checkpoints: readonly (readonly [string, unknown])[];
+}
+
 /**
- * Parses all reserved raster roots without mutating the Y.Doc and enforces exact schema plus every
- * per-surface and document-wide semantic budget.
+ * Extracts plain entries from every reserved raster root — the only Y.Doc-touching step of the read
+ * path. Cheap: just Y.Map iteration, no JSON parsing/validation (that's parseStudioCrdtRasterDocumentRoots).
+ * Returns null if any reserved root exists with the wrong Yjs type (same contract as requiredRootSet).
  */
-export function readStudioCrdtRasterDocument(
-  doc: Y.Doc
-): StudioCrdtRasterDocumentSnapshot {
+export function extractStudioCrdtRasterRawRoots(doc: Y.Doc): StudioCrdtRasterRawRoots | null {
   const roots = requiredRootSet(doc);
-  if (!roots) fail("래스터 CRDT reserved root는 Y.Map이어야 합니다.");
+  if (!roots) return null;
+  return {
+    surfaces: [...(roots.surfaces ?? [])],
+    operations: [...(roots.operations ?? [])],
+    undoOperations: [...(roots.undoOperations ?? [])],
+    undoAcknowledgements: [...(roots.undoAcknowledgements ?? [])],
+    checkpoints: [...(roots.checkpoints ?? [])],
+  };
+}
+
+/**
+ * Parses the plain entries extracted from every reserved raster root and enforces exact schema plus
+ * every per-surface and document-wide semantic budget. No Y.Doc/DOM dependency — this is the pure
+ * core a Web Worker (or server-side code) can call directly given extractStudioCrdtRasterRawRoots'
+ * output, without needing the originating Y.Doc.
+ */
+export function parseStudioCrdtRasterDocumentRoots(
+  roots: StudioCrdtRasterRawRoots
+): StudioCrdtRasterDocumentSnapshot {
   const {
     surfaces: surfaceRoot,
     operations: operationRoot,
@@ -262,17 +290,17 @@ export function readStudioCrdtRasterDocument(
     checkpoints: checkpointRoot,
   } = roots;
   if (
-    (surfaceRoot?.size ?? 0) > STUDIO_CRDT_RASTER_MAX_SURFACES ||
-    (operationRoot?.size ?? 0) > STUDIO_RASTER_MAX_OPERATIONS ||
-    (undoRoot?.size ?? 0) > STUDIO_RASTER_MAX_UNDO_OPERATIONS ||
-    (acknowledgementRoot?.size ?? 0) > STUDIO_RASTER_MAX_UNDO_OPERATIONS ||
-    (checkpointRoot?.size ?? 0) > STUDIO_CRDT_RASTER_MAX_CHECKPOINTS
+    surfaceRoot.length > STUDIO_CRDT_RASTER_MAX_SURFACES ||
+    operationRoot.length > STUDIO_RASTER_MAX_OPERATIONS ||
+    undoRoot.length > STUDIO_RASTER_MAX_UNDO_OPERATIONS ||
+    acknowledgementRoot.length > STUDIO_RASTER_MAX_UNDO_OPERATIONS ||
+    checkpointRoot.length > STUDIO_CRDT_RASTER_MAX_CHECKPOINTS
   ) {
     fail("래스터 CRDT 문서 전역 root 수가 허용 한도를 초과했습니다.");
   }
 
   const surfaces = new Map<string, StudioRasterSurfaceSpec>();
-  for (const [surfaceId, encoded] of surfaceRoot ?? []) {
+  for (const [surfaceId, encoded] of surfaceRoot) {
     const parsed = parseCanonicalJson(encoded);
     try {
       assertStudioRasterSurfaceSpec(parsed, `surfaces[${surfaceId}]`);
@@ -308,7 +336,7 @@ export function readStudioCrdtRasterDocument(
     return log;
   };
 
-  for (const [operationId, encoded] of operationRoot ?? []) {
+  for (const [operationId, encoded] of operationRoot) {
     const parsed = parseCanonicalJson(encoded);
     if (
       !hasExactKeys(parsed, ["surfaceId", "operation"]) ||
@@ -320,7 +348,7 @@ export function readStudioCrdtRasterDocument(
     );
     registerIdentity(operationId, "operation");
   }
-  for (const [undoOperationId, encoded] of undoRoot ?? []) {
+  for (const [undoOperationId, encoded] of undoRoot) {
     const parsed = parseCanonicalJson(encoded);
     if (
       !hasExactKeys(parsed, ["surfaceId", "undoOperation"]) ||
@@ -332,7 +360,7 @@ export function readStudioCrdtRasterDocument(
     );
     registerIdentity(undoOperationId, "undo-operation");
   }
-  for (const [acknowledgementId, encoded] of acknowledgementRoot ?? []) {
+  for (const [acknowledgementId, encoded] of acknowledgementRoot) {
     const parsed = parseCanonicalJson(encoded);
     if (
       !hasExactKeys(parsed, ["surfaceId", "acknowledgement"]) ||
@@ -369,7 +397,7 @@ export function readStudioCrdtRasterDocument(
   assertStudioCrdtRasterGlobalPatchCount(totalPatchCount);
 
   const checkpoints: StudioRasterCompactionCheckpoint[] = [];
-  for (const [checkpointId, encoded] of checkpointRoot ?? []) {
+  for (const [checkpointId, encoded] of checkpointRoot) {
     const parsed = parseCanonicalJson(encoded);
     let checkpoint: StudioRasterCompactionCheckpoint;
     try {
@@ -420,6 +448,21 @@ export function readStudioCrdtRasterDocument(
     referencedBytes,
     totalPatchCount,
   };
+}
+
+/**
+ * Parses all reserved raster roots without mutating the Y.Doc and enforces exact schema plus every
+ * per-surface and document-wide semantic budget. Thin composition of the two pieces above — kept for
+ * every existing synchronous caller (server-side code, local-write preflights); callers that can
+ * tolerate an async boundary should prefer extractStudioCrdtRasterRawRoots + a Worker-backed call to
+ * parseStudioCrdtRasterDocumentRoots instead, since the latter is the actual CPU-heavy step.
+ */
+export function readStudioCrdtRasterDocument(
+  doc: Y.Doc
+): StudioCrdtRasterDocumentSnapshot {
+  const roots = extractStudioCrdtRasterRawRoots(doc);
+  if (!roots) fail("래스터 CRDT reserved root는 Y.Map이어야 합니다.");
+  return parseStudioCrdtRasterDocumentRoots(roots);
 }
 
 export function hasValidStudioCrdtRasterDocument(doc: Y.Doc): boolean {
