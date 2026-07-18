@@ -129,6 +129,19 @@ describe("createStudioWebGpuCommittedHandoff", () => {
     });
   });
 
+  it("fails closed behind a legacy segment stroke with no sample spacing or pressure model", () => {
+    const handoff = createStudioWebGpuCommittedHandoff({
+      elements: [draw("legacy", { sampleSpacing: undefined, pressureModel: undefined })],
+    });
+
+    expect(handoff).toMatchObject({
+      status: "empty",
+      elementIds: [],
+      strokes: [],
+      frontBarrier: { elementId: "legacy", reason: "invalid-geometry" },
+    });
+  });
+
   it("fails closed behind a frontmost unsupported draw operation", () => {
     const handoff = createStudioWebGpuCommittedHandoff({
       elements: [draw("safe"), draw("eraser", { mode: "eraser" })],

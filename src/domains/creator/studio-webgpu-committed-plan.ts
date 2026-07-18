@@ -30,6 +30,7 @@ export interface StudioWebGpuCommittedElementInput {
   readonly stroke?: unknown;
   readonly strokeWidth?: unknown;
   readonly pressureModel?: unknown;
+  readonly sampleSpacing?: unknown;
   readonly paintModel?: unknown;
   readonly opacity?: unknown;
   readonly brush?: unknown;
@@ -100,6 +101,7 @@ export interface StudioWebGpuCommittedPlanInput<T extends StudioWebGpuCommittedE
   /** Scene order: index 0 is back, the final index is front. */
   readonly elements: readonly T[];
   readonly gates?: StudioWebGpuCommittedPlanGates;
+  readonly barrierOptions?: StudioWebGpuCommittedBarrierOptions;
 }
 
 const SUPPORTED_BRUSHES = new Set(["pen", "fineliner"]);
@@ -154,9 +156,20 @@ function hasUnsupportedStyle(element: StudioWebGpuCommittedElementInput): boolea
     || element.watercolorPipeline !== undefined;
 }
 
+export interface StudioWebGpuCommittedBarrierOptions {
+  /**
+   * Konva renders causal (dab-sampled) and legacy (endpoint-width segment) geometry through two
+   * genuinely different code paths. Callers that reproduce Konva's dab rasterization pixel-for-pixel
+   * — the retained GPU render, not the raster-CRDT promotion's own legacy fallback — must opt in here
+   * instead of admitting legacy strokes into a renderer that never mirrors their segment geometry.
+   */
+  readonly requireCausalGeometry?: boolean;
+}
+
 /** Returns the first fail-closed reason, or `null` when the element is safe for this slice. */
 export function studioWebGpuCommittedBarrierReason(
-  element: StudioWebGpuCommittedElementInput
+  element: StudioWebGpuCommittedElementInput,
+  options?: StudioWebGpuCommittedBarrierOptions
 ): StudioWebGpuCommittedBarrierReason | null {
   if (element.type !== "draw") return "non-draw";
   if ((element.kind ?? "freehand") !== "freehand") return "non-freehand";
@@ -178,6 +191,13 @@ export function studioWebGpuCommittedBarrierReason(
     && !isStudioInkPressureModel(element.pressureModel)
   ) {
     return "unsupported-pressure-model";
+  }
+
+  if (options?.requireCausalGeometry === true) {
+    const hasFiniteSampleSpacing =
+      typeof element.sampleSpacing === "number"
+      && Number.isFinite(element.sampleSpacing);
+    if (!hasFiniteSampleSpacing && element.pressureModel === undefined) return "invalid-geometry";
   }
 
   if (!finitePointArray(element.points)) return "invalid-geometry";
@@ -255,7 +275,7 @@ export function planStudioWebGpuCommittedSuffix<T extends StudioWebGpuCommittedE
     const element = input.elements[index]!;
     if (element.hidden === true) continue;
 
-    const reason = studioWebGpuCommittedBarrierReason(element);
+    const reason = studioWebGpuCommittedBarrierReason(element, input.barrierOptions);
     if (reason === null) {
       selectedFrontToBack.push(element);
       continue;
