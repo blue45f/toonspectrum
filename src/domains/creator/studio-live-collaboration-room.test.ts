@@ -22,6 +22,7 @@ import {
   type StudioLiveRoomDependencies,
   type StudioLiveRoomEvent,
   type StudioLiveSignalEnvelope,
+  type StudioLiveVoiceEvent,
 } from "./studio-live-collaboration-room";
 
 import type {
@@ -444,6 +445,121 @@ describe("StudioLiveRoom", () => {
     roomA.close();
     roomB.close();
     roomC.close();
+  });
+
+  it("keeps a six-seat voice huddle isolated from viewers, other calls and untargeted peers", async () => {
+    const test = harness();
+    const viewer = { sessionId: "session-viewer", displayName: "보기 전용", role: "viewer" } as const;
+    const roomA = test.room(alice);
+    const roomB = test.room(bob);
+    const roomViewer = test.room(viewer);
+    const voiceA: StudioLiveVoiceEvent[] = [];
+    const voiceB: StudioLiveVoiceEvent[] = [];
+    roomA.subscribeVoice((event) => voiceA.push(event));
+    roomB.subscribeVoice((event) => voiceB.push(event));
+    await roomA.start();
+    await roomB.start();
+    await roomViewer.start();
+
+    expect(roomViewer.joinVoice({ callId: "voice-main", muted: false })).toBe(false);
+    expect(roomA.joinVoice({ callId: "voice-main", muted: false })).toBe(true);
+    expect(roomB.joinVoice({ callId: "voice-main", muted: true })).toBe(true);
+    expect(roomA.getVoiceMembers()).toEqual([
+      { participant: bob, callId: "voice-main", muted: true },
+      { participant: alice, callId: "voice-main", muted: false },
+    ]);
+    expect(roomA.updateVoiceState({ callId: "voice-main", muted: true })).toBe(true);
+    expect(roomB.getVoiceMembers()).toContainEqual({
+      participant: alice,
+      callId: "voice-main",
+      muted: true,
+    });
+    expect(
+      roomA.sendVoiceDescription(bob.sessionId, {
+        callId: "voice-other",
+        type: "offer",
+        sdp: "v=0",
+      })
+    ).toBe(false);
+    expect(
+      roomA.sendVoiceDescription(alice.sessionId, {
+        callId: "voice-main",
+        type: "offer",
+        sdp: "v=0",
+      })
+    ).toBe(false);
+    expect(
+      roomA.sendVoiceDescription(bob.sessionId, {
+        callId: "voice-main",
+        type: "offer",
+        sdp: "v=0",
+      })
+    ).toBe(true);
+    expect(voiceB).toContainEqual(
+      expect.objectContaining({
+        type: "voice:description",
+        participant: alice,
+        payload: { callId: "voice-main", type: "offer", sdp: "v=0" },
+      })
+    );
+    expect(voiceA.some((event) => event.type === "voice:description")).toBe(false);
+    expect(roomB.leaveVoice({ callId: "voice-main" })).toBe(true);
+    expect(roomA.getVoiceMembers()).toEqual([
+      { participant: alice, callId: "voice-main", muted: true },
+    ]);
+
+    roomA.close();
+    roomB.close();
+    roomViewer.close();
+  });
+
+  it("rejects a seventh local mesh participant before publishing a voice join", async () => {
+    const test = harness();
+    const rooms = Array.from({ length: 7 }, (_, index) =>
+      test.room({
+        sessionId: `session-${index}`,
+        displayName: `팀원 ${index}`,
+        role: "editor",
+      })
+    );
+    for (const room of rooms) await room.start();
+    for (const room of rooms.slice(0, 6)) {
+      expect(room.joinVoice({ callId: "voice-main", muted: false })).toBe(true);
+    }
+    const publishedBefore = test.hub.published.length;
+    expect(rooms[6]?.joinVoice({ callId: "voice-main", muted: false })).toBe(false);
+    expect(test.hub.published).toHaveLength(publishedBefore);
+    for (const room of rooms) room.close();
+  });
+
+  it("rolls back optimistic self voice membership on authoritative server removal", async () => {
+    const test = harness("server");
+    const room = test.room(alice);
+    const events: StudioLiveVoiceEvent[] = [];
+    room.subscribeVoice((event) => events.push(event));
+    await room.start();
+
+    expect(room.joinVoice({ callId: "voice-authoritative", muted: false })).toBe(true);
+    expect(room.getVoiceMembers()).toContainEqual({
+      participant: alice,
+      callId: "voice-authoritative",
+      muted: false,
+    });
+    test.hub.transports[0]?.receiveControl({
+      type: "voice-removed",
+      callId: "voice-authoritative",
+      reason: "rejected",
+      message: "음성 대화 정원은 최대 6명입니다.",
+    });
+
+    expect(room.getVoiceMembers()).toEqual([]);
+    expect(events).toContainEqual({
+      type: "voice:self-left",
+      callId: "voice-authoritative",
+      reason: "rejected",
+      message: "음성 대화 정원은 최대 6명입니다.",
+    });
+    room.close();
   });
 
   it("clears peer and lock metadata immediately when server access is revoked", async () => {

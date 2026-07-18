@@ -32,6 +32,7 @@ import {
   type StudioLiveParticipant,
   type StudioLivePayloadMap,
   type StudioLiveScreenAccessPayload,
+  type StudioLiveVoiceIcePayload,
   type StudioLiveWebRtcIcePayload,
 } from "./studio-live-collaboration-protocol";
 import { resolveStudioLiveSocketEndpoint } from "./studio-live-socket-endpoint";
@@ -50,9 +51,12 @@ import { getRuntimeApiBase } from "@/src/infrastructure/runtime-api-base";
 const SOCKET_PATH = "/socket.io";
 const CONNECT_TIMEOUT_MS = 10_000;
 const CRDT_ACK_TIMEOUT_MS = 10_000;
+const VOICE_JOIN_ACK_TIMEOUT_MS = 10_000;
 const MAX_TOKEN_LENGTH = 8_192;
 const MAX_SEEN_CRDT_UPDATE_IDS = 4_096;
 const MAX_PENDING_PRESENCE_CONNECTIONS = 2_048;
+const MAX_PENDING_VOICE_CONNECTIONS = 256;
+const MAX_PENDING_VOICE_SIGNALS = 256;
 
 type ServerRole = StudioLiveParticipant["role"];
 
@@ -72,6 +76,10 @@ type PendingPresenceDelta =
   | { kind: "update"; participant: ServerParticipant }
   | { kind: "leave"; connectionId: string };
 
+type PendingVoiceDelta =
+  | { kind: "update"; member: ServerVoiceMember }
+  | { kind: "leave"; connectionId: string; callId: string };
+
 interface ServerLock {
   resourceId: string;
   leaseId: string;
@@ -80,10 +88,34 @@ interface ServerLock {
   expiresAt: string;
 }
 
+interface ServerVoiceMember {
+  connectionId: string;
+  callId: string;
+  muted: boolean;
+}
+
+interface PendingVoiceSignal {
+  targetConnectionId: string;
+  callId: string;
+  payload: Record<string, unknown>;
+}
+
+interface PendingVoiceAdmission {
+  callId: string;
+  initialMuted: boolean;
+  muted: boolean;
+  intentGeneration: number;
+  joinGeneration: number;
+  selfConnectionId: string;
+  signals: PendingVoiceSignal[];
+  timeout: unknown;
+}
+
 interface ServerJoinSnapshot {
   self: ServerParticipant;
   participants: ServerParticipant[];
   locks: ServerLock[];
+  voiceMembers: ServerVoiceMember[];
 }
 
 interface ServerFailure {
@@ -107,6 +139,7 @@ export interface StudioLiveSocketTransportDependencies {
   now?: () => number;
   setTimeout?: (handler: () => void, delay: number) => unknown;
   clearTimeout?: (handle: unknown) => void;
+  voiceJoinAckTimeoutMs?: number;
 }
 
 function defaultCreateSocket(auth: { sessionToken: string }): StudioLiveSocketLike {
@@ -154,6 +187,10 @@ function safeString(value: unknown, maximum: number, allowEmpty = false): value 
   if (hasDisallowedControlCharacter(value)) return false;
   if (allowEmpty) return true;
   return value.trim().length > 0;
+}
+
+function safeIdentifier(value: unknown, maximum: number): value is string {
+  return safeString(value, maximum) && value === value.trim();
 }
 
 function nullableString(value: unknown, maximum: number, allowEmpty = false): value is string | null {
@@ -231,6 +268,22 @@ function parseLock(value: unknown): ServerLock | null {
   };
 }
 
+function parseVoiceMember(value: unknown): ServerVoiceMember | null {
+  if (
+    !isRecord(value) ||
+    !safeIdentifier(value.connectionId, 128) ||
+    !safeIdentifier(value.callId, 160) ||
+    typeof value.muted !== "boolean"
+  ) {
+    return null;
+  }
+  return {
+    connectionId: value.connectionId,
+    callId: value.callId,
+    muted: value.muted,
+  };
+}
+
 function parseFailure(value: unknown): ServerFailure | null {
   if (
     !isRecord(value) ||
@@ -251,13 +304,21 @@ function parseJoinAck(value: unknown): ServerJoinSnapshot | ServerFailure | null
   if (!self || !Array.isArray(value.data.participants) || !Array.isArray(value.data.locks)) return null;
   const participants = value.data.participants.map(parseParticipant);
   const locks = value.data.locks.map(parseLock);
-  if (participants.some((participant) => participant === null) || locks.some((lock) => lock === null)) {
+  const voiceMembers = Array.isArray(value.data.voiceMembers)
+    ? value.data.voiceMembers.map(parseVoiceMember)
+    : [];
+  if (
+    participants.some((participant) => participant === null) ||
+    locks.some((lock) => lock === null) ||
+    voiceMembers.some((member) => member === null)
+  ) {
     return null;
   }
   return {
     self,
     participants: participants as ServerParticipant[],
     locks: locks as ServerLock[],
+    voiceMembers: voiceMembers as ServerVoiceMember[],
   };
 }
 
@@ -302,6 +363,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
   private readonly now: () => number;
   private readonly scheduleTimeout: (handler: () => void, delay: number) => unknown;
   private readonly cancelTimeout: (handle: unknown) => void;
+  private readonly voiceJoinAckTimeoutMs: number;
   private readonly listeners = new Set<(value: unknown) => void>();
   private readonly controlListeners = new Set<(event: StudioLiveTransportControlEvent) => void>();
   private readonly crdtListeners = new Set<(message: StudioCrdtTransportMessage) => void>();
@@ -314,8 +376,10 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
   private readonly participants = new Map<string, ServerParticipant>();
   private readonly sequenceByConnection = new Map<string, number>();
   private readonly shareIdByConnection = new Map<string, string>();
+  private readonly voiceMemberByConnection = new Map<string, ServerVoiceMember>();
   private readonly locksByResource = new Map<string, ServerLock>();
   private readonly pendingPresenceByConnection = new Map<string, PendingPresenceDelta>();
+  private readonly pendingVoiceByConnection = new Map<string, PendingVoiceDelta>();
   private sessionToken: string | null;
   private selfConnectionId: string | null = null;
   private pendingInitialSnapshot: ServerJoinSnapshot | null = null;
@@ -324,6 +388,9 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
   private accessRevoked = false;
   private everJoined = false;
   private joinGeneration = 0;
+  private voiceIntentGeneration = 0;
+  private desiredVoiceCallId: string | null = null;
+  private pendingVoiceAdmission: PendingVoiceAdmission | null = null;
   private connectPromise: Promise<void> | null = null;
   private resolveConnect: (() => void) | null = null;
   private rejectConnect: ((error: Error) => void) | null = null;
@@ -342,6 +409,13 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.now = dependencies.now ?? Date.now;
     this.scheduleTimeout = dependencies.setTimeout ?? defaultSetTimeout;
     this.cancelTimeout = dependencies.clearTimeout ?? defaultClearTimeout;
+    this.voiceJoinAckTimeoutMs = Math.min(
+      30_000,
+      Math.max(
+        100,
+        Math.trunc(dependencies.voiceJoinAckTimeoutMs ?? VOICE_JOIN_ACK_TIMEOUT_MS)
+      )
+    );
     this.socket = (dependencies.createSocket ?? defaultCreateSocket)({ sessionToken });
     this.socket.on("connect", this.onConnect);
     this.socket.on("connect_error", this.onConnectError);
@@ -358,6 +432,11 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.socket.on("studio:screen:request", this.onScreenRequest);
     this.socket.on("studio:screen:access", this.onScreenAccess);
     this.socket.on("studio:screen:stop", this.onScreenStop);
+    this.socket.on("studio:voice:snapshot", this.onVoiceSnapshot);
+    this.socket.on("studio:voice:join", this.onVoiceJoin);
+    this.socket.on("studio:voice:state", this.onVoiceState);
+    this.socket.on("studio:voice:leave", this.onVoiceLeave);
+    this.socket.on("studio:voice:signal", this.onVoiceSignal);
     this.socket.on("studio:chat:message", this.onChatMessage);
     this.socket.on("studio:crdt:sync", this.onCrdtSync);
     this.socket.on("studio:crdt:update", this.onCrdtUpdate);
@@ -567,6 +646,191 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
           });
           return true;
         }
+        case "voice:join": {
+          const payload = envelope.payload as StudioLivePayloadMap["voice:join"];
+          this.cancelPendingVoiceAdmission({
+            emitRemoval: false,
+            preserveIntent: false,
+            sendLeave: true,
+          });
+          const intentGeneration = ++this.voiceIntentGeneration;
+          this.desiredVoiceCallId = payload.callId;
+          const selfConnectionId = this.selfConnectionId;
+          if (!selfConnectionId) return false;
+          const pending: PendingVoiceAdmission = {
+            callId: payload.callId,
+            initialMuted: payload.muted,
+            muted: payload.muted,
+            intentGeneration,
+            joinGeneration: this.joinGeneration,
+            selfConnectionId,
+            signals: [],
+            timeout: null,
+          };
+          this.pendingVoiceAdmission = pending;
+          pending.timeout = this.scheduleTimeout(() => {
+            this.rejectPendingVoiceAdmission(
+              pending,
+              "음성 작업실 참가 응답 시간이 초과되었습니다. 다시 참가해 주세요."
+            );
+          }, this.voiceJoinAckTimeoutMs);
+          this.socket.emit(
+            "studio:voice:join",
+            {
+              workId: this.context.workId,
+              callId: payload.callId,
+              muted: payload.muted,
+            },
+            (value: unknown) => this.completePendingVoiceAdmission(pending, value)
+          );
+          return true;
+        }
+        case "voice:state": {
+          const payload = envelope.payload as StudioLivePayloadMap["voice:state"];
+          const pending = this.pendingVoiceAdmission;
+          if (
+            pending &&
+            this.isCurrentVoiceAdmission(pending) &&
+            pending.callId === payload.callId
+          ) {
+            pending.muted = payload.muted;
+            return true;
+          }
+          const current = this.selfConnectionId
+            ? this.voiceMemberByConnection.get(this.selfConnectionId)
+            : null;
+          if (!current || current.callId !== payload.callId) return false;
+          this.voiceMemberByConnection.set(current.connectionId, { ...current, muted: payload.muted });
+          this.emitWithAck(
+            "studio:voice:state",
+            {
+              workId: this.context.workId,
+              callId: payload.callId,
+              muted: payload.muted,
+            },
+            undefined,
+            (message) => this.rejectSelfVoice(payload.callId, message)
+          );
+          return true;
+        }
+        case "voice:leave": {
+          const payload = envelope.payload as StudioLivePayloadMap["voice:leave"];
+          const pending = this.pendingVoiceAdmission;
+          if (pending && pending.callId === payload.callId) {
+            this.cancelPendingVoiceAdmission({
+              emitRemoval: false,
+              preserveIntent: false,
+              sendLeave: true,
+            });
+            return true;
+          }
+          const current = this.selfConnectionId
+            ? this.voiceMemberByConnection.get(this.selfConnectionId)
+            : null;
+          if (!current || current.callId !== payload.callId) return false;
+          ++this.voiceIntentGeneration;
+          if (this.desiredVoiceCallId === payload.callId) this.desiredVoiceCallId = null;
+          this.voiceMemberByConnection.delete(current.connectionId);
+          this.emitWithAck("studio:voice:leave", {
+            workId: this.context.workId,
+            callId: payload.callId,
+          });
+          return true;
+        }
+        case "voice:description": {
+          const payload = envelope.payload as StudioLivePayloadMap["voice:description"];
+          const target = this.validTarget(envelope.targetSessionId);
+          if (!target) return false;
+          const targetVoice = this.voiceMemberByConnection.get(target);
+          const pending = this.pendingVoiceAdmission;
+          if (
+            pending &&
+            this.isCurrentVoiceAdmission(pending) &&
+            pending.callId === payload.callId &&
+            targetVoice?.callId === payload.callId
+          ) {
+            return this.queuePendingVoiceSignal(pending, {
+              targetConnectionId: target,
+              callId: payload.callId,
+              payload: {
+                workId: this.context.workId,
+                targetConnectionId: target,
+                callId: payload.callId,
+                kind: "description",
+                description: { type: payload.type, sdp: payload.sdp },
+              },
+            });
+          }
+          const selfVoice = this.selfConnectionId
+            ? this.voiceMemberByConnection.get(this.selfConnectionId)
+            : null;
+          if (
+            !selfVoice ||
+            !targetVoice ||
+            selfVoice.callId !== payload.callId ||
+            targetVoice.callId !== payload.callId
+          ) return false;
+          this.emitWithAck("studio:voice:signal", {
+            workId: this.context.workId,
+            targetConnectionId: target,
+            callId: payload.callId,
+            kind: "description",
+            description: { type: payload.type, sdp: payload.sdp },
+          });
+          return true;
+        }
+        case "voice:ice": {
+          const payload = envelope.payload as StudioLivePayloadMap["voice:ice"];
+          const target = this.validTarget(envelope.targetSessionId);
+          if (!target) return false;
+          const targetVoice = this.voiceMemberByConnection.get(target);
+          const pending = this.pendingVoiceAdmission;
+          if (
+            pending &&
+            this.isCurrentVoiceAdmission(pending) &&
+            pending.callId === payload.callId &&
+            targetVoice?.callId === payload.callId
+          ) {
+            return this.queuePendingVoiceSignal(pending, {
+              targetConnectionId: target,
+              callId: payload.callId,
+              payload: {
+                workId: this.context.workId,
+                targetConnectionId: target,
+                callId: payload.callId,
+                kind: "candidate",
+                candidate: {
+                  candidate: payload.candidate,
+                  sdpMid: payload.sdpMid,
+                  sdpMLineIndex: payload.sdpMLineIndex,
+                  usernameFragment: payload.usernameFragment,
+                },
+              },
+            });
+          }
+          const selfVoice = this.selfConnectionId
+            ? this.voiceMemberByConnection.get(this.selfConnectionId)
+            : null;
+          if (
+            !selfVoice ||
+            !targetVoice ||
+            selfVoice.callId !== payload.callId ||
+            targetVoice.callId !== payload.callId
+          ) return false;
+          this.emitWithAck("studio:voice:signal", {
+            workId: this.context.workId,
+            targetConnectionId: target,
+            callId: payload.callId,
+            kind: "candidate",
+            candidate: {
+              candidate: payload.candidate,
+              sdpMid: payload.sdpMid,
+              sdpMLineIndex: payload.sdpMLineIndex,
+              usernameFragment: payload.usernameFragment,
+            },
+          });
+          return true;
+        }
         case "chat:message": {
           const payload = envelope.payload as StudioLivePayloadMap["chat:message"];
           this.emitWithAck("studio:chat:send", {
@@ -600,6 +864,10 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
 
   close(): void {
     if (this.closed) return;
+    this.terminateVoiceIntent(
+      "removed",
+      "팀 공동작업 연결이 종료되어 음성 작업실에서 나갔습니다."
+    );
     this.closed = true;
     ++this.joinGeneration;
     this.joined = false;
@@ -621,6 +889,11 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.socket.off("studio:screen:request", this.onScreenRequest);
     this.socket.off("studio:screen:access", this.onScreenAccess);
     this.socket.off("studio:screen:stop", this.onScreenStop);
+    this.socket.off("studio:voice:snapshot", this.onVoiceSnapshot);
+    this.socket.off("studio:voice:join", this.onVoiceJoin);
+    this.socket.off("studio:voice:state", this.onVoiceState);
+    this.socket.off("studio:voice:leave", this.onVoiceLeave);
+    this.socket.off("studio:voice:signal", this.onVoiceSignal);
     this.socket.off("studio:chat:message", this.onChatMessage);
     this.socket.off("studio:crdt:sync", this.onCrdtSync);
     this.socket.off("studio:crdt:update", this.onCrdtUpdate);
@@ -629,8 +902,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       "팀 공동작업 연결이 종료되었습니다.",
       "connection"
     ));
-    this.socket.auth = {};
-    this.sessionToken = null;
+    this.scrubCredentials();
     this.socket.disconnect();
     this.listeners.clear();
     this.controlListeners.clear();
@@ -640,9 +912,11 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.participants.clear();
     this.sequenceByConnection.clear();
     this.shareIdByConnection.clear();
+    this.voiceMemberByConnection.clear();
     this.locksByResource.clear();
     this.pendingInitialSnapshot = null;
     this.pendingPresenceByConnection.clear();
+    this.pendingVoiceByConnection.clear();
     this.selfConnectionId = null;
   }
 
@@ -665,11 +939,13 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
   };
 
   private revokeFromConnectError(message: string): void {
+    this.terminateVoiceIntent("revoked", message);
     ++this.joinGeneration;
     this.accessRevoked = true;
     this.joined = false;
     this.pendingInitialSnapshot = null;
     this.pendingPresenceByConnection.clear();
+    this.pendingVoiceByConnection.clear();
     this.clearConnectTimeout();
     this.rejectConnect?.(new Error(message));
     this.clearConnectDeferred();
@@ -679,14 +955,24 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       "connection"
     ));
     this.emitStatus({ state: "revoked", message, recoverable: false });
+    this.scrubCredentials();
     this.socket.disconnect();
   }
 
   private readonly onDisconnect = (reason: unknown) => {
     if (this.closed) return;
+    // The room retains the user's desired call across a recoverable reconnect and republishes the
+    // join after the next work-room ACK. Signals from the abandoned socket generation must not.
+    this.cancelPendingVoiceAdmission({
+      emitRemoval: false,
+      preserveIntent: true,
+      sendLeave: false,
+    });
     this.joined = false;
     this.selfConnectionId = null;
     this.pendingPresenceByConnection.clear();
+    this.pendingVoiceByConnection.clear();
+    this.voiceMemberByConnection.clear();
     this.rejectPendingCrdtOperations(createStudioCrdtRetryableError(
       "disconnected",
       "연결이 끊겨 CRDT 작업을 다시 시도해야 합니다.",
@@ -712,11 +998,13 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       isRecord(value) && typeof value.message === "string" && value.message.trim()
         ? value.message.slice(0, 500)
         : "팀 권한이 변경되어 실시간 작업실 연결이 종료되었습니다.";
+    this.terminateVoiceIntent("revoked", message);
     ++this.joinGeneration;
     this.accessRevoked = true;
     this.joined = false;
     this.pendingInitialSnapshot = null;
     this.pendingPresenceByConnection.clear();
+    this.pendingVoiceByConnection.clear();
     this.clearConnectTimeout();
     this.rejectConnect?.(new Error(message));
     this.clearConnectDeferred();
@@ -726,6 +1014,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       "connection"
     ));
     this.emitStatus({ state: "revoked", message, recoverable: false });
+    this.scrubCredentials();
     this.socket.disconnect();
   };
 
@@ -775,9 +1064,19 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
 
   private applyPresenceLeave(connectionId: string): void {
     const participant = this.participants.get(connectionId);
+    const voice = this.voiceMemberByConnection.get(connectionId);
+    const pendingVoice = this.pendingVoiceByConnection.get(connectionId);
     this.participants.delete(connectionId);
     this.shareIdByConnection.delete(connectionId);
+    this.voiceMemberByConnection.delete(connectionId);
+    this.pendingVoiceByConnection.delete(connectionId);
     if (!participant || participant.connectionId === this.selfConnectionId) return;
+    if (
+      voice &&
+      !(pendingVoice?.kind === "update" && pendingVoice.member.callId === voice.callId)
+    ) {
+      this.deliver(participant, "voice:leave", { callId: voice.callId });
+    }
     this.deliver(participant, "presence:leave", {});
   }
 
@@ -790,6 +1089,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       visibility: participant.state === "active" ? "active" : "idle",
       pageId: participant.pageId,
     });
+    this.replayPendingVoiceForParticipant(participant);
   }
 
   private bufferPresenceDelta(delta: PendingPresenceDelta): void {
@@ -811,6 +1111,51 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     if (this.pendingPresenceByConnection.size <= MAX_PENDING_PRESENCE_CONNECTIONS) return;
     const oldest = this.pendingPresenceByConnection.keys().next().value;
     if (typeof oldest === "string") this.pendingPresenceByConnection.delete(oldest);
+  }
+
+  private bufferVoiceDelta(delta: PendingVoiceDelta): void {
+    if (this.closed || this.accessRevoked || !this.socket.connected || this.joinGeneration <= 0) {
+      return;
+    }
+    const connectionId = delta.kind === "update" ? delta.member.connectionId : delta.connectionId;
+    this.pendingVoiceByConnection.delete(connectionId);
+    this.pendingVoiceByConnection.set(connectionId, delta);
+    if (this.pendingVoiceByConnection.size <= MAX_PENDING_VOICE_CONNECTIONS) return;
+    const oldestEntry = this.pendingVoiceByConnection.entries().next().value;
+    if (!oldestEntry) return;
+    const [oldestConnectionId, oldestDelta] = oldestEntry;
+    this.pendingVoiceByConnection.delete(oldestConnectionId);
+    const current = this.voiceMemberByConnection.get(oldestConnectionId);
+    if (
+      oldestDelta.kind === "update" &&
+      !this.participants.has(oldestConnectionId) &&
+      current?.callId === oldestDelta.member.callId
+    ) {
+      this.voiceMemberByConnection.delete(oldestConnectionId);
+    }
+  }
+
+  private replayPendingVoiceForParticipant(participant: ServerParticipant): void {
+    const pending = this.pendingVoiceByConnection.get(participant.connectionId);
+    if (!pending) return;
+    if (pending.kind === "leave") {
+      const current = this.voiceMemberByConnection.get(participant.connectionId);
+      if (current?.callId === pending.callId) {
+        this.voiceMemberByConnection.delete(participant.connectionId);
+      }
+      return;
+    }
+    this.pendingVoiceByConnection.delete(participant.connectionId);
+    const current = this.voiceMemberByConnection.get(participant.connectionId);
+    if (!current || current.callId !== pending.member.callId) return;
+    if (participant.role === "viewer") {
+      this.voiceMemberByConnection.delete(participant.connectionId);
+      return;
+    }
+    this.deliver(participant, "voice:join", {
+      callId: current.callId,
+      muted: current.muted,
+    });
   }
 
   private stagePresenceDelta(delta: PendingPresenceDelta): void {
@@ -990,6 +1335,373 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     }
   };
 
+  private readonly onVoiceSnapshot = (value: unknown) => {
+    if (!isRecord(value) || value.workId !== this.context.workId) return;
+    if (!Array.isArray(value.members)) return;
+    if (value.callId !== undefined && !safeIdentifier(value.callId, 160)) return;
+    const parsed = value.members.map(parseVoiceMember);
+    if (parsed.some((member) => member === null)) return;
+    if (!this.ready || this.pendingInitialSnapshot) {
+      for (const member of parsed as ServerVoiceMember[]) {
+        this.bufferVoiceDelta({ kind: "update", member });
+      }
+      return;
+    }
+    this.applyVoiceSnapshot(
+      parsed as ServerVoiceMember[],
+      typeof value.callId === "string" ? value.callId : undefined
+    );
+  };
+
+  private applyVoiceSnapshot(members: ServerVoiceMember[], scopeCallId?: string): void {
+    const next = new Map(members.map((member) => [member.connectionId, member]));
+    for (const [connectionId, pending] of this.pendingVoiceByConnection) {
+      if (pending.kind === "leave" && next.get(connectionId)?.callId === pending.callId) {
+        next.delete(connectionId);
+      }
+    }
+    const previousByConnection = new Map(this.voiceMemberByConnection);
+    for (const previous of previousByConnection.values()) {
+      const replacement = next.get(previous.connectionId);
+      if (
+        replacement?.callId === previous.callId ||
+        (scopeCallId !== undefined && previous.callId !== scopeCallId)
+      ) {
+        continue;
+      }
+      if (previous.connectionId === this.selfConnectionId) {
+        if (scopeCallId === undefined) this.voiceMemberByConnection.delete(previous.connectionId);
+        continue;
+      }
+      const pending = this.pendingVoiceByConnection.get(previous.connectionId);
+      const wasPending =
+        pending?.kind === "update" && pending.member.callId === previous.callId;
+      const participant = this.remoteParticipant(previous.connectionId);
+      this.voiceMemberByConnection.delete(previous.connectionId);
+      if (pending?.kind === "update" && pending.member.callId === previous.callId) {
+        this.pendingVoiceByConnection.delete(previous.connectionId);
+      }
+      if (!replacement && !participant) {
+        this.bufferVoiceDelta({
+          kind: "leave",
+          connectionId: previous.connectionId,
+          callId: previous.callId,
+        });
+      } else if (participant && participant.role !== "viewer" && !wasPending) {
+        this.deliver(participant, "voice:leave", { callId: previous.callId });
+      }
+    }
+    for (const member of next.values()) {
+      const previous = previousByConnection.get(member.connectionId);
+      const pending = this.pendingVoiceByConnection.get(member.connectionId);
+      const wasPending =
+        pending?.kind === "update" && pending.member.callId === member.callId;
+      if (member.connectionId === this.selfConnectionId) {
+        if (this.pendingVoiceAdmission?.callId === member.callId) {
+          // Gateways publish a self snapshot immediately before invoking the join ACK. The snapshot
+          // is useful for peer discovery, but only the correlated ACK authorizes local signaling.
+          continue;
+        }
+        const authorizedSelf = previousByConnection.get(member.connectionId);
+        if (authorizedSelf?.callId !== member.callId) {
+          if (this.desiredVoiceCallId !== member.callId) {
+            this.bestEffortVoiceLeave(member.callId);
+          }
+          continue;
+        }
+        if (this.desiredVoiceCallId !== member.callId) {
+          this.voiceMemberByConnection.delete(member.connectionId);
+          this.socket.emit("studio:voice:leave", {
+            workId: this.context.workId,
+            callId: member.callId,
+          });
+          continue;
+        }
+        this.voiceMemberByConnection.set(member.connectionId, member);
+        this.pendingVoiceByConnection.delete(member.connectionId);
+        continue;
+      }
+      this.voiceMemberByConnection.set(member.connectionId, member);
+      const participant = this.remoteParticipant(member.connectionId);
+      if (!participant) {
+        this.bufferVoiceDelta({ kind: "update", member });
+        continue;
+      }
+      this.pendingVoiceByConnection.delete(member.connectionId);
+      if (participant.role === "viewer") {
+        this.voiceMemberByConnection.delete(member.connectionId);
+        continue;
+      }
+      if (previous?.callId === member.callId && !wasPending) {
+        if (previous.muted !== member.muted) {
+          this.deliver(participant, "voice:state", {
+            callId: member.callId,
+            muted: member.muted,
+          });
+        }
+        continue;
+      }
+      this.deliver(participant, "voice:join", { callId: member.callId, muted: member.muted });
+    }
+  }
+
+  private readonly onVoiceJoin = (value: unknown) => {
+    const member = parseVoiceMember(value);
+    if (!member) return;
+    if (!this.ready || this.pendingInitialSnapshot) {
+      this.bufferVoiceDelta({ kind: "update", member });
+      return;
+    }
+    if (member.connectionId === this.selfConnectionId) {
+      if (this.pendingVoiceAdmission?.callId === member.callId) return;
+      const authorizedSelf = this.voiceMemberByConnection.get(member.connectionId);
+      if (authorizedSelf?.callId !== member.callId) {
+        if (this.desiredVoiceCallId !== member.callId) this.bestEffortVoiceLeave(member.callId);
+        return;
+      }
+      if (this.desiredVoiceCallId !== member.callId) {
+        this.voiceMemberByConnection.delete(member.connectionId);
+        this.socket.emit("studio:voice:leave", {
+          workId: this.context.workId,
+          callId: member.callId,
+        });
+        return;
+      }
+      this.voiceMemberByConnection.set(member.connectionId, member);
+      this.pendingVoiceByConnection.delete(member.connectionId);
+      return;
+    }
+    const previous = this.voiceMemberByConnection.get(member.connectionId);
+    const pending = this.pendingVoiceByConnection.get(member.connectionId);
+    const participant = this.remoteParticipant(member.connectionId);
+    this.voiceMemberByConnection.set(member.connectionId, member);
+    if (!participant) {
+      this.bufferVoiceDelta({ kind: "update", member });
+      return;
+    }
+    this.pendingVoiceByConnection.delete(member.connectionId);
+    if (participant.role === "viewer") {
+      this.voiceMemberByConnection.delete(member.connectionId);
+      return;
+    }
+    const wasPending =
+      pending?.kind === "update" && pending.member.callId === member.callId;
+    if (previous?.callId === member.callId && !wasPending) {
+      if (previous.muted !== member.muted) {
+        this.deliver(participant, "voice:state", {
+          callId: member.callId,
+          muted: member.muted,
+        });
+      }
+      return;
+    }
+    if (previous && previous.callId !== member.callId) {
+      const previousWasPending =
+        pending?.kind === "update" && pending.member.callId === previous.callId;
+      if (!previousWasPending) {
+        this.deliver(participant, "voice:leave", { callId: previous.callId });
+      }
+    }
+    this.deliver(participant, "voice:join", { callId: member.callId, muted: member.muted });
+  };
+
+  private readonly onVoiceState = (value: unknown) => {
+    const member = parseVoiceMember(value);
+    if (!member) return;
+    if (!this.ready || this.pendingInitialSnapshot) {
+      this.bufferVoiceDelta({ kind: "update", member });
+      return;
+    }
+    const current = this.voiceMemberByConnection.get(member.connectionId);
+    const participant = this.remoteParticipant(member.connectionId);
+    if (!current || current.callId !== member.callId) {
+      if (member.connectionId === this.selfConnectionId) {
+        if (this.pendingVoiceAdmission?.callId === member.callId) return;
+        return;
+      }
+      this.voiceMemberByConnection.set(member.connectionId, member);
+      if (!participant) {
+        this.bufferVoiceDelta({ kind: "update", member });
+        return;
+      }
+      if (participant.role === "viewer") {
+        this.voiceMemberByConnection.delete(member.connectionId);
+        return;
+      }
+      this.pendingVoiceByConnection.delete(member.connectionId);
+      this.deliver(participant, "voice:join", {
+        callId: member.callId,
+        muted: member.muted,
+      });
+      return;
+    }
+    this.voiceMemberByConnection.set(member.connectionId, member);
+    if (member.connectionId === this.selfConnectionId) return;
+    if (!participant) {
+      this.bufferVoiceDelta({ kind: "update", member });
+      return;
+    }
+    const pending = this.pendingVoiceByConnection.get(member.connectionId);
+    this.pendingVoiceByConnection.delete(member.connectionId);
+    if (participant.role === "viewer") {
+      this.voiceMemberByConnection.delete(member.connectionId);
+      return;
+    }
+    if (pending?.kind === "update" && pending.member.callId === member.callId) {
+      this.deliver(participant, "voice:join", { callId: member.callId, muted: member.muted });
+      return;
+    }
+    if (current.muted !== member.muted) {
+      this.deliver(participant, "voice:state", { callId: member.callId, muted: member.muted });
+    }
+  };
+
+  private readonly onVoiceLeave = (value: unknown) => {
+    if (
+      !isRecord(value) ||
+      !safeIdentifier(value.connectionId, 128) ||
+      !safeIdentifier(value.callId, 160)
+    ) return;
+    const pendingSelf = this.pendingVoiceAdmission;
+    if (
+      value.connectionId === this.selfConnectionId &&
+      pendingSelf?.callId === value.callId
+    ) {
+      const serverReason = value.reason;
+      const message = serverReason === "revoked"
+        ? "작품 권한이 변경되어 음성 작업실에서 나갔습니다."
+        : serverReason === "capacity"
+          ? "음성 작업실 정원은 최대 6명입니다."
+          : "서버에서 음성 작업실 참가 상태를 종료했습니다.";
+      this.rejectPendingVoiceAdmission(
+        pendingSelf,
+        message,
+        serverReason === "revoked" ? "revoked" : "rejected"
+      );
+      return;
+    }
+    const current = this.voiceMemberByConnection.get(value.connectionId);
+    if (
+      value.connectionId === this.selfConnectionId &&
+      current?.callId === value.callId
+    ) {
+      this.voiceMemberByConnection.delete(value.connectionId);
+      this.pendingVoiceByConnection.delete(value.connectionId);
+      ++this.voiceIntentGeneration;
+      if (this.desiredVoiceCallId === value.callId) this.desiredVoiceCallId = null;
+      const serverReason = value.reason;
+      const reason = serverReason === "revoked"
+        ? "revoked"
+        : serverReason === "capacity"
+          ? "rejected"
+          : "removed";
+      const message = reason === "revoked"
+        ? "작품 권한이 변경되어 음성 작업실에서 나갔습니다."
+        : reason === "rejected"
+          ? "음성 작업실 정원은 최대 6명입니다."
+          : "서버에서 음성 작업실 참가 상태를 종료했습니다.";
+      this.emitControl({ type: "voice-removed", callId: value.callId, reason, message });
+      return;
+    }
+    if (!this.ready || this.pendingInitialSnapshot) {
+      this.bufferVoiceDelta({
+        kind: "leave",
+        connectionId: value.connectionId,
+        callId: value.callId,
+      });
+      return;
+    }
+    const participant = this.remoteParticipant(value.connectionId);
+    if (current && current.callId !== value.callId) return;
+    const pending = this.pendingVoiceByConnection.get(value.connectionId);
+    const wasPending =
+      pending?.kind === "update" && pending.member.callId === value.callId;
+    if (current) this.voiceMemberByConnection.delete(value.connectionId);
+    if (!participant) {
+      this.bufferVoiceDelta({
+        kind: "leave",
+        connectionId: value.connectionId,
+        callId: value.callId,
+      });
+      return;
+    }
+    if (
+      (pending?.kind === "update" && pending.member.callId === value.callId) ||
+      (pending?.kind === "leave" && pending.callId === value.callId)
+    ) {
+      this.pendingVoiceByConnection.delete(value.connectionId);
+    }
+    if (current && participant.role !== "viewer" && !wasPending) {
+      this.deliver(participant, "voice:leave", { callId: value.callId });
+    }
+  };
+
+  private readonly onVoiceSignal = (value: unknown) => {
+    if (
+      !this.ready ||
+      !isRecord(value) ||
+      !safeIdentifier(value.fromConnectionId, 128) ||
+      !safeIdentifier(value.callId, 160)
+    ) return;
+    const participant = this.remoteParticipant(value.fromConnectionId);
+    const remoteVoice = this.voiceMemberByConnection.get(value.fromConnectionId);
+    const selfVoice = this.selfConnectionId
+      ? this.voiceMemberByConnection.get(this.selfConnectionId)
+      : null;
+    if (
+      !participant ||
+      participant.role === "viewer" ||
+      !remoteVoice ||
+      !selfVoice ||
+      remoteVoice.callId !== value.callId ||
+      selfVoice.callId !== value.callId
+    ) return;
+    if (value.kind === "description" && isRecord(value.description)) {
+      const type = value.description.type;
+      const sdp = value.description.sdp;
+      if ((type !== "offer" && type !== "answer") || !safeSdpString(sdp)) return;
+      this.deliver(
+        participant,
+        "voice:description",
+        { callId: value.callId, type, sdp },
+        this.context.participant.sessionId
+      );
+      return;
+    }
+    if (value.kind !== "candidate" || !isRecord(value.candidate)) return;
+    const candidate = value.candidate;
+    if (
+      !safeString(candidate.candidate, STUDIO_LIVE_ICE_CANDIDATE_MAX_LENGTH) ||
+      !studioLiveStringFitsByteContract(
+        candidate.candidate,
+        STUDIO_LIVE_ICE_CANDIDATE_MAX_LENGTH
+      ) ||
+      !nullableString(candidate.sdpMid ?? null, STUDIO_LIVE_SDP_MID_MAX_LENGTH, true) ||
+      !(
+        candidate.sdpMLineIndex == null ||
+        (typeof candidate.sdpMLineIndex === "number" &&
+          Number.isInteger(candidate.sdpMLineIndex) &&
+          candidate.sdpMLineIndex >= 0 &&
+          candidate.sdpMLineIndex <= 65_535)
+      ) ||
+      !nullableString(
+        candidate.usernameFragment ?? null,
+        STUDIO_LIVE_USERNAME_FRAGMENT_MAX_LENGTH,
+        true
+      )
+    ) return;
+    const payload: StudioLiveVoiceIcePayload = {
+      callId: value.callId,
+      candidate: candidate.candidate,
+      sdpMid: typeof candidate.sdpMid === "string" ? candidate.sdpMid : null,
+      sdpMLineIndex:
+        typeof candidate.sdpMLineIndex === "number" ? candidate.sdpMLineIndex : null,
+      usernameFragment:
+        typeof candidate.usernameFragment === "string" ? candidate.usernameFragment : null,
+    };
+    this.deliver(participant, "voice:ice", payload, this.context.participant.sessionId);
+  };
+
   private readonly onChatMessage = (value: unknown) => {
     if (!this.ready) return;
     if (
@@ -1032,6 +1744,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     const generation = ++this.joinGeneration;
     this.joined = false;
     this.pendingPresenceByConnection.clear();
+    this.pendingVoiceByConnection.clear();
     this.emitStatus({
       state: "connecting",
       message: "작품 팀 권한을 확인하고 있습니다.",
@@ -1083,9 +1796,11 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     const participantsByConnection = new Map(
       snapshot.participants.map((participant) => [participant.connectionId, participant])
     );
+    const departedConnectionIds = new Set<string>();
     for (const delta of this.pendingPresenceByConnection.values()) {
       if (delta.kind === "leave") {
         participantsByConnection.delete(delta.connectionId);
+        departedConnectionIds.add(delta.connectionId);
         continue;
       }
       const previous = participantsByConnection.get(delta.participant.connectionId);
@@ -1093,17 +1808,34 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
         participantsByConnection.set(delta.participant.connectionId, delta.participant);
       }
     }
+    const voiceMembersByConnection = new Map(
+      snapshot.voiceMembers.map((member) => [member.connectionId, member])
+    );
+    for (const delta of this.pendingVoiceByConnection.values()) {
+      if (delta.kind === "leave") {
+        const current = voiceMembersByConnection.get(delta.connectionId);
+        if (current?.callId === delta.callId) voiceMembersByConnection.delete(delta.connectionId);
+        continue;
+      }
+      voiceMembersByConnection.set(delta.member.connectionId, delta.member);
+    }
+    for (const connectionId of departedConnectionIds) {
+      voiceMembersByConnection.delete(connectionId);
+    }
     participantsByConnection.set(snapshot.self.connectionId, snapshot.self);
     this.pendingPresenceByConnection.clear();
+    this.pendingVoiceByConnection.clear();
     return {
       ...snapshot,
       participants: [...participantsByConnection.values()],
+      voiceMembers: [...voiceMembersByConnection.values()],
     };
   }
 
   private failJoin(message: string, recoverable: boolean, code?: string): void {
     this.joined = false;
     this.pendingPresenceByConnection.clear();
+    this.pendingVoiceByConnection.clear();
     const state: StudioLiveTransportStatus["state"] = recoverable ? "error" : "revoked";
     this.emitStatus({ state, message, recoverable } as StudioLiveTransportStatus);
     if (!this.everJoined) {
@@ -1111,6 +1843,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     }
     if (!recoverable || (code && isNonRecoverable(code))) {
       this.accessRevoked = true;
+      this.scrubCredentials();
       this.socket.disconnect();
     }
   }
@@ -1134,13 +1867,28 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       recoverable,
     } as StudioLiveTransportStatus);
     if (!recoverable) {
+      this.terminateVoiceIntent("revoked", failure.message);
       ++this.joinGeneration;
       this.accessRevoked = true;
       this.joined = false;
       this.pendingInitialSnapshot = null;
       this.pendingPresenceByConnection.clear();
+      this.pendingVoiceByConnection.clear();
+      this.scrubCredentials();
       this.socket.disconnect();
     }
+  }
+
+  private scrubCredentials(): void {
+    this.cancelPendingVoiceAdmission({
+      emitRemoval: false,
+      preserveIntent: false,
+      sendLeave: false,
+    });
+    ++this.voiceIntentGeneration;
+    this.desiredVoiceCallId = null;
+    this.socket.auth = {};
+    this.sessionToken = null;
   }
 
   private flushInitialSnapshot(): void {
@@ -1150,14 +1898,19 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     const reconciled = this.reconcilePendingPresence(snapshot);
     this.applyParticipants(reconciled.participants);
     this.applyLockSnapshot(reconciled.locks);
+    this.applyVoiceSnapshot(reconciled.voiceMembers);
   }
 
   private applyParticipants(nextParticipants: ServerParticipant[]): void {
     const next = new Map(nextParticipants.map((participant) => [participant.connectionId, participant]));
     for (const previous of this.participants.values()) {
       if (previous.connectionId === this.selfConnectionId || next.has(previous.connectionId)) continue;
+      const voice = this.voiceMemberByConnection.get(previous.connectionId);
+      if (voice) this.deliver(previous, "voice:leave", { callId: voice.callId });
       this.deliver(previous, "presence:leave", {});
       this.shareIdByConnection.delete(previous.connectionId);
+      this.voiceMemberByConnection.delete(previous.connectionId);
+      this.pendingVoiceByConnection.delete(previous.connectionId);
     }
     this.participants.clear();
     for (const participant of next.values()) this.participants.set(participant.connectionId, participant);
@@ -1167,6 +1920,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
         visibility: participant.state === "active" ? "active" : "idle",
         pageId: participant.pageId,
       });
+      this.replayPendingVoiceForParticipant(participant);
     }
   }
 
@@ -1286,10 +2040,222 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     }
   }
 
+  private isCurrentVoiceAdmission(pending: PendingVoiceAdmission): boolean {
+    return (
+      this.pendingVoiceAdmission === pending &&
+      !this.closed &&
+      this.ready &&
+      pending.joinGeneration === this.joinGeneration &&
+      pending.selfConnectionId === this.selfConnectionId &&
+      pending.intentGeneration === this.voiceIntentGeneration &&
+      pending.callId === this.desiredVoiceCallId
+    );
+  }
+
+  private isAuthorizedVoiceAttempt(pending: PendingVoiceAdmission): boolean {
+    const selfVoice = this.voiceMemberByConnection.get(pending.selfConnectionId);
+    return (
+      !this.closed &&
+      this.ready &&
+      pending.joinGeneration === this.joinGeneration &&
+      pending.selfConnectionId === this.selfConnectionId &&
+      pending.intentGeneration === this.voiceIntentGeneration &&
+      pending.callId === this.desiredVoiceCallId &&
+      selfVoice?.callId === pending.callId
+    );
+  }
+
+  private queuePendingVoiceSignal(
+    pending: PendingVoiceAdmission,
+    signal: PendingVoiceSignal
+  ): boolean {
+    if (!this.isCurrentVoiceAdmission(pending)) return false;
+    if (pending.signals.length >= MAX_PENDING_VOICE_SIGNALS) {
+      this.rejectPendingVoiceAdmission(
+        pending,
+        "음성 연결 신호가 너무 많이 대기해 참가를 안전하게 취소했습니다. 다시 참가해 주세요."
+      );
+      return false;
+    }
+    pending.signals.push(signal);
+    return true;
+  }
+
+  private completePendingVoiceAdmission(
+    pending: PendingVoiceAdmission,
+    value: unknown
+  ): void {
+    if (!this.isCurrentVoiceAdmission(pending)) {
+      this.cancelTimeout(pending.timeout);
+      if (
+        this.desiredVoiceCallId !== pending.callId &&
+        this.voiceMemberByConnection.get(pending.selfConnectionId)?.callId !== pending.callId
+      ) {
+        this.bestEffortVoiceLeave(pending.callId);
+      }
+      return;
+    }
+
+    const failure = parseFailure(value);
+    if (failure) {
+      this.rejectPendingVoiceAdmission(pending, failure.message);
+      this.handleFailure(failure, "operation");
+      return;
+    }
+    if (!isRecord(value) || value.ok !== true || !isRecord(value.data)) {
+      const message = "팀 서버의 음성 참가 응답을 확인하지 못했습니다.";
+      this.rejectPendingVoiceAdmission(pending, message);
+      this.emitStatus({ state: "error", message, recoverable: true });
+      return;
+    }
+    let ackMembers: ServerVoiceMember[] | null = [];
+    if (value.data.members !== undefined) {
+      if (!Array.isArray(value.data.members)) {
+        ackMembers = null;
+      } else {
+        const parsed = value.data.members.map(parseVoiceMember);
+        ackMembers = parsed.some((member) => member === null)
+          ? null
+          : parsed as ServerVoiceMember[];
+      }
+    }
+    if (!ackMembers) {
+      const message = "팀 서버의 음성 참가자 목록이 올바르지 않습니다.";
+      this.rejectPendingVoiceAdmission(pending, message);
+      this.emitStatus({ state: "error", message, recoverable: true });
+      return;
+    }
+
+    this.cancelTimeout(pending.timeout);
+    this.pendingVoiceAdmission = null;
+    this.voiceMemberByConnection.set(pending.selfConnectionId, {
+      connectionId: pending.selfConnectionId,
+      callId: pending.callId,
+      muted: pending.muted,
+    });
+    if (ackMembers.length > 0) this.applyVoiceSnapshot(ackMembers, pending.callId);
+    // The admission ACK can describe the mute bit supplied with the original join request while a
+    // newer local toggle was queued. Keep the latest local intent, then publish it authoritatively.
+    this.voiceMemberByConnection.set(pending.selfConnectionId, {
+      connectionId: pending.selfConnectionId,
+      callId: pending.callId,
+      muted: pending.muted,
+    });
+
+    if (pending.muted !== pending.initialMuted) {
+      this.emitWithAck(
+        "studio:voice:state",
+        {
+          workId: this.context.workId,
+          callId: pending.callId,
+          muted: pending.muted,
+        },
+        undefined,
+        (message) => this.rejectSelfVoice(pending.callId, message)
+      );
+    }
+    if (!this.isAuthorizedVoiceAttempt(pending)) {
+      pending.signals.length = 0;
+      return;
+    }
+    const signals = pending.signals.splice(0);
+    for (const signal of signals) {
+      if (!this.isAuthorizedVoiceAttempt(pending)) break;
+      const targetVoice = this.voiceMemberByConnection.get(signal.targetConnectionId);
+      if (signal.callId !== pending.callId || targetVoice?.callId !== pending.callId) continue;
+      this.emitWithAck("studio:voice:signal", signal.payload);
+    }
+  }
+
+  private rejectPendingVoiceAdmission(
+    pending: PendingVoiceAdmission,
+    message: string,
+    reason: "rejected" | "revoked" | "removed" = "rejected"
+  ): void {
+    if (this.pendingVoiceAdmission !== pending) return;
+    this.cancelTimeout(pending.timeout);
+    this.pendingVoiceAdmission = null;
+    pending.signals.length = 0;
+    ++this.voiceIntentGeneration;
+    if (this.desiredVoiceCallId === pending.callId) this.desiredVoiceCallId = null;
+    if (this.voiceMemberByConnection.get(pending.selfConnectionId)?.callId === pending.callId) {
+      this.voiceMemberByConnection.delete(pending.selfConnectionId);
+    }
+    this.emitControl({
+      type: "voice-removed",
+      callId: pending.callId,
+      reason,
+      message,
+    });
+    this.bestEffortVoiceLeave(pending.callId);
+  }
+
+  private cancelPendingVoiceAdmission(options: {
+    emitRemoval: boolean;
+    preserveIntent: boolean;
+    sendLeave: boolean;
+    reason?: "rejected" | "revoked" | "removed";
+    message?: string;
+  }): void {
+    const pending = this.pendingVoiceAdmission;
+    if (!pending) return;
+    this.cancelTimeout(pending.timeout);
+    this.pendingVoiceAdmission = null;
+    pending.signals.length = 0;
+    ++this.voiceIntentGeneration;
+    if (!options.preserveIntent && this.desiredVoiceCallId === pending.callId) {
+      this.desiredVoiceCallId = null;
+    }
+    if (this.voiceMemberByConnection.get(pending.selfConnectionId)?.callId === pending.callId) {
+      this.voiceMemberByConnection.delete(pending.selfConnectionId);
+    }
+    if (options.emitRemoval) {
+      this.emitControl({
+        type: "voice-removed",
+        callId: pending.callId,
+        reason: options.reason ?? "removed",
+        message: options.message ?? "음성 작업실 참가가 취소되었습니다.",
+      });
+    }
+    if (options.sendLeave) this.bestEffortVoiceLeave(pending.callId);
+  }
+
+  private terminateVoiceIntent(
+    reason: "rejected" | "revoked" | "removed",
+    message: string
+  ): void {
+    const pending = this.pendingVoiceAdmission;
+    const selfConnectionId = this.selfConnectionId;
+    const current = selfConnectionId
+      ? this.voiceMemberByConnection.get(selfConnectionId)
+      : null;
+    const callId = pending?.callId ?? current?.callId ?? this.desiredVoiceCallId;
+    if (pending) {
+      this.cancelPendingVoiceAdmission({
+        emitRemoval: false,
+        preserveIntent: false,
+        sendLeave: false,
+      });
+    } else {
+      ++this.voiceIntentGeneration;
+      this.desiredVoiceCallId = null;
+    }
+    if (selfConnectionId && current) this.voiceMemberByConnection.delete(selfConnectionId);
+    if (!callId) return;
+    this.emitControl({ type: "voice-removed", callId, reason, message });
+    this.bestEffortVoiceLeave(callId);
+  }
+
+  private bestEffortVoiceLeave(callId: string): void {
+    if (!this.socket.connected) return;
+    this.socket.emit("studio:voice:leave", { workId: this.context.workId, callId });
+  }
+
   private emitWithAck(
     event: string,
     payload: Record<string, unknown>,
-    onSuccess?: (data: unknown) => void
+    onSuccess?: (data: unknown) => void,
+    onFailure?: (message: string) => void
   ): void {
     const generation = this.joinGeneration;
     const selfConnectionId = this.selfConnectionId;
@@ -1304,19 +2270,41 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       }
       const failure = parseFailure(value);
       if (failure) {
+        onFailure?.(failure.message);
         this.handleFailure(failure, "operation");
         return;
       }
       if (!isRecord(value) || value.ok !== true) {
+        const message = "팀 서버 응답을 확인하지 못했습니다.";
+        onFailure?.(message);
         this.emitStatus({
           state: "error",
-          message: "팀 서버 응답을 확인하지 못했습니다.",
+          message,
           recoverable: true,
         });
         return;
       }
       onSuccess?.(value.data);
     });
+  }
+
+  private rejectSelfVoice(callId: string, message: string): void {
+    const connectionId = this.selfConnectionId;
+    if (!connectionId) return;
+    const current = this.voiceMemberByConnection.get(connectionId);
+    if (!current || current.callId !== callId) return;
+    ++this.voiceIntentGeneration;
+    if (this.desiredVoiceCallId === callId) this.desiredVoiceCallId = null;
+    this.voiceMemberByConnection.delete(connectionId);
+    this.emitControl({
+      type: "voice-removed",
+      callId,
+      reason: "rejected",
+      message,
+    });
+    // The server may have accepted a membership before a later ACK path failed. Best-effort leave
+    // prevents an adapter-visible ghost while the local fail-safe immediately stops microphone use.
+    this.socket.emit("studio:voice:leave", { workId: this.context.workId, callId });
   }
 
   private emitCrdtWithAck<T>(

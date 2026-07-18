@@ -18,6 +18,11 @@ import {
   type StudioLiveScreenStopPayload,
   type StudioLiveWebRtcDescriptionPayload,
   type StudioLiveWebRtcIcePayload,
+  type StudioLiveVoiceDescriptionPayload,
+  type StudioLiveVoiceIcePayload,
+  type StudioLiveVoiceJoinPayload,
+  type StudioLiveVoiceLeavePayload,
+  type StudioLiveVoiceStatePayload,
 } from "./studio-live-collaboration-protocol";
 import {
   createStudioLocalLiveTransport,
@@ -41,6 +46,7 @@ const DEFAULT_PRESENCE_TTL_MS = 30_000;
 const DEFAULT_LOCK_LEASE_MS = 15_000;
 const DEFAULT_CURSOR_INTERVAL_MS = 40;
 export const STUDIO_LIVE_CHAT_HISTORY_LIMIT = 200;
+export const STUDIO_LIVE_VOICE_MAX_PARTICIPANTS = 6;
 
 type StudioLiveSignalKind =
   | "screen:announce"
@@ -66,6 +72,49 @@ export interface StudioLiveLock {
   owner: StudioLiveParticipant;
   leaseUntil: number;
 }
+
+export interface StudioLiveVoiceMember {
+  participant: StudioLiveParticipant;
+  callId: string;
+  muted: boolean;
+}
+
+export type StudioLiveVoiceEvent =
+  | { type: "presence"; members: StudioLiveVoiceMember[] }
+  | {
+      type: "voice:joined";
+      participant: StudioLiveParticipant;
+      callId: string;
+      muted: boolean;
+    }
+  | {
+      type: "voice:state";
+      participant: StudioLiveParticipant;
+      callId: string;
+      muted: boolean;
+    }
+  | {
+      type: "voice:left";
+      participant: StudioLiveParticipant;
+      callId: string;
+    }
+  | {
+      type: "voice:self-left";
+      callId: string;
+      reason: "rejected" | "revoked" | "removed";
+      message: string;
+    }
+  | {
+      type: "voice:description";
+      participant: StudioLiveParticipant;
+      payload: StudioLiveVoiceDescriptionPayload;
+    }
+  | {
+      type: "voice:ice";
+      participant: StudioLiveParticipant;
+      payload: StudioLiveVoiceIcePayload;
+    }
+  | { type: "terminal"; reason: "revoked" | "closed" | "error"; message?: string };
 
 /** One ephemeral session chat line. History lives only in room memory and dies with the room. */
 export interface StudioLiveChatMessage {
@@ -160,7 +209,9 @@ export class StudioLiveRoom {
   private readonly cursorIntervalMs: number;
   private readonly listeners = new Set<(event: StudioLiveRoomEvent) => void>();
   private readonly crdtListeners = new Set<(event: StudioLiveCrdtRoomEvent) => void>();
+  private readonly voiceListeners = new Set<(event: StudioLiveVoiceEvent) => void>();
   private readonly peers = new Map<string, StudioLivePeer>();
+  private readonly voiceMembers = new Map<string, StudioLiveVoiceMember>();
   private readonly locks = new Map<string, StudioLiveLock>();
   private readonly chatMessages: StudioLiveChatMessage[] = [];
   private readonly lastSequenceBySession = new Map<string, number>();
@@ -238,6 +289,11 @@ export class StudioLiveRoom {
     return () => this.crdtListeners.delete(listener);
   }
 
+  subscribeVoice(listener: (event: StudioLiveVoiceEvent) => void): () => void {
+    this.voiceListeners.add(listener);
+    return () => this.voiceListeners.delete(listener);
+  }
+
   async start(): Promise<void> {
     if (this.phase === "ready") return;
     if (this.phase === "closed") throw new Error("이미 닫힌 공동작업 세션입니다.");
@@ -308,6 +364,16 @@ export class StudioLiveRoom {
       ...message,
       participant: copyParticipant(message.participant),
     }));
+  }
+
+  getVoiceMembers(): StudioLiveVoiceMember[] {
+    return Array.from(this.voiceMembers.values(), (member) => ({
+      ...member,
+      participant: copyParticipant(member.participant),
+    })).sort((left, right) =>
+      left.participant.displayName.localeCompare(right.participant.displayName, "ko-KR") ||
+      left.participant.sessionId.localeCompare(right.participant.sessionId)
+    );
   }
 
   /**
@@ -449,6 +515,79 @@ export class StudioLiveRoom {
     return this.post("webrtc:ice", payload, targetSessionId);
   }
 
+  joinVoice(payload: StudioLiveVoiceJoinPayload): boolean {
+    if (this.participant.role === "viewer") return false;
+    const current = this.voiceMembers.get(this.participant.sessionId);
+    const alreadyJoined = current?.callId === payload.callId;
+    const callSize = [...this.voiceMembers.values()].filter(
+      (member) => member.callId === payload.callId
+    ).length;
+    if (!alreadyJoined && callSize >= STUDIO_LIVE_VOICE_MAX_PARTICIPANTS) return false;
+    this.voiceMembers.set(this.participant.sessionId, {
+      participant: copyParticipant(this.participant),
+      callId: payload.callId,
+      muted: payload.muted,
+    });
+    this.emitVoicePresence();
+    // Install the optimistic local record before sending. A test transport or an in-process socket
+    // adapter may invoke a rejection ACK synchronously; the control-plane rollback must be able to
+    // find and remove this exact attempt. Server media signaling still remains gated by its ACK.
+    if (!this.post("voice:join", payload)) {
+      const optimistic = this.voiceMembers.get(this.participant.sessionId);
+      if (optimistic?.callId === payload.callId) {
+        if (current) this.voiceMembers.set(this.participant.sessionId, current);
+        else this.voiceMembers.delete(this.participant.sessionId);
+        this.emitVoicePresence();
+      }
+      return false;
+    }
+    return this.voiceMembers.get(this.participant.sessionId)?.callId === payload.callId;
+  }
+
+  updateVoiceState(payload: StudioLiveVoiceStatePayload): boolean {
+    if (this.participant.role === "viewer") return false;
+    const current = this.voiceMembers.get(this.participant.sessionId);
+    if (!current || current.callId !== payload.callId) return false;
+    if (!this.post("voice:state", payload)) return false;
+    this.voiceMembers.set(this.participant.sessionId, { ...current, muted: payload.muted });
+    this.emitVoicePresence();
+    return true;
+  }
+
+  leaveVoice(payload: StudioLiveVoiceLeavePayload): boolean {
+    const current = this.voiceMembers.get(this.participant.sessionId);
+    if (!current || current.callId !== payload.callId) return false;
+    if (!this.post("voice:leave", payload)) return false;
+    this.voiceMembers.delete(this.participant.sessionId);
+    this.emitVoicePresence();
+    return true;
+  }
+
+  sendVoiceDescription(
+    targetSessionId: string,
+    payload: StudioLiveVoiceDescriptionPayload
+  ): boolean {
+    if (this.participant.role === "viewer") return false;
+    if (targetSessionId === this.participant.sessionId) return false;
+    const self = this.voiceMembers.get(this.participant.sessionId);
+    const target = this.voiceMembers.get(targetSessionId);
+    if (!self || !target || self.callId !== payload.callId || target.callId !== payload.callId) {
+      return false;
+    }
+    return this.post("voice:description", payload, targetSessionId);
+  }
+
+  sendVoiceIce(targetSessionId: string, payload: StudioLiveVoiceIcePayload): boolean {
+    if (this.participant.role === "viewer") return false;
+    if (targetSessionId === this.participant.sessionId) return false;
+    const self = this.voiceMembers.get(this.participant.sessionId);
+    const target = this.voiceMembers.get(targetSessionId);
+    if (!self || !target || self.callId !== payload.callId || target.callId !== payload.callId) {
+      return false;
+    }
+    return this.post("voice:ice", payload, targetSessionId);
+  }
+
   async requestCrdtSync(request: StudioCrdtSyncRequest): Promise<StudioCrdtSyncResponse | null> {
     if (!this.ready || !this.transport?.requestCrdtSync) {
       throw new Error("CRDT 동기화 전송 계층이 준비되지 않았습니다.");
@@ -490,6 +629,8 @@ export class StudioLiveRoom {
     if (this.phase === "closed") return;
     ++this.connectionGeneration;
     if (this.ready) {
+      const voice = this.voiceMembers.get(this.participant.sessionId);
+      if (voice) this.post("voice:leave", { callId: voice.callId });
       for (const lock of this.locks.values()) {
         if (lock.owner.sessionId !== this.participant.sessionId) continue;
         this.post("lock:release", { resource: lock.resource, claimId: lock.claimId });
@@ -507,12 +648,15 @@ export class StudioLiveRoom {
     this.unsubscribeTransportCrdt = null;
     this.transport?.close();
     this.transport = null;
+    this.emitVoice({ type: "terminal", reason: "closed" });
     this.peers.clear();
+    this.voiceMembers.clear();
     this.locks.clear();
     this.chatMessages.length = 0;
     this.lastSequenceBySession.clear();
     this.listeners.clear();
     this.crdtListeners.clear();
+    this.voiceListeners.clear();
   }
 
   private appendChatMessage(message: StudioLiveChatMessage): void {
@@ -608,6 +752,16 @@ export class StudioLiveRoom {
     if (envelope.kind === "presence:leave") {
       const presenceChanged = this.peers.delete(envelope.sender.sessionId);
       this.lastSequenceBySession.delete(envelope.sender.sessionId);
+      const voiceMember = this.voiceMembers.get(envelope.sender.sessionId);
+      if (voiceMember) {
+        this.voiceMembers.delete(envelope.sender.sessionId);
+        this.emitVoice({
+          type: "voice:left",
+          participant: copyParticipant(voiceMember.participant),
+          callId: voiceMember.callId,
+        });
+        this.emitVoicePresence();
+      }
       let locksChanged = false;
       for (const [resource, lock] of this.locks) {
         if (lock.owner.sessionId !== envelope.sender.sessionId) continue;
@@ -627,6 +781,10 @@ export class StudioLiveRoom {
         // BroadcastChannel does not replay an older tab's hello. Reply immediately so a late joiner
         // discovers every already-open participant without waiting for the next heartbeat tick.
         this.sendPresence("presence:heartbeat");
+        if (this.transport?.mode === "local") {
+          const voice = this.voiceMembers.get(this.participant.sessionId);
+          if (voice) this.post("voice:join", { callId: voice.callId, muted: voice.muted });
+        }
         if (!presenceChanged) this.emitPresence();
         return;
       case "presence:heartbeat":
@@ -669,6 +827,88 @@ export class StudioLiveRoom {
       case "screen:stop":
         this.emit({ type: "signal", envelope: envelope as StudioLiveSignalEnvelope });
         return;
+      case "voice:join": {
+        if (envelope.sender.role === "viewer") return;
+        const payload = envelope.payload as StudioLiveVoiceJoinPayload;
+        const current = this.voiceMembers.get(envelope.sender.sessionId);
+        const callSize = [...this.voiceMembers.values()].filter(
+          (member) => member.callId === payload.callId
+        ).length;
+        if (current?.callId !== payload.callId && callSize >= STUDIO_LIVE_VOICE_MAX_PARTICIPANTS) {
+          return;
+        }
+        this.voiceMembers.set(envelope.sender.sessionId, {
+          participant: copyParticipant(envelope.sender),
+          callId: payload.callId,
+          muted: payload.muted,
+        });
+        this.emitVoice({
+          type: "voice:joined",
+          participant: copyParticipant(envelope.sender),
+          callId: payload.callId,
+          muted: payload.muted,
+        });
+        this.emitVoicePresence();
+        return;
+      }
+      case "voice:state": {
+        if (envelope.sender.role === "viewer") return;
+        const payload = envelope.payload as StudioLiveVoiceStatePayload;
+        const current = this.voiceMembers.get(envelope.sender.sessionId);
+        if (!current || current.callId !== payload.callId) return;
+        this.voiceMembers.set(envelope.sender.sessionId, { ...current, muted: payload.muted });
+        this.emitVoice({
+          type: "voice:state",
+          participant: copyParticipant(envelope.sender),
+          callId: payload.callId,
+          muted: payload.muted,
+        });
+        this.emitVoicePresence();
+        return;
+      }
+      case "voice:leave": {
+        const payload = envelope.payload as StudioLiveVoiceLeavePayload;
+        const current = this.voiceMembers.get(envelope.sender.sessionId);
+        if (!current || current.callId !== payload.callId) return;
+        this.voiceMembers.delete(envelope.sender.sessionId);
+        this.emitVoice({
+          type: "voice:left",
+          participant: copyParticipant(envelope.sender),
+          callId: payload.callId,
+        });
+        this.emitVoicePresence();
+        return;
+      }
+      case "voice:description": {
+        if (envelope.sender.role === "viewer") return;
+        const payload = envelope.payload as StudioLiveVoiceDescriptionPayload;
+        const self = this.voiceMembers.get(this.participant.sessionId);
+        const remote = this.voiceMembers.get(envelope.sender.sessionId);
+        if (!self || !remote || self.callId !== payload.callId || remote.callId !== payload.callId) {
+          return;
+        }
+        this.emitVoice({
+          type: "voice:description",
+          participant: copyParticipant(envelope.sender),
+          payload: { ...payload },
+        });
+        return;
+      }
+      case "voice:ice": {
+        if (envelope.sender.role === "viewer") return;
+        const payload = envelope.payload as StudioLiveVoiceIcePayload;
+        const self = this.voiceMembers.get(this.participant.sessionId);
+        const remote = this.voiceMembers.get(envelope.sender.sessionId);
+        if (!self || !remote || self.callId !== payload.callId || remote.callId !== payload.callId) {
+          return;
+        }
+        this.emitVoice({
+          type: "voice:ice",
+          participant: copyParticipant(envelope.sender),
+          payload: { ...payload },
+        });
+        return;
+      }
     }
   }
 
@@ -684,6 +924,26 @@ export class StudioLiveRoom {
         this.lastSequenceBySession.clear();
         if (hadPeers) this.emitPresence();
         if (hadLocks) this.emitLocks();
+        this.voiceMembers.clear();
+        this.emitVoicePresence();
+        this.emitVoice({
+          type: "terminal",
+          reason: "revoked",
+          message: event.status.message,
+        });
+      } else if (event.status.state === "disconnected") {
+        let changed = false;
+        for (const [sessionId, member] of this.voiceMembers) {
+          if (sessionId === this.participant.sessionId) continue;
+          this.voiceMembers.delete(sessionId);
+          this.emitVoice({
+            type: "voice:left",
+            participant: copyParticipant(member.participant),
+            callId: member.callId,
+          });
+          changed = true;
+        }
+        if (changed) this.emitVoicePresence();
       } else if (
         event.status.state === "ready" &&
         this.phase === "ready" &&
@@ -692,8 +952,23 @@ export class StudioLiveRoom {
         // Reconnect joins start with a fresh server participant. Restore the current page and
         // visibility immediately instead of waiting up to one heartbeat interval.
         this.sendPresence("presence:heartbeat");
+        const voice = this.voiceMembers.get(this.participant.sessionId);
+        if (voice) this.post("voice:join", { callId: voice.callId, muted: voice.muted });
       }
       this.emit({ type: "transport-status", status: event.status });
+      return;
+    }
+    if (event.type === "voice-removed") {
+      const current = this.voiceMembers.get(this.participant.sessionId);
+      if (!current || current.callId !== event.callId) return;
+      this.voiceMembers.delete(this.participant.sessionId);
+      this.emitVoicePresence();
+      this.emitVoice({
+        type: "voice:self-left",
+        callId: event.callId,
+        reason: event.reason,
+        message: event.message,
+      });
       return;
     }
     // Socket ACKs and broadcasts can already be queued when access is revoked or the connection
@@ -779,6 +1054,15 @@ export class StudioLiveRoom {
       if (now - peer.lastSeenAt <= this.presenceTtlMs) continue;
       this.peers.delete(sessionId);
       this.lastSequenceBySession.delete(sessionId);
+      const voiceMember = this.voiceMembers.get(sessionId);
+      if (voiceMember) {
+        this.voiceMembers.delete(sessionId);
+        this.emitVoice({
+          type: "voice:left",
+          participant: copyParticipant(voiceMember.participant),
+          callId: voiceMember.callId,
+        });
+      }
       presenceChanged = true;
     }
     let locksChanged = false;
@@ -789,6 +1073,7 @@ export class StudioLiveRoom {
       locksChanged = true;
     }
     if (presenceChanged) this.emitPresence();
+    if (presenceChanged) this.emitVoicePresence();
     if (locksChanged) this.emitLocks();
   }
 
@@ -798,6 +1083,20 @@ export class StudioLiveRoom {
 
   private emitLocks(): void {
     this.emit({ type: "locks", locks: this.getLocks() });
+  }
+
+  private emitVoicePresence(): void {
+    this.emitVoice({ type: "presence", members: this.getVoiceMembers() });
+  }
+
+  private emitVoice(event: StudioLiveVoiceEvent): void {
+    for (const listener of this.voiceListeners) {
+      try {
+        listener(event);
+      } catch {
+        // One voice controller cannot interrupt room cleanup or other subscribers.
+      }
+    }
   }
 
   private emit(event: StudioLiveRoomEvent): void {

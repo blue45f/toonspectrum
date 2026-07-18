@@ -21,6 +21,7 @@ import {
   useStudioLiveCollaboration,
   type StudioLiveAvailability,
   type StudioLiveRecoveryState,
+  type StudioLiveVoiceContextValue,
 } from "./studio-live-collaboration-context";
 import { STUDIO_LIVE_CHAT_TEXT_MAX_LENGTH } from "./studio-live-collaboration-protocol";
 import {
@@ -37,6 +38,7 @@ import {
   type StudioScreenShareState,
   type StudioScreenShareViewer,
 } from "./studio-screen-share";
+import { StudioVoiceCallPanelSection } from "./StudioVoiceCallControls";
 
 
 import type {
@@ -73,6 +75,7 @@ export interface StudioLiveCollaborationPanelViewProps {
   canChat: boolean;
   chatDraft: string;
   chatNotice: string | null;
+  voice: StudioLiveVoiceContextValue;
   screenState: StudioScreenShareState;
   screenSupported: boolean;
   serverAvailable: boolean;
@@ -142,6 +145,7 @@ export function StudioLiveCollaborationPanelView({
   canChat,
   chatDraft,
   chatNotice,
+  voice,
   screenState,
   screenSupported,
   serverAvailable,
@@ -515,6 +519,20 @@ export function StudioLiveCollaborationPanelView({
           </p>
         ) : null}
       </div>
+
+      <StudioVoiceCallPanelSection
+        ready={ready && voice.ready}
+        supported={voice.supported}
+        allowed={voice.allowed}
+        state={voice.state}
+        error={voice.error}
+        onJoin={voice.join}
+        onLeave={voice.leave}
+        onMutedChange={voice.setMuted}
+        onPushToTalkChange={voice.setPushToTalk}
+        onPushToTalkPressedChange={voice.setPushToTalkPressed}
+        onRetryRemoteAudio={voice.retryRemoteAudio}
+      />
 
       <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
         {screenState.localSharing ? (
@@ -899,6 +917,7 @@ export function StudioLiveCollaborationPanel() {
       chatDraft={chatDraft}
       chatMessages={live.chatMessages}
       chatNotice={chatNotice}
+      voice={live.voice}
       error={screenError ?? live.error}
       syncSnapshot={live.sync}
       recovery={live.recovery}

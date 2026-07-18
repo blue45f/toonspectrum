@@ -36,6 +36,10 @@ interface RoomRecord {
   closeCount: number;
   startCount: number;
   unsubscribeCount: number;
+  voiceSubscribeCount: number;
+  voiceUnsubscribeCount: number;
+  voiceJoinCount: number;
+  voiceLeaveCount: number;
   clearCursorCount: number;
   presenceUpdates: Array<Record<string, unknown>>;
   emit: (event: StudioLiveRoomEvent) => void;
@@ -180,6 +184,11 @@ const recoveryVault = vi.hoisted(() => ({
 }));
 const lifecycle = vi.hoisted(() => ({
   roomStart: "pending" as "pending" | "resolve" | "reject",
+  voiceGetMembersError: null as string | null,
+  voiceMediaStart: "resolve" as "resolve" | "pending",
+  voiceMediaRequestCount: 0,
+  voiceMediaStopCount: 0,
+  voiceMediaResolvers: [] as Array<(stream: MediaStream) => void>,
   bindingStart: "resolve" as "pending" | "resolve" | "reject",
   bindingStartResolvers: [] as Array<() => void>,
   bindingStatusOnStart: null as MockBindingStatus | null,
@@ -236,6 +245,10 @@ vi.mock("./studio-live-collaboration-room", () => {
         closeCount: 0,
         startCount: 0,
         unsubscribeCount: 0,
+        voiceSubscribeCount: 0,
+        voiceUnsubscribeCount: 0,
+        voiceJoinCount: 0,
+        voiceLeaveCount: 0,
         clearCursorCount: 0,
         presenceUpdates: [],
         emit: () => undefined,
@@ -249,6 +262,46 @@ vi.mock("./studio-live-collaboration-room", () => {
         this.record.unsubscribeCount += 1;
         this.record.emit = () => undefined;
       };
+    }
+
+    getVoiceMembers(): [] {
+      if (lifecycle.voiceGetMembersError) {
+        throw new Error(lifecycle.voiceGetMembersError);
+      }
+      return [];
+    }
+
+    subscribeVoice(): () => void {
+      this.record.voiceSubscribeCount += 1;
+      return () => {
+        this.record.voiceUnsubscribeCount += 1;
+      };
+    }
+
+    get participant(): StudioLiveParticipant {
+      return this.record.options.participant;
+    }
+
+    joinVoice(): boolean {
+      this.record.voiceJoinCount += 1;
+      return true;
+    }
+
+    updateVoiceState(): boolean {
+      return true;
+    }
+
+    leaveVoice(): boolean {
+      this.record.voiceLeaveCount += 1;
+      return true;
+    }
+
+    sendVoiceDescription(): boolean {
+      return true;
+    }
+
+    sendVoiceIce(): boolean {
+      return true;
     }
 
     start(): Promise<void> {
@@ -459,6 +512,11 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
   beforeEach(() => {
     rooms.instances.length = 0;
     lifecycle.roomStart = "pending";
+    lifecycle.voiceGetMembersError = null;
+    lifecycle.voiceMediaStart = "resolve";
+    lifecycle.voiceMediaRequestCount = 0;
+    lifecycle.voiceMediaStopCount = 0;
+    lifecycle.voiceMediaResolvers.length = 0;
     lifecycle.bindingStart = "resolve";
     lifecycle.bindingStartResolvers.length = 0;
     lifecycle.bindingStatusOnStart = null;
@@ -468,23 +526,143 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
     recoveryVault.entries.length = 0;
     recoveryVault.listCount = 0;
     recoveryVault.emptyReadsBeforeVisible = 0;
+    const track = {
+      kind: "audio",
+      readyState: "live",
+      enabled: true,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      stop: () => {
+        lifecycle.voiceMediaStopCount += 1;
+      },
+    } as unknown as MediaStreamTrack;
+    const stream = {
+      getAudioTracks: () => [track],
+      getTracks: () => [track],
+    } as unknown as MediaStream;
+    vi.stubGlobal("navigator", {
+      mediaDevices: {
+        getUserMedia: () => {
+          lifecycle.voiceMediaRequestCount += 1;
+          if (lifecycle.voiceMediaStart === "resolve") return Promise.resolve(stream);
+          return new Promise<MediaStream>((resolve) => {
+            lifecycle.voiceMediaResolvers.push(resolve);
+          });
+        },
+      },
+    });
+    vi.stubGlobal("RTCPeerConnection", class MockPeerConnection {});
   });
 
   afterEach(() => {
     hooks.reset();
+    vi.unstubAllGlobals();
   });
 
-  it("keeps the room alive when presentation children such as the team panel change", () => {
+  it("loads voice only after explicit join and keeps it alive when presentation children change", async () => {
+    lifecycle.roomStart = "resolve";
     const onRoomChange = vi.fn();
-    renderProvider({ children: "team-panel-open", onRoomChange });
+    let live = renderProvider({ children: "team-panel-open", onRoomChange });
     const room = rooms.instances[0];
+    await vi.waitFor(() => {
+      live = renderProvider({ children: "team-panel-open", onRoomChange });
+      expect(live.availability).toBe("ready");
+    });
+    expect(live.voice.ready).toBe(true);
+    expect(room.voiceSubscribeCount).toBe(0);
+    expect(lifecycle.voiceMediaRequestCount).toBe(0);
+
+    await expect(live.voice.join()).resolves.toBe(true);
+    await vi.waitFor(() => expect(room.voiceSubscribeCount).toBe(1));
+    expect(room.voiceJoinCount).toBe(1);
+    expect(lifecycle.voiceMediaRequestCount).toBe(1);
 
     renderProvider({ children: "team-panel-closed", onRoomChange });
 
     expect(rooms.instances).toHaveLength(1);
     expect(room.closeCount).toBe(0);
     expect(room.startCount).toBe(1);
+    expect(room.voiceSubscribeCount).toBe(1);
+    expect(room.voiceUnsubscribeCount).toBe(0);
     expect(onRoomChange).toHaveBeenCalledTimes(1);
+  });
+
+  it("contains lazy voice initialization failures and keeps the room usable", async () => {
+    lifecycle.roomStart = "resolve";
+    lifecycle.voiceGetMembersError = "voice constructor failed";
+    let live = renderProvider();
+    await vi.waitFor(() => {
+      live = renderProvider();
+      expect(live.availability).toBe("ready");
+    });
+    expect(live.voice.error).toBeNull();
+    expect(rooms.instances[0].voiceSubscribeCount).toBe(0);
+
+    await expect(live.voice.join()).resolves.toBe(false);
+    live = renderProvider();
+
+    expect(live.voice.error).toContain("voice constructor failed");
+    expect(live.voice.ready).toBe(true);
+    expect(live.voice.state.phase).toBe("idle");
+    expect(rooms.instances).toHaveLength(1);
+    expect(rooms.instances[0].closeCount).toBe(0);
+    expect(rooms.instances[0].voiceSubscribeCount).toBe(0);
+    expect(lifecycle.voiceMediaRequestCount).toBe(0);
+  });
+
+  it("does not load voice or request media in an unsupported browser", async () => {
+    lifecycle.roomStart = "resolve";
+    vi.stubGlobal("navigator", { mediaDevices: {} });
+    vi.stubGlobal("RTCPeerConnection", undefined);
+    let live = renderProvider();
+    await vi.waitFor(() => {
+      live = renderProvider();
+      expect(live.availability).toBe("ready");
+    });
+
+    expect(live.voice.supported).toBe(false);
+    expect(live.voice.ready).toBe(false);
+    await expect(live.voice.join()).resolves.toBe(false);
+    expect(rooms.instances[0].voiceSubscribeCount).toBe(0);
+    expect(lifecycle.voiceMediaRequestCount).toBe(0);
+  });
+
+  it("invalidates a pending first join when work and role scope change", async () => {
+    lifecycle.roomStart = "resolve";
+    lifecycle.voiceMediaStart = "pending";
+    let live = renderProvider();
+    await vi.waitFor(() => {
+      live = renderProvider();
+      expect(live.availability).toBe("ready");
+    });
+    const firstRoom = rooms.instances[0];
+    const joining = live.voice.join();
+    await vi.waitFor(() => {
+      expect(firstRoom.voiceSubscribeCount).toBe(1);
+      expect(lifecycle.voiceMediaResolvers).toHaveLength(1);
+    });
+
+    renderProvider({ workId: "work-b", participant: { displayName: "열람자", role: "viewer" } });
+    const stopLateTrack = vi.fn();
+    const lateTrack = {
+      kind: "audio",
+      readyState: "live",
+      enabled: true,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      stop: stopLateTrack,
+    } as unknown as MediaStreamTrack;
+    const lateStream = {
+      getAudioTracks: () => [lateTrack],
+      getTracks: () => [lateTrack],
+    } as unknown as MediaStream;
+    lifecycle.voiceMediaResolvers[0]?.(lateStream);
+
+    await expect(joining).resolves.toBe(false);
+    expect(stopLateTrack).toHaveBeenCalledTimes(1);
+    expect(firstRoom.voiceUnsubscribeCount).toBe(1);
+    expect(firstRoom.voiceJoinCount).toBe(0);
+    expect(rooms.instances[1]?.voiceSubscribeCount).toBe(0);
   });
 
   it("closes the previous room when the work or authorized participant changes", () => {
@@ -608,15 +786,23 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
     expect(rooms.instances[1]?.options.workId).toBe("work-b");
   });
 
-  it("unsubscribes, closes, and clears the exposed room on unmount", () => {
+  it("unsubscribes, closes, and clears the exposed room and voice controller on unmount", async () => {
+    lifecycle.roomStart = "resolve";
     const onRoomChange = vi.fn();
-    renderProvider({ onRoomChange });
+    let live = renderProvider({ onRoomChange });
     const room = rooms.instances[0];
+    await vi.waitFor(() => {
+      live = renderProvider({ onRoomChange });
+      expect(live.availability).toBe("ready");
+    });
+    await expect(live.voice.join()).resolves.toBe(true);
+    await vi.waitFor(() => expect(room.voiceSubscribeCount).toBe(1));
 
     hooks.unmount();
 
     expect(room.unsubscribeCount).toBe(1);
-    expect(room.closeCount).toBe(1);
+    expect(room.voiceUnsubscribeCount).toBe(1);
+    await vi.waitFor(() => expect(room.closeCount).toBe(1));
     expect(onRoomChange).toHaveBeenLastCalledWith(null);
   });
 

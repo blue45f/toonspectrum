@@ -28,6 +28,13 @@ import {
   type StudioCrdtSyncTelemetry,
   type StudioLivePersistenceDurability,
 } from "./studio-live-sync-safety";
+import {
+  createEmptyStudioVoiceCallState,
+  isStudioVoiceCallSupported,
+  studioVoiceCallErrorMessage,
+  type StudioVoiceCallEvent,
+  type StudioVoiceCallState,
+} from "./studio-voice-call-model";
 
 import type { StudioCrdtDocument } from "./studio-crdt-document";
 import type { StudioCrdtRecoveryVaultEntry } from "./studio-crdt-recovery-vault";
@@ -36,6 +43,7 @@ import type {
   StudioCrdtBindingStatus,
   StudioCrdtRoomBinding,
 } from "./studio-crdt-room-binding";
+import type { StudioVoiceCallController } from "./studio-voice-call";
 
 export type StudioCrdtAuthoritativeSaveBarrier = (
   timeoutMs?: number
@@ -107,6 +115,27 @@ interface StudioLiveRevocationBoundaryLatch {
   scopeKey: string;
   mode: StudioLiveTransportMode;
   message: string;
+}
+
+interface StudioVoiceErrorScope {
+  code: Extract<StudioVoiceCallEvent, { type: "error" }>["code"] | "action";
+  participantSessionId: string | null;
+}
+
+interface StudioVoiceControllerScope {
+  generation: number;
+  room: StudioLiveRoom;
+}
+
+interface StudioVoiceControllerBinding {
+  scope: StudioVoiceControllerScope;
+  controller: StudioVoiceCallController;
+  unsubscribe: () => void;
+}
+
+interface StudioVoiceControllerLoad {
+  scope: StudioVoiceControllerScope;
+  promise: Promise<StudioVoiceCallController | null>;
 }
 
 const RECOVERY_VAULT_REHYDRATION_INITIAL_DELAY_MS = 50;
@@ -198,6 +227,15 @@ export function StudioLiveCollaborationProvider({
   const [peers, setPeers] = useState<StudioLivePeer[]>([]);
   const [locks, setLocks] = useState<StudioLiveLock[]>([]);
   const [chatMessages, setChatMessages] = useState<StudioLiveChatMessage[]>([]);
+  const [voiceState, setVoiceState] = useState<StudioVoiceCallState>(() =>
+    createEmptyStudioVoiceCallState()
+  );
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const voiceErrorScopeRef = useRef<StudioVoiceErrorScope | null>(null);
+  const voiceControllerBindingRef = useRef<StudioVoiceControllerBinding | null>(null);
+  const voiceControllerLoadRef = useRef<StudioVoiceControllerLoad | null>(null);
+  const voiceControllerScopeRef = useRef<StudioVoiceControllerScope | null>(null);
+  const voiceControllerGenerationRef = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [localFallbackAllowed, setLocalFallbackAllowed] = useState(true);
   const [transportPreference, setTransportPreference] = useState<"server" | "local">(
@@ -223,6 +261,8 @@ export function StudioLiveCollaborationProvider({
   const participantName = participant?.displayName ?? null;
   const participantRole = participant?.role ?? null;
   const participantCanEdit = canParticipantEdit(participantRole);
+  const participantCanVoice = participantRole !== null && participantRole !== "viewer";
+  const voiceSupported = isStudioVoiceCallSupported();
   const recoveryBoundaryScopeKey = workId
     ? JSON.stringify([outboxScope || null, workId])
     : null;
@@ -729,6 +769,101 @@ export function StudioLiveCollaborationProvider({
     }
   }, [currentPageId, currentTool, room]);
 
+  // Voice belongs to the authenticated room lifecycle, not to the team panel lifecycle. The heavy
+  // WebRTC controller is intentionally not imported here: the first explicit join action is its
+  // only load boundary. Work navigation, unsupported runtimes and ACL changes invalidate that
+  // boundary before any late import can construct a controller or request the microphone.
+  useEffect(() => {
+    const generation = ++voiceControllerGenerationRef.current;
+    const scope = room && participantCanVoice && voiceSupported
+      ? { generation, room }
+      : null;
+    voiceControllerScopeRef.current = scope;
+    voiceControllerLoadRef.current = null;
+    const previous = voiceControllerBindingRef.current;
+    voiceControllerBindingRef.current = null;
+    previous?.unsubscribe();
+    previous?.controller.close();
+    setVoiceState(createEmptyStudioVoiceCallState());
+    setVoiceError(null);
+    voiceErrorScopeRef.current = null;
+
+    return () => {
+      if (voiceControllerScopeRef.current === scope) {
+        voiceControllerScopeRef.current = null;
+      }
+      if (voiceControllerLoadRef.current?.scope === scope) {
+        voiceControllerLoadRef.current = null;
+      }
+      const current = voiceControllerBindingRef.current;
+      if (current?.scope === scope) {
+        voiceControllerBindingRef.current = null;
+        current.unsubscribe();
+        current.controller.close();
+      }
+    };
+  }, [participantCanVoice, room, voiceSupported]);
+
+  const ensureVoiceController = (
+    scope: StudioVoiceControllerScope
+  ): Promise<StudioVoiceCallController | null> => {
+    const current = voiceControllerBindingRef.current;
+    if (current?.scope === scope) return Promise.resolve(current.controller);
+    const loading = voiceControllerLoadRef.current;
+    if (loading?.scope === scope) return loading.promise;
+
+    const promise = import("./studio-voice-call")
+      .then(({ StudioVoiceCallController: VoiceController }) => {
+        if (voiceControllerScopeRef.current !== scope) return null;
+        const controller = new VoiceController(scope.room);
+        if (voiceControllerScopeRef.current !== scope) {
+          controller.close();
+          return null;
+        }
+        const binding: StudioVoiceControllerBinding = {
+          scope,
+          controller,
+          unsubscribe: () => undefined,
+        };
+        binding.unsubscribe = controller.subscribe((event) => {
+          if (voiceControllerBindingRef.current !== binding) return;
+          if (event.type === "state") {
+            setVoiceState(event.state);
+            const issue = voiceErrorScopeRef.current;
+            if (issue?.participantSessionId) {
+              const remote = event.state.participants.find(
+                ({ participant: remoteParticipant }) =>
+                  remoteParticipant.sessionId === issue.participantSessionId
+              );
+              const resolved =
+                !remote ||
+                (issue.code === "autoplay" && remote.autoplay !== "blocked") ||
+                (issue.code === "connection" && remote.connection === "live");
+              if (resolved) {
+                voiceErrorScopeRef.current = null;
+                setVoiceError(null);
+              }
+            }
+            return;
+          }
+          voiceErrorScopeRef.current = {
+            code: event.code,
+            participantSessionId: event.participant?.sessionId ?? null,
+          };
+          setVoiceError(event.message);
+        });
+        voiceControllerBindingRef.current = binding;
+        return controller;
+      })
+      .finally(() => {
+        if (voiceControllerLoadRef.current?.scope === scope) {
+          voiceControllerLoadRef.current = null;
+        }
+      });
+    voiceControllerLoadRef.current = { scope, promise };
+    return promise;
+  };
+
   // State updates from the previous room can survive for one render while React tears that room
   // down. Never project those guarantees onto a different work id.
   const scopedOperationSyncReady = Boolean(
@@ -825,6 +960,87 @@ export function StudioLiveCollaborationProvider({
         setError(messageFrom(cause, "채팅 메시지를 보내지 못했습니다."));
         return false;
       }
+    },
+    voice: {
+      supported: voiceSupported,
+      ready: Boolean(room && participantCanVoice && voiceSupported),
+      allowed: participantCanVoice,
+      state: voiceState,
+      error: voiceError,
+      join: async (options) => {
+        const scope = voiceControllerScopeRef.current;
+        if (!participantCanVoice || !voiceSupported || !room || scope?.room !== room) {
+          voiceErrorScopeRef.current = { code: "action", participantSessionId: null };
+          setVoiceError(
+            !participantCanVoice
+              ? "열람자 권한에서는 음성 작업실에 참여할 수 없습니다."
+              : !voiceSupported
+                ? "이 브라우저는 마이크 WebRTC 음성 작업실을 지원하지 않습니다."
+                : "팀 작업실 연결이 준비되지 않았습니다."
+          );
+          return false;
+        }
+        voiceErrorScopeRef.current = null;
+        setVoiceError(null);
+        setVoiceState((previous) =>
+          previous.phase === "idle" ? { ...previous, phase: "joining" } : previous
+        );
+        try {
+          const controller = await ensureVoiceController(scope);
+          if (!controller || voiceControllerScopeRef.current !== scope) return false;
+          await controller.join(options);
+          return voiceControllerBindingRef.current?.controller === controller;
+        } catch (cause) {
+          if (voiceControllerScopeRef.current === scope) {
+            const current = voiceControllerBindingRef.current;
+            setVoiceState(current?.scope === scope
+              ? current.controller.getState()
+              : createEmptyStudioVoiceCallState());
+            voiceErrorScopeRef.current = { code: "action", participantSessionId: null };
+            setVoiceError(studioVoiceCallErrorMessage(cause));
+          }
+          return false;
+        }
+      },
+      leave: () => {
+        voiceErrorScopeRef.current = null;
+        setVoiceError(null);
+        voiceControllerBindingRef.current?.controller.leave();
+      },
+      setMuted: (muted) => {
+        const changed = voiceControllerBindingRef.current?.controller.setMuted(muted) ?? false;
+        if (changed) {
+          voiceErrorScopeRef.current = null;
+          setVoiceError(null);
+        }
+        return changed;
+      },
+      setPushToTalk: (enabled) => {
+        const changed =
+          voiceControllerBindingRef.current?.controller.setPushToTalk(enabled) ?? false;
+        if (changed) {
+          voiceErrorScopeRef.current = null;
+          setVoiceError(null);
+        }
+        return changed;
+      },
+      setPushToTalkPressed: (pressed) =>
+        voiceControllerBindingRef.current?.controller.setPushToTalkPressed(pressed) ?? false,
+      retryRemoteAudio: async (sessionId) => {
+        const controller = voiceControllerBindingRef.current?.controller;
+        if (!controller) return false;
+        voiceErrorScopeRef.current = null;
+        setVoiceError(null);
+        try {
+          return await controller.retryRemoteAudio(sessionId);
+        } catch (cause) {
+          if (voiceControllerBindingRef.current?.controller === controller) {
+            voiceErrorScopeRef.current = { code: "action", participantSessionId: sessionId };
+            setVoiceError(studioVoiceCallErrorMessage(cause));
+          }
+          return false;
+        }
+      },
     },
     sync: syncSnapshot,
     recovery,

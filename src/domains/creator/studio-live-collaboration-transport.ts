@@ -45,7 +45,13 @@ export type StudioLiveAuthoritativeLockEvent =
 
 export type StudioLiveTransportControlEvent =
   | { type: "status"; status: StudioLiveTransportStatus }
-  | { type: "lock"; lock: StudioLiveAuthoritativeLockEvent };
+  | { type: "lock"; lock: StudioLiveAuthoritativeLockEvent }
+  | {
+      type: "voice-removed";
+      callId: string;
+      reason: "rejected" | "revoked" | "removed";
+      message: string;
+    };
 
 /**
  * Transport-neutral ephemeral message surface. A server implementation must fail closed until its

@@ -4,6 +4,10 @@ import {
   INITIAL_STUDIO_LIVE_SYNC_SNAPSHOT,
   type StudioLiveSyncSnapshot,
 } from "./studio-live-sync-safety";
+import {
+  createEmptyStudioVoiceCallState,
+  type StudioVoiceCallState,
+} from "./studio-voice-call-model";
 
 import type {
   StudioLiveChatMessage,
@@ -23,6 +27,23 @@ export interface StudioLiveRecoveryState {
   message: string;
 }
 
+export interface StudioLiveVoiceContextValue {
+  /** The current room can initialize voice; the controller itself loads only on explicit join(). */
+  ready: boolean;
+  /** Runtime support only. Microphone permission is requested exclusively by join(). */
+  supported: boolean;
+  /** Viewer roles fail closed; commenter/editor/admin/owner may explicitly join. */
+  allowed: boolean;
+  state: StudioVoiceCallState;
+  error: string | null;
+  join: (options?: { muted?: boolean }) => Promise<boolean>;
+  leave: () => void;
+  setMuted: (muted: boolean) => boolean;
+  setPushToTalk: (enabled: boolean) => boolean;
+  setPushToTalkPressed: (pressed: boolean) => boolean;
+  retryRemoteAudio: (sessionId: string) => Promise<boolean>;
+}
+
 export interface StudioLiveCollaborationContextValue {
   room: StudioLiveRoom | null;
   availability: StudioLiveAvailability;
@@ -37,6 +58,7 @@ export interface StudioLiveCollaborationContextValue {
   localFallbackAllowed: boolean;
   usingLocalFallback: boolean;
   sendChatMessage: (text: string) => boolean;
+  voice: StudioLiveVoiceContextValue;
   /** Structured, fail-closed durability state for always-visible editor chrome. */
   sync: StudioLiveSyncSnapshot;
   recovery: StudioLiveRecoveryState | null;
@@ -59,6 +81,19 @@ export const EMPTY_STUDIO_LIVE_CONTEXT: StudioLiveCollaborationContextValue = {
   localFallbackAllowed: false,
   usingLocalFallback: false,
   sendChatMessage: () => false,
+  voice: {
+    ready: false,
+    supported: false,
+    allowed: false,
+    state: createEmptyStudioVoiceCallState(),
+    error: null,
+    join: async () => false,
+    leave: () => undefined,
+    setMuted: () => false,
+    setPushToTalk: () => false,
+    setPushToTalkPressed: () => false,
+    retryRemoteAudio: async () => false,
+  },
   sync: INITIAL_STUDIO_LIVE_SYNC_SNAPSHOT,
   recovery: null,
   exportRecovery: async () => undefined,
