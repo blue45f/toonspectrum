@@ -248,6 +248,10 @@ import {
   calculateStudioBg3dThreeWorldDeltaTransform,
 } from "./studio-bg3d-three-hierarchy";
 import {
+  createStudioBg3dThreeStaticInstanceBatch,
+  type StudioBg3dThreeInstancingSuccess,
+} from "./studio-bg3d-three-instancing";
+import {
   createStudioBg3dThreeWebglCaptureAdapter,
   registerStudioBg3dCaptureExcludedObject,
 } from "./studio-bg3d-three-webgl-capture";
@@ -1329,7 +1333,10 @@ interface BgCustomModelMeshProps {
   registerRef: (id: string, obj: THREE.Group | null) => void;
   registerAnimationTime: (id: string, reader: (() => number) | null) => void;
   onAnimationComplete: (id: string, timeSeconds: number) => void;
-  onCloneStatus: (id: string, ok: boolean) => void;
+  onCloneStatus: (
+    ids: readonly string[],
+    status: "pending" | "ready" | "failed",
+  ) => void;
   children?: React.ReactNode;
 }
 
@@ -1368,8 +1375,8 @@ function BgCustomModelMesh({ instance, cachedRoot, animations, selected, capturi
   useEffect(() => {
     let active = true;
     setEditableClone(null);
+    onCloneStatusRef.current([instance.id], "pending");
     if (!cachedRoot) {
-      onCloneStatusRef.current(instance.id, false);
       return () => {
         active = false;
       };
@@ -1381,14 +1388,15 @@ function BgCustomModelMesh({ instance, cachedRoot, animations, selected, capturi
           return;
         }
         setEditableClone(next);
-        onCloneStatusRef.current(instance.id, true);
+        onCloneStatusRef.current([instance.id], "ready");
       })
       .catch(() => {
         if (!active) return;
-        onCloneStatusRef.current(instance.id, false);
+        onCloneStatusRef.current([instance.id], "failed");
       });
     return () => {
       active = false;
+      onCloneStatusRef.current([instance.id], "pending");
     };
   }, [cachedRoot, instance.id]);
 
@@ -1567,6 +1575,69 @@ function BgCustomModelMesh({ instance, cachedRoot, animations, selected, capturi
   );
 }
 
+function BgCustomModelInstanceBatch({
+  batchKey,
+  sourceRoot,
+  instances,
+  onSelect,
+  onCloneStatus,
+  onUnavailable,
+}: {
+  batchKey: string;
+  sourceRoot: THREE.Object3D;
+  instances: readonly BgCustomModelInstance[];
+  onSelect: (id: string, isMulti: boolean) => void;
+  onCloneStatus: (
+    ids: readonly string[],
+    status: "pending" | "ready" | "failed",
+  ) => void;
+  onUnavailable: () => void;
+}) {
+  const instancesRef = useRef(instances);
+  instancesRef.current = instances;
+  const [batch, setBatch] = useState<StudioBg3dThreeInstancingSuccess | null>(null);
+  const cloneStatus = useEffectEvent(onCloneStatus);
+  const unavailable = useEffectEvent(onUnavailable);
+  useEffect(() => {
+    const currentInstances = instancesRef.current;
+    const instanceIds = currentInstances.map((instance) => instance.id);
+    cloneStatus(instanceIds, "pending");
+    const result = createStudioBg3dThreeStaticInstanceBatch(
+      sourceRoot,
+      currentInstances.map((instance) => ({
+        id: instance.id,
+        position: instance.position,
+        rotation: instance.rotation,
+        scale: instance.scale,
+      })),
+    );
+    if (!result.ok) {
+      setBatch(null);
+      unavailable();
+      return;
+    }
+    setBatch(result);
+    cloneStatus(instanceIds, "ready");
+    return () => {
+      result.dispose();
+      cloneStatus(instanceIds, "pending");
+    };
+  }, [batchKey, sourceRoot]);
+  if (!batch) return null;
+  return (
+    <primitive
+      object={batch.root}
+      dispose={null}
+      onClick={(event: { stopPropagation(): void; instanceId?: number; shiftKey: boolean; metaKey: boolean; ctrlKey: boolean }) => {
+        const id = batch.resolveInstanceId(event.instanceId);
+        if (!id) return;
+        event.stopPropagation();
+        onSelect(id, event.shiftKey || event.metaKey || event.ctrlKey);
+      }}
+    />
+  );
+}
+
 function Vec3Field({
   label,
   values,
@@ -1719,6 +1790,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     const [sceneRecoveryError, setSceneRecoveryError] = useState<string | null>(null);
   const [failedCloneIds, setFailedCloneIds] = useState<Set<string>>(() => new Set());
   const [readyCloneIds, setReadyCloneIds] = useState<Set<string>>(() => new Set());
+  const [unbatchableModelIds, setUnbatchableModelIds] = useState<Set<string>>(() => new Set());
   const [sceneBaseDocument, setSceneBaseDocument] = useState<StudioBg3dSceneDocument>(
     () => canonicalSceneDocument(initialScene) ?? DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT
   );
@@ -3411,23 +3483,70 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
       return next;
     });
   };
-  const updateModelCloneStatus = (id: string, ok: boolean) => {
+  const updateModelCloneStatuses = (
+    ids: readonly string[],
+    status: "pending" | "ready" | "failed",
+  ) => {
     setReadyCloneIds((previous) => {
       const next = new Set(previous);
-      if (ok) next.add(id);
-      else next.delete(id);
+      for (const id of ids) {
+        if (status === "ready") next.add(id);
+        else next.delete(id);
+      }
       return next;
     });
     setFailedCloneIds((previous) => {
       const next = new Set(previous);
-      if (ok) next.delete(id);
-      else next.add(id);
+      for (const id of ids) {
+        if (status === "failed") next.add(id);
+        else next.delete(id);
+      }
       return next;
     });
   };
   const primitiveById = new Map(primitives.map((primitive) => [primitive.id, primitive] as const));
   const customModelById = new Map(customModels.map((model) => [model.id, model] as const));
+  const batchCandidatesByModelId = new Map<string, BgCustomModelInstance[]>();
+  for (const model of customModels) {
+    const cacheEntry = modelRootCacheRef.current.get(model.modelId);
+    if (
+      !cacheEntry || unbatchableModelIds.has(model.modelId) || !isBgObjectVisible(model) ||
+      selectedIds.has(model.id) || (sceneHierarchy.parentById.get(model.id) ?? null) !== null ||
+      (sceneHierarchy.childrenByParent.get(model.id)?.length ?? 0) > 0 ||
+      model.materialOverride !== undefined || model.animation !== undefined || model.pose !== undefined ||
+      model.morph !== undefined || model.constraints !== undefined ||
+      cacheEntry.metrics.skins > 0 || cacheEntry.metrics.morphTargets > 0 || cacheEntry.metrics.lights > 0 ||
+      model.scale.some((component) => component <= 0)
+    ) continue;
+    const candidates = batchCandidatesByModelId.get(model.modelId) ?? [];
+    candidates.push(model);
+    batchCandidatesByModelId.set(model.modelId, candidates);
+  }
+  const staticModelBatches: {
+    readonly key: string;
+    readonly modelId: string;
+    readonly sourceRoot: THREE.Object3D;
+    readonly instances: readonly BgCustomModelInstance[];
+  }[] = [];
+  const batchedNodeIds = new Set<string>();
+  for (const [modelId, candidates] of batchCandidatesByModelId) {
+    const sourceRoot = modelRootCacheRef.current.get(modelId)?.root;
+    if (!sourceRoot) continue;
+    for (let offset = 0; offset < candidates.length; offset += 1_024) {
+      const instances = candidates.slice(offset, offset + 1_024);
+      if (instances.length < 3) continue;
+      const key = instances.map((instance) => [
+        instance.id,
+        ...instance.position,
+        ...instance.rotation,
+        ...instance.scale,
+      ].join(":")).join("|");
+      staticModelBatches.push({ key, modelId, sourceRoot, instances });
+      for (const instance of instances) batchedNodeIds.add(instance.id);
+    }
+  }
   const renderSceneEntity = (id: string): React.ReactNode => {
+    if (batchedNodeIds.has(id)) return null;
     const children = (sceneHierarchy.childrenByParent.get(id) ?? []).map(renderSceneEntity);
     const primitive = primitiveById.get(id);
     if (primitive) {
@@ -3462,7 +3581,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
         registerRef={registerPrimitiveRef}
         registerAnimationTime={registerModelAnimationTime}
         onAnimationComplete={finishModelAnimation}
-        onCloneStatus={updateModelCloneStatus}
+        onCloneStatus={updateModelCloneStatuses}
       >
         {children}
       </BgCustomModelMesh>
@@ -3508,6 +3627,19 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
         shadow-mapSize-width={deviceQuality.shadowMapSize || 1024}
       />
       <BgGroundHelper visible={!lineArtPreview && !isCapturing} />
+      {staticModelBatches.map((batch) => (
+        <BgCustomModelInstanceBatch
+          key={`${batch.modelId}:${batch.key}`}
+          batchKey={batch.key}
+          sourceRoot={batch.sourceRoot}
+          instances={batch.instances}
+          onSelect={selectSceneEntity}
+          onCloneStatus={updateModelCloneStatuses}
+          onUnavailable={() => {
+            setUnbatchableModelIds((current) => new Set(current).add(batch.modelId));
+          }}
+        />
+      ))}
       {sceneHierarchy.roots.map(renderSceneEntity)}
       {!isCapturing &&
       firstSelectedId &&

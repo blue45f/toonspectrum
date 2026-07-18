@@ -58,9 +58,22 @@
   동안 governor를 정지한다. 캡처는 요청 크기의 별도 render target이므로 export 해상도는 유지된다.
 - device `lodBias`는 이제 거리 기반 animation CPU LOD에도 반영되어 모바일/저품질 프로필이 far/very
   far sampling rate로 더 일찍 전환하고, 음수 bias는 근거리 full-rate 영역을 넓힌다.
+- 정적 모델 instancing: 같은 verified model을 3개 이상 반복 배치하면 안전 조건을 통과한 source mesh마다
+  하나의 Three `InstancedMesh`로 묶는다. skin/morph, line/point/light, transparent/custom shader,
+  custom render hook, LOD, per-instance material/animation/pose/constraint, hierarchy child, mirrored/sheared
+  transform은 자동 제외한다. instance index는 원래 SceneDocument node id로 역매핑되므로 클릭 시 해당
+  항목만 개별 scene graph로 되돌아와 편집된다. 배치/개별 클론 전환 동안에는 해당 항목을 pending으로
+  두어 캡처를 막는다. instance buffer만 batch가 dispose하고 geometry/material/texture는 기존 검증 cache가
+  계속 소유한다.
 - WebGPU lab: GPUDevice를 만들지 않는 보수적 capability/limit probe와 완전 지연
   `three/webgpu` renderer factory를 별도 Canvas 계약으로 구현했다. 현재 WebGL 편집 Canvas를 소유하거나
   자동 교체하지 않는다.
+- 물리 specialist DTO: static/dynamic/kinematic body, box/sphere/capsule/convex/triangle-mesh collider,
+  질량·마찰·반발·감쇠·solver substep, hull vertex/mesh triangle, 전체 body-substep과 narrow-phase 작업량을
+  엔진 중립 예산으로 제한한다. dynamic triangle mesh, 잠긴/parented/자식을 가진 dynamic body는 거부하고,
+  검증된 collider metadata가 없는 model은 bounded AABB로 폴백한다. Babylon/향후 Rapier가 반환한 결과는
+  원래 world의 dynamic root에 속하는 정규화된 position과 quaternion만 받아 canonical SceneDocument
+  transform patch로 다시 검증한 뒤 적용할 수 있다.
 
 ## 엔진 및 프레임워크 비교
 
@@ -144,8 +157,8 @@
   Worker로 제한하며 CSP가 blob Worker를 막으면 비동기 WASM 경로로 안전하게 폴백한다.
 - KTX2/BasisU·Draco: transcoder/decoder asset 무결성, Worker 수명주기, 디코딩 메모리·시간 예산을
   먼저 만든 뒤 canonical allowlist에 추가한다.
-- LOD/instance: geometry 공유와 정적 root matrix 고정은 구현 완료. 다음은 안전한 반복 객체만 묶는
-  instancing(비애니메이션·비skin/morph·동일 material), 저작 LOD attachment와 카메라 투영 크기 전환이다.
+- LOD/instance: geometry 공유, 정적 root matrix 고정, 안전한 반복 model instancing은 구현 완료.
+  다음은 저작 LOD attachment와 카메라 투영 크기 전환이다.
 - WebGPU: Three WebGPURenderer 격리 lab/probe는 구현했다. 다음 게이트는 feature flag UI와 동일
   SceneDocument·capture golden 실기기 비교이며, 통과 전에는 기본 편집기를 교체하지 않는다.
 - animation/rig: clip layer, pose/morph, IK, retarget, root motion, constraints를 문서 레이어로 확장.
