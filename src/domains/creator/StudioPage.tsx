@@ -99,6 +99,12 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { ClipMaskGroup } from "./ClipMaskGroup";
 import { studioCreationLinkParams } from "./creator-studio-links";
+import {
+  applyStudioBg3dInsertResult,
+  applyStudioVrmInsertResult,
+  type StudioBg3dInsertHandler,
+  type StudioVrmInsertHandler,
+} from "./studio-3d-insert-controller";
 import { studioAdjustmentStackToFilterFields } from "./studio-adjustment-stack";
 import {
   runStudioAdvancedFillInBrowser,
@@ -495,6 +501,7 @@ import {
   isStudioEditorMutationContinuationAllowed,
   isStudioSourceHydrationPending,
   studioEditorInstanceKey,
+  type StudioEditorMutationTicket,
 } from "./studio-editor-scope";
 import {
   loadStudioEffectFavoriteState,
@@ -4607,7 +4614,7 @@ function StudioCuttoonEditor() {
   const documentRevalidateAbortRef = useRef<AbortController | null>(null);
   const serverRevisionAbortRef = useRef<AbortController | null>(null);
   const previousMutationScopeRef = useRef(JSON.stringify([studioAuthUserId, workId]));
-  function captureStudioMutationTicket() {
+  function captureStudioMutationTicket(): StudioEditorMutationTicket {
     const current = collaborationAccessRef.current;
     return {
       authScopeKey: current.authScopeKey,
@@ -4617,7 +4624,7 @@ function StudioCuttoonEditor() {
     };
   }
   function canApplyStudioMutation(
-    ticket: ReturnType<typeof captureStudioMutationTicket>,
+    ticket: StudioEditorMutationTicket,
     options: { allowDuringSave?: boolean } = {}
   ): boolean {
     const current = collaborationAccessRef.current;
@@ -6832,8 +6839,8 @@ function StudioCuttoonEditor() {
     undefined
   );
   const [bg3dInitialElementId, setBg3dInitialElementId] = useState<string | undefined>(undefined);
-  const poserMutationTicketRef = useRef<ReturnType<typeof captureStudioMutationTicket> | null>(null);
-  const bg3dMutationTicketRef = useRef<ReturnType<typeof captureStudioMutationTicket> | null>(null);
+  const poserMutationTicketRef = useRef<StudioEditorMutationTicket | null>(null);
+  const bg3dMutationTicketRef = useRef<StudioEditorMutationTicket | null>(null);
   useEffect(() => {
     poserMutationTicketRef.current = poserVrmOpen ? captureStudioMutationTicket() : null;
   }, [poserVrmOpen]);
@@ -12968,10 +12975,11 @@ function StudioCuttoonEditor() {
     }));
     updateActivePage({ animTimeline: setKeyframe(animTimeline, trackId, frameIndex, { id: uid(), src }) });
   }
-  function addEl(el: El) {
-    commit([...elements, el]);
+  function addEl(el: El): boolean {
+    if (!commit([...elements, el])) return false;
     setSelectedId(el.id);
     setTool("select");
+    return true;
   }
   // ── 레이어 그룹(폴더) ─────────────────────────────────────────────────────
   // 그룹 목록·요소 groupId를 한 번에 커밋(원자적). seedElId가 있으면 새 그룹에 그 요소를 넣는다.
@@ -13362,7 +13370,7 @@ function StudioCuttoonEditor() {
     aiProvenance?: StudioPublishAiProvenance,
     isAnimatedGif = false,
     elementPatch?: Partial<ImageEl> & { name?: string }
-  ) {
+  ): boolean {
     setError(null);
     const element = createCanvasImageElement({
         id: uid(),
@@ -13372,7 +13380,7 @@ function StudioCuttoonEditor() {
         sourceWidth: width,
         sourceHeight: height,
       });
-    addEl({
+    return addEl({
       ...element,
       ...(aiProvenance ? { aiProvenance } : {}),
       ...(isAnimatedGif ? { isAnimatedGif: true } : {}),
@@ -13403,7 +13411,7 @@ function StudioCuttoonEditor() {
           setError("잠긴 레이어예요. 레이어 잠금을 해제한 뒤 3D 장면을 다시 적용해 주세요.");
           return false;
         }
-        patchEl(targetElementId, {
+        if (!patchEl(targetElementId, {
           src: result.compositePngDataUrl,
           height: Math.max(1, Math.round(target.width * (result.height / result.width))),
           bg3dScene: result.bg3dScene,
@@ -13411,7 +13419,7 @@ function StudioCuttoonEditor() {
           bg3dLtRole: undefined,
           bg3dLtRenderMode: undefined,
           name: "3D LT 배경 · 병합",
-        });
+        })) return false;
       } else {
         const masterImage = createCanvasImageElement({
           id: uid(),
@@ -13421,7 +13429,11 @@ function StudioCuttoonEditor() {
           sourceWidth: result.width,
           sourceHeight: result.height,
         });
-        addEl({ ...masterImage, name: "3D LT 배경 · 병합", bg3dScene: result.bg3dScene });
+        if (!addEl({
+          ...masterImage,
+          name: "3D LT 배경 · 병합",
+          bg3dScene: result.bg3dScene,
+        })) return false;
       }
       return true;
     }
@@ -13456,7 +13468,7 @@ function StudioCuttoonEditor() {
       setError(plan.message);
       return false;
     }
-    commit(plan.nextElements, { groups: plan.nextGroups });
+    if (!commit(plan.nextElements, { groups: plan.nextGroups })) return false;
     setSelectedId(plan.anchorElementId);
     setTool("select");
 
@@ -24542,14 +24554,11 @@ function StudioCuttoonEditor() {
 
   const studioLazyPanelStackHandlers = useStudioStableHandlers<StudioLazyPanelStackHandlers>({
     addPage,
-    addRenderedImage,
     applyStudioCommentsPanelChange,
     markAllStudioCommentThreadsRead,
     markStudioCommentThreadRead,
-    applyBg3dRenderedImage,
     applyWriterRoomAiReview,
     applyWriterRoomCanvasPlan,
-    canApplyStudioMutation,
     cancelAutoAction,
     cancelWriterRoomAi,
     changeAutoActionScope,
@@ -24569,6 +24578,29 @@ function StudioCuttoonEditor() {
     handleTimelapseRecordingEnd,
     handleTimelapseRecordingStart,
     importAutoActionJson,
+    insertBg3dResult: (result) => applyStudioBg3dInsertResult({
+      result,
+      mutationTicket: bg3dMutationTicketRef.current,
+      admitMutation: canApplyStudioMutation,
+      targetElementId: bg3dInitialElementId,
+      applyRenderedImage: applyBg3dRenderedImage,
+    }),
+    insertVrmResult: (result) => applyStudioVrmInsertResult({
+      result,
+      mutationTicket: poserMutationTicketRef.current,
+      admitMutation: canApplyStudioMutation,
+      targetElementId: poserInitialElementId,
+      resolveTarget: (elementId) => elementById.get(elementId),
+      patchTarget: (elementId, patch) => patchEl(elementId, patch),
+      appendImage: ({ src, width, height, elementPatch }) => addRenderedImage(
+        src,
+        width,
+        height,
+        undefined,
+        false,
+        elementPatch
+      ),
+    }),
     onApplyScenarioPreview,
     onCancelScenario,
     onChangeScenarioScene,
@@ -24578,7 +24610,6 @@ function StudioCuttoonEditor() {
     onRegenerateScenarioImage,
     onRemoveScenarioScene,
     onScenarioApplyTargetChange,
-    patchEl,
     patchPageReview,
     planAutoAction,
     rememberColor,
@@ -26200,9 +26231,7 @@ function StudioCuttoonEditor() {
           autoActionsOpen={autoActionsOpen}
           autoActionStatus={autoActionStatus}
           bg3dInitialDataUrl={bg3dInitialDataUrl}
-          bg3dInitialElementId={bg3dInitialElementId}
           bg3dInitialScene={bg3dInitialScene}
-          bg3dMutationTicketRef={bg3dMutationTicketRef}
           bg3dOpen={bg3dOpen}
           characterBible={characterBible}
           characterBibleOpen={characterBibleOpen}
@@ -26242,7 +26271,6 @@ function StudioCuttoonEditor() {
           pagesHistory={pagesHistory}
           poserInitialDataUrl={poserInitialDataUrl}
           poserInitialElementId={poserInitialElementId}
-          poserMutationTicketRef={poserMutationTicketRef}
           poserVrmOpen={poserVrmOpen}
           productionInsightsOpen={productionInsightsOpen}
           productionInsightsResult={productionInsightsResult}
@@ -29663,21 +29691,11 @@ const StudioMenubarContent = memo(function StudioMenubarContent({
 
 interface StudioLazyPanelStackHandlers {
   addPage: () => void;
-  addRenderedImage: (
-    src: string,
-    width: number,
-    height: number,
-    aiProvenance?: StudioPublishAiProvenance,
-    isAnimatedGif?: boolean,
-    elementPatch?: Partial<ImageEl> & { name?: string }
-  ) => void;
   applyStudioCommentsPanelChange: (value: StudioCommentsDocument) => Promise<boolean>;
   markAllStudioCommentThreadsRead: () => Promise<boolean>;
   markStudioCommentThreadRead: (threadId: string) => Promise<boolean>;
-  applyBg3dRenderedImage: (result: StudioBackground3DInsertResult, targetElementId?: string) => boolean;
   applyWriterRoomAiReview: () => void;
   applyWriterRoomCanvasPlan: () => void;
-  canApplyStudioMutation: (ticket: ReturnType<() => { authScopeKey: string | null; workId: string | null; accessGeneration: number; documentGeneration: number; }>, options?: { allowDuringSave?: boolean; }) => boolean;
   cancelAutoAction: () => void;
   cancelWriterRoomAi: () => void;
   captureTimelapseStep: (historyIndex: number, targetWidth: number) => Promise<MotionCutImage>;
@@ -29699,6 +29717,8 @@ interface StudioLazyPanelStackHandlers {
   handleTimelapseRecordingEnd: () => void;
   handleTimelapseRecordingStart: () => void;
   importAutoActionJson: (json: string, fileName: string) => Promise<void>;
+  insertBg3dResult: StudioBg3dInsertHandler;
+  insertVrmResult: StudioVrmInsertHandler;
   onApplyScenarioPreview: () => void;
   onCancelScenario: () => void;
   onChangeScenarioScene: (index: number, patch: { beatType?: ScenarioBeatType; summary?: string; imagePrompt?: string; dialogue?: string; continuity?: ScenarioPreviewItem["continuity"]; }) => void;
@@ -29708,7 +29728,6 @@ interface StudioLazyPanelStackHandlers {
   onRegenerateScenarioImage: (index: number) => void;
   onRemoveScenarioScene: (index: number) => void;
   onScenarioApplyTargetChange: (target: "current-page" | "new-page") => void;
-  patchEl: (id: string, patch: Partial<El>) => void;
   patchPageReview: (pageId: string, patch: Partial<Omit<PageReviewState, "updatedAt">>) => void;
   planAutoAction: () => Promise<void>;
   reloadServerRevisions: () => Promise<void>;
@@ -29750,9 +29769,7 @@ interface StudioLazyPanelStackProps {
   autoActionsOpen: boolean;
   autoActionStatus: string | null;
   bg3dInitialDataUrl: string | undefined;
-  bg3dInitialElementId: string | undefined;
   bg3dInitialScene: StudioBg3dSceneDocument | undefined;
-  bg3dMutationTicketRef: import("react").RefObject<{ authScopeKey: string | null; workId: string | null; accessGeneration: number; documentGeneration: number; } | null>;
   bg3dOpen: boolean;
   characterBible: { version: 1; characters: { id: string; name: string; role: string; appearance: string; costume: string; colors: string[]; voice: string; goal: string; relationships: string[]; props: string[]; lockedFields: ("name" | "colors" | "relationships" | "props" | "role" | "appearance" | "costume" | "voice" | "goal")[]; }[]; };
   characterBibleOpen: boolean;
@@ -29792,7 +29809,6 @@ interface StudioLazyPanelStackProps {
   pagesHistory: PageState[][];
   poserInitialDataUrl: string | undefined;
   poserInitialElementId: string | undefined;
-  poserMutationTicketRef: import("react").RefObject<{ authScopeKey: string | null; workId: string | null; accessGeneration: number; documentGeneration: number; } | null>;
   poserVrmOpen: boolean;
   productionInsightsOpen: boolean;
   productionInsightsResult: import("./studio-production-insights").StudioProductionInsights | null;
@@ -29915,9 +29931,7 @@ const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
   autoActionsOpen,
   autoActionStatus,
   bg3dInitialDataUrl,
-  bg3dInitialElementId,
   bg3dInitialScene,
-  bg3dMutationTicketRef,
   bg3dOpen,
   characterBible,
   characterBibleOpen,
@@ -29957,7 +29971,6 @@ const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
   pagesHistory,
   poserInitialDataUrl,
   poserInitialElementId,
-  poserMutationTicketRef,
   poserVrmOpen,
   productionInsightsOpen,
   productionInsightsResult,
@@ -30065,14 +30078,11 @@ const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
 }: StudioLazyPanelStackProps) {
   const {
     addPage,
-    addRenderedImage,
     applyStudioCommentsPanelChange,
     markAllStudioCommentThreadsRead,
     markStudioCommentThreadRead,
-    applyBg3dRenderedImage,
     applyWriterRoomAiReview,
     applyWriterRoomCanvasPlan,
-    canApplyStudioMutation,
     cancelAutoAction,
     cancelWriterRoomAi,
     changeAutoActionScope,
@@ -30092,6 +30102,8 @@ const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
     handleTimelapseRecordingEnd,
     handleTimelapseRecordingStart,
     importAutoActionJson,
+    insertBg3dResult,
+    insertVrmResult,
     onApplyScenarioPreview,
     onCancelScenario,
     onChangeScenarioScene,
@@ -30101,7 +30113,6 @@ const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
     onRegenerateScenarioImage,
     onRemoveScenarioScene,
     onScenarioApplyTargetChange,
-    patchEl,
     patchPageReview,
     planAutoAction,
     rememberColor,
@@ -30161,31 +30172,7 @@ const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
               setPoserInitialDataUrl(undefined);
               setPoserInitialElementId(undefined);
             }}
-            onInsert={({ pngDataUrl, width, height, scene }) => {
-              const mutationTicket = poserMutationTicketRef.current;
-              if (!mutationTicket || !canApplyStudioMutation(mutationTicket)) return false;
-              if (poserInitialElementId) {
-                const targetEl = elementById.get(poserInitialElementId);
-                if (!targetEl || targetEl.type !== "image") return false;
-                const targetWidth = targetEl.width;
-                const targetHeight = Math.round(targetWidth * (height / width));
-                patchEl(poserInitialElementId, {
-                  src: pngDataUrl,
-                  height: targetHeight,
-                  vrmScene: scene,
-                });
-              } else {
-                addRenderedImage(
-                  pngDataUrl,
-                  width,
-                  height,
-                  undefined,
-                  false,
-                  { vrmScene: scene, name: "3D 데생 인형" }
-                );
-              }
-              return true;
-            }}
+            onInsert={insertVrmResult}
           />
         ) : null}
       </Suspense>
@@ -30202,11 +30189,7 @@ const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
               setBg3dInitialScene(undefined);
               setBg3dInitialElementId(undefined);
             }}
-            onInsert={(result) => {
-              const mutationTicket = bg3dMutationTicketRef.current;
-              if (!mutationTicket || !canApplyStudioMutation(mutationTicket)) return false;
-              return applyBg3dRenderedImage(result, bg3dInitialElementId);
-            }}
+            onInsert={insertBg3dResult}
           />
         ) : null}
       </Suspense>

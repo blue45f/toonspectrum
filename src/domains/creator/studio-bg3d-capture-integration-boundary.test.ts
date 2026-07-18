@@ -106,10 +106,10 @@ describe("Studio 3D asynchronous capture integration boundary", () => {
 
     expect(modalStart).toBeGreaterThanOrEqual(0);
     expect(modalEnd).toBeGreaterThan(modalStart);
-    expect(modal).toContain(
-      "if (!mutationTicket || !canApplyStudioMutation(mutationTicket)) return false;"
+    expect(studioPageSource).toContain(
+      "insertBg3dResult: (result) => applyStudioBg3dInsertResult({"
     );
-    expect(modal).toContain("return applyBg3dRenderedImage(result, bg3dInitialElementId);");
+    expect(modal).toContain("onInsert={insertBg3dResult}");
 
     const handleStart = background3dSource.indexOf("async function handleInsert()");
     const handleEnd = background3dSource.indexOf("// 선택된 것이 도형", handleStart);

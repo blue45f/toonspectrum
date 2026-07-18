@@ -1,0 +1,252 @@
+import { describe, expect, it, vi } from "vitest";
+
+import {
+  applyStudioBg3dInsertResult,
+  applyStudioVrmInsertResult,
+  type ApplyStudioVrmInsertResultInput,
+} from "./studio-3d-insert-controller";
+
+import type { StudioEditorMutationTicket } from "./studio-editor-scope";
+import type { StudioBackground3DInsertResult } from "./StudioBackground3D";
+import type { StudioVrmPoserInsertResult } from "./StudioVrmPoser";
+
+const mutationTicket: StudioEditorMutationTicket = {
+  authScopeKey: "artist-1",
+  workId: "work-1",
+  accessGeneration: 2,
+  documentGeneration: 3,
+};
+
+const vrmScene = { version: 1 } as StudioVrmPoserInsertResult["scene"];
+const vrmResult: StudioVrmPoserInsertResult = {
+  pngDataUrl: "data:image/png;base64,vrm",
+  width: 200,
+  height: 100,
+  scene: vrmScene,
+};
+
+const bg3dResult = {
+  kind: "separated",
+  width: 800,
+  height: 600,
+  layers: [],
+  compositePngDataUrl: "data:image/png;base64,bg3d",
+  perspectiveGuides: [],
+  bg3dScene: {},
+} as unknown as StudioBackground3DInsertResult;
+
+function vrmInput(
+  overrides: Partial<ApplyStudioVrmInsertResultInput> = {}
+): ApplyStudioVrmInsertResultInput {
+  return {
+    result: vrmResult,
+    mutationTicket,
+    admitMutation: vi.fn(() => true),
+    resolveTarget: vi.fn(() => undefined),
+    patchTarget: vi.fn(() => true),
+    appendImage: vi.fn(() => true),
+    ...overrides,
+  };
+}
+
+describe("studio 3D insert controller", () => {
+  describe("VRM insertion", () => {
+    it("rejects a missing ticket before admission or document effects", () => {
+      const admitMutation = vi.fn(() => true);
+      const resolveTarget = vi.fn();
+      const patchTarget = vi.fn(() => true);
+      const appendImage = vi.fn(() => true);
+
+      expect(applyStudioVrmInsertResult(vrmInput({
+        mutationTicket: null,
+        admitMutation,
+        targetElementId: "image-1",
+        resolveTarget,
+        patchTarget,
+        appendImage,
+      }))).toBe(false);
+      expect(admitMutation).not.toHaveBeenCalled();
+      expect(resolveTarget).not.toHaveBeenCalled();
+      expect(patchTarget).not.toHaveBeenCalled();
+      expect(appendImage).not.toHaveBeenCalled();
+    });
+
+    it("rejects failed admission before resolving or mutating a target", () => {
+      const order: string[] = [];
+      const admitMutation = vi.fn(() => {
+        order.push("admit");
+        return false;
+      });
+      const resolveTarget = vi.fn(() => {
+        order.push("resolve");
+        return { type: "image", width: 100 };
+      });
+      const patchTarget = vi.fn(() => true);
+      const appendImage = vi.fn(() => true);
+
+      expect(applyStudioVrmInsertResult(vrmInput({
+        admitMutation,
+        targetElementId: "image-1",
+        resolveTarget,
+        patchTarget,
+        appendImage,
+      }))).toBe(false);
+      expect(admitMutation).toHaveBeenCalledOnce();
+      expect(admitMutation).toHaveBeenCalledWith(mutationTicket);
+      expect(order).toEqual(["admit"]);
+      expect(patchTarget).not.toHaveBeenCalled();
+      expect(appendImage).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [0, 100],
+      [-1, 100],
+      [Number.NaN, 100],
+      [Number.POSITIVE_INFINITY, 100],
+      [200, 0],
+      [200, -1],
+      [200, Number.NaN],
+      [200, Number.POSITIVE_INFINITY],
+    ])("rejects invalid capture dimensions %s × %s", (width, height) => {
+      const patchTarget = vi.fn(() => true);
+      const appendImage = vi.fn(() => true);
+
+      expect(applyStudioVrmInsertResult(vrmInput({
+        result: { ...vrmResult, width, height },
+        targetElementId: "image-1",
+        resolveTarget: vi.fn(() => ({ type: "image", width: 320 })),
+        patchTarget,
+        appendImage,
+      }))).toBe(false);
+      expect(patchTarget).not.toHaveBeenCalled();
+      expect(appendImage).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [undefined],
+      [null],
+      [{ type: "text", width: 320 }],
+      [{ type: "image" }],
+      [{ type: "image", width: 0 }],
+      [{ type: "image", width: Number.NaN }],
+    ])("rejects an invalid replacement target %#", (target) => {
+      const patchTarget = vi.fn(() => true);
+      const appendImage = vi.fn(() => true);
+
+      expect(applyStudioVrmInsertResult(vrmInput({
+        targetElementId: "image-1",
+        resolveTarget: vi.fn(() => target),
+        patchTarget,
+        appendImage,
+      }))).toBe(false);
+      expect(patchTarget).not.toHaveBeenCalled();
+      expect(appendImage).not.toHaveBeenCalled();
+    });
+
+    it("patches a valid image with its existing width and exact capture aspect ratio", () => {
+      const patchTarget = vi.fn(() => true);
+      const appendImage = vi.fn(() => true);
+
+      expect(applyStudioVrmInsertResult(vrmInput({
+        targetElementId: "image-1",
+        resolveTarget: vi.fn(() => ({ type: "image", width: 333 })),
+        patchTarget,
+        appendImage,
+      }))).toBe(true);
+      expect(patchTarget).toHaveBeenCalledOnce();
+      expect(patchTarget).toHaveBeenCalledWith("image-1", {
+        src: vrmResult.pngDataUrl,
+        height: 167,
+        vrmScene,
+      });
+      expect(appendImage).not.toHaveBeenCalled();
+    });
+
+    it("propagates a target patch rejection without reporting insertion success", () => {
+      expect(applyStudioVrmInsertResult(vrmInput({
+        targetElementId: "image-1",
+        resolveTarget: vi.fn(() => ({ type: "image", width: 320 })),
+        patchTarget: vi.fn(() => false),
+      }))).toBe(false);
+    });
+
+    it("clamps an extreme replacement aspect ratio to one canvas pixel", () => {
+      const patchTarget = vi.fn(() => true);
+
+      expect(applyStudioVrmInsertResult(vrmInput({
+        result: { ...vrmResult, width: 1_000, height: 1 },
+        targetElementId: "image-1",
+        resolveTarget: vi.fn(() => ({ type: "image", width: 1 })),
+        patchTarget,
+      }))).toBe(true);
+      expect(patchTarget).toHaveBeenCalledWith("image-1", {
+        src: vrmResult.pngDataUrl,
+        height: 1,
+        vrmScene,
+      });
+    });
+
+    it("appends a new image with the editable scene and product label", () => {
+      const appendImage = vi.fn(() => true);
+
+      expect(applyStudioVrmInsertResult(vrmInput({ appendImage }))).toBe(true);
+      expect(appendImage).toHaveBeenCalledOnce();
+      expect(appendImage).toHaveBeenCalledWith({
+        src: vrmResult.pngDataUrl,
+        width: vrmResult.width,
+        height: vrmResult.height,
+        elementPatch: {
+          vrmScene,
+          name: "3D 데생 인형",
+        },
+      });
+    });
+
+    it("propagates a new-image append rejection", () => {
+      expect(applyStudioVrmInsertResult(vrmInput({
+        appendImage: vi.fn(() => false),
+      }))).toBe(false);
+    });
+  });
+
+  describe("background 3D insertion", () => {
+    it("rejects missing or obsolete tickets before applying the rendered image", () => {
+      const admitMutation = vi.fn(() => false);
+      const applyRenderedImage = vi.fn(() => true);
+
+      expect(applyStudioBg3dInsertResult({
+        result: bg3dResult,
+        mutationTicket: null,
+        admitMutation,
+        applyRenderedImage,
+      })).toBe(false);
+      expect(admitMutation).not.toHaveBeenCalled();
+
+      expect(applyStudioBg3dInsertResult({
+        result: bg3dResult,
+        mutationTicket,
+        admitMutation,
+        applyRenderedImage,
+      })).toBe(false);
+      expect(admitMutation).toHaveBeenCalledOnce();
+      expect(applyRenderedImage).not.toHaveBeenCalled();
+    });
+
+    it.each([true, false])(
+      "propagates rendered-image result %s with the exact target",
+      (accepted) => {
+        const applyRenderedImage = vi.fn(() => accepted);
+
+        expect(applyStudioBg3dInsertResult({
+          result: bg3dResult,
+          mutationTicket,
+          admitMutation: vi.fn(() => true),
+          targetElementId: "background-1",
+          applyRenderedImage,
+        })).toBe(accepted);
+        expect(applyRenderedImage).toHaveBeenCalledOnce();
+        expect(applyRenderedImage).toHaveBeenCalledWith(bg3dResult, "background-1");
+      }
+    );
+  });
+});

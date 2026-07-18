@@ -56,9 +56,10 @@ describe("Studio VRM visual pose bone boundary", () => {
     expect(source).toContain("pngDataUrl: fullDataUrl,");
     expect(source).toContain("scene: sceneDocument,");
     expect(source).toContain("if (accepted === false) {");
-    expect(studioPageSource).toContain("if (!mutationTicket || !canApplyStudioMutation(mutationTicket)) return false");
-    expect(studioPageSource).toContain('if (!targetEl || targetEl.type !== "image") return false');
-    expect(studioPageSource).toContain("return true;");
+    expect(studioPageSource).toContain(
+      "insertVrmResult: (result) => applyStudioVrmInsertResult({"
+    );
+    expect(studioPageSource).toContain("onInsert={insertVrmResult}");
   });
 
   it("bounds server sharing and releases local capture helpers before upload", () => {
