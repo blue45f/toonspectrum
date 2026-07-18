@@ -16,6 +16,7 @@ import type {
   StudioLiveRoom,
 } from "./studio-live-collaboration-room";
 import type { StudioLiveTransportMode } from "./studio-live-collaboration-transport";
+import type { StudioVoiceIcePolicyMode } from "@/lib/studio-voice-ice-policy-contract";
 
 export type StudioLiveAvailability = "idle" | "connecting" | "ready" | "unsupported" | "error";
 
@@ -34,6 +35,8 @@ export interface StudioLiveVoiceContextValue {
   supported: boolean;
   /** Viewer roles fail closed; commenter/editor/admin/owner may explicitly join. */
   allowed: boolean;
+  /** Null before explicit join; otherwise the deployment policy used for new peer connections. */
+  networkMode: StudioVoiceIcePolicyMode | null;
   state: StudioVoiceCallState;
   error: string | null;
   join: (options?: { muted?: boolean }) => Promise<boolean>;
@@ -85,6 +88,7 @@ export const EMPTY_STUDIO_LIVE_CONTEXT: StudioLiveCollaborationContextValue = {
     ready: false,
     supported: false,
     allowed: false,
+    networkMode: null,
     state: createEmptyStudioVoiceCallState(),
     error: null,
     join: async () => false,

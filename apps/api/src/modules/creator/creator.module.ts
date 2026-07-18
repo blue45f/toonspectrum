@@ -21,6 +21,11 @@ import { StudioRasterAssetService } from "./studio-raster-asset.service";
 import { StudioTeamCommentController } from "./studio-team-comment.controller";
 import { studioTeamCommentRepositoryProvider } from "./studio-team-comment.repository";
 import { StudioTeamCommentService } from "./studio-team-comment.service";
+import { StudioVoiceIcePolicyController } from "./studio-voice-ice-policy.controller";
+import {
+  StudioVoiceIcePolicyService,
+  studioVoiceIceConfigurationProvider,
+} from "./studio-voice-ice-policy.service";
 import { StudioWorkAssetController } from "./studio-work-asset.controller";
 import { studioWorkAssetRepositoryProvider } from "./studio-work-asset.repository";
 import { StudioWorkAssetService } from "./studio-work-asset.service";
@@ -30,6 +35,7 @@ import { StudioWorkAssetService } from "./studio-work-asset.service";
     CreatorController,
     StudioRasterAssetController,
     StudioTeamCommentController,
+    StudioVoiceIcePolicyController,
     StudioWorkAssetController,
   ],
   providers: [
@@ -38,10 +44,12 @@ import { StudioWorkAssetService } from "./studio-work-asset.service";
     studioLiveLockRepositoryProvider,
     studioRasterAssetRepositoryProvider,
     studioTeamCommentRepositoryProvider,
+    studioVoiceIceConfigurationProvider,
     studioWorkAssetRepositoryProvider,
     CreatorService,
     StudioRasterAssetService,
     StudioTeamCommentService,
+    StudioVoiceIcePolicyService,
     StudioWorkAssetService,
     StudioRasterAssetUploadGuard,
     StudioWorkAssetUploadGuard,

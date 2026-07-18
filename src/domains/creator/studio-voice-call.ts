@@ -72,6 +72,8 @@ interface PeerState {
   sink: StudioVoiceAudioSink | null;
   operation: Promise<void>;
   playbackGeneration: number;
+  restartAttempts: number;
+  restartScheduled: boolean;
 }
 
 function defaultGetUserMedia(
@@ -410,7 +412,16 @@ export class StudioVoiceCallController {
     }
 
     try {
-      const onEnded = () => this.leave();
+      const onEnded = () => {
+        if (this.localMedia?.track !== audioTrack || this.phase !== "joined") return;
+        this.leaveInternal(true, "idle");
+        this.emitError(
+          "media",
+          "마이크 연결이 끊겼습니다. 장치를 확인한 뒤 음성 작업실에 다시 참가해 주세요.",
+          null,
+          true
+        );
+      };
       audioTrack.enabled = !this.effectiveMuted;
       audioTrack.addEventListener("ended", onEnded, { once: true });
       this.localMedia = { callId, stream, track: audioTrack, onEnded };
@@ -462,6 +473,21 @@ export class StudioVoiceCallController {
     const peer = this.peers.get(sessionId);
     if (!peer || !peer.stream) return Promise.resolve(false);
     return this.attemptPlayback(peer);
+  }
+
+  /**
+   * Re-negotiate active peers after the deployment rotates short-lived ICE credentials.
+   * Session-id ordering keeps exactly one offerer per pair, so both browsers may receive the
+   * refreshed policy without creating glare.
+   */
+  refreshNetworkPolicy(): boolean {
+    if (this.closed || this.phase !== "joined") return false;
+    let scheduled = false;
+    for (const peer of this.peers.values()) {
+      if (!this.isLocalOfferer(peer.participant.sessionId)) continue;
+      scheduled = this.schedulePeerIceRestart(peer, false) || scheduled;
+    }
+    return scheduled;
   }
 
   endSession(reason: StudioVoiceSessionTerminalReason): void {
@@ -764,6 +790,8 @@ export class StudioVoiceCallController {
       sink: null,
       operation: Promise.resolve(),
       playbackGeneration: 0,
+      restartAttempts: 0,
+      restartScheduled: false,
     };
     this.peers.set(member.participant.sessionId, peer);
     member.connection = "connecting";
@@ -795,6 +823,8 @@ export class StudioVoiceCallController {
     connection.onconnectionstatechange = () => {
       if (!this.isActivePeer(peer)) return;
       if (connection.connectionState === "connected") {
+        peer.restartAttempts = 0;
+        peer.restartScheduled = false;
         const current = this.members.get(peer.participant.sessionId);
         if (current?.callId === peer.callId && current.stream) {
           current.connection = "live";
@@ -809,12 +839,26 @@ export class StudioVoiceCallController {
         return;
       }
       const current = this.members.get(peer.participant.sessionId);
+      if (
+        connection.connectionState === "failed" &&
+        current?.callId === peer.callId &&
+        this.isLocalOfferer(peer.participant.sessionId) &&
+        this.schedulePeerIceRestart(peer, true)
+      ) {
+        current.connection = "connecting";
+        this.emitState();
+        return;
+      }
       if (current?.callId === peer.callId) {
         current.connection = "failed";
         current.autoplay = "idle";
         current.stream = null;
       }
-      this.removePeer(peer.participant.sessionId, false);
+      // Keep a failed peer alive long enough to accept an ICE-restart offer from the elected
+      // remote offerer. Closed peers cannot recover and are removed immediately.
+      if (connection.connectionState === "closed") {
+        this.removePeer(peer.participant.sessionId, false);
+      }
       this.emitError(
         "connection",
         "음성 통화 연결이 끊어졌습니다. 통화에서 나갔다가 다시 참여해 주세요.",
@@ -878,9 +922,35 @@ export class StudioVoiceCallController {
     });
   }
 
-  private async createAndSendOffer(peer: PeerState): Promise<void> {
+  private schedulePeerIceRestart(
+    peer: PeerState,
+    countAttempt: boolean
+  ): boolean {
+    if (!this.isActivePeer(peer) || peer.restartScheduled || peer.awaitingAnswer) return false;
+    if (countAttempt && peer.restartAttempts >= 2) return false;
+    if (countAttempt) peer.restartAttempts += 1;
+    peer.restartScheduled = true;
+    this.queuePeerOperation(peer, async () => {
+      try {
+        if (typeof peer.connection.restartIce === "function") {
+          peer.connection.restartIce();
+        }
+        await this.createAndSendOffer(peer, true);
+      } finally {
+        peer.restartScheduled = false;
+      }
+    });
+    return true;
+  }
+
+  private async createAndSendOffer(
+    peer: PeerState,
+    iceRestart = false
+  ): Promise<void> {
     if (!this.isLocalOfferer(peer.participant.sessionId)) return;
-    const offer = await peer.connection.createOffer();
+    const offer = iceRestart
+      ? await peer.connection.createOffer({ iceRestart: true })
+      : await peer.connection.createOffer();
     if (!this.isActivePeer(peer)) return;
     await peer.connection.setLocalDescription(offer);
     if (!this.isActivePeer(peer)) return;

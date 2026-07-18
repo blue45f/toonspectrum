@@ -15,6 +15,7 @@ import type {
   StudioVoiceCallState,
   StudioVoiceRemoteState,
 } from "./studio-voice-call-model";
+import type { StudioVoiceIcePolicyMode } from "@/lib/studio-voice-ice-policy-contract";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,7 @@ export interface StudioVoiceCallControlsProps {
   ready: boolean;
   supported: boolean;
   allowed: boolean;
+  networkMode: StudioVoiceIcePolicyMode | null;
   state: StudioVoiceCallState;
   error: string | null;
   onJoin: (options?: { muted?: boolean }) => Promise<boolean>;
@@ -82,6 +84,26 @@ function voiceUnavailableCopy({
   if (terminalReason === "closed") return "현재 협업 세션이 종료되었습니다.";
   if (!ready) return "팀 작업실 연결이 준비되면 참여할 수 있습니다.";
   return null;
+}
+
+function voiceNetworkSummary(mode: StudioVoiceIcePolicyMode | null): string {
+  if (mode === "turn") return "보호된 중계 연결 준비";
+  if (mode === "stun") return "네트워크 경로 탐색 지원";
+  if (mode === "direct") return "브라우저 직접 연결";
+  return "참가 시 배포 연결 정책 확인";
+}
+
+function voiceNetworkPrivacyCopy(mode: StudioVoiceIcePolicyMode | null): string {
+  if (mode === "turn") {
+    return "직접 연결이 어려운 네트워크에서는 배포 환경이 소유한 중계 서버를 사용하며, 새 팀원 연결에 쓸 단기 자격 증명은 메모리에서 미리 갱신됩니다.";
+  }
+  if (mode === "stun") {
+    return "네트워크 경로 탐색 서버는 사용하지만 중계 서버는 사용하지 않아 일부 제한된 회사망·통신사망에서는 연결되지 않을 수 있습니다.";
+  }
+  if (mode === "direct") {
+    return "외부 중계 서버를 사용하지 않는 직접 연결 모드라 네트워크 환경에 따라 연결이 제한될 수 있습니다.";
+  }
+  return "참가할 때 현재 배포 환경의 직접·탐색·중계 연결 정책을 인증된 경로로 확인합니다.";
 }
 
 export function StudioVoiceCallMiniDock({
@@ -186,6 +208,7 @@ export function StudioVoiceCallPanelSection({
   ready,
   supported,
   allowed,
+  networkMode,
   state,
   error,
   onJoin,
@@ -272,7 +295,7 @@ export function StudioVoiceCallPanelSection({
             </span>
           </div>
           <span className="mt-0.5 block text-[0.7rem] leading-relaxed text-fg-3">
-            오디오 전용 P2P · 녹음·문서·DB·로컬 저장소에 보존하지 않음
+            오디오 전용 P2P · {voiceNetworkSummary(networkMode)} · 녹음·문서·DB·로컬 저장소에 보존하지 않음
           </span>
         </div>
       </div>
@@ -447,7 +470,7 @@ export function StudioVoiceCallPanelSection({
           <li>명시적으로 참가할 때만 마이크를 요청하며 영상 권한은 요청하지 않습니다.</li>
           <li>최대 6명이 브라우저 간 P2P mesh로 연결되며 원시 오디오를 기록하지 않습니다.</li>
           <li>직접 연결을 위해 같은 음성실 팀원끼리 기기의 공개·로컬 네트워크 주소 정보를 교환할 수 있습니다.</li>
-          <li>외부 TURN 설정이 없는 기본 모드에서는 네트워크 환경에 따라 연결이 제한될 수 있습니다.</li>
+          <li>{voiceNetworkPrivacyCopy(networkMode)}</li>
           <li>나가기·작품 이동·권한 회수·연결 종료 시 모든 트랙과 피어를 즉시 정리합니다.</li>
           <li>연결 설정과 네트워크 주소 정보는 메모리에서만 전달하고 작품 데이터나 활동 기록에 남기지 않습니다.</li>
         </ul>

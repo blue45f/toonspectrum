@@ -524,6 +524,7 @@ export function StudioLiveCollaborationPanelView({
         ready={ready && voice.ready}
         supported={voice.supported}
         allowed={voice.allowed}
+        networkMode={voice.networkMode}
         state={voice.state}
         error={voice.error}
         onJoin={voice.join}

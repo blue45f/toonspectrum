@@ -30,6 +30,7 @@ describe("StudioVoiceCallControls", () => {
         ready
         supported
         allowed
+        networkMode={null}
         state={createEmptyStudioVoiceCallState()}
         error={null}
         {...baseActions}
@@ -74,6 +75,7 @@ describe("StudioVoiceCallControls", () => {
         ready
         supported
         allowed
+        networkMode="turn"
         state={state}
         error="브라우저가 원격 오디오 자동 재생을 막았습니다."
         {...baseActions}
@@ -91,6 +93,9 @@ describe("StudioVoiceCallControls", () => {
     expect(html).toContain("먼저 마이크를 켜 주세요");
     expect(html).not.toContain(">말하는 중<");
     expect(html).toContain("최대 6명이 브라우저 간 P2P mesh");
+    expect(html).toContain("보호된 중계 연결 준비");
+    expect(html).toContain("배포 환경이 소유한 중계 서버");
+    expect(html).toContain("새 팀원 연결에 쓸 단기 자격 증명은 메모리에서 미리 갱신");
     expect(html).toContain("공개·로컬 네트워크 주소 정보");
     expect(html).not.toContain("ICE 네트워크 후보");
     expect(html).not.toContain(privateSessionId);
@@ -103,6 +108,7 @@ describe("StudioVoiceCallControls", () => {
         ready
         supported={false}
         allowed
+        networkMode={null}
         state={createEmptyStudioVoiceCallState()}
         error={null}
         {...baseActions}
@@ -116,6 +122,7 @@ describe("StudioVoiceCallControls", () => {
         ready
         supported
         allowed={false}
+        networkMode={null}
         state={createEmptyStudioVoiceCallState()}
         error={null}
         {...baseActions}

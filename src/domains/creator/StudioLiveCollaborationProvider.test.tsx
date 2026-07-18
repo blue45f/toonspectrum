@@ -182,6 +182,11 @@ const recoveryVault = vi.hoisted(() => ({
   listCount: 0,
   emptyReadsBeforeVisible: 0,
 }));
+const voiceIcePolicy = vi.hoisted(() => ({
+  acquireCount: 0,
+  closeCount: 0,
+  requestedWorkIds: [] as string[],
+}));
 const lifecycle = vi.hoisted(() => ({
   roomStart: "pending" as "pending" | "resolve" | "reject",
   voiceGetMembersError: null as string | null,
@@ -214,6 +219,21 @@ vi.mock("./studio-crdt-recovery-vault", () => ({
   }),
   downloadStudioCrdtRecoveryBundle: async () => {
     recoveryDownloads.count += 1;
+  },
+}));
+
+vi.mock("./studio-voice-ice-policy", () => ({
+  acquireStudioVoiceIcePolicyLease: async (workId: string) => {
+    voiceIcePolicy.acquireCount += 1;
+    voiceIcePolicy.requestedWorkIds.push(workId);
+    return {
+      mode: "turn" as const,
+      createPeerConnection: () => new RTCPeerConnection({ iceServers: [] }),
+      subscribeConfigurationChange: () => () => undefined,
+      close: () => {
+        voiceIcePolicy.closeCount += 1;
+      },
+    };
   },
 }));
 
@@ -526,6 +546,9 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
     recoveryVault.entries.length = 0;
     recoveryVault.listCount = 0;
     recoveryVault.emptyReadsBeforeVisible = 0;
+    voiceIcePolicy.acquireCount = 0;
+    voiceIcePolicy.closeCount = 0;
+    voiceIcePolicy.requestedWorkIds.length = 0;
     const track = {
       kind: "audio",
       readyState: "live",
@@ -569,6 +592,7 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
       expect(live.availability).toBe("ready");
     });
     expect(live.voice.ready).toBe(true);
+    expect(live.voice.networkMode).toBeNull();
     expect(room.voiceSubscribeCount).toBe(0);
     expect(lifecycle.voiceMediaRequestCount).toBe(0);
 
@@ -576,6 +600,9 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
     await vi.waitFor(() => expect(room.voiceSubscribeCount).toBe(1));
     expect(room.voiceJoinCount).toBe(1);
     expect(lifecycle.voiceMediaRequestCount).toBe(1);
+    live = renderProvider({ children: "team-panel-open", onRoomChange });
+    expect(live.voice.networkMode).toBe("turn");
+    expect(voiceIcePolicy.requestedWorkIds).toEqual(["work-a"]);
 
     renderProvider({ children: "team-panel-closed", onRoomChange });
 
@@ -608,6 +635,34 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
     expect(rooms.instances[0].closeCount).toBe(0);
     expect(rooms.instances[0].voiceSubscribeCount).toBe(0);
     expect(lifecycle.voiceMediaRequestCount).toBe(0);
+    expect(voiceIcePolicy.acquireCount).toBe(1);
+    expect(voiceIcePolicy.closeCount).toBe(1);
+    expect(live.voice.networkMode).toBeNull();
+  });
+
+  it("releases expiring network credentials on leave and reacquires them on rejoin", async () => {
+    lifecycle.roomStart = "resolve";
+    let live = renderProvider();
+    await vi.waitFor(() => {
+      live = renderProvider();
+      expect(live.availability).toBe("ready");
+    });
+
+    await expect(live.voice.join()).resolves.toBe(true);
+    live = renderProvider();
+    expect(live.voice.networkMode).toBe("turn");
+    expect(voiceIcePolicy.acquireCount).toBe(1);
+
+    live.voice.leave();
+    live = renderProvider();
+    expect(live.voice.state.phase).toBe("idle");
+    expect(live.voice.networkMode).toBeNull();
+    expect(voiceIcePolicy.closeCount).toBe(1);
+
+    await expect(live.voice.join()).resolves.toBe(true);
+    live = renderProvider();
+    expect(live.voice.networkMode).toBe("turn");
+    expect(voiceIcePolicy.acquireCount).toBe(2);
   });
 
   it("does not load voice or request media in an unsupported browser", async () => {

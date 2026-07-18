@@ -72,6 +72,7 @@ function renderView(overrides: Partial<StudioLiveCollaborationPanelViewProps> = 
       ready: true,
       supported: true,
       allowed: true,
+      networkMode: "direct",
       state: createEmptyStudioVoiceCallState(),
       error: null,
       join: async () => true,

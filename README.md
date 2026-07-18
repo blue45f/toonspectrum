@@ -50,7 +50,8 @@ ToonSpectrum는 콘텐츠를 호스팅하지 않습니다. 플랫폼 장벽 너�
 - **인사이트** `/insights` — 장르·플랫폼·연도·평점·가격·어댑테이션을 시각화한 트렌드 대시보드
 - **내 서재** `/library` — 관심/평가/완독 관리, **취향 분석**, 맞춤 추천, 컬렉션
 - **창작 스튜디오** `/studio` — 멀티페이지 컷·말풍선·3D/VRM·벡터/래스터 소재·AI 제작 보조·검토·
-  복구·Publish Package와 역할 기반 팀 초대·CRDT 동시 편집·화면 공유·최대 6인 P2P 음성 작업실·
+  복구·Publish Package와 역할 기반 팀 초대·CRDT 동시 편집·화면 공유·단기 TURN 자격증명과
+  자동 ICE 재협상을 지원하는 최대 6인 P2P 음성 작업실·
   공유 원본·revision 충돌 방지를 합친 모바일 대응 올인원
   제작실. 컷툰/업로드 작품 형식을 보존한 채 팀 작업 목록에서 바로 전환하며, 상세 벤치마크와 구현 현황은
   [`docs/studio-competitor-features.md`](docs/studio-competitor-features.md) 참고

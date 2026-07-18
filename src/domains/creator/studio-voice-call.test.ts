@@ -92,12 +92,19 @@ class FakePeerConnection {
   readonly addedIce: RTCIceCandidateInit[] = [];
   readonly remoteDescriptions: RTCSessionDescriptionInit[] = [];
   createOfferCalls = 0;
+  readonly createOfferOptions: Array<RTCOfferOptions | undefined> = [];
   createAnswerCalls = 0;
+  restartIceCalls = 0;
   closeCalls = 0;
 
-  createOffer(): Promise<RTCSessionDescriptionInit> {
+  createOffer(options?: RTCOfferOptions): Promise<RTCSessionDescriptionInit> {
     this.createOfferCalls += 1;
+    this.createOfferOptions.push(options);
     return Promise.resolve({ type: "offer", sdp: "v=0\r\no=voice-offer" });
+  }
+
+  restartIce(): void {
+    this.restartIceCalls += 1;
   }
 
   createAnswer(): Promise<RTCSessionDescriptionInit> {
@@ -625,6 +632,33 @@ describe("StudioVoiceCallController", () => {
     controller.close();
   });
 
+  it("restarts ICE only from the deterministic offerer after credential rotation", async () => {
+    const room = new FakeRoom(local);
+    room.members = [member(remoteA), member(remoteC)];
+    const peers: FakePeerConnection[] = [];
+    const controller = new StudioVoiceCallController(room, {
+      getUserMedia: () => Promise.resolve(fakeStream([new FakeTrack()])),
+      createPeerConnection: () => {
+        const peer = new FakePeerConnection();
+        peers.push(peer);
+        return peer as unknown as RTCPeerConnection;
+      },
+      randomId: () => "call-local",
+    });
+    await controller.join();
+    await settle();
+    room.emit(answerEvent(remoteC));
+    await settle();
+
+    expect(controller.refreshNetworkPolicy()).toBe(true);
+    await settle();
+    expect(peers[0].restartIceCalls).toBe(0);
+    expect(peers[1].restartIceCalls).toBe(1);
+    expect(peers[1].createOfferOptions.at(-1)).toEqual({ iceRestart: true });
+    expect(room.descriptions.at(-1)?.target).toBe(remoteC.sessionId);
+    controller.close();
+  });
+
   it("ignores glare offers, unsolicited answers, and stale call generations", async () => {
     const room = new FakeRoom(local);
     room.members = [member(remoteC)];
@@ -835,12 +869,14 @@ describe("StudioVoiceCallController", () => {
     const remoteTrack = new FakeTrack();
     const peer = new FakePeerConnection();
     const sink = new FakeAudioSink();
+    const events: StudioVoiceCallEvent[] = [];
     const controller = new StudioVoiceCallController(room, {
       getUserMedia: () => Promise.resolve(fakeStream([localTrack])),
       createPeerConnection: () => peer as unknown as RTCPeerConnection,
       createAudioSink: () => sink,
       randomId: () => "call-local",
     });
+    controller.subscribe((event) => events.push(event));
     await controller.join();
     peer.emitTrack(fakeStream([remoteTrack]), remoteTrack);
     await settle();
@@ -852,6 +888,11 @@ describe("StudioVoiceCallController", () => {
     expect(peer.closeCalls).toBe(1);
     expect(sink.destroyCalls).toBe(1);
     expect(controller.getState()).toMatchObject({ phase: "idle" });
+    expect(events).toContainEqual(expect.objectContaining({
+      type: "error",
+      code: "media",
+      message: expect.stringMatching(/마이크 연결이 끊겼습니다/u),
+    }));
     controller.close();
   });
 

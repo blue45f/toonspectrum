@@ -44,6 +44,10 @@ import type {
   StudioCrdtRoomBinding,
 } from "./studio-crdt-room-binding";
 import type { StudioVoiceCallController } from "./studio-voice-call";
+import type {
+  StudioVoiceIcePolicyLease,
+} from "./studio-voice-ice-policy";
+import type { StudioVoiceIcePolicyMode } from "@/lib/studio-voice-ice-policy-contract";
 
 export type StudioCrdtAuthoritativeSaveBarrier = (
   timeoutMs?: number
@@ -130,16 +134,29 @@ interface StudioVoiceControllerScope {
 interface StudioVoiceControllerBinding {
   scope: StudioVoiceControllerScope;
   controller: StudioVoiceCallController;
+  icePolicyLease: StudioVoiceIcePolicyLease | null;
+  unsubscribeIcePolicy: () => void;
   unsubscribe: () => void;
 }
 
 interface StudioVoiceControllerLoad {
   scope: StudioVoiceControllerScope;
   promise: Promise<StudioVoiceCallController | null>;
+  cancel: () => void;
 }
 
 const RECOVERY_VAULT_REHYDRATION_INITIAL_DELAY_MS = 50;
 const RECOVERY_VAULT_REHYDRATION_MAX_DELAY_MS = 5_000;
+
+function closeStudioVoiceControllerBinding(
+  binding: StudioVoiceControllerBinding | null | undefined
+): void {
+  if (!binding) return;
+  binding.unsubscribe();
+  binding.unsubscribeIcePolicy();
+  binding.controller.close();
+  binding.icePolicyLease?.close();
+}
 
 function findStudioLiveRecoveryBoundaryEntry(
   entries: readonly StudioCrdtRecoveryVaultEntry[],
@@ -230,6 +247,8 @@ export function StudioLiveCollaborationProvider({
   const [voiceState, setVoiceState] = useState<StudioVoiceCallState>(() =>
     createEmptyStudioVoiceCallState()
   );
+  const [voiceNetworkMode, setVoiceNetworkMode] =
+    useState<StudioVoiceIcePolicyMode | null>(null);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const voiceErrorScopeRef = useRef<StudioVoiceErrorScope | null>(null);
   const voiceControllerBindingRef = useRef<StudioVoiceControllerBinding | null>(null);
@@ -779,12 +798,14 @@ export function StudioLiveCollaborationProvider({
       ? { generation, room }
       : null;
     voiceControllerScopeRef.current = scope;
+    const previousLoad = voiceControllerLoadRef.current;
     voiceControllerLoadRef.current = null;
+    previousLoad?.cancel();
     const previous = voiceControllerBindingRef.current;
     voiceControllerBindingRef.current = null;
-    previous?.unsubscribe();
-    previous?.controller.close();
+    closeStudioVoiceControllerBinding(previous);
     setVoiceState(createEmptyStudioVoiceCallState());
+    setVoiceNetworkMode(null);
     setVoiceError(null);
     voiceErrorScopeRef.current = null;
 
@@ -793,13 +814,13 @@ export function StudioLiveCollaborationProvider({
         voiceControllerScopeRef.current = null;
       }
       if (voiceControllerLoadRef.current?.scope === scope) {
+        voiceControllerLoadRef.current.cancel();
         voiceControllerLoadRef.current = null;
       }
       const current = voiceControllerBindingRef.current;
       if (current?.scope === scope) {
         voiceControllerBindingRef.current = null;
-        current.unsubscribe();
-        current.controller.close();
+        closeStudioVoiceControllerBinding(current);
       }
     };
   }, [participantCanVoice, room, voiceSupported]);
@@ -812,19 +833,55 @@ export function StudioLiveCollaborationProvider({
     const loading = voiceControllerLoadRef.current;
     if (loading?.scope === scope) return loading.promise;
 
-    const promise = import("./studio-voice-call")
-      .then(({ StudioVoiceCallController: VoiceController }) => {
+    const abortController = new AbortController();
+    const promise = Promise.all([
+      import("./studio-voice-call"),
+      scope.room.mode === "server"
+        ? import("./studio-voice-ice-policy")
+        : Promise.resolve(null),
+    ])
+      .then(async ([{ StudioVoiceCallController: VoiceController }, icePolicyModule]) => {
         if (voiceControllerScopeRef.current !== scope) return null;
-        const controller = new VoiceController(scope.room);
+        const icePolicyLease = icePolicyModule
+          ? await icePolicyModule.acquireStudioVoiceIcePolicyLease(
+              scope.room.workId,
+              { signal: abortController.signal }
+            )
+          : null;
+        if (voiceControllerScopeRef.current !== scope) {
+          icePolicyLease?.close();
+          return null;
+        }
+        let controller: StudioVoiceCallController;
+        try {
+          controller = new VoiceController(
+            scope.room,
+            icePolicyLease
+              ? { createPeerConnection: icePolicyLease.createPeerConnection }
+              : undefined
+          );
+        } catch (error) {
+          icePolicyLease?.close();
+          throw error;
+        }
         if (voiceControllerScopeRef.current !== scope) {
           controller.close();
+          icePolicyLease?.close();
           return null;
         }
         const binding: StudioVoiceControllerBinding = {
           scope,
           controller,
+          icePolicyLease,
+          unsubscribeIcePolicy: () => undefined,
           unsubscribe: () => undefined,
         };
+        binding.unsubscribeIcePolicy =
+          icePolicyLease?.subscribeConfigurationChange(() => {
+            if (voiceControllerBindingRef.current !== binding) return;
+            setVoiceNetworkMode(icePolicyLease.mode);
+            controller.refreshNetworkPolicy();
+          }) ?? (() => undefined);
         binding.unsubscribe = controller.subscribe((event) => {
           if (voiceControllerBindingRef.current !== binding) return;
           if (event.type === "state") {
@@ -850,9 +907,16 @@ export function StudioLiveCollaborationProvider({
             code: event.code,
             participantSessionId: event.participant?.sessionId ?? null,
           };
+          if (event.code === "media" && controller.getState().phase === "idle") {
+            voiceControllerBindingRef.current = null;
+            closeStudioVoiceControllerBinding(binding);
+            setVoiceNetworkMode(null);
+            setVoiceState(createEmptyStudioVoiceCallState());
+          }
           setVoiceError(event.message);
         });
         voiceControllerBindingRef.current = binding;
+        setVoiceNetworkMode(icePolicyLease?.mode ?? "direct");
         return controller;
       })
       .finally(() => {
@@ -860,7 +924,11 @@ export function StudioLiveCollaborationProvider({
           voiceControllerLoadRef.current = null;
         }
       });
-    voiceControllerLoadRef.current = { scope, promise };
+    voiceControllerLoadRef.current = {
+      scope,
+      promise,
+      cancel: () => abortController.abort(),
+    };
     return promise;
   };
 
@@ -966,6 +1034,7 @@ export function StudioLiveCollaborationProvider({
       ready: Boolean(room && participantCanVoice && voiceSupported),
       allowed: participantCanVoice,
       state: voiceState,
+      networkMode: voiceNetworkMode,
       error: voiceError,
       join: async (options) => {
         const scope = voiceControllerScopeRef.current;
@@ -993,9 +1062,12 @@ export function StudioLiveCollaborationProvider({
         } catch (cause) {
           if (voiceControllerScopeRef.current === scope) {
             const current = voiceControllerBindingRef.current;
-            setVoiceState(current?.scope === scope
-              ? current.controller.getState()
-              : createEmptyStudioVoiceCallState());
+            if (current?.scope === scope) {
+              voiceControllerBindingRef.current = null;
+              closeStudioVoiceControllerBinding(current);
+            }
+            setVoiceNetworkMode(null);
+            setVoiceState(createEmptyStudioVoiceCallState());
             voiceErrorScopeRef.current = { code: "action", participantSessionId: null };
             setVoiceError(studioVoiceCallErrorMessage(cause));
           }
@@ -1005,7 +1077,12 @@ export function StudioLiveCollaborationProvider({
       leave: () => {
         voiceErrorScopeRef.current = null;
         setVoiceError(null);
-        voiceControllerBindingRef.current?.controller.leave();
+        const current = voiceControllerBindingRef.current;
+        voiceControllerBindingRef.current = null;
+        current?.controller.leave();
+        closeStudioVoiceControllerBinding(current);
+        setVoiceNetworkMode(null);
+        setVoiceState(createEmptyStudioVoiceCallState());
       },
       setMuted: (muted) => {
         const changed = voiceControllerBindingRef.current?.controller.setMuted(muted) ?? false;

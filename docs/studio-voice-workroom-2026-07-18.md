@@ -28,9 +28,11 @@ Studio의 실시간 협업에 짧은 작업 대화를 위한 **최대 6인 오�
 - 서버는 발신자와 대상이 같은 작품·같은 `callId`에 실제로 참가 중인지 검사하며 자기 자신을
   대상으로 보내는 신호, 다른 작품/허들의 신호, 미가입 대상, 초과 키와 잘못된 payload를
   거절한다.
-- 서버 또는 BroadcastChannel은 SDP/ICE 시그널만 중계한다. 미디어는 브라우저 사이에서 직접
-  전송되며 WebRTC의 DTLS-SRTP 전송 보호를 사용한다. 직접 연결 특성상 같은 허들 팀원끼리 ICE
-  네트워크 후보가 교환된다는 점을 UI에서 고지한다.
+- 서버 또는 BroadcastChannel은 SDP/ICE 시그널만 중계한다. WebRTC 미디어는 DTLS-SRTP로
+  보호되며, 브라우저가 직접 경로를 만들 수 없을 때는 배포 소유 TURN이 암호화된 패킷을
+  중계한다. TURN은 오디오를 복호화하거나 작품 문서에 기록하지 않는다. 로컬 fallback은 외부
+  ICE 서버를 전혀 사용하지 않으며 같은 허들 팀원끼리 직접 후보가 교환될 수 있음을 UI에
+  명확히 표시한다.
 - 6명 제한은 로컬 컨트롤러와 룸/서버 admission 양쪽에서 강제한다. 세션 ID 순서로 한쪽만
   offerer가 되도록 정해 glare를 피하고, remote description보다 먼저 온 ICE는 제한된 큐에서
   기다린 뒤 적용한다.
@@ -46,6 +48,50 @@ Studio의 실시간 협업에 짧은 작업 대화를 위한 **최대 6인 오�
 - 인증 주체와 권한은 gateway의 비공개 저장소에서만 유지한다. 공유 Socket.IO 어댑터가 볼 수 있는
   `socket.data`에는 라우팅에 필요한 공개 participant/membership 정보만 넣고, 연결 실패·권한 회수·
   퇴장·모듈 종료 때 인증 정보와 핸드셰이크 토큰을 정리한다.
+
+## 배포 소유 TURN 정책
+
+- 서버 room에서 사용자가 `음성 참가`를 누르면 마이크 권한보다 먼저 인증된
+  `GET /creator/works/:id/voice/ice`를 호출한다. 현재 작품 ACL을 다시 읽어 active commenter 이상만
+  허용하며 viewer, 다른 작품 사용자, 비인증 요청은 자격증명을 받지 못한다. 응답은
+  `Cache-Control: private, no-store`이고 room broadcast, Socket.IO adapter, CRDT, localStorage에
+  넣지 않는다.
+- 발급기는 coturn REST API 방식의 `${expiry}:${opaqueIdentity}` username과 HMAC-SHA1 credential을
+  만든다. opaque identity는 배포 비밀로 HMAC 처리해 TURN 로그에 원본 user/work ID가 남지 않게
+  하고, 기본 900초의 짧은 TTL만 허용한다. 정책 계약은 사용자 정보가 들어간 URL, 제어 문자,
+  임의 query, 불완전한 credential, STUN/TURN 혼합 서버 항목을 거절한다.
+- 브라우저는 정책 요청을 10초로 제한하고 작품 전환, 권한 변경, 나가기, 참가 실패, Provider
+  해제 시 요청·갱신 타이머·메모리 자격증명을 즉시 폐기한다. 정책의 서버 발급 시각과 TTL을
+  검증하되 실제 lease는 응답 수신 시각에 고정해 브라우저 시계 오차 때문에 새 credential이
+  즉시 만료되지 않게 한다.
+- 만료 전에 새 credential을 받아 열려 있는 모든 `RTCPeerConnection`에 `setConfiguration`으로
+  적용한다. 참가자 세션 ID로 정한 단 하나의 offerer만 `restartIce()`와 ICE-restart offer를
+  보내므로 양쪽이 동시에 재협상하는 glare를 피한다. 갱신 실패는 단일 in-flight 요청,
+  지수 backoff와 jitter로 제한하고, 이미 만료된 credential은 새 peer에 절대 재사용하지 않는다.
+- `STUDIO_VOICE_TURN_REQUIRED=true`인 경우 UDP relay 경로와 TCP 또는 TLS/TCP 경로가 모두
+  없으면 잘못된 부분 구성으로 보고 Nest 모듈 초기화가 실패한다. `NODE_ENV=production`에서 필수
+  모드를 켜지 않은 배포는 전체 API를 중단시키지 않되 음성 정책 endpoint만 503으로 fail-closed한다.
+  따라서 운영 사용자가 조용히 direct 모드로 내려가지는 않는다. development/test만 설정이 없을
+  때 privacy-preserving direct 모드로 동작한다.
+- HTTP 자격증명 발급기는 일반 API origin(`VITE_API_BASE`/runtime API)을 사용하고, 시그널링은
+  별도 `VITE_STUDIO_LIVE_ORIGIN`을 사용할 수 있다. 두 Nest 배포는 같은 세션/ACL 버전과 계약을
+  사용해야 하며 TURN shared secret은 발급 API와 실제 TURN 데이터 플레인에만 존재해야 한다.
+
+필수 운영 변수:
+
+```dotenv
+STUDIO_VOICE_STUN_URLS=stun:voice.example.com:3478
+STUDIO_VOICE_TURN_URLS=turn:voice.example.com:3478?transport=udp,turns:voice.example.com:5349?transport=tcp
+STUDIO_VOICE_TURN_SHARED_SECRET=<coturn static-auth-secret와 동일한 32자 이상 비밀>
+STUDIO_VOICE_TURN_REQUIRED=true
+STUDIO_VOICE_TURN_TTL_SECONDS=900
+```
+
+Nest는 자격증명 제어면이지 미디어 데이터 플레인이 아니다. 운영에는 별도 coturn 또는 관리형
+TURN의 공인 IP, DNS, TLS 인증서, UDP/TCP/TLS listener, relay UDP 포트 범위, allocation·사용자·
+대역폭 quota, credential이 제거된 로그, relay 선택률·실패율·대역폭 관측이 필요하다. 공유 secret
+교체는 새 발급기와 TURN 서버를 같은 변경 창에서 갱신하고 기존 TTL 이상 겹쳐 운영하는 절차로
+수행한다.
 
 ## 수명주기와 실패 안전성
 
@@ -64,10 +110,10 @@ Studio의 실시간 협업에 짧은 작업 대화를 위한 **최대 6인 오�
 
 - 녹음, 녹취, 자막, 음성 파일 업로드, 회의 기록은 제공하지 않는다. 이 범위를 추가하려면 별도
   동의·보존 기간·삭제·접근 감사 정책이 먼저 필요하다.
-- 현재 기본 `RTCPeerConnection`은 외부 STUN/TURN 서버를 사용하지 않는다. 같은 로컬 네트워크
-  또는 직접 연결 가능한 네트워크에서는 동작하지만 NAT/방화벽 환경에 따라 다른 네트워크 간
-  연결이 실패할 수 있다. 상용 배포에서는 단기 자격 증명을 발급하는 배포 소유 TURN 정책을
-  별도 주입해야 한다.
+- 저장소만으로 실제 TURN 서버가 생성되지는 않는다. 위 운영 데이터 플레인이 배포되지 않았거나
+  DNS·인증서·relay 포트가 잘못된 경우 단위 테스트가 통과해도 제한된 NAT/방화벽 환경의 연결을
+  보장할 수 없다. production 배포 승인은 실제 서로 다른 네트워크에서 forced-relay 검증을
+  통과한 뒤에만 내린다.
 - P2P mesh는 소규모 허들용이다. 6명을 넘는 음성실은 TURN 추가만으로 해결하지 않고 SFU,
   대역폭 admission, 화자 선택, 운영 관측성과 abuse 대응을 포함한 별도 서버 아키텍처가 필요하다.
 
@@ -80,3 +126,10 @@ Studio의 실시간 협업에 짧은 작업 대화를 위한 **최대 6인 오�
   눌러 말하기, 자동 재생 복구, 비디오 트랙 거절과 모든 종료 경로의 자원 해제를 다룬다.
 - Provider/UI 테스트는 패널과 통화 수명주기의 분리, 작품/권한 전환 정리, 44px 조작 대상,
   접근 가능한 상태/오류 안내와 내부 세션 ID 비노출을 다룬다.
+- 정책 테스트는 환경 fail-closed, UDP+TCP/TLS 경로, URL/credential strictness, coturn HMAC,
+  ACL과 발급 제한, timeout/abort, 시계 오차, 만료 전 갱신, 기존 peer 구성 교체와 단일 offerer
+  ICE restart를 다룬다.
+- 운영 smoke/E2E는 두 격리 브라우저에서 `iceTransportPolicy: relay`를 강제하고 `getStats()`의
+  selected candidate pair가 `relay`인지, 원격 audio RTP byte가 증가하는지 확인해야 한다. UDP
+  차단 시 TCP/TLS fallback, credential 만료·교체, TURN 재시작, Wi-Fi↔모바일 네트워크 전환도
+  별도로 검증한다. 이 검증은 실제 TURN endpoint 없이는 저장소 로컬 CI에서 수행할 수 없다.

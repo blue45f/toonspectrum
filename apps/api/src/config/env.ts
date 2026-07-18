@@ -28,6 +28,14 @@ const envSchema = z.object({
     .string()
     .regex(/^(?:[2-9]|10)$/u, "STUDIO_LIVE_POSTGRES_POOL_MAX must be between 2 and 10")
     .optional(),
+  STUDIO_VOICE_STUN_URLS: z.string().optional(),
+  STUDIO_VOICE_TURN_URLS: z.string().optional(),
+  STUDIO_VOICE_TURN_SHARED_SECRET: z.string().min(32).optional(),
+  STUDIO_VOICE_TURN_REQUIRED: z.enum(["true", "false"]).optional(),
+  STUDIO_VOICE_TURN_TTL_SECONDS: z
+    .string()
+    .regex(/^\d+$/u, "STUDIO_VOICE_TURN_TTL_SECONDS must be numeric")
+    .optional(),
   // 세션 서명 비밀. 운영에선 AUTH_SESSION_SECRET(없으면 AUTH_STATE_SECRET) 권장.
   AUTH_SESSION_SECRET: z.string().min(1).optional(),
   AUTH_STATE_SECRET: z.string().min(1).optional(),
@@ -85,6 +93,7 @@ const SECRET_KEYS: ReadonlyArray<keyof ValidatedEnv> = [
   "CATALOG_INGEST_TRIGGER_TOKEN",
   "DATABASE_URL",
   "STUDIO_LIVE_POSTGRES_URL",
+  "STUDIO_VOICE_TURN_SHARED_SECRET",
   "OPENAI_API_KEY",
   "DEEPSEEK_API_KEY",
   "DEEPSEEK_USER_ID_SALT",
