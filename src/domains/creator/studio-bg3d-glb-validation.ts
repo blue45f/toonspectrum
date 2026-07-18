@@ -5,6 +5,8 @@
  * here before creating an object URL, invoking a renderer loader, or resolving any glTF resource.
  */
 
+import { inspectStudioBg3dBasisKtx2 } from "./studio-bg3d-ktx2-validation";
+
 export const STUDIO_BG3D_GLB_MAX_BYTES = 100 * 1024 * 1024;
 export const STUDIO_BG3D_GLB_MAX_JSON_BYTES = 4 * 1024 * 1024;
 export const STUDIO_BG3D_GLB_MIME_TYPE = "model/gltf-binary" as const;
@@ -17,7 +19,6 @@ const GLB_JSON_CHUNK = 0x4e4f534a;
 const GLB_BIN_CHUNK = 0x004e4942;
 const SHA256_PATTERN = /^(?:sha256:)?([a-f0-9]{64})$/iu;
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] as const;
-const KTX2_SIGNATURE = [0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb, 0x0d, 0x0a, 0x1a, 0x0a] as const;
 
 export type StudioBg3dGlbProfile = "mobile" | "desktop";
 
@@ -759,14 +760,6 @@ function webpDimensions(bytes: Uint8Array): ImageDimensions | null {
   return null;
 }
 
-function ktx2Dimensions(bytes: Uint8Array): ImageDimensions | null {
-  if (bytes.byteLength < 28 || !matchesSignature(bytes, KTX2_SIGNATURE)) return null;
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const width = view.getUint32(20, true);
-  const height = view.getUint32(24, true);
-  return width > 0 && height > 0 ? { width, height } : null;
-}
-
 function imageDimensions(mimeType: string, bytes: Uint8Array): ImageDimensions | null {
   switch (mimeType) {
     case "image/png":
@@ -775,11 +768,91 @@ function imageDimensions(mimeType: string, bytes: Uint8Array): ImageDimensions |
       return jpegDimensions(bytes);
     case "image/webp":
       return webpDimensions(bytes);
-    case "image/ktx2":
-      return ktx2Dimensions(bytes);
     default:
       return null;
   }
+}
+
+function validateTextureImageReferences(
+  root: Record<string, unknown>,
+  textures: readonly unknown[],
+  images: readonly unknown[],
+): StudioBg3dGlbValidationFailure | null {
+  const usedRaw = root.extensionsUsed;
+  const requiredRaw = root.extensionsRequired;
+  if (
+    (usedRaw !== undefined && (
+      !Array.isArray(usedRaw) || usedRaw.some((extension) => typeof extension !== "string") ||
+      new Set(usedRaw).size !== usedRaw.length
+    )) ||
+    (requiredRaw !== undefined && (
+      !Array.isArray(requiredRaw) || requiredRaw.some((extension) => typeof extension !== "string") ||
+      new Set(requiredRaw).size !== requiredRaw.length
+    ))
+  ) return failure("invalid-gltf-root");
+  const used = new Set((usedRaw ?? []) as string[]);
+  const required = new Set((requiredRaw ?? []) as string[]);
+  if (Array.from(required).some((extension) => !used.has(extension))) {
+    return failure("invalid-gltf-root");
+  }
+  const samplersRaw = root.samplers;
+  if (samplersRaw !== undefined && (
+    !Array.isArray(samplersRaw) || samplersRaw.some((sampler) => !isRecord(sampler))
+  )) return failure("invalid-gltf-root");
+  const samplers = (samplersRaw ?? []) as readonly unknown[];
+  const basisImageIndices = new Set<number>();
+  let usesBasisTexture = false;
+
+  for (const texture of textures) {
+    if (!isRecord(texture)) return failure("invalid-gltf-root");
+    if (
+      texture.sampler !== undefined && (
+        !isSafeNonNegativeInteger(texture.sampler) || texture.sampler >= samplers.length
+      )
+    ) return failure("invalid-gltf-root");
+    const coreSource = texture.source;
+    if (
+      coreSource !== undefined && (
+        !isSafeNonNegativeInteger(coreSource) || coreSource >= images.length ||
+        !isRecord(images[coreSource]) || images[coreSource].mimeType === "image/ktx2"
+      )
+    ) return failure("invalid-image");
+    const extensions = texture.extensions;
+    if (extensions !== undefined && !isRecord(extensions)) return failure("invalid-gltf-root");
+    const basis = isRecord(extensions) ? extensions.KHR_texture_basisu : undefined;
+    if (basis === undefined) {
+      if (coreSource === undefined) return failure("invalid-image");
+      continue;
+    }
+    if (!isRecord(basis) || !isSafeNonNegativeInteger(basis.source) || basis.source >= images.length) {
+      return failure("invalid-image");
+    }
+    const basisImage = images[basis.source];
+    if (!isRecord(basisImage) || basisImage.mimeType !== "image/ktx2" || !used.has("KHR_texture_basisu")) {
+      return failure("invalid-image");
+    }
+    if (coreSource !== undefined) {
+      const fallbackImage = images[coreSource];
+      if (
+        !isRecord(fallbackImage) ||
+        (fallbackImage.mimeType !== "image/png" && fallbackImage.mimeType !== "image/jpeg")
+      ) return failure("invalid-image");
+    }
+    if (coreSource === undefined && !required.has("KHR_texture_basisu")) {
+      return failure("invalid-image");
+    }
+    usesBasisTexture = true;
+    basisImageIndices.add(basis.source);
+  }
+
+  if (used.has("KHR_texture_basisu") !== usesBasisTexture) return failure("invalid-image");
+  for (let index = 0; index < images.length; index += 1) {
+    const image = images[index];
+    if (isRecord(image) && image.mimeType === "image/ktx2" && !basisImageIndices.has(index)) {
+      return failure("invalid-image");
+    }
+  }
+  return null;
 }
 
 function accessorCount(accessors: readonly unknown[], index: unknown): number | null {
@@ -1307,14 +1380,20 @@ function collectMetrics(
     const nextImageBytes = safeAdd(imageBytes, range.byteLength);
     if (nextImageBytes === null) return { failure: failure("arithmetic-overflow") };
     imageBytes = nextImageBytes;
-    const dimensions = imageDimensions(
-      mimeType,
-      bytes.subarray(range.embeddedOffset, range.embeddedOffset + range.byteLength),
-    );
+    const imageData = bytes.subarray(range.embeddedOffset, range.embeddedOffset + range.byteLength);
+    const basisInfo = mimeType === "image/ktx2"
+      ? inspectStudioBg3dBasisKtx2(imageData)
+      : null;
+    if (mimeType === "image/ktx2" && !basisInfo) {
+      return { failure: failure("invalid-image") };
+    }
+    const dimensions = basisInfo ?? imageDimensions(mimeType, imageData);
     if (dimensions) {
       maxImageDimension = Math.max(maxImageDimension, dimensions.width, dimensions.height);
-      const pixels = safeMultiply(dimensions.width, dimensions.height);
-      const decodedBytes = pixels === null ? null : safeMultiply(pixels, 4);
+      const pixels = basisInfo ? null : safeMultiply(dimensions.width, dimensions.height);
+      const decodedBytes = basisInfo?.estimatedDecodedBytes ?? (
+        pixels === null ? null : safeMultiply(pixels, 4)
+      );
       const nextDecodedBytes = decodedBytes === null
         ? null
         : safeAdd(estimatedDecodedImageBytes, decodedBytes);
@@ -1322,6 +1401,8 @@ function collectMetrics(
       estimatedDecodedImageBytes = nextDecodedBytes;
     } else undeterminedImageDimensions += 1;
   }
+  const textureReferenceFailure = validateTextureImageReferences(root, textures, images);
+  if (textureReferenceFailure) return { failure: textureReferenceFailure };
 
   let lights = 0;
   const rootExtensions = root.extensions;

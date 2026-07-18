@@ -8,6 +8,7 @@ import {
 } from "./studio-bg3d-runtime-adapter";
 import {
   DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+  STUDIO_BG3D_SCENE_DOCUMENT_VERSION,
   normalizeStudioBg3dSceneDocument,
 } from "./studio-bg3d-scene-document";
 
@@ -38,7 +39,7 @@ describe("Studio BG3D runtime adapter boundary", () => {
     expect(snapshot.totalAssetBytes).toBe(0);
     expect(JSON.parse(snapshot.canonicalDocumentJson)).toMatchObject({
       kind: "toonspectrum.bg3d-scene",
-      version: 2,
+      version: STUDIO_BG3D_SCENE_DOCUMENT_VERSION,
     });
     expect(Object.isFrozen(snapshot)).toBe(true);
   });

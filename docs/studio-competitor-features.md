@@ -537,6 +537,36 @@ ibisPaint의 [타원자 말풍선 제작](https://ibispaint.com/lecture/index.js
 복합 오브젝트 프리셋 14종(건물/자연/차량/소품, 기존 13개 BgPrimitive 조합) · 뷰포트 하늘색 프리셋 4종 ·
 사진→웹툰 필터 3종.
 
+### 3D 물리 배치·분석적 리깅 (완료, 2026-07-18)
+
+- **결정론적 물리 배치** — 선택한 최상위 소품을 2/4/8초 동안 지구·달·무중력 환경에서 낙하시켜
+  바닥과 주변 오브젝트 위에 배치한다. 60Hz 고정 타임라인을 별도 module Worker의
+  `@dimforge/rapier3d-deterministic-compat`로 선계산하며, Worker·WASM은 사용자가 시작 버튼을 누를 때만
+  로드된다. 최대 256개 충돌 바디/32개 동적 바디, 입력·결과 좌표·쿼터니언·메시 예산, 15초 작업 제한을
+  양쪽 신뢰 경계에서 검증한다.
+- **비파괴 미리보기와 단일 베이크** — 재생 중에는 React 장면 문서를 바꾸지 않고 Three root 객체에만
+  임시 world transform을 투영한다. 재생/일시정지/처음으로/현재 자세 적용을 제공하고, 미리보기 중에는
+  선택·기즈모·계층 변경·저장·삽입을 잠가 좌표 공간 충돌을 막는다. `현재 자세 적용`은 canonical
+  SceneDocument를 한 번만 갱신하므로 실행 취소/다시 실행 한 단계로 왕복한다.
+- **모바일 우선 조작** — `추가` 빠른 실행에 3D 배경 카드를 노출하고, 320/390px에서도 물리 transport의
+  모든 조작 대상을 최소 44px로 유지한다. 320px 하단 저장/닫기/삽입 명령은 아이콘·축약 라벨로 전환해
+  글자가 세로로 깨지지 않게 한다.
+- **두 관절 IK** — SceneDocument v3가 모델별 analytic two-bone IK 체인(상완/전완/끝 관절,
+  모델-local target·pole·weight)을 최대 32개 보존한다. v2 문서는 빈 IK 목록을 명시적으로 더해 무손실
+  마이그레이션하고, 같은 순수 solver를 3D 배경 모델과 VRM 양손 소품 결합에 공유한다. 비균일/반사 스케일,
+  잘못된 계층, 중복 관절, 비유한 입력은 적용하지 않는 fail-closed 계약이다.
+- **제약→포즈 굽기** — 현재 animation→비파괴 pose→IK/aim 결과를 버튼 한 번으로 weight 1 포즈에
+  저장하고 애니메이션을 실제 표시 프레임에서 일시정지한 뒤 제약을 제거한다. 성공한 모델-local 결과만
+  저장하며 외부 transform write나 유효하지 않은 조인트 결과는 거부한다. 전체 변경은 3D undo/redo 한
+  단계로 복원된다.
+- **화면 크기 기반 animation LOD** — 단순 카메라 거리 대신 모델의 투영 지름(CSS px), FOV/zoom,
+  perspective/orthographic viewport를 사용하고 10% hysteresis를 적용한다. 선택·capture·near-plane
+  교차는 full-rate를 강제하고 측정 실패 시 거리/반경 LOD로 폴백한다.
+- **성능·회귀 게이트** — Rapier가 Studio/3D 편집기 초기 정적 그래프로 되돌아오지 않는지 manifest에서
+  검사하고, 격리 Worker를 정확히 하나만 허용하며 2.35MB raw/875KB gzip 예산을 고정한다. 순수 계약
+  테스트와 실제 브라우저의 낙하→정지→초기화→베이크→undo/redo, 모바일 overflow·터치 타깃을 함께
+  검증한다.
+
 ### 경쟁사 갭 2차 배치 6개 (완료, 프로덕션 배포됨)
 아이소메트릭 원근 그리드(Procreate) · 자유형 페인터블 레이어 마스크(Photoshop, `ClipMaskGroup` 중첩
 합성) · 팝업 원형 팔레트/색상환(Krita, 롱프레스) · 매직 리사이즈(미리캔버스/Canva, 비율 재배치) · 붓·

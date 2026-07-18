@@ -2786,6 +2786,7 @@ function QuickStartPanel({
   onExample,
   onOpenTemplate,
   onOpenCharacter,
+  onOpenBackground3d,
   onOpenBubble,
   onSmartShape,
   onStartDraw,
@@ -2797,6 +2798,7 @@ function QuickStartPanel({
   onExample: () => void;
   onOpenTemplate: () => void;
   onOpenCharacter: () => void;
+  onOpenBackground3d: () => void;
   onOpenBubble: () => void;
   onSmartShape: () => void;
   onStartDraw: () => void;
@@ -2806,7 +2808,7 @@ function QuickStartPanel({
 }) {
   // Drawing-first tools only — Canva-style visual starter cards (no marketing copy).
   const steps: {
-    id: "draw" | "smart-shape" | "brush-kit" | "template" | "collab-focus" | "character" | "bubble";
+    id: "draw" | "smart-shape" | "brush-kit" | "template" | "collab-focus" | "character" | "background-3d" | "bubble";
     label: string;
     hint: string;
     icon: typeof Pencil;
@@ -2853,6 +2855,13 @@ function QuickStartPanel({
       hint: "2D / 3D 포즈",
       icon: Smile,
       onClick: onOpenCharacter,
+    },
+    {
+      id: "background-3d",
+      label: "3D 배경",
+      hint: "장면 배치 · 물리 낙하",
+      icon: Boxes,
+      onClick: onOpenBackground3d,
     },
     {
       id: "bubble",
@@ -25147,6 +25156,7 @@ function StudioCuttoonEditor() {
           selectedId={selectedId}
           setAiNoticeOpen={setAiNoticeOpen}
           setAppSettingsOpen={setAppSettingsOpen}
+          setBg3dOpen={setBg3dOpen}
           setCanvasOnlyMode={setCanvasOnlyMode}
           setCommentPinArmed={setCommentPinArmed}
           setCommentsOpen={setCommentsOpen}
@@ -36305,6 +36315,7 @@ interface StudioCanvasViewportProps {
   selectedId: string | null;
   setAiNoticeOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setAppSettingsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setBg3dOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setCanvasOnlyMode: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setCommentPinArmed: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setCommentsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
@@ -36554,6 +36565,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   selectedId,
   setAiNoticeOpen,
   setAppSettingsOpen,
+  setBg3dOpen,
   setCanvasOnlyMode,
   setCommentPinArmed,
   setCommentsOpen,
@@ -39163,6 +39175,10 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
               onOpenCharacter={() => {
                 dismissQuickStart();
                 setPoserVrmOpen(true);
+              }}
+              onOpenBackground3d={() => {
+                dismissQuickStart();
+                setBg3dOpen(true);
               }}
               onOpenBubble={() => openQuickStartMenu("bubble")}
               onSmartShape={() => {

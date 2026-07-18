@@ -595,6 +595,7 @@ export type StudioStarterArtId =
   | "template"
   | "collab-focus"
   | "character"
+  | "background-3d"
   | "bubble"
   | "example";
 
@@ -620,6 +621,8 @@ export function StudioStarterCardArt({
         return "linear-gradient(145deg, oklch(0.32 0.03 70 / 0.5), oklch(0.18 0.01 70 / 0.9))";
       case "character":
         return "linear-gradient(145deg, oklch(0.4 0.09 25 / 0.28), oklch(0.2 0.02 70 / 0.85))";
+      case "background-3d":
+        return "linear-gradient(145deg, oklch(0.42 0.11 52 / 0.34), oklch(0.19 0.02 70 / 0.9))";
       case "bubble":
         return "linear-gradient(145deg, oklch(0.42 0.04 85 / 0.4), oklch(0.22 0.02 70 / 0.85))";
       case "example":
@@ -689,6 +692,32 @@ export function StudioStarterCardArt({
           <>
             <circle cx={20} cy={10} r={5} fill="none" stroke="oklch(0.8 0.08 25)" strokeWidth={1.5} />
             <path d="M10 24 C12 16, 28 16, 30 24" fill="none" stroke="oklch(0.8 0.08 25)" strokeWidth={1.5} strokeLinecap="round" />
+          </>
+        )}
+        {id === "background-3d" && (
+          <>
+            <path
+              d="M20 3 33 9.5 20 16 7 9.5Z"
+              fill="oklch(0.78 0.12 52 / 0.3)"
+              stroke="oklch(0.82 0.12 52)"
+              strokeWidth={1.35}
+              strokeLinejoin="round"
+            />
+            <path
+              d="M7 9.5v9L20 25v-9M33 9.5v9L20 25"
+              fill="none"
+              stroke="oklch(0.72 0.08 52)"
+              strokeWidth={1.35}
+              strokeLinejoin="round"
+            />
+            <path
+              d="M4 24h32"
+              fill="none"
+              stroke="oklch(0.7 0.03 70)"
+              strokeWidth={1}
+              strokeLinecap="round"
+              strokeDasharray="2 2"
+            />
           </>
         )}
         {id === "bubble" && (

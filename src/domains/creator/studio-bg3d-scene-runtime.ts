@@ -6,6 +6,7 @@
 
 import {
   DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+  STUDIO_BG3D_MAX_TWO_BONE_IK_CONSTRAINTS,
   STUDIO_BG3D_PRIMITIVE_KINDS,
   STUDIO_BG3D_SCENE_DOCUMENT_MAX_ATTACHMENTS,
   STUDIO_BG3D_SCENE_DOCUMENT_MAX_NODES,
@@ -308,7 +309,33 @@ function modelNodeFromRuntime(
   const constraints = value.constraints === undefined
     ? undefined
     : normalizeStudioBg3dConstraintLayer(value.constraints);
-  if (value.constraints !== undefined && !constraints) return null;
+  const sourceConstraintRecord = typeof value.constraints === "object" && value.constraints !== null
+    ? value.constraints
+    : null;
+  const sourceConstraintAims = sourceConstraintRecord
+    ? Reflect.get(sourceConstraintRecord, "aims")
+    : undefined;
+  const sourceConstraintTwoBoneIks = sourceConstraintRecord
+    ? Reflect.get(sourceConstraintRecord, "twoBoneIks")
+    : undefined;
+  const sourceAimCount = Array.isArray(sourceConstraintAims)
+    ? sourceConstraintAims.length
+    : -1;
+  // Aim-only v2 runtime objects are still valid in memory during HMR and legacy hydration. Treat a
+  // missing v3 collection as the canonical empty list, but fail closed for every other bad shape.
+  const sourceTwoBoneIkCount = sourceConstraintTwoBoneIks === undefined
+    ? 0
+    : Array.isArray(sourceConstraintTwoBoneIks)
+      ? sourceConstraintTwoBoneIks.length
+      : -1;
+  if (
+    value.constraints !== undefined && (
+      !constraints ||
+      sourceTwoBoneIkCount > STUDIO_BG3D_MAX_TWO_BONE_IK_CONSTRAINTS ||
+      constraints.aims.length !== sourceAimCount ||
+      constraints.twoBoneIks.length !== sourceTwoBoneIkCount
+    )
+  ) return null;
   return {
     id: value.id,
     name: value.name || "GLB 모델",
@@ -701,6 +728,13 @@ export function hydrateStudioBg3dDocumentToRuntime(
       constraints: node.constraints ? {
         ...node.constraints,
         aims: node.constraints.aims.map((aim) => ({ ...aim, target: [...aim.target] })),
+        ...(node.constraints.twoBoneIks ? {
+          twoBoneIks: node.constraints.twoBoneIks.map((ik) => ({
+            ...ik,
+            target: [...ik.target],
+            poleTarget: [...ik.poleTarget],
+          })),
+        } : {}),
       } : undefined,
     });
   }

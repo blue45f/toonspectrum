@@ -18,6 +18,7 @@ import {
   measureBg3dObjectSize,
   measureStudioBg3dThreeMetrics,
   parseBg3dSceneWithModelsFromDataUrl,
+  isStudioBg3dThreeTwoBoneIkChainSupported,
   sampleStudioBg3dAnimationActionAtTime,
 } from "./studio-background-3d-model";
 import { createPrimitive, encodeBg3dSceneHash } from "./studio-background-3d-primitives";
@@ -100,16 +101,37 @@ describe("studio-background-3d-model", () => {
 
   it("cloneBgCustomModelInstances deep-clones tuples so mutating a clone never affects the original", () => {
     const originals: BgCustomModelInstance[] = [
-      { id: "a", modelId: "model-1", position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+      {
+        id: "a",
+        modelId: "model-1",
+        position: [0, 0, 0],
+        rotation: [0, 0, 0],
+        scale: [1, 1, 1],
+        constraints: {
+          enabled: true,
+          aims: [],
+          twoBoneIks: [{
+            upperJointKey: "skin-0:joint-0",
+            middleJointKey: "skin-0:joint-1",
+            endJointKey: "skin-0:joint-2",
+            target: [1, 2, 3],
+            poleTarget: [0, 1, 1],
+            weight: 1,
+          }],
+        },
+      },
     ];
     const cloned = cloneBgCustomModelInstances(originals);
     cloned[0].position[0] = 99;
     cloned[0].scale[1] = 42;
+    (cloned[0].constraints?.twoBoneIks?.[0]?.target as [number, number, number])[0] = 99;
 
     expect(originals[0].position).toEqual([0, 0, 0]);
     expect(originals[0].scale).toEqual([1, 1, 1]);
     expect(cloned[0].id).toBe("a"); // id/modelId preserved for undo/redo snapshot identity
     expect(cloned[0].modelId).toBe("model-1");
+    expect(originals[0].constraints?.twoBoneIks?.[0]?.target).toEqual([1, 2, 3]);
+    expect(cloned[0].constraints?.twoBoneIks?.[0]?.target).toEqual([99, 2, 3]);
   });
 
   it("computeAutoFitScale scales the largest dimension to the target size (default 2, or a custom target)", () => {
@@ -744,8 +766,24 @@ describe("verified GLB Three.js safety boundary", () => {
     };
 
     expect(controller.joints).toEqual([
-      { key: "skin-0:joint-0", name: "Hips", skinIndex: 0, jointIndex: 0 },
-      { key: "skin-0:joint-1", name: "Arm", skinIndex: 0, jointIndex: 1 },
+      {
+        key: "skin-0:joint-0",
+        canonicalKey: "skin-0:joint-0",
+        name: "Hips",
+        skinIndex: 0,
+        jointIndex: 0,
+        parentKey: null,
+        restPosition: [0, 0, 0],
+      },
+      {
+        key: "skin-0:joint-1",
+        canonicalKey: "skin-0:joint-1",
+        name: "Arm",
+        skinIndex: 0,
+        jointIndex: 1,
+        parentKey: "skin-0:joint-0",
+        restPosition: [0, 0, 0],
+      },
     ]);
     controller.applyFromRestPose(pose);
     const once = arm.quaternion.clone();
@@ -779,9 +817,10 @@ describe("verified GLB Three.js safety boundary", () => {
         axis: "+z" as const,
         weight: 1,
       }],
+      twoBoneIks: [],
     };
 
-    controller.applyAimConstraints(constraints);
+    controller.applyConstraints(constraints);
     const aimed = new THREE.Vector3(0, 0, 1).applyQuaternion(bone.quaternion).normalize();
     expect(aimed.x).toBeCloseTo(1, 6);
     expect(aimed.y).toBeCloseTo(0, 6);
@@ -790,11 +829,414 @@ describe("verified GLB Three.js safety boundary", () => {
 
     controller.removeAppliedPoseOffsets();
     expect(bone.quaternion.angleTo(rest)).toBeLessThan(1e-8);
-    controller.applyAimConstraints(constraints);
+    controller.applyConstraints(constraints);
     expect(bone.quaternion.angleTo(once)).toBeLessThan(1e-8);
     controller.removeAppliedPoseOffsets();
-    controller.applyAimConstraints({ ...constraints, enabled: false });
+    controller.applyConstraints({ ...constraints, enabled: false });
     expect(bone.quaternion.angleTo(rest)).toBeLessThan(1e-8);
+  });
+
+  it("solves model-local two-bone IK after authored pose without frame accumulation", () => {
+    const upper = new THREE.Bone();
+    upper.name = "Upper";
+    const middle = new THREE.Bone();
+    middle.name = "Middle";
+    middle.position.set(1, 0, 0);
+    const end = new THREE.Bone();
+    end.name = "End";
+    end.position.set(1, 0, 0);
+    upper.add(middle);
+    middle.add(end);
+    const skeleton = new THREE.Skeleton([upper, middle, end]);
+    const mesh = new THREE.SkinnedMesh(triangleGeometry(1), new THREE.MeshBasicMaterial());
+    mesh.add(upper);
+    mesh.bind(skeleton);
+    const root = new THREE.Group();
+    root.position.set(3, 2, -4);
+    root.rotation.set(0.2, 0.45, -0.1);
+    root.add(mesh);
+    const controller = createStudioBg3dThreePoseController(root);
+    const restUpper = upper.quaternion.clone();
+    const restMiddle = middle.quaternion.clone();
+    const poseOffset = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, 0.2));
+    const pose = {
+      enabled: true,
+      weight: 0.6,
+      joints: [{
+        jointKey: "skin-0:joint-0",
+        rotationOffset: [poseOffset.x, poseOffset.y, poseOffset.z, poseOffset.w] as const,
+      }],
+    };
+    const target = [1, 1, 0] as const;
+    const poleTarget = [0, 0, 1] as const;
+    const constraints = {
+      enabled: true,
+      aims: [{
+        jointKey: "skin-0:joint-0",
+        target: [-2, 0, 0] as const,
+        axis: "+x" as const,
+        weight: 1,
+      }],
+      twoBoneIks: [{
+        upperJointKey: "skin-0:joint-0",
+        middleJointKey: "skin-0:joint-1",
+        endJointKey: "skin-0:joint-2",
+        target,
+        poleTarget,
+        weight: 1,
+      }],
+    };
+
+    expect(controller.joints.map((joint) => joint.parentKey)).toEqual([
+      null,
+      "skin-0:joint-0",
+      "skin-0:joint-1",
+    ]);
+    expect(controller.joints[2]?.restPosition[0]).toBeCloseTo(2, 8);
+    expect(controller.joints[2]?.restPosition[1]).toBeCloseTo(0, 8);
+    expect(controller.joints[2]?.restPosition[2]).toBeCloseTo(0, 8);
+    controller.applyToCurrentPose(pose);
+    controller.applyConstraints(constraints);
+    root.updateWorldMatrix(true, true);
+    const solvedLocal = end.getWorldPosition(new THREE.Vector3())
+      .applyMatrix4(root.matrixWorld.clone().invert());
+    expect(solvedLocal.distanceTo(new THREE.Vector3(...target))).toBeLessThan(1e-6);
+    const onceUpper = upper.quaternion.clone();
+    const onceMiddle = middle.quaternion.clone();
+    const bakedPose = controller.captureConstraintBakePose();
+    expect(bakedPose).toMatchObject({ enabled: true, weight: 1 });
+    expect(bakedPose?.joints.map(({ jointKey }) => jointKey)).toEqual([
+      "skin-0:joint-0",
+      "skin-0:joint-1",
+    ]);
+    controller.removeAppliedPoseOffsets();
+    controller.applyToCurrentPose(bakedPose ?? undefined);
+    root.updateWorldMatrix(true, true);
+    expect(upper.quaternion.angleTo(onceUpper)).toBeLessThan(1e-8);
+    expect(middle.quaternion.angleTo(onceMiddle)).toBeLessThan(1e-8);
+    expect(end.getWorldPosition(new THREE.Vector3()).applyMatrix4(root.matrixWorld.clone().invert())
+      .distanceTo(new THREE.Vector3(...target))).toBeLessThan(1e-6);
+    for (let iteration = 0; iteration < 100; iteration += 1) {
+      controller.applyFromRestPose(bakedPose ?? undefined);
+    }
+    expect(upper.quaternion.angleTo(onceUpper)).toBeLessThan(1e-8);
+    expect(middle.quaternion.angleTo(onceMiddle)).toBeLessThan(1e-8);
+
+    for (let iteration = 0; iteration < 100; iteration += 1) {
+      controller.removeAppliedPoseOffsets();
+      controller.applyToCurrentPose(pose);
+      controller.applyConstraints(constraints);
+    }
+    expect(upper.quaternion.angleTo(onceUpper)).toBeLessThan(1e-8);
+    expect(middle.quaternion.angleTo(onceMiddle)).toBeLessThan(1e-8);
+    expect(target).toEqual([1, 1, 0]);
+    expect(poleTarget).toEqual([0, 0, 1]);
+
+    controller.removeAppliedPoseOffsets();
+    expect(upper.quaternion.angleTo(restUpper)).toBeLessThan(1e-8);
+    expect(middle.quaternion.angleTo(restMiddle)).toBeLessThan(1e-8);
+
+    const partialConstraints = {
+      ...constraints,
+      aims: [],
+      twoBoneIks: [{ ...constraints.twoBoneIks[0], weight: 0.35 }],
+    };
+    controller.applyConstraints(partialConstraints);
+    const partialUpper = upper.quaternion.clone();
+    const partialMiddle = middle.quaternion.clone();
+    for (let iteration = 0; iteration < 100; iteration += 1) {
+      controller.removeAppliedPoseOffsets();
+      controller.applyConstraints(partialConstraints);
+    }
+    expect(upper.quaternion.angleTo(partialUpper)).toBeLessThan(1e-8);
+    expect(middle.quaternion.angleTo(partialMiddle)).toBeLessThan(1e-8);
+    controller.removeAppliedPoseOffsets();
+
+    controller.applyConstraints({
+      ...constraints,
+      aims: [],
+      twoBoneIks: [{ ...constraints.twoBoneIks[0], weight: 0 }],
+    });
+    expect(upper.quaternion.angleTo(restUpper)).toBeLessThan(1e-8);
+    expect(middle.quaternion.angleTo(restMiddle)).toBeLessThan(1e-8);
+  });
+
+  it("solves nested non-overlapping IK chains ancestor-first regardless of stored order", () => {
+    const parentUpper = new THREE.Bone();
+    parentUpper.name = "ParentUpper";
+    const parentMiddle = new THREE.Bone();
+    parentMiddle.name = "ParentMiddle";
+    parentMiddle.position.x = 1;
+    const parentEnd = new THREE.Bone();
+    parentEnd.name = "ParentEnd";
+    parentEnd.position.x = 1;
+    const childUpper = new THREE.Bone();
+    childUpper.name = "ChildUpper";
+    const childMiddle = new THREE.Bone();
+    childMiddle.name = "ChildMiddle";
+    childMiddle.position.x = 1;
+    const childEnd = new THREE.Bone();
+    childEnd.name = "ChildEnd";
+    childEnd.position.x = 1;
+    parentUpper.add(parentMiddle);
+    parentMiddle.add(parentEnd);
+    parentEnd.add(childUpper);
+    childUpper.add(childMiddle);
+    childMiddle.add(childEnd);
+    const skeleton = new THREE.Skeleton([
+      parentUpper,
+      parentMiddle,
+      parentEnd,
+      childUpper,
+      childMiddle,
+      childEnd,
+    ]);
+    const mesh = new THREE.SkinnedMesh(triangleGeometry(1), new THREE.MeshBasicMaterial());
+    mesh.add(parentUpper);
+    mesh.bind(skeleton);
+    const root = new THREE.Group();
+    root.position.set(3, -2, 4);
+    root.rotation.set(0.2, -0.35, 0.15);
+    root.add(mesh);
+    const controller = createStudioBg3dThreePoseController(root);
+    const parentTarget = [1, 1, 0] as const;
+    const childTarget = [2, 2, 0.4] as const;
+    const parentConstraint = {
+      upperJointKey: "skin-0:joint-0",
+      middleJointKey: "skin-0:joint-1",
+      endJointKey: "skin-0:joint-2",
+      target: parentTarget,
+      poleTarget: [0, 0, 1] as const,
+      weight: 1,
+    };
+    const childConstraint = {
+      upperJointKey: "skin-0:joint-3",
+      middleJointKey: "skin-0:joint-4",
+      endJointKey: "skin-0:joint-5",
+      target: childTarget,
+      poleTarget: [1, 1, 1] as const,
+      weight: 1,
+    };
+    const inverseRoot = new THREE.Matrix4();
+    const sampleSolvedPose = (
+      twoBoneIks: readonly (typeof parentConstraint | typeof childConstraint)[],
+    ) => {
+      controller.applyConstraints({ enabled: true, aims: [], twoBoneIks });
+      root.updateWorldMatrix(true, true);
+      inverseRoot.copy(root.matrixWorld).invert();
+      const parentEndLocal = parentEnd.getWorldPosition(new THREE.Vector3()).applyMatrix4(inverseRoot);
+      const childEndLocal = childEnd.getWorldPosition(new THREE.Vector3()).applyMatrix4(inverseRoot);
+      const rotations = [
+        parentUpper.quaternion.clone(),
+        parentMiddle.quaternion.clone(),
+        childUpper.quaternion.clone(),
+        childMiddle.quaternion.clone(),
+      ];
+      controller.removeAppliedPoseOffsets();
+      return { parentEndLocal, childEndLocal, rotations };
+    };
+
+    const descendantFirst = sampleSolvedPose([childConstraint, parentConstraint]);
+    const ancestorFirst = sampleSolvedPose([parentConstraint, childConstraint]);
+
+    for (const solved of [descendantFirst, ancestorFirst]) {
+      expect(solved.parentEndLocal.distanceTo(new THREE.Vector3(...parentTarget))).toBeLessThan(1e-6);
+      expect(solved.childEndLocal.distanceTo(new THREE.Vector3(...childTarget))).toBeLessThan(1e-6);
+    }
+    for (let index = 0; index < descendantFirst.rotations.length; index += 1) {
+      expect(descendantFirst.rotations[index]!.angleTo(ancestorFirst.rotations[index]!))
+        .toBeLessThan(1e-8);
+    }
+  });
+
+  it("rejects non-uniform roots and invalid IK ancestry without mutating the chain", () => {
+    const upper = new THREE.Bone();
+    const middle = new THREE.Bone();
+    middle.position.x = 1;
+    const end = new THREE.Bone();
+    end.position.x = 1;
+    upper.add(middle);
+    middle.add(end);
+    const skeleton = new THREE.Skeleton([upper, middle, end]);
+    const mesh = new THREE.SkinnedMesh(triangleGeometry(1), new THREE.MeshBasicMaterial());
+    mesh.add(upper);
+    mesh.bind(skeleton);
+    const root = new THREE.Group();
+    root.add(mesh);
+    const controller = createStudioBg3dThreePoseController(root);
+    const restUpper = upper.quaternion.clone();
+    const restMiddle = middle.quaternion.clone();
+    const validConstraint = {
+      enabled: true,
+      aims: [],
+      twoBoneIks: [{
+        upperJointKey: "skin-0:joint-0",
+        middleJointKey: "skin-0:joint-1",
+        endJointKey: "skin-0:joint-2",
+        target: [1, 1, 0] as const,
+        poleTarget: [0, 0, 1] as const,
+        weight: 1,
+      }],
+    };
+
+    const chainSupport = (instanceWorldMatrix: THREE.Matrix4) =>
+      isStudioBg3dThreeTwoBoneIkChainSupported({
+        root,
+        instanceWorldMatrix,
+        upperJointKey: "skin-0:joint-0",
+        middleJointKey: "skin-0:joint-1",
+        endJointKey: "skin-0:joint-2",
+      });
+    expect(chainSupport(new THREE.Matrix4().makeScale(2, 2, 2))).toBe(true);
+    expect(chainSupport(new THREE.Matrix4().makeScale(2, 1, 1))).toBe(false);
+    expect(chainSupport(new THREE.Matrix4().makeScale(-1, 1, 1))).toBe(false);
+
+    root.scale.set(2, 1, 1);
+    controller.applyConstraints(validConstraint);
+    expect(controller.captureConstraintBakePose()).toBeNull();
+    expect(upper.quaternion.angleTo(restUpper)).toBeLessThan(1e-8);
+    expect(middle.quaternion.angleTo(restMiddle)).toBeLessThan(1e-8);
+
+    root.scale.set(0.001, 0.001009, 0.001);
+    controller.applyConstraints(validConstraint);
+    expect(upper.quaternion.angleTo(restUpper)).toBeLessThan(1e-8);
+    expect(middle.quaternion.angleTo(restMiddle)).toBeLessThan(1e-8);
+
+    root.scale.set(-1, 1, 1);
+    controller.applyConstraints(validConstraint);
+    expect(upper.quaternion.angleTo(restUpper)).toBeLessThan(1e-8);
+    expect(middle.quaternion.angleTo(restMiddle)).toBeLessThan(1e-8);
+
+    root.matrixAutoUpdate = false;
+    root.matrix.set(
+      1, 0.5, 0, 0,
+      0, Math.sqrt(0.75), 0, 0,
+      0, 0, 1, 0,
+      0, 0, 0, 1,
+    );
+    controller.applyConstraints(validConstraint);
+    expect(upper.quaternion.angleTo(restUpper)).toBeLessThan(1e-8);
+    expect(middle.quaternion.angleTo(restMiddle)).toBeLessThan(1e-8);
+
+    root.matrixAutoUpdate = true;
+    root.scale.set(1, 1, 1);
+    controller.applyConstraints({
+      ...validConstraint,
+      twoBoneIks: [{
+        ...validConstraint.twoBoneIks[0],
+        middleJointKey: "skin-0:joint-2",
+        endJointKey: "skin-0:joint-1",
+      }],
+    });
+    expect(controller.captureConstraintBakePose()).toBeNull();
+    expect(upper.quaternion.angleTo(restUpper)).toBeLessThan(1e-8);
+    expect(middle.quaternion.angleTo(restMiddle)).toBeLessThan(1e-8);
+  });
+
+  it("keeps an IK target fixed when an aim constraint also targets a chain ancestor", () => {
+    const shoulder = new THREE.Bone();
+    const upper = new THREE.Bone();
+    const middle = new THREE.Bone();
+    middle.position.x = 1;
+    const end = new THREE.Bone();
+    end.position.x = 1;
+    shoulder.add(upper);
+    upper.add(middle);
+    middle.add(end);
+    const skeleton = new THREE.Skeleton([shoulder, upper, middle, end]);
+    const mesh = new THREE.SkinnedMesh(triangleGeometry(1), new THREE.MeshBasicMaterial());
+    mesh.add(shoulder);
+    mesh.bind(skeleton);
+    const root = new THREE.Group();
+    root.add(mesh);
+    const controller = createStudioBg3dThreePoseController(root);
+    const shoulderRest = shoulder.quaternion.clone();
+    const aim = {
+      jointKey: "skin-0:joint-0",
+      target: [-1, 0, 0] as const,
+      axis: "+x" as const,
+      weight: 1,
+    };
+
+    controller.applyConstraints({ enabled: true, aims: [aim], twoBoneIks: [] });
+    expect(shoulder.quaternion.angleTo(shoulderRest)).toBeGreaterThan(1);
+    controller.removeAppliedPoseOffsets();
+
+    const target = new THREE.Vector3(1, 1, 0);
+    controller.applyConstraints({
+      enabled: true,
+      aims: [aim],
+      twoBoneIks: [{
+        upperJointKey: "skin-0:joint-1",
+        middleJointKey: "skin-0:joint-2",
+        endJointKey: "skin-0:joint-3",
+        target: [1, 1, 0],
+        poleTarget: [0, 0, 1],
+        weight: 1,
+      }],
+    });
+    root.updateWorldMatrix(true, true);
+    expect(end.getWorldPosition(new THREE.Vector3()).distanceTo(target)).toBeLessThan(1e-6);
+    expect(shoulder.quaternion.angleTo(shoulderRest)).toBeLessThan(1e-8);
+  });
+
+  it("preserves external bone writes and removes shared-skin procedural rotations exactly", () => {
+    const sharedBone = new THREE.Bone();
+    const firstSkeleton = new THREE.Skeleton([sharedBone]);
+    const secondSkeleton = new THREE.Skeleton([sharedBone]);
+    const firstMesh = new THREE.SkinnedMesh(triangleGeometry(1), new THREE.MeshBasicMaterial());
+    const secondMesh = new THREE.SkinnedMesh(triangleGeometry(1), new THREE.MeshBasicMaterial());
+    firstMesh.add(sharedBone);
+    firstMesh.bind(firstSkeleton);
+    secondMesh.bind(secondSkeleton);
+    const root = new THREE.Group();
+    root.add(firstMesh, secondMesh);
+    const controller = createStudioBg3dThreePoseController(root);
+    const rest = sharedBone.quaternion.clone();
+    expect(controller.joints.map((joint) => joint.canonicalKey)).toEqual([
+      "skin-0:joint-0",
+      "skin-0:joint-0",
+    ]);
+    const x = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.6, 0, 0));
+    const y = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0.7, 0));
+    const pose = {
+      enabled: true,
+      weight: 1,
+      joints: [
+        { jointKey: "skin-0:joint-0", rotationOffset: [x.x, x.y, x.z, x.w] as const },
+        { jointKey: "skin-1:joint-0", rotationOffset: [y.x, y.y, y.z, y.w] as const },
+      ],
+    };
+    const aimConstraint = {
+      enabled: true,
+      aims: [{
+        jointKey: "skin-0:joint-0",
+        target: [1, 1, 0] as const,
+        axis: "+x" as const,
+        weight: 0.5,
+      }],
+      twoBoneIks: [],
+    };
+
+    controller.applyToCurrentPose(pose);
+    controller.applyConstraints(aimConstraint);
+    expect(sharedBone.quaternion.angleTo(rest)).toBeGreaterThan(0.5);
+    expect(controller.captureConstraintBakePose()?.joints.map(({ jointKey }) => jointKey))
+      .toEqual(["skin-0:joint-0"]);
+    controller.removeAppliedPoseOffsets();
+    expect(sharedBone.quaternion.angleTo(rest)).toBeLessThan(1e-8);
+
+    controller.applyToCurrentPose(pose);
+    controller.applyConstraints(aimConstraint);
+    const external = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.2, 0.4, 0.1));
+    sharedBone.quaternion.copy(external);
+    expect(controller.captureConstraintBakePose()).toBeNull();
+    controller.removeAppliedPoseOffsets();
+    expect(sharedBone.quaternion.angleTo(external)).toBeLessThan(1e-7);
+
+    controller.applyToCurrentPose(pose);
+    controller.removeAppliedPoseOffsets();
+    expect(sharedBone.quaternion.angleTo(external)).toBeLessThan(1e-7);
   });
 
   it("samples a real AnimationMixer across the ping-pong boundary without double reflection", () => {
