@@ -614,6 +614,22 @@ describe("V2 IndexedDB behavior", () => {
     expect(state.records.size).toBe(0);
   });
 
+  it("honors a late abort immediately before opening the write transaction", async () => {
+    const state = installFakeIndexedDb();
+    const controller = new AbortController();
+
+    await expect(importVerifiedBg3dModelsAtomically([glbFile("cancelled.glb")], {
+      signal: controller.signal,
+      idFactory: () => {
+        controller.abort();
+        return "cancelled-storage";
+      },
+    })).rejects.toMatchObject({ code: "aborted" });
+
+    expect(state.transactionModes).not.toContain("readwrite");
+    expect(state.records.size).toBe(0);
+  });
+
   it("lazily promotes a legacy GLB only after full validation and keeps unknown rights commercial-safe", async () => {
     const bytes = validGlb();
     const legacy: Bg3dLegacyStoredRecord = {

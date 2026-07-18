@@ -345,6 +345,24 @@ describe("GLB validator policy derivation", () => {
     expect(profiles.desktop.complexity.maxModelBytes).toBe(100 * 1024 * 1024);
     expect(profiles.mobile.complexity.maxNodes).toBe(256);
     expect(profiles.desktop.complexity.maxNodes).toBe(256);
+    expect(profiles.mobile.complexity).toMatchObject({
+      maxAnimations: 32,
+      maxAnimationChannels: 256,
+      maxAnimationKeyframes: 250_000,
+      maxAnimationValues: 2_000_000,
+      maxSkins: 32,
+      maxJoints: 1_024,
+      maxMorphTargets: 128,
+    });
+    expect(profiles.desktop.complexity).toMatchObject({
+      maxAnimations: 64,
+      maxAnimationChannels: 1_024,
+      maxAnimationKeyframes: 1_000_000,
+      maxAnimationValues: 8_000_000,
+      maxSkins: 64,
+      maxJoints: 2_048,
+      maxMorphTargets: 256,
+    });
     expect(profiles.mobile.textures.maxTextures).toBe(64);
     expect(profiles.desktop.textures.maxTextures).toBe(128);
     expect(profiles.mobile.textures.maxDimension).toBe(4096);
@@ -363,6 +381,15 @@ describe("GLB validator policy derivation", () => {
           maxDrawCalls: 30,
           maxMaterials: 20,
           maxLights: 2,
+          maxAnimations: 3,
+          maxAnimationChannels: 30,
+          maxAnimationKeyframes: 300,
+          maxAnimationValues: 1_200,
+          maxSkins: 2,
+          maxJoints: 64,
+          maxMorphTargets: 8,
+          maxAccessorElements: 100_000,
+          maxDecodedGeometryBytes: 4_000_000,
         },
         textures: {
           maxTextures: 10,
@@ -406,6 +433,8 @@ describe("GLB validator policy derivation", () => {
           ...base.budgets.complexity,
           maxNodes: Number.NaN,
           maxModelBytes: Number.POSITIVE_INFINITY,
+          maxAnimationValues: Number.NEGATIVE_INFINITY,
+          maxMorphTargets: -1,
         },
       },
     };
@@ -415,6 +444,10 @@ describe("GLB validator policy derivation", () => {
     expect(profiles.desktop.complexity.maxNodes).toBe(0);
     expect(profiles.mobile.complexity.maxModelBytes).toBe(0);
     expect(profiles.desktop.complexity.maxModelBytes).toBe(0);
+    expect(profiles.mobile.complexity.maxAnimationValues).toBe(0);
+    expect(profiles.desktop.complexity.maxAnimationValues).toBe(0);
+    expect(profiles.mobile.complexity.maxMorphTargets).toBe(0);
+    expect(profiles.desktop.complexity.maxMorphTargets).toBe(0);
   });
 
   it("never exceeds the hard renderer pixel ceiling", () => {

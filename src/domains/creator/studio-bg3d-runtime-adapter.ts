@@ -1,0 +1,361 @@
+import {
+  STUDIO_BG3D_RUNTIME_CATALOG,
+  type StudioBg3dRuntimeCapability,
+  type StudioBg3dRuntimeId,
+} from "./studio-bg3d-runtime-topology";
+import {
+  parseStudioBg3dSceneDocument,
+  serializeStudioBg3dSceneDocument,
+  type StudioBg3dSceneDocument,
+} from "./studio-bg3d-scene-document";
+
+import type { StudioBg3dGlbValidationSuccess } from "./studio-bg3d-glb-validation";
+
+export type StudioBg3dRuntimeBoundaryErrorCode =
+  | "invalid-snapshot"
+  | "missing-verified-asset"
+  | "asset-metadata-mismatch"
+  | "adapter-already-registered"
+  | "adapter-not-registered"
+  | "capability-unavailable"
+  | "invalid-request"
+  | "invalid-result"
+  | "aborted"
+  | "registry-disposed";
+
+export class StudioBg3dRuntimeBoundaryError extends Error {
+  constructor(readonly code: StudioBg3dRuntimeBoundaryErrorCode) {
+    super(code);
+    this.name = "StudioBg3dRuntimeBoundaryError";
+  }
+}
+
+export interface StudioBg3dRuntimeAssetSnapshot {
+  readonly attachmentId: string;
+  readonly hash: string;
+  readonly byteSize: number;
+  /** Always returns a fresh copy; adapters can never mutate the coordinator's verified snapshot. */
+  readVerifiedBytes(): Uint8Array;
+}
+
+export interface StudioBg3dRuntimeSnapshot {
+  readonly canonicalDocumentJson: string;
+  readonly assets: readonly StudioBg3dRuntimeAssetSnapshot[];
+  readonly totalAssetBytes: number;
+}
+
+const trustedRuntimeSnapshots = new WeakSet<object>();
+
+export function createStudioBg3dRuntimeSnapshot(
+  document: StudioBg3dSceneDocument,
+  verificationByAttachmentId: ReadonlyMap<string, StudioBg3dGlbValidationSuccess>,
+): StudioBg3dRuntimeSnapshot {
+  const canonicalDocumentJson = serializeStudioBg3dSceneDocument(document);
+  if (!canonicalDocumentJson || !parseStudioBg3dSceneDocument(canonicalDocumentJson)) {
+    throw new StudioBg3dRuntimeBoundaryError("invalid-snapshot");
+  }
+  const assets: StudioBg3dRuntimeAssetSnapshot[] = [];
+  let totalAssetBytes = 0;
+  for (const attachment of document.attachments) {
+    const verification = verificationByAttachmentId.get(attachment.id);
+    if (!verification) throw new StudioBg3dRuntimeBoundaryError("missing-verified-asset");
+    if (
+      verification.verifiedSha256 !== attachment.hash ||
+      verification.verifiedBytes.byteLength !== attachment.byteSize ||
+      verification.metrics.byteSize !== attachment.byteSize
+    ) {
+      throw new StudioBg3dRuntimeBoundaryError("asset-metadata-mismatch");
+    }
+    const ownedBytes = Uint8Array.from(verification.verifiedBytes);
+    totalAssetBytes += ownedBytes.byteLength;
+    assets.push(Object.freeze({
+      attachmentId: attachment.id,
+      hash: attachment.hash,
+      byteSize: ownedBytes.byteLength,
+      readVerifiedBytes: () => Uint8Array.from(ownedBytes),
+    }));
+  }
+  const snapshot = Object.freeze({
+    canonicalDocumentJson,
+    assets: Object.freeze(assets),
+    totalAssetBytes,
+  });
+  trustedRuntimeSnapshots.add(snapshot);
+  return snapshot;
+}
+
+export type StudioBg3dSpecialistRequest =
+  | { readonly kind: "runtime-metrics" }
+  | { readonly kind: "capture"; readonly width: number; readonly height: number }
+  | {
+    readonly kind: "physics-preview";
+    readonly durationSeconds: number;
+    readonly stepSeconds: number;
+    readonly gravity: readonly [number, number, number];
+  }
+  | { readonly kind: "material-conformance"; readonly width: number; readonly height: number }
+  | { readonly kind: "splat-preview"; readonly width: number; readonly height: number }
+  | { readonly kind: "geospatial-frame"; readonly width: number; readonly height: number }
+  | { readonly kind: "point-cloud-frame"; readonly width: number; readonly height: number }
+  | { readonly kind: "geospatial-data-frame"; readonly width: number; readonly height: number }
+  | { readonly kind: "vector-map-frame"; readonly width: number; readonly height: number }
+  | { readonly kind: "bim-section"; readonly width: number; readonly height: number }
+  | { readonly kind: "xr-runtime-metrics" }
+  | { readonly kind: "scientific-isosurface"; readonly isoValue: number };
+
+type StudioBg3dMetricValue = number | string | boolean | null;
+
+export type StudioBg3dSpecialistResult =
+  | {
+    readonly kind: "metrics";
+    readonly values: Readonly<Record<string, StudioBg3dMetricValue>>;
+  }
+  | {
+    readonly kind: "capture";
+    readonly width: number;
+    readonly height: number;
+    readonly rgba: Uint8Array;
+    readonly depthFloat32?: Float32Array;
+  }
+  | {
+    readonly kind: "transforms";
+    readonly samples: readonly {
+      readonly nodeId: string;
+      readonly position: readonly [number, number, number];
+      readonly rotation: readonly [number, number, number, number];
+    }[];
+  };
+
+export interface StudioBg3dRuntimeAdapterJob {
+  readonly id: string;
+  readonly snapshot: StudioBg3dRuntimeSnapshot;
+  readonly request: StudioBg3dSpecialistRequest;
+  readonly signal: AbortSignal;
+}
+
+export interface StudioBg3dRuntimeAdapter {
+  readonly runtimeId: StudioBg3dRuntimeId;
+  readonly capabilities: ReadonlySet<StudioBg3dRuntimeCapability>;
+  runIsolated(job: StudioBg3dRuntimeAdapterJob): Promise<StudioBg3dSpecialistResult>;
+  dispose(): void | Promise<void>;
+}
+
+function runtimeBoundaryError(code: StudioBg3dRuntimeBoundaryErrorCode): StudioBg3dRuntimeBoundaryError {
+  return new StudioBg3dRuntimeBoundaryError(code);
+}
+
+function validDimension(value: unknown): value is number {
+  return Number.isSafeInteger(value) && typeof value === "number" && value > 0 && value <= 16_384;
+}
+
+const MAX_RASTER_PIXELS = 16_777_216;
+const MAX_METRIC_STRING_LENGTH = 4_096;
+const MAX_TRANSFORM_POSITION = 1_000_000;
+const MIN_QUATERNION_LENGTH = 1e-8;
+
+function validRasterSize(width: unknown, height: unknown): width is number {
+  return validDimension(width) && validDimension(height)
+    && width <= Math.floor(MAX_RASTER_PIXELS / height);
+}
+
+function isTrustedRuntimeSnapshot(value: unknown): value is StudioBg3dRuntimeSnapshot {
+  return typeof value === "object" && value !== null && trustedRuntimeSnapshots.has(value);
+}
+
+function validRequest(request: StudioBg3dSpecialistRequest): boolean {
+  if (!request || typeof request !== "object") return false;
+  switch (request.kind) {
+    case "runtime-metrics":
+      return true;
+    case "capture":
+    case "material-conformance":
+    case "splat-preview":
+    case "geospatial-frame":
+    case "point-cloud-frame":
+    case "geospatial-data-frame":
+    case "vector-map-frame":
+    case "bim-section":
+      return validRasterSize(request.width, request.height);
+    case "xr-runtime-metrics":
+      return true;
+    case "physics-preview":
+      return Number.isFinite(request.durationSeconds) && request.durationSeconds > 0
+        && request.durationSeconds <= 60
+        && Number.isFinite(request.stepSeconds) && request.stepSeconds >= 1 / 240
+        && request.stepSeconds <= 1 / 15
+        && Array.isArray(request.gravity) && request.gravity.length === 3
+        && request.gravity.every((value) => Number.isFinite(value) && Math.abs(value) <= 1_000);
+    case "scientific-isosurface":
+      return Number.isFinite(request.isoValue);
+  }
+}
+
+function sanitizeResult(result: StudioBg3dSpecialistResult): StudioBg3dSpecialistResult {
+  if (!result || typeof result !== "object") throw runtimeBoundaryError("invalid-result");
+  if (result.kind === "metrics") {
+    const entries = Object.entries(result.values ?? {});
+    if (
+      entries.length > 128 ||
+      entries.some(([key, value]) =>
+        !key || key.length > 64 ||
+        !(value === null || typeof value === "string" || typeof value === "boolean" ||
+          (typeof value === "number" && Number.isFinite(value))) ||
+        (typeof value === "string" && value.length > MAX_METRIC_STRING_LENGTH)
+      )
+    ) {
+      throw runtimeBoundaryError("invalid-result");
+    }
+    return Object.freeze({ kind: "metrics", values: Object.freeze(Object.fromEntries(entries)) });
+  }
+  if (result.kind === "capture") {
+    if (!validRasterSize(result.width, result.height)) {
+      throw runtimeBoundaryError("invalid-result");
+    }
+    const pixels = result.width * result.height;
+    if (!(result.rgba instanceof Uint8Array) || result.rgba.byteLength !== pixels * 4) {
+      throw runtimeBoundaryError("invalid-result");
+    }
+    if (
+      result.depthFloat32 !== undefined &&
+      (!(result.depthFloat32 instanceof Float32Array) || result.depthFloat32.length !== pixels)
+    ) {
+      throw runtimeBoundaryError("invalid-result");
+    }
+    return Object.freeze({
+      kind: "capture",
+      width: result.width,
+      height: result.height,
+      rgba: Uint8Array.from(result.rgba),
+      ...(result.depthFloat32 ? { depthFloat32: Float32Array.from(result.depthFloat32) } : {}),
+    });
+  }
+  if (result.kind === "transforms") {
+    if (!Array.isArray(result.samples) || result.samples.length > 512) {
+      throw runtimeBoundaryError("invalid-result");
+    }
+    const ids = new Set<string>();
+    const samples = result.samples.map((sample) => {
+      if (
+        !sample || typeof sample.nodeId !== "string" || !sample.nodeId || sample.nodeId.length > 128 ||
+        ids.has(sample.nodeId) || !Array.isArray(sample.position) || sample.position.length !== 3 ||
+        !Array.isArray(sample.rotation) || sample.rotation.length !== 4 ||
+        [...sample.position, ...sample.rotation].some((value) => !Number.isFinite(value)) ||
+        sample.position.some((value: number) => Math.abs(value) > MAX_TRANSFORM_POSITION)
+      ) {
+        throw runtimeBoundaryError("invalid-result");
+      }
+      const rotationLength = Math.hypot(...sample.rotation);
+      if (!Number.isFinite(rotationLength) || rotationLength < MIN_QUATERNION_LENGTH) {
+        throw runtimeBoundaryError("invalid-result");
+      }
+      ids.add(sample.nodeId);
+      return Object.freeze({
+        nodeId: sample.nodeId,
+        position: Object.freeze([...sample.position]) as unknown as readonly [number, number, number],
+        rotation: Object.freeze(sample.rotation.map((value: number) => value / rotationLength)) as unknown as
+          readonly [number, number, number, number],
+      });
+    });
+    return Object.freeze({ kind: "transforms", samples: Object.freeze(samples) });
+  }
+  throw runtimeBoundaryError("invalid-result");
+}
+
+function requiredCapabilitiesForRequest(
+  request: StudioBg3dSpecialistRequest,
+): readonly StudioBg3dRuntimeCapability[] {
+  switch (request.kind) {
+    case "runtime-metrics": return [];
+    case "capture": return ["capture-rgba-depth"];
+    case "physics-preview": return ["physics"];
+    case "material-conformance": return ["material-conformance"];
+    case "splat-preview": return ["gaussian-splatting"];
+    case "geospatial-frame": return ["geospatial-streaming"];
+    case "point-cloud-frame": return ["point-cloud-streaming"];
+    case "geospatial-data-frame": return ["geospatial-data-layers"];
+    case "vector-map-frame": return ["vector-map-streaming"];
+    case "bim-section": return ["bim-semantic-model"];
+    case "xr-runtime-metrics": return ["webxr", "wasm-runtime"];
+    case "scientific-isosurface": return ["scientific-volume"];
+  }
+}
+
+interface StudioBg3dRegisteredRuntimeAdapter {
+  readonly adapter: StudioBg3dRuntimeAdapter;
+  readonly capabilities: ReadonlySet<StudioBg3dRuntimeCapability>;
+}
+
+/** Registry serializes jobs per adapter so two specialist scenes never share mutable engine state. */
+export class StudioBg3dRuntimeAdapterRegistry {
+  readonly #adapters = new Map<StudioBg3dRuntimeId, StudioBg3dRegisteredRuntimeAdapter>();
+  readonly #queues = new Map<StudioBg3dRuntimeId, Promise<void>>();
+  #disposed = false;
+  #disposePromise: Promise<void> | undefined;
+
+  register(adapter: StudioBg3dRuntimeAdapter): void {
+    if (this.#disposed) throw runtimeBoundaryError("registry-disposed");
+    const descriptor = STUDIO_BG3D_RUNTIME_CATALOG[adapter.runtimeId];
+    if (!descriptor) throw runtimeBoundaryError("invalid-request");
+    if (this.#adapters.has(adapter.runtimeId)) throw runtimeBoundaryError("adapter-already-registered");
+    const capabilities = new Set(adapter.capabilities);
+    if ([...capabilities].some((capability) => !descriptor.capabilities.has(capability))) {
+      throw runtimeBoundaryError("capability-unavailable");
+    }
+    this.#adapters.set(adapter.runtimeId, {
+      adapter,
+      capabilities,
+    });
+  }
+
+  registeredRuntimeIds(): readonly StudioBg3dRuntimeId[] {
+    return Object.freeze([...this.#adapters.keys()]);
+  }
+
+  async run(
+    runtimeId: StudioBg3dRuntimeId,
+    id: string,
+    snapshot: StudioBg3dRuntimeSnapshot,
+    request: StudioBg3dSpecialistRequest,
+    signal: AbortSignal = new AbortController().signal,
+  ): Promise<StudioBg3dSpecialistResult> {
+    if (this.#disposed) throw runtimeBoundaryError("registry-disposed");
+    const registration = this.#adapters.get(runtimeId);
+    if (!registration) throw runtimeBoundaryError("adapter-not-registered");
+    if (!isTrustedRuntimeSnapshot(snapshot)) throw runtimeBoundaryError("invalid-snapshot");
+    if (!id || id.length > 128 || !validRequest(request)) throw runtimeBoundaryError("invalid-request");
+    if (
+      requiredCapabilitiesForRequest(request)
+        .some((capability) => !registration.capabilities.has(capability))
+    ) {
+      throw runtimeBoundaryError("capability-unavailable");
+    }
+    const previous = this.#queues.get(runtimeId) ?? Promise.resolve();
+    let release: (() => void) | undefined;
+    const queued = new Promise<void>((resolve) => { release = resolve; });
+    this.#queues.set(runtimeId, previous.catch(() => undefined).then(() => queued));
+    await previous.catch(() => undefined);
+    try {
+      if (signal.aborted) throw runtimeBoundaryError("aborted");
+      const result = await registration.adapter.runIsolated({ id, snapshot, request, signal });
+      if (signal.aborted) throw runtimeBoundaryError("aborted");
+      return sanitizeResult(result);
+    } finally {
+      release?.();
+    }
+  }
+
+  async dispose(): Promise<void> {
+    if (this.#disposePromise) return this.#disposePromise;
+    this.#disposed = true;
+    this.#disposePromise = (async () => {
+      await Promise.allSettled([...this.#queues.values()]);
+      await Promise.allSettled(
+        [...this.#adapters.values()].map(({ adapter }) =>
+          Promise.resolve().then(() => adapter.dispose())),
+      );
+      this.#adapters.clear();
+      this.#queues.clear();
+    })();
+    await this.#disposePromise;
+  }
+}

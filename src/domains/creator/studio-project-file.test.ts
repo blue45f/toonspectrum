@@ -4,7 +4,10 @@ import {
   appendStudioAiOperation,
   createEmptyStudioAiProvenanceDocument,
 } from "./studio-ai-provenance";
-import { createDefaultStudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
+import {
+  STUDIO_BG3D_SCENE_DOCUMENT_VERSION,
+  createDefaultStudioBg3dSceneDocument,
+} from "./studio-bg3d-scene-document";
 import {
   parseStudioProjectFile,
   resetStudioAiProvenanceForRemix,
@@ -13,6 +16,26 @@ import {
 
 const page = { id: "p1", elements: [], bg: "#ffffff", bgGrad: null, canvasH: 1080 };
 const PRIVATE_PROMPT = "원작자의 비공개 결말 프롬프트";
+
+function schemaV1Scene(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  const current = createDefaultStudioBg3dSceneDocument();
+  return {
+    ...current,
+    ...overrides,
+    version: 1,
+    budgets: {
+      complexity: {
+        maxNodes: current.budgets.complexity.maxNodes,
+        maxTriangles: current.budgets.complexity.maxTriangles,
+        maxDrawCalls: current.budgets.complexity.maxDrawCalls,
+        maxMaterials: current.budgets.complexity.maxMaterials,
+        maxLights: current.budgets.complexity.maxLights,
+        maxModelBytes: current.budgets.complexity.maxModelBytes,
+      },
+      textures: { ...current.budgets.textures },
+    },
+  };
+}
 
 function retainedAiProvenance() {
   return appendStudioAiOperation(
@@ -149,18 +172,45 @@ describe("studio project file", () => {
     expect(JSON.parse(serializeStudioProjectFile(parsed)).pagesList[0].elements[0].bg3dScene).toEqual(scene);
   });
 
+  it("페이지와 마스터에 저장된 실제 schema-v1 3D 장면을 v2로 마이그레이션한다", () => {
+    const scene = schemaV1Scene();
+    const image = {
+      id: "image-1",
+      type: "image",
+      src: "data:image/png;base64,iVBORw0KGgo=",
+      bg3dScene: scene,
+    };
+    const parsed = parseStudioProjectFile({
+      version: 2,
+      pagesList: [{ ...page, elements: [image] }],
+      master: { elements: [{ ...image, id: "master-image" }] },
+    });
+    const pageScene = (parsed.pagesList[0].elements[0] as typeof image).bg3dScene;
+    const masterScene = ((parsed.master as { elements: typeof image[] }).elements[0]).bg3dScene;
+
+    expect(pageScene).toMatchObject({
+      version: STUDIO_BG3D_SCENE_DOCUMENT_VERSION,
+      budgets: {
+        complexity: {
+          maxAnimations: expect.any(Number),
+          maxDecodedGeometryBytes: expect.any(Number),
+        },
+      },
+    });
+    expect(masterScene).toEqual(pageScene);
+  });
+
   it("schema-v1 파노라마 URL만 제거하고 3D 편집 원본을 보존해 가져온다", () => {
-    const scene = createDefaultStudioBg3dSceneDocument();
-    const historicalScene = {
-      ...scene,
-      camera: { ...scene.camera, position: [8, 4, 6] },
+    const current = createDefaultStudioBg3dSceneDocument();
+    const historicalScene = schemaV1Scene({
+      camera: { ...current.camera, position: [8, 4, 6] },
       background: {
-        ...scene.background,
+        ...current.background,
         skyPresetId: "sunset",
         panoramaRotation: 35,
         panoramaUrl: "https://private.invalid/legacy.webp?access_token=secret",
       },
-    };
+    });
     const parsed = parseStudioProjectFile({
       version: 2,
       pagesList: [{
@@ -174,8 +224,9 @@ describe("studio project file", () => {
       }],
     });
     const image = parsed.pagesList[0].elements[0] as Record<string, unknown>;
-    const migrated = image.bg3dScene as typeof scene;
+    const migrated = image.bg3dScene as typeof current;
 
+    expect(migrated.version).toBe(STUDIO_BG3D_SCENE_DOCUMENT_VERSION);
     expect(migrated.camera.position).toEqual([8, 4, 6]);
     expect(migrated.background).toMatchObject({
       panoramaRotation: 35,

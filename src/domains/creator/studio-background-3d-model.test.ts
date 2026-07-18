@@ -8,6 +8,9 @@ import {
   cloneBgCustomModelInstances,
   computeAutoFitScale,
   createBgCustomModelInstance,
+  createStudioBg3dEditableThreeClone,
+  createStudioBg3dThreePoseController,
+  createStudioBg3dThreeMorphController,
   disposeStudioBg3dThreeResources,
   duplicateBgCustomModelInstance,
   encodeBg3dSceneWithModelsHash,
@@ -15,13 +18,16 @@ import {
   measureBg3dObjectSize,
   measureStudioBg3dThreeMetrics,
   parseBg3dSceneWithModelsFromDataUrl,
+  sampleStudioBg3dAnimationActionAtTime,
 } from "./studio-background-3d-model";
 import { createPrimitive, encodeBg3dSceneHash } from "./studio-background-3d-primitives";
+import { resolveStudioBg3dAnimationTime } from "./studio-bg3d-animation-time";
 import {
   DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES,
   STUDIO_BG3D_GLB_MIME_TYPE,
   validateStudioBg3dGlb,
 } from "./studio-bg3d-glb-validation";
+import { DEFAULT_STUDIO_BG3D_MATERIAL_OVERRIDE } from "./studio-bg3d-scene-document";
 
 import type { BgCustomModelInstance } from "./studio-background-3d-model";
 import type { StudioBg3dGlbValidationSuccess } from "./studio-bg3d-glb-validation";
@@ -29,11 +35,17 @@ import type { StudioBg3dParsedGlbMetrics, StudioBg3dSceneBudgets } from "./studi
 
 const threeLoaderMocks = vi.hoisted(() => ({
   parseAsync: vi.fn(),
+  setMeshoptDecoder: vi.fn(),
   skeletonClone: vi.fn(),
 }));
 
 vi.mock("three/examples/jsm/loaders/GLTFLoader.js", () => ({
   GLTFLoader: class MockGltfLoader {
+    setMeshoptDecoder(decoder: unknown) {
+      threeLoaderMocks.setMeshoptDecoder(decoder);
+      return this;
+    }
+
     parseAsync(data: ArrayBuffer | string, path: string) {
       return threeLoaderMocks.parseAsync(data, path);
     }
@@ -191,6 +203,15 @@ const generousBudgets: StudioBg3dSceneBudgets = {
     maxDrawCalls: 10_000,
     maxMaterials: 10_000,
     maxLights: 1_000,
+    maxAnimations: 1_000,
+    maxAnimationChannels: 10_000,
+    maxAnimationKeyframes: 10_000_000,
+    maxAnimationValues: 100_000_000,
+    maxSkins: 1_000,
+    maxJoints: 10_000,
+    maxMorphTargets: 10_000,
+    maxAccessorElements: 100_000_000,
+    maxDecodedGeometryBytes: 1_000_000_000,
     maxModelBytes: 100 * 1024 * 1024,
   },
   textures: {
@@ -241,6 +262,15 @@ function verifiedResult(bytes: Uint8Array = minimalGlbBytes()): StudioBg3dGlbVal
       maxImageDimension: 0,
       undeterminedImageDimensions: 0,
       lights: 0,
+      animations: 0,
+      animationChannels: 0,
+      animationKeyframes: 0,
+      animationValues: 0,
+      skins: 0,
+      joints: 0,
+      morphTargets: 0,
+      accessorElements: 0,
+      estimatedDecodedGeometryBytes: 0,
     },
   };
 }
@@ -269,6 +299,7 @@ function triangleGeometry(triangleCount: number): THREE.BufferGeometry {
 describe("verified GLB Three.js safety boundary", () => {
   beforeEach(() => {
     threeLoaderMocks.parseAsync.mockReset();
+    threeLoaderMocks.setMeshoptDecoder.mockReset();
     threeLoaderMocks.skeletonClone.mockReset();
   });
 
@@ -295,6 +326,15 @@ describe("verified GLB Three.js safety boundary", () => {
         drawCalls: 3,
         materials: 2,
         lights: 1,
+        animations: 0,
+        animationChannels: 0,
+        animationKeyframes: 0,
+        animationValues: 0,
+        skins: 0,
+        joints: 0,
+        morphTargets: 0,
+        accessorElements: 12,
+        estimatedDecodedGeometryBytes: 144,
         textures: 1,
         textureBytes: 64,
         maxTextureDimension: 4,
@@ -327,10 +367,90 @@ describe("verified GLB Three.js safety boundary", () => {
         drawCalls: 7,
         materials: 2,
         lights: 0,
+        animations: 0,
+        animationChannels: 0,
+        animationKeyframes: 0,
+        animationValues: 0,
+        skins: 0,
+        joints: 0,
+        morphTargets: 0,
+        accessorElements: 6,
+        estimatedDecodedGeometryBytes: 72,
         textures: 0,
         textureBytes: 0,
         maxTextureDimension: 0,
       },
+    });
+  });
+
+  it("counts unique skins, joint references, morph targets, and Three animation sampler work", () => {
+    const geometry = triangleGeometry(1);
+    geometry.morphAttributes.position = [
+      new THREE.Float32BufferAttribute(new Float32Array(9), 3),
+      new THREE.Float32BufferAttribute(new Float32Array(9), 3),
+    ];
+    geometry.morphAttributes.normal = [
+      new THREE.Float32BufferAttribute(new Float32Array(9), 3),
+      new THREE.Float32BufferAttribute(new Float32Array(9), 3),
+    ];
+    const material = new THREE.MeshBasicMaterial();
+    const rootBone = new THREE.Bone();
+    const childBone = new THREE.Bone();
+    rootBone.add(childBone);
+    const skeleton = new THREE.Skeleton([rootBone, childBone]);
+    const firstMesh = new THREE.SkinnedMesh(geometry, material);
+    const secondMesh = new THREE.SkinnedMesh(geometry, material);
+    firstMesh.bind(skeleton);
+    secondMesh.bind(skeleton);
+    const root = new THREE.Group();
+    root.add(rootBone, firstMesh, secondMesh);
+
+    const move = new THREE.VectorKeyframeTrack(
+      "actor.position",
+      [0, 1, 2],
+      [0, 0, 0, 1, 1, 1, 2, 2, 2],
+    );
+    const turn = new THREE.QuaternionKeyframeTrack(
+      "actor.quaternion",
+      [0, 1],
+      [0, 0, 0, 1, 0, 0.707, 0, 0.707],
+    );
+    const expression = new THREE.NumberKeyframeTrack(
+      "actor.morphTargetInfluences[0]",
+      [0, 0.5, 1],
+      [0, 1, 0],
+    );
+    const animations = [
+      new THREE.AnimationClip("body", 2, [move, turn]),
+      new THREE.AnimationClip("expression", 1, [expression]),
+    ];
+
+    const result = measureStudioBg3dThreeMetrics(root, animations);
+
+    expect(result).toMatchObject({
+      ok: true,
+      metrics: {
+        animations: 2,
+        animationChannels: 3,
+        animationKeyframes: 8,
+        animationValues: 20,
+        skins: 1,
+        joints: 2,
+        morphTargets: 2,
+        accessorElements: 33,
+        estimatedDecodedGeometryBytes: 420,
+      },
+    });
+  });
+
+  it("fails closed for malformed animation sampler cardinality", () => {
+    const track = new THREE.NumberKeyframeTrack("actor.value", [0, 1], [0, 1]);
+    Object.defineProperty(track, "values", { value: new Float32Array([0, 0.5, 1]) });
+    const clip = new THREE.AnimationClip("malformed", 1, [track]);
+
+    expect(measureStudioBg3dThreeMetrics(new THREE.Group(), [clip])).toMatchObject({
+      ok: false,
+      code: "unsafe-scene-metrics",
     });
   });
 
@@ -428,6 +548,15 @@ describe("verified GLB Three.js safety boundary", () => {
       drawCalls: 4,
       materials: 5,
       lights: 1,
+      animations: 1,
+      animationChannels: 2,
+      animationKeyframes: 3,
+      animationValues: 4,
+      skins: 1,
+      joints: 2,
+      morphTargets: 1,
+      accessorElements: 6,
+      estimatedDecodedGeometryBytes: 24,
       textures: 2,
       textureBytes: 128,
       maxTextureDimension: 64,
@@ -439,6 +568,15 @@ describe("verified GLB Three.js safety boundary", () => {
         maxDrawCalls: 4,
         maxMaterials: 5,
         maxLights: 1,
+        maxAnimations: 1,
+        maxAnimationChannels: 2,
+        maxAnimationKeyframes: 3,
+        maxAnimationValues: 4,
+        maxSkins: 1,
+        maxJoints: 2,
+        maxMorphTargets: 1,
+        maxAccessorElements: 6,
+        maxDecodedGeometryBytes: 24,
         maxModelBytes: 20,
       },
       textures: { maxTextures: 2, maxTotalBytes: 128, maxDimension: 64 },
@@ -460,6 +598,33 @@ describe("verified GLB Three.js safety boundary", () => {
     expect(checkStudioBg3dThreeBudgets(metrics, {
       ...exact, complexity: { ...exact.complexity, maxLights: 0 },
     })?.code).toBe("light-budget-exceeded");
+    expect(checkStudioBg3dThreeBudgets(metrics, {
+      ...exact, complexity: { ...exact.complexity, maxAnimations: 0 },
+    })?.code).toBe("animation-count-budget-exceeded");
+    expect(checkStudioBg3dThreeBudgets(metrics, {
+      ...exact, complexity: { ...exact.complexity, maxAnimationChannels: 1 },
+    })?.code).toBe("animation-channel-budget-exceeded");
+    expect(checkStudioBg3dThreeBudgets(metrics, {
+      ...exact, complexity: { ...exact.complexity, maxAnimationKeyframes: 2 },
+    })?.code).toBe("animation-keyframe-budget-exceeded");
+    expect(checkStudioBg3dThreeBudgets(metrics, {
+      ...exact, complexity: { ...exact.complexity, maxAnimationValues: 3 },
+    })?.code).toBe("animation-value-budget-exceeded");
+    expect(checkStudioBg3dThreeBudgets(metrics, {
+      ...exact, complexity: { ...exact.complexity, maxSkins: 0 },
+    })?.code).toBe("skin-count-budget-exceeded");
+    expect(checkStudioBg3dThreeBudgets(metrics, {
+      ...exact, complexity: { ...exact.complexity, maxJoints: 1 },
+    })?.code).toBe("joint-count-budget-exceeded");
+    expect(checkStudioBg3dThreeBudgets(metrics, {
+      ...exact, complexity: { ...exact.complexity, maxMorphTargets: 0 },
+    })?.code).toBe("morph-target-budget-exceeded");
+    expect(checkStudioBg3dThreeBudgets(metrics, {
+      ...exact, complexity: { ...exact.complexity, maxAccessorElements: 5 },
+    })?.code).toBe("accessor-element-budget-exceeded");
+    expect(checkStudioBg3dThreeBudgets(metrics, {
+      ...exact, complexity: { ...exact.complexity, maxDecodedGeometryBytes: 23 },
+    })?.code).toBe("geometry-memory-budget-exceeded");
     expect(checkStudioBg3dThreeBudgets(metrics, {
       ...exact, textures: { ...exact.textures, maxTextures: 1 },
     })?.code).toBe("texture-count-budget-exceeded");
@@ -550,6 +715,314 @@ describe("verified GLB Three.js safety boundary", () => {
       message: "3D 모델 인스턴스를 복제하지 못했습니다. 모델을 다시 불러와 주세요.",
     });
     expect((safeError as Error).message).not.toContain("private-node-name");
+  });
+
+  it("addresses joints by stable skin/joint ordinals and applies pose offsets without accumulation", () => {
+    const hips = new THREE.Bone();
+    hips.name = "Hips";
+    hips.quaternion.setFromEuler(new THREE.Euler(0, 0.2, 0));
+    const arm = new THREE.Bone();
+    arm.name = "Arm";
+    hips.add(arm);
+    const skeleton = new THREE.Skeleton([hips, arm]);
+    const mesh = new THREE.SkinnedMesh(triangleGeometry(1), new THREE.MeshBasicMaterial());
+    mesh.add(hips);
+    mesh.bind(skeleton);
+    const root = new THREE.Group();
+    root.add(mesh);
+
+    const controller = createStudioBg3dThreePoseController(root);
+    const rest = arm.quaternion.clone();
+    const offset = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0));
+    const pose = {
+      enabled: true,
+      weight: 1,
+      joints: [{
+        jointKey: "skin-0:joint-1",
+        rotationOffset: [offset.x, offset.y, offset.z, offset.w] as const,
+      }],
+    };
+
+    expect(controller.joints).toEqual([
+      { key: "skin-0:joint-0", name: "Hips", skinIndex: 0, jointIndex: 0 },
+      { key: "skin-0:joint-1", name: "Arm", skinIndex: 0, jointIndex: 1 },
+    ]);
+    controller.applyFromRestPose(pose);
+    const once = arm.quaternion.clone();
+    expect(once.angleTo(rest.clone().multiply(offset))).toBeLessThan(1e-8);
+
+    controller.applyFromRestPose(pose);
+    expect(arm.quaternion.angleTo(once)).toBeLessThan(1e-8);
+
+    controller.applyFromRestPose({ ...pose, enabled: false });
+    expect(arm.quaternion.angleTo(rest)).toBeLessThan(1e-8);
+  });
+
+  it("applies non-destructive model-local aim constraints after pose and removes them exactly", () => {
+    const bone = new THREE.Bone();
+    bone.name = "Look";
+    const skeleton = new THREE.Skeleton([bone]);
+    const mesh = new THREE.SkinnedMesh(triangleGeometry(1), new THREE.MeshBasicMaterial());
+    mesh.add(bone);
+    mesh.bind(skeleton);
+    const root = new THREE.Group();
+    root.position.set(3, 2, -4);
+    root.rotation.y = 0.4;
+    root.add(mesh);
+    const controller = createStudioBg3dThreePoseController(root);
+    const rest = bone.quaternion.clone();
+    const constraints = {
+      enabled: true,
+      aims: [{
+        jointKey: "skin-0:joint-0",
+        target: [5, 0, 0] as const,
+        axis: "+z" as const,
+        weight: 1,
+      }],
+    };
+
+    controller.applyAimConstraints(constraints);
+    const aimed = new THREE.Vector3(0, 0, 1).applyQuaternion(bone.quaternion).normalize();
+    expect(aimed.x).toBeCloseTo(1, 6);
+    expect(aimed.y).toBeCloseTo(0, 6);
+    expect(aimed.z).toBeCloseTo(0, 6);
+    const once = bone.quaternion.clone();
+
+    controller.removeAppliedPoseOffsets();
+    expect(bone.quaternion.angleTo(rest)).toBeLessThan(1e-8);
+    controller.applyAimConstraints(constraints);
+    expect(bone.quaternion.angleTo(once)).toBeLessThan(1e-8);
+    controller.removeAppliedPoseOffsets();
+    controller.applyAimConstraints({ ...constraints, enabled: false });
+    expect(bone.quaternion.angleTo(rest)).toBeLessThan(1e-8);
+  });
+
+  it("samples a real AnimationMixer across the ping-pong boundary without double reflection", () => {
+    const root = new THREE.Group();
+    const actor = new THREE.Object3D();
+    actor.name = "Actor";
+    root.add(actor);
+    const clip = new THREE.AnimationClip("move", 1, [
+      new THREE.NumberKeyframeTrack("Actor.position[x]", [0, 1], [0, 10]),
+    ]);
+    const mixer = new THREE.AnimationMixer(root);
+    const action = mixer.clipAction(clip);
+    action.clampWhenFinished = true;
+    action.setLoop(THREE.LoopOnce, 1);
+    action.play();
+
+    const sampleAt = (elapsedSeconds: number) => sampleStudioBg3dAnimationActionAtTime(
+      mixer,
+      action,
+      resolveStudioBg3dAnimationTime({
+        baseTimeSeconds: 0,
+        elapsedSeconds,
+        timeScale: 1,
+        durationSeconds: 1,
+        loop: "ping-pong",
+      }),
+    );
+
+    expect(sampleAt(0.75)).toBeCloseTo(0.75);
+    expect(actor.position.x).toBeCloseTo(7.5);
+    expect(sampleAt(1)).toBe(1);
+    expect(actor.position.x).toBeCloseTo(10);
+    expect(sampleAt(1.25)).toBeCloseTo(0.75);
+    expect(actor.position.x).toBeCloseTo(7.5);
+    expect(action.paused).toBe(true);
+    expect(mixer.time).toBe(0);
+  });
+
+  it("resamples a paused action at a nonzero absolute time without snapping to frame zero", () => {
+    const root = new THREE.Group();
+    const actor = new THREE.Object3D();
+    actor.name = "Actor";
+    root.add(actor);
+    const clip = new THREE.AnimationClip("move", 1, [
+      new THREE.NumberKeyframeTrack("Actor.position[x]", [0, 1], [0, 10]),
+    ]);
+    const mixer = new THREE.AnimationMixer(root);
+    const action = mixer.clipAction(clip);
+    action.clampWhenFinished = true;
+    action.setLoop(THREE.LoopOnce, 1);
+    action.play();
+
+    sampleStudioBg3dAnimationActionAtTime(mixer, action, 0.6);
+    expect(actor.position.x).toBeCloseTo(6);
+    sampleStudioBg3dAnimationActionAtTime(mixer, action, 0.6);
+
+    expect(actor.position.x).toBeCloseTo(6);
+    expect(action.time).toBeCloseTo(0.6);
+    expect(action.paused).toBe(true);
+  });
+
+  it("reapplies a pose over consecutive real mixer samples without frame-zero snap or accumulation", () => {
+    const arm = new THREE.Bone();
+    arm.name = "Arm";
+    const skeleton = new THREE.Skeleton([arm]);
+    const mesh = new THREE.SkinnedMesh(triangleGeometry(1), new THREE.MeshBasicMaterial());
+    mesh.add(arm);
+    mesh.bind(skeleton);
+    const root = new THREE.Group();
+    root.add(mesh);
+    const identity = new THREE.Quaternion();
+    const animatedEnd = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI / 2, 0));
+    const clip = new THREE.AnimationClip("turn", 1, [
+      new THREE.QuaternionKeyframeTrack(
+        "Arm.quaternion",
+        [0, 1],
+        [
+          identity.x, identity.y, identity.z, identity.w,
+          animatedEnd.x, animatedEnd.y, animatedEnd.z, animatedEnd.w,
+        ],
+      ),
+    ]);
+    const mixer = new THREE.AnimationMixer(root);
+    const action = mixer.clipAction(clip);
+    action.clampWhenFinished = true;
+    action.setLoop(THREE.LoopOnce, 1);
+    action.play();
+    const controller = createStudioBg3dThreePoseController(root);
+    const offset = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 4, 0, 0));
+    const pose = {
+      enabled: true,
+      weight: 1,
+      joints: [{
+        jointKey: "skin-0:joint-0",
+        rotationOffset: [offset.x, offset.y, offset.z, offset.w] as const,
+      }],
+    };
+    const sampleWithPose = (timeSeconds: number) => {
+      controller.removeAppliedPoseOffsets();
+      sampleStudioBg3dAnimationActionAtTime(mixer, action, timeSeconds);
+      controller.applyToCurrentPose(pose);
+    };
+
+    sampleWithPose(0.5);
+    const expectedHalf = new THREE.Quaternion()
+      .setFromEuler(new THREE.Euler(0, Math.PI / 4, 0))
+      .multiply(offset);
+    const first = arm.quaternion.clone();
+    expect(first.angleTo(expectedHalf)).toBeLessThan(1e-7);
+
+    sampleWithPose(0.5);
+    expect(arm.quaternion.angleTo(first)).toBeLessThan(1e-7);
+
+    sampleWithPose(0.75);
+    const expectedLater = new THREE.Quaternion()
+      .setFromEuler(new THREE.Euler(0, Math.PI * 0.375, 0))
+      .multiply(offset);
+    expect(arm.quaternion.angleTo(expectedLater)).toBeLessThan(1e-7);
+    expect(arm.quaternion.angleTo(offset)).toBeGreaterThan(0.5);
+  });
+
+  it("addresses named morph targets by stable mesh/target ordinals and layers bounded offsets", () => {
+    const geometry = triangleGeometry(1);
+    geometry.morphAttributes.position = [
+      new THREE.Float32BufferAttribute(new Float32Array(9), 3),
+      new THREE.Float32BufferAttribute(new Float32Array(9), 3),
+    ];
+    const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial());
+    mesh.updateMorphTargets();
+    mesh.morphTargetDictionary = { Smile: 0, Blink: 1 };
+    if (!mesh.morphTargetInfluences) throw new Error("morph fixture must initialize influences");
+    mesh.morphTargetInfluences[0] = 0.1;
+    mesh.morphTargetInfluences[1] = 0;
+    const root = new THREE.Group();
+    root.add(mesh);
+
+    const controller = createStudioBg3dThreeMorphController(root);
+    expect(controller.targets).toEqual([
+      { key: "mesh-0:target-0", name: "Smile", meshIndex: 0, targetIndex: 0 },
+      { key: "mesh-0:target-1", name: "Blink", meshIndex: 0, targetIndex: 1 },
+    ]);
+
+    const morph = {
+      enabled: true,
+      weight: 0.5,
+      targets: [{ targetKey: "mesh-0:target-0", weightOffset: 0.8 }],
+    };
+    controller.applyFromRestWeights(morph);
+    expect(mesh.morphTargetInfluences[0]).toBeCloseTo(0.5);
+    controller.applyFromRestWeights(morph);
+    expect(mesh.morphTargetInfluences[0]).toBeCloseTo(0.5);
+
+    controller.removeAppliedWeightOffsets();
+    mesh.morphTargetInfluences[0] = 0.8;
+    controller.applyToCurrentWeights({ ...morph, weight: 1 });
+    expect(mesh.morphTargetInfluences[0]).toBe(1);
+    controller.applyFromRestWeights({ ...morph, enabled: false });
+    expect(mesh.morphTargetInfluences[0]).toBeCloseTo(0.1);
+  });
+
+  it("isolates editable instance materials while keeping geometry and textures cache-owned", async () => {
+    const geometry = triangleGeometry(1);
+    const texture = new THREE.Texture();
+    const sourceMaterial = new THREE.MeshStandardMaterial({
+      color: "#808080",
+      map: texture,
+      opacity: 0.8,
+      roughness: 0.9,
+      metalness: 0.1,
+    });
+    const root = new THREE.Group();
+    root.add(
+      new THREE.Mesh(geometry, sourceMaterial),
+      new THREE.Mesh(geometry, sourceMaterial),
+    );
+
+    const editable = await createStudioBg3dEditableThreeClone(root);
+    const meshes: THREE.Mesh[] = [];
+    editable.root.traverse((object) => {
+      if ((object as THREE.Mesh).isMesh) meshes.push(object as THREE.Mesh);
+    });
+    const firstMaterial = meshes[0].material as THREE.MeshStandardMaterial;
+    const secondMaterial = meshes[1].material as THREE.MeshStandardMaterial;
+    const materialDispose = vi.spyOn(firstMaterial, "dispose");
+    const textureDispose = vi.spyOn(texture, "dispose");
+
+    expect(editable.materialCount).toBe(1);
+    expect(firstMaterial).toBe(secondMaterial);
+    expect(firstMaterial).not.toBe(sourceMaterial);
+    expect(firstMaterial.map).toBe(texture);
+    expect(meshes[0].geometry).toBe(geometry);
+
+    editable.applyMaterialOverride({
+      ...DEFAULT_STUDIO_BG3D_MATERIAL_OVERRIDE,
+      colorMode: "replace",
+      color: "#ff0000",
+      colorStrength: 1,
+      opacityMultiplier: 0.5,
+      roughness: 0.25,
+      metalness: 0.75,
+      emissiveColor: "#001122",
+      emissiveIntensity: 2,
+      wireframe: true,
+      doubleSided: true,
+    });
+
+    expect(firstMaterial.color.getHexString()).toBe("ff0000");
+    expect(firstMaterial.opacity).toBeCloseTo(0.4);
+    expect(firstMaterial.transparent).toBe(true);
+    expect(firstMaterial.roughness).toBe(0.25);
+    expect(firstMaterial.metalness).toBe(0.75);
+    expect(firstMaterial.emissive.getHexString()).toBe("001122");
+    expect(firstMaterial.emissiveIntensity).toBe(2);
+    expect(firstMaterial.wireframe).toBe(true);
+    expect(firstMaterial.side).toBe(THREE.DoubleSide);
+    expect(sourceMaterial.color.getHexString()).toBe("808080");
+    expect(sourceMaterial.opacity).toBe(0.8);
+
+    editable.applyMaterialOverride(undefined);
+    expect(firstMaterial.color.getHexString()).toBe("808080");
+    expect(firstMaterial.opacity).toBe(0.8);
+    expect(firstMaterial.roughness).toBe(0.9);
+    expect(firstMaterial.map).toBe(texture);
+
+    editable.dispose();
+    editable.dispose();
+    expect(materialDispose).toHaveBeenCalledOnce();
+    expect(textureDispose).not.toHaveBeenCalled();
   });
 
   it("accepts the validator-owned success snapshot without reusing the caller's source bytes", async () => {

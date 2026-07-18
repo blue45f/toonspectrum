@@ -44,6 +44,15 @@ export interface StudioBg3dGlbComplexityBudget {
   readonly maxDrawCalls: number;
   readonly maxMaterials: number;
   readonly maxLights: number;
+  readonly maxAnimations: number;
+  readonly maxAnimationChannels: number;
+  readonly maxAnimationKeyframes: number;
+  readonly maxAnimationValues: number;
+  readonly maxSkins: number;
+  readonly maxJoints: number;
+  readonly maxMorphTargets: number;
+  readonly maxAccessorElements: number;
+  readonly maxDecodedGeometryBytes: number;
 }
 
 export interface StudioBg3dGlbTextureBudget {
@@ -77,6 +86,15 @@ export const DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES: StudioBg3dGlbBudgetProfile
         maxDrawCalls: 256,
         maxMaterials: 128,
         maxLights: 4,
+        maxAnimations: 32,
+        maxAnimationChannels: 256,
+        maxAnimationKeyframes: 250_000,
+        maxAnimationValues: 2_000_000,
+        maxSkins: 32,
+        maxJoints: 1_024,
+        maxMorphTargets: 128,
+        maxAccessorElements: 20_000_000,
+        maxDecodedGeometryBytes: 128 * 1024 * 1024,
       }),
       textures: Object.freeze({
         maxTextures: 64,
@@ -92,6 +110,15 @@ export const DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES: StudioBg3dGlbBudgetProfile
         maxDrawCalls: 1024,
         maxMaterials: 512,
         maxLights: 16,
+        maxAnimations: 128,
+        maxAnimationChannels: 2_048,
+        maxAnimationKeyframes: 2_000_000,
+        maxAnimationValues: 16_000_000,
+        maxSkins: 128,
+        maxJoints: 4_096,
+        maxMorphTargets: 512,
+        maxAccessorElements: 80_000_000,
+        maxDecodedGeometryBytes: 512 * 1024 * 1024,
       }),
       textures: Object.freeze({
         maxTextures: 256,
@@ -139,6 +166,22 @@ export interface StudioBg3dGlbMetrics {
   readonly maxImageDimension: number;
   readonly undeterminedImageDimensions: number;
   readonly lights: number;
+  /** Animation clips declared by the model. */
+  readonly animations: number;
+  /** Evaluated animation channels, including channels that share a sampler. */
+  readonly animationChannels: number;
+  /** Input accessor keyframes summed once per evaluated channel. */
+  readonly animationKeyframes: number;
+  /** Output scalar cardinality, including cubic-spline tangents, summed per channel. */
+  readonly animationValues: number;
+  /** Skin records declared by the model. */
+  readonly skins: number;
+  /** Joint references summed across skins; shared joints are counted conservatively per skin. */
+  readonly joints: number;
+  /** Morph-target records summed across mesh primitives. */
+  readonly morphTargets: number;
+  readonly accessorElements: number;
+  readonly estimatedDecodedGeometryBytes: number;
 }
 
 export type StudioBg3dGlbFailureCode =
@@ -175,6 +218,8 @@ export type StudioBg3dGlbFailureCode =
   | "invalid-accessor"
   | "invalid-mesh"
   | "invalid-node"
+  | "invalid-animation"
+  | "invalid-skin"
   | "invalid-image"
   | "arithmetic-overflow"
   | "node-budget-exceeded"
@@ -182,6 +227,15 @@ export type StudioBg3dGlbFailureCode =
   | "draw-call-budget-exceeded"
   | "material-budget-exceeded"
   | "light-budget-exceeded"
+  | "animation-count-budget-exceeded"
+  | "animation-channel-budget-exceeded"
+  | "animation-keyframe-budget-exceeded"
+  | "animation-value-budget-exceeded"
+  | "skin-count-budget-exceeded"
+  | "joint-count-budget-exceeded"
+  | "morph-target-budget-exceeded"
+  | "accessor-element-budget-exceeded"
+  | "geometry-memory-budget-exceeded"
   | "texture-count-budget-exceeded"
   | "texture-byte-budget-exceeded"
   | "texture-dimension-budget-exceeded";
@@ -246,6 +300,8 @@ const FAILURE_MESSAGES: Readonly<Record<StudioBg3dGlbFailureCode, string>> = Obj
   "invalid-accessor": "3D 모델의 기하 데이터 개수 정보를 확인할 수 없습니다. 파일을 다시 내보내 주세요.",
   "invalid-mesh": "3D 모델의 메시 구조가 올바르지 않습니다. 파일을 다시 내보내 주세요.",
   "invalid-node": "3D 모델의 장면 노드 구조가 올바르지 않습니다. 파일을 다시 내보내 주세요.",
+  "invalid-animation": "3D 모델의 애니메이션 구조가 올바르지 않습니다. 애니메이션을 정리해 다시 내보내 주세요.",
+  "invalid-skin": "3D 모델의 스킨 또는 조인트 구조가 올바르지 않습니다. 리깅을 정리해 다시 내보내 주세요.",
   "invalid-image": "3D 모델의 내장 이미지 구조가 올바르지 않습니다. 지원 형식으로 다시 내보내 주세요.",
   "arithmetic-overflow": "3D 모델의 복잡도를 안전하게 계산할 수 없습니다. 모델을 단순화해 주세요.",
   "node-budget-exceeded": "이 기기의 장면 노드 수 기준을 초과했습니다. 모델 계층을 단순화해 주세요.",
@@ -253,6 +309,15 @@ const FAILURE_MESSAGES: Readonly<Record<StudioBg3dGlbFailureCode, string>> = Obj
   "draw-call-budget-exceeded": "이 기기의 드로콜 기준을 초과했습니다. 메시와 재질을 병합해 주세요.",
   "material-budget-exceeded": "이 기기의 재질 수 기준을 초과했습니다. 재질을 정리하거나 병합해 주세요.",
   "light-budget-exceeded": "이 기기의 조명 수 기준을 초과했습니다. 조명 수를 줄여 주세요.",
+  "animation-count-budget-exceeded": "이 기기의 애니메이션 클립 수 기준을 초과했습니다. 사용하지 않는 동작을 정리해 주세요.",
+  "animation-channel-budget-exceeded": "이 기기의 애니메이션 채널 수 기준을 초과했습니다. 애니메이션 트랙을 단순화해 주세요.",
+  "animation-keyframe-budget-exceeded": "이 기기의 애니메이션 키프레임 기준을 초과했습니다. 키프레임을 줄여 주세요.",
+  "animation-value-budget-exceeded": "이 기기의 애니메이션 데이터 메모리 기준을 초과했습니다. 애니메이션을 압축하거나 단순화해 주세요.",
+  "skin-count-budget-exceeded": "이 기기의 스킨 수 기준을 초과했습니다. 리깅 구조를 단순화해 주세요.",
+  "joint-count-budget-exceeded": "이 기기의 조인트 수 기준을 초과했습니다. 본 구조를 단순화해 주세요.",
+  "morph-target-budget-exceeded": "이 기기의 모프 타깃 수 기준을 초과했습니다. 표정·변형 타깃을 정리해 주세요.",
+  "accessor-element-budget-exceeded": "이 기기의 3D 데이터 요소 수 기준을 초과했습니다. 메시와 애니메이션을 단순화해 주세요.",
+  "geometry-memory-budget-exceeded": "이 기기의 디코딩된 3D 데이터 메모리 기준을 초과했습니다. 메시·리깅·애니메이션을 최적화해 주세요.",
   "texture-count-budget-exceeded": "이 기기의 텍스처 개수 기준을 초과했습니다. 텍스처를 정리해 주세요.",
   "texture-byte-budget-exceeded": "이 기기의 내장 텍스처 용량 기준을 초과했습니다. 텍스처를 압축해 주세요.",
   "texture-dimension-budget-exceeded": "이 기기의 텍스처 해상도 기준을 초과했습니다. 텍스처 크기를 낮춰 주세요.",
@@ -270,8 +335,13 @@ interface ParsedContainer {
 }
 
 interface BufferViewRange {
-  readonly offset: number;
+  /** Logical offset in the parent (possibly placeholder) buffer after decompression. */
+  readonly logicalOffset: number;
+  /** Absolute offset in the GLB snapshot, or null when bytes exist only after Meshopt decode. */
+  readonly embeddedOffset: number | null;
   readonly byteLength: number;
+  readonly byteStride: number | null;
+  readonly meshoptCompressed: boolean;
 }
 
 interface ImageDimensions {
@@ -376,6 +446,15 @@ function validBudget(budget: StudioBg3dGlbValidationBudget): boolean {
     isSafePositiveInteger(budget.complexity.maxDrawCalls) &&
     isSafePositiveInteger(budget.complexity.maxMaterials) &&
     isSafePositiveInteger(budget.complexity.maxLights) &&
+    isSafeNonNegativeInteger(budget.complexity.maxAnimations) &&
+    isSafeNonNegativeInteger(budget.complexity.maxAnimationChannels) &&
+    isSafeNonNegativeInteger(budget.complexity.maxAnimationKeyframes) &&
+    isSafeNonNegativeInteger(budget.complexity.maxAnimationValues) &&
+    isSafeNonNegativeInteger(budget.complexity.maxSkins) &&
+    isSafeNonNegativeInteger(budget.complexity.maxJoints) &&
+    isSafeNonNegativeInteger(budget.complexity.maxMorphTargets) &&
+    isSafeNonNegativeInteger(budget.complexity.maxAccessorElements) &&
+    isSafeNonNegativeInteger(budget.complexity.maxDecodedGeometryBytes) &&
     isSafePositiveInteger(budget.textures.maxTextures) &&
     isSafePositiveInteger(budget.textures.maxTotalBytes) &&
     isSafePositiveInteger(budget.textures.maxDimension)
@@ -471,29 +550,49 @@ function validateRequiredExtensions(
 }
 
 function parseBufferViews(
+  bytes: Uint8Array,
   root: Record<string, unknown>,
   bin: GlbChunk | null,
 ): readonly BufferViewRange[] | StudioBg3dGlbValidationFailure {
   const buffers = readArray(root, "buffers");
   const rawViews = readArray(root, "bufferViews");
   if (!buffers || !rawViews) return failure("invalid-gltf-root");
-  if (buffers.length > 1) return failure("invalid-buffer");
+  const meshoptRequired = Array.isArray(root.extensionsRequired)
+    && root.extensionsRequired.includes("EXT_meshopt_compression");
   if (buffers.length === 0) {
     if (rawViews.length > 0 || bin) return failure("invalid-buffer");
     return [];
   }
 
-  const buffer = buffers[0];
-  if (!isRecord(buffer) || Object.hasOwn(buffer, "uri") || !isSafeNonNegativeInteger(buffer.byteLength)) {
-    return Object.hasOwn(isRecord(buffer) ? buffer : {}, "uri")
-      ? failure("external-resource-uri")
-      : failure("invalid-buffer");
+  const bufferLengths: number[] = [];
+  const placeholderBufferReferenced = new Array<boolean>(buffers.length).fill(false);
+  for (let index = 0; index < buffers.length; index += 1) {
+    const buffer = buffers[index];
+    if (!isRecord(buffer) || Object.hasOwn(buffer, "uri") || !isSafeNonNegativeInteger(buffer.byteLength)) {
+      return Object.hasOwn(isRecord(buffer) ? buffer : {}, "uri")
+        ? failure("external-resource-uri")
+        : failure("invalid-buffer");
+    }
+    const extensions = buffer.extensions;
+    if (extensions !== undefined) {
+      if (!isRecord(extensions)) return failure("invalid-buffer");
+      const meshoptFallback = extensions.EXT_meshopt_compression;
+      if (
+        meshoptFallback !== undefined
+        && (!isRecord(meshoptFallback) || meshoptFallback.fallback !== true)
+      ) {
+        return failure("invalid-buffer");
+      }
+    }
+    bufferLengths.push(buffer.byteLength);
   }
-  if (!bin && buffer.byteLength > 0) return failure("missing-bin-chunk");
-  if (!bin) return rawViews.length === 0 ? [] : failure("missing-bin-chunk");
-  if (bin.byteLength < buffer.byteLength || bin.byteLength > buffer.byteLength + 3) {
+
+  const embeddedBufferLength = bufferLengths[0] ?? 0;
+  if (!bin && embeddedBufferLength > 0) return failure("missing-bin-chunk");
+  if (bin && (bin.byteLength < embeddedBufferLength || bin.byteLength > embeddedBufferLength + 3)) {
     return failure("invalid-buffer");
   }
+  if (!bin && rawViews.length > 0) return failure("missing-bin-chunk");
 
   const views: BufferViewRange[] = [];
   for (const rawView of rawViews) {
@@ -501,17 +600,94 @@ function parseBufferViews(
     const bufferIndex = rawView.buffer;
     const byteOffset = rawView.byteOffset ?? 0;
     const byteLength = rawView.byteLength;
+    const byteStride = rawView.byteStride;
     if (
-      bufferIndex !== 0 ||
+      !isSafeNonNegativeInteger(bufferIndex) ||
+      bufferIndex >= bufferLengths.length ||
       !isSafeNonNegativeInteger(byteOffset) ||
       !isSafePositiveInteger(byteLength) ||
-      byteOffset > buffer.byteLength ||
-      byteLength > buffer.byteLength - byteOffset ||
-      byteLength > bin.byteLength - byteOffset
+      byteOffset > (bufferLengths[bufferIndex] ?? -1) ||
+      byteLength > (bufferLengths[bufferIndex] ?? -1) - byteOffset ||
+      (byteStride !== undefined && (
+        !isSafePositiveInteger(byteStride) || byteStride < 4 || byteStride > 252 || byteStride % 4 !== 0
+      ))
     ) {
       return failure("invalid-buffer-view");
     }
-    views.push(Object.freeze({ offset: bin.offset + byteOffset, byteLength }));
+
+    const extensions = rawView.extensions;
+    if (extensions !== undefined && !isRecord(extensions)) return failure("invalid-buffer-view");
+    const meshopt = isRecord(extensions) ? extensions.EXT_meshopt_compression : undefined;
+    if (meshopt === undefined) {
+      if (bufferIndex !== 0 || !bin || byteLength > bin.byteLength - byteOffset) {
+        return failure("invalid-buffer-view");
+      }
+      views.push(Object.freeze({
+        logicalOffset: byteOffset,
+        embeddedOffset: bin.offset + byteOffset,
+        byteLength,
+        byteStride: byteStride ?? null,
+        meshoptCompressed: false,
+      }));
+      continue;
+    }
+    if (!isRecord(meshopt) || !bin) return failure("invalid-buffer-view");
+
+    const compressedBuffer = meshopt.buffer;
+    const compressedOffset = meshopt.byteOffset ?? 0;
+    const compressedLength = meshopt.byteLength;
+    const decodedStride = meshopt.byteStride;
+    const decodedCount = meshopt.count;
+    const mode = meshopt.mode;
+    const filter = meshopt.filter ?? "NONE";
+    const decodedLength = isSafePositiveInteger(decodedStride) && isSafePositiveInteger(decodedCount)
+      ? safeMultiply(decodedStride, decodedCount)
+      : null;
+    if (
+      compressedBuffer !== 0 ||
+      !isSafeNonNegativeInteger(compressedOffset) ||
+      !isSafePositiveInteger(compressedLength) ||
+      !isSafePositiveInteger(decodedStride) ||
+      !isSafePositiveInteger(decodedCount) ||
+      decodedLength === null || decodedLength !== byteLength ||
+      compressedOffset > embeddedBufferLength ||
+      compressedLength > embeddedBufferLength - compressedOffset ||
+      compressedLength > bin.byteLength - compressedOffset ||
+      (byteStride !== undefined && byteStride !== decodedStride) ||
+      (mode !== "ATTRIBUTES" && mode !== "TRIANGLES" && mode !== "INDICES") ||
+      (filter !== "NONE" && filter !== "OCTAHEDRAL" && filter !== "QUATERNION" && filter !== "EXPONENTIAL")
+    ) {
+      return failure("invalid-buffer-view");
+    }
+    if (
+      (mode === "ATTRIBUTES" && (decodedStride % 4 !== 0 || decodedStride > 256)) ||
+      (mode === "TRIANGLES" && (decodedCount % 3 !== 0 || (decodedStride !== 2 && decodedStride !== 4))) ||
+      (mode === "INDICES" && decodedStride !== 2 && decodedStride !== 4) ||
+      ((mode === "TRIANGLES" || mode === "INDICES") && filter !== "NONE") ||
+      (filter === "OCTAHEDRAL" && decodedStride !== 4 && decodedStride !== 8) ||
+      (filter === "QUATERNION" && decodedStride !== 8) ||
+      (filter === "EXPONENTIAL" && decodedStride % 4 !== 0)
+    ) {
+      return failure("invalid-buffer-view");
+    }
+    const expectedHeader = mode === "ATTRIBUTES" ? 0xa0 : mode === "TRIANGLES" ? 0xe1 : 0xd1;
+    if (bytes[bin.offset + compressedOffset] !== expectedHeader) {
+      return failure("invalid-buffer-view");
+    }
+    if (bufferIndex > 0) {
+      if (!meshoptRequired) return failure("invalid-buffer-view");
+      placeholderBufferReferenced[bufferIndex] = true;
+    }
+    views.push(Object.freeze({
+      logicalOffset: byteOffset,
+      embeddedOffset: null,
+      byteLength,
+      byteStride: byteStride ?? null,
+      meshoptCompressed: true,
+    }));
+  }
+  if (placeholderBufferReferenced.slice(1).some((referenced) => !referenced)) {
+    return failure("invalid-buffer");
   }
   return Object.freeze(views);
 }
@@ -642,12 +818,239 @@ function gpuInstanceCount(node: Record<string, unknown>, accessors: readonly unk
   return maximum;
 }
 
+const ACCESSOR_TYPE_COMPONENTS: Readonly<Record<string, number>> = Object.freeze({
+  SCALAR: 1,
+  VEC2: 2,
+  VEC3: 3,
+  VEC4: 4,
+  MAT2: 4,
+  MAT3: 9,
+  MAT4: 16,
+});
+
+const ACCESSOR_COMPONENT_BYTES: Readonly<Record<number, number>> = Object.freeze({
+  5120: 1,
+  5121: 1,
+  5122: 2,
+  5123: 2,
+  5125: 4,
+  5126: 4,
+});
+
+const ACCESSOR_MATRIX_SHAPE: Readonly<Record<string, readonly [number, number]>> = Object.freeze({
+  MAT2: Object.freeze([2, 2] as const),
+  MAT3: Object.freeze([3, 3] as const),
+  MAT4: Object.freeze([4, 4] as const),
+});
+
+interface AnimationAccessorDescriptor {
+  readonly count: number;
+  readonly type: string;
+  readonly components: number;
+  readonly componentType: number;
+}
+
+interface AccessorValidationSuccess {
+  readonly accessorElements: number;
+  readonly estimatedDecodedGeometryBytes: number;
+  readonly estimatedOrdinaryDecodedGeometryBytes: number;
+}
+
+function accessorElementByteSize(type: string, components: number, componentBytes: number): number | null {
+  const matrix = ACCESSOR_MATRIX_SHAPE[type];
+  if (!matrix) return safeMultiply(components, componentBytes);
+  const [columns, rows] = matrix;
+  const columnBytes = safeMultiply(rows, componentBytes);
+  if (columnBytes === null) return null;
+  const alignedColumnBytes = Math.ceil(columnBytes / 4) * 4;
+  return safeMultiply(columns, alignedColumnBytes);
+}
+
+function rangeContainsElements(
+  view: BufferViewRange,
+  byteOffset: number,
+  elementBytes: number,
+  count: number,
+  stride: number,
+): boolean {
+  if (
+    byteOffset > view.byteLength ||
+    stride < elementBytes
+  ) {
+    return false;
+  }
+  const precedingBytes = safeMultiply(count - 1, stride);
+  const requiredBytes = precedingBytes === null ? null : safeAdd(precedingBytes, elementBytes);
+  return requiredBytes !== null && requiredBytes <= view.byteLength - byteOffset;
+}
+
+function validateAccessors(
+  accessors: readonly unknown[],
+  views: readonly BufferViewRange[],
+): AccessorValidationSuccess | StudioBg3dGlbValidationFailure {
+  let accessorElements = 0;
+  let estimatedDecodedGeometryBytes = 0;
+  let estimatedOrdinaryDecodedGeometryBytes = 0;
+  for (const accessor of accessors) {
+    if (!isRecord(accessor) || !isSafePositiveInteger(accessor.count)) {
+      return failure("invalid-accessor");
+    }
+    const type = accessor.type;
+    const componentType = accessor.componentType;
+    const components = typeof type === "string" ? ACCESSOR_TYPE_COMPONENTS[type] : undefined;
+    const componentBytes = isSafeNonNegativeInteger(componentType)
+      ? ACCESSOR_COMPONENT_BYTES[componentType]
+      : undefined;
+    if (
+      components === undefined ||
+      componentBytes === undefined ||
+      (accessor.normalized !== undefined && typeof accessor.normalized !== "boolean")
+    ) {
+      return failure("invalid-accessor");
+    }
+    const elementBytes = accessorElementByteSize(type as string, components, componentBytes);
+    if (elementBytes === null) return failure("arithmetic-overflow");
+    const byteOffset = accessor.byteOffset ?? 0;
+    if (!isSafeNonNegativeInteger(byteOffset) || byteOffset % componentBytes !== 0) {
+      return failure("invalid-accessor");
+    }
+    if (accessor.bufferView === undefined) {
+      if (byteOffset !== 0) return failure("invalid-accessor");
+    } else {
+      if (!isSafeNonNegativeInteger(accessor.bufferView) || accessor.bufferView >= views.length) {
+        return failure("invalid-accessor");
+      }
+      const view = views[accessor.bufferView];
+      if (
+        !view ||
+        (view.logicalOffset + byteOffset) % componentBytes !== 0 ||
+        (view.byteStride !== null && view.byteStride % componentBytes !== 0)
+      ) {
+        return failure("invalid-accessor");
+      }
+      const stride = view.byteStride ?? elementBytes;
+      if (!rangeContainsElements(view, byteOffset, elementBytes, accessor.count, stride)) {
+        return failure("invalid-accessor");
+      }
+    }
+
+    for (const extrema of [accessor.min, accessor.max]) {
+      if (
+        extrema !== undefined &&
+        (!Array.isArray(extrema) || extrema.length !== components || extrema.some(
+          (entry) => typeof entry !== "number" || !Number.isFinite(entry),
+        ))
+      ) {
+        return failure("invalid-accessor");
+      }
+    }
+
+    if (accessor.sparse !== undefined) {
+      const sparse = accessor.sparse;
+      if (
+        !isRecord(sparse) ||
+        !isSafePositiveInteger(sparse.count) ||
+        sparse.count > accessor.count ||
+        !isRecord(sparse.indices) ||
+        !isRecord(sparse.values)
+      ) {
+        return failure("invalid-accessor");
+      }
+      const indicesComponentType = sparse.indices.componentType;
+      const indicesComponentBytes = isSafeNonNegativeInteger(indicesComponentType)
+        ? ACCESSOR_COMPONENT_BYTES[indicesComponentType]
+        : undefined;
+      if (
+        (indicesComponentType !== 5121 && indicesComponentType !== 5123 && indicesComponentType !== 5125) ||
+        indicesComponentBytes === undefined ||
+        !isSafeNonNegativeInteger(sparse.indices.bufferView) ||
+        sparse.indices.bufferView >= views.length ||
+        !isSafeNonNegativeInteger(sparse.values.bufferView) ||
+        sparse.values.bufferView >= views.length
+      ) {
+        return failure("invalid-accessor");
+      }
+      const indicesView = views[sparse.indices.bufferView];
+      const valuesView = views[sparse.values.bufferView];
+      const indicesOffset = sparse.indices.byteOffset ?? 0;
+      const valuesOffset = sparse.values.byteOffset ?? 0;
+      if (
+        !indicesView || !valuesView ||
+        indicesView.byteStride !== null || valuesView.byteStride !== null ||
+        !isSafeNonNegativeInteger(indicesOffset) || indicesOffset % indicesComponentBytes !== 0 ||
+        !isSafeNonNegativeInteger(valuesOffset) || valuesOffset % componentBytes !== 0 ||
+        (indicesView.logicalOffset + indicesOffset) % indicesComponentBytes !== 0 ||
+        (valuesView.logicalOffset + valuesOffset) % componentBytes !== 0 ||
+        !rangeContainsElements(
+          indicesView,
+          indicesOffset,
+          indicesComponentBytes,
+          sparse.count,
+          indicesComponentBytes,
+        ) ||
+        !rangeContainsElements(valuesView, valuesOffset, elementBytes, sparse.count, elementBytes)
+      ) {
+        return failure("invalid-accessor");
+      }
+    }
+
+    const decodedBytes = safeMultiply(accessor.count, elementBytes);
+    const nextElements = safeAdd(accessorElements, accessor.count);
+    const nextDecodedBytes = decodedBytes === null
+      ? null
+      : safeAdd(estimatedDecodedGeometryBytes, decodedBytes);
+    const primaryView = accessor.bufferView === undefined
+      ? null
+      : views[accessor.bufferView as number];
+    // Meshopt buffer-view output is charged once at the view level below. Ordinary/zero-filled
+    // accessors still need their own decoded allocation, and sparse patching can materialize a
+    // distinct accessor even when its base view was Meshopt-compressed.
+    const ordinaryDecodedBytes = primaryView?.meshoptCompressed === true && accessor.sparse === undefined
+      ? 0
+      : decodedBytes;
+    const nextOrdinaryDecodedBytes = ordinaryDecodedBytes === null
+      ? null
+      : safeAdd(estimatedOrdinaryDecodedGeometryBytes, ordinaryDecodedBytes);
+    if (
+      nextElements === null ||
+      nextDecodedBytes === null ||
+      nextOrdinaryDecodedBytes === null
+    ) {
+      return failure("arithmetic-overflow");
+    }
+    accessorElements = nextElements;
+    estimatedDecodedGeometryBytes = nextDecodedBytes;
+    estimatedOrdinaryDecodedGeometryBytes = nextOrdinaryDecodedBytes;
+  }
+  return Object.freeze({
+    accessorElements,
+    estimatedDecodedGeometryBytes,
+    estimatedOrdinaryDecodedGeometryBytes,
+  });
+}
+
+function animationAccessorDescriptor(
+  accessors: readonly unknown[],
+  index: unknown,
+): AnimationAccessorDescriptor | null {
+  if (!isSafeNonNegativeInteger(index) || index >= accessors.length) return null;
+  const accessor = accessors[index];
+  if (!isRecord(accessor) || !isSafePositiveInteger(accessor.count)) return null;
+  const type = accessor.type;
+  const componentType = accessor.componentType;
+  if (typeof type !== "string" || !isSafeNonNegativeInteger(componentType)) return null;
+  const components = ACCESSOR_TYPE_COMPONENTS[type];
+  return components === undefined
+    ? null
+    : Object.freeze({ count: accessor.count, type, components, componentType });
+}
+
 function collectMetrics(
   bytes: Uint8Array,
   root: Record<string, unknown>,
   bin: GlbChunk | null,
 ): CountResult {
-  const views = parseBufferViews(root, bin);
+  const views = parseBufferViews(bytes, root, bin);
   if ("ok" in views) return { failure: views };
 
   const nodes = readArray(root, "nodes");
@@ -656,8 +1059,26 @@ function collectMetrics(
   const materials = readArray(root, "materials");
   const textures = readArray(root, "textures");
   const images = readArray(root, "images");
-  if (!nodes || !meshes || !accessors || !materials || !textures || !images) {
+  const animations = readArray(root, "animations");
+  const skins = readArray(root, "skins");
+  if (!nodes || !meshes || !accessors || !materials || !textures || !images || !animations || !skins) {
     return { failure: failure("invalid-gltf-root") };
+  }
+  const validatedAccessors = validateAccessors(accessors, views);
+  if ("ok" in validatedAccessors) return { failure: validatedAccessors };
+  let meshoptDecodedBytes = 0;
+  for (const view of views) {
+    if (!view.meshoptCompressed) continue;
+    const next = safeAdd(meshoptDecodedBytes, view.byteLength);
+    if (next === null) return { failure: failure("arithmetic-overflow") };
+    meshoptDecodedBytes = next;
+  }
+  const estimatedDecodedGeometryBytes = safeAdd(
+    validatedAccessors.estimatedOrdinaryDecodedGeometryBytes,
+    meshoptDecodedBytes,
+  );
+  if (estimatedDecodedGeometryBytes === null) {
+    return { failure: failure("arithmetic-overflow") };
   }
 
   const meshInstances = new Array<number>(meshes.length).fill(0);
@@ -677,19 +1098,48 @@ function collectMetrics(
   let meshPrimitives = 0;
   let drawCalls = 0;
   let triangles = 0;
+  let morphTargets = 0;
   let usesDefaultMaterial = false;
+  const meshMorphTargetCounts = new Array<number>(meshes.length).fill(0);
   for (let meshIndex = 0; meshIndex < meshes.length; meshIndex += 1) {
     const mesh = meshes[meshIndex];
     if (!isRecord(mesh) || !Array.isArray(mesh.primitives) || mesh.primitives.length === 0) {
       return { failure: failure("invalid-mesh") };
     }
     const instanceCount = Math.max(1, meshInstances[meshIndex] ?? 0);
+    let meshMorphTargetCount: number | null = null;
     for (const rawPrimitive of mesh.primitives) {
       if (!isRecord(rawPrimitive)) return { failure: failure("invalid-mesh") };
       const mode = rawPrimitive.mode ?? 4;
       if (!isSafeNonNegativeInteger(mode) || mode > 6) return { failure: failure("invalid-mesh") };
       const vertices = primitiveVertexCount(rawPrimitive, accessors);
       if (vertices === null) return { failure: failure("invalid-accessor") };
+      const attributes = rawPrimitive.attributes;
+      const positionVertices = isRecord(attributes)
+        ? accessorCount(accessors, attributes.POSITION)
+        : null;
+      if (positionVertices === null) return { failure: failure("invalid-accessor") };
+      const rawTargets = rawPrimitive.targets;
+      const targets = rawTargets === undefined ? [] : Array.isArray(rawTargets) ? rawTargets : null;
+      if (!targets) return { failure: failure("invalid-mesh") };
+      if (meshMorphTargetCount === null) meshMorphTargetCount = targets.length;
+      else if (meshMorphTargetCount !== targets.length) return { failure: failure("invalid-mesh") };
+      for (const target of targets) {
+        if (!isRecord(target) || Object.keys(target).length === 0) {
+          return { failure: failure("invalid-mesh") };
+        }
+        for (const [semantic, accessorIndex] of Object.entries(target)) {
+          if (semantic !== "POSITION" && semantic !== "NORMAL" && semantic !== "TANGENT") {
+            return { failure: failure("invalid-mesh") };
+          }
+          if (accessorCount(accessors, accessorIndex) !== positionVertices) {
+            return { failure: failure("invalid-accessor") };
+          }
+        }
+        const nextMorphTargets = safeAdd(morphTargets, 1);
+        if (nextMorphTargets === null) return { failure: failure("arithmetic-overflow") };
+        morphTargets = nextMorphTargets;
+      }
       if (rawPrimitive.material === undefined) usesDefaultMaterial = true;
       else if (!isSafeNonNegativeInteger(rawPrimitive.material) || rawPrimitive.material >= materials.length) {
         return { failure: failure("invalid-mesh") };
@@ -704,6 +1154,131 @@ function collectMetrics(
       meshPrimitives = nextPrimitives;
       drawCalls = nextDrawCalls;
       triangles = nextTriangles;
+    }
+    meshMorphTargetCounts[meshIndex] = meshMorphTargetCount ?? 0;
+  }
+
+  let joints = 0;
+  for (const skin of skins) {
+    if (!isRecord(skin) || !Array.isArray(skin.joints) || skin.joints.length === 0) {
+      return { failure: failure("invalid-skin") };
+    }
+    const uniqueJoints = new Set<number>();
+    for (const joint of skin.joints) {
+      if (!isSafeNonNegativeInteger(joint) || joint >= nodes.length || uniqueJoints.has(joint)) {
+        return { failure: failure("invalid-skin") };
+      }
+      uniqueJoints.add(joint);
+    }
+    if (skin.skeleton !== undefined && (!isSafeNonNegativeInteger(skin.skeleton) || skin.skeleton >= nodes.length)) {
+      return { failure: failure("invalid-skin") };
+    }
+    if (skin.inverseBindMatrices !== undefined) {
+      const inverseBindMatrices = animationAccessorDescriptor(accessors, skin.inverseBindMatrices);
+      if (
+        !inverseBindMatrices ||
+        inverseBindMatrices.componentType !== 5126 ||
+        inverseBindMatrices.type !== "MAT4" ||
+        inverseBindMatrices.count !== skin.joints.length
+      ) {
+        return { failure: failure("invalid-skin") };
+      }
+    }
+    const nextJoints = safeAdd(joints, skin.joints.length);
+    if (nextJoints === null) return { failure: failure("arithmetic-overflow") };
+    joints = nextJoints;
+  }
+
+  for (const node of nodes) {
+    if (!isRecord(node)) return { failure: failure("invalid-node") };
+    if (node.skin !== undefined) {
+      if (!isSafeNonNegativeInteger(node.skin) || node.skin >= skins.length || node.mesh === undefined) {
+        return { failure: failure("invalid-skin") };
+      }
+    }
+  }
+
+  let animationChannels = 0;
+  let animationKeyframes = 0;
+  let animationValues = 0;
+  for (const animation of animations) {
+    if (
+      !isRecord(animation) ||
+      !Array.isArray(animation.samplers) ||
+      !Array.isArray(animation.channels) ||
+      animation.samplers.length === 0 ||
+      animation.channels.length === 0
+    ) {
+      return { failure: failure("invalid-animation") };
+    }
+    for (const sampler of animation.samplers) {
+      if (!isRecord(sampler)) return { failure: failure("invalid-animation") };
+      const interpolation = sampler.interpolation ?? "LINEAR";
+      if (interpolation !== "LINEAR" && interpolation !== "STEP" && interpolation !== "CUBICSPLINE") {
+        return { failure: failure("invalid-animation") };
+      }
+      const input = animationAccessorDescriptor(accessors, sampler.input);
+      const output = animationAccessorDescriptor(accessors, sampler.output);
+      if (
+        !input || !output ||
+        input.componentType !== 5126 || input.type !== "SCALAR" ||
+        output.componentType !== 5126
+      ) {
+        return { failure: failure("invalid-animation") };
+      }
+    }
+    for (const channel of animation.channels) {
+      if (
+        !isRecord(channel) ||
+        !isSafeNonNegativeInteger(channel.sampler) ||
+        channel.sampler >= animation.samplers.length ||
+        !isRecord(channel.target) ||
+        !isSafeNonNegativeInteger(channel.target.node) ||
+        channel.target.node >= nodes.length
+      ) {
+        return { failure: failure("invalid-animation") };
+      }
+      const sampler = animation.samplers[channel.sampler];
+      if (!isRecord(sampler)) return { failure: failure("invalid-animation") };
+      const input = animationAccessorDescriptor(accessors, sampler.input);
+      const output = animationAccessorDescriptor(accessors, sampler.output);
+      if (!input || !output) return { failure: failure("invalid-animation") };
+      const interpolationMultiplier = sampler.interpolation === "CUBICSPLINE" ? 3 : 1;
+      const targetPath = channel.target.path;
+      let expectedOutputCount: number | null;
+      if (targetPath === "translation" || targetPath === "scale") {
+        if (output.type !== "VEC3") return { failure: failure("invalid-animation") };
+        expectedOutputCount = safeMultiply(input.count, interpolationMultiplier);
+      } else if (targetPath === "rotation") {
+        if (output.type !== "VEC4") return { failure: failure("invalid-animation") };
+        expectedOutputCount = safeMultiply(input.count, interpolationMultiplier);
+      } else if (targetPath === "weights") {
+        if (output.type !== "SCALAR") return { failure: failure("invalid-animation") };
+        const targetNode = nodes[channel.target.node];
+        if (!isRecord(targetNode) || !isSafeNonNegativeInteger(targetNode.mesh)) {
+          return { failure: failure("invalid-animation") };
+        }
+        const targetCount = meshMorphTargetCounts[targetNode.mesh];
+        if (!targetCount) return { failure: failure("invalid-animation") };
+        const keyTargetCount = safeMultiply(input.count, targetCount);
+        expectedOutputCount = keyTargetCount === null
+          ? null
+          : safeMultiply(keyTargetCount, interpolationMultiplier);
+      } else {
+        return { failure: failure("invalid-animation") };
+      }
+      if (expectedOutputCount === null) return { failure: failure("arithmetic-overflow") };
+      if (output.count !== expectedOutputCount) return { failure: failure("invalid-animation") };
+      const outputScalars = safeMultiply(output.count, output.components);
+      const nextChannels = safeAdd(animationChannels, 1);
+      const nextKeyframes = safeAdd(animationKeyframes, input.count);
+      const nextValues = outputScalars === null ? null : safeAdd(animationValues, outputScalars);
+      if (nextChannels === null || nextKeyframes === null || nextValues === null) {
+        return { failure: failure("arithmetic-overflow") };
+      }
+      animationChannels = nextChannels;
+      animationKeyframes = nextKeyframes;
+      animationValues = nextValues;
     }
   }
 
@@ -726,11 +1301,16 @@ function collectMetrics(
       return { failure: failure("invalid-image") };
     }
     const range = views[image.bufferView];
-    if (!range) return { failure: failure("invalid-image") };
+    if (!range || range.meshoptCompressed || range.embeddedOffset === null) {
+      return { failure: failure("invalid-image") };
+    }
     const nextImageBytes = safeAdd(imageBytes, range.byteLength);
     if (nextImageBytes === null) return { failure: failure("arithmetic-overflow") };
     imageBytes = nextImageBytes;
-    const dimensions = imageDimensions(mimeType, bytes.subarray(range.offset, range.offset + range.byteLength));
+    const dimensions = imageDimensions(
+      mimeType,
+      bytes.subarray(range.embeddedOffset, range.embeddedOffset + range.byteLength),
+    );
     if (dimensions) {
       maxImageDimension = Math.max(maxImageDimension, dimensions.width, dimensions.height);
       const pixels = safeMultiply(dimensions.width, dimensions.height);
@@ -773,6 +1353,19 @@ function collectMetrics(
       maxImageDimension,
       undeterminedImageDimensions,
       lights,
+      animations: animations.length,
+      animationChannels,
+      animationKeyframes,
+      animationValues,
+      skins: skins.length,
+      joints,
+      morphTargets,
+      accessorElements: validatedAccessors.accessorElements,
+      // Charge ordinary accessor allocations and every Meshopt view output together. Accessors
+      // backed solely by a Meshopt view were excluded from the ordinary subtotal, so mixed files
+      // cannot hide a second large allocation behind Math.max while compressed views are not
+      // double-counted merely because several accessors reference them.
+      estimatedDecodedGeometryBytes,
     }),
   };
 }
@@ -786,6 +1379,17 @@ function enforceBudgets(
   if (metrics.drawCalls > budget.complexity.maxDrawCalls) return failure("draw-call-budget-exceeded");
   if (metrics.materials > budget.complexity.maxMaterials) return failure("material-budget-exceeded");
   if (metrics.lights > budget.complexity.maxLights) return failure("light-budget-exceeded");
+  if (metrics.animations > budget.complexity.maxAnimations) return failure("animation-count-budget-exceeded");
+  if (metrics.animationChannels > budget.complexity.maxAnimationChannels) return failure("animation-channel-budget-exceeded");
+  if (metrics.animationKeyframes > budget.complexity.maxAnimationKeyframes) return failure("animation-keyframe-budget-exceeded");
+  if (metrics.animationValues > budget.complexity.maxAnimationValues) return failure("animation-value-budget-exceeded");
+  if (metrics.skins > budget.complexity.maxSkins) return failure("skin-count-budget-exceeded");
+  if (metrics.joints > budget.complexity.maxJoints) return failure("joint-count-budget-exceeded");
+  if (metrics.morphTargets > budget.complexity.maxMorphTargets) return failure("morph-target-budget-exceeded");
+  if (metrics.accessorElements > budget.complexity.maxAccessorElements) return failure("accessor-element-budget-exceeded");
+  if (metrics.estimatedDecodedGeometryBytes > budget.complexity.maxDecodedGeometryBytes) {
+    return failure("geometry-memory-budget-exceeded");
+  }
   if (metrics.textures > budget.textures.maxTextures) return failure("texture-count-budget-exceeded");
   if (
     Math.max(metrics.imageBytes, metrics.estimatedDecodedImageBytes) >

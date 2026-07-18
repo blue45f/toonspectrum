@@ -3,7 +3,7 @@ import { OrthographicCamera } from "@react-three/drei/core/OrthographicCamera.js
 import { PerspectiveCamera } from "@react-three/drei/core/PerspectiveCamera.js";
 import { TransformControls } from "@react-three/drei/core/TransformControls.js";
 import { View } from "@react-three/drei/web/View.js";
-import { Canvas, useThree } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import {
   AlertTriangle,
   Boxes,
@@ -51,7 +51,8 @@ import {
 import {
   useEffect,
   useEffectEvent,
-  useMemo,
+  useCallback,
+  useLayoutEffect,
   useRef,
   useState,
   Fragment,
@@ -88,22 +89,27 @@ import {
 } from "./studio-background-3d-composites";
 import {
   cloneBgCustomModelInstances,
-  cloneStudioBg3dThreeObject,
   checkStudioBg3dThreeBudgets,
+  collectStudioBg3dThreeJoints,
+  collectStudioBg3dThreeMorphTargets,
   computeAutoFitScale,
+  createStudioBg3dEditableThreeClone,
   createBgCustomModelInstance,
   duplicateBgCustomModelInstance,
   loadVerifiedStudioBg3dGlbWithThree,
   measureBg3dObjectSize,
   parseBg3dSceneWithModelsFromDataUrl,
+  sampleStudioBg3dAnimationActionAtTime,
   type BgCustomModelInstance,
+  type StudioBg3dEditableThreeClone,
   type StudioBg3dThreeLoadSuccess,
+  type StudioBg3dThreeJointDescriptor,
+  type StudioBg3dThreeMorphDescriptor,
 } from "./studio-background-3d-model";
 import {
   clonePrimitives,
   createPrimitive,
   duplicatePrimitive,
-  makeGeometry,
   PRIMITIVE_DEFS,
   type BgPrimitive,
   type BgPrimitiveKind,
@@ -119,6 +125,12 @@ import {
   getSkyPreset,
   normalizePanoramaRotationDegrees,
 } from "./studio-background-3d-sky";
+import { resolveStudioBg3dAnimationSchedule } from "./studio-bg3d-animation-scheduler";
+import {
+  isStudioBg3dAnimationOnceComplete,
+  resolveStudioBg3dAnimationTime,
+  snapshotStudioBg3dLiveAnimationPlayback,
+} from "./studio-bg3d-animation-time";
 import {
   acquireStudioBg3dCaptureAdapterAfterViewTransition,
   captureStudioBg3dRaster,
@@ -135,6 +147,10 @@ import {
   type StudioBg3dDeviceSignals,
   type StudioBg3dResolvedDeviceQuality,
 } from "./studio-bg3d-device-quality";
+import {
+  canSetStudioBg3dParent,
+  resolveStudioBg3dHierarchy,
+} from "./studio-bg3d-hierarchy";
 import { resolveStudioBg3dLtCaptureSize } from "./studio-bg3d-lt-capture-size";
 import {
   EMPTY_STUDIO_BG3D_LT_USER_PRESET_PAYLOAD,
@@ -167,6 +183,11 @@ import {
   type StudioBg3dLtRasterLayerRole,
 } from "./studio-bg3d-lt-render";
 import {
+  convertStudioBg3dModelFilesToGlb,
+  StudioBg3dModelImportError,
+  type StudioBg3dImportProgress,
+} from "./studio-bg3d-model-import";
+import {
   applyStudioBg3dSnapToTransform,
   DEFAULT_STUDIO_BG3D_SNAP_SETTINGS,
   filterStudioBg3dLayerItems,
@@ -183,6 +204,15 @@ import {
   type StudioBg3dSnapSettings,
 } from "./studio-bg3d-object-ops";
 import {
+  StudioBg3dPrimitiveGeometryPool,
+  synchronizeStudioBg3dRootMatrix,
+} from "./studio-bg3d-render-optimization";
+import {
+  DEFAULT_STUDIO_BG3D_ANIMATION_PLAYBACK,
+  DEFAULT_STUDIO_BG3D_CONSTRAINT_LAYER,
+  DEFAULT_STUDIO_BG3D_MATERIAL_OVERRIDE,
+  DEFAULT_STUDIO_BG3D_POSE_LAYER,
+  DEFAULT_STUDIO_BG3D_MORPH_LAYER,
   DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
   migrateStudioBg3dSceneDocument,
   parseStudioBg3dSceneDocument,
@@ -190,6 +220,12 @@ import {
   type StudioBg3dCameraSettings,
   type StudioBg3dBackgroundSettings,
   type StudioBg3dLineOutputSettings,
+  type StudioBg3dAnimationPlayback,
+  type StudioBg3dConstraintLayer,
+  type StudioBg3dMaterialOverride,
+  type StudioBg3dPoseLayer,
+  type StudioBg3dMorphLayer,
+  type StudioBg3dQuaternion,
   type StudioBg3dModelAttachment,
   type StudioBg3dSceneBudgets,
   type StudioBg3dSceneDocument,
@@ -203,6 +239,10 @@ import {
   adaptStudioBg3dRuntimeToDocument,
   hydrateStudioBg3dDocumentToRuntime,
 } from "./studio-bg3d-scene-runtime";
+import {
+  calculateStudioBg3dThreeReparentTransform,
+  calculateStudioBg3dThreeWorldDeltaTransform,
+} from "./studio-bg3d-three-hierarchy";
 import {
   createStudioBg3dThreeWebglCaptureAdapter,
   registerStudioBg3dCaptureExcludedObject,
@@ -268,10 +308,12 @@ function createStudioBg3dHistorySnapshot(input: {
     document: input.document,
   };
 }
-type ModelRootCacheEntry = Pick<StudioBg3dThreeLoadSuccess, "root" | "dispose"> & {
+type ModelRootCacheEntry = Pick<StudioBg3dThreeLoadSuccess, "root" | "dispose" | "animations"> & {
   readonly record: Bg3dVerifiedStoredRecord;
   readonly metrics: StudioBg3dThreeLoadSuccess["metrics"];
   readonly admittedProfiles: Set<StudioBg3dResolvedDeviceQuality["profile"]>;
+  readonly joints: readonly StudioBg3dThreeJointDescriptor[];
+  readonly morphTargets: readonly StudioBg3dThreeMorphDescriptor[];
 };
 
 const CONTROL_BUTTON =
@@ -281,6 +323,9 @@ const ICON_BUTTON =
 const VIEWPORT_BTN =
   "grid size-11 place-items-center rounded-lg border border-line/70 bg-panel/80 text-fg-2 shadow-sm backdrop-blur transition-colors hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:size-9";
 const DEFAULT_LT_USER_PRESET_DESCRIPTION = "현재 장면에서 저장한 LT 선화·톤 설정입니다.";
+const EMPTY_THREE_ANIMATION_CLIPS: readonly THREE.AnimationClip[] = Object.freeze([]);
+const EMPTY_THREE_JOINTS: readonly StudioBg3dThreeJointDescriptor[] = Object.freeze([]);
+const EMPTY_THREE_MORPH_TARGETS: readonly StudioBg3dThreeMorphDescriptor[] = Object.freeze([]);
 
 let fallbackLtUserPresetIdSequence = 0;
 
@@ -988,10 +1033,13 @@ async function admitAndCacheModel(args: {
     }
     const entry: ModelRootCacheEntry = {
       root: loaded.root,
+      animations: loaded.animations,
       dispose: loaded.dispose,
       record: args.record,
       metrics: loaded.metrics,
       admittedProfiles: new Set([policy.profile]),
+      joints: collectStudioBg3dThreeJoints(loaded.root),
+      morphTargets: collectStudioBg3dThreeMorphTargets(loaded.root),
     };
     args.cache.set(args.record.id, entry);
     return entry;
@@ -1016,6 +1064,22 @@ function radToDeg(rad: number): number {
 }
 function degToRad(deg: number): number {
   return (deg * Math.PI) / 180;
+}
+function quaternionToEulerDegrees(rotation: StudioBg3dQuaternion): [number, number, number] {
+  const euler = new THREE.Euler().setFromQuaternion(
+    new THREE.Quaternion(...rotation),
+    "XYZ",
+  );
+  return [radToDeg(euler.x), radToDeg(euler.y), radToDeg(euler.z)];
+}
+function eulerDegreesToQuaternion(rotation: readonly [number, number, number]): StudioBg3dQuaternion {
+  const quaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+    degToRad(rotation[0]),
+    degToRad(rotation[1]),
+    degToRad(rotation[2]),
+    "XYZ",
+  )).normalize();
+  return [quaternion.x, quaternion.y, quaternion.z, quaternion.w];
 }
 function round(value: number, precision: number): number {
   const factor = 10 ** precision;
@@ -1162,8 +1226,10 @@ function BgGroundHelper({ visible }: { visible: boolean }) {
 
 interface BgPrimitiveMeshProps {
   prim: BgPrimitive;
+  geometryPool: StudioBg3dPrimitiveGeometryPool;
   lineArt: boolean;
   showEdges: boolean;
+  selected: boolean;
   onSelect: (id: string, isMulti: boolean) => void;
   registerRef: (id: string, obj: THREE.Group | null) => void;
   children?: React.ReactNode;
@@ -1174,23 +1240,12 @@ interface BgPrimitiveMeshProps {
    바꾸는 게 핵심: 깊이쓰기가 계속 켜져 있어 (1) 가려진 도형의 엣지가 앞 도형에 정확히 가려지는
    hidden-line-removal이 유지되고 (2) three.js/R3F가 invisible 오브젝트는 레이캐스트에서 제외하므로
    라인아트 미리보기 중에도 클릭 선택이 계속 동작한다. */
-function BgPrimitiveMesh({ prim, lineArt, showEdges, onSelect, registerRef, children }: BgPrimitiveMeshProps) {
-  const geometry = useMemo(() => makeGeometry(prim.kind), [prim.kind]);
-  // BoxGeometry의 각 면은 삼각형 2장(동일 평면)이라 임계각이 낮으면 면 대각선에 가짜 엣지가 그려진다.
-  // 20°는 그 가짜 대각선은 없애면서 상자 모서리·원기둥 캡 테두리 같은 실제 크리스는 모두 살린다.
-  const edges = useMemo(() => new THREE.EdgesGeometry(geometry, 20), [geometry]);
-  // geometry/edges는 <mesh geometry={geometry}> 처럼 prop으로 붙어 JSX 자식이 아니므로 R3F의
-  // 언마운트 시 자동 dispose 재귀(child.children만 훑음)가 이 둘을 못 본다 — 직접 해제하지 않으면
-  // 도형을 추가·삭제할 때마다 GPU BufferGeometry가 새는다. useMemo 의존성이 바뀌어 새 지오메트리로
-  // 교체될 때도 이전 것을 여기서 정리한다.
-  useEffect(() => {
-    return () => {
-      geometry.dispose();
-      edges.dispose();
-    };
-  }, [geometry, edges]);
-
+function BgPrimitiveMesh({ prim, geometryPool, lineArt, showEdges, selected, onSelect, registerRef, children }: BgPrimitiveMeshProps) {
+  const { geometry, edges } = geometryPool.get(prim.kind);
   const groupRef = useRef<THREE.Group>(null);
+  useLayoutEffect(() => {
+    if (groupRef.current) synchronizeStudioBg3dRootMatrix(groupRef.current, selected);
+  }, [prim.position, prim.rotation, prim.scale, selected]);
   useEffect(() => {
     registerRef(prim.id, groupRef.current);
     return () => registerRef(prim.id, null);
@@ -1230,33 +1285,66 @@ function BgPrimitiveMesh({ prim, lineArt, showEdges, onSelect, registerRef, chil
 interface BgCustomModelMeshProps {
   instance: BgCustomModelInstance;
   cachedRoot: THREE.Object3D | undefined;
+  animations: readonly THREE.AnimationClip[];
+  selected: boolean;
+  capturing: boolean;
+  targetFps: number;
   onSelect: (id: string, isMulti: boolean) => void;
   registerRef: (id: string, obj: THREE.Group | null) => void;
+  registerAnimationTime: (id: string, reader: (() => number) | null) => void;
+  onAnimationComplete: (id: string, timeSeconds: number) => void;
   onCloneStatus: (id: string, ok: boolean) => void;
   children?: React.ReactNode;
 }
 
-function BgCustomModelMesh({ instance, cachedRoot, onSelect, registerRef, onCloneStatus, children }: BgCustomModelMeshProps) {
-  // 검증 로더의 루트를 인스턴스마다 복제하되, 스킨 메시가 있으면 SkeletonUtils.clone을 거쳐 뼈와
-  // 스켈레톤 바인딩을 분리한다. geometry/material은 로더 캐시가 소유하므로 여기서는 dispose하지 않는다.
-  const [cloned, setCloned] = useState<THREE.Object3D | null>(null);
+function BgCustomModelMesh({ instance, cachedRoot, animations, selected, capturing, targetFps, onSelect, registerRef, registerAnimationTime, onAnimationComplete, onCloneStatus, children }: BgCustomModelMeshProps) {
+  // Geometry/textures stay cache-owned, while each render instance owns cloned materials so its
+  // adjustments cannot leak into sibling placements or the verified source cache.
+  const [editableClone, setEditableClone] = useState<StudioBg3dEditableThreeClone | null>(null);
+  const groupRef = useRef<THREE.Group>(null);
+  useLayoutEffect(() => {
+    if (groupRef.current) synchronizeStudioBg3dRootMatrix(groupRef.current, selected);
+  }, [instance.position, instance.rotation, instance.scale, selected]);
+  const localBoundsRef = useRef(new THREE.Sphere(new THREE.Vector3(), 1));
+  const worldBoundsRef = useRef(new THREE.Sphere(new THREE.Vector3(), 1));
+  const projectionMatrixRef = useRef(new THREE.Matrix4());
+  const frustumRef = useRef(new THREE.Frustum());
+  const animationRunRef = useRef<{
+    readonly mixer: THREE.AnimationMixer;
+    readonly action: THREE.AnimationAction;
+    readonly playback: StudioBg3dAnimationPlayback;
+    readonly durationSeconds: number;
+    sampledTimeSeconds: number;
+    completed: boolean;
+    startElapsedSeconds: number | null;
+    lastSampleElapsedSeconds: number;
+  } | null>(null);
+  const poseRef = useRef(instance.pose);
+  poseRef.current = instance.pose;
+  const morphRef = useRef(instance.morph);
+  morphRef.current = instance.morph;
+  const constraintsRef = useRef(instance.constraints);
+  constraintsRef.current = instance.constraints;
   const onCloneStatusRef = useRef(onCloneStatus);
   useEffect(() => {
     onCloneStatusRef.current = onCloneStatus;
   });
   useEffect(() => {
     let active = true;
-    setCloned(null);
+    setEditableClone(null);
     if (!cachedRoot) {
       onCloneStatusRef.current(instance.id, false);
       return () => {
         active = false;
       };
     }
-    void cloneStudioBg3dThreeObject(cachedRoot)
+    void createStudioBg3dEditableThreeClone(cachedRoot)
       .then((next) => {
-        if (!active) return;
-        setCloned(next);
+        if (!active) {
+          next.dispose();
+          return;
+        }
+        setEditableClone(next);
         onCloneStatusRef.current(instance.id, true);
       })
       .catch(() => {
@@ -1268,13 +1356,159 @@ function BgCustomModelMesh({ instance, cachedRoot, onSelect, registerRef, onClon
     };
   }, [cachedRoot, instance.id]);
 
-  const groupRef = useRef<THREE.Group>(null);
+  useEffect(() => () => editableClone?.dispose(), [editableClone]);
+  useEffect(() => {
+    editableClone?.applyMaterialOverride(instance.materialOverride);
+  }, [editableClone, instance.materialOverride]);
+  useEffect(() => {
+    animationRunRef.current?.mixer.stopAllAction();
+    animationRunRef.current = null;
+    const playback = instance.animation;
+    const clip = playback ? (animations[playback.clipIndex] ?? animations[0]) : undefined;
+    if (!editableClone || !playback || !clip) return;
+    const mixer = new THREE.AnimationMixer(editableClone.root);
+    const action = mixer.clipAction(clip);
+    action.enabled = true;
+    // The Studio clock resolves repeat/ping-pong into an absolute clip-local time. Keeping the
+    // Three action paused in LoopOnce prevents Three from applying a second loop transform.
+    action.clampWhenFinished = true;
+    action.setLoop(THREE.LoopOnce, 1);
+    action.setEffectiveWeight(playback.weight);
+    action.play();
+    action.paused = true;
+    const durationSeconds = Math.max(0, Number.isFinite(clip.duration) ? clip.duration : 0);
+    editableClone.poseController.restoreRestPose();
+    editableClone.morphController.restoreRestWeights();
+    const sampledTimeSeconds = sampleStudioBg3dAnimationActionAtTime(mixer, action, resolveStudioBg3dAnimationTime({
+      baseTimeSeconds: playback.timeSeconds,
+      elapsedSeconds: 0,
+      timeScale: playback.timeScale,
+      durationSeconds,
+      loop: playback.loop,
+    }));
+    editableClone.poseController.applyToCurrentPose(poseRef.current);
+    editableClone.poseController.applyAimConstraints(constraintsRef.current);
+    editableClone.morphController.applyToCurrentWeights(morphRef.current);
+    const run = {
+      mixer,
+      action,
+      playback,
+      durationSeconds,
+      sampledTimeSeconds,
+      completed: false,
+      startElapsedSeconds: null,
+      lastSampleElapsedSeconds: Number.NEGATIVE_INFINITY,
+    };
+    animationRunRef.current = run;
+    registerAnimationTime(instance.id, () => run.sampledTimeSeconds);
+    return () => {
+      registerAnimationTime(instance.id, null);
+      mixer.stopAllAction();
+      mixer.uncacheRoot(editableClone.root);
+      if (animationRunRef.current?.mixer === mixer) animationRunRef.current = null;
+    };
+  }, [animations, editableClone, instance.animation, instance.id, registerAnimationTime]);
+  useEffect(() => {
+    const group = groupRef.current;
+    if (!editableClone || !group) return;
+    group.updateWorldMatrix(true, true);
+    const worldBounds = new THREE.Box3().setFromObject(editableClone.root)
+      .getBoundingSphere(new THREE.Sphere());
+    if (!Number.isFinite(worldBounds.radius) || worldBounds.radius <= 0) {
+      localBoundsRef.current.set(new THREE.Vector3(), 1);
+      return;
+    }
+    const inverseGroup = group.matrixWorld.clone().invert();
+    worldBounds.applyMatrix4(inverseGroup);
+    // Skinning can move vertices outside the rest-pose geometry bounds; a conservative margin keeps
+    // near-edge characters updating instead of visibly popping when they re-enter the frustum.
+    worldBounds.radius *= 1.5;
+    localBoundsRef.current.copy(worldBounds);
+  }, [editableClone]);
+  useEffect(() => {
+    if (!editableClone) return;
+    const run = animationRunRef.current;
+    if (run) {
+      editableClone.poseController.removeAppliedPoseOffsets();
+      editableClone.morphController.removeAppliedWeightOffsets();
+      run.sampledTimeSeconds = sampleStudioBg3dAnimationActionAtTime(
+        run.mixer,
+        run.action,
+        run.sampledTimeSeconds,
+      );
+      editableClone.poseController.applyToCurrentPose(instance.pose);
+      editableClone.poseController.applyAimConstraints(instance.constraints);
+      editableClone.morphController.applyToCurrentWeights(instance.morph);
+    } else {
+      editableClone.poseController.applyFromRestPose(instance.pose);
+      editableClone.poseController.applyAimConstraints(instance.constraints);
+      editableClone.morphController.applyFromRestWeights(instance.morph);
+    }
+  }, [editableClone, instance.animation, instance.constraints, instance.morph, instance.pose]);
+  useFrame(({ clock, camera }) => {
+    const run = animationRunRef.current;
+    if (!run?.playback.playing) return;
+    run.startElapsedSeconds ??= clock.elapsedTime;
+    const elapsed = clock.elapsedTime - run.startElapsedSeconds;
+    const timing = {
+      baseTimeSeconds: run.playback.timeSeconds,
+      elapsedSeconds: elapsed,
+      timeScale: run.playback.timeScale,
+      durationSeconds: run.durationSeconds,
+      loop: run.playback.loop,
+    } as const;
+    const timeSeconds = resolveStudioBg3dAnimationTime(timing);
+    if (!editableClone) return;
+    const group = groupRef.current;
+    if (!group) return;
+    group.updateWorldMatrix(true, false);
+    let visibleInHierarchy = true;
+    for (let object: THREE.Object3D | null = group; object; object = object.parent) {
+      if (!object.visible) {
+        visibleInHierarchy = false;
+        break;
+      }
+    }
+    worldBoundsRef.current.copy(localBoundsRef.current).applyMatrix4(group.matrixWorld);
+    camera.updateWorldMatrix(true, false);
+    projectionMatrixRef.current.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    frustumRef.current.setFromProjectionMatrix(projectionMatrixRef.current);
+    const schedule = resolveStudioBg3dAnimationSchedule({
+      visibleInHierarchy,
+      inCameraFrustum: frustumRef.current.intersectsSphere(worldBoundsRef.current),
+      capturing,
+      selected,
+      targetFps,
+      distanceToCamera: camera.position.distanceTo(worldBoundsRef.current.center),
+      boundingRadius: worldBoundsRef.current.radius,
+    });
+    if (
+      schedule.suspended ||
+      clock.elapsedTime - run.lastSampleElapsedSeconds < schedule.minimumIntervalSeconds
+    ) {
+      return;
+    }
+    run.lastSampleElapsedSeconds = clock.elapsedTime;
+    editableClone.poseController.removeAppliedPoseOffsets();
+    editableClone.morphController.removeAppliedWeightOffsets();
+    run.sampledTimeSeconds = sampleStudioBg3dAnimationActionAtTime(
+      run.mixer,
+      run.action,
+      timeSeconds,
+    );
+    editableClone.poseController.applyToCurrentPose(poseRef.current);
+    editableClone.poseController.applyAimConstraints(constraintsRef.current);
+    editableClone.morphController.applyToCurrentWeights(morphRef.current);
+    if (!run.completed && isStudioBg3dAnimationOnceComplete(timing)) {
+      run.completed = true;
+      onAnimationComplete(instance.id, timeSeconds);
+    }
+  });
+
   useEffect(() => {
     registerRef(instance.id, groupRef.current);
     return () => registerRef(instance.id, null);
   }, [instance.id, registerRef]);
-
-  if (!cloned) return null;
 
   const visible = isBgObjectVisible(instance);
 
@@ -1290,7 +1524,7 @@ function BgCustomModelMesh({ instance, cachedRoot, onSelect, registerRef, onClon
         onSelect(instance.id, e.shiftKey || e.metaKey || e.ctrlKey);
       }}
     >
-      <primitive object={cloned} />
+      {editableClone ? <primitive object={editableClone.root} /> : null}
       {children}
     </group>
   );
@@ -1338,6 +1572,7 @@ function Vec3Field({
 }
 
 export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose, onInsert }: StudioBackground3DProps) {
+  const [primitiveGeometryPool] = useState(() => new StudioBg3dPrimitiveGeometryPool());
   const [primitives, setPrimitives] = useState<BgPrimitive[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [transformMode, setTransformMode] = useState<TransformModeId>("translate");
@@ -1385,11 +1620,25 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   const [modelLibrary, setModelLibrary] = useState<Bg3dModelLibraryEntry[]>([]);
   const [modelLibraryStatus, setModelLibraryStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [isUploadingModel, setIsUploadingModel] = useState(false);
+  const [modelImportProgress, setModelImportProgress] = useState<StudioBg3dImportProgress | null>(null);
+  const modelImportAbortRef = useRef<AbortController | null>(null);
+  const modelAnimationTimeReadersRef = useRef(new Map<string, () => number>());
+  const [poseJointSelection, setPoseJointSelection] = useState("");
+  const [morphTargetSelection, setMorphTargetSelection] = useState("");
   const [deletingModelId, setDeletingModelId] = useState<string | null>(null);
   const [isRestoringScene, setIsRestoringScene] = useState(false);
   const [templateLibrary, setTemplateLibrary] = useState<Bg3dTemplateLibraryEntry[]>([]);
   const [templateLibraryStatus, setTemplateLibraryStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+
+  useEffect(() => () => modelImportAbortRef.current?.abort(), []);
+  useEffect(() => {
+    if (!open) primitiveGeometryPool.dispose();
+  }, [open, primitiveGeometryPool]);
+  useEffect(() => {
+    primitiveGeometryPool.retain();
+    return () => primitiveGeometryPool.releaseSoon();
+  }, [primitiveGeometryPool]);
   
   const generateId = () => "template-" + Math.random().toString(36).substring(2, 15);
 
@@ -1445,8 +1694,12 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   const pendingInitialCameraRef = useRef<StudioBg3dCameraSettings | null>(null);
   const viewportHostRef = useRef<HTMLDivElement>(null);
   const primitiveObjectsRef = useRef<Map<string, THREE.Group>>(new Map());
-  const dragInitialSelectedTransformsRef = useRef<Map<string, { position: [number, number, number], rotation: [number, number, number], scale: [number, number, number] }>>(new Map());
-  const dragInitialFirstTransformRef = useRef<{ position: [number, number, number], rotation: [number, number, number], scale: [number, number, number] } | null>(null);
+  const dragInitialSelectedTransformsRef = useRef<Map<string, {
+    worldMatrix: THREE.Matrix4;
+  }>>(new Map());
+  const dragInitialFirstTransformRef = useRef<{
+    worldMatrix: THREE.Matrix4;
+  } | null>(null);
   const [, setRefTick] = useState(0);
   const panelScrollRef = useRef<HTMLDivElement>(null);
   // storage id는 이 두 Map과 검증 캐시 안에서만 쓰며 Studio 장면 문서에는 절대 직렬화하지 않는다.
@@ -1813,10 +2066,40 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     setSelectedIds(new Set([parts[0].id]));
   };
 
+  const removeSceneEntities = (ids: ReadonlySet<string>): boolean => {
+    if (ids.size === 0) return false;
+    const entities = [...primitives, ...customModels];
+    const detachedTransforms = new Map<
+      string,
+      NonNullable<ReturnType<typeof calculateStudioBg3dThreeReparentTransform>>
+    >();
+    for (const entity of entities) {
+      if (ids.has(entity.id) || !entity.parentId || !ids.has(entity.parentId)) continue;
+      const detached = calculateStudioBg3dThreeReparentTransform(entities, entity.id, null);
+      if (!detached) {
+        setError("부모를 삭제해도 자식의 월드 변환을 보존할 수 없어 삭제를 취소했습니다.");
+        return false;
+      }
+      detachedTransforms.set(entity.id, detached);
+    }
+    const retain = <T extends BgPrimitive | BgCustomModelInstance>(entity: T): T | null => {
+      if (ids.has(entity.id)) return null;
+      if (!detachedTransforms.has(entity.id)) return entity;
+      return {
+        ...entity,
+        parentId: null,
+        ...detachedTransforms.get(entity.id),
+      };
+    };
+    setPrimitives((current) => current.map(retain).filter((entity): entity is BgPrimitive => entity !== null));
+    setCustomModels((current) =>
+      current.map(retain).filter((entity): entity is BgCustomModelInstance => entity !== null));
+    return true;
+  };
+
   const deleteSelected = () => {
     if (selectedIds.size === 0) return;
-    setPrimitives((prev) => prev.filter((p) => !selectedIds.has(p.id)));
-    setCustomModels((prev) => prev.filter((m) => !selectedIds.has(m.id)));
+    if (!removeSceneEntities(selectedIds)) return;
     setSelectedIds(new Set());
     setIsTransforming(false);
   };
@@ -1870,10 +2153,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     const firstObj = primitiveObjectsRef.current.get(firstSelectedId!);
     const initialFirst = dragInitialFirstTransformRef.current;
     if (!firstObj || !initialFirst) return;
-
-    const dx = firstObj.position.x - initialFirst.position[0];
-    const dy = firstObj.position.y - initialFirst.position[1];
-    const dz = firstObj.position.z - initialFirst.position[2];
+    firstObj.updateWorldMatrix(true, false);
 
     const patchTransform = (item: BgPrimitive | BgCustomModelInstance, isFirst: boolean) => {
       const initial = dragInitialSelectedTransformsRef.current.get(item.id);
@@ -1893,13 +2173,28 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
       }
       
       if (!initial) return item;
+      const object = primitiveObjectsRef.current.get(item.id);
+      if (!object) return item;
+      object.parent?.updateWorldMatrix(true, false);
+      const parentWorld = object.parent?.matrixWorld;
+      const targetLocal = calculateStudioBg3dThreeWorldDeltaTransform({
+        initialDriverWorldMatrix: initialFirst.worldMatrix,
+        currentDriverWorldMatrix: firstObj.matrixWorld,
+        initialTargetWorldMatrix: initial.worldMatrix,
+        targetParentWorldMatrix: parentWorld,
+      });
+      if (!targetLocal) return item;
       const next = {
         ...item,
-        position: [initial.position[0] + dx, initial.position[1] + dy, initial.position[2] + dz] as [number, number, number],
+        ...targetLocal,
       };
       if (snap) {
-        const snapped = applyStudioBg3dSnapToTransform({ position: next.position, rotation: initial.rotation }, snapSettings);
+        const snapped = applyStudioBg3dSnapToTransform({
+          position: next.position,
+          rotation: next.rotation,
+        }, snapSettings);
         next.position = snapped.position as [number, number, number];
+        next.rotation = snapped.rotation as [number, number, number];
       }
       return next;
     };
@@ -1969,6 +2264,136 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     );
   }
 
+  function updateCustomModelMaterial(
+    id: string,
+    update: StudioBg3dMaterialOverride | null | ((current: StudioBg3dMaterialOverride) => StudioBg3dMaterialOverride),
+  ) {
+    setCustomModels((prev) => prev.map((model) => {
+      if (model.id !== id) return model;
+      if (update === null) return { ...model, materialOverride: undefined };
+      const current = model.materialOverride ?? DEFAULT_STUDIO_BG3D_MATERIAL_OVERRIDE;
+      const materialOverride = typeof update === "function" ? update(current) : update;
+      return { ...model, materialOverride: { ...materialOverride } };
+    }));
+  }
+
+  function updateCustomModelAnimation(
+    id: string,
+    update: StudioBg3dAnimationPlayback | null | ((current: StudioBg3dAnimationPlayback) => StudioBg3dAnimationPlayback),
+  ) {
+    setCustomModels((prev) => prev.map((model) => {
+      if (model.id !== id) return model;
+      if (update === null) return { ...model, animation: undefined };
+      const stored = model.animation ?? DEFAULT_STUDIO_BG3D_ANIMATION_PLAYBACK;
+      const liveTimeSeconds = modelAnimationTimeReadersRef.current.get(id)?.();
+      const current = snapshotStudioBg3dLiveAnimationPlayback(stored, liveTimeSeconds);
+      const animation = typeof update === "function" ? update(current) : update;
+      return { ...model, animation: { ...animation } };
+    }));
+  }
+
+  function updateCustomModelPose(
+    id: string,
+    update: StudioBg3dPoseLayer | null | ((current: StudioBg3dPoseLayer) => StudioBg3dPoseLayer),
+  ) {
+    setCustomModels((prev) => prev.map((model) => {
+      if (model.id !== id) return model;
+      if (update === null) return { ...model, pose: undefined };
+      const current = model.pose ?? DEFAULT_STUDIO_BG3D_POSE_LAYER;
+      const pose = typeof update === "function" ? update(current) : update;
+      return {
+        ...model,
+        pose: {
+          ...pose,
+          joints: pose.joints.map((joint) => ({
+            jointKey: joint.jointKey,
+            rotationOffset: [...joint.rotationOffset],
+          })),
+        },
+      };
+    }));
+  }
+
+  function updateCustomModelMorph(
+    id: string,
+    update: StudioBg3dMorphLayer | null | ((current: StudioBg3dMorphLayer) => StudioBg3dMorphLayer),
+  ) {
+    setCustomModels((prev) => prev.map((model) => {
+      if (model.id !== id) return model;
+      if (update === null) return { ...model, morph: undefined };
+      const current = model.morph ?? DEFAULT_STUDIO_BG3D_MORPH_LAYER;
+      const morph = typeof update === "function" ? update(current) : update;
+      return {
+        ...model,
+        morph: {
+          ...morph,
+          targets: morph.targets.map((target) => ({ ...target })),
+        },
+      };
+    }));
+  }
+
+  function updateCustomModelConstraints(
+    id: string,
+    update: StudioBg3dConstraintLayer | null | ((current: StudioBg3dConstraintLayer) => StudioBg3dConstraintLayer),
+  ) {
+    setCustomModels((previous) => previous.map((model) => {
+      if (model.id !== id) return model;
+      if (update === null) return { ...model, constraints: undefined };
+      const current = model.constraints ?? DEFAULT_STUDIO_BG3D_CONSTRAINT_LAYER;
+      const constraints = typeof update === "function" ? update(current) : update;
+      return {
+        ...model,
+        constraints: {
+          ...constraints,
+          aims: constraints.aims.map((aim) => ({ ...aim, target: [...aim.target] })),
+        },
+      };
+    }));
+  }
+
+  function reparentSceneEntity(id: string, nextParentId: string | null): void {
+    const entities = [...primitives, ...customModels];
+    const entity = entities.find((candidate) => candidate.id === id);
+    if (
+      !entity ||
+      isBgObjectTransformBlocked(entity) ||
+      !canSetStudioBg3dParent(entities, id, nextParentId)
+    ) {
+      return;
+    }
+    const preserved = calculateStudioBg3dThreeReparentTransform(entities, id, nextParentId);
+    if (!preserved) {
+      setError("현재 부모 변환에는 기울어짐이 생겨 위치를 보존할 수 없습니다. 부모의 비균일 크기 조정을 확인해 주세요.");
+      return;
+    }
+    const apply = <T extends BgPrimitive | BgCustomModelInstance>(candidate: T): T => {
+      if (candidate.id !== id) return candidate;
+      return {
+        ...candidate,
+        parentId: nextParentId,
+        ...preserved,
+      };
+    };
+    setPrimitives((current) => current.map(apply) as BgPrimitive[]);
+    setCustomModels((current) => current.map(apply) as BgCustomModelInstance[]);
+  }
+
+  const registerModelAnimationTime = useCallback((id: string, reader: (() => number) | null) => {
+    if (reader) modelAnimationTimeReadersRef.current.set(id, reader);
+    else modelAnimationTimeReadersRef.current.delete(id);
+  }, []);
+
+  const finishModelAnimation = useCallback((id: string, timeSeconds: number) => {
+    setCustomModels((current) => current.map((model) => {
+      if (model.id !== id || !model.animation?.playing) return model;
+      return {
+        ...model,
+        animation: { ...model.animation, playing: false, timeSeconds },
+      };
+    }));
+  }, []);
+
   const updateColor = (id: string, color: string) => {
     setPrimitives((prev) => prev.map((p) => (p.id === id ? { ...p, color } : p)));
   };
@@ -2011,15 +2436,45 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   function groundSelectedEntity() {
     if (selectedIds.size === 0) return;
     for (const id of selectedIds) {
+      const object = primitiveObjectsRef.current.get(id);
+      if (object) {
+        object.updateWorldMatrix(true, true);
+        const bounds = new THREE.Box3().setFromObject(object);
+        if (!bounds.isEmpty() && Number.isFinite(bounds.min.y)) {
+          const nextWorldPosition = object.getWorldPosition(new THREE.Vector3());
+          nextWorldPosition.y -= bounds.min.y;
+          object.parent?.updateWorldMatrix(true, false);
+          const nextLocalPosition = object.parent
+            ? object.parent.worldToLocal(nextWorldPosition)
+            : nextWorldPosition;
+          const position: [number, number, number] = [
+            nextLocalPosition.x,
+            nextLocalPosition.y,
+            nextLocalPosition.z,
+          ];
+          const primitive = primitives.find((candidate) => candidate.id === id);
+          if (primitive && !isBgObjectTransformBlocked(primitive)) {
+            updateTransform(id, { position }, { snap: false });
+            continue;
+          }
+          const model = customModels.find((candidate) => candidate.id === id);
+          if (model && !isBgObjectTransformBlocked(model)) {
+            updateCustomModelTransform(id, { position }, { snap: false });
+            continue;
+          }
+        }
+      }
       const prim = primitives.find((p) => p.id === id);
       if (prim) {
         if (isBgObjectTransformBlocked(prim)) continue;
+        if (prim.parentId) continue;
         const position = groundPrimitiveTransform(prim.kind, prim.position, prim.rotation, prim.scale);
         updateTransform(prim.id, { position });
         continue;
       }
       const model = customModels.find((m) => m.id === id);
       if (!model || isBgObjectTransformBlocked(model)) continue;
+      if (model.parentId) continue;
       const root = modelRootCacheRef.current.get(model.modelId)?.root;
       const size = root ? measureBg3dObjectSize(root) : ([2, 2, 2] as [number, number, number]);
       const position = groundModelTransform(size, model.position, model.rotation, model.scale);
@@ -2032,7 +2487,14 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     const firstId = Array.from(selectedIds)[0];
     const entity = primitives.find((p) => p.id === firstId) || customModels.find((m) => m.id === firstId);
     if (!entity) return;
-    viewportApiRef.current?.focusOn(entity.position);
+    const object = primitiveObjectsRef.current.get(firstId);
+    if (!object) {
+      viewportApiRef.current?.focusOn(entity.position);
+      return;
+    }
+    object.updateWorldMatrix(true, false);
+    const worldPosition = object.getWorldPosition(new THREE.Vector3());
+    viewportApiRef.current?.focusOn([worldPosition.x, worldPosition.y, worldPosition.z]);
   }
 
   const registerPrimitiveRef = (id: string, obj: THREE.Group | null) => {
@@ -2092,14 +2554,22 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     event.currentTarget.value = ""; // StudioVrmPoser.tsx handleFileChange와 동일 — 같은 파일 재선택 허용
     if (files.length === 0) return;
 
+    modelImportAbortRef.current?.abort();
+    const importController = new AbortController();
+    modelImportAbortRef.current = importController;
     setIsUploadingModel(true);
     setError(null);
     const cacheIdsBefore = new Set(modelRootCacheRef.current.keys());
     try {
       const policy = deriveStudioBg3dGlbValidationPolicy(sceneBaseDocument, deviceQuality);
-      const imported = await importVerifiedBg3dModelsAtomically(files, {
+      const canonicalInputs = await convertStudioBg3dModelFilesToGlb(files, {
+        signal: importController.signal,
+        onProgress: setModelImportProgress,
+      });
+      const imported = await importVerifiedBg3dModelsAtomically(canonicalInputs, {
         profile: policy.profile,
         budgets: policy.budgets,
+        signal: importController.signal,
       });
       const saved: Bg3dVerifiedStoredRecord[] = [];
       for (const importedRecord of imported) {
@@ -2170,7 +2640,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
         setSelectedIds(new Set([placements[placements.length - 1].id]));
         setRefTick((n) => n + 1);
       }
-    } catch {
+    } catch (importFailure) {
       // 저장은 atomic import가 책임지고, 화면 배치는 별도 all-or-none이다. 이번 시도에서 처음 로드한
       // 캐시만 되돌려 기존 장면 인스턴스가 공유 중인 자원은 건드리지 않는다.
       for (const [id, entry] of modelRootCacheRef.current) {
@@ -2178,13 +2648,21 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
         entry.dispose();
         modelRootCacheRef.current.delete(id);
       }
-      setError("선택한 GLB 중 하나가 안전 검사 또는 기기 복잡도 기준을 통과하지 못해 아무 모델도 배치하지 않았습니다.");
+      setError(
+        importFailure instanceof StudioBg3dModelImportError
+          ? importFailure.message
+          : importController.signal.aborted
+            ? "3D 모델 가져오기를 취소했습니다. 장면과 라이브러리는 변경하지 않았습니다."
+            : "선택한 모델 중 하나가 변환·안전 검사 또는 기기 복잡도 기준을 통과하지 못해 아무 모델도 배치하지 않았습니다."
+      );
       try {
         setModelLibrary(await listBg3dModelLibraryEntries());
       } catch {
         setModelLibraryStatus("error");
       }
     } finally {
+      if (modelImportAbortRef.current === importController) modelImportAbortRef.current = null;
+      setModelImportProgress(null);
       setIsUploadingModel(false);
     }
   }
@@ -2193,7 +2671,10 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     setDeletingModelId(id);
     try {
       await deleteStoredBg3dModel(id);
-      setCustomModels((prev) => prev.filter((inst) => inst.modelId !== id));
+      const removedInstanceIds = new Set(
+        customModels.filter((instance) => instance.modelId === id).map((instance) => instance.id),
+      );
+      removeSceneEntities(removedInstanceIds);
       const attachment = attachmentByStorageModelIdRef.current.get(id);
       attachmentByStorageModelIdRef.current.delete(id);
       if (attachment) storageModelIdByAttachmentIdRef.current.delete(attachment.id);
@@ -2744,6 +3225,40 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   const selectedPrimitive = firstSelectedId ? (primitives.find((p) => p.id === firstSelectedId) ?? null) : null;
   const selectedCustomModel = firstSelectedId ? (customModels.find((m) => m.id === firstSelectedId) ?? null) : null;
   const selectedEntity = selectedPrimitive ?? selectedCustomModel;
+  const selectedModelAnimations = selectedCustomModel
+    ? (modelRootCacheRef.current.get(selectedCustomModel.modelId)?.animations ?? EMPTY_THREE_ANIMATION_CLIPS)
+    : EMPTY_THREE_ANIMATION_CLIPS;
+  const selectedModelJoints = selectedCustomModel
+    ? (modelRootCacheRef.current.get(selectedCustomModel.modelId)?.joints ?? EMPTY_THREE_JOINTS)
+    : EMPTY_THREE_JOINTS;
+  const selectedPoseJointKey = selectedModelJoints.some((joint) => joint.key === poseJointSelection)
+    ? poseJointSelection
+    : (selectedModelJoints[0]?.key ?? "");
+  const selectedPoseJoint = selectedCustomModel?.pose?.joints.find(
+    (joint) => joint.jointKey === selectedPoseJointKey,
+  );
+  const selectedAimConstraint = selectedCustomModel?.constraints?.aims.find(
+    (constraint) => constraint.jointKey === selectedPoseJointKey,
+  );
+  const selectedPoseEulerDegrees = quaternionToEulerDegrees(
+    selectedPoseJoint?.rotationOffset ?? [0, 0, 0, 1],
+  );
+  const selectedModelMorphTargets = selectedCustomModel
+    ? (modelRootCacheRef.current.get(selectedCustomModel.modelId)?.morphTargets ?? EMPTY_THREE_MORPH_TARGETS)
+    : EMPTY_THREE_MORPH_TARGETS;
+  const selectedMorphTargetKey = selectedModelMorphTargets.some((target) => target.key === morphTargetSelection)
+    ? morphTargetSelection
+    : (selectedModelMorphTargets[0]?.key ?? "");
+  const selectedMorphOverride = selectedCustomModel?.morph?.targets.find(
+    (target) => target.targetKey === selectedMorphTargetKey,
+  );
+  const selectedAnimationClip = selectedCustomModel?.animation
+    ? (selectedModelAnimations[selectedCustomModel.animation.clipIndex] ?? selectedModelAnimations[0])
+    : undefined;
+  const selectedAnimationDuration = Math.max(
+    0.01,
+    Number.isFinite(selectedAnimationClip?.duration) ? selectedAnimationClip?.duration ?? 0.01 : 0.01,
+  );
   const selectedIsLocked = isBgObjectTransformBlocked(selectedEntity);
   const selectedEntities = Array.from(selectedIds).reduce<Array<BgPrimitive | BgCustomModelInstance>>(
     (entities, id) => {
@@ -2786,6 +3301,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
       };
     }),
   ];
+  const sceneHierarchy = resolveStudioBg3dHierarchy(layerListItems);
   const filteredLayerItems = filterStudioBg3dLayerItems(layerListItems, layerQuery);
   const ltLineSettings = sceneBaseDocument.output.line;
   const ltToneSettings = sceneBaseDocument.output.tone;
@@ -2844,6 +3360,72 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     120,
     Math.ceil(Math.max(fogNear + STUDIO_BG3D_FOG_MIN_GAP, fogFar) / 10) * 10,
   );
+
+  const selectSceneEntity = (id: string, isMulti: boolean) => {
+    setSelectedIds((previous) => {
+      if (!isMulti) return new Set([id]);
+      const next = new Set(previous);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const updateModelCloneStatus = (id: string, ok: boolean) => {
+    setReadyCloneIds((previous) => {
+      const next = new Set(previous);
+      if (ok) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+    setFailedCloneIds((previous) => {
+      const next = new Set(previous);
+      if (ok) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const primitiveById = new Map(primitives.map((primitive) => [primitive.id, primitive] as const));
+  const customModelById = new Map(customModels.map((model) => [model.id, model] as const));
+  const renderSceneEntity = (id: string): React.ReactNode => {
+    const children = (sceneHierarchy.childrenByParent.get(id) ?? []).map(renderSceneEntity);
+    const primitive = primitiveById.get(id);
+    if (primitive) {
+      return (
+        <BgPrimitiveMesh
+          key={id}
+          prim={primitive}
+          geometryPool={primitiveGeometryPool}
+          lineArt={lineArtPreview}
+          showEdges={!isCapturing}
+          selected={selectedIds.has(id)}
+          onSelect={selectSceneEntity}
+          registerRef={registerPrimitiveRef}
+        >
+          {children}
+        </BgPrimitiveMesh>
+      );
+    }
+    const instance = customModelById.get(id);
+    if (!instance) return null;
+    return (
+      <BgCustomModelMesh
+        key={id}
+        instance={instance}
+        cachedRoot={modelRootCacheRef.current.get(instance.modelId)?.root}
+        animations={modelRootCacheRef.current.get(instance.modelId)?.animations ?? EMPTY_THREE_ANIMATION_CLIPS}
+        selected={selectedIds.has(id)}
+        capturing={isCapturing}
+        targetFps={deviceQuality.targetFps}
+        onSelect={selectSceneEntity}
+        registerRef={registerPrimitiveRef}
+        registerAnimationTime={registerModelAnimationTime}
+        onAnimationComplete={finishModelAnimation}
+        onCloneStatus={updateModelCloneStatus}
+      >
+        {children}
+      </BgCustomModelMesh>
+    );
+  };
   
   const sceneContent = (
     <Fragment>
@@ -2884,59 +3466,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
         shadow-mapSize-width={deviceQuality.shadowMapSize || 1024}
       />
       <BgGroundHelper visible={!lineArtPreview && !isCapturing} />
-      {primitives.map((prim) => (
-        <BgPrimitiveMesh
-          key={prim.id}
-          prim={prim}
-          lineArt={lineArtPreview}
-          showEdges={!isCapturing}
-          onSelect={(id, isMulti) => {
-            setSelectedIds((prev) => {
-              if (isMulti) {
-                const next = new Set(prev);
-                if (next.has(id)) next.delete(id);
-                else next.add(id);
-                return next;
-              }
-              return new Set([id]);
-            });
-          }}
-          registerRef={registerPrimitiveRef}
-        />
-      ))}
-      {customModels.map((inst) => (
-        <BgCustomModelMesh
-          key={inst.id}
-          instance={inst}
-          cachedRoot={modelRootCacheRef.current.get(inst.modelId)?.root}
-          onSelect={(id, isMulti) => {
-            setSelectedIds((prev) => {
-              if (isMulti) {
-                const next = new Set(prev);
-                if (next.has(id)) next.delete(id);
-                else next.add(id);
-                return next;
-              }
-              return new Set([id]);
-            });
-          }}
-          registerRef={registerPrimitiveRef}
-          onCloneStatus={(id, ok) => {
-            setReadyCloneIds((prev) => {
-              const next = new Set(prev);
-              if (ok) next.add(id);
-              else next.delete(id);
-              return next;
-            });
-            setFailedCloneIds((prev) => {
-              const next = new Set(prev);
-              if (ok) next.delete(id);
-              else next.add(id);
-              return next;
-            });
-          }}
-        />
-      ))}
+      {sceneHierarchy.roots.map(renderSceneEntity)}
       {!isCapturing &&
       firstSelectedId &&
       !selectedIsLocked &&
@@ -2952,20 +3482,18 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
               if (!firstSelectedId) return;
               const firstObj = primitiveObjectsRef.current.get(firstSelectedId);
               if (firstObj) {
+                firstObj.updateWorldMatrix(true, false);
                 dragInitialFirstTransformRef.current = {
-                  position: [firstObj.position.x, firstObj.position.y, firstObj.position.z],
-                  rotation: [firstObj.rotation.x, firstObj.rotation.y, firstObj.rotation.z],
-                  scale: [firstObj.scale.x, firstObj.scale.y, firstObj.scale.z],
+                  worldMatrix: firstObj.matrixWorld.clone(),
                 };
               }
               dragInitialSelectedTransformsRef.current.clear();
               for (const id of selectedIds) {
                 const obj = primitiveObjectsRef.current.get(id);
                 if (obj) {
+                  obj.updateWorldMatrix(true, false);
                   dragInitialSelectedTransformsRef.current.set(id, {
-                    position: [obj.position.x, obj.position.y, obj.position.z],
-                    rotation: [obj.rotation.x, obj.rotation.y, obj.rotation.z],
-                    scale: [obj.scale.x, obj.scale.y, obj.scale.z],
+                    worldMatrix: obj.matrixWorld.clone(),
                   });
                 }
               }
@@ -3637,14 +4165,17 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                         <label className="flex flex-col gap-1.5 text-xs font-medium text-fg-2">부모 계층 (Parent)
                         <select
                           className="h-9 w-full rounded border border-line bg-card px-2 text-xs text-fg focus:border-accent"
+                          disabled={selectedIsLocked}
                           value={selectedPrimitive.parentId || ""}
                           onChange={(e) => {
                             const newParentId = e.target.value || null;
-                            setPrimitives((prev) => prev.map((p) => p.id === selectedPrimitive.id ? { ...p, parentId: newParentId } : p));
+                            reparentSceneEntity(selectedPrimitive.id, newParentId);
                           }}
                         >
                           <option value="">(최상위 / 없음)</option>
-                          {layerListItems.filter(item => item.id !== selectedPrimitive.id).map(item => (
+                          {layerListItems.filter((item) =>
+                            canSetStudioBg3dParent(layerListItems, selectedPrimitive.id, item.id)
+                          ).map(item => (
                             <option key={item.id} value={item.id}>
                               {item.label}
                             </option>
@@ -3783,14 +4314,17 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                         <label className="flex flex-col gap-1.5 text-xs font-medium text-fg-2">부모 계층 (Parent)
                         <select
                           className="h-9 w-full rounded border border-line bg-card px-2 text-xs text-fg focus:border-accent"
+                          disabled={selectedIsLocked}
                           value={selectedCustomModel.parentId || ""}
                           onChange={(e) => {
                             const newParentId = e.target.value || null;
-                            setCustomModels((prev) => prev.map((m) => m.id === selectedCustomModel.id ? { ...m, parentId: newParentId } : m));
+                            reparentSceneEntity(selectedCustomModel.id, newParentId);
                           }}
                         >
                           <option value="">(최상위 / 없음)</option>
-                          {layerListItems.filter(item => item.id !== selectedCustomModel.id).map(item => (
+                          {layerListItems.filter((item) =>
+                            canSetStudioBg3dParent(layerListItems, selectedCustomModel.id, item.id)
+                          ).map(item => (
                             <option key={item.id} value={item.id}>
                               {item.label}
                             </option>
@@ -3838,7 +4372,638 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                         }}
                       />
 
-                      <p className="text-[0.68rem] leading-relaxed text-fg-3">업로드한 3D 모델은 셰이딩 미리보기 색상을 따로 지정할 수 없어요.</p>
+                      <div className="space-y-2 rounded-xl border border-line bg-card/55 p-2.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <label className="flex items-center gap-2 text-xs font-semibold text-fg-2">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(selectedCustomModel.materialOverride)}
+                              onChange={(event) => updateCustomModelMaterial(
+                                selectedCustomModel.id,
+                                event.target.checked ? { ...DEFAULT_STUDIO_BG3D_MATERIAL_OVERRIDE } : null,
+                              )}
+                            />
+                            인스턴스 재질 편집
+                          </label>
+                          {selectedCustomModel.materialOverride ? (
+                            <button
+                              type="button"
+                              className="text-[0.68rem] font-semibold text-accent hover:underline"
+                              onClick={() => updateCustomModelMaterial(selectedCustomModel.id, null)}
+                            >
+                              원본 복원
+                            </button>
+                          ) : null}
+                        </div>
+
+                        {selectedCustomModel.materialOverride ? (
+                          <div className="space-y-2 border-t border-line/70 pt-2">
+                            <label className="grid grid-cols-[4.5rem_1fr] items-center gap-2 text-[0.68rem] text-fg-3">
+                              색상 방식
+                              <select
+                                className="h-8 rounded-lg border border-line bg-panel px-2 text-xs text-fg"
+                                value={selectedCustomModel.materialOverride.colorMode}
+                                onChange={(event) => updateCustomModelMaterial(
+                                  selectedCustomModel.id,
+                                  (current) => ({
+                                    ...current,
+                                    colorMode: event.target.value as StudioBg3dMaterialOverride["colorMode"],
+                                  }),
+                                )}
+                              >
+                                <option value="original">원본</option>
+                                <option value="multiply">곱하기</option>
+                                <option value="replace">교체</option>
+                              </select>
+                            </label>
+                            <label className="grid grid-cols-[4.5rem_2.75rem_1fr] items-center gap-2 text-[0.68rem] text-fg-3">
+                              재질 색
+                              <input
+                                type="color"
+                                className="h-8 w-11 cursor-pointer rounded border border-line bg-panel"
+                                disabled={selectedCustomModel.materialOverride.colorMode === "original"}
+                                value={selectedCustomModel.materialOverride.color}
+                                onChange={(event) => updateCustomModelMaterial(
+                                  selectedCustomModel.id,
+                                  (current) => ({ ...current, color: event.target.value }),
+                                )}
+                              />
+                              <input
+                                aria-label="재질 색상 혼합 강도"
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.01"
+                                disabled={selectedCustomModel.materialOverride.colorMode === "original"}
+                                value={selectedCustomModel.materialOverride.colorStrength}
+                                onChange={(event) => updateCustomModelMaterial(
+                                  selectedCustomModel.id,
+                                  (current) => ({ ...current, colorStrength: Number(event.target.value) }),
+                                )}
+                              />
+                            </label>
+                            <label className="grid grid-cols-[4.5rem_1fr_2.5rem] items-center gap-2 text-[0.68rem] text-fg-3">
+                              불투명도
+                              <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.01"
+                                value={selectedCustomModel.materialOverride.opacityMultiplier}
+                                onChange={(event) => updateCustomModelMaterial(
+                                  selectedCustomModel.id,
+                                  (current) => ({ ...current, opacityMultiplier: Number(event.target.value) }),
+                                )}
+                              />
+                              <span className="text-right tabular-nums text-fg-2">
+                                {Math.round(selectedCustomModel.materialOverride.opacityMultiplier * 100)}%
+                              </span>
+                            </label>
+                            <div className="flex flex-wrap gap-x-4 gap-y-2 text-[0.68rem] text-fg-2">
+                              <label className="flex items-center gap-1.5">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedCustomModel.materialOverride.wireframe}
+                                  onChange={(event) => updateCustomModelMaterial(
+                                    selectedCustomModel.id,
+                                    (current) => ({ ...current, wireframe: event.target.checked }),
+                                  )}
+                                />
+                                와이어프레임
+                              </label>
+                              <label className="flex items-center gap-1.5">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedCustomModel.materialOverride.doubleSided}
+                                  onChange={(event) => updateCustomModelMaterial(
+                                    selectedCustomModel.id,
+                                    (current) => ({ ...current, doubleSided: event.target.checked }),
+                                  )}
+                                />
+                                양면 렌더링
+                              </label>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-[0.68rem] leading-relaxed text-fg-3">
+                            원본 재질과 텍스처는 보존한 채 이 배치에만 색·투명도·와이어 설정을 적용합니다.
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2 rounded-xl border border-line bg-card/55 p-2.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <label className="flex items-center gap-2 text-xs font-semibold text-fg-2">
+                            <input
+                              type="checkbox"
+                              disabled={selectedModelJoints.length === 0}
+                              checked={Boolean(selectedCustomModel.constraints)}
+                              onChange={(event) => updateCustomModelConstraints(
+                                selectedCustomModel.id,
+                                event.target.checked ? { ...DEFAULT_STUDIO_BG3D_CONSTRAINT_LAYER } : null,
+                              )}
+                            />
+                            조인트 에임 제약
+                          </label>
+                          <span className="text-[0.68rem] tabular-nums text-fg-3">
+                            {selectedCustomModel.constraints?.aims.length ?? 0}개 적용
+                          </span>
+                        </div>
+
+                        {selectedCustomModel.constraints && selectedModelJoints.length > 0 ? (
+                          <div className="space-y-2 border-t border-line/70 pt-2">
+                            <div className="grid grid-cols-[1fr_auto] gap-2">
+                              <select
+                                aria-label="에임 조인트"
+                                className="h-8 min-w-0 rounded-lg border border-line bg-panel px-2 text-xs text-fg"
+                                value={selectedPoseJointKey}
+                                onChange={(event) => setPoseJointSelection(event.target.value)}
+                              >
+                                {selectedModelJoints.map((joint) => (
+                                  <option key={joint.key} value={joint.key}>
+                                    {joint.name} · S{joint.skinIndex + 1}/J{joint.jointIndex + 1}
+                                  </option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                className="h-8 rounded-lg border border-line bg-panel px-2 text-[0.68rem] font-semibold text-fg-2 hover:bg-raised disabled:opacity-50"
+                                disabled={!selectedAimConstraint}
+                                onClick={() => updateCustomModelConstraints(
+                                  selectedCustomModel.id,
+                                  (current) => ({
+                                    ...current,
+                                    aims: current.aims.filter((aim) => aim.jointKey !== selectedPoseJointKey),
+                                  }),
+                                )}
+                              >
+                                제약 해제
+                              </button>
+                            </div>
+                            <Vec3Field
+                              label="모델 로컬 타깃"
+                              values={[...(selectedAimConstraint?.target ?? [0, 1, 1])]}
+                              step={0.1}
+                              precision={2}
+                              onCommit={(axis, value) => {
+                                const target: [number, number, number] = [
+                                  ...(selectedAimConstraint?.target ?? [0, 1, 1]),
+                                ];
+                                target[axis] = Math.max(-10_000, Math.min(10_000, value));
+                                updateCustomModelConstraints(selectedCustomModel.id, (current) => ({
+                                  ...current,
+                                  aims: [
+                                    ...current.aims.filter((aim) => aim.jointKey !== selectedPoseJointKey),
+                                    {
+                                      jointKey: selectedPoseJointKey,
+                                      target,
+                                      axis: selectedAimConstraint?.axis ?? "+z",
+                                      weight: selectedAimConstraint?.weight ?? 1,
+                                    },
+                                  ],
+                                }));
+                              }}
+                            />
+                            <div className="grid grid-cols-2 gap-2">
+                              <label className="space-y-1 text-[0.68rem] text-fg-3">
+                                향할 로컬 축
+                                <select
+                                  className="h-8 w-full rounded-lg border border-line bg-panel px-2 text-xs text-fg"
+                                  value={selectedAimConstraint?.axis ?? "+z"}
+                                  onChange={(event) => updateCustomModelConstraints(
+                                    selectedCustomModel.id,
+                                    (current) => ({
+                                      ...current,
+                                      aims: [
+                                        ...current.aims.filter((aim) => aim.jointKey !== selectedPoseJointKey),
+                                        {
+                                          jointKey: selectedPoseJointKey,
+                                          target: [...(selectedAimConstraint?.target ?? [0, 1, 1])],
+                                          axis: event.target.value as "+x" | "-x" | "+y" | "-y" | "+z" | "-z",
+                                          weight: selectedAimConstraint?.weight ?? 1,
+                                        },
+                                      ],
+                                    }),
+                                  )}
+                                >
+                                  <option value="+x">+X</option><option value="-x">−X</option>
+                                  <option value="+y">+Y</option><option value="-y">−Y</option>
+                                  <option value="+z">+Z</option><option value="-z">−Z</option>
+                                </select>
+                              </label>
+                              <label className="space-y-1 text-[0.68rem] text-fg-3">
+                                강도 · {Math.round((selectedAimConstraint?.weight ?? 1) * 100)}%
+                                <input
+                                  className="block h-8 w-full"
+                                  type="range"
+                                  min="0"
+                                  max="1"
+                                  step="0.01"
+                                  value={selectedAimConstraint?.weight ?? 1}
+                                  onChange={(event) => updateCustomModelConstraints(
+                                    selectedCustomModel.id,
+                                    (current) => ({
+                                      ...current,
+                                      aims: [
+                                        ...current.aims.filter((aim) => aim.jointKey !== selectedPoseJointKey),
+                                        {
+                                          jointKey: selectedPoseJointKey,
+                                          target: [...(selectedAimConstraint?.target ?? [0, 1, 1])],
+                                          axis: selectedAimConstraint?.axis ?? "+z",
+                                          weight: Number(event.target.value),
+                                        },
+                                      ],
+                                    }),
+                                  )}
+                                />
+                              </label>
+                            </div>
+                            <label className="flex items-center gap-1.5 text-[0.68rem] text-fg-2">
+                              <input
+                                type="checkbox"
+                                checked={selectedCustomModel.constraints.enabled}
+                                onChange={(event) => updateCustomModelConstraints(
+                                  selectedCustomModel.id,
+                                  (current) => ({ ...current, enabled: event.target.checked }),
+                                )}
+                              />
+                              애니메이션·포즈 뒤에 제약 적용
+                            </label>
+                            <p className="text-[0.66rem] leading-relaxed text-fg-3">
+                              눈·머리·무기 본의 선택 축이 모델 로컬 타깃을 향하도록 비파괴 혼합합니다.
+                              원본 스켈레톤과 애니메이션 키는 수정하지 않습니다.
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-[0.68rem] leading-relaxed text-fg-3">
+                            모델에 스킨 조인트가 있으면 시선·머리·소품 방향 제약을 추가할 수 있습니다.
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2 rounded-xl border border-line bg-card/55 p-2.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <label className="flex items-center gap-2 text-xs font-semibold text-fg-2">
+                            <input
+                              type="checkbox"
+                              disabled={selectedModelAnimations.length === 0}
+                              checked={Boolean(selectedCustomModel.animation)}
+                              onChange={(event) => updateCustomModelAnimation(
+                                selectedCustomModel.id,
+                                event.target.checked ? { ...DEFAULT_STUDIO_BG3D_ANIMATION_PLAYBACK } : null,
+                              )}
+                            />
+                            모델 애니메이션
+                          </label>
+                          <span className="text-[0.68rem] tabular-nums text-fg-3">
+                            {selectedModelAnimations.length}개 클립
+                          </span>
+                        </div>
+
+                        {selectedCustomModel.animation && selectedAnimationClip ? (
+                          <div className="space-y-2 border-t border-line/70 pt-2">
+                            <label className="grid grid-cols-[4.5rem_1fr] items-center gap-2 text-[0.68rem] text-fg-3">
+                              클립
+                              <select
+                                className="h-8 min-w-0 rounded-lg border border-line bg-panel px-2 text-xs text-fg"
+                                value={Math.min(
+                                  selectedCustomModel.animation.clipIndex,
+                                  Math.max(0, selectedModelAnimations.length - 1),
+                                )}
+                                onChange={(event) => updateCustomModelAnimation(
+                                  selectedCustomModel.id,
+                                  (current) => ({
+                                    ...current,
+                                    clipIndex: Number(event.target.value),
+                                    timeSeconds: 0,
+                                  }),
+                                )}
+                              >
+                                {selectedModelAnimations.map((clip, index) => (
+                                  <option key={`${index}-${clip.uuid}`} value={index}>
+                                    {(clip.name || `클립 ${index + 1}`).slice(0, 80)} · {clip.duration.toFixed(2)}s
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <div className="grid grid-cols-[4.5rem_1fr] items-center gap-2">
+                              <button
+                                type="button"
+                                className="h-8 rounded-lg border border-line bg-panel px-2 text-[0.68rem] font-semibold text-fg-2 hover:bg-raised"
+                                onClick={() => updateCustomModelAnimation(
+                                  selectedCustomModel.id,
+                                  (current) => ({ ...current, playing: !current.playing }),
+                                )}
+                              >
+                                {selectedCustomModel.animation.playing ? "일시정지" : "재생"}
+                              </button>
+                              <input
+                                aria-label="애니메이션 시간"
+                                type="range"
+                                min="0"
+                                max={selectedAnimationDuration}
+                                step={Math.max(0.001, selectedAnimationDuration / 1_000)}
+                                value={Math.min(selectedAnimationDuration, selectedCustomModel.animation.timeSeconds)}
+                                onChange={(event) => updateCustomModelAnimation(
+                                  selectedCustomModel.id,
+                                  (current) => ({ ...current, timeSeconds: Number(event.target.value) }),
+                                )}
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <label className="space-y-1 text-[0.68rem] text-fg-3">
+                                반복
+                                <select
+                                  className="h-8 w-full rounded-lg border border-line bg-panel px-2 text-xs text-fg"
+                                  value={selectedCustomModel.animation.loop}
+                                  onChange={(event) => updateCustomModelAnimation(
+                                    selectedCustomModel.id,
+                                    (current) => ({
+                                      ...current,
+                                      loop: event.target.value as StudioBg3dAnimationPlayback["loop"],
+                                    }),
+                                  )}
+                                >
+                                  <option value="once">한 번</option>
+                                  <option value="repeat">반복</option>
+                                  <option value="ping-pong">왕복</option>
+                                </select>
+                              </label>
+                              <label className="space-y-1 text-[0.68rem] text-fg-3">
+                                속도 · {selectedCustomModel.animation.timeScale.toFixed(1)}×
+                                <input
+                                  className="block h-8 w-full"
+                                  type="range"
+                                  min="-2"
+                                  max="2"
+                                  step="0.1"
+                                  value={selectedCustomModel.animation.timeScale}
+                                  onChange={(event) => updateCustomModelAnimation(
+                                    selectedCustomModel.id,
+                                    (current) => ({ ...current, timeScale: Number(event.target.value) }),
+                                  )}
+                                />
+                              </label>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-[0.68rem] leading-relaxed text-fg-3">
+                            {selectedModelAnimations.length > 0
+                              ? "활성화하면 클립 선택·재생·스크럽·반복·역재생 속도를 이 배치에 저장합니다."
+                              : "이 모델에는 재생 가능한 glTF 애니메이션 클립이 없습니다."}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2 rounded-xl border border-line bg-card/55 p-2.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <label className="flex items-center gap-2 text-xs font-semibold text-fg-2">
+                            <input
+                              type="checkbox"
+                              disabled={selectedModelJoints.length === 0}
+                              checked={Boolean(selectedCustomModel.pose)}
+                              onChange={(event) => updateCustomModelPose(
+                                selectedCustomModel.id,
+                                event.target.checked ? { ...DEFAULT_STUDIO_BG3D_POSE_LAYER } : null,
+                              )}
+                            />
+                            비파괴 포즈 레이어
+                          </label>
+                          <span className="text-[0.68rem] tabular-nums text-fg-3">
+                            {selectedModelJoints.length}개 조인트
+                          </span>
+                        </div>
+
+                        {selectedCustomModel.pose && selectedModelJoints.length > 0 ? (
+                          <div className="space-y-2 border-t border-line/70 pt-2">
+                            <div className="grid grid-cols-[1fr_auto] gap-2">
+                              <select
+                                aria-label="포즈 조인트"
+                                className="h-8 min-w-0 rounded-lg border border-line bg-panel px-2 text-xs text-fg"
+                                value={selectedPoseJointKey}
+                                onChange={(event) => setPoseJointSelection(event.target.value)}
+                              >
+                                {selectedModelJoints.map((joint) => (
+                                  <option key={joint.key} value={joint.key}>
+                                    {joint.name} · S{joint.skinIndex + 1}/J{joint.jointIndex + 1}
+                                  </option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                className="h-8 rounded-lg border border-line bg-panel px-2 text-[0.68rem] font-semibold text-fg-2 hover:bg-raised disabled:opacity-50"
+                                disabled={!selectedPoseJoint}
+                                onClick={() => updateCustomModelPose(
+                                  selectedCustomModel.id,
+                                  (current) => ({
+                                    ...current,
+                                    joints: current.joints.filter((joint) => joint.jointKey !== selectedPoseJointKey),
+                                  }),
+                                )}
+                              >
+                                조인트 초기화
+                              </button>
+                            </div>
+                            <Vec3Field
+                              label="회전 오프셋"
+                              values={selectedPoseEulerDegrees}
+                              step={1}
+                              precision={1}
+                              suffix="°"
+                              onCommit={(axis, value) => {
+                                const nextEuler: [number, number, number] = [...selectedPoseEulerDegrees];
+                                nextEuler[axis] = Math.max(-180, Math.min(180, value));
+                                const rotationOffset = eulerDegreesToQuaternion(nextEuler);
+                                updateCustomModelPose(selectedCustomModel.id, (current) => ({
+                                  ...current,
+                                  joints: [
+                                    ...current.joints.filter((joint) => joint.jointKey !== selectedPoseJointKey),
+                                    { jointKey: selectedPoseJointKey, rotationOffset },
+                                  ],
+                                }));
+                              }}
+                            />
+                            <label className="grid grid-cols-[4.5rem_1fr_2.5rem] items-center gap-2 text-[0.68rem] text-fg-3">
+                              강도
+                              <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.01"
+                                value={selectedCustomModel.pose.weight}
+                                onChange={(event) => updateCustomModelPose(
+                                  selectedCustomModel.id,
+                                  (current) => ({ ...current, weight: Number(event.target.value) }),
+                                )}
+                              />
+                              <span className="text-right tabular-nums text-fg-2">
+                                {Math.round(selectedCustomModel.pose.weight * 100)}%
+                              </span>
+                            </label>
+                            <div className="flex items-center justify-between gap-2">
+                              <label className="flex items-center gap-1.5 text-[0.68rem] text-fg-2">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedCustomModel.pose.enabled}
+                                  onChange={(event) => updateCustomModelPose(
+                                    selectedCustomModel.id,
+                                    (current) => ({ ...current, enabled: event.target.checked }),
+                                  )}
+                                />
+                                레이어 적용
+                              </label>
+                              <button
+                                type="button"
+                                className="text-[0.68rem] font-semibold text-accent hover:underline"
+                                onClick={() => updateCustomModelPose(
+                                  selectedCustomModel.id,
+                                  { ...DEFAULT_STUDIO_BG3D_POSE_LAYER },
+                                )}
+                              >
+                                전체 포즈 초기화
+                              </button>
+                            </div>
+                            <p className="text-[0.66rem] leading-relaxed text-fg-3">
+                              애니메이션 또는 원본 휴지 자세를 먼저 계산한 뒤 로컬 회전 오프셋을 더합니다.
+                              원본 리깅과 클립은 변경하지 않습니다.
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-[0.68rem] leading-relaxed text-fg-3">
+                            {selectedModelJoints.length > 0
+                              ? "활성화하면 본별 회전 오프셋과 혼합 강도를 이 배치에 저장합니다."
+                              : "이 모델에는 편집 가능한 스킨 조인트가 없습니다."}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2 rounded-xl border border-line bg-card/55 p-2.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <label className="flex items-center gap-2 text-xs font-semibold text-fg-2">
+                            <input
+                              type="checkbox"
+                              disabled={selectedModelMorphTargets.length === 0}
+                              checked={Boolean(selectedCustomModel.morph)}
+                              onChange={(event) => updateCustomModelMorph(
+                                selectedCustomModel.id,
+                                event.target.checked ? { ...DEFAULT_STUDIO_BG3D_MORPH_LAYER } : null,
+                              )}
+                            />
+                            표정·모프 레이어
+                          </label>
+                          <span className="text-[0.68rem] tabular-nums text-fg-3">
+                            {selectedModelMorphTargets.length}개 타깃
+                          </span>
+                        </div>
+
+                        {selectedCustomModel.morph && selectedModelMorphTargets.length > 0 ? (
+                          <div className="space-y-2 border-t border-line/70 pt-2">
+                            <div className="grid grid-cols-[1fr_auto] gap-2">
+                              <select
+                                aria-label="모프 타깃"
+                                className="h-8 min-w-0 rounded-lg border border-line bg-panel px-2 text-xs text-fg"
+                                value={selectedMorphTargetKey}
+                                onChange={(event) => setMorphTargetSelection(event.target.value)}
+                              >
+                                {selectedModelMorphTargets.map((target) => (
+                                  <option key={target.key} value={target.key}>
+                                    {target.name} · M{target.meshIndex + 1}/T{target.targetIndex + 1}
+                                  </option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                className="h-8 rounded-lg border border-line bg-panel px-2 text-[0.68rem] font-semibold text-fg-2 hover:bg-raised disabled:opacity-50"
+                                disabled={!selectedMorphOverride}
+                                onClick={() => updateCustomModelMorph(
+                                  selectedCustomModel.id,
+                                  (current) => ({
+                                    ...current,
+                                    targets: current.targets.filter((target) => target.targetKey !== selectedMorphTargetKey),
+                                  }),
+                                )}
+                              >
+                                타깃 초기화
+                              </button>
+                            </div>
+                            <label className="grid grid-cols-[4.5rem_1fr_3rem] items-center gap-2 text-[0.68rem] text-fg-3">
+                              오프셋
+                              <input
+                                type="range"
+                                min="-1"
+                                max="1"
+                                step="0.01"
+                                value={selectedMorphOverride?.weightOffset ?? 0}
+                                onChange={(event) => updateCustomModelMorph(
+                                  selectedCustomModel.id,
+                                  (current) => ({
+                                    ...current,
+                                    targets: [
+                                      ...current.targets.filter((target) => target.targetKey !== selectedMorphTargetKey),
+                                      {
+                                        targetKey: selectedMorphTargetKey,
+                                        weightOffset: Number(event.target.value),
+                                      },
+                                    ],
+                                  }),
+                                )}
+                              />
+                              <span className="text-right tabular-nums text-fg-2">
+                                {(selectedMorphOverride?.weightOffset ?? 0).toFixed(2)}
+                              </span>
+                            </label>
+                            <label className="grid grid-cols-[4.5rem_1fr_2.5rem] items-center gap-2 text-[0.68rem] text-fg-3">
+                              전체 강도
+                              <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.01"
+                                value={selectedCustomModel.morph.weight}
+                                onChange={(event) => updateCustomModelMorph(
+                                  selectedCustomModel.id,
+                                  (current) => ({ ...current, weight: Number(event.target.value) }),
+                                )}
+                              />
+                              <span className="text-right tabular-nums text-fg-2">
+                                {Math.round(selectedCustomModel.morph.weight * 100)}%
+                              </span>
+                            </label>
+                            <div className="flex items-center justify-between gap-2">
+                              <label className="flex items-center gap-1.5 text-[0.68rem] text-fg-2">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedCustomModel.morph.enabled}
+                                  onChange={(event) => updateCustomModelMorph(
+                                    selectedCustomModel.id,
+                                    (current) => ({ ...current, enabled: event.target.checked }),
+                                  )}
+                                />
+                                레이어 적용
+                              </label>
+                              <button
+                                type="button"
+                                className="text-[0.68rem] font-semibold text-accent hover:underline"
+                                onClick={() => updateCustomModelMorph(
+                                  selectedCustomModel.id,
+                                  { ...DEFAULT_STUDIO_BG3D_MORPH_LAYER },
+                                )}
+                              >
+                                전체 모프 초기화
+                              </button>
+                            </div>
+                            <p className="text-[0.66rem] leading-relaxed text-fg-3">
+                              애니메이션이 만든 모프 값에 오프셋을 더하고 0–1 범위로 제한합니다.
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-[0.68rem] leading-relaxed text-fg-3">
+                            {selectedModelMorphTargets.length > 0
+                              ? "활성화하면 표정·립싱크·변형 타깃을 배치별로 조절할 수 있습니다."
+                              : "이 모델에는 편집 가능한 모프 타깃이 없습니다."}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   ) : (
                     <p className="text-xs leading-relaxed text-fg-3">도형이나 모델을 추가하거나 뷰포트·레이어 목록에서 선택하면 여기서 위치·회전·크기를 정확한 수치로 조정할 수 있습니다.</p>
@@ -3887,10 +5052,18 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                     ) : (
                                             <ul className="space-y-1">
                         {(() => {
+                          const filteredById = new Map(
+                            filteredLayerItems.map((entry) => [entry.id, entry] as const),
+                          );
+                          const searchActive = layerQuery.trim().length > 0;
                           const renderSidebarNode = (item: typeof filteredLayerItems[0], depth: number = 0) => {
                             const isActive = selectedIds.has(item.id);
                             const prim = item.kind === "primitive" ? primitives.find((p) => p.id === item.id) : null;
-                            const children = filteredLayerItems.filter(x => x.parentId === item.id);
+                            const children = searchActive
+                              ? []
+                              : (sceneHierarchy.childrenByParent.get(item.id) ?? [])
+                                .map((id) => filteredById.get(id))
+                                .filter((entry): entry is typeof item => entry !== undefined);
                             
                             return (
                               <Fragment key={item.id}>
@@ -3995,11 +5168,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                                       title="삭제"
                                       className="grid size-11 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent sm:size-6"
                                       onClick={() => {
-                                        if (item.kind === "primitive") {
-                                          setPrimitives((prev) => prev.filter((p) => p.id !== item.id));
-                                        } else {
-                                          setCustomModels((prev) => prev.filter((m) => m.id !== item.id));
-                                        }
+                                        removeSceneEntities(new Set([item.id]));
                                         setSelectedIds((prev) => {
                                           const next = new Set(prev);
                                           next.delete(item.id);
@@ -4015,7 +5184,11 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                               </Fragment>
                             );
                           };
-                          const roots = filteredLayerItems.filter(x => !x.parentId);
+                          const roots = searchActive
+                            ? filteredLayerItems
+                            : sceneHierarchy.roots
+                              .map((id) => filteredById.get(id))
+                              .filter((entry): entry is typeof filteredLayerItems[0] => entry !== undefined);
                           return roots.map(root => renderSidebarNode(root, 0));
                         })()}
                       </ul>
@@ -4973,19 +6146,34 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                   </span>
                 </div>
 
-                <input ref={fileInputRef} accept=".glb,model/gltf-binary" className="sr-only" multiple type="file" onChange={handleUploadModelFiles} />
+                <input
+                  ref={fileInputRef}
+                  accept=".glb,.gltf,.obj,.fbx,.dae,.stl,.ply,.3ds,.mtl,.bin,.png,.jpg,.jpeg,.webp,model/gltf-binary,model/gltf+json,model/obj,model/stl"
+                  className="sr-only"
+                  multiple
+                  type="file"
+                  onChange={handleUploadModelFiles}
+                />
                 <button
                   type="button"
                   className={cx(CONTROL_BUTTON, "w-full border-accent/50 bg-accent text-on-accent hover:bg-accent/90")}
-                  disabled={isUploadingModel}
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => {
+                    if (isUploadingModel) modelImportAbortRef.current?.abort();
+                    else fileInputRef.current?.click();
+                  }}
                 >
-                  {isUploadingModel ? <Loader2 className="animate-spin" size={14} aria-hidden /> : <Upload size={14} aria-hidden />}
-                  3D 모델 업로드
+                  {isUploadingModel ? <X size={14} aria-hidden /> : <Upload size={14} aria-hidden />}
+                  {isUploadingModel
+                    ? modelImportProgress?.totalModels
+                      ? `가져오기 취소 · ${modelImportProgress.completedModels}/${modelImportProgress.totalModels}`
+                      : "가져오기 취소"
+                    : "3D 모델 및 연결 파일 가져오기"}
                 </button>
                 <p className="mt-2 rounded-xl border border-line bg-card/60 px-3 py-2 text-xs leading-relaxed text-fg-3">
-                  모든 텍스처를 포함한 GLB 2.0만 등록할 수 있어요. 파일 구조·SHA-256·외부 참조·기기별
-                  삼각형/텍스처 예산을 검사한 뒤 로컬 라이브러리에 저장합니다.
+                  GLB·glTF·OBJ·FBX·DAE·STL·PLY·3DS를 지원합니다. glTF의 BIN/텍스처나 OBJ의 MTL/텍스처도 함께 선택하세요.
+                  외부 네트워크 참조 없이 자체 포함 GLB로 변환하고, Worker에서 SHA-256·파일 구조와 기기별
+                  삼각형/텍스처 예산을 검사한 뒤 로컬 라이브러리에 저장합니다. Meshopt 압축은 별도 WASM
+                  Worker에서 풀며 디코딩 후 메모리도 같은 기기 예산으로 제한합니다.
                 </p>
 
                 {modelLibraryStatus === "error" ? (
@@ -5002,7 +6190,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
 
                   {modelLibraryStatus === "ready" && modelLibrary.length === 0 ? (
                     <div className="col-span-2 rounded-xl border border-dashed border-line bg-card/45 px-3 py-4 text-center text-xs leading-relaxed text-fg-3">
-                      업로드한 3D 모델이 아직 없습니다. 위 버튼으로 하나의 파일에 리소스를 포함한 .glb를 올려보세요.
+                      가져온 3D 모델이 아직 없습니다. GLB를 선택하거나 모델과 연결 리소스를 함께 선택해 보세요.
                     </div>
                   ) : null}
 

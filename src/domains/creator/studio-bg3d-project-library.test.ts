@@ -82,6 +82,15 @@ const METRICS = Object.freeze({
   maxImageDimension: 0,
   undeterminedImageDimensions: 0,
   lights: 0,
+  animations: 0,
+  animationChannels: 0,
+  animationKeyframes: 0,
+  animationValues: 0,
+  skins: 0,
+  joints: 0,
+  morphTargets: 0,
+  accessorElements: 0,
+  estimatedDecodedGeometryBytes: 0,
 });
 
 function storedRecord(

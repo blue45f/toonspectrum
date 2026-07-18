@@ -2,7 +2,6 @@ import {
   DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES,
   STUDIO_BG3D_GLB_MAX_BYTES,
   STUDIO_BG3D_GLB_MIME_TYPE,
-  validateStudioBg3dGlb,
   type StudioBg3dGlbBudgetProfiles,
   type StudioBg3dGlbDigest,
   type StudioBg3dGlbFailureCode,
@@ -10,6 +9,11 @@ import {
   type StudioBg3dGlbProfile,
   type StudioBg3dGlbValidationSuccess,
 } from "./studio-bg3d-glb-validation";
+import {
+  StudioBg3dValidationWorkerError,
+  validateStudioBg3dGlbOffMainThread,
+} from "./studio-bg3d-glb-validation-worker-client";
+import { STUDIO_BG3D_CANONICAL_REQUIRED_GLTF_EXTENSIONS } from "./studio-bg3d-meshopt";
 import {
   STUDIO_BG3D_GLB_MIME,
   type StudioBg3dAttachmentRights,
@@ -169,6 +173,8 @@ export interface Bg3dModelVerificationOptions {
   readonly maximumCumulativeBytes?: number;
   readonly supportedRequiredExtensions?: readonly string[];
   readonly digest?: StudioBg3dGlbDigest;
+  /** Cancels worker validation before any IndexedDB write transaction starts. */
+  readonly signal?: AbortSignal;
   /** Deterministic clocks/IDs are useful to importers and tests; neither value enters scene docs. */
   readonly now?: number;
   readonly idFactory?: () => string;
@@ -540,6 +546,10 @@ function resolveNow(now: number | undefined): number {
   return value;
 }
 
+function throwIfBg3dOperationAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) throw new StudioBg3dValidationWorkerError("aborted");
+}
+
 function makeVerifiedBlob(bytes: Uint8Array): Blob {
   const copy = Uint8Array.from(bytes);
   return new Blob([copy.buffer], { type: STUDIO_BG3D_GLB_MIME_TYPE });
@@ -559,20 +569,30 @@ async function prepareVerifiedBg3dModelRecordInternal(
   alreadyCountedHashes: ReadonlySet<string> = new Set(),
 ): Promise<Bg3dVerifiedStoredRecord> {
   const item = normalizeImportItem(input);
+  throwIfBg3dOperationAborted(options.signal);
   validateUploadMetadata(item.file);
 
   let rawBuffer: ArrayBuffer;
   try {
     rawBuffer = await item.file.arrayBuffer();
   } catch {
+    throwIfBg3dOperationAborted(options.signal);
     throw createLibraryError("invalid-file");
   }
+  throwIfBg3dOperationAborted(options.signal);
   if (!(rawBuffer instanceof ArrayBuffer)) throw createLibraryError("invalid-file");
   if (rawBuffer.byteLength > STUDIO_BG3D_GLB_MAX_BYTES) throw createLibraryError("file-too-large");
   if (rawBuffer.byteLength !== item.file.size) throw createLibraryError("invalid-file");
 
   const inputSnapshot = new Uint8Array(rawBuffer.slice(0));
-  const computedHash = await calculateSha256(inputSnapshot, options.digest);
+  let computedHash: `sha256:${string}`;
+  try {
+    computedHash = await calculateSha256(inputSnapshot, options.digest);
+  } catch (error) {
+    throwIfBg3dOperationAborted(options.signal);
+    throw error;
+  }
+  throwIfBg3dOperationAborted(options.signal);
   if (item.expectedSha256 !== undefined) {
     const expectedHash = canonicalizeBg3dModelHash(item.expectedSha256);
     if (!expectedHash || expectedHash !== computedHash) throw createLibraryError("hash-mismatch");
@@ -584,7 +604,7 @@ async function prepareVerifiedBg3dModelRecordInternal(
   const validationUsedBytes = alreadyCountedHashes.has(computedHash)
     ? Math.max(0, cumulativeUsedBytes - inputSnapshot.byteLength)
     : cumulativeUsedBytes;
-  const validation = await validateStudioBg3dGlb(inputSnapshot, {
+  const validationOutcome = await validateStudioBg3dGlbOffMainThread(inputSnapshot, {
     declared: {
       byteSize: inputSnapshot.byteLength,
       sha256: computedHash,
@@ -594,8 +614,10 @@ async function prepareVerifiedBg3dModelRecordInternal(
     profile,
     budgets: options.budgets ?? DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES,
     digest: options.digest,
-    supportedRequiredExtensions: options.supportedRequiredExtensions,
-  });
+    supportedRequiredExtensions: options.supportedRequiredExtensions
+      ?? STUDIO_BG3D_CANONICAL_REQUIRED_GLTF_EXTENSIONS,
+  }, options.signal);
+  const validation = validationOutcome.result;
   if (!validation.ok) throw createLibraryError("validation-failed", validation.code);
 
   const now = resolveNow(options.now);
@@ -839,6 +861,7 @@ export async function importVerifiedBg3dModelsAtomically(
   }
 
   // Every validation above has completed successfully before this sole write transaction begins.
+  throwIfBg3dOperationAborted(options.signal);
   const committed = await putVerifiedRecordsAtomically([...preparedByHash.values()]);
   const resolvedByHash = new Map(existingByHash);
   for (const record of committed) resolvedByHash.set(record.contentHash, record);
@@ -888,7 +911,7 @@ export async function revalidateStoredBg3dModelForRendering(
   }
   if (storedBuffer.byteLength !== record.byteSize) throw createLibraryError("stored-metadata-mismatch");
 
-  const validation = await validateStudioBg3dGlb(storedBuffer, {
+  const validationOutcome = await validateStudioBg3dGlbOffMainThread(storedBuffer, {
     declared: {
       byteSize: record.byteSize,
       sha256: record.contentHash,
@@ -901,8 +924,10 @@ export async function revalidateStoredBg3dModelForRendering(
     profile: options.profile ?? record.validatorProfile,
     budgets: options.budgets ?? DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES,
     digest: options.digest,
-    supportedRequiredExtensions: options.supportedRequiredExtensions,
-  });
+    supportedRequiredExtensions: options.supportedRequiredExtensions
+      ?? STUDIO_BG3D_CANONICAL_REQUIRED_GLTF_EXTENSIONS,
+  }, options.signal);
+  const validation = validationOutcome.result;
   if (!validation.ok) {
     const code = STORED_METADATA_FAILURE_CODES.has(validation.code)
       ? "stored-metadata-mismatch"

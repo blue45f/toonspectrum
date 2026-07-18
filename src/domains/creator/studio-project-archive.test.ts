@@ -703,6 +703,25 @@ describe("studio-project-archive", () => {
         source: "upload" as const,
       }],
     });
+    const sharedScene = scene("master-model", secondHash);
+    const constrainedSharedScene = {
+      ...sharedScene,
+      budgets: {
+        ...sharedScene.budgets,
+        complexity: {
+          ...sharedScene.budgets.complexity,
+          maxAccessorElements: 10_000,
+          maxDecodedGeometryBytes: 1_000_000,
+          maxAnimations: 3,
+          maxAnimationChannels: 30,
+          maxAnimationKeyframes: 300,
+          maxAnimationValues: 1_200,
+          maxSkins: 2,
+          maxJoints: 64,
+          maxMorphTargets: 8,
+        },
+      },
+    };
     const project = {
       ...projectWith(),
       pagesList: [
@@ -710,7 +729,12 @@ describe("studio-project-archive", () => {
         { ...minimalPage([{ id: "page-b", type: "image", src: "render-b", bg3dScene: scene("page-model-b", firstHash) }]), id: "page-2" },
       ],
       master: {
-        elements: [{ id: "master-a", type: "image", src: "render-master", bg3dScene: scene("master-model", secondHash) }],
+        elements: [{
+          id: "master-a",
+          type: "image",
+          src: "render-master",
+          bg3dScene: constrainedSharedScene,
+        }],
       },
     };
 
@@ -724,6 +748,28 @@ describe("studio-project-archive", () => {
     expect(plan.attachments.every(({ documentReferences }) =>
       documentReferences.every((reference) => reference.mode === "sha256-prefixed")
     )).toBe(true);
+    expect(plan.attachments[1]?.validationBudgets.mobile.complexity).toMatchObject({
+      maxAccessorElements: 10_000,
+      maxDecodedGeometryBytes: 1_000_000,
+      maxAnimations: 3,
+      maxAnimationChannels: 30,
+      maxAnimationKeyframes: 300,
+      maxAnimationValues: 1_200,
+      maxSkins: 2,
+      maxJoints: 64,
+      maxMorphTargets: 8,
+    });
+    expect(plan.attachments[1]?.validationBudgets.desktop.complexity).toMatchObject({
+      maxAccessorElements: 10_000,
+      maxDecodedGeometryBytes: 1_000_000,
+      maxAnimations: 3,
+      maxAnimationChannels: 30,
+      maxAnimationKeyframes: 300,
+      maxAnimationValues: 1_200,
+      maxSkins: 2,
+      maxJoints: 64,
+      maxMorphTargets: 8,
+    });
     expect(plan.totalAttachmentBytes).toBe(256);
     expect(plan.referenceCount).toBe(3);
     expect(JSON.stringify(plan)).not.toContain("storageKey");

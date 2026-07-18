@@ -534,6 +534,42 @@ export function deriveStudioBg3dGlbBudgetProfiles(
           document.budgets.complexity.maxLights,
           defaults.complexity.maxLights,
         ),
+        maxAnimations: cappedDocumentLimit(
+          document.budgets.complexity.maxAnimations,
+          defaults.complexity.maxAnimations,
+        ),
+        maxAnimationChannels: cappedDocumentLimit(
+          document.budgets.complexity.maxAnimationChannels,
+          defaults.complexity.maxAnimationChannels,
+        ),
+        maxAnimationKeyframes: cappedDocumentLimit(
+          document.budgets.complexity.maxAnimationKeyframes,
+          defaults.complexity.maxAnimationKeyframes,
+        ),
+        maxAnimationValues: cappedDocumentLimit(
+          document.budgets.complexity.maxAnimationValues,
+          defaults.complexity.maxAnimationValues,
+        ),
+        maxSkins: cappedDocumentLimit(
+          document.budgets.complexity.maxSkins,
+          defaults.complexity.maxSkins,
+        ),
+        maxJoints: cappedDocumentLimit(
+          document.budgets.complexity.maxJoints,
+          defaults.complexity.maxJoints,
+        ),
+        maxMorphTargets: cappedDocumentLimit(
+          document.budgets.complexity.maxMorphTargets,
+          defaults.complexity.maxMorphTargets,
+        ),
+        maxAccessorElements: cappedDocumentLimit(
+          document.budgets.complexity.maxAccessorElements,
+          defaults.complexity.maxAccessorElements,
+        ),
+        maxDecodedGeometryBytes: cappedDocumentLimit(
+          document.budgets.complexity.maxDecodedGeometryBytes,
+          defaults.complexity.maxDecodedGeometryBytes,
+        ),
       }),
       textures: Object.freeze({
         maxTextures: cappedDocumentLimit(

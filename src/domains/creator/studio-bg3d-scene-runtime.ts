@@ -9,7 +9,12 @@ import {
   STUDIO_BG3D_PRIMITIVE_KINDS,
   STUDIO_BG3D_SCENE_DOCUMENT_MAX_ATTACHMENTS,
   STUDIO_BG3D_SCENE_DOCUMENT_MAX_NODES,
+  normalizeStudioBg3dAnimationPlayback,
+  normalizeStudioBg3dConstraintLayer,
   normalizeStudioBg3dGlbAttachment,
+  normalizeStudioBg3dMaterialOverride,
+  normalizeStudioBg3dPoseLayer,
+  normalizeStudioBg3dMorphLayer,
   normalizeStudioBg3dSceneDocument,
   parseStudioBg3dSceneDocument,
   serializeStudioBg3dSceneDocument,
@@ -284,6 +289,26 @@ function modelNodeFromRuntime(
   ) {
     return null;
   }
+  const materialOverride = value.materialOverride === undefined
+    ? undefined
+    : normalizeStudioBg3dMaterialOverride(value.materialOverride);
+  if (value.materialOverride !== undefined && !materialOverride) return null;
+  const animation = value.animation === undefined
+    ? undefined
+    : normalizeStudioBg3dAnimationPlayback(value.animation);
+  if (value.animation !== undefined && !animation) return null;
+  const pose = value.pose === undefined
+    ? undefined
+    : normalizeStudioBg3dPoseLayer(value.pose);
+  if (value.pose !== undefined && !pose) return null;
+  const morph = value.morph === undefined
+    ? undefined
+    : normalizeStudioBg3dMorphLayer(value.morph);
+  if (value.morph !== undefined && !morph) return null;
+  const constraints = value.constraints === undefined
+    ? undefined
+    : normalizeStudioBg3dConstraintLayer(value.constraints);
+  if (value.constraints !== undefined && !constraints) return null;
   return {
     id: value.id,
     name: value.name || "GLB 모델",
@@ -299,6 +324,11 @@ function modelNodeFromRuntime(
     castsShadow: true,
     receivesShadow: true,
     parentId: value.parentId ?? null,
+    ...(materialOverride ? { materialOverride } : {}),
+    ...(animation ? { animation } : {}),
+    ...(pose ? { pose } : {}),
+    ...(morph ? { morph } : {}),
+    ...(constraints ? { constraints } : {}),
   };
 }
 
@@ -655,6 +685,23 @@ export function hydrateStudioBg3dDocumentToRuntime(
       visible: node.visible !== false,
       locked: node.locked === true,
       parentId: node.parentId ?? null,
+      materialOverride: node.materialOverride ? { ...node.materialOverride } : undefined,
+      animation: node.animation ? { ...node.animation } : undefined,
+      pose: node.pose ? {
+        ...node.pose,
+        joints: node.pose.joints.map((joint) => ({
+          jointKey: joint.jointKey,
+          rotationOffset: [...joint.rotationOffset],
+        })),
+      } : undefined,
+      morph: node.morph ? {
+        ...node.morph,
+        targets: node.morph.targets.map((target) => ({ ...target })),
+      } : undefined,
+      constraints: node.constraints ? {
+        ...node.constraints,
+        aims: node.constraints.aims.map((aim) => ({ ...aim, target: [...aim.target] })),
+      } : undefined,
     });
   }
 

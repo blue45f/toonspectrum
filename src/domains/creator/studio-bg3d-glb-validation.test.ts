@@ -63,7 +63,7 @@ function validRoot(overrides: Record<string, unknown> = {}): Record<string, unkn
     asset: { version: "2.0", generator: "test" },
     buffers: [{ byteLength: 32 }],
     bufferViews: [{ buffer: 0, byteOffset: 0, byteLength: 32 }],
-    accessors: [{ count: 6 }],
+    accessors: [{ count: 6, type: "VEC3", componentType: 5126 }],
     meshes: [{ primitives: [{ attributes: { POSITION: 0 }, material: 0 }] }],
     nodes: [{ mesh: 0 }, { mesh: 0 }],
     materials: [{}],
@@ -78,6 +78,82 @@ function validRoot(overrides: Record<string, unknown> = {}): Record<string, unkn
 
 function validGlb(overrides: Record<string, unknown> = {}, bin = pngHeader(2, 3)): Uint8Array {
   return makeGlb(validRoot(overrides), bin);
+}
+
+function meshoptGlb(
+  extensionOverrides: Record<string, unknown> = {},
+  rootOverrides: Record<string, unknown> = {},
+  header = 0xa0,
+): Uint8Array {
+  const bin = new Uint8Array(8);
+  bin[0] = header;
+  return makeGlb({
+    asset: { version: "2.0", generator: "meshopt-test" },
+    extensionsUsed: ["EXT_meshopt_compression"],
+    extensionsRequired: ["EXT_meshopt_compression"],
+    buffers: [
+      { byteLength: bin.byteLength },
+      { byteLength: 36, extensions: { EXT_meshopt_compression: { fallback: true } } },
+    ],
+    bufferViews: [{
+      buffer: 1,
+      byteOffset: 0,
+      byteLength: 36,
+      byteStride: 12,
+      extensions: {
+        EXT_meshopt_compression: {
+          buffer: 0,
+          byteOffset: 0,
+          byteLength: bin.byteLength,
+          byteStride: 12,
+          count: 3,
+          mode: "ATTRIBUTES",
+          filter: "NONE",
+          ...extensionOverrides,
+        },
+      },
+    }],
+    accessors: [{
+      bufferView: 0,
+      componentType: 5126,
+      count: 3,
+      type: "VEC3",
+    }],
+    meshes: [{ primitives: [{ attributes: { POSITION: 0 } }] }],
+    nodes: [{ mesh: 0 }],
+    scenes: [{ nodes: [0] }],
+    scene: 0,
+    ...rootOverrides,
+  }, bin);
+}
+
+function mixedOrdinaryAndMeshoptGlb(): Uint8Array {
+  return meshoptGlb({}, {
+    bufferViews: [
+      {
+        buffer: 1,
+        byteOffset: 0,
+        byteLength: 36,
+        byteStride: 12,
+        extensions: {
+          EXT_meshopt_compression: {
+            buffer: 0,
+            byteOffset: 0,
+            byteLength: 8,
+            byteStride: 12,
+            count: 3,
+            mode: "ATTRIBUTES",
+            filter: "NONE",
+          },
+        },
+      },
+      { buffer: 0, byteOffset: 4, byteLength: 4 },
+    ],
+    accessors: [
+      { bufferView: 0, componentType: 5126, count: 3, type: "VEC3" },
+      { bufferView: 1, componentType: 5126, count: 1, type: "SCALAR" },
+    ],
+  });
 }
 
 async function sha256(bytes: Uint8Array): Promise<string> {
@@ -163,6 +239,15 @@ describe("validateStudioBg3dGlb valid self-contained files", () => {
         maxImageDimension: 3,
         undeterminedImageDimensions: 0,
         lights: 2,
+        animations: 0,
+        animationChannels: 0,
+        animationKeyframes: 0,
+        animationValues: 0,
+        skins: 0,
+        joints: 0,
+        morphTargets: 0,
+        accessorElements: 6,
+        estimatedDecodedGeometryBytes: 72,
       },
     });
     expect(result.ok && result.verifiedSha256).toMatch(/^sha256:[a-f0-9]{64}$/u);
@@ -199,7 +284,10 @@ describe("validateStudioBg3dGlb valid self-contained files", () => {
 
   it("counts triangle strips and GPU instancing conservatively", async () => {
     const bytes = validGlb({
-      accessors: [{ count: 7 }, { count: 4 }],
+      accessors: [
+        { count: 7, type: "VEC3", componentType: 5126 },
+        { count: 4, type: "VEC3", componentType: 5126 },
+      ],
       meshes: [{ primitives: [{ attributes: { POSITION: 0 }, mode: 5 }] }],
       nodes: [
         {
@@ -387,6 +475,69 @@ describe("validateStudioBg3dGlb self-contained resource policy", () => {
     });
     await expectFailure(bytes, "invalid-buffer-view");
   });
+
+  it("admits structurally bounded Meshopt views only through an explicit renderer allowlist", async () => {
+    const bytes = meshoptGlb();
+    await expectFailure(bytes, "unsupported-required-extension");
+
+    const result = await validate(bytes, {
+      supportedRequiredExtensions: ["EXT_meshopt_compression"],
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      metrics: {
+        triangles: 1,
+        accessorElements: 3,
+        estimatedDecodedGeometryBytes: 36,
+      },
+    });
+  });
+
+  it.each([
+    [{ count: 4 }, 0xa0],
+    [{ byteOffset: 4, byteLength: 8 }, 0xa0],
+    [{ byteStride: 6 }, 0xa0],
+    [{ mode: "TRIANGLES", count: 3, byteStride: 12 }, 0xe1],
+    [{ mode: "INDICES", byteStride: 2, filter: "QUATERNION", count: 18 }, 0xd1],
+    [{}, 0xff],
+  ])("rejects malformed Meshopt layout or bitstream headers before renderer decode", async (extension, header) => {
+    await expectFailure(meshoptGlb(extension, {}, header), "invalid-buffer-view", {
+      supportedRequiredExtensions: ["EXT_meshopt_compression"],
+    });
+  });
+
+  it("charges Meshopt's logical output size against the existing decoded-geometry budget", async () => {
+    await expectFailure(meshoptGlb(), "geometry-memory-budget-exceeded", {
+      supportedRequiredExtensions: ["EXT_meshopt_compression"],
+      budgets: profiles({ complexity: { maxDecodedGeometryBytes: 35 } }),
+    });
+  });
+
+  it("adds ordinary accessor allocations to Meshopt output for mixed models", async () => {
+    const bytes = mixedOrdinaryAndMeshoptGlb();
+    const result = await validate(bytes, {
+      supportedRequiredExtensions: ["EXT_meshopt_compression"],
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      metrics: { estimatedDecodedGeometryBytes: 40 },
+    });
+    await expectFailure(bytes, "geometry-memory-budget-exceeded", {
+      supportedRequiredExtensions: ["EXT_meshopt_compression"],
+      budgets: profiles({ complexity: { maxDecodedGeometryBytes: 39 } }),
+    });
+  });
+
+  it("rejects compressed image buffer views because image signatures cannot be preflighted safely", async () => {
+    const bytes = meshoptGlb({}, {
+      images: [{ bufferView: 0, mimeType: "image/png" }],
+      textures: [{ source: 0 }],
+    });
+    await expectFailure(bytes, "invalid-image", {
+      supportedRequiredExtensions: ["EXT_meshopt_compression"],
+    });
+  });
 });
 
 describe("validateStudioBg3dGlb commercial profile budgets", () => {
@@ -455,5 +606,233 @@ describe("validateStudioBg3dGlb commercial profile budgets", () => {
       desktop: DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES.desktop,
     };
     await expectFailure(bytes, "draw-call-budget-exceeded", { profile: "mobile", budgets });
+  });
+
+  it("measures animation, skin, joint, and morph work before renderer parsing", async () => {
+    const bytes = validGlb({
+      accessors: [
+        { count: 6, type: "VEC3", componentType: 5126 },
+        { count: 2, type: "SCALAR", componentType: 5126 },
+        { count: 2, type: "VEC3", componentType: 5126 },
+        { count: 6, type: "VEC3", componentType: 5126 },
+        { count: 2, type: "SCALAR", componentType: 5126 },
+        { count: 6, type: "VEC4", componentType: 5126 },
+        { count: 2, type: "MAT4", componentType: 5126 },
+      ],
+      meshes: [{
+        primitives: [{
+          attributes: { POSITION: 0 },
+          material: 0,
+          targets: [{ POSITION: 3 }],
+        }],
+      }],
+      nodes: [{ mesh: 0, skin: 0 }, {}, {}],
+      skins: [{ joints: [1, 2], skeleton: 1, inverseBindMatrices: 6 }],
+      animations: [{
+        samplers: [
+          { input: 1, output: 2 },
+          { input: 1, output: 4 },
+          { input: 1, output: 5, interpolation: "CUBICSPLINE" },
+        ],
+        channels: [
+          { sampler: 0, target: { node: 0, path: "translation" } },
+          { sampler: 1, target: { node: 0, path: "weights" } },
+          { sampler: 2, target: { node: 0, path: "rotation" } },
+        ],
+      }],
+    });
+    const result = await validate(bytes);
+
+    expect(result).toMatchObject({
+      ok: true,
+      metrics: {
+        animations: 1,
+        animationChannels: 3,
+        animationKeyframes: 6,
+        // 2 VEC3 values + 2 morph weights + 6 cubic-spline VEC4 values.
+        animationValues: 32,
+        skins: 1,
+        joints: 2,
+        morphTargets: 1,
+      },
+    });
+  });
+
+  it.each([
+    ["animation-count-budget-exceeded", { maxAnimations: 0 }],
+    ["animation-channel-budget-exceeded", { maxAnimationChannels: 0 }],
+    ["animation-keyframe-budget-exceeded", { maxAnimationKeyframes: 1 }],
+    ["animation-value-budget-exceeded", { maxAnimationValues: 5 }],
+  ] as const)("enforces %s", async (code, complexity) => {
+    const bytes = validGlb({
+      accessors: [
+        { count: 6, type: "VEC3", componentType: 5126 },
+        { count: 2, type: "SCALAR", componentType: 5126 },
+        { count: 2, type: "VEC3", componentType: 5126 },
+      ],
+      animations: [{
+        samplers: [{ input: 1, output: 2 }],
+        channels: [{ sampler: 0, target: { node: 0, path: "translation" } }],
+      }],
+    });
+    await expectFailure(bytes, code, { budgets: profiles({ complexity }) });
+  });
+
+  it.each([
+    ["skin-count-budget-exceeded", { maxSkins: 0 }],
+    ["joint-count-budget-exceeded", { maxJoints: 1 }],
+  ] as const)("enforces %s", async (code, complexity) => {
+    const bytes = validGlb({
+      nodes: [{ mesh: 0, skin: 0 }, {}, {}],
+      skins: [{ joints: [1, 2] }],
+    });
+    await expectFailure(bytes, code, { budgets: profiles({ complexity }) });
+  });
+
+  it("enforces the morph target budget", async () => {
+    const bytes = validGlb({
+      accessors: [
+        { count: 6, type: "VEC3", componentType: 5126 },
+        { count: 6, type: "VEC3", componentType: 5126 },
+      ],
+      meshes: [{
+        primitives: [{
+          attributes: { POSITION: 0 },
+          material: 0,
+          targets: [{ POSITION: 1 }],
+        }],
+      }],
+    });
+    await expectFailure(bytes, "morph-target-budget-exceeded", {
+      budgets: profiles({ complexity: { maxMorphTargets: 0 } }),
+    });
+  });
+
+  it("rejects malformed animation and skin graphs with sanitized failures", async () => {
+    await expectFailure(validGlb({
+      animations: [{ samplers: [], channels: [] }],
+    }), "invalid-animation");
+    await expectFailure(validGlb({
+      nodes: [{ mesh: 0, skin: 0 }],
+      skins: [{ joints: [99] }],
+    }), "invalid-skin");
+  });
+
+  it("rejects animation value overflow and mismatched inverse-bind cardinality", async () => {
+    await expectFailure(validGlb({
+      accessors: [
+        { count: 6, type: "VEC3", componentType: 5126 },
+        { count: Number.MAX_SAFE_INTEGER, type: "SCALAR", componentType: 5126 },
+        { count: Number.MAX_SAFE_INTEGER, type: "VEC3", componentType: 5126 },
+      ],
+      animations: [{
+        samplers: [{ input: 1, output: 2 }],
+        channels: [{ sampler: 0, target: { node: 0, path: "translation" } }],
+      }],
+    }), "arithmetic-overflow");
+
+    await expectFailure(validGlb({
+      accessors: [
+        { count: 6, type: "VEC3", componentType: 5126 },
+        { count: 3, type: "MAT4", componentType: 5126 },
+      ],
+      nodes: [{ mesh: 0, skin: 0 }, {}, {}],
+      skins: [{ joints: [1, 2], inverseBindMatrices: 1 }],
+    }), "invalid-skin");
+  });
+});
+
+describe("validateStudioBg3dGlb accessor allocation boundary", () => {
+  it("rejects malformed, out-of-range, and undersized interleaved accessors", async () => {
+    await expectFailure(validGlb({
+      accessors: [{ count: 6 }],
+    }), "invalid-accessor");
+
+    await expectFailure(validGlb({
+      accessors: [{
+        bufferView: 0,
+        count: 3,
+        type: "VEC3",
+        componentType: 5126,
+      }],
+    }), "invalid-accessor");
+
+    await expectFailure(validGlb({
+      bufferViews: [{ buffer: 0, byteOffset: 0, byteLength: 32, byteStride: 8 }],
+      accessors: [{
+        bufferView: 0,
+        count: 2,
+        type: "VEC3",
+        componentType: 5126,
+      }],
+    }), "invalid-accessor");
+  });
+
+  it("accepts a bounded interleaved accessor and accounts for its decoded allocation", async () => {
+    const result = await validate(validGlb({
+      bufferViews: [{ buffer: 0, byteOffset: 0, byteLength: 32, byteStride: 16 }],
+      accessors: [{
+        bufferView: 0,
+        count: 2,
+        type: "VEC3",
+        componentType: 5126,
+      }],
+    }));
+
+    expect(result).toMatchObject({
+      ok: true,
+      metrics: {
+        accessorElements: 2,
+        estimatedDecodedGeometryBytes: 24,
+      },
+    });
+  });
+
+  it("uses glTF matrix column alignment and validates sparse index/value ranges", async () => {
+    await expectFailure(validGlb({
+      bufferViews: [{ buffer: 0, byteOffset: 0, byteLength: 9 }],
+      accessors: [{
+        bufferView: 0,
+        count: 1,
+        type: "MAT3",
+        componentType: 5121,
+      }],
+    }), "invalid-accessor");
+
+    await expectFailure(validGlb({
+      accessors: [
+        { count: 6, type: "VEC3", componentType: 5126 },
+        {
+          count: 10,
+          type: "SCALAR",
+          componentType: 5126,
+          sparse: {
+            count: 2,
+            indices: { bufferView: 0, byteOffset: 31, componentType: 5123 },
+            values: { bufferView: 0, byteOffset: 0 },
+          },
+        },
+      ],
+    }), "invalid-accessor");
+  });
+
+  it("blocks sparse/zero-initialized accessor allocation bombs independently of file size", async () => {
+    const bytes = validGlb({
+      accessors: [
+        { count: 6, type: "VEC3", componentType: 5126 },
+        { count: 1_000_000, type: "VEC4", componentType: 5126 },
+      ],
+    });
+    await expectFailure(bytes, "accessor-element-budget-exceeded", {
+      budgets: profiles({ complexity: { maxAccessorElements: 100 } }),
+    });
+    await expectFailure(bytes, "geometry-memory-budget-exceeded", {
+      budgets: profiles({
+        complexity: {
+          maxAccessorElements: 2_000_000,
+          maxDecodedGeometryBytes: 1_000_000,
+        },
+      }),
+    });
   });
 });

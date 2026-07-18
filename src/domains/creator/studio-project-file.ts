@@ -6,7 +6,6 @@ import {
 } from "./studio-ai-provenance";
 import {
   STUDIO_BG3D_SCENE_DOCUMENT_KIND,
-  STUDIO_BG3D_SCENE_DOCUMENT_VERSION,
   migrateStudioBg3dSceneDocument,
   parseStudioBg3dSceneDocument,
   serializeStudioBg3dSceneDocument,
@@ -85,8 +84,7 @@ function canonicalizeBg3dSceneElement(value: unknown): unknown {
   }
   const migrated =
     isRecord(value.bg3dScene) &&
-    value.bg3dScene.kind === STUDIO_BG3D_SCENE_DOCUMENT_KIND &&
-    value.bg3dScene.version === STUDIO_BG3D_SCENE_DOCUMENT_VERSION
+    value.bg3dScene.kind === STUDIO_BG3D_SCENE_DOCUMENT_KIND
       ? migrateStudioBg3dSceneDocument(value.bg3dScene)
       : null;
   const serialized = serializeStudioBg3dSceneDocument(migrated);

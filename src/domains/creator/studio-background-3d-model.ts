@@ -5,11 +5,18 @@
 // docs/studio-bg3d-custom-model-upload.md).
 import * as THREE from "three";
 
+import { loadStudioBg3dMeshoptDecoder } from "./studio-bg3d-meshopt";
+
 import type { Bg3dModelFormat } from "./bg3d-model-library";
 import type { BgPrimitive } from "./studio-background-3d-primitives";
 import type { StudioBg3dGlbValidationSuccess } from "./studio-bg3d-glb-validation";
 import type {
+  StudioBg3dAnimationPlayback,
+  StudioBg3dConstraintLayer,
+  StudioBg3dMaterialOverride,
   StudioBg3dParsedGlbMetrics,
+  StudioBg3dPoseLayer,
+  StudioBg3dMorphLayer,
   StudioBg3dSceneBudgets,
 } from "./studio-bg3d-scene-document";
 
@@ -28,6 +35,16 @@ export interface BgCustomModelInstance {
   locked?: boolean;
   /** Parent entity ID for hierarchy grouping. null/undefined means root. */
   parentId?: string | null;
+  /** Engine-neutral, per-instance adjustments applied to cloned materials only. */
+  materialOverride?: StudioBg3dMaterialOverride;
+  /** Optional clip playback state for animated glTF/FBX-derived assets. */
+  animation?: StudioBg3dAnimationPlayback;
+  /** Engine-neutral additive joint rotations applied after animation sampling. */
+  pose?: StudioBg3dPoseLayer;
+  /** Additive per-instance morph target offsets (expressions/deformations). */
+  morph?: StudioBg3dMorphLayer;
+  /** Non-destructive model-local joint aim constraints, applied after animation and pose. */
+  constraints?: StudioBg3dConstraintLayer;
 }
 
 // PRIMITIVE_DEFS 도형들의 대략적인 크기 감각(반경 0.5~1m대)과 맞춘 오토핏 목표 치수.
@@ -80,6 +97,23 @@ export function cloneBgCustomModelInstances(instances: BgCustomModelInstance[]):
     visible: inst.visible,
     locked: inst.locked,
     parentId: inst.parentId,
+    materialOverride: inst.materialOverride ? { ...inst.materialOverride } : undefined,
+    animation: inst.animation ? { ...inst.animation } : undefined,
+    pose: inst.pose ? {
+      ...inst.pose,
+      joints: inst.pose.joints.map((joint) => ({
+        jointKey: joint.jointKey,
+        rotationOffset: [...joint.rotationOffset],
+      })),
+    } : undefined,
+    morph: inst.morph ? {
+      ...inst.morph,
+      targets: inst.morph.targets.map((target) => ({ ...target })),
+    } : undefined,
+    constraints: inst.constraints ? {
+      ...inst.constraints,
+      aims: inst.constraints.aims.map((aim) => ({ ...aim, target: [...aim.target] })),
+    } : undefined,
   }));
 }
 
@@ -148,8 +182,11 @@ export async function loadBg3dCustomModelFromBlob(blob: Blob, format: Bg3dModelF
     }
 
     // GLTFLoader는 .glb(바이너리)/.gltf(JSON) 콘텐츠를 자동 판별하므로 둘을 따로 분기할 필요가 없다.
-    const { GLTFLoader } = await import("three/examples/jsm/loaders/GLTFLoader.js");
-    const gltf = await new GLTFLoader().loadAsync(objectUrl);
+    const [{ GLTFLoader }, meshoptDecoder] = await Promise.all([
+      import("three/examples/jsm/loaders/GLTFLoader.js"),
+      loadStudioBg3dMeshoptDecoder(),
+    ]);
+    const gltf = await new GLTFLoader().setMeshoptDecoder(meshoptDecoder).loadAsync(objectUrl);
     return gltf.scene;
   } finally {
     URL.revokeObjectURL(objectUrl);
@@ -179,6 +216,15 @@ export type StudioBg3dThreeFailureCode =
   | "draw-call-budget-exceeded"
   | "material-budget-exceeded"
   | "light-budget-exceeded"
+  | "animation-count-budget-exceeded"
+  | "animation-channel-budget-exceeded"
+  | "animation-keyframe-budget-exceeded"
+  | "animation-value-budget-exceeded"
+  | "skin-count-budget-exceeded"
+  | "joint-count-budget-exceeded"
+  | "morph-target-budget-exceeded"
+  | "accessor-element-budget-exceeded"
+  | "geometry-memory-budget-exceeded"
   | "texture-count-budget-exceeded"
   | "texture-byte-budget-exceeded"
   | "texture-dimension-budget-exceeded";
@@ -238,6 +284,15 @@ const THREE_FAILURE_MESSAGES: Readonly<Record<StudioBg3dThreeFailureCode, string
     "draw-call-budget-exceeded": "이 장면의 드로콜 기준을 초과했습니다. 메시와 재질을 병합해 주세요.",
     "material-budget-exceeded": "이 장면의 재질 수 기준을 초과했습니다. 재질을 정리하거나 병합해 주세요.",
     "light-budget-exceeded": "이 장면의 조명 수 기준을 초과했습니다. 조명 수를 줄여 주세요.",
+    "animation-count-budget-exceeded": "이 장면의 애니메이션 클립 수 기준을 초과했습니다. 사용하지 않는 동작을 정리해 주세요.",
+    "animation-channel-budget-exceeded": "이 장면의 애니메이션 채널 수 기준을 초과했습니다. 트랙을 단순화해 주세요.",
+    "animation-keyframe-budget-exceeded": "이 장면의 애니메이션 키프레임 기준을 초과했습니다. 키프레임을 줄여 주세요.",
+    "animation-value-budget-exceeded": "이 장면의 애니메이션 메모리 기준을 초과했습니다. 애니메이션을 압축해 주세요.",
+    "skin-count-budget-exceeded": "이 장면의 스킨 수 기준을 초과했습니다. 리깅 구조를 단순화해 주세요.",
+    "joint-count-budget-exceeded": "이 장면의 조인트 수 기준을 초과했습니다. 본 구조를 단순화해 주세요.",
+    "morph-target-budget-exceeded": "이 장면의 모프 타깃 수 기준을 초과했습니다. 표정·변형 타깃을 정리해 주세요.",
+    "accessor-element-budget-exceeded": "이 장면의 3D 데이터 요소 수 기준을 초과했습니다. 메시와 애니메이션을 단순화해 주세요.",
+    "geometry-memory-budget-exceeded": "이 장면의 디코딩된 3D 데이터 메모리 기준을 초과했습니다. 모델을 최적화해 주세요.",
     "texture-count-budget-exceeded": "이 장면의 텍스처 개수 기준을 초과했습니다. 텍스처를 정리해 주세요.",
     "texture-byte-budget-exceeded": "이 장면의 디코딩 텍스처 메모리 기준을 초과했습니다. 텍스처를 축소해 주세요.",
     "texture-dimension-budget-exceeded": "이 장면의 텍스처 해상도 기준을 초과했습니다. 텍스처 크기를 낮춰 주세요.",
@@ -588,16 +643,21 @@ function collectThreeResources(roots: readonly THREE.Object3D[]): ThreeResources
  * 삼각형 작업에는 반복 반영하되, 재질·텍스처 GPU 자원은 객체 동일성 기준으로 한 번만 센다.
  */
 export function measureStudioBg3dThreeMetrics(
-  rootOrRoots: THREE.Object3D | readonly THREE.Object3D[]
+  rootOrRoots: THREE.Object3D | readonly THREE.Object3D[],
+  animations: readonly THREE.AnimationClip[] = [],
 ): StudioBg3dThreeMetricsResult {
   const roots = uniqueRoots(rootOrRoots);
   if (roots.length === 0 || roots.some((root) => !isObject3d(root))) return threeFailure("invalid-scene");
+  if (!Array.isArray(animations)) return threeFailure("unsafe-scene-metrics");
 
   const resources = collectThreeResources(roots);
   let nodes = 0;
   let triangles = 0;
   let drawCalls = 0;
   let lights = 0;
+  const skeletons = new Set<THREE.Skeleton>();
+  const decodedArrays = new Set<ArrayBufferView>();
+  let accessorElements = 0;
   const seenObjects = new Set<THREE.Object3D>();
   let unsafe = false;
   for (const root of roots) {
@@ -617,6 +677,14 @@ export function measureStudioBg3dThreeMetrics(
           return;
         }
         lights = nextLights;
+      }
+      if ((object as THREE.SkinnedMesh).isSkinnedMesh) {
+        const skeleton = (object as THREE.SkinnedMesh).skeleton;
+        if (!(skeleton instanceof THREE.Skeleton)) {
+          unsafe = true;
+          return;
+        }
+        skeletons.add(skeleton);
       }
       let work: MeshRenderWork | null;
       if ((object as THREE.Mesh).isMesh) work = measureMeshRenderWork(object as THREE.Mesh);
@@ -639,6 +707,109 @@ export function measureStudioBg3dThreeMetrics(
   }
   if (unsafe) return threeFailure("unsafe-scene-metrics");
 
+  let joints = 0;
+  for (const skeleton of skeletons) {
+    const nextJoints = safeAdd(joints, skeleton.bones.length);
+    if (nextJoints === null) return threeFailure("unsafe-scene-metrics");
+    joints = nextJoints;
+    const nextAccessorElements = safeAdd(accessorElements, skeleton.boneInverses.length);
+    if (nextAccessorElements === null || !ArrayBuffer.isView(skeleton.boneMatrices)) {
+      return threeFailure("unsafe-scene-metrics");
+    }
+    accessorElements = nextAccessorElements;
+    decodedArrays.add(skeleton.boneMatrices);
+  }
+
+  let morphTargets = 0;
+  for (const geometry of resources.geometries) {
+    const morphAttributeSets = Object.values(geometry.morphAttributes);
+    if (morphAttributeSets.some((attributes) => !Array.isArray(attributes))) {
+      return threeFailure("unsafe-scene-metrics");
+    }
+    // A single glTF morph target can contain POSITION, NORMAL, and TANGENT accessors. Three keeps
+    // those semantics in parallel arrays, so the largest semantic-array length is the number of
+    // target records for this primitive; summing the arrays would count one target up to 3 times.
+    const targetCount = morphAttributeSets.reduce(
+      (largest, attributes) => Math.max(largest, attributes.length),
+      0,
+    );
+    const nextMorphTargets = safeAdd(morphTargets, targetCount);
+    if (nextMorphTargets === null) return threeFailure("unsafe-scene-metrics");
+    morphTargets = nextMorphTargets;
+    const attributes = [
+      geometry.index,
+      ...Object.values(geometry.attributes),
+      ...Object.values(geometry.morphAttributes).flat(),
+    ].filter((attribute): attribute is THREE.BufferAttribute | THREE.InterleavedBufferAttribute => Boolean(attribute));
+    const uniqueAttributes = new Set(attributes);
+    for (const attribute of uniqueAttributes) {
+      if (!isSafeCount(attribute.count)) return threeFailure("unsafe-scene-metrics");
+      const nextAccessorElements = safeAdd(accessorElements, attribute.count);
+      const array = attribute instanceof THREE.InterleavedBufferAttribute
+        ? attribute.data.array
+        : attribute.array;
+      if (nextAccessorElements === null || !ArrayBuffer.isView(array)) {
+        return threeFailure("unsafe-scene-metrics");
+      }
+      accessorElements = nextAccessorElements;
+      decodedArrays.add(array);
+    }
+  }
+
+  let animationChannels = 0;
+  let animationKeyframes = 0;
+  let animationValues = 0;
+  for (const clip of animations) {
+    if (!(clip instanceof THREE.AnimationClip) || !Array.isArray(clip.tracks)) {
+      return threeFailure("unsafe-scene-metrics");
+    }
+    const nextChannels = safeAdd(animationChannels, clip.tracks.length);
+    if (nextChannels === null) return threeFailure("unsafe-scene-metrics");
+    animationChannels = nextChannels;
+    for (const track of clip.tracks) {
+      const times = track.times;
+      const values = track.values;
+      if (
+        !times
+        || !values
+        || !isSafeCount(times.length)
+        || !isSafeCount(values.length)
+        || (times.length === 0 && values.length !== 0)
+        || (times.length > 0 && values.length % times.length !== 0)
+      ) {
+        return threeFailure("unsafe-scene-metrics");
+      }
+      const nextKeyframes = safeAdd(animationKeyframes, times.length);
+      const nextValues = safeAdd(animationValues, values.length);
+      if (nextKeyframes === null || nextValues === null) return threeFailure("unsafe-scene-metrics");
+      animationKeyframes = nextKeyframes;
+      animationValues = nextValues;
+      const outputElementCount = track.getValueSize() > 0
+        ? Math.ceil(values.length / track.getValueSize())
+        : Number.NaN;
+      const nextAccessorElements = Number.isSafeInteger(outputElementCount)
+        ? safeAdd(accessorElements, times.length + outputElementCount)
+        : null;
+      if (
+        nextAccessorElements === null ||
+        !ArrayBuffer.isView(times) ||
+        !ArrayBuffer.isView(values)
+      ) {
+        return threeFailure("unsafe-scene-metrics");
+      }
+      accessorElements = nextAccessorElements;
+      decodedArrays.add(times);
+      decodedArrays.add(values);
+    }
+  }
+
+  let estimatedDecodedGeometryBytes = 0;
+  for (const array of decodedArrays) {
+    const nextBytes = safeAdd(estimatedDecodedGeometryBytes, array.byteLength);
+    if (nextBytes === null) return threeFailure("unsafe-scene-metrics");
+    estimatedDecodedGeometryBytes = nextBytes;
+  }
+
   let textureBytes = 0;
   let maxTextureDimension = 0;
   for (const texture of resources.textures) {
@@ -658,6 +829,15 @@ export function measureStudioBg3dThreeMetrics(
       drawCalls,
       materials: resources.materials.size,
       lights,
+      animations: animations.length,
+      animationChannels,
+      animationKeyframes,
+      animationValues,
+      skins: skeletons.size,
+      joints,
+      morphTargets,
+      accessorElements,
+      estimatedDecodedGeometryBytes,
       textures: resources.textures.size,
       textureBytes,
       maxTextureDimension,
@@ -673,6 +853,15 @@ function validBudgets(budgets: StudioBg3dSceneBudgets): boolean {
     budgets.complexity?.maxDrawCalls,
     budgets.complexity?.maxMaterials,
     budgets.complexity?.maxLights,
+    budgets.complexity?.maxAnimations,
+    budgets.complexity?.maxAnimationChannels,
+    budgets.complexity?.maxAnimationKeyframes,
+    budgets.complexity?.maxAnimationValues,
+    budgets.complexity?.maxSkins,
+    budgets.complexity?.maxJoints,
+    budgets.complexity?.maxMorphTargets,
+    budgets.complexity?.maxAccessorElements,
+    budgets.complexity?.maxDecodedGeometryBytes,
     budgets.complexity?.maxModelBytes,
     budgets.textures?.maxTextures,
     budgets.textures?.maxTotalBytes,
@@ -689,6 +878,15 @@ function validParsedMetrics(metrics: StudioBg3dParsedGlbMetrics): boolean {
     metrics.drawCalls,
     metrics.materials,
     metrics.lights,
+    metrics.animations,
+    metrics.animationChannels,
+    metrics.animationKeyframes,
+    metrics.animationValues,
+    metrics.skins,
+    metrics.joints,
+    metrics.morphTargets,
+    metrics.accessorElements,
+    metrics.estimatedDecodedGeometryBytes,
     metrics.textures,
     metrics.textureBytes,
     metrics.maxTextureDimension,
@@ -707,6 +905,17 @@ export function checkStudioBg3dThreeBudgets(
   if (metrics.drawCalls > budgets.complexity.maxDrawCalls) return threeFailure("draw-call-budget-exceeded");
   if (metrics.materials > budgets.complexity.maxMaterials) return threeFailure("material-budget-exceeded");
   if (metrics.lights > budgets.complexity.maxLights) return threeFailure("light-budget-exceeded");
+  if (metrics.animations > budgets.complexity.maxAnimations) return threeFailure("animation-count-budget-exceeded");
+  if (metrics.animationChannels > budgets.complexity.maxAnimationChannels) return threeFailure("animation-channel-budget-exceeded");
+  if (metrics.animationKeyframes > budgets.complexity.maxAnimationKeyframes) return threeFailure("animation-keyframe-budget-exceeded");
+  if (metrics.animationValues > budgets.complexity.maxAnimationValues) return threeFailure("animation-value-budget-exceeded");
+  if (metrics.skins > budgets.complexity.maxSkins) return threeFailure("skin-count-budget-exceeded");
+  if (metrics.joints > budgets.complexity.maxJoints) return threeFailure("joint-count-budget-exceeded");
+  if (metrics.morphTargets > budgets.complexity.maxMorphTargets) return threeFailure("morph-target-budget-exceeded");
+  if (metrics.accessorElements > budgets.complexity.maxAccessorElements) return threeFailure("accessor-element-budget-exceeded");
+  if (metrics.estimatedDecodedGeometryBytes > budgets.complexity.maxDecodedGeometryBytes) {
+    return threeFailure("geometry-memory-budget-exceeded");
+  }
   if (metrics.textures > budgets.textures.maxTextures) return threeFailure("texture-count-budget-exceeded");
   if (metrics.textureBytes > budgets.textures.maxTotalBytes) return threeFailure("texture-byte-budget-exceeded");
   if (metrics.maxTextureDimension > budgets.textures.maxDimension) {
@@ -765,6 +974,406 @@ export async function cloneStudioBg3dThreeObject(root: THREE.Object3D): Promise<
   }
 }
 
+interface StudioBg3dEditableMaterialBinding {
+  readonly source: THREE.Material;
+  readonly editable: THREE.Material;
+}
+
+export interface StudioBg3dThreeJointDescriptor {
+  readonly key: string;
+  readonly name: string;
+  readonly skinIndex: number;
+  readonly jointIndex: number;
+}
+
+interface StudioBg3dThreeJointBinding {
+  readonly descriptor: StudioBg3dThreeJointDescriptor;
+  readonly bone: THREE.Bone;
+  readonly restRotation: THREE.Quaternion;
+}
+
+export interface StudioBg3dThreePoseController {
+  readonly joints: readonly StudioBg3dThreeJointDescriptor[];
+  restoreRestPose(): void;
+  /** Removes the last additive layer while preserving the underlying animation/rest sample. */
+  removeAppliedPoseOffsets(): void;
+  /** Applies additive offsets to the current animation/rest sample. */
+  applyToCurrentPose(pose: StudioBg3dPoseLayer | undefined): void;
+  /** Aims configured joint-local axes at model-local targets after animation and additive pose. */
+  applyAimConstraints(constraints: StudioBg3dConstraintLayer | undefined): void;
+  /** Restores the cloned asset's original local rotations, then applies the pose layer. */
+  applyFromRestPose(pose: StudioBg3dPoseLayer | undefined): void;
+}
+
+export interface StudioBg3dThreeMorphDescriptor {
+  readonly key: string;
+  readonly name: string;
+  readonly meshIndex: number;
+  readonly targetIndex: number;
+}
+
+interface StudioBg3dThreeMorphBinding {
+  readonly descriptor: StudioBg3dThreeMorphDescriptor;
+  readonly influences: number[];
+  readonly restWeight: number;
+}
+
+export interface StudioBg3dThreeMorphController {
+  readonly targets: readonly StudioBg3dThreeMorphDescriptor[];
+  restoreRestWeights(): void;
+  /** Removes the last additive layer while preserving the underlying animation/rest sample. */
+  removeAppliedWeightOffsets(): void;
+  applyToCurrentWeights(morph: StudioBg3dMorphLayer | undefined): void;
+  applyFromRestWeights(morph: StudioBg3dMorphLayer | undefined): void;
+}
+
+/**
+ * Samples a played Three action at an absolute clip-local time without advancing mixer time.
+ *
+ * Studio resolves repeat and ping-pong itself, so the action must stay paused and use LoopOnce.
+ * Assigning `action.time` before `mixer.update(0)` is deliberate: `mixer.setTime()` resets every
+ * action's local time and retained loop counter, which can snap paused clips to frame zero or
+ * double-reflect a manually resolved ping-pong boundary.
+ */
+export function sampleStudioBg3dAnimationActionAtTime(
+  mixer: THREE.AnimationMixer,
+  action: THREE.AnimationAction,
+  timeSeconds: number,
+): number {
+  const duration = action.getClip().duration;
+  const safeDuration = Number.isFinite(duration) ? Math.max(0, duration) : 0;
+  const safeTime = Number.isFinite(timeSeconds)
+    ? Math.min(safeDuration, Math.max(0, timeSeconds))
+    : 0;
+  action.paused = true;
+  action.time = safeTime;
+  mixer.update(0);
+  return safeTime;
+}
+
+function collectStudioBg3dThreeJointBindings(root: THREE.Object3D): StudioBg3dThreeJointBinding[] {
+  const skeletons: THREE.Skeleton[] = [];
+  const seen = new Set<THREE.Skeleton>();
+  root.traverse((object) => {
+    if (!(object as THREE.SkinnedMesh).isSkinnedMesh) return;
+    const skeleton = (object as THREE.SkinnedMesh).skeleton;
+    if (!(skeleton instanceof THREE.Skeleton) || seen.has(skeleton)) return;
+    seen.add(skeleton);
+    skeletons.push(skeleton);
+  });
+  return skeletons.flatMap((skeleton, skinIndex) => skeleton.bones.map((bone, jointIndex) => ({
+    descriptor: Object.freeze({
+      key: `skin-${skinIndex}:joint-${jointIndex}`,
+      name: (bone.name || `Joint ${jointIndex + 1}`).slice(0, 128),
+      skinIndex,
+      jointIndex,
+    }),
+    bone,
+    restRotation: bone.quaternion.clone(),
+  })));
+}
+
+export function collectStudioBg3dThreeJoints(
+  root: THREE.Object3D,
+): readonly StudioBg3dThreeJointDescriptor[] {
+  return Object.freeze(collectStudioBg3dThreeJointBindings(root).map((binding) => binding.descriptor));
+}
+
+export function createStudioBg3dThreePoseController(
+  root: THREE.Object3D,
+): StudioBg3dThreePoseController {
+  const bindings = collectStudioBg3dThreeJointBindings(root);
+  const byKey = new Map(bindings.map((binding) => [binding.descriptor.key, binding] as const));
+  const appliedOffsets = new Map<StudioBg3dThreeJointBinding, THREE.Quaternion>();
+  const identity = new THREE.Quaternion();
+  const weighted = new THREE.Quaternion();
+  const axis = new THREE.Vector3();
+  const targetWorld = new THREE.Vector3();
+  const boneWorld = new THREE.Vector3();
+  const directionInParent = new THREE.Vector3();
+  const inverseParentWorld = new THREE.Matrix4();
+  const currentInverse = new THREE.Quaternion();
+  const desired = new THREE.Quaternion();
+  const removeAppliedPoseOffsets = () => {
+    for (const [binding, appliedOffset] of appliedOffsets) {
+      binding.bone.quaternion.multiply(weighted.copy(appliedOffset).invert()).normalize();
+      binding.bone.updateMatrix();
+    }
+    appliedOffsets.clear();
+  };
+  const restoreRestPose = () => {
+    appliedOffsets.clear();
+    for (const binding of bindings) {
+      binding.bone.quaternion.copy(binding.restRotation);
+      binding.bone.updateMatrix();
+    }
+  };
+  const applyToCurrentPose = (pose: StudioBg3dPoseLayer | undefined) => {
+    if (!pose?.enabled || pose.weight <= 0) return;
+    for (const override of pose.joints) {
+      const binding = byKey.get(override.jointKey);
+      if (!binding) continue;
+      weighted.set(...override.rotationOffset);
+      if (!Number.isFinite(weighted.lengthSq()) || weighted.lengthSq() < 1e-12) continue;
+      weighted.normalize();
+      if (pose.weight < 1) weighted.slerpQuaternions(identity, weighted, pose.weight);
+      binding.bone.quaternion.multiply(weighted).normalize();
+      binding.bone.updateMatrix();
+      const applied = appliedOffsets.get(binding);
+      if (applied) applied.multiply(weighted).normalize();
+      else appliedOffsets.set(binding, weighted.clone());
+    }
+  };
+  const applyAimConstraints = (constraints: StudioBg3dConstraintLayer | undefined) => {
+    if (!constraints?.enabled) return;
+    root.updateWorldMatrix(true, true);
+    for (const constraint of constraints.aims) {
+      if (constraint.weight <= 0) continue;
+      const binding = byKey.get(constraint.jointKey);
+      const parent = binding?.bone.parent;
+      if (!binding || !parent) continue;
+      targetWorld.set(...constraint.target).applyMatrix4(root.matrixWorld);
+      binding.bone.getWorldPosition(boneWorld);
+      directionInParent.copy(targetWorld).sub(boneWorld);
+      if (!Number.isFinite(directionInParent.lengthSq()) || directionInParent.lengthSq() < 1e-12) continue;
+      parent.updateWorldMatrix(true, false);
+      if (Math.abs(parent.matrixWorld.determinant()) < 1e-12) continue;
+      inverseParentWorld.copy(parent.matrixWorld).invert();
+      directionInParent.transformDirection(inverseParentWorld);
+      switch (constraint.axis) {
+        case "+x": axis.set(1, 0, 0); break;
+        case "-x": axis.set(-1, 0, 0); break;
+        case "+y": axis.set(0, 1, 0); break;
+        case "-y": axis.set(0, -1, 0); break;
+        case "+z": axis.set(0, 0, 1); break;
+        case "-z": axis.set(0, 0, -1); break;
+      }
+      desired.setFromUnitVectors(axis, directionInParent);
+      weighted.copy(currentInverse.copy(binding.bone.quaternion).invert().multiply(desired));
+      if (constraint.weight < 1) weighted.slerpQuaternions(identity, weighted, constraint.weight);
+      binding.bone.quaternion.multiply(weighted).normalize();
+      binding.bone.updateMatrix();
+      binding.bone.updateWorldMatrix(false, true);
+      const applied = appliedOffsets.get(binding);
+      if (applied) applied.multiply(weighted).normalize();
+      else appliedOffsets.set(binding, weighted.clone());
+    }
+  };
+  return Object.freeze({
+    joints: Object.freeze(bindings.map((binding) => binding.descriptor)),
+    restoreRestPose,
+    removeAppliedPoseOffsets,
+    applyToCurrentPose,
+    applyAimConstraints,
+    applyFromRestPose(pose: StudioBg3dPoseLayer | undefined) {
+      restoreRestPose();
+      applyToCurrentPose(pose);
+    },
+  });
+}
+
+function collectStudioBg3dThreeMorphBindings(root: THREE.Object3D): StudioBg3dThreeMorphBinding[] {
+  const bindings: StudioBg3dThreeMorphBinding[] = [];
+  let meshIndex = 0;
+  root.traverse((object) => {
+    if (!(object as THREE.Mesh).isMesh) return;
+    const mesh = object as THREE.Mesh;
+    const currentMeshIndex = meshIndex;
+    meshIndex += 1;
+    const influences = mesh.morphTargetInfluences;
+    if (!Array.isArray(influences)) return;
+    const namesByIndex = new Map<number, string>();
+    for (const [name, targetIndex] of Object.entries(mesh.morphTargetDictionary ?? {})) {
+      if (Number.isSafeInteger(targetIndex) && targetIndex >= 0 && targetIndex < influences.length) {
+        namesByIndex.set(targetIndex, name);
+      }
+    }
+    for (let targetIndex = 0; targetIndex < influences.length; targetIndex += 1) {
+      const restWeight = influences[targetIndex];
+      if (typeof restWeight !== "number" || !Number.isFinite(restWeight)) continue;
+      bindings.push({
+        descriptor: Object.freeze({
+          key: `mesh-${currentMeshIndex}:target-${targetIndex}`,
+          name: (namesByIndex.get(targetIndex) || `Morph ${targetIndex + 1}`).slice(0, 128),
+          meshIndex: currentMeshIndex,
+          targetIndex,
+        }),
+        influences,
+        restWeight,
+      });
+    }
+  });
+  return bindings;
+}
+
+export function collectStudioBg3dThreeMorphTargets(
+  root: THREE.Object3D,
+): readonly StudioBg3dThreeMorphDescriptor[] {
+  return Object.freeze(collectStudioBg3dThreeMorphBindings(root).map((binding) => binding.descriptor));
+}
+
+export function createStudioBg3dThreeMorphController(
+  root: THREE.Object3D,
+): StudioBg3dThreeMorphController {
+  const bindings = collectStudioBg3dThreeMorphBindings(root);
+  const byKey = new Map(bindings.map((binding) => [binding.descriptor.key, binding] as const));
+  const weightsBeforeAppliedOffsets = new Map<StudioBg3dThreeMorphBinding, number>();
+  const removeAppliedWeightOffsets = () => {
+    for (const [binding, weight] of weightsBeforeAppliedOffsets) {
+      binding.influences[binding.descriptor.targetIndex] = weight;
+    }
+    weightsBeforeAppliedOffsets.clear();
+  };
+  const restoreRestWeights = () => {
+    weightsBeforeAppliedOffsets.clear();
+    for (const binding of bindings) binding.influences[binding.descriptor.targetIndex] = binding.restWeight;
+  };
+  const applyToCurrentWeights = (morph: StudioBg3dMorphLayer | undefined) => {
+    if (!morph?.enabled || morph.weight <= 0) return;
+    for (const override of morph.targets) {
+      const binding = byKey.get(override.targetKey);
+      if (!binding) continue;
+      const current = binding.influences[binding.descriptor.targetIndex] ?? binding.restWeight;
+      if (!weightsBeforeAppliedOffsets.has(binding)) {
+        weightsBeforeAppliedOffsets.set(binding, current);
+      }
+      binding.influences[binding.descriptor.targetIndex] = Math.max(
+        0,
+        Math.min(1, current + override.weightOffset * morph.weight),
+      );
+    }
+  };
+  return Object.freeze({
+    targets: Object.freeze(bindings.map((binding) => binding.descriptor)),
+    restoreRestWeights,
+    removeAppliedWeightOffsets,
+    applyToCurrentWeights,
+    applyFromRestWeights(morph: StudioBg3dMorphLayer | undefined) {
+      restoreRestWeights();
+      applyToCurrentWeights(morph);
+    },
+  });
+}
+
+export interface StudioBg3dEditableThreeClone {
+  readonly root: THREE.Object3D;
+  readonly materialCount: number;
+  readonly poseController: StudioBg3dThreePoseController;
+  readonly morphController: StudioBg3dThreeMorphController;
+  applyMaterialOverride(override: StudioBg3dMaterialOverride | undefined): void;
+  /** Disposes only instance-owned material clones; geometry and textures remain cache-owned. */
+  dispose(): void;
+}
+
+type AdjustableThreeMaterial = THREE.Material & {
+  color?: THREE.Color;
+  emissive?: THREE.Color;
+  emissiveIntensity?: number;
+  metalness?: number;
+  opacity: number;
+  roughness?: number;
+  wireframe?: boolean;
+};
+
+function applyMaterialOverrideToBinding(
+  binding: StudioBg3dEditableMaterialBinding,
+  override: StudioBg3dMaterialOverride | undefined,
+): void {
+  const source = binding.source as AdjustableThreeMaterial;
+  const editable = binding.editable as AdjustableThreeMaterial;
+  editable.copy(source);
+  if (!override) {
+    editable.needsUpdate = true;
+    return;
+  }
+
+  if (source.color && editable.color && override.colorMode !== "original") {
+    const original = source.color.clone();
+    const selected = new THREE.Color(override.color);
+    const target = override.colorMode === "multiply"
+      ? original.clone().multiply(selected)
+      : selected;
+    editable.color.copy(original).lerp(target, override.colorStrength);
+  }
+  editable.opacity = Math.max(0, Math.min(1, source.opacity * override.opacityMultiplier));
+  editable.transparent = source.transparent || editable.opacity < 1;
+  if (typeof editable.roughness === "number" && override.roughness !== null) {
+    editable.roughness = override.roughness;
+  }
+  if (typeof editable.metalness === "number" && override.metalness !== null) {
+    editable.metalness = override.metalness;
+  }
+  if (
+    editable.emissive
+    && typeof editable.emissiveIntensity === "number"
+    && override.emissiveIntensity !== null
+  ) {
+    editable.emissive.set(override.emissiveColor);
+    editable.emissiveIntensity = override.emissiveIntensity;
+  }
+  if (typeof editable.wireframe === "boolean") editable.wireframe = override.wireframe;
+  if (override.doubleSided) editable.side = THREE.DoubleSide;
+  editable.needsUpdate = true;
+}
+
+/**
+ * Produces an editable render instance while retaining cache ownership of geometry and textures.
+ * Shared source materials are cloned once per instance, preserving sharing inside that instance.
+ */
+export async function createStudioBg3dEditableThreeClone(
+  root: THREE.Object3D,
+): Promise<StudioBg3dEditableThreeClone> {
+  const clone = await cloneStudioBg3dThreeObject(root);
+  const poseController = createStudioBg3dThreePoseController(clone);
+  const morphController = createStudioBg3dThreeMorphController(clone);
+  const editableBySource = new Map<THREE.Material, THREE.Material>();
+  const bindings: StudioBg3dEditableMaterialBinding[] = [];
+  clone.traverse((object) => {
+    const isRenderable =
+      (object as THREE.Mesh).isMesh
+      || (object as THREE.Points).isPoints
+      || (object as THREE.Line).isLine;
+    if (!isRenderable) {
+      return;
+    }
+    const renderable = object as THREE.Mesh | THREE.Points | THREE.Line;
+    const sourceMaterials = Array.isArray(renderable.material)
+      ? renderable.material
+      : [renderable.material];
+    const editableMaterials = sourceMaterials.map((source) => {
+      let editable = editableBySource.get(source);
+      if (!editable) {
+        editable = source.clone();
+        editableBySource.set(source, editable);
+        bindings.push({ source, editable });
+      }
+      return editable;
+    });
+    renderable.material = Array.isArray(renderable.material)
+      ? editableMaterials
+      : editableMaterials[0];
+  });
+
+  let disposed = false;
+  return {
+    root: clone,
+    materialCount: bindings.length,
+    poseController,
+    morphController,
+    applyMaterialOverride(override) {
+      if (disposed) return;
+      for (const binding of bindings) applyMaterialOverrideToBinding(binding, override);
+    },
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      for (const { editable } of bindings) editable.dispose();
+      bindings.length = 0;
+      editableBySource.clear();
+    },
+  };
+}
+
 /** 결과 union을 쓰기 어려운 clone 호출부에도 고정 코드/한국어 문구만 전달하는 안전 예외. */
 export class StudioBg3dThreeOperationError extends Error {
   readonly code: StudioBg3dThreeFailureCode;
@@ -815,8 +1424,11 @@ export async function loadVerifiedStudioBg3dGlbWithThree(
 
   let loader: import("three/examples/jsm/loaders/GLTFLoader.js").GLTFLoader;
   try {
-    const { GLTFLoader } = await import("three/examples/jsm/loaders/GLTFLoader.js");
-    loader = new GLTFLoader();
+    const [{ GLTFLoader }, meshoptDecoder] = await Promise.all([
+      import("three/examples/jsm/loaders/GLTFLoader.js"),
+      loadStudioBg3dMeshoptDecoder(),
+    ]);
+    loader = new GLTFLoader().setMeshoptDecoder(meshoptDecoder);
   } catch {
     return threeFailure("renderer-unavailable");
   }
@@ -835,7 +1447,8 @@ export async function loadVerifiedStudioBg3dGlbWithThree(
     return threeFailure("invalid-scene");
   }
 
-  const measured = measureStudioBg3dThreeMetrics(ownedRoots);
+  const parsedAnimations = Object.freeze([...(Array.isArray(parsed.animations) ? parsed.animations : [])]);
+  const measured = measureStudioBg3dThreeMetrics(ownedRoots, parsedAnimations);
   if (!measured.ok) {
     disposeStudioBg3dThreeResources(ownedRoots);
     return measured;
@@ -863,7 +1476,7 @@ export async function loadVerifiedStudioBg3dGlbWithThree(
     code: "loaded",
     message: "검증된 3D 모델을 안전하게 불러왔습니다.",
     root: parsed.scene,
-    animations: Object.freeze([...(Array.isArray(parsed.animations) ? parsed.animations : [])]),
+    animations: parsedAnimations,
     metrics: measured.metrics,
     dispose,
   });

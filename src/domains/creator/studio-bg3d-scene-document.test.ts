@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  DEFAULT_STUDIO_BG3D_MATERIAL_OVERRIDE,
   DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
   STUDIO_BG3D_GLB_MAX_BYTES,
   STUDIO_BG3D_GLB_MIME,
@@ -70,6 +71,30 @@ function currentDocument(overrides: Record<string, unknown> = {}): Record<string
   };
 }
 
+function schemaV1Budgets(): Record<string, unknown> {
+  const current = DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.budgets;
+  return {
+    complexity: {
+      maxNodes: current.complexity.maxNodes,
+      maxTriangles: current.complexity.maxTriangles,
+      maxDrawCalls: current.complexity.maxDrawCalls,
+      maxMaterials: current.complexity.maxMaterials,
+      maxLights: current.complexity.maxLights,
+      maxModelBytes: current.complexity.maxModelBytes,
+    },
+    textures: { ...current.textures },
+  };
+}
+
+/** A genuine v1 fixture: it predates every animation/rig/accessor budget added by v2. */
+function schemaV1Document(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    ...currentDocument(overrides),
+    version: 1,
+    budgets: overrides.budgets ?? schemaV1Budgets(),
+  };
+}
+
 describe("Studio BG3D scene document defaults", () => {
   it("keeps the canonical default byte-for-byte stable across repeated parse and serialize cycles", () => {
     const original = createDefaultStudioBg3dSceneDocument();
@@ -120,6 +145,159 @@ describe("Studio BG3D scene document defaults", () => {
 });
 
 describe("Studio BG3D scene document normalization", () => {
+  it("round-trips bounded engine-neutral material overrides on model instances", () => {
+    const materialOverride = {
+      ...DEFAULT_STUDIO_BG3D_MATERIAL_OVERRIDE,
+      colorMode: "multiply" as const,
+      color: "#80c0ff",
+      colorStrength: 0.65,
+      opacityMultiplier: 0.72,
+      roughness: 0.35,
+      metalness: 0.2,
+      emissiveColor: "#112233",
+      emissiveIntensity: 1.4,
+      wireframe: true,
+      doubleSided: true,
+    };
+    const serialized = serializeStudioBg3dSceneDocument(currentDocument({
+      attachments: [attachment(1)],
+      nodes: [{
+        id: "model-node-1",
+        name: "편집 모델",
+        kind: "model",
+        attachmentId: "model-1",
+        transform: { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+        parentId: null,
+        visible: true,
+        locked: false,
+        castsShadow: true,
+        receivesShadow: true,
+        materialOverride,
+        animation: {
+          clipIndex: 2,
+          playing: true,
+          loop: "ping-pong",
+          timeSeconds: 1.25,
+          timeScale: -0.5,
+          weight: 0.8,
+        },
+        pose: {
+          enabled: true,
+          weight: 0.75,
+          joints: [{
+            jointKey: "skin-0:joint-2",
+            rotationOffset: [0, 0.7071067811865475, 0, 0.7071067811865475],
+          }],
+        },
+        morph: {
+          enabled: true,
+          weight: 0.5,
+          targets: [{ targetKey: "mesh-0:target-1", weightOffset: 0.4 }],
+        },
+        constraints: {
+          enabled: true,
+          aims: [{
+            jointKey: "skin-0:joint-2",
+            target: [1, 2, 3],
+            axis: "+z",
+            weight: 0.6,
+          }],
+        },
+      }],
+    }));
+    const parsed = parseStudioBg3dSceneDocument(serialized ?? "");
+    const node = parsed?.nodes[0];
+
+    expect(node?.kind).toBe("model");
+    if (!node || node.kind !== "model") throw new Error("model fixture must survive");
+    expect(node.materialOverride).toEqual(materialOverride);
+    expect(node.animation).toEqual({
+      clipIndex: 2,
+      playing: true,
+      loop: "ping-pong",
+      timeSeconds: 1.25,
+      timeScale: -0.5,
+      weight: 0.8,
+    });
+    expect(node.pose).toEqual({
+      enabled: true,
+      weight: 0.75,
+      joints: [{
+        jointKey: "skin-0:joint-2",
+        rotationOffset: [0, 0.7071067811865475, 0, 0.7071067811865475],
+      }],
+    });
+    expect(node.morph).toEqual({
+      enabled: true,
+      weight: 0.5,
+      targets: [{ targetKey: "mesh-0:target-1", weightOffset: 0.4 }],
+    });
+    expect(node.constraints).toEqual({
+      enabled: true,
+      aims: [{
+        jointKey: "skin-0:joint-2",
+        target: [1, 2, 3],
+        axis: "+z",
+        weight: 0.6,
+      }],
+    });
+    expect(Object.isFrozen(node.materialOverride)).toBe(true);
+    expect(Object.isFrozen(node.pose?.joints[0]?.rotationOffset)).toBe(true);
+    expect(Object.isFrozen(node.morph?.targets[0])).toBe(true);
+    expect(Object.isFrozen(node.constraints?.aims[0]?.target)).toBe(true);
+
+    const hostile = JSON.parse(serialized ?? "{}") as { nodes: { materialOverride: { opacityMultiplier: number } }[] };
+    hostile.nodes[0].materialOverride.opacityMultiplier = 2;
+    expect(parseStudioBg3dSceneDocument(JSON.stringify(hostile))).toBeNull();
+  });
+
+  it("migrates a canonical schema-v1 document to v2 without accepting v2-only fields", () => {
+    const legacy = schemaV1Document();
+
+    expect(parseStudioBg3dSceneDocument(JSON.stringify(legacy))).toBeNull();
+    expect(migrateStudioBg3dSceneDocument(legacy)).toMatchObject({
+      kind: STUDIO_BG3D_SCENE_DOCUMENT_KIND,
+      version: STUDIO_BG3D_SCENE_DOCUMENT_VERSION,
+      budgets: {
+        complexity: {
+          maxAnimations: DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.budgets.complexity.maxAnimations,
+          maxAccessorElements:
+            DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.budgets.complexity.maxAccessorElements,
+        },
+      },
+    });
+
+    expect(migrateStudioBg3dSceneDocument({
+      ...legacy,
+      budgets: {
+        ...(legacy.budgets as object),
+        complexity: {
+          ...((legacy.budgets as { complexity: Record<string, unknown> }).complexity),
+          maxAnimations: 1,
+        },
+      },
+    })).toBeNull();
+
+    const legacyWithFutureField = {
+      ...legacy,
+      attachments: [attachment(1)],
+      nodes: [{
+        id: "future-node",
+        name: "future",
+        kind: "model",
+        attachmentId: "model-1",
+        transform: { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+        parentId: null,
+        visible: true,
+        locked: false,
+        castsShadow: true,
+        receivesShadow: true,
+        materialOverride: DEFAULT_STUDIO_BG3D_MATERIAL_OVERRIDE,
+      }],
+    };
+    expect(migrateStudioBg3dSceneDocument(legacyWithFutureField)).toBeNull();
+  });
+
   it("round-trips the material-color output type without degrading it to grayscale", () => {
     const candidate = currentDocument({
       output: {
@@ -321,6 +499,15 @@ describe("Studio BG3D scene document normalization", () => {
             maxDrawCalls: 99_999,
             maxMaterials: 99_999,
             maxLights: 99,
+            maxAnimations: 99_999,
+            maxAnimationChannels: 99_999,
+            maxAnimationKeyframes: 99_999_999,
+            maxAnimationValues: 99_999_999,
+            maxSkins: 99_999,
+            maxJoints: 99_999,
+            maxMorphTargets: 99_999,
+            maxAccessorElements: 999_999_999,
+            maxDecodedGeometryBytes: 9_999_999_999,
             maxModelBytes: 999_999_999,
           },
           textures: {
@@ -381,6 +568,15 @@ describe("Studio BG3D scene document normalization", () => {
       maxDrawCalls: 2048,
       maxMaterials: 1024,
       maxLights: 16,
+      maxAnimations: 256,
+      maxAnimationChannels: 4_096,
+      maxAnimationKeyframes: 4_000_000,
+      maxAnimationValues: 32_000_000,
+      maxSkins: 256,
+      maxJoints: 8_192,
+      maxMorphTargets: 1_024,
+      maxAccessorElements: 160_000_000,
+      maxDecodedGeometryBytes: 1024 * 1024 * 1024,
       maxModelBytes: 512 * 1024 * 1024,
     });
     expect(normalized.budgets.textures).toEqual({
@@ -830,6 +1026,24 @@ describe("Studio BG3D scene nodes and budgets", () => {
     expect(normalized.nodes.map((node) => node.id)).toEqual(["node-1", "node-2", "node-3"]);
   });
 
+  it("repairs orphan/self/cyclic parents leniently and rejects them at the strict boundary", () => {
+    const cycleA = { ...primitiveNode(1), parentId: "node-2" };
+    const cycleB = { ...primitiveNode(2), parentId: "node-1" };
+    const orphan = { ...primitiveNode(3), parentId: "missing" };
+    const self = { ...primitiveNode(4), parentId: "node-4" };
+    const candidate = currentDocument({ nodes: [cycleA, cycleB, orphan, self] });
+
+    const normalized = normalizeStudioBg3dSceneDocument(candidate);
+
+    expect(normalized.nodes.map(({ id, parentId }) => [id, parentId])).toEqual([
+      ["node-1", null],
+      ["node-2", "node-1"],
+      ["node-3", null],
+      ["node-4", null],
+    ]);
+    expect(parseStudioBg3dSceneDocument(JSON.stringify(candidate))).toBeNull();
+  });
+
   it("hard-caps a large but byte-bounded scene at 512 nodes", () => {
     const nodes = Array.from(
       { length: STUDIO_BG3D_SCENE_DOCUMENT_MAX_NODES + 60 },
@@ -947,19 +1161,19 @@ describe("Studio BG3D scene migration and serialization", () => {
   });
 
   it("explicitly migrates the historical schema-v1 panorama URL without losing edit data", () => {
-    const original = currentDocument({
-      camera: {
-        ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera,
-        position: [7, 5, 9],
-      },
-      background: {
-        ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.background,
-        skyPresetId: "sunset",
-        panoramaRotation: 72,
-        panoramaUrl: "https://private.invalid/legacy-sky.webp?access_token=secret",
-      },
-      nodes: [primitiveNode(1)],
-    });
+    const original = schemaV1Document({
+        camera: {
+          ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera,
+          position: [7, 5, 9],
+        },
+        background: {
+          ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.background,
+          skyPresetId: "sunset",
+          panoramaRotation: 72,
+          panoramaUrl: "https://private.invalid/legacy-sky.webp?access_token=secret",
+        },
+        nodes: [primitiveNode(1)],
+      });
 
     expect(parseStudioBg3dSceneDocument(JSON.stringify(original))).toBeNull();
     expect(serializeStudioBg3dSceneDocument(original)).toBeNull();
@@ -980,12 +1194,12 @@ describe("Studio BG3D scene migration and serialization", () => {
   });
 
   it("rejects schema-v1 panorama migration when any unrelated lossy rewrite is required", () => {
-    const historical = currentDocument({
-      background: {
-        ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.background,
-        panoramaUrl: "https://private.invalid/legacy-sky.webp",
-      },
-    });
+    const historical = schemaV1Document({
+        background: {
+          ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.background,
+          panoramaUrl: "https://private.invalid/legacy-sky.webp",
+        },
+      });
 
     expect(
       migrateStudioBg3dSceneDocument({ ...historical, runtimeUrl: "blob:hostile" })

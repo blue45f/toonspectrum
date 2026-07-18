@@ -1,0 +1,377 @@
+import {
+  validateStudioBg3dGlb,
+  type StudioBg3dGlbValidationOptions,
+  type StudioBg3dGlbValidationResult,
+} from "./studio-bg3d-glb-validation";
+import {
+  STUDIO_BG3D_GLB_VALIDATION_WORKER_PROTOCOL_VERSION,
+  isStudioBg3dGlbWorkerResponse,
+  type StudioBg3dGlbWorkerRequest,
+} from "./studio-bg3d-glb-validation-worker-protocol";
+
+export const STUDIO_BG3D_GLB_WORKER_TIMEOUT_MS = 90_000;
+
+export type StudioBg3dGlbValidationExecution = "worker" | "main-thread";
+
+export interface StudioBg3dGlbWorkerValidationOutcome {
+  readonly execution: StudioBg3dGlbValidationExecution;
+  readonly result: StudioBg3dGlbValidationResult;
+}
+
+interface WorkerMessageEventLike {
+  readonly data: unknown;
+}
+
+interface WorkerErrorEventLike {
+  preventDefault?(): void;
+}
+
+export interface StudioBg3dValidationWorkerLike {
+  postMessage(message: StudioBg3dGlbWorkerRequest, transfer?: Transferable[]): void;
+  addEventListener(type: "message", listener: (event: WorkerMessageEventLike) => void): void;
+  addEventListener(type: "error" | "messageerror", listener: (event: WorkerErrorEventLike) => void): void;
+  removeEventListener(type: "message", listener: (event: WorkerMessageEventLike) => void): void;
+  removeEventListener(type: "error" | "messageerror", listener: (event: WorkerErrorEventLike) => void): void;
+  terminate(): void;
+}
+
+interface PendingValidation {
+  readonly resolve: (outcome: StudioBg3dGlbWorkerValidationOutcome) => void;
+  readonly reject: (error: Error) => void;
+  readonly timeout: ReturnType<typeof setTimeout>;
+  readonly signal?: AbortSignal;
+  readonly abortListener?: () => void;
+}
+
+export interface StudioBg3dValidationWorkerClientOptions {
+  readonly workerFactory: () => StudioBg3dValidationWorkerLike;
+  readonly timeoutMs?: number;
+}
+
+export class StudioBg3dValidationWorkerError extends Error {
+  constructor(readonly code: "aborted" | "disposed" | "protocol" | "timeout" | "worker-failed") {
+    super(`studio-bg3d-validation-worker:${code}`);
+    this.name = "StudioBg3dValidationWorkerError";
+  }
+}
+
+function copyToOwnedBuffer(input: ArrayBuffer | Uint8Array): ArrayBuffer {
+  const source = input instanceof ArrayBuffer
+    ? new Uint8Array(input)
+    : new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
+  return Uint8Array.from(source).buffer;
+}
+
+function withoutDigest(
+  options: StudioBg3dGlbValidationOptions,
+): Omit<StudioBg3dGlbValidationOptions, "digest"> {
+  const { digest: _digest, ...serializable } = options;
+  return serializable;
+}
+
+export class StudioBg3dValidationWorkerClient {
+  readonly #workerFactory: () => StudioBg3dValidationWorkerLike;
+  readonly #timeoutMs: number;
+  readonly #pending = new Map<number, PendingValidation>();
+  #worker: StudioBg3dValidationWorkerLike | null = null;
+  #nextRequestId = 1;
+  #disposed = false;
+
+  constructor(options: StudioBg3dValidationWorkerClientOptions) {
+    this.#workerFactory = options.workerFactory;
+    this.#timeoutMs = Math.max(1_000, Math.min(300_000, options.timeoutMs ?? STUDIO_BG3D_GLB_WORKER_TIMEOUT_MS));
+    this.#worker = this.#createWorker();
+  }
+
+  get pendingCount(): number {
+    return this.#pending.size;
+  }
+
+  validate(
+    input: ArrayBuffer | Uint8Array,
+    options: StudioBg3dGlbValidationOptions,
+    signal?: AbortSignal,
+  ): Promise<StudioBg3dGlbWorkerValidationOutcome> {
+    if (this.#disposed) return Promise.reject(new StudioBg3dValidationWorkerError("disposed"));
+    if (signal?.aborted) return Promise.reject(new StudioBg3dValidationWorkerError("aborted"));
+
+    let worker: StudioBg3dValidationWorkerLike;
+    try {
+      worker = this.#worker ?? this.#createWorker();
+      this.#worker = worker;
+    } catch {
+      return Promise.reject(new StudioBg3dValidationWorkerError("worker-failed"));
+    }
+    const requestId = this.#allocateRequestId();
+    const bytes = copyToOwnedBuffer(input);
+    return new Promise((resolve, reject) => {
+      let requestPosted = false;
+      const timeout = setTimeout(() => {
+        const pending = this.#finish(requestId);
+        if (!pending) return;
+        pending.reject(new StudioBg3dValidationWorkerError("timeout"));
+        this.#discardWorker(new StudioBg3dValidationWorkerError("worker-failed"));
+      }, this.#timeoutMs);
+      const abortListener = signal
+        ? () => {
+            const pending = this.#finish(requestId);
+            if (!pending) return;
+            if (requestPosted) this.#postCancel(worker, requestId);
+            pending.reject(new StudioBg3dValidationWorkerError("aborted"));
+          }
+        : undefined;
+      this.#pending.set(requestId, { resolve, reject, timeout, signal, abortListener });
+      signal?.addEventListener("abort", abortListener!, { once: true });
+      if (signal?.aborted) {
+        abortListener?.();
+        return;
+      }
+
+      const request: StudioBg3dGlbWorkerRequest = {
+        version: STUDIO_BG3D_GLB_VALIDATION_WORKER_PROTOCOL_VERSION,
+        kind: "validate",
+        requestId,
+        bytes,
+        options: withoutDigest(options),
+      };
+      try {
+        requestPosted = true;
+        worker.postMessage(request, [bytes]);
+      } catch {
+        this.#discardWorker(new StudioBg3dValidationWorkerError("worker-failed"));
+      }
+    });
+  }
+
+  dispose(): void {
+    if (this.#disposed) return;
+    this.#disposed = true;
+    this.#discardWorker(new StudioBg3dValidationWorkerError("disposed"));
+  }
+
+  #createWorker(): StudioBg3dValidationWorkerLike {
+    const worker = this.#workerFactory();
+    try {
+      worker.addEventListener("message", this.#handleMessage);
+      worker.addEventListener("error", this.#handleWorkerFailure);
+      worker.addEventListener("messageerror", this.#handleWorkerFailure);
+      return worker;
+    } catch (error) {
+      worker.terminate();
+      throw error;
+    }
+  }
+
+  #allocateRequestId(): number {
+    while (this.#pending.has(this.#nextRequestId)) {
+      this.#nextRequestId = this.#nextRequestId >= Number.MAX_SAFE_INTEGER ? 1 : this.#nextRequestId + 1;
+    }
+    const result = this.#nextRequestId;
+    this.#nextRequestId = result >= Number.MAX_SAFE_INTEGER ? 1 : result + 1;
+    return result;
+  }
+
+  #postCancel(worker: StudioBg3dValidationWorkerLike, requestId: number): void {
+    if (this.#worker !== worker) return;
+    try {
+      worker.postMessage({
+        version: STUDIO_BG3D_GLB_VALIDATION_WORKER_PROTOCOL_VERSION,
+        kind: "cancel",
+        requestId,
+      });
+    } catch {
+      // The request is already rejected locally. A failed best-effort cancellation is harmless.
+    }
+  }
+
+  #finish(requestId: number): PendingValidation | undefined {
+    const pending = this.#pending.get(requestId);
+    if (!pending) return undefined;
+    this.#pending.delete(requestId);
+    clearTimeout(pending.timeout);
+    if (pending.abortListener) pending.signal?.removeEventListener("abort", pending.abortListener);
+    return pending;
+  }
+
+  readonly #handleMessage = (event: WorkerMessageEventLike): void => {
+    const response = event.data;
+    if (!isStudioBg3dGlbWorkerResponse(response)) {
+      this.#discardWorker(new StudioBg3dValidationWorkerError("protocol"));
+      return;
+    }
+    const pending = this.#finish(response.requestId);
+    if (!pending) return;
+    if (response.kind === "error") {
+      const error = new StudioBg3dValidationWorkerError("worker-failed");
+      pending.reject(error);
+      this.#discardWorker(error);
+      return;
+    }
+    pending.resolve({ execution: "worker", result: response.result });
+  };
+
+  readonly #handleWorkerFailure = (event: WorkerErrorEventLike): void => {
+    event.preventDefault?.();
+    this.#discardWorker(new StudioBg3dValidationWorkerError("worker-failed"));
+  };
+
+  #discardWorker(error: StudioBg3dValidationWorkerError): void {
+    const worker = this.#worker;
+    this.#worker = null;
+    if (worker) {
+      worker.removeEventListener("message", this.#handleMessage);
+      worker.removeEventListener("error", this.#handleWorkerFailure);
+      worker.removeEventListener("messageerror", this.#handleWorkerFailure);
+      worker.terminate();
+    }
+    for (const requestId of [...this.#pending.keys()]) this.#finish(requestId)?.reject(error);
+  }
+}
+
+export interface StudioBg3dValidationWorkerPoolOptions
+  extends StudioBg3dValidationWorkerClientOptions {
+  readonly maximumWorkers?: number;
+}
+
+/**
+ * Lazily expands validation to a tiny worker pool. A second worker is created only while every
+ * existing worker is busy, preventing a single-file import from paying extra startup/heap cost.
+ */
+export class StudioBg3dValidationWorkerPool {
+  readonly #clientOptions: StudioBg3dValidationWorkerClientOptions;
+  readonly #maximumWorkers: number;
+  readonly #clients: StudioBg3dValidationWorkerClient[] = [];
+  #disposed = false;
+
+  constructor(options: StudioBg3dValidationWorkerPoolOptions) {
+    this.#clientOptions = options;
+    this.#maximumWorkers = Number.isFinite(options.maximumWorkers)
+      ? Math.max(1, Math.min(2, Math.floor(options.maximumWorkers ?? 1)))
+      : 1;
+  }
+
+  validate(
+    input: ArrayBuffer | Uint8Array,
+    options: StudioBg3dGlbValidationOptions,
+    signal?: AbortSignal,
+  ): Promise<StudioBg3dGlbWorkerValidationOutcome> {
+    if (this.#disposed) return Promise.reject(new StudioBg3dValidationWorkerError("disposed"));
+    let client = this.#clients.reduce<StudioBg3dValidationWorkerClient | null>(
+      (best, candidate) => !best || candidate.pendingCount < best.pendingCount ? candidate : best,
+      null,
+    );
+    if (
+      (!client || client.pendingCount > 0) &&
+      this.#clients.length < this.#maximumWorkers
+    ) {
+      client = new StudioBg3dValidationWorkerClient(this.#clientOptions);
+      this.#clients.push(client);
+    }
+    client ??= this.#clients[0] ?? null;
+    if (!client) return Promise.reject(new StudioBg3dValidationWorkerError("worker-failed"));
+    return client.validate(input, options, signal);
+  }
+
+  dispose(): void {
+    if (this.#disposed) return;
+    this.#disposed = true;
+    for (const client of this.#clients) client.dispose();
+    this.#clients.length = 0;
+  }
+}
+
+let sharedPool: StudioBg3dValidationWorkerPool | null = null;
+
+function browserWorkerFactory(): StudioBg3dValidationWorkerLike {
+  return new Worker(
+    new URL("./studio-bg3d-glb-validation.worker.ts", import.meta.url),
+    { name: "toonspectrum-bg3d-glb-validator", type: "module" },
+  );
+}
+
+function maximumBrowserValidationWorkers(): number {
+  if (typeof navigator !== "object" || !navigator) return 1;
+  const hardwareConcurrency = Number(navigator.hardwareConcurrency);
+  const deviceMemory = Number((navigator as Navigator & { readonly deviceMemory?: number }).deviceMemory);
+  if (!Number.isFinite(hardwareConcurrency) || hardwareConcurrency <= 4) return 1;
+  if (Number.isFinite(deviceMemory) && deviceMemory <= 4) return 1;
+  return 2;
+}
+
+function canUseBrowserWorker(options: StudioBg3dGlbValidationOptions): boolean {
+  return options.digest === undefined && typeof Worker === "function";
+}
+
+function abortedValidationError(): StudioBg3dValidationWorkerError {
+  return new StudioBg3dValidationWorkerError("aborted");
+}
+
+async function validateStudioBg3dGlbOnMainThread(
+  input: ArrayBuffer | Uint8Array,
+  options: StudioBg3dGlbValidationOptions,
+  signal?: AbortSignal,
+): Promise<StudioBg3dGlbWorkerValidationOutcome> {
+  if (signal?.aborted) throw abortedValidationError();
+  if (!signal) {
+    return { execution: "main-thread", result: await validateStudioBg3dGlb(input, options) };
+  }
+
+  let abortListener: (() => void) | undefined;
+  const abortPromise = new Promise<never>((_resolve, reject) => {
+    abortListener = () => reject(abortedValidationError());
+    signal.addEventListener("abort", abortListener, { once: true });
+    if (signal.aborted) abortListener();
+  });
+  try {
+    const result = await Promise.race([
+      validateStudioBg3dGlb(input, options),
+      abortPromise,
+    ]);
+    if (signal.aborted) throw abortedValidationError();
+    return { execution: "main-thread", result };
+  } finally {
+    if (abortListener) signal.removeEventListener("abort", abortListener);
+  }
+}
+
+/**
+ * Runs the engine-neutral GLB trust boundary outside the render/UI thread when workers are
+ * available. Injected digest adapters deliberately stay in-process so deterministic tests and
+ * restricted runtimes preserve their exact semantics.
+ */
+export async function validateStudioBg3dGlbOffMainThread(
+  input: ArrayBuffer | Uint8Array,
+  options: StudioBg3dGlbValidationOptions,
+  signal?: AbortSignal,
+): Promise<StudioBg3dGlbWorkerValidationOutcome> {
+  if (!canUseBrowserWorker(options)) {
+    return validateStudioBg3dGlbOnMainThread(input, options, signal);
+  }
+  try {
+    sharedPool ??= new StudioBg3dValidationWorkerPool({
+      workerFactory: browserWorkerFactory,
+      maximumWorkers: maximumBrowserValidationWorkers(),
+    });
+  } catch {
+    return validateStudioBg3dGlbOnMainThread(input, options, signal);
+  }
+  const pool = sharedPool;
+  try {
+    return await pool.validate(input, options, signal);
+  } catch (error) {
+    if (
+      error instanceof StudioBg3dValidationWorkerError
+      && error.code !== "aborted"
+      && sharedPool === pool
+    ) {
+      pool.dispose();
+      sharedPool = null;
+    }
+    throw error;
+  }
+}
+
+export function disposeSharedStudioBg3dValidationWorker(): void {
+  sharedPool?.dispose();
+  sharedPool = null;
+}

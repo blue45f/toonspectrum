@@ -6,8 +6,11 @@
  * at the runtime boundary; this document stores only bounded GLB metadata and scene intent.
  */
 
+import { normalizeStudioBg3dHierarchyParents } from "./studio-bg3d-hierarchy";
+
 export const STUDIO_BG3D_SCENE_DOCUMENT_KIND = "toonspectrum.bg3d-scene" as const;
-export const STUDIO_BG3D_SCENE_DOCUMENT_VERSION = 1 as const;
+export const STUDIO_BG3D_SCENE_DOCUMENT_VERSION = 2 as const;
+const STUDIO_BG3D_LEGACY_SCENE_DOCUMENT_VERSION = 1 as const;
 export const STUDIO_BG3D_SCENE_DOCUMENT_MAX_BYTES = 256 * 1024;
 export const STUDIO_BG3D_SCENE_DOCUMENT_MAX_NODES = 512;
 export const STUDIO_BG3D_SCENE_DOCUMENT_MAX_ATTACHMENTS = 64;
@@ -15,6 +18,7 @@ export const STUDIO_BG3D_GLB_MIME = "model/gltf-binary" as const;
 export const STUDIO_BG3D_GLB_MAX_BYTES = 100 * 1024 * 1024;
 
 export type StudioBg3dVec3 = readonly [number, number, number];
+export type StudioBg3dQuaternion = readonly [number, number, number, number];
 
 export const STUDIO_BG3D_PRIMITIVE_KINDS = [
   "box",
@@ -41,6 +45,8 @@ export type StudioBg3dToneMode = "none" | "flat" | "cel" | "screentone";
 export type StudioBg3dLineLayerType = "raster" | "vector";
 export type StudioBg3dToneOutputType = "color" | "grayscale" | "pattern";
 export type StudioBg3dTonePattern = "dot" | "line" | "crosshatch" | "noise";
+export type StudioBg3dMaterialColorMode = "original" | "multiply" | "replace";
+export type StudioBg3dAnimationLoopMode = "once" | "repeat" | "ping-pong";
 export type StudioBg3dAttachmentSource = "upload" | "local-library" | "bundled";
 export type StudioBg3dRightsStatus = "owned" | "licensed" | "public-domain" | "unknown";
 
@@ -50,6 +56,113 @@ export interface StudioBg3dTransform {
   readonly rotation: StudioBg3dVec3;
   readonly scale: StudioBg3dVec3;
 }
+
+/** Engine-neutral per-instance material adjustments; source textures remain asset-owned. */
+export interface StudioBg3dMaterialOverride {
+  readonly colorMode: StudioBg3dMaterialColorMode;
+  readonly color: string;
+  readonly colorStrength: number;
+  readonly opacityMultiplier: number;
+  readonly roughness: number | null;
+  readonly metalness: number | null;
+  readonly emissiveColor: string;
+  readonly emissiveIntensity: number | null;
+  readonly wireframe: boolean;
+  readonly doubleSided: boolean;
+}
+
+export const DEFAULT_STUDIO_BG3D_MATERIAL_OVERRIDE: StudioBg3dMaterialOverride = Object.freeze({
+  colorMode: "original",
+  color: "#ffffff",
+  colorStrength: 1,
+  opacityMultiplier: 1,
+  roughness: null,
+  metalness: null,
+  emissiveColor: "#000000",
+  emissiveIntensity: null,
+  wireframe: false,
+  doubleSided: false,
+});
+
+export interface StudioBg3dAnimationPlayback {
+  readonly clipIndex: number;
+  readonly playing: boolean;
+  readonly loop: StudioBg3dAnimationLoopMode;
+  readonly timeSeconds: number;
+  readonly timeScale: number;
+  readonly weight: number;
+}
+
+export const DEFAULT_STUDIO_BG3D_ANIMATION_PLAYBACK: StudioBg3dAnimationPlayback = Object.freeze({
+  clipIndex: 0,
+  playing: false,
+  loop: "repeat",
+  timeSeconds: 0,
+  timeScale: 1,
+  weight: 1,
+});
+
+export interface StudioBg3dJointPoseOverride {
+  /** Engine-neutral canonical skin/joint ordinal, e.g. `skin-0:joint-12`. */
+  readonly jointKey: string;
+  /** Additive local-space rotation relative to the sampled animation/rest pose. */
+  readonly rotationOffset: StudioBg3dQuaternion;
+}
+
+export interface StudioBg3dPoseLayer {
+  readonly enabled: boolean;
+  readonly weight: number;
+  readonly joints: readonly StudioBg3dJointPoseOverride[];
+}
+
+export const DEFAULT_STUDIO_BG3D_POSE_LAYER: StudioBg3dPoseLayer = Object.freeze({
+  enabled: true,
+  weight: 1,
+  joints: Object.freeze([]),
+});
+
+export interface StudioBg3dMorphWeightOverride {
+  /** Engine-neutral canonical renderable/target ordinal, e.g. `mesh-2:target-0`. */
+  readonly targetKey: string;
+  /** Additive offset applied after animation sampling. */
+  readonly weightOffset: number;
+}
+
+export interface StudioBg3dMorphLayer {
+  readonly enabled: boolean;
+  readonly weight: number;
+  readonly targets: readonly StudioBg3dMorphWeightOverride[];
+}
+
+export const DEFAULT_STUDIO_BG3D_MORPH_LAYER: StudioBg3dMorphLayer = Object.freeze({
+  enabled: true,
+  weight: 1,
+  targets: Object.freeze([]),
+});
+
+export const STUDIO_BG3D_AIM_AXES = [
+  "+x", "-x", "+y", "-y", "+z", "-z",
+] as const;
+export type StudioBg3dAimAxis = (typeof STUDIO_BG3D_AIM_AXES)[number];
+
+export interface StudioBg3dJointAimConstraint {
+  readonly jointKey: string;
+  /** Target point in the model instance's local coordinate system. */
+  readonly target: StudioBg3dVec3;
+  /** Joint-local axis that should point toward the target. */
+  readonly axis: StudioBg3dAimAxis;
+  readonly weight: number;
+}
+
+export interface StudioBg3dConstraintLayer {
+  readonly enabled: boolean;
+  readonly aims: readonly StudioBg3dJointAimConstraint[];
+}
+
+export const DEFAULT_STUDIO_BG3D_CONSTRAINT_LAYER: StudioBg3dConstraintLayer = Object.freeze({
+  enabled: true,
+  aims: Object.freeze([]),
+});
 
 export interface StudioBg3dCameraSettings {
   readonly position: StudioBg3dVec3;
@@ -153,6 +266,21 @@ export interface StudioBg3dComplexityBudget {
   readonly maxDrawCalls: number;
   readonly maxMaterials: number;
   readonly maxLights: number;
+  readonly maxAnimations: number;
+  readonly maxAnimationChannels: number;
+  /** Sum of timeline keys referenced by animation channels. */
+  readonly maxAnimationKeyframes: number;
+  /** Scalar components in animation sampler outputs after accessor type expansion. */
+  readonly maxAnimationValues: number;
+  readonly maxSkins: number;
+  /** Sum of joint references across skins. */
+  readonly maxJoints: number;
+  /** Sum of morph target records across mesh primitives. */
+  readonly maxMorphTargets: number;
+  /** Sum of accessor element counts before component expansion. */
+  readonly maxAccessorElements: number;
+  /** Conservative decoded allocation estimate for all accessors. */
+  readonly maxDecodedGeometryBytes: number;
   readonly maxModelBytes: number;
 }
 
@@ -241,6 +369,15 @@ export interface StudioBg3dParsedGlbMetrics {
   readonly drawCalls: number;
   readonly materials: number;
   readonly lights: number;
+  readonly animations: number;
+  readonly animationChannels: number;
+  readonly animationKeyframes: number;
+  readonly animationValues: number;
+  readonly skins: number;
+  readonly joints: number;
+  readonly morphTargets: number;
+  readonly accessorElements: number;
+  readonly estimatedDecodedGeometryBytes: number;
   readonly textures: number;
   readonly textureBytes: number;
   readonly maxTextureDimension: number;
@@ -288,6 +425,11 @@ export interface StudioBg3dPrimitiveNode extends StudioBg3dSceneNodeBase {
 export interface StudioBg3dModelNode extends StudioBg3dSceneNodeBase {
   readonly kind: "model";
   readonly attachmentId: string;
+  readonly materialOverride?: StudioBg3dMaterialOverride;
+  readonly animation?: StudioBg3dAnimationPlayback;
+  readonly pose?: StudioBg3dPoseLayer;
+  readonly morph?: StudioBg3dMorphLayer;
+  readonly constraints?: StudioBg3dConstraintLayer;
 }
 
 export type StudioBg3dSceneNode = StudioBg3dPrimitiveNode | StudioBg3dModelNode;
@@ -330,6 +472,8 @@ const TONE_MODE_SET = new Set<string>(["none", "flat", "cel", "screentone"]);
 const LINE_LAYER_TYPE_SET = new Set<string>(["raster", "vector"]);
 const TONE_OUTPUT_TYPE_SET = new Set<string>(["color", "grayscale", "pattern"]);
 const TONE_PATTERN_SET = new Set<string>(["dot", "line", "crosshatch", "noise"]);
+const MATERIAL_COLOR_MODE_SET = new Set<string>(["original", "multiply", "replace"]);
+const ANIMATION_LOOP_MODE_SET = new Set<string>(["once", "repeat", "ping-pong"]);
 const ATTACHMENT_SOURCE_SET = new Set<string>(["upload", "local-library", "bundled"]);
 const RIGHTS_STATUS_SET = new Set<string>(["owned", "licensed", "public-domain", "unknown"]);
 const SHADOW_MAP_SIZES = [256, 512, 1024, 2048, 4096] as const;
@@ -442,6 +586,15 @@ const DEFAULT_RAW_DOCUMENT = {
       maxDrawCalls: 512,
       maxMaterials: 256,
       maxLights: 4,
+      maxAnimations: 64,
+      maxAnimationChannels: 1_024,
+      maxAnimationKeyframes: 1_000_000,
+      maxAnimationValues: 8_000_000,
+      maxSkins: 64,
+      maxJoints: 2_048,
+      maxMorphTargets: 256,
+      maxAccessorElements: 40_000_000,
+      maxDecodedGeometryBytes: 256 * 1024 * 1024,
       maxModelBytes: 256 * 1024 * 1024,
     },
     textures: {
@@ -462,12 +615,15 @@ function hasOwn(value: Record<string, unknown>, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(value, key);
 }
 
-/** Persistence requires every version-1 root section even though the public normalizer is lenient. */
-function hasCompleteCurrentRootShape(value: unknown): value is Record<string, unknown> {
+/** Persistence requires every root section even though the public normalizer is lenient. */
+function hasCompleteRootShapeForVersion(
+  value: unknown,
+  version: number,
+): value is Record<string, unknown> & { readonly nodes: readonly unknown[] } {
   return (
     isRecord(value) &&
     value.kind === STUDIO_BG3D_SCENE_DOCUMENT_KIND &&
-    value.version === STUDIO_BG3D_SCENE_DOCUMENT_VERSION &&
+    value.version === version &&
     isRecord(value.camera) &&
     isRecord(value.render) &&
     isRecord(value.background) &&
@@ -478,6 +634,12 @@ function hasCompleteCurrentRootShape(value: unknown): value is Record<string, un
     Array.isArray(value.attachments) &&
     Array.isArray(value.nodes)
   );
+}
+
+function hasCompleteCurrentRootShape(
+  value: unknown,
+): value is Record<string, unknown> & { readonly nodes: readonly unknown[] } {
+  return hasCompleteRootShapeForVersion(value, STUDIO_BG3D_SCENE_DOCUMENT_VERSION);
 }
 
 function isExplicitUnversionedLegacyRoot(
@@ -861,6 +1023,60 @@ function normalizeBudgets(value: unknown): StudioBg3dSceneBudgets {
         3,
         16
       ),
+      maxAnimations: boundedInteger(
+        complexity.maxAnimations,
+        DEFAULT_RAW_DOCUMENT.budgets.complexity.maxAnimations,
+        0,
+        256
+      ),
+      maxAnimationChannels: boundedInteger(
+        complexity.maxAnimationChannels,
+        DEFAULT_RAW_DOCUMENT.budgets.complexity.maxAnimationChannels,
+        0,
+        4_096
+      ),
+      maxAnimationKeyframes: boundedInteger(
+        complexity.maxAnimationKeyframes,
+        DEFAULT_RAW_DOCUMENT.budgets.complexity.maxAnimationKeyframes,
+        0,
+        4_000_000
+      ),
+      maxAnimationValues: boundedInteger(
+        complexity.maxAnimationValues,
+        DEFAULT_RAW_DOCUMENT.budgets.complexity.maxAnimationValues,
+        0,
+        32_000_000
+      ),
+      maxSkins: boundedInteger(
+        complexity.maxSkins,
+        DEFAULT_RAW_DOCUMENT.budgets.complexity.maxSkins,
+        0,
+        256
+      ),
+      maxJoints: boundedInteger(
+        complexity.maxJoints,
+        DEFAULT_RAW_DOCUMENT.budgets.complexity.maxJoints,
+        0,
+        8_192
+      ),
+      maxMorphTargets: boundedInteger(
+        complexity.maxMorphTargets,
+        DEFAULT_RAW_DOCUMENT.budgets.complexity.maxMorphTargets,
+        0,
+        1_024
+      ),
+      maxAccessorElements: boundedInteger(
+        complexity.maxAccessorElements,
+        DEFAULT_RAW_DOCUMENT.budgets.complexity.maxAccessorElements,
+        0,
+        160_000_000
+      ),
+      maxDecodedGeometryBytes: boundedInteger(
+        complexity.maxDecodedGeometryBytes,
+        DEFAULT_RAW_DOCUMENT.budgets.complexity.maxDecodedGeometryBytes,
+        0,
+        1024 * 1024 * 1024
+      ),
       maxModelBytes: boundedInteger(
         complexity.maxModelBytes,
         DEFAULT_RAW_DOCUMENT.budgets.complexity.maxModelBytes,
@@ -989,6 +1205,130 @@ function normalizeTransform(value: unknown): StudioBg3dTransform {
   };
 }
 
+function normalizeMaterialOverride(value: unknown): StudioBg3dMaterialOverride | null {
+  if (!isRecord(value)) return null;
+  return {
+    colorMode: normalizedEnum(
+      value.colorMode,
+      MATERIAL_COLOR_MODE_SET,
+      DEFAULT_STUDIO_BG3D_MATERIAL_OVERRIDE.colorMode,
+    ),
+    color: normalizedColor(value.color, DEFAULT_STUDIO_BG3D_MATERIAL_OVERRIDE.color),
+    colorStrength: boundedNumber(value.colorStrength, 1, 0, 1),
+    opacityMultiplier: boundedNumber(value.opacityMultiplier, 1, 0, 1),
+    roughness: value.roughness === null ? null : boundedNumber(value.roughness, 0.8, 0, 1),
+    metalness: value.metalness === null ? null : boundedNumber(value.metalness, 0, 0, 1),
+    emissiveColor: normalizedColor(value.emissiveColor, "#000000"),
+    emissiveIntensity: value.emissiveIntensity === null
+      ? null
+      : boundedNumber(value.emissiveIntensity, 0, 0, 20),
+    wireframe: normalizedBoolean(value.wireframe, false),
+    doubleSided: normalizedBoolean(value.doubleSided, false),
+  };
+}
+
+function normalizeAnimationPlayback(value: unknown): StudioBg3dAnimationPlayback | null {
+  if (!isRecord(value)) return null;
+  return {
+    clipIndex: boundedInteger(value.clipIndex, 0, 0, 255),
+    playing: normalizedBoolean(value.playing, false),
+    loop: normalizedEnum(value.loop, ANIMATION_LOOP_MODE_SET, "repeat"),
+    timeSeconds: boundedNumber(value.timeSeconds, 0, 0, 86_400),
+    timeScale: boundedNumber(value.timeScale, 1, -4, 4),
+    weight: boundedNumber(value.weight, 1, 0, 1),
+  };
+}
+
+function normalizeQuaternion(value: unknown): StudioBg3dQuaternion | null {
+  if (
+    !Array.isArray(value) ||
+    value.length !== 4 ||
+    value.some((component) => typeof component !== "number" || !Number.isFinite(component))
+  ) {
+    return null;
+  }
+  const magnitude = Math.hypot(value[0], value[1], value[2], value[3]);
+  if (!Number.isFinite(magnitude) || magnitude < 1e-8) return null;
+  // q and -q encode the same rotation. Canonicalizing to w >= 0 keeps strict persistence stable.
+  const sign = value[3] < 0 ? -1 : 1;
+  return [
+    (value[0] / magnitude) * sign,
+    (value[1] / magnitude) * sign,
+    (value[2] / magnitude) * sign,
+    (value[3] / magnitude) * sign,
+  ];
+}
+
+function normalizePoseLayer(value: unknown): StudioBg3dPoseLayer | null {
+  if (!isRecord(value) || !Array.isArray(value.joints)) return null;
+  const joints: StudioBg3dJointPoseOverride[] = [];
+  const keys = new Set<string>();
+  for (const rawJoint of value.joints) {
+    if (!isRecord(rawJoint)) continue;
+    const jointKey = normalizedText(rawJoint.jointKey, 128);
+    const rotationOffset = normalizeQuaternion(rawJoint.rotationOffset);
+    if (!jointKey || !rotationOffset || keys.has(jointKey)) continue;
+    keys.add(jointKey);
+    joints.push({ jointKey, rotationOffset });
+    if (joints.length >= 256) break;
+  }
+  return {
+    enabled: normalizedBoolean(value.enabled, true),
+    weight: boundedNumber(value.weight, 1, 0, 1),
+    joints,
+  };
+}
+
+function normalizeMorphLayer(value: unknown): StudioBg3dMorphLayer | null {
+  if (!isRecord(value) || !Array.isArray(value.targets)) return null;
+  const targets: StudioBg3dMorphWeightOverride[] = [];
+  const keys = new Set<string>();
+  for (const rawTarget of value.targets) {
+    if (!isRecord(rawTarget)) continue;
+    const targetKey = normalizedText(rawTarget.targetKey, 128);
+    if (!targetKey || keys.has(targetKey)) continue;
+    keys.add(targetKey);
+    targets.push({
+      targetKey,
+      weightOffset: boundedNumber(rawTarget.weightOffset, 0, -1, 1),
+    });
+    if (targets.length >= 256) break;
+  }
+  return {
+    enabled: normalizedBoolean(value.enabled, true),
+    weight: boundedNumber(value.weight, 1, 0, 1),
+    targets,
+  };
+}
+
+const AIM_AXIS_SET = new Set<string>(STUDIO_BG3D_AIM_AXES);
+
+function normalizeConstraintLayer(value: unknown): StudioBg3dConstraintLayer | null {
+  if (!isRecord(value) || !Array.isArray(value.aims)) return null;
+  const aims: StudioBg3dJointAimConstraint[] = [];
+  const keys = new Set<string>();
+  for (const rawAim of value.aims) {
+    if (!isRecord(rawAim)) continue;
+    const jointKey = normalizedText(rawAim.jointKey, 128);
+    const axis = typeof rawAim.axis === "string" && AIM_AXIS_SET.has(rawAim.axis)
+      ? rawAim.axis as StudioBg3dAimAxis
+      : null;
+    if (!jointKey || !axis || keys.has(jointKey)) continue;
+    keys.add(jointKey);
+    aims.push({
+      jointKey,
+      target: normalizedVec3(rawAim.target, [0, 1, 0], -MAX_WORLD_COORDINATE, MAX_WORLD_COORDINATE),
+      axis,
+      weight: boundedNumber(rawAim.weight, 1, 0, 1),
+    });
+    if (aims.length >= 128) break;
+  }
+  return {
+    enabled: normalizedBoolean(value.enabled, true),
+    aims,
+  };
+}
+
 function normalizeNode(
   value: unknown,
   attachmentIds: ReadonlySet<string>
@@ -1020,7 +1360,21 @@ function normalizeNode(
   if (value.kind === "model") {
     const attachmentId = normalizedId(value.attachmentId);
     if (!attachmentId || !attachmentIds.has(attachmentId)) return null;
-    return { ...base, kind: "model", attachmentId };
+    const materialOverride = normalizeMaterialOverride(value.materialOverride);
+    const animation = normalizeAnimationPlayback(value.animation);
+    const pose = normalizePoseLayer(value.pose);
+    const morph = normalizeMorphLayer(value.morph);
+    const constraints = normalizeConstraintLayer(value.constraints);
+    return {
+      ...base,
+      kind: "model",
+      attachmentId,
+      ...(materialOverride ? { materialOverride } : {}),
+      ...(animation ? { animation } : {}),
+      ...(pose ? { pose } : {}),
+      ...(morph ? { morph } : {}),
+      ...(constraints ? { constraints } : {}),
+    };
   }
   return null;
 }
@@ -1040,7 +1394,7 @@ function normalizeNodes(
     ids.add(node.id);
     if (nodes.length >= maxNodes) break;
   }
-  return nodes;
+  return normalizeStudioBg3dHierarchyParents(nodes);
 }
 
 function canonicalDocumentByteLength(document: StudioBg3dSceneDocument): number {
@@ -1224,25 +1578,106 @@ function migrateDecodedLegacyDocument(
 }
 
 /**
- * Schema v1 briefly persisted an optional `background.panoramaUrl`. The URL is no longer part of
+ * Early scene documents briefly persisted an optional `background.panoramaUrl`. The URL is no longer part of
  * the persistence contract, but rejecting the whole marked document would also discard its camera,
  * nodes, attachments, and LT settings. Migrate only that exact historical shape: remove the URL,
- * then require every remaining field to pass the current strict v1 boundary without any other
+ * then require every remaining field to pass the current strict v2 boundary without any other
  * lossy rewrite. This is intentionally separate from the unversioned legacy payload migration.
  */
-function migrateDecodedSchemaV1PanoramaDocument(
+const SCHEMA_V2_ONLY_COMPLEXITY_BUDGET_KEYS = Object.freeze([
+  "maxAnimations",
+  "maxAnimationChannels",
+  "maxAnimationKeyframes",
+  "maxAnimationValues",
+  "maxSkins",
+  "maxJoints",
+  "maxMorphTargets",
+  "maxAccessorElements",
+  "maxDecodedGeometryBytes",
+] as const);
+
+/**
+ * Schema v1 predates animation, rigging, morph, and decoded-accessor budgets. Add those defaults
+ * before the strict v2 equality check, while rejecting payloads that claim v2-only fields under a
+ * v1 version marker. Unknown or missing historical fields are still rejected by strict normalize.
+ */
+function migrateSchemaV1Budgets(value: unknown): Record<string, unknown> | null {
+  if (!isRecord(value) || !isRecord(value.complexity)) return null;
+  const complexity = value.complexity;
+  if (SCHEMA_V2_ONLY_COMPLEXITY_BUDGET_KEYS.some((key) => hasOwn(complexity, key))) {
+    return null;
+  }
+  return {
+    ...value,
+    complexity: {
+      ...complexity,
+      maxAnimations: DEFAULT_RAW_DOCUMENT.budgets.complexity.maxAnimations,
+      maxAnimationChannels: DEFAULT_RAW_DOCUMENT.budgets.complexity.maxAnimationChannels,
+      maxAnimationKeyframes: DEFAULT_RAW_DOCUMENT.budgets.complexity.maxAnimationKeyframes,
+      maxAnimationValues: DEFAULT_RAW_DOCUMENT.budgets.complexity.maxAnimationValues,
+      maxSkins: DEFAULT_RAW_DOCUMENT.budgets.complexity.maxSkins,
+      maxJoints: DEFAULT_RAW_DOCUMENT.budgets.complexity.maxJoints,
+      maxMorphTargets: DEFAULT_RAW_DOCUMENT.budgets.complexity.maxMorphTargets,
+      maxAccessorElements: DEFAULT_RAW_DOCUMENT.budgets.complexity.maxAccessorElements,
+      maxDecodedGeometryBytes: DEFAULT_RAW_DOCUMENT.budgets.complexity.maxDecodedGeometryBytes,
+    },
+  };
+}
+
+function migrateDecodedSchemaV1Document(value: unknown): StudioBg3dSceneDocument | null {
+  if (!hasCompleteRootShapeForVersion(value, STUDIO_BG3D_LEGACY_SCENE_DOCUMENT_VERSION)) {
+    return null;
+  }
+  if (
+    value.nodes.some((node) =>
+      isRecord(node) && (
+        hasOwn(node, "materialOverride") || hasOwn(node, "animation") || hasOwn(node, "pose") || hasOwn(node, "morph") || hasOwn(node, "constraints")
+      ))
+  ) return null;
+  const budgets = migrateSchemaV1Budgets(value.budgets);
+  if (!budgets) return null;
+  return normalizeDecodedCurrentDocument({
+    ...value,
+    version: STUDIO_BG3D_SCENE_DOCUMENT_VERSION,
+    budgets,
+  }, "strict");
+}
+
+function migrateDecodedSchemaPanoramaDocument(
   value: unknown
 ): StudioBg3dSceneDocument | null {
   if (
-    !hasCompleteCurrentRootShape(value) ||
+    !isRecord(value) ||
+    !(
+      hasCompleteCurrentRootShape(value)
+      || hasCompleteRootShapeForVersion(value, STUDIO_BG3D_LEGACY_SCENE_DOCUMENT_VERSION)
+    ) ||
     !isRecord(value.background) ||
     !hasOwn(value.background, "panoramaUrl") ||
     typeof value.background.panoramaUrl !== "string"
   ) {
     return null;
   }
+  if (
+    value.version === STUDIO_BG3D_LEGACY_SCENE_DOCUMENT_VERSION
+    && value.nodes.some((node) =>
+      isRecord(node) && (
+        hasOwn(node, "materialOverride") || hasOwn(node, "animation") || hasOwn(node, "pose") || hasOwn(node, "morph") || hasOwn(node, "constraints")
+      ))
+  ) {
+    return null;
+  }
+  const budgets = value.version === STUDIO_BG3D_LEGACY_SCENE_DOCUMENT_VERSION
+    ? migrateSchemaV1Budgets(value.budgets)
+    : value.budgets;
+  if (!budgets) return null;
   const { panoramaUrl: _discardedPanoramaUrl, ...background } = value.background;
-  return normalizeDecodedCurrentDocument({ ...value, background }, "strict");
+  return normalizeDecodedCurrentDocument({
+    ...value,
+    version: STUDIO_BG3D_SCENE_DOCUMENT_VERSION,
+    background,
+    budgets,
+  }, "strict");
 }
 
 /** Returns a new, deeply frozen default document on every call. */
@@ -1294,8 +1729,10 @@ export function migrateStudioBg3dSceneDocument(
   const decoded = decodeBoundedJson(raw);
   const current = normalizeDecodedCurrentDocument(decoded, "strict");
   if (current) return current;
-  const schemaV1Panorama = migrateDecodedSchemaV1PanoramaDocument(decoded);
+  const schemaV1Panorama = migrateDecodedSchemaPanoramaDocument(decoded);
   if (schemaV1Panorama) return schemaV1Panorama;
+  const schemaV1 = migrateDecodedSchemaV1Document(decoded);
+  if (schemaV1) return schemaV1;
   if (
     rawHasSchemaMarker ||
     (isRecord(decoded) && (hasOwn(decoded, "kind") || hasOwn(decoded, "version")))
@@ -1329,4 +1766,29 @@ export function normalizeStudioBg3dGlbAttachment(
 ): StudioBg3dModelAttachment | null {
   const decoded = decodeBoundedJson(raw);
   return deepFreeze(normalizeAttachment(decoded));
+}
+
+/** Runtime adapter helper for accepting only the bounded canonical material payload. */
+export function normalizeStudioBg3dMaterialOverride(
+  raw: unknown,
+): StudioBg3dMaterialOverride | null {
+  return deepFreeze(normalizeMaterialOverride(decodeBoundedJson(raw)));
+}
+
+export function normalizeStudioBg3dAnimationPlayback(
+  raw: unknown,
+): StudioBg3dAnimationPlayback | null {
+  return deepFreeze(normalizeAnimationPlayback(decodeBoundedJson(raw)));
+}
+
+export function normalizeStudioBg3dPoseLayer(raw: unknown): StudioBg3dPoseLayer | null {
+  return deepFreeze(normalizePoseLayer(decodeBoundedJson(raw)));
+}
+
+export function normalizeStudioBg3dMorphLayer(raw: unknown): StudioBg3dMorphLayer | null {
+  return deepFreeze(normalizeMorphLayer(decodeBoundedJson(raw)));
+}
+
+export function normalizeStudioBg3dConstraintLayer(raw: unknown): StudioBg3dConstraintLayer | null {
+  return deepFreeze(normalizeConstraintLayer(decodeBoundedJson(raw)));
 }

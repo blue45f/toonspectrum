@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  DEFAULT_STUDIO_BG3D_MATERIAL_OVERRIDE,
   DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
   STUDIO_BG3D_GLB_MIME,
   normalizeStudioBg3dGlbAttachment,
@@ -95,6 +96,84 @@ function diagnosticCodes(
 }
 
 describe("Studio BG3D runtime to document adapter", () => {
+  it("preserves per-instance material edits across runtime/document hydration", () => {
+    const storageId = "idb-material-model";
+    const model = {
+      ...customModel("material-node", storageId),
+      materialOverride: {
+        ...DEFAULT_STUDIO_BG3D_MATERIAL_OVERRIDE,
+        colorMode: "replace" as const,
+        color: "#ff8844",
+        colorStrength: 0.8,
+        opacityMultiplier: 0.6,
+        roughness: 0.25,
+        wireframe: true,
+      },
+      animation: {
+        clipIndex: 1,
+        playing: true,
+        loop: "repeat" as const,
+        timeSeconds: 0.75,
+        timeScale: 1.5,
+        weight: 0.9,
+      },
+      pose: {
+        enabled: true,
+        weight: 0.6,
+        joints: [{
+          jointKey: "skin-0:joint-4",
+          rotationOffset: [0.7071067811865475, 0, 0, 0.7071067811865475] as const,
+        }],
+      },
+      morph: {
+        enabled: true,
+        weight: 0.7,
+        targets: [{ targetKey: "mesh-1:target-0", weightOffset: -0.25 }],
+      },
+      constraints: {
+        enabled: true,
+        aims: [{
+          jointKey: "skin-0:joint-4",
+          target: [1, 2, 3] as const,
+          axis: "+z" as const,
+          weight: 0.8,
+        }],
+      },
+    };
+    const adapted = adaptStudioBg3dRuntimeToDocument({
+      primitives: [],
+      customModels: [model],
+      attachmentByStorageModelId: new Map([[storageId, attachment("material-attachment", 17)]]),
+    });
+    const hydrated = hydrateStudioBg3dDocumentToRuntime({
+      document: adapted.document,
+      storageModelIdByAttachmentId: new Map([["material-attachment", storageId]]),
+    });
+
+    expect(adapted.diagnostics).toEqual([]);
+    expect(adapted.document.nodes[0]).toMatchObject({
+      kind: "model",
+      materialOverride: model.materialOverride,
+      animation: model.animation,
+      pose: model.pose,
+      morph: model.morph,
+      constraints: model.constraints,
+    });
+    expect(hydrated.ok).toBe(true);
+    expect(hydrated.customModels[0]?.materialOverride).toEqual(model.materialOverride);
+    expect(hydrated.customModels[0]?.materialOverride).not.toBe(model.materialOverride);
+    expect(hydrated.customModels[0]?.animation).toEqual(model.animation);
+    expect(hydrated.customModels[0]?.animation).not.toBe(model.animation);
+    expect(hydrated.customModels[0]?.pose).toEqual(model.pose);
+    expect(hydrated.customModels[0]?.pose).not.toBe(model.pose);
+    expect(hydrated.customModels[0]?.pose?.joints[0]).not.toBe(model.pose.joints[0]);
+    expect(hydrated.customModels[0]?.morph).toEqual(model.morph);
+    expect(hydrated.customModels[0]?.morph?.targets[0]).not.toBe(model.morph.targets[0]);
+    expect(hydrated.customModels[0]?.constraints).toEqual(model.constraints);
+    expect(hydrated.customModels[0]?.constraints?.aims[0]).not.toBe(model.constraints.aims[0]);
+    expect(hydrated.customModels[0]?.constraints?.aims[0]?.target).not.toBe(model.constraints.aims[0].target);
+  });
+
   it("preserves settings, maps runtime order deterministically, and never persists storage ids", () => {
     const firstStorageId = "idb-private-storage-key-alpha";
     const secondStorageId = "idb-private-storage-key-beta";

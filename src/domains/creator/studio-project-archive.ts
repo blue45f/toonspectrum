@@ -388,6 +388,36 @@ function intersectBg3dGlbBudgets(
       maxDrawCalls: Math.min(left[name].complexity.maxDrawCalls, right[name].complexity.maxDrawCalls),
       maxMaterials: Math.min(left[name].complexity.maxMaterials, right[name].complexity.maxMaterials),
       maxLights: Math.min(left[name].complexity.maxLights, right[name].complexity.maxLights),
+      maxAccessorElements: Math.min(
+        left[name].complexity.maxAccessorElements,
+        right[name].complexity.maxAccessorElements
+      ),
+      maxDecodedGeometryBytes: Math.min(
+        left[name].complexity.maxDecodedGeometryBytes,
+        right[name].complexity.maxDecodedGeometryBytes
+      ),
+      maxAnimations: Math.min(
+        left[name].complexity.maxAnimations,
+        right[name].complexity.maxAnimations
+      ),
+      maxAnimationChannels: Math.min(
+        left[name].complexity.maxAnimationChannels,
+        right[name].complexity.maxAnimationChannels
+      ),
+      maxAnimationKeyframes: Math.min(
+        left[name].complexity.maxAnimationKeyframes,
+        right[name].complexity.maxAnimationKeyframes
+      ),
+      maxAnimationValues: Math.min(
+        left[name].complexity.maxAnimationValues,
+        right[name].complexity.maxAnimationValues
+      ),
+      maxSkins: Math.min(left[name].complexity.maxSkins, right[name].complexity.maxSkins),
+      maxJoints: Math.min(left[name].complexity.maxJoints, right[name].complexity.maxJoints),
+      maxMorphTargets: Math.min(
+        left[name].complexity.maxMorphTargets,
+        right[name].complexity.maxMorphTargets
+      ),
     },
     textures: {
       maxTextures: Math.min(left[name].textures.maxTextures, right[name].textures.maxTextures),
