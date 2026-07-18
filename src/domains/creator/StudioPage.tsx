@@ -703,8 +703,8 @@ import {
   applyMagicWandRegionToSelection,
   flipNormalizedPoint,
   MAGIC_WAND_TOLERANCE_DEFAULT,
-  magicWandScanFromImage,
 } from "./studio-magic-wand";
+import { magicWandScanFromImage } from "./studio-magic-wand-browser";
 import {
   MASTER_EDIT_GHOST_OPACITY,
   composeMasterRenderElements,

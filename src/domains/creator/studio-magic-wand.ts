@@ -10,11 +10,12 @@
  * studio-selection-tools.ts 의 SelPoint 와 동일한 의미다 — 스캔 해상도(마스크 크기)가 원본
  * 자연 해상도보다 낮아도(추적 성능을 위해 다운스케일함) 결과는 항상 0..1 이라 손실 없이 호환된다.
  *
- * DOM 의존성: magicWandScanFromImage 만 캔버스/Image 를 만진다(studio-flood-fill.ts 의
- * floodFillImage 와 동일한 수준·동일한 이유로 테스트 안 됨). 그 외 함수는 전부 순수 —
- * Uint8ClampedArray/Uint8Array 를 직접 만들어 유닛 테스트할 수 있다.
+ * DOM 의존성 없음 — 이 파일 전체가 순수하다(Uint8ClampedArray/Uint8Array 를 직접 만들어
+ * 유닛 테스트할 수 있다). 캔버스/Image/Worker 오케스트레이션은 studio-magic-wand-browser.ts 가
+ * 담당한다(studio-advanced-fill-browser.ts 와 동일한 분리 — 순수 코어를 Worker 클라이언트에서
+ * 순환 참조 없이 재사용하기 위함).
  */
-import { loadFloodFillSourceImage, scanFloodRegionMask } from "./studio-flood-fill";
+import { scanFloodRegionMask } from "./studio-flood-fill";
 import {
   addSelectionSubpath,
   MIN_SELECTION_SUBPATH_AREA,
@@ -212,58 +213,4 @@ export function scanMagicWandRegionFromImageData(
 ): MagicWandRegion {
   const mask = scanFloodRegionMask(data, w, h, startX, startY, tolerance);
   return traceMaskContours(mask, w, h, startX, startY);
-}
-
-// ---------------------------------------------------------------------------
-// DOM 경계 — floodFillImage 와 동일한 수준의(테스트되지 않는) 캔버스 orchestration.
-// ---------------------------------------------------------------------------
-
-/**
- * 이미지 src + 클릭 지점(표시 좌표 0..1, 요소가 flip 되어 있으면 표시된 그대로) → MagicWandRegion
- * (표시 좌표계로 되돌려진 채로 반환 — 그대로 addSelectionSubpath/PixelSelection 에 넣으면 된다).
- * @param opts.flipX/flipY 대상 이미지 요소의 좌우/상하 반전(ImageEl.flipped/flippedY) — 원본
- *   픽셀은 항상 비반전 상태로 저장되므로, 샘플 지점은 원본 좌표로 뒤집어 스캔하고 결과 폴리곤은
- *   다시 표시 좌표로 뒤집는다(buildSelectionMaskPlan 의 flipX/flipY 처리와 동일한 규약).
- */
-export async function magicWandScanFromImage(
-  src: string,
-  xRatio: number,
-  yRatio: number,
-  tolerance = MAGIC_WAND_TOLERANCE_DEFAULT,
-  opts?: { maxTraceDim?: number; flipX?: boolean; flipY?: boolean },
-): Promise<MagicWandRegion> {
-  const img = await loadFloodFillSourceImage(src);
-  const naturalW = img.naturalWidth || img.width;
-  const naturalH = img.naturalHeight || img.height;
-  if (!naturalW || !naturalH) throw new Error("이미지 크기를 확인할 수 없습니다.");
-
-  const maxDim = opts?.maxTraceDim ?? MAGIC_WAND_TRACE_MAX_DIM;
-  const scale = Math.min(1, maxDim / Math.max(naturalW, naturalH));
-  const traceW = Math.max(1, Math.round(naturalW * scale));
-  const traceH = Math.max(1, Math.round(naturalH * scale));
-
-  const canvas = document.createElement("canvas");
-  canvas.width = traceW;
-  canvas.height = traceH;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("캔버스를 만들 수 없습니다.");
-  ctx.imageSmoothingEnabled = false; // 다운스케일 시 색 경계가 번지지 않도록(허용 오차 매칭 안정화).
-  ctx.drawImage(img, 0, 0, traceW, traceH);
-  const { data } = ctx.getImageData(0, 0, traceW, traceH);
-
-  const flipX = opts?.flipX ?? false;
-  const flipY = opts?.flipY ?? false;
-  const sampleP = flipNormalizedPoint({ x: xRatio, y: yRatio }, flipX, flipY);
-  const startX = Math.min(traceW - 1, Math.max(0, Math.round(sampleP.x * traceW)));
-  const startY = Math.min(traceH - 1, Math.max(0, Math.round(sampleP.y * traceH)));
-
-  // traceMaskContours(윤곽 추적)는 대형/스크린톤 이미지에서 0.5초+ 걸릴 수 있는 동기 작업이다.
-  // 완전한 청크 분할까지는 과하지만, 최소한 한 프레임 양보해 호출부가 그려둔 "계산 중" 상태가
-  // 실제로 화면에 페인트될 기회를 준 뒤 무거운 작업을 시작한다(그 프레임 없이 바로 동기 실행하면
-  // 로딩 UI를 그리라고 큐에 넣은 리렌더가 이 함수가 끝날 때까지 화면에 반영되지 않는다).
-  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-  const region = scanMagicWandRegionFromImageData(data, traceW, traceH, startX, startY, tolerance);
-  const displayRegion = flipMagicWandRegion(region, flipX, flipY);
-  if (displayRegion.outer.length < 3) throw new Error("이 지점에서 선택할 영역을 찾지 못했어요.");
-  return displayRegion;
 }

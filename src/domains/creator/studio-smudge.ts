@@ -5,8 +5,8 @@
  * studio-flood-fill.ts/studio-magic-wand.ts 의 로더·좌표 반전 헬퍼를 재사용한다(중복 금지).
  *
  * DOM 의존성: smudgeStrokeImage 만 캔버스/Image 를 만진다(studio-flood-fill.ts 의 floodFillImage,
- * studio-magic-wand.ts 의 magicWandScanFromImage 와 동일한 수준·동일한 이유로 테스트 안 됨). 그
- * 외 함수는 전부 순수 — Uint8ClampedArray 를 직접 만들어 유닛 테스트할 수 있다.
+ * studio-magic-wand-browser.ts 의 magicWandScanFromImage 와 동일한 수준·동일한 이유로 테스트 안
+ * 됨). 그 외 함수는 전부 순수 — Uint8ClampedArray 를 직접 만들어 유닛 테스트할 수 있다.
  */
 import { loadFloodFillSourceImage } from "./studio-flood-fill";
 import { flipNormalizedPoint } from "./studio-magic-wand";

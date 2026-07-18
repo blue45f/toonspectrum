@@ -6,7 +6,7 @@
  *   (B) 픽셀 알고리즘 — StudioImageDataLike 입출력만 다루는 순수 함수(캔버스 무관, 유닛 테스트 가능).
  *   (C) 캔버스 팩토리 orchestration — applySelectionAdjustToCanvas 와 동일하게 DOM 은 호출자가
  *       주입한다(HealCloneCanvasFactory). 이 파일 안에서는 document/canvas 를 직접 만들지 않는다
- *       — studio-magic-wand.ts 의 magicWandScanFromImage 같은 "DOM 경계 1개"조차 없다.
+ *       — studio-magic-wand-browser.ts 의 magicWandScanFromImage 같은 "DOM 경계 1개"조차 없다.
  *
  * 좌표 규약: 도장의 dest 궤적은 studio-selection-tools.ts 의 브러시 서브패스와 동일한 정규화
  * SelPoint(요소 비회전 로컬 박스 0..1) 공간을 쓴다. flip(좌우/상하 반전 표시) 처리도
