@@ -4,8 +4,12 @@ import {
   StudioBg3dRuntimeAdapterRegistry,
   createStudioBg3dRuntimeSnapshot,
   type StudioBg3dRuntimeAdapter,
+  type StudioBg3dRuntimeAdapterJob,
 } from "./studio-bg3d-runtime-adapter";
-import { DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT } from "./studio-bg3d-scene-document";
+import {
+  DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+  normalizeStudioBg3dSceneDocument,
+} from "./studio-bg3d-scene-document";
 
 import type { StudioBg3dRuntimeCapability } from "./studio-bg3d-runtime-topology";
 
@@ -49,7 +53,13 @@ describe("Studio BG3D runtime adapter boundary", () => {
       "babylon-webgl-lab",
       "physics",
       snapshot,
-      { kind: "physics-preview", durationSeconds: 1, stepSeconds: 1 / 60, gravity: [0, -9.8, 0] },
+      {
+        kind: "physics-preview",
+        durationSeconds: 1,
+        stepSeconds: 1 / 60,
+        gravity: [0, -9.8, 0],
+        world: { bodies: [], solverSubsteps: 2, allowSleep: true },
+      },
     );
 
     expect(result).toEqual({ kind: "metrics", values: { request: "physics-preview", assets: 0 } });
@@ -68,6 +78,114 @@ describe("Studio BG3D runtime adapter boundary", () => {
       snapshot,
       { kind: "runtime-metrics" },
     )).rejects.toMatchObject({ code: "registry-disposed" });
+  });
+
+  it("rejects physics worlds that reference nodes outside the canonical snapshot", async () => {
+    const registry = new StudioBg3dRuntimeAdapterRegistry();
+    registry.register(metricsAdapter());
+    const snapshot = createStudioBg3dRuntimeSnapshot(DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT, new Map());
+
+    await expect(registry.run(
+      "babylon-webgl-lab",
+      "invalid-physics",
+      snapshot,
+      {
+        kind: "physics-preview",
+        durationSeconds: 1,
+        stepSeconds: 1 / 60,
+        gravity: [0, -9.8, 0],
+        world: {
+          solverSubsteps: 2,
+          allowSleep: true,
+          bodies: [{
+            nodeId: "not-in-document",
+            motion: "dynamic",
+            collider: { kind: "sphere", radius: 1 },
+            mass: 1,
+            friction: 0.5,
+            restitution: 0,
+            linearDamping: 0,
+            angularDamping: 0,
+          }],
+        },
+      },
+    )).rejects.toMatchObject({ code: "invalid-request" });
+    await registry.dispose();
+  });
+
+  it("snapshots an exact frozen physics DTO and rejects hostile request getters", async () => {
+    let received: StudioBg3dRuntimeAdapterJob["request"] | undefined;
+    const adapter: StudioBg3dRuntimeAdapter = {
+      runtimeId: "babylon-webgl-lab",
+      capabilities: new Set(["physics"]),
+      async runIsolated(job) {
+        received = job.request;
+        return { kind: "metrics", values: { accepted: true } };
+      },
+      dispose() {},
+    };
+    const registry = new StudioBg3dRuntimeAdapterRegistry();
+    registry.register(adapter);
+    const snapshot = createStudioBg3dRuntimeSnapshot(DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT, new Map());
+    const request = {
+      kind: "physics-preview" as const,
+      durationSeconds: 1,
+      stepSeconds: 1 / 60,
+      gravity: [0, -9.8, 0] as const,
+      world: { bodies: [], solverSubsteps: 2, allowSleep: true },
+      injected: new Uint8Array(1_024),
+    };
+
+    await expect(registry.run("babylon-webgl-lab", "exact-physics", snapshot, request))
+      .resolves.toMatchObject({ kind: "metrics" });
+    expect(received).not.toHaveProperty("injected");
+    expect(Object.isFrozen(received)).toBe(true);
+    expect(received?.kind === "physics-preview" && Object.isFrozen(received.gravity)).toBe(true);
+    expect(received?.kind === "physics-preview" && Object.isFrozen(received.world)).toBe(true);
+
+    const hostile = {
+      kind: "physics-preview" as const,
+      durationSeconds: 1,
+      stepSeconds: 1 / 60,
+      gravity: [0, -9.8, 0] as const,
+      get world(): never { throw new Error("hostile getter"); },
+    };
+    await expect(registry.run("babylon-webgl-lab", "hostile", snapshot, hostile))
+      .rejects.toMatchObject({ code: "invalid-request" });
+    await registry.dispose();
+  });
+
+  it("rejects physics previews whose bounded fields still exceed the total work budget", async () => {
+    const adapter = metricsAdapter();
+    const runIsolated = vi.spyOn(adapter, "runIsolated");
+    const registry = new StudioBg3dRuntimeAdapterRegistry();
+    registry.register(adapter);
+    const crowdedDocument = normalizeStudioBg3dSceneDocument({
+      ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+      nodes: Array.from({ length: 256 }, (_, index) => ({
+        id: `node-${index}`,
+        parentId: null,
+        name: `Node ${index}`,
+        kind: "primitive" as const,
+        primitiveKind: "box" as const,
+        color: "#ffffff",
+        transform: { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+        visible: true,
+        locked: false,
+        castsShadow: true,
+        receivesShadow: true,
+      })),
+    });
+    const snapshot = createStudioBg3dRuntimeSnapshot(crowdedDocument, new Map());
+
+    await expect(registry.run("babylon-webgl-lab", "over-budget", snapshot, {
+      kind: "physics-preview",
+      durationSeconds: 60,
+      stepSeconds: 1 / 240,
+      gravity: [0, -9.8, 0],
+    })).rejects.toMatchObject({ code: "invalid-request" });
+    expect(runIsolated).not.toHaveBeenCalled();
+    await registry.dispose();
   });
 
   it("serializes same-engine jobs and rejects malformed adapter output", async () => {

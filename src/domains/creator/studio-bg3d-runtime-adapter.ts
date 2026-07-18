@@ -1,4 +1,8 @@
 import {
+  normalizeStudioBg3dPhysicsWorld,
+  type StudioBg3dPhysicsWorld,
+} from "./studio-bg3d-physics";
+import {
   STUDIO_BG3D_RUNTIME_CATALOG,
   type StudioBg3dRuntimeCapability,
   type StudioBg3dRuntimeId,
@@ -92,6 +96,7 @@ export type StudioBg3dSpecialistRequest =
     readonly durationSeconds: number;
     readonly stepSeconds: number;
     readonly gravity: readonly [number, number, number];
+    readonly world?: StudioBg3dPhysicsWorld;
   }
   | { readonly kind: "material-conformance"; readonly width: number; readonly height: number }
   | { readonly kind: "splat-preview"; readonly width: number; readonly height: number }
@@ -152,6 +157,8 @@ const MAX_RASTER_PIXELS = 16_777_216;
 const MAX_METRIC_STRING_LENGTH = 4_096;
 const MAX_TRANSFORM_POSITION = 1_000_000;
 const MIN_QUATERNION_LENGTH = 1e-8;
+const MAX_PHYSICS_BODY_SUBSTEPS = 2_000_000;
+const MAX_PHYSICS_TRIANGLE_TESTS = 50_000_000;
 
 function validRasterSize(width: unknown, height: unknown): width is number {
   return validDimension(width) && validDimension(height)
@@ -162,9 +169,10 @@ function isTrustedRuntimeSnapshot(value: unknown): value is StudioBg3dRuntimeSna
   return typeof value === "object" && value !== null && trustedRuntimeSnapshots.has(value);
 }
 
-function validRequest(request: StudioBg3dSpecialistRequest): boolean {
+function validRequest(request: unknown): request is StudioBg3dSpecialistRequest {
   if (!request || typeof request !== "object") return false;
-  switch (request.kind) {
+  const candidate = request as Record<string, unknown>;
+  switch (candidate.kind) {
     case "runtime-metrics":
       return true;
     case "capture":
@@ -175,18 +183,79 @@ function validRequest(request: StudioBg3dSpecialistRequest): boolean {
     case "geospatial-data-frame":
     case "vector-map-frame":
     case "bim-section":
-      return validRasterSize(request.width, request.height);
+      return validRasterSize(candidate.width, candidate.height);
     case "xr-runtime-metrics":
       return true;
     case "physics-preview":
-      return Number.isFinite(request.durationSeconds) && request.durationSeconds > 0
-        && request.durationSeconds <= 60
-        && Number.isFinite(request.stepSeconds) && request.stepSeconds >= 1 / 240
-        && request.stepSeconds <= 1 / 15
-        && Array.isArray(request.gravity) && request.gravity.length === 3
-        && request.gravity.every((value) => Number.isFinite(value) && Math.abs(value) <= 1_000);
+      return typeof candidate.durationSeconds === "number" &&
+        Number.isFinite(candidate.durationSeconds) && candidate.durationSeconds > 0 &&
+        candidate.durationSeconds <= 60 &&
+        typeof candidate.stepSeconds === "number" && Number.isFinite(candidate.stepSeconds) &&
+        candidate.stepSeconds >= 1 / 240 && candidate.stepSeconds <= 1 / 15 &&
+        Array.isArray(candidate.gravity) && candidate.gravity.length === 3 &&
+        candidate.gravity.every((value: unknown) =>
+          typeof value === "number" && Number.isFinite(value) && Math.abs(value) <= 1_000
+        ) &&
+        (candidate.world === undefined || normalizeStudioBg3dPhysicsWorld(candidate.world) !== null);
     case "scientific-isosurface":
-      return Number.isFinite(request.isoValue);
+      return typeof candidate.isoValue === "number" && Number.isFinite(candidate.isoValue);
+    default:
+      return false;
+  }
+}
+
+function snapshotRequest(
+  request: StudioBg3dSpecialistRequest,
+  snapshot: StudioBg3dRuntimeSnapshot,
+): StudioBg3dSpecialistRequest | null {
+  try {
+    if (!validRequest(request)) return null;
+    switch (request.kind) {
+      case "runtime-metrics":
+      case "xr-runtime-metrics":
+        return Object.freeze({ kind: request.kind });
+      case "capture":
+      case "material-conformance":
+      case "splat-preview":
+      case "geospatial-frame":
+      case "point-cloud-frame":
+      case "geospatial-data-frame":
+      case "vector-map-frame":
+      case "bim-section":
+        return Object.freeze({ kind: request.kind, width: request.width, height: request.height });
+      case "scientific-isosurface":
+        return Object.freeze({ kind: request.kind, isoValue: request.isoValue });
+      case "physics-preview": {
+        const document = parseStudioBg3dSceneDocument(snapshot.canonicalDocumentJson);
+        if (!document) return null;
+        const world = request.world
+          ? normalizeStudioBg3dPhysicsWorld(request.world, document)
+          : undefined;
+        if (request.world && !world) return null;
+        const steps = Math.ceil(request.durationSeconds / request.stepSeconds);
+        const bodyCount = world?.bodies.length ?? document.nodes.length;
+        const solverSubsteps = world?.solverSubsteps ?? 1;
+        if (steps * solverSubsteps * bodyCount > MAX_PHYSICS_BODY_SUBSTEPS) return null;
+        const dynamicBodyCount = world?.bodies.filter((body) => body.motion === "dynamic").length ?? 0;
+        const triangleCount = world?.bodies.reduce((total, body) =>
+          total + (body.collider.kind === "triangle-mesh" ? body.collider.triangleCount : 0), 0
+        ) ?? 0;
+        if (
+          triangleCount > 0 &&
+          steps * solverSubsteps * Math.max(1, dynamicBodyCount) * triangleCount >
+            MAX_PHYSICS_TRIANGLE_TESTS
+        ) return null;
+        return Object.freeze({
+          kind: request.kind,
+          durationSeconds: request.durationSeconds,
+          stepSeconds: request.stepSeconds,
+          gravity: Object.freeze([...request.gravity]) as readonly [number, number, number],
+          ...(world ? { world } : {}),
+        });
+      }
+    }
+  } catch {
+    return null;
   }
 }
 
@@ -322,9 +391,10 @@ export class StudioBg3dRuntimeAdapterRegistry {
     const registration = this.#adapters.get(runtimeId);
     if (!registration) throw runtimeBoundaryError("adapter-not-registered");
     if (!isTrustedRuntimeSnapshot(snapshot)) throw runtimeBoundaryError("invalid-snapshot");
-    if (!id || id.length > 128 || !validRequest(request)) throw runtimeBoundaryError("invalid-request");
+    const requestSnapshot = snapshotRequest(request, snapshot);
+    if (!id || id.length > 128 || !requestSnapshot) throw runtimeBoundaryError("invalid-request");
     if (
-      requiredCapabilitiesForRequest(request)
+      requiredCapabilitiesForRequest(requestSnapshot)
         .some((capability) => !registration.capabilities.has(capability))
     ) {
       throw runtimeBoundaryError("capability-unavailable");
@@ -336,7 +406,12 @@ export class StudioBg3dRuntimeAdapterRegistry {
     await previous.catch(() => undefined);
     try {
       if (signal.aborted) throw runtimeBoundaryError("aborted");
-      const result = await registration.adapter.runIsolated({ id, snapshot, request, signal });
+      const result = await registration.adapter.runIsolated({
+        id,
+        snapshot,
+        request: requestSnapshot,
+        signal,
+      });
       if (signal.aborted) throw runtimeBoundaryError("aborted");
       return sanitizeResult(result);
     } finally {
