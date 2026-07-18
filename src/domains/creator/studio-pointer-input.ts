@@ -59,6 +59,8 @@ export interface StudioStrokeMoveTransportClaim {
   readonly session: StudioStrokePointerSession;
 }
 
+export type StudioPointerCaptureLossOutcome = "foreign" | "retain" | "finish";
+
 const LEGACY_POINTER_ID = 1;
 
 function finiteNumber(value: unknown, fallback: number): number {
@@ -173,6 +175,51 @@ export function shouldEndStudioStrokeForReleasedContact(
   if (session.pointerType !== "mouse" && session.pointerType !== "unknown") return false;
   if (typeof event.buttons !== "number" || !Number.isFinite(event.buttons)) return false;
   return event.buttons === 0;
+}
+
+/**
+ * Losing DOM pointer capture is transport degradation, not a cancellation signal. The global
+ * pointerup/cancel safety listeners still own the gesture. A mouse loss that already reports
+ * buttons=0 can be finalized from the last authoritative sample; every other matching loss keeps
+ * the session alive until a real end signal arrives.
+ */
+export function resolveStudioPointerCaptureLoss(
+  session: StudioStrokePointerSession | null | undefined,
+  event: StudioPointerEventLike
+): StudioPointerCaptureLossOutcome {
+  if (!session || !isStudioStrokePointerEvent(session, event)) return "foreign";
+  return shouldEndStudioStrokeForReleasedContact(session, event) ? "finish" : "retain";
+}
+
+/**
+ * A capture-phase `window` blur listener also observes focus leaving a descendant control. That is
+ * an ordinary focus transfer (for example, toolbar button -> canvas), not a browser-window abort.
+ */
+export function isStudioTopLevelWindowBlur(
+  eventTarget: unknown,
+  windowTarget: unknown
+): boolean {
+  return eventTarget === windowTarget;
+}
+
+/** Keep already-rendered mouse/pen ink when the browser transport itself is interrupted. */
+export function shouldPreserveStudioStrokeOnTransportAbort(
+  session: StudioStrokePointerSession | null | undefined
+): boolean {
+  return Boolean(session && session.pointerType !== "touch");
+}
+
+/**
+ * Browsers and embedded webviews may cancel a mouse or pen stream after showing valid ink. Keep
+ * that last authoritative prefix instead of deleting it. Touch cancellation remains destructive
+ * because it normally means the gesture was promoted to scrolling, pinch zoom, or palm rejection.
+ */
+export function shouldCommitStudioStrokeOnPointerCancel(
+  session: StudioStrokePointerSession | null | undefined,
+  event: StudioPointerEventLike
+): boolean {
+  if (!session || !isStudioStrokePointerEvent(session, event)) return false;
+  return shouldPreserveStudioStrokeOnTransportAbort(session);
 }
 
 /** A second finger transitions a finger stroke into navigation; pen + touch remains palm-safe. */

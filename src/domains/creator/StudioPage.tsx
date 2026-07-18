@@ -813,7 +813,11 @@ import {
   beginStudioStrokePointerSession,
   claimStudioStrokeMoveTransport,
   collectStudioStrokePointerBatch,
+  isStudioTopLevelWindowBlur,
   isStudioStrokePointerEvent,
+  resolveStudioPointerCaptureLoss,
+  shouldCommitStudioStrokeOnPointerCancel,
+  shouldPreserveStudioStrokeOnTransportAbort,
   shouldEndStudioStrokeForReleasedContact,
   shouldCancelStudioFingerStrokeForAdditionalContact,
   tryCaptureStudioStrokePointer,
@@ -9331,9 +9335,11 @@ function StudioCuttoonEditor() {
    * Latest finish/discard entry for global safety listeners. Stage handlers rebind each render;
    * window listeners attached at stroke start must not close over a stale `elements`/`commit`.
    */
-  const drawingPointerGlobalEndRef = useRef<(pointerEvent: PointerEvent, cancelled: boolean) => void>(
-    () => undefined
-  );
+  const drawingPointerGlobalEndRef = useRef<(
+    pointerEvent: PointerEvent,
+    cancelled: boolean,
+    consumeReleaseSample?: boolean
+  ) => void>(() => undefined);
   const drawingPointerGlobalMoveRef = useRef<(pointerEvent: PointerEvent) => void>(() => undefined);
   const drawingPointerGlobalCancelRef = useRef<() => void>(() => undefined);
   const drawingUnmountCleanupRef = useRef<() => void>(() => undefined);
@@ -17891,18 +17897,45 @@ function StudioCuttoonEditor() {
       drawingHandledNativeEndEventsRef.current.add(pointerEvent);
       drawingPointerGlobalEndRef.current(pointerEvent, event.type === "pointercancel");
     };
-    const onGlobalAbort = () => {
+    const onGlobalAbort = (event?: Event) => {
       const session = drawingPointerSessionRef.current;
       if (!session || session.pointerId !== pointerId) return;
+      // `blur` does not bubble, but a capture listener on Window observes a toolbar button losing
+      // focus when the pointer enters the canvas. That normal focus transfer must not erase the
+      // stroke that just started. Only a real top-level window blur is an abort signal.
+      if (
+        event?.type === "blur"
+        && !isStudioTopLevelWindowBlur(event.target, globalThis)
+      ) return;
+      const lastPointerSample = drawingLastAuthoritativePointerRef.current;
+      if (
+        shouldPreserveStudioStrokeOnTransportAbort(session)
+        && lastPointerSample
+        && isStudioStrokePointerEvent(session, lastPointerSample)
+      ) {
+        // A real window/page transport interruption may never deliver pointerup. Preserve the
+        // already visible mouse/pen prefix, while touch remains cancellable for scroll/pinch.
+        drawingPointerGlobalEndRef.current(lastPointerSample, true, false);
+        return;
+      }
       drawingPointerGlobalCancelRef.current();
     };
-    const onVisibilityChange = () => {
-      if (globalThis.document.visibilityState !== "visible") onGlobalAbort();
+    const onVisibilityChange = (event: Event) => {
+      if (globalThis.document.visibilityState !== "visible") onGlobalAbort(event);
     };
     const onLostPointerCapture = (event: Event) => {
-      const lostPointerId = (event as PointerEvent).pointerId;
-      if (Number.isFinite(lostPointerId) && lostPointerId !== pointerId) return;
-      onGlobalAbort();
+      const pointerEvent = event as PointerEvent;
+      const outcome = resolveStudioPointerCaptureLoss(
+        drawingPointerSessionRef.current,
+        pointerEvent
+      );
+      if (outcome === "foreign") return;
+      // Capture loss does not mean the browser cancelled the stroke. Window-level up/cancel and
+      // buttons=0 recovery remain armed, so a fast release cannot delete already visible ink.
+      drawingPointerCaptureTargetRef.current = null;
+      if (outcome === "finish") {
+        drawingPointerGlobalEndRef.current(pointerEvent, false, false);
+      }
     };
     // Capture phase makes processed pointermove + its coalesced hardware samples the one
     // authoritative freehand transport before Konva performs cursor/hit-test work.
@@ -17910,7 +17943,7 @@ function StudioCuttoonEditor() {
     // Still receive release when a chrome overlay stops propagation.
     globalThis.addEventListener("pointerup", onGlobalEnd, true);
     globalThis.addEventListener("pointercancel", onGlobalEnd, true);
-    globalThis.addEventListener("blur", onGlobalAbort, true);
+    globalThis.addEventListener("blur", onGlobalAbort);
     globalThis.addEventListener("pagehide", onGlobalAbort, true);
     globalThis.document.addEventListener("visibilitychange", onVisibilityChange, true);
     captureTarget?.addEventListener("lostpointercapture", onLostPointerCapture, true);
@@ -17918,7 +17951,7 @@ function StudioCuttoonEditor() {
       globalThis.removeEventListener("pointermove", onGlobalMove, true);
       globalThis.removeEventListener("pointerup", onGlobalEnd, true);
       globalThis.removeEventListener("pointercancel", onGlobalEnd, true);
-      globalThis.removeEventListener("blur", onGlobalAbort, true);
+      globalThis.removeEventListener("blur", onGlobalAbort);
       globalThis.removeEventListener("pagehide", onGlobalAbort, true);
       globalThis.document.removeEventListener("visibilitychange", onVisibilityChange, true);
       captureTarget?.removeEventListener("lostpointercapture", onLostPointerCapture, true);
@@ -20372,8 +20405,42 @@ function StudioCuttoonEditor() {
                   webGpuCanvasHandleRef.current?.syncPinnedStrokes(pendingGpuStrokesRef.current);
                 }
               }
+              if (!deferInkCleanup) {
+                // The live Canvas/WebGPU surface can be briefly unavailable during initial layout,
+                // resize, or device fallback. Keep an exact settled Konva copy until the committed
+                // main-layer draw receipt arrives instead of exposing a blank handoff frame.
+                draftPreviewStoreRef.current.settle(finished);
+                deferInkCleanup = true;
+              }
             } else {
               // 불투명도·도형 등 즉시 커밋 경로도 최종 초안을 실제 draw 영수증까지 유지한다.
+              draftPreviewStoreRef.current.settle(finished);
+              deferInkCleanup = true;
+            }
+          }
+          if (!committed) {
+            // A transient save/lock/CRDT publication race must not destroy the only completed
+            // stroke. Requeue the new stroke together with any batch consumed above and retain its
+            // exact live pixels until a later flush succeeds.
+            restorePendingStrokeCommits({
+              pageId: activePage.id,
+              strokes: [...(merged?.strokes ?? []), finished],
+              retryCount: merged?.retryCount ?? 0,
+            });
+            if (liveDraftDirectRef.current) {
+              deferInkCleanup = true;
+              if (gpuLiveInkPinnedRef.current) {
+                const settledGpu = buildGpuLiveStroke(authoritativeLiveStroke ?? finished, {
+                  sealEndpoint: true,
+                });
+                if (settledGpu) {
+                  pendingGpuStrokesRef.current = [...pendingGpuStrokesRef.current, settledGpu];
+                  webGpuCanvasHandleRef.current?.syncPinnedStrokes(pendingGpuStrokesRef.current);
+                }
+              } else if (!overlayRenderer.isActive && finished.mode !== "eraser") {
+                draftPreviewStoreRef.current.settle(finished);
+              }
+            } else {
               draftPreviewStoreRef.current.settle(finished);
               deferInkCleanup = true;
             }
@@ -20386,9 +20453,6 @@ function StudioCuttoonEditor() {
                 finished.id,
               ],
             };
-          } else if (!committed && merged) {
-            // 실패한 즉시 커밋이 먼저 꺼낸 배치의 유일한 벡터/표면 사본을 잃지 않게 복원한다.
-            restorePendingStrokeCommits(merged);
           }
           if (
             committed && rasterPlan && rasterWorkId && rasterDocument &&
@@ -20433,6 +20497,19 @@ function StudioCuttoonEditor() {
             }
           }
         }
+      } else if (drawingRef.current && drawingCrdtStrokeActiveRef.current) {
+        // Tiny geometric gestures below the intentional completion threshold are discarded locally.
+        // Remove their streaming CRDT draft as well so a hidden `drawing` record cannot reappear on
+        // reconnect or pollute the shared frontier.
+        try {
+          studioCrdtDocumentRef.current?.deleteStroke(drawingRef.current.id);
+        } catch (cause) {
+          setError(
+            cause instanceof Error
+              ? `미완성 획 정리: ${cause.message}`
+              : "미완성 실시간 획을 정리하지 못했습니다."
+          );
+        }
       }
     } finally {
       // Always clear the hold timer after commit/promote so a second pointerup cannot re-use it.
@@ -20462,11 +20539,17 @@ function StudioCuttoonEditor() {
     }
   }
   // Keep window safety listeners on the latest finish/discard (refs avoid stale `elements`/`commit`).
-  drawingPointerGlobalEndRef.current = (pointerEvent, cancelled) => {
+  drawingPointerGlobalEndRef.current = (pointerEvent, cancelled, consumeReleaseSample = true) => {
     const session = drawingPointerSessionRef.current;
     if (!session || !isStudioStrokePointerEvent(session, pointerEvent)) return;
     if (cancelled) {
-      discardDrawingPointerSession();
+      if (shouldCommitStudioStrokeOnPointerCancel(session, pointerEvent)) {
+        // Mouse/pen cancellation can be a capture/WebView transport interruption after ink was
+        // already shown. Preserve the last authoritative prefix without consuming cancel coords.
+        finishDrawingPointer(stageRef.current, pointerEvent, { consumeReleaseSample: false });
+      } else {
+        discardDrawingPointerSession();
+      }
       return;
     }
     // Snapshot + stop happen inside finishDrawingPointer; clearing here wiped promote state.
@@ -20474,7 +20557,7 @@ function StudioCuttoonEditor() {
       clearTimeout(colorWheelTimerRef.current);
       colorWheelTimerRef.current = null;
     }
-    finishDrawingPointer(stageRef.current, pointerEvent);
+    finishDrawingPointer(stageRef.current, pointerEvent, { consumeReleaseSample });
   };
   function onStagePointerCancel(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
     const pointerEvent = e.evt as PointerEvent;
@@ -20487,7 +20570,14 @@ function StudioCuttoonEditor() {
       if (drawingPointerSession && !isStudioStrokePointerEvent(drawingPointerSession, pointerEvent)) {
         return;
       }
-      discardDrawingPointerSession();
+      if (
+        drawingPointerSession
+        && shouldCommitStudioStrokeOnPointerCancel(drawingPointerSession, pointerEvent)
+      ) {
+        finishDrawingPointer(e.target.getStage(), pointerEvent, { consumeReleaseSample: false });
+      } else {
+        discardDrawingPointerSession();
+      }
       return;
     }
     const current = advancedFillTapGestureRef.current;

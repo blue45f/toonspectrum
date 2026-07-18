@@ -4,10 +4,14 @@ import {
   beginStudioStrokePointerSession,
   claimStudioStrokeMoveTransport,
   collectStudioStrokePointerBatch,
+  isStudioTopLevelWindowBlur,
   isStudioLeftContactDown,
   isStudioStrokePointerEvent,
+  resolveStudioPointerCaptureLoss,
   shouldCancelStudioFingerStrokeForAdditionalContact,
+  shouldCommitStudioStrokeOnPointerCancel,
   shouldEndStudioStrokeForReleasedContact,
+  shouldPreserveStudioStrokeOnTransportAbort,
   tryCaptureStudioStrokePointer,
   tryReleaseStudioStrokePointer,
   type StudioPointerEventLike,
@@ -88,6 +92,77 @@ describe("studio pointer input", () => {
     expect(
       shouldEndStudioStrokeForReleasedContact(mouse, sample(2, { pointerType: "mouse", buttons: undefined }))
     ).toBe(false);
+  });
+
+  it("retains a stroke when capture is lost and finishes only a released mouse contact", () => {
+    const mouse = beginStudioStrokePointerSession(
+      sample(1, { pointerType: "mouse", buttons: 1 })
+    )!;
+    const pen = beginStudioStrokePointerSession(sample(1, { pointerType: "pen", buttons: 1 }))!;
+
+    expect(
+      resolveStudioPointerCaptureLoss(
+        mouse,
+        sample(2, { pointerType: "mouse", buttons: 1 })
+      )
+    ).toBe("retain");
+    expect(
+      resolveStudioPointerCaptureLoss(
+        mouse,
+        sample(2, { pointerType: "mouse", buttons: 0 })
+      )
+    ).toBe("finish");
+    expect(
+      resolveStudioPointerCaptureLoss(
+        pen,
+        sample(2, { pointerType: "pen", buttons: 0 })
+      )
+    ).toBe("retain");
+    expect(
+      resolveStudioPointerCaptureLoss(
+        mouse,
+        sample(2, { pointerId: 99, pointerType: "mouse", buttons: 0 })
+      )
+    ).toBe("foreign");
+    expect(resolveStudioPointerCaptureLoss(null, sample(2))).toBe("foreign");
+  });
+
+  it("keeps the visible mouse and pen prefix on pointercancel but discards touch navigation", () => {
+    const mouse = beginStudioStrokePointerSession(sample(1, { pointerType: "mouse" }))!;
+    const pen = beginStudioStrokePointerSession(sample(1, { pointerType: "pen" }))!;
+    const touch = beginStudioStrokePointerSession(sample(1, { pointerType: "touch" }))!;
+    const unknown = beginStudioStrokePointerSession(sample(1, { pointerType: "unknown" }))!;
+
+    expect(shouldCommitStudioStrokeOnPointerCancel(mouse, sample(2))).toBe(true);
+    expect(shouldCommitStudioStrokeOnPointerCancel(pen, sample(2))).toBe(true);
+    expect(shouldCommitStudioStrokeOnPointerCancel(unknown, sample(2))).toBe(true);
+    expect(shouldCommitStudioStrokeOnPointerCancel(touch, sample(2))).toBe(false);
+    expect(
+      shouldCommitStudioStrokeOnPointerCancel(mouse, sample(2, { pointerId: 99 }))
+    ).toBe(false);
+    expect(shouldCommitStudioStrokeOnPointerCancel(null, sample(2))).toBe(false);
+  });
+
+  it("does not treat a focused toolbar control blurring into the canvas as a window abort", () => {
+    const windowTarget = {};
+    const toolbarButton = {};
+
+    expect(isStudioTopLevelWindowBlur(windowTarget, windowTarget)).toBe(true);
+    expect(isStudioTopLevelWindowBlur(toolbarButton, windowTarget)).toBe(false);
+    expect(isStudioTopLevelWindowBlur(null, windowTarget)).toBe(false);
+  });
+
+  it("preserves visible mouse and pen ink on transport abort but cancels touch navigation", () => {
+    const mouse = beginStudioStrokePointerSession(sample(1, { pointerType: "mouse" }))!;
+    const pen = beginStudioStrokePointerSession(sample(1, { pointerType: "pen" }))!;
+    const touch = beginStudioStrokePointerSession(sample(1, { pointerType: "touch" }))!;
+    const unknown = beginStudioStrokePointerSession(sample(1, { pointerType: "unknown" }))!;
+
+    expect(shouldPreserveStudioStrokeOnTransportAbort(mouse)).toBe(true);
+    expect(shouldPreserveStudioStrokeOnTransportAbort(pen)).toBe(true);
+    expect(shouldPreserveStudioStrokeOnTransportAbort(unknown)).toBe(true);
+    expect(shouldPreserveStudioStrokeOnTransportAbort(touch)).toBe(false);
+    expect(shouldPreserveStudioStrokeOnTransportAbort(null)).toBe(false);
   });
 
   it("binds every move/up/cancel decision to the pointer that opened the stroke", () => {
