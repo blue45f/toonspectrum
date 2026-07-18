@@ -36,9 +36,17 @@ const budgets = {
   // 2026-07-19 SceneDocument v3의 bounded shot camera/render/LT/visibility parser가 project-file
   // 검증 경로에 남아 incremental raw 2,117,656 bytes로 측정됐다. Three/R3F는 계속 사용자 진입
   // 시점의 dynamic graph에만 있으므로 raw schema 비용 0.24%만 허용하고 gzip 상한은 유지한다.
+  // 2026-07-19 드로잉 보조 문서 영속화·다중 참고 보드·원근/아이소메트릭·VRM 장면 메타데이터를
+  // Studio의 동기 복구 경로에 추가했다. 무거운 참고 보드/3D UI는 계속 지연 로딩하며, 정적 증가분은
+  // 복구 스키마와 StudioPage 배선뿐이다. 관측치(entry 1,196,284/358,997,
+  // incremental 2,176,681/708,141, 124 requests)에 약 2% 여유를 두되 전체 route 상한은 유지한다.
+  // 2026-07-19 Inspector 3,727줄을 독립 React Compiler 단위로 분리했다. 이전에는 500KB를 넘는
+  // StudioPage 전체의 코드 생성을 Babel이 deopt했지만, 새 Inspector 모듈은 정상 컴파일되어
+  // entry 1,258,797/376,835, incremental 2,232,628/723,459, 128 requests로 재배치됐다.
+  // 전체 Studio route 상한은 그대로 유지하고, 세부 회귀 예산만 실제 관측치+약 2%로 다시 잠근다.
   studio: { raw: 2_698_000, gzip: 882_500 },
-  studioEntry: { raw: 1_160_000, gzip: 350_000 },
-  studioIncremental: { raw: 2_120_000, gzip: 690_000, chunks: 120 },
+  studioEntry: { raw: 1_284_000, gzip: 384_500 },
+  studioIncremental: { raw: 2_278_000, gzip: 738_000, chunks: 131 },
   // Rapier deterministic compat is intentionally isolated in a user-triggered module Worker.
   // 2026-07-18 production output: 2,302,139 raw / 855,399 gzip. Keep ~2% version-drift headroom
   // without charging this optional engine to Studio or the 3D editor's initial graph.

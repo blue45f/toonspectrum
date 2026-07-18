@@ -27,7 +27,21 @@ function moduleEdges(relativePath: string): ModuleEdges {
   function visit(node: ts.Node): void {
     if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
       allImports.push(node.moduleSpecifier.text);
-      if (!node.importClause?.isTypeOnly) {
+      const clause = node.importClause;
+      const namedBindings = clause?.namedBindings;
+      const hasRuntimeValue = !clause || (
+        !clause.isTypeOnly
+        && (
+          Boolean(clause.name)
+          || Boolean(namedBindings && ts.isNamespaceImport(namedBindings))
+          || Boolean(
+            namedBindings
+            && ts.isNamedImports(namedBindings)
+            && namedBindings.elements.some((specifier) => !specifier.isTypeOnly),
+          )
+        )
+      );
+      if (hasRuntimeValue) {
         valueImports.push(node.moduleSpecifier.text);
       }
     }
@@ -65,6 +79,7 @@ const STUDIO_LAZY_UI_OPTIONAL_MODULES = [
 describe("Studio optional UI bundle boundaries", () => {
   it("owns optional inspector and canvas-tool surfaces in the neutral lazy registry", () => {
     const page = moduleEdges("./StudioPage.tsx");
+    const inspector = moduleEdges("./StudioInspectorAside.tsx");
     const registry = moduleEdges("./studio-page-lazy-ui.ts");
 
     expect(registry.allImports).not.toContain("./StudioPage");
@@ -73,6 +88,8 @@ describe("Studio optional UI bundle boundaries", () => {
     for (const specifier of STUDIO_LAZY_UI_OPTIONAL_MODULES) {
       expect(page.valueImports, `${specifier} must not be a StudioPage value import`).not.toContain(specifier);
       expect(page.dynamicImports, `${specifier} must not be loaded by StudioPage`).not.toContain(specifier);
+      expect(inspector.valueImports, `${specifier} must not be an Inspector value import`).not.toContain(specifier);
+      expect(inspector.dynamicImports, `${specifier} must not be loaded by Inspector`).not.toContain(specifier);
       expect(registry.valueImports, `${specifier} must remain lazy in the registry`).not.toContain(specifier);
       expect(
         registry.dynamicImports.filter((candidate) => candidate === specifier),
@@ -99,7 +116,7 @@ describe("Studio optional UI bundle boundaries", () => {
   });
 
   it("mounts only active or actually visited image tabs instead of persisted hidden children", () => {
-    const source = moduleEdges("./StudioPage.tsx").source;
+    const source = moduleEdges("./StudioInspectorAside.tsx").source;
 
     for (const tab of ["quick", "fill", "retouch", "mask", "transform"] as const) {
       expect(source).toContain(`shouldMountImageInspectorTab("${tab}") ? (`);

@@ -3,41 +3,55 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
-function studioPageEdges() {
-  const fileUrl = new URL("./StudioPage.tsx", import.meta.url);
+function moduleEdges(relativePath: string) {
+  const fileUrl = new URL(relativePath, import.meta.url);
   const source = readFileSync(fileUrl, "utf8");
   const file = ts.createSourceFile(
     fileUrl.pathname,
     source,
     ts.ScriptTarget.Latest,
     true,
-    ts.ScriptKind.TSX,
+    relativePath.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
   );
-  const valueImports: string[] = [];
-  const typeImports: string[] = [];
   const dynamicImports: string[] = [];
+  const typeImports: string[] = [];
+  const valueImports: string[] = [];
   let layerNavigatorUsesLazyRetry = false;
 
-  function visit(node: ts.Node) {
+  function visit(node: ts.Node): void {
     if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
-      (node.importClause?.isTypeOnly ? typeImports : valueImports).push(node.moduleSpecifier.text);
+      const clause = node.importClause;
+      const namedBindings = clause?.namedBindings;
+      const hasRuntimeValue = !clause || (
+        !clause.isTypeOnly
+        && (
+          Boolean(clause.name)
+          || Boolean(namedBindings && ts.isNamespaceImport(namedBindings))
+          || Boolean(
+            namedBindings
+            && ts.isNamedImports(namedBindings)
+            && namedBindings.elements.some((specifier) => !specifier.isTypeOnly),
+          )
+        )
+      );
+      (hasRuntimeValue ? valueImports : typeImports).push(node.moduleSpecifier.text);
     }
     if (
-      ts.isCallExpression(node) &&
-      node.expression.kind === ts.SyntaxKind.ImportKeyword &&
-      node.arguments.length === 1 &&
-      ts.isStringLiteral(node.arguments[0])
+      ts.isCallExpression(node)
+      && node.expression.kind === ts.SyntaxKind.ImportKeyword
+      && node.arguments.length === 1
+      && ts.isStringLiteral(node.arguments[0])
     ) {
       dynamicImports.push(node.arguments[0].text);
     }
     if (
-      ts.isVariableDeclaration(node) &&
-      ts.isIdentifier(node.name) &&
-      node.name.text === "StudioLayerNavigator" &&
-      node.initializer &&
-      ts.isCallExpression(node.initializer) &&
-      ts.isIdentifier(node.initializer.expression) &&
-      node.initializer.expression.text === "lazyRetry"
+      ts.isVariableDeclaration(node)
+      && ts.isIdentifier(node.name)
+      && node.name.text === "StudioLayerNavigator"
+      && node.initializer
+      && ts.isCallExpression(node.initializer)
+      && ts.isIdentifier(node.initializer.expression)
+      && node.initializer.expression.text === "lazyRetry"
     ) {
       layerNavigatorUsesLazyRetry = true;
     }
@@ -55,19 +69,23 @@ function studioPageEdges() {
 }
 
 describe("Studio layer navigator bundle boundary", () => {
-  it("keeps the optional layer navigator behind one analyzable lazyRetry import", () => {
-    const edges = studioPageEdges();
+  it("keeps the optional layer navigator behind one registry-owned lazyRetry import", () => {
+    const page = moduleEdges("./StudioPage.tsx");
+    const inspector = moduleEdges("./StudioInspectorAside.tsx");
+    const registry = moduleEdges("./studio-page-lazy-ui.ts");
 
-    expect(edges.valueImports).not.toContain("./StudioLayerNavigator");
-    expect(edges.typeImports).toContain("./StudioLayerNavigator");
-    expect(edges.dynamicImports.filter((specifier) => specifier === "./StudioLayerNavigator")).toEqual([
+    expect(page.valueImports).not.toContain("./StudioLayerNavigator");
+    expect(inspector.valueImports).not.toContain("./StudioLayerNavigator");
+    expect(page.dynamicImports).not.toContain("./StudioLayerNavigator");
+    expect(inspector.dynamicImports).not.toContain("./StudioLayerNavigator");
+    expect(registry.dynamicImports.filter((specifier) => specifier === "./StudioLayerNavigator")).toEqual([
       "./StudioLayerNavigator",
     ]);
-    expect(edges.layerNavigatorUsesLazyRetry).toBe(true);
+    expect(registry.layerNavigatorUsesLazyRetry).toBe(true);
   });
 
-  it("mounts the navigator only for the visible layer tab with an accessible stable fallback", () => {
-    const source = studioPageEdges().source;
+  it("mounts the navigator only for the visible inspector layer tab with an accessible fallback", () => {
+    const source = moduleEdges("./StudioInspectorAside.tsx").source;
 
     expect(source).toMatch(
       /aria-label="레이어"[\s\S]*?\{inspectorLayout\.primary === "layers" \? \([\s\S]*?<Suspense/,
