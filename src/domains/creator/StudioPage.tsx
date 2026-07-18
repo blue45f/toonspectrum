@@ -903,6 +903,10 @@ import {
   type StudioRasterHandoffCandidate,
 } from "./studio-raster-handoff-authority";
 import { STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED } from "./studio-raster-publication-feature";
+import {
+  projectStudioRasterOverlayElements,
+  resolveStudioRasterHandoffProjection,
+} from "./studio-raster-publication-projection";
 import { studioRasterVisibleDocumentRectFromViewport } from "./studio-raster-visible-rect";
 import {
   createEmptyStudioReleaseScheduleSnapshot,
@@ -22985,13 +22989,16 @@ function StudioCuttoonEditor() {
       viewport: webGpuViewportSurface,
     });
   const studioRasterOverlayElements: readonly StudioRasterOverlaySourceElement[] = useMemo(() =>
-    elements.map((element) => ({
-      ...element,
-      hidden: isEffectivelyHidden(element, groups),
-      panelClip: !masterEditMode && containingPanel(element, elements)
-        ? "clipped" as const
-        : "none" as const,
-    })), [elements, groups, masterEditMode]);
+    projectStudioRasterOverlayElements({
+      enabled: STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED,
+      project: () => elements.map((element) => ({
+        ...element,
+        hidden: isEffectivelyHidden(element, groups),
+        panelClip: !masterEditMode && containingPanel(element, elements)
+          ? "clipped" as const
+          : "none" as const,
+      })),
+    }), [elements, groups, masterEditMode]);
   // The first product slice is deliberately idle/select-only. Konva interaction planes such as
   // brush cursors, rulers and node handles currently live inside the Stage; an HTML raster surface
   // above the Stage must not cover them until those planes move to a shared top overlay contract.
@@ -23013,19 +23020,25 @@ function StudioCuttoonEditor() {
     bubbleShapeArmed, smudgeArmed, healCloneArmed, layerMaskPaintArmed, historyBrushArmed,
     puppetWarpArmed, pageGradeActive, colorBlindPreview,
   ]);
-  const studioRasterVisibleDocumentRect = studioRasterVisibleDocumentRectFromViewport({
-    viewport: webGpuViewportSurface,
-    documentWidth: CANVAS_W,
-    documentHeight: canvasH,
-    documentScale: effScale,
-  });
-  const studioRasterHandoffBaseKey = createStudioRasterHandoffBaseKey({
-    pageId: activePage.id,
-    documentWidth: CANVAS_W,
-    documentHeight: canvasH,
-    elements: studioRasterOverlayElements,
-    gates: studioRasterHandoffGates,
-    viewport: webGpuViewportSurface,
+  const {
+    visibleDocumentRect: studioRasterVisibleDocumentRect,
+    handoffBaseKey: studioRasterHandoffBaseKey,
+  } = resolveStudioRasterHandoffProjection({
+    enabled: STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED,
+    projectVisibleDocumentRect: () => studioRasterVisibleDocumentRectFromViewport({
+      viewport: webGpuViewportSurface,
+      documentWidth: CANVAS_W,
+      documentHeight: canvasH,
+      documentScale: effScale,
+    }),
+    createHandoffBaseKey: () => createStudioRasterHandoffBaseKey({
+      pageId: activePage.id,
+      documentWidth: CANVAS_W,
+      documentHeight: canvasH,
+      elements: studioRasterOverlayElements,
+      gates: studioRasterHandoffGates,
+      viewport: webGpuViewportSurface,
+    }),
   });
   const studioRasterHandoffBlocked =
     !STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED ||
