@@ -160,10 +160,13 @@ export function planStudioRasterDrawPromotion(input: {
 }): StudioRasterDrawPromotionPlan | null {
   const element = input.element;
   if ((element.mode ?? "pen") !== "pen") return null;
-  const barrier = studioWebGpuCommittedBarrierReason({
-    ...element,
-    panelClip: "none",
-  });
+  const barrier = studioWebGpuCommittedBarrierReason(
+    {
+      ...element,
+      panelClip: "none",
+    },
+    { requireCausalGeometry: true }
+  );
   if (barrier !== null) return null;
 
   const sourcePoints = element.points as readonly number[];

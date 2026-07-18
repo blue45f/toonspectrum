@@ -159,9 +159,9 @@ function hasUnsupportedStyle(element: StudioWebGpuCommittedElementInput): boolea
 export interface StudioWebGpuCommittedBarrierOptions {
   /**
    * Konva renders causal (dab-sampled) and legacy (endpoint-width segment) geometry through two
-   * genuinely different code paths. Callers that reproduce Konva's dab rasterization pixel-for-pixel
-   * — the retained GPU render, not the raster-CRDT promotion's own legacy fallback — must opt in here
-   * instead of admitting legacy strokes into a renderer that never mirrors their segment geometry.
+   * genuinely different code paths. Callers that rasterize via dabs — the retained GPU render and
+   * the raster-CRDT promotion path alike — must opt in here instead of admitting legacy strokes
+   * into a renderer that never mirrors their segment geometry.
    */
   readonly requireCausalGeometry?: boolean;
 }
