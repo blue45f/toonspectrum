@@ -96,4 +96,17 @@ describe("Studio left tool rail module boundary", () => {
     expect(rail.valueImports).toContain("./studio-page-lazy-ui");
     expect(rail.source).toContain("preloadStudioReferencePanel");
   });
+
+  it("exposes the more-tools popover as one keyboard-operable dialog", () => {
+    const rail = moduleShape("./StudioLeftToolRail.tsx");
+
+    expect(rail.source).toContain('aria-haspopup="dialog"');
+    expect(rail.source).toContain("aria-expanded={railMoreOpen}");
+    expect(rail.source).toContain("aria-controls={railMoreOpen ? railMoreDialogId : undefined}");
+    expect(rail.source).toContain('role="dialog"');
+    expect(rail.source).toContain("aria-labelledby={railMoreTitleId}");
+    expect(rail.source).toContain('if (event.key !== "Escape") return;');
+    expect(rail.source).toContain("closeRailMoreAndRestoreFocus()");
+    expect(rail.source).toContain("?.focus();");
+  });
 });

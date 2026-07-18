@@ -27,7 +27,7 @@ import {
   Type as TypeIcon,
   Wind,
 } from "lucide-react";
-import { memo } from "react";
+import { memo, useEffect, useId, useRef } from "react";
 
 import {
   DEFAULT_STUDIO_RAIL_TOOL_ORDER,
@@ -170,6 +170,10 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
   viewTool,
   stableHandlers,
 }: StudioLeftToolRailProps) {
+  const railMoreDialogId = useId();
+  const railMoreTriggerId = `${railMoreDialogId}-trigger`;
+  const railMoreTitleId = `${railMoreDialogId}-title`;
+  const railMoreDialogRef = useRef<HTMLDivElement>(null);
   const {
     addBubble,
     addText,
@@ -188,6 +192,34 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
     openPixelSelectionTransform,
     openSelectedLayerCrop,
   } = stableHandlers;
+
+  useEffect(() => {
+    if (!railMoreOpen) return;
+    const dialog = railMoreDialogRef.current;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      setRailMoreOpen(false);
+      requestAnimationFrame(() => document.getElementById(railMoreTriggerId)?.focus());
+    };
+    dialog?.addEventListener("keydown", handleKeyDown);
+    const frame = requestAnimationFrame(() => {
+      dialog
+        ?.querySelector<HTMLElement>('button:not([disabled]), [href], input:not([disabled])')
+        ?.focus();
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      dialog?.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [railMoreOpen, railMoreTriggerId, setRailMoreOpen]);
+
+  function closeRailMoreAndRestoreFocus(): void {
+    setRailMoreOpen(false);
+    requestAnimationFrame(() => document.getElementById(railMoreTriggerId)?.focus());
+  }
+
   return (
     <>
         {studioUiDensityAllows(uiDensityMode, "tool-rail") && !canvasOnlyMode ? (
@@ -637,19 +669,30 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
             {/* More tools — hidden rail tools + Application Settings */}
             <div className="relative">
               <StudioRailToolButton
+                id={railMoreTriggerId}
                 icon={Settings2}
                 label="더보기 · 툴바 설정"
                 description="숨긴 도구를 열거나 애플리케이션 설정에서 툴바·단축키·마우스·터치를 맞춤 설정합니다."
                 active={railMoreOpen || appSettingsOpen}
+                aria-controls={railMoreOpen ? railMoreDialogId : undefined}
+                aria-expanded={railMoreOpen}
+                aria-haspopup="dialog"
                 onClick={() => setRailMoreOpen((v) => !v)}
               />
               {railMoreOpen ? (
-                <div className="absolute left-full top-0 z-[80] ml-1 w-48 rounded-xl border border-line bg-panel p-1.5 shadow-2xl">
-                  <p className="px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-wider text-fg-3">
+                <div
+                  ref={railMoreDialogRef}
+                  id={railMoreDialogId}
+                  role="dialog"
+                  aria-labelledby={railMoreTitleId}
+                  tabIndex={-1}
+                  className="absolute left-full top-0 z-[80] ml-1 w-48 rounded-xl border border-line bg-panel p-1.5 shadow-2xl"
+                >
+                  <p id={railMoreTitleId} className="px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-wider text-fg-3">
                     숨긴 도구
                   </p>
                   {appSettings.toolbar.visibleIds.length >= DEFAULT_STUDIO_RAIL_TOOL_ORDER.length ? (
-                    <p className="px-2 py-1.5 text-[0.68rem] text-fg-3">모두 표시 중</p>
+                    <p className="px-2 py-1.5 text-[0.6875rem] text-fg-3">모두 표시 중</p>
                   ) : (
                     (
                       [
@@ -696,7 +739,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                                 visibleIds: [...appSettings.toolbar.visibleIds, id],
                               },
                             });
-                            setRailMoreOpen(false);
+                            closeRailMoreAndRestoreFocus();
                           }}
                         >
                           {studioRailToolLabel(id)}

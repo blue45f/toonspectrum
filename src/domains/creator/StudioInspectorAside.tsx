@@ -1130,6 +1130,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                             min={0}
                             max={guide.type === "v" ? 800 : canvasH}
                             value={guide.pos}
+                            aria-label={`${guide.type === "v" ? "세로" : "가로"} 가이드 #${idx + 1} 위치`}
                             onChange={(e) => {
                               const pos = Number(e.target.value);
                               setUserGuides((prev) =>
@@ -1253,6 +1254,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     <input
                       type="color"
                       value={selected.stroke || "#16100c"}
+                      aria-label="선 색상"
                       onChange={(e) => patchEl(selected.id, { stroke: e.target.value } as Partial<El>)}
                       className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent"
                     />
@@ -1303,6 +1305,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                         <input
                           type="color"
                           value={selected.fill || "#ffffff"}
+                          aria-label="채우기 색상"
                           onChange={(e) => patchEl(selected.id, { fill: e.target.value } as Partial<El>)}
                           className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent"
                         />
@@ -1480,6 +1483,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     <input
                       type="checkbox"
                       checked={selected.fill === "transparent"}
+                      aria-label="말풍선 배경 투명"
                       onChange={(e) => {
                         patchEl(selected.id, {
                           fill: e.target.checked ? "transparent" : "#ffffff",
@@ -1524,6 +1528,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                       <input
                         type="checkbox"
                         checked={!!selected.stroke}
+                        aria-label="말풍선 테두리 커스텀"
                         onChange={(e) => {
                           const hasStroke = e.target.checked;
                           patchEl(selected.id, {
@@ -1595,6 +1600,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                       <input
                         type="checkbox"
                         checked={selected.shadowColor !== undefined}
+                        aria-label="말풍선 그림자 사용"
                         onChange={(e) => {
                           const hasShadow = e.target.checked;
                           patchEl(selected.id, {
@@ -1946,6 +1952,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     <input
                       type="checkbox"
                       checked={!!selected.stroke}
+                      aria-label="글자 외곽선 사용"
                       onChange={(e) => {
                         const hasStroke = e.target.checked;
                         patchEl(selected.id, {
@@ -2031,6 +2038,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     <input
                       type="checkbox"
                       checked={!!selected.shadowColor}
+                      aria-label="글자 그림자 사용"
                       onChange={(e) => {
                         const hasShadow = e.target.checked;
                         patchEl(selected.id, {
@@ -2292,7 +2300,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                         type="number"
                         value={Math.round(selected.x)}
                         onChange={(e) => patchEl(selected.id, { x: Number(e.target.value) } as Partial<El>)}
-                        className="rounded border border-line bg-canvas/50 px-2 py-0.5 text-xs text-fg focus:border-accent focus:outline-none"
+                        className="rounded border border-line bg-canvas/50 px-2 py-0.5 text-xs text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
                       />
                     </label>
                     <label className="flex flex-col gap-0.5">
@@ -2301,7 +2309,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                         type="number"
                         value={Math.round(selected.y)}
                         onChange={(e) => patchEl(selected.id, { y: Number(e.target.value) } as Partial<El>)}
-                        className="rounded border border-line bg-canvas/50 px-2 py-0.5 text-xs text-fg focus:border-accent focus:outline-none"
+                        className="rounded border border-line bg-canvas/50 px-2 py-0.5 text-xs text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
                       />
                     </label>
                     {(selected.type === "image" || selected.type === "bubble" || selected.type === "frame" || selected.type === "text") && (
@@ -2311,7 +2319,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                           type="number"
                           value={Math.round(selected.width)}
                           onChange={(e) => patchEl(selected.id, { width: Math.max(10, Number(e.target.value)) } as Partial<El>)}
-                          className="rounded border border-line bg-canvas/50 px-2 py-0.5 text-xs text-fg focus:border-accent focus:outline-none"
+                          className="rounded border border-line bg-canvas/50 px-2 py-0.5 text-xs text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
                         />
                       </label>
                     )}
@@ -2322,7 +2330,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                           type="number"
                           value={Math.round(selected.height)}
                           onChange={(e) => patchEl(selected.id, { height: Math.max(10, Number(e.target.value)) } as Partial<El>)}
-                          className="rounded border border-line bg-canvas/50 px-2 py-0.5 text-xs text-fg focus:border-accent focus:outline-none"
+                          className="rounded border border-line bg-canvas/50 px-2 py-0.5 text-xs text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
                         />
                       </label>
                     )}
@@ -2342,7 +2350,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                             type="number"
                             value={Math.round(selected.rotation ?? 0)}
                             onChange={(e) => patchEl(selected.id, { rotation: Number(e.target.value) } as Partial<El>)}
-                            className="w-14 rounded border border-line bg-canvas/50 px-1 py-0.5 text-center text-xs text-fg focus:border-accent focus:outline-none"
+                            className="w-14 rounded border border-line bg-canvas/50 px-1 py-0.5 text-center text-xs text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
                           />
                         </div>
                       </label>
@@ -2635,7 +2643,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                                   },
                                 } as Partial<El>)
                               }
-                              className="mt-1 w-full rounded-lg border border-line bg-card px-2 py-1.5 text-xs text-fg outline-none focus:border-accent"
+                              className="mt-1 w-full rounded-lg border border-line bg-card px-2 py-1.5 text-xs text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
                             >
                               {SCENARIO_BEAT_TYPES.map((beatType) => (
                                 <option key={beatType} value={beatType}>{SCENARIO_BEAT_LABELS[beatType]}</option>
@@ -2655,7 +2663,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                                 } as Partial<El>)
                               }
                               rows={2}
-                              className="mt-1 w-full resize-y rounded-lg border border-line bg-card px-2 py-1.5 text-xs leading-relaxed text-fg outline-none focus:border-accent"
+                              className="mt-1 w-full resize-y rounded-lg border border-line bg-card px-2 py-1.5 text-xs leading-relaxed text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
                             />
                           </label>
                         </div>
@@ -2780,6 +2788,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                       <input
                         type="checkbox"
                         checked={!!selected.stroke}
+                        aria-label="패널 테두리 커스텀"
                         onChange={(e) => {
                           const hasStroke = e.target.checked;
                           patchEl(selected.id, {
@@ -3881,7 +3890,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
               maxLength={80}
               spellCheck
               readOnly={collaborationDocumentLocked || saving}
-              className="w-full rounded-lg border border-line bg-card px-3 py-2 text-sm text-fg outline-none focus:border-accent read-only:cursor-default read-only:text-fg-2"
+              className="w-full rounded-lg border border-line bg-card px-3 py-2 text-sm text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent read-only:cursor-default read-only:text-fg-2"
             />
             <textarea
               value={description}
@@ -3894,7 +3903,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
               spellCheck
               rows={2}
               readOnly={collaborationDocumentLocked || saving}
-              className="mt-2 w-full resize-none rounded-lg border border-line bg-card px-3 py-2 text-sm text-fg outline-none focus:border-accent read-only:cursor-default read-only:text-fg-2"
+              className="mt-2 w-full resize-none rounded-lg border border-line bg-card px-3 py-2 text-sm text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent read-only:cursor-default read-only:text-fg-2"
             />
             <input
               value={tagsText}
@@ -3905,7 +3914,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
               aria-label="게시 태그 (쉼표로 구분, 선택)"
               placeholder="태그 (쉼표로 구분)"
               readOnly={collaborationDocumentLocked || saving}
-              className="mt-2 w-full rounded-lg border border-line bg-card px-3 py-2 text-sm text-fg outline-none focus:border-accent read-only:cursor-default read-only:text-fg-2"
+              className="mt-2 w-full rounded-lg border border-line bg-card px-3 py-2 text-sm text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent read-only:cursor-default read-only:text-fg-2"
             />
           </div>
         </aside>

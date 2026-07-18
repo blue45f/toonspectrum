@@ -5317,7 +5317,15 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                     표시 {visibleLibraryEntries.length}/{filteredLibraryEntries.length}명
                   </span>
                 </div>
-                <input ref={fileInputRef} accept=".vrm" className="sr-only" multiple type="file" onChange={handleFileChange} />
+                <input
+                  ref={fileInputRef}
+                  accept=".vrm"
+                  aria-label="VRM 캐릭터 파일 선택"
+                  className="sr-only"
+                  multiple
+                  type="file"
+                  onChange={handleFileChange}
+                />
                 <button
                   type="button"
                   className={cx(CONTROL_BUTTON, "w-full border-accent/50 bg-accent text-on-accent hover:bg-accent/90")}
@@ -5429,7 +5437,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                     placeholder="캐릭터 이름 검색..."
                     aria-label="캐릭터 라이브러리 검색"
                     spellCheck={false}
-                    className="min-h-11 w-full rounded-lg border border-line bg-card py-1.5 pl-8 pr-2 text-xs text-fg outline-none placeholder:text-fg-3 focus:border-accent"
+                    className="min-h-11 w-full rounded-lg border border-line bg-card py-1.5 pl-8 pr-2 text-xs text-fg placeholder:text-fg-3 focus:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                   />
                 </div>
 
@@ -5683,6 +5691,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                                   step="0.05"
                                   value={weight}
                                   disabled={!vrm}
+                                  aria-label={`${action.label} 표정 강도`}
                                   className="h-2 flex-1 accent-accent"
                                   onChange={(e) => updateExpressionWeight(name, Number(e.target.value))}
                                 />
@@ -5810,7 +5819,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                 </label>
 
                 <StudioVrmPhotoPoseScanner
-                  disabled={!vrm || webcamActive || webcamLoading}
+                  disabled={!vrm || webcamActive || webcamLoading || isCapturing || isSharingPose || isThumbnailCapturing || idleAnimation}
                   onApply={handlePhotoPoseApply}
                 />
 
@@ -5848,6 +5857,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                     value={poseQuery}
                     onChange={(e) => setPoseQuery(e.target.value)}
                     placeholder="포즈 검색 (이름 · 분위기)"
+                    aria-label="포즈 검색"
                     className="w-full rounded-lg border border-line bg-card py-1.5 pl-8 pr-3 text-xs text-fg placeholder:text-fg-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                   />
                 </div>
@@ -6563,6 +6573,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                               max={axisBounds[0].max}
                               value={xDeg}
                               disabled={!vrm || locked}
+                              aria-label={`${label} 앞뒤 회전`}
                               className="h-2 flex-1 accent-accent"
                               onFocus={() => {
                                 const handleBone = resolveStudioVrmJointHandleBone(boneName);
@@ -6581,6 +6592,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                               max={axisBounds[1].max}
                               value={yDeg}
                               disabled={!vrm || locked}
+                              aria-label={`${label} 뒤틀기 회전`}
                               className="h-2 flex-1 accent-accent"
                               onFocus={() => {
                                 const handleBone = resolveStudioVrmJointHandleBone(boneName);
@@ -6599,6 +6611,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                               max={axisBounds[2].max}
                               value={zDeg}
                               disabled={!vrm || locked}
+                              aria-label={`${label} 안팎 회전`}
                               className="h-2 flex-1 accent-accent"
                               onFocus={() => {
                                 const handleBone = resolveStudioVrmJointHandleBone(boneName);
@@ -6830,7 +6843,13 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                     <p className="text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">전체 상태 저장 · 불러오기</p>
                     <p className="text-[0.68rem] leading-relaxed text-fg-3">포즈 · 비율 · 손가락 · 의상 · 조명 · 소품을 한 번에 저장하고 불러옵니다.</p>
                     <div className="flex gap-1.5">
-                      <input value={fullStateName} onChange={e=>setFullStateName(e.target.value)} placeholder="상태 이름" className="min-w-0 flex-1 rounded-lg border border-line bg-card px-2 py-1 text-xs text-fg placeholder:text-fg-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" />
+                      <input
+                        value={fullStateName}
+                        onChange={(event) => setFullStateName(event.target.value)}
+                        placeholder="상태 이름"
+                        aria-label="저장할 3D 캐릭터 상태 이름"
+                        className="min-w-0 flex-1 rounded-lg border border-line bg-card px-2 py-1 text-xs text-fg placeholder:text-fg-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                      />
                       <button type="button" onClick={handleSaveFullLocal} className="shrink-0 rounded-lg border border-accent/30 bg-accent-soft/40 px-3 py-1 text-[0.68rem] font-bold text-accent transition-colors hover:bg-accent-soft">저장</button>
                     </div>
                     <div className="flex gap-1.5">
@@ -6963,6 +6982,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                                       <input
                                         type="color"
                                         value={recolor ?? "#ffffff"}
+                                        aria-label={`${entry.label} 의상 색상`}
                                         onChange={(e) => recolorCostumeMesh(entry.key, e.target.value)}
                                         className="size-6 cursor-pointer rounded border border-line bg-transparent p-0"
                                       />
@@ -7021,6 +7041,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                           type="color"
                           value={materialFx[row.key] ?? "#ffffff"}
                           disabled={!vrm}
+                          aria-label={row.label}
                           onChange={(e) => {
                             const hex = e.target.value;
                             setMaterialFx((prev) => ({ ...prev, [row.key]: hex }));
@@ -7405,7 +7426,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
 
                         {webcamActive && (
                           <div className="mt-2.5 space-y-2.5 rounded-lg border border-line/60 bg-card/20 p-2">
-                            <div className="flex items-center justify-between text-[0.68rem] text-fg-2">
+                            <label className="flex cursor-pointer items-center justify-between text-[0.6875rem] text-fg-2">
                               <span>거울 모드 (좌우 반전)</span>
                               <input
                                 type="checkbox"
@@ -7415,8 +7436,8 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                                   setTrackingOptions((prev: TrackingOptions) => ({ ...prev, mirrorMode: e.target.checked }))
                                 }
                               />
-                            </div>
-                            <div className="flex items-center justify-between text-[0.68rem] text-fg-2">
+                            </label>
+                            <label className="flex cursor-pointer items-center justify-between text-[0.6875rem] text-fg-2">
                               <span>시선 고정 (정면 바라보기)</span>
                               <input
                                 type="checkbox"
@@ -7426,8 +7447,8 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                                   setTrackingOptions((prev: TrackingOptions) => ({ ...prev, gazeLock: e.target.checked }))
                                 }
                               />
-                            </div>
-                            <div className="flex items-center justify-between text-[0.68rem] text-fg-2">
+                            </label>
+                            <label className="flex cursor-pointer items-center justify-between text-[0.6875rem] text-fg-2">
                               <span>손가락 추적 (재시작 시 적용)</span>
                               <input
                                 type="checkbox"
@@ -7437,7 +7458,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                                   setTrackingOptions((prev: TrackingOptions) => ({ ...prev, fingerTracking: e.target.checked }))
                                 }
                               />
-                            </div>
+                            </label>
                             <div className="block text-[0.68rem] text-fg-2">
                               <label htmlFor="tracking-sensitivity" className="flex justify-between mb-1">
                                 <span>트래킹 감도</span>
