@@ -148,6 +148,10 @@ import {
   type StudioBg3dResolvedDeviceQuality,
 } from "./studio-bg3d-device-quality";
 import {
+  advanceStudioBg3dFrameQuality,
+  createStudioBg3dFrameQualityState,
+} from "./studio-bg3d-frame-quality-governor";
+import {
   canSetStudioBg3dParent,
   resolveStudioBg3dHierarchy,
 } from "./studio-bg3d-hierarchy";
@@ -1224,6 +1228,37 @@ function BgGroundHelper({ visible }: { visible: boolean }) {
   );
 }
 
+function BgAdaptiveDprController({
+  targetFps,
+  paused,
+  onScaleChange,
+}: {
+  targetFps: number;
+  paused: boolean;
+  onScaleChange: (scale: number) => void;
+}) {
+  const governorRef = useRef(createStudioBg3dFrameQualityState(targetFps));
+  const scaleChangeRef = useRef(onScaleChange);
+  useEffect(() => {
+    scaleChangeRef.current = onScaleChange;
+  }, [onScaleChange]);
+  useEffect(() => {
+    governorRef.current = createStudioBg3dFrameQualityState(targetFps);
+    scaleChangeRef.current(1);
+  }, [targetFps]);
+  useFrame((_state, deltaSeconds) => {
+    const previous = governorRef.current;
+    const next = advanceStudioBg3dFrameQuality(previous, {
+      deltaSeconds,
+      targetFps,
+      paused,
+    });
+    governorRef.current = next;
+    if (next.dprScale !== previous.dprScale) scaleChangeRef.current(next.dprScale);
+  });
+  return null;
+}
+
 interface BgPrimitiveMeshProps {
   prim: BgPrimitive;
   geometryPool: StudioBg3dPrimitiveGeometryPool;
@@ -1289,6 +1324,7 @@ interface BgCustomModelMeshProps {
   selected: boolean;
   capturing: boolean;
   targetFps: number;
+  lodBias: number;
   onSelect: (id: string, isMulti: boolean) => void;
   registerRef: (id: string, obj: THREE.Group | null) => void;
   registerAnimationTime: (id: string, reader: (() => number) | null) => void;
@@ -1297,7 +1333,7 @@ interface BgCustomModelMeshProps {
   children?: React.ReactNode;
 }
 
-function BgCustomModelMesh({ instance, cachedRoot, animations, selected, capturing, targetFps, onSelect, registerRef, registerAnimationTime, onAnimationComplete, onCloneStatus, children }: BgCustomModelMeshProps) {
+function BgCustomModelMesh({ instance, cachedRoot, animations, selected, capturing, targetFps, lodBias, onSelect, registerRef, registerAnimationTime, onAnimationComplete, onCloneStatus, children }: BgCustomModelMeshProps) {
   // Geometry/textures stay cache-owned, while each render instance owns cloned materials so its
   // adjustments cannot leak into sibling placements or the verified source cache.
   const [editableClone, setEditableClone] = useState<StudioBg3dEditableThreeClone | null>(null);
@@ -1479,6 +1515,7 @@ function BgCustomModelMesh({ instance, cachedRoot, animations, selected, capturi
       capturing,
       selected,
       targetFps,
+      lodBias,
       distanceToCamera: camera.position.distanceTo(worldBoundsRef.current.center),
       boundingRadius: worldBoundsRef.current.radius,
     });
@@ -1573,6 +1610,7 @@ function Vec3Field({
 
 export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose, onInsert }: StudioBackground3DProps) {
   const [primitiveGeometryPool] = useState(() => new StudioBg3dPrimitiveGeometryPool());
+  const [adaptiveDprScale, setAdaptiveDprScale] = useState(1);
   const [primitives, setPrimitives] = useState<BgPrimitive[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [transformMode, setTransformMode] = useState<TransformModeId>("translate");
@@ -1633,7 +1671,10 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
 
   useEffect(() => () => modelImportAbortRef.current?.abort(), []);
   useEffect(() => {
-    if (!open) primitiveGeometryPool.dispose();
+    if (!open) {
+      primitiveGeometryPool.dispose();
+      setAdaptiveDprScale(1);
+    }
   }, [open, primitiveGeometryPool]);
   useEffect(() => {
     primitiveGeometryPool.retain();
@@ -3416,6 +3457,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
         selected={selectedIds.has(id)}
         capturing={isCapturing}
         targetFps={deviceQuality.targetFps}
+        lodBias={deviceQuality.lodBias}
         onSelect={selectSceneEntity}
         registerRef={registerPrimitiveRef}
         registerAnimationTime={registerModelAnimationTime}
@@ -3618,12 +3660,17 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                     far: 200,
                   }}
                   className={cx("h-full w-full", effectiveIsQuadView && "pointer-events-none absolute inset-0 z-10")}
-                  dpr={deviceQuality.effectiveDpr}
+                  dpr={deviceQuality.effectiveDpr * adaptiveDprScale}
                   shadows={{ enabled: deviceQuality.shadows, type: THREE.PCFShadowMap }}
                   gl={{ antialias: sceneBaseDocument.render.antialias, alpha: true }}
                   onCreated={({ gl }) => gl.setClearColor(getSkyPreset(renderedSkyPresetId).clearColor, 1)}
                   onPointerMissed={() => setSelectedIds(new Set())}
                 >
+                  <BgAdaptiveDprController
+                    targetFps={deviceQuality.targetFps}
+                    paused={isCapturing || !open}
+                    onScaleChange={setAdaptiveDprScale}
+                  />
                   {effectiveIsQuadView ? (
                     <Fragment>
                       <View track={viewTopRef as unknown as React.RefObject<HTMLElement>}>
