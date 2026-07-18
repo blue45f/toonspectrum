@@ -72,6 +72,16 @@ const UASTC_BASE64 = [
   "CQAAAAAAAAAAAA==",
 ].join("");
 
+// Khronos KTX-Software-CTS (Apache-2.0), official 8x8 UASTC + Zstd input corpus.
+// Source: clitests/input/ktx2/valid_R8G8B8A8_SRGB_2D_UASTC_ZSTD_1.ktx2
+const UASTC_ZSTD_BASE64 = [
+  "q0tUWCAyMLsNChoKAAAAAAEAAAAIAAAACAAAAAAAAAAAAAAAAQAAAAEAAAACAAAAaAAAACwAAACUAAAAYAAAAAAAAAAAAAAA",
+  "AAAAAAAAAAD0AAAAAAAAAEkAAAAAAAAAQAAAAAAAAAAsAAAAAAAAAAIAKACmAQIAAwMAABAAAAAAAAAAAAB/AwAAAAAAAAAA",
+  "/////yUAAABLVFh3cml0ZXIAVW5pZGVudGlmaWVkIGFwcCAvIGxpYmt0eCAAAAAALQAAAEtUWHdyaXRlclNjUGFyYW1zAC0t",
+  "dWFzdGMtcXVhbGl0eSAwIC0tenN0ZCAxAAAAACi1L/0gQAECACYgwaMgDubjMRpAIm1s6/9mIMGjJE/23/AJQCJtbOv/JiAx",
+  "M0H2n8MJYEAibWTr/zYgETJF94+/SHBAom1s6/8=",
+].join("");
+
 interface BasisKtx2File {
   close(): void;
   delete(): void;
@@ -184,13 +194,17 @@ async function loadAttestedBasisModule(): Promise<{
   return { capability, module };
 }
 
-function transcodeAllMipsToRgba32(module: BasisModule, bytes: Uint8Array): Uint8Array {
+function transcodeAllMipsToRgba32(
+  module: BasisModule,
+  bytes: Uint8Array,
+  hasAlpha = false,
+): Uint8Array {
   const file = new module.KTX2File(bytes);
   try {
     expect(file.isValid()).toBe(true);
     expect(file.getLayers()).toBe(0);
     expect(file.getFaces()).toBe(1);
-    expect(file.getHasAlpha()).toBe(false);
+    expect(file.getHasAlpha()).toBe(hasAlpha);
     expect(file.startTranscoding()).toBe(1);
 
     const mipmaps: Uint8Array[] = [];
@@ -207,6 +221,24 @@ function transcodeAllMipsToRgba32(module: BasisModule, bytes: Uint8Array): Uint8
       output.set(mipmap, offset);
       offset += mipmap.byteLength;
     }
+    return output;
+  } finally {
+    file.close();
+    file.delete();
+  }
+}
+
+function transcodeFirstMip(
+  module: BasisModule,
+  bytes: Uint8Array,
+  format: number,
+): Uint8Array {
+  const file = new module.KTX2File(bytes);
+  try {
+    expect(file.isValid()).toBe(true);
+    expect(file.startTranscoding()).toBe(1);
+    const output = new Uint8Array(file.getImageTranscodedSizeInBytes(0, 0, 0, format));
+    expect(file.transcodeImage(output, 0, 0, 0, format, 0, -1, -1)).toBe(1);
     return output;
   } finally {
     file.close();
@@ -275,6 +307,47 @@ describe("Studio KTX2 pinned transcoder release gate", () => {
       const output = transcodeAllMipsToRgba32(module, admission.copyVerifiedSource());
       expect(output.byteLength, fixture.name).toBe(8_520);
       expect(sha256(output), fixture.name).toBe(fixture.outputSha256);
+    }
+  });
+
+  it("decodes official Khronos UASTC+Zstd and pins portable pixels plus GPU-target bytes", async () => {
+    const { capability, module } = await loadAttestedBasisModule();
+    const fixture = Uint8Array.from(Buffer.from(UASTC_ZSTD_BASE64, "base64"));
+    expect(fixture.byteLength).toBe(317);
+    expect(sha256(fixture)).toBe(
+      "5bd7d650fa1ca300d3dc6be7a292d0e79c58d3592f57b1a2d12b4c9e8aac8c4d",
+    );
+    expect(inspectStudioBg3dBasisKtx2(fixture)).toEqual({
+      width: 8,
+      height: 8,
+      levelCount: 1,
+      estimatedDecodedBytes: 256,
+      colorModel: "uastc",
+      supercompression: "zstandard",
+    });
+    await expect(admitStudioBg3dKtx2Transcode(fixture, { capability })).resolves.toMatchObject({
+      sourceByteLength: 317,
+      estimatedDecodedBytes: 256,
+      supercompression: "zstandard",
+    });
+
+    // RGBA32 is the portable pixel golden. Compressed outputs are deterministic byte goldens for
+    // target selection/regression only; GPU context loss and driver decompression are renderer tests.
+    expect(sha256(transcodeAllMipsToRgba32(module, fixture, true))).toBe(
+      "c770e0f532e9fb639f74ae9179390e81e791071df85965d3b286c02d94b908a6",
+    );
+    const gpuTargetByteGoldens = [
+      ["ETC1_RGB", 0, 32, "4bbc6f28ad6bbf3a9a4171baf291935a652100058049df84341e2999f86c5b53"],
+      ["ETC2_RGBA", 1, 64, "7b62d4101286b775da2d7f81adf75b6edc8f8bffb554d62eb2e49e1a6c5aee50"],
+      ["BC1_RGB", 2, 32, "799e2fe7f5516e36d54ceaaa409a74bd38923a456f710546248be149fe699de0"],
+      ["BC3_RGBA", 3, 64, "34c4a9d708a56b67f48bc62a382208942038648baca99af8b39bbef037f85246"],
+      ["BC7_M6_RGBA", 6, 64, "e0f7b9cd5c4036231f254f1c571678d892b5319fa9c0e7820260738ce671cd3b"],
+      ["ASTC_4x4_RGBA", 10, 64, "2ad46761d18c4b2893447f958f45ff43358b5f6807b85d9a121299149bf71092"],
+    ] as const;
+    for (const [name, format, byteLength, checksum] of gpuTargetByteGoldens) {
+      const output = transcodeFirstMip(module, fixture, format);
+      expect(output.byteLength, name).toBe(byteLength);
+      expect(sha256(output), name).toBe(checksum);
     }
   });
 

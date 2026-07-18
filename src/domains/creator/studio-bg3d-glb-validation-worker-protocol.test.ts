@@ -100,6 +100,10 @@ describe("studio BG3D worker protocol guards", () => {
       ...base,
       result: { ...base.result, message: "" },
     })).toBe(false);
+    expect(isStudioBg3dGlbWorkerResponse({
+      ...base,
+      result: { ...base.result, code: "basis-transcode-failed" },
+    })).toBe(true);
   });
 
   it("validates request envelopes and strips the non-cloneable digest adapter boundary", () => {
@@ -129,6 +133,14 @@ describe("studio BG3D worker protocol guards", () => {
           transcoderId: "three@0.184.0/basis_transcoder",
         },
       },
+    })).toBe(false);
+    expect(isStudioBg3dGlbWorkerRequest({
+      ...request,
+      options: { ...request.options, basisPayloadPreflight: async () => true },
+    })).toBe(false);
+    expect(isStudioBg3dGlbWorkerRequest({
+      ...request,
+      options: { ...request.options, basisRuntimeProvider: async () => null },
     })).toBe(false);
     expect(isStudioBg3dGlbWorkerRequest({ ...request, requestId: 0 })).toBe(false);
     expect(isStudioBg3dGlbWorkerRequest({

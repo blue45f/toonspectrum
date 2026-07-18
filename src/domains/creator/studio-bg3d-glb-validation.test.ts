@@ -48,11 +48,15 @@ function assembleGlb(chunks: readonly { type: number; bytes: Uint8Array }[]): Ui
   return result;
 }
 
-function makeGlb(root: Record<string, unknown>, bin?: Uint8Array): Uint8Array {
-  const json = pad(new TextEncoder().encode(JSON.stringify(root)), 0x20);
+function makeGlbFromJsonText(jsonText: string, bin?: Uint8Array): Uint8Array {
+  const json = pad(new TextEncoder().encode(jsonText), 0x20);
   const chunks = [{ type: JSON_CHUNK, bytes: json }];
   if (bin) chunks.push({ type: BIN_CHUNK, bytes: pad(bin, 0) });
   return assembleGlb(chunks);
+}
+
+function makeGlb(root: Record<string, unknown>, bin?: Uint8Array): Uint8Array {
+  return makeGlbFromJsonText(JSON.stringify(root), bin);
 }
 
 function pngHeader(width: number, height: number, byteLength = 32): Uint8Array {
@@ -115,11 +119,13 @@ function basisTextureGlb({
   required = false,
   ktx2 = validUastcKtx2(),
   rootOverrides = {},
+  escapeBasisExtension = false,
 }: {
   fallback?: boolean;
   required?: boolean;
   ktx2?: Uint8Array;
   rootOverrides?: Record<string, unknown>;
+  escapeBasisExtension?: boolean;
 } = {}): Uint8Array {
   const png = pngHeader(2, 3);
   const ktxOffset = fallback ? png.byteLength : 0;
@@ -141,7 +147,7 @@ function basisTextureGlb({
     : [{ buffer: 0, byteOffset: 0, byteLength: ktx2.byteLength }];
   const basisSource = fallback ? 1 : 0;
 
-  return makeGlb(validRoot({
+  const root = validRoot({
     buffers: [{ byteLength: bin.byteLength }],
     bufferViews,
     images,
@@ -152,7 +158,14 @@ function basisTextureGlb({
     extensionsUsed: ["KHR_texture_basisu"],
     ...(required ? { extensionsRequired: ["KHR_texture_basisu"] } : {}),
     ...rootOverrides,
-  }), bin);
+  });
+  const json = JSON.stringify(root);
+  return makeGlbFromJsonText(
+    escapeBasisExtension
+      ? json.replaceAll("KHR_texture_basisu", "KHR\\u005ftexture\\u005fbasisu")
+      : json,
+    bin,
+  );
 }
 
 function validRoot(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -611,6 +624,7 @@ describe("validateStudioBg3dGlb self-contained resource policy", () => {
     const result = await validate(bytes, {
       supportedRequiredExtensions: ["KHR_texture_basisu"],
       basisTranscoderCapability,
+      basisPayloadPreflight: async () => true,
     });
     expect(result).toMatchObject({
       ok: true,
@@ -626,6 +640,77 @@ describe("validateStudioBg3dGlb self-contained resource policy", () => {
     await expectFailure(bytes, "unsupported-required-extension", {
       supportedRequiredExtensions: ["KHR_texture_basisu"],
       basisTranscoderCapability: Object.freeze({ ...basisTranscoderCapability }),
+      basisPayloadPreflight: async () => true,
+    });
+  });
+
+  it("resolves Basis from parsed evidence when every extension spelling uses JSON escapes", async () => {
+    const bytes = basisTextureGlb({
+      fallback: false,
+      required: true,
+      escapeBasisExtension: true,
+    });
+    const capability = await attestInstalledBasisTranscoder();
+    const preflight = vi.fn(async () => true);
+    const provider = vi.fn(async () => ({ capability, preflight }));
+
+    const result = await validate(bytes, {
+      supportedRequiredExtensions: ["KHR_texture_basisu"],
+      basisRuntimeProvider: provider,
+    });
+    expect(result.ok).toBe(true);
+    expect(provider).toHaveBeenCalledOnce();
+    expect(preflight).toHaveBeenCalledOnce();
+  });
+
+  it("does not initialize Basis for unrelated raw strings and fails optional provider loss closed", async () => {
+    const capability = await attestInstalledBasisTranscoder();
+    const unrelatedProvider = vi.fn(async () => ({
+      capability,
+      preflight: async () => true,
+    }));
+    const unrelated = await validate(validGlb({
+      asset: { version: "2.0", generator: "literal KHR_texture_basisu is not extension evidence" },
+    }), {
+      basisRuntimeProvider: unrelatedProvider,
+    });
+    expect(unrelated.ok).toBe(true);
+    expect(unrelatedProvider).not.toHaveBeenCalled();
+
+    await expectFailure(
+      basisTextureGlb({ escapeBasisExtension: true }),
+      "basis-transcode-failed",
+      { basisRuntimeProvider: async () => null },
+    );
+  });
+
+  it("pretranscodes each Basis payload copy and fails closed on decoder rejection", async () => {
+    const bytes = basisTextureGlb();
+    let observedInfo: unknown;
+    const success = await validate(bytes, {
+      basisPayloadPreflight: async (payload, info) => {
+        observedInfo = info;
+        payload[0] = 0;
+        return true;
+      },
+    });
+    expect(success.ok).toBe(true);
+    expect(observedInfo).toEqual({
+      width: 4,
+      height: 4,
+      levelCount: 1,
+      estimatedDecodedBytes: 64,
+      colorModel: "uastc",
+      supercompression: "none",
+    });
+
+    await expectFailure(bytes, "basis-transcode-failed", {
+      basisPayloadPreflight: async () => false,
+    });
+    await expectFailure(bytes, "basis-transcode-failed", {
+      basisPayloadPreflight: async () => {
+        throw new Error("decoder detail must not cross the trust boundary");
+      },
     });
   });
 
@@ -681,6 +766,7 @@ describe("validateStudioBg3dGlb self-contained resource policy", () => {
     }), "invalid-gltf-root", {
       supportedRequiredExtensions: ["KHR_texture_basisu"],
       basisTranscoderCapability,
+      basisPayloadPreflight: async () => true,
     });
     await expectFailure(basisTextureGlb({
       rootOverrides: {

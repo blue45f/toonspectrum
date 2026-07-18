@@ -114,9 +114,15 @@ describe("StudioBg3dValidationWorkerClient", () => {
     client.dispose();
   });
 
-  it("cancels only the aborted request and ignores a late worker response", async () => {
-    const worker = new FakeWorker();
-    const client = new StudioBg3dValidationWorkerClient({ workerFactory: () => worker });
+  it("hard-terminates an aborted WASM worker and recovers with a fresh realm", async () => {
+    const workers: FakeWorker[] = [];
+    const client = new StudioBg3dValidationWorkerClient({
+      workerFactory: () => {
+        const worker = new FakeWorker();
+        workers.push(worker);
+        return worker;
+      },
+    });
     const controller = new AbortController();
     const pending = client.validate(new Uint8Array([1, 2, 3, 4]), OPTIONS, controller.signal);
     controller.abort();
@@ -124,13 +130,31 @@ describe("StudioBg3dValidationWorkerClient", () => {
     await expect(pending).rejects.toMatchObject({
       code: "aborted",
     });
-    expect(worker.messages.map(({ message }) => message.kind)).toEqual(["validate", "cancel"]);
+    expect(workers[0]?.messages.map(({ message }) => message.kind)).toEqual(["validate"]);
+    expect(workers[0]?.terminated).toBe(true);
 
-    worker.emitMessage({
+    workers[0]?.emitMessage({
       version: STUDIO_BG3D_GLB_VALIDATION_WORKER_PROTOCOL_VERSION,
       kind: "result",
       requestId: 1,
       result: { ok: false, code: "invalid-input", message: "late" },
+    });
+
+    const recovered = client.validate(new Uint8Array([5, 6, 7, 8]), OPTIONS);
+    expect(workers).toHaveLength(2);
+    workers[1]?.emitMessage({
+      version: STUDIO_BG3D_GLB_VALIDATION_WORKER_PROTOCOL_VERSION,
+      kind: "result",
+      requestId: 2,
+      result: { ok: false, code: "invalid-magic", message: "recovered" },
+    });
+    await expect(recovered).resolves.toMatchObject({ execution: "worker" });
+    expect(client.lifecycleMetrics).toMatchObject({
+      workersCreated: 2,
+      workersTerminated: 1,
+      workerRecoveries: 1,
+      abortTerminations: 1,
+      timeoutTerminations: 0,
     });
     client.dispose();
   });
@@ -233,6 +257,12 @@ describe("StudioBg3dValidationWorkerClient", () => {
       result: { ok: false, code: "invalid-magic", message: "recovered" },
     });
     await expect(recovered).resolves.toMatchObject({ execution: "worker" });
+    expect(client.lifecycleMetrics).toMatchObject({
+      workersCreated: 2,
+      workersTerminated: 1,
+      workerRecoveries: 1,
+      timeoutTerminations: 1,
+    });
     client.dispose();
   });
 
@@ -305,6 +335,18 @@ describe("StudioBg3dValidationWorkerClient", () => {
     await expect(outcome).rejects.toMatchObject({
       code: "basis-worker-attestation-required",
     });
+    expect(workers).toHaveLength(0);
+
+    await expect(validateStudioBg3dGlbOffMainThread(
+      new Uint8Array([1, 2, 3, 4]),
+      { ...OPTIONS, basisPayloadPreflight: async () => true },
+    )).rejects.toMatchObject({ code: "basis-worker-attestation-required" });
+    expect(workers).toHaveLength(0);
+
+    await expect(validateStudioBg3dGlbOffMainThread(
+      new Uint8Array([1, 2, 3, 4]),
+      { ...OPTIONS, basisRuntimeProvider: async () => null },
+    )).rejects.toMatchObject({ code: "basis-worker-attestation-required" });
     expect(workers).toHaveLength(0);
   });
 

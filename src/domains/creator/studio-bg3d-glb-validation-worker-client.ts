@@ -48,6 +48,24 @@ export interface StudioBg3dValidationWorkerClientOptions {
   readonly timeoutMs?: number;
 }
 
+export interface StudioBg3dValidationWorkerLifecycleMetrics {
+  readonly workersCreated: number;
+  readonly workersTerminated: number;
+  readonly workerRecoveries: number;
+  readonly abortTerminations: number;
+  readonly timeoutTerminations: number;
+  readonly failureTerminations: number;
+  readonly protocolTerminations: number;
+  readonly disposeTerminations: number;
+}
+
+type StudioBg3dWorkerTerminationReason =
+  | "abort"
+  | "dispose"
+  | "failure"
+  | "protocol"
+  | "timeout";
+
 export class StudioBg3dValidationWorkerError extends Error {
   constructor(readonly code:
     | "aborted"
@@ -71,8 +89,13 @@ function copyToOwnedBuffer(input: ArrayBuffer | Uint8Array): ArrayBuffer {
 
 function serializableValidationOptions(
   options: StudioBg3dGlbValidationOptions,
-): Omit<StudioBg3dGlbValidationOptions, "basisTranscoderCapability" | "digest"> {
+): Omit<
+  StudioBg3dGlbValidationOptions,
+  "basisPayloadPreflight" | "basisRuntimeProvider" | "basisTranscoderCapability" | "digest"
+> {
   const {
+    basisPayloadPreflight: _basisPayloadPreflight,
+    basisRuntimeProvider: _basisRuntimeProvider,
     basisTranscoderCapability: _basisTranscoderCapability,
     digest: _digest,
     ...serializable
@@ -87,6 +110,16 @@ export class StudioBg3dValidationWorkerClient {
   #worker: StudioBg3dValidationWorkerLike | null = null;
   #nextRequestId = 1;
   #disposed = false;
+  readonly #lifecycle = {
+    workersCreated: 0,
+    workersTerminated: 0,
+    workerRecoveries: 0,
+    abortTerminations: 0,
+    timeoutTerminations: 0,
+    failureTerminations: 0,
+    protocolTerminations: 0,
+    disposeTerminations: 0,
+  };
 
   constructor(options: StudioBg3dValidationWorkerClientOptions) {
     this.#workerFactory = options.workerFactory;
@@ -96,6 +129,10 @@ export class StudioBg3dValidationWorkerClient {
 
   get pendingCount(): number {
     return this.#pending.size;
+  }
+
+  get lifecycleMetrics(): StudioBg3dValidationWorkerLifecycleMetrics {
+    return Object.freeze({ ...this.#lifecycle });
   }
 
   validate(
@@ -121,14 +158,18 @@ export class StudioBg3dValidationWorkerClient {
         const pending = this.#finish(requestId);
         if (!pending) return;
         pending.reject(new StudioBg3dValidationWorkerError("timeout"));
-        this.#discardWorker(new StudioBg3dValidationWorkerError("worker-failed"));
+        this.#discardWorker(new StudioBg3dValidationWorkerError("worker-failed"), "timeout");
       }, this.#timeoutMs);
       const abortListener = signal
         ? () => {
             const pending = this.#finish(requestId);
             if (!pending) return;
-            if (requestPosted) this.#postCancel(worker, requestId);
             pending.reject(new StudioBg3dValidationWorkerError("aborted"));
+            if (requestPosted) {
+              // Basis `transcodeImage` is synchronous WASM. A queued cancel message cannot run
+              // until that call returns, so termination is the only hard cancellation boundary.
+              this.#discardWorker(new StudioBg3dValidationWorkerError("worker-failed"), "abort");
+            }
           }
         : undefined;
       this.#pending.set(requestId, { resolve, reject, timeout, signal, abortListener });
@@ -149,7 +190,7 @@ export class StudioBg3dValidationWorkerClient {
         requestPosted = true;
         worker.postMessage(request, [bytes]);
       } catch {
-        this.#discardWorker(new StudioBg3dValidationWorkerError("worker-failed"));
+        this.#discardWorker(new StudioBg3dValidationWorkerError("worker-failed"), "failure");
       }
     });
   }
@@ -157,11 +198,13 @@ export class StudioBg3dValidationWorkerClient {
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
-    this.#discardWorker(new StudioBg3dValidationWorkerError("disposed"));
+    this.#discardWorker(new StudioBg3dValidationWorkerError("disposed"), "dispose");
   }
 
   #createWorker(): StudioBg3dValidationWorkerLike {
     const worker = this.#workerFactory();
+    this.#lifecycle.workersCreated += 1;
+    if (this.#lifecycle.workersCreated > 1) this.#lifecycle.workerRecoveries += 1;
     try {
       worker.addEventListener("message", this.#handleMessage);
       worker.addEventListener("error", this.#handleWorkerFailure);
@@ -169,6 +212,7 @@ export class StudioBg3dValidationWorkerClient {
       return worker;
     } catch (error) {
       worker.terminate();
+      this.#recordTermination("failure");
       throw error;
     }
   }
@@ -180,19 +224,6 @@ export class StudioBg3dValidationWorkerClient {
     const result = this.#nextRequestId;
     this.#nextRequestId = result >= Number.MAX_SAFE_INTEGER ? 1 : result + 1;
     return result;
-  }
-
-  #postCancel(worker: StudioBg3dValidationWorkerLike, requestId: number): void {
-    if (this.#worker !== worker) return;
-    try {
-      worker.postMessage({
-        version: STUDIO_BG3D_GLB_VALIDATION_WORKER_PROTOCOL_VERSION,
-        kind: "cancel",
-        requestId,
-      });
-    } catch {
-      // The request is already rejected locally. A failed best-effort cancellation is harmless.
-    }
   }
 
   #finish(requestId: number): PendingValidation | undefined {
@@ -207,7 +238,7 @@ export class StudioBg3dValidationWorkerClient {
   readonly #handleMessage = (event: WorkerMessageEventLike): void => {
     const response = event.data;
     if (!isStudioBg3dGlbWorkerResponse(response)) {
-      this.#discardWorker(new StudioBg3dValidationWorkerError("protocol"));
+      this.#discardWorker(new StudioBg3dValidationWorkerError("protocol"), "protocol");
       return;
     }
     const pending = this.#finish(response.requestId);
@@ -215,7 +246,7 @@ export class StudioBg3dValidationWorkerClient {
     if (response.kind === "error") {
       const error = new StudioBg3dValidationWorkerError("worker-failed");
       pending.reject(error);
-      this.#discardWorker(error);
+      this.#discardWorker(error, "failure");
       return;
     }
     pending.resolve({ execution: "worker", result: response.result });
@@ -223,10 +254,22 @@ export class StudioBg3dValidationWorkerClient {
 
   readonly #handleWorkerFailure = (event: WorkerErrorEventLike): void => {
     event.preventDefault?.();
-    this.#discardWorker(new StudioBg3dValidationWorkerError("worker-failed"));
+    this.#discardWorker(new StudioBg3dValidationWorkerError("worker-failed"), "failure");
   };
 
-  #discardWorker(error: StudioBg3dValidationWorkerError): void {
+  #recordTermination(reason: StudioBg3dWorkerTerminationReason): void {
+    this.#lifecycle.workersTerminated += 1;
+    if (reason === "abort") this.#lifecycle.abortTerminations += 1;
+    if (reason === "timeout") this.#lifecycle.timeoutTerminations += 1;
+    if (reason === "failure") this.#lifecycle.failureTerminations += 1;
+    if (reason === "protocol") this.#lifecycle.protocolTerminations += 1;
+    if (reason === "dispose") this.#lifecycle.disposeTerminations += 1;
+  }
+
+  #discardWorker(
+    error: StudioBg3dValidationWorkerError,
+    reason: StudioBg3dWorkerTerminationReason,
+  ): void {
     const worker = this.#worker;
     this.#worker = null;
     if (worker) {
@@ -234,6 +277,7 @@ export class StudioBg3dValidationWorkerClient {
       worker.removeEventListener("error", this.#handleWorkerFailure);
       worker.removeEventListener("messageerror", this.#handleWorkerFailure);
       worker.terminate();
+      this.#recordTermination(reason);
     }
     for (const requestId of [...this.#pending.keys()]) this.#finish(requestId)?.reject(error);
   }
@@ -312,6 +356,8 @@ function maximumBrowserValidationWorkers(): number {
 function canUseBrowserWorker(options: StudioBg3dGlbValidationOptions): boolean {
   // A same-realm runtime attestation is deliberately not structured-cloneable proof.
   return options.digest === undefined &&
+    options.basisPayloadPreflight === undefined &&
+    options.basisRuntimeProvider === undefined &&
     options.basisTranscoderCapability === undefined &&
     typeof Worker === "function";
 }
@@ -361,7 +407,11 @@ export async function validateStudioBg3dGlbOffMainThread(
   // Never move a potentially 100 MiB required-Basis validation job onto the UI thread merely to
   // preserve a main-realm capability. The dedicated Worker must fetch and attest its own runtime
   // before this path can be enabled.
-  if (options.basisTranscoderCapability !== undefined) {
+  if (
+    options.basisTranscoderCapability !== undefined ||
+    options.basisPayloadPreflight !== undefined ||
+    options.basisRuntimeProvider !== undefined
+  ) {
     throw new StudioBg3dValidationWorkerError("basis-worker-attestation-required");
   }
   if (!canUseBrowserWorker(options)) {

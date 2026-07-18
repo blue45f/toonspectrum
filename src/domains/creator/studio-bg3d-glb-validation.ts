@@ -9,7 +9,10 @@ import {
   isAttestedStudioBg3dKtx2TranscoderCapability,
   type StudioBg3dKtx2TranscoderCapability,
 } from "./studio-bg3d-ktx2-transcoder-capability";
-import { inspectStudioBg3dBasisKtx2 } from "./studio-bg3d-ktx2-validation";
+import {
+  inspectStudioBg3dBasisKtx2,
+  type StudioBg3dBasisKtx2Info,
+} from "./studio-bg3d-ktx2-validation";
 
 export const STUDIO_BG3D_GLB_MAX_BYTES = 100 * 1024 * 1024;
 export const STUDIO_BG3D_GLB_MAX_JSON_BYTES = 4 * 1024 * 1024;
@@ -137,6 +140,20 @@ export type StudioBg3dGlbDigest = (
   bytes: Uint8Array,
 ) => Promise<ArrayBuffer | Uint8Array | string>;
 
+export type StudioBg3dBasisPayloadPreflight = (
+  bytes: Uint8Array,
+  info: StudioBg3dBasisKtx2Info,
+) => Promise<boolean>;
+
+export interface StudioBg3dBasisPayloadRuntime {
+  readonly capability: StudioBg3dKtx2TranscoderCapability;
+  readonly preflight: StudioBg3dBasisPayloadPreflight;
+}
+
+export type StudioBg3dBasisRuntimeProvider = () => Promise<
+  StudioBg3dBasisPayloadRuntime | null
+>;
+
 export interface StudioBg3dGlbValidationOptions {
   readonly declared: StudioBg3dGlbDeclaredMetadata;
   readonly cumulative: StudioBg3dGlbCumulativeByteBudget;
@@ -154,6 +171,17 @@ export interface StudioBg3dGlbValidationOptions {
    * trusted after structured cloning; a Worker must attest its own executable assets.
    */
   readonly basisTranscoderCapability?: StudioBg3dKtx2TranscoderCapability;
+  /**
+   * Same-realm decoder gate for every embedded Basis payload. The callback receives a private copy
+   * of bytes that already passed the decoder-free envelope checks and must transcode every mip.
+   */
+  readonly basisPayloadPreflight?: StudioBg3dBasisPayloadPreflight;
+  /**
+   * Lazy same-realm runtime resolver. It is invoked only after parsed glTF evidence proves the
+   * document may use Basis, so escaped JSON spellings cannot bypass initialization and unrelated
+   * raw strings cannot trigger the WASM download.
+   */
+  readonly basisRuntimeProvider?: StudioBg3dBasisRuntimeProvider;
 }
 
 export interface StudioBg3dGlbMetrics {
@@ -232,6 +260,7 @@ export type StudioBg3dGlbFailureCode =
   | "invalid-animation"
   | "invalid-skin"
   | "invalid-image"
+  | "basis-transcode-failed"
   | "arithmetic-overflow"
   | "node-budget-exceeded"
   | "triangle-budget-exceeded"
@@ -314,6 +343,7 @@ const FAILURE_MESSAGES: Readonly<Record<StudioBg3dGlbFailureCode, string>> = Obj
   "invalid-animation": "3D 모델의 애니메이션 구조가 올바르지 않습니다. 애니메이션을 정리해 다시 내보내 주세요.",
   "invalid-skin": "3D 모델의 스킨 또는 조인트 구조가 올바르지 않습니다. 리깅을 정리해 다시 내보내 주세요.",
   "invalid-image": "3D 모델의 내장 이미지 구조가 올바르지 않습니다. 지원 형식으로 다시 내보내 주세요.",
+  "basis-transcode-failed": "3D 모델의 Basis 텍스처를 안전하게 디코딩할 수 없습니다. 텍스처를 다시 내보내 주세요.",
   "arithmetic-overflow": "3D 모델의 복잡도를 안전하게 계산할 수 없습니다. 모델을 단순화해 주세요.",
   "node-budget-exceeded": "이 기기의 장면 노드 수 기준을 초과했습니다. 모델 계층을 단순화해 주세요.",
   "triangle-budget-exceeded": "이 기기의 삼각형 수 기준을 초과했습니다. 메시를 경량화해 주세요.",
@@ -545,10 +575,28 @@ function hasExternalResourceUri(root: Record<string, unknown>): boolean | null {
   return false;
 }
 
+function hasParsedBasisRuntimeEvidence(root: Record<string, unknown>): boolean {
+  for (const extensionKey of ["extensionsUsed", "extensionsRequired"] as const) {
+    const extensions = root[extensionKey];
+    if (Array.isArray(extensions) && extensions.includes("KHR_texture_basisu")) return true;
+  }
+  const images = root.images;
+  if (
+    Array.isArray(images) &&
+    images.some((image) => isRecord(image) && image.mimeType === "image/ktx2")
+  ) return true;
+  const textures = root.textures;
+  return Array.isArray(textures) && textures.some((texture) => (
+    isRecord(texture) && isRecord(texture.extensions) &&
+    Object.hasOwn(texture.extensions, "KHR_texture_basisu")
+  ));
+}
+
 function validateRequiredExtensions(
   root: Record<string, unknown>,
   supported: readonly string[],
   basisTranscoderCapability: unknown,
+  basisPayloadPreflight: unknown,
 ): StudioBg3dGlbValidationFailure | null {
   const required = root.extensionsRequired;
   if (required === undefined) return null;
@@ -560,7 +608,10 @@ function validateRequiredExtensions(
     !allowed.has(extension as string) ||
     (
       extension === "KHR_texture_basisu" &&
-      !isAttestedStudioBg3dKtx2TranscoderCapability(basisTranscoderCapability)
+      (
+        !isAttestedStudioBg3dKtx2TranscoderCapability(basisTranscoderCapability) ||
+        typeof basisPayloadPreflight !== "function"
+      )
     )
   ))
     ? failure("unsupported-required-extension")
@@ -1135,11 +1186,12 @@ function animationAccessorDescriptor(
     : Object.freeze({ count: accessor.count, type, components, componentType });
 }
 
-function collectMetrics(
+async function collectMetrics(
   bytes: Uint8Array,
   root: Record<string, unknown>,
   bin: GlbChunk | null,
-): CountResult {
+  basisPayloadPreflight?: StudioBg3dBasisPayloadPreflight,
+): Promise<CountResult> {
   const views = parseBufferViews(bytes, root, bin);
   if ("ok" in views) return { failure: views };
 
@@ -1374,6 +1426,9 @@ function collectMetrics(
 
   for (const material of materials) if (!isRecord(material)) return { failure: failure("invalid-gltf-root") };
   for (const texture of textures) if (!isRecord(texture)) return { failure: failure("invalid-gltf-root") };
+  // Reject extension/reference topology before paying for any WASM pretranscode.
+  const textureReferenceFailure = validateTextureImageReferences(root, textures, images);
+  if (textureReferenceFailure) return { failure: textureReferenceFailure };
 
   let imageBytes = 0;
   let estimatedDecodedImageBytes = 0;
@@ -1404,6 +1459,15 @@ function collectMetrics(
     if (mimeType === "image/ktx2" && !basisInfo) {
       return { failure: failure("invalid-image") };
     }
+    if (basisInfo && basisPayloadPreflight) {
+      try {
+        if (!await basisPayloadPreflight(Uint8Array.from(imageData), basisInfo)) {
+          return { failure: failure("basis-transcode-failed") };
+        }
+      } catch {
+        return { failure: failure("basis-transcode-failed") };
+      }
+    }
     const dimensions = basisInfo ?? imageDimensions(mimeType, imageData);
     if (dimensions) {
       maxImageDimension = Math.max(maxImageDimension, dimensions.width, dimensions.height);
@@ -1418,9 +1482,6 @@ function collectMetrics(
       estimatedDecodedImageBytes = nextDecodedBytes;
     } else undeterminedImageDimensions += 1;
   }
-  const textureReferenceFailure = validateTextureImageReferences(root, textures, images);
-  if (textureReferenceFailure) return { failure: textureReferenceFailure };
-
   let lights = 0;
   const rootExtensions = root.extensions;
   if (rootExtensions !== undefined) {
@@ -1513,6 +1574,18 @@ export async function validateStudioBg3dGlb(
   if (!isRecord(options) || (options.profile !== "mobile" && options.profile !== "desktop")) {
     return failure("invalid-options");
   }
+  if (
+    options.basisPayloadPreflight !== undefined &&
+    typeof options.basisPayloadPreflight !== "function"
+  ) return failure("invalid-options");
+  if (
+    options.basisRuntimeProvider !== undefined &&
+    (
+      typeof options.basisRuntimeProvider !== "function" ||
+      options.basisPayloadPreflight !== undefined ||
+      options.basisTranscoderCapability !== undefined
+    )
+  ) return failure("invalid-options");
   const profileBudget = options.budgets?.[options.profile];
   if (
     !validBudget(profileBudget) ||
@@ -1559,17 +1632,45 @@ export async function validateStudioBg3dGlb(
   const parsed = parseContainer(bytes, Math.min(configuredJsonBytes, STUDIO_BG3D_GLB_MAX_JSON_BYTES));
   if ("ok" in parsed) return parsed;
 
+  let basisTranscoderCapability = options.basisTranscoderCapability;
+  let basisPayloadPreflight = options.basisPayloadPreflight;
+  if (
+    options.basisRuntimeProvider &&
+    hasParsedBasisRuntimeEvidence(parsed.root)
+  ) {
+    try {
+      const runtime = await options.basisRuntimeProvider();
+      if (
+        runtime && typeof runtime === "object" &&
+        typeof runtime.preflight === "function"
+      ) {
+        basisTranscoderCapability = runtime.capability;
+        basisPayloadPreflight = runtime.preflight;
+      } else {
+        basisPayloadPreflight = async () => false;
+      }
+    } catch {
+      basisPayloadPreflight = async () => false;
+    }
+  }
+
   const requiredExtensionFailure = validateRequiredExtensions(
     parsed.root,
     options.supportedRequiredExtensions ?? [],
-    options.basisTranscoderCapability,
+    basisTranscoderCapability,
+    basisPayloadPreflight,
   );
   if (requiredExtensionFailure) return requiredExtensionFailure;
   const externalResource = hasExternalResourceUri(parsed.root);
   if (externalResource === null) return failure("invalid-gltf-root");
   if (externalResource) return failure("external-resource-uri");
 
-  const collected = collectMetrics(bytes, parsed.root, parsed.bin);
+  const collected = await collectMetrics(
+    bytes,
+    parsed.root,
+    parsed.bin,
+    basisPayloadPreflight,
+  );
   if (collected.failure || !collected.metrics) return collected.failure ?? failure("invalid-gltf-root");
   const metrics: StudioBg3dGlbMetrics = Object.freeze({
     byteSize: byteLength,

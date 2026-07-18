@@ -5,11 +5,11 @@ import type {
   StudioBg3dGlbValidationResult,
 } from "./studio-bg3d-glb-validation";
 
-export const STUDIO_BG3D_GLB_VALIDATION_WORKER_PROTOCOL_VERSION = 2 as const;
+export const STUDIO_BG3D_GLB_VALIDATION_WORKER_PROTOCOL_VERSION = 4 as const;
 
 export type StudioBg3dGlbWorkerValidationOptions = Omit<
   StudioBg3dGlbValidationOptions,
-  "basisTranscoderCapability" | "digest"
+  "basisPayloadPreflight" | "basisRuntimeProvider" | "basisTranscoderCapability" | "digest"
 >;
 
 export interface StudioBg3dGlbWorkerValidateRequest {
@@ -88,6 +88,7 @@ const FAILURE_CODES = new Set<StudioBg3dGlbFailureCode>([
   "invalid-animation",
   "invalid-skin",
   "invalid-image",
+  "basis-transcode-failed",
   "arithmetic-overflow",
   "node-budget-exceeded",
   "triangle-budget-exceeded",
@@ -236,7 +237,10 @@ function isValidationOptions(value: unknown): value is StudioBg3dGlbWorkerValida
   ) {
     return false;
   }
-  return !Object.hasOwn(value, "digest") && !Object.hasOwn(value, "basisTranscoderCapability");
+  return !Object.hasOwn(value, "digest") &&
+    !Object.hasOwn(value, "basisTranscoderCapability") &&
+    !Object.hasOwn(value, "basisPayloadPreflight") &&
+    !Object.hasOwn(value, "basisRuntimeProvider");
 }
 
 export function isStudioBg3dGlbWorkerRequest(

@@ -113,7 +113,12 @@ async function calculateSha256(
       return bytes.byteLength === 32 ? bytesToHex(bytes) : null;
     }
     if (!globalThis.crypto?.subtle) return null;
-    const result = await globalThis.crypto.subtle.digest("SHA-256", Uint8Array.from(source));
+    // Callers cannot reach these private snapshots. Avoid a second full-size allocation in the
+    // production ArrayBuffer path; injected adapters and SharedArrayBuffer views remain copied.
+    const digestSource = source.buffer instanceof ArrayBuffer
+      ? new Uint8Array(source.buffer, source.byteOffset, source.byteLength)
+      : Uint8Array.from(source);
+    const result = await globalThis.crypto.subtle.digest("SHA-256", digestSource);
     return bytesToHex(new Uint8Array(result));
   } catch {
     return null;
