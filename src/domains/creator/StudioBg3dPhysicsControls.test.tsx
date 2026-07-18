@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
+import controlFieldsSource from "./studio-bg3d-control-fields.tsx?raw";
 import background3dSource from "./StudioBackground3D.tsx?raw";
 import {
   StudioBg3dPhysicsPanel,
@@ -193,11 +194,9 @@ describe("Studio BG3D rig control quality", () => {
   });
 
   it("shows live animation time without committing mixer ticks into scene history", () => {
-    const playheadEffect = sourceSlice(
-      background3dSource,
-      "function BgAnimationPlayhead({",
-      "export function StudioBackground3D",
-    );
+    const playheadStart = controlFieldsSource.indexOf("export function BgAnimationPlayhead({");
+    expect(playheadStart).toBeGreaterThanOrEqual(0);
+    const playheadEffect = controlFieldsSource.slice(playheadStart);
 
     expect(playheadEffect).toContain("globalThis.setInterval");
     expect(playheadEffect).toContain("setLiveSample");
@@ -205,7 +204,7 @@ describe("Studio BG3D rig control quality", () => {
     expect(playheadEffect).not.toContain("commitImmediateHistoryTransition");
     expect(playheadEffect).toContain("value={displayTime}");
     expect(background3dSource).toContain('active={open && activePanelTab === "models"}');
-    expect(background3dSource).toContain("현재 애니메이션 시간");
+    expect(controlFieldsSource).toContain("현재 애니메이션 시간");
     expect(background3dSource).toContain("createStudioBg3dRigPoseBakeHistoryTransition(");
     expect(background3dSource).toContain("customModels: beforeCustomModels");
   });

@@ -123,14 +123,12 @@ import {
 } from "./studio-background-3d-scene-templates";
 import {
   BG_SKY_PRESETS,
-  clampPanoramaRotationDegrees,
   getSkyPreset,
   normalizePanoramaRotationDegrees,
 } from "./studio-background-3d-sky";
 import { resolveStudioBg3dAnimationSchedule } from "./studio-bg3d-animation-scheduler";
 import {
   isStudioBg3dAnimationOnceComplete,
-  resolveStudioBg3dAnimationDisplayTime,
   resolveStudioBg3dAnimationTime,
   snapshotStudioBg3dLiveAnimationPlayback,
 } from "./studio-bg3d-animation-time";
@@ -145,6 +143,13 @@ import {
   createStudioBg3dCaptureBackgroundSnapshot,
   type StudioBg3dCaptureBackgroundSnapshot,
 } from "./studio-bg3d-capture-background";
+import {
+  BgAnimationPlayhead,
+  LtRangeControl,
+  LtToggleRow,
+  PanoramaRotationNumberField,
+  Vec3Field,
+} from "./studio-bg3d-control-fields";
 import {
   deriveStudioBg3dGlbValidationPolicy,
   resolveStudioBg3dDeviceQuality,
@@ -378,6 +383,10 @@ type TransformModeId = "translate" | "rotate" | "scale";
 type BgPanelTab = "shapes" | "templates" | "layers" | "view" | "lt" | "models";
 type ViewEditorSection = "camera" | "physics";
 type LtEditorSection = "line" | "tone";
+const VIEW_EDITOR_SECTIONS = [
+  { id: "camera", label: "카메라 · 환경" },
+  { id: "physics", label: "물리 배치" },
+] as const satisfies readonly { id: ViewEditorSection; label: string }[];
 type LtUserPresetLibraryStatus = "idle" | "ready" | "recovered" | "unavailable";
 type LtUserPresetNoticeTone = "info" | "success" | "error";
 type LtUserPresetNotice = {
@@ -603,162 +612,6 @@ function encodeStudioBg3dLtLayers(
     layers: Object.freeze(encodedLayers),
     compositePngDataUrl,
   });
-}
-
-interface LtRangeControlProps {
-  readonly id: string;
-  readonly label: string;
-  readonly max: number;
-  readonly min: number;
-  readonly onChange: (value: number) => void;
-  readonly step: number;
-  readonly value: number;
-  readonly valueText: string;
-  readonly disabled?: boolean;
-}
-
-function LtRangeControl({
-  id,
-  label,
-  max,
-  min,
-  onChange,
-  step,
-  value,
-  valueText,
-  disabled = false,
-}: LtRangeControlProps) {
-  return (
-    <label
-      htmlFor={id}
-      className={cx(
-        "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 border-b border-line/70 py-1.5 last:border-b-0",
-        disabled && "opacity-45"
-      )}
-    >
-      <span className="text-xs font-semibold text-fg-2">{label}</span>
-      <output htmlFor={id} className="min-w-12 text-right text-[0.68rem] tabular-nums text-fg-3">
-        {valueText}
-      </output>
-      <input
-        id={id}
-        type="range"
-        aria-valuetext={valueText}
-        className="col-span-2 h-11 w-full cursor-pointer accent-accent disabled:cursor-not-allowed sm:h-8"
-        disabled={disabled}
-        max={max}
-        min={min}
-        step={step}
-        value={value}
-        onChange={(event) => onChange(Number(event.target.value))}
-      />
-    </label>
-  );
-}
-
-interface PanoramaRotationNumberFieldProps {
-  readonly disabled?: boolean;
-  readonly onCommit: (value: number) => void;
-  readonly value: number;
-}
-
-/** Keeps incomplete mobile/keyboard drafts local and commits one clamped degree value on blur. */
-function PanoramaRotationNumberField({
-  disabled = false,
-  onCommit,
-  value,
-}: PanoramaRotationNumberFieldProps) {
-  const cancelCommitRef = useRef(false);
-  const [editState, setEditState] = useState<{
-    readonly draft: string;
-    readonly sourceValue: number;
-  } | null>(null);
-  const draft = editState?.sourceValue === value ? editState.draft : String(value);
-
-  const commitDraft = () => {
-    if (cancelCommitRef.current) {
-      cancelCommitRef.current = false;
-      setEditState(null);
-      return;
-    }
-    const parsed = Number(draft.trim());
-    setEditState(null);
-    if (!draft.trim() || !Number.isFinite(parsed)) return;
-    const committed = Math.round(clampPanoramaRotationDegrees(parsed));
-    if (committed !== value) onCommit(committed);
-  };
-
-  return (
-    <label className="flex min-h-11 items-center gap-2 rounded-lg border border-line bg-panel px-3 text-xs font-semibold text-fg-2 sm:min-h-9">
-      <span className="shrink-0">각도</span>
-      <input
-        type="text"
-        inputMode="decimal"
-        role="spinbutton"
-        aria-label="360도 환경 배경 수평 회전 각도"
-        aria-valuemax={180}
-        aria-valuemin={-180}
-        aria-valuenow={
-          draft.trim().length > 0 && Number.isFinite(Number(draft)) ? Number(draft) : undefined
-        }
-        autoComplete="off"
-        disabled={disabled}
-        value={draft}
-        onBlur={commitDraft}
-        onChange={(event) => {
-          setEditState({ draft: event.target.value, sourceValue: value });
-        }}
-        onFocus={() => {
-          cancelCommitRef.current = false;
-          setEditState({ draft: String(value), sourceValue: value });
-        }}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") event.currentTarget.blur();
-          if (event.key === "Escape") {
-            cancelCommitRef.current = true;
-            event.currentTarget.blur();
-          }
-        }}
-        className="min-w-0 flex-1 bg-transparent text-right tabular-nums text-fg outline-none disabled:cursor-not-allowed disabled:opacity-45"
-      />
-      <span className="text-fg-3">°</span>
-    </label>
-  );
-}
-
-interface LtToggleRowProps {
-  readonly checked: boolean;
-  readonly label: string;
-  readonly onChange: (checked: boolean) => void;
-  readonly disabled?: boolean;
-}
-
-function LtToggleRow({ checked, label, onChange, disabled = false }: LtToggleRowProps) {
-  return (
-    <button
-      type="button"
-      aria-pressed={checked}
-      className="flex min-h-11 w-full items-center justify-between gap-3 border-b border-line/70 py-2 text-left text-xs font-semibold text-fg-2 transition-colors last:border-b-0 hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-    >
-      <span>{label}</span>
-      <span
-        aria-hidden
-        className={cx(
-          "relative h-5 w-9 shrink-0 rounded-full border transition-colors",
-          checked ? "border-accent bg-accent" : "border-line-strong bg-raised"
-        )}
-      >
-        <span
-          className={cx(
-            "absolute top-0.5 size-3.5 rounded-full bg-fg transition-transform",
-            checked ? "translate-x-[1.05rem]" : "translate-x-0.5"
-          )}
-        />
-      </span>
-    </button>
-  );
 }
 
 function ltOutputFingerprint(
@@ -1988,139 +1841,6 @@ function BgCustomModelInstanceBatch({
         onSelect(id, event.shiftKey || event.metaKey || event.ctrlKey);
       }}
     />
-  );
-}
-
-function Vec3Field({
-  label,
-  values,
-  step,
-  precision,
-  suffix,
-  disabled = false,
-  touchFriendly = false,
-  onCommit,
-}: {
-  label: string;
-  values: [number, number, number];
-  step: number;
-  precision: number;
-  suffix?: string;
-  disabled?: boolean;
-  touchFriendly?: boolean;
-  onCommit: (index: 0 | 1 | 2, value: number) => void;
-}) {
-  const axisLabels = ["X", "Y", "Z"] as const;
-  return (
-    <div role="group" aria-label={label}>
-      <p className="mb-1 text-[0.68rem] font-semibold text-fg-3">{label}</p>
-      <div className="grid grid-cols-3 gap-1.5">
-        {axisLabels.map((axisLabel, i) => (
-          <label
-            key={axisLabel}
-            className={cx(
-              "flex items-center gap-1 rounded-lg border border-line bg-card px-1.5 py-1 text-[0.7rem]",
-              touchFriendly && "min-h-11 sm:min-h-8 pointer-coarse:min-h-11",
-            )}
-          >
-            <span className="text-fg-3">{axisLabel}</span>
-            <input
-              aria-label={`${label} ${axisLabel}`}
-              type="number"
-              disabled={disabled}
-              step={step}
-              value={round(values[i as 0 | 1 | 2], precision)}
-              onChange={(e) => {
-                const n = Number(e.target.value);
-                if (Number.isFinite(n)) onCommit(i as 0 | 1 | 2, n);
-              }}
-              className="w-full min-w-0 bg-transparent text-right text-fg outline-none disabled:cursor-not-allowed disabled:opacity-50"
-            />
-            {suffix ? <span className="text-fg-3">{suffix}</span> : null}
-          </label>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function BgAnimationPlayhead({
-  active,
-  modelId,
-  playback,
-  durationSeconds,
-  readLiveTime,
-  onCommit,
-}: {
-  readonly active: boolean;
-  readonly modelId: string;
-  readonly playback: StudioBg3dAnimationPlayback;
-  readonly durationSeconds: number;
-  readonly readLiveTime: () => number | undefined;
-  readonly onCommit: (timeSeconds: number) => void;
-}) {
-  const [liveSample, setLiveSample] = useState<{
-    readonly modelId: string;
-    readonly clipIndex: number;
-    readonly baseTimeSeconds: number;
-    readonly timeSeconds: number;
-  } | null>(null);
-  const readCurrentLiveTime = useEffectEvent(readLiveTime);
-  const displayTime = resolveStudioBg3dAnimationDisplayTime({
-    modelId,
-    playback,
-    durationSeconds,
-    liveSample,
-  });
-
-  useEffect(() => {
-    if (!active || !playback.playing) return;
-    const interval = globalThis.setInterval(() => {
-      const timeSeconds = readCurrentLiveTime();
-      if (!Number.isFinite(timeSeconds)) return;
-      setLiveSample((current) => {
-        const next = {
-          modelId,
-          clipIndex: playback.clipIndex,
-          baseTimeSeconds: playback.timeSeconds,
-          timeSeconds: Math.max(0, timeSeconds!),
-        };
-        return current?.modelId === next.modelId &&
-          current.clipIndex === next.clipIndex &&
-          current.baseTimeSeconds === next.baseTimeSeconds &&
-          Math.abs(current.timeSeconds - next.timeSeconds) < 0.000_1
-          ? current
-          : next;
-      });
-    }, 100);
-    return () => globalThis.clearInterval(interval);
-  }, [
-    active,
-    modelId,
-    playback.clipIndex,
-    playback.playing,
-    playback.timeSeconds,
-  ]);
-
-  return (
-    <div className="min-w-0">
-      <input
-        aria-label="애니메이션 시간"
-        className="h-11 w-full sm:h-8 pointer-coarse:h-11"
-        type="range"
-        min="0"
-        max={durationSeconds}
-        step={Math.max(0.001, durationSeconds / 1_000)}
-        value={displayTime}
-        onChange={(event) => onCommit(Number(event.target.value))}
-      />
-      <output
-        aria-label="현재 애니메이션 시간"
-        className="block text-right text-[0.66rem] tabular-nums text-fg-3"
-      >
-        {displayTime.toFixed(2)}s / {durationSeconds.toFixed(2)}s
-      </output>
-    </div>
   );
 }
 
@@ -7255,7 +6975,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                         value={layerQuery}
                         onChange={(e) => setLayerQuery(e.target.value)}
                         placeholder="이름 검색…"
-                        className="min-h-11 w-full rounded-lg border border-line bg-card px-3 text-xs font-medium text-fg outline-none focus:border-accent sm:min-h-9"
+                        className="min-h-11 w-full rounded-lg border border-line bg-card px-3 text-xs font-medium text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
                       />
                     </label>
                     {filteredLayerItems.length === 0 ? (
@@ -7414,20 +7134,38 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                   aria-label="보기 도구"
                   className="mb-4 grid grid-cols-2 gap-1 rounded-xl border border-line bg-card/70 p-1"
                 >
-                  {([
-                    { id: "camera" as const, label: "카메라 · 환경" },
-                    { id: "physics" as const, label: "물리 배치" },
-                  ]).map((section) => {
+                  {VIEW_EDITOR_SECTIONS.map((section, sectionIndex) => {
                     const active = viewEditorSection === section.id;
                     return (
                       <button
                         key={section.id}
+                        id={`bg3d-view-tab-${section.id}`}
                         type="button"
                         role="tab"
                         aria-selected={active}
                         aria-controls={`bg3d-view-section-${section.id}`}
                         tabIndex={active ? 0 : -1}
                         onClick={() => setViewEditorSection(section.id)}
+                        onKeyDown={(event) => {
+                          let nextIndex: number;
+                          if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+                            nextIndex = (sectionIndex + 1) % VIEW_EDITOR_SECTIONS.length;
+                          } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+                            nextIndex = (sectionIndex - 1 + VIEW_EDITOR_SECTIONS.length) % VIEW_EDITOR_SECTIONS.length;
+                          } else if (event.key === "Home") {
+                            nextIndex = 0;
+                          } else if (event.key === "End") {
+                            nextIndex = VIEW_EDITOR_SECTIONS.length - 1;
+                          } else {
+                            return;
+                          }
+                          event.preventDefault();
+                          const nextSection = VIEW_EDITOR_SECTIONS[nextIndex]!;
+                          setViewEditorSection(nextSection.id);
+                          requestAnimationFrame(() => {
+                            document.getElementById(`bg3d-view-tab-${nextSection.id}`)?.focus();
+                          });
+                        }}
                         className={cx(
                           "min-h-11 rounded-lg px-2 text-[0.68rem] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent sm:min-h-9",
                           active
@@ -7444,6 +7182,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                 <div
                   id="bg3d-view-section-physics"
                   role="tabpanel"
+                  aria-labelledby="bg3d-view-tab-physics"
                   hidden={viewEditorSection !== "physics"}
                 >
                   <StudioBg3dPhysicsPanel
@@ -7469,6 +7208,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                 <div
                   id="bg3d-view-section-camera"
                   role="tabpanel"
+                  aria-labelledby="bg3d-view-tab-camera"
                   hidden={viewEditorSection !== "camera"}
                 >
                   <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
@@ -7498,7 +7238,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                       disabled={isCapturing || isRestoringScene || physicsInteractionLocked}
                       placeholder={`컷 ${(sceneBaseDocument.shots?.length ?? 0) + 1}`}
                       onChange={(event) => setShotNameDraft(event.target.value)}
-                      className="mt-1 min-h-11 w-full rounded-lg border border-line bg-card px-3 text-xs text-fg outline-none placeholder:text-fg-3 focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-9"
+                      className="mt-1 min-h-11 w-full rounded-lg border border-line bg-card px-3 text-xs text-fg placeholder:text-fg-3 focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-9"
                     />
                   </label>
                   <div className="mt-2 grid grid-cols-2 gap-2">
@@ -8011,7 +7751,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                   <select
                     id="bg3d-lt-preset"
                     value={appliedLtPresetId}
-                    className="mt-1.5 min-h-11 w-full rounded-lg border border-line bg-card px-3 text-xs font-semibold text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 sm:min-h-9"
+                    className="mt-1.5 min-h-11 w-full rounded-lg border border-line bg-card px-3 text-xs font-semibold text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
                     onChange={(event) => {
                       if (event.target.value !== "custom") applyLtPreset(event.target.value);
                     }}
@@ -8070,7 +7810,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                         required
                         maxLength={STUDIO_BG3D_LT_PRESET_MAX_NAME_LENGTH}
                         value={ltUserPresetName}
-                        className="mt-1.5 min-h-11 w-full rounded-lg border border-line bg-panel px-3 text-xs text-fg outline-none placeholder:text-fg-3 focus:border-accent focus:ring-2 focus:ring-accent/25 sm:min-h-9"
+                        className="mt-1.5 min-h-11 w-full rounded-lg border border-line bg-panel px-3 text-xs text-fg placeholder:text-fg-3 focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
                         placeholder="예: 야간 골목 선화"
                         onChange={(event) => {
                           setLtUserPresetName(event.target.value);
@@ -8086,7 +7826,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                         rows={2}
                         maxLength={STUDIO_BG3D_LT_PRESET_MAX_DESCRIPTION_LENGTH}
                         value={ltUserPresetDescription}
-                        className="mt-1.5 min-h-20 w-full resize-y rounded-lg border border-line bg-panel px-3 py-2.5 text-xs leading-relaxed text-fg outline-none placeholder:text-fg-3 focus:border-accent focus:ring-2 focus:ring-accent/25"
+                        className="mt-1.5 min-h-20 w-full resize-y rounded-lg border border-line bg-panel px-3 py-2.5 text-xs leading-relaxed text-fg placeholder:text-fg-3 focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                         placeholder="어떤 장면과 작업 단계에 쓰는 설정인지 기록하세요."
                         onChange={(event) => {
                           setLtUserPresetDescription(event.target.value);
@@ -8183,7 +7923,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                   <select
                     id="bg3d-lt-export-height"
                     aria-label="LT 출력 높이"
-                    className="min-h-11 rounded-lg border border-line bg-panel px-2.5 text-xs font-semibold text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 sm:min-h-9"
+                    className="min-h-11 rounded-lg border border-line bg-panel px-2.5 text-xs font-semibold text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
                     value={sceneBaseDocument.output.exportHeight}
                     onChange={(event) => updateLtExportHeight(Number(event.target.value))}
                   >
@@ -8470,7 +8210,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                     <select
                       id="bg3d-lt-tone-mode"
                       value={ltToneSettings.mode}
-                      className="min-h-11 min-w-36 rounded-lg border border-line bg-card px-2.5 text-xs text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 sm:min-h-9"
+                      className="min-h-11 min-w-36 rounded-lg border border-line bg-card px-2.5 text-xs text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
                       onChange={(event) => {
                         const mode = event.target.value as StudioBg3dToneOutputSettings["mode"];
                         updateLtToneSettings({
@@ -8497,7 +8237,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                         <select
                           id="bg3d-lt-tone-type"
                           value={ltToneSettings.type}
-                          className="min-h-11 min-w-36 rounded-lg border border-line bg-card px-2.5 text-xs text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 sm:min-h-9"
+                          className="min-h-11 min-w-36 rounded-lg border border-line bg-card px-2.5 text-xs text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
                           onChange={(event) => updateLtToneSettings({ type: event.target.value as StudioBg3dToneOutputSettings["type"] })}
                         >
                           {Object.entries(LT_TONE_TYPE_LABELS).map(([value, label]) => (
@@ -8511,7 +8251,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                           <select
                             id="bg3d-lt-tone-pattern"
                             value={ltToneSettings.pattern}
-                            className="min-h-11 min-w-36 rounded-lg border border-line bg-card px-2.5 text-xs text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 sm:min-h-9"
+                            className="min-h-11 min-w-36 rounded-lg border border-line bg-card px-2.5 text-xs text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
                             onChange={(event) => updateLtToneSettings({ pattern: event.target.value as StudioBg3dToneOutputSettings["pattern"] })}
                           >
                             {Object.entries(LT_TONE_PATTERN_LABELS).map(([value, label]) => (
@@ -8630,7 +8370,9 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                       </button>
                       <button
                         type="button"
-                        className="absolute right-1.5 top-1.5 grid size-7 place-items-center rounded-lg border border-line bg-panel/90 text-fg-3 transition-colors hover:bg-raised hover:text-accent"
+                        aria-label={`${entry.name} 템플릿 삭제`}
+                        title="템플릿 삭제"
+                        className="absolute right-1.5 top-1.5 grid size-11 place-items-center rounded-lg border border-line bg-panel/90 text-fg-3 transition-colors hover:bg-raised hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:size-7"
                         onClick={(e) => { e.stopPropagation(); void handleDeleteTemplate(entry.id); }}
                       >
                         <Trash2 size={13} aria-hidden />
@@ -8653,6 +8395,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                 <input
                   ref={fileInputRef}
                   accept=".glb,.gltf,.obj,.fbx,.dae,.stl,.ply,.3ds,.mtl,.bin,.png,.jpg,.jpeg,.webp,model/gltf-binary,model/gltf+json,model/obj,model/stl"
+                  aria-label="3D 모델 및 연결 파일 선택"
                   className="sr-only"
                   multiple
                   type="file"

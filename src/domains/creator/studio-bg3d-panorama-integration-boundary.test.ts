@@ -3,6 +3,10 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const background3dSource = readFileSync(new URL("./StudioBackground3D.tsx", import.meta.url), "utf8");
+const controlFieldsSource = readFileSync(
+  new URL("./studio-bg3d-control-fields.tsx", import.meta.url),
+  "utf8",
+);
 const panoramaComponentSource = readFileSync(
   new URL("./StudioBg3dScenePanorama.tsx", import.meta.url),
   "utf8",
@@ -35,10 +39,10 @@ describe("Studio BG3D procedural panorama integration boundary", () => {
     expect(viewEnd).toBeGreaterThan(viewStart);
     expect(viewControls).toContain('id="bg3d-panorama-rotation"');
     expect(viewControls).toContain("<PanoramaRotationNumberField");
-    expect(background3dSource).toContain(
-      'function PanoramaRotationNumberField('
+    expect(controlFieldsSource).toContain(
+      "export function PanoramaRotationNumberField("
     );
-    expect(background3dSource).toContain("min-h-11");
+    expect(controlFieldsSource).toContain("min-h-11");
     expect(viewControls).toContain("정면 초기화");
     expect(tabType).not.toMatch(/panorama|sky/iu);
   });
