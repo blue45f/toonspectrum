@@ -11,11 +11,11 @@ import { studioCrdtClusterLoadRepositoryProvider } from "./studio-crdt-cluster-l
 import { studioCrdtRepositoryProvider } from "./studio-crdt.repository";
 import { StudioCrdtService } from "./studio-crdt.service";
 import { studioLiveLockRepositoryProvider } from "./studio-live-lock.repository";
+import { StudioLiveGateway } from "./studio-live.gateway";
 import {
-  StudioLiveGateway,
   studioLiveSessionAuthenticatorProvider,
   studioLiveSessionRevalidatorProvider,
-} from "./studio-live.gateway";
+} from "./studio-live.protocol";
 import { StudioRasterAssetController } from "./studio-raster-asset.controller";
 import { studioRasterAssetRepositoryProvider } from "./studio-raster-asset.repository";
 import { StudioRasterAssetService } from "./studio-raster-asset.service";
