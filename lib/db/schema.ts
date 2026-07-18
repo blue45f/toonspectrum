@@ -476,7 +476,7 @@ export const creatorWorkCrdtSnapshots = pgTable(
     snapshot: bytea("snapshot").notNull(),
     compactedSequence: bigint("compactedSequence", { mode: "bigint" })
       .notNull()
-      .default(BigInt(0)),
+      .default(sql`0`),
     updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -953,7 +953,7 @@ export const creatorWorkTeamCommentThreads = pgTable(
     resolvedAt: timestamp("resolvedAt", { mode: "date", withTimezone: true }),
     lastActivitySequence: bigint("lastActivitySequence", { mode: "bigint" })
       .notNull()
-      .default(BigInt(0)),
+      .default(sql`0`),
     createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -1162,7 +1162,7 @@ export const creatorWorkTeamCommentReads = pgTable(
     userId: text("userId").notNull(),
     lastReadActivitySequence: bigint("lastReadActivitySequence", { mode: "bigint" })
       .notNull()
-      .default(BigInt(0)),
+      .default(sql`0`),
     readAt: timestamp("readAt", { mode: "date", withTimezone: true })
       .notNull()
       .defaultNow(),

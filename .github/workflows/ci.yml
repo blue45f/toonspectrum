@@ -49,7 +49,36 @@ jobs:
       - run: pnpm run lint
       - run: pnpm run typecheck
       # 테스트 전에 스키마를 provision(Drizzle) — DB-backed 테스트가 의존.
-      - run: pnpm exec drizzle-kit push --force
+      # drizzle-kit 0.31.x는 일부 내부 예외에도 종료 코드 0을 반환할 수 있어, 앱의 최소 스키마
+      # 계약을 PostgreSQL에서 직접 확인해 부분 provision 상태로 테스트를 진행하지 않는다.
+      - name: Provision and verify database schema
+        run: |
+          pnpm exec drizzle-kit push --force
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          BEGIN
+            IF NOT EXISTS (
+              SELECT 1
+              FROM information_schema.columns
+              WHERE table_schema = 'public'
+                AND table_name = 'user'
+                AND column_name = 'status'
+            ) THEN
+              RAISE EXCEPTION 'Drizzle schema provision failed: public.user.status is missing';
+            END IF;
+
+            IF NOT EXISTS (
+              SELECT 1
+              FROM information_schema.columns
+              WHERE table_schema = 'public'
+                AND table_name = 'creator_work_crdt_snapshot'
+                AND column_name = 'compactedSequence'
+            ) THEN
+              RAISE EXCEPTION 'Drizzle schema provision failed: CRDT sequence contract is missing';
+            END IF;
+          END;
+          $$;
+          SQL
       # 배포 migration 자체도 idempotent하게 적용되는지 검증한 뒤 realtime integration을 실행한다.
       - run: psql "$STUDIO_LIVE_POSTGRES_INTEGRATION_URL" -v ON_ERROR_STOP=1 -f lib/db/migrations/0009_socket_io_postgres_adapter.sql
       - run: pnpm run test
