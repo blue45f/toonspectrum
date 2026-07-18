@@ -4,6 +4,7 @@ import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 interface ModuleEdges {
+  readonly allImports: readonly string[];
   readonly dynamicImports: readonly string[];
   readonly source: string;
   readonly valueImports: readonly string[];
@@ -19,16 +20,16 @@ function moduleEdges(relativePath: string): ModuleEdges {
     true,
     ts.ScriptKind.TSX
   );
+  const allImports: string[] = [];
   const dynamicImports: string[] = [];
   const valueImports: string[] = [];
 
   function visit(node: ts.Node): void {
-    if (
-      ts.isImportDeclaration(node)
-      && ts.isStringLiteral(node.moduleSpecifier)
-      && !node.importClause?.isTypeOnly
-    ) {
-      valueImports.push(node.moduleSpecifier.text);
+    if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
+      allImports.push(node.moduleSpecifier.text);
+      if (!node.importClause?.isTypeOnly) {
+        valueImports.push(node.moduleSpecifier.text);
+      }
     }
     if (
       ts.isCallExpression(node)
@@ -42,16 +43,19 @@ function moduleEdges(relativePath: string): ModuleEdges {
   }
 
   visit(file);
-  return { dynamicImports, source, valueImports };
+  return { allImports, dynamicImports, source, valueImports };
 }
 
-const STUDIO_PAGE_OPTIONAL_MODULES = [
+const STUDIO_LAZY_UI_OPTIONAL_MODULES = [
   "./StudioColorPalettePanel",
+  "./StudioFilterDialog",
   "./StudioFloodFillPanel",
   "./StudioHealCloneOverlay",
   "./StudioHistoryBrushOverlay",
+  "./StudioImageAdjustmentsPanel",
   "./StudioIsometricGridOverlay",
   "./StudioLayerMaskOverlay",
+  "./StudioLayerNavigator",
   "./StudioPaletteLibraryPanel",
   "./StudioPanelSplitTool",
   "./StudioPerspectiveOverlay",
@@ -59,16 +63,39 @@ const STUDIO_PAGE_OPTIONAL_MODULES = [
 ] as const;
 
 describe("Studio optional UI bundle boundaries", () => {
-  it("keeps optional inspector and canvas-tool surfaces behind analyzable imports", () => {
-    const edges = moduleEdges("./StudioPage.tsx");
+  it("owns optional inspector and canvas-tool surfaces in the neutral lazy registry", () => {
+    const page = moduleEdges("./StudioPage.tsx");
+    const registry = moduleEdges("./studio-page-lazy-ui.ts");
 
-    for (const specifier of STUDIO_PAGE_OPTIONAL_MODULES) {
-      expect(edges.valueImports, `${specifier} must not be a static value import`).not.toContain(specifier);
+    expect(registry.allImports).not.toContain("./StudioPage");
+    expect(registry.allImports).not.toContain("./StudioInspectorAside");
+
+    for (const specifier of STUDIO_LAZY_UI_OPTIONAL_MODULES) {
+      expect(page.valueImports, `${specifier} must not be a StudioPage value import`).not.toContain(specifier);
+      expect(page.dynamicImports, `${specifier} must not be loaded by StudioPage`).not.toContain(specifier);
+      expect(registry.valueImports, `${specifier} must remain lazy in the registry`).not.toContain(specifier);
       expect(
-        edges.dynamicImports.filter((candidate) => candidate === specifier),
-        `${specifier} must have one literal dynamic import`
+        registry.dynamicImports.filter((candidate) => candidate === specifier),
+        `${specifier} must have one registry-owned literal dynamic import`
       ).toEqual([specifier]);
     }
+  });
+
+  it("shares one PanelSplit module loader between the inspector panel and canvas overlay", () => {
+    const page = moduleEdges("./StudioPage.tsx");
+    const registry = moduleEdges("./studio-page-lazy-ui.ts");
+
+    expect(page.dynamicImports).not.toContain("./StudioPanelSplitTool");
+    expect(registry.dynamicImports.filter((specifier) => specifier === "./StudioPanelSplitTool")).toEqual([
+      "./StudioPanelSplitTool",
+    ]);
+    expect(registry.source).toContain("const studioPanelSplitToolLoader = createStudioIntentLazyLoader(");
+    expect(registry.source).toContain(
+      "studioPanelSplitToolLoader.load().then((mod) => ({ default: mod.StudioPanelSplitPanel }))"
+    );
+    expect(registry.source).toContain(
+      "studioPanelSplitToolLoader.load().then((mod) => ({ default: mod.StudioPanelSplitOverlay }))"
+    );
   });
 
   it("mounts only active or actually visited image tabs instead of persisted hidden children", () => {

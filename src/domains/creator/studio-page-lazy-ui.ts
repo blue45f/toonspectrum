@@ -1,4 +1,5 @@
 import { loadStudioBackground3DModule } from "./studio-background-3d-loader";
+import { createStudioIntentLazyLoader } from "./studio-intent-lazy-loader";
 
 import type { StudioAssetMenuPanelProps } from "./StudioAssetMenuPanel";
 import type { StudioColorPopoverProps } from "./StudioColorPopover";
@@ -49,6 +50,74 @@ const StudioPageGradePanel = lazyRetry(
   () => import("./StudioPageGradePanel").then((mod) => ({ default: mod.StudioPageGradePanel })),
   "StudioPageGradePanel"
 );
+const StudioImageAdjustmentsPanel = lazyRetry(
+  () => import("./StudioImageAdjustmentsPanel").then((mod) => ({ default: mod.StudioImageAdjustmentsPanel })),
+  "StudioImageAdjustmentsPanel"
+);
+const StudioFilterDialog = lazyRetry(
+  () => import("./StudioFilterDialog").then((mod) => ({ default: mod.StudioFilterDialog })),
+  "StudioFilterDialog"
+);
+const StudioColorPalettePanel = lazyRetry(
+  () => import("./StudioColorPalettePanel").then((mod) => ({ default: mod.StudioColorPalettePanel })),
+  "StudioColorPalettePanel"
+);
+const StudioFloodFillPanel = lazyRetry(
+  () => import("./StudioFloodFillPanel").then((mod) => ({ default: mod.StudioFloodFillPanel })),
+  "StudioFloodFillPanel"
+);
+const StudioHealCloneOverlay = lazyRetry(
+  () => import("./StudioHealCloneOverlay").then((mod) => ({ default: mod.StudioHealCloneOverlay })),
+  "StudioHealCloneOverlay"
+);
+const StudioHistoryBrushOverlay = lazyRetry(
+  () => import("./StudioHistoryBrushOverlay").then((mod) => ({ default: mod.StudioHistoryBrushOverlay })),
+  "StudioHistoryBrushOverlay"
+);
+const StudioIsometricGridOverlay = lazyRetry(
+  () => import("./StudioIsometricGridOverlay").then((mod) => ({ default: mod.StudioIsometricGridOverlay })),
+  "StudioIsometricGridOverlay"
+);
+const StudioLayerMaskOverlay = lazyRetry(
+  () => import("./StudioLayerMaskOverlay").then((mod) => ({ default: mod.StudioLayerMaskOverlay })),
+  "StudioLayerMaskOverlay"
+);
+const studioPanelSplitToolLoader = createStudioIntentLazyLoader(
+  () => import("./StudioPanelSplitTool")
+);
+const StudioPanelSplitOverlay = lazyRetry(
+  () => studioPanelSplitToolLoader.load().then((mod) => ({ default: mod.StudioPanelSplitOverlay })),
+  "StudioPanelSplitOverlay"
+);
+const StudioPanelSplitPanel = lazyRetry(
+  () => studioPanelSplitToolLoader.load().then((mod) => ({ default: mod.StudioPanelSplitPanel })),
+  "StudioPanelSplitPanel"
+);
+const StudioPerspectiveOverlay = lazyRetry(
+  () => import("./StudioPerspectiveOverlay").then((mod) => ({ default: mod.StudioPerspectiveOverlay })),
+  "StudioPerspectiveOverlay"
+);
+const StudioPuppetWarpOverlay = lazyRetry(
+  () => import("./StudioPuppetWarpOverlay").then((mod) => ({ default: mod.StudioPuppetWarpOverlay })),
+  "StudioPuppetWarpOverlay"
+);
+const StudioLayerNavigator = lazyRetry(
+  () => import("./StudioLayerNavigator").then((mod) => ({ default: mod.StudioLayerNavigator })),
+  "StudioLayerNavigator"
+);
+const studioPaletteLibraryPanelLoader = createStudioIntentLazyLoader(() =>
+  import("./StudioPaletteLibraryPanel").then((mod) => ({
+    default: mod.StudioPaletteLibraryPanel,
+  }))
+);
+const StudioPaletteLibraryPanel = lazyRetry(
+  studioPaletteLibraryPanelLoader.load,
+  "StudioPaletteLibraryPanel"
+);
+
+function preloadStudioPaletteLibraryPanel(): void {
+  studioPaletteLibraryPanelLoader.preload();
+}
 const StudioBubbleStylePresetPanel = lazyRetry(
   () => import("./StudioBubbleStylePresetPanel").then((mod) => ({ default: mod.StudioBubbleStylePresetPanel })),
   "StudioBubbleStylePresetPanel"
@@ -580,6 +649,7 @@ export {
   StudioCharacterBiblePanel,
   StudioCheckpointPanel,
   StudioCollagePanel,
+  StudioColorPalettePanel,
   StudioColorPopoverContent,
   StudioColorWheelOverlay,
   StudioCommentsPanel,
@@ -595,14 +665,22 @@ export {
   StudioEmeresLibraryPanel,
   StudioExportMenuPanel,
   StudioFeatureTutorialHub,
+  StudioFilterDialog,
   StudioFrameAnimationPanel,
+  StudioFloodFillPanel,
   StudioGradientEnginePanel,
   StudioHealClonePanel,
+  StudioHealCloneOverlay,
   StudioHistoryBrushPanel,
+  StudioHistoryBrushOverlay,
   StudioHistoryPanel,
+  StudioImageAdjustmentsPanel,
   StudioIntegrationsSettingsPanel,
   StudioIsometricGridPanel,
+  StudioIsometricGridOverlay,
   StudioLayerMaskPanel,
+  StudioLayerMaskOverlay,
+  StudioLayerNavigator,
   StudioLiquifyPanel,
   StudioLiveInkOverlayHost,
   StudioLiveInkPredictionHost,
@@ -616,15 +694,20 @@ export {
   StudioPageGradePanel,
   StudioPageReviewPanel,
   StudioPageThumbnail,
+  StudioPaletteLibraryPanel,
   StudioPaletteSuggestPanel,
+  StudioPanelSplitOverlay,
+  StudioPanelSplitPanel,
   StudioPatternFillPanel,
   StudioPerspectivePanel,
+  StudioPerspectiveOverlay,
   StudioProductionInsightsPanel,
   StudioPublicationOperationsPanel,
   StudioPublishContextBanner,
   StudioPublishPackagePanel,
   StudioPublishPreflightPanel,
   StudioPuppetWarpPanel,
+  StudioPuppetWarpOverlay,
   StudioQuickActionsMenu,
   StudioQuickShapePanel,
   StudioRasterAssetGrid,
@@ -665,6 +748,7 @@ export {
   preloadStudioColorPopover,
   preloadStudioExportMenuPanel,
   preloadStudioIntegrationsSettingsPanel,
+  preloadStudioPaletteLibraryPanel,
   preloadStudioReferencePanel,
   preloadStudioStockImagePanel,
 };
