@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { STUDIO_CRDT_PROTOCOL_VERSION } from "./studio-crdt-protocol";
 import { StudioLiveCollaborationProvider } from "./StudioLiveCollaborationProvider";
 
 import type { StudioCrdtRecoveryVaultEntry } from "./studio-crdt-recovery-vault";
@@ -407,7 +408,7 @@ function recoveryVaultEntry(options: {
     failureMessage: "server rejected update",
     rejectedUpdateId: options.rejectedUpdateId,
     updates: [{
-      protocolVersion: 1,
+      protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
       workId,
       updateId: options.rejectedUpdateId,
       clientSequence: 1,

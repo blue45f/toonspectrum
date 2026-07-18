@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import {
   BadRequestException,
   ConflictException,
@@ -23,6 +25,7 @@ import {
   STUDIO_TEAM_COMMENT_REPOSITORY,
   StudioTeamCommentCursorError,
   StudioTeamCommentForbiddenError,
+  StudioTeamCommentMutationConflictError,
   StudioTeamCommentNotFoundError,
   StudioTeamCommentQuotaError,
   StudioTeamCommentStateConflictError,
@@ -64,7 +67,10 @@ export class StudioTeamCommentService {
     body: CreateStudioTeamCommentThreadDto
   ): Promise<StudioTeamCommentThread> {
     const input = CreateStudioTeamCommentThreadSchema.parse(body);
-    const response = await this.run(() => this.repository.createThread(actorUserId, workId, input));
+    const response = await this.run(() => this.repository.createThread(actorUserId, workId, {
+      ...input,
+      mutationId: input.mutationId ?? randomUUID(),
+    }));
     return StudioTeamCommentThreadSchema.parse(response);
   }
 
@@ -79,7 +85,7 @@ export class StudioTeamCommentService {
       actorUserId,
       workId,
       threadId,
-      input.body
+      { ...input, mutationId: input.mutationId ?? randomUUID() }
     ));
     return AddStudioTeamCommentReplyResponseSchema.parse(response);
   }
@@ -144,6 +150,11 @@ export class StudioTeamCommentService {
       if (error instanceof StudioTeamCommentStateConflictError) {
         throw new ConflictException(
           "해결된 팀 검수 댓글에는 답글을 추가할 수 없습니다. 댓글을 다시 연 뒤 작성해 주세요."
+        );
+      }
+      if (error instanceof StudioTeamCommentMutationConflictError) {
+        throw new ConflictException(
+          "같은 댓글 요청 식별자가 다른 내용에 이미 사용되었습니다. 새 요청으로 다시 시도해 주세요."
         );
       }
       if (error instanceof StudioTeamCommentQuotaError) {

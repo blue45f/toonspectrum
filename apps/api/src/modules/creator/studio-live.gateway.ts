@@ -93,7 +93,8 @@ const ResourceIdSchema = boundedIdentifier(200);
 const ConnectionIdSchema = boundedIdentifier(128);
 const ScreenShareIdSchema = boundedIdentifier(160);
 const ScreenShareLabelSchema = boundedIdentifier(80);
-const StudioCrdtProtocolVersionSchema = z.literal(1);
+const STUDIO_CRDT_PROTOCOL_VERSION = 2 as const;
+const StudioCrdtProtocolVersionSchema = z.literal(STUDIO_CRDT_PROTOCOL_VERSION);
 const StudioCrdtRequestIdSchema = boundedIdentifier(160);
 const StudioCrdtUpdateIdSchema = z.uuid();
 const STUDIO_CRDT_BASE64_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u;
@@ -399,7 +400,7 @@ type StudioLiveCrdtSyncInput = z.infer<typeof StudioLiveCrdtSyncSchema>;
 type StudioLiveCrdtUpdateInput = z.infer<typeof StudioLiveCrdtUpdateSchema>;
 
 export interface StudioLiveCrdtSyncResult {
-  protocolVersion: 1;
+  protocolVersion: typeof STUDIO_CRDT_PROTOCOL_VERSION;
   workId: string;
   requestId: string;
   transferId: string;
@@ -411,7 +412,7 @@ export interface StudioLiveCrdtSyncResult {
 }
 
 export interface StudioLiveCrdtUpdateAck {
-  protocolVersion: 1;
+  protocolVersion: typeof STUDIO_CRDT_PROTOCOL_VERSION;
   workId: string;
   updateId: string;
   serverSequence: string;
@@ -420,7 +421,7 @@ export interface StudioLiveCrdtUpdateAck {
 }
 
 export interface StudioLiveCrdtRemoteUpdate {
-  protocolVersion: 1;
+  protocolVersion: typeof STUDIO_CRDT_PROTOCOL_VERSION;
   workId: string;
   updateId: string;
   serverSequence: string;
@@ -1152,7 +1153,7 @@ export class StudioLiveGateway
     return reply(ack, {
       ok: true,
       data: {
-        protocolVersion: 1,
+        protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
         workId: parsed.data.workId,
         requestId: parsed.data.requestId,
         transferId: crypto.randomUUID(),
@@ -1219,7 +1220,7 @@ export class StudioLiveGateway
     }
 
     const data: StudioLiveCrdtUpdateAck = {
-      protocolVersion: 1,
+      protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
       workId: parsed.data.workId,
       updateId: applied.updateId,
       serverSequence: applied.serverSequence,
@@ -1235,7 +1236,7 @@ export class StudioLiveGateway
     reply(ack, response);
     if (!applied.duplicate) {
       const remote: StudioLiveCrdtRemoteUpdate = {
-        protocolVersion: 1,
+        protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION,
         workId: parsed.data.workId,
         updateId: applied.updateId,
         serverSequence: applied.serverSequence,

@@ -15,6 +15,18 @@ const StudioTeamCommentOpaqueIdSchema = z
   );
 
 const StudioTeamCommentWorkIdSchema = z.string().trim().min(1).max(160);
+export const StudioTeamCommentMutationIdSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(160)
+  .refine(
+    (value) => ![...value].some((character) => {
+      const codePoint = character.codePointAt(0) ?? 0;
+      return codePoint <= 31 || (codePoint >= 127 && codePoint <= 159);
+    }),
+    "요청 식별자에 제어 문자를 사용할 수 없습니다."
+  );
 const StudioTeamCommentAnchorIdSchema = z
   .string()
   .max(120)
@@ -111,13 +123,16 @@ export const ListStudioTeamCommentsQuerySchema = z
 
 export const CreateStudioTeamCommentThreadSchema = z
   .object({
+    // Optional during the rolling-deploy window: new clients send Idempotency-Key while cached
+    // clients keep the legacy body. The service supplies a server key when neither is present.
+    mutationId: StudioTeamCommentMutationIdSchema.optional(),
     anchor: StudioTeamCommentAnchorSchema,
     body: StudioTeamCommentBodySchema,
   })
   .strict();
 
 export const AddStudioTeamCommentReplySchema = CreateStudioTeamCommentThreadSchema
-  .pick({ body: true })
+  .pick({ mutationId: true, body: true })
   .strict();
 
 export const StudioTeamCommentUserSchema = z

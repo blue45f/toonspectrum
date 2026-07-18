@@ -226,10 +226,12 @@ describe("Studio team comment API client", () => {
       });
 
     await createStudioTeamCommentThread("work/한글", {
+      mutationId: "mutation-create-1",
       anchor: { type: "element", pageId: "page-1", frameId: "frame-1", elementId: "el-1" },
       body: "  첫 댓글  ",
     });
     await addStudioTeamCommentReply("work/한글", "thread/한글", {
+      mutationId: "mutation-reply-1",
       body: "  후속 답글  ",
     });
 
@@ -245,14 +247,38 @@ describe("Studio team comment API client", () => {
         },
         body: "첫 댓글",
       },
-      { signal: undefined }
+      {
+        signal: undefined,
+        headers: { "Idempotency-Key": "mutation-create-1" },
+      }
     );
     expect(apiPost).toHaveBeenNthCalledWith(
       2,
       "/creator/works/work%2F%ED%95%9C%EA%B8%80/team/comments/thread%2F%ED%95%9C%EA%B8%80/replies",
       { body: "후속 답글" },
-      { signal: undefined }
+      {
+        signal: undefined,
+        headers: { "Idempotency-Key": "mutation-reply-1" },
+      }
     );
+  });
+
+  it("adds a cryptographically random retry key when no local mutation id is available", async () => {
+    apiPost.mockResolvedValueOnce(
+      openThread({ messages: [openThread().messages[0]], messageCount: 1 })
+    );
+
+    await createStudioTeamCommentThread("work/한글", {
+      anchor: PAGE_ANCHOR,
+      body: "첫 댓글",
+    });
+
+    const requestOptions = apiPost.mock.calls[0]?.[2] as {
+      headers?: { "Idempotency-Key"?: unknown };
+    } | undefined;
+    expect(requestOptions?.headers?.["Idempotency-Key"]).toEqual(expect.stringMatching(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
+    ));
   });
 
   it("uses dedicated resolve, reopen, per-thread read, and bulk read endpoints", async () => {
@@ -323,19 +349,28 @@ describe("Studio team comment API client", () => {
     ).rejects.toThrow("댓글 목록 조건이 올바르지 않습니다");
     await expect(
       createStudioTeamCommentThread("work-1", {
+        mutationId: "mutation-invalid-anchor",
         anchor: { type: "point", pageId: "page-1", x: 2, y: 0.5 },
         body: "내용",
       })
     ).rejects.toThrow("연결 위치가 올바르지 않습니다");
     await expect(
       createStudioTeamCommentThread("work-1", {
+        mutationId: "mutation-long-body",
         anchor: PAGE_ANCHOR,
         body: `${" ".repeat(4_000)}x`,
       })
     ).rejects.toThrow("새 댓글 내용 또는 연결 위치가 올바르지 않습니다");
     await expect(
       addStudioTeamCommentReply("work-1", "thread-1", {
+        mutationId: "mutation-long-reply",
         body: `${" ".repeat(4_000)}x`,
+      })
+    ).rejects.toThrow("답글 내용이 올바르지 않습니다");
+    await expect(
+      addStudioTeamCommentReply("work-1", "thread-1", {
+        mutationId: "bad\nmutation",
+        body: "답글",
       })
     ).rejects.toThrow("답글 내용이 올바르지 않습니다");
     expect(apiGet).not.toHaveBeenCalled();

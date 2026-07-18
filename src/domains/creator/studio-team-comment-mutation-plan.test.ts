@@ -27,6 +27,7 @@ describe("planStudioTeamCommentMutation", () => {
     }, at);
     expect(planStudioTeamCommentMutation(empty, created)).toEqual({
       kind: "create",
+      mutationId: "thread-1",
       anchor: { type: "point", pageId: "page-1", x: 0.2, y: 0.3 },
       body: "검수",
     });
@@ -38,6 +39,7 @@ describe("planStudioTeamCommentMutation", () => {
     }, new Date("2026-07-18T01:01:00.000Z"));
     expect(planStudioTeamCommentMutation(created, replied)).toEqual({
       kind: "reply",
+      mutationId: "reply-1",
       threadId: "thread-1",
       body: "반영했습니다.",
     });

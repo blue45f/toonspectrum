@@ -1176,6 +1176,82 @@ export const creatorWorkTeamCommentReads = pgTable(
   ]
 );
 
+// 댓글 생성/답글 추가의 네트워크 재시도를 정확히 한 번의 논리 mutation으로 수렴시키는 영수증.
+// work 행을 먼저 잠그는 repository 규약과 복합 PK가 같은 작품 안의 동시 재시도를 직렬화하며,
+// requestHash가 같은 mutationId를 다른 payload에 재사용하는 것을 거부한다. response는 최초 커밋
+// 결과를 그대로 재생하기 위한 서버 응답 snapshot이고, thread/message 삭제 시 함께 정리된다.
+export const creatorWorkTeamCommentMutations = pgTable(
+  "creator_work_team_comment_mutation",
+  {
+    workId: text("workId").notNull(),
+    actorUserId: text("actorUserId").notNull(),
+    mutationId: text("mutationId").notNull(),
+    operation: text("operation").notNull(),
+    requestHash: text("requestHash").notNull(),
+    threadId: text("threadId").notNull(),
+    messageId: text("messageId").notNull(),
+    response: jsonb("response").$type<unknown>().notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    primaryKey({
+      name: "creator_work_team_comment_mutation_pkey",
+      columns: [t.workId, t.actorUserId, t.mutationId],
+    }),
+    foreignKey({
+      name: "creator_work_team_comment_mutation_work_fkey",
+      columns: [t.workId],
+      foreignColumns: [creatorWorks.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "creator_work_team_comment_mutation_actor_fkey",
+      columns: [t.actorUserId],
+      foreignColumns: [users.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "creator_work_team_comment_mutation_thread_fkey",
+      columns: [t.workId, t.threadId],
+      foreignColumns: [
+        creatorWorkTeamCommentThreads.workId,
+        creatorWorkTeamCommentThreads.id,
+      ],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "creator_work_team_comment_mutation_message_fkey",
+      columns: [t.threadId, t.messageId],
+      foreignColumns: [
+        creatorWorkTeamCommentMessages.threadId,
+        creatorWorkTeamCommentMessages.id,
+      ],
+    }).onDelete("cascade"),
+    unique("creator_work_team_comment_mutation_message_unique").on(t.messageId),
+    index("idx_creator_work_team_comment_mutation_actor_created")
+      .on(t.actorUserId, t.createdAt.desc()),
+    index("idx_creator_work_team_comment_mutation_thread_created")
+      .on(t.threadId, t.createdAt.desc()),
+    check(
+      "creator_work_team_comment_mutation_id_check",
+      sql`length(${t.mutationId}) between 1 and 160
+        and ${t.mutationId} = btrim(${t.mutationId})
+        and ${t.mutationId} !~ '[[:cntrl:]]'`
+    ),
+    check(
+      "creator_work_team_comment_mutation_operation_check",
+      sql`${t.operation} in ('thread_create', 'reply_add')`
+    ),
+    check(
+      "creator_work_team_comment_mutation_request_hash_check",
+      sql`${t.requestHash} ~ '^[0-9a-f]{64}$'`
+    ),
+    check(
+      "creator_work_team_comment_mutation_response_check",
+      sql`jsonb_typeof(${t.response}) = 'object'`
+    ),
+  ]
+);
+
 // ── 창작 연재 시리즈 — 회차(creator_work.seriesId)를 묶는 단위 ──────────────
 // author/avatar는 게시 시점 스냅샷(표시는 항상 users 조인 값 우선, 탈퇴/조인 실패 시 폴백).
 export const creatorSeries = pgTable("creator_series", {

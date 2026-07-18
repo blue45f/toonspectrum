@@ -48,6 +48,19 @@ const StudioTeamCommentOpaqueIdSchema = z
       })
   );
 
+const StudioTeamCommentMutationIdSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(MAX_OPAQUE_ID_LENGTH)
+  .refine(
+    (value) =>
+      ![...value].some((character) => {
+        const codePoint = character.codePointAt(0) ?? 0;
+        return codePoint <= 31 || (codePoint >= 127 && codePoint <= 159);
+      })
+  );
+
 const StudioTeamCommentBodySchema = z
   .string()
   .max(MAX_COMMENT_BODY_LENGTH)
@@ -274,13 +287,17 @@ const ListStudioTeamCommentsOptionsSchema = z
 
 const CreateStudioTeamCommentThreadInputSchema = z
   .object({
+    mutationId: StudioTeamCommentMutationIdSchema.optional(),
     anchor: StudioCommentAnchorSchema,
     body: StudioTeamCommentBodySchema,
   })
   .strict();
 
 const AddStudioTeamCommentReplyInputSchema = z
-  .object({ body: StudioTeamCommentBodySchema })
+  .object({
+    mutationId: StudioTeamCommentMutationIdSchema.optional(),
+    body: StudioTeamCommentBodySchema,
+  })
   .strict();
 
 export type StudioTeamCommentAnchor = StudioCommentAnchor;
@@ -333,6 +350,16 @@ export class StudioTeamCommentInputError extends Error {
     super(message);
     this.name = "StudioTeamCommentInputError";
   }
+}
+
+export function createStudioTeamCommentMutationId(): string {
+  const generated = globalThis.crypto?.randomUUID?.();
+  if (!generated) {
+    throw new StudioTeamCommentInputError(
+      "이 브라우저에서는 안전한 댓글 요청 식별자를 만들 수 없습니다."
+    );
+  }
+  return generated;
 }
 
 export function isStudioTeamCommentResponseContractError(
@@ -546,8 +573,16 @@ export async function createStudioTeamCommentThread(
     inputValue,
     "새 댓글 내용 또는 연결 위치가 올바르지 않습니다."
   );
+  const mutationId = input.mutationId ?? createStudioTeamCommentMutationId();
+  const request = {
+    anchor: input.anchor,
+    body: input.body,
+  };
   return requestStudioTeamComment({
-    run: () => api.post<unknown>(commentCollectionPath(workId), input, { signal }),
+    run: () => api.post<unknown>(commentCollectionPath(workId), request, {
+      signal,
+      headers: { "Idempotency-Key": mutationId },
+    }),
     schema: StudioTeamCommentThreadSchema,
     validateScope: (response) => response.workId === workId,
     fallback: "팀 댓글을 등록하지 못했습니다.",
@@ -569,9 +604,14 @@ export async function addStudioTeamCommentReply(
     inputValue,
     "답글 내용이 올바르지 않습니다."
   );
+  const mutationId = input.mutationId ?? createStudioTeamCommentMutationId();
+  const request = { body: input.body };
   return requestStudioTeamComment({
     run: () =>
-      api.post<unknown>(`${commentThreadPath(workId, threadId)}/replies`, input, { signal }),
+      api.post<unknown>(`${commentThreadPath(workId, threadId)}/replies`, request, {
+        signal,
+        headers: { "Idempotency-Key": mutationId },
+      }),
     schema: AddStudioTeamCommentReplyResponseSchema,
     validateScope: (response) => response.threadId === threadId,
     fallback: "팀 댓글에 답글을 등록하지 못했습니다.",

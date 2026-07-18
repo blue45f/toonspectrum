@@ -418,7 +418,7 @@ function crdtUpdate(key = "stroke", value = "1"): string {
 
 function crdtUpdateRequest(sequence = 1) {
   return {
-    protocolVersion: 1 as const,
+    protocolVersion: 2 as const,
     workId: "work-1",
     updateId: `00000000-0000-4000-8000-${sequence.toString().padStart(12, "0")}`,
     clientSequence: sequence,
@@ -467,15 +467,15 @@ describe("studio live protocol", () => {
     ).toBe(false);
   });
 
-  it("enforces the exact CRDT v1 request shape and incremental byte boundary", () => {
+  it("enforces the exact CRDT v2 request shape and incremental byte boundary", () => {
     const sync = {
-      protocolVersion: 1,
+      protocolVersion: 2,
       workId: "work-1",
       requestId: "request-1",
       stateVector: crdtStateVector(),
     };
     expect(StudioLiveCrdtSyncSchema.safeParse(sync).success).toBe(true);
-    expect(StudioLiveCrdtSyncSchema.safeParse({ ...sync, protocolVersion: 2 }).success).toBe(
+    expect(StudioLiveCrdtSyncSchema.safeParse({ ...sync, protocolVersion: 1 }).success).toBe(
       false
     );
     expect(StudioLiveCrdtSyncSchema.safeParse({ ...sync, extra: true }).success).toBe(false);
@@ -3233,7 +3233,7 @@ describe("StudioLiveGateway", () => {
     const response = await harness.gateway.syncCrdtDocument(
       viewer as never,
       {
-        protocolVersion: 1,
+        protocolVersion: 2,
         workId: "work-1",
         requestId: "request-1",
         stateVector: crdtStateVector(),
@@ -3244,7 +3244,7 @@ describe("StudioLiveGateway", () => {
     expect(response).toEqual({
       ok: true,
       data: {
-        protocolVersion: 1,
+        protocolVersion: 2,
         workId: "work-1",
         requestId: "request-1",
         transferId: expect.any(String),
@@ -3294,7 +3294,7 @@ describe("StudioLiveGateway", () => {
     expect(response).toEqual({
       ok: true,
       data: {
-        protocolVersion: 1,
+        protocolVersion: 2,
         workId: "work-1",
         updateId: request.updateId,
         serverSequence: "1",
@@ -3306,7 +3306,7 @@ describe("StudioLiveGateway", () => {
       target: "from:editor:studio-live:work-1",
       event: "studio:crdt:update",
       payload: {
-        protocolVersion: 1,
+        protocolVersion: 2,
         workId: "work-1",
         updateId: request.updateId,
         serverSequence: "1",
@@ -3390,7 +3390,7 @@ describe("StudioLiveGateway", () => {
       harness.gateway.syncCrdtDocument(
         editor as never,
         {
-          protocolVersion: 1,
+          protocolVersion: 2,
           workId: "work-1",
           requestId: "corrupt-storage-sync",
           stateVector: crdtStateVector(),
@@ -3457,7 +3457,7 @@ describe("StudioLiveGateway", () => {
       target: "from:editor:studio-live:work-1",
       event: "studio:crdt:update",
       payload: {
-        protocolVersion: 1,
+        protocolVersion: 2,
         workId: "work-1",
         updateId: request.updateId,
         serverSequence: "8",
@@ -3537,7 +3537,7 @@ describe("StudioLiveGateway", () => {
           harness.gateway.syncCrdtDocument(
             firstConnection as never,
             {
-              protocolVersion: 1,
+              protocolVersion: 2,
               workId: "work-1",
               requestId: `sync-before-${request}`,
               stateVector: crdtStateVector(),
@@ -3556,7 +3556,7 @@ describe("StudioLiveGateway", () => {
         harness.gateway.syncCrdtDocument(
           reconnected as never,
           {
-            protocolVersion: 1,
+            protocolVersion: 2,
             workId: "work-1",
             requestId: "sync-after-reconnect",
             stateVector: crdtStateVector(),
@@ -3607,7 +3607,7 @@ describe("StudioLiveGateway", () => {
       harness.gateway.syncCrdtDocument(
         unjoined as never,
         {
-          protocolVersion: 1,
+          protocolVersion: 2,
           workId: "work-1",
           requestId: "unjoined-sync",
           stateVector: crdtStateVector(),
@@ -3654,7 +3654,7 @@ describe("StudioLiveGateway", () => {
       harness.gateway.syncCrdtDocument(
         editor as never,
         {
-          protocolVersion: 1,
+          protocolVersion: 2,
           workId: "work-1",
           requestId: "bounded-quota-map",
           stateVector: crdtStateVector(),
@@ -3680,7 +3680,7 @@ describe("StudioLiveGateway", () => {
       harness.gateway.syncCrdtDocument(
         editor as never,
         {
-          protocolVersion: 1,
+          protocolVersion: 2,
           workId: "work-1",
           requestId: "purge-stale-quota",
           stateVector: crdtStateVector(),

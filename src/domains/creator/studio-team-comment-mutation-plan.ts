@@ -9,8 +9,8 @@ import {
 } from "./studio-comments";
 
 export type StudioTeamCommentMutationPlan =
-  | { kind: "create"; anchor: StudioCommentAnchor; body: string }
-  | { kind: "reply"; threadId: string; body: string }
+  | { kind: "create"; mutationId: string; anchor: StudioCommentAnchor; body: string }
+  | { kind: "reply"; mutationId: string; threadId: string; body: string }
   | { kind: "resolve"; threadId: string }
   | { kind: "reopen"; threadId: string };
 
@@ -50,7 +50,12 @@ export function planStudioTeamCommentMutation(
         mentions: thread.mentions,
       }, new Date(thread.createdAt));
       return documentsEqual(replayed, next.data)
-        ? { kind: "create", anchor: thread.anchor, body: thread.body }
+        ? {
+            kind: "create",
+            mutationId: thread.id,
+            anchor: thread.anchor,
+            body: thread.body,
+          }
         : null;
     } catch {
       return null;
@@ -81,7 +86,12 @@ export function planStudioTeamCommentMutation(
           mentions: reply.mentions,
         }, new Date(reply.createdAt));
         return documentsEqual(replayed, next.data)
-          ? { kind: "reply", threadId: previousThread.id, body: reply.body }
+          ? {
+              kind: "reply",
+              mutationId: reply.id,
+              threadId: previousThread.id,
+              body: reply.body,
+            }
           : null;
       } catch {
         return null;

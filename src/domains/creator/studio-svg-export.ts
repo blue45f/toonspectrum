@@ -101,6 +101,10 @@ import { isEffectivelyHidden, type LayerGroup } from "./studio-layers";
 import { getPatternDef, normalizePatternSpec, type StudioPatternSpec } from "./studio-pattern-fill";
 import { skewDegToKonva, type SkewFields } from "./studio-skew";
 import {
+  isStudioStrokePaintModelCompatible,
+  type StudioStrokePaintModel,
+} from "./studio-stroke-paint-model";
+import {
   effectiveCornerRadius,
   lineArrowHeadGeoms,
   normalizeShapeParams,
@@ -263,7 +267,9 @@ export interface SvgDrawElLike extends SvgElMeta {
   brush?: string;
   pressures?: number[];
   pressureModel?: StudioInkPressureModel;
+  paintModel?: StudioStrokePaintModel;
   sampleSpacing?: number;
+  stampPipeline?: "causal-walker-v2";
   watercolorPipeline?: "causal-walker-v2";
   tiltXs?: number[];
   tiltYs?: number[];
@@ -448,6 +454,33 @@ function pointsToPathD(points: readonly number[], closed = false): string {
   for (let i = 2; i + 1 < points.length; i += 2) parts.push(`L ${fmt(points[i])} ${fmt(points[i + 1])}`);
   if (closed) parts.push("Z");
   return parts.join(" ");
+}
+
+/**
+ * Round dabs as one painted SVG geometry.
+ *
+ * A list of sibling circles would composite an alpha-bearing CSS color once per circle, so their
+ * overlaps would darken even when the stroke opacity itself is isolated on a parent group. One
+ * compound path is rasterized as a single source shape instead, matching the Canvas Path2D fill
+ * used by `layered-flow-v1` for both color alpha and stroke opacity.
+ */
+function circularDabsToCompoundPathD(
+  dabs: readonly { readonly x: number; readonly y: number; readonly radius: number }[]
+): string {
+  return dabs.map((dab) => {
+    const x = Number.isFinite(dab.x) ? dab.x : 0;
+    const y = Number.isFinite(dab.y) ? dab.y : 0;
+    const radius = Number.isFinite(dab.radius) ? Math.max(0, dab.radius) : 0;
+    if (radius === 0) return `M ${fmt(x)} ${fmt(y)} Z`;
+    const left = x - radius;
+    const right = x + radius;
+    return [
+      `M ${fmt(left)} ${fmt(y)}`,
+      `A ${fmt(radius)} ${fmt(radius)} 0 1 0 ${fmt(right)} ${fmt(y)}`,
+      `A ${fmt(radius)} ${fmt(radius)} 0 1 0 ${fmt(left)} ${fmt(y)}`,
+      "Z",
+    ].join(" ");
+  }).join(" ");
 }
 
 /** 평탄 포인트 → polygon points 속성("x,y x,y ..."). */
@@ -1108,6 +1141,25 @@ function serializeFreehand(
       minDistance: el.sampleSpacing ?? 0,
       size: strokeWidth,
     });
+    const layeredOpacity = isStudioStrokePaintModelCompatible({
+      paintModel: el.paintModel,
+      kind: el.kind,
+      mode: el.mode,
+      brush: el.brush,
+      sampleSpacing: el.sampleSpacing,
+      pressureModel: el.pressureModel,
+      fill: el.fill,
+      brushDynamics: el.brushDynamics,
+      stampPipeline: el.stampPipeline,
+      watercolorPipeline: el.watercolorPipeline,
+      symmetry: el.symmetry,
+    });
+    if (layeredOpacity) {
+      const path = circularDabsToCompoundPathD(plan.dabs);
+      return path.length > 0
+        ? `<path d="${path}" fill="${escapeXml(stroke)}"${opacityAttr}/>`
+        : "";
+    }
     const dabs = plan.dabs.map((dab) => (
       `<circle cx="${fmt(dab.x)}" cy="${fmt(dab.y)}" r="${fmt(dab.radius)}" fill="${escapeXml(stroke)}"${opacityAttr}/>`
     )).join("");

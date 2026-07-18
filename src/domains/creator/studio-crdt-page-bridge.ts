@@ -1,3 +1,4 @@
+import { STUDIO_CRDT_STROKE_PAYLOAD_VERSION } from "./studio-crdt-protocol";
 import {
   STUDIO_CRDT_LAYER_GROUP_PAYLOAD_VERSION,
   STUDIO_CRDT_PAGE_PAYLOAD_VERSION,
@@ -13,6 +14,7 @@ import {
   type StudioCrdtPayloadSceneElementType,
 } from "./studio-crdt-scene-schema";
 import { isStudioInkPressureModel } from "./studio-ink-pressure-model";
+import { isStudioStrokePaintModelCompatible } from "./studio-stroke-paint-model";
 
 import type {
   StudioCrdtLayerGroupInput,
@@ -177,6 +179,14 @@ export function studioCrdtStrokeToDrawElement(
   }
   const pressureModel = extensions.pressureModel;
   if (isStudioInkPressureModel(pressureModel)) result.pressureModel = pressureModel;
+  const paintModel = extensions.paintModel;
+  const paintModelCandidate = { ...result, paintModel };
+  if (
+    payload.version === STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+    && isStudioStrokePaintModelCompatible(paintModelCandidate)
+  ) {
+    result.paintModel = paintModelCandidate.paintModel;
+  }
   if (!result.groupId && record.layerId !== "page-root") result.groupId = record.layerId;
   return result;
 }

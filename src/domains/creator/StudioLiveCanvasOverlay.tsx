@@ -53,7 +53,11 @@ export interface StudioLiveCanvasOverlayProps {
   canvasHeight: number;
   cursors: readonly StudioLiveCanvasCursor[];
   commentPins: readonly StudioCanvasCommentPin[];
-  onCommentPinClick: (anchor: StudioCommentAnchor, threadIds?: readonly string[]) => void;
+  onCommentPinClick: (
+    anchor: StudioCommentAnchor,
+    newestThreadId?: string,
+    threadIds?: readonly string[]
+  ) => void;
   flipX?: boolean;
 }
 
@@ -75,7 +79,11 @@ export interface StudioRemoteCursorOverlayProps {
   canvasHeight: number;
   hidden?: boolean;
   commentPins: readonly StudioCanvasCommentPin[];
-  onCommentPinClick: (anchor: StudioCommentAnchor, threadIds?: readonly string[]) => void;
+  onCommentPinClick: (
+    anchor: StudioCommentAnchor,
+    newestThreadId?: string,
+    threadIds?: readonly string[]
+  ) => void;
   flipX?: boolean;
 }
 
@@ -157,27 +165,34 @@ export function StudioLiveCanvasOverlay({
         <button
           key={pin.key}
           type="button"
+          aria-haspopup="dialog"
           aria-label={`${pin.label}, ${pin.unreadCount ? `읽지 않은 댓글 ${pin.unreadCount}개, ` : ""}열림 댓글 ${pin.count}개`}
+          data-studio-comment-pin="true"
           className={cn(
-            "pointer-events-auto absolute grid size-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-white bg-accent text-[0.65rem] font-black tabular-nums text-on-accent shadow-[0_4px_14px_oklch(0.12_0.03_270/0.38)] transition-transform hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-            pin.unreadCount ? "ring-4 ring-accent/30" : null
+            "pointer-events-auto absolute grid size-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full text-[0.65rem] font-black tabular-nums text-on-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+            "[&>span]:transition-transform [&>span]:duration-200 motion-reduce:[&>span]:transition-none hover:[&>span]:scale-110",
+            pin.unreadCount ? "[&>span]:ring-4 [&>span]:ring-accent/30" : null
           )}
           style={{
-            left: `clamp(1rem, ${(((flipX ? canvasWidth - pin.x : pin.x) / canvasWidth) * 100).toFixed(4)}%, calc(100% - 1rem))`,
-            top: `clamp(1rem, ${((pin.y / canvasHeight) * 100).toFixed(4)}%, calc(100% - 1rem))`,
-            marginLeft: pin.screenOffsetX ?? 0,
-            marginTop: pin.screenOffsetY ?? 0,
+            left: `clamp(1.375rem, calc(${(((flipX ? canvasWidth - pin.x : pin.x) / canvasWidth) * 100).toFixed(4)}% + ${(flipX ? -1 : 1) * (pin.screenOffsetX ?? 0)}px), calc(100% - 1.375rem))`,
+            top: `clamp(1.375rem, calc(${((pin.y / canvasHeight) * 100).toFixed(4)}% + ${pin.screenOffsetY ?? 0}px), calc(100% - 1.375rem))`,
           }}
           title={`${pin.label} · ${pin.unreadCount ? `읽지 않음 ${pin.unreadCount}개 · ` : ""}열림 ${pin.count}개`}
-          onClick={() => onCommentPinClick(pin.anchor, pin.threadIds)}
+          onClick={() => onCommentPinClick(
+            pin.anchor,
+            pin.newestUnreadThreadId ?? pin.newestThreadId,
+            pin.threadIds
+          )}
         >
-          {pin.count > 1 ? pin.count : <MessageCircle size={14} aria-hidden />}
-          {pin.unreadCount ? (
-            <span
-              aria-hidden
-              className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-white bg-warn shadow-sm"
-            />
-          ) : null}
+          <span className="relative grid size-8 place-items-center rounded-full border-2 border-panel bg-accent shadow-[0_4px_14px_oklch(0.10_0.02_70/0.42)]">
+            {pin.count > 1 ? pin.count : <MessageCircle size={14} aria-hidden />}
+            {pin.unreadCount ? (
+              <span
+                aria-hidden
+                className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-panel bg-warn shadow-sm"
+              />
+            ) : null}
+          </span>
         </button>
       ))}
 

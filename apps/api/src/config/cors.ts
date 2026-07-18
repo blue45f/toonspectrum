@@ -23,7 +23,7 @@ const LOCAL_CORS_ORIGINS = [
 ] as const;
 
 export const API_CORS_METHODS = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"] as const;
-export const API_CORS_HEADERS = ["Content-Type", "x-user-id"] as const;
+export const API_CORS_HEADERS = ["Content-Type", "x-user-id", "Idempotency-Key"] as const;
 
 function normalizeOrigin(value: string): string | null {
   try {

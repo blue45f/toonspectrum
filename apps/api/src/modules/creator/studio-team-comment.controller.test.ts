@@ -47,16 +47,19 @@ describe("StudioTeamCommentController", () => {
     )).toEqual({ status: "all", limit: 20, messageLimit: 20 });
     expect(createPipe.transform(
       {
+        mutationId: "mutation-create-1",
         anchor: { type: "element", pageId: "page-1", elementId: "panel-1" },
         body: "  선을 조금 더 굵게 해 주세요.  ",
       },
       { type: "body", metatype: undefined, data: undefined }
     )).toEqual({
+      mutationId: "mutation-create-1",
       anchor: { type: "element", pageId: "page-1", elementId: "panel-1" },
       body: "선을 조금 더 굵게 해 주세요.",
     });
     expect(createPipe.transform(
       {
+        mutationId: "mutation-create-2",
         anchor: { type: "frame", pageId: "page-1", frameId: "panel-1" },
         body: "컷 검수",
       },
@@ -64,6 +67,7 @@ describe("StudioTeamCommentController", () => {
     )).toMatchObject({ anchor: { type: "frame", frameId: "panel-1" } });
     expect(() => createPipe.transform(
       {
+        mutationId: "mutation-spoof",
         anchor: { type: "page", pageId: "page-1" },
         body: "본문",
         actorUserId: "spoofed-user",
@@ -73,13 +77,29 @@ describe("StudioTeamCommentController", () => {
     )).toThrow(BadRequestException);
     expect(() => createPipe.transform(
       {
+        mutationId: "mutation-invalid-point",
         anchor: { type: "point", pageId: "page-1", x: -0.1, y: 0.2, zoom: 4 },
         body: "본문",
       },
       { type: "body", metatype: undefined, data: undefined }
     )).toThrow(BadRequestException);
     expect(() => replyPipe.transform(
-      { body: "x".repeat(4_001) },
+      { mutationId: "mutation-long-reply", body: "x".repeat(4_001) },
+      { type: "body", metatype: undefined, data: undefined }
+    )).toThrow(BadRequestException);
+    expect(createPipe.transform(
+      { anchor: { type: "page", pageId: "page-1" }, body: "본문" },
+      { type: "body", metatype: undefined, data: undefined }
+    )).toEqual({
+      anchor: { type: "page", pageId: "page-1" },
+      body: "본문",
+    });
+    expect(replyPipe.transform(
+      { body: "  구버전 답글  " },
+      { type: "body", metatype: undefined, data: undefined }
+    )).toEqual({ body: "구버전 답글" });
+    expect(() => replyPipe.transform(
+      { mutationId: "bad\nmutation", body: "본문" },
       { type: "body", metatype: undefined, data: undefined }
     )).toThrow(BadRequestException);
     expect(() => queryPipe.transform(
@@ -88,7 +108,7 @@ describe("StudioTeamCommentController", () => {
     )).toThrow(BadRequestException);
   });
 
-  it("forwards authenticated work/thread scope without accepting actor fields from the body", async () => {
+  it("injects Idempotency-Key headers into authenticated create and reply requests", async () => {
     service.createThread.mockResolvedValue({ id: "thread-1" });
     service.addReply.mockResolvedValue({ threadId: "thread-1" });
     service.resolve.mockResolvedValue({ threadId: "thread-1", status: "resolved" });
@@ -98,11 +118,17 @@ describe("StudioTeamCommentController", () => {
     const instance = controller();
     const anchor = { type: "point" as const, pageId: "page-1", x: 0.1, y: 0.2 };
 
-    await instance.createThread({ id: "work-1" }, { anchor, body: "검수" }, "commenter");
+    await instance.createThread(
+      { id: "work-1" },
+      { anchor, body: "검수" },
+      "commenter",
+      "mutation-create"
+    );
     await instance.addReply(
       { id: "work-1", threadId: "thread-1" },
       { body: "반영했습니다." },
-      "editor"
+      "editor",
+      "mutation-reply"
     );
     await instance.resolve({ id: "work-1", threadId: "thread-1" }, "editor");
     await instance.reopen({ id: "work-1", threadId: "thread-1" }, "owner");
@@ -112,18 +138,63 @@ describe("StudioTeamCommentController", () => {
     expect(service.createThread).toHaveBeenCalledWith(
       "commenter",
       "work-1",
-      { anchor, body: "검수" }
+      { mutationId: "mutation-create", anchor, body: "검수" }
     );
     expect(service.addReply).toHaveBeenCalledWith(
       "editor",
       "work-1",
       "thread-1",
-      { body: "반영했습니다." }
+      { mutationId: "mutation-reply", body: "반영했습니다." }
     );
     expect(service.resolve).toHaveBeenCalledWith("editor", "work-1", "thread-1");
     expect(service.reopen).toHaveBeenCalledWith("owner", "work-1", "thread-1");
     expect(service.markRead).toHaveBeenCalledWith("viewer", "work-1", "thread-1");
     expect(service.markAllRead).toHaveBeenCalledWith("viewer", "work-1");
+  });
+
+  it("keeps legacy body mutation IDs and rejects conflicting header/body IDs", async () => {
+    service.createThread.mockResolvedValue({ id: "thread-1" });
+    service.addReply.mockResolvedValue({ threadId: "thread-1" });
+    const instance = controller();
+    const anchor = { type: "page" as const, pageId: "page-1" };
+
+    await instance.createThread(
+      { id: "work-1" },
+      { mutationId: "legacy-create", anchor, body: "구버전 요청" },
+      "commenter"
+    );
+    await instance.addReply(
+      { id: "work-1", threadId: "thread-1" },
+      { mutationId: "legacy-reply", body: "구버전 답글" },
+      "editor"
+    );
+
+    expect(service.createThread).toHaveBeenCalledWith("commenter", "work-1", {
+      mutationId: "legacy-create",
+      anchor,
+      body: "구버전 요청",
+    });
+    expect(service.addReply).toHaveBeenCalledWith(
+      "editor",
+      "work-1",
+      "thread-1",
+      { mutationId: "legacy-reply", body: "구버전 답글" }
+    );
+
+    await expect(instance.createThread(
+      { id: "work-1" },
+      { mutationId: "body-id", anchor, body: "충돌 요청" },
+      "commenter",
+      "header-id"
+    )).rejects.toBeInstanceOf(BadRequestException);
+    await expect(instance.addReply(
+      { id: "work-1", threadId: "thread-1" },
+      { body: "잘못된 헤더" },
+      "editor",
+      "bad\nmutation"
+    )).rejects.toBeInstanceOf(BadRequestException);
+    expect(service.createThread).toHaveBeenCalledTimes(1);
+    expect(service.addReply).toHaveBeenCalledTimes(1);
   });
 
   it("rejects unauthenticated private review reads and writes before service access", async () => {
@@ -134,7 +205,11 @@ describe("StudioTeamCommentController", () => {
     )).rejects.toBeInstanceOf(ForbiddenException);
     await expect(instance.createThread(
       { id: "work-1" },
-      { anchor: { type: "page", pageId: "page-1" }, body: "본문" }
+      {
+        mutationId: "mutation-unauthenticated",
+        anchor: { type: "page", pageId: "page-1" },
+        body: "본문",
+      }
     )).rejects.toBeInstanceOf(ForbiddenException);
     await expect(instance.resolve({ id: "work-1", threadId: "thread-1" }))
       .rejects.toBeInstanceOf(ForbiddenException);

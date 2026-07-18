@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   StudioTeamCommentCursorError,
   StudioTeamCommentForbiddenError,
+  StudioTeamCommentMutationConflictError,
   StudioTeamCommentNotFoundError,
   StudioTeamCommentQuotaError,
   StudioTeamCommentStateConflictError,
@@ -82,16 +83,21 @@ describe("StudioTeamCommentService", () => {
     await expect(instance.createThread(
       "artist-1",
       "work-1",
-      { anchor: thread.anchor, body: "  검수 본문  " }
+      {
+        mutationId: "  mutation-create  ",
+        anchor: thread.anchor,
+        body: "  검수 본문  ",
+      }
     )).resolves.toEqual(thread);
     await expect(instance.addReply(
       "artist-1",
       "work-1",
       "thread-1",
-      { body: "  반영했습니다.  " }
+      { mutationId: "  mutation-reply  ", body: "  반영했습니다.  " }
     )).resolves.toMatchObject({ threadId: "thread-1" });
 
     expect(repository.createThread).toHaveBeenCalledWith("artist-1", "work-1", {
+      mutationId: "mutation-create",
       anchor: thread.anchor,
       body: "검수 본문",
     });
@@ -99,15 +105,54 @@ describe("StudioTeamCommentService", () => {
       "artist-1",
       "work-1",
       "thread-1",
-      "반영했습니다."
+      { mutationId: "mutation-reply", body: "반영했습니다." }
     );
 
     repository.createThread.mockResolvedValue({ ...thread, serverSecret: "must-not-leak" });
     await expect(instance.createThread(
       "artist-1",
       "work-1",
-      { anchor: thread.anchor, body: "검수" }
+      { mutationId: "mutation-extra-response", anchor: thread.anchor, body: "검수" }
     )).rejects.toThrow();
+  });
+
+  it("supplies server mutation IDs when rolling-deploy clients omit them", async () => {
+    repository.createThread.mockResolvedValue(thread);
+    repository.addReply.mockResolvedValue({
+      threadId: "thread-1",
+      message,
+      latestActivitySequence: "2",
+    });
+    const instance = service();
+
+    await expect(instance.createThread(
+      "artist-1",
+      "work-1",
+      { anchor: thread.anchor, body: "구버전 댓글" }
+    )).resolves.toEqual(thread);
+    await expect(instance.addReply(
+      "artist-1",
+      "work-1",
+      "thread-1",
+      { body: "구버전 답글" }
+    )).resolves.toMatchObject({ threadId: "thread-1" });
+
+    const createInput = repository.createThread.mock.calls[0]?.[2];
+    const replyInput = repository.addReply.mock.calls[0]?.[3];
+    expect(createInput).toEqual({
+      anchor: thread.anchor,
+      body: "구버전 댓글",
+      mutationId: expect.stringMatching(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
+      ),
+    });
+    expect(replyInput).toEqual({
+      body: "구버전 답글",
+      mutationId: expect.stringMatching(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
+      ),
+    });
+    expect(createInput?.mutationId).not.toBe(replyInput?.mutationId);
   });
 
   it("maps repository capability, state, not-found, and cursor failures to HTTP errors", async () => {
@@ -125,7 +170,7 @@ describe("StudioTeamCommentService", () => {
     await expect(instance.createThread(
       "viewer",
       "work-1",
-      { anchor: thread.anchor, body: "검수" }
+      { mutationId: "mutation-forbidden", anchor: thread.anchor, body: "검수" }
     )).rejects.toBeInstanceOf(ForbiddenException);
 
     repository.addReply.mockRejectedValueOnce(
@@ -135,7 +180,7 @@ describe("StudioTeamCommentService", () => {
       "artist-1",
       "work-1",
       "thread-1",
-      { body: "답글" }
+      { mutationId: "mutation-resolved", body: "답글" }
     )).rejects.toBeInstanceOf(ConflictException);
 
     repository.resolve.mockRejectedValueOnce(new StudioTeamCommentNotFoundError("thread"));
@@ -146,7 +191,7 @@ describe("StudioTeamCommentService", () => {
     await expect(instance.createThread(
       "artist-1",
       "work-1",
-      { anchor: thread.anchor, body: "검수" }
+      { mutationId: "mutation-quota", anchor: thread.anchor, body: "검수" }
     )).rejects.toBeInstanceOf(PayloadTooLargeException);
 
     repository.addReply.mockRejectedValueOnce(
@@ -156,9 +201,23 @@ describe("StudioTeamCommentService", () => {
       "artist-1",
       "work-1",
       "thread-1",
-      { body: "답글" }
+      { mutationId: "mutation-work-quota", body: "답글" }
     )).rejects.toMatchObject({
       response: { message: "이 작품에 저장할 수 있는 팀 검수 메시지 수를 초과했습니다." },
+    });
+
+    repository.addReply.mockRejectedValueOnce(
+      new StudioTeamCommentMutationConflictError()
+    );
+    await expect(instance.addReply(
+      "artist-1",
+      "work-1",
+      "thread-1",
+      { mutationId: "mutation-reused", body: "다른 답글" }
+    )).rejects.toMatchObject({
+      response: {
+        message: "같은 댓글 요청 식별자가 다른 내용에 이미 사용되었습니다. 새 요청으로 다시 시도해 주세요.",
+      },
     });
   });
 

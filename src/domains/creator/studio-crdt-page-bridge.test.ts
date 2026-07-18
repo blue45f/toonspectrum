@@ -124,6 +124,8 @@ describe("studio CRDT page bridge", () => {
       stampPipeline: "causal-walker-v2",
       pressureModel: "linear-full-v1",
     });
+    expect(encoded.payload.version).toBe(1);
+    expect(encoded.payload.extensions?.paintModel).toBeUndefined();
 
     const decoded = studioCrdtStrokeToDrawElement({
       ...record("stroke-a", "page-a", 0),
@@ -143,6 +145,42 @@ describe("studio CRDT page bridge", () => {
       stamp: { flow: 0.4, hardness: 0.9, minSize: 0.2 },
       stampPipeline: "causal-walker-v2",
     });
+    expect(decoded.paintModel).toBeUndefined();
+  });
+
+  it("round-trips layered-flow only for compatible ordinary pen and marker strokes", () => {
+    const element: StudioCrdtCompatibleDrawElement = {
+      id: "stroke-layered-marker",
+      type: "draw",
+      kind: "freehand",
+      mode: "pen",
+      points: [1, 2, 3, 4],
+      pressures: [1, 1],
+      paintModel: "layered-flow-v1",
+      stroke: "rgba(20, 40, 80, 0.5)",
+      strokeWidth: 18,
+      opacity: 0.6,
+      brush: "marker",
+      sampleSpacing: 0,
+    };
+
+    const encoded = studioDrawElementToCrdtStroke("page-a", element);
+    expect(encoded.payload).toMatchObject({
+      version: 2,
+      opacity: 0.6,
+      brush: "marker",
+      extensions: { paintModel: "layered-flow-v1" },
+    });
+
+    const decoded = studioCrdtStrokeToDrawElement({
+      ...record(element.id, "page-a", 0),
+      ...encoded,
+      orderIndex: 0,
+      status: "finalized",
+      deleted: false,
+    });
+    expect(decoded.paintModel).toBe("layered-flow-v1");
+    expect(decoded.stroke).toBe(element.stroke);
   });
 
   it("round-trips the causal watercolor pipeline as an explicit CRDT extension", () => {
@@ -201,6 +239,8 @@ describe("studio CRDT page bridge", () => {
     });
     expect(decodedLegacy.pressureModel).toBeUndefined();
     expect("pressureModel" in decodedLegacy).toBe(false);
+    expect(decodedLegacy.paintModel).toBeUndefined();
+    expect("paintModel" in decodedLegacy).toBe(false);
     expect(decodedLegacy.stampPipeline).toBeUndefined();
     expect("stampPipeline" in decodedLegacy).toBe(false);
     expect(decodedLegacy.watercolorPipeline).toBeUndefined();
@@ -226,6 +266,60 @@ describe("studio CRDT page bridge", () => {
     ));
     expect(decodedUnknown.pressureModel).toBeUndefined();
     expect("pressureModel" in decodedUnknown).toBe(false);
+
+    const encodedUnknownPaint = studioDrawElementToCrdtStroke("page-a", {
+      ...legacy,
+      id: "stroke-unknown-paint-write",
+      paintModel: "layered-flow-v2",
+    } as unknown as StudioCrdtCompatibleDrawElement);
+    expect(encodedUnknownPaint.payload.extensions).toBeUndefined();
+
+    const decodedUnknownPaint = studioCrdtStrokeToDrawElement(record(
+      "stroke-unknown-paint-read",
+      "page-a",
+      0,
+      {
+        payload: {
+          ...record("paint-source", "page-a", 0).payload,
+          extensions: { paintModel: "layered-flow-v2" },
+        },
+      }
+    ));
+    expect(decodedUnknownPaint.paintModel).toBeUndefined();
+    expect("paintModel" in decodedUnknownPaint).toBe(false);
+
+    const decodedLegacyPaint = studioCrdtStrokeToDrawElement(record(
+      "stroke-legacy-paint-read",
+      "page-a",
+      0,
+      {
+        payload: {
+          ...record("legacy-paint-source", "page-a", 0).payload,
+          version: 1,
+          brush: "marker",
+          opacity: 0.6,
+          extensions: { paintModel: "layered-flow-v1" },
+        },
+      }
+    ));
+    expect(decodedLegacyPaint.paintModel).toBeUndefined();
+
+    const decodedIncompatiblePaint = studioCrdtStrokeToDrawElement(record(
+      "stroke-incompatible-paint-read",
+      "page-a",
+      0,
+      {
+        payload: {
+          ...record("incompatible-paint-source", "page-a", 0).payload,
+          version: 2,
+          mode: "eraser",
+          brush: "marker",
+          opacity: 0.6,
+          extensions: { paintModel: "layered-flow-v1" },
+        },
+      }
+    ));
+    expect(decodedIncompatiblePaint.paintModel).toBeUndefined();
   });
 
   it("round-trips the residual V2 ink contract as an explicit CRDT extension", () => {

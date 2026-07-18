@@ -32,6 +32,8 @@ export interface StudioCanvasCommentPin {
   threadIds?: readonly string[];
   /** Most recently active thread represented by this pin. */
   newestThreadId?: string;
+  /** Most recently active unread thread, preferred when opening a clustered pin. */
+  newestUnreadThreadId?: string;
   label: string;
   x: number;
   y: number;
@@ -59,6 +61,69 @@ function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
 }
 
+interface StudioPinCollisionDirection {
+  x: number;
+  y: number;
+}
+
+const DIAGONAL_COMPONENT = Math.SQRT1_2;
+
+/** Keeps collision nudges inside the visible edge instead of letting CSS clamp collapse them. */
+function studioPinCollisionDirections(
+  normalizedX: number,
+  normalizedY: number
+): readonly StudioPinCollisionDirection[] {
+  const horizontalEdge = normalizedX <= 0.03 || normalizedX >= 0.97;
+  const verticalEdge = normalizedY <= 0.03 || normalizedY >= 0.97;
+  const inwardX = normalizedX >= 0.5 ? -1 : 1;
+  const inwardY = normalizedY >= 0.5 ? -1 : 1;
+
+  if (horizontalEdge && verticalEdge) {
+    return [
+      { x: inwardX * DIAGONAL_COMPONENT, y: inwardY * DIAGONAL_COMPONENT },
+      { x: inwardX, y: 0 },
+      { x: 0, y: inwardY },
+      { x: inwardX * 0.924, y: inwardY * 0.383 },
+      { x: inwardX * 0.383, y: inwardY * 0.924 },
+    ];
+  }
+  if (horizontalEdge) {
+    return [
+      { x: inwardX, y: 0 },
+      { x: inwardX * DIAGONAL_COMPONENT, y: -DIAGONAL_COMPONENT },
+      { x: inwardX * DIAGONAL_COMPONENT, y: DIAGONAL_COMPONENT },
+      { x: 0, y: -1 },
+      { x: 0, y: 1 },
+    ];
+  }
+  if (verticalEdge) {
+    return [
+      { x: 0, y: inwardY },
+      { x: -DIAGONAL_COMPONENT, y: inwardY * DIAGONAL_COMPONENT },
+      { x: DIAGONAL_COMPONENT, y: inwardY * DIAGONAL_COMPONENT },
+      { x: -1, y: 0 },
+      { x: 1, y: 0 },
+    ];
+  }
+  return Array.from({ length: 6 }, (_, index) => {
+    const angle = index * (Math.PI / 3);
+    return { x: Math.cos(angle), y: Math.sin(angle) };
+  });
+}
+
+/**
+ * The visible pin center is clamped 22px inside the overlay. A 22px nudge therefore collapses
+ * back onto the unshifted pin at an edge. Reserve at least one full 44px touch target after that
+ * clamp, with extra diagonal travel at corners where each axis only receives √1/2 of the radius.
+ */
+function studioPinCollisionRadius(normalizedX: number, normalizedY: number): number {
+  const horizontalEdge = normalizedX <= 0.03 || normalizedX >= 0.97;
+  const verticalEdge = normalizedY <= 0.03 || normalizedY >= 0.97;
+  if (horizontalEdge && verticalEdge) return 88;
+  if (horizontalEdge || verticalEdge) return 72;
+  return 52;
+}
+
 function anchorTargetId(anchor: StudioCommentAnchor): string | null {
   if (anchor.type === "frame") return anchor.frameId;
   if (anchor.type === "element") return anchor.elementId;
@@ -84,6 +149,8 @@ export function projectStudioCanvasCommentPins(options: {
     threadIds: string[];
     newestThreadId: string;
     newestUpdatedAt: string;
+    newestUnreadThreadId?: string;
+    newestUnreadUpdatedAt?: string;
     unreadCount: number;
   }>();
 
@@ -93,7 +160,20 @@ export function projectStudioCanvasCommentPins(options: {
     const existing = grouped.get(key);
     if (existing) {
       existing.threadIds.push(thread.id);
-      if (options.unreadThreadIds?.has(thread.id)) existing.unreadCount += 1;
+      if (options.unreadThreadIds?.has(thread.id)) {
+        existing.unreadCount += 1;
+        if (
+          !existing.newestUnreadUpdatedAt
+          || Date.parse(thread.updatedAt) > Date.parse(existing.newestUnreadUpdatedAt)
+          || (
+            thread.updatedAt === existing.newestUnreadUpdatedAt
+            && thread.id.localeCompare(existing.newestUnreadThreadId ?? "") > 0
+          )
+        ) {
+          existing.newestUnreadThreadId = thread.id;
+          existing.newestUnreadUpdatedAt = thread.updatedAt;
+        }
+      }
       if (
         Date.parse(thread.updatedAt) > Date.parse(existing.newestUpdatedAt)
         || (
@@ -110,6 +190,10 @@ export function projectStudioCanvasCommentPins(options: {
         threadIds: [thread.id],
         newestThreadId: thread.id,
         newestUpdatedAt: thread.updatedAt,
+        newestUnreadThreadId: options.unreadThreadIds?.has(thread.id) ? thread.id : undefined,
+        newestUnreadUpdatedAt: options.unreadThreadIds?.has(thread.id)
+          ? thread.updatedAt
+          : undefined,
         unreadCount: options.unreadThreadIds?.has(thread.id) ? 1 : 0,
       });
     }
@@ -139,6 +223,7 @@ export function projectStudioCanvasCommentPins(options: {
       unreadCount: group.unreadCount,
       threadIds: group.threadIds,
       newestThreadId: group.newestThreadId,
+      newestUnreadThreadId: group.newestUnreadThreadId,
       label:
         options.labelForAnchor?.(group.anchor) ??
         (group.anchor.type === "page"
@@ -163,10 +248,18 @@ export function projectStudioCanvasCommentPins(options: {
       && Math.abs(candidate.y / options.canvasHeight - pin.y / options.canvasHeight) < 0.02
     ).length;
     if (collisionIndex === 0) continue;
-    const angle = ((collisionIndex - 1) % 6) * (Math.PI / 3);
-    const radius = 22 * Math.ceil(collisionIndex / 6);
-    pin.screenOffsetX = Math.round(Math.cos(angle) * radius);
-    pin.screenOffsetY = Math.round(Math.sin(angle) * radius);
+    const directions = studioPinCollisionDirections(
+      pin.x / options.canvasWidth,
+      pin.y / options.canvasHeight
+    );
+    const direction = directions[(collisionIndex - 1) % directions.length];
+    const ring = Math.floor((collisionIndex - 1) / directions.length) + 1;
+    const radius = studioPinCollisionRadius(
+      pin.x / options.canvasWidth,
+      pin.y / options.canvasHeight
+    ) * ring;
+    pin.screenOffsetX = Math.round(direction.x * radius);
+    pin.screenOffsetY = Math.round(direction.y * radius);
   }
   return sorted;
 }

@@ -23,6 +23,7 @@ import {
 } from "./studio-crdt-document";
 import {
   STUDIO_CRDT_PROTOCOL_VERSION,
+  STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_UPDATE_MAX_BYTES,
   encodeStudioCrdtStateVector,
   encodeStudioCrdtSyncChunks,
@@ -193,6 +194,41 @@ describe("StudioCrdtDocument", () => {
 
     expect(record.payload.sampleSpacing).toBe(0);
     expect(document.getStroke("fixed-rate")?.payload.sampleSpacing).toBe(0);
+    document.destroy();
+  });
+
+  it("reads legacy strokes while requiring V2 and compatible fields for layered-flow paint", () => {
+    const document = new StudioCrdtDocument();
+    expect(document.addStroke(stroke("legacy-stroke", "page-a")).payload.version).toBe(1);
+    const layered = payload([10, 20, 14, 20], {
+      version: STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
+      opacity: 0.6,
+      brush: "marker",
+      sampleSpacing: 0,
+      extensions: { paintModel: "layered-flow-v1" },
+    });
+    expect(document.addStroke({
+      ...stroke("layered-stroke", "page-a"),
+      payload: layered,
+    }).payload.extensions?.paintModel).toBe("layered-flow-v1");
+
+    const invalidPayloads: StudioCrdtDrawStrokePayload[] = [
+      { ...layered, version: 1 as const },
+      { ...layered, mode: "eraser" as const },
+      { ...layered, sampleSpacing: undefined },
+      { ...layered, brush: "watercolor" },
+      { ...layered, symmetry: { type: "vertical" } },
+      { ...layered, extensions: {
+        paintModel: "layered-flow-v1",
+        stampPipeline: "causal-walker-v2",
+      } },
+    ];
+    for (const [index, invalid] of invalidPayloads.entries()) {
+      expect(() => document.addStroke({
+        ...stroke(`invalid-${index}`, "page-a"),
+        payload: invalid,
+      })).toThrow("페인트 모델과 브러시 합성 모드가 호환되지 않습니다");
+    }
     document.destroy();
   });
 

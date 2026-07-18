@@ -25,6 +25,38 @@ function addThread(
   );
 }
 
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.min(maximum, Math.max(minimum, value));
+}
+
+function resolvedPinCenter(
+  pin: ReturnType<typeof projectStudioCanvasCommentPins>[number],
+  canvasWidth: number,
+  canvasHeight: number,
+  viewportWidth = 390,
+  viewportHeight = 667
+): { x: number; y: number } {
+  return {
+    x: clamp(
+      (pin.x / canvasWidth) * viewportWidth + (pin.screenOffsetX ?? 0),
+      22,
+      viewportWidth - 22
+    ),
+    y: clamp(
+      (pin.y / canvasHeight) * viewportHeight + (pin.screenOffsetY ?? 0),
+      22,
+      viewportHeight - 22
+    ),
+  };
+}
+
+function centerDistance(
+  first: { x: number; y: number },
+  second: { x: number; y: number }
+): number {
+  return Math.hypot(first.x - second.x, first.y - second.y);
+}
+
 describe("projectStudioCanvasCommentPins", () => {
   it("keeps clustered point pins and exact-location filtering on the same canonical identity", () => {
     const firstAnchor: StudioCommentAnchor = {
@@ -64,6 +96,7 @@ describe("projectStudioCanvasCommentPins", () => {
     expect(clustered).toMatchObject({
       threadIds: ["thread-near-old", "thread-near-new"],
       newestThreadId: "thread-near-new",
+      newestUnreadThreadId: "thread-near-new",
       unreadCount: 1,
     });
     expect(clustered).toBeDefined();
@@ -136,11 +169,81 @@ describe("projectStudioCanvasCommentPins", () => {
       .toBeGreaterThan(0);
   });
 
+  it("nudges edge collisions toward the canvas interior before the overlay clamp", () => {
+    let document = createEmptyStudioCommentsDocument();
+    document = addThread(document, "thread-right-a", {
+      type: "point", pageId: "page-1", x: 0.999, y: 0.5,
+    }, "2026-07-18T00:00:00.000Z");
+    document = addThread(document, "thread-right-b", {
+      type: "point", pageId: "page-1", x: 0.9995, y: 0.5005,
+    }, "2026-07-18T00:01:00.000Z");
+    const rightPins = projectStudioCanvasCommentPins({
+      threads: document.threads,
+      pageId: "page-1",
+      canvasWidth: 1_000,
+      canvasHeight: 2_000,
+      boundsByElementId: new Map(),
+    });
+
+    expect(rightPins).toHaveLength(2);
+    expect(rightPins[1].screenOffsetX).toBeLessThan(0);
+    expect(centerDistance(
+      resolvedPinCenter(rightPins[0], 1_000, 2_000),
+      resolvedPinCenter(rightPins[1], 1_000, 2_000)
+    )).toBeGreaterThanOrEqual(44);
+
+    document = createEmptyStudioCommentsDocument();
+    document = addThread(document, "thread-bottom-a", {
+      type: "point", pageId: "page-1", x: 0.5, y: 0.999,
+    }, "2026-07-18T00:00:00.000Z");
+    document = addThread(document, "thread-bottom-b", {
+      type: "point", pageId: "page-1", x: 0.5005, y: 0.9995,
+    }, "2026-07-18T00:01:00.000Z");
+    const bottomPins = projectStudioCanvasCommentPins({
+      threads: document.threads,
+      pageId: "page-1",
+      canvasWidth: 1_000,
+      canvasHeight: 2_000,
+      boundsByElementId: new Map(),
+    });
+
+    expect(bottomPins).toHaveLength(2);
+    expect(bottomPins[1].screenOffsetY).toBeLessThan(0);
+    expect(centerDistance(
+      resolvedPinCenter(bottomPins[0], 1_000, 2_000),
+      resolvedPinCenter(bottomPins[1], 1_000, 2_000)
+    )).toBeGreaterThanOrEqual(44);
+  });
+
+  it("keeps corner collisions at least one touch target apart after the overlay clamp", () => {
+    let document = createEmptyStudioCommentsDocument();
+    document = addThread(document, "thread-corner-a", {
+      type: "point", pageId: "page-1", x: 0.001, y: 0.001,
+    }, "2026-07-18T00:00:00.000Z");
+    document = addThread(document, "thread-corner-b", {
+      type: "point", pageId: "page-1", x: 0.0015, y: 0.0015,
+    }, "2026-07-18T00:01:00.000Z");
+
+    const pins = projectStudioCanvasCommentPins({
+      threads: document.threads,
+      pageId: "page-1",
+      canvasWidth: 1_000,
+      canvasHeight: 2_000,
+      boundsByElementId: new Map(),
+    });
+
+    expect(pins).toHaveLength(2);
+    expect(centerDistance(
+      resolvedPinCenter(pins[0], 1_000, 2_000),
+      resolvedPinCenter(pins[1], 1_000, 2_000)
+    )).toBeGreaterThanOrEqual(44);
+  });
+
   it("keeps viewer-specific unread state on the pin projection only", () => {
     let document = createEmptyStudioCommentsDocument();
     document = addThread(document, "thread-read", {
       type: "point", pageId: "page-1", x: 0.25, y: 0.25,
-    }, "2026-07-18T00:00:00.000Z");
+    }, "2026-07-18T00:02:00.000Z");
     document = addThread(document, "thread-unread", {
       type: "point", pageId: "page-1", x: 0.25, y: 0.25,
     }, "2026-07-18T00:01:00.000Z");
@@ -155,7 +258,12 @@ describe("projectStudioCanvasCommentPins", () => {
     });
 
     expect(pins).toHaveLength(1);
-    expect(pins[0]).toMatchObject({ count: 2, unreadCount: 1 });
+    expect(pins[0]).toMatchObject({
+      count: 2,
+      unreadCount: 1,
+      newestThreadId: "thread-read",
+      newestUnreadThreadId: "thread-unread",
+    });
     expect(document.threads.every((thread) => !("unread" in thread))).toBe(true);
   });
 });

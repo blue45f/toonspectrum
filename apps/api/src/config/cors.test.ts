@@ -42,7 +42,7 @@ describe("API CORS", () => {
       headers: {
         Origin: origin,
         "Access-Control-Request-Method": "POST",
-        "Access-Control-Request-Headers": "content-type,x-user-id",
+        "Access-Control-Request-Headers": "content-type,x-user-id,idempotency-key",
       },
     });
 
@@ -51,6 +51,7 @@ describe("API CORS", () => {
     expect(response.headers.get("access-control-allow-methods")).toContain("POST");
     expect(response.headers.get("access-control-allow-headers")?.toLowerCase()).toContain("content-type");
     expect(response.headers.get("access-control-allow-headers")?.toLowerCase()).toContain("x-user-id");
+    expect(response.headers.get("access-control-allow-headers")?.toLowerCase()).toContain("idempotency-key");
   });
 
   it("허용된 Origin의 실제 POST 응답에도 CORS 헤더를 넣는다", async () => {

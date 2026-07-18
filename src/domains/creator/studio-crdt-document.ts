@@ -9,9 +9,11 @@ import {
   STUDIO_CRDT_ORIGIN_LOCAL,
   STUDIO_CRDT_ORIGIN_REMOTE,
   STUDIO_CRDT_ORIGIN_SYNC,
+  STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_UPDATE_MAX_BYTES,
   type StudioCrdtSyncResponse,
+  type StudioCrdtStrokePayloadVersion,
 } from "./studio-crdt-protocol";
 import {
   STUDIO_CRDT_LAYER_GROUP_PAYLOAD_VERSION,
@@ -37,6 +39,7 @@ import {
   studioInkFallbackPressure,
   type StudioInkPressureModel,
 } from "./studio-ink-pressure-model";
+import { isStudioStrokePaintModelCompatible } from "./studio-stroke-paint-model";
 
 import type { StudioRasterCompactionCheckpoint } from "@/lib/studio-crdt-raster-compaction";
 
@@ -71,7 +74,9 @@ export {
   STUDIO_CRDT_ORIGIN_LOCAL,
   STUDIO_CRDT_ORIGIN_REMOTE,
   STUDIO_CRDT_ORIGIN_SYNC,
+  STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION,
   STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
+  type StudioCrdtStrokePayloadVersion,
 } from "./studio-crdt-protocol";
 export {
   STUDIO_CRDT_LAYER_GROUP_MAX_BYTES,
@@ -199,7 +204,7 @@ export interface StudioCrdtStrokeSamples {
 
 /** Versioned, JSON-safe representation of the complete StudioPage DrawEl surface. */
 export interface StudioCrdtDrawStrokePayload extends StudioCrdtStrokeSamples {
-  version: typeof STUDIO_CRDT_STROKE_PAYLOAD_VERSION;
+  version: StudioCrdtStrokePayloadVersion;
   type: "draw";
   kind: string;
   mode: "pen" | "eraser";
@@ -760,7 +765,11 @@ function normalizedSamples(
 }
 
 function validatePayload(payload: StudioCrdtDrawStrokePayload, allowEmpty: boolean): void {
-  if (payload.version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION || payload.type !== "draw") {
+  if (
+    (payload.version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+      && payload.version !== STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION)
+    || payload.type !== "draw"
+  ) {
     throw new Error("지원하지 않는 획 페이로드 버전입니다.");
   }
   if (!exactText(payload.kind, 80)) throw new Error("획 종류가 올바르지 않습니다.");
@@ -785,6 +794,22 @@ function validatePayload(payload: StudioCrdtDrawStrokePayload, allowEmpty: boole
   for (const key of JSON_PAYLOAD_KEYS) {
     const value = payload[key];
     if (value !== undefined) cloneJsonObject(value);
+  }
+  const paintModel = payload.extensions?.paintModel;
+  if (
+    paintModel !== undefined
+    && (
+      payload.version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+      || !isStudioStrokePaintModelCompatible({
+        ...payload,
+        paintModel,
+        pressureModel: payload.extensions?.pressureModel,
+        stampPipeline: payload.extensions?.stampPipeline,
+        watercolorPipeline: payload.extensions?.watercolorPipeline,
+      })
+    )
+  ) {
+    throw new Error("획 페인트 모델과 브러시 합성 모드가 호환되지 않습니다.");
   }
   if (payloadMetadataByteLength(payload) > STUDIO_CRDT_METADATA_MAX_BYTES) {
     throw new Error(
@@ -909,7 +934,8 @@ function readPayload(record: Y.Map<unknown>): StudioCrdtDrawStrokePayload | null
   const pointsLength = sharedArrays.points?.length ?? -1;
   const count = pointsLength / 2;
   if (
-    version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION ||
+    (version !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION
+      && version !== STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION) ||
     type !== "draw" ||
     !kind ||
     (mode !== "pen" && mode !== "eraser") ||

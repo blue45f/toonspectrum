@@ -126,6 +126,9 @@ describe("planStudioWebGpuCommittedSuffix", () => {
     ["unknown brush", { brush: "future-super-brush" }, "unsupported-brush"],
     ["dynamic brush", { brush: "ink-particle" }, "unsupported-brush"],
     ["unknown pressure model", { pressureModel: "linear-full-v2" }, "unsupported-pressure-model"],
+    ["layered paint model", { paintModel: "layered-flow-v1", sampleSpacing: 0 }, "paint-model"],
+    ["layered marker paint model", { brush: "marker", paintModel: "layered-flow-v1", sampleSpacing: 0 }, "paint-model"],
+    ["unknown paint model", { paintModel: "layered-flow-v2" }, "unsupported-style"],
     ["fill metadata", { fill: "#ff0000" }, "unsupported-style"],
   ] as const)("treats %s as a hard front barrier", (_label, overrides, reason) => {
     const blocked = draw("blocked", overrides);

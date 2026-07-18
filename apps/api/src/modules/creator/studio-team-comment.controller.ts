@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   ForbiddenException,
@@ -19,6 +20,7 @@ import {
   AddStudioTeamCommentReplyDto,
   CreateStudioTeamCommentThreadDto,
   ListStudioTeamCommentsQueryDto,
+  StudioTeamCommentMutationIdSchema,
   StudioTeamCommentThreadParamsDto,
   StudioTeamCommentWorkParamsDto,
 } from "./studio-team-comment.dto";
@@ -27,6 +29,21 @@ import { StudioTeamCommentService } from "./studio-team-comment.service";
 function authenticatedStudioCommentUserId(userId: string | undefined): string {
   if (!userId) throw new ForbiddenException("로그인이 필요해요.");
   return userId;
+}
+
+function resolveStudioCommentMutationId(
+  bodyMutationId: string | undefined,
+  headerMutationId: string | undefined
+): string | undefined {
+  if (!headerMutationId) return bodyMutationId;
+  const parsed = StudioTeamCommentMutationIdSchema.safeParse(headerMutationId);
+  if (!parsed.success) {
+    throw new BadRequestException("댓글 요청 식별자가 올바르지 않습니다.");
+  }
+  if (bodyMutationId && bodyMutationId !== parsed.data) {
+    throw new BadRequestException("댓글 요청 식별자 헤더와 본문이 일치하지 않습니다.");
+  }
+  return parsed.data;
 }
 
 @Controller()
@@ -55,12 +72,14 @@ export class StudioTeamCommentController {
     params: StudioTeamCommentWorkParamsDto,
     @Body(new ZodValidationPipe(CreateStudioTeamCommentThreadDto))
     body: CreateStudioTeamCommentThreadDto,
-    @Headers("x-user-id") userId?: string
+    @Headers("x-user-id") userId?: string,
+    @Headers("idempotency-key") mutationIdHeader?: string
   ) {
+    const mutationId = resolveStudioCommentMutationId(body.mutationId, mutationIdHeader);
     return this.service.createThread(
       authenticatedStudioCommentUserId(userId),
       params.id,
-      body
+      { ...body, ...(mutationId ? { mutationId } : {}) }
     );
   }
 
@@ -85,13 +104,15 @@ export class StudioTeamCommentController {
     params: StudioTeamCommentThreadParamsDto,
     @Body(new ZodValidationPipe(AddStudioTeamCommentReplyDto))
     body: AddStudioTeamCommentReplyDto,
-    @Headers("x-user-id") userId?: string
+    @Headers("x-user-id") userId?: string,
+    @Headers("idempotency-key") mutationIdHeader?: string
   ) {
+    const mutationId = resolveStudioCommentMutationId(body.mutationId, mutationIdHeader);
     return this.service.addReply(
       authenticatedStudioCommentUserId(userId),
       params.id,
       params.threadId,
-      body
+      { ...body, ...(mutationId ? { mutationId } : {}) }
     );
   }
 

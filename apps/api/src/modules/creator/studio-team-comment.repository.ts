@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import {
   and,
@@ -19,6 +19,7 @@ import {
   creatorWorks,
   creatorWorkTeamCommentActivities,
   creatorWorkTeamCommentMessages,
+  creatorWorkTeamCommentMutations,
   creatorWorkTeamCommentReads,
   creatorWorkTeamCommentThreads,
   db,
@@ -59,6 +60,7 @@ type StudioTeamCommentActivityAction =
   | "reply_added"
   | "resolved"
   | "reopened";
+type StudioTeamCommentMutationOperation = "thread_create" | "reply_add";
 
 export interface StudioTeamCommentAccess {
   view: boolean;
@@ -74,7 +76,13 @@ export interface ListStudioTeamCommentsInput {
 }
 
 export interface CreateStudioTeamCommentThreadInput {
+  mutationId: string;
   anchor: StudioTeamCommentAnchor;
+  body: string;
+}
+
+export interface AddStudioTeamCommentReplyInput {
+  mutationId: string;
   body: string;
 }
 
@@ -93,7 +101,7 @@ export interface StudioTeamCommentRepository {
     actorUserId: string,
     workId: string,
     threadId: string,
-    body: string
+    input: AddStudioTeamCommentReplyInput
   ): Promise<StudioTeamCommentReplyResponse>;
   resolve(
     actorUserId: string,
@@ -137,6 +145,13 @@ export class StudioTeamCommentStateConflictError extends Error {
   }
 }
 
+export class StudioTeamCommentMutationConflictError extends Error {
+  constructor() {
+    super("studio_team_comment_mutation_payload_conflict");
+    this.name = "StudioTeamCommentMutationConflictError";
+  }
+}
+
 export class StudioTeamCommentCursorError extends Error {
   constructor() {
     super("studio_team_comment_invalid_cursor");
@@ -167,10 +182,44 @@ interface StudioTeamCommentContext {
   access: StudioTeamCommentAccess;
 }
 
+interface StudioTeamCommentMutationReceipt {
+  operation: string;
+  requestHash: string;
+  response: unknown;
+}
+
 const threadCreators = alias(users, "studio_team_comment_thread_creator");
 const threadResolvers = alias(users, "studio_team_comment_thread_resolver");
 const messageAuthors = alias(users, "studio_team_comment_message_author");
 const workOwners = alias(users, "studio_team_comment_work_owner");
+
+function canonicalStudioTeamCommentAnchor(anchor: StudioTeamCommentAnchor): readonly unknown[] {
+  if (anchor.type === "page") return ["page", anchor.pageId];
+  if (anchor.type === "frame") return ["frame", anchor.pageId, anchor.frameId];
+  if (anchor.type === "element") {
+    return ["element", anchor.pageId, anchor.frameId ?? null, anchor.elementId];
+  }
+  return ["point", anchor.pageId, anchor.x, anchor.y];
+}
+
+export function hashStudioTeamCommentMutation(
+  input:
+    | {
+        operation: "thread_create";
+        anchor: StudioTeamCommentAnchor;
+        body: string;
+      }
+    | {
+        operation: "reply_add";
+        threadId: string;
+        body: string;
+      }
+): string {
+  const canonical = input.operation === "thread_create"
+    ? [input.operation, canonicalStudioTeamCommentAnchor(input.anchor), input.body]
+    : [input.operation, input.threadId, input.body];
+  return createHash("sha256").update(JSON.stringify(canonical), "utf8").digest("hex");
+}
 
 export function resolveStudioTeamCommentAccess(input: {
   actorUserId: string;
@@ -372,6 +421,59 @@ async function recordStudioTeamCommentRead(
         readAt,
       },
     });
+}
+
+async function loadStudioTeamCommentMutationReceipt(
+  transaction: StudioTeamCommentTransaction,
+  workId: string,
+  actorUserId: string,
+  mutationId: string
+): Promise<StudioTeamCommentMutationReceipt | null> {
+  const [receipt] = await transaction
+    .select({
+      operation: creatorWorkTeamCommentMutations.operation,
+      requestHash: creatorWorkTeamCommentMutations.requestHash,
+      response: creatorWorkTeamCommentMutations.response,
+    })
+    .from(creatorWorkTeamCommentMutations)
+    .where(
+      and(
+        eq(creatorWorkTeamCommentMutations.workId, workId),
+        eq(creatorWorkTeamCommentMutations.actorUserId, actorUserId),
+        eq(creatorWorkTeamCommentMutations.mutationId, mutationId)
+      )
+    )
+    .limit(1);
+  return receipt ?? null;
+}
+
+function replayStudioTeamCommentMutation<T>(
+  receipt: StudioTeamCommentMutationReceipt | null,
+  operation: StudioTeamCommentMutationOperation,
+  requestHash: string
+): T | null {
+  if (!receipt) return null;
+  if (receipt.operation !== operation || receipt.requestHash !== requestHash) {
+    throw new StudioTeamCommentMutationConflictError();
+  }
+  return receipt.response as T;
+}
+
+async function recordStudioTeamCommentMutation(
+  transaction: StudioTeamCommentTransaction,
+  input: {
+    workId: string;
+    actorUserId: string;
+    mutationId: string;
+    operation: StudioTeamCommentMutationOperation;
+    requestHash: string;
+    threadId: string;
+    messageId: string;
+    response: unknown;
+    createdAt: Date;
+  }
+): Promise<void> {
+  await transaction.insert(creatorWorkTeamCommentMutations).values(input);
 }
 
 function studioTeamCommentMessageFromRow(row: {
@@ -587,6 +689,11 @@ export class DrizzleStudioTeamCommentRepository implements StudioTeamCommentRepo
     workId: string,
     input: CreateStudioTeamCommentThreadInput
   ): Promise<StudioTeamCommentThread> {
+    const requestHash = hashStudioTeamCommentMutation({
+      operation: "thread_create",
+      anchor: input.anchor,
+      body: input.body,
+    });
     return db.transaction(async (transaction) => {
       const context = await loadStudioTeamCommentContext(
         transaction,
@@ -595,6 +702,17 @@ export class DrizzleStudioTeamCommentRepository implements StudioTeamCommentRepo
         "update"
       );
       requireStudioTeamCommentAccess(context.access, "comment");
+      const replay = replayStudioTeamCommentMutation<StudioTeamCommentThread>(
+        await loadStudioTeamCommentMutationReceipt(
+          transaction,
+          workId,
+          actorUserId,
+          input.mutationId
+        ),
+        "thread_create",
+        requestHash
+      );
+      if (replay) return replay;
       const actor = await loadActor(transaction, actorUserId);
       const [threadUsage] = await transaction
         .select({ value: count() })
@@ -649,7 +767,7 @@ export class DrizzleStudioTeamCommentRepository implements StudioTeamCommentRepo
         .where(eq(creatorWorkTeamCommentThreads.id, threadId));
       await recordStudioTeamCommentRead(transaction, threadId, actorUserId, sequence, now);
 
-      return {
+      const response: StudioTeamCommentThread = {
         id: threadId,
         workId,
         anchor: input.anchor,
@@ -670,6 +788,18 @@ export class DrizzleStudioTeamCommentRepository implements StudioTeamCommentRepo
         }],
         messagesTruncated: false,
       };
+      await recordStudioTeamCommentMutation(transaction, {
+        workId,
+        actorUserId,
+        mutationId: input.mutationId,
+        operation: "thread_create",
+        requestHash,
+        threadId,
+        messageId,
+        response,
+        createdAt: now,
+      });
+      return response;
     });
   }
 
@@ -677,8 +807,13 @@ export class DrizzleStudioTeamCommentRepository implements StudioTeamCommentRepo
     actorUserId: string,
     workId: string,
     threadId: string,
-    body: string
+    input: AddStudioTeamCommentReplyInput
   ): Promise<StudioTeamCommentReplyResponse> {
+    const requestHash = hashStudioTeamCommentMutation({
+      operation: "reply_add",
+      threadId,
+      body: input.body,
+    });
     return db.transaction(async (transaction) => {
       const context = await loadStudioTeamCommentContext(
         transaction,
@@ -687,6 +822,17 @@ export class DrizzleStudioTeamCommentRepository implements StudioTeamCommentRepo
         "update"
       );
       requireStudioTeamCommentAccess(context.access, "comment");
+      const replay = replayStudioTeamCommentMutation<StudioTeamCommentReplyResponse>(
+        await loadStudioTeamCommentMutationReceipt(
+          transaction,
+          workId,
+          actorUserId,
+          input.mutationId
+        ),
+        "reply_add",
+        requestHash
+      );
+      if (replay) return replay;
       const thread = await this.lockThread(transaction, workId, threadId);
       if (thread.status === "resolved") {
         throw new StudioTeamCommentStateConflictError("resolved");
@@ -717,7 +863,7 @@ export class DrizzleStudioTeamCommentRepository implements StudioTeamCommentRepo
         id: messageId,
         threadId,
         authorUserId: actorUserId,
-        body,
+        body: input.body,
         createdAt: now,
       });
       const sequence = await appendStudioTeamCommentActivity(transaction, {
@@ -734,16 +880,28 @@ export class DrizzleStudioTeamCommentRepository implements StudioTeamCommentRepo
         .set({ lastActivitySequence: sequence, updatedAt: now })
         .where(eq(creatorWorkTeamCommentThreads.id, threadId));
       await recordStudioTeamCommentRead(transaction, threadId, actorUserId, sequence, now);
-      return {
+      const response: StudioTeamCommentReplyResponse = {
         threadId,
         message: {
           id: messageId,
           author: actor,
-          body,
+          body: input.body,
           createdAt: now.toISOString(),
         },
         latestActivitySequence: sequence.toString(),
       };
+      await recordStudioTeamCommentMutation(transaction, {
+        workId,
+        actorUserId,
+        mutationId: input.mutationId,
+        operation: "reply_add",
+        requestHash,
+        threadId,
+        messageId,
+        response,
+        createdAt: now,
+      });
+      return response;
     });
   }
 
