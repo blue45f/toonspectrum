@@ -135,9 +135,17 @@ rewrites rather than claims that every legacy scene type already runs on the new
   verified frame; one React commit then reveals it and hides only the exact redundant Konva source
   IDs. Scroll/resize, scene edits, selection, drawing tools, post-processing, export, device loss,
   stale frames and replay conflicts immediately restore the vectors.
-- The live draft compositor still uses interpolated dabs while Konva uses endpoint-width segments.
-  Therefore live-draft ownership remains temporary; analytic segment parity and browser golden
-  pixels are required before broader committed vector authority.
+- The causal/legacy split, not live/committed, decides dab-versus-segment geometry. Causal pen and
+  fineliner strokes (`sampleSpacing` or a `pressureModel` set -- the default for every newly
+  authored stroke) share the same dab geometry across the live draft compositor, Konva's committed
+  render, and the committed WebGPU handoff, all calling `selectStudioCausalInkSamples`/
+  `planStudioGpuDabs`. Only legacy strokes (neither field set) still render through Konva's
+  endpoint-width segment path (`drawFreehandPenSegments`), which the GPU compositor does not
+  reproduce; `studioWebGpuCommittedBarrierReason`'s `requireCausalGeometry` option fails those
+  closed for committed handoff. Therefore live-draft ownership remains temporary; browser
+  golden-pixel parity for the causal path (in progress, see below) and, separately, an analytic
+  segment renderer for the legacy path (optional -- see the capability table below) are what
+  broader committed vector authority actually needs.
 - Studio live drafts disable unused frame-readback snapshots, eliminating the per-frame full-surface
   texture copy. Empty/invalid stroke sets suspend retained resources and defer GPU initialization
   while keeping an already acquired device reusable for the next valid stroke.
@@ -164,10 +172,44 @@ rewrites rather than claims that every legacy scene type already runs on the new
 - Canvas2D remains the compositor-compatible fallback when WebGPU is unavailable. Konva remains the
   scene/interactions authority for unsupported images, text, bubbles, filters, selections, and 3D
   surfaces until their render contracts move to GPU passes.
-- Broader committed ownership will be enabled only after an analytic endpoint-width segment pass,
-  alpha and single-point golden-pixel parity, GPU-aware readback composition, and a shared top
-  interaction overlay plane all pass together. The current raster pilot already uses receipt
-  authority tokens and native-scroll pre-paint revocation, but remains idle/select-only.
+- Broader committed ownership is **not** one bundled prerequisite list to execute because it exists.
+  Independently reviewed (2026-07-19, Codex gpt-5.6-sol/max), the four capabilities below solve
+  different problems for different product goals and are not one natural dependency chain. Treat
+  each as its own driver-gated tier; do not start a tier without its stated driver.
+
+  | Capability | Required when | Status |
+  |---|---|---|
+  | Causal dab golden-pixel parity | Maintaining the live GPU renderer; piloting causal committed ownership | In progress: `pnpm verify:studio-gpu-committed-parity` characterizes opaque, translucent, and isolated-dab cases against real WebGPU. Remaining diff is native circle-AA-curve disagreement only (no structural bug); not yet gated to a tolerance. |
+  | True causal single-point committed eligibility | A production causal committed handoff is actually being enabled | Deferred. Small, well-understood change (loosen `finitePointArray`'s four-coordinate minimum for `requireCausalGeometry` callers only) but production-facing; do not bundle into harness-only work. |
+  | Legacy analytic/quadratic segment renderer | GPU must own old (pre-causal) strokes, and the causal-only barrier measurably defeats the benefit | Do not start. Materially harder than "one shader feature": reproducing Canvas2D's smoothed points, per-path `beginPath()`/`stroke()`, straight-line/quadratic branching, endpoint-indexed widths, and round caps/joins is close to a second browser-rasterizer clone. |
+  | GPU-aware mixed readback composition | Export, capture, or another feature needs the exact mixed authoritative GPU/Konva frame | Do not start. `captureFrame()` exists and is well-built, but has no non-test/script caller; the mounted `StudioWebGpuCanvas` explicitly disables retained snapshots to avoid an unconsumed per-frame texture copy. |
+  | Shared top interaction overlay plane | GPU/raster presentation must cover or replace Konva's interaction layer broadly | Do not start. An end-state migration (selection handles, brush cursors, rulers, perspective controls, pointer capture, touch/pinch, a11y), not an incremental step. The raster pilot deliberately stays idle/select-only for this reason. |
+
+  `createStudioWebGpuCommittedHandoff` currently has no production caller anywhere in `StudioPage`
+  (the declarative WebGPU stroke list and committed authority snapshot are both intentionally kept
+  empty). Building further prerequisite systems before a committed consumer exists would be
+  speculative platform work. Restart only on a concrete, measurable trigger:
+
+  - A representative committed-vector document exceeds its rendering frame budget and profiling
+    attributes the cost to Konva committed ink specifically.
+  - The eligible frontmost causal suffix covers enough real scenes that moving it to GPU would
+    materially reduce Stage work.
+  - A new effect or export format requires GPU-owned committed pixels.
+  - Export, capture, or raster publication genuinely requires the rendered GPU result.
+  - The product deliberately decides to replace the Stage interaction layer.
+
+  If a trigger fires, start with a 1-2 day measurement/acceptance spike (define the desired
+  outcome, profile representative documents, measure how often the frontmost-suffix barrier
+  actually admits useful ownership, decide whether legacy support is needed at all) before any
+  further shader or engine change -- not a resumption of shader tuning for its own sake. Further
+  antialiasing-curve tuning on the shared dab shader is a production change to the already-live
+  live-ink renderer, not test-only work; it should be driven by a visible defect or a concrete
+  ownership requirement, not by chasing a diagnostic counter toward zero.
+
+  Raster-CRDT promotion's own causal-only policy (`planStudioRasterDrawPromotion` in
+  `studio-crdt-raster-ui-bridge.ts`, currently admitting legacy strokes through a deterministic but
+  non-pixel-exact approximation) is a separate release decision, gated by its own experiment token,
+  independent of this initiative.
 
 ## Verification contracts
 
