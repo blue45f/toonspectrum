@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   bakeStudioBg3dRigPoseLayer,
   createStudioBg3dRigPoseBakeCommitPatch,
+  createStudioBg3dRigPoseBakeHistoryTransition,
   type StudioBg3dRigPoseBakeSample,
 } from "./studio-bg3d-rig-pose-bake";
 
@@ -24,6 +25,74 @@ describe("static rig pose bake", () => {
       -0.5,
       0.5,
     ]);
+  });
+
+  it("captures the live pre-bake timestamp without changing playback for atomic undo", () => {
+    const animation = {
+      clipIndex: 0,
+      playing: true,
+      loop: "repeat" as const,
+      timeScale: 1,
+      weight: 1,
+      timeSeconds: 0,
+    };
+    const transition = createStudioBg3dRigPoseBakeHistoryTransition(animation, {
+      pose: { enabled: true, weight: 1, joints: [] },
+      sampledTimeSeconds: 7.5,
+    });
+
+    expect(transition?.beforeAnimation).toEqual({
+      ...animation,
+      playing: true,
+      timeSeconds: 7.5,
+    });
+    expect(transition?.patch.animation).toEqual({
+      ...animation,
+      playing: false,
+      timeSeconds: 7.5,
+    });
+    expect(animation).toEqual({
+      clipIndex: 0,
+      playing: true,
+      loop: "repeat",
+      timeScale: 1,
+      weight: 1,
+      timeSeconds: 0,
+    });
+  });
+
+  it("supports static models while rejecting an invalid sampled history timestamp", () => {
+    expect(createStudioBg3dRigPoseBakeHistoryTransition(undefined, {
+      pose: { enabled: true, weight: 1, joints: [] },
+      sampledTimeSeconds: 2,
+    })).toMatchObject({ beforeAnimation: undefined, patch: { animation: undefined } });
+    expect(createStudioBg3dRigPoseBakeHistoryTransition(undefined, {
+      pose: { enabled: true, weight: 1, joints: [] },
+      sampledTimeSeconds: Number.NaN,
+    })).toBeNull();
+  });
+
+  it("preserves a paused authored loop timestamp in undo while baking its rendered sample", () => {
+    const paused = {
+      clipIndex: 0,
+      playing: false,
+      loop: "repeat" as const,
+      timeScale: 1,
+      weight: 1,
+      timeSeconds: 3,
+    };
+    const transition = createStudioBg3dRigPoseBakeHistoryTransition(paused, {
+      pose: { enabled: true, weight: 1, joints: [] },
+      sampledTimeSeconds: 1,
+    });
+
+    expect(transition?.beforeAnimation).toBe(paused);
+    expect(transition?.beforeAnimation?.timeSeconds).toBe(3);
+    expect(transition?.patch.animation).toMatchObject({
+      playing: false,
+      loop: "repeat",
+      timeSeconds: 1,
+    });
   });
 
   it("canonicalizes q/-q equivalence, including deterministic w=0 half-turns", () => {

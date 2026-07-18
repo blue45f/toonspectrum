@@ -120,6 +120,16 @@ describe("studio BG3D worker protocol guards", () => {
       ...request,
       options: { ...request.options, digest: () => new ArrayBuffer(32) },
     })).toBe(false);
+    expect(isStudioBg3dGlbWorkerRequest({
+      ...request,
+      options: {
+        ...request.options,
+        basisTranscoderCapability: {
+          protocolVersion: 1,
+          transcoderId: "three@0.184.0/basis_transcoder",
+        },
+      },
+    })).toBe(false);
     expect(isStudioBg3dGlbWorkerRequest({ ...request, requestId: 0 })).toBe(false);
     expect(isStudioBg3dGlbWorkerRequest({
       version: STUDIO_BG3D_GLB_VALIDATION_WORKER_PROTOCOL_VERSION,

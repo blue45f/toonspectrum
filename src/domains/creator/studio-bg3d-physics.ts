@@ -1,4 +1,7 @@
-import { resolveStudioBg3dHierarchy } from "./studio-bg3d-hierarchy";
+import {
+  collectStudioBg3dEffectivelyVisibleEntityIds,
+  resolveStudioBg3dHierarchy,
+} from "./studio-bg3d-hierarchy";
 import {
   parseStudioBg3dSceneDocument,
   serializeStudioBg3dSceneDocument,
@@ -82,21 +85,7 @@ function createStudioBg3dPhysicsHierarchyContext(
     if (parentId !== null) parentNodeIds.add(parentId);
   }
 
-  const effectivelyVisibleNodeIds = new Set<string>();
-  const pending = hierarchy.roots.map((id) => ({ id, ancestorsVisible: true }));
-  while (pending.length > 0) {
-    const entry = pending.pop();
-    if (!entry) break;
-    const node = nodeById.get(entry.id);
-    if (!node) continue;
-    const visible = entry.ancestorsVisible && node.visible !== false;
-    if (visible) effectivelyVisibleNodeIds.add(entry.id);
-    const children = hierarchy.childrenByParent.get(entry.id) ?? [];
-    for (let index = children.length - 1; index >= 0; index -= 1) {
-      const childId = children[index];
-      if (childId) pending.push({ id: childId, ancestorsVisible: visible });
-    }
-  }
+  const effectivelyVisibleNodeIds = collectStudioBg3dEffectivelyVisibleEntityIds(nodes);
 
   return {
     nodeById,
@@ -337,6 +326,9 @@ export function applyStudioBg3dPhysicsTransforms(
   const dynamicNodeIds = new Set(
     world.bodies.filter((body) => body.motion === "dynamic").map((body) => body.nodeId),
   );
+  // Worker bake output is an atomic snapshot: accepting only a prefix would silently mix
+  // simulated and authored transforms. Static/kinematic bodies intentionally have no sample.
+  if (samples.length !== dynamicNodeIds.size) return null;
   const nodeById = new Map(document.nodes.map((node) => [node.id, node] as const));
   const patchById = new Map<string, { position: StudioBg3dVec3; rotation: StudioBg3dVec3 }>();
   try {
@@ -366,6 +358,8 @@ export function applyStudioBg3dPhysicsTransforms(
   } catch {
     return null;
   }
+  // Keep the exact-coverage invariant explicit even if per-sample validation changes later.
+  if (patchById.size !== dynamicNodeIds.size) return null;
   const raw = {
     ...document,
     nodes: document.nodes.map((node) => {

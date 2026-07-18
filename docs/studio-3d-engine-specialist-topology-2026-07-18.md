@@ -176,15 +176,19 @@
 - Meshopt: 구현 완료. GLB 검증기가 압축 원본 범위와 디코딩 논리 범위를 따로 검사하고, 디코딩 출력은
   기존 geometry memory budget에 포함한다. Three의 WASM 디코더는 기기 코어 수에 따라 최대 2개
   Worker로 제한하며 CSP가 blob Worker를 막으면 비동기 WASM 경로로 안전하게 폴백한다.
-- KTX2/BasisU: decoder-free 구조 검증 경계까지 구현했다. KTX2 식별자·header, 안전한 uint64와 level
+- KTX2/BasisU: decoder-free 구조 검증 경계와 pinned decoder release gate를 구현했다. KTX2 식별자·header, 안전한 uint64와 level
   index 순서/범위/정렬, Basis DFD, 정렬·중복·예약 key를 포함한 KVD, ETC1S SGD slice, glTF의
   `KHR_texture_basisu` source/fallback 참조를 먼저 검증한다. optional Basis + 검증된 PNG/JPEG fallback만
-  현재 런타임에 들어오며, 필수 Basis 확장은 renderer allowlist에서 계속 fail closed다. 선언 mip 전체의
+  현재 런타임에 들어오며, 필수 Basis 확장은 renderer allowlist와 실행 realm이 직접 발급한 transcoder
+  capability를 모두 요구한다. 선언 mip 전체의
   RGBA8 decoded-memory도 texture budget에 청구한다. UASTC/ETC1S DFD는 sample bit offset/length,
   qualifier, position, lower/upper까지 Khronos model 계약과 대조하고, Zstandard mip는 magic·frame header,
-  dictionary/content-size 필드, block envelope와 선언 uncompressed size를 디코더 없이 검증한다. 다음
-  게이트는 pinned transcoder/WASM asset 무결성, Worker 수명주기, 실제 UASTC/ETC1S/Zstd corpus의 디코딩
-  시간·checksum·메모리·폭탄 내성이다. Draco도 동일한 validator-first 원칙으로 별도 진행한다.
+  dictionary/content-size 필드, block envelope와 선언 uncompressed size를 디코더 없이 검증한다. Three
+  0.184.0의 JS/WASM 크기·SHA-256을 고정하고 공식 ETC1S/UASTC corpus의 전체 mip를 실제 RGBA32로
+  transcode해 출력 checksum까지 확인한다. 다음 게이트는 validation Worker 자체 fetch/attestation,
+  임의 사용자 payload의 bounded preflight transcode, 실제 UASTC+Zstd corpus와 시간·heap·취소·폭탄 내성이다.
+  세부 경계는 `studio-ktx2-transcoder-release-gate-2026-07-19.md`에 기록했다. Draco도 동일한
+  validator-first 원칙으로 별도 진행한다.
 - LOD/instance: geometry 공유, 정적 root matrix 고정, 안전한 반복 model instancing과 engine-neutral
   projected CSS-pixel size/hysteresis selector를 animation CPU LOD에 연결했다. perspective/orthographic,
   FOV/zoom/viewport, near-plane, 선택/capture 최고 세부도와 거리 폴백까지 순수 테스트로 고정했다. 다음은

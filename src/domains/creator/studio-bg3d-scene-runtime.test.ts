@@ -218,7 +218,167 @@ describe("Studio BG3D runtime to document adapter", () => {
 
     expect(adapted.document.nodes).toEqual([]);
     expect(adapted.counts.droppedCustomModels).toBe(1);
-    expect(diagnosticCodes(adapted.diagnostics)).toContain("invalid-custom-model");
+    expect(diagnosticCodes(adapted.diagnostics)).toContain(
+      "lossy-custom-model-normalization"
+    );
+  });
+
+  it("fails closed and accounts for every lenient nested-payload repair", () => {
+    const storageId = "idb-lossy-payload";
+    const binding = new Map([[storageId, attachment("lossy-payload-attachment", 20)]]);
+    const canonicalAnimation = {
+      clipIndex: 0,
+      playing: false,
+      loop: "repeat" as const,
+      timeSeconds: 0,
+      timeScale: 1,
+      weight: 1,
+    };
+    const cases: readonly [string, Partial<BgCustomModelInstance>][] = [
+      ["material out of range", {
+        materialOverride: {
+          ...DEFAULT_STUDIO_BG3D_MATERIAL_OVERRIDE,
+          colorStrength: 99,
+        },
+      }],
+      ["animation out of range", {
+        animation: { ...canonicalAnimation, weight: 99 },
+      }],
+      ["animation NaN", {
+        animation: { ...canonicalAnimation, timeSeconds: Number.NaN },
+      }],
+      ["pose Infinity", {
+        pose: { enabled: true, weight: Number.POSITIVE_INFINITY, joints: [] },
+      }],
+      ["morph out of range", {
+        morph: {
+          enabled: true,
+          weight: 1,
+          targets: [{ targetKey: "mesh-0:target-0", weightOffset: -5 }],
+        },
+      }],
+      ["constraint null target", {
+        constraints: {
+          enabled: true,
+          aims: [{
+            jointKey: "skin-0:joint-1",
+            target: null as unknown as readonly [number, number, number],
+            axis: "+z" as const,
+            weight: 1,
+          }],
+          twoBoneIks: [],
+        },
+      }],
+      ["constraint component NaN", {
+        constraints: {
+          enabled: true,
+          aims: [],
+          twoBoneIks: [{
+            upperJointKey: "skin-0:joint-1",
+            middleJointKey: "skin-0:joint-2",
+            endJointKey: "skin-0:joint-3",
+            target: [0, Number.NaN, 0],
+            poleTarget: [0, 0, 1],
+            weight: 1,
+          }],
+        },
+      }],
+    ];
+
+    for (const [label, overrides] of cases) {
+      const model = {
+        ...customModel(`lossy-${label.replaceAll(" ", "-")}`, storageId),
+        ...overrides,
+      } as BgCustomModelInstance;
+      const first = adaptStudioBg3dRuntimeToDocument({
+        primitives: [],
+        customModels: [model],
+        attachmentByStorageModelId: binding,
+      });
+      const second = adaptStudioBg3dRuntimeToDocument({
+        primitives: [],
+        customModels: [model],
+        attachmentByStorageModelId: binding,
+      });
+
+      expect(first.document.nodes, label).toEqual([]);
+      expect(first.document.attachments, label).toEqual([]);
+      expect(first.counts, label).toEqual({
+        inputPrimitives: 0,
+        inputCustomModels: 1,
+        emittedPrimitives: 0,
+        emittedCustomModels: 0,
+        droppedPrimitives: 0,
+        droppedCustomModels: 1,
+      });
+      expect(first.diagnostics, label).toEqual([{
+        direction: "runtime-to-document",
+        code: "lossy-custom-model-normalization",
+        source: "custom-model",
+        sourceIndex: 0,
+        nodeId: model.id,
+        count: 1,
+      }]);
+      expect(second.diagnostics, label).toEqual(first.diagnostics);
+      expect(second.counts, label).toEqual(first.counts);
+      expect(second.serialized, label).toBe(first.serialized);
+    }
+  });
+
+  it("rejects hostile JSON payloads without throwing or dropping later valid models", () => {
+    const firstStorageId = "idb-before-hostile";
+    const hostileStorageId = "idb-hostile";
+    const lastStorageId = "idb-after-hostile";
+    const cyclicAnimation = {
+      clipIndex: 0,
+      playing: false,
+      loop: "repeat",
+      timeSeconds: 0,
+      timeScale: 1,
+      weight: 1,
+    } as Record<string, unknown>;
+    cyclicAnimation.self = cyclicAnimation;
+    const hostile = {
+      ...customModel("hostile-cyclic-model", hostileStorageId),
+      animation: cyclicAnimation,
+    } as unknown as BgCustomModelInstance;
+    const input = {
+      primitives: [],
+      customModels: [
+        customModel("valid-before-hostile", firstStorageId),
+        hostile,
+        customModel("valid-after-hostile", lastStorageId),
+      ],
+      attachmentByStorageModelId: new Map([
+        [firstStorageId, attachment("before-hostile-attachment", 21)],
+        [hostileStorageId, attachment("hostile-attachment", 22)],
+        [lastStorageId, attachment("after-hostile-attachment", 23)],
+      ]),
+    };
+
+    expect(() => adaptStudioBg3dRuntimeToDocument(input)).not.toThrow();
+    const result = adaptStudioBg3dRuntimeToDocument(input);
+
+    expect(result.document.nodes.map((node) => node.id)).toEqual([
+      "valid-before-hostile",
+      "valid-after-hostile",
+    ]);
+    expect(result.counts).toEqual({
+      inputPrimitives: 0,
+      inputCustomModels: 3,
+      emittedPrimitives: 0,
+      emittedCustomModels: 2,
+      droppedPrimitives: 0,
+      droppedCustomModels: 1,
+    });
+    expect(result.diagnostics).toEqual([{
+      direction: "runtime-to-document",
+      code: "invalid-custom-model",
+      source: "custom-model",
+      sourceIndex: 1,
+      nodeId: "hostile-cyclic-model",
+      count: 1,
+    }]);
   });
 
   it("upgrades aim-only v2 runtime constraints and rejects hostile shapes without throwing", () => {

@@ -9,7 +9,7 @@ export const STUDIO_BG3D_GLB_VALIDATION_WORKER_PROTOCOL_VERSION = 2 as const;
 
 export type StudioBg3dGlbWorkerValidationOptions = Omit<
   StudioBg3dGlbValidationOptions,
-  "digest"
+  "basisTranscoderCapability" | "digest"
 >;
 
 export interface StudioBg3dGlbWorkerValidateRequest {
@@ -236,7 +236,7 @@ function isValidationOptions(value: unknown): value is StudioBg3dGlbWorkerValida
   ) {
     return false;
   }
-  return !Object.hasOwn(value, "digest");
+  return !Object.hasOwn(value, "digest") && !Object.hasOwn(value, "basisTranscoderCapability");
 }
 
 export function isStudioBg3dGlbWorkerRequest(

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   isStudioBg3dAnimationOnceComplete,
+  resolveStudioBg3dAnimationDisplayTime,
   resolveStudioBg3dAnimationTime,
   snapshotStudioBg3dLiveAnimationPlayback,
 } from "./studio-bg3d-animation-time";
@@ -111,5 +112,84 @@ describe("resolveStudioBg3dAnimationTime", () => {
       1.375,
     )).toEqual({ ...playing, playing: false });
     expect(snapshotStudioBg3dLiveAnimationPlayback(playing, Number.NaN)).toBe(playing);
+  });
+
+  it("shows only the selected playing model's live time without changing stored playback", () => {
+    const playback = {
+      ...DEFAULT_STUDIO_BG3D_ANIMATION_PLAYBACK,
+      playing: true,
+      timeSeconds: 1,
+    };
+
+    expect(resolveStudioBg3dAnimationDisplayTime({
+      modelId: "model-a",
+      playback,
+      durationSeconds: 10,
+      liveSample: { modelId: "model-a", clipIndex: 0, baseTimeSeconds: 1, timeSeconds: 7.5 },
+    })).toBe(7.5);
+    expect(resolveStudioBg3dAnimationDisplayTime({
+      modelId: "model-b",
+      playback,
+      durationSeconds: 10,
+      liveSample: { modelId: "model-a", clipIndex: 0, baseTimeSeconds: 1, timeSeconds: 7.5 },
+    })).toBe(1);
+    expect(playback.timeSeconds).toBe(1);
+  });
+
+  it("matches renderer loop semantics for paused or unavailable live samples", () => {
+    const paused = {
+      ...DEFAULT_STUDIO_BG3D_ANIMATION_PLAYBACK,
+      playing: false,
+      timeSeconds: 3,
+    };
+
+    expect(resolveStudioBg3dAnimationDisplayTime({
+      modelId: "model",
+      playback: paused,
+      durationSeconds: 2,
+      liveSample: { modelId: "model", clipIndex: 0, baseTimeSeconds: 3, timeSeconds: 1.5 },
+    })).toBe(1);
+    expect(resolveStudioBg3dAnimationDisplayTime({
+      modelId: "model",
+      playback: { ...paused, playing: true },
+      durationSeconds: 2,
+      liveSample: { modelId: "model", clipIndex: 0, baseTimeSeconds: 3, timeSeconds: Number.NaN },
+    })).toBe(1);
+    expect(resolveStudioBg3dAnimationDisplayTime({
+      modelId: "model",
+      playback: { ...paused, playing: true },
+      durationSeconds: Number.POSITIVE_INFINITY,
+      liveSample: { modelId: "model", clipIndex: 0, baseTimeSeconds: 3, timeSeconds: 1 },
+    })).toBe(0);
+
+    expect(resolveStudioBg3dAnimationDisplayTime({
+      modelId: "model",
+      playback: { ...paused, loop: "ping-pong", timeSeconds: 3 },
+      durationSeconds: 2,
+      liveSample: null,
+    })).toBe(1);
+    expect(resolveStudioBg3dAnimationDisplayTime({
+      modelId: "model",
+      playback: { ...paused, loop: "once", timeSeconds: 3 },
+      durationSeconds: 2,
+      liveSample: null,
+    })).toBe(2);
+  });
+
+  it("ignores a stale sample after the clip or playback anchor changes", () => {
+    const playback = {
+      ...DEFAULT_STUDIO_BG3D_ANIMATION_PLAYBACK,
+      playing: true,
+      clipIndex: 1,
+      timeSeconds: 4,
+    };
+    const stale = { modelId: "model", clipIndex: 0, baseTimeSeconds: 1, timeSeconds: 9 };
+
+    expect(resolveStudioBg3dAnimationDisplayTime({
+      modelId: "model",
+      playback,
+      durationSeconds: 10,
+      liveSample: stale,
+    })).toBe(4);
   });
 });

@@ -129,6 +129,7 @@ import {
 import { resolveStudioBg3dAnimationSchedule } from "./studio-bg3d-animation-scheduler";
 import {
   isStudioBg3dAnimationOnceComplete,
+  resolveStudioBg3dAnimationDisplayTime,
   resolveStudioBg3dAnimationTime,
   snapshotStudioBg3dLiveAnimationPlayback,
 } from "./studio-bg3d-animation-time";
@@ -154,6 +155,7 @@ import {
 } from "./studio-bg3d-frame-quality-governor";
 import {
   canSetStudioBg3dParent,
+  collectStudioBg3dEffectivelyVisibleEntityIds,
   resolveStudioBg3dHierarchy,
 } from "./studio-bg3d-hierarchy";
 import { projectStudioBg3dLodDiameterCssPx } from "./studio-bg3d-lod-selection";
@@ -217,6 +219,10 @@ import {
   type StudioBg3dPhysicsWorld,
 } from "./studio-bg3d-physics";
 import {
+  createStudioBg3dPhysicsSessionSourceToken,
+  isStudioBg3dPhysicsSessionSourceCurrent,
+} from "./studio-bg3d-physics-session";
+import {
   createStudioBg3dPhysicsThreeJob,
   measureStudioBg3dPhysicsModelLocalBounds,
   projectStudioBg3dPhysicsSamples,
@@ -236,9 +242,16 @@ import {
   synchronizeStudioBg3dRootMatrix,
 } from "./studio-bg3d-render-optimization";
 import {
-  createStudioBg3dRigPoseBakeCommitPatch,
+  createStudioBg3dRigPoseBakeHistoryTransition,
   type StudioBg3dRigPoseBakeSnapshot,
 } from "./studio-bg3d-rig-pose-bake";
+import {
+  mutateStudioBg3dAimConstraint,
+  mutateStudioBg3dPoseOverride,
+  mutateStudioBg3dTwoBoneIkConstraint,
+  resolveStudioBg3dRigSelection,
+  type StudioBg3dRigSelectionState,
+} from "./studio-bg3d-rig-selection";
 import {
   DEFAULT_STUDIO_BG3D_ANIMATION_PLAYBACK,
   DEFAULT_STUDIO_BG3D_CONSTRAINT_LAYER,
@@ -347,6 +360,7 @@ interface StudioBg3dPhysicsSession {
   readonly world: StudioBg3dPhysicsWorld;
   readonly timeline: StudioBg3dPhysicsTimelineResult;
   readonly initialDynamicSamples: readonly StudioBg3dPhysicsTransformSample[];
+  readonly sourceToken: string;
 }
 
 function describeStudioBg3dPhysicsStatus(
@@ -1872,6 +1886,86 @@ function Vec3Field({
   );
 }
 
+function BgAnimationPlayhead({
+  active,
+  modelId,
+  playback,
+  durationSeconds,
+  readLiveTime,
+  onCommit,
+}: {
+  readonly active: boolean;
+  readonly modelId: string;
+  readonly playback: StudioBg3dAnimationPlayback;
+  readonly durationSeconds: number;
+  readonly readLiveTime: () => number | undefined;
+  readonly onCommit: (timeSeconds: number) => void;
+}) {
+  const [liveSample, setLiveSample] = useState<{
+    readonly modelId: string;
+    readonly clipIndex: number;
+    readonly baseTimeSeconds: number;
+    readonly timeSeconds: number;
+  } | null>(null);
+  const readCurrentLiveTime = useEffectEvent(readLiveTime);
+  const displayTime = resolveStudioBg3dAnimationDisplayTime({
+    modelId,
+    playback,
+    durationSeconds,
+    liveSample,
+  });
+
+  useEffect(() => {
+    if (!active || !playback.playing) return;
+    const interval = globalThis.setInterval(() => {
+      const timeSeconds = readCurrentLiveTime();
+      if (!Number.isFinite(timeSeconds)) return;
+      setLiveSample((current) => {
+        const next = {
+          modelId,
+          clipIndex: playback.clipIndex,
+          baseTimeSeconds: playback.timeSeconds,
+          timeSeconds: Math.max(0, timeSeconds!),
+        };
+        return current?.modelId === next.modelId &&
+          current.clipIndex === next.clipIndex &&
+          current.baseTimeSeconds === next.baseTimeSeconds &&
+          Math.abs(current.timeSeconds - next.timeSeconds) < 0.000_1
+          ? current
+          : next;
+      });
+    }, 100);
+    return () => globalThis.clearInterval(interval);
+  }, [
+    active,
+    modelId,
+    playback.clipIndex,
+    playback.playing,
+    playback.timeSeconds,
+  ]);
+
+  return (
+    <div className="min-w-0">
+      <input
+        aria-label="애니메이션 시간"
+        className="h-11 w-full sm:h-8 pointer-coarse:h-11"
+        type="range"
+        min="0"
+        max={durationSeconds}
+        step={Math.max(0.001, durationSeconds / 1_000)}
+        value={displayTime}
+        onChange={(event) => onCommit(Number(event.target.value))}
+      />
+      <output
+        aria-label="현재 애니메이션 시간"
+        className="block text-right text-[0.66rem] tabular-nums text-fg-3"
+      >
+        {displayTime.toFixed(2)}s / {durationSeconds.toFixed(2)}s
+      </output>
+    </div>
+  );
+}
+
 export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose, onInsert }: StudioBackground3DProps) {
   const [primitiveGeometryPool] = useState(() => new StudioBg3dPrimitiveGeometryPool());
   const [adaptiveDprScale, setAdaptiveDprScale] = useState(1);
@@ -1936,12 +2030,16 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   const modelImportAbortRef = useRef<AbortController | null>(null);
   const modelAnimationTimeReadersRef = useRef(new Map<string, () => number>());
   const modelRigBakeReadersRef = useRef(new Map<string, StudioBg3dRigBakeReader>());
-  const [poseJointSelection, setPoseJointSelection] = useState("");
+  const [poseJointSelection, setPoseJointSelection] =
+    useState<StudioBg3dRigSelectionState | null>(null);
   const [ikEndJointSelection, setIkEndJointSelection] = useState<{
     readonly modelId: string;
     readonly jointKey: string;
   } | null>(null);
-  const [morphTargetSelection, setMorphTargetSelection] = useState("");
+  const [morphTargetSelection, setMorphTargetSelection] = useState<{
+    readonly modelId: string;
+    readonly key: string;
+  } | null>(null);
   const [deletingModelId, setDeletingModelId] = useState<string | null>(null);
   const [isRestoringScene, setIsRestoringScene] = useState(false);
   const [templateLibrary, setTemplateLibrary] = useState<Bg3dTemplateLibraryEntry[]>([]);
@@ -2061,6 +2159,12 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   const physicsLastFrameTimestampRef = useRef(0);
   const latestPhysicsSamplesRef = useRef<readonly StudioBg3dPhysicsTransformSample[]>([]);
   const physicsSessionRef = useRef<StudioBg3dPhysicsSession | null>(null);
+  const physicsRuntimeSourceRef = useRef({
+    primitives,
+    customModels,
+    document: sceneBaseDocument,
+  });
+  physicsRuntimeSourceRef.current = { primitives, customModels, document: sceneBaseDocument };
   const physicsStartButtonRef = useRef<HTMLButtonElement | null>(null);
   const physicsTransportActionRef = useRef<HTMLButtonElement | null>(null);
   const shouldTransferPhysicsFocusRef = useRef(false);
@@ -2422,8 +2526,9 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     nextPrimitives: readonly BgPrimitive[],
     nextCustomModels: readonly BgCustomModelInstance[],
     nextDocument: StudioBg3dSceneDocument,
+    beforeOverride?: StudioBg3dHistorySnapshot,
   ): void {
-    const before = createStudioBg3dHistorySnapshot({
+    const before = beforeOverride ?? createStudioBg3dHistorySnapshot({
       primitives,
       customModels,
       document: sceneBaseDocument,
@@ -2858,16 +2963,35 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
       setError("현재 리그 결과를 안전하게 고정할 수 없습니다. 조인트 계층·크기 변환과 모델 준비 상태를 확인해 주세요.");
       return;
     }
-    const patch = createStudioBg3dRigPoseBakeCommitPatch(model.animation, snapshot);
-    if (!patch) {
+    const transition = createStudioBg3dRigPoseBakeHistoryTransition(model.animation, snapshot);
+    if (!transition) {
       setError("현재 표시 프레임을 정적 포즈로 정규화하지 못했습니다.");
       return;
     }
-    const nextCustomModels = customModels.map((candidate) => candidate.id === id
-      ? { ...candidate, ...patch }
+    const beforeCustomModels = customModels.map((candidate) => {
+      if (!candidate.animation) return candidate;
+      const animation = candidate.id === id
+        ? transition.beforeAnimation
+        : snapshotStudioBg3dLiveAnimationPlayback(
+            candidate.animation,
+            modelAnimationTimeReadersRef.current.get(candidate.id)?.(),
+          );
+      return animation ? { ...candidate, animation } : candidate;
+    });
+    const nextCustomModels = beforeCustomModels.map((candidate) => candidate.id === id
+      ? { ...candidate, ...transition.patch }
       : candidate
     );
-    commitImmediateHistoryTransition(primitives, nextCustomModels, sceneBaseDocument);
+    commitImmediateHistoryTransition(
+      primitives,
+      nextCustomModels,
+      sceneBaseDocument,
+      createStudioBg3dHistorySnapshot({
+        primitives,
+        customModels: beforeCustomModels,
+        document: sceneBaseDocument,
+      }),
+    );
     setError(null);
     setCustomModels(nextCustomModels);
   }
@@ -3728,11 +3852,20 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   const selectedModelJoints = selectedCustomModel
     ? (modelRootCacheRef.current.get(selectedCustomModel.modelId)?.joints ?? EMPTY_THREE_JOINTS)
     : EMPTY_THREE_JOINTS;
-  const selectedPoseJointKey = selectedModelJoints.some((joint) => joint.key === poseJointSelection)
-    ? poseJointSelection
-    : (selectedModelJoints[0]?.key ?? "");
+  const selectedJointByKey = new Map(selectedModelJoints.map((joint) => [joint.key, joint] as const));
+  const selectedPoseRigSelection = selectedCustomModel
+    ? resolveStudioBg3dRigSelection({
+        modelId: selectedCustomModel.id,
+        descriptors: selectedModelJoints,
+        selection: poseJointSelection,
+      })
+    : null;
+  const selectedPoseJointKey = selectedPoseRigSelection?.key ?? "";
+  const selectedPoseCanonicalKey = selectedPoseRigSelection?.canonicalKey ?? "";
   const selectedPoseJoint = selectedCustomModel?.pose?.joints.find(
-    (joint) => joint.jointKey === selectedPoseJointKey,
+    (joint) => (
+      selectedJointByKey.get(joint.jointKey)?.canonicalKey ?? joint.jointKey
+    ) === selectedPoseCanonicalKey,
   );
   const selectedAimConstraints: StudioBg3dConstraintLayer["aims"] =
     Array.isArray(selectedCustomModel?.constraints?.aims)
@@ -3764,9 +3897,10 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                 ? "물리 미리보기 중에는 포즈로 구울 수 없습니다. 현재 자세를 적용하거나 미리보기를 초기화해 주세요."
                 : null;
   const selectedAimConstraint = selectedAimConstraints.find(
-    (constraint) => constraint.jointKey === selectedPoseJointKey,
+    (constraint) => (
+      selectedJointByKey.get(constraint.jointKey)?.canonicalKey ?? constraint.jointKey
+    ) === selectedPoseCanonicalKey,
   );
-  const selectedJointByKey = new Map(selectedModelJoints.map((joint) => [joint.key, joint] as const));
   const selectedIkProtectedJointKeys = new Set<string>();
   for (const constraint of selectedTwoBoneIkConstraints) {
     const middle = selectedJointByKey.get(constraint.middleJointKey);
@@ -3815,6 +3949,9 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   )
     ? requestedIkEndJointKey
     : (savedIkEndJointKey ?? selectedIkEndCandidates[0]?.key ?? "");
+  const selectedIkRigSelection = selectedCustomModel && selectedIkEndJointKey
+    ? { modelId: selectedCustomModel.id, key: selectedIkEndJointKey }
+    : null;
   const selectedIkEndJoint = selectedJointByKey.get(selectedIkEndJointKey);
   const selectedIkMiddleJoint = selectedIkEndJoint?.parentKey
     ? selectedJointByKey.get(selectedIkEndJoint.parentKey)
@@ -3879,8 +4016,13 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   const selectedModelMorphTargets = selectedCustomModel
     ? (modelRootCacheRef.current.get(selectedCustomModel.modelId)?.morphTargets ?? EMPTY_THREE_MORPH_TARGETS)
     : EMPTY_THREE_MORPH_TARGETS;
-  const selectedMorphTargetKey = selectedModelMorphTargets.some((target) => target.key === morphTargetSelection)
-    ? morphTargetSelection
+  const selectedMorphTargetCandidateKey = morphTargetSelection !== null &&
+    morphTargetSelection.modelId === selectedCustomModel?.id
+    ? morphTargetSelection.key
+    : null;
+  const selectedMorphTargetKey = selectedMorphTargetCandidateKey !== null &&
+    selectedModelMorphTargets.some((target) => target.key === selectedMorphTargetCandidateKey)
+    ? selectedMorphTargetCandidateKey
     : (selectedModelMorphTargets[0]?.key ?? "");
   const selectedMorphOverride = selectedCustomModel?.morph?.targets.find(
     (target) => target.targetKey === selectedMorphTargetKey,
@@ -3892,6 +4034,54 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     0.01,
     Number.isFinite(selectedAnimationClip?.duration) ? selectedAnimationClip?.duration ?? 0.01 : 0.01,
   );
+
+  function commitSelectedPoseOverride(
+    next: Omit<StudioBg3dPoseLayer["joints"][number], "jointKey"> | null,
+  ): void {
+    if (!selectedCustomModel || !selectedPoseRigSelection) return;
+    updateCustomModelPose(selectedCustomModel.id, (current) => {
+      const joints = mutateStudioBg3dPoseOverride({
+        modelId: selectedCustomModel.id,
+        descriptors: selectedModelJoints,
+        selection: selectedPoseRigSelection,
+        overrides: current.joints,
+        next,
+      });
+      return joints ? { ...current, joints: [...joints] } : current;
+    });
+  }
+
+  function commitSelectedAimConstraint(
+    next: Omit<StudioBg3dConstraintLayer["aims"][number], "jointKey"> | null,
+  ): void {
+    if (!selectedCustomModel || !selectedPoseRigSelection) return;
+    updateCustomModelConstraints(selectedCustomModel.id, (current) => {
+      const aims = mutateStudioBg3dAimConstraint({
+        modelId: selectedCustomModel.id,
+        descriptors: selectedModelJoints,
+        selection: selectedPoseRigSelection,
+        constraints: current.aims,
+        next,
+      });
+      return aims ? { ...current, aims: [...aims] } : current;
+    });
+  }
+
+  function commitSelectedTwoBoneIkConstraint(
+    next: Omit<StudioBg3dConstraintLayer["twoBoneIks"][number], "endJointKey"> | null,
+  ): void {
+    if (!selectedCustomModel || !selectedIkRigSelection) return;
+    updateCustomModelConstraints(selectedCustomModel.id, (current) => {
+      const twoBoneIks = mutateStudioBg3dTwoBoneIkConstraint({
+        modelId: selectedCustomModel.id,
+        descriptors: selectedModelJoints,
+        selection: selectedIkRigSelection,
+        constraints: current.twoBoneIks,
+        next,
+      });
+      return twoBoneIks ? { ...current, twoBoneIks: [...twoBoneIks] } : current;
+    });
+  }
   const selectedIsLocked = isBgObjectTransformBlocked(selectedEntity);
   const selectedEntities = Array.from(selectedIds).reduce<Array<BgPrimitive | BgCustomModelInstance>>(
     (entities, id) => {
@@ -3937,6 +4127,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     }),
   ];
   const sceneHierarchy = resolveStudioBg3dHierarchy(layerListItems);
+  const effectivelyVisibleLayerIds = collectStudioBg3dEffectivelyVisibleEntityIds(layerListItems);
   let physicsSelectionUnavailableReason: string | null = null;
   if (selectedIds.size > STUDIO_BG3D_PHYSICS_MAX_DYNAMIC_BODIES) {
     physicsSelectionUnavailableReason =
@@ -3974,6 +4165,19 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
           "리그·애니메이션 모델은 자세를 고정하거나 일반 소품 모델로 바꾼 뒤 사용하세요.";
         break;
       }
+    }
+  }
+  if (!physicsSelectionUnavailableReason) {
+    const unsupportedVisibleModel = customModels.find((model) => {
+      if (!effectivelyVisibleLayerIds.has(model.id)) return false;
+      const cacheEntry = modelRootCacheRef.current.get(model.modelId);
+      return model.animation !== undefined || model.pose !== undefined || model.morph !== undefined ||
+        model.constraints !== undefined || (cacheEntry?.metrics.skins ?? 0) > 0 ||
+        (cacheEntry?.metrics.morphTargets ?? 0) > 0;
+    });
+    if (unsupportedVisibleModel) {
+      physicsSelectionUnavailableReason =
+        "보이는 리그·애니메이션·모프 모델은 현재 자세와 충돌체가 어긋날 수 있습니다. 해당 모델을 숨기거나 정적 소품으로 고정한 뒤 물리를 실행하세요.";
     }
   }
   const filteredLayerItems = filterStudioBg3dLayerItems(layerListItems, layerQuery);
@@ -4140,6 +4344,17 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
       return;
     }
 
+    const sourceToken = createStudioBg3dPhysicsSessionSourceToken({
+      primitives,
+      customModels,
+      document: sceneBaseDocument,
+    });
+    if (!sourceToken) {
+      setPhysicsError("현재 장면 상태를 물리 세션과 원자적으로 연결하지 못했습니다.");
+      transitionPhysicsPhase("error");
+      return;
+    }
+
     const adapted = adaptStudioBg3dRuntimeToDocument({
       primitives,
       customModels,
@@ -4211,6 +4426,13 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
         abortController.signal.aborted || generation !== physicsGenerationRef.current ||
         !componentActiveRef.current
       ) return;
+      if (!isStudioBg3dPhysicsSessionSourceCurrent(
+        sourceToken,
+        physicsRuntimeSourceRef.current,
+      )) {
+        failPhysicsPreview("물리 계산 중 장면이 변경되어 오래된 결과를 폐기했습니다. 다시 실행해 주세요.");
+        return;
+      }
       const initialDynamicSamples = sampleStudioBg3dPhysicsTimeline(timeline, 0);
       if (!initialDynamicSamples) {
         throw new Error("invalid-initial-physics-sample");
@@ -4220,6 +4442,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
         world: physicsJob.world,
         timeline,
         initialDynamicSamples,
+        sourceToken,
       });
       physicsSessionRef.current = session;
       latestPhysicsSamplesRef.current = initialDynamicSamples;
@@ -4248,6 +4471,14 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     const session = physicsSessionRef.current;
     const samples = latestPhysicsSamplesRef.current;
     if (!session || samples.length === 0) return;
+    if (!isStudioBg3dPhysicsSessionSourceCurrent(
+      session.sourceToken,
+      physicsRuntimeSourceRef.current,
+    )) {
+      failPhysicsPreview("물리 미리보기 시작 뒤 장면이 변경되어 현재 자세를 적용하지 않았습니다.");
+      return;
+    }
+    const currentRuntimeSource = physicsRuntimeSourceRef.current;
     cancelPhysicsAnimationFrame();
     transitionPhysicsPhase("baking");
     const bakedDocument = applyStudioBg3dPhysicsTransforms(
@@ -4265,8 +4496,8 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
       !bakedDocument || !hydrated || !hydrated.ok || hydrated.diagnostics.length > 0 ||
       hydrated.omittedDiagnosticCount > 0 ||
       hydrated.counts.droppedPrimitives > 0 || hydrated.counts.droppedCustomModels > 0 ||
-      hydrated.primitives.length !== primitives.length ||
-      hydrated.customModels.length !== customModels.length
+      hydrated.primitives.length !== currentRuntimeSource.primitives.length ||
+      hydrated.customModels.length !== currentRuntimeSource.customModels.length
     ) {
       failPhysicsPreview("현재 물리 자세를 장면 문서에 손실 없이 적용하지 못했습니다.");
       return;
@@ -4279,6 +4510,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
       hydrated.primitives,
       hydrated.customModels,
       bakedDocument,
+      createStudioBg3dHistorySnapshot(currentRuntimeSource),
     );
     setPrimitives(hydrated.primitives);
     setCustomModels(hydrated.customModels);
@@ -5612,7 +5844,10 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                                 aria-label="에임 조인트"
                                 className="h-11 min-w-0 rounded-lg border border-line bg-panel px-2 text-xs text-fg sm:h-8 pointer-coarse:h-11"
                                 value={selectedPoseJointKey}
-                                onChange={(event) => setPoseJointSelection(event.target.value)}
+                                onChange={(event) => setPoseJointSelection({
+                                  modelId: selectedCustomModel.id,
+                                  key: event.target.value,
+                                })}
                               >
                                 {selectedModelJoints.map((joint) => (
                                   <option key={joint.key} value={joint.key}>
@@ -5624,13 +5859,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                                 type="button"
                                 className="h-11 rounded-lg border border-line bg-panel px-2 text-[0.68rem] font-semibold text-fg-2 hover:bg-raised disabled:opacity-50 sm:h-8 pointer-coarse:h-11"
                                 disabled={!selectedAimConstraint}
-                                onClick={() => updateCustomModelConstraints(
-                                  selectedCustomModel.id,
-                                  (current) => ({
-                                    ...current,
-                                    aims: current.aims.filter((aim) => aim.jointKey !== selectedPoseJointKey),
-                                  }),
-                                )}
+                                onClick={() => commitSelectedAimConstraint(null)}
                               >
                                 에임 해제
                               </button>
@@ -5647,18 +5876,11 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                                   ...(selectedAimConstraint?.target ?? [0, 1, 1]),
                                 ];
                                 target[axis] = Math.max(-10_000, Math.min(10_000, value));
-                                updateCustomModelConstraints(selectedCustomModel.id, (current) => ({
-                                  ...current,
-                                  aims: [
-                                    ...current.aims.filter((aim) => aim.jointKey !== selectedPoseJointKey),
-                                    {
-                                      jointKey: selectedPoseJointKey,
-                                      target,
-                                      axis: selectedAimConstraint?.axis ?? "+z",
-                                      weight: selectedAimConstraint?.weight ?? 1,
-                                    },
-                                  ],
-                                }));
+                                commitSelectedAimConstraint({
+                                  target,
+                                  axis: selectedAimConstraint?.axis ?? "+z",
+                                  weight: selectedAimConstraint?.weight ?? 1,
+                                });
                               }}
                             />
                             <div className="grid grid-cols-2 gap-2">
@@ -5668,21 +5890,11 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                                   className="h-11 w-full rounded-lg border border-line bg-panel px-2 text-xs text-fg sm:h-8 pointer-coarse:h-11"
                                   disabled={selectedAimSuppressedByIk}
                                   value={selectedAimConstraint?.axis ?? "+z"}
-                                  onChange={(event) => updateCustomModelConstraints(
-                                    selectedCustomModel.id,
-                                    (current) => ({
-                                      ...current,
-                                      aims: [
-                                        ...current.aims.filter((aim) => aim.jointKey !== selectedPoseJointKey),
-                                        {
-                                          jointKey: selectedPoseJointKey,
-                                          target: [...(selectedAimConstraint?.target ?? [0, 1, 1])],
-                                          axis: event.target.value as "+x" | "-x" | "+y" | "-y" | "+z" | "-z",
-                                          weight: selectedAimConstraint?.weight ?? 1,
-                                        },
-                                      ],
-                                    }),
-                                  )}
+                                  onChange={(event) => commitSelectedAimConstraint({
+                                    target: [...(selectedAimConstraint?.target ?? [0, 1, 1])],
+                                    axis: event.target.value as "+x" | "-x" | "+y" | "-y" | "+z" | "-z",
+                                    weight: selectedAimConstraint?.weight ?? 1,
+                                  })}
                                 >
                                   <option value="+x">+X</option><option value="-x">−X</option>
                                   <option value="+y">+Y</option><option value="-y">−Y</option>
@@ -5699,21 +5911,11 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                                   max="1"
                                   step="0.01"
                                   value={selectedAimConstraint?.weight ?? 1}
-                                  onChange={(event) => updateCustomModelConstraints(
-                                    selectedCustomModel.id,
-                                    (current) => ({
-                                      ...current,
-                                      aims: [
-                                        ...current.aims.filter((aim) => aim.jointKey !== selectedPoseJointKey),
-                                        {
-                                          jointKey: selectedPoseJointKey,
-                                          target: [...(selectedAimConstraint?.target ?? [0, 1, 1])],
-                                          axis: selectedAimConstraint?.axis ?? "+z",
-                                          weight: Number(event.target.value),
-                                        },
-                                      ],
-                                    }),
-                                  )}
+                                  onChange={(event) => commitSelectedAimConstraint({
+                                    target: [...(selectedAimConstraint?.target ?? [0, 1, 1])],
+                                    axis: selectedAimConstraint?.axis ?? "+z",
+                                    weight: Number(event.target.value),
+                                  })}
                                 />
                               </label>
                             </div>
@@ -5759,47 +5961,20 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                                           !selectedIkTransformSupported
                                         ))
                                       }
-                                      onClick={() => updateCustomModelConstraints(
-                                        selectedCustomModel.id,
-                                        (current) => {
-                                          const remaining = current.twoBoneIks.filter((ik) => (
-                                            selectedJointByKey.get(ik.endJointKey)?.canonicalKey ??
-                                            ik.endJointKey
-                                          ) !== selectedIkEndJoint?.canonicalKey);
-                                          if (selectedTwoBoneIkConstraint) {
-                                            return { ...current, twoBoneIks: remaining };
-                                          }
-                                          if (!selectedIkUpperJoint || !selectedIkMiddleJoint || !selectedIkEndJoint) {
-                                            return current;
-                                          }
-                                          const chainKeys = new Set([
-                                            selectedIkUpperJoint.canonicalKey,
-                                            selectedIkMiddleJoint.canonicalKey,
-                                            selectedIkEndJoint.canonicalKey,
-                                          ]);
-                                          if (
-                                            current.twoBoneIks.length >= STUDIO_BG3D_MAX_TWO_BONE_IK_CONSTRAINTS ||
-                                            current.twoBoneIks.some((ik) => [
-                                              ik.upperJointKey,
-                                              ik.middleJointKey,
-                                              ik.endJointKey,
-                                            ].some((key) => chainKeys.has(
-                                              selectedJointByKey.get(key)?.canonicalKey ?? key,
-                                            )))
-                                          ) return current;
-                                          return {
-                                            ...current,
-                                            twoBoneIks: [...current.twoBoneIks, {
-                                              upperJointKey: selectedIkUpperJoint.key,
-                                              middleJointKey: selectedIkMiddleJoint.key,
-                                              endJointKey: selectedIkEndJoint.key,
-                                              target: [...selectedIkDefaultTarget],
-                                              poleTarget: [...selectedIkDefaultPole],
-                                              weight: 1,
-                                            }],
-                                          };
-                                        },
-                                      )}
+                                      onClick={() => {
+                                        if (selectedTwoBoneIkConstraint) {
+                                          commitSelectedTwoBoneIkConstraint(null);
+                                          return;
+                                        }
+                                        if (!selectedIkUpperJoint || !selectedIkMiddleJoint) return;
+                                        commitSelectedTwoBoneIkConstraint({
+                                          upperJointKey: selectedIkUpperJoint.key,
+                                          middleJointKey: selectedIkMiddleJoint.key,
+                                          target: [...selectedIkDefaultTarget],
+                                          poleTarget: [...selectedIkDefaultPole],
+                                          weight: 1,
+                                        });
+                                      }}
                                     >
                                       {selectedTwoBoneIkConstraint ? "IK 해제" : "IK 적용"}
                                     </button>
@@ -5833,15 +6008,17 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                                     touchFriendly
                                     onCommit={(axis, value) => {
                                       if (!selectedTwoBoneIkConstraint) return;
-                                      updateCustomModelConstraints(selectedCustomModel.id, (current) => ({
-                                        ...current,
-                                        twoBoneIks: current.twoBoneIks.map((ik) => {
-                                          if (ik.endJointKey !== selectedIkEndJointKey) return ik;
-                                          const target: [number, number, number] = [...ik.target];
-                                          target[axis] = Math.max(-10_000, Math.min(10_000, value));
-                                          return { ...ik, target };
-                                        }),
-                                      }));
+                                      const target: [number, number, number] = [
+                                        ...selectedTwoBoneIkConstraint.target,
+                                      ];
+                                      target[axis] = Math.max(-10_000, Math.min(10_000, value));
+                                      commitSelectedTwoBoneIkConstraint({
+                                        upperJointKey: selectedTwoBoneIkConstraint.upperJointKey,
+                                        middleJointKey: selectedTwoBoneIkConstraint.middleJointKey,
+                                        target,
+                                        poleTarget: [...selectedTwoBoneIkConstraint.poleTarget],
+                                        weight: selectedTwoBoneIkConstraint.weight,
+                                      });
                                     }}
                                   />
                                   <Vec3Field
@@ -5855,15 +6032,17 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                                     touchFriendly
                                     onCommit={(axis, value) => {
                                       if (!selectedTwoBoneIkConstraint) return;
-                                      updateCustomModelConstraints(selectedCustomModel.id, (current) => ({
-                                        ...current,
-                                        twoBoneIks: current.twoBoneIks.map((ik) => {
-                                          if (ik.endJointKey !== selectedIkEndJointKey) return ik;
-                                          const poleTarget: [number, number, number] = [...ik.poleTarget];
-                                          poleTarget[axis] = Math.max(-10_000, Math.min(10_000, value));
-                                          return { ...ik, poleTarget };
-                                        }),
-                                      }));
+                                      const poleTarget: [number, number, number] = [
+                                        ...selectedTwoBoneIkConstraint.poleTarget,
+                                      ];
+                                      poleTarget[axis] = Math.max(-10_000, Math.min(10_000, value));
+                                      commitSelectedTwoBoneIkConstraint({
+                                        upperJointKey: selectedTwoBoneIkConstraint.upperJointKey,
+                                        middleJointKey: selectedTwoBoneIkConstraint.middleJointKey,
+                                        target: [...selectedTwoBoneIkConstraint.target],
+                                        poleTarget,
+                                        weight: selectedTwoBoneIkConstraint.weight,
+                                      });
                                     }}
                                   />
                                   <label className="grid grid-cols-[4.5rem_1fr_2.5rem] items-center gap-2 text-[0.68rem] text-fg-3">
@@ -5878,14 +6057,13 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                                       value={selectedTwoBoneIkConstraint?.weight ?? 1}
                                       onChange={(event) => {
                                         if (!selectedTwoBoneIkConstraint) return;
-                                        updateCustomModelConstraints(selectedCustomModel.id, (current) => ({
-                                          ...current,
-                                          twoBoneIks: current.twoBoneIks.map((ik) =>
-                                            ik.endJointKey === selectedIkEndJointKey
-                                              ? { ...ik, weight: Number(event.target.value) }
-                                              : ik
-                                          ),
-                                        }));
+                                        commitSelectedTwoBoneIkConstraint({
+                                          upperJointKey: selectedTwoBoneIkConstraint.upperJointKey,
+                                          middleJointKey: selectedTwoBoneIkConstraint.middleJointKey,
+                                          target: [...selectedTwoBoneIkConstraint.target],
+                                          poleTarget: [...selectedTwoBoneIkConstraint.poleTarget],
+                                          weight: Number(event.target.value),
+                                        });
                                       }}
                                     />
                                     <span className="text-right tabular-nums text-fg-2">
@@ -5996,7 +6174,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                             <div className="grid grid-cols-[4.5rem_1fr] items-center gap-2">
                               <button
                                 type="button"
-                                className="h-8 rounded-lg border border-line bg-panel px-2 text-[0.68rem] font-semibold text-fg-2 hover:bg-raised"
+                                className="h-11 rounded-lg border border-line bg-panel px-2 text-[0.68rem] font-semibold text-fg-2 hover:bg-raised sm:h-8 pointer-coarse:h-11"
                                 onClick={() => updateCustomModelAnimation(
                                   selectedCustomModel.id,
                                   (current) => ({ ...current, playing: !current.playing }),
@@ -6004,16 +6182,17 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                               >
                                 {selectedCustomModel.animation.playing ? "일시정지" : "재생"}
                               </button>
-                              <input
-                                aria-label="애니메이션 시간"
-                                type="range"
-                                min="0"
-                                max={selectedAnimationDuration}
-                                step={Math.max(0.001, selectedAnimationDuration / 1_000)}
-                                value={Math.min(selectedAnimationDuration, selectedCustomModel.animation.timeSeconds)}
-                                onChange={(event) => updateCustomModelAnimation(
+                              <BgAnimationPlayhead
+                                active={open && activePanelTab === "models"}
+                                modelId={selectedCustomModel.id}
+                                playback={selectedCustomModel.animation}
+                                durationSeconds={selectedAnimationDuration}
+                                readLiveTime={() => modelAnimationTimeReadersRef.current.get(
                                   selectedCustomModel.id,
-                                  (current) => ({ ...current, timeSeconds: Number(event.target.value) }),
+                                )?.()}
+                                onCommit={(timeSeconds) => updateCustomModelAnimation(
+                                  selectedCustomModel.id,
+                                  (current) => ({ ...current, timeSeconds }),
                                 )}
                               />
                             </div>
@@ -6086,9 +6265,12 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                             <div className="grid grid-cols-[1fr_auto] gap-2">
                               <select
                                 aria-label="포즈 조인트"
-                                className="h-8 min-w-0 rounded-lg border border-line bg-panel px-2 text-xs text-fg"
+                                className="h-11 min-w-0 rounded-lg border border-line bg-panel px-2 text-xs text-fg sm:h-8 pointer-coarse:h-11"
                                 value={selectedPoseJointKey}
-                                onChange={(event) => setPoseJointSelection(event.target.value)}
+                                onChange={(event) => setPoseJointSelection({
+                                  modelId: selectedCustomModel.id,
+                                  key: event.target.value,
+                                })}
                               >
                                 {selectedModelJoints.map((joint) => (
                                   <option key={joint.key} value={joint.key}>
@@ -6098,15 +6280,9 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                               </select>
                               <button
                                 type="button"
-                                className="h-8 rounded-lg border border-line bg-panel px-2 text-[0.68rem] font-semibold text-fg-2 hover:bg-raised disabled:opacity-50"
+                                className="h-11 rounded-lg border border-line bg-panel px-2 text-[0.68rem] font-semibold text-fg-2 hover:bg-raised disabled:opacity-50 sm:h-8 pointer-coarse:h-11"
                                 disabled={!selectedPoseJoint}
-                                onClick={() => updateCustomModelPose(
-                                  selectedCustomModel.id,
-                                  (current) => ({
-                                    ...current,
-                                    joints: current.joints.filter((joint) => joint.jointKey !== selectedPoseJointKey),
-                                  }),
-                                )}
+                                onClick={() => commitSelectedPoseOverride(null)}
                               >
                                 조인트 초기화
                               </button>
@@ -6121,13 +6297,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                                 const nextEuler: [number, number, number] = [...selectedPoseEulerDegrees];
                                 nextEuler[axis] = Math.max(-180, Math.min(180, value));
                                 const rotationOffset = eulerDegreesToQuaternion(nextEuler);
-                                updateCustomModelPose(selectedCustomModel.id, (current) => ({
-                                  ...current,
-                                  joints: [
-                                    ...current.joints.filter((joint) => joint.jointKey !== selectedPoseJointKey),
-                                    { jointKey: selectedPoseJointKey, rotationOffset },
-                                  ],
-                                }));
+                                commitSelectedPoseOverride({ rotationOffset });
                               }}
                             />
                             <label className="grid grid-cols-[4.5rem_1fr_2.5rem] items-center gap-2 text-[0.68rem] text-fg-3">
@@ -6210,7 +6380,10 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                                 aria-label="모프 타깃"
                                 className="h-8 min-w-0 rounded-lg border border-line bg-panel px-2 text-xs text-fg"
                                 value={selectedMorphTargetKey}
-                                onChange={(event) => setMorphTargetSelection(event.target.value)}
+                                onChange={(event) => setMorphTargetSelection({
+                                  modelId: selectedCustomModel.id,
+                                  key: event.target.value,
+                                })}
                               >
                                 {selectedModelMorphTargets.map((target) => (
                                   <option key={target.key} value={target.key}>

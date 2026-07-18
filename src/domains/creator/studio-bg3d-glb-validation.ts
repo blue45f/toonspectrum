@@ -5,6 +5,10 @@
  * here before creating an object URL, invoking a renderer loader, or resolving any glTF resource.
  */
 
+import {
+  isAttestedStudioBg3dKtx2TranscoderCapability,
+  type StudioBg3dKtx2TranscoderCapability,
+} from "./studio-bg3d-ktx2-transcoder-capability";
 import { inspectStudioBg3dBasisKtx2 } from "./studio-bg3d-ktx2-validation";
 
 export const STUDIO_BG3D_GLB_MAX_BYTES = 100 * 1024 * 1024;
@@ -144,6 +148,12 @@ export interface StudioBg3dGlbValidationOptions {
   readonly maxJsonBytes?: number;
   /** Required extensions not in this allowlist are rejected before a renderer sees the file. */
   readonly supportedRequiredExtensions?: readonly string[];
+  /**
+   * Same-realm proof that the exact Three Basis JS/WASM assets were hashed successfully. Required
+   * in addition to the allowlist for a required KHR_texture_basisu asset. This object cannot be
+   * trusted after structured cloning; a Worker must attest its own executable assets.
+   */
+  readonly basisTranscoderCapability?: StudioBg3dKtx2TranscoderCapability;
 }
 
 export interface StudioBg3dGlbMetrics {
@@ -538,6 +548,7 @@ function hasExternalResourceUri(root: Record<string, unknown>): boolean | null {
 function validateRequiredExtensions(
   root: Record<string, unknown>,
   supported: readonly string[],
+  basisTranscoderCapability: unknown,
 ): StudioBg3dGlbValidationFailure | null {
   const required = root.extensionsRequired;
   if (required === undefined) return null;
@@ -545,7 +556,13 @@ function validateRequiredExtensions(
     return failure("invalid-gltf-root");
   }
   const allowed = new Set(supported);
-  return required.some((extension) => !allowed.has(extension as string))
+  return required.some((extension) => (
+    !allowed.has(extension as string) ||
+    (
+      extension === "KHR_texture_basisu" &&
+      !isAttestedStudioBg3dKtx2TranscoderCapability(basisTranscoderCapability)
+    )
+  ))
     ? failure("unsupported-required-extension")
     : null;
 }
@@ -1545,6 +1562,7 @@ export async function validateStudioBg3dGlb(
   const requiredExtensionFailure = validateRequiredExtensions(
     parsed.root,
     options.supportedRequiredExtensions ?? [],
+    options.basisTranscoderCapability,
   );
   if (requiredExtensionFailure) return requiredExtensionFailure;
   const externalResource = hasExternalResourceUri(parsed.root);

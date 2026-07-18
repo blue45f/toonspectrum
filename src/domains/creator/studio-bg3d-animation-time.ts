@@ -68,3 +68,39 @@ export function snapshotStudioBg3dLiveAnimationPlayback(
   if (!playback.playing || !Number.isFinite(liveTimeSeconds)) return playback;
   return { ...playback, timeSeconds: Math.max(0, liveTimeSeconds!) };
 }
+
+/**
+ * Resolves the selected-model playhead without persisting mixer ticks into SceneDocument/history.
+ * The live reader is authoritative only while the same model is playing; all other states use the
+ * canonical stored time. The result is always safe for a range input.
+ */
+export function resolveStudioBg3dAnimationDisplayTime(input: {
+  readonly modelId: string;
+  readonly playback: StudioBg3dAnimationPlayback;
+  readonly durationSeconds: number;
+  readonly liveSample: {
+    readonly modelId: string;
+    readonly clipIndex: number;
+    readonly baseTimeSeconds: number;
+    readonly timeSeconds: number;
+  } | null;
+}): number {
+  const duration = Number.isFinite(input.durationSeconds)
+    ? Math.max(0, input.durationSeconds)
+    : 0;
+  const hasCurrentLiveSample = input.playback.playing &&
+    input.liveSample?.modelId === input.modelId &&
+    input.liveSample.clipIndex === input.playback.clipIndex &&
+    input.liveSample.baseTimeSeconds === input.playback.timeSeconds &&
+    Number.isFinite(input.liveSample.timeSeconds);
+  if (hasCurrentLiveSample) {
+    return Math.min(duration, Math.max(0, input.liveSample!.timeSeconds));
+  }
+  return resolveStudioBg3dAnimationTime({
+    baseTimeSeconds: input.playback.timeSeconds,
+    elapsedSeconds: 0,
+    timeScale: input.playback.timeScale,
+    durationSeconds: duration,
+    loop: input.playback.loop,
+  });
+}
