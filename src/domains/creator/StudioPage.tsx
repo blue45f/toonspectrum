@@ -771,7 +771,6 @@ import {
   StudioDialogueBatchPanel,
   StudioDialogueSuggestPanel,
   StudioDialogueTranslatePanel,
-  StudioDrawOptionsBar,
   StudioElementsPanel,
   StudioEmeresLibraryPanel,
   StudioExportMenuPanel,
@@ -811,7 +810,6 @@ import {
   StudioRemoteCursorOverlay,
   StudioScenarioAutoLayoutPanel,
   StudioScrollPreviewPanel,
-  StudioSelectOptionsBar,
   StudioSelectionAntsOverlay,
   StudioShapePickerGrid,
   StudioShortcutsHelp,
@@ -1244,6 +1242,12 @@ import {
   type StudioCrdtSceneGraphRuntime,
 } from "./StudioLiveCollaborationProvider";
 import { StudioMobileSheetHandle } from "./StudioMobileSheetHandle";
+import {
+  StudioOptionsBars,
+  type StudioOptionsBarsDrawModel,
+  type StudioOptionsBarsHandlers,
+  type StudioOptionsBarsSelectionModel,
+} from "./StudioOptionsBars";
 import {
   StudioPageListPane,
   type StudioPageListPaneHandlers,
@@ -24672,17 +24676,189 @@ function StudioCuttoonEditor() {
   });
 
   const studioOptionsBarsHandlers = useStudioStableHandlers<StudioOptionsBarsHandlers>({
-    announceDrawingShortcut,
-    applyBrushSlot,
-    applyBuiltInBrushPreset,
-    disarmAllPixelTools,
-    duplicateSelected,
-    openInspectorRoute,
-    removeSelected,
-    reorder,
-    patchEl,
-    toggleHorizontalCanvasView,
+    assignBrushSlot: (index) => {
+      setBrushSlotsState((prev) => {
+        const next = assignStudioBrushSlot(prev, index, {
+          brushId: brush,
+          strokeWidth,
+          brushOpacity,
+        });
+        saveStudioBrushSlotsState(
+          typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage,
+          next
+        );
+        return next;
+      });
+      announceDrawingShortcut(`슬롯 ${index + 1}에 저장`);
+    },
+    cycleStabilizer: () => {
+      setStabilizer((prev) => {
+        const next = cycleStudioStabilizerStrength(prev);
+        announceDrawingShortcut(`보정 ${next}`);
+        return next;
+      });
+    },
+    deleteSelection: removeSelected,
+    duplicateSelection: duplicateSelected,
+    openBrushStudio: () => {
+      void loadStudioBrushStudio();
+      setTool("draw");
+      setDrawMode("pen");
+      setRightPanelOpen(true);
+      setMobileSheet(isMobile ? "draw" : null);
+      openInspectorRoute({ primary: "properties" });
+    },
+    recallBrushSlot: (index) => {
+      const slot = studioBrushSlotAt(brushSlotsState, index);
+      if (slot) applyBrushSlot(slot);
+    },
+    reorderSelection: (direction) => reorder(direction),
+    selectBrushId: studioBrushCatalogHandlers.selectBrushId,
+    setBrushOpacity,
+    setColor,
+    setDrawMode: (mode) => {
+      setTool("draw");
+      setDrawMode(mode);
+      setEyedropperActive(false);
+    },
+    setDrawShape,
+    setPostCorrection,
+    setPressureCurvePreset: (id) => setPressureCurve(pressureCurveValueForPreset(id)),
+    setSecondaryColor,
+    setShapeFill,
+    setStabilizer,
+    setStabilizerMode,
+    setStampTuning,
+    setStrokeWidth,
+    setSymmetryType,
+    swapColors: () => {
+      setColor(secondaryColor);
+      setSecondaryColor(color);
+      announceDrawingShortcut("색 교체");
+    },
+    toggleBrushCatalog: (trigger) =>
+      studioBrushCatalogHandlers.toggle("desktop-dock", trigger),
+    toggleCanvasFlip: toggleHorizontalCanvasView,
+    toggleFavoriteBrush: studioBrushCatalogHandlers.toggleFavorite,
+    toggleOpacityLock: () => {
+      setProDrawPrefs((prev) => {
+        const next = { ...prev, opacityLocked: !prev.opacityLocked };
+        saveStudioProDrawPrefs(studioProDrawStorage(), next);
+        announceDrawingShortcut(next.opacityLocked ? "불투명 잠금" : "불투명 잠금 해제");
+        return next;
+      });
+    },
+    toggleQuickShape: () => {
+      const next = !quickShapeActive;
+      if (next) {
+        disarmAllPixelTools();
+        setTool("draw");
+        setDrawMode("pen");
+        setEyedropperActive(false);
+        announceDrawingShortcut("스마트 도형 켜짐 · 그려서 손을 떼면 다듬어요");
+      } else {
+        announceDrawingShortcut("스마트 도형 꺼짐");
+      }
+      setQuickShapeActive(next);
+    },
+    toggleSelectedLock: () => {
+      if (!selected) return;
+      patchEl(selected.id, { locked: !selected.locked });
+    },
+    toggleSizeLock: () => {
+      setProDrawPrefs((prev) => {
+        const next = { ...prev, sizeLocked: !prev.sizeLocked };
+        saveStudioProDrawPrefs(studioProDrawStorage(), next);
+        announceDrawingShortcut(next.sizeLocked ? "크기 잠금" : "크기 잠금 해제");
+        return next;
+      });
+    },
   });
+
+  const studioOptionsBarsDrawModel = useMemo<StudioOptionsBarsDrawModel>(
+    () => ({
+      visible: tool === "draw" && !canvasOnlyMode,
+      brushId: brush,
+      brushCatalogOpen: brushCatalogSession?.placement === "desktop-dock",
+      brushOpacity,
+      brushSlots: brushSlotsState.slots,
+      canvasFlipH,
+      color,
+      dockInsets: {
+        left:
+          (visibleLeftPanelOpen
+            ? leftResize.width + 8
+            : presentationPanelsHidden
+              ? 0
+              : 32) +
+          (studioUiDensityAllows(uiDensityMode, "tool-rail") ? 52 : 0),
+        right: visibleRightPanelOpen
+          ? rightResize.width + 8
+          : presentationPanelsHidden
+            ? 0
+            : 32,
+      },
+      drawMode: drawMode === "shape" ? "shape" : drawMode === "eraser" ? "eraser" : "pen",
+      drawShape,
+      favoriteBrushIds: proDrawPrefs.favoriteBrushIds,
+      opacityLocked: proDrawPrefs.opacityLocked,
+      postCorrection,
+      pressureCurveId: pressureCurvePresetId(pressureCurve),
+      quickShapeActive,
+      recentBrushIds: proDrawPrefs.recentBrushIds,
+      secondaryColor,
+      shapeFill,
+      sizeLocked: proDrawPrefs.sizeLocked,
+      stabilizer,
+      stabilizerMode,
+      stampTuning,
+      strokeWidth,
+      symmetryType,
+    }),
+    [
+      brush,
+      brushCatalogSession?.placement,
+      brushOpacity,
+      brushSlotsState.slots,
+      canvasFlipH,
+      canvasOnlyMode,
+      color,
+      drawMode,
+      drawShape,
+      leftResize.width,
+      postCorrection,
+      presentationPanelsHidden,
+      pressureCurve,
+      proDrawPrefs.favoriteBrushIds,
+      proDrawPrefs.opacityLocked,
+      proDrawPrefs.recentBrushIds,
+      proDrawPrefs.sizeLocked,
+      quickShapeActive,
+      rightResize.width,
+      secondaryColor,
+      shapeFill,
+      stabilizer,
+      stabilizerMode,
+      stampTuning,
+      strokeWidth,
+      symmetryType,
+      tool,
+      uiDensityMode,
+      visibleLeftPanelOpen,
+      visibleRightPanelOpen,
+    ]
+  );
+
+  const studioOptionsBarsSelectionModel = useMemo<StudioOptionsBarsSelectionModel>(() => {
+    const count = marqueeIds.length > 0 ? marqueeIds.length : selectedId ? 1 : 0;
+    return {
+      visible: tool === "select" && !canvasOnlyMode && count > 0,
+      count,
+      label: selected ? elementLabel(selected) : null,
+      locked: Boolean(selected?.locked),
+      canToggleLock: Boolean(selected),
+    };
+  }, [canvasOnlyMode, marqueeIds.length, selected, selectedId, tool]);
 
   // 렌더 시점 ref 스냅샷 — RC 컴파일 자식(캔버스)은 렌더 중 ref 접근이 금지라, 비컴파일
   // 에디터에서 읽어 값으로 전달한다(어차피 렌더 시점 값만 화면에 반영되므로 의미 동일).
@@ -25073,58 +25249,8 @@ function StudioCuttoonEditor() {
       </div>
 
       <StudioOptionsBars
-        brush={brush}
-        brushCatalogHandlers={studioBrushCatalogHandlers}
-        brushCatalogOpen={brushCatalogSession?.placement === "desktop-dock"}
-        brushOpacity={brushOpacity}
-        brushSlotsState={brushSlotsState}
-        canvasFlipH={canvasFlipH}
-        canvasOnlyMode={canvasOnlyMode}
-        color={color}
-        drawMode={drawMode}
-        drawShape={drawShape}
-        isMobile={isMobile}
-        leftResize={leftResize}
-        marqueeIds={marqueeIds}
-        postCorrection={postCorrection}
-        presentationPanelsHidden={presentationPanelsHidden}
-        pressureCurve={pressureCurve}
-        proDrawPrefs={proDrawPrefs}
-        quickShapeActive={quickShapeActive}
-        rightResize={rightResize}
-        secondaryColor={secondaryColor}
-        selected={selected}
-        selectedId={selectedId}
-        setBrushOpacity={setBrushOpacity}
-        setBrushSlotsState={setBrushSlotsState}
-        setColor={setColor}
-        setDrawMode={setDrawMode}
-        setDrawShape={setDrawShape}
-        setEyedropperActive={setEyedropperActive}
-        setMobileSheet={setMobileSheet}
-        setPostCorrection={setPostCorrection}
-        setPressureCurve={setPressureCurve}
-        setProDrawPrefs={setProDrawPrefs}
-        setQuickShapeActive={setQuickShapeActive}
-        setRightPanelOpen={setRightPanelOpen}
-        setSecondaryColor={setSecondaryColor}
-        setShapeFill={setShapeFill}
-        setStabilizer={setStabilizer}
-        setStabilizerMode={setStabilizerMode}
-        setStampTuning={setStampTuning}
-        setStrokeWidth={setStrokeWidth}
-        setSymmetryType={setSymmetryType}
-        setTool={setTool}
-        shapeFill={shapeFill}
-        stabilizer={stabilizer}
-        stabilizerMode={stabilizerMode}
-        stampTuning={stampTuning}
-        strokeWidth={strokeWidth}
-        symmetryType={symmetryType}
-        tool={tool}
-        uiDensityMode={uiDensityMode}
-        visibleLeftPanelOpen={visibleLeftPanelOpen}
-        visibleRightPanelOpen={visibleRightPanelOpen}
+        draw={studioOptionsBarsDrawModel}
+        selection={studioOptionsBarsSelectionModel}
         stableHandlers={studioOptionsBarsHandlers}
       />
 
@@ -31546,308 +31672,6 @@ const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   );
 });
 
-
-interface StudioOptionsBarsHandlers {
-  announceDrawingShortcut: (message: string) => void;
-  applyBrushSlot: (slot: { brushId: string; strokeWidth: number; brushOpacity: number; }) => void;
-  applyBuiltInBrushPreset: (preset: BrushPreset) => void;
-  disarmAllPixelTools: () => void;
-  duplicateSelected: () => void;
-  openInspectorRoute: (route: StudioInspectorRoute) => void;
-  patchEl: (id: string, patch: Partial<El>) => void;
-  removeSelected: () => void;
-  reorder: (dir: "front" | "back" | "forward" | "backward") => void;
-  toggleHorizontalCanvasView: () => void;
-}
-
-interface StudioOptionsBarsProps {
-  brush: string;
-  brushCatalogHandlers: StudioBrushCatalogHandlers;
-  brushCatalogOpen: boolean;
-  brushOpacity: number;
-  brushSlotsState: StudioBrushSlotsState;
-  canvasFlipH: boolean;
-  canvasOnlyMode: boolean;
-  color: string;
-  drawMode: DrawMode;
-  drawShape: DrawShapeKind;
-  isMobile: boolean;
-  leftResize: import("@/components/use-resizable").Resizable;
-  marqueeIds: string[];
-  postCorrection: number;
-  presentationPanelsHidden: boolean;
-  pressureCurve: number;
-  proDrawPrefs: StudioProDrawPrefs;
-  quickShapeActive: boolean;
-  rightResize: import("@/components/use-resizable").Resizable;
-  secondaryColor: string;
-  selected: El | null;
-  selectedId: string | null;
-  setBrushOpacity: import("react").Dispatch<import("react").SetStateAction<number>>;
-  setBrushSlotsState: import("react").Dispatch<import("react").SetStateAction<StudioBrushSlotsState>>;
-  setColor: import("react").Dispatch<import("react").SetStateAction<string>>;
-  setDrawMode: import("react").Dispatch<import("react").SetStateAction<DrawMode>>;
-  setDrawShape: import("react").Dispatch<import("react").SetStateAction<DrawShapeKind>>;
-  setEyedropperActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setMobileSheet: import("react").Dispatch<import("react").SetStateAction<"draw" | "pages" | "props" | "brushes" | null>>;
-  setPostCorrection: import("react").Dispatch<import("react").SetStateAction<number>>;
-  setPressureCurve: import("react").Dispatch<import("react").SetStateAction<number>>;
-  setProDrawPrefs: import("react").Dispatch<import("react").SetStateAction<StudioProDrawPrefs>>;
-  setQuickShapeActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setRightPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setSecondaryColor: import("react").Dispatch<import("react").SetStateAction<string>>;
-  setShapeFill: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setStabilizer: import("react").Dispatch<import("react").SetStateAction<number>>;
-  setStabilizerMode: import("react").Dispatch<import("react").SetStateAction<"standard" | "adaptive" | "precision">>;
-  setStampTuning: import("react").Dispatch<import("react").SetStateAction<{ flow: number; hardness: number; minSize: number; } | null>>;
-  setStrokeWidth: import("react").Dispatch<import("react").SetStateAction<number>>;
-  setSymmetryType: import("react").Dispatch<import("react").SetStateAction<"none" | "vertical" | "horizontal" | "radial" | "kaleidoscope">>;
-  setTool: import("react").Dispatch<import("react").SetStateAction<Tool>>;
-  shapeFill: boolean;
-  stabilizer: number;
-  stabilizerMode: "standard" | "adaptive" | "precision";
-  stampTuning: { flow: number; hardness: number; minSize: number; } | null;
-  strokeWidth: number;
-  symmetryType: "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope";
-  tool: Tool;
-  uiDensityMode: "simple" | "full" | "focus";
-  visibleLeftPanelOpen: boolean;
-  visibleRightPanelOpen: boolean;
-  stableHandlers: StudioOptionsBarsHandlers;
-}
-
-const StudioOptionsBars = memo(function StudioOptionsBars({
-  brush,
-  brushCatalogHandlers,
-  brushCatalogOpen,
-  brushOpacity,
-  brushSlotsState,
-  canvasFlipH,
-  canvasOnlyMode,
-  color,
-  drawMode,
-  drawShape,
-  isMobile,
-  leftResize,
-  marqueeIds,
-  postCorrection,
-  presentationPanelsHidden,
-  pressureCurve,
-  proDrawPrefs,
-  quickShapeActive,
-  rightResize,
-  secondaryColor,
-  selected,
-  selectedId,
-  setBrushOpacity,
-  setBrushSlotsState,
-  setColor,
-  setDrawMode,
-  setDrawShape,
-  setEyedropperActive,
-  setMobileSheet,
-  setPostCorrection,
-  setPressureCurve,
-  setProDrawPrefs,
-  setQuickShapeActive,
-  setRightPanelOpen,
-  setSecondaryColor,
-  setShapeFill,
-  setStabilizer,
-  setStabilizerMode,
-  setStampTuning,
-  setStrokeWidth,
-  setSymmetryType,
-  setTool,
-  shapeFill,
-  stabilizer,
-  stabilizerMode,
-  stampTuning,
-  strokeWidth,
-  symmetryType,
-  tool,
-  uiDensityMode,
-  visibleLeftPanelOpen,
-  visibleRightPanelOpen,
-  stableHandlers,
-}: StudioOptionsBarsProps) {
-  const {
-    announceDrawingShortcut,
-    applyBrushSlot,
-    applyBuiltInBrushPreset,
-    disarmAllPixelTools,
-    duplicateSelected,
-    openInspectorRoute,
-    removeSelected,
-    reorder,
-    patchEl,
-    toggleHorizontalCanvasView,
-  } = stableHandlers;
-  return (
-    <>
-      {/* Commercial draw options — size/opacity/stabilizer/brushes (CSP-style properties strip). */}
-      {tool === "draw" && !canvasOnlyMode ? (
-        // fallback은 반드시 레이아웃 중립이어야 한다: docked 바는 fixed(플로우 0px)인데 인플로우
-        // 40px 스트립을 폴백으로 쓰면 레이지 로드가 끝나는 순간(첫 스트로크 중·펜업 직후) 캔버스가
-        // 40px 튀어 오른다 — 릴리즈 때 "선이 튀는" 증상의 원인.
-        <Suspense fallback={null}>
-          <StudioDrawOptionsBar
-            docked
-            brushCatalogOpen={brushCatalogOpen}
-            onToggleBrushCatalog={(trigger) =>
-              brushCatalogHandlers.toggle("desktop-dock", trigger)
-            }
-            dockInsets={{
-              left:
-                (visibleLeftPanelOpen
-                  ? leftResize.width + 8
-                  : presentationPanelsHidden
-                    ? 0
-                    : 32) +
-                (studioUiDensityAllows(uiDensityMode, "tool-rail") ? 52 : 0),
-              right: visibleRightPanelOpen
-                ? rightResize.width + 8
-                : presentationPanelsHidden
-                  ? 0
-                  : 32,
-            }}
-            drawMode={drawMode === "shape" ? "shape" : drawMode === "eraser" ? "eraser" : "pen"}
-            brushId={brush}
-            strokeWidth={strokeWidth}
-            brushOpacity={brushOpacity}
-            stabilizer={stabilizer}
-            stabilizerMode={stabilizerMode}
-            onStabilizerModeChange={setStabilizerMode}
-            color={color}
-            recentSwatches={DRAW_COLOR_SWATCHES}
-            brushSlots={brushSlotsState.slots}
-            symmetryType={symmetryType}
-            quickShapeActive={quickShapeActive}
-            onSelectBrush={(item) => {
-              const preset = BRUSH_PRESETS.find((candidate) => candidate.id === item.id);
-              if (preset) applyBuiltInBrushPreset(preset);
-            }}
-            onStrokeWidthChange={setStrokeWidth}
-            onOpacityChange={setBrushOpacity}
-            onStabilizerChange={setStabilizer}
-            postCorrection={postCorrection}
-            onPostCorrectionChange={setPostCorrection}
-            pressureCurveId={pressureCurvePresetId(pressureCurve)}
-            onPressureCurveChange={(id) => setPressureCurve(pressureCurveValueForPreset(id))}
-            stampTuning={stampTuning}
-            onStampTuningChange={setStampTuning}
-            onColorChange={setColor}
-            secondaryColor={secondaryColor}
-            onSecondaryColorChange={setSecondaryColor}
-            onSwapColors={() => {
-              setColor(secondaryColor);
-              setSecondaryColor(color);
-              announceDrawingShortcut("색 교체");
-            }}
-            canvasFlipH={canvasFlipH}
-            onToggleCanvasFlipH={toggleHorizontalCanvasView}
-            onOpenBrushStudio={() => {
-              void loadStudioBrushStudio();
-              setTool("draw");
-              setDrawMode("pen");
-              setRightPanelOpen(true);
-              setMobileSheet(isMobile ? "draw" : null);
-              openInspectorRoute({ primary: "properties" });
-            }}
-            onToggleQuickShape={() => {
-              const next = !quickShapeActive;
-              if (next) {
-                disarmAllPixelTools();
-                setTool("draw");
-                setDrawMode("pen");
-                setEyedropperActive(false);
-                announceDrawingShortcut("스마트 도형 켜짐 · 그려서 손을 떼면 다듬어요");
-              } else {
-                announceDrawingShortcut("스마트 도형 꺼짐");
-              }
-              setQuickShapeActive(next);
-            }}
-            onSetDrawMode={(mode) => {
-              setTool("draw");
-              setDrawMode(mode);
-              setEyedropperActive(false);
-            }}
-            shapeKind={drawShape}
-            onShapeKindChange={(kind) => setDrawShape(kind as DrawShapeKind)}
-            shapeFill={shapeFill}
-            onShapeFillChange={setShapeFill}
-            onRecallBrushSlot={(index) => {
-              const slot = studioBrushSlotAt(brushSlotsState, index);
-              if (slot) applyBrushSlot(slot);
-            }}
-            onAssignBrushSlot={(index) => {
-              setBrushSlotsState((prev) => {
-                const next = assignStudioBrushSlot(prev, index, {
-                  brushId: brush,
-                  strokeWidth,
-                  brushOpacity,
-                });
-                saveStudioBrushSlotsState(
-                  typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage,
-                  next
-                );
-                return next;
-              });
-              announceDrawingShortcut(`슬롯 ${index + 1}에 저장`);
-            }}
-            onSymmetryTypeChange={setSymmetryType}
-            sizeLocked={proDrawPrefs.sizeLocked}
-            opacityLocked={proDrawPrefs.opacityLocked}
-            onToggleSizeLock={() => {
-              setProDrawPrefs((prev) => {
-                const next = { ...prev, sizeLocked: !prev.sizeLocked };
-                saveStudioProDrawPrefs(studioProDrawStorage(), next);
-                announceDrawingShortcut(next.sizeLocked ? "크기 잠금" : "크기 잠금 해제");
-                return next;
-              });
-            }}
-            onToggleOpacityLock={() => {
-              setProDrawPrefs((prev) => {
-                const next = { ...prev, opacityLocked: !prev.opacityLocked };
-                saveStudioProDrawPrefs(studioProDrawStorage(), next);
-                announceDrawingShortcut(next.opacityLocked ? "불투명 잠금" : "불투명 잠금 해제");
-                return next;
-              });
-            }}
-            recentBrushIds={proDrawPrefs.recentBrushIds}
-            favoriteBrushIds={proDrawPrefs.favoriteBrushIds}
-            onToggleFavoriteBrush={brushCatalogHandlers.toggleFavorite}
-            onCycleStabilizer={() => {
-              setStabilizer((prev) => {
-                const next = cycleStudioStabilizerStrength(prev);
-                announceDrawingShortcut(`보정 ${next}`);
-                return next;
-              });
-            }}
-          />
-        </Suspense>
-      ) : null}
-      {tool === "select" && !canvasOnlyMode && (selectedId || marqueeIds.length > 0) ? (
-        <Suspense fallback={null}>
-          <StudioSelectOptionsBar
-            selectionCount={marqueeIds.length > 0 ? marqueeIds.length : selectedId ? 1 : 0}
-            selectionLabel={selected ? elementLabel(selected) : null}
-            locked={Boolean(selected?.locked)}
-            onDuplicate={duplicateSelected}
-            onDelete={removeSelected}
-            onBringFront={() => reorder("front")}
-            onSendBack={() => reorder("back")}
-            onToggleLock={
-              selected
-                ? () => patchEl(selected.id, { locked: !selected.locked })
-                : undefined
-            }
-          />
-        </Suspense>
-      ) : null}
-    </>
-  );
-});
 
 interface StudioCanvasViewportHandlers {
   addPage: () => void;
