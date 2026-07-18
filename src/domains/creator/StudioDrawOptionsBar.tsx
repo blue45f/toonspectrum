@@ -712,11 +712,13 @@ export function StudioDrawOptionsBar({
           {drawMode === "pen" ? (
             <StudioBrushTray
               activeBrushId={brushId}
-              compact
-              hideCategories
+              recentBrushIds={recentBrushIds}
+              favoriteBrushIds={favoriteBrushIds}
               onSelect={onSelectBrush}
-              className="w-[18rem] shrink-0"
-              aria-label="빠른 브러시 프리셋"
+              onOpenLibrary={() => setLibraryOpen(true)}
+              libraryOpen={libraryOpen}
+              className="w-[24rem] shrink-0"
+              aria-label="빠른 브러시 — 즐겨찾기, 최근 사용, 추천"
             />
           ) : null}
 

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   beginStampWalker,
   drawStampStroke,
+  planStudioStampBrushDabs,
   STUDIO_STAMP_BRUSH_DEFAULTS,
   stampJitter,
   stampStrokeDot,
@@ -100,6 +101,37 @@ describe("studio stamp brush engine", () => {
       }
       expect(incremental.dabs).toEqual(whole.dabs);
       expect(incremental.strokes).toEqual(whole.strokes);
+    }
+  });
+
+  it("pure dab planner preserves tap, short-stroke and long-stroke ordering deterministically", () => {
+    const ink = style("ink", { size: 16, minSizeRatio: 0.2 });
+    const tap = planStudioStampBrushDabs(ink, [7, 9], [0.25]);
+    const short = planStudioStampBrushDabs(ink, [7, 9, 17, 9], [0.25, 0.7]);
+    const long = planStudioStampBrushDabs(ink, [7, 9, 117, 9], [0.25, 0.7]);
+
+    expect(tap).toHaveLength(1);
+    expect(tap[0]).toMatchObject({ x: 7, y: 9, index: 0, alpha: 1 });
+    expect(short.length).toBeGreaterThan(tap.length);
+    expect(long.length).toBeGreaterThan(short.length);
+    expect(long.map((dab) => dab.index)).toEqual(
+      Array.from({ length: long.length }, (_, index) => index)
+    );
+    expect(planStudioStampBrushDabs(ink, [7, 9, 117, 9], [0.25, 0.7])).toEqual(long);
+  });
+
+  it("pure planner and Canvas primary dabs share the same footprint", () => {
+    for (const kind of ["airbrush", "ink", "watercolor"] as const) {
+      const brushStyle = style(kind, { opacity: 0.65 });
+      const planned = planStudioStampBrushDabs(brushStyle, LINE, LINE_PRESSURES);
+      const rendered = recordingContext();
+      drawStampStroke(rendered.context, brushStyle, LINE, LINE_PRESSURES);
+      expect(rendered.dabs).toEqual(planned.map(({ x, y, radius, alpha }) => ({
+        x,
+        y,
+        r: radius,
+        alpha,
+      })));
     }
   });
 

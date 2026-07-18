@@ -1,20 +1,8 @@
 /**
- * StudioBrushTray — Picsart / Adobe Express / Ibis / CSP inspired visual brush strip.
- * Category chips + commercial stroke-preview tiles (not flat labels alone).
- * Pure presentation.
+ * StudioBrushTray — compact recent/favorite shelf with a full-library exit.
+ * Pure presentation; the complete searchable catalog lives in StudioBrushLibrarySheet.
  */
-import {
-  ChevronDown,
-  ChevronUp,
-  Droplets,
-  Highlighter,
-  Pencil,
-  Sparkles,
-  Squircle,
-  Stars,
-  Wand2,
-} from "lucide-react";
-import { useState, type ReactElement } from "react";
+import { History, LayoutGrid, Star } from "lucide-react";
 
 import {
   studioBrushChipSurface,
@@ -25,39 +13,33 @@ import {
   studioBrushPreviewStrokeWidth,
 } from "./studio-brush-visual";
 import {
-  listStudioBrushTrayItems,
-  STUDIO_BRUSH_TRAY_CATEGORY_CHIPS,
-  type StudioBrushTrayCategory,
+  listStudioQuickBrushTrayItems,
   type StudioBrushTrayItem,
+  type StudioQuickBrushSource,
 } from "./studio-creative-ux";
 import { STUDIO_FOCUS_RING, STUDIO_EASE } from "./studio-panel-ui";
 import { StudioBrushPresetIcon } from "./StudioBrushPresetIcon";
 
-import type { LucideIcon } from "lucide-react";
+import type { ReactElement } from "react";
 
 import { cn } from "@/lib/utils";
-
-const CATEGORY_ICONS: Record<StudioBrushTrayCategory, LucideIcon> = {
-  beginner: Sparkles,
-  expressive: Wand2,
-  line: Pencil,
-  marker: Highlighter,
-  paint: Droplets,
-  fx: Stars,
-  texture: Squircle,
-  all: Wand2,
-};
 
 export interface StudioBrushTrayProps {
   activeBrushId: string;
   onSelect: (item: StudioBrushTrayItem) => void;
-  /** simple density → beginner only until expanded / category change */
-  compact?: boolean;
+  recentBrushIds?: readonly string[];
+  favoriteBrushIds?: readonly string[];
+  onOpenLibrary: () => void;
+  libraryOpen?: boolean;
   className?: string;
   "aria-label"?: string;
-  /** Hide category chips (ultra-dense tool strip). */
-  hideCategories?: boolean;
 }
+
+const QUICK_SOURCE_LABEL: Record<StudioQuickBrushSource, string> = {
+  favorite: "즐겨찾기",
+  recent: "최근 사용",
+  starter: "추천",
+};
 
 const PREVIEW_W = 40;
 const PREVIEW_H = 18;
@@ -178,69 +160,23 @@ function BrushPreviewGlyph({
 export function StudioBrushTray({
   activeBrushId,
   onSelect,
-  compact = false,
+  recentBrushIds = [],
+  favoriteBrushIds = [],
+  onOpenLibrary,
+  libraryOpen = false,
   className,
-  "aria-label": ariaLabel = "브러시 키트",
-  hideCategories = false,
+  "aria-label": ariaLabel = "빠른 브러시 — 즐겨찾기, 최근 사용, 추천",
 }: StudioBrushTrayProps): ReactElement {
-  const [expanded, setExpanded] = useState(!compact);
-  const [category, setCategory] = useState<StudioBrushTrayCategory>("beginner");
-
-  const effectiveCategory: StudioBrushTrayCategory =
-    !expanded && (category === "expressive" || category === "all")
-      ? "beginner"
-      : expanded
-        ? category === "beginner" && !compact
-          ? "beginner"
-          : category
-        : "beginner";
-
-  const visible =
-    !expanded
-      ? listStudioBrushTrayItems("beginner")
-      : listStudioBrushTrayItems(effectiveCategory === "all" ? "expressive" : effectiveCategory);
+  const visible = listStudioQuickBrushTrayItems({
+    favoriteIds: favoriteBrushIds,
+    recentIds: recentBrushIds,
+  });
 
   return (
     <div
       data-studio-brush-tray="true"
       className={cn("flex min-w-0 max-w-full items-center gap-1", className)}
     >
-      {!hideCategories && expanded ? (
-        <div
-          role="tablist"
-          aria-label="브러시 분류"
-          className="hidden shrink-0 items-center gap-0.5 rounded-lg border border-line/50 bg-canvas/30 p-0.5 sm:flex"
-        >
-          {STUDIO_BRUSH_TRAY_CATEGORY_CHIPS.map((chip) => {
-            const active =
-              effectiveCategory === chip.id ||
-              (chip.id === "expressive" && effectiveCategory === "all");
-            const CatIcon = CATEGORY_ICONS[chip.id] ?? Sparkles;
-            return (
-              <button
-                key={chip.id}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                aria-label={chip.title}
-                title={chip.title}
-                onClick={() => setCategory(chip.id)}
-                className={cn(
-                  "grid size-7 place-items-center rounded-md",
-                  STUDIO_EASE,
-                  STUDIO_FOCUS_RING,
-                  active
-                    ? "bg-raised text-fg shadow-sm ring-1 ring-accent/35"
-                    : "text-fg-3 hover:bg-raised/70 hover:text-fg-2"
-                )}
-              >
-                <CatIcon size={13} strokeWidth={1.75} aria-hidden />
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
-
       <div
         role="listbox"
         aria-label={ariaLabel}
@@ -249,17 +185,19 @@ export function StudioBrushTray({
         {visible.map((item) => {
           const active = activeBrushId === item.id;
           const surface = studioBrushChipSurface(item.mediaGroup);
+          const sourceLabel = QUICK_SOURCE_LABEL[item.quickSource];
           return (
             <button
               key={item.id}
               type="button"
               role="option"
               aria-selected={active}
-              aria-label={`${item.name} — ${item.hint}`}
-              title={`${item.name} — ${item.hint}`}
+              aria-label={`${sourceLabel} 브러시 ${item.name} — ${item.hint}`}
+              title={`${sourceLabel} · ${item.name} — ${item.hint}`}
               onClick={() => onSelect(item)}
               data-studio-brush-chip={item.id}
               data-studio-brush-media={item.mediaGroup}
+              data-studio-quick-source={item.quickSource}
               className={cn(
                 // Icon + stroke preview tile (Ibis/Picsart/CSP)
                 "relative grid h-11 w-11 shrink-0 place-items-center rounded-xl border",
@@ -287,27 +225,41 @@ export function StudioBrushTray({
                 <StudioBrushPresetIcon brushId={item.id} size={10} strokeWidth={2} />
               </span>
               <BrushPreviewGlyph item={item} active={active} />
+              {item.quickSource !== "starter" ? (
+                <span
+                  aria-hidden
+                  className={cn(
+                    "absolute right-0.5 top-0.5 grid size-3.5 place-items-center rounded-full",
+                    active ? "bg-on-accent/15 text-on-accent" : "bg-canvas/70 text-fg-2"
+                  )}
+                >
+                  {item.quickSource === "favorite" ? (
+                    <Star size={8} fill="currentColor" strokeWidth={1.5} />
+                  ) : (
+                    <History size={8} strokeWidth={2} />
+                  )}
+                </span>
+              ) : null}
             </button>
           );
         })}
       </div>
       <button
         type="button"
-        onClick={() => setExpanded((v) => !v)}
-        aria-expanded={expanded}
-        aria-label={expanded ? "브러시 키트 접기" : "브러시 키트 펼치기"}
-        title={expanded ? "접기" : "더 많은 브러시"}
+        onClick={onOpenLibrary}
+        aria-expanded={libraryOpen}
+        aria-haspopup="dialog"
+        aria-label="전체 브러시 보기"
+        title="전체 브러시 보기"
+        data-studio-open-brush-library="true"
         className={cn(
-          "grid size-8 shrink-0 place-items-center rounded-lg border border-line/70 bg-card/80 text-fg-3 hover:bg-raised hover:text-fg",
+          "flex h-11 shrink-0 items-center gap-1 rounded-xl border border-line/70 bg-card/80 px-2 text-[0.62rem] font-bold text-fg-2 hover:border-accent/40 hover:bg-raised hover:text-fg",
           STUDIO_EASE,
           STUDIO_FOCUS_RING
         )}
       >
-        {expanded ? (
-          <ChevronUp size={14} strokeWidth={1.75} aria-hidden />
-        ) : (
-          <ChevronDown size={14} strokeWidth={1.75} aria-hidden />
-        )}
+        <LayoutGrid size={13} strokeWidth={1.75} aria-hidden />
+        <span className="whitespace-nowrap">전체 보기</span>
       </button>
     </div>
   );

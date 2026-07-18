@@ -11,6 +11,7 @@ export interface BrushPreset {
   name: string;
   defaultWidth: number;
   defaultOpacity: number;
+  /** Catalogue preview suggestion only; switching tools preserves the artist's active color. */
   defaultColor?: string;
 }
 

@@ -133,8 +133,9 @@ describe("드로잉 단축키 수치 조절", () => {
     expect(adjustStudioBrushWidth(Number.NaN, 5)).toBe(6);
   });
 
-  it("불투명도를 0.1~1로 clamp하고 소수 오차를 누적하지 않는다", () => {
-    expect(adjustStudioBrushOpacity(0.1, -0.05)).toBe(0.1);
+  it("불투명도를 0.05~1로 clamp하고 소수 오차를 누적하지 않는다", () => {
+    expect(adjustStudioBrushOpacity(0.05, -0.05)).toBe(0.05);
+    expect(adjustStudioBrushOpacity(0.1, -0.05)).toBe(0.05);
     expect(adjustStudioBrushOpacity(1, 0.05)).toBe(1);
     expect(adjustStudioBrushOpacity(0.7, 0.05)).toBe(0.75);
     expect(adjustStudioBrushOpacity(0.7, -0.05)).toBe(0.65);

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { BRUSH_PRESETS } from "./studio-brush";
 import {
   listStudioBrushTrayItems,
+  listStudioQuickBrushTrayItems,
   STUDIO_BEGINNER_BRUSH_IDS,
   STUDIO_CREATIVE_STARTER_CARDS,
   studioBrushTrayItem,
@@ -44,6 +45,47 @@ describe("studio creative ux", () => {
     expect(tone.previewStyle).toBe("tone");
     const gpen = studioBrushTrayItem(BRUSH_PRESETS.find((p) => p.id === "gpen")!);
     expect(gpen.previewStyle).toBe("calligraphy");
+    expect(studioBrushTrayItem(BRUSH_PRESETS.find((p) => p.id === "liner")!).previewStyle).toBe("calligraphy");
+    expect(studioBrushTrayItem(BRUSH_PRESETS.find((p) => p.id === "marker-bold")!).previewStyle).toBe("solid");
+    expect(studioBrushTrayItem(BRUSH_PRESETS.find((p) => p.id === "highlighter")!).previewStyle).toBe("solid");
+    expect(studioBrushTrayItem(BRUSH_PRESETS.find((p) => p.id === "spray")!).previewStyle).toBe("soft");
+  });
+
+  it("builds a deduplicated favorite and recent quick shelf with beginner fallback", () => {
+    const quick = listStudioQuickBrushTrayItems({
+      favoriteIds: ["glow", "missing", "pen"],
+      recentIds: ["marker", "glow", "gpen"],
+      limit: 8,
+    });
+
+    expect(quick.map((item) => item.id)).toEqual([
+      "glow",
+      "pen",
+      "marker",
+      "gpen",
+      "fineliner",
+      "pencil",
+      "ballpoint",
+      "felt-tip",
+    ]);
+    expect(quick.map((item) => item.quickSource)).toEqual([
+      "favorite",
+      "favorite",
+      "recent",
+      "recent",
+      "starter",
+      "starter",
+      "starter",
+      "starter",
+    ]);
+    expect(new Set(quick.map((item) => item.id)).size).toBe(quick.length);
+  });
+
+  it("uses the beginner kit when quick brush history is empty and respects zero limit", () => {
+    expect(listStudioQuickBrushTrayItems().map((item) => item.id)).toEqual([
+      ...STUDIO_BEGINNER_BRUSH_IDS,
+    ]);
+    expect(listStudioQuickBrushTrayItems({ limit: 0 })).toEqual([]);
   });
 
   it("exposes drawing-first starter cards without publish marketing", () => {

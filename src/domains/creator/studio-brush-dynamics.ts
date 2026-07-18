@@ -430,7 +430,7 @@ export const STUDIO_BRUSH_DYNAMICS_PRESETS: readonly StudioBrushDynamicsPreset[]
   {
     id: "airbrush",
     name: "소프트 에어브러시",
-    description: "낮은 flow와 넓은 산포로 여러 번 쌓아 올리는 부드러운 분사",
+    description: "짧은 입력도 보이면서 여러 번 부드럽게 쌓이는 제어된 분사",
     settings: {
       seed: 202,
       taper: {
@@ -447,9 +447,12 @@ export const STUDIO_BRUSH_DYNAMICS_PRESETS: readonly StudioBrushDynamicsPreset[]
         mappings: [{ source: "pressure", from: 0.7, to: 1.25 }],
         jitter: { mode: "multiply", amount: 0.1 },
       },
-      opacity: { base: 0.3, mappings: [{ source: "pressure", from: 0.25, to: 1 }] },
-      flow: { base: 0.18, mappings: [{ source: "pressure", from: 0.35, to: 1 }] },
-      spacingRatio: 0.07,
+      // Mouse fallback pressure is 0.5. The soft alpha tip halves the centre sample again, so
+      // opacity/flow must be strong enough to survive a single tap; wider spacing prevents that
+      // stronger dab from turning a normal long stroke opaque.
+      opacity: { base: 0.65, mappings: [{ source: "pressure", from: 0.4, to: 1 }] },
+      flow: { base: 0.48, mappings: [{ source: "pressure", from: 0.45, to: 1 }] },
+      spacingRatio: 0.18,
       spacing: { mappings: [{ source: "speed", from: 0.8, to: 1.5 }] },
       scatterRatio: 0.32,
       scatter: { mappings: [{ source: "pressure", from: 1.4, to: 0.6 }] },

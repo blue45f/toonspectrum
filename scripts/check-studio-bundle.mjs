@@ -24,7 +24,10 @@ const budgets = {
   // 2026-07-17 모놀리스 분할: 에디터 JSX를 React Compiler 컴파일 memo 자식 9개로 이전.
   // RC memo-cache 코드젠+props 배선 비용 ≈ +5% (~2527 KiB raw / ~826 KiB gzip 관측) 대신
   // 정착 커밋 렌더 570→68ms. 예산은 관측치+약 2% 여유로 상향.
-  studio: { raw: 2_640_000, gzip: 865_000 },
+  // 2026-07-18 브러시 탐색 통합·모바일 스탬프 제어 후 선택/크롭/라이브 잉크 호스트를
+  // 지연 청크로 분리: ~2580 KiB raw / ~844 KiB gzip. gzip 상한은 유지하고, 새 계약 코드의
+  // 0.2% 미만 raw 증가만 잠근다.
+  studio: { raw: 2_645_000, gzip: 865_000 },
   // Measured after the same build: 443,257 raw / 143,956 gzip.
   app: { raw: 500_000, gzip: 170_000 },
 };

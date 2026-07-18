@@ -17,6 +17,7 @@ import {
   type StudioBrushDynamicsSettings,
   type StudioDynamicBrushPlan,
 } from "./studio-brush-dynamics";
+import { buildStudioBrushTipAlphaMap } from "./studio-brush-tip-stamp";
 
 function expectFiniteRecipe(recipe: StudioBrushDynamicsRecipe): void {
   for (const value of Object.values(recipe)) expect(Number.isFinite(value)).toBe(true);
@@ -311,6 +312,53 @@ describe("studio brush dynamics settings safety", () => {
     const first = studioBrushDynamicsPresetSettings("ink-particle");
     first.width.base = 99;
     expect(studioBrushDynamicsPresetSettings("ink-particle").width.base).toBe(8);
+  });
+
+  it("keeps airbrush aliases visible on mouse taps without making long strokes opaque", () => {
+    const settings = studioBrushDynamicsPresetSettings("airbrush");
+    const tap = planStudioDynamicBrush({
+      points: [40, 40],
+      pressures: [0.5],
+      baseWidth: settings.width.base,
+      baseOpacity: settings.opacity.base,
+      settings,
+    });
+    expect(tap.dabs).toHaveLength(1);
+
+    const centreTipAlpha = Math.max(...buildStudioBrushTipAlphaMap(settings.tip).alphas);
+    // These are the built-in toolbar opacities for airbrush, soft-brush and spray. Include the
+    // procedural soft-tip alpha so this contract measures the pixel artists actually see.
+    for (const toolOpacity of [0.7, 0.55, 0.55]) {
+      const effectiveTapAlpha = tap.dabs[0]!.opacity
+        * tap.dabs[0]!.flow
+        * toolOpacity
+        * centreTipAlpha;
+      expect(effectiveTapAlpha).toBeGreaterThanOrEqual(0.04);
+      expect(effectiveTapAlpha).toBeLessThan(0.07);
+    }
+
+    const stroke = planStudioDynamicBrush({
+      points: [0, 0, 200, 0],
+      pressures: [0.5, 0.5],
+      speeds: [0, 0],
+      baseWidth: settings.width.base,
+      baseOpacity: settings.opacity.base,
+      settings,
+      seed: 202,
+    });
+    const compositeAlphaAt = (x: number, y: number): number => {
+      let remaining = 1;
+      for (const dab of stroke.dabs) {
+        // This intentionally treats the whole soft-tip radius as solid. It is a conservative upper
+        // bound; the renderer's procedural soft alpha map makes the real composited alpha lower.
+        if (Math.hypot(dab.x - x, dab.y - y) > dab.size / 2) continue;
+        remaining *= 1 - dab.opacity * dab.flow * 0.7;
+      }
+      return 1 - remaining;
+    };
+    const sampledAlpha = Array.from({ length: 33 }, (_, index) => compositeAlphaAt(index * 6.25, 0));
+    expect(Math.max(...sampledAlpha)).toBeGreaterThan(0.12);
+    expect(Math.max(...sampledAlpha)).toBeLessThan(0.65);
   });
 
   it("keeps exported defaults detached from runtime normalization", () => {
