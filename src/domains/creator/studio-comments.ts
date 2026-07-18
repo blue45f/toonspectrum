@@ -12,7 +12,8 @@ export const STUDIO_COMMENTS_MAX_THREADS = 200;
 export const STUDIO_COMMENTS_MAX_REPLIES_PER_THREAD = 50;
 export const STUDIO_COMMENTS_MAX_TOTAL_MESSAGES = 1_000;
 export const STUDIO_COMMENTS_MAX_ID_LENGTH = 120;
-export const STUDIO_COMMENTS_MAX_DISPLAY_NAME_LENGTH = 80;
+// Team-comment API user names are bounded to the same 160-character contract.
+export const STUDIO_COMMENTS_MAX_DISPLAY_NAME_LENGTH = 160;
 export const STUDIO_COMMENTS_MAX_BODY_LENGTH = 4_000;
 export const STUDIO_COMMENTS_MAX_MENTIONS = 20;
 
@@ -90,6 +91,35 @@ export const StudioCommentAnchorSchema = z.discriminatedUnion("type", [
 ]);
 
 export type StudioCommentAnchor = z.infer<typeof StudioCommentAnchorSchema>;
+
+const STUDIO_COMMENT_POINT_KEY_DECIMALS = 4;
+
+/**
+ * Returns the one canonical identity used everywhere an anchor is grouped or compared.
+ *
+ * Point coordinates intentionally use the same four-decimal bucket as canvas pins. At the
+ * largest practical Webtoon canvas this absorbs sub-pixel serialization noise without mutating
+ * the persisted v1 coordinate. JSON tuples keep arbitrary user-generated IDs collision-safe,
+ * and an element's optional frame remains part of its identity.
+ */
+export function canonicalStudioCommentAnchorKey(value: StudioCommentAnchor): string {
+  const anchor = StudioCommentAnchorSchema.parse(value);
+  if (anchor.type === "page") return JSON.stringify(["page", anchor.pageId]);
+  if (anchor.type === "frame") {
+    return JSON.stringify(["frame", anchor.pageId, anchor.frameId]);
+  }
+  if (anchor.type === "element") {
+    // Studio element IDs are page-global. A legacy frameId is descriptive metadata, not a
+    // second identity axis; treating it as identity would render duplicate pins for one element.
+    return JSON.stringify(["element", anchor.pageId, anchor.elementId]);
+  }
+  return JSON.stringify([
+    "point",
+    anchor.pageId,
+    anchor.x.toFixed(STUDIO_COMMENT_POINT_KEY_DECIMALS),
+    anchor.y.toFixed(STUDIO_COMMENT_POINT_KEY_DECIMALS),
+  ]);
+}
 
 const CommentMessageShape = {
   id: IdSchema,
@@ -584,15 +614,11 @@ export function studioCommentAnchorsEqual(
   left: StudioCommentAnchor,
   right: StudioCommentAnchor
 ): boolean {
-  if (left.type !== right.type || left.pageId !== right.pageId) return false;
-  if (left.type === "point" && right.type === "point") {
-    return left.x === right.x && left.y === right.y;
+  try {
+    return canonicalStudioCommentAnchorKey(left) === canonicalStudioCommentAnchorKey(right);
+  } catch {
+    return false;
   }
-  return (left.type === "page" || right.type === "page"
-      || (left.type !== "point" && right.type !== "point" && left.frameId === right.frameId))
-    && (left.type === "element" && right.type === "element"
-      ? left.elementId === right.elementId
-      : true);
 }
 
 export function addStudioCommentThread(

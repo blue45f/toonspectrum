@@ -914,6 +914,344 @@ export const creatorWorkCollaborationEvents = pgTable(
   ]
 );
 
+// 공개 작품 댓글(creator_comment)과 분리된 스튜디오 팀 검수 댓글. 캔버스 위치를 가리키는
+// thread, append-only message/activity, 사용자별 read frontier를 각각 보존한다. 모든 공개 ID는
+// 레거시 text ID를 유지하되 길이를 제한하고, 작성자/시각은 API 서버가 정한 값만 저장한다.
+export const creatorWorkTeamCommentThreads = pgTable(
+  "creator_work_team_comment_thread",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    workId: text("workId").notNull(),
+    anchor: jsonb("anchor")
+      .$type<
+        | { type: "page"; pageId: string }
+        | { type: "frame"; pageId: string; frameId: string }
+        | { type: "element"; pageId: string; elementId: string; frameId?: string }
+        | { type: "point"; pageId: string; x: number; y: number }
+      >()
+      .notNull(),
+    status: text("status").notNull().default("open"),
+    createdBy: text("createdBy"),
+    resolvedBy: text("resolvedBy"),
+    resolvedAt: timestamp("resolvedAt", { mode: "date", withTimezone: true }),
+    lastActivitySequence: bigint("lastActivitySequence", { mode: "bigint" })
+      .notNull()
+      .default(BigInt(0)),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    foreignKey({
+      name: "creator_work_team_comment_thread_work_fkey",
+      columns: [t.workId],
+      foreignColumns: [creatorWorks.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "creator_work_team_comment_thread_created_by_fkey",
+      columns: [t.createdBy],
+      foreignColumns: [users.id],
+    }).onDelete("set null"),
+    foreignKey({
+      name: "creator_work_team_comment_thread_resolved_by_fkey",
+      columns: [t.resolvedBy],
+      foreignColumns: [users.id],
+    }).onDelete("set null"),
+    unique("creator_work_team_comment_thread_work_id_unique").on(t.workId, t.id),
+    index("idx_creator_work_team_comment_thread_work_updated")
+      .on(t.workId, t.updatedAt.desc(), t.id.desc()),
+    index("idx_creator_work_team_comment_thread_work_status_updated")
+      .on(t.workId, t.status, t.updatedAt.desc(), t.id.desc()),
+    index("idx_creator_work_team_comment_thread_created_by")
+      .on(t.createdBy, t.createdAt.desc()),
+    index("idx_creator_work_team_comment_thread_resolved_by")
+      .on(t.resolvedBy, t.resolvedAt.desc()),
+    check(
+      "creator_work_team_comment_thread_id_check",
+      sql`length(${t.id}) between 1 and 160`
+    ),
+    check(
+      "creator_work_team_comment_thread_anchor_check",
+      sql`(
+        jsonb_typeof(${t.anchor}) = 'object'
+        and ${t.anchor} ?& array['type', 'pageId']
+        and jsonb_typeof(${t.anchor}->'pageId') = 'string'
+        and length(${t.anchor}->>'pageId') between 1 and 120
+        and ${t.anchor}->>'pageId' = btrim(${t.anchor}->>'pageId')
+        and case ${t.anchor}->>'type'
+          when 'page' then
+            ${t.anchor} - array['type', 'pageId'] = '{}'::jsonb
+          when 'frame' then
+            ${t.anchor} - array['type', 'pageId', 'frameId'] = '{}'::jsonb
+            and jsonb_typeof(${t.anchor}->'frameId') = 'string'
+            and length(${t.anchor}->>'frameId') between 1 and 120
+            and ${t.anchor}->>'frameId' = btrim(${t.anchor}->>'frameId')
+          when 'element' then
+            ${t.anchor} - array['type', 'pageId', 'frameId', 'elementId'] = '{}'::jsonb
+            and jsonb_typeof(${t.anchor}->'elementId') = 'string'
+            and length(${t.anchor}->>'elementId') between 1 and 120
+            and ${t.anchor}->>'elementId' = btrim(${t.anchor}->>'elementId')
+            and (
+              not (${t.anchor} ? 'frameId')
+              or (
+                jsonb_typeof(${t.anchor}->'frameId') = 'string'
+                and length(${t.anchor}->>'frameId') between 1 and 120
+                and ${t.anchor}->>'frameId' = btrim(${t.anchor}->>'frameId')
+              )
+            )
+          when 'point' then
+            ${t.anchor} - array['type', 'pageId', 'x', 'y'] = '{}'::jsonb
+            and jsonb_typeof(${t.anchor}->'x') = 'number'
+            and (${t.anchor}->>'x')::numeric between 0 and 1
+            and jsonb_typeof(${t.anchor}->'y') = 'number'
+            and (${t.anchor}->>'y')::numeric between 0 and 1
+          else false
+        end
+      ) is true`
+    ),
+    check(
+      "creator_work_team_comment_thread_status_check",
+      sql`${t.status} in ('open', 'resolved')`
+    ),
+    check(
+      "creator_work_team_comment_thread_resolution_state_check",
+      sql`(
+        (${t.status} = 'open' and ${t.resolvedAt} is null and ${t.resolvedBy} is null)
+        or (${t.status} = 'resolved' and ${t.resolvedAt} is not null)
+      )`
+    ),
+    check(
+      "creator_work_team_comment_thread_activity_sequence_check",
+      sql`${t.lastActivitySequence} >= 0`
+    ),
+    check(
+      "creator_work_team_comment_thread_timestamp_order_check",
+      sql`${t.updatedAt} >= ${t.createdAt}
+        and (${t.resolvedAt} is null or ${t.resolvedAt} >= ${t.createdAt})`
+    ),
+  ]
+);
+
+export const creatorWorkTeamCommentMessages = pgTable(
+  "creator_work_team_comment_message",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    threadId: text("threadId").notNull(),
+    authorUserId: text("authorUserId"),
+    body: text("body").notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    foreignKey({
+      name: "creator_work_team_comment_message_thread_fkey",
+      columns: [t.threadId],
+      foreignColumns: [creatorWorkTeamCommentThreads.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "creator_work_team_comment_message_author_user_fkey",
+      columns: [t.authorUserId],
+      foreignColumns: [users.id],
+    }).onDelete("set null"),
+    unique("creator_work_team_comment_message_thread_id_unique").on(t.threadId, t.id),
+    index("idx_creator_work_team_comment_message_thread_created")
+      .on(t.threadId, t.createdAt, t.id),
+    index("idx_creator_work_team_comment_message_author_created")
+      .on(t.authorUserId, t.createdAt.desc()),
+    check(
+      "creator_work_team_comment_message_id_check",
+      sql`length(${t.id}) between 1 and 160`
+    ),
+    check(
+      "creator_work_team_comment_message_body_check",
+      sql`length(${t.body}) between 1 and 4000 and ${t.body} = btrim(${t.body})`
+    ),
+  ]
+);
+
+export const creatorWorkTeamCommentActivities = pgTable(
+  "creator_work_team_comment_activity",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    workId: text("workId").notNull(),
+    threadId: text("threadId").notNull(),
+    actorUserId: text("actorUserId"),
+    messageId: text("messageId"),
+    action: text("action").notNull(),
+    sequence: bigint("sequence", { mode: "bigint" }).generatedAlwaysAsIdentity(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    foreignKey({
+      name: "creator_work_team_comment_activity_thread_fkey",
+      columns: [t.workId, t.threadId],
+      foreignColumns: [
+        creatorWorkTeamCommentThreads.workId,
+        creatorWorkTeamCommentThreads.id,
+      ],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "creator_work_team_comment_activity_actor_user_fkey",
+      columns: [t.actorUserId],
+      foreignColumns: [users.id],
+    }).onDelete("set null"),
+    foreignKey({
+      name: "creator_work_team_comment_activity_message_fkey",
+      columns: [t.threadId, t.messageId],
+      foreignColumns: [
+        creatorWorkTeamCommentMessages.threadId,
+        creatorWorkTeamCommentMessages.id,
+      ],
+    }).onDelete("cascade"),
+    unique("creator_work_team_comment_activity_message_unique").on(t.messageId),
+    index("idx_creator_work_team_comment_activity_thread_sequence")
+      .on(t.threadId, t.sequence.desc()),
+    index("idx_creator_work_team_comment_activity_work_sequence")
+      .on(t.workId, t.sequence.desc()),
+    index("idx_creator_work_team_comment_activity_actor_created")
+      .on(t.actorUserId, t.createdAt.desc()),
+    check(
+      "creator_work_team_comment_activity_id_check",
+      sql`length(${t.id}) between 1 and 160`
+    ),
+    check(
+      "creator_work_team_comment_activity_action_check",
+      sql`${t.action} in ('thread_created', 'reply_added', 'resolved', 'reopened')`
+    ),
+    check(
+      "creator_work_team_comment_activity_message_state_check",
+      sql`(
+        (${t.action} in ('thread_created', 'reply_added') and ${t.messageId} is not null)
+        or (${t.action} in ('resolved', 'reopened') and ${t.messageId} is null)
+      )`
+    ),
+  ]
+);
+
+export const creatorWorkTeamCommentReads = pgTable(
+  "creator_work_team_comment_read",
+  {
+    threadId: text("threadId").notNull(),
+    userId: text("userId").notNull(),
+    lastReadActivitySequence: bigint("lastReadActivitySequence", { mode: "bigint" })
+      .notNull()
+      .default(BigInt(0)),
+    readAt: timestamp("readAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    foreignKey({
+      name: "creator_work_team_comment_read_thread_fkey",
+      columns: [t.threadId],
+      foreignColumns: [creatorWorkTeamCommentThreads.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "creator_work_team_comment_read_user_fkey",
+      columns: [t.userId],
+      foreignColumns: [users.id],
+    }).onDelete("cascade"),
+    primaryKey({
+      name: "creator_work_team_comment_read_pkey",
+      columns: [t.threadId, t.userId],
+    }),
+    index("idx_creator_work_team_comment_read_user_at")
+      .on(t.userId, t.readAt.desc()),
+    check(
+      "creator_work_team_comment_read_sequence_check",
+      sql`${t.lastReadActivitySequence} >= 0`
+    ),
+  ]
+);
+
+// 댓글 생성/답글 추가의 네트워크 재시도를 정확히 한 번의 논리 mutation으로 수렴시키는 영수증.
+// work 행을 먼저 잠그는 repository 규약과 복합 PK가 같은 작품 안의 동시 재시도를 직렬화하며,
+// requestHash가 같은 mutationId를 다른 payload에 재사용하는 것을 거부한다. response는 최초 커밋
+// 결과를 그대로 재생하기 위한 서버 응답 snapshot이고, thread/message 삭제 시 함께 정리된다.
+export const creatorWorkTeamCommentMutations = pgTable(
+  "creator_work_team_comment_mutation",
+  {
+    workId: text("workId").notNull(),
+    actorUserId: text("actorUserId").notNull(),
+    mutationId: text("mutationId").notNull(),
+    operation: text("operation").notNull(),
+    requestHash: text("requestHash").notNull(),
+    threadId: text("threadId").notNull(),
+    messageId: text("messageId").notNull(),
+    response: jsonb("response").$type<unknown>().notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    primaryKey({
+      name: "creator_work_team_comment_mutation_pkey",
+      columns: [t.workId, t.actorUserId, t.mutationId],
+    }),
+    foreignKey({
+      name: "creator_work_team_comment_mutation_work_fkey",
+      columns: [t.workId],
+      foreignColumns: [creatorWorks.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "creator_work_team_comment_mutation_actor_fkey",
+      columns: [t.actorUserId],
+      foreignColumns: [users.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "creator_work_team_comment_mutation_thread_fkey",
+      columns: [t.workId, t.threadId],
+      foreignColumns: [
+        creatorWorkTeamCommentThreads.workId,
+        creatorWorkTeamCommentThreads.id,
+      ],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "creator_work_team_comment_mutation_message_fkey",
+      columns: [t.threadId, t.messageId],
+      foreignColumns: [
+        creatorWorkTeamCommentMessages.threadId,
+        creatorWorkTeamCommentMessages.id,
+      ],
+    }).onDelete("cascade"),
+    unique("creator_work_team_comment_mutation_message_unique").on(t.messageId),
+    index("idx_creator_work_team_comment_mutation_actor_created")
+      .on(t.actorUserId, t.createdAt.desc()),
+    index("idx_creator_work_team_comment_mutation_thread_created")
+      .on(t.threadId, t.createdAt.desc()),
+    check(
+      "creator_work_team_comment_mutation_id_check",
+      sql`length(${t.mutationId}) between 1 and 160
+        and ${t.mutationId} = btrim(${t.mutationId})
+        and ${t.mutationId} !~ '[[:cntrl:]]'`
+    ),
+    check(
+      "creator_work_team_comment_mutation_operation_check",
+      sql`${t.operation} in ('thread_create', 'reply_add')`
+    ),
+    check(
+      "creator_work_team_comment_mutation_request_hash_check",
+      sql`${t.requestHash} ~ '^[0-9a-f]{64}$'`
+    ),
+    check(
+      "creator_work_team_comment_mutation_response_check",
+      sql`jsonb_typeof(${t.response}) = 'object'`
+    ),
+  ]
+);
+
 // ── 창작 연재 시리즈 — 회차(creator_work.seriesId)를 묶는 단위 ──────────────
 // author/avatar는 게시 시점 스냅샷(표시는 항상 users 조인 값 우선, 탈퇴/조인 실패 시 폴백).
 export const creatorSeries = pgTable("creator_series", {

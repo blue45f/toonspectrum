@@ -1,4 +1,5 @@
 import {
+  parsePersistedStudioCrdtUpdateRequest,
   parseStudioCrdtUpdateRequest,
   type StudioCrdtUpdateRequest,
 } from "./studio-crdt-protocol";
@@ -197,7 +198,9 @@ function isStoredEntry(value: unknown): value is StoredStudioCrdtRecoveryVaultEn
   )) return false;
 
   return entry.updates.every((candidate) =>
-    parseStudioCrdtUpdateRequest(candidate, { expectedWorkId: entry.workId }) !== null
+    parsePersistedStudioCrdtUpdateRequest(candidate, {
+      expectedWorkId: entry.workId,
+    }) !== null
   );
 }
 
@@ -245,7 +248,9 @@ function isStoredChunk(value: unknown): value is StoredStudioCrdtRecoveryChunk {
     )
   )) return false;
   return chunk.updates.every((candidate) =>
-    parseStudioCrdtUpdateRequest(candidate, { expectedWorkId: chunk.workId }) !== null
+    parsePersistedStudioCrdtUpdateRequest(candidate, {
+      expectedWorkId: chunk.workId,
+    }) !== null
   );
 }
 
@@ -395,7 +400,13 @@ function publicEntry(entry: StoredStudioCrdtRecoveryVaultEntry): StudioCrdtRecov
     failureCode: entry.failureCode,
     failureMessage: entry.failureMessage,
     rejectedUpdateId: entry.rejectedUpdateId,
-    updates: entry.updates.map((request) => ({ ...request })),
+    updates: entry.updates.map((request) => {
+      const parsed = parsePersistedStudioCrdtUpdateRequest(request, {
+        expectedWorkId: entry.workId,
+      });
+      if (!parsed) throw new Error("CRDT 복구 frontier 업데이트가 손상되었습니다.");
+      return parsed;
+    }),
     createdAt: entry.createdAt,
     exportedAt: entry.exportedAt,
   };
@@ -662,9 +673,13 @@ export class IndexedDbStudioCrdtRecoveryVault implements StudioCrdtRecoveryVault
         failureCode: manifest.failureCode,
         failureMessage: manifest.failureMessage,
         rejectedUpdateId: manifest.rejectedUpdateId,
-        updates: chunks.flatMap((chunk) =>
-          chunk.updates.map((request) => ({ ...request }))
-        ),
+        updates: chunks.flatMap((chunk) => chunk.updates.map((request) => {
+          const parsed = parsePersistedStudioCrdtUpdateRequest(request, {
+            expectedWorkId: manifest.workId,
+          });
+          if (!parsed) throw new Error("CRDT 복구 frontier 업데이트가 손상되었습니다.");
+          return parsed;
+        })),
         createdAt: manifest.createdAt,
         exportedAt: manifest.exportedAt,
       });

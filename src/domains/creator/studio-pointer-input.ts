@@ -59,11 +59,7 @@ export interface StudioStrokeMoveTransportClaim {
   readonly session: StudioStrokePointerSession;
 }
 
-export interface StudioStrokeReleaseSource<T extends StudioPointerEventLike> {
-  readonly event: T;
-  /** Contact samples use ordinary pressure semantics; only the fallback can be a non-contact up. */
-  readonly kind: "retained-contact" | "release-fallback";
-}
+export type StudioPointerCaptureLossOutcome = "foreign" | "retain" | "finish";
 
 const LEGACY_POINTER_ID = 1;
 
@@ -181,6 +177,51 @@ export function shouldEndStudioStrokeForReleasedContact(
   return event.buttons === 0;
 }
 
+/**
+ * Losing DOM pointer capture is transport degradation, not a cancellation signal. The global
+ * pointerup/cancel safety listeners still own the gesture. A mouse loss that already reports
+ * buttons=0 can be finalized from the last authoritative sample; every other matching loss keeps
+ * the session alive until a real end signal arrives.
+ */
+export function resolveStudioPointerCaptureLoss(
+  session: StudioStrokePointerSession | null | undefined,
+  event: StudioPointerEventLike
+): StudioPointerCaptureLossOutcome {
+  if (!session || !isStudioStrokePointerEvent(session, event)) return "foreign";
+  return shouldEndStudioStrokeForReleasedContact(session, event) ? "finish" : "retain";
+}
+
+/**
+ * A capture-phase `window` blur listener also observes focus leaving a descendant control. That is
+ * an ordinary focus transfer (for example, toolbar button -> canvas), not a browser-window abort.
+ */
+export function isStudioTopLevelWindowBlur(
+  eventTarget: unknown,
+  windowTarget: unknown
+): boolean {
+  return eventTarget === windowTarget;
+}
+
+/** Keep already-rendered mouse/pen ink when the browser transport itself is interrupted. */
+export function shouldPreserveStudioStrokeOnTransportAbort(
+  session: StudioStrokePointerSession | null | undefined
+): boolean {
+  return Boolean(session && session.pointerType !== "touch");
+}
+
+/**
+ * Browsers and embedded webviews may cancel a mouse or pen stream after showing valid ink. Keep
+ * that last authoritative prefix instead of deleting it. Touch cancellation remains destructive
+ * because it normally means the gesture was promoted to scrolling, pinch zoom, or palm rejection.
+ */
+export function shouldCommitStudioStrokeOnPointerCancel(
+  session: StudioStrokePointerSession | null | undefined,
+  event: StudioPointerEventLike
+): boolean {
+  if (!session || !isStudioStrokePointerEvent(session, event)) return false;
+  return shouldPreserveStudioStrokeOnTransportAbort(session);
+}
+
 /** A second finger transitions a finger stroke into navigation; pen + touch remains palm-safe. */
 export function shouldCancelStudioFingerStrokeForAdditionalContact(
   session: StudioStrokePointerSession | null | undefined,
@@ -224,6 +265,8 @@ export function collectStudioStrokePointerBatch<T extends StudioPointerEventLike
   event: T,
   options: {
     includePredicted?: boolean;
+    /** Normal pointerup owns exactly its dispatched endpoint, never stale move coalescing. */
+    authoritativeSource?: "coalesced-or-parent" | "parent-only";
   } = {}
 ): StudioStrokePointerBatch<T> {
   if (!isStudioStrokePointerEvent(session, event)) {
@@ -232,7 +275,9 @@ export function collectStudioStrokePointerBatch<T extends StudioPointerEventLike
 
   const authoritative: T[] = [];
   let previousSignature = session.lastAuthoritativeSignature;
-  const coalesced = safeRelatedEvents(event, "getCoalescedEvents");
+  const coalesced = options.authoritativeSource === "parent-only"
+    ? []
+    : safeRelatedEvents(event, "getCoalescedEvents");
   // A trusted parent pointer event is the processed aggregate of its coalesced list, not an extra
   // hardware sample. Consume one representation only; empty/throwing APIs fall back to parent.
   const candidates = coalesced.length > 0 ? coalesced : [event];
@@ -262,26 +307,6 @@ export function collectStudioStrokePointerBatch<T extends StudioPointerEventLike
   }
 
   return { authoritative, predicted, session: nextSession };
-}
-
-/**
- * Chooses metadata for release-time stabilizer draining without inventing another geometry sample.
- *
- * A dispatched `pointerup` can be several CSS pixels beyond the browser's last processed move.
- * Treating that coordinate as ink makes a fast flick leave the cursor route at the very end. The
- * durable path therefore seals at its retained down/move sample; the release event remains only a
- * lifecycle signal. This matches the processed-input contract used by the comparison canvas.
- */
-export function resolveStudioStrokeReleaseSource<T extends StudioPointerEventLike>(
-  session: StudioStrokePointerSession | null | undefined,
-  releaseEvent: T,
-  lastAuthoritativeEvent: T | null | undefined
-): StudioStrokeReleaseSource<T> | null {
-  if (!session || !isStudioStrokePointerEvent(session, releaseEvent)) return null;
-  if (lastAuthoritativeEvent && isStudioStrokePointerEvent(session, lastAuthoritativeEvent)) {
-    return { event: lastAuthoritativeEvent, kind: "retained-contact" };
-  }
-  return { event: releaseEvent, kind: "release-fallback" };
 }
 
 /** Pointer capture is a progressive enhancement; unsupported/detached DOM nodes fail closed. */

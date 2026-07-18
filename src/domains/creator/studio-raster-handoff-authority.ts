@@ -36,6 +36,7 @@ const AUTHORITY_ELEMENT_KEYS = [
   "stroke",
   "strokeWidth",
   "pressureModel",
+  "paintModel",
   "opacity",
   "brush",
   "blendMode",
@@ -50,6 +51,8 @@ const AUTHORITY_ELEMENT_KEYS = [
   "pattern",
   "brushDynamics",
   "brushTip",
+  "stampPipeline",
+  "watercolorPipeline",
   "sampleSpacing",
   "groupId",
 ] as const;

@@ -36,6 +36,7 @@ import type {
   StudioPredictedInkSample,
   StudioPredictedInkSurfaceUpdate,
 } from "./studio-predicted-ink-tail";
+import type { StudioStrokePaintModel } from "./studio-stroke-paint-model";
 
 export interface StudioLiveInkSurface {
   /** 스케일된 문서 안에서 표면의 CSS 배치(px). planStudioWebGpuViewportSurface.surface 와 동일. */
@@ -56,9 +57,25 @@ export interface StudioLiveInkStrokeStyle {
   readonly strokeWidthDoc: number;
   /** Omitted strokes retain the legacy 0.3 + 1.4p diameter contract. */
   readonly pressureModel?: StudioInkPressureModel;
+  /**
+   * Versioned stroke-level compositor semantics. The incremental surfaces reject every present
+   * model until they own an isolated stroke-local coverage buffer.
+   */
+  readonly paintModel?: StudioStrokePaintModel;
   readonly opacity: number;
   /** 입력 sampler와 동일한 thinning 최소 간격(문서 px). */
   readonly minDistanceDoc: number;
+}
+
+/**
+ * The fast append/prediction canvases paint dabs directly into their destination. They cannot
+ * represent a contract that accumulates coverage first and applies color/stroke alpha once, so a
+ * versioned paint model must stay on the canonical Konva compound-path renderer.
+ */
+export function studioLiveInkFastOverlaySupportsStyle(
+  style: StudioLiveInkStrokeStyle
+): boolean {
+  return style.paintModel === undefined;
 }
 
 export type StudioLiveInkPointTailUpdate =
@@ -145,7 +162,10 @@ export class StudioLiveInkOverlayRenderer {
   }
 
   begin(style: StudioLiveInkStrokeStyle, x: number, y: number, pressure: number): boolean {
-    if (!this.context || !this.surface) return false;
+    if (
+      !this.context || !this.surface ||
+      !studioLiveInkFastOverlaySupportsStyle(style)
+    ) return false;
     const resolvedPressure = resolveStudioInkPressure(pressure, style.pressureModel);
     this.style = style;
     this.keptX = [x];
@@ -163,7 +183,10 @@ export class StudioLiveInkOverlayRenderer {
 
   /** Starts an append-only corrected head whose first pixels will arrive in a later settled span. */
   beginDeferred(style: StudioLiveInkStrokeStyle): boolean {
-    if (!this.context || !this.surface) return false;
+    if (
+      !this.context || !this.surface ||
+      !studioLiveInkFastOverlaySupportsStyle(style)
+    ) return false;
     this.style = style;
     this.keptX = [];
     this.keptY = [];
@@ -554,6 +577,10 @@ export class StudioLiveInkPredictionRenderer {
 
   /** Applies only the transient-surface half of the pure prediction state transition. */
   apply(update: StudioPredictedInkSurfaceUpdate, style: StudioLiveInkStrokeStyle): void {
+    if (!studioLiveInkFastOverlaySupportsStyle(style)) {
+      this.clear();
+      return;
+    }
     if (update.kind === "keep") return;
     this.clearDirty();
     if (update.kind === "clear") {
@@ -572,6 +599,10 @@ export class StudioLiveInkPredictionRenderer {
     style: StudioLiveInkStrokeStyle,
     pressures: readonly number[] | undefined
   ): void {
+    if (!studioLiveInkFastOverlaySupportsStyle(style)) {
+      this.clear();
+      return;
+    }
     if (update.kind === "keep") return;
     this.clearDirty();
     if (update.kind === "clear") {

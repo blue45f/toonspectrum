@@ -1,4 +1,5 @@
 import { isStudioInkPressureModel } from "./studio-ink-pressure-model";
+import { isStudioStrokePaintModelCompatible } from "./studio-stroke-paint-model";
 import { isStudioGpuColorSupported } from "./studio-webgpu-color";
 
 /**
@@ -29,6 +30,7 @@ export interface StudioWebGpuCommittedElementInput {
   readonly stroke?: unknown;
   readonly strokeWidth?: unknown;
   readonly pressureModel?: unknown;
+  readonly paintModel?: unknown;
   readonly opacity?: unknown;
   readonly brush?: unknown;
   readonly blendMode?: unknown;
@@ -43,6 +45,8 @@ export interface StudioWebGpuCommittedElementInput {
   readonly pattern?: unknown;
   readonly brushDynamics?: unknown;
   readonly brushTip?: unknown;
+  readonly stampPipeline?: unknown;
+  readonly watercolorPipeline?: unknown;
 }
 
 export interface StudioWebGpuCommittedPlanGates {
@@ -66,6 +70,7 @@ export type StudioWebGpuCommittedBarrierReason =
   | "non-pen-mode"
   | "unsupported-brush"
   | "unsupported-pressure-model"
+  | "paint-model"
   | "invalid-geometry"
   | "opacity"
   | "blend-mode"
@@ -144,7 +149,9 @@ function hasUnsupportedStyle(element: StudioWebGpuCommittedElementInput): boolea
     || element.gradient !== undefined
     || element.pattern !== undefined
     || element.brushDynamics !== undefined
-    || element.brushTip !== undefined;
+    || element.brushTip !== undefined
+    || element.stampPipeline !== undefined
+    || element.watercolorPipeline !== undefined;
 }
 
 /** Returns the first fail-closed reason, or `null` when the element is safe for this slice. */
@@ -154,6 +161,13 @@ export function studioWebGpuCommittedBarrierReason(
   if (element.type !== "draw") return "non-draw";
   if ((element.kind ?? "freehand") !== "freehand") return "non-freehand";
   if ((element.mode ?? "pen") !== "pen") return "non-pen-mode";
+
+  // The retained WebGPU compositor still paints every dab directly into the destination. A valid
+  // layered-flow stroke therefore cannot be delegated until the GPU owns a stroke-local coverage
+  // surface and composites element opacity exactly once. Unknown/cross-field-invalid contracts
+  // remain a generic unsupported style instead of being mistaken for this understood version.
+  if (isStudioStrokePaintModelCompatible(element)) return "paint-model";
+  if (element.paintModel !== undefined) return "unsupported-style";
 
   // An omitted brush is the legacy/default pen contract. Unknown aliases must not inherit the
   // renderer's generic pen fallback, because that would opt future brush families into GPU output.

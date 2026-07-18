@@ -117,6 +117,53 @@ const STUDIO_CRDT_STROKE_RECORD_KEYS = new Set([
 ]);
 const STUDIO_CRDT_STROKE_METADATA_MAX_BYTES = 16 * 1_024;
 const STUDIO_CRDT_STROKE_WIDTH_MAX = 8_192;
+const STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION = 1;
+const STUDIO_CRDT_STROKE_PAYLOAD_VERSION = 2;
+const STUDIO_CRDT_LAYERED_FLOW_PAINT_MODEL = "layered-flow-v1";
+const STUDIO_CRDT_CAUSAL_PRESSURE_MODELS = new Set([
+  "linear-full-v1",
+  "linear-residual-v2",
+  "linear-residual-path-v3",
+]);
+const STUDIO_CRDT_LAYERED_FLOW_COMPATIBLE_BRUSH_IDS = new Set([
+  "pen",
+  "fineliner",
+  "ballpoint",
+  "marker",
+  "felt-tip",
+  "marker-bold",
+]);
+const STUDIO_CRDT_KNOWN_INCOMPATIBLE_LAYERED_FLOW_BRUSH_IDS = new Set([
+  "gpen",
+  "liner",
+  "ink-brush",
+  "airbrush-fine",
+  "pencil-grain",
+  "wash-brush",
+  "calligraphy",
+  "highlighter",
+  "neon",
+  "glow",
+  "soft-glow",
+  "glitter",
+  "star-dust",
+  "brush",
+  "watercolor",
+  "ink-wash",
+  "oil",
+  "pastel",
+  "ink-particle",
+  "airbrush",
+  "spray",
+  "soft-brush",
+  "dry-media",
+  "crayon",
+  "chalk",
+  "charcoal",
+  "pencil",
+  "soft-pencil",
+  "screentone",
+]);
 const STUDIO_CRDT_SCENE_INDEX_ROOT = "scene-elements";
 const STUDIO_CRDT_PAGE_INDEX_ROOT = "studio-pages";
 const STUDIO_CRDT_LAYER_GROUP_INDEX_ROOT = "layer-groups";
@@ -1060,6 +1107,7 @@ function validateTrackedLayerGroupRoots(doc: Y.Doc): boolean {
 
 function validateStrokeRoot(id: string, record: Y.Map<unknown>): boolean {
   const strokeWidth = record.get("strokeWidth");
+  const payloadVersion = record.get("payloadVersion");
   if (
     !hasOnlyKeys(record, STUDIO_CRDT_STROKE_RECORD_KEYS) ||
     record.get("id") !== id ||
@@ -1067,7 +1115,8 @@ function validateStrokeRoot(id: string, record: Y.Map<unknown>): boolean {
     !isBoundedStudioCrdtId(record.get("layerId")) ||
     (record.get("status") !== "drawing" && record.get("status") !== "finalized") ||
     (record.has("deleted") && typeof record.get("deleted") !== "boolean") ||
-    record.get("payloadVersion") !== 1 ||
+    (payloadVersion !== STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION &&
+      payloadVersion !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION) ||
     record.get("type") !== "draw" ||
     (record.get("mode") !== "pen" && record.get("mode") !== "eraser") ||
     !boundedExactText(record.get("kind"), 80) ||
@@ -1095,8 +1144,41 @@ function validateStrokeRoot(id: string, record: Y.Map<unknown>): boolean {
         !isBoundedJsonValue(value))
     ) return false;
   }
+  const extensionsValue = record.get("extensions");
+  const extensions = extensionsValue !== null && typeof extensionsValue === "object"
+    && !Array.isArray(extensionsValue)
+    ? extensionsValue as Record<string, unknown>
+    : undefined;
+  const paintModel = extensions?.paintModel;
+  if (paintModel !== undefined) {
+    const brush = record.get("brush");
+    const knownCompatibleBrush = brush === undefined ||
+      (typeof brush === "string" && STUDIO_CRDT_LAYERED_FLOW_COMPATIBLE_BRUSH_IDS.has(brush));
+    const unknownBrushUsesPenFallback = typeof brush === "string" &&
+      !STUDIO_CRDT_KNOWN_INCOMPATIBLE_LAYERED_FLOW_BRUSH_IDS.has(brush);
+    const symmetry = record.get("symmetry");
+    const identitySymmetry = symmetry === undefined || symmetry === null ||
+      (typeof symmetry === "object" && !Array.isArray(symmetry) &&
+        ((symmetry as Record<string, unknown>).type === undefined ||
+          (symmetry as Record<string, unknown>).type === "none"));
+    const hasCausalGeometry = record.has("sampleSpacing")
+      || STUDIO_CRDT_CAUSAL_PRESSURE_MODELS.has(extensions?.pressureModel as string);
+    if (
+      payloadVersion !== STUDIO_CRDT_STROKE_PAYLOAD_VERSION ||
+      paintModel !== STUDIO_CRDT_LAYERED_FLOW_PAINT_MODEL ||
+      record.get("kind") !== "freehand" ||
+      record.get("mode") !== "pen" ||
+      record.has("fill") ||
+      record.has("brushDynamics") ||
+      extensions?.stampPipeline !== undefined ||
+      extensions?.watercolorPipeline !== undefined ||
+      !hasCausalGeometry ||
+      !identitySymmetry ||
+      (!knownCompatibleBrush && !unknownBrushUsesPenFallback)
+    ) return false;
+  }
   const metadata: Record<string, unknown> = {
-    version: 1,
+    version: payloadVersion,
     type: "draw",
     kind: record.get("kind"),
     mode: record.get("mode"),

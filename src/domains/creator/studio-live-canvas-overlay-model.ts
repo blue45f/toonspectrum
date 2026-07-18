@@ -1,4 +1,8 @@
-import type { StudioCommentAnchor, StudioCommentThread } from "./studio-comments";
+import {
+  canonicalStudioCommentAnchorKey,
+  type StudioCommentAnchor,
+  type StudioCommentThread,
+} from "./studio-comments";
 
 export const STUDIO_LIVE_PARTICIPANT_COLORS = [
   "#6d28d9",
@@ -22,9 +26,20 @@ export interface StudioCanvasCommentPin {
   key: string;
   anchor: StudioCommentAnchor;
   count: number;
+  /** Threads represented by this pin that are unread for the current viewer. */
+  unreadCount?: number;
+  /** Stable input-order IDs represented by this collapsed pin. */
+  threadIds?: readonly string[];
+  /** Most recently active thread represented by this pin. */
+  newestThreadId?: string;
+  /** Most recently active unread thread, preferred when opening a clustered pin. */
+  newestUnreadThreadId?: string;
   label: string;
   x: number;
   y: number;
+  /** Deterministic screen-pixel nudge for distinct anchors that would otherwise overlap. */
+  screenOffsetX?: number;
+  screenOffsetY?: number;
 }
 
 function stableHash(value: string): number {
@@ -46,12 +61,67 @@ function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
 }
 
-function anchorKey(anchor: StudioCommentAnchor): string {
-  if (anchor.type === "page") return `page:${anchor.pageId}`;
-  if (anchor.type === "frame") return `frame:${anchor.pageId}:${anchor.frameId}`;
-  // 부동소수 미세 차이가 그룹 키를 갈라놓지 않도록 고정 정밀도로 직렬화한다.
-  if (anchor.type === "point") return `point:${anchor.pageId}:${anchor.x.toFixed(4)}:${anchor.y.toFixed(4)}`;
-  return `element:${anchor.pageId}:${anchor.elementId}`;
+interface StudioPinCollisionDirection {
+  x: number;
+  y: number;
+}
+
+const DIAGONAL_COMPONENT = Math.SQRT1_2;
+
+/** Keeps collision nudges inside the visible edge instead of letting CSS clamp collapse them. */
+function studioPinCollisionDirections(
+  normalizedX: number,
+  normalizedY: number
+): readonly StudioPinCollisionDirection[] {
+  const horizontalEdge = normalizedX <= 0.03 || normalizedX >= 0.97;
+  const verticalEdge = normalizedY <= 0.03 || normalizedY >= 0.97;
+  const inwardX = normalizedX >= 0.5 ? -1 : 1;
+  const inwardY = normalizedY >= 0.5 ? -1 : 1;
+
+  if (horizontalEdge && verticalEdge) {
+    return [
+      { x: inwardX * DIAGONAL_COMPONENT, y: inwardY * DIAGONAL_COMPONENT },
+      { x: inwardX, y: 0 },
+      { x: 0, y: inwardY },
+      { x: inwardX * 0.924, y: inwardY * 0.383 },
+      { x: inwardX * 0.383, y: inwardY * 0.924 },
+    ];
+  }
+  if (horizontalEdge) {
+    return [
+      { x: inwardX, y: 0 },
+      { x: inwardX * DIAGONAL_COMPONENT, y: -DIAGONAL_COMPONENT },
+      { x: inwardX * DIAGONAL_COMPONENT, y: DIAGONAL_COMPONENT },
+      { x: 0, y: -1 },
+      { x: 0, y: 1 },
+    ];
+  }
+  if (verticalEdge) {
+    return [
+      { x: 0, y: inwardY },
+      { x: -DIAGONAL_COMPONENT, y: inwardY * DIAGONAL_COMPONENT },
+      { x: DIAGONAL_COMPONENT, y: inwardY * DIAGONAL_COMPONENT },
+      { x: -1, y: 0 },
+      { x: 1, y: 0 },
+    ];
+  }
+  return Array.from({ length: 6 }, (_, index) => {
+    const angle = index * (Math.PI / 3);
+    return { x: Math.cos(angle), y: Math.sin(angle) };
+  });
+}
+
+/**
+ * The visible pin center is clamped 22px inside the overlay. A 22px nudge therefore collapses
+ * back onto the unshifted pin at an edge. Reserve at least one full 44px touch target after that
+ * clamp, with extra diagonal travel at corners where each axis only receives √1/2 of the radius.
+ */
+function studioPinCollisionRadius(normalizedX: number, normalizedY: number): number {
+  const horizontalEdge = normalizedX <= 0.03 || normalizedX >= 0.97;
+  const verticalEdge = normalizedY <= 0.03 || normalizedY >= 0.97;
+  if (horizontalEdge && verticalEdge) return 88;
+  if (horizontalEdge || verticalEdge) return 72;
+  return 52;
 }
 
 function anchorTargetId(anchor: StudioCommentAnchor): string | null {
@@ -71,19 +141,64 @@ export function projectStudioCanvasCommentPins(options: {
   canvasWidth: number;
   canvasHeight: number;
   boundsByElementId: ReadonlyMap<string, StudioCanvasAnchorBounds>;
+  unreadThreadIds?: ReadonlySet<string>;
   labelForAnchor?: (anchor: StudioCommentAnchor) => string;
 }): StudioCanvasCommentPin[] {
-  const grouped = new Map<string, { anchor: StudioCommentAnchor; count: number }>();
+  const grouped = new Map<string, {
+    anchor: StudioCommentAnchor;
+    threadIds: string[];
+    newestThreadId: string;
+    newestUpdatedAt: string;
+    newestUnreadThreadId?: string;
+    newestUnreadUpdatedAt?: string;
+    unreadCount: number;
+  }>();
 
   for (const thread of options.threads) {
     if (thread.resolved || thread.anchor.pageId !== options.pageId) continue;
-    const key = anchorKey(thread.anchor);
+    const key = canonicalStudioCommentAnchorKey(thread.anchor);
     const existing = grouped.get(key);
-    if (existing) existing.count += 1;
-    else grouped.set(key, { anchor: thread.anchor, count: 1 });
+    if (existing) {
+      existing.threadIds.push(thread.id);
+      if (options.unreadThreadIds?.has(thread.id)) {
+        existing.unreadCount += 1;
+        if (
+          !existing.newestUnreadUpdatedAt
+          || Date.parse(thread.updatedAt) > Date.parse(existing.newestUnreadUpdatedAt)
+          || (
+            thread.updatedAt === existing.newestUnreadUpdatedAt
+            && thread.id.localeCompare(existing.newestUnreadThreadId ?? "") > 0
+          )
+        ) {
+          existing.newestUnreadThreadId = thread.id;
+          existing.newestUnreadUpdatedAt = thread.updatedAt;
+        }
+      }
+      if (
+        Date.parse(thread.updatedAt) > Date.parse(existing.newestUpdatedAt)
+        || (
+          thread.updatedAt === existing.newestUpdatedAt
+          && thread.id.localeCompare(existing.newestThreadId) > 0
+        )
+      ) {
+        existing.newestThreadId = thread.id;
+        existing.newestUpdatedAt = thread.updatedAt;
+      }
+    } else {
+      grouped.set(key, {
+        anchor: thread.anchor,
+        threadIds: [thread.id],
+        newestThreadId: thread.id,
+        newestUpdatedAt: thread.updatedAt,
+        newestUnreadThreadId: options.unreadThreadIds?.has(thread.id) ? thread.id : undefined,
+        newestUnreadUpdatedAt: options.unreadThreadIds?.has(thread.id)
+          ? thread.updatedAt
+          : undefined,
+        unreadCount: options.unreadThreadIds?.has(thread.id) ? 1 : 0,
+      });
+    }
   }
 
-  const margin = 18;
   const pins: StudioCanvasCommentPin[] = [];
   for (const [key, group] of grouped) {
     const targetId = anchorTargetId(group.anchor);
@@ -104,7 +219,11 @@ export function projectStudioCanvasCommentPins(options: {
     pins.push({
       key,
       anchor: group.anchor,
-      count: group.count,
+      count: group.threadIds.length,
+      unreadCount: group.unreadCount,
+      threadIds: group.threadIds,
+      newestThreadId: group.newestThreadId,
+      newestUnreadThreadId: group.newestUnreadThreadId,
       label:
         options.labelForAnchor?.(group.anchor) ??
         (group.anchor.type === "page"
@@ -114,12 +233,33 @@ export function projectStudioCanvasCommentPins(options: {
             : group.anchor.type === "point"
               ? "위치 댓글"
               : "요소 댓글"),
-      x: clamp(rawX, margin, Math.max(margin, options.canvasWidth - margin)),
-      y: clamp(rawY, margin, Math.max(margin, options.canvasHeight - margin)),
+      x: clamp(rawX, 0, options.canvasWidth),
+      y: clamp(rawY, 0, options.canvasHeight),
     });
   }
 
-  return pins.sort(
+  const sorted = pins.sort(
     (left, right) => left.y - right.y || left.x - right.x || left.key.localeCompare(right.key)
   );
+  for (let index = 0; index < sorted.length; index += 1) {
+    const pin = sorted[index];
+    const collisionIndex = sorted.slice(0, index).filter((candidate) =>
+      Math.abs(candidate.x / options.canvasWidth - pin.x / options.canvasWidth) < 0.02
+      && Math.abs(candidate.y / options.canvasHeight - pin.y / options.canvasHeight) < 0.02
+    ).length;
+    if (collisionIndex === 0) continue;
+    const directions = studioPinCollisionDirections(
+      pin.x / options.canvasWidth,
+      pin.y / options.canvasHeight
+    );
+    const direction = directions[(collisionIndex - 1) % directions.length];
+    const ring = Math.floor((collisionIndex - 1) / directions.length) + 1;
+    const radius = studioPinCollisionRadius(
+      pin.x / options.canvasWidth,
+      pin.y / options.canvasHeight
+    ) * ring;
+    pin.screenOffsetX = Math.round(direction.x * radius);
+    pin.screenOffsetY = Math.round(direction.y * radius);
+  }
+  return sorted;
 }

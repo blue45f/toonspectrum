@@ -1916,6 +1916,56 @@ describe("StudioCrdtService", () => {
     source.destroy();
   });
 
+  it("admits versioned layered-flow strokes and rejects incompatible paint semantics", () => {
+    const valid = createStrokeDocument();
+    const validStroke = valid.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!;
+    validStroke.set("payloadVersion", 2);
+    validStroke.set("opacity", 0.6);
+    validStroke.set("brush", "marker");
+    validStroke.set("sampleSpacing", 0);
+    validStroke.set("extensions", { paintModel: "layered-flow-v1" });
+    expect(hasValidStudioCrdtRootSchema(valid)).toBe(true);
+    valid.destroy();
+
+    const invalidCases: Array<(stroke: Y.Map<unknown>) => void> = [
+      (stroke) => stroke.set("payloadVersion", 1),
+      (stroke) => stroke.set("mode", "eraser"),
+      (stroke) => stroke.set("kind", "shape"),
+      (stroke) => stroke.set("fill", "#ffffff"),
+      (stroke) => stroke.set("brush", "watercolor"),
+      (stroke) => stroke.set("brushDynamics", { pressureSize: true }),
+      (stroke) => stroke.set("symmetry", { type: "vertical" }),
+      (stroke) => stroke.set("extensions", {
+        paintModel: "layered-flow-v1",
+        stampPipeline: "causal-walker-v2",
+      }),
+      (stroke) => stroke.set("extensions", { paintModel: "layered-flow-v2" }),
+    ];
+    for (const mutate of invalidCases) {
+      const document = createStrokeDocument();
+      const stroke = document.getMap<Y.Map<unknown>>("strokes").get("stroke-1")!;
+      stroke.set("payloadVersion", 2);
+      stroke.set("opacity", 0.6);
+      stroke.set("brush", "marker");
+      stroke.set("sampleSpacing", 0);
+      stroke.set("extensions", { paintModel: "layered-flow-v1" });
+      mutate(stroke);
+      expect(hasValidStudioCrdtRootSchema(document)).toBe(false);
+      document.destroy();
+    }
+
+    const missingCausalGeometry = createStrokeDocument();
+    const missingGeometryStroke = missingCausalGeometry
+      .getMap<Y.Map<unknown>>("strokes")
+      .get("stroke-1")!;
+    missingGeometryStroke.set("payloadVersion", 2);
+    missingGeometryStroke.set("opacity", 0.6);
+    missingGeometryStroke.set("brush", "marker");
+    missingGeometryStroke.set("extensions", { paintModel: "layered-flow-v1" });
+    expect(hasValidStudioCrdtRootSchema(missingCausalGeometry)).toBe(false);
+    missingCausalGeometry.destroy();
+  });
+
   it("admits the V3 path-phase extension and stationary pressure samples", async () => {
     const repository = new MemoryStudioCrdtRepository();
     const current = service(repository);

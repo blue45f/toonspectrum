@@ -4,6 +4,7 @@ import {
   addStudioCommentReply,
   addStudioCommentThread,
   assignStudioCommentThread,
+  canonicalStudioCommentAnchorKey,
   createEmptyStudioCommentsDocument,
   editStudioCommentReply,
   editStudioCommentThread,
@@ -16,12 +17,14 @@ import {
   resolveStudioCommentThread,
   serializeStudioCommentsDocument,
   STUDIO_COMMENTS_MAX_BODY_LENGTH,
+  STUDIO_COMMENTS_MAX_DISPLAY_NAME_LENGTH,
   STUDIO_COMMENTS_MAX_MENTIONS,
   STUDIO_COMMENTS_MAX_REPLIES_PER_THREAD,
   STUDIO_COMMENTS_MAX_THREADS,
   STUDIO_COMMENTS_MAX_TOTAL_MESSAGES,
   STUDIO_COMMENTS_VERSION,
   StudioCommentsDocumentSchema,
+  studioCommentAnchorsEqual,
   type StudioCommentActor,
   type StudioCommentAnchor,
   type StudioCommentsDocument,
@@ -145,6 +148,17 @@ describe("studio comments schema and migration", () => {
     expect(normalized.threads[0].updatedAt).toBe("2026-07-09T17:00:00.000Z");
     expect(normalized.threads[0]).not.toHaveProperty("unknown");
     expect(normalized).not.toHaveProperty("unknownRoot");
+  });
+
+  it("accepts the full server-bounded collaborator display name contract", () => {
+    const displayName = "가".repeat(STUDIO_COMMENTS_MAX_DISPLAY_NAME_LENGTH);
+    const document = addStudioCommentThread(createEmptyStudioCommentsDocument(), {
+      id: "long-name-thread",
+      anchor: PAGE_ANCHOR,
+      author: { id: "long-name-author", displayName },
+      body: "긴 표시 이름 계약 확인",
+    }, CREATED_AT);
+    expect(document.threads[0].author.displayName).toBe(displayName);
   });
 
   it("drops malformed records and duplicate IDs without inventing replacements", () => {
@@ -391,6 +405,59 @@ describe("studio comments immutable operations", () => {
       "frame-thread",
     ]);
     expect(reanchorStudioCommentThread(moved, "page-thread", { ...movedAnchor })).toBe(moved);
+  });
+
+  it("uses one collision-safe canonical identity for framed elements and nearby point pins", () => {
+    const firstPoint: StudioCommentAnchor = {
+      type: "point",
+      pageId: "page-1",
+      x: 0.234441,
+      y: 0.765541,
+    };
+    const nearbyPoint: StudioCommentAnchor = {
+      type: "point",
+      pageId: "page-1",
+      x: 0.234449,
+      y: 0.765549,
+    };
+    const separatePoint: StudioCommentAnchor = {
+      type: "point",
+      pageId: "page-1",
+      x: 0.23456,
+      y: 0.76566,
+    };
+    const firstFrameElement: StudioCommentAnchor = {
+      type: "element",
+      pageId: "page-1",
+      frameId: "frame-1",
+      elementId: "shared-element-id",
+    };
+    const secondFrameElement: StudioCommentAnchor = {
+      type: "element",
+      pageId: "page-1",
+      frameId: "frame-2",
+      elementId: "shared-element-id",
+    };
+
+    expect(canonicalStudioCommentAnchorKey(firstPoint)).toBe(
+      canonicalStudioCommentAnchorKey(nearbyPoint)
+    );
+    expect(studioCommentAnchorsEqual(firstPoint, nearbyPoint)).toBe(true);
+    expect(studioCommentAnchorsEqual(firstPoint, separatePoint)).toBe(false);
+    expect(canonicalStudioCommentAnchorKey(firstFrameElement)).toBe(
+      canonicalStudioCommentAnchorKey(secondFrameElement)
+    );
+    expect(studioCommentAnchorsEqual(firstFrameElement, secondFrameElement)).toBe(true);
+
+    const source = withThread(firstPoint);
+    expect(listStudioCommentThreadsForAnchor(source, nearbyPoint).map(({ id }) => id)).toEqual([
+      "thread-1",
+    ]);
+    expect(reanchorStudioCommentThread(source, "thread-1", nearbyPoint)).toBe(source);
+
+    const serialized = JSON.parse(serializeStudioCommentsDocument(source)) as StudioCommentsDocument;
+    expect(serialized.version).toBe(STUDIO_COMMENTS_VERSION);
+    expect(serialized.threads[0].anchor).toEqual(firstPoint);
   });
 
   it("can exclude resolved threads from exact-anchor selections", () => {

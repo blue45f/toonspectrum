@@ -116,7 +116,7 @@ describe("StudioLiveCanvasOverlay", () => {
       ]),
     });
 
-    expect(pins.find((pin) => pin.anchor.type === "element")).toMatchObject({ x: 182, y: 18 });
+    expect(pins.find((pin) => pin.anchor.type === "element")).toMatchObject({ x: 200, y: 0 });
     const withoutTarget = projectStudioCanvasCommentPins({
       threads: document.threads,
       pageId: "page-1",
@@ -150,6 +150,7 @@ describe("StudioLiveCanvasOverlay", () => {
             key: "page:page-1",
             anchor: { type: "page", pageId: "page-1" },
             count: 3,
+            unreadCount: 2,
             label: "1페이지",
             x: 400,
             y: 120,
@@ -164,9 +165,39 @@ describe("StudioLiveCanvasOverlay", () => {
     expect(html).toContain("top:75%");
     expect(html).toContain("서윤 · 이 탭");
     expect(html).toContain("· pen");
-    expect(html).toContain("1페이지, 열림 댓글 3개");
+    expect(html).toContain("1페이지, 읽지 않은 댓글 2개, 열림 댓글 3개");
+    expect(html).toContain("size-11");
+    expect(html).toContain("size-8");
+    expect(html).toContain("ring-accent/30");
+    expect(html).toContain('data-studio-comment-pin="true"');
+    expect(html).not.toContain("border-white");
+    expect(html).not.toContain("0.03_270");
+    expect(html).toContain("clamp(1.375rem, calc(50.0000% + 0px), calc(100% - 1.375rem))");
     expect(html).not.toContain(privateSessionId);
     expect(html).not.toContain("page:page-1");
+  });
+
+  it("mirrors an inward pin collision nudge when the canvas is flipped", () => {
+    const html = renderToStaticMarkup(
+      <StudioLiveCanvasOverlay
+        canvasWidth={800}
+        canvasHeight={1_200}
+        cursors={[]}
+        commentPins={[{
+          key: "right-edge",
+          anchor: { type: "point", pageId: "page-1", x: 1, y: 0.5 },
+          count: 1,
+          label: "오른쪽 핀",
+          x: 800,
+          y: 600,
+          screenOffsetX: -22,
+        }]}
+        flipX
+        onCommentPinClick={noop}
+      />
+    );
+
+    expect(html).toContain("calc(0.0000% + 22px)");
   });
 
   it("uses deterministic participant colors and exposes Figma-style follow controls", () => {

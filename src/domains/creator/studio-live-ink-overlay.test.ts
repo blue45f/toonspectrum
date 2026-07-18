@@ -8,6 +8,7 @@ import {
 import {
   StudioLiveInkOverlayRenderer,
   StudioLiveInkPredictionRenderer,
+  studioLiveInkFastOverlaySupportsStyle,
   type StudioLiveInkStrokeStyle,
   type StudioLiveInkSurface,
 } from "./studio-live-ink-overlay";
@@ -111,6 +112,30 @@ afterEach(() => {
 });
 
 describe("StudioLiveInkOverlayRenderer", () => {
+  it("fails closed for layered-flow without painting or mutating a settled stable prefix", () => {
+    const recording = recordingCanvas();
+    const renderer = new StudioLiveInkOverlayRenderer();
+    renderer.attach(recording.canvas);
+    renderer.setSurface(SURFACE);
+    addStroke(renderer, [0, 0, 10, 0, 20, 0], [1, 1, 1]);
+    const settledPrefix = recording.dabs.map((dab) => ({ ...dab }));
+    const layeredStyle = {
+      ...STYLE,
+      opacity: 0.6,
+      paintModel: "layered-flow-v1",
+    } as const;
+
+    expect(studioLiveInkFastOverlaySupportsStyle(layeredStyle)).toBe(false);
+    expect(renderer.begin(layeredStyle, 30, 0, 1)).toBe(false);
+    renderer.appendFrom([30, 0, 40, 0, 50, 0], [1, 1, 1]);
+    renderer.end();
+    expect(renderer.beginDeferred(layeredStyle)).toBe(false);
+
+    expect(renderer.isActive).toBe(false);
+    expect(renderer.settledStrokeCount).toBe(1);
+    expect(recording.dabs).toEqual(settledPrefix);
+  });
+
   it("carries residual spacing across live appends and replays the identical settled footprint", () => {
     const style = {
       ...STYLE,
@@ -441,6 +466,40 @@ describe("StudioLiveInkOverlayRenderer", () => {
 });
 
 describe("StudioLiveInkPredictionRenderer", () => {
+  it("clears and rejects layered-flow prediction tails instead of darkening canonical ink", () => {
+    const recording = recordingCanvas();
+    const renderer = new StudioLiveInkPredictionRenderer();
+    renderer.attach(recording.canvas);
+    renderer.setSurface(SURFACE);
+    renderer.apply({
+      kind: "replace",
+      anchor: { x: 0, y: 0, pressure: 1 },
+      samples: [{ x: 10, y: 0, pressure: 1 }],
+    }, STYLE);
+    const opaqueDabCount = recording.dabs.length;
+    recording.clearRect.mockClear();
+    const layeredStyle = {
+      ...STYLE,
+      opacity: 0.6,
+      paintModel: "layered-flow-v1",
+    } as const;
+
+    renderer.apply({
+      kind: "replace",
+      anchor: { x: 10, y: 0, pressure: 1 },
+      samples: [{ x: 20, y: 0, pressure: 1 }],
+    }, layeredStyle);
+    renderer.applyPointTail({
+      kind: "replace",
+      anchor: null,
+      startSampleIndex: 0,
+      points: [30, 0, 40, 0],
+    }, layeredStyle, [1, 1]);
+
+    expect(recording.clearRect).toHaveBeenCalledTimes(1);
+    expect(recording.dabs).toHaveLength(opaqueDabCount);
+  });
+
   it("replaces only its transient tail and clears a bounded dirty rectangle", () => {
     const recording = recordingCanvas();
     const renderer = new StudioLiveInkPredictionRenderer();

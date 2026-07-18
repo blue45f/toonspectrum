@@ -1,8 +1,19 @@
 import { fromUint8Array, toUint8Array } from "js-base64";
 
-export const STUDIO_CRDT_PROTOCOL_VERSION = 1 as const;
-export const STUDIO_CRDT_LOCAL_WIRE_BRAND = "toonspectrum:studio-crdt:v1" as const;
-export const STUDIO_CRDT_STROKE_PAYLOAD_VERSION = 1 as const;
+// v2 gates rooms that can persist the renderer-significant stroke payload v2. Keeping this at v1
+// would let a long-open legacy tab join the same room and silently omit layered-flow strokes.
+export const STUDIO_CRDT_PROTOCOL_VERSION = 2 as const;
+export const STUDIO_CRDT_LOCAL_WIRE_BRAND = "toonspectrum:studio-crdt:v2" as const;
+/**
+ * v2 adds renderer-significant stroke extensions such as `paintModel`.
+ * New clients still read v1, while v1 clients reject v2 instead of silently rendering different
+ * pixels in the same room.
+ */
+export const STUDIO_CRDT_STROKE_PAYLOAD_VERSION = 2 as const;
+export const STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION = 1 as const;
+export type StudioCrdtStrokePayloadVersion =
+  | typeof STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION
+  | typeof STUDIO_CRDT_STROKE_PAYLOAD_VERSION;
 export const STUDIO_CRDT_ORIGIN_LOCAL = Symbol("studio-crdt-local");
 export const STUDIO_CRDT_ORIGIN_REMOTE = Symbol("studio-crdt-remote");
 export const STUDIO_CRDT_ORIGIN_SYNC = Symbol("studio-crdt-sync");
@@ -360,6 +371,21 @@ export function parseStudioCrdtUpdateRequest(
     return null;
   }
   return value as unknown as StudioCrdtUpdateRequest;
+}
+
+/**
+ * Protocol v2 changed the room capability gate, not the encoded Yjs update shape. Pending v1
+ * outbox/recovery rows can therefore be upgraded locally before resend/export, while network
+ * parsers continue to reject live v1 peers and prevent mixed-capability rooms.
+ */
+export function parsePersistedStudioCrdtUpdateRequest(
+  value: unknown,
+  options: ParseStudioCrdtOptions = {}
+): StudioCrdtUpdateRequest | null {
+  const candidate = isRecord(value) && value.protocolVersion === 1
+    ? { ...value, protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION }
+    : value;
+  return parseStudioCrdtUpdateRequest(candidate, options);
 }
 
 export function parseStudioCrdtUpdateAck(

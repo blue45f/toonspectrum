@@ -1,9 +1,17 @@
-import { STUDIO_CRDT_STROKE_PAYLOAD_VERSION } from "./studio-crdt-protocol";
+import {
+  STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION,
+  STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
+} from "./studio-crdt-protocol";
 import {
   isStudioInkPressureModel,
   studioInkFallbackPressure,
   type StudioInkPressureModel,
 } from "./studio-ink-pressure-model";
+import {
+  isStudioStrokePaintModel,
+  isStudioStrokePaintModelCompatible,
+  type StudioStrokePaintModel,
+} from "./studio-stroke-paint-model";
 
 import type {
   StudioCrdtDrawStrokePayload,
@@ -22,6 +30,7 @@ export interface StudioCrdtCompatibleDrawElement {
   stroke: string;
   strokeWidth: number;
   opacity?: number;
+  paintModel?: StudioStrokePaintModel;
   fill?: string;
   gradient?: unknown;
   pattern?: unknown;
@@ -146,6 +155,11 @@ function extensionsOf(element: StudioCrdtCompatibleDrawElement): StudioCrdtJsonO
   if (isStudioInkPressureModel(element.pressureModel)) {
     extensions.pressureModel = element.pressureModel;
   }
+  // Stroke alpha semantics are versioned just like pressure geometry. Unknown future values must
+  // never enter the shared document through the generic JSON extension whitelist.
+  if (isStudioStrokePaintModelCompatible(element)) {
+    extensions.paintModel = element.paintModel;
+  }
   return Object.keys(extensions).length > 0 ? extensions : undefined;
 }
 
@@ -153,14 +167,25 @@ export function studioDrawElementToCrdtStroke(
   pageId: string,
   element: StudioCrdtCompatibleDrawElement
 ): StudioCrdtStrokeInput {
+  if (
+    isStudioStrokePaintModel(element.paintModel)
+    && !isStudioStrokePaintModelCompatible(element)
+  ) {
+    throw new Error("획 페인트 모델과 브러시 합성 모드가 호환되지 않습니다.");
+  }
   const sampleCount = Math.floor(element.points.length / 2);
   const pressureFallback = studioInkFallbackPressure(element.pressureModel);
   const pressures = element.pressures === undefined
     && isStudioInkPressureModel(element.pressureModel)
     ? Array<number>(sampleCount).fill(pressureFallback)
     : aligned(element.pressures, sampleCount, pressureFallback);
+  const extensions = extensionsOf(element);
   const payload: StudioCrdtDrawStrokePayload = {
-    version: STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
+    // Keep ordinary strokes on v1 so long-open v1 collaborators continue to render them. Only
+    // renderer-significant layered paint semantics require the fail-closed v2 payload.
+    version: extensions?.paintModel === undefined
+      ? STUDIO_CRDT_LEGACY_STROKE_PAYLOAD_VERSION
+      : STUDIO_CRDT_STROKE_PAYLOAD_VERSION,
     type: "draw",
     kind: element.kind ?? "freehand",
     mode: element.mode ?? "pen",
@@ -188,7 +213,7 @@ export function studioDrawElementToCrdtStroke(
   payload.strokeStyle = jsonObject(element.strokeStyle);
   payload.shapeParams = jsonObject(element.shapeParams);
   payload.symmetry = jsonObject(element.symmetry);
-  payload.extensions = extensionsOf(element);
+  payload.extensions = extensions;
   return {
     id: element.id,
     pageId,

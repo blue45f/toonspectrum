@@ -287,6 +287,54 @@ describe("도형 직렬화", () => {
     expect(skipped).toEqual([]);
   });
 
+  it("layered-flow-v1 마커는 알파 색상 dab을 단일 compound path로 한 번만 합성한다", () => {
+    const marker = rectEl({
+      id: "layered-marker-svg",
+      kind: "freehand",
+      points: [0, 0, 8, 0, 16, 0],
+      pressures: [1, 1, 1],
+      pressureModel: "linear-residual-path-v3",
+      paintModel: "layered-flow-v1",
+      sampleSpacing: 0,
+      stroke: "rgba(171, 51, 68, 0.4)",
+      strokeWidth: 16,
+      opacity: 0.6,
+      brush: "marker",
+      fill: undefined,
+    });
+    const { svg, skipped } = exportPageToSvg(page([marker]));
+    const layeredPath = /<path d="([^"]+)" fill="rgba\(171, 51, 68, 0\.4\)" opacity="0\.6"\/>/.exec(svg);
+
+    expect(layeredPath?.[1]).toContain("M -8 0 A 8 8 0 1 0 8 0 A 8 8 0 1 0 -8 0 Z");
+    expect(layeredPath?.[1].match(/M /g)?.length).toBeGreaterThan(1);
+    expect(svg).not.toContain("<circle");
+    expect(svg.match(/fill="rgba\(171, 51, 68, 0\.4\)"/g)).toHaveLength(1);
+    expect(svg.match(/opacity="0\.6"/g)).toHaveLength(1);
+    expect(skipped).toEqual([]);
+  });
+
+  it("호환되지 않는 대칭 paintModel 조합은 레거시 per-dab SVG 경로로 fail-closed 한다", () => {
+    const invalidLayeredSymmetry = rectEl({
+      id: "invalid-layered-symmetry-svg",
+      kind: "freehand",
+      points: [0, 0, 8, 0],
+      pressures: [1, 1],
+      pressureModel: "linear-residual-path-v3",
+      paintModel: "layered-flow-v1",
+      sampleSpacing: 0,
+      stroke: "#ab3344",
+      strokeWidth: 16,
+      opacity: 0.6,
+      brush: "marker",
+      fill: undefined,
+      symmetry: { type: "vertical", centerX: 50, centerY: 0 },
+    });
+    const { svg } = exportPageToSvg(page([invalidLayeredSymmetry]));
+
+    expect(svg).toContain('<circle cx="0" cy="0" r="8" fill="#ab3344" opacity="0.6"/>');
+    expect(svg).not.toContain('<path d="M -8 0 A 8 8');
+  });
+
   it("linear-full-v1 기본 펜 — 압력 0/.5/1을 지름 0/.5x/1x로 내보낸다", () => {
     const pen = rectEl({
       id: "linear-pressure-pen-svg",

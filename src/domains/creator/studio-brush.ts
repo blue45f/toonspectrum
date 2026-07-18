@@ -892,6 +892,49 @@ export function processFreehandPoints(
   return smoothed;
 }
 
+export interface StudioFreehandRenderPathOptions {
+  /**
+   * 새 입력 파이프라인이 획 생성 시 기록한 문서 좌표 샘플 간격.
+   * 유한한 숫자가 있으면 이미 채택·보정된 점이므로 다시 스무딩하지 않는다.
+   */
+  sampleSpacing: unknown;
+  /** 기존 문서에만 적용할 과거 Konva tension 값. */
+  legacyTension: number;
+  /** 기존 문서의 점 정리에 적용할 최소 거리. 생략하면 과거 3px 규칙을 쓴다. */
+  legacyMinDistance?: number;
+}
+
+export interface StudioFreehandRenderPath {
+  points: number[];
+  tension: number;
+}
+
+/**
+ * 저장된 획 버전에 맞는 렌더 경로를 고른다.
+ *
+ * 새 획의 points는 입력 단계에서 이미 채택·보정된 확정 샘플이다. 렌더 단계에서
+ * 다시 이동평균이나 곡선 tension을 적용하면 뒤에 점이 추가될 때 앞부분의 픽셀이
+ * 다시 움직이므로 원본 배열을 그대로 사용한다. sampleSpacing이 없는 레거시 문서는
+ * 과거의 processFreehandPoints + tension 결과를 유지한다.
+ */
+export function resolveStudioFreehandRenderPath(
+  points: number[],
+  {
+    sampleSpacing,
+    legacyTension,
+    legacyMinDistance = LEGACY_STROKE_RENDER_DISTANCE,
+  }: StudioFreehandRenderPathOptions
+): StudioFreehandRenderPath {
+  if (typeof sampleSpacing === "number" && Number.isFinite(sampleSpacing)) {
+    return { points, tension: 0 };
+  }
+
+  return {
+    points: processFreehandPoints(points, legacyMinDistance),
+    tension: legacyTension,
+  };
+}
+
 /**
  * Applies a stable deterministic jitter to points [x0, y0, ...] to simulate a pencil texture.
  */

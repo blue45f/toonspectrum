@@ -1,5 +1,5 @@
 import {
-  parseStudioCrdtUpdateRequest,
+  parsePersistedStudioCrdtUpdateRequest,
   type StudioCrdtUpdateRequest,
 } from "./studio-crdt-protocol";
 
@@ -248,7 +248,9 @@ function isStoredUpdate(value: unknown): value is StoredStudioCrdtUpdate {
     typeof row.createdAt === "number" &&
     Number.isFinite(row.createdAt)
   )) return false;
-  const parsed = parseStudioCrdtUpdateRequest(row.request, { expectedWorkId: row.workId });
+  const parsed = parsePersistedStudioCrdtUpdateRequest(row.request, {
+    expectedWorkId: row.workId,
+  });
   return (
     parsed !== null &&
     parsed.updateId === row.updateId &&
@@ -283,7 +285,9 @@ function requestsFromStoredRows(
         left.createdAt - right.createdAt ||
         left.updateId.localeCompare(right.updateId)
     )
-    .map((row) => parseStudioCrdtUpdateRequest(row.request, { expectedWorkId: workId }))
+    .map((row) => parsePersistedStudioCrdtUpdateRequest(row.request, {
+      expectedWorkId: workId,
+    }))
     .filter((request): request is StudioCrdtUpdateRequest => request !== null);
 }
 

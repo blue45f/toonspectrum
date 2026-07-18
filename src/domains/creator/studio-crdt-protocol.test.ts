@@ -8,6 +8,7 @@ import {
   encodeStudioCrdtSyncChunks,
   encodeStudioCrdtUpdate,
   parseStudioCrdtLocalWireMessage,
+  parsePersistedStudioCrdtUpdateRequest,
   parseStudioCrdtSyncRequest,
   parseStudioCrdtSyncResponse,
   parseStudioCrdtUpdateAck,
@@ -80,6 +81,7 @@ describe("studio CRDT protocol", () => {
     expect(parseStudioCrdtSyncRequest(syncRequest(), { expectedWorkId: workId })).toEqual(
       syncRequest()
     );
+    expect(parseStudioCrdtSyncRequest({ ...syncRequest(), protocolVersion: 1 })).toBeNull();
     expect(parseStudioCrdtSyncRequest({ ...syncRequest(), extra: true })).toBeNull();
     expect(parseStudioCrdtSyncRequest(syncRequest(), { expectedWorkId: "work-2" })).toBeNull();
 
@@ -91,6 +93,10 @@ describe("studio CRDT protocol", () => {
       update,
     } as const;
     expect(parseStudioCrdtUpdateRequest(publish, { expectedWorkId: workId })).toEqual(publish);
+    expect(parsePersistedStudioCrdtUpdateRequest(
+      { ...publish, protocolVersion: 1 },
+      { expectedWorkId: workId }
+    )).toEqual(publish);
     expect(parseStudioCrdtUpdateRequest({ ...publish, updateId: "bad id" })).toBeNull();
     expect(parseStudioCrdtUpdateRequest({ ...publish, clientSequence: 0 })).toBeNull();
   });
@@ -114,7 +120,7 @@ describe("studio CRDT protocol", () => {
     ).toBeNull();
   });
 
-  it("uses a separate branded and targeted local durable wire surface", () => {
+  it("uses a version-gated, separately branded and targeted local durable wire surface", () => {
     const requestWire = createStudioCrdtLocalWireMessage({
       workId,
       senderSessionId: "alice-session",

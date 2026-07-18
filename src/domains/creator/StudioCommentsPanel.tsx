@@ -1,13 +1,22 @@
 import {
+  ArrowDownWideNarrow,
   CheckCircle2,
+  CheckCheck,
+  ChevronDown,
   CircleDot,
   CornerDownRight,
+  Edit3,
+  Eye,
+  EyeOff,
   HardDrive,
   MapPin,
   MessageSquareText,
+  Plus,
   Reply,
   RotateCcw,
+  Search,
   Send,
+  Trash2,
   UserRoundCheck,
   X,
 } from "lucide-react";
@@ -18,6 +27,10 @@ import {
   addStudioCommentReply,
   addStudioCommentThread,
   assignStudioCommentThread,
+  editStudioCommentReply,
+  editStudioCommentThread,
+  removeStudioCommentReply,
+  removeStudioCommentThread,
   reopenStudioCommentThread,
   resolveStudioCommentThread,
   STUDIO_COMMENTS_MAX_BODY_LENGTH,
@@ -25,11 +38,16 @@ import {
   STUDIO_COMMENTS_MAX_REPLIES_PER_THREAD,
   STUDIO_COMMENTS_MAX_THREADS,
   STUDIO_COMMENTS_MAX_TOTAL_MESSAGES,
+  canonicalStudioCommentAnchorKey,
   studioCommentAnchorsEqual,
   type StudioCommentActor,
   type StudioCommentAnchor,
   type StudioCommentsDocument,
 } from "./studio-comments";
+import {
+  mergeStudioTeamCommentMutableDocument,
+  partitionStudioTeamCommentMutableDocument,
+} from "./studio-team-comment-mutable-document";
 
 export interface StudioCommentAnchorOption {
   anchor: StudioCommentAnchor;
@@ -40,38 +58,79 @@ export interface StudioCommentsPanelProps {
   open: boolean;
   onClose: () => void;
   document: StudioCommentsDocument;
-  onChange: (document: StudioCommentsDocument) => void;
+  onChange: (
+    document: StudioCommentsDocument
+  ) => void | boolean | Promise<void | boolean>;
   activeAnchor: StudioCommentAnchor | null;
   currentActor: StudioCommentActor;
   anchorOptions?: readonly StudioCommentAnchorOption[];
+  /** Guards a frozen draft anchor against page/frame/element deletion while the rail stays open. */
+  isAnchorValid?: (anchor: StudioCommentAnchor) => boolean;
   onSelectAnchor?: (anchor: StudioCommentAnchor) => void;
-  /** Figma식 자유 위치 핀: 패널을 닫고 캔버스 클릭 한 번으로 point 앵커를 잡는 모드를 무장한다. */
+  /** Figma식 자유 위치 핀: 캔버스 클릭 한 번으로 point 앵커를 잡는 모드를 무장한다. */
   onArmPinPlacement?: () => void;
+  capabilities?: Partial<StudioCommentsPanelCapabilities>;
+  mutationDisabledReason?: string;
+  syncError?: string;
+  storageMode?: "document" | "team";
+  unreadThreadIds?: ReadonlySet<string>;
+  /** 팀 댓글 도입 전에 문서에 저장된 댓글. 내용과 위치는 보존하되 서버 액션은 노출하지 않는다. */
+  readOnlyThreadIds?: ReadonlySet<string>;
+  pinsHidden?: boolean;
+  onTogglePinsHidden?: () => void;
+  onMarkThreadRead?: (threadId: string) => void | boolean | Promise<void | boolean>;
+  onMarkAllRead?: () => void | boolean | Promise<void | boolean>;
+  focusRequest?: { threadId: string; requestId: number } | null;
+  onFocusRequestHandled?: (requestId: number) => void;
 }
 
-type CommentFilter = "current" | "all" | "open" | "resolved";
+export interface StudioCommentsPanelCapabilities {
+  create: boolean;
+  reply: boolean;
+  editOwn: boolean;
+  deleteOwn: boolean;
+  resolve: boolean;
+  assign: boolean;
+}
+
+type CommentFilter = "current" | "all" | "unread" | "open" | "resolved";
+type CommentSort = "recent" | "oldest" | "location";
+
+interface CommentMessageTarget {
+  threadId: string;
+  replyId?: string;
+}
 
 const FILTERS: readonly { value: CommentFilter; label: string }[] = [
   { value: "current", label: "현재 위치" },
   { value: "all", label: "전체" },
+  { value: "unread", label: "읽지 않음" },
   { value: "open", label: "열림" },
   { value: "resolved", label: "해결됨" },
 ];
 
-const FOCUSABLE_SELECTOR = [
-  "a[href]",
-  "button:not([disabled])",
-  "input:not([disabled])",
-  "select:not([disabled])",
-  "textarea:not([disabled])",
-  '[tabindex]:not([tabindex="-1"])',
-].join(",");
+const SORTS: readonly { value: CommentSort; label: string }[] = [
+  { value: "recent", label: "최근 활동순" },
+  { value: "oldest", label: "오래된 활동순" },
+  { value: "location", label: "위치순" },
+];
+
+const EMPTY_THREAD_IDS: ReadonlySet<string> = new Set<string>();
+
+const DEFAULT_CAPABILITIES: StudioCommentsPanelCapabilities = Object.freeze({
+  create: true,
+  reply: true,
+  editOwn: true,
+  deleteOwn: true,
+  resolve: true,
+  assign: true,
+});
 
 const FIELD_CLASS =
   "w-full rounded-lg border border-line bg-card px-3 py-2 text-sm leading-relaxed text-fg outline-none transition-colors placeholder:text-fg-3 hover:border-line-strong focus:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50";
 
 const QUIET_BUTTON_CLASS =
-  "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-line bg-card px-2.5 text-xs font-semibold text-fg-2 transition-colors hover:border-line-strong hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40";
+  "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-line bg-card px-2.5 text-xs font-semibold text-fg-2 transition-colors hover:border-line-strong hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-9";
 
 const DATE_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
   year: "numeric",
@@ -97,6 +156,22 @@ function actorInitial(actor: StudioCommentActor): string {
   return Array.from(actor.displayName.trim())[0] ?? "?";
 }
 
+function actorsRepresentSamePerson(
+  left: StudioCommentActor,
+  right: StudioCommentActor
+): boolean {
+  if (left.id || right.id) return Boolean(left.id && right.id && left.id === right.id);
+  return left.displayName.normalize("NFKC").toLocaleLowerCase()
+    === right.displayName.normalize("NFKC").toLocaleLowerCase();
+}
+
+function messageTargetsEqual(
+  left: CommentMessageTarget | null,
+  right: CommentMessageTarget
+): boolean {
+  return left?.threadId === right.threadId && left.replyId === right.replyId;
+}
+
 function shortId(value: string): string {
   return value.length <= 12 ? value : `${value.slice(0, 5)}…${value.slice(-4)}`;
 }
@@ -106,13 +181,6 @@ function fallbackAnchorLabel(anchor: StudioCommentAnchor): string {
   if (anchor.type === "frame") return `컷 · ${shortId(anchor.frameId)}`;
   if (anchor.type === "point") return `위치 · ${Math.round(anchor.x * 100)}%, ${Math.round(anchor.y * 100)}%`;
   return `요소 · ${shortId(anchor.elementId)}`;
-}
-
-function anchorKey(anchor: StudioCommentAnchor): string {
-  if (anchor.type === "page") return `page:${anchor.pageId}`;
-  if (anchor.type === "frame") return `frame:${anchor.pageId}:${anchor.frameId}`;
-  if (anchor.type === "point") return `point:${anchor.pageId}:${anchor.x.toFixed(4)}:${anchor.y.toFixed(4)}`;
-  return `element:${anchor.pageId}:${anchor.frameId ?? ""}:${anchor.elementId}`;
 }
 
 function getAnchorLabel(
@@ -131,86 +199,219 @@ export function StudioCommentsPanel({
   activeAnchor,
   currentActor,
   anchorOptions = [],
+  isAnchorValid = () => true,
   onSelectAnchor,
   onArmPinPlacement,
+  capabilities: capabilityOverrides,
+  mutationDisabledReason,
+  syncError,
+  storageMode = "document",
+  unreadThreadIds = EMPTY_THREAD_IDS,
+  readOnlyThreadIds = EMPTY_THREAD_IDS,
+  pinsHidden = false,
+  onTogglePinsHidden,
+  onMarkThreadRead,
+  onMarkAllRead,
+  focusRequest = null,
+  onFocusRequestHandled,
 }: StudioCommentsPanelProps) {
   const titleId = useId();
   const descriptionId = useId();
-  const dialogRef = useRef<HTMLElement>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const replyEditorRef = useRef<HTMLTextAreaElement>(null);
   const assigneeEditorRef = useRef<HTMLInputElement>(null);
+  const editEditorRef = useRef<HTMLTextAreaElement>(null);
+  const deleteConfirmRef = useRef<HTMLButtonElement>(null);
+  const panelWasOpenRef = useRef(false);
+  const lastFocusRequestIdRef = useRef<number | null>(null);
+  const pendingFocusThreadIdRef = useRef<string | null>(null);
+  const pendingNewCommentIdRef = useRef<{
+    commentId: string;
+    payloadSignature: string;
+  } | null>(null);
+  const pendingReplyIdRef = useRef<{
+    threadId: string;
+    replyId: string;
+    payloadSignature: string;
+  } | null>(null);
   const [filter, setFilter] = useState<CommentFilter>("current");
+  const [sort, setSort] = useState<CommentSort>("recent");
+  const [composerExpanded, setComposerExpanded] = useState(false);
+  const [composerAnchor, setComposerAnchor] = useState<StudioCommentAnchor | null>(null);
+  const [composerAnchorLabelSnapshot, setComposerAnchorLabelSnapshot] = useState<string | null>(null);
   const [newComment, setNewComment] = useState("");
   const [replyingThreadId, setReplyingThreadId] = useState<string | null>(null);
   const [replyBody, setReplyBody] = useState("");
   const [assigningThreadId, setAssigningThreadId] = useState<string | null>(null);
   const [assigneeName, setAssigneeName] = useState("");
+  const [editingMessage, setEditingMessage] = useState<CommentMessageTarget | null>(null);
+  const [editBody, setEditBody] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<CommentMessageTarget | null>(null);
+  const [query, setQuery] = useState("");
+  const [readMutation, setReadMutation] = useState<string | "all" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const capabilities: StudioCommentsPanelCapabilities = {
+    ...DEFAULT_CAPABILITIES,
+    ...capabilityOverrides,
+  };
+  const composerAnchorValid = composerAnchor !== null && isAnchorValid(composerAnchor);
+  const focusReviewRail = () => {
+    dialogRef.current?.focus({ preventScroll: true });
+  };
+  const currentAnchorOptions = anchorOptions.filter((option, index) =>
+    anchorOptions.findIndex((candidate) =>
+      canonicalStudioCommentAnchorKey(candidate.anchor)
+        === canonicalStudioCommentAnchorKey(option.anchor)
+    ) === index
+  );
+  const frozenComposerAnchorOption = composerAnchor !== null
+    && composerAnchorValid
+    && !currentAnchorOptions.some((option) =>
+      studioCommentAnchorsEqual(option.anchor, composerAnchor)
+    )
+    ? {
+        anchor: composerAnchor,
+        label: composerAnchorLabelSnapshot ?? fallbackAnchorLabel(composerAnchor),
+      }
+    : null;
+  const selectableAnchorOptions = frozenComposerAnchorOption
+    ? [frozenComposerAnchorOption, ...currentAnchorOptions]
+    : currentAnchorOptions;
 
   useEffect(() => {
     if (!open || typeof globalThis.document === "undefined") return;
     const previousFocus = globalThis.document.activeElement;
-    const previousOverflow = globalThis.document.body.style.overflow;
-    globalThis.document.body.style.overflow = "hidden";
+    const reviewRail = dialogRef.current;
 
     const animationFrame = globalThis.requestAnimationFrame(() => {
-      if (composerRef.current && !composerRef.current.disabled) composerRef.current.focus();
-      else dialogRef.current?.focus();
+      reviewRail?.focus();
     });
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        event.stopPropagation();
-        onClose();
-        return;
-      }
-      if (event.key !== "Tab" || !dialogRef.current) return;
-      const focusable = Array.from(
-        dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
-      ).filter((element) => element.tabIndex !== -1 && element.offsetParent !== null);
-      if (focusable.length === 0) {
-        event.preventDefault();
-        dialogRef.current.focus();
-        return;
-      }
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && globalThis.document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && globalThis.document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-
-    globalThis.document.addEventListener("keydown", onKeyDown, true);
     return () => {
       globalThis.cancelAnimationFrame(animationFrame);
-      globalThis.document.body.style.overflow = previousOverflow;
-      globalThis.document.removeEventListener("keydown", onKeyDown, true);
-      if (previousFocus instanceof HTMLElement) previousFocus.focus();
+      const activeElement = globalThis.document.activeElement;
+      if (
+        previousFocus instanceof HTMLElement
+        && activeElement instanceof Node
+        && reviewRail?.contains(activeElement)
+      ) {
+        previousFocus.focus();
+      }
     };
-  }, [open, onClose]);
+  }, [open]);
 
   useEffect(() => {
     if (!open || typeof globalThis.document === "undefined") return;
     const animationFrame = globalThis.requestAnimationFrame(() => {
       if (replyingThreadId) replyEditorRef.current?.focus();
       else if (assigningThreadId) assigneeEditorRef.current?.focus();
+      else if (editingMessage) editEditorRef.current?.focus();
+      else if (pendingDelete) deleteConfirmRef.current?.focus();
+      else if (composerExpanded) composerRef.current?.focus();
     });
     return () => globalThis.cancelAnimationFrame(animationFrame);
-  }, [assigningThreadId, open, replyingThreadId]);
+  }, [assigningThreadId, composerExpanded, editingMessage, open, pendingDelete, replyingThreadId]);
+
+  useEffect(() => {
+    if (!open) {
+      panelWasOpenRef.current = false;
+      pendingFocusThreadIdRef.current = null;
+      return;
+    }
+    if (panelWasOpenRef.current) return;
+    panelWasOpenRef.current = true;
+    const hasThreadAtAnchor = activeAnchor
+      ? document.threads.some((thread) => studioCommentAnchorsEqual(thread.anchor, activeAnchor))
+      : false;
+    setFilter(activeAnchor ? "current" : "all");
+    if (!newComment.trim()) {
+      setComposerAnchor(activeAnchor);
+      setComposerAnchorLabelSnapshot(
+        activeAnchor ? getAnchorLabel(activeAnchor, anchorOptions) : null
+      );
+      setComposerExpanded(capabilities.create && Boolean(activeAnchor) && !hasThreadAtAnchor);
+    }
+    const preserveReplyDraft = Boolean(
+      replyingThreadId
+      && replyBody.trim()
+      && document.threads.some(
+        (thread) => thread.id === replyingThreadId && !thread.resolved
+      )
+    );
+    if (!preserveReplyDraft) {
+      setReplyingThreadId(null);
+      setReplyBody("");
+      pendingReplyIdRef.current = null;
+    }
+    setAssigningThreadId(null);
+    setEditingMessage(null);
+    setPendingDelete(null);
+    if (!newComment.trim() && !preserveReplyDraft) setError(null);
+  }, [
+    activeAnchor,
+    anchorOptions,
+    capabilities.create,
+    document.threads,
+    newComment,
+    open,
+    replyBody,
+    replyingThreadId,
+  ]);
+
+  useEffect(() => {
+    if (
+      !open
+      || !focusRequest
+      || lastFocusRequestIdRef.current === focusRequest.requestId
+    ) return;
+    lastFocusRequestIdRef.current = focusRequest.requestId;
+    pendingFocusThreadIdRef.current = focusRequest.threadId;
+    onFocusRequestHandled?.(focusRequest.requestId);
+    setFilter("current");
+    setQuery("");
+    if (!newComment.trim()) {
+      setComposerExpanded(false);
+      setComposerAnchor(null);
+      setComposerAnchorLabelSnapshot(null);
+    }
+    setReplyingThreadId(null);
+    setReplyBody("");
+    pendingReplyIdRef.current = null;
+    setAssigningThreadId(null);
+    setEditingMessage(null);
+    setPendingDelete(null);
+    setError(null);
+  }, [focusRequest, newComment, onFocusRequestHandled, open]);
+
+  useEffect(() => {
+    if (!open || !pendingFocusThreadIdRef.current) return;
+    const animationFrame = globalThis.requestAnimationFrame(() => {
+      const threadId = pendingFocusThreadIdRef.current;
+      const thread = Array.from(
+        dialogRef.current?.querySelectorAll<HTMLElement>("[data-studio-comment-thread-id]") ?? []
+      ).find((candidate) => candidate.dataset.studioCommentThreadId === threadId);
+      if (!thread) return;
+      pendingFocusThreadIdRef.current = null;
+      thread.focus({ preventScroll: true });
+      thread.scrollIntoView({ block: "nearest", behavior: "auto" });
+    });
+    return () => globalThis.cancelAnimationFrame(animationFrame);
+  }, [document.threads, filter, focusRequest, open, query, sort]);
 
   if (!open || typeof globalThis.document === "undefined") return null;
 
-  const totalMessages = document.threads.reduce(
-    (count, thread) => count + 1 + thread.replies.length,
-    0
-  );
+  const {
+    mutableDocument,
+    readOnlyThreads,
+    mutableMessageCount: mutableTotalMessages,
+    readOnlyMessageCount,
+  } = partitionStudioTeamCommentMutableDocument(document, readOnlyThreadIds);
+  const mutableThreads = mutableDocument.threads;
+  const totalMessages = mutableTotalMessages + readOnlyMessageCount;
   const openCount = document.threads.filter((thread) => !thread.resolved).length;
   const resolvedCount = document.threads.length - openCount;
+  const unreadCount = document.threads.filter((thread) => unreadThreadIds.has(thread.id)).length;
   const currentCount = activeAnchor
     ? document.threads.filter((thread) =>
         studioCommentAnchorsEqual(thread.anchor, activeAnchor)
@@ -219,9 +420,11 @@ export function StudioCommentsPanel({
   const filterCounts: Record<CommentFilter, number> = {
     current: currentCount,
     all: document.threads.length,
+    unread: unreadCount,
     open: openCount,
     resolved: resolvedCount,
   };
+  const normalizedQuery = query.trim().normalize("NFKC").toLocaleLowerCase();
   const visibleThreads = document.threads
     .filter((thread) => {
       if (filter === "current") {
@@ -229,63 +432,138 @@ export function StudioCommentsPanel({
           ? studioCommentAnchorsEqual(thread.anchor, activeAnchor)
           : false;
       }
+      if (filter === "unread") return unreadThreadIds.has(thread.id);
       if (filter === "open") return !thread.resolved;
       if (filter === "resolved") return thread.resolved;
       return true;
     })
+    .filter((thread) => {
+      if (!normalizedQuery) return true;
+      return [
+        thread.author.displayName,
+        thread.body,
+        thread.assignee?.displayName ?? "",
+        ...thread.replies.flatMap((reply) => [reply.author.displayName, reply.body]),
+      ].some((value) => value.normalize("NFKC").toLocaleLowerCase().includes(normalizedQuery));
+    })
     .slice()
-    .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
+    .sort((left, right) => {
+      if (sort === "oldest") {
+        return Date.parse(left.updatedAt) - Date.parse(right.updatedAt)
+          || left.id.localeCompare(right.id);
+      }
+      if (sort === "location") {
+        return getAnchorLabel(left.anchor, anchorOptions).localeCompare(
+          getAnchorLabel(right.anchor, anchorOptions),
+          "ko-KR"
+        ) || Date.parse(right.updatedAt) - Date.parse(left.updatedAt);
+      }
+      return Date.parse(right.updatedAt) - Date.parse(left.updatedAt)
+        || right.id.localeCompare(left.id);
+    });
   const canAddThread =
-    document.threads.length < STUDIO_COMMENTS_MAX_THREADS
-    && totalMessages < STUDIO_COMMENTS_MAX_TOTAL_MESSAGES;
+    capabilities.create
+    && !saving
+    && mutableThreads.length < STUDIO_COMMENTS_MAX_THREADS
+    && mutableTotalMessages < STUDIO_COMMENTS_MAX_TOTAL_MESSAGES;
 
-  const applyChange = (operation: () => StudioCommentsDocument, fallbackMessage: string): boolean => {
+  const applyChange = async (
+    operation: () => StudioCommentsDocument,
+    fallbackMessage: string
+  ): Promise<boolean> => {
+    if (saving) return false;
     try {
       const nextDocument = operation();
-      if (nextDocument !== document) onChange(nextDocument);
+      if (nextDocument === document) return false;
+      setSaving(true);
+      const accepted = await onChange(nextDocument);
+      if (accepted === false) throw new Error(fallbackMessage);
       setError(null);
       return true;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : fallbackMessage);
       return false;
+    } finally {
+      setSaving(false);
     }
   };
 
-  const submitComment = (event: FormEvent<HTMLFormElement>) => {
+  const submitComment = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!activeAnchor) {
+    if (!capabilities.create) {
+      setError(mutationDisabledReason ?? "현재 권한으로는 새 댓글을 남길 수 없어요.");
+      return;
+    }
+    if (!composerAnchor) {
       setError("댓글을 연결할 페이지, 컷 또는 요소를 먼저 선택해 주세요.");
       return;
     }
-    const saved = applyChange(
-      () => addStudioCommentThread(document, {
-        id: createCommentId("comment"),
-        anchor: activeAnchor,
-        author: currentActor,
-        body: newComment,
-      }),
+    if (!isAnchorValid(composerAnchor)) {
+      setError("댓글을 연결한 위치가 삭제되었습니다. 새 위치를 선택해 주세요.");
+      return;
+    }
+    const payloadSignature = JSON.stringify([
+      canonicalStudioCommentAnchorKey(composerAnchor),
+      newComment.trim(),
+    ]);
+    const pendingComment = pendingNewCommentIdRef.current?.payloadSignature === payloadSignature
+      ? pendingNewCommentIdRef.current
+      : { commentId: createCommentId("comment"), payloadSignature };
+    pendingNewCommentIdRef.current = pendingComment;
+    const saved = await applyChange(
+      () => mergeStudioTeamCommentMutableDocument(
+        addStudioCommentThread(mutableDocument, {
+          id: pendingComment.commentId,
+          anchor: composerAnchor,
+          author: currentActor,
+          body: newComment,
+        }),
+        readOnlyThreads
+      ),
       "댓글을 저장하지 못했어요."
     );
-    if (saved) setNewComment("");
-  };
-
-  const submitReply = (event: FormEvent<HTMLFormElement>, threadId: string) => {
-    event.preventDefault();
-    const saved = applyChange(
-      () => addStudioCommentReply(document, threadId, {
-        id: createCommentId("reply"),
-        author: currentActor,
-        body: replyBody,
-      }),
-      "답글을 저장하지 못했어요."
-    );
     if (saved) {
-      setReplyBody("");
-      setReplyingThreadId(null);
+      focusReviewRail();
+      setNewComment("");
+      setComposerExpanded(false);
+      setComposerAnchor(null);
+      setComposerAnchorLabelSnapshot(null);
+      pendingNewCommentIdRef.current = null;
     }
   };
 
-  const submitAssignee = (event: FormEvent<HTMLFormElement>, threadId: string) => {
+  const submitReply = async (event: FormEvent<HTMLFormElement>, threadId: string) => {
+    event.preventDefault();
+    if (!capabilities.reply) {
+      setError(mutationDisabledReason ?? "현재 권한으로는 답글을 남길 수 없어요.");
+      return;
+    }
+    const payloadSignature = JSON.stringify([threadId, replyBody.trim()]);
+    const pendingReply = pendingReplyIdRef.current?.threadId === threadId
+      && pendingReplyIdRef.current.payloadSignature === payloadSignature
+      ? pendingReplyIdRef.current
+      : { threadId, replyId: createCommentId("reply"), payloadSignature };
+    pendingReplyIdRef.current = pendingReply;
+    const saved = await applyChange(
+      () => mergeStudioTeamCommentMutableDocument(
+        addStudioCommentReply(mutableDocument, threadId, {
+          id: pendingReply.replyId,
+          author: currentActor,
+          body: replyBody,
+        }),
+        readOnlyThreads
+      ),
+      "답글을 저장하지 못했어요."
+    );
+    if (saved) {
+      focusReviewRail();
+      setReplyBody("");
+      setReplyingThreadId(null);
+      pendingReplyIdRef.current = null;
+    }
+  };
+
+  const submitAssignee = async (event: FormEvent<HTMLFormElement>, threadId: string) => {
     event.preventDefault();
     const displayName = assigneeName.trim().slice(0, STUDIO_COMMENTS_MAX_DISPLAY_NAME_LENGTH);
     if (!displayName) {
@@ -295,38 +573,120 @@ export function StudioCommentsPanel({
     const assignee = displayName === currentActor.displayName
       ? currentActor
       : { displayName };
-    const saved = applyChange(
+    const saved = await applyChange(
       () => assignStudioCommentThread(document, threadId, assignee),
       "담당자를 지정하지 못했어요."
     );
-    if (saved) setAssigningThreadId(null);
+    if (saved) {
+      focusReviewRail();
+      setAssigningThreadId(null);
+    }
   };
 
-  const assignToCurrentActor = (threadId: string) => {
-    const saved = applyChange(
+  const assignToCurrentActor = async (threadId: string) => {
+    const saved = await applyChange(
       () => assignStudioCommentThread(document, threadId, currentActor),
       "담당자를 지정하지 못했어요."
     );
-    if (saved) setAssigningThreadId(null);
+    if (saved) {
+      focusReviewRail();
+      setAssigningThreadId(null);
+    }
   };
 
-  const clearAssignee = (threadId: string) => {
-    const saved = applyChange(
+  const clearAssignee = async (threadId: string) => {
+    const saved = await applyChange(
       () => assignStudioCommentThread(document, threadId, null),
       "담당자 배정을 해제하지 못했어요."
     );
-    if (saved) setAssigningThreadId(null);
+    if (saved) {
+      focusReviewRail();
+      setAssigningThreadId(null);
+    }
+  };
+
+  const beginEditing = (target: CommentMessageTarget, body: string) => {
+    setEditingMessage(target);
+    setEditBody(body);
+    setPendingDelete(null);
+    setReplyingThreadId(null);
+    setAssigningThreadId(null);
+    setError(null);
+  };
+
+  const cancelEditing = () => {
+    focusReviewRail();
+    setEditingMessage(null);
+    setEditBody("");
+  };
+
+  const submitEdit = async (event: FormEvent<HTMLFormElement>, target: CommentMessageTarget) => {
+    event.preventDefault();
+    const saved = await applyChange(
+      () => target.replyId
+        ? editStudioCommentReply(document, target.threadId, target.replyId, { body: editBody })
+        : editStudioCommentThread(document, target.threadId, { body: editBody }),
+      "댓글을 수정하지 못했어요."
+    );
+    if (saved) cancelEditing();
+  };
+
+  const confirmDelete = async (target: CommentMessageTarget) => {
+    const saved = await applyChange(
+      () => target.replyId
+        ? removeStudioCommentReply(document, target.threadId, target.replyId)
+        : removeStudioCommentThread(document, target.threadId),
+      "댓글을 삭제하지 못했어요."
+    );
+    if (saved) {
+      focusReviewRail();
+      setPendingDelete(null);
+      if (messageTargetsEqual(editingMessage, target)) cancelEditing();
+    }
   };
 
   const navigateToAnchor = (anchor: StudioCommentAnchor) => {
     if (!onSelectAnchor) return;
     onSelectAnchor(anchor);
-    onClose();
+  };
+
+  const markThreadRead = async (threadId: string): Promise<void> => {
+    if (!onMarkThreadRead || !unreadThreadIds.has(threadId) || readMutation) return;
+    setReadMutation(threadId);
+    try {
+      const accepted = await onMarkThreadRead(threadId);
+      if (accepted === false) throw new Error("댓글을 읽음 처리하지 못했어요.");
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "댓글을 읽음 처리하지 못했어요.");
+    } finally {
+      setReadMutation(null);
+    }
+  };
+
+  const markAllRead = async (): Promise<void> => {
+    if (!onMarkAllRead || unreadCount === 0 || readMutation) return;
+    setReadMutation("all");
+    try {
+      const accepted = await onMarkAllRead();
+      if (accepted === false) throw new Error("모든 댓글을 읽음 처리하지 못했어요.");
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "모든 댓글을 읽음 처리하지 못했어요.");
+    } finally {
+      setReadMutation(null);
+    }
   };
 
   let emptyTitle = "이 조건에 맞는 댓글이 없어요";
   let emptyDescription = "필터를 바꾸거나 새 댓글을 등록하면 여기에 표시됩니다.";
-  if (filter === "current" && !activeAnchor) {
+  if (normalizedQuery) {
+    emptyTitle = "검색 결과가 없어요";
+    emptyDescription = "다른 작성자 이름이나 댓글 문구로 다시 검색해 보세요.";
+  } else if (filter === "unread") {
+    emptyTitle = "새 피드백을 모두 확인했어요";
+    emptyDescription = "새 댓글이나 답글이 도착하면 여기에 모아 보여 드립니다.";
+  } else if (filter === "current" && !activeAnchor) {
     emptyTitle = "선택한 위치가 없어요";
     emptyDescription = "캔버스에서 페이지, 컷 또는 요소를 선택하거나 전체 댓글을 확인하세요.";
   } else if (filter === "current") {
@@ -336,142 +696,245 @@ export function StudioCommentsPanel({
   const activeAnchorLabel = activeAnchor
     ? getAnchorLabel(activeAnchor, anchorOptions)
     : "선택한 위치 없음";
+  const composerAnchorLabel = composerAnchor
+    ? composerAnchorLabelSnapshot ?? getAnchorLabel(composerAnchor, anchorOptions)
+    : "선택한 위치 없음";
 
-  const modal = (
-    <div className="fixed inset-0 z-[80] isolate flex items-stretch justify-center p-0 text-fg sm:p-4">
-      <button
-        type="button"
-        tabIndex={-1}
-        aria-hidden="true"
-        onClick={onClose}
-        className="absolute inset-0 cursor-default bg-[oklch(0.08_0.01_70/0.84)] backdrop-blur-sm"
-      />
-      <section
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={descriptionId}
-        tabIndex={-1}
-        className="relative z-10 flex h-full w-full max-w-3xl flex-col overflow-hidden border-line bg-panel shadow-2xl outline-none sm:rounded-2xl sm:border"
-      >
-        <header className="flex shrink-0 items-start gap-3 border-b border-line px-4 py-3 sm:px-5">
-          <span className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl border border-line bg-card text-accent">
-            <MessageSquareText size={17} aria-hidden />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 id={titleId} className="text-sm font-bold text-fg">편집 댓글</h2>
-              <span className="inline-flex items-center gap-1 rounded-md border border-cool/30 bg-cool/10 px-1.5 py-0.5 text-[0.62rem] font-semibold text-cool">
-                <HardDrive size={10} aria-hidden />
-                로컬 우선 · 문서에 포함
+  const reviewRail = (
+    <dialog
+      open
+      ref={dialogRef}
+      aria-labelledby={titleId}
+      aria-describedby={descriptionId}
+      aria-busy={saving || readMutation !== null}
+      tabIndex={-1}
+      data-studio-comments-rail="true"
+      onKeyDown={(event) => {
+        if (event.nativeEvent.isComposing || event.key !== "Escape") return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (pendingDelete) {
+          focusReviewRail();
+          setPendingDelete(null);
+        } else if (editingMessage) {
+          cancelEditing();
+        } else if (replyingThreadId) {
+          focusReviewRail();
+          setReplyingThreadId(null);
+          setReplyBody("");
+          pendingReplyIdRef.current = null;
+        } else if (assigningThreadId) {
+          focusReviewRail();
+          setAssigningThreadId(null);
+        } else if (composerExpanded) {
+          focusReviewRail();
+          setComposerExpanded(false);
+          setNewComment("");
+          setComposerAnchor(null);
+          setComposerAnchorLabelSnapshot(null);
+          pendingNewCommentIdRef.current = null;
+        } else {
+          onClose();
+        }
+      }}
+      className="fixed inset-x-2 bottom-[calc(7rem+env(safe-area-inset-bottom))] top-auto z-[80] m-0 ml-0 flex h-[min(62dvh,36rem)] max-h-none max-w-none flex-col overflow-hidden rounded-2xl border border-line bg-panel p-0 text-fg shadow-[0_-18px_48px_oklch(0.08_0.01_70/0.35)] outline-none sm:inset-y-3 sm:right-3 sm:left-auto sm:h-auto sm:w-[min(27rem,calc(100vw-1.5rem))] sm:rounded-2xl sm:border sm:shadow-[0_18px_60px_oklch(0.08_0.01_70/0.48)]"
+    >
+      <header className="flex shrink-0 items-start gap-3 border-b border-line px-4 py-3">
+        <span className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl border border-line bg-card text-accent">
+          <MessageSquareText size={17} aria-hidden />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 id={titleId} className="text-sm font-bold text-fg">검토 댓글</h2>
+            <span className="inline-flex items-center gap-1 rounded-md border border-cool/30 bg-cool/10 px-1.5 py-0.5 text-[0.62rem] font-semibold text-cool" title={storageMode === "team" ? "팀 댓글 서버에 안전하게 동기화됩니다." : "프로젝트 파일에 댓글이 함께 저장됩니다."}>
+              <HardDrive size={10} aria-hidden />
+              {storageMode === "team" ? "팀 동기화" : "문서 저장"}
+            </span>
+            {unreadCount > 0 ? (
+              <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-accent px-1.5 py-0.5 text-[0.62rem] font-bold tabular-nums text-on-accent" aria-label={`읽지 않은 댓글 ${unreadCount}개`}>
+                새 글 {unreadCount}
               </span>
-            </div>
-            <p id={descriptionId} className="mt-0.5 text-xs leading-relaxed text-fg-3">
-              선택한 위치에 검토 의견을 연결하고 해결 상태를 관리합니다.
-            </p>
+            ) : null}
           </div>
+          <p id={descriptionId} className="mt-0.5 truncate text-xs leading-relaxed text-fg-3">
+            캔버스를 보며 위치별 피드백을 검토하세요.
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <span className="rounded-md bg-raised px-2 py-1 text-[0.65rem] font-semibold tabular-nums text-fg-2" aria-label={`열린 댓글 ${openCount}개`}>
+            열림 {openCount}
+          </span>
           <button
             type="button"
             onClick={onClose}
-            aria-label="편집 댓글 닫기"
+            aria-label="검토 댓글 닫기"
             title="닫기 (Esc)"
-            className="grid size-9 shrink-0 place-items-center rounded-lg border border-line bg-card text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="grid size-11 shrink-0 place-items-center rounded-lg border border-line bg-card text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:size-9"
           >
             <X size={16} aria-hidden />
           </button>
-        </header>
+        </div>
+      </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-          <div className="border-b border-line bg-card/35 px-4 py-3 sm:px-5">
-            <p className="text-xs font-semibold text-fg-2">문서에 함께 저장되는 검토 메모입니다.</p>
-            <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
-              실시간 동기화, 알림, 계정 조회, 서버 권한 검사는 제공하지 않습니다. 프로젝트 파일을 공유할 때 댓글도 함께 포함됩니다.
-            </p>
-          </div>
-
-          <form onSubmit={submitComment} className="border-b border-line px-4 py-4 sm:px-5">
-            <div className="flex flex-wrap items-end justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <label htmlFor={`${titleId}-body`} className="text-xs font-bold text-fg">새 댓글</label>
-                <p className="mt-0.5 truncate text-[0.68rem] text-fg-3" title={activeAnchorLabel}>
-                  연결 위치 · {activeAnchorLabel}
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-2 [scrollbar-gutter:stable]">
+          {composerExpanded ? (
+            <form onSubmit={submitComment} className="border-b border-line bg-card/25 px-4 py-3">
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+                <div className="min-w-0">
+                  <label htmlFor={`${titleId}-body`} className="block text-xs font-bold text-fg">
+                    새 댓글
+                  </label>
+                  <p className="mt-0.5 truncate text-[0.7rem] text-fg-3" title={composerAnchorLabel}>
+                    연결 위치 · {composerAnchorLabel}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    focusReviewRail();
+                    setComposerExpanded(false);
+                    setNewComment("");
+                    setComposerAnchor(null);
+                    setComposerAnchorLabelSnapshot(null);
+                    pendingNewCommentIdRef.current = null;
+                    setError(null);
+                  }}
+                  className={QUIET_BUTTON_CLASS}
+                >
+                  <X size={13} aria-hidden />
+                  작성 취소
+                </button>
+                {composerAnchor && !composerAnchorValid ? (
+                  <p role="status" className="col-span-2 rounded-lg border border-warn/35 bg-warn/10 px-2.5 py-2 text-[0.7rem] font-semibold text-warn">
+                    연결 위치가 삭제되었어요. 아래에서 새 위치를 선택해 주세요.
+                  </p>
+                ) : null}
+                {selectableAnchorOptions.length > 0 && onSelectAnchor ? (
+                  <div className="col-span-2 min-w-0">
+                    <label htmlFor={`${titleId}-anchor`} className="sr-only">댓글 연결 위치</label>
+                    <select
+                      id={`${titleId}-anchor`}
+                      value={composerAnchor ? canonicalStudioCommentAnchorKey(composerAnchor) : ""}
+                      onChange={(event) => {
+                        const option = selectableAnchorOptions.find(
+                          (candidate) => canonicalStudioCommentAnchorKey(candidate.anchor) === event.target.value
+                        );
+                        if (option) {
+                          setComposerAnchor(option.anchor);
+                          setComposerAnchorLabelSnapshot(option.label);
+                          onSelectAnchor(option.anchor);
+                        }
+                      }}
+                      className={FIELD_CLASS}
+                    >
+                      <option value="">위치를 선택하세요</option>
+                      {selectableAnchorOptions.map((option) => (
+                        <option key={canonicalStudioCommentAnchorKey(option.anchor)} value={canonicalStudioCommentAnchorKey(option.anchor)}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
+              </div>
+              <textarea
+                ref={composerRef}
+                id={`${titleId}-body`}
+                value={newComment}
+                maxLength={STUDIO_COMMENTS_MAX_BODY_LENGTH}
+                rows={3}
+                disabled={!composerAnchorValid || !canAddThread || saving}
+                placeholder={!composerAnchor
+                  ? "먼저 페이지, 컷 또는 요소를 선택해 주세요."
+                  : !composerAnchorValid
+                    ? "삭제되지 않은 페이지, 컷 또는 요소를 다시 선택해 주세요."
+                    : "수정할 점이나 확인이 필요한 내용을 구체적으로 남겨 주세요."}
+                onChange={(event) =>
+                  setNewComment(event.target.value.slice(0, STUDIO_COMMENTS_MAX_BODY_LENGTH))
+                }
+                onKeyDown={(event) => {
+                  if (
+                    !event.nativeEvent.isComposing
+                    && (event.metaKey || event.ctrlKey)
+                    && event.key === "Enter"
+                  ) {
+                    event.preventDefault();
+                    event.currentTarget.form?.requestSubmit();
+                  }
+                }}
+                className={`${FIELD_CLASS} mt-2 min-h-24 resize-y`}
+              />
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[0.7rem] text-fg-3">
+                  {canAddThread
+                    ? "⌘/Ctrl + Enter로 등록"
+                    : mutationDisabledReason ?? (saving ? "댓글을 동기화하는 중이에요." : "댓글 문서의 저장 한도에 도달했어요.")}
+                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[0.7rem] tabular-nums text-fg-3">
+                    {newComment.length.toLocaleString("ko-KR")}/{STUDIO_COMMENTS_MAX_BODY_LENGTH.toLocaleString("ko-KR")}
+                  </span>
+                  <button
+                    type="submit"
+                    disabled={!composerAnchorValid || !canAddThread || !newComment.trim()}
+                    className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-3.5 text-xs font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-9"
+                  >
+                    <Send size={13} aria-hidden />
+                    댓글 등록
+                  </button>
+                </div>
+              </div>
+            </form>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2 border-b border-line bg-card/20 px-4 py-2.5">
+              <div className="min-w-0 flex-1 basis-40">
+                <p className="text-[0.68rem] font-semibold text-fg-3">선택한 피드백 위치</p>
+                <p className="mt-0.5 truncate text-xs font-semibold text-fg" title={activeAnchorLabel}>
+                  {activeAnchorLabel}
                 </p>
               </div>
-              {onArmPinPlacement && (
+              {onArmPinPlacement && capabilities.create ? (
                 <button
                   type="button"
                   onClick={onArmPinPlacement}
-                  className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border border-accent/40 bg-accent-soft/40 px-2.5 text-xs font-semibold text-accent transition-colors hover:bg-accent-soft/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                  title="캔버스의 원하는 지점을 클릭해 그 위치에 댓글을 답니다 (Figma 스타일)"
+                  className={QUIET_BUTTON_CLASS}
+                  title="캔버스에서 댓글을 연결할 위치를 선택합니다"
                 >
-                  <MapPin size={13} aria-hidden="true" /> 캔버스에 핀 찍기
+                  <MapPin size={13} aria-hidden />
+                  핀 찍기
                 </button>
-              )}
-              {anchorOptions.length > 0 && onSelectAnchor && (
-                <div className="w-full sm:w-64">
-                  <label htmlFor={`${titleId}-anchor`} className="sr-only">댓글 연결 위치</label>
-                  <select
-                    id={`${titleId}-anchor`}
-                    value={activeAnchor ? anchorKey(activeAnchor) : ""}
-                    onChange={(event) => {
-                      const option = anchorOptions.find(
-                        (candidate) => anchorKey(candidate.anchor) === event.target.value
-                      );
-                      if (option) onSelectAnchor(option.anchor);
-                    }}
-                    className={FIELD_CLASS}
-                  >
-                    <option value="">위치를 선택하세요</option>
-                    {anchorOptions.map((option) => (
-                      <option key={anchorKey(option.anchor)} value={anchorKey(option.anchor)}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              ) : null}
+              <button
+                type="button"
+                disabled={!activeAnchor || !canAddThread}
+                onClick={() => {
+                  setComposerAnchor(activeAnchor);
+                  setComposerAnchorLabelSnapshot(
+                    activeAnchor ? getAnchorLabel(activeAnchor, anchorOptions) : null
+                  );
+                  setComposerExpanded(true);
+                  setError(null);
+                }}
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-9"
+              >
+                <Plus size={13} aria-hidden />
+                새 댓글
+              </button>
             </div>
-            <textarea
-              ref={composerRef}
-              id={`${titleId}-body`}
-              value={newComment}
-              maxLength={STUDIO_COMMENTS_MAX_BODY_LENGTH}
-              rows={3}
-              disabled={!activeAnchor || !canAddThread}
-              placeholder={activeAnchor
-                ? "수정할 점이나 확인이 필요한 내용을 구체적으로 남겨 주세요."
-                : "먼저 페이지, 컷 또는 요소를 선택해 주세요."}
-              onChange={(event) =>
-                setNewComment(event.target.value.slice(0, STUDIO_COMMENTS_MAX_BODY_LENGTH))
-              }
-              onKeyDown={(event) => {
-                if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-                  event.preventDefault();
-                  event.currentTarget.form?.requestSubmit();
-                }
-              }}
-              className={`${FIELD_CLASS} mt-2 min-h-24 resize-y`}
-            />
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-              <span className="text-[0.68rem] text-fg-3">
-                {canAddThread ? "⌘/Ctrl + Enter로 등록" : "댓글 문서의 저장 한도에 도달했어요."}
-              </span>
-              <div className="flex items-center gap-2">
-                <span className="text-[0.68rem] tabular-nums text-fg-3">
-                  {newComment.length.toLocaleString("ko-KR")}/{STUDIO_COMMENTS_MAX_BODY_LENGTH.toLocaleString("ko-KR")}
-                </span>
-                <button
-                  type="submit"
-                  disabled={!activeAnchor || !canAddThread || !newComment.trim()}
-                  className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-accent px-3.5 text-xs font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <Send size={13} aria-hidden />
-                  댓글 등록
-                </button>
-              </div>
+          )}
+
+          {syncError ? (
+            <div
+              role="status"
+              aria-live="polite"
+              className="flex items-start gap-2 border-b border-warn/35 bg-warn/10 px-4 py-2.5 text-xs leading-relaxed text-warn sm:px-5"
+            >
+              <CircleDot size={14} className="mt-0.5 shrink-0" aria-hidden />
+              <p className="min-w-0 flex-1">
+                팀 댓글 동기화 지연 · {syncError}
+              </p>
             </div>
-          </form>
+          ) : null}
 
           {error && (
             <div role="alert" className="flex items-start gap-2 border-b border-bad/35 bg-bad/10 px-4 py-2.5 text-xs leading-relaxed text-bad sm:px-5">
@@ -481,38 +944,105 @@ export function StudioCommentsPanel({
                 type="button"
                 onClick={() => setError(null)}
                 aria-label="오류 메시지 닫기"
-                className="grid size-7 shrink-0 place-items-center rounded-md hover:bg-bad/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                className="grid size-11 shrink-0 place-items-center rounded-md hover:bg-bad/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:size-7"
               >
                 <X size={13} aria-hidden />
               </button>
             </div>
           )}
 
-          <div className="sticky top-0 z-10 flex flex-wrap items-center gap-1 border-b border-line bg-panel/95 px-4 py-2.5 backdrop-blur-sm sm:px-5">
-            <span className="mr-1 text-[0.68rem] font-semibold text-fg-3">필터</span>
-            {FILTERS.map((item) => {
-              const active = filter === item.value;
-              return (
+          <div className="sticky top-0 z-10 flex flex-col gap-1.5 border-b border-line bg-panel/95 px-4 py-2.5 backdrop-blur-sm sm:px-5">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <label className="relative min-w-0 flex-1">
+                <span className="sr-only">댓글 검색</span>
+                <Search size={13} aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-3" />
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value.slice(0, 120))}
+                  placeholder="작성자와 댓글 검색"
+                  className="h-11 w-full rounded-lg border border-line bg-card pl-8 pr-3 text-xs text-fg outline-none transition-colors placeholder:text-fg-3 hover:border-line-strong focus:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:h-9"
+                />
+              </label>
+              {onTogglePinsHidden ? (
                 <button
-                  key={item.value}
                   type="button"
-                  aria-pressed={active}
-                  disabled={item.value === "current" && !activeAnchor}
-                  onClick={() => setFilter(item.value)}
-                  className={`inline-flex min-h-8 items-center gap-1 rounded-lg border px-2.5 text-[0.7rem] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-35 ${
-                    active
-                      ? "border-accent/45 bg-accent-soft text-accent"
-                      : "border-line bg-card text-fg-2 hover:border-line-strong hover:bg-raised hover:text-fg"
-                  }`}
+                  aria-pressed={pinsHidden}
+                  aria-label={pinsHidden ? "캔버스 댓글 핀 표시" : "캔버스 댓글 핀 숨김"}
+                  onClick={onTogglePinsHidden}
+                  className={`${QUIET_BUTTON_CLASS} shrink-0 px-3 sm:px-2.5`}
+                  title={pinsHidden ? "캔버스 댓글 핀을 다시 표시합니다 (Shift+C)" : "캔버스 댓글 핀을 숨깁니다 (Shift+C)"}
                 >
-                  {item.label}
-                  <span className="tabular-nums text-[0.65rem] opacity-75">{filterCounts[item.value]}</span>
+                  {pinsHidden ? <Eye size={13} aria-hidden /> : <EyeOff size={13} aria-hidden />}
+                  <span className="sr-only sm:not-sr-only">{pinsHidden ? "핀 표시" : "핀 숨김"}</span>
                 </button>
-              );
-            })}
-            <span className="ml-auto text-[0.65rem] tabular-nums text-fg-3">
-              메시지 {totalMessages}/{STUDIO_COMMENTS_MAX_TOTAL_MESSAGES}
-            </span>
+              ) : null}
+              {onMarkAllRead && storageMode === "team" ? (
+                <button
+                  type="button"
+                  disabled={unreadCount === 0 || readMutation !== null}
+                  aria-label={readMutation === "all" ? "모든 댓글 읽음 처리 중" : "모든 댓글 읽음 처리"}
+                  onClick={() => void markAllRead()}
+                  className={`${QUIET_BUTTON_CLASS} shrink-0 px-3 sm:px-2.5`}
+                  title="현재 읽지 않은 팀 댓글을 모두 읽음 처리합니다"
+                >
+                  <CheckCheck size={13} aria-hidden />
+                  <span className="sr-only sm:not-sr-only">{readMutation === "all" ? "처리 중" : "모두 읽음"}</span>
+                </button>
+              ) : null}
+              <label className="relative size-11 shrink-0 sm:h-8 sm:w-auto sm:min-w-32">
+                <span className="sr-only">댓글 정렬</span>
+                <ArrowDownWideNarrow
+                  size={13}
+                  aria-hidden
+                  className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 text-fg-2 sm:left-2 sm:translate-x-0 sm:text-fg-3"
+                />
+                <select
+                  aria-label="댓글 정렬"
+                  value={sort}
+                  onChange={(event) => setSort(event.target.value as CommentSort)}
+                  className="h-11 w-11 appearance-none rounded-lg border border-line bg-card px-0 text-transparent outline-none transition-colors hover:border-line-strong hover:bg-raised focus:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent [&>option]:text-fg-2 sm:h-8 sm:w-full sm:pl-7 sm:pr-7 sm:text-[0.7rem] sm:font-semibold sm:text-fg-2"
+                >
+                  {SORTS.map((item) => (
+                    <option key={item.value} value={item.value}>{item.label}</option>
+                  ))}
+                </select>
+                <ChevronDown
+                  size={12}
+                  aria-hidden
+                  className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 text-fg-3 sm:block"
+                />
+              </label>
+            </div>
+            <div className="-mx-4 flex min-w-0 items-center gap-1.5 overflow-x-auto px-4 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
+              <span className="mr-1 shrink-0 text-[0.68rem] font-semibold text-fg-3">필터</span>
+              {FILTERS.filter((item) => storageMode === "team" || item.value !== "unread").map((item) => {
+                const active = filter === item.value;
+                return (
+                  <button
+                    key={item.value}
+                    type="button"
+                    aria-pressed={active}
+                    disabled={item.value === "current" && !activeAnchor}
+                    onClick={() => setFilter(item.value)}
+                    className={`inline-flex min-h-11 shrink-0 items-center gap-1 rounded-lg border px-2.5 text-[0.7rem] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-35 sm:min-h-8 ${
+                      active
+                        ? "border-accent/45 bg-accent-soft text-accent"
+                        : "border-line bg-card text-fg-2 hover:border-line-strong hover:bg-raised hover:text-fg"
+                    }`}
+                  >
+                    {item.label}
+                    <span className="tabular-nums text-[0.65rem] opacity-75">{filterCounts[item.value]}</span>
+                  </button>
+                );
+              })}
+              <span className="ml-auto hidden text-[0.68rem] tabular-nums text-fg-3 sm:block">
+                {normalizedQuery ? `검색 ${visibleThreads.length} · ` : ""}
+                {storageMode === "team" && readOnlyMessageCount > 0
+                  ? `팀 메시지 ${mutableTotalMessages}/${STUDIO_COMMENTS_MAX_TOTAL_MESSAGES} · 보관 ${readOnlyMessageCount}`
+                  : `메시지 ${totalMessages}/${STUDIO_COMMENTS_MAX_TOTAL_MESSAGES}`}
+              </span>
+            </div>
           </div>
 
           {visibleThreads.length === 0 ? (
@@ -535,17 +1065,32 @@ export function StudioCommentsPanel({
           ) : (
             <ol aria-label={`${FILTERS.find((item) => item.value === filter)?.label ?? "전체"} 댓글`}>
               {visibleThreads.map((thread) => {
+                const isReadOnlyArchive = readOnlyThreadIds.has(thread.id);
                 const canReply =
-                  !thread.resolved
+                  !isReadOnlyArchive
+                  && capabilities.reply
+                  && !saving
+                  && !thread.resolved
                   && thread.replies.length < STUDIO_COMMENTS_MAX_REPLIES_PER_THREAD
-                  && totalMessages < STUDIO_COMMENTS_MAX_TOTAL_MESSAGES;
-                const isReplying = replyingThreadId === thread.id;
-                const isAssigning = assigningThreadId === thread.id;
+                  && mutableTotalMessages < STUDIO_COMMENTS_MAX_TOTAL_MESSAGES;
+                const isReplying = !isReadOnlyArchive && replyingThreadId === thread.id;
+                const isAssigning = !isReadOnlyArchive && assigningThreadId === thread.id;
+                const threadTarget: CommentMessageTarget = { threadId: thread.id };
+                const ownsThread = actorsRepresentSamePerson(thread.author, currentActor);
+                const canEditThread = !isReadOnlyArchive && capabilities.editOwn && ownsThread && !saving;
+                const canDeleteThread = !isReadOnlyArchive && capabilities.deleteOwn && ownsThread && !saving;
+                const isEditingThread = !isReadOnlyArchive && messageTargetsEqual(editingMessage, threadTarget);
+                const isDeletingThread = !isReadOnlyArchive && messageTargetsEqual(pendingDelete, threadTarget);
                 const locationLabel = getAnchorLabel(thread.anchor, anchorOptions);
 
                 return (
                   <li key={thread.id} className="border-b border-line last:border-b-0">
-                    <article className="px-4 py-4 sm:px-5">
+                    <article
+                      id={`${titleId}-thread-${thread.id}`}
+                      data-studio-comment-thread-id={thread.id}
+                      tabIndex={-1}
+                      className={`relative px-4 py-4 outline-none transition-colors focus-visible:bg-accent-soft/20 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent sm:px-5 ${unreadThreadIds.has(thread.id) ? "bg-accent-soft/15 before:absolute before:inset-y-3 before:left-0 before:w-0.5 before:rounded-r before:bg-accent" : ""}`}
+                    >
                       <div className="flex min-w-0 items-start gap-3">
                         <span aria-hidden className="grid size-8 shrink-0 place-items-center rounded-full border border-line bg-raised text-xs font-bold text-fg-2">
                           {actorInitial(thread.author)}
@@ -566,12 +1111,29 @@ export function StudioCommentsPanel({
                                 : <CircleDot size={10} aria-hidden />}
                               {thread.resolved ? "해결됨" : "열림"}
                             </span>
+                            {unreadThreadIds.has(thread.id) ? (
+                              <span className="inline-flex items-center gap-1 rounded-md bg-accent px-1.5 py-0.5 text-[0.62rem] font-bold text-on-accent">
+                                새 피드백
+                              </span>
+                            ) : null}
+                            {isReadOnlyArchive ? (
+                              <span
+                                className="inline-flex items-center gap-1 rounded-md border border-line bg-raised px-1.5 py-0.5 text-[0.62rem] font-semibold text-fg-2"
+                                title="팀 댓글 도입 전에 문서에 저장된 댓글입니다. 내용과 위치만 보존됩니다."
+                              >
+                                <HardDrive size={10} aria-hidden />
+                                로컬 보관본 · 읽기 전용
+                              </span>
+                            ) : null}
                           </div>
                           {onSelectAnchor ? (
                             <button
                               type="button"
-                              onClick={() => navigateToAnchor(thread.anchor)}
-                              aria-label={`${locationLabel} 위치로 이동하고 댓글 패널 닫기`}
+                              onClick={() => {
+                                navigateToAnchor(thread.anchor);
+                                void markThreadRead(thread.id);
+                              }}
+                              aria-label={`${locationLabel} 위치로 이동`}
                               className="mt-1 inline-flex max-w-full items-center gap-1 rounded-md text-[0.68rem] font-semibold text-cool hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                             >
                               <MapPin size={11} className="shrink-0" aria-hidden />
@@ -585,39 +1147,246 @@ export function StudioCommentsPanel({
                             </span>
                           )}
                         </div>
+                        {(canEditThread || canDeleteThread) && !isEditingThread && (
+                          <span className="inline-flex shrink-0 items-center gap-1">
+                            {canEditThread ? <button
+                              type="button"
+                              onClick={() => beginEditing(threadTarget, thread.body)}
+                              aria-label={`${thread.author.displayName}의 댓글 수정`}
+                              title="댓글 수정"
+                              className="grid size-11 place-items-center rounded-md text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:size-8"
+                            >
+                              <Edit3 size={12} aria-hidden />
+                            </button> : null}
+                            {canDeleteThread ? <button
+                              type="button"
+                              aria-expanded={isDeletingThread}
+                              aria-label={`${thread.author.displayName}의 댓글 삭제`}
+                              title="댓글 삭제"
+                              onClick={() => {
+                                setPendingDelete(isDeletingThread ? null : threadTarget);
+                                setEditingMessage(null);
+                                setEditBody("");
+                                setReplyingThreadId(null);
+                                setAssigningThreadId(null);
+                              }}
+                              className="grid size-11 place-items-center rounded-md text-fg-3 transition-colors hover:bg-bad/10 hover:text-bad focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:size-8"
+                            >
+                              <Trash2 size={12} aria-hidden />
+                            </button> : null}
+                          </span>
+                        )}
                       </div>
 
-                      <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-fg">
-                        {thread.body}
-                      </p>
+                      {isDeletingThread && (
+                        <div role="alert" className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-bad/30 bg-bad/10 px-3 py-2.5 text-xs text-fg-2">
+                          <span className="min-w-0 flex-1">
+                            이 스레드와 답글 {thread.replies.length}개를 삭제할까요?
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              focusReviewRail();
+                              setPendingDelete(null);
+                            }}
+                            className={QUIET_BUTTON_CLASS}
+                          >
+                            취소
+                          </button>
+                          <button
+                            ref={deleteConfirmRef}
+                            type="button"
+                            onClick={() => void confirmDelete(threadTarget)}
+                            className="inline-flex min-h-11 items-center rounded-lg bg-bad px-3 text-xs font-bold text-on-accent transition-colors hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bad sm:min-h-9"
+                          >
+                            스레드 삭제
+                          </button>
+                        </div>
+                      )}
+
+                      {isEditingThread ? (
+                        <form onSubmit={(event) => submitEdit(event, threadTarget)} className="mt-3 rounded-xl bg-raised/35 p-3">
+                          <label htmlFor={`${titleId}-edit-${thread.id}`} className="block text-[0.7rem] font-semibold text-fg-2">
+                            댓글 수정
+                          </label>
+                          <textarea
+                            ref={editEditorRef}
+                            id={`${titleId}-edit-${thread.id}`}
+                            value={editBody}
+                            maxLength={STUDIO_COMMENTS_MAX_BODY_LENGTH}
+                            rows={3}
+                            onChange={(event) => setEditBody(event.target.value.slice(0, STUDIO_COMMENTS_MAX_BODY_LENGTH))}
+                            onKeyDown={(event) => {
+                              if (
+                                !event.nativeEvent.isComposing
+                                && (event.metaKey || event.ctrlKey)
+                                && event.key === "Enter"
+                              ) {
+                                event.preventDefault();
+                                event.currentTarget.form?.requestSubmit();
+                              }
+                            }}
+                            className={`${FIELD_CLASS} mt-1.5 resize-y`}
+                          />
+                          <div className="mt-2 flex items-center justify-between gap-2">
+                            <span className="text-[0.65rem] tabular-nums text-fg-3">{editBody.length}/{STUDIO_COMMENTS_MAX_BODY_LENGTH}</span>
+                            <div className="flex items-center gap-2">
+                              <button type="button" onClick={cancelEditing} className={QUIET_BUTTON_CLASS}>취소</button>
+                              <button
+                                type="submit"
+                                disabled={!editBody.trim() || editBody.trim() === thread.body}
+                                className="inline-flex min-h-11 items-center rounded-lg bg-accent px-3 text-xs font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-9"
+                              >
+                                저장
+                              </button>
+                            </div>
+                          </div>
+                        </form>
+                      ) : (
+                        <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-fg">
+                          {thread.body}
+                        </p>
+                      )}
 
                       {thread.replies.length > 0 && (
                         <ol aria-label={`${thread.author.displayName} 댓글의 답글`} className="mt-3">
-                          {thread.replies.map((reply) => (
-                            <li key={reply.id} className="border-t border-line/70 py-3">
-                              <div className="flex min-w-0 items-start gap-2.5 pl-4 sm:pl-8">
-                                <span aria-hidden className="grid size-7 shrink-0 place-items-center rounded-full bg-raised text-[0.68rem] font-bold text-fg-2">
-                                  {actorInitial(reply.author)}
-                                </span>
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                                    <strong className="text-[0.72rem] text-fg-2">{reply.author.displayName}</strong>
-                                    <time dateTime={reply.createdAt} className="text-[0.65rem] text-fg-3">
-                                      {formatDate(reply.createdAt)}
-                                    </time>
+                          {thread.replies.map((reply) => {
+                            const replyTarget: CommentMessageTarget = {
+                              threadId: thread.id,
+                              replyId: reply.id,
+                            };
+                            const ownsReply = actorsRepresentSamePerson(reply.author, currentActor);
+                            const canEditReply = !isReadOnlyArchive && capabilities.editOwn && ownsReply && !saving;
+                            const canDeleteReply = !isReadOnlyArchive && capabilities.deleteOwn && ownsReply && !saving;
+                            const isEditingReply = !isReadOnlyArchive && messageTargetsEqual(editingMessage, replyTarget);
+                            const isDeletingReply = !isReadOnlyArchive && messageTargetsEqual(pendingDelete, replyTarget);
+                            return (
+                              <li key={reply.id} className="border-t border-line/70 py-3">
+                                <div className="flex min-w-0 items-start gap-2.5 pl-4 sm:pl-6">
+                                  <span aria-hidden className="grid size-7 shrink-0 place-items-center rounded-full bg-raised text-[0.68rem] font-bold text-fg-2">
+                                    {actorInitial(reply.author)}
+                                  </span>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                      <strong className="text-[0.72rem] text-fg-2">{reply.author.displayName}</strong>
+                                      <time dateTime={reply.createdAt} className="text-[0.65rem] text-fg-3">
+                                        {formatDate(reply.createdAt)}
+                                      </time>
+                                      {reply.updatedAt !== reply.createdAt && (
+                                        <span className="text-[0.62rem] text-fg-3">수정됨</span>
+                                      )}
+                                      {(canEditReply || canDeleteReply) && !isEditingReply && (
+                                        <span className="ml-auto inline-flex items-center gap-1">
+                                          {canEditReply ? <button
+                                            type="button"
+                                            onClick={() => beginEditing(replyTarget, reply.body)}
+                                            aria-label={`${reply.author.displayName}의 답글 수정`}
+                                            title="답글 수정"
+                                            className="grid size-11 place-items-center rounded-md text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:size-8"
+                                          >
+                                            <Edit3 size={12} aria-hidden />
+                                          </button> : null}
+                                          {canDeleteReply ? <button
+                                            type="button"
+                                            onClick={() => {
+                                              setPendingDelete(isDeletingReply ? null : replyTarget);
+                                              setEditingMessage(null);
+                                              setEditBody("");
+                                              setReplyingThreadId(null);
+                                              setAssigningThreadId(null);
+                                            }}
+                                            aria-expanded={isDeletingReply}
+                                            aria-label={`${reply.author.displayName}의 답글 삭제`}
+                                            title="답글 삭제"
+                                            className="grid size-11 place-items-center rounded-md text-fg-3 transition-colors hover:bg-bad/10 hover:text-bad focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:size-8"
+                                          >
+                                            <Trash2 size={12} aria-hidden />
+                                          </button> : null}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {isEditingReply ? (
+                                      <form onSubmit={(event) => submitEdit(event, replyTarget)} className="mt-2 rounded-xl bg-raised/35 p-2.5">
+                                        <label htmlFor={`${titleId}-edit-${reply.id}`} className="sr-only">답글 수정</label>
+                                        <textarea
+                                          ref={editEditorRef}
+                                          id={`${titleId}-edit-${reply.id}`}
+                                          value={editBody}
+                                          maxLength={STUDIO_COMMENTS_MAX_BODY_LENGTH}
+                                          rows={2}
+                                          onChange={(event) => setEditBody(event.target.value.slice(0, STUDIO_COMMENTS_MAX_BODY_LENGTH))}
+                                          onKeyDown={(event) => {
+                                            if (
+                                              !event.nativeEvent.isComposing
+                                              && (event.metaKey || event.ctrlKey)
+                                              && event.key === "Enter"
+                                            ) {
+                                              event.preventDefault();
+                                              event.currentTarget.form?.requestSubmit();
+                                            }
+                                          }}
+                                          className={`${FIELD_CLASS} resize-y`}
+                                        />
+                                        <div className="mt-2 flex justify-end gap-2">
+                                          <button type="button" onClick={cancelEditing} className={QUIET_BUTTON_CLASS}>취소</button>
+                                          <button
+                                            type="submit"
+                                            disabled={!editBody.trim() || editBody.trim() === reply.body}
+                                            className="inline-flex min-h-11 items-center rounded-lg bg-accent px-3 text-xs font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-9"
+                                          >
+                                            저장
+                                          </button>
+                                        </div>
+                                      </form>
+                                    ) : (
+                                      <p className="mt-1 whitespace-pre-wrap break-words text-xs leading-5 text-fg-2">
+                                        {reply.body}
+                                      </p>
+                                    )}
+                                    {isDeletingReply && (
+                                      <div role="alert" className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-bad/30 bg-bad/10 px-2.5 py-2 text-[0.68rem] text-fg-2">
+                                        <span className="min-w-0 flex-1">이 답글을 삭제할까요?</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            focusReviewRail();
+                                            setPendingDelete(null);
+                                          }}
+                                          className={QUIET_BUTTON_CLASS}
+                                        >
+                                          취소
+                                        </button>
+                                        <button
+                                          ref={deleteConfirmRef}
+                                          type="button"
+                                          onClick={() => void confirmDelete(replyTarget)}
+                                          className="inline-flex min-h-11 items-center rounded-lg bg-bad px-3 text-xs font-bold text-on-accent transition-colors hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bad sm:min-h-9"
+                                        >
+                                          삭제
+                                        </button>
+                                      </div>
+                                    )}
                                   </div>
-                                  <p className="mt-1 whitespace-pre-wrap break-words text-xs leading-5 text-fg-2">
-                                    {reply.body}
-                                  </p>
                                 </div>
-                              </div>
-                            </li>
-                          ))}
+                              </li>
+                            );
+                          })}
                         </ol>
                       )}
 
                       <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <button
+                        {!isReadOnlyArchive && unreadThreadIds.has(thread.id) && onMarkThreadRead ? (
+                          <button
+                            type="button"
+                            disabled={readMutation !== null}
+                            onClick={() => void markThreadRead(thread.id)}
+                            className={QUIET_BUTTON_CLASS}
+                          >
+                            <CheckCheck size={13} aria-hidden />
+                            {readMutation === thread.id ? "읽음 처리 중" : "읽음으로 표시"}
+                          </button>
+                        ) : null}
+                        {!isReadOnlyArchive && capabilities.reply ? <button
                           type="button"
                           aria-expanded={isReplying}
                           disabled={!canReply}
@@ -625,43 +1394,52 @@ export function StudioCommentsPanel({
                           onClick={() => {
                             setReplyingThreadId(isReplying ? null : thread.id);
                             setReplyBody("");
+                            pendingReplyIdRef.current = null;
                             setAssigningThreadId(null);
+                            setEditingMessage(null);
+                            setEditBody("");
+                            setPendingDelete(null);
                             setError(null);
                           }}
                           className={QUIET_BUTTON_CLASS}
                         >
                           <Reply size={13} aria-hidden />
                           답글{thread.replies.length > 0 ? ` ${thread.replies.length}` : ""}
-                        </button>
-                        <button
+                        </button> : null}
+                        {!isReadOnlyArchive && capabilities.assign ? <button
                           type="button"
                           aria-expanded={isAssigning}
                           onClick={() => {
                             setAssigningThreadId(isAssigning ? null : thread.id);
                             setAssigneeName(thread.assignee?.displayName ?? "");
                             setReplyingThreadId(null);
+                            setEditingMessage(null);
+                            setEditBody("");
+                            setPendingDelete(null);
                             setError(null);
                           }}
                           className={QUIET_BUTTON_CLASS}
                         >
                           <UserRoundCheck size={13} aria-hidden />
                           {thread.assignee ? `담당 · ${thread.assignee.displayName}` : "담당자 지정"}
-                        </button>
-                        <button
+                        </button> : null}
+                        {!isReadOnlyArchive && capabilities.resolve ? <button
                           type="button"
+                          disabled={saving}
                           onClick={() => {
-                            const saved = applyChange(
+                            void applyChange(
                               () => thread.resolved
                                 ? reopenStudioCommentThread(document, thread.id)
                                 : resolveStudioCommentThread(document, thread.id, currentActor),
                               thread.resolved
                                 ? "댓글을 다시 열지 못했어요."
                                 : "댓글을 해결 처리하지 못했어요."
-                            );
-                            if (saved && !thread.resolved) {
-                              setReplyingThreadId(null);
-                              setReplyBody("");
-                            }
+                            ).then((saved) => {
+                              if (saved && !thread.resolved) {
+                                setReplyingThreadId(null);
+                                setReplyBody("");
+                              }
+                            });
                           }}
                           className={`${QUIET_BUTTON_CLASS} ${
                             thread.resolved ? "text-warn hover:text-warn" : "text-good hover:text-good"
@@ -671,7 +1449,7 @@ export function StudioCommentsPanel({
                             ? <RotateCcw size={13} aria-hidden />
                             : <CheckCircle2 size={13} aria-hidden />}
                           {thread.resolved ? "다시 열기" : "해결"}
-                        </button>
+                        </button> : null}
                       </div>
 
                       {isReplying && (
@@ -689,7 +1467,11 @@ export function StudioCommentsPanel({
                               setReplyBody(event.target.value.slice(0, STUDIO_COMMENTS_MAX_BODY_LENGTH))
                             }
                             onKeyDown={(event) => {
-                              if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+                              if (
+                                !event.nativeEvent.isComposing
+                                && (event.metaKey || event.ctrlKey)
+                                && event.key === "Enter"
+                              ) {
                                 event.preventDefault();
                                 event.currentTarget.form?.requestSubmit();
                               }
@@ -705,8 +1487,10 @@ export function StudioCommentsPanel({
                               <button
                                 type="button"
                                 onClick={() => {
+                                  focusReviewRail();
                                   setReplyingThreadId(null);
                                   setReplyBody("");
+                                  pendingReplyIdRef.current = null;
                                 }}
                                 className={QUIET_BUTTON_CLASS}
                               >
@@ -715,7 +1499,7 @@ export function StudioCommentsPanel({
                               <button
                                 type="submit"
                                 disabled={!replyBody.trim()}
-                                className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
+                                className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-9"
                               >
                                 <Send size={12} aria-hidden />
                                 답글 등록
@@ -744,18 +1528,18 @@ export function StudioCommentsPanel({
                               className={`${FIELD_CLASS} min-w-0 flex-1`}
                             />
                             <div className="flex flex-wrap items-center gap-2">
-                              <button type="button" onClick={() => assignToCurrentActor(thread.id)} className={QUIET_BUTTON_CLASS}>
+                              <button type="button" onClick={() => void assignToCurrentActor(thread.id)} className={QUIET_BUTTON_CLASS}>
                                 나에게
                               </button>
                               {thread.assignee && (
-                                <button type="button" onClick={() => clearAssignee(thread.id)} className={QUIET_BUTTON_CLASS}>
+                                <button type="button" onClick={() => void clearAssignee(thread.id)} className={QUIET_BUTTON_CLASS}>
                                   배정 해제
                                 </button>
                               )}
                               <button
                                 type="submit"
                                 disabled={!assigneeName.trim()}
-                                className="inline-flex min-h-9 items-center rounded-lg bg-accent px-3 text-xs font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
+                                className="inline-flex min-h-11 items-center rounded-lg bg-accent px-3 text-xs font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-9"
                               >
                                 지정
                               </button>
@@ -779,9 +1563,8 @@ export function StudioCommentsPanel({
             </ol>
           )}
         </div>
-      </section>
-    </div>
+      </dialog>
   );
 
-  return createPortal(modal, globalThis.document.body);
+  return createPortal(reviewRail, globalThis.document.body);
 }
