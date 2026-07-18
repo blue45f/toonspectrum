@@ -241,7 +241,7 @@ import {
   preloadStudioBackground3D,
 } from "./studio-background-3d-loader";
 import { parseStudio3dTool } from "./studio-background-3d-metadata";
-import { studioBackgroundGradientColorStops } from "./studio-background-presets";
+import { studioBackgroundGradientColorStops } from "./studio-background-gradient-color-stops";
 import {
   planStudioBg3dLtLayers,
   preserveStudioBg3dLtSceneAnchorAfterRemoval,
@@ -13720,8 +13720,15 @@ function StudioCuttoonEditor() {
     setMobileHintDismissed(true);
     storeMobileHintDismissed();
   }
-  // 모바일 첫 사용 안내를 띄울지: 모바일 + 미해제 + 하이드레이션 완료 + 빠른시작 패널이 떠 있지 않을 때만.
-  const showMobileHint = isMobile && !mobileHintDismissed && workHydrated && !showQuickStart;
+  // 캔버스 transient surface priority: autosave > drawing feedback > first-use coach.
+  // Several independent floating notices used to cover the same mobile pixels at once.
+  const showMobileHint =
+    isMobile &&
+    !mobileHintDismissed &&
+    workHydrated &&
+    !showQuickStart &&
+    !hasAutosave &&
+    drawingShortcutNotice === null;
   function openQuickStartMenu(nextMenu: Extract<StudioMenu, "template" | "char" | "bubble">) {
     setTool("select");
     setSelectedId(null);
@@ -23730,7 +23737,9 @@ function StudioCuttoonEditor() {
         aria-hidden={!isMobile}
         className={cn(
           canvasOnlyMode && "hidden",
-          mobileImmersive && "shrink-0",
+          // Immersive mobile already exposes the same frequent actions in its 44px thumb dock.
+          // Removing the 4.7x-wide belt restores canvas height and eliminates undiscoverable scroll.
+          mobileImmersive && "max-lg:hidden",
           // Desktop: collapse belt (not -100vw fixed — that + filter made popovers unusable).
           "lg:pointer-events-none lg:absolute lg:left-0 lg:top-0 lg:z-[1] lg:h-0 lg:w-0 lg:overflow-visible lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none",
           // 트리거/숨은 호스트는 클릭 불필요(포털 팝오버는 body). 모바일은 정상 클릭.
@@ -24111,7 +24120,7 @@ function StudioCuttoonEditor() {
           dialogueBatchOpen={dialogueBatchOpen}
           dialogueTranslateOpen={dialogueTranslateOpen}
           drawingRef={drawingRef}
-          drawingShortcutNotice={drawingShortcutNotice}
+          drawingShortcutNotice={hasAutosave || showMobileHint ? null : drawingShortcutNotice}
           drawMode={drawMode}
           drawShape={drawShape}
           editing={editing}
@@ -33594,9 +33603,9 @@ const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
           <div
             role="toolbar"
             aria-label="선택 항목 빠른 작업"
-            className="fixed inset-x-2 bottom-[calc(6.45rem+env(safe-area-inset-bottom))] z-[53] mx-auto flex max-w-[34rem] items-center gap-1 overflow-x-auto rounded-2xl border border-line bg-panel/95 p-1.5 shadow-2xl backdrop-blur [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:hidden"
+            className="fixed inset-x-2 z-[53] mx-auto flex max-w-[34rem] items-center gap-1 overflow-x-auto rounded-2xl border border-line bg-panel/95 p-1.5 shadow-2xl backdrop-blur [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:hidden"
             style={{
-              bottom: `calc(6.45rem + env(safe-area-inset-bottom) + ${mobileKeyboardInset}px)`,
+              bottom: `calc(var(--studio-canvas-bottom-inset, 7rem) + 0.35rem + ${mobileKeyboardInset}px)`,
             }}
           >
             <div className="w-[4.75rem] shrink-0 px-2">
@@ -33650,9 +33659,10 @@ const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
         {showMobileHint && !mobileSheet && !quickActionsOpen && (
           <div
             role="status"
-            className="fixed inset-x-3 bottom-[calc(7rem+env(safe-area-inset-bottom))] z-[53] mx-auto flex max-w-[32rem] items-start gap-2.5 rounded-2xl border border-accent/30 bg-panel/95 p-3 shadow-2xl backdrop-blur motion-safe:animate-hud-in lg:hidden"
+            data-studio-canvas-transient="coach"
+            className="fixed inset-x-3 z-[53] mx-auto flex max-w-[32rem] items-start gap-2.5 rounded-2xl border border-accent/30 bg-panel/95 p-3 shadow-2xl backdrop-blur motion-safe:animate-hud-in lg:hidden"
             style={{
-              bottom: `calc(7rem + env(safe-area-inset-bottom) + ${mobileKeyboardInset}px)`,
+              bottom: `calc(var(--studio-canvas-bottom-inset, 7rem) + 0.5rem + ${mobileKeyboardInset}px)`,
             }}
           >
             <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent">
@@ -33729,14 +33739,14 @@ const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
             aria-label="브러시 설정"
             aria-modal={false}
             className={cn(
-              "fixed inset-x-0 bottom-[calc(7rem+env(safe-area-inset-bottom))] z-[54] mx-auto max-w-[34rem] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel/95 p-3 shadow-2xl backdrop-blur transition-all duration-200 ease-out lg:hidden",
+              "fixed inset-x-0 z-[54] mx-auto max-w-[34rem] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel/95 p-3 shadow-2xl backdrop-blur transition-all duration-200 ease-out lg:hidden",
               mobileSheet === "draw"
                 ? "pointer-events-auto translate-y-0 opacity-100"
                 : "pointer-events-none translate-y-3 opacity-0"
             )}
             inert={mobileSheet === "draw" ? undefined : true}
             style={{
-              bottom: `calc(7rem + env(safe-area-inset-bottom) + ${mobileKeyboardInset}px)`,
+              bottom: `calc(var(--studio-canvas-bottom-inset, 7rem) + ${mobileKeyboardInset}px)`,
               maxHeight: `min(56dvh, calc(100dvh - 8rem - env(safe-area-inset-bottom) - ${mobileKeyboardInset}px))`,
             }}
           >
@@ -34040,6 +34050,7 @@ const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
         {isMobile && (
           <nav
             aria-label="스튜디오 모바일 도구막대"
+            data-studio-mobile-editing-dock="true"
             className="fixed inset-x-0 bottom-0 z-[55] flex flex-col gap-1 border-t border-line bg-panel/95 pb-[max(0.35rem,env(safe-area-inset-bottom))] pl-[max(0.375rem,env(safe-area-inset-left))] pr-[max(0.375rem,env(safe-area-inset-right))] pt-1.5 backdrop-blur lg:hidden"
             style={{ bottom: mobileKeyboardInset }}
           >
@@ -35866,7 +35877,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
           {/* 색맹 시뮬레이션용 숨김 SVG filter defs — filter id 는 문서 전역 참조라 위치 무관, 정적이라 무조건 마운트 */}
           <StudioColorBlindFilterDefs />
           {/* Sketchbook/Krita/Concepts status — zoom HUD + tool metrics over canvas */}
-          {!canvasOnlyMode ? (
+          {!canvasOnlyMode && !isMobile ? (
             <StudioStatusBar
               className={cn(
                 tool === "draw" && !isMobile && "bottom-[4.75rem]",

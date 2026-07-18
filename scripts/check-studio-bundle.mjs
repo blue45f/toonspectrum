@@ -141,6 +141,36 @@ if (!fs.existsSync(manifestPath)) {
       );
     }
 
+    const eagerVoiceController = matchingEntries(
+      studioKeys,
+      /studio-voice-call(?!-model)/,
+    );
+    if (eagerVoiceController.length > 0) {
+      fail(
+        `optional WebRTC voice controller returned to the Studio static graph: ${eagerVoiceController.join(", ")}`,
+      );
+    }
+
+    const eagerBackgroundCatalog = matchingEntries(
+      studioKeys,
+      /studio-background-presets/,
+    );
+    if (eagerBackgroundCatalog.length > 0) {
+      fail(
+        `optional background preset catalog returned to the Studio static graph: ${eagerBackgroundCatalog.join(", ")}`,
+      );
+    }
+
+    const eagerFrameAnimationExport = matchingEntries(
+      studioKeys,
+      /(?:studio-frame-animation-export|studio-motion-export)/,
+    );
+    if (eagerFrameAnimationExport.length > 0) {
+      fail(
+        `optional frame-animation WebM runtime returned to the Studio static graph: ${eagerFrameAnimationExport.join(", ")}`,
+      );
+    }
+
     const eager3dRuntime = matchingEntries(
       studioKeys,
       /(?:studio-background-3d-primitives|StudioBackground3D|react-three-fiber|three\.module)/,

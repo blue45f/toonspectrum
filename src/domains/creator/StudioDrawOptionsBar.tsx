@@ -325,14 +325,28 @@ export function StudioDrawOptionsBar({
         data-studio-draw-options="true"
         data-studio-icon-first="true"
         className={cn(
-          "pointer-events-auto flex min-h-[3.25rem] flex-nowrap items-center gap-1.5 overflow-x-auto border-b border-line px-2 py-1",
-          "[scrollbar-width:thin] [scrollbar-color:oklch(0.42_0.02_70/0.4)_transparent]",
+          "pointer-events-auto flex min-h-[3.25rem] min-w-0 flex-nowrap items-center gap-1.5 overflow-hidden border-b border-line px-2 py-1",
           "bg-panel/95 backdrop-blur-sm",
           docked && "rounded-lg border shadow-[0_18px_48px_oklch(0.06_0.01_70/0.62)]"
         )}
       >
+        <div
+          data-studio-draw-options-primary="true"
+          data-studio-draw-options-scroll="visible"
+          role="group"
+          aria-label="핵심 그리기 도구: 모드, 브러시, 도형, 크기, 불투명도. 좌우로 스크롤할 수 있습니다."
+          className={cn(
+            "flex min-w-0 flex-1 flex-nowrap items-center gap-1.5 overflow-x-auto overflow-y-hidden",
+            "overscroll-x-contain [scrollbar-gutter:stable]"
+          )}
+        >
         {onSetDrawMode ? (
-          <div className="studio-opt-cluster shrink-0" role="group" aria-label="그리기 모드">
+          <div
+            className="studio-opt-cluster shrink-0"
+            role="group"
+            aria-label="그리기 모드"
+            data-studio-core-draw-control="mode"
+          >
             {(
               [
                 { id: "pen" as const, label: "펜", Icon: Pencil },
@@ -393,6 +407,7 @@ export function StudioDrawOptionsBar({
                 aria-haspopup="dialog"
                 aria-label={`현재 브러시 ${brushMeta?.name ?? brushId}, 브러시 라이브러리 열기`}
                 data-studio-brush-active-pill="true"
+                data-studio-core-draw-control="brush"
                 className={cn(
                   "flex h-9 max-w-[9.5rem] items-center gap-1.5 rounded-xl border px-2",
                   STUDIO_EASE,
@@ -435,6 +450,7 @@ export function StudioDrawOptionsBar({
               >
                 <button
                   type="button"
+                  data-studio-draw-secondary-action="favorite"
                   aria-pressed={isFavorite}
                   aria-label={isFavorite ? "즐겨찾기 해제" : "즐겨찾기 추가"}
                   onClick={() => onToggleFavoriteBrush(brushId)}
@@ -454,7 +470,10 @@ export function StudioDrawOptionsBar({
         ) : null}
 
         {drawMode === "shape" && onShapeKindChange ? (
-          <div className="flex min-w-0 max-w-[min(28rem,52vw)] shrink items-center gap-1">
+          <div
+            className="flex min-w-0 max-w-[min(28rem,52vw)] shrink items-center gap-1"
+            data-studio-core-draw-control="shape"
+          >
             <StudioShapePickerStrip
               activeKind={shapeKind}
               onSelect={onShapeKindChange}
@@ -504,7 +523,9 @@ export function StudioDrawOptionsBar({
 
         <span aria-hidden className="hidden h-5 w-px shrink-0 bg-line sm:block" />
 
-        <SizePreview size={strokeWidth} color={tipColor} opacity={brushOpacity} />
+        <span data-studio-draw-size-preview="true" className="contents">
+          <SizePreview size={strokeWidth} color={tipColor} opacity={brushOpacity} />
+        </span>
 
         <StudioToolHintTarget
           className="shrink-0"
@@ -515,7 +536,11 @@ export function StudioDrawOptionsBar({
             "brush-size"
           )}
         >
-          <label className="flex shrink-0 items-center gap-1 text-fg-3">
+          <label
+            data-studio-draw-primary-control="size"
+            data-studio-core-draw-control="size"
+            className="flex shrink-0 items-center gap-1 text-fg-3"
+          >
             <Circle size={12} strokeWidth={1.75} className="shrink-0 opacity-80" aria-hidden />
             <span className="sr-only">크기</span>
             <input
@@ -542,7 +567,11 @@ export function StudioDrawOptionsBar({
             "opacity"
           )}
         >
-          <label className="flex shrink-0 items-center gap-1 text-fg-3">
+          <label
+            data-studio-draw-primary-control="opacity"
+            data-studio-core-draw-control="opacity"
+            className="flex shrink-0 items-center gap-1 text-fg-3"
+          >
             <StudioOpacityGlyph opacity01={brushOpacity} />
             <span className="sr-only">불투명</span>
             <input
@@ -561,9 +590,16 @@ export function StudioDrawOptionsBar({
           </label>
         </StudioToolHintTarget>
 
-        {drawMode !== "eraser" ? (
-          <>
-            <span aria-hidden className="hidden h-5 w-px shrink-0 bg-line/80 sm:block" />
+        </div>
+
+        <div
+          data-studio-draw-options-end="true"
+          className={cn(
+            "ml-auto flex shrink-0 items-center gap-1 border-l border-line/70 bg-panel/95 pl-1.5 backdrop-blur-sm",
+            "shadow-[-10px_0_12px_-8px_oklch(0.12_0.02_70/0.55)]"
+          )}
+        >
+          {drawMode !== "eraser" ? (
             <StudioDualColorWell
               primary={color}
               secondary={secondaryColor}
@@ -572,46 +608,38 @@ export function StudioDrawOptionsBar({
               onSecondaryChange={onSecondaryColorChange}
               onSwap={onSwapColors}
             />
-          </>
-        ) : null}
+          ) : null}
 
-        {/* Advanced toggle — progressive disclosure */}
-        <StudioToolHintTarget
-          hint={studioToolHintFromLabel(
-            advancedOpen ? "세부 그리기 옵션 접기" : "세부 그리기 옵션",
-            advancedOpen
-              ? "브러시 프리셋·보정·필압·대칭·빠른 슬롯 행을 접어 캔버스 공간을 되찾습니다."
-              : "브러시 프리셋·손떨림 보정·필압 곡선·대칭·빠른 슬롯을 한 줄에서 정밀 조정합니다.",
-            undefined,
-            "stabilizer"
-          )}
-        >
-          <button
-            type="button"
-            aria-expanded={advancedOpen}
-            aria-controls="studio-draw-advanced"
-            onClick={() => setAdvancedOpen((v) => !v)}
-            aria-label={advancedOpen ? "세부 옵션 접기" : "세부 옵션 펼치기"}
-            data-studio-draw-advanced-toggle="true"
-            className={cn(
-              iconBtn,
-              "size-8",
+          {/* Explicit overflow: unlike a hidden horizontal scroll, this control is always pinned. */}
+          <StudioToolHintTarget
+            hint={studioToolHintFromLabel(
+              advancedOpen ? "세부 그리기 옵션 접기" : "세부 그리기 옵션",
               advancedOpen
-                ? "border-accent/50 bg-accent-soft text-accent"
-                : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
+                ? "브러시 프리셋·보정·필압·대칭·빠른 슬롯 행을 접어 캔버스 공간을 되찾습니다."
+                : "브러시 프리셋·손떨림 보정·필압 곡선·대칭·빠른 슬롯을 한 줄에서 정밀 조정합니다.",
+              undefined,
+              "stabilizer"
             )}
           >
-            {advancedOpen ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
-          </button>
-        </StudioToolHintTarget>
+            <button
+              type="button"
+              aria-expanded={advancedOpen}
+              aria-controls="studio-draw-advanced"
+              onClick={() => setAdvancedOpen((v) => !v)}
+              aria-label={advancedOpen ? "세부 옵션 접기" : "세부 옵션 펼치기"}
+              data-studio-draw-advanced-toggle="true"
+              className={cn(
+                iconBtn,
+                "size-8",
+                advancedOpen
+                  ? "border-accent/50 bg-accent-soft text-accent"
+                  : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
+              )}
+            >
+              {advancedOpen ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
+            </button>
+          </StudioToolHintTarget>
 
-        <div
-          data-studio-draw-options-end="true"
-          className={cn(
-            "sticky right-0 ml-auto flex shrink-0 items-center gap-1 border-l border-line/70 bg-panel/95 pl-1.5 backdrop-blur-sm",
-            "shadow-[-10px_0_12px_-8px_oklch(0.12_0.02_70/0.55)]"
-          )}
-        >
           {onToggleCanvasFlipH ? (
             <StudioToolHintTarget
               hint={studioToolHintFromLabel(

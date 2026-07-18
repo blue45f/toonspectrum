@@ -4,6 +4,8 @@
  * Pure data + builders (no DOM/Konva).
  */
 
+export { studioBackgroundGradientColorStops } from "./studio-background-gradient-color-stops";
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -572,23 +574,6 @@ export function planStudioBackgroundApply(
     presetId: preset.id,
     label: preset.label,
   };
-}
-
-/**
- * Convert N color stops into Konva `fillLinearGradientColorStops` flat array:
- * [0, c0, t1, c1, ..., 1, cLast]
- */
-export function studioBackgroundGradientColorStops(
-  stops: readonly string[] | null | undefined
-): Array<number | string> | null {
-  if (!stops || stops.length === 0) return null;
-  if (stops.length === 1) return [0, stops[0]!, 1, stops[0]!];
-  const out: Array<number | string> = [];
-  const last = stops.length - 1;
-  for (let i = 0; i < stops.length; i++) {
-    out.push(last === 0 ? 0 : i / last, stops[i]!);
-  }
-  return out;
 }
 
 /** CSS preview for solid/gradient tiles. */

@@ -7,6 +7,7 @@ import { StudioBrushLibrarySheet } from "./StudioBrushLibrarySheet";
 import { StudioDrawOptionsBar } from "./StudioDrawOptionsBar";
 
 const drawOptionsSource = readFileSync(new URL("./StudioDrawOptionsBar.tsx", import.meta.url), "utf8");
+const studioGlobalsSource = readFileSync(new URL("../../styles/globals.css", import.meta.url), "utf8");
 
 describe("StudioDrawOptionsBar", () => {
   it("renders a compact primary dock with continuous size, opacity, and smart-shape controls", () => {
@@ -75,6 +76,31 @@ describe("StudioDrawOptionsBar", () => {
     );
     expect(html).toContain("브러시 라이브러리");
     expect(html).toContain("네온");
+  });
+
+  it("keeps every core control reachable in a visible, keyboard-navigable narrow-dock scroller", () => {
+    const primaryIndex = drawOptionsSource.indexOf('data-studio-draw-options-primary="true"');
+    const utilityIndex = drawOptionsSource.indexOf('data-studio-draw-options-end="true"');
+    const advancedIndex = drawOptionsSource.indexOf('data-studio-draw-advanced-toggle="true"');
+
+    expect(primaryIndex).toBeGreaterThan(0);
+    expect(utilityIndex).toBeGreaterThan(primaryIndex);
+    expect(advancedIndex).toBeGreaterThan(utilityIndex);
+    expect(drawOptionsSource).toContain('data-studio-draw-options-scroll="visible"');
+    expect(drawOptionsSource).toContain('role="group"');
+    expect(drawOptionsSource).toContain("좌우로 스크롤할 수 있습니다");
+    expect(drawOptionsSource).toContain("overflow-x-auto overflow-y-hidden");
+    expect(drawOptionsSource).not.toContain(
+      'data-studio-draw-options-primary="true"\n          className="flex min-w-0 flex-1 flex-nowrap items-center gap-1.5 overflow-hidden"'
+    );
+    for (const control of ["mode", "brush", "shape", "size", "opacity"]) {
+      expect(drawOptionsSource).toContain(`data-studio-core-draw-control="${control}"`);
+    }
+    expect(studioGlobalsSource).toContain("container-name: studio-draw-options");
+    expect(studioGlobalsSource).toContain("@container studio-draw-options (max-width: 60rem)");
+    expect(studioGlobalsSource).toContain('[data-studio-draw-secondary-action="favorite"]');
+    expect(studioGlobalsSource).toContain('[data-studio-draw-options-primary="true"]::-webkit-scrollbar');
+    expect(studioGlobalsSource).toContain("scrollbar-width: auto");
   });
 
   it("gives high-frequency primary controls one rich coach target without native-title duplication", () => {

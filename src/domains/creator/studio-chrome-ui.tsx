@@ -712,6 +712,7 @@ export function StudioDualColorWell({
         <button
           key={swatch}
           type="button"
+          data-studio-recent-color="true"
           title={swatch}
           aria-label={`최근 색 ${swatch}`}
           onClick={() => onPrimaryChange(swatch)}
