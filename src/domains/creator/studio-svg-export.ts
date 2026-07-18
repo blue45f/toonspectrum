@@ -49,6 +49,15 @@ import {
   type StudioBrushDynamicsSettings,
 } from "./studio-brush-dynamics";
 import {
+  planStudioStampBrushDabs,
+  resolveStudioStampBrushKind,
+  resolveStudioStampBrushStyle,
+  stampJitter,
+  type StudioStampBrushDab,
+  type StudioStampBrushStyle,
+  type StudioStampBrushTuning,
+} from "./studio-brush-stamp-engine";
+import {
   studioDynamicBrushDabVariations,
 } from "./studio-brush-symmetry";
 import {
@@ -270,6 +279,8 @@ export interface SvgDrawElLike extends SvgElMeta {
   paintModel?: StudioStrokePaintModel;
   sampleSpacing?: number;
   stampPipeline?: "causal-walker-v2";
+  /** 스탬프 브러시 흐름·경도·최소 굵기 스냅샷. */
+  stamp?: StudioStampBrushTuning;
   watercolorPipeline?: "causal-walker-v2";
   tiltXs?: number[];
   tiltYs?: number[];
@@ -860,6 +871,54 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
   return parts.join("");
 }
 
+/** Canvas drawDab과 같은 하나의 논리 dab → 종류별 SVG 마크 직렬화. */
+function serializeStampBrushDabs(
+  ctx: ExportCtx,
+  style: StudioStampBrushStyle,
+  dabs: readonly StudioStampBrushDab[]
+): string {
+  if (dabs.length === 0) return "";
+  const color = escapeXml(style.color);
+
+  if (style.kind === "ink") {
+    const circles = dabs.map((dab) => (
+      `<circle cx="${fmt(dab.x)}" cy="${fmt(dab.y)}" r="${fmt(dab.radius)}" fill="${color}" opacity="${fmtDabOpacity(dab.alpha)}"/>`
+    )).join("");
+    return `<g data-stamp-brush="ink">${circles}</g>`;
+  }
+
+  if (style.kind === "pencil") {
+    const marks = dabs.map((dab) => {
+      // Canvas drawDab과 같은 salt/산식 — 주 dab 1개 + 종이 그레인 2개.
+      const jx = (stampJitter(dab.index, 11) - 0.5) * dab.radius * 0.5;
+      const jy = (stampJitter(dab.index, 23) - 0.5) * dab.radius * 0.5;
+      const primaryRadius = dab.radius * (0.82 + 0.18 * stampJitter(dab.index, 41));
+      const primaryOpacity = dab.alpha * (0.7 + 0.3 * stampJitter(dab.index, 37));
+      const grains = [0, 1].map((grain) => {
+        const gx = dab.x + (stampJitter(dab.index, 53 + grain) - 0.5) * dab.radius * 2.4;
+        const gy = dab.y + (stampJitter(dab.index, 67 + grain) - 0.5) * dab.radius * 2.4;
+        return `<circle cx="${fmt(gx)}" cy="${fmt(gy)}" r="${fmt(dab.radius * 0.2)}" opacity="${fmtDabOpacity(dab.alpha * 0.45)}"/>`;
+      }).join("");
+      return `<circle cx="${fmt(dab.x + jx)}" cy="${fmt(dab.y + jy)}" r="${fmt(primaryRadius)}" opacity="${fmtDabOpacity(primaryOpacity)}"/>${grains}`;
+    }).join("");
+    return `<g data-stamp-brush="pencil" fill="${color}">${marks}</g>`;
+  }
+
+  // Canvas의 inner radius(hardness×.85)까지 단색, 바깥에서 0으로 감쇠하는 방사 팁.
+  const gradientId = nextId(ctx, style.kind === "airbrush" ? "ssa" : "ssw");
+  const hardStop = fmt(Math.min(1, Math.max(0, style.hardness)) * 85);
+  ctx.defs.push(
+    `<radialGradient id="${gradientId}" cx="50%" cy="50%" r="50%"><stop offset="${hardStop}%" stop-color="${color}"/><stop offset="100%" stop-color="${color}" stop-opacity="0"/></radialGradient>`
+  );
+  const marks = dabs.map((dab) => {
+    const fill = `<circle cx="${fmt(dab.x)}" cy="${fmt(dab.y)}" r="${fmt(dab.radius)}" fill="url(#${gradientId})" opacity="${fmtDabOpacity(dab.alpha)}"/>`;
+    if (style.kind === "airbrush") return fill;
+    // 수채 웻엣지 링도 Canvas와 같은 반경·굵기·0.22 농도다.
+    return `${fill}<circle cx="${fmt(dab.x)}" cy="${fmt(dab.y)}" r="${fmt(dab.radius * 0.94)}" fill="none" stroke="${color}" stroke-width="${fmt(Math.max(0.35, dab.radius * 0.1))}" opacity="${fmtDabOpacity(dab.alpha * 0.22)}"/>`;
+  }).join("");
+  return `<g data-stamp-brush="${style.kind}">${marks}</g>`;
+}
+
 /** 자유곡선(브러시별) — 캔버스 렌더 경로와 같은 지오메트리 소스(studio-brush)를 쓴다. */
 function serializeFreehand(
   ctx: ExportCtx,
@@ -876,6 +935,7 @@ function serializeFreehand(
   const brushFamily = resolveStudioBrushRenderFamily(brush);
   const dynamicsPresetId = resolveStudioBrushDynamicsPresetId(brush);
   const dynamicBrush = dynamicsPresetId !== null;
+  const stampKind = resolveStudioStampBrushKind(brush);
   const renderSampleDistance = strokeRenderDistance(el.sampleSpacing);
 
   if (
@@ -889,6 +949,7 @@ function serializeFreehand(
     brushFamily !== "glitter" &&
     brushFamily !== "oil" &&
     brushFamily !== "pastel" &&
+    stampKind === null &&
     !dynamicBrush
   ) {
     const pressure = resolveStudioInkPressure(el.pressures?.[0], el.pressureModel);
@@ -901,6 +962,31 @@ function serializeFreehand(
       ? studioInkPressureRadius(strokeWidth, pressure, el.pressureModel)
       : Math.max(0.35, width / 2);
     return `<circle cx="${fmt(points[0])}" cy="${fmt(points[1])}" r="${fmt(radius)}" fill="${escapeXml(stroke)}"${opacityAttr}/>`;
+  }
+
+  if (stampKind) {
+    const style = resolveStudioStampBrushStyle(
+      stampKind,
+      { color: stroke, size: strokeWidth, opacity: strokeOpacity },
+      el.stamp
+    );
+    // v2는 이미 수락·안정화된 append-only 입력이다. legacy만 과거 평활화/압력 재표본을 유지한다.
+    const causal = el.stampPipeline === "causal-walker-v2";
+    const stampPoints = causal
+      ? points
+      : processFreehandPoints(points, renderSampleDistance);
+    const stampPressures = causal
+      ? el.pressures
+      : resampleStrokePressures(
+          el.pressures ?? [],
+          Math.floor(stampPoints.length / 2),
+          0.5
+        );
+    return serializeStampBrushDabs(
+      ctx,
+      style,
+      planStudioStampBrushDabs(style, stampPoints, stampPressures)
+    );
   }
 
   if (dynamicBrush && dynamicsPresetId) {
@@ -1068,10 +1154,16 @@ function serializeFreehand(
     const smoothed = processFreehandPoints(points, renderSampleDistance);
     const soft = (el.brush ?? "glow") === "soft-glow";
     const passes = planGlowBrushPasses(strokeWidth, soft);
-    const pathD = tensionPathD(smoothed, 0.35);
-    const layers = passes.map((pass) => (
-      `<path d="${pathD}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(Math.max(0.5, strokeWidth * pass.widthScale))}" stroke-linecap="round" stroke-linejoin="round" opacity="${fmt(pass.opacity)}" style="mix-blend-mode:screen"/>`
-    )).join("");
+    const layers = smoothed.length === 2
+      ? passes.map((pass) => (
+          `<circle cx="${fmt(smoothed[0])}" cy="${fmt(smoothed[1])}" r="${fmt(Math.max(0.25, strokeWidth * pass.widthScale / 2))}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(pass.opacity)}" style="mix-blend-mode:screen"/>`
+        )).join("")
+      : (() => {
+          const pathD = tensionPathD(smoothed, 0.35);
+          return passes.map((pass) => (
+            `<path d="${pathD}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(Math.max(0.5, strokeWidth * pass.widthScale))}" stroke-linecap="round" stroke-linejoin="round" opacity="${fmt(pass.opacity)}" style="mix-blend-mode:screen"/>`
+          )).join("");
+        })();
     return `<g${opacityAttr}>${layers}</g>`;
   }
 

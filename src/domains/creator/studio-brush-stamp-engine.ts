@@ -129,8 +129,37 @@ export interface StudioStampWalkerState {
   stampIndex: number;
 }
 
+/**
+ * Canvas와 SVG가 공유하는 논리 dab. 연필의 종이 그레인 점이나 수채의 웻엣지 링처럼
+ * 종류별 세부 마크는 이 한 dab에서 결정적으로 파생한다.
+ */
+export interface StudioStampBrushDab {
+  readonly x: number;
+  readonly y: number;
+  readonly radius: number;
+  readonly alpha: number;
+  /** 결정적 그레인 지터 시드. 시작 탭은 항상 0이다. */
+  readonly index: number;
+}
+
 export function beginStampWalker(x: number, y: number, pressure: number): StudioStampWalkerState {
   return { lastX: x, lastY: y, lastPressure: pressure, residual: 0, stampIndex: 0 };
+}
+
+function stampDotPlan(
+  style: StudioStampBrushStyle,
+  x: number,
+  y: number,
+  pressure: number,
+  index: number
+): StudioStampBrushDab {
+  return {
+    x,
+    y,
+    radius: pressureRadius(style, pressure),
+    alpha: clamp01(style.flow) * clamp01(style.opacity),
+    index,
+  };
 }
 
 function drawDab(
@@ -204,6 +233,23 @@ export function walkStampSegment(
   y: number,
   pressure: number
 ): void {
+  walkStampSegmentPlan(style, state, x, y, pressure, (dab) => {
+    drawDab(context, style, dab.x, dab.y, dab.radius, dab.alpha, dab.index);
+  });
+}
+
+/**
+ * 이전 점→새 점을 걷는 순수 계획 코어. Canvas 증분 렌더와 SVG 내보내기가 이 함수를
+ * 공유하므로 잔여 간격·잉크 속도 감쇠·지터 인덱스가 장치와 무관하게 동일하다.
+ */
+function walkStampSegmentPlan(
+  style: StudioStampBrushStyle,
+  state: StudioStampWalkerState,
+  x: number,
+  y: number,
+  pressure: number,
+  emit: (dab: StudioStampBrushDab) => void
+): void {
   const dx = x - state.lastX;
   const dy = y - state.lastY;
   const distance = Math.hypot(dx, dy);
@@ -221,7 +267,7 @@ export function walkStampSegment(
     const py = state.lastY + dy * t;
     const p = state.lastPressure + (pressure - state.lastPressure) * t;
     const radius = pressureRadius(style, p) * speedFactor;
-    drawDab(context, style, px, py, radius, baseAlpha, state.stampIndex);
+    emit({ x: px, y: py, radius, alpha: baseAlpha, index: state.stampIndex });
     state.stampIndex += 1;
     travelled += spacingOf(p);
   }
@@ -239,15 +285,39 @@ export function stampStrokeDot(
   y: number,
   pressure: number
 ): void {
-  drawDab(
-    context,
-    style,
-    x,
-    y,
-    pressureRadius(style, pressure),
-    clamp01(style.flow) * clamp01(style.opacity),
-    0
-  );
+  const dab = stampDotPlan(style, x, y, pressure, 0);
+  drawDab(context, style, dab.x, dab.y, dab.radius, dab.alpha, dab.index);
+}
+
+/**
+ * 전체 획을 논리 dab 배열로 계획한다. DOM/Canvas에 의존하지 않는 결정적 함수라 SVG,
+ * 서버 썸네일, 향후 WebGPU 파이프라인에서도 같은 footprint를 재사용할 수 있다.
+ */
+export function planStudioStampBrushDabs(
+  style: StudioStampBrushStyle,
+  points: readonly number[],
+  pressures: readonly number[] | undefined
+): StudioStampBrushDab[] {
+  const total = Math.floor(points.length / 2);
+  if (total === 0) return [];
+  const pressureAt = (index: number): number => pressures?.[index] ?? 0.5;
+  const dabs: StudioStampBrushDab[] = [
+    stampDotPlan(style, points[0]!, points[1]!, pressureAt(0), 0),
+  ];
+  if (total === 1) return dabs;
+  const state = beginStampWalker(points[0]!, points[1]!, pressureAt(0));
+  state.stampIndex = 1;
+  for (let index = 1; index < total; index += 1) {
+    walkStampSegmentPlan(
+      style,
+      state,
+      points[index * 2]!,
+      points[index * 2 + 1]!,
+      pressureAt(index),
+      (dab) => dabs.push(dab)
+    );
+  }
+  return dabs;
 }
 
 /**
@@ -260,13 +330,15 @@ export function drawStampStroke(
   points: readonly number[],
   pressures: readonly number[] | undefined
 ): void {
+  // Canvas 재생은 긴 획에서도 배열을 추가 할당하지 않고 스트리밍한다. planner와 같은
+  // walkStampSegmentPlan 코어를 쓰므로 출력 규약은 동일하다.
   const total = Math.floor(points.length / 2);
   if (total === 0) return;
   const pressureAt = (index: number): number => pressures?.[index] ?? 0.5;
   stampStrokeDot(context, style, points[0]!, points[1]!, pressureAt(0));
   if (total === 1) return;
   const state = beginStampWalker(points[0]!, points[1]!, pressureAt(0));
-  state.stampIndex = 1; // 시작 dot 이 인덱스 0 을 소비했다 — 증분 경로와 시드를 맞춘다.
+  state.stampIndex = 1;
   for (let index = 1; index < total; index += 1) {
     walkStampSegment(
       context,

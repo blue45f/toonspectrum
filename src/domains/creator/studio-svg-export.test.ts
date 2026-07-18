@@ -432,6 +432,131 @@ describe("도형 직렬화", () => {
     expect(skipped).toEqual([]);
   });
 
+  it("스탬프 4종 탭 — 각 엔진 고유의 dab·그레인·그라데이션·웻엣지를 보존한다", () => {
+    const cases = [
+      { brush: "ink-brush", kind: "ink", circles: 1 },
+      { brush: "airbrush-fine", kind: "airbrush", circles: 1 },
+      { brush: "pencil-grain", kind: "pencil", circles: 3 },
+      { brush: "wash-brush", kind: "watercolor", circles: 2 },
+    ] as const;
+    const outputs = cases.map(({ brush, kind, circles }) => {
+      const input = page([rectEl({
+        id: `stamp-tap-${kind}`,
+        kind: "freehand",
+        brush,
+        points: [12, 34],
+        pressures: [0.6],
+        stroke: "#315f73",
+        strokeWidth: 20,
+        opacity: 0.75,
+        fill: undefined,
+        stampPipeline: "causal-walker-v2",
+      })]);
+      const first = exportPageToSvg(input);
+      const repeated = exportPageToSvg(input);
+
+      expect(first.svg).toBe(repeated.svg);
+      expect(first.svg).toContain(`data-stamp-brush="${kind}"`);
+      expect((first.svg.match(/<circle\b/g) ?? [])).toHaveLength(circles);
+      expect(first.svg).not.toContain('<path d="M 12 34');
+      expect(first.skipped).toEqual([]);
+      return first.svg;
+    });
+
+    expect(new Set(outputs).size).toBe(4);
+    expect(outputs[1]).toContain("<radialGradient");
+    expect(outputs[2]).toContain('data-stamp-brush="pencil" fill="#315f73"');
+    expect(outputs[3]).toContain('fill="none" stroke="#315f73"');
+  });
+
+  it("스탬프 튜닝 — flow·hardness·minSize를 SVG 농도·팁 경도·탭 반경에 반영한다", () => {
+    const { svg } = exportPageToSvg(page([rectEl({
+      id: "stamp-tuning-svg",
+      kind: "freehand",
+      brush: "airbrush-fine",
+      points: [10, 20],
+      pressures: [0],
+      stroke: "#204060",
+      strokeWidth: 20,
+      opacity: 0.5,
+      fill: undefined,
+      stampPipeline: "causal-walker-v2",
+      stamp: { flow: 0.4, hardness: 0.8, minSize: 0.2 },
+    })]));
+
+    expect(svg).toContain('<stop offset="68%" stop-color="#204060"/>');
+    expect(svg).toContain('<circle cx="10" cy="20" r="2"');
+    expect(svg).toContain('opacity="0.2"');
+  });
+
+  it("스탬프 4종 스트로크 — 짧은 획보다 긴 획의 마크가 많고 출력은 결정적이다", () => {
+    const brushes = ["ink-brush", "airbrush-fine", "pencil-grain", "wash-brush"] as const;
+    for (const brush of brushes) {
+      const base = rectEl({
+        id: `stamp-length-${brush}`,
+        kind: "freehand",
+        brush,
+        pressures: [0.35, 0.8],
+        stroke: "#4a3020",
+        strokeWidth: 14,
+        fill: undefined,
+        stampPipeline: "causal-walker-v2",
+      });
+      const short = exportPageToSvg(page([{ ...base, points: [4, 8, 20, 8] }])).svg;
+      const longInput = page([{ ...base, points: [4, 8, 180, 8] }]);
+      const long = exportPageToSvg(longInput).svg;
+      const repeated = exportPageToSvg(longInput).svg;
+
+      expect((long.match(/<circle\b/g) ?? []).length).toBeGreaterThan(
+        (short.match(/<circle\b/g) ?? []).length
+      );
+      expect(long).toBe(repeated);
+    }
+  });
+
+  it("causal 스탬프는 raw 급회전을 보존하고 legacy 스탬프만 과거 평활화를 유지한다", () => {
+    const base = rectEl({
+      id: "stamp-stream-contract",
+      kind: "freehand",
+      brush: "airbrush-fine",
+      points: [0, 0, 0, 10, 10, 10],
+      pressures: [0.3, 0.6, 0.9],
+      sampleSpacing: 128,
+      stroke: "#3f6280",
+      strokeWidth: 10,
+      fill: undefined,
+    });
+    const legacy = exportPageToSvg(page([base])).svg;
+    const causalInput = page([{ ...base, stampPipeline: "causal-walker-v2" }]);
+    const causal = exportPageToSvg(causalInput).svg;
+
+    expect(causal).toBe(exportPageToSvg(causalInput).svg);
+    expect(causal).not.toBe(legacy);
+    expect(causal).toMatch(/<circle cx="0" cy="[1-9][^"]*"/);
+    expect(legacy).not.toMatch(/<circle cx="0" cy="[1-9][^"]*"/);
+  });
+
+  it("글로우 탭 — 경로가 아닌 동심 원 레이어로 한 번의 클릭도 보이게 내보낸다", () => {
+    for (const brush of ["glow", "soft-glow"] as const) {
+      const input = page([rectEl({
+        id: `glow-tap-${brush}`,
+        kind: "freehand",
+        brush,
+        points: [25, 35],
+        stroke: "#55ccff",
+        strokeWidth: 16,
+        opacity: 0.8,
+        fill: undefined,
+      })]);
+      const first = exportPageToSvg(input).svg;
+
+      expect(first).toBe(exportPageToSvg(input).svg);
+      expect((first.match(/<circle cx="25" cy="35"/g) ?? []).length).toBeGreaterThan(1);
+      expect(first).toContain("mix-blend-mode:screen");
+      expect(first).not.toContain('<path d="M 25 35');
+    }
+  });
+
   it("수채 번짐 — 결정적 core/diffuse dab과 방사 그라데이션을 보존한다", () => {
     const watercolor = rectEl({
       id: "watercolor-svg-1",
@@ -563,11 +688,12 @@ describe("도형 직렬화", () => {
       brushDynamics: ellipseDynamics("airbrush"),
     })]));
 
-    // default opacity .3×.25, flow .18×.35, toolbar .7 = .0033075. 부동소수점의 마지막
-    // 반올림 방향과 무관하게 두 자리 좌표 포맷의 0이 아니라 실제 저농도를 유지해야 한다.
+    // visible-tap default: opacity .65×.4, flow .48×.45, toolbar .7 = .039312.
+    // 부동소수점의 마지막 반올림 방향과 무관하게 두 자리 좌표 포맷의 0이 아니라 실제
+    // 저농도를 유지해야 한다.
     const serializedOpacity = Number(/<ellipse [^>]*opacity="([0-9.]+)"/.exec(svg)?.[1]);
     expect(serializedOpacity).toBeGreaterThan(0);
-    expect(serializedOpacity).toBeCloseTo(0.3 * 0.25 * 0.18 * 0.35 * 0.7, 5);
+    expect(serializedOpacity).toBeCloseTo(0.65 * 0.4 * 0.48 * 0.45 * 0.7, 5);
     expect(svg).not.toContain('opacity="0"');
   });
 

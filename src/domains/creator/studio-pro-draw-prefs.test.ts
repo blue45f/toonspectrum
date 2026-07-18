@@ -19,14 +19,24 @@ describe("studio pro draw prefs", () => {
       brushId: "marker",
       strokeWidth: 16,
       brushOpacity: 0.6,
-      color: "#112233",
+      color: "#abcdef",
     });
     expect(applyBrushPresetWithLocks(preset, { sizeLocked: true, opacityLocked: true }, current)).toEqual({
       brushId: "marker",
       strokeWidth: 4,
       brushOpacity: 0.9,
-      color: "#112233",
+      color: "#abcdef",
     });
+  });
+
+  it("treats a special brush default color as preview metadata only", () => {
+    expect(
+      applyBrushPresetWithLocks(
+        { id: "star-dust", defaultWidth: 18, defaultOpacity: 0.9, defaultColor: "#f8fafc" },
+        { sizeLocked: false, opacityLocked: false },
+        { strokeWidth: 6, brushOpacity: 1, color: "#7c3aed" }
+      ).color
+    ).toBe("#7c3aed");
   });
 
   it("remembers recent and favorite built-in brushes", () => {

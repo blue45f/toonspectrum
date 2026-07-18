@@ -289,6 +289,7 @@ import {
   markBrushUsedWithResult,
   restoreDeletedBrush,
   type DeletedBrushRecord,
+  type StudioBrushStampTuning,
   type StudioBrushSnapshot,
   type StudioSavedBrush,
 } from "./studio-brush-library";
@@ -435,11 +436,7 @@ import {
   applyCropAspect,
   beginCropDrag,
   cropAspectRatio,
-  cropHandlePoints,
   cropHitTolerance,
-  cropRectLocalPx,
-  cropShadeRects,
-  cropThirdsLines,
   hitTestCropHandle,
   initialCropRect,
   isCropRectNoop,
@@ -487,12 +484,15 @@ import {
   STUDIO_DRAW_SHAPE_PICKER_KINDS,
   studioDrawHudToolLabel,
   studioPressureCurveHudLabel,
-  studioPressureHudRatio,
   studioShapeFillHudLabel,
   studioShapeKindLabel,
   studioStabilizerHudLabel,
   studioSymmetryHudLabel,
 } from "./studio-draw-hud";
+import {
+  STUDIO_BRUSH_OPACITY_RANGE,
+  STUDIO_BRUSH_SIZE_RANGE,
+} from "./studio-draw-ux";
 import {
   adjustStudioBrushOpacity,
   adjustStudioBrushWidth,
@@ -556,7 +556,6 @@ import {
   insertFrame,
   MAX_ANIM_FRAMES,
   onionSkinLayers,
-  type OnionSkinLayer,
   type OnionSkinSettings,
   type StudioAnimFrame,
 } from "./studio-frame-animation";
@@ -675,7 +674,6 @@ import {
   StudioLiveInkPredictionRenderer,
   studioLiveInkFastOverlaySupportsStyle,
   type StudioLiveInkStrokeStyle,
-  type StudioLiveInkSurface,
 } from "./studio-live-ink-overlay";
 import {
   canBeginStudioLiveMutation,
@@ -730,7 +728,6 @@ import {
   NODE_EDIT_DEFAULT_MAX_HANDLES,
   NODE_EDIT_DEFAULT_MIN_SPACING_PX,
   NODE_EDIT_WIDTH_DRAG_RANGE_PX,
-  pressureAt,
   updateNodeDragMove,
   updateNodeDragWidth,
   withPointMoved,
@@ -927,7 +924,6 @@ import {
   applySelectionContentTransformToCanvas,
   beginPolyLassoSession,
   beginSelectionDrag,
-  brushStrokePreview,
   buildSelectionMaskPlan,
   canvasPointToNormalized,
   commitPolyLassoSession,
@@ -938,7 +934,6 @@ import {
   isSelectionAdjustNoop,
   isSelectionContentTransformNoop,
   isSelectionUsable,
-  marchingAntsPasses,
   normalizedPointToCanvas,
   planSelectionAdjust,
   polyLassoCloseToStart,
@@ -950,7 +945,6 @@ import {
   selectionBoundsNorm,
   SELECTION_BRUSH_RADIUS_DEFAULT,
   setSelectionFeather,
-  subpathOutlinePoints,
   toggleSelectionInvert,
   transformSelectionMarquee,
   translateSelection,
@@ -1220,6 +1214,7 @@ import type { StudioBackground3DInsertResult } from "./StudioBackground3D";
 import type { StudioColorPopoverProps } from "./StudioColorPopover";
 import type { StudioExportMenuPanelProps } from "./StudioExportMenuPanel";
 import type { StudioIntegrationsSettingsPanelProps } from "./StudioIntegrationsSettingsPanel";
+import type { StudioLivePressureStore } from "./StudioLiveInkHosts";
 import type { StudioMainMenuGroup } from "./StudioMainMenu";
 import type { PublishContext } from "./StudioPublishContextBanner";
 import type { StudioStockImagePanelProps } from "./StudioStockImagePanel";
@@ -1496,6 +1491,46 @@ const StudioDrawOptionsBar = lazyRetry(
   () => import("./StudioDrawOptionsBar").then((mod) => ({ default: mod.StudioDrawOptionsBar })),
   "StudioDrawOptionsBar"
 );
+const StudioUnifiedBrushPicker = lazyRetry(
+  () => import("./StudioUnifiedBrushPicker").then((mod) => ({ default: mod.StudioUnifiedBrushPicker })),
+  "StudioUnifiedBrushPicker"
+);
+const StudioSelectionAntsOverlay = lazyRetry(
+  () => import("./StudioSelectionOverlays").then((mod) => ({ default: mod.StudioSelectionAntsOverlay })),
+  "StudioSelectionAntsOverlay"
+);
+const StudioCropOverlay = lazyRetry(
+  () => import("./StudioSelectionOverlays").then((mod) => ({ default: mod.StudioCropOverlay })),
+  "StudioCropOverlay"
+);
+const StudioNodeEditOverlay = lazyRetry(
+  () => import("./StudioSelectionOverlays").then((mod) => ({ default: mod.StudioNodeEditOverlay })),
+  "StudioNodeEditOverlay"
+);
+const StudioBubbleShapeOverlay = lazyRetry(
+  () => import("./StudioSelectionOverlays").then((mod) => ({ default: mod.StudioBubbleShapeOverlay })),
+  "StudioBubbleShapeOverlay"
+);
+const StudioOnionSkinImage = lazyRetry(
+  () => import("./StudioSelectionOverlays").then((mod) => ({ default: mod.StudioOnionSkinImage })),
+  "StudioOnionSkinImage"
+);
+const StudioLiveInkOverlayHost = lazyRetry(
+  () => import("./StudioLiveInkHosts").then((mod) => ({ default: mod.StudioLiveInkOverlayHost })),
+  "StudioLiveInkOverlayHost"
+);
+const StudioLiveStampOverlayHost = lazyRetry(
+  () => import("./StudioLiveInkHosts").then((mod) => ({ default: mod.StudioLiveStampOverlayHost })),
+  "StudioLiveStampOverlayHost"
+);
+const StudioLiveInkPredictionHost = lazyRetry(
+  () => import("./StudioLiveInkHosts").then((mod) => ({ default: mod.StudioLiveInkPredictionHost })),
+  "StudioLiveInkPredictionHost"
+);
+const StudioLivePressureHudPill = lazyRetry(
+  () => import("./StudioLiveInkHosts").then((mod) => ({ default: mod.StudioLivePressureHudPill })),
+  "StudioLivePressureHudPill"
+);
 const loadStudioBrushStudio = () => import("./StudioBrushStudio");
 const StudioBrushStudio = lazyRetry(
   () => loadStudioBrushStudio().then((mod) => ({ default: mod.StudioBrushStudio })),
@@ -1510,10 +1545,6 @@ const StudioShapePickerGrid = lazyRetry(
   () => import("./studio-creative-visuals").then((mod) => ({ default: mod.StudioShapePickerGrid })),
   "StudioShapePickerGrid"
 );
-const StudioPressureHudMeter = lazyRetry(
-  () => import("./studio-creative-visuals").then((mod) => ({ default: mod.StudioPressureHudMeter })),
-  "StudioPressureHudMeter"
-);
 const StudioSelectOptionsBar = lazyRetry(
   () => import("./StudioSelectOptionsBar").then((mod) => ({ default: mod.StudioSelectOptionsBar })),
   "StudioSelectOptionsBar"
@@ -1522,6 +1553,7 @@ const StudioBrushLibraryPanel = lazyRetry(
   () => import("./StudioBrushLibraryPanel").then((mod) => ({ default: mod.StudioBrushLibraryPanel })),
   "StudioBrushLibraryPanel"
 );
+
 const BRUSH_DELETE_UNDO_MS = 10_000;
 /**
  * handleSave가 페이지마다 스테이지를 재캡처하는 무거운 경로라 손을 놓은 지 한참 지난 뒤에만
@@ -1529,6 +1561,17 @@ const BRUSH_DELETE_UNDO_MS = 10_000;
  * 겹치지 않게 한다.
  */
 const STUDIO_SERVER_AUTOSAVE_IDLE_MS = 45_000;
+
+function defaultStampTuningForBrushId(brushId: string): StudioBrushStampTuning | null {
+  const kind = resolveStudioStampBrushKind(brushId);
+  if (!kind) return null;
+  const defaults = STUDIO_STAMP_BRUSH_DEFAULTS[kind];
+  return {
+    flow: defaults.flow,
+    hardness: defaults.hardness,
+    minSize: defaults.minSizeRatio,
+  };
+}
 
 interface PendingBrushDelete {
   id: string;
@@ -2991,121 +3034,6 @@ function drawStudioCausalInkDabs(
   fillStudioCausalInkDabs(context, plan.dabs, strokeColor, paintModel);
 }
 
-/** 증분 라이브 잉크 표면 — 스크롤/줌 변화만 React 로 동기화하고 픽셀은 임페러티브. */
-const StudioLiveInkOverlayHost = memo(function StudioLiveInkOverlayHost({
-  renderer,
-  left,
-  top,
-  width,
-  height,
-  documentScale,
-  documentWidth,
-  flipX,
-}: StudioLiveInkSurface & { renderer: StudioLiveInkOverlayRenderer }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  useLayoutEffect(() => {
-    renderer.attach(canvasRef.current);
-    return () => renderer.attach(null);
-  }, [renderer]);
-  useLayoutEffect(() => {
-    renderer.setSurface({ left, top, width, height, documentScale, documentWidth, flipX });
-  });
-  return (
-    <canvas
-      ref={canvasRef}
-      aria-hidden="true"
-      data-studio-live-ink-overlay="true"
-      className="pointer-events-none absolute z-10"
-      style={{ left, top, width, height }}
-    />
-  );
-});
-
-/** 저투명 스탬프 dab을 과거 픽셀 재계산 없이 누적하는 독립 표면. */
-const StudioLiveStampOverlayHost = memo(function StudioLiveStampOverlayHost({
-  renderer,
-  left,
-  top,
-  width,
-  height,
-  documentScale,
-  documentWidth,
-  flipX,
-}: StudioLiveInkSurface & { renderer: StudioLiveStampOverlayRenderer }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  useLayoutEffect(() => {
-    renderer.attach(canvasRef.current);
-    return () => renderer.attach(null);
-  }, [renderer]);
-  useLayoutEffect(() => {
-    renderer.setSurface({ left, top, width, height, documentScale, documentWidth, flipX });
-  });
-  return (
-    <canvas
-      ref={canvasRef}
-      aria-hidden="true"
-      data-studio-live-stamp-overlay="true"
-      className="pointer-events-none absolute z-10"
-      style={{ left, top, width, height }}
-    />
-  );
-});
-
-/** 교체 가능한 예측 꼬리 전용 표면 — 확정 잉크 canvas와 물리적으로 분리한다. */
-const StudioLiveInkPredictionHost = memo(function StudioLiveInkPredictionHost({
-  renderer,
-  left,
-  top,
-  width,
-  height,
-  documentScale,
-  documentWidth,
-  flipX,
-}: StudioLiveInkSurface & { renderer: StudioLiveInkPredictionRenderer }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  useLayoutEffect(() => {
-    renderer.attach(canvasRef.current);
-    return () => renderer.attach(null);
-  }, [renderer]);
-  useLayoutEffect(() => {
-    renderer.setSurface({ left, top, width, height, documentScale, documentWidth, flipX });
-  });
-  return (
-    <canvas
-      ref={canvasRef}
-      aria-hidden="true"
-      data-studio-live-ink-prediction="true"
-      className="pointer-events-none absolute z-[11]"
-      style={{ left, top, width, height }}
-    />
-  );
-});
-
-/** 프레임 단위 필압 통지용 미니 스토어 — StudioPage 리렌더 없이 HUD 미터만 갱신한다. */
-interface StudioLivePressureStore {
-  value: number | null;
-  listeners: Set<() => void>;
-}
-
-function StudioLivePressureHudPill({ store }: { store: StudioLivePressureStore }) {
-  const pressure = useSyncExternalStore(
-    (onStoreChange) => {
-      store.listeners.add(onStoreChange);
-      return () => store.listeners.delete(onStoreChange);
-    },
-    () => store.value
-  );
-  const ratio = studioPressureHudRatio(pressure);
-  if (ratio === null) return null;
-  return (
-    <StudioHudPill title="실시간 필압" accent>
-      <Suspense fallback={null}>
-        <StudioPressureHudMeter ratio={ratio} />
-      </Suspense>
-    </StudioHudPill>
-  );
-}
-
 /**
  * 다이렉트 라이브 초안 대상인지 — StudioDrawNode 의 Default(pen/marker/eraser) 브랜치와 정확히
  * 같은 집합만 참이어야 미리보기가 커밋과 픽셀 단위로 일치한다. 지우개는 모든 브러시에서 Default
@@ -3800,18 +3728,31 @@ const StudioDrawNode = memo(function StudioDrawNode({
             return (
               <Group key={index} opacity={opacity} listening={false}>
                 {passes.map((pass, passIndex) => (
-                  <Line
-                    key={passIndex}
-                    points={renderPath.points}
-                    stroke={stroke}
-                    strokeWidth={Math.max(0.5, strokeWidth * pass.widthScale)}
-                    opacity={pass.opacity}
-                    lineCap="round"
-                    lineJoin="round"
-                    tension={renderPath.tension}
-                    globalCompositeOperation="lighter"
-                    listening={false}
-                  />
+                  renderPath.points.length === 2 ? (
+                    <KCircle
+                      key={passIndex}
+                      x={renderPath.points[0]}
+                      y={renderPath.points[1]}
+                      radius={Math.max(0.25, strokeWidth * pass.widthScale * 0.5)}
+                      fill={stroke}
+                      opacity={pass.opacity}
+                      globalCompositeOperation="lighter"
+                      listening={false}
+                    />
+                  ) : (
+                    <Line
+                      key={passIndex}
+                      points={renderPath.points}
+                      stroke={stroke}
+                      strokeWidth={Math.max(0.5, strokeWidth * pass.widthScale)}
+                      opacity={pass.opacity}
+                      lineCap="round"
+                      lineJoin="round"
+                      tension={renderPath.tension}
+                      globalCompositeOperation="lighter"
+                      listening={false}
+                    />
+                  )
                 ))}
               </Group>
             );
@@ -4510,318 +4451,6 @@ function cachedBuildImageFilters(el: ImageEl, key: string, mod: StudioKonvaFilte
   }
   imageFilterBuildCache.set(key, built);
   return built;
-}
-
-/** 선택 결합 모드별 드래그/드래프트 미리보기 색 — 합치기=보라, 빼기=적, 교집합=하늘. */
-function selectionModePreviewColors(mode: SelectionCombineMode): { stroke: string; fill: string } {
-  if (mode === "subtract") return { stroke: "rgba(244, 63, 94, 0.55)", fill: "rgba(244, 63, 94, 0.12)" };
-  if (mode === "intersect") return { stroke: "rgba(14, 165, 233, 0.55)", fill: "rgba(14, 165, 233, 0.12)" };
-  return { stroke: "rgba(124, 92, 252, 0.5)", fill: "rgba(124, 92, 252, 0.10)" };
-}
-
-// 픽셀 선택 마칭앤츠 오버레이 — 자체 RAF 로 대시 오프셋만 갱신해 StudioPage 전체 리렌더 없이
-// 자기 자신(전용 Layer 안 소수 노드)만 다시 그린다. 오프셋은 경과시간의 순수 함수(결정적).
-function StudioSelectionAntsOverlay({
-  selection,
-  drag,
-  polyDraft,
-  frame,
-  scale,
-}: {
-  selection: PixelSelection | null;
-  drag: SelectionDragState | null;
-  /** 다각형 올가미 진행 중 — 열린 폴리라인 + 고무줄(hover) + 꼭짓점 점. */
-  polyDraft?: { points: SelPoint[]; hover: SelPoint | null; mode: SelectionCombineMode } | null;
-  frame: SelectionFrame;
-  scale: number;
-}) {
-  const [elapsedMs, setElapsedMs] = useState(0);
-  useEffect(() => {
-    const start = performance.now();
-    let raf = 0;
-    const tick = (now: number) => {
-      // 50ms(20fps) 양자화 — 같은 값이면 setState 가 리렌더를 건너뛴다(고전 마칭앤츠 감성 + 절전).
-      setElapsedMs(Math.floor((now - start) / 50) * 50);
-      raf = globalThis.requestAnimationFrame(tick);
-    };
-    raf = globalThis.requestAnimationFrame(tick);
-    return () => globalThis.cancelAnimationFrame(raf);
-  }, []);
-
-  const passes = marchingAntsPasses(elapsedMs, scale);
-  const size = { width: frame.width, height: frame.height };
-  // 브러시 드래그는 마칭앤츠 폴리곤이 아니라 반투명 라운드 획(미리보기=마스크 결과 일치)으로 그린다.
-  const brushDrag = drag?.tool === "brush" ? brushStrokePreview(drag.points, drag.brushRadius, size) : null;
-  const dragPoints =
-    drag && drag.tool !== "brush" && drag.points.length >= 2
-      ? subpathOutlinePoints({ mode: drag.mode, points: drag.points }, size)
-      : null;
-  const dragColors = selectionModePreviewColors(drag?.mode ?? "add");
-  const polyDraftPoints =
-    polyDraft && polyDraft.points.length > 0
-      ? subpathOutlinePoints(
-          {
-            mode: polyDraft.mode,
-            points: polyDraft.hover ? [...polyDraft.points, polyDraft.hover] : polyDraft.points,
-          },
-          size
-        )
-      : null;
-  const polyColors = selectionModePreviewColors(polyDraft?.mode ?? "add");
-  const vertexR = 3.5 / scale;
-  return (
-    <Group x={frame.x} y={frame.y} rotation={frame.rotation ?? 0} listening={false}>
-      {selection?.subpaths.map((sp, i) => {
-        // 브러시 서브패스는 라운드 획으로(닫힌 폴리곤 앤츠는 궤적을 왜곡).
-        if (sp.kind === "brush") {
-          const stroke = brushStrokePreview(sp.points, sp.radius, size);
-          if (!stroke) return null;
-          return passes.map((pass, j) => (
-            <Line
-              key={`ants-brush-${i}-${j}`}
-              points={stroke.points}
-              stroke={pass.stroke}
-              strokeWidth={stroke.strokeWidth}
-              lineCap="round"
-              lineJoin="round"
-              opacity={j === 0 ? 0.9 : 0.5}
-            />
-          ));
-        }
-        const pts = subpathOutlinePoints(sp, size);
-        return passes.map((pass, j) => (
-          <Line
-            key={`ants-${i}-${j}`}
-            points={pts}
-            closed
-            stroke={pass.stroke}
-            strokeWidth={pass.strokeWidth}
-            dash={pass.dash ?? undefined}
-            dashOffset={pass.dashOffset}
-          />
-        ));
-      })}
-      {/* 반전 선택은 이미지 테두리에도 앤츠를 둘러 "바깥이 선택됨"을 표시한다. */}
-      {selection?.invert &&
-        passes.map((pass, j) => (
-          <Rect
-            key={`ants-inv-${j}`}
-            x={0}
-            y={0}
-            width={frame.width}
-            height={frame.height}
-            stroke={pass.stroke}
-            strokeWidth={pass.strokeWidth}
-            dash={pass.dash ?? undefined}
-            dashOffset={pass.dashOffset}
-          />
-        ))}
-      {/* 진행 중 브러시 드래그 — 반투명 라운드 획(결과 마스크와 동일 도형). */}
-      {brushDrag && (
-        <Line
-          points={brushDrag.points}
-          stroke={dragColors.stroke}
-          strokeWidth={brushDrag.strokeWidth}
-          lineCap="round"
-          lineJoin="round"
-        />
-      )}
-      {/* 진행 중 폴리곤 드래그 미리보기 — 합치기=보라, 빼기=적, 교집합=하늘 반투명 채움 + 앤츠. */}
-      {dragPoints && (
-        <>
-          <Line points={dragPoints} closed fill={dragColors.fill} />
-          {passes.map((pass, j) => (
-            <Line
-              key={`ants-drag-${j}`}
-              points={dragPoints}
-              closed
-              stroke={pass.stroke}
-              strokeWidth={pass.strokeWidth}
-              dash={pass.dash ?? undefined}
-              dashOffset={pass.dashOffset}
-            />
-          ))}
-        </>
-      )}
-      {/* 다각형 올가미 초안 — 열린 폴리라인 + 고무줄 + 꼭짓점(닫히기 전). */}
-      {polyDraftPoints && polyDraft && (
-        <>
-          <Line
-            points={polyDraftPoints}
-            closed={false}
-            stroke={polyColors.stroke}
-            strokeWidth={1.5 / scale}
-            lineJoin="round"
-            lineCap="round"
-          />
-          {polyDraft.points.map((p, i) => (
-            <KCircle
-              key={`poly-v-${i}`}
-              x={p.x * size.width}
-              y={p.y * size.height}
-              radius={i === 0 && polyDraft.points.length >= 3 ? vertexR * 1.35 : vertexR}
-              fill={i === 0 ? polyColors.stroke : "rgba(255,255,255,0.9)"}
-              stroke={polyColors.stroke}
-              strokeWidth={1 / scale}
-            />
-          ))}
-        </>
-      )}
-    </Group>
-  );
-}
-
-// 크롭 오버레이 — 크롭 모드 중 이미지 위에 크롭 rect(바깥 어둡게 마스킹 + 3분할선 + 8핸들)를
-// 그린다. 기하는 studio-crop 순수 헬퍼가 계산하고 여기서는 Konva 노드로 그리기만 한다.
-// listening=false — 포인터는 Stage 핸들러(onStageDown/Move/Up)가 히트테스트로 처리한다.
-function StudioCropOverlay({ rect, frame, scale }: { rect: CropRect; frame: SelectionFrame; scale: number }) {
-  const size = { width: frame.width, height: frame.height };
-  const border = cropRectLocalPx(rect, size);
-  const handleSide = 9 / scale; // 화면 9px 사각 핸들
-  return (
-    <Group x={frame.x} y={frame.y} rotation={frame.rotation ?? 0} listening={false}>
-      {cropShadeRects(rect, size).map((s, i) => (
-        <Rect key={`crop-shade-${i}`} x={s.x} y={s.y} width={s.w} height={s.h} fill="rgba(9, 9, 11, 0.55)" />
-      ))}
-      {cropThirdsLines(rect, size).map((pts, i) => (
-        <Line key={`crop-third-${i}`} points={pts} stroke="rgba(255, 255, 255, 0.4)" strokeWidth={1 / scale} />
-      ))}
-      {/* 이중 테두리 — 어두운 밑줄 + 흰 실선이라 어떤 배경에서도 보인다. */}
-      <Rect
-        x={border.x}
-        y={border.y}
-        width={border.w}
-        height={border.h}
-        stroke="rgba(24, 24, 27, 0.6)"
-        strokeWidth={3 / scale}
-      />
-      <Rect x={border.x} y={border.y} width={border.w} height={border.h} stroke="#ffffff" strokeWidth={1.5 / scale} />
-      {cropHandlePoints(rect, size).map((hd) => (
-        <Rect
-          key={`crop-handle-${hd.id}`}
-          x={hd.x - handleSide / 2}
-          y={hd.y - handleSide / 2}
-          width={handleSide}
-          height={handleSide}
-          fill="#ffffff"
-          stroke="#18181b"
-          strokeWidth={1 / scale}
-          cornerRadius={2 / scale}
-        />
-      ))}
-    </Group>
-  );
-}
-
-// 벡터 노드 편집 핸들 — 이동 모드는 흰 원, 굵기 모드는 필압에 비례해 커지는 보라 원(굵기를
-// 시각적으로 미리 보여준다). 드래그 중인 핸들은 항상 보라로 강조.
-function StudioNodeEditOverlay({
-  handles,
-  tool,
-  pressures,
-  scale,
-  activeHandleIndex,
-}: {
-  handles: NodeEditHandle[];
-  tool: NodeEditTool;
-  pressures: number[] | undefined;
-  scale: number;
-  activeHandleIndex: number | null;
-}) {
-  return (
-    <Group listening={false}>
-      {handles.map((h) => {
-        const isActive = activeHandleIndex === h.pointIndex;
-        const r = tool === "width" ? (4 + pressureAt(pressures, h.pointIndex) * 8) / scale : 5 / scale;
-        // "스무딩" 은 핸들 크기로 표현할 스칼라가 없다(강도는 도구 전역 값이지 핸들별 값이 아니다)
-        // — 색만 청록(#14b8a6)으로 구분해 "굵기"(보라)와 헷갈리지 않게 한다.
-        const fill = isActive
-          ? tool === "smooth"
-            ? "#0f766e"
-            : "#7c5cfc"
-          : tool === "width"
-            ? "#7c5cfc"
-            : tool === "smooth"
-              ? "#14b8a6"
-              : "#ffffff";
-        return (
-          <KCircle
-            key={h.pointIndex}
-            x={h.x}
-            y={h.y}
-            radius={r}
-            fill={fill}
-            stroke="#18181b"
-            strokeWidth={1.25 / scale}
-          />
-        );
-      })}
-    </Group>
-  );
-}
-
-// 말풍선 커스텀 모양 오버레이 — 폴리곤 점 핸들. DrawEl(페이지 절대좌표) 용인 StudioNodeEditOverlay와
-// 달리 BubbleEl은 x/y/rotation 요소라, 점은 로컬(비스케일) 좌표 그대로 두고 Group에 x/y/rotation을
-// 줘서 Konva가 회전·이동을 자동 적용하게 한다(호출부에서 좌표를 캔버스로 미리 변환할 필요 없음 —
-// 히트테스트/드래그 쪽만 bubbleShapeCanvasPointToLocal로 역변환한다, §8 참고).
-function StudioBubbleShapeOverlay({
-  frame,
-  handles,
-  scale,
-  activeHandleIndex,
-}: {
-  frame: { x: number; y: number; rotation: number };
-  handles: NodeEditHandle[];
-  scale: number;
-  activeHandleIndex: number | null;
-}) {
-  return (
-    <Group x={frame.x} y={frame.y} rotation={frame.rotation} listening={false}>
-      {handles.map((h) => (
-        <KCircle
-          key={h.pointIndex}
-          x={h.x}
-          y={h.y}
-          radius={5 / scale}
-          fill={activeHandleIndex === h.pointIndex ? "#7c5cfc" : "#ffffff"}
-          stroke="#18181b"
-          strokeWidth={1.25 / scale}
-        />
-      ))}
-    </Group>
-  );
-}
-
-// 프레임 애니메이션 어니언스킨 — 이전/다음 프레임을 옅게 겹쳐 그린다. Transformer/포인터가 절대
-// 이걸 붙잡지 않도록 항상 listening=false, nodeRefs에도 등록하지 않는다(선택 불가능한 참고선).
-function OnionSkinImage({ el, layer }: { el: ImageEl; layer: OnionSkinLayer }) {
-  const [img, setImg] = useState<HTMLImageElement>();
-  useEffect(() => {
-    const im = new globalThis.Image();
-    im.onload = () => setImg(im);
-    im.src = layer.frame.src;
-    return () => {
-      im.onload = null;
-    };
-  }, [layer.frame.src]);
-  if (!img) return null;
-  return (
-    <Group opacity={layer.opacity} listening={false}>
-      <KImage image={img} x={el.x} y={el.y} width={el.width} height={el.height} listening={false} />
-      {layer.tint !== "none" && (
-        <Rect
-          x={el.x}
-          y={el.y}
-          width={el.width}
-          height={el.height}
-          fill={layer.tint === "prev" ? "#ef4444" : "#3b82f6"}
-          opacity={0.55}
-          globalCompositeOperation="source-atop"
-          listening={false}
-        />
-      )}
-    </Group>
-  );
 }
 
 // 비동기 로드가 필요한 이미지 노드 — src 가 바뀌면 다시 로드한다.
@@ -7784,25 +7413,9 @@ function StudioCuttoonEditor() {
   const [drawMode, setDrawMode] = useState<DrawMode>("pen");
   const [brushOpacity, setBrushOpacity] = useState(1);
   const [brush, setBrush] = useState<string>("pen");
-  // 스탬프 브러시(잉크붓/정밀에어/그레인연필/물맛붓) 튜닝 — 브러시를 바꾸면 그 종류의
-  // 기본값으로 리셋되고, 슬라이더 조정값은 획에 스냅샷(el.stamp)으로 영속화된다.
-  const [stampTuning, setStampTuning] = useState<{
-    flow: number;
-    hardness: number;
-    minSize: number;
-  } | null>(null);
-  useEffect(() => {
-    const kind = resolveStudioStampBrushKind(brush);
-    setStampTuning(
-      kind
-        ? {
-            flow: STUDIO_STAMP_BRUSH_DEFAULTS[kind].flow,
-            hardness: STUDIO_STAMP_BRUSH_DEFAULTS[kind].hardness,
-            minSize: STUDIO_STAMP_BRUSH_DEFAULTS[kind].minSizeRatio,
-          }
-        : null
-    );
-  }, [brush]);
+  // 스탬프 브러시(잉크붓/정밀에어/그레인연필/물맛붓) 튜닝. 브러시 선택 경로에서 기본값을
+  // 명시적으로 적용해, 저장 브러시를 불러온 직후 effect가 사용자 값을 덮어쓰지 않게 한다.
+  const [stampTuning, setStampTuning] = useState<StudioBrushStampTuning | null>(null);
   const [brushSlotsState, setBrushSlotsState] = useState<StudioBrushSlotsState>(() =>
     loadStudioBrushSlotsState(
       typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage
@@ -7939,6 +7552,7 @@ function StudioCuttoonEditor() {
     tipAngle,
     tipRoundness,
     brushDynamics,
+    stampTuning,
   };
   const appliedSavedBrush = appliedSavedBrushId
     ? savedBrushes.find((savedBrush) => savedBrush.id === appliedSavedBrushId) ?? null
@@ -7955,6 +7569,7 @@ function StudioCuttoonEditor() {
     setTool("draw");
     setDrawMode("pen");
     setBrush(saved.brushId);
+    setStampTuning(saved.stampTuning);
     setStrokeWidth(saved.strokeWidth);
     setBrushOpacity(saved.brushOpacity);
     setColor(saved.color);
@@ -7992,6 +7607,7 @@ function StudioCuttoonEditor() {
       color,
     });
     setBrush(applied.brushId);
+    setStampTuning(defaultStampTuningForBrushId(applied.brushId));
     setStrokeWidth(applied.strokeWidth);
     setBrushOpacity(applied.brushOpacity);
     if (applied.color !== color) setColor(applied.color);
@@ -8022,12 +7638,14 @@ function StudioCuttoonEditor() {
     const preset = BRUSH_PRESETS.find((p) => p.id === slot.brushId);
     if (preset) {
       setBrush(preset.id);
+      setStampTuning(defaultStampTuningForBrushId(preset.id));
       const dynamicsId = resolveStudioBrushDynamicsPresetId(preset.id);
       if (dynamicsId) {
         setBrushDynamics(studioBrushDynamicsPresetSettings(dynamicsId));
       }
     } else {
       setBrush(slot.brushId);
+      setStampTuning(defaultStampTuningForBrushId(slot.brushId));
     }
     setStrokeWidth(slot.strokeWidth);
     setBrushOpacity(slot.brushOpacity);
@@ -25048,6 +24666,7 @@ function StudioCuttoonEditor() {
           postCorrection={postCorrection}
           preserveCorners={preserveCorners}
           pressureCurve={pressureCurve}
+          proDrawPrefs={proDrawPrefs}
           propsSheetRef={propsSheetRef}
           puppetWarpActive={puppetWarpActive}
           puppetWarpBusy={puppetWarpBusy}
@@ -25124,6 +24743,7 @@ function StudioCuttoonEditor() {
           setPostCorrection={setPostCorrection}
           setPreserveCorners={setPreserveCorners}
           setPressureCurve={setPressureCurve}
+          setProDrawPrefs={setProDrawPrefs}
           setPuppetWarpActive={setPuppetWarpActive}
           setPuppetWarpPins={setPuppetWarpPins}
           setQuickShapeActive={setQuickShapeActive}
@@ -25213,6 +24833,7 @@ function StudioCuttoonEditor() {
           postCorrection={postCorrection}
           preserveCorners={preserveCorners}
           pressureCurve={pressureCurve}
+          proDrawPrefs={proDrawPrefs}
           quickActionsOpen={quickActionsOpen}
           savedBrushes={savedBrushes}
           selected={selected}
@@ -25227,10 +24848,12 @@ function StudioCuttoonEditor() {
           setPostCorrection={setPostCorrection}
           setPreserveCorners={setPreserveCorners}
           setPressureCurve={setPressureCurve}
+          setProDrawPrefs={setProDrawPrefs}
           setQuickStartOpen={setQuickStartOpen}
           setSavedBrushes={setSavedBrushes}
           setSelectedId={setSelectedId}
           setShapeFill={setShapeFill}
+          setStampTuning={setStampTuning}
           setStabilizer={setStabilizer}
           setStabilizerMode={setStabilizerMode}
           setStrokeWidth={setStrokeWidth}
@@ -25245,6 +24868,7 @@ function StudioCuttoonEditor() {
           showMobileHint={showMobileHint}
           stabilizer={stabilizer}
           stabilizerMode={stabilizerMode}
+          stampTuning={stampTuning}
           strokeWidth={strokeWidth}
           tiltEnabled={tiltEnabled}
           tipAngle={tipAngle}
@@ -25822,6 +25446,7 @@ interface StudioInspectorAsideProps {
   postCorrection: number;
   preserveCorners: boolean;
   pressureCurve: number;
+  proDrawPrefs: StudioProDrawPrefs;
   propsSheetRef: import("react").RefObject<HTMLElement | null>;
   puppetWarpActive: boolean;
   puppetWarpBusy: boolean;
@@ -25898,6 +25523,7 @@ interface StudioInspectorAsideProps {
   setPostCorrection: import("react").Dispatch<import("react").SetStateAction<number>>;
   setPreserveCorners: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setPressureCurve: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setProDrawPrefs: import("react").Dispatch<import("react").SetStateAction<StudioProDrawPrefs>>;
   setPuppetWarpActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setPuppetWarpPins: import("react").Dispatch<import("react").SetStateAction<PuppetPin[]>>;
   setQuickShapeActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
@@ -26064,6 +25690,7 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
   postCorrection,
   preserveCorners,
   pressureCurve,
+  proDrawPrefs,
   propsSheetRef,
   puppetWarpActive,
   puppetWarpBusy,
@@ -26140,6 +25767,7 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
   setPostCorrection,
   setPreserveCorners,
   setPressureCurve,
+  setProDrawPrefs,
   setPuppetWarpActive,
   setPuppetWarpPins,
   setQuickShapeActive,
@@ -28748,31 +28376,20 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
                 ))}
               </div>
 
-              {/* 지우개가 아닐 때 브러시 종류 선택 */}
-              {drawMode === "pen" && (
-                <div className="space-y-1">
-                  <p className="text-[0.66rem] font-medium text-fg-3">브러시 프리셋</p>
-                  <div className="grid grid-cols-2 gap-1">
-                    {BRUSH_PRESETS.map((p) => {
-                      const active = brush === p.id;
-                      return (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => applyBuiltInBrushPreset(p)}
-                          className={cn(
-                            "rounded border py-1 text-xs transition-colors",
-                            active
-                              ? "border-accent bg-accent-soft/30 text-accent font-semibold"
-                              : "border-line text-fg-2 hover:bg-raised"
-                          )}
-                        >
-                          {p.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+              {/* 현재 → 최근/즐겨찾기 → 전체 카탈로그의 단일 브러시 탐색 경로 */}
+              {drawMode === "pen" && inspectorLayout.primary === "properties" && (
+                <Suspense fallback={<div className="h-24 animate-pulse rounded-xl bg-raised/40 motion-reduce:animate-none" aria-hidden />}>
+                  <StudioUnifiedBrushPicker
+                    activeBrushId={brush}
+                    brushOpacity={brushOpacity}
+                    color={color}
+                    placement="inspector"
+                    proDrawPrefs={proDrawPrefs}
+                    strokeWidth={strokeWidth}
+                    setProDrawPrefs={setProDrawPrefs}
+                    onSelectBrush={applyBuiltInBrushPreset}
+                  />
+                </Suspense>
               )}
 
               {/* 저장된 브러시 라이브러리 — ibisPaint 브러시/머티리얼 라이브러리 대응.
@@ -28886,8 +28503,8 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
                   <span className="flex items-center gap-1.5">
                     <input
                       type="range"
-                      min={1}
-                      max={48}
+                      min={STUDIO_BRUSH_SIZE_RANGE.min}
+                      max={STUDIO_BRUSH_SIZE_RANGE.max}
                       value={strokeWidth}
                       onChange={(e) => setStrokeWidth(Number(e.target.value))}
                       className="w-24 accent-accent cursor-pointer"
@@ -28902,8 +28519,8 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
                   <span className="flex items-center gap-1.5">
                     <input
                       type="range"
-                      min={10}
-                      max={100}
+                      min={STUDIO_BRUSH_OPACITY_RANGE.min * 100}
+                      max={STUDIO_BRUSH_OPACITY_RANGE.max * 100}
                       step={5}
                       value={Math.round(brushOpacity * 100)}
                       onChange={(e) => setBrushOpacity(Number(e.target.value) / 100)}
@@ -34086,6 +33703,7 @@ interface StudioMobileEditingDockProps {
   postCorrection: number;
   preserveCorners: boolean;
   pressureCurve: number;
+  proDrawPrefs: StudioProDrawPrefs;
   quickActionsOpen: boolean;
   savedBrushes: StudioSavedBrush[];
   selected: El | null;
@@ -34100,10 +33718,12 @@ interface StudioMobileEditingDockProps {
   setPostCorrection: import("react").Dispatch<import("react").SetStateAction<number>>;
   setPreserveCorners: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setPressureCurve: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setProDrawPrefs: import("react").Dispatch<import("react").SetStateAction<StudioProDrawPrefs>>;
   setQuickStartOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setSavedBrushes: import("react").Dispatch<import("react").SetStateAction<StudioSavedBrush[]>>;
   setSelectedId: import("react").Dispatch<import("react").SetStateAction<string | null>>;
   setShapeFill: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setStampTuning: import("react").Dispatch<import("react").SetStateAction<StudioBrushStampTuning | null>>;
   setStabilizer: import("react").Dispatch<import("react").SetStateAction<number>>;
   setStabilizerMode: import("react").Dispatch<import("react").SetStateAction<"standard" | "adaptive" | "precision">>;
   setStrokeWidth: import("react").Dispatch<import("react").SetStateAction<number>>;
@@ -34118,6 +33738,7 @@ interface StudioMobileEditingDockProps {
   showMobileHint: boolean;
   stabilizer: number;
   stabilizerMode: "standard" | "adaptive" | "precision";
+  stampTuning: StudioBrushStampTuning | null;
   strokeWidth: number;
   tiltEnabled: boolean;
   tipAngle: number;
@@ -34156,6 +33777,7 @@ const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   postCorrection,
   preserveCorners,
   pressureCurve,
+  proDrawPrefs,
   quickActionsOpen,
   savedBrushes,
   selected,
@@ -34170,10 +33792,12 @@ const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   setPostCorrection,
   setPreserveCorners,
   setPressureCurve,
+  setProDrawPrefs,
   setQuickStartOpen,
   setSavedBrushes,
   setSelectedId,
   setShapeFill,
+  setStampTuning,
   setStabilizer,
   setStabilizerMode,
   setStrokeWidth,
@@ -34188,6 +33812,7 @@ const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   showMobileHint,
   stabilizer,
   stabilizerMode,
+  stampTuning,
   strokeWidth,
   tiltEnabled,
   tipAngle,
@@ -34414,8 +34039,8 @@ const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               })}
             </div>
 
-            {/* 펜 프리셋 — 가로 스크롤 칩(굵기·투명도·색 기본값 적용) */}
-            {drawMode === "pen" && (
+            {/* 펜 프리셋 — 데스크톱과 같은 현재/빠른 선반/전체 카탈로그 구조 */}
+            {drawMode === "pen" && mobileSheet === "draw" && (
               <>
                 <StudioSavedBrushShelf
                   brushes={savedBrushes}
@@ -34424,26 +34049,21 @@ const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                   onManage={() => setMobileSheet("brushes")}
                 />
                 <div className="mb-2.5">
-                  <p className="mb-1 text-[0.7rem] font-medium text-fg-3">기본 브러시</p>
-                  <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    {BRUSH_PRESETS.map((p) => {
-                      const active = brush === p.id;
-                      return (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => applyBuiltInBrushPreset(p)}
-                          aria-pressed={active}
-                          className={cn(
-                            "min-h-[2.75rem] shrink-0 whitespace-nowrap rounded-lg border px-3 text-xs font-semibold transition-colors",
-                            active ? "border-accent bg-accent-soft text-fg" : "border-line bg-card text-fg-2 hover:bg-raised"
-                          )}
-                        >
-                          {p.name}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <Suspense fallback={<div className="h-24 animate-pulse rounded-xl bg-raised/40 motion-reduce:animate-none" aria-hidden />}>
+                    <StudioUnifiedBrushPicker
+                      activeBrushId={brush}
+                      brushOpacity={brushOpacity}
+                      color={color}
+                      mobileKeyboardInset={mobileKeyboardInset}
+                      placement="mobile"
+                      proDrawPrefs={proDrawPrefs}
+                      stampTuning={stampTuning}
+                      strokeWidth={strokeWidth}
+                      setProDrawPrefs={setProDrawPrefs}
+                      onStampTuningChange={setStampTuning}
+                      onSelectBrush={applyBuiltInBrushPreset}
+                    />
+                  </Suspense>
                 </div>
               </>
             )}
@@ -34497,8 +34117,8 @@ const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 <div className="grid grid-cols-[minmax(0,1fr)_4.5rem_2.5rem] items-center gap-2">
                   <input
                     type="range"
-                    min={1}
-                    max={80}
+                    min={STUDIO_BRUSH_SIZE_RANGE.min}
+                    max={STUDIO_BRUSH_SIZE_RANGE.max}
                     value={strokeWidth}
                     onChange={(e) => setStrokeWidth(Number(e.target.value))}
                     className="h-11 w-full accent-accent"
@@ -34508,12 +34128,20 @@ const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                   <input
                     id="mobile-brush-width"
                     type="number"
-                    min={1}
-                    max={80}
+                    min={STUDIO_BRUSH_SIZE_RANGE.min}
+                    max={STUDIO_BRUSH_SIZE_RANGE.max}
                     inputMode="numeric"
                     value={strokeWidth}
                     onChange={(event) =>
-                      setStrokeWidth(Math.min(80, Math.max(1, Number(event.target.value) || 1)))
+                      setStrokeWidth(
+                        Math.min(
+                          STUDIO_BRUSH_SIZE_RANGE.max,
+                          Math.max(
+                            STUDIO_BRUSH_SIZE_RANGE.min,
+                            Number(event.target.value) || STUDIO_BRUSH_SIZE_RANGE.min
+                          )
+                        )
+                      )
                     }
                     className="min-h-11 w-full rounded-lg border border-line bg-card px-2 text-center text-xs tabular-nums text-fg outline-none focus:border-accent"
                   />
@@ -34536,8 +34164,8 @@ const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                   <div className="grid grid-cols-[minmax(0,1fr)_4.5rem_2.5rem] items-center gap-2">
                     <input
                       type="range"
-                      min={10}
-                      max={100}
+                      min={STUDIO_BRUSH_OPACITY_RANGE.min * 100}
+                      max={STUDIO_BRUSH_OPACITY_RANGE.max * 100}
                       step={5}
                       value={Math.round(brushOpacity * 100)}
                       onChange={(e) => setBrushOpacity(Number(e.target.value) / 100)}
@@ -34548,13 +34176,21 @@ const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                     <input
                       id="mobile-brush-opacity"
                       type="number"
-                      min={10}
-                      max={100}
+                      min={STUDIO_BRUSH_OPACITY_RANGE.min * 100}
+                      max={STUDIO_BRUSH_OPACITY_RANGE.max * 100}
                       step={5}
                       inputMode="numeric"
                       value={Math.round(brushOpacity * 100)}
                       onChange={(event) =>
-                        setBrushOpacity(Math.min(100, Math.max(10, Number(event.target.value) || 10)) / 100)
+                        setBrushOpacity(
+                          Math.min(
+                            STUDIO_BRUSH_OPACITY_RANGE.max * 100,
+                            Math.max(
+                              STUDIO_BRUSH_OPACITY_RANGE.min * 100,
+                              Number(event.target.value) || STUDIO_BRUSH_OPACITY_RANGE.min * 100
+                            )
+                          ) / 100
+                        )
                       }
                       className="min-h-11 w-full rounded-lg border border-line bg-card px-2 text-center text-xs tabular-nums text-fg outline-none focus:border-accent"
                     />
@@ -36568,7 +36204,9 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 </StudioHudPill>
               ) : null}
               {tool === "draw" && drawMode === "pen" ? (
-                <StudioLivePressureHudPill store={liveDrawPressureStore} />
+                <Suspense fallback={null}>
+                  <StudioLivePressureHudPill store={liveDrawPressureStore} />
+                </Suspense>
               ) : null}
               {tool === "draw" && drawMode === "shape" && studioShapeFillHudLabel(shapeFill, drawShape) ? (
                 <StudioHudPill accent title="도형 채우기">
@@ -37063,9 +36701,15 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                       : null;
                   return wrapClip(
                     <Fragment key={el.id}>
-                      {onion.map((layer) => (
-                        <OnionSkinImage key={`onion-${el.id}-${layer.frame.id}`} el={el} layer={layer} />
-                      ))}
+                      <Suspense fallback={null}>
+                        {onion.map((layer) => (
+                          <StudioOnionSkinImage
+                            key={`onion-${el.id}-${layer.frame.id}`}
+                            el={el}
+                            layer={layer}
+                          />
+                        ))}
+                      </Suspense>
                       <UrlImage
                         el={effectiveEl}
                         draggable={draggable}
@@ -38023,27 +37667,31 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
               pixelOverlayFrame &&
               (pixelOverlaySel || pixelDragPreview || polyLassoSession) && (
               <Layer listening={false}>
-                <StudioSelectionAntsOverlay
-                  selection={pixelOverlaySel}
-                  drag={pixelDragPreview}
-                  polyDraft={
-                    polyLassoSession
-                      ? {
-                          points: polyLassoSession.points,
-                          hover: polyLassoHover,
-                          mode: polyLassoSession.mode,
-                        }
-                      : null
-                  }
-                  frame={pixelOverlayFrame}
-                  scale={effScale}
-                />
+                <Suspense fallback={null}>
+                  <StudioSelectionAntsOverlay
+                    selection={pixelOverlaySel}
+                    drag={pixelDragPreview}
+                    polyDraft={
+                      polyLassoSession
+                        ? {
+                            points: polyLassoSession.points,
+                            hover: polyLassoHover,
+                            mode: polyLassoSession.mode,
+                          }
+                        : null
+                    }
+                    frame={pixelOverlayFrame}
+                    scale={effScale}
+                  />
+                </Suspense>
               </Layer>
             )}
             {/* 크롭 오버레이 — 크롭 모드 중 크롭 rect(바깥 어둡게 + 3분할선 + 8핸들). */}
             {!isExporting && cropRect && pixelOverlayFrame && (
               <Layer listening={false}>
-                <StudioCropOverlay rect={cropRect} frame={pixelOverlayFrame} scale={effScale} />
+                <Suspense fallback={null}>
+                  <StudioCropOverlay rect={cropRect} frame={pixelOverlayFrame} scale={effScale} />
+                </Suspense>
               </Layer>
             )}
             {/* 패널 손그림 컷 오버레이 — 드래그 중 절단선 미리보기(유효/무효 색 구분). */}
@@ -38055,24 +37703,28 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
             {/* 벡터 노드 편집 오버레이 — 자유선 점 핸들. */}
             {!isExporting && nodeEditArmed && selected?.type === "draw" && (
               <Layer listening={false}>
-                <StudioNodeEditOverlay
-                  handles={nodeEditHandles}
-                  tool={nodeEditTool!}
-                  pressures={nodeEditDraft?.elId === selected.id ? nodeEditDraft.pressures : selected.pressures}
-                  scale={effScale}
-                  activeHandleIndex={nodeEditActiveHandleIndex}
-                />
+                <Suspense fallback={null}>
+                  <StudioNodeEditOverlay
+                    handles={nodeEditHandles}
+                    tool={nodeEditTool!}
+                    pressures={nodeEditDraft?.elId === selected.id ? nodeEditDraft.pressures : selected.pressures}
+                    scale={effScale}
+                    activeHandleIndex={nodeEditActiveHandleIndex}
+                  />
+                </Suspense>
               </Layer>
             )}
             {/* 말풍선 커스텀 모양 오버레이 — 폴리곤 점 핸들(로컬좌표, Group이 x/y/rotation 자동 적용). */}
             {!isExporting && bubbleShapeArmed && selected?.type === "bubble" && (
               <Layer listening={false}>
-                <StudioBubbleShapeOverlay
-                  frame={{ x: selected.x, y: selected.y, rotation: selected.rotation }}
-                  handles={bubbleShapeHandles}
-                  scale={effScale}
-                  activeHandleIndex={bubbleShapeActiveHandleIndex}
-                />
+                <Suspense fallback={null}>
+                  <StudioBubbleShapeOverlay
+                    frame={{ x: selected.x, y: selected.y, rotation: selected.rotation }}
+                    handles={bubbleShapeHandles}
+                    scale={effScale}
+                    activeHandleIndex={bubbleShapeActiveHandleIndex}
+                  />
+                </Suspense>
               </Layer>
             )}
             {!isExporting && healCloneArmed && pixelOverlayFrame && (healCloneSourceAnchor || healCloneDragPreview) && (
@@ -38525,42 +38177,44 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
               />
             </Suspense>
           ) : null}
-          {webGpuViewportSurface ? (
-            <StudioLiveInkOverlayHost
-              renderer={liveInkOverlayRenderer}
-              left={webGpuViewportSurface.surface.left}
-              top={webGpuViewportSurface.surface.top}
-              width={webGpuViewportSurface.surface.width}
-              height={webGpuViewportSurface.surface.height}
-              documentScale={effScale}
-              documentWidth={CANVAS_W}
-              flipX={canvasFlipH}
-            />
-          ) : null}
-          {webGpuViewportSurface ? (
-            <StudioLiveStampOverlayHost
-              renderer={liveStampOverlayRenderer}
-              left={webGpuViewportSurface.surface.left}
-              top={webGpuViewportSurface.surface.top}
-              width={webGpuViewportSurface.surface.width}
-              height={webGpuViewportSurface.surface.height}
-              documentScale={effScale}
-              documentWidth={CANVAS_W}
-              flipX={canvasFlipH}
-            />
-          ) : null}
-          {STUDIO_POINTER_PREDICTION_ENABLED && webGpuViewportSurface ? (
-            <StudioLiveInkPredictionHost
-              renderer={liveInkPredictionRenderer}
-              left={webGpuViewportSurface.surface.left}
-              top={webGpuViewportSurface.surface.top}
-              width={webGpuViewportSurface.surface.width}
-              height={webGpuViewportSurface.surface.height}
-              documentScale={effScale}
-              documentWidth={CANVAS_W}
-              flipX={canvasFlipH}
-            />
-          ) : null}
+          <Suspense fallback={null}>
+            {webGpuViewportSurface ? (
+              <StudioLiveInkOverlayHost
+                renderer={liveInkOverlayRenderer}
+                left={webGpuViewportSurface.surface.left}
+                top={webGpuViewportSurface.surface.top}
+                width={webGpuViewportSurface.surface.width}
+                height={webGpuViewportSurface.surface.height}
+                documentScale={effScale}
+                documentWidth={CANVAS_W}
+                flipX={canvasFlipH}
+              />
+            ) : null}
+            {webGpuViewportSurface ? (
+              <StudioLiveStampOverlayHost
+                renderer={liveStampOverlayRenderer}
+                left={webGpuViewportSurface.surface.left}
+                top={webGpuViewportSurface.surface.top}
+                width={webGpuViewportSurface.surface.width}
+                height={webGpuViewportSurface.surface.height}
+                documentScale={effScale}
+                documentWidth={CANVAS_W}
+                flipX={canvasFlipH}
+              />
+            ) : null}
+            {STUDIO_POINTER_PREDICTION_ENABLED && webGpuViewportSurface ? (
+              <StudioLiveInkPredictionHost
+                renderer={liveInkPredictionRenderer}
+                left={webGpuViewportSurface.surface.left}
+                top={webGpuViewportSurface.surface.top}
+                width={webGpuViewportSurface.surface.width}
+                height={webGpuViewportSurface.surface.height}
+                documentScale={effScale}
+                documentWidth={CANVAS_W}
+                flipX={canvasFlipH}
+              />
+            ) : null}
+          </Suspense>
           {webGpuViewportSurface ? (
             <Suspense fallback={null}>
               <StudioWebGpuCanvas

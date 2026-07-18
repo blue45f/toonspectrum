@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  FX_BRUSH_SEED_RANGE,
   fxBrushSeedFromKey,
   planGlitterBrushParticles,
   planGlowBrushPasses,
@@ -70,6 +71,37 @@ describe("planGlitterBrushParticles", () => {
     });
     expect(dust.length).toBeLessThan(glitter.length);
   });
+
+  it.each(["glitter", "star-dust"] as const)(
+    "guarantees a deterministic visible %s particle for every supported seed on a point tap",
+    (mode) => {
+      const missingSeeds: number[] = [];
+      let minimumRadius = Number.POSITIVE_INFINITY;
+      let minimumOpacity = Number.POSITIVE_INFINITY;
+
+      for (let seed = FX_BRUSH_SEED_RANGE.min; seed <= FX_BRUSH_SEED_RANGE.max; seed++) {
+        const input = {
+          points: [12, 34],
+          pressures: [0.5],
+          baseWidth: 18,
+          seed,
+          mode,
+        } as const;
+        const particles = planGlitterBrushParticles(input);
+        if (particles.length === 0) {
+          missingSeeds.push(seed);
+          continue;
+        }
+        minimumRadius = Math.min(minimumRadius, ...particles.map((particle) => particle.radius));
+        minimumOpacity = Math.min(minimumOpacity, ...particles.map((particle) => particle.opacity));
+        expect(planGlitterBrushParticles(input)).toEqual(particles);
+      }
+
+      expect(missingSeeds).toEqual([]);
+      expect(minimumRadius).toBeGreaterThanOrEqual(0.35);
+      expect(minimumOpacity).toBeGreaterThanOrEqual(0.35);
+    }
+  );
 });
 
 describe("planOilBrushDabs", () => {

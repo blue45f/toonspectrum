@@ -22,6 +22,7 @@ const snapshot: StudioBrushSnapshot = {
   tipAngle: -30,
   tipRoundness: 0.24,
   brushDynamics: studioBrushDynamicsPresetSettings("ink-particle"),
+  stampTuning: null,
 };
 
 const saved: StudioSavedBrush = {

@@ -84,6 +84,20 @@ export interface StudioBrushTrayItem {
   previewStyle: StudioBrushPreviewStyle;
 }
 
+export type StudioQuickBrushSource = "favorite" | "recent" | "starter";
+
+export interface StudioQuickBrushTrayItem extends StudioBrushTrayItem {
+  quickSource: StudioQuickBrushSource;
+}
+
+export interface StudioQuickBrushTrayOptions {
+  favoriteIds?: readonly string[];
+  recentIds?: readonly string[];
+  limit?: number;
+}
+
+export const STUDIO_QUICK_BRUSH_LIMIT = 8;
+
 const BEGINNER_SET = new Set<string>(STUDIO_BEGINNER_BRUSH_IDS);
 
 const MEDIA_GROUP: Record<string, StudioBrushMediaGroup> = {
@@ -205,12 +219,12 @@ const PREVIEW_STYLE: Record<string, StudioBrushPreviewStyle> = {
   fineliner: "solid",
   ballpoint: "solid",
   gpen: "calligraphy",
-  liner: "solid",
+  liner: "calligraphy",
   calligraphy: "calligraphy",
-  marker: "soft",
+  marker: "solid",
   "felt-tip": "solid",
-  "marker-bold": "soft",
-  highlighter: "soft",
+  "marker-bold": "solid",
+  highlighter: "solid",
   neon: "neon",
   glow: "glow",
   "soft-glow": "glow",
@@ -223,7 +237,7 @@ const PREVIEW_STYLE: Record<string, StudioBrushPreviewStyle> = {
   pastel: "soft",
   airbrush: "soft",
   "soft-brush": "soft",
-  spray: "dots",
+  spray: "soft",
   pencil: "dashed",
   "soft-pencil": "dashed",
   "dry-media": "texture",
@@ -285,6 +299,43 @@ export function listStudioBrushTrayItems(
     return all.filter((item) => item.mediaGroup === category);
   }
   return all;
+}
+
+/**
+ * Compact brush shelf: pinned favorites first, then MRU brushes, then a
+ * beginner-safe fallback. Unknown and duplicate IDs are ignored so persisted
+ * preferences cannot create empty or repeated affordances.
+ */
+export function listStudioQuickBrushTrayItems({
+  favoriteIds = [],
+  recentIds = [],
+  limit = STUDIO_QUICK_BRUSH_LIMIT,
+}: StudioQuickBrushTrayOptions = {}): StudioQuickBrushTrayItem[] {
+  const safeLimit = Number.isFinite(limit)
+    ? Math.min(BRUSH_PRESETS.length, Math.max(0, Math.floor(limit)))
+    : STUDIO_QUICK_BRUSH_LIMIT;
+  if (safeLimit === 0) return [];
+
+  const catalog = new Map(listStudioBrushTrayItems("all").map((item) => [item.id, item]));
+  const selected: StudioQuickBrushTrayItem[] = [];
+  const seen = new Set<string>();
+
+  function append(ids: readonly string[], quickSource: StudioQuickBrushSource): void {
+    for (const id of ids) {
+      if (selected.length >= safeLimit) return;
+      if (seen.has(id)) continue;
+      const item = catalog.get(id);
+      if (!item) continue;
+      selected.push({ ...item, quickSource });
+      seen.add(id);
+    }
+  }
+
+  append(favoriteIds, "favorite");
+  append(recentIds, "recent");
+  append(STUDIO_BEGINNER_BRUSH_IDS, "starter");
+
+  return selected;
 }
 
 export const STUDIO_BRUSH_TRAY_CATEGORY_CHIPS: readonly {

@@ -16,6 +16,10 @@ import {
   studioBrushDynamicsSettingsEqual,
   type NormalizedStudioBrushDynamicsSettings,
 } from "./studio-brush-dynamics";
+import {
+  resolveStudioStampBrushKind,
+  STUDIO_STAMP_BRUSH_DEFAULTS,
+} from "./studio-brush-stamp-engine";
 import { normalizeHexColor } from "./studio-color-utils";
 import {
   isStudioStabilizerMode,
@@ -27,12 +31,21 @@ import {
 // StudioPage.tsx의 "그리기 도구 설정" 패널에서 drawMode === "pen"일 때 실제로 그리기에 쓰이는
 // state를 그대로 미러링한 필드들. 정확한 대응은 docs/studio-brush-library-integration.md 참고.
 
+export interface StudioBrushStampTuning {
+  /** dab 하나의 도포량. UI와 획 스냅샷이 사용하는 0~1 비율. */
+  flow: number;
+  /** 스탬프 팁 가장자리 경도. 0=부드러움, 1=선명함. */
+  hardness: number;
+  /** 필압이 0일 때 유지할 최소 굵기 비율. */
+  minSize: number;
+}
+
 export interface StudioBrushSnapshot {
   /** BRUSH_PRESETS[].id (studio-brush.ts). StudioPage의 `brush` state에 대응. */
   brushId: string;
   /** StudioPage의 `strokeWidth` state에 대응. UI 슬라이더 범위와 동일하게 1~80로 clamp. */
   strokeWidth: number;
-  /** StudioPage의 `brushOpacity` state에 대응(0~1). UI 슬라이더 범위와 동일하게 0.1~1로 clamp. */
+  /** StudioPage의 `brushOpacity` state에 대응(0~1). UI 슬라이더 범위와 동일하게 0.05~1로 clamp. */
   brushOpacity: number;
   /** 정규화된 소문자 #rrggbb. StudioPage의 `color` state에 대응. */
   color: string;
@@ -59,6 +72,8 @@ export interface StudioBrushSnapshot {
   tipRoundness: number;
   /** 필압·속도·틸트·트위스트에 따른 입자 크기/농도/간격/산포를 재현하는 정규화된 동역학 설정. */
   brushDynamics: NormalizedStudioBrushDynamicsSettings;
+  /** 스탬프 엔진 브러시의 흐름·경도·최소 굵기. 비스탬프 브러시는 null. */
+  stampTuning: StudioBrushStampTuning | null;
 }
 
 export interface StudioSavedBrush extends StudioBrushSnapshot {
@@ -140,11 +155,12 @@ export interface BrushUpdateResult {
 }
 
 export const BRUSH_STROKE_WIDTH_RANGE = [1, 80] as const;
-export const BRUSH_OPACITY_RANGE = [0.1, 1] as const;
+export const BRUSH_OPACITY_RANGE = [0.05, 1] as const;
 export const BRUSH_PRESSURE_CURVE_RANGE = [0.3, 3] as const;
 export const BRUSH_VELOCITY_SENSITIVITY_RANGE = [0.1, 1] as const;
 export const BRUSH_TIP_ANGLE_RANGE = [-180, 180] as const;
 export const BRUSH_TIP_ROUNDNESS_RANGE = [0.08, 1] as const;
+export const BRUSH_STAMP_TUNING_RANGE = [0, 1] as const;
 
 /**
  * 새 캔버스와 누락 필드를 가진 레거시 브러시가 공유하는 기본 필기감.
@@ -168,6 +184,7 @@ export const DEFAULT_STUDIO_BRUSH_SNAPSHOT: StudioBrushSnapshot = {
   tipAngle: -30,
   tipRoundness: 0.24,
   brushDynamics: DEFAULT_STUDIO_BRUSH_DYNAMICS_SETTINGS,
+  stampTuning: null,
 };
 
 const DEFAULT_SNAPSHOT = DEFAULT_STUDIO_BRUSH_SNAPSHOT;
@@ -192,6 +209,50 @@ function clampedNumberField(
   }
   adjusted.push(key);
   return fallback;
+}
+
+function sanitizeStampTuning(
+  brushId: string,
+  raw: unknown,
+  adjusted: string[]
+): StudioBrushStampTuning | null {
+  const kind = resolveStudioStampBrushKind(brushId);
+  if (!kind) {
+    if (raw !== null && raw !== undefined) adjusted.push("stampTuning");
+    return null;
+  }
+
+  const defaults = STUDIO_STAMP_BRUSH_DEFAULTS[kind];
+  const source = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
+  const fieldAdjusted: string[] = [];
+  const flow = clampedNumberField(
+    source,
+    "flow",
+    BRUSH_STAMP_TUNING_RANGE[0],
+    BRUSH_STAMP_TUNING_RANGE[1],
+    defaults.flow,
+    fieldAdjusted
+  );
+  const hardness = clampedNumberField(
+    source,
+    "hardness",
+    BRUSH_STAMP_TUNING_RANGE[0],
+    BRUSH_STAMP_TUNING_RANGE[1],
+    defaults.hardness,
+    fieldAdjusted
+  );
+  const minSize = clampedNumberField(
+    source,
+    "minSize",
+    BRUSH_STAMP_TUNING_RANGE[0],
+    BRUSH_STAMP_TUNING_RANGE[1],
+    defaults.minSizeRatio,
+    fieldAdjusted
+  );
+  if (fieldAdjusted.length > 0 || !raw || typeof raw !== "object") {
+    adjusted.push("stampTuning");
+  }
+  return { flow, hardness, minSize };
 }
 
 /** JSON 데이터의 키 순서와 무관한 구조 비교. 순환 참조 입력도 보정 대상으로 안전하게 처리한다. */
@@ -298,6 +359,7 @@ export function sanitizeBrushSnapshot(raw: unknown): { snapshot: StudioBrushSnap
   );
   const brushDynamics = normalizeStudioBrushDynamicsSettings(o.brushDynamics);
   if (!jsonStructureEqual(o.brushDynamics, brushDynamics)) adjustedFields.push("brushDynamics");
+  const stampTuning = sanitizeStampTuning(brushId, o.stampTuning, adjustedFields);
 
   let useVelocityPressure: boolean;
   if (typeof o.useVelocityPressure === "boolean") {
@@ -349,6 +411,7 @@ export function sanitizeBrushSnapshot(raw: unknown): { snapshot: StudioBrushSnap
       tipAngle,
       tipRoundness,
       brushDynamics,
+      stampTuning,
     },
     adjustedFields,
   };
@@ -749,13 +812,14 @@ export function brushMatchesSnapshot(
     && brush.tiltEnabled === snapshot.tiltEnabled
     && brush.tipAngle === snapshot.tipAngle
     && brush.tipRoundness === snapshot.tipRoundness
+    && jsonStructureEqual(brush.stampTuning, snapshot.stampTuning)
     && studioBrushDynamicsSettingsEqual(brush.brushDynamics, snapshot.brushDynamics);
 }
 
 // ── JSON 내보내기/가져오기(이 앱 전용 포맷 — 브러시 설정엔 GPL 같은 표준이 없다) ──────
 
 export const BRUSH_EXPORT_KIND = "toonspectrum-studio-brush";
-export const BRUSH_EXPORT_VERSION = 4;
+export const BRUSH_EXPORT_VERSION = 5;
 
 /** StudioSavedBrush → JSON 텍스트(들여쓰기 2칸, 사람이 읽을 수 있게). */
 export function writeBrushJson(brush: StudioSavedBrush): string {
@@ -778,6 +842,7 @@ export function writeBrushJson(brush: StudioSavedBrush): string {
     tipAngle: brush.tipAngle,
     tipRoundness: brush.tipRoundness,
     brushDynamics: normalizeStudioBrushDynamicsSettings(brush.brushDynamics),
+    stampTuning: sanitizeStampTuning(brush.brushId, brush.stampTuning, []),
   };
   return JSON.stringify(payload, null, 2);
 }

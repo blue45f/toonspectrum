@@ -91,7 +91,7 @@ export function saveStudioProDrawPrefs(
   }
 }
 
-/** Procreate-style: switching brushes does not overwrite locked size/opacity. */
+/** Procreate-style: switching brushes never overwrites the artist's active color. */
 export function applyBrushPresetWithLocks(
   preset: { id: string; defaultWidth: number; defaultOpacity: number; defaultColor?: string },
   locks: Pick<StudioProDrawPrefs, "sizeLocked" | "opacityLocked">,
@@ -101,7 +101,9 @@ export function applyBrushPresetWithLocks(
     brushId: preset.id,
     strokeWidth: locks.sizeLocked ? current.strokeWidth : preset.defaultWidth,
     brushOpacity: locks.opacityLocked ? current.brushOpacity : preset.defaultOpacity,
-    color: preset.defaultColor ?? current.color,
+    // Preset colors are catalogue-preview hints, not drawing-state mutations. Keeping the
+    // active color avoids the especially confusing white-on-white stroke after Star Dust.
+    color: current.color,
   };
 }
 

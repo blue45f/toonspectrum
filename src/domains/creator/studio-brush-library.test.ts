@@ -10,6 +10,8 @@ import {
   BRUSH_LIBRARY_KEY,
   BRUSH_LIBRARY_STORAGE_VERSION,
   BRUSH_OPACITY_RANGE,
+  BRUSH_EXPORT_VERSION,
+  BRUSH_STAMP_TUNING_RANGE,
   BRUSH_STROKE_WIDTH_RANGE,
   brushFileName,
   brushMatchesSnapshot,
@@ -63,6 +65,7 @@ const validSnapshot: StudioBrushSnapshot = {
   tiltEnabled: true,
   tipAngle: -35,
   tipRoundness: 0.3,
+  stampTuning: null,
   brushDynamics: normalizeStudioBrushDynamicsSettings({
     ...studioBrushDynamicsPresetSettings("dry-media"),
     seed: 492,
@@ -103,6 +106,7 @@ describe("sanitizeBrushSnapshot", () => {
     expect(adjustedFields).toContain("tipAngle");
     expect(adjustedFields).toContain("tipRoundness");
     expect(adjustedFields).toContain("brushDynamics");
+    expect(adjustedFields).not.toContain("stampTuning");
   });
 
   it("알 수 없는 brushId는 pen으로 대체한다", () => {
@@ -124,6 +128,10 @@ describe("sanitizeBrushSnapshot", () => {
     const { snapshot, adjustedFields } = sanitizeBrushSnapshot({ ...validSnapshot, brushOpacity: 5 });
     expect(snapshot.brushOpacity).toBe(BRUSH_OPACITY_RANGE[1]);
     expect(adjustedFields).toEqual(["brushOpacity"]);
+
+    const faint = sanitizeBrushSnapshot({ ...validSnapshot, brushOpacity: 0.01 });
+    expect(faint.snapshot.brushOpacity).toBe(0.05);
+    expect(faint.adjustedFields).toEqual(["brushOpacity"]);
   });
 
   it("NaN/Infinity/문자열 숫자 필드는 기본값으로 대체한다", () => {
@@ -219,6 +227,47 @@ describe("sanitizeBrushSnapshot", () => {
     expect(snapshot.brushDynamics.tip).toMatchObject({ shape: "grain", softness: 1, alphaMapSize: 8 });
     expect(adjustedFields).toEqual(["brushDynamics"]);
     expect(() => JSON.stringify(snapshot.brushDynamics)).not.toThrow();
+  });
+
+  it("스탬프 브러시 튜닝을 0~1 범위로 정규화한다", () => {
+    const { snapshot, adjustedFields } = sanitizeBrushSnapshot({
+      ...validSnapshot,
+      brushId: "airbrush-fine",
+      stampTuning: { flow: -1, hardness: 0.42, minSize: 99 },
+    });
+    expect(snapshot.stampTuning).toEqual({
+      flow: BRUSH_STAMP_TUNING_RANGE[0],
+      hardness: 0.42,
+      minSize: BRUSH_STAMP_TUNING_RANGE[1],
+    });
+    expect(adjustedFields).toEqual(["stampTuning"]);
+  });
+
+  it("스탬프 브러시의 누락·비수치 튜닝은 종류별 기본값으로 마이그레이션한다", () => {
+    const missing = sanitizeBrushSnapshot({
+      ...validSnapshot,
+      brushId: "wash-brush",
+      stampTuning: undefined,
+    });
+    expect(missing.snapshot.stampTuning).toEqual({ flow: 0.3, hardness: 0.35, minSize: 0.6 });
+    expect(missing.adjustedFields).toEqual(["stampTuning"]);
+
+    const partial = sanitizeBrushSnapshot({
+      ...validSnapshot,
+      brushId: "pencil-grain",
+      stampTuning: { flow: 0.5, hardness: Number.NaN, minSize: "0.2" },
+    });
+    expect(partial.snapshot.stampTuning).toEqual({ flow: 0.5, hardness: 0.85, minSize: 0.35 });
+    expect(partial.adjustedFields).toEqual(["stampTuning"]);
+  });
+
+  it("비스탬프 브러시의 오래된 튜닝 찌꺼기는 null로 제거한다", () => {
+    const { snapshot, adjustedFields } = sanitizeBrushSnapshot({
+      ...validSnapshot,
+      stampTuning: { flow: 0.4, hardness: 0.5, minSize: 0.6 },
+    });
+    expect(snapshot.stampTuning).toBeNull();
+    expect(adjustedFields).toEqual(["stampTuning"]);
   });
 
   it("테이퍼·PNG 팁 설정이 라이브러리 JSON 왕복 후에도 동일하다", () => {
@@ -339,6 +388,13 @@ describe("listBrushes", () => {
     delete legacy.brushDynamics;
     const s = fakeStorage({ [BRUSH_LIBRARY_KEY]: JSON.stringify([legacy]) });
     expect(listBrushes(s)[0]?.brushDynamics).toEqual(DEFAULT_STUDIO_BRUSH_DYNAMICS_SETTINGS);
+  });
+
+  it("이전 저장 스탬프 브러시에 튜닝 필드가 없어도 종류별 기본값으로 마이그레이션한다", () => {
+    const legacy = { ...brush("legacy-stamp"), brushId: "ink-brush" } as Partial<StudioSavedBrush>;
+    delete legacy.stampTuning;
+    const s = fakeStorage({ [BRUSH_LIBRARY_KEY]: JSON.stringify([legacy]) });
+    expect(listBrushes(s)[0]?.stampTuning).toEqual({ flow: 1, hardness: 1, minSize: 0.08 });
   });
 
   it("v2 저장 브러시에 새 선 보정 필드가 없어도 안전 기본값으로 마이그레이션한다", () => {
@@ -510,6 +566,17 @@ describe("saveBrush", () => {
     const s = fakeStorage();
     saveBrush(s, brush("a"));
     expect(listBrushes(s).map((b) => b.id)).toEqual(["a"]);
+  });
+
+  it("스탬프 튜닝을 저장소 쓰기·다시 읽기에서 손실 없이 유지한다", () => {
+    const s = fakeStorage();
+    const stampBrush: StudioSavedBrush = {
+      ...brush("stamp"),
+      brushId: "pencil-grain",
+      stampTuning: { flow: 0.41, hardness: 0.73, minSize: 0.26 },
+    };
+    saveBrush(s, stampBrush);
+    expect(listBrushes(s)[0]?.stampTuning).toEqual(stampBrush.stampTuning);
   });
 });
 
@@ -719,6 +786,21 @@ describe("빠른 선반·복제·삭제 취소", () => {
       ...validSnapshot,
       brushDynamics: normalizeStudioBrushDynamicsSettings({ ...validSnapshot.brushDynamics, seed: 493 }),
     })).toBe(false);
+    const stamp = {
+      ...saved,
+      brushId: "airbrush-fine",
+      stampTuning: { flow: 0.22, hardness: 0.12, minSize: 0.75 },
+    };
+    expect(brushMatchesSnapshot(stamp, {
+      ...validSnapshot,
+      brushId: "airbrush-fine",
+      stampTuning: { flow: 0.22, hardness: 0.12, minSize: 0.75 },
+    })).toBe(true);
+    expect(brushMatchesSnapshot(stamp, {
+      ...validSnapshot,
+      brushId: "airbrush-fine",
+      stampTuning: { flow: 0.5, hardness: 0.12, minSize: 0.75 },
+    })).toBe(false);
   });
 });
 
@@ -727,6 +809,7 @@ describe("writeBrushJson / importBrushFromJson 왕복", () => {
     const out = writeBrushJson(brush("a"));
     const parsed = JSON.parse(out);
     expect(parsed.kind).toBe(BRUSH_EXPORT_KIND);
+    expect(parsed.version).toBe(BRUSH_EXPORT_VERSION);
     expect(parsed.name).toBe("브러시 a");
     expect(parsed.brushId).toBe("gpen");
     expect(parsed.stabilizerMode).toBe("precision");
@@ -736,6 +819,7 @@ describe("writeBrushJson / importBrushFromJson 왕복", () => {
     expect(parsed.tipAngle).toBe(-35);
     expect(parsed.tipRoundness).toBe(0.3);
     expect(parsed.brushDynamics).toEqual(validSnapshot.brushDynamics);
+    expect(parsed.stampTuning).toBeNull();
     expect(parsed).not.toHaveProperty("pinned");
     expect(parsed).not.toHaveProperty("lastUsedAt");
   });
@@ -749,6 +833,7 @@ describe("writeBrushJson / importBrushFromJson 왕복", () => {
     expect(imported.strokeWidth).toBe(original.strokeWidth);
     expect(imported.color).toBe(original.color);
     expect(imported.brushDynamics).toEqual(original.brushDynamics);
+    expect(imported.stampTuning).toEqual(original.stampTuning);
     expect(imported).toMatchObject({ pinned: false, lastUsedAt: null });
     expect(adjustedFields).toEqual([]);
     expect(imported.id).not.toBe(original.id); // 가져오기는 새 id를 발급한다(같은 id 충돌 방지)
@@ -761,6 +846,32 @@ describe("writeBrushJson / importBrushFromJson 왕복", () => {
     const { brush: imported, adjustedFields } = importBrushFromJson(JSON.stringify(legacy));
     expect(imported.brushDynamics).toEqual(DEFAULT_STUDIO_BRUSH_DYNAMICS_SETTINGS);
     expect(adjustedFields).toContain("brushDynamics");
+  });
+
+  it("v4 내보내기처럼 stampTuning이 없어도 스탬프 종류별 기본값으로 가져온다", () => {
+    const legacy = JSON.parse(writeBrushJson({
+      ...brush("legacy-stamp-export"),
+      brushId: "airbrush-fine",
+      stampTuning: { flow: 0.71, hardness: 0.64, minSize: 0.2 },
+    }));
+    legacy.version = 4;
+    delete legacy.stampTuning;
+    const { brush: imported, adjustedFields } = importBrushFromJson(JSON.stringify(legacy));
+    expect(imported.stampTuning).toEqual({ flow: 0.22, hardness: 0.12, minSize: 0.75 });
+    expect(adjustedFields).toContain("stampTuning");
+  });
+
+  it("스탬프 튜닝을 JSON 내보내기·가져오기에서 손실 없이 왕복한다", () => {
+    const original = {
+      ...brush("stamp-round-trip"),
+      brushId: "wash-brush",
+      stampTuning: { flow: 0.47, hardness: 0.68, minSize: 0.29 },
+    };
+    const parsed = JSON.parse(writeBrushJson(original));
+    expect(parsed.stampTuning).toEqual(original.stampTuning);
+    const { brush: imported, adjustedFields } = importBrushFromJson(JSON.stringify(parsed));
+    expect(imported.stampTuning).toEqual(original.stampTuning);
+    expect(adjustedFields).toEqual([]);
   });
 
   it("kind가 없거나 다르면 던진다", () => {

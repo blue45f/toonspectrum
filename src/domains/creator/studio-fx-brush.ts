@@ -220,6 +220,33 @@ export function planGlitterBrushParticles(input: FxGlitterPlanInput): FxGlitterP
       });
     }
   }
+
+  // A point tap has only one station, so the organic sparsity filter above can reject every
+  // candidate for some otherwise valid seeds. Keep the stochastic look for normal strokes, but
+  // guarantee one deterministic fallback spark for every non-empty input. This is deliberately
+  // derived from the same stroke seed (rather than Math.random) so replay, collaboration and SVG
+  // export all produce the exact same visible tap.
+  if (particles.length === 0) {
+    const stationNoise = hash2(31, 47, seed);
+    const stationIndex = Math.min(stations.length - 1, Math.floor(stationNoise * stations.length));
+    const station = stations[stationIndex]!;
+    const angleNoise = hash2(stationIndex + 53, 61, seed);
+    const distanceNoise = hash2(stationIndex + 67, 71, seed);
+    const sizeNoise = hash2(stationIndex + 73, 79, seed);
+    const kindNoise = hash2(stationIndex + 83, 89, seed);
+    const angle = angleNoise * TAU;
+    const distance = scatter * Math.sqrt(distanceNoise);
+    const radiusScale = mode === "star-dust"
+      ? 0.08 + sizeNoise * 0.22
+      : 0.04 + sizeNoise * 0.14;
+    particles.push({
+      x: station.x + Math.cos(angle) * distance,
+      y: station.y + Math.sin(angle) * distance,
+      radius: Math.max(0.35, baseWidth * radiusScale),
+      opacity: clamp(0.55 + distanceNoise * 0.35, 0.55, 0.9),
+      kind: kindNoise > 0.62 ? 1 : 0,
+    });
+  }
   return particles;
 }
 
