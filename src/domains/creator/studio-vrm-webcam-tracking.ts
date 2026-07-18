@@ -288,6 +288,59 @@ export function disposePoseLandmarker(): void {
   initPosePromise = null;
 }
 
+let cachedPhotoPoseLandmarker: PoseLandmarker | null = null;
+let initPhotoPosePromise: Promise<PoseLandmarker> | null = null;
+
+/**
+ * A separate IMAGE-mode task for still-photo scans. The live VIDEO singleton cannot safely switch
+ * running modes while a webcam frame loop owns it, so the two workloads deliberately keep
+ * independent MediaPipe task instances.
+ */
+export async function initPhotoPoseLandmarker(): Promise<PoseLandmarker> {
+  if (cachedPhotoPoseLandmarker) return cachedPhotoPoseLandmarker;
+  if (initPhotoPosePromise) return initPhotoPosePromise;
+
+  initPhotoPosePromise = (async () => {
+    const { FilesetResolver, PoseLandmarker: PLM } = await import("@mediapipe/tasks-vision");
+    const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_VISION_CDN);
+    const modelAssetPath =
+      "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task";
+    const options = {
+      runningMode: "IMAGE",
+      outputSegmentationMasks: false,
+      numPoses: 1,
+      minPoseDetectionConfidence: 0.5,
+      minPosePresenceConfidence: 0.5,
+    } as const;
+    try {
+      cachedPhotoPoseLandmarker = await PLM.createFromOptions(vision, {
+        baseOptions: { modelAssetPath, delegate: "GPU" },
+        ...options,
+      });
+    } catch (error) {
+      console.warn("Photo PoseLandmarker GPU delegate failed, falling back to CPU:", error);
+      cachedPhotoPoseLandmarker = await PLM.createFromOptions(vision, {
+        baseOptions: { modelAssetPath, delegate: "CPU" },
+        ...options,
+      });
+    }
+    return cachedPhotoPoseLandmarker;
+  })();
+
+  try {
+    return await initPhotoPosePromise;
+  } catch (error) {
+    initPhotoPosePromise = null;
+    throw error;
+  }
+}
+
+export function disposePhotoPoseLandmarker(): void {
+  cachedPhotoPoseLandmarker?.close();
+  cachedPhotoPoseLandmarker = null;
+  initPhotoPosePromise = null;
+}
+
 let cachedHandLandmarker: HandLandmarker | null = null;
 let initHandPromise: Promise<HandLandmarker> | null = null;
 

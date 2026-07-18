@@ -161,6 +161,16 @@ function image(
   return { width, height, rgba };
 }
 
+function depthImage(
+  width: number,
+  height: number,
+  sample: (x: number, y: number) => number
+): Float32Array {
+  return Float32Array.from({ length: width * height }, (_, index) =>
+    sample(index % width, Math.floor(index / width))
+  );
+}
+
 function splitImage(width = 9, height = 9): StudioBg3dLtRasterInput {
   return image(width, height, (x) =>
     x < Math.floor(width / 2) ? [16, 16, 16, 255] : [240, 240, 240, 255]
@@ -318,6 +328,54 @@ describe("renderStudioBg3dLtLayers", () => {
     expect(withoutDepth.layers).toEqual([]);
     expect(withDepth.layers.map((layer) => layer.role)).toEqual(["main-line"]);
     expect(alphaCount(layerData(withDepth, "main-line"))).toBeGreaterThan(0);
+  });
+
+  it("inks the foreground side of a depth step without a far-surface double contour", () => {
+    const width = 9;
+    const height = 7;
+    const base = image(width, height, () => [128, 128, 128, 255]);
+    const depth = depthImage(width, height, (x) => (x < 4 ? 0.25 : 0.75));
+    const result = renderStudioBg3dLtLayers(
+      { ...base, depth },
+      settings({
+        widthPx: 1,
+        strength: 1,
+        accuracy: 1,
+        exteriorOutlineStrength: 0,
+        depthEnabled: true,
+        depthStrength: 1,
+        depthOutlineOnly: true,
+        textureLineEnabled: false,
+      })
+    );
+    const output = layerData(result, "main-line");
+
+    expect(output[(3 * width + 3) * 4 + 3]).toBeGreaterThan(0);
+    expect(output[(3 * width + 4) * 4 + 3]).toBe(0);
+  });
+
+  it("detects a compressed far-depth contour without inking a constant depth ramp", () => {
+    const width = 9;
+    const height = 7;
+    const base = image(width, height, () => [128, 128, 128, 255]);
+    const line = {
+      widthPx: 1,
+      strength: 1,
+      accuracy: 1,
+      exteriorOutlineStrength: 0,
+      depthEnabled: true,
+      depthStrength: 1,
+      depthOutlineOnly: true,
+      textureLineEnabled: false,
+    } satisfies Partial<StudioBg3dLineOutputSettings>;
+    const farStep = depthImage(width, height, (x) => (x < 4 ? 0.99 : 0.995));
+    const ramp = depthImage(width, height, (x, y) => 0.8 + x * 0.005 + y * 0.001);
+
+    const contour = renderStudioBg3dLtLayers({ ...base, depth: farStep }, settings(line));
+    const planar = renderStudioBg3dLtLayers({ ...base, depth: ramp }, settings(line));
+
+    expect(alphaCount(layerData(contour, "main-line"))).toBeGreaterThan(0);
+    expect(planar.layers).toEqual([]);
   });
 
   it("extracts high-frequency texture into its own layer and honors its switch", () => {

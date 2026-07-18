@@ -19,6 +19,11 @@ const STUDIO_BG3D_LEGACY_SCENE_DOCUMENT_VERSION = 1 as const;
 export const STUDIO_BG3D_SCENE_DOCUMENT_MAX_BYTES = 320 * 1024;
 export const STUDIO_BG3D_SCENE_DOCUMENT_MAX_NODES = 512;
 export const STUDIO_BG3D_SCENE_DOCUMENT_MAX_ATTACHMENTS = 64;
+export const STUDIO_BG3D_SCENE_DOCUMENT_MAX_SHOTS = 64;
+export const STUDIO_BG3D_SHOT_ID_MAX_LENGTH = 80;
+export const STUDIO_BG3D_SHOT_NAME_MAX_LENGTH = 80;
+export const STUDIO_BG3D_SHOT_MAX_NODE_VISIBILITY_OVERRIDES =
+  STUDIO_BG3D_SCENE_DOCUMENT_MAX_NODES;
 export const STUDIO_BG3D_GLB_MIME = "model/gltf-binary" as const;
 export const STUDIO_BG3D_GLB_MAX_BYTES = 100 * 1024 * 1024;
 
@@ -453,6 +458,111 @@ export interface StudioBg3dModelNode extends StudioBg3dSceneNodeBase {
 
 export type StudioBg3dSceneNode = StudioBg3dPrimitiveNode | StudioBg3dModelNode;
 
+/**
+ * A shot is a bounded, engine-neutral view of the same scene graph. It may override presentation
+ * state, but it never owns geometry, model bytes, URLs, attachment metadata, or runtime handles.
+ * Array order is the canonical storyboard order.
+ */
+export interface StudioBg3dShotCameraOverride {
+  readonly position?: StudioBg3dVec3;
+  readonly target?: StudioBg3dVec3;
+  readonly fovDegrees?: number;
+  readonly projection?: "perspective" | "orthographic";
+  readonly zoom?: number;
+  readonly lensShift?: readonly [number, number];
+}
+
+export interface StudioBg3dShotRenderOverride {
+  readonly antialias?: boolean;
+  readonly shadows?: boolean;
+  readonly exposure?: number;
+  readonly toneMapping?: StudioBg3dToneMapping;
+  readonly colorSpace?: "srgb";
+}
+
+export interface StudioBg3dShotBackgroundOverride {
+  readonly mode?: StudioBg3dBackgroundMode;
+  readonly color?: string;
+  readonly skyPresetId?: StudioBg3dSkyPresetId;
+  readonly panoramaRotation?: number;
+  readonly fogEnabled?: boolean;
+  readonly fogColor?: string;
+  readonly fogNear?: number;
+  readonly fogFar?: number;
+}
+
+export interface StudioBg3dShotDirectionalLightOverride {
+  readonly color?: string;
+  readonly direction?: StudioBg3dVec3;
+  readonly intensity?: number;
+  readonly castsShadow?: boolean;
+}
+
+export interface StudioBg3dShotLightingOverride {
+  readonly ambientColor?: string;
+  readonly ambientIntensity?: number;
+  readonly key?: StudioBg3dShotDirectionalLightOverride;
+  readonly fill?: StudioBg3dShotDirectionalLightOverride;
+}
+
+export interface StudioBg3dShotLineOutputOverride {
+  readonly enabled?: boolean;
+  readonly layerType?: StudioBg3dLineLayerType;
+  readonly color?: string;
+  readonly widthPx?: number;
+  readonly strength?: number;
+  readonly accuracy?: number;
+  readonly scaleAwareAccuracy?: boolean;
+  readonly exteriorOutlineStrength?: number;
+  readonly depthEnabled?: boolean;
+  readonly depthStrength?: number;
+  readonly depthOutlineOnly?: boolean;
+  readonly smoothing?: number;
+  readonly textureLineEnabled?: boolean;
+  readonly textureLineStrength?: number;
+  readonly creaseAngleDegrees?: number;
+  readonly hiddenLineRemoval?: boolean;
+}
+
+export interface StudioBg3dShotToneOutputOverride {
+  readonly mode?: StudioBg3dToneMode;
+  readonly type?: StudioBg3dToneOutputType;
+  readonly pattern?: StudioBg3dTonePattern;
+  readonly levels?: number;
+  readonly opacity?: number;
+  readonly frequency?: number;
+  readonly angleDegrees?: number;
+}
+
+/** Partial line/tone export state (LT) for one storyboard shot. */
+export interface StudioBg3dShotOutputOverride {
+  readonly transparentBackground?: boolean;
+  readonly exportHeight?: number;
+  readonly line?: StudioBg3dShotLineOutputOverride;
+  readonly tone?: StudioBg3dShotToneOutputOverride;
+}
+
+export interface StudioBg3dShotNodeVisibilityOverride {
+  readonly nodeId: string;
+  readonly visible: boolean;
+}
+
+export interface StudioBg3dShot {
+  readonly id: string;
+  readonly name: string;
+  readonly camera?: StudioBg3dShotCameraOverride;
+  readonly nodeVisibility?: readonly StudioBg3dShotNodeVisibilityOverride[];
+  readonly render?: StudioBg3dShotRenderOverride;
+  readonly background?: StudioBg3dShotBackgroundOverride;
+  readonly lighting?: StudioBg3dShotLightingOverride;
+  readonly output?: StudioBg3dShotOutputOverride;
+}
+
+export interface StudioBg3dShotCreateRequest {
+  readonly id: string;
+  readonly name: string;
+}
+
 export interface StudioBg3dSceneDocument {
   readonly kind: typeof STUDIO_BG3D_SCENE_DOCUMENT_KIND;
   readonly version: typeof STUDIO_BG3D_SCENE_DOCUMENT_VERSION;
@@ -465,6 +575,10 @@ export interface StudioBg3dSceneDocument {
   readonly budgets: StudioBg3dSceneBudgets;
   readonly attachments: readonly StudioBg3dModelAttachment[];
   readonly nodes: readonly StudioBg3dSceneNode[];
+  /** Optional to preserve byte-for-byte compatibility with canonical v3 documents. */
+  readonly shots?: readonly StudioBg3dShot[];
+  /** Absent means no shot is currently applied; it must reference `shots` when present. */
+  readonly activeShotId?: string;
 }
 
 const DEFAULT_CAMERA_POSITION: StudioBg3dVec3 = [4, 3, 6];
@@ -1006,6 +1120,231 @@ function normalizeOutput(value: unknown): StudioBg3dOutputSettings {
   };
 }
 
+function normalizeShotCameraOverride(value: unknown): StudioBg3dShotCameraOverride {
+  const candidate = isRecord(value) ? value : {};
+  const result: Record<string, unknown> = {};
+  if (hasOwn(candidate, "position")) {
+    result.position = normalizedVec3(
+      candidate.position,
+      DEFAULT_CAMERA_POSITION,
+      -MAX_WORLD_COORDINATE,
+      MAX_WORLD_COORDINATE,
+    );
+  }
+  if (hasOwn(candidate, "target")) {
+    result.target = normalizedVec3(
+      candidate.target,
+      DEFAULT_CAMERA_TARGET,
+      -MAX_WORLD_COORDINATE,
+      MAX_WORLD_COORDINATE,
+    );
+  }
+  if (hasOwn(candidate, "fovDegrees")) {
+    result.fovDegrees = boundedNumber(candidate.fovDegrees, 50, 10, 120);
+  }
+  if (hasOwn(candidate, "projection")) {
+    result.projection = candidate.projection === "orthographic" ? "orthographic" : "perspective";
+  }
+  if (hasOwn(candidate, "zoom")) {
+    result.zoom = boundedNumber(candidate.zoom, 1, 0.1, 100);
+  }
+  if (hasOwn(candidate, "lensShift")) {
+    result.lensShift =
+      Array.isArray(candidate.lensShift) && candidate.lensShift.length === 2
+        ? [
+            boundedNumber(candidate.lensShift[0], 0, -2, 2),
+            boundedNumber(candidate.lensShift[1], 0, -2, 2),
+          ]
+        : [0, 0];
+  }
+  return result as StudioBg3dShotCameraOverride;
+}
+
+function normalizeShotRenderOverride(value: unknown): StudioBg3dShotRenderOverride {
+  const candidate = isRecord(value) ? value : {};
+  const result: Record<string, unknown> = {};
+  if (hasOwn(candidate, "antialias")) {
+    result.antialias = normalizedBoolean(candidate.antialias, true);
+  }
+  if (hasOwn(candidate, "shadows")) {
+    result.shadows = normalizedBoolean(candidate.shadows, true);
+  }
+  if (hasOwn(candidate, "exposure")) {
+    result.exposure = boundedNumber(candidate.exposure, 1, 0.1, 8);
+  }
+  if (hasOwn(candidate, "toneMapping")) {
+    result.toneMapping = normalizedEnum(candidate.toneMapping, TONE_MAPPING_SET, "neutral");
+  }
+  if (hasOwn(candidate, "colorSpace")) result.colorSpace = "srgb";
+  return result as StudioBg3dShotRenderOverride;
+}
+
+function normalizeShotBackgroundOverride(value: unknown): StudioBg3dShotBackgroundOverride {
+  const candidate = isRecord(value) ? value : {};
+  const result: Record<string, unknown> = {};
+  if (hasOwn(candidate, "mode")) {
+    result.mode = normalizedEnum(candidate.mode, BACKGROUND_MODE_SET, "sky-preset");
+  }
+  if (hasOwn(candidate, "color")) result.color = normalizedColor(candidate.color, "#ffffff");
+  if (hasOwn(candidate, "skyPresetId")) {
+    result.skyPresetId = normalizedEnum(candidate.skyPresetId, SKY_PRESET_SET, "blank");
+  }
+  if (hasOwn(candidate, "panoramaRotation")) {
+    result.panoramaRotation = boundedNumber(candidate.panoramaRotation, 0, -360, 360);
+  }
+  if (hasOwn(candidate, "fogEnabled")) {
+    result.fogEnabled = normalizedBoolean(candidate.fogEnabled, false);
+  }
+  if (hasOwn(candidate, "fogColor")) {
+    result.fogColor = normalizedColor(candidate.fogColor, "#ffffff");
+  }
+  if (hasOwn(candidate, "fogNear")) {
+    result.fogNear = boundedNumber(candidate.fogNear, 10, 0, MAX_WORLD_COORDINATE);
+  }
+  if (hasOwn(candidate, "fogFar")) {
+    result.fogFar = boundedNumber(candidate.fogFar, 50, 0, MAX_WORLD_COORDINATE * 2);
+  }
+  return result as StudioBg3dShotBackgroundOverride;
+}
+
+function normalizeShotDirectionalLightOverride(
+  value: unknown,
+  fallback: (typeof DEFAULT_RAW_DOCUMENT.lighting)["key" | "fill"],
+): StudioBg3dShotDirectionalLightOverride {
+  const candidate = isRecord(value) ? value : {};
+  const result: Record<string, unknown> = {};
+  if (hasOwn(candidate, "color")) result.color = normalizedColor(candidate.color, fallback.color);
+  if (hasOwn(candidate, "direction")) {
+    result.direction = normalizedDirection(candidate.direction, fallback.direction);
+  }
+  if (hasOwn(candidate, "intensity")) {
+    result.intensity = boundedNumber(candidate.intensity, fallback.intensity, 0, 20);
+  }
+  if (hasOwn(candidate, "castsShadow")) {
+    result.castsShadow = normalizedBoolean(candidate.castsShadow, fallback.castsShadow);
+  }
+  return result as StudioBg3dShotDirectionalLightOverride;
+}
+
+function normalizeShotLightingOverride(value: unknown): StudioBg3dShotLightingOverride {
+  const candidate = isRecord(value) ? value : {};
+  const result: Record<string, unknown> = {};
+  if (hasOwn(candidate, "ambientColor")) {
+    result.ambientColor = normalizedColor(candidate.ambientColor, "#ffffff");
+  }
+  if (hasOwn(candidate, "ambientIntensity")) {
+    result.ambientIntensity = boundedNumber(candidate.ambientIntensity, 0.75, 0, 10);
+  }
+  if (hasOwn(candidate, "key")) {
+    result.key = normalizeShotDirectionalLightOverride(
+      candidate.key,
+      DEFAULT_RAW_DOCUMENT.lighting.key,
+    );
+  }
+  if (hasOwn(candidate, "fill")) {
+    result.fill = normalizeShotDirectionalLightOverride(
+      candidate.fill,
+      DEFAULT_RAW_DOCUMENT.lighting.fill,
+    );
+  }
+  return result as StudioBg3dShotLightingOverride;
+}
+
+function normalizeShotLineOutputOverride(value: unknown): StudioBg3dShotLineOutputOverride {
+  const candidate = isRecord(value) ? value : {};
+  const result: Record<string, unknown> = {};
+  if (hasOwn(candidate, "enabled")) result.enabled = normalizedBoolean(candidate.enabled, true);
+  if (hasOwn(candidate, "layerType")) {
+    result.layerType = normalizedEnum(candidate.layerType, LINE_LAYER_TYPE_SET, "raster");
+  }
+  if (hasOwn(candidate, "color")) result.color = normalizedColor(candidate.color, "#000000");
+  if (hasOwn(candidate, "widthPx")) {
+    result.widthPx = boundedNumber(candidate.widthPx, 1, 0.25, 8);
+  }
+  if (hasOwn(candidate, "strength")) {
+    result.strength = boundedNumber(candidate.strength, 0.8, 0, 1);
+  }
+  if (hasOwn(candidate, "accuracy")) {
+    result.accuracy = boundedNumber(candidate.accuracy, 0.75, 0, 1);
+  }
+  if (hasOwn(candidate, "scaleAwareAccuracy")) {
+    result.scaleAwareAccuracy = normalizedBoolean(candidate.scaleAwareAccuracy, true);
+  }
+  if (hasOwn(candidate, "exteriorOutlineStrength")) {
+    result.exteriorOutlineStrength = boundedNumber(candidate.exteriorOutlineStrength, 1, 0, 2);
+  }
+  if (hasOwn(candidate, "depthEnabled")) {
+    result.depthEnabled = normalizedBoolean(candidate.depthEnabled, false);
+  }
+  if (hasOwn(candidate, "depthStrength")) {
+    result.depthStrength = boundedNumber(candidate.depthStrength, 0.5, 0, 1);
+  }
+  if (hasOwn(candidate, "depthOutlineOnly")) {
+    result.depthOutlineOnly = normalizedBoolean(candidate.depthOutlineOnly, true);
+  }
+  if (hasOwn(candidate, "smoothing")) {
+    result.smoothing = boundedNumber(candidate.smoothing, 0.5, 0, 1);
+  }
+  if (hasOwn(candidate, "textureLineEnabled")) {
+    result.textureLineEnabled = normalizedBoolean(candidate.textureLineEnabled, true);
+  }
+  if (hasOwn(candidate, "textureLineStrength")) {
+    result.textureLineStrength = boundedNumber(candidate.textureLineStrength, 0.5, 0, 1);
+  }
+  if (hasOwn(candidate, "creaseAngleDegrees")) {
+    result.creaseAngleDegrees = boundedNumber(candidate.creaseAngleDegrees, 20, 0, 180);
+  }
+  if (hasOwn(candidate, "hiddenLineRemoval")) {
+    result.hiddenLineRemoval = normalizedBoolean(candidate.hiddenLineRemoval, true);
+  }
+  return result as StudioBg3dShotLineOutputOverride;
+}
+
+function normalizeShotToneOutputOverride(value: unknown): StudioBg3dShotToneOutputOverride {
+  const candidate = isRecord(value) ? value : {};
+  const result: Record<string, unknown> = {};
+  if (hasOwn(candidate, "mode")) {
+    result.mode = normalizedEnum(candidate.mode, TONE_MODE_SET, "flat");
+  }
+  if (hasOwn(candidate, "type")) {
+    result.type = normalizedEnum(candidate.type, TONE_OUTPUT_TYPE_SET, "color");
+  }
+  if (hasOwn(candidate, "pattern")) {
+    result.pattern = normalizedEnum(candidate.pattern, TONE_PATTERN_SET, "dot");
+  }
+  if (hasOwn(candidate, "levels")) {
+    result.levels = boundedInteger(candidate.levels, 4, 2, 8);
+  }
+  if (hasOwn(candidate, "opacity")) {
+    result.opacity = boundedNumber(candidate.opacity, 1, 0, 1);
+  }
+  if (hasOwn(candidate, "frequency")) {
+    result.frequency = boundedNumber(candidate.frequency, 60, 1, 200);
+  }
+  if (hasOwn(candidate, "angleDegrees")) {
+    result.angleDegrees = boundedNumber(candidate.angleDegrees, 45, -180, 180);
+  }
+  return result as StudioBg3dShotToneOutputOverride;
+}
+
+function normalizeShotOutputOverride(value: unknown): StudioBg3dShotOutputOverride {
+  const candidate = isRecord(value) ? value : {};
+  const result: Record<string, unknown> = {};
+  if (hasOwn(candidate, "transparentBackground")) {
+    result.transparentBackground = normalizedBoolean(candidate.transparentBackground, false);
+  }
+  if (hasOwn(candidate, "exportHeight")) {
+    result.exportHeight = boundedInteger(candidate.exportHeight, 640, 256, 4096);
+  }
+  if (hasOwn(candidate, "line")) {
+    result.line = normalizeShotLineOutputOverride(candidate.line);
+  }
+  if (hasOwn(candidate, "tone")) {
+    result.tone = normalizeShotToneOutputOverride(candidate.tone);
+  }
+  return result as StudioBg3dShotOutputOverride;
+}
+
 function normalizeBudgets(value: unknown): StudioBg3dSceneBudgets {
   const candidate = isRecord(value) ? value : {};
   const complexity = isRecord(candidate.complexity) ? candidate.complexity : {};
@@ -1454,6 +1793,87 @@ function normalizeNodes(
   return normalizeStudioBg3dHierarchyParents(nodes);
 }
 
+function normalizeShotNodeVisibility(
+  value: unknown,
+  nodeIds: ReadonlySet<string>,
+): readonly StudioBg3dShotNodeVisibilityOverride[] {
+  if (!Array.isArray(value)) return [];
+  const overrides: StudioBg3dShotNodeVisibilityOverride[] = [];
+  const claimedNodeIds = new Set<string>();
+  for (const candidate of value) {
+    if (!isRecord(candidate)) continue;
+    const nodeId = normalizedId(candidate.nodeId);
+    if (
+      !nodeId ||
+      !nodeIds.has(nodeId) ||
+      claimedNodeIds.has(nodeId) ||
+      typeof candidate.visible !== "boolean"
+    ) {
+      continue;
+    }
+    claimedNodeIds.add(nodeId);
+    overrides.push({ nodeId, visible: candidate.visible });
+    if (overrides.length >= STUDIO_BG3D_SHOT_MAX_NODE_VISIBILITY_OVERRIDES) break;
+  }
+  return overrides;
+}
+
+function normalizeShot(
+  value: unknown,
+  nodeIds: ReadonlySet<string>,
+): StudioBg3dShot | null {
+  if (!isRecord(value)) return null;
+  const id = normalizedId(value.id);
+  const name = normalizedText(value.name, STUDIO_BG3D_SHOT_NAME_MAX_LENGTH, true);
+  if (!id || id.length > STUDIO_BG3D_SHOT_ID_MAX_LENGTH || !name) return null;
+  return {
+    id,
+    name,
+    ...(hasOwn(value, "camera")
+      ? { camera: normalizeShotCameraOverride(value.camera) }
+      : {}),
+    ...(hasOwn(value, "nodeVisibility")
+      ? { nodeVisibility: normalizeShotNodeVisibility(value.nodeVisibility, nodeIds) }
+      : {}),
+    ...(hasOwn(value, "render")
+      ? { render: normalizeShotRenderOverride(value.render) }
+      : {}),
+    ...(hasOwn(value, "background")
+      ? { background: normalizeShotBackgroundOverride(value.background) }
+      : {}),
+    ...(hasOwn(value, "lighting")
+      ? { lighting: normalizeShotLightingOverride(value.lighting) }
+      : {}),
+    ...(hasOwn(value, "output")
+      ? { output: normalizeShotOutputOverride(value.output) }
+      : {}),
+  };
+}
+
+function normalizeShots(
+  value: unknown,
+  nodeIds: ReadonlySet<string>,
+): readonly StudioBg3dShot[] {
+  if (!Array.isArray(value)) return [];
+  const shots: StudioBg3dShot[] = [];
+  const ids = new Set<string>();
+  for (const candidate of value) {
+    const shot = normalizeShot(candidate, nodeIds);
+    if (!shot || ids.has(shot.id)) continue;
+    ids.add(shot.id);
+    shots.push(shot);
+    if (shots.length >= STUDIO_BG3D_SCENE_DOCUMENT_MAX_SHOTS) break;
+  }
+  return shots;
+}
+
+function withoutActiveShot(
+  document: StudioBg3dSceneDocument,
+): StudioBg3dSceneDocument {
+  const { activeShotId: _discardedActiveShotId, ...rest } = document;
+  return rest;
+}
+
 function canonicalDocumentByteLength(document: StudioBg3dSceneDocument): number {
   return utf8ByteLength(JSON.stringify(document));
 }
@@ -1480,8 +1900,9 @@ function largestPersistablePrefix(
 
 /**
  * Normalization expands sparse nodes with explicit defaults, so a byte-bounded input can produce a
- * larger canonical graph. Keep the longest stable prefix, dropping trailing nodes before trailing
- * attachments. This makes the output deterministic and guarantees every returned graph persists.
+ * larger canonical graph. Keep the longest stable prefix, dropping optional trailing shots before
+ * scene nodes and attachments. Removing shots before nodes also guarantees no retained visibility
+ * override can reference a node removed by byte-budget fitting.
  */
 function fitNormalizedDocumentToByteBudget(
   document: StudioBg3dSceneDocument
@@ -1489,15 +1910,34 @@ function fitNormalizedDocumentToByteBudget(
   if (canonicalDocumentByteLength(document) <= STUDIO_BG3D_SCENE_DOCUMENT_MAX_BYTES) {
     return document;
   }
-  const nodeBounded = largestPersistablePrefix(document.nodes.length, (count) => ({
-    ...document,
+
+  let shotlessDocument = document;
+  if (document.shots !== undefined) {
+    const withoutActive = withoutActiveShot(document);
+    const shotBounded = largestPersistablePrefix(document.shots.length, (count) => {
+      const shots = document.shots?.slice(0, count) ?? [];
+      const keepsActiveShot =
+        document.activeShotId !== undefined &&
+        shots.some((shot) => shot.id === document.activeShotId);
+      return {
+        ...withoutActive,
+        shots,
+        ...(keepsActiveShot ? { activeShotId: document.activeShotId } : {}),
+      };
+    });
+    if (shotBounded) return shotBounded;
+    shotlessDocument = { ...withoutActive, shots: [] };
+  }
+
+  const nodeBounded = largestPersistablePrefix(shotlessDocument.nodes.length, (count) => ({
+    ...shotlessDocument,
     nodes: document.nodes.slice(0, count),
   }));
   if (nodeBounded) return nodeBounded;
 
-  return largestPersistablePrefix(document.attachments.length, (count) => ({
-    ...document,
-    attachments: document.attachments.slice(0, count),
+  return largestPersistablePrefix(shotlessDocument.attachments.length, (count) => ({
+    ...shotlessDocument,
+    attachments: shotlessDocument.attachments.slice(0, count),
     nodes: [],
   }));
 }
@@ -1520,6 +1960,12 @@ function normalizeDecodedCurrentDocument(
     budgets.complexity.maxModelBytes
   );
   const attachmentIds = new Set(attachments.map((attachment) => attachment.id));
+  const nodes = normalizeNodes(value.nodes, attachmentIds, budgets.complexity.maxNodes);
+  const nodeIds = new Set(nodes.map((node) => node.id));
+  const includesShots = hasOwn(value, "shots");
+  const shots = includesShots ? normalizeShots(value.shots, nodeIds) : undefined;
+  const shotIds = new Set(shots?.map((shot) => shot.id) ?? []);
+  const activeShotId = normalizedId(value.activeShotId);
   const normalized: StudioBg3dSceneDocument = {
     kind: STUDIO_BG3D_SCENE_DOCUMENT_KIND,
     version: STUDIO_BG3D_SCENE_DOCUMENT_VERSION,
@@ -1531,7 +1977,9 @@ function normalizeDecodedCurrentDocument(
     output: normalizeOutput(value.output),
     budgets,
     attachments,
-    nodes: normalizeNodes(value.nodes, attachmentIds, budgets.complexity.maxNodes),
+    nodes,
+    ...(shots ? { shots } : {}),
+    ...(activeShotId && shotIds.has(activeShotId) ? { activeShotId } : {}),
   };
   const fitted = fitNormalizedDocumentToByteBudget(normalized);
   if (!fitted || (rootMode === "strict" && !jsonStructuresEqual(value, fitted))) return null;
@@ -1706,7 +2154,11 @@ function migrateSchemaV2Nodes(value: readonly unknown[]): readonly unknown[] | n
 }
 
 function migrateDecodedSchemaV2Document(value: unknown): StudioBg3dSceneDocument | null {
-  if (!hasCompleteRootShapeForVersion(value, STUDIO_BG3D_SCHEMA_V2_SCENE_DOCUMENT_VERSION)) {
+  if (
+    !hasCompleteRootShapeForVersion(value, STUDIO_BG3D_SCHEMA_V2_SCENE_DOCUMENT_VERSION) ||
+    hasOwn(value, "shots") ||
+    hasOwn(value, "activeShotId")
+  ) {
     return null;
   }
   const nodes = migrateSchemaV2Nodes(value.nodes);
@@ -1719,7 +2171,11 @@ function migrateDecodedSchemaV2Document(value: unknown): StudioBg3dSceneDocument
 }
 
 function migrateDecodedSchemaV1Document(value: unknown): StudioBg3dSceneDocument | null {
-  if (!hasCompleteRootShapeForVersion(value, STUDIO_BG3D_LEGACY_SCENE_DOCUMENT_VERSION)) {
+  if (
+    !hasCompleteRootShapeForVersion(value, STUDIO_BG3D_LEGACY_SCENE_DOCUMENT_VERSION) ||
+    hasOwn(value, "shots") ||
+    hasOwn(value, "activeShotId")
+  ) {
     return null;
   }
   if (
@@ -1759,6 +2215,12 @@ function migrateDecodedSchemaPanoramaDocument(
       isRecord(node) && (
         hasOwn(node, "materialOverride") || hasOwn(node, "animation") || hasOwn(node, "pose") || hasOwn(node, "morph") || hasOwn(node, "constraints")
       ))
+  ) {
+    return null;
+  }
+  if (
+    value.version !== STUDIO_BG3D_SCENE_DOCUMENT_VERSION &&
+    (hasOwn(value, "shots") || hasOwn(value, "activeShotId"))
   ) {
     return null;
   }
@@ -1847,7 +2309,7 @@ export function migrateStudioBg3dSceneDocument(
 /**
  * Canonical current-version JSON serialization. Only already-canonical current documents are
  * accepted; callers must use the lenient editor normalizer or explicit legacy migration before
- * reaching this persistence boundary. Every non-null result is UTF-8 bounded to 256 KiB.
+ * reaching this persistence boundary. Every non-null result is UTF-8 bounded to 320 KiB.
  */
 export function serializeStudioBg3dSceneDocument(raw: unknown): string | null {
   const document = normalizeDecodedCurrentDocument(decodeBoundedJson(raw), "strict");
@@ -1860,6 +2322,208 @@ export function serializeStudioBg3dSceneDocument(raw: unknown): string | null {
   } catch {
     return null;
   }
+}
+
+function normalizeShotCreateRequest(value: unknown): StudioBg3dShotCreateRequest | null {
+  const decoded = decodeBoundedJson(value);
+  if (!isRecord(decoded)) return null;
+  const id = normalizedId(decoded.id);
+  const name = normalizedText(decoded.name, STUDIO_BG3D_SHOT_NAME_MAX_LENGTH, true);
+  const normalized = id && id.length <= STUDIO_BG3D_SHOT_ID_MAX_LENGTH && name
+    ? { id, name }
+    : null;
+  return normalized && jsonStructuresEqual(decoded, normalized) ? normalized : null;
+}
+
+function canonicalDocumentForShotHelper(raw: unknown): StudioBg3dSceneDocument | null {
+  return normalizeDecodedCurrentDocument(decodeBoundedJson(raw), "strict");
+}
+
+/**
+ * Captures the current camera, presentation, LT output, and every node's visibility as a new shot.
+ * The source document is never mutated. A duplicate id, the 64-shot cap, or the document byte
+ * ceiling returns null rather than discarding an existing shot or scene element.
+ */
+export function captureStudioBg3dShot(
+  raw: unknown,
+  request: StudioBg3dShotCreateRequest,
+): StudioBg3dSceneDocument | null {
+  const document = canonicalDocumentForShotHelper(raw);
+  const normalizedRequest = normalizeShotCreateRequest(request);
+  if (
+    !document ||
+    !normalizedRequest ||
+    (document.shots?.length ?? 0) >= STUDIO_BG3D_SCENE_DOCUMENT_MAX_SHOTS ||
+    document.shots?.some((shot) => shot.id === normalizedRequest.id)
+  ) {
+    return null;
+  }
+
+  const shot: StudioBg3dShot = {
+    ...normalizedRequest,
+    camera: { ...document.camera },
+    nodeVisibility: document.nodes.map(({ id: nodeId, visible }) => ({ nodeId, visible })),
+    render: { ...document.render },
+    background: { ...document.background },
+    lighting: {
+      ...document.lighting,
+      key: { ...document.lighting.key },
+      fill: { ...document.lighting.fill },
+    },
+    output: {
+      ...document.output,
+      line: { ...document.output.line },
+      tone: { ...document.output.tone },
+    },
+  };
+  return canonicalDocumentForShotHelper({
+    ...withoutActiveShot(document),
+    shots: [...(document.shots ?? []), shot],
+    activeShotId: shot.id,
+  });
+}
+
+/** Creates an independent storyboard entry whose overrides initially match an existing shot. */
+export function duplicateStudioBg3dShot(
+  raw: unknown,
+  sourceShotId: string,
+  request: StudioBg3dShotCreateRequest,
+): StudioBg3dSceneDocument | null {
+  const document = canonicalDocumentForShotHelper(raw);
+  const normalizedRequest = normalizeShotCreateRequest(request);
+  const normalizedSourceShotId = normalizedId(sourceShotId);
+  if (
+    !document ||
+    !normalizedRequest ||
+    !normalizedSourceShotId ||
+    normalizedSourceShotId !== sourceShotId ||
+    (document.shots?.length ?? 0) >= STUDIO_BG3D_SCENE_DOCUMENT_MAX_SHOTS ||
+    document.shots?.some((shot) => shot.id === normalizedRequest.id)
+  ) {
+    return null;
+  }
+  const source = document.shots?.find((shot) => shot.id === normalizedSourceShotId);
+  if (!source) return null;
+  const duplicate: StudioBg3dShot = {
+    ...source,
+    ...normalizedRequest,
+  };
+  return canonicalDocumentForShotHelper({
+    ...withoutActiveShot(document),
+    shots: [...(document.shots ?? []), duplicate],
+    activeShotId: duplicate.id,
+  });
+}
+
+/** Removes one storyboard entry; the immutable scene graph and every other shot stay untouched. */
+export function removeStudioBg3dShot(
+  raw: unknown,
+  shotId: string,
+): StudioBg3dSceneDocument | null {
+  const document = canonicalDocumentForShotHelper(raw);
+  const normalizedShotId = normalizedId(shotId);
+  if (!document || !normalizedShotId || normalizedShotId !== shotId) return null;
+  const shots = document.shots ?? [];
+  if (!shots.some((shot) => shot.id === normalizedShotId)) return null;
+
+  const remaining = shots.filter((shot) => shot.id !== normalizedShotId);
+  const {
+    shots: _discardedShots,
+    activeShotId: _discardedActiveShotId,
+    ...scene
+  } = document;
+  return canonicalDocumentForShotHelper({
+    ...scene,
+    ...(remaining.length > 0 ? { shots: remaining } : {}),
+    ...(document.activeShotId && document.activeShotId !== normalizedShotId
+      ? { activeShotId: document.activeShotId }
+      : {}),
+  });
+}
+
+/** Moves one shot to an exact bounded storyboard index without changing any shot payload. */
+export function moveStudioBg3dShot(
+  raw: unknown,
+  shotId: string,
+  targetIndex: number,
+): StudioBg3dSceneDocument | null {
+  const document = canonicalDocumentForShotHelper(raw);
+  const normalizedShotId = normalizedId(shotId);
+  if (
+    !document ||
+    !normalizedShotId ||
+    normalizedShotId !== shotId ||
+    !Number.isSafeInteger(targetIndex)
+  ) {
+    return null;
+  }
+  const shots = [...(document.shots ?? [])];
+  const sourceIndex = shots.findIndex((shot) => shot.id === normalizedShotId);
+  if (sourceIndex < 0 || targetIndex < 0 || targetIndex >= shots.length) return null;
+  if (sourceIndex === targetIndex) return document;
+  const [shot] = shots.splice(sourceIndex, 1);
+  if (!shot) return null;
+  shots.splice(targetIndex, 0, shot);
+  return canonicalDocumentForShotHelper({ ...document, shots });
+}
+
+/** Applies one shot's partial overrides and marks it active without changing asset or geometry data. */
+export function applyStudioBg3dShot(
+  raw: unknown,
+  shotId: string,
+): StudioBg3dSceneDocument | null {
+  const document = canonicalDocumentForShotHelper(raw);
+  const normalizedShotId = normalizedId(shotId);
+  if (!document || !normalizedShotId || normalizedShotId !== shotId) return null;
+  const shot = document.shots?.find((candidate) => candidate.id === normalizedShotId);
+  if (!shot) return null;
+
+  const visibleByNodeId = new Map(
+    shot.nodeVisibility?.map(({ nodeId, visible }) => [nodeId, visible] as const) ?? [],
+  );
+  const lighting = shot.lighting
+    ? normalizeLighting({
+        ...document.lighting,
+        ...shot.lighting,
+        key: shot.lighting.key
+          ? { ...document.lighting.key, ...shot.lighting.key }
+          : document.lighting.key,
+        fill: shot.lighting.fill
+          ? { ...document.lighting.fill, ...shot.lighting.fill }
+          : document.lighting.fill,
+      })
+    : document.lighting;
+  const output = shot.output
+    ? normalizeOutput({
+        ...document.output,
+        ...shot.output,
+        line: shot.output.line
+          ? { ...document.output.line, ...shot.output.line }
+          : document.output.line,
+        tone: shot.output.tone
+          ? { ...document.output.tone, ...shot.output.tone }
+          : document.output.tone,
+      })
+    : document.output;
+  return canonicalDocumentForShotHelper({
+    ...document,
+    camera: shot.camera
+      ? normalizeCamera({ ...document.camera, ...shot.camera })
+      : document.camera,
+    render: shot.render
+      ? normalizeRender({ ...document.render, ...shot.render })
+      : document.render,
+    background: shot.background
+      ? normalizeBackground({ ...document.background, ...shot.background })
+      : document.background,
+    lighting,
+    output,
+    nodes: document.nodes.map((node) => {
+      const visible = visibleByNodeId.get(node.id);
+      return visible === undefined ? node : { ...node, visible };
+    }),
+    activeShotId: shot.id,
+  });
 }
 
 /** Runtime/UI helper for pre-validating one metadata record without retaining hostile fields. */

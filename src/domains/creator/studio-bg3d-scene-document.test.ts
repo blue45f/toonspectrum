@@ -9,12 +9,21 @@ import {
   STUDIO_BG3D_SCENE_DOCUMENT_MAX_ATTACHMENTS,
   STUDIO_BG3D_SCENE_DOCUMENT_MAX_BYTES,
   STUDIO_BG3D_SCENE_DOCUMENT_MAX_NODES,
+  STUDIO_BG3D_SCENE_DOCUMENT_MAX_SHOTS,
   STUDIO_BG3D_SCENE_DOCUMENT_VERSION,
+  STUDIO_BG3D_SHOT_ID_MAX_LENGTH,
+  STUDIO_BG3D_SHOT_MAX_NODE_VISIBILITY_OVERRIDES,
+  STUDIO_BG3D_SHOT_NAME_MAX_LENGTH,
+  applyStudioBg3dShot,
+  captureStudioBg3dShot,
   createDefaultStudioBg3dSceneDocument,
+  duplicateStudioBg3dShot,
   migrateStudioBg3dSceneDocument,
+  moveStudioBg3dShot,
   normalizeStudioBg3dGlbAttachment,
   normalizeStudioBg3dSceneDocument,
   parseStudioBg3dSceneDocument,
+  removeStudioBg3dShot,
   serializeStudioBg3dSceneDocument,
   type StudioBg3dModelAttachment,
   type StudioBg3dSceneDocument,
@@ -1241,6 +1250,331 @@ describe("Studio BG3D scene nodes and budgets", () => {
     );
 
     expect(normalized.nodes).toHaveLength(STUDIO_BG3D_SCENE_DOCUMENT_MAX_NODES);
+  });
+});
+
+describe("Studio BG3D bounded storyboard shots", () => {
+  it("keeps shot-less v3 and migrated v2 documents byte-compatible", () => {
+    const v3 = createDefaultStudioBg3dSceneDocument();
+    const serializedV3 = serializeStudioBg3dSceneDocument(v3);
+    const migratedV2 = migrateStudioBg3dSceneDocument(schemaV2Document());
+    const inactiveStoryboard = currentDocument({
+      shots: [{ id: "shot-a", name: "비활성 컷" }],
+    });
+
+    expect(serializedV3).toBe(JSON.stringify(v3));
+    expect(parseStudioBg3dSceneDocument(serializedV3 ?? "")).toEqual(v3);
+    expect(v3).not.toHaveProperty("shots");
+    expect(v3).not.toHaveProperty("activeShotId");
+    expect(migratedV2).not.toBeNull();
+    expect(migratedV2).not.toHaveProperty("shots");
+    expect(migratedV2).not.toHaveProperty("activeShotId");
+    expect(serializeStudioBg3dSceneDocument(inactiveStoryboard)).not.toBeNull();
+    expect(normalizeStudioBg3dSceneDocument(inactiveStoryboard)).not.toHaveProperty(
+      "activeShotId",
+    );
+  });
+
+  it("round-trips ordered partial camera, visibility, atmosphere, lighting, render, and LT overrides", () => {
+    const candidate = currentDocument({
+      nodes: [primitiveNode(1), primitiveNode(2)],
+      shots: [
+        {
+          id: "shot-wide",
+          name: "전경 와이드",
+          camera: { position: [8, 4, 8], fovDegrees: 35 },
+          nodeVisibility: [{ nodeId: "node-2", visible: false }],
+          render: { exposure: 1.5, toneMapping: "aces" },
+          background: {
+            skyPresetId: "sunset",
+            fogEnabled: true,
+            fogColor: "#112233",
+          },
+          lighting: { ambientIntensity: 0.4, key: { intensity: 2 } },
+          output: {
+            line: { layerType: "vector", widthPx: 2 },
+            tone: { mode: "screentone", pattern: "crosshatch" },
+          },
+        },
+        { id: "shot-close", name: "클로즈업", camera: { zoom: 1.4 } },
+      ],
+      activeShotId: "shot-wide",
+    });
+    const serialized = serializeStudioBg3dSceneDocument(candidate);
+    const parsed = parseStudioBg3dSceneDocument(serialized ?? "");
+
+    expect(serialized).not.toBeNull();
+    expect(parsed?.shots?.map((shot) => shot.id)).toEqual(["shot-wide", "shot-close"]);
+    expect(parsed?.shots?.[0]).toMatchObject({
+      id: "shot-wide",
+      name: "전경 와이드",
+      camera: { position: [8, 4, 8], fovDegrees: 35 },
+      nodeVisibility: [{ nodeId: "node-2", visible: false }],
+      render: { exposure: 1.5, toneMapping: "aces" },
+      background: { skyPresetId: "sunset", fogEnabled: true, fogColor: "#112233" },
+      lighting: { ambientIntensity: 0.4, key: { intensity: 2 } },
+      output: {
+        line: { layerType: "vector", widthPx: 2 },
+        tone: { mode: "screentone", pattern: "crosshatch" },
+      },
+    });
+    expect(parsed?.activeShotId).toBe("shot-wide");
+    expect(Object.isFrozen(parsed?.shots)).toBe(true);
+    expect(Object.isFrozen(parsed?.shots?.[0]?.camera)).toBe(true);
+  });
+
+  it("applies a shot without mutating geometry, assets, or unspecified presentation fields", () => {
+    const original = normalizeStudioBg3dSceneDocument(currentDocument({
+      nodes: [primitiveNode(1), primitiveNode(2)],
+      shots: [{
+        id: "shot-night",
+        name: "야간 컷",
+        camera: { position: [2, 1.5, 3], fovDegrees: 28 },
+        nodeVisibility: [{ nodeId: "node-2", visible: false }],
+        render: { exposure: 0.7 },
+        background: { skyPresetId: "night", fogEnabled: true },
+        lighting: { key: { intensity: 3.2 } },
+        output: { line: { widthPx: 2.5 }, tone: { mode: "cel", levels: 3 } },
+      }],
+    }));
+    const applied = applyStudioBg3dShot(original, "shot-night");
+
+    expect(applied).not.toBeNull();
+    expect(applied?.activeShotId).toBe("shot-night");
+    expect(applied?.camera).toMatchObject({ position: [2, 1.5, 3], fovDegrees: 28 });
+    expect(applied?.nodes.map(({ id, visible }) => [id, visible])).toEqual([
+      ["node-1", true],
+      ["node-2", false],
+    ]);
+    expect(applied?.background).toMatchObject({ skyPresetId: "night", fogEnabled: true });
+    expect(applied?.lighting.key).toMatchObject({
+      intensity: 3.2,
+      color: original.lighting.key.color,
+      direction: original.lighting.key.direction,
+    });
+    expect(applied?.output.line.widthPx).toBe(2.5);
+    expect(applied?.output.tone).toMatchObject({ mode: "cel", levels: 3 });
+    expect(applied?.nodes[0].transform).toEqual(original.nodes[0].transform);
+    expect(applied?.attachments).toEqual(original.attachments);
+    expect(original.nodes[1].visible).toBe(true);
+    expect(original).not.toHaveProperty("activeShotId");
+    expect(applyStudioBg3dShot(original, "missing-shot")).toBeNull();
+  });
+
+  it("captures and duplicates immutable full-state shot snapshots through pure helpers", () => {
+    const original = normalizeStudioBg3dSceneDocument(currentDocument({
+      camera: { ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera, fovDegrees: 42 },
+      background: {
+        ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.background,
+        skyPresetId: "clear_day",
+      },
+      nodes: [primitiveNode(1), { ...primitiveNode(2), visible: false }],
+    }));
+    const captured = captureStudioBg3dShot(original, { id: "shot-a", name: "설정 컷" });
+    const duplicated = duplicateStudioBg3dShot(
+      captured,
+      "shot-a",
+      { id: "shot-b", name: "설정 컷 복제" },
+    );
+
+    expect(captured?.shots).toHaveLength(1);
+    expect(captured?.shots?.[0]).toMatchObject({
+      id: "shot-a",
+      name: "설정 컷",
+      camera: { fovDegrees: 42 },
+      background: { skyPresetId: "clear_day" },
+      nodeVisibility: [
+        { nodeId: "node-1", visible: true },
+        { nodeId: "node-2", visible: false },
+      ],
+    });
+    expect(duplicated?.shots).toHaveLength(2);
+    expect(duplicated?.shots?.[1]).toEqual({
+      ...duplicated?.shots?.[0],
+      id: "shot-b",
+      name: "설정 컷 복제",
+    });
+    expect(duplicated?.activeShotId).toBe("shot-b");
+    expect(Object.isFrozen(duplicated?.shots?.[1]?.output?.line)).toBe(true);
+    expect(original).not.toHaveProperty("shots");
+    expect(duplicateStudioBg3dShot(captured, "shot-a", {
+      id: "shot-a",
+      name: "중복",
+    })).toBeNull();
+  });
+
+  it("reorders and removes shots without changing their payloads or scene geometry", () => {
+    const original = normalizeStudioBg3dSceneDocument(currentDocument({
+      nodes: [primitiveNode(1)],
+      shots: [
+        { id: "shot-a", name: "첫 컷", camera: { zoom: 1.1 } },
+        { id: "shot-b", name: "둘째 컷", background: { fogEnabled: true } },
+        { id: "shot-c", name: "셋째 컷", output: { transparentBackground: true } },
+      ],
+      activeShotId: "shot-b",
+    }));
+    const moved = moveStudioBg3dShot(original, "shot-c", 0);
+    const removedInactive = removeStudioBg3dShot(moved, "shot-a");
+    const removedActive = removeStudioBg3dShot(removedInactive, "shot-b");
+
+    expect(moved?.shots?.map((shot) => shot.id)).toEqual(["shot-c", "shot-a", "shot-b"]);
+    expect(moved?.shots?.[0]).toEqual(original.shots?.[2]);
+    expect(moved?.nodes).toEqual(original.nodes);
+    expect(moved?.activeShotId).toBe("shot-b");
+    expect(removedInactive?.shots?.map((shot) => shot.id)).toEqual(["shot-c", "shot-b"]);
+    expect(removedInactive?.activeShotId).toBe("shot-b");
+    expect(removedActive?.shots?.map((shot) => shot.id)).toEqual(["shot-c"]);
+    expect(removedActive).not.toHaveProperty("activeShotId");
+    expect(original.shots?.map((shot) => shot.id)).toEqual(["shot-a", "shot-b", "shot-c"]);
+    expect(moveStudioBg3dShot(original, "missing", 0)).toBeNull();
+    expect(moveStudioBg3dShot(original, "shot-a", -1)).toBeNull();
+    expect(moveStudioBg3dShot(original, "shot-a", 3)).toBeNull();
+    expect(removeStudioBg3dShot(original, "missing")).toBeNull();
+  });
+
+  it("caps shots and node visibility overrides while strict persistence rejects truncation", () => {
+    const tooManyShots = currentDocument({
+      shots: Array.from(
+        { length: STUDIO_BG3D_SCENE_DOCUMENT_MAX_SHOTS + 1 },
+        (_, index) => ({ id: `shot-${index}`, name: `컷 ${index}` }),
+      ),
+    });
+    const nodes = Array.from(
+      { length: STUDIO_BG3D_SHOT_MAX_NODE_VISIBILITY_OVERRIDES },
+      (_, index) => primitiveNode(index + 1),
+    );
+    const tooManyVisibilityOverrides = currentDocument({
+      budgets: {
+        ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.budgets,
+        complexity: {
+          ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.budgets.complexity,
+          maxNodes: STUDIO_BG3D_SCENE_DOCUMENT_MAX_NODES,
+        },
+      },
+      nodes,
+      shots: [{
+        id: "shot-crowded",
+        name: "전체 배치",
+        nodeVisibility: [
+          ...nodes.map((node) => ({ nodeId: node.id, visible: false })),
+          { nodeId: nodes[0].id, visible: true },
+        ],
+      }],
+    });
+
+    expect(normalizeStudioBg3dSceneDocument(tooManyShots).shots).toHaveLength(
+      STUDIO_BG3D_SCENE_DOCUMENT_MAX_SHOTS,
+    );
+    const boundedShots = normalizeStudioBg3dSceneDocument(tooManyShots);
+    expect(captureStudioBg3dShot(boundedShots, {
+      id: "shot-over-cap",
+      name: "초과 컷",
+    })).toBeNull();
+    expect(duplicateStudioBg3dShot(
+      boundedShots,
+      "shot-0",
+      { id: "shot-over-cap", name: "초과 복제" },
+    )).toBeNull();
+    expect(parseStudioBg3dSceneDocument(JSON.stringify(tooManyShots))).toBeNull();
+    expect(
+      normalizeStudioBg3dSceneDocument(tooManyVisibilityOverrides).shots?.[0].nodeVisibility,
+    ).toHaveLength(STUDIO_BG3D_SHOT_MAX_NODE_VISIBILITY_OVERRIDES);
+    expect(
+      parseStudioBg3dSceneDocument(JSON.stringify(tooManyVisibilityOverrides)),
+    ).toBeNull();
+  });
+
+  it("drops dangling and duplicate references leniently and rejects them strictly", () => {
+    const hostile = currentDocument({
+      nodes: [primitiveNode(1)],
+      shots: [
+        {
+          id: "shot-a",
+          name: "정상 컷",
+          nodeVisibility: [
+            { nodeId: "missing-node", visible: false },
+            { nodeId: "node-1", visible: false },
+            { nodeId: "node-1", visible: true },
+          ],
+        },
+        { id: "shot-a", name: "중복 컷" },
+      ],
+      activeShotId: "missing-shot",
+    });
+    const normalized = normalizeStudioBg3dSceneDocument(hostile);
+
+    expect(normalized.shots).toEqual([{
+      id: "shot-a",
+      name: "정상 컷",
+      nodeVisibility: [{ nodeId: "node-1", visible: false }],
+    }]);
+    expect(normalized).not.toHaveProperty("activeShotId");
+    expect(parseStudioBg3dSceneDocument(JSON.stringify(hostile))).toBeNull();
+    expect(serializeStudioBg3dSceneDocument(hostile)).toBeNull();
+  });
+
+  it("rejects overlong ids and names at the boundary while accepting exact limits", () => {
+    const bounded = currentDocument({
+      shots: [{
+        id: "s".repeat(STUDIO_BG3D_SHOT_ID_MAX_LENGTH),
+        name: "가".repeat(STUDIO_BG3D_SHOT_NAME_MAX_LENGTH),
+      }],
+    });
+    const overlong = currentDocument({
+      shots: [
+        { id: `s${"x".repeat(STUDIO_BG3D_SHOT_ID_MAX_LENGTH)}`, name: "긴 ID" },
+        { id: "shot-name", name: "가".repeat(STUDIO_BG3D_SHOT_NAME_MAX_LENGTH + 1) },
+      ],
+    });
+
+    expect(serializeStudioBg3dSceneDocument(bounded)).not.toBeNull();
+    expect(normalizeStudioBg3dSceneDocument(overlong).shots).toEqual([]);
+    expect(parseStudioBg3dSceneDocument(JSON.stringify(overlong))).toBeNull();
+  });
+
+  it("never persists geometry, bytes, data/object URLs, or unknown shot fields", () => {
+    const hostile = currentDocument({
+      shots: [{
+        id: "shot-hostile",
+        name: "안전 컷",
+        camera: { fovDegrees: 40, runtimeCamera: { engine: "three" } },
+        geometry: { positions: [0, 1, 2] },
+        modelBytes: [103, 108, 84, 70],
+        previewUrl: "data:image/png;base64,AAAA",
+        runtimeUrl: "blob:https://editor.invalid/runtime",
+      }],
+    });
+    const normalized = normalizeStudioBg3dSceneDocument(hostile);
+    const normalizedJson = JSON.stringify(normalized);
+
+    expect(normalized.shots).toEqual([{
+      id: "shot-hostile",
+      name: "안전 컷",
+      camera: { fovDegrees: 40 },
+    }]);
+    expect(normalizedJson).not.toContain("positions");
+    expect(normalizedJson).not.toContain("modelBytes");
+    expect(normalizedJson).not.toContain("data:image");
+    expect(normalizedJson).not.toContain("blob:");
+    expect(parseStudioBg3dSceneDocument(JSON.stringify(hostile))).toBeNull();
+  });
+
+  it("fails closed for malicious shot JSON that exceeds the document metadata budget", () => {
+    const oversized = JSON.stringify(currentDocument({
+      shots: [{
+        id: "shot-oversized",
+        name: "초과 컷",
+        unknownPadding: "가".repeat(STUDIO_BG3D_SCENE_DOCUMENT_MAX_BYTES),
+      }],
+    }));
+
+    expect(new TextEncoder().encode(oversized).byteLength).toBeGreaterThan(
+      STUDIO_BG3D_SCENE_DOCUMENT_MAX_BYTES,
+    );
+    expect(parseStudioBg3dSceneDocument(oversized)).toBeNull();
+    expect(normalizeStudioBg3dSceneDocument(oversized)).toEqual(
+      createDefaultStudioBg3dSceneDocument(),
+    );
   });
 });
 

@@ -187,6 +187,42 @@ describe("Studio 3D capture adapter contract", () => {
     ).rejects.toBe(failure);
   });
 
+  it("releases callers on abort or timeout even when an engine phase never settles", async () => {
+    const never = new Promise<StudioBg3dCapturedRaster>(() => undefined);
+    const controller = new AbortController();
+    const aborted = captureStudioBg3dRaster(
+      adapter(() => never),
+      REQUEST,
+      { signal: controller.signal },
+    );
+    controller.abort();
+    await expect(aborted).rejects.toMatchObject({ name: "AbortError" });
+
+    const preAbortedController = new AbortController();
+    preAbortedController.abort();
+    const capture = vi.fn(() => never);
+    await expect(captureStudioBg3dRaster(
+      adapter(capture),
+      REQUEST,
+      { signal: preAbortedController.signal },
+    )).rejects.toMatchObject({ name: "AbortError" });
+    expect(capture).not.toHaveBeenCalled();
+
+    vi.useFakeTimers();
+    try {
+      const timedOut = captureStudioBg3dRaster(
+        adapter(() => never),
+        REQUEST,
+        { timeoutMs: 250 },
+      );
+      const timeoutExpectation = expect(timedOut).rejects.toMatchObject({ name: "TimeoutError" });
+      await vi.advanceTimersByTimeAsync(250);
+      await timeoutExpectation;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("rejects unsupported adapters and malformed source dimensions", async () => {
     const unsupported = { ...adapter(), backend: "unknown" } as unknown as StudioBg3dCaptureAdapter;
     const invalidSource = { ...adapter(), getSourceSize: () => ({ width: 0, height: 1 }) };

@@ -55,6 +55,7 @@ export type StudioBg3dRuntimeAdapterDiagnosticCode =
   | "attachment-budget-exceeded"
   | "model-byte-budget-exceeded"
   | "persistence-byte-budget-exceeded"
+  | "lossy-shot-repair"
   | "unresolved-attachment"
   | "invalid-storage-binding"
   | "conflicting-storage-binding";
@@ -300,6 +301,8 @@ function settingsOnlyDocument(
     budgets: base.budgets,
     attachments,
     nodes,
+    ...(base.shots === undefined ? {} : { shots: base.shots }),
+    ...(base.activeShotId === undefined ? {} : { activeShotId: base.activeShotId }),
   };
 }
 
@@ -461,12 +464,39 @@ function nodesMatchPrefix(
   return true;
 }
 
+function shotStateMatches(
+  base: StudioBg3dSceneDocument,
+  document: StudioBg3dSceneDocument,
+): boolean {
+  return jsonStructuresEqual(base.shots, document.shots) &&
+    base.activeShotId === document.activeShotId;
+}
+
+function minimumPrefixForShotNodes(
+  base: StudioBg3dSceneDocument,
+  pending: readonly PendingNode[],
+): number | null {
+  const referencedIds = new Set(
+    base.shots?.flatMap((shot) => shot.nodeVisibility?.map((entry) => entry.nodeId) ?? []) ?? [],
+  );
+  if (referencedIds.size === 0) return 0;
+  const indexById = new Map(pending.map((entry, index) => [entry.node.id, index] as const));
+  let minimum = 0;
+  for (const nodeId of referencedIds) {
+    const index = indexById.get(nodeId);
+    if (index === undefined) return null;
+    minimum = Math.max(minimum, index + 1);
+  }
+  return minimum;
+}
+
 function fitPendingNodes(
   base: StudioBg3dSceneDocument,
   pending: readonly PendingNode[],
   orderedAttachments: readonly StudioBg3dModelAttachment[]
 ): { readonly roundTrip: StrictRoundTrip; readonly count: number } {
-  let lower = 0;
+  const requiredPrefix = minimumPrefixForShotNodes(base, pending);
+  let lower = requiredPrefix ?? pending.length + 1;
   let upper = pending.length;
   let best: { readonly roundTrip: StrictRoundTrip; readonly count: number } | null = null;
   while (lower <= upper) {
@@ -477,7 +507,11 @@ function fitPendingNodes(
     );
     const attachments = orderedAttachments.filter((attachment) => referenced.has(attachment.id));
     const roundTrip = normalizedRuntimeRoundTrip(settingsOnlyDocument(base, attachments, nodes));
-    if (roundTrip && nodesMatchPrefix(pending, count, roundTrip.document)) {
+    if (
+      roundTrip &&
+      nodesMatchPrefix(pending, count, roundTrip.document) &&
+      shotStateMatches(base, roundTrip.document)
+    ) {
       best = { roundTrip, count };
       lower = count + 1;
     } else {
@@ -664,6 +698,11 @@ export function adaptStudioBg3dRuntimeToDocument(
   }
 
   const fitted = fitPendingNodes(base, pending, attachments);
+  if (!shotStateMatches(base, fitted.roundTrip.document)) {
+    diagnostics.add("lossy-shot-repair", "base", {
+      count: Math.max(1, base.shots?.length ?? 0),
+    });
+  }
   if (fitted.count < pending.length) {
     const tail = pending.slice(fitted.count);
     const droppedPrimitives = tail.filter((entry) => entry.source === "primitive").length;

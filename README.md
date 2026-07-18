@@ -49,12 +49,15 @@ ToonSpectrum는 콘텐츠를 호스팅하지 않습니다. 플랫폼 장벽 너�
 - **리뷰 피드** `/reviews` — Letterboxd 감성의 한 줄 리뷰 피드 (스포일러 블러·공감·정렬)
 - **인사이트** `/insights` — 장르·플랫폼·연도·평점·가격·어댑테이션을 시각화한 트렌드 대시보드
 - **내 서재** `/library` — 관심/평가/완독 관리, **취향 분석**, 맞춤 추천, 컬렉션
-- **창작 스튜디오** `/studio` — 멀티페이지 컷·말풍선·3D/VRM·결정론적 물리 배치·분석적 IK·벡터/래스터 소재·AI 제작 보조·검토·
+- **창작 스튜디오** `/studio` — 멀티페이지 컷·말풍선·표준 3D 파일/VRM·최대 64개 샷 보드와 컷별 LT 합성 PNG 일괄 렌더·Worker ZIP 패키징·
+  시간대 무드 리그·가림 관계 인지 선화·의미 재질 분석·로컬 사진 포즈 스캔·시각적 관절/손목 IK·결정론적 물리 배치·분석적 IK·
+  벡터/래스터 소재·AI 제작 보조·검토·
   복구·Publish Package와 역할 기반 팀 초대·CRDT 동시 편집·화면 공유·단기 TURN 자격증명과
   자동 ICE 재협상을 지원하는 최대 6인 P2P 음성 작업실·
   공유 원본·revision 충돌 방지를 합친 모바일 대응 올인원
   제작실. 컷툰/업로드 작품 형식을 보존한 채 팀 작업 목록에서 바로 전환하며, 상세 벤치마크와 구현 현황은
-  [`docs/studio-competitor-features.md`](docs/studio-competitor-features.md) 참고
+  [`docs/studio-competitor-features.md`](docs/studio-competitor-features.md)와
+  [`docs/studio-3d-webtoon-tool-benchmark-2026-07-19.md`](docs/studio-3d-webtoon-tool-benchmark-2026-07-19.md) 참고
 - **⌘K 커맨드 팔레트** — 어디서든 통합 검색
 
 <br/>

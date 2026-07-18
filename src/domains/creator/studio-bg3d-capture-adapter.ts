@@ -35,6 +35,11 @@ export interface StudioBg3dCaptureAdapter {
   capture(request: StudioBg3dCaptureRequest): Promise<StudioBg3dCapturedRaster>;
 }
 
+export interface StudioBg3dCaptureOperationOptions {
+  readonly signal?: AbortSignal;
+  readonly timeoutMs?: number;
+}
+
 export interface AcquireStudioBg3dCaptureAdapterAfterViewTransitionInput {
   /** Reads the adapter owned by the View that is current after React commits the transition. */
   readonly readAdapter: () => StudioBg3dCaptureAdapter | null;
@@ -42,10 +47,61 @@ export interface AcquireStudioBg3dCaptureAdapterAfterViewTransitionInput {
   readonly isActive: () => boolean;
   /** One browser paint boundary; two are required for R3F View teardown and passive effects. */
   readonly waitForPaintFrame: () => Promise<void>;
+  readonly signal?: AbortSignal;
+  readonly timeoutMs?: number;
 }
 
 const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/iu;
 const BACKEND_SET = new Set<StudioBg3dCaptureBackend>(["three-webgl", "three-webgpu"]);
+
+function captureOperationError(name: "AbortError" | "TimeoutError"): Error {
+  const error = new Error(
+    name === "AbortError" ? "3D 캡처를 취소했습니다." : "3D 캡처 제한 시간이 초과되었습니다.",
+  );
+  error.name = name;
+  return error;
+}
+
+function throwIfCaptureOperationAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) throw captureOperationError("AbortError");
+}
+
+/** Stops waiting on a paint/GPU/encoding phase so the editor can always release its capture lease. */
+export function waitForStudioBg3dCapturePhase<Value>(
+  phase: PromiseLike<Value>,
+  options: StudioBg3dCaptureOperationOptions = {},
+): Promise<Value> {
+  if (options.signal?.aborted) return Promise.reject(captureOperationError("AbortError"));
+  const timeoutMs = options.timeoutMs === undefined
+    ? null
+    : Math.max(250, Math.min(120_000, Math.floor(options.timeoutMs)));
+  return new Promise<Value>((resolve, reject) => {
+    let settled = false;
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+    const cleanup = () => {
+      if (timeout !== null) clearTimeout(timeout);
+      options.signal?.removeEventListener("abort", abort);
+    };
+    const finish = (callback: () => void) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      callback();
+    };
+    const abort = () => finish(() => reject(captureOperationError("AbortError")));
+    options.signal?.addEventListener("abort", abort, { once: true });
+    if (timeoutMs !== null) {
+      timeout = setTimeout(
+        () => finish(() => reject(captureOperationError("TimeoutError"))),
+        timeoutMs,
+      );
+    }
+    void Promise.resolve(phase).then(
+      (value) => finish(() => resolve(value)),
+      (error: unknown) => finish(() => reject(error)),
+    );
+  });
+}
 
 function assertSize(size: unknown, label: string, enforcePixelBudget: boolean): asserts size is StudioBg3dCaptureSize {
   if (!size || typeof size !== "object") throw new TypeError(`${label} must be an object.`);
@@ -93,8 +149,10 @@ export async function acquireStudioBg3dCaptureAdapterAfterViewTransition(
   ) {
     throw new TypeError("3D capture View transition callbacks are required.");
   }
-  await input.waitForPaintFrame();
-  await input.waitForPaintFrame();
+  throwIfCaptureOperationAborted(input.signal);
+  await waitForStudioBg3dCapturePhase(input.waitForPaintFrame(), input);
+  throwIfCaptureOperationAborted(input.signal);
+  await waitForStudioBg3dCapturePhase(input.waitForPaintFrame(), input);
   if (!input.isActive()) return null;
   const adapter = input.readAdapter();
   if (!adapter) return null;
@@ -167,7 +225,8 @@ export function getStudioBg3dCaptureSourceSize(adapter: StudioBg3dCaptureAdapter
 
 export async function captureStudioBg3dRaster(
   adapter: StudioBg3dCaptureAdapter,
-  request: StudioBg3dCaptureRequest
+  request: StudioBg3dCaptureRequest,
+  options: StudioBg3dCaptureOperationOptions = {},
 ): Promise<StudioBg3dCapturedRaster> {
   assertAdapter(adapter);
   assertRequest(request);
@@ -177,7 +236,11 @@ export async function captureStudioBg3dRaster(
     includeDepth: request.includeDepth,
     background: Object.freeze({ ...request.background }),
   });
-  const captured = await adapter.capture(requestSnapshot);
+  throwIfCaptureOperationAborted(options.signal);
+  const captured = await waitForStudioBg3dCapturePhase(
+    adapter.capture(requestSnapshot),
+    options,
+  );
   assertCapturedRaster(captured, requestSnapshot);
 
   // WebGPU mapped buffers and renderer pools may be recycled after the adapter Promise settles.

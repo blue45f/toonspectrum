@@ -33,9 +33,12 @@ const budgets = {
   // 2026-07-18 작업공간 manager·이미지 전문 패널·선택 도구 overlay를 실제 사용자 의도
   // 경계로 분리하고 Container의 section barrel 우회를 제거했다. 전체 route 상한은 원격 Worker
   // wave의 더 큰 보수 예산을 유지하고, entry/앱 셸 이후 증분 예산으로 eager 회귀를 별도 잠근다.
+  // 2026-07-19 SceneDocument v3의 bounded shot camera/render/LT/visibility parser가 project-file
+  // 검증 경로에 남아 incremental raw 2,117,656 bytes로 측정됐다. Three/R3F는 계속 사용자 진입
+  // 시점의 dynamic graph에만 있으므로 raw schema 비용 0.24%만 허용하고 gzip 상한은 유지한다.
   studio: { raw: 2_698_000, gzip: 882_500 },
   studioEntry: { raw: 1_160_000, gzip: 350_000 },
-  studioIncremental: { raw: 2_115_000, gzip: 690_000, chunks: 120 },
+  studioIncremental: { raw: 2_120_000, gzip: 690_000, chunks: 120 },
   // Rapier deterministic compat is intentionally isolated in a user-triggered module Worker.
   // 2026-07-18 production output: 2,302,139 raw / 855,399 gzip. Keep ~2% version-drift headroom
   // without charging this optional engine to Studio or the 3D editor's initial graph.

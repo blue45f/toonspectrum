@@ -7,6 +7,7 @@ import {
   getWorkRevisionComparison,
   getWorkRevision,
   listWorkRevisions,
+  publishAsset,
   restoreWorkRevision,
   updateWork,
 } from "./creator-client";
@@ -123,6 +124,24 @@ describe("creator client revision conflicts", () => {
       { baseRevision: 7 },
       { signal: controller.signal }
     );
+  });
+
+  it("공유 에셋 업로드에도 AbortSignal을 전달해 멈춘 요청을 취소할 수 있다", async () => {
+    const controller = new AbortController();
+    const input = {
+      name: "[3D_POSE] 테스트",
+      dataUrl: "data:image/png;base64,pose",
+      width: 360,
+      height: 520,
+      kind: "vrm_pose",
+    };
+    apiPost.mockResolvedValue({ id: "shared-pose" });
+
+    await publishAsset(input, controller.signal);
+
+    expect(apiPost).toHaveBeenCalledWith("/creator/assets", input, {
+      signal: controller.signal,
+    });
   });
 });
 

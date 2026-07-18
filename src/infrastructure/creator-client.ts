@@ -588,8 +588,11 @@ export async function listSharedAssets(
   return ensureArray<SharedAsset>(data);
 }
 
-export async function publishAsset(input: PublishAssetInput): Promise<SharedAsset> {
-  return callOrThrow(() => api.post<SharedAsset>(`${BASE}/assets`, input), "에셋을 공유하지 못했습니다.");
+export async function publishAsset(input: PublishAssetInput, signal?: AbortSignal): Promise<SharedAsset> {
+  return callOrThrow(
+    () => api.post<SharedAsset>(`${BASE}/assets`, input, { signal }),
+    "에셋을 공유하지 못했습니다."
+  );
 }
 
 export async function generateAsset(input: GenerateAssetInput): Promise<GeneratedAsset> {

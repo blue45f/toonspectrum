@@ -10,12 +10,17 @@
  * a separate post-process and must not be inferred from pixels by this trust boundary.
  */
 
+import {
+  STUDIO_BG3D_LT_DEPTH_EDGE_MAX_PIXELS,
+  extractStudioBg3dLtDepthEdges,
+} from "./studio-bg3d-lt-depth-edges";
+
 import type {
   StudioBg3dLineOutputSettings,
   StudioBg3dToneOutputSettings,
 } from "./studio-bg3d-scene-document";
 
-export const STUDIO_BG3D_LT_RENDER_MAX_PIXELS = 8_388_608;
+export const STUDIO_BG3D_LT_RENDER_MAX_PIXELS = STUDIO_BG3D_LT_DEPTH_EDGE_MAX_PIXELS;
 
 export type StudioBg3dLtRasterLayerRole = "color" | "main-line" | "texture-line" | "tone";
 
@@ -426,6 +431,15 @@ function renderMainLineResponse(
     : 1;
   const threshold = (0.16 - line.accuracy * 0.12) * scaleFactor;
   const softness = 0.22 - line.accuracy * 0.1;
+  const depthResponse =
+    line.depthEnabled && input.depth
+      ? extractStudioBg3dLtDepthEdges({
+          width: input.width,
+          height: input.height,
+          depth: input.depth,
+          includeCreases: !line.depthOutlineOnly,
+        })
+      : null;
 
   for (let y = 0; y < input.height; y += 1) {
     for (let x = 0; x < input.width; x += 1) {
@@ -439,20 +453,8 @@ function renderMainLineResponse(
       const exteriorEdge =
         smoothResponse(sobelAlpha(input, x, y), 0.01, 0.2) * line.exteriorOutlineStrength;
       let depthEdge = 0;
-      if (line.depthEnabled && input.depth) {
-        const gradient = sobelField(input.depth, x, y, input.width, input.height);
-        let depthFeature = gradient;
-        if (!line.depthOutlineOnly) {
-          const center = input.depth[index];
-          const curvature = Math.abs(
-            center * 4 -
-              input.depth[clampedIndex(x - 1, y, input.width, input.height)] -
-              input.depth[clampedIndex(x + 1, y, input.width, input.height)] -
-              input.depth[clampedIndex(x, y - 1, input.width, input.height)] -
-              input.depth[clampedIndex(x, y + 1, input.width, input.height)]
-          );
-          depthFeature = Math.max(depthFeature, clamp01(curvature));
-        }
+      if (depthResponse) {
+        const depthFeature = depthResponse[index] / 255;
         depthEdge = smoothResponse(depthFeature, threshold * 0.5, softness) * line.depthStrength;
       }
       const combined = Math.max(luminanceEdge, exteriorEdge, depthEdge);

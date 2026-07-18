@@ -88,9 +88,13 @@ describe("Studio 3D asynchronous capture integration boundary", () => {
 
     expect(history).toContain("document: sceneBaseDocument");
     expect(history).toContain(
-      "[customModels, isRestoringScene, primitives, sceneBaseDocument]"
+      "[customModels, isBatchRenderingShots, isRestoringScene, primitives, sceneBaseDocument]"
     );
+    expect(history).toContain("if (isRestoringScene || isBatchRenderingShots) return;");
     expect(history.match(/setSceneBaseDocument\(snap\.document\)/gu)).toHaveLength(2);
+    expect(history).toContain("studioBg3dHistoryDocumentAtView(previousLast.document, liveView)");
+    expect(history).toContain("const commandChangesCamera");
+    expect(history).not.toContain("setLineArtPreview(snap.document.output.line.enabled)");
     expect(background3dSource).not.toContain("setSkyPresetId");
     expect(background3dSource).not.toContain("setTransparentInsert");
   });

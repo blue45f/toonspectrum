@@ -13726,6 +13726,20 @@ function StudioCuttoonEditor() {
     commit(plan.nextElements, { groups: plan.nextGroups });
     setSelectedId(plan.anchorElementId);
     setTool("select");
+
+    const anchor = plan.nextElements.find((element) => element.id === plan.anchorElementId);
+    if (
+      anchor?.type === "image" &&
+      Math.abs(anchor.rotation ?? 0) < 1e-6 &&
+      result.perspectiveGuides.length > 0
+    ) {
+      setVanishingPoints(result.perspectiveGuides.map((point) => ({
+        id: uid(),
+        x: anchor.x + point.x * anchor.width,
+        y: anchor.y + point.y * anchor.height,
+      })));
+      setPerspectiveRulerActive(true);
+    }
     return true;
   }
   async function addBuiltinRasterAsset(asset: StudioRasterAsset) {
@@ -34196,22 +34210,20 @@ const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
             }}
             onInsert={(src, w, h) => {
               const mutationTicket = poserMutationTicketRef.current;
-              if (!mutationTicket || !canApplyStudioMutation(mutationTicket)) return;
+              if (!mutationTicket || !canApplyStudioMutation(mutationTicket)) return false;
               if (poserInitialElementId) {
                 const targetEl = elementById.get(poserInitialElementId);
-                if (targetEl && targetEl.type === "image") {
-                  const targetWidth = targetEl.width;
-                  const targetHeight = Math.round(targetWidth * (h / w));
-                  patchEl(poserInitialElementId, {
-                    src,
-                    height: targetHeight,
-                  });
-                } else {
-                  patchEl(poserInitialElementId, { src });
-                }
+                if (!targetEl || targetEl.type !== "image") return false;
+                const targetWidth = targetEl.width;
+                const targetHeight = Math.round(targetWidth * (h / w));
+                patchEl(poserInitialElementId, {
+                  src,
+                  height: targetHeight,
+                });
               } else {
                 addRenderedImage(src, w, h);
               }
+              return true;
             }}
           />
         ) : null}

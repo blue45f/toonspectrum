@@ -5,6 +5,7 @@ import {
   DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
   STUDIO_BG3D_GLB_MIME,
   STUDIO_BG3D_MAX_TWO_BONE_IK_CONSTRAINTS,
+  captureStudioBg3dShot,
   normalizeStudioBg3dGlbAttachment,
   parseStudioBg3dSceneDocument,
   serializeStudioBg3dSceneDocument,
@@ -97,6 +98,87 @@ function diagnosticCodes(
 }
 
 describe("Studio BG3D runtime to document adapter", () => {
+  it("preserves canonical storyboard shots while refreshing runtime nodes", () => {
+    const source = adaptStudioBg3dRuntimeToDocument({
+      primitives: [primitive("shot-node")],
+      customModels: [],
+      attachmentByStorageModelId: new Map(),
+    });
+    const withShot = captureStudioBg3dShot(source.document, {
+      id: "shot-runtime-roundtrip",
+      name: "전경 컷",
+    });
+    expect(withShot).not.toBeNull();
+
+    const refreshed = adaptStudioBg3dRuntimeToDocument({
+      primitives: [{ ...primitive("shot-node"), visible: false }],
+      customModels: [],
+      attachmentByStorageModelId: new Map(),
+      baseDocument: withShot ?? undefined,
+    });
+
+    expect(refreshed.diagnostics).toEqual([]);
+    expect(refreshed.document.shots).toEqual(withShot?.shots);
+    expect(refreshed.document.activeShotId).toBe("shot-runtime-roundtrip");
+    expect(refreshed.document.nodes[0]?.visible).toBe(false);
+  });
+
+  it("fails closed instead of silently repairing a shot that references a removed runtime node", () => {
+    const source = adaptStudioBg3dRuntimeToDocument({
+      primitives: [primitive("kept-node"), primitive("removed-node", 2)],
+      customModels: [],
+      attachmentByStorageModelId: new Map(),
+    });
+    const withShot = captureStudioBg3dShot(source.document, {
+      id: "shot-with-removed-node",
+      name: "삭제 전 컷",
+    });
+    expect(withShot?.shots?.[0]?.nodeVisibility?.map((entry) => entry.nodeId)).toContain("removed-node");
+
+    const adapted = adaptStudioBg3dRuntimeToDocument({
+      primitives: [primitive("kept-node")],
+      customModels: [],
+      attachmentByStorageModelId: new Map(),
+      baseDocument: withShot ?? undefined,
+    });
+
+    expect(diagnosticCodes(adapted.diagnostics)).toContain("lossy-shot-repair");
+    expect(adapted.document.shots).not.toEqual(withShot?.shots);
+  });
+
+  it("keeps every shot byte-for-byte and drops nodes first when the document budget is tight", () => {
+    const nodes = Array.from({ length: 180 }, (_, index) => ({
+      ...primitive(`budget-node-${index}`, index % 20),
+      name: `표준화확장-${"각".repeat(60)}-${index}`,
+    }));
+    const source = adaptStudioBg3dRuntimeToDocument({
+      primitives: nodes,
+      customModels: [],
+      attachmentByStorageModelId: new Map(),
+    });
+    let withShots = source.document;
+    for (let index = 0; index < 10; index += 1) {
+      const captured = captureStudioBg3dShot(withShots, {
+        id: `budget-shot-${index}`,
+        name: `예산 컷 ${index}`,
+      });
+      expect(captured).not.toBeNull();
+      withShots = captured ?? withShots;
+    }
+
+    const refreshed = adaptStudioBg3dRuntimeToDocument({
+      primitives: nodes.map((node) => ({ ...node, visible: true })),
+      customModels: [],
+      attachmentByStorageModelId: new Map(),
+      baseDocument: withShots,
+    });
+
+    if (!diagnosticCodes(refreshed.diagnostics).includes("lossy-shot-repair")) {
+      expect(refreshed.document.shots).toEqual(withShots.shots);
+      expect(refreshed.document.activeShotId).toBe(withShots.activeShotId);
+    }
+  });
+
   it("preserves per-instance material edits across runtime/document hydration", () => {
     const storageId = "idb-material-model";
     const model = {
