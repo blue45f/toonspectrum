@@ -77,11 +77,95 @@ function compareRawRgba(
   };
 }
 
+const MODERATE_ALPHA_THRESHOLD = 32;
+
+interface RawPixelDeltaDiagnostics {
+  /** Coordinates and raw RGBA of the single largest-delta pixel, or null for an all-zero diff. */
+  readonly maxDeltaPixel: {
+    readonly x: number;
+    readonly y: number;
+    readonly canvas: readonly [number, number, number, number];
+    readonly gpu: readonly [number, number, number, number];
+  } | null;
+  /**
+   * Straight (unpremultiplied) RGB near-zero alpha is ill-conditioned: dividing a tiny
+   * premultiplied channel by a tiny alpha can swing the recovered byte across the full 0-255
+   * range from one-bit rounding noise alone, with no corresponding visual difference. Comparing
+   * channels re-premultiplied by their own alpha is well-conditioned at low alpha (it naturally
+   * goes to zero as alpha does), so it isolates genuine color/blend differences from that noise.
+   */
+  readonly maxPremultipliedChannelDelta: number;
+  /** Straight-RGB delta, but only over pixels where both buffers have at least moderate coverage. */
+  readonly maxStraightRgbDeltaAtModerateAlpha: number;
+  readonly moderateAlphaThreshold: number;
+}
+
+function premultipliedByte(channel: number, alpha: number): number {
+  return Math.round((channel * alpha) / 255);
+}
+
+function diagnoseRawRgba(
+  first: Uint8ClampedArray,
+  second: Uint8ClampedArray,
+  width: number
+): RawPixelDeltaDiagnostics {
+  let maxDelta = -1;
+  let maxDeltaPixel: RawPixelDeltaDiagnostics["maxDeltaPixel"] = null;
+  let maxPremultipliedChannelDelta = 0;
+  let maxStraightRgbDeltaAtModerateAlpha = 0;
+
+  for (let offset = 0; offset < first.length; offset += 4) {
+    const canvasPixel = [first[offset]!, first[offset + 1]!, first[offset + 2]!, first[offset + 3]!] as const;
+    const gpuPixel = [second[offset]!, second[offset + 1]!, second[offset + 2]!, second[offset + 3]!] as const;
+
+    let pixelDelta = 0;
+    for (let channel = 0; channel < 4; channel += 1) {
+      pixelDelta = Math.max(pixelDelta, Math.abs(canvasPixel[channel] - gpuPixel[channel]));
+    }
+    if (pixelDelta > maxDelta) {
+      maxDelta = pixelDelta;
+      const pixelIndex = offset / 4;
+      maxDeltaPixel = {
+        x: pixelIndex % width,
+        y: Math.floor(pixelIndex / width),
+        canvas: canvasPixel,
+        gpu: gpuPixel,
+      };
+    }
+
+    for (let channel = 0; channel < 3; channel += 1) {
+      const canvasPremultiplied = premultipliedByte(canvasPixel[channel], canvasPixel[3]);
+      const gpuPremultiplied = premultipliedByte(gpuPixel[channel], gpuPixel[3]);
+      maxPremultipliedChannelDelta = Math.max(
+        maxPremultipliedChannelDelta,
+        Math.abs(canvasPremultiplied - gpuPremultiplied)
+      );
+    }
+
+    if (canvasPixel[3] >= MODERATE_ALPHA_THRESHOLD && gpuPixel[3] >= MODERATE_ALPHA_THRESHOLD) {
+      for (let channel = 0; channel < 3; channel += 1) {
+        maxStraightRgbDeltaAtModerateAlpha = Math.max(
+          maxStraightRgbDeltaAtModerateAlpha,
+          Math.abs(canvasPixel[channel] - gpuPixel[channel])
+        );
+      }
+    }
+  }
+
+  return {
+    maxDeltaPixel,
+    maxPremultipliedChannelDelta,
+    maxStraightRgbDeltaAtModerateAlpha,
+    moderateAlphaThreshold: MODERATE_ALPHA_THRESHOLD,
+  };
+}
+
 interface ParityCaseResult {
   readonly id: string;
   readonly dabCount: number;
   readonly exact: RawPixelDiff;
   readonly tolerance2: RawPixelDiff;
+  readonly diagnostics: RawPixelDeltaDiagnostics;
   readonly canvasPng: string;
   readonly gpuPng: string;
   readonly diffPng: string;
@@ -282,6 +366,7 @@ async function runCase(
     dabCount: gpuPlan.dabs.length,
     exact: compareRawRgba(canvasPixels, gpuPixels, 0),
     tolerance2: compareRawRgba(canvasPixels, gpuPixels, 2),
+    diagnostics: diagnoseRawRgba(canvasPixels, gpuPixels, WIDTH),
     canvasPng: pixelsToPngDataUrl(canvasPixels, WIDTH, HEIGHT),
     gpuPng: pixelsToPngDataUrl(gpuPixels, WIDTH, HEIGHT),
     diffPng: diffPngDataUrl(canvasPixels, gpuPixels, WIDTH, HEIGHT),

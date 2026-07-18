@@ -32,7 +32,10 @@ const SCRATCH =
   ?? process.env.TOONSPECTRUM_VERIFY_DIR
   ?? join(tmpdir(), "toonspectrum-studio-gpu-committed-parity");
 const HARNESS_PATH = "/__studio_gpu_committed_parity__";
-const RESULT_TIMEOUT_MS = 20_000;
+// The browser entry runs its PARITY_CASES sequentially, each with its own ~10s per-case receipt
+// timeout (see RECEIPT_TIMEOUT_MS in studio-gpu-committed-parity-browser.ts). This outer timeout
+// must safely exceed every case's worst-case budget plus Vite/Playwright startup, not just one.
+const RESULT_TIMEOUT_MS = 45_000;
 
 interface RawPixelDiff {
   readonly changedPixels: number;
@@ -43,11 +46,24 @@ interface RawPixelDiff {
   readonly totalAbsoluteDelta: number;
 }
 
+interface RawPixelDeltaDiagnostics {
+  readonly maxDeltaPixel: {
+    readonly x: number;
+    readonly y: number;
+    readonly canvas: readonly [number, number, number, number];
+    readonly gpu: readonly [number, number, number, number];
+  } | null;
+  readonly maxPremultipliedChannelDelta: number;
+  readonly maxStraightRgbDeltaAtModerateAlpha: number;
+  readonly moderateAlphaThreshold: number;
+}
+
 interface ParityCaseResult {
   readonly id: string;
   readonly dabCount: number;
   readonly exact: RawPixelDiff;
   readonly tolerance2: RawPixelDiff;
+  readonly diagnostics: RawPixelDeltaDiagnostics;
   readonly canvasPng: string;
   readonly gpuPng: string;
   readonly diffPng: string;
@@ -173,6 +189,10 @@ async function main(): Promise<void> {
         exactAlphaChangedPixels: parityCase.exact.alphaChangedPixels,
         tolerance2ChangedPixels: parityCase.tolerance2.changedPixels,
         tolerance2MaxChannelDelta: parityCase.tolerance2.maxChannelDelta,
+        maxDeltaPixel: parityCase.diagnostics.maxDeltaPixel,
+        maxPremultipliedChannelDelta: parityCase.diagnostics.maxPremultipliedChannelDelta,
+        maxStraightRgbDeltaAtModerateAlpha: parityCase.diagnostics.maxStraightRgbDeltaAtModerateAlpha,
+        moderateAlphaThreshold: parityCase.diagnostics.moderateAlphaThreshold,
       };
     });
 
