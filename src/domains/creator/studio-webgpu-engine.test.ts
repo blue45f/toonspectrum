@@ -1070,6 +1070,83 @@ describe("StudioWebGpuEngine", () => {
     expect(fake.texture.destroy).not.toHaveBeenCalled();
   });
 
+  it("reuses retained-tile presentation bindings and reports bounded allocation metrics", async () => {
+    const neverLost = new Promise<GPUDeviceLostInfo>(() => undefined);
+    const fake = fakeGpuDevice(neverLost);
+    const context = {
+      configure: vi.fn(),
+      unconfigure: vi.fn(),
+      getCurrentTexture: vi.fn(() => ({ createView: vi.fn(() => ({ view: true })) })),
+    } as unknown as GPUCanvasContext;
+    const adapter = { requestDevice: vi.fn(async () => fake.device) } as unknown as GPUAdapter;
+    const gpu = {
+      requestAdapter: vi.fn(async () => adapter),
+      getPreferredCanvasFormat: vi.fn(() => "bgra8unorm"),
+    } as unknown as GPU;
+    const onFrameReady = vi.fn((_receipt: StudioGpuFrameReceipt) => undefined);
+    const engine = new StudioWebGpuEngine({
+      canvas: fakeGpuCanvas(context),
+      fallbackCanvas: fakeCanvas2d().canvas,
+      gpu,
+      retainReadbackSnapshot: false,
+      onFrameReady,
+    });
+    const retained = stroke({
+      id: "binding-cache",
+      points: [8, 12, 36, 12],
+      pressures: [0.5, 0.8],
+    });
+
+    engine.resize({ logicalWidth: 100, logicalHeight: 80 });
+    engine.render([retained], "binding:first");
+    await engine.initialize();
+    await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalledWith(expect.objectContaining({
+      requestId: "binding:first",
+      backend: "webgpu",
+    })));
+
+    const firstBindGroupCount = vi.mocked(fake.device.createBindGroup).mock.calls.length;
+    const firstMetrics = engine.getPerformanceMetrics();
+    expect(firstBindGroupCount).toBeGreaterThan(0);
+    expect(firstMetrics).toMatchObject({
+      instanceBufferAllocations: 1,
+      presentationBufferAllocations: 1,
+      presentationBindGroupAllocations: firstBindGroupCount,
+      presentationBindGroupReuses: 0,
+    });
+    expect(Object.isFrozen(firstMetrics)).toBe(true);
+
+    engine.render([retained], "binding:second");
+    await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalledWith(expect.objectContaining({
+      requestId: "binding:second",
+      backend: "webgpu",
+    })));
+
+    expect(vi.mocked(fake.device.createBindGroup)).toHaveBeenCalledTimes(firstBindGroupCount);
+    expect(engine.getPerformanceMetrics()).toEqual({
+      instanceBufferAllocations: 1,
+      presentationBufferAllocations: 1,
+      presentationBindGroupAllocations: firstBindGroupCount,
+      presentationBindGroupReuses: firstBindGroupCount,
+    });
+
+    engine.suspend("binding:suspended");
+    engine.render([retained], "binding:after-suspend");
+    await vi.waitFor(() => expect(onFrameReady).toHaveBeenCalledWith(expect.objectContaining({
+      requestId: "binding:after-suspend",
+      backend: "webgpu",
+    })));
+    expect(vi.mocked(fake.device.createBindGroup)).toHaveBeenCalledTimes(
+      firstBindGroupCount * 2
+    );
+    expect(engine.getPerformanceMetrics()).toEqual({
+      instanceBufferAllocations: 1,
+      presentationBufferAllocations: 1,
+      presentationBindGroupAllocations: firstBindGroupCount * 2,
+      presentationBindGroupReuses: firstBindGroupCount,
+    });
+  });
+
   it("retains exact tiles, appends immutable operations, and rebuilds changed history", async () => {
     const neverLost = new Promise<GPUDeviceLostInfo>(() => undefined);
     const fake = fakeGpuDevice(neverLost);

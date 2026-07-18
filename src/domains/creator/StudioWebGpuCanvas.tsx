@@ -8,6 +8,7 @@ import {
   type StudioGpuFrameReadbackRequest,
   type StudioGpuFrameReadbackResult,
   type StudioGpuFrameReceipt,
+  type StudioGpuPerformanceMetrics,
   type StudioGpuStroke,
   type StudioGpuViewTransform,
 } from "./studio-webgpu-engine";
@@ -26,6 +27,12 @@ import type { StudioWebGpuSurfaceBounds } from "./studio-webgpu-viewport";
 import { cn } from "@/lib/utils";
 
 const EMPTY_STROKES: readonly StudioGpuStroke[] = Object.freeze([]);
+const EMPTY_PERFORMANCE_METRICS: StudioGpuPerformanceMetrics = Object.freeze({
+  instanceBufferAllocations: 0,
+  presentationBufferAllocations: 0,
+  presentationBindGroupAllocations: 0,
+  presentationBindGroupReuses: 0,
+});
 
 export interface StudioWebGpuCanvasProps extends StudioGpuViewTransform {
   readonly className?: string;
@@ -70,6 +77,8 @@ export interface StudioWebGpuCanvasHandle {
   readonly captureFrame: (
     request: StudioGpuFrameReadbackRequest
   ) => Promise<StudioGpuFrameReadbackResult>;
+  /** Snapshot of bounded allocation/reuse counters for browser performance instrumentation. */
+  readonly getPerformanceMetrics: () => StudioGpuPerformanceMetrics;
   /**
    * Stroke-pinned imperative feed: updates the engine without a parent React render. The pinned
    * live-ink path calls this once per pointer frame so a 30k-line parent never re-renders per
@@ -247,6 +256,8 @@ function StudioWebGpuCanvas({
       status: "rejected",
       reason: "frame-unavailable",
     }),
+    getPerformanceMetrics: () =>
+      engineRef.current?.getPerformanceMetrics() ?? EMPTY_PERFORMANCE_METRICS,
     syncPinnedStrokes: (nextStrokes) => {
       const update = planStudioGpuPinnedStrokeFeedUpdate(
         pinnedStrokesRef.current,

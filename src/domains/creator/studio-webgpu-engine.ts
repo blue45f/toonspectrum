@@ -104,6 +104,14 @@ export interface StudioGpuFrameReceipt {
   readonly physicalHeight: number;
 }
 
+/** Bounded counters for browser profiling without exposing mutable GPU resources. */
+export interface StudioGpuPerformanceMetrics {
+  readonly instanceBufferAllocations: number;
+  readonly presentationBufferAllocations: number;
+  readonly presentationBindGroupAllocations: number;
+  readonly presentationBindGroupReuses: number;
+}
+
 export interface StudioGpuFrameReadbackRequest {
   /** Exact receipt previously emitted by this engine. Older or reconstructed frames fail closed. */
   readonly receipt: StudioGpuFrameReceipt;
@@ -302,6 +310,10 @@ function positiveOr(value: unknown, fallback: number): number {
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
+}
+
+function incrementBoundedMetric(value: number): number {
+  return value < Number.MAX_SAFE_INTEGER ? value + 1 : Number.MAX_SAFE_INTEGER;
 }
 
 function normalizeViewport(input: StudioGpuViewport): NormalizedStudioGpuViewport {
@@ -1269,10 +1281,16 @@ export class StudioWebGpuEngine {
   private erasePipeline: GPURenderPipeline | null = null;
   private presentationPipeline: GPURenderPipeline | null = null;
   private presentationSampler: GPUSampler | null = null;
+  private presentationBindGroupLayout: GPUBindGroupLayout | null = null;
+  private presentationBindGroups = new WeakMap<GPUTexture, GPUBindGroup>();
   private instanceBuffer: GPUBuffer | null = null;
   private instanceCapacity = 0;
   private presentationBuffer: GPUBuffer | null = null;
   private presentationCapacity = 0;
+  private instanceBufferAllocations = 0;
+  private presentationBufferAllocations = 0;
+  private presentationBindGroupAllocations = 0;
+  private presentationBindGroupReuses = 0;
   private tileRuntime: StudioGpuTileRuntime<GPUTexture> | null = null;
   private tileRuntimeDevice: GPUDevice | null = null;
   private tileRuntimeResolutionScale = 0;
@@ -1320,6 +1338,15 @@ export class StudioWebGpuEngine {
     return this.backend;
   }
 
+  public getPerformanceMetrics(): StudioGpuPerformanceMetrics {
+    return Object.freeze({
+      instanceBufferAllocations: this.instanceBufferAllocations,
+      presentationBufferAllocations: this.presentationBufferAllocations,
+      presentationBindGroupAllocations: this.presentationBindGroupAllocations,
+      presentationBindGroupReuses: this.presentationBindGroupReuses,
+    });
+  }
+
   public initialize(): Promise<StudioGpuBackend> {
     if (this.disposed) return Promise.resolve(this.backend);
     if (this.backend === "webgpu" && this.device) return Promise.resolve(this.backend);
@@ -1336,6 +1363,8 @@ export class StudioWebGpuEngine {
       this.erasePipeline = null;
       this.presentationPipeline = null;
       this.presentationSampler = null;
+      this.presentationBindGroupLayout = null;
+      this.presentationBindGroups = new WeakMap();
       this.format = null;
       this.instanceBuffer?.destroy();
       this.instanceBuffer = null;
@@ -1609,6 +1638,8 @@ export class StudioWebGpuEngine {
     this.erasePipeline = null;
     this.presentationPipeline = null;
     this.presentationSampler = null;
+    this.presentationBindGroupLayout = null;
+    this.presentationBindGroups = new WeakMap();
     this.format = null;
     this.instanceBuffer?.destroy();
     this.instanceBuffer = null;
@@ -2127,6 +2158,7 @@ export class StudioWebGpuEngine {
         magFilter: "linear",
         minFilter: "linear",
       });
+      const presentationBindGroupLayout = presentationPipeline.getBindGroupLayout(0);
       context.configure({
         device,
         format,
@@ -2146,6 +2178,8 @@ export class StudioWebGpuEngine {
       this.erasePipeline = erasePipeline;
       this.presentationPipeline = presentationPipeline;
       this.presentationSampler = presentationSampler;
+      this.presentationBindGroupLayout = presentationBindGroupLayout;
+      this.presentationBindGroups = new WeakMap();
       this.instanceBuffer?.destroy();
       this.instanceBuffer = null;
       this.instanceCapacity = 0;
@@ -2179,6 +2213,8 @@ export class StudioWebGpuEngine {
     this.erasePipeline = null;
     this.presentationPipeline = null;
     this.presentationSampler = null;
+    this.presentationBindGroupLayout = null;
+    this.presentationBindGroups = new WeakMap();
     this.format = null;
     this.instanceBuffer?.destroy();
     this.instanceBuffer = null;
@@ -2266,6 +2302,7 @@ export class StudioWebGpuEngine {
     this.instanceBuffer?.destroy();
     this.instanceBuffer = replacement;
     this.instanceCapacity = capacity;
+    this.instanceBufferAllocations = incrementBoundedMetric(this.instanceBufferAllocations);
     return replacement;
   }
 
@@ -2284,7 +2321,40 @@ export class StudioWebGpuEngine {
     this.presentationBuffer?.destroy();
     this.presentationBuffer = replacement;
     this.presentationCapacity = capacity;
+    this.presentationBufferAllocations = incrementBoundedMetric(
+      this.presentationBufferAllocations
+    );
     return replacement;
+  }
+
+  private presentationBindGroupFor(texture: GPUTexture, tileId: string): GPUBindGroup | null {
+    const cached = this.presentationBindGroups.get(texture);
+    if (cached) {
+      this.presentationBindGroupReuses = incrementBoundedMetric(
+        this.presentationBindGroupReuses
+      );
+      return cached;
+    }
+    if (
+      !this.device ||
+      !this.presentationSampler ||
+      !this.presentationBindGroupLayout
+    ) {
+      return null;
+    }
+    const created = this.device.createBindGroup({
+      label: `Studio retained tile ${tileId} presentation bindings`,
+      layout: this.presentationBindGroupLayout,
+      entries: [
+        { binding: 0, resource: this.presentationSampler },
+        { binding: 1, resource: texture.createView() },
+      ],
+    });
+    this.presentationBindGroups.set(texture, created);
+    this.presentationBindGroupAllocations = incrementBoundedMetric(
+      this.presentationBindGroupAllocations
+    );
+    return created;
   }
 
   private requiredTileResolutionScale(): number {
@@ -2342,6 +2412,9 @@ export class StudioWebGpuEngine {
     this.tileRuntime = null;
     this.tileRuntimeDevice = null;
     this.tileRuntimeResolutionScale = 0;
+    // Bind groups retain views into tile textures. Drop the weak index whenever those textures are
+    // retired so a future runtime can never reuse a binding for a destroyed resource.
+    this.presentationBindGroups = new WeakMap();
   }
 
   private invalidateRenderedFrame(): void {
@@ -2607,16 +2680,10 @@ export class StudioWebGpuEngine {
       if (presentationBuffer && presentation.draws.length > 0) {
         pass.setPipeline(presentationPipeline);
         pass.setVertexBuffer(0, presentationBuffer);
-        const bindGroupLayout = presentationPipeline.getBindGroupLayout(0);
         for (const draw of presentation.draws) {
-          pass.setBindGroup(0, device.createBindGroup({
-            label: `Studio retained tile ${draw.tileId} presentation bindings`,
-            layout: bindGroupLayout,
-            entries: [
-              { binding: 0, resource: presentationSampler },
-              { binding: 1, resource: draw.resource.createView() },
-            ],
-          }));
+          const bindGroup = this.presentationBindGroupFor(draw.resource, draw.tileId);
+          if (!bindGroup) throw new Error("Studio WebGPU tile presentation binding unavailable");
+          pass.setBindGroup(0, bindGroup);
           pass.draw(draw.vertexCount, 1, draw.firstVertex, 0);
         }
       }

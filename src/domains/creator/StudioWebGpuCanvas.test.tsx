@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -14,6 +16,11 @@ const supportedStroke = {
   color: "#7c5cff",
   size: 8,
 } as const;
+
+const webGpuCanvasSource = readFileSync(
+  new URL("./StudioWebGpuCanvas.tsx", import.meta.url),
+  "utf8",
+);
 
 describe("StudioWebGpuCanvas", () => {
   it("keeps pinned strokes authoritative across parent renders until the pin is released", () => {
@@ -148,5 +155,15 @@ describe("StudioWebGpuCanvas", () => {
     expect(syncViewport).toHaveBeenCalledTimes(1);
     expect(engine.render).toHaveBeenCalledWith([supportedStroke], "frame:active");
     expect(requestInitialization).toHaveBeenCalledTimes(1);
+  });
+
+  it("exposes allocation/reuse metrics imperatively without adding render subscriptions", () => {
+    expect(webGpuCanvasSource).toContain(
+      "readonly getPerformanceMetrics: () => StudioGpuPerformanceMetrics",
+    );
+    expect(webGpuCanvasSource).toContain(
+      "engineRef.current?.getPerformanceMetrics() ?? EMPTY_PERFORMANCE_METRICS",
+    );
+    expect(webGpuCanvasSource).not.toContain("setPerformanceMetrics");
   });
 });
