@@ -1133,6 +1133,7 @@ import { StudioPerspectiveOverlay } from "./StudioPerspectiveOverlay";
 import { StudioPuppetWarpOverlay } from "./StudioPuppetWarpOverlay";
 import { StudioSavedBrushShelf } from "./StudioSavedBrushShelf";
 import { StudioSkewPanel } from "./StudioSkewPanel";
+import StudioTextEditOverlay, { StudioTextEditFallbackModal } from "./StudioTextEditOverlay";
 import {
   StudioToolHintPreferencesProvider,
   StudioToolHintTarget,
@@ -7193,7 +7194,7 @@ function StudioCuttoonEditor() {
   }, [activePage.id, masterEditMode, pagesHi]);
   // 필터 클립보드 — "필터 복사"로 담아 다른 요소에 "붙여넣기"(웹툰 컷 간 룩 통일용).
   const [filterClipboard, setFilterClipboard] = useState<Partial<ImageFilterFields> | null>(null);
-  const [editing, setEditing] = useState<{ id: string; value: string } | null>(null);
+  const [editing, setEditing] = useState<{ id: string } | null>(null);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [tutorialHubOpen, setTutorialHubOpen] = useState(false);
   const [tutorialInitialId, setTutorialInitialId] = useState<string | null>(null);
@@ -20878,10 +20879,10 @@ function StudioCuttoonEditor() {
     const el = elementById.get(id);
     if (!el || (el.type !== "text" && el.type !== "bubble" && el.type !== "sticker")) return;
     if (!beginLiveResourceEdit([id])) return;
-    setEditing({ id, value: el.text });
+    setEditing({ id });
   }
 
-  function commitEditText() {
+  function commitEditText(finalValue: string) {
     try {
       if (editing) {
         const el = elementById.get(editing.id);
@@ -20891,7 +20892,7 @@ function StudioCuttoonEditor() {
         let height: number | undefined;
         if (el && el.type === "bubble" && !el.autoShrinkText) {
           const measure = new KonvaRuntime.Text({
-            text: editing.value || " ",
+            text: finalValue || " ",
             width: el.width - 36,
             fontSize: el.fontSize ?? 24,
             fontFamily: el.font ?? "Pretendard, sans-serif",
@@ -20901,12 +20902,17 @@ function StudioCuttoonEditor() {
           height = Math.max(el.height, Math.ceil(measure.height()) + 28);
           measure.destroy();
         }
-        patchEl(editing.id, { text: editing.value, ...(height !== undefined ? { height } : {}) } as Partial<El>);
+        patchEl(editing.id, { text: finalValue, ...(height !== undefined ? { height } : {}) } as Partial<El>);
       }
       setEditing(null);
     } finally {
       endLiveResourceEdit();
     }
+  }
+
+  function cancelEditText() {
+    setEditing(null);
+    endLiveResourceEdit();
   }
 
   async function captureReadyStageForPage(page: PageState): Promise<Konva.Stage> {
@@ -23596,6 +23602,7 @@ function StudioCuttoonEditor() {
     applyDialogueReplacePlan,
     applyTranslationDraft,
     cancelAdvancedFillPreview,
+    cancelEditText,
     captureAnimFrame,
     captureTimelineKeyframe,
     clearAdvancedFillTapGesture,
@@ -24351,6 +24358,7 @@ function StudioCuttoonEditor() {
           drawShape={drawShape}
           editing={editing}
           effScale={effScale}
+          elementById={elementById}
           elements={elements}
           followingStudioSessionId={followingStudioSessionId}
           frameAnimEl={frameAnimEl}
@@ -24408,6 +24416,7 @@ function StudioCuttoonEditor() {
           nodeEditDraft={nodeEditDraft}
           nodeEditHandles={nodeEditHandles}
           nodeEditTool={nodeEditTool}
+          nodeRefsRef={nodeRefsRef}
           onionSkin={onionSkin}
           pageGrade={pageGrade}
           pageGradeCss={pageGradeCss}
@@ -24444,7 +24453,6 @@ function StudioCuttoonEditor() {
           setDialogueBatchOpen={setDialogueBatchOpen}
           setDialogueTranslateOpen={setDialogueTranslateOpen}
           setDrawMode={setDrawMode}
-          setEditing={setEditing}
           setError={setError}
           setEyedropperActive={setEyedropperActive}
           setFollowingStudioSessionId={setFollowingStudioSessionId}
@@ -35271,7 +35279,8 @@ interface StudioCanvasViewportHandlers {
   clearAutosave: () => void;
   commitAppSettings: (next: StudioAppSettings) => void;
   commitCoalesced: (nextElements: El[], key: string) => void;
-  commitEditText: () => void;
+  cancelEditText: () => void;
+  commitEditText: (finalValue: string) => void;
   commitPages: (nextPages: PageState[], options?: { bypassReviewLock?: boolean; }) => boolean;
   designateHistoryBrushSource: (index: number) => void;
   dismissQuickStart: () => void;
@@ -35369,8 +35378,9 @@ interface StudioCanvasViewportProps {
   drawingShortcutNotice: { id: number; message: string; } | null;
   drawMode: DrawMode;
   drawShape: DrawShapeKind;
-  editing: { id: string; value: string; } | null;
+  editing: { id: string; } | null;
   effScale: number;
+  elementById: Map<string, El>;
   elements: El[];
   followingStudioSessionId: string | null;
   frameAnimEl: ImageEl | null;
@@ -35429,6 +35439,7 @@ interface StudioCanvasViewportProps {
   nodeEditDraft: { elId: string; points: number[]; pressures: number[]; } | null;
   nodeEditHandles: NodeEditHandle[];
   nodeEditTool: NodeEditTool | null;
+  nodeRefsRef: import("react").RefObject<Record<string, Konva.Node | null>>;
   onionSkin: OnionSkinSettings;
   pageGrade: PageGrade;
   pageGradeCss: string;
@@ -35466,7 +35477,6 @@ interface StudioCanvasViewportProps {
   setDialogueBatchOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setDialogueTranslateOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setDrawMode: import("react").Dispatch<import("react").SetStateAction<DrawMode>>;
-  setEditing: import("react").Dispatch<import("react").SetStateAction<{ id: string; value: string; } | null>>;
   setError: import("react").Dispatch<import("react").SetStateAction<string | null>>;
   setEyedropperActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setFollowingStudioSessionId: import("react").Dispatch<import("react").SetStateAction<string | null>>;
@@ -35620,6 +35630,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   drawShape,
   editing,
   effScale,
+  elementById,
   elements,
   followingStudioSessionId,
   frameAnimEl,
@@ -35677,6 +35688,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   nodeEditDraft,
   nodeEditHandles,
   nodeEditTool,
+  nodeRefsRef,
   onionSkin,
   pageGrade,
   pageGradeCss,
@@ -35714,7 +35726,6 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   setDialogueBatchOpen,
   setDialogueTranslateOpen,
   setDrawMode,
-  setEditing,
   setError,
   setEyedropperActive,
   setFollowingStudioSessionId,
@@ -35826,6 +35837,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
     applyDialogueReplacePlan,
     applyTranslationDraft,
     cancelAdvancedFillPreview,
+    cancelEditText,
     captureAnimFrame,
     captureTimelineKeyframe,
     clearAdvancedFillTapGesture,
@@ -35888,6 +35900,13 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
     onWebGpuDeviceLost,
     onWebGpuFrameReady,
   } = stableHandlers;
+  // 텍스트 인라인 편집 — canvasFlipH(좌우 반전 미리보기)나 세로쓰기 요소는 캔버스 실시간 오버레이가
+  // 안전하게 다룰 수 없어(StudioTextEditOverlay 상단 주석 참고) 예전 중앙 모달로 폴백한다.
+  const editingTarget = editing ? elementById.get(editing.id) : null;
+  const editingVertical = !!editingTarget &&
+    (editingTarget.type === "text" || editingTarget.type === "bubble") && !!editingTarget.vertical;
+  const editingFallbackToModal = !!editingTarget && (canvasFlipH || editingVertical);
+  const editingUseOverlay = !!editingTarget && !editingFallbackToModal;
   return (
         <div
           className={cn(
@@ -38271,6 +38290,17 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
               />
             </Suspense>
           ) : null}
+          {editingUseOverlay && (
+            <StudioTextEditOverlay
+              key={editing!.id}
+              elementId={editing!.id}
+              elementById={elementById}
+              nodeRefsRef={nodeRefsRef}
+              effScale={effScale}
+              onCommit={commitEditText}
+              onCancel={cancelEditText}
+            />
+          )}
           </div>
           </div>
 
@@ -38649,47 +38679,17 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
             </button>
           </div>
 
-          {/* 텍스트 인라인 편집 오버레이 */}
-          {editing && (
-            <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 p-6">
-              <div className="w-full max-w-sm rounded-2xl border border-line bg-panel p-4">
-                <p className="mb-2 text-sm font-medium text-fg">텍스트 편집</p>
-                <textarea
-                  // eslint-disable-next-line jsx-a11y/no-autofocus -- 텍스트 편집 모달은 사용자 액션으로만 열리며, 열릴 때 입력란에 포커스를 주는 것이 올바른 모달 a11y 패턴
-                  autoFocus
-                  spellCheck
-                  value={editing.value}
-                  onChange={(e) => setEditing({ ...editing, value: e.target.value })}
-                  onKeyDown={(e) => {
-                    if (e.key === "Escape") {
-                      e.preventDefault();
-                      setEditing(null);
-                      endLiveResourceEdit();
-                    } else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                      e.preventDefault();
-                      commitEditText();
-                    }
-                  }}
-                  rows={3}
-                  className="w-full resize-none rounded-lg border border-line bg-card p-2 text-sm text-fg outline-none focus:border-accent"
-                />
-                <div className="mt-2 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditing(null);
-                      endLiveResourceEdit();
-                    }}
-                    className={buttonClass({ size: "sm", variant: "quiet" })}
-                  >
-                    취소
-                  </button>
-                  <button type="button" onClick={commitEditText} className={buttonClass({ size: "sm", variant: "solid" })}>
-                    적용
-                  </button>
-                </div>
-              </div>
-            </div>
+          {/* 텍스트 인라인 편집 — canvasFlipH(거울상)나 세로쓰기 요소는 캔버스 실시간 오버레이가
+              안전하게 다룰 수 없어 예전 중앙 모달로 폴백한다(StudioTextEditOverlay 상단 주석 참고).
+              이 폴백은 zoomHostRef 좌표계가 필요 없는 단순 중앙 모달이라 여기(줌 프레임 밖)에 둔다. */}
+          {editingFallbackToModal && (
+            <StudioTextEditFallbackModal
+              key={editing!.id}
+              elementId={editing!.id}
+              elementById={elementById}
+              onCommit={commitEditText}
+              onCancel={cancelEditText}
+            />
           )}
         </div>
   );
