@@ -7,6 +7,7 @@ import {
   StudioRasterAssetUploadGuard,
   StudioWorkAssetUploadGuard,
 } from "./studio-asset-upload.guard";
+import { studioCrdtClusterLoadRepositoryProvider } from "./studio-crdt-cluster-load.repository";
 import { studioCrdtRepositoryProvider } from "./studio-crdt.repository";
 import { StudioCrdtService } from "./studio-crdt.service";
 import { studioLiveLockRepositoryProvider } from "./studio-live-lock.repository";
@@ -40,6 +41,7 @@ import { StudioWorkAssetService } from "./studio-work-asset.service";
   ],
   providers: [
     creatorCollaborationRepositoryProvider,
+    studioCrdtClusterLoadRepositoryProvider,
     studioCrdtRepositoryProvider,
     studioLiveLockRepositoryProvider,
     studioRasterAssetRepositoryProvider,

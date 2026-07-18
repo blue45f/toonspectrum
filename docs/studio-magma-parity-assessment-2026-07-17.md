@@ -5,9 +5,10 @@
 결론: **가능하며, 대부분의 영역에서 이미 동등 이상을 달성했다.** 아래 매트릭스는 Magma 공식
 헬프 문서(출처는 `docs/studio-web-drawing-benchmark-2026-07-12.md`의 링크 목록)에서 확인되는
 기능만을 기준으로 하고, ToonSpectrum 상태는 커밋/파일 근거를 함께 적는다. 남은 열세 항목은
-2개이며 각각 실행 가능한 경로가 있다(마지막 절). 음성 작업실 평가와 자유 좌표 댓글 핀은
-2026-07-18 구현을 반영해 갱신했다(자유 좌표 핀은 이미 출하됐던 항목이 문서에 누락된 것을
-바로잡음).
+1개이며 실행 가능한 경로가 있다(마지막 절). 음성 작업실 평가·자유 좌표 댓글 핀·30명+ 스케일
+admission은 2026-07-18 구현을 반영해 갱신했다(자유 좌표 핀은 이미 출하됐던 항목이 문서에
+누락된 것을 바로잡음; admission은 룸 참가자 캡과 CRDT 오퍼레이션 클러스터 예산을 모두
+구현·병합 완료).
 
 ## Magma 기능 전수 매트릭스
 
@@ -16,7 +17,7 @@ Magma의 창작 기능축은 공식 문서 기준 6개 영역이다: ① 실시�
 
 | Magma 기능 (공식 문서 근거) | Magma | ToonSpectrum | 근거 (파일/커밋) | 판정 |
 | --- | --- | --- | --- | --- |
-| 실시간 커서·presence (최대 30명) | 핵심 | 서버 인증 presence·40ms 커서 스로틀·페이지/툴 상태 | `studio-live.gateway.ts`, `StudioLiveCanvasOverlay` | **동등** |
+| 실시간 커서·presence (최대 30명) | 핵심 | 서버 인증 presence·40ms 커서 스로틀·페이지/툴 상태 + 룸 참가자 소프트 30인 캡(`fetchSockets()` 클러스터 판독) + CRDT 오퍼레이션 클러스터 admission 예산(노드별 하트비트·근사 합산, 로컬 캡으로 fail-closed) | `studio-live.gateway.ts`, `StudioLiveCanvasOverlay`, `studio-crdt.service.ts`, `studio-crdt-cluster-load.repository.ts` | **동등+** |
 | 실시간 공동 편집(획 단위) | 서버 위임 | **Yjs CRDT + PostgreSQL 영속**·오프라인 아웃박스·복구 볼트 — 전달 순서 무관 수렴·동시 삭제/복원 경쟁 해소 | `docs/studio-crdt-webgpu-architecture-2026-07-16.md`, `17455e9` | **우세** (Magma는 문서화된 오프라인 영속·복구 계약이 없음) |
 | 역할·권한·참가자 관리 | owner/editor/viewer | owner/admin/editor/commenter/viewer + 초대·상태·능력 매트릭스, 세션 재검증 | `creator-collaboration.policy`, `studio-team-client.ts` | **동등+** |
 | 레이어 소유권(soft lock) | 레이어 잠금 | 리소스 단위 분산 리스(PG 직렬화·만료·역할강등 회수) | `studio-live-lock.repository.ts` | **동등+** |
@@ -38,12 +39,26 @@ Magma의 창작 기능축은 공식 문서 기준 6개 영역이다: ① 실시�
 프리셋·타임랩스·애니메이션 타임라인·PSD 왕복·출판 파이프라인·화면 공유. Magma는 범용 공동
 드로잉 캔버스이고, ToonSpectrum은 같은 협업 기반 위에 웹툰 제작 파이프라인 전체를 얹었다.
 
-## 남은 열세 2건과 실행 경로
+## 남은 열세 1건과 실행 경로
 
 | # | 항목 | 경로 | 규모 |
 | --- | --- | --- | --- |
 | ① | 전체 캔버스 GPU 렌더 | 라이브 잉크는 완료. 커밋 픽셀은 골든픽셀 패리티·Stage 리드백 계약 게이트 후 단계 이관(문서화됨) | 대 (장기, 게이트 명시) |
-| ② | 30명+ 스케일 admission | 프로세스-로컬 백프레셔·클러스터 어댑터(PG)·음성/락 admission(PG advisory lock)은 완료. 룸 참가자 수 자체엔 캡이 없었음 — 2026-07-18 `fetchSockets()` 기반 소프트 30인 캡 추가(`studio-live.gateway.ts`). CRDT 오퍼레이션 단위 분산 admission 예산은 스트로크 핫패스에 DB 라운드트립을 추가하는 트레이드오프라 별도 설계 결정 필요 | 중 (룸 캡은 완료, CRDT-op 예산은 보류) |
+
+**해소됨 (2026-07-18)** — 30명+ 스케일 admission: 프로세스-로컬 백프레셔·클러스터 어댑터
+(PG)·음성/락 admission(PG advisory lock)은 기존 완료. 남아있던 두 갭도 모두 구현·병합됨.
+① 룸 참가자 수 자체엔 캡이 없었음 → `fetchSockets()` 기반 소프트 30인 캡 추가
+(`studio-live.gateway.ts`). ② CRDT 오퍼레이션 단위는 프로세스-로컬 백프레셔뿐이었음 →
+스트로크 핫패스에 동기 DB 라운드트립을 추가하지 않는 방식으로 클러스터 예산 추가:
+각 노드가 350ms 주기로 자신의 대기 오퍼레이션 수를 Postgres에 하트비트하고, 그 클러스터
+합산치를 로컬 캐시로만 동기 판독한다(`studio-crdt-cluster-load.repository.ts`,
+`studio-crdt.service.ts`). 하트비트가 1.5초 이상 stale해지면 클러스터 게이트를 건너뛰고
+기존 로컬 캡으로만 fail-closed — 정지된 신호가 무제한 허용으로도, 실제 편집을 막는 하드
+블록으로도 이어지지 않는다. 자체 적대적 검증에서 발견된 실제 결함 2건도 함께 수정:
+(a) `onModuleDestroy`가 진행 중인 하트비트를 추적하지 않아 teardown 완료 후에도 죽어가는
+풀에 쓰기가 발생할 수 있던 경합 — 현재는 in-flight 프라미스를 추적해 destroy가 이를
+기다린다. (b) 하트비트 쿼리가 멈추면 재시도 없이 영구 비활성화될 수 있던 경로 — 이제
+쿼리를 타임아웃으로 감싸 다음 주기가 항상 재시도할 수 있다.
 
 ## 판정
 
@@ -58,5 +73,5 @@ Magma의 창작 기능축은 공식 문서 기준 6개 영역이다: ① 실시�
   CRDT 영속·복구와 웹툰 제작 중 화면 공유는 우세. 음성은 대규모 회의가 아니라 작업 중
   짧은 대화를 위한 P2P 허들로 범위를 고정한다.
 
-따라서 "최소 Magma 드로잉 기능 이상"은 **이미 충족**했고, 잔여 3건은 모두 실행 가능한
+따라서 "최소 Magma 드로잉 기능 이상"은 **이미 충족**했고, 잔여 1건도 실행 가능한
 경로가 문서화되어 있어 계속 고도화 가능하다.

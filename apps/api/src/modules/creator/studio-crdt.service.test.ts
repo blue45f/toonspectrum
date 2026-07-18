@@ -41,6 +41,7 @@ import {
   hasValidStudioCrdtRootSchema,
 } from "./studio-crdt.service";
 
+import type { StudioCrdtClusterLoadRepository } from "./studio-crdt-cluster-load.repository";
 import type {
   AppendStudioCrdtUpdateInput,
   AppendStudioCrdtUpdateResult,
@@ -206,6 +207,38 @@ class MemoryStudioCrdtRepository implements StudioCrdtRepository {
   }
 }
 
+// Trivially "under budget" by default (readClusterLoad resolves 0), so existing tests that don't
+// care about the cluster-wide cap are unaffected by it.
+class MemoryStudioCrdtClusterLoadRepository implements StudioCrdtClusterLoadRepository {
+  readonly reportedLoads: Array<{ nodeId: string; pendingOperations: number; now: Date }> = [];
+  clusterLoad = 0;
+  failReads = false;
+  // When set, readClusterLoad suspends until the test resolves it -- used to hold a heartbeat
+  // genuinely in-flight (e.g. to test onModuleDestroy racing against it).
+  readGate: Promise<void> | undefined;
+  private firstReadResolve: (() => void) | undefined;
+  readonly firstRead = new Promise<void>((resolve) => {
+    this.firstReadResolve = resolve;
+  });
+
+  async reportLoad(nodeId: string, pendingOperations: number, now: Date): Promise<void> {
+    this.reportedLoads.push({ nodeId, pendingOperations, now });
+  }
+
+  async readClusterLoad(): Promise<number> {
+    if (this.readGate) await this.readGate;
+    if (this.failReads) throw new Error("cluster load discovery failed");
+    // Scheduled as a macrotask, not resolved synchronously: the caller (reportClusterLoad) still
+    // has a pending microtask-queued assignment of cachedClusterPendingOperations after this
+    // promise settles. A setTimeout only fires once the full microtask queue has drained, so
+    // awaiting firstRead is guaranteed to observe that assignment already applied.
+    const resolve = this.firstReadResolve;
+    this.firstReadResolve = undefined;
+    if (resolve) setTimeout(resolve, 0);
+    return this.clusterLoad;
+  }
+}
+
 const services: StudioCrdtService[] = [];
 
 const allowStoredRasterAssetReferences: StudioCrdtRasterAssetAdmission = {
@@ -222,14 +255,16 @@ const allowStoredWorkAssetReferences: StudioCrdtWorkAssetAdmission = {
 
 function service(
   repository: MemoryStudioCrdtRepository,
-  options: ConstructorParameters<typeof StudioCrdtService>[3] = {},
+  options: ConstructorParameters<typeof StudioCrdtService>[4] = {},
   rasterAssetAdmission: StudioCrdtRasterAssetAdmission = allowStoredRasterAssetReferences,
-  workAssetAdmission: StudioCrdtWorkAssetAdmission = allowStoredWorkAssetReferences
+  workAssetAdmission: StudioCrdtWorkAssetAdmission = allowStoredWorkAssetReferences,
+  clusterLoadRepository: StudioCrdtClusterLoadRepository = new MemoryStudioCrdtClusterLoadRepository()
 ): StudioCrdtService {
   const created = new StudioCrdtService(
     repository,
     rasterAssetAdmission,
     workAssetAdmission,
+    clusterLoadRepository,
     options
   );
   services.push(created);
@@ -2554,6 +2589,95 @@ describe("StudioCrdtService", () => {
     await expect(current.sync("work-global-c")).resolves.toMatchObject({
       serverSequence: "0",
     });
+  });
+
+  it("rejects a new operation when the cached cluster-wide load is at or over budget", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const clusterLoadRepository = new MemoryStudioCrdtClusterLoadRepository();
+    clusterLoadRepository.clusterLoad = 5;
+    const current = service(
+      repository,
+      { maxClusterPendingOperationsTotal: 5 },
+      undefined,
+      undefined,
+      clusterLoadRepository
+    );
+    await clusterLoadRepository.firstRead;
+
+    await expect(current.sync("work-cluster-cap")).rejects.toBeInstanceOf(
+      StudioCrdtBackpressureError
+    );
+  });
+
+  it("falls back to local-only caps once the last cluster heartbeat is stale", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const clusterLoadRepository = new MemoryStudioCrdtClusterLoadRepository();
+    clusterLoadRepository.clusterLoad = 999;
+    let currentTime = new Date("2026-01-01T00:00:00.000Z");
+    const current = service(
+      repository,
+      {
+        now: () => currentTime,
+        maxClusterPendingOperationsTotal: 1,
+        clusterLoadStaleAfterMs: 1_000,
+        // Only the constructor's immediate heartbeat should run in this test; a real recurring
+        // timer would race the manually-advanced clock below.
+        scheduleInterval: () => ({}) as ReturnType<typeof setInterval>,
+        cancelInterval: () => undefined,
+      },
+      undefined,
+      undefined,
+      clusterLoadRepository
+    );
+    await clusterLoadRepository.firstRead;
+
+    await expect(current.sync("work-stale-cluster")).rejects.toBeInstanceOf(
+      StudioCrdtBackpressureError
+    );
+
+    currentTime = new Date(currentTime.getTime() + 1_001);
+    await expect(current.sync("work-stale-cluster")).resolves.toMatchObject({
+      serverSequence: "0",
+    });
+  });
+
+  it("never blocks admission on a failed cluster-load heartbeat", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const clusterLoadRepository = new MemoryStudioCrdtClusterLoadRepository();
+    clusterLoadRepository.failReads = true;
+    const current = service(
+      repository,
+      {},
+      undefined,
+      undefined,
+      clusterLoadRepository
+    );
+
+    await expect(current.sync("work-cluster-down")).resolves.toMatchObject({
+      serverSequence: "0",
+    });
+  });
+
+  it("waits out an in-flight cluster heartbeat before onModuleDestroy resolves", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const clusterLoadRepository = new MemoryStudioCrdtClusterLoadRepository();
+    let releaseGate: (() => void) | undefined;
+    clusterLoadRepository.readGate = new Promise((resolve) => {
+      releaseGate = resolve;
+    });
+    // The constructor's own immediate heartbeat is now suspended inside readClusterLoad.
+    const current = service(repository, {}, undefined, undefined, clusterLoadRepository);
+
+    let destroyed = false;
+    const destroying = current.onModuleDestroy().then(() => {
+      destroyed = true;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(destroyed).toBe(false);
+
+    releaseGate?.();
+    await destroying;
+    expect(destroyed).toBe(true);
   });
 
   it("deduplicates exact retries and rejects update-id collisions", async () => {

@@ -641,6 +641,21 @@ export const creatorWorkLiveLocks = pgTable(
   ]
 );
 
+// 클러스터 전체 CRDT 대기 작업 부하를 노드당 1행으로 근사 집계한다. work/user와 무관하게
+// 프로세스 수에 비례해 크기가 고정되므로 별도 TTL 정리 없이도 무한 증가하지 않는다.
+export const creatorWorkCrdtNodeLoad = pgTable(
+  "creator_work_crdt_node_load",
+  {
+    nodeId: text("nodeId").primaryKey(),
+    pendingOperations: integer("pendingOperations").notNull(),
+    reportedAt: timestamp("reportedAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_creator_work_crdt_node_load_reported").on(t.reportedAt),
+    check("creator_work_crdt_node_load_pending_check", sql`${t.pendingOperations} >= 0`),
+  ]
+);
+
 // CRDT scene topology stores only `(assetId, elementType)`. The authored binary body and the
 // bounded placement descriptor live here, scoped to the private work and removed with it. Keeping
 // this separate from creator_asset is deliberate: creator_asset is a public image/data-URL
