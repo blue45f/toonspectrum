@@ -26,6 +26,18 @@ describe("StudioCommentsPanel review rail contract", () => {
     expect(source).toContain("<dialog");
     expect(source).toContain("aria-labelledby={titleId}");
     expect(source).toContain("aria-describedby={descriptionId}");
+    expect(source).toContain('id="studio-comments-review-dialog"');
+  });
+
+  it("exposes one permission-aware desktop inbox trigger tied to the review dialog", () => {
+    expect(studioPageSource).toContain('data-studio-comments-inbox="true"');
+    expect(studioPageSource).toContain('aria-controls="studio-comments-review-dialog"');
+    expect(studioPageSource).toContain(
+      "disabled={collaborationDocumentLocked && !sharedDocument?.capabilities.view}"
+    );
+    expect(studioPageSource).toContain("lg:inline-flex");
+    expect(studioPageSource).toContain('commentsOpen\n                ? "댓글 검토함 닫기"');
+    expect(studioPageSource).toContain('openStudioCommentCount > 99 ? "99+" : openStudioCommentCount');
   });
 
   it("keeps the inbox dense until the user explicitly composes and restores anchor context", () => {

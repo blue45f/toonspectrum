@@ -703,6 +703,7 @@ export function StudioCommentsPanel({
   const reviewRail = (
     <dialog
       open
+      id="studio-comments-review-dialog"
       ref={dialogRef}
       aria-labelledby={titleId}
       aria-describedby={descriptionId}
@@ -967,8 +968,8 @@ export function StudioCommentsPanel({
               {onTogglePinsHidden ? (
                 <button
                   type="button"
-                  aria-pressed={pinsHidden}
-                  aria-label={pinsHidden ? "캔버스 댓글 핀 표시" : "캔버스 댓글 핀 숨김"}
+                  aria-pressed={!pinsHidden}
+                  aria-label="캔버스 열린 댓글 핀 표시"
                   onClick={onTogglePinsHidden}
                   className={`${QUIET_BUTTON_CLASS} shrink-0 px-3 sm:px-2.5`}
                   title={pinsHidden ? "캔버스 댓글 핀을 다시 표시합니다 (Shift+C)" : "캔버스 댓글 핀을 숨깁니다 (Shift+C)"}

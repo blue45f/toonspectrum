@@ -117,7 +117,7 @@ const HINTS: Record<string, StudioToolHintSpec> = {
     description:
       "이미지 픽셀을 자유 올가미(드래그 닫기) 또는 다각형 올가미(클릭 꼭짓점 → Enter/더블클릭 닫기)로 고릅니다. 합치기·빼기·교집합, 페더, 확장/축소, 밝기·색조·콘텐츠 인식 채우기를 속성 패널에서 이어서 쓸 수 있어요.",
     preview: "lasso",
-    tip: "Shift는 선택 추가, Alt는 선택 빼기로 바로 전환됩니다.",
+    tip: "선택 모드는 속성 패널의 새 선택·합치기·빼기·교집합 버튼에서 바꿀 수 있어요.",
   },
   "poly-lasso": {
     id: "poly-lasso",

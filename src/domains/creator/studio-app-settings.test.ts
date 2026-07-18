@@ -13,6 +13,7 @@ import {
   showStudioRailTool,
   studioRailHiddenIds,
   STUDIO_APP_SETTINGS_TABS,
+  STUDIO_RAIL_TOOL_CATALOG,
   STUDIO_SHORTCUT_ACTIONS,
 } from "./studio-app-settings";
 
@@ -31,10 +32,77 @@ describe("studio-app-settings", () => {
     expect(d.toolbar.visibleIds).toEqual(DEFAULT_STUDIO_RAIL_TOOL_ORDER);
     expect(Object.keys(d.shortcuts).length).toBe(STUDIO_SHORTCUT_ACTIONS.length);
     expect(d.shortcuts["toggle-chrome"]).toBe("`");
+    expect(d.shortcuts["flip-canvas"]).toBe("H");
+    expect(STUDIO_RAIL_TOOL_CATALOG.find(({ id }) => id === "hand")?.defaultShortcut).toBe("Space");
     expect(d.general.toolHintMode).toBe("rich");
     expect(d.touch.toolHintHoldMs).toBe(480);
     expect(d.mouse.wheel).toBe("zoom");
     expect(d.touch.oneFingerDrag).toBe("draw");
+  });
+
+  it("keeps the new selection, retouch, and view tools aligned across both catalogs", () => {
+    const expected = [
+      { railId: "blend", actionId: "tool-blend", label: "혼합(스머지)", shortcut: "N" },
+      { railId: "liquify", actionId: "tool-liquify", label: "리퀴파이", shortcut: "J" },
+      { railId: "marquee-circle", actionId: "tool-marquee-circle", label: "원형 선택", shortcut: "Shift+M" },
+      { railId: "crop", actionId: "tool-crop", label: "자르기", shortcut: "C" },
+      { railId: "zoom", actionId: "tool-zoom", label: "보기 확대·축소", shortcut: "Z" },
+      { railId: "rotate-view", actionId: "tool-rotate-view", label: "보기 회전", shortcut: "R" },
+    ] as const;
+    const defaults = defaultStudioAppSettings();
+
+    expect(new Set(STUDIO_RAIL_TOOL_CATALOG.map(({ id }) => id)).size).toBe(
+      STUDIO_RAIL_TOOL_CATALOG.length
+    );
+    expect(new Set(STUDIO_SHORTCUT_ACTIONS.map(({ id }) => id)).size).toBe(
+      STUDIO_SHORTCUT_ACTIONS.length
+    );
+    expect(
+      DEFAULT_STUDIO_RAIL_TOOL_ORDER.filter((id) =>
+        expected.some(({ railId }) => railId === id)
+      )
+    ).toEqual(expected.map(({ railId }) => railId));
+
+    for (const item of expected) {
+      expect(STUDIO_RAIL_TOOL_CATALOG.find(({ id }) => id === item.railId)).toMatchObject({
+        label: item.label,
+        defaultShortcut: item.shortcut,
+      });
+      expect(STUDIO_SHORTCUT_ACTIONS.find(({ id }) => id === item.actionId)).toMatchObject({
+        label: item.label,
+        defaultKeys: item.shortcut,
+      });
+      expect(defaults.shortcuts[item.actionId]).toBe(item.shortcut);
+    }
+
+    expect(
+      matchStudioShortcut(defaults.shortcuts["tool-marquee-circle"], {
+        key: "m",
+        shiftKey: true,
+      })
+    ).toBe(true);
+    expect(
+      matchStudioShortcut(defaults.shortcuts["tool-marquee-circle"], {
+        key: "m",
+        shiftKey: false,
+      })
+    ).toBe(false);
+  });
+
+  it("adds new shortcut defaults when normalizing a legacy shortcut payload", () => {
+    const normalized = normalizeStudioAppSettings({
+      shortcuts: { "tool-pen": "K" },
+    });
+
+    expect(normalized.shortcuts).toMatchObject({
+      "tool-pen": "K",
+      "tool-marquee-circle": "Shift+M",
+      "tool-crop": "C",
+      "tool-blend": "N",
+      "tool-liquify": "J",
+      "tool-zoom": "Z",
+      "tool-rotate-view": "R",
+    });
   });
 
   it("normalizes broken payloads without throwing", () => {
@@ -102,5 +170,23 @@ describe("studio-app-settings", () => {
       matchStudioShortcut("Mod+D", { key: "d", metaKey: false, ctrlKey: false, shiftKey: false, altKey: false })
     ).toBe(false);
     expect(formatStudioShortcutChord("Mod+Shift+I")).toContain("⌘");
+  });
+
+  it("remaps canvas flip without retaining a hidden hard-coded H binding", () => {
+    const shortcuts = { ...defaultStudioAppSettings().shortcuts, "flip-canvas": "K" };
+    expect(matchStudioShortcut(shortcuts["flip-canvas"], { key: "k", code: "KeyK" })).toBe(true);
+    expect(matchStudioShortcut(shortcuts["flip-canvas"], { key: "h", code: "KeyH" })).toBe(false);
+  });
+
+  it("exposes configured chord conflicts so dispatch priority can remain deterministic", () => {
+    const shortcuts = {
+      ...defaultStudioAppSettings().shortcuts,
+      "tool-pen": "K",
+      "flip-canvas": "K",
+    };
+    const matches = STUDIO_SHORTCUT_ACTIONS
+      .filter(({ id }) => matchStudioShortcut(shortcuts[id], { key: "k", code: "KeyK" }))
+      .map(({ id }) => id);
+    expect(matches).toEqual(["tool-pen", "flip-canvas"]);
   });
 });

@@ -15,6 +15,9 @@ import {
   studioSharedAutosaveCompatibility,
   writeStudioLifecycleAutosave,
 } from "./studio-autosave";
+import { STUDIO_CANVAS_WIDTH } from "./studio-canvas-constants";
+import { createDefaultStudioDrawingAssistDocument } from "./studio-drawing-assist-document";
+import { createStudioReferenceBoardDocument } from "./studio-reference-board";
 
 const PRIVATE_PROMPT = "공개하면 안 되는 반전 프롬프트";
 
@@ -141,6 +144,65 @@ describe("studio autosave", () => {
       JSON.stringify({ pagesList: [{ id: "p1", elements: [] }], characterBible })
     );
     expect(parsed?.characterBible).toEqual(characterBible);
+    expect(parsed && studioAutosaveHasContent(parsed)).toBe(true);
+  });
+
+  it("드로잉 가이드만 작성한 빈 페이지도 왕복하고 복구 대상으로 보존한다", () => {
+    const guide = createDefaultStudioDrawingAssistDocument({
+      canvasWidth: STUDIO_CANVAS_WIDTH,
+      canvasHeight: 1_080,
+    });
+    const drawingAssist = {
+      ...guide,
+      perspective: {
+        active: true,
+        points: [{ id: "vp-a", x: 120, y: 240 }],
+      },
+    };
+    const parsed = parseStudioAutosave(serializeStudioAutosave({
+      version: 2,
+      savedAt: "2026-07-19T00:00:00.000Z",
+      pagesList: [{ id: "p1", elements: [], canvasH: 1_080, drawingAssist }],
+    }));
+
+    expect(parsed?.pagesList[0]?.drawingAssist).toEqual(drawingAssist);
+    expect(parsed && studioAutosaveHasContent(parsed)).toBe(true);
+    expect(studioAutosaveHasContent({
+      version: 2,
+      savedAt: "2026-07-19T00:00:00.000Z",
+      pagesList: [{ id: "p1", elements: [], canvasH: 1_080, drawingAssist: guide }],
+    })).toBe(false);
+  });
+
+  it("포즈 참고 보드만 작성한 빈 문서도 해시 기반으로 왕복하고 복구한다", () => {
+    const referenceBoard = createStudioReferenceBoardDocument([{
+      id: "pose-reference",
+      asset: {
+        sha256: `sha256:${"c".repeat(64)}`,
+        assetId: "local-pose",
+        name: "손 포즈",
+      },
+      view: {
+        centerX: 0.25,
+        centerY: 0.75,
+        zoom: 2,
+        rotationDeg: 30,
+        flipX: true,
+        flipY: false,
+        opacity: 0.6,
+        grayscale: true,
+      },
+    }]);
+    const serialized = serializeStudioAutosave({
+      version: 2,
+      savedAt: "2026-07-19T00:00:00.000Z",
+      pagesList: [{ id: "p1", elements: [] }],
+      referenceBoard,
+    });
+    const parsed = parseStudioAutosave(serialized);
+
+    expect(parsed?.referenceBoard).toEqual(referenceBoard);
+    expect(serialized).not.toContain("data:");
     expect(parsed && studioAutosaveHasContent(parsed)).toBe(true);
   });
 

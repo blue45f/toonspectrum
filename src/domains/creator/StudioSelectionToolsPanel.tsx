@@ -191,6 +191,7 @@ export function StudioSelectionToolsPanel({
             >
               <StudioToggleChip
                 active={active}
+                disabled={busy}
                 onClick={() => onPickTool(active ? null : tool.id)}
                 aria-label={tool.label}
               >
@@ -229,14 +230,15 @@ export function StudioSelectionToolsPanel({
                 preview: "select",
                 tip:
                   mode.id === "add"
-                    ? "Shift를 누르면 작업 중에도 합치기로 잠시 전환할 수 있어요."
+                    ? "새 영역을 기존 선택에 더하려면 ‘합치기’ 결합 모드 버튼을 선택하세요."
                     : mode.id === "subtract"
-                      ? "Alt 또는 Option을 누르면 작업 중에도 빼기로 잠시 전환할 수 있어요."
+                      ? "새 영역을 기존 선택에서 빼려면 ‘빼기’ 결합 모드 버튼을 선택하세요."
                       : "겹친 픽셀만 남겨 정교한 마스크를 만들 때 유용해요.",
               }}
             >
               <StudioToggleChip
                 active={combineMode === mode.id}
+                disabled={busy}
                 onClick={() => onCombineModeChange(mode.id)}
                 aria-label={mode.label}
               >
@@ -260,6 +262,7 @@ export function StudioSelectionToolsPanel({
       <div className="flex flex-wrap items-center gap-1.5">
         <StudioToggleChip
           active={!!selection?.invert}
+          disabled={busy}
           onClick={onToggleInvert}
           title="선택 영역을 반전합니다(그린 영역의 바깥을 선택)."
           aria-label="선택 반전"

@@ -23,6 +23,13 @@ import {
   type StudioPackageArchiveSource,
 } from "./studio-package-archive";
 import { parseStudioProjectFile, type StudioProjectFile } from "./studio-project-file";
+import { parseStudioReferenceBoardDocument } from "./studio-reference-board";
+import {
+  STUDIO_VRM_SCENE_DOCUMENT_MAX_BYTES,
+  parseStudioVrmLegacyFragment,
+  serializeStudioVrmSceneDocument,
+} from "./studio-vrm-scene-document";
+import { SAMPLE_VRMS } from "./vrm-library";
 
 /**
  * Self-contained ToonSpectrum project archive.
@@ -1301,12 +1308,12 @@ async function extractEmbeddedAssets(
 }
 
 /**
- * Older Studio builds appended a percent-encoded BG3D JSON fragment to a PNG data URL. Convert
- * primitive-only payloads to the current separate scene field before raster extraction. Legacy
- * custom models contain only local IndexedDB keys, so archiving them without an explicit binary
- * resolver would be lossy; those projects fail with an actionable boundary instead.
+ * Older Studio builds appended percent-encoded BG3D or VRM poser JSON to a captured PNG. Convert
+ * those payloads to separate canonical scene fields before raster extraction. Legacy custom
+ * models contain only local IndexedDB keys, so archiving them without an explicit binary resolver
+ * would be lossy; those projects fail with an actionable boundary instead.
  */
-function migrateLegacyBg3dImageFragments(project: Record<string, unknown>): void {
+function migrateLegacyStudio3dImageFragments(project: Record<string, unknown>): void {
   const primitiveKinds = new Set<string>(STUDIO_BG3D_PRIMITIVE_KINDS);
   const finiteVec3Within = (candidate: unknown, minimum: number, maximum: number): boolean =>
     Array.isArray(candidate)
@@ -1339,9 +1346,13 @@ function migrateLegacyBg3dImageFragments(project: Record<string, unknown>): void
       if (!/^data:image\/(?:png|jpeg|gif|webp);base64,/iu.test(baseDataUrl)) continue;
       if (
         element.bg3dScene !== undefined
+        || element.vrmScene !== undefined
         || encodedFragment.length === 0
         || textEncoder.encode(encodedFragment).byteLength
-          > STUDIO_BG3D_SCENE_DOCUMENT_MAX_BYTES * 3
+          > Math.max(
+            STUDIO_BG3D_SCENE_DOCUMENT_MAX_BYTES,
+            STUDIO_VRM_SCENE_DOCUMENT_MAX_BYTES
+          ) * 3
       ) {
         fail("PROJECT_INVALID", "레거시 3D 배경 fragment를 안전하게 변환할 수 없습니다.", { pointer });
       }
@@ -1352,6 +1363,36 @@ function migrateLegacyBg3dImageFragments(project: Record<string, unknown>): void
         decoded = JSON.parse(decodedFragment) as unknown;
       } catch {
         fail("PROJECT_INVALID", "레거시 3D 배경 fragment를 해석할 수 없습니다.", { pointer });
+      }
+      if (
+        isRecord(decoded)
+        && (decoded.tool === "vrm-poser" || (decoded.tool === undefined && decoded.modelId !== undefined))
+      ) {
+        const migratedVrm = parseStudioVrmLegacyFragment(element.src, {
+          bundledModels: SAMPLE_VRMS.map(({ id, name }) => ({ id, name })),
+        });
+        if (!migratedVrm) {
+          fail("PROJECT_INVALID", "레거시 3D 데생 인형 fragment를 해석할 수 없습니다.", { pointer });
+        }
+        if (migratedVrm.status === "unresolved-model") {
+          fail(
+            "PROJECT_INVALID",
+            "레거시 업로드 VRM을 먼저 Studio에서 다시 열어 모델 attachment로 저장해 주세요.",
+            { pointer }
+          );
+        }
+        const canonicalVrmSceneJson = serializeStudioVrmSceneDocument(migratedVrm.document);
+        if (!canonicalVrmSceneJson) {
+          fail("PROJECT_INVALID", "레거시 3D 데생 인형 장면을 canonical 형식으로 저장할 수 없습니다.", {
+            pointer,
+          });
+        }
+        value[index] = {
+          ...element,
+          src: migratedVrm.rasterSrc,
+          vrmScene: JSON.parse(canonicalVrmSceneJson) as unknown,
+        };
+        continue;
       }
       if (
         !isRecord(decoded)
@@ -1581,6 +1622,43 @@ function assertProjectAssetUrisCovered(
   }
 }
 
+interface StudioReferenceBoardIntegrityReference {
+  pointer: string;
+  sha256: string;
+}
+
+function collectReferenceBoardIntegrityReferences(
+  project: StudioProjectFile
+): StudioReferenceBoardIntegrityReference[] {
+  const document = parseStudioReferenceBoardDocument(project.referenceBoard);
+  if (!document) return [];
+  return document.items.map((item, index) => ({
+    pointer: `/referenceBoard/items/${index}/asset/sha256`,
+    sha256: item.asset.sha256.slice("sha256:".length),
+  }));
+}
+
+/**
+ * A raw `sha256:` value is only an identity, not evidence that its bytes are inside the ZIP.
+ * Reference-board hashes are optional external dependencies, so unlike BG3D models they produce a
+ * self-containment warning instead of making project export/import fail.
+ */
+function warnUncoveredReferenceBoardAttachments(
+  project: StudioProjectFile,
+  diagnostics: StudioProjectArchiveDiagnostic[],
+  isCovered: (reference: StudioReferenceBoardIntegrityReference) => boolean
+): void {
+  for (const reference of collectReferenceBoardIntegrityReferences(project)) {
+    if (isCovered(reference)) continue;
+    warning(
+      diagnostics,
+      "EXTERNAL_PROJECT_DEPENDENCY",
+      "참고 보드 이미지 바이트가 project archive에 포함되지 않았습니다.",
+      { pointer: reference.pointer }
+    );
+  }
+}
+
 interface Bg3dArchiveAttachmentEvidence {
   readonly byteSize: number;
   readonly mimeType: string;
@@ -1804,7 +1882,7 @@ export async function buildStudioProjectArchive(
     nodes: 0,
   });
   if (!isRecord(canonicalProjectValue)) fail("PROJECT_INVALID", "프로젝트 JSON 루트가 올바르지 않습니다.");
-  migrateLegacyBg3dImageFragments(canonicalProjectValue);
+  migrateLegacyStudio3dImageFragments(canonicalProjectValue);
   const context: BuildContext = {
     limits,
     diagnostics,
@@ -1907,6 +1985,21 @@ export async function buildStudioProjectArchive(
   }
 
   const canonicalProject = parseStudioProjectFile(canonicalProjectValue);
+  warnUncoveredReferenceBoardAttachments(
+    canonicalProject,
+    diagnostics,
+    ({ pointer, sha256 }) => {
+      const attachment = context.attachments.get(sha256);
+      return context.pointerOwners.get(pointer) === sha256
+        && context.pointerModes.get(pointer) === "sha256-prefixed"
+        && attachment?.kinds.has("reference") === true
+        && [...attachment.references.values()].some((reference) =>
+          reference.pointer === pointer
+          && reference.usage === "reference"
+          && documentReferenceMode(reference) === "sha256-prefixed"
+        );
+    }
+  );
   scanExternalProjectDependencies(canonicalProject, "", diagnostics);
   const canonicalProjectJson = canonicalJson(canonicalProjectValue);
   const projectBytes = textEncoder.encode(canonicalProjectJson);
@@ -2431,6 +2524,23 @@ export async function importStudioProjectArchive(
     });
   }
 
+  const manifestByHash = new Map(manifest.attachments.map((attachment) => [
+    attachment.sha256,
+    attachment,
+  ]));
+  warnUncoveredReferenceBoardAttachments(
+    canonicalProject,
+    diagnostics,
+    ({ pointer, sha256 }) => {
+      const attachment = manifestByHash.get(sha256);
+      return attachment?.kinds.includes("reference") === true
+        && attachment.documentReferences.some((reference) =>
+          reference.pointer === pointer
+          && reference.usage === "reference"
+          && documentReferenceMode(reference) === "sha256-prefixed"
+        );
+    }
+  );
   scanExternalProjectDependencies(rehydratedValue, "", diagnostics);
   let project: StudioProjectFile;
   try {

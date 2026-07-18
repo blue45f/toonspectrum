@@ -8,11 +8,14 @@ import {
   STUDIO_BG3D_SCENE_DOCUMENT_VERSION,
   createDefaultStudioBg3dSceneDocument,
 } from "./studio-bg3d-scene-document";
+import { createDefaultStudioDrawingAssistDocument } from "./studio-drawing-assist-document";
 import {
   parseStudioProjectFile,
   resetStudioAiProvenanceForRemix,
   serializeStudioProjectFile,
 } from "./studio-project-file";
+import { createStudioReferenceBoardDocument } from "./studio-reference-board";
+import { createStudioVrmSceneDocument } from "./studio-vrm-scene-document";
 
 const page = { id: "p1", elements: [], bg: "#ffffff", bgGrad: null, canvasH: 1080 };
 const PRIVATE_PROMPT = "원작자의 비공개 결말 프롬프트";
@@ -170,6 +173,128 @@ describe("studio project file", () => {
     expect(pageImage.bg3dScene).toEqual(scene);
     expect(masterImage.bg3dScene).toEqual(scene);
     expect(JSON.parse(serializeStudioProjectFile(parsed)).pagesList[0].elements[0].bg3dScene).toEqual(scene);
+  });
+
+  it("VRM 포저 장면을 캡처 PNG와 분리해 페이지·마스터로 왕복하고 손상본은 거부한다", () => {
+    const vrmScene = createStudioVrmSceneDocument({
+      source: "bundled",
+      id: "sample-vrm",
+      name: "루미",
+    });
+    const image = {
+      id: "vrm-image-1",
+      type: "image",
+      src: "data:image/png;base64,iVBORw0KGgo=",
+      vrmScene,
+    };
+    const parsed = parseStudioProjectFile({
+      version: 2,
+      pagesList: [{ ...page, elements: [image] }],
+      master: { elements: [{ ...image, id: "master-vrm-image" }] },
+    });
+    const pageImage = parsed.pagesList[0].elements[0] as typeof image;
+    const masterImage = (parsed.master as { elements: typeof image[] }).elements[0];
+
+    expect(pageImage.src).not.toContain("#");
+    expect(pageImage.vrmScene).toEqual(vrmScene);
+    expect(masterImage.vrmScene).toEqual(vrmScene);
+    expect(JSON.parse(serializeStudioProjectFile(parsed)).pagesList[0].elements[0].vrmScene)
+      .toEqual(vrmScene);
+
+    expect(() => parseStudioProjectFile({
+      version: 2,
+      pagesList: [{
+        ...page,
+        elements: [{ ...image, vrmScene: { ...vrmScene, version: 99 } }],
+      }],
+    })).toThrow(/3D 데생 인형 장면/);
+  });
+
+  it("페이지별 드로잉 보조 문서를 프로젝트 파일로 왕복하고 손상본은 거부한다", () => {
+    const drawingAssist = createDefaultStudioDrawingAssistDocument({
+      canvasWidth: 800,
+      canvasHeight: 1_080,
+    });
+    drawingAssist.perspective = {
+      active: true,
+      points: [{ id: "vp-a", x: 400, y: 320 }],
+    };
+    const parsed = parseStudioProjectFile({
+      version: 2,
+      pagesList: [{ ...page, drawingAssist }],
+    });
+    expect(parsed.pagesList[0].drawingAssist).toEqual(drawingAssist);
+    expect(JSON.parse(serializeStudioProjectFile(parsed)).pagesList[0].drawingAssist)
+      .toEqual(drawingAssist);
+
+    expect(() => parseStudioProjectFile({
+      version: 2,
+      pagesList: [{
+        ...page,
+        drawingAssist: {
+          ...drawingAssist,
+          isometric: { ...drawingAssist.isometric, active: true },
+        },
+      }],
+    })).toThrow(/드로잉 보조/);
+  });
+
+  it("여러 포즈 참고의 해시·변형·z순서를 프로젝트로 왕복하고 바이너리 URL은 거부한다", () => {
+    const referenceBoard = createStudioReferenceBoardDocument([
+      {
+        id: "reference-back",
+        asset: {
+          sha256: `sha256:${"a".repeat(64)}`,
+          assetId: "device-asset-a",
+          name: "전신 포즈",
+          mimeType: "image/png",
+          width: 1200,
+          height: 1800,
+        },
+        view: {
+          centerX: 0.35,
+          centerY: 0.55,
+          zoom: 0.8,
+          rotationDeg: -12,
+          flipX: false,
+          flipY: false,
+          opacity: 0.72,
+          grayscale: true,
+        },
+      },
+      {
+        id: "reference-front",
+        asset: { sha256: `sha256:${"b".repeat(64)}` },
+        view: {
+          centerX: 0.7,
+          centerY: 0.4,
+          zoom: 1.4,
+          rotationDeg: 18,
+          flipX: true,
+          flipY: false,
+          opacity: 1,
+          grayscale: false,
+        },
+      },
+    ]);
+    const parsed = parseStudioProjectFile({ version: 2, pagesList: [page], referenceBoard });
+
+    expect(parsed.referenceBoard).toEqual(referenceBoard);
+    expect(JSON.parse(serializeStudioProjectFile(parsed)).referenceBoard).toEqual(referenceBoard);
+    expect(JSON.stringify(parsed.referenceBoard)).not.toContain("data:");
+
+    expect(() => parseStudioProjectFile({
+      version: 2,
+      pagesList: [page],
+      referenceBoard: {
+        version: 1,
+        items: [{
+          id: "unsafe",
+          asset: { sha256: "data:image/png;base64,AA==" },
+          view: referenceBoard.items[0]?.view,
+        }],
+      },
+    })).toThrow(/포즈 참고 보드/);
   });
 
   it("페이지와 마스터에 저장된 실제 schema-v1 3D 장면을 v2로 마이그레이션한다", () => {

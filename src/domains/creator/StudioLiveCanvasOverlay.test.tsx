@@ -13,6 +13,7 @@ import {
 import {
   StudioLiveCanvasOverlay,
   StudioLivePresenceDock,
+  StudioRemoteCursorOverlay,
 } from "./StudioLiveCanvasOverlay";
 
 import type { StudioLiveSyncSnapshot } from "./studio-live-sync-safety";
@@ -198,6 +199,119 @@ describe("StudioLiveCanvasOverlay", () => {
     );
 
     expect(html).toContain("calc(0.0000% + 22px)");
+  });
+
+  it.each([
+    { rotation: 0, flipX: false, x: 25, y: 25, offsetX: 12, offsetY: 8 },
+    { rotation: 90, flipX: false, x: 75, y: 25, offsetX: -8, offsetY: 12 },
+    { rotation: 180, flipX: false, x: 75, y: 75, offsetX: -12, offsetY: -8 },
+    { rotation: 270, flipX: false, x: 25, y: 75, offsetX: 8, offsetY: -12 },
+    { rotation: 0, flipX: true, x: 75, y: 25, offsetX: -12, offsetY: 8 },
+    { rotation: 90, flipX: true, x: 25, y: 25, offsetX: 8, offsetY: 12 },
+    { rotation: 180, flipX: true, x: 25, y: 75, offsetX: 12, offsetY: -8 },
+    { rotation: 270, flipX: true, x: 75, y: 75, offsetX: -8, offsetY: -12 },
+  ] as const)(
+    "projects pins and cursors after local flip (rotation=$rotation, flipX=$flipX)",
+    ({ rotation, flipX, x, y, offsetX, offsetY }) => {
+      const html = renderToStaticMarkup(
+        <StudioLiveCanvasOverlay
+          canvasWidth={800}
+          canvasHeight={400}
+          cursors={[
+            {
+              participant: { sessionId: "peer", displayName: "동료", role: "editor" },
+              cursor: { x: 0.25, y: 0.25, pageId: "page-1", tool: null },
+              updatedAt: 1,
+            },
+          ]}
+          commentPins={[
+            {
+              key: "point",
+              anchor: { type: "point", pageId: "page-1", x: 0.25, y: 0.25 },
+              count: 1,
+              label: "검토 핀",
+              x: 200,
+              y: 100,
+              screenOffsetX: 12,
+              screenOffsetY: 8,
+            },
+          ]}
+          flipX={flipX}
+          rotation={rotation}
+          onCommentPinClick={noop}
+        />
+      );
+
+      expect(html).toContain(
+        `left:clamp(1.375rem, calc(${x.toFixed(4)}% + ${offsetX}px), calc(100% - 1.375rem))`
+      );
+      expect(html).toContain(
+        `top:clamp(1.375rem, calc(${y.toFixed(4)}% + ${offsetY}px), calc(100% - 1.375rem))`
+      );
+      expect(html).toContain(`left:${x}%;top:${y}%`);
+    }
+  );
+
+  it.each([false, true] as const)(
+    "keeps an omitted rotation byte-for-byte compatible with rotation zero (flipX=$flipX)",
+    (flipX) => {
+      const props = {
+        canvasWidth: 800,
+        canvasHeight: 400,
+        cursors: [
+          {
+            participant: { sessionId: "peer", displayName: "동료", role: "editor" as const },
+            cursor: { x: 0.25, y: 0.25, pageId: "page-1", tool: null },
+            updatedAt: 1,
+          },
+        ],
+        commentPins: [
+          {
+            key: "point",
+            anchor: { type: "point" as const, pageId: "page-1", x: 0.25, y: 0.25 },
+            count: 1,
+            label: "검토 핀",
+            x: 200,
+            y: 100,
+            screenOffsetX: 12,
+            screenOffsetY: 8,
+          },
+        ],
+        flipX,
+        onCommentPinClick: noop,
+      };
+      const omitted = renderToStaticMarkup(<StudioLiveCanvasOverlay {...props} />);
+      const explicitZero = renderToStaticMarkup(<StudioLiveCanvasOverlay {...props} rotation={0} />);
+      expect(omitted).toBe(explicitZero);
+    }
+  );
+
+  it("forwards the remote overlay rotation to comment pins before live cursors arrive", () => {
+    const html = renderToStaticMarkup(
+      <StudioRemoteCursorOverlay
+        pageId="page-1"
+        canvasWidth={800}
+        canvasHeight={400}
+        commentPins={[
+          {
+            key: "point",
+            anchor: { type: "point", pageId: "page-1", x: 0.25, y: 0.25 },
+            count: 1,
+            label: "검토 핀",
+            x: 200,
+            y: 100,
+            screenOffsetX: 12,
+            screenOffsetY: 8,
+          },
+        ]}
+        rotation={90}
+        flipX
+        onCommentPinClick={noop}
+      />
+    );
+
+    expect(html).toContain("left:clamp(1.375rem, calc(25.0000% + 8px)");
+    expect(html).toContain("top:clamp(1.375rem, calc(25.0000% + 12px)");
   });
 
   it("uses deterministic participant colors and exposes Figma-style follow controls", () => {

@@ -172,6 +172,36 @@ describe("studio-pages (pure, real exports)", () => {
     expect(mt.id).not.toBe("t1");
   });
 
+  it("duplicateMirroredPage mirrors drawing-assist horizontal anchors", () => {
+    resetIds();
+    const drawingAssist = {
+      version: 1 as const,
+      perspective: {
+        active: true,
+        points: [{ id: "vp-a", x: 120, y: 300 }],
+      },
+      isometric: {
+        active: false,
+        angleDeg: 30,
+        cellSize: 40,
+        originX: 200,
+        originY: 500,
+      },
+    };
+    const source = samplePage({ drawingAssist });
+    const mirrored = duplicateMirroredPage(source, makeId, CANVAS_W);
+
+    expect(mirrored.drawingAssist).toEqual({
+      ...drawingAssist,
+      perspective: {
+        active: true,
+        points: [{ id: "vp-a", x: 600, y: 300 }],
+      },
+      isometric: { ...drawingAssist.isometric, originX: 520 },
+    });
+    expect(source.drawingAssist).toEqual(drawingAssist);
+  });
+
   it("findPageIndex works", () => {
     const a = samplePage({ id: "a" });
     const b = samplePage({ id: "b" });

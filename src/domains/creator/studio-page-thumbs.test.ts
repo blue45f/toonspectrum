@@ -26,7 +26,7 @@ import {
 } from "./studio-page-thumbs";
 import { reorderPages, type PageLike } from "./studio-pages";
 
-import type { El } from "./StudioPage";
+import type { El } from "./studio-element-model";
 import type { StudioPageDndItemProps } from "./StudioPageThumbnails";
 import type { DragEventHandler } from "react";
 

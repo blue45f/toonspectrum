@@ -15,8 +15,8 @@ import {
   type DialoguePageLike,
 } from "./studio-dialogue-batch";
 
+import type { El } from "./studio-element-model";
 import type { LayerGroup } from "./studio-layers";
-import type { El } from "./StudioPage";
 
 // StudioPage El 실제 형태를 흉내낸 픽스처 — bubble/text 외 타입은 목록에서 제외돼야 한다.
 function makePages(): DialoguePageLike[] {

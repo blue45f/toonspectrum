@@ -2,6 +2,8 @@
 // StudioPage 커밋 경로(요소 패치는 map 으로 새 배열, 무변화 요소는 참조 유지)를 그대로 흉내 낸다.
 import { describe, expect, it } from "vitest";
 
+import { STUDIO_CANVAS_WIDTH } from "./studio-canvas-constants";
+import { createDefaultStudioDrawingAssistDocument } from "./studio-drawing-assist-document";
 import {
   HISTORY_INITIAL_LABEL,
   HISTORY_PANEL_MAX_VISIBLE,
@@ -262,6 +264,31 @@ describe("describeHistoryStep — 페이지 속성/구조", () => {
     expect(describeHistoryStep(before, after)).toBe("그룹 변경");
   });
 
+  it("드로잉 가이드만 바뀐 히스토리를 실질 변경으로 표시한다", () => {
+    const defaultGuide = createDefaultStudioDrawingAssistDocument({
+      canvasWidth: STUDIO_CANVAS_WIDTH,
+      canvasHeight: 1080,
+    });
+    const before: HistorySnapshot = [page("p1", [], { drawingAssist: defaultGuide })];
+    const after = repage(before, "p1", {
+      drawingAssist: {
+        ...defaultGuide,
+        perspective: {
+          active: true,
+          points: [{ id: "vp-a", x: 100, y: 200 }],
+        },
+      },
+    });
+    expect(describeHistoryStep(before, after)).toBe("드로잉 가이드 변경");
+    expect(describeHistoryStep(before, [
+      page("p1", [], { drawingAssist: structuredClone(defaultGuide) }),
+    ])).toBe("변경 없음");
+    expect(describeHistoryStep(
+      [page("p1", [], { drawingAssist: undefined })],
+      [page("p1", [], { drawingAssist: structuredClone(defaultGuide) })]
+    )).toBe("변경 없음");
+  });
+
   it("페이지 추가/삭제/순서 변경", () => {
     const p1 = page("p1", []);
     const p2 = page("p2", []);
@@ -299,6 +326,26 @@ describe("describeHistoryStep — 페이지 속성/구조", () => {
       { canvasH: 2000 }
     );
     expect(describeHistoryStep(before, mixed)).toBe("페이지 2개 편집");
+
+    const defaultGuide = createDefaultStudioDrawingAssistDocument({
+      canvasWidth: 800,
+      canvasHeight: 1080,
+    });
+    const guidesBefore: HistorySnapshot = before.map((p) => ({
+      ...p,
+      drawingAssist: defaultGuide,
+    }));
+    const guidesAfter: HistorySnapshot = guidesBefore.map((p, index) => ({
+      ...p,
+      drawingAssist: {
+        ...defaultGuide,
+        perspective: {
+          active: true,
+          points: [{ id: `vp-${index}`, x: 100 + index, y: 200 }],
+        },
+      },
+    }));
+    expect(describeHistoryStep(guidesBefore, guidesAfter)).toBe("전체 드로잉 가이드 변경");
   });
 
   it("참조만 새것이고 내용이 같으면 변경 없음", () => {

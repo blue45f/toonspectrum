@@ -8,7 +8,7 @@ import {
   fitBubbleFontSize,
 } from "./studio-bubble-text-fit";
 
-import type { El } from "./StudioPage";
+import type { El } from "./studio-element-model";
 import type Konva from "konva";
 
 import { buttonClass } from "@/components/ui/button-utils";

@@ -29,6 +29,23 @@ describe("creatorWorkSnapshotToStudioProject", () => {
         webtoonTheme: "vivid",
         panelGutter: 32,
         characterBible: { version: 1, characters: [] },
+        referenceBoard: {
+          version: 1,
+          items: [{
+            id: "pose-reference",
+            asset: { sha256: `sha256:${"d".repeat(64)}` },
+            view: {
+              centerX: 0.5,
+              centerY: 0.5,
+              zoom: 1,
+              rotationDeg: 0,
+              flipX: false,
+              flipY: false,
+              opacity: 1,
+              grayscale: false,
+            },
+          }],
+        },
         publishPack: { profile: "naver-webtoon" },
       },
     });
@@ -50,6 +67,10 @@ describe("creatorWorkSnapshotToStudioProject", () => {
       status: "draft",
       pagesList: [expect.objectContaining({ id: "page-2", canvasH: 2400 })],
       publishPack: { profile: "naver-webtoon" },
+      referenceBoard: expect.objectContaining({
+        version: 1,
+        items: [expect.objectContaining({ id: "pose-reference" })],
+      }),
     });
   });
 

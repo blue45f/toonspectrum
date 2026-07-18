@@ -31,6 +31,7 @@ import {
   type ClipboardElementLike,
   type StudioClipboardPayload,
 } from "./studio-page-meta";
+import { createStudioVrmSceneDocument } from "./studio-vrm-scene-document";
 
 // 결정적 id 생성기 (uuid 대체)
 function seqId(prefix = "id") {
@@ -382,6 +383,12 @@ describe("serialize/parse round trip", () => {
     };
     expect(isClipboardPayload({ ...payload, els: [{ ...image, frames: "not-an-array" }] })).toBe(false);
     expect(isClipboardPayload({ ...payload, els: [{ ...image, bg3dScene: "not-an-object" }] })).toBe(false);
+    const vrmScene = createStudioVrmSceneDocument();
+    expect(isClipboardPayload({ ...payload, els: [{ ...image, vrmScene }] })).toBe(true);
+    expect(isClipboardPayload({
+      ...payload,
+      els: [{ ...image, vrmScene: { ...vrmScene, version: 99 } }],
+    })).toBe(false);
     expect(isClipboardPayload({ ...payload, els: [{
       id: "bubble",
       type: "bubble",

@@ -6,6 +6,7 @@ import { createPortal as createDomPortal } from "react-dom";
 import * as THREE from "three";
 
 import { EXPRESSION_PRESETS, EXTRA_POSE_PRESETS, NATURAL_IDLE_POSES, pickNaturalIdlePose, POSER_FINGER_BONES, type StudioExpressionPreset } from "./studio-pose-presets";
+import { createTwoBoneDefaultPoleTarget } from "./studio-rig-two-bone-ik";
 import {
   createAvatarForgeState,
   parseAvatarForgeState,
@@ -19,11 +20,13 @@ import {
   COSTUME_SLOT_LABELS,
   COSTUME_PALETTES,
   parseCostumeState,
+  serializeCostume,
   tintColor,
   type CostumeState,
   type CostumeSlot,
 } from "./studio-vrm-costume";
 import { avatarSideForHand, solveHandToFingerBones } from "./studio-vrm-hand-solver";
+import { clampStudioVrmJointRotation, getStudioVrmJointLimit } from "./studio-vrm-joint-limits";
 import {
   parseVrmPhysicsSettings,
   DEFAULT_VRM_PHYSICS,
@@ -37,10 +40,13 @@ import {
   clampStudioVrmJointDegrees,
   mirrorStudioVrmFingerRotations,
   mirrorStudioVrmPoseBones,
-  resolveStudioVrmJointAxisRange,
   straightenStudioVrmUpperBody,
   type StudioVrmPoseMirrorScope,
 } from "./studio-vrm-pose-editing";
+import {
+  STUDIO_VRM_DIRECT_EDIT_BONES,
+  bakeStudioVrmRuntimePose,
+} from "./studio-vrm-pose-bake";
 import {
   applyExpressionWeightsToVrm,
   applyPoseToVrm,
@@ -111,6 +117,19 @@ import {
   type PropInstance,
 } from "./studio-vrm-props";
 import {
+  STUDIO_VRM_FINGER_BONES,
+  STUDIO_VRM_HUMANOID_BONES,
+  STUDIO_VRM_MODEL_MAX_BYTES,
+  normalizeStudioVrmSceneDocument,
+  parseStudioVrmSceneDocument,
+  serializeStudioVrmSceneDocument,
+  type StudioVrmCameraSettings,
+  type StudioVrmFingerRotationMap,
+  type StudioVrmPoseBoneMap,
+  type StudioVrmSceneDocument,
+  type StudioVrmSceneModel,
+} from "./studio-vrm-scene-document";
+import {
   parseSceneProps,
   serializeSceneProps,
   type ScenePropAttachmentConfig as PropAttachmentConfig,
@@ -130,6 +149,11 @@ import {
   type TrackingCalibration,
 } from "./studio-vrm-tracking-calibration";
 import { AdaptiveQualityController } from "./studio-vrm-tracking-quality";
+import {
+  solveStudioVrmUserIk,
+  STUDIO_VRM_USER_IK_CHAINS,
+  type StudioVrmUserIkResult,
+} from "./studio-vrm-user-ik";
 import {
   WARDROBE_SLOTS,
   WARDROBE_SLOT_LABELS,
@@ -177,8 +201,16 @@ import { StudioToolHintTarget } from "./StudioToolHint";
 import { StudioVrmAvatarForge, countDetectedVrmHairMeshes } from "./StudioVrmAvatarForge";
 import { StudioVrmAvatarForgePanel } from "./StudioVrmAvatarForgePanel";
 import { StudioVrmPhotoPoseScanner } from "./StudioVrmPhotoPoseScanner";
+import {
+  STUDIO_VRM_JOINT_HANDLE_DEFINITIONS,
+  StudioVrmJointHandles,
+  type StudioVrmIkEffectorBone,
+  type StudioVrmJointHandleBone,
+  type StudioVrmJointWorldPoint,
+} from "./StudioVrmJointHandles";
 import { StudioVrmPropPanel } from "./StudioVrmPropPanel";
 import {
+  canonicalizeVrmContentHash,
   deleteStoredVrmModel,
   getStoredVrmModel,
   isUsableVrmAssetResponse,
@@ -204,11 +236,19 @@ import {
   type SharedAsset,
 } from "@/src/infrastructure/creator-client";
 
+export type StudioVrmPoserInsertResult = {
+  pngDataUrl: string;
+  width: number;
+  height: number;
+  scene: StudioVrmSceneDocument;
+};
+
 type StudioVrmPoserProps = {
   open: boolean;
   onClose: () => void;
-  onInsert: (pngDataUrl: string, width: number, height: number) => boolean;
+  onInsert: (result: StudioVrmPoserInsertResult) => boolean | void | Promise<boolean | void>;
   initialDataUrl?: string;
+  initialScene?: StudioVrmSceneDocument;
 };
 
 type LoadStatus = "empty" | "loading" | "ready" | "error";
@@ -714,6 +754,9 @@ const BONE_LABELS: Record<string, string> = {
   neck: "목 (Neck)",
   spine: "척추 (Spine)",
   chest: "가슴 (Chest)",
+  upperChest: "윗가슴 (Upper Chest)",
+  leftShoulder: "왼쪽 쇄골/어깨 (L Shoulder)",
+  rightShoulder: "오른쪽 쇄골/어깨 (R Shoulder)",
   leftUpperArm: "왼쪽 어깨 (L Upper Arm)",
   rightUpperArm: "오른쪽 어깨 (R Upper Arm)",
   leftLowerArm: "왼쪽 팔꿈치 (L Lower Arm)",
@@ -726,6 +769,8 @@ const BONE_LABELS: Record<string, string> = {
   rightLowerLeg: "오른쪽 무릎 (R Lower Leg)",
   leftFoot: "왼쪽 발목 (L Foot)",
   rightFoot: "오른쪽 발목 (R Foot)",
+  leftToes: "왼쪽 발끝 (L Toes)",
+  rightToes: "오른쪽 발끝 (R Toes)",
   // finger labels (detailed per-finger editing)
   leftThumbMetacarpal: "왼 엄지 중수 (L Thumb MC)",
   leftThumbProximal: "왼 엄지 근위 (L Thumb Prox)",
@@ -761,11 +806,11 @@ const BONE_LABELS: Record<string, string> = {
 
 const BONE_CATEGORIES: Array<{ id: string; label: string; bones: VRMHumanBoneName[] }> = [
   { id: "head", label: "머리/목", bones: ["head", "neck"] },
-  { id: "torso", label: "몸통/상체", bones: ["hips", "spine", "chest"] },
-  { id: "rightArm", label: "오른팔", bones: ["rightUpperArm", "rightLowerArm", "rightHand"] },
-  { id: "leftArm", label: "왼팔", bones: ["leftUpperArm", "leftLowerArm", "leftHand"] },
-  { id: "rightLeg", label: "오른다리", bones: ["rightUpperLeg", "rightLowerLeg", "rightFoot"] },
-  { id: "leftLeg", label: "왼다리", bones: ["leftUpperLeg", "leftLowerLeg", "leftFoot"] },
+  { id: "torso", label: "골반/몸통", bones: ["hips", "spine", "chest", "upperChest"] },
+  { id: "rightArm", label: "오른팔", bones: ["rightShoulder", "rightUpperArm", "rightLowerArm", "rightHand"] },
+  { id: "leftArm", label: "왼팔", bones: ["leftShoulder", "leftUpperArm", "leftLowerArm", "leftHand"] },
+  { id: "rightLeg", label: "오른다리", bones: ["rightUpperLeg", "rightLowerLeg", "rightFoot", "rightToes"] },
+  { id: "leftLeg", label: "왼다리", bones: ["leftUpperLeg", "leftLowerLeg", "leftFoot", "leftToes"] },
   { id: "leftFingers", label: "왼손가락", bones: POSER_FINGER_BONES.filter((b) => b.startsWith("left")) as VRMHumanBoneName[] },
   { id: "rightFingers", label: "오른손가락", bones: POSER_FINGER_BONES.filter((b) => b.startsWith("right")) as VRMHumanBoneName[] },
 ];
@@ -777,6 +822,72 @@ const VIEWPORT_POSE_BONES: readonly VRMHumanBoneName[] = Object.freeze([
   "leftUpperLeg", "leftLowerLeg", "leftFoot",
   "rightUpperLeg", "rightLowerLeg", "rightFoot",
 ]);
+
+type StudioVrmIkTransaction = {
+  vrm: VRM;
+  effector: StudioVrmIkEffectorBone;
+  baseline: { bones: PoseBoneMap; yOffset: number };
+  poleWorld?: THREE.Vector3;
+  latest: StudioVrmUserIkResult | null;
+};
+
+function extractStudioVrmFingerRotations(bones: PoseBoneMap): FingerRotationMap {
+  const fingers: FingerRotationMap = {};
+  for (const boneName of POSER_FINGER_BONES) {
+    const rotation = bones[boneName]?.rotation;
+    if (!rotation) continue;
+    fingers[boneName] = [rotation[0], rotation[1], rotation[2]];
+  }
+  return fingers;
+}
+
+function applyStudioVrmRotationPose(
+  targetVrm: VRM,
+  pose: { bones: PoseBoneMap; yOffset: number },
+  bodyScale: BodyScale,
+) {
+  applyPoserVisualState(targetVrm, {
+    bones: stripFingerBones(pose.bones),
+    yOffset: pose.yOffset,
+    fingerEdits: extractStudioVrmFingerRotations(pose.bones),
+    bodyScale,
+  });
+}
+
+function createStudioVrmIkPole(
+  targetVrm: VRM,
+  effector: StudioVrmIkEffectorBone,
+): THREE.Vector3 | undefined {
+  try {
+    const chain = STUDIO_VRM_USER_IK_CHAINS[effector];
+    const upper = targetVrm.humanoid.getNormalizedBoneNode(chain.upper);
+    const lower = targetVrm.humanoid.getNormalizedBoneNode(chain.lower);
+    const end = targetVrm.humanoid.getNormalizedBoneNode(chain.end);
+    if (!upper || !lower || !end) return undefined;
+    targetVrm.scene.updateMatrixWorld(true);
+    const startWorld = upper.getWorldPosition(new THREE.Vector3());
+    const middleWorld = lower.getWorldPosition(new THREE.Vector3());
+    const endWorld = end.getWorldPosition(new THREE.Vector3());
+    const values = [startWorld, middleWorld, endWorld].flatMap((point) => [point.x, point.y, point.z]);
+    if (!values.every(Number.isFinite)) return undefined;
+    const pole = createTwoBoneDefaultPoleTarget(
+      [startWorld.x, startWorld.y, startWorld.z],
+      [middleWorld.x, middleWorld.y, middleWorld.z],
+      [endWorld.x, endWorld.y, endWorld.z],
+    );
+    return new THREE.Vector3(pole[0], pole[1], pole[2]);
+  } catch {
+    return undefined;
+  }
+}
+
+function categoryForStudioVrmJointHandle(bone: StudioVrmJointHandleBone): string | null {
+  return BONE_CATEGORIES.find((category) => category.bones.includes(bone))?.id ?? null;
+}
+
+function resolveStudioVrmJointHandleBone(bone: VRMHumanBoneName): StudioVrmJointHandleBone | null {
+  return STUDIO_VRM_JOINT_HANDLE_DEFINITIONS.find((definition) => definition.bone === bone)?.bone ?? null;
+}
 
 type ScenePropDef = {
   id: string;
@@ -1137,6 +1248,26 @@ function applyCameraPreset(camera: THREE.Camera, preset: CameraPreset, invalidat
   invalidate();
 }
 
+function restorePerspectiveCamera(
+  camera: THREE.Camera,
+  controls: OrbitLike,
+  settings: StudioVrmCameraSettings,
+  invalidate: () => void
+): void {
+  if (!(camera instanceof THREE.PerspectiveCamera)) return;
+  camera.position.set(...settings.position);
+  camera.up.set(...settings.up).normalize();
+  camera.fov = settings.fovDegrees;
+  camera.near = settings.near;
+  camera.far = settings.far;
+  camera.lookAt(...settings.target);
+  camera.updateProjectionMatrix();
+  camera.updateMatrixWorld();
+  controls?.target?.set(...settings.target);
+  controls?.update?.();
+  invalidate();
+}
+
 function CaptureBridge({
   onCaptureUpdate,
 }: {
@@ -1161,7 +1292,11 @@ type OrbitLike = {
   update?: () => void;
 } | null;
 
-type ViewportApi = { zoomBy: (factor: number) => void };
+type ViewportApi = {
+  zoomBy: (factor: number) => void;
+  readCamera: () => StudioVrmCameraSettings | null;
+  restoreCamera: (settings: StudioVrmCameraSettings) => void;
+};
 
 // Canvas 내부에서 OrbitControls/카메라를 잡아 줌 등 명령형 동작을 패널 오버레이로 노출.
 function ViewportController({ onReady }: { onReady: (api: ViewportApi | null) => void }) {
@@ -1183,6 +1318,23 @@ function ViewportController({ onReady }: { onReady: (api: ViewportApi | null) =>
         controls?.update?.();
         invalidate();
       },
+      readCamera: () => {
+        if (!(camera instanceof THREE.PerspectiveCamera)) return null;
+        const target = controls?.target?.clone()
+          ?? camera.position.clone().add(camera.getWorldDirection(new THREE.Vector3()));
+        return {
+          projection: "perspective",
+          position: [camera.position.x, camera.position.y, camera.position.z],
+          target: [target.x, target.y, target.z],
+          up: [camera.up.x, camera.up.y, camera.up.z],
+          fovDegrees: camera.fov,
+          near: camera.near,
+          far: camera.far,
+        };
+      },
+      restoreCamera: (settings: StudioVrmCameraSettings) => {
+        restorePerspectiveCamera(camera, controls, settings, invalidate);
+      },
     });
     return () => {
       onReady(null);
@@ -1198,13 +1350,14 @@ function CameraDirector({ presetId, resetNonce }: { presetId: string; resetNonce
   const preset = findCameraPreset(presetId);
 
   useEffect(() => {
+    if (presetId === "custom") return;
     applyCameraPreset(camera, preset, invalidate);
     // 사용자가 궤도를 돌린 뒤에도 시점 초기화가 프리셋 타깃으로 정확히 복귀하도록 동기화.
     if (controls?.target) {
       controls.target.set(preset.target[0], preset.target[1], preset.target[2]);
       controls.update?.();
     }
-  }, [camera, invalidate, preset, controls, resetNonce]);
+  }, [camera, invalidate, preset, presetId, controls, resetNonce]);
 
   return null;
 }
@@ -2550,6 +2703,101 @@ function applyRotationToVrm(vrm: VRM, bodyRotation: number) {
   vrm.scene.updateMatrixWorld(true);
 }
 
+type MannequinMaterial = THREE.Material & {
+  color?: THREE.Color;
+  emissive?: THREE.Color;
+  emissiveIntensity?: number;
+  map?: THREE.Texture | null;
+  metalness?: number;
+  roughness?: number;
+};
+
+type MannequinMaterialSnapshot = {
+  material: MannequinMaterial;
+  color: THREE.Color | null;
+  emissive: THREE.Color | null;
+  emissiveIntensity: number | undefined;
+  map: THREE.Texture | null | undefined;
+  metalness: number | undefined;
+  roughness: number | undefined;
+};
+
+function StudioVrmMannequinMaterial({
+  vrm,
+  enabled,
+  customColors,
+  materialFx,
+}: {
+  vrm: VRM;
+  enabled: boolean;
+  customColors: Record<string, string>;
+  materialFx: VrmMaterialFx;
+}) {
+  const snapshotsRef = useRef<MannequinMaterialSnapshot[]>([]);
+
+  const restore = () => {
+    for (const snapshot of snapshotsRef.current) {
+      if (snapshot.color && snapshot.material.color) snapshot.material.color.copy(snapshot.color);
+      if (snapshot.emissive && snapshot.material.emissive) snapshot.material.emissive.copy(snapshot.emissive);
+      if (snapshot.emissiveIntensity !== undefined) snapshot.material.emissiveIntensity = snapshot.emissiveIntensity;
+      if (snapshot.map !== undefined) snapshot.material.map = snapshot.map;
+      if (snapshot.metalness !== undefined) snapshot.material.metalness = snapshot.metalness;
+      if (snapshot.roughness !== undefined) snapshot.material.roughness = snapshot.roughness;
+      snapshot.material.needsUpdate = true;
+    }
+    snapshotsRef.current = [];
+  };
+
+  const enforce = () => {
+    for (const { material } of snapshotsRef.current) {
+      material.color?.set("#b7b2a8");
+      material.emissive?.set("#000000");
+      if (material.emissiveIntensity !== undefined) material.emissiveIntensity = 0;
+      if (material.map !== undefined) material.map = null;
+      if (material.metalness !== undefined) material.metalness = 0;
+      if (material.roughness !== undefined) material.roughness = 0.82;
+    }
+  };
+
+  useEffect(() => {
+    restore();
+    if (!enabled) {
+      applyVrmCustomColors(vrm, customColors);
+      applyVrmMaterialFx(vrm, materialFx);
+      return;
+    }
+    const seen = new Set<THREE.Material>();
+    vrm.scene.traverse((object) => {
+      const mesh = object as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const rawMaterial of materials) {
+        if (!rawMaterial || seen.has(rawMaterial)) continue;
+        seen.add(rawMaterial);
+        const material = rawMaterial as MannequinMaterial;
+        snapshotsRef.current.push({
+          material,
+          color: material.color?.clone() ?? null,
+          emissive: material.emissive?.clone() ?? null,
+          emissiveIntensity: material.emissiveIntensity,
+          map: material.map,
+          metalness: material.metalness,
+          roughness: material.roughness,
+        });
+        material.needsUpdate = true;
+      }
+    });
+    enforce();
+    return restore;
+  }, [customColors, enabled, materialFx, vrm]);
+
+  useFrame(() => {
+    if (enabled) enforce();
+  });
+
+  return null;
+}
+
 /**
  * vrm.lookAt 직접 구동. VRMLookAt.yaw/pitch 단위는 도(degree) —
  * 라디안을 넣으면 거의 움직이지 않는다. useFrame 밖 헬퍼로 분리(react-compiler 프롭 변이 제약).
@@ -3075,7 +3323,7 @@ function parseCameraError(error: unknown): string {
   return errMsg;
 }
 
-export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: StudioVrmPoserProps) {
+export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initialScene }: StudioVrmPoserProps) {
   const dialogTitleId = useId();
   const dialogDescriptionId = useId();
   const dialogRef = useRef<HTMLDivElement | null>(null);
@@ -3110,6 +3358,11 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     loadStudioVrmRecentCharacters(typeof localStorage === "undefined" ? null : localStorage)
   );
   const [bodyRotation, setBodyRotation] = useState(0);
+  const [mannequinMode, setMannequinMode] = useState(false);
+  const [jointHandlesVisible, setJointHandlesVisible] = useState(true);
+  const [selectedJointHandle, setSelectedJointHandle] = useState<StudioVrmJointHandleBone | null>(null);
+  const [jointHandleInteracting, setJointHandleInteracting] = useState(false);
+  const [jointHandleStatus, setJointHandleStatus] = useState("");
   // 뷰포트 오버레이 컨트롤 — 줌/시점초기화/턴테이블/드래그 힌트.
   const [turntable, setTurntable] = useState(false);
   const [viewResetNonce, setViewResetNonce] = useState(0);
@@ -3131,6 +3384,8 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   const [libraryQuery, setLibraryQuery] = useState("");
   const [libraryVisibleCount, setLibraryVisibleCount] = useState(LIBRARY_BATCH_SIZE);
   const [activeModelId, setActiveModelId] = useState(SAMPLE_VRM_ID);
+  const activeModelIdRef = useRef(activeModelId);
+  activeModelIdRef.current = activeModelId;
   const [isUploading, setIsUploading] = useState(false);
   const [deletingModelId, setDeletingModelId] = useState<string | null>(null);
 
@@ -3216,7 +3471,11 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
   const insertCaptureFrameRef = useRef<number | null>(null);
   const sharePoseAbortRef = useRef<AbortController | null>(null);
   const captureRef = useRef<CaptureState>({ camera: null, gl: null, scene: null });
+  const captureRequestRef = useRef(0);
+  const pendingCameraRestoreRef = useRef<StudioVrmCameraSettings | null>(null);
   const panelScrollRef = useRef<HTMLDivElement>(null);
+  const manualPoseDetailsRef = useRef<HTMLDetailsElement>(null);
+  const jointIkTransactionRef = useRef<StudioVrmIkTransaction | null>(null);
   // 캡처(투명 PNG 삽입) 순간에만 발밑 타원 그림자를 꺼서 캐릭터만 남긴다 — React state가 아니라
   // three.js 객체를 직접 명령형으로 토글해야 gl.render() 호출 전에 확실히 반영된다(state 갱신은
   // 다음 R3F 커밋을 기다려야 해서 같은 프레임 안에서 타이밍을 보장할 수 없다).
@@ -3302,6 +3561,141 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     setViewResetNonce((n) => n + 1);
     setViewportHinted(true);
   }, []);
+
+  function handleJointHandleSelect(bone: StudioVrmJointHandleBone) {
+    setSelectedJointHandle(bone);
+    const category = categoryForStudioVrmJointHandle(bone);
+    if (category) setActiveCategory(category);
+    handlePanelTabChange("pose");
+    if (manualPoseDetailsRef.current) manualPoseDetailsRef.current.open = true;
+    requestAnimationFrame(() => {
+      document.getElementById(`vrm-manual-bone-${bone}`)?.scrollIntoView({
+        block: "nearest",
+        behavior: "smooth",
+      });
+    });
+  }
+
+  function previewJointHandleIk(
+    effector: StudioVrmIkEffectorBone,
+    worldPosition: StudioVrmJointWorldPoint,
+  ): StudioVrmUserIkResult | null {
+    const currentVrm = vrmRef.current;
+    if (!currentVrm || webcamActive || idleAnimation || isCapturing) {
+      setJointHandleStatus("실시간 추적·대기 애니메이션·캡처 중에는 관절 핸들을 편집할 수 없습니다.");
+      return null;
+    }
+    const chain = STUDIO_VRM_USER_IK_CHAINS[effector];
+    if ([chain.upper, chain.lower, chain.end].some((boneName) => lockedPoseBones.includes(boneName))) {
+      setJointHandleStatus("잠긴 관절이 포함된 손·발 체인은 IK로 움직일 수 없습니다. 먼저 해당 관절의 잠금을 해제해 주세요.");
+      return null;
+    }
+
+    let transaction = jointIkTransactionRef.current;
+    if (!transaction || transaction.vrm !== currentVrm || transaction.effector !== effector) {
+      if (transaction) {
+        applyStudioVrmRotationPose(transaction.vrm, transaction.baseline, bodyScale);
+      }
+      const baseline = bakeStudioVrmRuntimePose(currentVrm);
+      if (!baseline) {
+        setJointHandleStatus("이 캐릭터의 현재 관절 자세를 읽지 못했습니다.");
+        return null;
+      }
+      transaction = {
+        vrm: currentVrm,
+        effector,
+        baseline,
+        poleWorld: createStudioVrmIkPole(currentVrm, effector),
+        latest: null,
+      };
+      jointIkTransactionRef.current = transaction;
+    } else {
+      // 매 move를 직전 preview가 아닌 같은 시작 자세에서 다시 풀어 누적 오차와 관절 뒤집힘을 막는다.
+      applyStudioVrmRotationPose(currentVrm, transaction.baseline, bodyScale);
+    }
+
+    const result = solveStudioVrmUserIk(currentVrm, {
+      effector,
+      targetWorld: new THREE.Vector3(worldPosition[0], worldPosition[1], worldPosition[2]),
+      poleWorld: transaction.poleWorld,
+    });
+    if (!result) {
+      applyStudioVrmRotationPose(currentVrm, transaction.baseline, bodyScale);
+      transaction.latest = null;
+      setJointHandleStatus("선택한 손·발의 IK 체인을 계산하지 못했습니다. 모델의 휴머노이드 본 구성을 확인해 주세요.");
+      return null;
+    }
+
+    transaction.latest = result;
+    applyStudioVrmRotationPose(currentVrm, result, bodyScale);
+    setJointHandleStatus(
+      result.clamped
+        ? "목표가 팔·다리 길이를 벗어나 도달 가능한 최대 위치에서 미리 보는 중입니다."
+        : result.limited
+          ? "관절 보호 범위 안으로 부드럽게 제한해 미리 보는 중입니다."
+          : "IK 자세 미리보기 · 놓으면 한 번만 포즈에 적용됩니다.",
+    );
+    return result;
+  }
+
+  function handleJointHandleIkCommit(
+    effector: StudioVrmIkEffectorBone,
+    worldPosition: StudioVrmJointWorldPoint,
+  ) {
+    let transaction = jointIkTransactionRef.current;
+    if (!transaction || transaction.effector !== effector || !transaction.latest) {
+      previewJointHandleIk(effector, worldPosition);
+      transaction = jointIkTransactionRef.current;
+    }
+    const result = transaction?.latest;
+    const currentVrm = vrmRef.current;
+    if (!result || !currentVrm || transaction?.vrm !== currentVrm) {
+      if (transaction) applyStudioVrmRotationPose(transaction.vrm, transaction.baseline, bodyScale);
+      jointIkTransactionRef.current = null;
+      setJointHandleInteracting(false);
+      return;
+    }
+
+    const nextFingers = extractStudioVrmFingerRotations(result.bones);
+    const nextBones = stripFingerBones(result.bones);
+    jointIkTransactionRef.current = null;
+    setActivePoseId("manual-ik");
+    setCustomBones(nextBones);
+    setFingerEdits(nextFingers);
+    setCustomYOffset(result.yOffset);
+    setSelectedJointHandle(effector);
+    setJointHandleInteracting(false);
+    applyStudioVrmRotationPose(currentVrm, result, bodyScale);
+    setJointHandleStatus(
+      `${BONE_LABELS[effector] ?? effector} IK 적용 완료${result.clamped ? " · 도달 범위에서 제한됨" : result.limited ? " · 관절 범위에서 제한됨" : ""}`,
+    );
+  }
+
+  function handleJointHandleIkRollback(effector: StudioVrmIkEffectorBone) {
+    const transaction = jointIkTransactionRef.current;
+    if (transaction?.effector === effector) {
+      applyStudioVrmRotationPose(transaction.vrm, transaction.baseline, bodyScale);
+      jointIkTransactionRef.current = null;
+      setJointHandleStatus("IK 이동을 취소하고 시작 자세로 되돌렸습니다.");
+    }
+    setJointHandleInteracting(false);
+  }
+
+  function handleBakeCurrentPoseForManualEditing() {
+    const currentVrm = vrmRef.current;
+    if (!currentVrm || webcamActive || idleAnimation || isCapturing) return;
+    const baked = bakeStudioVrmRuntimePose(currentVrm);
+    if (!baked) {
+      setJointHandleStatus("현재 자세를 관절 편집값으로 변환하지 못했습니다.");
+      return;
+    }
+    setActivePoseId("manual-pose");
+    setCustomBones(stripFingerBones(baked.bones));
+    setFingerEdits(extractStudioVrmFingerRotations(baked.bones));
+    setCustomYOffset(baked.yOffset);
+    applyStudioVrmRotationPose(currentVrm, baked, bodyScale);
+    setJointHandleStatus("현재 보이는 자세를 회전 기반 관절 편집값으로 동기화했습니다.");
+  }
 
   // 드래그 힌트는 모델이 준비되면 잠깐 보여 주고 일정 시간 뒤 자동으로 사라진다.
   useEffect(() => {
@@ -3585,6 +3979,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     customColors?: Record<string, string>;
     materialFx?: VrmMaterialFx;
     modelId?: string;
+    modelHash?: string;
     modelName?: string;
     vrmProps?: unknown;
     sceneProps?: unknown;
@@ -3597,12 +3992,58 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     lighting?: LightingParams;
     env?: EnvVariant;
     avatarForge?: unknown;
+    bodyRotationY?: number;
+    camera?: StudioVrmCameraSettings;
+    mannequin?: boolean;
   }
 
   const pendingPoseDataRef = useRef<PendingPoseData | null>(null);
 
   useEffect(() => {
-    if (open && initialDataUrl) {
+    if (open && initialScene) {
+      const poseBones: PoseBoneMap = {};
+      for (const boneName of STUDIO_VRM_HUMANOID_BONES) {
+        const bone = initialScene.pose.bones[boneName];
+        if (!bone) continue;
+        poseBones[boneName] = {
+          rotation: [bone.rotation[0], bone.rotation[1], bone.rotation[2]],
+        };
+      }
+      const fingerOverrides: FingerRotationMap = {};
+      for (const boneName of STUDIO_VRM_FINGER_BONES) {
+        const rotation = initialScene.pose.fingerOverrides[boneName];
+        if (!rotation) continue;
+        fingerOverrides[boneName] = [rotation[0], rotation[1], rotation[2]];
+      }
+      const poseData: PendingPoseData = {
+        bones: poseBones,
+        yOffset: initialScene.pose.yOffset,
+        bodyRotationY: initialScene.pose.bodyRotationY,
+        expressionWeights: { ...initialScene.expressions },
+        customColors: { ...initialScene.appearance.customColors },
+        materialFx: { ...initialScene.appearance.materialFx },
+        modelId: initialScene.model.source === "bundled" ? initialScene.model.id : undefined,
+        modelHash: initialScene.model.source === "attachment" ? initialScene.model.hash : undefined,
+        modelName: initialScene.model.name,
+        vrmProps: initialScene.props,
+        sceneProps: initialScene.sceneProps,
+        costume: initialScene.appearance.costume,
+        wardrobe: initialScene.appearance.wardrobe,
+        physics: initialScene.physics,
+        bodyScale: { ...initialScene.appearance.bodyScale },
+        fingerOverrides,
+        lighting: { ...initialScene.lighting },
+        env: initialScene.env,
+        avatarForge: initialScene.appearance.avatarForge,
+        camera: initialScene.camera,
+        mannequin: initialScene.appearance.mannequin,
+      };
+      pendingPoseDataRef.current = poseData;
+      pendingCameraRestoreRef.current = initialScene.camera;
+      setMannequinMode(initialScene.appearance.mannequin);
+      setActiveCameraId("custom");
+      if (poseData.modelId) setActiveModelId(poseData.modelId);
+    } else if (open && initialDataUrl) {
       try {
         const hashIndex = initialDataUrl.indexOf("#");
         if (hashIndex !== -1) {
@@ -3623,9 +4064,10 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
       }
     } else if (!open) {
       pendingPoseDataRef.current = null;
+      pendingCameraRestoreRef.current = null;
       resetFullStateHistory();
     }
-  }, [open, initialDataUrl, resetFullStateHistory]);
+  }, [open, initialDataUrl, initialScene, resetFullStateHistory]);
 
   useEffect(() => {
     const stored = localStorage.getItem("studio_custom_poses");
@@ -4472,6 +4914,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     return () => {
       cancelPendingInsertCapture();
       cancelPendingPoseShare();
+      jointIkTransactionRef.current = null;
       loadRequestRef.current += 1;
       if (vrmRef.current) {
         disposeVrm(vrmRef.current);
@@ -4484,6 +4927,8 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     if (open) return;
     cancelPendingInsertCapture();
     cancelPendingPoseShare();
+    captureRequestRef.current += 1;
+    jointIkTransactionRef.current = null;
     loadRequestRef.current += 1;
     thumbnailRequestRef.current += 1;
     captureHelperLeaseCountRef.current = 0;
@@ -4496,6 +4941,11 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     setIsThumbnailCapturing(false);
     setIsSharingPose(false);
     setIsViewportHandIkDragging(false);
+    setJointHandleInteracting(false);
+    setJointHandleStatus("");
+    setSelectedJointHandle(null);
+    setMannequinMode(false);
+    setActiveCameraId("front");
     setActiveProps([]);
     setPropAttachments({});
     setSelectedPropId(null);
@@ -4522,47 +4972,52 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     setLibraryStatus("loading");
     setLibraryError("");
 
+    const resolveTargetEntry = (
+      entries: VrmLibraryEntry[],
+      pending: PendingPoseData | null
+    ): VrmLibraryEntry | null => {
+      if (pending?.modelHash) {
+        return entries.find((entry) => entry.contentHash === pending.modelHash) ?? null;
+      }
+      if (pending?.modelId) {
+        return entries.find((entry) => entry.id === pending.modelId) ?? null;
+      }
+      if (pending?.modelName) {
+        return entries.find((entry) => entry.name === pending.modelName) ?? null;
+      }
+      return entries.find((entry) => entry.id === activeModelIdRef.current) ?? entries[0] ?? null;
+    };
+
+    const loadResolvedEntry = (entries: VrmLibraryEntry[]): void => {
+      const targetEntry = resolveTargetEntry(entries, pendingPoseDataRef.current);
+      if (!targetEntry) {
+        setStatus("error");
+        setLibraryStatus("error");
+        setLibraryError("이 장면이 사용하는 VRM 모델을 찾지 못했습니다. 프로젝트 모델 attachment를 먼저 복원해 주세요.");
+        return;
+      }
+      loadModelRef.current(targetEntry);
+    };
+
     listVrmLibraryEntries()
       .then((entries) => {
         if (cancelled) return;
         setLibraryEntries(entries);
         setLibraryStatus("ready");
-        
-        let targetEntry = entries[0];
-        const pending = pendingPoseDataRef.current;
-        if (pending) {
-          if (pending.modelId) {
-            targetEntry = entries.find((e) => e.id === pending.modelId) || targetEntry;
-          } else if (pending.modelName) {
-            targetEntry = entries.find((e) => e.name === pending.modelName) || targetEntry;
-          }
-        } else {
-          targetEntry = entries.find((entry) => entry.id === activeModelId) || targetEntry;
-        }
-        loadModelRef.current(targetEntry);
+        loadResolvedEntry(entries);
       })
       .catch((caughtError: unknown) => {
         if (cancelled) return;
         setLibraryEntries(SAMPLE_VRM_ENTRIES);
         setLibraryStatus("error");
         setLibraryError(getErrorMessage(caughtError, "저장된 VRM 라이브러리를 불러오지 못했습니다."));
-        
-        let targetEntry = SAMPLE_VRM_ENTRIES[0];
-        const pending = pendingPoseDataRef.current;
-        if (pending) {
-          if (pending.modelId) {
-            targetEntry = SAMPLE_VRM_ENTRIES.find((e) => e.id === pending.modelId) || targetEntry;
-          } else if (pending.modelName) {
-            targetEntry = SAMPLE_VRM_ENTRIES.find((e) => e.name === pending.modelName) || targetEntry;
-          }
-        }
-        loadModelRef.current(targetEntry);
+        loadResolvedEntry(SAMPLE_VRM_ENTRIES);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [open, activeModelId]);
+  }, [open]);
 
   useEffect(() => {
     if (!open || status !== "ready" || !vrm || !activeLibraryEntry || activeLibraryEntry.thumbnail) return;
@@ -4663,6 +5118,15 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
         customColors: pending.customColors,
       };
       commitFullStateRestore(pendingFull, nextVrm);
+      setBodyRotation(typeof pending.bodyRotationY === "number" ? pending.bodyRotationY : 0);
+      setMannequinMode(pending.mannequin ?? false);
+      const cameraToRestore = pending.camera ?? pendingCameraRestoreRef.current;
+      pendingCameraRestoreRef.current = null;
+      if (cameraToRestore) {
+        requestAnimationFrame(() => {
+          viewportApiRef.current?.restoreCamera(cameraToRestore);
+        });
+      }
     } else {
       // 스폰 기본 포즈: T-포즈 대신 캐릭터 id로 결정되는 자연 아이들 포즈를 적용한다.
       const spawnPose = pickNaturalIdlePose(nextModelId);
@@ -4674,6 +5138,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
       setExpressionWeights({});
       setBodyRotation(0);
       applyRotationToVrm(nextVrm, 0);
+      setMannequinMode(false);
       setCustomColors({ ...DEFAULT_VRM_CUSTOM_COLORS });
       setMaterialFx(DEFAULT_VRM_MATERIAL_FX);
       setAvatarForgeState(createAvatarForgeState());
@@ -5016,19 +5481,37 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
       ? clampStudioVrmJointDegrees(key, axisIndex, degrees)
       : degrees;
     const radians = d(safeDegrees);
+    const baked = bakeStudioVrmRuntimePose(vrm, STUDIO_VRM_DIRECT_EDIT_BONES);
+    const bakedRotation = baked?.bones[key]?.rotation;
+    setActivePoseId("manual-pose");
     if (POSER_FINGER_BONES.includes(key)) {
       // Single source of truth: fingers go to fingerEdits only
       setFingerEdits((prev) => {
-        const current = prev[key] ? [...prev[key]] as [number, number, number] : [0, 0, 0];
+        const current = prev[key]
+          ? [...prev[key]] as [number, number, number]
+          : bakedRotation
+            ? [...bakedRotation] as [number, number, number]
+            : [0, 0, 0];
         current[axisIndex] = radians;
-        return { ...prev, [key]: current };
+        return {
+          ...prev,
+          [key]: jointLimitsEnabled ? clampStudioVrmJointRotation(key, current) : current,
+        };
       });
       return;
     }
     setCustomBones((prev) => {
-      const current = [...getPoseBoneRotation(prev[key])] as [number, number, number];
+      const base = baked ? stripFingerBones(baked.bones) : prev;
+      const current = bakedRotation
+        ? [...bakedRotation] as [number, number, number]
+        : [...getPoseBoneRotation(base[key])] as [number, number, number];
       current[axisIndex] = radians;
-      return { ...prev, [key]: { rotation: current } };
+      return {
+        ...base,
+        [key]: {
+          rotation: jointLimitsEnabled ? clampStudioVrmJointRotation(key, current) : current,
+        },
+      };
     });
   }
 
@@ -5328,6 +5811,88 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
     setSelectedVrmPropUid((cur) => (cur === uid ? null : cur));
   }
 
+  function createCurrentSceneDocument(width: number, height: number): StudioVrmSceneDocument | null {
+    const currentVrm = vrmRef.current;
+    const currentEntry = libraryEntries.find((entry) => entry.id === activeModelId) ?? null;
+    const camera = viewportApiRef.current?.readCamera() ?? null;
+    if (!currentVrm || !currentEntry || !camera) return null;
+
+    let model: StudioVrmSceneModel;
+    if (currentEntry.source === "sample") {
+      model = { source: "bundled", id: currentEntry.id, name: currentEntry.name };
+    } else if (
+      canonicalizeVrmContentHash(currentEntry.contentHash)
+      && currentEntry.byteSize
+      && currentEntry.byteSize <= STUDIO_VRM_MODEL_MAX_BYTES
+    ) {
+      const contentHash = canonicalizeVrmContentHash(currentEntry.contentHash);
+      if (!contentHash) return null;
+      model = {
+        source: "attachment",
+        hash: contentHash,
+        byteSize: currentEntry.byteSize,
+        mime: "model/gltf-binary",
+        name: currentEntry.name,
+      };
+    } else {
+      setError("업로드한 VRM의 콘텐츠 해시를 확인하지 못했거나 휴대 가능한 프로젝트 자산 크기(96MB)를 넘었습니다.");
+      return null;
+    }
+
+    const baked = bakeStudioVrmRuntimePose(currentVrm, STUDIO_VRM_DIRECT_EDIT_BONES);
+    if (!baked) return null;
+    const poseBones: StudioVrmPoseBoneMap = {};
+    const bakedFingers: StudioVrmFingerRotationMap = {};
+    for (const boneName of STUDIO_VRM_HUMANOID_BONES) {
+      const bone = baked.bones[boneName];
+      if (!bone?.rotation) continue;
+      poseBones[boneName] = {
+        rotation: [bone.rotation[0], bone.rotation[1], bone.rotation[2]],
+      };
+    }
+    for (const boneName of STUDIO_VRM_FINGER_BONES) {
+      const bone = baked.bones[boneName];
+      if (!bone?.rotation) continue;
+      bakedFingers[boneName] = [bone.rotation[0], bone.rotation[1], bone.rotation[2]];
+    }
+
+    const normalized = normalizeStudioVrmSceneDocument({
+      kind: "studio-vrm-scene",
+      version: 1,
+      model,
+      pose: {
+        bones: poseBones,
+        yOffset: customYOffset,
+        bodyRotationY: bodyRotation,
+        fingerOverrides: bakedFingers,
+      },
+      expressions: expressionWeights,
+      camera,
+      appearance: {
+        bodyScale,
+        customColors,
+        materialFx,
+        mannequin: mannequinMode,
+        avatarForge: serializeAvatarForgeState(avatarForgeState),
+        costume: serializeCostume(costumeState) ?? null,
+        wardrobe: serializeWardrobe(wardrobeState) ?? null,
+      },
+      props: serializeVrmProps(vrmPropItems) ?? null,
+      sceneProps: serializeSceneProps(activeProps, propAttachments) ?? null,
+      lighting,
+      physics: vrmPhysics,
+      env: envVariant,
+      render: {
+        width,
+        height,
+        transparentBackground: true,
+        backgroundColor: "#ffffff",
+      },
+    });
+    const serialized = serializeStudioVrmSceneDocument(normalized);
+    return serialized ? parseStudioVrmSceneDocument(serialized) : null;
+  }
+
   function handleInsert() {
     if (isCapturing || isSharingPose || isThumbnailCapturing) return;
     const currentCapture = captureRef.current;
@@ -5339,55 +5904,96 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
       return;
     }
 
+    if (isCapturing) return;
+    const captureRequest = captureRequestRef.current + 1;
+    captureRequestRef.current = captureRequest;
     const { camera, gl, scene } = currentCapture;
     const captureGeneration = insertCaptureGenerationRef.current + 1;
     insertCaptureGenerationRef.current = captureGeneration;
     setIsCapturing(true);
-    const releaseCaptureHelpers = acquireVrmCaptureHelperLease();
+    setError("");
     insertCaptureFrameRef.current = requestAnimationFrame(() => {
-      let inserted = false;
-      try {
+      insertCaptureFrameRef.current = null;
+      if (
+        captureGeneration !== insertCaptureGenerationRef.current
+        || captureRequest !== captureRequestRef.current
+        || vrmRef.current !== currentVrm
+        || captureRef.current.gl !== gl
+        || captureRef.current.scene !== scene
+        || captureRef.current.camera !== camera
+      ) {
         if (
-          captureGeneration !== insertCaptureGenerationRef.current ||
-          vrmRef.current !== currentVrm ||
-          captureRef.current.gl !== gl ||
-          captureRef.current.scene !== scene ||
-          captureRef.current.camera !== camera
+          captureGeneration === insertCaptureGenerationRef.current
+          && captureRequest === captureRequestRef.current
         ) {
-          return;
-        }
-        // 정지 컷: 캡처 직전 흔들림을 정착시켜 머리카락/치마가 가라앉은 프레임을 쓴다.
-        if (!physicsPreview && countSpringBoneJoints(currentVrm) > 0) {
-          settleVrmPhysics(currentVrm);
-        }
-        currentVrm.update(0);
-        gl.render(scene, camera);
-        const baseDataUrl = gl.domElement.toDataURL("image/png");
-        const { width, height } = roundExportSize(gl.domElement);
-
-        // "3D 배경" 도구도 같은 #해시 방식으로 재편집 메타를 싣는다. 공용 builder가 tool 식별자와
-        // full-state 필드를 한 번에 직렬화해 공유/삽입 경로가 다시 어긋나지 않게 한다.
-        const poseMetadata = buildVrmPoseDataUrlMetadata(captureFullState(), modelName);
-        const hashPayload = encodeURIComponent(JSON.stringify(poseMetadata));
-        const fullDataUrl = `${baseDataUrl}#${hashPayload}`;
-
-        const accepted = onInsert(fullDataUrl, width, height);
-        if (!accepted) {
-          setError("편집 문서가 변경되어 포즈를 추가하지 못했습니다. 현재 페이지 상태를 확인한 뒤 다시 시도해 주세요.");
-          return;
-        }
-        inserted = true;
-      } catch (caughtError) {
-        setError(getErrorMessage(caughtError, "VRM 포즈 PNG를 캡처하지 못했습니다."));
-        setStatus(vrmRef.current ? "ready" : "error");
-      } finally {
-        if (insertCaptureFrameRef.current !== null) insertCaptureFrameRef.current = null;
-        releaseCaptureHelpers();
-        if (captureGeneration === insertCaptureGenerationRef.current) {
           setIsCapturing(false);
         }
+        return;
       }
-      if (inserted && captureGeneration === insertCaptureGenerationRef.current) onClose();
+
+      void (async () => {
+        let inserted = false;
+        const releaseCaptureHelpers = acquireVrmCaptureHelperLease();
+        try {
+          // 같은 설정은 물리 미리보기 여부와 무관하게 같은 정지 컷으로 재현되어야 한다.
+          if (countSpringBoneJoints(currentVrm) > 0) {
+            settleVrmPhysics(currentVrm);
+          }
+          currentVrm.update(0);
+          gl.render(scene, camera);
+          const baseDataUrl = gl.domElement.toDataURL("image/png");
+          const { width, height } = roundExportSize(gl.domElement);
+          const poseMetadata = buildVrmPoseDataUrlMetadata(captureFullState(), modelName);
+          const hashPayload = encodeURIComponent(JSON.stringify(poseMetadata));
+          const fullDataUrl = `${baseDataUrl}#${hashPayload}`;
+          const sceneDocument = createCurrentSceneDocument(width, height);
+          if (!sceneDocument) {
+            throw new Error("재편집 가능한 3D 데생 인형 장면을 만들지 못했습니다.");
+          }
+
+          const accepted = await onInsert({
+            pngDataUrl: fullDataUrl,
+            width,
+            height,
+            scene: sceneDocument,
+          });
+          if (
+            captureGeneration !== insertCaptureGenerationRef.current
+            || captureRequest !== captureRequestRef.current
+            || vrmRef.current !== currentVrm
+          ) {
+            return;
+          }
+          if (accepted === false) {
+            throw new Error("편집 중 문서가 바뀌어 캡처를 삽입하지 않았습니다. 현재 페이지에서 다시 시도해 주세요.");
+          }
+          inserted = true;
+        } catch (caughtError: unknown) {
+          if (
+            captureGeneration === insertCaptureGenerationRef.current
+            && captureRequest === captureRequestRef.current
+          ) {
+            setError(getErrorMessage(caughtError, "3D 데생 인형 캡처를 추가하지 못했습니다."));
+            setStatus(vrmRef.current ? "ready" : "error");
+          }
+        } finally {
+          releaseCaptureHelpers();
+          if (
+            captureGeneration === insertCaptureGenerationRef.current
+            && captureRequest === captureRequestRef.current
+          ) {
+            setIsCapturing(false);
+          }
+        }
+
+        if (
+          inserted
+          && captureGeneration === insertCaptureGenerationRef.current
+          && captureRequest === captureRequestRef.current
+        ) {
+          onClose();
+        }
+      })();
     });
   }
 
@@ -5488,6 +6094,27 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                     />
                   ) : null}
                   {vrm ? <StudioVrmAvatarForge vrm={vrm} state={avatarForgeState} /> : null}
+                  {vrm ? (
+                    <StudioVrmMannequinMaterial
+                      vrm={vrm}
+                      enabled={mannequinMode}
+                      customColors={customColors}
+                      materialFx={materialFx}
+                    />
+                  ) : null}
+                  {vrm ? (
+                    <StudioVrmJointHandles
+                      vrm={vrm}
+                      visible={jointHandlesVisible && activePanelTab === "pose"}
+                      selectedBone={selectedJointHandle}
+                      disabled={webcamActive || idleAnimation || isCapturing}
+                      onSelectBone={handleJointHandleSelect}
+                      onEffectorPreview={previewJointHandleIk}
+                      onEffectorCommit={handleJointHandleIkCommit}
+                      onEffectorRollback={handleJointHandleIkRollback}
+                      onInteractionActiveChange={setJointHandleInteracting}
+                    />
+                  ) : null}
                   {vrm
                     ? vrmPropItems.map((item) => (
                         <VrmPropAttachment key={item.uid} vrm={vrm} instance={item} metrics={effectivePropRigMetrics} />
@@ -5526,11 +6153,11 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                   </mesh>
                   <OrbitControls
                     makeDefault
-                    enabled={!isViewportHandIkDragging}
+                    enabled={!isViewportHandIkDragging && !jointHandleInteracting}
                     enableDamping
                     dampingFactor={0.08}
                     enablePan={false}
-                    autoRotate={turntable}
+                    autoRotate={turntable && !jointHandleInteracting && !isViewportHandIkDragging}
                     autoRotateSpeed={1.6}
                     minDistance={1.3}
                     maxDistance={5.2}
@@ -6149,12 +6776,12 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
               </section>
 
               <section hidden={hideOnTab("pose")}>
-                <div className="mb-2 flex items-center justify-between">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
                     <UserRound size={15} className="text-accent" aria-hidden />
                     포즈
                   </h3>
-                  <div className="flex gap-1.5">
+                  <div className="flex flex-wrap justify-end gap-1.5">
                     <button
                       type="button"
                       disabled={!vrm}
@@ -6191,6 +6818,44 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                       <Sparkles size={11} /> 저장
                     </button>
                   </div>
+                </div>
+
+                <div className="mb-3 rounded-xl border border-accent/25 bg-accent-soft/20 p-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-[0.7rem] font-bold text-fg">뷰포트 관절 핸들 · 손발 IK</p>
+                      <p className="mt-0.5 text-[0.65rem] leading-relaxed text-fg-3">
+                        점을 누르면 해당 관절로 이동하고, 손·발 마름모를 끌면 팔·다리가 자연스럽게 따라옵니다.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      aria-pressed={jointHandlesVisible}
+                      disabled={!vrm}
+                      onClick={() => {
+                        setJointHandlesVisible((visible) => !visible);
+                        setJointHandleStatus("");
+                      }}
+                      className={cx(
+                        "shrink-0 rounded-lg border px-2.5 py-1.5 text-[0.68rem] font-bold transition-colors disabled:opacity-45",
+                        jointHandlesVisible
+                          ? "border-accent/60 bg-accent-soft text-accent"
+                          : "border-line bg-card text-fg-2 hover:bg-raised",
+                      )}
+                    >
+                      {jointHandlesVisible ? "핸들 켜짐" : "핸들 꺼짐"}
+                    </button>
+                  </div>
+                  {webcamActive || idleAnimation ? (
+                    <p className="mt-1.5 text-[0.65rem] text-warn" role="status">
+                      실시간 추적 또는 대기 애니메이션을 끄면 관절 핸들을 편집할 수 있습니다.
+                    </p>
+                  ) : null}
+                  {jointHandleStatus ? (
+                    <p className="mt-1.5 text-[0.65rem] leading-relaxed text-fg-2" role="status" aria-live="polite">
+                      {jointHandleStatus}
+                    </p>
+                  ) : null}
                 </div>
 
                 <label className="mb-3 flex items-center gap-2 text-xs text-fg-2 cursor-pointer bg-card/30 border border-line/50 p-2 rounded-lg hover:bg-raised/40 transition-colors">
@@ -6603,9 +7268,37 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                 id="vrm-character-section-appearance"
                 role="tabpanel"
                 aria-labelledby="vrm-character-subtab-appearance"
-                hidden={hideOnCharacterSection("appearance")}
-                className="rounded-xl border border-line bg-card/45 p-3"
+              hidden={hideOnCharacterSection("appearance")}
+              className="rounded-xl border border-line bg-card/45 p-3"
               >
+                <div className="mb-4 rounded-xl border border-accent/25 bg-accent-soft/20 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="flex items-center gap-1.5 text-xs font-bold text-fg">
+                        <PersonStanding size={14} className="text-accent" aria-hidden />
+                        중립 데생 인형 보기
+                      </h3>
+                      <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
+                        캐릭터의 텍스처와 발광을 숨기고 명암·실루엣·관절만 확인합니다. 원래 외형은 언제든 복원됩니다.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={mannequinMode}
+                      disabled={!vrm}
+                      className={cx(
+                        "min-h-9 shrink-0 rounded-lg border px-2.5 text-[0.68rem] font-bold disabled:opacity-45",
+                        mannequinMode
+                          ? "border-accent/55 bg-accent text-on-accent"
+                          : "border-line bg-card text-fg-2 hover:bg-raised"
+                      )}
+                      onClick={() => setMannequinMode((current) => !current)}
+                    >
+                      {mannequinMode ? "사용 중" : "켜기"}
+                    </button>
+                  </div>
+                </div>
                 <div className="mb-4 border-b border-line/45 pb-4">
                   <div className="mb-2 flex items-center justify-between gap-2">
                     <h3 className="flex items-center gap-1.5 text-xs font-bold text-fg">
@@ -6724,12 +7417,26 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                 </button>
               </section>
 
-              <details hidden={hideOnTab("pose")} className="group rounded-xl border border-line bg-card/45 p-3">
+              <details ref={manualPoseDetailsRef} hidden={hideOnTab("pose")} className="group rounded-xl border border-line bg-card/45 p-3">
                 <summary className="mb-2.5 flex cursor-pointer list-none items-center gap-1.5 text-xs font-bold text-fg [&::-webkit-details-marker]:hidden">
                   <Sliders size={14} className="text-accent" aria-hidden />
                   관절 미세 조정 (Manual Pose)
                   <ChevronDown size={13} className="ml-auto text-fg-3 transition-transform group-open:rotate-180" aria-hidden />
                 </summary>
+
+                <div className="mb-3 flex items-center justify-between gap-2 rounded-lg border border-line/55 bg-panel/40 p-2">
+                  <p className="text-[0.65rem] leading-relaxed text-fg-3">
+                    방향 기반 프리셋을 현재 보이는 회전값으로 변환하면 슬라이더와 관절 핸들이 정확히 이어집니다.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={!vrm || webcamActive || idleAnimation || isCapturing}
+                    onClick={handleBakeCurrentPoseForManualEditing}
+                    className="shrink-0 rounded-lg border border-line bg-card px-2 py-1 text-[0.65rem] font-bold text-fg-2 hover:bg-raised disabled:opacity-45"
+                  >
+                    현재 자세 동기화
+                  </button>
+                </div>
                 
                 <div className="mb-3 grid gap-2 rounded-lg border border-line/60 bg-panel/35 p-2.5">
                   <label className="flex cursor-pointer items-center justify-between gap-3 text-[0.68rem] font-semibold text-fg-2">
@@ -6846,23 +7553,22 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                       const yDeg = Math.round(THREE.MathUtils.radToDeg(yRad));
                       const zDeg = Math.round(THREE.MathUtils.radToDeg(zRad));
                       const locked = lockedPoseBones.includes(boneName);
-                      const xRange = jointLimitsEnabled
-                        ? resolveStudioVrmJointAxisRange(boneName, 0)
-                        : { minDegrees: -180, maxDegrees: 180 };
-                      const yRange = jointLimitsEnabled
-                        ? resolveStudioVrmJointAxisRange(boneName, 1)
-                        : { minDegrees: -180, maxDegrees: 180 };
-                      const zRange = jointLimitsEnabled
-                        ? resolveStudioVrmJointAxisRange(boneName, 2)
-                        : { minDegrees: -180, maxDegrees: 180 };
+                      const jointLimit = getStudioVrmJointLimit(boneName);
+                      const axisBounds = jointLimitsEnabled
+                        ? [jointLimit.x, jointLimit.y, jointLimit.z].map((axis) => ({
+                            min: Math.ceil(THREE.MathUtils.radToDeg(axis.hardMin)),
+                            max: Math.floor(THREE.MathUtils.radToDeg(axis.hardMax)),
+                          }))
+                        : [0, 1, 2].map(() => ({ min: -180, max: 180 }));
 
                       return (
                         <div
                           key={boneName}
+                          id={`vrm-manual-bone-${boneName}`}
                           data-vrm-pose-bone={boneName}
                           className={cx(
                             "rounded-lg border bg-panel/40 p-2.5 transition-colors",
-                            selectedViewportPoseBone === boneName
+                            selectedViewportPoseBone === boneName || selectedJointHandle === boneName
                               ? "border-accent/70 ring-1 ring-accent/25"
                               : "border-line/60",
                           )}
@@ -6912,11 +7618,15 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                             <span className="w-8 shrink-0">앞/뒤:</span>
                             <input
                               type="range"
-                              min={xRange.minDegrees}
-                              max={xRange.maxDegrees}
+                              min={axisBounds[0].min}
+                              max={axisBounds[0].max}
                               value={xDeg}
                               disabled={!vrm || locked}
                               className="h-2 flex-1 accent-accent"
+                              onFocus={() => {
+                                const handleBone = resolveStudioVrmJointHandleBone(boneName);
+                                if (handleBone) setSelectedJointHandle(handleBone);
+                              }}
                               onChange={(e) => handleBoneRotationChange(boneName, 0, Number(e.target.value))}
                             />
                             <span className="w-8 text-right numeral">{xDeg}°</span>
@@ -6926,11 +7636,15 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                             <span className="w-8 shrink-0">뒤틀기:</span>
                             <input
                               type="range"
-                              min={yRange.minDegrees}
-                              max={yRange.maxDegrees}
+                              min={axisBounds[1].min}
+                              max={axisBounds[1].max}
                               value={yDeg}
                               disabled={!vrm || locked}
                               className="h-2 flex-1 accent-accent"
+                              onFocus={() => {
+                                const handleBone = resolveStudioVrmJointHandleBone(boneName);
+                                if (handleBone) setSelectedJointHandle(handleBone);
+                              }}
                               onChange={(e) => handleBoneRotationChange(boneName, 1, Number(e.target.value))}
                             />
                             <span className="w-8 text-right numeral">{yDeg}°</span>
@@ -6940,11 +7654,15 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl }: Stud
                             <span className="w-8 shrink-0">안/밖:</span>
                             <input
                               type="range"
-                              min={zRange.minDegrees}
-                              max={zRange.maxDegrees}
+                              min={axisBounds[2].min}
+                              max={axisBounds[2].max}
                               value={zDeg}
                               disabled={!vrm || locked}
                               className="h-2 flex-1 accent-accent"
+                              onFocus={() => {
+                                const handleBone = resolveStudioVrmJointHandleBone(boneName);
+                                if (handleBone) setSelectedJointHandle(handleBone);
+                              }}
                               onChange={(e) => handleBoneRotationChange(boneName, 2, Number(e.target.value))}
                             />
                             <span className="w-8 text-right numeral">{zDeg}°</span>

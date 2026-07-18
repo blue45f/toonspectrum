@@ -19,7 +19,7 @@ import {
   type SvgExportResult,
 } from "./studio-svg-export";
 
-import type { El } from "./StudioPage";
+import type { El } from "./studio-element-model";
 
 // ---------------------------------------------------------------------------
 // 헬퍼 — 페이지 입력/요소 빌더

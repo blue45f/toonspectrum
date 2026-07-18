@@ -72,6 +72,8 @@ import {
   PenTool,
   Plus,
   Redo2,
+  RotateCcw,
+  RotateCw,
   Settings2,
   ShieldCheck,
   SlidersHorizontal,
@@ -113,10 +115,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { ClipMaskGroup } from "./ClipMaskGroup";
 import { studioCreationLinkParams } from "./creator-studio-links";
-import {
-  studioAdjustmentStackToFilterFields,
-  type StudioAdjustmentStack,
-} from "./studio-adjustment-stack";
+import { studioAdjustmentStackToFilterFields } from "./studio-adjustment-stack";
 import {
   runStudioAdvancedFillInBrowser,
   studioAdvancedFillResultMessage,
@@ -197,6 +196,7 @@ import {
   assertStudioApiJsonPayloadSize,
 } from "./studio-api-payload-safety";
 import {
+  DEFAULT_STUDIO_RAIL_TOOL_ORDER,
   loadStudioAppSettings,
   matchStudioShortcut,
   resetStudioAppSettings,
@@ -250,8 +250,6 @@ import { studioBackgroundGradientColorStops } from "./studio-background-gradient
 import {
   planStudioBg3dLtLayers,
   preserveStudioBg3dLtSceneAnchorAfterRemoval,
-  type StudioBg3dLtLayerRole,
-  type StudioBg3dLtRenderMode,
 } from "./studio-bg3d-lt-layer-plan";
 import { BRAND_KIT_LOGO_MASTER_ID, placeBrandKitLogo, type BrandKit } from "./studio-brand-kit";
 import {
@@ -312,7 +310,6 @@ import {
   resolveStudioStampBrushKind,
   resolveStudioStampBrushStyle,
   STUDIO_STAMP_BRUSH_DEFAULTS,
-  type StudioStampBrushTuning,
 } from "./studio-brush-stamp-engine";
 import { studioDynamicBrushDabVariations } from "./studio-brush-symmetry";
 import {
@@ -503,6 +500,12 @@ import {
   STUDIO_BRUSH_SIZE_RANGE,
 } from "./studio-draw-ux";
 import {
+  areStudioDrawingAssistDocumentsEqual,
+  normalizeStudioDrawingAssistDocument,
+  studioDrawingAssistHasContent,
+  type StudioDrawingAssistDocument,
+} from "./studio-drawing-assist-document";
+import {
   adjustStudioBrushOpacity,
   adjustStudioBrushWidth,
   resolveStudioDrawingShortcut,
@@ -534,6 +537,7 @@ import {
   type StudioEffectFavoriteState,
   type StudioEffectId,
 } from "./studio-effect-favorites";
+import { containingPanel, elBounds } from "./studio-element-geometry";
 import {
   type ExportFormat,
 } from "./studio-export";
@@ -573,7 +577,6 @@ import {
   MAX_ANIM_FRAMES,
   onionSkinLayers,
   type OnionSkinSettings,
-  type StudioAnimFrame,
 } from "./studio-frame-animation";
 import {
   fxBrushSeedFromKey,
@@ -588,7 +591,6 @@ import {
   estimateTextGradientBBox,
   konvaGradientProps,
   legacyTextGradientToSpec,
-  type StudioGradientSpec,
 } from "./studio-gradient-engine";
 import { GRADIENT_PRESETS, gradientToBgGrad } from "./studio-gradients";
 import {
@@ -628,8 +630,6 @@ import {
   clampIsometricAngleDeg,
   clampIsometricCellSize,
   defaultIsometricOrigin,
-  DEFAULT_ISOMETRIC_ANGLE_DEG,
-  DEFAULT_ISOMETRIC_CELL_SIZE,
   resolveIsometricAxisRay,
   snapStrokePointToIsometricGrid,
   type IsometricAxisRay,
@@ -688,6 +688,13 @@ import {
   LIQUIFY_STRENGTH_RANGE,
 } from "./studio-liquify";
 import { bakeLiquifyStrokeToCanvas } from "./studio-liquify-browser";
+import {
+  appendStudioLiquifyPointerPoint,
+  beginStudioLiquifyPointerSession,
+  endStudioLiquifyPointerSession,
+  isStudioLiquifyPointerOwner,
+  type StudioLiquifyPointerSession,
+} from "./studio-liquify-pointer";
 import { projectStudioCanvasCommentPins } from "./studio-live-canvas-overlay-model";
 import {
   StudioLiveInkOverlayRenderer,
@@ -1054,6 +1061,13 @@ import {
 } from "./studio-raster-publication-projection";
 import { studioRasterVisibleDocumentRectFromViewport } from "./studio-raster-visible-rect";
 import {
+  areStudioReferenceBoardDocumentsEqual,
+  createDefaultStudioReferenceBoardDocument,
+  normalizeStudioReferenceBoardDocument,
+  studioReferenceBoardHasContent,
+  type StudioReferenceBoardDocument,
+} from "./studio-reference-board";
+import {
   createEmptyStudioReleaseScheduleSnapshot,
   loadStudioReleaseScheduleRuntime,
 } from "./studio-release-schedule-loader";
@@ -1148,8 +1162,6 @@ import {
   normalizeStrokeStyle,
   polygonPathNodeLayoutInBounds,
   strokeDashArray,
-  type ShapeParams,
-  type StrokeStyle,
 } from "./studio-stroke-shapes";
 import {
   createStudioPointerVelocityState,
@@ -1192,8 +1204,17 @@ import {
   captureStudioView,
   fitStudioViewToWidth,
   planStudioViewRestore,
+  planStudioViewRotationTransition,
+  planStudioViewScrollToDocumentPoint,
+  planStudioViewStageLayout,
+  projectStudioDocumentPointToView,
+  projectStudioViewPointToDocument,
+  projectStudioViewRectToDocumentRect,
   resolveStudioViewShortcut,
+  rotateStudioViewLeft,
+  rotateStudioViewRight,
   stepStudioViewZoom,
+  type StudioViewRotation,
   type StudioViewSnapshot,
 } from "./studio-view-controls";
 import { planWatercolorBrushDabs, watercolorBrushSeedFromKey } from "./studio-watercolor-brush";
@@ -1282,6 +1303,7 @@ import { StudioMagicResizePanel } from "./StudioMagicResizePanel";
 import { StudioMagicWandPanel } from "./StudioMagicWandPanel";
 import { StudioMobileSheetHandle } from "./StudioMobileSheetHandle";
 import { StudioNodeEditPanel } from "./StudioNodeEditPanel";
+import { StudioPageSequenceStrip } from "./StudioPageSequenceStrip";
 import { StudioSavedBrushShelf } from "./StudioSavedBrushShelf";
 import { StudioSkewPanel } from "./StudioSkewPanel";
 import StudioTextEditOverlay, { StudioTextEditFallbackModal } from "./StudioTextEditOverlay";
@@ -1289,6 +1311,7 @@ import {
   StudioToolHintPreferencesProvider,
   StudioToolHintTarget,
 } from "./StudioToolHint";
+import { StudioViewToolsHud } from "./StudioViewToolsHud";
 import { StudioWorkspaceMenuGate } from "./StudioWorkspaceMenuGate";
 import { useStudioModalSheet } from "./useStudioModalSheet";
 
@@ -1300,14 +1323,8 @@ import type {
   StudioAutoActionScope,
   StudioAutoActionSet,
 } from "./studio-auto-actions";
-import type { AutoAdjust } from "./studio-auto-adjust";
 import type { StudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
-import type { BlurFx } from "./studio-blur";
-import type { ChannelMixer } from "./studio-channel-mixer";
-import type { Clarity } from "./studio-clarity";
 import type { StudioClip } from "./studio-clips";
-import type { ColorBalance } from "./studio-color-balance";
-import type { ColorToAlpha } from "./studio-color-to-alpha";
 import type { ComipoAssemblySeed } from "./studio-comipo-assembly";
 import type {
   StudioElementLike,
@@ -1316,9 +1333,22 @@ import type {
 } from "./studio-comipo-shipped";
 import type { StudioCrdtDocument } from "./studio-crdt-document";
 import type { StudioRasterOverlaySourceElement } from "./studio-crdt-raster-ui-bridge";
-import type { CurvePoint } from "./studio-curves";
-import type { Detail } from "./studio-detail";
-import type { Distort } from "./studio-distort";
+import type {
+  DrawMode,
+  DrawShapeKind,
+  Tool,
+} from "./studio-editor-tool-model";
+import type {
+  BubbleEl,
+  DrawEl,
+  El,
+  FocusLinesEl,
+  FrameEl,
+  ImageEl,
+  SpeedLinesEl,
+  StickerEl,
+  TextEl,
+} from "./studio-element-model";
 import type { StudioEmeresLibraryItem } from "./studio-emeres-library";
 import type { StudioTutorialTryAction } from "./studio-feature-tutorials";
 import type {
@@ -1326,23 +1356,15 @@ import type {
   StudioFilterKind,
   StudioFilterPreview,
 } from "./studio-filter-menu";
-import type { Glow } from "./studio-glow";
-import type { GradientMap } from "./studio-gradient-map";
-import type { Grain } from "./studio-grain";
-import type { Halftone } from "./studio-halftone";
-import type { InkWash } from "./studio-ink-wash";
 import type {
   StudioLayerColor,
   StudioLayerNavigatorItem,
   StudioLayerRole,
 } from "./studio-layer-navigator";
-import type { Light } from "./studio-light";
 import type { StudioLiveRoom } from "./studio-live-collaboration-room";
 import type { MotionCutImage } from "./studio-motion-export";
-import type { Outline } from "./studio-outline";
 import type { PaletteSuggestion } from "./studio-palette-suggest";
 import type { PanelLayoutPreset } from "./studio-panel-layouts";
-import type { PhotoFilter } from "./studio-photo-filter";
 import type { PsdExportEl, PsdExportResult } from "./studio-psd-export";
 import type { StudioPublicationAnalyticsDocument } from "./studio-publication-analytics";
 import type {
@@ -1353,15 +1375,11 @@ import type {
 } from "./studio-publish-preflight";
 import type { StudioReleaseSchedule } from "./studio-release-schedule";
 import type { SceneTemplate } from "./studio-scene-templates";
-import type { SelectiveHsl } from "./studio-selective-hsl";
 import type { SfxPreset } from "./studio-sfx-presets";
 import type { StudioSharedDocument } from "./studio-shared-document-client";
-import type { Sketch } from "./studio-sketch";
-import type { StudioStockImageCredit, StudioStockPhoto } from "./studio-stock-image-client";
-import type { Stylize } from "./studio-stylize";
+import type { StudioStockPhoto } from "./studio-stock-image-client";
 import type { SvgExportEl, SvgExportResult } from "./studio-svg-export";
 import type { StudioTeamCommentCapabilities } from "./studio-team-comment-client";
-import type { Vibrance } from "./studio-vibrance";
 import type { StudioGpuBackend } from "./studio-webgpu-engine";
 import type { StudioGpuStroke } from "./studio-webgpu-stroke";
 import type {
@@ -1688,10 +1706,6 @@ function PanelResizeHandle({
   );
 }
 
-type Tool = "select" | "draw" | "hand";
-/** pen/eraser/shape + 픽셀 펜슬 · lasso fill. */
-type DrawMode = "pen" | "eraser" | "shape" | "pixel" | "lasso-fill";
-type DrawShapeKind = "line" | "rect" | "ellipse" | "star" | "arrow" | "triangle" | "polygon";
 const QUICKSHAPE_KIND_LABELS: Record<string, string> = {
   line: "선",
   rect: "사각형",
@@ -1700,330 +1714,6 @@ const QUICKSHAPE_KIND_LABELS: Record<string, string> = {
   polygon: "다각형",
 };
 
-export interface ImageEl {
-  id: string;
-  type: "image";
-  src: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  rotation: number;
-  opacity?: number; // 불투명도(흐린 배경 캐릭터·페이드 등). 미설정=1.
-  flipped?: boolean; // 좌우 반전(캐릭터 미러링).
-  flippedY?: boolean; // 상하 반전
-  blur?: number;
-  brightness?: number;
-  contrast?: number;
-  grayscale?: boolean;
-  sepia?: boolean;
-  screentone?: boolean;
-  lineart?: boolean;
-  chromatic?: number;
-  posterize?: number;
-  noise?: number;
-  // 포토샵급 보정 — Konva HSL/내장 필터 + studio-filters 커스텀 픽셀 필터로 적용.
-  saturation?: number; // 채도(-1..1, Konva HSL)
-  hue?: number; // 색조 회전(-180..180°)
-  temperature?: number; // 색온도(-100..100, 따뜻/차갑게)
-  sharpen?: number; // 선명도(0..1, 언샤프 마스크)
-  pixelate?: number; // 픽셀화(0..40)
-  invert?: boolean; // 색 반전
-  inkThreshold?: number; // 먹선 임계(0..1, 순흑/순백)
-  duotoneShadow?: string; // 듀오톤 어두운 색
-  duotoneHighlight?: string; // 듀오톤 밝은 색
-  // 레벨 보정(Levels) — 입력/출력 검정·흰점 + 감마.
-  levelsBlack?: number;
-  levelsWhite?: number;
-  levelsGamma?: number;
-  levelsOutBlack?: number;
-  levelsOutWhite?: number;
-  // 레이어 스타일(그림자/글로우/둥근 모서리) — Konva.Image 네이티브 속성.
-  shadowColor?: string;
-  shadowBlur?: number;
-  shadowOffsetX?: number;
-  shadowOffsetY?: number;
-  shadowOpacity?: number;
-  cornerRadius?: number;
-  // 톤 커브(Curves) + 컬러 밸런스(Color Balance) + 채널 믹서(Channel Mixer) + 선택 색상(HSL) + 생동감(Vibrance).
-  curve?: CurvePoint[];
-  colorBalance?: ColorBalance;
-  channelMixer?: ChannelMixer;
-  selectiveHsl?: SelectiveHsl;
-  vibrance?: Vibrance;
-  gradientMap?: GradientMap;
-  photoFilter?: PhotoFilter;
-  colorToAlpha?: ColorToAlpha; // 색상 투명화 — 키 색상을 알파로 punching(studio-color-to-alpha)
-  autoAdjust?: AutoAdjust;
-  clarity?: Clarity;
-  outline?: Outline;
-  glow?: Glow;
-  halftone?: Halftone;
-  grain?: Grain;
-  /** 수묵/수채 번짐·종이결·안료 과립을 조합하는 비파괴 재질 효과. */
-  inkWash?: InkWash;
-  blurFx?: BlurFx;
-  distort?: Distort;
-  stylize?: Stylize;
-  light?: Light;
-  sketch?: Sketch;
-  detail?: Detail;
-  // 기울이기(Skew) — 도 단위(-60..60). 0(항등)은 저장하지 않는다(studio-skew 직렬화 규약).
-  skewX?: number;
-  skewY?: number;
-  /** Photopea-style reorderable smart filter stack (non-destructive). */
-  smartFilters?: StudioAdjustmentStack;
-  // 프레임별 셀 애니메이션 — 있으면 이 이미지는 "애니메이션 셀"이다.
-  // src는 항상 frames 중 현재 표시 프레임의 src와 동일하게 유지한다.
-  frames?: StudioAnimFrame[];
-  frameFps?: number; // 재생 속도(기본 12) — durationMs 미설정 프레임에 적용.
-  frameLoop?: boolean; // 반복 재생(기본 true).
-  activeFrameId?: string; // 현재 편집/표시 중인 프레임(패널이 열려 있을 때의 탐색 위치).
-  // 애니메이션 GIF 업로드 — 있으면 src 자체가 data:image/gif인 다중 프레임 GIF이고, 브라우저가
-  // <img> 소스를 내부적으로 계속 재생한다(디코딩은 이 앱이 하지 않는다 — studio-gif-element.ts
-  // 참고). 위 frames(셀 애니메이션)와는 서로 다른 축이다: frames는 이 앱이 여러 장의 정적 src를
-  // 프레임으로 넘겨가며 재생하는 것이고, isAnimatedGif는 단일 src 하나를 브라우저가 자체
-  // 재생하는 것 — 실질적으로 상호배타적으로 취급한다(UrlImage 리렌더 루프의 가드 참고).
-  isAnimatedGif?: boolean;
-  // 스톡 사진(Unsplash) 삽입 출처 — StudioStockImagePanel에서 삽입한 이미지에만 설정된다.
-  // Unsplash API Guidelines가 요구하는 "사진 사용 시 작가·Unsplash 크레딧 표시"를 삽입 이후에도
-  // (예: 선택된 이미지 사이드바에서) 다시 보여줄 수 있도록 요소에 영구 보존한다.
-  stockImageCredit?: StudioStockImageCredit;
-  /** AI 생성/편집 provenance. 페이지 JSON과 함께 저장되어 Publish Pack 사전검사에 사용된다. */
-  aiProvenance?: StudioPublishAiProvenance;
-  /** 번들 소재 카탈로그의 안정 ID. 다시 열어도 라이선스·생성 메타데이터를 추적한다. */
-  builtinRasterAssetId?: StudioRasterAsset["id"];
-  /** 고급 채우기가 선화 경계로 읽는 명시적 래스터 참조 레이어. */
-  fillReference?: boolean;
-  /** 재편집 가능한 3D 장면 원본. PNG src와 분리하며 로컬 저장소 ID는 포함하지 않는다. */
-  bg3dScene?: StudioBg3dSceneDocument;
-  /** 분리된 3D LT 레이어를 같은 원본 장면으로 다시 묶는 안정 식별자. */
-  bg3dLtBundleId?: string;
-  /** 톤·재질선·주선 중 이 래스터 레이어의 역할. */
-  bg3dLtRole?: StudioBg3dLtLayerRole;
-  /** 레거시 단일 PNG인지 분리 출력인지 구분하는 재편집 메타데이터. */
-  bg3dLtRenderMode?: StudioBg3dLtRenderMode;
-}
-interface TextEl {
-  id: string;
-  type: "text";
-  text: string;
-  x: number;
-  y: number;
-  width: number;
-  fontSize: number;
-  fill: string;
-  rotation: number;
-  font?: string; // 글꼴(웹툰 대사용)
-  stroke?: string; // 효과음(SFX) 외곽선
-  strokeWidth?: number;
-  letterSpacing?: number; // 자간(px)
-  lineHeight?: number; // 행간(배수)
-  vertical?: boolean;
-  align?: "left" | "center" | "right";
-  fontStyle?: "normal" | "bold" | "italic" | "bold italic";
-  shadowColor?: string;
-  shadowBlur?: number;
-  shadowOffsetX?: number;
-  shadowOffsetY?: number;
-  shadowOpacity?: number;
-  fillType?: "solid" | "gradient";
-  gradientColorStart?: string;
-  gradientColorEnd?: string;
-  gradientDirection?: "vertical" | "horizontal";
-  gradient?: StudioGradientSpec; // 멀티스톱 그라데이션(엔진) — 있으면 위 2색 레거시 필드보다 우선.
-  textPath?: TextPathConfig; // 곡선 텍스트(아치/물결/원) — 미설정/none이면 직선.
-  skewX?: number; // 가로 기울임(도, -60..60) — studio-skew 직렬화 규약. 미설정=0.
-  skewY?: number; // 세로 기울임(도) — studio-skew 직렬화 규약. 미설정=0.
-}
-interface BubbleEl {
-  id: string;
-  type: "bubble";
-  variant: BubbleVariant;
-  text: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  fill: string;
-  textFill: string;
-  rotation: number;
-  tail?: "left" | "right" | "none"; // 말풍선 꼬리 방향(화자 쪽). shout/box는 무시.
-  tailDirection?: "bottom" | "top" | "left" | "right"; // 말풍선 꼬리 방향(상하좌우).
-  extraTails?: BubbleTailSpec[]; // 추가 꼬리(두 화자 동시 대사) — 주 꼬리 외 최대 2개. studio-bubble-path 정규화 규약.
-  font?: string; // 말풍선 글꼴(미설정 시 기본 고딕)
-  fontSize?: number; // 말풍선 글자 크기(미설정 시 24)
-  lineHeight?: number; // 행간(배수, 미설정 시 1.1)
-  vertical?: boolean;
-  align?: "left" | "center" | "right";
-  fontStyle?: "normal" | "bold" | "italic" | "bold italic";
-  tailXRatio?: number;
-  tailHeight?: number;
-  tailBase?: number; // 주 꼬리 밑동 너비(px). 미설정이면 말풍선 크기·테마에 맞춰 자동 계산.
-  tailBend?: number; // 주 꼬리 곡률(-1..1). 0은 직선형 테이퍼.
-  /** 꼬리 자동 부착 대상 요소 id. 설정되면 매 커밋마다 대상의 중심점을 향해 tailDirection/
-   *  tailXRatio/tailHeight 가 자동 재계산된다(studio-bubble-anchor.ts). 대상이 삭제되면
-   *  자동으로 지워진다(마지막 tail 값은 그대로 남아 수동 모드로 복귀). tailAnchorPoint 와
-   *  상호배타 — 패널이 하나를 설정할 때 다른 하나를 undefined 로 같이 patch 한다. */
-  tailAnchorId?: string;
-  /** 꼬리 자동 부착 대상 고정 좌표(페이지/캔버스 좌표, el.x/y 와 동일 원점). tailAnchorId 가
-   *  없을 때만 의미가 있다 — 말풍선이 움직이면 이 좌표를 향한 각도가 재계산된다(좌표 자체는
-   *  고정, 저절로 움직이지 않는다). */
-  tailAnchorPoint?: { x: number; y: number };
-  stroke?: string;
-  strokeWidth?: number;
-  strokeStyle?: StrokeStyle; // 점선 등(studio-stroke-shapes 규약) — 화살촉 필드는 말풍선엔 의미 없어 무시.
-  gradient?: StudioGradientSpec; // 멀티스톱 그라데이션 채우기 — 있으면 fill(단색)보다 우선(studio-gradient-engine).
-  autoShrinkText?: boolean; // true면 텍스트가 넘칠 때 높이 대신 폰트 크기를 자동 축소(studio-bubble-text-fit).
-  autoShrinkMinFontSize?: number; // 자동 축소 하한(px). 미설정 시 BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT.
-  starAmplitude?: number; // shout/angry variant(Star)의 안쪽 반경 비율(0..1). 미설정 시 각 variant의 기존 비율(36/68, 28/64).
-  shadowColor?: string;
-  shadowBlur?: number;
-  shadowOffsetX?: number;
-  shadowOffsetY?: number;
-  shadowOpacity?: number;
-  /** 커스텀 폐곡선 점 배열(요소 로컬 0,0~width,height — bubblePathData 와 동일 좌표계, 짝수 길이
-   *  [x0,y0,x1,y1,...], 최소 3점/6칸). 있으면 렌더는 variant별 모양(둥근사각형·별·하트·구름 등)
-   *  대신 이 폴리곤을 그린다(studio-bubble-custom-shape.ts). "커스텀 모양으로 전환" 버튼이
-   *  bubblePathData/Multi 결과를 샘플링해 채운다 — tailDirection/tailXRatio/tailHeight/extraTails
-   *  값 자체는 보존되지만(되돌리기용) 이 필드가 있는 동안은 렌더에 반영되지 않는다(꼬리가 이미
-   *  폴리곤에 구워져 있다). */
-  customShapePoints?: number[];
-}
-interface FrameEl {
-  id: string;
-  type: "frame";
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  bg?: string;
-  bgColor?: string;
-  stroke?: string;
-  strokeWidth?: number;
-  dashStyle?: "solid" | "dashed";
-  /** AI 비트 시트에서 적용된 장면의 서사 역할·변화 요약. 페이지/프로젝트 JSON에 그대로 남아
-   * 이후 continuity lint와 작가실 편집의 안정적인 연결점이 된다. */
-  storyBeat?: {
-    type: ScenarioBeatType;
-    summary: string;
-    continuity?: Omit<StudioStoryBeat, "sceneId">;
-    textAiProvenance?: StudioTextAiProvenance;
-  };
-  /** AI 생성 배경이 프레임에 들어간 경우의 provenance. */
-  aiProvenance?: StudioPublishAiProvenance;
-  // 사선/비정형 패널 — 프레임 로컬좌표(x,y 기준) 쿼드 폴리곤 [x0,y0,x1,y1,x2,y2,x3,y3].
-  // 있으면 사각형 대신 이 폴리곤으로 클립·채움·테두리를 그린다.
-  points?: number[];
-}
-interface StickerEl {
-  id: string;
-  type: "sticker";
-  text: string;
-  x: number;
-  y: number;
-  fontSize: number;
-  rotation: number;
-  skewX?: number; // 가로 기울임(도, -60..60) — studio-skew 직렬화 규약. 미설정=0.
-  skewY?: number; // 세로 기울임(도) — studio-skew 직렬화 규약. 미설정=0.
-}
-interface DrawEl {
-  id: string;
-  type: "draw";
-  kind?: "freehand" | DrawShapeKind;
-  mode?: "pen" | "eraser";
-  points: number[];
-  stroke: string;
-  strokeWidth: number;
-  opacity?: number;
-  /**
-   * Versioned stroke-level alpha semantics. Omitted persisted strokes retain their frozen
-   * per-dab opacity behavior; newly authored translucent round ink opts into one-shot stroke
-   * opacity so overlapping dabs cannot darken an already visible prefix.
-   */
-  paintModel?: StudioStrokePaintModel;
-  fill?: string;
-  gradient?: StudioGradientSpec; // 도형 채우기 그라데이션(멀티스톱) — 미설정이면 fill 단색.
-  // 도형 채우기 패턴 — 우선순위: 패턴 > 그라데이션 > fill 단색. 타일 로드 전엔 아래 채우기가 폴백.
-  pattern?: StudioPatternSpec;
-  brush?: string;
-  pressures?: number[];
-  /** Versioned pressure→diameter semantics. Omitted persisted strokes retain the legacy curve. */
-  pressureModel?: StudioInkPressureModel;
-  /** 새 획을 만들 때의 논리 좌표 샘플 간격. 미설정 legacy 획은 과거 3px 렌더 규칙을 유지한다. */
-  sampleSpacing?: number;
-  /** 포인트별 PointerEvent 스타일러스 메타데이터. 캘리그래피·입자 브러시에서 저장한다. */
-  tiltXs?: number[];
-  tiltYs?: number[];
-  twists?: number[];
-  /** 입자 브러시가 속도·배럴 압력을 문서와 함께 재생하기 위한 포인트별 입력. */
-  speeds?: number[];
-  tangentialPressures?: number[];
-  /** 입자 브러시의 입력→출력 매핑 스냅샷. 저장·협업·SVG 내보내기에서 같은 dab을 재현한다. */
-  brushDynamics?: NormalizedStudioBrushDynamicsSettings;
-  /** 이 획을 다시 열거나 내보낼 때도 같은 펜촉 결과를 재현하기 위한 스냅샷. */
-  brushTip?: {
-    tiltEnabled: boolean;
-    angleDeg: number;
-    roundness: number;
-  };
-  /** 스탬프 브러시 튜닝 스냅샷(흐름/경도/최소 굵기) — 미설정 시 종류별 기본값. */
-  stamp?: StudioStampBrushTuning;
-  /** 새 스탬프 획의 append-only raw accepted-sample 재생 규약. 미설정 획은 legacy smoothing. */
-  stampPipeline?: "causal-walker-v2";
-  /** 새 수채/수묵 획의 prefix-stable pigment station 규약. 미설정 획은 legacy 재배치 플래너. */
-  watercolorPipeline?: "causal-walker-v2";
-  // 스트로크 스타일(점선/선 끝/화살촉) — 도형·선 전용. 미설정 시 기본(실선·둥근 끝).
-  strokeStyle?: StrokeStyle;
-  // 도형 파라미터(별 꼭짓점/다각형 변/모서리 반경) — 미설정 시 기존 하드코딩과 동일한 기본값.
-  shapeParams?: ShapeParams;
-  symmetry?: {
-    type: "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope";
-    centerX: number;
-    centerY: number;
-    radialCount?: number;
-  };
-}
-interface FocusLinesEl {
-  id: string;
-  type: "focusLines";
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  lineCount: number;
-  innerRadius: number;
-  outerRadius: number;
-  stroke: string;
-  strokeWidth: number;
-  noise: number;
-  rotation: number;
-  opacity?: number;
-  centerXRatio?: number;
-  centerYRatio?: number;
-}
-interface SpeedLinesEl {
-  id: string;
-  type: "speedLines";
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  lineCount: number;
-  direction: "horizontal" | "vertical";
-  stroke: string;
-  strokeWidth: number;
-  noise?: number;
-  rotation: number;
-  opacity?: number;
-}
-// 인터섹션으로 모든 요소 변형에 레이어 메타(표시/숨김·잠금)를 부여.
-export type El = (ImageEl | TextEl | BubbleEl | StickerEl | DrawEl | FrameEl | FocusLinesEl | SpeedLinesEl) & { name?: string; hidden?: boolean; locked?: boolean; noClip?: boolean; opacity?: number; blendMode?: string; lockAspect?: boolean; groupId?: string; clipBelow?: boolean; alphaLocked?: boolean; maskSrc?: string; maskEnabled?: boolean; layerRole?: StudioLayerRole; layerColor?: StudioLayerColor;
-  /** 이 요소가 이메레스 밑그림 틀로 삽입됐는지 + 어디서 왔는지 표식. 카탈로그 틀: t.id 그대로.
-   *  개인 보관함 항목: `custom:${item.id}`. 두 출처 모두 "이메레스에서 온 요소"라는 사실만으로
-   *  일괄 삭제 대상이 된다. */
-  emeresSourceId?: string;
-};
 
 function readyStudioWorkAssetImageSources(
   hydrator: StudioWorkAssetHydrator
@@ -2168,30 +1858,6 @@ const STUDIO_FONTS_LINK_ID = "studio-google-fonts";
 const STUDIO_FONTS_CSS2_URL =
   "https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=East+Sea+Dokdo&family=Gaegu:wght@400;700&family=Gamja+Flower&family=Jua&family=Nanum+Pen+Script&family=Yeon+Sung&display=swap";
 
-// 요소의 대략적 바운딩 박스(중심·크기 판정용).
-function elBounds(el: El): { x: number; y: number; w: number; h: number } {
-  if (el.type === "draw") {
-    const x0 = el.points[0] ?? 0;
-    const y0 = el.points[1] ?? 0;
-    let minX = x0;
-    let minY = y0;
-    let maxX = x0;
-    let maxY = y0;
-    for (let i = 2; i < el.points.length; i += 2) {
-      const x = el.points[i] ?? maxX;
-      const y = el.points[i + 1] ?? maxY;
-      if (x < minX) minX = x;
-      else if (x > maxX) maxX = x;
-      if (y < minY) minY = y;
-      else if (y > maxY) maxY = y;
-    }
-    return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
-  }
-  if (el.type === "text") return { x: el.x, y: el.y, w: el.width, h: el.fontSize * 1.4 };
-  if (el.type === "sticker") return { x: el.x, y: el.y, w: el.fontSize, h: el.fontSize };
-  return { x: el.x, y: el.y, w: el.width, h: el.height }; // image · bubble · frame
-}
-
 // 부착된 말풍선(tailAnchorId/tailAnchorPoint)의 꼬리 방향/비율/길이를 매 커밋마다 다시
 // 계산한다. commit()/commitCoalesced() 가 pagesHistory 에 넣기 직전(+ masterEditMode 분기
 // 이전)의 nextElements 에 적용한다 — patchEl 뿐 아니라 정렬/분배/넛지/복제/클립삽입처럼
@@ -2233,28 +1899,6 @@ function studioElementIdOf(node: Konva.Node | null): string | null {
     current = current.getParent();
   }
   return null;
-}
-
-// 요소가 "들어가야 할" 패널(중심이 패널 안 + 패널보다 크게 넘치지 않음). 없으면 null.
-// 전체 배경처럼 패널보다 훨씬 큰 요소는 제외해 백드롭이 한 칸에 갇히지 않게 한다.
-function containingPanel(el: El, all: readonly El[]): FrameEl | null {
-  if (el.type === "frame") return null;
-  const b = elBounds(el);
-  const cx = b.x + b.w / 2;
-  const cy = b.y + b.h / 2;
-  let best: FrameEl | null = null;
-  let bestArea = Infinity;
-  for (const f of all) {
-    if (f.type !== "frame" || f.hidden) continue;
-    if (cx < f.x || cx > f.x + f.width || cy < f.y || cy > f.y + f.height) continue;
-    if (b.w > f.width * 1.4 || b.h > f.height * 1.4) continue;
-    const area = f.width * f.height;
-    if (area < bestArea) {
-      bestArea = area;
-      best = f;
-    }
-  }
-  return best;
 }
 
 // 레이어 목록용 라벨(아이콘 + 이름).
@@ -4745,6 +4389,10 @@ function clampZoom(z: number) {
   return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z * 20) / 20));
 }
 
+function isStudioViewToolsHudEventTarget(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest("[data-studio-view-tools-hud]") !== null;
+}
+
 interface PageState {
   id: string;
   elements: El[];
@@ -4761,6 +4409,8 @@ interface PageState {
   cameraAngle?: string; // 카메라 앵글(로우/하이/더치 등) — studio-panel-shot-tags 관리. 미설정=태그 없음(빈 값 저장 시 키 제거).
   dialogueI18n?: DialogueLocaleMap; // 대사 번역 저장소(studio-dialogue-translate) — elId→로케일→텍스트. 미설정=번역 없음(기존 문서 100% 호환).
   review?: PageReviewState; // 페이지 검토 상태·담당·메모·로컬 편집 잠금.
+  /** 페이지 소유 원근자·아이소메트릭 가이드. 미설정 레거시는 비활성 기본값으로 정규화. */
+  drawingAssist?: StudioDrawingAssistDocument;
 }
 
 function publishPackageSettingsFromPack(value: unknown): StudioPublishPackageSettings {
@@ -5028,7 +4678,6 @@ function StudioCuttoonEditor() {
     setGridSize(next.grids.pixelGridSize);
     setPressureCurve(next.other.pressureCurve);
     if (next.grids.snapToPixelGrid) setSnapEnabled(true);
-    if (next.grids.showIsometricOnDraw) setIsometricGridActive(true);
   }
   // useCallback: 좌측 레일 memo 자식에서 렌더 중 호출 — prop 안정성 유지.
   const isRailToolVisible = useCallback(
@@ -5510,6 +5159,19 @@ function StudioCuttoonEditor() {
   const setPublicationAnalytics = (next: Parameters<typeof setPublicationAnalyticsState>[0]) => {
     if (!markStudioDocumentChanged()) return;
     setPublicationAnalyticsState(next);
+  };
+  const [referenceBoard, setReferenceBoardState] = useState<StudioReferenceBoardDocument>(() =>
+    createDefaultStudioReferenceBoardDocument()
+  );
+  const referenceBoardRef = useRef(referenceBoard);
+  referenceBoardRef.current = referenceBoard;
+  const setReferenceBoard = (next: StudioReferenceBoardDocument): boolean => {
+    const normalized = normalizeStudioReferenceBoardDocument(next);
+    if (areStudioReferenceBoardDocumentsEqual(referenceBoardRef.current, normalized)) return true;
+    if (!markStudioDocumentChanged()) return false;
+    referenceBoardRef.current = normalized;
+    setReferenceBoardState(normalized);
+    return true;
   };
   const [masterEditMode, setMasterEditMode] = useState(false);
   const masterEditModeRef = useRef(masterEditMode);
@@ -6122,28 +5784,6 @@ function StudioCuttoonEditor() {
         .map((thread) => thread.id)
     );
   }, [studioComments.threads, studioTeamComments.threads, studioTeamCommentsWorkId]);
-  useEffect(() => {
-    const handleCommentVisibilityShortcut = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (
-        event.code !== "KeyC"
-        || !event.shiftKey
-        || event.metaKey
-        || event.ctrlKey
-        || event.altKey
-        || target?.isContentEditable
-        || target?.tagName === "INPUT"
-        || target?.tagName === "TEXTAREA"
-        || target?.tagName === "SELECT"
-      ) {
-        return;
-      }
-      event.preventDefault();
-      setStudioCommentPinsHidden((hidden) => !hidden);
-    };
-    globalThis.addEventListener("keydown", handleCommentVisibilityShortcut);
-    return () => globalThis.removeEventListener("keydown", handleCommentVisibilityShortcut);
-  }, []);
   useEffect(() => {
     const generation = studioTeamCommentsLoadGenerationRef.current + 1;
     studioTeamCommentsLoadGenerationRef.current = generation;
@@ -7015,6 +6655,12 @@ function StudioCuttoonEditor() {
   const [secondaryColor, setSecondaryColor] = useState("#ffffff");
   /** View-only horizontal flip for checking drawing balance (CSP). */
   const [canvasFlipH, setCanvasFlipH] = useState(false);
+  /** 문서 데이터와 분리된 90° 단위 보기 회전. 내보내기에는 포함하지 않는다. */
+  const [canvasRotation, setCanvasRotation] = useState<StudioViewRotation>(0);
+  const pendingCanvasRotationScrollRef = useRef<ReturnType<typeof planStudioViewRotationTransition> | null>(null);
+  const captureSuppressedViewRef = useRef<StudioViewSnapshot | null>(null);
+  /** Magma식 보기 도구 HUD — 캔버스 편집 도구와 독립된 비파괴 뷰 컨트롤이다. */
+  const [viewTool, setViewTool] = useState<"zoom" | "rotate" | null>(null);
   /** "나만 숨기기" — 이 클라이언트 화면에서만 숨긴다. 문서(CRDT)에는 반영되지 않아 다른 협업자에게는 그대로 보인다. */
   const [localHiddenElementIds, setLocalHiddenElementIds] = useState<ReadonlySet<string>>(() => new Set());
   function toggleLocalHidden(id: string) {
@@ -7447,17 +7093,42 @@ function StudioCuttoonEditor() {
   const drawingShortcutStateRef = useRef({ tool, drawMode, strokeWidth, brushOpacity });
   drawingShortcutStateRef.current = { tool, drawMode, strokeWidth, brushOpacity };
   const [symmetryType, setSymmetryType] = useState<"none" | "vertical" | "horizontal" | "radial" | "kaleidoscope">("none");
-  const [symmetryCenterX, setSymmetryCenterX] = useState<number>(400);
+  const [symmetryCenterX, setSymmetryCenterX] = useState<number>(() => CANVAS_W / 2);
   const [symmetryCenterY, setSymmetryCenterY] = useState<number>(540);
   const [symmetryRadialCount, setSymmetryRadialCount] = useState<number>(6);
-  const [perspectiveRulerActive, setPerspectiveRulerActive] = useState(false);
+  const normalizedDrawingAssistDocument = normalizeStudioDrawingAssistDocument(activePage.drawingAssist, {
+    canvasWidth: CANVAS_W,
+    canvasHeight: canvasH,
+  });
+  const defaultedDrawingAssistDocument = activePage.drawingAssist === undefined
+    && appSettings.grids.showIsometricOnDraw
+    ? {
+        ...normalizedDrawingAssistDocument,
+        isometric: { ...normalizedDrawingAssistDocument.isometric, active: true },
+      }
+    : normalizedDrawingAssistDocument;
+  const [drawingAssistPreview, setDrawingAssistPreview] = useState<{
+    pageId: string;
+    source: StudioDrawingAssistDocument | undefined;
+    document: StudioDrawingAssistDocument;
+  } | null>(null);
+  const drawingAssistPreviewRef = useRef(drawingAssistPreview);
+  drawingAssistPreviewRef.current = drawingAssistPreview;
+  const drawingAssistDocument = drawingAssistPreview?.pageId === activePage.id
+    && drawingAssistPreview.source === activePage.drawingAssist
+    ? drawingAssistPreview.document
+    : defaultedDrawingAssistDocument;
+  useEffect(() => {
+    setDrawingAssistPreview(null);
+  }, [activePage.id, activePage.drawingAssist]);
+  const perspectiveRulerActive = drawingAssistDocument.perspective.active;
   const [quickShapeActive, setQuickShapeActive] = useState(false); // 기본 꺼짐
-  const [vanishingPoints, setVanishingPoints] = useState<VanishingPoint[]>([]);
-  const [isometricGridActive, setIsometricGridActive] = useState(false);
-  const [isometricAngleDeg, setIsometricAngleDeg] = useState<number>(DEFAULT_ISOMETRIC_ANGLE_DEG);
-  const [isometricCellSize, setIsometricCellSize] = useState<number>(DEFAULT_ISOMETRIC_CELL_SIZE);
-  const [isometricOriginX, setIsometricOriginX] = useState<number>(() => CANVAS_W / 2);
-  const [isometricOriginY, setIsometricOriginY] = useState<number>(() => canvasH / 2);
+  const vanishingPoints = drawingAssistDocument.perspective.points;
+  const isometricGridActive = drawingAssistDocument.isometric.active;
+  const isometricAngleDeg = drawingAssistDocument.isometric.angleDeg;
+  const isometricCellSize = drawingAssistDocument.isometric.cellSize;
+  const isometricOriginX = drawingAssistDocument.isometric.originX;
+  const isometricOriginY = drawingAssistDocument.isometric.originY;
   const [eyedropperActive, setEyedropperActive] = useState(false);
   const [bubbleAnchorPickActive, setBubbleAnchorPickActive] = useState(false);
   const [studioOptionalAssets, setStudioOptionalAssets] = useState<StudioOptionalAssetPacks>(
@@ -7644,6 +7315,7 @@ function StudioCuttoonEditor() {
     }
   }, [frameAnimOpen, frameAnimTargetId, frameAnimTarget]);
   const [timelineOpen, setTimelineOpen] = useState(false);
+  const [pageSequenceOpen, setPageSequenceOpen] = useState(false);
   const [timelinePlayhead, setTimelinePlayhead] = useState(0);
   const [timelinePlaying, setTimelinePlaying] = useState(false);
   const [timelineFocusedTrackId, setTimelineFocusedTrackId] = useState<string | null>(null);
@@ -7760,6 +7432,23 @@ function StudioCuttoonEditor() {
   };
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (
+      masterEditMode
+      || activeSurfaceReviewLocked
+      || saving
+      || sourceHydrationPending
+      || collaborationDocumentUnavailable
+    ) {
+      setDrawingAssistPreview(null);
+    }
+  }, [
+    activeSurfaceReviewLocked,
+    collaborationDocumentUnavailable,
+    masterEditMode,
+    saving,
+    sourceHydrationPending,
+  ]);
 
   function collectPublishPreflightProvenance(
     sourcePages: readonly PageState[] = pages
@@ -8038,6 +7727,13 @@ function StudioCuttoonEditor() {
   // 표시용 스케일(컨테이너 폭에 맞춤).
   const wrapRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
+  const studioViewDocumentWidth = canvasRotation === 90 || canvasRotation === 270
+    ? canvasH
+    : CANVAS_W;
+  const studioViewDocumentWidthRef = useRef(studioViewDocumentWidth);
+  useLayoutEffect(() => {
+    studioViewDocumentWidthRef.current = studioViewDocumentWidth;
+  }, [studioViewDocumentWidth]);
   useEffect(() => {
     const el = wrapRef.current;
     // 컨테이너 폭에 맞춰 캔버스를 채운다. 전체화면이면 초광폭 모니터도 채우게 상한을 4배로 올린다.
@@ -8045,7 +7741,7 @@ function StudioCuttoonEditor() {
     const cap = isFullscreen || maximized || mobileImmersive || canvasOnlyMode ? 4 : 2.5;
     const measure = () => {
       const w = (el ?? wrapRef.current)?.clientWidth ?? CANVAS_W;
-      setScale(Math.min(cap, Math.max(0.1, w / CANVAS_W)));
+      setScale(Math.min(cap, Math.max(0.1, w / studioViewDocumentWidthRef.current)));
     };
     measure();
     let ro: ResizeObserver | null = null;
@@ -8074,6 +7770,7 @@ function StudioCuttoonEditor() {
   // 앵커(포인터 아래 문서점)가 그대로 유지되도록 스크롤을 보정한다. 틱마다 setZoom 을 부르면
   // 에디터 전체가 틱당 한 번씩 다시 그려져 연속 휠이 초 단위로 밀리는 것을 계측으로 확인했다.
   const zoomHostRef = useRef<HTMLDivElement | null>(null);
+  const viewTransformSuppressedRef = useRef(false);
   const zoomGestureRef = useRef<{
     baseZoom: number;
     targetZoom: number;
@@ -8110,11 +7807,21 @@ function StudioCuttoonEditor() {
         }
         return;
       }
-      const effBase = gesture.baseWidth / CANVAS_W;
-      zoomSettleAnchorRef.current = effBase > 0
+      const effBase = gesture.baseWidth / studioViewDocumentWidth;
+      const documentPoint = effBase > 0
+        ? projectStudioViewPointToDocument({
+            documentWidth: CANVAS_W,
+            documentHeight: canvasH,
+            canvasFlipH,
+            canvasRotation,
+            x: gesture.originX / effBase,
+            y: gesture.originY / effBase,
+          })
+        : null;
+      zoomSettleAnchorRef.current = documentPoint
         ? {
-            docX: gesture.originX / effBase,
-            docY: gesture.originY / effBase,
+            docX: documentPoint.x,
+            docY: documentPoint.y,
             clientX: gesture.clientX,
             clientY: gesture.clientY,
           }
@@ -8181,12 +7888,20 @@ function StudioCuttoonEditor() {
     zoomSettleAnchorRef.current = null;
     if (!host || !wrap) return;
     // 정착 레이아웃에서 제스처 포인터 아래에 같은 문서점이 오도록 스크롤 보정(앵커 보존 줌).
-    const effNow = host.clientWidth / CANVAS_W;
+    const effNow = host.clientWidth / studioViewDocumentWidth;
     if (!(effNow > 0)) return;
     const wrapRect = wrap.getBoundingClientRect();
-    wrap.scrollLeft = Math.max(0, anchor.docX * effNow - (anchor.clientX - wrapRect.left));
-    wrap.scrollTop = Math.max(0, anchor.docY * effNow - (anchor.clientY - wrapRect.top));
-  }, [zoom]);
+    const projected = projectStudioDocumentPointToView({
+      documentWidth: CANVAS_W,
+      documentHeight: canvasH,
+      canvasFlipH,
+      canvasRotation,
+      x: anchor.docX,
+      y: anchor.docY,
+    });
+    wrap.scrollLeft = Math.max(0, projected.x * effNow - (anchor.clientX - wrapRect.left));
+    wrap.scrollTop = Math.max(0, projected.y * effNow - (anchor.clientY - wrapRect.top));
+  }, [canvasFlipH, canvasH, canvasRotation, studioViewDocumentWidth, zoom]);
   useEffect(() => () => {
     const gesture = zoomGestureRef.current;
     zoomGestureRef.current = null;
@@ -8210,6 +7925,8 @@ function StudioCuttoonEditor() {
     const node = wrapRef.current;
     if (!node) return;
     const onWheel = (e: WheelEvent) => {
+      if (viewTransformSuppressedRef.current) return;
+      if (isStudioViewToolsHudEventTarget(e.target)) return;
       const prefs = appSettingsRef.current.mouse;
       const modZoom = e.ctrlKey || e.metaKey;
       const wheelMode = modZoom ? "zoom" : prefs.wheel;
@@ -8247,6 +7964,14 @@ function StudioCuttoonEditor() {
     // 정확히 두 손가락일 때만 기준선을 잡는다. 손가락 수가 바뀌면(예: 2→3→2) 기준선을 버려
     // 다음 두-손가락 프레임에서 새로 잡게 해 줌이 튀지 않도록 한다.
     const arm = (e: TouchEvent) => {
+      if (viewTransformSuppressedRef.current) {
+        pinchStartDist = 0;
+        return;
+      }
+      if (isStudioViewToolsHudEventTarget(e.target)) {
+        pinchStartDist = 0;
+        return;
+      }
       if (e.touches.length === 2 && !stageRef.current?.isDragging()) {
         pinchStartDist = dist(e.touches);
         pinchStartZoom = zoomGestureRef.current?.targetZoom ?? zoomRef.current;
@@ -8256,6 +7981,11 @@ function StudioCuttoonEditor() {
     };
     const onTouchStart = arm;
     const onTouchMove = (e: TouchEvent) => {
+      if (viewTransformSuppressedRef.current) {
+        pinchStartDist = 0;
+        return;
+      }
+      if (isStudioViewToolsHudEventTarget(e.target)) return;
       if (e.touches.length !== 2 || stageRef.current?.isDragging()) {
         pinchStartDist = 0; // 요소 드래그 중이거나 두 손가락이 아니면 핀치 비활성
         return;
@@ -8346,6 +8076,17 @@ function StudioCuttoonEditor() {
   });
   const updateScrollPos = () => updateScrollPosRef.current();
 
+  useLayoutEffect(() => {
+    const pending = pendingCanvasRotationScrollRef.current;
+    if (!pending || pending.canvasRotation !== canvasRotation) return;
+    pendingCanvasRotationScrollRef.current = null;
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    wrap.scrollLeft = pending.scrollLeft;
+    wrap.scrollTop = pending.scrollTop;
+    updateScrollPosRef.current();
+  }, [canvasRotation]);
+
   useEffect(() => {
     const wrap = wrapRef.current;
     if (!wrap) return;
@@ -8422,6 +8163,10 @@ function StudioCuttoonEditor() {
     // 직전 작업 백업이 빈 상태로 교체되는 것도 방지한다.
     const hasContent =
       durablePages.some((p) => p.elements.length > 0) ||
+      durablePages.some((p) => studioDrawingAssistHasContent(p.drawingAssist, {
+        canvasWidth: CANVAS_W,
+        canvasHeight: p.canvasH,
+      })) ||
       master.elements.length > 0 ||
       characterBible.characters.length > 0 ||
       studioWriterRoomHasContent(writerRoom) ||
@@ -8429,6 +8174,7 @@ function StudioCuttoonEditor() {
       studioComments.threads.length > 0 ||
       releaseSchedule.items.length > 0 ||
       publicationAnalytics.records.length > 0 ||
+      studioReferenceBoardHasContent(referenceBoard) ||
       publishProfile !== "generic" ||
       publishAiUsage !== "none" ||
       publishAiDisclosure.trim() !== "" ||
@@ -8465,6 +8211,7 @@ function StudioCuttoonEditor() {
           comments: studioComments,
           releaseSchedule,
           publicationAnalytics,
+          referenceBoard,
           aiProvenance,
           title,
           description,
@@ -8509,6 +8256,7 @@ function StudioCuttoonEditor() {
     studioComments,
     releaseSchedule,
     publicationAnalytics,
+    referenceBoard,
     title,
     description,
     tagsText,
@@ -8548,6 +8296,10 @@ function StudioCuttoonEditor() {
     if (!title.trim()) return;
     const hasContent =
       pages.some((p) => p.elements.length > 0) ||
+      pages.some((p) => studioDrawingAssistHasContent(p.drawingAssist, {
+        canvasWidth: CANVAS_W,
+        canvasHeight: p.canvasH,
+      })) ||
       master.elements.length > 0 ||
       characterBible.characters.length > 0;
     if (!hasContent) return;
@@ -8730,6 +8482,7 @@ function StudioCuttoonEditor() {
         setStudioComments(normalizeStudioCommentsDocument(parsed.comments));
         setReleaseSchedule(normalizeStudioReleaseSchedule(parsed.releaseSchedule));
         setPublicationAnalytics(normalizedPublicationAnalytics);
+        setReferenceBoard(normalizeStudioReferenceBoardDocument(parsed.referenceBoard));
         // 문서 마스터 복구 — 백업에 없으면 빈 마스터(하위호환).
         setMaster(normalizeDocumentMaster(parsed.master) as DocumentMaster<El>);
         setAutosaveRestoreBlockedReason(null);
@@ -8778,6 +8531,7 @@ function StudioCuttoonEditor() {
 
   // 화면 드래그 스크롤 핸들러 (Space + Drag · 핸드 툴)
   const onWrapMouseDown = (e: React.MouseEvent) => {
+    if (isStudioViewToolsHudEventTarget(e.target)) return;
     if (!isSpacePressed && tool !== "hand") return;
     setIsPanning(true);
     const wrap = wrapRef.current;
@@ -8812,10 +8566,19 @@ function StudioCuttoonEditor() {
     const mHeight = rect.height;
     const wrap = wrapRef.current;
     if (!wrap) return;
-    const targetX = (mx / mWidth) * (CANVAS_W * effScale) - wrap.clientWidth / 2;
-    const targetY = (my / mHeight) * (canvasH * effScale) - wrap.clientHeight / 2;
-    wrap.scrollLeft = targetX;
-    wrap.scrollTop = targetY;
+    const target = planStudioViewScrollToDocumentPoint({
+      documentWidth: CANVAS_W,
+      documentHeight: canvasH,
+      canvasFlipH,
+      canvasRotation,
+      scale: effScale,
+      viewportWidth: wrap.clientWidth,
+      viewportHeight: wrap.clientHeight,
+      x: (mx / mWidth) * CANVAS_W,
+      y: (my / mHeight) * canvasH,
+    });
+    wrap.scrollLeft = target.scrollLeft;
+    wrap.scrollTop = target.scrollTop;
     updateScrollPos();
   };
 
@@ -8863,10 +8626,14 @@ function StudioCuttoonEditor() {
 
     const dropStagePoint = () => {
       const rect = wrap.getBoundingClientRect();
-      return {
+      return projectStudioViewPointToDocument({
+        documentWidth: CANVAS_W,
+        documentHeight: canvasH,
+        canvasFlipH,
+        canvasRotation,
         x: (cx - rect.left + wrap.scrollLeft) / effScale,
         y: (cy - rect.top + wrap.scrollTop) / effScale,
-      };
+      });
     };
 
     // 메뉴 타일을 캔버스로 끌어다 놓기 — 클릭 삽입(중앙/패널 규칙)과 달리 드롭 지점에 배치한다.
@@ -8888,9 +8655,7 @@ function StudioCuttoonEditor() {
 
     // 드롭 지점(스테이지 좌표) → 거기에 중앙을 맞춰 배치한다.
     const placeAt = (src: string, width: number, height: number, isAnimatedGif = false) => {
-      const rect = wrap.getBoundingClientRect();
-      const x = (cx - rect.left + wrap.scrollLeft) / effScale;
-      const y = (cy - rect.top + wrap.scrollTop) / effScale;
+      const { x, y } = dropStagePoint();
       const fit = Math.min(1, (CANVAS_W - 80) / width);
       const targetW = Math.round(width * fit);
       const targetH = Math.round(height * fit);
@@ -8960,6 +8725,21 @@ function StudioCuttoonEditor() {
   const drawingRef = useRef<DrawEl | null>(null);
   const drawingStabilizerRef = useRef<StudioStrokeStabilizerState | null>(null);
   const drawingFixedRateFilterRef = useRef<FixedRateStrokeFilterState | null>(null);
+  const drawingInputSettingsRef = useRef<{
+    version: 1;
+    stabilizer: number;
+    stabilizerMode: StudioStabilizerMode;
+    postCorrection: number;
+    preserveCorners: boolean;
+    pressureCurve: number;
+    useVelocityPressure: boolean;
+    velocitySensitivity: number;
+    coordinateScale: number;
+    perspectiveActive: boolean;
+    vanishingPoints: VanishingPoint[];
+    isometricActive: boolean;
+    isometricAngleDeg: number;
+  } | null>(null);
   /** Strength-zero Magma input: quantized coalesced samples with no fixed-clock latency. */
   const drawingImmediateCausalInputRef = useRef(false);
   /** One processed/coalesced batch may mutate its private draft clone before publishing once. */
@@ -9097,6 +8877,35 @@ function StudioCuttoonEditor() {
   const liveDraftDirectRef = useRef(false);
   // Figma식 자유 위치 댓글: 무장 → 캔버스 클릭 한 번 → point 앵커 확정(0..1 정규화 좌표).
   const [commentPinArmed, setCommentPinArmed] = useState(false);
+  useEffect(() => {
+    if (viewTool !== null) setCommentPinArmed(false);
+  }, [viewTool]);
+  const canCreateStudioComment = workId
+    ? studioTeamCommentCapabilities?.comment === true
+    : !collaborationDocumentLocked;
+  function openStudioCommentInbox() {
+    setCommentPinArmed(false);
+    setTeamPanelOpen(false);
+    setCommentsOpen(true);
+  }
+  function toggleStudioCommentPinPlacement() {
+    if (!canCreateStudioComment) {
+      openStudioCommentInbox();
+      announceDrawingShortcut("댓글 작성 권한이 없어 검토함을 열었습니다");
+      return;
+    }
+    if (commentPinArmed) {
+      setCommentPinArmed(false);
+      announceDrawingShortcut("댓글 핀 배치 취소");
+      return;
+    }
+    disarmAllPixelTools();
+    setTeamPanelOpen(false);
+    setCommentsOpen(false);
+    setPointCommentAnchor(null);
+    setCommentPinArmed(true);
+    announceDrawingShortcut("댓글 · 캔버스에서 핀 위치를 선택하세요");
+  }
   const [pointCommentAnchor, setPointCommentAnchor] = useState<
     { pageId: string; x: number; y: number } | null
   >(null);
@@ -9778,7 +9587,46 @@ function StudioCuttoonEditor() {
   const [liquifyRadius, setLiquifyRadius] = useState(40);
   const [liquifyStrength, setLiquifyStrength] = useState(50);
   const [liquifyBusy, setLiquifyBusy] = useState(false);
-  const liquifyDragRef = useRef<{ elId: string; frame: SelectionFrame; points: SelPoint[] } | null>(null);
+  const liquifyDragRef = useRef<StudioLiquifyPointerSession | null>(null);
+  const liquifyCaptureTargetRef = useRef<Element | null>(null);
+  const liquifyHandledNativeEndEventsRef = useRef(new WeakSet<Event>());
+  const liquifyPointerGlobalEndRef = useRef<(event: PointerEvent, cancelled: boolean) => boolean>(
+    () => false
+  );
+  const releaseLiquifyPointerCapture = useCallback((session = liquifyDragRef.current) => {
+    const target = liquifyCaptureTargetRef.current;
+    liquifyCaptureTargetRef.current = null;
+    if (!session || !target) return;
+    try {
+      if (target.hasPointerCapture(session.pointerId)) target.releasePointerCapture(session.pointerId);
+    } catch {
+      // Capture may already have been released by the browser after an outside pointerup.
+    }
+  }, []);
+  const cancelLiquifyPointerSession = useCallback(() => {
+    const session = liquifyDragRef.current;
+    liquifyDragRef.current = null;
+    releaseLiquifyPointerCapture(session);
+  }, [releaseLiquifyPointerCapture]);
+  useEffect(() => {
+    const onPointerUp = (event: PointerEvent) => {
+      if (!liquifyPointerGlobalEndRef.current(event, false)) return;
+      liquifyHandledNativeEndEventsRef.current.add(event);
+    };
+    const onPointerCancel = (event: PointerEvent) => {
+      if (!liquifyPointerGlobalEndRef.current(event, true)) return;
+      liquifyHandledNativeEndEventsRef.current.add(event);
+    };
+    globalThis.addEventListener("pointerup", onPointerUp, true);
+    globalThis.addEventListener("pointercancel", onPointerCancel, true);
+    globalThis.addEventListener("lostpointercapture", onPointerCancel, true);
+    return () => {
+      globalThis.removeEventListener("pointerup", onPointerUp, true);
+      globalThis.removeEventListener("pointercancel", onPointerCancel, true);
+      globalThis.removeEventListener("lostpointercapture", onPointerCancel, true);
+      cancelLiquifyPointerSession();
+    };
+  }, [cancelLiquifyPointerSession]);
   const [pixelCombine, setPixelCombine] = useState<SelectionCombineMode>("add");
   const [pixelBusy, setPixelBusy] = useState(false);
   // 브러시 선택 반경(캔버스 표시 px) — 드래그 시작 시 요소 폭으로 나눠 정규화 반경으로 넘긴다.
@@ -9832,6 +9680,7 @@ function StudioCuttoonEditor() {
   // 선택 요소가 바뀌면 픽셀 선택·진행 중 드래그·busy 를 해제한다(선택 영역은 이미지 1개 귀속).
   useEffect(() => {
     void selectedId; // 값 자체는 안 쓰지만 "바뀌면 초기화"를 위해 의존성으로 구독한다.
+    cancelLiquifyPointerSession();
     pixelDragRef.current = null;
     pendingPixelDragRef.current = null;
     if (pixelDragRafRef.current !== null) {
@@ -9843,7 +9692,7 @@ function StudioCuttoonEditor() {
     setPixelSel(null);
     setPixelBusy(false);
     pixelWandRunIdRef.current += 1; // 요소가 바뀌면 진행 중인 매직완드 스캔 결과를 무효화한다.
-  }, [selectedId]);
+  }, [cancelLiquifyPointerSession, selectedId]);
   useEffect(() => {
     saveStudioAdvancedFillSettings(studioAdvancedFillStorage(), advancedFillSettings);
   }, [advancedFillSettings]);
@@ -10222,6 +10071,32 @@ function StudioCuttoonEditor() {
   const colorWheelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [userGuides, setUserGuides] = useState<{ id: string; type: "v" | "h"; pos: number }[]>([]);
   const [isExporting, setIsExporting] = useState<boolean>(false);
+  const viewTransformSuppressed = isExporting || saving || timelapseCapturing;
+  useLayoutEffect(() => {
+    viewTransformSuppressedRef.current = viewTransformSuppressed;
+  }, [viewTransformSuppressed]);
+  useEffect(() => {
+    if (viewTransformSuppressed) setViewTool(null);
+  }, [viewTransformSuppressed]);
+  useLayoutEffect(() => {
+    if (viewTransformSuppressed) return;
+    const snapshot = captureSuppressedViewRef.current;
+    const wrap = wrapRef.current;
+    if (!snapshot || !wrap) return;
+    const restored = planStudioViewRestore({
+      snapshot,
+      pageId: activePage.id,
+      viewportWidth: wrap.clientWidth,
+      viewportHeight: wrap.clientHeight,
+      canvasWidth: CANVAS_W,
+      canvasHeight: canvasH,
+    });
+    if (!restored) return;
+    captureSuppressedViewRef.current = null;
+    wrap.scrollLeft = restored.scrollLeft;
+    wrap.scrollTop = restored.scrollTop;
+    updateScrollPosRef.current();
+  }, [activePage.id, canvasH, viewTransformSuppressed]);
   const mutationScopeKey = JSON.stringify([studioAuthUserId, workId]);
   useLayoutEffect(() => {
     if (previousMutationScopeRef.current === mutationScopeKey) return;
@@ -11056,7 +10931,7 @@ function StudioCuttoonEditor() {
   // 픽셀 선택 도구가 실제로 무장된 상태(이미지 요소 선택 + 도구 on).
   // 무장 중엔 캔버스 드래그를 픽셀 선택으로 가로채므로 요소 드래그/클릭 선택 전환을 함께 잠근다.
   const pixelToolArmed =
-    pixelTool !== null && selected?.type === "image" && !selectedContentMutationLocked;
+    pixelTool !== null && !pixelBusy && selected?.type === "image" && !selectedContentMutationLocked;
   // 마칭앤츠 오버레이용 프레임/선택 — 이미지 요소가 아닐 땐 null(오버레이 미마운트).
   const pixelOverlayFrame: SelectionFrame | null =
     selected?.type === "image"
@@ -11106,7 +10981,12 @@ function StudioCuttoonEditor() {
     [bubbleShapeArmed, selected, bubbleShapeDraft]
   );
   const smudgeArmed =
-    smudgeActive && selected?.type === "image" && !selectedContentMutationLocked;
+    smudgeActive && !smudgeBusy && selected?.type === "image" && !selectedContentMutationLocked;
+  const liquifyArmed =
+    liquifyActive && !liquifyBusy && selected?.type === "image" && !selectedContentMutationLocked;
+  useEffect(() => {
+    if (!liquifyArmed) cancelLiquifyPointerSession();
+  }, [cancelLiquifyPointerSession, liquifyArmed]);
   const healCloneArmed =
     healCloneTool !== null && selected?.type === "image" && !selectedContentMutationLocked;
   const layerMaskPaintArmed =
@@ -11252,6 +11132,7 @@ function StudioCuttoonEditor() {
           comments?: unknown;
           releaseSchedule?: unknown;
           publicationAnalytics?: unknown;
+          referenceBoard?: unknown;
           publishPack?: unknown;
         };
         const normalizedPublicationAnalytics = remixId
@@ -11331,6 +11212,11 @@ function StudioCuttoonEditor() {
             : normalizeStudioReleaseSchedule(doc?.releaseSchedule)
         );
         setPublicationAnalyticsState(normalizedPublicationAnalytics);
+        setReferenceBoardState(
+          remixId
+            ? createDefaultStudioReferenceBoardDocument()
+            : normalizeStudioReferenceBoardDocument(hydratedProject.referenceBoard)
+        );
         if (doc?.webtoonTheme) setWebtoonThemeState(doc.webtoonTheme);
         if (doc?.panelGutter) setPanelGutterState(doc.panelGutter);
         const publishPack = normalizeStudioPublishPackSettings(doc?.publishPack);
@@ -13014,6 +12900,7 @@ function StudioCuttoonEditor() {
   // 된다 — 개별 상호배제 누락이 이 세션에서 실제 버그로 여러 번 재발했다(예: eyedropper/
   // bubbleAnchorPick/quickShape 토글이 다른 armed 도구를 안 껐고, pixelTool도 crop을 안 껐음).
   function disarmAllPixelTools() {
+    cancelLiquifyPointerSession();
     advancedFillRunIdRef.current += 1;
     advancedFillAbortRef.current?.abort();
     advancedFillAbortRef.current = null;
@@ -13026,6 +12913,7 @@ function StudioCuttoonEditor() {
     setAdvancedFillStatus(null);
     setCropRect(null);
     setPixelTool(null);
+    setPixelForceCircle(false);
     clearPolyLassoDraft();
     setPanelSplitActive(false);
     setNodeEditTool(null);
@@ -13094,39 +12982,202 @@ function StudioCuttoonEditor() {
     setBubbleAnchorPickActive(false);
     patchEl(selected.id, { tailAnchorId: undefined, tailAnchorPoint: undefined } as Partial<El>);
   }
-  // 원근자 — 소실점은 undo/redo(commit) 대상이 아니다(가이드 도구 상태, 그리기 결과물이 아님).
+  function currentStudioDrawingAssistDocument(): {
+    document: StudioDrawingAssistDocument;
+    persistedDocument: StudioDrawingAssistDocument;
+    page: PageState;
+    pages: PageState[];
+  } | null {
+    const history = pagesHistoryRef.current;
+    const historyIndex = Math.max(0, Math.min(pagesHiRef.current, Math.max(0, history.length - 1)));
+    const currentPages = history[historyIndex] ?? pages;
+    const page = currentPages.find((candidate) => candidate.id === currentPageIdRef.current);
+    if (!page) return null;
+    const normalized = normalizeStudioDrawingAssistDocument(page.drawingAssist, {
+      canvasWidth: CANVAS_W,
+      canvasHeight: page.canvasH,
+    });
+    const defaulted = page.drawingAssist === undefined
+      && appSettingsRef.current.grids.showIsometricOnDraw
+      ? { ...normalized, isometric: { ...normalized.isometric, active: true } }
+      : normalized;
+    const preview = drawingAssistPreviewRef.current;
+    return {
+      document: preview?.pageId === page.id && preview.source === page.drawingAssist
+        ? preview.document
+        : defaulted,
+      persistedDocument: defaulted,
+      page,
+      pages: currentPages,
+    };
+  }
+
+  function previewStudioDrawingAssistDocument(
+    update: (current: StudioDrawingAssistDocument) => StudioDrawingAssistDocument
+  ): void {
+    if (
+      masterEditMode
+      || activeSurfaceReviewLocked
+      || saving
+      || sourceHydrationPending
+      || collaborationDocumentUnavailable
+    ) {
+      setDrawingAssistPreview(null);
+      return;
+    }
+    const current = currentStudioDrawingAssistDocument();
+    if (!current) return;
+    const next = normalizeStudioDrawingAssistDocument(update(current.document), {
+      canvasWidth: CANVAS_W,
+      canvasHeight: current.page.canvasH,
+    });
+    setDrawingAssistPreview({
+      pageId: current.page.id,
+      source: current.page.drawingAssist,
+      document: next,
+    });
+  }
+
+  function commitStudioDrawingAssistDocument(
+    update: (current: StudioDrawingAssistDocument) => StudioDrawingAssistDocument
+  ): boolean {
+    if (masterEditMode) return false;
+    const current = currentStudioDrawingAssistDocument();
+    if (!current) return false;
+    const next = normalizeStudioDrawingAssistDocument(update(current.document), {
+      canvasWidth: CANVAS_W,
+      canvasHeight: current.page.canvasH,
+    });
+    if (areStudioDrawingAssistDocumentsEqual(current.persistedDocument, next)) {
+      setDrawingAssistPreview(null);
+      return true;
+    }
+    const committed = commitPages(current.pages.map((page) =>
+      page.id === current.page.id ? { ...page, drawingAssist: next } : page
+    ));
+    setDrawingAssistPreview(null);
+    return committed;
+  }
+
+  function setPerspectiveRulerActive(
+    action: boolean | ((current: boolean) => boolean)
+  ): void {
+    commitStudioDrawingAssistDocument((current) => {
+      const active = typeof action === "function" ? action(current.perspective.active) : action;
+      return {
+        ...current,
+        perspective: { ...current.perspective, active },
+        isometric: active ? { ...current.isometric, active: false } : current.isometric,
+      };
+    });
+  }
+
+  function setIsometricGridActive(
+    action: boolean | ((current: boolean) => boolean)
+  ): void {
+    commitStudioDrawingAssistDocument((current) => {
+      const active = typeof action === "function" ? action(current.isometric.active) : action;
+      return {
+        ...current,
+        perspective: active ? { ...current.perspective, active: false } : current.perspective,
+        isometric: { ...current.isometric, active },
+      };
+    });
+  }
+
+  // 원근자·아이소메트릭 설정은 페이지 문서에 포함되어 저장/undo/협업에서 같은 상태를 본다.
   function addVanishingPointHandler() {
-    setVanishingPoints((prev) => {
-      const pos = defaultVanishingPointPosition(prev, CANVAS_W, canvasH);
-      return addVanishingPoint(prev, { id: uid(), x: pos.x, y: pos.y });
+    commitStudioDrawingAssistDocument((current) => {
+      const pos = defaultVanishingPointPosition(current.perspective.points, CANVAS_W, canvasH);
+      return {
+        ...current,
+        perspective: {
+          ...current.perspective,
+          points: addVanishingPoint(
+            current.perspective.points,
+            { id: uid(), x: pos.x, y: pos.y }
+          ),
+        },
+      };
     });
   }
   function removeVanishingPointHandler(id: string) {
-    setVanishingPoints((prev) => removeVanishingPoint(prev, id));
+    commitStudioDrawingAssistDocument((current) => ({
+      ...current,
+      perspective: {
+        ...current.perspective,
+        points: removeVanishingPoint(current.perspective.points, id),
+      },
+    }));
   }
   function moveVanishingPointById(id: string, x: number, y: number) {
-    setVanishingPoints((prev) => moveVanishingPoint(prev, id, x, y));
+    commitStudioDrawingAssistDocument((current) => ({
+      ...current,
+      perspective: {
+        ...current.perspective,
+        points: moveVanishingPoint(current.perspective.points, id, x, y),
+      },
+    }));
   }
-  // 아이소메트릭 그리드 — 원근자와 마찬가지로 undo/redo 대상 아님(가이드 도구 상태).
+  function previewVanishingPointById(id: string, x: number, y: number) {
+    previewStudioDrawingAssistDocument((current) => ({
+      ...current,
+      perspective: {
+        ...current.perspective,
+        points: moveVanishingPoint(current.perspective.points, id, x, y),
+      },
+    }));
+  }
   // 원근자와 동시에 켜지면 펜/직선 스냅이 어느 쪽을 따를지 모호해지므로 상호 배타적으로 만든다
   // (한쪽을 켜면 다른 쪽을 끈다).
   function toggleIsometricGridActive() {
-    setIsometricGridActive((v) => {
-      const next = !v;
-      if (next) setPerspectiveRulerActive(false);
-      return next;
-    });
+    setIsometricGridActive((active) => !active);
   }
   function setIsometricAngleDegClamped(next: number) {
-    setIsometricAngleDeg(clampIsometricAngleDeg(next));
+    commitStudioDrawingAssistDocument((current) => ({
+      ...current,
+      isometric: { ...current.isometric, angleDeg: clampIsometricAngleDeg(next) },
+    }));
+  }
+  function previewIsometricAngleDegClamped(next: number) {
+    previewStudioDrawingAssistDocument((current) => ({
+      ...current,
+      isometric: { ...current.isometric, angleDeg: clampIsometricAngleDeg(next) },
+    }));
   }
   function setIsometricCellSizeClamped(next: number) {
-    setIsometricCellSize(clampIsometricCellSize(next));
+    commitStudioDrawingAssistDocument((current) => ({
+      ...current,
+      isometric: { ...current.isometric, cellSize: clampIsometricCellSize(next) },
+    }));
+  }
+  function previewIsometricCellSizeClamped(next: number) {
+    previewStudioDrawingAssistDocument((current) => ({
+      ...current,
+      isometric: { ...current.isometric, cellSize: clampIsometricCellSize(next) },
+    }));
+  }
+  function previewIsometricOrigin(x: number, y: number) {
+    previewStudioDrawingAssistDocument((current) => ({
+      ...current,
+      isometric: { ...current.isometric, originX: x, originY: y },
+    }));
+  }
+  function commitIsometricOrigin(x: number, y: number) {
+    commitStudioDrawingAssistDocument((current) => ({
+      ...current,
+      isometric: { ...current.isometric, originX: x, originY: y },
+    }));
+  }
+  function cancelStudioDrawingAssistPreview() {
+    setDrawingAssistPreview(null);
   }
   function resetIsometricOrigin() {
     const origin = defaultIsometricOrigin(CANVAS_W, canvasH);
-    setIsometricOriginX(origin.x);
-    setIsometricOriginY(origin.y);
+    commitStudioDrawingAssistDocument((current) => ({
+      ...current,
+      isometric: { ...current.isometric, originX: origin.x, originY: origin.y },
+    }));
   }
 
   // patchEl과 동일하지만 commitCoalesced를 써서 연속 호출을 undo 1스텝으로 합친다(프레임 탐색 전용).
@@ -13134,6 +13185,37 @@ function StudioCuttoonEditor() {
     const target = elementById.get(id);
     if (target && isEffectivelyLocked(target, groups) && !isLayerMetadataPatch(patch)) return;
     commitCoalesced(elements.map((e) => (e.id === id ? ({ ...e, ...patch } as El) : e)), key);
+  }
+
+  /**
+   * 보기 전용 반전·회전은 캡처 픽셀에 굽지 않는다. Konva Stage의 루트 변환을 동기적으로
+   * 문서 좌표계로 되돌려 읽은 뒤, 사용자가 보고 있던 정확한 레이아웃을 즉시 복원한다.
+   */
+  function readStageInDocumentView<T>(stage: Konva.Stage, read: () => T): T {
+    const previous = {
+      width: stage.width(),
+      height: stage.height(),
+      x: stage.x(),
+      y: stage.y(),
+      rotation: stage.rotation(),
+      scaleX: stage.scaleX(),
+      scaleY: stage.scaleY(),
+    };
+
+    try {
+      stage.size({ width: CANVAS_W * effScale, height: canvasH * effScale });
+      stage.position({ x: 0, y: 0 });
+      stage.rotation(0);
+      stage.scale({ x: effScale, y: effScale });
+      stage.draw();
+      return read();
+    } finally {
+      stage.size({ width: previous.width, height: previous.height });
+      stage.position({ x: previous.x, y: previous.y });
+      stage.rotation(previous.rotation);
+      stage.scale({ x: previous.scaleX, y: previous.scaleY });
+      stage.draw();
+    }
   }
   // 브랜드 킷 — 제목/본문 글꼴을 현재 선택된 텍스트/말풍선 요소에 적용.
   // selected가 없거나 text/bubble이 아니면 아무 것도 하지 않는다(패널의 canApplyFont로 사전 방지되지만 방어적으로 재확인).
@@ -13171,17 +13253,17 @@ function StudioCuttoonEditor() {
     setSelectedId(null); // Transformer 핸들 캡처 방지(handleSave와 동일 관행)
     await new Promise((r) => setTimeout(r, 60)); // 재렌더 대기(handleSave와 동일 관행)
     if (!canApplyStudioMutation(mutationTicket)) return;
-    const src = readStudioAuthoritativeStageFrame({
+    const src = readStageInDocumentView(stage, () => readStudioAuthoritativeStageFrame({
       revokeRasterHandoff: () => revokeStudioRasterHandoffRef.current(),
       drawStage: () => stage.draw(),
       read: () => stage.toDataURL({
-        x: el.x,
-        y: el.y,
-        width: el.width,
-        height: el.height,
+        x: el.x * effScale,
+        y: el.y * effScale,
+        width: el.width * effScale,
+        height: el.height * effScale,
         pixelRatio: 2 / effScale,
       }),
-    });
+    }));
     const newFrameId = uid();
     // 마지막 캡처 이후 새로 추가된 "draw" 타입 요소 중 캡처 bbox와 겹치는 것만 스트로크로 간주해
     // 소거한다(텍스트/말풍선/스티커 등 다른 새 요소는 건드리지 않는다 — flatten은 펜 스크래치만 소비).
@@ -13224,17 +13306,17 @@ function StudioCuttoonEditor() {
     await new Promise((r) => setTimeout(r, 60)); // 재렌더 대기(동일 관행)
     if (!canApplyStudioMutation(mutationTicket)) return;
     const b = elBounds(el);
-    const src = readStudioAuthoritativeStageFrame({
+    const src = readStageInDocumentView(stage, () => readStudioAuthoritativeStageFrame({
       revokeRasterHandoff: () => revokeStudioRasterHandoffRef.current(),
       drawStage: () => stage.draw(),
       read: () => stage.toDataURL({
-        x: b.x,
-        y: b.y,
-        width: b.w,
-        height: b.h,
+        x: b.x * effScale,
+        y: b.y * effScale,
+        width: b.w * effScale,
+        height: b.h * effScale,
         pixelRatio: 2 / effScale,
       }),
-    });
+    }));
     updateActivePage({ animTimeline: setKeyframe(animTimeline, trackId, frameIndex, { id: uid(), src }) });
   }
   function addEl(el: El) {
@@ -13629,7 +13711,8 @@ function StudioCuttoonEditor() {
     width: number,
     height: number,
     aiProvenance?: StudioPublishAiProvenance,
-    isAnimatedGif = false
+    isAnimatedGif = false,
+    elementPatch?: Partial<ImageEl> & { name?: string }
   ) {
     setError(null);
     const element = createCanvasImageElement({
@@ -13644,6 +13727,7 @@ function StudioCuttoonEditor() {
       ...element,
       ...(aiProvenance ? { aiProvenance } : {}),
       ...(isAnimatedGif ? { isAnimatedGif: true } : {}),
+      ...elementPatch,
     });
   }
   function applyBg3dRenderedImage(
@@ -14403,9 +14487,10 @@ function StudioCuttoonEditor() {
     setPagesHi(nextIndex);
   };
   function fitCanvasToWidth() {
+    if (viewTransformSuppressed) return;
     const wrap = wrapRef.current;
     const maximumScale = isFullscreen || maximized || mobileImmersive || canvasOnlyMode ? 4 : 2.5;
-    if (wrap) setScale(fitStudioViewToWidth(wrap.clientWidth, CANVAS_W, maximumScale));
+    if (wrap) setScale(fitStudioViewToWidth(wrap.clientWidth, studioViewDocumentWidth, maximumScale));
     setZoom(1);
   }
   function executeQuickAction(action: StudioQuickActionId) {
@@ -14460,6 +14545,10 @@ function StudioCuttoonEditor() {
       moved: boolean;
     } | null = null;
     const onTouchStart = (event: TouchEvent) => {
+      if (isStudioViewToolsHudEventTarget(event.target)) {
+        candidate = null;
+        return;
+      }
       if (event.touches.length !== 2 && event.touches.length !== 3) {
         candidate = null;
         return;
@@ -14533,7 +14622,28 @@ function StudioCuttoonEditor() {
   // 화면 리셋 — 줌·너비맞춤 스케일·좌우 반전(뷰 전용, 문서 데이터 아님)을 기본값으로,
   // 스크롤 위치도 좌상단으로 되돌린다. "100%"/"맞춤" 버튼은 줌만 건드리고 반전·스크롤은
   // 그대로 둬서, 확대·회전한 채로 자리를 잃었을 때 한 번에 돌아올 방법이 없었다.
+  function preserveStudioViewBeforeCapture() {
+    if (viewTransformSuppressed || captureSuppressedViewRef.current) return;
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    captureSuppressedViewRef.current = captureStudioView({
+      pageId: activePage.id,
+      scale,
+      zoom,
+      scrollLeft: wrap.scrollLeft,
+      scrollTop: wrap.scrollTop,
+      viewportWidth: wrap.clientWidth,
+      viewportHeight: wrap.clientHeight,
+      canvasWidth: CANVAS_W,
+      canvasHeight: canvasH,
+      canvasFlipH,
+      canvasRotation,
+    });
+    viewTransformSuppressedRef.current = true;
+  }
+
   function resetView() {
+    if (viewTransformSuppressed) return;
     const wrap = wrapRef.current;
     if (wrap) {
       const maximumScale = isFullscreen || maximized || mobileImmersive || canvasOnlyMode ? 4 : 2.5;
@@ -14543,20 +14653,61 @@ function StudioCuttoonEditor() {
     }
     setZoom(1);
     setCanvasFlipH(false);
+    pendingCanvasRotationScrollRef.current = null;
+    setCanvasRotation(0);
   }
 
   function setActualPixelView() {
+    if (viewTransformSuppressed) return;
     // effScale = scale × zoom. 두 값을 1로 맞춰 문서 1px을 CSS 1px로 정확히 표시한다.
     setScale(1);
     setZoom(1);
   }
 
   function toggleHorizontalCanvasView() {
+    if (viewTransformSuppressed) return;
     setCanvasFlipH((current) => {
       const next = !current;
       announceDrawingShortcut(next ? "캔버스 좌우 반전" : "캔버스 반전 해제");
       return next;
     });
+  }
+
+  function setCanvasViewRotationPreservingCenter(next: StudioViewRotation) {
+    if (viewTransformSuppressed) return;
+    if (next === canvasRotation) {
+      pendingCanvasRotationScrollRef.current = null;
+      return;
+    }
+    const wrap = wrapRef.current;
+    pendingCanvasRotationScrollRef.current = wrap
+      ? planStudioViewRotationTransition({
+          documentWidth: CANVAS_W,
+          documentHeight: canvasH,
+          canvasFlipH,
+          canvasRotation,
+          nextCanvasRotation: next,
+          scale: effScale,
+          scrollLeft: wrap.scrollLeft,
+          scrollTop: wrap.scrollTop,
+          viewportWidth: wrap.clientWidth,
+          viewportHeight: wrap.clientHeight,
+        })
+      : null;
+    setCanvasRotation(next);
+  }
+
+  function rotateCanvasView(direction: "left" | "right") {
+    const next = direction === "left"
+      ? rotateStudioViewLeft(canvasRotation)
+      : rotateStudioViewRight(canvasRotation);
+    setCanvasViewRotationPreservingCenter(next);
+    announceDrawingShortcut(`캔버스 ${direction === "left" ? "왼쪽" : "오른쪽"} 회전 · ${next}°`);
+  }
+
+  function resetCanvasViewRotation() {
+    setCanvasViewRotationPreservingCenter(0);
+    announceDrawingShortcut("보기 회전 초기화");
   }
 
   function toggleGrayscaleView() {
@@ -14570,6 +14721,7 @@ function StudioCuttoonEditor() {
   }
 
   function saveCurrentStudioView() {
+    if (viewTransformSuppressed) return;
     const wrap = wrapRef.current;
     if (!wrap) {
       announceDrawingShortcut("현재 보기를 저장할 수 없습니다");
@@ -14583,12 +14735,16 @@ function StudioCuttoonEditor() {
       scrollTop: wrap.scrollTop,
       viewportWidth: wrap.clientWidth,
       viewportHeight: wrap.clientHeight,
+      canvasWidth: CANVAS_W,
+      canvasHeight: canvasH,
       canvasFlipH,
+      canvasRotation,
     }));
     announceDrawingShortcut("현재 보기 저장");
   }
 
   function restoreSavedStudioView() {
+    if (viewTransformSuppressed) return;
     const wrap = wrapRef.current;
     if (!savedStudioView || !wrap) {
       announceDrawingShortcut("저장된 보기가 없습니다");
@@ -14610,6 +14766,7 @@ function StudioCuttoonEditor() {
     setScale(initialPlan.scale);
     setZoom(initialPlan.zoom);
     setCanvasFlipH(initialPlan.canvasFlipH);
+    setCanvasRotation(initialPlan.canvasRotation);
     const restoreScroll = () => {
       const currentWrap = wrapRef.current;
       if (!currentWrap) return;
@@ -14634,20 +14791,24 @@ function StudioCuttoonEditor() {
   }
 
   function togglePerspectiveGuideView() {
-    setPerspectiveRulerActive((current) => {
-      const next = !current;
-      if (next) {
-        setTool("draw");
-        setIsometricGridActive(false);
-        setVanishingPoints((points) => {
-          if (points.length > 0) return points;
-          const position = defaultVanishingPointPosition(points, CANVAS_W, canvasH);
-          return addVanishingPoint(points, { id: uid(), x: position.x, y: position.y });
-        });
+    const current = currentStudioDrawingAssistDocument();
+    if (!current) return;
+    const active = !current.document.perspective.active;
+    const committed = commitStudioDrawingAssistDocument((document) => {
+      let points = document.perspective.points;
+      if (active && points.length === 0) {
+        const position = defaultVanishingPointPosition(points, CANVAS_W, current.page.canvasH);
+        points = addVanishingPoint(points, { id: uid(), x: position.x, y: position.y });
       }
-      announceDrawingShortcut(next ? "원근 도우미 표시" : "원근 도우미 숨김");
-      return next;
+      return {
+        ...document,
+        perspective: { active, points },
+        isometric: active ? { ...document.isometric, active: false } : document.isometric,
+      };
     });
+    if (!committed) return;
+    if (active) setTool("draw");
+    announceDrawingShortcut(active ? "원근 도우미 표시" : "원근 도우미 숨김");
   }
 
   function showAllLocallyHiddenLayers() {
@@ -14698,6 +14859,27 @@ function StudioCuttoonEditor() {
         timelapseCapturing,
       })) return;
       const mod = e.metaKey || e.ctrlKey;
+      if (e.key === "Escape" && viewTool) {
+        e.preventDefault();
+        setViewTool(null);
+        return;
+      }
+      if (
+        e.code === "KeyC"
+        && e.shiftKey
+        && !e.metaKey
+        && !e.ctrlKey
+        && !e.altKey
+        && !e.repeat
+      ) {
+        e.preventDefault();
+        setStudioCommentPinsHidden((hidden) => {
+          const next = !hidden;
+          announceDrawingShortcut(next ? "열린 댓글 핀 숨김" : "열린 댓글 핀 표시");
+          return next;
+        });
+        return;
+      }
       // 앱 설정 → Shortcuts: user-bound chords (tool switchers etc.).
       const sc = appSettingsRef.current.shortcuts;
       if (matchStudioShortcut(sc["tool-select"], e)) {
@@ -14740,8 +14922,7 @@ function StudioCuttoonEditor() {
         }
         return;
       }
-      // 설정 화면(STUDIO_SHORTCUT_ACTIONS)에는 나열돼 있지만 실제 배선이 없던 3개 —
-      // 각 도구의 레일 버튼 onClick과 동일한 상태 전이를 재사용한다(rail 버튼 근처 참고).
+      // 각 설정 가능 단축키는 레일 버튼과 동일한 상태 전이를 재사용한다.
       if (matchStudioShortcut(sc["tool-pixel"], e)) {
         e.preventDefault();
         if (!activeSurfaceReviewLocked) {
@@ -14754,21 +14935,53 @@ function StudioCuttoonEditor() {
       }
       if (matchStudioShortcut(sc["tool-marquee"], e)) {
         e.preventDefault();
-        if (selected?.type === "image" && !selectedContentMutationLocked) {
-          setTool("select");
-          clearPolyLassoDraft();
-          disarmAllPixelTools();
-          setPixelForceCircle(false);
-          setPixelTool((t) => (t === "rect" ? null : "rect"));
-        }
+        togglePixelMarquee("rect");
+        return;
+      }
+      if (matchStudioShortcut(sc["tool-marquee-circle"], e)) {
+        e.preventDefault();
+        togglePixelMarquee("circle");
         return;
       }
       if (matchStudioShortcut(sc["tool-transform"], e)) {
         e.preventDefault();
-        if (selected?.type === "image" && isSelectionUsable(pixelSel)) {
-          setRightPanelOpen(true);
-          announceDrawingShortcut("리터치 패널에서 내용 변형을 적용하세요");
+        openPixelSelectionTransform();
+        return;
+      }
+      if (matchStudioShortcut(sc["tool-crop"], e)) {
+        e.preventDefault();
+        openSelectedLayerCrop();
+        return;
+      }
+      if (matchStudioShortcut(sc["tool-blend"], e)) {
+        e.preventDefault();
+        toggleSmudgeTool();
+        return;
+      }
+      if (matchStudioShortcut(sc["tool-liquify"], e)) {
+        e.preventDefault();
+        toggleLiquifyTool();
+        return;
+      }
+      if (matchStudioShortcut(sc["tool-zoom"], e)) {
+        e.preventDefault();
+        if (!viewTransformSuppressed) {
+          setViewTool((current) => current === "zoom" ? null : "zoom");
+          announceDrawingShortcut("보기 확대·축소 도구");
         }
+        return;
+      }
+      if (matchStudioShortcut(sc["tool-rotate-view"], e)) {
+        e.preventDefault();
+        if (!viewTransformSuppressed) {
+          setViewTool((current) => current === "rotate" ? null : "rotate");
+          announceDrawingShortcut("보기 회전 도구");
+        }
+        return;
+      }
+      if (matchStudioShortcut(sc["flip-canvas"], e)) {
+        e.preventDefault();
+        if (!e.repeat) toggleHorizontalCanvasView();
         return;
       }
       if (matchStudioShortcut(sc["reset-view"], e)) {
@@ -14801,12 +15014,11 @@ function StudioCuttoonEditor() {
       const viewShortcut = resolveStudioViewShortcut(e);
       if (viewShortcut) {
         e.preventDefault();
+        if (viewTransformSuppressed) return;
         if (viewShortcut === "zoom-in") {
           setZoom((current) => stepStudioViewZoom(current, 1));
         } else if (viewShortcut === "zoom-out") {
           setZoom((current) => stepStudioViewZoom(current, -1));
-        } else if (viewShortcut === "flip-horizontal") {
-          toggleHorizontalCanvasView();
         } else if (viewShortcut === "fit-width") {
           fitCanvasToWidth();
           announceDrawingShortcut("화면에 맞게 조정");
@@ -14946,10 +15158,7 @@ function StudioCuttoonEditor() {
             return next;
           });
         } else if (drawingShortcut.type === "toggle-canvas-flip-h") {
-          setCanvasFlipH((v) => {
-            announceDrawingShortcut(v ? "캔버스 반전 해제" : "캔버스 좌우 반전");
-            return !v;
-          });
+          toggleHorizontalCanvasView();
         } else if (drawingShortcut.type === "toggle-size-lock") {
           setProDrawPrefs((prev) => {
             const next = { ...prev, sizeLocked: !prev.sizeLocked };
@@ -15094,7 +15303,7 @@ function StudioCuttoonEditor() {
           setSmudgeActive(false);
         } else if (liquifyActive) {
           setLiquifyActive(false);
-          liquifyDragRef.current = null;
+          cancelLiquifyPointerSession();
         } else if (layerMaskPaintActive) {
           setLayerMaskPaintActive(false);
           layerMaskDragRef.current = null;
@@ -16644,17 +16853,17 @@ function StudioCuttoonEditor() {
     const bounds = elBounds(el);
     setSelectedId(null);
     await new Promise((r) => setTimeout(r, 60));
-    const src = readStudioAuthoritativeStageFrame({
+    const src = readStageInDocumentView(stage, () => readStudioAuthoritativeStageFrame({
       revokeRasterHandoff: () => revokeStudioRasterHandoffRef.current(),
       drawStage: () => stage.draw(),
       read: () => stage.toDataURL({
-        x: bounds.x,
-        y: bounds.y,
-        width: bounds.w,
-        height: bounds.h,
+        x: bounds.x * effScale,
+        y: bounds.y * effScale,
+        width: bounds.w * effScale,
+        height: bounds.h * effScale,
         pixelRatio: 2 / effScale,
       }),
-    });
+    }));
     const name = globalThis.prompt("틀 이름을 정해주세요", "내 이메레스 틀")?.trim();
     setContextMenu((prev) => ({ ...prev, visible: false }));
     if (!name) return;
@@ -17357,7 +17566,9 @@ function StudioCuttoonEditor() {
       const src = (out as HTMLCanvasElement).toDataURL("image/png");
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (isLatestLayerContentMutationLocked(target.id)) return;
-      patchEl(target.id, { src } as Partial<El>);
+      // 협업 잠금/스냅샷 경합으로 커밋이 거절되면 마퀴만 먼저 움직여 픽셀과
+      // 어긋나서는 안 된다. 픽셀과 마퀴는 한 성공 경로에서만 함께 전진한다.
+      if (!patchEl(target.id, { src } as Partial<El>)) return;
       // 마퀴를 같은 변환으로 따라가게 한다(정규화 좌표 · 요소 종횡비).
       const aspect = target.width > 0 ? target.height / target.width : 1;
       const nextSel = transformSelectionMarquee(sel, {
@@ -17448,7 +17659,8 @@ function StudioCuttoonEditor() {
         devicePts,
         radiusDevice,
         liquifyStrength / 100,
-        createPixelEditCanvas
+        createPixelEditCanvas,
+        { flipX: target.flipped ?? false, flipY: target.flippedY ?? false }
       );
       if (!out) return;
       const src = (out as HTMLCanvasElement).toDataURL("image/png");
@@ -17463,6 +17675,38 @@ function StudioCuttoonEditor() {
       setLiquifyBusy(false);
     }
   }
+
+  function finishLiquifyPointerSession(
+    pointerEvent: PointerEvent,
+    cancelled: boolean,
+    stage: Konva.Stage | null
+  ): boolean {
+    const session = liquifyDragRef.current;
+    if (!session || !isStudioLiquifyPointerOwner(session, pointerEvent)) return false;
+    let releasePoint: SelPoint | undefined;
+    if (!cancelled && stage) {
+      try {
+        stage.setPointersPositions(pointerEvent);
+        const position = stage.getRelativePointerPosition();
+        if (position) {
+          releasePoint = canvasPointToNormalized(position.x, position.y, session.frame);
+        }
+      } catch {
+        // An outside release can race Stage teardown; the accumulated prefix remains usable.
+      }
+    }
+    const outcome = endStudioLiquifyPointerSession(session, pointerEvent, {
+      cancelled,
+      releasePoint,
+    });
+    if (outcome.kind === "ignored") return false;
+    liquifyDragRef.current = null;
+    releaseLiquifyPointerCapture(session);
+    if (outcome.kind === "apply") void applyLiquifyStroke(outcome.elId, outcome.points);
+    return true;
+  }
+  liquifyPointerGlobalEndRef.current = (event, cancelled) =>
+    finishLiquifyPointerSession(event, cancelled, stageRef.current);
 
   async function applySmudgeStroke(elId: string, points: SelPoint[]) {
     if (smudgeBusy) return;
@@ -18080,13 +18324,13 @@ function StudioCuttoonEditor() {
     const stage = stageRef.current;
     if (!stage) return null;
     revokeStudioRasterHandoffRef.current();
-    // react-konva may otherwise leave the restored fallback in its next batch; eyedropper reads now.
-    stage.draw();
-    const canvas = stage.toCanvas({ pixelRatio: 1 / effScale });
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return null;
-    const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    return pickColorFromImageData(data, width, height, pos.x, pos.y);
+    return readStageInDocumentView(stage, () => {
+      const canvas = stage.toCanvas({ pixelRatio: 1 / effScale });
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return null;
+      const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      return pickColorFromImageData(data, width, height, pos.x, pos.y);
+    });
   }
   // QuickShape — 손그림 스트로크가 잠시 멈추면(1단계) 완벽한 도형으로 자동 인식하고, 계속 멈춰
   // 있으면(2단계) 정비율(정사각형/정원 등)로 고정한다. setInterval 콜백은 스트로크 시작 시점의
@@ -18252,7 +18496,9 @@ function StudioCuttoonEditor() {
       // A scheduler/consumer exception must not escape from rAF and poison the editor event loop.
       // Fall back to direct samples for the remainder of this stroke.
       onError: () => {
+        drawingImmediateCausalInputRef.current = true;
         drawingFixedRateFilterRef.current = null;
+        drawingStabilizerRef.current = null;
         drawingFixedRatePumpClockRef.current = null;
         drawingFixedRateSampleClockRef.current = null;
       },
@@ -18305,6 +18551,7 @@ function StudioCuttoonEditor() {
     drawingFixedRateSampleClockRef.current = null;
     drawingLastAuthoritativePointerRef.current = null;
     drawingVelocityRef.current = null;
+    drawingInputSettingsRef.current = null;
   }
   function discardDrawingPointerSession() {
     const discardedId = drawingRef.current?.id;
@@ -18473,9 +18720,17 @@ function StudioCuttoonEditor() {
     }
   }
   function onStageDown(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
-    if (e.target.name() === "symmetry-handle" || e.target.name() === "guide-line-handle" || e.target.name() === "vp-handle") {
+    if (
+      e.target.name() === "symmetry-handle"
+      || e.target.name() === "guide-line-handle"
+      || e.target.name() === "vp-handle"
+      || e.target.name() === "isometric-origin-handle"
+    ) {
       return;
     }
+    const stagePointerEvent = e.evt as PointerEvent;
+    // One contact owns a liquify gesture. A second finger is ignored and cannot cancel or replace it.
+    if (liquifyDragRef.current) return;
     // Figma식 자유 위치 댓글 핀: 무장 상태의 첫 캔버스 클릭이 point 앵커를 확정하고 소비된다.
     if (commentPinArmed) {
       const pos = e.target.getStage()?.getRelativePointerPosition();
@@ -18697,13 +18952,13 @@ function StudioCuttoonEditor() {
     }
     // 리퀴파이 — 이미지를 드래그하면 픽셀을 밀어 왜곡한다.
     if (
-      liquifyActive &&
-      !liquifyBusy &&
+      liquifyArmed &&
       selected?.type === "image" &&
       !isSpacePressed &&
       tool !== "hand" &&
       !(e.target.getParent() instanceof KonvaRuntime.Transformer)
     ) {
+      if (stagePointerEvent.isPrimary === false) return;
       const pos = e.target.getStage()?.getRelativePointerPosition();
       if (!pos) return;
       const frame: SelectionFrame = {
@@ -18713,11 +18968,23 @@ function StudioCuttoonEditor() {
         height: selected.height,
         rotation: selected.rotation,
       };
-      liquifyDragRef.current = {
+      const session = beginStudioLiquifyPointerSession({
         elId: selected.id,
         frame,
-        points: [canvasPointToNormalized(pos.x, pos.y, frame)],
-      };
+        point: canvasPointToNormalized(pos.x, pos.y, frame),
+        pointer: stagePointerEvent,
+      });
+      if (!session) return;
+      liquifyDragRef.current = session;
+      const captureTarget = stagePointerEvent.target instanceof Element
+        ? stagePointerEvent.target
+        : e.target.getStage()?.container() ?? null;
+      liquifyCaptureTargetRef.current = captureTarget;
+      try {
+        captureTarget?.setPointerCapture(session.pointerId);
+      } catch {
+        // Global capture-phase pointerup remains the safety net on browsers without capture.
+      }
       return;
     }
     // 레이어 마스크 브러시 무장 중: 스테이지 드래그를 마스크 스트로크 좌표 누적으로 가로챈다.
@@ -18835,7 +19102,7 @@ function StudioCuttoonEditor() {
     // 드로잉보다 우선). 트랜스포머 앵커는 예외(선택이 정규화 좌표라 리사이즈/회전을 따라간다),
     // Space/Hand 팬도 예외. 시작점은 이미지 밖이어도 된다(rect/ellipse 는 0..1 로 클램프).
     if (
-      pixelTool &&
+      pixelToolArmed &&
       selected?.type === "image" &&
       !isSpacePressed &&
       tool !== "hand" &&
@@ -18938,6 +19205,24 @@ function StudioCuttoonEditor() {
         endLiveResourceEdit();
         return;
       }
+      // One pointer contact owns one immutable input contract. Toolbar shortcuts can re-render
+      // while a pen is still down; those new preferences apply to the next stroke, never halfway
+      // through the current filter/pressure/post-correction pipeline.
+      drawingInputSettingsRef.current = {
+        version: 1,
+        stabilizer,
+        stabilizerMode,
+        postCorrection,
+        preserveCorners,
+        pressureCurve,
+        useVelocityPressure,
+        velocitySensitivity,
+        coordinateScale: effScale,
+        perspectiveActive: perspectiveRulerActive,
+        vanishingPoints: vanishingPoints.map((point) => ({ ...point })),
+        isometricActive: isometricGridActive,
+        isometricAngleDeg,
+      };
       setSelectedId(null);
 
       const fixedRateBrushFamily = resolveStudioBrushRenderFamily(brush);
@@ -19578,12 +19863,17 @@ function StudioCuttoonEditor() {
       return;
     }
     if (liquifyDragRef.current) {
+      const pointerEvent = e.evt as PointerEvent;
+      if (!isStudioLiquifyPointerOwner(liquifyDragRef.current, pointerEvent)) return;
       const pos = e.target.getStage()?.getRelativePointerPosition();
       if (pos) {
         const session = liquifyDragRef.current;
         const next = canvasPointToNormalized(pos.x, pos.y, session.frame);
-        const last = session.points[session.points.length - 1];
-        if (!last || Math.hypot(next.x - last.x, next.y - last.y) >= 0.002) session.points.push(next);
+        liquifyDragRef.current = appendStudioLiquifyPointerPoint(
+          session,
+          pointerEvent,
+          next
+        );
       }
       return;
     }
@@ -19648,7 +19938,7 @@ function StudioCuttoonEditor() {
     // 동시에 성립 가능), 셋 다 조건이 참일 수 있는 경우를 else if 로 묶어 한 프레임에 커서 하나만
     // (그리고 batchDraw 한 번만) 갱신되게 한다 — onStageDown 의 armed 우선순위(smudge/healClone이
     // draw 브러시보다 우선)와 동일 순서.
-    if (smudgeArmed) {
+    if (smudgeArmed || liquifyArmed) {
       const cursorPos = e.target.getStage()?.getRelativePointerPosition();
       const cursorNode = smudgeCursorRef.current;
       if (cursorPos && cursorNode) {
@@ -19858,6 +20148,7 @@ function StudioCuttoonEditor() {
   ) {
     const current = drawingRef.current;
     if (!current) return;
+    const inputSettings = drawingInputSettingsRef.current;
     const rawLastX = current.points[current.points.length - 2] ?? pos.x;
     const rawLastY = current.points[current.points.length - 1] ?? pos.y;
     const sampleTimeStamp = typeof canonicalTimeStamp === "number" && Number.isFinite(canonicalTimeStamp)
@@ -19878,9 +20169,9 @@ function StudioCuttoonEditor() {
           rawPressure: pointerSample.pressure,
           distance: velocitySample.distance,
           elapsedMs: velocitySample.elapsedMs,
-          velocityFallbackEnabled: useVelocityPressure,
-          velocitySensitivity,
-          pressureCurve,
+          velocityFallbackEnabled: inputSettings?.useVelocityPressure ?? useVelocityPressure,
+          velocitySensitivity: inputSettings?.velocitySensitivity ?? velocitySensitivity,
+          pressureCurve: inputSettings?.pressureCurve ?? pressureCurve,
           fallbackPressure: current.pressureModel ? 1 : 0.5,
         });
     let targetX = pos.x;
@@ -19893,7 +20184,7 @@ function StudioCuttoonEditor() {
       const quantized = quantizeFixedRateStrokeSample({
         x: targetX,
         y: targetY,
-        positionScale: effScale,
+        positionScale: inputSettings?.coordinateScale ?? effScale,
         pressure,
         tiltX: stylus.tiltX,
         tiltY: stylus.tiltY,
@@ -19948,20 +20239,31 @@ function StudioCuttoonEditor() {
       if (!drawingPredictionPreviewRef.current) scheduleDraft(nextShift);
       return;
     }
-    if (perspectiveRulerActive && current.mode !== "eraser" && vanishingPoints.length > 0) {
+    const strokeVanishingPoints = inputSettings?.vanishingPoints ?? vanishingPoints;
+    if (
+      (inputSettings?.perspectiveActive ?? perspectiveRulerActive)
+      && current.mode !== "eraser"
+      && strokeVanishingPoints.length > 0
+    ) {
       // 스트로크 시작점 기준으로 소실점 하나를 골라(가장 가까운 방향) 락을 걸고, 이후 포인트를
       // 그 직선 위로 투영한다. 락은 onStageDown/onStageUp에서 스트로크 경계마다 초기화된다.
       if (!perspectiveRayRef.current) {
         const startX = current.points[0] ?? pos.x;
         const startY = current.points[1] ?? pos.y;
-        perspectiveRayRef.current = resolvePerspectiveRay(vanishingPoints, startX, startY, pos.x, pos.y);
+        perspectiveRayRef.current = resolvePerspectiveRay(strokeVanishingPoints, startX, startY, pos.x, pos.y);
       }
       [targetX, targetY] = snapStrokePointToPerspective(targetX, targetY, perspectiveRayRef.current);
-    } else if (isometricGridActive && current.mode !== "eraser") {
+    } else if ((inputSettings?.isometricActive ?? isometricGridActive) && current.mode !== "eraser") {
       if (!isometricAxisRayRef.current) {
         const startX = current.points[0] ?? pos.x;
         const startY = current.points[1] ?? pos.y;
-        isometricAxisRayRef.current = resolveIsometricAxisRay(isometricAngleDeg, startX, startY, pos.x, pos.y);
+        isometricAxisRayRef.current = resolveIsometricAxisRay(
+          inputSettings?.isometricAngleDeg ?? isometricAngleDeg,
+          startX,
+          startY,
+          pos.x,
+          pos.y
+        );
       }
       [targetX, targetY] = snapStrokePointToIsometricGrid(targetX, targetY, isometricAxisRayRef.current);
     }
@@ -19973,7 +20275,7 @@ function StudioCuttoonEditor() {
         samples: [{
           x: targetX,
           y: targetY,
-          positionScale: effScale,
+          positionScale: inputSettings?.coordinateScale ?? effScale,
           pressure,
           tiltX: stylus.tiltX,
           tiltY: stylus.tiltY,
@@ -19994,7 +20296,11 @@ function StudioCuttoonEditor() {
       const stabilized = stabilizeStudioStrokeSample(
         liveStabilizerState,
         { x: targetX, y: targetY, timeStamp: sampleTimeStamp },
-        { strength: stabilizer, mode: stabilizerMode, coordinateScale: effScale }
+        {
+          strength: inputSettings?.stabilizer ?? stabilizer,
+          mode: inputSettings?.stabilizerMode ?? stabilizerMode,
+          coordinateScale: inputSettings?.coordinateScale ?? effScale,
+        }
       );
       drawingStabilizerRef.current = stabilized.state;
       [targetX, targetY] = stabilized.point;
@@ -20014,7 +20320,8 @@ function StudioCuttoonEditor() {
       nextX: targetX,
       nextY: targetY,
       nextPressure: pressure,
-      minDistance: current.sampleSpacing ?? strokeSampleDistanceForScale(effScale),
+      minDistance: current.sampleSpacing
+        ?? strokeSampleDistanceForScale(inputSettings?.coordinateScale ?? effScale),
       pressureModel: current.pressureModel,
     })) return;
     const capturePointerDynamics = current.mode === "pen" && resolveStudioBrushDynamicsPresetId(current.brush) !== null;
@@ -20476,6 +20783,7 @@ function StudioCuttoonEditor() {
   ) {
     // Idempotent: Stage pointerup and the window safety listener can both observe the same release.
     if (!drawingRef.current && !drawingPointerSessionRef.current) return;
+    const inputSettings = drawingInputSettingsRef.current;
     // No scheduled frame may race the final hardware sample or continue changing released pixels.
     stopFixedRateStrokePump();
     if (
@@ -20526,7 +20834,7 @@ function StudioCuttoonEditor() {
                 pointerType: "pen",
                 rawPressure: pointerEvent.pressure,
                 lastContactPressure: releaseLastContactPressure,
-                pressureCurve,
+                pressureCurve: inputSettings?.pressureCurve ?? pressureCurve,
                 fallbackPressure: releaseLastContactPressure,
               })
             : undefined,
@@ -20564,7 +20872,7 @@ function StudioCuttoonEditor() {
                     rawPressure: pointerEvent.pressure,
                     lastContactPressure: lastPressure,
                     velocityFallbackEnabled: false,
-                    pressureCurve,
+                    pressureCurve: inputSettings?.pressureCurve ?? pressureCurve,
                     fallbackPressure: lastPressure,
                   })
                 : lastPressure;
@@ -20688,14 +20996,18 @@ function StudioCuttoonEditor() {
         // 방향 전환은 그대로 두고 고주파 떨림만 정리한다(점 개수·필압 정렬은 보존).
         if (
           (finished.kind ?? "freehand") === "freehand"
-          && postCorrection > 0
+          && (inputSettings?.postCorrection ?? postCorrection) > 0
           && finished.stampPipeline !== "causal-walker-v2"
           && finished.watercolorPipeline !== "causal-walker-v2"
           && causalPostCorrectionStateRef.current?.phase !== "sealed"
         ) {
           finished = {
             ...finished,
-            points: smoothStrokePoints(finished.points, postCorrection, { preserveCorners }),
+            points: smoothStrokePoints(
+              finished.points,
+              inputSettings?.postCorrection ?? postCorrection,
+              { preserveCorners: inputSettings?.preserveCorners ?? preserveCorners }
+            ),
           };
         }
         // 커밋 지연: 다이렉트 라이브 잉크(증분 오버레이/GPU 파인)는 표면에 그대로 남긴 채
@@ -20935,6 +21247,7 @@ function StudioCuttoonEditor() {
   };
   function onStagePointerCancel(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
     const pointerEvent = e.evt as PointerEvent;
+    if (liquifyHandledNativeEndEventsRef.current.delete(pointerEvent)) return;
     if (drawingHandledNativeEndEventsRef.current.delete(pointerEvent)) return;
     const pointerId = Number.isFinite(pointerEvent.pointerId) ? pointerEvent.pointerId : 1;
     // Drawing owns its matching cancel before any stale tool session can early-return. A foreign
@@ -20954,6 +21267,11 @@ function StudioCuttoonEditor() {
       }
       return;
     }
+    if (liquifyDragRef.current) {
+      if (!isStudioLiquifyPointerOwner(liquifyDragRef.current, pointerEvent)) return;
+      finishLiquifyPointerSession(pointerEvent, true, e.target.getStage());
+      return;
+    }
     const current = advancedFillTapGestureRef.current;
     if (current) {
       const outcome = endStudioAdvancedFillTap(current, pointerId, true);
@@ -20968,6 +21286,7 @@ function StudioCuttoonEditor() {
 
   function onStageUp(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
     const pointerEvent = e.evt as PointerEvent;
+    if (liquifyHandledNativeEndEventsRef.current.delete(pointerEvent)) return;
     if (drawingHandledNativeEndEventsRef.current.delete(pointerEvent)) return;
     const drawingPointerSession = drawingPointerSessionRef.current;
     if (drawingRef.current || drawingPointerSession) {
@@ -20989,6 +21308,11 @@ function StudioCuttoonEditor() {
       // cannot intercept pointerup and leak capture; finishDrawingPointer always cleans up in finally
       // (including QuickShape timer stop after promote snapshot).
       finishDrawingPointer(e.target.getStage(), pointerEvent);
+      return;
+    }
+    if (liquifyDragRef.current) {
+      if (!isStudioLiquifyPointerOwner(liquifyDragRef.current, pointerEvent)) return;
+      finishLiquifyPointerSession(pointerEvent, false, e.target.getStage());
       return;
     }
     stopQuickShapeTracking(); // 드로잉이 아닌 경로 — 잔여 인터벌만 정리.
@@ -21121,12 +21445,6 @@ function StudioCuttoonEditor() {
       const session = smudgeDragRef.current;
       smudgeDragRef.current = null;
       if (session.points.length >= 2) void applySmudgeStroke(session.elId, session.points);
-      return;
-    }
-    if (liquifyDragRef.current) {
-      const session = liquifyDragRef.current;
-      liquifyDragRef.current = null;
-      if (session.points.length >= 2) void applyLiquifyStroke(session.elId, session.points);
       return;
     }
     // 레이어 마스크 브러시 드래그 종료 — 누적된 좌표로 실제 마스크 스트로크를 굽는다.
@@ -21543,6 +21861,7 @@ function StudioCuttoonEditor() {
     if (!markStudioDocumentChanged()) return;
     documentSaveInFlightRef.current = true;
     const saveMutationTicket = captureStudioMutationTicket();
+    preserveStudioViewBeforeCapture();
     setSaving(true);
     setError(null);
     setSharedDocumentNotice(null);
@@ -21550,6 +21869,7 @@ function StudioCuttoonEditor() {
     const originalPageId = currentPageId;
     const originalMasterEditMode = masterEditMode;
     setMasterEditMode(false);
+    preserveStudioViewBeforeCapture();
     setIsExporting(true);
     let authoritativeCrdtServerSequence: string | null = null;
     try {
@@ -21614,6 +21934,7 @@ function StudioCuttoonEditor() {
           comments: studioComments,
           releaseSchedule,
           publicationAnalytics,
+          referenceBoard,
           currentPageId,
           webtoonTheme,
           panelGutter,
@@ -21888,6 +22209,45 @@ function StudioCuttoonEditor() {
     setRightPanelOpen(true);
     announceDrawingShortcut("레이어 자르기");
   }
+  function togglePixelMarquee(kind: "rect" | "circle") {
+    if (selected?.type !== "image" || selectedContentMutationLocked) return;
+    const isActive = kind === "circle"
+      ? pixelTool === "ellipse" && pixelForceCircle
+      : pixelTool === "rect" && !pixelForceCircle;
+    setTool("select");
+    setMenu(null);
+    clearPolyLassoDraft();
+    disarmAllPixelTools();
+    if (isActive) return;
+    setPixelForceCircle(kind === "circle");
+    setPixelTool(kind === "circle" ? "ellipse" : "rect");
+  }
+  function toggleSmudgeTool() {
+    if (selected?.type !== "image" || selectedContentMutationLocked || smudgeBusy) return;
+    const next = !smudgeActive;
+    disarmAllPixelTools();
+    if (next) {
+      setTool("select");
+      setSmudgeActive(true);
+      announceDrawingShortcut("혼합(스머지) · 이미지 위를 드래그하세요");
+    }
+  }
+  function toggleLiquifyTool() {
+    if (selected?.type !== "image" || selectedContentMutationLocked || liquifyBusy) return;
+    const next = !liquifyActive;
+    disarmAllPixelTools();
+    if (next) {
+      setTool("select");
+      setLiquifyActive(true);
+      announceDrawingShortcut("리퀴파이 · 이미지 위를 밀어 보세요");
+    }
+  }
+  function openPixelSelectionTransform() {
+    if (selected?.type !== "image" || !isSelectionUsable(pixelSel)) return;
+    openInspectorRoute({ primary: "properties", image: "retouch" });
+    setRightPanelOpen(true);
+    announceDrawingShortcut("리터치 패널에서 내용 변형을 적용하세요");
+  }
   function openImagePastePicker() {
     editMenuImageInputRef.current?.click();
   }
@@ -21944,6 +22304,8 @@ function StudioCuttoonEditor() {
     reorder,
     removeSelected,
     restoreSavedStudioView,
+    rotateCanvasView,
+    resetCanvasViewRotation,
     saveCurrentStudioView,
     selectAllForEdit,
     setActualPixelView,
@@ -22314,6 +22676,7 @@ function StudioCuttoonEditor() {
           label: "확대",
           icon: Plus,
           shortcut: "=",
+          disabled: viewTransformSuppressed,
           onSelect: () => setZoom((current) => stepStudioViewZoom(current, 1)),
         },
         {
@@ -22321,6 +22684,7 @@ function StudioCuttoonEditor() {
           label: "축소",
           icon: Minus,
           shortcut: "-",
+          disabled: viewTransformSuppressed,
           onSelect: () => setZoom((current) => stepStudioViewZoom(current, -1)),
         },
         {
@@ -22329,13 +22693,37 @@ function StudioCuttoonEditor() {
           icon: FlipHorizontal2,
           shortcut: "H",
           checked: canvasFlipH,
+          disabled: viewTransformSuppressed,
           onSelect: () => studioMainMenuActions.toggleHorizontalCanvasView(),
+        },
+        {
+          id: "rotate-left",
+          label: "왼쪽으로 90° 회전",
+          icon: RotateCcw,
+          disabled: viewTransformSuppressed,
+          onSelect: () => studioMainMenuActions.rotateCanvasView("left"),
+        },
+        {
+          id: "rotate-right",
+          label: "오른쪽으로 90° 회전",
+          icon: RotateCw,
+          disabled: viewTransformSuppressed,
+          onSelect: () => studioMainMenuActions.rotateCanvasView("right"),
+        },
+        {
+          id: "reset-rotation",
+          label: `보기 회전 초기화 (${canvasRotation}°)`,
+          icon: HistoryIcon,
+          disabled: viewTransformSuppressed || canvasRotation === 0,
+          separatorAfter: true,
+          onSelect: () => studioMainMenuActions.resetCanvasViewRotation(),
         },
         {
           id: "fit",
           label: "화면에 맞게 조정",
           icon: ScanLine,
           shortcut: "Home",
+          disabled: viewTransformSuppressed,
           onSelect: () => studioMainMenuActions.fitCanvasToWidth(),
         },
         {
@@ -22343,6 +22731,7 @@ function StudioCuttoonEditor() {
           label: "실제 픽셀 (100%)",
           icon: Maximize2,
           shortcut: "End",
+          disabled: viewTransformSuppressed,
           onSelect: () => studioMainMenuActions.setActualPixelView(),
           separatorAfter: true,
         },
@@ -22352,6 +22741,7 @@ function StudioCuttoonEditor() {
           icon: isFullscreen ? Minimize2 : Maximize2,
           shortcut: "F11",
           checked: isFullscreen,
+          disabled: viewTransformSuppressed,
           onSelect: () => studioMainMenuActions.toggleFullscreen(),
         },
         {
@@ -22360,6 +22750,7 @@ function StudioCuttoonEditor() {
           icon: Palette,
           shortcut: "Q",
           checked: colorBlindPreview === "grayscale",
+          disabled: viewTransformSuppressed,
           onSelect: () => studioMainMenuActions.toggleGrayscaleView(),
         },
         {
@@ -22374,10 +22765,19 @@ function StudioCuttoonEditor() {
           separatorAfter: true,
         },
         {
+          id: "page-sequence",
+          label: pageSequenceOpen ? "페이지 시퀀스 닫기" : "페이지 시퀀스 열기",
+          icon: Clapperboard,
+          checked: pageSequenceOpen,
+          onSelect: () => setPageSequenceOpen((current) => !current),
+          separatorAfter: true,
+        },
+        {
           id: "save-current-view",
           label: "현재 보기 저장",
           icon: Bookmark,
           shortcut: "⇧S",
+          disabled: viewTransformSuppressed,
           onSelect: () => studioMainMenuActions.saveCurrentStudioView(),
         },
         {
@@ -22385,7 +22785,7 @@ function StudioCuttoonEditor() {
           label: "보기 복원",
           icon: HistoryIcon,
           shortcut: "⇧Z",
-          disabled: !menuHasSavedView,
+          disabled: viewTransformSuppressed || !menuHasSavedView,
           onSelect: () => studioMainMenuActions.restoreSavedStudioView(),
           separatorAfter: true,
         },
@@ -22395,6 +22795,7 @@ function StudioCuttoonEditor() {
           icon: Triangle,
           shortcut: "⇧G",
           checked: perspectiveRulerActive,
+          disabled: viewTransformSuppressed,
           onSelect: () => studioMainMenuActions.togglePerspectiveGuideView(),
         },
         {
@@ -22636,6 +23037,7 @@ function StudioCuttoonEditor() {
     },
   ], [
     canvasFlipH,
+    canvasRotation,
     collaborationDocumentLocked,
     colorBlindPreview,
     isFullscreen,
@@ -22656,6 +23058,7 @@ function StudioCuttoonEditor() {
     menuEditSelectAllDisabled,
     menuEditUndoDisabled,
     leftPanelOpen,
+    pageSequenceOpen,
     perspectiveRulerActive,
     projectArchiveBusy,
     psdImportBusy,
@@ -22665,6 +23068,7 @@ function StudioCuttoonEditor() {
     menuSharedNonOwnerSave,
     workId,
     studioMainMenuActions,
+    viewTransformSuppressed,
   ]);
   // 모바일 하단 보조 막대 버튼(페이지/추가/속성/줌) — 아이콘 + 작은 라벨 세로 스택.
   // 서브탭 칩·드로잉 도구 칩은 studioSegmentChipClass / studioToolButtonClass 로 이관됨.
@@ -22737,6 +23141,7 @@ function StudioCuttoonEditor() {
     setSelectedId(null);
     const originalMasterEditMode = masterEditMode;
     setMasterEditMode(false);
+    preserveStudioViewBeforeCapture();
     setIsExporting(true);
     try {
       const stage = await captureReadyStageForPage(activePage);
@@ -22779,6 +23184,7 @@ function StudioCuttoonEditor() {
     setSelectedId(null);
     const originalMasterEditMode = masterEditMode;
     setMasterEditMode(false);
+    preserveStudioViewBeforeCapture();
     setIsExporting(true);
     try {
       const stage = await captureReadyStageForPage(activePage);
@@ -22841,6 +23247,7 @@ function StudioCuttoonEditor() {
     const originalPageId = currentPageId;
     const originalMasterEditMode = masterEditMode;
     setMasterEditMode(false);
+    preserveStudioViewBeforeCapture();
     setIsExporting(true);
     const pageCanvases: HTMLCanvasElement[] = [];
 
@@ -22924,6 +23331,7 @@ function StudioCuttoonEditor() {
     const originalPageId = currentPageId;
     const originalMasterEditMode = masterEditMode;
     setMasterEditMode(false);
+    preserveStudioViewBeforeCapture();
     setIsExporting(true);
     const captured: HTMLCanvasElement[] = [];
     try {
@@ -23168,6 +23576,7 @@ function StudioCuttoonEditor() {
     timelapseOriginalPageIdRef.current = currentPageId;
     timelapseOriginalMasterEditModeRef.current = masterEditMode;
     setMasterEditMode(false);
+    preserveStudioViewBeforeCapture();
     setTimelapseCapturing(true);
   }
 
@@ -23209,6 +23618,7 @@ function StudioCuttoonEditor() {
     const originalMasterEditMode = masterEditMode;
     setSelectedId(null);
     setMasterEditMode(false);
+    preserveStudioViewBeforeCapture();
     setIsExporting(true);
     try {
       const [stage, { exportPagePsd }] = await Promise.all([
@@ -23333,6 +23743,7 @@ function StudioCuttoonEditor() {
       comments: studioComments,
       releaseSchedule,
       publicationAnalytics,
+      referenceBoard,
       currentPageId,
       webtoonTheme,
       panelGutter,
@@ -23486,6 +23897,7 @@ function StudioCuttoonEditor() {
     setStudioComments(normalizeStudioCommentsDocument(projectData.comments));
     setReleaseSchedule(normalizeReleaseSchedule(projectData.releaseSchedule));
     setPublicationAnalytics(publicationAnalyticsDocument);
+    setReferenceBoard(normalizeStudioReferenceBoardDocument(projectData.referenceBoard));
     return true;
   }
 
@@ -23982,12 +24394,23 @@ function StudioCuttoonEditor() {
     setProjectArchiveBusy(true);
     setProjectArchiveStatus(null);
     try {
-      const [{ buildStudioProjectArchiveWithVerifiedBg3dModels }, { downloadBlob }] = await Promise.all([
+      const project = currentStudioProjectSnapshot();
+      const [
+        { buildStudioProjectArchiveWithVerifiedBg3dModels },
+        { prepareStudioReferenceBoardArchiveExport },
+        { prepareStudioVrmProjectArchiveExport },
+        { downloadBlob },
+      ] = await Promise.all([
         import("./studio-bg3d-project-library"),
+        import("./studio-reference-board-archive"),
+        import("./studio-vrm-project-library"),
         import("./studio-export"),
       ]);
+      const referenceArchive = await prepareStudioReferenceBoardArchiveExport(project);
+      const vrmArchive = await prepareStudioVrmProjectArchiveExport(project);
       const result = await buildStudioProjectArchiveWithVerifiedBg3dModels({
-        project: currentStudioProjectSnapshot(),
+        project,
+        attachments: [...referenceArchive.attachments, ...vrmArchive.attachments],
       }, {
         limits: isMobile ? MOBILE_PROJECT_ARCHIVE_LIMITS : undefined,
       });
@@ -24000,7 +24423,15 @@ function StudioCuttoonEditor() {
         tone: result.isSelfContained ? "good" : "warn",
         text: result.isSelfContained
           ? `프로젝트와 중복 제거 자산 ${result.manifest.attachments.length}개를 무결성 검증형 archive로 저장 요청했어요.`
-          : `archive를 저장했지만 외부 종속성 경고 ${warningCount}건이 있어 다른 기기에서 일부 원본 자산을 다시 연결해야 할 수 있어요.`,
+          : `archive를 저장했지만 외부 종속성 경고 ${warningCount}건이 있어 다른 기기에서 일부 원본 자산을 다시 연결해야 할 수 있어요.${
+              referenceArchive.missing.length > 0
+                ? ` 참고 이미지 원본 ${referenceArchive.missing.length}개를 이 기기에서 찾지 못했습니다.`
+                : ""
+            }${
+              vrmArchive.missing.length > 0
+                ? ` 업로드 VRM 원본 ${vrmArchive.missing.length}개를 이 기기에서 찾지 못했거나 검증하지 못했습니다.`
+                : ""
+            }`,
       });
       setError(null);
     } catch (cause) {
@@ -24046,23 +24477,41 @@ function StudioCuttoonEditor() {
       const [
         { importStudioProjectArchive },
         { installStudioBg3dProjectArchiveModelsAndApply },
+        { restoreStudioReferenceBoardArchiveImport },
+        { restoreStudioVrmProjectArchiveImport },
         { normalizeStudioReleaseSchedule },
       ] =
         await Promise.all([
           import("./studio-project-archive"),
           import("./studio-bg3d-project-library"),
+          import("./studio-reference-board-archive"),
+          import("./studio-vrm-project-library"),
           loadStudioReleaseScheduleRuntime(),
         ]);
       const result = await importStudioProjectArchive(file, {
         rehydrateDataUrls: true,
         limits: isMobile ? MOBILE_PROJECT_ARCHIVE_LIMITS : undefined,
       });
+      if (!canApplyStudioMutation(mutationTicket)) return;
+      const restoredReferences = await restoreStudioReferenceBoardArchiveImport(result);
+      const restoredResult = {
+        ...result,
+        project: restoredReferences.project,
+        canonicalProject: restoredReferences.canonicalProject,
+      };
+      const restoredVrmModels = await restoreStudioVrmProjectArchiveImport(restoredResult);
+      if (!canApplyStudioMutation(mutationTicket)) return;
+      const portableResult = {
+        ...restoredResult,
+        project: restoredVrmModels.project,
+        canonicalProject: restoredVrmModels.canonicalProject,
+      };
       const publicationAnalyticsDocument =
-        await normalizeStudioPublicationAnalyticsDeferred(result.project.publicationAnalytics);
+        await normalizeStudioPublicationAnalyticsDeferred(portableResult.project.publicationAnalytics);
       if (!canApplyStudioMutation(mutationTicket)) return;
       let projectApplied = false;
       const installed = await installStudioBg3dProjectArchiveModelsAndApply(
-        result,
+        portableResult,
         (project) => {
           if (!canApplyStudioMutation(mutationTicket)) return;
           projectApplied = applyStudioProjectSnapshotWithPreparedDocuments(
@@ -24078,11 +24527,15 @@ function StudioCuttoonEditor() {
       );
       if (!projectApplied) return;
       const warningCount = result.diagnostics.filter((item) => item.severity === "warning").length;
+      const fullyResolved =
+        result.isSelfContained
+        && restoredReferences.unresolved.length === 0
+        && restoredVrmModels.unresolved.length === 0;
       setProjectArchiveStatus({
-        tone: result.isSelfContained ? "good" : "warn",
-        text: result.isSelfContained
-          ? `SHA-256·CRC-32·MIME 검증을 통과한 프로젝트와 자산 ${result.attachments.size}개를 복구했어요. 검증된 3D 모델 ${installed.records.length}개도 로컬 라이브러리에 원자적으로 설치했어요.`
-          : `프로젝트를 복구했지만 외부 종속성 경고 ${warningCount}건이 있어 원본 자산 확인이 필요해요.`,
+        tone: fullyResolved ? "good" : "warn",
+        text: fullyResolved
+          ? `SHA-256·CRC-32·MIME 검증을 통과한 프로젝트와 자산 ${result.attachments.size}개를 복구했어요. 참고 이미지 ${restoredReferences.installed.length}개 설치·${restoredReferences.reused.length}개 재사용, VRM ${restoredVrmModels.installed.length}개 설치·${restoredVrmModels.reused.length}개 재사용, 3D 배경 모델 ${installed.records.length}개를 로컬 라이브러리에 원자적으로 설치했어요.`
+          : `프로젝트를 복구했지만 외부 종속성 경고 ${warningCount}건, 미해결 참고 이미지 ${restoredReferences.unresolved.length}개, 미해결 VRM ${restoredVrmModels.unresolved.length}개가 있어 원본 자산 확인이 필요해요.`,
       });
       setError(null);
     } catch (cause) {
@@ -24154,16 +24607,20 @@ function StudioCuttoonEditor() {
   // prop 은 항상 비어 있으며(영수증 권한 경로는 캡처/커밋 핸드오프 전용으로 유지), 파인 중
   // 가시성은 pinnedVisible 이 담당한다.
   const webGpuPreviewStrokes: readonly StudioGpuStroke[] = EMPTY_STUDIO_GPU_STROKES;
-  const webGpuViewportSurface = planStudioWebGpuViewportSurface({
-    documentWidth: CANVAS_W,
-    documentHeight: canvasH,
-    documentScale: effScale,
-    scrollLeft: scrollPos.left,
-    scrollTop: scrollPos.top,
-    viewportWidth: scrollPos.width,
-    viewportHeight: scrollPos.height,
-    flipX: canvasFlipH,
-  });
+  // GPU/DOM raster surfaces are axis-aligned today. Quarter-turn views fail closed to the
+  // authoritative Konva Stage until the GPU viewport contract can carry rotation explicitly.
+  const webGpuViewportSurface = canvasRotation === 0
+    ? planStudioWebGpuViewportSurface({
+        documentWidth: CANVAS_W,
+        documentHeight: canvasH,
+        documentScale: effScale,
+        scrollLeft: scrollPos.left,
+        scrollTop: scrollPos.top,
+        viewportWidth: scrollPos.width,
+        viewportHeight: scrollPos.height,
+        flipX: canvasFlipH,
+      })
+    : null;
   // With no live strokes fed to the compositor this can never authorize a visible GPU frame
   // (the authority contract requires strokes.length > 0); keeping the real check exercises the
   // authority state machine for the future committed-surface handoff without a dead-code fork.
@@ -24195,17 +24652,17 @@ function StudioCuttoonEditor() {
     masterEditActive: masterEditMode,
     editActive: selectedId !== null || marqueeIds.length > 0 || editing !== null,
     specialDraftActive:
-      tool !== "select" || eyedropperActive || timelinePlaying ||
+      tool !== "select" || canvasRotation !== 0 || eyedropperActive || timelinePlaying ||
       marqueeActive || userGuides.length > 0 ||
       advancedFillArmed || pixelToolArmed || cropArmed || panelSplitArmed ||
-      nodeEditArmed || bubbleShapeArmed || smudgeArmed || healCloneArmed ||
+      nodeEditArmed || bubbleShapeArmed || smudgeArmed || liquifyArmed || healCloneArmed ||
       layerMaskPaintArmed || historyBrushArmed || puppetWarpArmed,
     postProcessingActive: pageGradeActive || colorBlindPreview !== "none",
   } as const), [
     isExporting, saving, timelapseCapturing, masterEditMode, selectedId, marqueeIds.length,
-    editing, tool, eyedropperActive, timelinePlaying, marqueeActive, userGuides.length,
+    editing, tool, canvasRotation, eyedropperActive, timelinePlaying, marqueeActive, userGuides.length,
     advancedFillArmed, pixelToolArmed, cropArmed, panelSplitArmed, nodeEditArmed,
-    bubbleShapeArmed, smudgeArmed, healCloneArmed, layerMaskPaintArmed, historyBrushArmed,
+    bubbleShapeArmed, smudgeArmed, liquifyArmed, healCloneArmed, layerMaskPaintArmed, historyBrushArmed,
     puppetWarpArmed, pageGradeActive, colorBlindPreview,
   ]);
   const {
@@ -24274,6 +24731,9 @@ function StudioCuttoonEditor() {
     handleLayerNavigatorAction,
     invertLayerMask,
     moveVanishingPointById,
+    previewVanishingPointById,
+    previewIsometricOrigin,
+    commitIsometricOrigin,
     onColorizeSelected,
     onMinimapClick,
     onMinimapKeyDown,
@@ -24296,6 +24756,8 @@ function StudioCuttoonEditor() {
     setDescription,
     setIsometricAngleDegClamped,
     setIsometricCellSizeClamped,
+    previewIsometricAngleDegClamped,
+    previewIsometricCellSizeClamped,
     setPanelGutter,
     setTagsText,
     setTitle,
@@ -24303,6 +24765,8 @@ function StudioCuttoonEditor() {
     splitFrameSelected,
     startEditText,
     toggleAdvancedFill,
+    toggleLiquifyTool,
+    toggleSmudgeTool,
     toggleBubbleAnchorPick,
     toggleEffectFavorite,
     toggleIsometricGridActive,
@@ -24312,7 +24776,10 @@ function StudioCuttoonEditor() {
   });
 
   const studioLeftToolRailHandlers = useStudioStableHandlers<StudioLeftToolRailHandlers>({
+    fitCanvasToWidth,
     openFrameAnimationForSelected,
+    openPixelSelectionTransform,
+    openSelectedLayerCrop,
     addBubble,
     addText,
     announceDrawingShortcut,
@@ -24321,6 +24788,10 @@ function StudioCuttoonEditor() {
     disarmAllPixelTools,
     onPickImage,
     toggleAdvancedFill,
+    toggleLiquifyTool,
+    togglePixelMarquee,
+    toggleSmudgeTool,
+    toggleStudioCommentPinPlacement,
   });
 
   const studioToolBeltContentHandlers = useStudioStableHandlers<StudioToolBeltContentHandlers>({
@@ -24464,6 +24935,7 @@ function StudioCuttoonEditor() {
     setAiProvenance,
     setCharacterBible,
     setPublicationAnalytics,
+    setReferenceBoard,
     setPublishAiDisclosure,
     setPublishAiUsage,
     setPublishCompliance,
@@ -24536,6 +25008,7 @@ function StudioCuttoonEditor() {
     removeSelected,
     reorder,
     patchEl,
+    toggleHorizontalCanvasView,
   });
 
   // 렌더 시점 ref 스냅샷 — RC 컴파일 자식(캔버스)은 렌더 중 ref 접근이 금지라, 비컴파일
@@ -24549,6 +25022,8 @@ function StudioCuttoonEditor() {
   const bubbleShapeActiveHandleIndex = bubbleShapeDragRef.current?.session.pointIndex ?? null;
 
   const studioCanvasViewportHandlers = useStudioStableHandlers<StudioCanvasViewportHandlers>({
+  addPage,
+  fitCanvasToWidth,
   onWebGpuFrameReady,
   onWebGpuDeviceLost,
   onWebGpuBackendChange,
@@ -24585,6 +25060,10 @@ function StudioCuttoonEditor() {
     hideSmudgeCursor,
     jumpToHistoryIndex,
     moveVanishingPointById,
+    previewVanishingPointById,
+    previewIsometricOrigin,
+    commitIsometricOrigin,
+    cancelStudioDrawingAssistPreview,
     onStageDown,
     onStageDragEnd,
     onStageDragMove,
@@ -24603,14 +25082,18 @@ function StudioCuttoonEditor() {
     patchTranslateDraft,
     removeSelected,
     restoreAutosave,
+    resetView,
+    rotateCanvasView,
     selectDialogueElement,
     selectStudioCommentAnchor,
     markStudioCommentThreadRead,
     setMaster,
     setStudioUiDensity,
+    setActualPixelView,
     startFromExample,
     switchToDialogueLocale,
     toggleAdvancedFill,
+    toggleHorizontalCanvasView,
     updateActivePage,
     endLiveResourceEdit,
     nodeInteractionBegin,
@@ -24792,6 +25275,44 @@ function StudioCuttoonEditor() {
           writerRoom={writerRoom}
           stableHandlers={studioMenubarContentHandlers}
         />
+        <button
+          type="button"
+          data-studio-comments-inbox="true"
+          onClick={() => {
+            if (commentsOpen) {
+              setCommentsOpen(false);
+              return;
+            }
+            openStudioCommentInbox();
+          }}
+          disabled={collaborationDocumentLocked && !sharedDocument?.capabilities.view}
+          aria-expanded={commentsOpen}
+          aria-haspopup="dialog"
+          aria-controls="studio-comments-review-dialog"
+          aria-label={`댓글 검토함${openStudioCommentCount > 0 ? `, 열린 댓글 ${openStudioCommentCount}개` : ""}`}
+          className={cn(
+            buttonClass({ size: "sm", variant: commentsOpen ? "solid" : "quiet" }),
+            "relative hidden min-h-9 shrink-0 gap-1.5 px-2.5 text-[0.72rem] disabled:cursor-not-allowed disabled:opacity-50 lg:inline-flex"
+          )}
+          title={
+            collaborationDocumentLocked && !sharedDocument?.capabilities.view
+              ? collaborationLockMessage()
+              : commentsOpen
+                ? "댓글 검토함 닫기"
+                : "댓글 검토함 열기 · 검색, 필터, 읽음 상태 관리"
+          }
+        >
+          <MessageCircle size={14} aria-hidden />
+          <span className="max-xl:sr-only">댓글</span>
+          {openStudioCommentCount > 0 ? (
+            <span
+              aria-hidden
+              className="inline-flex min-w-5 items-center justify-center rounded-full bg-accent px-1.5 py-0.5 text-[0.6rem] font-bold tabular-nums text-on-accent"
+            >
+              {openStudioCommentCount > 99 ? "99+" : openStudioCommentCount}
+            </span>
+          ) : null}
+        </button>
       </StudioAppMenubar>
 
       <div
@@ -24903,7 +25424,6 @@ function StudioCuttoonEditor() {
         selectedId={selectedId}
         setBrushOpacity={setBrushOpacity}
         setBrushSlotsState={setBrushSlotsState}
-        setCanvasFlipH={setCanvasFlipH}
         setColor={setColor}
         setDrawMode={setDrawMode}
         setDrawShape={setDrawShape}
@@ -25253,15 +25773,15 @@ function StudioCuttoonEditor() {
           advancedFillUnsupportedReason={advancedFillUnsupportedReason}
           appSettings={appSettings}
           appSettingsOpen={appSettingsOpen}
-          canvasFlipH={canvasFlipH}
           canvasOnlyMode={canvasOnlyMode}
           commentsOpen={commentsOpen}
+          commentPinArmed={commentPinArmed}
+          cropActive={cropRect !== null}
           drawMode={drawMode}
           drawShape={drawShape}
           eyedropperActive={eyedropperActive}
           frameAnimOpen={frameAnimOpen}
           frameAnimTargetId={frameAnimTargetId}
-          isFullscreen={isFullscreen}
           isRailToolVisible={isRailToolVisible}
           liquifyActive={liquifyActive}
           mobileImmersive={mobileImmersive}
@@ -25275,12 +25795,9 @@ function StudioCuttoonEditor() {
           selected={selected}
           selectedContentMutationLocked={selectedContentMutationLocked}
           setAppSettingsOpen={setAppSettingsOpen}
-          setCanvasFlipH={setCanvasFlipH}
-          setCommentsOpen={setCommentsOpen}
           setDrawMode={setDrawMode}
           setDrawShape={setDrawShape}
           setEyedropperActive={setEyedropperActive}
-          setLiquifyActive={setLiquifyActive}
           setMenu={setMenu}
           setPerspectiveRulerActive={setPerspectiveRulerActive}
           setPixelForceCircle={setPixelForceCircle}
@@ -25288,16 +25805,14 @@ function StudioCuttoonEditor() {
           setQuickShapeActive={setQuickShapeActive}
           setRailMoreOpen={setRailMoreOpen}
           setReferencePanelOpen={setReferencePanelOpen}
-          setRightPanelOpen={setRightPanelOpen}
-          setScale={setScale}
-          setSmudgeActive={setSmudgeActive}
           setStrokeWidth={setStrokeWidth}
           setTool={setTool}
-          setZoom={setZoom}
+          setViewTool={setViewTool}
           smudgeActive={smudgeActive}
           tool={tool}
           uiDensityMode={uiDensityMode}
-          wrapRef={wrapRef}
+          viewTransformSuppressed={viewTransformSuppressed}
+          viewTool={viewTool}
           stableHandlers={studioLeftToolRailHandlers}
         />
 
@@ -25313,6 +25828,7 @@ function StudioCuttoonEditor() {
           activeDialogueLocale={activeDialogueLocale}
           activePage={activePage}
           activePageIndex={activePageIndex}
+          activeSurfaceReviewLocked={activeSurfaceReviewLocked}
           activeServerAiProviderLabel={activeServerAiProviderLabel}
           advancedFillActive={advancedFillActive}
           advancedFillArmed={advancedFillArmed}
@@ -25334,6 +25850,7 @@ function StudioCuttoonEditor() {
           bubbleShapeDraft={bubbleShapeDraft}
           bubbleShapeHandles={bubbleShapeHandles}
           canvasFlipH={canvasFlipH}
+          canvasRotation={canvasRotation}
           canvasH={canvasH}
           canvasOnlyMode={canvasOnlyMode}
           collaborationDocumentLocked={collaborationDocumentLocked}
@@ -25379,7 +25896,6 @@ function StudioCuttoonEditor() {
           historyBrushSourceIndex={historyBrushSourceIndex}
           historyPanelOpen={historyPanelOpen}
           isExporting={isExporting}
-          isFullscreen={isFullscreen}
           isMobile={isMobile}
           isometricAngleDeg={isometricAngleDeg}
           isometricCellSize={isometricCellSize}
@@ -25417,6 +25933,7 @@ function StudioCuttoonEditor() {
           pageGrade={pageGrade}
           pageGradeCss={pageGradeCss}
           pages={pages}
+          pageSequenceOpen={pageSequenceOpen}
           pagesHi={pagesHi}
           pagesHistory={pagesHistory}
           panelGutter={panelGutter}
@@ -25457,19 +25974,17 @@ function StudioCuttoonEditor() {
           setFrameAnimOpen={setFrameAnimOpen}
           setFrameAnimTargetId={setFrameAnimTargetId}
           setHistoryPanelOpen={setHistoryPanelOpen}
-          setIsometricOriginX={setIsometricOriginX}
-          setIsometricOriginY={setIsometricOriginY}
           setLeftPanelOpen={setLeftPanelOpen}
           setMarqueeIds={setMarqueeIds}
           setMasterEditMode={setMasterEditMode}
           setMasterPanelOpen={setMasterPanelOpen}
           setOnionSkin={setOnionSkin}
+          setPageSequenceOpen={setPageSequenceOpen}
           setPoserVrmOpen={setPoserVrmOpen}
           setPuppetWarpPins={setPuppetWarpPins}
           setQuickShapeActive={setQuickShapeActive}
           setQuickStartOpen={setQuickStartOpen}
           setRightPanelOpen={setRightPanelOpen}
-          setScale={setScale}
           setSelectedId={setSelectedId}
           setSharedDocumentNotice={setSharedDocumentNotice}
           setShortcutsOpen={setShortcutsOpen}
@@ -25482,6 +25997,7 @@ function StudioCuttoonEditor() {
           setTimelinePlayhead={setTimelinePlayhead}
           setTimelinePlaying={setTimelinePlaying}
           setTool={setTool}
+          setViewTool={setViewTool}
           setTranslateDraft={setTranslateDraft}
           setTranslateGlossary={setTranslateGlossary}
           setTranslateTargetLocale={setTranslateTargetLocale}
@@ -25496,6 +26012,8 @@ function StudioCuttoonEditor() {
           showWebtoonGuides={showWebtoonGuides}
           smartGuides={smartGuides}
           smudgeArmed={smudgeArmed}
+          liquifyArmed={liquifyArmed}
+          liquifyRadius={liquifyRadius}
           smudgeCursorRef={smudgeCursorRef}
           smudgeRadius={smudgeRadius}
           sourceHydrationPending={sourceHydrationPending}
@@ -25529,6 +26047,7 @@ function StudioCuttoonEditor() {
           timelinePreviewFrame={timelinePreviewFrame}
           title={title}
           tool={tool}
+          viewTool={viewTool}
           translateBusy={translateBusy}
           translateDraft={translateDraft}
           translateError={translateError}
@@ -25594,7 +26113,9 @@ function StudioCuttoonEditor() {
           bubbleShapeArmed={bubbleShapeArmed}
           bubbleShapeEditActive={bubbleShapeEditActive}
           bubbleShapeHandles={bubbleShapeHandles}
+          canvasFlipH={canvasFlipH}
           canvasH={canvasH}
+          canvasRotation={canvasRotation}
           collaborationDocumentLocked={collaborationDocumentLocked}
           color={color}
           cropAspect={cropAspect}
@@ -25720,13 +26241,11 @@ function StudioCuttoonEditor() {
           setHistoryBrushSourceIndex={setHistoryBrushSourceIndex}
           setHistoryBrushSourceSrc={setHistoryBrushSourceSrc}
           setHistoryPanelOpen={setHistoryPanelOpen}
-          setIsometricGridActive={setIsometricGridActive}
           setLayerMaskHardness={setLayerMaskHardness}
           setLayerMaskPaintActive={setLayerMaskPaintActive}
           setLayerMaskPaintMode={setLayerMaskPaintMode}
           setLayerMaskRadius={setLayerMaskRadius}
           setLayerMaskStrength={setLayerMaskStrength}
-          setLiquifyActive={setLiquifyActive}
           setLiquifyRadius={setLiquifyRadius}
           setLiquifyStrength={setLiquifyStrength}
           setMagicResizeStrategy={setMagicResizeStrategy}
@@ -25741,6 +26260,7 @@ function StudioCuttoonEditor() {
           setPerspectiveRulerActive={setPerspectiveRulerActive}
           setPixelBrushRadius={setPixelBrushRadius}
           setPixelCombine={setPixelCombine}
+          setPixelForceCircle={setPixelForceCircle}
           setPixelSel={setPixelSel}
           setPixelTool={setPixelTool}
           setPoserInitialDataUrl={setPoserInitialDataUrl}
@@ -25758,7 +26278,6 @@ function StudioCuttoonEditor() {
           setSharedDocumentNotice={setSharedDocumentNotice}
           setShowGrid={setShowGrid}
           setShowWebtoonGuides={setShowWebtoonGuides}
-          setSmudgeActive={setSmudgeActive}
           setSmudgeRadius={setSmudgeRadius}
           setSmudgeStrength={setSmudgeStrength}
           setSnapEnabled={setSnapEnabled}
@@ -25972,6 +26491,7 @@ function StudioCuttoonEditor() {
           quickActionsPreferences={quickActionsPreferences}
           recentColors={recentColors}
           referencePanelOpen={referencePanelOpen}
+          referenceBoard={referenceBoard}
           releaseSchedule={releaseSchedule}
           scenarioApplyTarget={scenarioApplyTarget}
           scenarioBusy={scenarioBusy}
@@ -26094,7 +26614,7 @@ function StudioCuttoonEditor() {
         >
           {contextMenu.elId ? (
             <>
-              {contextMenuEl?.type === "image" && parseStudio3dTool(contextMenuEl.src) === "vrm-poser" && (
+              {contextMenuEl?.type === "image" && (contextMenuEl.vrmScene || parseStudio3dTool(contextMenuEl.src) === "vrm-poser") && (
                 <>
                   <button
                     type="button"
@@ -26342,6 +26862,9 @@ interface StudioInspectorAsideHandlers {
   handleLayerNavigatorAction: (action: StudioLayerNavigatorAction) => void;
   invertLayerMask: () => void;
   moveVanishingPointById: (id: string, x: number, y: number) => void;
+  previewVanishingPointById: (id: string, x: number, y: number) => void;
+  previewIsometricOrigin: (x: number, y: number) => void;
+  commitIsometricOrigin: (x: number, y: number) => void;
   onColorizeSelected: () => void;
   onMinimapClick: (e: React.MouseEvent<HTMLDivElement>) => void;
   onMinimapKeyDown: (e: React.KeyboardEvent<HTMLDivElement>) => void;
@@ -26364,6 +26887,8 @@ interface StudioInspectorAsideHandlers {
   setDescription: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<string>>>[0]) => void;
   setIsometricAngleDegClamped: (next: number) => void;
   setIsometricCellSizeClamped: (next: number) => void;
+  previewIsometricAngleDegClamped: (next: number) => void;
+  previewIsometricCellSizeClamped: (next: number) => void;
   setPanelGutter: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<number>>>[0]) => void;
   setTagsText: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<string>>>[0]) => void;
   setTitle: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<string>>>[0]) => void;
@@ -26372,6 +26897,8 @@ interface StudioInspectorAsideHandlers {
   startEditText: (id: string) => void;
   toggleAdvancedFill: () => void;
   toggleBubbleAnchorPick: () => void;
+  toggleLiquifyTool: () => void;
+  toggleSmudgeTool: () => void;
   toggleEffectFavorite: (effectId: StudioEffectId) => void;
   toggleIsometricGridActive: () => void;
   toggleLayerMaskEnabled: () => void;
@@ -26403,7 +26930,9 @@ interface StudioInspectorAsideProps {
   bubbleShapeArmed: boolean;
   bubbleShapeEditActive: boolean;
   bubbleShapeHandles: NodeEditHandle[];
+  canvasFlipH: boolean;
   canvasH: number;
+  canvasRotation: StudioViewRotation;
   collaborationDocumentLocked: boolean;
   color: string;
   cropAspect: CropAspectId;
@@ -26530,13 +27059,11 @@ interface StudioInspectorAsideProps {
   setHistoryBrushSourceIndex: import("react").Dispatch<import("react").SetStateAction<number | null>>;
   setHistoryBrushSourceSrc: import("react").Dispatch<import("react").SetStateAction<string | null>>;
   setHistoryPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setIsometricGridActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setLayerMaskHardness: import("react").Dispatch<import("react").SetStateAction<number>>;
   setLayerMaskPaintActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setLayerMaskPaintMode: import("react").Dispatch<import("react").SetStateAction<LayerMaskPaintMode>>;
   setLayerMaskRadius: import("react").Dispatch<import("react").SetStateAction<number>>;
   setLayerMaskStrength: import("react").Dispatch<import("react").SetStateAction<number>>;
-  setLiquifyActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setLiquifyRadius: import("react").Dispatch<import("react").SetStateAction<number>>;
   setLiquifyStrength: import("react").Dispatch<import("react").SetStateAction<number>>;
   setMagicResizeStrategy: import("react").Dispatch<import("react").SetStateAction<MagicResizeStrategy>>;
@@ -26551,6 +27078,7 @@ interface StudioInspectorAsideProps {
   setPerspectiveRulerActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setPixelBrushRadius: import("react").Dispatch<import("react").SetStateAction<number>>;
   setPixelCombine: import("react").Dispatch<import("react").SetStateAction<SelectionCombineMode>>;
+  setPixelForceCircle: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setPixelSel: import("react").Dispatch<import("react").SetStateAction<PixelSelection | null>>;
   setPixelTool: import("react").Dispatch<import("react").SetStateAction<SelectionToolKind | "wand" | null>>;
   setPoserInitialDataUrl: import("react").Dispatch<import("react").SetStateAction<string | undefined>>;
@@ -26568,7 +27096,6 @@ interface StudioInspectorAsideProps {
   setSharedDocumentNotice: import("react").Dispatch<import("react").SetStateAction<string | null>>;
   setShowGrid: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setShowWebtoonGuides: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setSmudgeActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setSmudgeRadius: import("react").Dispatch<import("react").SetStateAction<number>>;
   setSmudgeStrength: import("react").Dispatch<import("react").SetStateAction<number>>;
   setSnapEnabled: import("react").Dispatch<import("react").SetStateAction<boolean>>;
@@ -26646,7 +27173,9 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
   bubbleShapeArmed,
   bubbleShapeEditActive,
   bubbleShapeHandles,
+  canvasFlipH,
   canvasH,
+  canvasRotation,
   collaborationDocumentLocked,
   color,
   cropAspect,
@@ -26772,13 +27301,11 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
   setHistoryBrushSourceIndex,
   setHistoryBrushSourceSrc,
   setHistoryPanelOpen,
-  setIsometricGridActive,
   setLayerMaskHardness,
   setLayerMaskPaintActive,
   setLayerMaskPaintMode,
   setLayerMaskRadius,
   setLayerMaskStrength,
-  setLiquifyActive,
   setLiquifyRadius,
   setLiquifyStrength,
   setMagicResizeStrategy,
@@ -26793,6 +27320,7 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
   setPerspectiveRulerActive,
   setPixelBrushRadius,
   setPixelCombine,
+  setPixelForceCircle,
   setPixelSel,
   setPixelTool,
   setPoserInitialDataUrl,
@@ -26810,7 +27338,6 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
   setSharedDocumentNotice,
   setShowGrid,
   setShowWebtoonGuides,
-  setSmudgeActive,
   setSmudgeRadius,
   setSmudgeStrength,
   setSnapEnabled,
@@ -26895,6 +27422,9 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
     handleLayerNavigatorAction,
     invertLayerMask,
     moveVanishingPointById,
+    previewVanishingPointById,
+    previewIsometricOrigin,
+    commitIsometricOrigin,
     onColorizeSelected,
     onMinimapClick,
     onMinimapKeyDown,
@@ -26917,6 +27447,8 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
     setDescription,
     setIsometricAngleDegClamped,
     setIsometricCellSizeClamped,
+    previewIsometricAngleDegClamped,
+    previewIsometricCellSizeClamped,
     setPanelGutter,
     setTagsText,
     setTitle,
@@ -26925,6 +27457,8 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
     startEditText,
     toggleAdvancedFill,
     toggleBubbleAnchorPick,
+    toggleLiquifyTool,
+    toggleSmudgeTool,
     toggleEffectFavorite,
     toggleIsometricGridActive,
     toggleLayerMaskEnabled,
@@ -26953,6 +27487,26 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
     activeImageInspectorTab === tab || activatedImageInspectorTabs.has(tab);
   const activeInspectorBrushName =
     BRUSH_PRESETS.find((preset) => preset.id === brush)?.name ?? brush;
+  const minimapViewportRect = projectStudioViewRectToDocumentRect({
+    documentWidth: CANVAS_W,
+    documentHeight: canvasH,
+    canvasFlipH,
+    canvasRotation,
+    x: scrollPos.left / effScale,
+    y: scrollPos.top / effScale,
+    width: scrollPos.width / effScale,
+    height: scrollPos.height / effScale,
+  });
+  const drawingAssistControlsDisabled = activeSurfaceReviewLocked || saving || masterEditMode;
+  const drawingAssistDisabledReason = masterEditMode
+    ? "마스터 편집을 마친 뒤 페이지 드로잉 가이드를 조정할 수 있어요."
+    : saving
+      ? "저장이 끝난 뒤 드로잉 가이드를 조정할 수 있어요."
+      : collaborationDocumentLocked
+        ? "공동 문서 편집 권한이 없어 드로잉 가이드가 잠겼어요."
+        : activeSurfaceReviewLocked
+          ? "검토 잠금을 해제한 뒤 드로잉 가이드를 조정할 수 있어요."
+          : undefined;
   return (
         <aside
           ref={propsSheetRef}
@@ -29070,6 +29624,9 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
                     onPickTool={(t) => {
                       clearPolyLassoDraft();
                       if (t) disarmAllPixelTools();
+                      // 원형 선택은 ellipse + forceCircle 조합이다. 리터치 패널의 일반
+                      // 타원을 다시 고를 때 이전 원형 제약이 새 세션으로 새지 않게 한다.
+                      setPixelForceCircle(false);
                       setPixelTool(t);
                     }}
                     onCombineModeChange={setPixelCombine}
@@ -29122,16 +29679,7 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
                     radius={smudgeRadius}
                     strength={smudgeStrength}
                     busy={smudgeBusy}
-                    onToggleActive={() =>
-                      setSmudgeActive((v) => {
-                        const next = !v;
-                        if (next) {
-                          disarmAllPixelTools();
-                          return true;
-                        }
-                        return false;
-                      })
-                    }
+                    onToggleActive={toggleSmudgeTool}
                     onRadiusChange={setSmudgeRadius}
                     onStrengthChange={setSmudgeStrength}
                   />
@@ -29140,16 +29688,7 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
                     radius={Math.min(LIQUIFY_RADIUS_RANGE.max, Math.max(LIQUIFY_RADIUS_RANGE.min, liquifyRadius))}
                     strength={Math.min(LIQUIFY_STRENGTH_RANGE.max, Math.max(LIQUIFY_STRENGTH_RANGE.min, liquifyStrength))}
                     busy={liquifyBusy}
-                    onToggleActive={() =>
-                      setLiquifyActive((v) => {
-                        const next = !v;
-                        if (next) {
-                          disarmAllPixelTools();
-                          return true;
-                        }
-                        return false;
-                      })
-                    }
+                    onToggleActive={toggleLiquifyTool}
                     onRadiusChange={setLiquifyRadius}
                     onStrengthChange={setLiquifyStrength}
                   />
@@ -29304,7 +29843,7 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
                 )}
                 {selected.type === "image" && (
                   <>
-                    {parseStudio3dTool(selected.src) === "vrm-poser" && (
+                    {(selected.vrmScene || parseStudio3dTool(selected.src) === "vrm-poser") && (
                       <button
                         type="button"
                         onClick={() => {
@@ -29772,7 +30311,7 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
                       <button
                         type="button"
                         onClick={() => {
-                          setSymmetryCenterX(400);
+                          setSymmetryCenterX(CANVAS_W / 2);
                           setSymmetryCenterY(canvasH / 2);
                         }}
                         className="w-full rounded border border-line bg-card py-1 text-[0.68rem] font-semibold text-fg-2 hover:bg-raised transition-colors cursor-pointer"
@@ -29786,17 +30325,15 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
                   <StudioPerspectivePanel
                     active={perspectiveRulerActive}
                     points={vanishingPoints}
+                    disabled={drawingAssistControlsDisabled}
+                    disabledReason={drawingAssistDisabledReason}
                     onToggleActive={() => {
-                      // 아이소메트릭 그리드와 상호 배타(toggleIsometricGridActive와 대칭).
-                      setPerspectiveRulerActive((v) => {
-                        const next = !v;
-                        if (next) setIsometricGridActive(false);
-                        return next;
-                      });
+                      setPerspectiveRulerActive((active) => !active);
                     }}
                     onAddPoint={addVanishingPointHandler}
                     onRemovePoint={removeVanishingPointHandler}
-                    onMovePoint={moveVanishingPointById}
+                    onPreviewPoint={previewVanishingPointById}
+                    onCommitPoint={moveVanishingPointById}
                   />
                 </Suspense>
                 <Suspense fallback={null}>
@@ -29808,9 +30345,15 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
                       originX: isometricOriginX,
                       originY: isometricOriginY,
                     }}
+                    disabled={drawingAssistControlsDisabled}
+                    disabledReason={drawingAssistDisabledReason}
                     onToggleActive={toggleIsometricGridActive}
-                    onChangeAngle={setIsometricAngleDegClamped}
-                    onChangeCellSize={setIsometricCellSizeClamped}
+                    onPreviewAngle={previewIsometricAngleDegClamped}
+                    onCommitAngle={setIsometricAngleDegClamped}
+                    onPreviewCellSize={previewIsometricCellSizeClamped}
+                    onCommitCellSize={setIsometricCellSizeClamped}
+                    onPreviewOrigin={previewIsometricOrigin}
+                    onCommitOrigin={commitIsometricOrigin}
                     onResetOrigin={resetIsometricOrigin}
                   />
                 </Suspense>
@@ -29954,10 +30497,10 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
                   <div
                     className="pointer-events-none absolute rounded-[2px] border border-accent shadow-[0_0_0_240px_oklch(0.1_0.01_70/0.35)]"
                     style={{
-                      left: `${(scrollPos.left / (CANVAS_W * effScale)) * 100}%`,
-                      top: `${(scrollPos.top / (canvasH * effScale)) * 100}%`,
-                      width: `${(scrollPos.width / (CANVAS_W * effScale)) * 100}%`,
-                      height: `${(scrollPos.height / (canvasH * effScale)) * 100}%`,
+                      left: `${(minimapViewportRect.x / CANVAS_W) * 100}%`,
+                      top: `${(minimapViewportRect.y / canvasH) * 100}%`,
+                      width: `${(minimapViewportRect.width / CANVAS_W) * 100}%`,
+                      height: `${(minimapViewportRect.height / canvasH) * 100}%`,
                     }}
                   />
                 )}
@@ -30016,7 +30559,10 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
 });
 
 interface StudioLeftToolRailHandlers {
+  fitCanvasToWidth: () => void;
   openFrameAnimationForSelected: () => void;
+  openPixelSelectionTransform: () => void;
+  openSelectedLayerCrop: () => void;
   addBubble: (variant: BubbleVariant, at?: { x: number; y: number; }) => void;
   addText: (at?: { x: number; y: number; }) => void;
   announceDrawingShortcut: (message: string) => void;
@@ -30025,6 +30571,10 @@ interface StudioLeftToolRailHandlers {
   disarmAllPixelTools: () => void;
   onPickImage: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
   toggleAdvancedFill: () => void;
+  toggleLiquifyTool: () => void;
+  togglePixelMarquee: (kind: "rect" | "circle") => void;
+  toggleSmudgeTool: () => void;
+  toggleStudioCommentPinPlacement: () => void;
 }
 
 interface StudioLeftToolRailProps {
@@ -30033,15 +30583,15 @@ interface StudioLeftToolRailProps {
   advancedFillUnsupportedReason: string | null;
   appSettings: StudioAppSettings;
   appSettingsOpen: boolean;
-  canvasFlipH: boolean;
   canvasOnlyMode: boolean;
   commentsOpen: boolean;
+  commentPinArmed: boolean;
+  cropActive: boolean;
   drawMode: DrawMode;
   drawShape: DrawShapeKind;
   eyedropperActive: boolean;
   frameAnimOpen: boolean;
   frameAnimTargetId: string | null;
-  isFullscreen: boolean;
   isRailToolVisible: (id: StudioRailToolId) => boolean;
   liquifyActive: boolean;
   mobileImmersive: boolean;
@@ -30055,12 +30605,9 @@ interface StudioLeftToolRailProps {
   selected: El | null;
   selectedContentMutationLocked: boolean;
   setAppSettingsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setCanvasFlipH: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setCommentsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setDrawMode: import("react").Dispatch<import("react").SetStateAction<DrawMode>>;
   setDrawShape: import("react").Dispatch<import("react").SetStateAction<DrawShapeKind>>;
   setEyedropperActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setLiquifyActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setMenu: import("react").Dispatch<import("react").SetStateAction<StudioMenu | null>>;
   setPerspectiveRulerActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setPixelForceCircle: import("react").Dispatch<import("react").SetStateAction<boolean>>;
@@ -30068,16 +30615,14 @@ interface StudioLeftToolRailProps {
   setQuickShapeActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setRailMoreOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setReferencePanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setRightPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setScale: import("react").Dispatch<import("react").SetStateAction<number>>;
-  setSmudgeActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setStrokeWidth: import("react").Dispatch<import("react").SetStateAction<number>>;
   setTool: import("react").Dispatch<import("react").SetStateAction<Tool>>;
-  setZoom: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setViewTool: import("react").Dispatch<import("react").SetStateAction<"zoom" | "rotate" | null>>;
   smudgeActive: boolean;
   tool: Tool;
   uiDensityMode: "simple" | "full" | "focus";
-  wrapRef: import("react").RefObject<HTMLDivElement | null>;
+  viewTransformSuppressed: boolean;
+  viewTool: "zoom" | "rotate" | null;
   stableHandlers: StudioLeftToolRailHandlers;
 }
 
@@ -30087,15 +30632,15 @@ const StudioLeftToolRail = memo(function StudioLeftToolRail({
   advancedFillUnsupportedReason,
   appSettings,
   appSettingsOpen,
-  canvasFlipH,
   canvasOnlyMode,
   commentsOpen,
+  commentPinArmed,
+  cropActive,
   drawMode,
   drawShape,
   eyedropperActive,
   frameAnimOpen,
   frameAnimTargetId,
-  isFullscreen,
   isRailToolVisible,
   liquifyActive,
   mobileImmersive,
@@ -30109,12 +30654,9 @@ const StudioLeftToolRail = memo(function StudioLeftToolRail({
   selected,
   selectedContentMutationLocked,
   setAppSettingsOpen,
-  setCanvasFlipH,
-  setCommentsOpen,
   setDrawMode,
   setDrawShape,
   setEyedropperActive,
-  setLiquifyActive,
   setMenu,
   setPerspectiveRulerActive,
   setPixelForceCircle,
@@ -30122,16 +30664,14 @@ const StudioLeftToolRail = memo(function StudioLeftToolRail({
   setQuickShapeActive,
   setRailMoreOpen,
   setReferencePanelOpen,
-  setRightPanelOpen,
-  setScale,
-  setSmudgeActive,
   setStrokeWidth,
   setTool,
-  setZoom,
+  setViewTool,
   smudgeActive,
   tool,
   uiDensityMode,
-  wrapRef,
+  viewTransformSuppressed,
+  viewTool,
   stableHandlers,
 }: StudioLeftToolRailProps) {
   const {
@@ -30141,9 +30681,16 @@ const StudioLeftToolRail = memo(function StudioLeftToolRail({
     clearPolyLassoDraft,
     commitAppSettings,
     disarmAllPixelTools,
+    fitCanvasToWidth,
     onPickImage,
     toggleAdvancedFill,
+    toggleStudioCommentPinPlacement,
+    toggleLiquifyTool,
+    togglePixelMarquee,
+    toggleSmudgeTool,
     openFrameAnimationForSelected,
+    openPixelSelectionTransform,
+    openSelectedLayerCrop,
   } = stableHandlers;
   return (
     <>
@@ -30189,14 +30736,7 @@ const StudioLeftToolRail = memo(function StudioLeftToolRail({
                     ? "선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요."
                     : undefined
               }
-              onClick={() => {
-                if (selected?.type !== "image" || selectedContentMutationLocked) return;
-                setTool("select");
-                clearPolyLassoDraft();
-                disarmAllPixelTools();
-                setPixelForceCircle(false);
-                setPixelTool((t) => (t === "rect" ? null : "rect"));
-              }}
+              onClick={() => togglePixelMarquee("rect")}
             />
             ) : null}
             {isRailToolVisible("marquee-circle") ? (
@@ -30213,14 +30753,7 @@ const StudioLeftToolRail = memo(function StudioLeftToolRail({
                     ? "선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요."
                     : undefined
               }
-              onClick={() => {
-                if (selected?.type !== "image" || selectedContentMutationLocked) return;
-                setTool("select");
-                clearPolyLassoDraft();
-                disarmAllPixelTools();
-                setPixelForceCircle(true);
-                setPixelTool((t) => (t === "ellipse" && pixelForceCircle ? null : "ellipse"));
-              }}
+              onClick={() => togglePixelMarquee("circle")}
             />
             ) : null}
             {isRailToolVisible("transform") ? (
@@ -30237,11 +30770,24 @@ const StudioLeftToolRail = memo(function StudioLeftToolRail({
                     ? "이미지 안에서 변형할 픽셀 영역을 먼저 선택하세요."
                     : undefined
               }
-              onClick={() => {
-                if (!isSelectionUsable(pixelSel)) return;
-                setRightPanelOpen(true);
-                announceDrawingShortcut("리터치 패널에서 내용 변형을 적용하세요");
-              }}
+              onClick={openPixelSelectionTransform}
+            />
+            ) : null}
+            {isRailToolVisible("crop") ? (
+            <StudioRailToolButton
+              icon={Crop}
+              label="자르기 (C)"
+              description="선택한 이미지의 가장자리와 모서리를 끌어 필요한 영역만 남깁니다. 적용 전까지 원본은 바뀌지 않아요."
+              active={cropActive}
+              disabled={selected?.type !== "image" || selectedContentMutationLocked}
+              unavailableReason={
+                selected?.type !== "image"
+                  ? "자를 이미지 레이어를 먼저 고르세요."
+                  : selectedContentMutationLocked
+                    ? "선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요."
+                    : undefined
+              }
+              onClick={openSelectedLayerCrop}
             />
             ) : null}
             {isRailToolVisible("pen") ? (
@@ -30297,7 +30843,7 @@ const StudioLeftToolRail = memo(function StudioLeftToolRail({
             {isRailToolVisible("blend") ? (
             <StudioRailToolButton
               icon={Wind}
-              label="혼합 (스머지)"
+              label="혼합 (스머지) (N)"
               description="이미지 픽셀을 문질러 색을 섞습니다."
               active={smudgeActive}
               disabled={selected?.type !== "image" || selectedContentMutationLocked}
@@ -30308,20 +30854,13 @@ const StudioLeftToolRail = memo(function StudioLeftToolRail({
                     ? "선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요."
                     : undefined
               }
-              onClick={() => {
-                if (selected?.type !== "image") return;
-                setSmudgeActive((v) => {
-                  const next = !v;
-                  if (next) disarmAllPixelTools();
-                  return next;
-                });
-              }}
+              onClick={toggleSmudgeTool}
             />
             ) : null}
             {isRailToolVisible("liquify") ? (
             <StudioRailToolButton
               icon={Move}
-              label="리퀴파이"
+              label="리퀴파이 (J)"
               description="이미지 위를 밀어 국소 왜곡합니다."
               active={liquifyActive}
               disabled={selected?.type !== "image" || selectedContentMutationLocked}
@@ -30332,14 +30871,7 @@ const StudioLeftToolRail = memo(function StudioLeftToolRail({
                     ? "선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요."
                     : undefined
               }
-              onClick={() => {
-                if (selected?.type !== "image") return;
-                setLiquifyActive((v) => {
-                  const next = !v;
-                  if (next) disarmAllPixelTools();
-                  return next;
-                });
-              }}
+              onClick={toggleLiquifyTool}
             />
             ) : null}
             {isRailToolVisible("fill") ? (
@@ -30426,10 +30958,10 @@ const StudioLeftToolRail = memo(function StudioLeftToolRail({
             {isRailToolVisible("comment") ? (
             <StudioRailToolButton
               icon={MessageSquare}
-              label="댓글"
-              description="캔버스에 협업 댓글을 달고 스레드를 관리합니다."
-              active={commentsOpen}
-              onClick={() => setCommentsOpen((current) => !current)}
+              label={commentPinArmed ? "댓글 핀 배치 취소" : "댓글 핀 배치"}
+              description="캔버스의 정확한 위치를 클릭해 댓글을 남깁니다. 댓글 검토함은 상단 댓글 버튼에서 열 수 있어요."
+              active={commentsOpen || commentPinArmed}
+              onClick={toggleStudioCommentPinPlacement}
             />
             ) : null}
             {isRailToolVisible("perspective") ? (
@@ -30449,23 +30981,37 @@ const StudioLeftToolRail = memo(function StudioLeftToolRail({
               icon={ScanLine}
               label="화면 맞춤"
               description="캔버스 폭에 맞춰 확대·축소합니다."
-              onClick={() => {
-                const wrap = wrapRef.current;
-                if (wrap) {
-                  const w = wrap.clientWidth;
-                  setScale(Math.min(isFullscreen ? 4 : 2.5, Math.max(0.1, w / CANVAS_W)));
-                  setZoom(1);
-                }
-              }}
+              disabled={viewTransformSuppressed}
+              unavailableReason={viewTransformSuppressed ? "내보내기·저장이 끝난 뒤 보기를 조절하세요." : undefined}
+              onClick={fitCanvasToWidth}
+            />
+            ) : null}
+            {isRailToolVisible("zoom") ? (
+            <StudioRailToolButton
+              icon={Search}
+              label="보기 확대·축소 (Z)"
+              description="확대·축소 HUD를 열어 배율·화면 맞춤·100% 보기를 빠르게 조절합니다."
+              active={viewTool === "zoom"}
+              disabled={viewTransformSuppressed}
+              unavailableReason={viewTransformSuppressed ? "내보내기·저장이 끝난 뒤 보기를 조절하세요." : undefined}
+              aria-expanded={viewTool === "zoom"}
+              aria-controls="studio-view-tools-hud-zoom"
+              data-studio-view-tool-trigger="zoom"
+              onClick={() => setViewTool((current) => current === "zoom" ? null : "zoom")}
             />
             ) : null}
             {isRailToolVisible("rotate-view") ? (
             <StudioRailToolButton
-              icon={FlipHorizontal2}
-              label="보기 반전"
-              description="캔버스를 좌우로 뒤집어 균형·대칭을 확인합니다. (CSP flip view)"
-              active={canvasFlipH}
-              onClick={() => setCanvasFlipH((v) => !v)}
+              icon={RotateCw}
+              label="보기 회전 (R)"
+              description="회전 HUD를 열어 캔버스를 좌·우 90°로 돌리거나 수평 반전합니다. 문서와 내보내기는 바뀌지 않아요."
+              active={viewTool === "rotate"}
+              disabled={viewTransformSuppressed}
+              unavailableReason={viewTransformSuppressed ? "내보내기·저장이 끝난 뒤 보기를 조절하세요." : undefined}
+              aria-expanded={viewTool === "rotate"}
+              aria-controls="studio-view-tools-hud-rotate"
+              data-studio-view-tool-trigger="rotate"
+              onClick={() => setViewTool((current) => current === "rotate" ? null : "rotate")}
             />
             ) : null}
             {isRailToolVisible("smart-shape") ? (
@@ -30606,7 +31152,7 @@ const StudioLeftToolRail = memo(function StudioLeftToolRail({
                   <p className="px-2 py-1 text-[0.62rem] font-semibold uppercase tracking-wider text-fg-3">
                     숨긴 도구
                   </p>
-                  {appSettings.toolbar.visibleIds.length >= 26 ? (
+                  {appSettings.toolbar.visibleIds.length >= DEFAULT_STUDIO_RAIL_TOOL_ORDER.length ? (
                     <p className="px-2 py-1.5 text-[0.68rem] text-fg-3">모두 표시 중</p>
                   ) : (
                     (
@@ -30625,6 +31171,7 @@ const StudioLeftToolRail = memo(function StudioLeftToolRail({
                         "marquee-circle",
                         "lasso",
                         "transform",
+                        "crop",
                         "smart-shape",
                         "shape-rect",
                         "shape-ellipse",
@@ -30633,6 +31180,7 @@ const StudioLeftToolRail = memo(function StudioLeftToolRail({
                         "image",
                         "comment",
                         "perspective",
+                        "zoom",
                         "zoom-fit",
                         "rotate-view",
                         "frame-anim",
@@ -30693,7 +31241,14 @@ interface StudioToolBeltContentHandlers {
   addFocusLines: () => void;
   addFrame: () => void;
   addFxOverlay: (svgMarkup: string, w: number, h: number) => void;
-  addRenderedImage: (src: string, width: number, height: number, aiProvenance?: StudioPublishAiProvenance) => void;
+  addRenderedImage: (
+    src: string,
+    width: number,
+    height: number,
+    aiProvenance?: StudioPublishAiProvenance,
+    isAnimatedGif?: boolean,
+    elementPatch?: Partial<ImageEl> & { name?: string }
+  ) => void;
   addSceneTemplate: (template: SceneTemplate) => Promise<void>;
   addSfxPreset: (preset: SfxPreset) => Promise<void>;
   addSpeedLines: () => void;
@@ -32785,10 +33340,12 @@ const StudioToolBeltContent = memo(function StudioToolBeltContent({
           type="button"
           onClick={() => {
             setTeamPanelOpen(false);
-            setCommentsOpen(true);
+            setCommentsOpen((current) => !current);
           }}
           disabled={collaborationDocumentLocked && !sharedDocument?.capabilities.view}
-          aria-pressed={commentsOpen}
+          aria-expanded={commentsOpen}
+          aria-haspopup="dialog"
+          aria-controls="studio-comments-review-dialog"
           aria-label={`문서 댓글${openStudioCommentCount > 0 ? `, 열림 ${openStudioCommentCount}개` : ""}`}
           className={cn(toolBtn(commentsOpen), "relative disabled:cursor-not-allowed disabled:opacity-50")}
           title={
@@ -32804,7 +33361,7 @@ const StudioToolBeltContent = memo(function StudioToolBeltContent({
           <MessageCircle size={14} />
           {openStudioCommentCount > 0 ? (
             <span className="absolute -right-1.5 -top-1.5 min-w-4 rounded-full bg-accent px-1 text-[0.58rem] font-bold leading-4 text-on-accent">
-              {Math.min(openStudioCommentCount, 99)}
+              {openStudioCommentCount > 99 ? "99+" : openStudioCommentCount}
             </span>
           ) : null}
         </button>
@@ -33728,7 +34285,14 @@ const StudioMenubarContent = memo(function StudioMenubarContent({
 
 interface StudioLazyPanelStackHandlers {
   addPage: () => void;
-  addRenderedImage: (src: string, width: number, height: number, aiProvenance?: StudioPublishAiProvenance) => void;
+  addRenderedImage: (
+    src: string,
+    width: number,
+    height: number,
+    aiProvenance?: StudioPublishAiProvenance,
+    isAnimatedGif?: boolean,
+    elementPatch?: Partial<ImageEl> & { name?: string }
+  ) => void;
   applyStudioCommentsPanelChange: (value: StudioCommentsDocument) => Promise<boolean>;
   markAllStudioCommentThreadsRead: () => Promise<boolean>;
   markStudioCommentThreadRead: (threadId: string) => Promise<boolean>;
@@ -33779,6 +34343,7 @@ interface StudioLazyPanelStackHandlers {
   setAiProvenance: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<{ version: 1; operations: { id: string; kind: "text" | "image"; task: "composition" | "scenario" | "translation" | "dialogue" | "palette" | "text-other" | "background-image" | "character-image" | "image-edit" | "colorize" | "line-cleanup" | "image-other"; provider: string; model: string; transport: "server" | "byok" | "local" | "other"; promptVersion: number; prompt: { sha256: string; summary: string; retention: "hash-only" | "raw-opt-in"; characterCount?: number | undefined; raw?: string | undefined; }; status: "pending" | "succeeded" | "failed" | "cancelled"; createdAt: string; updatedAt: string; references: { assetId?: string | undefined; sha256?: string | undefined; }[]; revisedPrompt?: { sha256: string; summary: string; retention: "hash-only" | "raw-opt-in"; characterCount?: number | undefined; raw?: string | undefined; } | undefined; usage?: { promptTokens?: number | undefined; completionTokens?: number | undefined; totalTokens?: number | undefined; } | undefined; target?: { pageId: string; frameId?: string | undefined; elementId?: string | undefined; } | undefined; requestedSize?: { width: number; height: number; } | undefined; seed?: string | undefined; requestId?: string | undefined; error?: { category: "unknown" | "provider" | "cancelled" | "configuration" | "network" | "policy"; code: string; message: string; retriable: boolean; } | undefined; }[]; }>>>[0]) => void;
   setCharacterBible: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<{ version: 1; characters: { id: string; name: string; role: string; appearance: string; costume: string; colors: string[]; voice: string; goal: string; relationships: string[]; props: string[]; lockedFields: ("name" | "colors" | "relationships" | "props" | "role" | "appearance" | "costume" | "voice" | "goal")[]; }[]; }>>>[0]) => void;
   setPublicationAnalytics: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<StudioPublicationAnalyticsDocument>>>[0]) => void;
+  setReferenceBoard: (next: StudioReferenceBoardDocument) => boolean;
   setPublishAiDisclosure: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<string>>>[0]) => void;
   setPublishAiUsage: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<StudioPublishAiUsage>>>[0]) => void;
   setPublishCompliance: (next: Parameters<import("react").Dispatch<import("react").SetStateAction<import("./studio-publish-compliance").StudioPublishComplianceChecklist>>>[0]) => void;
@@ -33873,6 +34438,7 @@ interface StudioLazyPanelStackProps {
   quickActionsPreferences: StudioQuickActionsPreferences;
   recentColors: string[];
   referencePanelOpen: boolean;
+  referenceBoard: StudioReferenceBoardDocument;
   releaseSchedule: { version: 1; items: { id: string; kind: "episode" | "milestone"; title: string; destination: "generic" | "webtoon" | "tapas"; localDate: string; localTime: string; timeZone: string; status: "draft" | "review" | "ready" | "scheduled" | "published"; notes?: string | undefined; }[]; };
   scenarioApplyTarget: "current-page" | "new-page";
   scenarioBusy: boolean;
@@ -34037,6 +34603,7 @@ const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
   quickActionsPreferences,
   recentColors,
   referencePanelOpen,
+  referenceBoard,
   releaseSchedule,
   scenarioApplyTarget,
   scenarioBusy,
@@ -34166,6 +34733,7 @@ const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
     setAiProvenance,
     setCharacterBible,
     setPublicationAnalytics,
+    setReferenceBoard,
     setPublishAiDisclosure,
     setPublishAiUsage,
     setPublishCompliance,
@@ -34182,6 +34750,12 @@ const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
     requestWriterRoomAiDraft,
     restoreServerRevision,
   } = stableHandlers;
+  const poserInitialElement = poserInitialElementId
+    ? elementById.get(poserInitialElementId) ?? null
+    : null;
+  const poserInitialScene = poserInitialElement?.type === "image"
+    ? poserInitialElement.vrmScene
+    : undefined;
   return (
     <>
         <Suspense fallback={null}>
@@ -34203,25 +34777,34 @@ const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
           <StudioVrmPoser
             open
             initialDataUrl={poserInitialDataUrl}
+            initialScene={poserInitialScene}
             onClose={() => {
               setPoserVrmOpen(false);
               setPoserInitialDataUrl(undefined);
               setPoserInitialElementId(undefined);
             }}
-            onInsert={(src, w, h) => {
+            onInsert={({ pngDataUrl, width, height, scene }) => {
               const mutationTicket = poserMutationTicketRef.current;
               if (!mutationTicket || !canApplyStudioMutation(mutationTicket)) return false;
               if (poserInitialElementId) {
                 const targetEl = elementById.get(poserInitialElementId);
                 if (!targetEl || targetEl.type !== "image") return false;
                 const targetWidth = targetEl.width;
-                const targetHeight = Math.round(targetWidth * (h / w));
+                const targetHeight = Math.round(targetWidth * (height / width));
                 patchEl(poserInitialElementId, {
-                  src,
+                  src: pngDataUrl,
                   height: targetHeight,
+                  vrmScene: scene,
                 });
               } else {
-                addRenderedImage(src, w, h);
+                addRenderedImage(
+                  pngDataUrl,
+                  width,
+                  height,
+                  undefined,
+                  false,
+                  { vrmScene: scene, name: "3D 데생 인형" }
+                );
               }
               return true;
             }}
@@ -34741,7 +35324,14 @@ const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
       ) : null}
 
       <Suspense fallback={null}>
-        {referencePanelOpen ? <StudioReferencePanel open onClose={() => setReferencePanelOpen(false)} /> : null}
+        {referencePanelOpen ? (
+          <StudioReferencePanel
+            open
+            document={referenceBoard}
+            onChange={setReferenceBoard}
+            onClose={() => setReferencePanelOpen(false)}
+          />
+        ) : null}
       </Suspense>
 
       <Suspense fallback={null}>
@@ -36166,6 +36756,7 @@ interface StudioOptionsBarsHandlers {
   patchEl: (id: string, patch: Partial<El>) => void;
   removeSelected: () => void;
   reorder: (dir: "front" | "back" | "forward" | "backward") => void;
+  toggleHorizontalCanvasView: () => void;
 }
 
 interface StudioOptionsBarsProps {
@@ -36193,7 +36784,6 @@ interface StudioOptionsBarsProps {
   selectedId: string | null;
   setBrushOpacity: import("react").Dispatch<import("react").SetStateAction<number>>;
   setBrushSlotsState: import("react").Dispatch<import("react").SetStateAction<StudioBrushSlotsState>>;
-  setCanvasFlipH: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setColor: import("react").Dispatch<import("react").SetStateAction<string>>;
   setDrawMode: import("react").Dispatch<import("react").SetStateAction<DrawMode>>;
   setDrawShape: import("react").Dispatch<import("react").SetStateAction<DrawShapeKind>>;
@@ -36250,7 +36840,6 @@ const StudioOptionsBars = memo(function StudioOptionsBars({
   selectedId,
   setBrushOpacity,
   setBrushSlotsState,
-  setCanvasFlipH,
   setColor,
   setDrawMode,
   setDrawShape,
@@ -36291,6 +36880,7 @@ const StudioOptionsBars = memo(function StudioOptionsBars({
     removeSelected,
     reorder,
     patchEl,
+    toggleHorizontalCanvasView,
   } = stableHandlers;
   return (
     <>
@@ -36354,7 +36944,7 @@ const StudioOptionsBars = memo(function StudioOptionsBars({
               announceDrawingShortcut("색 교체");
             }}
             canvasFlipH={canvasFlipH}
-            onToggleCanvasFlipH={() => setCanvasFlipH((v) => !v)}
+            onToggleCanvasFlipH={toggleHorizontalCanvasView}
             onOpenBrushStudio={() => {
               void loadStudioBrushStudio();
               setTool("draw");
@@ -36459,6 +37049,8 @@ const StudioOptionsBars = memo(function StudioOptionsBars({
 });
 
 interface StudioCanvasViewportHandlers {
+  addPage: () => void;
+  fitCanvasToWidth: () => void;
   onWebGpuFrameReady: () => void;
   onWebGpuDeviceLost: () => void;
   onWebGpuBackendChange: (backend: StudioGpuBackend) => void;
@@ -36497,6 +37089,10 @@ interface StudioCanvasViewportHandlers {
   hideSmudgeCursor: () => void;
   jumpToHistoryIndex: (index: number) => void;
   moveVanishingPointById: (id: string, x: number, y: number) => void;
+  previewVanishingPointById: (id: string, x: number, y: number) => void;
+  previewIsometricOrigin: (x: number, y: number) => void;
+  commitIsometricOrigin: (x: number, y: number) => void;
+  cancelStudioDrawingAssistPreview: () => void;
   nodeInteractionBegin: (elementId: string) => boolean;
   onStageDown: (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => void;
   onStageDragEnd: () => void;
@@ -36517,6 +37113,8 @@ interface StudioCanvasViewportHandlers {
   patchTranslateDraft: (id: string, text: string) => void;
   removeSelected: () => void;
   restoreAutosave: () => Promise<void>;
+  resetView: () => void;
+  rotateCanvasView: (direction: "left" | "right") => void;
   selectDialogueElement: (pageId: string, elId: string) => void;
   selectStudioCommentAnchor: (anchor: StudioCommentAnchor) => void;
   markStudioCommentThreadRead: (threadId: string) => Promise<boolean>;
@@ -36525,8 +37123,10 @@ interface StudioCanvasViewportHandlers {
   snapBoundFunc: (pos: { x: number; y: number; }) => { x: number; y: number; };
   startEditText: (id: string) => void;
   startFromExample: () => Promise<void>;
+  setActualPixelView: () => void;
   switchToDialogueLocale: (locale: string) => void;
   toggleAdvancedFill: () => void;
+  toggleHorizontalCanvasView: () => void;
   updateActivePage: (patch: Partial<Omit<PageState, "id">>) => void;
 }
 
@@ -36541,6 +37141,7 @@ interface StudioCanvasViewportProps {
   activeDialogueLocale: string;
   activePage: PageState;
   activePageIndex: number;
+  activeSurfaceReviewLocked: boolean;
   activeServerAiProviderLabel: string;
   advancedFillActive: boolean;
   advancedFillArmed: boolean;
@@ -36562,6 +37163,7 @@ interface StudioCanvasViewportProps {
   bubbleShapeDraft: { elId: string; points: number[]; } | null;
   bubbleShapeHandles: NodeEditHandle[];
   canvasFlipH: boolean;
+  canvasRotation: StudioViewRotation;
   canvasH: number;
   canvasOnlyMode: boolean;
   collaborationDocumentLocked: boolean;
@@ -36606,7 +37208,6 @@ interface StudioCanvasViewportProps {
   historyBrushSourceIndex: number | null;
   historyPanelOpen: boolean;
   isExporting: boolean;
-  isFullscreen: boolean;
   isMobile: boolean;
   isometricAngleDeg: number;
   isometricCellSize: number;
@@ -36645,6 +37246,7 @@ interface StudioCanvasViewportProps {
   pageGrade: PageGrade;
   pageGradeCss: string;
   pages: PageState[];
+  pageSequenceOpen: boolean;
   pagesHi: number;
   pagesHistory: PageState[][];
   panelGutter: number;
@@ -36686,19 +37288,17 @@ interface StudioCanvasViewportProps {
   setFrameAnimOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setFrameAnimTargetId: import("react").Dispatch<import("react").SetStateAction<string | null>>;
   setHistoryPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setIsometricOriginX: import("react").Dispatch<import("react").SetStateAction<number>>;
-  setIsometricOriginY: import("react").Dispatch<import("react").SetStateAction<number>>;
   setLeftPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setMarqueeIds: import("react").Dispatch<import("react").SetStateAction<string[]>>;
   setMasterEditMode: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setMasterPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setOnionSkin: import("react").Dispatch<import("react").SetStateAction<OnionSkinSettings>>;
+  setPageSequenceOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setPoserVrmOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setPuppetWarpPins: import("react").Dispatch<import("react").SetStateAction<PuppetPin[]>>;
   setQuickShapeActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setQuickStartOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setRightPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setScale: import("react").Dispatch<import("react").SetStateAction<number>>;
   setSelectedId: import("react").Dispatch<import("react").SetStateAction<string | null>>;
   setSharedDocumentNotice: import("react").Dispatch<import("react").SetStateAction<string | null>>;
   setShortcutsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
@@ -36711,6 +37311,7 @@ interface StudioCanvasViewportProps {
   setTimelinePlayhead: import("react").Dispatch<import("react").SetStateAction<number>>;
   setTimelinePlaying: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setTool: import("react").Dispatch<import("react").SetStateAction<Tool>>;
+  setViewTool: import("react").Dispatch<import("react").SetStateAction<"zoom" | "rotate" | null>>;
   setTranslateDraft: import("react").Dispatch<import("react").SetStateAction<Map<string, string> | null>>;
   setTranslateGlossary: import("react").Dispatch<import("react").SetStateAction<string>>;
   setTranslateTargetLocale: import("react").Dispatch<import("react").SetStateAction<string>>;
@@ -36725,6 +37326,8 @@ interface StudioCanvasViewportProps {
   showWebtoonGuides: boolean;
   smartGuides: SmartGuideOverlay;
   smudgeArmed: boolean;
+  liquifyArmed: boolean;
+  liquifyRadius: number;
   smudgeCursorRef: import("react").RefObject<import("konva/lib/shapes/Circle").Circle | null>;
   smudgeRadius: number;
   sourceHydrationPending: boolean;
@@ -36758,6 +37361,7 @@ interface StudioCanvasViewportProps {
   timelinePreviewFrame: number;
   title: string;
   tool: Tool;
+  viewTool: "zoom" | "rotate" | null;
   translateBusy: boolean;
   translateDraft: Map<string, string> | null;
   translateError: string | null;
@@ -36795,6 +37399,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   activeDialogueLocale,
   activePage,
   activePageIndex,
+  activeSurfaceReviewLocked,
   activeServerAiProviderLabel,
   advancedFillActive,
   advancedFillArmed,
@@ -36816,6 +37421,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   bubbleShapeDraft,
   bubbleShapeHandles,
   canvasFlipH,
+  canvasRotation,
   canvasH,
   canvasOnlyMode,
   collaborationDocumentLocked,
@@ -36860,7 +37466,6 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   historyBrushSourceIndex,
   historyPanelOpen,
   isExporting,
-  isFullscreen,
   isMobile,
   isometricAngleDeg,
   isometricCellSize,
@@ -36898,6 +37503,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   pageGrade,
   pageGradeCss,
   pages,
+  pageSequenceOpen,
   pagesHi,
   pagesHistory,
   panelGutter,
@@ -36939,19 +37545,17 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   setFrameAnimOpen,
   setFrameAnimTargetId,
   setHistoryPanelOpen,
-  setIsometricOriginX,
-  setIsometricOriginY,
   setLeftPanelOpen,
   setMarqueeIds,
   setMasterEditMode,
   setMasterPanelOpen,
   setOnionSkin,
+  setPageSequenceOpen,
   setPoserVrmOpen,
   setPuppetWarpPins,
   setQuickShapeActive,
   setQuickStartOpen,
   setRightPanelOpen,
-  setScale,
   setSelectedId,
   setSharedDocumentNotice,
   setShortcutsOpen,
@@ -36964,6 +37568,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   setTimelinePlayhead,
   setTimelinePlaying,
   setTool,
+  setViewTool,
   setTranslateDraft,
   setTranslateGlossary,
   setTranslateTargetLocale,
@@ -36978,6 +37583,8 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   showWebtoonGuides,
   smartGuides,
   smudgeArmed,
+  liquifyArmed,
+  liquifyRadius,
   smudgeCursorRef,
   smudgeRadius,
   sourceHydrationPending,
@@ -37011,6 +37618,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   timelinePreviewFrame,
   title,
   tool,
+  viewTool,
   translateBusy,
   translateDraft,
   translateError,
@@ -37037,6 +37645,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   stableHandlers,
 }: StudioCanvasViewportProps) {
   const {
+    addPage,
     acknowledgeAiNotice,
     alignSelected,
     applyAdvancedFillPreview,
@@ -37057,6 +37666,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
     downloadAutosaveBackup,
     duplicateSelected,
     enterCanvasOnlyMode,
+    fitCanvasToWidth,
     executeGenerateTranslations,
     groupSelectedElements,
     handleTutorialTry,
@@ -37067,6 +37677,10 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
     hideSmudgeCursor,
     jumpToHistoryIndex,
     moveVanishingPointById,
+    previewVanishingPointById,
+    previewIsometricOrigin,
+    commitIsometricOrigin,
+    cancelStudioDrawingAssistPreview,
     onStageDown,
     onStageDragEnd,
     onStageDragMove,
@@ -37085,14 +37699,18 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
     patchTranslateDraft,
     removeSelected,
     restoreAutosave,
+    resetView,
+    rotateCanvasView,
     selectDialogueElement,
     selectStudioCommentAnchor,
     markStudioCommentThreadRead,
     setMaster,
     setStudioUiDensity,
+    setActualPixelView,
     startFromExample,
     switchToDialogueLocale,
     toggleAdvancedFill,
+    toggleHorizontalCanvasView,
     updateActivePage,
     endLiveResourceEdit,
     nodeInteractionBegin,
@@ -37112,7 +37730,19 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   const editingTarget = editing ? elementById.get(editing.id) : null;
   const editingVertical = !!editingTarget &&
     (editingTarget.type === "text" || editingTarget.type === "bubble") && !!editingTarget.vertical;
-  const editingFallbackToModal = !!editingTarget && (canvasFlipH || editingVertical);
+  const editingFallbackToModal = !!editingTarget && (
+    canvasFlipH || canvasRotation !== 0 || editingVertical
+  );
+  // 보기 변환은 문서 데이터가 아니다. 저장·내보내기·타임랩스 캡처 프레임에서는
+  // Stage를 정규 좌표계로 되돌려 회전/반전이 결과 픽셀에 굽히지 않게 한다.
+  const suppressViewTransform = isExporting || saving || timelapseCapturing;
+  const stageViewLayout = planStudioViewStageLayout({
+    documentWidth: CANVAS_W,
+    documentHeight: canvasH,
+    scale: effScale,
+    canvasFlipH: suppressViewTransform ? false : canvasFlipH,
+    canvasRotation: suppressViewTransform ? 0 : canvasRotation,
+  });
   const editingUseOverlay = !!editingTarget && !editingFallbackToModal;
   return (
         <div
@@ -37378,7 +38008,16 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 </button>
               </StudioHudPill>
               <StudioHudPill title={pageDisplayName(activePage, activePageIndex)} className="max-w-[7rem] truncate">
-                {pageDisplayName(activePage, activePageIndex)}
+                <button
+                  type="button"
+                  aria-expanded={pageSequenceOpen}
+                  aria-label={`페이지 시퀀스 ${pageSequenceOpen ? "닫기" : "열기"} · ${pageDisplayName(activePage, activePageIndex)}`}
+                  onClick={() => setPageSequenceOpen((current) => !current)}
+                  className="inline-flex min-w-0 items-center gap-1 rounded-full px-0.5 text-fg transition-colors hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                >
+                  <Clapperboard size={11} aria-hidden />
+                  <span className="truncate">{pageDisplayName(activePage, activePageIndex)}</span>
+                </button>
               </StudioHudPill>
               <StudioHudPill
                 title={studioDrawHudToolLabel(
@@ -37478,14 +38117,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  const wrap = wrapRef.current;
-                  if (wrap) {
-                    const w = wrap.clientWidth;
-                    setScale(Math.min(isFullscreen ? 4 : 2.5, Math.max(0.1, w / CANVAS_W)));
-                    setZoom(1);
-                  }
-                }}
+                onClick={fitCanvasToWidth}
                 className="rounded-full px-1.5 py-0.5 text-[0.58rem] font-bold text-fg-3 hover:bg-raised hover:text-fg"
                 title="너비에 맞춤"
               >
@@ -37556,6 +38188,28 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
               />
             </Suspense>
           </div>
+          {viewTool ? (
+            <div className="pointer-events-none sticky top-2 z-[44] flex h-0 items-start justify-center px-2">
+              <StudioViewToolsHud
+                className="!relative !left-auto !top-auto !max-w-full !translate-x-0"
+                mode={viewTool}
+                magnification={effScale}
+                canZoomIn={stepStudioViewZoom(zoom, 1) !== zoom}
+                canZoomOut={stepStudioViewZoom(zoom, -1) !== zoom}
+                rotation={canvasRotation}
+                flipped={canvasFlipH}
+                onZoomIn={() => setZoom((current) => stepStudioViewZoom(current, 1))}
+                onZoomOut={() => setZoom((current) => stepStudioViewZoom(current, -1))}
+                onFit={fitCanvasToWidth}
+                onActual={setActualPixelView}
+                onRotateLeft={() => rotateCanvasView("left")}
+                onRotateRight={() => rotateCanvasView("right")}
+                onToggleFlip={toggleHorizontalCanvasView}
+                onReset={resetView}
+                onClose={() => setViewTool(null)}
+              />
+            </div>
+          ) : null}
           {commentPinArmed ? (
             <div className="pointer-events-none sticky top-3 z-[45] flex h-0 items-start justify-center px-3">
               <div
@@ -37641,10 +38295,10 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
             ref={zoomHostRef}
             className={cn(
               "relative rounded-sm shadow-[0_0_0_1px_oklch(0.3_0.012_64/0.55),0_18px_50px_oklch(0.08_0.01_70/0.45)]",
-              (collaborationDocumentLocked || saving) && "pointer-events-none select-none",
+              (activeSurfaceReviewLocked || saving) && "pointer-events-none select-none",
               (sourceHydrationPending || collaborationDocumentUnavailable) && "invisible absolute inset-0"
             )}
-            style={{ width: CANVAS_W * effScale, height: canvasH * effScale }}
+            style={{ width: stageViewLayout.width, height: stageViewLayout.height }}
           >
           <div
             className="relative"
@@ -37653,15 +38307,17 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
           <Profiler id="studio:stage" onRender={recordStudioRenderProfile}>
           <Stage
             ref={stageRef}
-            width={CANVAS_W * effScale}
-            height={canvasH * effScale}
+            width={stageViewLayout.width}
+            height={stageViewLayout.height}
             // Drawing owns the contact stream; browser panning would otherwise cancel a fast
             // finger stroke. The wrap's explicit two-finger pinch handler still receives bubbled
             // touch events, and a second touch cancels an unfinished finger stroke above.
-            style={{ touchAction: tool === "draw" ? "none" : "auto" }}
-            scaleX={canvasFlipH ? -effScale : effScale}
-            scaleY={effScale}
-            x={canvasFlipH ? CANVAS_W * effScale : 0}
+            style={{ touchAction: tool === "draw" || liquifyArmed ? "none" : "auto" }}
+            scaleX={stageViewLayout.scaleX}
+            scaleY={stageViewLayout.scaleY}
+            x={stageViewLayout.x}
+            y={stageViewLayout.y}
+            rotation={stageViewLayout.rotation}
             onPointerDown={onStageDown}
             onPointerMove={onStageMove}
             onPointerUp={onStageUp}
@@ -37816,6 +38472,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                   !panelSplitArmed &&
                   !nodeEditArmed &&
                   !smudgeArmed &&
+                  !liquifyArmed &&
                   !healCloneArmed &&
                   !layerMaskPaintArmed &&
                   !historyBrushArmed &&
@@ -37834,6 +38491,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                       !panelSplitArmed &&
                       !nodeEditArmed &&
                       !smudgeArmed &&
+                      !liquifyArmed &&
                       !healCloneArmed &&
                       !layerMaskPaintArmed &&
                       !historyBrushArmed &&
@@ -38830,13 +39488,13 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 />
               </Layer>
             )}
-            {!isExporting && smudgeArmed && (
+            {!isExporting && (smudgeArmed || liquifyArmed) && (
               <Layer listening={false}>
                 <KCircle
                   ref={smudgeCursorRef}
                   visible={false}
-                  radius={Math.max(1.5, smudgeRadius)}
-                  stroke="#7c5cff"
+                  radius={Math.max(1.5, liquifyArmed ? liquifyRadius : smudgeRadius)}
+                  stroke={liquifyArmed ? "#fb923c" : "#7c5cff"}
                   strokeWidth={1.25 / effScale}
                   dash={[3 / effScale, 3 / effScale]}
                   opacity={0.9}
@@ -39373,7 +40031,10 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                     canvasWidth={CANVAS_W}
                     canvasHeight={canvasH}
                     effScale={effScale}
-                    onMovePoint={moveVanishingPointById}
+                    disabled={activeSurfaceReviewLocked || saving || masterEditMode}
+                    onPreviewPoint={previewVanishingPointById}
+                    onCommitPoint={moveVanishingPointById}
+                    onCancelPoint={cancelStudioDrawingAssistPreview}
                   />
                 </Suspense>
               </Layer>
@@ -39391,10 +40052,10 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                     canvasWidth={CANVAS_W}
                     canvasHeight={canvasH}
                     effScale={effScale}
-                    onMoveOrigin={(x, y) => {
-                      setIsometricOriginX(x);
-                      setIsometricOriginY(y);
-                    }}
+                    disabled={activeSurfaceReviewLocked || saving || masterEditMode}
+                    onPreviewOrigin={previewIsometricOrigin}
+                    onCommitOrigin={commitIsometricOrigin}
+                    onCancelOrigin={cancelStudioDrawingAssistPreview}
                   />
                 </Suspense>
               </Layer>
@@ -39502,6 +40163,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 hidden={isExporting || sourceHydrationPending || collaborationDocumentUnavailable}
                 commentPins={studioCanvasCommentPins}
                 flipX={canvasFlipH}
+                rotation={canvasRotation}
                 onCommentPinClick={(anchor, newestThreadId) => {
                   setCommentPinArmed(false);
                   selectStudioCommentAnchor(anchor);
@@ -39883,6 +40545,23 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
           {aiNoticeOpen && (
             <AiAssetNotice onCancel={() => setAiNoticeOpen(false)} onAcknowledge={acknowledgeAiNotice} />
           )}
+
+          <StudioPageSequenceStrip
+            open={pageSequenceOpen && !canvasOnlyMode && !mobileImmersive}
+            pages={pages.map((page, index) => ({
+              id: page.id,
+              label: pageDisplayName(page, index),
+              thumbnailUrl: null,
+            }))}
+            currentPageId={activePage.id}
+            onSelectPage={(pageId) => {
+              if (!setCurrentPageId(pageId)) return;
+              setSelectedId(null);
+              setMarqueeIds([]);
+            }}
+            onAddPage={collaborationDocumentLocked ? undefined : addPage}
+            onClose={() => setPageSequenceOpen(false)}
+          />
 
           {/* 캔버스 줌 컨트롤 — ⌘± / ⌘0 단축키 또는 ⌘+휠과 동일 동작 (모바일은 하단 도구막대로 대체) */}
           <div className="absolute bottom-3 left-3 z-30 hidden items-center gap-0.5 rounded-full border border-line bg-panel/95 p-0.5 shadow-lg backdrop-blur lg:flex">

@@ -7,6 +7,11 @@
  * 단위 테스트와 StudioPage가 동일한 진짜 export를 사용한다.
  */
 
+import {
+  mirrorStudioDrawingAssistDocument,
+  parseStudioDrawingAssistDocument,
+} from "./studio-drawing-assist-document";
+
 export interface PageElementLike {
   id: string;
   type?: unknown;
@@ -30,6 +35,7 @@ export interface PageLike {
   canvasH: number;
   grade?: unknown;
   groups?: Array<{ id: string }>;
+  drawingAssist?: unknown;
 }
 
 export const DEFAULT_CANVAS_H = 1080;
@@ -137,6 +143,7 @@ export function duplicateMirroredPage<P extends PageLike>(
   makeId: () => string,
   canvasW: number
 ): P {
+  const drawingAssist = parseStudioDrawingAssistDocument(page.drawingAssist);
   const mirroredEls = page.elements.map((el) => {
     const w = typeof el.width === "number" ? el.width : 0;
     const x = typeof el.x === "number" ? el.x : 0;
@@ -182,6 +189,9 @@ export function duplicateMirroredPage<P extends PageLike>(
     ...page,
     id: makeId(),
     elements: mirroredEls,
+    ...(drawingAssist
+      ? { drawingAssist: mirrorStudioDrawingAssistDocument(drawingAssist, canvasW) }
+      : {}),
   } as P;
 }
 

@@ -8,6 +8,12 @@
  * 전부 불변 · 부수효과 없음(스냅샷 불변성을 이용한 내부 라벨 메모만). Konva/React/DOM 의존 없음.
  */
 
+import { STUDIO_CANVAS_WIDTH } from "./studio-canvas-constants";
+import {
+  areStudioDrawingAssistDocumentsEqual,
+  normalizeStudioDrawingAssistDocument,
+} from "./studio-drawing-assist-document";
+
 // StudioPage 의 El 과 구조 호환되는 최소 형태 — diff 휴리스틱에 쓰는 필드만 선언한다.
 export interface HistoryElementLike {
   id: string;
@@ -41,6 +47,7 @@ export interface HistoryPageLike {
   groups?: unknown;
   name?: unknown;
   note?: unknown;
+  drawingAssist?: unknown;
 }
 
 /** 히스토리 한 칸 = 전체 페이지 배열 스냅샷(StudioPage pagesHistory 의 원소). */
@@ -205,6 +212,25 @@ interface PageDiff {
   grade: boolean;
   groups: boolean;
   meta: boolean;
+  drawingAssist: boolean;
+}
+
+function drawingAssistDocumentsDiffer(
+  previous: unknown,
+  next: unknown,
+  canvasHeight: unknown
+): boolean {
+  if (Object.is(previous, next)) return false;
+  const viewport = {
+    canvasWidth: STUDIO_CANVAS_WIDTH,
+    canvasHeight: typeof canvasHeight === "number" && Number.isFinite(canvasHeight)
+      ? canvasHeight
+      : 1_080,
+  };
+  return !areStudioDrawingAssistDocumentsEqual(
+    normalizeStudioDrawingAssistDocument(previous, viewport),
+    normalizeStudioDrawingAssistDocument(next, viewport)
+  );
 }
 
 function diffPage(prev: HistoryPageLike, next: HistoryPageLike): PageDiff {
@@ -215,6 +241,11 @@ function diffPage(prev: HistoryPageLike, next: HistoryPageLike): PageDiff {
     grade: prev.grade !== next.grade,
     groups: prev.groups !== next.groups,
     meta: prev.name !== next.name || prev.note !== next.note,
+    drawingAssist: drawingAssistDocumentsDiffer(
+      prev.drawingAssist,
+      next.drawingAssist,
+      next.canvasH
+    ),
   };
   if (prev.elements !== next.elements) diff.elements = diffElements(prev.elements, next.elements);
   return diff;
@@ -307,6 +338,7 @@ function pageDiffLabel(diff: PageDiff): string | null {
   if (diff.canvasH) parts.push("캔버스 높이 변경");
   if (diff.grade) parts.push("색보정 변경");
   if (diff.meta) parts.push("페이지 정보 수정");
+  if (diff.drawingAssist) parts.push("드로잉 가이드 변경");
   if (parts.length === 0) return null;
   if (parts.length > 2) return "여러 항목 편집";
   return parts.join(" · ");
@@ -349,14 +381,17 @@ export function describeHistoryStep(prev: HistorySnapshot | null | undefined, ne
   const n = pageDiffs.length;
   const isAll = n === next.length;
   const scope = isAll ? "전체" : `페이지 ${n}개`;
-  if (pageDiffs.every((d) => !d.elements && d.grade && !d.bg && !d.canvasH && !d.groups && !d.meta)) {
+  if (pageDiffs.every((d) => !d.elements && d.grade && !d.bg && !d.canvasH && !d.groups && !d.meta && !d.drawingAssist)) {
     return `${scope} 색보정 변경`;
   }
-  if (pageDiffs.every((d) => !d.elements && d.bg && !d.grade && !d.canvasH && !d.groups && !d.meta)) {
+  if (pageDiffs.every((d) => !d.elements && d.bg && !d.grade && !d.canvasH && !d.groups && !d.meta && !d.drawingAssist)) {
     return `${scope} 배경 변경`;
   }
-  if (pageDiffs.every((d) => d.elements?.onlyTextEdits && !d.bg && !d.grade && !d.canvasH && !d.groups && !d.meta)) {
+  if (pageDiffs.every((d) => d.elements?.onlyTextEdits && !d.bg && !d.grade && !d.canvasH && !d.groups && !d.meta && !d.drawingAssist)) {
     return "대사 일괄 수정";
+  }
+  if (pageDiffs.every((d) => !d.elements && !d.bg && !d.grade && !d.canvasH && !d.groups && !d.meta && d.drawingAssist)) {
+    return `${scope} 드로잉 가이드 변경`;
   }
   return `페이지 ${n}개 편집`;
 }

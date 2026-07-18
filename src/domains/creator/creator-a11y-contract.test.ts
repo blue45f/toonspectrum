@@ -92,8 +92,8 @@ describe("창작 화면 a11y 계약", () => {
     expect(panelUi).toMatch(/PANEL_SWATCH_CHIP_CLASS =\s*\n?\s*"[^"]*min-h-6[^"]*"/);
     // 슬라이더 회독(readout): 0.72rem 이상
     expect(panelUi).toMatch(/PANEL_READOUT_CLASS =\s*\n?\s*"[^"]*text-\[0\.72rem\][^"]*"/);
-    // 터치 기기 레인지 슬라이더: 24px(h-6) 타깃
-    expect(panelUi).toContain("pointer-coarse:h-6");
+    // 터치 기기 레인지 슬라이더: WCAG 권장 44px(h-11) 조작 타깃
+    expect(panelUi).toContain("pointer-coarse:h-11");
   });
 
   it("폼 컨트롤이 접근 가능한 이름(aria-label 또는 label 연결)을 가진다", () => {

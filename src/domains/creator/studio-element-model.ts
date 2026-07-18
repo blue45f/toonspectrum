@@ -1,0 +1,410 @@
+import type { StudioAdjustmentStack } from "./studio-adjustment-stack";
+import type { StudioTextAiProvenance } from "./studio-ai-client";
+import type { BubbleVariant } from "./studio-assets";
+import type { AutoAdjust } from "./studio-auto-adjust";
+import type {
+  StudioBg3dLtLayerRole,
+  StudioBg3dLtRenderMode,
+} from "./studio-bg3d-lt-layer-plan";
+import type { StudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
+import type { BlurFx } from "./studio-blur";
+import type { NormalizedStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
+import type { StudioStampBrushTuning } from "./studio-brush-stamp-engine";
+import type { BubbleTailSpec } from "./studio-bubble-path";
+import type { ChannelMixer } from "./studio-channel-mixer";
+import type { Clarity } from "./studio-clarity";
+import type { ColorBalance } from "./studio-color-balance";
+import type { ColorToAlpha } from "./studio-color-to-alpha";
+import type { StudioStoryBeat } from "./studio-continuity";
+import type { CurvePoint } from "./studio-curves";
+import type { Detail } from "./studio-detail";
+import type { Distort } from "./studio-distort";
+import type { DrawShapeKind } from "./studio-editor-tool-model";
+import type { StudioAnimFrame } from "./studio-frame-animation";
+import type { Glow } from "./studio-glow";
+import type { StudioGradientSpec } from "./studio-gradient-engine";
+import type { GradientMap } from "./studio-gradient-map";
+import type { Grain } from "./studio-grain";
+import type { Halftone } from "./studio-halftone";
+import type { StudioInkPressureModel } from "./studio-ink-pressure-model";
+import type { InkWash } from "./studio-ink-wash";
+import type {
+  StudioLayerColor,
+  StudioLayerRole,
+} from "./studio-layer-navigator";
+import type { Light } from "./studio-light";
+import type { Outline } from "./studio-outline";
+import type { StudioPatternSpec } from "./studio-pattern-fill";
+import type { PhotoFilter } from "./studio-photo-filter";
+import type { StudioPublishAiProvenance } from "./studio-publish-preflight";
+import type { StudioRasterAsset } from "./studio-raster-assets";
+import type { SelectiveHsl } from "./studio-selective-hsl";
+import type { Sketch } from "./studio-sketch";
+import type { StudioStockImageCredit } from "./studio-stock-image-client";
+import type { ScenarioBeatType } from "./studio-story-beats";
+import type { StudioStrokePaintModel } from "./studio-stroke-paint-model";
+import type { ShapeParams, StrokeStyle } from "./studio-stroke-shapes";
+import type { Stylize } from "./studio-stylize";
+import type { TextPathConfig } from "./studio-text-path";
+import type { Vibrance } from "./studio-vibrance";
+import type { StudioVrmSceneDocument } from "./studio-vrm-scene-document";
+
+export interface ImageEl {
+  id: string;
+  type: "image";
+  src: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  opacity?: number; // 불투명도(흐린 배경 캐릭터·페이드 등). 미설정=1.
+  flipped?: boolean; // 좌우 반전(캐릭터 미러링).
+  flippedY?: boolean; // 상하 반전
+  blur?: number;
+  brightness?: number;
+  contrast?: number;
+  grayscale?: boolean;
+  sepia?: boolean;
+  screentone?: boolean;
+  lineart?: boolean;
+  chromatic?: number;
+  posterize?: number;
+  noise?: number;
+  // 포토샵급 보정 — Konva HSL/내장 필터 + studio-filters 커스텀 픽셀 필터로 적용.
+  saturation?: number; // 채도(-1..1, Konva HSL)
+  hue?: number; // 색조 회전(-180..180°)
+  temperature?: number; // 색온도(-100..100, 따뜻/차갑게)
+  sharpen?: number; // 선명도(0..1, 언샤프 마스크)
+  pixelate?: number; // 픽셀화(0..40)
+  invert?: boolean; // 색 반전
+  inkThreshold?: number; // 먹선 임계(0..1, 순흑/순백)
+  duotoneShadow?: string; // 듀오톤 어두운 색
+  duotoneHighlight?: string; // 듀오톤 밝은 색
+  // 레벨 보정(Levels) — 입력/출력 검정·흰점 + 감마.
+  levelsBlack?: number;
+  levelsWhite?: number;
+  levelsGamma?: number;
+  levelsOutBlack?: number;
+  levelsOutWhite?: number;
+  // 레이어 스타일(그림자/글로우/둥근 모서리) — Konva.Image 네이티브 속성.
+  shadowColor?: string;
+  shadowBlur?: number;
+  shadowOffsetX?: number;
+  shadowOffsetY?: number;
+  shadowOpacity?: number;
+  cornerRadius?: number;
+  // 톤 커브(Curves) + 컬러 밸런스(Color Balance) + 채널 믹서(Channel Mixer) + 선택 색상(HSL) + 생동감(Vibrance).
+  curve?: CurvePoint[];
+  colorBalance?: ColorBalance;
+  channelMixer?: ChannelMixer;
+  selectiveHsl?: SelectiveHsl;
+  vibrance?: Vibrance;
+  gradientMap?: GradientMap;
+  photoFilter?: PhotoFilter;
+  colorToAlpha?: ColorToAlpha; // 색상 투명화 — 키 색상을 알파로 punching(studio-color-to-alpha)
+  autoAdjust?: AutoAdjust;
+  clarity?: Clarity;
+  outline?: Outline;
+  glow?: Glow;
+  halftone?: Halftone;
+  grain?: Grain;
+  /** 수묵/수채 번짐·종이결·안료 과립을 조합하는 비파괴 재질 효과. */
+  inkWash?: InkWash;
+  blurFx?: BlurFx;
+  distort?: Distort;
+  stylize?: Stylize;
+  light?: Light;
+  sketch?: Sketch;
+  detail?: Detail;
+  // 기울이기(Skew) — 도 단위(-60..60). 0(항등)은 저장하지 않는다(studio-skew 직렬화 규약).
+  skewX?: number;
+  skewY?: number;
+  /** Photopea-style reorderable smart filter stack (non-destructive). */
+  smartFilters?: StudioAdjustmentStack;
+  // 프레임별 셀 애니메이션 — 있으면 이 이미지는 "애니메이션 셀"이다.
+  // src는 항상 frames 중 현재 표시 프레임의 src와 동일하게 유지한다.
+  frames?: StudioAnimFrame[];
+  frameFps?: number; // 재생 속도(기본 12) — durationMs 미설정 프레임에 적용.
+  frameLoop?: boolean; // 반복 재생(기본 true).
+  activeFrameId?: string; // 현재 편집/표시 중인 프레임(패널이 열려 있을 때의 탐색 위치).
+  // 애니메이션 GIF 업로드 — 있으면 src 자체가 data:image/gif인 다중 프레임 GIF이고, 브라우저가
+  // <img> 소스를 내부적으로 계속 재생한다(디코딩은 이 앱이 하지 않는다 — studio-gif-element.ts
+  // 참고). 위 frames(셀 애니메이션)와는 서로 다른 축이다: frames는 이 앱이 여러 장의 정적 src를
+  // 프레임으로 넘겨가며 재생하는 것이고, isAnimatedGif는 단일 src 하나를 브라우저가 자체
+  // 재생하는 것 — 실질적으로 상호배타적으로 취급한다(UrlImage 리렌더 루프의 가드 참고).
+  isAnimatedGif?: boolean;
+  // 스톡 사진(Unsplash) 삽입 출처 — StudioStockImagePanel에서 삽입한 이미지에만 설정된다.
+  // Unsplash API Guidelines가 요구하는 "사진 사용 시 작가·Unsplash 크레딧 표시"를 삽입 이후에도
+  // (예: 선택된 이미지 사이드바에서) 다시 보여줄 수 있도록 요소에 영구 보존한다.
+  stockImageCredit?: StudioStockImageCredit;
+  /** AI 생성/편집 provenance. 페이지 JSON과 함께 저장되어 Publish Pack 사전검사에 사용된다. */
+  aiProvenance?: StudioPublishAiProvenance;
+  /** 번들 소재 카탈로그의 안정 ID. 다시 열어도 라이선스·생성 메타데이터를 추적한다. */
+  builtinRasterAssetId?: StudioRasterAsset["id"];
+  /** 고급 채우기가 선화 경계로 읽는 명시적 래스터 참조 레이어. */
+  fillReference?: boolean;
+  /** 재편집 가능한 3D 장면 원본. PNG src와 분리하며 로컬 저장소 ID는 포함하지 않는다. */
+  bg3dScene?: StudioBg3dSceneDocument;
+  /** 재편집 가능한 VRM 포저 장면. 캡처 PNG와 분리하며 모델은 번들 ID 또는 콘텐츠 해시로만 식별한다. */
+  vrmScene?: StudioVrmSceneDocument;
+  /** 분리된 3D LT 레이어를 같은 원본 장면으로 다시 묶는 안정 식별자. */
+  bg3dLtBundleId?: string;
+  /** 톤·재질선·주선 중 이 래스터 레이어의 역할. */
+  bg3dLtRole?: StudioBg3dLtLayerRole;
+  /** 레거시 단일 PNG인지 분리 출력인지 구분하는 재편집 메타데이터. */
+  bg3dLtRenderMode?: StudioBg3dLtRenderMode;
+}
+
+export interface TextEl {
+  id: string;
+  type: "text";
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  fontSize: number;
+  fill: string;
+  rotation: number;
+  font?: string; // 글꼴(웹툰 대사용)
+  stroke?: string; // 효과음(SFX) 외곽선
+  strokeWidth?: number;
+  letterSpacing?: number; // 자간(px)
+  lineHeight?: number; // 행간(배수)
+  vertical?: boolean;
+  align?: "left" | "center" | "right";
+  fontStyle?: "normal" | "bold" | "italic" | "bold italic";
+  shadowColor?: string;
+  shadowBlur?: number;
+  shadowOffsetX?: number;
+  shadowOffsetY?: number;
+  shadowOpacity?: number;
+  fillType?: "solid" | "gradient";
+  gradientColorStart?: string;
+  gradientColorEnd?: string;
+  gradientDirection?: "vertical" | "horizontal";
+  gradient?: StudioGradientSpec; // 멀티스톱 그라데이션(엔진) — 있으면 위 2색 레거시 필드보다 우선.
+  textPath?: TextPathConfig; // 곡선 텍스트(아치/물결/원) — 미설정/none이면 직선.
+  skewX?: number; // 가로 기울임(도, -60..60) — studio-skew 직렬화 규약. 미설정=0.
+  skewY?: number; // 세로 기울임(도) — studio-skew 직렬화 규약. 미설정=0.
+}
+
+export interface BubbleEl {
+  id: string;
+  type: "bubble";
+  variant: BubbleVariant;
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  fill: string;
+  textFill: string;
+  rotation: number;
+  tail?: "left" | "right" | "none"; // 말풍선 꼬리 방향(화자 쪽). shout/box는 무시.
+  tailDirection?: "bottom" | "top" | "left" | "right"; // 말풍선 꼬리 방향(상하좌우).
+  extraTails?: BubbleTailSpec[]; // 추가 꼬리(두 화자 동시 대사) — 주 꼬리 외 최대 2개. studio-bubble-path 정규화 규약.
+  font?: string; // 말풍선 글꼴(미설정 시 기본 고딕)
+  fontSize?: number; // 말풍선 글자 크기(미설정 시 24)
+  lineHeight?: number; // 행간(배수, 미설정 시 1.1)
+  vertical?: boolean;
+  align?: "left" | "center" | "right";
+  fontStyle?: "normal" | "bold" | "italic" | "bold italic";
+  tailXRatio?: number;
+  tailHeight?: number;
+  tailBase?: number; // 주 꼬리 밑동 너비(px). 미설정이면 말풍선 크기·테마에 맞춰 자동 계산.
+  tailBend?: number; // 주 꼬리 곡률(-1..1). 0은 직선형 테이퍼.
+  /** 꼬리 자동 부착 대상 요소 id. 설정되면 매 커밋마다 대상의 중심점을 향해 tailDirection/
+   *  tailXRatio/tailHeight 가 자동 재계산된다(studio-bubble-anchor.ts). 대상이 삭제되면
+   *  자동으로 지워진다(마지막 tail 값은 그대로 남아 수동 모드로 복귀). tailAnchorPoint 와
+   *  상호배타 — 패널이 하나를 설정할 때 다른 하나를 undefined 로 같이 patch 한다. */
+  tailAnchorId?: string;
+  /** 꼬리 자동 부착 대상 고정 좌표(페이지/캔버스 좌표, el.x/y 와 동일 원점). tailAnchorId 가
+   *  없을 때만 의미가 있다 — 말풍선이 움직이면 이 좌표를 향한 각도가 재계산된다(좌표 자체는
+   *  고정, 저절로 움직이지 않는다). */
+  tailAnchorPoint?: { x: number; y: number };
+  stroke?: string;
+  strokeWidth?: number;
+  strokeStyle?: StrokeStyle; // 점선 등(studio-stroke-shapes 규약) — 화살촉 필드는 말풍선엔 의미 없어 무시.
+  gradient?: StudioGradientSpec; // 멀티스톱 그라데이션 채우기 — 있으면 fill(단색)보다 우선(studio-gradient-engine).
+  autoShrinkText?: boolean; // true면 텍스트가 넘칠 때 높이 대신 폰트 크기를 자동 축소(studio-bubble-text-fit).
+  autoShrinkMinFontSize?: number; // 자동 축소 하한(px). 미설정 시 BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT.
+  starAmplitude?: number; // shout/angry variant(Star)의 안쪽 반경 비율(0..1). 미설정 시 각 variant의 기존 비율(36/68, 28/64).
+  shadowColor?: string;
+  shadowBlur?: number;
+  shadowOffsetX?: number;
+  shadowOffsetY?: number;
+  shadowOpacity?: number;
+  /** 커스텀 폐곡선 점 배열(요소 로컬 0,0~width,height — bubblePathData 와 동일 좌표계, 짝수 길이
+   *  [x0,y0,x1,y1,...], 최소 3점/6칸). 있으면 렌더는 variant별 모양(둥근사각형·별·하트·구름 등)
+   *  대신 이 폴리곤을 그린다(studio-bubble-custom-shape.ts). "커스텀 모양으로 전환" 버튼이
+   *  bubblePathData/Multi 결과를 샘플링해 채운다 — tailDirection/tailXRatio/tailHeight/extraTails
+   *  값 자체는 보존되지만(되돌리기용) 이 필드가 있는 동안은 렌더에 반영되지 않는다(꼬리가 이미
+   *  폴리곤에 구워져 있다). */
+  customShapePoints?: number[];
+}
+
+export interface FrameEl {
+  id: string;
+  type: "frame";
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  bg?: string;
+  bgColor?: string;
+  stroke?: string;
+  strokeWidth?: number;
+  dashStyle?: "solid" | "dashed";
+  /** AI 비트 시트에서 적용된 장면의 서사 역할·변화 요약. 페이지/프로젝트 JSON에 그대로 남아
+   * 이후 continuity lint와 작가실 편집의 안정적인 연결점이 된다. */
+  storyBeat?: {
+    type: ScenarioBeatType;
+    summary: string;
+    continuity?: Omit<StudioStoryBeat, "sceneId">;
+    textAiProvenance?: StudioTextAiProvenance;
+  };
+  /** AI 생성 배경이 프레임에 들어간 경우의 provenance. */
+  aiProvenance?: StudioPublishAiProvenance;
+  // 사선/비정형 패널 — 프레임 로컬좌표(x,y 기준) 쿼드 폴리곤 [x0,y0,x1,y1,x2,y2,x3,y3].
+  // 있으면 사각형 대신 이 폴리곤으로 클립·채움·테두리를 그린다.
+  points?: number[];
+}
+
+export interface StickerEl {
+  id: string;
+  type: "sticker";
+  text: string;
+  x: number;
+  y: number;
+  fontSize: number;
+  rotation: number;
+  skewX?: number; // 가로 기울임(도, -60..60) — studio-skew 직렬화 규약. 미설정=0.
+  skewY?: number; // 세로 기울임(도) — studio-skew 직렬화 규약. 미설정=0.
+}
+
+export interface DrawEl {
+  id: string;
+  type: "draw";
+  kind?: "freehand" | DrawShapeKind;
+  mode?: "pen" | "eraser";
+  points: number[];
+  stroke: string;
+  strokeWidth: number;
+  opacity?: number;
+  /**
+   * Versioned stroke-level alpha semantics. Omitted persisted strokes retain their frozen
+   * per-dab opacity behavior; newly authored translucent round ink opts into one-shot stroke
+   * opacity so overlapping dabs cannot darken an already visible prefix.
+   */
+  paintModel?: StudioStrokePaintModel;
+  fill?: string;
+  gradient?: StudioGradientSpec; // 도형 채우기 그라데이션(멀티스톱) — 미설정이면 fill 단색.
+  // 도형 채우기 패턴 — 우선순위: 패턴 > 그라데이션 > fill 단색. 타일 로드 전엔 아래 채우기가 폴백.
+  pattern?: StudioPatternSpec;
+  brush?: string;
+  pressures?: number[];
+  /** Versioned pressure→diameter semantics. Omitted persisted strokes retain the legacy curve. */
+  pressureModel?: StudioInkPressureModel;
+  /** 새 획을 만들 때의 논리 좌표 샘플 간격. 미설정 legacy 획은 과거 3px 렌더 규칙을 유지한다. */
+  sampleSpacing?: number;
+  /** 포인트별 PointerEvent 스타일러스 메타데이터. 캘리그래피·입자 브러시에서 저장한다. */
+  tiltXs?: number[];
+  tiltYs?: number[];
+  twists?: number[];
+  /** 입자 브러시가 속도·배럴 압력을 문서와 함께 재생하기 위한 포인트별 입력. */
+  speeds?: number[];
+  tangentialPressures?: number[];
+  /** 입자 브러시의 입력→출력 매핑 스냅샷. 저장·협업·SVG 내보내기에서 같은 dab을 재현한다. */
+  brushDynamics?: NormalizedStudioBrushDynamicsSettings;
+  /** 이 획을 다시 열거나 내보낼 때도 같은 펜촉 결과를 재현하기 위한 스냅샷. */
+  brushTip?: {
+    tiltEnabled: boolean;
+    angleDeg: number;
+    roundness: number;
+  };
+  /** 스탬프 브러시 튜닝 스냅샷(흐름/경도/최소 굵기) — 미설정 시 종류별 기본값. */
+  stamp?: StudioStampBrushTuning;
+  /** 새 스탬프 획의 append-only raw accepted-sample 재생 규약. 미설정 획은 legacy smoothing. */
+  stampPipeline?: "causal-walker-v2";
+  /** 새 수채/수묵 획의 prefix-stable pigment station 규약. 미설정 획은 legacy 재배치 플래너. */
+  watercolorPipeline?: "causal-walker-v2";
+  // 스트로크 스타일(점선/선 끝/화살촉) — 도형·선 전용. 미설정 시 기본(실선·둥근 끝).
+  strokeStyle?: StrokeStyle;
+  // 도형 파라미터(별 꼭짓점/다각형 변/모서리 반경) — 미설정 시 기존 하드코딩과 동일한 기본값.
+  shapeParams?: ShapeParams;
+  symmetry?: {
+    type: "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope";
+    centerX: number;
+    centerY: number;
+    radialCount?: number;
+  };
+}
+
+export interface FocusLinesEl {
+  id: string;
+  type: "focusLines";
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  lineCount: number;
+  innerRadius: number;
+  outerRadius: number;
+  stroke: string;
+  strokeWidth: number;
+  noise: number;
+  rotation: number;
+  opacity?: number;
+  centerXRatio?: number;
+  centerYRatio?: number;
+}
+
+export interface SpeedLinesEl {
+  id: string;
+  type: "speedLines";
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  lineCount: number;
+  direction: "horizontal" | "vertical";
+  stroke: string;
+  strokeWidth: number;
+  noise?: number;
+  rotation: number;
+  opacity?: number;
+}
+
+interface StudioElementLayerMetadata {
+  name?: string;
+  hidden?: boolean;
+  locked?: boolean;
+  noClip?: boolean;
+  opacity?: number;
+  blendMode?: string;
+  lockAspect?: boolean;
+  groupId?: string;
+  clipBelow?: boolean;
+  alphaLocked?: boolean;
+  maskSrc?: string;
+  maskEnabled?: boolean;
+  layerRole?: StudioLayerRole;
+  layerColor?: StudioLayerColor;
+  /** 이 요소가 이메레스 밑그림 틀로 삽입됐는지 + 어디서 왔는지 표식. 카탈로그 틀: t.id 그대로.
+   *  개인 보관함 항목: `custom:${item.id}`. 두 출처 모두 "이메레스에서 온 요소"라는 사실만으로
+   *  일괄 삭제 대상이 된다. */
+  emeresSourceId?: string;
+}
+
+// 인터섹션으로 모든 요소 변형에 레이어 메타(표시/숨김·잠금)를 부여.
+export type El = (
+  | ImageEl
+  | TextEl
+  | BubbleEl
+  | StickerEl
+  | DrawEl
+  | FrameEl
+  | FocusLinesEl
+  | SpeedLinesEl
+) & StudioElementLayerMetadata;

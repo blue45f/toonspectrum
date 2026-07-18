@@ -60,6 +60,8 @@ export interface StudioLiveCanvasOverlayProps {
     threadIds?: readonly string[]
   ) => void;
   flipX?: boolean;
+  /** View-only clockwise quarter turn; horizontal flip remains relative to the visible screen. */
+  rotation?: 0 | 90 | 180 | 270;
 }
 
 export interface StudioLivePresenceDockProps {
@@ -87,6 +89,8 @@ export interface StudioRemoteCursorOverlayProps {
     threadIds?: readonly string[]
   ) => void;
   flipX?: boolean;
+  /** View-only clockwise quarter turn; horizontal flip remains relative to the visible screen. */
+  rotation?: 0 | 90 | 180 | 270;
 }
 
 export interface StudioLivePresenceDockConnectedProps {
@@ -99,6 +103,62 @@ export interface StudioLivePresenceDockConnectedProps {
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
+}
+
+interface StudioLiveOverlayProjection {
+  x: number;
+  y: number;
+  screenOffsetX: number;
+  screenOffsetY: number;
+}
+
+/** Project document-local coordinates into the axis-aligned quarter-turned view box. */
+function projectStudioLiveOverlayPoint(
+  x: number,
+  y: number,
+  screenOffsetX: number,
+  screenOffsetY: number,
+  flipX: boolean,
+  rotation: 0 | 90 | 180 | 270
+): StudioLiveOverlayProjection {
+  let projected: StudioLiveOverlayProjection;
+  if (rotation === 90) {
+    projected = {
+      x: 1 - y,
+      y: x,
+      screenOffsetX: -screenOffsetY,
+      screenOffsetY: screenOffsetX,
+    };
+  } else if (rotation === 180) {
+    projected = {
+      x: 1 - x,
+      y: 1 - y,
+      screenOffsetX: -screenOffsetX,
+      screenOffsetY: -screenOffsetY,
+    };
+  } else if (rotation === 270) {
+    projected = {
+      x: y,
+      y: 1 - x,
+      screenOffsetX: screenOffsetY,
+      screenOffsetY: -screenOffsetX,
+    };
+  } else {
+    projected = {
+      x,
+      y,
+      screenOffsetX,
+      screenOffsetY,
+    };
+  }
+
+  return flipX
+    ? {
+        ...projected,
+        x: 1 - projected.x,
+        screenOffsetX: -projected.screenOffsetX,
+      }
+    : projected;
 }
 
 function initial(value: string): string {
@@ -156,6 +216,7 @@ export function StudioLiveCanvasOverlay({
   commentPins,
   onCommentPinClick,
   flipX = false,
+  rotation = 0,
 }: StudioLiveCanvasOverlayProps) {
   return (
     <div
@@ -163,50 +224,68 @@ export function StudioLiveCanvasOverlay({
       className="pointer-events-none absolute inset-0 z-20 overflow-hidden"
       data-studio-live-canvas-overlay
     >
-      {commentPins.map((pin) => (
-        <button
-          key={pin.key}
-          type="button"
-          aria-haspopup="dialog"
-          aria-label={`${pin.label}, ${pin.unreadCount ? `읽지 않은 댓글 ${pin.unreadCount}개, ` : ""}열림 댓글 ${pin.count}개`}
-          data-studio-comment-pin="true"
-          className={cn(
-            "pointer-events-auto absolute grid size-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full text-[0.65rem] font-black tabular-nums text-on-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-            "[&>span]:transition-transform [&>span]:duration-200 motion-reduce:[&>span]:transition-none hover:[&>span]:scale-110",
-            pin.unreadCount ? "[&>span]:ring-4 [&>span]:ring-accent/30" : null
-          )}
-          style={{
-            left: `clamp(1.375rem, calc(${(((flipX ? canvasWidth - pin.x : pin.x) / canvasWidth) * 100).toFixed(4)}% + ${(flipX ? -1 : 1) * (pin.screenOffsetX ?? 0)}px), calc(100% - 1.375rem))`,
-            top: `clamp(1.375rem, calc(${((pin.y / canvasHeight) * 100).toFixed(4)}% + ${pin.screenOffsetY ?? 0}px), calc(100% - 1.375rem))`,
-          }}
-          title={`${pin.label} · ${pin.unreadCount ? `읽지 않음 ${pin.unreadCount}개 · ` : ""}열림 ${pin.count}개`}
-          onClick={() => onCommentPinClick(
-            pin.anchor,
-            pin.newestUnreadThreadId ?? pin.newestThreadId,
-            pin.threadIds
-          )}
-        >
-          <span className="relative grid size-8 place-items-center rounded-full border-2 border-panel bg-accent shadow-[0_4px_14px_oklch(0.10_0.02_70/0.42)]">
-            {pin.count > 1 ? pin.count : <MessageCircle size={14} aria-hidden />}
-            {pin.unreadCount ? (
-              <span
-                aria-hidden
-                className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-panel bg-warn shadow-sm"
-              />
-            ) : null}
-          </span>
-        </button>
-      ))}
+      {commentPins.map((pin) => {
+        const projected = projectStudioLiveOverlayPoint(
+          pin.x / canvasWidth,
+          pin.y / canvasHeight,
+          pin.screenOffsetX ?? 0,
+          pin.screenOffsetY ?? 0,
+          flipX,
+          rotation
+        );
+        return (
+          <button
+            key={pin.key}
+            type="button"
+            aria-haspopup="dialog"
+            aria-label={`${pin.label}, ${pin.unreadCount ? `읽지 않은 댓글 ${pin.unreadCount}개, ` : ""}열림 댓글 ${pin.count}개`}
+            data-studio-comment-pin="true"
+            className={cn(
+              "pointer-events-auto absolute grid size-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full text-[0.65rem] font-black tabular-nums text-on-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+              "[&>span]:transition-transform [&>span]:duration-200 motion-reduce:[&>span]:transition-none hover:[&>span]:scale-110",
+              pin.unreadCount ? "[&>span]:ring-4 [&>span]:ring-accent/30" : null
+            )}
+            style={{
+              left: `clamp(1.375rem, calc(${(projected.x * 100).toFixed(4)}% + ${projected.screenOffsetX}px), calc(100% - 1.375rem))`,
+              top: `clamp(1.375rem, calc(${(projected.y * 100).toFixed(4)}% + ${projected.screenOffsetY}px), calc(100% - 1.375rem))`,
+            }}
+            title={`${pin.label} · ${pin.unreadCount ? `읽지 않음 ${pin.unreadCount}개 · ` : ""}열림 ${pin.count}개`}
+            onClick={() => onCommentPinClick(
+              pin.anchor,
+              pin.newestUnreadThreadId ?? pin.newestThreadId,
+              pin.threadIds
+            )}
+          >
+            <span className="relative grid size-8 place-items-center rounded-full border-2 border-panel bg-accent shadow-[0_4px_14px_oklch(0.10_0.02_70/0.42)]">
+              {pin.count > 1 ? pin.count : <MessageCircle size={14} aria-hidden />}
+              {pin.unreadCount ? (
+                <span
+                  aria-hidden
+                  className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-panel bg-warn shadow-sm"
+                />
+              ) : null}
+            </span>
+          </button>
+        );
+      })}
 
       {cursors.map(({ participant, cursor }) => {
         const color = studioLiveParticipantColor(participant.sessionId);
+        const projected = projectStudioLiveOverlayPoint(
+          clamp(cursor.x, 0, 1),
+          clamp(cursor.y, 0, 1),
+          0,
+          0,
+          flipX,
+          rotation
+        );
         return (
           <div
             key={participant.sessionId}
             className="absolute left-0 top-0 motion-safe:transition-[left,top] motion-safe:duration-75"
             style={{
-              left: `${(flipX ? 1 - clamp(cursor.x, 0, 1) : clamp(cursor.x, 0, 1)) * 100}%`,
-              top: `${clamp(cursor.y, 0, 1) * 100}%`,
+              left: `${projected.x * 100}%`,
+              top: `${projected.y * 100}%`,
             }}
           >
             <MousePointer2
@@ -243,6 +322,7 @@ export function StudioRemoteCursorOverlay({
   commentPins,
   onCommentPinClick,
   flipX = false,
+  rotation = 0,
 }: StudioRemoteCursorOverlayProps) {
   const { room } = useStudioLiveCollaboration();
   const cursorMapRef = useRef(new Map<string, StudioLiveCanvasCursor>());
@@ -338,6 +418,7 @@ export function StudioRemoteCursorOverlay({
       commentPins={commentPins}
       onCommentPinClick={onCommentPinClick}
       flipX={flipX}
+      rotation={rotation}
     />
   );
 }

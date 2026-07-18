@@ -137,6 +137,7 @@ export function creatorWorkSnapshotToStudioProject(
     comments: doc.comments,
     releaseSchedule: doc.releaseSchedule,
     publicationAnalytics: doc.publicationAnalytics,
+    referenceBoard: doc.referenceBoard,
     publishPack: doc.publishPack,
     // WorkFxPanel persists this registered document extension directly under `doc.fx`.
     fx: comparableFx,

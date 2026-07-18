@@ -22,6 +22,7 @@ import {
   type StudioAnimKeyframe,
 } from "./studio-anim-tracks";
 import { STUDIO_UPLOAD_DESKTOP_MAX_DECODED_PIXELS } from "./studio-upload-image-safety";
+import { serializeStudioVrmSceneDocument } from "./studio-vrm-scene-document";
 
 import type { LayerGroup } from "./studio-layers";
 
@@ -335,6 +336,10 @@ function hasSafeImageClipboardOptionals(value: Record<string, unknown>): boolean
     return false;
   }
   if (value.bg3dScene !== undefined && !isRecord(value.bg3dScene)) return false;
+  if (
+    value.vrmScene !== undefined
+    && (!isRecord(value.vrmScene) || serializeStudioVrmSceneDocument(value.vrmScene) === null)
+  ) return false;
   if (value.smartFilters !== undefined && !isRecord(value.smartFilters)) return false;
   if (value.frames !== undefined) {
     if (!Array.isArray(value.frames) || value.frames.length > 60) return false;

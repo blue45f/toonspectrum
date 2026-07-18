@@ -2,6 +2,13 @@ import {
   normalizeStudioAiProvenanceDocument,
   type StudioAiProvenanceDocument,
 } from "./studio-ai-provenance";
+import { STUDIO_CANVAS_WIDTH } from "./studio-canvas-constants";
+import { studioDrawingAssistHasContent } from "./studio-drawing-assist-document";
+import {
+  normalizeStudioReferenceBoardDocument,
+  studioReferenceBoardHasContent,
+  type StudioReferenceBoardDocument,
+} from "./studio-reference-board";
 
 export const LEGACY_STUDIO_AUTOSAVE_KEY = "toonspectrum-studio-autosave";
 const STUDIO_AUTOSAVE_PREFIX = "toonspectrum-studio-autosave:v2";
@@ -45,7 +52,12 @@ export type StudioLifecycleDurabilityMarker = {
 export type StudioAutosavePayload = {
   version: 2;
   savedAt: string;
-  pagesList: Array<{ id?: unknown; elements?: unknown[] }>;
+  pagesList: Array<{
+    id?: unknown;
+    elements?: unknown[];
+    canvasH?: unknown;
+    drawingAssist?: unknown;
+  }>;
   master?: { elements?: unknown[] } | unknown;
   characterBible?: unknown;
   /** Private story planning/review state. Never projected into public creator documents. */
@@ -53,6 +65,8 @@ export type StudioAutosavePayload = {
   comments?: unknown;
   releaseSchedule?: unknown;
   publicationAnalytics?: unknown;
+  /** Project-owned reference composition. Image bytes are content-addressed outside this JSON. */
+  referenceBoard?: StudioReferenceBoardDocument;
   /** Private, document-scoped AI operation history. Prompt text is redacted during hydration. */
   aiProvenance?: StudioAiProvenanceDocument;
   title?: string;
@@ -216,6 +230,9 @@ export function parseStudioAutosave(raw: string | null): StudioAutosavePayload |
       comments: record.comments,
       releaseSchedule: record.releaseSchedule,
       publicationAnalytics: record.publicationAnalytics,
+      referenceBoard: Object.hasOwn(record, "referenceBoard")
+        ? normalizeStudioReferenceBoardDocument(record.referenceBoard)
+        : undefined,
       aiProvenance: Object.hasOwn(record, "aiProvenance")
         ? normalizeStudioAiProvenanceDocument(record.aiProvenance)
         : undefined,
@@ -256,6 +273,9 @@ export function parseStudioAutosave(raw: string | null): StudioAutosavePayload |
 export function serializeStudioAutosave(payload: StudioAutosavePayload): string {
   return JSON.stringify({
     ...payload,
+    ...(payload.referenceBoard === undefined
+      ? {}
+      : { referenceBoard: normalizeStudioReferenceBoardDocument(payload.referenceBoard) }),
     ...(payload.aiProvenance === undefined
       ? {}
       : { aiProvenance: normalizeStudioAiProvenanceDocument(payload.aiProvenance) }),
@@ -294,6 +314,12 @@ export function studioAutosaveHasContent(payload: StudioAutosavePayload): boolea
     // the final element or changing page/background metadata that older content heuristics omit.
     payload.lifecycleDurability !== undefined ||
     payload.pagesList.some((page) => Array.isArray(page?.elements) && page.elements.length > 0) ||
+    payload.pagesList.some((page) => studioDrawingAssistHasContent(page?.drawingAssist, {
+      canvasWidth: STUDIO_CANVAS_WIDTH,
+      canvasHeight: typeof page?.canvasH === "number" && Number.isFinite(page.canvasH)
+        ? page.canvasH
+        : 1_080,
+    })) ||
     (typeof payload.master === "object" &&
       payload.master !== null &&
       Array.isArray((payload.master as { elements?: unknown[] }).elements) &&
@@ -315,6 +341,7 @@ export function studioAutosaveHasContent(payload: StudioAutosavePayload): boolea
       payload.publicationAnalytics !== null &&
       Array.isArray((payload.publicationAnalytics as { records?: unknown[] }).records) &&
       ((payload.publicationAnalytics as { records: unknown[] }).records.length > 0)) ||
+    studioReferenceBoardHasContent(payload.referenceBoard) ||
     (payload.aiProvenance?.operations.length ?? 0) > 0 ||
     (payload.title ?? "").trim().length > 0 ||
     (payload.description ?? "").trim().length > 0 ||

@@ -13,8 +13,8 @@ import {
 import { extractFilterFields, looksResetPatch, type StudioLook } from "./studio-looks";
 import { applyPhotoWebtoonPreset, resetPhotoWebtoonPreset } from "./studio-photo-webtoon-preset";
 
+import type { El, ImageEl } from "./studio-element-model";
 import type { ImageFilterFields } from "./studio-konva-filter-fields";
-import type { El, ImageEl } from "./StudioPage";
 
 function createLookEffectId(lookId: string): StudioEffectId {
   return createStudioEffectId("look", lookId);

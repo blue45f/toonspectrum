@@ -10,6 +10,14 @@ import {
   parseStudioBg3dSceneDocument,
   serializeStudioBg3dSceneDocument,
 } from "./studio-bg3d-scene-document";
+import { parseStudioDrawingAssistDocument } from "./studio-drawing-assist-document";
+import { parseStudioReferenceBoardDocument } from "./studio-reference-board";
+import {
+  STUDIO_VRM_SCENE_DOCUMENT_KIND,
+  migrateStudioVrmSceneDocument,
+  parseStudioVrmSceneDocument,
+  serializeStudioVrmSceneDocument,
+} from "./studio-vrm-scene-document";
 
 const STUDIO_PROJECT_MAX_ELEMENTS_PER_PAGE_OR_MASTER = 10_000;
 
@@ -43,6 +51,8 @@ const CommonProjectSchema = z.object({
   comments: z.unknown().optional(),
   releaseSchedule: z.unknown().optional(),
   publicationAnalytics: z.unknown().optional(),
+  /** Project-owned pose/reference board. Binary bytes live in the asset archive, never here. */
+  referenceBoard: z.unknown().optional(),
   /** Private operation history; hydration always strips raw prompt fields by default. */
   aiProvenance: OptionalAiProvenanceSchema,
   // 목적지 정책은 자주 바뀌므로 프로젝트 파서는 느슨하게 보존하고, UI에서 별도 정규화한다.
@@ -95,23 +105,64 @@ function canonicalizeBg3dSceneElement(value: unknown): unknown {
   return { ...value, bg3dScene: scene };
 }
 
+function canonicalizeVrmSceneElement(value: unknown): unknown {
+  if (!isRecord(value) || value.type !== "image" || value.vrmScene === undefined) {
+    return value;
+  }
+  const migrated =
+    isRecord(value.vrmScene)
+    && value.vrmScene.kind === STUDIO_VRM_SCENE_DOCUMENT_KIND
+      ? migrateStudioVrmSceneDocument(value.vrmScene)
+      : null;
+  const serialized = serializeStudioVrmSceneDocument(migrated);
+  const scene = serialized ? parseStudioVrmSceneDocument(serialized) : null;
+  if (!scene) {
+    throw new Error("3D 데생 인형 장면 데이터가 손상되었거나 지원하지 않는 버전입니다.");
+  }
+  return { ...value, vrmScene: scene };
+}
+
+function canonicalizeStudio3dSceneElement(value: unknown): unknown {
+  return canonicalizeVrmSceneElement(canonicalizeBg3dSceneElement(value));
+}
+
 function canonicalizeBg3dSceneElements(value: unknown): unknown {
   if (!Array.isArray(value)) return value;
   if (value.length > STUDIO_PROJECT_MAX_ELEMENTS_PER_PAGE_OR_MASTER) {
     throw new Error("마스터 요소 수가 프로젝트 안전 한도를 넘었습니다.");
   }
-  return value.map(canonicalizeBg3dSceneElement);
+  return value.map(canonicalizeStudio3dSceneElement);
 }
 
 function canonicalizeProjectBg3dScenes(project: StudioProjectFile): StudioProjectFile {
-  const pagesList = project.pagesList.map((page) => ({
-    ...page,
-    elements: page.elements.map(canonicalizeBg3dSceneElement),
-  }));
+  const pagesList = project.pagesList.map((page) => {
+    const drawingAssist = page.drawingAssist === undefined
+      ? undefined
+      : parseStudioDrawingAssistDocument(page.drawingAssist);
+    if (page.drawingAssist !== undefined && !drawingAssist) {
+      throw new Error("페이지 드로잉 보조 설정이 손상되었거나 지원하지 않는 버전입니다.");
+    }
+    return {
+      ...page,
+      elements: page.elements.map(canonicalizeStudio3dSceneElement),
+      ...(drawingAssist ? { drawingAssist } : {}),
+    };
+  });
   const master = isRecord(project.master) && Array.isArray(project.master.elements)
     ? { ...project.master, elements: canonicalizeBg3dSceneElements(project.master.elements) }
     : project.master;
-  return { ...project, pagesList, master };
+  const referenceBoard = project.referenceBoard === undefined
+    ? undefined
+    : parseStudioReferenceBoardDocument(project.referenceBoard);
+  if (project.referenceBoard !== undefined && !referenceBoard) {
+    throw new Error("포즈 참고 보드 데이터가 손상되었거나 지원하지 않는 버전입니다.");
+  }
+  return {
+    ...project,
+    pagesList,
+    master,
+    ...(referenceBoard ? { referenceBoard } : {}),
+  };
 }
 
 export function parseStudioProjectFile(value: unknown): StudioProjectFile {

@@ -973,6 +973,58 @@ describe("studio-project-archive", () => {
     }), "PROJECT_INVALID");
   });
 
+  it("레거시 VRM 포저 PNG fragment를 정식 장면으로 변환하고 로컬 모델 의존성은 거부한다", async () => {
+    const raster = pngBytes(43);
+    const legacyPose = {
+      tool: "vrm-poser",
+      modelId: "avatar-a",
+      modelName: "하린",
+      yOffset: 0.12,
+      bodyRotationY: 0.35,
+      bones: { head: { rotation: [0.1, -0.2, 0.05] } },
+      expressionWeights: { happy: 0.7 },
+      fingerOverrides: {},
+    };
+    const legacySrc = `${dataUrl("image/png", raster)}#${encodeURIComponent(JSON.stringify(legacyPose))}`;
+    const project = {
+      version: "1.0",
+      title: "레거시 데생 인형",
+      pages: [minimalPage([{ id: "legacy-vrm", type: "image", src: legacySrc }])],
+    };
+
+    const built = await buildStudioProjectArchive({ project });
+    const imported = await importStudioProjectArchive(built.blob);
+    const image = imported.project.pagesList[0]?.elements[0] as {
+      src: string;
+      vrmScene: {
+        model: { source: string; id: string };
+        pose: { yOffset: number; bodyRotationY: number };
+        expressions: Record<string, number>;
+      };
+    };
+    expect(image.src).toBe(dataUrl("image/png", raster));
+    expect(image.src).not.toContain("#");
+    expect(image.vrmScene).toMatchObject({
+      model: { source: "bundled", id: "avatar-a" },
+      pose: { yOffset: 0.12, bodyRotationY: 0.35 },
+      expressions: { happy: 0.7 },
+    });
+
+    await expectArchiveError(buildStudioProjectArchive({
+      project: {
+        ...project,
+        pages: [minimalPage([{
+          id: "legacy-local-vrm",
+          type: "image",
+          src: `${dataUrl("image/png", raster)}#${encodeURIComponent(JSON.stringify({
+            ...legacyPose,
+            modelId: "local-indexeddb-model",
+          }))}`,
+        }])],
+      },
+    }), "PROJECT_INVALID");
+  });
+
   it("기존 v1 manifest를 읽고 신규 writer는 mode가 명시된 v2만 출력한다", async () => {
     const legacy = await importStudioProjectArchive(await manualRasterArchive({
       bytes: pngBytes(41),
