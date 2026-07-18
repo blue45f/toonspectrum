@@ -1,6 +1,6 @@
-[verify-bg3d-physics] preview: ➜  Local:   http://127.0.0.1:62120/
-[verify-bg3d-physics] preview ready @ http://127.0.0.1:62120/studio
-[verify-bg3d-physics] desktop PASS: previewY=2.8180 bakedY=2.8200
+[verify-bg3d-physics] preview: ➜  Local:   http://127.0.0.1:56711/
+[verify-bg3d-physics] preview ready @ http://127.0.0.1:56711/studio
+[verify-bg3d-physics] desktop PASS: previewY=1.5273 bakedY=1.5300
 [verify-bg3d-physics] mobile 390px PASS: touch targets >=44px, no horizontal overflow
 [verify-bg3d-physics] mobile 320px PASS: touch targets >=44px, no horizontal overflow
 [verify-bg3d-physics] screenshots: /Users/hjunkim/WebstormProjects/toonspectrum/artifacts/browser/studio-bg3d-physics/desktop-running.png /Users/hjunkim/WebstormProjects/toonspectrum/artifacts/browser/studio-bg3d-physics/desktop-paused.png /Users/hjunkim/WebstormProjects/toonspectrum/artifacts/browser/studio-bg3d-physics/desktop-reset.png /Users/hjunkim/WebstormProjects/toonspectrum/artifacts/browser/studio-bg3d-physics/desktop-baked.png /Users/hjunkim/WebstormProjects/toonspectrum/artifacts/browser/studio-bg3d-physics/desktop-undo.png /Users/hjunkim/WebstormProjects/toonspectrum/artifacts/browser/studio-bg3d-physics/desktop-redo.png /Users/hjunkim/WebstormProjects/toonspectrum/artifacts/browser/studio-bg3d-physics/mobile-390-paused.png /Users/hjunkim/WebstormProjects/toonspectrum/artifacts/browser/studio-bg3d-physics/mobile-320-paused.png
