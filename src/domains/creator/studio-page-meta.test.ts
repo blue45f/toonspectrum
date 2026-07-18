@@ -184,6 +184,19 @@ function drawEl(id: string, points: number[] = [10, 20, 30, 40]): ClipboardEleme
   return { id, type: "draw", points, stroke: "#000", strokeWidth: 4 };
 }
 
+function imageEl(id: string, x = 100, y = 200): ClipboardElementLike {
+  return {
+    id,
+    type: "image",
+    src: "data:image/png;base64,AA==",
+    x,
+    y,
+    width: 100,
+    height: 80,
+    rotation: 0,
+  };
+}
+
 describe("buildClipboardPayload", () => {
   it("버전·출처 페이지 크기·출처 페이지 id·복사 시각을 싣는다", () => {
     const p = buildClipboardPayload([textEl("e1")], SRC, 1234);
@@ -236,7 +249,7 @@ describe("buildClipboardPayload", () => {
 
   it("선택 그룹 메타데이터와 애니메이션 트랙만 함께 캡처하고 Cut 관계 완전성을 검사", () => {
     const payload = buildClipboardPayload(
-      [{ ...textEl("a"), groupId: "dialogue" }, textEl("b")],
+      [{ ...imageEl("a"), groupId: "dialogue" }, textEl("b")],
       SRC,
       10,
       {
@@ -256,6 +269,7 @@ describe("buildClipboardPayload", () => {
 
     expect(payload.groups?.map((group) => group.id)).toEqual(["dialogue"]);
     expect(Object.keys(payload.animation?.tracks ?? {})).toEqual(["a"]);
+    expect(clipboardPayloadMatchesMembers(payload, ["a", "b"])).toBe(true);
     expect(clipboardPayloadMatchesMembers(payload, ["a", "b"], {
       groupIds: ["dialogue"],
       trackIds: ["a"],
@@ -456,6 +470,24 @@ describe("serialize/parse round trip", () => {
 
   it("잘못된 그룹 이름과 타임라인 관계는 외부 페이로드에서 거부", () => {
     const base = buildClipboardPayload([{ ...textEl("e1"), groupId: "g1" }], SRC, 1);
+    expect(isClipboardPayload({
+      ...base,
+      els: [{
+        id: "bubble",
+        type: "bubble",
+        variant: "speech",
+        text: "안녕",
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 80,
+        fill: "#fff",
+        textFill: "#111",
+        rotation: 0,
+        tailAnchorPoint: { x: "bad", y: 10 },
+      }],
+      groups: undefined,
+    })).toBe(false);
     expect(isClipboardPayload({ ...base, groups: [{ id: "g1", name: "" }] })).toBe(false);
     expect(isClipboardPayload({ ...base, groups: [{ id: "g1", name: "bad\u0007name" }] })).toBe(false);
     expect(isClipboardPayload({ ...base, groups: [{ id: "unreferenced", name: "유령" }] })).toBe(false);
@@ -465,6 +497,15 @@ describe("serialize/parse round trip", () => {
         frameCount: 12,
         tracks: {
           missing: [{ frameIndex: 0, frame: { id: "f", src: "data:image/png;base64,AA==" } }],
+        },
+      },
+    })).toBe(false);
+    expect(isClipboardPayload({
+      ...base,
+      animation: {
+        frameCount: 12,
+        tracks: {
+          e1: [{ frameIndex: 0, frame: { id: "f", src: "data:image/png;base64,AA==" } }],
         },
       },
     })).toBe(false);
@@ -551,7 +592,7 @@ describe("planClipboardPaste", () => {
   it("말풍선 내부 앵커·사용자 그룹명·타임라인을 새 ID로 함께 재매핑", () => {
     const payload = buildClipboardPayload(
       [
-        { ...textEl("anchor"), groupId: "dialogue" },
+        { ...imageEl("anchor"), groupId: "dialogue" },
         {
           id: "bubble",
           type: "bubble",
@@ -575,7 +616,7 @@ describe("planClipboardPaste", () => {
         animationTimeline: {
           frameCount: 24,
           tracks: {
-            bubble: [{
+            anchor: [{
               frameIndex: 4,
               frame: { id: "frame-source", src: "data:image/png;base64,AA==", durationMs: 80 },
               transform: { x: 5, y: -3, rotation: 10, scaleX: 1.1, scaleY: 0.9 },
@@ -605,12 +646,54 @@ describe("planClipboardPaste", () => {
       locked: false,
     }]);
     expect(plan.animationFrameCount).toBe(24);
-    expect(plan.animationTracks["copy-2"]).toEqual([{
+    expect(plan.animationTracks["copy-1"]).toEqual([{
       frameIndex: 4,
       frame: { id: "copy-4", src: "data:image/png;base64,AA==", durationMs: 80 },
       transform: { x: 10, y: -6, rotation: 10, scaleX: 1.1, scaleY: 0.9 },
       ease: "ease-in-out",
     }]);
+  });
+
+  it("외부 말풍선 앵커는 같은 페이지에서 유지하고 다른 페이지에서 끊으며 절대 꼬리 좌표를 보정", () => {
+    const payload = buildClipboardPayload(
+      [{
+        id: "bubble",
+        type: "bubble",
+        variant: "speech",
+        text: "다른 레이어를 가리킴",
+        x: 200,
+        y: 300,
+        width: 180,
+        height: 100,
+        fill: "#fff",
+        textFill: "#111",
+        rotation: 0,
+        tailAnchorId: "not-copied",
+        tailAnchorPoint: { x: 250, y: 360 },
+      }],
+      SRC,
+      1
+    );
+
+    const samePagePlan = planClipboardPaste(
+      payload,
+      { canvasW: 720, canvasH: 1080, pageId: "page-1" },
+      seqId("same")
+    )!;
+    expect(samePagePlan.els[0].tailAnchorId).toBe("not-copied");
+    expect(samePagePlan.els[0].tailAnchorPoint).toEqual({
+      x: 250 + PASTE_OFFSET,
+      y: 360 + PASTE_OFFSET,
+    });
+
+    const plan = planClipboardPaste(
+      payload,
+      { canvasW: 1440, canvasH: 2160, pageId: "page-2" },
+      seqId("copy")
+    )!;
+
+    expect(plan.els[0]).not.toHaveProperty("tailAnchorId");
+    expect(plan.els[0].tailAnchorPoint).toEqual({ x: 500, y: 720 });
   });
 
   it("같은 페이지 → PASTE_OFFSET 겹침 방지, draw 는 points 로 이동", () => {

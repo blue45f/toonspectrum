@@ -429,7 +429,7 @@ function isClipboardAnimationKeyframe(
 
 function isClipboardAnimation(
   value: unknown,
-  elementIds: ReadonlySet<string>
+  elementTypes: ReadonlyMap<string, unknown>
 ): value is NonNullable<StudioClipboardPayload["animation"]> {
   if (!isRecord(value) || !hasSafeClipboardJsonComplexity(value)) return false;
   const frameCount = value.frameCount;
@@ -441,9 +441,14 @@ function isClipboardAnimation(
     !isRecord(value.tracks)
   ) return false;
   const tracks = Object.entries(value.tracks);
-  if (tracks.length > elementIds.size) return false;
+  if (tracks.length > elementTypes.size) return false;
   for (const [trackId, keyframes] of tracks) {
-    if (!elementIds.has(trackId) || !Array.isArray(keyframes) || keyframes.length < 1 || keyframes.length > MAX_TRACK_KEYFRAMES) {
+    if (
+      elementTypes.get(trackId) !== "image" ||
+      !Array.isArray(keyframes) ||
+      keyframes.length < 1 ||
+      keyframes.length > MAX_TRACK_KEYFRAMES
+    ) {
       return false;
     }
     let previousFrameIndex = -1;
@@ -481,6 +486,9 @@ function isClipboardElement(v: unknown): v is ClipboardElementLike {
         isBoundedString(v.textFill, STUDIO_CLIPBOARD_MAX_STYLE_CHARS, false) &&
         hasFiniteFields(v, ["x", "y", "width", "height", "rotation"], ["width", "height"]) &&
         (v.tailAnchorId === undefined || isBoundedString(v.tailAnchorId, STUDIO_CLIPBOARD_MAX_ID_CHARS, false)) &&
+        (v.tailAnchorPoint === undefined || (
+          isRecord(v.tailAnchorPoint) && hasFiniteFields(v.tailAnchorPoint, ["x", "y"])
+        )) &&
         (v.customShapePoints === undefined || isBoundedNumberArray(v.customShapePoints));
     case "sticker":
       return isBoundedString(v.text, STUDIO_CLIPBOARD_MAX_TEXT_CHARS) &&
@@ -539,10 +547,12 @@ export function isClipboardPayload(v: unknown): v is StudioClipboardPayload {
   ) return false;
   if (!Array.isArray(o.els) || o.els.length > STUDIO_CLIPBOARD_MAX_ELEMENTS) return false;
   const ids = new Set<string>();
+  const elementTypes = new Map<string, unknown>();
   const referencedGroupIds = new Set<string>();
   for (const element of o.els) {
     if (!isClipboardElement(element) || ids.has(element.id)) return false;
     ids.add(element.id);
+    elementTypes.set(element.id, element.type);
     if (typeof element.groupId === "string") referencedGroupIds.add(element.groupId);
   }
   if (o.groups !== undefined) {
@@ -557,7 +567,7 @@ export function isClipboardPayload(v: unknown): v is StudioClipboardPayload {
       groupIds.add(group.id);
     }
   }
-  if (o.animation !== undefined && !isClipboardAnimation(o.animation, ids)) return false;
+  if (o.animation !== undefined && !isClipboardAnimation(o.animation, elementTypes)) return false;
   return true;
 }
 
@@ -590,6 +600,7 @@ export function buildClipboardPayload(
     els: deepCopyJson(valid),
   };
   const elementIds = new Set(valid.map((element) => element.id));
+  const elementTypes = new Map(valid.map((element) => [element.id, element.type] as const));
   const referencedGroupIds = new Set(
     valid.flatMap((element) => typeof element.groupId === "string" ? [element.groupId] : [])
   );
@@ -608,7 +619,7 @@ export function buildClipboardPayload(
       frameCount: extras.animationTimeline.frameCount,
       tracks,
     };
-    if (Object.keys(tracks).length > 0 && isClipboardAnimation(animation, elementIds)) {
+    if (Object.keys(tracks).length > 0 && isClipboardAnimation(animation, elementTypes)) {
       payload.animation = animation;
     }
   }
@@ -629,16 +640,23 @@ export function clipboardPayloadMatchesMembers(
     payload.els.length !== memberIds.length ||
     !payload.els.every((element, index) => element.id === memberIds[index])
   ) return false;
-  const expectedGroups = new Set(expectedRelations?.groupIds ?? []);
-  const payloadGroups = new Set(payload.groups?.map((group) => group.id) ?? []);
-  if (
-    payloadGroups.size !== expectedGroups.size ||
-    [...expectedGroups].some((id) => !payloadGroups.has(id))
-  ) return false;
-  const expectedTracks = new Set(expectedRelations?.trackIds ?? []);
-  const payloadTracks = new Set(Object.keys(payload.animation?.tracks ?? {}));
-  return payloadTracks.size === expectedTracks.size &&
-    [...expectedTracks].every((id) => payloadTracks.has(id));
+  if (expectedRelations?.groupIds !== undefined) {
+    const expectedGroups = new Set(expectedRelations.groupIds);
+    const payloadGroups = new Set(payload.groups?.map((group) => group.id) ?? []);
+    if (
+      payloadGroups.size !== expectedGroups.size ||
+      [...expectedGroups].some((id) => !payloadGroups.has(id))
+    ) return false;
+  }
+  if (expectedRelations?.trackIds !== undefined) {
+    const expectedTracks = new Set(expectedRelations.trackIds);
+    const payloadTracks = new Set(Object.keys(payload.animation?.tracks ?? {}));
+    if (
+      payloadTracks.size !== expectedTracks.size ||
+      [...expectedTracks].some((id) => !payloadTracks.has(id))
+    ) return false;
+  }
+  return true;
 }
 
 /** 페이로드 → JSON 문자열(시스템 클립보드 text/plain 및 폴백 저장용). */
@@ -720,6 +738,12 @@ function scaleElement(el: ClipboardElementLike, s: number): ClipboardElementLike
   if (Array.isArray(points)) {
     next.points = points.map((v) => (typeof v === "number" && Number.isFinite(v) ? round2(v * s) : v));
   }
+  if (isRecord(next.tailAnchorPoint)) {
+    next.tailAnchorPoint = {
+      x: round2((next.tailAnchorPoint.x as number) * s),
+      y: round2((next.tailAnchorPoint.y as number) * s),
+    };
+  }
   return next;
 }
 
@@ -776,6 +800,12 @@ function shiftLooseElement(el: ClipboardElementLike, dx: number, dy: number): Cl
   }
   if (typeof next.x === "number" && Number.isFinite(next.x)) next.x = round2(next.x + dx);
   if (typeof next.y === "number" && Number.isFinite(next.y)) next.y = round2(next.y + dy);
+  if (isRecord(next.tailAnchorPoint)) {
+    next.tailAnchorPoint = {
+      x: round2((next.tailAnchorPoint.x as number) + dx),
+      y: round2((next.tailAnchorPoint.y as number) + dy),
+    };
+  }
   return next;
 }
 
@@ -860,6 +890,7 @@ export function planClipboardPaste(
     if (el.type === "bubble" && typeof el.tailAnchorId === "string") {
       const copiedAnchorId = idMap.get(el.tailAnchorId);
       if (copiedAnchorId) next.tailAnchorId = copiedAnchorId;
+      else if (!samePage) delete next.tailAnchorId;
     }
     return next;
   });
@@ -877,19 +908,22 @@ export function planClipboardPaste(
   for (const [sourceElementId, keyframes] of Object.entries(payload.animation?.tracks ?? {})) {
     const targetElementId = idMap.get(sourceElementId);
     if (!targetElementId) continue;
-    animationTracks[targetElementId] = keyframes.map((keyframe) => ({
-      ...deepCopyJson(keyframe),
-      frame: { ...deepCopyJson(keyframe.frame), id: makeId() },
-      ...(keyframe.transform
-        ? {
-            transform: {
-              ...deepCopyJson(keyframe.transform),
-              x: round2(keyframe.transform.x * scale),
-              y: round2(keyframe.transform.y * scale),
-            },
-          }
-        : {}),
-    }));
+    animationTracks[targetElementId] = keyframes.map((keyframe) => {
+      const copied = deepCopyJson(keyframe);
+      return {
+        ...copied,
+        frame: { ...copied.frame, id: makeId() },
+        ...(copied.transform
+          ? {
+              transform: {
+                ...copied.transform,
+                x: round2(copied.transform.x * scale),
+                y: round2(copied.transform.y * scale),
+              },
+            }
+          : {}),
+      };
+    });
   }
   return {
     els,

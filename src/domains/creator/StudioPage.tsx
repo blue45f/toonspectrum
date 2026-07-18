@@ -15172,19 +15172,25 @@ function StudioCuttoonEditor() {
     const members = collectCopyElements(elements, selectedId, marqueeIds);
     if (members.length === 0) return null;
     const memberIds = members.map((member) => member.id);
-    const expectedGroupIds = [...new Set(
-      members.flatMap((member) =>
-        member.groupId && groups.some((group) => group.id === member.groupId)
-          ? [member.groupId]
-          : []
-      )
-    )];
-    const expectedTrackIds = memberIds.filter((id) => hasTrack(animTimeline, id));
+    const expectedGroupIds = masterEditMode
+      ? []
+      : [...new Set(
+          members.flatMap((member) =>
+            member.groupId && groups.some((group) => group.id === member.groupId)
+              ? [member.groupId]
+              : []
+          )
+        )];
+    const expectedTrackIds = masterEditMode
+      ? []
+      : members
+          .filter((member) => member.type === "image" && hasTrack(animTimeline, member.id))
+          .map((member) => member.id);
     const payload = buildClipboardPayload(members, {
         canvasW: CANVAS_W,
         canvasH,
         pageId: activePage.id,
-      }, Date.now(), {
+      }, Date.now(), masterEditMode ? undefined : {
         groups,
         animationTimeline: animTimeline,
       });
