@@ -9097,6 +9097,18 @@ function StudioCuttoonEditor() {
    * 바깥 DrawEl 객체(next)는 여전히 매 호출 새 참조라 scheduleDraft의 변경 감지는 그대로 동작한다.
    */
   const drawingFixedRateOwnedPointsRef = useRef<number[] | null>(null);
+  /**
+   * drawingFixedRateOwnedPointsRef가 가리키는 배열이 실제로 handle.appendPinnedStrokeSuffix로
+   * 비동기 WebGPU 큐에 노출된(fallbackStrokes/nextStroke로 참조 보관되는) 그 순간의 참조만 담는다
+   * — flushDirectLiveDraft 안에서 buildGpuLiveStrokeView가 뷰를 만든다고 해서 항상 노출되는 건
+   * 아니다(증분 없는 호출은 조기 반환, 최초 baseline 호출은 별도로 리샘플한 배열을 보낸다 —
+   * 둘 다 next.points 자체는 건드리지 않는다). gpuLiveInkPinnedRef가 켜져 있다는 사실 자체가
+   * 아니라 이 배열이 "정말 노출됐는가"만으로 계속 이어붙여도 되는지 판단한다(task #27:
+   * gpuLiveInkPinnedRef 하나로만 판단하면 핀이 켜진 매 호출마다 무조건 새로 복제해야 했다).
+   * 노출 빈도 자체(호출 경로별로 rAF 게이팅 유무가 다르다)는 이 판단과 무관하다 — ownsCurrentArrays는
+   * 매 호출 참조 동일성을 다시 확인하므로 노출이 정확히 언제·얼마나 자주 일어나든 항상 옳게 감지한다.
+   */
+  const gpuLiveInkExposedPointsRef = useRef<number[] | null>(null);
   const drawingLastAuthoritativePointerRef = useRef<PointerEvent | null>(null);
   const drawingVelocityRef = useRef<StudioPointerVelocityState | null>(null);
   // A stroke belongs to exactly one pointer from down through up/cancel. Keeping this high-rate
@@ -9475,6 +9487,11 @@ function StudioCuttoonEditor() {
     const pointCount = Math.floor(el.points.length / 2);
     if (pointCount < 1 || el.points.length !== pointCount * 2) return null;
     if (!el.pressures || el.pressures.length < pointCount) return null;
+    // Building a view here does NOT by itself expose el.points to the async GPU queue — the
+    // caller may still discard it (no-growth early-return) or replace it with a differently
+    // resampled array (the baseline branch's buildGpuLiveStroke(next), no "View" suffix). Only
+    // mark gpuLiveInkExposedPointsRef at the specific call site that actually retains this
+    // reference asynchronously (the appendPinnedStrokeSuffix branch below).
     return {
       id: el.id,
       // The drawing model replaces these arrays rather than mutating them. The explicit suffix
@@ -9521,6 +9538,11 @@ function StudioCuttoonEditor() {
         const previousPointCount = gpuPinnedLivePointCountRef.current;
         const fallbackStrokes = [...pendingGpuStrokesRef.current, strokeView];
         if (previousPointCount > 0 && pointCount > previousPointCount) {
+          // This is the exact moment next.points (=== strokeView.points, just read back through
+          // a readonly-typed field) becomes exposed to the async WebGPU queue — it's retained by
+          // reference in fallbackStrokes/nextStroke for a possible device-loss resync, so it must
+          // never be mutated again from here on.
+          gpuLiveInkExposedPointsRef.current = next.points;
           handle.appendPinnedStrokeSuffix({
             strokeIndex: pendingGpuStrokesRef.current.length,
             previousPointCount,
@@ -19279,14 +19301,16 @@ function StudioCuttoonEditor() {
     // 이어지는 중이면) 다시 복제하지 않고 그대로 이어붙인다 — 매 호출 전체 복제는 긴 스트로크에서
     // O(n²)이 된다. 바깥 DrawEl(next)은 그래도 매 호출 새 객체라 scheduleDraft의 참조 비교 변경
     // 감지는 그대로 유효하다.
-    // gpuLiveInkPinnedRef가 켜져 있으면 buildGpuLiveStrokeView가 이 points 배열을 그대로(clone
-    // 없이) trustedImmutable=true 로 잡아 비동기 WebGPU 큐에 넘긴다 — 그 순간의 배열은 이후 절대
-    // 그대로 이어붙이면 안 된다. 핀이 꺼진 뒤에도 "그 배열"이 다시 매칭되지 않도록 소유권 ref를
-    // null로 무효화해 다음 호출이 반드시 새로 복제하게 만든다(그 새 복제본은 GPU에 노출된 적이
-    // 없으므로 그때부터는 다시 안전하게 재사용할 수 있다).
+    // gpuLiveInkPinnedRef가 켜져 있는 동안 flushDirectLiveDraft가 이 points 배열을 그대로(clone
+    // 없이) trustedImmutable=true 로 잡아 handle.appendPinnedStrokeSuffix로 비동기 WebGPU 큐에
+    // 넘기는 "그 순간"부터는 절대 이어붙이면 안 된다 — 다만 핀이 켜져 있다는 사실 자체가 아니라
+    // gpuLiveInkExposedPointsRef로 실제 노출 여부를 추적한다(task #27: 핀 플래그 하나로만 판단하면
+    // 핀이 켜진 매 호출마다 무조건 새로 복제해야 했다). 노출이 정확히 몇 번, 어떤 호출 경로로
+    // 일어나는지는 이 판단과 무관하다 — 매 호출 참조 동일성을 다시 확인하므로 노출 전까지는 계속
+    // 안전하게 이어붙일 수 있고, 실제로 노출된 바로 그 배열과 일치할 때만 새로 복제한다.
     const ownsCurrentArrays = !mutateDirectly
-      && !gpuLiveInkPinnedRef.current
-      && current.points === drawingFixedRateOwnedPointsRef.current;
+      && current.points === drawingFixedRateOwnedPointsRef.current
+      && current.points !== gpuLiveInkExposedPointsRef.current;
     const reuseOrClone = <T,>(shouldTrack: boolean, arr: T[] | undefined): T[] | undefined => {
       if (!shouldTrack || !arr) return arr;
       return ownsCurrentArrays ? arr : [...arr];
@@ -19304,7 +19328,7 @@ function StudioCuttoonEditor() {
           tangentialPressures: reuseOrClone(capturePointerDynamics, current.tangentialPressures),
         };
     if (!mutateDirectly) {
-      drawingFixedRateOwnedPointsRef.current = gpuLiveInkPinnedRef.current ? null : next.points;
+      drawingFixedRateOwnedPointsRef.current = next.points;
     }
     let appended = false;
     const appendAligned = (
