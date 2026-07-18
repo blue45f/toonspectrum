@@ -23,7 +23,8 @@
  * 3계층 구성은 studio-heal-clone.ts와 동일한 관례를 따른다:
  *   (A) 기하 — 리샘플(균등 간격 재추출), falloff.
  *   (B) 픽셀 알고리즘 — StudioImageDataLike 입출력만 다루는 순수 함수(캔버스 무관, 유닛 테스트 가능).
- *   (C) 캔버스 팩토리 orchestration — DOM은 호출자(StudioPage의 createPixelEditCanvas)가 주입한다.
+ *   (C) 캔버스 팩토리 orchestration(bakeLiquifyStrokeToCanvas, Worker 오프로드 포함) —
+ *       studio-liquify-browser.ts에 있다(순환 참조 회피, 위 파일 docstring 참고).
  *
  * 좌표 규약: heal-clone(HealCloneDab)/smudge(SmudgePixelPoint)의 선례를 따라 이 모듈도 독립적인
  * "자연 픽셀 좌표" 포인트 타입(LiquifyPixelPoint)을 정의한다(다른 브러시 도구의 타입을 재사용하지
@@ -32,7 +33,6 @@
  * 들어와야 한다 — 호출부(StudioPage)가 flipNormalizedPoint로 되돌린 뒤 자연 해상도로 스케일해서 넘긴다.
  */
 import type { StudioImageDataLike } from "./studio-filters";
-import type { MaskCanvasLike, MaskCtx2DLike, MaskImageSource } from "./studio-selection-tools";
 
 // ---------------------------------------------------------------------------
 // 타입 · 상수
@@ -307,65 +307,8 @@ export function applyLiquifyDisplacement(
   }
 }
 
-// ---------------------------------------------------------------------------
-// (C) 캔버스 팩토리 orchestration — studio-heal-clone.ts의 bakeHealCloneStrokeToCanvas와 동일 관례.
-// ---------------------------------------------------------------------------
-
-/**
- * studio-selection-tools.ts의 MaskCtx2DLike를 확장 — 픽셀을 읽고 쓰려면 get/putImageData가
- * 필요하다(heal-clone의 HealCloneCtx2DLike와 동일한 이유로 별도 정의 — 브러시 도구마다 이
- * 확장을 독립적으로 선언하는 게 이 세션의 선례다, 위 모듈 docstring 참고). StudioPage.tsx의
- * createPixelEditCanvas는 이미 진짜 CanvasRenderingContext2D를 반환하므로 **수정 없이 그대로**
- * 이 자리에 넘길 수 있다(구조적 호환).
- */
-export type LiquifyCtx2DLike = MaskCtx2DLike & {
-  getImageData(sx: number, sy: number, sw: number, sh: number): StudioImageDataLike;
-  putImageData(imageData: StudioImageDataLike, dx: number, dy: number): void;
-};
-
-/** 오프스크린 캔버스 팩토리 — DOM 의존부를 호출자(StudioPage)가 주입한다. */
-export type LiquifyCanvasFactory = (
-  width: number,
-  height: number
-) => { canvas: MaskCanvasLike & MaskImageSource; ctx: LiquifyCtx2DLike } | null;
-
-/**
- * 스트로크 전체를 원본에 구워 결과 캔버스를 만든다. 변위 필드가 null이면(스트로크가 너무 짧거나
- * 반경/강도가 0) null — 이 경우 캔버스를 아예 만들지 않는다(불필요한 DOM 작업 방지, 호출자는
- * patchEl을 생략해야 한다는 신호). radiusPx는 **디바이스(자연) px**여야 한다(호출자가 target.width
- * 기준 배율로 변환해서 넘긴다 — heal-clone의 관례와 동일).
- */
-export function bakeLiquifyStrokeToCanvas(
-  source: MaskImageSource,
-  width: number,
-  height: number,
-  points: readonly LiquifyPixelPoint[],
-  radiusPx: number,
-  strength: number,
-  createCanvas: LiquifyCanvasFactory
-): (MaskCanvasLike & MaskImageSource) | null {
-  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null;
-  const w = Math.max(1, Math.round(width));
-  const h = Math.max(1, Math.round(height));
-
-  const field = buildLiquifyDisplacementField(points, radiusPx, strength, w, h);
-  if (!field) return null;
-
-  // frozen — 변위 계산의 유일한 색 소스, 다시는 건드리지 않는다(원본을 한 번 그린 뒤 고정).
-  const frozen = createCanvas(w, h);
-  if (!frozen) return null;
-  frozen.ctx.drawImage(source, 0, 0);
-
-  // work — 원본을 한 번 그린 뒤 변위 필드가 실제로 반영되는 결과 버퍼.
-  const work = createCanvas(w, h);
-  if (!work) return null;
-  work.ctx.drawImage(source, 0, 0);
-
-  const frozenData = frozen.ctx.getImageData(0, 0, w, h);
-  const workData = work.ctx.getImageData(0, 0, w, h);
-
-  applyLiquifyDisplacement(frozenData, workData, field);
-
-  work.ctx.putImageData(workData, 0, 0);
-  return work.canvas;
-}
+// (C) 캔버스 팩토리 orchestration(bakeLiquifyStrokeToCanvas)은 studio-liquify-browser.ts로
+// 옮겼다 — 무거운 변위 적용을 Worker로 오프로드하려면 그 워커 클라이언트가 이 파일의
+// applyLiquifyDisplacement를 폴백용으로 import해야 하는데, 이 파일이 오케스트레이션 함수를 통해
+// 다시 워커 클라이언트를 import하면 순환 참조가 된다(studio-magic-wand.ts/
+// studio-magic-wand-browser.ts와 동일한 분리 이유).

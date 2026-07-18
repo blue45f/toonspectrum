@@ -6,15 +6,17 @@ import {
   LIQUIFY_STRENGTH_DEFAULT,
   LIQUIFY_STRENGTH_RANGE,
   applyLiquifyDisplacement,
-  bakeLiquifyStrokeToCanvas,
   buildLiquifyDisplacementField,
   liquifyBrushWeight,
   resampleLiquifyPath,
   sampleBilinearClamped,
-  type LiquifyCanvasFactory,
-  type LiquifyCtx2DLike,
   type LiquifyPixelPoint,
 } from "./studio-liquify";
+import {
+  bakeLiquifyStrokeToCanvas,
+  type LiquifyCanvasFactory,
+  type LiquifyCtx2DLike,
+} from "./studio-liquify-browser";
 
 import type { StudioImageDataLike } from "./studio-filters";
 import type { MaskCanvasLike, MaskImageSource } from "./studio-selection-tools";
@@ -437,24 +439,24 @@ describe("bakeLiquifyStrokeToCanvas", () => {
     { x: 15, y: 10 },
   ];
 
-  it("변위 필드가 없으면(점<2 등) 캔버스를 아예 만들지 않고 null", () => {
+  it("변위 필드가 없으면(점<2 등) 캔버스를 아예 만들지 않고 null", async () => {
     const log: string[] = [];
     const buffers = new Map<number, StudioImageDataLike>();
     const factory = fakeLiquifyFactory(log, buffers);
     const source: FakeSource = { testImage: solidImage(20, 20, 1, 1, 1) };
-    const out = bakeLiquifyStrokeToCanvas(source, 20, 20, [{ x: 1, y: 1 }], 5, 0.5, factory);
+    const out = await bakeLiquifyStrokeToCanvas(source, 20, 20, [{ x: 1, y: 1 }], 5, 0.5, factory);
     expect(out).toBeNull();
     expect(log).toEqual([]);
   });
 
-  it("frozen/work 캔버스를 순서대로 만들고, work만 putImageData로 갱신해 반환한다", () => {
+  it("frozen/work 캔버스를 순서대로 만들고, work만 putImageData로 갱신해 반환한다", async () => {
     const log: string[] = [];
     const buffers = new Map<number, StudioImageDataLike>();
     const factory = fakeLiquifyFactory(log, buffers);
     const testImage = paintedImage(20, 20, (x) => (x < 10 ? [0, 0, 0, 255] : [255, 255, 255, 255]));
     const source: FakeSource = { testImage };
 
-    const out = bakeLiquifyStrokeToCanvas(source, 20, 20, points, 8, 1, factory);
+    const out = await bakeLiquifyStrokeToCanvas(source, 20, 20, points, 8, 1, factory);
 
     expect(out).not.toBeNull();
     expect((out as FakeCanvas).id).toBe(2); // work 캔버스(두 번째 생성)가 반환된다.
@@ -478,22 +480,22 @@ describe("bakeLiquifyStrokeToCanvas", () => {
     expect(workBuf.data).toEqual(expectedDst.data);
   });
 
-  it("두 번째 캔버스(work) 생성이 실패하면 null", () => {
+  it("두 번째 캔버스(work) 생성이 실패하면 null", async () => {
     const log: string[] = [];
     const buffers = new Map<number, StudioImageDataLike>();
     const factory = fakeLiquifyFactory(log, buffers, 2); // 2번째 생성부터 실패.
     const source: FakeSource = { testImage: solidImage(20, 20, 1, 1, 1) };
-    const out = bakeLiquifyStrokeToCanvas(source, 20, 20, points, 8, 1, factory);
+    const out = await bakeLiquifyStrokeToCanvas(source, 20, 20, points, 8, 1, factory);
     expect(out).toBeNull();
   });
 
-  it("width/height가 비정상이면 캔버스를 만들지 않고 null", () => {
+  it("width/height가 비정상이면 캔버스를 만들지 않고 null", async () => {
     const log: string[] = [];
     const buffers = new Map<number, StudioImageDataLike>();
     const factory = fakeLiquifyFactory(log, buffers);
     const source: FakeSource = { testImage: solidImage(20, 20, 1, 1, 1) };
-    expect(bakeLiquifyStrokeToCanvas(source, 0, 20, points, 8, 1, factory)).toBeNull();
-    expect(bakeLiquifyStrokeToCanvas(source, 20, Number.NaN, points, 8, 1, factory)).toBeNull();
+    expect(await bakeLiquifyStrokeToCanvas(source, 0, 20, points, 8, 1, factory)).toBeNull();
+    expect(await bakeLiquifyStrokeToCanvas(source, 20, Number.NaN, points, 8, 1, factory)).toBeNull();
     expect(log).toEqual([]);
   });
 });

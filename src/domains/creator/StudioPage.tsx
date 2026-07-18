@@ -665,10 +665,10 @@ import {
   type LayerGroup,
 } from "./studio-layers";
 import {
-  bakeLiquifyStrokeToCanvas,
   LIQUIFY_RADIUS_RANGE,
   LIQUIFY_STRENGTH_RANGE,
 } from "./studio-liquify";
+import { bakeLiquifyStrokeToCanvas } from "./studio-liquify-browser";
 import { projectStudioCanvasCommentPins } from "./studio-live-canvas-overlay-model";
 import {
   StudioLiveInkOverlayRenderer,
@@ -17393,7 +17393,7 @@ function StudioCuttoonEditor() {
         y: p.y * h,
       }));
       const radiusDevice = (liquifyRadius / Math.max(1, target.width)) * w;
-      const out = bakeLiquifyStrokeToCanvas(
+      const out = await bakeLiquifyStrokeToCanvas(
         img,
         w,
         h,
