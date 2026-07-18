@@ -1,12 +1,13 @@
 /**
  * Studio Heal/Clone — 복구 브러시(Healing brush) / 도장(Clone stamp) 순수 코어.
  *
- * studio-selection-tools.ts 처럼 3계층으로 나눈다:
+ * studio-selection-tools.ts 처럼 계층으로 나눈다:
  *   (A) 기하 — 정규화(SelPoint) 공간에서 소스 오프셋을 다루는 단위 무관 산술.
- *   (B) 픽셀 알고리즘 — StudioImageDataLike 입출력만 다루는 순수 함수(캔버스 무관, 유닛 테스트 가능).
- *   (C) 캔버스 팩토리 orchestration — applySelectionAdjustToCanvas 와 동일하게 DOM 은 호출자가
- *       주입한다(HealCloneCanvasFactory). 이 파일 안에서는 document/canvas 를 직접 만들지 않는다
- *       — studio-magic-wand-browser.ts 의 magicWandScanFromImage 같은 "DOM 경계 1개"조차 없다.
+ *   (B) 픽셀 알고리즘 — StudioImageDataLike 입출력만 다루는 순수 함수(캔버스 무관, 유닛 테스트 가능,
+ *       Worker 안에서도 그대로 실행 가능 — studio-heal-clone.worker.ts 가 이 계층만 감싼다).
+ *
+ * DOM 의존부(캔버스 팩토리 orchestration, Worker 오프로드)는 studio-heal-clone-browser.ts 가
+ * 담당한다 — 이 파일 안에서는 document/canvas 를 직접 만들지 않는다.
  *
  * 좌표 규약: 도장의 dest 궤적은 studio-selection-tools.ts 의 브러시 서브패스와 동일한 정규화
  * SelPoint(요소 비회전 로컬 박스 0..1) 공간을 쓴다. flip(좌우/상하 반전 표시) 처리도
@@ -16,7 +17,7 @@
 import { flipNormalizedPoint } from "./studio-magic-wand";
 
 import type { StudioImageDataLike } from "./studio-filters";
-import type { MaskCanvasLike, MaskCtx2DLike, MaskImageSource, SelPoint } from "./studio-selection-tools";
+import type { SelPoint } from "./studio-selection-tools";
 
 // ---------------------------------------------------------------------------
 // 타입·상수
@@ -272,66 +273,4 @@ export function applyHealCloneDabs(
   for (const dab of dabs) {
     stampHealCloneDab(src, dst, dab, radiusPx, hardness, opacity, mode);
   }
-}
-
-// ---------------------------------------------------------------------------
-// (C) 캔버스 팩토리 orchestration — applySelectionAdjustToCanvas 와 동일 관례
-// ---------------------------------------------------------------------------
-
-/**
- * studio-selection-tools.ts 의 MaskCtx2DLike 를 확장 — 도장 패치를 읽고 쓰려면 get/putImageData 가
- * 필요하다(MaskCtx2DLike 엔 없음). StudioPage.tsx 의 createPixelEditCanvas 는 이미 진짜
- * CanvasRenderingContext2D 를 반환하므로 **수정 없이 그대로** 이 자리에 넘길 수 있다(구조적 호환,
- * SelectionCanvasFactory 와 동일한 관례 — 메서드 바이베리언스로 컴파일 검증됨).
- */
-export type HealCloneCtx2DLike = MaskCtx2DLike & {
-  getImageData(sx: number, sy: number, sw: number, sh: number): StudioImageDataLike;
-  putImageData(imageData: StudioImageDataLike, dx: number, dy: number): void;
-};
-
-/** 오프스크린 캔버스 팩토리 — DOM 의존부를 호출자(StudioPage)가 주입한다. */
-export type HealCloneCanvasFactory = (
-  width: number,
-  height: number
-) => { canvas: MaskCanvasLike & MaskImageSource; ctx: HealCloneCtx2DLike } | null;
-
-/**
- * 스트로크 전체를 원본에 구워 결과 캔버스를 만든다. dabs 가 비었으면 null(구울 게 없음 — 호출자는
- * patchEl 을 생략해야 한다는 신호) — 이 경우 캔버스를 아예 만들지 않는다(불필요한 DOM 작업 방지).
- * radiusPx 는 **디바이스(자연) px**여야 한다(호출자가 target.width 기준 배율로 변환해서 넘긴다 —
- * buildSelectionMaskPlan 의 featherScale 관례와 동일).
- */
-export function bakeHealCloneStrokeToCanvas(
-  source: MaskImageSource,
-  width: number,
-  height: number,
-  dabs: readonly HealCloneDab[],
-  brush: HealCloneBrushSettings,
-  mode: HealCloneMode,
-  createCanvas: HealCloneCanvasFactory
-): (MaskCanvasLike & MaskImageSource) | null {
-  if (dabs.length === 0) return null;
-  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null;
-  const w = Math.max(1, Math.round(width));
-  const h = Math.max(1, Math.round(height));
-
-  // frozen — 원본을 한 번 그린 뒤 다시는 건드리지 않는다(같은 스트로크 안의 여러 도장이 서로의
-  // 결과가 아니라 항상 스트로크 시작 시점의 원본을 소스로 삼도록 — heal 의 로컬 평균 드리프트
-  // 방지와 같은 이유).
-  const frozen = createCanvas(w, h);
-  if (!frozen) return null;
-  frozen.ctx.drawImage(source, 0, 0);
-
-  // work — 원본을 한 번 그린 뒤 도장이 누적되며 실제로 변형되는 결과 버퍼.
-  const work = createCanvas(w, h);
-  if (!work) return null;
-  work.ctx.drawImage(source, 0, 0);
-
-  const frozenData = frozen.ctx.getImageData(0, 0, w, h);
-  const workData = work.ctx.getImageData(0, 0, w, h);
-
-  applyHealCloneDabs(frozenData, workData, dabs, brush.radiusPx, brush.hardness, brush.opacity, mode);
-
-  work.ctx.putImageData(workData, 0, 0);
-  return work.canvas;
 }

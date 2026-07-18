@@ -9,17 +9,19 @@ import {
   HEAL_CLONE_RADIUS_DEFAULT,
   HEAL_CLONE_RADIUS_RANGE,
   applyHealCloneDabs,
-  bakeHealCloneStrokeToCanvas,
   computeHealCloneSourceOffset,
   healCloneSourcePoint,
   healLocalMeanRadius,
   localMeanColor,
   planHealCloneDabs,
   stampHealCloneDab,
-  type HealCloneCanvasFactory,
-  type HealCloneCtx2DLike,
   type HealCloneDab,
 } from "./studio-heal-clone";
+import {
+  bakeHealCloneStrokeToCanvas,
+  type HealCloneCanvasFactory,
+  type HealCloneCtx2DLike,
+} from "./studio-heal-clone-browser";
 
 import type { StudioImageDataLike } from "./studio-filters";
 import type { MaskCanvasLike, MaskImageSource } from "./studio-selection-tools";
@@ -427,17 +429,17 @@ function fakeHealCloneFactory(
 describe("bakeHealCloneStrokeToCanvas", () => {
   const brush = { radiusPx: 3, hardness: 1, opacity: 1 };
 
-  it("도장이 없으면 캔버스를 아예 만들지 않고 null", () => {
+  it("도장이 없으면 캔버스를 아예 만들지 않고 null", async () => {
     const log: string[] = [];
     const buffers = new Map<number, StudioImageDataLike>();
     const factory = fakeHealCloneFactory(log, buffers);
     const source: FakeSource = { testImage: solidImage(10, 10, 1, 1, 1) };
-    const out = bakeHealCloneStrokeToCanvas(source, 10, 10, [], brush, "clone", factory);
+    const out = await bakeHealCloneStrokeToCanvas(source, 10, 10, [], brush, "clone", factory);
     expect(out).toBeNull();
     expect(log).toEqual([]);
   });
 
-  it("frozen/work 캔버스를 순서대로 만들고, work 만 putImageData 로 갱신해 반환한다", () => {
+  it("frozen/work 캔버스를 순서대로 만들고, work 만 putImageData 로 갱신해 반환한다", async () => {
     const log: string[] = [];
     const buffers = new Map<number, StudioImageDataLike>();
     const factory = fakeHealCloneFactory(log, buffers);
@@ -445,7 +447,7 @@ describe("bakeHealCloneStrokeToCanvas", () => {
     const source: FakeSource = { testImage };
     const dabs: HealCloneDab[] = [{ srcX: 8, srcY: 5, destX: 2, destY: 5 }]; // 흰색을 왼쪽 검정 영역에 복제.
 
-    const out = bakeHealCloneStrokeToCanvas(source, 10, 10, dabs, brush, "clone", factory);
+    const out = await bakeHealCloneStrokeToCanvas(source, 10, 10, dabs, brush, "clone", factory);
 
     expect(out).not.toBeNull();
     expect((out as FakeHealCanvas).id).toBe(2); // work 캔버스(두 번째 생성)가 반환된다.
@@ -469,28 +471,28 @@ describe("bakeHealCloneStrokeToCanvas", () => {
     expect(workBuf.data).toEqual(expectedDst.data);
   });
 
-  it("두 번째 캔버스(work) 생성이 실패하면 null(첫 캔버스는 그냥 버려진다)", () => {
+  it("두 번째 캔버스(work) 생성이 실패하면 null(첫 캔버스는 그냥 버려진다)", async () => {
     const log: string[] = [];
     const buffers = new Map<number, StudioImageDataLike>();
     const factory = fakeHealCloneFactory(log, buffers, 2); // 2번째 생성부터 실패.
     const source: FakeSource = { testImage: solidImage(10, 10, 1, 1, 1) };
     const dabs: HealCloneDab[] = [{ srcX: 5, srcY: 5, destX: 5, destY: 5 }];
-    const out = bakeHealCloneStrokeToCanvas(source, 10, 10, dabs, brush, "clone", factory);
+    const out = await bakeHealCloneStrokeToCanvas(source, 10, 10, dabs, brush, "clone", factory);
     expect(out).toBeNull();
   });
 
-  it("width/height 가 비정상이면 캔버스를 만들지 않고 null", () => {
+  it("width/height 가 비정상이면 캔버스를 만들지 않고 null", async () => {
     const log: string[] = [];
     const buffers = new Map<number, StudioImageDataLike>();
     const factory = fakeHealCloneFactory(log, buffers);
     const source: FakeSource = { testImage: solidImage(10, 10, 1, 1, 1) };
     const dabs: HealCloneDab[] = [{ srcX: 5, srcY: 5, destX: 5, destY: 5 }];
-    expect(bakeHealCloneStrokeToCanvas(source, 0, 10, dabs, brush, "clone", factory)).toBeNull();
-    expect(bakeHealCloneStrokeToCanvas(source, 10, Number.NaN, dabs, brush, "clone", factory)).toBeNull();
+    expect(await bakeHealCloneStrokeToCanvas(source, 0, 10, dabs, brush, "clone", factory)).toBeNull();
+    expect(await bakeHealCloneStrokeToCanvas(source, 10, Number.NaN, dabs, brush, "clone", factory)).toBeNull();
     expect(log).toEqual([]);
   });
 
-  it("heal 모드도 orchestration 을 그대로 통과한다(알고리즘 위임 검증)", () => {
+  it("heal 모드도 orchestration 을 그대로 통과한다(알고리즘 위임 검증)", async () => {
     const log: string[] = [];
     const buffers = new Map<number, StudioImageDataLike>();
     const factory = fakeHealCloneFactory(log, buffers);
@@ -499,7 +501,7 @@ describe("bakeHealCloneStrokeToCanvas", () => {
     const dabs: HealCloneDab[] = [{ srcX: 5, srcY: 10, destX: 15, destY: 10 }];
     const healBrush = { radiusPx: 3, hardness: 1, opacity: 1 };
 
-    const out = bakeHealCloneStrokeToCanvas(source, 20, 20, dabs, healBrush, "heal", factory);
+    const out = await bakeHealCloneStrokeToCanvas(source, 20, 20, dabs, healBrush, "heal", factory);
     expect(out).not.toBeNull();
 
     const expectedDst = cloneImage(testImage);

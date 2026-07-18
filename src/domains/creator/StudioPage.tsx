@@ -575,7 +575,6 @@ import {
 } from "./studio-gradient-engine";
 import { GRADIENT_PRESETS, gradientToBgGrad } from "./studio-gradients";
 import {
-  bakeHealCloneStrokeToCanvas,
   computeHealCloneSourceOffset,
   healCloneSourcePoint,
   planHealCloneDabs,
@@ -584,6 +583,7 @@ import {
   HEAL_CLONE_RADIUS_DEFAULT,
   type HealCloneMode,
 } from "./studio-heal-clone";
+import { bakeHealCloneStrokeToCanvas } from "./studio-heal-clone-browser";
 import {
   bakeHistoryBrushStrokeToCanvas,
   planHistoryBrushDabs,
@@ -17200,7 +17200,7 @@ function StudioCuttoonEditor() {
       });
       if (dabs.length === 0) return;
       const radiusPxDevice = healCloneRadius * (target.width > 0 ? w / target.width : 1);
-      const out = bakeHealCloneStrokeToCanvas(
+      const out = await bakeHealCloneStrokeToCanvas(
         img,
         w,
         h,
