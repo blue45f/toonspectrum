@@ -16,11 +16,13 @@ function moduleEdges(relativePath: string) {
   const dynamicImports: string[] = [];
   const typeImports: string[] = [];
   const valueImports: string[] = [];
+  const wholeClauseTypeImports: string[] = [];
   let layerNavigatorUsesLazyRetry = false;
 
   function visit(node: ts.Node): void {
     if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
       const clause = node.importClause;
+      if (clause?.isTypeOnly) wholeClauseTypeImports.push(node.moduleSpecifier.text);
       const namedBindings = clause?.namedBindings;
       const hasRuntimeValue = !clause || (
         !clause.isTypeOnly
@@ -65,6 +67,7 @@ function moduleEdges(relativePath: string) {
     source,
     typeImports,
     valueImports,
+    wholeClauseTypeImports,
   };
 }
 
@@ -76,6 +79,9 @@ describe("Studio layer navigator bundle boundary", () => {
 
     expect(page.valueImports).not.toContain("./StudioLayerNavigator");
     expect(inspector.valueImports).not.toContain("./StudioLayerNavigator");
+    expect(
+      inspector.wholeClauseTypeImports.filter((specifier) => specifier === "./StudioLayerNavigator"),
+    ).toEqual(["./StudioLayerNavigator"]);
     expect(page.dynamicImports).not.toContain("./StudioLayerNavigator");
     expect(inspector.dynamicImports).not.toContain("./StudioLayerNavigator");
     expect(registry.dynamicImports.filter((specifier) => specifier === "./StudioLayerNavigator")).toEqual([

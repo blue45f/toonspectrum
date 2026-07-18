@@ -170,7 +170,6 @@ import { StudioBgRemoveButton } from "./StudioBgRemoveButton";
 import { StudioBubbleShapePanel } from "./StudioBubbleShapePanel";
 import { StudioBubbleVariantGlyph } from "./StudioBubbleVariantGlyph";
 import { StudioInspectorNavigator } from "./StudioInspectorNavigator";
-import { type StudioLayerNavigatorAction } from "./StudioLayerNavigator";
 import { LazyStudioColorPopover } from "./StudioLazyColorPopover";
 import { StudioPanelLoading } from "./StudioLazySurfaceFallback";
 import { StudioLineCleanupPanel } from "./StudioLineCleanupPanel";
@@ -180,6 +179,8 @@ import { StudioMagicWandPanel } from "./StudioMagicWandPanel";
 import { StudioMobileSheetHandle } from "./StudioMobileSheetHandle";
 import { StudioNodeEditPanel } from "./StudioNodeEditPanel";
 import { StudioSkewPanel } from "./StudioSkewPanel";
+
+import type { StudioLayerNavigatorAction } from "./StudioLayerNavigator";
 
 import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";
