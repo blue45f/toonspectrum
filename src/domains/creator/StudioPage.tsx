@@ -475,13 +475,13 @@ import {
   switchDialogueLocale,
   DIALOGUE_LOCALE_PRESETS,
   SOURCE_LOCALE,
-  type DialogueLocaleMap,
 } from "./studio-dialogue-translate";
 import {
   loadStudioPsdExportModule,
   loadStudioPsdImportModule,
   loadStudioSvgExportWorkerClientModule,
 } from "./studio-document-export-loaders";
+import { DRAW_COLOR_SWATCHES } from "./studio-draw-color-swatches";
 import {
   isCompleteStudioDrawOp,
   isStudioImmediateFreehandCommit,
@@ -538,6 +538,7 @@ import {
   type StudioEffectId,
 } from "./studio-effect-favorites";
 import { containingPanel, elBounds } from "./studio-element-geometry";
+import { elementLabel } from "./studio-element-label";
 import {
   type ExportFormat,
 } from "./studio-export";
@@ -612,6 +613,7 @@ import {
   HISTORY_BRUSH_OPACITY_DEFAULT,
   HISTORY_BRUSH_RADIUS_DEFAULT,
 } from "./studio-history-brush";
+import { uid } from "./studio-id";
 import { createCanvasImageElement } from "./studio-image-placement";
 import {
   STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
@@ -1043,6 +1045,7 @@ import {
   QUICKSHAPE_STILL_RADIUS_PX,
   type QuickShapeKind,
 } from "./studio-quickshape";
+import { QUICKSHAPE_KIND_LABELS } from "./studio-quickshape-labels";
 import {
   filterStudioRasterAssets,
   STUDIO_RASTER_ASSETS,
@@ -1315,7 +1318,8 @@ import { StudioViewToolsHud } from "./StudioViewToolsHud";
 import { StudioWorkspaceMenuGate } from "./StudioWorkspaceMenuGate";
 import { useStudioModalSheet } from "./useStudioModalSheet";
 
-import type { AdvancedFillDiagnostics, AdvancedFillMaskLike } from "./studio-advanced-fill";
+import type { AdvancedFillMaskLike } from "./studio-advanced-fill";
+import type { StudioAdvancedFillPreview } from "./studio-advanced-fill-preview";
 import type { StudioAsset } from "./studio-asset-library";
 import type {
   StudioAutoActionExecutionProgress,
@@ -1336,6 +1340,7 @@ import type { StudioRasterOverlaySourceElement } from "./studio-crdt-raster-ui-b
 import type {
   DrawMode,
   DrawShapeKind,
+  StudioMenu,
   Tool,
 } from "./studio-editor-tool-model";
 import type {
@@ -1363,6 +1368,7 @@ import type {
 } from "./studio-layer-navigator";
 import type { StudioLiveRoom } from "./studio-live-collaboration-room";
 import type { MotionCutImage } from "./studio-motion-export";
+import type { PageState } from "./studio-page-state";
 import type { PaletteSuggestion } from "./studio-palette-suggest";
 import type { PanelLayoutPreset } from "./studio-panel-layouts";
 import type { PsdExportEl, PsdExportResult } from "./studio-psd-export";
@@ -1706,15 +1712,6 @@ function PanelResizeHandle({
   );
 }
 
-const QUICKSHAPE_KIND_LABELS: Record<string, string> = {
-  line: "선",
-  rect: "사각형",
-  ellipse: "타원",
-  triangle: "삼각형",
-  polygon: "다각형",
-};
-
-
 function readyStudioWorkAssetImageSources(
   hydrator: StudioWorkAssetHydrator
 ): Map<string, El> {
@@ -1737,7 +1734,6 @@ const groupPopoverClass = (width: "w-72" | "w-80") =>
     "fixed inset-x-2 top-[6.5rem] z-[70] max-h-[min(78dvh,36rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-2xl lg:inset-x-auto lg:left-3 lg:w-auto lg:max-w-[min(28rem,calc(100vw-1.5rem))]",
     width === "w-72" ? "lg:w-72" : "lg:w-80"
   );
-type StudioMenu = "template" | "collage" | "bubble" | "sticker" | "elements" | "char" | "bgScene" | "bgFill" | "asset" | "emeres" | "tone" | "scene" | "clip" | "palette" | "brandKit" | "stockImage" | "aiAssist" | "integrations";
 // 2026-07-05 툴바 그룹화 — 20개 이상의 플랫한 툴바 버튼을 논리 그룹 4개로 묶는다(선택/펜/지우개/
 // 텍스트/말풍선처럼 사용 빈도가 높은 핵심 도구는 그룹화 대상에서 제외하고 그대로 1줄 유지).
 // 그룹 팝오버는 `menu` 하나로 열림 상태·활성 서브탭을 동시에 표현한다(별도 상태 미도입) — 그룹 멤버인
@@ -1790,7 +1786,6 @@ type StudioSfxPacks = {
   presets: SfxPreset[];
 };
 
-const uid = () => crypto.randomUUID();
 // 시나리오 자동 생성의 패널 종횡비(studio-scenario-layout)를 AI 이미지 생성 사이즈 프리셋으로 매핑
 // — studio-scenario-layout.ts는 AI 클라이언트를 몰라도 되게 이 매핑을 호출부(StudioPage)에 남긴다.
 function scenarioAspectToImageSize(aspect: ScenarioPanelAspect): StudioAiImageSize {
@@ -1840,7 +1835,6 @@ const EMPTY_EFFECT_EMOJIS: string[] = [];
 const EMPTY_FX_LINE_PRESETS: typeof FX_LINE_PRESETS = [];
 
 const TEMPLATE_GROUPS = groupTemplates(TEMPLATES);
-const BUBBLE_VARIANT_BY_ID = new Map(BUBBLE_VARIANTS.map((variant) => [variant.id, variant] as const));
 
 function filterSfxPresets(presets: SfxPreset[], query: string): SfxPreset[] {
   const normalizedQuery = query.replace(/\s+/g, "").toLowerCase();
@@ -1901,32 +1895,6 @@ function studioElementIdOf(node: Konva.Node | null): string | null {
   return null;
 }
 
-// 레이어 목록용 라벨(아이콘 + 이름).
-function elementLabel(el: El): string {
-  if (el.name) return el.name;
-  switch (el.type) {
-    case "text":
-      return `T ${el.text.slice(0, 14).trim() || "텍스트"}`;
-    case "bubble": {
-      const v = BUBBLE_VARIANT_BY_ID.get(el.variant);
-      return `${v?.label ?? "대사"} 말풍선`;
-    }
-    case "sticker":
-      return `${el.text} 스티커`;
-    case "draw":
-      return "✏️ 그림";
-    case "frame":
-      return "▢ 패널";
-    case "image":
-      return "🖼️ 이미지";
-    case "focusLines":
-      return "🔆 집중선";
-    case "speedLines":
-      return "💨 속도선";
-    default:
-      return "요소";
-  }
-}
 // 말풍선 "크기 고정" 미리보기 — 인스펙터가 StudioBubbleAutoShrinkPanel에 넘길 계산된 폰트 크기/
 // 오버플로 여부. autoShrinkText가 꺼져 있으면 계산 자체를 하지 않는다(null).
 //
@@ -1952,7 +1920,6 @@ function bubbleAutoShrinkPreview(
     BUBBLE_TEXT_MEASURER
   );
 }
-const DRAW_COLOR_SWATCHES = ["#16100c", "#71717a", "#f8f2df", "#ff3b30", "#ff9500", "#ffcc00", "#4caf50", "#2196f3", "#9c27b0", "#ff6fb1", "#8a5a44", "#ffffff"];
 const QUICK_START_DISMISSED_KEY = "toonspectrum-studio-quick-start-dismissed";
 /**
  * Canvas2D is the visible low-latency front buffer by default because it shares the exact browser
@@ -4393,26 +4360,6 @@ function isStudioViewToolsHudEventTarget(target: EventTarget | null): boolean {
   return target instanceof Element && target.closest("[data-studio-view-tools-hud]") !== null;
 }
 
-interface PageState {
-  id: string;
-  elements: El[];
-  bg: string;
-  bgGrad: string[] | null;
-  canvasH: number;
-  grade?: PageGrade; // 페이지 전체 색보정(밝기/대비/채도/색조/세피아/흑백/비네트). 미설정=보정 없음.
-  groups?: LayerGroup[]; // 레이어 그룹(폴더). 미설정=그룹 없음.
-  animTimeline?: AnimationTimelineDoc; // 다중 레이어 타임라인(studio-anim-tracks). 미설정=타임라인 없음(기존 문서 100% 호환).
-  name?: string; // 페이지 이름(스트립 표시) — studio-page-meta 관리. 미설정=자동 이름("1페이지").
-  note?: string; // 콘티 메모 — 미설정=없음. 빈 값 저장 시 키 제거로 레거시 직렬화 형태 유지.
-  hideMaster?: boolean; // 이 페이지에서 문서 마스터(공통 요소) 숨김 — studio-master-page. 미설정=표시(해제 시 키 제거).
-  shotType?: string; // 샷 타입(클로즈업/와이드 등) — studio-panel-shot-tags 관리. 미설정=태그 없음(빈 값 저장 시 키 제거).
-  cameraAngle?: string; // 카메라 앵글(로우/하이/더치 등) — studio-panel-shot-tags 관리. 미설정=태그 없음(빈 값 저장 시 키 제거).
-  dialogueI18n?: DialogueLocaleMap; // 대사 번역 저장소(studio-dialogue-translate) — elId→로케일→텍스트. 미설정=번역 없음(기존 문서 100% 호환).
-  review?: PageReviewState; // 페이지 검토 상태·담당·메모·로컬 편집 잠금.
-  /** 페이지 소유 원근자·아이소메트릭 가이드. 미설정 레거시는 비활성 기본값으로 정규화. */
-  drawingAssist?: StudioDrawingAssistDocument;
-}
-
 function publishPackageSettingsFromPack(value: unknown): StudioPublishPackageSettings {
   const record = value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -4472,17 +4419,6 @@ function studioAdvancedFillStorage(): Storage | null {
     return null;
   }
 }
-
-type StudioAdvancedFillPreview = {
-  targetId: string;
-  originalSrc: string;
-  historyIndex: number;
-  resultSrc: string;
-  diagnostics: AdvancedFillDiagnostics;
-  message: string;
-  paintedPixelCount: number;
-  regionCount: number;
-};
 
 /**
  * 커밋 렌더 원가 계측(개발 전용): window.__studioRenderProfile 링버퍼.

@@ -11,3 +11,23 @@ export type DrawShapeKind =
   | "arrow"
   | "triangle"
   | "polygon";
+
+export type StudioMenu =
+  | "template"
+  | "collage"
+  | "bubble"
+  | "sticker"
+  | "elements"
+  | "char"
+  | "bgScene"
+  | "bgFill"
+  | "asset"
+  | "emeres"
+  | "tone"
+  | "scene"
+  | "clip"
+  | "palette"
+  | "brandKit"
+  | "stockImage"
+  | "aiAssist"
+  | "integrations";
