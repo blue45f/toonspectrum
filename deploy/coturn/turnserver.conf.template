@@ -1,0 +1,50 @@
+# Static, non-secret coturn policy. entrypoint.sh appends validated deployment values and
+# one or two static-auth-secret entries into /run/coturn/turnserver.conf (tmpfs, mode 0600).
+
+fingerprint
+use-auth-secret
+rest-api-separator=:
+
+# Browser-to-TURN UDP, TCP, TLS and DTLS listeners remain enabled. WebRTC only needs UDP relay
+# allocations, so disable RFC 6062 peer-side TCP relays to reduce the reachable attack surface.
+no-tcp-relay
+allocation-default-address-family=ipv4
+
+# Do not expose management surfaces or known amplification/peer routes.
+no-cli
+no-multicast-peers
+unauthorized-ratelimit
+unauthorized-ratelimit-rps=10
+max-allocate-timeout=10
+stale-nonce=600
+
+# Prevent allocations from reaching addresses that should never be WebRTC peers. coturn also
+# rejects loopback by default. Public IPv6 can be enabled later with an audited dual-stack map.
+denied-peer-ip=0.0.0.0-0.255.255.255
+denied-peer-ip=10.0.0.0-10.255.255.255
+denied-peer-ip=100.64.0.0-100.127.255.255
+denied-peer-ip=127.0.0.0-127.255.255.255
+denied-peer-ip=169.254.0.0-169.254.255.255
+denied-peer-ip=172.16.0.0-172.31.255.255
+denied-peer-ip=192.0.0.0-192.0.0.255
+denied-peer-ip=192.0.2.0-192.0.2.255
+denied-peer-ip=192.168.0.0-192.168.255.255
+denied-peer-ip=198.18.0.0-198.19.255.255
+denied-peer-ip=198.51.100.0-198.51.100.255
+denied-peer-ip=203.0.113.0-203.0.113.255
+denied-peer-ip=240.0.0.0-255.255.255.255
+denied-peer-ip=::1
+denied-peer-ip=fc00::-fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff
+denied-peer-ip=fe80::-febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff
+
+# Container logs only. Keep verbose, log-binding, software-attribute, web-admin and Prometheus
+# disabled. The Docker logging policy applies bounded local retention.
+log-file=stdout
+simple-log
+new-log-timestamp
+pidfile=/run/coturn/turnserver.pid
+
+# The bootstrap process starts as root only to read host-owned secrets, then coturn drops to the
+# official image's unprivileged account after initialization.
+proc-user=nobody
+proc-group=nogroup
