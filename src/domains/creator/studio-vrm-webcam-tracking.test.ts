@@ -1,11 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   smoothRawChannels,
   convertChannelsToVrmData,
   createChannelSmoother,
+  disposePhotoPoseLandmarker,
   GAZE_PITCH_MAX_DEG,
   GAZE_YAW_MAX_DEG,
+  initPhotoPoseLandmarker,
   NEUTRAL_CHANNELS,
   type TrackingChannels,
   type TrackingOptions,
@@ -196,5 +198,38 @@ describe("studio-vrm-webcam-tracking", () => {
       const afterReset = smoother.smooth({ ...mockChannels, headYaw: 1 }, 1, 0.35);
       expect(afterReset.headYaw).toBe(1); // 리셋 후 스냅
     });
+  });
+});
+
+describe("photo-pose landmarker lifecycle", () => {
+  afterEach(() => {
+    disposePhotoPoseLandmarker();
+  });
+
+  it("closes an initialization that resolves after disposal and never resurrects its cache", async () => {
+    type PhotoPoseLandmarker = Awaited<ReturnType<typeof initPhotoPoseLandmarker>>;
+    let resolveFactory!: (landmarker: PhotoPoseLandmarker) => void;
+    const closeStale = vi.fn();
+    const factory = vi.fn(() => new Promise<PhotoPoseLandmarker>((resolve) => {
+      resolveFactory = resolve;
+    }));
+    const pending = initPhotoPoseLandmarker(factory);
+    await vi.waitFor(() => expect(factory).toHaveBeenCalledOnce());
+
+    disposePhotoPoseLandmarker();
+    resolveFactory({ close: closeStale } as unknown as PhotoPoseLandmarker);
+
+    await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    expect(closeStale).toHaveBeenCalledOnce();
+
+    const closeFresh = vi.fn();
+    const fresh = { close: closeFresh } as unknown as PhotoPoseLandmarker;
+    const freshFactory = vi.fn(async () => fresh);
+    await expect(initPhotoPoseLandmarker(freshFactory)).resolves.toBe(fresh);
+    await expect(initPhotoPoseLandmarker()).resolves.toBe(fresh);
+    expect(freshFactory).toHaveBeenCalledOnce();
+
+    disposePhotoPoseLandmarker();
+    expect(closeFresh).toHaveBeenCalledOnce();
   });
 });

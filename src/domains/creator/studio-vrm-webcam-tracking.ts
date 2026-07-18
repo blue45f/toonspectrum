@@ -290,55 +290,92 @@ export function disposePoseLandmarker(): void {
 
 let cachedPhotoPoseLandmarker: PoseLandmarker | null = null;
 let initPhotoPosePromise: Promise<PoseLandmarker> | null = null;
+let photoPoseLandmarkerGeneration = 0;
+
+export type PhotoPoseLandmarkerFactory = () => Promise<PoseLandmarker>;
+
+async function createPhotoPoseLandmarker(): Promise<PoseLandmarker> {
+  const { FilesetResolver, PoseLandmarker: PLM } = await import("@mediapipe/tasks-vision");
+  const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_VISION_CDN);
+  const modelAssetPath =
+    "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task";
+  const options = {
+    runningMode: "IMAGE",
+    outputSegmentationMasks: false,
+    numPoses: 1,
+    minPoseDetectionConfidence: 0.5,
+    minPosePresenceConfidence: 0.5,
+  } as const;
+  try {
+    return await PLM.createFromOptions(vision, {
+      baseOptions: { modelAssetPath, delegate: "GPU" },
+      ...options,
+    });
+  } catch (error) {
+    console.warn("Photo PoseLandmarker GPU delegate failed, falling back to CPU:", error);
+    return PLM.createFromOptions(vision, {
+      baseOptions: { modelAssetPath, delegate: "CPU" },
+      ...options,
+    });
+  }
+}
+
+function photoPoseLandmarkerDisposedError(): Error {
+  const error = new Error("Photo pose landmarker initialization was disposed.");
+  error.name = "AbortError";
+  return error;
+}
 
 /**
  * A separate IMAGE-mode task for still-photo scans. The live VIDEO singleton cannot safely switch
  * running modes while a webcam frame loop owns it, so the two workloads deliberately keep
  * independent MediaPipe task instances.
  */
-export async function initPhotoPoseLandmarker(): Promise<PoseLandmarker> {
-  if (cachedPhotoPoseLandmarker) return cachedPhotoPoseLandmarker;
+export function initPhotoPoseLandmarker(
+  factory: PhotoPoseLandmarkerFactory = createPhotoPoseLandmarker,
+): Promise<PoseLandmarker> {
+  if (cachedPhotoPoseLandmarker) return Promise.resolve(cachedPhotoPoseLandmarker);
   if (initPhotoPosePromise) return initPhotoPosePromise;
 
-  initPhotoPosePromise = (async () => {
-    const { FilesetResolver, PoseLandmarker: PLM } = await import("@mediapipe/tasks-vision");
-    const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_VISION_CDN);
-    const modelAssetPath =
-      "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task";
-    const options = {
-      runningMode: "IMAGE",
-      outputSegmentationMasks: false,
-      numPoses: 1,
-      minPoseDetectionConfidence: 0.5,
-      minPosePresenceConfidence: 0.5,
-    } as const;
-    try {
-      cachedPhotoPoseLandmarker = await PLM.createFromOptions(vision, {
-        baseOptions: { modelAssetPath, delegate: "GPU" },
-        ...options,
-      });
-    } catch (error) {
-      console.warn("Photo PoseLandmarker GPU delegate failed, falling back to CPU:", error);
-      cachedPhotoPoseLandmarker = await PLM.createFromOptions(vision, {
-        baseOptions: { modelAssetPath, delegate: "CPU" },
-        ...options,
-      });
-    }
-    return cachedPhotoPoseLandmarker;
-  })();
-
-  try {
-    return await initPhotoPosePromise;
-  } catch (error) {
-    initPhotoPosePromise = null;
-    throw error;
-  }
+  const generation = photoPoseLandmarkerGeneration;
+  const pending: Promise<PoseLandmarker> = Promise.resolve()
+    .then(factory)
+    .then(
+      (landmarker) => {
+        if (
+          generation !== photoPoseLandmarkerGeneration
+          || initPhotoPosePromise !== pending
+        ) {
+          try {
+            landmarker.close();
+          } catch {
+            // A disposed initialization must never resurrect its cache, even if close fails.
+          }
+          throw photoPoseLandmarkerDisposedError();
+        }
+        cachedPhotoPoseLandmarker = landmarker;
+        initPhotoPosePromise = null;
+        return landmarker;
+      },
+      (error: unknown) => {
+        if (initPhotoPosePromise === pending) initPhotoPosePromise = null;
+        throw error;
+      },
+    );
+  initPhotoPosePromise = pending;
+  return pending;
 }
 
 export function disposePhotoPoseLandmarker(): void {
-  cachedPhotoPoseLandmarker?.close();
+  photoPoseLandmarkerGeneration += 1;
+  const active = cachedPhotoPoseLandmarker;
   cachedPhotoPoseLandmarker = null;
   initPhotoPosePromise = null;
+  try {
+    active?.close();
+  } catch {
+    // Disposal is best-effort and must not break the scanner unmount path.
+  }
 }
 
 let cachedHandLandmarker: HandLandmarker | null = null;

@@ -63,13 +63,21 @@ describe("studio VRM photo-pose main-thread inference boundary", () => {
   it("returns copied numeric pose data without mutating state and closes the transferred bitmap", () => {
     const image = preprocessed();
     const rawLandmarks = landmarks();
-    const detector = { detect: vi.fn(() => ({ landmarks: [rawLandmarks], worldLandmarks: [landmarks()] })) };
+    const close = vi.fn();
+    const detector = {
+      detect: vi.fn(() => ({
+        landmarks: [rawLandmarks],
+        worldLandmarks: [landmarks()],
+        close,
+      })),
+    };
     const result = inferStudioVrmPhotoPoseFromImage(image, detector, { expectedGenerationId: 3 });
 
     expect(detector.detect).toHaveBeenCalledWith(image.bitmap);
     expect(result.inference.generationId).toBe(3);
     expect(result.inference.normalizedLandmarks).not.toBe(rawLandmarks);
     expect(result.source).toBe(image.source);
+    expect(close).toHaveBeenCalledOnce();
     expect(image.bitmap.close).toHaveBeenCalledOnce();
   });
 
@@ -94,11 +102,19 @@ describe("studio VRM photo-pose main-thread inference boundary", () => {
   it("rejects a generation superseded during inference and maps detector exceptions", () => {
     const superseded = preprocessed(7);
     let checks = 0;
-    const detector = { detect: vi.fn(() => ({ landmarks: [landmarks()], worldLandmarks: [landmarks()] })) };
+    const close = vi.fn();
+    const detector = {
+      detect: vi.fn(() => ({
+        landmarks: [landmarks()],
+        worldLandmarks: [landmarks()],
+        close,
+      })),
+    };
     expect(() => inferStudioVrmPhotoPoseFromImage(superseded, detector, {
       expectedGenerationId: 7,
       isGenerationCurrent: () => ++checks === 1,
     })).toThrowError(expect.objectContaining({ code: "stale-generation" }));
+    expect(close).toHaveBeenCalledOnce();
     expect(superseded.bitmap.close).toHaveBeenCalledOnce();
 
     const failed = preprocessed(8);
@@ -108,5 +124,36 @@ describe("studio VRM photo-pose main-thread inference boundary", () => {
       { expectedGenerationId: 8 },
     )).toThrowError(expect.objectContaining({ code: "inference-failed" }));
     expect(failed.bitmap.close).toHaveBeenCalledOnce();
+  });
+
+  it("closes malformed detector results and ignores cleanup failures after copying valid data", () => {
+    const malformedImage = preprocessed(9);
+    const closeMalformed = vi.fn();
+    expect(() => inferStudioVrmPhotoPoseFromImage(
+      malformedImage,
+      { detect: () => ({ landmarks: [], worldLandmarks: [landmarks()], close: closeMalformed }) },
+      { expectedGenerationId: 9 },
+    )).toThrowError(expect.objectContaining({ code: "protocol" }));
+    expect(closeMalformed).toHaveBeenCalledOnce();
+    expect(malformedImage.bitmap.close).toHaveBeenCalledOnce();
+
+    const validImage = preprocessed(10);
+    const closeWithFailure = vi.fn(() => {
+      throw new Error("already released");
+    });
+    const result = inferStudioVrmPhotoPoseFromImage(
+      validImage,
+      {
+        detect: () => ({
+          landmarks: [landmarks()],
+          worldLandmarks: [landmarks()],
+          close: closeWithFailure,
+        }),
+      },
+      { expectedGenerationId: 10 },
+    );
+    expect(result.inference.generationId).toBe(10);
+    expect(closeWithFailure).toHaveBeenCalledOnce();
+    expect(validImage.bitmap.close).toHaveBeenCalledOnce();
   });
 });

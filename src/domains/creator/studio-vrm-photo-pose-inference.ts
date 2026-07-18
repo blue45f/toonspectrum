@@ -25,6 +25,17 @@ export interface StudioVrmPhotoPoseScanResult {
   readonly output: StudioVrmPhotoPosePreprocessedImage["output"];
 }
 
+function closeStudioVrmPhotoPoseDetectorResult(result: unknown): void {
+  if (typeof result !== "object" || result === null) return;
+  const close = (result as { readonly close?: unknown }).close;
+  if (typeof close !== "function") return;
+  try {
+    close.call(result);
+  } catch {
+    // MediaPipe cleanup is best-effort and must not replace the inference outcome.
+  }
+}
+
 /**
  * Makes an otherwise non-cancellable async phase (for example MediaPipe module/model startup)
  * obey the scan-level AbortSignal. The underlying promise may still settle and populate its safe
@@ -81,26 +92,30 @@ export function inferStudioVrmPhotoPoseFromImage(
 ): StudioVrmPhotoPoseScanResult {
   try {
     assertCurrentGeneration(preprocessed.generationId, options);
-    let rawResult: unknown;
+    let rawResult: unknown = undefined;
     try {
-      rawResult = detector.detect(preprocessed.bitmap);
-    } catch (error) {
-      throw new StudioVrmPhotoPoseError("inference-failed", { cause: error });
+      try {
+        rawResult = detector.detect(preprocessed.bitmap);
+      } catch (error) {
+        throw new StudioVrmPhotoPoseError("inference-failed", { cause: error });
+      }
+      assertCurrentGeneration(preprocessed.generationId, options);
+      const inference = createStudioVrmPhotoPoseInferenceResult(
+        preprocessed.generationId,
+        rawResult,
+        {
+          mirror: options.mirrorPose,
+          minimumVisibility: options.minimumVisibility,
+        },
+      );
+      return {
+        inference,
+        source: preprocessed.source,
+        output: preprocessed.output,
+      };
+    } finally {
+      closeStudioVrmPhotoPoseDetectorResult(rawResult);
     }
-    assertCurrentGeneration(preprocessed.generationId, options);
-    const inference = createStudioVrmPhotoPoseInferenceResult(
-      preprocessed.generationId,
-      rawResult,
-      {
-        mirror: options.mirrorPose,
-        minimumVisibility: options.minimumVisibility,
-      },
-    );
-    return {
-      inference,
-      source: preprocessed.source,
-      output: preprocessed.output,
-    };
   } finally {
     // The worker transferred ownership to the main thread. The inference result contains copied
     // numeric landmarks only, so the bitmap must never outlive this boundary.
