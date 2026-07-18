@@ -66,7 +66,8 @@ afterEach(() => {
 
 describe("StudioVrmJointHandles helpers", () => {
   it("defines the requested center, left, and right joints with four IK effectors", () => {
-    expect(STUDIO_VRM_JOINT_HANDLE_DEFINITIONS.map((item) => item.bone)).toEqual([
+    const bones = STUDIO_VRM_JOINT_HANDLE_DEFINITIONS.map((item) => item.bone);
+    expect(bones).toEqual([
       "hips",
       "head",
       "leftShoulder",
@@ -80,6 +81,7 @@ describe("StudioVrmJointHandles helpers", () => {
       "leftFoot",
       "rightFoot",
     ]);
+    expect(new Set(bones).size).toBe(bones.length);
     expect(STUDIO_VRM_JOINT_HANDLE_DEFINITIONS.filter((item) => item.effector).map((item) => item.bone))
       .toEqual(["leftHand", "rightHand", "leftFoot", "rightFoot"]);
   });
@@ -113,7 +115,9 @@ describe("StudioVrmJointHandles helpers", () => {
     const copied = createStudioVrmJointDragPlane(camera, start, explicit);
     expect(copied).not.toBe(explicit);
     expect(copied.normal.length()).toBeCloseTo(1);
+    expect(copied.constant).toBeCloseTo(-2);
     expect(explicit.normal.length()).toBeCloseTo(2);
+    expect(explicit.constant).toBe(-4);
 
     const cameraFacing = createStudioVrmJointDragPlane(camera, start);
     expect(cameraFacing.distanceToPoint(start)).toBeCloseTo(0);
@@ -143,6 +147,13 @@ describe("StudioVrmJointHandles helpers", () => {
       0,
       0,
       { left: 0, top: 0, width: 0, height: 200 },
+      camera,
+      plane
+    )).toBeNull();
+    expect(projectStudioVrmJointPointerToPlane(
+      Number.NaN,
+      0,
+      { left: 0, top: 0, width: 200, height: 200 },
       camera,
       plane
     )).toBeNull();
