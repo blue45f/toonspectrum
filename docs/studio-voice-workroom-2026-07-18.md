@@ -81,7 +81,7 @@ Studio의 실시간 협업에 짧은 작업 대화를 위한 **최대 6인 오�
 
 ```dotenv
 STUDIO_VOICE_STUN_URLS=stun:voice.example.com:3478
-STUDIO_VOICE_TURN_URLS=turn:voice.example.com:3478?transport=udp,turns:voice.example.com:5349?transport=tcp
+STUDIO_VOICE_TURN_URLS=turn:voice.example.com:3478?transport=udp,turn:voice.example.com:3478?transport=tcp,turns:voice.example.com:5349?transport=tcp
 STUDIO_VOICE_TURN_SHARED_SECRET=<coturn static-auth-secret와 동일한 32자 이상 비밀>
 STUDIO_VOICE_TURN_REQUIRED=true
 STUDIO_VOICE_TURN_TTL_SECONDS=900
@@ -91,7 +91,8 @@ Nest는 자격증명 제어면이지 미디어 데이터 플레인이 아니다.
 TURN의 공인 IP, DNS, TLS 인증서, UDP/TCP/TLS listener, relay UDP 포트 범위, allocation·사용자·
 대역폭 quota, credential이 제거된 로그, relay 선택률·실패율·대역폭 관측이 필요하다. 공유 secret
 교체는 새 발급기와 TURN 서버를 같은 변경 창에서 갱신하고 기존 TTL 이상 겹쳐 운영하는 절차로
-수행한다.
+수행한다. 저장소의 비활성 기본 배포 예시와 방화벽·인증서·쿼터·무중단 secret 교체·외부 smoke
+절차는 [`deploy/coturn/README.md`](../deploy/coturn/README.md)에 분리했다.
 
 ## 수명주기와 실패 안전성
 

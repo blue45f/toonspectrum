@@ -1,0 +1,84 @@
+name: toonspectrum-turn
+
+# Explicitly opt in with:
+#   docker compose --profile turn --env-file .env up -d
+#
+# Linux host networking is deliberate. coturn's official Docker guide recommends it for
+# relay port ranges, and it avoids Docker NAT rewriting the address/port advertised to ICE.
+services:
+  coturn:
+    profiles: ["turn"]
+    image: ${COTURN_IMAGE:-coturn/coturn:4.14.0-r0-debian}
+    restart: unless-stopped
+    network_mode: host
+    init: true
+    user: "0:0"
+    read_only: true
+    cap_drop: ["ALL"]
+    cap_add: ["SETGID", "SETUID"]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    stop_grace_period: 20s
+    tmpfs:
+      - /run/coturn:rw,noexec,nosuid,nodev,size=16m,mode=0700
+      - /var/lib/coturn:rw,noexec,nosuid,nodev,size=16m,mode=0700,uid=65534,gid=65534
+      - /tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777
+    entrypoint: ["/bin/sh", "/usr/local/bin/toonspectrum-coturn-entrypoint"]
+    command: []
+    environment:
+      TURN_REALM: ${TURN_REALM:-}
+      TURN_EXTERNAL_IP: ${TURN_EXTERNAL_IP:-}
+      TURN_RELAY_IP: ${TURN_RELAY_IP:-}
+      TURN_LISTEN_PORT: ${TURN_LISTEN_PORT:-3478}
+      TURN_TLS_LISTEN_PORT: ${TURN_TLS_LISTEN_PORT:-5349}
+      TURN_RELAY_MIN_PORT: ${TURN_RELAY_MIN_PORT:-49160}
+      TURN_RELAY_MAX_PORT: ${TURN_RELAY_MAX_PORT:-49259}
+      TURN_USER_QUOTA: ${TURN_USER_QUOTA:-12}
+      TURN_TOTAL_QUOTA: ${TURN_TOTAL_QUOTA:-100}
+      TURN_MAX_BPS: ${TURN_MAX_BPS:-262144}
+      TURN_BPS_CAPACITY: ${TURN_BPS_CAPACITY:-26214400}
+      TURN_LOG_MIN_LEVEL: ${TURN_LOG_MIN_LEVEL:-warning}
+      TURN_SHARED_SECRET_FILE: /run/secrets/turn_shared_secret
+      TURN_PREVIOUS_SHARED_SECRET_FILE: /run/secrets/turn_previous_shared_secret
+      TURN_TLS_CERT_FILE: /run/secrets/turn_tls_cert
+      TURN_TLS_KEY_FILE: /run/secrets/turn_tls_key
+      TURN_CONFIG_TEMPLATE: /etc/coturn/turnserver.conf.template
+      TURN_CONFIG_OUTPUT: /run/coturn/turnserver.conf
+    secrets:
+      - turn_shared_secret
+      - turn_previous_shared_secret
+      - turn_tls_cert
+      - turn_tls_key
+    volumes:
+      - ./turnserver.conf.template:/etc/coturn/turnserver.conf.template:ro
+      - ./entrypoint.sh:/usr/local/bin/toonspectrum-coturn-entrypoint:ro
+    healthcheck:
+      # Liveness only: this proves the local UDP STUN listener responds. The authenticated
+      # allocation and public relay path are verified separately by smoke.sh / browser E2E.
+      test:
+        [
+          "CMD-SHELL",
+          "turnutils_stunclient -p $${TURN_LISTEN_PORT:-3478} 127.0.0.1 >/dev/null 2>&1",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+secrets:
+  turn_shared_secret:
+    file: ${TURN_SHARED_SECRET_PATH:-./secrets/static-auth-secret}
+  # During normal operation this defaults to the current secret. During rotation point it at
+  # the old secret so coturn accepts both until the API credential TTL has drained.
+  turn_previous_shared_secret:
+    file: ${TURN_PREVIOUS_SHARED_SECRET_PATH:-./secrets/static-auth-secret}
+  turn_tls_cert:
+    file: ${TURN_TLS_CERT_PATH:-./certs/fullchain.pem}
+  turn_tls_key:
+    file: ${TURN_TLS_KEY_PATH:-./certs/privkey.pem}
