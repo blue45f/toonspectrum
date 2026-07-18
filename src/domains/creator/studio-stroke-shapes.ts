@@ -381,6 +381,79 @@ export function polygonPathPoints(cx: number, cy: number, radius: number, sides:
   return points;
 }
 
+/**
+ * 다각형을 지정 바운딩 박스에 정확히 맞춘 패스. 홀수 변 다각형은 위 꼭짓점과 아래 변 때문에
+ * 원점 기준 unit 정점의 min/max가 대칭이 아니다. 단순 radiusX/radiusY 배율은 삼각형 높이의
+ * 25%를 다시 잃으므로, 먼저 unit 정점 범위를 구한 뒤 각 축을 독립적으로 bbox에 정규화한다.
+ * 선 굵기는 변환하지 않는 실제 좌표를 반환해 Konva scaleX/scaleY의 비균일 stroke 왜곡도 피한다.
+ */
+export function polygonPathPointsInBounds(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  sides: number
+): number[] {
+  const r = SHAPE_PARAM_RANGES;
+  const n = clampIntTo(sides, r.polygonSides.min, r.polygonSides.max, DEFAULT_SHAPE_PARAMS.polygonSides);
+  const left = Number.isFinite(x) ? x : 0;
+  const top = Number.isFinite(y) ? y : 0;
+  const safeWidth = Math.max(0.1, Number.isFinite(width) ? Math.abs(width) : 0.1);
+  const safeHeight = Math.max(0.1, Number.isFinite(height) ? Math.abs(height) : 0.1);
+  const unit = Array.from({ length: n }, (_, index) => {
+    const angle = -Math.PI / 2 + (index * 2 * Math.PI) / n;
+    return { x: Math.cos(angle), y: Math.sin(angle) };
+  });
+  const minX = Math.min(...unit.map((point) => point.x));
+  const maxX = Math.max(...unit.map((point) => point.x));
+  const minY = Math.min(...unit.map((point) => point.y));
+  const maxY = Math.max(...unit.map((point) => point.y));
+  const spanX = Math.max(1e-9, maxX - minX);
+  const spanY = Math.max(1e-9, maxY - minY);
+  const points: number[] = [];
+  for (const point of unit) {
+    points.push(
+      round2(left + ((point.x - minX) / spanX) * safeWidth),
+      round2(top + ((point.y - minY) / spanY) * safeHeight)
+    );
+  }
+  return points;
+}
+
+export interface PolygonPathNodeLayout {
+  readonly x: number;
+  readonly y: number;
+  readonly points: readonly number[];
+}
+
+/**
+ * Konva layout whose node origin is the bbox center while its points remain bbox-exact. Pattern
+ * fills are node-local, so this keeps Canvas' tile origin identical to SVG's centered origin.
+ */
+export function polygonPathNodeLayoutInBounds(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  sides: number,
+): PolygonPathNodeLayout {
+  const left = Number.isFinite(x) ? x : 0;
+  const top = Number.isFinite(y) ? y : 0;
+  const safeWidth = Math.max(0.1, Number.isFinite(width) ? Math.abs(width) : 0.1);
+  const safeHeight = Math.max(0.1, Number.isFinite(height) ? Math.abs(height) : 0.1);
+  return Object.freeze({
+    x: left + safeWidth / 2,
+    y: top + safeHeight / 2,
+    points: Object.freeze(polygonPathPointsInBounds(
+      -safeWidth / 2,
+      -safeHeight / 2,
+      safeWidth,
+      safeHeight,
+      sides,
+    )),
+  });
+}
+
 /** 사각형에 실제로 적용할 모서리 반경 — 짧은 변의 절반을 넘지 않게 클램프. */
 export function effectiveCornerRadius(width: number, height: number, cornerRadius: number): number {
   if (!Number.isFinite(width) || !Number.isFinite(height)) return 0;

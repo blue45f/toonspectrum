@@ -5,6 +5,7 @@
  * - Two successive desktop headless runs plus one mobile drawing run via Playwright API
  * - addInitScript to dismiss quick-start overlay
  * - Asserts Konva/canvas surface present with target webtoon dims
+ * - Verifies the workspace manager stays intent-gated and preserves dialog focus
  * - Performs a driven interaction using shipped UI (click "예시로 시작" or "추가")
  * - Logs stageInfo JSON + consoleErrors count
  * - Writes screenshots to {SCRATCH}
@@ -43,8 +44,41 @@ interface RunResult {
     hasKonvaSurface: boolean;
     pageDelta: number;
   };
+  workspaceMenu: WorkspaceMenuGateContractResult;
   errCount: number;
   shot: string;
+}
+
+interface WorkspaceMenuGateContractResult {
+  ok: boolean;
+  initialGateCount: number;
+  initialHeavyMenuCount: number;
+  initialDialogCount: number;
+  initialTriggerCount: number;
+  loadingObserved: boolean;
+  loadingFocusRetained: boolean;
+  loadingExpandedFalse: boolean;
+  loadingDialogCount: number;
+  activatedGateCount: number;
+  activatedHeavyMenuCount: number;
+  activatedDialogCount: number;
+  activatedTriggerCount: number;
+  focusMovedInside: boolean;
+  dialogClosed: boolean;
+  closeFocusRestored: boolean;
+  reopened: boolean;
+  reopenFocusInside: boolean;
+  retryClosed: boolean;
+  finalTriggerCount: number;
+}
+
+interface MobileWorkspaceMenuGateResult {
+  ok: boolean;
+  gateCount: number;
+  heavyMenuCount: number;
+  dialogCount: number;
+  triggerCount: number;
+  triggerVisible: boolean;
 }
 
 interface MobileRunResult {
@@ -59,6 +93,7 @@ interface MobileRunResult {
   launcherFocusRestored: boolean;
   dotRecorded: boolean;
   dotRendered: boolean;
+  workspaceMenu: MobileWorkspaceMenuGateResult;
   errCount: number;
   shot: string;
   dotShot: string;
@@ -74,6 +109,7 @@ interface MobileDockLayoutResult {
   noDocumentOverflow: boolean;
   historyFocusReady: boolean;
   drawSheetCanvasInteractive: boolean;
+  workspaceMenu: MobileWorkspaceMenuGateResult;
   sheets: MobileSheetContractResult[];
   errCount: number;
   shot: string;
@@ -147,6 +183,191 @@ async function findFreePort(): Promise<number> {
   });
 }
 
+async function verifyWorkspaceMenuGate(
+  page: Page,
+  run: number,
+): Promise<WorkspaceMenuGateContractResult> {
+  const gate = page.locator('[data-testid="studio-workspace-menu-gate"]');
+  const heavyMenu = page.locator('[data-testid="studio-workspace-menu"]');
+  const dialog = page.locator('[data-testid="studio-workspace-dialog"]');
+  const allTriggers = page.locator('button[aria-haspopup="dialog"][aria-label^="작업공간:"]');
+
+  await gate.waitFor({ state: "attached", timeout: 5000 });
+  const initialGateCount = await gate.count();
+  const initialHeavyMenuCount = await heavyMenu.count();
+  const initialDialogCount = await dialog.count();
+  const initialTriggerCount = await allTriggers.count();
+  const initialReady =
+    initialGateCount === 1 &&
+    initialHeavyMenuCount === 0 &&
+    initialDialogCount === 0 &&
+    initialTriggerCount === 1;
+  const gateTrigger = gate.locator(
+    'button[aria-haspopup="dialog"][aria-label^="작업공간:"]',
+  );
+  const gateTriggerHandle = await gateTrigger.elementHandle();
+
+  // This is deliberately the only activation gesture. Focus warms the chunk, then the native
+  // keyboard button action must keep that same launcher focused throughout the delayed load.
+  await gateTrigger.focus();
+  await page.keyboard.press("Enter");
+  const loadingSnapshot = gateTriggerHandle
+    ? await page.waitForFunction(
+        (element) => {
+          if (!element.isConnected || element.getAttribute("aria-busy") !== "true") return null;
+          return {
+            focusRetained: document.activeElement === element,
+            expandedFalse: element.getAttribute("aria-expanded") === "false",
+            dialogCount: document.querySelectorAll(
+              '[data-testid="studio-workspace-dialog"]',
+            ).length,
+          };
+        },
+        gateTriggerHandle,
+        { timeout: 1500 },
+      ).then((handle) => handle.jsonValue()).catch(() => null)
+    : null;
+  const loadingObserved = loadingSnapshot !== null;
+  const loadingFocusRetained = loadingSnapshot?.focusRetained === true;
+  const loadingExpandedFalse = loadingSnapshot?.expandedFalse === true;
+  const loadingDialogCount = loadingSnapshot?.dialogCount ?? -1;
+  await heavyMenu.waitFor({ state: "attached", timeout: 5000 });
+  await dialog.waitFor({ state: "visible", timeout: 5000 });
+  await gate.waitFor({ state: "detached", timeout: 5000 });
+
+  const dialogHandle = await dialog.elementHandle();
+  const focusMovedInside = dialogHandle
+    ? await page.waitForFunction(
+        (element) => element.contains(document.activeElement),
+        dialogHandle,
+        { timeout: 3000 },
+      ).then(() => true).catch(() => false)
+    : false;
+  const activatedGateCount = await gate.count();
+  const activatedHeavyMenuCount = await heavyMenu.count();
+  const activatedDialogCount = await dialog.count();
+  const activatedTriggerCount = await allTriggers.count();
+  const heavyTrigger = heavyMenu.locator(
+    ':scope > button[aria-haspopup="dialog"][aria-label^="작업공간:"]',
+  );
+  const activatedReady =
+    activatedGateCount === 0 &&
+    activatedHeavyMenuCount === 1 &&
+    activatedDialogCount === 1 &&
+    activatedTriggerCount === 1 &&
+    await heavyTrigger.count() === 1 &&
+    await heavyTrigger.getAttribute("aria-expanded") === "true";
+
+  await dialog
+    .getByRole("button", { name: "작업공간 메뉴 닫기", exact: true })
+    .click();
+  const dialogClosed = await dialog
+    .waitFor({ state: "hidden", timeout: 3000 })
+    .then(() => true)
+    .catch(() => false);
+  const closeFocusRestored = dialogClosed && await waitForLocatorFocus(page, heavyTrigger);
+  const finalTriggerCount = await allTriggers.count();
+  const finalReady =
+    await gate.count() === 0 &&
+    await heavyMenu.count() === 1 &&
+    await dialog.count() === 1 &&
+    finalTriggerCount === 1 &&
+    await heavyTrigger.getAttribute("aria-expanded") === "false";
+  await heavyTrigger.click();
+  const reopened = await dialog
+    .waitFor({ state: "visible", timeout: 3000 })
+    .then(() => true)
+    .catch(() => false);
+  const reopenFocusInside = reopened && dialogHandle
+    ? await page.waitForFunction(
+        (element) => element.contains(document.activeElement),
+        dialogHandle,
+        { timeout: 3000 },
+      ).then(() => true).catch(() => false)
+    : false;
+  if (reopened) {
+    await dialog
+      .getByRole("button", { name: "작업공간 메뉴 닫기", exact: true })
+      .click();
+  }
+  const retryClosed = reopened && await dialog
+    .waitFor({ state: "hidden", timeout: 3000 })
+    .then(() => waitForLocatorFocus(page, heavyTrigger))
+    .catch(() => false);
+  const ok =
+    initialReady &&
+    loadingObserved &&
+    loadingFocusRetained &&
+    loadingExpandedFalse &&
+    loadingDialogCount === 0 &&
+    activatedReady &&
+    focusMovedInside &&
+    dialogClosed &&
+    closeFocusRestored &&
+    finalReady &&
+    reopened &&
+    reopenFocusInside &&
+    retryClosed;
+
+  log(
+    `run${run} workspace-gate: initial=${initialGateCount}/${initialHeavyMenuCount}/${initialDialogCount}/${initialTriggerCount} ` +
+    `loading=${loadingObserved}/${loadingFocusRetained}/${loadingExpandedFalse}/${loadingDialogCount} ` +
+    `activated=${activatedGateCount}/${activatedHeavyMenuCount}/${activatedDialogCount}/${activatedTriggerCount} ` +
+    `focusInside=${focusMovedInside} closed=${dialogClosed} focusRestored=${closeFocusRestored} ` +
+    `reopen=${reopened}/${reopenFocusInside}/${retryClosed} finalTriggers=${finalTriggerCount} ok=${ok}`,
+  );
+  return {
+    ok,
+    initialGateCount,
+    initialHeavyMenuCount,
+    initialDialogCount,
+    initialTriggerCount,
+    loadingObserved,
+    loadingFocusRetained,
+    loadingExpandedFalse,
+    loadingDialogCount,
+    activatedGateCount,
+    activatedHeavyMenuCount,
+    activatedDialogCount,
+    activatedTriggerCount,
+    focusMovedInside,
+    dialogClosed,
+    closeFocusRestored,
+    reopened,
+    reopenFocusInside,
+    retryClosed,
+    finalTriggerCount,
+  };
+}
+
+async function verifyMobileWorkspaceMenuGateDormant(
+  page: Page,
+  label: string,
+): Promise<MobileWorkspaceMenuGateResult> {
+  const gate = page.locator('[data-testid="studio-workspace-menu-gate"]');
+  const heavyMenu = page.locator('[data-testid="studio-workspace-menu"]');
+  const dialog = page.locator('[data-testid="studio-workspace-dialog"]');
+  const trigger = page.locator('button[aria-haspopup="dialog"][aria-label^="작업공간:"]');
+
+  await gate.waitFor({ state: "attached", timeout: 5000 });
+  const gateCount = await gate.count();
+  const heavyMenuCount = await heavyMenu.count();
+  const dialogCount = await dialog.count();
+  const triggerCount = await trigger.count();
+  const triggerVisible = await trigger.isVisible().catch(() => false);
+  const ok =
+    gateCount === 1 &&
+    heavyMenuCount === 0 &&
+    dialogCount === 0 &&
+    triggerCount === 1 &&
+    !triggerVisible;
+  log(
+    `${label} workspace-gate: gate=${gateCount} heavy=${heavyMenuCount} dialog=${dialogCount} ` +
+    `triggers=${triggerCount} triggerVisible=${triggerVisible} ok=${ok}`,
+  );
+  return { ok, gateCount, heavyMenuCount, dialogCount, triggerCount, triggerVisible };
+}
+
 async function runOne(browser: Browser, run: number, url: string): Promise<RunResult> {
   const shot = join(SCRATCH, `studio-launch-${run}.png`);
   const ctx = await browser.newContext();
@@ -175,6 +396,13 @@ async function runOne(browser: Browser, run: number, url: string): Promise<RunRe
   // Wide viewport
   await page.setViewportSize({ width: 1400, height: 2000 });
 
+  // Exercise the real Suspense loading interval instead of only the warm-cache final state.
+  // The focused launcher must remain mounted, busy, and collapsed until the dialog exists.
+  await page.route(/\/assets\/StudioWorkspaceMenu-[^/]+\.js(?:\?.*)?$/u, async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 2_500));
+    await route.continue();
+  });
+
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 15000 });
   await page.waitForTimeout(500);
 
@@ -187,6 +415,8 @@ async function runOne(browser: Browser, run: number, url: string): Promise<RunRe
       log(`run${run}: population via example`);
     }
   } catch {}
+
+  const workspaceMenu = await verifyWorkspaceMenuGate(page, run);
 
   // Stable shipped observables + reliable card count for delta (page cards)
   const pageCards = page.locator('[data-testid="studio-page-item"]');
@@ -239,9 +469,12 @@ async function runOne(browser: Browser, run: number, url: string): Promise<RunRe
   await ctx.close();
 
   // Strict gate: driven action performed (click logged) + konva surface + target logical noted
-  const ok = pageDelta >= 2 && dimOk && consoleErrors.length === 0;
+  const ok = pageDelta >= 2 && dimOk && workspaceMenu.ok && consoleErrors.length === 0;
   if (!ok) {
-    log(`run${run} FAIL (delta=${pageDelta}, dimOk=${dimOk}, errs=${consoleErrors.length})`);
+    log(
+      `run${run} FAIL (delta=${pageDelta}, dimOk=${dimOk}, ` +
+      `workspaceMenu=${workspaceMenu.ok}, errs=${consoleErrors.length})`,
+    );
     if (consoleErrors.length > 0) {
       // 실패 시 원인을 출력해야 실제 Studio 회귀와 무해한 네트워크 경고를 구별할 수 있다.
       // 메시지는 길어질 수 있어 최대 8건만 로그에 남기되, strict gate 자체는 그대로 유지한다.
@@ -253,7 +486,13 @@ async function runOne(browser: Browser, run: number, url: string): Promise<RunRe
       log(`run${run} failedResponse[${index}]: ${response}`);
     }
   }
-  return { ok, stageInfo: { logicalW, hasKonvaSurface, pageDelta }, errCount: consoleErrors.length, shot };
+  return {
+    ok,
+    stageInfo: { logicalW, hasKonvaSurface, pageDelta },
+    workspaceMenu,
+    errCount: consoleErrors.length,
+    shot,
+  };
 }
 
 async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRunResult> {
@@ -290,6 +529,7 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
   await page
     .locator('[data-studio-editor="true"][data-studio-mobile-immersive="true"]')
     .waitFor({ state: "attached", timeout: 3000 });
+  const workspaceMenu = await verifyMobileWorkspaceMenuGateDormant(page, "mobile");
 
   await page.getByRole("button", { name: "브러시 설정 (굵기·색·프리셋)" }).click();
   const sheet = page.getByRole("dialog", { name: "브러시 설정" });
@@ -427,6 +667,7 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
     launcherFocusRestored &&
     dotRecorded &&
     dotRendered &&
+    workspaceMenu.ok &&
     consoleErrors.length === 0;
   log(
     `mobile: immersive=${immersive} root=${immersiveRootReady} ` +
@@ -437,6 +678,7 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
     `categoryTargetsReady=${categoryTargetsReady} categoryTabHeights=${categoryTabHeights.join(",")} ` +
     `rootInert=${rootInert} ` +
     `launcherFocusRestored=${launcherFocusRestored} dotRecorded=${dotRecorded} dotRendered=${dotRendered} ` +
+    `workspaceMenu=${workspaceMenu.ok} ` +
     `consoleErrors=${consoleErrors.length}`
   );
   if (!ok) {
@@ -458,6 +700,7 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
     launcherFocusRestored,
     dotRecorded,
     dotRendered,
+    workspaceMenu,
     errCount: consoleErrors.length,
     shot,
     dotShot,
@@ -758,6 +1001,10 @@ async function runMobileDockLayout(
   // Sheet isolation deliberately removes the dock from the accessibility tree while open.
   const dock = page.locator('nav[aria-label="스튜디오 모바일 도구막대"]');
   await dock.waitFor({ state: "visible", timeout: 8000 });
+  const workspaceMenu = await verifyMobileWorkspaceMenuGateDormant(
+    page,
+    `mobile-dock-${width}`,
+  );
   const primary = dock.locator('[data-studio-mobile-dock-scroll="primary"]');
   const secondary = dock.locator('[data-studio-mobile-dock-scroll="secondary"]');
   const primaryTargets = primary.locator(
@@ -907,6 +1154,7 @@ async function runMobileDockLayout(
     historyFocusReady &&
     drawSheetCanvasInteractive &&
     drawFocusRestored &&
+    workspaceMenu.ok &&
     sheets.every((sheet) => sheet.ok) &&
     consoleErrors.length === 0;
   log(
@@ -914,7 +1162,8 @@ async function runMobileDockLayout(
     `widths=${[...primaryWidths, ...secondaryWidths].join(",")} ` +
     `primaryScrollable=${primaryScrollable} documentOverflow=${!noDocumentOverflow} ` +
     `historyFocusReady=${historyFocusReady} drawInteractive=${drawSheetCanvasInteractive} ` +
-    `drawFocus=${drawFocusRestored} sheets=${sheets.map((sheet) => `${sheet.id}:${sheet.ok}`).join(",")} ` +
+    `drawFocus=${drawFocusRestored} workspaceMenu=${workspaceMenu.ok} ` +
+    `sheets=${sheets.map((sheet) => `${sheet.id}:${sheet.ok}`).join(",")} ` +
     `consoleErrors=${consoleErrors.length}`,
   );
   if (!ok) {
@@ -933,6 +1182,7 @@ async function runMobileDockLayout(
     noDocumentOverflow,
     historyFocusReady,
     drawSheetCanvasInteractive,
+    workspaceMenu,
     sheets,
     errCount: consoleErrors.length,
     shot,

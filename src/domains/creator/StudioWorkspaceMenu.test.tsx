@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
@@ -37,6 +40,21 @@ function renderMenu(
 }
 
 describe("StudioWorkspaceMenu selector and built-in workspaces", () => {
+  it("hands the initial lazy-dialog focus off in a layout effect without an RAF race", () => {
+    const source = readFileSync(
+      fileURLToPath(new URL("./StudioWorkspaceMenu.tsx", import.meta.url)),
+      "utf8",
+    );
+    const handoff = source.slice(
+      source.indexOf("useLayoutEffect(() =>"),
+      source.indexOf("}, [onInitialOpenReady, open]);") + 32,
+    );
+
+    expect(handoff).toContain("(initial ?? dialog).focus");
+    expect(handoff).toContain("onInitialOpenReady?.(true)");
+    expect(handoff).not.toContain("requestAnimationFrame");
+  });
+
   it("summarizes the active workspace and exposes an accessible dialog trigger", () => {
     const html = renderMenu();
 

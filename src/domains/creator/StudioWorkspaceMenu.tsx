@@ -28,6 +28,7 @@ import {
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type FormEvent,
@@ -64,6 +65,10 @@ import {
 import { cn } from "@/lib/utils";
 
 export interface StudioWorkspaceMenuProps {
+  /** Opens the dialog on the first mount. Used by the intent-gated lazy launcher. */
+  initialOpen?: boolean;
+  /** Notifies the lazy launcher atomically when the initial dialog receives focus. */
+  onInitialOpenReady?: (ready: true) => void;
   /** Persisted workspace catalog and preferences. */
   state: StudioWorkspaceState;
   /** Authoritative layout currently rendered by StudioPage. */
@@ -230,6 +235,8 @@ function persistenceNotice(
 }
 
 export function StudioWorkspaceMenu({
+  initialOpen = false,
+  onInitialOpenReady,
   state,
   liveLayout,
   persistence,
@@ -251,7 +258,7 @@ export function StudioWorkspaceMenu({
   const manageEntryRef = useRef<HTMLButtonElement>(null);
   const manageBackRef = useRef<HTMLButtonElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initialOpen);
   const [view, setView] = useState<"switch" | "manage">("switch");
   const [manageTab, setManageTab] = useState<"catalog" | "preferences">("catalog");
   const [query, setQuery] = useState("");
@@ -380,7 +387,7 @@ export function StudioWorkspaceMenu({
     });
   }
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open || typeof globalThis.document === "undefined") return;
     const dialog = dialogRef.current;
     if (!dialog) return;
@@ -389,15 +396,13 @@ export function StudioWorkspaceMenu({
         ? globalThis.document.activeElement
         : null;
     const triggerAtOpen = triggerRef.current;
-    const frame = globalThis.requestAnimationFrame(() => {
-      const initial = dialog.querySelector<HTMLElement>(
-        "[data-workspace-initial-focus]"
-      );
-      (initial ?? dialog).focus({ preventScroll: true });
-    });
+    const initial = dialog.querySelector<HTMLElement>(
+      "[data-workspace-initial-focus]"
+    );
+    (initial ?? dialog).focus({ preventScroll: true });
+    onInitialOpenReady?.(true);
 
     return () => {
-      globalThis.cancelAnimationFrame(frame);
       const returnTarget = triggerAtOpen?.isConnected
         ? triggerAtOpen
         : previousFocus?.isConnected
@@ -405,7 +410,7 @@ export function StudioWorkspaceMenu({
           : null;
       returnTarget?.focus({ preventScroll: true });
     };
-  }, [open]);
+  }, [onInitialOpenReady, open]);
 
   useEffect(() => {
     if (!open || typeof globalThis.document === "undefined") return;

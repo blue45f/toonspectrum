@@ -1,0 +1,81 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it } from "vitest";
+
+import {
+  DEFAULT_STUDIO_WORKSPACE_STATE,
+  normalizeStudioWorkspaceLayout,
+} from "./studio-workspaces";
+import { StudioWorkspaceMenuGate } from "./StudioWorkspaceMenuGate";
+
+const persisted = { status: "persisted", failure: null } as const;
+
+function renderGate(
+  liveLayout = DEFAULT_STUDIO_WORKSPACE_STATE.liveLayout,
+  persistence: { status: "persisted" | "session-only"; failure: null | "write-failed" } = persisted
+): string {
+  return renderToStaticMarkup(
+    <StudioWorkspaceMenuGate
+      state={DEFAULT_STUDIO_WORKSPACE_STATE}
+      liveLayout={liveLayout}
+      persistence={persistence}
+      onStateChange={() => persisted}
+      onApplyLayout={() => undefined}
+    />
+  );
+}
+
+describe("StudioWorkspaceMenuGate", () => {
+  it("renders a complete lightweight trigger without mounting the heavy manager", () => {
+    const html = renderGate();
+
+    expect(html).toContain('data-testid="studio-workspace-menu-gate"');
+    expect(html).toContain('aria-haspopup="dialog"');
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain("작업공간: 스토리보드, 이 기기 저장 확인됨");
+    expect(html).not.toContain('data-testid="studio-workspace-dialog"');
+    expect(html).not.toContain('data-testid="studio-workspace-menu"');
+  });
+
+  it("keeps dirty and session-only truth visible before the optional chunk loads", () => {
+    const liveLayout = normalizeStudioWorkspaceLayout({
+      ...DEFAULT_STUDIO_WORKSPACE_STATE.liveLayout,
+      inspector: {
+        ...DEFAULT_STUDIO_WORKSPACE_STATE.liveLayout.inspector,
+        primary: "layers",
+      },
+    });
+    const html = renderGate(liveLayout, {
+      status: "session-only",
+      failure: "write-failed",
+    });
+
+    expect(html).toContain("저장되지 않은 배치 변경 있음");
+    expect(html).toContain("변경은 이 세션에서만 유지");
+    expect(html).toContain(">변경됨</span>");
+    expect(html).toContain(">세션</span>");
+  });
+
+  it("uses one analyzable lazy import and all three intent preload signals", () => {
+    const source = readFileSync(
+      fileURLToPath(new URL("./StudioWorkspaceMenuGate.tsx", import.meta.url)),
+      "utf8"
+    );
+
+    expect(source.match(/import\("\.\/StudioWorkspaceMenu"\)/g)).toHaveLength(1);
+    expect(source).toContain("onPointerEnter={preloadStudioWorkspaceMenu}");
+    expect(source).toContain("onPointerDown={preloadStudioWorkspaceMenu}");
+    expect(source).toContain("onFocus={preloadStudioWorkspaceMenu}");
+    expect(source).toContain("busy={activated}");
+    expect(source).toContain("setActivationAttempt((attempt) => attempt + 1)");
+    expect(source).toContain("key={activationAttempt}");
+    expect(source).toContain("onInitialOpenReady={setManagerReady}");
+    expect(source).toContain("<Suspense fallback={null}>");
+    expect(source).toContain("aria-expanded={false}");
+    expect(source).toContain("<LazyStudioWorkspaceMenu");
+    expect(source).toContain("{...props}");
+    expect(source).toContain("initialOpen");
+  });
+});

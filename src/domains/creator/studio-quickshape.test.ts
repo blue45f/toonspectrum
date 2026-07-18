@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   anchorQuickShapePoints,
+  anchorQuickShapePointsForLiveDrag,
   classifyQuickShape,
   promoteFreehandQuickShapeOnRelease,
   QUICKSHAPE_HOLD_MS,
   QUICKSHAPE_LOCK_HOLD_MS,
   regularizeQuickShapePoints,
+  trimQuickShapeDwellTail,
 } from "./studio-quickshape";
 
 // ---------------------------------------------------------------------------
@@ -176,6 +178,22 @@ describe("classifyQuickShape — 열린 스트로크(직선)", () => {
 });
 
 describe("classifyQuickShape — 닫힌 루프(코너 카운팅)", () => {
+  it("홀드 중 펜 지터 꼬리를 제외하면 사각형 라이브/릴리스 인식이 유지된다", () => {
+    const clean = rectStrokePoints(0, 0, 200, 100, 10, 0);
+    const jittered = [...clean];
+    for (let index = 0; index < 20; index += 1) {
+      const angle = (index * Math.PI * 2) / 7;
+      const radius = 2 + (index % 4);
+      jittered.push(Math.cos(angle) * radius, Math.sin(angle) * radius);
+    }
+
+    const recognitionRoute = trimQuickShapeDwellTail(jittered, clean.length);
+
+    expect(classifyQuickShape(recognitionRoute, QUICKSHAPE_HOLD_MS)?.kind).toBe("rect");
+    expect(promoteFreehandQuickShapeOnRelease(recognitionRoute)?.kind).toBe("rect");
+    expect(recognitionRoute).toEqual(clean);
+  });
+
   it("손그림 축정렬 사각형(4코너, 약간 지터) → rect, points 는 바운딩 박스", () => {
     const pts = rectStrokePoints(40, 20, 160, 140, 10, 0.3);
     const match = classifyQuickShape(pts, QUICKSHAPE_HOLD_MS);
@@ -425,6 +443,37 @@ describe("anchorQuickShapePoints", () => {
     expect(result[2]).toBe(99);
     expect(result[3]).toBe(98);
   });
+
+  it.each(["ellipse", "triangle", "polygon"] as const)(
+    "%s: 변/꼭짓점의 닫힘 포인터를 bbox 모서리로 오인해 한 축을 줄이지 않는다",
+    (kind) => {
+      const points: [number, number, number, number] = [10, 20, 310, 140];
+      // 원/삼각형/다각형은 흔히 위쪽 중앙에서 시작해 같은 곳에서 닫힌다.
+      expect(anchorQuickShapePoints(kind, points, { x: 160, y: 20 })).toEqual(points);
+    }
+  );
+
+  it.each(["ellipse", "triangle", "polygon"] as const)(
+    "%s: live hold 뒤 1px 이동해도 전체 bbox를 유지한 채 연속 리사이즈한다",
+    (kind) => {
+      const recognized: [number, number, number, number] = [10, 20, 310, 140];
+      const pointer = { x: 160, y: 20 };
+      const live = anchorQuickShapePointsForLiveDrag(kind, recognized, pointer);
+      const moved: [number, number, number, number] = [
+        live.points[0],
+        live.points[1],
+        pointer.x + 1 + live.pointerOffset.x,
+        pointer.y + 1 + live.pointerOffset.y,
+      ];
+      const width = Math.abs(moved[2] - moved[0]);
+      const height = Math.abs(moved[3] - moved[1]);
+
+      expect(Math.abs(live.points[2] - live.points[0])).toBe(300);
+      expect(Math.abs(live.points[3] - live.points[1])).toBe(120);
+      expect(width).toBeGreaterThanOrEqual(299);
+      expect(height).toBeGreaterThanOrEqual(119);
+    }
+  );
 });
 
 describe("2단계(정비율 고정) 통합 시나리오", () => {
@@ -516,6 +565,33 @@ describe("promoteFreehandQuickShapeOnRelease", () => {
     }
     const promoted = promoteFreehandQuickShapeOnRelease(pts);
     expect(promoted?.kind).toBe("ellipse");
+  });
+
+  it("한 꼭짓점만 3배 이상 돌출된 불규칙 5각 낙서는 release에서도 정오각형으로 승격하지 않는다", () => {
+    const vertices: { x: number; y: number }[] = [];
+    for (let index = 0; index <= 5; index += 1) {
+      const angle = -Math.PI / 2 + (index * 2 * Math.PI) / 5;
+      const radius = index === 1 ? 200 : 60;
+      vertices.push({
+        x: 100 + radius * Math.cos(angle),
+        y: 100 + radius * Math.sin(angle),
+      });
+    }
+    const points: number[] = [];
+    for (let edge = 0; edge < 5; edge += 1) {
+      const start = vertices[edge]!;
+      const end = vertices[edge + 1]!;
+      for (let sample = 0; sample < 10; sample += 1) {
+        const amount = sample / 10;
+        points.push(
+          start.x + (end.x - start.x) * amount,
+          start.y + (end.y - start.y) * amount
+        );
+      }
+    }
+    points.push(vertices[5]!.x, vertices[5]!.y);
+
+    expect(promoteFreehandQuickShapeOnRelease(points)?.kind).not.toBe("polygon");
   });
 });
 

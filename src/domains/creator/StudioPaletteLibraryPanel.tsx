@@ -34,8 +34,8 @@ export interface StudioPaletteLibraryPanelProps {
 }
 
 export function StudioPaletteLibraryPanel({ onPickColor, seedColors }: StudioPaletteLibraryPanelProps) {
-  // lazy 초기화 — 모듈은 정적 import라 useEffect 없이 마운트 시점에 동기 로드 가능(클립과 달리
-  // 동적 import가 필요 없다: 이 패널 자체가 menu === "palette"일 때만 마운트되므로 이미 "필요할 때만"이다).
+  // lazy 초기화 — StudioPage가 사용자 의도 시 이 패널 청크를 불러오고, 마운트 시점에는
+  // 별도 네트워크나 effect 없이 브라우저 저장소의 팔레트 목록을 동기 복원한다.
   const [palettes, setPalettes] = useState<StudioNamedPalette[]>(() => listPalettes(globalThis.localStorage));
   const [error, setError] = useState<string | null>(null);
   const [doneMsg, setDoneMsg] = useState<string | null>(null); // StudioMotionExportPanel.tsx의 doneMsg 관례

@@ -15,6 +15,8 @@ import {
   normalizeStrokeStyle,
   pathPointsToSvg,
   polygonPathPoints,
+  polygonPathPointsInBounds,
+  polygonPathNodeLayoutInBounds,
   SHAPE_PARAM_RANGES,
   starPathPoints,
   STROKE_ARROW_HEADS,
@@ -325,6 +327,35 @@ describe("polygonPathPoints", () => {
   it("변 수는 3..12로 클램프된다", () => {
     expect(polygonPathPoints(0, 0, 10, 2)).toHaveLength(6);
     expect(polygonPathPoints(0, 0, 10, 40)).toHaveLength(24);
+  });
+});
+
+describe("polygonPathPointsInBounds", () => {
+  it.each([3, 5, 6, 10])("%i각형이 가로·세로가 다른 bbox의 네 경계를 모두 사용한다", (sides) => {
+    const pts = polygonPathPointsInBounds(10, 20, 300, 90, sides);
+    const xs = pts.filter((_, index) => index % 2 === 0);
+    const ys = pts.filter((_, index) => index % 2 === 1);
+    expect(Math.min(...xs)).toBeCloseTo(10, 2);
+    expect(Math.max(...xs)).toBeCloseTo(310, 2);
+    expect(Math.min(...ys)).toBeCloseTo(20, 2);
+    expect(Math.max(...ys)).toBeCloseTo(110, 2);
+  });
+
+  it("변 수와 비정상 크기를 안전하게 정규화한다", () => {
+    const pts = polygonPathPointsInBounds(Number.NaN, Number.NaN, -0, Number.NaN, 1);
+    expect(pts).toHaveLength(6);
+    expect(pts.every(Number.isFinite)).toBe(true);
+  });
+
+  it("비정사각형 패턴 도형의 노드 원점을 bbox 중심에 두면서 절대 지오메트리를 보존한다", () => {
+    const layout = polygonPathNodeLayoutInBounds(10, 20, 300, 90, 5);
+    expect(layout).toMatchObject({ x: 160, y: 65 });
+    const absolute = layout.points.map((value, index) =>
+      value + (index % 2 === 0 ? layout.x : layout.y));
+    const expected = polygonPathPointsInBounds(10, 20, 300, 90, 5);
+    absolute.forEach((value, index) => expect(value).toBeCloseTo(expected[index] ?? Number.NaN, 8));
+    expect(Object.isFrozen(layout)).toBe(true);
+    expect(Object.isFrozen(layout.points)).toBe(true);
   });
 });
 

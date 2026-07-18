@@ -41,6 +41,28 @@ export const QUICKSHAPE_LINE_MAX_DEVIATION_RATIO = 0.06; // 직선 적합 잔차
 // 일부 코너를 놓쳤다(§구현 편차, 통합 요약 참조). 30°로 낮추면 정삼각형~정십각형(외각 120°~36°)
 // 전 구간이 넉넉한 여유로 검출되면서도, 원(곡률 기반 가짜 코너)은 여전히 0으로 유지된다.
 export const QUICKSHAPE_CORNER_ANGLE_THRESHOLD_DEG = 30;
+
+/**
+ * Excludes samples accumulated after the pointer entered its current still-radius. Stylus devices
+ * commonly emit ~60Hz sub-pixel jitter during the hold gesture; those points are useful for an
+ * immediate release route but must not distort the geometry classified after a dwell.
+ */
+export function trimQuickShapeDwellTail(
+  points: readonly number[],
+  stableCoordinateLength: number,
+): readonly number[] {
+  const completeLength = points.length - (points.length % 2);
+  const boundedLength = Math.max(
+    0,
+    Math.min(
+      completeLength,
+      Number.isFinite(stableCoordinateLength)
+        ? Math.floor(stableCoordinateLength / 2) * 2
+        : completeLength,
+    ),
+  );
+  return boundedLength >= completeLength ? points : points.slice(0, boundedLength);
+}
 export const QUICKSHAPE_MIN_POLYGON_SIDES = 5;
 export const QUICKSHAPE_MAX_POLYGON_SIDES = 10; // SHAPE_PARAM_RANGES 는 12까지 허용하지만 11~12각
 // 코너 카운팅은 손떨림 대비 신뢰도가 낮아 보수적으로 캡.
@@ -60,6 +82,14 @@ export const QUICKSHAPE_MAX_SIDE_DEVIATION_RATIO = 0.18;
 // 손그림 삼각형은 변이 살짝 휘는 경우가 흔해 rect 문턱(0.18)보다 관대하게 허용한다.
 // 실측: 살짝 불룩한 변 3개 + 지터면 ~0.22~0.26, 원 오검출 코너 3개 현 편차는 ~0.45+.
 export const QUICKSHAPE_TRIANGLE_MAX_SIDE_DEVIATION_RATIO = 0.28;
+// Release path passes through the production stabilizer, which intentionally rounds polygon
+// vertices more than the ideal geometry fixtures. Keep live recognition strict, but allow the
+// confirmed release to retain those short rounded shoulders without accepting circle-scale arcs.
+export const QUICKSHAPE_RELEASE_POLYGON_MAX_SIDE_DEVIATION_RATIO = 0.32;
+// Release may relax rounded *edges*, but not the regular-polygon contract itself. Raising the side
+// length CV lets a five-corner scribble with one vertex more than 3x farther out snap into a regular
+// pentagon. Keep the same side-balance gate as live recognition and relax only side straightness.
+export const QUICKSHAPE_RELEASE_POLYGON_SIDE_LENGTH_CV_MAX = QUICKSHAPE_SIDE_LENGTH_CV_MAX;
 // 타원/원 폴백 — 코너 1~2개 또는 직선성 실패 시, 중심 대비 반경 변동계수(CV)가 낮으면 원형으로 본다.
 // 정다각형·사각형은 CV가 훨씬 커서(정삼각형 ~0.3+, 사각형 ~0.2+) 이 문턱 아래로 잘 안 내려간다.
 export const QUICKSHAPE_ELLIPSE_RADIAL_CV_MAX = 0.16;
@@ -464,7 +494,7 @@ function classifyOpenStroke(points: readonly number[], startPt: Pt): QuickShapeM
 function classifyClosedLoop(
   points: readonly number[],
   bbox: { minX: number; minY: number; maxX: number; maxY: number },
-  options?: { relaxTriangle?: boolean; relaxEllipse?: boolean }
+  options?: { relaxTriangle?: boolean; relaxEllipse?: boolean; relaxPolygon?: boolean }
 ): QuickShapeMatch | null {
   const vertices = toVertices(points);
   const loop = resampleClosedLoop(vertices, QUICKSHAPE_RESAMPLE_COUNT);
@@ -514,10 +544,16 @@ function classifyClosedLoop(
   }
 
   if (cornerCount >= QUICKSHAPE_MIN_POLYGON_SIDES && cornerCount <= QUICKSHAPE_MAX_POLYGON_SIDES) {
-    if (sideDev > QUICKSHAPE_MAX_SIDE_DEVIATION_RATIO) {
+    const polygonSideDevMax = options?.relaxPolygon
+      ? QUICKSHAPE_RELEASE_POLYGON_MAX_SIDE_DEVIATION_RATIO
+      : QUICKSHAPE_MAX_SIDE_DEVIATION_RATIO;
+    const polygonSideLengthCvMax = options?.relaxPolygon
+      ? QUICKSHAPE_RELEASE_POLYGON_SIDE_LENGTH_CV_MAX
+      : QUICKSHAPE_SIDE_LENGTH_CV_MAX;
+    if (sideDev > polygonSideDevMax) {
       return tryEllipse();
     }
-    if (sideLengthCV(loop, cornerIndices) > QUICKSHAPE_SIDE_LENGTH_CV_MAX) {
+    if (sideLengthCV(loop, cornerIndices) > polygonSideLengthCvMax) {
       return tryEllipse();
     }
     const sides = clampInt(
@@ -693,7 +729,7 @@ export function classifyQuickShapeForRelease(points: readonly number[]): QuickSh
   }
   // 닫힌(또는 거의 닫힌) 경로: 삼각형 변 편차·원형 폴백을 완화한 닫힌 루프 분류.
   return (
-    classifyClosedLoop(points, bbox, { relaxTriangle: true, relaxEllipse: true })
+    classifyClosedLoop(points, bbox, { relaxTriangle: true, relaxEllipse: true, relaxPolygon: true })
     ?? classifyLooseTriangle(points, bbox)
   );
 }
@@ -789,6 +825,16 @@ export function anchorQuickShapePoints(
       : [round2(anchor.x), round2(anchor.y), round2(x1), round2(y1)];
   }
 
+  // A rectangle conventionally closes on a bounding-box corner, so attaching that corner to the
+  // live pointer preserves the intended drag continuation. Ellipses and regular polygons do not:
+  // their closing point is normally the right/top curve point or an outer vertex, which is often
+  // halfway along a bounding-box edge. Treating that point as a box corner cuts one axis roughly
+  // in half on release (most visibly for triangles and tall polygons). Their recognized bbox is
+  // already authoritative; preserve it instead of inventing a corner from the closing pointer.
+  if (kind !== "rect") {
+    return [round2(points[0]), round2(points[1]), round2(points[2]), round2(points[3])];
+  }
+
   const [x0, y0, x1, y1] = points;
   const corners: Pt[] = [
     { x: x0, y: y0 },
@@ -807,4 +853,68 @@ export function anchorQuickShapePoints(
   }
   const fixed = corners[farIdx]!;
   return [round2(fixed.x), round2(fixed.y), round2(anchor.x), round2(anchor.y)];
+}
+
+export interface QuickShapeLiveDragAnchor {
+  /** Full recognized bounds, oriented as fixed corner -> moving corner. */
+  readonly points: [number, number, number, number];
+  /** Added to the live pointer before replacing points[2..3]. */
+  readonly pointerOffset: { readonly x: number; readonly y: number };
+}
+
+/**
+ * Prepares a recognized shape for continued pointer-down resizing without changing its bounds.
+ *
+ * Pointer-up promotion intentionally uses `anchorQuickShapePoints`: ellipse/triangle/polygon keep
+ * their authoritative bbox because their closing point is normally on an edge, not a bbox corner.
+ * A live hold has an additional requirement: later pointer moves must still resize the shape. For
+ * non-rect shapes, orient the full bbox from the corner opposite the pointer to the nearest corner
+ * and retain the pointer-to-corner offset. Applying that offset on later moves avoids the first
+ * 1 px move collapsing an ellipse or polygon to the closing pointer's edge position.
+ */
+export function anchorQuickShapePointsForLiveDrag(
+  kind: QuickShapeKind,
+  points: readonly [number, number, number, number],
+  anchor: { x: number; y: number }
+): QuickShapeLiveDragAnchor {
+  if (kind === "line" || kind === "rect") {
+    const anchored = anchorQuickShapePoints(kind, points, anchor);
+    return {
+      points: anchored,
+      pointerOffset: {
+        x: round2(anchored[2] - anchor.x),
+        y: round2(anchored[3] - anchor.y),
+      },
+    };
+  }
+
+  const minX = Math.min(points[0], points[2]);
+  const minY = Math.min(points[1], points[3]);
+  const maxX = Math.max(points[0], points[2]);
+  const maxY = Math.max(points[1], points[3]);
+  const corners: readonly Pt[] = [
+    { x: minX, y: minY },
+    { x: maxX, y: minY },
+    { x: maxX, y: maxY },
+    { x: minX, y: maxY },
+  ];
+  let movingIndex = 0;
+  let nearestDistance = Infinity;
+  for (let index = 0; index < corners.length; index += 1) {
+    const corner = corners[index]!;
+    const distance = Math.hypot(corner.x - anchor.x, corner.y - anchor.y);
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      movingIndex = index;
+    }
+  }
+  const moving = corners[movingIndex]!;
+  const fixed = corners[(movingIndex + 2) % corners.length]!;
+  return {
+    points: [round2(fixed.x), round2(fixed.y), round2(moving.x), round2(moving.y)],
+    pointerOffset: {
+      x: round2(moving.x - anchor.x),
+      y: round2(moving.y - anchor.y),
+    },
+  };
 }

@@ -121,7 +121,7 @@ import {
   lineArrowHeadGeoms,
   normalizeShapeParams,
   normalizeStrokeStyle,
-  polygonPathPoints,
+  polygonPathPointsInBounds,
   starPathPoints,
   strokeDashArray,
   type ShapeParams,
@@ -825,7 +825,13 @@ function serializeDraw(ctx: ExportCtx, el: SvgDrawElLike): string {
       const pts =
         kind === "star"
           ? starPathPoints(cx, cy, m / 2, shapeParams)
-          : polygonPathPoints(cx, cy, m / 2, kind === "triangle" ? 3 : shapeParams.polygonSides);
+          : polygonPathPointsInBounds(
+              box.x,
+              box.y,
+              box.width,
+              box.height,
+              kind === "triangle" ? 3 : shapeParams.polygonSides
+            );
       parts.push(
         `<polygon points="${pointsAttr(pts)}" fill="${escapeXml(fill)}"${strokeAttrs}${dashAttr} stroke-linejoin="round"${opacityAttr}/>`
       );

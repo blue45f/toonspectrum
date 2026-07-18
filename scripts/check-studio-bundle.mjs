@@ -30,7 +30,12 @@ const budgets = {
   // 2026-07-18 SVG 내보내기·마술봉·리퀴파이 3개를 Worker로 오프로드(client+protocol+worker
   // 파일 9개 추가): 2645087 raw / 865123 gzip 관측(예산을 87/123바이트 초과). 관측치+약 2%
   // 여유로 상향 — 뒤이어 스머지·힐클론 오프로드가 곧바로 예정돼 있다.
+  // 2026-07-18 작업공간 manager·이미지 전문 패널·선택 도구 overlay를 실제 사용자 의도
+  // 경계로 분리하고 Container의 section barrel 우회를 제거했다. 전체 route 상한은 원격 Worker
+  // wave의 더 큰 보수 예산을 유지하고, entry/앱 셸 이후 증분 예산으로 eager 회귀를 별도 잠근다.
   studio: { raw: 2_698_000, gzip: 882_500 },
+  studioEntry: { raw: 1_160_000, gzip: 350_000 },
+  studioIncremental: { raw: 2_115_000, gzip: 690_000, chunks: 120 },
   // Measured after the same build: 443,257 raw / 143,956 gzip.
   app: { raw: 500_000, gzip: 170_000 },
 };
@@ -91,13 +96,43 @@ if (!fs.existsSync(manifestPath)) {
     });
   }
 
+  function matchingManifestEntries(pattern) {
+    return Object.entries(manifest)
+      .filter(([key, entry]) => pattern.test([key, entry.src, entry.file].filter(Boolean).join(" ")))
+      .map(([key]) => key);
+  }
+
+  function checkDynamicBoundary(label, pattern, staticKeys) {
+    const matching = matchingManifestEntries(pattern);
+    const dynamicEntries = matching.filter((key) => manifest[key].isDynamicEntry === true);
+    if (dynamicEntries.length === 0) {
+      fail(`${label} is missing an analyzable dynamic manifest entry`);
+      return;
+    }
+    const eagerEntries = dynamicEntries.filter((key) => staticKeys.has(key));
+    if (eagerEntries.length > 0) {
+      fail(`${label} returned to the Studio static graph: ${eagerEntries.join(", ")}`);
+    }
+  }
+
   try {
     const studioKeys = staticClosure(studioEntry);
     const appKeys = staticClosure(appEntry);
+    const studioIncrementalKeys = new Set([...studioKeys].filter((key) => !appKeys.has(key)));
     const studioSize = measure(studioKeys);
+    const studioEntrySize = measure(new Set([studioEntry]));
+    const studioIncrementalSize = measure(studioIncrementalKeys);
     const appSize = measure(appKeys);
 
     checkBudget("Studio route", studioSize, budgets.studio);
+    checkBudget("StudioPage entry", studioEntrySize, budgets.studioEntry);
+    checkBudget("Studio route after app shell", studioIncrementalSize, budgets.studioIncremental);
+    if (studioIncrementalKeys.size > budgets.studioIncremental.chunks) {
+      fail(
+        `Studio route after app shell uses ${studioIncrementalKeys.size} static JS requests `
+          + `(budget ${budgets.studioIncremental.chunks})`,
+      );
+    }
     checkBudget("app entry", appSize, budgets.app);
 
     const eagerDocumentEngines = matchingEntries(
@@ -144,9 +179,66 @@ if (!fs.existsSync(manifestPath)) {
       );
     }
 
+    const eagerVoiceRuntime = matchingEntries(
+      studioKeys,
+      /(?:studio-voice-call(?!-model)|studio-voice-ice-policy)/,
+    );
+    if (eagerVoiceRuntime.length > 0) {
+      fail(
+        `optional WebRTC voice runtime returned to the Studio static graph: ${eagerVoiceRuntime.join(", ")}`,
+      );
+    }
+
+    const eagerLayerNavigator = matchingEntries(
+      studioKeys,
+      /StudioLayerNavigator(?:\.tsx)?/,
+    );
+    if (eagerLayerNavigator.length > 0) {
+      fail(
+        `optional layer navigator returned to the Studio static graph: ${eagerLayerNavigator.join(", ")}`,
+      );
+    }
+
+    const optionalUiBoundaries = [
+      ["optional workspace manager", /src\/domains\/creator\/StudioWorkspaceMenu\.tsx/],
+      ["optional color palette", /src\/domains\/creator\/StudioColorPalettePanel\.tsx/],
+      ["optional flood fill panel", /src\/domains\/creator\/StudioFloodFillPanel\.tsx/],
+      ["optional palette library", /src\/domains\/creator\/StudioPaletteLibraryPanel\.tsx/],
+      ["optional panel split tool", /src\/domains\/creator\/StudioPanelSplitTool\.tsx/],
+      ["optional heal/clone overlay", /src\/domains\/creator\/StudioHealCloneOverlay\.tsx/],
+      ["optional history brush overlay", /src\/domains\/creator\/StudioHistoryBrushOverlay\.tsx/],
+      ["optional isometric overlay", /src\/domains\/creator\/StudioIsometricGridOverlay\.tsx/],
+      ["optional layer mask overlay", /src\/domains\/creator\/StudioLayerMaskOverlay\.tsx/],
+      ["optional perspective overlay", /src\/domains\/creator\/StudioPerspectiveOverlay\.tsx/],
+      ["optional puppet warp overlay", /src\/domains\/creator\/StudioPuppetWarpOverlay\.tsx/],
+    ];
+    for (const [label, pattern] of optionalUiBoundaries) {
+      checkDynamicBoundary(label, pattern, studioKeys);
+    }
+
+    const eagerBackgroundCatalog = matchingEntries(
+      studioKeys,
+      /studio-background-presets/,
+    );
+    if (eagerBackgroundCatalog.length > 0) {
+      fail(
+        `optional background preset catalog returned to the Studio static graph: ${eagerBackgroundCatalog.join(", ")}`,
+      );
+    }
+
+    const eagerFrameAnimationExport = matchingEntries(
+      studioKeys,
+      /(?:studio-frame-animation-export|studio-motion-export)/,
+    );
+    if (eagerFrameAnimationExport.length > 0) {
+      fail(
+        `optional frame-animation WebM runtime returned to the Studio static graph: ${eagerFrameAnimationExport.join(", ")}`,
+      );
+    }
+
     const eager3dRuntime = matchingEntries(
       studioKeys,
-      /(?:studio-background-3d-primitives|StudioBackground3D|react-three-fiber|three\.module)/,
+      /(?:studio-background-3d-primitives|StudioBackground3D|studio-bg3d-three-webgpu-lab|react-three-fiber|three\.(?:module|webgpu))/,
     );
     if (eager3dRuntime.length > 0) {
       fail(`optional 3D runtime returned to the Studio static graph: ${eager3dRuntime.join(", ")}`);
@@ -159,7 +251,10 @@ if (!fs.existsSync(manifestPath)) {
 
     if (!process.exitCode) {
       console.log(
-        `studio bundle check passed: Studio ${studioKeys.size} chunks, ${describe(studioSize.raw)} raw / ${describe(studioSize.gzip)} gzip; app ${appKeys.size} chunks, ${describe(appSize.raw)} raw / ${describe(appSize.gzip)} gzip`,
+        `studio bundle check passed: Studio ${studioKeys.size} chunks, ${describe(studioSize.raw)} raw / ${describe(studioSize.gzip)} gzip; `
+          + `StudioPage ${describe(studioEntrySize.raw)} raw / ${describe(studioEntrySize.gzip)} gzip; `
+          + `after app shell ${studioIncrementalKeys.size} chunks, ${describe(studioIncrementalSize.raw)} raw / ${describe(studioIncrementalSize.gzip)} gzip; `
+          + `app ${appKeys.size} chunks, ${describe(appSize.raw)} raw / ${describe(appSize.gzip)} gzip`,
       );
     }
   } catch (error) {

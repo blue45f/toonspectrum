@@ -105,7 +105,7 @@ import {
 } from "lucide-react";
 import { Fragment, Profiler, Suspense, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ComponentType, type ReactNode } from "react";
 import { createPortal, flushSync } from "react-dom";
-import { Stage, Layer, Rect, Text as KText, TextPath as KTextPath, Image as KImage, Line, Group, Star, Ellipse, Circle as KCircle, Path, Transformer, Shape, Arrow, RegularPolygon } from "react-konva/lib/ReactKonvaCore";
+import { Stage, Layer, Rect, Text as KText, TextPath as KTextPath, Image as KImage, Line, Group, Star, Ellipse, Circle as KCircle, Path, Transformer, Shape, Arrow } from "react-konva/lib/ReactKonvaCore";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 
@@ -611,9 +611,11 @@ import {
 } from "./studio-ink-pressure-model";
 import {
   navigateStudioInspector,
+  type StudioImageInspectorSection,
   type StudioInspectorLayout,
   type StudioInspectorRoute,
 } from "./studio-inspector-layout";
+import { createStudioIntentLazyLoader } from "./studio-intent-lazy-loader";
 import {
   clampIsometricAngleDeg,
   clampIsometricCellSize,
@@ -897,10 +899,11 @@ import {
   type StudioQuickActionsPreferences,
 } from "./studio-quick-actions";
 import {
-  anchorQuickShapePoints,
+  anchorQuickShapePointsForLiveDrag,
   classifyQuickShape,
   promoteFreehandQuickShapeOnRelease,
   regularizeQuickShapePoints,
+  trimQuickShapeDwellTail,
   QUICKSHAPE_LOCK_HOLD_MS,
   QUICKSHAPE_STILL_RADIUS_PX,
   type QuickShapeKind,
@@ -1015,6 +1018,7 @@ import {
   lineArrowHeadGeoms,
   normalizeShapeParams,
   normalizeStrokeStyle,
+  polygonPathNodeLayoutInBounds,
   strokeDashArray,
   type ShapeParams,
   type StrokeStyle,
@@ -1124,13 +1128,8 @@ import {
   StudioColorBlindPreviewToggle,
   type CvdMode,
 } from "./StudioColorBlindPreview";
-import { StudioColorPalettePanel } from "./StudioColorPalettePanel";
-import { StudioFloodFillPanel } from "./StudioFloodFillPanel";
-import { StudioHealCloneOverlay } from "./StudioHealCloneOverlay";
-import { StudioHistoryBrushOverlay } from "./StudioHistoryBrushOverlay";
 import { StudioInspectorNavigator } from "./StudioInspectorNavigator";
-import { StudioIsometricGridOverlay } from "./StudioIsometricGridOverlay";
-import { StudioLayerMaskOverlay } from "./StudioLayerMaskOverlay";
+import { StudioPanelLoading, StudioRouteLoading } from "./StudioLazySurfaceFallback";
 import { StudioLineCleanupPanel } from "./StudioLineCleanupPanel";
 import { StudioLineCorrectionControls } from "./StudioLineCorrectionControls";
 import {
@@ -1142,10 +1141,6 @@ import { StudioMagicResizePanel } from "./StudioMagicResizePanel";
 import { StudioMagicWandPanel } from "./StudioMagicWandPanel";
 import { StudioMobileSheetHandle } from "./StudioMobileSheetHandle";
 import { StudioNodeEditPanel } from "./StudioNodeEditPanel";
-import { StudioPaletteLibraryPanel } from "./StudioPaletteLibraryPanel";
-import { StudioPanelSplitOverlay, StudioPanelSplitPanel } from "./StudioPanelSplitTool";
-import { StudioPerspectiveOverlay } from "./StudioPerspectiveOverlay";
-import { StudioPuppetWarpOverlay } from "./StudioPuppetWarpOverlay";
 import { StudioSavedBrushShelf } from "./StudioSavedBrushShelf";
 import { StudioSkewPanel } from "./StudioSkewPanel";
 import StudioTextEditOverlay, { StudioTextEditFallbackModal } from "./StudioTextEditOverlay";
@@ -1153,7 +1148,7 @@ import {
   StudioToolHintPreferencesProvider,
   StudioToolHintTarget,
 } from "./StudioToolHint";
-import { StudioWorkspaceMenu } from "./StudioWorkspaceMenu";
+import { StudioWorkspaceMenuGate } from "./StudioWorkspaceMenuGate";
 import { useStudioModalSheet } from "./useStudioModalSheet";
 
 import type { AdvancedFillDiagnostics, AdvancedFillMaskLike } from "./studio-advanced-fill";
@@ -1248,7 +1243,7 @@ import type {
 import type Konva from "konva";
 
 import { scheduleIdle } from "@/components/auth/schedule-idle";
-import { Container } from "@/components/section";
+import { Container } from "@/components/container";
 import { buttonClass } from "@/components/ui/button-utils";
 import { useIsMobile } from "@/components/use-media-query";
 import { useResizable } from "@/components/use-resizable";
@@ -1270,6 +1265,50 @@ const BUBBLE_TEXT_MEASURER = createCanvasBubbleTextMeasurer();
 const StudioImageAdjustmentsPanel = lazyRetry(
   () => import("./StudioImageAdjustmentsPanel").then((mod) => ({ default: mod.StudioImageAdjustmentsPanel })),
   "StudioImageAdjustmentsPanel"
+);
+const StudioColorPalettePanel = lazyRetry(
+  () => import("./StudioColorPalettePanel").then((mod) => ({ default: mod.StudioColorPalettePanel })),
+  "StudioColorPalettePanel"
+);
+const StudioFloodFillPanel = lazyRetry(
+  () => import("./StudioFloodFillPanel").then((mod) => ({ default: mod.StudioFloodFillPanel })),
+  "StudioFloodFillPanel"
+);
+const StudioHealCloneOverlay = lazyRetry(
+  () => import("./StudioHealCloneOverlay").then((mod) => ({ default: mod.StudioHealCloneOverlay })),
+  "StudioHealCloneOverlay"
+);
+const StudioHistoryBrushOverlay = lazyRetry(
+  () => import("./StudioHistoryBrushOverlay").then((mod) => ({ default: mod.StudioHistoryBrushOverlay })),
+  "StudioHistoryBrushOverlay"
+);
+const StudioIsometricGridOverlay = lazyRetry(
+  () => import("./StudioIsometricGridOverlay").then((mod) => ({ default: mod.StudioIsometricGridOverlay })),
+  "StudioIsometricGridOverlay"
+);
+const StudioLayerMaskOverlay = lazyRetry(
+  () => import("./StudioLayerMaskOverlay").then((mod) => ({ default: mod.StudioLayerMaskOverlay })),
+  "StudioLayerMaskOverlay"
+);
+const studioPanelSplitToolLoader = createStudioIntentLazyLoader(
+  () => import("./StudioPanelSplitTool")
+);
+
+const StudioPanelSplitOverlay = lazyRetry(
+  () => studioPanelSplitToolLoader.load().then((mod) => ({ default: mod.StudioPanelSplitOverlay })),
+  "StudioPanelSplitOverlay"
+);
+const StudioPanelSplitPanel = lazyRetry(
+  () => studioPanelSplitToolLoader.load().then((mod) => ({ default: mod.StudioPanelSplitPanel })),
+  "StudioPanelSplitPanel"
+);
+const StudioPerspectiveOverlay = lazyRetry(
+  () => import("./StudioPerspectiveOverlay").then((mod) => ({ default: mod.StudioPerspectiveOverlay })),
+  "StudioPerspectiveOverlay"
+);
+const StudioPuppetWarpOverlay = lazyRetry(
+  () => import("./StudioPuppetWarpOverlay").then((mod) => ({ default: mod.StudioPuppetWarpOverlay })),
+  "StudioPuppetWarpOverlay"
 );
 const StudioLayerNavigator = lazyRetry(
   () => import("./StudioLayerNavigator").then((mod) => ({ default: mod.StudioLayerNavigator })),
@@ -1580,6 +1619,21 @@ const StudioBrushLibraryPanel = lazyRetry(
   () => import("./StudioBrushLibraryPanel").then((mod) => ({ default: mod.StudioBrushLibraryPanel })),
   "StudioBrushLibraryPanel"
 );
+
+const studioPaletteLibraryPanelLoader = createStudioIntentLazyLoader(() =>
+  import("./StudioPaletteLibraryPanel").then((mod) => ({
+    default: mod.StudioPaletteLibraryPanel,
+  }))
+);
+
+const StudioPaletteLibraryPanel = lazyRetry(
+  studioPaletteLibraryPanelLoader.load,
+  "StudioPaletteLibraryPanel"
+);
+
+function preloadStudioPaletteLibraryPanel(): void {
+  studioPaletteLibraryPanelLoader.preload();
+}
 
 const BRUSH_DELETE_UNDO_MS = 10_000;
 /**
@@ -1903,25 +1957,6 @@ function LazyStudioColorPopover({ onLoadRecentColors, ...props }: LazyStudioColo
     <Suspense fallback={<StudioColorPopoverFallback {...props} busy />}>
       <StudioColorPopoverContent {...props} initialOpen />
     </Suspense>
-  );
-}
-
-function StudioPanelLoading({ label = "패널을 여는 중..." }: { label?: string }) {
-  return (
-    <div className="rounded-lg border border-line bg-card/70 px-3 py-2 text-xs text-fg-3">
-      {label}
-    </div>
-  );
-}
-
-function StudioRouteLoading({ label }: { label: string }) {
-  return (
-    <div className="grid min-h-dvh place-items-center bg-bg px-4" role="status" aria-live="polite">
-      <div className="flex items-center gap-2 rounded-xl border border-line bg-card/90 px-4 py-3 text-sm text-fg-2 shadow-lg">
-        <Loader2 className="animate-spin motion-reduce:animate-none" size={18} aria-hidden />
-        <span>{label}</span>
-      </div>
-    </div>
   );
 }
 
@@ -3299,13 +3334,14 @@ const StudioDrawNode = memo(function StudioDrawNode({
 
         if (kind === "triangle") {
           const box = drawBounds(points);
+          const layout = polygonPathNodeLayoutInBounds(box.x, box.y, box.width, box.height, 3);
           return (
-            <RegularPolygon
+            <Line
               key={index}
-              x={box.x + box.width / 2}
-              y={box.y + box.height / 2}
-              sides={3}
-              radius={Math.max(0.1, Math.min(box.width, box.height) / 2)}
+              x={layout.x}
+              y={layout.y}
+              points={[...layout.points]}
+              closed
               fill={el.fill}
               {...konvaPatternProps(el.pattern, patternImage)}
               stroke={stroke}
@@ -3321,13 +3357,20 @@ const StudioDrawNode = memo(function StudioDrawNode({
 
         if (kind === "polygon") {
           const box = drawBounds(points);
+          const layout = polygonPathNodeLayoutInBounds(
+            box.x,
+            box.y,
+            box.width,
+            box.height,
+            shapeParams.polygonSides,
+          );
           return (
-            <RegularPolygon
+            <Line
               key={index}
-              x={box.x + box.width / 2}
-              y={box.y + box.height / 2}
-              sides={shapeParams.polygonSides}
-              radius={Math.max(0.1, Math.min(box.width, box.height) / 2)}
+              x={layout.x}
+              y={layout.y}
+              points={[...layout.points]}
+              closed
               fill={el.fill}
               {...konvaPatternProps(el.pattern, patternImage)}
               stroke={stroke}
@@ -9423,6 +9466,16 @@ function StudioCuttoonEditor() {
   const quickShapeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const quickShapeStillElapsedRef = useRef<number>(0);
   const quickShapeStillAnchorRef = useRef<{ x: number; y: number } | null>(null);
+  // Live-hold recognition preserves the full bbox even when the closing pointer sits halfway along
+  // an edge. Keep that pointer-to-corner offset so the first follow-up move resizes instead of
+  // collapsing an ellipse/triangle/polygon to the pointer position.
+  const quickShapeLivePointerOffsetRef = useRef({ x: 0, y: 0 });
+  // Shape recognition follows the artist's pointer route, not the ink stabilizer output. The
+  // latter deliberately rounds corners and can reduce a fast five-sided gesture to four apparent
+  // turns even though the displayed freehand remains visually pentagonal.
+  const quickShapeSourcePointsRef = useRef<number[]>([]);
+  /** Coordinate length captured on the last still-anchor reset; excludes the subsequent jitter tail. */
+  const quickShapeStableSourceLengthRef = useRef(0);
   const quickShapeConvertedRef = useRef<boolean>(false); // 이 스트로크가 QuickShape 로 변환됐는지
   const quickShapeLockedRef = useRef<boolean>(false); // 2단계(정비율 고정)를 이미 적용했는지
   // 브러시 커서 프리뷰(Konva 노드 직접 갱신 — hover 리렌더 방지).
@@ -18063,6 +18116,9 @@ function StudioCuttoonEditor() {
     quickShapeConvertedRef.current = false;
     quickShapeLockedRef.current = false;
     quickShapeStillAnchorRef.current = pos;
+    quickShapeLivePointerOffsetRef.current = { x: 0, y: 0 };
+    quickShapeSourcePointsRef.current = [pos.x, pos.y];
+    quickShapeStableSourceLengthRef.current = 2;
     // onStageDown(포인터 이벤트 핸들러)에서만 호출되며 아래 타이머도 렌더가 끝난 뒤 시작한다.
     quickShapeStillElapsedRef.current = 0;
     if (quickShapeTimerRef.current !== null) globalThis.clearInterval(quickShapeTimerRef.current);
@@ -18074,6 +18130,9 @@ function StudioCuttoonEditor() {
       quickShapeTimerRef.current = null;
     }
     quickShapeStillAnchorRef.current = null;
+    quickShapeLivePointerOffsetRef.current = { x: 0, y: 0 };
+    quickShapeSourcePointsRef.current = [];
+    quickShapeStableSourceLengthRef.current = 0;
     quickShapeStillElapsedRef.current = 0;
     quickShapeConvertedRef.current = false;
     quickShapeLockedRef.current = false;
@@ -18082,6 +18141,8 @@ function StudioCuttoonEditor() {
   function snapshotQuickShapeTracking() {
     return {
       anchor: quickShapeStillAnchorRef.current,
+      sourcePoints: quickShapeSourcePointsRef.current.slice(),
+      stableSourceLength: quickShapeStableSourceLengthRef.current,
       elapsed: quickShapeStillElapsedRef.current,
       locked: quickShapeLockedRef.current,
       converted: quickShapeConvertedRef.current,
@@ -18337,9 +18398,22 @@ function StudioCuttoonEditor() {
   function noteQuickShapePointerMoved(pos: { x: number; y: number }) {
     const anchor = quickShapeStillAnchorRef.current;
     if (!anchor) return; // 무장 안 됨 — 저비용 no-op
+    if (!quickShapeConvertedRef.current) {
+      const source = quickShapeSourcePointsRef.current;
+      const lastX = source[source.length - 2];
+      const lastY = source[source.length - 1];
+      if (
+        lastX === undefined
+        || lastY === undefined
+        || Math.hypot(pos.x - lastX, pos.y - lastY) > 1e-3
+      ) {
+        source.push(pos.x, pos.y);
+      }
+    }
     const radius = QUICKSHAPE_STILL_RADIUS_PX / effScale;
     if (Math.hypot(pos.x - anchor.x, pos.y - anchor.y) > radius) {
       quickShapeStillAnchorRef.current = pos;
+      quickShapeStableSourceLengthRef.current = quickShapeSourcePointsRef.current.length;
       // onStageMove(포인터 이벤트 핸들러) 안에서만 갱신한다.
       quickShapeStillElapsedRef.current = 0;
     }
@@ -18359,9 +18433,19 @@ function StudioCuttoonEditor() {
 
     if (!quickShapeConvertedRef.current) {
       if ((current.kind ?? "freehand") !== "freehand") return; // 방어적
-      const match = classifyQuickShape(current.points, elapsed);
+      const sourcePoints = quickShapeSourcePointsRef.current;
+      const recognitionPoints = trimQuickShapeDwellTail(
+        sourcePoints,
+        quickShapeStableSourceLengthRef.current,
+      );
+      const match = classifyQuickShape(
+        recognitionPoints.length >= 8 ? recognitionPoints : current.points,
+        elapsed,
+      );
       if (!match) return;
-      const anchored = anchorQuickShapePoints(match.kind, match.points, anchor);
+      const liveAnchor = anchorQuickShapePointsForLiveDrag(match.kind, match.points, anchor);
+      let anchored = liveAnchor.points;
+      quickShapeLivePointerOffsetRef.current = liveAnchor.pointerOffset;
       let next: DrawEl = {
         ...current,
         kind: match.kind,
@@ -18381,7 +18465,12 @@ function StudioCuttoonEditor() {
       };
       quickShapeConvertedRef.current = true;
       if (elapsed >= QUICKSHAPE_LOCK_HOLD_MS) {
-        next = { ...next, points: regularizeQuickShapePoints(match.kind, anchored) };
+        anchored = regularizeQuickShapePoints(match.kind, anchored);
+        next = { ...next, points: anchored };
+        quickShapeLivePointerOffsetRef.current = {
+          x: anchored[2] - anchor.x,
+          y: anchored[3] - anchor.y,
+        };
         quickShapeLockedRef.current = true;
       }
       drawingRef.current = next;
@@ -18396,6 +18485,10 @@ function StudioCuttoonEditor() {
       const locked = regularizeQuickShapePoints(kind, current.points as [number, number, number, number]);
       const next = { ...current, points: locked };
       drawingRef.current = next;
+      quickShapeLivePointerOffsetRef.current = {
+        x: locked[2] - anchor.x,
+        y: locked[3] - anchor.y,
+      };
       quickShapeLockedRef.current = true;
       scheduleDraft(next);
     }
@@ -19268,8 +19361,11 @@ function StudioCuttoonEditor() {
     if (!pos) return false;
     const x0 = current.points[0] ?? pos.x;
     const y0 = current.points[1] ?? pos.y;
-    let x1 = pos.x;
-    let y1 = pos.y;
+    const livePointerOffset = quickShapeConvertedRef.current
+      ? quickShapeLivePointerOffsetRef.current
+      : null;
+    let x1 = pos.x + (livePointerOffset?.x ?? 0);
+    let y1 = pos.y + (livePointerOffset?.y ?? 0);
     // Shift is the explicit gesture and therefore wins over perspective/isometric ruler locks.
     if (perspectiveRulerActive && kind === "line" && !pointerEvent.shiftKey && vanishingPoints.length > 0) {
       if (!perspectiveRayRef.current) {
@@ -20403,6 +20499,19 @@ function StudioCuttoonEditor() {
     if (!drawingRef.current && !drawingPointerSessionRef.current) return;
     // No scheduled frame may race the final hardware sample or continue changing released pixels.
     stopFixedRateStrokePump();
+    if (
+      options.consumeReleaseSample !== false
+      && quickShapeActive
+      && (drawingRef.current?.kind ?? "freehand") === "freehand"
+      && stage
+    ) {
+      // Browsers need not emit a final pointermove before pointerup. Add the release coordinate to
+      // the raw recognition route before snapshotting it, just as the ink path below consumes that
+      // coordinate for visible geometry.
+      stage.setPointersPositions(pointerEvent);
+      const releasePoint = stage.getRelativePointerPosition();
+      if (releasePoint) noteQuickShapePointerMoved(releasePoint);
+    }
     // Capture hold/lock BEFORE any stopQuickShapeTracking() side-effect from callers/global listeners.
     // Callers historically stopped tracking first and wiped the refs used by release promotion.
     const quickShapeSnapshot = snapshotQuickShapeTracking();
@@ -20544,7 +20653,16 @@ function StudioCuttoonEditor() {
           && finished.mode !== "eraser"
           && (finished.kind ?? "freehand") === "freehand"
         ) {
-          const promoted = promoteFreehandQuickShapeOnRelease(finished.points, {
+          const heldRecognitionPoints = quickShapeSnapshot.elapsed > 0
+            ? trimQuickShapeDwellTail(
+                quickShapeSnapshot.sourcePoints,
+                quickShapeSnapshot.stableSourceLength,
+              )
+            : quickShapeSnapshot.sourcePoints;
+          const promotionPoints = heldRecognitionPoints.length >= 8
+            ? heldRecognitionPoints
+            : finished.points;
+          const promoted = promoteFreehandQuickShapeOnRelease(promotionPoints, {
             anchor: quickShapeSnapshot.anchor,
             lockAspect:
               quickShapeSnapshot.locked
@@ -26486,6 +26604,26 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
     toggleLocalHidden,
     updateAdvancedFillSettings,
   } = stableHandlers;
+  const [activatedImageInspectorTabs, setActivatedImageInspectorTabs] = useState<
+    ReadonlySet<StudioImageInspectorSection>
+  >(() => new Set());
+  const activeImageInspectorTab =
+    inspectorLayout.primary === "properties" && selected?.type === "image"
+      ? inspectorLayout.image
+      : null;
+
+  useEffect(() => {
+    if (!activeImageInspectorTab) return;
+    setActivatedImageInspectorTabs((current) => {
+      if (current.has(activeImageInspectorTab)) return current;
+      const next = new Set(current);
+      next.add(activeImageInspectorTab);
+      return next;
+    });
+  }, [activeImageInspectorTab]);
+
+  const shouldMountImageInspectorTab = (tab: StudioImageInspectorSection) =>
+    activeImageInspectorTab === tab || activatedImageInspectorTabs.has(tab);
   const activeInspectorBrushName =
     BRUSH_PRESETS.find((preset) => preset.id === brush)?.name ?? brush;
   return (
@@ -28364,28 +28502,30 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
                     </button>
                   </div>
 
-                  <StudioPanelSplitPanel
-                    active={panelSplitActive}
-                    gutterPx={panelGutter}
-                    hint={panelSplitHint}
-                    onToggle={() => {
-                      setPanelSplitHint(null);
-                      setPanelSplitActive((v) => {
-                        const next = !v;
-                        if (next) {
-                          disarmAllPixelTools();
-                          return true;
+                  <Suspense fallback={<StudioPanelLoading label="컷 분할 도구를 여는 중..." />}>
+                    <StudioPanelSplitPanel
+                      active={panelSplitActive}
+                      gutterPx={panelGutter}
+                      hint={panelSplitHint}
+                      onToggle={() => {
+                        setPanelSplitHint(null);
+                        setPanelSplitActive((v) => {
+                          const next = !v;
+                          if (next) {
+                            disarmAllPixelTools();
+                            return true;
+                          }
+                          return false;
+                        });
+                      }}
+                      onGutterChange={(value) => {
+                        if (!collaborationDocumentLocked) {
+                          setPanelGutter(value);
+                          setSharedDocumentNotice(null);
                         }
-                        return false;
-                      });
-                    }}
-                    onGutterChange={(value) => {
-                      if (!collaborationDocumentLocked) {
-                        setPanelGutter(value);
-                        setSharedDocumentNotice(null);
-                      }
-                    }}
-                  />
+                      }}
+                    />
+                  </Suspense>
 
                   <div className="mt-3.5 border-t border-line/40 pt-2.5 space-y-2.5">
                     <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">패널 배경 및 테두리</p>
@@ -28483,13 +28623,9 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
                       {selectedWorkAssetDestructiveEditReason}
                     </p>
                   ) : null}
-                  <div
-                    hidden={
-                      inspectorLayout.primary !== "properties" ||
-                      inspectorLayout.image !== "quick"
-                    }
-                    className="space-y-3"
-                  >
+                  {shouldMountImageInspectorTab("quick") ? (
+                  <div className="space-y-3" hidden={activeImageInspectorTab !== "quick"}>
+                    <Suspense fallback={<StudioPanelLoading label="빠른 이미지 도구를 여는 중..." />}>
                       {!selectedWorkAssetDestructiveEditReason ? (
                         <>
                           <StudioBgRemoveButton
@@ -28535,14 +28671,12 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
                           onPickColor={(hex) => setColor(hex)}
                         />
                       ) : null}
+                    </Suspense>
                   </div>
-                  <div
-                    hidden={
-                      inspectorLayout.primary !== "properties" ||
-                      inspectorLayout.image !== "fill"
-                    }
-                    className="space-y-3"
-                  >
+                  ) : null}
+                  {shouldMountImageInspectorTab("fill") ? (
+                  <div className="space-y-3" hidden={activeImageInspectorTab !== "fill"}>
+                    <Suspense fallback={<StudioPanelLoading label="채우기·선화 도구를 여는 중..." />}>
                   <StudioFloodFillPanel
                     active={advancedFillActive}
                     busy={advancedFillBusy}
@@ -28576,14 +28710,12 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
                       onResult={(dataUrl) => patchEl(selected.id, { src: dataUrl })}
                     />
                   ) : null}
+                    </Suspense>
                   </div>
-                  <div
-                    hidden={
-                      inspectorLayout.primary !== "properties" ||
-                      inspectorLayout.image !== "quick"
-                    }
-                    className="space-y-3"
-                  >
+                  ) : null}
+                  {shouldMountImageInspectorTab("quick") ? (
+                  <div className="space-y-3" hidden={activeImageInspectorTab !== "quick"}>
+                    <Suspense fallback={<StudioPanelLoading label="이미지 보정을 여는 중..." />}>
                     <StudioImageAdjustmentsPanel
                       selected={selected}
                       filterClipboard={filterClipboard}
@@ -28593,14 +28725,12 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
                       onToggleEffectFavorite={toggleEffectFavorite}
                       onRememberEffectRecent={rememberEffectRecent}
                     />
+                    </Suspense>
                   </div>
-                  <div
-                    hidden={
-                      inspectorLayout.primary !== "properties" ||
-                      inspectorLayout.image !== "retouch"
-                    }
-                    className="space-y-3"
-                  >
+                  ) : null}
+                  {shouldMountImageInspectorTab("retouch") ? (
+                  <div className="space-y-3" hidden={activeImageInspectorTab !== "retouch"}>
+                    <Suspense fallback={<StudioPanelLoading label="선택·리터치 도구를 여는 중..." />}>
                     {/* 픽셀 선택 도구 — 사각/타원/자유·다각형 올가미/브러시 + 결합/페더/확장·축소. */}
                     <StudioSelectionToolsPanel
                     selection={pixelSel}
@@ -28744,14 +28874,12 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
                     }}
                       onOpenHistoryPanel={historyPanelOpen ? undefined : () => setHistoryPanelOpen(true)}
                     />
+                    </Suspense>
                   </div>
-                  <div
-                    hidden={
-                      inspectorLayout.primary !== "properties" ||
-                      inspectorLayout.image !== "mask"
-                    }
-                    className="space-y-3"
-                  >
+                  ) : null}
+                  {shouldMountImageInspectorTab("mask") ? (
+                  <div className="space-y-3" hidden={activeImageInspectorTab !== "mask"}>
+                    <Suspense fallback={<StudioPanelLoading label="레이어 마스크를 여는 중..." />}>
                     <StudioLayerMaskPanel
                     hasMask={!!selected.maskSrc}
                     enabled={selected.maskEnabled !== false}
@@ -28778,14 +28906,12 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
                     onHardnessChange={setLayerMaskHardness}
                       onStrengthChange={setLayerMaskStrength}
                     />
+                    </Suspense>
                   </div>
-                  <div
-                    hidden={
-                      inspectorLayout.primary !== "properties" ||
-                      inspectorLayout.image !== "transform"
-                    }
-                    className="space-y-3"
-                  >
+                  ) : null}
+                  {shouldMountImageInspectorTab("transform") ? (
+                  <div className="space-y-3" hidden={activeImageInspectorTab !== "transform"}>
+                    <Suspense fallback={<StudioPanelLoading label="이미지 변형 도구를 여는 중..." />}>
                     {/* 이미지 크롭 — 캔버스 위 크롭 rect 를 조절해 원본 해상도로 자른다. */}
                     <StudioCropPanel
                     active={!!cropRect}
@@ -28837,7 +28963,9 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
                       setPuppetWarpPins([]);
                     }}
                     />
+                    </Suspense>
                   </div>
+                  ) : null}
                 </>
               )}
 
@@ -31787,6 +31915,9 @@ const StudioToolBeltContent = memo(function StudioToolBeltContent({
           <button
             type="button"
             onClick={() => setMenu(activeToolbarGroup === "styleGroup" ? null : "palette")}
+            onPointerEnter={preloadStudioPaletteLibraryPanel}
+            onPointerDown={preloadStudioPaletteLibraryPanel}
+            onFocus={preloadStudioPaletteLibraryPanel}
             aria-haspopup="menu"
             aria-expanded={activeToolbarGroup === "styleGroup"}
             className={cn(
@@ -31817,7 +31948,14 @@ const StudioToolBeltContent = memo(function StudioToolBeltContent({
                   { id: "brandKit", label: "브랜드 킷", icon: Package, title: "팔레트·글꼴·로고를 묶은 브랜드 킷 저장·적용" },
                 ]}
               />
-              {menu === "palette" && <StudioPaletteLibraryPanel onPickColor={(hex) => setColor(hex)} seedColors={recentColors} />}
+              {menu === "palette" && (
+                <Suspense fallback={<StudioPanelLoading label="팔레트 라이브러리를 여는 중..." />}>
+                  <StudioPaletteLibraryPanel
+                    onPickColor={(hex) => setColor(hex)}
+                    seedColors={recentColors}
+                  />
+                </Suspense>
+              )}
               {menu === "brandKit" && (
                 <Suspense fallback={<StudioPanelLoading label="브랜드 킷 패널을 여는 중..." />}>
                   <StudioBrandKitPanel
@@ -32700,7 +32838,7 @@ const StudioMenubarContent = memo(function StudioMenubarContent({
             </span>
           ) : null}
           {workspacePersistence.ownerScope === currentWorkspaceOwnerScope ? (
-            <StudioWorkspaceMenu
+            <StudioWorkspaceMenuGate
               key={`${currentWorkspaceOwnerScope}:${workspaceMenuEpoch}`}
               state={workspaceState}
               liveLayout={liveWorkspaceLayout}
@@ -38416,7 +38554,9 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
             {/* 패널 손그림 컷 오버레이 — 드래그 중 절단선 미리보기(유효/무효 색 구분). */}
             {!isExporting && panelSplitPreview && (
               <Layer listening={false}>
-                <StudioPanelSplitOverlay preview={panelSplitPreview} gutterPx={panelGutter} scale={effScale} />
+                <Suspense fallback={null}>
+                  <StudioPanelSplitOverlay preview={panelSplitPreview} gutterPx={panelGutter} scale={effScale} />
+                </Suspense>
               </Layer>
             )}
             {/* 벡터 노드 편집 오버레이 — 자유선 점 핸들. */}
@@ -38448,23 +38588,27 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
             )}
             {!isExporting && healCloneArmed && pixelOverlayFrame && (healCloneSourceAnchor || healCloneDragPreview) && (
               <Layer listening={false}>
-                <StudioHealCloneOverlay
-                  frame={pixelOverlayFrame}
-                  scale={effScale}
-                  sourceAnchor={healCloneSourceAnchor}
-                  drag={healCloneDragPreview}
-                  radiusPx={healCloneRadius}
-                  mode={healCloneTool ?? "clone"}
-                />
+                <Suspense fallback={null}>
+                  <StudioHealCloneOverlay
+                    frame={pixelOverlayFrame}
+                    scale={effScale}
+                    sourceAnchor={healCloneSourceAnchor}
+                    drag={healCloneDragPreview}
+                    radiusPx={healCloneRadius}
+                    mode={healCloneTool ?? "clone"}
+                  />
+                </Suspense>
               </Layer>
             )}
             {!isExporting && historyBrushArmed && pixelOverlayFrame && historyBrushDragPreview && (
               <Layer listening={false}>
-                <StudioHistoryBrushOverlay
-                  frame={pixelOverlayFrame}
-                  drag={historyBrushDragPreview}
-                  radiusPx={historyBrushRadius}
-                />
+                <Suspense fallback={null}>
+                  <StudioHistoryBrushOverlay
+                    frame={pixelOverlayFrame}
+                    drag={historyBrushDragPreview}
+                    radiusPx={historyBrushRadius}
+                  />
+                </Suspense>
               </Layer>
             )}
             {/* 퍼펫 워프 오버레이 — 핀 마커(드래그 가능) + 변형된 메쉬 그물선. 다른 픽셀 도구 오버레이와
@@ -38472,24 +38616,28 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 하기 때문(오버레이 파일 헤더 주석 참고). */}
             {!isExporting && puppetWarpArmed && pixelOverlayFrame && (
               <Layer>
-                <StudioPuppetWarpOverlay
-                  frame={pixelOverlayFrame}
-                  scale={effScale}
-                  pins={puppetWarpPins}
-                  busy={puppetWarpBusy}
-                  onMovePin={(id, x, y) => setPuppetWarpPins((pins) => movePuppetPin(pins, id, x, y))}
-                />
+                <Suspense fallback={null}>
+                  <StudioPuppetWarpOverlay
+                    frame={pixelOverlayFrame}
+                    scale={effScale}
+                    pins={puppetWarpPins}
+                    busy={puppetWarpBusy}
+                    onMovePin={(id, x, y) => setPuppetWarpPins((pins) => movePuppetPin(pins, id, x, y))}
+                  />
+                </Suspense>
               </Layer>
             )}
             {!isExporting && layerMaskPaintArmed && pixelOverlayFrame && (
               <Layer listening={false}>
-                <StudioLayerMaskOverlay
-                  frame={pixelOverlayFrame}
-                  scale={effScale}
-                  drag={layerMaskDragPreview}
-                  radiusPx={layerMaskRadius}
-                  mode={layerMaskPaintMode}
-                />
+                <Suspense fallback={null}>
+                  <StudioLayerMaskOverlay
+                    frame={pixelOverlayFrame}
+                    scale={effScale}
+                    drag={layerMaskDragPreview}
+                    radiusPx={layerMaskRadius}
+                    mode={layerMaskPaintMode}
+                  />
+                </Suspense>
               </Layer>
             )}
             {!isExporting && (guides.x.length > 0 || guides.y.length > 0) && (
@@ -38842,32 +38990,36 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
             )}
             {!isExporting && tool === "draw" && perspectiveRulerActive && vanishingPoints.length > 0 && (
               <Layer>
-                <StudioPerspectiveOverlay
-                  points={vanishingPoints}
-                  canvasWidth={CANVAS_W}
-                  canvasHeight={canvasH}
-                  effScale={effScale}
-                  onMovePoint={moveVanishingPointById}
-                />
+                <Suspense fallback={null}>
+                  <StudioPerspectiveOverlay
+                    points={vanishingPoints}
+                    canvasWidth={CANVAS_W}
+                    canvasHeight={canvasH}
+                    effScale={effScale}
+                    onMovePoint={moveVanishingPointById}
+                  />
+                </Suspense>
               </Layer>
             )}
             {!isExporting && tool === "draw" && isometricGridActive && (
               <Layer>
-                <StudioIsometricGridOverlay
-                  config={{
-                    angleDeg: isometricAngleDeg,
-                    cellSize: isometricCellSize,
-                    originX: isometricOriginX,
-                    originY: isometricOriginY,
-                  }}
-                  canvasWidth={CANVAS_W}
-                  canvasHeight={canvasH}
-                  effScale={effScale}
-                  onMoveOrigin={(x, y) => {
-                    setIsometricOriginX(x);
-                    setIsometricOriginY(y);
-                  }}
-                />
+                <Suspense fallback={null}>
+                  <StudioIsometricGridOverlay
+                    config={{
+                      angleDeg: isometricAngleDeg,
+                      cellSize: isometricCellSize,
+                      originX: isometricOriginX,
+                      originY: isometricOriginY,
+                    }}
+                    canvasWidth={CANVAS_W}
+                    canvasHeight={canvasH}
+                    effScale={effScale}
+                    onMoveOrigin={(x, y) => {
+                      setIsometricOriginX(x);
+                      setIsometricOriginY(y);
+                    }}
+                  />
+                </Suspense>
               </Layer>
             )}
           </Stage>

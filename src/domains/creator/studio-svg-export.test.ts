@@ -220,6 +220,34 @@ describe("도형 직렬화", () => {
     expect((polygons[1]?.match(/,/g) ?? []).length).toBe(6);
   });
 
+  it("비정사각 triangle/polygon도 캔버스와 동일하게 bbox 네 경계를 채운다", () => {
+    const triangle = rectEl({ id: "tall-triangle", kind: "triangle", points: [10, 20, 310, 110] });
+    const polygon = rectEl({
+      id: "wide-polygon",
+      kind: "polygon",
+      points: [30, 160, 150, 460],
+      shapeParams: { starPoints: 5, starInnerRatio: 0.5, polygonSides: 5, cornerRadius: 3 },
+    });
+    const { svg } = exportPageToSvg(page([triangle, polygon]));
+    const pointSets = Array.from(svg.matchAll(/<polygon points="([^"]+)"/g), (match) =>
+      match[1]!.split(" ").map((pair) => pair.split(",").map(Number) as [number, number])
+    );
+    const bounds = (points: readonly [number, number][]) => {
+      const xs = points.map(([x]) => x);
+      const ys = points.map(([, y]) => y);
+      return {
+        left: Math.min(...xs),
+        top: Math.min(...ys),
+        right: Math.max(...xs),
+        bottom: Math.max(...ys),
+      };
+    };
+
+    expect(pointSets).toHaveLength(2);
+    expect(bounds(pointSets[0]!)).toEqual({ left: 10, top: 20, right: 310, bottom: 110 });
+    expect(bounds(pointSets[1]!)).toEqual({ left: 30, top: 160, right: 150, bottom: 460 });
+  });
+
   it("선 — 화살촉(삼각형)을 stroke 색으로 채워 함께 그린다", () => {
     const line = rectEl({
       id: "l1",
@@ -1032,6 +1060,23 @@ describe("그라데이션·패턴 채우기", () => {
     expect(svg).toContain('patternUnits="userSpaceOnUse" width="32" height="32" patternTransform="translate(10 20)"');
     expect(svg).toContain('<circle cx="4" cy="4" r="2.2" fill="#112233"/>');
     expect(svg).toMatch(/<rect [^>]*fill="url\(#sp\d+\)"/);
+  });
+
+  it("비정사각 triangle/polygon 패턴 원점은 캔버스 노드와 같은 bbox 중심이다", () => {
+    const pattern = { patternId: "dots" as const, fg: "#112233", scale: 1 };
+    const { svg } = exportPageToSvg(page([
+      rectEl({ id: "triangle-pattern", kind: "triangle", points: [10, 20, 310, 110], pattern }),
+      rectEl({
+        id: "polygon-pattern",
+        kind: "polygon",
+        points: [30, 160, 150, 460],
+        pattern,
+        shapeParams: { starPoints: 5, starInnerRatio: 0.5, polygonSides: 5, cornerRadius: 3 },
+      }),
+    ]));
+
+    expect(svg).toContain('patternTransform="translate(160 65)"');
+    expect(svg).toContain('patternTransform="translate(90 310)"');
   });
 
   it("패턴이 그라데이션보다 이긴다(캔버스 fillPriority 규약)", () => {
