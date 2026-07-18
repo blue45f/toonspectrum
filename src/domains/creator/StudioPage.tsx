@@ -7381,6 +7381,16 @@ function StudioCuttoonEditor() {
   const [secondaryColor, setSecondaryColor] = useState("#ffffff");
   /** View-only horizontal flip for checking drawing balance (CSP). */
   const [canvasFlipH, setCanvasFlipH] = useState(false);
+  /** "나만 숨기기" — 이 클라이언트 화면에서만 숨긴다. 문서(CRDT)에는 반영되지 않아 다른 협업자에게는 그대로 보인다. */
+  const [localHiddenElementIds, setLocalHiddenElementIds] = useState<ReadonlySet<string>>(() => new Set());
+  function toggleLocalHidden(id: string) {
+    setLocalHiddenElementIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
   // 최근 사용 색(색상 팝오버 공용) — 색상 선택기를 실제로 열 때만 복원해 초기 Studio 진입을 가볍게 유지한다.
   const [recentColors, setRecentColors] = useState<string[]>([]);
   const recentColorsLoadRef = useRef<Promise<void> | null>(null);
@@ -22987,6 +22997,7 @@ function StudioCuttoonEditor() {
     toggleEffectFavorite,
     toggleIsometricGridActive,
     toggleLayerMaskEnabled,
+    toggleLocalHidden,
     updateAdvancedFillSettings,
   });
 
@@ -24018,6 +24029,7 @@ function StudioCuttoonEditor() {
           layerMaskPaintArmed={layerMaskPaintArmed}
           layerMaskPaintMode={layerMaskPaintMode}
           layerMaskRadius={layerMaskRadius}
+          localHiddenElementIds={localHiddenElementIds}
           liveDraftDirectRef={liveDraftDirectRef}
           liveDraftLayerRef={liveDraftLayerRef}
           liveDraftVisualRef={liveDraftVisualRef}
@@ -24263,6 +24275,7 @@ function StudioCuttoonEditor() {
           layerMaskRadius={layerMaskRadius}
           layerMaskStrength={layerMaskStrength}
           layerNavigatorItems={layerNavigatorItems}
+          localHiddenElementIds={localHiddenElementIds}
           liquifyActive={liquifyActive}
           liquifyBusy={liquifyBusy}
           liquifyRadius={liquifyRadius}
@@ -24948,6 +24961,7 @@ interface StudioInspectorAsideHandlers {
   toggleEffectFavorite: (effectId: StudioEffectId) => void;
   toggleIsometricGridActive: () => void;
   toggleLayerMaskEnabled: () => void;
+  toggleLocalHidden: (id: string) => void;
   updateAdvancedFillSettings: (next: StudioAdvancedFillSettings) => void;
 }
 
@@ -25023,6 +25037,8 @@ interface StudioInspectorAsideProps {
   layerMaskRadius: number;
   layerMaskStrength: number;
   layerNavigatorItems: StudioLayerNavigatorItem[];
+  /** "나만 숨기기" — 문서(CRDT)에 없는, 이 클라이언트에서만 켠 로컬 숨김 대상. */
+  localHiddenElementIds: ReadonlySet<string>;
   liquifyActive: boolean;
   liquifyBusy: boolean;
   liquifyRadius: number;
@@ -25264,6 +25280,7 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
   layerMaskRadius,
   layerMaskStrength,
   layerNavigatorItems,
+  localHiddenElementIds,
   liquifyActive,
   liquifyBusy,
   liquifyRadius,
@@ -25498,6 +25515,7 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
     toggleEffectFavorite,
     toggleIsometricGridActive,
     toggleLayerMaskEnabled,
+    toggleLocalHidden,
     updateAdvancedFillSettings,
   } = stableHandlers;
   return (
@@ -28392,6 +28410,8 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
               pageKey={`${masterEditMode ? "master" : currentPageId}:${inspectorLayout.primary}`}
               readOnly={activeSurfaceReviewLocked}
               groupingDisabled={masterEditMode}
+              localHiddenIds={localHiddenElementIds}
+              onToggleLocalHidden={toggleLocalHidden}
               onSelectionChange={selectLayersFromNavigator}
               onAction={handleLayerNavigatorAction}
             />
@@ -28437,7 +28457,7 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
                     (요소 수에 비례하는 커밋당 jsxDEV 비용이 미니맵을 안 보는 동안에도 나가던 것). */}
                 {inspectorLayout.primary === "document" && inspectorLayout.document === "navigator"
                   ? elements.map((el) => {
-                  if (isEffectivelyHidden(el, groups)) return null;
+                  if (isEffectivelyHidden(el, groups) || localHiddenElementIds.has(el.id)) return null;
                   const bounds = elBounds(el);
                   const pctX = (bounds.x / CANVAS_W) * 100;
                   const pctY = (bounds.y / canvasH) * 100;
@@ -34936,6 +34956,8 @@ interface StudioCanvasViewportProps {
   layerMaskPaintArmed: boolean;
   layerMaskPaintMode: LayerMaskPaintMode;
   layerMaskRadius: number;
+  /** "나만 숨기기" — 문서(CRDT)에 없는, 이 클라이언트에서만 켠 로컬 숨김 대상. */
+  localHiddenElementIds: ReadonlySet<string>;
   liveDraftDirectRef: import("react").RefObject<boolean>;
   liveDraftLayerRef: import("react").RefObject<import("konva/lib/Layer").Layer | null>;
   liveDraftVisualRef: import("react").RefObject<DrawEl | null>;
@@ -35181,6 +35203,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   layerMaskPaintArmed,
   layerMaskPaintMode,
   layerMaskRadius,
+  localHiddenElementIds,
   liveDraftDirectRef,
   liveDraftLayerRef,
   liveDraftVisualRef,
@@ -36883,7 +36906,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                   </Group>
                 ) : null;
                 const mainEls = canvasRenderElements.map((el, idx) => {
-                  if (isEffectivelyHidden(el, groups)) return null; // 숨긴 레이어/그룹은 렌더·내보내기에서 제외
+                  if (isEffectivelyHidden(el, groups) || localHiddenElementIds.has(el.id)) return null; // 숨긴 레이어/그룹 + "나만 숨기기"는 렌더·내보내기에서 제외
                   // A verified raster frame and these vector fallbacks switch in one React commit.
                   // Any stale/gated/error frame yields an empty set, restoring Konva immediately.
                   if (studioRasterHiddenOperationIds.has(el.id)) return null;
@@ -36922,7 +36945,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                       </ClipMaskGroup>
                     );
                   };
-                  if (base && !isEffectivelyHidden(base, groups)) {
+                  if (base && !isEffectivelyHidden(base, groups) && !localHiddenElementIds.has(base.id)) {
                     // 알파 정밀 클리핑: 베이스 사본(마스크) + 자식(source-in)을 캐시 그룹에 담아 베이스 알파로만 자른다.
                     const ck = [
                       el.id,

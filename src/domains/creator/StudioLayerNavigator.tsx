@@ -10,6 +10,7 @@ import {
   Folder,
   FolderMinus,
   FolderPlus,
+  Ghost,
   Grid2X2,
   Image as ImageIcon,
   Layers3,
@@ -117,6 +118,9 @@ export interface StudioLayerNavigatorProps {
   readOnly?: boolean;
   /** 마스터 레이어처럼 그룹 데이터 모델을 지원하지 않는 작업면에서 그룹 생성·배정·해제·이동만 잠근다. */
   groupingDisabled?: boolean;
+  /** 문서(CRDT)에 반영되지 않는, 이 클라이언트에서만 켜진 "나만 숨기기" 대상. */
+  localHiddenIds: ReadonlySet<string>;
+  onToggleLocalHidden: (id: string) => void;
   onSelectionChange: (ids: readonly string[]) => void;
   onAction: (action: StudioLayerNavigatorAction) => void;
 }
@@ -398,6 +402,8 @@ export function StudioLayerNavigator({
   pageKey,
   readOnly = false,
   groupingDisabled = false,
+  localHiddenIds,
+  onToggleLocalHidden,
   onSelectionChange,
   onAction,
 }: StudioLayerNavigatorProps) {
@@ -514,6 +520,7 @@ export function StudioLayerNavigator({
   const activeItemHiddenByGroup = activeItemGroup?.hidden === true && activeItem?.hidden !== true;
   const activeItemLockedByGroup = activeItemGroup?.locked === true && activeItem?.locked !== true;
   const activeItemEffectivelyLocked = activeItem?.locked === true || activeItemGroup?.locked === true;
+  const activeItemLocallyHidden = activeItem ? localHiddenIds.has(activeItem.id) : false;
 
   useEffect(() => {
     void pageKey;
@@ -1724,6 +1731,14 @@ export function StudioLayerNavigator({
               >
                 {activeItem.hidden ? <Eye size={13} /> : <EyeOff size={13} />}
                 {activeItemHiddenByGroup ? "그룹에서 숨김" : activeItem.hidden ? "표시" : "숨김"}
+              </button>
+              <button
+                type="button"
+                onClick={() => onToggleLocalHidden(activeItem.id)}
+                className={compactControl}
+                title="다른 협업자 화면에는 그대로 보이고, 내 화면에서만 숨겨요"
+              >
+                <Ghost size={13} /> {activeItemLocallyHidden ? "나만 숨기기 해제" : "나만 숨기기"}
               </button>
               <button
                 type="button"
