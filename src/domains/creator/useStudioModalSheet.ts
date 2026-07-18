@@ -27,6 +27,7 @@ interface AttributeSnapshot {
 export interface StudioModalSheetActivationOptions {
   dialog: HTMLElement;
   document: Document;
+  fallbackReturnFocus?: HTMLElement | null;
   initialFocus?: HTMLElement | null;
   onDismiss: () => void;
   returnFocus?: HTMLElement | null;
@@ -39,6 +40,7 @@ interface UseStudioModalSheetOptions {
   fallbackReturnFocusRef?: RefObject<HTMLElement | null>;
   onDismiss: () => void;
   resolveInitialFocus?: (dialog: HTMLElement) => HTMLElement | null;
+  resolveReturnFocus?: () => HTMLElement | null;
   rootRef: RefObject<HTMLElement | null>;
 }
 
@@ -55,6 +57,16 @@ function canReceiveFocus(element: Element | null): element is HTMLElement {
     if (style.display === "none" || style.visibility === "hidden") return false;
     if (candidate.getClientRects().length === 0) return false;
   }
+  return true;
+}
+
+function canRestoreFocusLater(element: Element | null): element is HTMLElement {
+  if (!element || typeof (element as HTMLElement).focus !== "function") return false;
+  const candidate = element as HTMLElement;
+  if (!candidate.isConnected) return false;
+  if ("disabled" in candidate && Boolean((candidate as HTMLButtonElement).disabled)) return false;
+  // A launcher can become inert in the same React commit that mounts the modal (brush settings →
+  // brush manager). It is still the correct return target once that sibling is promoted again.
   return true;
 }
 
@@ -93,6 +105,10 @@ function isolateModalBranch(root: HTMLElement, dialog: HTMLElement): () => void 
     if (!parent) break;
     for (const sibling of [...parent.children]) {
       if (sibling === branch) continue;
+      // The visual scrim is intentionally pointer-only and already aria-hidden. Keeping it out of
+      // `inert` lets a touch outside the sheet dismiss the modal while the focus loop still keeps
+      // keyboard and assistive-technology navigation inside the dialog.
+      if (sibling.getAttribute("data-studio-modal-backdrop") === "true") continue;
       snapshots.push({
         ariaHidden: sibling.getAttribute("aria-hidden"),
         element: sibling,
@@ -106,10 +122,17 @@ function isolateModalBranch(root: HTMLElement, dialog: HTMLElement): () => void 
 
   return () => {
     for (const snapshot of snapshots) {
-      if (snapshot.ariaHidden === null) snapshot.element.removeAttribute("aria-hidden");
-      else snapshot.element.setAttribute("aria-hidden", snapshot.ariaHidden);
-      if (snapshot.inert === null) snapshot.element.removeAttribute("inert");
-      else snapshot.element.setAttribute("inert", snapshot.inert);
+      // React may have intentionally changed a sibling while the modal closes (notably brushes →
+      // draw removes the underlying draw sheet's own `inert`). Restore only attributes that still
+      // carry the exact value imposed by this isolator; never overwrite newer application state.
+      if (snapshot.element.getAttribute("aria-hidden") === "true") {
+        if (snapshot.ariaHidden === null) snapshot.element.removeAttribute("aria-hidden");
+        else snapshot.element.setAttribute("aria-hidden", snapshot.ariaHidden);
+      }
+      if (snapshot.element.getAttribute("inert") === "") {
+        if (snapshot.inert === null) snapshot.element.removeAttribute("inert");
+        else snapshot.element.setAttribute("inert", snapshot.inert);
+      }
     }
   };
 }
@@ -121,6 +144,7 @@ function isolateModalBranch(root: HTMLElement, dialog: HTMLElement): () => void 
 export function activateStudioModalSheet({
   dialog,
   document: ownerDocument,
+  fallbackReturnFocus,
   initialFocus,
   onDismiss,
   returnFocus,
@@ -130,9 +154,9 @@ export function activateStudioModalSheet({
   // the canvas. Guarding the DOM attribute here prevents a caller from trapping it accidentally.
   if (dialog.getAttribute("aria-modal") !== "true") return () => undefined;
 
-  const returnTarget = canReceiveFocus(returnFocus ?? null)
+  const returnTarget = canRestoreFocusLater(returnFocus ?? null)
     ? returnFocus
-    : canReceiveFocus(ownerDocument.activeElement)
+    : canRestoreFocusLater(ownerDocument.activeElement)
       ? ownerDocument.activeElement
       : null;
   const target = canReceiveFocus(initialFocus ?? null)
@@ -185,7 +209,13 @@ export function activateStudioModalSheet({
     ownerDocument.removeEventListener("focusin", onFocusIn, true);
     restoreBackground();
     if (returnTarget?.isConnected && !returnTarget.closest("[inert]")) {
-      focusElement(returnTarget);
+      if (focusElement(returnTarget)) return;
+    }
+    if (
+      fallbackReturnFocus?.isConnected &&
+      !fallbackReturnFocus.closest("[inert]")
+    ) {
+      focusElement(fallbackReturnFocus);
     }
   };
 }
@@ -197,11 +227,15 @@ export function useStudioModalSheet({
   fallbackReturnFocusRef,
   onDismiss,
   resolveInitialFocus,
+  resolveReturnFocus,
   rootRef,
 }: UseStudioModalSheetOptions): void {
   const dismissFromEffect = useEffectEvent(onDismiss);
   const resolveInitialFocusFromEffect = useEffectEvent(
     (dialog: HTMLElement) => resolveInitialFocus?.(dialog) ?? null,
+  );
+  const resolveReturnFocusFromEffect = useEffectEvent(
+    () => resolveReturnFocus?.() ?? null,
   );
 
   useLayoutEffect(() => {
@@ -209,14 +243,18 @@ export function useStudioModalSheet({
     const dialog = dialogRef.current;
     const root = rootRef.current;
     if (!dialog || !root) return;
+    const requestedReturnFocus = resolveReturnFocusFromEffect();
 
     return activateStudioModalSheet({
       dialog,
       document: dialog.ownerDocument,
+      fallbackReturnFocus: fallbackReturnFocusRef?.current,
       initialFocus: resolveInitialFocusFromEffect(dialog),
       onDismiss: dismissFromEffect,
       returnFocus:
-        canReceiveFocus(dialog.ownerDocument.activeElement)
+        canRestoreFocusLater(requestedReturnFocus)
+          ? requestedReturnFocus
+          : canRestoreFocusLater(dialog.ownerDocument.activeElement)
           ? dialog.ownerDocument.activeElement
           : fallbackReturnFocusRef?.current,
       root,

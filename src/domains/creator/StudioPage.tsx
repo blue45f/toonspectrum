@@ -1125,6 +1125,7 @@ import {
 } from "./StudioLiveCollaborationProvider";
 import { StudioMagicResizePanel } from "./StudioMagicResizePanel";
 import { StudioMagicWandPanel } from "./StudioMagicWandPanel";
+import { StudioMobileSheetHandle } from "./StudioMobileSheetHandle";
 import { StudioNodeEditPanel } from "./StudioNodeEditPanel";
 import { StudioPaletteLibraryPanel } from "./StudioPaletteLibraryPanel";
 import { StudioPanelSplitOverlay, StudioPanelSplitPanel } from "./StudioPanelSplitTool";
@@ -6655,6 +6656,15 @@ function StudioCuttoonEditor() {
   }, [isMobile]);
   // 모바일에서 열려 있는 바텀시트(페이지 / 속성 / 빠른 브러시 / 브러시 관리). null=캔버스 전체.
   const [mobileSheet, setMobileSheet] = useState<null | "pages" | "props" | "draw" | "brushes">(null);
+  function dismissActiveMobileSheet() {
+    // 브러시 관리는 브러시 설정에서 한 단계 들어온 화면이므로 모든 닫기 경로가 설정으로
+    // 돌아간다. 나머지 시트는 곧바로 캔버스로 복귀한다.
+    if (mobileSheet === "brushes") {
+      dismissBrushManagerToDraw();
+      return;
+    }
+    setMobileSheet(null);
+  }
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
   const [quickActionsAnchor, setQuickActionsAnchor] = useState({ x: 180, y: 320 });
   const [quickActionsPreferences, setQuickActionsPreferences] = useState<StudioQuickActionsPreferences>(() =>
@@ -6664,10 +6674,37 @@ function StudioCuttoonEditor() {
   const propsSheetRef = useRef<HTMLElement>(null);
   const drawSheetRef = useRef<HTMLDivElement>(null);
   const brushManagerSheetRef = useRef<HTMLDivElement>(null);
+  const brushManagerReturnFocusRef = useRef<HTMLButtonElement>(null);
   const mobileBrushDockButtonRef = useRef<HTMLButtonElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const studioRootRef = useRef<HTMLDivElement>(null);
+  const previousMobileSheetRef = useRef<typeof mobileSheet>(null);
   const mobileSheetAutofocusTargetRef = useRef<"default" | "publish-title">("default");
+  function dismissBrushManagerToDraw() {
+    setMobileSheet("draw");
+    const focusLauncher = () => {
+      const drawSheet = drawSheetRef.current;
+      const rememberedLauncher = brushManagerReturnFocusRef.current;
+      const managerLauncher = rememberedLauncher?.isConnected
+        ? rememberedLauncher
+        : drawSheet?.querySelector<HTMLButtonElement>(
+            '[data-studio-brush-manager-launcher="true"]'
+          );
+      if (managerLauncher) brushManagerReturnFocusRef.current = managerLauncher;
+      if (managerLauncher?.isConnected && !managerLauncher.closest("[inert]")) {
+        managerLauncher.focus({ preventScroll: true });
+      }
+    };
+    if (globalThis.requestAnimationFrame) {
+      globalThis.requestAnimationFrame(() => globalThis.requestAnimationFrame(focusLauncher));
+    } else {
+      globalThis.queueMicrotask?.(focusLauncher);
+    }
+  }
+  function openBrushManager(launcher: HTMLButtonElement) {
+    brushManagerReturnFocusRef.current = launcher;
+    setMobileSheet("brushes");
+  }
   function changeInspectorLayout(next: StudioInspectorLayout) {
     setInspectorLayout(next);
     // 탭마다 독립적인 짧은 작업면처럼 느껴지도록 이전 장문 패널의 스크롤 위치를 이어받지 않는다.
@@ -6695,7 +6732,7 @@ function StudioCuttoonEditor() {
     activeKey: modalMobileSheet,
     dialogRef: modalMobileSheetRef,
     fallbackReturnFocusRef: mobileBrushDockButtonRef,
-    onDismiss: () => setMobileSheet(null),
+    onDismiss: dismissActiveMobileSheet,
     resolveInitialFocus: (dialog) => {
       const preferredTarget =
         modalMobileSheet === "props" &&
@@ -6705,19 +6742,36 @@ function StudioCuttoonEditor() {
       mobileSheetAutofocusTargetRef.current = "default";
       return preferredTarget ?? dialog.querySelector<HTMLElement>("[data-autofocus]");
     },
+    resolveReturnFocus: () => {
+      if (modalMobileSheet !== "brushes") return null;
+      const rememberedLauncher = brushManagerReturnFocusRef.current;
+      if (rememberedLauncher?.isConnected) return rememberedLauncher;
+      return drawSheetRef.current?.querySelector<HTMLButtonElement>(
+        '[data-studio-brush-manager-launcher="true"]'
+      ) ?? null;
+    },
     rootRef: studioRootRef,
   });
   // 브러시 설정은 캔버스를 보며 조절하는 비모달 시트다. 포커스 루프와 배경 inert는 적용하지
   // 않되, 열고 닫을 때만 진입점과 트리거를 보존해 키보드 사용자가 숨은 시트에 남지 않게 한다.
   useLayoutEffect(() => {
+    const previousMobileSheet = previousMobileSheetRef.current;
+    previousMobileSheetRef.current = mobileSheet;
     if (!isMobile || mobileSheet !== "draw") return;
     const sheet = drawSheetRef.current;
     if (!sheet) return;
     const fallbackReturnTarget = mobileBrushDockButtonRef.current;
-    const returnTarget = document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : fallbackReturnTarget;
-    sheet.querySelector<HTMLElement>("[data-autofocus]")?.focus();
+    const returnTarget =
+      previousMobileSheet === "brushes"
+        ? fallbackReturnTarget
+        : document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : fallbackReturnTarget;
+    // 관리자에서 돌아올 때는 modal cleanup이 정확한 `저장·관리` 트리거를 복원한다. 여기서
+    // 닫기 버튼을 선점하면 중첩 화면의 복귀 맥락이 사라지므로 최초 진입 때만 autofocus한다.
+    if (previousMobileSheet !== "brushes") {
+      sheet.querySelector<HTMLElement>("[data-autofocus]")?.focus();
+    }
     return () => {
       globalThis.requestAnimationFrame?.(() => {
         if (!sheet.contains(document.activeElement)) return;
@@ -14333,7 +14387,7 @@ function StudioCuttoonEditor() {
           && openModals.every((modal) => modal.dataset.studioMobileSheet === "true")
         ) {
           e.preventDefault();
-          setMobileSheet(null);
+          dismissActiveMobileSheet();
         }
         return;
       }
@@ -14624,7 +14678,7 @@ function StudioCuttoonEditor() {
         e.preventDefault();
         setShortcutsOpen((v) => !v);
       } else if (e.key === "Escape") {
-        if (mobileSheet) setMobileSheet(null);
+        if (mobileSheet) dismissActiveMobileSheet();
         else if (shortcutsOpen) setShortcutsOpen(false);
         else if (menu) {
           // 위 레이어부터 닫기: 단축키 오버레이 → 열린 툴바 드롭다운 → 선택해제.
@@ -23300,6 +23354,7 @@ function StudioCuttoonEditor() {
     dismissMobileHint,
     duplicateSelected,
     fitCanvasToWidth,
+    openBrushManager,
     openInspectorRoute,
     queueBrushDelete,
     redo,
@@ -23977,13 +24032,18 @@ function StudioCuttoonEditor() {
           mobileImmersive && "overflow-hidden"
         )}
       >
-        {/* 모바일 바텀시트 백드롭 — 탭하면 닫힘 */}
-        {isMobile && mobileSheet && (
-          <button
-            type="button"
-            aria-label="패널 닫기"
-            onClick={() => setMobileSheet(null)}
-            className="fixed inset-0 z-40 bg-black/45 backdrop-blur-sm lg:hidden"
+        {/* 모달 시트 전용 스크림. 브러시 설정(draw)은 캔버스를 계속 만질 수 있는 비모달이다. */}
+        {isMobile && modalMobileSheet && (
+          <div
+            aria-hidden
+            data-studio-modal-backdrop="true"
+            onPointerDown={(event) => {
+              // The scrim itself is not a focus target. Prevent the pointer's default focus move
+              // from overriding the modal controller's launcher-focus restoration during unmount.
+              event.preventDefault();
+              dismissActiveMobileSheet();
+            }}
+            className="fixed inset-0 z-[59] bg-black/45 backdrop-blur-sm lg:hidden"
           />
         )}
         {/* 왼쪽: 페이지 목록 — 접히면 아이콘 엣지 레일 */}
@@ -24589,6 +24649,7 @@ function StudioCuttoonEditor() {
           drawMode={drawMode}
           drawShape={drawShape}
           drawSheetRef={drawSheetRef}
+          dismissBrushManager={dismissBrushManagerToDraw}
           hi={hi}
           history={history}
           isMobile={isMobile}
@@ -25666,14 +25727,16 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
           ref={propsSheetRef}
           role={isMobile ? "dialog" : undefined}
           aria-modal={isMobile && mobileSheet === "props" ? true : undefined}
+          data-studio-sheet-id="props"
           data-studio-mobile-sheet={isMobile && mobileSheet === "props" ? "true" : undefined}
+          data-popup-kind={isMobile && mobileSheet === "props" ? "sheet" : undefined}
           aria-label={isMobile ? "속성" : undefined}
           tabIndex={isMobile ? -1 : undefined}
           inert={isMobile && mobileSheet !== "props" ? true : undefined}
           className={cn(
             "flex min-h-0 flex-col gap-2 overscroll-contain [scrollbar-gutter:stable]",
             // 모바일: 하단에서 올라오는 바텀시트
-            "fixed inset-x-0 bottom-0 z-50 max-h-[82vh] overflow-y-auto rounded-t-3xl border border-line bg-panel p-2.5 pb-[calc(7rem+env(safe-area-inset-bottom))] shadow-2xl transition-transform duration-300 ease-out",
+            "fixed inset-x-0 bottom-0 z-[60] max-h-[82dvh] overflow-y-auto rounded-t-3xl border border-line bg-panel p-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-2xl transition-transform duration-300 ease-out motion-reduce:transition-none",
             // 데스크톱: 뷰포트 높이 엣지 도크 — 메뉴바+툴벨트 높이만 빼고 캔버스와 나란히 채움.
             "lg:static lg:z-auto lg:max-h-none lg:min-h-0 lg:flex-none lg:self-stretch lg:overflow-y-auto lg:rounded-none lg:border lg:border-y-0 lg:border-r-0 lg:border-line lg:bg-panel/50 lg:p-2 lg:shadow-none lg:transition-none lg:translate-y-0",
             mobileSheet === "props" ? "translate-y-0" : "translate-y-full",
@@ -25682,14 +25745,13 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
           )}
           style={
             isMobile
-              ? { bottom: mobileKeyboardInset }
+              ? {
+                  bottom: mobileKeyboardInset,
+                  maxHeight: `calc(82dvh - ${mobileKeyboardInset}px)`,
+                }
               : { width: rightResize.width, minWidth: 240 }
           }
         >
-          {/* 모바일 시트 손잡이. 닫기는 스크롤해도 남는 작업 패널 헤더에 둔다. */}
-          <div className="flex items-center justify-center lg:hidden">
-            <div className="mx-auto h-1 w-10 rounded-full bg-line" />
-          </div>
           <div className="hidden items-center justify-between gap-1 lg:flex">
             <span className="text-[0.65rem] font-bold uppercase tracking-[0.08em] text-fg-3">인스펙터</span>
             <button
@@ -25707,6 +25769,15 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
             selectionLabel={selected ? elementLabel(selected) : null}
             drawing={selected === null && tool === "draw"}
             layerCount={elements.length}
+            mobileSheetHandle={
+              <StudioMobileSheetHandle
+                active={isMobile && mobileSheet === "props"}
+                kind="props"
+                label="속성 시트"
+                onDismiss={() => setMobileSheet(null)}
+                sheetRef={propsSheetRef}
+              />
+            }
             onRequestClose={() => setMobileSheet(null)}
             onChange={changeInspectorLayout}
           />
@@ -33440,6 +33511,7 @@ interface StudioMobileEditingDockHandlers {
   dismissMobileHint: () => void;
   duplicateSelected: () => void;
   fitCanvasToWidth: () => void;
+  openBrushManager: (launcher: HTMLButtonElement) => void;
   openInspectorRoute: (route: StudioInspectorRoute) => void;
   queueBrushDelete: (deleted: DeletedBrushRecord) => void;
   redo: () => void;
@@ -33464,6 +33536,7 @@ interface StudioMobileEditingDockProps {
   drawMode: DrawMode;
   drawShape: DrawShapeKind;
   drawSheetRef: import("react").RefObject<HTMLDivElement | null>;
+  dismissBrushManager: () => void;
   hi: number;
   history: PageState[][];
   isMobile: boolean;
@@ -33538,6 +33611,7 @@ const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   drawMode,
   drawShape,
   drawSheetRef,
+  dismissBrushManager,
   hi,
   history,
   isMobile,
@@ -33603,6 +33677,7 @@ const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
     dismissMobileHint,
     duplicateSelected,
     fitCanvasToWidth,
+    openBrushManager,
     openInspectorRoute,
     queueBrushDelete,
     redo,
@@ -33709,30 +33784,41 @@ const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
             ref={brushManagerSheetRef}
             role="dialog"
             aria-modal="true"
+            data-studio-sheet-id="brushes"
             data-studio-mobile-sheet="true"
+            data-popup-kind="sheet"
             aria-label="내 브러시 관리"
             tabIndex={-1}
             data-studio-shortcut-boundary="true"
-            className="fixed inset-x-0 z-50 mx-auto max-w-[34rem] overflow-y-auto overscroll-contain rounded-t-3xl border border-line bg-panel px-3 pb-[calc(7rem+env(safe-area-inset-bottom))] shadow-2xl lg:hidden"
+            className="fixed inset-x-0 z-[60] mx-auto max-w-[34rem] overflow-y-auto overscroll-contain rounded-t-3xl border border-line bg-panel px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-2xl motion-reduce:transition-none lg:hidden"
             style={{
               bottom: mobileKeyboardInset,
-              maxHeight: `calc(100dvh - 1rem - ${mobileKeyboardInset}px)`,
+              maxHeight: `calc(100dvh - 1rem - env(safe-area-inset-top) - ${mobileKeyboardInset}px)`,
             }}
           >
-            <div className="sticky top-0 z-10 -mx-3 mb-2 flex min-h-14 items-center justify-between border-b border-line bg-panel/95 px-3 backdrop-blur">
-              <div>
-                <p className="text-sm font-bold text-fg">내 브러시 관리</p>
-                <p className="text-[0.68rem] text-fg-3">저장·고정·복제·이름 변경·내보내기</p>
+            <div className="sticky top-0 z-10 -mx-3 mb-2 border-b border-line bg-panel/95 px-3 backdrop-blur">
+              <StudioMobileSheetHandle
+                active
+                kind="brushes"
+                label="내 브러시 관리"
+                onDismiss={dismissBrushManager}
+                sheetRef={brushManagerSheetRef}
+              />
+              <div className="flex min-h-12 items-center justify-between">
+                <div>
+                  <p className="text-sm font-bold text-fg">내 브러시 관리</p>
+                  <p className="text-[0.68rem] text-fg-3">저장·고정·복제·이름 변경·내보내기</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={dismissBrushManager}
+                  className="grid size-11 place-items-center rounded-xl text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                  aria-label="브러시 관리 닫기"
+                  data-autofocus
+                >
+                  <X size={18} aria-hidden />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setMobileSheet("draw")}
-                className="grid size-11 place-items-center rounded-xl text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-                aria-label="브러시 관리 닫기"
-                data-autofocus
-              >
-                <X size={18} aria-hidden />
-              </button>
             </div>
             <Suspense fallback={<p className="py-6 text-center text-xs text-fg-3">브러시를 불러오는 중…</p>}>
               <StudioBrushLibraryPanel
@@ -33755,8 +33841,10 @@ const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
             role="dialog"
             aria-label="브러시 설정"
             aria-modal={false}
+            data-studio-sheet-id="draw"
+            data-studio-mobile-sheet={mobileSheet === "draw" ? "draw" : undefined}
             className={cn(
-              "fixed inset-x-0 z-[54] mx-auto max-w-[34rem] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel/95 p-3 shadow-2xl backdrop-blur transition-all duration-200 ease-out lg:hidden",
+              "fixed inset-x-0 z-[54] mx-auto max-w-[34rem] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel/95 p-3 shadow-2xl backdrop-blur transition-[transform,opacity] duration-200 ease-out motion-reduce:transition-none lg:hidden",
               mobileSheet === "draw"
                 ? "pointer-events-auto translate-y-0 opacity-100"
                 : "pointer-events-none translate-y-3 opacity-0"
@@ -33767,19 +33855,28 @@ const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               maxHeight: `min(56dvh, calc(100dvh - 8rem - env(safe-area-inset-bottom) - ${mobileKeyboardInset}px))`,
             }}
           >
-            <div className="sticky -top-3 z-10 -mx-3 -mt-3 mb-2 flex min-h-14 items-center justify-between border-b border-line/70 bg-panel/95 px-3 backdrop-blur">
-              <p className="text-sm font-semibold text-fg">
-                {drawMode === "eraser" ? "지우개" : drawMode === "shape" ? "도형" : "브러시"} 설정
-              </p>
-              <button
-                type="button"
-                onClick={() => setMobileSheet(null)}
-                className="grid size-11 place-items-center rounded-xl text-fg-3 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-                aria-label="브러시 설정 닫기"
-                data-autofocus
-              >
-                <X size={16} aria-hidden />
-              </button>
+            <div className="sticky -top-3 z-10 -mx-3 -mt-3 mb-2 border-b border-line/70 bg-panel/95 px-3 backdrop-blur">
+              <StudioMobileSheetHandle
+                active={mobileSheet === "draw"}
+                kind="draw"
+                label="브러시 설정"
+                onDismiss={() => setMobileSheet(null)}
+                sheetRef={drawSheetRef}
+              />
+              <div className="flex min-h-12 items-center justify-between">
+                <p className="text-sm font-semibold text-fg">
+                  {drawMode === "eraser" ? "지우개" : drawMode === "shape" ? "도형" : "브러시"} 설정
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setMobileSheet(null)}
+                  className="grid size-11 place-items-center rounded-xl text-fg-3 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                  aria-label="브러시 설정 닫기"
+                  data-autofocus
+                >
+                  <X size={16} aria-hidden />
+                </button>
+              </div>
             </div>
 
             {/* 모드 전환 — icon-first (펜↔지우개↔도형) */}
@@ -33820,7 +33917,7 @@ const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                   brushes={savedBrushes}
                   activeBrushId={activeSavedBrushId}
                   onApply={applySavedBrush}
-                  onManage={() => setMobileSheet("brushes")}
+                  onManage={(event) => openBrushManager(event.currentTarget)}
                 />
                 <div className="mb-2.5">
                   <Suspense fallback={<div className="h-24 animate-pulse rounded-xl bg-raised/40 motion-reduce:animate-none" aria-hidden />}>
@@ -34383,14 +34480,16 @@ const StudioPageListPane = memo(function StudioPageListPane({
           ref={pagesSheetRef}
           role={isMobile ? "dialog" : undefined}
           aria-modal={isMobile && mobileSheet === "pages" ? true : undefined}
+          data-studio-sheet-id="pages"
           data-studio-mobile-sheet={isMobile && mobileSheet === "pages" ? "true" : undefined}
+          data-popup-kind={isMobile && mobileSheet === "pages" ? "sheet" : undefined}
           aria-label={isMobile ? "페이지 목록" : undefined}
           tabIndex={isMobile ? -1 : undefined}
           inert={isMobile && mobileSheet !== "pages" ? true : undefined}
           className={cn(
             "flex flex-col gap-1.5 border border-line p-2",
             // 모바일: 하단에서 올라오는 바텀시트
-            "fixed inset-x-0 bottom-0 z-50 max-h-[72vh] overflow-y-auto rounded-t-3xl bg-panel pb-[calc(7rem+env(safe-area-inset-bottom))] shadow-2xl transition-transform duration-300 ease-out",
+            "fixed inset-x-0 bottom-0 z-[60] max-h-[72dvh] overflow-hidden rounded-t-3xl bg-panel pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-2xl transition-transform duration-300 ease-out motion-reduce:transition-none",
             // 데스크톱: 엣지 도크(라운드·여백 최소, 캔버스 폭 최대)
             "lg:static lg:z-auto lg:max-h-none lg:min-h-0 lg:overflow-hidden lg:rounded-none lg:border-y-0 lg:border-l-0 lg:bg-panel/50 lg:pb-2 lg:shadow-none lg:transition-none lg:translate-y-0",
             mobileSheet === "pages" ? "translate-y-0" : "translate-y-full",
@@ -34398,76 +34497,94 @@ const StudioPageListPane = memo(function StudioPageListPane({
           )}
           style={
             isMobile
-              ? { bottom: mobileKeyboardInset }
+              ? {
+                  bottom: mobileKeyboardInset,
+                  maxHeight: `calc(72dvh - ${mobileKeyboardInset}px)`,
+                }
               : { width: leftResize.width, minWidth: 128 }
           }
         >
-          {/* 모바일 시트 손잡이 */}
-          <div className="mx-auto -mt-1 mb-1 h-1 w-10 shrink-0 rounded-full bg-line lg:hidden" />
-          <div className="flex flex-wrap items-center justify-between gap-1 border-b border-line/50 pb-1.5">
-            <span className="flex items-center gap-1 text-[0.7rem] font-bold text-fg-2">
+          <div className="shrink-0 border-b border-line/50 pb-1.5">
+            <StudioMobileSheetHandle
+              active={isMobile && mobileSheet === "pages"}
+              kind="pages"
+              label="페이지 시트"
+              onDismiss={() => setMobileSheet(null)}
+              sheetRef={pagesSheetRef}
+            />
+            <div className="flex min-h-11 items-center justify-between gap-2 lg:min-h-6">
+              <span className="flex items-center gap-1 text-[0.7rem] font-bold text-fg-2">
+                <button
+                  type="button"
+                  onClick={() => setLeftPanelOpen(false)}
+                  className="hidden text-fg-3 transition-colors hover:text-fg lg:inline-flex"
+                  title="페이지 목록 접기"
+                >
+                  <ChevronLeft size={13} />
+                </button>
+                페이지
+              </span>
+              <div className="flex shrink-0 items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setMobileSheet(null)}
+                  className="grid size-11 place-items-center rounded-xl text-fg-3 hover:bg-raised lg:hidden"
+                  aria-label="페이지 시트 닫기"
+                  data-autofocus
+                >
+                  <X size={16} aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  data-testid="studio-add-page"
+                  onClick={addPage}
+                  className="flex min-h-11 items-center gap-1 rounded-lg bg-accent px-3 text-[0.7rem] font-semibold text-on-accent hover:bg-accent-hover lg:min-h-6 lg:px-2 lg:text-[10px]"
+                >
+                  <Plus size={12} aria-hidden /> 추가
+                </button>
+              </div>
+            </div>
+            <div
+              role="toolbar"
+              aria-label="페이지 일괄 작업"
+              className="flex gap-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:flex-wrap lg:overflow-x-visible"
+            >
               <button
                 type="button"
-                onClick={() => setLeftPanelOpen(false)}
-                className="hidden text-fg-3 transition-colors hover:text-fg lg:inline-flex"
-                title="페이지 목록 접기"
+                onClick={applyGradeToAll}
+                className="min-h-11 shrink-0 rounded-lg border border-line px-3 text-[0.7rem] text-fg-3 hover:bg-raised lg:min-h-6 lg:px-1.5 lg:text-[10px]"
+                title="현재 페이지의 색보정을 모든 페이지에 적용"
               >
-                <ChevronLeft size={13} />
+                그레이드 전체
               </button>
-              페이지
               <button
                 type="button"
-                onClick={() => setMobileSheet(null)}
-                className="ml-1 rounded p-0.5 text-fg-3 hover:bg-raised lg:hidden"
-                aria-label="페이지 시트 닫기"
-                data-autofocus
+                onClick={applyBgToAll}
+                className="min-h-11 shrink-0 rounded-lg border border-line px-3 text-[0.7rem] text-fg-3 hover:bg-raised lg:min-h-6 lg:px-1.5 lg:text-[10px]"
+                title="현재 페이지의 배경을 모든 페이지에 적용"
               >
-                <X size={14} />
+                배경 전체
               </button>
-            </span>
-            <button
-              type="button"
-              data-testid="studio-add-page"
-              onClick={addPage}
-              className="flex items-center gap-1 rounded bg-accent px-2 py-1 text-[10px] font-semibold text-on-accent hover:bg-accent-hover"
-            >
-              <Plus size={10} /> 추가
-            </button>
-            <button
-              type="button"
-              onClick={applyGradeToAll}
-              className="rounded border border-line px-1.5 py-0.5 text-[10px] text-fg-3 hover:bg-raised"
-              title="현재 페이지의 색보정을 모든 페이지에 적용"
-            >
-              그레이드 전체
-            </button>
-            <button
-              type="button"
-              onClick={applyBgToAll}
-              className="rounded border border-line px-1.5 py-0.5 text-[10px] text-fg-3 hover:bg-raised"
-              title="현재 페이지의 배경을 모든 페이지에 적용"
-            >
-              배경 전체
-            </button>
-            <button
-              type="button"
-              onClick={() => setMasterPanelOpen((v) => !v)}
-              disabled={collaborationDocumentLocked}
-              aria-pressed={masterPanelOpen}
-              className={cn(
-                "rounded border px-1.5 py-0.5 text-[10px] transition-colors disabled:cursor-not-allowed disabled:opacity-50",
-                masterEditMode
-                  ? "border-accent bg-accent-soft/50 text-accent"
-                  : masterPanelOpen
-                    ? "border-accent/60 text-fg-2 hover:bg-raised"
-                    : "border-line text-fg-3 hover:bg-raised"
-              )}
-              title={collaborationDocumentLocked ? collaborationLockMessage() : "마스터 페이지(모든 페이지 공통 요소) 관리"}
-            >
-              마스터{master.elements.length > 0 ? ` ${master.elements.length}` : ""}
-            </button>
+              <button
+                type="button"
+                onClick={() => setMasterPanelOpen((v) => !v)}
+                disabled={collaborationDocumentLocked}
+                aria-pressed={masterPanelOpen}
+                className={cn(
+                  "min-h-11 shrink-0 rounded-lg border px-3 text-[0.7rem] transition-colors disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-6 lg:px-1.5 lg:text-[10px]",
+                  masterEditMode
+                    ? "border-accent bg-accent-soft/50 text-accent"
+                    : masterPanelOpen
+                      ? "border-accent/60 text-fg-2 hover:bg-raised"
+                      : "border-line text-fg-3 hover:bg-raised"
+                )}
+                title={collaborationDocumentLocked ? collaborationLockMessage() : "마스터 페이지(모든 페이지 공통 요소) 관리"}
+              >
+                마스터{master.elements.length > 0 ? ` ${master.elements.length}` : ""}
+              </button>
+            </div>
           </div>
-          <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto max-h-[56vh] pr-0.5 lg:max-h-none">
+          <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain pr-0.5">
             {pages.map((p, idx) => {
               const isActive = p.id === currentPageId;
               const dropIndicator = pageDnd.indicatorFor(idx);
@@ -34503,32 +34620,32 @@ const StudioPageListPane = memo(function StudioPageListPane({
                       )}
                     />
                   )}
-                  <div className="flex items-center justify-between gap-1">
-                    <span className="min-w-0 truncate text-[10px] font-bold text-fg-2" title={pageDisplayName(p, idx)}>
+                  <div className="flex min-w-0 items-center justify-between gap-1">
+                    <span className="min-w-0 flex-1 truncate text-xs font-bold text-fg-2 lg:text-[10px]" title={pageDisplayName(p, idx)}>
                       {pageDisplayName(p, idx)}
                     </span>
                     {shotTagBadgeText(p) ? (
                       <span
-                        className="shrink-0 rounded bg-accent-soft px-1 py-0.5 text-[8px] font-semibold text-accent"
+                        className="shrink-0 rounded bg-accent-soft px-1 py-0.5 text-[0.65rem] font-semibold text-accent lg:text-[8px]"
                         title={shotTagBadgeTitle(p) ?? undefined}
                       >
                         {shotTagBadgeText(p)}
                       </span>
                     ) : null}
                     {/* 액션 버튼은 늘린 선택 버튼(z-10) 위로 띄운다. */}
-                    <div className="relative z-20 flex items-center gap-0.5">
+                    <div className="relative z-20 flex max-w-[70%] items-center gap-0.5 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:max-w-none lg:overflow-visible">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           setMetaEditPageId((v) => (v === p.id ? null : p.id));
                         }}
-                        className={cn("rounded p-0.5 hover:bg-raised", metaEditPageId === p.id ? "text-accent" : "text-fg-3")}
+                        className={cn("grid size-11 shrink-0 place-items-center rounded-xl hover:bg-raised lg:size-auto lg:rounded lg:p-0.5", metaEditPageId === p.id ? "text-accent" : "text-fg-3")}
                         title="이름·콘티 메모 편집"
                         aria-label={`${pageDisplayName(p, idx)} 이름·콘티 메모 편집`}
                         aria-expanded={metaEditPageId === p.id}
                       >
-                        <Pencil size={10} />
+                        <Pencil size={14} aria-hidden />
                       </button>
                       <button
                         type="button"
@@ -34537,11 +34654,11 @@ const StudioPageListPane = memo(function StudioPageListPane({
                           movePageUp(p.id);
                         }}
                         disabled={idx === 0}
-                        className="rounded p-0.5 text-fg-3 hover:bg-raised disabled:opacity-30"
+                        className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised disabled:opacity-30 lg:size-auto lg:rounded lg:p-0.5"
                         title="위로 이동"
                         aria-label="위로 이동"
                       >
-                        <ChevronUp size={10} />
+                        <ChevronUp size={14} aria-hidden />
                       </button>
                       <button
                         type="button"
@@ -34550,11 +34667,11 @@ const StudioPageListPane = memo(function StudioPageListPane({
                           movePageDown(p.id);
                         }}
                         disabled={idx === pages.length - 1}
-                        className="rounded p-0.5 text-fg-3 hover:bg-raised disabled:opacity-30"
+                        className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised disabled:opacity-30 lg:size-auto lg:rounded lg:p-0.5"
                         title="아래로 이동"
                         aria-label="아래로 이동"
                       >
-                        <ChevronDown size={10} />
+                        <ChevronDown size={14} aria-hidden />
                       </button>
                       <button
                         type="button"
@@ -34563,11 +34680,11 @@ const StudioPageListPane = memo(function StudioPageListPane({
                           movePageToTop(p.id);
                         }}
                         disabled={idx === 0}
-                        className="rounded p-0.5 text-fg-3 hover:bg-raised disabled:opacity-30"
+                        className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised disabled:opacity-30 lg:size-auto lg:rounded lg:p-0.5"
                         title="맨 위로"
                         aria-label="맨 위로 이동"
                       >
-                        <span aria-hidden="true">⇧</span>
+                        <span aria-hidden="true" className="text-sm leading-none lg:text-[10px]">⇧</span>
                       </button>
                       <button
                         type="button"
@@ -34576,11 +34693,11 @@ const StudioPageListPane = memo(function StudioPageListPane({
                           movePageToBottom(p.id);
                         }}
                         disabled={idx === pages.length - 1}
-                        className="rounded p-0.5 text-fg-3 hover:bg-raised disabled:opacity-30"
+                        className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised disabled:opacity-30 lg:size-auto lg:rounded lg:p-0.5"
                         title="맨 아래로"
                         aria-label="맨 아래로 이동"
                       >
-                        <span aria-hidden="true">⇩</span>
+                        <span aria-hidden="true" className="text-sm leading-none lg:text-[10px]">⇩</span>
                       </button>
                     </div>
                   </div>
@@ -34607,7 +34724,7 @@ const StudioPageListPane = memo(function StudioPageListPane({
                         placeholder={autoPageName(idx)}
                         maxLength={PAGE_NAME_MAX}
                         aria-label="페이지 이름"
-                        className="w-full rounded border border-line bg-card px-1.5 py-1 text-[10px] font-semibold text-fg placeholder:text-fg-3 focus:border-accent focus:outline-none"
+                        className="min-h-11 w-full rounded-lg border border-line bg-card px-2 text-xs font-semibold text-fg placeholder:text-fg-3 focus:border-accent focus:outline-none lg:min-h-0 lg:rounded lg:px-1.5 lg:py-1 lg:text-[10px]"
                         onClick={(e) => e.stopPropagation()}
                         onKeyDown={(e) => {
                           e.stopPropagation();
@@ -34627,7 +34744,7 @@ const StudioPageListPane = memo(function StudioPageListPane({
                         maxLength={PAGE_NOTE_MAX}
                         spellCheck
                         aria-label="콘티 메모"
-                        className="w-full resize-none rounded border border-line bg-card px-1.5 py-1 text-[9px] leading-tight text-fg placeholder:text-fg-3 focus:border-accent focus:outline-none"
+                        className="min-h-16 w-full resize-none rounded-lg border border-line bg-card px-2 py-2 text-xs leading-tight text-fg placeholder:text-fg-3 focus:border-accent focus:outline-none lg:min-h-0 lg:rounded lg:px-1.5 lg:py-1 lg:text-[9px]"
                         onClick={(e) => e.stopPropagation()}
                         onKeyDown={(e) => e.stopPropagation()}
                         onBlur={(e) => commitPageMeta(p.id, { note: e.target.value })}
@@ -34638,7 +34755,7 @@ const StudioPageListPane = memo(function StudioPageListPane({
                           e.stopPropagation();
                           setMetaEditPageId(null);
                         }}
-                        className="self-end rounded bg-accent px-2 py-0.5 text-[9px] font-semibold text-on-accent hover:bg-accent-hover"
+                        className="min-h-11 self-end rounded-lg bg-accent px-4 text-xs font-semibold text-on-accent hover:bg-accent-hover lg:min-h-0 lg:rounded lg:px-2 lg:py-0.5 lg:text-[9px]"
                       >
                         완료
                       </button>
@@ -34648,17 +34765,18 @@ const StudioPageListPane = memo(function StudioPageListPane({
                       {p.note}
                     </p>
                   ) : null}
-                  <div className="flex items-center justify-end gap-1.5 pt-1">
+                  <div className="relative z-20 flex items-center justify-start gap-1 overflow-x-auto overscroll-x-contain pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:justify-end lg:overflow-visible">
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         insertPageBefore(p.id);
                       }}
-                      className="rounded p-0.5 text-fg-3 hover:bg-raised"
+                      className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised lg:size-auto lg:rounded lg:p-0.5"
                       title="이 앞에 빈 페이지 삽입"
+                      aria-label="이 앞에 빈 페이지 삽입"
                     >
-                      <Plus size={10} />
+                      <Plus size={14} aria-hidden />
                     </button>
                     <button
                       type="button"
@@ -34666,10 +34784,11 @@ const StudioPageListPane = memo(function StudioPageListPane({
                         e.stopPropagation();
                         insertPageAfter(p.id);
                       }}
-                      className="rounded p-0.5 text-fg-3 hover:bg-raised"
+                      className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised lg:size-auto lg:rounded lg:p-0.5"
                       title="이 뒤에 빈 페이지 삽입"
+                      aria-label="이 뒤에 빈 페이지 삽입"
                     >
-                      <Plus size={10} />
+                      <Plus size={14} aria-hidden />
                     </button>
                     <button
                       type="button"
@@ -34677,10 +34796,11 @@ const StudioPageListPane = memo(function StudioPageListPane({
                         e.stopPropagation();
                         duplicatePage(p.id);
                       }}
-                      className="rounded p-0.5 text-fg-3 hover:bg-raised"
+                      className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised lg:size-auto lg:rounded lg:p-0.5"
                       title="페이지 복제"
+                      aria-label="페이지 복제"
                     >
-                      <Copy size={10} />
+                      <Copy size={14} aria-hidden />
                     </button>
                     <button
                       type="button"
@@ -34688,10 +34808,11 @@ const StudioPageListPane = memo(function StudioPageListPane({
                         e.stopPropagation();
                         duplicatePageMirrored(p.id);
                       }}
-                      className="rounded p-0.5 text-fg-3 hover:bg-raised"
+                      className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised lg:size-auto lg:rounded lg:p-0.5"
                       title="미러 복제 (좌우 반전)"
+                      aria-label="미러 복제 (좌우 반전)"
                     >
-                      <FlipHorizontal2 size={10} />
+                      <FlipHorizontal2 size={14} aria-hidden />
                     </button>
                     <button
                       type="button"
@@ -34699,10 +34820,11 @@ const StudioPageListPane = memo(function StudioPageListPane({
                         e.stopPropagation();
                         clearPageFor(p.id);
                       }}
-                      className="rounded p-0.5 text-fg-3 hover:bg-raised"
+                      className="grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised lg:size-auto lg:rounded lg:p-0.5"
                       title="이 페이지 내용 비우기"
+                      aria-label="이 페이지 내용 비우기"
                     >
-                      <Eraser size={10} />
+                      <Eraser size={14} aria-hidden />
                     </button>
                     <button
                       type="button"
@@ -34714,10 +34836,11 @@ const StudioPageListPane = memo(function StudioPageListPane({
                         }
                       }}
                       disabled={pages.length <= 1}
-                      className="rounded p-0.5 text-bad hover:bg-bad-soft/20 disabled:opacity-30"
+                      className="grid size-11 shrink-0 place-items-center rounded-xl text-bad hover:bg-bad-soft/20 disabled:opacity-30 lg:size-auto lg:rounded lg:p-0.5"
                       title="페이지 삭제"
+                      aria-label="페이지 삭제"
                     >
-                      <Trash2 size={10} />
+                      <Trash2 size={14} aria-hidden />
                     </button>
                   </div>
                 </div>

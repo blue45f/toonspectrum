@@ -15,6 +15,7 @@ import {
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
 } from "react";
 
 import {
@@ -41,6 +42,7 @@ export interface StudioInspectorNavigatorProps {
   selectionLabel: string | null;
   drawing: boolean;
   layerCount: number;
+  mobileSheetHandle?: ReactNode;
   onRequestClose?: () => void;
   onChange: (layout: StudioInspectorLayout) => void;
 }
@@ -135,6 +137,7 @@ export function StudioInspectorNavigator({
   selectionLabel,
   drawing,
   layerCount,
+  mobileSheetHandle,
   onRequestClose,
   onChange,
 }: StudioInspectorNavigatorProps) {
@@ -183,6 +186,9 @@ export function StudioInspectorNavigator({
       className="sticky top-0 z-30 -mx-0.5 rounded-lg border border-line bg-panel/95 p-1.5 shadow-[0_6px_20px_oklch(0.12_0.01_70/0.28)] backdrop-blur supports-[backdrop-filter]:bg-panel/90"
       data-testid="studio-inspector-navigator"
     >
+      {mobileSheetHandle ? (
+        <div className="-mx-1.5 -mt-1.5 mb-0.5 lg:hidden">{mobileSheetHandle}</div>
+      ) : null}
       <div className="mb-1.5 flex min-w-0 items-center justify-between gap-1.5 px-0.5">
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-1.5">
@@ -205,7 +211,7 @@ export function StudioInspectorNavigator({
             aria-label={searchOpen ? "패널 찾기 닫기" : "패널과 기능 찾기"}
             title="패널과 기능 찾기"
             className={cn(
-              "grid size-9 shrink-0 place-items-center rounded-md border border-line text-fg-2 transition-colors duration-150 hover:border-line-strong hover:bg-raised hover:text-fg lg:size-8 pointer-coarse:size-11",
+              "grid size-11 shrink-0 place-items-center rounded-lg border border-line text-fg-2 transition-colors duration-150 hover:border-line-strong hover:bg-raised hover:text-fg lg:size-8 lg:rounded-md",
               searchOpen && "border-accent bg-accent-soft text-accent",
               tabFocusClass
             )}
@@ -219,7 +225,7 @@ export function StudioInspectorNavigator({
               aria-label="속성 시트 닫기"
               data-autofocus
               className={cn(
-                "grid size-9 shrink-0 place-items-center rounded-md text-fg-3 transition-colors duration-150 hover:bg-raised hover:text-fg pointer-coarse:size-11 lg:hidden",
+                "grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors duration-150 hover:bg-raised hover:text-fg lg:hidden",
                 tabFocusClass
               )}
             >
@@ -247,7 +253,7 @@ export function StudioInspectorNavigator({
               onClick={() => navigate({ primary: tab.id })}
               onKeyDown={moveTabFocus}
               className={cn(
-                "relative flex min-h-10 min-w-0 flex-col items-center justify-center gap-px rounded-md px-0.5 text-[0.6rem] font-semibold transition-colors duration-150 lg:min-h-9 pointer-coarse:min-h-11",
+                "relative flex min-h-11 min-w-0 flex-col items-center justify-center gap-px rounded-md px-0.5 text-[0.6rem] font-semibold transition-colors duration-150 lg:min-h-9",
                 active
                   ? "bg-raised text-fg shadow-sm ring-1 ring-accent/25"
                   : "text-fg-3 hover:bg-card hover:text-fg-2",
