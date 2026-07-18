@@ -145,6 +145,65 @@ describe("StudioPageListPane", () => {
     expect(props.setCurrentPageId).not.toHaveBeenCalled();
   });
 
+  it("delegates ordered page moves and preserves the DnD card contract", () => {
+    const onDragStart = vi.fn();
+    const onDragOver = vi.fn();
+    const onDrop = vi.fn();
+    const onDragEnd = vi.fn();
+    const itemProps = vi.fn((_index: number) => ({
+      draggable: true,
+      onDragStart,
+      onDragOver,
+      onDrop,
+      onDragEnd,
+    }));
+    const indicatorFor = vi.fn((index: number) => (index === 1 ? "before" as const : null));
+    const props = createProps({
+      pageDnd: {
+        dragIndex: 1,
+        dropSlot: 1,
+        itemProps,
+        indicatorFor,
+      },
+    });
+    render(<StudioPageListPane {...props} />);
+
+    expect(itemProps.mock.calls.map(([index]) => index)).toEqual([0, 1]);
+    expect(indicatorFor.mock.calls.map(([index]) => index)).toEqual([0, 1]);
+
+    const [firstPage, secondPage] = screen.getAllByTestId("studio-page-item");
+    expect(firstPage?.getAttribute("draggable")).toBe("true");
+    expect(secondPage?.classList.contains("opacity-50")).toBe(true);
+    expect(
+      Array.from(secondPage!.querySelectorAll('span[aria-hidden="true"]')).some((node) =>
+        node.className.includes("h-[3px]"),
+      ),
+    ).toBe(true);
+
+    fireEvent.dragStart(firstPage!);
+    fireEvent.dragOver(firstPage!);
+    fireEvent.drop(firstPage!);
+    fireEvent.dragEnd(firstPage!);
+    expect(onDragStart).toHaveBeenCalledOnce();
+    expect(onDragOver).toHaveBeenCalledOnce();
+    expect(onDrop).toHaveBeenCalledOnce();
+    expect(onDragEnd).toHaveBeenCalledOnce();
+
+    fireEvent.click(within(firstPage!).getByRole("button", { name: "아래로 이동" }));
+    fireEvent.click(within(firstPage!).getByRole("button", { name: "맨 아래로 이동" }));
+    fireEvent.click(within(secondPage!).getByRole("button", { name: "위로 이동" }));
+    fireEvent.click(within(secondPage!).getByRole("button", { name: "맨 위로 이동" }));
+
+    expect(props.stableHandlers.movePageDown).toHaveBeenCalledWith("page-1");
+    expect(props.stableHandlers.movePageToBottom).toHaveBeenCalledWith("page-1");
+    expect(props.stableHandlers.movePageUp).toHaveBeenCalledWith("page-2");
+    expect(props.stableHandlers.movePageToTop).toHaveBeenCalledWith("page-2");
+    expect(within(firstPage!).getByRole<HTMLButtonElement>("button", { name: "위로 이동" }).disabled).toBe(true);
+    expect(within(firstPage!).getByRole<HTMLButtonElement>("button", { name: "맨 위로 이동" }).disabled).toBe(true);
+    expect(within(secondPage!).getByRole<HTMLButtonElement>("button", { name: "아래로 이동" }).disabled).toBe(true);
+    expect(within(secondPage!).getByRole<HTMLButtonElement>("button", { name: "맨 아래로 이동" }).disabled).toBe(true);
+  });
+
   it("preserves batch actions and inline page metadata commits", () => {
     const props = createProps({ metaEditPageId: "page-1" });
     render(<StudioPageListPane {...props} />);

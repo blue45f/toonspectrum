@@ -7,6 +7,7 @@ interface ModuleShape {
   readonly allImports: readonly string[];
   readonly dynamicImports: readonly string[];
   readonly exportedDeclarations: ReadonlySet<string>;
+  readonly namedValueImports: ReadonlyMap<string, string>;
   readonly source: string;
   readonly topLevelDeclarations: ReadonlySet<string>;
   readonly valueImports: readonly string[];
@@ -25,6 +26,7 @@ function moduleShape(relativePath: string): ModuleShape {
   const allImports: string[] = [];
   const dynamicImports: string[] = [];
   const exportedDeclarations = new Set<string>();
+  const namedValueImports = new Map<string, string>();
   const topLevelDeclarations = new Set<string>();
   const valueImports: string[] = [];
 
@@ -40,6 +42,18 @@ function moduleShape(relativePath: string): ModuleShape {
     if (ts.isImportDeclaration(statement) && ts.isStringLiteral(statement.moduleSpecifier)) {
       allImports.push(statement.moduleSpecifier.text);
       if (!statement.importClause?.isTypeOnly) valueImports.push(statement.moduleSpecifier.text);
+      const bindings = statement.importClause?.namedBindings;
+      if (
+        !statement.importClause?.isTypeOnly
+        && bindings
+        && ts.isNamedImports(bindings)
+      ) {
+        for (const element of bindings.elements) {
+          if (!element.isTypeOnly) {
+            namedValueImports.set(element.name.text, statement.moduleSpecifier.text);
+          }
+        }
+      }
     }
     if (
       ts.isInterfaceDeclaration(statement)
@@ -72,6 +86,7 @@ function moduleShape(relativePath: string): ModuleShape {
     allImports,
     dynamicImports,
     exportedDeclarations,
+    namedValueImports,
     source,
     topLevelDeclarations,
     valueImports,
@@ -109,6 +124,8 @@ describe("Studio page-list pane module boundary", () => {
     const pane = moduleShape("./StudioPageListPane.tsx");
 
     expect(pane.valueImports).toContain("./studio-page-lazy-ui");
+    expect(pane.namedValueImports.get("StudioPageThumbnail")).toBe("./studio-page-lazy-ui");
+    expect(pane.allImports).not.toContain("./StudioPageThumbnails");
     expect(pane.valueImports).toContain("./StudioPanelResizeHandle");
     expect(pane.allImports).not.toContain("konva");
     expect(pane.allImports).not.toContain("react-konva/lib/ReactKonvaCore");
