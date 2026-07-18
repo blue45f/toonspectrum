@@ -47,6 +47,9 @@ describe("StudioBrushLibraryPanel", () => {
         onBrushDeleted={() => undefined}
       />
     );
+    expect(html).toContain('data-studio-brush-library-scope="saved"');
+    expect(html).toContain('aria-label="내 브러시"');
+    expect(html).toContain("사용자 저장");
     expect(html).toContain("1/40");
     expect(html).toContain('aria-label="브러시 설정 가져오기"');
     expect(html).toContain("주력 펜 고정 해제");

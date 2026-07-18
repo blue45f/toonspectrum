@@ -44,6 +44,7 @@ describe("studio brush tip alpha maps", () => {
 
     const tip = normalizeStudioBrushTipSettings({
       shape: "grain",
+      softness: 0,
       alphaMapBase64: encoded,
       alphaMapSize: size,
     });
@@ -57,8 +58,37 @@ describe("studio brush tip alpha maps", () => {
     expect(map.alphas[bytes.length - 1]).toBeCloseTo(bytes[bytes.length - 1]! / 255, 5);
   });
 
+  it("applies the edge-softness control to imported PNG alpha without mutating its payload", () => {
+    const size = 8;
+    const bytes = new Uint8Array(size * size);
+    bytes[3 * size + 3] = 255;
+    bytes[3 * size + 4] = 255;
+    bytes[4 * size + 3] = 255;
+    bytes[4 * size + 4] = 255;
+    const alphaMapBase64 = encodeStudioBrushTipAlphaMapBase64(bytes);
+    const sharp = buildStudioBrushTipAlphaMap({ alphaMapBase64, alphaMapSize: size, softness: 0 });
+    const soft = buildStudioBrushTipAlphaMap({ alphaMapBase64, alphaMapSize: size, softness: 1 });
+
+    expect(sharp.alphas[3 * size + 2]).toBe(0);
+    expect(soft.alphas[3 * size + 2]).toBeGreaterThan(0);
+    expect(soft.alphas[3 * size + 3]).toBeLessThan(sharp.alphas[3 * size + 3]!);
+    expect(normalizeStudioBrushTipSettings({ alphaMapBase64, alphaMapSize: size, softness: 1 }).alphaMapBase64)
+      .toBe(alphaMapBase64);
+  });
+
   it("builds distinct procedural alpha shapes with zero outside the tip", () => {
-    const shapes = ["round", "soft", "hard", "flake", "grain", "star"] as const;
+    const shapes = [
+      "round",
+      "soft",
+      "hard",
+      "flake",
+      "grain",
+      "bristle",
+      "sponge",
+      "sumi",
+      "halftone",
+      "star",
+    ] as const;
     for (const shape of shapes) {
       expect(sampleStudioBrushTipProceduralAlpha(shape, 2, 0, 0.3)).toBe(0);
       expect(sampleStudioBrushTipProceduralAlpha(shape, 0, 0, 0.3)).toBeGreaterThan(0.2);
@@ -66,6 +96,26 @@ describe("studio brush tip alpha maps", () => {
     expect(sampleStudioBrushTipProceduralAlpha("hard", 0, 0, 0)).toBe(1);
     expect(sampleStudioBrushTipProceduralAlpha("soft", 0.2, 0, 0.9))
       .toBeLessThan(sampleStudioBrushTipProceduralAlpha("hard", 0.2, 0, 0));
+  });
+
+  it("ships visually distinct texture signatures for every bundled tip", () => {
+    const signatures = new Set(
+      ["round", "soft", "hard", "flake", "grain", "bristle", "sponge", "sumi", "halftone", "star"]
+        .map((shape) => [
+          [0, 0],
+          [0.18, 0.11],
+          [0.42, -0.27],
+          [-0.58, 0.21],
+          [0.73, -0.08],
+        ].map(([x, y]) => Math.round(sampleStudioBrushTipProceduralAlpha(
+          shape as Parameters<typeof sampleStudioBrushTipProceduralAlpha>[0],
+          x!,
+          y!,
+          0.32
+        ) * 255)).join(","))
+    );
+
+    expect(signatures.size).toBe(10);
   });
 });
 

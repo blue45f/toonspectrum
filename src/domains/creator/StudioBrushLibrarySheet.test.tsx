@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -10,6 +12,7 @@ import {
 import type { StudioBrushTrayItem } from "./studio-creative-ux";
 
 const catalog = new Map(listStudioBrushTrayItems("all").map((item) => [item.id, item]));
+const sheetSource = readFileSync(new URL("./StudioBrushLibrarySheet.tsx", import.meta.url), "utf8");
 
 function brush(id: string): StudioBrushTrayItem {
   const item = catalog.get(id);
@@ -38,10 +41,34 @@ describe("StudioBrushLibrarySheet", () => {
     const html = renderSheet();
 
     expect(html).toContain('data-studio-brush-catalog="built-in"');
-    expect(html).toContain("기본 브러시 카탈로그");
-    expect(html).toContain("내 브러시와 별개");
-    expect(html).toContain('aria-label="기본 브러시 카탈로그 닫기"');
+    expect(html).toContain("기본 프리셋");
+    expect(html).toContain("앱 제공 브러시 · 내 브러시와 별개");
+    expect(html).toContain('aria-label="기본 프리셋 닫기"');
     expect(html).not.toContain(">브러시 라이브러리<");
+  });
+
+  it("provides one controlled Portal host for desktop and mobile triggers", () => {
+    expect(sheetSource.match(/createPortal\(/g)).toHaveLength(1);
+    expect(sheetSource).toContain('type StudioBrushCatalogPlacement = "desktop-dock" | "mobile-sheet"');
+    expect(sheetSource).toContain('data-studio-brush-catalog-session="true"');
+    expect(sheetSource).toContain("triggerElement");
+  });
+
+  it("keeps outside-pointer focus on the newly chosen control and fits short viewports", () => {
+    expect(sheetSource).toContain('onClose("outside-pointer")');
+    expect(sheetSource).toContain('onClose("escape")');
+    expect(sheetSource).toContain('onClose("selection")');
+    expect(sheetSource).toContain("spaceAbove >= spaceBelow");
+    expect(sheetSource).not.toContain("Math.max(224, viewportHeight - bottom - 8)");
+  });
+
+  it("keeps catalog search, tabs, close, and favorites at 44px touch density", () => {
+    const html = renderSheet({ onToggleFavorite: vi.fn() });
+
+    expect(html).toContain("size-11");
+    expect(html).toContain("min-h-11");
+    expect(html).toContain("min-w-11");
+    expect(html).toContain("grid size-11 place-items-center");
   });
 
   it("exposes a non-modal dialog, one-tab-stop tablist, named panel, and live result count", () => {

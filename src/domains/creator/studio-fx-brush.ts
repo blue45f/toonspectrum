@@ -131,6 +131,28 @@ export type FxGlowPass = {
   opacity: number;
 };
 
+export type FxNeonPass = FxGlowPass & {
+  /** Coloured halo passes sit behind a near-white luminous core. */
+  tone: "color" | "white-core";
+};
+
+/**
+ * Neon marker footprint: two coloured screen-blended halos plus a narrow luminous core.
+ *
+ * This is intentionally separate from the broader decorative glow brush.  The catalogue has
+ * always previewed neon as a three-layer tube; sharing this deterministic plan with Canvas/SVG
+ * prevents the selected brush from collapsing into an ordinary single line at playback/export.
+ */
+export function planNeonBrushPasses(baseWidth: number): FxNeonPass[] {
+  const w = clamp(finiteNumber(baseWidth, 12), 0.5, 2048);
+  const outer = w < 6 ? 3.1 : 2.7;
+  return [
+    { widthScale: outer, opacity: 0.14, tone: "color" },
+    { widthScale: 1.65, opacity: 0.34, tone: "color" },
+    { widthScale: 0.54, opacity: 0.96, tone: "white-core" },
+  ];
+}
+
 /**
  * Outer soft halo → bright core. Renderer draws passes back-to-front.
  * softGlow=true widens the halo (soft-glow preset).

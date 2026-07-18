@@ -31,6 +31,7 @@ import {
   processFreehandPoints,
   processPencilPoints,
   resampleStrokePressures,
+  resolveStudioFreehandRenderPath,
   resolveStudioBrushRenderFamily,
   screentoneDotRadius,
   screentoneDotsForStroke,
@@ -48,6 +49,7 @@ import {
   type StudioDynamicBrushDab,
   type StudioBrushDynamicsSettings,
 } from "./studio-brush-dynamics";
+import { resolveStudioBrushSinglePointRoute } from "./studio-brush-runtime-contract";
 import {
   planStudioStampBrushDabs,
   resolveStudioStampBrushKind,
@@ -85,6 +87,7 @@ import {
   fxBrushSeedFromKey,
   planGlitterBrushParticles,
   planGlowBrushPasses,
+  planNeonBrushPasses,
   planOilBrushDabs,
   planPastelBrushDabs,
 } from "./studio-fx-brush";
@@ -937,20 +940,15 @@ function serializeFreehand(
   const dynamicBrush = dynamicsPresetId !== null;
   const stampKind = resolveStudioStampBrushKind(brush);
   const renderSampleDistance = strokeRenderDistance(el.sampleSpacing);
+  const singlePointRoute = resolveStudioBrushSinglePointRoute({
+    brushId: brush,
+    mode: el.mode,
+    causalInkEnabled: el.sampleSpacing !== undefined || el.pressureModel !== undefined,
+  });
 
   if (
     points.length === 2 &&
-    (el.sampleSpacing === undefined || el.fill !== undefined || (
-      brushFamily !== "pen" && brushFamily !== "marker"
-    )) &&
-    brushFamily !== "watercolor" &&
-    brushFamily !== "screentone" &&
-    brushFamily !== "glow" &&
-    brushFamily !== "glitter" &&
-    brushFamily !== "oil" &&
-    brushFamily !== "pastel" &&
-    stampKind === null &&
-    !dynamicBrush
+    singlePointRoute === "generic-dot"
   ) {
     const pressure = resolveStudioInkPressure(el.pressures?.[0], el.pressureModel);
     const pressureAware = brushFamily === "pen"
@@ -1042,9 +1040,9 @@ function serializeFreehand(
       `<radialGradient id="${diffuseId}" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="${escapeXml(stroke)}"/><stop offset="45%" stop-color="${escapeXml(stroke)}"/><stop offset="100%" stop-color="${escapeXml(stroke)}" stop-opacity="0"/></radialGradient>`
     );
     const circles = dabs.map((dab) => (
-      `<circle cx="${fmt(dab.x)}" cy="${fmt(dab.y)}" r="${fmt(dab.radius)}" fill="${dab.role === "diffuse" ? `url(#${diffuseId})` : escapeXml(stroke)}" opacity="${fmt(dab.opacity)}"/>`
+      `<circle cx="${fmt(dab.x)}" cy="${fmt(dab.y)}" r="${fmt(dab.radius)}" fill="${dab.role === "diffuse" ? `url(#${diffuseId})` : escapeXml(stroke)}" opacity="${fmtDabOpacity(dab.opacity * strokeOpacity)}"/>`
     )).join("");
-    return `<g${opacityAttr}>${circles}</g>`;
+    return `<g>${circles}</g>`;
   }
 
   if (brushFamily === "calligraphy") {
@@ -1134,32 +1132,60 @@ function serializeFreehand(
   }
 
   if (brushFamily === "pencil") {
-    // 연필 — 결정적 지터 + tension 0.2 곡선.
-    const jittered = processPencilPoints(points);
-    return `<path d="${tensionPathD(jittered, 0.2)}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(strokeWidth)}" stroke-linecap="round" stroke-linejoin="round"${opacityAttr}/>`;
+    // 연필 — 새 획은 append-only raw 샘플, 레거시는 과거 평활화+tension을 유지한다.
+    const renderPath = resolveStudioFreehandRenderPath(points, {
+      sampleSpacing: el.sampleSpacing,
+      legacyMinDistance: renderSampleDistance,
+      legacyTension: 0.2,
+    });
+    const jittered = processPencilPoints(renderPath.points);
+    return `<path d="${tensionPathD(jittered, renderPath.tension)}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(strokeWidth)}" stroke-linecap="round" stroke-linejoin="round"${opacityAttr}/>`;
   }
 
   if (brushFamily === "highlighter") {
     // 형광펜 — 사각 끝 + multiply 합성(SVG mix-blend-mode 로 동일 표현).
-    const smoothed = processFreehandPoints(points, renderSampleDistance);
-    return `<path d="${tensionPathD(smoothed, 0.4)}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(strokeWidth)}" stroke-linecap="square" stroke-linejoin="miter" style="mix-blend-mode:multiply"${opacityAttr}/>`;
+    const renderPath = resolveStudioFreehandRenderPath(points, {
+      sampleSpacing: el.sampleSpacing,
+      legacyMinDistance: renderSampleDistance,
+      legacyTension: 0.4,
+    });
+    return `<path d="${tensionPathD(renderPath.points, renderPath.tension)}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(strokeWidth)}" stroke-linecap="square" stroke-linejoin="miter" style="mix-blend-mode:multiply"${opacityAttr}/>`;
   }
 
   if (brushFamily === "neon") {
-    const smoothed = processFreehandPoints(points, renderSampleDistance);
-    return `<path d="${tensionPathD(smoothed, 0.35)}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(strokeWidth)}" stroke-linecap="round" stroke-linejoin="round" style="mix-blend-mode:screen"${opacityAttr}/>`;
+    const renderPath = resolveStudioFreehandRenderPath(points, {
+      sampleSpacing: el.sampleSpacing,
+      legacyMinDistance: renderSampleDistance,
+      legacyTension: 0.35,
+    });
+    const passes = planNeonBrushPasses(strokeWidth);
+    const layers = renderPath.points.length === 2
+      ? passes.map((pass) => (
+          `<circle cx="${fmt(renderPath.points[0])}" cy="${fmt(renderPath.points[1])}" r="${fmt(Math.max(0.25, strokeWidth * pass.widthScale / 2))}" fill="${pass.tone === "white-core" ? "#fff" : escapeXml(stroke)}" opacity="${fmtDabOpacity(pass.opacity)}" style="mix-blend-mode:screen"/>`
+        )).join("")
+      : (() => {
+          const pathD = tensionPathD(renderPath.points, renderPath.tension);
+          return passes.map((pass) => (
+            `<path d="${pathD}" fill="none" stroke="${pass.tone === "white-core" ? "#fff" : escapeXml(stroke)}" stroke-width="${fmt(Math.max(0.5, strokeWidth * pass.widthScale))}" stroke-linecap="round" stroke-linejoin="round" opacity="${fmtDabOpacity(pass.opacity)}" style="mix-blend-mode:screen"/>`
+          )).join("");
+        })();
+    return `<g data-brush-engine="neon-halo"${opacityAttr}>${layers}</g>`;
   }
 
   if (brushFamily === "glow") {
-    const smoothed = processFreehandPoints(points, renderSampleDistance);
+    const renderPath = resolveStudioFreehandRenderPath(points, {
+      sampleSpacing: el.sampleSpacing,
+      legacyMinDistance: renderSampleDistance,
+      legacyTension: 0.35,
+    });
     const soft = (el.brush ?? "glow") === "soft-glow";
     const passes = planGlowBrushPasses(strokeWidth, soft);
-    const layers = smoothed.length === 2
+    const layers = renderPath.points.length === 2
       ? passes.map((pass) => (
-          `<circle cx="${fmt(smoothed[0])}" cy="${fmt(smoothed[1])}" r="${fmt(Math.max(0.25, strokeWidth * pass.widthScale / 2))}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(pass.opacity)}" style="mix-blend-mode:screen"/>`
+          `<circle cx="${fmt(renderPath.points[0])}" cy="${fmt(renderPath.points[1])}" r="${fmt(Math.max(0.25, strokeWidth * pass.widthScale / 2))}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(pass.opacity)}" style="mix-blend-mode:screen"/>`
         )).join("")
       : (() => {
-          const pathD = tensionPathD(smoothed, 0.35);
+          const pathD = tensionPathD(renderPath.points, renderPath.tension);
           return passes.map((pass) => (
             `<path d="${pathD}" fill="none" stroke="${escapeXml(stroke)}" stroke-width="${fmt(Math.max(0.5, strokeWidth * pass.widthScale))}" stroke-linecap="round" stroke-linejoin="round" opacity="${fmt(pass.opacity)}" style="mix-blend-mode:screen"/>`
           )).join("");
@@ -1180,11 +1206,11 @@ function serializeFreehand(
     const marks = particles.map((p) => {
       if (p.kind === 1) {
         const s = p.radius * 1.35;
-        return `<rect x="${fmt(p.x - s / 2)}" y="${fmt(p.y - s / 2)}" width="${fmt(s)}" height="${fmt(s)}" fill="${escapeXml(stroke)}" opacity="${fmt(p.opacity)}" transform="rotate(45 ${fmt(p.x)} ${fmt(p.y)})"/>`;
+        return `<rect x="${fmt(p.x - s / 2)}" y="${fmt(p.y - s / 2)}" width="${fmt(s)}" height="${fmt(s)}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(p.opacity * strokeOpacity)}" transform="rotate(45 ${fmt(p.x)} ${fmt(p.y)})"/>`;
       }
-      return `<circle cx="${fmt(p.x)}" cy="${fmt(p.y)}" r="${fmt(p.radius)}" fill="${escapeXml(stroke)}" opacity="${fmt(p.opacity)}"/>`;
+      return `<circle cx="${fmt(p.x)}" cy="${fmt(p.y)}" r="${fmt(p.radius)}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(p.opacity * strokeOpacity)}"/>`;
     }).join("");
-    return `<g style="mix-blend-mode:screen"${opacityAttr}>${marks}</g>`;
+    return `<g style="mix-blend-mode:screen">${marks}</g>`;
   }
 
   if (brushFamily === "oil") {
@@ -1196,9 +1222,9 @@ function serializeFreehand(
       maxDabs: 512,
     });
     const ellipses = dabs.map((dab) => (
-      `<ellipse cx="${fmt(dab.x)}" cy="${fmt(dab.y)}" rx="${fmt(dab.radiusX)}" ry="${fmt(dab.radiusY)}" fill="${escapeXml(stroke)}" opacity="${fmt(dab.opacity)}" transform="rotate(${fmt((dab.angleRad * 180) / Math.PI)} ${fmt(dab.x)} ${fmt(dab.y)})"/>`
+      `<ellipse cx="${fmt(dab.x)}" cy="${fmt(dab.y)}" rx="${fmt(dab.radiusX)}" ry="${fmt(dab.radiusY)}" fill="${escapeXml(stroke)}" opacity="${fmtDabOpacity(dab.opacity * strokeOpacity)}" transform="rotate(${fmt((dab.angleRad * 180) / Math.PI)} ${fmt(dab.x)} ${fmt(dab.y)})"/>`
     )).join("");
-    return `<g${opacityAttr}>${ellipses}</g>`;
+    return `<g>${ellipses}</g>`;
   }
 
   if (brushFamily === "pastel") {
@@ -1215,9 +1241,9 @@ function serializeFreehand(
       `<radialGradient id="${softId}" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="${escapeXml(stroke)}"/><stop offset="55%" stop-color="${escapeXml(stroke)}"/><stop offset="100%" stop-color="${escapeXml(stroke)}" stop-opacity="0"/></radialGradient>`
     );
     const circles = dabs.map((dab) => (
-      `<circle cx="${fmt(dab.x)}" cy="${fmt(dab.y)}" r="${fmt(dab.radius)}" fill="url(#${softId})" opacity="${fmt(dab.opacity)}"/>`
+      `<circle cx="${fmt(dab.x)}" cy="${fmt(dab.y)}" r="${fmt(dab.radius)}" fill="url(#${softId})" opacity="${fmtDabOpacity(dab.opacity * strokeOpacity)}"/>`
     )).join("");
-    return `<g${opacityAttr}>${circles}</g>`;
+    return `<g>${circles}</g>`;
   }
 
   // 새 기본 펜/마커 — live Canvas, WebGPU, Konva가 공유하는 round-dab footprint 그대로.

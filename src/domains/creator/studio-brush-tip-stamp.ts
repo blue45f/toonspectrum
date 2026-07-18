@@ -19,6 +19,10 @@ export const STUDIO_BRUSH_TIP_SHAPE_IDS = [
   "hard",
   "flake",
   "grain",
+  "bristle",
+  "sponge",
+  "sumi",
+  "halftone",
   "star",
 ] as const;
 
@@ -26,7 +30,7 @@ export type StudioBrushTipShapeId = (typeof STUDIO_BRUSH_TIP_SHAPE_IDS)[number];
 
 export interface StudioBrushTipSettings {
   shape?: StudioBrushTipShapeId;
-  /** Edge falloff for procedural tips (0 = sharpest for shape, 1 = softest). */
+  /** Edge falloff for procedural and imported tips (0 = original/sharp, 1 = softest). */
   softness?: number;
   /**
    * Optional custom alpha channel: base64 of N×N bytes (0..255). When present and valid,
@@ -215,6 +219,51 @@ export function sampleStudioBrushTipProceduralAlpha(
       const body = Math.pow(1 - radius, 0.7 + soft * 1.2);
       return clamp01(body * grain);
     }
+    case "bristle": {
+      // A fan of deterministic fibres: broad enough to join into a stroke, but with
+      // lengthwise channels that stay visible at normal Webtoon inking sizes.
+      const bodyRadius = Math.hypot(nx * 0.82, ny * 1.04);
+      if (bodyRadius >= 1) return 0;
+      const fibres = Math.abs(Math.sin((nx + 1.07) * Math.PI * 7.5));
+      const brokenEdge = 0.72 + 0.28 * hashUnit(Math.round(nx * 13), Math.round(ny * 7), 0x2b7e_1516);
+      const channel = 0.28 + 0.72 * Math.pow(fibres, 0.35 + soft * 0.9);
+      return clamp01(Math.pow(1 - bodyRadius, 0.22 + soft * 0.9) * channel * brokenEdge);
+    }
+    case "sponge": {
+      if (radius >= 1) return 0;
+      // Coarse cellular pores remain deterministic across Canvas, SVG and collaboration replay.
+      const cellX = Math.floor((nx + 1) * 6);
+      const cellY = Math.floor((ny + 1) * 6);
+      const pore = hashUnit(cellX, cellY, 0x76d4_4b91);
+      const mottling = 0.18 + 0.82 * Math.pow(pore, 0.55 + soft * 0.8);
+      const body = Math.pow(1 - radius, 0.28 + soft * 0.75);
+      return clamp01(body * mottling);
+    }
+    case "sumi": {
+      // Slightly asymmetric, ragged ink belly inspired by a loaded sumi brush.
+      const warpedX = nx * (0.82 + 0.1 * Math.sin(ny * 7));
+      const warpedY = (ny + 0.08 * Math.sin(nx * 5)) * 1.04;
+      const inkRadius = Math.hypot(warpedX, warpedY);
+      const fringe = 0.9 + 0.1 * hashUnit(Math.round(nx * 19), Math.round(ny * 19), 0x5a11_0b1e);
+      if (inkRadius >= fringe) return 0;
+      const belly = Math.pow(1 - inkRadius / fringe, 0.18 + soft * 0.95);
+      const dryBreak = 0.58 + 0.42 * hashUnit(Math.round(nx * 17), Math.round(ny * 5), 0x11da_7a1f);
+      return clamp01(belly * dryBreak);
+    }
+    case "halftone": {
+      if (radius >= 1) return 0;
+      const frequency = 5;
+      const gridX = (nx + 1) * frequency;
+      const gridY = (ny + 1) * frequency;
+      const dotX = gridX - Math.round(gridX);
+      const dotY = gridY - Math.round(gridY);
+      const dotDistance = Math.hypot(dotX, dotY);
+      const dotRadius = 0.26 + (1 - soft) * 0.08;
+      if (dotDistance >= dotRadius) return 0;
+      const dotEdge = 1 - dotDistance / dotRadius;
+      const vignette = Math.pow(1 - radius, 0.08 + soft * 0.35);
+      return clamp01(Math.pow(dotEdge, 0.35 + soft) * vignette);
+    }
     case "star": {
       const angle = Math.atan2(ny, nx);
       const points = 5;
@@ -246,21 +295,72 @@ function buildProceduralAlphaMap(
   return alphas;
 }
 
-function buildCustomAlphaMap(base64: string, size: number): Float32Array | null {
+function softenCustomAlphaMap(
+  source: Float32Array,
+  size: number,
+  softness: number
+): Float32Array {
+  const blend = clamp01(softness);
+  if (blend <= 0 || size <= 1) return source;
+  const maxRadius = Math.max(1, Math.min(4, Math.floor(size / 8)));
+  const radius = Math.max(1, Math.ceil(maxRadius * blend));
+  const horizontal = new Float32Array(source.length);
+  const blurred = new Float32Array(source.length);
+
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      let total = 0;
+      let weight = 0;
+      for (let offset = -radius; offset <= radius; offset++) {
+        const sampleX = clamp(x + offset, 0, size - 1);
+        const sampleWeight = radius + 1 - Math.abs(offset);
+        total += (source[y * size + sampleX] ?? 0) * sampleWeight;
+        weight += sampleWeight;
+      }
+      horizontal[y * size + x] = total / Math.max(1, weight);
+    }
+  }
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      let total = 0;
+      let weight = 0;
+      for (let offset = -radius; offset <= radius; offset++) {
+        const sampleY = clamp(y + offset, 0, size - 1);
+        const sampleWeight = radius + 1 - Math.abs(offset);
+        total += (horizontal[sampleY * size + x] ?? 0) * sampleWeight;
+        weight += sampleWeight;
+      }
+      const index = y * size + x;
+      const softAlpha = total / Math.max(1, weight);
+      blurred[index] = clamp01((source[index] ?? 0) * (1 - blend) + softAlpha * blend);
+    }
+  }
+  return blurred;
+}
+
+function buildCustomAlphaMap(
+  base64: string,
+  size: number,
+  softness: number
+): Float32Array | null {
   const bytes = decodeStudioBrushTipAlphaMapBase64(base64);
   if (!bytes || bytes.length !== size * size) return null;
   const alphas = new Float32Array(size * size);
   for (let index = 0; index < bytes.length; index++) {
     alphas[index] = bytes[index]! / 255;
   }
-  return alphas;
+  return softenCustomAlphaMap(alphas, size, softness);
 }
 
 /** Build a reusable tip alpha map (procedural or custom PNG-alpha payload). */
 export function buildStudioBrushTipAlphaMap(value?: unknown): StudioBrushTipAlphaMap {
   const tip = normalizeStudioBrushTipSettings(value);
   if (tip.alphaMapBase64) {
-    const custom = buildCustomAlphaMap(tip.alphaMapBase64, tip.alphaMapSize);
+    const custom = buildCustomAlphaMap(
+      tip.alphaMapBase64,
+      tip.alphaMapSize,
+      tip.softness
+    );
     if (custom) {
       return {
         size: tip.alphaMapSize,

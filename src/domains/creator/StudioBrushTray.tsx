@@ -17,6 +17,7 @@ import {
   type StudioBrushTrayItem,
   type StudioQuickBrushSource,
 } from "./studio-creative-ux";
+import { planNeonBrushPasses } from "./studio-fx-brush";
 import { STUDIO_FOCUS_RING, STUDIO_EASE } from "./studio-panel-ui";
 import { StudioBrushPresetIcon } from "./StudioBrushPresetIcon";
 
@@ -29,7 +30,7 @@ export interface StudioBrushTrayProps {
   onSelect: (item: StudioBrushTrayItem) => void;
   recentBrushIds?: readonly string[];
   favoriteBrushIds?: readonly string[];
-  onOpenLibrary: () => void;
+  onOpenLibrary: (trigger: HTMLButtonElement) => void;
   libraryOpen?: boolean;
   className?: string;
   "aria-label"?: string;
@@ -64,7 +65,7 @@ function BrushPreviewGlyph({
     item.previewWeight
   );
   const ink = active ? "currentColor" : surface.ink;
-  const glow = item.previewStyle === "neon" || item.previewStyle === "glow";
+  const neonPasses = item.previewStyle === "neon" ? planNeonBrushPasses(strokeW) : null;
 
   return (
     <svg
@@ -106,24 +107,30 @@ function BrushPreviewGlyph({
           ))}
         </g>
       ) : (
-        <>
-          {(item.previewStyle === "soft" || item.previewStyle === "neon") && (
+        neonPasses ? (
+          <g data-studio-brush-preview-layer="neon">
+            {neonPasses.map((pass, index) => (
+              <path
+                key={index}
+                d={pathD}
+                fill="none"
+                stroke={pass.tone === "white-core" ? "oklch(0.97 0.015 85)" : ink}
+                strokeWidth={Math.max(1, strokeW * pass.widthScale)}
+                strokeLinecap="round"
+                opacity={pass.opacity * (active ? 1 : 0.82)}
+              />
+            ))}
+          </g>
+        ) : (
+          <>
+          {item.previewStyle === "soft" && (
             <path
               d={pathD}
               fill="none"
               stroke={ink}
-              strokeWidth={strokeW * (glow ? 2.4 : 1.85)}
+              strokeWidth={strokeW * 1.85}
               strokeLinecap="round"
-              opacity={glow ? (active ? 0.45 : 0.28) : active ? 0.32 : 0.22}
-              style={
-                glow
-                  ? {
-                      filter: active
-                        ? "drop-shadow(0 0 3px currentColor)"
-                        : "drop-shadow(0 0 2px oklch(0.72 0.14 42 / 0.55))",
-                    }
-                  : undefined
-              }
+              opacity={active ? 0.32 : 0.22}
             />
           )}
           {item.previewStyle === "calligraphy" && (
@@ -151,7 +158,8 @@ function BrushPreviewGlyph({
               opacity={active ? 0.98 : 0.88}
             />
           )}
-        </>
+          </>
+        )
       )}
     </svg>
   );
@@ -246,11 +254,11 @@ export function StudioBrushTray({
       </div>
       <button
         type="button"
-        onClick={onOpenLibrary}
+        onClick={(event) => onOpenLibrary(event.currentTarget)}
         aria-expanded={libraryOpen}
         aria-haspopup="dialog"
-        aria-label="전체 브러시 보기"
-        title="전체 브러시 보기"
+        aria-label="기본 프리셋 전체 보기"
+        title="기본 프리셋 전체 보기"
         data-studio-open-brush-library="true"
         className={cn(
           "flex h-11 shrink-0 items-center gap-1 rounded-xl border border-line/70 bg-card/80 px-2 text-[0.62rem] font-bold text-fg-2 hover:border-accent/40 hover:bg-raised hover:text-fg",

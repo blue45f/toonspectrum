@@ -46,7 +46,6 @@ import {
 import { STUDIO_BRUSH_SIZE_RANGE } from "./studio-draw-ux";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { studioToolHintFromLabel } from "./studio-tool-hints";
-import { StudioBrushLibrarySheet } from "./StudioBrushLibrarySheet";
 import { StudioBrushPresetIcon } from "./StudioBrushPresetIcon";
 import { StudioBrushTray } from "./StudioBrushTray";
 import { StudioToolHintTarget } from "./StudioToolHint";
@@ -104,6 +103,8 @@ export interface StudioDrawOptionsBarProps {
   recentBrushIds?: readonly string[];
   favoriteBrushIds?: readonly string[];
   onToggleFavoriteBrush?: (brushId: string) => void;
+  brushCatalogOpen?: boolean;
+  onToggleBrushCatalog?: (trigger: HTMLButtonElement) => void;
   onCycleStabilizer?: () => void;
   shapeKind?: string;
   onShapeKindChange?: (kind: string) => void;
@@ -200,6 +201,8 @@ export function StudioDrawOptionsBar({
   recentBrushIds = [],
   favoriteBrushIds = [],
   onToggleFavoriteBrush,
+  brushCatalogOpen = false,
+  onToggleBrushCatalog,
   onCycleStabilizer,
   shapeKind = "line",
   onShapeKindChange,
@@ -210,11 +213,9 @@ export function StudioDrawOptionsBar({
   dockInsets = { left: 56, right: 56 },
   className,
 }: StudioDrawOptionsBarProps): ReactElement {
-  const [libraryOpen, setLibraryOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [canvasDockFrame, setCanvasDockFrame] = useState<Readonly<{ center: number; width: number }> | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
-  const brushLibraryTriggerRef = useRef<HTMLButtonElement>(null);
 
   const brushMeta = BRUSH_PRESETS.find((preset) => preset.id === brushId);
   const brushTrayItem = brushMeta ? studioBrushTrayItem(brushMeta) : null;
@@ -223,23 +224,9 @@ export function StudioDrawOptionsBar({
   const safeDockLeft = Math.max(0, Math.round(dockInsets.left));
   const safeDockRight = Math.max(0, Math.round(dockInsets.right));
 
-  function closeBrushLibraryAndRestoreFocus() {
-    setLibraryOpen(false);
-    globalThis.setTimeout(() => brushLibraryTriggerRef.current?.focus(), 0);
+  function toggleBrushCatalog(trigger: HTMLButtonElement) {
+    onToggleBrushCatalog?.(trigger);
   }
-
-  useEffect(() => {
-    if (!libraryOpen) return;
-    function onPointerDown(e: PointerEvent) {
-      const root = rootRef.current;
-      if (!root) return;
-      if (e.target instanceof Node && !root.contains(e.target)) {
-        setLibraryOpen(false);
-      }
-    }
-    globalThis.addEventListener("pointerdown", onPointerDown, true);
-    return () => globalThis.removeEventListener("pointerdown", onPointerDown, true);
-  }, [libraryOpen]);
 
   useEffect(() => {
     if (!docked) return;
@@ -394,25 +381,24 @@ export function StudioDrawOptionsBar({
               className="min-w-0"
               hint={studioToolHintFromLabel(
                 `현재 브러시 · ${brushMeta?.name ?? brushId}`,
-                "브러시 라이브러리를 열어 촉감·용도별 프리셋을 검색하고 바로 교체합니다. 현재 색과 불투명도는 그대로 유지돼요.",
+                "기본 프리셋을 열어 촉감·용도별 브러시를 검색하고 바로 교체합니다. 현재 색과 불투명도는 그대로 유지돼요.",
                 undefined,
                 "ink"
               )}
             >
               <button
-                ref={brushLibraryTriggerRef}
                 type="button"
-                onClick={() => setLibraryOpen((v) => !v)}
-                aria-expanded={libraryOpen}
+                onClick={(event) => toggleBrushCatalog(event.currentTarget)}
+                aria-expanded={brushCatalogOpen}
                 aria-haspopup="dialog"
-                aria-label={`현재 브러시 ${brushMeta?.name ?? brushId}, 브러시 라이브러리 열기`}
+                aria-label={`현재 브러시 ${brushMeta?.name ?? brushId}, 기본 프리셋 열기`}
                 data-studio-brush-active-pill="true"
                 data-studio-core-draw-control="brush"
                 className={cn(
                   "flex h-9 max-w-[9.5rem] items-center gap-1.5 rounded-xl border px-2",
                   STUDIO_EASE,
                   STUDIO_FOCUS_RING,
-                  libraryOpen
+                  brushCatalogOpen
                     ? "border-accent bg-accent text-on-accent shadow-[0_2px_8px_oklch(0.72_0.185_42/0.28)]"
                     : "border-line/80 bg-card text-fg hover:border-accent/40 hover:bg-raised"
                 )}
@@ -420,7 +406,7 @@ export function StudioDrawOptionsBar({
                 <span
                   className={cn(
                     "grid size-6 shrink-0 place-items-center rounded-md",
-                    libraryOpen ? "bg-on-accent/15" : "bg-canvas/70"
+                    brushCatalogOpen ? "bg-on-accent/15" : "bg-canvas/70"
                   )}
                   aria-hidden
                 >
@@ -743,10 +729,10 @@ export function StudioDrawOptionsBar({
               recentBrushIds={recentBrushIds}
               favoriteBrushIds={favoriteBrushIds}
               onSelect={onSelectBrush}
-              onOpenLibrary={() => setLibraryOpen(true)}
-              libraryOpen={libraryOpen}
+              onOpenLibrary={toggleBrushCatalog}
+              libraryOpen={brushCatalogOpen}
               className="w-[24rem] shrink-0"
-              aria-label="빠른 브러시 — 즐겨찾기, 최근 사용, 추천"
+              aria-label="기본 프리셋 빠른 선택 — 즐겨찾기, 최근 사용, 추천"
             />
           ) : null}
 
@@ -1141,21 +1127,6 @@ export function StudioDrawOptionsBar({
         </div>
       ) : null}
 
-      {drawMode === "pen" ? (
-        <StudioBrushLibrarySheet
-          open={libraryOpen}
-          activeBrushId={brushId}
-          favoriteIds={favoriteBrushIds}
-          recentIds={recentBrushIds}
-          onClose={closeBrushLibraryAndRestoreFocus}
-          onSelect={onSelectBrush}
-          onToggleFavorite={onToggleFavoriteBrush}
-          className={cn(
-            "pointer-events-auto",
-            docked && "bottom-[calc(100%+0.4rem)] top-auto"
-          )}
-        />
-      ) : null}
     </div>
   );
 }

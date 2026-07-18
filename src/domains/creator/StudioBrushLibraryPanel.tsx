@@ -237,11 +237,17 @@ export function StudioBrushLibraryPanel({
   }
 
   return (
-    <section className="space-y-2 border-t border-line/35 pt-2" aria-label="내 브러시 라이브러리">
+    <section
+      className="space-y-2 border-t border-line/35 pt-2"
+      aria-label="내 브러시"
+      data-studio-brush-library-scope="saved"
+    >
       <div className="flex items-center justify-between gap-2">
         <div>
           <p className="text-[0.68rem] font-semibold text-fg-2">내 브러시</p>
-          <p className="text-[0.6rem] tabular-nums text-fg-3">{brushes.length}/{MAX_BRUSHES} · 고정과 최근 사용 우선</p>
+          <p className="text-[0.6rem] tabular-nums text-fg-3">
+            사용자 저장 · {brushes.length}/{MAX_BRUSHES} · 고정과 최근 사용 우선
+          </p>
         </div>
         <label className="flex min-h-11 shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-line px-2 text-[0.62rem] font-semibold text-fg-2 transition-colors hover:bg-raised focus-within:outline focus-within:outline-2 focus-within:outline-accent lg:min-h-8">
           <Upload size={12} aria-hidden /> 가져오기
