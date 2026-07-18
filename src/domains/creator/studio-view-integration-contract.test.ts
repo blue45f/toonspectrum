@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const source = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const inspectorSource = readFileSync(new URL("./StudioInspectorAside.tsx", import.meta.url), "utf8");
+const leftToolRailSource = readFileSync(new URL("./StudioLeftToolRail.tsx", import.meta.url), "utf8");
 
 describe("StudioPage view integration contract", () => {
   it("wires the quarter-turn Stage and transformed collaboration overlay together", () => {
@@ -22,7 +24,7 @@ describe("StudioPage view integration contract", () => {
     expect(source).toContain("planStudioViewScrollToDocumentPoint({");
     expect(source).toContain("projectStudioViewPointToDocument({");
     expect(source).toContain("projectStudioDocumentPointToView({");
-    expect(source).toContain("projectStudioViewRectToDocumentRect({");
+    expect(inspectorSource).toContain("projectStudioViewRectToDocumentRect({");
   });
 
   it("keeps rotation out of automatic ResizeObserver fitting", () => {
@@ -34,8 +36,8 @@ describe("StudioPage view integration contract", () => {
 
   it("shows effective magnification and exposes an accessible rail-to-toolbar relationship", () => {
     expect(source).toContain("magnification={effScale}");
-    expect(source).toContain('aria-controls="studio-view-tools-hud-zoom"');
-    expect(source).toContain('data-studio-view-tool-trigger="rotate"');
+    expect(leftToolRailSource).toContain('aria-controls="studio-view-tools-hud-zoom"');
+    expect(leftToolRailSource).toContain('data-studio-view-tool-trigger="rotate"');
   });
 
   it("keeps configurable flip dispatch before the hard-coded view resolver", () => {
