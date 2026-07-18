@@ -480,7 +480,7 @@ import {
 import {
   loadStudioPsdExportModule,
   loadStudioPsdImportModule,
-  loadStudioSvgExportModule,
+  loadStudioSvgExportWorkerClientModule,
 } from "./studio-document-export-loaders";
 import { isCompleteStudioDrawOp } from "./studio-draw-completion";
 import {
@@ -22697,8 +22697,8 @@ function StudioCuttoonEditor() {
     if (!ensureSharedDocumentAvailableForExport()) {
       throw new Error("공동 문서를 불러온 뒤 SVG로 내보낼 수 있어요.");
     }
-    const { exportPageToSvg } = await loadStudioSvgExportModule();
-    return exportPageToSvg({
+    const { runStudioSvgExportWorker } = await loadStudioSvgExportWorkerClientModule();
+    const { result } = await runStudioSvgExportWorker({
       width: CANVAS_W,
       height: canvasH,
       bg,
@@ -22708,6 +22708,7 @@ function StudioCuttoonEditor() {
       groups,
       theme: webtoonTheme,
     });
+    return result;
   }
 
   // 현재 페이지 → 요소별 레이어를 가진 PSD. exportPagePsd 는 숨김 요소를 스스로 거르지 않으므로
