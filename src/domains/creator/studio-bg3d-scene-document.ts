@@ -9,9 +9,14 @@
 import { normalizeStudioBg3dHierarchyParents } from "./studio-bg3d-hierarchy";
 
 export const STUDIO_BG3D_SCENE_DOCUMENT_KIND = "toonspectrum.bg3d-scene" as const;
-export const STUDIO_BG3D_SCENE_DOCUMENT_VERSION = 2 as const;
+export const STUDIO_BG3D_SCENE_DOCUMENT_VERSION = 3 as const;
+const STUDIO_BG3D_SCHEMA_V2_SCENE_DOCUMENT_VERSION = 2 as const;
 const STUDIO_BG3D_LEGACY_SCENE_DOCUMENT_VERSION = 1 as const;
-export const STUDIO_BG3D_SCENE_DOCUMENT_MAX_BYTES = 256 * 1024;
+// Schema v3 adds an explicit `twoBoneIks` collection to every constrained model. Keeping the old
+// 256 KiB ceiling would make an otherwise valid near-cap v2 document fail migration solely because
+// each aim-only layer gains `twoBoneIks: []`. The bounded 320 KiB ceiling preserves all legacy
+// payloads while retaining a small, deterministic metadata budget.
+export const STUDIO_BG3D_SCENE_DOCUMENT_MAX_BYTES = 320 * 1024;
 export const STUDIO_BG3D_SCENE_DOCUMENT_MAX_NODES = 512;
 export const STUDIO_BG3D_SCENE_DOCUMENT_MAX_ATTACHMENTS = 64;
 export const STUDIO_BG3D_GLB_MIME = "model/gltf-binary" as const;
@@ -143,6 +148,7 @@ export const DEFAULT_STUDIO_BG3D_MORPH_LAYER: StudioBg3dMorphLayer = Object.free
 export const STUDIO_BG3D_AIM_AXES = [
   "+x", "-x", "+y", "-y", "+z", "-z",
 ] as const;
+export const STUDIO_BG3D_MAX_TWO_BONE_IK_CONSTRAINTS = 32;
 export type StudioBg3dAimAxis = (typeof STUDIO_BG3D_AIM_AXES)[number];
 
 export interface StudioBg3dJointAimConstraint {
@@ -154,14 +160,27 @@ export interface StudioBg3dJointAimConstraint {
   readonly weight: number;
 }
 
+export interface StudioBg3dTwoBoneIkConstraint {
+  readonly upperJointKey: string;
+  readonly middleJointKey: string;
+  readonly endJointKey: string;
+  /** End-effector target in the model instance's local coordinate system. */
+  readonly target: StudioBg3dVec3;
+  /** Model-local point defining the elbow/knee bend plane. */
+  readonly poleTarget: StudioBg3dVec3;
+  readonly weight: number;
+}
+
 export interface StudioBg3dConstraintLayer {
   readonly enabled: boolean;
   readonly aims: readonly StudioBg3dJointAimConstraint[];
+  readonly twoBoneIks: readonly StudioBg3dTwoBoneIkConstraint[];
 }
 
 export const DEFAULT_STUDIO_BG3D_CONSTRAINT_LAYER: StudioBg3dConstraintLayer = Object.freeze({
   enabled: true,
   aims: Object.freeze([]),
+  twoBoneIks: Object.freeze([]),
 });
 
 export interface StudioBg3dCameraSettings {
@@ -1323,9 +1342,47 @@ function normalizeConstraintLayer(value: unknown): StudioBg3dConstraintLayer | n
     });
     if (aims.length >= 128) break;
   }
+  const rawTwoBoneIks = hasOwn(value, "twoBoneIks") ? value.twoBoneIks : [];
+  if (!Array.isArray(rawTwoBoneIks)) return null;
+
+  const twoBoneIks: StudioBg3dTwoBoneIkConstraint[] = [];
+  const claimedJointKeys = new Set<string>();
+  for (const rawIk of rawTwoBoneIks) {
+    if (!isRecord(rawIk)) continue;
+    const upperJointKey = normalizedText(rawIk.upperJointKey, 128);
+    const middleJointKey = normalizedText(rawIk.middleJointKey, 128);
+    const endJointKey = normalizedText(rawIk.endJointKey, 128);
+    if (
+      !upperJointKey || !middleJointKey || !endJointKey ||
+      upperJointKey === middleJointKey || upperJointKey === endJointKey ||
+      middleJointKey === endJointKey ||
+      claimedJointKeys.has(upperJointKey) || claimedJointKeys.has(middleJointKey) ||
+      claimedJointKeys.has(endJointKey)
+    ) {
+      continue;
+    }
+    claimedJointKeys.add(upperJointKey);
+    claimedJointKeys.add(middleJointKey);
+    claimedJointKeys.add(endJointKey);
+    twoBoneIks.push({
+      upperJointKey,
+      middleJointKey,
+      endJointKey,
+      target: normalizedVec3(rawIk.target, [0, 1, 0], -MAX_WORLD_COORDINATE, MAX_WORLD_COORDINATE),
+      poleTarget: normalizedVec3(
+        rawIk.poleTarget,
+        [0, 0, 1],
+        -MAX_WORLD_COORDINATE,
+        MAX_WORLD_COORDINATE,
+      ),
+      weight: boundedNumber(rawIk.weight, 1, 0, 1),
+    });
+    if (twoBoneIks.length >= STUDIO_BG3D_MAX_TWO_BONE_IK_CONSTRAINTS) break;
+  }
   return {
     enabled: normalizedBoolean(value.enabled, true),
     aims,
+    twoBoneIks,
   };
 }
 
@@ -1581,7 +1638,7 @@ function migrateDecodedLegacyDocument(
  * Early scene documents briefly persisted an optional `background.panoramaUrl`. The URL is no longer part of
  * the persistence contract, but rejecting the whole marked document would also discard its camera,
  * nodes, attachments, and LT settings. Migrate only that exact historical shape: remove the URL,
- * then require every remaining field to pass the current strict v2 boundary without any other
+ * then require every remaining field to pass the current strict schema boundary without any other
  * lossy rewrite. This is intentionally separate from the unversioned legacy payload migration.
  */
 const SCHEMA_V2_ONLY_COMPLEXITY_BUDGET_KEYS = Object.freeze([
@@ -1598,7 +1655,7 @@ const SCHEMA_V2_ONLY_COMPLEXITY_BUDGET_KEYS = Object.freeze([
 
 /**
  * Schema v1 predates animation, rigging, morph, and decoded-accessor budgets. Add those defaults
- * before the strict v2 equality check, while rejecting payloads that claim v2-only fields under a
+ * before the strict current-version equality check, while rejecting payloads that claim v2-only fields under a
  * v1 version marker. Unknown or missing historical fields are still rejected by strict normalize.
  */
 function migrateSchemaV1Budgets(value: unknown): Record<string, unknown> | null {
@@ -1622,6 +1679,43 @@ function migrateSchemaV1Budgets(value: unknown): Record<string, unknown> | null 
       maxDecodedGeometryBytes: DEFAULT_RAW_DOCUMENT.budgets.complexity.maxDecodedGeometryBytes,
     },
   };
+}
+
+/**
+ * Schema v3 adds analytic two-bone IK to every persisted constraint layer. Preserve canonical v2
+ * aim-only layers by adding the explicit empty collection, while rejecting documents that claim
+ * the v3-only field under a v2 marker.
+ */
+function migrateSchemaV2Nodes(value: readonly unknown[]): readonly unknown[] | null {
+  const nodes: unknown[] = [];
+  for (const node of value) {
+    if (!isRecord(node) || node.kind !== "model" || !hasOwn(node, "constraints")) {
+      nodes.push(node);
+      continue;
+    }
+    if (!isRecord(node.constraints) || hasOwn(node.constraints, "twoBoneIks")) return null;
+    nodes.push({
+      ...node,
+      constraints: {
+        ...node.constraints,
+        twoBoneIks: [],
+      },
+    });
+  }
+  return nodes;
+}
+
+function migrateDecodedSchemaV2Document(value: unknown): StudioBg3dSceneDocument | null {
+  if (!hasCompleteRootShapeForVersion(value, STUDIO_BG3D_SCHEMA_V2_SCENE_DOCUMENT_VERSION)) {
+    return null;
+  }
+  const nodes = migrateSchemaV2Nodes(value.nodes);
+  if (!nodes) return null;
+  return normalizeDecodedCurrentDocument({
+    ...value,
+    version: STUDIO_BG3D_SCENE_DOCUMENT_VERSION,
+    nodes,
+  }, "strict");
 }
 
 function migrateDecodedSchemaV1Document(value: unknown): StudioBg3dSceneDocument | null {
@@ -1650,6 +1744,7 @@ function migrateDecodedSchemaPanoramaDocument(
     !isRecord(value) ||
     !(
       hasCompleteCurrentRootShape(value)
+      || hasCompleteRootShapeForVersion(value, STUDIO_BG3D_SCHEMA_V2_SCENE_DOCUMENT_VERSION)
       || hasCompleteRootShapeForVersion(value, STUDIO_BG3D_LEGACY_SCENE_DOCUMENT_VERSION)
     ) ||
     !isRecord(value.background) ||
@@ -1671,12 +1766,17 @@ function migrateDecodedSchemaPanoramaDocument(
     ? migrateSchemaV1Budgets(value.budgets)
     : value.budgets;
   if (!budgets) return null;
+  const nodes = value.version === STUDIO_BG3D_SCHEMA_V2_SCENE_DOCUMENT_VERSION
+    ? migrateSchemaV2Nodes(value.nodes)
+    : value.nodes;
+  if (!nodes) return null;
   const { panoramaUrl: _discardedPanoramaUrl, ...background } = value.background;
   return normalizeDecodedCurrentDocument({
     ...value,
     version: STUDIO_BG3D_SCENE_DOCUMENT_VERSION,
     background,
     budgets,
+    nodes,
   }, "strict");
 }
 
@@ -1731,6 +1831,8 @@ export function migrateStudioBg3dSceneDocument(
   if (current) return current;
   const schemaV1Panorama = migrateDecodedSchemaPanoramaDocument(decoded);
   if (schemaV1Panorama) return schemaV1Panorama;
+  const schemaV2 = migrateDecodedSchemaV2Document(decoded);
+  if (schemaV2) return schemaV2;
   const schemaV1 = migrateDecodedSchemaV1Document(decoded);
   if (schemaV1) return schemaV1;
   if (

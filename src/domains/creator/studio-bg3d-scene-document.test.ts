@@ -95,6 +95,48 @@ function schemaV1Document(overrides: Record<string, unknown> = {}): Record<strin
   };
 }
 
+function schemaV2Document(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    ...currentDocument(overrides),
+    version: 2,
+  };
+}
+
+function nearLegacyByteCapSchemaV2Document(): Record<string, unknown> {
+  const nodes = Array.from({ length: 488 }, (_, index) => ({
+    id: `n${index}`,
+    name: "m".repeat(80),
+    kind: "model",
+    attachmentId: "model-1",
+    transform: { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+    parentId: null,
+    visible: true,
+    locked: false,
+    castsShadow: true,
+    receivesShadow: true,
+    constraints: {
+      enabled: true,
+      aims: Array.from({ length: 3 }, (_, aimIndex) => ({
+        jointKey: `joint-${aimIndex}`,
+        target: [0, 1, 0],
+        axis: "+z",
+        weight: 1,
+      })),
+    },
+  }));
+  return schemaV2Document({
+    attachments: [attachment(1)],
+    nodes,
+    budgets: {
+      ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.budgets,
+      complexity: {
+        ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.budgets.complexity,
+        maxNodes: STUDIO_BG3D_SCENE_DOCUMENT_MAX_NODES,
+      },
+    },
+  });
+}
+
 describe("Studio BG3D scene document defaults", () => {
   it("keeps the canonical default byte-for-byte stable across repeated parse and serialize cycles", () => {
     const original = createDefaultStudioBg3dSceneDocument();
@@ -202,6 +244,14 @@ describe("Studio BG3D scene document normalization", () => {
             axis: "+z",
             weight: 0.6,
           }],
+          twoBoneIks: [{
+            upperJointKey: "skin-0:joint-3",
+            middleJointKey: "skin-0:joint-4",
+            endJointKey: "skin-0:joint-5",
+            target: [0.8, 1.2, 0.4],
+            poleTarget: [0, 1, 1],
+            weight: 0.75,
+          }],
         },
       }],
     }));
@@ -240,18 +290,138 @@ describe("Studio BG3D scene document normalization", () => {
         axis: "+z",
         weight: 0.6,
       }],
+      twoBoneIks: [{
+        upperJointKey: "skin-0:joint-3",
+        middleJointKey: "skin-0:joint-4",
+        endJointKey: "skin-0:joint-5",
+        target: [0.8, 1.2, 0.4],
+        poleTarget: [0, 1, 1],
+        weight: 0.75,
+      }],
     });
     expect(Object.isFrozen(node.materialOverride)).toBe(true);
     expect(Object.isFrozen(node.pose?.joints[0]?.rotationOffset)).toBe(true);
     expect(Object.isFrozen(node.morph?.targets[0])).toBe(true);
     expect(Object.isFrozen(node.constraints?.aims[0]?.target)).toBe(true);
+    expect(Object.isFrozen(node.constraints?.twoBoneIks?.[0]?.target)).toBe(true);
+    expect(Object.isFrozen(node.constraints?.twoBoneIks?.[0]?.poleTarget)).toBe(true);
 
     const hostile = JSON.parse(serialized ?? "{}") as { nodes: { materialOverride: { opacityMultiplier: number } }[] };
     hostile.nodes[0].materialOverride.opacityMultiplier = 2;
     expect(parseStudioBg3dSceneDocument(JSON.stringify(hostile))).toBeNull();
   });
 
-  it("migrates a canonical schema-v1 document to v2 without accepting v2-only fields", () => {
+  it("migrates aim-only v2 constraints and rejects ambiguous or falsely versioned IK chains", () => {
+    const modelNode = {
+      id: "model-node-1",
+      name: "리그 모델",
+      kind: "model",
+      attachmentId: "model-1",
+      transform: { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+      parentId: null,
+      visible: true,
+      locked: false,
+      castsShadow: true,
+      receivesShadow: true,
+      constraints: {
+        enabled: true,
+        aims: [{
+          jointKey: "skin-0:joint-0",
+          target: [0, 1, 0],
+          axis: "+z",
+          weight: 1,
+        }],
+      },
+    };
+    const aimOnly = schemaV2Document({
+      attachments: [attachment(1)],
+      nodes: [modelNode],
+    });
+    const aimOnlyJson = JSON.stringify(aimOnly);
+    expect(parseStudioBg3dSceneDocument(aimOnlyJson)).toBeNull();
+    expect(serializeStudioBg3dSceneDocument(aimOnly)).toBeNull();
+    const migratedAimOnly = migrateStudioBg3dSceneDocument(aimOnly);
+    const migratedAimNode = migratedAimOnly?.nodes[0];
+    expect(migratedAimOnly?.version).toBe(STUDIO_BG3D_SCENE_DOCUMENT_VERSION);
+    expect(migratedAimNode?.kind).toBe("model");
+    if (!migratedAimNode || migratedAimNode.kind !== "model") {
+      throw new Error("migrated aim-only model fixture must survive");
+    }
+    expect(migratedAimNode.constraints).toEqual({
+      ...modelNode.constraints,
+      twoBoneIks: [],
+    });
+    expect(Object.isFrozen(migratedAimNode.constraints?.twoBoneIks)).toBe(true);
+
+    const validIk = {
+      upperJointKey: "skin-0:joint-1",
+      middleJointKey: "skin-0:joint-2",
+      endJointKey: "skin-0:joint-3",
+      target: [1, 1, 0],
+      poleTarget: [0, 0, 1],
+      weight: 1,
+    };
+    const ambiguous = currentDocument({
+      attachments: [attachment(1)],
+      nodes: [{
+        ...modelNode,
+        constraints: {
+          ...modelNode.constraints,
+          twoBoneIks: [
+            validIk,
+            { ...validIk, upperJointKey: "skin-0:joint-4" },
+            { ...validIk, endJointKey: "skin-0:joint-5", middleJointKey: "skin-0:joint-1" },
+          ],
+        },
+      }],
+    });
+    const normalized = normalizeStudioBg3dSceneDocument(ambiguous);
+    const normalizedNode = normalized?.nodes[0];
+    expect(normalizedNode?.kind).toBe("model");
+    if (!normalizedNode || normalizedNode.kind !== "model") {
+      throw new Error("normalized IK model fixture must survive");
+    }
+    expect(normalizedNode.constraints?.twoBoneIks).toEqual([validIk]);
+    expect(parseStudioBg3dSceneDocument(JSON.stringify(ambiguous))).toBeNull();
+    expect(serializeStudioBg3dSceneDocument(
+      ambiguous as unknown as StudioBg3dSceneDocument,
+    )).toBeNull();
+    expect(migrateStudioBg3dSceneDocument({
+      ...aimOnly,
+      nodes: [{
+        ...modelNode,
+        constraints: { ...modelNode.constraints, twoBoneIks: [validIk] },
+      }],
+    })).toBeNull();
+  });
+
+  it("preserves near-cap v2 aim scenes when v3 adds explicit empty IK collections", () => {
+    const legacy = nearLegacyByteCapSchemaV2Document();
+    const legacyBytes = new TextEncoder().encode(JSON.stringify(legacy)).byteLength;
+    const migrated = migrateStudioBg3dSceneDocument(legacy);
+    const migratedBytes = new TextEncoder().encode(JSON.stringify(migrated)).byteLength;
+
+    expect(legacyBytes).toBeLessThanOrEqual(256 * 1024);
+    expect(migratedBytes).toBeGreaterThan(256 * 1024);
+    expect(migratedBytes).toBeLessThanOrEqual(STUDIO_BG3D_SCENE_DOCUMENT_MAX_BYTES);
+    expect(migrated?.nodes).toHaveLength(488);
+    expect(migrated?.nodes.every((node) =>
+      node.kind !== "model" || node.constraints?.twoBoneIks.length === 0
+    )).toBe(true);
+
+    const panoramaLegacy = {
+      ...legacy,
+      background: {
+        ...(legacy.background as Record<string, unknown>),
+        panoramaUrl: "https://legacy.invalid/near-cap-panorama.jpg",
+      },
+    };
+    const migratedPanorama = migrateStudioBg3dSceneDocument(panoramaLegacy);
+    expect(migratedPanorama?.nodes).toHaveLength(488);
+    expect(Reflect.has(migratedPanorama?.background ?? {}, "panoramaUrl")).toBe(false);
+  });
+
+  it("migrates a canonical schema-v1 document to the current schema without accepting v2-only fields", () => {
     const legacy = schemaV1Document();
 
     expect(parseStudioBg3dSceneDocument(JSON.stringify(legacy))).toBeNull();
@@ -682,15 +852,18 @@ describe("Studio BG3D scene document normalization", () => {
     });
   });
 
-  it("bounds lenient normalization for 512 sparse nodes without letting strict persistence truncate", () => {
+  it("bounds lenient normalization for 512 sparse model nodes without letting strict persistence truncate", () => {
     const nodes = Array.from({ length: STUDIO_BG3D_SCENE_DOCUMENT_MAX_NODES }, (_, index) => ({
       id: `emoji-${index}`,
       name: "😀".repeat(80),
-      kind: "primitive",
-      primitiveKind: "box",
+      kind: "model",
+      attachmentId: "model-1",
+      // A present but sparse optional section expands to its full canonical shape.
+      materialOverride: {},
     }));
     const raw = JSON.stringify(
       currentDocument({
+        attachments: [attachment()],
         budgets: {
           ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.budgets,
           complexity: {

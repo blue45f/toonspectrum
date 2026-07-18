@@ -4,6 +4,7 @@ import {
   DEFAULT_STUDIO_BG3D_MATERIAL_OVERRIDE,
   DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
   STUDIO_BG3D_GLB_MIME,
+  STUDIO_BG3D_MAX_TWO_BONE_IK_CONSTRAINTS,
   normalizeStudioBg3dGlbAttachment,
   parseStudioBg3dSceneDocument,
   serializeStudioBg3dSceneDocument,
@@ -138,6 +139,14 @@ describe("Studio BG3D runtime to document adapter", () => {
           axis: "+z" as const,
           weight: 0.8,
         }],
+        twoBoneIks: [{
+          upperJointKey: "skin-0:joint-1",
+          middleJointKey: "skin-0:joint-2",
+          endJointKey: "skin-0:joint-3",
+          target: [0.5, 1.25, 0.2] as const,
+          poleTarget: [0, 1, 1] as const,
+          weight: 0.7,
+        }],
       },
     };
     const adapted = adaptStudioBg3dRuntimeToDocument({
@@ -172,6 +181,100 @@ describe("Studio BG3D runtime to document adapter", () => {
     expect(hydrated.customModels[0]?.constraints).toEqual(model.constraints);
     expect(hydrated.customModels[0]?.constraints?.aims[0]).not.toBe(model.constraints.aims[0]);
     expect(hydrated.customModels[0]?.constraints?.aims[0]?.target).not.toBe(model.constraints.aims[0].target);
+    expect(hydrated.customModels[0]?.constraints?.twoBoneIks?.[0])
+      .not.toBe(model.constraints.twoBoneIks[0]);
+    expect(hydrated.customModels[0]?.constraints?.twoBoneIks?.[0]?.target)
+      .not.toBe(model.constraints.twoBoneIks[0].target);
+    expect(hydrated.customModels[0]?.constraints?.twoBoneIks?.[0]?.poleTarget)
+      .not.toBe(model.constraints.twoBoneIks[0].poleTarget);
+  });
+
+  it("fails the model boundary instead of silently truncating excess IK constraints", () => {
+    const storageId = "idb-over-budget-rig";
+    const model: BgCustomModelInstance = {
+      ...customModel("over-budget-rig", storageId),
+      constraints: {
+        enabled: true,
+        aims: [],
+        twoBoneIks: Array.from(
+          { length: STUDIO_BG3D_MAX_TWO_BONE_IK_CONSTRAINTS + 1 },
+          (_, index) => ({
+            upperJointKey: `skin-0:joint-${index * 3}`,
+            middleJointKey: `skin-0:joint-${index * 3 + 1}`,
+            endJointKey: `skin-0:joint-${index * 3 + 2}`,
+            target: [1, 1, 0] as const,
+            poleTarget: [0, 0, 1] as const,
+            weight: 1,
+          }),
+        ),
+      },
+    };
+
+    const adapted = adaptStudioBg3dRuntimeToDocument({
+      primitives: [],
+      customModels: [model],
+      attachmentByStorageModelId: new Map([[storageId, attachment("over-budget", 18)]]),
+    });
+
+    expect(adapted.document.nodes).toEqual([]);
+    expect(adapted.counts.droppedCustomModels).toBe(1);
+    expect(diagnosticCodes(adapted.diagnostics)).toContain("invalid-custom-model");
+  });
+
+  it("upgrades aim-only v2 runtime constraints and rejects hostile shapes without throwing", () => {
+    const storageId = "idb-legacy-aim-model";
+    const legacyAimOnly = {
+      ...customModel("legacy-aim-node", storageId),
+      constraints: {
+        enabled: true,
+        aims: [{
+          jointKey: "skin-0:joint-1",
+          target: [0, 1, 0] as const,
+          axis: "+z" as const,
+          weight: 1,
+        }],
+      },
+    } as unknown as BgCustomModelInstance;
+    const attachmentMap = new Map([[storageId, attachment("legacy-aim-attachment", 19)]]);
+
+    const adapted = adaptStudioBg3dRuntimeToDocument({
+      primitives: [],
+      customModels: [legacyAimOnly],
+      attachmentByStorageModelId: attachmentMap,
+    });
+    expect(adapted.diagnostics).toEqual([]);
+    expect(adapted.document.nodes[0]).toMatchObject({
+      kind: "model",
+      constraints: {
+        enabled: true,
+        aims: legacyAimOnly.constraints?.aims,
+        twoBoneIks: [],
+      },
+    });
+
+    const hostileConstraints = [
+      { enabled: true, aims: "not-an-array" },
+      { enabled: true, aims: [], twoBoneIks: "not-an-array" },
+      null,
+    ];
+    for (const [index, constraints] of hostileConstraints.entries()) {
+      const hostile = {
+        ...customModel(`hostile-${index}`, storageId),
+        constraints,
+      } as unknown as BgCustomModelInstance;
+      expect(() => adaptStudioBg3dRuntimeToDocument({
+        primitives: [],
+        customModels: [hostile],
+        attachmentByStorageModelId: attachmentMap,
+      })).not.toThrow();
+      const rejected = adaptStudioBg3dRuntimeToDocument({
+        primitives: [],
+        customModels: [hostile],
+        attachmentByStorageModelId: attachmentMap,
+      });
+      expect(rejected.counts.droppedCustomModels).toBe(1);
+      expect(diagnosticCodes(rejected.diagnostics)).toContain("invalid-custom-model");
+    }
   });
 
   it("preserves settings, maps runtime order deterministically, and never persists storage ids", () => {

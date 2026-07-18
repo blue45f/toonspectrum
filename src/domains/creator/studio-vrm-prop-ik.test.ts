@@ -190,6 +190,30 @@ describe("applyVrmTwoBoneGrip", () => {
     expectFiniteQuaternion(fixture.lowerArm.quaternion);
   });
 
+  it("모델 로컬 elbowHint를 이동·회전된 VRM의 world pole로 변환한다", () => {
+    const fixture = createArmFixture();
+    fixture.scene.position.set(8, -3, 5);
+    fixture.scene.rotation.set(0.35, -0.7, 0.45);
+    fixture.scene.updateMatrixWorld(true);
+
+    const target = new THREE.Vector3(1, 1, 0).applyMatrix4(fixture.scene.matrixWorld);
+    const elbowHint = [0, 0, 1] as const;
+    const poleWorld = new THREE.Vector3(...elbowHint).applyMatrix4(fixture.scene.matrixWorld);
+    const expected = solveTwoBoneTarget(
+      fixture.upperArm.getWorldPosition(new THREE.Vector3()),
+      fixture.lowerArm.getWorldPosition(new THREE.Vector3()),
+      fixture.hand.getWorldPosition(new THREE.Vector3()),
+      target,
+      poleWorld
+    )!;
+
+    expect(applyVrmTwoBoneGrip(fixture.vrm, "left", target, 1, elbowHint)).toBe(true);
+    fixture.scene.updateMatrixWorld(true);
+
+    expectVectorClose(fixture.lowerArm.getWorldPosition(new THREE.Vector3()), expected.elbow, 5);
+    expectVectorClose(fixture.hand.getWorldPosition(new THREE.Vector3()), target, 5);
+  });
+
   it("targetQuaternion 옵션으로 손의 world 방향까지 정렬한다", () => {
     const fixture = createArmFixture();
     const targetQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.2, -0.4, 0.7));

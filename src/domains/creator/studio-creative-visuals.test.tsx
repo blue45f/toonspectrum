@@ -114,6 +114,7 @@ describe("studio creative visuals", () => {
       "template",
       "collab-focus",
       "character",
+      "background-3d",
       "bubble",
       "example",
     ] as const;

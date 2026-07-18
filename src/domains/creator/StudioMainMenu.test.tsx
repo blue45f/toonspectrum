@@ -1,7 +1,12 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { StudioMainMenu, type StudioMainMenuGroup } from "./StudioMainMenu";
+import {
+  resolveStudioMainMenuItemIndex,
+  StudioMainMenu,
+  type StudioMainMenuGroup,
+} from "./StudioMainMenu";
+import mainMenuSource from "./StudioMainMenu.tsx?raw";
 
 /** Mirrors production IA labels from StudioPage `studioMainMenuGroups` (structure only). */
 const PRODUCTION_MENU_CATALOG: StudioMainMenuGroup[] = [
@@ -54,18 +59,43 @@ const PRODUCTION_MENU_CATALOG: StudioMainMenuGroup[] = [
     id: "view",
     label: "보기",
     items: [
+      { id: "zoom-in", label: "확대", shortcut: "=", onSelect: vi.fn() },
+      { id: "zoom-out", label: "축소", shortcut: "-", onSelect: vi.fn() },
+      { id: "flip-horizontal", label: "수평 반전", shortcut: "H", checked: false, onSelect: vi.fn() },
+      { id: "fit", label: "화면에 맞게 조정", shortcut: "Home", onSelect: vi.fn() },
+      { id: "actual-pixels", label: "실제 픽셀 (100%)", shortcut: "End", onSelect: vi.fn(), separatorAfter: true },
+      { id: "fullscreen", label: "전체화면", shortcut: "F11", checked: false, onSelect: vi.fn() },
+      { id: "grayscale", label: "흑백으로 표시", shortcut: "Q", checked: false, onSelect: vi.fn() },
+      { id: "reference-window", label: "참고 이미지 창 열기", checked: false, onSelect: vi.fn(), separatorAfter: true },
+      { id: "save-current-view", label: "현재 보기 저장", shortcut: "⇧S", onSelect: vi.fn() },
+      { id: "restore-view", label: "보기 복원", shortcut: "⇧Z", disabled: true, onSelect: vi.fn(), separatorAfter: true },
+      { id: "perspective-guide", label: "원근 도우미 보기", shortcut: "⇧G", checked: false, onSelect: vi.fn() },
+      { id: "reset-local-visibility", label: "나만 숨긴 레이어 모두 표시", disabled: true, onSelect: vi.fn() },
+      { id: "production-insights", label: "제작 인사이트…", onSelect: vi.fn(), separatorAfter: true },
       { id: "density-focus", label: "슈퍼심플 레이아웃", onSelect: vi.fn() },
       { id: "density-full", label: "전체 레이아웃", onSelect: vi.fn() },
       { id: "wide", label: "패널 접어 넓게", onSelect: vi.fn() },
-      { id: "fit", label: "너비에 맞춤", onSelect: vi.fn() },
-      { id: "zoom-in", label: "확대", shortcut: "⌘+", onSelect: vi.fn() },
-      { id: "zoom-out", label: "축소", shortcut: "⌘-", onSelect: vi.fn() },
-      { id: "zoom-reset", label: "실제 크기 (100%)", onSelect: vi.fn(), separatorAfter: true },
-      { id: "fullscreen", label: "전체화면", onSelect: vi.fn() },
       { id: "canvas-only", label: "캔버스만", shortcut: "`", onSelect: vi.fn(), separatorAfter: true },
       { id: "left-panel", label: "왼쪽 패널 보이기", onSelect: vi.fn() },
       { id: "right-panel", label: "속성 패널 보이기", onSelect: vi.fn() },
       { id: "shortcuts", label: "단축키 도움말", shortcut: "?", onSelect: vi.fn() },
+    ],
+  },
+  {
+    id: "filter",
+    label: "필터",
+    items: [
+      { id: "last-filter", label: "마지막 필터…", onSelect: vi.fn(), separatorAfter: true },
+      { id: "gaussian-blur", label: "가우시안 블러", shortcut: "⌘⇧1", onSelect: vi.fn() },
+      { id: "motion-blur", label: "모션 블러", shortcut: "⌘⇧2", onSelect: vi.fn() },
+      {
+        id: "hue-saturation-brightness",
+        label: "색조 / 채도 / 밝기",
+        shortcut: "⌘⇧3",
+        onSelect: vi.fn(),
+      },
+      { id: "brightness-contrast", label: "명도 / 대비", shortcut: "⌘⇧4", onSelect: vi.fn() },
+      { id: "color-curves", label: "색상 커브", shortcut: "⌘⇧5", onSelect: vi.fn() },
     ],
   },
   {
@@ -119,7 +149,56 @@ describe("StudioMainMenu", () => {
     expect(html).toContain("data-studio-main-menu-trigger");
   });
 
-  it("exposes the full commercial File/Edit/Insert/View/Draw/AI catalog labels", () => {
+  it("resolves the first and last enabled APG menuitems", () => {
+    const items = [
+      { disabled: true },
+      { disabled: false },
+      { disabled: true },
+      {},
+      { disabled: true },
+    ];
+
+    expect(resolveStudioMainMenuItemIndex(items, -1, "first")).toBe(1);
+    expect(resolveStudioMainMenuItemIndex(items, -1, "last")).toBe(3);
+  });
+
+  it("skips disabled menuitems and wraps ArrowUp/ArrowDown roving navigation", () => {
+    const items = [
+      {},
+      { disabled: true },
+      {},
+      { disabled: true },
+      {},
+    ];
+
+    expect(resolveStudioMainMenuItemIndex(items, 0, "next")).toBe(2);
+    expect(resolveStudioMainMenuItemIndex(items, 2, "next")).toBe(4);
+    expect(resolveStudioMainMenuItemIndex(items, 4, "next")).toBe(0);
+    expect(resolveStudioMainMenuItemIndex(items, 0, "previous")).toBe(4);
+    expect(resolveStudioMainMenuItemIndex(items, 4, "previous")).toBe(2);
+  });
+
+  it("recovers from a disabled or missing active item and handles all-disabled menus", () => {
+    const mixedItems = [{ disabled: true }, {}, { disabled: true }, {}];
+
+    expect(resolveStudioMainMenuItemIndex(mixedItems, 0, "next")).toBe(1);
+    expect(resolveStudioMainMenuItemIndex(mixedItems, 0, "previous")).toBe(3);
+    expect(resolveStudioMainMenuItemIndex(mixedItems, 99, "next")).toBe(1);
+    expect(resolveStudioMainMenuItemIndex(mixedItems, 99, "previous")).toBe(3);
+    expect(resolveStudioMainMenuItemIndex(
+      [{ disabled: true }, { disabled: true }],
+      -1,
+      "first",
+    )).toBe(-1);
+  });
+
+  it("does not steal focus back from a control clicked outside an open menu", () => {
+    expect(mainMenuSource).toContain("closeMenuRef.current(false);");
+    expect(mainMenuSource).toContain("if (restoreFocus) buttonRef.current?.focus");
+    expect(mainMenuSource).not.toContain("restoreFocusTimerRef");
+  });
+
+  it("exposes the full commercial File/Edit/Insert/View/Filter/Draw/AI catalog labels", () => {
     const html = renderToStaticMarkup(<StudioMainMenu groups={PRODUCTION_MENU_CATALOG} />);
     expect(html).toContain('aria-label="메인 메뉴"');
     for (const group of PRODUCTION_MENU_CATALOG) {
@@ -131,6 +210,7 @@ describe("StudioMainMenu", () => {
       "edit",
       "insert",
       "view",
+      "filter",
       "draw",
       "ai",
     ]);
@@ -152,12 +232,46 @@ describe("StudioMainMenu", () => {
       "슈퍼심플 레이아웃",
       "확대",
       "축소",
-      "실제 크기 (100%)",
+      "수평 반전",
+      "화면에 맞게 조정",
+      "실제 픽셀 (100%)",
+      "흑백으로 표시",
+      "참고 이미지 창 열기",
+      "현재 보기 저장",
+      "보기 복원",
+      "원근 도우미 보기",
+      "나만 숨긴 레이어 모두 표시",
+      "제작 인사이트…",
       "단축키 도움말",
+      "마지막 필터…",
+      "가우시안 블러",
+      "모션 블러",
+      "색조 / 채도 / 밝기",
+      "명도 / 대비",
+      "색상 커브",
       "스마트 도형",
       "AI 어시스트",
     ]) {
       expect(itemLabels).toContain(required);
     }
+  });
+
+  it("keeps the Magma-style View command order and shortcuts explicit", () => {
+    const view = PRODUCTION_MENU_CATALOG.find((group) => group.id === "view");
+    expect(view?.items.slice(0, 13).map((item) => [item.id, item.shortcut ?? null])).toEqual([
+      ["zoom-in", "="],
+      ["zoom-out", "-"],
+      ["flip-horizontal", "H"],
+      ["fit", "Home"],
+      ["actual-pixels", "End"],
+      ["fullscreen", "F11"],
+      ["grayscale", "Q"],
+      ["reference-window", null],
+      ["save-current-view", "⇧S"],
+      ["restore-view", "⇧Z"],
+      ["perspective-guide", "⇧G"],
+      ["reset-local-visibility", null],
+      ["production-insights", null],
+    ]);
   });
 });

@@ -97,6 +97,7 @@ import {
   createBgCustomModelInstance,
   duplicateBgCustomModelInstance,
   loadVerifiedStudioBg3dGlbWithThree,
+  isStudioBg3dThreeTwoBoneIkChainSupported,
   measureBg3dObjectSize,
   parseBg3dSceneWithModelsFromDataUrl,
   sampleStudioBg3dAnimationActionAtTime,
@@ -155,6 +156,7 @@ import {
   canSetStudioBg3dParent,
   resolveStudioBg3dHierarchy,
 } from "./studio-bg3d-hierarchy";
+import { projectStudioBg3dLodDiameterCssPx } from "./studio-bg3d-lod-selection";
 import { resolveStudioBg3dLtCaptureSize } from "./studio-bg3d-lt-capture-size";
 import {
   EMPTY_STUDIO_BG3D_LT_USER_PRESET_PAYLOAD,
@@ -208,9 +210,35 @@ import {
   type StudioBg3dSnapSettings,
 } from "./studio-bg3d-object-ops";
 import {
+  applyStudioBg3dPhysicsTransforms,
+  createStudioBg3dPhysicsWorld,
+  STUDIO_BG3D_PHYSICS_MAX_DYNAMIC_BODIES,
+  type StudioBg3dPhysicsTransformSample,
+  type StudioBg3dPhysicsWorld,
+} from "./studio-bg3d-physics";
+import {
+  createStudioBg3dPhysicsThreeJob,
+  measureStudioBg3dPhysicsModelLocalBounds,
+  projectStudioBg3dPhysicsSamples,
+} from "./studio-bg3d-physics-three";
+import {
+  sampleStudioBg3dPhysicsTimeline,
+  type StudioBg3dPhysicsTimelineResult,
+} from "./studio-bg3d-physics-timeline";
+import {
+  isStudioBg3dPhysicsTransientPhase,
+  STUDIO_BG3D_PHYSICS_GRAVITY,
+  type StudioBg3dPhysicsGravityPreset,
+  type StudioBg3dPhysicsPhase,
+} from "./studio-bg3d-physics-ui";
+import {
   StudioBg3dPrimitiveGeometryPool,
   synchronizeStudioBg3dRootMatrix,
 } from "./studio-bg3d-render-optimization";
+import {
+  createStudioBg3dRigPoseBakeCommitPatch,
+  type StudioBg3dRigPoseBakeSnapshot,
+} from "./studio-bg3d-rig-pose-bake";
 import {
   DEFAULT_STUDIO_BG3D_ANIMATION_PLAYBACK,
   DEFAULT_STUDIO_BG3D_CONSTRAINT_LAYER,
@@ -218,6 +246,7 @@ import {
   DEFAULT_STUDIO_BG3D_POSE_LAYER,
   DEFAULT_STUDIO_BG3D_MORPH_LAYER,
   DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+  STUDIO_BG3D_MAX_TWO_BONE_IK_CONSTRAINTS,
   migrateStudioBg3dSceneDocument,
   parseStudioBg3dSceneDocument,
   serializeStudioBg3dSceneDocument,
@@ -245,6 +274,7 @@ import {
 } from "./studio-bg3d-scene-runtime";
 import {
   calculateStudioBg3dThreeReparentTransform,
+  calculateStudioBg3dThreeWorldMatrix,
   calculateStudioBg3dThreeWorldDeltaTransform,
 } from "./studio-bg3d-three-hierarchy";
 import {
@@ -255,10 +285,16 @@ import {
   createStudioBg3dThreeWebglCaptureAdapter,
   registerStudioBg3dCaptureExcludedObject,
 } from "./studio-bg3d-three-webgl-capture";
+import { createTwoBoneDefaultPoleTarget } from "./studio-rig-two-bone-ik";
+import {
+  StudioBg3dPhysicsPanel,
+  StudioBg3dPhysicsTransport,
+} from "./StudioBg3dPhysicsControls";
 import { StudioBg3dSceneFog } from "./StudioBg3dSceneFog";
 import { StudioBg3dScenePanorama } from "./StudioBg3dScenePanorama";
 import { StudioBg3dSceneTemplatePanel } from "./StudioBg3dSceneTemplatePanel";
 import { StudioToolHintTarget } from "./StudioToolHint";
+import { useStudioModalSheet } from "./useStudioModalSheet";
 
 import type { StudioToolHintSpec } from "./studio-tool-hints";
 
@@ -290,6 +326,7 @@ export interface StudioBackground3DProps {
 
 type TransformModeId = "translate" | "rotate" | "scale";
 type BgPanelTab = "shapes" | "templates" | "layers" | "view" | "lt" | "models";
+type ViewEditorSection = "camera" | "physics";
 type LtEditorSection = "line" | "tone";
 type LtUserPresetLibraryStatus = "idle" | "ready" | "recovered" | "unavailable";
 type LtUserPresetNoticeTone = "info" | "success" | "error";
@@ -303,6 +340,61 @@ interface StudioBg3dHistorySnapshot {
   readonly primitives: BgPrimitive[];
   readonly customModels: BgCustomModelInstance[];
   readonly document: StudioBg3dSceneDocument;
+}
+
+interface StudioBg3dPhysicsSession {
+  readonly document: StudioBg3dSceneDocument;
+  readonly world: StudioBg3dPhysicsWorld;
+  readonly timeline: StudioBg3dPhysicsTimelineResult;
+  readonly initialDynamicSamples: readonly StudioBg3dPhysicsTransformSample[];
+}
+
+function describeStudioBg3dPhysicsStatus(
+  phase: StudioBg3dPhysicsPhase,
+  errorMessage: string | null,
+): string {
+  switch (phase) {
+    case "idle":
+      return "물리 미리보기를 시작할 준비가 되었습니다.";
+    case "loading":
+      return "물리 미리보기 계산을 시작했습니다.";
+    case "running":
+      return "물리 미리보기 재생을 시작했습니다.";
+    case "paused":
+      return "물리 미리보기를 일시정지했습니다.";
+    case "complete":
+      return "물리 미리보기 재생이 완료되었습니다. 다시 재생하거나 현재 자세를 적용할 수 있습니다.";
+    case "baking":
+      return "현재 물리 자세를 장면에 적용하고 있습니다.";
+    case "error":
+      return errorMessage ?? "물리 미리보기를 계속할 수 없습니다.";
+  }
+}
+
+function resolveStudioBg3dReturnFocus(dialog: HTMLElement | null): HTMLElement | null {
+  if (!dialog) return null;
+  const ownerDocument = dialog.ownerDocument;
+  const activeElement = ownerDocument.activeElement;
+  if (
+    activeElement && activeElement !== ownerDocument.body &&
+    !dialog.contains(activeElement) &&
+    typeof (activeElement as HTMLElement).focus === "function"
+  ) {
+    // Returning null lets the shared modal owner capture the exact still-mounted launcher.
+    return null;
+  }
+
+  const candidates = [...ownerDocument.querySelectorAll<HTMLButtonElement>("button:not([disabled])")]
+    .filter((button) => !dialog.contains(button) && button.getClientRects().length > 0);
+  const normalizedText = (button: HTMLButtonElement) =>
+    button.textContent?.replace(/\s+/gu, " ").trim() ?? "";
+  return candidates.find((button) =>
+    button.dataset.studioBg3dLauncher === "true" ||
+    button.title === "3D 배경 재편집" ||
+    normalizedText(button) === "3D 배경"
+  ) ?? candidates.find((button) =>
+    button.getAttribute("aria-haspopup") === "menu" && normalizedText(button).startsWith("배경")
+  ) ?? null;
 }
 
 function createStudioBg3dHistorySnapshot(input: {
@@ -1332,6 +1424,7 @@ interface BgCustomModelMeshProps {
   onSelect: (id: string, isMulti: boolean) => void;
   registerRef: (id: string, obj: THREE.Group | null) => void;
   registerAnimationTime: (id: string, reader: (() => number) | null) => void;
+  registerRigBake: (id: string, reader: StudioBg3dRigBakeReader | null) => void;
   onAnimationComplete: (id: string, timeSeconds: number) => void;
   onCloneStatus: (
     ids: readonly string[],
@@ -1340,11 +1433,25 @@ interface BgCustomModelMeshProps {
   children?: React.ReactNode;
 }
 
-function BgCustomModelMesh({ instance, cachedRoot, animations, selected, capturing, targetFps, lodBias, onSelect, registerRef, registerAnimationTime, onAnimationComplete, onCloneStatus, children }: BgCustomModelMeshProps) {
+type StudioBg3dRigBakeReader = () => StudioBg3dRigPoseBakeSnapshot | null;
+
+function studioBg3dMatricesDiffer(
+  left: THREE.Matrix4 | null,
+  right: THREE.Matrix4,
+  epsilon = 1e-10,
+): boolean {
+  if (!left) return true;
+  return left.elements.some((value, index) =>
+    Math.abs(value - (right.elements[index] ?? Number.NaN)) > epsilon
+  );
+}
+
+function BgCustomModelMesh({ instance, cachedRoot, animations, selected, capturing, targetFps, lodBias, onSelect, registerRef, registerAnimationTime, registerRigBake, onAnimationComplete, onCloneStatus, children }: BgCustomModelMeshProps) {
   // Geometry/textures stay cache-owned, while each render instance owns cloned materials so its
   // adjustments cannot leak into sibling placements or the verified source cache.
   const [editableClone, setEditableClone] = useState<StudioBg3dEditableThreeClone | null>(null);
   const groupRef = useRef<THREE.Group>(null);
+  const lastConstraintWorldMatrixRef = useRef<THREE.Matrix4 | null>(null);
   useLayoutEffect(() => {
     if (groupRef.current) synchronizeStudioBg3dRootMatrix(groupRef.current, selected);
   }, [instance.position, instance.rotation, instance.scale, selected]);
@@ -1352,6 +1459,8 @@ function BgCustomModelMesh({ instance, cachedRoot, animations, selected, capturi
   const worldBoundsRef = useRef(new THREE.Sphere(new THREE.Vector3(), 1));
   const projectionMatrixRef = useRef(new THREE.Matrix4());
   const frustumRef = useRef(new THREE.Frustum());
+  const cameraSpaceCenterRef = useRef(new THREE.Vector3());
+  const previousProjectedLodReasonRef = useRef<"near" | "far" | "very-far" | null>(null);
   const animationRunRef = useRef<{
     readonly mixer: THREE.AnimationMixer;
     readonly action: THREE.AnimationAction;
@@ -1366,6 +1475,8 @@ function BgCustomModelMesh({ instance, cachedRoot, animations, selected, capturi
   poseRef.current = instance.pose;
   const morphRef = useRef(instance.morph);
   morphRef.current = instance.morph;
+  const animationRef = useRef(instance.animation);
+  animationRef.current = instance.animation;
   const constraintsRef = useRef(instance.constraints);
   constraintsRef.current = instance.constraints;
   const onCloneStatusRef = useRef(onCloneStatus);
@@ -1388,7 +1499,6 @@ function BgCustomModelMesh({ instance, cachedRoot, animations, selected, capturi
           return;
         }
         setEditableClone(next);
-        onCloneStatusRef.current([instance.id], "ready");
       })
       .catch(() => {
         if (!active) return;
@@ -1401,6 +1511,10 @@ function BgCustomModelMesh({ instance, cachedRoot, animations, selected, capturi
   }, [cachedRoot, instance.id]);
 
   useEffect(() => () => editableClone?.dispose(), [editableClone]);
+  useEffect(() => {
+    lastConstraintWorldMatrixRef.current = null;
+    previousProjectedLodReasonRef.current = null;
+  }, [editableClone]);
   useEffect(() => {
     editableClone?.applyMaterialOverride(instance.materialOverride);
   }, [editableClone, instance.materialOverride]);
@@ -1431,7 +1545,7 @@ function BgCustomModelMesh({ instance, cachedRoot, animations, selected, capturi
       loop: playback.loop,
     }));
     editableClone.poseController.applyToCurrentPose(poseRef.current);
-    editableClone.poseController.applyAimConstraints(constraintsRef.current);
+    editableClone.poseController.applyConstraints(constraintsRef.current);
     editableClone.morphController.applyToCurrentWeights(morphRef.current);
     const run = {
       mixer,
@@ -1452,6 +1566,25 @@ function BgCustomModelMesh({ instance, cachedRoot, animations, selected, capturi
       if (animationRunRef.current?.mixer === mixer) animationRunRef.current = null;
     };
   }, [animations, editableClone, instance.animation, instance.id, registerAnimationTime]);
+  useEffect(() => {
+    if (!editableClone) {
+      registerRigBake(instance.id, null);
+      return;
+    }
+    const reader: StudioBg3dRigBakeReader = () => {
+      const pose = editableClone.poseController.captureConstraintBakePose();
+      if (!pose) return null;
+      const sampledTimeSeconds = animationRunRef.current?.sampledTimeSeconds ??
+        animationRef.current?.timeSeconds ?? 0;
+      if (!Number.isFinite(sampledTimeSeconds) || sampledTimeSeconds < 0) return null;
+      return { pose, sampledTimeSeconds };
+    };
+    registerRigBake(instance.id, reader);
+    // Clone readiness means every command exposed by the inspector, including rig bake, already
+    // has its live reader registered. This avoids an enabled-button/passive-effect race.
+    onCloneStatusRef.current([instance.id], "ready");
+    return () => registerRigBake(instance.id, null);
+  }, [editableClone, instance.id, registerRigBake]);
   useEffect(() => {
     const group = groupRef.current;
     if (!editableClone || !group) return;
@@ -1481,17 +1614,52 @@ function BgCustomModelMesh({ instance, cachedRoot, animations, selected, capturi
         run.sampledTimeSeconds,
       );
       editableClone.poseController.applyToCurrentPose(instance.pose);
-      editableClone.poseController.applyAimConstraints(instance.constraints);
+      editableClone.poseController.applyConstraints(instance.constraints);
       editableClone.morphController.applyToCurrentWeights(instance.morph);
     } else {
       editableClone.poseController.applyFromRestPose(instance.pose);
-      editableClone.poseController.applyAimConstraints(instance.constraints);
+      editableClone.poseController.applyConstraints(instance.constraints);
       editableClone.morphController.applyFromRestWeights(instance.morph);
     }
+    const group = groupRef.current;
+    if (group) {
+      group.updateWorldMatrix(true, false);
+      lastConstraintWorldMatrixRef.current = group.matrixWorld.clone();
+    }
   }, [editableClone, instance.animation, instance.constraints, instance.morph, instance.pose]);
-  useFrame(({ clock, camera }) => {
+  useFrame(({ clock, camera, size }) => {
     const run = animationRunRef.current;
-    if (!run?.playback.playing) return;
+    if (!editableClone) return;
+    const group = groupRef.current;
+    if (!group) return;
+    group.updateWorldMatrix(true, false);
+    const rootTransformChanged = studioBg3dMatricesDiffer(
+      lastConstraintWorldMatrixRef.current,
+      group.matrixWorld,
+    );
+    if (!run?.playback.playing) {
+      if (rootTransformChanged && constraintsRef.current?.enabled) {
+        if (run) {
+          editableClone.poseController.removeAppliedPoseOffsets();
+          editableClone.morphController.removeAppliedWeightOffsets();
+          run.sampledTimeSeconds = sampleStudioBg3dAnimationActionAtTime(
+            run.mixer,
+            run.action,
+            run.sampledTimeSeconds,
+          );
+          editableClone.poseController.applyToCurrentPose(poseRef.current);
+          editableClone.poseController.applyConstraints(constraintsRef.current);
+          editableClone.morphController.applyToCurrentWeights(morphRef.current);
+        } else {
+          editableClone.poseController.applyFromRestPose(poseRef.current);
+          editableClone.poseController.applyConstraints(constraintsRef.current);
+          editableClone.morphController.applyFromRestWeights(morphRef.current);
+        }
+      }
+      lastConstraintWorldMatrixRef.current = group.matrixWorld.clone();
+      return;
+    }
+    lastConstraintWorldMatrixRef.current = group.matrixWorld.clone();
     run.startElapsedSeconds ??= clock.elapsedTime;
     const elapsed = clock.elapsedTime - run.startElapsedSeconds;
     const timing = {
@@ -1502,10 +1670,6 @@ function BgCustomModelMesh({ instance, cachedRoot, animations, selected, capturi
       loop: run.playback.loop,
     } as const;
     const timeSeconds = resolveStudioBg3dAnimationTime(timing);
-    if (!editableClone) return;
-    const group = groupRef.current;
-    if (!group) return;
-    group.updateWorldMatrix(true, false);
     let visibleInHierarchy = true;
     for (let object: THREE.Object3D | null = group; object; object = object.parent) {
       if (!object.visible) {
@@ -1517,6 +1681,16 @@ function BgCustomModelMesh({ instance, cachedRoot, animations, selected, capturi
     camera.updateWorldMatrix(true, false);
     projectionMatrixRef.current.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     frustumRef.current.setFromProjectionMatrix(projectionMatrixRef.current);
+    cameraSpaceCenterRef.current.copy(worldBoundsRef.current.center)
+      .applyMatrix4(camera.matrixWorldInverse);
+    const projectedLod = projectStudioBg3dLodDiameterCssPx({
+      worldRadius: worldBoundsRef.current.radius,
+      viewDepth: -cameraSpaceCenterRef.current.z,
+      verticalProjectionScale: camera.projectionMatrix.elements[5] ?? Number.NaN,
+      viewportCssHeight: size.height,
+      perspective: camera instanceof THREE.PerspectiveCamera,
+      nearPlane: camera.near,
+    });
     const schedule = resolveStudioBg3dAnimationSchedule({
       visibleInHierarchy,
       inCameraFrustum: frustumRef.current.intersectsSphere(worldBoundsRef.current),
@@ -1524,9 +1698,16 @@ function BgCustomModelMesh({ instance, cachedRoot, animations, selected, capturi
       selected,
       targetFps,
       lodBias,
+      projectedDiameterCssPx: projectedLod?.projectedDiameterCssPx,
+      projectedForceHighestDetail: projectedLod?.forceHighestDetail,
+      previousProjectedLodReason: previousProjectedLodReasonRef.current,
       distanceToCamera: camera.position.distanceTo(worldBoundsRef.current.center),
       boundingRadius: worldBoundsRef.current.radius,
     });
+    if (
+      schedule.reason === "near" || schedule.reason === "far" ||
+      schedule.reason === "very-far"
+    ) previousProjectedLodReasonRef.current = schedule.reason;
     if (
       schedule.suspended ||
       clock.elapsedTime - run.lastSampleElapsedSeconds < schedule.minimumIntervalSeconds
@@ -1542,7 +1723,7 @@ function BgCustomModelMesh({ instance, cachedRoot, animations, selected, capturi
       timeSeconds,
     );
     editableClone.poseController.applyToCurrentPose(poseRef.current);
-    editableClone.poseController.applyAimConstraints(constraintsRef.current);
+    editableClone.poseController.applyConstraints(constraintsRef.current);
     editableClone.morphController.applyToCurrentWeights(morphRef.current);
     if (!run.completed && isStudioBg3dAnimationOnceComplete(timing)) {
       run.completed = true;
@@ -1644,6 +1825,8 @@ function Vec3Field({
   step,
   precision,
   suffix,
+  disabled = false,
+  touchFriendly = false,
   onCommit,
 }: {
   label: string;
@@ -1651,25 +1834,35 @@ function Vec3Field({
   step: number;
   precision: number;
   suffix?: string;
+  disabled?: boolean;
+  touchFriendly?: boolean;
   onCommit: (index: 0 | 1 | 2, value: number) => void;
 }) {
   const axisLabels = ["X", "Y", "Z"] as const;
   return (
-    <div>
+    <div role="group" aria-label={label}>
       <p className="mb-1 text-[0.68rem] font-semibold text-fg-3">{label}</p>
       <div className="grid grid-cols-3 gap-1.5">
         {axisLabels.map((axisLabel, i) => (
-          <label key={axisLabel} className="flex items-center gap-1 rounded-lg border border-line bg-card px-1.5 py-1 text-[0.7rem]">
+          <label
+            key={axisLabel}
+            className={cx(
+              "flex items-center gap-1 rounded-lg border border-line bg-card px-1.5 py-1 text-[0.7rem]",
+              touchFriendly && "min-h-11 sm:min-h-8 pointer-coarse:min-h-11",
+            )}
+          >
             <span className="text-fg-3">{axisLabel}</span>
             <input
+              aria-label={`${label} ${axisLabel}`}
               type="number"
+              disabled={disabled}
               step={step}
               value={round(values[i as 0 | 1 | 2], precision)}
               onChange={(e) => {
                 const n = Number(e.target.value);
                 if (Number.isFinite(n)) onCommit(i as 0 | 1 | 2, n);
               }}
-              className="w-full min-w-0 bg-transparent text-right text-fg outline-none"
+              className="w-full min-w-0 bg-transparent text-right text-fg outline-none disabled:cursor-not-allowed disabled:opacity-50"
             />
             {suffix ? <span className="text-fg-3">{suffix}</span> : null}
           </label>
@@ -1695,6 +1888,16 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   const [isCapturing, setIsCapturing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activePanelTab, setActivePanelTab] = useState<BgPanelTab>("shapes");
+  const [viewEditorSection, setViewEditorSection] = useState<ViewEditorSection>("camera");
+  const [physicsPhase, setPhysicsPhase] = useState<StudioBg3dPhysicsPhase>("idle");
+  const [physicsDurationSeconds, setPhysicsDurationSeconds] = useState<2 | 4 | 8>(4);
+  const [physicsGravityPreset, setPhysicsGravityPreset] =
+    useState<StudioBg3dPhysicsGravityPreset>("earth");
+  const [physicsGroundEnabled, setPhysicsGroundEnabled] = useState(true);
+  const [physicsProgress, setPhysicsProgress] = useState(0);
+  const [physicsCurrentSeconds, setPhysicsCurrentSeconds] = useState(0);
+  const [physicsError, setPhysicsError] = useState<string | null>(null);
+  const [physicsPreviewRevision, setPhysicsPreviewRevision] = useState(0);
   const [ltEditorSection, setLtEditorSection] = useState<LtEditorSection>("line");
   const [ltUserPresetPayload, setLtUserPresetPayload] = useState<StudioBg3dLtPresetPayload>(
     EMPTY_STUDIO_BG3D_LT_USER_PRESET_PAYLOAD
@@ -1732,7 +1935,12 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   const [modelImportProgress, setModelImportProgress] = useState<StudioBg3dImportProgress | null>(null);
   const modelImportAbortRef = useRef<AbortController | null>(null);
   const modelAnimationTimeReadersRef = useRef(new Map<string, () => number>());
+  const modelRigBakeReadersRef = useRef(new Map<string, StudioBg3dRigBakeReader>());
   const [poseJointSelection, setPoseJointSelection] = useState("");
+  const [ikEndJointSelection, setIkEndJointSelection] = useState<{
+    readonly modelId: string;
+    readonly jointKey: string;
+  } | null>(null);
   const [morphTargetSelection, setMorphTargetSelection] = useState("");
   const [deletingModelId, setDeletingModelId] = useState<string | null>(null);
   const [isRestoringScene, setIsRestoringScene] = useState(false);
@@ -1748,6 +1956,21 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     }
   }, [open, primitiveGeometryPool]);
   useEffect(() => {
+    if (!open) return;
+    return () => {
+      physicsGenerationRef.current += 1;
+      physicsAbortRef.current?.abort();
+      physicsAbortRef.current = null;
+      if (physicsAnimationFrameRef.current !== null) {
+        cancelAnimationFrame(physicsAnimationFrameRef.current);
+        physicsAnimationFrameRef.current = null;
+      }
+      physicsSessionRef.current = null;
+      latestPhysicsSamplesRef.current = [];
+      physicsPhaseRef.current = "idle";
+    };
+  }, [open]);
+  useEffect(() => {
     primitiveGeometryPool.retain();
     return () => primitiveGeometryPool.releaseSoon();
   }, [primitiveGeometryPool]);
@@ -1755,7 +1978,10 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   const generateId = () => "template-" + Math.random().toString(36).substring(2, 15);
 
   const handleSaveSceneAsTemplate = async () => {
-    if (primitives.length === 0 && customModels.length === 0) return;
+    if (
+      primitives.length === 0 && customModels.length === 0 ||
+      isStudioBg3dPhysicsTransientPhase(physicsPhaseRef.current)
+    ) return;
     setIsSavingTemplate(true);
     try {
       const templateName = `내 소재 ${new Date().toLocaleDateString()}`;
@@ -1803,6 +2029,8 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     sceneBaseDocument.background.mode === "transparent";
 
   const captureRef = useRef<CaptureState>({ adapter: null });
+  const modalDialogRef = useRef<HTMLDivElement | null>(null);
+  const modalRootRef = useRef<HTMLElement | null>(null);
   const viewportApiRef = useRef<BgViewportApi | null>(null);
   const pendingInitialCameraRef = useRef<StudioBg3dCameraSettings | null>(null);
   const viewportHostRef = useRef<HTMLDivElement>(null);
@@ -1823,6 +2051,19 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   const componentActiveRef = useRef(false);
   const captureInFlightRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const physicsPhaseRef = useRef<StudioBg3dPhysicsPhase>("idle");
+  const physicsAbortRef = useRef<AbortController | null>(null);
+  const physicsAnimationFrameRef = useRef<number | null>(null);
+  const physicsGenerationRef = useRef(0);
+  const physicsPlaybackStartedAtRef = useRef(0);
+  const physicsPlaybackOffsetRef = useRef(0);
+  const physicsLastUiUpdateRef = useRef(0);
+  const physicsLastFrameTimestampRef = useRef(0);
+  const latestPhysicsSamplesRef = useRef<readonly StudioBg3dPhysicsTransformSample[]>([]);
+  const physicsSessionRef = useRef<StudioBg3dPhysicsSession | null>(null);
+  const physicsStartButtonRef = useRef<HTMLButtonElement | null>(null);
+  const physicsTransportActionRef = useRef<HTMLButtonElement | null>(null);
+  const shouldTransferPhysicsFocusRef = useRef(false);
 
   const historyRef = useRef<StudioBg3dHistorySnapshot[]>([]);
   const historyIndexRef = useRef(-1);
@@ -1836,7 +2077,41 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   const hasPendingClone = customModels.some(
     (model) => !readyCloneIds.has(model.id) && !failedCloneIds.has(model.id)
   );
-  const insertBlocked = Boolean(sceneRecoveryError) || hasCloneFailure || hasPendingClone || isRestoringScene;
+  const physicsInteractionLocked = isStudioBg3dPhysicsTransientPhase(physicsPhase);
+  const insertBlocked = Boolean(sceneRecoveryError) || hasCloneFailure || hasPendingClone ||
+    isRestoringScene || physicsInteractionLocked;
+
+  // This editor is portalled to document.body, so body is the nearest shared root that contains
+  // both the dialog and the Studio launcher. Setting it in an earlier layout effect satisfies the
+  // shared modal hook's rootRef contract before that hook activates focus isolation.
+  useLayoutEffect(() => {
+    modalRootRef.current = modalDialogRef.current?.ownerDocument.body ?? null;
+  }, [open]);
+  useStudioModalSheet({
+    activeKey: open ? "studio-bg3d" : null,
+    dialogRef: modalDialogRef,
+    onDismiss: requestUserClose,
+    resolveInitialFocus: (dialog) =>
+      dialog.querySelector<HTMLElement>("[data-bg3d-initial-focus='true']"),
+    resolveReturnFocus: () => resolveStudioBg3dReturnFocus(modalDialogRef.current),
+    rootRef: modalRootRef,
+  });
+  useLayoutEffect(() => {
+    if (!shouldTransferPhysicsFocusRef.current) return;
+    if (!physicsInteractionLocked) {
+      shouldTransferPhysicsFocusRef.current = false;
+      return;
+    }
+    const currentAction = physicsTransportActionRef.current;
+    if (!currentAction || currentAction.disabled) return;
+    shouldTransferPhysicsFocusRef.current = false;
+    currentAction.focus({ preventScroll: true });
+  }, [physicsInteractionLocked, physicsPhase]);
+
+  const transitionPhysicsPhase = (next: StudioBg3dPhysicsPhase) => {
+    physicsPhaseRef.current = next;
+    setPhysicsPhase(next);
+  };
 
   // 검증 로더가 성공 시점에 만든 자원 snapshot만 캐시가 소유한다. 언마운트/닫힘 때 loader.dispose를
   // 호출하므로 공유 geometry/material/texture/ImageBitmap을 빠뜨리거나 두 번 해제하지 않는다.
@@ -1958,6 +2233,20 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     setSceneRecoveryError(null);
     setError(null);
     setSelectedIds(new Set());
+    physicsGenerationRef.current += 1;
+    physicsAbortRef.current?.abort();
+    physicsAbortRef.current = null;
+    if (physicsAnimationFrameRef.current !== null) {
+      cancelAnimationFrame(physicsAnimationFrameRef.current);
+      physicsAnimationFrameRef.current = null;
+    }
+    physicsSessionRef.current = null;
+    latestPhysicsSamplesRef.current = [];
+    physicsPhaseRef.current = "idle";
+    setPhysicsPhase("idle");
+    setPhysicsProgress(0);
+    setPhysicsCurrentSeconds(0);
+    setPhysicsError(null);
     setFailedCloneIds(new Set());
     setReadyCloneIds(new Set());
     historyRef.current = [];
@@ -2129,7 +2418,39 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     return () => clearTimeout(timer);
   }, [customModels, isRestoringScene, primitives, sceneBaseDocument]);
 
+  function commitImmediateHistoryTransition(
+    nextPrimitives: readonly BgPrimitive[],
+    nextCustomModels: readonly BgCustomModelInstance[],
+    nextDocument: StudioBg3dSceneDocument,
+  ): void {
+    const before = createStudioBg3dHistorySnapshot({
+      primitives,
+      customModels,
+      document: sceneBaseDocument,
+    });
+    const after = createStudioBg3dHistorySnapshot({
+      primitives: nextPrimitives,
+      customModels: nextCustomModels,
+      document: nextDocument,
+    });
+    const base = historyRef.current.slice(0, historyIndexRef.current + 1);
+    const appendIfChanged = (snapshot: StudioBg3dHistorySnapshot) => {
+      const last = base[base.length - 1];
+      if (!last || JSON.stringify(last) !== JSON.stringify(snapshot)) base.push(snapshot);
+    };
+    // Preserve edits made inside the 400ms debounce window, then append the command result. Undo is
+    // immediately available and returns to the exact pre-command constraint/physics state.
+    appendIfChanged(before);
+    appendIfChanged(after);
+    while (base.length > 60) base.shift();
+    historyRef.current = base;
+    historyIndexRef.current = base.length - 1;
+    setCanUndo(historyIndexRef.current > 0);
+    setCanRedo(false);
+  }
+
   const doUndo = () => {
+    if (isStudioBg3dPhysicsTransientPhase(physicsPhaseRef.current)) return;
     if (historyIndexRef.current <= 0) return;
     historyIndexRef.current -= 1;
     const snap = historyRef.current[historyIndexRef.current];
@@ -2140,6 +2461,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     setCanRedo(historyIndexRef.current < historyRef.current.length - 1);
   };
   const doRedo = () => {
+    if (isStudioBg3dPhysicsTransientPhase(physicsPhaseRef.current)) return;
     if (historyIndexRef.current >= historyRef.current.length - 1) return;
     historyIndexRef.current += 1;
     const snap = historyRef.current[historyIndexRef.current];
@@ -2453,13 +2775,26 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     setCustomModels((previous) => previous.map((model) => {
       if (model.id !== id) return model;
       if (update === null) return { ...model, constraints: undefined };
-      const current = model.constraints ?? DEFAULT_STUDIO_BG3D_CONSTRAINT_LAYER;
+      const current: StudioBg3dConstraintLayer = model.constraints
+        ? {
+            ...model.constraints,
+            aims: Array.isArray(model.constraints.aims) ? model.constraints.aims : [],
+            twoBoneIks: Array.isArray(model.constraints.twoBoneIks)
+              ? model.constraints.twoBoneIks
+              : [],
+          }
+        : DEFAULT_STUDIO_BG3D_CONSTRAINT_LAYER;
       const constraints = typeof update === "function" ? update(current) : update;
       return {
         ...model,
         constraints: {
           ...constraints,
           aims: constraints.aims.map((aim) => ({ ...aim, target: [...aim.target] })),
+          twoBoneIks: constraints.twoBoneIks.map((ik) => ({
+            ...ik,
+            target: [...ik.target],
+            poleTarget: [...ik.poleTarget],
+          })),
         },
       };
     }));
@@ -2496,6 +2831,46 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     if (reader) modelAnimationTimeReadersRef.current.set(id, reader);
     else modelAnimationTimeReadersRef.current.delete(id);
   }, []);
+
+  const registerModelRigBake = useCallback((id: string, reader: StudioBg3dRigBakeReader | null) => {
+    if (reader) modelRigBakeReadersRef.current.set(id, reader);
+    else modelRigBakeReadersRef.current.delete(id);
+  }, []);
+
+  function bakeCustomModelRigConstraints(id: string): void {
+    if (
+      captureInFlightRef.current || isCapturing || isRestoringScene ||
+      isStudioBg3dPhysicsTransientPhase(physicsPhaseRef.current)
+    ) return;
+    const model = customModels.find((candidate) => candidate.id === id);
+    const hasEffectiveConstraint = Boolean(
+      model?.constraints?.enabled && (
+        model.constraints.aims.some((aim) => aim.weight > 0) ||
+        model.constraints.twoBoneIks.some((ik) => ik.weight > 0)
+      )
+    );
+    if (!model || !hasEffectiveConstraint) {
+      setError("굽기 전에 강도가 0보다 큰 IK 또는 에임 제약을 켜 주세요.");
+      return;
+    }
+    const snapshot = modelRigBakeReadersRef.current.get(id)?.() ?? null;
+    if (!snapshot) {
+      setError("현재 리그 결과를 안전하게 고정할 수 없습니다. 조인트 계층·크기 변환과 모델 준비 상태를 확인해 주세요.");
+      return;
+    }
+    const patch = createStudioBg3dRigPoseBakeCommitPatch(model.animation, snapshot);
+    if (!patch) {
+      setError("현재 표시 프레임을 정적 포즈로 정규화하지 못했습니다.");
+      return;
+    }
+    const nextCustomModels = customModels.map((candidate) => candidate.id === id
+      ? { ...candidate, ...patch }
+      : candidate
+    );
+    commitImmediateHistoryTransition(primitives, nextCustomModels, sceneBaseDocument);
+    setError(null);
+    setCustomModels(nextCustomModels);
+  }
 
   const finishModelAnimation = useCallback((id: string, timeSeconds: number) => {
     setCustomModels((current) => current.map((model) => {
@@ -3045,7 +3420,8 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   });
 
   // 키보드 단축키: T/R/S 변환 모드, ⌘/Ctrl+Z(+Shift) undo/redo, Delete/Backspace 삭제,
-  // Esc는 선택 해제 우선 후 두 번째 누름에 모달 닫기. 숫자 입력 필드가 있으므로 텍스트 입력 중엔 전부 무시한다.
+  // Escape와 Tab 포커스 루프는 useStudioModalSheet가 전담한다. 숫자 입력 필드가 있으므로
+  // 편집 중에는 캔버스 단축키만 무시한다.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -3054,13 +3430,11 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
       if (typing) return;
       if (captureInFlightRef.current) return;
 
-      if (e.key === "Escape") {
-        if (selectedIdsRef.current.size > 0) setSelectedIds(new Set());
-        else onClose();
-        return;
-      }
       if (e.key === "Delete" || e.key === "Backspace") {
-        if (selectedIdsRef.current.size > 0) {
+        if (
+          !isStudioBg3dPhysicsTransientPhase(physicsPhaseRef.current) &&
+          selectedIdsRef.current.size > 0
+        ) {
           e.preventDefault();
           deleteSelectedRef.current();
         }
@@ -3085,7 +3459,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  }, [open]);
 
   const onCaptureUpdate = (
     state: CaptureState,
@@ -3105,11 +3479,17 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     // the click that can arrive before React commits `isCapturing`. Successful insertion closes via
     // `onClose` directly after its transaction has completed.
     if (captureInFlightRef.current) return;
+    if (isStudioBg3dPhysicsTransientPhase(physicsPhaseRef.current)) {
+      resetPhysicsPreview();
+    }
     onClose();
   }
 
   async function handleSaveToLibrary() {
-    if (captureInFlightRef.current || isCapturing || insertBlocked) return;
+    if (
+      captureInFlightRef.current || isCapturing || insertBlocked ||
+      isStudioBg3dPhysicsTransientPhase(physicsPhaseRef.current)
+    ) return;
     const currentCapture = captureRef.current;
     if (!currentCapture.adapter) {
       setError("캡처할 3D 장면이 아직 준비되지 않았습니다.");
@@ -3208,6 +3588,10 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
 
   async function handleInsert() {
     if (captureInFlightRef.current || isCapturing) return;
+    if (isStudioBg3dPhysicsTransientPhase(physicsPhaseRef.current)) {
+      setError("물리 미리보기를 초기화하거나 현재 자세를 적용한 뒤 3D 배경을 추가하세요.");
+      return;
+    }
     if (insertBlocked) {
       setError("3D 장면 복원과 모델 렌더 준비를 모두 마친 뒤 추가할 수 있습니다.");
       return;
@@ -3350,9 +3734,145 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   const selectedPoseJoint = selectedCustomModel?.pose?.joints.find(
     (joint) => joint.jointKey === selectedPoseJointKey,
   );
-  const selectedAimConstraint = selectedCustomModel?.constraints?.aims.find(
+  const selectedAimConstraints: StudioBg3dConstraintLayer["aims"] =
+    Array.isArray(selectedCustomModel?.constraints?.aims)
+    ? selectedCustomModel.constraints.aims
+    : [];
+  const selectedTwoBoneIkConstraints: StudioBg3dConstraintLayer["twoBoneIks"] =
+    Array.isArray(selectedCustomModel?.constraints?.twoBoneIks)
+    ? selectedCustomModel.constraints.twoBoneIks
+    : [];
+  const selectedHasEffectiveRigConstraint = Boolean(
+    selectedCustomModel?.constraints?.enabled && (
+      selectedAimConstraints.some((constraint) => constraint.weight > 0) ||
+      selectedTwoBoneIkConstraints.some((constraint) => constraint.weight > 0)
+    )
+  );
+  const selectedRigBakeDisabledReason = !selectedCustomModel
+    ? "포즈로 구울 3D 모델을 먼저 선택해 주세요."
+    : !selectedHasEffectiveRigConstraint
+      ? "강도가 0보다 큰 IK 또는 에임 제약을 켜야 포즈로 구울 수 있습니다."
+      : failedCloneIds.has(selectedCustomModel.id)
+        ? "모델 리그를 불러오지 못해 포즈로 구울 수 없습니다. 모델 파일 상태를 확인해 주세요."
+        : !readyCloneIds.has(selectedCustomModel.id)
+          ? "모델 리그를 준비하는 중입니다. 준비가 끝나면 포즈로 구울 수 있습니다."
+          : isCapturing
+            ? "3D 장면을 캡처하는 중에는 포즈로 구울 수 없습니다. 캡처가 끝난 뒤 다시 시도해 주세요."
+            : isRestoringScene
+              ? "3D 장면을 복원하는 중에는 포즈로 구울 수 없습니다. 복원이 끝난 뒤 다시 시도해 주세요."
+              : physicsInteractionLocked
+                ? "물리 미리보기 중에는 포즈로 구울 수 없습니다. 현재 자세를 적용하거나 미리보기를 초기화해 주세요."
+                : null;
+  const selectedAimConstraint = selectedAimConstraints.find(
     (constraint) => constraint.jointKey === selectedPoseJointKey,
   );
+  const selectedJointByKey = new Map(selectedModelJoints.map((joint) => [joint.key, joint] as const));
+  const selectedIkProtectedJointKeys = new Set<string>();
+  for (const constraint of selectedTwoBoneIkConstraints) {
+    const middle = selectedJointByKey.get(constraint.middleJointKey);
+    if (middle) selectedIkProtectedJointKeys.add(middle.canonicalKey);
+    let ancestor = selectedJointByKey.get(constraint.upperJointKey);
+    while (ancestor) {
+      selectedIkProtectedJointKeys.add(ancestor.canonicalKey);
+      ancestor = ancestor.parentKey ? selectedJointByKey.get(ancestor.parentKey) : undefined;
+    }
+  }
+  const selectedAimSuppressedByIk = selectedIkProtectedJointKeys.has(
+    selectedJointByKey.get(selectedPoseJointKey)?.canonicalKey ?? selectedPoseJointKey,
+  );
+  const selectedIkEndCandidates = selectedModelJoints.filter((end) => {
+    const middle = end.parentKey ? selectedJointByKey.get(end.parentKey) : undefined;
+    const upper = middle?.parentKey ? selectedJointByKey.get(middle.parentKey) : undefined;
+    const upperLength = middle && upper
+      ? Math.hypot(
+          middle.restPosition[0] - upper.restPosition[0],
+          middle.restPosition[1] - upper.restPosition[1],
+          middle.restPosition[2] - upper.restPosition[2],
+        )
+      : 0;
+    const lowerLength = middle
+      ? Math.hypot(
+          end.restPosition[0] - middle.restPosition[0],
+          end.restPosition[1] - middle.restPosition[1],
+          end.restPosition[2] - middle.restPosition[2],
+        )
+      : 0;
+    return Boolean(
+      middle && upper &&
+      middle.skinIndex === end.skinIndex && upper.skinIndex === end.skinIndex &&
+      upperLength > 1e-6 && lowerLength > 1e-6,
+    );
+  });
+  const savedIkEndJointKey = selectedTwoBoneIkConstraints.find((constraint) =>
+    selectedIkEndCandidates.some((joint) => joint.key === constraint.endJointKey)
+  )?.endJointKey;
+  const requestedIkEndJointKey = ikEndJointSelection &&
+    ikEndJointSelection.modelId === selectedCustomModel?.id
+    ? ikEndJointSelection.jointKey
+    : "";
+  const selectedIkEndJointKey = selectedIkEndCandidates.some(
+    (joint) => joint.key === requestedIkEndJointKey,
+  )
+    ? requestedIkEndJointKey
+    : (savedIkEndJointKey ?? selectedIkEndCandidates[0]?.key ?? "");
+  const selectedIkEndJoint = selectedJointByKey.get(selectedIkEndJointKey);
+  const selectedIkMiddleJoint = selectedIkEndJoint?.parentKey
+    ? selectedJointByKey.get(selectedIkEndJoint.parentKey)
+    : undefined;
+  const selectedIkUpperJoint = selectedIkMiddleJoint?.parentKey
+    ? selectedJointByKey.get(selectedIkMiddleJoint.parentKey)
+    : undefined;
+  const selectedTwoBoneIkConstraint = selectedTwoBoneIkConstraints.find(
+    (constraint) => (
+      selectedJointByKey.get(constraint.endJointKey)?.canonicalKey ?? constraint.endJointKey
+    ) === selectedIkEndJoint?.canonicalKey,
+  );
+  const selectedIkChainKeys = new Set([
+    selectedIkUpperJoint?.canonicalKey,
+    selectedIkMiddleJoint?.canonicalKey,
+    selectedIkEndJoint?.canonicalKey,
+  ].filter((key): key is string => Boolean(key)));
+  const selectedIkHasOverlap = selectedTwoBoneIkConstraints.some(
+    (constraint) => constraint !== selectedTwoBoneIkConstraint && [
+      constraint.upperJointKey,
+      constraint.middleJointKey,
+      constraint.endJointKey,
+    ].some((key) => selectedIkChainKeys.has(
+      selectedJointByKey.get(key)?.canonicalKey ?? key,
+    )),
+  );
+  const selectedIkLimitReached = selectedTwoBoneIkConstraints.length >=
+    STUDIO_BG3D_MAX_TWO_BONE_IK_CONSTRAINTS;
+  const selectedIkWorldMatrix = selectedCustomModel
+    ? calculateStudioBg3dThreeWorldMatrix(
+        [...primitives, ...customModels],
+        selectedCustomModel.id,
+      )
+    : null;
+  const selectedIkSourceRoot = selectedCustomModel
+    ? modelRootCacheRef.current.get(selectedCustomModel.modelId)?.root
+    : undefined;
+  const selectedIkTransformSupported = !(
+    selectedIkSourceRoot && selectedIkWorldMatrix &&
+    selectedIkUpperJoint && selectedIkMiddleJoint && selectedIkEndJoint
+  ) || isStudioBg3dThreeTwoBoneIkChainSupported({
+    root: selectedIkSourceRoot,
+    instanceWorldMatrix: selectedIkWorldMatrix,
+    upperJointKey: selectedIkUpperJoint.key,
+    middleJointKey: selectedIkMiddleJoint.key,
+    endJointKey: selectedIkEndJoint.key,
+  });
+  const selectedIkDefaultTarget: [number, number, number] = selectedIkEndJoint
+    ? [...selectedIkEndJoint.restPosition]
+    : [0, 1, 0];
+  const selectedIkDefaultPole: [number, number, number] =
+    selectedIkUpperJoint && selectedIkMiddleJoint && selectedIkEndJoint
+    ? createTwoBoneDefaultPoleTarget(
+        selectedIkUpperJoint.restPosition,
+        selectedIkMiddleJoint.restPosition,
+        selectedIkEndJoint.restPosition,
+      )
+    : [0, 0, 1];
   const selectedPoseEulerDegrees = quaternionToEulerDegrees(
     selectedPoseJoint?.rotationOffset ?? [0, 0, 0, 1],
   );
@@ -3383,7 +3903,9 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   );
   const canGroundSelection = selectedEntities.some((entity) => !isBgObjectTransformBlocked(entity));
   const groundSelectionDisabledReason =
-    selectedEntities.length === 0
+    physicsInteractionLocked
+      ? "물리 미리보기 중에는 장면 변형 도구를 잠급니다."
+      : selectedEntities.length === 0
       ? "도형 또는 3D 모델을 먼저 선택하세요."
       : !canGroundSelection
         ? "선택한 객체의 잠금을 해제하세요."
@@ -3415,6 +3937,45 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     }),
   ];
   const sceneHierarchy = resolveStudioBg3dHierarchy(layerListItems);
+  let physicsSelectionUnavailableReason: string | null = null;
+  if (selectedIds.size > STUDIO_BG3D_PHYSICS_MAX_DYNAMIC_BODIES) {
+    physicsSelectionUnavailableReason =
+      `한 번에 최대 ${STUDIO_BG3D_PHYSICS_MAX_DYNAMIC_BODIES}개 오브젝트를 시뮬레이션할 수 있습니다.`;
+  } else {
+    for (const id of selectedIds) {
+      const entity = primitives.find((primitive) => primitive.id === id) ??
+        customModels.find((model) => model.id === id);
+      if (!entity || !isBgObjectVisible(entity)) {
+        physicsSelectionUnavailableReason = "숨긴 오브젝트는 물리 미리보기에 사용할 수 없습니다.";
+        break;
+      }
+      if (isBgObjectTransformBlocked(entity)) {
+        physicsSelectionUnavailableReason = "선택한 오브젝트의 잠금을 먼저 해제하세요.";
+        break;
+      }
+      if ((sceneHierarchy.parentById.get(id) ?? null) !== null) {
+        physicsSelectionUnavailableReason = "그룹 안의 자식 대신 독립된 최상위 오브젝트를 선택하세요.";
+        break;
+      }
+      if ((sceneHierarchy.childrenByParent.get(id)?.length ?? 0) > 0) {
+        physicsSelectionUnavailableReason = "자식이 있는 그룹은 아직 동적 충돌체로 바꿀 수 없습니다.";
+        break;
+      }
+      const model = customModels.find((candidate) => candidate.id === id);
+      const cacheEntry = model ? modelRootCacheRef.current.get(model.modelId) : undefined;
+      if (
+        model && (
+          model.animation !== undefined || model.pose !== undefined || model.morph !== undefined ||
+          model.constraints !== undefined || (cacheEntry?.metrics.skins ?? 0) > 0 ||
+          (cacheEntry?.metrics.morphTargets ?? 0) > 0
+        )
+      ) {
+        physicsSelectionUnavailableReason =
+          "리그·애니메이션 모델은 자세를 고정하거나 일반 소품 모델로 바꾼 뒤 사용하세요.";
+        break;
+      }
+    }
+  }
   const filteredLayerItems = filterStudioBg3dLayerItems(layerListItems, layerQuery);
   const ltLineSettings = sceneBaseDocument.output.line;
   const ltToneSettings = sceneBaseDocument.output.tone;
@@ -3437,6 +3998,308 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   });
   const hideOnTab = (tab: BgPanelTab) => activePanelTab !== tab;
 
+  const cancelPhysicsAnimationFrame = () => {
+    if (physicsAnimationFrameRef.current === null) return;
+    cancelAnimationFrame(physicsAnimationFrameRef.current);
+    physicsAnimationFrameRef.current = null;
+  };
+
+  const updatePhysicsProgress = (
+    currentSeconds: number,
+    durationSeconds: number,
+    timestamp: number,
+    force = false,
+  ) => {
+    if (!force && timestamp - physicsLastUiUpdateRef.current < 100) return;
+    physicsLastUiUpdateRef.current = timestamp;
+    setPhysicsCurrentSeconds(currentSeconds);
+    setPhysicsProgress(durationSeconds > 0 ? currentSeconds / durationSeconds : 0);
+    setPhysicsPreviewRevision((revision) => revision + 1);
+  };
+
+  const restorePhysicsInitialPose = (session = physicsSessionRef.current) => {
+    if (!session || session.initialDynamicSamples.length === 0) return;
+    projectStudioBg3dPhysicsSamples(session.initialDynamicSamples, primitiveObjectsRef.current);
+  };
+
+  const resetPhysicsPreview = (options: { readonly keepError?: boolean } = {}) => {
+    physicsGenerationRef.current += 1;
+    physicsAbortRef.current?.abort();
+    physicsAbortRef.current = null;
+    cancelPhysicsAnimationFrame();
+    restorePhysicsInitialPose();
+    physicsSessionRef.current = null;
+    latestPhysicsSamplesRef.current = [];
+    physicsPlaybackStartedAtRef.current = 0;
+    physicsPlaybackOffsetRef.current = 0;
+    physicsLastUiUpdateRef.current = 0;
+    physicsLastFrameTimestampRef.current = 0;
+    setPhysicsCurrentSeconds(0);
+    setPhysicsProgress(0);
+    setPhysicsPreviewRevision((revision) => revision + 1);
+    if (!options.keepError) setPhysicsError(null);
+    transitionPhysicsPhase(options.keepError ? "error" : "idle");
+  };
+
+  const failPhysicsPreview = (message: string) => {
+    setPhysicsError(message);
+    resetPhysicsPreview({ keepError: true });
+  };
+
+  const physicsPlaybackFrame = (timestamp: number) => {
+    physicsAnimationFrameRef.current = null;
+    if (physicsPhaseRef.current !== "running") return;
+    const session = physicsSessionRef.current;
+    if (!session) {
+      failPhysicsPreview("물리 미리보기 세션을 복원하지 못했습니다. 다시 시도해 주세요.");
+      return;
+    }
+    if (physicsPlaybackStartedAtRef.current < 0) physicsPlaybackStartedAtRef.current = timestamp;
+    physicsLastFrameTimestampRef.current = timestamp;
+    const elapsedSeconds = Math.max(0, (timestamp - physicsPlaybackStartedAtRef.current) / 1_000);
+    const currentSeconds = Math.min(
+      session.timeline.durationSeconds,
+      physicsPlaybackOffsetRef.current + elapsedSeconds,
+    );
+    const samples = sampleStudioBg3dPhysicsTimeline(session.timeline, currentSeconds);
+    if (!samples || !projectStudioBg3dPhysicsSamples(samples, primitiveObjectsRef.current)) {
+      failPhysicsPreview("물리 결과를 현재 3D 오브젝트에 안전하게 표시하지 못했습니다.");
+      return;
+    }
+    latestPhysicsSamplesRef.current = samples;
+    updatePhysicsProgress(
+      currentSeconds,
+      session.timeline.durationSeconds,
+      timestamp,
+      currentSeconds >= session.timeline.durationSeconds,
+    );
+    if (currentSeconds >= session.timeline.durationSeconds) {
+      physicsPlaybackOffsetRef.current = session.timeline.durationSeconds;
+      transitionPhysicsPhase("complete");
+      return;
+    }
+    physicsAnimationFrameRef.current = requestAnimationFrame(physicsPlaybackFrame);
+  };
+
+  const startPhysicsPlayback = (session: StudioBg3dPhysicsSession, offsetSeconds = 0) => {
+    cancelPhysicsAnimationFrame();
+    const safeOffset = Math.min(session.timeline.durationSeconds, Math.max(0, offsetSeconds));
+    physicsPlaybackOffsetRef.current = safeOffset;
+    physicsPlaybackStartedAtRef.current = -1;
+    physicsLastUiUpdateRef.current = 0;
+    transitionPhysicsPhase("running");
+    physicsAnimationFrameRef.current = requestAnimationFrame(physicsPlaybackFrame);
+  };
+
+  const pausePhysicsPreview = () => {
+    if (physicsPhaseRef.current !== "running") return;
+    const session = physicsSessionRef.current;
+    if (!session) return;
+    const now = physicsLastFrameTimestampRef.current;
+    physicsPlaybackOffsetRef.current = Math.min(
+      session.timeline.durationSeconds,
+      physicsPlaybackOffsetRef.current +
+        Math.max(0, (now - physicsPlaybackStartedAtRef.current) / 1_000),
+    );
+    cancelPhysicsAnimationFrame();
+    updatePhysicsProgress(
+      physicsPlaybackOffsetRef.current,
+      session.timeline.durationSeconds,
+      now,
+      true,
+    );
+    transitionPhysicsPhase("paused");
+  };
+
+  const resumePhysicsPreview = () => {
+    const session = physicsSessionRef.current;
+    if (!session || (physicsPhaseRef.current !== "paused" && physicsPhaseRef.current !== "complete")) {
+      return;
+    }
+    const offset = physicsPhaseRef.current === "complete" ? 0 : physicsPlaybackOffsetRef.current;
+    if (offset === 0) {
+      const initial = sampleStudioBg3dPhysicsTimeline(session.timeline, 0);
+      if (!initial || !projectStudioBg3dPhysicsSamples(initial, primitiveObjectsRef.current)) {
+        failPhysicsPreview("물리 미리보기의 시작 자세를 복원하지 못했습니다.");
+        return;
+      }
+      latestPhysicsSamplesRef.current = initial;
+      updatePhysicsProgress(0, session.timeline.durationSeconds, physicsLastFrameTimestampRef.current, true);
+    }
+    startPhysicsPlayback(session, offset);
+  };
+
+  const startPhysicsPreview = async () => {
+    if (
+      captureInFlightRef.current || isCapturing || isRestoringScene ||
+      isStudioBg3dPhysicsTransientPhase(physicsPhaseRef.current)
+    ) return;
+    if (selectedIds.size === 0 || physicsSelectionUnavailableReason) {
+      setPhysicsError(physicsSelectionUnavailableReason ?? "움직일 오브젝트를 먼저 선택하세요.");
+      transitionPhysicsPhase("error");
+      return;
+    }
+
+    const adapted = adaptStudioBg3dRuntimeToDocument({
+      primitives,
+      customModels,
+      attachmentByStorageModelId: attachmentByStorageModelIdRef.current,
+      baseDocument: sceneBaseDocument,
+    });
+    if (
+      adapted.diagnostics.length > 0 || adapted.omittedDiagnosticCount > 0 ||
+      adapted.counts.droppedPrimitives > 0 || adapted.counts.droppedCustomModels > 0 ||
+      adapted.counts.emittedPrimitives !== primitives.length ||
+      adapted.counts.emittedCustomModels !== customModels.length
+    ) {
+      setPhysicsError("장면 원본을 손실 없이 준비하지 못해 물리 미리보기를 시작하지 않았습니다.");
+      transitionPhysicsPhase("error");
+      return;
+    }
+    const localWorld = createStudioBg3dPhysicsWorld(adapted.document, selectedIds);
+    const modelLocalBoundsByNodeId = new Map(
+      customModels.flatMap((model) => {
+        const cachedRoot = modelRootCacheRef.current.get(model.modelId)?.root;
+        const bounds = cachedRoot
+          ? measureStudioBg3dPhysicsModelLocalBounds(cachedRoot)
+          : null;
+        return bounds ? [[model.id, bounds] as const] : [];
+      }),
+    );
+    const physicsJob = localWorld
+      ? createStudioBg3dPhysicsThreeJob(
+          adapted.document,
+          localWorld,
+          modelLocalBoundsByNodeId,
+        )
+      : null;
+    if (!physicsJob) {
+      setPhysicsError("선택한 오브젝트의 계층·잠금·변형을 물리 장면으로 안전하게 변환하지 못했습니다.");
+      transitionPhysicsPhase("error");
+      return;
+    }
+
+    const generation = physicsGenerationRef.current + 1;
+    physicsGenerationRef.current = generation;
+    physicsAbortRef.current?.abort();
+    const abortController = new AbortController();
+    physicsAbortRef.current = abortController;
+    physicsSessionRef.current = null;
+    latestPhysicsSamplesRef.current = [];
+    setPhysicsError(null);
+    setError(null);
+    setPhysicsCurrentSeconds(0);
+    setPhysicsProgress(0);
+    transitionPhysicsPhase("loading");
+
+    try {
+      // Literal import keeps Rapier, its Worker, and WASM outside the 3D editor's initial chunk.
+      const { runStudioBg3dPhysicsTimeline } = await import("./studio-bg3d-physics-worker-client");
+      const timeline = await runStudioBg3dPhysicsTimeline({
+        world: physicsJob.world,
+        initialPoses: physicsJob.initialPoses,
+        durationSeconds: physicsDurationSeconds,
+        gravity: STUDIO_BG3D_PHYSICS_GRAVITY[physicsGravityPreset],
+        ground: physicsGroundEnabled
+          ? { y: 0, friction: 0.75, restitution: 0.08 }
+          : null,
+      }, {
+        signal: abortController.signal,
+        timeoutMs: 15_000,
+      });
+      if (
+        abortController.signal.aborted || generation !== physicsGenerationRef.current ||
+        !componentActiveRef.current
+      ) return;
+      const initialDynamicSamples = sampleStudioBg3dPhysicsTimeline(timeline, 0);
+      if (!initialDynamicSamples) {
+        throw new Error("invalid-initial-physics-sample");
+      }
+      const session: StudioBg3dPhysicsSession = Object.freeze({
+        document: adapted.document,
+        world: physicsJob.world,
+        timeline,
+        initialDynamicSamples,
+      });
+      physicsSessionRef.current = session;
+      latestPhysicsSamplesRef.current = initialDynamicSamples;
+      if (!projectStudioBg3dPhysicsSamples(initialDynamicSamples, primitiveObjectsRef.current)) {
+        throw new Error("physics-projection-unavailable");
+      }
+      startPhysicsPlayback(session);
+    } catch (caught) {
+      if (generation !== physicsGenerationRef.current || abortController.signal.aborted) return;
+      console.error("Studio BG3D physics preview failed", caught);
+      failPhysicsPreview(
+        typeof Worker !== "function"
+          ? "이 브라우저는 격리된 물리 Worker를 지원하지 않습니다. 최신 브라우저에서 다시 시도해 주세요."
+          : "물리 엔진을 준비하거나 계산하지 못했습니다. 오브젝트 수를 줄이고 다시 시도해 주세요.",
+      );
+    } finally {
+      if (physicsAbortRef.current === abortController) physicsAbortRef.current = null;
+    }
+  };
+
+  const bakePhysicsPreview = () => {
+    if (
+      physicsPhaseRef.current !== "paused" && physicsPhaseRef.current !== "complete" &&
+      physicsPhaseRef.current !== "running"
+    ) return;
+    const session = physicsSessionRef.current;
+    const samples = latestPhysicsSamplesRef.current;
+    if (!session || samples.length === 0) return;
+    cancelPhysicsAnimationFrame();
+    transitionPhysicsPhase("baking");
+    const bakedDocument = applyStudioBg3dPhysicsTransforms(
+      session.document,
+      samples,
+      session.world,
+    );
+    const hydrated = bakedDocument
+      ? hydrateStudioBg3dDocumentToRuntime({
+          document: bakedDocument,
+          storageModelIdByAttachmentId: storageModelIdByAttachmentIdRef.current,
+        })
+      : null;
+    if (
+      !bakedDocument || !hydrated || !hydrated.ok || hydrated.diagnostics.length > 0 ||
+      hydrated.omittedDiagnosticCount > 0 ||
+      hydrated.counts.droppedPrimitives > 0 || hydrated.counts.droppedCustomModels > 0 ||
+      hydrated.primitives.length !== primitives.length ||
+      hydrated.customModels.length !== customModels.length
+    ) {
+      failPhysicsPreview("현재 물리 자세를 장면 문서에 손실 없이 적용하지 못했습니다.");
+      return;
+    }
+    physicsGenerationRef.current += 1;
+    physicsSessionRef.current = null;
+    latestPhysicsSamplesRef.current = [];
+    physicsPlaybackOffsetRef.current = 0;
+    commitImmediateHistoryTransition(
+      hydrated.primitives,
+      hydrated.customModels,
+      bakedDocument,
+    );
+    setPrimitives(hydrated.primitives);
+    setCustomModels(hydrated.customModels);
+    setSceneBaseDocument(bakedDocument);
+    setPhysicsCurrentSeconds(0);
+    setPhysicsProgress(0);
+    setPhysicsError(null);
+    setPhysicsPreviewRevision((revision) => revision + 1);
+    transitionPhysicsPhase("idle");
+  };
+
+  const pausePhysicsWhenHidden = useEffectEvent(() => pausePhysicsPreview());
+  useEffect(() => {
+    if (!open || typeof document === "undefined") return;
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") pausePhysicsWhenHidden();
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [open]);
+
   // 저장소 로드 뒤 현재 장면과 정확히 일치하는 사용자 프리셋이 있으면 관리 폼도 그 항목을 따른다.
   // 수동 조정으로 사용자 설정 상태가 된 뒤에는 ltManagedUserPresetId를 유지해 "현재 값으로 업데이트"
   // 작업이 끊기지 않게 한다.
@@ -3453,7 +4316,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
 
   if (!open) return null;
 
-  const effectiveIsQuadView = isQuadView && !isCapturing;
+  const effectiveIsQuadView = isQuadView && !isCapturing && !physicsInteractionLocked;
   const isMainOrtho = sceneBaseDocument.camera.projection === "orthographic";
   const selectedSky = getSkyPreset(skyPresetId);
   const panoramaRotation = normalizePanoramaRotationDegrees(
@@ -3475,6 +4338,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   );
 
   const selectSceneEntity = (id: string, isMulti: boolean) => {
+    if (isStudioBg3dPhysicsTransientPhase(physicsPhaseRef.current)) return;
     setSelectedIds((previous) => {
       if (!isMulti) return new Set([id]);
       const next = new Set(previous);
@@ -3580,6 +4444,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
         onSelect={selectSceneEntity}
         registerRef={registerPrimitiveRef}
         registerAnimationTime={registerModelAnimationTime}
+        registerRigBake={registerModelRigBake}
         onAnimationComplete={finishModelAnimation}
         onCloneStatus={updateModelCloneStatuses}
       >
@@ -3642,6 +4507,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
       ))}
       {sceneHierarchy.roots.map(renderSceneEntity)}
       {!isCapturing &&
+      !physicsInteractionLocked &&
       firstSelectedId &&
       !selectedIsLocked &&
       isBgObjectVisible(selectedEntity) &&
@@ -3734,9 +4600,13 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
 
   const modal = (
     <div
+      ref={modalDialogRef}
       aria-modal="true"
+      aria-labelledby="studio-bg3d-dialog-title"
+      data-testid="studio-bg3d-dialog"
       className="fixed inset-0 z-[80] bg-[oklch(0.08_0.01_70/0.82)] p-2 text-fg backdrop-blur-sm sm:p-4"
       role="dialog"
+      tabIndex={-1}
       style={{
         paddingTop: "max(0.5rem, env(safe-area-inset-top))",
         paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))",
@@ -3749,12 +4619,13 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
               <Boxes size={14} aria-hidden />
               3D 배경
             </p>
-            <h2 className="mt-1 truncate text-lg font-bold tracking-tight text-fg sm:text-xl">3D 배경 블록아웃 만들기</h2>
+            <h2 id="studio-bg3d-dialog-title" className="mt-1 truncate text-lg font-bold tracking-tight text-fg sm:text-xl">3D 배경 블록아웃 만들기</h2>
             <p className="mt-1 line-clamp-1 text-xs text-fg-3">상자·모델로 구조를 잡고 컬러·선화 레이어로 추출해 패널에 추가</p>
           </div>
           <button
             type="button"
             aria-label="닫기"
+            data-bg3d-initial-focus="true"
             title={isCapturing ? "캡처가 끝난 뒤 닫을 수 있습니다" : "닫기 (Esc)"}
             className={ICON_BUTTON}
             disabled={isCapturing}
@@ -3796,7 +4667,11 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                   shadows={{ enabled: deviceQuality.shadows, type: THREE.PCFShadowMap }}
                   gl={{ antialias: sceneBaseDocument.render.antialias, alpha: true }}
                   onCreated={({ gl }) => gl.setClearColor(getSkyPreset(renderedSkyPresetId).clearColor, 1)}
-                  onPointerMissed={() => setSelectedIds(new Set())}
+                  onPointerMissed={() => {
+                    if (!isStudioBg3dPhysicsTransientPhase(physicsPhaseRef.current)) {
+                      setSelectedIds(new Set());
+                    }
+                  }}
                 >
                   <BgAdaptiveDprController
                     targetFps={deviceQuality.targetFps}
@@ -3846,6 +4721,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                             type="button"
                             aria-label={m.label}
                             aria-pressed={isActive}
+                            disabled={physicsInteractionLocked}
                             className={cx(
                               "grid size-11 place-items-center rounded-md text-fg-2 transition-colors hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:size-8",
                               isActive && "bg-accent text-on-accent hover:bg-accent/90 hover:text-on-accent"
@@ -3863,6 +4739,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                       type="button"
                       aria-label="4분할 뷰 토글"
                       aria-pressed={isQuadView}
+                      disabled={physicsInteractionLocked}
                       className={cx(
                         VIEWPORT_BTN,
                         isQuadView && "bg-accent text-on-accent hover:bg-accent/90 hover:text-on-accent"
@@ -3881,7 +4758,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                     <button
                       type="button"
                       aria-label="실행 취소"
-                      disabled={!canUndo}
+                      disabled={!canUndo || physicsInteractionLocked}
                       className={cx(VIEWPORT_BTN, "disabled:cursor-not-allowed disabled:opacity-40")}
                       onClick={doUndo}
                     >
@@ -3897,7 +4774,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                     <button
                       type="button"
                       aria-label="다시 실행"
-                      disabled={!canRedo}
+                      disabled={!canRedo || physicsInteractionLocked}
                       className={cx(VIEWPORT_BTN, "disabled:cursor-not-allowed disabled:opacity-40")}
                       onClick={doRedo}
                     >
@@ -4015,7 +4892,33 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                   </StudioToolHintTarget>
                 </div>
 
-                {!viewportHinted ? (
+                <StudioBg3dPhysicsTransport
+                  currentActionRef={physicsTransportActionRef}
+                  phase={physicsPhase}
+                  progress={physicsProgress}
+                  currentSeconds={physicsCurrentSeconds}
+                  durationSeconds={physicsSessionRef.current?.timeline.durationSeconds ?? physicsDurationSeconds}
+                  onPause={pausePhysicsPreview}
+                  onResume={resumePhysicsPreview}
+                  onReset={() => resetPhysicsPreview()}
+                  onBake={bakePhysicsPreview}
+                />
+                <output
+                  aria-live="polite"
+                  aria-atomic="true"
+                  data-testid="bg3d-physics-status"
+                  data-state={physicsPhase}
+                  data-preview-revision={physicsPreviewRevision}
+                  data-dynamic-count={physicsSessionRef.current?.timeline.nodeIds.length ?? 0}
+                  data-sample-count={latestPhysicsSamplesRef.current.length}
+                  data-preview-node-id={latestPhysicsSamplesRef.current[0]?.nodeId ?? ""}
+                  data-preview-y={latestPhysicsSamplesRef.current[0]?.position[1] ?? ""}
+                  className="sr-only"
+                >
+                  {describeStudioBg3dPhysicsStatus(physicsPhase, physicsError)}
+                </output>
+
+                {!physicsInteractionLocked && !viewportHinted ? (
                   <div className="pointer-events-none absolute inset-x-0 bottom-3 z-10 flex justify-center">
                     <span className="rounded-full border border-line/70 bg-panel/85 px-3 py-1 text-center text-[0.66rem] font-medium text-fg-3 shadow-sm backdrop-blur">
                       끌어서 회전 · 오른쪽 드래그로 이동 · 도형 클릭으로 선택
@@ -4040,7 +4943,12 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
           </section>
 
           <aside className="flex min-h-0 flex-col border-t border-line bg-panel lg:border-l lg:border-t-0">
-            <div role="tablist" aria-label="컨트롤 카테고리" className="grid shrink-0 grid-cols-6 gap-1 border-b border-line bg-panel/95 px-2 py-2 backdrop-blur sm:px-3">
+            <div
+              role="tablist"
+              aria-label="컨트롤 카테고리"
+              inert={physicsInteractionLocked}
+              className="grid shrink-0 grid-cols-6 gap-1 border-b border-line bg-panel/95 px-2 py-2 backdrop-blur sm:px-3"
+            >
               {BG_PANEL_TABS.map((tab) => {
                 const TabIcon = tab.icon;
                 const isActive = activePanelTab === tab.id;
@@ -4082,7 +4990,14 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
               })}
             </div>
 
-            <div ref={panelScrollRef} id="bg3d-panel-body" role="tabpanel" aria-labelledby={`bg3d-tab-${activePanelTab}`} className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 sm:px-5">
+            <div
+              ref={panelScrollRef}
+              id="bg3d-panel-body"
+              role="tabpanel"
+              aria-labelledby={`bg3d-tab-${activePanelTab}`}
+              inert={physicsInteractionLocked}
+              className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 sm:px-5"
+            >
               <section hidden={hideOnTab("shapes")}>
                 <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
                   <Boxes size={15} className="text-accent" aria-hidden />
@@ -4095,6 +5010,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                       <button
                         key={btn.kind}
                         type="button"
+                        aria-label={btn.label}
                         className={cx(CONTROL_BUTTON, "flex-col gap-1 border-line bg-card text-fg-2 hover:bg-raised hover:text-fg")}
                         onClick={() => addPrimitive(btn.kind)}
                       >
@@ -4672,7 +5588,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
 
                       <div className="space-y-2 rounded-xl border border-line bg-card/55 p-2.5">
                         <div className="flex items-center justify-between gap-2">
-                          <label className="flex items-center gap-2 text-xs font-semibold text-fg-2">
+                          <label className="flex min-h-11 items-center gap-2 text-xs font-semibold text-fg-2 sm:min-h-8 pointer-coarse:min-h-11">
                             <input
                               type="checkbox"
                               disabled={selectedModelJoints.length === 0}
@@ -4682,10 +5598,10 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                                 event.target.checked ? { ...DEFAULT_STUDIO_BG3D_CONSTRAINT_LAYER } : null,
                               )}
                             />
-                            조인트 에임 제약
+                            리그 제약
                           </label>
                           <span className="text-[0.68rem] tabular-nums text-fg-3">
-                            {selectedCustomModel.constraints?.aims.length ?? 0}개 적용
+                            {selectedAimConstraints.length} 에임 · {selectedTwoBoneIkConstraints.length} IK
                           </span>
                         </div>
 
@@ -4694,7 +5610,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                             <div className="grid grid-cols-[1fr_auto] gap-2">
                               <select
                                 aria-label="에임 조인트"
-                                className="h-8 min-w-0 rounded-lg border border-line bg-panel px-2 text-xs text-fg"
+                                className="h-11 min-w-0 rounded-lg border border-line bg-panel px-2 text-xs text-fg sm:h-8 pointer-coarse:h-11"
                                 value={selectedPoseJointKey}
                                 onChange={(event) => setPoseJointSelection(event.target.value)}
                               >
@@ -4706,7 +5622,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                               </select>
                               <button
                                 type="button"
-                                className="h-8 rounded-lg border border-line bg-panel px-2 text-[0.68rem] font-semibold text-fg-2 hover:bg-raised disabled:opacity-50"
+                                className="h-11 rounded-lg border border-line bg-panel px-2 text-[0.68rem] font-semibold text-fg-2 hover:bg-raised disabled:opacity-50 sm:h-8 pointer-coarse:h-11"
                                 disabled={!selectedAimConstraint}
                                 onClick={() => updateCustomModelConstraints(
                                   selectedCustomModel.id,
@@ -4716,7 +5632,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                                   }),
                                 )}
                               >
-                                제약 해제
+                                에임 해제
                               </button>
                             </div>
                             <Vec3Field
@@ -4724,6 +5640,8 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                               values={[...(selectedAimConstraint?.target ?? [0, 1, 1])]}
                               step={0.1}
                               precision={2}
+                              disabled={selectedAimSuppressedByIk}
+                              touchFriendly
                               onCommit={(axis, value) => {
                                 const target: [number, number, number] = [
                                   ...(selectedAimConstraint?.target ?? [0, 1, 1]),
@@ -4747,7 +5665,8 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                               <label className="space-y-1 text-[0.68rem] text-fg-3">
                                 향할 로컬 축
                                 <select
-                                  className="h-8 w-full rounded-lg border border-line bg-panel px-2 text-xs text-fg"
+                                  className="h-11 w-full rounded-lg border border-line bg-panel px-2 text-xs text-fg sm:h-8 pointer-coarse:h-11"
+                                  disabled={selectedAimSuppressedByIk}
                                   value={selectedAimConstraint?.axis ?? "+z"}
                                   onChange={(event) => updateCustomModelConstraints(
                                     selectedCustomModel.id,
@@ -4773,8 +5692,9 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                               <label className="space-y-1 text-[0.68rem] text-fg-3">
                                 강도 · {Math.round((selectedAimConstraint?.weight ?? 1) * 100)}%
                                 <input
-                                  className="block h-8 w-full"
+                                  className="block h-11 w-full sm:h-8 pointer-coarse:h-11"
                                   type="range"
+                                  disabled={selectedAimSuppressedByIk}
                                   min="0"
                                   max="1"
                                   step="0.01"
@@ -4797,7 +5717,189 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                                 />
                               </label>
                             </div>
-                            <label className="flex items-center gap-1.5 text-[0.68rem] text-fg-2">
+                            {selectedAimSuppressedByIk ? (
+                              <p className="rounded-lg border border-warning/30 bg-warning/10 px-2 py-1.5 text-[0.64rem] leading-relaxed text-warning">
+                                이 조인트의 에임은 손·발 타깃을 보존하기 위해 활성 IK 뒤에서 자동 중지됩니다. 에임을 사용하려면 겹치는 IK를 먼저 해제해 주세요.
+                              </p>
+                            ) : null}
+                            <div className="space-y-2 border-t border-line/70 pt-2">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[0.68rem] font-semibold text-fg-2">
+                                  2본 IK · 손/발 위치
+                                </span>
+                                <span className="text-[0.64rem] text-fg-3">
+                                  팔꿈치·무릎 자동 계산
+                                </span>
+                              </div>
+                              {selectedIkEndCandidates.length > 0 ? (
+                                <>
+                                  <div className="grid grid-cols-[1fr_auto] gap-2">
+                                    <select
+                                      aria-label="IK 끝 조인트"
+                                      className="h-11 min-w-0 rounded-lg border border-line bg-panel px-2 text-xs text-fg sm:h-8 pointer-coarse:h-11"
+                                      value={selectedIkEndJointKey}
+                                      onChange={(event) => setIkEndJointSelection({
+                                        modelId: selectedCustomModel.id,
+                                        jointKey: event.target.value,
+                                      })}
+                                    >
+                                      {selectedIkEndCandidates.map((joint) => (
+                                        <option key={joint.key} value={joint.key}>
+                                          {joint.name} · S{joint.skinIndex + 1}/J{joint.jointIndex + 1}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    <button
+                                      type="button"
+                                      className="h-11 rounded-lg border border-line bg-panel px-2 text-[0.68rem] font-semibold text-fg-2 hover:bg-raised disabled:opacity-50 sm:h-8 pointer-coarse:h-11"
+                                      disabled={
+                                        !selectedIkUpperJoint || !selectedIkMiddleJoint || !selectedIkEndJoint ||
+                                        (!selectedTwoBoneIkConstraint && (
+                                          selectedIkLimitReached || selectedIkHasOverlap ||
+                                          !selectedIkTransformSupported
+                                        ))
+                                      }
+                                      onClick={() => updateCustomModelConstraints(
+                                        selectedCustomModel.id,
+                                        (current) => {
+                                          const remaining = current.twoBoneIks.filter((ik) => (
+                                            selectedJointByKey.get(ik.endJointKey)?.canonicalKey ??
+                                            ik.endJointKey
+                                          ) !== selectedIkEndJoint?.canonicalKey);
+                                          if (selectedTwoBoneIkConstraint) {
+                                            return { ...current, twoBoneIks: remaining };
+                                          }
+                                          if (!selectedIkUpperJoint || !selectedIkMiddleJoint || !selectedIkEndJoint) {
+                                            return current;
+                                          }
+                                          const chainKeys = new Set([
+                                            selectedIkUpperJoint.canonicalKey,
+                                            selectedIkMiddleJoint.canonicalKey,
+                                            selectedIkEndJoint.canonicalKey,
+                                          ]);
+                                          if (
+                                            current.twoBoneIks.length >= STUDIO_BG3D_MAX_TWO_BONE_IK_CONSTRAINTS ||
+                                            current.twoBoneIks.some((ik) => [
+                                              ik.upperJointKey,
+                                              ik.middleJointKey,
+                                              ik.endJointKey,
+                                            ].some((key) => chainKeys.has(
+                                              selectedJointByKey.get(key)?.canonicalKey ?? key,
+                                            )))
+                                          ) return current;
+                                          return {
+                                            ...current,
+                                            twoBoneIks: [...current.twoBoneIks, {
+                                              upperJointKey: selectedIkUpperJoint.key,
+                                              middleJointKey: selectedIkMiddleJoint.key,
+                                              endJointKey: selectedIkEndJoint.key,
+                                              target: [...selectedIkDefaultTarget],
+                                              poleTarget: [...selectedIkDefaultPole],
+                                              weight: 1,
+                                            }],
+                                          };
+                                        },
+                                      )}
+                                    >
+                                      {selectedTwoBoneIkConstraint ? "IK 해제" : "IK 적용"}
+                                    </button>
+                                  </div>
+                                  <p className="text-[0.64rem] leading-relaxed text-fg-3">
+                                    {selectedIkUpperJoint?.name ?? "상위"} →{
+                                      selectedIkMiddleJoint?.name ?? "중간"
+                                    } → {selectedIkEndJoint?.name ?? "끝"}
+                                  </p>
+                                  {!selectedIkTransformSupported ? (
+                                    <p className="rounded-lg border border-warning/30 bg-warning/10 px-2 py-1.5 text-[0.64rem] leading-relaxed text-warning">
+                                      현재 부모·모델·관절의 월드 변환에 비균일 크기, 반전 또는 전단이 있어 IK가 일시 중지됩니다. 계층 전체를 균일 크기로 맞춰 주세요.
+                                    </p>
+                                  ) : selectedIkHasOverlap ? (
+                                    <p className="rounded-lg border border-warning/30 bg-warning/10 px-2 py-1.5 text-[0.64rem] leading-relaxed text-warning">
+                                      다른 IK와 조인트를 공유하는 체인은 동시에 적용할 수 없습니다.
+                                    </p>
+                                  ) : selectedIkLimitReached && !selectedTwoBoneIkConstraint ? (
+                                    <p className="rounded-lg border border-warning/30 bg-warning/10 px-2 py-1.5 text-[0.64rem] leading-relaxed text-warning">
+                                      모델당 IK는 최대 {STUDIO_BG3D_MAX_TWO_BONE_IK_CONSTRAINTS}개까지 저장할 수 있습니다.
+                                    </p>
+                                  ) : null}
+                                  <Vec3Field
+                                    label="끝 위치 타깃"
+                                    values={[
+                                      ...(selectedTwoBoneIkConstraint?.target ?? selectedIkDefaultTarget),
+                                    ]}
+                                    step={0.05}
+                                    precision={2}
+                                    disabled={!selectedTwoBoneIkConstraint}
+                                    touchFriendly
+                                    onCommit={(axis, value) => {
+                                      if (!selectedTwoBoneIkConstraint) return;
+                                      updateCustomModelConstraints(selectedCustomModel.id, (current) => ({
+                                        ...current,
+                                        twoBoneIks: current.twoBoneIks.map((ik) => {
+                                          if (ik.endJointKey !== selectedIkEndJointKey) return ik;
+                                          const target: [number, number, number] = [...ik.target];
+                                          target[axis] = Math.max(-10_000, Math.min(10_000, value));
+                                          return { ...ik, target };
+                                        }),
+                                      }));
+                                    }}
+                                  />
+                                  <Vec3Field
+                                    label="굽힘 폴 타깃"
+                                    values={[
+                                      ...(selectedTwoBoneIkConstraint?.poleTarget ?? selectedIkDefaultPole),
+                                    ]}
+                                    step={0.05}
+                                    precision={2}
+                                    disabled={!selectedTwoBoneIkConstraint}
+                                    touchFriendly
+                                    onCommit={(axis, value) => {
+                                      if (!selectedTwoBoneIkConstraint) return;
+                                      updateCustomModelConstraints(selectedCustomModel.id, (current) => ({
+                                        ...current,
+                                        twoBoneIks: current.twoBoneIks.map((ik) => {
+                                          if (ik.endJointKey !== selectedIkEndJointKey) return ik;
+                                          const poleTarget: [number, number, number] = [...ik.poleTarget];
+                                          poleTarget[axis] = Math.max(-10_000, Math.min(10_000, value));
+                                          return { ...ik, poleTarget };
+                                        }),
+                                      }));
+                                    }}
+                                  />
+                                  <label className="grid grid-cols-[4.5rem_1fr_2.5rem] items-center gap-2 text-[0.68rem] text-fg-3">
+                                    IK 강도
+                                    <input
+                                      className="h-11 w-full sm:h-8 pointer-coarse:h-11"
+                                      type="range"
+                                      min="0"
+                                      max="1"
+                                      step="0.01"
+                                      disabled={!selectedTwoBoneIkConstraint}
+                                      value={selectedTwoBoneIkConstraint?.weight ?? 1}
+                                      onChange={(event) => {
+                                        if (!selectedTwoBoneIkConstraint) return;
+                                        updateCustomModelConstraints(selectedCustomModel.id, (current) => ({
+                                          ...current,
+                                          twoBoneIks: current.twoBoneIks.map((ik) =>
+                                            ik.endJointKey === selectedIkEndJointKey
+                                              ? { ...ik, weight: Number(event.target.value) }
+                                              : ik
+                                          ),
+                                        }));
+                                      }}
+                                    />
+                                    <span className="text-right tabular-nums text-fg-2">
+                                      {Math.round((selectedTwoBoneIkConstraint?.weight ?? 1) * 100)}%
+                                    </span>
+                                  </label>
+                                </>
+                              ) : (
+                                <p className="text-[0.66rem] leading-relaxed text-fg-3">
+                                  같은 스킨에서 부모 → 중간 → 끝으로 이어지는 3개 조인트 체인이 없습니다.
+                                </p>
+                              )}
+                            </div>
+                            <label className="flex min-h-11 items-center gap-1.5 text-[0.68rem] text-fg-2 sm:min-h-8 pointer-coarse:min-h-11">
                               <input
                                 type="checkbox"
                                 checked={selectedCustomModel.constraints.enabled}
@@ -4808,14 +5910,40 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                               />
                               애니메이션·포즈 뒤에 제약 적용
                             </label>
+                            <button
+                              type="button"
+                              aria-describedby={
+                                selectedRigBakeDisabledReason
+                                  ? "bg3d-rig-bake-disabled-reason"
+                                  : "bg3d-rig-bake-description"
+                              }
+                              className="min-h-11 w-full rounded-lg border border-accent/35 bg-accent-soft px-3 text-[0.7rem] font-semibold text-accent hover:bg-accent/15 disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-9 pointer-coarse:min-h-11"
+                              disabled={selectedRigBakeDisabledReason !== null}
+                              onClick={() => bakeCustomModelRigConstraints(selectedCustomModel.id)}
+                            >
+                              현재 IK·에임을 포즈로 굽기
+                            </button>
+                            {selectedRigBakeDisabledReason ? (
+                              <p
+                                id="bg3d-rig-bake-disabled-reason"
+                                className="rounded-lg border border-warning/30 bg-warning/10 px-2 py-1.5 text-[0.64rem] leading-relaxed text-warning"
+                              >
+                                {selectedRigBakeDisabledReason}
+                              </p>
+                            ) : null}
+                            <p id="bg3d-rig-bake-description" className="text-[0.64rem] leading-relaxed text-fg-3">
+                              지금 보이는 한 프레임을 weight 1 포즈로 고정하고 모든 리그 제약을 제거합니다.
+                              애니메이션은 비본 트랙을 보존한 채 현재 시각에서 일시정지되며, 3D 실행 취소로
+                              원래 포즈와 제약을 되돌릴 수 있습니다.
+                            </p>
                             <p className="text-[0.66rem] leading-relaxed text-fg-3">
-                              눈·머리·무기 본의 선택 축이 모델 로컬 타깃을 향하도록 비파괴 혼합합니다.
-                              원본 스켈레톤과 애니메이션 키는 수정하지 않습니다.
+                              에임은 눈·머리·무기 방향을, 2본 IK는 손·발 위치와 굽힘 평면을 비파괴
+                              혼합합니다. 원본 스켈레톤과 애니메이션 키는 수정하지 않습니다.
                             </p>
                           </div>
                         ) : (
                           <p className="text-[0.68rem] leading-relaxed text-fg-3">
-                            모델에 스킨 조인트가 있으면 시선·머리·소품 방향 제약을 추가할 수 있습니다.
+                            모델에 스킨 조인트가 있으면 시선·머리 에임과 손·발 2본 IK를 추가할 수 있습니다.
                           </p>
                         )}
                       </div>
@@ -5377,10 +6505,72 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
               </section>
 
               <section hidden={hideOnTab("view")}>
-                <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
+                <div
+                  role="tablist"
+                  aria-label="보기 도구"
+                  className="mb-4 grid grid-cols-2 gap-1 rounded-xl border border-line bg-card/70 p-1"
+                >
+                  {([
+                    { id: "camera" as const, label: "카메라 · 환경" },
+                    { id: "physics" as const, label: "물리 배치" },
+                  ]).map((section) => {
+                    const active = viewEditorSection === section.id;
+                    return (
+                      <button
+                        key={section.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={active}
+                        aria-controls={`bg3d-view-section-${section.id}`}
+                        tabIndex={active ? 0 : -1}
+                        onClick={() => setViewEditorSection(section.id)}
+                        className={cx(
+                          "min-h-11 rounded-lg px-2 text-[0.68rem] font-bold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent sm:min-h-9",
+                          active
+                            ? "bg-accent text-on-accent shadow-sm"
+                            : "text-fg-3 hover:bg-raised hover:text-fg",
+                        )}
+                      >
+                        {section.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div
+                  id="bg3d-view-section-physics"
+                  role="tabpanel"
+                  hidden={viewEditorSection !== "physics"}
+                >
+                  <StudioBg3dPhysicsPanel
+                    startButtonRef={physicsStartButtonRef}
+                    selectedCount={selectedIds.size}
+                    durationSeconds={physicsDurationSeconds}
+                    gravityPreset={physicsGravityPreset}
+                    groundEnabled={physicsGroundEnabled}
+                    phase={physicsPhase}
+                    progress={physicsProgress}
+                    unavailableReason={physicsSelectionUnavailableReason}
+                    errorMessage={physicsError}
+                    onDurationChange={setPhysicsDurationSeconds}
+                    onGravityPresetChange={setPhysicsGravityPreset}
+                    onGroundEnabledChange={setPhysicsGroundEnabled}
+                    onStart={() => {
+                      shouldTransferPhysicsFocusRef.current = true;
+                      void startPhysicsPreview();
+                    }}
+                  />
+                </div>
+
+                <div
+                  id="bg3d-view-section-camera"
+                  role="tabpanel"
+                  hidden={viewEditorSection !== "camera"}
+                >
+                  <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
                   <Camera size={15} className="text-accent" aria-hidden />
                   카메라
-                </h3>
+                  </h3>
                 <div className="grid grid-cols-2 gap-2">
                   {Object.entries(CAMERA_PRESETS).map(([id, preset]) => (
                     <button
@@ -5664,6 +6854,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                       안개는 뷰포트와 컬러·톤 캡처에 함께 반영되며 선화 레이어의 투명 배경은 유지됩니다.
                     </p>
                   </div>
+                </div>
                 </div>
               </section>
 
@@ -6474,40 +7665,57 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
               </div>
             ) : null}
 
-            <footer className="flex shrink-0 items-center justify-between gap-2 border-t border-line px-4 py-3 sm:px-5">
-              <div className="flex items-center gap-2">
+            <footer className="flex shrink-0 items-center justify-between gap-2 border-t border-line px-3 py-3 min-[360px]:px-4 sm:px-5">
+              <div className="flex min-w-0 items-center gap-2">
                 <button
                   type="button"
-                  className={cx(CONTROL_BUTTON, "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg")}
+                  aria-label="3D 배경 편집기 닫기"
+                  className={cx(
+                    CONTROL_BUTTON,
+                    "shrink-0 whitespace-nowrap border-line bg-card text-fg-2 hover:bg-raised hover:text-fg max-[359px]:size-11 max-[359px]:px-0",
+                  )}
                   disabled={isCapturing}
                   onClick={requestUserClose}
                 >
-                  닫기
+                  <X size={14} className="hidden max-[359px]:block" aria-hidden />
+                  <span className="max-[359px]:sr-only">닫기</span>
                 </button>
                 <button
                   type="button"
-                  className={cx(CONTROL_BUTTON, "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg")}
+                  aria-label="3D 소재 저장"
+                  className={cx(
+                    CONTROL_BUTTON,
+                    "shrink-0 whitespace-nowrap border-line bg-card text-fg-2 hover:bg-raised hover:text-fg max-[359px]:size-11 max-[359px]:px-0",
+                  )}
                   disabled={(primitives.length === 0 && customModels.length === 0) || isCapturing || insertBlocked}
                   onClick={handleSaveToLibrary}
                 >
-                  <Save size={14} className="mr-1.5" aria-hidden />
-                  소재 저장
+                  <Save size={14} className="min-[360px]:mr-1.5" aria-hidden />
+                  <span className="max-[359px]:sr-only">소재 저장</span>
                 </button>
               </div>
               <button
                 type="button"
-                className={cx(CONTROL_BUTTON, "min-w-36 border-accent/60 bg-accent text-on-accent hover:bg-accent/90")}
+                className={cx(
+                  CONTROL_BUTTON,
+                  "min-w-0 shrink whitespace-nowrap border-accent/60 bg-accent text-on-accent hover:bg-accent/90 min-[360px]:min-w-36",
+                )}
                 disabled={(primitives.length === 0 && customModels.length === 0) || isCapturing || insertBlocked}
                 onClick={handleInsert}
               >
                 {isCapturing || isRestoringScene || hasPendingClone ? <Loader2 className="animate-spin" size={14} aria-hidden /> : <ImagePlus size={14} aria-hidden />}
-                {initialScene || initialDataUrl
-                  ? "3D 배경 업데이트"
-                  : !hasFilledOutput
-                    ? "선화만 추가"
-                    : ltToneSettings.type === "color"
-                      ? "컬러 배경 추가"
-                      : "톤 배경 추가"}
+                <span className="max-[359px]:hidden">
+                  {initialScene || initialDataUrl
+                    ? "3D 배경 업데이트"
+                    : !hasFilledOutput
+                      ? "선화만 추가"
+                      : ltToneSettings.type === "color"
+                        ? "컬러 배경 추가"
+                        : "톤 배경 추가"}
+                </span>
+                <span className="hidden max-[359px]:inline">
+                  {initialScene || initialDataUrl ? "업데이트" : "배경 추가"}
+                </span>
               </button>
             </footer>
           </aside>

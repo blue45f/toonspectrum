@@ -3,8 +3,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   calculateStudioBg3dThreeReparentTransform,
+  calculateStudioBg3dThreeWorldMatrix,
   calculateStudioBg3dThreeWorldDeltaTransform,
   decomposeStudioBg3dThreeLocalMatrix,
+  isStudioBg3dThreeAnalyticIkMatrixSupported,
   type StudioBg3dThreeHierarchyEntity,
 } from "./studio-bg3d-three-hierarchy";
 
@@ -23,6 +25,56 @@ function expectMatrixClose(actual: THREE.Matrix4, expected: THREE.Matrix4): void
 }
 
 describe("studio-bg3d-three-hierarchy", () => {
+  it("resolves nested canonical transforms into a deterministic world matrix", () => {
+    const parent: StudioBg3dThreeHierarchyEntity = {
+      id: "parent",
+      position: [3, 2, -1],
+      rotation: [0, Math.PI / 3, 0],
+      scale: [2, 2, 2],
+    };
+    const child: StudioBg3dThreeHierarchyEntity = {
+      id: "child",
+      parentId: "parent",
+      position: [1, 0, 2],
+      rotation: [0.2, 0, -0.1],
+      scale: [0.5, 0.5, 0.5],
+    };
+
+    const resolved = calculateStudioBg3dThreeWorldMatrix([parent, child], "child");
+
+    expect(resolved).not.toBeNull();
+    expectMatrixClose(resolved!, matrix(parent).multiply(matrix(child)));
+    expect(calculateStudioBg3dThreeWorldMatrix([parent], "missing")).toBeNull();
+  });
+
+  it("accepts only finite right-handed uniform shear-free matrices for analytic IK", () => {
+    expect(isStudioBg3dThreeAnalyticIkMatrixSupported(matrix({
+      id: "uniform",
+      position: [4, -2, 8],
+      rotation: [0.2, -0.3, 0.4],
+      scale: [2, 2, 2],
+    }))).toBe(true);
+    expect(isStudioBg3dThreeAnalyticIkMatrixSupported(matrix({
+      id: "non-uniform",
+      position: [0, 0, 0],
+      rotation: [0, 0, 0],
+      scale: [1, 2, 1],
+    }))).toBe(false);
+    expect(isStudioBg3dThreeAnalyticIkMatrixSupported(matrix({
+      id: "mirrored",
+      position: [0, 0, 0],
+      rotation: [0, 0, 0],
+      scale: [-1, 1, 1],
+    }))).toBe(false);
+    const shear = new THREE.Matrix4().set(
+      1, 0.2, 0, 0,
+      0, 1, 0, 0,
+      0, 0, 1, 0,
+      0, 0, 0, 1,
+    );
+    expect(isStudioBg3dThreeAnalyticIkMatrixSupported(shear)).toBe(false);
+  });
+
   it("preserves world TRS when moving a root below a transformed parent", () => {
     const parent: StudioBg3dThreeHierarchyEntity = {
       id: "parent",

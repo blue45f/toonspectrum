@@ -53,6 +53,63 @@ describe("studio-bg3d-animation-scheduler", () => {
     }).reason).toBe("near");
   });
 
+  it("prefers projected CSS-pixel coverage over distance while preserving the distance fallback", () => {
+    expect(resolveStudioBg3dAnimationSchedule({
+      ...BASE,
+      distanceToCamera: 1_000,
+      projectedDiameterCssPx: 100,
+    }).reason).toBe("near");
+    expect(resolveStudioBg3dAnimationSchedule({
+      ...BASE,
+      distanceToCamera: 1,
+      projectedDiameterCssPx: 10,
+    }).reason).toBe("very-far");
+    expect(resolveStudioBg3dAnimationSchedule({
+      ...BASE,
+      distanceToCamera: 40,
+      projectedDiameterCssPx: Number.NaN,
+    }).reason).toBe("far");
+  });
+
+  it("stabilizes projected bands with hysteresis and honors LOD bias/near-plane force-high", () => {
+    expect(resolveStudioBg3dAnimationSchedule({
+      ...BASE,
+      projectedDiameterCssPx: 52,
+      previousProjectedLodReason: null,
+    }).reason).toBe("far");
+    expect(resolveStudioBg3dAnimationSchedule({
+      ...BASE,
+      projectedDiameterCssPx: 52,
+      previousProjectedLodReason: "near",
+    }).reason).toBe("near");
+    expect(resolveStudioBg3dAnimationSchedule({
+      ...BASE,
+      projectedDiameterCssPx: 50,
+      previousProjectedLodReason: "near",
+    }).reason).toBe("far");
+    expect(resolveStudioBg3dAnimationSchedule({
+      ...BASE,
+      projectedDiameterCssPx: 60,
+      previousProjectedLodReason: "far",
+    }).reason).toBe("far");
+    expect(resolveStudioBg3dAnimationSchedule({
+      ...BASE,
+      projectedDiameterCssPx: 62,
+      previousProjectedLodReason: "far",
+    }).reason).toBe("near");
+    expect(resolveStudioBg3dAnimationSchedule({
+      ...BASE,
+      projectedDiameterCssPx: 100,
+      lodBias: 2,
+    }).reason).toBe("far");
+    expect(resolveStudioBg3dAnimationSchedule({
+      ...BASE,
+      projectedDiameterCssPx: 1,
+      projectedForceHighestDetail: true,
+      previousProjectedLodReason: "very-far",
+    }).reason).toBe("near");
+  });
+
   it("fails safely on invalid device and bounds signals", () => {
     const result = resolveStudioBg3dAnimationSchedule({
       ...BASE,

@@ -29,12 +29,15 @@ importers:
 
   .:
     dependencies:
+      '@dimforge/rapier3d-deterministic-compat':
+        specifier: 0.19.3
+        version: 0.19.3
       '@heejun/deskcloud':
         specifier: ^0.1.0
         version: 0.1.0(socket.io-client@4.8.3)
       '@heejun/platform-bridge':
         specifier: ^0.1.0
-        version: 0.1.0(@apps-in-toss/web-framework@3.0.0-beta.b36d7b5(@types/node@24.13.2)(typanion@3.14.0)(typescript@5.7.3))(react@19.2.7)
+        version: 0.1.0(react@19.2.7)
       '@hookform/resolvers':
         specifier: ^5.4.0
         version: 5.4.0(react-hook-form@7.77.0(react@19.2.7))
@@ -737,6 +740,9 @@ packages:
 
   '@dimforge/rapier3d-compat@0.12.0':
     resolution: {integrity: sha512-uekIGetywIgopfD97oDL5PfeezkFpNhwlzlaEYNOA0N6ghdsOvh/HYjSMek5Q2O1PYvRSDFcqFVJl4r4ZBwOow==}
+
+  '@dimforge/rapier3d-deterministic-compat@0.19.3':
+    resolution: {integrity: sha512-peuD6Cq4ePNW+awx9zzB20nUJ6qNWuf1brPk2bU8o1eV8LDgBqcZ/jz3w8Stuy7KVIhWZCeVkGheiGDIWvjE8Q==}
 
   '@drizzle-team/brocli@0.10.2':
     resolution: {integrity: sha512-z33Il7l5dKjUgGULTqBsQBQwckHh5AbIuxhdsIxDDiZAzBOrZO6q9ogcWC65kU382AfynTfgNumVcNIjuIua6w==}
@@ -6436,6 +6442,8 @@ snapshots:
 
   '@dimforge/rapier3d-compat@0.12.0': {}
 
+  '@dimforge/rapier3d-deterministic-compat@0.19.3': {}
+
   '@drizzle-team/brocli@0.10.2': {}
 
   '@emnapi/core@1.10.0':
@@ -7165,6 +7173,10 @@ snapshots:
       react: 19.2.7
     optionalDependencies:
       '@apps-in-toss/web-framework': 3.0.0-beta.b36d7b5(@types/node@24.13.2)(typanion@3.14.0)(typescript@5.7.3)
+
+  '@heejun/platform-bridge@0.1.0(react@19.2.7)':
+    dependencies:
+      react: 19.2.7
 
   '@hookform/resolvers@5.4.0(react-hook-form@7.77.0(react@19.2.7))':
     dependencies:

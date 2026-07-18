@@ -105,6 +105,7 @@ describe("studio CRDT raster UI bridge", () => {
         strokeWidth: 8,
         opacity: 1,
         brush: "pen",
+        sampleSpacing: 0,
       },
       pageId: "page-a",
       documentWidth: 800,
@@ -156,7 +157,39 @@ describe("studio CRDT raster UI bridge", () => {
       documentWidth: 800,
       documentHeight: 1_200,
     });
-    const legacy = planStudioRasterDrawPromotion({
+    const causalDefaultModel = planStudioRasterDrawPromotion({
+      element: {
+        id,
+        type: "draw",
+        kind: "freehand",
+        mode: "pen",
+        points: [10, 10, 30, 30],
+        pressures: [0, 1],
+        stroke: "#112233",
+        strokeWidth: 8,
+        opacity: 1,
+        brush: "pen",
+        sampleSpacing: 0,
+      },
+      pageId: "page-a",
+      documentWidth: 800,
+      documentHeight: 1_200,
+    });
+
+    expect(plan?.stroke.pressureModel).toBe(pressureModel);
+    expect(plan?.stroke.pressures).toEqual([0, 1]);
+    expect(JSON.parse(plan!.semanticParameters).stroke.pressureModel).toBe(pressureModel);
+    expect(Object.hasOwn(causalDefaultModel!.stroke, "pressureModel")).toBe(false);
+    expect(JSON.parse(causalDefaultModel!.semanticParameters).stroke.pressureModel)
+      .toBe("studio-gpu-pressure-radius-v1");
+    expect(plan?.semanticParameters).not.toBe(causalDefaultModel?.semanticParameters);
+  });
+
+  it("falls back a legacy pen stroke with no causal geometry instead of promoting it", () => {
+    // No sampleSpacing and no pressureModel means Konva would render this through the legacy
+    // lineTo/quadraticCurveTo segment path, which the dab-based rasterizer never reproduces.
+    const id = uuid(13);
+    expect(planStudioRasterDrawPromotion({
       element: {
         id,
         type: "draw",
@@ -172,15 +205,7 @@ describe("studio CRDT raster UI bridge", () => {
       pageId: "page-a",
       documentWidth: 800,
       documentHeight: 1_200,
-    });
-
-    expect(plan?.stroke.pressureModel).toBe(pressureModel);
-    expect(plan?.stroke.pressures).toEqual([0, 1]);
-    expect(JSON.parse(plan!.semanticParameters).stroke.pressureModel).toBe(pressureModel);
-    expect(Object.hasOwn(legacy!.stroke, "pressureModel")).toBe(false);
-    expect(JSON.parse(legacy!.semanticParameters).stroke.pressureModel)
-      .toBe("studio-gpu-pressure-radius-v1");
-    expect(plan?.semanticParameters).not.toBe(legacy?.semanticParameters);
+    })).toBeNull();
   });
 
   it("promotes no-spacing explicit-model points without legacy smoothing", () => {
@@ -280,6 +305,7 @@ describe("studio CRDT raster UI bridge", () => {
       strokeWidth: 8,
       opacity: 1,
       brush: "pen",
+      sampleSpacing: 0,
     };
     const plan = planStudioRasterDrawPromotion({
       element,
@@ -326,6 +352,7 @@ describe("studio CRDT raster UI bridge", () => {
       strokeWidth: 8,
       opacity: 1,
       brush: "pen",
+      sampleSpacing: 0,
       panelClip: "none" as const,
     });
     const rasterLog = createStudioRasterOperationLog({

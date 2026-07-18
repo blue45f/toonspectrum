@@ -55,9 +55,11 @@
     "verify:studio-launch": "tsx scripts/verify-studio-launch.mts",
     "verify:studio-brushes": "tsx scripts/verify-studio-brushes.mts",
     "verify:studio-gpu-committed-parity": "tsx scripts/verify-studio-gpu-committed-parity.mts",
+    "verify:studio-bg3d-physics": "tsx scripts/verify-studio-bg3d-physics.mts",
     "verify:creator-logic": "tsx scripts/verify-creator-logic.mts"
   },
   "dependencies": {
+    "@dimforge/rapier3d-deterministic-compat": "0.19.3",
     "@heejun/deskcloud": "^0.1.0",
     "@heejun/platform-bridge": "^0.1.0",
     "@hookform/resolvers": "^5.4.0",

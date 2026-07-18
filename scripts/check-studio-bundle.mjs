@@ -36,6 +36,10 @@ const budgets = {
   studio: { raw: 2_698_000, gzip: 882_500 },
   studioEntry: { raw: 1_160_000, gzip: 350_000 },
   studioIncremental: { raw: 2_115_000, gzip: 690_000, chunks: 120 },
+  // Rapier deterministic compat is intentionally isolated in a user-triggered module Worker.
+  // 2026-07-18 production output: 2,302,139 raw / 855,399 gzip. Keep ~2% version-drift headroom
+  // without charging this optional engine to Studio or the 3D editor's initial graph.
+  bg3dPhysicsWorker: { raw: 2_350_000, gzip: 875_000 },
   // Measured after the same build: 443,257 raw / 143,956 gzip.
   app: { raw: 500_000, gzip: 170_000 },
 };
@@ -242,6 +246,46 @@ if (!fs.existsSync(manifestPath)) {
     );
     if (eager3dRuntime.length > 0) {
       fail(`optional 3D runtime returned to the Studio static graph: ${eager3dRuntime.join(", ")}`);
+    }
+
+    checkDynamicBoundary(
+      "optional 3D background editor",
+      /src\/domains\/creator\/StudioBackground3D\.tsx/,
+      studioKeys,
+    );
+    const background3dEntries = matchingManifestEntries(
+      /src\/domains\/creator\/StudioBackground3D\.tsx/,
+    );
+    if (background3dEntries.length !== 1) {
+      fail(`expected one StudioBackground3D manifest entry, found ${background3dEntries.length}`);
+    } else {
+      const background3dKeys = staticClosure(background3dEntries[0]);
+      const eagerPhysicsRuntime = matchingEntries(
+        background3dKeys,
+        /(?:studio-bg3d-physics-worker-client|node_modules.*rapier3d)/,
+      );
+      if (eagerPhysicsRuntime.length > 0) {
+        fail(
+          `optional BG3D physics runtime returned to the 3D editor static graph: ${eagerPhysicsRuntime.join(", ")}`,
+        );
+      }
+      checkDynamicBoundary(
+        "optional BG3D physics runtime",
+        /src\/domains\/creator\/studio-bg3d-physics-worker-client\.ts/,
+        background3dKeys,
+      );
+    }
+
+    const physicsWorkerFiles = fs.readdirSync(path.join(outputDirectory, "assets"))
+      .filter((file) => /^studio-bg3d-physics\.worker-[A-Za-z0-9_-]+\.js$/u.test(file));
+    if (physicsWorkerFiles.length !== 1) {
+      fail(`expected one isolated BG3D physics Worker asset, found ${physicsWorkerFiles.length}`);
+    } else {
+      const bytes = fs.readFileSync(path.join(outputDirectory, "assets", physicsWorkerFiles[0]));
+      checkBudget("BG3D physics Worker", {
+        raw: bytes.byteLength,
+        gzip: gzipSync(bytes).byteLength,
+      }, budgets.bg3dPhysicsWorker);
     }
 
     const eagerWebglIntro = matchingEntries(appKeys, /(?:IntroSplash|three\.module)/);

@@ -42,7 +42,7 @@ describe("Studio 3D viewport Motion Coach integration", () => {
     const toolbar = sliceBetween(
       backgroundSource,
       '<div className="absolute left-2 top-2 z-10 grid grid-cols-3 gap-1.5 sm:left-2.5 sm:top-2.5 sm:flex sm:flex-col">',
-      "{!viewportHinted ?"
+      "{!physicsInteractionLocked && !viewportHinted ?"
     );
 
     expect(toolbar).toContain("<StudioToolHintTarget");

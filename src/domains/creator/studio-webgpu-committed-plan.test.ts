@@ -179,7 +179,7 @@ describe("planStudioWebGpuCommittedSuffix", () => {
     expect(studioWebGpuCommittedBarrierReason(draw("invalid", overrides))).toBe("invalid-geometry");
   });
 
-  it("allows legacy segment geometry by default, matching the raster-promotion path's own fallback", () => {
+  it("allows legacy segment geometry when the caller does not require causal geometry", () => {
     expect(studioWebGpuCommittedBarrierReason(draw("legacy-segments", {
       sampleSpacing: undefined,
       pressureModel: undefined,

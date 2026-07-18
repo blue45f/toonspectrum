@@ -152,14 +152,13 @@ export function studioRasterBrushSurface(
  * surface owns all pixels below it; otherwise destination-out could not erase non-raster scene
  * content without changing semantics.
  *
- * Causal geometry (sampleSpacing/pressureModel set) is pixel-compatible with Konva's own dab path
- * and the committed WebGPU engine, since all three call the same selectStudioCausalInkSamples /
- * planStudioGpuDabs pipeline. Legacy geometry (neither field set) is NOT pixel-exact: this promotes
- * it through processFreehandPoints + planStudioGpuDabs + arc().fill(), a deterministic, versioned
- * ("studio-freehand-v1") approximation of Konva's actual segment renderer (drawFreehandPenSegments),
- * not a reproduction of it. studioWebGpuCommittedBarrierReason's requireCausalGeometry option is not
- * enabled here, so legacy strokes are still promoted; see studio-webgpu-committed-handoff.ts for the
- * gated committed-render path.
+ * requireCausalGeometry: true restricts promotion to causal geometry (sampleSpacing/pressureModel
+ * set), matching the committed WebGPU handoff's own restriction -- both share
+ * studioWebGpuCommittedBarrierReason and opt in for the same reason. Legacy strokes (neither field
+ * set) fail the barrier and are never promoted: Konva renders them through its endpoint-width
+ * segment path (drawFreehandPenSegments), which this function's dab-based rasterization does not
+ * reproduce. The processFreehandPoints/legacy-pressure branch below is therefore currently
+ * unreachable in practice -- the barrier already rejects every element that would take it.
  */
 export function planStudioRasterDrawPromotion(input: {
   readonly element: StudioRasterDrawPromotionElement;
@@ -169,10 +168,13 @@ export function planStudioRasterDrawPromotion(input: {
 }): StudioRasterDrawPromotionPlan | null {
   const element = input.element;
   if ((element.mode ?? "pen") !== "pen") return null;
-  const barrier = studioWebGpuCommittedBarrierReason({
-    ...element,
-    panelClip: "none",
-  });
+  const barrier = studioWebGpuCommittedBarrierReason(
+    {
+      ...element,
+      panelClip: "none",
+    },
+    { requireCausalGeometry: true }
+  );
   if (barrier !== null) return null;
 
   const sourcePoints = element.points as readonly number[];

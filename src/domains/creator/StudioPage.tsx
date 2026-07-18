@@ -800,7 +800,7 @@ import {
   type PanelSplitLine,
   type PanelSplitPreview,
 } from "./studio-panel-split";
-import { studioToolButtonClass } from "./studio-panel-ui";
+import { STUDIO_EASE, studioToolButtonClass } from "./studio-panel-ui";
 import {
   konvaPatternProps,
   loadPatternTileImage,
@@ -1055,6 +1055,14 @@ import {
   studioUiDensityLabel,
   type StudioUiDensityMode,
 } from "./studio-ui-density";
+import {
+  captureStudioView,
+  fitStudioViewToWidth,
+  planStudioViewRestore,
+  resolveStudioViewShortcut,
+  stepStudioViewZoom,
+  type StudioViewSnapshot,
+} from "./studio-view-controls";
 import { planWatercolorBrushDabs, watercolorBrushSeedFromKey } from "./studio-watercolor-brush";
 import {
   DEFAULT_WATERMARK,
@@ -1180,6 +1188,11 @@ import type { Detail } from "./studio-detail";
 import type { Distort } from "./studio-distort";
 import type { StudioEmeresLibraryItem } from "./studio-emeres-library";
 import type { StudioTutorialTryAction } from "./studio-feature-tutorials";
+import type {
+  StudioFilterDraft,
+  StudioFilterKind,
+  StudioFilterPreview,
+} from "./studio-filter-menu";
 import type { Glow } from "./studio-glow";
 import type { GradientMap } from "./studio-gradient-map";
 import type { Grain } from "./studio-grain";
@@ -1260,11 +1273,44 @@ KonvaRuntime.Filters = KonvaRuntime.Filters ?? {};
 // (내부 공유 <canvas>를 감싸는 얇은 래퍼라 element/렌더별로 새로 만들 이유가 없다).
 const BUBBLE_TEXT_MEASURER = createCanvasBubbleTextMeasurer();
 
+function studioPatchValuesEqual(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+  if (Array.isArray(left) && Array.isArray(right)) {
+    return left.length === right.length &&
+      left.every((value, index) => studioPatchValuesEqual(value, right[index]));
+  }
+  if (
+    left !== null && right !== null &&
+    typeof left === "object" && typeof right === "object"
+  ) {
+    const leftRecord = left as Record<string, unknown>;
+    const rightRecord = right as Record<string, unknown>;
+    const leftKeys = Object.keys(leftRecord);
+    const rightKeys = Object.keys(rightRecord);
+    return leftKeys.length === rightKeys.length &&
+      leftKeys.every((key) => Object.hasOwn(rightRecord, key) &&
+        studioPatchValuesEqual(leftRecord[key], rightRecord[key]));
+  }
+  return false;
+}
+
+const STUDIO_FILTER_SHORTCUTS: Partial<Record<string, StudioFilterKind>> = {
+  Digit1: "gaussian-blur",
+  Digit2: "motion-blur",
+  Digit3: "hue-saturation-brightness",
+  Digit4: "brightness-contrast",
+  Digit5: "color-curves",
+};
+
 // lazyRetry: 이 세션 안에 배포가 잦으면 이미 열린 스튜디오 탭의 lazy import가 옛 청크 해시로
 // 404 나기 쉽다(예: "3D 배경 삽입 시 오류") — 1회 자동 새로고침으로 복구한다(lib/lazy-retry.ts).
 const StudioImageAdjustmentsPanel = lazyRetry(
   () => import("./StudioImageAdjustmentsPanel").then((mod) => ({ default: mod.StudioImageAdjustmentsPanel })),
   "StudioImageAdjustmentsPanel"
+);
+const StudioFilterDialog = lazyRetry(
+  () => import("./StudioFilterDialog").then((mod) => ({ default: mod.StudioFilterDialog })),
+  "StudioFilterDialog"
 );
 const StudioColorPalettePanel = lazyRetry(
   () => import("./StudioColorPalettePanel").then((mod) => ({ default: mod.StudioColorPalettePanel })),
@@ -2601,7 +2647,7 @@ function studioElementIdOf(node: Konva.Node | null): string | null {
 
 // 요소가 "들어가야 할" 패널(중심이 패널 안 + 패널보다 크게 넘치지 않음). 없으면 null.
 // 전체 배경처럼 패널보다 훨씬 큰 요소는 제외해 백드롭이 한 칸에 갇히지 않게 한다.
-function containingPanel(el: El, all: El[]): FrameEl | null {
+function containingPanel(el: El, all: readonly El[]): FrameEl | null {
   if (el.type === "frame") return null;
   const b = elBounds(el);
   const cx = b.x + b.w / 2;
@@ -2786,6 +2832,7 @@ function QuickStartPanel({
   onExample,
   onOpenTemplate,
   onOpenCharacter,
+  onOpenBackground3d,
   onOpenBubble,
   onSmartShape,
   onStartDraw,
@@ -2797,6 +2844,7 @@ function QuickStartPanel({
   onExample: () => void;
   onOpenTemplate: () => void;
   onOpenCharacter: () => void;
+  onOpenBackground3d: () => void;
   onOpenBubble: () => void;
   onSmartShape: () => void;
   onStartDraw: () => void;
@@ -2806,7 +2854,7 @@ function QuickStartPanel({
 }) {
   // Drawing-first tools only — Canva-style visual starter cards (no marketing copy).
   const steps: {
-    id: "draw" | "smart-shape" | "brush-kit" | "template" | "collab-focus" | "character" | "bubble";
+    id: "draw" | "smart-shape" | "brush-kit" | "template" | "collab-focus" | "character" | "background-3d" | "bubble";
     label: string;
     hint: string;
     icon: typeof Pencil;
@@ -2853,6 +2901,13 @@ function QuickStartPanel({
       hint: "2D / 3D 포즈",
       icon: Smile,
       onClick: onOpenCharacter,
+    },
+    {
+      id: "background-3d",
+      label: "3D 배경",
+      hint: "장면 배치 · 물리 낙하",
+      icon: Boxes,
+      onClick: onOpenBackground3d,
     },
     {
       id: "bubble",
@@ -6453,6 +6508,13 @@ function StudioCuttoonEditor() {
 
   // 색맹 시뮬레이션 미리보기 — Stage 에만 SVG feColorMatrix filter 로 라이브 근사(el 데이터 변경 없음).
   const [colorBlindPreview, setColorBlindPreview] = useState<CvdMode>("none");
+  // Q 흑백 보기에서 빠져나갈 때 사용자가 보던 색각 미리보기로 복귀한다.
+  const colorPreviewBeforeGrayscaleRef = useRef<CvdMode>("none");
+  useEffect(() => {
+    if (colorBlindPreview !== "grayscale") {
+      colorPreviewBeforeGrayscaleRef.current = colorBlindPreview;
+    }
+  }, [colorBlindPreview]);
 
   // 그리드 스냅 상태
   const [snapEnabled, setSnapEnabled] = useState(true);
@@ -7396,6 +7458,17 @@ function StudioCuttoonEditor() {
   }, [activePage.id, masterEditMode, pagesHi]);
   // 필터 클립보드 — "필터 복사"로 담아 다른 요소에 "붙여넣기"(웹툰 컷 간 룩 통일용).
   const [filterClipboard, setFilterClipboard] = useState<Partial<ImageFilterFields> | null>(null);
+  // Magma식 상단 필터 메뉴 — 다이얼로그의 draft는 히스토리/CRDT 밖에서 캔버스에만 투영하고,
+  // 저장할 때 patchEl 한 번으로 커밋한다. 취소는 preview만 비우므로 빈 undo 항목을 남기지 않는다.
+  const studioFilterSessionIdRef = useRef(0);
+  const [studioFilterSession, setStudioFilterSession] = useState<{
+    id: number;
+    elementId: string;
+    kind: StudioFilterKind;
+    initialDraft?: StudioFilterDraft;
+  } | null>(null);
+  const [studioFilterPreview, setStudioFilterPreview] = useState<StudioFilterPreview | null>(null);
+  const [lastStudioFilterDraft, setLastStudioFilterDraft] = useState<StudioFilterDraft | null>(null);
   const [editing, setEditing] = useState<{ id: string } | null>(null);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [tutorialHubOpen, setTutorialHubOpen] = useState(false);
@@ -7544,11 +7617,12 @@ function StudioCuttoonEditor() {
     // 캔버스만 보기와 브라우저 Fullscreen API는 서로 다른 복원 경로(Esc)를 갖는다. 함께 켜면
     // Escape 한 번에 둘 다 빠질 수 있으므로, 새 프레젠테이션 모드를 고를 때 이전 모드를 정리한다.
     setCanvasOnlyMode(false);
-    if (document.fullscreenElement) {
-      void document.exitFullscreen?.();
-    } else {
-      void studioRootRef.current?.requestFullscreen?.();
-    }
+    const operation = document.fullscreenElement
+      ? document.exitFullscreen?.()
+      : studioRootRef.current?.requestFullscreen?.();
+    void operation?.catch(() => {
+      announceDrawingShortcut("브라우저에서 전체화면을 허용하지 않았습니다");
+    });
   }
   // 브라우저 창 최대화 토글 — 저장된 패널 상태는 보존하고 화면에서만 잠시 숨긴다.
   function toggleMaximize() {
@@ -8532,6 +8606,8 @@ function StudioCuttoonEditor() {
 
   // 사용자 줌(폭맞춤 스케일에 곱함). effScale로 Stage·내보내기 해상도를 함께 보정.
   const [zoom, setZoom] = useState(1);
+  // Magma식 현재 보기 저장 — 문서/히스토리와 분리된 이 탭 세션의 뷰포트 스냅샷이다.
+  const [savedStudioView, setSavedStudioView] = useState<StudioViewSnapshot | null>(null);
   // 핀치 줌 제스처가 최신 zoom을 stale 없이 읽도록 ref로 동기화.
   const zoomRef = useRef(zoom);
   useEffect(() => {
@@ -10980,6 +11056,20 @@ function StudioCuttoonEditor() {
   }, [menu]);
 
   const selected = selectedId ? (elementById.get(selectedId) ?? null) : null;
+  const studioFilterDialogImage = studioFilterSession
+    ? (elementById.get(studioFilterSession.elementId) ?? null)
+    : null;
+  const studioFilterDialogMutationLocked = !studioFilterDialogImage ||
+    studioFilterDialogImage.type !== "image" ||
+    activeSurfaceReviewLocked ||
+    studioWorkAssetDestructiveEditReason(studioFilterDialogImage) !== null ||
+    isEffectivelyLocked(studioFilterDialogImage, groups);
+  useEffect(() => {
+    if (!studioFilterSession) return;
+    if (studioFilterDialogImage?.type === "image") return;
+    setStudioFilterSession(null);
+    setStudioFilterPreview(null);
+  }, [studioFilterDialogImage, studioFilterSession]);
   const selectedWorkAssetDestructiveEditReason =
     studioWorkAssetDestructiveEditReason(selected);
   const selectedReadableImageSource = selected?.type === "image"
@@ -13410,19 +13500,26 @@ function StudioCuttoonEditor() {
       key === "alphaLocked"
     );
   }
-  function patchEl(id: string, patch: Partial<El>) {
+  function patchEl(id: string, patch: Partial<El>): boolean {
     const target = elementById.get(id);
-    if (target && isEffectivelyLocked(target, groups) && !isLayerMetadataPatch(patch)) return;
+    if (!target) return false;
+    if (isEffectivelyLocked(target, groups) && !isLayerMetadataPatch(patch)) return false;
     const workAssetReason = studioWorkAssetSourceReplacementReason(
-      target ?? null,
+      target,
       patch as Record<string, unknown>
     );
     if (workAssetReason) {
       setError(workAssetReason);
-      return;
+      return false;
     }
+    const changed = Object.entries(patch).some(([key, value]) =>
+      !studioPatchValuesEqual((target as unknown as Record<string, unknown>)[key], value)
+    );
+    if (!changed) return true;
+    const committed = commit(elements.map((e) => (e.id === id ? ({ ...e, ...patch } as El) : e)));
+    if (!committed) return false;
     maybeRecordMacroFromPatch(patch);
-    commit(elements.map((e) => (e.id === id ? ({ ...e, ...patch } as El) : e)));
+    return true;
   }
   // 매직 리사이즈 — 프리셋을 누르면 폭(CANVAS_W)은 그대로 두고 높이만 목표 비율로 바꾼 뒤,
   // studio-magic-resize로 요소 배열을 재배치한다. commit()의 2번째 인자(extraPatch)로 canvasH를
@@ -14796,7 +14893,8 @@ function StudioCuttoonEditor() {
   };
   function fitCanvasToWidth() {
     const wrap = wrapRef.current;
-    if (wrap) setScale(Math.min(2.5, Math.max(0.1, wrap.clientWidth / CANVAS_W)));
+    const maximumScale = isFullscreen || maximized || mobileImmersive || canvasOnlyMode ? 4 : 2.5;
+    if (wrap) setScale(fitStudioViewToWidth(wrap.clientWidth, CANVAS_W, maximumScale));
     setZoom(1);
   }
   function executeQuickAction(action: StudioQuickActionId) {
@@ -14927,8 +15025,8 @@ function StudioCuttoonEditor() {
   function resetView() {
     const wrap = wrapRef.current;
     if (wrap) {
-      const w = wrap.clientWidth;
-      setScale(Math.min(isFullscreen ? 4 : 2.5, Math.max(0.1, w / CANVAS_W)));
+      const maximumScale = isFullscreen || maximized || mobileImmersive || canvasOnlyMode ? 4 : 2.5;
+      setScale(fitStudioViewToWidth(wrap.clientWidth, CANVAS_W, maximumScale));
       wrap.scrollLeft = 0;
       wrap.scrollTop = 0;
     }
@@ -14936,7 +15034,117 @@ function StudioCuttoonEditor() {
     setCanvasFlipH(false);
   }
 
-  // 키보드 단축키: ⌘Z 실행취소 · ⌘⇧Z/⌘Y 다시실행 · G 고급 채우기 · ⌘D 복제 · Delete/Backspace 삭제 · Esc 메뉴 닫기/선택해제.
+  function setActualPixelView() {
+    // effScale = scale × zoom. 두 값을 1로 맞춰 문서 1px을 CSS 1px로 정확히 표시한다.
+    setScale(1);
+    setZoom(1);
+  }
+
+  function toggleHorizontalCanvasView() {
+    setCanvasFlipH((current) => {
+      const next = !current;
+      announceDrawingShortcut(next ? "캔버스 좌우 반전" : "캔버스 반전 해제");
+      return next;
+    });
+  }
+
+  function toggleGrayscaleView() {
+    setColorBlindPreview((current) => {
+      const next = current === "grayscale"
+        ? colorPreviewBeforeGrayscaleRef.current
+        : "grayscale";
+      announceDrawingShortcut(next === "grayscale" ? "흑백 보기" : "흑백 보기 해제");
+      return next;
+    });
+  }
+
+  function saveCurrentStudioView() {
+    const wrap = wrapRef.current;
+    if (!wrap) {
+      announceDrawingShortcut("현재 보기를 저장할 수 없습니다");
+      return;
+    }
+    setSavedStudioView(captureStudioView({
+      pageId: activePage.id,
+      scale,
+      zoom,
+      scrollLeft: wrap.scrollLeft,
+      scrollTop: wrap.scrollTop,
+      viewportWidth: wrap.clientWidth,
+      viewportHeight: wrap.clientHeight,
+      canvasFlipH,
+    }));
+    announceDrawingShortcut("현재 보기 저장");
+  }
+
+  function restoreSavedStudioView() {
+    const wrap = wrapRef.current;
+    if (!savedStudioView || !wrap) {
+      announceDrawingShortcut("저장된 보기가 없습니다");
+      return;
+    }
+    const initialPlan = planStudioViewRestore({
+      snapshot: savedStudioView,
+      pageId: activePage.id,
+      viewportWidth: wrap.clientWidth,
+      viewportHeight: wrap.clientHeight,
+      canvasWidth: CANVAS_W,
+      canvasHeight: canvasH,
+    });
+    if (!initialPlan) {
+      announceDrawingShortcut("이 페이지에 저장된 보기가 없습니다");
+      return;
+    }
+
+    setScale(initialPlan.scale);
+    setZoom(initialPlan.zoom);
+    setCanvasFlipH(initialPlan.canvasFlipH);
+    const restoreScroll = () => {
+      const currentWrap = wrapRef.current;
+      if (!currentWrap) return;
+      const plan = planStudioViewRestore({
+        snapshot: savedStudioView,
+        pageId: activePage.id,
+        viewportWidth: currentWrap.clientWidth,
+        viewportHeight: currentWrap.clientHeight,
+        canvasWidth: CANVAS_W,
+        canvasHeight: canvasH,
+      });
+      if (!plan) return;
+      currentWrap.scrollLeft = plan.scrollLeft;
+      currentWrap.scrollTop = plan.scrollTop;
+    };
+    if (typeof globalThis.requestAnimationFrame === "function") {
+      globalThis.requestAnimationFrame(restoreScroll);
+    } else {
+      restoreScroll();
+    }
+    announceDrawingShortcut("보기 복원");
+  }
+
+  function togglePerspectiveGuideView() {
+    setPerspectiveRulerActive((current) => {
+      const next = !current;
+      if (next) {
+        setTool("draw");
+        setIsometricGridActive(false);
+        setVanishingPoints((points) => {
+          if (points.length > 0) return points;
+          const position = defaultVanishingPointPosition(points, CANVAS_W, canvasH);
+          return addVanishingPoint(points, { id: uid(), x: position.x, y: position.y });
+        });
+      }
+      announceDrawingShortcut(next ? "원근 도우미 표시" : "원근 도우미 숨김");
+      return next;
+    });
+  }
+
+  function showAllLocallyHiddenLayers() {
+    setLocalHiddenElementIds((current) => current.size === 0 ? current : new Set());
+    announceDrawingShortcut("나만 숨긴 레이어 모두 표시");
+  }
+
+  // 키보드 단축키: Magma식 보기 키 + ⌘Z/⌘⇧Z 실행취소·다시실행 + 편집/그리기 키.
   // 최신 클로저를 ref로 흘려 리스너 재등록 없이(빈 deps) 항상 현재 상태를 참조.
   const shortcutRef = useRef<(e: KeyboardEvent) => void>(() => {});
   useEffect(() => {
@@ -15075,8 +15283,44 @@ function StudioCuttoonEditor() {
         setShortcutsOpen((v) => !v);
         return;
       }
+      // Magma식 보기 키는 Shift+S(기존 크기 잠금)와 Shift+G(고급 채우기)보다 먼저 해석한다.
+      // 입력 필드·모달·메뉴·레이어 트리는 위 shortcut boundary 가 이미 보호한다.
+      const viewShortcut = resolveStudioViewShortcut(e);
+      if (viewShortcut) {
+        e.preventDefault();
+        if (viewShortcut === "zoom-in") {
+          setZoom((current) => stepStudioViewZoom(current, 1));
+        } else if (viewShortcut === "zoom-out") {
+          setZoom((current) => stepStudioViewZoom(current, -1));
+        } else if (viewShortcut === "flip-horizontal") {
+          toggleHorizontalCanvasView();
+        } else if (viewShortcut === "fit-width") {
+          fitCanvasToWidth();
+          announceDrawingShortcut("화면에 맞게 조정");
+        } else if (viewShortcut === "actual-pixels") {
+          setActualPixelView();
+          announceDrawingShortcut("실제 픽셀 100%");
+        } else if (viewShortcut === "fullscreen") {
+          toggleFullscreen();
+        } else if (viewShortcut === "toggle-grayscale") {
+          toggleGrayscaleView();
+        } else if (viewShortcut === "save-view") {
+          saveCurrentStudioView();
+        } else if (viewShortcut === "restore-view") {
+          restoreSavedStudioView();
+        } else if (viewShortcut === "toggle-perspective-guide") {
+          togglePerspectiveGuideView();
+        }
+        return;
+      }
       const drawingShortcut = resolveStudioDrawingShortcut(e);
-      if (mod && (e.key === "z" || e.key === "Z")) {
+      const filterShortcut = mod && e.shiftKey && !e.altKey
+        ? STUDIO_FILTER_SHORTCUTS[e.code]
+        : undefined;
+      if (filterShortcut) {
+        e.preventDefault();
+        openStudioFilter(filterShortcut);
+      } else if (mod && (e.key === "z" || e.key === "Z")) {
         e.preventDefault();
         if (e.shiftKey) redo();
         else undo();
@@ -15271,18 +15515,6 @@ function StudioCuttoonEditor() {
         setColor(secondaryColor);
         setSecondaryColor(color);
         announceDrawingShortcut("색 교체");
-      } else if (
-        !mod &&
-        !e.altKey &&
-        !e.shiftKey &&
-        !e.repeat &&
-        (e.key === "h" || e.key === "H") &&
-        !(e.target instanceof HTMLElement && e.target.closest("input, textarea, select, [contenteditable=true]"))
-      ) {
-        // flip canvas horizontally (view only).
-        e.preventDefault();
-        setCanvasFlipH((v) => !v);
-        announceDrawingShortcut("캔버스 반전");
       } else if (!mod && (e.key === "g" || e.key === "G") && selected?.type === "image") {
         e.preventDefault();
         toggleAdvancedFill();
@@ -21861,6 +22093,32 @@ function StudioCuttoonEditor() {
     setSelectedId(null);
     setMarqueeIds(elements.map((el) => el.id));
   }
+  function closeStudioFilterDialog() {
+    setStudioFilterSession(null);
+    setStudioFilterPreview(null);
+  }
+  function openStudioFilter(kind: StudioFilterKind, initialDraft?: StudioFilterDraft) {
+    if (selected?.type !== "image") {
+      announceDrawingShortcut("필터를 적용할 이미지 레이어를 먼저 선택하세요");
+      return;
+    }
+    if (selectedContentMutationLocked) {
+      setError(
+        collaborationDocumentLocked
+          ? collaborationLockMessage()
+          : "이미지 또는 상위 그룹의 잠금을 해제한 뒤 필터를 적용해 주세요."
+      );
+      return;
+    }
+    setStudioFilterPreview(null);
+    studioFilterSessionIdRef.current += 1;
+    setStudioFilterSession({
+      id: studioFilterSessionIdRef.current,
+      elementId: selected.id,
+      kind,
+      ...(initialDraft?.kind === kind ? { initialDraft } : {}),
+    });
+  }
   // 메뉴 항목 onSelect 클로저가 참조하는 에디터 핸들러의 안정 번들 — 그룹 배열 useMemo가
   // 렌더마다 무효화되지 않게 하고, 이벤트 시점엔 항상 최신 클로저를 호출한다.
   const studioMainMenuActions = useStudioStableHandlers({
@@ -21871,16 +22129,25 @@ function StudioCuttoonEditor() {
     copySelectedElements,
     duplicateSelected,
     enterCanvasOnlyMode,
+    fitCanvasToWidth,
     handleCopyToClipboard,
     handleExportProject,
     handleExportProjectArchive,
     handleSave,
+    openStudioFilter,
     openFeatureTutorial,
     redo,
     removeSelected,
+    restoreSavedStudioView,
+    saveCurrentStudioView,
+    setActualPixelView,
     setStudioUiDensity,
+    showAllLocallyHiddenLayers,
     toggleAdvancedFill,
     toggleFullscreen,
+    toggleGrayscaleView,
+    toggleHorizontalCanvasView,
+    togglePerspectiveGuideView,
     undo,
   });
 
@@ -21890,7 +22157,10 @@ function StudioCuttoonEditor() {
   const menuUndoDisabled = hi === 0 || collaborationDocumentLocked;
   const menuRedoDisabled = hi >= history.length - 1 || collaborationDocumentLocked;
   const menuNoSelection = !selected && marqueeIds.length === 0;
+  const menuFilterDisabled = selected?.type !== "image" || selectedContentMutationLocked;
   const menuSharedNonOwnerSave = Boolean(sharedDocument && sharedDocument.role !== "owner");
+  const menuHasSavedView = savedStudioView?.pageId === activePage.id;
+  const menuHasLocallyHiddenLayers = localHiddenElementIds.size > 0;
   const studioMainMenuGroups: StudioMainMenuGroup[] = useMemo(() => [
     {
       id: "file",
@@ -22165,6 +22435,108 @@ function StudioCuttoonEditor() {
       label: "보기",
       items: [
         {
+          id: "zoom-in",
+          label: "확대",
+          icon: Plus,
+          shortcut: "=",
+          onSelect: () => setZoom((current) => stepStudioViewZoom(current, 1)),
+        },
+        {
+          id: "zoom-out",
+          label: "축소",
+          icon: Minus,
+          shortcut: "-",
+          onSelect: () => setZoom((current) => stepStudioViewZoom(current, -1)),
+        },
+        {
+          id: "flip-horizontal",
+          label: "수평 반전",
+          icon: FlipHorizontal2,
+          shortcut: "H",
+          checked: canvasFlipH,
+          onSelect: () => studioMainMenuActions.toggleHorizontalCanvasView(),
+        },
+        {
+          id: "fit",
+          label: "화면에 맞게 조정",
+          icon: ScanLine,
+          shortcut: "Home",
+          onSelect: () => studioMainMenuActions.fitCanvasToWidth(),
+        },
+        {
+          id: "actual-pixels",
+          label: "실제 픽셀 (100%)",
+          icon: Maximize2,
+          shortcut: "End",
+          onSelect: () => studioMainMenuActions.setActualPixelView(),
+          separatorAfter: true,
+        },
+        {
+          id: "fullscreen",
+          label: "전체화면",
+          icon: isFullscreen ? Minimize2 : Maximize2,
+          shortcut: "F11",
+          checked: isFullscreen,
+          onSelect: () => studioMainMenuActions.toggleFullscreen(),
+        },
+        {
+          id: "grayscale",
+          label: "흑백으로 표시",
+          icon: Palette,
+          shortcut: "Q",
+          checked: colorBlindPreview === "grayscale",
+          onSelect: () => studioMainMenuActions.toggleGrayscaleView(),
+        },
+        {
+          id: "reference-window",
+          label: "참고 이미지 창 열기",
+          icon: PictureInPicture2,
+          checked: referencePanelOpen,
+          onSelect: () => {
+            preloadStudioReferencePanel();
+            setReferencePanelOpen((current) => !current);
+          },
+          separatorAfter: true,
+        },
+        {
+          id: "save-current-view",
+          label: "현재 보기 저장",
+          icon: Bookmark,
+          shortcut: "⇧S",
+          onSelect: () => studioMainMenuActions.saveCurrentStudioView(),
+        },
+        {
+          id: "restore-view",
+          label: "보기 복원",
+          icon: HistoryIcon,
+          shortcut: "⇧Z",
+          disabled: !menuHasSavedView,
+          onSelect: () => studioMainMenuActions.restoreSavedStudioView(),
+          separatorAfter: true,
+        },
+        {
+          id: "perspective-guide",
+          label: "원근 도우미 보기",
+          icon: Triangle,
+          shortcut: "⇧G",
+          checked: perspectiveRulerActive,
+          onSelect: () => studioMainMenuActions.togglePerspectiveGuideView(),
+        },
+        {
+          id: "reset-local-visibility",
+          label: "나만 숨긴 레이어 모두 표시",
+          icon: Layers,
+          disabled: !menuHasLocallyHiddenLayers,
+          onSelect: () => studioMainMenuActions.showAllLocallyHiddenLayers(),
+        },
+        {
+          id: "production-insights",
+          label: "제작 인사이트…",
+          icon: GanttChartSquare,
+          onSelect: () => setProductionInsightsOpen(true),
+          separatorAfter: true,
+        },
+        {
           id: "density-focus",
           label: "슈퍼심플 레이아웃",
           icon: Minimize2,
@@ -22204,46 +22576,6 @@ function StudioCuttoonEditor() {
           },
         },
         {
-          id: "fit",
-          label: "너비에 맞춤",
-          icon: ScanLine,
-          onSelect: () => {
-            const wrap = wrapRef.current;
-            if (wrap) {
-              const w = wrap.clientWidth;
-              setScale(Math.min(isFullscreen ? 4 : 2.5, Math.max(0.1, w / CANVAS_W)));
-              setZoom(1);
-            }
-          },
-        },
-        {
-          id: "zoom-in",
-          label: "확대",
-          icon: Plus,
-          shortcut: "⌘+",
-          onSelect: () => setZoom((z) => clampZoom(z + 0.2)),
-        },
-        {
-          id: "zoom-out",
-          label: "축소",
-          icon: Minus,
-          shortcut: "⌘-",
-          onSelect: () => setZoom((z) => clampZoom(z - 0.2)),
-        },
-        {
-          id: "zoom-reset",
-          label: "실제 크기 (100%)",
-          icon: Maximize2,
-          onSelect: () => setZoom(1),
-          separatorAfter: true,
-        },
-        {
-          id: "fullscreen",
-          label: isFullscreen ? "창 모드" : "전체화면",
-          icon: isFullscreen ? Minimize2 : Maximize2,
-          onSelect: () => studioMainMenuActions.toggleFullscreen(),
-        },
-        {
           id: "canvas-only",
           label: "캔버스만",
           icon: Square,
@@ -22281,6 +22613,67 @@ function StudioCuttoonEditor() {
           label: "애플리케이션 설정",
           icon: Settings2,
           onSelect: () => setAppSettingsOpen(true),
+        },
+      ],
+    },
+    {
+      id: "filter",
+      label: "필터",
+      items: [
+        {
+          id: "last-filter",
+          label: lastStudioFilterDraft ? "마지막 필터 다시 열기" : "마지막 필터…",
+          icon: HistoryIcon,
+          disabled: !lastStudioFilterDraft || menuFilterDisabled,
+          separatorAfter: true,
+          onSelect: () => {
+            if (lastStudioFilterDraft) {
+              studioMainMenuActions.openStudioFilter(
+                lastStudioFilterDraft.kind,
+                lastStudioFilterDraft,
+              );
+            }
+          },
+        },
+        {
+          id: "gaussian-blur",
+          label: "가우시안 블러",
+          icon: Droplets,
+          shortcut: "⌘⇧1",
+          disabled: menuFilterDisabled,
+          onSelect: () => studioMainMenuActions.openStudioFilter("gaussian-blur"),
+        },
+        {
+          id: "motion-blur",
+          label: "모션 블러",
+          icon: Wind,
+          shortcut: "⌘⇧2",
+          disabled: menuFilterDisabled,
+          onSelect: () => studioMainMenuActions.openStudioFilter("motion-blur"),
+        },
+        {
+          id: "hue-saturation-brightness",
+          label: "색조 / 채도 / 밝기",
+          icon: Palette,
+          shortcut: "⌘⇧3",
+          disabled: menuFilterDisabled,
+          onSelect: () => studioMainMenuActions.openStudioFilter("hue-saturation-brightness"),
+        },
+        {
+          id: "brightness-contrast",
+          label: "명도 / 대비",
+          icon: SlidersHorizontal,
+          shortcut: "⌘⇧4",
+          disabled: menuFilterDisabled,
+          onSelect: () => studioMainMenuActions.openStudioFilter("brightness-contrast"),
+        },
+        {
+          id: "color-curves",
+          label: "색상 커브",
+          icon: GanttChartSquare,
+          shortcut: "⌘⇧5",
+          disabled: menuFilterDisabled,
+          onSelect: () => studioMainMenuActions.openStudioFilter("color-curves"),
         },
       ],
     },
@@ -22368,15 +22761,23 @@ function StudioCuttoonEditor() {
     },
   ], [
     activePageMutationLocked,
+    canvasFlipH,
     collaborationDocumentLocked,
+    colorBlindPreview,
+    isFullscreen,
+    lastStudioFilterDraft,
     menuDocumentEmpty,
+    menuFilterDisabled,
+    menuHasLocallyHiddenLayers,
+    menuHasSavedView,
+    menuNoSelection,
     menuUndoDisabled,
     menuRedoDisabled,
-    isFullscreen,
     leftPanelOpen,
-    menuNoSelection,
+    perspectiveRulerActive,
     projectArchiveBusy,
     psdImportBusy,
+    referencePanelOpen,
     rightPanelOpen,
     saving,
     menuSharedNonOwnerSave,
@@ -24217,6 +24618,7 @@ function StudioCuttoonEditor() {
     fitCanvasToWidth,
     openBrushManager,
     openInspectorRoute,
+    openStudioFilter,
     queueBrushDelete,
     redo,
     removeSelected,
@@ -25062,6 +25464,7 @@ function StudioCuttoonEditor() {
           effScale={effScale}
           elementById={elementById}
           elements={elements}
+          studioFilterPreview={studioFilterPreview}
           followingStudioSessionId={followingStudioSessionId}
           frameAnimEl={frameAnimEl}
           frameAnimOpen={frameAnimOpen}
@@ -25147,6 +25550,7 @@ function StudioCuttoonEditor() {
           selectedId={selectedId}
           setAiNoticeOpen={setAiNoticeOpen}
           setAppSettingsOpen={setAppSettingsOpen}
+          setBg3dOpen={setBg3dOpen}
           setCanvasOnlyMode={setCanvasOnlyMode}
           setCommentPinArmed={setCommentPinArmed}
           setCommentsOpen={setCommentsOpen}
@@ -25534,6 +25938,7 @@ function StudioCuttoonEditor() {
           drawShape={drawShape}
           drawSheetRef={drawSheetRef}
           dismissBrushManager={dismissBrushManagerToDraw}
+          filterMutationLocked={selectedContentMutationLocked}
           hi={hi}
           history={history}
           isMobile={isMobile}
@@ -25756,6 +26161,36 @@ function StudioCuttoonEditor() {
           writerRoomOpen={writerRoomOpen}
           stableHandlers={studioLazyPanelStackHandlers}
         />
+
+      {studioFilterSession && studioFilterDialogImage?.type === "image" ? (
+        <Suspense fallback={null}>
+          <StudioFilterDialog
+            key={studioFilterSession.id}
+            activeKey={`filter:${studioFilterSession.id}`}
+            kind={studioFilterSession.kind}
+            image={studioFilterDialogImage}
+            {...(studioFilterSession.initialDraft
+              ? { initialDraft: studioFilterSession.initialDraft }
+              : {})}
+            rootRef={studioRootRef}
+            mutationLocked={studioFilterDialogMutationLocked}
+            onPreview={(patch) => {
+              setStudioFilterPreview(
+                patch
+                  ? { elementId: studioFilterSession.elementId, patch }
+                  : null,
+              );
+            }}
+            onApply={(patch, draft) => {
+              if (!patchEl(studioFilterSession.elementId, patch as Partial<El>)) return;
+              setStudioFilterPreview(null);
+              setLastStudioFilterDraft(draft);
+              setStudioFilterSession(null);
+            }}
+            onClose={closeStudioFilterDialog}
+          />
+        </Suspense>
+      ) : null}
 
       {contextMenu.visible && (
         // onClick은 사용자 액션이 아니라 window의 바깥-클릭 닫기로의 버블링만 막는 용도(stopPropagation)이며, 실제 동작은 내부 <button> 메뉴 항목이 담당하는 false positive다.
@@ -34446,6 +34881,7 @@ interface StudioMobileEditingDockHandlers {
   fitCanvasToWidth: () => void;
   openBrushManager: (launcher: HTMLButtonElement) => void;
   openInspectorRoute: (route: StudioInspectorRoute) => void;
+  openStudioFilter: (kind: StudioFilterKind) => void;
   queueBrushDelete: (deleted: DeletedBrushRecord) => void;
   redo: () => void;
   removeSelected: () => void;
@@ -34472,6 +34908,7 @@ interface StudioMobileEditingDockProps {
   drawShape: DrawShapeKind;
   drawSheetRef: import("react").RefObject<HTMLDivElement | null>;
   dismissBrushManager: () => void;
+  filterMutationLocked: boolean;
   hi: number;
   history: PageState[][];
   isMobile: boolean;
@@ -34548,6 +34985,7 @@ const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   drawShape,
   drawSheetRef,
   dismissBrushManager,
+  filterMutationLocked,
   hi,
   history,
   isMobile,
@@ -34614,6 +35052,7 @@ const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
     fitCanvasToWidth,
     openBrushManager,
     openInspectorRoute,
+    openStudioFilter,
     queueBrushDelete,
     redo,
     removeSelected,
@@ -34654,13 +35093,46 @@ const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               }}
             />
             {selected?.type === "image" && marqueeIds.length === 0 ? (
-              <StudioContextActionButton
-                icon={PaintBucket}
-                label="채우기"
-                active={advancedFillActive}
-                disabled={!advancedFillActive && advancedFillUnsupportedReason !== null}
-                onClick={toggleAdvancedFill}
-              />
+              <>
+                <label
+                  className={cn(
+                    "relative flex min-h-11 min-w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl px-2 text-[0.62rem] font-semibold text-fg-2",
+                    STUDIO_EASE,
+                    "focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent",
+                    filterMutationLocked ? "cursor-not-allowed opacity-40" : "cursor-pointer hover:bg-raised",
+                  )}
+                  title={filterMutationLocked ? "이미지 또는 문서 잠금을 해제한 뒤 필터를 적용하세요." : "이미지 필터 선택"}
+                >
+                  <WandSparkles size={16} aria-hidden />
+                  필터
+                  <select
+                    aria-label="이미지 필터 선택"
+                    defaultValue=""
+                    disabled={filterMutationLocked}
+                    className="absolute inset-0 size-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+                    onChange={(event) => {
+                      const kind = event.currentTarget.value as StudioFilterKind;
+                      if (!kind) return;
+                      openStudioFilter(kind);
+                      event.currentTarget.value = "";
+                    }}
+                  >
+                    <option value="" disabled>필터 선택</option>
+                    <option value="gaussian-blur">가우시안 블러</option>
+                    <option value="motion-blur">모션 블러</option>
+                    <option value="hue-saturation-brightness">색조 / 채도 / 밝기</option>
+                    <option value="brightness-contrast">명도 / 대비</option>
+                    <option value="color-curves">색상 커브</option>
+                  </select>
+                </label>
+                <StudioContextActionButton
+                  icon={PaintBucket}
+                  label="채우기"
+                  active={advancedFillActive}
+                  disabled={!advancedFillActive && advancedFillUnsupportedReason !== null}
+                  onClick={toggleAdvancedFill}
+                />
+              </>
             ) : null}
             <StudioContextActionButton icon={Copy} label="복제" onClick={duplicateSelected} />
             {selected && marqueeIds.length === 0 ? (
@@ -36219,6 +36691,7 @@ interface StudioCanvasViewportProps {
   effScale: number;
   elementById: Map<string, El>;
   elements: El[];
+  studioFilterPreview: StudioFilterPreview | null;
   followingStudioSessionId: string | null;
   frameAnimEl: ImageEl | null;
   frameAnimOpen: boolean;
@@ -36305,6 +36778,7 @@ interface StudioCanvasViewportProps {
   selectedId: string | null;
   setAiNoticeOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setAppSettingsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setBg3dOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setCanvasOnlyMode: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setCommentPinArmed: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setCommentsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
@@ -36469,6 +36943,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   effScale,
   elementById,
   elements,
+  studioFilterPreview,
   followingStudioSessionId,
   frameAnimEl,
   frameAnimOpen,
@@ -36554,6 +37029,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   selectedId,
   setAiNoticeOpen,
   setAppSettingsOpen,
+  setBg3dOpen,
   setCanvasOnlyMode,
   setCommentPinArmed,
   setCommentsOpen,
@@ -37398,9 +37874,16 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 // Only this paint-time array may contain ephemeral Blob URLs. The authored
                 // `elements`, page history, autosave, revisions, and CRDT publisher continue to
                 // see stable work-asset URIs.
-                const canvasRenderElements = masterEditMode
+                const authoredCanvasRenderElements = masterEditMode
                   ? elements
                   : studioWorkAssetRenderProjection.elements;
+                const canvasRenderElements = studioFilterPreview
+                  ? authoredCanvasRenderElements.map((element) =>
+                      element.id === studioFilterPreview.elementId && element.type === "image"
+                        ? ({ ...element, ...studioFilterPreview.patch } as El)
+                        : element,
+                    )
+                  : authoredCanvasRenderElements;
                 // 다중 레이어 타임라인 재생 미리보기 — 재생 중에만 계산(커밋 없이 렌더 시점 override).
                 // 정지 상태(timelinePlaying=false)면 항상 null이라 기존 렌더 경로와 100% 동일.
                 const timelineComposite = timelinePlaying
@@ -39163,6 +39646,10 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
               onOpenCharacter={() => {
                 dismissQuickStart();
                 setPoserVrmOpen(true);
+              }}
+              onOpenBackground3d={() => {
+                dismissQuickStart();
+                setBg3dOpen(true);
               }}
               onOpenBubble={() => openQuickStartMenu("bubble")}
               onSmartShape={() => {

@@ -1,3 +1,4 @@
+import { resolveStudioBg3dHierarchy } from "./studio-bg3d-hierarchy";
 import {
   parseStudioBg3dSceneDocument,
   serializeStudioBg3dSceneDocument,
@@ -10,7 +11,12 @@ import {
 export type StudioBg3dPhysicsMotion = "static" | "dynamic" | "kinematic";
 
 export type StudioBg3dCollider =
-  | { readonly kind: "box"; readonly halfExtents: readonly [number, number, number] }
+  | {
+      readonly kind: "box";
+      readonly halfExtents: readonly [number, number, number];
+      /** Collider-local offset from the authored node origin (used by off-origin model AABBs). */
+      readonly center?: StudioBg3dVec3;
+    }
   | { readonly kind: "sphere"; readonly radius: number }
   | { readonly kind: "capsule"; readonly radius: number; readonly halfHeight: number }
   | { readonly kind: "convex-hull"; readonly vertexCount: number }
@@ -39,7 +45,8 @@ export interface StudioBg3dPhysicsTransformSample {
   readonly rotation: StudioBg3dQuaternion;
 }
 
-const MAX_PHYSICS_BODIES = 256;
+export const STUDIO_BG3D_PHYSICS_MAX_BODIES = 256;
+export const STUDIO_BG3D_PHYSICS_MAX_DYNAMIC_BODIES = 32;
 const MAX_COLLIDER_DIMENSION = 10_000;
 const MAX_CONVEX_HULL_VERTICES = 4_096;
 const MAX_TRIANGLE_MESH_TRIANGLES = 50_000;
@@ -52,6 +59,51 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function finiteInRange(value: unknown, minimum: number, maximum: number): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= minimum && value <= maximum;
+}
+
+interface StudioBg3dPhysicsHierarchyContext {
+  readonly nodeById: ReadonlyMap<string, StudioBg3dSceneNode>;
+  readonly parentById: ReadonlyMap<string, string | null>;
+  readonly parentNodeIds: ReadonlySet<string>;
+  readonly effectivelyVisibleNodeIds: ReadonlySet<string>;
+}
+
+/** Mirrors the repaired render hierarchy so collider admission follows effective scene visibility. */
+function createStudioBg3dPhysicsHierarchyContext(
+  nodes: readonly StudioBg3dSceneNode[],
+): StudioBg3dPhysicsHierarchyContext {
+  const nodeById = new Map<string, StudioBg3dSceneNode>();
+  for (const node of nodes) {
+    if (!nodeById.has(node.id)) nodeById.set(node.id, node);
+  }
+  const hierarchy = resolveStudioBg3dHierarchy(nodes);
+  const parentNodeIds = new Set<string>();
+  for (const parentId of hierarchy.parentById.values()) {
+    if (parentId !== null) parentNodeIds.add(parentId);
+  }
+
+  const effectivelyVisibleNodeIds = new Set<string>();
+  const pending = hierarchy.roots.map((id) => ({ id, ancestorsVisible: true }));
+  while (pending.length > 0) {
+    const entry = pending.pop();
+    if (!entry) break;
+    const node = nodeById.get(entry.id);
+    if (!node) continue;
+    const visible = entry.ancestorsVisible && node.visible !== false;
+    if (visible) effectivelyVisibleNodeIds.add(entry.id);
+    const children = hierarchy.childrenByParent.get(entry.id) ?? [];
+    for (let index = children.length - 1; index >= 0; index -= 1) {
+      const childId = children[index];
+      if (childId) pending.push({ id: childId, ancestorsVisible: visible });
+    }
+  }
+
+  return {
+    nodeById,
+    parentById: hierarchy.parentById,
+    parentNodeIds,
+    effectivelyVisibleNodeIds,
+  };
 }
 
 function normalizeCollider(value: unknown): StudioBg3dCollider | null {
@@ -80,11 +132,21 @@ function normalizeCollider(value: unknown): StudioBg3dCollider | null {
   if (value.kind === "box") {
     if (
       !Array.isArray(value.halfExtents) || value.halfExtents.length !== 3 ||
-      value.halfExtents.some((component) => !finiteInRange(component, 0.001, MAX_COLLIDER_DIMENSION))
+      value.halfExtents.some((component) => !finiteInRange(component, 0.001, MAX_COLLIDER_DIMENSION)) ||
+      (value.center !== undefined && (
+        !Array.isArray(value.center) || value.center.length !== 3 ||
+        value.center.some((component) =>
+          !finiteInRange(component, -MAX_COLLIDER_DIMENSION, MAX_COLLIDER_DIMENSION)
+        )
+      ))
     ) return null;
+    const center = value.center === undefined
+      ? undefined
+      : Object.freeze([...value.center]) as StudioBg3dVec3;
     return Object.freeze({
       kind: "box",
       halfExtents: Object.freeze([...value.halfExtents]) as readonly [number, number, number],
+      ...(center ? { center } : {}),
     });
   }
   return null;
@@ -98,17 +160,16 @@ export function normalizeStudioBg3dPhysicsWorld(
   try {
     if (
       !isRecord(value) || !Array.isArray(value.bodies) ||
-      value.bodies.length > MAX_PHYSICS_BODIES ||
+      value.bodies.length > STUDIO_BG3D_PHYSICS_MAX_BODIES ||
       !Number.isSafeInteger(value.solverSubsteps) ||
       !finiteInRange(value.solverSubsteps, 1, 16) ||
       typeof value.allowSleep !== "boolean"
     ) return null;
-    const nodeById = document
-      ? new Map(document.nodes.map((node) => [node.id, node] as const))
+    const hierarchy = document
+      ? createStudioBg3dPhysicsHierarchyContext(document.nodes)
       : null;
-    const parentNodeIds = document
-      ? new Set(document.nodes.flatMap((node) => node.parentId ? [node.parentId] : []))
-      : null;
+    const nodeById = hierarchy?.nodeById ?? null;
+    const parentNodeIds = hierarchy?.parentNodeIds ?? null;
     const documentOrder = document
       ? new Map(document.nodes.map((node, index) => [node.id, index] as const))
       : null;
@@ -122,9 +183,11 @@ export function normalizeStudioBg3dPhysicsWorld(
       if (
         typeof nodeId !== "string" || !nodeId || nodeId.length > 80 ||
         seen.has(nodeId) || (nodeById && !node) ||
+        (hierarchy && !hierarchy.effectivelyVisibleNodeIds.has(nodeId)) ||
         (motion !== "static" && motion !== "dynamic" && motion !== "kinematic") ||
         (motion === "dynamic" && (
-          node?.parentId || node?.locked || parentNodeIds?.has(nodeId)
+          (hierarchy?.parentById.get(nodeId) ?? null) !== null ||
+          node?.locked || parentNodeIds?.has(nodeId)
         )) ||
         !finiteInRange(rawBody.mass, 0, 1_000_000) ||
         !finiteInRange(rawBody.friction, 0, 2) ||
@@ -167,8 +230,11 @@ export function normalizeStudioBg3dPhysicsWorld(
   }
 }
 
-function defaultCollider(node: StudioBg3dSceneNode): StudioBg3dCollider {
-  const scale = node.transform.scale.map((component) => Math.abs(component)) as [number, number, number];
+export function createStudioBg3dPhysicsDefaultCollider(
+  node: StudioBg3dSceneNode,
+  effectiveScale: StudioBg3dVec3 = node.transform.scale,
+): StudioBg3dCollider {
+  const scale = effectiveScale.map((component) => Math.abs(component)) as [number, number, number];
   // Model geometry is not trusted to be cheap enough for runtime hull generation. Until verified
   // collider metadata exists, a bounded unit-space AABB is the deterministic preview fallback.
   if (node.kind === "model") {
@@ -208,21 +274,26 @@ export function createStudioBg3dPhysicsWorld(
   document: StudioBg3dSceneDocument,
   dynamicNodeIds: ReadonlySet<string>,
 ): StudioBg3dPhysicsWorld | null {
-  if (dynamicNodeIds.size > MAX_PHYSICS_BODIES) return null;
-  const nodeById = new Map(document.nodes.map((node) => [node.id, node] as const));
-  const parentNodeIds = new Set(document.nodes.flatMap((node) =>
-    node.parentId ? [node.parentId] : []
-  ));
+  if (dynamicNodeIds.size > STUDIO_BG3D_PHYSICS_MAX_DYNAMIC_BODIES) return null;
+  const hierarchy = createStudioBg3dPhysicsHierarchyContext(document.nodes);
   for (const id of dynamicNodeIds) {
-    const node = nodeById.get(id);
-    if (!node || node.parentId || node.locked || parentNodeIds.has(id)) return null;
+    const node = hierarchy.nodeById.get(id);
+    if (
+      !node || !hierarchy.effectivelyVisibleNodeIds.has(id) ||
+      (hierarchy.parentById.get(id) ?? null) !== null ||
+      node.locked || hierarchy.parentNodeIds.has(id)
+    ) return null;
   }
-  const bodies: StudioBg3dPhysicsBody[] = document.nodes.map((node) => {
+  // 숨긴 레이어는 화면에도 없으므로 충돌체로 남기지 않는다. 그렇지 않으면 사용자가 볼 수 없는
+  // 오브젝트 위에 선택한 소품이 떠 있는 것처럼 보여 물리 미리보기와 렌더 결과가 어긋난다.
+  const bodies: StudioBg3dPhysicsBody[] = document.nodes
+    .filter((node) => hierarchy.effectivelyVisibleNodeIds.has(node.id))
+    .map((node) => {
     const dynamic = dynamicNodeIds.has(node.id);
     return {
       nodeId: node.id,
       motion: dynamic ? "dynamic" : "static",
-      collider: defaultCollider(node),
+      collider: createStudioBg3dPhysicsDefaultCollider(node),
       mass: dynamic ? 1 : 0,
       friction: 0.6,
       restitution: 0.1,
@@ -260,7 +331,7 @@ export function applyStudioBg3dPhysicsTransforms(
   samples: unknown,
   worldValue: unknown,
 ): StudioBg3dSceneDocument | null {
-  if (!Array.isArray(samples) || samples.length > MAX_PHYSICS_BODIES) return null;
+  if (!Array.isArray(samples) || samples.length > STUDIO_BG3D_PHYSICS_MAX_BODIES) return null;
   const world = normalizeStudioBg3dPhysicsWorld(worldValue, document);
   if (!world) return null;
   const dynamicNodeIds = new Set(

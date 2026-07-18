@@ -148,6 +148,32 @@ describe("Studio BG3D physics boundary", () => {
     expect(createStudioBg3dPhysicsWorld(lockedDocument, new Set(["root-box"]))).toBeNull();
   });
 
+  it("omits hidden colliders, including visible descendants of a hidden ancestor", () => {
+    const hiddenDocument = normalizeStudioBg3dSceneDocument({
+      ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+      nodes: [
+        DOCUMENT.nodes[0],
+        { ...DOCUMENT.nodes[1], visible: false },
+        DOCUMENT.nodes[2],
+      ],
+    });
+    const world = createStudioBg3dPhysicsWorld(hiddenDocument, new Set(["root-box"]));
+    expect(world?.bodies.map((body) => body.nodeId)).toEqual(["root-box"]);
+    expect(createStudioBg3dPhysicsWorld(hiddenDocument, new Set(["parent-box"]))).toBeNull();
+
+    const visibleWorld = createStudioBg3dPhysicsWorld(DOCUMENT, new Set(["root-box"]))!;
+    expect(normalizeStudioBg3dPhysicsWorld({
+      ...visibleWorld,
+      bodies: visibleWorld.bodies.filter((body) => body.nodeId !== "parent-box"),
+    }, hiddenDocument)).toBeNull();
+
+    const hiddenSelectionDocument = normalizeStudioBg3dSceneDocument({
+      ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+      nodes: [{ ...DOCUMENT.nodes[0], visible: false }],
+    });
+    expect(createStudioBg3dPhysicsWorld(hiddenSelectionDocument, new Set(["root-box"]))).toBeNull();
+  });
+
   it("normalizes quaternion bake results into a new root-local SceneDocument", () => {
     const world = createStudioBg3dPhysicsWorld(DOCUMENT, new Set(["root-box"]))!;
     const result = applyStudioBg3dPhysicsTransforms(DOCUMENT, [{

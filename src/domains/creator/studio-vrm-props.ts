@@ -433,6 +433,7 @@ export interface PropRigSecondary {
   bone: PropHandBone;
   /** 원래 포즈와 보조 손 IK 결과의 혼합 비율. */
   influence: number;
+  /** VRM 아바타/모델 로컬 좌표의 팔꿈치 유도점. 런타임에서 vrm.scene.matrixWorld로 변환한다. */
   elbowHint?: Vec3;
 }
 

@@ -58,6 +58,96 @@ function pngHeader(width: number, height: number, byteLength = 32): Uint8Array {
   return bytes;
 }
 
+function validUastcKtx2(): Uint8Array {
+  const headerBytes = 80;
+  const levelIndexBytes = 24;
+  const dfdOffset = headerBytes + levelIndexBytes;
+  const dfdByteLength = 44;
+  const levelOffset = 160; // KTX2 level data begins at a 16-byte boundary.
+  const levelByteLength = 16;
+  const bytes = new Uint8Array(levelOffset + levelByteLength);
+  const view = new DataView(bytes.buffer);
+
+  bytes.set([0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb, 0x0d, 0x0a, 0x1a, 0x0a]);
+  view.setUint32(12, 0, true); // vkFormat: Basis Universal payload
+  view.setUint32(16, 1, true); // typeSize
+  view.setUint32(20, 4, true);
+  view.setUint32(24, 4, true);
+  view.setUint32(28, 0, true); // 2D texture
+  view.setUint32(32, 0, true); // not an array texture
+  view.setUint32(36, 1, true); // one face
+  view.setUint32(40, 1, true); // one mip level
+  view.setUint32(44, 0, true); // UASTC without supercompression
+  view.setUint32(48, dfdOffset, true);
+  view.setUint32(52, dfdByteLength, true);
+
+  view.setBigUint64(80, BigInt(levelOffset), true);
+  view.setBigUint64(88, BigInt(levelByteLength), true);
+  view.setBigUint64(96, BigInt(levelByteLength), true);
+
+  view.setUint32(dfdOffset, dfdByteLength, true);
+  view.setUint32(dfdOffset + 4, 0, true); // Khronos vendor + basic descriptor type
+  view.setUint16(dfdOffset + 8, 2, true);
+  view.setUint16(dfdOffset + 10, 40, true);
+  bytes[dfdOffset + 12] = 166; // KHR_DF_MODEL_UASTC
+  bytes[dfdOffset + 13] = 1; // BT.709/sRGB primaries
+  bytes[dfdOffset + 14] = 2; // sRGB transfer
+  bytes[dfdOffset + 16] = 3; // 4x4 texel block, stored as dimension - 1
+  bytes[dfdOffset + 17] = 3;
+  bytes[dfdOffset + 20] = levelByteLength;
+  bytes[dfdOffset + 30] = 127; // one UASTC sample spans the full 128-bit block
+  bytes[dfdOffset + 31] = 0; // RGBA UASTC channel type
+  view.setUint32(dfdOffset + 36, 0, true);
+  view.setUint32(dfdOffset + 40, 0xffff_ffff, true);
+  bytes.fill(0x5a, levelOffset);
+  return bytes;
+}
+
+function basisTextureGlb({
+  fallback = true,
+  required = false,
+  ktx2 = validUastcKtx2(),
+  rootOverrides = {},
+}: {
+  fallback?: boolean;
+  required?: boolean;
+  ktx2?: Uint8Array;
+  rootOverrides?: Record<string, unknown>;
+} = {}): Uint8Array {
+  const png = pngHeader(2, 3);
+  const ktxOffset = fallback ? png.byteLength : 0;
+  const bin = new Uint8Array(ktxOffset + ktx2.byteLength);
+  if (fallback) bin.set(png);
+  bin.set(ktx2, ktxOffset);
+
+  const images = fallback
+    ? [
+        { bufferView: 0, mimeType: "image/png" },
+        { bufferView: 1, mimeType: "image/ktx2" },
+      ]
+    : [{ bufferView: 0, mimeType: "image/ktx2" }];
+  const bufferViews = fallback
+    ? [
+        { buffer: 0, byteOffset: 0, byteLength: png.byteLength },
+        { buffer: 0, byteOffset: ktxOffset, byteLength: ktx2.byteLength },
+      ]
+    : [{ buffer: 0, byteOffset: 0, byteLength: ktx2.byteLength }];
+  const basisSource = fallback ? 1 : 0;
+
+  return makeGlb(validRoot({
+    buffers: [{ byteLength: bin.byteLength }],
+    bufferViews,
+    images,
+    textures: [{
+      ...(fallback ? { source: 0 } : {}),
+      extensions: { KHR_texture_basisu: { source: basisSource } },
+    }],
+    extensionsUsed: ["KHR_texture_basisu"],
+    ...(required ? { extensionsRequired: ["KHR_texture_basisu"] } : {}),
+    ...rootOverrides,
+  }), bin);
+}
+
 function validRoot(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     asset: { version: "2.0", generator: "test" },
@@ -464,9 +554,138 @@ describe("validateStudioBg3dGlb self-contained resource policy", () => {
   });
 
   it("requires callers to explicitly allow renderer-supported required extensions", async () => {
-    const bytes = validGlb({ extensionsRequired: ["KHR_draco_mesh_compression"] });
+    const bytes = validGlb({
+      extensionsUsed: ["KHR_draco_mesh_compression"],
+      extensionsRequired: ["KHR_draco_mesh_compression"],
+    });
     await expectFailure(bytes, "unsupported-required-extension");
     expect((await validate(bytes, { supportedRequiredExtensions: ["KHR_draco_mesh_compression"] })).ok).toBe(true);
+  });
+
+  it("accepts optional KHR_texture_basisu UASTC with a core PNG fallback", async () => {
+    const bytes = basisTextureGlb();
+    const result = await validate(bytes);
+
+    expect(result).toMatchObject({
+      ok: true,
+      metrics: {
+        textures: 1,
+        images: 2,
+        imageBytes: 208,
+        estimatedDecodedImageBytes: 88,
+        maxImageDimension: 4,
+        undeterminedImageDimensions: 0,
+      },
+    });
+  });
+
+  it("keeps required KHR_texture_basisu fail-closed unless the renderer explicitly allowlists it", async () => {
+    const bytes = basisTextureGlb({ fallback: false, required: true });
+
+    await expectFailure(bytes, "unsupported-required-extension");
+    const result = await validate(bytes, {
+      supportedRequiredExtensions: ["KHR_texture_basisu"],
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      metrics: {
+        textures: 1,
+        images: 1,
+        imageBytes: 176,
+        estimatedDecodedImageBytes: 64,
+        maxImageDimension: 4,
+      },
+    });
+  });
+
+  it("rejects malformed KTX2 bytes even when a valid core fallback exists", async () => {
+    const malformed = validUastcKtx2();
+    malformed[0] = 0;
+    await expectFailure(basisTextureGlb({ ktx2: malformed }), "invalid-image");
+  });
+
+  it.each([
+    [
+      "an out-of-bounds Basis source",
+      { textures: [{ source: 0, extensions: { KHR_texture_basisu: { source: 2 } } }] },
+    ],
+    [
+      "a PNG selected as the Basis source",
+      { textures: [{ source: 0, extensions: { KHR_texture_basisu: { source: 0 } } }] },
+    ],
+    [
+      "a KTX2 image selected through the core texture source",
+      { textures: [{ source: 1, extensions: { KHR_texture_basisu: { source: 1 } } }] },
+    ],
+    [
+      "a Basis texture without extensionsUsed declaration",
+      { extensionsUsed: undefined },
+    ],
+  ])("rejects %s", async (_label, rootOverrides) => {
+    await expectFailure(basisTextureGlb({ rootOverrides }), "invalid-image");
+  });
+
+  it("rejects an optional Basis texture without a portable core fallback", async () => {
+    await expectFailure(basisTextureGlb({ fallback: false }), "invalid-image");
+  });
+
+  it("rejects an embedded KTX2 image that no Basis texture references", async () => {
+    const bytes = basisTextureGlb({
+      rootOverrides: {
+        textures: [{ source: 0 }],
+        extensionsUsed: undefined,
+      },
+    });
+    await expectFailure(bytes, "invalid-image");
+  });
+
+  it("validates extension-set and sampler references before renderer admission", async () => {
+    await expectFailure(basisTextureGlb({
+      rootOverrides: { extensionsUsed: ["KHR_texture_basisu", "KHR_texture_basisu"] },
+    }), "invalid-gltf-root");
+    await expectFailure(basisTextureGlb({
+      required: true,
+      rootOverrides: { extensionsRequired: ["KHR_texture_basisu", "KHR_texture_basisu"] },
+    }), "invalid-gltf-root", { supportedRequiredExtensions: ["KHR_texture_basisu"] });
+    await expectFailure(basisTextureGlb({
+      rootOverrides: {
+        extensionsRequired: ["KHR_draco_mesh_compression"],
+      },
+    }), "invalid-gltf-root", {
+      supportedRequiredExtensions: ["KHR_draco_mesh_compression"],
+    });
+    await expectFailure(basisTextureGlb({
+      rootOverrides: {
+        textures: [{
+          source: 0,
+          sampler: 0,
+          extensions: { KHR_texture_basisu: { source: 1 } },
+        }],
+      },
+    }), "invalid-gltf-root");
+
+    const validSampler = await validate(basisTextureGlb({
+      rootOverrides: {
+        samplers: [{}],
+        textures: [{
+          source: 0,
+          sampler: 0,
+          extensions: { KHR_texture_basisu: { source: 1 } },
+        }],
+      },
+    }));
+    expect(validSampler.ok).toBe(true);
+  });
+
+  it("requires a core PNG/JPEG fallback rather than an extension-only image format", async () => {
+    await expectFailure(basisTextureGlb({
+      rootOverrides: {
+        images: [
+          { bufferView: 0, mimeType: "image/webp" },
+          { bufferView: 1, mimeType: "image/ktx2" },
+        ],
+      },
+    }), "invalid-image");
   });
 
   it("rejects out-of-bounds buffer views before reading image bytes", async () => {

@@ -1,7 +1,8 @@
 # ToonSpectrum Studio 3D 엔진·전문 런타임 확장 검토
 
 - 작성일: 2026-07-18
-- 상태: 엔진 중립 경계·Three WebGPU 격리 lab 구현, 프로덕션 기본은 Three/R3F 유지
+- 상태: SceneDocument v3·범용 2-bone IK·Rapier Worker 물리 preview/bake·Three WebGPU 격리 lab 구현,
+  프로덕션 기본은 Three/R3F 유지
 - 연계 ADR: [Babylon.js 도입 평가](./studio-babylonjs-adoption-evaluation-2026-07-11.md), [3D 런타임 지연 로딩·WebGPU 벤치마크](./studio-3d-runtime-loading-benchmark-2026-07-13.md)
 - 구현 계약: `studio-bg3d-runtime-topology.ts`, `studio-bg3d-runtime-adapter.ts`,
   `studio-bg3d-three-webgpu-lab.ts`
@@ -27,8 +28,10 @@
 
 ## 현재 구현된 공통 기반
 
-- SceneDocument v2: 카메라, 조명, 출력, 품질, attachment, transform, 재질 override, animation,
-  additive joint pose, additive morph layer를 엔진 중립 데이터로 왕복한다.
+- SceneDocument v3: 카메라, 조명, 출력, 품질, attachment, transform, 재질 override, animation,
+  additive joint pose, additive morph, aim과 analytic two-bone IK를 엔진 중립 데이터로 왕복한다.
+  v2 aim-only 문서는 명시적인 v2→v3 migration에서 빈 IK 컬렉션을 추가하며, v2 마커로 v3 필드를
+  위장한 문서는 거부한다.
 - GLB 신뢰 경계: SHA-256, 컨테이너/chunk, 외부 URI, bufferView/accessor/sparse 범위, texture decoded
   memory, animation/skin/joint/morph/accessor 예산을 Worker에서 검사한다.
 - 다중 형식 입력: GLB, glTF, OBJ/MTL, FBX, DAE, STL, PLY, 3DS를 canonical self-contained GLB로
@@ -45,19 +48,37 @@
   실패 폐쇄한다. 현재 측정된 동적 청크는 197,119 gzip bytes이며 정책 예산은 210,000 bytes다.
 - 계층/제약: primitive와 model이 섞인 실제 렌더 트리, 순환·고아 부모 복구, 월드 구도를 보존하는
   재부모화, 서로 다른 부모를 가진 다중 선택의 월드 행렬 delta, 애니메이션·포즈 뒤 비파괴 joint
-  aim constraint를 제공한다.
+  aim과 model-local target/pole 기반 analytic two-bone IK를 제공한다. IK solver는 VRM과 generic
+  GLB/FBX/OBJ canonical 경로가 공유하며, 부분 weight를 반복해도 누적되지 않는다. 겹치는 IK 체인,
+  zero-length ancestry, mirrored/singular/non-uniform/sheared transform은 fail closed 처리하고, 성공한
+  IK 체인의 ancestor aim은 end-effector 위치를 깨뜨리지 않도록 건너뛴다. 외부 animation/tracking이
+  procedural 출력 뒤에 본을 다시 쓰면 최신 외부 포즈의 소유권을 보존한다.
 - 런타임 부하 제어: 숨김/프러스텀 밖 애니메이션은 정지하고 먼 모델은 20/10Hz로 낮추되 절대 Studio
   시간에서 다시 샘플해 드리프트를 없앤다. 선택한 모델과 캡처 프레임은 항상 최신 자세를 사용한다.
 - Worker 풀: GLB 신뢰 경계는 단일 파일에서 Worker 하나만 지연 생성하고, 여러 파일 검사가 실제로
   겹칠 때에만 기기 코어·메모리 신호에 따라 최대 2개로 확장한다. 저사양/정보 미확인 환경은 1개다.
+- Rapier 물리 Worker: deterministic-compat WASM을 첫 사용 때만 지연 로드하고 UI thread와 분리해
+  root-level static/dynamic body를 고정 timestep으로 preview한다. play/pause/resume/reset, 진행률,
+  지구/달/무중력, 선택 제한, transient transform projection, 현재 프레임 bake와 undo를 제공한다.
+  rig/animation/pose/morph/constraint 모델은 transform ownership 충돌을 막기 위해 dynamic 대상에서
+  제외한다. 중첩된 static collider는 부모를 포함한 world scale을 사용하고, 비균일 scale과 자식 회전이
+  rigid body로 표현할 수 없는 shear를 만들면 작업 전체를 fail closed한다. 프로덕션 빌드와 Worker 경계
+  테스트뿐 아니라 실제 Chromium에서 box 낙하, pause/freeze,
+  reset, bake, 3D undo/redo를 통과했다. 390px/320px 모바일에서도 같은 Worker transport, 44px touch
+  target, 가로 overflow 없음과 console/page error 부재를 확인했다. 현재 package script로 제공되는
+  이 Chromium smoke를 수동 배포 전 회귀 검사로 유지하며, CI 브라우저 실행 환경이 고정되면 자동
+  배포 게이트로 승격한다.
 - 정적 렌더 최적화: 동일 프리미티브 kind는 editor-local geometry/edge GPU buffer를 공유하고,
   선택되지 않은 루트는 local matrix를 고정한다. 문서 transform 변경 때 matrix를 즉시 갱신하며
   선택/TransformControls 진입 시 자동 행렬 갱신을 되살린다.
 - 적응형 viewport 품질: 지속적인 프레임 예산 초과에서만 DPR을 `1/0.85/0.7/0.55` 단계로 낮추고,
   훨씬 긴 여유 구간 뒤에 천천히 복구한다. 탭 복귀·debug pause·단발 long task는 무시하고 capture
   동안 governor를 정지한다. 캡처는 요청 크기의 별도 render target이므로 export 해상도는 유지된다.
-- device `lodBias`는 이제 거리 기반 animation CPU LOD에도 반영되어 모바일/저품질 프로필이 far/very
-  far sampling rate로 더 일찍 전환하고, 음수 bias는 근거리 full-rate 영역을 넓힌다.
+- animation CPU LOD는 모델 구의 카메라 투영 지름을 CSS pixel로 계산해 near/far/very-far sampling
+  rate를 선택한다. perspective/orthographic 카메라, viewport 높이, FOV/zoom을 같은 의미로 처리하고
+  10% hysteresis로 임계점 떨림을 막는다. near-plane 교차, 선택, capture는 최고 세부도를 강제하며,
+  투영 신호가 유효하지 않을 때만 기존 거리/반경 경로로 안전하게 폴백한다. device `lodBias`도 두 경로에
+  동일하게 반영한다.
 - 정적 모델 instancing: 같은 verified model을 3개 이상 반복 배치하면 안전 조건을 통과한 source mesh마다
   하나의 Three `InstancedMesh`로 묶는다. skin/morph, line/point/light, transparent/custom shader,
   custom render hook, LOD, per-instance material/animation/pose/constraint, hierarchy child, mirrored/sheared
@@ -71,7 +92,7 @@
 - 물리 specialist DTO: static/dynamic/kinematic body, box/sphere/capsule/convex/triangle-mesh collider,
   질량·마찰·반발·감쇠·solver substep, hull vertex/mesh triangle, 전체 body-substep과 narrow-phase 작업량을
   엔진 중립 예산으로 제한한다. dynamic triangle mesh, 잠긴/parented/자식을 가진 dynamic body는 거부하고,
-  검증된 collider metadata가 없는 model은 bounded AABB로 폴백한다. Babylon/향후 Rapier가 반환한 결과는
+  검증된 collider metadata가 없는 model은 bounded unit-space AABB로 폴백한다. Rapier가 반환한 결과는
   원래 world의 dynamic root에 속하는 정규화된 position과 quaternion만 받아 canonical SceneDocument
   transform patch로 다시 검증한 뒤 적용할 수 있다.
 
@@ -155,13 +176,27 @@
 - Meshopt: 구현 완료. GLB 검증기가 압축 원본 범위와 디코딩 논리 범위를 따로 검사하고, 디코딩 출력은
   기존 geometry memory budget에 포함한다. Three의 WASM 디코더는 기기 코어 수에 따라 최대 2개
   Worker로 제한하며 CSP가 blob Worker를 막으면 비동기 WASM 경로로 안전하게 폴백한다.
-- KTX2/BasisU·Draco: transcoder/decoder asset 무결성, Worker 수명주기, 디코딩 메모리·시간 예산을
-  먼저 만든 뒤 canonical allowlist에 추가한다.
-- LOD/instance: geometry 공유, 정적 root matrix 고정, 안전한 반복 model instancing은 구현 완료.
-  다음은 저작 LOD attachment와 카메라 투영 크기 전환이다.
+- KTX2/BasisU: decoder-free 구조 검증 경계까지 구현했다. KTX2 식별자·header, 안전한 uint64와 level
+  index 순서/범위/정렬, Basis DFD, 정렬·중복·예약 key를 포함한 KVD, ETC1S SGD slice, glTF의
+  `KHR_texture_basisu` source/fallback 참조를 먼저 검증한다. optional Basis + 검증된 PNG/JPEG fallback만
+  현재 런타임에 들어오며, 필수 Basis 확장은 renderer allowlist에서 계속 fail closed다. 선언 mip 전체의
+  RGBA8 decoded-memory도 texture budget에 청구한다. UASTC/ETC1S DFD는 sample bit offset/length,
+  qualifier, position, lower/upper까지 Khronos model 계약과 대조하고, Zstandard mip는 magic·frame header,
+  dictionary/content-size 필드, block envelope와 선언 uncompressed size를 디코더 없이 검증한다. 다음
+  게이트는 pinned transcoder/WASM asset 무결성, Worker 수명주기, 실제 UASTC/ETC1S/Zstd corpus의 디코딩
+  시간·checksum·메모리·폭탄 내성이다. Draco도 동일한 validator-first 원칙으로 별도 진행한다.
+- LOD/instance: geometry 공유, 정적 root matrix 고정, 안전한 반복 model instancing과 engine-neutral
+  projected CSS-pixel size/hysteresis selector를 animation CPU LOD에 연결했다. perspective/orthographic,
+  FOV/zoom/viewport, near-plane, 선택/capture 최고 세부도와 거리 폴백까지 순수 테스트로 고정했다. 다음은
+  SceneDocument v4 후보인 authored LOD attachment set과 attachment별 verified cache/mapping이다.
 - WebGPU: Three WebGPURenderer 격리 lab/probe는 구현했다. 다음 게이트는 feature flag UI와 동일
   SceneDocument·capture golden 실기기 비교이며, 통과 전에는 기본 편집기를 교체하지 않는다.
-- animation/rig: clip layer, pose/morph, IK, retarget, root motion, constraints를 문서 레이어로 확장.
+- animation/rig: pose/morph, aim, analytic two-bone IK와 현재 animation→pose→IK/aim 결과의 무손실
+  pose bake를 구현했다. bake는 성공한 유효 제약만 weight 1 정적 pose로 원자 저장하고, animation을 실제
+  표시 sample time에 일시정지하며 제약을 제거해 한 번의 3D undo/redo로 왕복한다. 외부 transform write,
+  비유한 값, 지원하지 않는 hierarchy/scale은 fail closed다. 다음은 semantic rig profile과 사용자 확인형
+  bone mapping, retarget, root motion 추출/loop 누적/bake, foot lock·ground contact, joint limit, twist 보정,
+  다관절 FABRIK/CCD, clip layer/crossfade/bone mask/additive clip 순서다.
 
 ### P1 — PlayCanvas와 Babylon의 경쟁 PoC
 
