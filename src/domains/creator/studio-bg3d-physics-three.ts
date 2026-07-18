@@ -3,6 +3,7 @@ import * as THREE from "three";
 import {
   createStudioBg3dPhysicsDefaultCollider,
   normalizeStudioBg3dPhysicsWorld,
+  type StudioBg3dCollider,
   type StudioBg3dPhysicsTransformSample,
   type StudioBg3dPhysicsWorld,
 } from "./studio-bg3d-physics";
@@ -17,10 +18,69 @@ import type {
 } from "./studio-bg3d-scene-document";
 
 const MAX_WORLD_COORDINATE = 10_000;
+const MIN_COLLIDER_HALF_EXTENT = 0.001;
+
+export interface StudioBg3dPhysicsModelLocalBounds {
+  readonly center: StudioBg3dVec3;
+  readonly halfExtents: StudioBg3dVec3;
+}
 
 export interface StudioBg3dPhysicsThreeJob {
   readonly world: StudioBg3dPhysicsWorld;
   readonly initialPoses: readonly StudioBg3dPhysicsTransformSample[];
+}
+
+/**
+ * Measures the same auto-fitted cache root that is cloned into the viewport. The result remains in
+ * the authored node's local space, including a GLB scene root's own position/rotation/scale.
+ */
+export function measureStudioBg3dPhysicsModelLocalBounds(
+  root: THREE.Object3D,
+): StudioBg3dPhysicsModelLocalBounds | null {
+  root.updateWorldMatrix(true, true);
+  const box = new THREE.Box3().setFromObject(root);
+  if (box.isEmpty()) return null;
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const values = [center.x, center.y, center.z, size.x, size.y, size.z];
+  if (
+    values.some((component) => !Number.isFinite(component)) ||
+    Math.max(size.x, size.y, size.z) <= 0
+  ) return null;
+  const halfExtents = [size.x / 2, size.y / 2, size.z / 2] as StudioBg3dVec3;
+  return Object.freeze({
+    center: Object.freeze([center.x, center.y, center.z] as const),
+    halfExtents: Object.freeze(halfExtents),
+  });
+}
+
+function createStudioBg3dModelBoundsCollider(
+  bounds: StudioBg3dPhysicsModelLocalBounds,
+  effectiveScale: StudioBg3dVec3,
+): StudioBg3dCollider | null {
+  const halfExtents = bounds.halfExtents.map(
+    (component, index) => Math.max(
+      MIN_COLLIDER_HALF_EXTENT,
+      component * effectiveScale[index],
+    ),
+  );
+  const center = bounds.center.map(
+    (component, index) => component * effectiveScale[index],
+  );
+  if (
+    halfExtents.some((component) =>
+      !Number.isFinite(component) || component < MIN_COLLIDER_HALF_EXTENT ||
+      component > MAX_WORLD_COORDINATE
+    ) ||
+    center.some((component) =>
+      !Number.isFinite(component) || Math.abs(component) > MAX_WORLD_COORDINATE
+    )
+  ) return null;
+  return Object.freeze({
+    kind: "box",
+    halfExtents: Object.freeze(halfExtents) as readonly [number, number, number],
+    center: Object.freeze(center) as StudioBg3dVec3,
+  });
 }
 
 /**
@@ -31,6 +91,7 @@ export interface StudioBg3dPhysicsThreeJob {
 export function createStudioBg3dPhysicsThreeJob(
   document: StudioBg3dSceneDocument,
   localWorld: StudioBg3dPhysicsWorld,
+  modelLocalBoundsByNodeId: ReadonlyMap<string, StudioBg3dPhysicsModelLocalBounds> = new Map(),
 ): StudioBg3dPhysicsThreeJob | null {
   const normalizedLocalWorld = normalizeStudioBg3dPhysicsWorld(localWorld, document);
   if (!normalizedLocalWorld) return null;
@@ -60,9 +121,18 @@ export function createStudioBg3dPhysicsThreeJob(
     if (effectiveScale.some((component) => !Number.isFinite(component) || component <= 1e-8)) {
       return null;
     }
+    const modelBounds = node.kind === "model"
+      ? modelLocalBoundsByNodeId.get(node.id)
+      : undefined;
+    const collider = node.kind === "model"
+      ? modelBounds
+        ? createStudioBg3dModelBoundsCollider(modelBounds, effectiveScale)
+        : null
+      : createStudioBg3dPhysicsDefaultCollider(node, effectiveScale);
+    if (!collider) return null;
     return {
       ...body,
-      collider: createStudioBg3dPhysicsDefaultCollider(node, effectiveScale),
+      collider,
     };
   });
   if (bodies.some((body) => body === null)) return null;

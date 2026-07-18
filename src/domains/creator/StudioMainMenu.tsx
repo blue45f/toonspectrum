@@ -5,7 +5,7 @@
  * stacking or menubar overflow clipping.
  * When one menu is open, hovering another group switches (desktop app menubar UX).
  */
-import { ChevronDown, type LucideIcon } from "lucide-react";
+import { Check, ChevronDown, type LucideIcon } from "lucide-react";
 import {
   useEffect,
   useId,
@@ -13,6 +13,7 @@ import {
   useRef,
   useState,
   type ReactElement,
+  type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
@@ -28,6 +29,8 @@ export interface StudioMainMenuItem {
   label: string;
   shortcut?: string;
   icon?: LucideIcon;
+  /** State for non-destructive view toggles such as canvas flip and grayscale preview. */
+  checked?: boolean;
   disabled?: boolean;
   danger?: boolean;
   separatorAfter?: boolean;
@@ -46,6 +49,37 @@ export interface StudioMainMenuProps {
 }
 
 type MenuCoords = { top: number; left: number; minWidth: number };
+type MenuOpenFocusIntent = "first" | "preserve";
+export type StudioMainMenuNavigationCommand = "first" | "last" | "next" | "previous";
+
+/** Pure APG roving-index resolver; enabled items wrap while disabled items are never targeted. */
+// This colocated export is intentional: the parent task limits the APG change to this component
+// and its test, while the pure resolver keeps disabled-item navigation independently verifiable.
+// eslint-disable-next-line react-refresh/only-export-components
+export function resolveStudioMainMenuItemIndex(
+  items: readonly Pick<StudioMainMenuItem, "disabled">[],
+  currentIndex: number,
+  command: StudioMainMenuNavigationCommand,
+): number {
+  const enabledIndexes: number[] = [];
+  for (let index = 0; index < items.length; index += 1) {
+    if (!items[index]?.disabled) enabledIndexes.push(index);
+  }
+  if (enabledIndexes.length === 0) return -1;
+  if (command === "first") return enabledIndexes[0] ?? -1;
+  if (command === "last") return enabledIndexes.at(-1) ?? -1;
+  const enabledPosition = enabledIndexes.indexOf(currentIndex);
+  if (enabledPosition < 0) {
+    return command === "previous"
+      ? (enabledIndexes.at(-1) ?? -1)
+      : (enabledIndexes[0] ?? -1);
+  }
+  const offset = command === "next" ? 1 : -1;
+  const targetPosition = (
+    enabledPosition + offset + enabledIndexes.length
+  ) % enabledIndexes.length;
+  return enabledIndexes[targetPosition] ?? -1;
+}
 
 function measureTrigger(btn: HTMLButtonElement | null): MenuCoords {
   if (!btn) {
@@ -81,18 +115,66 @@ function MenuDropdown({
   const panelId = useId();
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const openedRef = useRef(false);
+  const openFocusIntentRef = useRef<MenuOpenFocusIntent>("first");
+  const closeMenuRef = useRef<(restoreFocus?: boolean) => void>(() => undefined);
   // Keep last coords so the panel can paint on the same frame as open=true
   // (do not gate portal on a second useState tick).
   const [coords, setCoords] = useState<MenuCoords>(() => measureTrigger(null));
+  const [activeItemIndex, setActiveItemIndex] = useState(() =>
+    resolveStudioMainMenuItemIndex(group.items, -1, "first")
+  );
 
   const updateCoords = () => {
     setCoords(measureTrigger(buttonRef.current));
   };
 
+  const closeMenu = (restoreFocus = true) => {
+    onClose();
+    // Escape and explicit menu actions return to the owning trigger. Pointer dismissal must leave
+    // focus on the control the artist just clicked; pulling it back makes form fields require a
+    // second click and breaks the expected desktop-app menu contract.
+    if (restoreFocus) buttonRef.current?.focus({ preventScroll: true });
+  };
+
+  const openMenu = (focusIntent: MenuOpenFocusIntent) => {
+    openFocusIntentRef.current = focusIntent;
+    setCoords(measureTrigger(buttonRef.current));
+    onOpen();
+  };
+
+  const focusMenuItem = (
+    command: StudioMainMenuNavigationCommand,
+    currentIndex = activeItemIndex,
+  ) => {
+    const nextIndex = resolveStudioMainMenuItemIndex(group.items, currentIndex, command);
+    if (nextIndex < 0) return;
+    setActiveItemIndex(nextIndex);
+    itemRefs.current[nextIndex]?.focus({ preventScroll: true });
+  };
+
+  useEffect(() => {
+    closeMenuRef.current = closeMenu;
+  });
+
   useLayoutEffect(() => {
-    if (!open) return;
+    if (!open) {
+      openedRef.current = false;
+      return;
+    }
+    if (openedRef.current) return;
+    openedRef.current = true;
     updateCoords();
-  }, [open]);
+    const firstEnabledIndex = resolveStudioMainMenuItemIndex(group.items, -1, "first");
+    setActiveItemIndex(firstEnabledIndex);
+    if (openFocusIntentRef.current === "first" && firstEnabledIndex >= 0) {
+      itemRefs.current[firstEnabledIndex]?.focus({ preventScroll: true });
+    } else if (openFocusIntentRef.current === "first") {
+      menuRef.current?.focus({ preventScroll: true });
+    }
+    openFocusIntentRef.current = "first";
+  }, [group.items, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -107,10 +189,12 @@ function MenuDropdown({
           "[data-studio-main-menu-trigger]"
         );
         if (otherTrigger) return;
-        onClose();
+        closeMenuRef.current(false);
       }
       function onKey(e: KeyboardEvent) {
-        if (e.key === "Escape") onClose();
+        if (e.key !== "Escape" || e.defaultPrevented) return;
+        e.preventDefault();
+        closeMenuRef.current();
       }
       function onReposition() {
         updateCoords();
@@ -130,7 +214,34 @@ function MenuDropdown({
       window.clearTimeout(attachTimer);
       remove?.();
     };
-  }, [open, onClose]);
+  }, [open]);
+
+  const handleMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      closeMenu();
+      return;
+    }
+    const command: StudioMainMenuNavigationCommand | null =
+      event.key === "ArrowDown"
+        ? "next"
+        : event.key === "ArrowUp"
+          ? "previous"
+          : event.key === "Home"
+            ? "first"
+            : event.key === "End"
+              ? "last"
+              : null;
+    if (!command) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const itemElement = (event.target as HTMLElement | null)?.closest?.(
+      "[data-studio-main-menu-item-index]"
+    );
+    const itemIndex = Number(itemElement?.getAttribute("data-studio-main-menu-item-index"));
+    focusMenuItem(command, Number.isSafeInteger(itemIndex) ? itemIndex : activeItemIndex);
+  };
 
   const menu =
     open && typeof document !== "undefined"
@@ -140,7 +251,10 @@ function MenuDropdown({
             id={panelId}
             role="menu"
             aria-label={group.label}
+            tabIndex={-1}
             data-studio-main-menu-panel="true"
+            data-studio-shortcut-boundary="true"
+            onKeyDown={handleMenuKeyDown}
             className={cn(
               "fixed max-h-[min(70dvh,28rem)] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel py-1.5 shadow-2xl",
               "[scrollbar-width:thin]"
@@ -153,18 +267,30 @@ function MenuDropdown({
               zIndex: STUDIO_Z.workspace,
             }}
           >
-            {group.items.map((item) => {
+            {group.items.map((item, itemIndex) => {
               const Icon = item.icon;
               return (
                 <div key={item.id}>
                   <button
+                    ref={(node) => {
+                      itemRefs.current[itemIndex] = node;
+                    }}
                     type="button"
-                    role="menuitem"
+                    role={item.checked === undefined ? "menuitem" : "menuitemcheckbox"}
+                    aria-checked={item.checked === undefined ? undefined : item.checked}
                     disabled={item.disabled}
+                    tabIndex={item.disabled || itemIndex !== activeItemIndex ? -1 : 0}
+                    data-studio-main-menu-item-index={itemIndex}
+                    onFocus={() => {
+                      if (!item.disabled) setActiveItemIndex(itemIndex);
+                    }}
                     onClick={() => {
                       if (item.disabled) return;
-                      item.onSelect();
-                      onClose();
+                      try {
+                        item.onSelect();
+                      } finally {
+                        closeMenu();
+                      }
                     }}
                     className={cn(
                       "mx-1 flex w-[calc(100%-0.5rem)] items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-[0.78rem] font-medium",
@@ -182,6 +308,9 @@ function MenuDropdown({
                       <span aria-hidden className="size-[15px] shrink-0" />
                     )}
                     <span className="min-w-0 flex-1 truncate tracking-tight">{item.label}</span>
+                    {item.checked ? (
+                      <Check size={13} strokeWidth={2.25} aria-hidden className="shrink-0 text-accent" />
+                    ) : null}
                     {item.shortcut ? <StudioKbdBadge>{item.shortcut}</StudioKbdBadge> : null}
                   </button>
                   {item.separatorAfter ? (
@@ -200,8 +329,8 @@ function MenuDropdown({
       className="relative shrink-0"
       onMouseEnter={() => {
         if (barActive && !open) {
-          setCoords(measureTrigger(buttonRef.current));
-          onOpen();
+          // Desktop hover switching should not yank keyboard focus into the newly revealed menu.
+          openMenu("preserve");
         }
       }}
     >
@@ -217,7 +346,23 @@ function MenuDropdown({
           if (e.button !== 0) return;
           if (!open) setCoords(measureTrigger(buttonRef.current));
         }}
-        onClick={() => (open ? onClose() : onOpen())}
+        onKeyDown={(event) => {
+          if (event.key === "Escape" && open) {
+            event.preventDefault();
+            event.stopPropagation();
+            closeMenu();
+            return;
+          }
+          if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+          event.preventDefault();
+          event.stopPropagation();
+          if (open) {
+            focusMenuItem("first", -1);
+          } else {
+            openMenu("first");
+          }
+        }}
+        onClick={() => (open ? closeMenu() : openMenu("first"))}
         className={cn(
           "inline-flex h-8 items-center gap-1 rounded-lg px-2.5 text-[0.78rem] font-semibold tracking-tight",
           STUDIO_EASE,
@@ -251,6 +396,7 @@ export function StudioMainMenu({ groups, className }: StudioMainMenuProps): Reac
     <nav
       aria-label="메인 메뉴"
       data-studio-main-menu="true"
+      data-studio-shortcut-boundary="true"
       className={cn("flex min-w-0 flex-nowrap items-center gap-0.5", className)}
     >
       {groups.map((group) => (

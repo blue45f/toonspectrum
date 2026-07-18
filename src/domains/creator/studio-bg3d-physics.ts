@@ -11,7 +11,12 @@ import {
 export type StudioBg3dPhysicsMotion = "static" | "dynamic" | "kinematic";
 
 export type StudioBg3dCollider =
-  | { readonly kind: "box"; readonly halfExtents: readonly [number, number, number] }
+  | {
+      readonly kind: "box";
+      readonly halfExtents: readonly [number, number, number];
+      /** Collider-local offset from the authored node origin (used by off-origin model AABBs). */
+      readonly center?: StudioBg3dVec3;
+    }
   | { readonly kind: "sphere"; readonly radius: number }
   | { readonly kind: "capsule"; readonly radius: number; readonly halfHeight: number }
   | { readonly kind: "convex-hull"; readonly vertexCount: number }
@@ -127,11 +132,21 @@ function normalizeCollider(value: unknown): StudioBg3dCollider | null {
   if (value.kind === "box") {
     if (
       !Array.isArray(value.halfExtents) || value.halfExtents.length !== 3 ||
-      value.halfExtents.some((component) => !finiteInRange(component, 0.001, MAX_COLLIDER_DIMENSION))
+      value.halfExtents.some((component) => !finiteInRange(component, 0.001, MAX_COLLIDER_DIMENSION)) ||
+      (value.center !== undefined && (
+        !Array.isArray(value.center) || value.center.length !== 3 ||
+        value.center.some((component) =>
+          !finiteInRange(component, -MAX_COLLIDER_DIMENSION, MAX_COLLIDER_DIMENSION)
+        )
+      ))
     ) return null;
+    const center = value.center === undefined
+      ? undefined
+      : Object.freeze([...value.center]) as StudioBg3dVec3;
     return Object.freeze({
       kind: "box",
       halfExtents: Object.freeze([...value.halfExtents]) as readonly [number, number, number],
+      ...(center ? { center } : {}),
     });
   }
   return null;

@@ -5,10 +5,12 @@ import { createStudioBg3dPhysicsWorld } from "./studio-bg3d-physics";
 import {
   createStudioBg3dPhysicsInitialPoses,
   createStudioBg3dPhysicsThreeJob,
+  measureStudioBg3dPhysicsModelLocalBounds,
   projectStudioBg3dPhysicsSamples,
 } from "./studio-bg3d-physics-three";
 import {
   DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+  STUDIO_BG3D_GLB_MIME,
   normalizeStudioBg3dSceneDocument,
 } from "./studio-bg3d-scene-document";
 
@@ -55,6 +57,35 @@ const DOCUMENT = normalizeStudioBg3dSceneDocument({
       receivesShadow: true,
     },
   ],
+});
+
+const MODEL_DOCUMENT = normalizeStudioBg3dSceneDocument({
+  ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+  attachments: [{
+    id: "model-attachment",
+    name: "Prop.glb",
+    mime: STUDIO_BG3D_GLB_MIME,
+    byteSize: 1_024,
+    hash: `sha256:${"1".padStart(64, "0")}`,
+    rights: {
+      status: "owned",
+      commercialUse: true,
+      attributionRequired: false,
+    },
+    source: "upload",
+  }],
+  nodes: [{
+    id: "model-node",
+    parentId: null,
+    name: "Model",
+    kind: "model",
+    attachmentId: "model-attachment",
+    transform: { position: [0, 3, 0], rotation: [0, 0, 0], scale: [1, 2, 0.5] },
+    visible: true,
+    locked: false,
+    castsShadow: true,
+    receivesShadow: true,
+  }],
 });
 
 describe("Studio BG3D physics Three projection", () => {
@@ -161,6 +192,42 @@ describe("Studio BG3D physics Three projection", () => {
     const localWorld = createStudioBg3dPhysicsWorld(oversizedDocument, new Set(["dynamic"]))!;
 
     expect(createStudioBg3dPhysicsThreeJob(oversizedDocument, localWorld)).toBeNull();
+  });
+
+  it("matches an auto-fitted model root AABB, including its local center offset", () => {
+    const root = new THREE.Group();
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1));
+    mesh.position.set(0.25, 0.5, -0.25);
+    root.add(mesh);
+    // The viewport cache applies this auto-fit transform before cloning the root into the node.
+    root.scale.setScalar(2);
+    const bounds = measureStudioBg3dPhysicsModelLocalBounds(root);
+    expect(bounds).toEqual({ center: [0.5, 1, -0.5], halfExtents: [1, 1, 1] });
+
+    const localWorld = createStudioBg3dPhysicsWorld(MODEL_DOCUMENT, new Set(["model-node"]))!;
+    const job = createStudioBg3dPhysicsThreeJob(
+      MODEL_DOCUMENT,
+      localWorld,
+      new Map([["model-node", bounds!]]),
+    );
+    expect(job?.world.bodies[0]?.collider).toEqual({
+      kind: "box",
+      halfExtents: [1, 2, 0.5],
+      center: [0.5, 2, -0.25],
+    });
+  });
+
+  it("fails closed when a model bound is unavailable or exceeds the Worker collider budget", () => {
+    const localWorld = createStudioBg3dPhysicsWorld(MODEL_DOCUMENT, new Set(["model-node"]))!;
+    expect(createStudioBg3dPhysicsThreeJob(MODEL_DOCUMENT, localWorld)).toBeNull();
+    expect(createStudioBg3dPhysicsThreeJob(
+      MODEL_DOCUMENT,
+      localWorld,
+      new Map([["model-node", {
+        center: [10_001, 0, 0],
+        halfExtents: [1, 1, 1],
+      }]]),
+    )).toBeNull();
   });
 
   it("validates the complete batch before projecting root transforms", () => {

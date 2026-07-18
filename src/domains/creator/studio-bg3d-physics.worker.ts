@@ -32,6 +32,7 @@ function colliderDescriptor(
   switch (body.collider.kind) {
     case "box":
       descriptor = RAPIER.ColliderDesc.cuboid(...body.collider.halfExtents);
+      if (body.collider.center) descriptor.setTranslation(...body.collider.center);
       break;
     case "sphere":
       descriptor = RAPIER.ColliderDesc.ball(body.collider.radius);

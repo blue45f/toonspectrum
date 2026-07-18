@@ -130,8 +130,13 @@ describe("Studio BG3D modal focus contract", () => {
     expect(background3dSource).toContain("dialogRef: modalDialogRef");
     expect(background3dSource).toContain("rootRef: modalRootRef");
     expect(background3dSource).toContain(
+      "resolveReturnFocus: () => resolveStudioBg3dReturnFocus(modalDialogRef.current)",
+    );
+    expect(background3dSource).toContain(
       "modalRootRef.current = modalDialogRef.current?.ownerDocument.body ?? null;",
     );
+    expect(background3dSource).toContain('button.title === "3D 배경 재편집"');
+    expect(background3dSource).toContain('normalizedText(button) === "3D 배경"');
     expect(background3dSource).toContain('data-bg3d-initial-focus="true"');
     expect(background3dSource).toContain("ref={modalDialogRef}");
     expect(background3dSource).toContain('aria-modal="true"');

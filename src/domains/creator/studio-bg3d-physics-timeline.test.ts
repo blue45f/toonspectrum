@@ -103,6 +103,33 @@ describe("studio BG3D deterministic physics timeline DTO", () => {
     expect(normalizeStudioBg3dPhysicsTimelineInput(inputFor(tooManyTotal))).toBeNull();
   });
 
+  it("preserves bounded model AABB offsets and rejects unsafe collider centers at the Worker DTO boundary", () => {
+    const offsetBox: StudioBg3dPhysicsBody = {
+      ...body("offset-box"),
+      collider: {
+        kind: "box",
+        halfExtents: [1, 2, 0.5],
+        center: [0.5, 2, -0.25],
+      },
+    };
+    const normalized = normalizeStudioBg3dPhysicsTimelineInput(inputFor([offsetBox]));
+    expect(normalized?.world.bodies[0]?.collider).toEqual(offsetBox.collider);
+    expect(Object.isFrozen(
+      normalized?.world.bodies[0]?.collider.kind === "box"
+        ? normalized.world.bodies[0].collider.center
+        : null,
+    )).toBe(true);
+
+    expect(normalizeStudioBg3dPhysicsTimelineInput(inputFor([{
+      ...offsetBox,
+      collider: {
+        kind: "box",
+        halfExtents: [1, 2, 0.5],
+        center: [10_001, 0, 0],
+      },
+    }]))).toBeNull();
+  });
+
   it("requires explicit, bounded geometry for hull and mesh colliders", () => {
     const hull: StudioBg3dPhysicsBody = {
       ...body("hull"),
