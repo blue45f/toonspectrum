@@ -22,6 +22,7 @@ describe("Studio VRM visual pose bone boundary", () => {
     expect(source).toContain("onSelect(boneName)");
     expect(source).toContain("function selectViewportPoseBone(boneName: VRMHumanBoneName)");
     expect(source).toContain("candidate.bones.includes(boneName)");
+    expect(source).toContain('id={`vrm-manual-bone-${boneName}`}');
     expect(source).toContain("data-vrm-pose-bone={boneName}");
     expect(source).toContain("selectedViewportPoseBone === boneName");
     expect(source).toContain("locked={lockedBones.includes(boneName)}");
@@ -34,7 +35,7 @@ describe("Studio VRM visual pose bone boundary", () => {
     expect(source).toContain("applyVrmTwoBoneGrip(");
     expect(source).toContain('if (phase !== "end") return;');
     expect(source).toContain("setCustomBones(nextBones)");
-    expect(source).toContain("enabled={!isViewportHandIkDragging}");
+    expect(source).toContain("enabled={!isViewportHandIkDragging && !jointHandleInteracting}");
     expect(source).toContain("onPointerCancel={(event) => {");
     expect(source).toContain("const pointerTarget = event.currentTarget as unknown as");
     expect(source).toContain("pointerTarget.setPointerCapture(event.pointerId)");
@@ -50,9 +51,11 @@ describe("Studio VRM visual pose bone boundary", () => {
   });
 
   it("keeps the poser open when the editor rejects an obsolete insertion ticket", () => {
-    expect(source).toContain("onInsert: (pngDataUrl: string, width: number, height: number) => boolean");
-    expect(source).toContain("const accepted = onInsert(fullDataUrl, width, height)");
-    expect(source).toContain("if (!accepted) {");
+    expect(source).toContain("onInsert: (result: StudioVrmPoserInsertResult) =>");
+    expect(source).toContain("const accepted = await onInsert({");
+    expect(source).toContain("pngDataUrl: fullDataUrl,");
+    expect(source).toContain("scene: sceneDocument,");
+    expect(source).toContain("if (accepted === false) {");
     expect(studioPageSource).toContain("if (!mutationTicket || !canApplyStudioMutation(mutationTicket)) return false");
     expect(studioPageSource).toContain('if (!targetEl || targetEl.type !== "image") return false');
     expect(studioPageSource).toContain("return true;");

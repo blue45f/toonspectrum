@@ -37,16 +37,16 @@ import {
   type VrmPhysicsSettings,
 } from "./studio-vrm-physics";
 import {
+  STUDIO_VRM_DIRECT_EDIT_BONES,
+  bakeStudioVrmRuntimePose,
+} from "./studio-vrm-pose-bake";
+import {
   clampStudioVrmJointDegrees,
   mirrorStudioVrmFingerRotations,
   mirrorStudioVrmPoseBones,
   straightenStudioVrmUpperBody,
   type StudioVrmPoseMirrorScope,
 } from "./studio-vrm-pose-editing";
-import {
-  STUDIO_VRM_DIRECT_EDIT_BONES,
-  bakeStudioVrmRuntimePose,
-} from "./studio-vrm-pose-bake";
 import {
   applyExpressionWeightsToVrm,
   applyPoseToVrm,
@@ -206,7 +206,6 @@ import {
 import { StudioToolHintTarget } from "./StudioToolHint";
 import { StudioVrmAvatarForge, countDetectedVrmHairMeshes } from "./StudioVrmAvatarForge";
 import { StudioVrmAvatarForgePanel } from "./StudioVrmAvatarForgePanel";
-import { StudioVrmPhotoPoseScanner } from "./StudioVrmPhotoPoseScanner";
 import {
   STUDIO_VRM_JOINT_HANDLE_DEFINITIONS,
   StudioVrmJointHandles,
@@ -214,6 +213,7 @@ import {
   type StudioVrmJointHandleBone,
   type StudioVrmJointWorldPoint,
 } from "./StudioVrmJointHandles";
+import { StudioVrmPhotoPoseScanner } from "./StudioVrmPhotoPoseScanner";
 import { StudioVrmPropPanel } from "./StudioVrmPropPanel";
 import {
   canonicalizeVrmContentHash,

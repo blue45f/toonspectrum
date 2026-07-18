@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const source = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const inspectorSource = readFileSync(new URL("./StudioInspectorAside.tsx", import.meta.url), "utf8");
 
 describe("StudioPage drawing-assist integration contract", () => {
   it("consumes both guide handles before the Stage can begin an ink stroke", () => {
@@ -15,11 +16,11 @@ describe("StudioPage drawing-assist integration contract", () => {
   });
 
   it("keeps panel and canvas guide interactions behind the same edit locks", () => {
-    expect(source).toContain(
+    expect(inspectorSource).toContain(
       "const drawingAssistControlsDisabled = activeSurfaceReviewLocked || saving || masterEditMode"
     );
-    expect(source).toMatch(/<StudioPerspectivePanel[\s\S]*?disabled=\{drawingAssistControlsDisabled\}/u);
-    expect(source).toMatch(/<StudioIsometricGridPanel[\s\S]*?disabled=\{drawingAssistControlsDisabled\}/u);
+    expect(inspectorSource).toMatch(/<StudioPerspectivePanel[\s\S]*?disabled=\{drawingAssistControlsDisabled\}/u);
+    expect(inspectorSource).toMatch(/<StudioIsometricGridPanel[\s\S]*?disabled=\{drawingAssistControlsDisabled\}/u);
     expect(source).toMatch(
       /<StudioPerspectiveOverlay[\s\S]*?disabled=\{activeSurfaceReviewLocked \|\| saving \|\| masterEditMode\}/u
     );
@@ -35,7 +36,7 @@ describe("StudioPage drawing-assist integration contract", () => {
     expect(source).toMatch(
       /<StudioIsometricGridOverlay[\s\S]*?onPreviewOrigin=\{previewIsometricOrigin\}[\s\S]*?onCommitOrigin=\{commitIsometricOrigin\}[\s\S]*?onCancelOrigin=\{cancelStudioDrawingAssistPreview\}/u
     );
-    expect(source).toMatch(
+    expect(inspectorSource).toMatch(
       /<StudioIsometricGridPanel[\s\S]*?onPreviewOrigin=\{previewIsometricOrigin\}[\s\S]*?onCommitOrigin=\{commitIsometricOrigin\}/u
     );
   });

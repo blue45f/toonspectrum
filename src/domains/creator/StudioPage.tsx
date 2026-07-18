@@ -13513,12 +13513,16 @@ function StudioCuttoonEditor() {
       Math.abs(anchor.rotation ?? 0) < 1e-6 &&
       result.perspectiveGuides.length > 0
     ) {
-      setVanishingPoints(result.perspectiveGuides.map((point) => ({
+      const perspectivePoints = result.perspectiveGuides.map((point) => ({
         id: uid(),
         x: anchor.x + point.x * anchor.width,
         y: anchor.y + point.y * anchor.height,
-      })));
-      setPerspectiveRulerActive(true);
+      }));
+      commitStudioDrawingAssistDocument((current) => ({
+        ...current,
+        perspective: { ...current.perspective, active: true, points: perspectivePoints },
+        isometric: { ...current.isometric, active: false },
+      }));
     }
     return true;
   }
