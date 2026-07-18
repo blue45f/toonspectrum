@@ -141,13 +141,23 @@ if (!fs.existsSync(manifestPath)) {
       );
     }
 
-    const eagerVoiceController = matchingEntries(
+    const eagerVoiceRuntime = matchingEntries(
       studioKeys,
-      /studio-voice-call(?!-model)/,
+      /(?:studio-voice-call(?!-model)|studio-voice-ice-policy)/,
     );
-    if (eagerVoiceController.length > 0) {
+    if (eagerVoiceRuntime.length > 0) {
       fail(
-        `optional WebRTC voice controller returned to the Studio static graph: ${eagerVoiceController.join(", ")}`,
+        `optional WebRTC voice runtime returned to the Studio static graph: ${eagerVoiceRuntime.join(", ")}`,
+      );
+    }
+
+    const eagerLayerNavigator = matchingEntries(
+      studioKeys,
+      /StudioLayerNavigator(?:\.tsx)?/,
+    );
+    if (eagerLayerNavigator.length > 0) {
+      fail(
+        `optional layer navigator returned to the Studio static graph: ${eagerLayerNavigator.join(", ")}`,
       );
     }
 

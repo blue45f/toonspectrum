@@ -917,8 +917,8 @@ export function StudioLayerNavigator({
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-1.5">
-              <h3 className="text-xs font-bold tracking-tight text-fg">레이어 {stats.total}</h3>
-              <span id={resultStatusId} role="status" aria-live="polite" className="rounded-full bg-raised px-1.5 py-0.5 text-[0.62rem] font-semibold tabular-nums text-fg-3">
+              <h3 className="whitespace-nowrap text-xs font-bold tracking-tight text-fg">레이어 {stats.total}</h3>
+              <span id={resultStatusId} role="status" aria-live="polite" className="whitespace-nowrap rounded-full bg-raised px-1.5 py-0.5 text-[0.62rem] font-semibold tabular-nums text-fg-3">
                 결과 {results.length}
               </span>
             </div>
@@ -931,11 +931,11 @@ export function StudioLayerNavigator({
             type="button"
             onClick={() => setMobileMultiSelect((current) => !current)}
             aria-pressed={mobileMultiSelect}
+            aria-label="다중 선택"
             className={cn(compactControl, mobileMultiSelect && "border-accent bg-accent-soft text-accent")}
             title="터치에서도 여러 레이어를 선택할 수 있어요"
           >
             <ListChecks size={13} />
-            <span className="hidden min-[350px]:inline">다중 선택</span>
           </button>
           <button
             type="button"
@@ -952,7 +952,6 @@ export function StudioLayerNavigator({
             }
           >
             <FolderPlus size={13} />
-            <span className="hidden min-[390px]:inline">그룹</span>
           </button>
         </div>
 

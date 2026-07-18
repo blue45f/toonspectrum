@@ -1116,10 +1116,6 @@ import { StudioHistoryBrushOverlay } from "./StudioHistoryBrushOverlay";
 import { StudioInspectorNavigator } from "./StudioInspectorNavigator";
 import { StudioIsometricGridOverlay } from "./StudioIsometricGridOverlay";
 import { StudioLayerMaskOverlay } from "./StudioLayerMaskOverlay";
-import {
-  StudioLayerNavigator,
-  type StudioLayerNavigatorAction,
-} from "./StudioLayerNavigator";
 import { StudioLineCleanupPanel } from "./StudioLineCleanupPanel";
 import { StudioLineCorrectionControls } from "./StudioLineCorrectionControls";
 import {
@@ -1218,6 +1214,7 @@ import type { StudioBackground3DInsertResult } from "./StudioBackground3D";
 import type { StudioColorPopoverProps } from "./StudioColorPopover";
 import type { StudioExportMenuPanelProps } from "./StudioExportMenuPanel";
 import type { StudioIntegrationsSettingsPanelProps } from "./StudioIntegrationsSettingsPanel";
+import type { StudioLayerNavigatorAction } from "./StudioLayerNavigator";
 import type { StudioLivePressureStore } from "./StudioLiveInkHosts";
 import type { StudioMainMenuGroup } from "./StudioMainMenu";
 import type { PublishContext } from "./StudioPublishContextBanner";
@@ -1255,6 +1252,10 @@ const BUBBLE_TEXT_MEASURER = createCanvasBubbleTextMeasurer();
 const StudioImageAdjustmentsPanel = lazyRetry(
   () => import("./StudioImageAdjustmentsPanel").then((mod) => ({ default: mod.StudioImageAdjustmentsPanel })),
   "StudioImageAdjustmentsPanel"
+);
+const StudioLayerNavigator = lazyRetry(
+  () => import("./StudioLayerNavigator").then((mod) => ({ default: mod.StudioLayerNavigator })),
+  "StudioLayerNavigator"
 );
 const StudioPageThumbnail = lazyRetry(
   () => import("./StudioPageThumbnails").then((mod) => ({ default: mod.StudioPageThumbnail })),
@@ -28541,16 +28542,37 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
             hidden={inspectorLayout.primary !== "layers"}
             className="h-[min(31rem,54dvh)] min-h-72 lg:h-[calc(100dvh-28rem)] lg:min-h-72 [&>section]:h-full"
           >
-            <StudioLayerNavigator
-              items={layerNavigatorItems}
-              groups={masterEditMode ? [] : groups}
-              selectedIds={marqueeIds.length > 0 ? marqueeIds : selectedId ? [selectedId] : []}
-              pageKey={`${masterEditMode ? "master" : currentPageId}:${inspectorLayout.primary}`}
-              readOnly={activeSurfaceReviewLocked}
-              groupingDisabled={masterEditMode}
-              onSelectionChange={selectLayersFromNavigator}
-              onAction={handleLayerNavigatorAction}
-            />
+            {inspectorLayout.primary === "layers" ? (
+              <Suspense
+                fallback={
+                  <div
+                    role="status"
+                    aria-live="polite"
+                    className="grid h-full min-h-72 place-items-center rounded-xl border border-line bg-panel/40 px-4 text-center"
+                  >
+                    <span className="inline-flex items-center gap-2 text-xs font-semibold text-fg-3">
+                      <Loader2
+                        size={15}
+                        className="animate-spin motion-reduce:animate-none"
+                        aria-hidden
+                      />
+                      레이어 탐색기 불러오는 중
+                    </span>
+                  </div>
+                }
+              >
+                <StudioLayerNavigator
+                  items={layerNavigatorItems}
+                  groups={masterEditMode ? [] : groups}
+                  selectedIds={marqueeIds.length > 0 ? marqueeIds : selectedId ? [selectedId] : []}
+                  pageKey={`${masterEditMode ? "master" : currentPageId}:${inspectorLayout.primary}`}
+                  readOnly={activeSurfaceReviewLocked}
+                  groupingDisabled={masterEditMode}
+                  onSelectionChange={selectLayersFromNavigator}
+                  onAction={handleLayerNavigatorAction}
+                />
+              </Suspense>
+            ) : null}
           </div>
 
           {/* 미니맵 / 네비게이터 */}
