@@ -9471,6 +9471,12 @@ function StudioCuttoonEditor() {
   const drawingFixedRatePumpClockRef = useRef<FixedRateStrokeFrameClockState | null>(null);
   const drawingFixedRateSampleClockRef = useRef<FixedRateStrokeSampleClockState | null>(null);
   const drawingFixedRatePumpFrameRef = useRef<(frameTimeStamp: number) => boolean>(() => false);
+  /**
+   * appendFixedRateStrokeSamples가 매 호출마다 points 등 배열 전체를 복제하면 긴 스트로크에서
+   * O(n²)이 된다 — 한 번 복제한 뒤로는 "우리가 만든 그 배열"임을 이 ref로 확인해 계속 이어붙인다.
+   * 바깥 DrawEl 객체(next)는 여전히 매 호출 새 참조라 scheduleDraft의 변경 감지는 그대로 동작한다.
+   */
+  const drawingFixedRateOwnedPointsRef = useRef<number[] | null>(null);
   const drawingLastAuthoritativePointerRef = useRef<PointerEvent | null>(null);
   const drawingVelocityRef = useRef<StudioPointerVelocityState | null>(null);
   // A stroke belongs to exactly one pointer from down through up/cancel. Keeping this high-rate
@@ -19649,21 +19655,37 @@ function StudioCuttoonEditor() {
     )
       && !gpuLiveInkPinnedRef.current
       && !drawingPredictionPreviewRef.current;
+    // current.points가 지난 호출에서 우리가 만들어 넘긴 바로 그 배열이면(같은 스트로크가 계속
+    // 이어지는 중이면) 다시 복제하지 않고 그대로 이어붙인다 — 매 호출 전체 복제는 긴 스트로크에서
+    // O(n²)이 된다. 바깥 DrawEl(next)은 그래도 매 호출 새 객체라 scheduleDraft의 참조 비교 변경
+    // 감지는 그대로 유효하다.
+    // gpuLiveInkPinnedRef가 켜져 있으면 buildGpuLiveStrokeView가 이 points 배열을 그대로(clone
+    // 없이) trustedImmutable=true 로 잡아 비동기 WebGPU 큐에 넘긴다 — 그 순간의 배열은 이후 절대
+    // 그대로 이어붙이면 안 된다. 핀이 꺼진 뒤에도 "그 배열"이 다시 매칭되지 않도록 소유권 ref를
+    // null로 무효화해 다음 호출이 반드시 새로 복제하게 만든다(그 새 복제본은 GPU에 노출된 적이
+    // 없으므로 그때부터는 다시 안전하게 재사용할 수 있다).
+    const ownsCurrentArrays = !mutateDirectly
+      && !gpuLiveInkPinnedRef.current
+      && current.points === drawingFixedRateOwnedPointsRef.current;
+    const reuseOrClone = <T,>(shouldTrack: boolean, arr: T[] | undefined): T[] | undefined => {
+      if (!shouldTrack || !arr) return arr;
+      return ownsCurrentArrays ? arr : [...arr];
+    };
     const next: DrawEl = mutateDirectly
       ? current
       : {
           ...current,
-          points: [...current.points],
-          pressures: current.pressures ? [...current.pressures] : undefined,
-          tiltXs: captureStylus && current.tiltXs ? [...current.tiltXs] : current.tiltXs,
-          tiltYs: captureStylus && current.tiltYs ? [...current.tiltYs] : current.tiltYs,
-          twists: captureStylus && current.twists ? [...current.twists] : current.twists,
-          speeds: capturePointerDynamics && current.speeds ? [...current.speeds] : current.speeds,
-          tangentialPressures:
-            capturePointerDynamics && current.tangentialPressures
-              ? [...current.tangentialPressures]
-              : current.tangentialPressures,
+          points: ownsCurrentArrays ? current.points : [...current.points],
+          pressures: reuseOrClone(true, current.pressures),
+          tiltXs: reuseOrClone(captureStylus, current.tiltXs),
+          tiltYs: reuseOrClone(captureStylus, current.tiltYs),
+          twists: reuseOrClone(captureStylus, current.twists),
+          speeds: reuseOrClone(capturePointerDynamics, current.speeds),
+          tangentialPressures: reuseOrClone(capturePointerDynamics, current.tangentialPressures),
         };
+    if (!mutateDirectly) {
+      drawingFixedRateOwnedPointsRef.current = gpuLiveInkPinnedRef.current ? null : next.points;
+    }
     let appended = false;
     const appendAligned = (
       values: number[] | undefined,
