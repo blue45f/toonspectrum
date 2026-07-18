@@ -19,6 +19,7 @@ import {
   type StudioCrdtCompatibleDrawElement,
   type StudioCrdtCompatibleSceneElement,
 } from "./studio-crdt-page-bridge";
+import { createDefaultStudioDrawingAssistDocument } from "./studio-drawing-assist-document";
 
 function record(
   id: string,
@@ -640,5 +641,42 @@ describe("studio CRDT page bridge", () => {
       id: "page-b",
       payload: { props: { bg: "#0b0b0b", canvasH: 2000, name: "이동한 B" } },
     });
+  });
+
+  it("round-trips page-owned perspective and isometric guide settings", () => {
+    const drawingAssist = createDefaultStudioDrawingAssistDocument({
+      canvasWidth: 800,
+      canvasHeight: 1_600,
+    });
+    drawingAssist.perspective = {
+      active: true,
+      points: [
+        { id: "vp-left", x: -900, y: 520 },
+        { id: "vp-right", x: 1_700, y: 520 },
+      ],
+    };
+    const page = {
+      id: "page-guides",
+      bg: "#fff",
+      bgGrad: null,
+      canvasH: 1_600,
+      elements: [] as Array<{ id: string; type: string }>,
+      drawingAssist,
+    };
+    const encoded = studioPageToCrdtPage(page);
+    expect(encoded.payload.props.drawingAssist).toEqual(drawingAssist);
+
+    const reconciled = reconcileStudioCrdtSceneGraphPages(
+      [page],
+      [],
+      [],
+      [{
+        id: page.id,
+        deleted: false,
+        orderIndex: 0,
+        payload: encoded.payload,
+      }]
+    );
+    expect(reconciled.pages[0]?.drawingAssist).toEqual(drawingAssist);
   });
 });

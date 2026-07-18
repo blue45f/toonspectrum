@@ -16,6 +16,7 @@ import {
 import { isStudioInkPressureModel } from "./studio-ink-pressure-model";
 import { isStudioStrokePaintModelCompatible } from "./studio-stroke-paint-model";
 
+
 import type {
   StudioCrdtLayerGroupInput,
   StudioCrdtLayerGroupRecord,
@@ -25,6 +26,7 @@ import type {
   StudioCrdtStrokeRecord,
 } from "./studio-crdt-document";
 import type { StudioCrdtCompatibleDrawElement } from "./studio-crdt-draw-bridge";
+import type { StudioDrawingAssistDocument } from "./studio-drawing-assist-document";
 
 import {
   STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS,
@@ -306,6 +308,7 @@ const PAGE_PAYLOAD_KEYS = [
   "hideMaster",
   "shotType",
   "cameraAngle",
+  "drawingAssist",
 ] as const;
 
 export interface StudioCrdtCompatibleOrderedPage<
@@ -319,6 +322,7 @@ export interface StudioCrdtCompatibleOrderedPage<
   hideMaster?: boolean;
   shotType?: string;
   cameraAngle?: string;
+  drawingAssist?: StudioDrawingAssistDocument;
   groups?: StudioCrdtCompatibleLayerGroup[];
 }
 

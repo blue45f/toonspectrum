@@ -1,5 +1,5 @@
 import { fromUint8Array, toUint8Array } from "js-base64";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import * as Y from "yjs";
 
 import { compactStudioRasterOperationLog } from "../../../../../lib/studio-crdt-raster-compaction";
@@ -324,6 +324,29 @@ function createScenePageDocument(): Y.Doc {
   doc.getArray<Y.Map<unknown>>("page-order").push([pageOrder]);
   return doc;
 }
+
+function createDrawingAssistDocument() {
+  return {
+    version: 1,
+    perspective: {
+      active: false,
+      points: [
+        { id: "vp-left", x: -10_000_000, y: 10_000_000 },
+        { id: "vp-center", x: 400, y: 320 },
+        { id: "vp-right", x: 10_000_000, y: -10_000_000 },
+      ],
+    },
+    isometric: {
+      active: true,
+      angleDeg: 1,
+      cellSize: 200,
+      originX: -10_000_000,
+      originY: 10_000_000,
+    },
+  };
+}
+
+type TestDrawingAssistDocument = ReturnType<typeof createDrawingAssistDocument>;
 
 const DELETION_OPERATION_ID = "00000000-0000-4000-8000-000000000301";
 const DELETION_TARGET = JSON.stringify(["scene", "scene-1"]);
@@ -799,6 +822,102 @@ describe("StudioCrdtService", () => {
 
     expect(hasValidStudioCrdtRootSchema(doc)).toBe(true);
     doc.destroy();
+  });
+
+  it("persists and rehydrates the canonical page drawing-assist v1 contract", async () => {
+    const doc = createScenePageDocument();
+    doc.getMap<unknown>("studio-page:page-1")
+      .set("prop:drawingAssist", createDrawingAssistDocument());
+
+    expect(hasValidStudioCrdtRootSchema(doc)).toBe(true);
+    const current = service(new MemoryStudioCrdtRepository());
+    await expect(current.applyUpdate({
+      workId: "work-drawing-assist",
+      updateId: "00000000-0000-4000-8000-000000000509",
+      actorUserId: "editor",
+      data: fromUint8Array(Y.encodeStateAsUpdate(doc)),
+    })).resolves.toMatchObject({ duplicate: false, serverSequence: "1" });
+
+    const hydrated = new Y.Doc();
+    applySync(hydrated, await current.sync("work-drawing-assist"));
+    expect(
+      hydrated.getMap<unknown>("studio-page:page-1").get("prop:drawingAssist")
+    ).toEqual(createDrawingAssistDocument());
+    doc.destroy();
+    hydrated.destroy();
+  });
+
+  it("rejects malformed page drawing-assist documents", () => {
+    const invalidCases: Array<[
+      label: string,
+      mutate: (value: TestDrawingAssistDocument) => void,
+    ]> = [
+      ["unknown root key", (value) => {
+        (value as unknown as Record<string, unknown>).plugin = true;
+      }],
+      ["unsupported version", (value) => { value.version = 2; }],
+      ["mutually active rulers", (value) => { value.perspective.active = true; }],
+      ["more than three points", (value) => {
+        value.perspective.points.push({ id: "vp-four", x: 0, y: 0 });
+      }],
+      ["duplicate point ids", (value) => {
+        value.perspective.points[1]!.id = value.perspective.points[0]!.id;
+      }],
+      ["empty point id", (value) => { value.perspective.points[0]!.id = ""; }],
+      ["oversized point id", (value) => { value.perspective.points[0]!.id = "x".repeat(161); }],
+      ["control character point id", (value) => { value.perspective.points[0]!.id = "vp\u0000"; }],
+      ["out-of-range point coordinate", (value) => {
+        value.perspective.points[0]!.x = 10_000_001;
+      }],
+      ["non-finite point coordinate", (value) => {
+        value.perspective.points[0]!.y = Number.POSITIVE_INFINITY;
+      }],
+      ["unknown point key", (value) => {
+        (value.perspective.points[0] as Record<string, unknown>).weight = 1;
+      }],
+      ["unknown perspective key", (value) => {
+        (value.perspective as unknown as Record<string, unknown>).mode = "three-point";
+      }],
+      ["angle below range", (value) => { value.isometric.angleDeg = 0; }],
+      ["angle above range", (value) => { value.isometric.angleDeg = 90; }],
+      ["cell size below range", (value) => { value.isometric.cellSize = 7; }],
+      ["cell size above range", (value) => { value.isometric.cellSize = 201; }],
+      ["out-of-range origin", (value) => { value.isometric.originY = 10_000_001; }],
+      ["missing isometric key", (value) => {
+        delete (value.isometric as unknown as Record<string, unknown>).originY;
+      }],
+      ["unknown isometric key", (value) => {
+        (value.isometric as unknown as Record<string, unknown>).skew = 0;
+      }],
+    ];
+
+    for (const [label, mutate] of invalidCases) {
+      const doc = createScenePageDocument();
+      const value = createDrawingAssistDocument();
+      mutate(value);
+      doc.getMap<unknown>("studio-page:page-1").set("prop:drawingAssist", value);
+      expect(hasValidStudioCrdtRootSchema(doc), label).toBe(false);
+      doc.destroy();
+    }
+  });
+
+  it("rejects hidden invalid drawing-assist candidates and page payloads over 8 KiB", () => {
+    const hiddenInvalid = createScenePageDocument();
+    const invalidBaseline = createDrawingAssistDocument();
+    invalidBaseline.version = 2;
+    const hiddenPage = hiddenInvalid.getMap<unknown>("studio-page:page-1");
+    hiddenPage.set("base:drawingAssist", invalidBaseline);
+    hiddenPage.set("prop:drawingAssist", createDrawingAssistDocument());
+    expect(hasValidStudioCrdtRootSchema(hiddenInvalid)).toBe(false);
+    hiddenInvalid.destroy();
+
+    const oversized = createScenePageDocument();
+    const oversizedPage = oversized.getMap<unknown>("studio-page:page-1");
+    oversizedPage.set("prop:drawingAssist", createDrawingAssistDocument());
+    // 3,000 Hangul code points are within the note's character limit but exceed 8 KiB as UTF-8.
+    oversizedPage.set("prop:note", "가".repeat(3_000));
+    expect(hasValidStudioCrdtRootSchema(oversized)).toBe(false);
+    oversized.destroy();
   });
 
   it("accepts canonical flat deletion operations and rejects malformed or orphan acknowledgements", () => {
@@ -2423,6 +2542,70 @@ describe("StudioCrdtService", () => {
     );
   });
 
+  it("fails closed when durable updates regress, duplicate a sequence, or corrupt metadata", async () => {
+    const makeStoredUpdate = (
+      sequence: bigint,
+      updateId: string,
+      overrides: Partial<StudioCrdtUpdateRecord> = {}
+    ): StudioCrdtUpdateRecord => ({
+      workId: "work-ordered-log",
+      sequence,
+      updateId,
+      actorUserId: "editor",
+      payload: toUint8Array(yUpdate(`sequence-${sequence}`, String(sequence))),
+      createdAt: new Date("2026-07-16T00:00:00.000Z"),
+      ...overrides,
+    });
+    const cases: Array<[string, StudioCrdtUpdateRecord[]]> = [
+      [
+        "regressing sequence",
+        [
+          makeStoredUpdate(2n, "00000000-0000-4000-8000-000000000502"),
+          makeStoredUpdate(1n, "00000000-0000-4000-8000-000000000501"),
+        ],
+      ],
+      [
+        "duplicate sequence",
+        [
+          makeStoredUpdate(1n, "00000000-0000-4000-8000-000000000503"),
+          makeStoredUpdate(1n, "00000000-0000-4000-8000-000000000504"),
+        ],
+      ],
+      [
+        "duplicate update id",
+        [
+          makeStoredUpdate(1n, "00000000-0000-4000-8000-000000000507"),
+          makeStoredUpdate(2n, "00000000-0000-4000-8000-000000000507"),
+        ],
+      ],
+      [
+        "invalid update id",
+        [makeStoredUpdate(1n, "not-a-uuid")],
+      ],
+      [
+        "invalid actor id",
+        [makeStoredUpdate(1n, "00000000-0000-4000-8000-000000000505", {
+          actorUserId: "editor\u0000",
+        })],
+      ],
+      [
+        "invalid timestamp",
+        [makeStoredUpdate(1n, "00000000-0000-4000-8000-000000000506", {
+          createdAt: new Date(Number.NaN),
+        })],
+      ],
+    ];
+
+    for (const [label, updates] of cases) {
+      const repository = new MemoryStudioCrdtRepository();
+      repository.updates.set("work-ordered-log", updates);
+      await expect(
+        service(repository).sync("work-ordered-log"),
+        label
+      ).rejects.toBeInstanceOf(StudioCrdtStorageCorruptionError);
+    }
+  });
+
   it("rejects a prospective state-vector overflow before persisting the update", async () => {
     const repository = new MemoryStudioCrdtRepository();
     const current = service(repository, { stateVectorMaxBytes: 1 });
@@ -2656,6 +2839,50 @@ describe("StudioCrdtService", () => {
     await expect(current.sync("work-cluster-down")).resolves.toMatchObject({
       serverSequence: "0",
     });
+  });
+
+  it("does not let a timed-out cluster-load read overwrite a newer successful heartbeat", async () => {
+    vi.useFakeTimers();
+    try {
+      let resolveLateRead: ((value: number) => void) | undefined;
+      const lateRead = new Promise<number>((resolve) => {
+        resolveLateRead = resolve;
+      });
+      let readCount = 0;
+      const clusterLoadRepository: StudioCrdtClusterLoadRepository = {
+        async reportLoad() {},
+        async readClusterLoad() {
+          readCount += 1;
+          return readCount === 1 ? lateRead : 2;
+        },
+      };
+      const current = service(
+        new MemoryStudioCrdtRepository(),
+        {
+          clusterLoadHeartbeatMs: 100,
+          clusterLoadStaleAfterMs: 1_000,
+        },
+        undefined,
+        undefined,
+        clusterLoadRepository
+      );
+      const internals = current as unknown as {
+        cachedClusterPendingOperations: number;
+      };
+
+      // The first immediate read times out at 400 ms; the 500 ms interval tick completes with 2.
+      await vi.advanceTimersByTimeAsync(501);
+      expect(readCount).toBeGreaterThanOrEqual(2);
+      expect(internals.cachedClusterPendingOperations).toBe(2);
+
+      resolveLateRead?.(999);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(internals.cachedClusterPendingOperations).toBe(2);
+      await current.onModuleDestroy();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("waits out an in-flight cluster heartbeat before onModuleDestroy resolves", async () => {

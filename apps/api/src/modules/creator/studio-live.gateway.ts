@@ -107,7 +107,9 @@ const ConnectionIdSchema = boundedIdentifier(128);
 const ScreenShareIdSchema = boundedIdentifier(160);
 const ScreenShareLabelSchema = boundedIdentifier(80);
 const VoiceCallIdSchema = boundedIdentifier(160);
-const STUDIO_CRDT_PROTOCOL_VERSION = 2 as const;
+// v3 is the first room protocol that accepts page-level drawing-assist documents. Rejecting v2
+// prevents stale tabs from sharing a Yjs room whose page schema they cannot interpret safely.
+const STUDIO_CRDT_PROTOCOL_VERSION = 3 as const;
 const StudioCrdtProtocolVersionSchema = z.literal(STUDIO_CRDT_PROTOCOL_VERSION);
 const StudioCrdtRequestIdSchema = boundedIdentifier(160);
 const StudioCrdtUpdateIdSchema = z.uuid();
@@ -117,7 +119,11 @@ const encodedBase64 = (maximumDecodedBytes: number) =>
     .string()
     .min(4)
     .max(Math.ceil(maximumDecodedBytes / 3) * 4)
-    .regex(STUDIO_CRDT_BASE64_PATTERN);
+    .regex(STUDIO_CRDT_BASE64_PATTERN)
+    .refine(
+      (value) => Buffer.from(value, "base64").toString("base64") === value,
+      "base64 must use its canonical encoding"
+    );
 
 export const StudioLiveJoinSchema = z
   .object({

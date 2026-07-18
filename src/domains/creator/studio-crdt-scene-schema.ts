@@ -1,3 +1,5 @@
+import { parseStudioDrawingAssistDocument } from "./studio-drawing-assist-document";
+
 import {
   STUDIO_WORK_ASSET_BOOLEAN_EDIT_KEYS,
   STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS,
@@ -161,6 +163,7 @@ export const STUDIO_CRDT_REQUIRED_SCENE_ELEMENT_KEYS: Record<
 
 export const STUDIO_CRDT_PAGE_PROPERTY_KEYS: ReadonlySet<string> = new Set([
   "bg", "bgGrad", "canvasH", "name", "note", "hideMaster", "shotType", "cameraAngle",
+  "drawingAssist",
 ]);
 
 export const STUDIO_CRDT_LAYER_GROUP_PROPERTY_KEYS: ReadonlySet<string> = new Set([
@@ -383,6 +386,30 @@ export function validateStudioCrdtPagePayload(payload: StudioCrdtPagePayload): S
   }
   if ("hideMaster" in props && typeof props.hideMaster !== "boolean") {
     throw new Error("페이지 마스터 표시 값이 올바르지 않습니다.");
+  }
+  if ("drawingAssist" in props) {
+    const drawingAssist = parseStudioDrawingAssistDocument(props.drawingAssist);
+    if (!drawingAssist) {
+      throw new Error("페이지 드로잉 보조 설정이 손상되었거나 지원하지 않는 버전입니다.");
+    }
+    props.drawingAssist = {
+      version: drawingAssist.version,
+      perspective: {
+        active: drawingAssist.perspective.active,
+        points: drawingAssist.perspective.points.map((point) => ({
+          id: point.id,
+          x: point.x,
+          y: point.y,
+        })),
+      },
+      isometric: {
+        active: drawingAssist.isometric.active,
+        angleDeg: drawingAssist.isometric.angleDeg,
+        cellSize: drawingAssist.isometric.cellSize,
+        originX: drawingAssist.isometric.originX,
+        originY: drawingAssist.isometric.originY,
+      },
+    };
   }
   if (TEXT_ENCODER.encode(JSON.stringify({ version: payload.version, props })).byteLength >
     STUDIO_CRDT_PAGE_MAX_BYTES) {

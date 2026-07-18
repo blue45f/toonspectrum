@@ -13,6 +13,7 @@ import {
   parseStudioCrdtSyncResponse,
   parseStudioCrdtUpdateAck,
   parseStudioCrdtUpdateRequest,
+  STUDIO_CRDT_LOCAL_WIRE_BRAND,
   STUDIO_CRDT_PROTOCOL_VERSION,
   STUDIO_CRDT_SYNC_CHUNK_MAX_BYTES,
   STUDIO_CRDT_UPDATE_MAX_BYTES,
@@ -47,6 +48,11 @@ function syncResponse(bytes = new Uint8Array([1, 2, 3])) {
 }
 
 describe("studio CRDT protocol", () => {
+  it("pins the drawing-assist room gate to the v3 network and local-wire contract", () => {
+    expect(STUDIO_CRDT_PROTOCOL_VERSION).toBe(3);
+    expect(STUDIO_CRDT_LOCAL_WIRE_BRAND).toBe("toonspectrum:studio-crdt:v3");
+  });
+
   it("accepts only canonical bounded base64 for incremental updates", () => {
     expect([...decodeStudioCrdtUpdate(update)]).toEqual([1, 2, 3]);
     expect(() => decodeStudioCrdtUpdate("AQID\n")).toThrow();
@@ -81,7 +87,7 @@ describe("studio CRDT protocol", () => {
     expect(parseStudioCrdtSyncRequest(syncRequest(), { expectedWorkId: workId })).toEqual(
       syncRequest()
     );
-    expect(parseStudioCrdtSyncRequest({ ...syncRequest(), protocolVersion: 1 })).toBeNull();
+    expect(parseStudioCrdtSyncRequest({ ...syncRequest(), protocolVersion: 2 })).toBeNull();
     expect(parseStudioCrdtSyncRequest({ ...syncRequest(), extra: true })).toBeNull();
     expect(parseStudioCrdtSyncRequest(syncRequest(), { expectedWorkId: "work-2" })).toBeNull();
 
@@ -93,8 +99,13 @@ describe("studio CRDT protocol", () => {
       update,
     } as const;
     expect(parseStudioCrdtUpdateRequest(publish, { expectedWorkId: workId })).toEqual(publish);
+    expect(parseStudioCrdtUpdateRequest({ ...publish, protocolVersion: 2 })).toBeNull();
     expect(parsePersistedStudioCrdtUpdateRequest(
       { ...publish, protocolVersion: 1 },
+      { expectedWorkId: workId }
+    )).toEqual(publish);
+    expect(parsePersistedStudioCrdtUpdateRequest(
+      { ...publish, protocolVersion: 2 },
       { expectedWorkId: workId }
     )).toEqual(publish);
     expect(parseStudioCrdtUpdateRequest({ ...publish, updateId: "bad id" })).toBeNull();
@@ -139,6 +150,20 @@ describe("studio CRDT protocol", () => {
         expectedWorkId: workId,
         selfSessionId: "alice-session",
       })
+    ).toBeNull();
+    expect(
+      parseStudioCrdtLocalWireMessage(
+        {
+          ...requestWire,
+          brand: "toonspectrum:studio-crdt:v2",
+          protocolVersion: 2,
+          payload: { ...requestWire.payload, protocolVersion: 2 },
+        },
+        {
+          expectedWorkId: workId,
+          selfSessionId: "bob-session",
+        }
+      )
     ).toBeNull();
 
     const responseWire = createStudioCrdtLocalWireMessage({

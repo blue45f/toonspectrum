@@ -196,6 +196,12 @@ const STUDIO_CRDT_JSON_MAX_DEPTH = 10;
 const STUDIO_CRDT_JSON_MAX_ENTRIES = 4_096;
 const STUDIO_CRDT_JSON_MAX_STRING_LENGTH = 64 * 1_024;
 const STUDIO_CRDT_MAX_COORDINATE = 10_000_000;
+const STUDIO_CRDT_DRAWING_ASSIST_VERSION = 1;
+const STUDIO_CRDT_DRAWING_ASSIST_MAX_VANISHING_POINTS = 3;
+const STUDIO_CRDT_DRAWING_ASSIST_ANGLE_MIN_DEG = 1;
+const STUDIO_CRDT_DRAWING_ASSIST_ANGLE_MAX_DEG = 89;
+const STUDIO_CRDT_DRAWING_ASSIST_CELL_SIZE_MIN = 8;
+const STUDIO_CRDT_DRAWING_ASSIST_CELL_SIZE_MAX = 200;
 const STUDIO_CRDT_DELETION_TARGET_MAX_LENGTH = 384;
 const STUDIO_CRDT_TEXT_ENCODER = new TextEncoder();
 const STUDIO_WORK_ASSET_TYPE_SET = new Set<string>(STUDIO_WORK_ASSET_TYPES);
@@ -296,6 +302,7 @@ const STUDIO_CRDT_PAGE_KEYS = new Set([
   "hideMaster",
   "shotType",
   "cameraAngle",
+  "drawingAssist",
 ]);
 
 const STUDIO_CRDT_LAYER_GROUP_KEYS = new Set(["name", "hidden", "locked"]);
@@ -458,9 +465,15 @@ export function encodeStudioCrdtServerStateVector(
 function validateStoredUpdate(update: StudioCrdtUpdateRecord, workId: string): void {
   if (
     update.workId !== workId ||
+    typeof update.sequence !== "bigint" ||
     update.sequence <= 0n ||
+    !UUID_PATTERN.test(update.updateId) ||
+    (update.actorUserId !== null && !isBoundedStudioCrdtId(update.actorUserId)) ||
+    !(update.payload instanceof Uint8Array) ||
     update.payload.byteLength === 0 ||
-    update.payload.byteLength > STUDIO_CRDT_UPDATE_MAX_BYTES
+    update.payload.byteLength > STUDIO_CRDT_UPDATE_MAX_BYTES ||
+    !(update.createdAt instanceof Date) ||
+    !Number.isFinite(update.createdAt.getTime())
   ) {
     throw new StudioCrdtStorageCorruptionError("Stored CRDT update violates its contract");
   }
@@ -562,6 +575,80 @@ function boundedExactText(value: unknown, maximum: number): value is string {
   for (const character of value) {
     const codePoint = character.codePointAt(0) ?? 0;
     if (codePoint <= 31 || (codePoint >= 127 && codePoint <= 159)) return false;
+  }
+  return true;
+}
+
+function isExactJsonObject(
+  value: unknown,
+  requiredKeys: ReadonlySet<string>
+): value is Record<string, unknown> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) return false;
+  const keys = Object.keys(value);
+  return keys.length === requiredKeys.size && keys.every((key) => requiredKeys.has(key));
+}
+
+const STUDIO_CRDT_DRAWING_ASSIST_KEYS = new Set(["version", "perspective", "isometric"]);
+const STUDIO_CRDT_PERSPECTIVE_ASSIST_KEYS = new Set(["active", "points"]);
+const STUDIO_CRDT_VANISHING_POINT_KEYS = new Set(["id", "x", "y"]);
+const STUDIO_CRDT_ISOMETRIC_ASSIST_KEYS = new Set([
+  "active",
+  "angleDeg",
+  "cellSize",
+  "originX",
+  "originY",
+]);
+
+function isValidStudioCrdtDrawingAssist(value: unknown): boolean {
+  if (!isExactJsonObject(value, STUDIO_CRDT_DRAWING_ASSIST_KEYS)) return false;
+  const { perspective, isometric } = value;
+  if (
+    value.version !== STUDIO_CRDT_DRAWING_ASSIST_VERSION ||
+    !isExactJsonObject(perspective, STUDIO_CRDT_PERSPECTIVE_ASSIST_KEYS) ||
+    !isExactJsonObject(isometric, STUDIO_CRDT_ISOMETRIC_ASSIST_KEYS) ||
+    typeof perspective.active !== "boolean" ||
+    typeof isometric.active !== "boolean" ||
+    (perspective.active && isometric.active) ||
+    !Array.isArray(perspective.points) ||
+    perspective.points.length > STUDIO_CRDT_DRAWING_ASSIST_MAX_VANISHING_POINTS ||
+    !finiteNumberInRange(
+      isometric.angleDeg,
+      STUDIO_CRDT_DRAWING_ASSIST_ANGLE_MIN_DEG,
+      STUDIO_CRDT_DRAWING_ASSIST_ANGLE_MAX_DEG
+    ) ||
+    !finiteNumberInRange(
+      isometric.cellSize,
+      STUDIO_CRDT_DRAWING_ASSIST_CELL_SIZE_MIN,
+      STUDIO_CRDT_DRAWING_ASSIST_CELL_SIZE_MAX
+    ) ||
+    !finiteNumberInRange(
+      isometric.originX,
+      -STUDIO_CRDT_MAX_COORDINATE,
+      STUDIO_CRDT_MAX_COORDINATE
+    ) ||
+    !finiteNumberInRange(
+      isometric.originY,
+      -STUDIO_CRDT_MAX_COORDINATE,
+      STUDIO_CRDT_MAX_COORDINATE
+    )
+  ) {
+    return false;
+  }
+
+  const pointIds = new Set<string>();
+  for (const point of perspective.points) {
+    if (
+      !isExactJsonObject(point, STUDIO_CRDT_VANISHING_POINT_KEYS) ||
+      !isBoundedStudioCrdtId(point.id) ||
+      pointIds.has(point.id) ||
+      !finiteNumberInRange(point.x, -STUDIO_CRDT_MAX_COORDINATE, STUDIO_CRDT_MAX_COORDINATE) ||
+      !finiteNumberInRange(point.y, -STUDIO_CRDT_MAX_COORDINATE, STUDIO_CRDT_MAX_COORDINATE)
+    ) {
+      return false;
+    }
+    pointIds.add(point.id);
   }
   return true;
 }
@@ -1050,6 +1137,19 @@ function validatePageRoot(id: string, record: Y.Map<unknown>): boolean {
     if (key in props && !boundedString(props[key], key === "note" ? 8_192 : 512)) return false;
   }
   if ("hideMaster" in props && typeof props.hideMaster !== "boolean") return false;
+  if ("drawingAssist" in props && !isValidStudioCrdtDrawingAssist(props.drawingAssist)) {
+    return false;
+  }
+  // A valid `prop:` winner can hide an invalid `base:` candidate until a later unset. Validate
+  // both candidates now so every future effective page payload remains safe to materialize.
+  for (const [key, value] of record) {
+    if (
+      (key === "base:drawingAssist" || key === "prop:drawingAssist") &&
+      !isValidStudioCrdtDrawingAssist(value)
+    ) {
+      return false;
+    }
+  }
   const byteLength = encodedJsonByteLength({ version: 1, props });
   return byteLength !== null && byteLength <= STUDIO_CRDT_PAGE_PAYLOAD_MAX_BYTES;
 }
@@ -1641,8 +1741,9 @@ export class StudioCrdtService implements OnModuleDestroy {
     this.destroyed = true;
     this.cancelInterval(this.evictionTimer);
     this.cancelInterval(this.clusterLoadTimer);
-    // Wait out any heartbeat already mid-flight so a caller that awaits onModuleDestroy never
-    // observes teardown as "complete" while a query is still running against the shared pool.
+    // Wait out the active heartbeat control promise. A database driver cannot cancel a query that
+    // already lost the bounded timeout race, but that detached query never owns service state (see
+    // runClusterLoadHeartbeat), so it cannot mutate admission data after teardown completes.
     await Promise.allSettled([
       ...this.workTails.values(),
       ...(this.clusterLoadHeartbeatPromise ? [this.clusterLoadHeartbeatPromise] : []),
@@ -1705,15 +1806,37 @@ export class StudioCrdtService implements OnModuleDestroy {
     if (state.snapshot) {
       if (
         state.snapshot.workId !== workId ||
+        typeof state.snapshot.compactedSequence !== "bigint" ||
+        !(state.snapshot.snapshot instanceof Uint8Array) ||
         state.snapshot.snapshot.byteLength === 0 ||
         state.snapshot.snapshot.byteLength > STUDIO_CRDT_SNAPSHOT_MAX_BYTES ||
-        state.snapshot.compactedSequence <= entry.sequence
+        state.snapshot.compactedSequence <= entry.sequence ||
+        !(state.snapshot.updatedAt instanceof Date) ||
+        !Number.isFinite(state.snapshot.updatedAt.getTime())
       ) {
         throw new StudioCrdtStorageCorruptionError("Stored CRDT snapshot violates its contract");
       }
     }
+    let previousStoredSequence = state.snapshot?.compactedSequence ?? entry.sequence;
+    const storedUpdateIds = new Set<string>();
     for (const update of state.updates) {
       validateStoredUpdate(update, workId);
+      // Repository reads are an ordered append log. Silently skipping a duplicate/regressing row
+      // would let a corrupt or misconfigured repository hide a committed update forever, and a
+      // later compaction could then make that omission permanent. Sequence gaps are valid because
+      // PostgreSQL identities can be consumed by aborted or unrelated-work transactions.
+      if (update.sequence <= previousStoredSequence) {
+        throw new StudioCrdtStorageCorruptionError(
+          "Stored CRDT updates are not strictly ordered"
+        );
+      }
+      if (storedUpdateIds.has(update.updateId)) {
+        throw new StudioCrdtStorageCorruptionError(
+          "Stored CRDT updates reuse an idempotency key"
+        );
+      }
+      storedUpdateIds.add(update.updateId);
+      previousStoredSequence = update.sequence;
     }
     const prospectiveSequence = state.snapshot?.compactedSequence ?? entry.sequence;
     if (
@@ -1998,10 +2121,10 @@ export class StudioCrdtService implements OnModuleDestroy {
     let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
     try {
       const now = this.now();
-      await Promise.race([
+      const observedClusterLoad = await Promise.race([
         (async () => {
           await this.clusterLoadRepository.reportLoad(this.nodeId, this.pendingOperationCount, now);
-          this.cachedClusterPendingOperations = await this.clusterLoadRepository.readClusterLoad(
+          return this.clusterLoadRepository.readClusterLoad(
             now,
             this.clusterLoadStaleAfterMs
           );
@@ -2019,6 +2142,12 @@ export class StudioCrdtService implements OnModuleDestroy {
           timeoutHandle.unref?.();
         }),
       ]);
+      // The repository attempt returns a value instead of assigning service state itself. If it
+      // loses the timeout race and completes later, its stale result has no continuation capable
+      // of overwriting a newer heartbeat. Teardown likewise prevents the winning result from
+      // publishing after the service has been destroyed.
+      if (this.destroyed) return;
+      this.cachedClusterPendingOperations = observedClusterLoad;
       this.lastClusterLoadSuccessAt = now.getTime();
     } catch (error) {
       this.logger.warn(
