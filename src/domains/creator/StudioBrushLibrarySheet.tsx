@@ -6,12 +6,14 @@ import { Search, Star, X } from "lucide-react";
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactElement,
 } from "react";
+import { createPortal } from "react-dom";
 
 import {
   studioBrushChipSurface,
@@ -25,6 +27,7 @@ import {
   filterStudioBrushLibraryItems,
   STUDIO_BRUSH_LIBRARY_TABS,
 } from "./studio-draw-ux";
+import { planGlowBrushPasses, planNeonBrushPasses } from "./studio-fx-brush";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { StudioBrushPresetIcon } from "./StudioBrushPresetIcon";
 
@@ -37,11 +40,31 @@ export interface StudioBrushLibrarySheetProps {
   activeBrushId: string;
   favoriteIds?: readonly string[];
   recentIds?: readonly string[];
-  onClose: () => void;
+  onClose: (reason: StudioBrushCatalogCloseReason) => void;
   onSelect: (item: StudioBrushTrayItem) => void;
   onToggleFavorite?: (brushId: string) => void;
   className?: string;
   style?: CSSProperties;
+}
+
+export type StudioBrushCatalogPlacement = "desktop-dock" | "mobile-sheet";
+export type StudioBrushCatalogCloseReason =
+  | "explicit"
+  | "escape"
+  | "selection"
+  | "outside-pointer";
+
+export interface StudioBrushCatalogPortalProps {
+  open: boolean;
+  placement: StudioBrushCatalogPlacement;
+  triggerElement: HTMLElement | null;
+  activeBrushId: string;
+  favoriteIds?: readonly string[];
+  recentIds?: readonly string[];
+  mobileKeyboardInset?: number;
+  onClose: (reason: StudioBrushCatalogCloseReason) => void;
+  onSelect: (item: StudioBrushTrayItem) => void;
+  onToggleFavorite: (brushId: string) => void;
 }
 
 export type StudioBrushCatalogPreviewKind =
@@ -166,33 +189,22 @@ export function LargeBrushPreview({
     );
   } else if (kind === "neon" || kind === "glow") {
     const softGlow = item.id === "soft-glow";
-    const outerScale = softGlow ? 3.7 : kind === "glow" ? 3.15 : 2.7;
+    const passes = kind === "neon"
+      ? planNeonBrushPasses(strokeW)
+      : planGlowBrushPasses(strokeW, softGlow).map((pass) => ({ ...pass, tone: "color" as const }));
     brushSample = (
       <g data-studio-brush-preview-layer={kind}>
-        <path
-          d={pathD}
-          fill="none"
-          stroke={ink}
-          strokeWidth={Math.max(5.5, strokeW * outerScale)}
-          strokeLinecap="round"
-          opacity={0.13}
-        />
-        <path
-          d={pathD}
-          fill="none"
-          stroke={ink}
-          strokeWidth={Math.max(3.2, strokeW * 1.8)}
-          strokeLinecap="round"
-          opacity={0.34}
-        />
-        <path
-          d={pathD}
-          fill="none"
-          stroke={kind === "neon" && !active ? "oklch(0.96 0.02 85)" : ink}
-          strokeWidth={Math.max(1.35, strokeW * 0.62)}
-          strokeLinecap="round"
-          opacity={opacity}
-        />
+        {passes.map((pass, index) => (
+          <path
+            key={index}
+            d={pathD}
+            fill="none"
+            stroke={pass.tone === "white-core" ? "oklch(0.97 0.015 85)" : ink}
+            strokeWidth={Math.max(1.15, strokeW * pass.widthScale)}
+            strokeLinecap="round"
+            opacity={pass.opacity * opacity}
+          />
+        ))}
       </g>
     );
   } else if (kind === "particle" || kind === "tone") {
@@ -354,7 +366,7 @@ export function StudioBrushLibrarySheet({
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
         e.preventDefault();
-        onClose();
+        onClose("escape");
       }
     }
     globalThis.addEventListener("keydown", onKey);
@@ -401,6 +413,7 @@ export function StudioBrushLibrarySheet({
       aria-describedby={`${titleId}-description`}
       data-studio-brush-library="true"
       data-studio-brush-catalog="built-in"
+      data-studio-brush-catalog-session="true"
       style={style}
       className={cn(
         "absolute left-2 top-[calc(100%+0.35rem)] z-[60] flex max-h-[min(32rem,calc(100dvh-1rem))] w-[min(22rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-[0_16px_48px_oklch(0.12_0.02_70/0.55)]",
@@ -410,18 +423,18 @@ export function StudioBrushLibrarySheet({
       <div className="flex items-center justify-between gap-2 border-b border-line px-3 py-2">
         <div className="min-w-0">
           <p id={titleId} className="text-sm font-bold text-fg">
-            기본 브러시 카탈로그
+            기본 프리셋
           </p>
           <p id={`${titleId}-description`} className="text-[0.62rem] text-fg-3">
-            내 브러시와 별개 · 기본 프리셋 {items.length}개 표시
+            앱 제공 브러시 · 내 브러시와 별개 · {items.length}개 표시
           </p>
         </div>
         <button
           type="button"
-          onClick={onClose}
-          aria-label="기본 브러시 카탈로그 닫기"
+          onClick={() => onClose("explicit")}
+          aria-label="기본 프리셋 닫기"
           className={cn(
-            "grid size-8 place-items-center rounded-lg text-fg-3 hover:bg-raised hover:text-fg",
+            "grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised hover:text-fg",
             STUDIO_FOCUS_RING
           )}
         >
@@ -437,7 +450,7 @@ export function StudioBrushLibrarySheet({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="브러시 검색 (네온, 수채, G펜…)"
-          className="min-h-10 w-full rounded-xl border border-line bg-card py-1.5 pl-9 pr-3 text-xs outline-none placeholder:text-fg-3 focus:border-accent focus:ring-1 focus:ring-accent/40"
+          className="min-h-11 w-full rounded-xl border border-line bg-card py-1.5 pl-9 pr-3 text-xs outline-none placeholder:text-fg-3 focus:border-accent focus:ring-1 focus:ring-accent/40"
           aria-label="브러시 검색"
           aria-controls={panelId}
         />
@@ -464,7 +477,7 @@ export function StudioBrushLibrarySheet({
               onClick={() => setTab(chip.id)}
               onKeyDown={(event) => onTabKeyDown(event, chipIndex)}
               className={cn(
-                "shrink-0 rounded-full border px-2.5 py-1 text-[0.64rem] font-semibold",
+                "min-h-11 min-w-11 shrink-0 rounded-xl border px-3 py-1 text-[0.64rem] font-semibold",
                 STUDIO_EASE,
                 STUDIO_FOCUS_RING,
                 active
@@ -518,7 +531,7 @@ export function StudioBrushLibrarySheet({
                     type="button"
                     onClick={() => {
                       onSelect(item);
-                      onClose();
+                      onClose("selection");
                     }}
                     title={item.hint}
                     aria-label={`${item.name} 선택`}
@@ -555,7 +568,7 @@ export function StudioBrushLibrarySheet({
                         onToggleFavorite(item.id);
                       }}
                       className={cn(
-                        "absolute right-1 top-1 grid size-7 place-items-center rounded-md",
+                        "absolute right-0 top-0 grid size-11 place-items-center rounded-xl",
                         STUDIO_FOCUS_RING,
                         fav
                           ? active
@@ -576,5 +589,118 @@ export function StudioBrushLibrarySheet({
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * The only built-in preset catalog Portal in Studio. Desktop and mobile
+ * triggers point at this controlled host, so Escape/outside-click/focus return
+ * and favorite mutations cannot diverge across hidden UI surfaces.
+ */
+export function StudioBrushCatalogPortal({
+  open,
+  placement,
+  triggerElement,
+  activeBrushId,
+  favoriteIds = [],
+  recentIds = [],
+  mobileKeyboardInset = 0,
+  onClose,
+  onSelect,
+  onToggleFavorite,
+}: StudioBrushCatalogPortalProps): ReactElement | null {
+  const [desktopStyle, setDesktopStyle] = useState<CSSProperties>({
+    bottom: 72,
+    left: 8,
+    width: "min(22rem, calc(100vw - 1rem))",
+  });
+
+  useLayoutEffect(() => {
+    if (!open || placement !== "desktop-dock") return;
+
+    const updatePosition = () => {
+      const viewportWidth = Math.max(320, globalThis.innerWidth || 0);
+      const viewportHeight = Math.max(320, globalThis.innerHeight || 0);
+      const catalogWidth = Math.min(352, Math.max(304, viewportWidth - 16));
+      const anchor = triggerElement?.getBoundingClientRect();
+      const anchorLeft = anchor?.left ?? (viewportWidth - catalogWidth) / 2;
+      const left = Math.min(
+        Math.max(8, anchorLeft),
+        Math.max(8, viewportWidth - catalogWidth - 8)
+      );
+      const spaceAbove = anchor ? Math.max(1, anchor.top - 16) : Math.max(1, viewportHeight - 80);
+      const spaceBelow = anchor ? Math.max(1, viewportHeight - anchor.bottom - 16) : 1;
+      // Prefer the side with real room. Never invent a minimum height larger than the viewport:
+      // on short laptop windows that pushed the fixed dialog above y=0 and hid its close/search UI.
+      setDesktopStyle(spaceAbove >= spaceBelow
+        ? {
+            bottom: anchor ? Math.max(8, viewportHeight - anchor.top + 8) : 72,
+            left,
+            maxHeight: spaceAbove,
+            top: "auto",
+            width: catalogWidth,
+          }
+        : {
+            bottom: "auto",
+            left,
+            maxHeight: spaceBelow,
+            top: Math.max(8, (anchor?.bottom ?? 0) + 8),
+            width: catalogWidth,
+          });
+    };
+
+    updatePosition();
+    const resizeObserver =
+      triggerElement && typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(updatePosition)
+        : null;
+    if (triggerElement) resizeObserver?.observe(triggerElement);
+    globalThis.addEventListener("resize", updatePosition);
+    globalThis.addEventListener("scroll", updatePosition, true);
+    return () => {
+      resizeObserver?.disconnect();
+      globalThis.removeEventListener("resize", updatePosition);
+      globalThis.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [open, placement, triggerElement]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!(event.target instanceof Node)) return;
+      const catalog = globalThis.document?.querySelector<HTMLElement>(
+        '[data-studio-brush-catalog-session="true"]'
+      );
+      if (catalog?.contains(event.target) || triggerElement?.contains(event.target)) return;
+      onClose("outside-pointer");
+    };
+    globalThis.addEventListener("pointerdown", onPointerDown, true);
+    return () => globalThis.removeEventListener("pointerdown", onPointerDown, true);
+  }, [open, onClose, triggerElement]);
+
+  if (!open || !globalThis.document) return null;
+
+  const mobileStyle: CSSProperties = {
+    bottom: `calc(7.5rem + env(safe-area-inset-bottom) + ${Math.max(0, mobileKeyboardInset)}px)`,
+  };
+
+  return createPortal(
+    <StudioBrushLibrarySheet
+      open
+      activeBrushId={activeBrushId}
+      favoriteIds={favoriteIds}
+      recentIds={recentIds}
+      onClose={onClose}
+      onSelect={onSelect}
+      onToggleFavorite={onToggleFavorite}
+      className={cn(
+        "fixed pointer-events-auto",
+        placement === "desktop-dock"
+          ? "bottom-auto left-auto top-auto"
+          : "inset-x-2 top-3 w-auto max-h-none"
+      )}
+      style={placement === "desktop-dock" ? desktopStyle : mobileStyle}
+    />,
+    globalThis.document.body
   );
 }

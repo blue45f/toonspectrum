@@ -674,6 +674,39 @@ describe("도형 직렬화", () => {
     });
   });
 
+  it.each([
+    ["watercolor", "watercolor-opacity"],
+    ["glitter", "glitter-opacity"],
+    ["oil", "oil-opacity"],
+    ["pastel", "pastel-opacity"],
+  ] as const)("%s — Canvas처럼 획 투명도를 겹치는 각 dab에 적용한다", (brush, id) => {
+    const dynamic = rectEl({
+      id,
+      kind: "freehand",
+      brush,
+      points: [8, 12, 32, 18, 58, 10],
+      pressures: [0.3, 0.8, 0.5],
+      stroke: "#4455aa",
+      strokeWidth: 22,
+      fill: undefined,
+    });
+    const full = exportPageToSvg(page([{ ...dynamic, opacity: 1 }])).svg;
+    const half = exportPageToSvg(page([{ ...dynamic, opacity: 0.5 }])).svg;
+    const dabOpacities = (svg: string) => Array.from(
+      svg.matchAll(/<(?:circle|ellipse|rect) [^>]*opacity="([0-9.]+)"/g),
+      (match) => Number(match[1])
+    );
+    const fullOpacities = dabOpacities(full);
+    const halfOpacities = dabOpacities(half);
+
+    expect(half).not.toMatch(/<g[^>]*opacity="0\.5"/);
+    expect(halfOpacities).toHaveLength(fullOpacities.length);
+    expect(halfOpacities.length).toBeGreaterThan(2);
+    halfOpacities.forEach((value, index) => {
+      expect(Math.abs(value - fullOpacities[index]! * 0.5)).toBeLessThanOrEqual(0.000001);
+    });
+  });
+
   it("기본 에어브러시 — 필압 0·툴바 투명도 70%의 저농도 dab을 0으로 반올림하지 않는다", () => {
     const { svg } = exportPageToSvg(page([rectEl({
       id: "airbrush-low-alpha",
@@ -869,6 +902,65 @@ describe("도형 직렬화", () => {
     const { svg } = exportPageToSvg(page([hl]));
     expect(svg).toContain('stroke-linecap="square"');
     expect(svg).toContain("mix-blend-mode:multiply");
+  });
+
+  it.each(["pencil", "highlighter", "neon", "glow"] as const)(
+    "%s — modern sampleSpacing은 raw 직선 샘플, legacy는 과거 평활화+tension을 유지한다",
+    (brush) => {
+      const base = rectEl({
+        id: `render-path-${brush}`,
+        kind: "freehand",
+        brush,
+        points: [0, 0, 10, 20, 20, -5, 30, 15],
+        stroke: "#13579b",
+        strokeWidth: 9,
+        fill: undefined,
+      });
+      const modern = exportPageToSvg(page([{ ...base, sampleSpacing: 1.5 }])).svg;
+      const legacy = exportPageToSvg(page([base])).svg;
+      const brushPaths = (svg: string) => Array.from(
+        svg.matchAll(/<path d="([^"]+)" fill="none" stroke="#13579b"/g),
+        (match) => match[1]!
+      );
+      const modernPaths = brushPaths(modern);
+      const legacyPaths = brushPaths(legacy);
+
+      expect(modernPaths.length).toBeGreaterThan(0);
+      expect(legacyPaths).toHaveLength(modernPaths.length);
+      expect(modernPaths.every((pathD) => pathD.includes(" L "))).toBe(true);
+      expect(modernPaths.every((pathD) => !pathD.includes(" Q ") && !pathD.includes(" C "))).toBe(true);
+      expect(legacyPaths.every((pathD) => pathD.includes(" Q ") || pathD.includes(" C "))).toBe(true);
+    }
+  );
+
+  it("네온 — 미리보기와 같은 2중 컬러 할로 + 흰색 코어를 내보낸다", () => {
+    const neon = rectEl({
+      id: "neon-1",
+      kind: "freehand",
+      brush: "neon",
+      points: [0, 10, 20, 0, 40, 16, 60, 8],
+      stroke: "#39ff14",
+      strokeWidth: 18,
+    });
+    const { svg } = exportPageToSvg(page([neon]));
+    expect(svg).toContain('data-brush-engine="neon-halo"');
+    expect((svg.match(/mix-blend-mode:screen/g) ?? []).length).toBe(3);
+    expect((svg.match(/stroke="#39ff14"/g) ?? []).length).toBe(2);
+    expect(svg).toContain('stroke="#fff"');
+  });
+
+  it("네온 탭 — 짧은 입력도 일반 원으로 축소하지 않고 3중 할로를 유지한다", () => {
+    const neonTap = rectEl({
+      id: "neon-tap-1",
+      kind: "freehand",
+      brush: "neon",
+      points: [20, 24],
+      stroke: "#39ff14",
+      strokeWidth: 18,
+    });
+    const { svg } = exportPageToSvg(page([neonTap]));
+    expect(svg).toContain('data-brush-engine="neon-halo"');
+    expect((svg.match(/<circle /g) ?? []).length).toBe(3);
   });
 
   it("캘리그래피 — 포인트별 필압·틸트·회전을 가변 굵기 벡터 선분으로 보존한다", () => {

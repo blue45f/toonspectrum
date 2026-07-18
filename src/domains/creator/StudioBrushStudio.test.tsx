@@ -2,9 +2,12 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { studioBrushDynamicsPresetSettings } from "./studio-brush-dynamics";
+import { studioBrushStudioDefaultPresetId } from "./studio-brush-studio-contract";
+import { studioBrushTipAlphaMapToBase64 } from "./studio-brush-tip-stamp";
 import {
   StudioBrushDynamicsPreview,
   StudioBrushStudio,
+  StudioBrushTipImportControls,
   type StudioBrushStudioProps,
 } from "./StudioBrushStudio";
 
@@ -50,6 +53,33 @@ describe("StudioBrushStudio", () => {
     );
     expect(html).toContain("min-h-14");
     expect(html).toContain("촉 -30° · 원형도 24%");
+  });
+
+  it.each([
+    ["spray", "airbrush"],
+    ["soft-brush", "airbrush"],
+    ["crayon", "dry-media"],
+    ["chalk", "dry-media"],
+    ["charcoal", "dry-media"],
+  ] as const)("maps the %s catalog alias to its actual dynamics preset", (brushId, presetId) => {
+    expect(studioBrushStudioDefaultPresetId(brushId)).toBe(presetId);
+    const html = renderToStaticMarkup(
+      <StudioBrushStudio
+        {...props({
+          brushId,
+          settings: studioBrushDynamicsPresetSettings(presetId),
+        })}
+      />
+    );
+
+    expect(html).toContain(
+      presetId === "airbrush" ? "에어브러시" : "드라이 미디어"
+    );
+    expect(html).not.toContain("필압·속도 입력과 입자 브러시");
+  });
+
+  it("falls back to ink-particle when a non-dynamics brush restores defaults", () => {
+    expect(studioBrushStudioDefaultPresetId("pen")).toBe("ink-particle");
   });
 
   it("renders deterministic rotated elliptical dabs from the shipped planner", () => {
@@ -106,5 +136,40 @@ describe("StudioBrushStudio", () => {
     expect(radiusX).toBe(0.25);
     expect(radiusY).toBeCloseTo(radiusX * settings.roundness.base, 12);
     expect(radiusY).toBeLessThan(0.25);
+  });
+
+  it("offers an actual PNG chooser with clear limits and a 44px touch target", () => {
+    const html = renderToStaticMarkup(
+      <StudioBrushTipImportControls
+        tip={{ shape: "round", softness: 0.35, alphaMapBase64: null, alphaMapSize: 24 }}
+        onTipChange={vi.fn()}
+      />
+    );
+
+    expect(html).toContain('type="file"');
+    expect(html).toContain('accept=".png,image/png"');
+    expect(html).toContain("PNG 펜촉 가져오기");
+    expect(html).toContain("4MB·4,096px 이하");
+    expect(html).toContain("min-h-[44px]");
+  });
+
+  it("shows embedded custom-tip status and an accessible remove action", () => {
+    const payload = studioBrushTipAlphaMapToBase64("sumi", 0.3, 16);
+    const html = renderToStaticMarkup(
+      <StudioBrushTipImportControls
+        tip={{
+          shape: "sumi",
+          softness: 0.3,
+          alphaMapBase64: payload.alphaMapBase64,
+          alphaMapSize: payload.alphaMapSize,
+        }}
+        onTipChange={vi.fn()}
+      />
+    );
+
+    expect(html).toContain("문서에 포함된 사용자 PNG");
+    expect(html).toContain("16×16 알파");
+    expect(html).toContain('aria-label="사용자 PNG 펜촉 제거"');
+    expect(html).toContain("다른 PNG로 교체");
   });
 });

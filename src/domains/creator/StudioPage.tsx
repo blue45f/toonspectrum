@@ -234,7 +234,11 @@ import {
   readStudioAutosave,
   serializeStudioAutosave,
   studioAutosaveKey,
+  studioLifecycleAutosaveSidecarKey,
   studioSharedAutosaveCompatibility,
+  writeStudioLifecycleAutosave,
+  type StudioAutosavePayload,
+  type StudioPendingStrokeDurabilityReason,
 } from "./studio-autosave";
 import {
   loadStudioBackground3DModule,
@@ -293,6 +297,7 @@ import {
   type StudioBrushSnapshot,
   type StudioSavedBrush,
 } from "./studio-brush-library";
+import { resolveStudioBrushSinglePointRoute } from "./studio-brush-runtime-contract";
 import {
   assignStudioBrushSlot,
   loadStudioBrushSlotsState,
@@ -479,7 +484,10 @@ import {
   loadStudioPsdImportModule,
   loadStudioSvgExportWorkerClientModule,
 } from "./studio-document-export-loaders";
-import { isCompleteStudioDrawOp } from "./studio-draw-completion";
+import {
+  isCompleteStudioDrawOp,
+  isStudioImmediateFreehandCommit,
+} from "./studio-draw-completion";
 import {
   STUDIO_DRAW_SHAPE_PICKER_KINDS,
   studioDrawHudToolLabel,
@@ -563,6 +571,7 @@ import {
   fxBrushSeedFromKey,
   planGlitterBrushParticles,
   planGlowBrushPasses,
+  planNeonBrushPasses,
   planOilBrushDabs,
   planPastelBrushDabs,
 } from "./studio-fx-brush";
@@ -796,6 +805,11 @@ import {
   patternDataUrl,
   type StudioPatternSpec,
 } from "./studio-pattern-fill";
+import {
+  appendStudioPagesHistorySnapshot,
+  createStudioLifecycleEmergencyAutosave,
+  projectStudioPendingStrokes,
+} from "./studio-pending-stroke-durability";
 import {
   addVanishingPoint,
   defaultVanishingPointPosition,
@@ -1504,6 +1518,10 @@ const StudioUnifiedBrushPicker = lazyRetry(
   () => import("./StudioUnifiedBrushPicker").then((mod) => ({ default: mod.StudioUnifiedBrushPicker })),
   "StudioUnifiedBrushPicker"
 );
+const StudioBrushCatalogPortal = lazyRetry(
+  () => import("./StudioBrushLibrarySheet").then((mod) => ({ default: mod.StudioBrushCatalogPortal })),
+  "StudioBrushCatalogPortal"
+);
 const StudioSelectionAntsOverlay = lazyRetry(
   () => import("./StudioSelectionOverlays").then((mod) => ({ default: mod.StudioSelectionAntsOverlay })),
   "StudioSelectionAntsOverlay"
@@ -1570,6 +1588,18 @@ const BRUSH_DELETE_UNDO_MS = 10_000;
  * 겹치지 않게 한다.
  */
 const STUDIO_SERVER_AUTOSAVE_IDLE_MS = 45_000;
+
+interface StudioBrushCatalogHandlers {
+  close: (
+    reason: import("./StudioBrushLibrarySheet").StudioBrushCatalogCloseReason
+  ) => void;
+  selectBrushId: (brushId: string) => void;
+  toggle: (
+    placement: import("./StudioBrushLibrarySheet").StudioBrushCatalogPlacement,
+    trigger: HTMLButtonElement
+  ) => void;
+  toggleFavorite: (brushId: string) => void;
+}
 
 function defaultStampTuningForBrushId(brushId: string): StudioBrushStampTuning | null {
   const kind = resolveStudioStampBrushKind(brushId);
@@ -3314,24 +3344,22 @@ const StudioDrawNode = memo(function StudioDrawNode({
         if (kind === "freehand") {
           const brush = el.brush ?? "pen";
           const brushFamily = resolveStudioBrushRenderFamily(brush);
-          const causalStampBrush = el.stampPipeline === "causal-walker-v2"
-            && resolveStudioStampBrushKind(brush) !== null;
+          const stampKind = el.mode !== "eraser" ? resolveStudioStampBrushKind(brush) : null;
           const dynamicBrush = dynamicBrushId !== null;
           const renderSampleDistance = strokeRenderDistance(el.sampleSpacing);
+          // Legacy documents predate the explicit causal-walker marker, but their four stamp
+          // brushes still need the exact dab renderer for a one-point tap. The shared pure route
+          // keeps Canvas, SVG and the future WebGPU playback contract in agreement.
+          const singlePointRoute = resolveStudioBrushSinglePointRoute({
+            brushId: brush,
+            mode: el.mode,
+            causalInkEnabled:
+              el.sampleSpacing !== undefined || el.pressureModel !== undefined,
+          });
 
           if (
             points.length === 2 &&
-            ((el.sampleSpacing === undefined && el.pressureModel === undefined) || (
-              el.mode !== "eraser" && brushFamily !== "pen" && brushFamily !== "marker"
-            )) &&
-            brushFamily !== "watercolor" &&
-            brushFamily !== "screentone" &&
-            brushFamily !== "glow" &&
-            brushFamily !== "glitter" &&
-            brushFamily !== "oil" &&
-            brushFamily !== "pastel" &&
-            !causalStampBrush &&
-            !dynamicBrush
+            singlePointRoute === "generic-dot"
           ) {
             const pressure = Math.min(1, Math.max(0, el.pressures?.[0] ?? 0.5));
             const pressureAware = el.mode === "eraser"
@@ -3359,7 +3387,6 @@ const StudioDrawNode = memo(function StudioDrawNode({
           {
             // 스탬프 엔진 계열(속도 잉크·정밀 에어브러시·그레인 연필·물맛 붓): 라이브 프리뷰와
             // 커밋이 같은 결정적 dab 시퀀스를 그린다 — 증분/재생/협업 복원에서 픽셀이 동일하다.
-            const stampKind = el.mode !== "eraser" ? resolveStudioStampBrushKind(brush) : null;
             if (stampKind) {
               const stampStyle = resolveStudioStampBrushStyle(
                 stampKind,
@@ -3726,20 +3753,39 @@ const StudioDrawNode = memo(function StudioDrawNode({
               legacyMinDistance: renderSampleDistance,
               legacyTension: 0.35,
             });
+            const passes = planNeonBrushPasses(strokeWidth);
             return (
-              <Line
-                key={index}
-                points={renderPath.points}
-                stroke={stroke}
-                strokeWidth={strokeWidth}
-                opacity={opacity}
-                lineCap="round"
-                lineJoin="round"
-                tension={renderPath.tension}
-                // Screen-style glow on dark panels — Express/Picsart neon marker affordance.
-                globalCompositeOperation="lighter"
-                listening={false}
-              />
+              <Group key={index} opacity={opacity} listening={false}>
+                {passes.map((pass, passIndex) => {
+                  const passColor = pass.tone === "white-core" ? "#ffffff" : stroke;
+                  const passWidth = Math.max(0.5, strokeWidth * pass.widthScale);
+                  return renderPath.points.length === 2 ? (
+                    <KCircle
+                      key={passIndex}
+                      x={renderPath.points[0]}
+                      y={renderPath.points[1]}
+                      radius={Math.max(0.25, passWidth / 2)}
+                      fill={passColor}
+                      opacity={pass.opacity}
+                      globalCompositeOperation="lighter"
+                      listening={false}
+                    />
+                  ) : (
+                    <Line
+                      key={passIndex}
+                      points={renderPath.points}
+                      stroke={passColor}
+                      strokeWidth={passWidth}
+                      opacity={pass.opacity}
+                      lineCap="round"
+                      lineJoin="round"
+                      tension={renderPath.tension}
+                      globalCompositeOperation="lighter"
+                      listening={false}
+                    />
+                  );
+                })}
+              </Group>
             );
           }
 
@@ -5818,7 +5864,33 @@ function StudioCuttoonEditor() {
   const comipoActionBusyRef = useRef(false);
   const pages = pagesHistory[pagesHi];
 
-  const [currentPageId, setCurrentPageId] = useState<string>(pages[0]?.id || "");
+  const [currentPageId, setCurrentPageIdState] = useState<string>(pages[0]?.id || "");
+  const currentPageIdRef = useRef(currentPageId);
+  currentPageIdRef.current = currentPageId;
+  function setCurrentPageId(next: Parameters<typeof setCurrentPageIdState>[0]): boolean {
+    const currentPage = currentPageIdRef.current;
+    const nextPageId = typeof next === "function" ? next(currentPage) : next;
+    if (nextPageId !== currentPage) {
+      if (drawingRef.current || drawingPointerSessionRef.current) {
+        setError("현재 획을 마친 뒤 페이지를 전환할 수 있어요.");
+        return false;
+      }
+      const pendingBatch = pendingStrokeCommitsRef.current;
+      if (
+        pendingBatch
+        && pendingBatch.pageId !== nextPageId
+        && !flushPendingStrokeCommitsRef.current()
+      ) {
+        setError(
+          "마지막 획을 원래 페이지에 확정하지 못해 페이지를 전환하지 않았어요. 잠금·동기화 상태를 확인한 뒤 다시 시도해 주세요."
+        );
+        return false;
+      }
+    }
+    currentPageIdRef.current = nextPageId;
+    setCurrentPageIdState(nextPageId);
+    return true;
+  }
 
   // ── 문서 마스터(공통 요소 레이어) — 모든 페이지에 깔리는 로고/워터마크/코너 장식(studio-master-page) ──
   // pagesHistory 와 분리된 문서 레벨 상태 — 마스터 편집은 페이지 실행취소 히스토리에 포함되지 않는다(패널 고지).
@@ -7236,6 +7308,23 @@ function StudioCuttoonEditor() {
   const [autosaveRestoreBlockedReason, setAutosaveRestoreBlockedReason] = useState<
     "legacy-unversioned" | "work-mismatch" | "revision-mismatch" | null
   >(null);
+  // A released opaque stroke can remain outside React history for 200ms while its exact pixels
+  // stay on the live surface. Keep that authoritative batch reachable by autosave/pagehide code
+  // declared earlier than the rendering pipeline so navigation can never drop the only vector copy.
+  const pendingStrokeCommitsRef = useRef<{
+    pageId: string;
+    strokes: DrawEl[];
+    timer: ReturnType<typeof setTimeout> | null;
+    retryCount: number;
+  } | null>(null);
+  const persistPendingStrokeEmergencyAutosaveRef = useRef<(
+    reason: StudioPendingStrokeDurabilityReason
+  ) => void>(() => undefined);
+  // Monotonic generation of the latest browser/server durable snapshot. Pending strokes live
+  // outside React history, so lifecycle persistence also checks the pending batch independently.
+  const studioLifecycleDurableGenerationRef = useRef(0);
+  const studioLifecycleDurablePendingFingerprintRef = useRef("");
+  const studioLifecycleBaselineScopeRef = useRef<string | null>(null);
 
   const [tool, setTool] = useState<Tool>("select");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -7497,6 +7586,10 @@ function StudioCuttoonEditor() {
   const [proDrawPrefs, setProDrawPrefs] = useState<StudioProDrawPrefs>(() =>
     loadStudioProDrawPrefs(studioProDrawStorage())
   );
+  const [brushCatalogSession, setBrushCatalogSession] = useState<{
+    placement: import("./StudioBrushLibrarySheet").StudioBrushCatalogPlacement;
+    trigger: HTMLButtonElement;
+  } | null>(null);
   const [drawShape, setDrawShape] = useState<DrawShapeKind>("line");
   const [shapeFill, setShapeFill] = useState(false);
   /**
@@ -7705,6 +7798,51 @@ function StudioCuttoonEditor() {
       return next;
     });
   }
+
+  function toggleBuiltInBrushFavorite(brushId: string) {
+    setProDrawPrefs((previous) => {
+      const next = toggleFavoriteBrushId(previous, brushId);
+      saveStudioProDrawPrefs(studioProDrawStorage(), next);
+      const favorite = next.favoriteBrushIds.includes(brushId);
+      announceDrawingShortcut(favorite ? "즐겨찾기 추가" : "즐겨찾기 해제");
+      return next;
+    });
+  }
+
+  function toggleBuiltInBrushCatalog(
+    placement: import("./StudioBrushLibrarySheet").StudioBrushCatalogPlacement,
+    trigger: HTMLButtonElement
+  ) {
+    setBrushCatalogSession((current) =>
+      current?.placement === placement ? null : { placement, trigger }
+    );
+  }
+
+  function closeBuiltInBrushCatalog(
+    reason: import("./StudioBrushLibrarySheet").StudioBrushCatalogCloseReason
+  ) {
+    const returnTarget = brushCatalogSession?.trigger;
+    setBrushCatalogSession(null);
+    // Outside-pointer dismissal must leave focus on the control the artist just chose.
+    // Explicit close, Escape, and selection return to the launcher for predictable keyboard flow.
+    if (reason === "outside-pointer") return;
+    globalThis.requestAnimationFrame?.(() => {
+      if (returnTarget?.isConnected && !returnTarget.closest("[inert]")) {
+        returnTarget.focus({ preventScroll: true });
+      }
+    });
+  }
+
+  useEffect(() => {
+    if (!brushCatalogSession) return;
+    const wrongSurface =
+      drawMode !== "pen" ||
+      tool !== "draw" ||
+      (brushCatalogSession.placement === "mobile-sheet"
+        ? !isMobile || mobileSheet !== "draw"
+        : isMobile);
+    if (wrongSurface) setBrushCatalogSession(null);
+  }, [brushCatalogSession, drawMode, isMobile, mobileSheet, tool]);
 
   function applyBrushSlot(slot: { brushId: string; strokeWidth: number; brushOpacity: number }) {
     const preset = BRUSH_PRESETS.find((p) => p.id === slot.brushId);
@@ -8050,8 +8188,10 @@ function StudioCuttoonEditor() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function collectPublishPreflightProvenance(): StudioPublishAiProvenance[] {
-    return pages.flatMap((page) =>
+  function collectPublishPreflightProvenance(
+    sourcePages: readonly PageState[] = pages
+  ): StudioPublishAiProvenance[] {
+    return sourcePages.flatMap((page) =>
       page.elements.flatMap((element) => {
         const provenance: StudioPublishAiProvenance[] = [];
         if ("aiProvenance" in element && element.aiProvenance) {
@@ -8070,7 +8210,8 @@ function StudioCuttoonEditor() {
   }
 
   function buildPublishPreflightInput(
-    provenance: readonly StudioPublishAiProvenance[]
+    provenance: readonly StudioPublishAiProvenance[],
+    sourcePages: readonly PageState[] = pages
   ): StudioPublishPreflightInput {
     return {
       title,
@@ -8078,7 +8219,7 @@ function StudioCuttoonEditor() {
         .split(/[,\s]+/)
         .map((tag) => tag.trim())
         .filter(Boolean),
-      pages: pages.map((page) => {
+      pages: sourcePages.map((page) => {
         const review = normalizePageReviewState(page.review);
         return {
           id: page.id,
@@ -8675,6 +8816,17 @@ function StudioCuttoonEditor() {
     mobileImmersive,
   ]);
 
+  // Hydration establishes the clean baseline for this document scope. Lifecycle persistence only
+  // runs after a later local/CRDT generation (or when a deferred stroke still lives outside it).
+  useEffect(() => {
+    if (!workHydrated) return;
+    const scope = JSON.stringify([studioAuthUserId, workId, remixId]);
+    if (studioLifecycleBaselineScopeRef.current === scope) return;
+    studioLifecycleBaselineScopeRef.current = scope;
+    studioLifecycleDurableGenerationRef.current = studioRevisionProjectGenerationRef.current;
+    studioLifecycleDurablePendingFingerprintRef.current = "";
+  }, [remixId, studioAuthUserId, workHydrated, workId]);
+
   // 오토세이브 임시저장 리스너 (디바운스 1.5초)
   useEffect(() => {
     if (!workHydrated) return;
@@ -8684,10 +8836,17 @@ function StudioCuttoonEditor() {
     // 복구 배너가 떠 있는 동안(복구/비우기 결정 전)은 저장하지 않는다 — 가드가 없으면
     // 재진입 1.5초 뒤 빈 초기 상태가 직전 작업을 덮어써 "복구하기"가 빈 캔버스를 복원한다.
     if (hasAutosave) return;
+    const pendingBatch = pendingStrokeCommitsRef.current;
+    const durablePages = projectStudioPendingStrokes(
+      pages,
+      pendingBatch
+        ? { pageId: pendingBatch.pageId, strokes: pendingBatch.strokes }
+        : null
+    ).pagesList as PageState[];
     // 빈 문서(요소·게시 정보 모두 없음)는 저장하지 않는다 — 의미 없는 복구 배너를 막고,
     // 직전 작업 백업이 빈 상태로 교체되는 것도 방지한다.
     const hasContent =
-      pages.some((p) => p.elements.length > 0) ||
+      durablePages.some((p) => p.elements.length > 0) ||
       master.elements.length > 0 ||
       characterBible.characters.length > 0 ||
       studioWriterRoomHasContent(writerRoom) ||
@@ -8706,15 +8865,25 @@ function StudioCuttoonEditor() {
       description.trim() !== "" ||
       tagsText.trim() !== "";
     if (!hasContent) return;
+    const scheduledGeneration = studioRevisionProjectGenerationRef.current;
+    const scheduledPendingFingerprint = pendingBatch
+      ? `${pendingBatch.pageId}:${pendingBatch.strokes.map((stroke) => stroke.id).join(",")}`
+      : "";
     const timer = setTimeout(() => {
       try {
+        if (
+          scheduledGeneration <= studioLifecycleDurableGenerationRef.current
+          && scheduledPendingFingerprint === studioLifecycleDurablePendingFingerprintRef.current
+        ) {
+          return;
+        }
         const payload = {
           version: 2 as const,
           savedAt: new Date().toISOString(),
           ...(workId && sharedDocument
             ? { sourceWorkId: workId, sourceRevision: sharedDocument.revision }
             : {}),
-          pagesList: pages,
+          pagesList: durablePages,
           master: serializeDocumentMaster(master),
           characterBible,
           writerRoom,
@@ -8743,6 +8912,14 @@ function StudioCuttoonEditor() {
           },
         };
         localStorage.setItem(autosaveKey, serializeStudioAutosave(payload));
+        // A normal autosave only runs after recovery was explicitly resolved (`hasAutosave=false`).
+        // It therefore owns the primary slot and can retire a lifecycle sidecar from that decision.
+        localStorage.removeItem(studioLifecycleAutosaveSidecarKey(autosaveKey));
+        studioLifecycleDurableGenerationRef.current = Math.max(
+          studioLifecycleDurableGenerationRef.current,
+          scheduledGeneration
+        );
+        studioLifecycleDurablePendingFingerprintRef.current = scheduledPendingFingerprint;
       } catch (e) {
         console.error("Auto-save failed:", e);
       }
@@ -8819,13 +8996,9 @@ function StudioCuttoonEditor() {
     title,
   ]);
 
-  // 복구 여부를 정하지 않은 채 캔버스 편집을 시작하면(undo 히스토리 누적) 배너를 닫고
-  // 자동 저장을 재개한다 — 배너를 무시한 새 작업이 저장되지 않는 공백을 막는다.
-  useEffect(() => {
-    if (hasAutosave && !autosaveRestoreBlockedReason && pagesHistory.length > 1) {
-      setHasAutosave(false);
-    }
-  }, [autosaveRestoreBlockedReason, hasAutosave, pagesHistory]);
+  // An unresolved recovery remains authoritative until the artist restores or clears it. New edits
+  // made while the banner is open are written to the lifecycle sidecar on route/pagehide instead
+  // of silently dismissing and overwriting that recovery.
 
   // 로드 시 임시저장 확인 리스너 — 실제 내용이 있는 백업만 복구 배너를 띄운다.
   // (요소·게시 정보가 전부 빈 백업은 복구 가치가 없고, 과거 버전이 남긴 빈 페이로드도 거른다.)
@@ -8862,11 +9035,35 @@ function StudioCuttoonEditor() {
     workId,
   ]);
 
+  function prepareStudioDocumentReplacement(
+    label: string,
+    options: { flushPending: boolean } = { flushPending: false }
+  ): boolean {
+    if (drawingRef.current || drawingPointerSessionRef.current) {
+      setError(`현재 획을 마친 뒤 ${label}할 수 있어요.`);
+      return false;
+    }
+    if (pendingStrokeCommitsRef.current) {
+      if (!options.flushPending) {
+        setError(`${label}하는 동안 새 획이 생겨 적용하지 않았어요. 획을 마친 뒤 다시 시도해 주세요.`);
+        return false;
+      }
+      if (!flushPendingStrokeCommitsRef.current()) {
+        setError(
+          `마지막 획을 확정하지 못해 ${label}하지 않았어요. 잠금·동기화 상태를 확인한 뒤 다시 시도해 주세요.`
+        );
+        return false;
+      }
+    }
+    return true;
+  }
+
   async function restoreAutosave() {
     if (collaborationDocumentLocked) {
       setError(collaborationLockMessage());
       return;
     }
+    if (!prepareStudioDocumentReplacement("임시저장본을 복구", { flushPending: true })) return;
     const mutationTicket = captureStudioMutationTicket();
     try {
       const saved = readStudioAutosave(localStorage, autosaveKey, !workId && !remixId);
@@ -8894,14 +9091,28 @@ function StudioCuttoonEditor() {
           loadStudioReleaseScheduleRuntime(),
           normalizeStudioPublicationAnalyticsDeferred(parsed.publicationAnalytics),
         ]);
+        if (
+          drawingRef.current
+          || drawingPointerSessionRef.current
+          || pendingStrokeCommitsRef.current
+        ) {
+          setError("임시저장본을 준비하는 동안 새 획이 시작되어 복구하지 않았어요. 획을 마친 뒤 다시 시도해 주세요.");
+          return;
+        }
         if (!canApplyStudioMutation(mutationTicket)) {
           setError("임시저장본을 준비하는 동안 원고가 변경되어 복구하지 않았어요. 다시 확인해 주세요.");
           return;
         }
         if (parsed.pagesList.length > 0) {
           const restoredPages = parsed.pagesList as PageState[];
+          const currentHistory = pagesHistoryRef.current;
+          const currentHistoryIndex = Math.max(
+            0,
+            Math.min(pagesHiRef.current, Math.max(0, currentHistory.length - 1))
+          );
+          const currentPages = currentHistory[currentHistoryIndex] ?? pages;
           const workAssetReason = studioWorkAssetDocumentSourceTransitionReason(
-            pages,
+            currentPages,
             restoredPages
           );
           if (workAssetReason) {
@@ -8909,6 +9120,8 @@ function StudioCuttoonEditor() {
             return;
           }
           resetAdvancedFillForDocumentReplacement();
+          pagesHistoryRef.current = [restoredPages];
+          pagesHiRef.current = 0;
           setPagesHistory([restoredPages]);
           setPagesHi(0);
           const restoredCurrentId = restoredPages.some((page) => page.id === parsed.currentPageId)
@@ -8955,6 +9168,7 @@ function StudioCuttoonEditor() {
   function clearAutosave() {
     try {
       localStorage.removeItem(autosaveKey);
+      localStorage.removeItem(studioLifecycleAutosaveSidecarKey(autosaveKey));
       if (!workId && !remixId) localStorage.removeItem(LEGACY_STUDIO_AUTOSAVE_KEY);
       setHasAutosave(false);
       setAutosaveRestoreBlockedReason(null);
@@ -9320,13 +9534,7 @@ function StudioCuttoonEditor() {
   // 펜을 뗀 획은 라이브 표면(증분 오버레이/GPU 파인 표면)에 잉크를 남긴 채 큐에 쌓고,
   // 마지막 획 후 짧은 유휴(또는 강제 플러시)에 한 번의 React 커밋으로 동기화한다.
   // 연속 스트로크가 커밋 렌더(수백 ms)에 절대 막히지 않는다 — 필기감의 구조적 핵심.
-  const pendingStrokeCommitsRef = useRef<{
-    pageId: string;
-    strokes: DrawEl[];
-    timer: ReturnType<typeof setTimeout> | null;
-    retryCount: number;
-  } | null>(null);
-  const flushPendingStrokeCommitsRef = useRef<() => void>(() => {});
+  const flushPendingStrokeCommitsRef = useRef<() => boolean>(() => true);
   const discardPendingStrokeCommitsRef = useRef<() => void>(() => {});
   // GPU 파인 획의 지연 표면 유지: 커밋 동기화 전까지 엔진에 함께 공급되는 확정 획들.
   const pendingGpuStrokesRef = useRef<StudioGpuStroke[]>([]);
@@ -9909,11 +10117,30 @@ function StudioCuttoonEditor() {
       if (marqueeRafRef.current !== null) globalThis.cancelAnimationFrame(marqueeRafRef.current);
       drawingUnmountCleanupRef.current();
       const pendingBatch = pendingStrokeCommitsRef.current;
+      // React route transitions do not dispatch pagehide. Persist every dirty stable generation as
+      // well as an uncommitted batch; the ref-backed writer cheaply no-ops when both are durable.
+      persistPendingStrokeEmergencyAutosaveRef.current("route-change");
       if (pendingBatch?.timer) globalThis.clearTimeout(pendingBatch.timer);
       pendingStrokeCommitsRef.current = null;
     },
     []
   );
+  useEffect(() => {
+    const handlePageHide = () => {
+      persistPendingStrokeEmergencyAutosaveRef.current("pagehide");
+    };
+    const handleVisibilityChange = () => {
+      if (globalThis.document.visibilityState === "hidden") {
+        persistPendingStrokeEmergencyAutosaveRef.current("visibility-hidden");
+      }
+    };
+    globalThis.addEventListener("pagehide", handlePageHide);
+    globalThis.document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      globalThis.removeEventListener("pagehide", handlePageHide);
+      globalThis.document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
   // ── 픽셀 선택 도구(포토샵식 마퀴/올가미) — studio-selection-tools 통합 상태 ──
   // 선택 영역·도구는 "이미지 요소 1개"에 귀속된다(요소가 바뀌면 아래 effect 가 해제).
   const [advancedFillActive, setAdvancedFillActive] = useState(false);
@@ -12687,10 +12914,17 @@ function StudioCuttoonEditor() {
       return false;
     }
     const commitPageId = targetPageId ?? activePage.id;
-    const commitBaseElements =
-      commitPageId === activePage.id
-        ? elements
-        : (pages.find((p) => p.id === commitPageId)?.elements ?? elements);
+    // Multiple pointerup/flush commits can run before React renders. Read and advance the
+    // ref-backed history, not this render's `pages`, so a cross-page deferred flush cannot be
+    // replaced by the immediate stroke that follows it in the same browser task.
+    const currentHistory = pagesHistoryRef.current;
+    const currentHistoryIndex = Math.max(
+      0,
+      Math.min(pagesHiRef.current, Math.max(0, currentHistory.length - 1))
+    );
+    const commitBasePages = currentHistory[currentHistoryIndex] ?? pages;
+    const commitTargetPage = commitBasePages.find((page) => page.id === commitPageId);
+    const commitBaseElements = commitTargetPage?.elements ?? elements;
     const workAssetReason = studioWorkAssetSourceTransitionReason(commitBaseElements, nextElements);
     if (workAssetReason) {
       setError(workAssetReason);
@@ -12710,15 +12944,22 @@ function StudioCuttoonEditor() {
       invalidateAdvancedFillWork("문서가 바뀌어 진행 중인 계산과 채우기 미리보기를 취소했습니다.");
     }
     coalesceKeyRef.current = null; // 일반 커밋은 합치기 체인을 끊는다.
-    const localNextPages = pages.map((p) =>
+    const localNextPages = commitBasePages.map((p) =>
       p.id === commitPageId ? { ...p, ...extraPatch, elements: resolved } : p
     );
-    if (!publishStudioCrdtSceneTransition(pages, localNextPages)) return false;
+    if (!publishStudioCrdtSceneTransition(commitBasePages, localNextPages)) return false;
     const nextPages = mergeStudioCrdtFrontier(localNextPages);
-    const h = pagesHistory.slice(0, pagesHi + 1);
-    h.push(nextPages);
-    setPagesHistory(h);
-    setPagesHi(h.length - 1);
+    const appended = appendStudioPagesHistorySnapshot(
+      currentHistory,
+      currentHistoryIndex,
+      nextPages
+    );
+    // Advance refs before scheduling React state. A second synchronous commit observes this exact
+    // first snapshot even though React Compiler batching has not rendered it yet.
+    pagesHistoryRef.current = appended.history;
+    pagesHiRef.current = appended.historyIndex;
+    setPagesHistory(appended.history);
+    setPagesHi(appended.historyIndex);
     return true;
   }
   // 같은 key의 연속 동작이면 새 히스토리 항목 대신 최상단을 교체(undo 1회로 합침).
@@ -12775,12 +13016,18 @@ function StudioCuttoonEditor() {
   useEffect(() => {
     flushPendingStrokeCommitsRef.current = () => {
       const batch = takePendingStrokeCommits();
-      if (!batch || batch.strokes.length === 0) return;
-      const targetPage = pages.find((page) => page.id === batch.pageId);
+      if (!batch || batch.strokes.length === 0) return true;
+      const currentHistory = pagesHistoryRef.current;
+      const currentIndex = Math.max(
+        0,
+        Math.min(pagesHiRef.current, Math.max(0, currentHistory.length - 1))
+      );
+      const currentPages = currentHistory[currentIndex] ?? pages;
+      const targetPage = currentPages.find((page) => page.id === batch.pageId);
       let committed = false;
       let baseElements: El[] = [];
       if (targetPage && !masterEditMode) {
-        baseElements = batch.pageId === activePage.id ? elements : targetPage.elements;
+        baseElements = targetPage.elements;
         committed = commit([...baseElements, ...batch.strokes], undefined, batch.pageId);
       }
       if (!committed) {
@@ -12788,7 +13035,7 @@ function StudioCuttoonEditor() {
         // rejected this particular attempt. Keep the settled surface visible and retry briefly;
         // after the bounded retries, the next stroke/scope flush can retry without a busy loop.
         restorePendingStrokeCommits(batch);
-        return;
+        return false;
       }
       // 즉시 커밋 경로와 동일한 래스터 승격 — 배치의 각 획을 개별 작업으로 큐잉한다.
       const rasterWorkId = authorizedWorkAssetScopeId;
@@ -12825,6 +13072,7 @@ function StudioCuttoonEditor() {
         batch.pageId,
         batch.strokes.map((stroke) => stroke.id)
       );
+      return true;
     };
     discardPendingStrokeCommitsRef.current = () => {
       const batch = takePendingStrokeCommits();
@@ -13006,7 +13254,13 @@ function StudioCuttoonEditor() {
     committedInkSurfaceHandoffRafRef.current = 0;
   }, []);
   // 전체 페이지 상태를 직접 커밋하는 헬퍼 (페이지 추가/삭제/이동용)
-  function commitPages(nextPages: PageState[], options: { bypassReviewLock?: boolean } = {}): boolean {
+  function commitPages(
+    nextPages: PageState[],
+    options: {
+      bypassReviewLock?: boolean;
+      pendingStrokePolicy?: "preserve" | "drop";
+    } = {}
+  ): boolean {
     if (!editorMountedRef.current) return false;
     if (documentSaveInFlightRef.current) {
       setError("저장 중에는 원고를 변경할 수 없어요. 저장이 끝난 뒤 다시 시도해 주세요.");
@@ -13016,14 +13270,46 @@ function StudioCuttoonEditor() {
       setError(collaborationLockMessage());
       return false;
     }
-    const workAssetReason = studioWorkAssetDocumentSourceTransitionReason(pages, nextPages);
+    if (drawingRef.current || drawingPointerSessionRef.current) {
+      setError("현재 획을 마친 뒤 페이지 구성을 변경할 수 있어요.");
+      return false;
+    }
+    // Page-level operations can run in the same task as a released deferred stroke. Flush first,
+    // then project that exact batch into the caller's stale render-derived page set. Most page
+    // operations must preserve the just-finished ink even when they intentionally create a new
+    // elements array (dialogue edit, grouping, locale switch, auto action). Explicit clear/delete
+    // flows opt out below instead of accidentally classifying every new array as a deletion.
+    const pendingBatch = pendingStrokeCommitsRef.current;
+    if (pendingBatch && !flushPendingStrokeCommitsRef.current()) {
+      setError(
+        "마지막 획을 원고에 확정하지 못해 페이지 작업을 실행하지 않았어요. 잠금·동기화 상태를 확인한 뒤 다시 시도해 주세요."
+      );
+      return false;
+    }
+    const currentHistory = pagesHistoryRef.current;
+    const currentHistoryIndex = Math.max(
+      0,
+      Math.min(pagesHiRef.current, Math.max(0, currentHistory.length - 1))
+    );
+    const currentPages = currentHistory[currentHistoryIndex] ?? pages;
+    let rebasedNextPages = nextPages;
+    if (pendingBatch && options.pendingStrokePolicy !== "drop") {
+      rebasedNextPages = projectStudioPendingStrokes(nextPages, {
+        pageId: pendingBatch.pageId,
+        strokes: pendingBatch.strokes,
+      }).pagesList as PageState[];
+    }
+    const workAssetReason = studioWorkAssetDocumentSourceTransitionReason(
+      currentPages,
+      rebasedNextPages
+    );
     if (workAssetReason) {
       setError(workAssetReason);
       return false;
     }
     setSharedDocumentNotice(null);
     if (!options.bypassReviewLock) {
-      const changedLockedPageId = findChangedLockedPageId(pages, nextPages);
+      const changedLockedPageId = findChangedLockedPageId(currentPages, rebasedNextPages);
       if (changedLockedPageId) {
         setError("잠긴 페이지가 포함된 변경이에요. 페이지 검토에서 잠금을 해제한 뒤 다시 시도해 주세요.");
         return false;
@@ -13033,16 +13319,21 @@ function StudioCuttoonEditor() {
       invalidateAdvancedFillWork("문서가 바뀌어 진행 중인 계산과 채우기 미리보기를 취소했습니다.");
     }
     const document = studioCrdtDocumentRef.current;
-    let resolvedPages = nextPages;
+    let resolvedPages = rebasedNextPages;
     if (document) {
-      if (!publishStudioCrdtSceneTransition(pages, nextPages)) return false;
-      resolvedPages = mergeStudioCrdtFrontier(nextPages);
+      if (!publishStudioCrdtSceneTransition(currentPages, rebasedNextPages)) return false;
+      resolvedPages = mergeStudioCrdtFrontier(rebasedNextPages);
     }
     coalesceKeyRef.current = null;
-    const h = pagesHistory.slice(0, pagesHi + 1);
-    h.push(resolvedPages);
-    setPagesHistory(h);
-    setPagesHi(h.length - 1);
+    const appended = appendStudioPagesHistorySnapshot(
+      currentHistory,
+      currentHistoryIndex,
+      resolvedPages
+    );
+    pagesHistoryRef.current = appended.history;
+    pagesHiRef.current = appended.historyIndex;
+    setPagesHistory(appended.history);
+    setPagesHi(appended.historyIndex);
     return true;
   }
 
@@ -13587,11 +13878,16 @@ function StudioCuttoonEditor() {
     }
   }
   // ── 페이지 관련 명령 조작 (pure studio-pages로 위임 — 동일 동작 유지 + 고도화) ──────────────────────────────────────────────
+  function latestStudioPagesSnapshot(): PageState[] {
+    const history = pagesHistoryRef.current;
+    const index = Math.max(0, Math.min(pagesHiRef.current, Math.max(0, history.length - 1)));
+    return history[index] ?? pages;
+  }
   function addPage() {
     // thin wrapper over pure shipped command + commit (behavior unchanged)
     const baseH = activePage.canvasH || 1080;
     const { nextPages, newPageId } = appendPageState(pages, uid, baseH);
-    commitPages(nextPages);
+    if (!commitPages(nextPages)) return;
     setCurrentPageId(newPageId);
   }
   function insertPageBefore(pageId: string) {
@@ -13599,7 +13895,7 @@ function StudioCuttoonEditor() {
     if (idx < 0) return;
     const baseH = pages[idx]?.canvasH || 1080;
     const nextPages = insertBlankPageAt(pages, idx, uid, baseH);
-    commitPages(nextPages);
+    if (!commitPages(nextPages)) return;
     // 새로 삽입된 것을 활성으로
     const inserted = nextPages[idx];
     if (inserted) setCurrentPageId(inserted.id);
@@ -13609,29 +13905,31 @@ function StudioCuttoonEditor() {
     if (idx < 0) return;
     const baseH = pages[idx]?.canvasH || 1080;
     const nextPages = insertBlankPageAt(pages, idx + 1, uid, baseH);
-    commitPages(nextPages);
+    if (!commitPages(nextPages)) return;
     const inserted = nextPages[idx + 1];
     if (inserted) setCurrentPageId(inserted.id);
   }
   function duplicatePage(pageId: string) {
-    const pageToDup = pages.find((p) => p.id === pageId);
+    if (pendingStrokeCommitsRef.current && !flushPendingStrokeCommitsRef.current()) return;
+    const basePages = latestStudioPagesSnapshot();
+    const pageToDup = basePages.find((p) => p.id === pageId);
     if (!pageToDup) return;
     const newPage = { ...duplicatePageState(pageToDup, uid), review: undefined };
-    const idx = pages.findIndex((p) => p.id === pageId);
-    const nextPages = [...pages];
+    const idx = basePages.findIndex((p) => p.id === pageId);
+    const nextPages = [...basePages];
     nextPages.splice(idx + 1, 0, newPage);
-    commitPages(nextPages);
-    setCurrentPageId(newPage.id);
+    if (commitPages(nextPages)) setCurrentPageId(newPage.id);
   }
   function duplicatePageMirrored(pageId: string) {
-    const pageToDup = pages.find((p) => p.id === pageId);
+    if (pendingStrokeCommitsRef.current && !flushPendingStrokeCommitsRef.current()) return;
+    const basePages = latestStudioPagesSnapshot();
+    const pageToDup = basePages.find((p) => p.id === pageId);
     if (!pageToDup) return;
     const mir = { ...duplicateMirroredPage(pageToDup, uid, CANVAS_W), review: undefined };
-    const idx = pages.findIndex((p) => p.id === pageId);
-    const nextPages = [...pages];
+    const idx = basePages.findIndex((p) => p.id === pageId);
+    const nextPages = [...basePages];
     nextPages.splice(idx + 1, 0, mir);
-    commitPages(nextPages);
-    setCurrentPageId(mir.id);
+    if (commitPages(nextPages)) setCurrentPageId(mir.id);
   }
   function deletePage(pageId: string) {
     if (pages.length <= 1) return;
@@ -13660,7 +13958,7 @@ function StudioCuttoonEditor() {
     const target = pages.find((p) => p.id === pageId);
     if (!target || target.elements.length === 0) return; // no-op guard, no history pollution
     const nextPages = clearPage(pages, pageId);
-    commitPages(nextPages);
+    commitPages(nextPages, { pendingStrokePolicy: "drop" });
   }
   function applyGradeToAll() {
     const cur = JSON.stringify(activePage.grade ?? null);
@@ -18540,6 +18838,17 @@ function StudioCuttoonEditor() {
         }
         return;
       }
+      const pendingBatch = pendingStrokeCommitsRef.current;
+      if (
+        pendingBatch
+        && pendingBatch.pageId !== activePage.id
+        && !flushPendingStrokeCommitsRef.current()
+      ) {
+        setError(
+          "이전 페이지의 마지막 획을 확정하지 못해 새 획을 시작하지 않았어요. 잠금·동기화 상태를 확인한 뒤 다시 시도해 주세요."
+        );
+        return;
+      }
       // A CRDT stroke has its own conflict-free operation stream, so it must not claim the old
       // page-wide lease that prevented two artists from drawing at once. Keep the lease fallback
       // only while the durable document is not connected.
@@ -20301,6 +20610,10 @@ function StudioCuttoonEditor() {
         const deferCommit =
           !masterEditMode
           && finished.mode !== "eraser"
+          // A tap or one-segment freehand gesture is the exact path artists perceive as
+          // "released too early". Commit it in the pointerup task so Undo/autosave/history become
+          // authoritative immediately; longer strokes retain the 200ms batching optimization.
+          && !isStudioImmediateFreehandCommit(finished)
           // A translucent settled preview would overlap the newly committed node for the handoff
           // frames and temporarily darken to 1-(1-a)^2. Commit it atomically instead.
           && (finished.opacity ?? 1) === 1
@@ -21082,9 +21395,29 @@ function StudioCuttoonEditor() {
       openPublishStep();
       return;
     }
+    // A deferred stroke is still outside React history. Flush it before installing the save lock;
+    // otherwise `commit` correctly rejects the flush and the server doc/images diverge. flushSync
+    // also gives the capture stage the projected page before the first screenshot is requested.
+    if (pendingStrokeCommitsRef.current) {
+      flushSync(() => {
+        flushPendingStrokeCommitsRef.current();
+      });
+      if (pendingStrokeCommitsRef.current) {
+        setError(
+          "마지막 획을 원고에 확정하지 못해 저장을 시작하지 않았어요. 잠금·동기화 상태를 확인한 뒤 다시 시도해 주세요."
+        );
+        return;
+      }
+    }
+    const saveHistory = pagesHistoryRef.current;
+    const saveHistoryIndex = Math.max(
+      0,
+      Math.min(pagesHiRef.current, Math.max(0, saveHistory.length - 1))
+    );
+    const savePages = saveHistory[saveHistoryIndex] ?? pages;
     if (
       status === "published" &&
-      pages.some((page) => normalizePageReviewState(page.review).status === "changes-requested")
+      savePages.some((page) => normalizePageReviewState(page.review).status === "changes-requested")
     ) {
       setError("수정 요청 상태인 페이지가 있어 게시할 수 없어요. 검토 메모를 반영한 뒤 상태를 변경해 주세요.");
       setPageReviewOpen(true);
@@ -21092,7 +21425,10 @@ function StudioCuttoonEditor() {
     }
     if (status === "published") {
       const structuralResult = validateStudioPublishPreflight(
-        buildPublishPreflightInput(collectPublishPreflightProvenance()),
+        buildPublishPreflightInput(
+          collectPublishPreflightProvenance(savePages),
+          savePages
+        ),
         publishProfile
       );
       if (!structuralResult.canPublish || !publishComplianceResult.readyForDestinationReview) {
@@ -21140,7 +21476,7 @@ function StudioCuttoonEditor() {
       }
       const pageImages: string[] = [];
 
-      for (const page of pages) {
+      for (const page of savePages) {
         if (!saveScopeStillCurrent()) return;
         setCurrentPageId(page.id);
         const stage = await captureReadyStageForPage(page);
@@ -21172,7 +21508,7 @@ function StudioCuttoonEditor() {
           // 연출(fx) 등 다른 owner 도구가 저장한 확장 키를 보존하고, 스튜디오가 소유한 키만 덮어쓴다.
           ...(sharedDocument?.document.doc ?? loadedWork?.doc ?? {}),
           width: CANVAS_W,
-          pagesList: pages,
+          pagesList: savePages,
           // 문서 마스터(공통 요소) — 비어 있으면 undefined 로 JSON 에서 키가 떨어진다(하위호환).
           master: serializeDocumentMaster(master),
           characterBible,
@@ -21312,7 +21648,11 @@ function StudioCuttoonEditor() {
 
       try {
         localStorage.removeItem(autosaveKey);
+        localStorage.removeItem(studioLifecycleAutosaveSidecarKey(autosaveKey));
         if (!workId && !remixId) localStorage.removeItem(LEGACY_STUDIO_AUTOSAVE_KEY);
+        studioLifecycleDurableGenerationRef.current =
+          studioRevisionProjectGenerationRef.current;
+        studioLifecycleDurablePendingFingerprintRef.current = "";
       } catch {
         // 무시
       }
@@ -22559,6 +22899,21 @@ function StudioCuttoonEditor() {
   }
 
   function currentStudioProjectSnapshot() {
+    const currentHistory = pagesHistoryRef.current;
+    const currentHistoryIndex = Math.max(
+      0,
+      Math.min(pagesHiRef.current, Math.max(0, currentHistory.length - 1))
+    );
+    // Immediate pointerup commits advance these refs before React renders, closing the same-task
+    // route/pagehide gap where this render's `pages` could still be one stroke behind.
+    const stablePages = currentHistory[currentHistoryIndex] ?? pages;
+    const pendingBatch = pendingStrokeCommitsRef.current;
+    const durablePages = projectStudioPendingStrokes(
+      stablePages,
+      pendingBatch
+        ? { pageId: pendingBatch.pageId, strokes: pendingBatch.strokes }
+        : null
+    ).pagesList as PageState[];
     return {
       version: 2 as const,
       savedAt: new Date().toISOString(),
@@ -22568,7 +22923,7 @@ function StudioCuttoonEditor() {
       linkedTitleId,
       linkedSeriesId,
       linkedChallengeId,
-      pagesList: pages,
+      pagesList: durablePages,
       // 문서 마스터(공통 요소) — 비어 있으면 undefined 로 키가 떨어진다(과거 파일과 동일 형태).
       master: serializeDocumentMaster(master),
       characterBible,
@@ -22591,6 +22946,75 @@ function StudioCuttoonEditor() {
     };
   }
 
+  // The empty-dependency page lifecycle listeners below call through this ref, so every render
+  // supplies the latest document/scope snapshot without reinstalling global handlers. This is a
+  // synchronous, private recovery write only; normal editing still uses the debounced autosave.
+  persistPendingStrokeEmergencyAutosaveRef.current = (reason) => {
+    const pendingBatch = pendingStrokeCommitsRef.current;
+    const pendingFingerprint = pendingBatch?.strokes.length
+      ? `${pendingBatch.pageId}:${pendingBatch.strokes.map((stroke) => stroke.id).join(",")}`
+      : "";
+    const hasDirtyPendingState =
+      pendingFingerprint !== studioLifecycleDurablePendingFingerprintRef.current;
+    const hasDirtyStableState =
+      studioRevisionProjectGenerationRef.current
+      > studioLifecycleDurableGenerationRef.current;
+    if (!hasDirtyPendingState && !hasDirtyStableState) return;
+    if (!workHydrated || collaborationDocumentLocked) return;
+    // A shared route must carry the exact hydrated revision. Treating a not-yet-hydrated work as
+    // local would create a recovery that can never pass shared compatibility checks.
+    if (workId && !sharedDocument) return;
+    try {
+      const savedAt = new Date().toISOString();
+      const snapshot = currentStudioProjectSnapshot();
+      const basePayload: StudioAutosavePayload = {
+        ...snapshot,
+        savedAt,
+        // The lifecycle builder projects the batch itself so its receipt can distinguish stable
+        // state from still-deferred vector data. Read the latest ref-backed history, not the render.
+        pagesList:
+          pagesHistoryRef.current[pagesHiRef.current]
+          ?? pages,
+        ...(workId && sharedDocument
+          ? { sourceWorkId: workId, sourceRevision: sharedDocument.revision }
+          : {}),
+      };
+      const emergency = createStudioLifecycleEmergencyAutosave({
+        payload: basePayload,
+        pending: pendingBatch
+          ? { pageId: pendingBatch.pageId, strokes: pendingBatch.strokes }
+          : null,
+        reason,
+        savedAt,
+        documentScope:
+          workId && sharedDocument
+            ? { kind: "shared", workId, revision: sharedDocument.revision }
+            : { kind: "local" },
+      });
+      if (emergency.ok) {
+        writeStudioLifecycleAutosave(
+          globalThis.localStorage,
+          autosaveKey,
+          emergency.payload,
+          {
+            // Startup recovery discovery is intentionally idle-scheduled. Until it completes,
+            // treat any contentful primary as unresolved so a fast edit + pagehide cannot replace
+            // the artist's older recovery before the banner has even had a chance to appear.
+            preservePrimary:
+              !autosaveChecked || hasAutosave || autosaveRestoreBlockedReason !== null,
+          }
+        );
+        studioLifecycleDurableGenerationRef.current =
+          studioRevisionProjectGenerationRef.current;
+        studioLifecycleDurablePendingFingerprintRef.current = pendingFingerprint;
+      }
+    } catch (cause) {
+      // pagehide/unmount must stay non-blocking. Keep a diagnostic for development without
+      // throwing during browser teardown, where React cannot safely surface an error banner.
+      console.error("Pending stroke emergency autosave failed:", cause);
+    }
+  };
+
   function applyStudioProjectSnapshotWithPreparedDocuments(
     projectData: StudioProjectFile,
     normalizeReleaseSchedule: (value: unknown) => StudioReleaseSchedule,
@@ -22605,19 +23029,34 @@ function StudioCuttoonEditor() {
       setError(collaborationLockMessage());
       return false;
     }
+    if (!prepareStudioDocumentReplacement("프로젝트를 교체")) return false;
     setSharedDocumentNotice(null);
     const restoredPages = projectData.pagesList as PageState[];
-    const workAssetReason = studioWorkAssetDocumentSourceTransitionReason(pages, restoredPages);
+    const currentHistory = pagesHistoryRef.current;
+    const currentHistoryIndex = Math.max(
+      0,
+      Math.min(pagesHiRef.current, Math.max(0, currentHistory.length - 1))
+    );
+    const currentPages = currentHistory[currentHistoryIndex] ?? pages;
+    const workAssetReason = studioWorkAssetDocumentSourceTransitionReason(
+      currentPages,
+      restoredPages
+    );
     if (workAssetReason) {
       setError(workAssetReason);
       return false;
     }
     resetAdvancedFillForDocumentReplacement();
     // 히스토리에 새 페이지 상태를 추가해 JSON/복구 지점 복원도 ⌘Z 흐름과 충돌하지 않게 한다.
-    const nextHistory = pagesHistory.slice(0, pagesHi + 1);
-    nextHistory.push(restoredPages);
-    setPagesHistory(nextHistory);
-    setPagesHi(nextHistory.length - 1);
+    const appended = appendStudioPagesHistorySnapshot(
+      currentHistory,
+      currentHistoryIndex,
+      restoredPages
+    );
+    pagesHistoryRef.current = appended.history;
+    pagesHiRef.current = appended.historyIndex;
+    setPagesHistory(appended.history);
+    setPagesHi(appended.historyIndex);
     setCurrentPageId(
       restoredPages.some((page) => page.id === projectData.currentPageId)
         ? projectData.currentPageId!
@@ -23409,7 +23848,6 @@ function StudioCuttoonEditor() {
     alignSelected,
     announceDrawingShortcut,
     applyBgPreset,
-    applyBuiltInBrushPreset,
     applyContentAwareFill,
     applyCropToSelectedImage,
     applyDynamicsPreset,
@@ -23640,6 +24078,16 @@ function StudioCuttoonEditor() {
     reloadServerRevisions,
     requestWriterRoomAiDraft,
     restoreServerRevision,
+  });
+
+  const studioBrushCatalogHandlers = useStudioStableHandlers<StudioBrushCatalogHandlers>({
+    close: closeBuiltInBrushCatalog,
+    selectBrushId: (brushId) => {
+      const preset = BRUSH_PRESETS.find((candidate) => candidate.id === brushId);
+      if (preset) applyBuiltInBrushPreset(preset);
+    },
+    toggle: toggleBuiltInBrushCatalog,
+    toggleFavorite: toggleBuiltInBrushFavorite,
   });
 
   const studioMobileEditingDockHandlers = useStudioStableHandlers<StudioMobileEditingDockHandlers>({
@@ -24022,6 +24470,8 @@ function StudioCuttoonEditor() {
 
       <StudioOptionsBars
         brush={brush}
+        brushCatalogHandlers={studioBrushCatalogHandlers}
+        brushCatalogOpen={brushCatalogSession?.placement === "desktop-dock"}
         brushOpacity={brushOpacity}
         brushSlotsState={brushSlotsState}
         canvasFlipH={canvasFlipH}
@@ -24074,6 +24524,23 @@ function StudioCuttoonEditor() {
         visibleRightPanelOpen={visibleRightPanelOpen}
         stableHandlers={studioOptionsBarsHandlers}
       />
+
+      {brushCatalogSession ? (
+        <Suspense fallback={null}>
+          <StudioBrushCatalogPortal
+            open
+            placement={brushCatalogSession.placement}
+            triggerElement={brushCatalogSession.trigger}
+            activeBrushId={brush}
+            favoriteIds={proDrawPrefs.favoriteBrushIds}
+            recentIds={proDrawPrefs.recentBrushIds}
+            mobileKeyboardInset={mobileKeyboardInset}
+            onClose={studioBrushCatalogHandlers.close}
+            onSelect={(item) => studioBrushCatalogHandlers.selectBrushId(item.id)}
+            onToggleFavorite={studioBrushCatalogHandlers.toggleFavorite}
+          />
+        </Suspense>
+      ) : null}
 
       {/* Legacy tool belt: primary on mobile. Desktop menubar owns discovery; belt is a zero-size
           host for triggers (popovers portal to body — never nest fixed UI under backdrop-filter). */}
@@ -24792,7 +25259,6 @@ function StudioCuttoonEditor() {
           postCorrection={postCorrection}
           preserveCorners={preserveCorners}
           pressureCurve={pressureCurve}
-          proDrawPrefs={proDrawPrefs}
           propsSheetRef={propsSheetRef}
           puppetWarpActive={puppetWarpActive}
           puppetWarpBusy={puppetWarpBusy}
@@ -24869,7 +25335,6 @@ function StudioCuttoonEditor() {
           setPostCorrection={setPostCorrection}
           setPreserveCorners={setPreserveCorners}
           setPressureCurve={setPressureCurve}
-          setProDrawPrefs={setProDrawPrefs}
           setPuppetWarpActive={setPuppetWarpActive}
           setPuppetWarpPins={setPuppetWarpPins}
           setQuickShapeActive={setQuickShapeActive}
@@ -24939,6 +25404,8 @@ function StudioCuttoonEditor() {
           advancedFillActive={advancedFillActive}
           advancedFillUnsupportedReason={advancedFillUnsupportedReason}
           brush={brush}
+          brushCatalogHandlers={studioBrushCatalogHandlers}
+          brushCatalogOpen={brushCatalogSession?.placement === "mobile-sheet"}
           brushDynamics={brushDynamics}
           brushManagerSheetRef={brushManagerSheetRef}
           brushOpacity={brushOpacity}
@@ -24975,7 +25442,6 @@ function StudioCuttoonEditor() {
           setPostCorrection={setPostCorrection}
           setPreserveCorners={setPreserveCorners}
           setPressureCurve={setPressureCurve}
-          setProDrawPrefs={setProDrawPrefs}
           setQuickStartOpen={setQuickStartOpen}
           setSavedBrushes={setSavedBrushes}
           setSelectedId={setSelectedId}
@@ -25406,7 +25872,6 @@ interface StudioInspectorAsideHandlers {
   alignSelected: (mode: "left" | "hcenter" | "right" | "top" | "vcenter" | "bottom" | "distributeH" | "distributeV") => void;
   announceDrawingShortcut: (message: string) => void;
   applyBgPreset: (p: BgPreset) => void;
-  applyBuiltInBrushPreset: (preset: BrushPreset) => void;
   applyContentAwareFill: () => Promise<void>;
   applyCropToSelectedImage: () => Promise<void>;
   applyDynamicsPreset: (id: StudioBrushDynamicsPresetId, settings: NormalizedStudioBrushDynamicsSettings) => void;
@@ -25573,7 +26038,6 @@ interface StudioInspectorAsideProps {
   postCorrection: number;
   preserveCorners: boolean;
   pressureCurve: number;
-  proDrawPrefs: StudioProDrawPrefs;
   propsSheetRef: import("react").RefObject<HTMLElement | null>;
   puppetWarpActive: boolean;
   puppetWarpBusy: boolean;
@@ -25650,7 +26114,6 @@ interface StudioInspectorAsideProps {
   setPostCorrection: import("react").Dispatch<import("react").SetStateAction<number>>;
   setPreserveCorners: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setPressureCurve: import("react").Dispatch<import("react").SetStateAction<number>>;
-  setProDrawPrefs: import("react").Dispatch<import("react").SetStateAction<StudioProDrawPrefs>>;
   setPuppetWarpActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setPuppetWarpPins: import("react").Dispatch<import("react").SetStateAction<PuppetPin[]>>;
   setQuickShapeActive: import("react").Dispatch<import("react").SetStateAction<boolean>>;
@@ -25817,7 +26280,6 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
   postCorrection,
   preserveCorners,
   pressureCurve,
-  proDrawPrefs,
   propsSheetRef,
   puppetWarpActive,
   puppetWarpBusy,
@@ -25894,7 +26356,6 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
   setPostCorrection,
   setPreserveCorners,
   setPressureCurve,
-  setProDrawPrefs,
   setPuppetWarpActive,
   setPuppetWarpPins,
   setQuickShapeActive,
@@ -25964,7 +26425,6 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
     alignSelected,
     announceDrawingShortcut,
     applyBgPreset,
-    applyBuiltInBrushPreset,
     applyContentAwareFill,
     applyCropToSelectedImage,
     applyDynamicsPreset,
@@ -26026,6 +26486,8 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
     toggleLocalHidden,
     updateAdvancedFillSettings,
   } = stableHandlers;
+  const activeInspectorBrushName =
+    BRUSH_PRESETS.find((preset) => preset.id === brush)?.name ?? brush;
   return (
         <aside
           ref={propsSheetRef}
@@ -28503,7 +28965,7 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
                       }
                     }}
                     className={cn(
-                      "grid h-9 flex-1 place-items-center rounded-md transition-colors",
+                      "grid min-h-11 flex-1 place-items-center rounded-md transition-colors lg:min-h-9",
                       drawMode === mode.v
                         ? "bg-accent text-on-accent"
                         : "text-fg-2 hover:bg-raised"
@@ -28514,21 +28976,38 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
                 ))}
               </div>
 
-              {/* 현재 → 최근/즐겨찾기 → 전체 카탈로그의 단일 브러시 탐색 경로 */}
-              {drawMode === "pen" && inspectorLayout.primary === "properties" && (
-                <Suspense fallback={<div className="h-24 animate-pulse rounded-xl bg-raised/40 motion-reduce:animate-none" aria-hidden />}>
-                  <StudioUnifiedBrushPicker
-                    activeBrushId={brush}
-                    brushOpacity={brushOpacity}
-                    color={color}
-                    placement="inspector"
-                    proDrawPrefs={proDrawPrefs}
-                    strokeWidth={strokeWidth}
-                    setProDrawPrefs={setProDrawPrefs}
-                    onSelectBrush={applyBuiltInBrushPreset}
-                  />
-                </Suspense>
-              )}
+              {/* 기본 프리셋 탐색은 하단 도크 한 곳에만 둔다. 인스펙터는 현재 상태와
+                  사용자 저장 브러시·고급 동역학에 집중해 긴 중복 메뉴를 만들지 않는다. */}
+              {drawMode === "pen" && inspectorLayout.primary === "properties" ? (
+                <section
+                  aria-label="현재 기본 프리셋 요약"
+                  data-studio-inspector-brush-summary="true"
+                  className="rounded-xl border border-line/70 bg-card/65 p-2.5"
+                >
+                  <div className="flex min-h-11 items-center gap-2">
+                    <span
+                      aria-hidden
+                      className="grid size-9 shrink-0 place-items-center rounded-lg border border-line/70 shadow-inner"
+                      style={{ backgroundColor: color }}
+                    >
+                      <Paintbrush className="size-4 text-white mix-blend-difference" strokeWidth={1.8} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[0.58rem] font-semibold text-fg-3">현재 기본 프리셋</span>
+                      <span className="block truncate text-xs font-bold text-fg">
+                        {activeInspectorBrushName}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-right text-[0.62rem] tabular-nums text-fg-3">
+                      <span className="block">{strokeWidth}px</span>
+                      <span className="block">{Math.round(brushOpacity * 100)}%</span>
+                    </span>
+                  </div>
+                  <p className="mt-1.5 border-t border-line/45 pt-1.5 text-[0.62rem] leading-relaxed text-fg-3">
+                    기본 프리셋 변경은 캔버스 하단 브러시 도크에서 할 수 있어요.
+                  </p>
+                </section>
+              ) : null}
 
               {/* 저장된 브러시 라이브러리 — ibisPaint 브러시/머티리얼 라이브러리 대응.
                   펜 모드 전용(저장 대상이 펜 설정 스냅샷이므로 drawMode==="pen"일 때만 노출). */}
@@ -32961,7 +33440,7 @@ interface StudioLazyPanelStackProps {
   setStudioCommentFocusRequest: import("react").Dispatch<import("react").SetStateAction<{ threadId: string; requestId: number } | null>>;
   setStudioCommentPinsHidden: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setContinuityOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setCurrentPageId: import("react").Dispatch<import("react").SetStateAction<string>>;
+  setCurrentPageId: (value: import("react").SetStateAction<string>) => boolean;
   setFxPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setLoadedWork: import("react").Dispatch<import("react").SetStateAction<WorkDetail | null>>;
   setPageReviewOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
@@ -33843,6 +34322,8 @@ interface StudioMobileEditingDockProps {
   advancedFillActive: boolean;
   advancedFillUnsupportedReason: string | null;
   brush: string;
+  brushCatalogHandlers: StudioBrushCatalogHandlers;
+  brushCatalogOpen: boolean;
   brushDynamics: NormalizedStudioBrushDynamicsSettings;
   brushManagerSheetRef: import("react").RefObject<HTMLDivElement | null>;
   brushOpacity: number;
@@ -33879,7 +34360,6 @@ interface StudioMobileEditingDockProps {
   setPostCorrection: import("react").Dispatch<import("react").SetStateAction<number>>;
   setPreserveCorners: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setPressureCurve: import("react").Dispatch<import("react").SetStateAction<number>>;
-  setProDrawPrefs: import("react").Dispatch<import("react").SetStateAction<StudioProDrawPrefs>>;
   setQuickStartOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setSavedBrushes: import("react").Dispatch<import("react").SetStateAction<StudioSavedBrush[]>>;
   setSelectedId: import("react").Dispatch<import("react").SetStateAction<string | null>>;
@@ -33918,6 +34398,8 @@ const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   advancedFillActive,
   advancedFillUnsupportedReason,
   brush,
+  brushCatalogHandlers,
+  brushCatalogOpen,
   brushDynamics,
   brushManagerSheetRef,
   brushOpacity,
@@ -33954,7 +34436,6 @@ const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   setPostCorrection,
   setPreserveCorners,
   setPressureCurve,
-  setProDrawPrefs,
   setQuickStartOpen,
   setSavedBrushes,
   setSelectedId,
@@ -34240,15 +34721,17 @@ const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                     <StudioUnifiedBrushPicker
                       activeBrushId={brush}
                       brushOpacity={brushOpacity}
+                      catalogOpen={brushCatalogOpen}
                       color={color}
-                      mobileKeyboardInset={mobileKeyboardInset}
-                      placement="mobile"
                       proDrawPrefs={proDrawPrefs}
                       stampTuning={stampTuning}
                       strokeWidth={strokeWidth}
-                      setProDrawPrefs={setProDrawPrefs}
                       onStampTuningChange={setStampTuning}
                       onSelectBrush={applyBuiltInBrushPreset}
+                      onToggleCatalog={(trigger) =>
+                        brushCatalogHandlers.toggle("mobile-sheet", trigger)
+                      }
+                      onToggleFavoriteBrush={brushCatalogHandlers.toggleFavorite}
                     />
                   </Suspense>
                 </div>
@@ -34731,7 +35214,7 @@ interface StudioPageListPaneProps {
   pages: PageState[];
   pagesSheetRef: import("react").RefObject<HTMLDivElement | null>;
   presentationPanelsHidden: boolean;
-  setCurrentPageId: import("react").Dispatch<import("react").SetStateAction<string>>;
+  setCurrentPageId: (value: import("react").SetStateAction<string>) => boolean;
   setLeftPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setMasterPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setMetaEditPageId: import("react").Dispatch<import("react").SetStateAction<string | null>>;
@@ -35187,6 +35670,8 @@ interface StudioOptionsBarsHandlers {
 
 interface StudioOptionsBarsProps {
   brush: string;
+  brushCatalogHandlers: StudioBrushCatalogHandlers;
+  brushCatalogOpen: boolean;
   brushOpacity: number;
   brushSlotsState: StudioBrushSlotsState;
   canvasFlipH: boolean;
@@ -35242,6 +35727,8 @@ interface StudioOptionsBarsProps {
 
 const StudioOptionsBars = memo(function StudioOptionsBars({
   brush,
+  brushCatalogHandlers,
+  brushCatalogOpen,
   brushOpacity,
   brushSlotsState,
   canvasFlipH,
@@ -35315,6 +35802,10 @@ const StudioOptionsBars = memo(function StudioOptionsBars({
         <Suspense fallback={null}>
           <StudioDrawOptionsBar
             docked
+            brushCatalogOpen={brushCatalogOpen}
+            onToggleBrushCatalog={(trigger) =>
+              brushCatalogHandlers.toggle("desktop-dock", trigger)
+            }
             dockInsets={{
               left:
                 (visibleLeftPanelOpen
@@ -35434,15 +35925,7 @@ const StudioOptionsBars = memo(function StudioOptionsBars({
             }}
             recentBrushIds={proDrawPrefs.recentBrushIds}
             favoriteBrushIds={proDrawPrefs.favoriteBrushIds}
-            onToggleFavoriteBrush={(brushId) => {
-              setProDrawPrefs((prev) => {
-                const next = toggleFavoriteBrushId(prev, brushId);
-                saveStudioProDrawPrefs(studioProDrawStorage(), next);
-                const nowFav = next.favoriteBrushIds.includes(brushId);
-                announceDrawingShortcut(nowFav ? "즐겨찾기 추가" : "즐겨찾기 해제");
-                return next;
-              });
-            }}
+            onToggleFavoriteBrush={brushCatalogHandlers.toggleFavorite}
             onCycleStabilizer={() => {
               setStabilizer((prev) => {
                 const next = cycleStudioStabilizerStrength(prev);
@@ -35689,7 +36172,7 @@ interface StudioCanvasViewportProps {
   setCommentsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   requestStudioCommentThreadFocus: (threadId: string) => void;
   setContextMenu: import("react").Dispatch<import("react").SetStateAction<{ visible: boolean; x: number; y: number; elId: string | null; }>>;
-  setCurrentPageId: import("react").Dispatch<import("react").SetStateAction<string>>;
+  setCurrentPageId: (value: import("react").SetStateAction<string>) => boolean;
   setDialogueBatchOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setDialogueTranslateOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setDrawMode: import("react").Dispatch<import("react").SetStateAction<DrawMode>>;
@@ -36558,7 +37041,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 }
                 onFollowPage={(pageId) => {
                   if (pageId === activePage.id || !pages.some((page) => page.id === pageId)) return;
-                  setCurrentPageId(pageId);
+                  if (!setCurrentPageId(pageId)) return;
                   setSelectedId(null);
                   setTool("select");
                 }}

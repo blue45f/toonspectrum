@@ -52,7 +52,7 @@ describe("StudioDrawOptionsBar", () => {
     expect(html).toContain('data-studio-draw-advanced-toggle="true"');
   });
 
-  it("keeps the full brush library reachable from the compact active-brush control", () => {
+  it("keeps the shared basic-preset catalog reachable from the compact active-brush control", () => {
     // Advanced row is closed by default; stabilizer lives behind toggle.
     // The library pill and two continuous controls remain visible; preset chips are progressive.
     const html = renderToStaticMarkup(
@@ -74,8 +74,18 @@ describe("StudioDrawOptionsBar", () => {
         onToggleFavoriteBrush={vi.fn()}
       />
     );
-    expect(html).toContain("브러시 라이브러리");
+    expect(html).toContain("기본 프리셋");
     expect(html).toContain("네온");
+  });
+
+  it("uses the StudioPage-owned catalog session instead of mounting a second sheet", () => {
+    expect(drawOptionsSource).toContain("brushCatalogOpen?: boolean");
+    expect(drawOptionsSource).toContain("onToggleBrushCatalog?: (trigger: HTMLButtonElement) => void");
+    expect(drawOptionsSource).not.toContain('import { StudioBrushLibrarySheet }');
+    expect(drawOptionsSource).not.toContain("<StudioBrushLibrarySheet");
+    expect(drawOptionsSource).not.toContain("setLibraryOpen");
+    expect(drawOptionsSource).toContain("toggleBrushCatalog(event.currentTarget)");
+    expect(drawOptionsSource).not.toContain("brushLibraryTriggerRef");
   });
 
   it("keeps every core control reachable in a visible, keyboard-navigable narrow-dock scroller", () => {

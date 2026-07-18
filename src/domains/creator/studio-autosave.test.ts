@@ -11,7 +11,9 @@ import {
   serializeStudioAutosave,
   studioAutosaveHasContent,
   studioAutosaveKey,
+  studioLifecycleAutosaveSidecarKey,
   studioSharedAutosaveCompatibility,
+  writeStudioLifecycleAutosave,
 } from "./studio-autosave";
 
 const PRIVATE_PROMPT = "공개하면 안 되는 반전 프롬프트";
@@ -239,6 +241,91 @@ describe("studio autosave", () => {
     values.delete(key);
     expect(readStudioAutosave(storage, key, false)).toBeNull();
     expect(readStudioAutosave(storage, key, true)?.payload.title).toBe("과거");
+  });
+
+  it("미해결 기본 복구본을 그대로 두고 lifecycle 편집은 sidecar에 보존한다", () => {
+    const key = studioAutosaveKey({ userId: "u1", workId: "w1" });
+    const original = JSON.stringify({
+      version: 2,
+      savedAt: "2026-07-18T00:00:00.000Z",
+      pagesList: [{ id: "old", elements: [{ id: "old-stroke" }] }],
+      sourceWorkId: "w1",
+      sourceRevision: 4,
+    });
+    const values = new Map<string, string>([[key, original]]);
+    const storage = {
+      getItem: (name: string) => values.get(name) ?? null,
+      setItem: (name: string, value: string) => values.set(name, value),
+      removeItem: (name: string) => values.delete(name),
+    };
+
+    const result = writeStudioLifecycleAutosave(
+      storage,
+      key,
+      {
+        version: 2,
+        savedAt: "2026-07-18T00:00:01.000Z",
+        pagesList: [{ id: "new", elements: [{ id: "new-stroke" }] }],
+        sourceWorkId: "w1",
+        sourceRevision: 5,
+      },
+      { preservePrimary: true }
+    );
+
+    expect(result).toEqual({
+      key: studioLifecycleAutosaveSidecarKey(key),
+      disposition: "preserved-primary-sidecar",
+    });
+    expect(values.get(key)).toBe(original);
+    expect(values.get(result.key)).toContain("new-stroke");
+    expect(readStudioAutosave(storage, key)?.key).toBe(result.key);
+    expect(readStudioAutosave(storage, key)?.payload.pagesList[0]?.id).toBe("new");
+
+    writeStudioLifecycleAutosave(
+      storage,
+      key,
+      {
+        version: 2,
+        savedAt: "2026-07-18T00:00:02.000Z",
+        pagesList: [{ id: "newer", elements: [{ id: "newer-stroke" }] }],
+        sourceWorkId: "w1",
+        sourceRevision: 5,
+      },
+      { preservePrimary: true }
+    );
+    const journalRaw = values.get(result.key) ?? "";
+    expect(journalRaw).toContain("new-stroke");
+    expect(journalRaw).toContain("newer-stroke");
+    expect(readStudioAutosave(storage, key)?.payload.pagesList[0]?.id).toBe("newer");
+  });
+
+  it("해결된 복구 흐름은 primary를 갱신하고 남은 sidecar를 제거한다", () => {
+    const key = studioAutosaveKey({ userId: "u1", workId: "w1" });
+    const sidecarKey = studioLifecycleAutosaveSidecarKey(key);
+    const values = new Map<string, string>([
+      [key, JSON.stringify({ pagesList: [{ id: "old", elements: [{ id: "old" }] }] })],
+      [sidecarKey, JSON.stringify({ pagesList: [{ id: "side", elements: [{ id: "side" }] }] })],
+    ]);
+    const storage = {
+      getItem: (name: string) => values.get(name) ?? null,
+      setItem: (name: string, value: string) => values.set(name, value),
+      removeItem: (name: string) => values.delete(name),
+    };
+
+    expect(
+      writeStudioLifecycleAutosave(
+        storage,
+        key,
+        {
+          version: 2,
+          savedAt: "2026-07-18T02:00:00.000Z",
+          pagesList: [{ id: "resolved", elements: [{ id: "resolved" }] }],
+        },
+        { preservePrimary: false }
+      )
+    ).toEqual({ key, disposition: "primary" });
+    expect(parseStudioAutosave(values.get(key) ?? null)?.pagesList[0]?.id).toBe("resolved");
+    expect(values.has(sidecarKey)).toBe(false);
   });
 
   it("내용이 전혀 없는 백업은 복구 대상으로 삼지 않는다", () => {

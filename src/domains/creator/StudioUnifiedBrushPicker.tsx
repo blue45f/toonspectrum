@@ -1,54 +1,33 @@
 /**
- * Shared built-in brush discovery for desktop and mobile.
+ * Mobile built-in preset shelf.
  *
- * This module is loaded only while the pen picker is visible. The complete
- * searchable catalog remains a second lazy boundary so the 35 preview tiles
- * do not join the Studio route or quick-shelf download.
+ * The searchable catalog itself is owned once by StudioPage. Keeping this
+ * component presentational prevents a hidden desktop inspector and the mobile
+ * sheet from opening competing dialogs or maintaining divergent favorites.
  */
 import { Bookmark, Paintbrush } from "lucide-react";
-import {
-  Suspense,
-  useEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-  type Dispatch,
-  type ReactElement,
-  type SetStateAction,
-} from "react";
-import { createPortal } from "react-dom";
+import { type ReactElement } from "react";
 
 import { BRUSH_PRESETS, type BrushPreset } from "./studio-brush";
-import {
-  saveStudioProDrawPrefs,
-  studioProDrawStorage,
-  toggleFavoriteBrushId,
-  type StudioProDrawPrefs,
-} from "./studio-pro-draw-prefs";
 import { StudioBrushTray } from "./StudioBrushTray";
 
 import type { StudioBrushStampTuning } from "./studio-brush-library";
+import type { StudioProDrawPrefs } from "./studio-pro-draw-prefs";
 
-import { lazyRetry } from "@/lib/lazy-retry";
 import { cn } from "@/lib/utils";
-
-const StudioBrushLibrarySheet = lazyRetry(
-  () => import("./StudioBrushLibrarySheet").then((mod) => ({ default: mod.StudioBrushLibrarySheet })),
-  "StudioBrushLibrarySheet"
-);
 
 export interface StudioUnifiedBrushPickerProps {
   activeBrushId: string;
   brushOpacity: number;
+  catalogOpen?: boolean;
   color: string;
-  mobileKeyboardInset?: number;
-  placement: "inspector" | "mobile";
   proDrawPrefs: StudioProDrawPrefs;
   stampTuning?: StudioBrushStampTuning | null;
   strokeWidth: number;
-  setProDrawPrefs: Dispatch<SetStateAction<StudioProDrawPrefs>>;
   onStampTuningChange?: (tuning: StudioBrushStampTuning) => void;
   onSelectBrush: (preset: BrushPreset) => void;
+  onToggleCatalog: (trigger: HTMLButtonElement) => void;
+  onToggleFavoriteBrush: (brushId: string) => void;
 }
 
 const STAMP_TUNING_CONTROLS = [
@@ -58,99 +37,41 @@ const STAMP_TUNING_CONTROLS = [
 ] as const;
 
 /**
- * One brush discovery path shared by the inspector and mobile draw sheet.
- * The shelf stays intentionally short; search/category browsing belongs to the
- * full catalog and user-authored brushes remain in the separate My Brushes UI.
+ * A short, thumb-reachable mobile projection of StudioPage's single built-in
+ * catalog session. User-authored brushes remain in the separate My Brushes UI.
  */
 export function StudioUnifiedBrushPicker({
   activeBrushId,
   brushOpacity,
+  catalogOpen = false,
   color,
-  mobileKeyboardInset = 0,
-  placement,
   proDrawPrefs,
   stampTuning,
   strokeWidth,
-  setProDrawPrefs,
   onStampTuningChange,
   onSelectBrush,
+  onToggleCatalog,
+  onToggleFavoriteBrush,
 }: StudioUnifiedBrushPickerProps): ReactElement {
-  const [libraryOpen, setLibraryOpen] = useState(false);
-  const pickerRef = useRef<HTMLElement>(null);
   const activePreset = BRUSH_PRESETS.find((preset) => preset.id === activeBrushId);
   const activeName = activePreset?.name ?? activeBrushId;
   const activeFavorite = proDrawPrefs.favoriteBrushIds.includes(activeBrushId);
-  const catalogStyle: CSSProperties = placement === "inspector"
-    ? {
-        right: "var(--studio-brush-catalog-right, 1.25rem)",
-        top: "var(--studio-brush-catalog-top, 6rem)",
-      }
-    : {
-        bottom: `calc(7.5rem + env(safe-area-inset-bottom) + ${Math.max(0, mobileKeyboardInset)}px)`,
-      };
-
-  useEffect(() => {
-    if (!libraryOpen || placement !== "inspector") return;
-    const root = globalThis.document?.documentElement;
-    if (!root) return;
-    const picker = pickerRef.current;
-    if (!picker) return;
-    const updateCatalogAnchor = () => {
-      const bounds = picker.getBoundingClientRect();
-      root.style.setProperty("--studio-brush-catalog-top", `${Math.max(8, bounds.bottom + 6)}px`);
-      root.style.setProperty(
-        "--studio-brush-catalog-right",
-        `${Math.max(8, globalThis.innerWidth - bounds.right)}px`
-      );
-    };
-    updateCatalogAnchor();
-    const resizeObserver = typeof ResizeObserver === "undefined"
-      ? null
-      : new ResizeObserver(updateCatalogAnchor);
-    resizeObserver?.observe(picker);
-    globalThis.addEventListener("resize", updateCatalogAnchor);
-    globalThis.addEventListener("scroll", updateCatalogAnchor, true);
-    return () => {
-      resizeObserver?.disconnect();
-      globalThis.removeEventListener("resize", updateCatalogAnchor);
-      globalThis.removeEventListener("scroll", updateCatalogAnchor, true);
-      root.style.removeProperty("--studio-brush-catalog-top");
-      root.style.removeProperty("--studio-brush-catalog-right");
-    };
-  }, [libraryOpen, placement]);
-
-  const closeLibraryAndRestoreFocus = () => {
-    setLibraryOpen(false);
-    globalThis.requestAnimationFrame?.(() => {
-      pickerRef.current
-        ?.querySelector<HTMLButtonElement>("[data-studio-open-brush-library='true']")
-        ?.focus();
-    });
-  };
   const selectBrushId = (brushId: string) => {
     const preset = BRUSH_PRESETS.find((candidate) => candidate.id === brushId);
     if (preset) onSelectBrush(preset);
   };
-  const toggleFavorite = (brushId: string) => {
-    setProDrawPrefs((previous) => {
-      const next = toggleFavoriteBrushId(previous, brushId);
-      saveStudioProDrawPrefs(studioProDrawStorage(), next);
-      return next;
-    });
-  };
-
   return (
     <section
-      ref={pickerRef}
-      aria-label="브러시 선택"
-      data-studio-unified-brush-picker={placement}
+      aria-label="기본 프리셋"
+      data-studio-unified-brush-picker="mobile"
       className="relative space-y-1.5"
     >
+      <div className="flex items-center justify-between gap-2 px-0.5">
+        <p className="text-[0.68rem] font-bold text-fg-2">기본 프리셋</p>
+        <p className="text-[0.6rem] text-fg-3">앱 제공 · 내 브러시와 별도</p>
+      </div>
       <div
-        className={cn(
-          "flex min-h-11 items-center gap-2 rounded-lg border border-line/70 bg-card/75 px-2",
-          placement === "mobile" && "min-h-12 rounded-xl px-2.5"
-        )}
+        className="flex min-h-12 items-center gap-2 rounded-xl border border-line/70 bg-card/75 px-2.5"
       >
         <span
           aria-hidden
@@ -171,12 +92,12 @@ export function StudioUnifiedBrushPicker({
         </span>
         <button
           type="button"
-          onClick={() => toggleFavorite(activeBrushId)}
+          onClick={() => onToggleFavoriteBrush(activeBrushId)}
           aria-label={activeFavorite ? `${activeName} 즐겨찾기 해제` : `${activeName} 즐겨찾기`}
           aria-pressed={activeFavorite}
           title={activeFavorite ? "현재 브러시 즐겨찾기 해제" : "현재 브러시 즐겨찾기"}
           className={cn(
-            "grid size-9 shrink-0 place-items-center rounded-lg border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+            "grid size-11 shrink-0 place-items-center rounded-xl border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
             activeFavorite
               ? "border-accent/50 bg-accent-soft text-accent"
               : "border-line/70 text-fg-3 hover:bg-raised hover:text-fg"
@@ -190,14 +111,14 @@ export function StudioUnifiedBrushPicker({
         activeBrushId={activeBrushId}
         favoriteBrushIds={proDrawPrefs.favoriteBrushIds}
         recentBrushIds={proDrawPrefs.recentBrushIds}
-        libraryOpen={libraryOpen}
-        onOpenLibrary={() => setLibraryOpen((current) => !current)}
+        libraryOpen={catalogOpen}
+        onOpenLibrary={onToggleCatalog}
         onSelect={(item) => selectBrushId(item.id)}
-        aria-label="빠른 브러시 — 즐겨찾기, 최근 사용, 추천"
-        className={placement === "mobile" ? "w-full" : undefined}
+        aria-label="기본 프리셋 빠른 선택 — 즐겨찾기, 최근 사용, 추천"
+        className="w-full"
       />
 
-      {placement === "mobile" && stampTuning && onStampTuningChange ? (
+      {stampTuning && onStampTuningChange ? (
         <div
           role="group"
           aria-label="스탬프 브러시 세부 조절"
@@ -222,51 +143,12 @@ export function StudioUnifiedBrushPicker({
                   [control.key]: Number(event.target.value) / 100,
                 })}
                 aria-label={`스탬프 ${control.label}`}
-                className="h-7 w-full cursor-pointer accent-accent"
+                className="h-11 w-full cursor-pointer accent-accent"
               />
             </label>
           ))}
         </div>
       ) : null}
-
-      {libraryOpen && globalThis.document
-        ? createPortal(
-            <Suspense
-              fallback={(
-                <div
-                  role="status"
-                  className={cn(
-                    "fixed z-[60] rounded-xl border border-line bg-panel p-4 text-center text-xs text-fg-3 shadow-xl",
-                    placement === "inspector"
-                      ? "bottom-3 w-[min(22rem,calc(100vw-1rem))]"
-                      : "inset-x-2 bottom-[calc(7.5rem+env(safe-area-inset-bottom))] top-3"
-                  )}
-                  style={catalogStyle}
-                >
-                  브러시 카탈로그를 불러오는 중…
-                </div>
-              )}
-            >
-              <StudioBrushLibrarySheet
-                open
-                activeBrushId={activeBrushId}
-                favoriteIds={proDrawPrefs.favoriteBrushIds}
-                recentIds={proDrawPrefs.recentBrushIds}
-                onClose={closeLibraryAndRestoreFocus}
-                onSelect={(item) => selectBrushId(item.id)}
-                onToggleFavorite={toggleFavorite}
-                className={cn(
-                  "fixed left-auto max-h-none",
-                  placement === "inspector"
-                    ? "bottom-3 w-[min(22rem,calc(100vw-1rem))]"
-                    : "inset-x-2 bottom-[calc(7.5rem+env(safe-area-inset-bottom))] top-3 w-auto"
-                )}
-                style={catalogStyle}
-              />
-            </Suspense>,
-            globalThis.document.body
-          )
-        : null}
     </section>
   );
 }

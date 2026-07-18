@@ -5,6 +5,7 @@ import {
   fxBrushSeedFromKey,
   planGlitterBrushParticles,
   planGlowBrushPasses,
+  planNeonBrushPasses,
   planOilBrushDabs,
   planPastelBrushDabs,
 } from "./studio-fx-brush";
@@ -28,6 +29,23 @@ describe("planGlowBrushPasses", () => {
     const soft = planGlowBrushPasses(16, true);
     const hard = planGlowBrushPasses(16, false);
     expect(soft[0]!.widthScale).toBeGreaterThan(hard[0]!.widthScale);
+  });
+});
+
+describe("planNeonBrushPasses", () => {
+  it("plans two coloured halos and one narrow luminous core", () => {
+    const passes = planNeonBrushPasses(18);
+    expect(passes).toHaveLength(3);
+    expect(passes.map((pass) => pass.tone)).toEqual(["color", "color", "white-core"]);
+    expect(passes[0]!.widthScale).toBeGreaterThan(passes[1]!.widthScale);
+    expect(passes[1]!.widthScale).toBeGreaterThan(passes[2]!.widthScale);
+    expect(passes[2]!.opacity).toBeGreaterThan(passes[1]!.opacity);
+  });
+
+  it("keeps a visible relative halo for very small neon widths", () => {
+    expect(planNeonBrushPasses(2)[0]!.widthScale).toBeGreaterThan(
+      planNeonBrushPasses(18)[0]!.widthScale
+    );
   });
 });
 

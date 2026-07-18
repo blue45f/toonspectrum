@@ -299,8 +299,8 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
   await lineCorrection.scrollIntoViewIfNeeded();
   // The unified picker intentionally keeps only starter/favorite/recent presets in the quick row.
   // Exercise the shipped catalog path for an expressive brush instead of depending on tray order.
-  await sheet.getByRole("button", { name: "전체 브러시 보기", exact: true }).click();
-  const builtInBrushCatalog = page.getByRole("dialog", { name: "기본 브러시 카탈로그" });
+  await sheet.getByRole("button", { name: "기본 프리셋 전체 보기", exact: true }).click();
+  const builtInBrushCatalog = page.getByRole("dialog", { name: "기본 프리셋" });
   await builtInBrushCatalog.waitFor({ state: "visible", timeout: 3000 });
   await builtInBrushCatalog.getByRole("tab", { name: "페인트", exact: true }).click();
   await builtInBrushCatalog.getByRole("button", { name: "소프트 에어브러시 선택", exact: true }).click();

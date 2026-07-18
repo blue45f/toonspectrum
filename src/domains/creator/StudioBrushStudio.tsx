@@ -1,19 +1,25 @@
 import {
   Activity,
+  CheckCircle2,
   ChevronRight,
   CircleDot,
   Gauge,
+  ImagePlus,
+  LoaderCircle,
   RotateCw,
   SlidersHorizontal,
   Sparkles,
   Stamp,
+  Trash2,
   X,
 } from "lucide-react";
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
+  type ChangeEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from "react";
@@ -22,8 +28,8 @@ import { createPortal } from "react-dom";
 import { BRUSH_PRESETS } from "./studio-brush";
 import {
   STUDIO_BRUSH_DYNAMICS_PRESETS,
-  isStudioBrushDynamicsPresetId,
   planStudioDynamicBrush,
+  resolveStudioBrushDynamicsPresetId,
   studioBrushDynamicsPresetSettings,
   type NormalizedStudioBrushDynamicsSettings,
   type StudioBrushDynamicsPresetId,
@@ -40,13 +46,19 @@ import {
   updateStudioBrushDynamicsTaper,
   updateStudioBrushDynamicsTip,
 } from "./studio-brush-dynamics-editor";
+import { studioBrushStudioDefaultPresetId } from "./studio-brush-studio-contract";
+import {
+  importStudioBrushTipPng,
+  studioBrushTipImportErrorMessage,
+  type ImportedStudioBrushTip,
+} from "./studio-brush-tip-import";
 import {
   buildStudioBrushTipAlphaMap,
   planStudioBrushTipStampWorldSamples,
-  studioBrushTipUsesSolidEllipse,
-} from "./studio-brush-tip-stamp";
-import {
   STUDIO_BRUSH_TIP_SHAPE_IDS,
+  studioBrushTipUsesSolidEllipse,
+  type NormalizedStudioBrushTipSettings,
+  type StudioBrushTipSettings,
   type StudioBrushTipShapeId,
 } from "./studio-brush-tip-stamp";
 import {
@@ -262,6 +274,10 @@ const TIP_SHAPE_LABELS: Record<StudioBrushTipShapeId, string> = {
   hard: "하드",
   flake: "플레이크",
   grain: "그레인",
+  bristle: "강모",
+  sponge: "스펀지",
+  sumi: "수묵",
+  halftone: "망점",
   star: "스타",
 };
 
@@ -286,6 +302,36 @@ function TipShapeGlyph({ shape, active }: { shape: StudioBrushTipShapeId; active
           <circle cx="20" cy="6.5" r="1.8" fill={fill} stroke={stroke} strokeWidth="0.8" />
         </>
       ) : null}
+      {shape === "bristle" ? (
+        <g fill="none" stroke={stroke} strokeLinecap="round">
+          <path d="M6 5.5 C10 7 10 12 14 13.5" strokeWidth="1.5" />
+          <path d="M10 4 C13 7 14 10 17 14" strokeWidth="1.1" />
+          <path d="M14 3.5 C16 7 18 10 21.5 12.5" strokeWidth="1.4" />
+        </g>
+      ) : null}
+      {shape === "sponge" ? (
+        <>
+          <circle cx="9" cy="6" r="3" fill={fill} stroke={stroke} strokeWidth="0.7" />
+          <circle cx="15" cy="10" r="4" fill={fill} stroke={stroke} strokeWidth="0.7" />
+          <circle cx="21" cy="6.5" r="2.6" fill={fill} stroke={stroke} strokeWidth="0.7" />
+          <circle cx="21" cy="13" r="2" fill={fill} stroke={stroke} strokeWidth="0.7" />
+        </>
+      ) : null}
+      {shape === "sumi" ? (
+        <path
+          d="M5.5 10.5 C7 5 11 2.8 15.5 4 C21 5.3 23.5 10.4 20.2 14 C17.5 16.4 9.4 15.3 5.5 10.5 Z"
+          fill={fill}
+          stroke={stroke}
+          strokeWidth="0.9"
+        />
+      ) : null}
+      {shape === "halftone" ? (
+        <g fill={stroke}>
+          {[8, 14, 20].flatMap((x) => [5, 10, 15].map((y) => (
+            <circle key={`${x}-${y}`} cx={x} cy={y} r={y === 10 ? 1.45 : 1.1} />
+          )))}
+        </g>
+      ) : null}
       {shape === "star" ? (
         <path
           d="M14 2.5 L16.2 7.4 L21.5 7.8 L17.4 11.2 L18.6 16.3 L14 13.7 L9.4 16.3 L10.6 11.2 L6.5 7.8 L11.8 7.4 Z"
@@ -295,6 +341,178 @@ function TipShapeGlyph({ shape, active }: { shape: StudioBrushTipShapeId; active
         />
       ) : null}
     </svg>
+  );
+}
+
+export interface StudioBrushTipImportControlsProps {
+  tip: NormalizedStudioBrushTipSettings;
+  onTipChange: (patch: Partial<StudioBrushTipSettings>) => void;
+  onImportingChange?: (importing: boolean) => void;
+}
+
+function importedTipSourceLabel(source: ImportedStudioBrushTip["source"]): string {
+  if (source === "alpha") return "투명 알파";
+  if (source === "grayscale-dark") return "검은 촉 자동 인식";
+  return "흰 촉 자동 인식";
+}
+
+export function StudioBrushTipImportControls({
+  tip,
+  onTipChange,
+  onImportingChange,
+}: StudioBrushTipImportControlsProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const requestIdRef = useRef(0);
+  const descriptionId = useId();
+  const [importing, setImporting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [imported, setImported] = useState<ImportedStudioBrushTip & { name: string } | null>(null);
+  const customActive = Boolean(tip.alphaMapBase64);
+  const activeImported = imported?.alphaMapBase64 === tip.alphaMapBase64 ? imported : null;
+  const tipRevision = `${tip.shape}:${tip.softness}:${tip.alphaMapSize}:${tip.alphaMapBase64 ?? ""}`;
+  const tipRevisionRef = useRef(tipRevision);
+
+  useEffect(() => () => {
+    requestIdRef.current++;
+  }, []);
+
+  useLayoutEffect(() => {
+    if (tipRevisionRef.current === tipRevision) return;
+    tipRevisionRef.current = tipRevision;
+    // Undo, preset restore, or another tip control wins before paint over an older async PNG
+    // decode. A passive effect left a commit-to-effect microtask window where stale import data
+    // could replace the newer tip.
+    if (!importing) return;
+    requestIdRef.current++;
+    setImporting(false);
+    onImportingChange?.(false);
+  }, [importing, onImportingChange, tipRevision]);
+
+  async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (!file) return;
+    const requestId = requestIdRef.current + 1;
+    const requestTipRevision = tipRevision;
+    requestIdRef.current = requestId;
+    setImporting(true);
+    onImportingChange?.(true);
+    setError(null);
+    try {
+      const result = await importStudioBrushTipPng(file);
+      if (
+        requestIdRef.current !== requestId
+        || tipRevisionRef.current !== requestTipRevision
+      ) return;
+      onTipChange({
+        alphaMapBase64: result.alphaMapBase64,
+        alphaMapSize: result.alphaMapSize,
+      });
+      setImported({ ...result, name: file.name });
+    } catch (reason) {
+      if (
+        requestIdRef.current !== requestId
+        || tipRevisionRef.current !== requestTipRevision
+      ) return;
+      setError(studioBrushTipImportErrorMessage(reason));
+    } finally {
+      if (requestIdRef.current === requestId) {
+        setImporting(false);
+        onImportingChange?.(false);
+      }
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-line bg-card/45 p-3">
+      <div className="flex items-start gap-2.5">
+        <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent ring-1 ring-accent/15">
+          <ImagePlus size={16} aria-hidden />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold text-fg">내 PNG 펜촉</p>
+          <p id={descriptionId} className="mt-0.5 text-[0.65rem] leading-relaxed text-fg-3 text-pretty">
+            4MB·4,096px 이하 PNG를 최대 64×64 알파로 안전하게 축소합니다. 투명 배경과 흑백 마스크를 모두 자동 인식합니다.
+          </p>
+        </div>
+      </div>
+
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".png,image/png"
+        aria-label="PNG 펜촉 파일 선택"
+        aria-describedby={descriptionId}
+        onChange={(event) => void handleFileChange(event)}
+        className="sr-only"
+      />
+
+      {customActive ? (
+        <div className="mt-2.5 flex min-h-[52px] items-center gap-2 rounded-lg border border-good/30 bg-good/10 px-2.5 py-1.5">
+          <CheckCircle2 size={16} className="shrink-0 text-good" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[0.7rem] font-semibold text-fg">
+              {activeImported?.name ?? "문서에 포함된 사용자 PNG"}
+            </p>
+            <p className="truncate text-[0.62rem] text-fg-3">
+              {tip.alphaMapSize}×{tip.alphaMapSize} 알파
+              {activeImported ? ` · ${importedTipSourceLabel(activeImported.source)}` : " · 획과 함께 저장됨"}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              requestIdRef.current++;
+              setImporting(false);
+              onImportingChange?.(false);
+              setImported(null);
+              setError(null);
+              onTipChange({ alphaMapBase64: null });
+            }}
+            className={cn(
+              "grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg",
+              STUDIO_FOCUS_RING
+            )}
+            aria-label="사용자 PNG 펜촉 제거"
+            title="사용자 PNG 제거"
+          >
+            <Trash2 size={16} aria-hidden />
+          </button>
+        </div>
+      ) : null}
+
+      {error ? (
+        <div role="alert" className="mt-2.5 flex min-h-[44px] items-center gap-2 rounded-lg border border-bad/35 bg-bad/10 pl-2.5 text-[0.65rem] leading-relaxed text-bad">
+          <span className="min-w-0 flex-1 py-2">{error}</span>
+          <button
+            type="button"
+            onClick={() => setError(null)}
+            className={cn("grid size-11 shrink-0 place-items-center rounded-lg hover:bg-bad/10", STUDIO_FOCUS_RING)}
+            aria-label="펜촉 가져오기 오류 닫기"
+          >
+            <X size={15} aria-hidden />
+          </button>
+        </div>
+      ) : null}
+
+      <button
+        type="button"
+        disabled={importing}
+        aria-busy={importing}
+        onClick={() => inputRef.current?.click()}
+        className={cn(
+          "mt-2.5 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg border border-line-strong bg-raised px-3 text-xs font-semibold text-fg-2 transition-colors hover:border-accent/45 hover:bg-card disabled:cursor-wait disabled:opacity-65",
+          STUDIO_FOCUS_RING
+        )}
+      >
+        {importing ? (
+          <LoaderCircle size={16} className="animate-spin motion-reduce:animate-none" aria-hidden />
+        ) : (
+          <ImagePlus size={16} className="text-accent" aria-hidden />
+        )}
+        {importing ? "펜촉 변환 중…" : customActive ? "다른 PNG로 교체" : "PNG 펜촉 가져오기"}
+      </button>
+    </div>
   );
 }
 
@@ -321,6 +539,7 @@ export function StudioBrushStudio({
 }: StudioBrushStudioProps) {
   const [open, setOpen] = useState(false);
   const [category, setCategory] = useState<BrushStudioCategory>("presets");
+  const [tipImporting, setTipImporting] = useState(false);
   const launcherRef = useRef<HTMLButtonElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -328,16 +547,22 @@ export function StudioBrushStudio({
   const descriptionId = useId();
   const tabIdBase = useId();
   const tabPanelId = useId();
-  const dynamicsActive = isStudioBrushDynamicsPresetId(brushId);
+  const dynamicsPresetId = resolveStudioBrushDynamicsPresetId(brushId);
+  const dynamicsActive = dynamicsPresetId !== null;
   const matchedPreset = dynamicsActive ? studioBrushDynamicsPresetMatch(settings) : null;
   const mappingCount = studioBrushDynamicsActiveMappingCount(settings);
   const brushLabel = BRUSH_PRESETS.find((preset) => preset.id === brushId)?.name ?? "브러시";
   const touch = density === "touch";
 
   function closeStudio() {
+    setTipImporting(false);
     setOpen(false);
     globalThis.requestAnimationFrame?.(() => launcherRef.current?.focus({ preventScroll: true }));
   }
+
+  useEffect(() => {
+    if (category !== "tip" && tipImporting) setTipImporting(false);
+  }, [category, tipImporting]);
 
   function handleCategoryKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>) {
     const tabs = Array.from(
@@ -598,16 +823,27 @@ export function StudioBrushStudio({
     dynamicsActive ? (
       <div className="space-y-2.5">
         <StudioSectionHeader
-          title="PNG 알파 펜촉"
-          description="원형·소프트·입자 등 알파 팁을 간격·산포 도장 경로에 찍습니다. 원형도가 낮을수록 각도 변화가 선명합니다."
+          title="펜촉 텍스처"
+          description="내 PNG 또는 정교한 기본 촉을 간격·산포 도장 경로에 찍습니다. 원형도가 낮을수록 각도 변화가 선명합니다."
         />
-        <div className="grid grid-cols-3 gap-1.5">
+        <StudioBrushTipImportControls
+          tip={settings.tip}
+          onTipChange={(patch) => onSettingsChange(updateStudioBrushDynamicsTip(settings, patch))}
+          onImportingChange={setTipImporting}
+        />
+        <div>
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <span className="text-[0.68rem] font-semibold text-fg-2">기본 펜촉</span>
+            <span className="text-[0.62rem] text-fg-3">선택하면 사용자 PNG가 해제됩니다</span>
+          </div>
+          <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-5">
           {STUDIO_BRUSH_TIP_SHAPE_IDS.map((shapeId) => {
-            const active = settings.tip.shape === shapeId;
+            const active = settings.tip.shape === shapeId && !settings.tip.alphaMapBase64;
             return (
               <button
                 key={shapeId}
                 type="button"
+                disabled={tipImporting}
                 aria-pressed={active}
                 onClick={() => onSettingsChange(updateStudioBrushDynamicsTip(settings, {
                   shape: shapeId,
@@ -618,7 +854,8 @@ export function StudioBrushStudio({
                   STUDIO_FOCUS_RING,
                   active
                     ? "border-accent bg-accent-soft/55 text-fg ring-1 ring-accent/20"
-                    : "border-line bg-card/55 text-fg-2 hover:border-accent/45 hover:bg-raised"
+                    : "border-line bg-card/55 text-fg-2 hover:border-accent/45 hover:bg-raised",
+                  "disabled:cursor-wait disabled:opacity-45"
                 )}
               >
                 <TipShapeGlyph shape={shapeId} active={active} />
@@ -626,6 +863,7 @@ export function StudioBrushStudio({
               </button>
             );
           })}
+          </div>
         </div>
         <RangeRow
           label="팁 가장자리"
@@ -794,7 +1032,7 @@ export function StudioBrushStudio({
           <button
             type="button"
             onClick={() => {
-              const presetId = isStudioBrushDynamicsPresetId(brushId) ? brushId : "ink-particle";
+              const presetId = studioBrushStudioDefaultPresetId(brushId);
               onSelectDynamicsPreset(presetId, studioBrushDynamicsPresetSettings(presetId));
             }}
             className="hidden min-h-[44px] rounded-xl border border-line bg-card px-3 text-xs font-semibold text-fg-2 hover:bg-raised sm:block"

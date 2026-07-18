@@ -11,6 +11,7 @@
  */
 
 import { BRUSH_PRESETS, type BrushPreset } from "./studio-brush";
+import { resolveStudioBrushRuntimeContract } from "./studio-brush-runtime-contract";
 
 import type { StudioBrushPreviewStyle } from "./studio-brush-visual";
 
@@ -214,44 +215,6 @@ const HINTS: Record<string, string> = {
   "wash-brush": "플로우가 쌓이는 물붓 — 웻엣지 수채",
 };
 
-const PREVIEW_STYLE: Record<string, StudioBrushPreviewStyle> = {
-  pen: "solid",
-  fineliner: "solid",
-  ballpoint: "solid",
-  gpen: "calligraphy",
-  liner: "calligraphy",
-  calligraphy: "calligraphy",
-  marker: "solid",
-  "felt-tip": "solid",
-  "marker-bold": "solid",
-  highlighter: "solid",
-  neon: "neon",
-  glow: "glow",
-  "soft-glow": "glow",
-  glitter: "glitter",
-  "star-dust": "glitter",
-  brush: "wavy",
-  watercolor: "soft",
-  "ink-wash": "soft",
-  oil: "oil",
-  pastel: "soft",
-  airbrush: "soft",
-  "soft-brush": "soft",
-  spray: "soft",
-  pencil: "dashed",
-  "soft-pencil": "dashed",
-  "dry-media": "texture",
-  crayon: "texture",
-  chalk: "texture",
-  charcoal: "texture",
-  "ink-particle": "dots",
-  screentone: "tone",
-  "ink-brush": "solid",
-  "airbrush-fine": "soft",
-  "pencil-grain": "texture",
-  "wash-brush": "soft",
-};
-
 function previewWeightFor(preset: BrushPreset): number {
   return Math.min(1, Math.max(0.18, preset.defaultWidth / 36));
 }
@@ -268,7 +231,9 @@ export function studioBrushTrayItem(preset: BrushPreset): StudioBrushTrayItem {
     category: BEGINNER_SET.has(preset.id) ? "beginner" : "expressive",
     mediaGroup: MEDIA_GROUP[preset.id] ?? "line",
     previewWeight: previewWeightFor(preset),
-    previewStyle: PREVIEW_STYLE[preset.id] ?? "solid",
+    // Preview style is part of the same audited contract as Canvas/SVG routing. Keeping it there
+    // prevents a catalogue card from advertising a texture that the selected preset cannot draw.
+    previewStyle: resolveStudioBrushRuntimeContract(preset.id)?.preview ?? "solid",
   };
 }
 
