@@ -3603,21 +3603,38 @@ const StudioDrawNode = memo(function StudioDrawNode({
               <Shape
                 key={index}
                 sceneFunc={(context) => {
+                  context.lineCap = "round";
+                  context.lineJoin = "round";
+                  context.strokeStyle = stroke;
+                  // 세그먼트마다 개별 stroke() 네이티브 호출을 내는 대신, 육안으로 구분되지
+                  // 않는 굵기 변화(<0.4px)는 같은 서브패스로 묶어 한 번에 stroke() 한다
+                  // (라이브 프레임당 캔버스 API 호출량이 병목이지 굵기 보간 자체는 저렴하다).
+                  const WIDTH_BUCKET_PX = 0.4;
+                  let bucketWidth: number | null = null;
+                  let pathOpen = false;
+                  const flush = () => {
+                    if (!pathOpen) return;
+                    context.lineWidth = bucketWidth!;
+                    context.stroke();
+                    pathOpen = false;
+                  };
                   for (let i = 2; i < smoothed.length; i += 2) {
                     const x0 = smoothed[i - 2]!;
                     const y0 = smoothed[i - 1]!;
                     const x1 = smoothed[i]!;
                     const y1 = smoothed[i + 1]!;
                     const w = widths[Math.floor(i / 2)] ?? strokeWidth;
-                    context.beginPath();
+                    const bucket = Math.round(w / WIDTH_BUCKET_PX) * WIDTH_BUCKET_PX;
+                    if (bucket !== bucketWidth) {
+                      flush();
+                      bucketWidth = bucket;
+                      context.beginPath();
+                      pathOpen = true;
+                    }
                     context.moveTo(x0, y0);
                     context.lineTo(x1, y1);
-                    context.lineWidth = w;
-                    context.lineCap = "round";
-                    context.lineJoin = "round";
-                    context.strokeStyle = stroke;
-                    context.stroke();
                   }
+                  flush();
                 }}
                 opacity={opacity}
                 globalCompositeOperation={composite}
