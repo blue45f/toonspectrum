@@ -100,6 +100,45 @@ function pointerSampleSignature(event: StudioPointerEventLike, pointerId: number
   ]);
 }
 
+/**
+ * Related-event APIs are browser/plugin boundaries even when the dispatched parent is trusted.
+ * A broken polyfill or embedded webview can return an Array containing nulls, primitives, or
+ * partial objects. Require the identity and coordinates needed by the drawing pipeline before a
+ * candidate can reach pointer matching or Konva's pointer-position adapter.
+ */
+function isUsableStudioRelatedPointerEvent(value: unknown): value is StudioPointerEventLike {
+  if (!value || typeof value !== "object") return false;
+  try {
+    const event = value as StudioPointerEventLike;
+    const pointerId = event.pointerId;
+    return (pointerId === undefined || pointerId === null || Number.isFinite(pointerIdOf(event, Number.NaN)))
+      && typeof event.clientX === "number"
+      && Number.isFinite(event.clientX)
+      && typeof event.clientY === "number"
+      && Number.isFinite(event.clientY);
+  } catch {
+    // Defensive against hostile or partially detached objects with throwing property accessors.
+    return false;
+  }
+}
+
+/**
+ * Related samples can come from browser/polyfill-owned arrays rather than the trusted dispatched
+ * event. Match and read every optional stylus channel inside one exception boundary so one broken
+ * getter cannot abort the authoritative parent fallback.
+ */
+function safeRelatedPointerSampleSignature(
+  session: StudioStrokePointerSession,
+  event: StudioPointerEventLike
+): string | null {
+  try {
+    if (!isStudioStrokePointerEvent(session, event)) return null;
+    return pointerSampleSignature(event, session.pointerId);
+  } catch {
+    return null;
+  }
+}
+
 function safeRelatedEvents<T extends StudioPointerEventLike>(
   event: T,
   methodName: "getCoalescedEvents" | "getPredictedEvents"
@@ -108,7 +147,9 @@ function safeRelatedEvents<T extends StudioPointerEventLike>(
   if (typeof method !== "function") return [];
   try {
     const result = (method as (this: T) => unknown).call(event);
-    return Array.isArray(result) ? (result as readonly T[]) : [];
+    return Array.isArray(result)
+      ? result.filter(isUsableStudioRelatedPointerEvent) as T[]
+      : [];
   } catch {
     // Safari versions, embedded webviews and test doubles may expose a method that still throws.
     // The dispatched event remains a complete standards-compatible fallback.
@@ -282,11 +323,24 @@ export function collectStudioStrokePointerBatch<T extends StudioPointerEventLike
   // hardware sample. Consume one representation only; empty/throwing APIs fall back to parent.
   const candidates = coalesced.length > 0 ? coalesced : [event];
   for (const candidate of candidates) {
-    if (!isStudioStrokePointerEvent(session, candidate)) continue;
-    const signature = pointerSampleSignature(candidate, session.pointerId);
+    const signature = candidate === event
+      ? pointerSampleSignature(candidate, session.pointerId)
+      : safeRelatedPointerSampleSignature(session, candidate);
+    if (signature === null) continue;
     if (signature === previousSignature) continue;
     authoritative.push(candidate);
     previousSignature = signature;
+  }
+
+  // A malformed implementation can return a non-empty list containing only foreign or otherwise
+  // unusable entries. In that case the matching dispatched event is still the standards-complete
+  // fallback. Preserve the usual adjacent dedupe rule so a repeated parent does not invent ink.
+  if (coalesced.length > 0 && authoritative.length === 0) {
+    const parentSignature = pointerSampleSignature(event, session.pointerId);
+    if (parentSignature !== previousSignature) {
+      authoritative.push(event);
+      previousSignature = parentSignature;
+    }
   }
 
   const nextSession: StudioStrokePointerSession = {
@@ -298,8 +352,8 @@ export function collectStudioStrokePointerBatch<T extends StudioPointerEventLike
   if (options.includePredicted) {
     let previousPredictedSignature = previousSignature;
     for (const candidate of safeRelatedEvents(event, "getPredictedEvents")) {
-      if (!isStudioStrokePointerEvent(session, candidate)) continue;
-      const signature = pointerSampleSignature(candidate, session.pointerId);
+      const signature = safeRelatedPointerSampleSignature(session, candidate);
+      if (signature === null) continue;
       if (signature === previousPredictedSignature) continue;
       predicted.push(candidate);
       previousPredictedSignature = signature;

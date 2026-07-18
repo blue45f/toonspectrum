@@ -14,6 +14,9 @@ export const FIXED_RATE_STROKE_POSITION_QUANTUM = 1 / 16;
 export const FIXED_RATE_STROKE_TILT_QUANTUM = 1 / 16;
 export const FIXED_RATE_STROKE_PRESSURE_STEPS = 1_023;
 export const FIXED_RATE_STROKE_RELEASE_POSITION_EPSILON = 1;
+export const FIXED_RATE_STROKE_RELEASE_PRESSURE_EPSILON = 1 / FIXED_RATE_STROKE_PRESSURE_STEPS;
+export const FIXED_RATE_STROKE_RELEASE_TILT_EPSILON = FIXED_RATE_STROKE_TILT_QUANTUM;
+export const FIXED_RATE_STROKE_RELEASE_MAX_TICKS = 4_096;
 
 const MIN_NORMALIZED_STRENGTH = 0.01;
 const MIN_RESPONSE = 20;
@@ -81,6 +84,10 @@ export interface FixedRateStrokeFilterState {
   readonly lastOutput: FixedRateStrokeFilteredSample;
   /** Sum of every stage's |dx| + |dy| on the most recently evaluated tick. */
   readonly lastStagePositionDelta: number;
+  /** Sum of every stage's pressure change on the most recently evaluated tick. */
+  readonly lastStagePressureDelta: number;
+  /** Sum of every stage's |tiltX| + |tiltY| change on the most recently evaluated tick. */
+  readonly lastStageTiltDelta: number;
   readonly closed: boolean;
 }
 
@@ -245,6 +252,8 @@ function createFixedRateStrokeFilterState(
     stages,
     lastOutput,
     lastStagePositionDelta: 0,
+    lastStagePressureDelta: 0,
+    lastStageTiltDelta: 0,
     closed: false,
   };
   return { state, emitted: [lastOutput], endpoint: lastOutput, releaseDrainTicks: 0 };
@@ -283,9 +292,13 @@ function evaluateCascade(
   readonly stages: readonly FixedRateStrokeFilterStage[];
   readonly output: FixedRateStrokeFilterStage;
   readonly positionDelta: number;
+  readonly pressureDelta: number;
+  readonly tiltDelta: number;
 } {
   let input: FixedRateStrokeFilterStage = stageFromSample(heldSample);
   let positionDelta = 0;
+  let pressureDelta = 0;
+  let tiltDelta = 0;
   const stages = previousStages.map((previous) => {
     const next: FixedRateStrokeFilterStage = {
       x: weightedChannel(previous.x, input.x, alpha),
@@ -295,6 +308,8 @@ function evaluateCascade(
       tiltY: weightedChannel(previous.tiltY, input.tiltY, alpha),
     };
     positionDelta += Math.abs(next.x - previous.x) + Math.abs(next.y - previous.y);
+    pressureDelta += Math.abs(next.pressure - previous.pressure);
+    tiltDelta += Math.abs(next.tiltX - previous.tiltX) + Math.abs(next.tiltY - previous.tiltY);
     input = next;
     return next;
   });
@@ -302,6 +317,8 @@ function evaluateCascade(
     stages,
     output: stages[stages.length - 1]!,
     positionDelta,
+    pressureDelta,
+    tiltDelta,
   };
 }
 
@@ -330,6 +347,8 @@ function evaluateLogicalTick(
       stages: cascade.stages,
       lastOutput: emitted,
       lastStagePositionDelta: cascade.positionDelta,
+      lastStagePressureDelta: cascade.pressureDelta,
+      lastStageTiltDelta: cascade.tiltDelta,
     },
     emitted,
   };
@@ -445,6 +464,12 @@ function channelsNeedDrain(state: FixedRateStrokeFilterState): boolean {
   ));
 }
 
+function releaseChannelsAreMoving(state: FixedRateStrokeFilterState): boolean {
+  return state.lastStagePositionDelta > FIXED_RATE_STROKE_RELEASE_POSITION_EPSILON
+    || state.lastStagePressureDelta > FIXED_RATE_STROKE_RELEASE_PRESSURE_EPSILON
+    || state.lastStageTiltDelta > FIXED_RATE_STROKE_RELEASE_TILT_EPSILON;
+}
+
 function releaseFilter(
   initialState: FixedRateStrokeFilterState,
   sample?: FixedRateStrokeRawSample
@@ -465,7 +490,8 @@ function releaseFilter(
       releaseDrainTicks += 1;
     } while (
       channelsNeedDrain(state) &&
-      state.lastStagePositionDelta > FIXED_RATE_STROKE_RELEASE_POSITION_EPSILON
+      releaseChannelsAreMoving(state) &&
+      releaseDrainTicks < FIXED_RATE_STROKE_RELEASE_MAX_TICKS
     );
   }
 

@@ -389,6 +389,85 @@ describe("studio pointer input", () => {
     ).toEqual([]);
   });
 
+  it("filters malformed related entries and falls back when every coalesced candidate is unusable", () => {
+    const session = beginStudioStrokePointerSession(sample(1))!;
+    const foreign = sample(2, { pointerId: 99 });
+    const current = sample(3, {
+      getCoalescedEvents: () => [null, 42, {}, foreign],
+    });
+
+    expect(() => collectStudioStrokePointerBatch(session, current)).not.toThrow();
+    expect(collectStudioStrokePointerBatch(session, current).authoritative).toEqual([current]);
+  });
+
+  it("keeps valid samples in mixed related lists while ignoring malformed predictions", () => {
+    const session = beginStudioStrokePointerSession(sample(1))!;
+    const authoritative = sample(2);
+    const foreign = sample(3, { pointerId: 99 });
+    const prediction = sample(5);
+    const current = sample(4, {
+      getCoalescedEvents: () => [null, authoritative, 42, foreign, {}],
+      getPredictedEvents: () => [undefined, {}, foreign, "junk", prediction],
+    });
+
+    const batch = collectStudioStrokePointerBatch(session, current, { includePredicted: true });
+    expect(batch.authoritative).toEqual([authoritative]);
+    expect(batch.predicted).toEqual([prediction]);
+  });
+
+  it("keeps coalesced and predicted detail for the legacy missing-pointerId session", () => {
+    const down = sample(0, { pointerId: undefined });
+    const session = beginStudioStrokePointerSession(down)!;
+    const first = sample(1, { pointerId: undefined });
+    const second = sample(2, { pointerId: undefined });
+    const prediction = sample(4, { pointerId: undefined });
+    const parent = sample(3, {
+      pointerId: undefined,
+      getCoalescedEvents: () => [first, second],
+      getPredictedEvents: () => [prediction],
+    });
+
+    const batch = collectStudioStrokePointerBatch(session, parent, { includePredicted: true });
+    expect(batch.authoritative).toEqual([first, second]);
+    expect(batch.predicted).toEqual([prediction]);
+  });
+
+  it("skips related samples with throwing optional getters and falls back to the parent", () => {
+    const session = beginStudioStrokePointerSession(sample(1))!;
+    const malformed = {
+      pointerId: 7,
+      clientX: 2,
+      clientY: 3,
+      get pressure(): never {
+        throw new Error("detached sample");
+      },
+    };
+    const current = sample(4, {
+      getCoalescedEvents: () => [malformed],
+      getPredictedEvents: () => [malformed],
+    });
+
+    expect(() => collectStudioStrokePointerBatch(
+      session,
+      current,
+      { includePredicted: true }
+    )).not.toThrow();
+    const batch = collectStudioStrokePointerBatch(session, current, { includePredicted: true });
+    expect(batch.authoritative).toEqual([current]);
+    expect(batch.predicted).toEqual([]);
+  });
+
+  it("does not manufacture a repeated parent when unusable coalesced entries remain", () => {
+    const down = sample(1);
+    const session = beginStudioStrokePointerSession(down)!;
+    const repeated = {
+      ...down,
+      getCoalescedEvents: () => [sample(2, { pointerId: 99 })],
+    };
+
+    expect(collectStudioStrokePointerBatch(session, repeated).authoritative).toEqual([]);
+  });
+
   it("keeps predictions preview-only so the same later hardware sample remains authoritative", () => {
     const session = beginStudioStrokePointerSession(sample(1))!;
     const prediction = sample(4);

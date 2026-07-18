@@ -4,6 +4,8 @@ import {
   FIXED_RATE_STROKE_FILTER_TICK_MS,
   FIXED_RATE_STROKE_PRESSURE_STEPS,
   FIXED_RATE_STROKE_RELEASE_POSITION_EPSILON,
+  FIXED_RATE_STROKE_RELEASE_PRESSURE_EPSILON,
+  FIXED_RATE_STROKE_RELEASE_TILT_EPSILON,
   createFixedRateStrokeFilter,
   quantizeFixedRateStrokeSample,
   resolveFixedRateStrokeFilterParameters,
@@ -542,15 +544,15 @@ describe("representative stroke fixtures", () => {
         },
       ]);
     expect(fixturePoint(result.finished.endpoint)).toEqual({
-      tick: 30,
-      x: 99.53274,
-      y: -11.445738,
-      pressure: 0.251397,
-      tiltX: 9.297953,
-      tiltY: 9.788029,
+      tick: 33,
+      x: 99.90245,
+      y: -11.490376,
+      pressure: 0.248936,
+      tiltX: 9.162081,
+      tiltY: 9.808172,
     });
-    expect(result.finished.releaseDrainTicks).toBe(14);
-    expect(round(result.state.lastStagePositionDelta)).toBe(0.782284);
+    expect(result.finished.releaseDrainTicks).toBe(17);
+    expect(round(result.state.lastStagePositionDelta)).toBe(0.160761);
   });
 
   it("locks a sharp-turn response without allowing future samples to rewrite its prefix", () => {
@@ -664,17 +666,75 @@ describe("representative stroke fixtures", () => {
       lastStagePositionDelta: round(finished.state.lastStagePositionDelta),
       endpoint: fixturePoint(finished.endpoint),
     }).toEqual({
-      releaseDrainTicks: 17,
-      lastStagePositionDelta: 0.969712,
+      releaseDrainTicks: 20,
+      lastStagePositionDelta: 0.179842,
       endpoint: {
-        tick: 18,
-        x: 99.538232,
-        y: 39.815293,
-        pressure: 0.796842,
-        tiltX: 19.907646,
-        tiltY: -11.944588,
+        tick: 21,
+        x: 99.914361,
+        y: 39.965744,
+        pressure: 0.799096,
+        tiltX: 19.982872,
+        tiltY: -11.989723,
       },
     });
+  });
+
+  it("continues draining a stationary pressure-only endpoint", () => {
+    const started = createFixedRateStrokeFilter({
+      x: 12,
+      y: 24,
+      pressure: 0,
+      timeStamp: 0,
+    }, 3.4);
+    const moved = append(started.state, [{
+      x: 12,
+      y: 24,
+      pressure: 1,
+      timeStamp: 1,
+    }]);
+    const finished = release(moved.state, {
+      x: 12,
+      y: 24,
+      pressure: 1,
+      timeStamp: 6,
+    });
+
+    expect(finished.releaseDrainTicks).toBeGreaterThan(1);
+    expect(finished.state.lastStagePositionDelta).toBe(0);
+    expect(finished.state.lastStagePressureDelta)
+      .toBeLessThanOrEqual(FIXED_RATE_STROKE_RELEASE_PRESSURE_EPSILON);
+    expect(finished.endpoint.pressure).toBeGreaterThan(0.99);
+  });
+
+  it("continues draining a stationary tilt-only endpoint", () => {
+    const started = createFixedRateStrokeFilter({
+      x: 12,
+      y: 24,
+      tiltX: 0,
+      tiltY: 0,
+      timeStamp: 0,
+    }, 3.4);
+    const moved = append(started.state, [{
+      x: 12,
+      y: 24,
+      tiltX: 30,
+      tiltY: -20,
+      timeStamp: 1,
+    }]);
+    const finished = release(moved.state, {
+      x: 12,
+      y: 24,
+      tiltX: 30,
+      tiltY: -20,
+      timeStamp: 6,
+    });
+
+    expect(finished.releaseDrainTicks).toBeGreaterThan(1);
+    expect(finished.state.lastStagePositionDelta).toBe(0);
+    expect(finished.state.lastStageTiltDelta)
+      .toBeLessThanOrEqual(FIXED_RATE_STROKE_RELEASE_TILT_EPSILON);
+    expect(finished.endpoint.tiltX).toBeGreaterThan(29.9);
+    expect(finished.endpoint.tiltY).toBeLessThan(-19.9);
   });
 
   it("closes an already settled tap without manufacturing extra ticks", () => {

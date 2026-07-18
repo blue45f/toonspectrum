@@ -212,6 +212,44 @@ describe("fixed-rate stroke frame pump", () => {
     expect(scheduler.cancelFrame).toHaveBeenLastCalledWith(3);
   });
 
+  it("fails closed when frame cancellation throws and keeps repeated stops idempotent", () => {
+    const cancellationFailure = new Error("frame cancellation failed");
+    const lateCallbacks: FixedRateStrokeFrameCallback[] = [];
+    const requestFrame = vi.fn((callback: FixedRateStrokeFrameCallback) => {
+      lateCallbacks.push(callback);
+      return 41;
+    });
+    const cancelFrame = vi.fn(() => {
+      throw cancellationFailure;
+    });
+    const onFrame = vi.fn(() => true);
+    const onError = vi.fn();
+    const pump = createFixedRateStrokeFramePump({
+      requestFrame,
+      cancelFrame,
+      onFrame,
+      onError,
+    });
+
+    pump.start();
+    expect(() => pump.stop()).not.toThrow();
+
+    expect(pump.isRunning()).toBe(false);
+    expect(cancelFrame).toHaveBeenCalledOnce();
+    expect(cancelFrame).toHaveBeenCalledWith(41);
+    expect(onError).toHaveBeenCalledOnce();
+    expect(onError).toHaveBeenCalledWith(cancellationFailure);
+
+    pump.stop();
+    expect(cancelFrame).toHaveBeenCalledOnce();
+    expect(onError).toHaveBeenCalledOnce();
+
+    lateCallbacks[0]?.(17);
+    expect(onFrame).not.toHaveBeenCalled();
+    expect(pump.isRunning()).toBe(false);
+    expect(requestFrame).toHaveBeenCalledOnce();
+  });
+
   it("fails closed and reports an asynchronous frame consumer error", () => {
     const scheduler = createFrameScheduler();
     const failure = new Error("frame failed");

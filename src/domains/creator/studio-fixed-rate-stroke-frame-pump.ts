@@ -222,17 +222,21 @@ export function createFixedRateStrokeFramePump(
   let generation = 0;
   let pendingFrame: number | null = null;
 
+  const reportError = (error: unknown): void => {
+    try {
+      options.onError?.(error);
+    } catch {
+      // A diagnostic hook must never resurrect the async exception that this boundary contains.
+    }
+  };
+
   const fail = (scheduledGeneration: number, error: unknown): void => {
     if (running && generation === scheduledGeneration) {
       running = false;
       generation += 1;
     }
     pendingFrame = null;
-    try {
-      options.onError?.(error);
-    } catch {
-      // A diagnostic hook must never resurrect the async exception that this boundary contains.
-    }
+    reportError(error);
   };
 
   const schedule = (scheduledGeneration: number): void => {
@@ -278,11 +282,19 @@ export function createFixedRateStrokeFramePump(
   };
 
   const stop = (): void => {
+    if (!running && pendingFrame === null) return;
+
     const frameToCancel = pendingFrame;
     pendingFrame = null;
     running = false;
     generation += 1;
-    if (frameToCancel !== null) options.cancelFrame(frameToCancel);
+    if (frameToCancel === null) return;
+
+    try {
+      options.cancelFrame(frameToCancel);
+    } catch (error) {
+      reportError(error);
+    }
   };
 
   return {

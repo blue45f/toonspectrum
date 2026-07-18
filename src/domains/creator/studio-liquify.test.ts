@@ -480,6 +480,43 @@ describe("bakeLiquifyStrokeToCanvas", () => {
     expect(workBuf.data).toEqual(expectedDst.data);
   });
 
+  it.each([
+    { flipX: false, flipY: false, expectedPoints: [{ x: 4, y: 6 }, { x: 9, y: 12 }] },
+    { flipX: true, flipY: false, expectedPoints: [{ x: 16, y: 6 }, { x: 11, y: 12 }] },
+    { flipX: false, flipY: true, expectedPoints: [{ x: 4, y: 24 }, { x: 9, y: 18 }] },
+    { flipX: true, flipY: true, expectedPoints: [{ x: 16, y: 24 }, { x: 11, y: 18 }] },
+  ])(
+    "표시 좌표를 원본 좌표로 보정한다(flipX=$flipX, flipY=$flipY)",
+    async ({ flipX, flipY, expectedPoints }) => {
+      const log: string[] = [];
+      const buffers = new Map<number, StudioImageDataLike>();
+      const factory = fakeLiquifyFactory(log, buffers);
+      const testImage = paintedImage(20, 30, (x, y) => [x * 9, y * 7, (x + y) * 3, 255]);
+      const source: FakeSource = { testImage };
+      const displayPoints: LiquifyPixelPoint[] = [
+        { x: 4, y: 6 },
+        { x: 9, y: 12 },
+      ];
+
+      const out = await bakeLiquifyStrokeToCanvas(
+        source,
+        20,
+        30,
+        displayPoints,
+        4,
+        0.75,
+        factory,
+        { flipX, flipY }
+      );
+
+      expect(out).not.toBeNull();
+      const expectedField = buildLiquifyDisplacementField(expectedPoints, 4, 0.75, 20, 30)!;
+      const expectedDst = cloneImage(testImage);
+      applyLiquifyDisplacement(testImage, expectedDst, expectedField);
+      expect(buffers.get(2)!.data).toEqual(expectedDst.data);
+    }
+  );
+
   it("두 번째 캔버스(work) 생성이 실패하면 null", async () => {
     const log: string[] = [];
     const buffers = new Map<number, StudioImageDataLike>();
