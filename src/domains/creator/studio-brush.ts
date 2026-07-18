@@ -772,7 +772,12 @@ export function screentoneDotsForStroke(points: number[], brushRadius: number, p
   const p = Math.max(2, pitch);
   if (points.length < 2) return [];
 
-  const seen = new Set<string>();
+  // 격자 인덱스(ix, iy)를 정수 하나로 패킹 — 문자열 키(`${ix}:${iy}`) 대신 숫자 Set을 써서
+  // 스트로크당 수천 번 호출되는 해시 경로에서 문자열 할당/해싱 비용을 없앤다.
+  // 망점 격자는 이 바이어스 범위(±1,048,576칸)에 절대 도달하지 않는다.
+  const GRID_KEY_BIAS = 1 << 20;
+  const GRID_KEY_STRIDE = GRID_KEY_BIAS * 2;
+  const seen = new Set<number>();
   const dots: number[] = [];
 
   const stampAt = (cx: number, cy: number) => {
@@ -787,7 +792,7 @@ export function screentoneDotsForStroke(points: number[], brushRadius: number, p
         const dx = ix * p + rowOffset;
         const dy = iy * p;
         if ((dx - cx) * (dx - cx) + (dy - cy) * (dy - cy) > r * r) continue;
-        const key = `${ix}:${iy}`;
+        const key = (iy + GRID_KEY_BIAS) * GRID_KEY_STRIDE + (ix + GRID_KEY_BIAS);
         if (seen.has(key)) continue;
         seen.add(key);
         dots.push(dx, dy);
