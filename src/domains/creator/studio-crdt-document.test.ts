@@ -1201,4 +1201,171 @@ describe("StudioCrdtDocument", () => {
     document.destroy();
     expect(() => document.getStrokes()).toThrow("이미 닫힌");
   });
+
+  // task #25: getStrokes/getSceneElements/getPages/getLayerGroups now read from per-id caches. An
+  // afterTransaction listener (reconcileRecordCaches) marks ids dirty using the changed-id sets the
+  // document already tracks; actual re-decoding is deferred to the next get*() call (drainDirty*Ids)
+  // instead of happening eagerly per transaction — so instead of rescanning every record on every
+  // call, only the ids actually touched since the last read get re-decoded, and only once per read.
+  // A freshly-constructed StudioCrdtDocument always bootstraps its caches from scratch (no incremental
+  // logic involved), so replaying the same bytes into a fresh instance after every mutation and
+  // diffing get*() output is a strong cross-check: any missed invalidation in the incremental path
+  // would show up as a divergence.
+  describe("record caches stay consistent with a fresh rescan", () => {
+    function snapshotAll(document: StudioCrdtDocument) {
+      return {
+        strokes: document.getStrokes({ includeDeleted: true }),
+        sceneElements: document.getSceneElements({ includeDeleted: true }),
+        pages: document.getPages(true),
+        layerGroups: document.getLayerGroups({ includeDeleted: true }),
+      };
+    }
+
+    function assertMatchesFreshRescan(document: StudioCrdtDocument): void {
+      const fresh = new StudioCrdtDocument(document.encodeStateAsUpdate());
+      try {
+        expect(snapshotAll(document)).toEqual(snapshotAll(fresh));
+      } finally {
+        fresh.destroy();
+      }
+    }
+
+    it("matches a freshly-bootstrapped document at every step of a mixed stroke/element/page/layer-group CRUD sequence", () => {
+      const document = new StudioCrdtDocument();
+
+      document.addPage(page("page-a"));
+      assertMatchesFreshRescan(document);
+      document.addPage(page("page-b", { canvasH: 2000 }));
+      assertMatchesFreshRescan(document);
+
+      document.addStroke(stroke("s1", "page-a", [0, 0, 10, 10]));
+      assertMatchesFreshRescan(document);
+      document.addStroke(stroke("s2", "page-a", [5, 5, 15, 15]));
+      assertMatchesFreshRescan(document);
+      document.addStroke(stroke("s3", "page-b", [1, 1, 2, 2]));
+      assertMatchesFreshRescan(document);
+
+      // Only s2's content changes here — s1/s3 must stay correct in the cache without being
+      // re-decoded (the actual regression this test targets; a full-rescan implementation would
+      // trivially pass this too, so the point is pinning the *incremental* path's correctness).
+      document.patchStroke("s2", {
+        payload: payload([5, 5, 15, 15, 25, 25], { pressures: undefined }),
+        changedPayloadKeys: ["points"],
+      });
+      assertMatchesFreshRescan(document);
+
+      document.moveStroke("s1", null); // reorder only — content unchanged, orderIndex must refresh
+      assertMatchesFreshRescan(document);
+      document.deleteStroke("s3");
+      assertMatchesFreshRescan(document);
+      document.restoreStroke("s3");
+      assertMatchesFreshRescan(document);
+
+      document.addSceneElement(textElement("t1"));
+      assertMatchesFreshRescan(document);
+      document.addSceneElement(textElement("t2", { text: "두번째" }));
+      assertMatchesFreshRescan(document);
+      document.patchSceneElement("t1", { set: { text: "수정됨" } });
+      assertMatchesFreshRescan(document);
+      document.moveSceneElement("t2", null);
+      assertMatchesFreshRescan(document);
+      document.deleteSceneElement("t2");
+      assertMatchesFreshRescan(document);
+      document.restoreSceneElement("t2");
+      assertMatchesFreshRescan(document);
+
+      document.addLayerGroup({
+        id: "lg1",
+        pageId: "page-a",
+        payload: {
+          version: STUDIO_CRDT_LAYER_GROUP_PAYLOAD_VERSION,
+          props: { name: "레이어1", hidden: false, locked: false },
+        },
+      });
+      assertMatchesFreshRescan(document);
+      document.patchLayerGroup("page-a", "lg1", { set: { hidden: true } });
+      assertMatchesFreshRescan(document);
+      document.deleteLayerGroup("page-a", "lg1");
+      assertMatchesFreshRescan(document);
+      document.restoreLayerGroup("page-a", "lg1");
+      assertMatchesFreshRescan(document);
+
+      document.patchPage("page-a", { set: { canvasH: 1800 } });
+      assertMatchesFreshRescan(document);
+      document.movePage("page-b", "page-a");
+      assertMatchesFreshRescan(document);
+      document.deletePage("page-b");
+      assertMatchesFreshRescan(document);
+      document.restorePage("page-b");
+      assertMatchesFreshRescan(document);
+
+      document.destroy();
+    });
+
+    it("keeps an id-format-invalid entry excluded from results after a content-root change (bootstrap has no exactText guard, refresh does)", () => {
+      const document = new StudioCrdtDocument();
+      document.addPage(page("page-a"));
+      document.addSceneElement(textElement("valid-id"));
+
+      // Directly poke an over-length id into the underlying scene-element-ids map the way a
+      // corrupted/adversarial remote update could, bypassing the public API's validation.
+      const doc = underlyingYDoc(document);
+      const overLongId = "x".repeat(600);
+      doc.transact(() => {
+        (doc.getMap("scene-elements") as Y.Map<boolean>).set(overLongId, true);
+        const root = doc.getMap<unknown>(`scene-element:${overLongId}`);
+        root.set("id", overLongId);
+        root.set("pageId", "page-a");
+        root.set("layerId", "lettering");
+        root.set("payloadVersion", STUDIO_CRDT_SCENE_ELEMENT_PAYLOAD_VERSION);
+        root.set("type", "text");
+        root.set("text", "corrupt");
+      }, STUDIO_CRDT_ORIGIN_LOCAL);
+
+      expect(document.getSceneElements({ includeDeleted: true }).map((r) => r.id)).not.toContain(
+        overLongId
+      );
+
+      // Touch its content root again post-bootstrap — this exercises reconcileRecordCaches for an
+      // id that was never exactText-valid, which must keep excluding it (not just skip it once).
+      doc.transact(() => {
+        doc.getMap<unknown>(`scene-element:${overLongId}`).set("text", "still corrupt");
+      }, STUDIO_CRDT_ORIGIN_LOCAL);
+
+      expect(document.getSceneElements({ includeDeleted: true }).map((r) => r.id)).not.toContain(
+        overLongId
+      );
+
+      document.destroy();
+    });
+
+    it("defers sample-array decoding until a get*() call, instead of re-decoding on every local append transaction", () => {
+      // Pins the fix for a regression an adversarial review caught: an earlier version of this
+      // cache eagerly re-decoded + deep-froze a stroke's full sample arrays inside the
+      // afterTransaction listener on every single appendStrokeSamples() call, which is exactly the
+      // pointer-move-driven local live-drawing hot path this task targets — turning "decode cost
+      // proportional to the current stroke length, paid once per pointer-move batch" into an O(n^2)
+      // cost over the life of one long stroke, and introducing cost where the pre-optimization code
+      // had none (getStrokes() was previously only ever called lazily, on read). The fix defers
+      // decoding to drainDirty*Ids(), invoked at the top of get*() — so N append transactions with
+      // no intervening read must decode the sample arrays at most once, not N times.
+      const document = new StudioCrdtDocument();
+      document.addPage(page("page-a"));
+      document.beginStroke(stroke("live-draw", "page-a", []));
+
+      const toArraySpy = vi.spyOn(Y.Array.prototype, "toArray");
+      toArraySpy.mockClear();
+
+      for (let i = 0; i < 20; i += 1) {
+        document.appendStrokeSamples("live-draw", { points: [i, i] });
+      }
+      expect(toArraySpy).not.toHaveBeenCalled();
+
+      document.getStrokes();
+      expect(toArraySpy).toHaveBeenCalled();
+
+      toArraySpy.mockRestore();
+      document.destroy();
+    });
+  });
 });

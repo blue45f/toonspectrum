@@ -987,6 +987,17 @@ function readPayload(record: Y.Map<unknown>): StudioCrdtDrawStrokePayload | null
   }
 }
 
+/** strokeRecordCache 등에 저장하기 전 레코드를 얼린다 — 캐시된 레코드는 get*() 호출마다 다시
+ * 디코딩되지 않고 여러 호출에서 재사용되므로, 호출자가 실수로 내부(payload/props 등)를 제자리
+ * 수정하면 캐시가 조용히 오염된다. lib/studio-crdt-raster-ops.ts 의 deepFreeze 와 동일한 관례. */
+function deepFreeze<T>(value: T): T {
+  if (value && typeof value === "object" && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const child of Object.values(value as Record<string, unknown>)) deepFreeze(child);
+  }
+  return value;
+}
+
 function orderEntryValue(entry: unknown, key: string): string | null {
   if (!(entry instanceof Y.Map)) return null;
   const value = entry.get(key);
@@ -1116,6 +1127,24 @@ export class StudioCrdtDocument {
   private readonly changedRasterUndoOperationIdsByTransaction = new WeakMap<Y.Transaction, Set<string>>();
   private readonly changedRasterUndoAcknowledgementIdsByTransaction = new WeakMap<Y.Transaction, Set<string>>();
   private readonly changedRasterCheckpointIdsByTransaction = new WeakMap<Y.Transaction, Set<string>>();
+  // subscribeChanges/get*() 호출마다 전체 문서를 다시 스캔하지 않도록, id별로 디코딩된 레코드를
+  // 캐시한다. orderIndex는 캐시에 포함하지 않는다(순서는 다른 항목의 삽입/삭제로도 바뀌므로 get*()
+  // 호출마다 order 배열에서 새로 계산한다). 갱신은 지연(lazy) 방식이다 — afterTransaction 리스너
+  // (reconcileRecordCaches, 생성자 맨 끝에서 등록)는 changed*IdsByTransaction 을 dirty*Ids 집합에
+  // 옮겨 담기만 할 뿐 그 자리에서 재디코딩하지 않는다(트랜잭션당 Set.add 몇 번뿐이라 사실상 공짜).
+  // 실제 디코딩(readPayload 의 Y.Array.toArray() + deepFreeze)은 get*() 호출 시작에서 drainDirty*Ids
+  // 가 수행한다 — 한 획을 라이브로 그리는 동안 appendStrokeSamples 가 로컬 트랜잭션을 수십~수백 번
+  // 만들어도(포인터 이동마다 1개), 그 사이 아무도 get*() 를 호출하지 않으면 재디코딩은 0번, 마지막에
+  // 실제로 읽힐 때 딱 1번만 일어난다 — eager 버전은 트랜잭션마다 매번 전체 샘플 배열을 다시 디코딩·
+  // 동결해 라이브 드로잉 경로에 없던 비용을 새로 만들어냈다(리뷰에서 확인된 실측 회귀).
+  private readonly strokeRecordCache = new Map<string, StudioCrdtStrokeRecord | null>();
+  private readonly sceneElementRecordCache = new Map<string, StudioCrdtSceneElementRecord | null>();
+  private readonly pageRecordCache = new Map<string, StudioCrdtPageRecord | null>();
+  private readonly layerGroupRecordCache = new Map<string, StudioCrdtLayerGroupRecord | null>();
+  private readonly dirtyStrokeIds = new Set<string>();
+  private readonly dirtySceneElementIds = new Set<string>();
+  private readonly dirtyPageIds = new Set<string>();
+  private readonly dirtyLayerGroupIds = new Set<string>();
   private readonly observedSceneElementRoots = new Set<string>();
   private readonly observedPageRoots = new Set<string>();
   private readonly observedLayerGroupRoots = new Set<string>();
@@ -1154,6 +1183,16 @@ export class StudioCrdtDocument {
     }
     for (const [operationId, target] of this.deletionOps) {
       this.indexDeletionOperation(operationId, target);
+    }
+    for (const [id] of this.strokes) this.refreshStrokeRecordCache(id);
+    for (const [id, active] of this.sceneElementIds) {
+      if (active === true) this.refreshSceneElementRecordCache(id);
+    }
+    for (const [id, active] of this.pageIds) {
+      if (active === true) this.refreshPageRecordCache(id);
+    }
+    for (const [compositeKey, active] of this.layerGroupIds) {
+      if (active === true) this.refreshLayerGroupRecordCache(compositeKey);
     }
 
     const observeStrokes: Parameters<typeof this.strokes.observeDeep>[0] = (events, transaction) => {
@@ -1377,6 +1416,28 @@ export class StudioCrdtDocument {
     this.cleanup.add(() => this.rasterUndoOperations.unobserve(observeRasterUndoOperations));
     this.cleanup.add(() => this.rasterUndoAcknowledgements.unobserve(observeRasterUndoAcknowledgements));
     this.cleanup.add(() => this.rasterCheckpoints.unobserve(observeRasterCheckpoints));
+
+    // 이 리스너는 생성자에서 등록되므로, 이후 외부에서 호출되는 모든 subscribeChanges 리스너보다
+    // 항상 먼저 afterTransaction을 받는다(Yjs는 등록 순서대로 리스너를 호출한다) — get*()가 이번
+    // 트랜잭션의 dirty 표시를 놓치지 않는다는 불변식이 이 등록 순서에 의존한다. 여기서는 재디코딩을
+    // 하지 않는다(Set.add 만 하므로 사실상 공짜) — 실제 디코딩은 drainDirty*Ids 가 get*() 호출 시점에
+    // 지연 수행한다.
+    const reconcileRecordCaches = (transaction: Y.Transaction) => {
+      const changedStrokeIds = this.changedStrokeIdsByTransaction.get(transaction);
+      if (changedStrokeIds) for (const id of changedStrokeIds) this.dirtyStrokeIds.add(id);
+      const changedSceneElementIds = this.changedSceneElementIdsByTransaction.get(transaction);
+      if (changedSceneElementIds) {
+        for (const id of changedSceneElementIds) this.dirtySceneElementIds.add(id);
+      }
+      const changedPageIds = this.changedPageIdsByTransaction.get(transaction);
+      if (changedPageIds) for (const id of changedPageIds) this.dirtyPageIds.add(id);
+      const changedLayerGroupIds = this.changedLayerGroupIdsByTransaction.get(transaction);
+      if (changedLayerGroupIds) {
+        for (const compositeKey of changedLayerGroupIds) this.dirtyLayerGroupIds.add(compositeKey);
+      }
+    };
+    this.doc.on("afterTransaction", reconcileRecordCaches);
+    this.cleanup.add(() => this.doc.off("afterTransaction", reconcileRecordCaches));
   }
 
   subscribe(handler: StudioCrdtUpdateHandler): () => void {
@@ -1840,6 +1901,7 @@ export class StudioCrdtDocument {
 
   getStrokes(query: StudioCrdtStrokeQuery = {}): StudioCrdtStrokeRecord[] {
     this.assertAlive();
+    this.drainDirtyStrokeIds();
     const latestOrder = new Map<string, number>();
     this.order.forEach((entry, index) => {
       if (!(entry instanceof Y.Map)) return;
@@ -1848,10 +1910,13 @@ export class StudioCrdtDocument {
       if (id) latestOrder.set(id, index);
     });
     const records: StudioCrdtStrokeRecord[] = [];
-    for (const [id, record] of this.strokes) {
-      if (!(record instanceof Y.Map)) continue;
-      const result = this.readRecord(id, record, latestOrder.get(id) ?? Number.MAX_SAFE_INTEGER);
-      if (!result || (!query.includeDeleted && result.deleted)) continue;
+    for (const [id, cached] of this.strokeRecordCache) {
+      if (!cached) continue;
+      const result: StudioCrdtStrokeRecord = {
+        ...cached,
+        orderIndex: latestOrder.get(id) ?? Number.MAX_SAFE_INTEGER,
+      };
+      if (!query.includeDeleted && result.deleted) continue;
       if (query.pageId !== undefined && result.pageId !== query.pageId) continue;
       if (query.layerId !== undefined && result.layerId !== query.layerId) continue;
       records.push(result);
@@ -2066,6 +2131,7 @@ export class StudioCrdtDocument {
 
   getSceneElements(query: StudioCrdtSceneElementQuery = {}): StudioCrdtSceneElementRecord[] {
     this.assertAlive();
+    this.drainDirtySceneElementIds();
     const latestOrder = new Map<string, number>();
     this.order.forEach((entry, index) => {
       if (!(entry instanceof Y.Map) || entry.get("active") !== true) return;
@@ -2073,12 +2139,13 @@ export class StudioCrdtDocument {
       if (id) latestOrder.set(id, index);
     });
     const records: StudioCrdtSceneElementRecord[] = [];
-    for (const [id, active] of this.sceneElementIds) {
-      if (active !== true || !exactText(id, MAX_ID_LENGTH)) continue;
-      const record = this.sceneElementRecord(id);
-      if (!record) continue;
-      const result = this.readSceneElementRecord(id, record, latestOrder.get(id) ?? Number.MAX_SAFE_INTEGER);
-      if (!result || (!query.includeDeleted && result.deleted)) continue;
+    for (const [id, cached] of this.sceneElementRecordCache) {
+      if (!cached) continue;
+      const result: StudioCrdtSceneElementRecord = {
+        ...cached,
+        orderIndex: latestOrder.get(id) ?? Number.MAX_SAFE_INTEGER,
+      };
+      if (!query.includeDeleted && result.deleted) continue;
       if (query.pageId !== undefined && result.pageId !== query.pageId) continue;
       if (query.layerId !== undefined && result.layerId !== query.layerId) continue;
       records.push(result);
@@ -2244,6 +2311,7 @@ export class StudioCrdtDocument {
 
   getPages(includeDeleted = false): StudioCrdtPageRecord[] {
     this.assertAlive();
+    this.drainDirtyPageIds();
     const latestOrder = new Map<string, number>();
     this.pageOrder.forEach((entry, index) => {
       if (!(entry instanceof Y.Map) || entry.get("active") !== true) return;
@@ -2251,12 +2319,13 @@ export class StudioCrdtDocument {
       if (id) latestOrder.set(id, index);
     });
     const records: StudioCrdtPageRecord[] = [];
-    for (const [id, active] of this.pageIds) {
-      if (active !== true || !exactText(id, MAX_ID_LENGTH)) continue;
-      const record = this.pageRecord(id);
-      if (!record) continue;
-      const result = this.readPageRecord(id, record, latestOrder.get(id) ?? Number.MAX_SAFE_INTEGER);
-      if (!result || (!includeDeleted && result.deleted)) continue;
+    for (const [id, cached] of this.pageRecordCache) {
+      if (!cached) continue;
+      const result: StudioCrdtPageRecord = {
+        ...cached,
+        orderIndex: latestOrder.get(id) ?? Number.MAX_SAFE_INTEGER,
+      };
+      if (!includeDeleted && result.deleted) continue;
       records.push(result);
     }
     return records.sort(
@@ -2422,15 +2491,13 @@ export class StudioCrdtDocument {
 
   getLayerGroups(query: StudioCrdtLayerGroupQuery = {}): StudioCrdtLayerGroupRecord[] {
     this.assertAlive();
+    this.drainDirtyLayerGroupIds();
     const records: StudioCrdtLayerGroupRecord[] = [];
-    for (const [compositeKey, active] of this.layerGroupIds) {
-      if (active !== true || !exactText(compositeKey, MAX_LAYER_GROUP_KEY_LENGTH)) continue;
-      const record = this.layerGroupRecord(compositeKey);
-      if (!record) continue;
-      const result = this.readLayerGroupRecord(compositeKey, record);
-      if (!result || (!query.includeDeleted && result.deleted)) continue;
-      if (query.pageId !== undefined && result.pageId !== query.pageId) continue;
-      records.push(result);
+    for (const cached of this.layerGroupRecordCache.values()) {
+      if (!cached) continue;
+      if (!query.includeDeleted && cached.deleted) continue;
+      if (query.pageId !== undefined && cached.pageId !== query.pageId) continue;
+      records.push({ ...cached });
     }
     return records.sort(
       (left, right) => left.pageId.localeCompare(right.pageId) || left.id.localeCompare(right.id)
@@ -3220,6 +3287,107 @@ export class StudioCrdtDocument {
     if (!(value instanceof Y.Map)) return;
     const id = orderEntryValue(value, "strokeId");
     if (id) this.strokeIdByType.set(value, id);
+  }
+
+  // strokeRecordCache/sceneElementRecordCache/pageRecordCache/layerGroupRecordCache 갱신 — 생성자
+  // 부트스트랩과 reconcileRecordCaches(afterTransaction) 양쪽에서 호출된다. 디코딩 로직은 기존
+  // readRecord/readSceneElementRecord/readPageRecord/readLayerGroupRecord 를 그대로 재사용하고
+  // (orderIndex 는 자리값 0 — get*() 가 캐시에서 꺼낸 뒤 order 배열 기준으로 새로 채운다), 결과는
+  // deepFreeze 로 얼려 여러 get*() 호출 사이에서 안전하게 공유한다.
+
+  private refreshStrokeRecordCache(id: string): void {
+    const record = this.strokes.get(id);
+    this.strokeRecordCache.set(
+      id,
+      record instanceof Y.Map ? deepFreeze(this.readRecord(id, record, 0)) : null
+    );
+  }
+
+  private refreshSceneElementRecordCache(id: string): void {
+    if (!exactText(id, MAX_ID_LENGTH)) {
+      this.sceneElementRecordCache.set(id, null);
+      return;
+    }
+    const record = this.sceneElementRecord(id);
+    this.sceneElementRecordCache.set(
+      id,
+      record ? deepFreeze(this.readSceneElementRecord(id, record, 0)) : null
+    );
+  }
+
+  private refreshPageRecordCache(id: string): void {
+    if (!exactText(id, MAX_ID_LENGTH)) {
+      this.pageRecordCache.set(id, null);
+      return;
+    }
+    const record = this.pageRecord(id);
+    this.pageRecordCache.set(id, record ? deepFreeze(this.readPageRecord(id, record, 0)) : null);
+  }
+
+  private refreshLayerGroupRecordCache(compositeKey: string): void {
+    if (!exactText(compositeKey, MAX_LAYER_GROUP_KEY_LENGTH)) {
+      this.layerGroupRecordCache.set(compositeKey, null);
+      return;
+    }
+    const record = this.layerGroupRecord(compositeKey);
+    this.layerGroupRecordCache.set(
+      compositeKey,
+      record ? deepFreeze(this.readLayerGroupRecord(compositeKey, record)) : null
+    );
+  }
+
+  // dirty*Ids 를 실제로 재디코딩해 캐시에 반영한다 — get*() 호출 맨 앞에서만 실행된다(지연 갱신).
+  // 개별 id 하나의 디코딩 실패가 나머지 id 나 이 트랜잭션의 다른 subscribeChanges 구독자 통지를
+  // 막지 않도록 각 항목을 개별적으로 try/catch 한다 — 이 파일의 다른 read* 헬퍼들이 신뢰할 수 없는
+  // 원격 CRDT 콘텐츠에 조용히 null 로 실패하는 것과 동일한 방어. 실패한 항목은 캐시의 마지막으로
+  // 성공한 값을 그대로 둔다(있다면) — 일시적 실패로 이전엔 유효했던 레코드를 사라지게 만들지 않는다.
+
+  private drainDirtyStrokeIds(): void {
+    if (this.dirtyStrokeIds.size === 0) return;
+    for (const id of this.dirtyStrokeIds) {
+      try {
+        this.refreshStrokeRecordCache(id);
+      } catch {
+        // 마지막으로 성공한 캐시 값 유지 — 위 주석 참고.
+      }
+    }
+    this.dirtyStrokeIds.clear();
+  }
+
+  private drainDirtySceneElementIds(): void {
+    if (this.dirtySceneElementIds.size === 0) return;
+    for (const id of this.dirtySceneElementIds) {
+      try {
+        this.refreshSceneElementRecordCache(id);
+      } catch {
+        // 마지막으로 성공한 캐시 값 유지 — 위 주석 참고.
+      }
+    }
+    this.dirtySceneElementIds.clear();
+  }
+
+  private drainDirtyPageIds(): void {
+    if (this.dirtyPageIds.size === 0) return;
+    for (const id of this.dirtyPageIds) {
+      try {
+        this.refreshPageRecordCache(id);
+      } catch {
+        // 마지막으로 성공한 캐시 값 유지 — 위 주석 참고.
+      }
+    }
+    this.dirtyPageIds.clear();
+  }
+
+  private drainDirtyLayerGroupIds(): void {
+    if (this.dirtyLayerGroupIds.size === 0) return;
+    for (const compositeKey of this.dirtyLayerGroupIds) {
+      try {
+        this.refreshLayerGroupRecordCache(compositeKey);
+      } catch {
+        // 마지막으로 성공한 캐시 값 유지 — 위 주석 참고.
+      }
+    }
+    this.dirtyLayerGroupIds.clear();
   }
 
   private createRecord(
