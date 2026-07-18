@@ -53,6 +53,11 @@
 - 정적 렌더 최적화: 동일 프리미티브 kind는 editor-local geometry/edge GPU buffer를 공유하고,
   선택되지 않은 루트는 local matrix를 고정한다. 문서 transform 변경 때 matrix를 즉시 갱신하며
   선택/TransformControls 진입 시 자동 행렬 갱신을 되살린다.
+- 적응형 viewport 품질: 지속적인 프레임 예산 초과에서만 DPR을 `1/0.85/0.7/0.55` 단계로 낮추고,
+  훨씬 긴 여유 구간 뒤에 천천히 복구한다. 탭 복귀·debug pause·단발 long task는 무시하고 capture
+  동안 governor를 정지한다. 캡처는 요청 크기의 별도 render target이므로 export 해상도는 유지된다.
+- device `lodBias`는 이제 거리 기반 animation CPU LOD에도 반영되어 모바일/저품질 프로필이 far/very
+  far sampling rate로 더 일찍 전환하고, 음수 bias는 근거리 full-rate 영역을 넓힌다.
 - WebGPU lab: GPUDevice를 만들지 않는 보수적 capability/limit probe와 완전 지연
   `three/webgpu` renderer factory를 별도 Canvas 계약으로 구현했다. 현재 WebGL 편집 Canvas를 소유하거나
   자동 교체하지 않는다.

@@ -35,6 +35,24 @@ describe("studio-bg3d-animation-scheduler", () => {
       .toEqual({ suspended: false, minimumIntervalSeconds: 1 / 15, reason: "far" });
   });
 
+  it("uses the device LOD bias to engage throttling earlier or later", () => {
+    expect(resolveStudioBg3dAnimationSchedule({
+      ...BASE,
+      distanceToCamera: 20,
+      lodBias: 1,
+    }).reason).toBe("far");
+    expect(resolveStudioBg3dAnimationSchedule({
+      ...BASE,
+      distanceToCamera: 50,
+      lodBias: -1,
+    }).reason).toBe("near");
+    expect(resolveStudioBg3dAnimationSchedule({
+      ...BASE,
+      distanceToCamera: 1,
+      lodBias: Number.NaN,
+    }).reason).toBe("near");
+  });
+
   it("fails safely on invalid device and bounds signals", () => {
     const result = resolveStudioBg3dAnimationSchedule({
       ...BASE,

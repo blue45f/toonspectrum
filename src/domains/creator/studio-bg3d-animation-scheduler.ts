@@ -13,6 +13,8 @@ export interface StudioBg3dAnimationScheduleInput {
   readonly capturing: boolean;
   readonly selected: boolean;
   readonly targetFps: number;
+  /** Positive values make CPU animation LOD engage sooner; negative values preserve full rate. */
+  readonly lodBias?: number;
   readonly distanceToCamera: number;
   readonly boundingRadius: number;
 }
@@ -49,14 +51,18 @@ export function resolveStudioBg3dAnimationSchedule(
     ? Math.max(0, input.distanceToCamera)
     : Number.POSITIVE_INFINITY;
   const distanceInRadii = distance / radius;
-  if (distanceInRadii >= 80) {
+  const lodBias = Number.isFinite(input.lodBias)
+    ? Math.min(4, Math.max(-2, input.lodBias ?? 0))
+    : 0;
+  const lodDistanceFactor = 2 ** lodBias;
+  if (distanceInRadii >= 80 / lodDistanceFactor) {
     return {
       suspended: false,
       minimumIntervalSeconds: 1 / Math.min(targetFps, 10),
       reason: "very-far",
     };
   }
-  if (distanceInRadii >= 30) {
+  if (distanceInRadii >= 30 / lodDistanceFactor) {
     return {
       suspended: false,
       minimumIntervalSeconds: 1 / Math.min(targetFps, 20),
