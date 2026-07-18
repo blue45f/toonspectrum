@@ -42,6 +42,7 @@ import {
   planStudioGpuTilePresentation,
   planStudioGpuVisibleTileFrame,
   resolveStudioGpuTileTasks,
+  STUDIO_GPU_DAB_INSTANCE_FLOATS,
 } from "./studio-webgpu-tile-compositor";
 import {
   createStudioGpuTileTextureFactory,
@@ -196,8 +197,7 @@ export interface StudioGpuDabRenderUpdate extends PlannedStudioGpuDabs {
   mode: "append" | "rebuild";
 }
 
-const INSTANCE_FLOATS = 8;
-const INSTANCE_BYTES = INSTANCE_FLOATS * Float32Array.BYTES_PER_ELEMENT;
+const INSTANCE_BYTES = STUDIO_GPU_DAB_INSTANCE_FLOATS * Float32Array.BYTES_PER_ELEMENT;
 export const STUDIO_GPU_MAX_DABS = 100_000;
 export const STUDIO_GPU_MAX_TILE_RESOLUTION_SCALE = 4;
 export const STUDIO_GPU_MAX_CONCURRENT_READBACKS = 2;
@@ -218,14 +218,16 @@ const STUDIO_GPU_BRUSH_SHADER = /* wgsl */ `
     @builtin(position) position: vec4<f32>,
     @location(0) local: vec2<f32>,
     @location(1) color: vec4<f32>,
+    @location(2) @interpolate(flat) nominal_radius_ratio: f32,
   }
 
   @vertex
   fn vs_main(
     @builtin(vertex_index) vertex_index: u32,
     @location(0) center: vec2<f32>,
-    @location(1) radius: vec2<f32>,
+    @location(1) quad_radius: vec2<f32>,
     @location(2) color: vec4<f32>,
+    @location(3) nominal_radius_ratio: f32,
   ) -> VertexOutput {
     let corners = array<vec2<f32>, 6>(
       vec2<f32>(-1.0, -1.0),
@@ -237,21 +239,28 @@ const STUDIO_GPU_BRUSH_SHADER = /* wgsl */ `
     );
     let corner = corners[vertex_index];
     var output: VertexOutput;
-    output.position = vec4<f32>(center + corner * radius, 0.0, 1.0);
+    output.position = vec4<f32>(center + corner * quad_radius, 0.0, 1.0);
     output.local = corner;
     output.color = color;
+    output.nominal_radius_ratio = nominal_radius_ratio;
     return output;
   }
 
   @fragment
   fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
+    // The quad is rasterized one physical texel larger than the analytic dab radius (see
+    // writePackedTileDab), so the coverage transition below has real geometry to feather into on
+    // every side instead of only toward the instanced quad's unclipped corners. local==1.0 is now
+    // the expanded quad edge; nominal_radius_ratio locates the true circle boundary inside it.
     let distance_from_center = length(input.local);
-    if (distance_from_center >= 1.0) {
-      discard;
-    }
     // Keep the edge close to one physical pixel instead of feathering 10% of large brush tips.
     let edge_width = max(fwidth(distance_from_center), 0.0005);
-    let coverage = 1.0 - smoothstep(1.0 - edge_width, 1.0, distance_from_center);
+    let half_edge_width = edge_width * 0.5;
+    let coverage = 1.0 - smoothstep(
+      input.nominal_radius_ratio - half_edge_width,
+      input.nominal_radius_ratio + half_edge_width,
+      distance_from_center
+    );
     return input.color * coverage;
   }
 `;
@@ -2041,6 +2050,7 @@ export class StudioWebGpuEngine {
               { shaderLocation: 0, offset: 0, format: "float32x2" },
               { shaderLocation: 1, offset: 8, format: "float32x2" },
               { shaderLocation: 2, offset: 16, format: "float32x4" },
+              { shaderLocation: 3, offset: 32, format: "float32" },
             ],
           },
         ],

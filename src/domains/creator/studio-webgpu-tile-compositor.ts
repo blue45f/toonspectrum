@@ -22,6 +22,14 @@ import type {
 } from "./studio-webgpu-tile-runtime";
 
 const PRESENTATION_VERTEX_FLOATS = 4;
+/**
+ * center(2) + quad radius(2) + premultiplied color(4) + nominal-radius-to-quad-radius ratio(1).
+ * The quad is deliberately rasterized larger than the analytic dab radius (see writePackedTileDab)
+ * so the fragment shader's antialiasing transition has real geometry to feather into on every side,
+ * not just toward the instanced quad's corners; the ratio tells the shader where the true circle
+ * boundary sits inside that larger quad.
+ */
+export const STUDIO_GPU_DAB_INSTANCE_FLOATS = 9;
 
 export interface StudioGpuNormalizedTileViewport {
   readonly logicalWidth: number;
@@ -238,12 +246,12 @@ export function resolveStudioGpuTileTasks<Resource>(
 export function packStudioGpuTileDabs(
   tasks: StudioGpuResolvedTileTasks<unknown>
 ): Float32Array {
-  const packed = new Float32Array(tasks.dabCount * 8);
+  const packed = new Float32Array(tasks.dabCount * STUDIO_GPU_DAB_INSTANCE_FLOATS);
   for (const resolved of tasks.tasks) {
     const { descriptor } = resolved.task;
     for (let index = 0; index < resolved.plan.dabs.length; index += 1) {
       const dab = resolved.plan.dabs[index]!;
-      const outputOffset = (resolved.firstInstance + index) * 8;
+      const outputOffset = (resolved.firstInstance + index) * STUDIO_GPU_DAB_INSTANCE_FLOATS;
       writePackedTileDab(packed, outputOffset, dab, descriptor);
     }
   }
@@ -257,14 +265,24 @@ function writePackedTileDab(
   descriptor: StudioGpuTileRenderTask<unknown>["descriptor"]
 ): void {
   const alpha = clamp(dab.alpha, 0, 1);
+  const nominalRadius = Math.max(0, dab.radius);
+  // One physical tile texel, expressed in the same logical document units as dab.radius.
+  const onePhysicalPixel = Math.max(
+    descriptor.renderWidth / descriptor.width,
+    descriptor.renderHeight / descriptor.height
+  );
+  const quadRadius = nominalRadius > 0 ? nominalRadius + onePhysicalPixel : 0;
+  const nominalRadiusRatio = quadRadius > 0 ? nominalRadius / quadRadius : 0;
+
   target[offset] = ((dab.x - descriptor.renderX) / descriptor.renderWidth) * 2 - 1;
   target[offset + 1] = 1 - ((dab.y - descriptor.renderY) / descriptor.renderHeight) * 2;
-  target[offset + 2] = (dab.radius / descriptor.renderWidth) * 2;
-  target[offset + 3] = (dab.radius / descriptor.renderHeight) * 2;
+  target[offset + 2] = (quadRadius / descriptor.renderWidth) * 2;
+  target[offset + 3] = (quadRadius / descriptor.renderHeight) * 2;
   target[offset + 4] = dab.red * alpha;
   target[offset + 5] = dab.green * alpha;
   target[offset + 6] = dab.blue * alpha;
   target[offset + 7] = alpha;
+  target[offset + 8] = nominalRadiusRatio;
 }
 
 function logicalPointToNdc(

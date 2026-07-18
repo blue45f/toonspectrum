@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 } from "./studio-ink-pressure-model";
 import {
   planStudioGpuDabs,
   planStudioGpuDabsInRect,
@@ -10,6 +11,7 @@ import {
   planStudioGpuTilePresentation,
   planStudioGpuVisibleTileFrame,
   resolveStudioGpuTileTasks,
+  STUDIO_GPU_DAB_INSTANCE_FLOATS,
   studioGpuLogicalViewBox,
 } from "./studio-webgpu-tile-compositor";
 import {
@@ -139,10 +141,39 @@ describe("studio WebGPU tile compositor planning", () => {
     expect(resolved).not.toBeNull();
     expect(resolved!.dabCount).toBeGreaterThan(2);
     const packed = packStudioGpuTileDabs(resolved!);
+    expect(packed).toHaveLength(resolved!.dabCount * STUDIO_GPU_DAB_INSTANCE_FLOATS);
     expect(packed[0]).toBeCloseTo(((500 - (-2)) / 516) * 2 - 1);
     expect(packed[1]).toBeCloseTo(1 - ((1_200 - 1_022) / 516) * 2);
     expect(packed[2]).toBeGreaterThan(0);
     expect(packed[7]).toBeCloseTo(0.8);
+    // The tile fixture's descriptor is 516 physical px over a 516-unit render rect, so one
+    // physical texel is exactly one logical unit -- the quad radius packed at slot 2 must exceed
+    // the analytic (nominal) radius recovered from slot 8's ratio by exactly that one-texel margin.
+    const quadRadius = (packed[2]! * 516) / 2;
+    const nominalRadiusRatio = packed[8]!;
+    expect(nominalRadiusRatio).toBeGreaterThan(0);
+    expect(nominalRadiusRatio).toBeLessThan(1);
+    const nominalRadius = nominalRadiusRatio * quadRadius;
+    expect(quadRadius - nominalRadius).toBeCloseTo(1);
+  });
+
+  it("packs a zero-radius dab as zero quad geometry instead of a phantom AA-guard dot", () => {
+    const current = stroke({
+      pressures: [0, 0],
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+    });
+    const resolved = resolveStudioGpuTileTasks(
+      [task(current)],
+      [current],
+      planStudioGpuDabsInRect,
+      100_000
+    );
+
+    expect(resolved).not.toBeNull();
+    const packed = packStudioGpuTileDabs(resolved!);
+    expect(packed[2]).toBe(0);
+    expect(packed[3]).toBe(0);
+    expect(packed[8]).toBe(0);
   });
 
   it("clips a globally oversized crossing stroke to visible dabs with exact spacing", () => {

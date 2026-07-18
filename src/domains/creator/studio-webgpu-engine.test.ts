@@ -16,6 +16,7 @@ import {
   type StudioGpuFrameReceipt,
   type StudioGpuStroke,
 } from "./studio-webgpu-engine";
+import { STUDIO_GPU_DAB_INSTANCE_FLOATS } from "./studio-webgpu-tile-compositor";
 
 import type { StudioGpuStrokeSuffixPatch } from "./studio-webgpu-stroke-feed";
 
@@ -750,6 +751,12 @@ describe("StudioWebGpuEngine", () => {
       label: "Studio retained tile presentation pipeline",
       fragment: { targets: [{ format: "bgra8unorm" }] },
     });
+    expect(pipelineCalls[0]?.[0].vertex.buffers?.[0]).toMatchObject({
+      arrayStride: STUDIO_GPU_DAB_INSTANCE_FLOATS * Float32Array.BYTES_PER_ELEMENT,
+      attributes: expect.arrayContaining([
+        { shaderLocation: 3, offset: 32, format: "float32" },
+      ]),
+    });
     expect(context.configure).toHaveBeenCalledWith(expect.objectContaining({
       device: fake.device,
       format: "bgra8unorm",
@@ -981,7 +988,7 @@ describe("StudioWebGpuEngine", () => {
       descriptor.colorAttachments.some((attachment) => attachment?.loadOp === "load")
     ))).toBe(true);
     expect(vi.mocked(fake.device.queue.writeBuffer).mock.calls.some((call) => (
-      call[4] === suffix.dabs.length * 8 * Float32Array.BYTES_PER_ELEMENT
+      call[4] === suffix.dabs.length * STUDIO_GPU_DAB_INSTANCE_FLOATS * Float32Array.BYTES_PER_ELEMENT
     ))).toBe(true);
     expect(fake.texture.destroy).not.toHaveBeenCalled();
   });
@@ -1052,7 +1059,7 @@ describe("StudioWebGpuEngine", () => {
       descriptor.colorAttachments.some((attachment) => attachment?.loadOp === "load")
     ))).toBe(true);
     expect(vi.mocked(fake.device.queue.writeBuffer).mock.calls[0]?.[4]).toBe(
-      suffix.dabs.length * 8 * Float32Array.BYTES_PER_ELEMENT
+      suffix.dabs.length * STUDIO_GPU_DAB_INSTANCE_FLOATS * Float32Array.BYTES_PER_ELEMENT
     );
     expect(vi.mocked(fake.device.createTexture).mock.calls.filter(([descriptor]) => (
       String(descriptor.label).startsWith("Studio retained tile ")
@@ -1118,7 +1125,7 @@ describe("StudioWebGpuEngine", () => {
       descriptor.colorAttachments.some((attachment) => attachment?.loadOp === "load")
     ))).toBe(true);
     expect(vi.mocked(fake.device.queue.writeBuffer).mock.calls[0]?.[4]).toBe(
-      planStudioGpuDabs([appended]).dabs.length * 8 * Float32Array.BYTES_PER_ELEMENT
+      planStudioGpuDabs([appended]).dabs.length * STUDIO_GPU_DAB_INSTANCE_FLOATS * Float32Array.BYTES_PER_ELEMENT
     );
     expect(vi.mocked(fake.device.createTexture).mock.calls.filter(([descriptor]) => (
       String(descriptor.label).startsWith("Studio retained tile ")
