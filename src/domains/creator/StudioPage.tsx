@@ -1523,6 +1523,12 @@ const StudioBrushLibraryPanel = lazyRetry(
   "StudioBrushLibraryPanel"
 );
 const BRUSH_DELETE_UNDO_MS = 10_000;
+/**
+ * handleSave가 페이지마다 스테이지를 재캡처하는 무거운 경로라 손을 놓은 지 한참 지난 뒤에만
+ * 조용히 돈다 — 로컬 임시저장(1.5초 디바운스)보다 훨씬 길게 잡아 타이핑·드로잉 중 서버 왕복이
+ * 겹치지 않게 한다.
+ */
+const STUDIO_SERVER_AUTOSAVE_IDLE_MS = 45_000;
 
 interface PendingBrushDelete {
   id: string;
@@ -9081,6 +9087,47 @@ function StudioCuttoonEditor() {
     hasAutosave,
     workId,
     sharedDocument,
+  ]);
+
+  // 서버 자동저장 — 위 로컬 임시저장(브라우저 저장소)과 별개로, 손을 놓은 지 45초가 지나면
+  // 조용히 서버에도 임시저장해 기기를 바꾸거나 브라우저 데이터가 사라져도 작업이 남게 한다.
+  // 아직 한 번도 저장하지 않은 새 문서(workId 없음)는 첫 저장에 제목 입력 등 게시 흐름이
+  // 필요해 대상에서 뺀다. 실시간 공동 편집 문서(sharedDocument)는 CRDT 자체가 이미 계속
+  // 서버에 반영하는 중이라 이 경로와 경합시키지 않는다.
+  // handleSave는 렌더마다 새 함수라 deps에 그대로 넣으면 이 이펙트가 매 렌더 재실행되어
+  // 45초 유휴 디바운스가 절대 채워지지 않는다 — ref에 최신 클로저만 담아 우회한다.
+  const handleSaveRef = useRef(handleSave);
+  handleSaveRef.current = handleSave;
+  useEffect(() => {
+    if (!workId) return;
+    if (sharedDocument) return;
+    if (!loggedIn) return;
+    if (collaborationDocumentLocked) return;
+    if (!workHydrated) return;
+    if (!title.trim()) return;
+    const hasContent =
+      pages.some((p) => p.elements.length > 0) ||
+      master.elements.length > 0 ||
+      characterBible.characters.length > 0;
+    if (!hasContent) return;
+    const timer = setTimeout(() => {
+      // handleSave는 스테이지 재캡처 동안 캔버스를 잠근다(pointer-events-none) — 획을 긋는
+      // 도중이면 이번 회차는 건너뛰고, 그 획이 커밋되며 나는 다음 변경이 다시 예약한다.
+      if (documentSaveInFlightRef.current) return;
+      if (drawingRef.current || drawingPointerSessionRef.current) return;
+      void handleSaveRef.current("draft");
+    }, STUDIO_SERVER_AUTOSAVE_IDLE_MS);
+    return () => clearTimeout(timer);
+  }, [
+    pages,
+    master,
+    characterBible,
+    workId,
+    sharedDocument,
+    loggedIn,
+    collaborationDocumentLocked,
+    workHydrated,
+    title,
   ]);
 
   // 복구 여부를 정하지 않은 채 캔버스 편집을 시작하면(undo 히스토리 누적) 배너를 닫고
