@@ -3,9 +3,11 @@
  * module script by verify-studio-gpu-committed-parity.mts's synthetic document; never imported by
  * the application itself.
  *
- * Renders one deterministic causal pen stroke through both the Canvas2D oracle StudioPage actually
- * calls (planStudioCausalInk + fillStudioCausalInkDabs) and a standalone StudioWebGpuEngine fed by
- * the real createStudioWebGpuCommittedHandoff conversion, then raw-diffs the two pixel buffers.
+ * Renders a small set of deterministic causal pen strokes through both the Canvas2D oracle
+ * StudioPage actually calls (planStudioCausalInk + fillStudioCausalInkDabs) and a standalone
+ * StudioWebGpuEngine fed by the real createStudioWebGpuCommittedHandoff conversion, then raw-diffs
+ * the two pixel buffers per case. One engine instance renders every case sequentially to avoid
+ * repeated device acquisition; each case is fully captured before the next one renders.
  *
  * Settles window.__studioGpuCommittedParityResult to either a success payload or a structured
  * error so the Node orchestrator never has to guess from a bare timeout.
@@ -21,8 +23,8 @@ import { planStudioGpuDabs, StudioWebGpuEngine } from "@/src/domains/creator/stu
 
 const WIDTH = 128;
 const HEIGHT = 96;
-const REQUEST_ID = "committed-parity:golden-pen-1";
 const RECEIPT_TIMEOUT_MS = 10_000;
+const REQUEST_ID_PREFIX = "committed-parity";
 
 interface RawPixelDiff {
   readonly changedPixels: number;
@@ -75,19 +77,23 @@ function compareRawRgba(
   };
 }
 
+interface ParityCaseResult {
+  readonly id: string;
+  readonly dabCount: number;
+  readonly exact: RawPixelDiff;
+  readonly tolerance2: RawPixelDiff;
+  readonly canvasPng: string;
+  readonly gpuPng: string;
+  readonly diffPng: string;
+}
+
 type ParityResult =
   | {
       readonly status: "ok";
       readonly backend: string;
       readonly width: number;
       readonly height: number;
-      readonly strokeCount: number;
-      readonly dabCount: number;
-      readonly exact: RawPixelDiff;
-      readonly tolerance2: RawPixelDiff;
-      readonly canvasPng: string;
-      readonly gpuPng: string;
-      readonly diffPng: string;
+      readonly cases: readonly ParityCaseResult[];
     }
   | {
       readonly status: "error";
@@ -135,9 +141,11 @@ function diffPngDataUrl(
   return pixelsToPngDataUrl(visualization, width, height);
 }
 
-async function run(): Promise<ParityResult> {
-  const element: StudioWebGpuCommittedHandoffElement = {
-    id: "golden-pen-1",
+function baseElement(
+  overrides: Partial<StudioWebGpuCommittedHandoffElement>
+): StudioWebGpuCommittedHandoffElement {
+  return {
+    id: "golden",
     type: "draw",
     kind: "freehand",
     mode: "pen",
@@ -155,7 +163,52 @@ async function run(): Promise<ParityResult> {
     sampleSpacing: 0,
     pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
     panelClip: "none",
+    ...overrides,
   };
+}
+
+interface ParityCase {
+  readonly id: string;
+  readonly element: StudioWebGpuCommittedHandoffElement;
+  readonly expectedDabCount?: number;
+}
+
+const PARITY_CASES: readonly ParityCase[] = [
+  {
+    id: "opaque-black",
+    element: baseElement({ id: "golden-pen-1" }),
+  },
+  {
+    // Opacity must stay exactly 1 -- the committed barrier rejects any other element opacity.
+    // Translucency instead lives in the stroke color itself (8-digit hex), exercising Canvas2D
+    // per-dab alpha accumulation, CPU premultiplication into the GPU instance buffer, premultiplied
+    // GPU blending, and readback unpremultiplication -- none of which the opaque-black case alone
+    // can isolate.
+    id: "colored-alpha",
+    element: baseElement({ id: "golden-colored-alpha", stroke: "#2f7bd680" }),
+  },
+  {
+    // Two identical points still satisfy the committed planner's four-coordinate minimum. The
+    // causal selector then refuses the duplicate (zero distance) and the planner emits exactly one
+    // initial dab -- an isolated single-circle diagnostic through both rasterizers, removing the
+    // 99-dab overlap accumulation the other two cases carry.
+    id: "isolated-dab",
+    element: baseElement({
+      id: "golden-isolated-dab",
+      points: [64.25, 48.25, 64.25, 48.25],
+      pressures: [0.85, 0.85],
+    }),
+    expectedDabCount: 1,
+  },
+];
+
+async function runCase(
+  engine: StudioWebGpuEngine,
+  pendingReceipts: Map<string, (receipt: StudioGpuFrameReceipt) => void>,
+  parityCase: ParityCase,
+  index: number
+): Promise<ParityCaseResult> {
+  const { element } = parityCase;
 
   // --- Canvas2D/Konva oracle -------------------------------------------------------------
   const causalPlan = planStudioCausalInk({
@@ -165,13 +218,18 @@ async function run(): Promise<ParityResult> {
     size: Math.max(1, element.strokeWidth as number),
     pressureModel: element.pressureModel as typeof STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
   });
-  if (!causalPlan.complete) throw new Error("Canvas causal plan was incomplete");
+  if (!causalPlan.complete) throw new Error(`[${parityCase.id}] Canvas causal plan was incomplete`);
+  if (parityCase.expectedDabCount !== undefined && causalPlan.dabs.length !== parityCase.expectedDabCount) {
+    throw new Error(
+      `[${parityCase.id}] expected ${parityCase.expectedDabCount} Canvas dab(s), got ${causalPlan.dabs.length}`
+    );
+  }
 
   const canvas = document.createElement("canvas");
   canvas.width = WIDTH;
   canvas.height = HEIGHT;
   const context = canvas.getContext("2d", { willReadFrequently: true });
-  if (!context) throw new Error("Canvas2D unavailable");
+  if (!context) throw new Error(`[${parityCase.id}] Canvas2D unavailable`);
   context.clearRect(0, 0, WIDTH, HEIGHT);
   context.globalAlpha = 1;
   context.globalCompositeOperation = "source-over";
@@ -180,40 +238,89 @@ async function run(): Promise<ParityResult> {
 
   // --- Committed handoff + geometry preflight ---------------------------------------------
   const handoff = createStudioWebGpuCommittedHandoff({ elements: [element] });
-  if (handoff.status !== "ready") throw new Error(`Handoff was ${handoff.status}`);
+  if (handoff.status !== "ready") throw new Error(`[${parityCase.id}] Handoff was ${handoff.status}`);
   if (handoff.elementIds.length !== 1 || handoff.strokes.length !== 1) {
-    throw new Error("Expected exactly one committed GPU stroke");
+    throw new Error(`[${parityCase.id}] Expected exactly one committed GPU stroke`);
   }
 
   const gpuPlan = planStudioGpuDabs(handoff.strokes);
+  if (!gpuPlan.complete) throw new Error(`[${parityCase.id}] GPU dab plan was incomplete`);
+  if (parityCase.expectedDabCount !== undefined && gpuPlan.dabs.length !== parityCase.expectedDabCount) {
+    throw new Error(
+      `[${parityCase.id}] expected ${parityCase.expectedDabCount} GPU dab(s), got ${gpuPlan.dabs.length}`
+    );
+  }
   const canvasGeometryKey = dabGeometryKey(causalPlan.dabs);
   const gpuGeometryKey = dabGeometryKey(gpuPlan.dabs);
   if (canvasGeometryKey !== gpuGeometryKey) {
-    throw new Error("Canvas/GPU dab geometry diverged before rasterization");
+    throw new Error(`[${parityCase.id}] Canvas/GPU dab geometry diverged before rasterization`);
   }
 
   // --- Real WebGPU render + capture --------------------------------------------------------
+  const requestId = `${REQUEST_ID_PREFIX}:${parityCase.id}:${index}`;
+  const receiptPromise = waitForReceipt(pendingReceipts, requestId);
+
+  engine.render(handoff.strokes, requestId);
+  const receipt = await receiptPromise;
+
+  if (receipt.backend !== "webgpu" || !receipt.complete) {
+    throw new Error(`[${parityCase.id}] WebGPU did not produce a complete authoritative receipt`);
+  }
+  if (receipt.physicalWidth !== WIDTH || receipt.physicalHeight !== HEIGHT) {
+    throw new Error(
+      `[${parityCase.id}] Receipt dimensions ${receipt.physicalWidth}x${receipt.physicalHeight} do not match the golden ${WIDTH}x${HEIGHT}`
+    );
+  }
+
+  const capture = await engine.captureFrame({ receipt, area: { kind: "viewport" } });
+  if (capture.status !== "captured") throw new Error(`[${parityCase.id}] GPU capture rejected: ${capture.reason}`);
+
+  const gpuPixels = new Uint8ClampedArray(capture.pixels);
+
+  return {
+    id: parityCase.id,
+    dabCount: gpuPlan.dabs.length,
+    exact: compareRawRgba(canvasPixels, gpuPixels, 0),
+    tolerance2: compareRawRgba(canvasPixels, gpuPixels, 2),
+    canvasPng: pixelsToPngDataUrl(canvasPixels, WIDTH, HEIGHT),
+    gpuPng: pixelsToPngDataUrl(gpuPixels, WIDTH, HEIGHT),
+    diffPng: diffPngDataUrl(canvasPixels, gpuPixels, WIDTH, HEIGHT),
+  };
+}
+
+function waitForReceipt(
+  pendingReceipts: Map<string, (receipt: StudioGpuFrameReceipt) => void>,
+  requestId: string
+): Promise<StudioGpuFrameReceipt> {
+  return new Promise<StudioGpuFrameReceipt>((resolve, reject) => {
+    const timeout = window.setTimeout(() => {
+      pendingReceipts.delete(requestId);
+      reject(new Error(`Timed out waiting for the WebGPU frame receipt for ${requestId}`));
+    }, RECEIPT_TIMEOUT_MS);
+    pendingReceipts.set(requestId, (receipt) => {
+      window.clearTimeout(timeout);
+      pendingReceipts.delete(requestId);
+      resolve(receipt);
+    });
+  });
+}
+
+async function run(): Promise<ParityResult> {
   const gpuCanvas = document.createElement("canvas");
   const fallbackCanvas = document.createElement("canvas");
   document.body.append(gpuCanvas, fallbackCanvas);
 
-  let receiptResolve!: (receipt: StudioGpuFrameReceipt) => void;
-  let receiptReject!: (error: Error) => void;
-  const receiptPromise = new Promise<StudioGpuFrameReceipt>((resolve, reject) => {
-    receiptResolve = resolve;
-    receiptReject = reject;
-  });
-  const receiptTimeout = window.setTimeout(() => {
-    receiptReject(new Error("Timed out waiting for the WebGPU frame receipt"));
-  }, RECEIPT_TIMEOUT_MS);
-
+  // StudioWebGpuEngine only exposes one onFrameReady callback, set at construction. Since cases
+  // render sequentially and each is awaited to completion before the next starts, at most one
+  // entry is ever pending, but a map keeps this correct even if that assumption ever changes.
+  const pendingReceipts = new Map<string, (receipt: StudioGpuFrameReceipt) => void>();
   const engine = new StudioWebGpuEngine({
     canvas: gpuCanvas,
     fallbackCanvas,
     retainReadbackSnapshot: true,
     autoRecover: false,
     onFrameReady: (receipt) => {
-      if (receipt.requestId === REQUEST_ID) receiptResolve(receipt);
+      pendingReceipts.get(receipt.requestId)?.(receipt);
     },
   });
 
@@ -234,39 +341,15 @@ async function run(): Promise<ParityResult> {
     const backend = await engine.initialize();
     if (backend !== "webgpu") throw new Error(`Expected WebGPU, received ${backend}`);
 
-    engine.render(handoff.strokes, REQUEST_ID);
-    const receipt = await receiptPromise;
-    window.clearTimeout(receiptTimeout);
-
-    if (receipt.backend !== "webgpu" || !receipt.complete) {
-      throw new Error("WebGPU did not produce a complete authoritative receipt");
-    }
-    if (receipt.physicalWidth !== WIDTH || receipt.physicalHeight !== HEIGHT) {
-      throw new Error(
-        `Receipt dimensions ${receipt.physicalWidth}x${receipt.physicalHeight} do not match the golden ${WIDTH}x${HEIGHT}`
-      );
+    const cases: ParityCaseResult[] = [];
+    for (const [index, parityCase] of PARITY_CASES.entries()) {
+      // Sequential by design: one shared engine/device, and each case's receipt/capture must
+      // settle before the next case's render() call replaces the retained frame.
+      cases.push(await runCase(engine, pendingReceipts, parityCase, index));
     }
 
-    const capture = await engine.captureFrame({ receipt, area: { kind: "viewport" } });
-    if (capture.status !== "captured") throw new Error(`GPU capture rejected: ${capture.reason}`);
-
-    const gpuPixels = new Uint8ClampedArray(capture.pixels);
-
-    return {
-      status: "ok",
-      backend,
-      width: WIDTH,
-      height: HEIGHT,
-      strokeCount: handoff.strokes.length,
-      dabCount: gpuPlan.dabs.length,
-      exact: compareRawRgba(canvasPixels, gpuPixels, 0),
-      tolerance2: compareRawRgba(canvasPixels, gpuPixels, 2),
-      canvasPng: pixelsToPngDataUrl(canvasPixels, WIDTH, HEIGHT),
-      gpuPng: pixelsToPngDataUrl(gpuPixels, WIDTH, HEIGHT),
-      diffPng: diffPngDataUrl(canvasPixels, gpuPixels, WIDTH, HEIGHT),
-    };
+    return { status: "ok", backend, width: WIDTH, height: HEIGHT, cases };
   } finally {
-    window.clearTimeout(receiptTimeout);
     engine.dispose();
   }
 }

@@ -1,12 +1,15 @@
 /**
- * First golden-pixel parity check between Studio's Canvas2D/Konva pen renderer and the (not yet
- * wired into production) committed WebGPU render path.
+ * Golden-pixel parity check between Studio's Canvas2D/Konva pen renderer and the (not yet wired
+ * into production) committed WebGPU render path, across a small set of deterministic causal
+ * strokes (see PARITY_CASES in the browser entry): an opaque black stroke, a translucent colored
+ * stroke, and an isolated single-dab diagnostic.
  *
- * Renders one deterministic causal pen stroke through both StudioPage's real Canvas2D oracle
- * (planStudioCausalInk + fillStudioCausalInkDabs) and a standalone StudioWebGpuEngine fed by the
- * real createStudioWebGpuCommittedHandoff conversion, in a real Chromium WebGPU context. Backend
+ * Each case renders through both StudioPage's real Canvas2D oracle (planStudioCausalInk +
+ * fillStudioCausalInkDabs) and a standalone StudioWebGpuEngine fed by the real
+ * createStudioWebGpuCommittedHandoff conversion, in a real Chromium WebGPU context. Backend
  * fallback to Canvas2D, a missing/incomplete receipt, or a geometry-preflight mismatch always fail
- * the run; the pixel delta itself is reported, not yet gated, until a defensible tolerance exists.
+ * the run; the pixel delta itself is reported per case, not yet gated, until a defensible
+ * tolerance exists.
  *
  * This is deliberately scoped to the disputed rasterization primitive only: no mounted StudioPage,
  * no Konva Stage, no DPR/zoom/flip matrix. See docs/studio-crdt-webgpu-architecture-2026-07-16.md.
@@ -40,19 +43,23 @@ interface RawPixelDiff {
   readonly totalAbsoluteDelta: number;
 }
 
+interface ParityCaseResult {
+  readonly id: string;
+  readonly dabCount: number;
+  readonly exact: RawPixelDiff;
+  readonly tolerance2: RawPixelDiff;
+  readonly canvasPng: string;
+  readonly gpuPng: string;
+  readonly diffPng: string;
+}
+
 type ParityResult =
   | {
       readonly status: "ok";
       readonly backend: string;
       readonly width: number;
       readonly height: number;
-      readonly strokeCount: number;
-      readonly dabCount: number;
-      readonly exact: RawPixelDiff;
-      readonly tolerance2: RawPixelDiff;
-      readonly canvasPng: string;
-      readonly gpuPng: string;
-      readonly diffPng: string;
+      readonly cases: readonly ParityCaseResult[];
     }
   | {
       readonly status: "error";
@@ -150,24 +157,30 @@ async function main(): Promise<void> {
       result.width > 0 && result.height > 0,
       "capture reported non-positive dimensions"
     );
+    invariant(result.cases.length > 0, "harness reported zero parity cases");
 
-    writeDataUrlPng(join(SCRATCH, "canvas2d-oracle.png"), result.canvasPng);
-    writeDataUrlPng(join(SCRATCH, "webgpu-capture.png"), result.gpuPng);
-    writeDataUrlPng(join(SCRATCH, "diff-amplified.png"), result.diffPng);
+    const caseSummaries = result.cases.map((parityCase) => {
+      writeDataUrlPng(join(SCRATCH, `${parityCase.id}.canvas2d.png`), parityCase.canvasPng);
+      writeDataUrlPng(join(SCRATCH, `${parityCase.id}.webgpu.png`), parityCase.gpuPng);
+      writeDataUrlPng(join(SCRATCH, `${parityCase.id}.diff.png`), parityCase.diffPng);
+      return {
+        id: parityCase.id,
+        dabCount: parityCase.dabCount,
+        exactChangedPixels: parityCase.exact.changedPixels,
+        exactTotalPixels: parityCase.exact.totalPixels,
+        exactMaxChannelDelta: parityCase.exact.maxChannelDelta,
+        exactMaxAlphaDelta: parityCase.exact.maxAlphaDelta,
+        exactAlphaChangedPixels: parityCase.exact.alphaChangedPixels,
+        tolerance2ChangedPixels: parityCase.tolerance2.changedPixels,
+        tolerance2MaxChannelDelta: parityCase.tolerance2.maxChannelDelta,
+      };
+    });
 
     const summary = {
       backend: result.backend,
       width: result.width,
       height: result.height,
-      strokeCount: result.strokeCount,
-      dabCount: result.dabCount,
-      exactChangedPixels: result.exact.changedPixels,
-      exactTotalPixels: result.exact.totalPixels,
-      exactMaxChannelDelta: result.exact.maxChannelDelta,
-      exactMaxAlphaDelta: result.exact.maxAlphaDelta,
-      exactAlphaChangedPixels: result.exact.alphaChangedPixels,
-      tolerance2ChangedPixels: result.tolerance2.changedPixels,
-      tolerance2MaxChannelDelta: result.tolerance2.maxChannelDelta,
+      cases: caseSummaries,
       consoleErrorCount: consoleErrors.length,
       pageErrorCount: pageErrors.length,
       scratch: SCRATCH,
