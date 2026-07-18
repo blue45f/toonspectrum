@@ -54,6 +54,7 @@
     "turbo:test": "pnpm exec turbo run test --concurrency=1",
     "verify:studio-launch": "tsx scripts/verify-studio-launch.mts",
     "verify:studio-brushes": "tsx scripts/verify-studio-brushes.mts",
+    "verify:studio-gpu-committed-parity": "tsx scripts/verify-studio-gpu-committed-parity.mts",
     "verify:creator-logic": "tsx scripts/verify-creator-logic.mts"
   },
   "dependencies": {
