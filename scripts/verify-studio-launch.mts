@@ -63,6 +63,19 @@ interface MobileRunResult {
   dotShot: string;
 }
 
+interface MobileDockLayoutResult {
+  width: number;
+  ok: boolean;
+  primaryTargetCount: number;
+  secondaryTargetCount: number;
+  targetsReady: boolean;
+  primaryScrollable: boolean;
+  noDocumentOverflow: boolean;
+  historyFocusReady: boolean;
+  errCount: number;
+  shot: string;
+}
+
 function log(msg: string) {
   const line = `[verify-studio] ${msg}`;
   console.log(line);
@@ -245,9 +258,17 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
 
   const lineCorrection = sheet.getByRole("region", { name: "선 보정" });
   await lineCorrection.scrollIntoViewIfNeeded();
-  const airbrushPreset = sheet.getByRole("button", { name: "소프트 에어브러시", exact: true });
-  await airbrushPreset.click();
-  const dynamicBrushReady = await airbrushPreset.getAttribute("aria-pressed") === "true";
+  // The unified picker intentionally keeps only starter/favorite/recent presets in the quick row.
+  // Exercise the shipped catalog path for an expressive brush instead of depending on tray order.
+  await sheet.getByRole("button", { name: "전체 브러시 보기", exact: true }).click();
+  const builtInBrushCatalog = page.getByRole("dialog", { name: "기본 브러시 카탈로그" });
+  await builtInBrushCatalog.waitFor({ state: "visible", timeout: 3000 });
+  await builtInBrushCatalog.getByRole("tab", { name: "페인트", exact: true }).click();
+  await builtInBrushCatalog.getByRole("button", { name: "소프트 에어브러시 선택", exact: true }).click();
+  await builtInBrushCatalog.waitFor({ state: "detached", timeout: 3000 });
+  const airbrushPreset = sheet.locator('[data-studio-brush-chip="airbrush"]');
+  await airbrushPreset.waitFor({ state: "visible", timeout: 3000 });
+  const dynamicBrushReady = await airbrushPreset.getAttribute("aria-selected") === "true";
   const brushStudioLaunchers = sheet
     .locator('button[aria-haspopup="dialog"]')
     .filter({ hasText: /^\s*브러시 스튜디오/ });
@@ -290,7 +311,7 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
     (await lineCorrection.count()) === 1 &&
     (await pressureInput.count()) === 1 &&
     await sheet.getByRole("combobox", { name: "보정 방식" }).isEnabled() &&
-    await brushStudio.getByRole("combobox", { name: "필압 반응" }).isEnabled();
+    await brushStudio.getByRole("slider", { name: "필압 반응 강도" }).isEnabled();
 
   const mobileImmersiveValue = await editorRoot.getAttribute("data-studio-mobile-immersive");
   const mobileImmersivePreference = await page.evaluate(() =>
@@ -404,6 +425,120 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
   };
 }
 
+async function runMobileDockLayout(
+  browser: Browser,
+  url: string,
+  width: 320 | 360 | 390,
+): Promise<MobileDockLayoutResult> {
+  const shot = join(SCRATCH, `studio-launch-mobile-dock-${width}.png`);
+  const ctx = await browser.newContext({ viewport: { width, height: 844 } });
+  const page = await ctx.newPage();
+  const consoleErrors: string[] = [];
+
+  page.on("console", (message) => {
+    if (message.type() !== "error") return;
+    const location = message.location().url;
+    const value = location ? `${message.text()} @ ${location}` : message.text();
+    if (!isExpectedStaticPreviewApiError(value)) consoleErrors.push(value);
+  });
+  page.on("pageerror", (error) => consoleErrors.push(String(error)));
+  await page.addInitScript(({ quickStartKey, mobileHintKey }) => {
+    try {
+      window.localStorage.setItem(quickStartKey, "1");
+      window.localStorage.setItem(mobileHintKey, "1");
+    } catch {}
+  }, {
+    quickStartKey: QUICKSTART_KEY,
+    mobileHintKey: "toonspectrum-studio-mobile-hint-dismissed",
+  });
+
+  await page.goto(url, { waitUntil: "domcontentloaded", timeout: 15000 });
+  const dock = page.getByRole("navigation", { name: "스튜디오 모바일 도구막대" });
+  await dock.waitFor({ state: "visible", timeout: 8000 });
+  const primary = dock.locator('[data-studio-mobile-dock-scroll="primary"]');
+  const secondary = dock.locator('[data-studio-mobile-dock-scroll="secondary"]');
+  const primaryTargets = primary.locator(
+    ':scope > button, :scope > [data-studio-tool-hint-target="true"]',
+  );
+  const secondaryTargets = secondary.locator(":scope > button, :scope > div > button");
+  const primaryWidths = await primaryTargets.evaluateAll((targets) =>
+    targets.map((target) => target.getBoundingClientRect().width)
+  );
+  const secondaryWidths = await secondaryTargets.evaluateAll((targets) =>
+    targets.map((target) => target.getBoundingClientRect().width)
+  );
+  const primaryTargetCount = primaryWidths.length;
+  const secondaryTargetCount = secondaryWidths.length;
+  const targetsReady =
+    primaryTargetCount === 7 &&
+    secondaryTargetCount === 7 &&
+    [...primaryWidths, ...secondaryWidths].every((targetWidth) => targetWidth >= 44);
+  const scrollGeometry = await primary.evaluate((toolbar) => ({
+    clientWidth: toolbar.clientWidth,
+    scrollWidth: toolbar.scrollWidth,
+  }));
+  const primaryScrollable = scrollGeometry.scrollWidth > scrollGeometry.clientWidth;
+  const noDocumentOverflow = await page.evaluate(() =>
+    document.documentElement.scrollWidth === window.innerWidth &&
+    document.body.scrollWidth <= window.innerWidth
+  );
+
+  let historyFocusReady = true;
+  for (const label of ["실행취소", "다시실행"] as const) {
+    // Fresh documents expose the disabled-reason coach wrapper as the keyboard target while the
+    // native button is aria-hidden. Locate that wrapper through its stable child command label.
+    const target = primary.locator(
+      `[data-studio-tool-hint-target="true"]:has(> button[aria-label="${label}"])`,
+    );
+    await target.scrollIntoViewIfNeeded();
+    await target.focus();
+    const visible = await target.evaluate((element) => {
+      const targetRect = element.getBoundingClientRect();
+      const toolbarRect = element
+        .closest("[data-studio-mobile-dock-scroll]")
+        ?.getBoundingClientRect();
+      return Boolean(
+        toolbarRect &&
+        targetRect.left >= toolbarRect.left - 0.5 &&
+        targetRect.right <= toolbarRect.right + 0.5
+      );
+    });
+    historyFocusReady &&= visible;
+  }
+
+  await page.screenshot({ path: shot, fullPage: false });
+  const ok =
+    targetsReady &&
+    (width !== 320 || primaryScrollable) &&
+    noDocumentOverflow &&
+    historyFocusReady &&
+    consoleErrors.length === 0;
+  log(
+    `mobile-dock-${width}: targets=${primaryTargetCount}+${secondaryTargetCount} ` +
+    `widths=${[...primaryWidths, ...secondaryWidths].join(",")} ` +
+    `primaryScrollable=${primaryScrollable} documentOverflow=${!noDocumentOverflow} ` +
+    `historyFocusReady=${historyFocusReady} consoleErrors=${consoleErrors.length}`,
+  );
+  if (!ok) {
+    for (const [index, message] of consoleErrors.slice(0, 8).entries()) {
+      log(`mobile-dock-${width} consoleError[${index}]: ${message}`);
+    }
+  }
+  await ctx.close();
+  return {
+    width,
+    ok,
+    primaryTargetCount,
+    secondaryTargetCount,
+    targetsReady,
+    primaryScrollable,
+    noDocumentOverflow,
+    historyFocusReady,
+    errCount: consoleErrors.length,
+    shot,
+  };
+}
+
 async function main() {
   mkdirSync(SCRATCH, { recursive: true });
   const port = await findFreePort();
@@ -445,12 +580,28 @@ async function main() {
       throw new Error("studio mobile drawing verification failed");
     }
 
+    const mobileDocks: MobileDockLayoutResult[] = [];
+    for (const width of [320, 360, 390] as const) {
+      const result = await runMobileDockLayout(browser, url, width);
+      mobileDocks.push(result);
+      if (!result.ok) {
+        throw new Error(`studio mobile dock verification failed at ${width}px`);
+      }
+    }
+
     await browser.close();
     browser = null;
 
     log("DESKTOP AND MOBILE RUNS OK");
-    log(`screenshots: ${[...results.map(r => r.shot), mobile.shot, mobile.dotShot].join(" ")}`);
-    console.log(JSON.stringify({ runs: results, mobile }, null, 2));
+    log(
+      `screenshots: ${[
+        ...results.map(r => r.shot),
+        mobile.shot,
+        mobile.dotShot,
+        ...mobileDocks.map((result) => result.shot),
+      ].join(" ")}`,
+    );
+    console.log(JSON.stringify({ runs: results, mobile, mobileDocks }, null, 2));
   } finally {
     if (browser) await browser.close().catch(() => undefined);
     try { server.kill("SIGKILL"); } catch {}

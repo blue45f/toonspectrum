@@ -87,6 +87,9 @@ const eslintArgs = [
   "exec",
   "eslint",
   "--max-warnings=0",
+  // 변경 목록에는 의도적으로 전역 ignore 된 설정/생성 파일이 섞일 수 있다. ESLint 10의
+  // ignored-file 경고만 숨기고, 실제 검사 대상의 경고는 max-warnings=0으로 계속 실패시킨다.
+  "--no-warn-ignored",
   "--cache",
   "--cache-strategy",
   "content",

@@ -1163,6 +1163,12 @@ body[data-studio-app="true"] .route-stage::before,
   outline-offset: -2px;
 }
 
+/* 320px 도크는 타깃을 44px 아래로 줄이지 않고 행 자체만 짧게 수평 이동한다.
+   컨테이너 가장자리에서도 포커스 링이 잘리지 않도록 이 두 툴바에만 안쪽 오프셋을 쓴다. */
+[data-studio-mobile-dock-scroll] :focus-visible {
+  outline-offset: -2px;
+}
+
 @container studio-draw-options (max-width: 60rem) {
   [data-studio-draw-options="true"] [data-studio-recent-color="true"],
   [data-studio-draw-options="true"] [data-studio-draw-secondary-action="favorite"],

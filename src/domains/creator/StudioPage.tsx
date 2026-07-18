@@ -1137,6 +1137,7 @@ import {
   StudioToolHintTarget,
 } from "./StudioToolHint";
 import { StudioWorkspaceMenu } from "./StudioWorkspaceMenu";
+import { useStudioModalSheet } from "./useStudioModalSheet";
 
 import type { AdvancedFillDiagnostics, AdvancedFillMaskLike } from "./studio-advanced-fill";
 import type { StudioAsset } from "./studio-asset-library";
@@ -6665,8 +6666,7 @@ function StudioCuttoonEditor() {
   const brushManagerSheetRef = useRef<HTMLDivElement>(null);
   const mobileBrushDockButtonRef = useRef<HTMLButtonElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
-  const sheetReturnFocusRef = useRef<HTMLElement | null>(null);
-  const previousMobileSheetRef = useRef<typeof mobileSheet>(null);
+  const studioRootRef = useRef<HTMLDivElement>(null);
   const mobileSheetAutofocusTargetRef = useRef<"default" | "publish-title">("default");
   function changeInspectorLayout(next: StudioInspectorLayout) {
     setInspectorLayout(next);
@@ -6679,62 +6679,56 @@ function StudioCuttoonEditor() {
   // 데스크톱으로 넘어가면 열린 바텀시트를 닫아 다시 모바일로 줄였을 때 시트가 떠 있지 않게 한다.
   useEffect(() => {
     if (!isMobile) {
-      const returnTarget = sheetReturnFocusRef.current;
-      if (returnTarget?.isConnected && !returnTarget.closest("[inert]")) {
-        returnTarget.focus({ preventScroll: true });
-      }
-      sheetReturnFocusRef.current = null;
-      previousMobileSheetRef.current = null;
       setMobileSheet(null);
       setQuickActionsOpen(false);
     }
   }, [isMobile]);
-  // 바텀시트 a11y: 열리면 시트 내부(닫기 버튼)로 포커스를 옮기고, 닫히면 트리거로 되돌린다.
-  useEffect(() => {
-    if (!isMobile) return;
-    if (!mobileSheet) {
-      mobileSheetAutofocusTargetRef.current = "default";
-      // Initial mobile mount is not a sheet-close transition. Do not jump focus to the brush dock
-      // (which would also open its rich keyboard tooltip before the artist asks for it).
-      if (!previousMobileSheetRef.current) {
-        sheetReturnFocusRef.current = null;
-        return;
-      }
-      const returnTarget = sheetReturnFocusRef.current;
-      const focusTarget = returnTarget?.isConnected && !returnTarget.closest("[inert]")
-        ? returnTarget
-        : mobileBrushDockButtonRef.current;
-      focusTarget?.focus({ preventScroll: true });
-      sheetReturnFocusRef.current = null;
-      previousMobileSheetRef.current = null;
-      return;
-    }
-    if (!previousMobileSheetRef.current) {
-      sheetReturnFocusRef.current = document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null;
-    }
-    previousMobileSheetRef.current = mobileSheet;
-    const id = requestAnimationFrame(() => {
-      const sheet =
-        mobileSheet === "pages"
-          ? pagesSheetRef.current
-          : mobileSheet === "draw"
-            ? drawSheetRef.current
-            : mobileSheet === "brushes"
-              ? brushManagerSheetRef.current
-              : propsSheetRef.current;
+  const modalMobileSheet =
+    isMobile && mobileSheet !== "draw" ? mobileSheet : null;
+  const modalMobileSheetRef =
+    modalMobileSheet === "pages"
+      ? pagesSheetRef
+      : modalMobileSheet === "brushes"
+        ? brushManagerSheetRef
+        : propsSheetRef;
+  useStudioModalSheet({
+    activeKey: modalMobileSheet,
+    dialogRef: modalMobileSheetRef,
+    fallbackReturnFocusRef: mobileBrushDockButtonRef,
+    onDismiss: () => setMobileSheet(null),
+    resolveInitialFocus: (dialog) => {
       const preferredTarget =
-        mobileSheet === "props" && mobileSheetAutofocusTargetRef.current === "publish-title"
+        modalMobileSheet === "props" &&
+        mobileSheetAutofocusTargetRef.current === "publish-title"
           ? titleInputRef.current
           : null;
-      (preferredTarget ?? sheet?.querySelector<HTMLElement>("[data-autofocus]"))?.focus({
-        preventScroll: preferredTarget !== null,
-      });
       mobileSheetAutofocusTargetRef.current = "default";
-    });
-    return () => cancelAnimationFrame(id);
-  }, [mobileSheet, isMobile]);
+      return preferredTarget ?? dialog.querySelector<HTMLElement>("[data-autofocus]");
+    },
+    rootRef: studioRootRef,
+  });
+  // 브러시 설정은 캔버스를 보며 조절하는 비모달 시트다. 포커스 루프와 배경 inert는 적용하지
+  // 않되, 열고 닫을 때만 진입점과 트리거를 보존해 키보드 사용자가 숨은 시트에 남지 않게 한다.
+  useLayoutEffect(() => {
+    if (!isMobile || mobileSheet !== "draw") return;
+    const sheet = drawSheetRef.current;
+    if (!sheet) return;
+    const fallbackReturnTarget = mobileBrushDockButtonRef.current;
+    const returnTarget = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : fallbackReturnTarget;
+    sheet.querySelector<HTMLElement>("[data-autofocus]")?.focus();
+    return () => {
+      globalThis.requestAnimationFrame?.(() => {
+        if (!sheet.contains(document.activeElement)) return;
+        const focusTarget =
+          returnTarget?.isConnected && !returnTarget.closest("[inert]")
+            ? returnTarget
+            : fallbackReturnTarget;
+        focusTarget?.focus({ preventScroll: true });
+      });
+    };
+  }, [isMobile, mobileSheet]);
   // 데스크톱: 캔버스와 도구 패널 너비를 드래그(또는 키보드)로 조절하는 스플리터.
   const leftResize = useResizable({
     initial: workspaceSnapshotLayout.desktop.leftPanelWidth,
@@ -8145,7 +8139,6 @@ function StudioCuttoonEditor() {
 
   // 표시용 스케일(컨테이너 폭에 맞춤).
   const wrapRef = useRef<HTMLDivElement>(null);
-  const studioRootRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
   useEffect(() => {
     const el = wrapRef.current;
@@ -21590,7 +21583,7 @@ function StudioCuttoonEditor() {
   // 서브탭 칩·드로잉 도구 칩은 studioSegmentChipClass / studioToolButtonClass 로 이관됨.
   const mobileBarBtn = (active: boolean) =>
     cn(
-      "flex min-h-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-1 text-[0.6875rem] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
+      "flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-1 text-[0.6875rem] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent",
       active ? "bg-accent-soft/60 text-accent" : "text-fg-2 hover:bg-raised"
     );
   const quickActionsDisabledActions = useMemo(() => {
@@ -25675,6 +25668,7 @@ const StudioInspectorAside = memo(function StudioInspectorAside({
           aria-modal={isMobile && mobileSheet === "props" ? true : undefined}
           data-studio-mobile-sheet={isMobile && mobileSheet === "props" ? "true" : undefined}
           aria-label={isMobile ? "속성" : undefined}
+          tabIndex={isMobile ? -1 : undefined}
           inert={isMobile && mobileSheet !== "props" ? true : undefined}
           className={cn(
             "flex min-h-0 flex-col gap-2 overscroll-contain [scrollbar-gutter:stable]",
@@ -33717,6 +33711,7 @@ const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
             aria-modal="true"
             data-studio-mobile-sheet="true"
             aria-label="내 브러시 관리"
+            tabIndex={-1}
             data-studio-shortcut-boundary="true"
             className="fixed inset-x-0 z-50 mx-auto max-w-[34rem] overflow-y-auto overscroll-contain rounded-t-3xl border border-line bg-panel px-3 pb-[calc(7rem+env(safe-area-inset-bottom))] shadow-2xl lg:hidden"
             style={{
@@ -34077,7 +34072,12 @@ const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
             style={{ bottom: mobileKeyboardInset }}
           >
             {/* 1행: 핵심 드로잉 도구 — 선택 | 펜/지우개/도형 | 히스토리 | 브러시 (CSP/Procreate 도크 IA) */}
-            <div className="flex items-stretch gap-1" role="toolbar" aria-label="드로잉 도구">
+            <div
+              className="flex min-w-0 touch-pan-x items-stretch gap-0.5 overflow-x-auto overscroll-x-contain [scrollbar-width:none] min-[360px]:gap-1 [&::-webkit-scrollbar]:hidden"
+              role="toolbar"
+              aria-label="드로잉 도구"
+              data-studio-mobile-dock-scroll="primary"
+            >
               <StudioDockButton
                 icon={MousePointer2}
                 label="선택"
@@ -34208,7 +34208,12 @@ const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
             </div>
 
             {/* 2행: 보조 내비 — 페이지·추가·6방향 퀵 메뉴·속성(레이어)·줌 */}
-            <div className="flex items-stretch gap-0.5 border-t border-line/60 pt-1" role="toolbar" aria-label="작업 공간">
+            <div
+              className="flex min-w-0 touch-pan-x items-stretch gap-0 overflow-x-auto overscroll-x-contain border-t border-line/60 pt-1 [scrollbar-width:none] min-[360px]:gap-0.5 [&::-webkit-scrollbar]:hidden"
+              role="toolbar"
+              aria-label="작업 공간"
+              data-studio-mobile-dock-scroll="secondary"
+            >
               {workspaceState.mobileControlSide === "left"
                 ? mobileQuickActionsButton
                 : null}
@@ -34380,6 +34385,7 @@ const StudioPageListPane = memo(function StudioPageListPane({
           aria-modal={isMobile && mobileSheet === "pages" ? true : undefined}
           data-studio-mobile-sheet={isMobile && mobileSheet === "pages" ? "true" : undefined}
           aria-label={isMobile ? "페이지 목록" : undefined}
+          tabIndex={isMobile ? -1 : undefined}
           inert={isMobile && mobileSheet !== "pages" ? true : undefined}
           className={cn(
             "flex flex-col gap-1.5 border border-line p-2",

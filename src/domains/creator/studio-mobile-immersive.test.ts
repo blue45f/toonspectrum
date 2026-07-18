@@ -62,4 +62,17 @@ describe("Studio mobile immersive preference", () => {
     expect(studioPageSource).toContain("drawingShortcutNotice === null");
     expect(studioGlobalsSource).toContain("--studio-canvas-bottom-inset");
   });
+
+  it("keeps every 320px dock target at 44px and scrolls only the two tool rows", () => {
+    expect(studioPageSource).toContain(
+      '"flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center',
+    );
+    expect(studioPageSource).toContain('data-studio-mobile-dock-scroll="primary"');
+    expect(studioPageSource).toContain('data-studio-mobile-dock-scroll="secondary"');
+    expect(studioPageSource.match(/touch-pan-x/g)).toHaveLength(2);
+    expect(studioPageSource).toContain("gap-0.5 overflow-x-auto");
+    expect(studioPageSource).toContain("gap-0 overflow-x-auto");
+    expect(studioGlobalsSource).toContain("[data-studio-mobile-dock-scroll] :focus-visible");
+    expect(studioGlobalsSource).toContain("outline-offset: -2px");
+  });
 });

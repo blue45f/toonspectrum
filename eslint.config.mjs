@@ -25,7 +25,7 @@ export default defineConfig(
   ]),
 
   // 공유 베이스(TS + import 위생 + 커스텀 규칙 + prettier 충돌 비활성).
-  base({ files: ['**/*.{ts,tsx}'] }),
+  base({ files: ['**/*.{ts,tsx,mts,cts}'] }),
 
   // 루트 Vite 앱(src/·components/·lib/) — React 19 + RC + jsx-a11y.
   // ToonSpectrum 은 Vite 앱이 레포 루트에 있고, NestJS API 만 apps/api 에 있다.
@@ -134,7 +134,7 @@ export default defineConfig(
 
   // 서버/DB/스크립트 유틸은 Node 런타임.
   {
-    files: ['lib/db/**/*.ts', 'lib/server/**/*.ts', 'scripts/**/*.{ts,tsx}'],
+    files: ['lib/db/**/*.ts', 'lib/server/**/*.ts', 'scripts/**/*.{ts,tsx,mts,cts}'],
     languageOptions: { globals: globals.node },
   },
 

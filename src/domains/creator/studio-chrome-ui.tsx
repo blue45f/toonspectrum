@@ -460,7 +460,7 @@ export const StudioDockButton = forwardRef<
       disabled={disabled}
       title={hintDescription ? undefined : title}
       className={cn(
-        "flex flex-1 flex-col items-center justify-center gap-0.5 rounded-xl py-1 text-[0.6875rem] font-semibold leading-none",
+        "flex min-w-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl py-1 text-[0.6875rem] font-semibold leading-none",
         STUDIO_EASE,
         STUDIO_FOCUS_RING,
         STUDIO_TOUCH_TARGET,
@@ -492,7 +492,7 @@ export const StudioDockButton = forwardRef<
           : undefined
       }
       preferredSide="top"
-      className="min-w-0 flex-1"
+      className="min-w-11 flex-1"
       hint={studioToolHintFromLabel(label, hintDescription, hintShortcut)}
     >
       {button}
@@ -520,7 +520,7 @@ export function StudioDockNavButton({
       type={type}
       disabled={disabled}
       className={cn(
-        "flex min-h-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-1 text-[0.6875rem] font-medium",
+        "flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-1 text-[0.6875rem] font-medium",
         STUDIO_EASE,
         STUDIO_FOCUS_RING,
         active ? "bg-accent-soft/70 text-accent" : "text-fg-2 hover:bg-raised",
