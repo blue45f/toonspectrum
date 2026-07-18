@@ -8,6 +8,7 @@ import { StudioUnifiedBrushPicker } from "./StudioUnifiedBrushPicker";
 const pickerSource = readFileSync(new URL("./StudioUnifiedBrushPicker.tsx", import.meta.url), "utf8");
 const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
 const inspectorSource = readFileSync(new URL("./StudioInspectorAside.tsx", import.meta.url), "utf8");
+const mobileDockSource = readFileSync(new URL("./StudioMobileEditingDock.tsx", import.meta.url), "utf8");
 
 function renderPicker(): string {
   return renderToStaticMarkup(
@@ -74,7 +75,8 @@ describe("StudioUnifiedBrushPicker", () => {
   });
 
   it("keeps built-in quick discovery out of the desktop inspector", () => {
-    expect(studioPageSource.match(/<StudioUnifiedBrushPicker/g)).toHaveLength(1);
+    expect(studioPageSource).not.toContain("<StudioUnifiedBrushPicker");
+    expect(mobileDockSource.match(/<StudioUnifiedBrushPicker/g)).toHaveLength(1);
     expect(inspectorSource).not.toContain("<StudioUnifiedBrushPicker");
     expect(inspectorSource).toContain('data-studio-inspector-brush-summary="true"');
     expect(inspectorSource).toContain("기본 프리셋 변경은 캔버스 하단 브러시 도크에서");

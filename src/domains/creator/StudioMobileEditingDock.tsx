@@ -1,0 +1,1017 @@
+import {
+  ArrowDownToLine,
+  ArrowUpToLine,
+  Copy,
+  Eraser,
+  Files,
+  Hand,
+  Layers,
+  Minus,
+  MousePointer2,
+  PaintBucket,
+  Palette,
+  Pencil,
+  Plus,
+  Redo2,
+  Shapes,
+  SlidersHorizontal,
+  Square,
+  Trash2,
+  Undo2,
+  WandSparkles,
+  X,
+} from "lucide-react";
+import { Suspense, memo, type ReactNode } from "react";
+
+import {
+  StudioContextActionButton,
+  StudioDockButton,
+  StudioDockNavButton,
+} from "./studio-chrome-ui";
+import { DRAW_COLOR_SWATCHES } from "./studio-draw-color-swatches";
+import { STUDIO_DRAW_SHAPE_PICKER_KINDS } from "./studio-draw-hud";
+import {
+  STUDIO_BRUSH_OPACITY_RANGE,
+  STUDIO_BRUSH_SIZE_RANGE,
+} from "./studio-draw-ux";
+import { elementLabel } from "./studio-element-label";
+import {
+  StudioBrushLibraryPanel,
+  StudioBrushStudio,
+  StudioShapePickerGrid,
+  StudioUnifiedBrushPicker,
+  loadStudioBrushStudio,
+} from "./studio-page-lazy-ui";
+import { STUDIO_EASE } from "./studio-panel-ui";
+import { StudioLineCorrectionControls } from "./StudioLineCorrectionControls";
+import { StudioMobileSheetHandle } from "./StudioMobileSheetHandle";
+import { StudioSavedBrushShelf } from "./StudioSavedBrushShelf";
+
+import type { BrushPreset } from "./studio-brush";
+import type {
+  NormalizedStudioBrushDynamicsSettings,
+  StudioBrushDynamicsPresetId,
+} from "./studio-brush-dynamics";
+import type {
+  DeletedBrushRecord,
+  StudioBrushSnapshot,
+  StudioBrushStampTuning,
+  StudioSavedBrush,
+} from "./studio-brush-library";
+import type {
+  DrawMode,
+  DrawShapeKind,
+  StudioMenu,
+  Tool,
+} from "./studio-editor-tool-model";
+import type { El } from "./studio-element-model";
+import type { StudioFilterKind } from "./studio-filter-menu";
+import type { StudioInspectorRoute } from "./studio-inspector-layout";
+import type { PageState } from "./studio-page-state";
+import type { StudioProDrawPrefs } from "./studio-pro-draw-prefs";
+import type { StudioWorkspaceState } from "./studio-workspaces";
+import type {
+  StudioBrushCatalogCloseReason,
+  StudioBrushCatalogPlacement,
+} from "./StudioBrushLibrarySheet";
+
+import { cn } from "@/lib/utils";
+
+const ZOOM_MIN = 0.2;
+const ZOOM_MAX = 5;
+
+function clampZoom(z: number): number {
+  return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z * 20) / 20));
+}
+
+export interface StudioBrushCatalogHandlers {
+  close: (
+    reason: StudioBrushCatalogCloseReason
+  ) => void;
+  selectBrushId: (brushId: string) => void;
+  toggle: (
+    placement: StudioBrushCatalogPlacement,
+    trigger: HTMLButtonElement
+  ) => void;
+  toggleFavorite: (brushId: string) => void;
+}
+
+export interface StudioMobileEditingDockHandlers {
+  applyBuiltInBrushPreset: (preset: BrushPreset) => void;
+  applyDynamicsPreset: (id: StudioBrushDynamicsPresetId, settings: NormalizedStudioBrushDynamicsSettings) => void;
+  applySavedBrush: (saved: StudioSavedBrush) => void;
+  dismissMobileHint: () => void;
+  duplicateSelected: () => void;
+  fitCanvasToWidth: () => void;
+  openBrushManager: (launcher: HTMLButtonElement) => void;
+  openInspectorRoute: (route: StudioInspectorRoute) => void;
+  openStudioFilter: (kind: StudioFilterKind) => void;
+  queueBrushDelete: (deleted: DeletedBrushRecord) => void;
+  redo: () => void;
+  removeSelected: () => void;
+  reorder: (dir: "front" | "back" | "forward" | "backward") => void;
+  toggleAdvancedFill: () => void;
+  undo: () => void;
+}
+
+export interface StudioMobileEditingDockProps {
+  activeSavedBrushId: string | null;
+  activeSurfaceReviewLocked: boolean;
+  advancedFillActive: boolean;
+  advancedFillUnsupportedReason: string | null;
+  brush: string;
+  brushCatalogHandlers: StudioBrushCatalogHandlers;
+  brushCatalogOpen: boolean;
+  brushDynamics: NormalizedStudioBrushDynamicsSettings;
+  brushManagerSheetRef: import("react").RefObject<HTMLDivElement | null>;
+  brushOpacity: number;
+  collaborationDocumentLocked: boolean;
+  color: string;
+  currentBrushSnapshot: StudioBrushSnapshot;
+  drawMode: DrawMode;
+  drawShape: DrawShapeKind;
+  drawSheetRef: import("react").RefObject<HTMLDivElement | null>;
+  dismissBrushManager: () => void;
+  filterMutationLocked: boolean;
+  hi: number;
+  history: PageState[][];
+  isMobile: boolean;
+  marqueeIds: string[];
+  mobileBrushDockButtonRef: import("react").RefObject<HTMLButtonElement | null>;
+  mobileKeyboardInset: number;
+  mobileQuickActionsButton: ReactNode;
+  mobileSheet: "draw" | "pages" | "props" | "brushes" | null;
+  postCorrection: number;
+  preserveCorners: boolean;
+  pressureCurve: number;
+  proDrawPrefs: StudioProDrawPrefs;
+  quickActionsOpen: boolean;
+  savedBrushes: StudioSavedBrush[];
+  selected: El | null;
+  setBrushDynamics: import("react").Dispatch<import("react").SetStateAction<NormalizedStudioBrushDynamicsSettings>>;
+  setBrushOpacity: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setColor: import("react").Dispatch<import("react").SetStateAction<string>>;
+  setDrawMode: import("react").Dispatch<import("react").SetStateAction<DrawMode>>;
+  setDrawShape: import("react").Dispatch<import("react").SetStateAction<DrawShapeKind>>;
+  setMarqueeIds: import("react").Dispatch<import("react").SetStateAction<string[]>>;
+  setMenu: import("react").Dispatch<import("react").SetStateAction<StudioMenu | null>>;
+  setMobileSheet: import("react").Dispatch<import("react").SetStateAction<"draw" | "pages" | "props" | "brushes" | null>>;
+  setPostCorrection: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setPreserveCorners: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setPressureCurve: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setQuickStartOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setSavedBrushes: import("react").Dispatch<import("react").SetStateAction<StudioSavedBrush[]>>;
+  setSelectedId: import("react").Dispatch<import("react").SetStateAction<string | null>>;
+  setShapeFill: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setStampTuning: import("react").Dispatch<import("react").SetStateAction<StudioBrushStampTuning | null>>;
+  setStabilizer: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setStabilizerMode: import("react").Dispatch<import("react").SetStateAction<"standard" | "adaptive" | "precision">>;
+  setStrokeWidth: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setTiltEnabled: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setTipAngle: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setTipRoundness: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setTool: import("react").Dispatch<import("react").SetStateAction<Tool>>;
+  setUseVelocityPressure: import("react").Dispatch<import("react").SetStateAction<boolean>>;
+  setVelocitySensitivity: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setZoom: import("react").Dispatch<import("react").SetStateAction<number>>;
+  shapeFill: boolean;
+  showMobileHint: boolean;
+  stabilizer: number;
+  stabilizerMode: "standard" | "adaptive" | "precision";
+  stampTuning: StudioBrushStampTuning | null;
+  strokeWidth: number;
+  tiltEnabled: boolean;
+  tipAngle: number;
+  tipRoundness: number;
+  tool: Tool;
+  useVelocityPressure: boolean;
+  velocitySensitivity: number;
+  workspaceState: StudioWorkspaceState;
+  zoom: number;
+  stableHandlers: StudioMobileEditingDockHandlers;
+}
+
+export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
+  activeSavedBrushId,
+  activeSurfaceReviewLocked,
+  advancedFillActive,
+  advancedFillUnsupportedReason,
+  brush,
+  brushCatalogHandlers,
+  brushCatalogOpen,
+  brushDynamics,
+  brushManagerSheetRef,
+  brushOpacity,
+  collaborationDocumentLocked,
+  color,
+  currentBrushSnapshot,
+  drawMode,
+  drawShape,
+  drawSheetRef,
+  dismissBrushManager,
+  filterMutationLocked,
+  hi,
+  history,
+  isMobile,
+  marqueeIds,
+  mobileBrushDockButtonRef,
+  mobileKeyboardInset,
+  mobileQuickActionsButton,
+  mobileSheet,
+  postCorrection,
+  preserveCorners,
+  pressureCurve,
+  proDrawPrefs,
+  quickActionsOpen,
+  savedBrushes,
+  selected,
+  setBrushDynamics,
+  setBrushOpacity,
+  setColor,
+  setDrawMode,
+  setDrawShape,
+  setMarqueeIds,
+  setMenu,
+  setMobileSheet,
+  setPostCorrection,
+  setPreserveCorners,
+  setPressureCurve,
+  setQuickStartOpen,
+  setSavedBrushes,
+  setSelectedId,
+  setShapeFill,
+  setStampTuning,
+  setStabilizer,
+  setStabilizerMode,
+  setStrokeWidth,
+  setTiltEnabled,
+  setTipAngle,
+  setTipRoundness,
+  setTool,
+  setUseVelocityPressure,
+  setVelocitySensitivity,
+  setZoom,
+  shapeFill,
+  showMobileHint,
+  stabilizer,
+  stabilizerMode,
+  stampTuning,
+  strokeWidth,
+  tiltEnabled,
+  tipAngle,
+  tipRoundness,
+  tool,
+  useVelocityPressure,
+  velocitySensitivity,
+  workspaceState,
+  zoom,
+  stableHandlers,
+}: StudioMobileEditingDockProps) {
+  const {
+    applyBuiltInBrushPreset,
+    applyDynamicsPreset,
+    applySavedBrush,
+    dismissMobileHint,
+    duplicateSelected,
+    fitCanvasToWidth,
+    openBrushManager,
+    openInspectorRoute,
+    openStudioFilter,
+    queueBrushDelete,
+    redo,
+    removeSelected,
+    reorder,
+    toggleAdvancedFill,
+    undo,
+  } = stableHandlers;
+  return (
+    <>
+        {/* Photoshop Mobile식 선택 문맥 작업바. 속성 패널까지 왕복하지 않고 가장 빈번한 후속 행동을
+            엄지 영역에 노출한다. 선택이 없거나 시트/첫 안내가 열리면 캔버스를 가리지 않도록 숨긴다. */}
+        {isMobile && !mobileSheet && !quickActionsOpen && !showMobileHint && (selected || marqueeIds.length > 0) ? (
+          <div
+            role="toolbar"
+            aria-label="선택 항목 빠른 작업"
+            className="fixed inset-x-2 z-[53] mx-auto flex max-w-[34rem] items-center gap-1 overflow-x-auto rounded-2xl border border-line bg-panel/95 p-1.5 shadow-2xl backdrop-blur [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:hidden"
+            style={{
+              bottom: `calc(var(--studio-canvas-bottom-inset, 7rem) + 0.35rem + ${mobileKeyboardInset}px)`,
+            }}
+          >
+            <div className="w-[4.75rem] shrink-0 px-2">
+              <p className="truncate text-[0.68rem] font-bold text-fg">
+                {marqueeIds.length > 0
+                  ? `${marqueeIds.length}개 선택`
+                  : selected
+                    ? elementLabel(selected)
+                    : "선택"}
+              </p>
+              <p className="text-[0.58rem] font-medium uppercase tracking-wide text-fg-3">빠른 작업</p>
+            </div>
+            <span aria-hidden className="h-8 w-px shrink-0 bg-line" />
+            <StudioContextActionButton
+              icon={SlidersHorizontal}
+              label="속성"
+              onClick={() => {
+                openInspectorRoute({ primary: "properties" });
+                setMobileSheet("props");
+              }}
+            />
+            {selected?.type === "image" && marqueeIds.length === 0 ? (
+              <>
+                <label
+                  className={cn(
+                    "relative flex min-h-11 min-w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl px-2 text-[0.62rem] font-semibold text-fg-2",
+                    STUDIO_EASE,
+                    "focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent",
+                    filterMutationLocked ? "cursor-not-allowed opacity-40" : "cursor-pointer hover:bg-raised",
+                  )}
+                  title={filterMutationLocked ? "이미지 또는 문서 잠금을 해제한 뒤 필터를 적용하세요." : "이미지 필터 선택"}
+                >
+                  <WandSparkles size={16} aria-hidden />
+                  필터
+                  <select
+                    aria-label="이미지 필터 선택"
+                    defaultValue=""
+                    disabled={filterMutationLocked}
+                    className="absolute inset-0 size-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+                    onChange={(event) => {
+                      const kind = event.currentTarget.value as StudioFilterKind;
+                      if (!kind) return;
+                      openStudioFilter(kind);
+                      event.currentTarget.value = "";
+                    }}
+                  >
+                    <option value="" disabled>필터 선택</option>
+                    <option value="gaussian-blur">가우시안 블러</option>
+                    <option value="motion-blur">모션 블러</option>
+                    <option value="hue-saturation-brightness">색조 / 채도 / 밝기</option>
+                    <option value="brightness-contrast">명도 / 대비</option>
+                    <option value="color-curves">색상 커브</option>
+                  </select>
+                </label>
+                <StudioContextActionButton
+                  icon={PaintBucket}
+                  label="채우기"
+                  active={advancedFillActive}
+                  disabled={!advancedFillActive && advancedFillUnsupportedReason !== null}
+                  onClick={toggleAdvancedFill}
+                />
+              </>
+            ) : null}
+            <StudioContextActionButton icon={Copy} label="복제" onClick={duplicateSelected} />
+            {selected && marqueeIds.length === 0 ? (
+              <>
+                <StudioContextActionButton icon={ArrowUpToLine} label="앞으로" onClick={() => reorder("front")} />
+                <StudioContextActionButton icon={ArrowDownToLine} label="뒤로" onClick={() => reorder("back")} />
+              </>
+            ) : null}
+            <StudioContextActionButton icon={Trash2} label="삭제" danger onClick={removeSelected} />
+            <StudioContextActionButton
+              icon={X}
+              label="해제"
+              onClick={() => {
+                setSelectedId(null);
+                setMarqueeIds([]);
+              }}
+            />
+          </div>
+        ) : null}
+
+        {/* 모바일 첫 사용 안내 — 하단 도구막대 + 두 손가락 이동/확대를 한 줄로. 1회만, 시트가 떠 있지 않을 때만. */}
+        {showMobileHint && !mobileSheet && !quickActionsOpen && (
+          <div
+            role="status"
+            data-studio-canvas-transient="coach"
+            className="fixed inset-x-3 z-[53] mx-auto flex max-w-[32rem] items-start gap-2.5 rounded-2xl border border-accent/30 bg-panel/95 p-3 shadow-2xl backdrop-blur motion-safe:animate-hud-in lg:hidden"
+            style={{
+              bottom: `calc(var(--studio-canvas-bottom-inset, 7rem) + 0.5rem + ${mobileKeyboardInset}px)`,
+            }}
+          >
+            <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent">
+              <Hand size={15} aria-hidden />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[0.8rem] font-semibold text-fg">한 손으로 그려보세요</p>
+              <p className="mt-0.5 text-[0.72rem] leading-snug text-fg-3">
+                아래 막대에서 <span className="font-medium text-fg-2">펜·지우개·도형</span>을 고르고,{" "}
+                <span className="font-medium text-fg-2">브러시</span>를 눌러 굵기·색을 바꿔요. 두 손가락으로
+                이동·확대하고, 짧게 두 손가락 톡은 되돌리기·세 손가락 톡은 다시 실행이에요.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={dismissMobileHint}
+              className="grid size-7 shrink-0 place-items-center rounded-lg text-fg-3 hover:bg-raised"
+              aria-label="안내 닫기"
+            >
+              <X size={15} aria-hidden />
+            </button>
+          </div>
+        )}
+
+        {/* 모바일 전용 브러시 관리자 — 일반 속성 패널을 거치지 않고 저장·고정·복제·내보내기에 바로 접근한다. */}
+        {isMobile && mobileSheet === "brushes" ? (
+          <div
+            ref={brushManagerSheetRef}
+            role="dialog"
+            aria-modal="true"
+            data-studio-sheet-id="brushes"
+            data-studio-mobile-sheet="true"
+            data-popup-kind="sheet"
+            aria-label="내 브러시 관리"
+            tabIndex={-1}
+            data-studio-shortcut-boundary="true"
+            className="fixed inset-x-0 z-[60] mx-auto max-w-[34rem] overflow-y-auto overscroll-contain rounded-t-3xl border border-line bg-panel px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-2xl motion-reduce:transition-none lg:hidden"
+            style={{
+              bottom: mobileKeyboardInset,
+              maxHeight: `calc(100dvh - 1rem - env(safe-area-inset-top) - ${mobileKeyboardInset}px)`,
+            }}
+          >
+            <div className="sticky top-0 z-10 -mx-3 mb-2 border-b border-line bg-panel/95 px-3 backdrop-blur">
+              <StudioMobileSheetHandle
+                active
+                kind="brushes"
+                label="내 브러시 관리"
+                onDismiss={dismissBrushManager}
+                sheetRef={brushManagerSheetRef}
+              />
+              <div className="flex min-h-12 items-center justify-between">
+                <div>
+                  <p className="text-sm font-bold text-fg">내 브러시 관리</p>
+                  <p className="text-[0.68rem] text-fg-3">저장·고정·복제·이름 변경·내보내기</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={dismissBrushManager}
+                  className="grid size-11 place-items-center rounded-xl text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                  aria-label="브러시 관리 닫기"
+                  data-autofocus
+                >
+                  <X size={18} aria-hidden />
+                </button>
+              </div>
+            </div>
+            <Suspense fallback={<p className="py-6 text-center text-xs text-fg-3">브러시를 불러오는 중…</p>}>
+              <StudioBrushLibraryPanel
+                currentSnapshot={currentBrushSnapshot}
+                brushes={savedBrushes}
+                activeBrushId={activeSavedBrushId}
+                onBrushesChange={setSavedBrushes}
+                onApplyBrush={applySavedBrush}
+                onBrushDeleted={queueBrushDelete}
+              />
+            </Suspense>
+          </div>
+        ) : null}
+
+        {/* 모바일 브러시 설정 시트 — 드로잉 도크 바로 위에 떠서 도구를 보며 굵기·색·프리셋·도형을 조절한다.
+            도크(z-55)는 가리지 않게 그 위쪽에 앉히고, 캔버스는 계속 보이게 반투명 배경. 데스크톱엔 인라인 브러시 바가 있으므로 모바일 전용. */}
+        {isMobile && (
+          <div
+            ref={drawSheetRef}
+            role="dialog"
+            aria-label="브러시 설정"
+            aria-modal={false}
+            data-studio-sheet-id="draw"
+            data-studio-mobile-sheet={mobileSheet === "draw" ? "draw" : undefined}
+            className={cn(
+              "fixed inset-x-0 z-[54] mx-auto max-w-[34rem] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel/95 p-3 shadow-2xl backdrop-blur transition-[transform,opacity] duration-200 ease-out motion-reduce:transition-none lg:hidden",
+              mobileSheet === "draw"
+                ? "pointer-events-auto translate-y-0 opacity-100"
+                : "pointer-events-none translate-y-3 opacity-0"
+            )}
+            inert={mobileSheet === "draw" ? undefined : true}
+            style={{
+              bottom: `calc(var(--studio-canvas-bottom-inset, 7rem) + ${mobileKeyboardInset}px)`,
+              maxHeight: `min(56dvh, calc(100dvh - 8rem - env(safe-area-inset-bottom) - ${mobileKeyboardInset}px))`,
+            }}
+          >
+            <div className="sticky -top-3 z-10 -mx-3 -mt-3 mb-2 border-b border-line/70 bg-panel/95 px-3 backdrop-blur">
+              <StudioMobileSheetHandle
+                active={mobileSheet === "draw"}
+                kind="draw"
+                label="브러시 설정"
+                onDismiss={() => setMobileSheet(null)}
+                sheetRef={drawSheetRef}
+              />
+              <div className="flex min-h-12 items-center justify-between">
+                <p className="text-sm font-semibold text-fg">
+                  {drawMode === "eraser" ? "지우개" : drawMode === "shape" ? "도형" : "브러시"} 설정
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setMobileSheet(null)}
+                  className="grid size-11 place-items-center rounded-xl text-fg-3 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                  aria-label="브러시 설정 닫기"
+                  data-autofocus
+                >
+                  <X size={16} aria-hidden />
+                </button>
+              </div>
+            </div>
+
+            {/* 모드 전환 — icon-first (펜↔지우개↔도형) */}
+            <div className="mb-2.5 grid grid-cols-3 gap-1 rounded-xl border border-line bg-card/60 p-1" role="group" aria-label="그리기 모드">
+              {([
+                { v: "pen" as const, label: "펜", icon: Pencil },
+                { v: "eraser" as const, label: "지우개", icon: Eraser },
+                { v: "shape" as const, label: "도형", icon: Shapes },
+              ]).map((m) => {
+                const Icon = m.icon;
+                const active = drawMode === m.v;
+                return (
+                  <button
+                    key={m.v}
+                    type="button"
+                    onClick={() => {
+                      setTool("draw");
+                      setDrawMode(m.v);
+                    }}
+                    aria-pressed={active}
+                    aria-label={m.label}
+                    title={m.label}
+                    className={cn(
+                      "grid min-h-11 place-items-center rounded-lg transition-colors",
+                      active ? "bg-accent text-on-accent shadow-sm" : "text-fg-2 hover:bg-raised"
+                    )}
+                  >
+                    <Icon size={18} strokeWidth={1.75} aria-hidden />
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* 펜 프리셋 — 데스크톱과 같은 현재/빠른 선반/전체 카탈로그 구조 */}
+            {drawMode === "pen" && mobileSheet === "draw" && (
+              <>
+                <StudioSavedBrushShelf
+                  brushes={savedBrushes}
+                  activeBrushId={activeSavedBrushId}
+                  onApply={applySavedBrush}
+                  onManage={(event) => openBrushManager(event.currentTarget)}
+                />
+                <div className="mb-2.5">
+                  <Suspense fallback={<div className="h-24 animate-pulse rounded-xl bg-raised/40 motion-reduce:animate-none" aria-hidden />}>
+                    <StudioUnifiedBrushPicker
+                      activeBrushId={brush}
+                      brushOpacity={brushOpacity}
+                      catalogOpen={brushCatalogOpen}
+                      color={color}
+                      proDrawPrefs={proDrawPrefs}
+                      stampTuning={stampTuning}
+                      strokeWidth={strokeWidth}
+                      onStampTuningChange={setStampTuning}
+                      onSelectBrush={applyBuiltInBrushPreset}
+                      onToggleCatalog={(trigger) =>
+                        brushCatalogHandlers.toggle("mobile-sheet", trigger)
+                      }
+                      onToggleFavoriteBrush={brushCatalogHandlers.toggleFavorite}
+                    />
+                  </Suspense>
+                </div>
+              </>
+            )}
+
+            {/* 색상 — 지우개에선 의미 없으니 숨김 */}
+            {drawMode !== "eraser" && (
+              <div className="mb-2.5">
+                <p className="mb-1 text-[0.7rem] font-medium text-fg-3">색상</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  {DRAW_COLOR_SWATCHES.map((swatch) => (
+                    <button
+                      key={swatch}
+                      type="button"
+                      onClick={() => setColor(swatch)}
+                      aria-label={`색상 ${swatch}`}
+                      aria-pressed={color.toLowerCase() === swatch.toLowerCase()}
+                      className={cn(
+                        "size-11 rounded-xl transition-transform active:scale-95",
+                        color.toLowerCase() === swatch.toLowerCase()
+                          ? "ring-2 ring-accent ring-offset-2 ring-offset-panel"
+                          : "border border-line/60"
+                      )}
+                      style={{ background: swatch }}
+                    />
+                  ))}
+                  <label
+                    className="relative grid size-11 cursor-pointer place-items-center overflow-hidden rounded-xl border border-line shadow-sm"
+                    title="사용자 정의 색상"
+                    style={{ background: color }}
+                  >
+                    <input
+                      type="color"
+                      value={color}
+                      onChange={(e) => setColor(e.target.value)}
+                      aria-label="사용자 정의 브러시 색상"
+                      className="absolute inset-0 size-full cursor-pointer opacity-0"
+                    />
+                    <Palette size={14} className="text-white mix-blend-difference" aria-hidden />
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* 굵기 + 투명도 — 큰 터치 슬라이더 */}
+            <div className="space-y-2.5">
+              <div>
+                <span className="mb-1 flex items-center justify-between text-[0.7rem] font-medium text-fg-3">
+                  <span>{drawMode === "eraser" ? "지우개 굵기" : "굵기"}</span>
+                  <span className="tabular-nums text-fg-2">{strokeWidth}px</span>
+                </span>
+                <div className="grid grid-cols-[minmax(0,1fr)_4.5rem_2.5rem] items-center gap-2">
+                  <input
+                    type="range"
+                    min={STUDIO_BRUSH_SIZE_RANGE.min}
+                    max={STUDIO_BRUSH_SIZE_RANGE.max}
+                    value={strokeWidth}
+                    onChange={(e) => setStrokeWidth(Number(e.target.value))}
+                    className="h-11 w-full accent-accent"
+                    aria-label="브러시 굵기 슬라이더"
+                  />
+                  <label className="sr-only" htmlFor="mobile-brush-width">브러시 굵기 숫자</label>
+                  <input
+                    id="mobile-brush-width"
+                    type="number"
+                    min={STUDIO_BRUSH_SIZE_RANGE.min}
+                    max={STUDIO_BRUSH_SIZE_RANGE.max}
+                    inputMode="numeric"
+                    value={strokeWidth}
+                    onChange={(event) =>
+                      setStrokeWidth(
+                        Math.min(
+                          STUDIO_BRUSH_SIZE_RANGE.max,
+                          Math.max(
+                            STUDIO_BRUSH_SIZE_RANGE.min,
+                            Number(event.target.value) || STUDIO_BRUSH_SIZE_RANGE.min
+                          )
+                        )
+                      )
+                    }
+                    className="min-h-11 w-full rounded-lg border border-line bg-card px-2 text-center text-xs tabular-nums text-fg outline-none focus:border-accent"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setStrokeWidth(drawMode === "eraser" ? 18 : 4)}
+                    className="min-h-11 rounded-lg border border-line bg-card text-[0.65rem] font-semibold text-fg-3 hover:bg-raised"
+                    aria-label="브러시 굵기 기본값으로 초기화"
+                  >
+                    초기화
+                  </button>
+                </div>
+              </div>
+              {drawMode !== "eraser" && (
+                <div>
+                  <span className="mb-1 flex items-center justify-between text-[0.7rem] font-medium text-fg-3">
+                    <span>투명도</span>
+                    <span className="tabular-nums text-fg-2">{Math.round(brushOpacity * 100)}%</span>
+                  </span>
+                  <div className="grid grid-cols-[minmax(0,1fr)_4.5rem_2.5rem] items-center gap-2">
+                    <input
+                      type="range"
+                      min={STUDIO_BRUSH_OPACITY_RANGE.min * 100}
+                      max={STUDIO_BRUSH_OPACITY_RANGE.max * 100}
+                      step={5}
+                      value={Math.round(brushOpacity * 100)}
+                      onChange={(e) => setBrushOpacity(Number(e.target.value) / 100)}
+                      className="h-11 w-full accent-accent"
+                      aria-label="브러시 투명도 슬라이더"
+                    />
+                    <label className="sr-only" htmlFor="mobile-brush-opacity">브러시 투명도 숫자</label>
+                    <input
+                      id="mobile-brush-opacity"
+                      type="number"
+                      min={STUDIO_BRUSH_OPACITY_RANGE.min * 100}
+                      max={STUDIO_BRUSH_OPACITY_RANGE.max * 100}
+                      step={5}
+                      inputMode="numeric"
+                      value={Math.round(brushOpacity * 100)}
+                      onChange={(event) =>
+                        setBrushOpacity(
+                          Math.min(
+                            STUDIO_BRUSH_OPACITY_RANGE.max * 100,
+                            Math.max(
+                              STUDIO_BRUSH_OPACITY_RANGE.min * 100,
+                              Number(event.target.value) || STUDIO_BRUSH_OPACITY_RANGE.min * 100
+                            )
+                          ) / 100
+                        )
+                      }
+                      className="min-h-11 w-full rounded-lg border border-line bg-card px-2 text-center text-xs tabular-nums text-fg outline-none focus:border-accent"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setBrushOpacity(1)}
+                      className="min-h-11 rounded-lg border border-line bg-card text-[0.65rem] font-semibold text-fg-3 hover:bg-raised"
+                      aria-label="브러시 투명도 100퍼센트로 초기화"
+                    >
+                      초기화
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {drawMode !== "shape" ? (
+              <>
+                <StudioLineCorrectionControls
+                  density="touch"
+                  stabilizer={stabilizer}
+                  onStabilizerChange={setStabilizer}
+                  mode={stabilizerMode}
+                  onModeChange={setStabilizerMode}
+                  postCorrection={postCorrection}
+                  onPostCorrectionChange={setPostCorrection}
+                  preserveCorners={preserveCorners}
+                  onPreserveCornersChange={setPreserveCorners}
+                />
+                <Suspense fallback={<div className="h-48 animate-pulse rounded-xl bg-raised/35 motion-reduce:animate-none" aria-hidden />}>
+                  <StudioBrushStudio
+                    density="touch"
+                    brushId={brush}
+                    strokeWidth={strokeWidth}
+                    color={color}
+                    settings={brushDynamics}
+                    onSettingsChange={setBrushDynamics}
+                    onSelectDynamicsPreset={applyDynamicsPreset}
+                    useVelocityPressure={useVelocityPressure}
+                    onUseVelocityPressureChange={setUseVelocityPressure}
+                    velocitySensitivity={velocitySensitivity}
+                    onVelocitySensitivityChange={setVelocitySensitivity}
+                    pressureCurve={pressureCurve}
+                    onPressureCurveChange={setPressureCurve}
+                    tiltEnabled={tiltEnabled}
+                    onTiltEnabledChange={setTiltEnabled}
+                    tipAngle={tipAngle}
+                    onTipAngleChange={setTipAngle}
+                    tipRoundness={tipRoundness}
+                    onTipRoundnessChange={setTipRoundness}
+                  />
+                </Suspense>
+              </>
+            ) : null}
+
+            {/* 도형 모양 + 채우기 — Photopea/Canva glyph strip (mobile touch) */}
+            {drawMode === "shape" && (
+              <div className="mt-2.5 border-t border-line/60 pt-2.5">
+                <p className="mb-1.5 text-[0.7rem] font-semibold uppercase tracking-wider text-fg-3">
+                  도형 모양
+                </p>
+                <Suspense fallback={<div className="h-24 rounded-xl bg-raised/40" aria-hidden />}>
+                  <StudioShapePickerGrid
+                    activeKind={drawShape}
+                    filled={shapeFill}
+                    onSelect={(kind) => {
+                      setTool("draw");
+                      setDrawMode("shape");
+                      setDrawShape(kind as DrawShapeKind);
+                    }}
+                    kinds={STUDIO_DRAW_SHAPE_PICKER_KINDS}
+                    className="grid-cols-4"
+                  />
+                </Suspense>
+                <button
+                  type="button"
+                  aria-pressed={shapeFill}
+                  disabled={drawShape === "line" || drawShape === "arrow"}
+                  title="채우기"
+                  aria-label="도형 채우기"
+                  onClick={() => setShapeFill((v) => !v)}
+                  className={cn(
+                    "mt-2 grid min-h-11 w-full place-items-center rounded-lg border transition-colors",
+                    drawShape === "line" || drawShape === "arrow"
+                      ? "cursor-not-allowed border-line bg-card text-fg-3 opacity-50"
+                      : shapeFill
+                        ? "border-accent/60 bg-accent-soft/50 text-accent"
+                        : "border-line bg-card text-fg-2"
+                  )}
+                >
+                  <PaintBucket size={18} aria-hidden />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 모바일 하단 드로잉 도크 — 한 손으로 그리기 위한 핵심 도구를 thumb 사정권에.
+            1행: 그리기 도구(선택·펜·지우개·도형·실행취소·다시·브러시). 2행: 보조 내비(페이지·추가·속성·줌). */}
+        {isMobile && (
+          <nav
+            aria-label="스튜디오 모바일 도구막대"
+            data-studio-mobile-editing-dock="true"
+            className="fixed inset-x-0 bottom-0 z-[55] flex flex-col gap-1 border-t border-line bg-panel/95 pb-[max(0.35rem,env(safe-area-inset-bottom))] pl-[max(0.375rem,env(safe-area-inset-left))] pr-[max(0.375rem,env(safe-area-inset-right))] pt-1.5 backdrop-blur lg:hidden"
+            style={{ bottom: mobileKeyboardInset }}
+          >
+            {/* 1행: 핵심 드로잉 도구 — 선택 | 펜/지우개/도형 | 히스토리 | 브러시 (CSP/Procreate 도크 IA) */}
+            <div
+              className="flex min-w-0 touch-pan-x items-stretch gap-0.5 overflow-x-auto overscroll-x-contain [scrollbar-width:none] min-[360px]:gap-1 [&::-webkit-scrollbar]:hidden"
+              role="toolbar"
+              aria-label="드로잉 도구"
+              data-studio-mobile-dock-scroll="primary"
+            >
+              <StudioDockButton
+                icon={MousePointer2}
+                label="선택"
+                hintDescription="요소를 선택해 이동·크기 조절·정렬하고 속성 패널에서 세부 값을 편집합니다."
+                hintShortcut="V"
+                active={tool === "select"}
+                onClick={() => {
+                  setTool("select");
+                  setMenu(null);
+                  setMobileSheet(null);
+                }}
+                aria-pressed={tool === "select"}
+              />
+              <span aria-hidden className="my-1 w-px self-stretch bg-line/70" />
+              <StudioDockButton
+                icon={Pencil}
+                label="펜"
+                hintDescription="필압과 보정이 적용되는 자유선을 그립니다. 다시 누르면 브러시 설정이 열립니다."
+                hintShortcut="B"
+                active={tool === "draw" && drawMode === "pen"}
+                disabled={activeSurfaceReviewLocked}
+                title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 펜을 사용할 수 있어요" : "펜 (B)"}
+                onClick={() => {
+                  if (tool === "draw" && drawMode === "pen") {
+                    setMobileSheet((s) => (s === "draw" ? null : "draw"));
+                    return;
+                  }
+                  setTool("draw");
+                  setDrawMode("pen");
+                  setMenu(null);
+                  setMobileSheet(null);
+                }}
+                aria-pressed={tool === "draw" && drawMode === "pen"}
+              />
+              <StudioDockButton
+                icon={Eraser}
+                label="지우개"
+                hintDescription="현재 레이어의 획을 지웁니다. 브러시 크기와 불투명도 설정을 그대로 활용합니다."
+                hintShortcut="E"
+                active={tool === "draw" && drawMode === "eraser"}
+                disabled={activeSurfaceReviewLocked}
+                title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 지우개를 사용할 수 있어요" : "지우개 (E)"}
+                onClick={() => {
+                  setTool("draw");
+                  setDrawMode("eraser");
+                  setMenu(null);
+                  setMobileSheet(null);
+                }}
+                aria-pressed={tool === "draw" && drawMode === "eraser"}
+              />
+              <StudioDockButton
+                icon={Square}
+                label="도형"
+                hintDescription="선·사각형·타원·화살표를 정돈된 벡터 도형으로 빠르게 배치합니다."
+                active={tool === "draw" && drawMode === "shape"}
+                disabled={activeSurfaceReviewLocked}
+                title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 도형을 사용할 수 있어요" : "도형"}
+                onClick={() => {
+                  if (tool === "draw" && drawMode === "shape") {
+                    setMobileSheet((s) => (s === "draw" ? null : "draw"));
+                    return;
+                  }
+                  setTool("draw");
+                  setDrawMode("shape");
+                  setMenu(null);
+                  setMobileSheet(null);
+                }}
+                aria-pressed={tool === "draw" && drawMode === "shape"}
+              />
+              <span aria-hidden className="my-1 w-px self-stretch bg-line/70" />
+              <StudioDockButton
+                icon={Undo2}
+                label="되돌리기"
+                hintDescription="마지막 편집을 한 단계 되돌립니다. 공동 작업 변경 이력과 함께 안전하게 이동합니다."
+                disabled={hi === 0 || collaborationDocumentLocked}
+                hintUnavailableReason={
+                  collaborationDocumentLocked
+                    ? "공동 작업 문서 잠금을 해제한 뒤 편집 기록을 이동할 수 있어요."
+                    : hi === 0
+                      ? "아직 되돌릴 편집 기록이 없어요."
+                      : undefined
+                }
+                onClick={undo}
+                aria-label="실행취소"
+              />
+              <StudioDockButton
+                icon={Redo2}
+                label="다시"
+                hintDescription="되돌린 편집을 한 단계 다시 적용합니다."
+                disabled={hi >= history.length - 1 || collaborationDocumentLocked}
+                hintUnavailableReason={
+                  collaborationDocumentLocked
+                    ? "공동 작업 문서 잠금을 해제한 뒤 편집 기록을 이동할 수 있어요."
+                    : hi >= history.length - 1
+                      ? "다시 적용할 편집 기록이 없어요."
+                      : undefined
+                }
+                onClick={redo}
+                aria-label="다시실행"
+              />
+              <span aria-hidden className="my-1 w-px self-stretch bg-line/70" />
+              <StudioDockButton
+                ref={mobileBrushDockButtonRef}
+                label="브러시"
+                hintDescription="굵기·불투명도·색·보정·프리셋을 한곳에서 조절합니다."
+                active={mobileSheet === "draw" || mobileSheet === "brushes"}
+                aria-pressed={mobileSheet === "draw" || mobileSheet === "brushes"}
+                aria-label="브러시 설정 (굵기·색·프리셋)"
+                onPointerEnter={() => void loadStudioBrushStudio()}
+                onFocus={() => void loadStudioBrushStudio()}
+                onClick={() => {
+                  void loadStudioBrushStudio();
+                  if (tool !== "draw") {
+                    setTool("draw");
+                    setDrawMode("pen");
+                    setMenu(null);
+                  }
+                  setMobileSheet((s) => (s === "draw" ? null : "draw"));
+                }}
+                swatch={(
+                  <span
+                    aria-hidden
+                    className="size-[19px] rounded-full border-2 border-current"
+                    style={drawMode === "eraser" ? undefined : { backgroundColor: color, borderColor: "oklch(0.95 0.01 85 / 0.45)" }}
+                  />
+                )}
+              />
+            </div>
+
+            {/* 2행: 보조 내비 — 페이지·추가·6방향 퀵 메뉴·속성(레이어)·줌 */}
+            <div
+              className="flex min-w-0 touch-pan-x items-stretch gap-0 overflow-x-auto overscroll-x-contain border-t border-line/60 pt-1 [scrollbar-width:none] min-[360px]:gap-0.5 [&::-webkit-scrollbar]:hidden"
+              role="toolbar"
+              aria-label="작업 공간"
+              data-studio-mobile-dock-scroll="secondary"
+            >
+              {workspaceState.mobileControlSide === "left"
+                ? mobileQuickActionsButton
+                : null}
+              <StudioDockNavButton
+                icon={Files}
+                label="페이지"
+                active={mobileSheet === "pages"}
+                aria-pressed={mobileSheet === "pages"}
+                onClick={() => setMobileSheet((s) => (s === "pages" ? null : "pages"))}
+              />
+              <StudioDockNavButton
+                icon={Plus}
+                label="추가"
+                onClick={() => {
+                  setMobileSheet(null);
+                  setQuickStartOpen(true);
+                }}
+              />
+              <StudioDockNavButton
+                icon={Layers}
+                label="작업"
+                active={mobileSheet === "props"}
+                aria-pressed={mobileSheet === "props"}
+                onClick={() => {
+                  if (mobileSheet === "props") {
+                    setMobileSheet(null);
+                    return;
+                  }
+                  openInspectorRoute({ primary: selected ? "properties" : "layers" });
+                  setMobileSheet("props");
+                }}
+              />
+              <div className="flex w-[8.25rem] flex-none items-center justify-center">
+                <button
+                  type="button"
+                  onClick={() => setZoom((z) => clampZoom(z - 0.25))}
+                  disabled={zoom <= ZOOM_MIN}
+                  className="grid size-11 place-items-center rounded-lg text-fg-2 transition-colors hover:bg-raised disabled:opacity-40"
+                  aria-label="축소"
+                >
+                  <Minus size={16} aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  onClick={fitCanvasToWidth}
+                  className="min-h-11 min-w-11 flex-1 rounded-lg px-1 py-2 text-center text-[0.7rem] font-semibold tabular-nums text-fg transition-colors hover:bg-raised"
+                  aria-label="화면 폭에 맞춤"
+                >
+                  {Math.round(zoom * 100)}%
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setZoom((z) => clampZoom(z + 0.25))}
+                  disabled={zoom >= ZOOM_MAX}
+                  className="grid size-11 place-items-center rounded-lg text-fg-2 transition-colors hover:bg-raised disabled:opacity-40"
+                  aria-label="확대"
+                >
+                  <Plus size={16} aria-hidden />
+                </button>
+              </div>
+              {workspaceState.mobileControlSide === "right"
+                ? mobileQuickActionsButton
+                : null}
+            </div>
+          </nav>
+        )}
+    </>
+  );
+});
+
+
