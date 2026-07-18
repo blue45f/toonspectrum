@@ -29,7 +29,8 @@
     "drizzle.config.ts",
     "eslint.config.mjs",
     "postcss.config.mjs",
-    "**/*.mts"
+    "**/*.mts",
+    "scripts/studio-gpu-committed-parity-browser.ts"
   ],
   "exclude": ["node_modules", "apps/**", "dist/**"]
 }

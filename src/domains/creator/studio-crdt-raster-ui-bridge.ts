@@ -148,9 +148,18 @@ export function studioRasterBrushSurface(
 }
 
 /**
- * Converts only the exact round, opaque source-over pen contract already shared by Konva and the
- * retained WebGPU engine. Erasers stay on Konva until the raster surface owns all pixels below it;
- * otherwise destination-out could not erase non-raster scene content without changing semantics.
+ * Converts only the round, opaque source-over pen contract. Erasers stay on Konva until the raster
+ * surface owns all pixels below it; otherwise destination-out could not erase non-raster scene
+ * content without changing semantics.
+ *
+ * Causal geometry (sampleSpacing/pressureModel set) is pixel-compatible with Konva's own dab path
+ * and the committed WebGPU engine, since all three call the same selectStudioCausalInkSamples /
+ * planStudioGpuDabs pipeline. Legacy geometry (neither field set) is NOT pixel-exact: this promotes
+ * it through processFreehandPoints + planStudioGpuDabs + arc().fill(), a deterministic, versioned
+ * ("studio-freehand-v1") approximation of Konva's actual segment renderer (drawFreehandPenSegments),
+ * not a reproduction of it. studioWebGpuCommittedBarrierReason's requireCausalGeometry option is not
+ * enabled here, so legacy strokes are still promoted; see studio-webgpu-committed-handoff.ts for the
+ * gated committed-render path.
  */
 export function planStudioRasterDrawPromotion(input: {
   readonly element: StudioRasterDrawPromotionElement;
