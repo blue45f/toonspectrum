@@ -101,7 +101,10 @@ function committedElementToGpuStroke(
 export function createStudioWebGpuCommittedHandoff<
   T extends StudioWebGpuCommittedHandoffElement,
 >(input: StudioWebGpuCommittedHandoffInput<T>): StudioWebGpuCommittedHandoff<T> {
-  const plan = planStudioWebGpuCommittedSuffix(input);
+  // Only this render handoff needs causal-only geometry: it feeds committedElementToGpuStroke,
+  // which mirrors Konva's dab path exactly and has no equivalent for legacy segment strokes. The
+  // raster-CRDT promotion path shares the same barrier function but keeps its own legacy fallback.
+  const plan = planStudioWebGpuCommittedSuffix({ ...input, barrierOptions: { requireCausalGeometry: true } });
   return {
     ...plan,
     strokes: plan.status === "ready"

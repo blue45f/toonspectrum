@@ -24,6 +24,7 @@ function draw(
     strokeWidth: 6,
     opacity: 1,
     brush: "pen",
+    sampleSpacing: 0,
     panelClip: "none",
     ...overrides,
   };
@@ -63,6 +64,23 @@ describe("planStudioWebGpuCommittedSuffix", () => {
     expect(plan.elements).toEqual([frontPenA, frontPenB]);
     expect(plan.elements[0]).toBe(frontPenA);
     expect(plan.elements[1]).toBe(frontPenB);
+  });
+
+  it("treats a legacy segment stroke as a lower barrier only when requireCausalGeometry is set", () => {
+    const lowerLegacy = draw("lower-legacy", { sampleSpacing: undefined, pressureModel: undefined });
+    const frontCausal = draw("front-causal");
+
+    expect(planStudioWebGpuCommittedSuffix({
+      elements: [lowerLegacy, frontCausal],
+    }).elementIds).toEqual(["lower-legacy", "front-causal"]);
+
+    expect(planStudioWebGpuCommittedSuffix({
+      elements: [lowerLegacy, frontCausal],
+      barrierOptions: { requireCausalGeometry: true },
+    })).toMatchObject({
+      elementIds: ["front-causal"],
+      lowerBarrier: { elementId: "lower-legacy", reason: "invalid-geometry" },
+    });
   });
 
   it("fails closed when the frontmost visible element is a non-draw barrier", () => {
@@ -161,7 +179,34 @@ describe("planStudioWebGpuCommittedSuffix", () => {
     expect(studioWebGpuCommittedBarrierReason(draw("invalid", overrides))).toBe("invalid-geometry");
   });
 
-  it("allows the explicit supported brushes and the omitted legacy default only", () => {
+  it("allows legacy segment geometry by default, matching the raster-promotion path's own fallback", () => {
+    expect(studioWebGpuCommittedBarrierReason(draw("legacy-segments", {
+      sampleSpacing: undefined,
+      pressureModel: undefined,
+    }))).toBeNull();
+  });
+
+  it("rejects legacy segment geometry only when the caller requires causal geometry", () => {
+    const options = { requireCausalGeometry: true };
+    expect(studioWebGpuCommittedBarrierReason(draw("legacy-segments", {
+      sampleSpacing: undefined,
+      pressureModel: undefined,
+    }), options)).toBe("invalid-geometry");
+    expect(studioWebGpuCommittedBarrierReason(draw("legacy-segments-nan", {
+      sampleSpacing: Number.NaN,
+      pressureModel: undefined,
+    }), options)).toBe("invalid-geometry");
+    expect(studioWebGpuCommittedBarrierReason(draw("causal-spacing-only", {
+      sampleSpacing: 0,
+      pressureModel: undefined,
+    }), options)).toBeNull();
+    expect(studioWebGpuCommittedBarrierReason(draw("causal-pressure-model-only", {
+      sampleSpacing: undefined,
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+    }), options)).toBeNull();
+  });
+
+  it("allows the explicit supported brushes and the omitted brush alias only", () => {
     expect(studioWebGpuCommittedBarrierReason(draw("pen"))).toBeNull();
     expect(studioWebGpuCommittedBarrierReason(draw("fineliner", { brush: "fineliner" }))).toBeNull();
     expect(studioWebGpuCommittedBarrierReason(draw("legacy", { brush: undefined }))).toBeNull();
