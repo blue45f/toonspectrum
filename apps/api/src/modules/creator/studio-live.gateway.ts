@@ -22,6 +22,7 @@ import {
   studioLiveFailure as failure,
 } from "./studio-live-ack";
 import { StudioLiveCrdtQuotaLimiter } from "./studio-live-crdt-quota";
+import { StudioLiveJoinTransitionSequencer } from "./studio-live-join-transition-sequencer";
 import {
   STUDIO_LIVE_LOCK_REPOSITORY,
   type StudioLiveLockRecord,
@@ -319,8 +320,6 @@ export class StudioLiveGateway
   private readonly socketIdsByWork = new Map<string, Set<string>>();
   private readonly rateLimits = new Map<string, Map<string, RateLimitBucket>>();
   private readonly crdtQuotaLimiter = new StudioLiveCrdtQuotaLimiter();
-  private readonly joinTransitionSequences = new Map<string, number>();
-  private readonly joinTransitionTails = new Map<string, Promise<void>>();
   private readonly participantAuthorizationRechecks = new Map<
     string,
     StudioLiveParticipantAuthorizationRecheck
@@ -354,6 +353,8 @@ export class StudioLiveGateway
     private readonly creatorService: CreatorService,
     @Inject(StudioLiveSocketAuthService)
     private readonly socketAuthentication: StudioLiveSocketAuthService,
+    @Inject(StudioLiveJoinTransitionSequencer)
+    private readonly joinTransitions: StudioLiveJoinTransitionSequencer,
     @Inject(StudioCrdtService)
     private readonly studioCrdtService: StudioCrdtService,
     @Inject(STUDIO_LIVE_LOCK_REPOSITORY)
@@ -414,8 +415,7 @@ export class StudioLiveGateway
     this.socketIdsByWork.clear();
     this.rateLimits.clear();
     this.crdtQuotaLimiter.clear();
-    this.joinTransitionSequences.clear();
-    this.joinTransitionTails.clear();
+    this.joinTransitions.clearAll();
     this.participantAuthorizationRechecks.clear();
     this.candidateRelayAuthorizations.clear();
     this.socketAuthentication.clearAll();
@@ -437,7 +437,7 @@ export class StudioLiveGateway
 
   handleDisconnect(client: StudioLiveSocket): void {
     this.socketAuthentication.clear(client);
-    this.joinTransitionSequences.delete(client.id);
+    this.joinTransitions.invalidate(client.id);
     this.participantAuthorizationRechecks.delete(client.id);
     this.deleteCandidateRelayAuthorizationsForSocket(client.id);
     this.removeParticipant(client.id, "disconnect");
@@ -459,16 +459,9 @@ export class StudioLiveGateway
     if (!this.consumeRateLimit(client.id, "join", 12, 60_000)) {
       return reply(ack, failure("rate_limited", "작업실 참가 요청이 너무 많습니다."));
     }
-    const transitionSequence = this.nextJoinTransitionSequence(client.id);
-    return this.enqueueJoinTransition(client.id, async () => {
-      try {
-        return await this.performJoin(client, parsed.data, transitionSequence, ack);
-      } finally {
-        if (this.joinTransitionSequences.get(client.id) === transitionSequence) {
-          this.joinTransitionSequences.delete(client.id);
-        }
-      }
-    });
+    return this.joinTransitions.runLatest(client.id, (transitionSequence) =>
+      this.performJoin(client, parsed.data, transitionSequence, ack)
+    );
   }
 
   private async performJoin(
@@ -2422,28 +2415,6 @@ export class StudioLiveGateway
     }
   }
 
-  private nextJoinTransitionSequence(socketId: string): number {
-    const sequence = (this.joinTransitionSequences.get(socketId) ?? 0) + 1;
-    this.joinTransitionSequences.set(socketId, sequence);
-    return sequence;
-  }
-
-  private enqueueJoinTransition<T>(socketId: string, operation: () => Promise<T>): Promise<T> {
-    const previous = this.joinTransitionTails.get(socketId) ?? Promise.resolve();
-    const run = previous.then(operation);
-    const tail = run.then(
-      () => undefined,
-      () => undefined
-    );
-    this.joinTransitionTails.set(socketId, tail);
-    void tail.then(() => {
-      if (this.joinTransitionTails.get(socketId) === tail) {
-        this.joinTransitionTails.delete(socketId);
-      }
-    });
-    return run;
-  }
-
   private isSocketCurrent(client: StudioLiveSocket): boolean {
     return this.server.sockets.get(client.id) === client;
   }
@@ -2499,7 +2470,7 @@ export class StudioLiveGateway
   private isCurrentJoinTransition(client: StudioLiveSocket, transitionSequence: number): boolean {
     return (
       this.isSocketCurrent(client) &&
-      this.joinTransitionSequences.get(client.id) === transitionSequence
+      this.joinTransitions.isCurrent(client.id, transitionSequence)
     );
   }
 
@@ -2842,7 +2813,7 @@ export class StudioLiveGateway
     }
     this.removeParticipant(socketId, "revoked");
     this.rateLimits.delete(socketId);
-    this.joinTransitionSequences.delete(socketId);
+    this.joinTransitions.invalidate(socketId);
     this.socketAuthentication.clearBySocketId(socketId, socket);
     if (socket) {
       socket.disconnect(true);

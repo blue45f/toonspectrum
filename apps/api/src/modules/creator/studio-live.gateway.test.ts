@@ -6,6 +6,7 @@ import {
   StudioCrdtBackpressureError,
   StudioCrdtStorageCorruptionError,
 } from "./studio-crdt.service";
+import { StudioLiveJoinTransitionSequencer } from "./studio-live-join-transition-sequencer";
 import { StudioLiveSocketAuthService } from "./studio-live-socket-auth.service";
 import {
   STUDIO_LIVE_ADAPTER_DISCOVERY_TIMEOUT_MS,
@@ -315,9 +316,11 @@ function createHarness(
   const authenticate = vi.fn(authenticateSession);
   const revalidate = vi.fn(revalidateSession);
   const socketAuthentication = new StudioLiveSocketAuthService(authenticate, revalidate);
+  const joinTransitions = new StudioLiveJoinTransitionSequencer();
   const gateway = new StudioLiveGateway(
     service as unknown as CreatorService,
     socketAuthentication,
+    joinTransitions,
     crdtService as unknown as StudioCrdtService,
     lockRepository
   );
@@ -363,6 +366,7 @@ function createHarness(
     authenticate,
     revalidate,
     socketAuthentication,
+    joinTransitions,
     lockRepository,
     emissions,
     sockets,
