@@ -25721,6 +25721,8 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                     onSelect={onSelect}
                     onEdit={() => startEditText(el.id)}
                     onChange={(patch) => patchEl(el.id, patch)}
+                    onInteractionBegin={() => nodeInteractionBegin(el.id)}
+                    onInteractionEnd={endLiveResourceEdit}
                   />
                 );
                 };

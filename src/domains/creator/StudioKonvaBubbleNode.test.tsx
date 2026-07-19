@@ -300,7 +300,14 @@ describe("StudioKonvaBubbleNode text and interaction", () => {
   });
 
   it("shows the selected tail handle and preserves clamping, mirroring, and drag reset", () => {
-    const props = commonProps({ effectiveScale: 2, selected: true });
+    const onInteractionBegin = vi.fn(() => true);
+    const onInteractionEnd = vi.fn();
+    const props = commonProps({
+      effectiveScale: 2,
+      onInteractionBegin,
+      onInteractionEnd,
+      selected: true,
+    });
     render(
       <StudioKonvaBubbleNode
         {...props}
@@ -309,6 +316,7 @@ describe("StudioKonvaBubbleNode text and interaction", () => {
     );
 
     const circle = latest(konvaCapture.circles, "tail handle") as {
+      onDragStart: (event: Record<string, unknown>) => void;
       onDragEnd: (event: Record<string, unknown>) => void;
       onDragMove: (event: Record<string, unknown>) => void;
     } & Record<string, unknown>;
@@ -333,9 +341,16 @@ describe("StudioKonvaBubbleNode text and interaction", () => {
     });
     const target = {
       getLayer: () => ({ batchDraw }),
+      stopDrag: vi.fn(),
       x: xAccessor,
       y: yAccessor,
     };
+    const startEvent = { cancelBubble: false, target };
+    circle.onDragStart(startEvent);
+    expect(startEvent.cancelBubble).toBe(true);
+    expect(onInteractionBegin).toHaveBeenCalledTimes(1);
+    expect(target.stopDrag).not.toHaveBeenCalled();
+
     const moveEvent = { cancelBubble: false, target };
     circle.onDragMove(moveEvent);
     expect(moveEvent.cancelBubble).toBe(true);
@@ -351,26 +366,29 @@ describe("StudioKonvaBubbleNode text and interaction", () => {
     expect(xAccessor).toHaveBeenCalledWith(160);
     expect(yAccessor).toHaveBeenCalledWith(130);
     expect(batchDraw).toHaveBeenCalledTimes(1);
+    expect(onInteractionEnd).toHaveBeenCalledTimes(1);
   });
 
-  it("preserves Group ref/select/edit/drag/resize behavior without adding soft-lock handlers", () => {
-    const props = commonProps();
+  it("preserves Group behavior while claiming and releasing the collaboration soft lock", () => {
+    const onInteractionBegin = vi.fn(() => true);
+    const onInteractionEnd = vi.fn();
+    const props = commonProps({ onInteractionBegin, onInteractionEnd });
     render(<StudioKonvaBubbleNode {...props} el={bubbleElement()} />);
 
     const group = latest(konvaCapture.groups, "bubble group") as {
       dragBoundFunc: unknown;
       onDblClick: () => void;
       onDblTap: () => void;
+      onDragStart: (event: Record<string, unknown>) => void;
       onDragEnd: (event: Record<string, unknown>) => void;
       onMouseDown: () => void;
       onTap: () => void;
+      onTransformStart: (event: Record<string, unknown>) => void;
       onTransformEnd: (event: Record<string, unknown>) => void;
       ref: unknown;
     } & Record<string, unknown>;
     expect(group.ref).toBe(props.innerRef);
     expect(group.dragBoundFunc).toBe(props.dragBoundFunc);
-    expect(group.onDragStart).toBeUndefined();
-    expect(group.onTransformStart).toBeUndefined();
 
     group.onMouseDown();
     group.onTap();
@@ -379,20 +397,27 @@ describe("StudioKonvaBubbleNode text and interaction", () => {
     expect(props.onSelect).toHaveBeenCalledTimes(2);
     expect(props.onEdit).toHaveBeenCalledTimes(2);
 
-    group.onDragEnd({ target: { x: () => 7, y: () => 8 } });
+    const dragTarget = { stopDrag: vi.fn(), x: () => 7, y: () => 8 };
+    group.onDragStart({ target: dragTarget });
+    expect(onInteractionBegin).toHaveBeenCalledTimes(1);
+    expect(dragTarget.stopDrag).not.toHaveBeenCalled();
+    group.onDragEnd({ target: dragTarget });
     expect(props.onChange).toHaveBeenLastCalledWith({ x: 7, y: 8 });
+    expect(onInteractionEnd).toHaveBeenCalledTimes(1);
 
     const scaleX = vi.fn((value?: number) => value === undefined ? 2 : undefined);
     const scaleY = vi.fn((value?: number) => value === undefined ? 0.25 : undefined);
-    group.onTransformEnd({
-      target: {
-        rotation: () => 15,
-        scaleX,
-        scaleY,
-        x: () => 9,
-        y: () => 10,
-      },
-    });
+    const transformTarget = {
+      rotation: () => 15,
+      scaleX,
+      scaleY,
+      stopDrag: vi.fn(),
+      x: () => 9,
+      y: () => 10,
+    };
+    group.onTransformStart({ target: transformTarget });
+    expect(onInteractionBegin).toHaveBeenCalledTimes(2);
+    group.onTransformEnd({ target: transformTarget });
     expect(scaleX).toHaveBeenCalledWith(1);
     expect(scaleY).toHaveBeenCalledWith(1);
     expect(props.onChange).toHaveBeenLastCalledWith({
@@ -402,5 +427,30 @@ describe("StudioKonvaBubbleNode text and interaction", () => {
       x: 9,
       y: 10,
     });
+    expect(onInteractionEnd).toHaveBeenCalledTimes(2);
+  });
+
+  it("stops a denied bubble gesture and always releases after a failing commit", () => {
+    const onInteractionBegin = vi.fn(() => false);
+    const onInteractionEnd = vi.fn();
+    const onChange = vi.fn(() => {
+      throw new Error("commit failed");
+    });
+    render(
+      <StudioKonvaBubbleNode
+        {...commonProps({ onChange, onInteractionBegin, onInteractionEnd })}
+        el={bubbleElement()}
+      />,
+    );
+
+    const group = latest(konvaCapture.groups, "guarded bubble group") as {
+      onDragStart: (event: Record<string, unknown>) => void;
+      onDragEnd: (event: Record<string, unknown>) => void;
+    };
+    const target = { stopDrag: vi.fn(), x: () => 7, y: () => 8 };
+    group.onDragStart({ target });
+    expect(target.stopDrag).toHaveBeenCalledTimes(1);
+    expect(() => group.onDragEnd({ target })).toThrow("commit failed");
+    expect(onInteractionEnd).toHaveBeenCalledTimes(1);
   });
 });

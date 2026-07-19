@@ -19,7 +19,7 @@ export type StudioNodeInteractionGuards = {
   onInteractionEnd?: () => void;
 };
 
-function attachInteractionGuards(
+export function withStudioNodeInteractionGuards(
   base: Record<string, unknown>,
   guards: StudioNodeInteractionGuards | undefined
 ): Record<string, unknown> {
@@ -88,7 +88,7 @@ export function resizableNodeProps<T>(opts: {
       onChange({ x: node.x(), y: node.y(), width: w, height: h, rotation: node.rotation() } as T);
     },
   };
-  return attachInteractionGuards(base, { onInteractionBegin, onInteractionEnd });
+  return withStudioNodeInteractionGuards(base, { onInteractionBegin, onInteractionEnd });
 }
 
 /**
@@ -115,5 +115,5 @@ export function textNodeProps<T>(opts: {
     onDblTap: () => onEdit(id),
     onDragEnd: (e: DragEvt) => onPatch(id, { x: e.target.x(), y: e.target.y() } as T),
   };
-  return attachInteractionGuards(base, { onInteractionBegin, onInteractionEnd });
+  return withStudioNodeInteractionGuards(base, { onInteractionBegin, onInteractionEnd });
 }

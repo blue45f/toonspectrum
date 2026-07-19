@@ -243,6 +243,8 @@ describe("Studio Konva lettering node boundary", () => {
       "onSelect",
       "onEdit",
       "onChange",
+      "onInteractionBegin",
+      "onInteractionEnd",
     ];
 
     expect(propertyNames(findInterface(bubbleNode, "StudioKonvaBubbleNodeProps").members)).toEqual(
@@ -265,9 +267,11 @@ describe("Studio Konva lettering node boundary", () => {
     expect(attributes.get("onSelect")).toBe("{onSelect}");
     expect(attributes.get("onEdit")).toContain("startEditText(el.id)");
     expect(attributes.get("onChange")).toContain("patchEl(el.id, patch)");
+    expect(attributes.get("onInteractionBegin")).toContain("nodeInteractionBegin(el.id)");
+    expect(attributes.get("onInteractionEnd")).toBe("{endLiveResourceEdit}");
   });
 
-  it("keeps bubble rendering one-way and preserves the pre-existing no-soft-lock mechanics", () => {
+  it("keeps bubble rendering one-way and shares the collaboration interaction guards", () => {
     const bubbleNode = moduleShape("./StudioKonvaBubbleNode.tsx");
 
     expect(bubbleNode.dynamicImports).toEqual([]);
@@ -278,12 +282,13 @@ describe("Studio Konva lettering node boundary", () => {
       "./studio-bubble-text-fit",
       "./studio-bubble-text-runtime",
       "./studio-gradient-engine",
+      "./studio-node-props",
       "./studio-stroke-shapes",
     ]);
     expect(bubbleNode.allImports).toContain("./studio-element-model");
     expect(bubbleNode.allImports).toContain("konva");
     expect(bubbleNode.allImports).not.toContain("./StudioPage");
-    expect(bubbleNode.allImports).not.toContain("./studio-node-props");
+    expect(bubbleNode.allImports).toContain("./studio-node-props");
     expect(bubbleNode.allImports).not.toContain("react-router-dom");
     expect(bubbleNode.allImports.some((specifier) => /(?:crdt|collaboration|gpu)/u.test(specifier))).toBe(false);
     expect(bubbleNode.source).toContain('import type { El } from "./studio-element-model";');
@@ -292,8 +297,9 @@ describe("Studio Konva lettering node boundary", () => {
     expect(bubbleNode.source).toContain("computeBubbleShapeGeometry");
     expect(bubbleNode.source).not.toContain("const automaticTailBase =");
     expect(bubbleNode.source).not.toContain("const tailIsVertical =");
-    expect(bubbleNode.source).not.toContain("onInteractionBegin");
-    expect(bubbleNode.source).not.toContain("onInteractionEnd");
+    expect(bubbleNode.source).toContain("withStudioNodeInteractionGuards");
+    expect(bubbleNode.source).toContain("onInteractionBegin");
+    expect(bubbleNode.source).toContain("onInteractionEnd");
     expect(bubbleNode.source).toContain("const bTailLen =");
     expect(bubbleNode.source).toContain("const tailHandle = selected && showTail && !exporting && !showCustomShape");
     expect(bubbleNode.source).toContain("const w = Math.max(60, el.width * node.scaleX());");

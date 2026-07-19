@@ -34,6 +34,7 @@ import {
   formatVerticalText,
 } from "./studio-bubble-text-runtime";
 import { konvaGradientProps } from "./studio-gradient-engine";
+import { withStudioNodeInteractionGuards } from "./studio-node-props";
 import { normalizeStrokeStyle, strokeDashArray } from "./studio-stroke-shapes";
 
 import type { El } from "./studio-element-model";
@@ -52,6 +53,8 @@ export interface StudioKonvaBubbleNodeProps {
   onSelect: () => void;
   onEdit: () => void;
   onChange: (patch: Partial<El>) => void;
+  onInteractionBegin?: () => boolean;
+  onInteractionEnd?: () => void;
 }
 
 export function StudioKonvaBubbleNode({
@@ -67,6 +70,8 @@ export function StudioKonvaBubbleNode({
   onSelect,
   onEdit,
   onChange,
+  onInteractionBegin,
+  onInteractionEnd,
 }: StudioKonvaBubbleNodeProps) {
   // 외곽선 두께: 사용자 지정 우선, 없으면 말풍선 평균크기 3단계(작을수록 가늘게).
   const avgSize = (el.width + el.height) / 2;
@@ -250,6 +255,12 @@ export function StudioKonvaBubbleNode({
       stroke="#1f1a16"
       strokeWidth={1.5 / effectiveScale}
       draggable
+      onDragStart={(e) => {
+        e.cancelBubble = true;
+        if (onInteractionBegin && !onInteractionBegin()) {
+          e.target.stopDrag();
+        }
+      }}
       onDragMove={(e) => {
         e.cancelBubble = true;
         const node = e.target;
@@ -300,11 +311,38 @@ export function StudioKonvaBubbleNode({
       }}
       onDragEnd={(e) => {
         e.cancelBubble = true;
-        e.target.x(lx);
-        e.target.y(ly);
-        e.target.getLayer()?.batchDraw();
+        try {
+          e.target.x(lx);
+          e.target.y(ly);
+          e.target.getLayer()?.batchDraw();
+        } finally {
+          onInteractionEnd?.();
+        }
       }}
     />
+  );
+
+  const bubbleInteractionProps = withStudioNodeInteractionGuards(
+    {
+      onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) => {
+        onChange({ x: e.target.x(), y: e.target.y() });
+      },
+      onTransformEnd: (e: Konva.KonvaEventObject<Event>) => {
+        const node = e.target as Konva.Group;
+        const w = Math.max(60, el.width * node.scaleX());
+        const h = Math.max(50, el.height * node.scaleY());
+        node.scaleX(1);
+        node.scaleY(1);
+        onChange({
+          x: node.x(),
+          y: node.y(),
+          width: w,
+          height: h,
+          rotation: node.rotation(),
+        });
+      },
+    },
+    { onInteractionBegin, onInteractionEnd }
   );
 
   return (
@@ -326,15 +364,7 @@ export function StudioKonvaBubbleNode({
       onTap={onSelect}
       onDblClick={onEdit}
       onDblTap={onEdit}
-      onDragEnd={(e) => onChange({ x: e.target.x(), y: e.target.y() })}
-      onTransformEnd={(e) => {
-        const node = e.target as Konva.Group;
-        const w = Math.max(60, el.width * node.scaleX());
-        const h = Math.max(50, el.height * node.scaleY());
-        node.scaleX(1);
-        node.scaleY(1);
-        onChange({ x: node.x(), y: node.y(), width: w, height: h, rotation: node.rotation() });
-      }}
+      {...bubbleInteractionProps}
     >
       {showCustomShape ? (
         <Line
