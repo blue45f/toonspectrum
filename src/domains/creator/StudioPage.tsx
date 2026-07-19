@@ -71,7 +71,7 @@ import {
 } from "lucide-react";
 import { Fragment, Profiler, Suspense, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type SetStateAction } from "react";
 import { createPortal, flushSync } from "react-dom";
-import { Stage, Layer, Rect, Text as KText, TextPath as KTextPath, Image as KImage, Line, Group, Ellipse, Circle as KCircle, Path, Transformer, Shape } from "react-konva/lib/ReactKonvaCore";
+import { Stage, Layer, Rect, Text as KText, TextPath as KTextPath, Line, Group, Ellipse, Circle as KCircle, Path, Transformer, Shape } from "react-konva/lib/ReactKonvaCore";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 
@@ -685,7 +685,7 @@ import {
   type NodeEditHandle,
   type NodeEditTool,
 } from "./studio-node-edit";
-import { resizableNodeProps, textNodeProps } from "./studio-node-props";
+import { textNodeProps } from "./studio-node-props";
 import { useStudioPageDnd } from "./studio-page-dnd";
 import {
   isDefaultPageGrade,
@@ -1114,6 +1114,12 @@ import {
 } from "./StudioInspectorAside";
 import { StudioKonvaImageNode } from "./StudioKonvaImageNode";
 import {
+  StudioFocusLinesNode,
+  StudioFramePanel,
+  StudioSpeedLinesNode,
+  StudioWorkAssetPlaceholderNode,
+} from "./StudioKonvaPrimitiveNodes";
+import {
   StudioLazyPanelStack,
   type StudioLazyPanelStackHandlers,
 } from "./StudioLazyPanelStack";
@@ -1193,10 +1199,8 @@ import type {
 import type {
   DrawEl,
   El,
-  FocusLinesEl,
   FrameEl,
   ImageEl,
-  SpeedLinesEl,
 } from "./studio-element-model";
 import type { StudioEmeresLibraryItem } from "./studio-emeres-library";
 import type { StudioTutorialTryAction } from "./studio-feature-tutorials";
@@ -1313,66 +1317,6 @@ interface PendingBrushDelete {
   id: string;
   deleted: DeletedBrushRecord;
   expiresAt: number;
-}
-function StudioWorkAssetPlaceholderNode({
-  placeholder,
-  scale,
-}: {
-  placeholder: StudioWorkAssetRenderPlaceholder;
-  scale: number;
-}) {
-  const palette = placeholder.status === "error"
-    ? { fill: "#450a0a", stroke: "#ef4444", title: "#fecaca", detail: "#fca5a5" }
-    : placeholder.status === "ready"
-      ? { fill: "#052e16", stroke: "#22c55e", title: "#bbf7d0", detail: "#86efac" }
-      : { fill: "#1e1b4b", stroke: "#8b5cf6", title: "#ddd6fe", detail: "#c4b5fd" };
-  const padding = Math.min(18, Math.max(8, placeholder.width * 0.05));
-  return (
-    <Group
-      key={`work-asset-placeholder:${placeholder.elementType}:${placeholder.assetId}`}
-      x={placeholder.x}
-      y={placeholder.y}
-      rotation={placeholder.rotation}
-      listening={false}
-    >
-      <Rect
-        width={placeholder.width}
-        height={placeholder.height}
-        fill={palette.fill}
-        opacity={0.88}
-        stroke={palette.stroke}
-        strokeWidth={1.5 / Math.max(0.1, scale)}
-        dash={[8 / Math.max(0.1, scale), 5 / Math.max(0.1, scale)]}
-        cornerRadius={10}
-      />
-      <KText
-        x={padding}
-        y={Math.max(10, placeholder.height * 0.28)}
-        width={Math.max(24, placeholder.width - padding * 2)}
-        text={placeholder.label}
-        fill={palette.title}
-        fontFamily="Pretendard, sans-serif"
-        fontStyle="bold"
-        fontSize={Math.min(18, Math.max(11, placeholder.width / 18))}
-        align="center"
-      />
-      {placeholder.message ? (
-        <KText
-          x={padding}
-          y={Math.max(32, placeholder.height * 0.54)}
-          width={Math.max(24, placeholder.width - padding * 2)}
-          height={Math.max(18, placeholder.height * 0.32)}
-          text={placeholder.message}
-          fill={palette.detail}
-          fontFamily="Pretendard, sans-serif"
-          fontSize={Math.min(13, Math.max(9, placeholder.width / 24))}
-          align="center"
-          ellipsis
-          wrap="word"
-        />
-      ) : null}
-    </Group>
-  );
 }
 
 // 캔버스와 도구 패널 사이의 드래그 스플리터(데스크톱). 너비를 끌어서 조절, 더블클릭=기본값, ←/→=미세조절.
@@ -1784,21 +1728,6 @@ function AiAssetNotice({ onCancel, onAcknowledge }: { onCancel: () => void; onAc
   return createPortal(notice, document.body);
 }
 
-function coverFitRect(containerW: number, containerH: number, imageW: number, imageH: number) {
-  if (imageW <= 0 || imageH <= 0) {
-    return { x: 0, y: 0, width: containerW, height: containerH };
-  }
-  const scale = Math.max(containerW / imageW, containerH / imageH);
-  const width = imageW * scale;
-  const height = imageH * scale;
-  return {
-    x: (containerW - width) / 2,
-    y: (containerH - height) / 2,
-    width,
-    height,
-  };
-}
-
 // 내보내기 캔버스에 페이지 색보정(그레이드)을 픽셀로 합성한다.
 // 미리보기는 CSS filter로 보여주지만 Stage.toCanvas는 원본 픽셀을 캡처하므로,
 // CSS와 동일한 filter 문자열을 2D 컨텍스트에 적용한 새 캔버스로 다시 그린 뒤 비네트를 얹는다.
@@ -1816,344 +1745,6 @@ function bakeGradeIntoCanvas(src: HTMLCanvasElement, grade: PageGrade): HTMLCanv
   ctx.filter = "none";
   drawVignette(ctx, out.width, out.height, grade.vignette);
   return out;
-}
-
-function FramePanel({
-  el,
-  theme,
-  draggable,
-  innerRef,
-  onSelect,
-  onChange,
-  dragBoundFunc,
-  onInteractionBegin,
-  onInteractionEnd,
-}: {
-  el: FrameEl;
-  theme: "classic" | "soft" | "vivid";
-  draggable: boolean;
-  innerRef: (n: Konva.Node | null) => void;
-  onSelect: () => void;
-  onChange: (patch: Partial<FrameEl>) => void;
-  dragBoundFunc?: (pos: Konva.Vector2d) => Konva.Vector2d;
-  onInteractionBegin?: () => boolean;
-  onInteractionEnd?: () => void;
-}) {
-  const [img, setImg] = useState<HTMLImageElement | null>(null);
-
-  useEffect(() => {
-    if (!el.bg) {
-      setImg(null);
-      return;
-    }
-    let alive = true;
-    const im = new globalThis.Image();
-    im.onload = () => {
-      if (alive) setImg(im);
-    };
-    im.onerror = () => {
-      if (alive) setImg(null);
-    };
-    im.src = el.bg;
-    return () => {
-      alive = false;
-      im.onload = null;
-      im.onerror = null;
-    };
-  }, [el.bg]);
-
-  let fStroke = el.stroke ?? "#16100c";
-  let fStrokeW = el.strokeWidth ?? 3;
-  let fRadius = 4;
-  let fShadowColor = undefined;
-  let fShadowBlur = 0;
-  let fShadowOpacity = 0;
-  let fShadowOffset = undefined;
-
-  if (theme === "soft") {
-    fStroke = el.stroke ?? "#222222";
-    fStrokeW = el.strokeWidth ?? 1.8;
-    fRadius = 0;
-  } else if (theme === "vivid") {
-    fStroke = el.stroke ?? "#3a3a3a";
-    fStrokeW = el.strokeWidth ?? 1.2;
-    fRadius = 6;
-    fShadowColor = "black";
-    fShadowBlur = 5;
-    fShadowOpacity = 0.08;
-    fShadowOffset = { x: 1, y: 2 };
-  }
-
-  const fit = img ? coverFitRect(el.width, el.height, img.naturalWidth || img.width, img.naturalHeight || img.height) : null;
-  const borderInset = fStrokeW / 2;
-  // 사선/비정형 패널: 쿼드(8수) 폴리곤이면 폴리곤 클립·채움·테두리로 그린다.
-  const poly = el.points && el.points.length >= 6 ? el.points : null;
-  const clipProps = poly
-    ? {
-        clipFunc: (ctx: Konva.Context) => {
-          ctx.beginPath();
-          ctx.moveTo(poly[0], poly[1]);
-          for (let i = 2; i < poly.length; i += 2) ctx.lineTo(poly[i], poly[i + 1]);
-          ctx.closePath();
-        },
-      }
-    : { clipX: 0, clipY: 0, clipWidth: el.width, clipHeight: el.height };
-
-  return (
-    <Group
-      studioElementId={el.id}
-      ref={innerRef}
-      x={el.x}
-      y={el.y}
-      {...clipProps}
-      draggable={draggable}
-      dragBoundFunc={dragBoundFunc}
-      onMouseDown={onSelect}
-      onTap={onSelect}
-      onDragStart={(e) => {
-        if (onInteractionBegin && !onInteractionBegin()) e.target.stopDrag();
-      }}
-      onTransformStart={(e) => {
-        if (onInteractionBegin && !onInteractionBegin()) {
-          const node = e.target as Konva.Node & { stopDrag?: () => void };
-          node.stopDrag?.();
-        }
-      }}
-      onDragEnd={(e) => {
-        try {
-          onChange({ x: e.target.x(), y: e.target.y() });
-        } finally {
-          onInteractionEnd?.();
-        }
-      }}
-      onTransformEnd={(e) => {
-        try {
-          const node = e.target as Konva.Group;
-          const sx = node.scaleX();
-          const sy = node.scaleY();
-          const w = Math.max(40, el.width * sx);
-          const h = Math.max(40, el.height * sy);
-          node.scaleX(1);
-          node.scaleY(1);
-          // 폴리곤도 같은 비율로 스케일해 형태 유지.
-          const patch: Partial<FrameEl> = { x: node.x(), y: node.y(), width: w, height: h };
-          if (poly) patch.points = poly.map((v, i) => v * (i % 2 === 0 ? sx : sy));
-          onChange(patch);
-        } finally {
-          onInteractionEnd?.();
-        }
-      }}
-    >
-      {poly ? (
-        <Line points={poly} closed fill={el.bgColor ?? "#ffffff"} />
-      ) : (
-        <Rect width={el.width} height={el.height} fill={el.bgColor ?? "#ffffff"} />
-      )}
-      {img && fit ? (
-        <KImage
-          image={img}
-          x={fit.x}
-          y={fit.y}
-          width={fit.width}
-          height={fit.height}
-        />
-      ) : null}
-      {fStrokeW > 0 &&
-        (poly ? (
-          <Line
-            points={poly}
-            closed
-            stroke={fStroke}
-            strokeWidth={fStrokeW}
-            shadowColor={fShadowColor}
-            shadowBlur={fShadowBlur}
-            shadowOpacity={fShadowOpacity}
-            shadowOffset={fShadowOffset}
-            dash={el.dashStyle === "dashed" ? [10, 5] : undefined}
-          />
-        ) : (
-          <Rect
-            x={borderInset}
-            y={borderInset}
-            width={Math.max(0, el.width - fStrokeW)}
-            height={Math.max(0, el.height - fStrokeW)}
-            stroke={fStroke}
-            strokeWidth={fStrokeW}
-            cornerRadius={Math.max(0, fRadius - borderInset)}
-            shadowColor={fShadowColor}
-            shadowBlur={fShadowBlur}
-            shadowOpacity={fShadowOpacity}
-            shadowOffset={fShadowOffset}
-            dash={el.dashStyle === "dashed" ? [10, 5] : undefined}
-          />
-        ))}
-    </Group>
-  );
-}
-
-function seededRandom(seedStr: string) {
-  let hash = 0;
-  for (let i = 0; i < seedStr.length; i++) {
-    hash = seedStr.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return () => {
-    const x = Math.sin(hash++) * 10000;
-    return x - Math.floor(x);
-  };
-}
-
-function FocusLinesNode({
-  el,
-  draggable,
-  innerRef,
-  onSelect,
-  onChange,
-  dragBoundFunc,
-  onInteractionBegin,
-  onInteractionEnd,
-}: {
-  el: FocusLinesEl;
-  draggable: boolean;
-  innerRef: (n: Konva.Node | null) => void;
-  onSelect: () => void;
-  onChange: (patch: Partial<FocusLinesEl>) => void;
-  dragBoundFunc?: (pos: Konva.Vector2d) => Konva.Vector2d;
-  onInteractionBegin?: () => boolean;
-  onInteractionEnd?: () => void;
-}) {
-  const count = el.lineCount ?? 80;
-  const innerR = el.innerRadius ?? 120;
-  const outerR = el.outerRadius ?? 600;
-  const noise = el.noise ?? 24;
-
-  return (
-    <Shape
-      studioElementId={el.id}
-      ref={innerRef}
-      sceneFunc={(context, shape) => {
-        context.beginPath();
-        const cx = el.width * (el.centerXRatio ?? 0.5);
-        const cy = el.height * (el.centerYRatio ?? 0.5);
-        const rand = seededRandom(el.id);
-        for (let i = 0; i < count; i++) {
-          const angle = (i * 2 * Math.PI) / count;
-          const nStart = (rand() - 0.5) * noise;
-          const nEnd = (rand() - 0.5) * noise;
-          const rStart = Math.max(1, innerR + nStart);
-          const rEnd = Math.max(rStart + 10, outerR + nEnd);
-
-          const x1 = cx + rStart * Math.cos(angle);
-          const y1 = cy + rStart * Math.sin(angle);
-          const x2 = cx + rEnd * Math.cos(angle);
-          const y2 = cy + rEnd * Math.sin(angle);
-
-          context.moveTo(x1, y1);
-          context.lineTo(x2, y2);
-        }
-        context.fillStrokeShape(shape);
-      }}
-      hitFunc={(context, shape) => {
-        // 가는 선이라 빈 곳 클릭이 안 잡히는 문제 해결 — 전체 박스를 클릭 영역으로.
-        context.beginPath();
-        context.rect(0, 0, el.width, el.height);
-        context.closePath();
-        context.fillStrokeShape(shape);
-      }}
-      x={el.x}
-      y={el.y}
-      width={el.width}
-      height={el.height}
-      stroke={el.stroke ?? "#000000"}
-      strokeWidth={el.strokeWidth ?? 2.5}
-      rotation={el.rotation ?? 0}
-      opacity={el.opacity ?? 1}
-      {...resizableNodeProps<Partial<FocusLinesEl>>({
-        draggable,
-        dragBoundFunc,
-        onSelect,
-        onChange,
-        onInteractionBegin,
-        onInteractionEnd,
-      })}
-    />
-  );
-}
-
-function SpeedLinesNode({
-  el,
-  draggable,
-  innerRef,
-  onSelect,
-  onChange,
-  dragBoundFunc,
-  onInteractionBegin,
-  onInteractionEnd,
-}: {
-  el: SpeedLinesEl;
-  draggable: boolean;
-  innerRef: (n: Konva.Node | null) => void;
-  onSelect: () => void;
-  onChange: (patch: Partial<SpeedLinesEl>) => void;
-  dragBoundFunc?: (pos: Konva.Vector2d) => Konva.Vector2d;
-  onInteractionBegin?: () => boolean;
-  onInteractionEnd?: () => void;
-}) {
-  const count = el.lineCount ?? 60;
-  const dir = el.direction ?? "horizontal";
-
-  return (
-    <Shape
-      studioElementId={el.id}
-      ref={innerRef}
-      sceneFunc={(context, shape) => {
-        context.beginPath();
-        const rand = seededRandom(el.id);
-        const w = el.width;
-        const h = el.height;
-        if (dir === "horizontal") {
-          for (let i = 0; i < count; i++) {
-            const y = rand() * h;
-            const len = w * (0.2 + rand() * 0.8);
-            const xStart = rand() > 0.5 ? 0 : w - len;
-            context.moveTo(xStart, y);
-            context.lineTo(xStart + len, y);
-          }
-        } else {
-          for (let i = 0; i < count; i++) {
-            const x = rand() * w;
-            const len = h * (0.2 + rand() * 0.8);
-            const yStart = rand() > 0.5 ? 0 : h - len;
-            context.moveTo(x, yStart);
-            context.lineTo(x, yStart + len);
-          }
-        }
-        context.fillStrokeShape(shape);
-      }}
-      hitFunc={(context, shape) => {
-        // 가는 선이라 빈 곳 클릭이 안 잡히는 문제 해결 — 전체 박스를 클릭 영역으로.
-        context.beginPath();
-        context.rect(0, 0, el.width, el.height);
-        context.closePath();
-        context.fillStrokeShape(shape);
-      }}
-      x={el.x}
-      y={el.y}
-      width={el.width}
-      height={el.height}
-      stroke={el.stroke ?? "#000000"}
-      strokeWidth={el.strokeWidth ?? 2.5}
-      rotation={el.rotation ?? 0}
-      opacity={el.opacity ?? 1}
-      {...resizableNodeProps<Partial<SpeedLinesEl>>({
-        draggable,
-        dragBoundFunc,
-        onSelect,
-        onChange,
-        onInteractionBegin,
-        onInteractionEnd,
-      })}
-    />
-  );
 }
 
 // 캔버스 줌 한계와 클램프(0.05 단위 반올림으로 깔끔한 퍼센트 유지).
@@ -26328,7 +25919,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 }
                 if (el.type === "frame") {
                   return (
-                    <FramePanel
+                    <StudioFramePanel
                       key={el.id}
                       el={el}
                       theme={webtoonTheme}
@@ -26344,7 +25935,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 }
                 if (el.type === "focusLines")
                   return wrapClip(
-                    <FocusLinesNode
+                    <StudioFocusLinesNode
                       key={el.id}
                       el={el}
                       draggable={draggable}
@@ -26358,7 +25949,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                   );
                 if (el.type === "speedLines")
                   return wrapClip(
-                    <SpeedLinesNode
+                    <StudioSpeedLinesNode
                       key={el.id}
                       el={el}
                       draggable={draggable}
