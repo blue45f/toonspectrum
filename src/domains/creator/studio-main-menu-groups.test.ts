@@ -1,0 +1,421 @@
+import { describe, expect, it, vi } from "vitest";
+
+import {
+  buildStudioMainMenuGroups,
+  type StudioMainMenuBuilderState,
+  type StudioMainMenuEditAvailability,
+  type StudioMainMenuEditorActions,
+  type StudioMainMenuUiActions,
+} from "./studio-main-menu-groups";
+
+import type {
+  StudioMainMenuGroup,
+  StudioMainMenuItem,
+} from "./studio-main-menu-model";
+
+const AVAILABLE_EDIT_ACTIONS: StudioMainMenuEditAvailability = {
+  undoDisabled: false,
+  redoDisabled: false,
+  cutDisabled: false,
+  copyDisabled: false,
+  pasteDisabled: false,
+  selectAllDisabled: false,
+  deselectDisabled: false,
+  invertSelectionDisabled: false,
+  clearSelectionDisabled: false,
+  duplicateDisabled: false,
+  reorderDisabled: false,
+  cropLayerDisabled: false,
+};
+
+const BASE_STATE: StudioMainMenuBuilderState = {
+  sharedNonOwnerSave: false,
+  saving: false,
+  collaborationDocumentLocked: false,
+  hasWorkId: false,
+  projectArchiveBusy: false,
+  psdImportBusy: false,
+  edit: AVAILABLE_EDIT_ACTIONS,
+  filterDisabled: false,
+  viewTransformSuppressed: false,
+  canvasFlipH: false,
+  canvasRotation: 0,
+  fullscreen: false,
+  grayscaleView: false,
+  referencePanelOpen: false,
+  pageSequenceOpen: false,
+  hasSavedView: false,
+  perspectiveRulerActive: false,
+  hasLocallyHiddenLayers: false,
+  leftPanelOpen: true,
+  rightPanelOpen: true,
+  lastFilterDraft: null,
+};
+
+function createEditorActions(): StudioMainMenuEditorActions {
+  return {
+    copyImageToClipboard: vi.fn(),
+    save: vi.fn(),
+    exportProject: vi.fn(),
+    exportProjectArchive: vi.fn(),
+    undo: vi.fn(),
+    redo: vi.fn(),
+    cutSelectedElements: vi.fn(),
+    copySelectedElements: vi.fn(),
+    pasteElements: vi.fn(),
+    openImagePastePicker: vi.fn(),
+    selectAll: vi.fn(),
+    deselect: vi.fn(),
+    invertSelection: vi.fn(),
+    clearSelection: vi.fn(),
+    duplicateSelected: vi.fn(),
+    reorder: vi.fn(),
+    openSelectedLayerCrop: vi.fn(),
+    addText: vi.fn(),
+    addPage: vi.fn(),
+    toggleHorizontalCanvasView: vi.fn(),
+    rotateCanvasView: vi.fn(),
+    resetCanvasViewRotation: vi.fn(),
+    fitCanvasToWidth: vi.fn(),
+    setActualPixelView: vi.fn(),
+    toggleFullscreen: vi.fn(),
+    toggleGrayscaleView: vi.fn(),
+    saveCurrentStudioView: vi.fn(),
+    restoreSavedStudioView: vi.fn(),
+    togglePerspectiveGuideView: vi.fn(),
+    showAllLocallyHiddenLayers: vi.fn(),
+    setStudioUiDensity: vi.fn(),
+    enterCanvasOnlyMode: vi.fn(),
+    openFeatureTutorial: vi.fn(),
+    openStudioFilter: vi.fn(),
+    toggleAdvancedFill: vi.fn(),
+  };
+}
+
+function createUiActions(): StudioMainMenuUiActions {
+  return {
+    openExportDownload: vi.fn(),
+    requestProjectImport: vi.fn(),
+    requestPsdImport: vi.fn(),
+    openProjectTools: vi.fn(),
+    toggleHistoryPanel: vi.fn(),
+    openAppSettings: vi.fn(),
+    openStudioMenu: vi.fn(),
+    openAssetMenu: vi.fn(),
+    requestImageInsert: vi.fn(),
+    openVrmPoser: vi.fn(),
+    openBackground3d: vi.fn(),
+    openReferencePanel: vi.fn(),
+    stepZoom: vi.fn(),
+    toggleReferencePanel: vi.fn(),
+    togglePageSequence: vi.fn(),
+    openProductionInsights: vi.fn(),
+    collapseSidePanels: vi.fn(),
+    openToolsCompanion: vi.fn(),
+    toggleLeftPanel: vi.fn(),
+    toggleRightPanel: vi.fn(),
+    openShortcuts: vi.fn(),
+    selectDrawMode: vi.fn(),
+    enableSmartShape: vi.fn(),
+  };
+}
+
+type StateOverrides = Partial<Omit<StudioMainMenuBuilderState, "edit">> & {
+  edit?: Partial<StudioMainMenuEditAvailability>;
+};
+
+function buildMenu(stateOverrides: StateOverrides = {}) {
+  const editor = createEditorActions();
+  const ui = createUiActions();
+  const state: StudioMainMenuBuilderState = {
+    ...BASE_STATE,
+    ...stateOverrides,
+    edit: {
+      ...AVAILABLE_EDIT_ACTIONS,
+      ...stateOverrides.edit,
+    },
+  };
+  const groups = buildStudioMainMenuGroups({ state, editor, ui });
+  return { editor, groups, ui };
+}
+
+function menuItem(
+  groups: readonly StudioMainMenuGroup[],
+  groupId: string,
+  itemId: string,
+): StudioMainMenuItem {
+  const group = groups.find((candidate) => candidate.id === groupId);
+  const item = group?.items.find((candidate) => candidate.id === itemId);
+  if (!item) throw new Error(`Missing menu item: ${groupId}/${itemId}`);
+  return item;
+}
+
+describe("buildStudioMainMenuGroups", () => {
+  it("preserves the complete group and item order", () => {
+    const { groups } = buildMenu();
+
+    expect(groups.map((group) => group.id)).toEqual([
+      "file",
+      "edit",
+      "insert",
+      "view",
+      "filter",
+      "draw",
+      "ai",
+    ]);
+    expect(groups.map((group) => group.items.map((item) => item.id))).toEqual([
+      [
+        "export",
+        "copy-image",
+        "save-draft",
+        "publish",
+        "export-json",
+        "export-archive",
+        "import-json",
+        "import-psd",
+        "project",
+      ],
+      [
+        "undo",
+        "redo",
+        "cut",
+        "copy",
+        "paste",
+        "paste-in-place",
+        "paste-file",
+        "select-all",
+        "deselect",
+        "invert-selection",
+        "clear-selection",
+        "duplicate",
+        "bring-front",
+        "bring-forward",
+        "send-back",
+        "send-backward",
+        "crop-layer",
+        "history",
+        "pen-pressure",
+        "app-settings",
+      ],
+      [
+        "template",
+        "collage",
+        "elements",
+        "bubble",
+        "text",
+        "image",
+        "char",
+        "bg3d",
+        "ref",
+        "page",
+      ],
+      [
+        "zoom-in",
+        "zoom-out",
+        "flip-horizontal",
+        "rotate-left",
+        "rotate-right",
+        "reset-rotation",
+        "fit",
+        "actual-pixels",
+        "fullscreen",
+        "grayscale",
+        "reference-window",
+        "page-sequence",
+        "save-current-view",
+        "restore-view",
+        "perspective-guide",
+        "reset-local-visibility",
+        "production-insights",
+        "density-focus",
+        "density-full",
+        "wide",
+        "tools-companion",
+        "canvas-only",
+        "left-panel",
+        "right-panel",
+        "feature-tutorials",
+        "shortcuts",
+        "app-settings",
+      ],
+      [
+        "last-filter",
+        "gaussian-blur",
+        "motion-blur",
+        "hue-saturation-brightness",
+        "brightness-contrast",
+        "color-curves",
+      ],
+      ["pen", "eraser", "fill", "smart-shape", "bg", "style"],
+      ["ai-assist", "stock", "integrations"],
+    ]);
+  });
+
+  it("projects document, collaboration, edit, and view state without changing semantics", () => {
+    const lastFilterDraft = { kind: "gaussian-blur" as const, radius: 12 };
+    const { groups } = buildMenu({
+      sharedNonOwnerSave: true,
+      saving: true,
+      collaborationDocumentLocked: true,
+      hasWorkId: true,
+      projectArchiveBusy: true,
+      psdImportBusy: true,
+      edit: Object.fromEntries(
+        Object.keys(AVAILABLE_EDIT_ACTIONS).map((key) => [key, true]),
+      ) as unknown as StudioMainMenuEditAvailability,
+      filterDisabled: true,
+      viewTransformSuppressed: true,
+      canvasFlipH: true,
+      canvasRotation: 90,
+      fullscreen: true,
+      grayscaleView: true,
+      referencePanelOpen: true,
+      pageSequenceOpen: true,
+      hasSavedView: true,
+      perspectiveRulerActive: true,
+      hasLocallyHiddenLayers: true,
+      leftPanelOpen: false,
+      rightPanelOpen: false,
+      lastFilterDraft,
+    });
+
+    expect(menuItem(groups, "file", "save-draft")).toMatchObject({
+      label: "공동 저장",
+      disabled: true,
+    });
+    expect(menuItem(groups, "file", "publish")).toMatchObject({
+      label: "수정 게시",
+      disabled: true,
+    });
+    expect(menuItem(groups, "file", "export-archive").disabled).toBe(true);
+    expect(menuItem(groups, "file", "import-psd").disabled).toBe(true);
+    expect(menuItem(groups, "insert", "page").disabled).toBe(true);
+
+    for (const itemId of [
+      "undo",
+      "redo",
+      "cut",
+      "copy",
+      "paste",
+      "paste-in-place",
+      "paste-file",
+      "select-all",
+      "deselect",
+      "invert-selection",
+      "clear-selection",
+      "duplicate",
+      "bring-front",
+      "bring-forward",
+      "send-back",
+      "send-backward",
+      "crop-layer",
+    ]) {
+      expect(menuItem(groups, "edit", itemId).disabled, itemId).toBe(true);
+    }
+
+    expect(menuItem(groups, "view", "flip-horizontal")).toMatchObject({
+      checked: true,
+      disabled: true,
+    });
+    expect(menuItem(groups, "view", "fullscreen")).toMatchObject({
+      checked: true,
+      disabled: true,
+    });
+    expect(menuItem(groups, "view", "grayscale")).toMatchObject({
+      checked: true,
+      disabled: true,
+    });
+    expect(menuItem(groups, "view", "reference-window").checked).toBe(true);
+    expect(menuItem(groups, "view", "page-sequence")).toMatchObject({
+      label: "페이지 시퀀스 닫기",
+      checked: true,
+    });
+    expect(menuItem(groups, "view", "reset-rotation")).toMatchObject({
+      label: "보기 회전 초기화 (90°)",
+      disabled: true,
+    });
+    expect(menuItem(groups, "view", "restore-view").disabled).toBe(true);
+    expect(menuItem(groups, "view", "perspective-guide").checked).toBe(true);
+    expect(menuItem(groups, "view", "reset-local-visibility").disabled).toBe(false);
+    expect(menuItem(groups, "view", "left-panel").label).toBe("왼쪽 패널 보이기");
+    expect(menuItem(groups, "view", "right-panel").label).toBe("속성 패널 보이기");
+    expect(menuItem(groups, "filter", "last-filter")).toMatchObject({
+      label: "마지막 필터 다시 열기",
+      disabled: true,
+    });
+    expect(menuItem(groups, "filter", "color-curves").disabled).toBe(true);
+  });
+
+  it("routes file, edit, insert, and drawing commands to their injected owners", () => {
+    const { editor, groups, ui } = buildMenu();
+
+    menuItem(groups, "file", "export").onSelect();
+    menuItem(groups, "file", "save-draft").onSelect();
+    menuItem(groups, "file", "publish").onSelect();
+    menuItem(groups, "file", "import-json").onSelect();
+    menuItem(groups, "edit", "paste").onSelect();
+    menuItem(groups, "edit", "paste-in-place").onSelect();
+    menuItem(groups, "edit", "bring-forward").onSelect();
+    menuItem(groups, "edit", "pen-pressure").onSelect();
+    menuItem(groups, "insert", "template").onSelect();
+    menuItem(groups, "insert", "elements").onSelect();
+    menuItem(groups, "insert", "text").onSelect();
+    menuItem(groups, "insert", "page").onSelect();
+    menuItem(groups, "draw", "pen").onSelect();
+    menuItem(groups, "draw", "smart-shape").onSelect();
+    menuItem(groups, "draw", "fill").onSelect();
+    menuItem(groups, "ai", "ai-assist").onSelect();
+
+    expect(ui.openExportDownload).toHaveBeenCalledOnce();
+    expect(editor.save).toHaveBeenNthCalledWith(1, "draft");
+    expect(editor.save).toHaveBeenNthCalledWith(2, "published");
+    expect(ui.requestProjectImport).toHaveBeenCalledOnce();
+    expect(editor.pasteElements).toHaveBeenNthCalledWith(1, "cascade");
+    expect(editor.pasteElements).toHaveBeenNthCalledWith(2, "in-place");
+    expect(editor.reorder).toHaveBeenCalledWith("forward");
+    expect(ui.openAppSettings).toHaveBeenCalledWith("other");
+    expect(ui.openAssetMenu).toHaveBeenCalledOnce();
+    expect(ui.openStudioMenu).toHaveBeenCalledWith("elements");
+    expect(editor.addText).toHaveBeenCalledOnce();
+    expect(editor.addPage).toHaveBeenCalledOnce();
+    expect(ui.selectDrawMode).toHaveBeenCalledWith("pen");
+    expect(ui.enableSmartShape).toHaveBeenCalledOnce();
+    expect(editor.toggleAdvancedFill).toHaveBeenCalledOnce();
+    expect(ui.openStudioMenu).toHaveBeenCalledWith("aiAssist");
+  });
+
+  it("routes view and filter commands, including compound focus layout behavior", () => {
+    const lastFilterDraft = { kind: "motion-blur" as const, distance: 8, angle: -30 };
+    const { editor, groups, ui } = buildMenu({ lastFilterDraft });
+
+    menuItem(groups, "view", "zoom-in").onSelect();
+    menuItem(groups, "view", "zoom-out").onSelect();
+    menuItem(groups, "view", "rotate-left").onSelect();
+    menuItem(groups, "view", "density-focus").onSelect();
+    menuItem(groups, "view", "density-full").onSelect();
+    menuItem(groups, "view", "tools-companion").onSelect();
+    menuItem(groups, "view", "feature-tutorials").onSelect();
+    menuItem(groups, "view", "app-settings").onSelect();
+    menuItem(groups, "filter", "last-filter").onSelect();
+    menuItem(groups, "filter", "gaussian-blur").onSelect();
+
+    expect(ui.stepZoom).toHaveBeenNthCalledWith(1, 1);
+    expect(ui.stepZoom).toHaveBeenNthCalledWith(2, -1);
+    expect(editor.rotateCanvasView).toHaveBeenCalledWith("left");
+    expect(editor.setStudioUiDensity).toHaveBeenNthCalledWith(1, "focus");
+    expect(ui.collapseSidePanels).toHaveBeenCalledOnce();
+    expect(editor.setStudioUiDensity).toHaveBeenNthCalledWith(2, "full");
+    expect(ui.openToolsCompanion).toHaveBeenCalledOnce();
+    expect(editor.openFeatureTutorial).toHaveBeenCalledOnce();
+    expect(ui.openAppSettings).toHaveBeenCalledWith();
+    expect(editor.openStudioFilter).toHaveBeenNthCalledWith(
+      1,
+      "motion-blur",
+      lastFilterDraft,
+    );
+    expect(editor.openStudioFilter).toHaveBeenNthCalledWith(2, "gaussian-blur");
+    expect(
+      vi.mocked(editor.setStudioUiDensity).mock.invocationCallOrder[0],
+    ).toBeLessThan(vi.mocked(ui.collapseSidePanels).mock.invocationCallOrder[0]);
+  });
+});
