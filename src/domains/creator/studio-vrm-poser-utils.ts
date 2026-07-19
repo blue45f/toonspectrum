@@ -1,5 +1,6 @@
 import * as THREE from "three";
 
+import { STUDIO_HUMANOID_BONE_NAMES } from "./studio-humanoid-bones";
 import { POSER_FINGER_BONES } from "./studio-pose-presets";
 import { classifyMeshName } from "./studio-vrm-costume";
 import { parseVrmProps, type PropInstance } from "./studio-vrm-props";
@@ -648,7 +649,6 @@ export const POSE_PRESETS: PosePreset[] = [
   },
 ];
 
-const CORE_ROTATION_BONE_ORDER = ["hips", "spine", "chest", "neck", "head", "leftShoulder", "rightShoulder"] as const satisfies readonly VRMHumanBoneName[];
 const LIMB_BONE_ORDER = [
   "leftUpperArm",
   "rightUpperArm",
@@ -659,7 +659,6 @@ const LIMB_BONE_ORDER = [
   "leftLowerLeg",
   "rightLowerLeg",
 ] as const satisfies readonly VRMHumanBoneName[];
-const END_EFFECTOR_ROTATION_BONE_ORDER = ["leftHand", "rightHand", "leftFoot", "rightFoot"] as const satisfies readonly VRMHumanBoneName[];
 // 손가락 본(오일러 회전 전용) — 모델에 해당 본이 없으면 그대로 건너뛴다.
 const FINGER_ROTATION_BONE_ORDER = [
   "leftThumbMetacarpal",
@@ -693,6 +692,29 @@ const FINGER_ROTATION_BONE_ORDER = [
   "rightLittleIntermediate",
   "rightLittleDistal",
 ] as const satisfies readonly VRMHumanBoneName[];
+/**
+ * Runtime pose application is deliberately derived from the same semantic allowlist used by the
+ * portable pose-material boundary. Arbitrary object keys can therefore never address scene nodes,
+ * while optional VRM bones (eyes, jaw, upper chest and toes included) are no longer dropped.
+ */
+export const STUDIO_VRM_APPLIED_HUMANOID_BONES = STUDIO_HUMANOID_BONE_NAMES;
+const LIMB_BONE_SET = new Set<VRMHumanBoneName>(LIMB_BONE_ORDER);
+const POST_DIRECTION_ROTATION_BONE_SET = new Set<VRMHumanBoneName>([
+  "leftHand",
+  "rightHand",
+  "leftFoot",
+  "leftToes",
+  "rightFoot",
+  "rightToes",
+  ...FINGER_ROTATION_BONE_ORDER,
+]);
+const PRE_DIRECTION_ROTATION_BONE_ORDER = STUDIO_VRM_APPLIED_HUMANOID_BONES.filter(
+  (boneName) =>
+    !LIMB_BONE_SET.has(boneName) && !POST_DIRECTION_ROTATION_BONE_SET.has(boneName)
+);
+const POST_DIRECTION_ROTATION_BONE_ORDER = STUDIO_VRM_APPLIED_HUMANOID_BONES.filter(
+  (boneName) => POST_DIRECTION_ROTATION_BONE_SET.has(boneName)
+);
 export const ZERO_ROTATION: Vec3 = [0, 0, 0];
 const MIN_DIRECTION_LENGTH_SQ = 0.000001;
 
@@ -786,7 +808,7 @@ export function applyPoseToVrm(vrm: VRM, bones: PoseBoneMap, yOffset: number) {
   vrm.scene.position.y = yOffset;
   vrm.scene.updateMatrixWorld(true);
 
-  CORE_ROTATION_BONE_ORDER.forEach((boneName) => {
+  PRE_DIRECTION_ROTATION_BONE_ORDER.forEach((boneName) => {
     const rotation = bones[boneName]?.rotation;
     if (rotation) {
       applyEulerRotation(humanoid, boneName, rotation);
@@ -808,14 +830,7 @@ export function applyPoseToVrm(vrm: VRM, bones: PoseBoneMap, yOffset: number) {
     }
   });
 
-  END_EFFECTOR_ROTATION_BONE_ORDER.forEach((boneName) => {
-    const rotation = bones[boneName]?.rotation;
-    if (rotation) {
-      applyEulerRotation(humanoid, boneName, rotation);
-    }
-  });
-
-  FINGER_ROTATION_BONE_ORDER.forEach((boneName) => {
+  POST_DIRECTION_ROTATION_BONE_ORDER.forEach((boneName) => {
     const rotation = bones[boneName]?.rotation;
     if (rotation) {
       applyEulerRotation(humanoid, boneName, rotation);
@@ -998,7 +1013,7 @@ export type FingerRotationMap = Partial<Record<VRMHumanBoneName, Vec3>>;
 export function applyFingerRotations(vrm: VRM, fingers: FingerRotationMap) {
   const humanoid = vrm.humanoid;
   if (!humanoid) return;
-  (Object.keys(fingers) as VRMHumanBoneName[]).forEach((boneName) => {
+  FINGER_ROTATION_BONE_ORDER.forEach((boneName) => {
     const rot = fingers[boneName];
     if (rot) applyEulerRotation(humanoid, boneName, rot);
   });

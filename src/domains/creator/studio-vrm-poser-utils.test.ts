@@ -1,7 +1,10 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 
+import { STUDIO_HUMANOID_BONE_NAMES } from "./studio-humanoid-bones";
 import {
+  STUDIO_VRM_APPLIED_HUMANOID_BONES,
+  applyPoseToVrm,
   stripFingerBones,
   applyPoserVisualState,
   applyFullState,
@@ -107,6 +110,42 @@ function addMesh(parent: THREE.Object3D, name: string, material: THREE.Material)
 }
 
 describe("studio-vrm-poser-utils unified pipeline", () => {
+  it("applies the complete shared 55-bone vocabulary including optional face and toe bones", () => {
+    expect(STUDIO_VRM_APPLIED_HUMANOID_BONES).toEqual(STUDIO_HUMANOID_BONE_NAMES);
+    const scene = new THREE.Group();
+    const optionalBones = [
+      "upperChest",
+      "leftEye",
+      "rightEye",
+      "jaw",
+      "leftToes",
+      "rightToes",
+    ] as const;
+    const nodes = new Map<VRMHumanBoneName, THREE.Object3D>();
+    for (const bone of optionalBones) {
+      const node = new THREE.Object3D();
+      scene.add(node);
+      nodes.set(bone, node);
+    }
+    const vrm = {
+      scene,
+      humanoid: {
+        resetNormalizedPose: () => nodes.forEach((node) => node.rotation.set(0, 0, 0)),
+        getNormalizedBoneNode: (bone: VRMHumanBoneName) => nodes.get(bone) ?? null,
+        update: () => undefined,
+      },
+      update: () => undefined,
+    } as unknown as VRM;
+    const pose = Object.fromEntries(
+      optionalBones.map((bone, index) => [bone, { rotation: [0.01 * (index + 1), 0.02, -0.03] }]),
+    ) as PoseBoneMap;
+
+    expect(applyPoseToVrm(vrm, pose, 0)).toBe(true);
+    for (const bone of optionalBones) {
+      expect(nodes.get(bone)?.rotation.x).toBeCloseTo(pose[bone]!.rotation![0]);
+    }
+  });
+
   it("serializes a bounded body rotation and explicit model owner while rejecting unsafe values", () => {
     const serialized = serializeFullVrmState({
       modelId: "model-a",

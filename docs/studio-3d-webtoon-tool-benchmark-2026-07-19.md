@@ -156,11 +156,14 @@ SKP 장면, 카메라, 조명·선·재질, 다중 scene와 render pass를 웹�
   거부하고 입력을 복사한 뒤 계산한다. 결과는 해당 승인 기기 컨텍스트의
   `qualify-approved-context`일 뿐 전역 채택 판정이 아니다. 실기기 corpus runner·기기 매트릭스 집계·
   production route에는 아직 연결하지 않았다.
-- **[이번 기반]** VRM 1.0 humanoid 55본을 의미 이름으로 저장하는 포즈 소재 v1과 full/upper/lower/
+- **[이번 반영]** VRM 1.0 humanoid 55본을 의미 이름으로 저장하는 포즈 소재 v1과 full/upper/lower/
   left-hand/right-hand/gaze-jaw 부분 적용, locked-bone merge plan, 최대 64개·256 KiB 로컬 라이브러리
   코어를 추가했다. 회전은 `xyzw`·right-handed·VRM normalized·bone-local·rest-relative·
   `delta × rest`로 wire semantics를 고정했다. 손상/미래 버전 저장소는 보존하며 전체 교체는 명시적
-  force가 있어야 한다. 아직 VRM poser의 사용자 패널과 runtime 적용 command에는 연결하지 않았다.
+  force가 있어야 한다. 별도 poser 패널에서 현재 normalized pose 저장, 범위별 부분 적용, 잠긴 본과
+  대상 모델 미지원 본 보존·보고, strict JSON merge/export를 제공한다. runtime 적용은 명시적 before/after
+  history transaction으로 즉시 undo/redo되며, eyes·jaw·upperChest·toes를 포함한 55본을 scene bake까지
+  동일 allowlist로 처리한다. 기존 Euler/direction·Y-offset·표정 포즈 저장소는 자동 변환하거나 덮어쓰지 않는다.
 
 ### 4.2 이번 변경에서 구현·연결된 기능
 
@@ -173,6 +176,7 @@ SKP 장면, 카메라, 조명·선·재질, 다중 scene와 render pass를 웹�
 | 검수·후반작업 bundle | archive Worker가 v2 manifest와 PNG/PSD를 bounded ZIP으로 만들고, 컷별 최대 4개 LT layer PSD는 별도 Worker에서 예산 내 생성한다. 컷당 대표 패스로 4×3 콘택트 시트를 OffscreenCanvas Worker에서 만들며, PSD·콘택트가 미지원/초과/실패하면 PNG를 보존하고 manifest에 fallback 사유를 남긴다 | ABLUR의 layered PSD/pass export와 Snaptoon식 빠른 컷 검수 |
 | 분위기 rig | 맑은 낮, 골든아워, 푸른 밤, 옅은 안개, 극적 야경의 배경·안개·조명·노출·tone mapping을 원자 적용 | ABLUR/Snaptoon의 빠른 분위기 연출 |
 | 사진 포즈 스캔 | JPEG/PNG/WebP admission, EXIF·회전·mirror·resize를 Worker 처리하고 로컬 MediaPipe IMAGE-mode 결과를 VRM pose로 적용 | SHAPER/CSP의 사진 포즈 workflow와 CSP 서버 업로드 대비 privacy 이점 |
+| 캐릭터 공용 포즈 소재 | VRM normalized 55본 quaternion을 전신·상하체·양손·시선/턱 scope로 저장하고 다른 VRM에 부분 이식한다. joint lock과 optional-bone skip을 보존·보고하고 한 command로 undo/redo하며, 장면에는 로컬 소재 ID가 아니라 실제 bake 회전을 저장한다 | CSP 포즈 소재의 재사용성과 웹 프로젝트의 이식성·오프라인 로컬 저장 |
 | 포즈 편집 보강 | 팔/다리/몸통/전체 mirror, 상체 펴기, 보수적인 VRM joint limit profile과 opt-out, 3D 관절 점 선택·잠금 표시, 화면 평면에서 손목을 끄는 two-bone IK와 drag-end 단일 pose commit | CSP joint limit·시각적 관절 선택, AccuPOSE lock/controlled posing의 기초 |
 | 렌더 설정 연결 | SceneDocument의 exposure와 neutral/ACES tone mapping을 실제 Three WebGL 렌더에 반영 | 조명 preset이 문서값에만 머물지 않도록 보장 |
 | 원근 브리지 | 분리 LT 삽입 경로에서 회전되지 않은 3D plate의 camera로 2D 원근자용 finite 소실점 가이드를 생성·적용하는 단방향 엔진 중립 경계 | 컷 구도를 2D 후반작업까지 연결 |
@@ -249,17 +253,19 @@ frequency를 조정한다.
   있다.
 - **[이번 반영]** local photo pose workflow는 CSP처럼 서버 업로드를 요구하지 않는다. 보수적 joint limit과
   mirror도 추가됐다.
-- **[이번 기반/UI 미연결]** VRM 1.0 semantic 55본 기반 pose material과 full/upper/lower/hand/gaze-jaw scope,
-  locked-bone merge plan, bounded local library를 구현했다.
-- **[격차]** pose material의 poser UI·undo command 연결, visual joint pin/end-effector lock, 실시간 hand
-  scanner, BVH pose sequence, true vector line, scale/depth-aware line thickness는 남아 있다.
+- **[이번 반영]** VRM 1.0 semantic 55본 기반 pose material을 poser의 저장·부분 적용·삭제·JSON
+  merge/export UI와 즉시 undo command에 연결했다. 잠긴 본, scope 밖 본, 대상 모델에 없는 optional bone은
+  변경하지 않고 결과를 `aria-live`로 보고한다.
+- **[격차]** visual joint pin/end-effector lock, 포즈 강도 blend/additive layer, 실시간 hand scanner,
+  BVH pose sequence, true vector line, scale/depth-aware line thickness는 남아 있다.
 
 #### 가져올 기능
 
-1. **[P1·코어 반영/UI 미연결] 포즈 소재**: full-body, upper/lower body, left/right hand, eye/jaw rotation을
+1. **[P1·이번 반영] 포즈 소재**: full-body, upper/lower body, left/right hand, eye/jaw rotation을
    분리하고 semantic bone name + VRM normalized rest-relative quaternion으로 저장한다. source rig의 bone
-   index를 저장하지 않으며, 다음 단계에서 poser adapter와 undo transaction을 연결한다. blink·감정·viseme
-   같은 표정은 bone pose로 과장하지 않고 별도의 bounded VRM expression-weight 계약으로 설계한다.
+   index를 저장하지 않으며 poser adapter와 undo transaction까지 연결했다. 다음 단계는 강도 blend,
+   additive/masked layer, thumbnail·folder·cloud share다. blink·감정·viseme 같은 표정은 bone pose로
+   과장하지 않고 별도의 bounded VRM expression-weight 계약으로 설계한다.
 2. **[P1] visual pin과 end-effector**: 손·발·골반·시선을 화면 controller로 움직이고, 선택한 joint를 pin한다.
    기존 analytic two-bone IK 결과를 같은 undo transaction에 넣는다.
 3. **[P1] 실시간 한 손 스캔**: camera permission을 명시적으로 받고 한 손씩 preview한다. 품질이 낮으면
@@ -369,8 +375,10 @@ selected-only render를 제공한다.
 1. **[P0] shot board 안정화**: shot apply가 camera뿐 아니라 background, lighting, render,
    node visibility를 원자 변경하고 undo/redo·archive round-trip·320 KiB SceneDocument 예산을 통과하게 한다.
 2. **[P1·이번 반영/부분] 선택형·복구 가능한 batch shot queue**: selected-only, animation freeze,
-   cancel/progress, hidden-tab pause와 같은 탭 안의 완료 컷 재사용은 구현했다. 다음 단계는 IndexedDB quota를
-   먼저 승인받는 작은 checkpoint로 새로고침·브라우저 재시작 뒤 복구를 제공하는 것이다.
+   cancel/progress, hidden-tab pause와 같은 탭 안의 완료 컷 재사용은 구현했다. 영속화 전에 Plan v2가
+   source·plan SHA-256과 컷별 정확한 capture width/height를 고정하고, user/work/page/element scope를
+   받아야 한다. 그다음 컷의 PNG/skip·PSD/fallback과 queue success를 같은 IndexedDB transaction으로
+   커밋하고 quota·TTL·lease/CAS를 적용해 새로고침·브라우저 재시작 뒤 마지막 원자 컷부터 복구한다.
 3. **[P1·이번 반영/부분] pass bundle**: beauty/composite, color, tone, texture line, main line, depth를
    v2 manifest와 함께 export한다. shadow, material-ID, normal은 capture adapter 계약이 마련되기 전에는
    지원한다고 표시하지 않는다.
@@ -721,11 +729,16 @@ transparent/LT capture, undo/redo가 desktop과 390/320 px mobile에서 데이�
 ### P1 — 웹툰 제작 속도를 직접 줄이는 기능
 
 1. **[이번 반영]** shot batch의 selected-only, 해상도 선택, pass별 PNG, 콘택트 시트, 같은 탭의 완료 컷
-   재사용을 유지하고, 다음으로 quota-aware durable checkpoint와 실패 컷만 재시도하는 UI를 연결한다.
-2. **[부분 반영]** beauty/color/line/texture-line/tone/depth와 bounded layered PSD는 연결됐다. 의미 재질
-   suggestion을 사용자가 확정한 slot과 capture adapter에 연결해 shadow/material-ID/normal을 추가한다.
-3. **[코어 반영/UI 미연결]** full-body/upper/lower/hand/gaze-jaw pose material library를 VRM poser의 저장·미리보기·
-   부분 적용 command에 연결하고 visual end-effector pin, joint lock, ground/foot contact를 보강한다.
+   재사용을 유지한다. 다음으로 SHA-256 source/plan identity와 frozen capture profile을 소유하는 Plan v2,
+   stable auth/work/page/element scope를 먼저 연결한 뒤 quota-aware IndexedDB checkpoint와 실패 컷만
+   재시도하는 복구 UI를 구현한다. source/plan/render/capture digest가 다르면 artifact를 섞지 않는다.
+2. **[부분 반영]** beauty/color/line/texture-line/tone/depth와 bounded layered PSD는 연결됐다. 다음 pass는
+   공통 renderer-state lease와 source alpha/side/displacement를 보존하는 auxiliary-surface capture를 먼저
+   만든 뒤 view-space geometric normal과 실제 normal-angle crease를 연결한다. 그 기반 위에서 stable
+   logical material legend를 갖춘 material-ID, 마지막으로 deterministic shadow camera/catcher를 구현한다.
+3. **[이번 반영]** full-body/upper/lower/hand/gaze-jaw pose material library를 VRM poser의 저장·부분 적용·
+   import/export·undo command에 연결했다. 다음은 visual end-effector pin, pose blend/additive mask,
+   ground/foot contact와 BVH retarget을 보강한다.
 4. 실시간 한 손 scanner와 photo pose의 preview/freeze/confirm UX.
 5. camera near clipping, Dutch roll, safe frame, panel aspect와 shot thumbnail. 콘택트 시트 export는 이번 반영.
 6. SHAPER식 `CharacterRecipe`와 권리형 hair/clothes/accessory/material preset catalog.

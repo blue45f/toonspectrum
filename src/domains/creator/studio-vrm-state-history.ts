@@ -73,6 +73,39 @@ export function appendStudioVrmFullStateHistory(
 }
 
 /**
+ * Commits one user command as an explicit before/after pair.
+ *
+ * The regular poser history is intentionally debounced for sliders, but discrete commands such as
+ * applying a portable pose material must be undoable immediately—even when the initial 450 ms
+ * snapshot has not fired yet. Both snapshots use the same generation and model-ownership checks;
+ * any invalid owner resets the timeline through the existing fail-closed append path.
+ */
+export function commitStudioVrmFullStateHistoryTransaction(
+  history: StudioVrmFullStateHistory,
+  before: FullVrmState,
+  after: FullVrmState,
+  activeModelId: unknown,
+  limit = STUDIO_VRM_FULL_STATE_HISTORY_LIMIT,
+): StudioVrmFullStateHistory {
+  const generation = history.generation;
+  const withBefore = appendStudioVrmFullStateHistory(
+    history,
+    before,
+    generation,
+    activeModelId,
+    limit,
+  );
+  if (withBefore.generation !== generation) return withBefore;
+  return appendStudioVrmFullStateHistory(
+    withBefore,
+    after,
+    generation,
+    activeModelId,
+    limit,
+  );
+}
+
+/**
  * Undo/redo target을 선택하면서 현재 모델의 소유권을 다시 확인한다. 오염된 timeline에서는
  * 스냅샷을 반환하지 않고 전체 history를 초기화한다.
  */

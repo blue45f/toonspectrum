@@ -1,37 +1,15 @@
 import * as THREE from "three";
 
-import { POSER_FINGER_BONES } from "./studio-pose-presets";
+import { STUDIO_HUMANOID_BONE_NAMES } from "./studio-humanoid-bones";
 
 import type { PoseBoneMap, Vec3 } from "./studio-vrm-poser-utils";
 import type { VRMHumanBoneName } from "@pixiv/three-vrm";
 
 const QUATERNION_EPSILON = 1e-12;
 
-export const STUDIO_VRM_DIRECT_EDIT_BONES = [
-  "hips",
-  "spine",
-  "chest",
-  "upperChest",
-  "neck",
-  "head",
-  "leftShoulder",
-  "leftUpperArm",
-  "leftLowerArm",
-  "leftHand",
-  "rightShoulder",
-  "rightUpperArm",
-  "rightLowerArm",
-  "rightHand",
-  "leftUpperLeg",
-  "leftLowerLeg",
-  "leftFoot",
-  "leftToes",
-  "rightUpperLeg",
-  "rightLowerLeg",
-  "rightFoot",
-  "rightToes",
-  ...POSER_FINGER_BONES,
-] as const satisfies readonly VRMHumanBoneName[];
+/** The complete semantic VRM vocabulary, shared with portable pose materials. */
+export const STUDIO_VRM_DIRECT_EDIT_BONES: readonly VRMHumanBoneName[] =
+  STUDIO_HUMANOID_BONE_NAMES;
 
 export interface StudioVrmRuntimePoseSource {
   humanoid?: {
