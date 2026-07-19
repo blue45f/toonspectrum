@@ -7,6 +7,7 @@ import {
   StudioCrdtStorageCorruptionError,
 } from "./studio-crdt.service";
 import { StudioLiveJoinTransitionSequencer } from "./studio-live-join-transition-sequencer";
+import { StudioLiveRoomTransitionCoordinator } from "./studio-live-room-transition-coordinator";
 import { StudioLiveSocketAuthService } from "./studio-live-socket-auth.service";
 import {
   STUDIO_LIVE_ADAPTER_DISCOVERY_TIMEOUT_MS,
@@ -317,10 +318,12 @@ function createHarness(
   const revalidate = vi.fn(revalidateSession);
   const socketAuthentication = new StudioLiveSocketAuthService(authenticate, revalidate);
   const joinTransitions = new StudioLiveJoinTransitionSequencer();
+  const roomTransitions = new StudioLiveRoomTransitionCoordinator();
   const gateway = new StudioLiveGateway(
     service as unknown as CreatorService,
     socketAuthentication,
     joinTransitions,
+    roomTransitions,
     crdtService as unknown as StudioCrdtService,
     lockRepository
   );
@@ -367,6 +370,7 @@ function createHarness(
     revalidate,
     socketAuthentication,
     joinTransitions,
+    roomTransitions,
     lockRepository,
     emissions,
     sockets,
@@ -1332,6 +1336,273 @@ describe("StudioLiveGateway", () => {
         undefined
       )
     ).resolves.toEqual({ ok: true, data: { accepted: true } });
+  });
+
+  it("keeps the previous participant authoritative when leaving its adapter room fails", async () => {
+    const harness = createHarness();
+    const socket = harness.socket("room-switch-leave-failure");
+    await connectAndJoin(harness, socket, "work-old");
+    const originalLeave = socket.leave;
+    socket.leave = vi.fn(async (room: string) => {
+      if (room === "studio-live:work-old") throw new Error("old room leave failed");
+      await originalLeave(room);
+    });
+    const emissionCountBeforeSwitch = harness.emissions.length;
+
+    await expect(
+      harness.gateway.join(
+        socket as never,
+        { workId: "work-new", clientInstanceId: "client-room-switch-leave-failure-new" },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: false, code: "forbidden" });
+
+    const internals = harness.gateway as unknown as {
+      participantsBySocket: Map<string, { workId: string }>;
+      socketIdsByWork: Map<string, Set<string>>;
+    };
+    expect([...socket.joined]).toEqual(["studio-live:work-old"]);
+    expect(socket.leave).toHaveBeenCalledWith("studio-live:work-old");
+    expect(socket.leave).toHaveBeenCalledWith("studio-live:work-new");
+    expect(internals.participantsBySocket.get(socket.id)?.workId).toBe("work-old");
+    expect([...internals.socketIdsByWork.keys()]).toEqual(["work-old"]);
+    expect(harness.emissions.slice(emissionCountBeforeSwitch)).not.toContainEqual(
+      expect.objectContaining({
+        target: "studio-live:work-new",
+        event: "studio:presence:update",
+      })
+    );
+  });
+
+  it("rolls back a superseded switch before it can commit or publish intermediate presence", async () => {
+    let releaseOldRoomLeave: (() => void) | null = null;
+    let notifyOldRoomLeaveStarted: (() => void) | null = null;
+    const oldRoomLeave = new Promise<void>((resolve) => {
+      releaseOldRoomLeave = resolve;
+    });
+    const oldRoomLeaveStarted = new Promise<void>((resolve) => {
+      notifyOldRoomLeaveStarted = resolve;
+    });
+    const harness = createHarness();
+    const socket = harness.socket("room-switch-latest");
+    await connectAndJoin(harness, socket, "work-old");
+    const originalLeave = socket.leave;
+    let shouldBlockOldRoomLeave = true;
+    socket.leave = vi.fn(async (room: string) => {
+      if (room === "studio-live:work-old" && shouldBlockOldRoomLeave) {
+        shouldBlockOldRoomLeave = false;
+        notifyOldRoomLeaveStarted?.();
+        await oldRoomLeave;
+      }
+      await originalLeave(room);
+    });
+    const emissionCountBeforeSwitch = harness.emissions.length;
+
+    const superseded = harness.gateway.join(
+      socket as never,
+      { workId: "work-a", clientInstanceId: "client-room-switch-a" },
+      undefined
+    );
+    await oldRoomLeaveStarted;
+    const latest = harness.gateway.join(
+      socket as never,
+      { workId: "work-b", clientInstanceId: "client-room-switch-b" },
+      undefined
+    );
+    releaseOldRoomLeave?.();
+
+    await expect(superseded).resolves.toMatchObject({ ok: false, code: "not_joined" });
+    await expect(latest).resolves.toMatchObject({ ok: true });
+    const internals = harness.gateway as unknown as {
+      participantsBySocket: Map<string, { workId: string }>;
+      socketIdsByWork: Map<string, Set<string>>;
+    };
+    expect([...socket.joined]).toEqual(["studio-live:work-b"]);
+    expect(internals.participantsBySocket.get(socket.id)?.workId).toBe("work-b");
+    expect([...internals.socketIdsByWork.keys()]).toEqual(["work-b"]);
+    expect(harness.emissions.slice(emissionCountBeforeSwitch)).not.toContainEqual(
+      expect.objectContaining({
+        target: "studio-live:work-a",
+        event: "studio:presence:update",
+      })
+    );
+  });
+
+  it("never removes a replacement participant after a stale socket finishes leaving", async () => {
+    let releaseOldRoomLeave: (() => void) | null = null;
+    let notifyOldRoomLeaveStarted: (() => void) | null = null;
+    const oldRoomLeave = new Promise<void>((resolve) => {
+      releaseOldRoomLeave = resolve;
+    });
+    const oldRoomLeaveStarted = new Promise<void>((resolve) => {
+      notifyOldRoomLeaveStarted = resolve;
+    });
+    const harness = createHarness();
+    const staleSocket = harness.socket("room-switch-replacement", "valid:stale-user");
+    await connectAndJoin(harness, staleSocket, "work-old");
+    const internals = harness.gateway as unknown as {
+      participantsBySocket: Map<string, {
+        workId: string;
+        authorizationSequence: number;
+      }>;
+    };
+    const previousParticipant = internals.participantsBySocket.get(staleSocket.id);
+    if (!previousParticipant) throw new Error("missing previous participant");
+    const originalLeave = staleSocket.leave;
+    staleSocket.leave = vi.fn(async (room: string) => {
+      if (room === "studio-live:work-old") {
+        notifyOldRoomLeaveStarted?.();
+        await oldRoomLeave;
+      }
+      await originalLeave(room);
+    });
+    const staleSwitch = harness.gateway.join(
+      staleSocket as never,
+      { workId: "work-stale", clientInstanceId: "client-stale-switch" },
+      undefined
+    );
+    await oldRoomLeaveStarted;
+
+    const replacementSocket = harness.socket(
+      "room-switch-replacement",
+      "valid:replacement-user"
+    );
+    await harness.gateway.handleConnection(replacementSocket as never);
+    const replacementParticipant = {
+      ...previousParticipant,
+      workId: "work-replacement",
+      authorizationSequence: previousParticipant.authorizationSequence + 1,
+    };
+    internals.participantsBySocket.set(staleSocket.id, replacementParticipant);
+    releaseOldRoomLeave?.();
+
+    await expect(staleSwitch).resolves.toMatchObject({ ok: false, code: "not_joined" });
+    expect(internals.participantsBySocket.get(staleSocket.id)).toBe(replacementParticipant);
+    expect(replacementSocket.disconnected).toBe(false);
+    expect(privateAuthPrincipal(harness, replacementSocket)?.userId).toBe("replacement-user");
+    expect(staleSocket.joined.size).toBe(0);
+  });
+
+  it("does not leave a ghost participant when the queued latest switch later fails ACL", async () => {
+    let releaseOldRoomLeave: (() => void) | null = null;
+    let notifyOldRoomLeaveStarted: (() => void) | null = null;
+    const oldRoomLeave = new Promise<void>((resolve) => {
+      releaseOldRoomLeave = resolve;
+    });
+    const oldRoomLeaveStarted = new Promise<void>((resolve) => {
+      notifyOldRoomLeaveStarted = resolve;
+    });
+    const harness = createHarness(async (userId, workId) => {
+      if (workId === "work-forbidden") throw new Error("work ACL denied");
+      return teamSnapshot(userId, workId);
+    });
+    const socket = harness.socket("room-switch-latest-acl-failure");
+    await connectAndJoin(harness, socket, "work-old");
+    const originalLeave = socket.leave;
+    socket.leave = vi.fn(async (room: string) => {
+      if (room === "studio-live:work-old") {
+        notifyOldRoomLeaveStarted?.();
+        await oldRoomLeave;
+      }
+      await originalLeave(room);
+    });
+
+    const superseded = harness.gateway.join(
+      socket as never,
+      { workId: "work-a", clientInstanceId: "client-switch-a" },
+      undefined
+    );
+    await oldRoomLeaveStarted;
+    const latest = harness.gateway.join(
+      socket as never,
+      { workId: "work-forbidden", clientInstanceId: "client-switch-forbidden" },
+      undefined
+    );
+    releaseOldRoomLeave?.();
+
+    await expect(superseded).resolves.toMatchObject({ ok: false, code: "not_joined" });
+    await expect(latest).resolves.toMatchObject({ ok: false, code: "forbidden" });
+    const internals = harness.gateway as unknown as {
+      participantsBySocket: Map<string, unknown>;
+      socketIdsByWork: Map<string, Set<string>>;
+    };
+    expect(socket.joined.size).toBe(0);
+    expect(internals.participantsBySocket.has(socket.id)).toBe(false);
+    expect(
+      [...internals.socketIdsByWork.values()].some((socketIds) => socketIds.has(socket.id))
+    ).toBe(false);
+  });
+
+  it("rechecks generation after the coordinator resolves and before participant commit", async () => {
+    const harness = createHarness();
+    const socket = harness.socket("room-switch-resume-boundary");
+    await connectAndJoin(harness, socket, "work-old");
+    const leavePreviousRoom = harness.roomTransitions.leavePreviousRoom.bind(
+      harness.roomTransitions
+    );
+    vi.spyOn(harness.roomTransitions, "leavePreviousRoom").mockImplementation(async (input) => {
+      const state = await leavePreviousRoom(input);
+      if (state === "current") harness.joinTransitions.invalidate(socket.id);
+      return state;
+    });
+
+    await expect(
+      harness.gateway.join(
+        socket as never,
+        { workId: "work-new", clientInstanceId: "client-resume-boundary" },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: false, code: "not_joined" });
+
+    const internals = harness.gateway as unknown as {
+      participantsBySocket: Map<string, unknown>;
+      socketIdsByWork: Map<string, Set<string>>;
+    };
+    expect(socket.joined.size).toBe(0);
+    expect(internals.participantsBySocket.has(socket.id)).toBe(false);
+    expect(
+      [...internals.socketIdsByWork.values()].some((socketIds) => socketIds.has(socket.id))
+    ).toBe(false);
+  });
+
+  it("rolls back an old socket's speculative room without touching its replacement", async () => {
+    let releaseAdapterJoin: (() => void) | null = null;
+    const adapterJoin = new Promise<void>((resolve) => {
+      releaseAdapterJoin = resolve;
+    });
+    const harness = createHarness();
+    const staleSocket = harness.socket("reused-room-socket", "valid:stale-user");
+    await harness.gateway.handleConnection(staleSocket as never);
+    staleSocket.join = vi.fn(async (room: string) => {
+      await adapterJoin;
+      staleSocket.joined.add(room);
+    });
+    const staleJoin = harness.gateway.join(
+      staleSocket as never,
+      { workId: "work-stale", clientInstanceId: "client-stale" },
+      undefined
+    );
+    await vi.waitFor(() =>
+      expect(staleSocket.join).toHaveBeenCalledWith("studio-live:work-stale")
+    );
+
+    const replacement = harness.socket("reused-room-socket", "valid:replacement-user");
+    await harness.gateway.handleConnection(replacement as never);
+    releaseAdapterJoin?.();
+
+    await expect(staleJoin).resolves.toMatchObject({ ok: false, code: "not_joined" });
+    expect(staleSocket.joined.size).toBe(0);
+    expect(staleSocket.left).toContain("studio-live:work-stale");
+    expect(replacement.disconnected).toBe(false);
+    expect(privateAuthPrincipal(harness, replacement)?.userId).toBe("replacement-user");
+    await expect(
+      harness.gateway.join(
+        replacement as never,
+        { workId: "work-current", clientInstanceId: "client-replacement" },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: true });
+    expect([...replacement.joined]).toEqual(["studio-live:work-current"]);
   });
 
   it("admits the first 30 room arrivals and rejects the 31st with rate_limited", async () => {

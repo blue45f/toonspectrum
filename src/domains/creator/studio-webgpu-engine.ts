@@ -50,6 +50,12 @@ import {
   type StudioGpuTileFrameToken,
 } from "./studio-webgpu-tile-runtime";
 
+import type {
+  PlannedStudioGpuDabs,
+  StudioGpuBatch,
+  StudioGpuDab,
+  StudioGpuDabRenderUpdate,
+} from "./studio-webgpu-dab-plan-contract";
 import type { StudioGpuRect } from "./studio-webgpu-tile-plan";
 
 export {
@@ -58,6 +64,12 @@ export {
   STUDIO_GPU_MAX_BRUSH_SIZE,
 } from "./studio-webgpu-stroke";
 export type { StudioGpuComposite, StudioGpuStroke } from "./studio-webgpu-stroke";
+export type {
+  PlannedStudioGpuDabs,
+  StudioGpuBatch,
+  StudioGpuDab,
+  StudioGpuDabRenderUpdate,
+} from "./studio-webgpu-dab-plan-contract";
 export {
   STUDIO_GPU_MAX_READBACK_PIXELS,
   STUDIO_GPU_READBACK_BYTES_PER_PIXEL,
@@ -174,35 +186,6 @@ interface NormalizedStudioGpuViewport {
   offsetX: number;
   offsetY: number;
   flipX: boolean;
-}
-
-export interface StudioGpuDab {
-  x: number;
-  y: number;
-  radius: number;
-  red: number;
-  green: number;
-  blue: number;
-  alpha: number;
-  composite: StudioGpuComposite;
-}
-
-export interface StudioGpuBatch {
-  composite: StudioGpuComposite;
-  firstInstance: number;
-  instanceCount: number;
-}
-
-export interface PlannedStudioGpuDabs {
-  dabs: StudioGpuDab[];
-  batches: StudioGpuBatch[];
-  /** False means the safety cap stopped planning before every requested operation was covered. */
-  complete: boolean;
-}
-
-export interface StudioGpuDabRenderUpdate extends PlannedStudioGpuDabs {
-  /** `append` is safe to draw over the retained frame; `rebuild` must clear it first. */
-  mode: "append" | "rebuild";
 }
 
 const INSTANCE_BYTES = STUDIO_GPU_DAB_INSTANCE_FLOATS * Float32Array.BYTES_PER_ELEMENT;
