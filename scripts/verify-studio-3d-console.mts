@@ -1,0 +1,327 @@
+/**
+ * Production-preview console contract for both Studio 3D editors.
+ *
+ * The smoke test covers the complete Canvas lifetime (mount and delayed unmount)
+ * and ensures opening the local character editor does not eagerly contact the
+ * optional shared-pose API.
+ *
+ * Run after a production build:
+ *   pnpm run build
+ *   pnpm run verify:studio-3d-console
+ */
+import { spawn, type ChildProcess } from "node:child_process";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { createRequire } from "node:module";
+import { createServer } from "node:net";
+import { dirname, join } from "node:path";
+
+import { chromium, type Locator, type Page } from "playwright";
+
+const QUICK_START_KEY = "toonspectrum-studio-quick-start-dismissed";
+const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
+const UI_DENSITY_KEY = "toonspectrum-studio-ui-density:v1";
+const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
+  "/api/kmas/merge-on-access",
+  "/api/studio-ai/status",
+  "/api/v1/apps/toonspectrum/visits/ping",
+] as const;
+const VITE_ERROR_OVERLAY_SELECTOR = [
+  "vite-error-overlay",
+  ".vite-error-overlay",
+  "#vite-error-overlay",
+  "[data-vite-error-overlay]",
+].join(",");
+const EXPECTED_R3F_VERSION = "9.6.1";
+const EXPECTED_THREE_VERSION = "0.184.0";
+const R3F_CONTEXT_LOSS_DIAGNOSTIC = "THREE.WebGLRenderer: Context Lost.";
+
+function assertCondition(condition: unknown, message: string): asserts condition {
+  if (!condition) throw new Error(message);
+}
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function findFreePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const probe = createServer();
+    probe.once("error", reject);
+    probe.listen(0, "127.0.0.1", () => {
+      const address = probe.address();
+      if (!address || typeof address === "string") {
+        probe.close();
+        reject(new Error("could not allocate a preview port"));
+        return;
+      }
+      probe.close((error) => error ? reject(error) : resolve(address.port));
+    });
+  });
+}
+
+async function waitForServer(url: string, timeoutMs = 20_000): Promise<void> {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    try {
+      const response = await fetch(url, { method: "HEAD" });
+      if (response.ok || response.status < 500) return;
+    } catch {
+      // Preview is still starting.
+    }
+    await delay(250);
+  }
+  throw new Error(`preview server did not become ready: ${url}`);
+}
+
+function isExpectedStaticPreviewApiMessage(message: string): boolean {
+  return OPTIONAL_STATIC_PREVIEW_API_PATHS.some((path) => message.includes(path));
+}
+
+function isExpectedHeadlessGraphicsDiagnostic(message: string): boolean {
+  return /GL Driver Message .*GPU stall due to ReadPixels/u.test(message) ||
+    message.startsWith("No available adapters.");
+}
+
+function verifyPatchedThreeRuntime(): void {
+  const require = createRequire(import.meta.url);
+  const readPackageVersion = (entryPoint: string): unknown => {
+    const packagePath = join(dirname(require.resolve(entryPoint)), "..", "package.json");
+    return (JSON.parse(readFileSync(packagePath, "utf8")) as { version?: unknown }).version;
+  };
+  const r3fVersion = readPackageVersion("@react-three/fiber");
+  const threeVersion = readPackageVersion("three");
+  assertCondition(
+    r3fVersion === EXPECTED_R3F_VERSION,
+    `unexpected @react-three/fiber version: ${String(r3fVersion)}`,
+  );
+  assertCondition(
+    threeVersion === EXPECTED_THREE_VERSION,
+    `unexpected three version: ${String(threeVersion)}`,
+  );
+
+  const r3fDistDirectory = dirname(require.resolve("@react-three/fiber"));
+  const eventRuntimeFiles = readdirSync(r3fDistDirectory)
+    .filter((name) => /^events-.*\.js$/u.test(name));
+  assertCondition(eventRuntimeFiles.length === 3, "could not identify all patched R3F event runtimes");
+  for (const name of eventRuntimeFiles) {
+    const source = readFileSync(join(r3fDistDirectory, name), "utf8");
+    assertCondition(source.includes("createLegacyClock"), `${name} is missing the Timer clock adapter`);
+    assertCondition(
+      source.includes("handlePlannedContextLoss") &&
+        source.includes("removeEventListener('webglcontextlost'") &&
+        source.includes("forceContextLoss"),
+      `${name} is missing the bounded planned-context-loss handler`,
+    );
+    assertCondition(
+      !/new THREE(?:__namespace)?\.Clock\(/u.test(source),
+      `${name} still constructs deprecated THREE.Clock`,
+    );
+  }
+}
+
+async function configureStudio(page: Page): Promise<void> {
+  await page.addInitScript(({ quickStartKey, mobileHintKey, uiDensityKey }) => {
+    try {
+      localStorage.setItem(quickStartKey, "1");
+      localStorage.setItem(mobileHintKey, "1");
+      localStorage.setItem(uiDensityKey, JSON.stringify({ mode: "full" }));
+    } catch {
+      // The visible UI assertions below remain authoritative if storage is blocked.
+    }
+  }, {
+    quickStartKey: QUICK_START_KEY,
+    mobileHintKey: MOBILE_HINT_KEY,
+    uiDensityKey: UI_DENSITY_KEY,
+  });
+}
+
+async function openInsertMenu(page: Page): Promise<Locator> {
+  const mainMenu = page.locator('[data-studio-main-menu="true"]');
+  await mainMenu.waitFor({ state: "visible", timeout: 20_000 });
+  await mainMenu.getByRole("button", { name: "삽입", exact: true }).click();
+  const menu = page.locator('[role="menu"][aria-label="삽입"]');
+  await menu.waitFor({ state: "visible", timeout: 5_000 });
+  return menu;
+}
+
+async function closeCanvasDialog(dialog: Locator, page: Page): Promise<void> {
+  const close = dialog.locator('button[aria-label="닫기"]');
+  await close.waitFor({ state: "visible", timeout: 5_000 });
+  await close.click();
+  await dialog.waitFor({ state: "detached", timeout: 5_000 });
+  // R3F intentionally defers renderer teardown by 500ms.
+  await page.waitForTimeout(850);
+}
+
+async function triggerObservableLiveContextLoss(dialog: Locator): Promise<{
+  supported: boolean;
+  observed: boolean;
+}> {
+  const canvas = dialog.locator("canvas").first();
+  await canvas.waitFor({ state: "visible", timeout: 5_000 });
+  return canvas.evaluate(async (element) => {
+    const target = element as HTMLCanvasElement;
+    const context = target.getContext("webgl2") ?? target.getContext("webgl");
+    const extension = context?.getExtension("WEBGL_lose_context");
+    if (!extension) return { supported: false, observed: false };
+
+    const observed = await new Promise<boolean>((resolve) => {
+      const timeout = window.setTimeout(() => resolve(false), 2_000);
+      target.addEventListener("webglcontextlost", (event) => {
+        // Preventing the default keeps the browser's restoration path available. The verifier
+        // deliberately leaves this test Canvas lost and closes it immediately afterwards.
+        event.preventDefault();
+        window.clearTimeout(timeout);
+        resolve(true);
+      }, { once: true });
+      extension.loseContext();
+    });
+    return { supported: true, observed };
+  });
+}
+
+async function run(page: Page, studioUrl: string): Promise<void> {
+  const issues: string[] = [];
+  const sharedPoseRequests: string[] = [];
+  let expectingLiveContextLoss = false;
+  let liveContextExplicitlyLost = false;
+  let liveContextLossDiagnostics = 0;
+
+  page.on("console", (message) => {
+    const type = message.type();
+    const location = message.location().url;
+    const value = location ? `${message.text()} @ ${location}` : message.text();
+    if (type === "log" && value.includes(R3F_CONTEXT_LOSS_DIAGNOSTIC)) {
+      if (expectingLiveContextLoss) liveContextLossDiagnostics += 1;
+      else issues.push(`unexpected planned-context-loss diagnostic: ${value}`);
+    } else if (type === "error" && !isExpectedStaticPreviewApiMessage(value)) {
+      issues.push(`console.error: ${value}`);
+    } else if (
+      type === "warning"
+      && !isExpectedHeadlessGraphicsDiagnostic(value)
+      && !(
+        liveContextExplicitlyLost
+        && value.includes("WEBGL_lose_context extension not supported")
+      )
+    ) {
+      issues.push(`console.warn: ${value}`);
+    }
+  });
+  page.on("pageerror", (error) => issues.push(`pageerror: ${String(error)}`));
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.pathname === "/api/creator/assets" && request.method() === "GET") {
+      sharedPoseRequests.push(request.url());
+    }
+  });
+
+  await configureStudio(page);
+  await page.goto(studioUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  try {
+    await page.locator('[data-studio-editor="true"]').waitFor({ state: "attached", timeout: 20_000 });
+  } catch (cause) {
+    throw new Error(
+      `Studio editor did not mount; diagnostics:\n${issues.join("\n") || "(none)"}`,
+      { cause },
+    );
+  }
+
+  const characterMenu = await openInsertMenu(page);
+  await characterMenu.getByRole("menuitem", { name: "3D 캐릭터", exact: true }).click();
+  const characterDialog = page.locator('[data-studio-vrm-dialog="true"]');
+  await characterDialog.waitFor({ state: "visible", timeout: 25_000 });
+  await page.waitForTimeout(1_000);
+
+  assertCondition(
+    sharedPoseRequests.length === 0,
+    `opening the local character editor eagerly requested the shared-pose API:\n${sharedPoseRequests.join("\n")}`,
+  );
+
+  await page.route(
+    (url) => url.pathname === "/api/creator/assets",
+    (route) => route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      // Exercise the component's inline failure path without introducing a browser-level
+      // failed-resource diagnostic that would obscure application console assertions.
+      body: "{malformed-shared-library-response",
+    }),
+  );
+  await characterDialog.getByRole("tab", { name: "포즈", exact: true }).click();
+  await characterDialog.getByText("서버 공유 포즈 라이브러리", { exact: true }).click();
+  await characterDialog.getByRole("status").filter({
+    hasText: "공유 포즈 서버에 연결하지 못했습니다",
+  }).waitFor({ state: "visible", timeout: 15_000 });
+  assertCondition(
+    sharedPoseRequests.length > 0,
+    "expanding the shared-pose library did not issue its explicit lazy request",
+  );
+  const diagnosticsBeforeLiveLoss = liveContextLossDiagnostics;
+  expectingLiveContextLoss = true;
+  try {
+    const liveLoss = await triggerObservableLiveContextLoss(characterDialog);
+    await page.waitForTimeout(250);
+    assertCondition(liveLoss.supported, "WEBGL_lose_context is unavailable in the browser verifier");
+    assertCondition(liveLoss.observed, "a live WebGL context loss did not reach the Canvas observer");
+    liveContextExplicitlyLost = true;
+    assertCondition(
+      liveContextLossDiagnostics > diagnosticsBeforeLiveLoss,
+      "Three's live context-loss diagnostic was incorrectly suppressed",
+    );
+  } finally {
+    expectingLiveContextLoss = false;
+  }
+  await closeCanvasDialog(characterDialog, page);
+
+  const backgroundMenu = await openInsertMenu(page);
+  await backgroundMenu.getByRole("menuitem", { name: "3D 배경", exact: true }).click();
+  const backgroundDialog = page.getByTestId("studio-bg3d-dialog");
+  await backgroundDialog.waitFor({ state: "visible", timeout: 25_000 });
+  await page.waitForTimeout(1_000);
+  await closeCanvasDialog(backgroundDialog, page);
+
+  const overlayCount = await page.locator(VITE_ERROR_OVERLAY_SELECTOR).count();
+  assertCondition(overlayCount === 0, `Vite/framework error overlay is present (${overlayCount})`);
+  assertCondition(issues.length === 0, `unexpected 3D browser diagnostics:\n${issues.join("\n")}`);
+}
+
+async function main(): Promise<void> {
+  verifyPatchedThreeRuntime();
+  assertCondition(
+    existsSync(join(process.cwd(), "dist", "index.html")),
+    'missing dist/index.html; run "pnpm run build" before the browser verifier',
+  );
+
+  const port = await findFreePort();
+  const rootUrl = `http://127.0.0.1:${port}/`;
+  const studioUrl = `${rootUrl}studio`;
+  const server: ChildProcess = spawn(
+    process.platform === "win32" ? "pnpm.cmd" : "pnpm",
+    ["exec", "vite", "preview", "--host", "127.0.0.1", "--port", String(port), "--strictPort"],
+    { cwd: process.cwd(), stdio: ["ignore", "pipe", "pipe"] },
+  );
+  server.stderr?.on("data", (chunk) => {
+    const value = String(chunk);
+    if (value.includes("ECONNREFUSED") || value.toLowerCase().includes("proxy error")) return;
+    process.stderr.write(chunk);
+  });
+
+  let browser: Awaited<ReturnType<typeof chromium.launch>> | null = null;
+  try {
+    await waitForServer(rootUrl);
+    browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
+    const context = await browser.newContext({ viewport: { width: 1_440, height: 1_000 } });
+    const page = await context.newPage();
+    await run(page, studioUrl);
+    await context.close();
+    console.log(`[verify-studio-3d-console] PASS ${studioUrl}`);
+  } finally {
+    if (browser) await browser.close().catch(() => undefined);
+    if (!server.killed) server.kill("SIGTERM");
+  }
+}
+
+main().catch((error: unknown) => {
+  console.error(error instanceof Error ? error.stack ?? error.message : String(error));
+  process.exitCode = 1;
+});

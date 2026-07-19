@@ -1,0 +1,252 @@
+diff --git a/dist/events-583399dd.cjs.prod.js b/dist/events-583399dd.cjs.prod.js
+index f3834fa28aa8504b48da031e326acb332a722965..c9269abf87a52f3958ad9e3ff1182062a61e5c34 100644
+--- a/dist/events-583399dd.cjs.prod.js
++++ b/dist/events-583399dd.cjs.prod.js
+@@ -971,5 +971,49 @@ function createEvents(store) {
+ const isRenderer = def => !!(def != null && def.render);
+ const context = /* @__PURE__ */React__namespace.createContext(null);
++// THREE.Clock is deprecated as of three r183, while react-three-fiber v9 still
++// exposes its shape publicly. Keep the v9 contract until v10 lands, but drive it
++// with THREE.Timer so mounting a Canvas does not emit a deprecation warning.
++const createLegacyClock = Timer => {
++  let timer = new Timer();
++  return {
++    autoStart: true,
++    startTime: 0,
++    oldTime: 0,
++    elapsedTime: 0,
++    running: false,
++    start() {
++      timer.dispose();
++      timer = new Timer();
++      timer.reset();
++      this.startTime = performance.now();
++      this.oldTime = this.startTime;
++      this.elapsedTime = 0;
++      this.running = true;
++    },
++    stop() {
++      this.getElapsedTime();
++      this.running = false;
++      this.autoStart = false;
++      timer.dispose();
++    },
++    getElapsedTime() {
++      this.getDelta();
++      return this.elapsedTime;
++    },
++    getDelta() {
++      if (this.autoStart && !this.running) {
++        this.start();
++        return 0;
++      }
++      if (!this.running) return 0;
++      timer.update();
++      const delta = timer.getDelta();
++      this.oldTime = performance.now();
++      this.elapsedTime += delta;
++      return delta;
++    }
++  };
++};
+ const createStore = (invalidate, advance) => {
+   const rootStore = traditional.createWithEqualityFn((set, get) => {
+     const position = new THREE__namespace.Vector3();
+@@ -1038,7 +1082,7 @@ const createStore = (invalidate, advance) => {
+       linear: false,
+       flat: false,
+       controls: null,
+-      clock: new THREE__namespace.Clock(),
++      clock: createLegacyClock(THREE__namespace.Timer),
+       pointer,
+       mouse: pointer,
+       frameloop: 'always',
+@@ -7698,6 +7742,20 @@ function unmountComponentAtNode(canvas, callback) {
+             var _state$gl, _state$gl$renderLists, _state$gl2, _state$gl3;
+             state.events.disconnect == null ? void 0 : state.events.disconnect();
+             (_state$gl = state.gl) == null ? void 0 : (_state$gl$renderLists = _state$gl.renderLists) == null ? void 0 : _state$gl$renderLists.dispose == null ? void 0 : _state$gl$renderLists.dispose();
++            // The loss is deliberate teardown, not a recoverable runtime loss. Intercept
++            // only this one event before Three's diagnostic handler logs "Context Lost".
++            const contextLossTarget = (_state$gl2 = state.gl) == null ? void 0 : _state$gl2.domElement;
++            const handlePlannedContextLoss = event => {
++              event.preventDefault();
++              event.stopImmediatePropagation();
++            };
++            contextLossTarget == null ? void 0 : contextLossTarget.addEventListener('webglcontextlost', handlePlannedContextLoss, {
++              capture: true,
++              once: true
++            });
++            contextLossTarget == null ? void 0 : setTimeout(() => {
++              contextLossTarget.removeEventListener('webglcontextlost', handlePlannedContextLoss, true);
++            }, 1000);
+             (_state$gl2 = state.gl) == null ? void 0 : _state$gl2.forceContextLoss == null ? void 0 : _state$gl2.forceContextLoss();
+             if ((_state$gl3 = state.gl) != null && _state$gl3.xr) state.xr.disconnect();
+             dispose(state.scene);
+diff --git a/dist/events-b389eeca.esm.js b/dist/events-b389eeca.esm.js
+index 76f308c96cb09a20e854133e48ec9ef7682edecc..4439ce0ead760aa279cab45f0d9473ce1185e8ff 100644
+--- a/dist/events-b389eeca.esm.js
++++ b/dist/events-b389eeca.esm.js
+@@ -946,5 +946,49 @@ function createEvents(store) {
+ const isRenderer = def => !!(def != null && def.render);
+ const context = /* @__PURE__ */React.createContext(null);
++// THREE.Clock is deprecated as of three r183, while react-three-fiber v9 still
++// exposes its shape publicly. Keep the v9 contract until v10 lands, but drive it
++// with THREE.Timer so mounting a Canvas does not emit a deprecation warning.
++const createLegacyClock = Timer => {
++  let timer = new Timer();
++  return {
++    autoStart: true,
++    startTime: 0,
++    oldTime: 0,
++    elapsedTime: 0,
++    running: false,
++    start() {
++      timer.dispose();
++      timer = new Timer();
++      timer.reset();
++      this.startTime = performance.now();
++      this.oldTime = this.startTime;
++      this.elapsedTime = 0;
++      this.running = true;
++    },
++    stop() {
++      this.getElapsedTime();
++      this.running = false;
++      this.autoStart = false;
++      timer.dispose();
++    },
++    getElapsedTime() {
++      this.getDelta();
++      return this.elapsedTime;
++    },
++    getDelta() {
++      if (this.autoStart && !this.running) {
++        this.start();
++        return 0;
++      }
++      if (!this.running) return 0;
++      timer.update();
++      const delta = timer.getDelta();
++      this.oldTime = performance.now();
++      this.elapsedTime += delta;
++      return delta;
++    }
++  };
++};
+ const createStore = (invalidate, advance) => {
+   const rootStore = createWithEqualityFn((set, get) => {
+     const position = new THREE.Vector3();
+@@ -1013,7 +1057,7 @@ const createStore = (invalidate, advance) => {
+       linear: false,
+       flat: false,
+       controls: null,
+-      clock: new THREE.Clock(),
++      clock: createLegacyClock(THREE.Timer),
+       pointer,
+       mouse: pointer,
+       frameloop: 'always',
+@@ -15870,6 +15914,20 @@ function unmountComponentAtNode(canvas, callback) {
+             var _state$gl, _state$gl$renderLists, _state$gl2, _state$gl3;
+             state.events.disconnect == null ? void 0 : state.events.disconnect();
+             (_state$gl = state.gl) == null ? void 0 : (_state$gl$renderLists = _state$gl.renderLists) == null ? void 0 : _state$gl$renderLists.dispose == null ? void 0 : _state$gl$renderLists.dispose();
++            // The loss is deliberate teardown, not a recoverable runtime loss. Intercept
++            // only this one event before Three's diagnostic handler logs "Context Lost".
++            const contextLossTarget = (_state$gl2 = state.gl) == null ? void 0 : _state$gl2.domElement;
++            const handlePlannedContextLoss = event => {
++              event.preventDefault();
++              event.stopImmediatePropagation();
++            };
++            contextLossTarget == null ? void 0 : contextLossTarget.addEventListener('webglcontextlost', handlePlannedContextLoss, {
++              capture: true,
++              once: true
++            });
++            contextLossTarget == null ? void 0 : setTimeout(() => {
++              contextLossTarget.removeEventListener('webglcontextlost', handlePlannedContextLoss, true);
++            }, 1000);
+             (_state$gl2 = state.gl) == null ? void 0 : _state$gl2.forceContextLoss == null ? void 0 : _state$gl2.forceContextLoss();
+             if ((_state$gl3 = state.gl) != null && _state$gl3.xr) state.xr.disconnect();
+             dispose(state.scene);
+diff --git a/dist/events-f19bcc32.cjs.dev.js b/dist/events-f19bcc32.cjs.dev.js
+index 07d45d4c0bd7d57301d338040e8aa71c88fce7c5..68371b7a12fb9c327cedb383ab0d1b947fb726a8 100644
+--- a/dist/events-f19bcc32.cjs.dev.js
++++ b/dist/events-f19bcc32.cjs.dev.js
+@@ -971,5 +971,49 @@ function createEvents(store) {
+ const isRenderer = def => !!(def != null && def.render);
+ const context = /* @__PURE__ */React__namespace.createContext(null);
++// THREE.Clock is deprecated as of three r183, while react-three-fiber v9 still
++// exposes its shape publicly. Keep the v9 contract until v10 lands, but drive it
++// with THREE.Timer so mounting a Canvas does not emit a deprecation warning.
++const createLegacyClock = Timer => {
++  let timer = new Timer();
++  return {
++    autoStart: true,
++    startTime: 0,
++    oldTime: 0,
++    elapsedTime: 0,
++    running: false,
++    start() {
++      timer.dispose();
++      timer = new Timer();
++      timer.reset();
++      this.startTime = performance.now();
++      this.oldTime = this.startTime;
++      this.elapsedTime = 0;
++      this.running = true;
++    },
++    stop() {
++      this.getElapsedTime();
++      this.running = false;
++      this.autoStart = false;
++      timer.dispose();
++    },
++    getElapsedTime() {
++      this.getDelta();
++      return this.elapsedTime;
++    },
++    getDelta() {
++      if (this.autoStart && !this.running) {
++        this.start();
++        return 0;
++      }
++      if (!this.running) return 0;
++      timer.update();
++      const delta = timer.getDelta();
++      this.oldTime = performance.now();
++      this.elapsedTime += delta;
++      return delta;
++    }
++  };
++};
+ const createStore = (invalidate, advance) => {
+   const rootStore = traditional.createWithEqualityFn((set, get) => {
+     const position = new THREE__namespace.Vector3();
+@@ -1038,7 +1082,7 @@ const createStore = (invalidate, advance) => {
+       linear: false,
+       flat: false,
+       controls: null,
+-      clock: new THREE__namespace.Clock(),
++      clock: createLegacyClock(THREE__namespace.Timer),
+       pointer,
+       mouse: pointer,
+       frameloop: 'always',
+@@ -15895,6 +15939,20 @@ function unmountComponentAtNode(canvas, callback) {
+             var _state$gl, _state$gl$renderLists, _state$gl2, _state$gl3;
+             state.events.disconnect == null ? void 0 : state.events.disconnect();
+             (_state$gl = state.gl) == null ? void 0 : (_state$gl$renderLists = _state$gl.renderLists) == null ? void 0 : _state$gl$renderLists.dispose == null ? void 0 : _state$gl$renderLists.dispose();
++            // The loss is deliberate teardown, not a recoverable runtime loss. Intercept
++            // only this one event before Three's diagnostic handler logs "Context Lost".
++            const contextLossTarget = (_state$gl2 = state.gl) == null ? void 0 : _state$gl2.domElement;
++            const handlePlannedContextLoss = event => {
++              event.preventDefault();
++              event.stopImmediatePropagation();
++            };
++            contextLossTarget == null ? void 0 : contextLossTarget.addEventListener('webglcontextlost', handlePlannedContextLoss, {
++              capture: true,
++              once: true
++            });
++            contextLossTarget == null ? void 0 : setTimeout(() => {
++              contextLossTarget.removeEventListener('webglcontextlost', handlePlannedContextLoss, true);
++            }, 1000);
+             (_state$gl2 = state.gl) == null ? void 0 : _state$gl2.forceContextLoss == null ? void 0 : _state$gl2.forceContextLoss();
+             if ((_state$gl3 = state.gl) != null && _state$gl3.xr) state.xr.disconnect();
+             dispose(state.scene);

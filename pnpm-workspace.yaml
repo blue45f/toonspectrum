@@ -55,3 +55,10 @@ overrides:
 auditConfig:
   ignoreGhsas:
     - GHSA-2p57-rm9w-gvfp
+
+# R3F v9 still constructs deprecated THREE.Clock and logs its own planned
+# forceContextLoss teardown. This compatibility patch keeps GPU release intact,
+# moves v9's public clock shape onto THREE.Timer, and suppresses only the deliberate
+# unmount event. Remove it when a stable R3F release ships the Timer migration.
+patchedDependencies:
+  '@react-three/fiber@9.6.1': patches/@react-three__fiber@9.6.1.patch
