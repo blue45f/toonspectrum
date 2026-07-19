@@ -17,6 +17,7 @@ import {
   parseStudioBg3dSceneDocument,
   serializeStudioBg3dSceneDocument,
 } from "./studio-bg3d-scene-document";
+import { compareStudioValidationStrings } from "./studio-validation-string-order";
 
 import type {
   StudioBg3dCaptureBackend,
@@ -229,8 +230,8 @@ const SHADOW_MAP_SIZES = new Set([0, 256, 512, 1024, 2048, 4096]);
 
 function hasExactKeys(value: unknown, expected: readonly string[]): boolean {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
-  const actual = Object.keys(value).sort();
-  const canonical = [...expected].sort();
+  const actual = Object.keys(value).sort(compareStudioValidationStrings);
+  const canonical = [...expected].sort(compareStudioValidationStrings);
   return actual.length === canonical.length &&
     actual.every((key, index) => key === canonical[index]);
 }

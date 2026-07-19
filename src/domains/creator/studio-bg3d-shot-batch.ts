@@ -27,6 +27,7 @@ import {
   STUDIO_BG3D_SHOT_PSD_MIME,
 } from "./studio-bg3d-shot-psd-contract";
 import { buildStudioPackageArchiveBlob } from "./studio-package-archive";
+import { compareStudioValidationStrings } from "./studio-validation-string-order";
 
 export const STUDIO_BG3D_SHOT_BATCH_MAX_SHOTS = 64;
 export const STUDIO_BG3D_SHOT_BATCH_MAX_ARTIFACTS = STUDIO_BG3D_SHOT_BATCH_MAX_FILES;
@@ -283,8 +284,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function hasExactKeys(value: unknown, keys: readonly string[]): boolean {
   if (!isRecord(value)) return false;
-  const actual = Object.keys(value).sort();
-  const expected = [...keys].sort();
+  const actual = Object.keys(value).sort(compareStudioValidationStrings);
+  const expected = [...keys].sort(compareStudioValidationStrings);
   return actual.length === expected.length &&
     actual.every((key, index) => key === expected[index]);
 }

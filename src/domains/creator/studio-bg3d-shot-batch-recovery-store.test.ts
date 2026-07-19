@@ -285,6 +285,65 @@ function skippedArtifacts(plan: StudioBg3dShotBatchPlan) {
 }
 
 describe("Studio BG3D durable shot-batch recovery", () => {
+  it("uses Web Crypto entropy when randomUUID is unavailable", async () => {
+    const { plan, sourceRevision } = await fixture("memory");
+    const originalCrypto = globalThis.crypto;
+    const mathRandom = vi.spyOn(Math, "random");
+    let invocation = 0;
+    const getRandomValues = vi.fn((target: Uint8Array) => {
+      invocation += 1;
+      target.fill(invocation);
+      return target;
+    });
+    vi.stubGlobal("crypto", {
+      subtle: originalCrypto.subtle,
+      getRandomValues,
+    });
+
+    try {
+      const store = createStudioBg3dShotBatchRecoveryStore({
+        indexedDB: null,
+        heartbeat: false,
+        storageManager: null,
+      });
+      const session = await store.acquire(plan, sourceRevision);
+      const run = await store.startShot(session, plan.shots[0]!.shotId);
+
+      expect(session.ownerId).toBe(`bg3d-batch-owner-${"01".repeat(16)}`);
+      expect(session.leaseToken).toBe(`bg3d-batch-memory-lease-${"02".repeat(16)}`);
+      expect(run.runId).toBe(`bg3d-batch-run-${"03".repeat(16)}`);
+      expect(session.ownerId).not.toBe(session.leaseToken);
+      expect(getRandomValues).toHaveBeenCalledTimes(3);
+      expect(mathRandom).not.toHaveBeenCalled();
+      await store.release(session);
+    } finally {
+      vi.unstubAllGlobals();
+      mathRandom.mockRestore();
+    }
+  });
+
+  it("fails closed with a typed error when Web Crypto entropy is incomplete", () => {
+    vi.stubGlobal("crypto", {} as Crypto);
+
+    try {
+      let cause: unknown;
+      try {
+        createStudioBg3dShotBatchRecoveryStore({
+          indexedDB: null,
+          heartbeat: false,
+          storageManager: null,
+        });
+      } catch (error) {
+        cause = error;
+      }
+
+      expect(cause).toBeInstanceOf(StudioBg3dShotBatchRecoveryError);
+      expect(cause).toMatchObject({ code: "storage-unavailable" });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("keeps an active same-tab memory session valid beyond the 30 second lease window", async () => {
     const { plan, sourceRevision } = await fixture("memory");
     let now = 10_000;

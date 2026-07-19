@@ -34,6 +34,7 @@ import {
   type StudioBg3dShotBatchFailureCode,
   type StudioBg3dShotBatchQueue,
 } from "./studio-bg3d-shot-batch-queue";
+import { compareStudioValidationStrings } from "./studio-validation-string-order";
 
 export const STUDIO_BG3D_SHOT_BATCH_RECOVERY_DATABASE_NAME =
   "toonspectrum-studio-bg3d-shot-batch-recovery";
@@ -234,7 +235,6 @@ export interface StudioBg3dShotBatchRecoveryStoreOptions {
 }
 
 const memoryRecords = new Map<string, MemoryRecord>();
-let fallbackIdSequence = 0;
 
 function purgeExpiredMemoryRecords(now: number): void {
   for (const [key, record] of memoryRecords) {
@@ -264,15 +264,37 @@ function memoryJobCountExcluding(recoveryKey: string): number {
 }
 
 function randomId(prefix: string): string {
-  fallbackIdSequence += 1;
-  return globalThis.crypto?.randomUUID?.() ??
-    `${prefix}-${Date.now()}-${fallbackIdSequence}-${Math.random().toString(36).slice(2)}`;
+  const cryptoApi = globalThis.crypto;
+  if (!cryptoApi) {
+    throw new StudioBg3dShotBatchRecoveryError(
+      "storage-unavailable",
+      "보안 난수 생성기를 사용할 수 없어 컷 배치 lease를 만들 수 없습니다.",
+    );
+  }
+  try {
+    if (typeof cryptoApi.randomUUID === "function") {
+      const uuid = cryptoApi.randomUUID();
+      if (uuid) return `${prefix}-${uuid}`;
+    }
+    if (typeof cryptoApi.getRandomValues !== "function") {
+      throw new TypeError("Web Crypto getRandomValues is unavailable");
+    }
+    const bytes = cryptoApi.getRandomValues(new Uint8Array(16));
+    const token = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    return `${prefix}-${token}`;
+  } catch (cause) {
+    throw new StudioBg3dShotBatchRecoveryError(
+      "storage-unavailable",
+      "보안 난수 생성기를 사용할 수 없어 컷 배치 lease를 만들 수 없습니다.",
+      { cause },
+    );
+  }
 }
 
 function exactKeys(value: unknown, keys: readonly string[]): boolean {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
-  const actual = Object.keys(value).sort();
-  const expected = [...keys].sort();
+  const actual = Object.keys(value).sort(compareStudioValidationStrings);
+  const expected = [...keys].sort(compareStudioValidationStrings);
   return actual.length === expected.length &&
     actual.every((key, index) => key === expected[index]);
 }

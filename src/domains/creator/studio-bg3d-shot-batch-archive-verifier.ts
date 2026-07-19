@@ -16,6 +16,7 @@ import {
   computeStudioBg3dShotBatchRenderDigest,
   type StudioBg3dShotBatchPass,
 } from "./studio-bg3d-shot-batch-plan";
+import { compareStudioValidationStrings } from "./studio-validation-string-order";
 
 const ZIP_LOCAL_SIGNATURE = 0x0403_4b50;
 const ZIP_CENTRAL_SIGNATURE = 0x0201_4b50;
@@ -109,8 +110,8 @@ function equalJson(left: unknown, right: unknown): boolean {
 function equalUnorderedJsonArrays(left: unknown, right: unknown): boolean {
   if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
   try {
-    const leftValues = left.map((value) => JSON.stringify(value)).sort();
-    const rightValues = right.map((value) => JSON.stringify(value)).sort();
+    const leftValues = left.map((value) => JSON.stringify(value)).sort(compareStudioValidationStrings);
+    const rightValues = right.map((value) => JSON.stringify(value)).sort(compareStudioValidationStrings);
     return leftValues.every((value, index) => value === rightValues[index]);
   } catch {
     return false;

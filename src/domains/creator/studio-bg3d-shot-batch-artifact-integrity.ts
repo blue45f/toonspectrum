@@ -16,6 +16,7 @@ import {
   STUDIO_BG3D_SHOT_PSD_MAX_OUTPUT_BYTES,
   STUDIO_BG3D_SHOT_PSD_MIME,
 } from "./studio-bg3d-shot-psd-contract";
+import { compareStudioValidationStrings } from "./studio-validation-string-order";
 
 import type {
   StudioBg3dShotBatchPlan,
@@ -47,8 +48,8 @@ const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
 
 function hasExactKeys(value: unknown, expected: readonly string[]): boolean {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
-  const actual = Object.keys(value).sort();
-  const canonical = [...expected].sort();
+  const actual = Object.keys(value).sort(compareStudioValidationStrings);
+  const canonical = [...expected].sort(compareStudioValidationStrings);
   return actual.length === canonical.length &&
     actual.every((key, index) => key === canonical[index]);
 }
