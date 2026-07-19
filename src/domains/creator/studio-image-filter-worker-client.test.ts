@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   runStudioImageFilterWorker,
@@ -76,6 +76,15 @@ class ApplyingWorker implements StudioImageFilterWorkerLike {
   }
 }
 
+class CapturingApplyingWorker extends ApplyingWorker {
+  postedEl: ImageFilterFields | null = null;
+
+  override postMessage(message: StudioImageFilterWorkerRunMessage, transfer: Transferable[]): void {
+    this.postedEl = message.request.el;
+    super.postMessage(message, transfer);
+  }
+}
+
 class HangingWorker implements StudioImageFilterWorkerLike {
   onmessage: StudioImageFilterWorkerLike["onmessage"] = null;
   onerror: StudioImageFilterWorkerLike["onerror"] = null;
@@ -138,6 +147,33 @@ describe("runStudioImageFilterWorker", () => {
     expect(Array.from(output.imageData.data)).toEqual(Array.from(expected));
   });
 
+  it("projects an element-shaped source before direct execution and reads each filter field once", async () => {
+    const el = {} as ImageFilterFields;
+    let brightnessReads = 0;
+    const unrelatedGetter = vi.fn(() => {
+      throw new Error("unrelated metadata must not be read");
+    });
+    Object.defineProperties(el, {
+      brightness: {
+        enumerable: true,
+        get: () => {
+          brightnessReads++;
+          return 0.3;
+        },
+      },
+      provenance: { enumerable: true, get: unrelatedGetter },
+    });
+    const request = requestFixture(el);
+    const expected = expectedPixels({ brightness: 0.3 });
+
+    const output = await runStudioImageFilterWorker(request, { workerFactory: null });
+
+    expect(output.execution).toBe("direct");
+    expect(brightnessReads).toBe(1);
+    expect(unrelatedGetter).not.toHaveBeenCalled();
+    expect(Array.from(output.imageData.data)).toEqual(Array.from(expected));
+  });
+
   it("skips over Konva-native filters (Blur/HSL) too via the direct path", async () => {
     const el: ImageFilterFields = { blur: 4, saturation: 0.5, hue: 90 };
     const request = requestFixture(el);
@@ -173,6 +209,38 @@ describe("runStudioImageFilterWorker", () => {
 
     expect(output.execution).toBe("worker");
     expect(worker.requestTransferCount).toBe(1);
+  });
+
+  it("posts only ImageFilterFields when the caller passes a full Studio element", async () => {
+    const unrelatedGetter = vi.fn(() => {
+      throw new Error("unrelated metadata must not be cloned");
+    });
+    const el = {
+      brightness: 0.3,
+      contrast: 20,
+      src: "blob:large-source",
+      frames: [{ src: "blob:animation-frame" }],
+      scene3d: { render() {} },
+      vrm: { dispose() {} },
+      provenance: new WeakMap<object, unknown>(),
+    } as unknown as ImageFilterFields;
+    Object.defineProperty(el, "runtimeGraph", {
+      enumerable: true,
+      get: unrelatedGetter,
+    });
+    const worker = new CapturingApplyingWorker();
+
+    const output = await runStudioImageFilterWorker(requestFixture(el), {
+      workerFactory: () => worker,
+    });
+
+    expect(output.execution).toBe("worker");
+    expect(unrelatedGetter).not.toHaveBeenCalled();
+    expect(Object.is(worker.postedEl, el)).toBe(false);
+    for (const key of ["src", "frames", "scene3d", "vrm", "provenance", "runtimeGraph"]) {
+      expect(worker.postedEl).not.toHaveProperty(key);
+    }
+    expect(worker.postedEl).toMatchObject({ brightness: 0.3, contrast: 20 });
   });
 
   it("falls back to direct execution when postMessage throws synchronously", async () => {

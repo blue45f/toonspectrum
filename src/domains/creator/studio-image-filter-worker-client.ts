@@ -8,6 +8,7 @@ import {
 import { applyImageFilters, buildImageFilters, registerStudioKonvaFilters, type KonvaLike } from "./studio-konva-filters";
 
 import type { StudioImageDataLike } from "./studio-filters";
+import type { ImageFilterFields } from "./studio-konva-filter-fields";
 
 export interface StudioImageFilterWorkerLike {
   onmessage: ((event: MessageEvent<StudioImageFilterWorkerResponseMessage>) => void) | null;
@@ -57,6 +58,68 @@ function throwIfAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted) throw createAbortError();
 }
 
+type ExhaustiveImageFilterFieldProjection = ImageFilterFields & Record<keyof ImageFilterFields, unknown>;
+
+/**
+ * Studio 이미지 요소처럼 더 넓은 객체에서 Worker/필터 엔진에 필요한 필드만 새 객체로 투영한다.
+ * 이 코드는 의도 기반 Worker 청크 안에 둬 정적 Studio 경로에 공용 청크 요청을 추가하지 않는다.
+ * 객체 열거·spread를 쓰지 않으므로 src, frame, 3D/VRM, provenance 같은 메타데이터가
+ * structured clone 경계로 새어 나가지 않으며, 필드 추가 시 exhaustive 타입이 누락을 잡는다.
+ */
+function projectImageFilterFields(el: ImageFilterFields): ImageFilterFields {
+  const projection = {
+    blur: el.blur,
+    brightness: el.brightness,
+    contrast: el.contrast,
+    grayscale: el.grayscale,
+    sepia: el.sepia,
+    screentone: el.screentone,
+    lineart: el.lineart,
+    chromatic: el.chromatic,
+    posterize: el.posterize,
+    noise: el.noise,
+    saturation: el.saturation,
+    hue: el.hue,
+    temperature: el.temperature,
+    sharpen: el.sharpen,
+    pixelate: el.pixelate,
+    invert: el.invert,
+    inkThreshold: el.inkThreshold,
+    duotoneShadow: el.duotoneShadow,
+    duotoneHighlight: el.duotoneHighlight,
+    levelsBlack: el.levelsBlack,
+    levelsWhite: el.levelsWhite,
+    levelsGamma: el.levelsGamma,
+    levelsOutBlack: el.levelsOutBlack,
+    levelsOutWhite: el.levelsOutWhite,
+    levelsCh: el.levelsCh,
+    curve: el.curve,
+    curveCh: el.curveCh,
+    colorBalance: el.colorBalance,
+    channelMixer: el.channelMixer,
+    selectiveHsl: el.selectiveHsl,
+    vibrance: el.vibrance,
+    gradientMap: el.gradientMap,
+    photoFilter: el.photoFilter,
+    colorToAlpha: el.colorToAlpha,
+    autoAdjust: el.autoAdjust,
+    clarity: el.clarity,
+    outline: el.outline,
+    glow: el.glow,
+    halftone: el.halftone,
+    grain: el.grain,
+    inkWash: el.inkWash,
+    blurFx: el.blurFx,
+    distort: el.distort,
+    stylize: el.stylize,
+    light: el.light,
+    sketch: el.sketch,
+    detail: el.detail,
+  } satisfies ExhaustiveImageFilterFieldProjection;
+
+  return projection;
+}
+
 /** Narrows the input to the protocol's clone-safe contract — drops any caller-attached helpers. */
 function cloneSafeWorkerRequest(request: StudioImageFilterWorkerRunRequest): StudioImageFilterWorkerRunRequest {
   return {
@@ -65,7 +128,7 @@ function cloneSafeWorkerRequest(request: StudioImageFilterWorkerRunRequest): Stu
       width: request.imageData.width,
       height: request.imageData.height,
     },
-    el: request.el,
+    el: projectImageFilterFields(request.el),
   };
 }
 
