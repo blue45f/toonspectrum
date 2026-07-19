@@ -848,6 +848,11 @@ import {
   createEmptyStudioReleaseScheduleSnapshot,
   loadStudioReleaseScheduleRuntime,
 } from "./studio-release-schedule-loader";
+import {
+  buildStudioDirectWorkSavePlan,
+  buildStudioSavePayload,
+  buildStudioSharedSavePatch,
+} from "./studio-save-payload";
 import { layoutScenarioPanels, type ScenarioPanelAspect, type ScenarioPreviewItem } from "./studio-scenario-layout";
 import {
   computeAlignDeltas,
@@ -19008,25 +19013,19 @@ function StudioCuttoonEditor() {
       setMasterEditMode(originalMasterEditMode);
 
       const cover = await downscaleDataUrl(pageImages[0] || "", 480);
-      const tags = tagsText
-        .split(/[,\s]+/)
-        .map((t) => t.trim().replace(/^#/, ""))
-        .filter(Boolean)
-        .slice(0, 8);
-      const payload = {
-        title: title.trim(),
-        description: description.trim(),
-        tags,
-        format: "cuttoon" as const,
-        titleId: linkedTitleId ?? undefined,
+      const payload = buildStudioSavePayload({
+        title,
+        description,
+        tagsText,
+        linkedTitleId,
         cover,
-        pages: pageImages,
-        doc: {
-          // 연출(fx) 등 다른 owner 도구가 저장한 확장 키를 보존하고, 스튜디오가 소유한 키만 덮어쓴다.
-          ...(sharedDocument?.document.doc ?? loadedWork?.doc ?? {}),
+        pageImages,
+        document: {
+          // 연출(fx) 등 다른 owner 도구가 저장한 확장 키를 보존하고, 스튜디오 소유 키만 덮어쓴다.
+          extensionBase: sharedDocument?.document.doc ?? loadedWork?.doc,
           width: CANVAS_W,
           pagesList: savePages,
-          // 문서 마스터(공통 요소) — 비어 있으면 undefined 로 JSON 에서 키가 떨어진다(하위호환).
+          // 비어 있는 마스터는 undefined여서 JSON 직렬화 시 키가 떨어진다(하위호환).
           master: serializeDocumentMaster(master),
           characterBible,
           writerRoom,
@@ -19046,12 +19045,13 @@ function StudioCuttoonEditor() {
             packageSettings: effectivePublishPackageSettings,
             packageCredits: publishPackageCredits,
           },
-        } as Record<string, unknown>,
+        },
         status,
-        remixFromId: (!workId && remixId) ? remixId : undefined,
-        seriesId: linkedSeriesId ?? undefined,
-        challengeId: linkedChallengeId ?? undefined,
-      };
+        workId,
+        remixId,
+        linkedSeriesId,
+        linkedChallengeId,
+      });
       let savedWorkId: string;
       let keepSharedEditorOpen = false;
       if (!saveScopeStillCurrent()) return;
@@ -19071,17 +19071,12 @@ function StudioCuttoonEditor() {
             "팀 원고의 CRDT 서버 순번을 확인하지 못해 저장을 시작하지 않았습니다."
           );
         }
-        const sharedPatch = {
+        const sharedPatch = buildStudioSharedSavePatch({
+          payload,
           baseRevision: sharedDocument.revision,
           crdtServerSequence: authoritativeCrdtServerSequence,
-          title: payload.title,
-          description: payload.description,
-          tags: payload.tags,
-          cover: payload.cover,
-          pages: payload.pages,
-          doc: payload.doc,
-          ...(sharedDocument.role === "owner" ? { status: payload.status } : {}),
-        };
+          role: sharedDocument.role,
+        });
         assertStudioApiJsonPayloadSize(sharedPatch);
         const saved = await updateStudioSharedDocument(
           workId,
@@ -19140,17 +19135,22 @@ function StudioCuttoonEditor() {
           !saveScopeStillCurrent() ||
           !canApplyStudioMutation(saveMutationTicket, { allowDuringSave: true })
         ) return;
+        const directSavePlan = buildStudioDirectWorkSavePlan({
+          payload,
+          workId,
+          baseRevision: loadedWork?.revision,
+        });
         let work: Awaited<ReturnType<typeof createWork>>;
-        if (workId) {
-          const updatePayload = {
-            ...payload,
-            ...(loadedWork?.revision ? { baseRevision: loadedWork.revision } : {}),
-          };
-          assertStudioApiJsonPayloadSize(updatePayload);
-          work = await updateWork(workId, updatePayload, saveController.signal);
+        if (directSavePlan.kind === "update") {
+          assertStudioApiJsonPayloadSize(directSavePlan.payload);
+          work = await updateWork(
+            directSavePlan.workId,
+            directSavePlan.payload,
+            saveController.signal,
+          );
         } else {
-          assertStudioApiJsonPayloadSize(payload);
-          work = await createWork(payload, saveController.signal);
+          assertStudioApiJsonPayloadSize(directSavePlan.payload);
+          work = await createWork(directSavePlan.payload, saveController.signal);
         }
         if (!saveScopeStillCurrent()) return;
         savedWorkId = work.id;
