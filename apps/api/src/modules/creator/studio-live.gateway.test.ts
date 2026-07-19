@@ -8,6 +8,7 @@ import {
 } from "./studio-crdt.service";
 import { StudioLiveAdapterCleanupService } from "./studio-live-adapter-cleanup.service";
 import { StudioLiveCleanupNotificationDispatcher } from "./studio-live-cleanup-notification-dispatcher";
+import { StudioLiveInterServerRelayTransport } from "./studio-live-inter-server-relay-transport";
 import { StudioLiveJoinTransitionSequencer } from "./studio-live-join-transition-sequencer";
 import { StudioLiveRoomTransitionCoordinator } from "./studio-live-room-transition-coordinator";
 import { StudioLiveSocketAuthService } from "./studio-live-socket-auth.service";
@@ -320,6 +321,7 @@ function createHarness(
   const revalidate = vi.fn(revalidateSession);
   const adapterCleanup = new StudioLiveAdapterCleanupService();
   const cleanupNotifications = new StudioLiveCleanupNotificationDispatcher();
+  const interServerRelayTransport = new StudioLiveInterServerRelayTransport();
   const socketAuthentication = new StudioLiveSocketAuthService(authenticate, revalidate);
   const joinTransitions = new StudioLiveJoinTransitionSequencer();
   const roomTransitions = new StudioLiveRoomTransitionCoordinator();
@@ -327,6 +329,7 @@ function createHarness(
     service as unknown as CreatorService,
     adapterCleanup,
     cleanupNotifications,
+    interServerRelayTransport,
     socketAuthentication,
     joinTransitions,
     roomTransitions,
@@ -376,6 +379,7 @@ function createHarness(
     revalidate,
     adapterCleanup,
     cleanupNotifications,
+    interServerRelayTransport,
     socketAuthentication,
     joinTransitions,
     roomTransitions,
@@ -438,6 +442,7 @@ function connectFakeInterServerBus(
       for (const [index, harness] of harnesses.entries()) {
         harness.namespace.in = originalDiscovery[index] ?? harness.namespace.in;
         harness.gateway.onModuleDestroy();
+        harness.interServerRelayTransport.onModuleDestroy();
       }
     },
   };

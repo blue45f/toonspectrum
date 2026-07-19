@@ -27,6 +27,10 @@ import {
   type StudioLiveCleanupNotificationRetry,
 } from "./studio-live-cleanup-notification-dispatcher";
 import { StudioLiveCrdtQuotaLimiter } from "./studio-live-crdt-quota";
+import {
+  STUDIO_LIVE_RELAY_RPC_TIMEOUT_MS,
+  StudioLiveInterServerRelayTransport,
+} from "./studio-live-inter-server-relay-transport";
 import { StudioLiveJoinTransitionSequencer } from "./studio-live-join-transition-sequencer";
 import {
   STUDIO_LIVE_LOCK_REPOSITORY,
@@ -40,13 +44,11 @@ import {
 import { StudioLiveSocketAuthService } from "./studio-live-socket-auth.service";
 import {
   STUDIO_CRDT_PROTOCOL_VERSION,
-  STUDIO_LIVE_INTER_SERVER_RELAY_EVENT,
   StudioLiveChatSchema,
   StudioLiveCrdtSyncSchema,
   StudioLiveCrdtUpdateSchema,
   StudioLiveCursorSchema,
   StudioLiveInterServerRelayRequestSchema,
-  StudioLiveInterServerRelayResponseSchema,
   StudioLiveJoinSchema,
   StudioLiveLockReleaseSchema,
   StudioLiveLockRequestSchema,
@@ -78,8 +80,6 @@ import type {
   StudioLiveCursorInput,
   StudioLiveFailure,
   StudioLiveInterServerRelayEvent,
-  StudioLiveInterServerRelayRequest,
-  StudioLiveInterServerRelayResponse,
   StudioLiveJoinInput,
   StudioLiveJoinResult,
   StudioLiveLock,
@@ -142,12 +142,13 @@ export type {
   StudioLiveVoiceMember,
 } from "./studio-live.protocol";
 
+export { STUDIO_LIVE_RELAY_RPC_TIMEOUT_MS } from "./studio-live-inter-server-relay-transport";
+
 const STUDIO_LIVE_NAMESPACE = "/studio-live";
 const STUDIO_LIVE_ROOM_PREFIX = "studio-live:";
 const STUDIO_LIVE_ACCESS_RECHECK_MS = 15_000;
 const STUDIO_LIVE_ACCESS_CACHE_MS = 5_000;
 export const STUDIO_LIVE_ADAPTER_DISCOVERY_TIMEOUT_MS = 2_000;
-export const STUDIO_LIVE_RELAY_RPC_TIMEOUT_MS = 2_000;
 const STUDIO_LIVE_CANDIDATE_AUTHORIZATION_CACHE_MS = 2_000;
 const STUDIO_LIVE_CANDIDATE_AUTHORIZATION_CACHE_LIMIT = 512;
 const STUDIO_LIVE_VOICE_SIGNAL_DEDUPE_TTL_MS = 10_000;
@@ -340,22 +341,6 @@ export class StudioLiveGateway
   private readonly voiceMembershipBySocket = new Map<string, StudioLiveVoiceMemberInternal>();
   private readonly deliveredInterServerVoiceSignals = new Map<string, number>();
   private accessRecheckTimer: ReturnType<typeof setInterval> | null = null;
-  private interServerNamespace: StudioLiveNamespace | null = null;
-  private readonly interServerRelayListener = (
-    request: StudioLiveInterServerRelayRequest,
-    ack: (response: StudioLiveInterServerRelayResponse) => void
-  ): void => {
-    let acknowledged = false;
-    const respond = (response: StudioLiveInterServerRelayResponse): void => {
-      if (acknowledged) return;
-      acknowledged = true;
-      ack(response);
-    };
-    void this.receiveInterServerRelay(request).then(
-      (delivered) => respond({ delivered }),
-      () => respond({ delivered: false })
-    );
-  };
 
   constructor(
     @Inject(CreatorService)
@@ -364,6 +349,8 @@ export class StudioLiveGateway
     private readonly adapterCleanup: StudioLiveAdapterCleanupService,
     @Inject(StudioLiveCleanupNotificationDispatcher)
     private readonly cleanupNotifications: StudioLiveCleanupNotificationDispatcher,
+    @Inject(StudioLiveInterServerRelayTransport)
+    private readonly interServerRelayTransport: StudioLiveInterServerRelayTransport,
     @Inject(StudioLiveSocketAuthService)
     private readonly socketAuthentication: StudioLiveSocketAuthService,
     @Inject(StudioLiveJoinTransitionSequencer)
@@ -377,15 +364,9 @@ export class StudioLiveGateway
   ) {}
 
   afterInit(server: Namespace): void {
-    const liveNamespace = server as StudioLiveNamespace;
-    this.interServerNamespace?.off(
-      STUDIO_LIVE_INTER_SERVER_RELAY_EVENT,
-      this.interServerRelayListener
-    );
-    this.interServerNamespace = liveNamespace;
-    liveNamespace.on(
-      STUDIO_LIVE_INTER_SERVER_RELAY_EVENT,
-      this.interServerRelayListener
+    this.interServerRelayTransport.bind(
+      server as StudioLiveNamespace,
+      (request) => this.receiveInterServerRelay(request)
     );
     // Namespace middleware completes authentication before Socket.IO emits `connection`, so a
     // valid client cannot race an async handleConnection hook with its first studio:join event.
@@ -419,11 +400,6 @@ export class StudioLiveGateway
   }
 
   onModuleDestroy(): void {
-    this.interServerNamespace?.off(
-      STUDIO_LIVE_INTER_SERVER_RELAY_EVENT,
-      this.interServerRelayListener
-    );
-    this.interServerNamespace = null;
     if (this.accessRecheckTimer) clearInterval(this.accessRecheckTimer);
     this.accessRecheckTimer = null;
     this.participantsBySocket.clear();
@@ -1733,8 +1709,6 @@ export class StudioLiveGateway
     targetConnectionId: string,
     relay: StudioLiveInterServerRelayEvent
   ): Promise<boolean> {
-    const namespace = this.interServerNamespace;
-    if (!namespace || typeof namespace.serverSideEmitWithAck !== "function") return false;
     const request = StudioLiveInterServerRelayRequestSchema.parse({
       workId,
       targetConnectionId,
@@ -1742,33 +1716,7 @@ export class StudioLiveGateway
       sender: publicParticipant(sender),
       relay,
     });
-    let timeout: ReturnType<typeof setTimeout> | null = null;
-    try {
-      const responses = await Promise.race([
-        namespace.serverSideEmitWithAck(
-          STUDIO_LIVE_INTER_SERVER_RELAY_EVENT,
-          request
-        ),
-        new Promise<never>((_resolve, reject) => {
-          timeout = setTimeout(
-            () => reject(new Error("studio peer relay RPC timed out")),
-            STUDIO_LIVE_RELAY_RPC_TIMEOUT_MS
-          );
-          timeout.unref?.();
-        }),
-      ]);
-      let delivered = 0;
-      for (const response of responses) {
-        const parsed = StudioLiveInterServerRelayResponseSchema.safeParse(response);
-        if (!parsed.success) return false;
-        if (parsed.data.delivered) delivered += 1;
-      }
-      return delivered === 1;
-    } catch {
-      return false;
-    } finally {
-      if (timeout) clearTimeout(timeout);
-    }
+    return this.interServerRelayTransport.send(request);
   }
 
   private async receiveInterServerRelay(request: unknown): Promise<boolean> {
