@@ -13,7 +13,7 @@ import {
   planVisibleStudioGpuTiles,
 } from "./studio-webgpu-tile-plan";
 
-import type { StudioGpuStroke } from "./studio-webgpu-engine";
+import type { StudioGpuStroke } from "./studio-webgpu-stroke";
 
 function stroke(overrides: Partial<StudioGpuStroke> = {}): StudioGpuStroke {
   return {

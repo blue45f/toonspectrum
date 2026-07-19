@@ -8,7 +8,7 @@ import {
 } from "./studio-crdt-raster-stroke-capture";
 import { STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 } from "./studio-ink-pressure-model";
 
-import type { StudioGpuStroke } from "./studio-webgpu-engine";
+import type { StudioGpuStroke } from "./studio-webgpu-stroke";
 
 function stroke(patch: Partial<StudioGpuStroke> = {}): StudioGpuStroke {
   return {

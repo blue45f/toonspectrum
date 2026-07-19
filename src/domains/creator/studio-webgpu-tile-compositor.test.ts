@@ -4,8 +4,7 @@ import { STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 } from "./studio-ink-pressure-
 import {
   planStudioGpuDabs,
   planStudioGpuDabsInRect,
-  type StudioGpuStroke,
-} from "./studio-webgpu-engine";
+} from "./studio-webgpu-dab-planner";
 import {
   packStudioGpuTileDabs,
   planStudioGpuTilePresentation,
@@ -20,6 +19,7 @@ import {
   type StudioGpuTile,
 } from "./studio-webgpu-tile-plan";
 
+import type { StudioGpuStroke } from "./studio-webgpu-stroke";
 import type {
   StudioGpuTileCompositeFrame,
   StudioGpuTileRenderTask,

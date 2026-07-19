@@ -6,18 +6,20 @@ import {
   STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
 } from "./studio-ink-pressure-model";
 import {
-  fingerprintStudioGpuFrame,
   isValidStudioGpuStroke,
   planStudioGpuDabUpdate,
   planStudioGpuDabs,
   planStudioGpuStrokeExtensionInRect,
   STUDIO_GPU_MAX_DABS,
+} from "./studio-webgpu-dab-planner";
+import {
+  fingerprintStudioGpuFrame,
   StudioWebGpuEngine,
-  type StudioGpuFrameReceipt,
-  type StudioGpuStroke,
 } from "./studio-webgpu-engine";
 import { STUDIO_GPU_DAB_INSTANCE_FLOATS } from "./studio-webgpu-tile-compositor";
 
+import type { StudioGpuFrameReceipt } from "./studio-webgpu-frame-contract";
+import type { StudioGpuStroke } from "./studio-webgpu-stroke";
 import type { StudioGpuStrokeSuffixPatch } from "./studio-webgpu-stroke-feed";
 
 interface Deferred<Value> {

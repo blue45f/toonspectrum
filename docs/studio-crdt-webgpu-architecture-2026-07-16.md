@@ -206,10 +206,11 @@ rewrites rather than claims that every legacy scene type already runs on the new
   live-ink renderer, not test-only work; it should be driven by a visible defect or a concrete
   ownership requirement, not by chasing a diagnostic counter toward zero.
 
-  Raster-CRDT promotion's own causal-only policy (`planStudioRasterDrawPromotion` in
-  `studio-crdt-raster-ui-bridge.ts`, currently admitting legacy strokes through a deterministic but
-  non-pixel-exact approximation) is a separate release decision, gated by its own experiment token,
-  independent of this initiative.
+  Raster-CRDT promotion mirrors the same causal-only geometry policy (`planStudioRasterDrawPromotion`
+  in `studio-crdt-raster-ui-bridge.ts` passes `requireCausalGeometry: true`). Legacy strokes therefore
+  remain on the Konva segment renderer instead of entering the dab-based raster approximation. The
+  raster promotion experiment is still a separate release decision with its own token, independent
+  of broader committed WebGPU ownership.
 
 ## Verification contracts
 

@@ -14,7 +14,7 @@ import {
   STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
   STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_V2,
 } from "./studio-ink-pressure-model";
-import { planStudioGpuDabs } from "./studio-webgpu-engine";
+import { planStudioGpuDabs } from "./studio-webgpu-dab-planner";
 import { studioGpuPressureRadius } from "./studio-webgpu-stroke";
 
 function expectDabsClose(

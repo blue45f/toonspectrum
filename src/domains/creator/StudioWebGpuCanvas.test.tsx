@@ -1,13 +1,10 @@
 import { readFileSync } from "node:fs";
 
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { resolveStudioWebGpuCanvasStrokes } from "./studio-webgpu-canvas-authority";
-import {
-  isStudioWebGpuCanvasActive,
-  routeStudioWebGpuCanvasRequest,
-} from "./studio-webgpu-engine";
+import { isStudioWebGpuCanvasActive } from "./studio-webgpu-dab-planner";
 import { StudioWebGpuCanvas } from "./StudioWebGpuCanvas";
 
 const supportedStroke = {
@@ -123,38 +120,6 @@ describe("StudioWebGpuCanvas", () => {
     );
     expect(emptyHtml).toContain('data-studio-gpu-active="false"');
     expect(emptyHtml).toContain("invisible");
-  });
-
-  it("routes inactive frames only to suspension and warms the engine on the first valid frame", () => {
-    const engine = {
-      suspend: vi.fn(),
-      render: vi.fn(),
-    };
-    const syncViewport = vi.fn();
-    const requestInitialization = vi.fn();
-
-    expect(routeStudioWebGpuCanvasRequest({
-      engine,
-      strokes: [],
-      requestId: "frame:empty",
-      syncViewport,
-      requestInitialization,
-    })).toBe("suspended");
-    expect(engine.suspend).toHaveBeenCalledWith("frame:empty");
-    expect(engine.render).not.toHaveBeenCalled();
-    expect(syncViewport).not.toHaveBeenCalled();
-    expect(requestInitialization).not.toHaveBeenCalled();
-
-    expect(routeStudioWebGpuCanvasRequest({
-      engine,
-      strokes: [supportedStroke],
-      requestId: "frame:active",
-      syncViewport,
-      requestInitialization,
-    })).toBe("active");
-    expect(syncViewport).toHaveBeenCalledTimes(1);
-    expect(engine.render).toHaveBeenCalledWith([supportedStroke], "frame:active");
-    expect(requestInitialization).toHaveBeenCalledTimes(1);
   });
 
   it("exposes allocation/reuse metrics imperatively without adding render subscriptions", () => {

@@ -1,14 +1,12 @@
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 
 import { resolveStudioWebGpuCanvasStrokes } from "./studio-webgpu-canvas-authority";
-import {
-  isStudioWebGpuCanvasActive,
-  StudioWebGpuEngine,
-  type StudioGpuStroke,
-} from "./studio-webgpu-engine";
+import { isStudioWebGpuCanvasActive } from "./studio-webgpu-dab-planner";
+import { StudioWebGpuEngine } from "./studio-webgpu-engine";
 import {
   sameStudioGpuStrokes,
   snapshotStudioGpuStrokes,
+  type StudioGpuStroke,
 } from "./studio-webgpu-stroke";
 import {
   planStudioGpuPinnedStrokeFeedUpdate,
