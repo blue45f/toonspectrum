@@ -1,5 +1,5 @@
 import { useFx } from "@toonspectrum/core/fx";
-import { Languages, Moon, Settings2, Sun, Volume2, VolumeX, X } from "lucide-react";
+import { Moon, Settings2, Sun, Volume2, VolumeX, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { cx } from "@/lib/cx";
@@ -178,16 +178,12 @@ export function FloatingControls({
       {showLang && (
         <div
           className="inline-flex h-11 items-center gap-1 rounded-full border border-line bg-panel/95 p-0.5 shadow-lg shadow-[oklch(0.1_0.02_70/0.35)] backdrop-blur"
-          role="group"
-          aria-label={t("control.language.label")}
         >
-          <Languages size={13} className="ml-1.5 text-fg-3" aria-hidden />
-          <span className="sr-only">{t("control.language.label")}</span>
           <select
             aria-label={t("control.language.label")}
             value={lang}
             onChange={(event) => setLang(event.target.value)}
-            className="min-w-[10rem] max-w-[14rem] rounded-full border border-line/0 bg-transparent py-2 pl-2 pr-5 text-xs font-semibold text-fg outline-none transition focus-visible:ring-2 focus-visible:ring-accent/35 sm:max-w-[16rem]"
+            className="max-w-[14rem] rounded-full bg-transparent px-2 py-2 text-xs font-semibold text-fg outline-none focus-visible:ring-2 focus-visible:ring-accent/35"
           >
             {langOptions.map((o) => (
               <option key={o.code} value={o.code}>
