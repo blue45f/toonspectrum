@@ -69,4 +69,48 @@ describe("studio live adapter cleanup boundary", () => {
     expect(revoke).toContain("this.joinTransitions.invalidate(socketId)");
     expect(revoke).toContain("this.socketAuthentication.clearBySocketId(socketId, socket)");
   });
+
+  it("commits local participant state before best-effort cleanup notifications", () => {
+    const source = readFileSync(gatewayPath, "utf8");
+    const invalidStart = source.indexOf("private disconnectInvalidSession(");
+    const revokeStart = source.indexOf("private revokeParticipant(", invalidStart);
+    const removeStart = source.indexOf("private removeParticipant(", revokeStart);
+    const releaseStart = source.indexOf("private releaseSocketLocks(", removeStart);
+    const notifyStart = source.indexOf(
+      "private emitCleanupNotificationBestEffort(",
+      releaseStart
+    );
+    const notifyEnd = source.indexOf("private localVoiceMembers(", notifyStart);
+    const invalidSession = source.slice(invalidStart, revokeStart);
+    const revoke = source.slice(revokeStart, removeStart);
+    const remove = source.slice(removeStart, releaseStart);
+    const notificationLeaf = source.slice(notifyStart, notifyEnd);
+    const localCommitMarkers = [
+      "this.detachVoiceMembership(socketId)",
+      "this.participantsBySocket.delete(socketId)",
+      "delete socket.data.studioParticipant",
+      "delete socket.data.studioWorkId",
+      "this.participantAuthorizationRechecks.delete(socketId)",
+      "this.deleteCandidateRelayAuthorizationsForSocket(socketId)",
+      "roomSockets?.delete(socketId)",
+    ];
+    const voiceNotification = remove.indexOf("this.emitVoiceLeave(");
+    const presenceNotification = remove.indexOf(
+      "this.emitCleanupNotificationBestEffort("
+    );
+
+    expect(invalidSession).toContain(
+      'this.emitCleanupNotificationBestEffort(socketId, "studio:access:revoked"'
+    );
+    expect(revoke).toContain(
+      'this.emitCleanupNotificationBestEffort(socketId, "studio:access:revoked"'
+    );
+    expect(notificationLeaf).toMatch(/try\s*\{[\s\S]*this\.server\.to\(target\)\.emit\(event, payload\);[\s\S]*\}\s*catch/u);
+    expect(voiceNotification).toBeGreaterThan(-1);
+    expect(presenceNotification).toBeGreaterThan(voiceNotification);
+    for (const marker of localCommitMarkers) {
+      expect(remove.indexOf(marker)).toBeGreaterThan(-1);
+      expect(remove.indexOf(marker)).toBeLessThan(voiceNotification);
+    }
+  });
 });

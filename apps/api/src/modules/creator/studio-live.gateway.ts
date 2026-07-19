@@ -2817,7 +2817,7 @@ export class StudioLiveGateway
     expectedParticipant: StudioLiveParticipantInternal
   ): void {
     if (this.participantsBySocket.get(socketId) !== expectedParticipant) return;
-    this.server.to(socketId).emit("studio:access:revoked", {
+    this.emitCleanupNotificationBestEffort(socketId, "studio:access:revoked", {
       workId: expectedParticipant.workId,
       message: "로그인 세션이 만료되거나 해제되어 실시간 작업실 연결을 종료했습니다.",
     });
@@ -2836,7 +2836,7 @@ export class StudioLiveGateway
   private revokeParticipant(socketId: string): void {
     const participant = this.participantsBySocket.get(socketId);
     if (!participant) return;
-    this.server.to(socketId).emit("studio:access:revoked", {
+    this.emitCleanupNotificationBestEffort(socketId, "studio:access:revoked", {
       workId: participant.workId,
       message: "팀 권한이 변경되어 실시간 작업실 연결을 종료했습니다.",
     });
@@ -2856,10 +2856,7 @@ export class StudioLiveGateway
   private removeParticipant(socketId: string, reason: "disconnect" | "switch" | "revoked"): void {
     const participant = this.participantsBySocket.get(socketId);
     if (!participant) return;
-    this.removeVoiceMembership(
-      socketId,
-      reason === "revoked" ? "revoked" : "removed"
-    );
+    const voiceMember = this.detachVoiceMembership(socketId);
     this.participantsBySocket.delete(socketId);
     const socket = this.server.sockets.get(socketId) as StudioLiveSocket | undefined;
     if (socket) {
@@ -2872,10 +2869,20 @@ export class StudioLiveGateway
     roomSockets?.delete(socketId);
     if (roomSockets?.size === 0) this.socketIdsByWork.delete(participant.workId);
     this.releaseSocketLocks(participant);
-    this.server.to(studioLiveRoom(participant.workId)).emit("studio:presence:leave", {
-      connectionId: participant.connectionId,
-      reason,
-    });
+    if (voiceMember) {
+      this.emitVoiceLeave(
+        voiceMember,
+        reason === "revoked" ? "revoked" : "removed"
+      );
+    }
+    this.emitCleanupNotificationBestEffort(
+      studioLiveRoom(participant.workId),
+      "studio:presence:leave",
+      {
+        connectionId: participant.connectionId,
+        reason,
+      }
+    );
   }
 
   private releaseSocketLocks(participant: StudioLiveParticipantInternal): void {
@@ -2955,23 +2962,48 @@ export class StudioLiveGateway
     member: StudioLiveVoiceMemberInternal,
     reason: StudioLiveVoiceLeaveReason = "removed"
   ): void {
-    this.server.to(studioLiveRoom(member.workId)).emit("studio:voice:leave", {
-      connectionId: member.connectionId,
-      callId: member.callId,
-      reason,
-    });
+    this.emitCleanupNotificationBestEffort(
+      studioLiveRoom(member.workId),
+      "studio:voice:leave",
+      {
+        connectionId: member.connectionId,
+        callId: member.callId,
+        reason,
+      }
+    );
+  }
+
+  private detachVoiceMembership(socketId: string): StudioLiveVoiceMemberInternal | undefined {
+    const member = this.voiceMembershipBySocket.get(socketId);
+    if (!member) return undefined;
+    this.voiceMembershipBySocket.delete(socketId);
+    const socket = this.server.sockets.get(socketId) as StudioLiveSocket | undefined;
+    if (socket) delete socket.data.studioVoiceMember;
+    return member;
   }
 
   private removeVoiceMembership(
     socketId: string,
     reason: StudioLiveVoiceLeaveReason = "removed"
   ): void {
-    const member = this.voiceMembershipBySocket.get(socketId);
+    const member = this.detachVoiceMembership(socketId);
     if (!member) return;
-    this.voiceMembershipBySocket.delete(socketId);
-    const socket = this.server.sockets.get(socketId) as StudioLiveSocket | undefined;
-    if (socket) delete socket.data.studioVoiceMember;
     this.emitVoiceLeave(member, reason);
+  }
+
+  private emitCleanupNotificationBestEffort(
+    target: string,
+    event: string,
+    payload: unknown
+  ): void {
+    try {
+      this.server.to(target).emit(event, payload);
+    } catch (error) {
+      this.logger.warn(
+        { target, event, error: error instanceof Error ? error.message : "unknown" },
+        "studio live cleanup notification failed"
+      );
+    }
   }
 
   private localVoiceMembers(workId: string, callId?: string): StudioLiveVoiceMember[] {

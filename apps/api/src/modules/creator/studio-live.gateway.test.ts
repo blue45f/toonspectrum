@@ -2365,6 +2365,172 @@ describe("StudioLiveGateway", () => {
     expect(privateAuthPrincipal(harness, replacementSocket)?.userId).toBe("replacement-user");
   });
 
+  it("fails closed when the expired-session notification throws synchronously", async () => {
+    const harness = createHarness();
+    const socket = harness.socket("cleanup-session-notification");
+    await connectAndJoin(harness, socket);
+    const internals = harness.gateway as unknown as {
+      participantsBySocket: Map<string, unknown>;
+      rateLimits: Map<string, unknown>;
+      disconnectInvalidSession(socketId: string, expectedParticipant: unknown): void;
+    };
+    const participant = internals.participantsBySocket.get(socket.id);
+    if (!participant) throw new Error("missing participant");
+    const originalTo = harness.namespace.to.bind(harness.namespace);
+    const accessNotification = vi.fn();
+    vi.spyOn(harness.namespace, "to").mockImplementation((target: string) => ({
+      emit(event: string, payload: unknown) {
+        if (target === socket.id && event === "studio:access:revoked") {
+          accessNotification();
+          throw new Error("access notification failed");
+        }
+        originalTo(target).emit(event, payload);
+      },
+    }));
+
+    expect(() =>
+      internals.disconnectInvalidSession(socket.id, participant)
+    ).not.toThrow();
+
+    expect(accessNotification).toHaveBeenCalledOnce();
+    expect(socket.disconnected).toBe(true);
+    expect(socket.left).toContain("studio-live:work-1");
+    expect(socket.data.studioParticipant).toBeUndefined();
+    expect(socket.data.studioWorkId).toBeUndefined();
+    expect(internals.participantsBySocket.has(socket.id)).toBe(false);
+    expect(internals.rateLimits.has(socket.id)).toBe(false);
+    expect(privateAuthPrincipal(harness, socket)).toBeUndefined();
+  });
+
+  it("fails closed when the ACL-revocation notification throws synchronously", async () => {
+    const harness = createHarness();
+    const socket = harness.socket("cleanup-acl-notification");
+    await connectAndJoin(harness, socket);
+    const internals = harness.gateway as unknown as {
+      participantsBySocket: Map<string, unknown>;
+      rateLimits: Map<string, unknown>;
+      revokeParticipant(socketId: string): void;
+    };
+    const originalTo = harness.namespace.to.bind(harness.namespace);
+    const accessNotification = vi.fn();
+    const invalidate = vi.spyOn(harness.joinTransitions, "invalidate");
+    vi.spyOn(harness.namespace, "to").mockImplementation((target: string) => ({
+      emit(event: string, payload: unknown) {
+        if (target === socket.id && event === "studio:access:revoked") {
+          accessNotification();
+          throw new Error("access notification failed");
+        }
+        originalTo(target).emit(event, payload);
+      },
+    }));
+
+    expect(() => internals.revokeParticipant(socket.id)).not.toThrow();
+
+    expect(accessNotification).toHaveBeenCalledOnce();
+    expect(socket.disconnected).toBe(true);
+    expect(socket.left).toContain("studio-live:work-1");
+    expect(internals.participantsBySocket.has(socket.id)).toBe(false);
+    expect(internals.rateLimits.has(socket.id)).toBe(false);
+    expect(invalidate).toHaveBeenCalledWith(socket.id);
+    expect(privateAuthPrincipal(harness, socket)).toBeUndefined();
+  });
+
+  it("commits all local participant state before best-effort leave notifications", async () => {
+    const harness = createHarness();
+    const socket = harness.socket("cleanup-notification-order");
+    await connectAndJoin(harness, socket);
+    const internals = harness.gateway as unknown as {
+      participantsBySocket: Map<string, unknown>;
+      socketIdsByWork: Map<string, Set<string>>;
+      participantAuthorizationRechecks: Map<string, unknown>;
+      candidateRelayAuthorizations: Map<
+        string,
+        { left: { connectionId: string }; right: { connectionId: string } }
+      >;
+      voiceMembershipBySocket: Map<string, unknown>;
+      removeParticipant(
+        socketId: string,
+        reason: "disconnect" | "switch" | "revoked"
+      ): void;
+    };
+    const participant = internals.participantsBySocket.get(socket.id);
+    if (!participant) throw new Error("missing participant");
+    internals.participantAuthorizationRechecks.set(socket.id, {
+      participant,
+      promise: Promise.resolve(null),
+    });
+    internals.candidateRelayAuthorizations.set("cleanup-order", {
+      left: { connectionId: socket.id },
+      right: { connectionId: "peer" },
+    });
+    internals.voiceMembershipBySocket.set(socket.id, {
+      workId: "work-1",
+      connectionId: socket.id,
+      callId: "voice-main",
+      muted: false,
+    });
+    socket.data.studioVoiceMember = {
+      connectionId: socket.id,
+      callId: "voice-main",
+      muted: false,
+    };
+    const localStateAtNotification: Array<{
+      event: string;
+      participant: boolean;
+      participantMetadata: boolean;
+      voice: boolean;
+      voiceMetadata: boolean;
+      recheck: boolean;
+      candidateAuthorization: boolean;
+      roomIndex: boolean;
+    }> = [];
+    vi.spyOn(harness.namespace, "to").mockImplementation((_target: string) => ({
+      emit(event: string) {
+        if (event !== "studio:voice:leave" && event !== "studio:presence:leave") return;
+        localStateAtNotification.push({
+          event,
+          participant: internals.participantsBySocket.has(socket.id),
+          participantMetadata: Boolean(
+            socket.data.studioParticipant || socket.data.studioWorkId
+          ),
+          voice: internals.voiceMembershipBySocket.has(socket.id),
+          voiceMetadata: Boolean(socket.data.studioVoiceMember),
+          recheck: internals.participantAuthorizationRechecks.has(socket.id),
+          candidateAuthorization: internals.candidateRelayAuthorizations.has(
+            "cleanup-order"
+          ),
+          roomIndex: Boolean(internals.socketIdsByWork.get("work-1")?.has(socket.id)),
+        });
+        throw new Error(`${event} notification failed`);
+      },
+    }));
+
+    expect(() => internals.removeParticipant(socket.id, "disconnect")).not.toThrow();
+
+    expect(localStateAtNotification).toEqual([
+      {
+        event: "studio:voice:leave",
+        participant: false,
+        participantMetadata: false,
+        voice: false,
+        voiceMetadata: false,
+        recheck: false,
+        candidateAuthorization: false,
+        roomIndex: false,
+      },
+      {
+        event: "studio:presence:leave",
+        participant: false,
+        participantMetadata: false,
+        voice: false,
+        voiceMetadata: false,
+        recheck: false,
+        candidateAuthorization: false,
+        roomIndex: false,
+      },
+    ]);
+  });
+
   it("finalizes local revocation state when the adapter socket is already absent", async () => {
     const harness = createHarness();
     const socket = harness.socket("cleanup-absent-socket");
