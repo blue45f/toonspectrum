@@ -2,10 +2,20 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const inspectorSource = readFileSync(
-  new URL("./StudioInspectorAside.tsx", import.meta.url),
-  "utf8",
-);
+const inspectorSources = [
+  {
+    file: "StudioInspectorAside.tsx",
+    source: readFileSync(new URL("./StudioInspectorAside.tsx", import.meta.url), "utf8"),
+  },
+  {
+    file: "StudioInspectorFocusSpeedFrameControls.tsx",
+    source: readFileSync(
+      new URL("./StudioInspectorFocusSpeedFrameControls.tsx", import.meta.url),
+      "utf8"
+    ),
+  },
+] as const;
+const inspectorSource = inspectorSources.map(({ source }) => source).join("\n");
 
 describe("Studio inspector accessibility boundary", () => {
   it("keeps inspector-only form controls explicitly named", () => {
@@ -21,11 +31,15 @@ describe("Studio inspector accessibility boundary", () => {
   });
 
   it("never removes the native outline without a focus-visible replacement", () => {
-    const violations = inspectorSource
-      .split("\n")
-      .map((line, index) => ({ line, number: index + 1 }))
-      .filter(({ line }) => line.includes("outline-none") && !line.includes("focus-visible:outline"))
-      .map(({ number }) => `StudioInspectorAside.tsx:${number}`);
+    const violations = inspectorSources.flatMap(({ file, source }) =>
+      source
+        .split("\n")
+        .map((line, index) => ({ line, number: index + 1 }))
+        .filter(
+          ({ line }) => line.includes("outline-none") && !line.includes("focus-visible:outline")
+        )
+        .map(({ number }) => `${file}:${number}`)
+    );
 
     expect(violations).toEqual([]);
     expect(inspectorSource.match(/focus-visible:outline-accent/g)?.length ?? 0).toBeGreaterThanOrEqual(10);
