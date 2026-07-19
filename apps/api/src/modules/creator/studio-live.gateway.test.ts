@@ -134,11 +134,25 @@ class MemoryStudioLiveLockRepository implements StudioLiveLockRepository {
           studioLiveLockResourcesConflict(lock.resourceId, input.resourceId)
       );
       if (conflicting) return { status: "conflict" as const, lock: conflicting };
+      if (
+        input.renewLeaseId !== undefined &&
+        (!current ||
+          current.ownerConnectionId !== input.ownerConnectionId ||
+          current.leaseId !== input.renewLeaseId)
+      ) {
+        return {
+          status: "stale" as const,
+          ...(current ? { lock: current } : {}),
+        };
+      }
+      if (input.rotateLease && input.renewLeaseId === undefined && current) {
+        return { status: "stale" as const, lock: current };
+      }
       if (!current && active.length >= 200) return { status: "limit" as const };
       const lock: StudioLiveLockRecord = {
         workId: input.workId,
         resourceId: input.resourceId,
-        leaseId: current?.leaseId ?? input.requestedLeaseId,
+        leaseId: current && !input.rotateLease ? current.leaseId : input.requestedLeaseId,
         acquisitionId: input.acquisitionId,
         ownerConnectionId: input.ownerConnectionId,
         ownerName: input.ownerName,
@@ -155,15 +169,17 @@ class MemoryStudioLiveLockRepository implements StudioLiveLockRepository {
     leaseId: string;
     ownerConnectionId: string;
   }) {
-    const key = this.key(input.workId, input.resourceId);
-    const current = this.locks.get(key);
-    if (
-      !current ||
-      current.ownerConnectionId !== input.ownerConnectionId ||
-      current.leaseId !== input.leaseId
-    ) return null;
-    this.locks.delete(key);
-    return current;
+    return this.withWorkMutation(input.workId, async () => {
+      const key = this.key(input.workId, input.resourceId);
+      const current = this.locks.get(key);
+      if (
+        !current ||
+        current.ownerConnectionId !== input.ownerConnectionId ||
+        current.leaseId !== input.leaseId
+      ) return null;
+      this.locks.delete(key);
+      return current;
+    });
   }
 
   async rollbackAcquire(input: {
@@ -1798,6 +1814,74 @@ describe("StudioLiveGateway", () => {
     });
   });
 
+  it("preserves a valid release request id when the remaining payload is malformed", async () => {
+    const harness = createHarness();
+    const socket = harness.socket("editor");
+
+    await expect(
+      harness.gateway.releaseLock(
+        socket as never,
+        {
+          workId: "",
+          resourceId: "page:page-1",
+          leaseId: "lease-1",
+          requestId: "00000000-0000-4000-8000-000000000010",
+        },
+        undefined
+      )
+    ).resolves.toEqual({
+      ok: false,
+      code: "invalid_payload",
+      message: "편집 잠금 해제 정보가 올바르지 않습니다.",
+      requestId: "00000000-0000-4000-8000-000000000010",
+    });
+  });
+
+  it("preserves release correlation when authorization or persistence rejects the request", async () => {
+    const forbiddenHarness = createHarness();
+    const forbiddenSocket = forbiddenHarness.socket("release-forbidden");
+    await expect(
+      forbiddenHarness.gateway.releaseLock(
+        forbiddenSocket as never,
+        {
+          workId: "work-1",
+          resourceId: "page:page-1",
+          leaseId: "lease-1",
+          requestId: "00000000-0000-4000-8000-000000000016",
+        },
+        undefined
+      )
+    ).resolves.toEqual({
+      ok: false,
+      code: "forbidden",
+      message: "이 원고를 편집할 권한이 없습니다.",
+      requestId: "00000000-0000-4000-8000-000000000016",
+    });
+
+    const repository = new MemoryStudioLiveLockRepository();
+    const failedHarness = createHarness(undefined, undefined, undefined, repository);
+    const failedSocket = failedHarness.socket("release-storage-failure");
+    await connectAndJoin(failedHarness, failedSocket);
+    vi.spyOn(repository, "release").mockRejectedValueOnce(new Error("database unavailable"));
+    await expect(
+      failedHarness.gateway.releaseLock(
+        failedSocket as never,
+        {
+          workId: "work-1",
+          resourceId: "page:page-1",
+          leaseId: "lease-1",
+          requestId: "00000000-0000-4000-8000-000000000019",
+        },
+        undefined
+      )
+    ).resolves.toEqual({
+      ok: false,
+      code: "internal_error",
+      message: "편집 잠금을 해제하지 못했습니다.",
+      requestId: "00000000-0000-4000-8000-000000000019",
+    });
+  });
+
   it("grants renewable edit leases and rejects a competing editor", async () => {
     const harness = createHarness();
     const first = harness.socket("editor-a");
@@ -1810,6 +1894,7 @@ describe("StudioLiveGateway", () => {
       {
         workId: "work-1",
         resourceId: "element:panel-1",
+        protocolVersion: 2,
         requestId: "00000000-0000-4000-8000-000000000011",
         leaseMs: 15_000,
       },
@@ -1837,12 +1922,14 @@ describe("StudioLiveGateway", () => {
       {
         workId: "work-1",
         resourceId: "element:panel-1",
+        protocolVersion: 2,
         requestId: "00000000-0000-4000-8000-000000000012",
+        renewLeaseId: acquired.data.lock.leaseId,
         leaseMs: 20_000,
       },
       undefined
     );
-    expect(renewed.ok && renewed.data.lock.leaseId).toBe(acquired.data.lock.leaseId);
+    expect(renewed.ok && renewed.data.lock.leaseId).not.toBe(acquired.data.lock.leaseId);
     expect(renewed).toMatchObject({
       ok: true,
       data: {
@@ -1868,28 +1955,240 @@ describe("StudioLiveGateway", () => {
       requestId: "00000000-0000-4000-8000-000000000013",
       lock: {
         resourceId: "element:panel-1",
-        leaseId: acquired.data.lock.leaseId,
+        leaseId: renewed.ok ? renewed.data.lock.leaseId : "missing",
         ownerConnectionId: first.id,
       },
     });
 
     const staleRelease = await harness.gateway.releaseLock(
       first as never,
-      { workId: "work-1", resourceId: "element:panel-1", leaseId: "stale" },
+      {
+        workId: "work-1",
+        resourceId: "element:panel-1",
+        leaseId: acquired.data.lock.leaseId,
+        requestId: "00000000-0000-4000-8000-000000000014",
+      },
       undefined
     );
-    expect(staleRelease).toEqual({ ok: true, data: { released: false } });
+    expect(staleRelease).toEqual({
+      ok: true,
+      data: {
+        requestId: "00000000-0000-4000-8000-000000000014",
+        resourceId: "element:panel-1",
+        leaseId: acquired.data.lock.leaseId,
+        released: false,
+      },
+    });
 
     const released = await harness.gateway.releaseLock(
       first as never,
       {
         workId: "work-1",
         resourceId: "element:panel-1",
-        leaseId: acquired.data.lock.leaseId,
+        leaseId: renewed.ok ? renewed.data.lock.leaseId : "missing",
+        requestId: "00000000-0000-4000-8000-000000000015",
       },
       undefined
     );
-    expect(released).toEqual({ ok: true, data: { released: true } });
+    expect(released).toEqual({
+      ok: true,
+      data: {
+        requestId: "00000000-0000-4000-8000-000000000015",
+        resourceId: "element:panel-1",
+        leaseId: renewed.ok ? renewed.data.lock.leaseId : "missing",
+        released: true,
+      },
+    });
+    expect(harness.emissions).toContainEqual({
+      target: "studio-live:work-1",
+      event: "studio:lock:update",
+      payload: expect.objectContaining({
+        action: "released",
+        requestId: "00000000-0000-4000-8000-000000000012",
+        releaseRequestId: "00000000-0000-4000-8000-000000000015",
+      }),
+    });
+  });
+
+  it("does not resurrect a v2 lease when release wins before a delayed renewal", async () => {
+    const repository = new MemoryStudioLiveLockRepository();
+    const harness = createHarness(undefined, undefined, undefined, repository);
+    const socket = harness.socket("editor");
+    await connectAndJoin(harness, socket);
+
+    const acquired = await harness.gateway.requestLock(
+      socket as never,
+      {
+        workId: "work-1",
+        resourceId: "page:release-first",
+        protocolVersion: 2,
+        requestId: "00000000-0000-4000-8000-000000000017",
+        leaseMs: 15_000,
+      },
+      undefined
+    );
+    expect(acquired.ok).toBe(true);
+    if (!acquired.ok) throw new Error("initial v2 lock failed");
+
+    await expect(
+      harness.gateway.releaseLock(
+        socket as never,
+        {
+          workId: "work-1",
+          resourceId: "page:release-first",
+          leaseId: acquired.data.lock.leaseId,
+          requestId: "00000000-0000-4000-8000-000000000018",
+        },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: true, data: { released: true } });
+
+    await expect(
+      harness.gateway.requestLock(
+        socket as never,
+        {
+          workId: "work-1",
+          resourceId: "page:release-first",
+          protocolVersion: 2,
+          requestId: "00000000-0000-4000-8000-000000000019",
+          renewLeaseId: acquired.data.lock.leaseId,
+          leaseMs: 15_000,
+        },
+        undefined
+      )
+    ).resolves.toEqual({
+      ok: false,
+      code: "lock_stale",
+      message: "편집 잠금 임대가 이미 변경되었거나 해제되었습니다.",
+      decision: "denied",
+      requestId: "00000000-0000-4000-8000-000000000019",
+    });
+    await expect(repository.list("work-1")).resolves.toEqual([]);
+  });
+
+  it("allows only one v2 renewal to rotate an observed fence", async () => {
+    const repository = new MemoryStudioLiveLockRepository();
+    const harness = createHarness(undefined, undefined, undefined, repository);
+    const socket = harness.socket("editor");
+    await connectAndJoin(harness, socket);
+
+    const acquired = await harness.gateway.requestLock(
+      socket as never,
+      {
+        workId: "work-1",
+        resourceId: "page:competing-renewals",
+        protocolVersion: 2,
+        requestId: "00000000-0000-4000-8000-000000000021",
+        leaseMs: 15_000,
+      },
+      undefined
+    );
+    expect(acquired.ok).toBe(true);
+    if (!acquired.ok) throw new Error("initial v2 lock failed");
+
+    const renewals = await Promise.all([
+      harness.gateway.requestLock(
+        socket as never,
+        {
+          workId: "work-1",
+          resourceId: "page:competing-renewals",
+          protocolVersion: 2,
+          requestId: "00000000-0000-4000-8000-000000000022",
+          renewLeaseId: acquired.data.lock.leaseId,
+          leaseMs: 15_000,
+        },
+        undefined
+      ),
+      harness.gateway.requestLock(
+        socket as never,
+        {
+          workId: "work-1",
+          resourceId: "page:competing-renewals",
+          protocolVersion: 2,
+          requestId: "00000000-0000-4000-8000-000000000023",
+          renewLeaseId: acquired.data.lock.leaseId,
+          leaseMs: 15_000,
+        },
+        undefined
+      ),
+    ]);
+    const winners = renewals.filter((result) => result.ok);
+    const stale = renewals.filter((result) => !result.ok);
+    expect(winners).toHaveLength(1);
+    expect(stale).toHaveLength(1);
+    const winner = winners[0];
+    if (!winner?.ok) throw new Error("v2 renewal winner missing");
+    expect(winner.data.lock.leaseId).not.toBe(acquired.data.lock.leaseId);
+    expect(stale[0]).toMatchObject({
+      ok: false,
+      code: "lock_stale",
+      lock: { leaseId: winner.data.lock.leaseId },
+    });
+    await expect(repository.list("work-1")).resolves.toEqual([
+      expect.objectContaining({ leaseId: winner.data.lock.leaseId }),
+    ]);
+
+    await expect(
+      harness.gateway.releaseLock(
+        socket as never,
+        {
+          workId: "work-1",
+          resourceId: "page:competing-renewals",
+          leaseId: acquired.data.lock.leaseId,
+          requestId: "00000000-0000-4000-8000-000000000024",
+        },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: true, data: { released: false } });
+    await expect(
+      harness.gateway.releaseLock(
+        socket as never,
+        {
+          workId: "work-1",
+          resourceId: "page:competing-renewals",
+          leaseId: winner.data.lock.leaseId,
+          requestId: "00000000-0000-4000-8000-000000000025",
+        },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: true, data: { released: true } });
+  });
+
+  it("keeps v1 renewals stable while v2 fresh requests use expected-none CAS", async () => {
+    const harness = createHarness();
+    const socket = harness.socket("editor");
+    await connectAndJoin(harness, socket);
+    const legacy = await harness.gateway.requestLock(
+      socket as never,
+      { workId: "work-1", resourceId: "page:rolling", leaseMs: 15_000 },
+      undefined
+    );
+    expect(legacy.ok).toBe(true);
+    if (!legacy.ok) throw new Error("legacy lock failed");
+    const legacyRenewed = await harness.gateway.requestLock(
+      socket as never,
+      { workId: "work-1", resourceId: "page:rolling", leaseMs: 20_000 },
+      undefined
+    );
+    expect(legacyRenewed.ok && legacyRenewed.data.lock.leaseId).toBe(legacy.data.lock.leaseId);
+
+    await expect(
+      harness.gateway.requestLock(
+        socket as never,
+        {
+          workId: "work-1",
+          resourceId: "page:rolling",
+          protocolVersion: 2,
+          requestId: "00000000-0000-4000-8000-000000000020",
+          leaseMs: 15_000,
+        },
+        undefined
+      )
+    ).resolves.toMatchObject({
+      ok: false,
+      code: "lock_stale",
+      requestId: "00000000-0000-4000-8000-000000000020",
+    });
   });
 
   it("serializes one shared lock owner across API gateway instances", async () => {
@@ -1950,10 +2249,19 @@ describe("StudioLiveGateway", () => {
         workId: "work-1",
         resourceId: "element:shared",
         leaseId: winner.data.lock.leaseId,
+        requestId: "00000000-0000-4000-8000-000000000016",
       },
       undefined
     );
-    expect(wrongOwnerRelease).toEqual({ ok: true, data: { released: false } });
+    expect(wrongOwnerRelease).toEqual({
+      ok: true,
+      data: {
+        requestId: "00000000-0000-4000-8000-000000000016",
+        resourceId: "element:shared",
+        leaseId: winner.data.lock.leaseId,
+        released: false,
+      },
+    });
 
     winnerHarness.gateway.handleDisconnect(winnerSocket as never);
     await vi.waitFor(async () => {
@@ -2166,7 +2474,7 @@ describe("StudioLiveGateway", () => {
     });
   });
 
-  it("does not delete a pre-existing lease when its renewal finishes after a same-work rejoin", async () => {
+  it("publishes a pre-existing v1 lease when its renewal finishes after a same-work rejoin", async () => {
     const repository = new MemoryStudioLiveLockRepository();
     const harness = createHarness(undefined, undefined, undefined, repository);
     const socket = harness.socket("editor");
@@ -2194,7 +2502,6 @@ describe("StudioLiveGateway", () => {
       await renewalBarrier;
       return result;
     });
-
     const renewal = harness.gateway.requestLock(
       socket as never,
       {
@@ -2215,10 +2522,12 @@ describe("StudioLiveGateway", () => {
 
     resumeRenewal?.();
     await expect(renewal).resolves.toMatchObject({
-      ok: false,
-      code: "forbidden",
-      decision: "revoked",
-      requestId: "00000000-0000-4000-8000-000000000042",
+      ok: true,
+      data: {
+        decision: "acquired",
+        requestId: "00000000-0000-4000-8000-000000000042",
+        lock: { leaseId: acquired.data.lock.leaseId },
+      },
     });
     await expect(repository.list("work-1")).resolves.toEqual([
       expect.objectContaining({
@@ -2227,6 +2536,239 @@ describe("StudioLiveGateway", () => {
         ownerConnectionId: socket.id,
       }),
     ]);
+  });
+
+  it("revalidates and publishes a rotated v2 fence after an overlapping ACL check", async () => {
+    const repository = new MemoryStudioLiveLockRepository();
+    const harness = createHarness(undefined, undefined, undefined, repository);
+    const socket = harness.socket("editor");
+    await connectAndJoin(harness, socket);
+    const acquired = await harness.gateway.requestLock(
+      socket as never,
+      {
+        workId: "work-1",
+        resourceId: "page:v2-auth-race",
+        protocolVersion: 2,
+        requestId: "00000000-0000-4000-8000-000000000043",
+        leaseMs: 15_000,
+      },
+      undefined
+    );
+    expect(acquired.ok).toBe(true);
+    if (!acquired.ok) throw new Error("initial v2 lock failed");
+
+    let announceRenewal: (() => void) | undefined;
+    const renewalStored = new Promise<void>((resolve) => {
+      announceRenewal = resolve;
+    });
+    let resumeRenewal: (() => void) | undefined;
+    const renewalBarrier = new Promise<void>((resolve) => {
+      resumeRenewal = resolve;
+    });
+    const acquire = repository.acquire.bind(repository);
+    vi.spyOn(repository, "acquire").mockImplementation(async (input) => {
+      const result = await acquire(input);
+      announceRenewal?.();
+      await renewalBarrier;
+      return result;
+    });
+    let announceVerification: (() => void) | undefined;
+    const verificationStarted = new Promise<void>((resolve) => {
+      announceVerification = resolve;
+    });
+    let resumeVerification: (() => void) | undefined;
+    const verificationBarrier = new Promise<void>((resolve) => {
+      resumeVerification = resolve;
+    });
+    const list = repository.list.bind(repository);
+    let listCalls = 0;
+    vi.spyOn(repository, "list").mockImplementation(async (workId) => {
+      const rows = await list(workId);
+      listCalls += 1;
+      if (listCalls === 1) {
+        announceVerification?.();
+        await verificationBarrier;
+      }
+      return rows;
+    });
+
+    const renewal = harness.gateway.requestLock(
+      socket as never,
+      {
+        workId: "work-1",
+        resourceId: "page:v2-auth-race",
+        protocolVersion: 2,
+        requestId: "00000000-0000-4000-8000-000000000044",
+        renewLeaseId: acquired.data.lock.leaseId,
+        leaseMs: 20_000,
+      },
+      undefined
+    );
+    await renewalStored;
+
+    let resolveRecheck:
+      | ((snapshot: ReturnType<typeof teamSnapshot>) => void)
+      | undefined;
+    const recheckGate = new Promise<ReturnType<typeof teamSnapshot>>((resolve) => {
+      resolveRecheck = resolve;
+    });
+    const teamReadsBeforeRecheck = harness.service.getWorkTeam.mock.calls.length;
+    harness.service.getWorkTeam.mockImplementationOnce(() => recheckGate);
+    const internals = harness.gateway as unknown as {
+      participantsBySocket: Map<string, unknown>;
+      startParticipantAuthorizationRecheck(socketId: string, participant: unknown): unknown;
+    };
+    const participant = internals.participantsBySocket.get(socket.id);
+    if (!participant) throw new Error("missing participant");
+    internals.startParticipantAuthorizationRecheck(socket.id, participant);
+    resumeRenewal?.();
+    await vi.waitFor(() => {
+      expect(harness.service.getWorkTeam).toHaveBeenCalledTimes(teamReadsBeforeRecheck + 1);
+    });
+    resolveRecheck?.(teamSnapshot("editor", "work-1"));
+    await verificationStarted;
+
+    let resolveSecondRecheck:
+      | ((snapshot: ReturnType<typeof teamSnapshot>) => void)
+      | undefined;
+    const secondRecheckGate = new Promise<ReturnType<typeof teamSnapshot>>((resolve) => {
+      resolveSecondRecheck = resolve;
+    });
+    harness.service.getWorkTeam.mockImplementationOnce(() => secondRecheckGate);
+    internals.startParticipantAuthorizationRecheck(socket.id, participant);
+    let renewalSettled = false;
+    void renewal.finally(() => {
+      renewalSettled = true;
+    });
+    resumeVerification?.();
+    await Promise.resolve();
+    expect(renewalSettled).toBe(false);
+    resolveSecondRecheck?.(teamSnapshot("editor", "work-1"));
+
+    const renewed = await renewal;
+    expect(renewed).toMatchObject({
+      ok: true,
+      data: {
+        decision: "acquired",
+        requestId: "00000000-0000-4000-8000-000000000044",
+      },
+    });
+    if (!renewed.ok) throw new Error("v2 renewal was not published");
+    expect(renewed.data.lock.leaseId).not.toBe(acquired.data.lock.leaseId);
+    await expect(repository.list("work-1")).resolves.toEqual([
+      expect.objectContaining({
+        resourceId: "page:v2-auth-race",
+        leaseId: renewed.data.lock.leaseId,
+        ownerConnectionId: socket.id,
+      }),
+    ]);
+    expect(harness.emissions).toContainEqual({
+      target: "studio-live:work-1",
+      event: "studio:lock:update",
+      payload: expect.objectContaining({
+        action: "acquired",
+        requestId: "00000000-0000-4000-8000-000000000044",
+        lock: expect.objectContaining({ leaseId: renewed.data.lock.leaseId }),
+      }),
+    });
+  });
+
+  it("rolls back and revokes both v2 fences when authorization is lost after rotation", async () => {
+    const repository = new MemoryStudioLiveLockRepository();
+    const harness = createHarness(undefined, undefined, undefined, repository);
+    const socket = harness.socket("editor");
+    await connectAndJoin(harness, socket);
+    const acquired = await harness.gateway.requestLock(
+      socket as never,
+      {
+        workId: "work-1",
+        resourceId: "page:v2-auth-revoked",
+        protocolVersion: 2,
+        requestId: "00000000-0000-4000-8000-000000000045",
+        leaseMs: 15_000,
+      },
+      undefined
+    );
+    expect(acquired.ok).toBe(true);
+    if (!acquired.ok) throw new Error("initial v2 lock failed");
+
+    let announceRenewal: (() => void) | undefined;
+    const renewalStored = new Promise<void>((resolve) => {
+      announceRenewal = resolve;
+    });
+    let resumeRenewal: (() => void) | undefined;
+    const renewalBarrier = new Promise<void>((resolve) => {
+      resumeRenewal = resolve;
+    });
+    const acquire = repository.acquire.bind(repository);
+    vi.spyOn(repository, "acquire").mockImplementation(async (input) => {
+      const result = await acquire(input);
+      announceRenewal?.();
+      await renewalBarrier;
+      return result;
+    });
+    const renewal = harness.gateway.requestLock(
+      socket as never,
+      {
+        workId: "work-1",
+        resourceId: "page:v2-auth-revoked",
+        protocolVersion: 2,
+        requestId: "00000000-0000-4000-8000-000000000046",
+        renewLeaseId: acquired.data.lock.leaseId,
+        leaseMs: 20_000,
+      },
+      undefined
+    );
+    await renewalStored;
+    const stored = await repository.list("work-1");
+    const rotatedLeaseId = stored[0]?.leaseId;
+    expect(rotatedLeaseId).toBeTruthy();
+    if (!rotatedLeaseId) throw new Error("rotated v2 lease missing");
+    expect(rotatedLeaseId).not.toBe(acquired.data.lock.leaseId);
+
+    let resolveRecheck:
+      | ((snapshot: ReturnType<typeof teamSnapshot>) => void)
+      | undefined;
+    const recheckGate = new Promise<ReturnType<typeof teamSnapshot>>((resolve) => {
+      resolveRecheck = resolve;
+    });
+    const teamReadsBeforeRecheck = harness.service.getWorkTeam.mock.calls.length;
+    harness.service.getWorkTeam.mockImplementationOnce(() => recheckGate);
+    const internals = harness.gateway as unknown as {
+      participantsBySocket: Map<string, unknown>;
+      startParticipantAuthorizationRecheck(socketId: string, participant: unknown): unknown;
+    };
+    const participant = internals.participantsBySocket.get(socket.id);
+    if (!participant) throw new Error("missing participant");
+    internals.startParticipantAuthorizationRecheck(socket.id, participant);
+    resumeRenewal?.();
+    await vi.waitFor(() => {
+      expect(harness.service.getWorkTeam).toHaveBeenCalledTimes(teamReadsBeforeRecheck + 1);
+    });
+    resolveRecheck?.(teamSnapshot("editor", "work-1", { role: "commenter", edit: false }));
+
+    await expect(renewal).resolves.toMatchObject({
+      ok: false,
+      code: "forbidden",
+      decision: "revoked",
+      requestId: "00000000-0000-4000-8000-000000000046",
+    });
+    await vi.waitFor(async () => {
+      await expect(repository.list("work-1")).resolves.toEqual([]);
+    });
+    const revocations = harness.emissions.filter(
+      (emission) =>
+        emission.event === "studio:lock:update" &&
+        (emission.payload as { action?: string; resourceId?: string }).action === "revoked" &&
+        (emission.payload as { resourceId?: string }).resourceId === "page:v2-auth-revoked"
+    );
+    expect(new Set(revocations.map((emission) =>
+      (emission.payload as { leaseId: string }).leaseId
+    ))).toEqual(new Set([acquired.data.lock.leaseId, rotatedLeaseId]));
+    for (const emission of revocations) {
+      expect(emission.payload).not.toHaveProperty("acquisitionId");
+      expect(emission.payload).not.toHaveProperty("releaseRequestId");
+    }
   });
 
   it("cannot roll back a newly created lease after a newer participant generation adopts it", async () => {
@@ -2291,7 +2833,7 @@ describe("StudioLiveGateway", () => {
     resumeFirstAcquire?.();
     await expect(staleAcquire).resolves.toMatchObject({
       ok: false,
-      code: "forbidden",
+      code: "lock_stale",
       decision: "revoked",
       requestId: "00000000-0000-4000-8000-000000000043",
     });

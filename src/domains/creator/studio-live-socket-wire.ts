@@ -34,6 +34,8 @@ export interface ServerVoiceMember {
 }
 
 export interface ServerJoinSnapshot {
+  /** Missing on v1 gateways; new clients retain their legacy wire behavior in that case. */
+  lockProtocolVersion: number;
   self: ServerParticipant;
   participants: ServerParticipant[];
   locks: ServerLock[];
@@ -182,8 +184,15 @@ export function parseJoinAck(value: unknown): ServerJoinSnapshot | ServerFailure
   if (failure) return failure;
   if (!isRecord(value) || value.ok !== true || !isRecord(value.data)) return null;
   const self = parseParticipant(value.data.self);
+  const lockProtocolVersion = value.data.lockProtocolVersion === undefined
+    ? 1
+    : value.data.lockProtocolVersion;
   if (
     !self ||
+    typeof lockProtocolVersion !== "number" ||
+    !Number.isInteger(lockProtocolVersion) ||
+    lockProtocolVersion < 1 ||
+    lockProtocolVersion > 100 ||
     !Array.isArray(value.data.participants) ||
     !Array.isArray(value.data.locks) ||
     (value.data.voiceMembers !== undefined && !Array.isArray(value.data.voiceMembers))
@@ -203,6 +212,7 @@ export function parseJoinAck(value: unknown): ServerJoinSnapshot | ServerFailure
     return null;
   }
   return {
+    lockProtocolVersion,
     self,
     participants: participants as ServerParticipant[],
     locks: locks as ServerLock[],

@@ -21,6 +21,8 @@ import {
 import {
   STUDIO_LIVE_CHAT_TEXT_MAX_LENGTH,
   STUDIO_LIVE_ICE_CANDIDATE_MAX_LENGTH,
+  STUDIO_LIVE_LOCK_MAX_LEASE_MS,
+  STUDIO_LIVE_LOCK_PROTOCOL_VERSION,
   STUDIO_LIVE_RESOURCE_MAX_LENGTH,
   STUDIO_LIVE_SDP_MID_MAX_LENGTH,
   STUDIO_LIVE_USERNAME_FRAGMENT_MAX_LENGTH,
@@ -28,6 +30,8 @@ import {
   studioLiveStringFitsByteContract,
   type StudioLiveEnvelope,
   type StudioLiveLockAcquireResult,
+  type StudioLiveLockReleaseRequest,
+  type StudioLiveLockReleaseResult,
   type StudioLiveLockRequest,
   type StudioLiveMessageKind,
   type StudioLivePayloadMap,
@@ -76,6 +80,8 @@ const MAX_SEEN_CRDT_UPDATE_IDS = 4_096;
 const MAX_PENDING_PRESENCE_CONNECTIONS = 2_048;
 const MAX_PENDING_VOICE_CONNECTIONS = 256;
 const MAX_PENDING_VOICE_SIGNALS = 256;
+const MAX_ABANDONED_LOCK_ACQUISITIONS = 512;
+const ABANDONED_LOCK_ACQUISITION_TTL_MS = 90_000;
 
 type PendingPresenceDelta =
   | { kind: "update"; participant: ServerParticipant }
@@ -113,8 +119,25 @@ interface PendingLockAcquisition {
 
 interface AbandonedLockAcquisition {
   requestId: string;
+  resource: string;
   joinGeneration: number;
   selfConnectionId: string;
+  discardAt: number;
+}
+
+interface DeferredSelfLock {
+  lock: ServerLock;
+  /** Exact abandoned lifecycle when the authoritative update carried request correlation. */
+  abandonedRequestId: string | null;
+}
+
+interface PendingLockRelease {
+  request: StudioLiveLockReleaseRequest;
+  joinGeneration: number;
+  selfConnectionId: string;
+  promise: Promise<StudioLiveLockReleaseResult>;
+  resolve: (result: StudioLiveLockReleaseResult) => void;
+  timeout: unknown;
 }
 
 export interface StudioLiveSocketLike {
@@ -130,6 +153,7 @@ export interface StudioLiveSocketLike {
 export interface StudioLiveSocketTransportDependencies {
   createSocket?: (auth: { sessionToken: string }) => StudioLiveSocketLike;
   now?: () => number;
+  randomId?: () => string;
   setTimeout?: (handler: () => void, delay: number) => unknown;
   clearTimeout?: (handle: unknown) => void;
   voiceJoinAckTimeoutMs?: number;
@@ -163,6 +187,13 @@ function defaultClearTimeout(handle: unknown): void {
   globalThis.clearTimeout(handle as ReturnType<typeof setTimeout>);
 }
 
+function defaultRandomId(): string {
+  if (typeof globalThis.crypto?.randomUUID !== "function") {
+    throw new Error("보안 잠금 요청 식별자를 생성할 수 없습니다.");
+  }
+  return globalThis.crypto.randomUUID();
+}
+
 function eventMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message.trim()) return error.message.slice(0, 500);
   if (isRecord(error) && typeof error.message === "string" && error.message.trim()) {
@@ -194,6 +225,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
   private readonly context: StudioLiveTransportContext;
   private readonly socket: StudioLiveSocketLike;
   private readonly now: () => number;
+  private readonly randomId: () => string;
   private readonly scheduleTimeout: (handler: () => void, delay: number) => unknown;
   private readonly cancelTimeout: (handle: unknown) => void;
   private readonly voiceJoinAckTimeoutMs: number;
@@ -209,8 +241,11 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
   }>();
   private readonly pendingLockAcquisitions = new Map<string, PendingLockAcquisition>();
   private readonly pendingLockRequestByResource = new Map<string, string>();
-  private readonly deferredSelfLocks = new Map<string, ServerLock>();
-  private readonly abandonedLockResources = new Map<string, AbandonedLockAcquisition>();
+  private readonly pendingLockReleases = new Map<string, PendingLockRelease>();
+  private readonly pendingLockReleaseByRequestId = new Map<string, PendingLockRelease>();
+  private readonly deferredSelfLocks = new Map<string, DeferredSelfLock>();
+  private readonly abandonedLockAcquisitions = new Map<string, AbandonedLockAcquisition>();
+  private readonly abandonedLockRequestIdsByResource = new Map<string, Set<string>>();
   private readonly participants = new Map<string, ServerParticipant>();
   private readonly sequenceByConnection = new Map<string, number>();
   private readonly shareIdByConnection = new Map<string, string>();
@@ -225,6 +260,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
   private closed = false;
   private accessRevoked = false;
   private everJoined = false;
+  private lockProtocolVersion = 1;
   private joinGeneration = 0;
   private voiceIntentGeneration = 0;
   private desiredVoiceCallId: string | null = null;
@@ -245,6 +281,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.context = context;
     this.sessionToken = sessionToken;
     this.now = dependencies.now ?? Date.now;
+    this.randomId = dependencies.randomId ?? defaultRandomId;
     this.scheduleTimeout = dependencies.setTimeout ?? defaultSetTimeout;
     this.cancelTimeout = dependencies.clearTimeout ?? defaultClearTimeout;
     this.voiceJoinAckTimeoutMs = Math.min(
@@ -378,6 +415,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     if (
       !safeIdentifier(request.resource, STUDIO_LIVE_RESOURCE_MAX_LENGTH) ||
       !safeIdentifier(request.requestId, 160) ||
+      (request.renewLeaseId !== undefined && !safeIdentifier(request.renewLeaseId, 80)) ||
       !Number.isInteger(request.leaseMs) ||
       request.leaseMs < 5_000 ||
       request.leaseMs > 30_000
@@ -399,6 +437,34 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
         message: this.accessRevoked
           ? "팀 권한이 해제되어 편집 잠금을 요청할 수 없습니다."
           : "팀 공동작업 연결이 준비되지 않았습니다.",
+      });
+    }
+    if (this.pendingLockReleases.has(request.resource)) {
+      return Promise.resolve({
+        status: "denied",
+        resource: request.resource,
+        requestId: request.requestId,
+        code: "release_pending",
+        message: "이 편집 영역의 이전 잠금을 해제하는 중입니다.",
+      });
+    }
+    if (this.pendingLockReleaseByRequestId.has(request.requestId)) {
+      return Promise.resolve({
+        status: "denied",
+        resource: request.resource,
+        requestId: request.requestId,
+        code: "duplicate_request_id",
+        message: "같은 요청 식별자로 편집 잠금 해제가 이미 진행 중입니다.",
+      });
+    }
+    this.pruneAbandonedLockAcquisitions();
+    if (this.abandonedLockAcquisitions.has(request.requestId)) {
+      return Promise.resolve({
+        status: "denied",
+        resource: request.resource,
+        requestId: request.requestId,
+        code: "duplicate_request_id",
+        message: "응답이 지연된 이전 편집 잠금 요청 식별자는 다시 사용할 수 없습니다.",
       });
     }
     const duplicate = this.pendingLockAcquisitions.get(request.requestId);
@@ -443,14 +509,9 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.pendingLockRequestByResource.set(request.resource, request.requestId);
     pending.timeout = this.scheduleTimeout(() => {
       if (!this.removePendingLockAcquisition(pending)) return;
-      const abandoned: AbandonedLockAcquisition = {
-        requestId: request.requestId,
-        joinGeneration: pending.joinGeneration,
-        selfConnectionId: pending.selfConnectionId,
-      };
-      this.abandonedLockResources.set(request.resource, abandoned);
+      const abandoned = this.rememberAbandonedLockAcquisition(pending);
       const deferred = this.deferredSelfLocks.get(request.resource);
-      if (deferred) this.rollbackAbandonedLock(abandoned, deferred);
+      if (deferred) this.rollbackDeferredSelfLock(deferred, abandoned);
       pending.resolve({
         status: "timeout",
         resource: request.resource,
@@ -466,6 +527,12 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
           workId: this.context.workId,
           resourceId: request.resource,
           requestId: request.requestId,
+          ...(this.lockProtocolVersion >= STUDIO_LIVE_LOCK_PROTOCOL_VERSION
+            ? {
+                protocolVersion: STUDIO_LIVE_LOCK_PROTOCOL_VERSION,
+                ...(request.renewLeaseId ? { renewLeaseId: request.renewLeaseId } : {}),
+              }
+            : {}),
           leaseMs: request.leaseMs,
         },
         (value: unknown) => this.completePendingLockAcquisition(pending, value)
@@ -478,6 +545,147 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
           requestId: request.requestId,
           code: "transport_error",
           message: eventMessage(error, "편집 잠금 요청을 보내지 못했습니다."),
+        });
+      }
+    }
+    return promise;
+  }
+
+  releaseLock(request: StudioLiveLockReleaseRequest): Promise<StudioLiveLockReleaseResult> {
+    if (
+      !safeIdentifier(request.resource, STUDIO_LIVE_RESOURCE_MAX_LENGTH) ||
+      !safeIdentifier(request.requestId, 160) ||
+      !safeIdentifier(request.claimId, 80)
+    ) {
+      return Promise.resolve({
+        status: "denied",
+        resource: request.resource,
+        requestId: request.requestId,
+        claimId: request.claimId,
+        code: "invalid_request",
+        message: "편집 잠금 해제 요청이 올바르지 않습니다.",
+      });
+    }
+    if (!this.ready || !this.selfConnectionId) {
+      return Promise.resolve({
+        status: "revoked",
+        resource: request.resource,
+        requestId: request.requestId,
+        claimId: request.claimId,
+        code: this.accessRevoked ? "access_revoked" : "not_ready",
+        message: this.accessRevoked
+          ? "팀 권한이 해제되어 편집 잠금을 해제할 수 없습니다."
+          : "팀 공동작업 연결이 준비되지 않았습니다.",
+      });
+    }
+    const duplicateRequest = this.pendingLockReleaseByRequestId.get(request.requestId);
+    if (duplicateRequest) {
+      if (
+        duplicateRequest.request.resource === request.resource &&
+        duplicateRequest.request.claimId === request.claimId
+      ) return duplicateRequest.promise;
+      return Promise.resolve({
+        status: "denied",
+        resource: request.resource,
+        requestId: request.requestId,
+        claimId: request.claimId,
+        code: "duplicate_request_id",
+        message: "같은 편집 잠금 해제 요청 식별자가 이미 사용 중입니다.",
+      });
+    }
+    const duplicate = this.pendingLockReleases.get(request.resource);
+    if (duplicate) {
+      if (
+        duplicate.request.requestId === request.requestId &&
+        duplicate.request.claimId === request.claimId
+      ) return duplicate.promise;
+      return Promise.resolve({
+        status: "denied",
+        resource: request.resource,
+        requestId: request.requestId,
+        claimId: request.claimId,
+        code: "release_pending",
+        message: "이 편집 영역의 다른 잠금 해제가 이미 진행 중입니다.",
+      });
+    }
+    if (this.pendingLockAcquisitions.has(request.requestId)) {
+      return Promise.resolve({
+        status: "denied",
+        resource: request.resource,
+        requestId: request.requestId,
+        claimId: request.claimId,
+        code: "duplicate_request_id",
+        message: "같은 요청 식별자로 편집 잠금 획득이 이미 진행 중입니다.",
+      });
+    }
+    const current = this.locksByResource.get(request.resource);
+    if (
+      current &&
+      (current.ownerConnectionId !== this.selfConnectionId || current.leaseId !== request.claimId)
+    ) {
+      return Promise.resolve({
+        status: "denied",
+        resource: request.resource,
+        requestId: request.requestId,
+        claimId: request.claimId,
+        code: "stale_claim",
+        message: "이미 변경된 편집 잠금은 이전 임대로 해제할 수 없습니다.",
+      });
+    }
+
+    let resolveResult!: (result: StudioLiveLockReleaseResult) => void;
+    const promise = new Promise<StudioLiveLockReleaseResult>((resolve) => {
+      resolveResult = resolve;
+    });
+    const pending: PendingLockRelease = {
+      request: { ...request },
+      joinGeneration: this.joinGeneration,
+      selfConnectionId: this.selfConnectionId,
+      promise,
+      resolve: resolveResult,
+      timeout: null,
+    };
+    this.pendingLockReleases.set(request.resource, pending);
+    this.pendingLockReleaseByRequestId.set(request.requestId, pending);
+    this.abandonPendingLockAcquisitionForRelease(request.resource);
+    const releaseTimeoutMs = this.lockProtocolVersion >= STUDIO_LIVE_LOCK_PROTOCOL_VERSION
+      ? this.lockAckTimeoutMs
+      : Math.max(this.lockAckTimeoutMs, STUDIO_LIVE_LOCK_MAX_LEASE_MS + 250);
+    pending.timeout = this.scheduleTimeout(() => {
+      if (!this.removePendingLockRelease(pending)) return;
+      this.applyAuthoritativeRelease(request.resource, request.claimId);
+      pending.resolve({
+        status: "timeout",
+        resource: request.resource,
+        requestId: request.requestId,
+        claimId: request.claimId,
+        message: "팀 서버의 편집 잠금 해제 응답 시간이 초과되었습니다.",
+      });
+    }, releaseTimeoutMs);
+
+    try {
+      this.socket.emit(
+        "studio:lock:release",
+        {
+          workId: this.context.workId,
+          resourceId: request.resource,
+          leaseId: request.claimId,
+          ...(this.lockProtocolVersion >= STUDIO_LIVE_LOCK_PROTOCOL_VERSION
+            ? { requestId: request.requestId }
+            : {}),
+        },
+        (value: unknown) => this.completePendingLockRelease(pending, value)
+      );
+    } catch (error) {
+      if (this.removePendingLockRelease(pending)) {
+        this.applyAuthoritativeRelease(request.resource, request.claimId);
+        pending.resolve({
+          status: "denied",
+          resource: request.resource,
+          requestId: request.requestId,
+          claimId: request.claimId,
+          code: "transport_error",
+          message: eventMessage(error, "편집 잠금 해제 요청을 보내지 못했습니다."),
         });
       }
     }
@@ -515,22 +723,24 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
         case "lock:claim": {
           const payload = envelope.payload as StudioLivePayloadMap["lock:claim"];
           const leaseMs = Math.max(5_000, Math.min(30_000, payload.leaseUntil - envelope.sentAt));
+          const requestId = this.randomId();
           void this.acquireLock({
             resource: payload.resource,
-            requestId: payload.claimId,
+            requestId,
+            renewLeaseId: payload.claimId,
             leaseMs,
           });
           return true;
         }
         case "lock:release": {
           const payload = envelope.payload as StudioLivePayloadMap["lock:release"];
-          const leaseId = this.locksByResource.get(payload.resource)?.leaseId;
-          if (!leaseId) return false;
-          this.emitWithAck(
-            "studio:lock:release",
-            { workId: this.context.workId, resourceId: payload.resource, leaseId },
-            () => this.applyAuthoritativeRelease(payload.resource, leaseId)
-          );
+          const current = this.locksByResource.get(payload.resource);
+          if (!current || current.leaseId !== payload.claimId) return false;
+          void this.releaseLock({
+            resource: payload.resource,
+            requestId: payload.claimId,
+            claimId: payload.claimId,
+          });
           return true;
         }
         case "screen:announce": {
@@ -812,6 +1022,10 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
 
   close(): void {
     if (this.closed) return;
+    this.revokePendingLockReleases(
+      "connection_closed",
+      "팀 공동작업 연결이 종료되어 편집 잠금 해제 확인이 취소되었습니다."
+    );
     this.revokePendingLockAcquisitions(
       "connection_closed",
       "팀 공동작업 연결이 종료되어 편집 잠금 요청이 취소되었습니다."
@@ -891,6 +1105,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
   };
 
   private revokeFromConnectError(message: string): void {
+    this.revokePendingLockReleases("access_revoked", message);
     this.revokePendingLockAcquisitions("access_revoked", message);
     this.terminateVoiceIntent("revoked", message);
     ++this.joinGeneration;
@@ -914,6 +1129,10 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
 
   private readonly onDisconnect = (reason: unknown) => {
     if (this.closed) return;
+    this.revokePendingLockReleases(
+      "disconnected",
+      "팀 서버 연결이 끊겨 편집 잠금 해제 확인이 취소되었습니다."
+    );
     this.revokePendingLockAcquisitions(
       "disconnected",
       "팀 서버 연결이 끊겨 편집 잠금 요청이 취소되었습니다."
@@ -955,6 +1174,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       isRecord(value) && typeof value.message === "string" && value.message.trim()
         ? value.message.slice(0, 500)
         : "팀 권한이 변경되어 실시간 작업실 연결이 종료되었습니다.";
+    this.revokePendingLockReleases("access_revoked", message);
     this.revokePendingLockAcquisitions("access_revoked", message);
     this.terminateVoiceIntent("revoked", message);
     ++this.joinGeneration;
@@ -1179,6 +1399,25 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       safeString(value.leaseId, 80)
     ) {
       this.applyAuthoritativeRelease(value.resourceId, value.leaseId);
+      const releaseRequestId = safeIdentifier(value.releaseRequestId, 160)
+        ? value.releaseRequestId
+        : null;
+      const pending = this.pendingLockReleases.get(value.resourceId);
+      if (
+        value.action === "released" &&
+        releaseRequestId &&
+        pending?.request.requestId === releaseRequestId &&
+        pending.request.claimId === value.leaseId &&
+        this.removePendingLockRelease(pending)
+      ) {
+        pending.resolve({
+          status: "released",
+          resource: pending.request.resource,
+          requestId: pending.request.requestId,
+          claimId: pending.request.claimId,
+          released: true,
+        });
+      }
     }
   };
 
@@ -1739,6 +1978,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
   private acceptJoin(snapshot: ServerJoinSnapshot): void {
     const reconciledSnapshot = this.reconcilePendingPresence(snapshot);
     const wasJoined = this.everJoined;
+    this.lockProtocolVersion = reconciledSnapshot.lockProtocolVersion;
     this.selfConnectionId = reconciledSnapshot.self.connectionId;
     this.joined = true;
     this.everJoined = true;
@@ -1834,6 +2074,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       recoverable,
     } as StudioLiveTransportStatus);
     if (!recoverable) {
+      this.revokePendingLockReleases(failure.code, failure.message);
       this.revokePendingLockAcquisitions(failure.code, failure.message);
       this.terminateVoiceIntent("revoked", failure.message);
       ++this.joinGeneration;
@@ -1902,24 +2143,77 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     for (const lock of locks) this.applyAuthoritativeLock(lock);
   }
 
-  private applyAuthoritativeLock(lock: ServerLock, requestId?: string): void {
+  private applyAuthoritativeLock(
+    lock: ServerLock,
+    requestId?: string,
+    allowNewSelfFence = false
+  ): void {
     const owner = this.participants.get(lock.ownerConnectionId);
     if (!owner) return;
     const leaseUntil = Date.parse(lock.expiresAt);
     if (!Number.isFinite(leaseUntil) || leaseUntil <= this.now()) return;
+    const previous = this.locksByResource.get(lock.resourceId);
     if (owner.connectionId === this.selfConnectionId) {
-      const abandoned = this.abandonedLockResources.get(lock.resourceId);
-      if (abandoned && (!requestId || requestId === abandoned.requestId)) {
+      const pendingRequestId = this.pendingLockRequestByResource.get(lock.resourceId);
+      const pendingRelease = this.pendingLockReleases.get(lock.resourceId);
+      const matchesAcceptedFence =
+        previous?.leaseId === lock.leaseId &&
+        previous.ownerConnectionId === lock.ownerConnectionId;
+      // A v1 gateway deliberately renews a lease without rotating its fence. A correlated reply
+      // can therefore arrive after the local heartbeat timeout while the exact same accepted lock
+      // is still active. That late reply refreshes the lease; it is not an abandoned fresh grant.
+      // An explicit release remains stronger and must continue to chase-release the fence.
+      const acceptedLegacyRenewal =
+        this.lockProtocolVersion < STUDIO_LIVE_LOCK_PROTOCOL_VERSION &&
+        !pendingRelease &&
+        matchesAcceptedFence;
+      if (acceptedLegacyRenewal && requestId) {
+        const exact = this.abandonedLockAcquisitions.get(requestId);
+        if (exact?.resource === lock.resourceId) {
+          this.forgetAbandonedLockAcquisition(exact.requestId);
+        }
+      }
+      const abandoned = acceptedLegacyRenewal
+        ? null
+        : this.findAbandonedLockAcquisition(
+            lock.resourceId,
+            requestId,
+            matchesAcceptedFence
+          );
+      if (abandoned) {
         this.rollbackAbandonedLock(abandoned, lock);
         return;
       }
-      const pendingRequestId = this.pendingLockRequestByResource.get(lock.resourceId);
-      if (pendingRequestId && (!requestId || requestId !== pendingRequestId)) {
-        this.deferredSelfLocks.set(lock.resourceId, lock);
+      if (
+        !allowNewSelfFence &&
+        requestId &&
+        requestId !== pendingRequestId &&
+        (previous?.leaseId !== lock.leaseId ||
+          previous.ownerConnectionId !== lock.ownerConnectionId)
+      ) {
+        // A listener survives Socket.IO reconnects, so an acquired update from an older join can
+        // arrive while the replacement generation is ready. Only a current request, an abandoned
+        // lifecycle handled above, or an already accepted identical fence may authorize it.
+        return;
+      }
+      if (pendingRelease) {
+        // A renewal may have committed just before release fenced its older lease. Suppress the
+        // transient self lock and chase the exact newer fence without letting Room heartbeat it.
+        this.releaseLockFenceBestEffort(lock, pendingRelease.request.requestId);
+        return;
+      }
+      if (
+        !acceptedLegacyRenewal &&
+        pendingRequestId &&
+        (!requestId || requestId !== pendingRequestId)
+      ) {
+        this.deferredSelfLocks.set(lock.resourceId, {
+          lock,
+          abandonedRequestId: null,
+        });
         return;
       }
     }
-    const previous = this.locksByResource.get(lock.resourceId);
     this.locksByResource.set(lock.resourceId, lock);
     if (
       previous?.leaseId === lock.leaseId &&
@@ -2239,9 +2533,12 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     if (this.pendingLockAcquisitions.get(pending.request.requestId) !== pending) {
       const lateLock = this.parseLockAcquisitionSuccess(pending, value);
       if (lateLock) {
-        const abandoned = this.abandonedLockResources.get(pending.request.resource);
-        if (abandoned?.requestId === pending.request.requestId) {
-          this.rollbackAbandonedLock(abandoned, lateLock);
+        const abandoned = this.abandonedLockAcquisitions.get(pending.request.requestId);
+        if (abandoned?.resource === pending.request.resource) {
+          // Route the late ACK through the same authoritative path as a broadcast. Legacy stable
+          // renewals can refresh an already accepted fence, while v2 or released lifecycles are
+          // still rolled back by the abandonment checks in applyAuthoritativeLock().
+          this.applyAuthoritativeLock(lateLock, pending.request.requestId);
         }
       }
       return;
@@ -2265,7 +2562,19 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     }
 
     const echoedRequestId = this.lockAckRequestId(value);
-    if (echoedRequestId && echoedRequestId !== pending.request.requestId) {
+    if (
+      (this.lockProtocolVersion >= STUDIO_LIVE_LOCK_PROTOCOL_VERSION &&
+        echoedRequestId !== pending.request.requestId) ||
+      (echoedRequestId !== null && echoedRequestId !== pending.request.requestId)
+    ) {
+      const abandoned = this.rememberAbandonedLockAcquisition(pending);
+      const uncorrelatedLock = this.parseLockAcquisitionSuccess(pending, value, true);
+      if (uncorrelatedLock) {
+        this.rollbackAbandonedLock(abandoned, uncorrelatedLock);
+      } else {
+        const deferred = this.deferredSelfLocks.get(pending.request.resource);
+        if (deferred) this.rollbackDeferredSelfLock(deferred, abandoned);
+      }
       pending.resolve({
         status: "denied",
         resource: pending.request.resource,
@@ -2311,12 +2620,16 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
               ...(publicConflict ? { lock: publicConflict } : {}),
             }
       );
+      this.settleDeferredSelfLock(pending.request.resource);
       this.handleFailure(failure, "operation");
       return;
     }
 
     const lock = this.parseLockAcquisitionSuccess(pending, value);
     if (!lock) {
+      const abandoned = this.rememberAbandonedLockAcquisition(pending);
+      const deferred = this.deferredSelfLocks.get(pending.request.resource);
+      if (deferred) this.rollbackDeferredSelfLock(deferred, abandoned);
       const message = "팀 서버의 편집 잠금 응답 형식이 올바르지 않습니다.";
       pending.resolve({
         status: "denied",
@@ -2328,10 +2641,10 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       this.emitStatus({ state: "error", message, recoverable: true });
       return;
     }
-    this.abandonedLockResources.delete(pending.request.resource);
-    this.deferredSelfLocks.delete(pending.request.resource);
+    this.forgetAbandonedLockAcquisition(pending.request.requestId);
+    this.settleDeferredSelfLock(pending.request.resource, lock);
     const leaseUntil = Date.parse(lock.expiresAt);
-    this.applyAuthoritativeLock(lock, pending.request.requestId);
+    this.applyAuthoritativeLock(lock, pending.request.requestId, true);
     pending.resolve({
       status: "acquired",
       resource: pending.request.resource,
@@ -2347,11 +2660,13 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
 
   private parseLockAcquisitionSuccess(
     pending: PendingLockAcquisition,
-    value: unknown
+    value: unknown,
+    ignoreRequestId = false
   ): ServerLock | null {
     if (!isRecord(value) || value.ok !== true || !isRecord(value.data)) return null;
     if (value.data.decision !== undefined && value.data.decision !== "acquired") return null;
     if (
+      !ignoreRequestId &&
       value.data.requestId !== undefined &&
       value.data.requestId !== pending.request.requestId
     ) return null;
@@ -2385,6 +2700,229 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     return true;
   }
 
+  private rememberAbandonedLockAcquisition(
+    pending: PendingLockAcquisition
+  ): AbandonedLockAcquisition {
+    this.pruneAbandonedLockAcquisitions();
+    const abandoned: AbandonedLockAcquisition = {
+      requestId: pending.request.requestId,
+      resource: pending.request.resource,
+      joinGeneration: pending.joinGeneration,
+      selfConnectionId: pending.selfConnectionId,
+      discardAt: this.now() + ABANDONED_LOCK_ACQUISITION_TTL_MS,
+    };
+    this.abandonedLockAcquisitions.set(abandoned.requestId, abandoned);
+    const requestIds = this.abandonedLockRequestIdsByResource.get(abandoned.resource) ?? new Set();
+    requestIds.add(abandoned.requestId);
+    this.abandonedLockRequestIdsByResource.set(abandoned.resource, requestIds);
+    while (this.abandonedLockAcquisitions.size > MAX_ABANDONED_LOCK_ACQUISITIONS) {
+      const oldestRequestId = this.abandonedLockAcquisitions.keys().next().value as
+        | string
+        | undefined;
+      if (!oldestRequestId) break;
+      this.forgetAbandonedLockAcquisition(oldestRequestId);
+    }
+    return abandoned;
+  }
+
+  private forgetAbandonedLockAcquisition(requestId: string): void {
+    const abandoned = this.abandonedLockAcquisitions.get(requestId);
+    if (!abandoned) return;
+    this.abandonedLockAcquisitions.delete(requestId);
+    const requestIds = this.abandonedLockRequestIdsByResource.get(abandoned.resource);
+    requestIds?.delete(requestId);
+    if (requestIds?.size === 0) {
+      this.abandonedLockRequestIdsByResource.delete(abandoned.resource);
+    }
+  }
+
+  private pruneAbandonedLockAcquisitions(): void {
+    const now = this.now();
+    for (const abandoned of Array.from(this.abandonedLockAcquisitions.values())) {
+      if (abandoned.discardAt > now) continue;
+      this.forgetAbandonedLockAcquisition(abandoned.requestId);
+    }
+  }
+
+  private findAbandonedLockAcquisition(
+    resource: string,
+    requestId: string | undefined,
+    matchesKnownLease: boolean
+  ): AbandonedLockAcquisition | null {
+    this.pruneAbandonedLockAcquisitions();
+    if (requestId) {
+      const exact = this.abandonedLockAcquisitions.get(requestId);
+      return exact?.resource === resource ? exact : null;
+    }
+    // An uncorrelated snapshot that repeats the already accepted lease is legitimate. An unknown
+    // self lease while an abandoned lifecycle remains is fail-closed and must be rolled back.
+    if (matchesKnownLease) return null;
+    const requestIds = this.abandonedLockRequestIdsByResource.get(resource);
+    if (!requestIds) return null;
+    const newest = Array.from(requestIds).at(-1);
+    return newest ? this.abandonedLockAcquisitions.get(newest) ?? null : null;
+  }
+
+  private abandonPendingLockAcquisitionForRelease(resource: string): void {
+    const requestId = this.pendingLockRequestByResource.get(resource);
+    if (!requestId) return;
+    const pending = this.pendingLockAcquisitions.get(requestId);
+    if (!pending || !this.removePendingLockAcquisition(pending)) return;
+    const abandoned = this.rememberAbandonedLockAcquisition(pending);
+    const deferred = this.deferredSelfLocks.get(resource);
+    if (deferred) this.rollbackDeferredSelfLock(deferred, abandoned);
+    pending.resolve({
+      status: "revoked",
+      resource,
+      requestId: pending.request.requestId,
+      code: "release_pending",
+      message: "사용자가 편집 잠금 해제를 요청해 진행 중인 갱신을 취소했습니다.",
+    });
+  }
+
+  private completePendingLockRelease(pending: PendingLockRelease, value: unknown): void {
+    if (this.pendingLockReleases.get(pending.request.resource) !== pending) return;
+    this.removePendingLockRelease(pending);
+    const settleLocalFence = () => {
+      this.applyAuthoritativeRelease(pending.request.resource, pending.request.claimId);
+    };
+
+    if (
+      this.closed ||
+      !this.ready ||
+      pending.joinGeneration !== this.joinGeneration ||
+      pending.selfConnectionId !== this.selfConnectionId
+    ) {
+      settleLocalFence();
+      pending.resolve({
+        status: "revoked",
+        resource: pending.request.resource,
+        requestId: pending.request.requestId,
+        claimId: pending.request.claimId,
+        code: "connection_changed",
+        message: "팀 연결이 변경되어 편집 잠금 해제 확인을 중단했습니다.",
+      });
+      return;
+    }
+
+    const echoedRequestId = this.lockAckRequestId(value);
+    if (
+      this.lockProtocolVersion >= STUDIO_LIVE_LOCK_PROTOCOL_VERSION &&
+      echoedRequestId !== pending.request.requestId
+    ) {
+      settleLocalFence();
+      const message = "팀 서버의 편집 잠금 해제 응답 식별자가 요청과 일치하지 않습니다.";
+      pending.resolve({
+        status: "denied",
+        resource: pending.request.resource,
+        requestId: pending.request.requestId,
+        claimId: pending.request.claimId,
+        code: "response_mismatch",
+        message,
+      });
+      this.emitStatus({ state: "error", message, recoverable: true });
+      return;
+    }
+
+    const failure = parseFailure(value);
+    if (failure) {
+      settleLocalFence();
+      const revoked = failure.code === "unauthenticated" || failure.code === "access_revoked";
+      pending.resolve(
+        revoked
+          ? {
+              status: "revoked",
+              resource: pending.request.resource,
+              requestId: pending.request.requestId,
+              claimId: pending.request.claimId,
+              code: failure.code,
+              message: failure.message,
+            }
+          : {
+              status: "denied",
+              resource: pending.request.resource,
+              requestId: pending.request.requestId,
+              claimId: pending.request.claimId,
+              code: failure.code,
+              message: failure.message,
+            }
+      );
+      this.handleFailure(failure, "operation");
+      return;
+    }
+
+    if (!isRecord(value) || value.ok !== true || !isRecord(value.data)) {
+      settleLocalFence();
+      const message = "팀 서버의 편집 잠금 해제 응답 형식이 올바르지 않습니다.";
+      pending.resolve({
+        status: "denied",
+        resource: pending.request.resource,
+        requestId: pending.request.requestId,
+        claimId: pending.request.claimId,
+        code: "invalid_response",
+        message,
+      });
+      this.emitStatus({ state: "error", message, recoverable: true });
+      return;
+    }
+    const data = value.data;
+    const v2ResponseMatches =
+      data.requestId === pending.request.requestId &&
+      data.resourceId === pending.request.resource &&
+      data.leaseId === pending.request.claimId;
+    if (
+      typeof data.released !== "boolean" ||
+      (this.lockProtocolVersion >= STUDIO_LIVE_LOCK_PROTOCOL_VERSION && !v2ResponseMatches)
+    ) {
+      settleLocalFence();
+      const message = "팀 서버의 편집 잠금 해제 응답 범위가 요청과 일치하지 않습니다.";
+      pending.resolve({
+        status: "denied",
+        resource: pending.request.resource,
+        requestId: pending.request.requestId,
+        claimId: pending.request.claimId,
+        code: "invalid_response",
+        message,
+      });
+      this.emitStatus({ state: "error", message, recoverable: true });
+      return;
+    }
+    settleLocalFence();
+    pending.resolve({
+      status: "released",
+      resource: pending.request.resource,
+      requestId: pending.request.requestId,
+      claimId: pending.request.claimId,
+      released: data.released,
+    });
+  }
+
+  private removePendingLockRelease(pending: PendingLockRelease): boolean {
+    if (this.pendingLockReleases.get(pending.request.resource) !== pending) return false;
+    this.pendingLockReleases.delete(pending.request.resource);
+    if (this.pendingLockReleaseByRequestId.get(pending.request.requestId) === pending) {
+      this.pendingLockReleaseByRequestId.delete(pending.request.requestId);
+    }
+    if (pending.timeout !== null) this.cancelTimeout(pending.timeout);
+    pending.timeout = null;
+    return true;
+  }
+
+  private revokePendingLockReleases(code: string, message: string): void {
+    for (const pending of Array.from(this.pendingLockReleases.values())) {
+      if (!this.removePendingLockRelease(pending)) continue;
+      this.applyAuthoritativeRelease(pending.request.resource, pending.request.claimId);
+      pending.resolve({
+        status: "revoked",
+        resource: pending.request.resource,
+        requestId: pending.request.requestId,
+        claimId: pending.request.claimId,
+        code,
+        message,
+      });
+    }
+  }
+
   private revokePendingLockAcquisitions(code: string, message: string): void {
     for (const pending of Array.from(this.pendingLockAcquisitions.values())) {
       if (!this.removePendingLockAcquisition(pending)) continue;
@@ -2397,7 +2935,8 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       });
     }
     this.deferredSelfLocks.clear();
-    this.abandonedLockResources.clear();
+    this.abandonedLockAcquisitions.clear();
+    this.abandonedLockRequestIdsByResource.clear();
   }
 
   private rollbackAbandonedLock(
@@ -2410,22 +2949,59 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       abandoned.selfConnectionId !== this.selfConnectionId ||
       !this.ready
     ) {
-      this.deferredSelfLocks.set(lock.resourceId, lock);
+      this.deferredSelfLocks.set(lock.resourceId, {
+        lock,
+        abandonedRequestId: abandoned.requestId,
+      });
       return;
     }
-    this.abandonedLockResources.delete(lock.resourceId);
+    this.forgetAbandonedLockAcquisition(abandoned.requestId);
     this.deferredSelfLocks.delete(lock.resourceId);
-    this.socket.emit(
+    this.releaseLockFenceBestEffort(lock, abandoned.requestId);
+  }
+
+  private rollbackDeferredSelfLock(
+    deferred: DeferredSelfLock,
+    fallback: AbandonedLockAcquisition | null = null
+  ): void {
+    const exact = deferred.abandonedRequestId
+      ? this.abandonedLockAcquisitions.get(deferred.abandonedRequestId) ?? null
+      : null;
+    const abandoned = exact ?? fallback;
+    if (abandoned?.resource === deferred.lock.resourceId) {
+      this.rollbackAbandonedLock(abandoned, deferred.lock);
+      return;
+    }
+    this.deferredSelfLocks.delete(deferred.lock.resourceId);
+  }
+
+  private settleDeferredSelfLock(resource: string, acceptedLock: ServerLock | null = null): void {
+    const deferred = this.deferredSelfLocks.get(resource);
+    if (!deferred) return;
+    if (
+      acceptedLock &&
+      deferred.lock.leaseId === acceptedLock.leaseId &&
+      deferred.lock.ownerConnectionId === acceptedLock.ownerConnectionId
+    ) {
+      if (deferred.abandonedRequestId) {
+        this.forgetAbandonedLockAcquisition(deferred.abandonedRequestId);
+      }
+      this.deferredSelfLocks.delete(resource);
+      return;
+    }
+    this.rollbackDeferredSelfLock(deferred);
+  }
+
+  private releaseLockFenceBestEffort(lock: ServerLock, requestId: string): void {
+    this.emitWithAck(
       "studio:lock:release",
       {
         workId: this.context.workId,
         resourceId: lock.resourceId,
         leaseId: lock.leaseId,
+        ...(this.lockProtocolVersion >= STUDIO_LIVE_LOCK_PROTOCOL_VERSION ? { requestId } : {}),
       },
-      (value: unknown) => {
-        const failure = parseFailure(value);
-        if (failure) this.handleFailure(failure, "operation");
-      }
+      () => this.applyAuthoritativeRelease(lock.resourceId, lock.leaseId)
     );
   }
 
