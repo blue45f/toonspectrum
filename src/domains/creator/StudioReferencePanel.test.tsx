@@ -14,10 +14,18 @@ import { REFERENCE_PANEL_STORAGE_KEY, serializeReferencePanelSettings } from "./
 import { StudioReferencePanel } from "./StudioReferencePanel";
 
 import type { StudioAsset } from "./studio-asset-library";
+import type { StudioReferenceImageRaster } from "./studio-reference-color-sampler";
 
 const assetLibraryMock = vi.hoisted(() => ({
   listAssets: vi.fn(),
   ensureStudioAssetContentHash: vi.fn(),
+  saveAsset: vi.fn(),
+}));
+const canvasImageIoMock = vi.hoisted(() => ({
+  loadImageFileForCanvas: vi.fn(),
+}));
+const colorSamplerMock = vi.hoisted(() => ({
+  loadStudioReferenceImageRaster: vi.fn(),
 }));
 
 vi.mock("./studio-asset-library", async (importOriginal) => {
@@ -26,6 +34,19 @@ vi.mock("./studio-asset-library", async (importOriginal) => {
     ...actual,
     listAssets: assetLibraryMock.listAssets,
     ensureStudioAssetContentHash: assetLibraryMock.ensureStudioAssetContentHash,
+    saveAsset: assetLibraryMock.saveAsset,
+  };
+});
+
+vi.mock("./studio-canvas-image-io", () => ({
+  loadImageFileForCanvas: canvasImageIoMock.loadImageFileForCanvas,
+}));
+
+vi.mock("./studio-reference-color-sampler", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./studio-reference-color-sampler")>();
+  return {
+    ...actual,
+    loadStudioReferenceImageRaster: colorSamplerMock.loadStudioReferenceImageRaster,
   };
 });
 
@@ -51,6 +72,19 @@ const ASSET_B: StudioAsset = {
   width: 1200,
   height: 800,
   createdAt: 1,
+};
+
+const COLOR_RASTER: StudioReferenceImageRaster = {
+  width: 2,
+  height: 3,
+  data: Uint8ClampedArray.from([
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+    0, 0, 255, 255,
+    255, 255, 0, 255,
+    1, 2, 3, 0,
+    255, 0, 255, 255,
+  ]),
 };
 
 function makeItem(
@@ -87,9 +121,11 @@ function makeItem(
 function ControlledReferencePanel({
   initialDocument,
   onCommit,
+  onPickColor,
 }: {
   initialDocument: StudioReferenceBoardDocument;
   onCommit: (next: StudioReferenceBoardDocument) => void;
+  onPickColor?: (hex: string) => void;
 }) {
   const [document, setDocument] = useState(initialDocument);
   return (
@@ -97,6 +133,7 @@ function ControlledReferencePanel({
       open
       onClose={vi.fn()}
       document={document}
+      onPickColor={onPickColor}
       onChange={(next) => {
         onCommit(next);
         setDocument(next);
@@ -109,6 +146,29 @@ beforeEach(() => {
   window.localStorage.clear();
   assetLibraryMock.listAssets.mockResolvedValue([ASSET_A, ASSET_B]);
   assetLibraryMock.ensureStudioAssetContentHash.mockImplementation(async (asset: StudioAsset) => asset);
+  let importedAssetIndex = 0;
+  assetLibraryMock.saveAsset.mockImplementation(async (input: {
+    name: string;
+    dataUrl: string;
+    width: number;
+    height: number;
+  }) => {
+    const index = importedAssetIndex;
+    importedAssetIndex += 1;
+    return {
+      id: `imported-${index}`,
+      ...input,
+      contentHash: `sha256:${String(index + 1).repeat(64)}` as `sha256:${string}`,
+      createdAt: 10 + index,
+    } satisfies StudioAsset;
+  });
+  canvasImageIoMock.loadImageFileForCanvas.mockImplementation(async (file: File) => ({
+    src: `data:image/webp;base64,${file.name}`,
+    width: 640,
+    height: 480,
+    isAnimatedGif: false,
+  }));
+  colorSamplerMock.loadStudioReferenceImageRaster.mockResolvedValue(COLOR_RASTER);
 });
 
 afterEach(() => {
@@ -140,6 +200,58 @@ describe("StudioReferencePanel controlled reference board", () => {
     expect(finalDocument.items.map((item) => item.asset.sha256)).toEqual([HASH_A, HASH_A]);
     expect(JSON.stringify(finalDocument)).not.toContain("data:image");
     expect(screen.getByText("2/32")).toBeTruthy();
+  });
+
+  it("imports multiple device files in source order and commits the board once", async () => {
+    const onCommit = vi.fn();
+    render(
+      <ControlledReferencePanel
+        initialDocument={createStudioReferenceBoardDocument()}
+        onCommit={onCommit}
+      />
+    );
+    const input = screen.getByLabelText("참고 이미지 파일 선택");
+    const files = [
+      new File(["png"], "첫 포즈.png", { type: "image/png" }),
+      new File(["jpg"], "둘째 포즈.jpg", { type: "image/jpeg" }),
+    ];
+
+    fireEvent.change(input, { target: { files } });
+
+    await waitFor(() => expect(onCommit).toHaveBeenCalledOnce());
+    expect(canvasImageIoMock.loadImageFileForCanvas.mock.calls.map(([file]) => file.name))
+      .toEqual(["첫 포즈.png", "둘째 포즈.jpg"]);
+    expect(assetLibraryMock.saveAsset).toHaveBeenCalledTimes(2);
+    const imported = onCommit.mock.calls[0]?.[0] as StudioReferenceBoardDocument;
+    expect(imported.items.map((item) => item.asset.name)).toEqual(["첫 포즈", "둘째 포즈"]);
+    expect(screen.getByText("2/32")).toBeTruthy();
+    expect(screen.getByText("2개 참고 이미지를 추가했습니다.")).toBeTruthy();
+  });
+
+  it("accepts board drops and image clipboard pastes as separate durable commits", async () => {
+    const onCommit = vi.fn();
+    render(
+      <ControlledReferencePanel
+        initialDocument={createStudioReferenceBoardDocument()}
+        onCommit={onCommit}
+      />
+    );
+    const dropzone = screen.getByTestId("reference-board-dropzone");
+    const dropped = new File(["png"], "드롭.png", { type: "image/png" });
+    fireEvent.drop(dropzone, {
+      dataTransfer: { files: [dropped], types: ["Files"], dropEffect: "none" },
+    });
+    await waitFor(() => expect(onCommit).toHaveBeenCalledTimes(1));
+
+    const pasted = new File(["GIF89a"], "붙여넣기.gif", { type: "image/gif" });
+    fireEvent.paste(window, {
+      clipboardData: { files: [pasted], items: [] },
+    });
+    await waitFor(() => expect(onCommit).toHaveBeenCalledTimes(2));
+
+    const imported = onCommit.mock.calls[1]?.[0] as StudioReferenceBoardDocument;
+    expect(imported.items.map((item) => item.asset.name)).toEqual(["드롭", "붙여넣기"]);
+    expect(assetLibraryMock.saveAsset).toHaveBeenCalledTimes(2);
   });
 
   it("resolves bytes by content hash before the legacy assetId hint", async () => {
@@ -290,6 +402,98 @@ describe("StudioReferencePanel controlled reference board", () => {
     expect(onCommit.mock.calls[0]?.[0].items[0]?.view.zoom).toBe(1.5);
     fireEvent.blur(zoom);
     expect(onCommit).toHaveBeenCalledOnce();
+  });
+
+  it("extracts a six-color local palette and forwards a selected swatch without a document commit", async () => {
+    const onCommit = vi.fn();
+    const onPickColor = vi.fn();
+    render(
+      <ControlledReferencePanel
+        initialDocument={createStudioReferenceBoardDocument([makeItem("ref-colors")])}
+        onCommit={onCommit}
+        onPickColor={onPickColor}
+      />
+    );
+
+    await screen.findByRole("button", { name: "동작 A 이동 및 선택" });
+    fireEvent.click(screen.getByRole("button", { name: "선택 이미지 속성" }));
+    const red = await screen.findByRole("button", { name: "#ff0000 색상 선택" });
+
+    expect(colorSamplerMock.loadStudioReferenceImageRaster).toHaveBeenCalledWith(
+      ASSET_A.dataUrl,
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
+    fireEvent.click(red);
+
+    expect(onPickColor).toHaveBeenCalledOnce();
+    expect(onPickColor).toHaveBeenCalledWith("#ff0000");
+    expect(red.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByText("#ff0000 색상을 기본색으로 선택했습니다.")).toBeTruthy();
+    expect(onCommit).not.toHaveBeenCalled();
+  });
+
+  it("samples the transformed selected image by pointer and keyboard, and Escape exits eyedropper mode", async () => {
+    const onPickColor = vi.fn();
+    render(
+      <ControlledReferencePanel
+        initialDocument={createStudioReferenceBoardDocument([makeItem("ref-eyedropper")])}
+        onCommit={vi.fn()}
+        onPickColor={onPickColor}
+      />
+    );
+
+    const initialItem = await screen.findByRole("button", { name: "동작 A 이동 및 선택" });
+    const canvas = screen.getByTestId("reference-board-canvas");
+    vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: 0,
+      top: 0,
+      left: 0,
+      right: 200,
+      bottom: 100,
+      width: 200,
+      height: 100,
+      toJSON: () => ({}),
+    });
+    fireEvent.click(screen.getByRole("button", { name: "선택 이미지 속성" }));
+    await screen.findByRole("button", { name: "#ffff00 색상 선택" });
+
+    const toggle = screen.getByRole("button", { name: "참고 이미지 스포이드 켜기" });
+    fireEvent.click(toggle);
+    const samplingItem = screen.getByRole("button", { name: "동작 A 색상 추출" });
+    fireEvent.pointerDown(samplingItem, { pointerId: 21, button: 0, clientX: 100, clientY: 50 });
+    expect(onPickColor).toHaveBeenLastCalledWith("#ffff00");
+
+    fireEvent.keyDown(samplingItem, { key: "Escape" });
+    expect(screen.getByRole("button", { name: "참고 이미지 스포이드 켜기" }).getAttribute("aria-pressed"))
+      .toBe("false");
+    expect(screen.getByRole("button", { name: "동작 A 이동 및 선택" })).toBe(initialItem);
+
+    fireEvent.click(screen.getByRole("button", { name: "참고 이미지 스포이드 켜기" }));
+    fireEvent.keyDown(screen.getByRole("button", { name: "동작 A 색상 추출" }), { key: "Enter" });
+    expect(onPickColor).toHaveBeenCalledTimes(2);
+    expect(onPickColor).toHaveBeenLastCalledWith("#ffff00");
+  });
+
+  it("reports local color-analysis failures and retries without changing the board", async () => {
+    colorSamplerMock.loadStudioReferenceImageRaster.mockRejectedValueOnce(new Error("픽셀 디코드 실패"));
+    const onCommit = vi.fn();
+    render(
+      <ControlledReferencePanel
+        initialDocument={createStudioReferenceBoardDocument([makeItem("ref-retry")])}
+        onCommit={onCommit}
+        onPickColor={vi.fn()}
+      />
+    );
+
+    await screen.findByRole("button", { name: "동작 A 이동 및 선택" });
+    fireEvent.click(screen.getByRole("button", { name: "선택 이미지 속성" }));
+    expect((await screen.findByRole("alert")).textContent).toContain("픽셀 디코드 실패");
+
+    fireEvent.click(screen.getByRole("button", { name: "다시 분석" }));
+    expect(await screen.findByRole("button", { name: "#ffff00 색상 선택" })).toBeTruthy();
+    expect(colorSamplerMock.loadStudioReferenceImageRaster).toHaveBeenCalledTimes(2);
+    expect(onCommit).not.toHaveBeenCalled();
   });
 
   it("migrates a legacy pinned workspace image once, including its flip state", async () => {

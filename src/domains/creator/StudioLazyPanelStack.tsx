@@ -992,6 +992,10 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
             open
             document={referenceBoard}
             onChange={setReferenceBoard}
+            onPickColor={(nextColor) => {
+              setColor(nextColor);
+              rememberColor(nextColor);
+            }}
             onClose={() => setReferencePanelOpen(false)}
           />
         ) : null}

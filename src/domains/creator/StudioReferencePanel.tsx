@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  Check,
   ChevronLeft,
   ChevronRight,
   FlipHorizontal2,
@@ -8,10 +9,14 @@ import {
   ImagePlus,
   Images,
   Loader2,
+  Palette,
+  Pipette,
+  RefreshCw,
   Search,
   SlidersHorizontal,
   Sparkles,
   Trash2,
+  Upload,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -20,8 +25,11 @@ import {
   canonicalizeStudioAssetContentHash,
   ensureStudioAssetContentHash,
   listAssets,
+  normalizeAssetName,
+  saveAsset,
   type StudioAsset,
 } from "./studio-asset-library";
+import { loadImageFileForCanvas } from "./studio-canvas-image-io";
 import {
   addStudioReferenceBoardItem,
   createStudioReferenceBoardItem,
@@ -33,6 +41,22 @@ import {
   type StudioReferenceBoardItem,
   type StudioReferenceBoardItemView,
 } from "./studio-reference-board";
+import {
+  extractStudioReferencePalette,
+  isStudioReferenceLocalRasterDataUrl,
+  loadStudioReferenceImageRaster,
+  sampleStudioReferenceColorAtBoardPoint,
+  studioReferenceItemFramePercent,
+  type StudioReferenceImageRaster,
+  type StudioReferencePoint,
+} from "./studio-reference-color-sampler";
+import {
+  assertStudioReferenceGifSignature,
+  assertStudioReferenceImportBatch,
+  isStudioReferenceEditablePasteTarget,
+  planStudioReferenceImports,
+  STUDIO_REFERENCE_IMPORT_ACCEPT,
+} from "./studio-reference-import";
 import {
   clampReferencePanelRect,
   defaultReferencePanelSettings,
@@ -47,7 +71,12 @@ import {
   type ReferencePanelSettings,
 } from "./studio-reference-panel";
 
-import type { KeyboardEvent, PointerEvent as ReactPointerEvent, ReactElement } from "react";
+import type {
+  DragEvent as ReactDragEvent,
+  KeyboardEvent,
+  PointerEvent as ReactPointerEvent,
+  ReactElement,
+} from "react";
 
 export interface StudioReferencePanelProps {
   open: boolean;
@@ -56,6 +85,8 @@ export interface StudioReferencePanelProps {
   document: StudioReferenceBoardDocument;
   /** One durable project commit. Preview-only pointer/range updates never call this callback. */
   onChange: (next: StudioReferenceBoardDocument) => boolean | void;
+  /** Optional Studio primary-color sink. Color inspection never mutates the reference document. */
+  onPickColor?: (hex: string) => void;
 }
 
 type DragKind = "move" | "resize";
@@ -72,6 +103,12 @@ type ItemDragSession = {
   boardRect: DOMRect;
 };
 type LibraryStatus = "idle" | "loading" | "ready" | "error";
+type ColorAnalysisStatus = "idle" | "loading" | "ready" | "error";
+type ReferenceColorRasterCache = {
+  itemId: string;
+  source: string;
+  raster: StudioReferenceImageRaster;
+};
 
 const CONTROL_BUTTON =
   "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45";
@@ -241,6 +278,7 @@ export function StudioReferencePanel({
   onClose,
   document,
   onChange,
+  onPickColor,
 }: StudioReferencePanelProps): ReactElement | null {
   const [settings, setSettings] = useState<ReferencePanelSettings>(() => {
     if (typeof window === "undefined") return defaultReferencePanelSettings(1280, 800);
@@ -261,10 +299,20 @@ export function StudioReferencePanel({
   const [libraryStatus, setLibraryStatus] = useState<LibraryStatus>("idle");
   const [libraryError, setLibraryError] = useState<string | null>(null);
   const [addingAssetId, setAddingAssetId] = useState<string | null>(null);
+  const [importingFiles, setImportingFiles] = useState(false);
+  const [importStatus, setImportStatus] = useState<string | null>(null);
+  const [dropActive, setDropActive] = useState(false);
   const [dragging, setDragging] = useState<DragKind | null>(null);
   const [dragPreview, setDragPreview] = useState<{ itemId: string; view: StudioReferenceBoardItemView } | null>(null);
   const [transformPreview, setTransformPreview] = useState<{ itemId: string; view: StudioReferenceBoardItemView } | null>(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
+  const [colorAnalysisStatus, setColorAnalysisStatus] = useState<ColorAnalysisStatus>("idle");
+  const [colorAnalysisError, setColorAnalysisError] = useState<string | null>(null);
+  const [colorAnalysisNonce, setColorAnalysisNonce] = useState(0);
+  const [paletteColors, setPaletteColors] = useState<string[]>([]);
+  const [eyedropperActive, setEyedropperActive] = useState(false);
+  const [pickedColor, setPickedColor] = useState<string | null>(null);
+  const [colorInteractionStatus, setColorInteractionStatus] = useState<string | null>(null);
 
   const panelDragSessionRef = useRef<PanelDragSession | null>(null);
   const panelDragListenersRef = useRef<{ onMove: (event: PointerEvent) => void; onEnd: () => void } | null>(null);
@@ -276,9 +324,26 @@ export function StudioReferencePanel({
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestIdRef = useRef(0);
   const legacyMigrationAttemptedRef = useRef(false);
+  const colorRasterRef = useRef<ReferenceColorRasterCache | null>(null);
+  const onPickColorRef = useRef(onPickColor);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const dropDepthRef = useRef(0);
+  const importInFlightRef = useRef(false);
+  const importFilesRef = useRef<(files: readonly File[]) => Promise<void>>(async () => undefined);
   settingsRef.current = settings;
   latestDocumentRef.current = document;
   onChangeRef.current = onChange;
+  onPickColorRef.current = onPickColor;
+
+  const effectiveSelectedItem = document.items.find((item) => item.id === selectedItemId)
+    ?? document.items.at(-1)
+    ?? null;
+  const effectiveSelectedId = effectiveSelectedItem?.id ?? null;
+  const effectiveSelectedAsset = effectiveSelectedItem
+    ? resolveReferenceAsset(effectiveSelectedItem, assets)
+    : null;
+  const selectedColorSource = effectiveSelectedAsset?.dataUrl ?? null;
+  const colorPickingEnabled = typeof onPickColor === "function";
 
   function emitDocumentChange(next: StudioReferenceBoardDocument): boolean {
     if (next === latestDocumentRef.current) return true;
@@ -308,6 +373,64 @@ export function StudioReferencePanel({
       if (requestIdRef.current === requestId) requestIdRef.current += 1;
     };
   }, [open, pickerOpen, refreshNonce]);
+
+  useEffect(() => {
+    colorRasterRef.current = null;
+    setPaletteColors([]);
+    setPickedColor(null);
+    setColorInteractionStatus(null);
+    setEyedropperActive(false);
+
+    if (!open || !inspectorOpen || !colorPickingEnabled || !effectiveSelectedId) {
+      setColorAnalysisStatus("idle");
+      setColorAnalysisError(null);
+      return;
+    }
+    if (!selectedColorSource) {
+      setColorAnalysisStatus("error");
+      setColorAnalysisError("원본 에셋을 찾을 수 없어 색상을 분석할 수 없습니다.");
+      return;
+    }
+    if (!isStudioReferenceLocalRasterDataUrl(selectedColorSource)) {
+      setColorAnalysisStatus("error");
+      setColorAnalysisError("로컬 PNG, JPG, WebP 또는 GIF 참고 이미지에서만 색상을 추출할 수 있습니다.");
+      return;
+    }
+
+    const controller = new AbortController();
+    const itemId = effectiveSelectedId;
+    const source = selectedColorSource;
+    let cancelled = false;
+    setColorAnalysisStatus("loading");
+    setColorAnalysisError(null);
+
+    void loadStudioReferenceImageRaster(source, { signal: controller.signal })
+      .then((raster) => {
+        if (cancelled) return;
+        colorRasterRef.current = { itemId, source, raster };
+        setPaletteColors(extractStudioReferencePalette(raster, { count: 6 }));
+        setColorAnalysisStatus("ready");
+      })
+      .catch((error: unknown) => {
+        if (cancelled || (error instanceof DOMException && error.name === "AbortError")) return;
+        setColorAnalysisStatus("error");
+        setColorAnalysisError(
+          error instanceof Error ? error.message : "참고 이미지 색상 분석에 실패했습니다."
+        );
+      });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [
+    colorAnalysisNonce,
+    colorPickingEnabled,
+    effectiveSelectedId,
+    inspectorOpen,
+    open,
+    selectedColorSource,
+  ]);
 
   // v1 workspace settings carried one pinned image. Migrate it once into an empty project board,
   // then clear the workspace hint so an intentional later delete cannot resurrect the old image.
@@ -403,6 +526,30 @@ export function StudioReferencePanel({
     };
   }, []);
 
+  useEffect(() => {
+    if (!open) return;
+    const onPaste = (event: ClipboardEvent) => {
+      if (isStudioReferenceEditablePasteTarget(event.target)) return;
+      const clipboard = event.clipboardData;
+      if (!clipboard) return;
+      let files = Array.from(clipboard.files);
+      if (files.length === 0) {
+        files = Array.from(clipboard.items)
+          .filter((item) => item.kind === "file")
+          .flatMap((item) => {
+            const file = item.getAsFile();
+            return file ? [file] : [];
+          });
+      }
+      const plan = planStudioReferenceImports(files, STUDIO_REFERENCE_BOARD_MAX_ITEMS);
+      if (plan.files.length === 0 && plan.overflow.length === 0) return;
+      event.preventDefault();
+      void importFilesRef.current(files);
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [open]);
+
   function retryLoadAssets(): void {
     setRefreshNonce((nonce) => nonce + 1);
   }
@@ -479,8 +626,250 @@ export function StudioReferencePanel({
     }
   }
 
-  function beginItemDrag(item: StudioReferenceBoardItem, event: ReactPointerEvent<HTMLButtonElement>): void {
+  async function importReferenceFiles(sourceFiles: readonly File[]): Promise<void> {
+    if (importInFlightRef.current) return;
+    const remainingSlots = STUDIO_REFERENCE_BOARD_MAX_ITEMS - latestDocumentRef.current.items.length;
+    const plan = planStudioReferenceImports(sourceFiles, remainingSlots);
+    if (plan.files.length === 0) {
+      if (plan.overflow.length > 0 || remainingSlots <= 0) {
+        setImportStatus(`참고 보드는 최대 ${STUDIO_REFERENCE_BOARD_MAX_ITEMS}개까지 추가할 수 있습니다.`);
+      } else if (sourceFiles.length > 0) {
+        setImportStatus("PNG, JPG, WebP 또는 GIF 이미지 파일만 가져올 수 있습니다.");
+      }
+      return;
+    }
+
+    try {
+      assertStudioReferenceImportBatch(plan.files);
+    } catch (error: unknown) {
+      setImportStatus(error instanceof Error ? error.message : "참고 이미지 안전 한도를 확인해 주세요.");
+      return;
+    }
+
+    importInFlightRef.current = true;
+    setImportingFiles(true);
+    setImportStatus("참고 이미지를 안전하게 처리하고 있습니다…");
+    setLibraryError(null);
+    const savedAssets: StudioAsset[] = [];
+    const failures: string[] = [];
+    try {
+      // Decode sequentially so a multi-file paste cannot retain several large rasters at once.
+      for (const file of plan.files) {
+        try {
+          await assertStudioReferenceGifSignature(file);
+          const image = await loadImageFileForCanvas(file);
+          const asset = await saveAsset({
+            name: normalizeAssetName(file.name),
+            dataUrl: image.src,
+            width: image.width,
+            height: image.height,
+          });
+          savedAssets.push(asset);
+        } catch (error: unknown) {
+          failures.push(error instanceof Error ? error.message : `${file.name} 파일을 가져오지 못했습니다.`);
+        }
+      }
+
+      if (savedAssets.length > 0) {
+        const savedIds = new Set(savedAssets.map((asset) => asset.id));
+        setAssets((previous) => [
+          ...savedAssets,
+          ...previous.filter((asset) => !savedIds.has(asset.id)),
+        ]);
+        setLibraryStatus("ready");
+      }
+
+      let next = latestDocumentRef.current;
+      const addedItems: StudioReferenceBoardItem[] = [];
+      for (const asset of savedAssets) {
+        if (next.items.length >= STUDIO_REFERENCE_BOARD_MAX_ITEMS) break;
+        const item = buildReferenceItem(asset, next.items.length);
+        if (!item) {
+          failures.push(`${asset.name} 콘텐츠 식별자를 만들지 못했습니다.`);
+          continue;
+        }
+        const withItem = addStudioReferenceBoardItem(next, item);
+        if (withItem === next) continue;
+        next = withItem;
+        addedItems.push(item);
+      }
+
+      const accepted = addedItems.length === 0 || emitDocumentChange(next);
+      if (accepted && addedItems.length > 0) {
+        setSelectedItemId(addedItems.at(-1)?.id ?? null);
+        setInspectorOpen(false);
+        setPickerOpen(false);
+      }
+
+      const skippedCount = plan.unsupported.length
+        + plan.overflow.length
+        + Math.max(0, savedAssets.length - addedItems.length);
+      if (!accepted) {
+        setImportStatus("현재 문서가 잠겨 있어 보드에는 추가하지 못했습니다. 파일은 개인 에셋에 저장했습니다.");
+      } else if (addedItems.length === 0) {
+        setImportStatus(failures[0] ?? "가져올 수 있는 참고 이미지가 없습니다.");
+      } else {
+        const details = [
+          `${addedItems.length}개 참고 이미지를 추가했습니다.`,
+          failures.length > 0 ? `${failures.length}개 실패: ${failures[0]}` : null,
+          skippedCount > 0 ? `${skippedCount}개는 형식 또는 보드 한도로 건너뛰었습니다.` : null,
+        ].filter(Boolean);
+        setImportStatus(details.join(" "));
+      }
+    } finally {
+      importInFlightRef.current = false;
+      setImportingFiles(false);
+    }
+  }
+
+  importFilesRef.current = importReferenceFiles;
+
+  function beginFileDrop(event: ReactDragEvent<HTMLElement>): void {
+    if (!Array.from(event.dataTransfer.types).includes("Files")) return;
+    event.preventDefault();
+    dropDepthRef.current += 1;
+    setDropActive(true);
+  }
+
+  function continueFileDrop(event: ReactDragEvent<HTMLElement>): void {
+    if (!Array.from(event.dataTransfer.types).includes("Files")) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+  }
+
+  function leaveFileDrop(event: ReactDragEvent<HTMLElement>): void {
+    if (!Array.from(event.dataTransfer.types).includes("Files")) return;
+    event.preventDefault();
+    dropDepthRef.current = Math.max(0, dropDepthRef.current - 1);
+    if (dropDepthRef.current === 0) setDropActive(false);
+  }
+
+  function finishFileDrop(event: ReactDragEvent<HTMLElement>): void {
+    if (!Array.from(event.dataTransfer.types).includes("Files")) return;
+    event.preventDefault();
+    dropDepthRef.current = 0;
+    setDropActive(false);
+    void importReferenceFiles(Array.from(event.dataTransfer.files));
+  }
+
+  function applyReferenceColor(hex: string): void {
+    const pickColor = onPickColorRef.current;
+    if (!pickColor) return;
+    pickColor(hex);
+    setPickedColor(hex);
+    setColorInteractionStatus(`${hex} 색상을 기본색으로 선택했습니다.`);
+  }
+
+  function sampleReferenceItemAtPoint(
+    item: StudioReferenceBoardItem,
+    view: StudioReferenceBoardItemView,
+    board: HTMLElement,
+    point: StudioReferencePoint
+  ): void {
+    const asset = resolveReferenceAsset(item, assets);
+    const cache = colorRasterRef.current;
+    if (
+      !asset
+      || !cache
+      || cache.itemId !== item.id
+      || cache.source !== asset.dataUrl
+      || colorAnalysisStatus !== "ready"
+    ) {
+      setColorInteractionStatus("선택 이미지의 색상 분석이 끝난 뒤 다시 시도해 주세요.");
+      return;
+    }
+    const boardRect = board.getBoundingClientRect();
+    if (boardRect.width <= 0 || boardRect.height <= 0) {
+      setColorInteractionStatus("참고 보드 크기를 확인하지 못했습니다.");
+      return;
+    }
+    const displayWidth = item.asset.width ?? asset.width ?? cache.raster.width;
+    const displayHeight = item.asset.height ?? asset.height ?? cache.raster.height;
+    const framePercent = studioReferenceItemFramePercent(displayWidth, displayHeight);
+    const hex = sampleStudioReferenceColorAtBoardPoint(cache.raster, point, {
+      boardWidth: boardRect.width,
+      boardHeight: boardRect.height,
+      centerX: view.centerX,
+      centerY: view.centerY,
+      frameWidth: boardRect.width * framePercent.width / 100,
+      frameHeight: boardRect.height * framePercent.height / 100,
+      zoom: view.zoom,
+      rotationDeg: view.rotationDeg,
+      flipX: view.flipX,
+      flipY: view.flipY,
+    });
+    if (!hex) {
+      setColorInteractionStatus("투명 영역이거나 이미지 표시 범위 밖입니다. 이미지 안쪽을 선택해 주세요.");
+      return;
+    }
+    applyReferenceColor(hex);
+  }
+
+  function sampleReferenceItemFromPointer(
+    item: StudioReferenceBoardItem,
+    view: StudioReferenceBoardItemView,
+    event: ReactPointerEvent<HTMLButtonElement>
+  ): void {
+    const board = event.currentTarget.closest<HTMLElement>("[data-reference-board-canvas]");
+    if (!board) return;
+    const rect = board.getBoundingClientRect();
+    sampleReferenceItemAtPoint(item, view, board, {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    });
+  }
+
+  function sampleReferenceItemFromKeyboard(
+    item: StudioReferenceBoardItem,
+    view: StudioReferenceBoardItemView,
+    event: KeyboardEvent<HTMLButtonElement>
+  ): void {
+    if (event.key === "Escape" && eyedropperActive) {
+      exitReferenceEyedropperFromKeyboard(event);
+      return;
+    }
+    if (!eyedropperActive || (event.key !== "Enter" && event.key !== " ")) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (item.id !== effectiveSelectedId) {
+      setSelectedItemId(item.id);
+      setInspectorOpen(true);
+      return;
+    }
+    const board = event.currentTarget.closest<HTMLElement>("[data-reference-board-canvas]");
+    if (!board) return;
+    const rect = board.getBoundingClientRect();
+    sampleReferenceItemAtPoint(item, view, board, {
+      x: view.centerX * rect.width,
+      y: view.centerY * rect.height,
+    });
+  }
+
+  function exitReferenceEyedropperFromKeyboard(event: KeyboardEvent<HTMLElement>): void {
+    if (event.key !== "Escape" || !eyedropperActive) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setEyedropperActive(false);
+    setColorInteractionStatus("참고 이미지 스포이드 모드를 종료했습니다.");
+  }
+
+  function beginItemDrag(
+    item: StudioReferenceBoardItem,
+    view: StudioReferenceBoardItemView,
+    event: ReactPointerEvent<HTMLButtonElement>
+  ): void {
     if (event.button !== 0) return;
+    if (eyedropperActive) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (item.id !== effectiveSelectedId) {
+        setSelectedItemId(item.id);
+        setInspectorOpen(true);
+        return;
+      }
+      sampleReferenceItemFromPointer(item, view, event);
+      return;
+    }
     const board = event.currentTarget.closest<HTMLElement>("[data-reference-board-canvas]");
     if (!board) return;
     event.stopPropagation();
@@ -565,10 +954,6 @@ export function StudioReferencePanel({
 
   if (!open) return null;
 
-  const effectiveSelectedItem = document.items.find((item) => item.id === selectedItemId)
-    ?? document.items.at(-1)
-    ?? null;
-  const effectiveSelectedId = effectiveSelectedItem?.id ?? null;
   const selectedIndex = effectiveSelectedId
     ? document.items.findIndex((item) => item.id === effectiveSelectedId)
     : -1;
@@ -587,6 +972,20 @@ export function StudioReferencePanel({
       className="fixed z-[70] flex flex-col overflow-hidden rounded-xl border border-line bg-panel shadow-[0_12px_36px_oklch(0.05_0.01_70/0.4)]"
       style={{ left: settings.x, top: settings.y, width: settings.width, height: settings.height }}
     >
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept={STUDIO_REFERENCE_IMPORT_ACCEPT}
+        aria-label="참고 이미지 파일 선택"
+        className="sr-only"
+        disabled={importingFiles || atItemLimit}
+        onChange={(event) => {
+          const files = Array.from(event.currentTarget.files ?? []);
+          event.currentTarget.value = "";
+          void importReferenceFiles(files);
+        }}
+      />
       <header
         className="flex shrink-0 cursor-grab items-center justify-between gap-1 border-b border-line bg-card px-2 py-1.5 active:cursor-grabbing"
         style={{ touchAction: "none" }}
@@ -644,7 +1043,31 @@ export function StudioReferencePanel({
         </div>
       </header>
 
-      <div className="relative min-h-0 flex-1 overflow-hidden bg-[oklch(0.14_0.008_70)]">
+      <div
+        data-testid="reference-board-dropzone"
+        className="relative min-h-0 flex-1 overflow-hidden bg-[oklch(0.14_0.008_70)]"
+        onDragEnter={beginFileDrop}
+        onDragOver={continueFileDrop}
+        onDragLeave={leaveFileDrop}
+        onDrop={finishFileDrop}
+      >
+        {dropActive ? (
+          <div
+            role="status"
+            className="pointer-events-none absolute inset-2 z-50 grid place-items-center rounded-xl border-2 border-dashed border-accent bg-panel/90 p-4 text-center text-xs font-bold text-accent"
+          >
+            PNG · JPG · WebP · GIF를 놓아 참고 보드에 추가
+          </div>
+        ) : null}
+        {importStatus && !dropActive ? (
+          <p
+            role="status"
+            className="absolute left-2 right-2 top-2 z-40 rounded-lg border border-line bg-panel/95 px-2 py-1.5 text-[0.62rem] leading-relaxed text-fg-2 shadow-lg"
+          >
+            {importingFiles ? <Loader2 size={11} className="mr-1 inline animate-spin text-accent" aria-hidden /> : null}
+            {importStatus}
+          </p>
+        ) : null}
         <div
           data-reference-board-canvas="true"
           data-testid="reference-board-canvas"
@@ -689,19 +1112,22 @@ export function StudioReferencePanel({
                 : item.view;
             const width = item.asset.width ?? asset?.width ?? 1;
             const height = item.asset.height ?? asset?.height ?? 1;
-            const aspect = Math.max(0.05, Math.min(20, width / Math.max(1, height)));
-            const baseWidth = aspect >= 1 ? 54 : 54 * aspect;
-            const baseHeight = aspect >= 1 ? 54 / aspect : 54;
+            const framePercent = studioReferenceItemFramePercent(width, height);
             const label = referenceItemLabel(item, asset);
             return (
               <button
                 key={item.id}
                 type="button"
-                aria-label={`${label} 이동 및 선택`}
+                aria-label={`${label} ${eyedropperActive && isSelected ? "색상 추출" : "이동 및 선택"}`}
                 aria-pressed={isSelected}
-                title={asset ? `${label} — 드래그해서 이동` : `${label} — 원본 에셋을 찾을 수 없음`}
+                title={asset
+                  ? eyedropperActive && isSelected
+                    ? `${label} — 클릭해서 원본 색상 추출`
+                    : `${label} — 드래그해서 이동`
+                  : `${label} — 원본 에셋을 찾을 수 없음`}
                 className={cx(
                   "absolute grid touch-none select-none place-items-center border bg-card/20 p-0 outline-none",
+                  eyedropperActive && isSelected && "cursor-crosshair",
                   isSelected
                     ? "border-accent shadow-[0_0_0_1px_oklch(0.72_0.185_42/0.35)]"
                     : "border-transparent hover:border-line-strong focus-visible:border-accent"
@@ -709,18 +1135,19 @@ export function StudioReferencePanel({
                 style={{
                   left: `${view.centerX * 100}%`,
                   top: `${view.centerY * 100}%`,
-                  width: `${baseWidth}%`,
-                  height: `${baseHeight}%`,
+                  width: `${framePercent.width}%`,
+                  height: `${framePercent.height}%`,
                   opacity: view.opacity,
                   filter: view.grayscale ? "grayscale(1)" : undefined,
                   transform: `translate(-50%, -50%) rotate(${view.rotationDeg}deg) scale(${view.zoom * (view.flipX ? -1 : 1)}, ${view.zoom * (view.flipY ? -1 : 1)})`,
                   transformOrigin: "center",
                 }}
-                onPointerDown={(event) => beginItemDrag(item, event)}
+                onPointerDown={(event) => beginItemDrag(item, view, event)}
                 onPointerMove={previewItemDrag}
                 onPointerUp={finishItemDrag}
                 onPointerCancel={cancelItemDrag}
                 onLostPointerCapture={cancelItemDrag}
+                onKeyDown={(event) => sampleReferenceItemFromKeyboard(item, view, event)}
               >
                 {asset ? (
                   <img
@@ -796,6 +1223,23 @@ export function StudioReferencePanel({
                 보드로 돌아가기
               </button>
             </div>
+            <button
+              type="button"
+              className={cx(
+                CONTROL_BUTTON,
+                "mb-1.5 w-full shrink-0 border-accent/60 bg-accent text-on-accent hover:bg-accent-2"
+              )}
+              disabled={importingFiles || atItemLimit}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {importingFiles
+                ? <Loader2 size={13} className="animate-spin" aria-hidden />
+                : <Upload size={13} aria-hidden />}
+              내 기기에서 가져오기
+            </button>
+            <p className="mb-2 text-center text-[0.56rem] text-fg-3">
+              여러 파일 선택 · 보드로 드롭 · 이미지 붙여넣기 지원
+            </p>
             <label className="relative mb-2 block shrink-0">
               <Search size={12} aria-hidden className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-fg-3" />
               <input
@@ -828,7 +1272,7 @@ export function StudioReferencePanel({
                 </div>
               ) : assets.length === 0 ? (
                 <p className="px-3 py-7 text-center text-[0.68rem] leading-relaxed text-fg-3">
-                  저장된 에셋이 없어요. 스튜디오의 에셋 메뉴에서 이미지를 먼저 업로드해 주세요.
+                  저장된 에셋이 없어요. 위 버튼에서 바로 가져오거나 보드에 파일을 놓아 주세요.
                 </p>
               ) : filteredAssets.length === 0 ? (
                 <p className="px-3 py-7 text-center text-[0.68rem] text-fg-3">
@@ -982,6 +1426,116 @@ export function StudioReferencePanel({
                 onCancel={clearTransformPreview}
               />
             </div>
+            {colorPickingEnabled ? (
+              <section aria-label="선택 참고 이미지 색상" className="mt-2 border-t border-line pt-2">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex min-w-0 flex-1 items-center gap-1.5 text-[0.68rem] font-semibold text-fg">
+                    <Palette size={13} className="shrink-0 text-accent" aria-hidden />
+                    주요 색상
+                  </span>
+                  <button
+                    type="button"
+                    aria-label={eyedropperActive ? "참고 이미지 스포이드 끄기" : "참고 이미지 스포이드 켜기"}
+                    aria-pressed={eyedropperActive}
+                    disabled={colorAnalysisStatus !== "ready"}
+                    className={cx(
+                      CONTROL_BUTTON,
+                      "min-h-11 border-line bg-card px-2 text-fg-2 hover:bg-raised",
+                      eyedropperActive && "border-accent/60 bg-accent-soft text-accent"
+                    )}
+                    onClick={() => {
+                      setEyedropperActive((current) => {
+                        const next = !current;
+                        setColorInteractionStatus(
+                          next
+                            ? "선택 이미지에서 색을 누르세요. Enter 또는 Space는 이미지 중앙 색을 선택합니다."
+                            : "참고 이미지 스포이드 모드를 종료했습니다."
+                        );
+                        return next;
+                      });
+                    }}
+                    onKeyDown={exitReferenceEyedropperFromKeyboard}
+                  >
+                    <Pipette size={13} aria-hidden /> 스포이드
+                  </button>
+                </div>
+
+                {colorAnalysisStatus === "loading" ? (
+                  <div role="status" className="mt-2 flex min-h-11 items-center gap-2 text-[0.65rem] text-fg-3">
+                    <Loader2 size={14} className="animate-spin text-accent motion-reduce:animate-none" aria-hidden />
+                    선택 이미지의 색상을 분석하는 중…
+                  </div>
+                ) : null}
+
+                {colorAnalysisStatus === "error" && colorAnalysisError ? (
+                  <div className="mt-2 flex items-start gap-2 rounded-lg border border-warn/40 bg-warn/10 p-2">
+                    <AlertTriangle size={14} className="mt-0.5 shrink-0 text-warn" aria-hidden />
+                    <div className="min-w-0 flex-1">
+                      <p role="alert" className="text-[0.64rem] leading-relaxed text-warn">
+                        {colorAnalysisError}
+                      </p>
+                      {selectedColorSource && isStudioReferenceLocalRasterDataUrl(selectedColorSource) ? (
+                        <button
+                          type="button"
+                          className="mt-1 inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-[0.64rem] font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                          onClick={() => setColorAnalysisNonce((nonce) => nonce + 1)}
+                        >
+                          <RefreshCw size={12} aria-hidden /> 다시 분석
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
+
+                {colorAnalysisStatus === "ready" && paletteColors.length > 0 ? (
+                  <div role="group" aria-label="추출된 주요 색상" className="mt-2 flex flex-wrap gap-1.5">
+                    {paletteColors.map((hex) => (
+                      <button
+                        key={hex}
+                        type="button"
+                        aria-label={`${hex} 색상 선택`}
+                        aria-pressed={pickedColor === hex}
+                        title={`${hex} 기본색으로 선택`}
+                        className={cx(
+                          "relative grid size-11 place-items-center rounded-lg border bg-card focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+                          pickedColor === hex ? "border-accent" : "border-line hover:border-line-strong"
+                        )}
+                        onClick={() => applyReferenceColor(hex)}
+                        onKeyDown={exitReferenceEyedropperFromKeyboard}
+                      >
+                        <span
+                          className="size-7 rounded-md border border-line/70"
+                          style={{ backgroundColor: hex }}
+                          aria-hidden
+                        />
+                        {pickedColor === hex ? (
+                          <span className="absolute -right-1 -top-1 grid size-4 place-items-center rounded-full bg-accent text-on-accent">
+                            <Check size={10} aria-hidden />
+                          </span>
+                        ) : null}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+
+                {colorAnalysisStatus === "ready" && paletteColors.length === 0 ? (
+                  <p role="status" className="mt-2 text-[0.64rem] leading-relaxed text-fg-3">
+                    불투명한 픽셀이 없어 추출할 주요 색상이 없습니다.
+                  </p>
+                ) : null}
+
+                {colorAnalysisStatus === "ready" ? (
+                  <p className="mt-2 text-[0.61rem] leading-relaxed text-fg-3">
+                    색상 분석은 이 브라우저에서만 실행됩니다. 흑백 보기 중에도 원본 이미지 색상을 선택합니다.
+                  </p>
+                ) : null}
+                {colorInteractionStatus ? (
+                  <p role="status" aria-live="polite" className="mt-1 text-[0.62rem] leading-relaxed text-fg-2">
+                    {colorInteractionStatus}
+                  </p>
+                ) : null}
+              </section>
+            ) : null}
           </div>
         ) : null}
       </div>
