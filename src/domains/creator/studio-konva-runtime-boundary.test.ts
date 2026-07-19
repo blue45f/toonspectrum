@@ -111,6 +111,7 @@ describe("studio Konva runtime ownership boundary", () => {
   it("does not eager-load heavy filters and preserves both literal intent boundaries", () => {
     const runtime = moduleEdges("./studio-konva-runtime.ts");
     const page = moduleEdges("./StudioPage.tsx");
+    const imageNode = moduleEdges("./StudioKonvaImageNode.tsx");
 
     expect(runtime.dynamicImports).toEqual([]);
     expect(runtime.allImports).not.toContain("./studio-konva-filters");
@@ -122,10 +123,12 @@ describe("studio Konva runtime ownership boundary", () => {
         specifier === "./studio-konva-filters"
         || specifier === "./studio-image-filter-worker-client"
       ),
-    ).toEqual([
+    ).toEqual([]);
+    expect(imageNode.dynamicImports).toEqual([
       "./studio-konva-filters",
       "./studio-image-filter-worker-client",
     ]);
+    expect(imageNode.valueImports).toContain("./studio-konva-runtime");
   });
 
   it("registers every non-Core shape named by StudioPage and StudioDrawNode", () => {
