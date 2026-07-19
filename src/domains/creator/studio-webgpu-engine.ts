@@ -1,4 +1,8 @@
 import {
+  clearStudioCanvas2dDabSurface,
+  renderStudioCanvas2dDabSurface,
+} from "./studio-canvas2d-dab-surface";
+import {
   advanceStudioResidualInk,
   planStudioCausalInkDabs,
   startStudioResidualInk,
@@ -1555,7 +1559,13 @@ export class StudioWebGpuEngine {
     // `invalidateFrameReceipt` retires the authority snapshot into this pool when there are no
     // readers. Destroy it immediately so an inactive live canvas retains no full-surface copy.
     this.destroyReadbackSnapshotPool();
-    if (hadPresentation && this.backend === "canvas2d") this.clearCanvas2d();
+    if (hadPresentation && this.backend === "canvas2d") {
+      clearStudioCanvas2dDabSurface(
+        this.fallbackContext,
+        this.fallbackCanvas.width,
+        this.fallbackCanvas.height
+      );
+    }
     this.setSurfaceVisibility(this.backend);
   }
 
@@ -1627,7 +1637,11 @@ export class StudioWebGpuEngine {
     safeUnconfigure(this.context);
     this.context = null;
     safeDestroyDevice(device);
-    this.clearCanvas2d();
+    clearStudioCanvas2dDabSurface(
+      this.fallbackContext,
+      this.fallbackCanvas.width,
+      this.fallbackCanvas.height
+    );
   }
 
   private isAuthorityFrameCurrent(frame: StudioGpuAuthorityFrame): boolean {
@@ -2742,15 +2756,6 @@ export class StudioWebGpuEngine {
       && this.backend === "webgpu";
   }
 
-  private clearCanvas2d(): void {
-    const context = this.fallbackContext;
-    if (!context) return;
-    context.save();
-    context.setTransform(1, 0, 0, 1, 0, 0);
-    context.clearRect(0, 0, this.fallbackCanvas.width, this.fallbackCanvas.height);
-    context.restore();
-  }
-
   private renderCanvas2d(
     strokes: readonly StudioGpuStroke[],
     requestId: string,
@@ -2760,27 +2765,13 @@ export class StudioWebGpuEngine {
     const context = this.fallbackContext;
     if (!context) return;
     const update = this.planRenderUpdate(strokes);
-    if (update.mode === "rebuild") this.clearCanvas2d();
-    const viewport = this.viewport;
-    const pixelScaleX = this.fallbackCanvas.width / viewport.logicalWidth;
-    const pixelScaleY = this.fallbackCanvas.height / viewport.logicalHeight;
-    const transformA = pixelScaleX * viewport.scaleX * (viewport.flipX ? -1 : 1);
-    const transformD = pixelScaleY * viewport.scaleY;
-    const transformE = pixelScaleX * (
-      viewport.offsetX + (viewport.flipX ? viewport.logicalWidth * viewport.scaleX : 0)
-    );
-    const transformF = pixelScaleY * viewport.offsetY;
-
-    context.save();
-    context.setTransform(transformA, 0, 0, transformD, transformE, transformF);
-    for (const dab of update.dabs) {
-      context.globalCompositeOperation = dab.composite === "erase" ? "destination-out" : "source-over";
-      context.fillStyle = `rgba(${Math.round(dab.red * 255)}, ${Math.round(dab.green * 255)}, ${Math.round(dab.blue * 255)}, ${dab.alpha})`;
-      context.beginPath();
-      context.arc(dab.x, dab.y, dab.radius, 0, Math.PI * 2);
-      context.fill();
-    }
-    context.restore();
+    renderStudioCanvas2dDabSurface({
+      context,
+      surfaceWidth: this.fallbackCanvas.width,
+      surfaceHeight: this.fallbackCanvas.height,
+      viewport: this.viewport,
+      update,
+    });
     const complete = this.recordRenderedFrame(strokes, update);
     if (
       complete
