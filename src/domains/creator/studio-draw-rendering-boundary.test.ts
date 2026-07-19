@@ -112,11 +112,25 @@ describe("studio draw rendering ownership boundary", () => {
     expect(rendering.source).not.toMatch(/\bGPUDevice\b/);
   });
 
-  it("leaves the React-Konva node and draft-preview store inside StudioPage", () => {
+  it("keeps the React-Konva node in its own one-way module and the draft store in StudioPage", () => {
     const page = moduleEdges("./StudioPage.tsx");
+    const drawNode = moduleEdges("./StudioDrawNode.tsx");
     const rendering = moduleEdges("./studio-draw-rendering.ts");
 
-    expect(page.source).toContain("const StudioDrawNode = memo(function StudioDrawNode(");
+    expect(
+      page.valueImports.filter((specifier) => specifier === "./StudioDrawNode"),
+    ).toEqual(["./StudioDrawNode"]);
+    expect(page.source).not.toContain("const StudioDrawNode = memo(function StudioDrawNode(");
+    expect(drawNode.source).toContain(
+      "export const StudioDrawNode = memo(function StudioDrawNode(",
+    );
+    expect(drawNode.allImports).not.toContain("./StudioPage");
+    expect(drawNode.dynamicImports).toEqual([]);
+    expect(drawNode.typeImports).toContain("./studio-element-model");
+    expect(drawNode.valueImports).not.toContain("./studio-element-model");
+    expect(drawNode.valueImports).toContain("./studio-draw-rendering");
+    expect(drawNode.valueImports).toContain("react-konva/lib/ReactKonvaCore");
+
     expect(page.source).toContain("class StudioDraftPreviewStore");
     expect(page.source).toContain(
       "const StudioDraftPreviewLayers = memo(function StudioDraftPreviewLayers(",
@@ -125,5 +139,29 @@ describe("studio draw rendering ownership boundary", () => {
     expect(rendering.source).not.toMatch(/\b(?:const|function|class)\s+StudioDraftPreviewStore\b/);
     expect(rendering.source).not.toMatch(/\b(?:const|function|class)\s+StudioDraftPreviewLayers\b/);
     expect(rendering.allImports.some((specifier) => specifier.startsWith("react-konva"))).toBe(false);
+  });
+
+  it("keeps editor lifecycle, collaboration, routing, and GPU ownership out of StudioDrawNode", () => {
+    const drawNode = moduleEdges("./StudioDrawNode.tsx");
+    const forbiddenSpecifier = /(?:^|\/)(?:react-router|auth|studio-crdt|studio-webgpu|StudioPage)(?:\/|$)/;
+
+    for (const specifier of drawNode.allImports) {
+      expect(specifier).not.toMatch(forbiddenSpecifier);
+    }
+    expect(drawNode.source).not.toMatch(/\b(?:navigator|document|window)\s*\./);
+    expect(drawNode.source).not.toMatch(/\b(?:GPUDevice|PointerEvent|WebSocket)\b/);
+  });
+
+  it("locks the stamp, watercolor, pattern, and memo routing seams in the extracted node", () => {
+    const drawNode = moduleEdges("./StudioDrawNode.tsx");
+
+    expect(drawNode.source).toContain("const tileSrc = pattern ? patternDataUrl(pattern) : null;");
+    expect(drawNode.source).toContain("if (active) setImage(img);");
+    expect(drawNode.source).toContain('el.stampPipeline === "causal-walker-v2"');
+    expect(drawNode.source).toContain("? points\n                : processFreehandPoints(points, renderSampleDistance)");
+    expect(drawNode.source).toContain('el.watercolorPipeline === "causal-walker-v2"');
+    expect(drawNode.source).toContain("planCausalWatercolorBrushDabs(watercolorInput, !activeDraft)");
+    expect(drawNode.source).toContain('globalCompositeOperation="multiply"');
+    expect(drawNode.source).toContain('globalCompositeOperation="lighter"');
   });
 });
