@@ -16,7 +16,6 @@ import {
   ChevronRight,
   ChevronUp,
   Copy,
-  Droplets,
   Eraser,
   FlipHorizontal2,
   FlipVertical2,
@@ -36,7 +35,7 @@ import { Suspense, memo, useEffect, useState } from "react";
 import { type StudioAdvancedFillPreview } from "./studio-advanced-fill-preview";
 import { DEFAULT_STUDIO_ADVANCED_FILL_SETTINGS, type StudioAdvancedFillSettings } from "./studio-advanced-fill-settings";
 import { isStudioAiConfigured, type StudioAiSettings } from "./studio-ai-client";
-import { BG_PRESETS, BUBBLE_VARIANTS, CANVAS_W, type BgPreset, type TemplateSpec } from "./studio-assets";
+import { BUBBLE_VARIANTS, CANVAS_W, type BgPreset, type TemplateSpec } from "./studio-assets";
 import { preloadStudioBackground3D } from "./studio-background-3d-loader";
 import { parseStudio3dTool } from "./studio-background-3d-metadata";
 import { type StudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
@@ -84,7 +83,6 @@ import {
   type TextEl,
 } from "./studio-element-model";
 import { legacyTextGradientToSpec } from "./studio-gradient-engine";
-import { GRADIENT_PRESETS, gradientToBgGrad } from "./studio-gradients";
 import { type HealCloneMode } from "./studio-heal-clone";
 import { uid } from "./studio-id";
 import { type StudioImageInspectorSection, type StudioInspectorLayout } from "./studio-inspector-layout";
@@ -166,13 +164,13 @@ import { projectStudioViewRectToDocumentRect, type StudioViewRotation } from "./
 import { StudioBgRemoveButton } from "./StudioBgRemoveButton";
 import { StudioBubbleShapePanel } from "./StudioBubbleShapePanel";
 import { StudioBubbleVariantGlyph } from "./StudioBubbleVariantGlyph";
+import { StudioInspectorCanvasControls } from "./StudioInspectorCanvasControls";
 import { StudioInspectorFocusSpeedFrameControls } from "./StudioInspectorFocusSpeedFrameControls";
 import { StudioInspectorNavigator } from "./StudioInspectorNavigator";
 import { LazyStudioColorPopover } from "./StudioLazyColorPopover";
 import { StudioPanelLoading } from "./StudioLazySurfaceFallback";
 import { StudioLineCleanupPanel } from "./StudioLineCleanupPanel";
 import { StudioLineCorrectionControls } from "./StudioLineCorrectionControls";
-import { StudioMagicResizePanel } from "./StudioMagicResizePanel";
 import { StudioMagicWandPanel } from "./StudioMagicWandPanel";
 import { StudioMobileSheetHandle } from "./StudioMobileSheetHandle";
 import { StudioNodeEditPanel } from "./StudioNodeEditPanel";
@@ -920,274 +918,76 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
             onChange={changeInspectorLayout}
           />
 
-          <div
-            role="tabpanel"
-            aria-label="캔버스 설정"
+          <StudioInspectorCanvasControls
+            background={bg}
+            canvasHeight={canvasH}
+            controlsDisabled={collaborationDocumentLocked}
+            gridSize={gridSize}
             hidden={
               inspectorLayout.primary !== "document" ||
               inspectorLayout.document !== "canvas"
             }
-            className="rounded-xl border border-line bg-panel/40 p-3"
-          >
-            <p className="mb-2 text-xs font-semibold text-fg-3">캔버스</p>
-            <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-              배경색
-              <input type="color" value={bg} onChange={(e) => setBg(e.target.value)} className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent" />
-            </label>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {BG_PRESETS.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => applyBgPreset(p)}
-                  title={p.label}
-                  aria-label={`배경 ${p.label}`}
-                  className="h-6 w-6 rounded-md border border-line"
-                  style={{ background: p.grad ? `linear-gradient(${p.grad[0]}, ${p.grad[1]})` : p.fill }}
-                />
-              ))}
-            </div>
-            {/* 그라디언트 배경 프리셋 — 세로 그라데이션으로 페이지 배경을 칠한다(웹툰 시간대·무드). */}
-            <div className="mt-2">
-              <p className="mb-1 text-[0.68rem] font-medium text-fg-3">그라디언트 배경</p>
-              <div className="flex flex-wrap gap-1.5">
-                {GRADIENT_PRESETS.map((g) => {
-                  const [c0, c1] = gradientToBgGrad(g);
-                  return (
-                    <button
-                      key={g.id}
-                      type="button"
-                      onClick={() => setBgGrad(gradientToBgGrad(g))}
-                      title={g.tip}
-                      aria-label={`그라디언트 ${g.label}`}
-                      className="h-6 w-6 rounded-md border border-line"
-                      style={{ background: `linear-gradient(${c0}, ${c1})` }}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setMenu("bgFill")}
-              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl border border-accent/30 bg-accent-soft px-2 py-2 text-[0.7rem] font-bold text-accent hover:border-accent/50"
-            >
-              <Droplets size={13} aria-hidden />
-              배경 편집기 · 리사이저 열기
-            </button>
-            <div className="mt-3 flex items-center justify-between gap-2 text-sm text-fg-2">
-              <span>높이</span>
-              <span className="flex items-center gap-1">
-                <button type="button" aria-label="높이 240px 줄이기" onClick={() => setCanvasH((h) => h - 240)} className="rounded border border-line px-2 text-fg-2 hover:bg-raised">
-                  −
-                </button>
-                <span className="numeral w-12 text-center text-xs" aria-label={`높이 ${canvasH}px`}>{canvasH}</span>
-                <button type="button" aria-label="높이 240px 늘리기" onClick={() => setCanvasH((h) => h + 240)} className="rounded border border-line px-2 text-fg-2 hover:bg-raised">
-                  +
-                </button>
-              </span>
-            </div>
-            {!masterEditMode && (
-              <div className="mt-3">
-                <StudioMagicResizePanel
-                  currentSize={{ width: CANVAS_W, height: canvasH }}
-                  strategy={magicResizeStrategy}
-                  onStrategyChange={setMagicResizeStrategy}
-                  onApplyPreset={applyMagicResizePreset}
-                />
-              </div>
-            )}
-            <label className="mt-3 flex items-center justify-between gap-2 text-sm text-fg-2">
-              패널 여백 (Gutter)
-              <span className="flex items-center gap-1.5">
-                <input
-                  type="range"
-                  min={8}
-                  max={48}
-                  step={2}
-                  value={panelGutter}
-                  onChange={(e) => {
-                    if (collaborationDocumentLocked) return;
-                    const nextGutter = Number(e.target.value);
-                    setPanelGutter(nextGutter);
-                    setSharedDocumentNotice(null);
-                    if (currentTemplate) {
-                      const nextEls = regenerateTemplate(currentTemplate, nextGutter);
-                      commit(nextEls);
-                    }
-                  }}
-                  className="w-24 accent-accent cursor-pointer"
-                  disabled={collaborationDocumentLocked || !currentTemplate || currentTemplate.id === "blank"}
-                />
-                <span className="w-5 text-right text-xs tabular-nums text-fg-3">{panelGutter}</span>
-              </span>
-            </label>
-            <div className="mt-3 border-t border-line/50 pt-2 space-y-2">
-              <label className="flex items-center justify-between text-xs text-fg-2">
-                정렬 가이드 (스냅)
-                <input
-                  type="checkbox"
-                  checked={snapEnabled}
-                  onChange={(e) => setSnapEnabled(e.target.checked)}
-                  className="size-3.5 accent-accent"
-                />
-              </label>
-              <label className="flex items-center justify-between text-xs text-fg-2">
-                그리드 격자 표시
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={showGrid}
-                    onChange={(e) => setShowGrid(e.target.checked)}
-                    className="size-3.5 accent-accent"
-                  />
-                  {showGrid && (
-                    <select
-                      value={gridSize}
-                      onChange={(e) => setGridSize(Number(e.target.value))}
-                      className="rounded border border-line bg-card px-1 py-0.5 text-[10px]"
-                    >
-                      {[20, 30, 40, 50, 60, 80].map((sz) => (
-                        <option key={sz} value={sz}>{sz}px</option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-              </label>
-
-              <label className="flex items-center justify-between text-xs text-fg-2">
-                웹툰 규격 가이드
-                <input
-                  type="checkbox"
-                  checked={showWebtoonGuides}
-                  onChange={(e) => {
-                    if (e.target.checked) ensureWebtoonGuidesLoaded();
-                    setShowWebtoonGuides(e.target.checked);
-                  }}
-                  onPointerEnter={ensureWebtoonGuidesLoaded}
-                  onFocus={ensureWebtoonGuidesLoaded}
-                  className="size-3.5 accent-accent"
-                />
-              </label>
-              {showWebtoonGuides && (
-                <div className="rounded-md border border-line bg-card px-2 py-1.5 text-[0.68rem] leading-snug text-fg-3">
-                  {webtoonGuides
-                    ? (() => {
-                        const len = webtoonGuides.episodeLengthLabel(canvasH);
-                        return (
-                          <>
-                            <span className="font-semibold text-fg-2">{len.label}</span> · {len.tier}
-                            <br />
-                            파란 점선 = 플랫폼 표준폭(네이버 690·카카오 720), 붉은 음영 = 세이프영역.
-                          </>
-                        );
-                      })()
-                    : "웹툰 규격 가이드를 여는 중..."}
-                </div>
-              )}
-
-              {/* 작가 가이드선 (Artist Guidelines) */}
-              <div className="pt-2 border-t border-line/35 space-y-2">
-                <p className="text-[0.65rem] font-bold text-fg-2">스냅 가이드선</p>
-                <div className="flex gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUserGuides((prev) => [
-                        ...prev,
-                        { id: uid(), type: "v", pos: 400 },
-                      ]);
-                    }}
-                    className="flex-1 rounded border border-line bg-card py-1 text-[0.68rem] font-semibold text-fg hover:bg-raised transition-colors cursor-pointer"
-                  >
-                    + 세로 가이드
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUserGuides((prev) => [
-                        ...prev,
-                        { id: uid(), type: "h", pos: canvasH / 2 },
-                      ]);
-                    }}
-                    className="flex-1 rounded border border-line bg-card py-1 text-[0.68rem] font-semibold text-fg hover:bg-raised transition-colors cursor-pointer"
-                  >
-                    + 가로 가이드
-                  </button>
-                </div>
-
-                {userGuides.length > 0 && (
-                  <div className="space-y-1.5 rounded-lg border border-line bg-card/30 p-2 max-h-40 overflow-y-auto">
-                    {userGuides.map((guide, idx) => (
-                      <div key={guide.id} className="flex items-center justify-between gap-1.5 text-[0.65rem]">
-                        <span className="text-fg-2 font-medium">
-                          {guide.type === "v" ? "세로" : "가로"} #{idx + 1} ({Math.round(guide.pos)}px)
-                        </span>
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="range"
-                            min={0}
-                            max={guide.type === "v" ? 800 : canvasH}
-                            value={guide.pos}
-                            aria-label={`${guide.type === "v" ? "세로" : "가로"} 가이드 #${idx + 1} 위치`}
-                            onChange={(e) => {
-                              const pos = Number(e.target.value);
-                              setUserGuides((prev) =>
-                                prev.map((g) => (g.id === guide.id ? { ...g, pos } : g))
-                              );
-                            }}
-                            className="w-16 h-2 accent-accent cursor-pointer"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setUserGuides((prev) => prev.filter((g) => g.id !== guide.id));
-                            }}
-                            className="text-[9px] text-bad hover:underline ml-1 cursor-pointer"
-                          >
-                            삭제
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => setUserGuides([])}
-                      className="w-full text-center text-[9px] text-bad-light hover:underline pt-1 border-t border-line/30 cursor-pointer"
-                    >
-                      모든 가이드 삭제
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="mt-3 border-t border-line pt-3">
-              <span className="text-[0.66rem] font-semibold text-fg-3 block mb-1.5">만화/웹툰 연출 스타일</span>
-              <div className="grid grid-cols-3 gap-1 bg-card rounded-lg p-0.5 border border-line">
-                {(["classic", "soft", "vivid"] as const).map((style) => (
-                  <button
-                    key={style}
-                    type="button"
-                    onClick={() => {
-                      if (collaborationDocumentLocked) return;
-                      setWebtoonTheme(style);
-                      setSharedDocumentNotice(null);
-                    }}
-                    disabled={collaborationDocumentLocked}
-                    className={cn(
-                      "rounded py-1 text-[0.66rem] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50",
-                      webtoonTheme === style
-                        ? "bg-accent text-on-accent"
-                        : "text-fg-2 hover:bg-raised"
-                    )}
-                  >
-                    {style === "classic" ? "출판만화" : style === "soft" ? "소프트" : "비비드"}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
+            magicResizeStrategy={magicResizeStrategy}
+            masterEditMode={masterEditMode}
+            panelGutter={panelGutter}
+            showGrid={showGrid}
+            showWebtoonGuides={showWebtoonGuides}
+            snapEnabled={snapEnabled}
+            templateGutterAvailable={
+              currentTemplate !== null && currentTemplate.id !== "blank"
+            }
+            userGuides={userGuides}
+            webtoonGuides={webtoonGuides}
+            webtoonTheme={webtoonTheme}
+            onAddUserGuide={(type) => {
+              setUserGuides((current) => [
+                ...current,
+                {
+                  id: uid(),
+                  type,
+                  pos: type === "v" ? CANVAS_W / 2 : canvasH / 2,
+                },
+              ]);
+            }}
+            onApplyBackgroundPreset={applyBgPreset}
+            onApplyMagicResizePreset={applyMagicResizePreset}
+            onBackgroundChange={setBg}
+            onCanvasHeightDelta={(delta) => setCanvasH((height) => height + delta)}
+            onClearUserGuides={() => setUserGuides([])}
+            onDeleteUserGuide={(id) => {
+              setUserGuides((current) => current.filter((guide) => guide.id !== id));
+            }}
+            onGradientChange={setBgGrad}
+            onGridSizeChange={setGridSize}
+            onMagicResizeStrategyChange={setMagicResizeStrategy}
+            onMoveUserGuide={(id, pos) => {
+              setUserGuides((current) =>
+                current.map((guide) => (guide.id === id ? { ...guide, pos } : guide))
+              );
+            }}
+            onOpenBackgroundEditor={() => setMenu("bgFill")}
+            onPanelGutterChange={(nextGutter) => {
+              if (collaborationDocumentLocked) return;
+              setPanelGutter(nextGutter);
+              setSharedDocumentNotice(null);
+              if (currentTemplate) {
+                const nextElements = regenerateTemplate(currentTemplate, nextGutter);
+                commit(nextElements);
+              }
+            }}
+            onShowGridChange={setShowGrid}
+            onShowWebtoonGuidesChange={(visible) => {
+              if (visible) ensureWebtoonGuidesLoaded();
+              setShowWebtoonGuides(visible);
+            }}
+            onSnapEnabledChange={setSnapEnabled}
+            onWarmWebtoonGuides={ensureWebtoonGuidesLoaded}
+            onWebtoonThemeChange={(theme) => {
+              if (collaborationDocumentLocked) return;
+              setWebtoonTheme(theme);
+              setSharedDocumentNotice(null);
+            }}
+          />
           {/* 페이지 전체 색보정(그레이드) — 무드 프리셋 + 밝기/대비/채도/색조/세피아/흑백/비네트 */}
           <div
             role="tabpanel"
