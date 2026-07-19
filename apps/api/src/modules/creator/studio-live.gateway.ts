@@ -15,14 +15,12 @@ import {
 import { allowedCorsOrigins } from "../../config/cors";
 
 import { CreatorService } from "./creator.service";
+import { StudioCrdtService } from "./studio-crdt.service";
 import {
-  StudioCrdtBackpressureError,
-  StudioCrdtDocumentTooLargeError,
-  StudioCrdtInvalidPayloadError,
-  StudioCrdtService,
-  StudioCrdtStorageCorruptionError,
-  StudioCrdtUpdateIdConflictError,
-} from "./studio-crdt.service";
+  mapStudioLiveCrdtFailure,
+  replyStudioLiveAck as reply,
+  studioLiveFailure as failure,
+} from "./studio-live-ack";
 import { StudioLiveCrdtQuotaLimiter } from "./studio-live-crdt-quota";
 import {
   STUDIO_LIVE_LOCK_REPOSITORY,
@@ -70,7 +68,6 @@ import type {
   StudioLiveCrdtUpdateInput,
   StudioLiveCursorInput,
   StudioLiveFailure,
-  StudioLiveFailureCode,
   StudioLiveInterServerRelayEvent,
   StudioLiveInterServerRelayRequest,
   StudioLiveInterServerRelayResponse,
@@ -270,15 +267,6 @@ function publicLock(lock: StudioLiveLockRecord): StudioLiveLock {
     ownerName: lock.ownerName,
     expiresAt: lock.expiresAt.toISOString(),
   };
-}
-
-function failure(code: StudioLiveFailureCode, message: string): StudioLiveFailure {
-  return { ok: false, code, message };
-}
-
-function reply<T>(ack: StudioLiveAckCallback<T> | undefined, response: StudioLiveAck<T>): StudioLiveAck<T> {
-  ack?.(response);
-  return response;
 }
 
 function canonicalBase64DecodedLength(value: string): number {
@@ -780,7 +768,11 @@ export class StudioLiveGateway
         parsed.data.stateVector
       );
     } catch (error) {
-      return reply(ack, this.crdtFailure(error, parsed.data.workId, "sync"));
+      const mappedFailure = mapStudioLiveCrdtFailure(error, parsed.data.workId, "sync");
+      if (mappedFailure.diagnostic) {
+        this.logger.error(mappedFailure.diagnostic, "studio CRDT operation failed");
+      }
+      return reply(ack, mappedFailure.response);
     }
     const authorizedAfter = await this.runWithAuthorizedParticipant(
       client,
@@ -857,7 +849,11 @@ export class StudioLiveGateway
         data: parsed.data.update,
       });
     } catch (error) {
-      return reply(ack, this.crdtFailure(error, parsed.data.workId, "update"));
+      const mappedFailure = mapStudioLiveCrdtFailure(error, parsed.data.workId, "update");
+      if (mappedFailure.diagnostic) {
+        this.logger.error(mappedFailure.diagnostic, "studio CRDT operation failed");
+      }
+      return reply(ack, mappedFailure.response);
     }
 
     const data: StudioLiveCrdtUpdateAck = {
@@ -2618,45 +2614,6 @@ export class StudioLiveGateway
     if (bucket.count >= maximum) return false;
     bucket.count += 1;
     return true;
-  }
-
-  private crdtFailure(
-    error: unknown,
-    workId: string,
-    operation: "sync" | "update"
-  ): StudioLiveFailure {
-    if (error instanceof StudioCrdtBackpressureError) {
-      // Admission failed before a durable mutation started. Surface a recoverable response so the
-      // ordered browser outbox backs off and retries the same update id without reporting data loss.
-      return failure("rate_limited", "공동 편집 요청이 밀려 있습니다. 잠시 후 자동으로 다시 시도합니다.");
-    }
-    if (
-      error instanceof StudioCrdtInvalidPayloadError ||
-      error instanceof StudioCrdtUpdateIdConflictError ||
-      error instanceof StudioCrdtDocumentTooLargeError
-    ) {
-      return failure("invalid_payload", "CRDT 데이터가 올바르지 않거나 허용 크기를 초과했습니다.");
-    }
-    const corruption = error instanceof StudioCrdtStorageCorruptionError;
-    this.logger.error(
-      {
-        workId,
-        operation,
-        error: error instanceof Error ? error.message : "unknown",
-        corruption,
-      },
-      "studio CRDT operation failed"
-    );
-    if (corruption) {
-      // Retrying a deterministic failure to decode the authoritative CRDT store cannot heal the
-      // document and can instead keep replaying optimistic browser updates forever. Give clients a
-      // dedicated permanent rejection so both sync and update paths stop at a recovery boundary.
-      return failure(
-        "storage_corruption",
-        "서버 원고 저장소의 무결성을 확인하지 못해 공동 편집을 중지했습니다."
-      );
-    }
-    return failure("internal_error", "CRDT 데이터를 안전하게 저장하거나 불러오지 못했습니다.");
   }
 
   private isParticipantAuthorizationCurrent(
