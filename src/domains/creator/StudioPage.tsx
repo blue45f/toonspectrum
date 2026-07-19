@@ -333,11 +333,9 @@ import {
   waitForStudioCaptureReady,
 } from "./studio-capture-readiness";
 import {
-  planStudioCausalInk,
   selectStudioCausalInkSamples,
   shouldAppendStudioCausalInkSample,
 } from "./studio-causal-ink";
-import { fillStudioCausalInkDabs } from "./studio-causal-ink-canvas";
 import {
   appendStudioCausalPostCorrection,
   createStudioCausalPostCorrectionState,
@@ -469,6 +467,15 @@ import {
   studioSymmetryHudLabel,
 } from "./studio-draw-hud";
 import {
+  drawBounds,
+  drawFreehandPenSegments,
+  drawLiveFreehandDraftToContext,
+  drawStudioCausalInkDabs,
+  getSymmetricPoints,
+  isDirectLiveDraftEl,
+  isDirectLiveStampDraftEl,
+} from "./studio-draw-rendering";
+import {
   areStudioDrawingAssistDocumentsEqual,
   normalizeStudioDrawingAssistDocument,
   studioDrawingAssistHasContent,
@@ -588,7 +595,6 @@ import {
   STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
   STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
   studioInkFallbackPressure,
-  type StudioInkPressureModel,
 } from "./studio-ink-pressure-model";
 import {
   navigateStudioInspector,
@@ -604,7 +610,6 @@ import {
   type IsometricAxisRay,
 } from "./studio-isometric-grid";
 import {
-  getKaleidoscopePoints,
   mirrorAxisAngle,
   wedgeBoundaryAngle,
 } from "./studio-kaleidoscope";
@@ -1053,7 +1058,6 @@ import { resolveShiftFreehandTransition } from "./studio-stroke-constrain";
 import {
   STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1,
   isStudioStrokePaintModelCompatible,
-  type StudioStrokePaintModel,
 } from "./studio-stroke-paint-model";
 import {
   DEFAULT_SHAPE_PARAMS,
@@ -1719,63 +1723,6 @@ function createQuickSampleFrames(): FrameEl[] {
   }));
 }
 
-function drawBounds(points: number[]) {
-  const [x1 = 0, y1 = 0, x2 = x1, y2 = y1] = points;
-  return {
-    x: Math.min(x1, x2),
-    y: Math.min(y1, y2),
-    width: Math.abs(x2 - x1),
-    height: Math.abs(y2 - y1),
-  };
-}
-
-function getSymmetricPoints(
-  points: number[],
-  symmetry: { type: "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope"; centerX: number; centerY: number; radialCount?: number } | undefined
-): number[][] {
-  if (!symmetry || symmetry.type === "none" || points.length === 0) {
-    return [points];
-  }
-  
-  const result: number[][] = [points];
-  const cx = symmetry.centerX;
-  const cy = symmetry.centerY;
-  
-  if (symmetry.type === "vertical") {
-    const mirrored: number[] = [];
-    for (let i = 0; i < points.length; i += 2) {
-      const x = points[i];
-      const y = points[i + 1];
-      if (x !== undefined && y !== undefined) {
-        mirrored.push(cx * 2 - x, y);
-      }
-    }
-    result.push(mirrored);
-  } else if (symmetry.type === "horizontal") {
-    const mirrored: number[] = [];
-    for (let i = 0; i < points.length; i += 2) {
-      const x = points[i];
-      const y = points[i + 1];
-      if (x !== undefined && y !== undefined) {
-        mirrored.push(x, cy * 2 - y);
-      }
-    }
-    result.push(mirrored);
-  } else if (symmetry.type === "radial" || symmetry.type === "kaleidoscope") {
-    const variations = getKaleidoscopePoints(points, {
-      centerX: cx,
-      centerY: cy,
-      radialCount: symmetry.radialCount,
-      mirror: symmetry.type === "kaleidoscope",
-    });
-    // variations[0]은 항상 원본 그대로(getKaleidoscopePoints 계약) — result에 이미 원본이 있으니
-    // 중복을 피하려면 나머지만 이어붙인다.
-    result.push(...variations.slice(1));
-  }
-
-  return result;
-}
-
 // 패턴 채우기 타일 이미지 훅 — 패턴 스펙의 SVG 타일(data URL)을 HTMLImage로 비동기 로드한다.
 // UrlImage의 effect 로드 방식을 훅으로 컴포넌트화한 것. 타일 src는 patternId/색에만
 // 의존하므로(배율은 fillPatternScale로 적용) 배율 조절로는 재로드되지 않는다.
@@ -1801,154 +1748,6 @@ function usePatternFillImage(pattern: StudioPatternSpec | undefined): HTMLImageE
     };
   }, [tileSrc]);
   return image;
-}
-
-/**
- * Default(pen/marker/eraser) 프리핸드 경로의 공용 래스터라이저 — 중점 이차곡선 + 정점 필압 폭.
- * StudioDrawNode 의 선언적 Shape 와 다이렉트 라이브 초안(임페러티브 sceneFunc)이 같은 함수를
- * 그려 미리보기와 커밋 픽셀이 일치한다.
- */
-function drawFreehandPenSegments(
-  context: Konva.Context,
-  smoothed: number[],
-  sampledPressures: readonly number[] | null,
-  strokeColor: string,
-  strokeWidth: number
-): void {
-  if (smoothed.length < 4) return;
-  context.lineCap = "round";
-  context.lineJoin = "round";
-  context.strokeStyle = strokeColor;
-  const widthAt = (idx: number) => {
-    if (!sampledPressures) return strokeWidth;
-    const p = sampledPressures[idx] ?? 0.5;
-    return Math.max(0.5, strokeWidth * (0.3 + p * 1.4));
-  };
-  const count = smoothed.length / 2;
-  if (count === 2) {
-    context.beginPath();
-    context.moveTo(smoothed[0]!, smoothed[1]!);
-    context.lineTo(smoothed[2]!, smoothed[3]!);
-    context.lineWidth = widthAt(1);
-    context.stroke();
-    return;
-  }
-  let prevMidX = smoothed[0]!;
-  let prevMidY = smoothed[1]!;
-  for (let i = 1; i < count; i += 1) {
-    const cx = smoothed[(i - 1) * 2]!;
-    const cy = smoothed[(i - 1) * 2 + 1]!;
-    const x = smoothed[i * 2]!;
-    const y = smoothed[i * 2 + 1]!;
-    const isLast = i === count - 1;
-    const midX = isLast ? x : (cx + x) / 2;
-    const midY = isLast ? y : (cy + y) / 2;
-    context.beginPath();
-    context.moveTo(prevMidX, prevMidY);
-    context.quadraticCurveTo(cx, cy, midX, midY);
-    context.lineWidth = widthAt(i);
-    context.stroke();
-    prevMidX = midX;
-    prevMidY = midY;
-  }
-}
-
-/** Canonical new-stroke rasterizer shared with the Canvas live overlay and retained WebGPU path. */
-function drawStudioCausalInkDabs(
-  context: Konva.Context,
-  points: readonly number[],
-  pressures: readonly number[] | undefined,
-  strokeColor: string,
-  strokeWidth: number,
-  minDistance: number,
-  pressureModel?: StudioInkPressureModel,
-  paintModel?: StudioStrokePaintModel
-): void {
-  const plan = planStudioCausalInk({
-    points,
-    pressures,
-    minDistance,
-    size: strokeWidth,
-    pressureModel,
-  });
-  fillStudioCausalInkDabs(context, plan.dabs, strokeColor, paintModel);
-}
-
-/**
- * 다이렉트 라이브 초안 대상인지 — StudioDrawNode 의 Default(pen/marker/eraser) 브랜치와 정확히
- * 같은 집합만 참이어야 미리보기가 커밋과 픽셀 단위로 일치한다. 지우개는 모든 브러시에서 Default
- * 경로를 타고, dynamics 프리셋 브러시(mode "pen")는 dab 브랜치라 제외한다.
- */
-function isDirectLiveDraftEl(el: DrawEl): boolean {
-  if ((el.kind ?? "freehand") !== "freehand") return false;
-  if (el.mode === "eraser") return true;
-  const family = resolveStudioBrushRenderFamily(el.brush ?? "pen");
-  if (family !== "pen" && family !== "marker") return false;
-  return resolveStudioBrushDynamicsPresetId(el.brush) === null;
-}
-
-/** v2 스탬프는 raw accepted point 접미사를 자체 walker에 공급한다(대칭은 후속 compositor 범위). */
-function isDirectLiveStampDraftEl(el: DrawEl): boolean {
-  return (el.kind ?? "freehand") === "freehand"
-    && el.mode === "pen"
-    && !el.fill
-    && el.stampPipeline === "causal-walker-v2"
-    && resolveStudioStampBrushKind(el.brush) !== null
-    && (el.symmetry?.type ?? "none") === "none";
-}
-
-/** 다이렉트 라이브 초안을 임페러티브로 그린다 — React 렌더 없이 Konva batchDraw 로만 갱신. */
-function drawLiveFreehandDraftToContext(context: Konva.Context, el: DrawEl): void {
-  const isEraser = el.mode === "eraser";
-  const strokeColor = isEraser ? "#16100c" : el.stroke;
-  const strokeWidth = Math.max(1, el.strokeWidth);
-  const renderSampleDistance = strokeRenderDistance(el.sampleSpacing);
-  const variations = getSymmetricPoints(el.points, el.symmetry);
-  context.save();
-  context.globalAlpha = Math.min(1, Math.max(0, el.opacity ?? 1));
-  context.globalCompositeOperation = isEraser ? "destination-out" : "source-over";
-  for (const points of variations) {
-    if ((el.sampleSpacing !== undefined || el.pressureModel !== undefined) && !el.fill) {
-      drawStudioCausalInkDabs(
-        context,
-        points,
-        el.pressures,
-        strokeColor,
-        strokeWidth,
-        el.sampleSpacing ?? 0,
-        el.pressureModel,
-        isStudioStrokePaintModelCompatible(el) ? el.paintModel : undefined
-      );
-      continue;
-    }
-    if (points.length === 2) {
-      const pressure = Math.min(1, Math.max(0, el.pressures?.[0] ?? 0.5));
-      const width = strokeWidth * (0.3 + pressure * 1.4);
-      context.beginPath();
-      context.arc(points[0]!, points[1]!, Math.max(0.35, width / 2), 0, Math.PI * 2);
-      context.fillStyle = strokeColor;
-      context.fill();
-      continue;
-    }
-    const smoothed = processFreehandPoints(points, renderSampleDistance);
-    const fill = !isEraser ? el.fill : undefined;
-    if (fill && smoothed.length >= 6) {
-      context.beginPath();
-      context.moveTo(smoothed[0]!, smoothed[1]!);
-      for (let i = 2; i < smoothed.length; i += 2) {
-        context.lineTo(smoothed[i]!, smoothed[i + 1]!);
-      }
-      context.closePath();
-      context.fillStyle = fill;
-      context.fill();
-    }
-    const pressures = el.pressures;
-    const sampledPressures = pressures && pressures.length > 0 && smoothed.length >= 4
-      ? resampleStrokePressures(pressures, Math.floor(smoothed.length / 2))
-      : null;
-    drawFreehandPenSegments(context, smoothed, sampledPressures, strokeColor, strokeWidth);
-  }
-  context.restore();
 }
 
 // memo 는 라이브 드로잉의 핵심 계약이다: 초안이 rAF마다 리렌더를 일으켜도 커밋된 획들은 같은
