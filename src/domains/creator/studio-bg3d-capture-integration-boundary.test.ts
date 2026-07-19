@@ -4,6 +4,10 @@ import { describe, expect, it } from "vitest";
 
 const background3dSource = readFileSync(new URL("./StudioBackground3D.tsx", import.meta.url), "utf8");
 const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const studioLazyPanelStackSource = readFileSync(
+  new URL("./StudioLazyPanelStack.tsx", import.meta.url),
+  "utf8"
+);
 
 describe("Studio 3D asynchronous capture integration boundary", () => {
   it("keeps adapter registration stable when capture UI state rerenders", () => {
@@ -100,9 +104,9 @@ describe("Studio 3D asynchronous capture integration boundary", () => {
   });
 
   it("returns insertion rejection so stale, locked, or failed plans keep the modal open", () => {
-    const modalStart = studioPageSource.indexOf("<StudioBackground3D");
-    const modalEnd = studioPageSource.indexOf("</Suspense>", modalStart);
-    const modal = studioPageSource.slice(modalStart, modalEnd);
+    const modalStart = studioLazyPanelStackSource.indexOf("<StudioBackground3D");
+    const modalEnd = studioLazyPanelStackSource.indexOf("</Suspense>", modalStart);
+    const modal = studioLazyPanelStackSource.slice(modalStart, modalEnd);
 
     expect(modalStart).toBeGreaterThanOrEqual(0);
     expect(modalEnd).toBeGreaterThan(modalStart);

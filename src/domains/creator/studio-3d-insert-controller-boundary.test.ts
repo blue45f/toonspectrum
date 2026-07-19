@@ -108,19 +108,17 @@ describe("Studio 3D insert controller boundary", () => {
   });
 
   it("exposes only semantic boolean insert transactions to the lazy modal stack", () => {
-    const page = moduleShape("./StudioPage.tsx").source;
-    const handlersStart = page.indexOf("interface StudioLazyPanelStackHandlers");
-    const propsStart = page.indexOf("interface StudioLazyPanelStackProps", handlersStart);
-    const componentStart = page.indexOf("const StudioLazyPanelStack =", propsStart);
-    const componentEnd = page.indexOf("interface StudioCanvasViewportHandlers", componentStart);
-    const handlerContract = page.slice(handlersStart, propsStart);
-    const propContract = page.slice(propsStart, componentStart);
-    const component = page.slice(componentStart, componentEnd);
+    const stack = moduleShape("./StudioLazyPanelStack.tsx").source;
+    const handlersStart = stack.indexOf("export interface StudioLazyPanelStackHandlers");
+    const propsStart = stack.indexOf("export interface StudioLazyPanelStackProps", handlersStart);
+    const componentStart = stack.indexOf("export const StudioLazyPanelStack =", propsStart);
+    const handlerContract = stack.slice(handlersStart, propsStart);
+    const propContract = stack.slice(propsStart, componentStart);
+    const component = stack.slice(componentStart);
 
     expect(handlersStart).toBeGreaterThanOrEqual(0);
     expect(propsStart).toBeGreaterThan(handlersStart);
     expect(componentStart).toBeGreaterThan(propsStart);
-    expect(componentEnd).toBeGreaterThan(componentStart);
     expect(handlerContract).toContain("insertVrmResult: StudioVrmInsertHandler;");
     expect(handlerContract).toContain("insertBg3dResult: StudioBg3dInsertHandler;");
     expect(handlerContract).not.toMatch(/^\s*(?:addRenderedImage|applyBg3dRenderedImage|canApplyStudioMutation|patchEl):/mu);

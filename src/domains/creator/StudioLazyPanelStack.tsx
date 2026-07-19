@@ -1,0 +1,1227 @@
+import { Loader2, X } from "lucide-react";
+import {
+  Suspense,
+  memo,
+  type Dispatch,
+  type RefObject,
+  type SetStateAction,
+} from "react";
+
+import { isStudioAiConfigured } from "./studio-ai-client";
+import { createEmptyStudioAiProvenanceDocument } from "./studio-ai-provenance";
+import { selectWheelColors } from "./studio-color-wheel";
+import {
+  StudioAiProvenancePanel,
+  StudioAutoActionsPanel,
+  StudioBackground3D,
+  StudioCharacterBiblePanel,
+  StudioCheckpointPanel,
+  StudioColorWheelOverlay,
+  StudioCommentsPanel,
+  StudioContinuityPanel,
+  StudioPageReviewPanel,
+  StudioProductionInsightsPanel,
+  StudioPublicationOperationsPanel,
+  StudioPublishPackagePanel,
+  StudioPublishPreflightPanel,
+  StudioQuickActionsMenu,
+  StudioReferencePanel,
+  StudioScenarioAutoLayoutPanel,
+  StudioScrollPreviewPanel,
+  StudioStoryboardGridPanel,
+  StudioTeamPanel,
+  StudioTimelapsePanel,
+  StudioVrmPoser,
+  StudioWriterRoomPanel,
+  WorkFxPanel,
+} from "./studio-page-lazy-ui";
+import { pageDisplayName } from "./studio-page-meta";
+import { parseStudioProjectFile } from "./studio-project-file";
+import { normalizeStudioPublishCompliance } from "./studio-publish-compliance";
+import { normalizeStudioWriterRoomDocument } from "./studio-writer-room";
+
+import type {
+  StudioBg3dInsertHandler,
+  StudioVrmInsertHandler,
+} from "./studio-3d-insert-controller";
+import type { StudioAiSettings, StudioTextAiProvenance } from "./studio-ai-client";
+import type { StudioAiProvenanceDocument } from "./studio-ai-provenance";
+import type {
+  StudioAutoActionExecutionProgress,
+  StudioAutoActionPlan,
+  StudioAutoActionScope,
+  StudioAutoActionSet,
+} from "./studio-auto-actions";
+import type { StudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
+import type { StudioCharacterBible } from "./studio-character-bible";
+import type { StudioCheckpoint } from "./studio-checkpoints";
+import type {
+  StudioCommentActor,
+  StudioCommentAnchor,
+  StudioCommentsDocument,
+} from "./studio-comments";
+import type {
+  StudioContinuityIssue,
+  StudioStoryBeat,
+} from "./studio-continuity";
+import type { Tool } from "./studio-editor-tool-model";
+import type { El } from "./studio-element-model";
+import type { StudioMacroSession } from "./studio-macro-recorder";
+import type { MotionCutImage } from "./studio-motion-export";
+import type { StudioPageDnd } from "./studio-page-dnd";
+import type { PageReviewState } from "./studio-page-review";
+import type { PageState } from "./studio-page-state";
+import type { StudioProductionInsights } from "./studio-production-insights";
+import type {
+  StudioPublicationAnalyticsDocument,
+} from "./studio-publication-analytics";
+import type {
+  StudioPublishComplianceChecklist,
+  StudioPublishComplianceResult,
+} from "./studio-publish-compliance";
+import type {
+  StudioPublishPackagePlan,
+  StudioPublishPackageSettings,
+} from "./studio-publish-package";
+import type {
+  StudioPublishAiUsage,
+  StudioPublishPreflightResult,
+  StudioPublishProfile,
+} from "./studio-publish-preflight";
+import type {
+  StudioQuickActionId,
+  StudioQuickActionsPreferences,
+} from "./studio-quick-actions";
+import type { StudioReferenceBoardDocument } from "./studio-reference-board";
+import type { StudioReleaseSchedule } from "./studio-release-schedule";
+import type { ScenarioPreviewItem } from "./studio-scenario-layout";
+import type { StudioSharedDocument } from "./studio-shared-document-client";
+import type { ScenarioBeatType } from "./studio-story-beats";
+import type { StudioTeamCommentCapabilities } from "./studio-team-comment-client";
+import type {
+  StudioWriterRoomDocument,
+  StudioWriterRoomStage,
+} from "./studio-writer-room";
+import type { StudioWriterRoomCanvasProjectionResult } from "./studio-writer-room-canvas-projection";
+import type {
+  WorkDetail,
+  WorkRevisionSummary,
+} from "@/src/infrastructure/creator-client";
+
+interface StudioLazyContinuityScene {
+  id: string;
+  frameId: string;
+  pageId: string;
+  label: string;
+  beat: StudioStoryBeat;
+}
+
+interface StudioLazyScenarioResult {
+  items: ScenarioPreviewItem[];
+  nextCanvasH: number;
+  characterDescription: string;
+  textAiProvenance: StudioTextAiProvenance;
+}
+
+interface StudioLazyWriterRoomAiReview {
+  stage: StudioWriterRoomStage;
+  rationale: string;
+  draft: unknown;
+  textProvenance: StudioTextAiProvenance;
+}
+
+interface StudioLazySharedDocumentScope {
+  authScopeKey: string;
+  workId: string;
+  value: StudioSharedDocument;
+}
+
+function PoserLoadingOverlay() {
+  return (
+    <div aria-live="polite" className="fixed inset-0 z-50 grid place-items-center bg-[oklch(0.08_0.01_70/0.72)] p-4 text-fg backdrop-blur-sm">
+      <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-panel px-4 py-3 text-sm font-semibold shadow-xl">
+        <Loader2 className="animate-spin text-accent" size={16} aria-hidden />
+        <span>포저를 여는 중</span>
+      </div>
+    </div>
+  );
+}
+
+function Bg3DLoadingOverlay() {
+  return (
+    <div aria-live="polite" className="fixed inset-0 z-50 grid place-items-center bg-[oklch(0.08_0.01_70/0.72)] p-4 text-fg backdrop-blur-sm">
+      <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-panel px-4 py-3 text-sm font-semibold shadow-xl">
+        <Loader2 className="animate-spin text-accent" size={16} aria-hidden />
+        <span>3D 배경 도구를 여는 중</span>
+      </div>
+    </div>
+  );
+}
+
+function TimelapseLoadingOverlay() {
+  return (
+    <div aria-live="polite" className="fixed inset-0 z-50 grid place-items-center bg-[oklch(0.08_0.01_70/0.72)] p-4 text-fg backdrop-blur-sm">
+      <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-panel px-4 py-3 text-sm font-semibold shadow-xl">
+        <Loader2 className="animate-spin text-accent" size={16} aria-hidden />
+        <span>타임랩스 도구를 여는 중</span>
+      </div>
+    </div>
+  );
+}
+
+function StoryboardGridLoadingOverlay() {
+  return (
+    <div aria-live="polite" className="fixed inset-0 z-50 grid place-items-center bg-[oklch(0.08_0.01_70/0.72)] p-4 text-fg backdrop-blur-sm">
+      <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-panel px-4 py-3 text-sm font-semibold shadow-xl">
+        <Loader2 className="animate-spin text-accent" size={16} aria-hidden />
+        <span>스토리보드 그리드를 여는 중</span>
+      </div>
+    </div>
+  );
+}
+
+function ScrollPreviewLoadingOverlay() {
+  return (
+    <div aria-live="polite" className="fixed inset-0 z-50 grid place-items-center bg-[oklch(0.08_0.01_70/0.72)] p-4 text-fg backdrop-blur-sm">
+      <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-panel px-4 py-3 text-sm font-semibold shadow-xl">
+        <Loader2 className="animate-spin text-accent" size={16} aria-hidden />
+        <span>스크롤 미리보기를 여는 중</span>
+      </div>
+    </div>
+  );
+}
+
+function ScenarioAutoLayoutLoadingOverlay() {
+  return (
+    <div aria-live="polite" className="fixed inset-0 z-50 grid place-items-center bg-[oklch(0.08_0.01_70/0.72)] p-4 text-fg backdrop-blur-sm">
+      <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-panel px-4 py-3 text-sm font-semibold shadow-xl">
+        <Loader2 className="animate-spin text-accent" size={16} aria-hidden />
+        <span>시나리오 자동 생성 도구를 여는 중</span>
+      </div>
+    </div>
+  );
+}
+
+export interface StudioLazyPanelStackHandlers {
+  addPage: () => void;
+  applyStudioCommentsPanelChange: (value: StudioCommentsDocument) => Promise<boolean>;
+  markAllStudioCommentThreadsRead: () => Promise<boolean>;
+  markStudioCommentThreadRead: (threadId: string) => Promise<boolean>;
+  applyWriterRoomAiReview: () => void;
+  applyWriterRoomCanvasPlan: () => void;
+  cancelAutoAction: () => void;
+  cancelWriterRoomAi: () => void;
+  captureTimelapseStep: (historyIndex: number, targetWidth: number) => Promise<MotionCutImage>;
+  changeAutoActionScope: (scope: StudioAutoActionScope) => void;
+  changeAutoActionSelectedPages: (pageIds: readonly string[]) => void;
+  commitShotTag: (pageId: string, patch: { shotType?: string | null; cameraAngle?: string | null; }) => void;
+  createNamedCheckpoint: (name: string) => void;
+  currentStudioProjectSnapshot: () => unknown;
+  deletePage: (pageId: string) => void;
+  disarmAllPixelTools: () => void;
+  downloadAiPublicSummary: (summary: unknown) => Promise<void>;
+  downloadPublishPackageManifest: () => Promise<void>;
+  downloadPublishPreflightReport: () => Promise<void>;
+  duplicatePage: (pageId: string) => void;
+  executeAutoAction: () => Promise<void>;
+  executePublishPackageExport: () => Promise<void>;
+  executeQuickAction: (action: StudioQuickActionId) => void;
+  exportAutoActionJson: () => Promise<void>;
+  handleTimelapseRecordingEnd: () => void;
+  handleTimelapseRecordingStart: () => void;
+  importAutoActionJson: (json: string, fileName: string) => Promise<void>;
+  insertBg3dResult: StudioBg3dInsertHandler;
+  insertVrmResult: StudioVrmInsertHandler;
+  onApplyScenarioPreview: () => void;
+  onCancelScenario: () => void;
+  onChangeScenarioScene: (index: number, patch: { beatType?: ScenarioBeatType; summary?: string; imagePrompt?: string; dialogue?: string; continuity?: ScenarioPreviewItem["continuity"]; }) => void;
+  onDiscardScenarioPreview: () => void;
+  onGenerateScenario: () => void;
+  onGenerateScenarioImages: () => void;
+  onRegenerateScenarioImage: (index: number) => void;
+  onRemoveScenarioScene: (index: number) => void;
+  onScenarioApplyTargetChange: (target: "current-page" | "new-page") => void;
+  patchPageReview: (pageId: string, patch: Partial<Omit<PageReviewState, "updatedAt">>) => void;
+  planAutoAction: () => Promise<void>;
+  reloadServerRevisions: () => Promise<void>;
+  rememberColor: (c: string) => void;
+  removeNamedCheckpoint: (checkpoint: StudioCheckpoint) => Promise<void>;
+  requestWriterRoomAiDraft: (stage: StudioWriterRoomStage) => Promise<void>;
+  restoreNamedCheckpoint: (checkpoint: StudioCheckpoint) => Promise<void>;
+  restoreServerRevision: (revision: WorkRevisionSummary, comparedBaseRevision: number) => Promise<boolean>;
+  selectStudioCommentAnchor: (anchor: StudioCommentAnchor) => void;
+  setAiProvenance: (next: SetStateAction<StudioAiProvenanceDocument>) => void;
+  setCharacterBible: (next: SetStateAction<StudioCharacterBible>) => void;
+  setCurrentPageId: (value: SetStateAction<string>) => boolean;
+  setPublicationAnalytics: (next: SetStateAction<StudioPublicationAnalyticsDocument>) => void;
+  setReferenceBoard: (next: StudioReferenceBoardDocument) => boolean;
+  setPublishAiDisclosure: (next: SetStateAction<string>) => void;
+  setPublishAiUsage: (next: SetStateAction<StudioPublishAiUsage>) => void;
+  setPublishCompliance: (next: SetStateAction<StudioPublishComplianceChecklist>) => void;
+  setPublishPackageCredits: (next: SetStateAction<string>) => void;
+  setPublishProfile: (next: SetStateAction<StudioPublishProfile>) => void;
+  setReleaseSchedule: (next: SetStateAction<StudioReleaseSchedule>) => void;
+  setWriterRoom: (next: SetStateAction<StudioWriterRoomDocument>) => void;
+  startMacroRecord: () => void;
+  stopMacroRecord: () => Promise<void>;
+  updatePublishPackageSettings: (value: StudioPublishPackageSettings) => void;
+}
+
+export interface StudioLazyPanelStackProps {
+  activeCommentAnchor: StudioCommentAnchor;
+  activePage: PageState;
+  aiProvenance: StudioAiProvenanceDocument;
+  aiProvenanceOpen: boolean;
+  aiSettings: StudioAiSettings;
+  autoActionBusy: boolean;
+  autoActionError: string | null;
+  autoActionPlan: StudioAutoActionPlan | null;
+  autoActionProgress: StudioAutoActionExecutionProgress | null;
+  autoActionScope: StudioAutoActionScope;
+  autoActionSelectedPageIds: string[];
+  autoActionSet: StudioAutoActionSet | null;
+  autoActionsOpen: boolean;
+  autoActionStatus: string | null;
+  bg3dInitialDataUrl: string | undefined;
+  bg3dInitialScene: StudioBg3dSceneDocument | undefined;
+  bg3dOpen: boolean;
+  characterBible: StudioCharacterBible;
+  characterBibleOpen: boolean;
+  checkpointError: string | null;
+  checkpointPanelOpen: boolean;
+  checkpoints: StudioCheckpoint[];
+  collaborationDocumentLocked: boolean;
+  colorWheelCenter: { x: number; y: number; } | null;
+  colorWheelOpen: boolean;
+  commentsOpen: boolean;
+  commentsPanelMounted: boolean;
+  studioCommentFocusRequest: { threadId: string; requestId: number } | null;
+  studioCommentSyncError: string | null;
+  studioCommentPinsHidden: boolean;
+  studioLegacyCommentThreadIdSet: ReadonlySet<string>;
+  studioTeamCommentCapabilities: StudioTeamCommentCapabilities | null;
+  studioTeamCommentsWorkId: string | null;
+  studioTeamUnreadCommentIdSet: ReadonlySet<string>;
+  composeWorkAssetPreviewPage: (page: PageState) => PageState;
+  continuityIssues: StudioContinuityIssue[];
+  continuityOpen: boolean;
+  continuityScenes: StudioLazyContinuityScene[];
+  currentPageId: string;
+  currentPublishPackageCreditsText: () => string;
+  effectivePublishPackageSettings: StudioPublishPackageSettings;
+  elementById: Map<string, El>;
+  fxPanelOpen: boolean;
+  isMobile: boolean;
+  loadedWork: WorkDetail | null;
+  loggedIn: boolean;
+  macroSession: StudioMacroSession;
+  masterEditMode: boolean;
+  pageDnd: StudioPageDnd;
+  pageReviewOpen: boolean;
+  pages: PageState[];
+  pagesHi: number;
+  pagesHistory: PageState[][];
+  poserInitialDataUrl: string | undefined;
+  poserInitialElementId: string | undefined;
+  poserVrmOpen: boolean;
+  productionInsightsOpen: boolean;
+  productionInsightsResult: StudioProductionInsights | null;
+  publicationAnalytics: StudioPublicationAnalyticsDocument;
+  publicationOperationsOpen: boolean;
+  publishAiDisclosure: string;
+  publishAiUsage: StudioPublishAiUsage;
+  publishCompliance: StudioPublishComplianceChecklist;
+  publishComplianceResult: StudioPublishComplianceResult;
+  publishPackageExportBusy: boolean;
+  publishPackageExportProgress: { done: number; total: number; } | null;
+  publishPackageExportStatus: { tone: "info" | "good" | "bad"; text: string; } | null;
+  publishPackageOpen: boolean;
+  publishPackagePlan: StudioPublishPackagePlan | null;
+  publishPreflightOpen: boolean;
+  publishPreflightResult: StudioPublishPreflightResult | null;
+  publishProfile: StudioPublishProfile;
+  quickActionsAnchor: { x: number; y: number; };
+  quickActionsDisabledActions: Set<StudioQuickActionId>;
+  quickActionsOpen: boolean;
+  quickActionsPreferences: StudioQuickActionsPreferences;
+  recentColors: string[];
+  referencePanelOpen: boolean;
+  referenceBoard: StudioReferenceBoardDocument;
+  releaseSchedule: StudioReleaseSchedule;
+  scenarioApplyTarget: "current-page" | "new-page";
+  scenarioBusy: boolean;
+  scenarioError: string | null;
+  scenarioOpen: boolean;
+  scenarioProgress: { done: number; total: number; } | null;
+  scenarioRegeneratingIndex: number | null;
+  scenarioResult: StudioLazyScenarioResult | null;
+  scenarioSceneCountHint: number | undefined;
+  scenarioStageLabel: string | null;
+  scenarioStoryText: string;
+  scrollPreviewOpen: boolean;
+  serverCurrentRevision: number | undefined;
+  serverRevisionError: string | null;
+  serverRevisionLoading: boolean;
+  serverRevisions: WorkRevisionSummary[];
+  setAiProvenanceOpen: Dispatch<SetStateAction<boolean>>;
+  setAutoActionsOpen: Dispatch<SetStateAction<boolean>>;
+  setBg3dInitialDataUrl: Dispatch<SetStateAction<string | undefined>>;
+  setBg3dInitialElementId: Dispatch<SetStateAction<string | undefined>>;
+  setBg3dInitialScene: Dispatch<SetStateAction<StudioBg3dSceneDocument | undefined>>;
+  setBg3dOpen: Dispatch<SetStateAction<boolean>>;
+  setCharacterBibleOpen: Dispatch<SetStateAction<boolean>>;
+  setCheckpointPanelOpen: Dispatch<SetStateAction<boolean>>;
+  setColor: Dispatch<SetStateAction<string>>;
+  setColorWheelOpen: Dispatch<SetStateAction<boolean>>;
+  setCommentPinArmed: Dispatch<SetStateAction<boolean>>;
+  setCommentsOpen: Dispatch<SetStateAction<boolean>>;
+  isStudioCommentAnchorValid: (anchor: StudioCommentAnchor) => boolean;
+  setStudioCommentFocusRequest: Dispatch<SetStateAction<{ threadId: string; requestId: number } | null>>;
+  setStudioCommentPinsHidden: Dispatch<SetStateAction<boolean>>;
+  setContinuityOpen: Dispatch<SetStateAction<boolean>>;
+  setFxPanelOpen: Dispatch<SetStateAction<boolean>>;
+  setLoadedWork: Dispatch<SetStateAction<WorkDetail | null>>;
+  setPageReviewOpen: Dispatch<SetStateAction<boolean>>;
+  setPoserInitialDataUrl: Dispatch<SetStateAction<string | undefined>>;
+  setPoserInitialElementId: Dispatch<SetStateAction<string | undefined>>;
+  setPoserVrmOpen: Dispatch<SetStateAction<boolean>>;
+  setProductionInsightsOpen: Dispatch<SetStateAction<boolean>>;
+  setPublicationOperationsOpen: Dispatch<SetStateAction<boolean>>;
+  setPublishPackageOpen: Dispatch<SetStateAction<boolean>>;
+  setPublishPreflightOpen: Dispatch<SetStateAction<boolean>>;
+  setQuickActionsOpen: Dispatch<SetStateAction<boolean>>;
+  setQuickActionsPreferences: Dispatch<SetStateAction<StudioQuickActionsPreferences>>;
+  setReferencePanelOpen: Dispatch<SetStateAction<boolean>>;
+  setScenarioOpen: Dispatch<SetStateAction<boolean>>;
+  setScenarioSceneCountHint: Dispatch<SetStateAction<number | undefined>>;
+  setScenarioStoryText: Dispatch<SetStateAction<string>>;
+  setScrollPreviewOpen: Dispatch<SetStateAction<boolean>>;
+  setSelectedId: Dispatch<SetStateAction<string | null>>;
+  setSharedDocumentNotice: Dispatch<SetStateAction<string | null>>;
+  setSharedDocumentScope: Dispatch<SetStateAction<StudioLazySharedDocumentScope | null>>;
+  setStoryboardGridOpen: Dispatch<SetStateAction<boolean>>;
+  setTeamPanelOpen: Dispatch<SetStateAction<boolean>>;
+  setTimelapseOpen: Dispatch<SetStateAction<boolean>>;
+  setTool: Dispatch<SetStateAction<Tool>>;
+  setWriterRoomAiDirection: Dispatch<SetStateAction<string>>;
+  setWriterRoomAiReview: Dispatch<SetStateAction<StudioLazyWriterRoomAiReview | null>>;
+  setWriterRoomOpen: Dispatch<SetStateAction<boolean>>;
+  sharedDocument: StudioSharedDocument | null;
+  storyboardGridOpen: boolean;
+  studioAuthUserId: string | null;
+  studioCommentActor: StudioCommentActor;
+  studioCommentAnchorOptions: { anchor: StudioCommentAnchor; label: string; }[];
+  studioComments: StudioCommentsDocument;
+  studioRevisionProjectGenerationRef: RefObject<number>;
+  teamPanelOpen: boolean;
+  textAiConfigured: boolean;
+  timelapseOpen: boolean;
+  title: string;
+  workId: string | null;
+  writerRoom: StudioWriterRoomDocument;
+  writerRoomAiBusy: boolean;
+  writerRoomAiDirection: string;
+  writerRoomAiError: string | null;
+  writerRoomAiReview: StudioLazyWriterRoomAiReview | null;
+  writerRoomCanvasPlan: StudioWriterRoomCanvasProjectionResult | null;
+  writerRoomOpen: boolean;
+  stableHandlers: StudioLazyPanelStackHandlers;
+}
+
+export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
+  activeCommentAnchor,
+  activePage,
+  aiProvenance,
+  aiProvenanceOpen,
+  aiSettings,
+  autoActionBusy,
+  autoActionError,
+  autoActionPlan,
+  autoActionProgress,
+  autoActionScope,
+  autoActionSelectedPageIds,
+  autoActionSet,
+  autoActionsOpen,
+  autoActionStatus,
+  bg3dInitialDataUrl,
+  bg3dInitialScene,
+  bg3dOpen,
+  characterBible,
+  characterBibleOpen,
+  checkpointError,
+  checkpointPanelOpen,
+  checkpoints,
+  collaborationDocumentLocked,
+  colorWheelCenter,
+  colorWheelOpen,
+  commentsOpen,
+  commentsPanelMounted,
+  studioCommentFocusRequest,
+  studioCommentSyncError,
+  studioCommentPinsHidden,
+  studioLegacyCommentThreadIdSet,
+  studioTeamCommentCapabilities,
+  studioTeamCommentsWorkId,
+  studioTeamUnreadCommentIdSet,
+  composeWorkAssetPreviewPage,
+  continuityIssues,
+  continuityOpen,
+  continuityScenes,
+  currentPageId,
+  currentPublishPackageCreditsText,
+  effectivePublishPackageSettings,
+  elementById,
+  fxPanelOpen,
+  isMobile,
+  loadedWork,
+  loggedIn,
+  macroSession,
+  masterEditMode,
+  pageDnd,
+  pageReviewOpen,
+  pages,
+  pagesHi,
+  pagesHistory,
+  poserInitialDataUrl,
+  poserInitialElementId,
+  poserVrmOpen,
+  productionInsightsOpen,
+  productionInsightsResult,
+  publicationAnalytics,
+  publicationOperationsOpen,
+  publishAiDisclosure,
+  publishAiUsage,
+  publishCompliance,
+  publishComplianceResult,
+  publishPackageExportBusy,
+  publishPackageExportProgress,
+  publishPackageExportStatus,
+  publishPackageOpen,
+  publishPackagePlan,
+  publishPreflightOpen,
+  publishPreflightResult,
+  publishProfile,
+  quickActionsAnchor,
+  quickActionsDisabledActions,
+  quickActionsOpen,
+  quickActionsPreferences,
+  recentColors,
+  referencePanelOpen,
+  referenceBoard,
+  releaseSchedule,
+  scenarioApplyTarget,
+  scenarioBusy,
+  scenarioError,
+  scenarioOpen,
+  scenarioProgress,
+  scenarioRegeneratingIndex,
+  scenarioResult,
+  scenarioSceneCountHint,
+  scenarioStageLabel,
+  scenarioStoryText,
+  scrollPreviewOpen,
+  serverCurrentRevision,
+  serverRevisionError,
+  serverRevisionLoading,
+  serverRevisions,
+  setAiProvenanceOpen,
+  setAutoActionsOpen,
+  setBg3dInitialDataUrl,
+  setBg3dInitialElementId,
+  setBg3dInitialScene,
+  setBg3dOpen,
+  setCharacterBibleOpen,
+  setCheckpointPanelOpen,
+  setColor,
+  setColorWheelOpen,
+  setCommentPinArmed,
+  setCommentsOpen,
+  isStudioCommentAnchorValid,
+  setStudioCommentFocusRequest,
+  setStudioCommentPinsHidden,
+  setContinuityOpen,
+  setFxPanelOpen,
+  setLoadedWork,
+  setPageReviewOpen,
+  setPoserInitialDataUrl,
+  setPoserInitialElementId,
+  setPoserVrmOpen,
+  setProductionInsightsOpen,
+  setPublicationOperationsOpen,
+  setPublishPackageOpen,
+  setPublishPreflightOpen,
+  setQuickActionsOpen,
+  setQuickActionsPreferences,
+  setReferencePanelOpen,
+  setScenarioOpen,
+  setScenarioSceneCountHint,
+  setScenarioStoryText,
+  setScrollPreviewOpen,
+  setSelectedId,
+  setSharedDocumentNotice,
+  setSharedDocumentScope,
+  setStoryboardGridOpen,
+  setTeamPanelOpen,
+  setTimelapseOpen,
+  setTool,
+  setWriterRoomAiDirection,
+  setWriterRoomAiReview,
+  setWriterRoomOpen,
+  sharedDocument,
+  storyboardGridOpen,
+  studioAuthUserId,
+  studioCommentActor,
+  studioCommentAnchorOptions,
+  studioComments,
+  studioRevisionProjectGenerationRef,
+  teamPanelOpen,
+  textAiConfigured,
+  timelapseOpen,
+  title,
+  workId,
+  writerRoom,
+  writerRoomAiBusy,
+  writerRoomAiDirection,
+  writerRoomAiError,
+  writerRoomAiReview,
+  writerRoomCanvasPlan,
+  writerRoomOpen,
+  stableHandlers,
+}: StudioLazyPanelStackProps) {
+  const {
+    addPage,
+    applyStudioCommentsPanelChange,
+    markAllStudioCommentThreadsRead,
+    markStudioCommentThreadRead,
+    applyWriterRoomAiReview,
+    applyWriterRoomCanvasPlan,
+    cancelAutoAction,
+    cancelWriterRoomAi,
+    changeAutoActionScope,
+    changeAutoActionSelectedPages,
+    commitShotTag,
+    createNamedCheckpoint,
+    deletePage,
+    disarmAllPixelTools,
+    downloadAiPublicSummary,
+    downloadPublishPackageManifest,
+    downloadPublishPreflightReport,
+    duplicatePage,
+    executeAutoAction,
+    executePublishPackageExport,
+    executeQuickAction,
+    exportAutoActionJson,
+    handleTimelapseRecordingEnd,
+    handleTimelapseRecordingStart,
+    importAutoActionJson,
+    insertBg3dResult,
+    insertVrmResult,
+    onApplyScenarioPreview,
+    onCancelScenario,
+    onChangeScenarioScene,
+    onDiscardScenarioPreview,
+    onGenerateScenario,
+    onGenerateScenarioImages,
+    onRegenerateScenarioImage,
+    onRemoveScenarioScene,
+    onScenarioApplyTargetChange,
+    patchPageReview,
+    planAutoAction,
+    rememberColor,
+    removeNamedCheckpoint,
+    restoreNamedCheckpoint,
+    selectStudioCommentAnchor,
+    setAiProvenance,
+    setCharacterBible,
+    setCurrentPageId,
+    setPublicationAnalytics,
+    setReferenceBoard,
+    setPublishAiDisclosure,
+    setPublishAiUsage,
+    setPublishCompliance,
+    setPublishPackageCredits,
+    setPublishProfile,
+    setReleaseSchedule,
+    setWriterRoom,
+    startMacroRecord,
+    stopMacroRecord,
+    updatePublishPackageSettings,
+    captureTimelapseStep,
+    currentStudioProjectSnapshot,
+    reloadServerRevisions,
+    requestWriterRoomAiDraft,
+    restoreServerRevision,
+  } = stableHandlers;
+  const poserInitialElement = poserInitialElementId
+    ? elementById.get(poserInitialElementId) ?? null
+    : null;
+  const poserInitialScene = poserInitialElement?.type === "image"
+    ? poserInitialElement.vrmScene
+    : undefined;
+  return (
+    <>
+        <Suspense fallback={null}>
+          {isMobile ? (
+            <StudioQuickActionsMenu
+              open={quickActionsOpen}
+              anchor={quickActionsAnchor}
+              preferences={quickActionsPreferences}
+              disabledActions={[...quickActionsDisabledActions]}
+              onExecute={executeQuickAction}
+              onPreferencesChange={setQuickActionsPreferences}
+              onClose={() => setQuickActionsOpen(false)}
+            />
+          ) : null}
+        </Suspense>
+
+      <Suspense fallback={<PoserLoadingOverlay />}>
+        {poserVrmOpen ? (
+          <StudioVrmPoser
+            open
+            initialDataUrl={poserInitialDataUrl}
+            initialScene={poserInitialScene}
+            onClose={() => {
+              setPoserVrmOpen(false);
+              setPoserInitialDataUrl(undefined);
+              setPoserInitialElementId(undefined);
+            }}
+            onInsert={insertVrmResult}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={<Bg3DLoadingOverlay />}>
+        {bg3dOpen ? (
+          <StudioBackground3D
+            open
+            initialDataUrl={bg3dInitialDataUrl}
+            initialScene={bg3dInitialScene}
+            onClose={() => {
+              setBg3dOpen(false);
+              setBg3dInitialDataUrl(undefined);
+              setBg3dInitialScene(undefined);
+              setBg3dInitialElementId(undefined);
+            }}
+            onInsert={insertBg3dResult}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={<TimelapseLoadingOverlay />}>
+        {timelapseOpen ? (
+          <StudioTimelapsePanel
+            open
+            onClose={() => setTimelapseOpen(false)}
+            pageId={activePage.id}
+            history={pagesHistory.slice(0, pagesHi + 1)}
+            title={title}
+            masterEditMode={masterEditMode}
+            captureStep={captureTimelapseStep}
+            onRecordingStart={handleTimelapseRecordingStart}
+            onRecordingEnd={handleTimelapseRecordingEnd}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={<StoryboardGridLoadingOverlay />}>
+        {storyboardGridOpen ? (
+          <StudioStoryboardGridPanel
+            open
+            onClose={() => setStoryboardGridOpen(false)}
+            pages={pages.map(composeWorkAssetPreviewPage)}
+            currentPageId={currentPageId}
+            dnd={pageDnd}
+            onSelectPage={(id) => {
+              setCurrentPageId(id);
+              setStoryboardGridOpen(false);
+            }}
+            onAddPage={addPage}
+            onDuplicatePage={duplicatePage}
+            onDeletePage={deletePage}
+            canDelete={pages.length > 1}
+            onShotTagChange={(pageId, patch) => commitShotTag(pageId, patch)}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {pageReviewOpen ? (
+          <StudioPageReviewPanel
+            open
+            onClose={() => setPageReviewOpen(false)}
+            pages={pages.map((page, index) => ({
+              id: page.id,
+              label: pageDisplayName(page, index),
+              review: page.review,
+            }))}
+            currentPageId={currentPageId}
+            onSelectPage={setCurrentPageId}
+            onPatchReview={patchPageReview}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {commentsPanelMounted ? (
+          <StudioCommentsPanel
+            open={commentsOpen}
+            onClose={() => setCommentsOpen(false)}
+            document={studioComments}
+            onChange={applyStudioCommentsPanelChange}
+            activeAnchor={activeCommentAnchor}
+            currentActor={studioCommentActor}
+            anchorOptions={studioCommentAnchorOptions}
+            isAnchorValid={isStudioCommentAnchorValid}
+            onSelectAnchor={selectStudioCommentAnchor}
+            focusRequest={studioCommentFocusRequest}
+            onFocusRequestHandled={(requestId) => {
+              setStudioCommentFocusRequest((current) => current?.requestId === requestId
+                ? null
+                : current);
+            }}
+            onArmPinPlacement={() => {
+              // 패널을 닫고 다음 캔버스 클릭 한 번으로 point 앵커를 잡는다(Esc/도구 전환 시 해제).
+              disarmAllPixelTools();
+              setCommentsOpen(false);
+              setCommentPinArmed(true);
+            }}
+            capabilities={workId
+              ? {
+                  create: studioTeamCommentCapabilities?.comment === true,
+                  reply: studioTeamCommentCapabilities?.comment === true,
+                  editOwn: false,
+                  deleteOwn: false,
+                  resolve: studioTeamCommentCapabilities?.resolve === true,
+                  assign: false,
+                }
+              : {
+                  create: !collaborationDocumentLocked,
+                  reply: !collaborationDocumentLocked,
+                  editOwn: !collaborationDocumentLocked,
+                  deleteOwn: !collaborationDocumentLocked,
+                  resolve: !collaborationDocumentLocked,
+                  assign: !collaborationDocumentLocked,
+                }}
+            mutationDisabledReason={workId && !studioTeamCommentCapabilities
+              ? "팀 댓글 권한과 기록을 확인하는 중이에요."
+              : workId && !studioTeamCommentCapabilities?.comment
+                ? "열람자는 댓글을 읽고 위치로 이동할 수 있지만 작성할 수는 없어요."
+                : undefined}
+            syncError={studioCommentSyncError ?? undefined}
+            storageMode={workId ? "team" : "document"}
+            unreadThreadIds={studioTeamUnreadCommentIdSet}
+            readOnlyThreadIds={studioLegacyCommentThreadIdSet}
+            pinsHidden={studioCommentPinsHidden}
+            onTogglePinsHidden={() => setStudioCommentPinsHidden((hidden) => !hidden)}
+            onMarkThreadRead={studioTeamCommentsWorkId && studioTeamCommentCapabilities?.view
+              ? markStudioCommentThreadRead
+              : undefined}
+            onMarkAllRead={studioTeamCommentsWorkId && studioTeamCommentCapabilities?.view
+              ? markAllStudioCommentThreadsRead
+              : undefined}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {teamPanelOpen ? (
+          <StudioTeamPanel
+            key={studioAuthUserId ?? "guest"}
+            open
+            authScopeKey={studioAuthUserId}
+            onClose={() => setTeamPanelOpen(false)}
+            workId={workId}
+            loggedIn={loggedIn}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {continuityOpen ? (
+          <StudioContinuityPanel
+            open
+            onClose={() => setContinuityOpen(false)}
+            issues={continuityIssues}
+            scenes={continuityScenes.map((scene) => ({ id: scene.id, label: scene.label }))}
+            onSelectScene={(sceneId) => {
+              const scene = continuityScenes.find((item) => item.id === sceneId);
+              if (!scene) return;
+              setCurrentPageId(scene.pageId);
+              setTool("select");
+              setSelectedId(scene.frameId);
+              setContinuityOpen(false);
+            }}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={<ScrollPreviewLoadingOverlay />}>
+        {scrollPreviewOpen ? (
+          <StudioScrollPreviewPanel
+            open
+            onClose={() => setScrollPreviewOpen(false)}
+            pages={pages.map(composeWorkAssetPreviewPage)}
+            currentPageId={currentPageId}
+            onSelectPage={(id) => {
+              setCurrentPageId(id);
+              setScrollPreviewOpen(false);
+            }}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={<ScenarioAutoLayoutLoadingOverlay />}>
+        {scenarioOpen ? (
+          <StudioScenarioAutoLayoutPanel
+            open
+            onClose={() => setScenarioOpen(false)}
+            textConfigured={textAiConfigured}
+            imageConfigured={isStudioAiConfigured(aiSettings)}
+            storyText={scenarioStoryText}
+            onStoryTextChange={setScenarioStoryText}
+            sceneCountHint={scenarioSceneCountHint}
+            onSceneCountHintChange={setScenarioSceneCountHint}
+            applyTarget={scenarioApplyTarget}
+            onApplyTargetChange={onScenarioApplyTargetChange}
+            busy={scenarioBusy}
+            stageLabel={scenarioStageLabel}
+            progress={scenarioProgress}
+            error={scenarioError}
+            preview={scenarioResult?.items ?? null}
+            textProvenance={scenarioResult?.textAiProvenance ?? null}
+            onGenerate={onGenerateScenario}
+            onGenerateImages={onGenerateScenarioImages}
+            onChangeScene={onChangeScenarioScene}
+            onRemoveScene={onRemoveScenarioScene}
+            onRegenerateScene={onRegenerateScenarioImage}
+            regeneratingIndex={scenarioRegeneratingIndex}
+            onCancel={onCancelScenario}
+            onApply={onApplyScenarioPreview}
+            onDiscard={onDiscardScenarioPreview}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {productionInsightsOpen && productionInsightsResult ? (
+          <StudioProductionInsightsPanel
+            open
+            onClose={() => setProductionInsightsOpen(false)}
+            insights={productionInsightsResult}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {publicationOperationsOpen ? (
+          <StudioPublicationOperationsPanel
+            open
+            onClose={() => setPublicationOperationsOpen(false)}
+            schedule={releaseSchedule}
+            onScheduleChange={(value) => {
+              if (!collaborationDocumentLocked) {
+                setReleaseSchedule(value);
+                setSharedDocumentNotice(null);
+              }
+            }}
+            analyticsDocument={publicationAnalytics}
+            onAnalyticsDocumentChange={(value) => {
+              if (!collaborationDocumentLocked) {
+                // The operations panel emits a canonical document from the same deferred runtime.
+                setPublicationAnalytics(value);
+                setSharedDocumentNotice(null);
+              }
+            }}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {publishPreflightOpen && publishPreflightResult ? (
+          <StudioPublishPreflightPanel
+            open
+            onClose={() => setPublishPreflightOpen(false)}
+            profile={publishProfile}
+            onProfileChange={(value) => {
+              if (!collaborationDocumentLocked) {
+                setPublishProfile(value);
+                setSharedDocumentNotice(null);
+              }
+            }}
+            aiUsage={publishAiUsage}
+            onAiUsageChange={(value) => {
+              if (!collaborationDocumentLocked) {
+                setPublishAiUsage(value);
+                setSharedDocumentNotice(null);
+              }
+            }}
+            disclosure={publishAiDisclosure}
+            onDisclosureChange={(value) => {
+              if (!collaborationDocumentLocked) {
+                setPublishAiDisclosure(value);
+                setSharedDocumentNotice(null);
+              }
+            }}
+            compliance={publishCompliance}
+            onComplianceChange={(value) => {
+              if (!collaborationDocumentLocked) {
+                setPublishCompliance(normalizeStudioPublishCompliance(value));
+                setSharedDocumentNotice(null);
+              }
+            }}
+            complianceResult={publishComplianceResult}
+            result={publishPreflightResult}
+            onDownloadReport={downloadPublishPreflightReport}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {publishPackageOpen && publishPackagePlan ? (
+          <StudioPublishPackagePanel
+            open
+            onClose={() => setPublishPackageOpen(false)}
+            settings={effectivePublishPackageSettings}
+            onSettingsChange={updatePublishPackageSettings}
+            plan={publishPackagePlan}
+            creditsText={currentPublishPackageCreditsText()}
+            onCreditsTextChange={(value) => {
+              if (!collaborationDocumentLocked) {
+                setPublishPackageCredits(value);
+                setSharedDocumentNotice(null);
+              }
+            }}
+            onDownloadManifest={() => void downloadPublishPackageManifest()}
+            onBeginExport={() => void executePublishPackageExport()}
+            exportBusy={publishPackageExportBusy}
+            exportProgress={publishPackageExportProgress}
+            exportStatus={publishPackageExportStatus}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {aiProvenanceOpen ? (
+          <StudioAiProvenancePanel
+            open
+            onClose={() => setAiProvenanceOpen(false)}
+            document={aiProvenance}
+            onExportPublicSummary={(summary) => downloadAiPublicSummary(summary)}
+            onClearHistory={() => {
+              if (!collaborationDocumentLocked) {
+                setAiProvenance(createEmptyStudioAiProvenanceDocument());
+                setSharedDocumentNotice(null);
+              }
+            }}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {writerRoomOpen ? (
+          <StudioWriterRoomPanel
+            open
+            onClose={() => setWriterRoomOpen(false)}
+            document={writerRoom}
+            onChange={(value) => {
+              if (!collaborationDocumentLocked) {
+                setWriterRoom(normalizeStudioWriterRoomDocument(value));
+                setSharedDocumentNotice(null);
+              }
+            }}
+            characters={characterBible.characters}
+            onOpenCharacterBible={() => {
+              setWriterRoomOpen(false);
+              setCharacterBibleOpen(true);
+            }}
+            onRequestAi={textAiConfigured ? requestWriterRoomAiDraft : undefined}
+            aiBusy={writerRoomAiBusy}
+            aiError={writerRoomAiError}
+            aiDirection={writerRoomAiDirection}
+            onAiDirectionChange={setWriterRoomAiDirection}
+            aiReview={writerRoomAiReview ? {
+              stage: writerRoomAiReview.stage,
+              rationale: writerRoomAiReview.rationale,
+              draft: writerRoomAiReview.draft,
+              provider: writerRoomAiReview.textProvenance.provider,
+              model: writerRoomAiReview.textProvenance.model,
+              totalTokens: writerRoomAiReview.textProvenance.usage?.totalTokens,
+              failover: writerRoomAiReview.textProvenance.failover,
+            } : null}
+            onApplyAiReview={applyWriterRoomAiReview}
+            onDiscardAiReview={() => setWriterRoomAiReview(null)}
+            onCancelAi={cancelWriterRoomAi}
+            canvasPlan={writerRoomCanvasPlan ? {
+              canApply: writerRoomCanvasPlan.applyReadiness.canApply,
+              pageCount: writerRoomCanvasPlan.pageGrouping.pages.length,
+              panelCount: writerRoomCanvasPlan.panels.length,
+              errorCount: writerRoomCanvasPlan.applyReadiness.errorCount,
+              warningCount: writerRoomCanvasPlan.applyReadiness.warningCount,
+              diagnosticMessages: writerRoomCanvasPlan.diagnostics.map(({ message }) => message),
+            } : undefined}
+            onApplyCanvasPlan={applyWriterRoomCanvasPlan}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {characterBibleOpen ? (
+          <StudioCharacterBiblePanel
+            open
+            onClose={() => setCharacterBibleOpen(false)}
+            bible={characterBible}
+            onChange={(value) => {
+              if (!collaborationDocumentLocked) {
+                setCharacterBible(value);
+                setSharedDocumentNotice(null);
+              }
+            }}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {autoActionsOpen ? (
+          <StudioAutoActionsPanel
+            open
+            actionSet={autoActionSet}
+            scope={autoActionScope}
+            pageOptions={pages.map((page, pageIndex) => ({
+              id: page.id,
+              label: pageDisplayName(page, pageIndex),
+            }))}
+            selectedPageIds={autoActionSelectedPageIds}
+            plan={autoActionPlan}
+            progress={autoActionProgress}
+            status={autoActionStatus}
+            busy={autoActionBusy}
+            error={autoActionError}
+            macroRecording={macroSession.recording}
+            macroCommandCount={macroSession.commands.length}
+            onStartMacroRecord={startMacroRecord}
+            onStopMacroRecord={() => void stopMacroRecord()}
+            onClose={() => {
+              if (!autoActionBusy) setAutoActionsOpen(false);
+            }}
+            onScopeChange={changeAutoActionScope}
+            onSelectedPageIdsChange={changeAutoActionSelectedPages}
+            onImportJson={importAutoActionJson}
+            onExportJson={() => void exportAutoActionJson()}
+            onRequestPlan={() => void planAutoAction()}
+            onExecute={() => void executeAutoAction()}
+            onCancel={cancelAutoAction}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {checkpointPanelOpen ? (
+          <StudioCheckpointPanel
+            open
+            onClose={() => setCheckpointPanelOpen(false)}
+            checkpoints={checkpoints}
+            error={checkpointError}
+            onCreate={createNamedCheckpoint}
+            onRestore={restoreNamedCheckpoint}
+            onDelete={removeNamedCheckpoint}
+            serverRevisions={serverRevisions}
+            serverCurrentRevision={sharedDocument?.role === "owner" ? serverCurrentRevision : undefined}
+            serverLoading={serverRevisionLoading}
+            serverError={serverRevisionError}
+            serverWorkId={workId ?? undefined}
+            getCurrentProject={() => parseStudioProjectFile(currentStudioProjectSnapshot())}
+            getCurrentProjectGeneration={() => studioRevisionProjectGenerationRef.current}
+            onReloadServer={workId && serverCurrentRevision && sharedDocument?.role === "owner" && loggedIn ? () => void reloadServerRevisions() : undefined}
+            onRestoreServer={workId && serverCurrentRevision && sharedDocument?.role === "owner" && loggedIn
+              ? restoreServerRevision
+              : undefined}
+            onNavigateServerChange={({ pageId, elementId }) => {
+              const targetPage = pages.find((page) => page.id === pageId);
+              if (!targetPage) return;
+              setCurrentPageId(pageId);
+              setSelectedId(
+                elementId && targetPage.elements.some((element) => element.id === elementId)
+                  ? elementId
+                  : null
+              );
+            }}
+          />
+        ) : null}
+      </Suspense>
+
+      {fxPanelOpen && loadedWork ? (
+        <div
+          aria-modal="true"
+          role="dialog"
+          className="fixed inset-0 z-[80] grid place-items-center bg-[oklch(0.08_0.01_70/0.72)] p-3 backdrop-blur-sm"
+          style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))", paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+        >
+          <div className="flex max-h-full w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-[0_24px_80px_oklch(0.05_0.01_70/0.55)]">
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-4 py-3">
+              <h2 className="text-sm font-bold text-fg">애니메이션 연출</h2>
+              <button
+                type="button"
+                aria-label="닫기"
+                title="닫기"
+                className="grid size-8 place-items-center rounded-lg border border-line bg-card text-fg-3 transition-colors hover:bg-accent-soft hover:text-accent"
+                onClick={() => setFxPanelOpen(false)}
+              >
+                <X size={15} aria-hidden />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+              <Suspense fallback={<div className="py-8 text-center text-xs text-fg-3">불러오는 중…</div>}>
+                <WorkFxPanel
+                  work={loadedWork}
+                  onUpdated={(doc, revision) => {
+                    setLoadedWork((prev) => prev ? { ...prev, doc, revision: revision ?? prev.revision } : prev);
+                    if (revision) {
+                      setSharedDocumentScope((current) =>
+                        current && current.workId === workId && current.authScopeKey === studioAuthUserId
+                          ? {
+                              ...current,
+                              value: {
+                                ...current.value,
+                                revision,
+                                document: { ...current.value.document, doc },
+                              },
+                            }
+                          : current
+                      );
+                    }
+                  }}
+                />
+              </Suspense>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <Suspense fallback={null}>
+        {referencePanelOpen ? (
+          <StudioReferencePanel
+            open
+            document={referenceBoard}
+            onChange={setReferenceBoard}
+            onClose={() => setReferencePanelOpen(false)}
+          />
+        ) : null}
+      </Suspense>
+
+      <Suspense fallback={null}>
+        {colorWheelOpen ? (
+          <StudioColorWheelOverlay
+            open={colorWheelOpen}
+            center={colorWheelCenter}
+            colors={selectWheelColors(recentColors)}
+            onSelect={(c) => {
+              setColor(c);
+              rememberColor(c);
+            }}
+            onClose={() => setColorWheelOpen(false)}
+          />
+        ) : null}
+      </Suspense>
+    </>
+  );
+});

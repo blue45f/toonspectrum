@@ -4,6 +4,10 @@ import { describe, expect, it } from "vitest";
 
 const source = readFileSync(new URL("./StudioCommentsPanel.tsx", import.meta.url), "utf8");
 const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const studioLazyPanelStackSource = readFileSync(
+  new URL("./StudioLazyPanelStack.tsx", import.meta.url),
+  "utf8"
+);
 
 describe("StudioCommentsPanel review rail contract", () => {
   it("coexists with the canvas instead of blocking the viewport as a modal", () => {
@@ -124,10 +128,11 @@ describe("StudioCommentsPanel review rail contract", () => {
     expect(studioPageSource).not.toContain("comments: studioCommentViewDocument");
   });
 
-  it("keeps retry ids mounted across rail close and validates frozen anchors in StudioPage", () => {
-    expect(studioPageSource).toContain("commentsPanelMounted");
-    expect(studioPageSource).toContain("open={commentsOpen}");
-    expect(studioPageSource).toContain("isAnchorValid={isStudioCommentAnchorValid}");
+  it("keeps retry ids mounted across rail close and validates frozen anchors across the controller boundary", () => {
+    expect(studioLazyPanelStackSource).toContain("commentsPanelMounted");
+    expect(studioLazyPanelStackSource).toContain("open={commentsOpen}");
+    expect(studioLazyPanelStackSource).toContain("isAnchorValid={isStudioCommentAnchorValid}");
+    expect(studioPageSource).toContain("commentsPanelMounted={commentsPanelMounted}");
     expect(studioPageSource).toContain("const isStudioCommentAnchorValid = useCallback");
   });
 

@@ -4,6 +4,10 @@ import { describe, expect, it } from "vitest";
 
 const source = readFileSync(new URL("./StudioVrmPoser.tsx", import.meta.url), "utf8");
 const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const studioLazyPanelStackSource = readFileSync(
+  new URL("./StudioLazyPanelStack.tsx", import.meta.url),
+  "utf8"
+);
 
 describe("Studio VRM visual pose bone boundary", () => {
   it("renders ephemeral normalized-bone markers that never enter captures", () => {
@@ -59,7 +63,7 @@ describe("Studio VRM visual pose bone boundary", () => {
     expect(studioPageSource).toContain(
       "insertVrmResult: (result) => applyStudioVrmInsertResult({"
     );
-    expect(studioPageSource).toContain("onInsert={insertVrmResult}");
+    expect(studioLazyPanelStackSource).toContain("onInsert={insertVrmResult}");
   });
 
   it("bounds server sharing and releases local capture helpers before upload", () => {
