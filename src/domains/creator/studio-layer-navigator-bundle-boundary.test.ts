@@ -75,6 +75,9 @@ describe("Studio layer navigator bundle boundary", () => {
   it("keeps the optional layer navigator behind one registry-owned lazyRetry import", () => {
     const page = moduleEdges("./StudioPage.tsx");
     const inspector = moduleEdges("./StudioInspectorAside.tsx");
+    const navigator = moduleEdges("./StudioLayerNavigator.tsx");
+    const itemRow = moduleEdges("./StudioLayerNavigatorItemRow.tsx");
+    const itemRowUi = moduleEdges("./studio-layer-navigator-row-ui.ts");
     const registry = moduleEdges("./studio-page-lazy-ui.ts");
 
     expect(page.valueImports).not.toContain("./StudioLayerNavigator");
@@ -88,6 +91,16 @@ describe("Studio layer navigator bundle boundary", () => {
       "./StudioLayerNavigator",
     ]);
     expect(registry.layerNavigatorUsesLazyRetry).toBe(true);
+    expect(navigator.valueImports).toContain("./StudioLayerNavigatorItemRow");
+    expect(navigator.dynamicImports).not.toContain("./StudioLayerNavigatorItemRow");
+    expect(itemRow.valueImports).not.toContain("./StudioLayerNavigator");
+    expect(itemRow.valueImports).not.toContain("./StudioPage");
+    expect(itemRow.valueImports).not.toContain("./StudioInspectorAside");
+    expect(itemRow.dynamicImports).toEqual([]);
+    expect(itemRowUi.valueImports).not.toContain("./StudioLayerNavigator");
+    expect(itemRowUi.valueImports).not.toContain("./StudioPage");
+    expect(itemRowUi.valueImports).not.toContain("./StudioInspectorAside");
+    expect(itemRowUi.dynamicImports).toEqual([]);
   });
 
   it("mounts the navigator only for the visible inspector layer tab with an accessible fallback", () => {
