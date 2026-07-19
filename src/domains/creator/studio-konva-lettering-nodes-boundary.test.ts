@@ -289,7 +289,9 @@ describe("Studio Konva lettering node boundary", () => {
     expect(bubbleNode.source).toContain('import type { El } from "./studio-element-model";');
     expect(bubbleNode.source).toContain('import type Konva from "konva";');
     expect(bubbleNode.source).not.toContain('from "konva/lib/Core"');
-    expect(bubbleNode.source).not.toContain("computeBubbleShapeGeometry");
+    expect(bubbleNode.source).toContain("computeBubbleShapeGeometry");
+    expect(bubbleNode.source).not.toContain("const automaticTailBase =");
+    expect(bubbleNode.source).not.toContain("const tailIsVertical =");
     expect(bubbleNode.source).not.toContain("onInteractionBegin");
     expect(bubbleNode.source).not.toContain("onInteractionEnd");
     expect(bubbleNode.source).toContain("const bTailLen =");

@@ -44,7 +44,7 @@ export { beginNodeDrag, hitTestNodeHandle, updateNodeDragMove, withPointMoved, t
 
 export type BubbleShapeTheme = "classic" | "soft" | "vivid";
 
-/** computeBubbleShapeGeometry 입력 — StudioPage 의 BubbleEl 관련 필드 + 현재 webtoonTheme 서브셋. */
+/** computeBubbleShapeGeometry 입력 — BubbleEl 기하 필드 + 현재 webtoonTheme 서브셋. */
 export interface BubbleShapeGeometryInput {
   width: number;
   height: number;
@@ -66,14 +66,10 @@ export interface BubbleShapeGeometry {
 }
 
 /**
- * StudioPage 의 말풍선 렌더 루프(테마별 bRadius/bTailLen/bTailBase 계산, ~line 10327-10405)와
- * 정확히 동일한 수식 — 한 곳만 두면 "지금 화면에 보이는 모양"과 "전환 버튼이 샘플링하는 모양"이
- * 항상 픽셀 단위로 일치한다(따로 계산하면 미세한 수치 차이로 전환 순간 모양이 살짝 튀는 버그가
- * 생긴다). design 문서 §4 는 렌더 루프도 이 함수를 호출하도록 리팩터를 지시한다.
+ * StudioKonvaBubbleNode와 커스텀 모양 전환이 함께 쓰는 단일 기하 수식. 한 곳만 두면
+ * "지금 화면에 보이는 모양"과 "전환 버튼이 샘플링하는 모양"이 픽셀 단위로 일치한다.
  */
 export function computeBubbleShapeGeometry(input: BubbleShapeGeometryInput): BubbleShapeGeometry {
-  const avgSize = (input.width + input.height) / 2;
-  void avgSize; // 반지름 자체는 avgSize 에 의존하지 않는다(스트로크 두께만 의존) — 계약 명시용.
   let radius = 18;
   let tailLenAdjust = 0;
   let borderRatio = 0.08;

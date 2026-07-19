@@ -9,6 +9,7 @@ import {
 } from "react-konva/lib/ReactKonvaCore";
 
 import {
+  computeBubbleShapeGeometry,
   hasCustomBubbleShape,
   normalizeCustomShapePoints,
 } from "./studio-bubble-custom-shape";
@@ -21,7 +22,6 @@ import {
   normalizeExtraTails,
   scaredBubblePathData,
   thoughtBubbleBodyPath,
-  type BubbleTailSpec,
 } from "./studio-bubble-path";
 import {
   BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT,
@@ -72,7 +72,6 @@ export function StudioKonvaBubbleNode({
   const avgSize = (el.width + el.height) / 2;
   let bStroke = el.stroke ?? "#1f1a16"; // 순흑 대신 따뜻한 잉크색
   let bStrokeW = el.strokeWidth ?? (avgSize < 300 ? 2.5 : avgSize < 500 ? 3 : 3.5);
-  let bRadius = 18;
   // 그림자: 사용자 지정 없으면 테마별 기본값(종이 위에 살짝 뜬 미세 그림자).
   let bShadowColor = el.shadowColor !== undefined ? el.shadowColor : "rgba(0, 0, 0, 0.2)";
   let bShadowBlur = el.shadowBlur !== undefined ? el.shadowBlur : 5;
@@ -86,16 +85,9 @@ export function StudioKonvaBubbleNode({
   const tailDirection = el.tailDirection ?? "bottom";
   const showTail = tailDir !== "none";
 
-  // 테마별 파라미터 사전 계산
-  let tHeightWithTheme = tHeight;
-  let borderRatio = 0.08;
-
   if (theme === "soft") {
     bStroke = el.stroke ?? "#2d2d2d";
     bStrokeW = el.strokeWidth ?? (avgSize < 300 ? 1.5 : avgSize < 500 ? 1.8 : 2);
-    bRadius = 24;
-    tHeightWithTheme = tHeight - 10;
-    borderRatio = 0.08;
     if (el.shadowColor === undefined) {
       bShadowColor = "rgba(0, 0, 0, 0.1)";
       bShadowBlur = 5;
@@ -105,9 +97,6 @@ export function StudioKonvaBubbleNode({
   } else if (theme === "vivid") {
     bStroke = el.stroke ?? "#444444";
     bStrokeW = el.strokeWidth ?? (avgSize < 300 ? 1.2 : avgSize < 500 ? 1.5 : 1.8);
-    bRadius = Math.min(el.width, el.height) / 2;
-    tHeightWithTheme = tHeight - 14;
-    borderRatio = 0.06;
     if (el.shadowColor === undefined) {
       bShadowColor = "black";
       bShadowBlur = 8;
@@ -127,28 +116,25 @@ export function StudioKonvaBubbleNode({
       ? [8, 5]
       : undefined;
 
-  // 본체+꼬리를 단일 path로(이음새 없는 매끈한 말풍선). 위치는 기존 tXRatio/flip을 보존.
-  // 꼬리 길이·밑동을 말풍선 최소변 기준으로 정규화 — 작은 말풍선의 과대 꼬리/큰 말풍선의 빈약 꼬리 방지.
-  const tailIsVertical = tailDirection === "bottom" || tailDirection === "top";
+  // 실제 렌더와 커스텀 외곽선 전환이 같은 기하 소스를 사용해야 전환 순간 모양이 튀지 않는다.
+  // extraTails는 저장 문서의 불신 입력을 먼저 정규화한 뒤 geometry 계약으로 넘긴다.
   const bMinDim = Math.min(el.width, el.height);
-  const bTailLen = Math.max(bMinDim * 0.12, Math.min(Math.max(8, tHeightWithTheme), bMinDim * 0.3));
-  const automaticTailBase = Math.max(
-    bMinDim * 0.1,
-    (tailIsVertical ? el.width : el.height) * borderRatio * 1.8,
-  );
-  const bTailBase = Math.max(4, Math.min(el.tailBase ?? automaticTailBase, bMinDim * 0.62));
-  const bubbleTailSpec: BubbleTailSpec | null = showTail
-    ? {
-        direction: tailDirection,
-        ratio: tailDir === "right" && tailIsVertical ? 1 - tXRatio : tXRatio,
-        length: bTailLen,
-        base: bTailBase,
-        side: "center",
-        bend: Math.max(-1, Math.min(el.tailBend ?? 0, 1)),
-      }
-    : null;
-  // 추가 꼬리(두 화자 동시 대사)가 있으면 다중 꼬리 워커로 — 없으면 기존 단일 경로 바이트 동일 유지.
-  const bubbleExtraTails = normalizeExtraTails(el.extraTails);
+  const bubbleGeometry = computeBubbleShapeGeometry({
+    width: el.width,
+    height: el.height,
+    theme,
+    tail: tailDir,
+    tailDirection,
+    tailXRatio: tXRatio,
+    tailHeight: tHeight,
+    tailBase: el.tailBase,
+    tailBend: el.tailBend,
+    extraTails: normalizeExtraTails(el.extraTails),
+  });
+  const bRadius = bubbleGeometry.radius;
+  const bubbleTailSpec = bubbleGeometry.tailSpec;
+  const bubbleExtraTails = bubbleGeometry.extraTails;
+  const bTailLen = bubbleTailSpec?.length ?? 0;
   // 드래그 중이면 미확정 draft를(커밋 전 실시간 미리보기), 아니면 저장된 값을 정규화해 쓴다 —
   // StudioDrawNode의 nodeEditDraft 병합과 동일한 관례. normalizeCustomShapePoints는 위
   // normalizeExtraTails(el.extraTails)와 동일하게, 저장 문서에서 불러온 값을 매 렌더 방어적으로
