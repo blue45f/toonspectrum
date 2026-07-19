@@ -21,6 +21,13 @@ const inspectorSources = [
       "utf8"
     ),
   },
+  {
+    file: "StudioInspectorBubbleAppearanceControls.tsx",
+    source: readFileSync(
+      new URL("./StudioInspectorBubbleAppearanceControls.tsx", import.meta.url),
+      "utf8"
+    ),
+  },
 ] as const;
 const inspectorSource = inspectorSources.map(({ source }) => source).join("\n");
 

@@ -35,7 +35,7 @@ import { Suspense, memo, useEffect, useState } from "react";
 import { type StudioAdvancedFillPreview } from "./studio-advanced-fill-preview";
 import { DEFAULT_STUDIO_ADVANCED_FILL_SETTINGS, type StudioAdvancedFillSettings } from "./studio-advanced-fill-settings";
 import { isStudioAiConfigured, type StudioAiSettings } from "./studio-ai-client";
-import { BUBBLE_VARIANTS, CANVAS_W, type BgPreset, type TemplateSpec } from "./studio-assets";
+import { CANVAS_W, type BgPreset, type TemplateSpec } from "./studio-assets";
 import { preloadStudioBackground3D } from "./studio-background-3d-loader";
 import { parseStudio3dTool } from "./studio-background-3d-metadata";
 import { type StudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
@@ -55,8 +55,6 @@ import {
   type BubbleShapeGeometryInput,
 } from "./studio-bubble-custom-shape";
 import { normalizeExtraTails } from "./studio-bubble-path";
-import { BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT } from "./studio-bubble-text-fit";
-import { bubbleAutoShrinkPreview } from "./studio-bubble-text-runtime";
 import {
   applyCropAspect,
   cropAspectRatio,
@@ -103,8 +101,6 @@ import {
   StudioBrushLibraryPanel,
   StudioBrushStudio,
   StudioBubbleAnchorPanel,
-  StudioBubbleAutoShrinkPanel,
-  StudioBubbleStylePresetPanel,
   StudioBubbleTailControls,
   StudioColorPalettePanel,
   StudioCropPanel,
@@ -163,11 +159,10 @@ import { normalizeTextPath, type TextPathConfig } from "./studio-text-path";
 import { projectStudioViewRectToDocumentRect, type StudioViewRotation } from "./studio-view-controls";
 import { StudioBgRemoveButton } from "./StudioBgRemoveButton";
 import { StudioBubbleShapePanel } from "./StudioBubbleShapePanel";
-import { StudioBubbleVariantGlyph } from "./StudioBubbleVariantGlyph";
+import { StudioInspectorBubbleAppearanceControls } from "./StudioInspectorBubbleAppearanceControls";
 import { StudioInspectorCanvasControls } from "./StudioInspectorCanvasControls";
 import { StudioInspectorFocusSpeedFrameControls } from "./StudioInspectorFocusSpeedFrameControls";
 import { StudioInspectorNavigator } from "./StudioInspectorNavigator";
-import { LazyStudioColorPopover } from "./StudioLazyColorPopover";
 import { StudioPanelLoading } from "./StudioLazySurfaceFallback";
 import { StudioLineCleanupPanel } from "./StudioLineCleanupPanel";
 import { StudioLineCorrectionControls } from "./StudioLineCorrectionControls";
@@ -1224,275 +1219,14 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                 </div>
               )}
               {selected.type === "bubble" && (
-                <>
-                  <div
-                    className="mt-2.5 rounded-2xl border border-line/45 bg-gradient-to-b from-card/70 to-canvas/20 p-2.5"
-                    data-studio-bubble-variant-picker="true"
-                  >
-                    <p className="mb-0.5 text-[0.72rem] font-semibold tracking-tight text-fg-2">모양 바꾸기</p>
-                    <p className="mb-2 text-[0.6rem] leading-snug text-fg-3">
-                      같은 대사이어도 말투만 바꿔 보면 분위기가 달라져요.
-                    </p>
-                    <div className="grid grid-cols-3 gap-1 sm:grid-cols-4">
-                      {BUBBLE_VARIANTS.map((v) => {
-                        const active = selected.variant === v.id;
-                        return (
-                          <button
-                            key={v.id}
-                            type="button"
-                            title={`${v.label} — ${v.hint}`}
-                            aria-pressed={active}
-                            onClick={() => patchEl(selected.id, { variant: v.id } as Partial<El>)}
-                            className={cn(
-                              "flex flex-col items-stretch gap-0.5 rounded-xl border p-1.5 text-left transition-[border-color,background,transform,box-shadow] duration-150 ease-out",
-                              active
-                                ? "border-accent/50 bg-accent-soft/55 shadow-sm ring-1 ring-accent/25"
-                                : "border-line/55 bg-card/80 hover:border-line-strong/50 hover:bg-raised"
-                            )}
-                          >
-                            <span
-                              className={cn(
-                                "flex h-8 items-center justify-center rounded-lg ring-1",
-                                active ? "bg-accent-soft/40 ring-accent/20" : "bg-canvas/40 ring-line/30"
-                              )}
-                            >
-                              <StudioBubbleVariantGlyph
-                                variant={v.id}
-                                className={cn("h-7 w-full", active ? "text-accent" : "text-fg-2")}
-                              />
-                            </span>
-                            <span className="truncate text-center text-[0.58rem] font-semibold text-fg">
-                              {v.label}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <Suspense fallback={<StudioPanelLoading label="말풍선 스타일을 여는 중..." />}>
-                    <StudioBubbleStylePresetPanel
-                      selected={selected}
-                      onApplyPreset={(patch) => patchEl(selected.id, patch as Partial<El>)}
-                    />
-                  </Suspense>
-
-                  <div className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
-                    배경 투명
-                    <input
-                      type="checkbox"
-                      checked={selected.fill === "transparent"}
-                      aria-label="말풍선 배경 투명"
-                      onChange={(e) => {
-                        patchEl(selected.id, {
-                          fill: e.target.checked ? "transparent" : "#ffffff",
-                        } as Partial<El>);
-                      }}
-                      className="size-4 accent-accent cursor-pointer"
-                    />
-                  </div>
-
-                  {selected.fill !== "transparent" && (
-                    <span className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
-                      말풍선색
-                      <LazyStudioColorPopover
-                        value={selected.fill}
-                        onChange={(c) => patchEl(selected.id, { fill: c } as Partial<El>)}
-                        recentColors={recentColors}
-                        onUseColor={rememberColor}
-                        onLoadRecentColors={ensureRecentColorsLoaded}
-                        title="말풍선 색상"
-                      />
-                    </span>
-                  )}
-
-                  {selected.fill !== "transparent" && (
-                    <div className="mt-2.5 border-t border-line/40 pt-2.5 space-y-2">
-                      <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">그라데이션 채우기</p>
-                      <Suspense fallback={<StudioPanelLoading label="그라데이션 패널을 여는 중..." />}>
-                        <StudioGradientEnginePanel
-                          value={selected.gradient ?? null}
-                          onChange={(spec) => patchEl(selected.id, { gradient: spec ?? undefined } as Partial<El>)}
-                          title="말풍선 그라데이션"
-                        />
-                      </Suspense>
-                    </div>
-                  )}
-
-                  <div className="mt-2.5 border-t border-line/40 pt-2.5 space-y-2.5">
-                    <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">테두리 설정</p>
-
-                    <div className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                      테두리 커스텀
-                      <input
-                        type="checkbox"
-                        checked={!!selected.stroke}
-                        aria-label="말풍선 테두리 커스텀"
-                        onChange={(e) => {
-                          const hasStroke = e.target.checked;
-                          patchEl(selected.id, {
-                            stroke: hasStroke ? (selected.stroke || "#16100c") : undefined,
-                            strokeWidth: hasStroke ? (selected.strokeWidth || 3) : undefined,
-                          } as Partial<El>);
-                        }}
-                        className="size-4 accent-accent cursor-pointer"
-                      />
-                    </div>
-
-                    {!!selected.stroke && (
-                      <>
-                        <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                          테두리 색상
-                          <input
-                            type="color"
-                            value={selected.stroke || "#16100c"}
-                            onChange={(e) => patchEl(selected.id, { stroke: e.target.value } as Partial<El>)}
-                            className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent"
-                          />
-                        </label>
-
-                        <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                          테두리 두께
-                          <span className="flex items-center gap-2">
-                            <input
-                              type="range"
-                              min={0.5}
-                              max={12}
-                              step={0.5}
-                              value={selected.strokeWidth ?? 3}
-                              onChange={(e) => patchEl(selected.id, { strokeWidth: Number(e.target.value) } as Partial<El>)}
-                              className="w-24 accent-accent cursor-pointer sm:w-28 h-2"
-                            />
-                            <span className="w-8 text-right text-xs tabular-nums text-fg-3">{(selected.strokeWidth ?? 3).toFixed(1)}px</span>
-                          </span>
-                        </label>
-                      </>
-                    )}
-                  </div>
-
-                  {(() => {
-                    // bubbleLineHeight와 정확히 같은 공식(렌더 루프와 동일) — 이 인스펙터 블록도
-                    // StudioPage 컴포넌트 스코프 안이라 webtoonTheme에 접근 가능하다.
-                    const previewLineHeight =
-                      selected.lineHeight ??
-                      (selected.vertical ? 1.4 : webtoonTheme === "soft" ? 1.35 : webtoonTheme === "vivid" ? 1.2 : 1.25);
-                    const fit = bubbleAutoShrinkPreview(selected, previewLineHeight);
-                    return (
-                      <Suspense fallback={<StudioPanelLoading label="텍스트 크기 고정 패널을 여는 중..." />}>
-                        <StudioBubbleAutoShrinkPanel
-                          enabled={!!selected.autoShrinkText}
-                          minFontSize={selected.autoShrinkMinFontSize ?? BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT}
-                          effectiveFontSize={fit ? Math.round(fit.fontSize) : null}
-                          overflow={fit?.overflow ?? false}
-                          onToggleEnabled={(v) => patchEl(selected.id, { autoShrinkText: v } as Partial<El>)}
-                          onMinFontSizeChange={(v) => patchEl(selected.id, { autoShrinkMinFontSize: v } as Partial<El>)}
-                        />
-                      </Suspense>
-                    );
-                  })()}
-
-                  <div className="mt-2.5 border-t border-line/40 pt-2.5 space-y-2.5">
-                    <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">말풍선 그림자 (Shadow)</p>
-
-                    <div className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                      그림자 사용
-                      <input
-                        type="checkbox"
-                        checked={selected.shadowColor !== undefined}
-                        aria-label="말풍선 그림자 사용"
-                        onChange={(e) => {
-                          const hasShadow = e.target.checked;
-                          patchEl(selected.id, {
-                            shadowColor: hasShadow ? (selected.shadowColor || "#000000") : undefined,
-                            shadowBlur: hasShadow ? (selected.shadowBlur || 6) : undefined,
-                            shadowOffsetX: hasShadow ? (selected.shadowOffsetX || 2) : undefined,
-                            shadowOffsetY: hasShadow ? (selected.shadowOffsetY || 3) : undefined,
-                            shadowOpacity: hasShadow ? (selected.shadowOpacity || 0.15) : undefined,
-                          } as Partial<El>);
-                        }}
-                        className="size-4 accent-accent cursor-pointer"
-                      />
-                    </div>
-
-                    {selected.shadowColor !== undefined && (
-                      <>
-                        <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                          그림자 색상
-                          <input
-                            type="color"
-                            value={selected.shadowColor || "#000000"}
-                            onChange={(e) => patchEl(selected.id, { shadowColor: e.target.value } as Partial<El>)}
-                            className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent"
-                          />
-                        </label>
-
-                        <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                          흐림 정도 (Blur)
-                          <span className="flex items-center gap-2">
-                            <input
-                              type="range"
-                              min={0}
-                              max={24}
-                              step={1}
-                              value={selected.shadowBlur ?? 6}
-                              onChange={(e) => patchEl(selected.id, { shadowBlur: Number(e.target.value) } as Partial<El>)}
-                              className="w-24 accent-accent cursor-pointer sm:w-28 h-2"
-                            />
-                            <span className="w-8 text-right text-xs tabular-nums text-fg-3">{selected.shadowBlur ?? 6}px</span>
-                          </span>
-                        </label>
-
-                        <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                          가로 오프셋 (X)
-                          <span className="flex items-center gap-2">
-                            <input
-                              type="range"
-                              min={-15}
-                              max={15}
-                              step={1}
-                              value={selected.shadowOffsetX ?? 2}
-                              onChange={(e) => patchEl(selected.id, { shadowOffsetX: Number(e.target.value) } as Partial<El>)}
-                              className="w-24 accent-accent cursor-pointer sm:w-28 h-2"
-                            />
-                            <span className="w-8 text-right text-xs tabular-nums text-fg-3">{selected.shadowOffsetX ?? 2}px</span>
-                          </span>
-                        </label>
-
-                        <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                          세로 오프셋 (Y)
-                          <span className="flex items-center gap-2">
-                            <input
-                              type="range"
-                              min={-15}
-                              max={15}
-                              step={1}
-                              value={selected.shadowOffsetY ?? 3}
-                              onChange={(e) => patchEl(selected.id, { shadowOffsetY: Number(e.target.value) } as Partial<El>)}
-                              className="w-24 accent-accent cursor-pointer sm:w-28 h-2"
-                            />
-                            <span className="w-8 text-right text-xs tabular-nums text-fg-3">{selected.shadowOffsetY ?? 3}px</span>
-                          </span>
-                        </label>
-
-                        <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                          불투명도
-                          <span className="flex items-center gap-2">
-                            <input
-                              type="range"
-                              min={0.05}
-                              max={1}
-                              step={0.05}
-                              value={selected.shadowOpacity ?? 0.15}
-                              onChange={(e) => patchEl(selected.id, { shadowOpacity: Number(e.target.value) } as Partial<El>)}
-                              className="w-24 accent-accent cursor-pointer sm:w-28 h-2"
-                            />
-                            <span className="w-8 text-right text-xs tabular-nums text-fg-3">{Math.round((selected.shadowOpacity ?? 0.15) * 100)}%</span>
-                          </span>
-                        </label>
-                      </>
-                    )}
-                  </div>
-                </>
+                <StudioInspectorBubbleAppearanceControls
+                  recentColors={recentColors}
+                  selected={selected}
+                  webtoonTheme={webtoonTheme}
+                  onEnsureRecentColorsLoaded={ensureRecentColorsLoaded}
+                  onPatch={(patch) => patchEl(selected.id, patch as Partial<El>)}
+                  onRememberColor={rememberColor}
+                />
               )}
               {selected.type === "bubble" &&
                 (selected.variant !== "double" || hasCustomBubbleShape(selected.customShapePoints)) && (
