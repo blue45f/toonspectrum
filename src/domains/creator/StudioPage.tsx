@@ -1,14 +1,3 @@
-import KonvaCore from "konva/lib/Core";
-import "konva/lib/shapes/Circle";
-import "konva/lib/shapes/Ellipse";
-import "konva/lib/shapes/Image";
-import "konva/lib/shapes/Line";
-import "konva/lib/shapes/Path";
-import "konva/lib/shapes/Rect";
-import "konva/lib/shapes/Star";
-import "konva/lib/shapes/Text";
-import "konva/lib/shapes/TextPath";
-import "konva/lib/shapes/Transformer";
 import {
   ArrowDownToLine,
   ArrowUpToLine,
@@ -569,6 +558,7 @@ import {
   imageFilterCacheKey,
   type ImageFilterFields,
 } from "./studio-konva-filter-fields";
+import { studioKonvaRuntime as KonvaRuntime } from "./studio-konva-runtime";
 import {
   bakeLayerMaskStroke,
   canLayerMask,
@@ -1270,9 +1260,6 @@ import { STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK } from "@/lib/studio-work-asset-c
 import { cn } from "@/lib/utils";
 import { resolveAssetUrl } from "@/src/catalog-static";
 import { useSession } from "@/src/compat/auth-session-store";
-
-const KonvaRuntime = KonvaCore as unknown as typeof Konva;
-KonvaRuntime.Filters = KonvaRuntime.Filters ?? {};
 
 function studioPatchValuesEqual(left: unknown, right: unknown): boolean {
   if (Object.is(left, right)) return true;

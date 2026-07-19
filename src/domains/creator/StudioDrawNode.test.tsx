@@ -224,6 +224,29 @@ describe("StudioDrawNode orchestration", () => {
     ]);
   });
 
+  it("routes arrow shapes to the registered Konva Arrow node", () => {
+    render(
+      <StudioDrawNode
+        el={drawEl({
+          kind: "arrow",
+          points: [2, 3, 42, 23],
+          stroke: "#654321",
+          strokeWidth: 5,
+        })}
+      />,
+    );
+
+    expect(captured("Arrow")).toHaveLength(1);
+    expect(captured("Arrow")[0]!.props).toMatchObject({
+      fill: "#654321",
+      points: [2, 3, 42, 23],
+      pointerLength: 10,
+      pointerWidth: 10,
+      stroke: "#654321",
+      strokeWidth: 5,
+    });
+  });
+
   it("routes ordinary and eraser taps to generic dots with the correct composite", () => {
     const pen = render(<StudioDrawNode el={drawEl({ points: [4, 7] })} />);
     expect(captured("Circle")).toHaveLength(1);
