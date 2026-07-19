@@ -31,6 +31,7 @@ import {
 
 import type { CreatorService } from "./creator.service";
 import type { StudioCrdtService } from "./studio-crdt.service";
+import type { StudioLiveCrdtQuotaLimiter } from "./studio-live-crdt-quota";
 import type {
   AcquireStudioLiveLockInput,
   StudioLiveLockRecord,
@@ -457,6 +458,15 @@ function privateAuthPrincipal(
     authPrincipalsBySocket: Map<FakeSocket, StudioLiveAuthPrincipal>;
   };
   return internals.authPrincipalsBySocket.get(socket);
+}
+
+function privateCrdtQuotaLimiter(
+  harness: ReturnType<typeof createHarness>
+): StudioLiveCrdtQuotaLimiter {
+  const internals = harness.gateway as unknown as {
+    crdtQuotaLimiter: StudioLiveCrdtQuotaLimiter;
+  };
+  return internals.crdtQuotaLimiter;
 }
 
 function expectNoAdapterVisibleAuthentication(socket: FakeSocket): void {
@@ -912,9 +922,11 @@ describe("StudioLiveGateway", () => {
     const authInternals = harness.gateway as unknown as {
       authPrincipalsBySocket: Map<FakeSocket, StudioLiveAuthPrincipal>;
     };
+    const quotaClear = vi.spyOn(privateCrdtQuotaLimiter(harness), "clear");
     expect(authInternals.authPrincipalsBySocket.size).toBe(1);
     harness.gateway.onModuleDestroy();
     expect(authInternals.authPrincipalsBySocket.size).toBe(0);
+    expect(quotaClear).toHaveBeenCalledOnce();
   });
 
   it("disconnects sockets without a verified session", async () => {
@@ -4295,10 +4307,6 @@ describe("StudioLiveGateway", () => {
     await harness.gateway.handleConnection(unjoined as never);
     const teamCallsBeforeRequests = harness.service.getWorkTeam.mock.calls.length;
     const sessionCallsBeforeRequests = harness.revalidate.mock.calls.length;
-    const internals = harness.gateway as unknown as {
-      crdtSyncBuckets: Map<string, unknown>;
-      crdtTokenBuckets: Map<string, unknown>;
-    };
 
     await expect(
       harness.gateway.applyCrdtUpdate(
@@ -4327,38 +4335,87 @@ describe("StudioLiveGateway", () => {
       )
     ).resolves.toMatchObject({ ok: false, code: "not_joined" });
 
-    expect(internals.crdtSyncBuckets.size).toBe(0);
-    expect(internals.crdtTokenBuckets.size).toBe(0);
     expect(harness.service.getWorkTeam).toHaveBeenCalledTimes(
       teamCallsBeforeRequests
     );
     expect(harness.revalidate).toHaveBeenCalledTimes(
       sessionCallsBeforeRequests
     );
+
+    for (let request = 1; request <= 30; request += 1) {
+      await expect(
+        harness.gateway.syncCrdtDocument(
+          joined as never,
+          {
+            protocolVersion: 3,
+            workId: "work-1",
+            requestId: `uncharged-sync-${request}`,
+            stateVector: crdtStateVector(),
+          },
+          undefined
+        )
+      ).resolves.toMatchObject({ ok: true });
+    }
+    await expect(
+      harness.gateway.syncCrdtDocument(
+        joined as never,
+        {
+          protocolVersion: 3,
+          workId: "work-1",
+          requestId: "charged-sync-limit",
+          stateVector: crdtStateVector(),
+        },
+        undefined
+      )
+    ).resolves.toMatchObject({ ok: false, code: "rate_limited" });
   });
 
-  it("purges stale CRDT quota buckets and keeps each in-process quota map bounded", async () => {
+  it("leaves the shared update budget untouched for invalid and unjoined calls", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-16T00:00:00.000Z"));
+    try {
+      const harness = createHarness();
+      const unjoined = harness.socket("unjoined-update-quota", "valid:shared-update-user");
+      await harness.gateway.handleConnection(unjoined as never);
+
+      await expect(
+        harness.gateway.applyCrdtUpdate(
+          unjoined as never,
+          { ...crdtUpdateRequest(1_124), update: "not-base64" },
+          undefined
+        )
+      ).resolves.toMatchObject({ ok: false, code: "invalid_payload" });
+      await expect(
+        harness.gateway.applyCrdtUpdate(
+          unjoined as never,
+          crdtUpdateRequest(1_125),
+          undefined
+        )
+      ).resolves.toMatchObject({ ok: false, code: "not_joined" });
+
+      const quotaLimiter = privateCrdtQuotaLimiter(harness);
+      const scope = { userId: "shared-update-user", workId: "work-1" };
+      for (let request = 0; request < 120; request += 1) {
+        expect(quotaLimiter.consumeUpdate(scope, 1)).toBe(true);
+      }
+      expect(quotaLimiter.consumeUpdate(scope, 1)).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("wires the bounded CRDT quota into sync admission and fails closed at capacity", async () => {
     const harness = createHarness();
     const editor = harness.socket("quota-cap-editor", "valid:quota-cap-user");
     await connectAndJoin(harness, editor);
-    const now = Date.now();
-    const internals = harness.gateway as unknown as {
-      crdtQuotaLastCleanupAt: number;
-      crdtSyncBuckets: Map<
-        string,
-        { count: number; resetsAt: number; updatedAt: number }
-      >;
-      crdtTokenBuckets: Map<
-        string,
-        { operationTokens: number; byteTokens: number; updatedAt: number }
-      >;
-    };
+    const quotaLimiter = privateCrdtQuotaLimiter(harness);
     for (let index = 0; index < 4_096; index += 1) {
-      internals.crdtSyncBuckets.set(`active-${index}`, {
-        count: 1,
-        resetsAt: now + 60_000,
-        updatedAt: now + index,
-      });
+      expect(
+        quotaLimiter.consumeSync({
+          userId: `capacity-user-${index}`,
+          workId: "capacity-work",
+        })
+      ).toBe(true);
     }
 
     await expect(
@@ -4373,19 +4430,8 @@ describe("StudioLiveGateway", () => {
         undefined
       )
     ).resolves.toMatchObject({ ok: false, code: "rate_limited" });
-    expect(internals.crdtSyncBuckets.size).toBe(4_096);
 
-    internals.crdtSyncBuckets.set("active-0", {
-      count: 30,
-      resetsAt: now - 1,
-      updatedAt: now - 1,
-    });
-    internals.crdtTokenBuckets.set("idle-update", {
-      operationTokens: 0,
-      byteTokens: 0,
-      updatedAt: now - 11 * 60_000,
-    });
-    internals.crdtQuotaLastCleanupAt = 0;
+    quotaLimiter.clear();
 
     await expect(
       harness.gateway.syncCrdtDocument(
@@ -4399,10 +4445,6 @@ describe("StudioLiveGateway", () => {
         undefined
       )
     ).resolves.toMatchObject({ ok: true });
-    expect(internals.crdtSyncBuckets.has("active-0")).toBe(false);
-    expect(internals.crdtTokenBuckets.has("idle-update")).toBe(false);
-    expect(internals.crdtSyncBuckets.size).toBeLessThanOrEqual(4_096);
-    expect(internals.crdtTokenBuckets.size).toBeLessThanOrEqual(4_096);
   });
 
   it("releases presence and leases when a socket disconnects", async () => {

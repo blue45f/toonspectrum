@@ -23,6 +23,7 @@ import {
   StudioCrdtStorageCorruptionError,
   StudioCrdtUpdateIdConflictError,
 } from "./studio-crdt.service";
+import { StudioLiveCrdtQuotaLimiter } from "./studio-live-crdt-quota";
 import {
   STUDIO_LIVE_LOCK_REPOSITORY,
   type StudioLiveLockRecord,
@@ -154,13 +155,6 @@ export const STUDIO_LIVE_VOICE_MAX_PARTICIPANTS = 6;
 // frequency (once per session) so this trades a small race window (two nodes briefly both
 // admitting near the boundary) for avoiding a DB round-trip on every room join.
 export const STUDIO_LIVE_ROOM_MAX_PARTICIPANTS = 30;
-const STUDIO_CRDT_OPERATION_BURST = 120;
-const STUDIO_CRDT_OPERATIONS_PER_SECOND = 40;
-const STUDIO_CRDT_BYTE_BURST = 2 * 1_024 * 1_024;
-const STUDIO_CRDT_BYTES_PER_SECOND = 1 * 1_024 * 1_024;
-const STUDIO_CRDT_QUOTA_BUCKET_LIMIT = 4_096;
-const STUDIO_CRDT_QUOTA_CLEANUP_INTERVAL_MS = 30_000;
-const STUDIO_CRDT_QUOTA_IDLE_TTL_MS = 10 * 60_000;
 
 interface StudioLiveParticipantInternal extends StudioLiveParticipant {
   userId: string;
@@ -203,16 +197,6 @@ type StudioLiveRelaySenderAuthorization =
 interface RateLimitBucket {
   count: number;
   resetsAt: number;
-}
-
-interface StudioCrdtTokenBucket {
-  operationTokens: number;
-  byteTokens: number;
-  updatedAt: number;
-}
-
-interface StudioCrdtSyncBucket extends RateLimitBucket {
-  updatedAt: number;
 }
 
 interface StudioLiveParticipantAuthorizationRecheck {
@@ -356,9 +340,7 @@ export class StudioLiveGateway
   private readonly participantsBySocket = new Map<string, StudioLiveParticipantInternal>();
   private readonly socketIdsByWork = new Map<string, Set<string>>();
   private readonly rateLimits = new Map<string, Map<string, RateLimitBucket>>();
-  private readonly crdtSyncBuckets = new Map<string, StudioCrdtSyncBucket>();
-  private readonly crdtTokenBuckets = new Map<string, StudioCrdtTokenBucket>();
-  private crdtQuotaLastCleanupAt = 0;
+  private readonly crdtQuotaLimiter = new StudioLiveCrdtQuotaLimiter();
   private readonly joinTransitionSequences = new Map<string, number>();
   private readonly joinTransitionTails = new Map<string, Promise<void>>();
   private readonly participantAuthorizationRechecks = new Map<
@@ -460,9 +442,7 @@ export class StudioLiveGateway
     this.participantsBySocket.clear();
     this.socketIdsByWork.clear();
     this.rateLimits.clear();
-    this.crdtSyncBuckets.clear();
-    this.crdtTokenBuckets.clear();
-    this.crdtQuotaLastCleanupAt = 0;
+    this.crdtQuotaLimiter.clear();
     this.joinTransitionSequences.clear();
     this.joinTransitionTails.clear();
     this.participantAuthorizationRechecks.clear();
@@ -774,7 +754,12 @@ export class StudioLiveGateway
     if (!quotaParticipant) {
       return reply(ack, failure("not_joined", "실시간 작업실에 다시 참여해 주세요."));
     }
-    if (!this.consumeCrdtSyncQuota(quotaParticipant.userId, parsed.data.workId)) {
+    if (
+      !this.crdtQuotaLimiter.consumeSync({
+        userId: quotaParticipant.userId,
+        workId: parsed.data.workId,
+      })
+    ) {
       return reply(ack, failure("rate_limited", "CRDT 전체 동기화 요청이 너무 많습니다."));
     }
     const authorizedBefore = await this.runWithAuthorizedParticipant(
@@ -842,9 +827,8 @@ export class StudioLiveGateway
       return reply(ack, failure("not_joined", "실시간 작업실에 다시 참여해 주세요."));
     }
     if (
-      !this.consumeCrdtUpdateQuota(
-        quotaParticipant.userId,
-        parsed.data.workId,
+      !this.crdtQuotaLimiter.consumeUpdate(
+        { userId: quotaParticipant.userId, workId: parsed.data.workId },
         decodedBytes
       )
     ) {
@@ -2634,92 +2618,6 @@ export class StudioLiveGateway
     if (bucket.count >= maximum) return false;
     bucket.count += 1;
     return true;
-  }
-
-  private consumeCrdtSyncQuota(userId: string, workId: string): boolean {
-    const now = Date.now();
-    const quotaKey = this.crdtQuotaKey(userId, workId);
-    this.cleanupCrdtQuotaBuckets(now);
-    if (!this.hasCrdtQuotaCapacity(this.crdtSyncBuckets, quotaKey)) return false;
-
-    const bucket = this.crdtSyncBuckets.get(quotaKey);
-    if (!bucket || bucket.resetsAt <= now) {
-      this.crdtSyncBuckets.set(quotaKey, {
-        count: 1,
-        resetsAt: now + 60_000,
-        updatedAt: now,
-      });
-      return true;
-    }
-    bucket.updatedAt = now;
-    if (bucket.count >= 30) return false;
-    bucket.count += 1;
-    return true;
-  }
-
-  private consumeCrdtUpdateQuota(
-    userId: string,
-    workId: string,
-    decodedBytes: number
-  ): boolean {
-    const now = Date.now();
-    const quotaKey = this.crdtQuotaKey(userId, workId);
-    this.cleanupCrdtQuotaBuckets(now);
-    if (!this.hasCrdtQuotaCapacity(this.crdtTokenBuckets, quotaKey)) return false;
-    const existing = this.crdtTokenBuckets.get(quotaKey);
-    const elapsedSeconds = existing ? Math.max(0, now - existing.updatedAt) / 1_000 : 0;
-    const operationTokens = existing
-      ? Math.min(
-          STUDIO_CRDT_OPERATION_BURST,
-          existing.operationTokens + elapsedSeconds * STUDIO_CRDT_OPERATIONS_PER_SECOND
-        )
-      : STUDIO_CRDT_OPERATION_BURST;
-    const byteTokens = existing
-      ? Math.min(
-          STUDIO_CRDT_BYTE_BURST,
-          existing.byteTokens + elapsedSeconds * STUDIO_CRDT_BYTES_PER_SECOND
-        )
-      : STUDIO_CRDT_BYTE_BURST;
-    const accepted = operationTokens >= 1 && byteTokens >= decodedBytes;
-    this.crdtTokenBuckets.set(quotaKey, {
-      operationTokens: accepted ? operationTokens - 1 : operationTokens,
-      byteTokens: accepted ? byteTokens - decodedBytes : byteTokens,
-      updatedAt: now,
-    });
-    return accepted;
-  }
-
-  private crdtQuotaKey(userId: string, workId: string): string {
-    // A serialized tuple avoids delimiter collisions while making every authenticated identity
-    // share one budget for a work across tabs, parallel sockets, and reconnects in this process.
-    return JSON.stringify([userId, workId]);
-  }
-
-  private cleanupCrdtQuotaBuckets(now: number): void {
-    if (
-      now >= this.crdtQuotaLastCleanupAt &&
-      now - this.crdtQuotaLastCleanupAt < STUDIO_CRDT_QUOTA_CLEANUP_INTERVAL_MS
-    ) {
-      return;
-    }
-    this.crdtQuotaLastCleanupAt = now;
-    for (const [key, bucket] of this.crdtSyncBuckets) {
-      if (bucket.resetsAt <= now) this.crdtSyncBuckets.delete(key);
-    }
-    for (const [key, bucket] of this.crdtTokenBuckets) {
-      if (now - bucket.updatedAt >= STUDIO_CRDT_QUOTA_IDLE_TTL_MS) {
-        this.crdtTokenBuckets.delete(key);
-      }
-    }
-  }
-
-  private hasCrdtQuotaCapacity<T>(
-    buckets: Map<string, T>,
-    incomingKey: string
-  ): boolean {
-    // Fail closed at capacity instead of evicting a live bucket: eviction would let a reconnecting
-    // client regain a fresh budget by churning enough authenticated user/work scopes.
-    return buckets.has(incomingKey) || buckets.size < STUDIO_CRDT_QUOTA_BUCKET_LIMIT;
   }
 
   private crdtFailure(
