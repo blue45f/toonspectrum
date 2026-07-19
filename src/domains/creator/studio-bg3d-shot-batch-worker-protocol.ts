@@ -1,10 +1,16 @@
 import {
+  STUDIO_BG3D_SHOT_BATCH_MAX_ARCHIVE_ARTIFACTS,
+  STUDIO_BG3D_SHOT_BATCH_MAX_ARTIFACTS,
   STUDIO_BG3D_SHOT_BATCH_MAX_SHOTS,
+  isStudioBg3dShotBatchManifestContext,
   type StudioBg3dShotBatchImage,
+  type StudioBg3dShotBatchContactSheet,
+  type StudioBg3dShotBatchLayeredPsd,
+  type StudioBg3dShotBatchManifestContext,
   type StudioBg3dShotBatchProgress,
 } from "./studio-bg3d-shot-batch";
 
-export const STUDIO_BG3D_SHOT_BATCH_WORKER_PROTOCOL_VERSION = 1;
+export const STUDIO_BG3D_SHOT_BATCH_WORKER_PROTOCOL_VERSION = 2;
 export const STUDIO_BG3D_SHOT_BATCH_MAX_ARCHIVE_BYTES = 400 * 1024 * 1024;
 
 export interface StudioBg3dShotBatchWorkerRequest {
@@ -12,6 +18,9 @@ export interface StudioBg3dShotBatchWorkerRequest {
   readonly kind: "build";
   readonly requestId: number;
   readonly images: readonly StudioBg3dShotBatchImage[];
+  readonly manifest?: StudioBg3dShotBatchManifestContext;
+  readonly layeredPsds?: readonly StudioBg3dShotBatchLayeredPsd[];
+  readonly contactSheets?: readonly StudioBg3dShotBatchContactSheet[];
 }
 
 export type StudioBg3dShotBatchWorkerResponse =
@@ -46,13 +55,24 @@ export function isStudioBg3dShotBatchWorkerRequest(
   value: unknown,
 ): value is StudioBg3dShotBatchWorkerRequest {
   if (!isRecord(value)) return false;
-  return Object.keys(value).every((key) => ["version", "kind", "requestId", "images"].includes(key)) &&
+  return Object.keys(value).every((key) => [
+    "version", "kind", "requestId", "images", "manifest", "layeredPsds", "contactSheets",
+  ].includes(key)) &&
     value.version === STUDIO_BG3D_SHOT_BATCH_WORKER_PROTOCOL_VERSION &&
     value.kind === "build" &&
     validRequestId(value.requestId) &&
     Array.isArray(value.images) &&
     value.images.length >= 1 &&
-    value.images.length <= STUDIO_BG3D_SHOT_BATCH_MAX_SHOTS;
+    value.images.length <= STUDIO_BG3D_SHOT_BATCH_MAX_ARTIFACTS &&
+    (value.layeredPsds === undefined || (
+      Array.isArray(value.layeredPsds) &&
+      value.layeredPsds.length <= STUDIO_BG3D_SHOT_BATCH_MAX_SHOTS
+    )) &&
+    (value.contactSheets === undefined || (
+      Array.isArray(value.contactSheets) &&
+      value.contactSheets.length <= STUDIO_BG3D_SHOT_BATCH_MAX_SHOTS
+    )) &&
+    isStudioBg3dShotBatchManifestContext(value.manifest);
 }
 
 export function isStudioBg3dShotBatchWorkerResponse(
@@ -76,7 +96,7 @@ export function isStudioBg3dShotBatchWorkerResponse(
       (completed as number) >= 0 &&
       (total as number) >= 1 &&
       (completed as number) <= (total as number) &&
-      (total as number) <= STUDIO_BG3D_SHOT_BATCH_MAX_SHOTS + 1;
+      (total as number) <= STUDIO_BG3D_SHOT_BATCH_MAX_ARCHIVE_ARTIFACTS + 1;
   }
   if (value.kind === "result") {
     return Object.keys(value).every((key) => ["version", "kind", "requestId", "archive"].includes(key)) &&

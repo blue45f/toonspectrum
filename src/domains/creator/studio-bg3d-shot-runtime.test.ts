@@ -4,7 +4,10 @@ import {
   DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
   type StudioBg3dSceneDocument,
 } from "./studio-bg3d-scene-document";
-import { projectStudioBg3dShotVisibilityToRuntime } from "./studio-bg3d-shot-runtime";
+import {
+  freezeStudioBg3dShotAnimationsForBatch,
+  projectStudioBg3dShotVisibilityToRuntime,
+} from "./studio-bg3d-shot-runtime";
 
 describe("Studio BG3D shot runtime projection", () => {
   const primitive = {
@@ -75,5 +78,62 @@ describe("Studio BG3D shot runtime projection", () => {
       [{ ...model, id: "unknown-model" }],
       document,
     )).toBeNull();
+  });
+
+  it("freezes only playing model clips at their persisted timeline sample", () => {
+    const playingDocument: StudioBg3dSceneDocument = {
+      ...document,
+      nodes: document.nodes.map((node) => node.kind === "model" ? {
+        ...node,
+        animation: {
+          clipIndex: 2,
+          playing: true,
+          loop: "repeat",
+          timeSeconds: 1.25,
+          timeScale: 1.5,
+          weight: 0.8,
+        },
+      } : node),
+    };
+    const frozen = freezeStudioBg3dShotAnimationsForBatch(playingDocument);
+
+    expect(frozen).not.toBe(playingDocument);
+    expect(frozen.nodes[0]).toBe(playingDocument.nodes[0]);
+    expect(frozen.nodes[1]).toMatchObject({
+      animation: {
+        clipIndex: 2,
+        playing: false,
+        timeSeconds: 1.25,
+        timeScale: 1.5,
+        weight: 0.8,
+      },
+    });
+    expect((playingDocument.nodes[1] as { animation?: { playing: boolean } }).animation?.playing)
+      .toBe(true);
+    const runtimePlaying = {
+      ...model,
+      animation: {
+        clipIndex: 2,
+        playing: true,
+        loop: "repeat" as const,
+        timeSeconds: 1.25,
+        timeScale: 1.5,
+        weight: 0.8,
+      },
+    };
+    const projected = projectStudioBg3dShotVisibilityToRuntime(
+      [primitive],
+      [runtimePlaying],
+      frozen,
+    );
+    expect(projected?.customModels[0]?.animation).toMatchObject({
+      clipIndex: 2,
+      playing: false,
+      timeSeconds: 1.25,
+      timeScale: 1.5,
+      weight: 0.8,
+    });
+    expect(runtimePlaying.animation.playing).toBe(true);
+    expect(freezeStudioBg3dShotAnimationsForBatch(document)).toBe(document);
   });
 });

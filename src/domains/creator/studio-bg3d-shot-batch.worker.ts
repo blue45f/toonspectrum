@@ -29,6 +29,9 @@ scope.addEventListener("message", (event: MessageEvent<unknown>) => {
   }
   const request = event.data;
   void buildStudioBg3dShotBatchArchive(request.images, {
+    ...(request.manifest ? { manifest: request.manifest } : {}),
+    ...(request.layeredPsds ? { layeredPsds: request.layeredPsds } : {}),
+    ...(request.contactSheets ? { contactSheets: request.contactSheets } : {}),
     onProgress: (progress) => post({
       version: STUDIO_BG3D_SHOT_BATCH_WORKER_PROTOCOL_VERSION,
       kind: "progress",

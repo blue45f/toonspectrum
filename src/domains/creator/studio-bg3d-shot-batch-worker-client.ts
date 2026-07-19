@@ -1,6 +1,10 @@
 import {
+  STUDIO_BG3D_SHOT_BATCH_MAX_ARTIFACTS,
   STUDIO_BG3D_SHOT_BATCH_MAX_SHOTS,
+  type StudioBg3dShotBatchContactSheet,
   type StudioBg3dShotBatchImage,
+  type StudioBg3dShotBatchLayeredPsd,
+  type StudioBg3dShotBatchManifestContext,
   type StudioBg3dShotBatchProgress,
 } from "./studio-bg3d-shot-batch";
 import {
@@ -33,6 +37,9 @@ export interface StudioBg3dShotBatchWorkerOptions {
   readonly onProgress?: (progress: StudioBg3dShotBatchProgress) => void;
   readonly timeoutMs?: number;
   readonly workerFactory?: () => StudioBg3dShotBatchWorkerLike;
+  readonly manifest?: StudioBg3dShotBatchManifestContext;
+  readonly layeredPsds?: readonly StudioBg3dShotBatchLayeredPsd[];
+  readonly contactSheets?: readonly StudioBg3dShotBatchContactSheet[];
 }
 
 let nextRequestId = 1;
@@ -65,7 +72,19 @@ export function buildStudioBg3dShotBatchArchiveInWorker(
   images: readonly StudioBg3dShotBatchImage[],
   options: StudioBg3dShotBatchWorkerOptions = {},
 ): Promise<Blob> {
-  if (!Array.isArray(images) || images.length < 1 || images.length > STUDIO_BG3D_SHOT_BATCH_MAX_SHOTS) {
+  if (!Array.isArray(images) || images.length < 1 || images.length > STUDIO_BG3D_SHOT_BATCH_MAX_ARTIFACTS) {
+    return Promise.reject(jobError("ProtocolError"));
+  }
+  if (
+    options.layeredPsds !== undefined &&
+    (!Array.isArray(options.layeredPsds) || options.layeredPsds.length > STUDIO_BG3D_SHOT_BATCH_MAX_SHOTS)
+  ) {
+    return Promise.reject(jobError("ProtocolError"));
+  }
+  if (
+    options.contactSheets !== undefined &&
+    (!Array.isArray(options.contactSheets) || options.contactSheets.length > STUDIO_BG3D_SHOT_BATCH_MAX_SHOTS)
+  ) {
     return Promise.reject(jobError("ProtocolError"));
   }
   if (options.signal?.aborted) return Promise.reject(jobError("AbortError"));
@@ -127,6 +146,9 @@ export function buildStudioBg3dShotBatchArchiveInWorker(
         kind: "build",
         requestId,
         images: [...images],
+        ...(options.manifest ? { manifest: options.manifest } : {}),
+        ...(options.layeredPsds ? { layeredPsds: [...options.layeredPsds] } : {}),
+        ...(options.contactSheets ? { contactSheets: [...options.contactSheets] } : {}),
       });
     } catch {
       finish(null, jobError("WorkerError"));

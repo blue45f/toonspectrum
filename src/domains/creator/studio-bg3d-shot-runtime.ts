@@ -1,6 +1,6 @@
 /**
- * Projects an already-canonical scene document's node visibility back to the editor's legacy
- * runtime arrays. Shot application is rejected when the two representations no longer describe
+ * Projects an already-canonical scene document's shot-owned runtime fields back to the editor's
+ * legacy arrays. Shot application is rejected when the two representations no longer describe
  * exactly the same node set; silently dropping or inventing an entity would make a storyboard cut
  * destructive.
  */
@@ -12,6 +12,29 @@ import type { StudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
 export interface StudioBg3dShotRuntimeProjection {
   readonly primitives: BgPrimitive[];
   readonly customModels: BgCustomModelInstance[];
+}
+
+/**
+ * Pins every embedded model clip to its stored timeline sample for deterministic batch capture.
+ * The persisted shot remains untouched; only the transient document projected into the renderer
+ * is frozen. Pose, morph, constraints, and the sampled `timeSeconds` are preserved exactly.
+ */
+export function freezeStudioBg3dShotAnimationsForBatch(
+  document: StudioBg3dSceneDocument,
+): StudioBg3dSceneDocument {
+  let changed = false;
+  const nodes = document.nodes.map((node) => {
+    if (node.kind !== "model" || !node.animation?.playing) return node;
+    changed = true;
+    return {
+      ...node,
+      animation: {
+        ...node.animation,
+        playing: false,
+      },
+    };
+  });
+  return changed ? { ...document, nodes } : document;
 }
 
 export function projectStudioBg3dShotVisibilityToRuntime(
@@ -36,7 +59,13 @@ export function projectStudioBg3dShotVisibilityToRuntime(
   for (const model of customModels) {
     const node = nodeById.get(model.id);
     if (!node || node.kind !== "model") return null;
-    nextCustomModels.push({ ...model, visible: node.visible });
+    nextCustomModels.push({
+      ...model,
+      visible: node.visible,
+      ...(node.animation || model.animation
+        ? { animation: node.animation ? { ...node.animation } : undefined }
+        : {}),
+    });
     nodeById.delete(model.id);
   }
 

@@ -133,6 +133,11 @@ import {
   snapshotStudioBg3dLiveAnimationPlayback,
 } from "./studio-bg3d-animation-time";
 import {
+  applyStudioBg3dViewportAfterTransition,
+  applyStudioBg3dViewToThreeCamera,
+  type BgViewportApi,
+} from "./studio-bg3d-camera-application";
+import {
   acquireStudioBg3dCaptureAdapterAfterViewTransition,
   captureStudioBg3dRaster,
   getStudioBg3dCaptureSourceSize,
@@ -150,6 +155,7 @@ import {
   PanoramaRotationNumberField,
   Vec3Field,
 } from "./studio-bg3d-control-fields";
+import { createStudioBg3dDepthRasterLayer } from "./studio-bg3d-depth-pass";
 import {
   deriveStudioBg3dGlbValidationPolicy,
   resolveStudioBg3dDeviceQuality,
@@ -313,12 +319,45 @@ import {
 import {
   buildStudioBg3dShotBatchArchive,
   STUDIO_BG3D_SHOT_BATCH_MAX_IMAGE_BYTES,
+  STUDIO_BG3D_SHOT_BATCH_MAX_DIMENSION,
   STUDIO_BG3D_SHOT_BATCH_MAX_TOTAL_BYTES,
   type StudioBg3dShotBatchBuildOptions,
+  type StudioBg3dShotBatchContactSheet,
+  type StudioBg3dShotBatchContactSheetFallback,
   type StudioBg3dShotBatchImage,
+  type StudioBg3dShotBatchLayeredPsd,
+  type StudioBg3dShotBatchPsdFallback,
+  type StudioBg3dShotBatchSkippedArtifact,
 } from "./studio-bg3d-shot-batch";
+import {
+  STUDIO_BG3D_SHOT_BATCH_PASSES,
+  STUDIO_BG3D_SHOT_BATCH_PASS_LABELS,
+  createStudioBg3dShotBatchPlan,
+  type StudioBg3dShotBatchPass,
+} from "./studio-bg3d-shot-batch-plan";
+import {
+  createStudioBg3dShotBatchQueue,
+  failStudioBg3dShotBatchQueueItem,
+  isStudioBg3dShotBatchQueueCompatible,
+  retryStudioBg3dShotBatchQueue,
+  startStudioBg3dShotBatchQueueItem,
+  studioBg3dShotBatchQueueCompletedCount,
+  succeedStudioBg3dShotBatchQueueItem,
+  waitForStudioBg3dBatchDocumentVisible,
+  type StudioBg3dShotBatchFailureCode,
+  type StudioBg3dShotBatchQueue,
+} from "./studio-bg3d-shot-batch-queue";
 import { buildStudioBg3dShotBatchArchiveInWorker } from "./studio-bg3d-shot-batch-worker-client";
-import { projectStudioBg3dShotVisibilityToRuntime } from "./studio-bg3d-shot-runtime";
+import {
+  type StudioBg3dShotContactSheetImage,
+} from "./studio-bg3d-shot-contact-sheet-contract";
+import { buildStudioBg3dShotContactSheetsInWorker } from "./studio-bg3d-shot-contact-sheet-worker-client";
+import { admitStudioBg3dShotPsdLayers } from "./studio-bg3d-shot-psd-contract";
+import { buildStudioBg3dShotLayeredPsdInWorker } from "./studio-bg3d-shot-psd-worker-client";
+import {
+  freezeStudioBg3dShotAnimationsForBatch,
+  projectStudioBg3dShotVisibilityToRuntime,
+} from "./studio-bg3d-shot-runtime";
 import {
   calculateStudioBg3dThreeReparentTransform,
   calculateStudioBg3dThreeWorldMatrix,
@@ -394,6 +433,25 @@ type LtUserPresetNotice = {
   readonly message: string;
 };
 type CaptureState = { adapter: StudioBg3dCaptureAdapter | null };
+
+interface StudioBg3dShotBatchRecoverySession {
+  readonly resumeKey: string;
+  queue: StudioBg3dShotBatchQueue;
+  images: StudioBg3dShotBatchImage[];
+  skippedArtifacts: StudioBg3dShotBatchSkippedArtifact[];
+  layeredPsds: StudioBg3dShotBatchLayeredPsd[];
+  psdFallbacks: StudioBg3dShotBatchPsdFallback[];
+}
+
+const STUDIO_BG3D_SHOT_CONTACT_SHEET_PASS_PRIORITY: readonly StudioBg3dShotBatchPass[] = [
+  "lt-composite",
+  "beauty",
+  "color",
+  "tone",
+  "main-line",
+  "texture-line",
+  "depth",
+];
 
 interface StudioBg3dHistorySnapshot {
   readonly primitives: BgPrimitive[];
@@ -936,8 +994,8 @@ async function encodeStudioBg3dLtCompositeToPngBlob(
     layers.length < 1 ||
     width < 1 ||
     height < 1 ||
-    width > 4_096 ||
-    height > 4_096 ||
+    width > STUDIO_BG3D_SHOT_BATCH_MAX_DIMENSION ||
+    height > STUDIO_BG3D_SHOT_BATCH_MAX_DIMENSION ||
     layers.some((layer) => (
       layer.width !== width ||
       layer.height !== height ||
@@ -1233,13 +1291,6 @@ function SkyClearColorController({ clearColor }: { clearColor: string }) {
 }
 
 type OrbitLike = { target?: THREE.Vector3; update?: () => void } | null;
-type BgViewportApi = {
-  zoomBy: (factor: number) => void;
-  applyPreset: (presetId: string) => void;
-  applyView: (view: StudioBg3dCameraSettings) => void;
-  readView: () => StudioBg3dCameraSettings;
-  focusOn: (position: [number, number, number]) => void;
-};
 
 /* Canvas 내부에서 카메라/컨트롤을 잡아 줌·프리셋 같은 명령형 동작을 패널 오버레이(Canvas 밖 HTML 버튼)에
    노출한다. target을 OrbitControls의 JSX prop으로 매 렌더 다시 넘기면(리터럴 배열은 매번 새 참조라
@@ -1279,25 +1330,7 @@ function BgViewportController({ onReady }: { onReady: (api: BgViewportApi | null
           camera.lookAt(preset.target[0], preset.target[1], preset.target[2]);
         }
       },
-      applyView: (view) => {
-        if (camera instanceof THREE.PerspectiveCamera) {
-          const projection = new THREE.PerspectiveCamera(
-            view.fovDegrees,
-            camera.aspect,
-            camera.near,
-            camera.far
-          );
-          camera.copy(projection, false);
-        }
-        camera.position.set(view.position[0], view.position[1], view.position[2]);
-        camera.updateMatrixWorld();
-        if (controls?.target) {
-          controls.target.set(view.target[0], view.target[1], view.target[2]);
-          controls.update?.();
-        } else {
-          camera.lookAt(view.target[0], view.target[1], view.target[2]);
-        }
-      },
+      applyView: (view) => applyStudioBg3dViewToThreeCamera(camera, controls, view),
       readView: () => {
         const target = controls?.target ?? new THREE.Vector3(...DEFAULT_CAMERA_TARGET);
         const fovDegrees = camera instanceof THREE.PerspectiveCamera ? camera.fov : 50;
@@ -1888,11 +1921,23 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [shotNameDraft, setShotNameDraft] = useState("");
+  /** Exclusions make newly recorded shots selected by default without effect-driven state repair. */
+  const [shotBatchExcludedIds, setShotBatchExcludedIds] = useState<Set<string>>(() => new Set());
+  const [shotBatchPasses, setShotBatchPasses] = useState<Set<StudioBg3dShotBatchPass>>(
+    () => new Set(["lt-composite"]),
+  );
+  const [shotBatchIncludeLayeredPsd, setShotBatchIncludeLayeredPsd] = useState(false);
+  const [shotBatchIncludeContactSheet, setShotBatchIncludeContactSheet] = useState(true);
+  const [shotBatchExportHeight, setShotBatchExportHeight] = useState<"per-shot" | number>("per-shot");
   const [shotBatchProgress, setShotBatchProgress] = useState<{
-    readonly stage: "render" | "archive";
+    readonly stage: "render" | "contact" | "archive";
     readonly completed: number;
     readonly total: number;
     readonly label: string;
+  } | null>(null);
+  const [shotBatchRecoverySummary, setShotBatchRecoverySummary] = useState<{
+    readonly completedShots: number;
+    readonly totalShots: number;
   } | null>(null);
   const isBatchRenderingShots = shotBatchProgress !== null;
   // 복합 오브젝트 프리셋 그리드 카테고리 필터. null=전체.
@@ -2005,6 +2050,13 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   const [sceneBaseDocument, setSceneBaseDocument] = useState<StudioBg3dSceneDocument>(
     () => canonicalSceneDocument(initialScene) ?? DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT
   );
+  const savedShots = sceneBaseDocument.shots ?? [];
+  const shotBatchSelectedIds = savedShots
+    .filter(({ id }) => !shotBatchExcludedIds.has(id))
+    .map(({ id }) => id);
+  const selectedShotBatchPasses = STUDIO_BG3D_SHOT_BATCH_PASSES.filter((pass) =>
+    shotBatchPasses.has(pass),
+  );
   const [captureBackgroundSnapshot, setCaptureBackgroundSnapshot] =
     useState<StudioBg3dCaptureBackgroundSnapshot | null>(null);
   const [deviceSignals, setDeviceSignals] = useState<StudioBg3dDeviceSignals>(() => collectDeviceSignals());
@@ -2036,6 +2088,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   const componentActiveRef = useRef(false);
   const captureInFlightRef = useRef(false);
   const shotBatchAbortRef = useRef<AbortController | null>(null);
+  const shotBatchRecoveryRef = useRef<StudioBg3dShotBatchRecoverySession | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const physicsPhaseRef = useRef<StudioBg3dPhysicsPhase>("idle");
   const physicsAbortRef = useRef<AbortController | null>(null);
@@ -2056,6 +2109,13 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   const physicsStartButtonRef = useRef<HTMLButtonElement | null>(null);
   const physicsTransportActionRef = useRef<HTMLButtonElement | null>(null);
   const shouldTransferPhysicsFocusRef = useRef(false);
+  const handleViewportReady = useCallback((api: BgViewportApi | null) => {
+    viewportApiRef.current = api;
+    const pendingView = pendingInitialCameraRef.current;
+    if (api && pendingView && api.applyView(pendingView)) {
+      pendingInitialCameraRef.current = null;
+    }
+  }, []);
 
   const historyRef = useRef<StudioBg3dHistorySnapshot[]>([]);
   const historyIndexRef = useRef(-1);
@@ -2072,6 +2132,19 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   const physicsInteractionLocked = isStudioBg3dPhysicsTransientPhase(physicsPhase);
   const insertBlocked = Boolean(sceneRecoveryError) || hasCloneFailure || hasPendingClone ||
     isRestoringScene || physicsInteractionLocked || isBatchRenderingShots;
+  const shotBatchBlockedReason = sceneRecoveryError
+    ? "3D 장면 복원 오류를 해결하기 전에는 누락 가능성이 있는 컷을 배치 출력할 수 없습니다."
+    : hasCloneFailure
+      ? "불러오기에 실패한 3D 모델이 있어 컷 배치 출력을 막았습니다. 모델 파일 상태를 확인해 주세요."
+      : hasPendingClone
+        ? "3D 모델 렌더 복제본을 준비하는 중입니다. 모든 모델이 표시된 뒤 컷 배치 출력을 다시 실행해 주세요."
+        : isRestoringScene
+          ? "3D 장면을 복원하는 중입니다. 복원이 끝난 뒤 컷 배치 출력을 실행해 주세요."
+          : physicsInteractionLocked
+            ? "물리 미리보기 중에는 컷 배치 출력을 실행할 수 없습니다. 현재 자세를 적용하거나 미리보기를 초기화해 주세요."
+            : isCapturing || isBatchRenderingShots
+              ? "다른 3D 캡처가 진행 중입니다. 완료하거나 취소한 뒤 컷 배치 출력을 다시 실행해 주세요."
+              : null;
 
   // This editor is portalled to document.body, so body is the nearest shared root that contains
   // both the dialog and the Studio launcher. Setting it in an earlier layout effect satisfies the
@@ -2271,8 +2344,9 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
 
       if (canonicalInitial) {
         setSceneBaseDocument(canonicalInitial);
-        pendingInitialCameraRef.current = canonicalInitial.camera;
-        viewportApiRef.current?.applyView(canonicalInitial.camera);
+        pendingInitialCameraRef.current = viewportApiRef.current?.applyView(canonicalInitial.camera) === true
+          ? null
+          : canonicalInitial.camera;
 
         const quality = resolveDeviceQuality(canonicalInitial, viewportHostRef.current);
         let cumulativeUsedBytes = 0;
@@ -2331,8 +2405,11 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
 
       const parsed = parseBg3dSceneWithModelsFromDataUrl(initialDataUrl);
       setSceneBaseDocument(DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT);
-      pendingInitialCameraRef.current = DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera;
-      viewportApiRef.current?.applyView(DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera);
+      pendingInitialCameraRef.current = viewportApiRef.current?.applyView(
+        DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera,
+      ) === true
+        ? null
+        : DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera;
       const nextPrimitives = parsed?.primitives ?? [];
       const nextModels = parsed?.customModels ?? [];
       historyRef.current = [createStudioBg3dHistorySnapshot({
@@ -3511,7 +3588,11 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     setPrimitives(projected.primitives);
     setCustomModels(projected.customModels);
     setSceneBaseDocument(appliedDocument);
-    viewportApiRef.current?.applyView(appliedDocument.camera);
+    if (viewportApiRef.current?.applyView(appliedDocument.camera) !== true) {
+      // Projection changes replace the default R3F camera. The replacement controller consumes this
+      // only after its own target-reset effect has completed.
+      pendingInitialCameraRef.current = appliedDocument.camera;
+    }
     setLineArtPreview(appliedDocument.output.line.enabled);
     setViewportHinted(true);
     const visibleIds = collectStudioBg3dEffectivelyVisibleEntityIds(appliedDocument.nodes);
@@ -3632,10 +3713,19 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   }
 
   async function exportSavedShotsAsZip() {
+    if (captureInFlightRef.current) {
+      setError("다른 3D 캡처가 진행 중입니다. 완료하거나 취소한 뒤 컷 배치 출력을 다시 실행해 주세요.");
+      return;
+    }
+    if (shotBatchBlockedReason) {
+      setError(shotBatchBlockedReason);
+      return;
+    }
     // Export is read-only. Keep the persisted scene document distinct from the live Orbit view
     // that `readCurrentCanonicalSceneForShot` temporarily samples for validation.
     const originalSceneBaseDocument = sceneBaseDocument;
-    const originalLiveView = viewportApiRef.current?.readView() ?? sceneBaseDocument.camera;
+    const originalViewportApi = viewportApiRef.current;
+    const originalLiveView = originalViewportApi?.readView() ?? sceneBaseDocument.camera;
     const currentDocument = readCurrentCanonicalSceneForShot();
     const shots = currentDocument?.shots ?? [];
     if (!currentDocument) return;
@@ -3643,10 +3733,51 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
       setError("일괄 렌더할 컷을 먼저 기록해 주세요.");
       return;
     }
+    const batchSourceRevision = serializeStudioBg3dSceneDocument(currentDocument);
+    if (!batchSourceRevision) {
+      setError("컷 배치 장면 revision을 안전하게 고정하지 못했습니다.");
+      return;
+    }
+    const batchPlanResult = createStudioBg3dShotBatchPlan(shots, {
+      selectedShotIds: shotBatchSelectedIds,
+      passes: selectedShotBatchPasses,
+      sourceRevision: batchSourceRevision,
+      layeredPsd: shotBatchIncludeLayeredPsd,
+      contactSheet: shotBatchIncludeContactSheet,
+      exportHeight: shotBatchExportHeight,
+    });
+    if (!batchPlanResult.ok) {
+      setError(batchPlanResult.message);
+      return;
+    }
+    const batchPlan = batchPlanResult.plan;
     if (!captureRef.current.adapter) {
       setError("컷을 렌더할 3D 뷰포트가 아직 준비되지 않았습니다.");
       return;
     }
+    const previousRecovery = shotBatchRecoveryRef.current;
+    const canResume = previousRecovery !== null &&
+      isStudioBg3dShotBatchQueueCompatible(previousRecovery.queue, batchPlan);
+    const recoverySession: StudioBg3dShotBatchRecoverySession = canResume
+      ? {
+          ...previousRecovery,
+          queue: retryStudioBg3dShotBatchQueue(previousRecovery.queue),
+          images: [...previousRecovery.images],
+          skippedArtifacts: [...previousRecovery.skippedArtifacts],
+          layeredPsds: [...previousRecovery.layeredPsds],
+          psdFallbacks: [...previousRecovery.psdFallbacks],
+        }
+      : {
+          resumeKey: batchPlan.resumeKey,
+          queue: createStudioBg3dShotBatchQueue(batchPlan),
+          images: [],
+          skippedArtifacts: [],
+          layeredPsds: [],
+          psdFallbacks: [],
+        };
+    shotBatchRecoveryRef.current = recoverySession;
+    if (!canResume) setShotBatchRecoverySummary(null);
+    const initiallyCompletedShots = studioBg3dShotBatchQueueCompletedCount(recoverySession.queue);
 
     const originalPrimitives = clonePrimitives(primitives);
     const originalCustomModels = cloneBgCustomModelInstances(customModels);
@@ -3658,23 +3789,54 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
     flushSync(() => {
       setShotBatchProgress({
         stage: "render",
-        completed: 0,
-        total: shots.length,
-        label: "컷 렌더 준비",
+        completed: initiallyCompletedShots,
+        total: batchPlan.shots.length,
+        label: initiallyCompletedShots > 0 ? "완료 artifact 복구" : "컷 렌더 준비",
       });
       setLineArtPreview(false);
       setIsCapturing(true);
       setError(null);
     });
 
-    const images: StudioBg3dShotBatchImage[] = [];
-    let accumulatedPngBytes = 0;
+    const images = [...recoverySession.images];
+    const skippedArtifacts = [...recoverySession.skippedArtifacts];
+    const layeredPsds = [...recoverySession.layeredPsds];
+    const psdFallbacks = [...recoverySession.psdFallbacks];
+    let accumulatedArtifactBytes =
+      images.reduce((total, image) => total + image.png.size, 0) +
+      layeredPsds.reduce((total, artifact) => total + artifact.psd.size, 0);
+    let activeQueueShotId: string | null = null;
+    let archiveCompleted = false;
+    let renderedProjection = originalLiveView.projection;
+    let renderedViewportApi = originalViewportApi;
+    let firstShotRequiresViewportReplacement = isQuadView;
     try {
-      for (let index = 0; index < shots.length; index += 1) {
+      for (let index = 0; index < batchPlan.shots.length; index += 1) {
         if (controller.signal.aborted) throw Object.assign(new Error("취소됨"), { name: "AbortError" });
-        const shot = shots[index];
+        const shot = batchPlan.shots[index];
         if (!shot) throw new Error("컷 순서를 읽지 못했습니다.");
-        const applied = applyStudioBg3dShot(currentDocument, shot.id);
+        const queueItem = recoverySession.queue.items[index];
+        if (queueItem?.status === "succeeded") continue;
+        if (document.visibilityState === "hidden") {
+          setShotBatchProgress({
+            stage: "render",
+            completed: studioBg3dShotBatchQueueCompletedCount(recoverySession.queue),
+            total: batchPlan.shots.length,
+            label: "탭이 다시 표시되기를 기다리는 중",
+          });
+        }
+        await waitForStudioBg3dBatchDocumentVisible(document, controller.signal);
+        const startedQueue = startStudioBg3dShotBatchQueueItem(
+          recoverySession.queue,
+          shot.shotId,
+        );
+        if (!startedQueue) throw new Error("컷 배치 큐 전이가 올바르지 않습니다.");
+        recoverySession.queue = startedQueue;
+        activeQueueShotId = shot.shotId;
+        const appliedShot = applyStudioBg3dShot(currentDocument, shot.shotId);
+        const applied = appliedShot
+          ? freezeStudioBg3dShotAnimationsForBatch(appliedShot)
+          : null;
         const projected = applied
           ? projectStudioBg3dShotVisibilityToRuntime(
               originalPrimitives,
@@ -3688,6 +3850,8 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
           transparent: applied.output.transparentBackground,
         });
 
+        const previousViewportApi = renderedViewportApi;
+        const projectionChanged = renderedProjection !== applied.camera.projection;
         flushSync(() => {
           setPrimitives(projected.primitives);
           setCustomModels(projected.customModels);
@@ -3696,43 +3860,89 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
           setShotBatchProgress({
             stage: "render",
             completed: index,
-            total: shots.length,
-            label: shot.name,
+            total: batchPlan.shots.length,
+            label: shot.shotName,
           });
         });
-        viewportApiRef.current?.applyView(applied.camera);
-
-        const captureAdapter = await acquireStudioBg3dCaptureAdapterAfterViewTransition({
+        const appliedViewportApi = await applyStudioBg3dViewportAfterTransition({
+          view: applied.camera,
+          previousApi: previousViewportApi,
+          requireReplacement: firstShotRequiresViewportReplacement || projectionChanged,
+          readApi: () => viewportApiRef.current,
           isActive: () => componentActiveRef.current && !controller.signal.aborted,
-          readAdapter: () => captureRef.current.adapter,
           waitForPaintFrame: waitForStudioBg3dPaintFrame,
           signal: controller.signal,
           timeoutMs: 15_000,
         });
-        if (!captureAdapter || controller.signal.aborted) {
-          throw Object.assign(new Error("취소됨"), { name: "AbortError" });
+        if (!appliedViewportApi) {
+          throw new Error("컷 카메라를 새 viewport에 안전하게 복원하지 못했습니다.");
         }
-        const sourceSize = getStudioBg3dCaptureSourceSize(captureAdapter);
-        const captureSize = resolveStudioBg3dLtCaptureSize({
-          sourceWidth: sourceSize.width,
-          sourceHeight: sourceSize.height,
-          requestedHeight: applied.output.exportHeight,
-          maxPixels: Math.min(deviceQuality.maxRenderPixels, STUDIO_BG3D_LT_RENDER_MAX_PIXELS),
-        });
-        if (!captureSize) throw new Error("컷 출력 해상도를 안전한 예산 안에서 계산하지 못했습니다.");
-        const captured = await captureStudioBg3dRaster(
-          captureAdapter,
-          {
-            width: captureSize.width,
-            height: captureSize.height,
-            background: {
-              color: backgroundSnapshot.clearColor,
-              alpha: backgroundSnapshot.transparent ? 0 : 1,
-            },
-            includeDepth: applied.output.line.depthEnabled,
-          },
-          { signal: controller.signal, timeoutMs: 30_000 },
-        );
+        pendingInitialCameraRef.current = null;
+        renderedViewportApi = appliedViewportApi;
+        renderedProjection = applied.camera.projection;
+        firstShotRequiresViewportReplacement = false;
+
+        const requestedCaptureHeight = batchPlan.exportHeight === "per-shot"
+          ? applied.output.exportHeight
+          : batchPlan.exportHeight;
+        let captureWasReduced = false;
+        let captured: Awaited<ReturnType<typeof captureStudioBg3dRaster>> | null = null;
+        while (!captured) {
+          if (document.visibilityState === "hidden") {
+            setShotBatchProgress({
+              stage: "render",
+              completed: studioBg3dShotBatchQueueCompletedCount(recoverySession.queue),
+              total: batchPlan.shots.length,
+              label: `${shot.shotName} · 표시 상태 대기`,
+            });
+          }
+          await waitForStudioBg3dBatchDocumentVisible(document, controller.signal);
+          try {
+            const captureAdapter = await acquireStudioBg3dCaptureAdapterAfterViewTransition({
+              isActive: () => componentActiveRef.current && !controller.signal.aborted,
+              readAdapter: () => captureRef.current.adapter,
+              waitForPaintFrame: waitForStudioBg3dPaintFrame,
+              signal: controller.signal,
+              timeoutMs: 15_000,
+            });
+            if (!captureAdapter || controller.signal.aborted) {
+              throw Object.assign(new Error("취소됨"), { name: "AbortError" });
+            }
+            const sourceSize = getStudioBg3dCaptureSourceSize(captureAdapter);
+            const captureSize = resolveStudioBg3dLtCaptureSize({
+              sourceWidth: sourceSize.width,
+              sourceHeight: sourceSize.height,
+              requestedHeight: requestedCaptureHeight,
+              maxPixels: Math.min(deviceQuality.maxRenderPixels, STUDIO_BG3D_LT_RENDER_MAX_PIXELS),
+              maxEdge: STUDIO_BG3D_SHOT_BATCH_MAX_DIMENSION,
+            });
+            if (!captureSize) throw new Error("컷 출력 해상도를 안전한 예산 안에서 계산하지 못했습니다.");
+            captureWasReduced = captureSize.wasReduced;
+            captured = await captureStudioBg3dRaster(
+              captureAdapter,
+              {
+                width: captureSize.width,
+                height: captureSize.height,
+                background: {
+                  color: backgroundSnapshot.clearColor,
+                  alpha: backgroundSnapshot.transparent ? 0 : 1,
+                },
+                includeDepth:
+                  applied.output.line.depthEnabled || batchPlan.passes.includes("depth"),
+              },
+              { signal: controller.signal, timeoutMs: 30_000 },
+            );
+          } catch (cause) {
+            if (
+              cause instanceof Error &&
+              cause.name === "TimeoutError" &&
+              document.visibilityState === "hidden"
+            ) {
+              continue;
+            }
+            throw cause;
+          }
+        }
         if (controller.signal.aborted) throw Object.assign(new Error("취소됨"), { name: "AbortError" });
         const rendered = renderStudioBg3dLtLayers(
           {
@@ -3743,44 +3953,246 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
           },
           { line: applied.output.line, tone: applied.output.tone },
         );
-        if (rendered.layers.length === 0) {
-          throw new Error("컷의 LT 설정에서 출력 레이어를 만들지 못했습니다.");
+        const layerByRole = new Map(rendered.layers.map((layer) => [layer.role, layer] as const));
+        const stagedImages: StudioBg3dShotBatchImage[] = [];
+        const stagedSkippedArtifacts: StudioBg3dShotBatchSkippedArtifact[] = [];
+        const stagedLayeredPsds: StudioBg3dShotBatchLayeredPsd[] = [];
+        const stagedPsdFallbacks: StudioBg3dShotBatchPsdFallback[] = [];
+        let stagedArtifactBytes = 0;
+        const mainLineConfigured = applied.output.line.enabled && applied.output.line.strength > 0;
+        const textureLineConfigured = mainLineConfigured &&
+          applied.output.line.textureLineEnabled && applied.output.line.textureLineStrength > 0;
+        const toneConfigured = applied.output.tone.mode !== "none" && applied.output.tone.opacity > 0;
+        const colorConfigured = toneConfigured && applied.output.tone.type === "color";
+        for (const pass of batchPlan.passes) {
+          let passLayers: readonly StudioBg3dLtRasterLayer[] | null = null;
+          let skipReason: StudioBg3dShotBatchSkippedArtifact["reason"] = "disabled";
+          if (pass === "beauty") {
+            passLayers = [{
+              role: "color",
+              width: captured.width,
+              height: captured.height,
+              data: new Uint8ClampedArray(captured.rgba),
+            }];
+          } else if (pass === "lt-composite") {
+            passLayers = rendered.layers.length > 0 ? rendered.layers : null;
+            skipReason = mainLineConfigured || textureLineConfigured || toneConfigured
+              ? "unavailable"
+              : "disabled";
+          } else if (pass === "depth") {
+            passLayers = captured.depth
+              ? [createStudioBg3dDepthRasterLayer(captured.width, captured.height, captured.depth)]
+              : null;
+            skipReason = "unavailable";
+          } else {
+            const layer = layerByRole.get(pass);
+            passLayers = layer ? [layer] : null;
+            const configured = pass === "main-line"
+              ? mainLineConfigured
+              : pass === "texture-line"
+                ? textureLineConfigured
+                : pass === "tone"
+                  ? toneConfigured && applied.output.tone.type !== "color"
+                  : colorConfigured;
+            skipReason = configured ? "unavailable" : "disabled";
+          }
+          if (!passLayers) {
+            stagedSkippedArtifacts.push({
+              shotId: shot.shotId,
+              shotName: shot.shotName,
+              pass,
+              reason: skipReason,
+            });
+            continue;
+          }
+          const png = await encodeStudioBg3dLtCompositeToPngBlob(
+            passLayers,
+            { signal: controller.signal, timeoutMs: 20_000 },
+          );
+          if (
+            png.size > STUDIO_BG3D_SHOT_BATCH_MAX_IMAGE_BYTES ||
+            accumulatedArtifactBytes + stagedArtifactBytes + png.size >
+              STUDIO_BG3D_SHOT_BATCH_MAX_TOTAL_BYTES
+          ) {
+            throw new RangeError("컷 PNG 합계가 브라우저 배치 메모리 예산을 벗어났습니다.");
+          }
+          stagedArtifactBytes += png.size;
+          stagedImages.push({
+            shotId: shot.shotId,
+            shotName: shot.shotName,
+            width: rendered.width,
+            height: rendered.height,
+            requestedHeight: requestedCaptureHeight,
+            wasReduced: captureWasReduced,
+            pass,
+            png,
+          });
         }
-        const png = await encodeStudioBg3dLtCompositeToPngBlob(
-          rendered.layers,
-          { signal: controller.signal, timeoutMs: 20_000 },
+        // Required PNG passes reserve the batch budget first. PSD is optional and must fall back
+        // without invalidating already encoded PNGs or the recovery checkpoint.
+        if (shotBatchIncludeLayeredPsd) {
+          const psdAdmission = admitStudioBg3dShotPsdLayers(rendered.layers);
+          if (!psdAdmission.ok) {
+            stagedPsdFallbacks.push({
+              shotId: shot.shotId,
+              shotName: shot.shotName,
+              reason: psdAdmission.reason === "empty" ? "unavailable" : "budget",
+            });
+          } else if (typeof Worker !== "function") {
+            stagedPsdFallbacks.push({
+              shotId: shot.shotId,
+              shotName: shot.shotName,
+              reason: "unavailable",
+            });
+          } else {
+            try {
+              const psd = await buildStudioBg3dShotLayeredPsdInWorker(rendered.layers, {
+                signal: controller.signal,
+                timeoutMs: 90_000,
+              });
+              if (
+                accumulatedArtifactBytes + stagedArtifactBytes + psd.size >
+                STUDIO_BG3D_SHOT_BATCH_MAX_TOTAL_BYTES
+              ) {
+                stagedPsdFallbacks.push({
+                  shotId: shot.shotId,
+                  shotName: shot.shotName,
+                  reason: "budget",
+                });
+              } else {
+                stagedArtifactBytes += psd.size;
+                stagedLayeredPsds.push({
+                  shotId: shot.shotId,
+                  shotName: shot.shotName,
+                  width: rendered.width,
+                  height: rendered.height,
+                  psd,
+                });
+              }
+            } catch (cause) {
+              if (cause instanceof Error && cause.name === "AbortError") throw cause;
+              stagedPsdFallbacks.push({
+                shotId: shot.shotId,
+                shotName: shot.shotName,
+                reason: "worker-failed",
+              });
+            }
+          }
+        }
+        images.push(...stagedImages);
+        skippedArtifacts.push(...stagedSkippedArtifacts);
+        layeredPsds.push(...stagedLayeredPsds);
+        psdFallbacks.push(...stagedPsdFallbacks);
+        accumulatedArtifactBytes += stagedArtifactBytes;
+        recoverySession.images = [...images];
+        recoverySession.skippedArtifacts = [...skippedArtifacts];
+        recoverySession.layeredPsds = [...layeredPsds];
+        recoverySession.psdFallbacks = [...psdFallbacks];
+        const succeededQueue = succeedStudioBg3dShotBatchQueueItem(
+          recoverySession.queue,
+          shot.shotId,
         );
-        if (
-          png.size > STUDIO_BG3D_SHOT_BATCH_MAX_IMAGE_BYTES ||
-          accumulatedPngBytes + png.size > STUDIO_BG3D_SHOT_BATCH_MAX_TOTAL_BYTES
-        ) {
-          throw new RangeError("컷 PNG 합계가 브라우저 배치 메모리 예산을 벗어났습니다.");
-        }
-        accumulatedPngBytes += png.size;
-        images.push({
-          shotId: shot.id,
-          shotName: shot.name,
-          width: rendered.width,
-          height: rendered.height,
-          output: "lt-composite",
-          png,
-        });
+        if (!succeededQueue) throw new Error("컷 배치 완료 전이가 올바르지 않습니다.");
+        recoverySession.queue = succeededQueue;
+        activeQueueShotId = null;
         setShotBatchProgress({
           stage: "render",
-          completed: index + 1,
-          total: shots.length,
-          label: shot.name,
+          completed: studioBg3dShotBatchQueueCompletedCount(recoverySession.queue),
+          total: batchPlan.shots.length,
+          label: shot.shotName,
         });
+      }
+
+      if (images.length === 0) {
+        throw new Error("선택한 패스가 모든 컷에서 꺼져 있어 출력 artifact가 없습니다.");
+      }
+
+      let contactSheets: StudioBg3dShotBatchContactSheet[] = [];
+      let contactSheetFallback: StudioBg3dShotBatchContactSheetFallback | undefined;
+      if (batchPlan.includeContactSheet) {
+        const imageByKey = new Map(images.map((image) => [
+          `${image.shotId}:${image.pass ?? image.output ?? "beauty"}`,
+          image,
+        ] as const));
+        const contactSources = batchPlan.shots.map((shot): StudioBg3dShotContactSheetImage | null => {
+          for (const pass of STUDIO_BG3D_SHOT_CONTACT_SHEET_PASS_PRIORITY) {
+            const image = imageByKey.get(`${shot.shotId}:${pass}`);
+            if (image) {
+              return {
+                shotId: image.shotId,
+                shotName: image.shotName,
+                width: image.width,
+                height: image.height,
+                png: image.png,
+              };
+            }
+          }
+          return null;
+        });
+        if (contactSources.some((source) => source === null)) {
+          contactSheetFallback = "source-unavailable";
+        } else if (typeof Worker !== "function") {
+          contactSheetFallback = "unavailable";
+        } else {
+          setShotBatchProgress({
+            stage: "contact",
+            completed: 0,
+            total: contactSources.length,
+            label: "콘택트 시트 준비",
+          });
+          try {
+            const result = await buildStudioBg3dShotContactSheetsInWorker(
+              contactSources as StudioBg3dShotContactSheetImage[],
+              {
+                signal: controller.signal,
+                timeoutMs: 120_000,
+                onProgress: (progress) => setShotBatchProgress({
+                  stage: "contact",
+                  completed: progress.completedShots,
+                  total: progress.totalShots,
+                  label: `콘택트 시트 ${progress.completedSheets}/${progress.totalSheets}장`,
+                }),
+              },
+            );
+            const contactBytes = result.sheets.reduce((total, sheet) => total + sheet.png.size, 0);
+            if (accumulatedArtifactBytes + contactBytes > STUDIO_BG3D_SHOT_BATCH_MAX_TOTAL_BYTES) {
+              contactSheetFallback = "budget";
+            } else {
+              contactSheets = [...result.sheets];
+              accumulatedArtifactBytes += contactBytes;
+            }
+          } catch (cause) {
+            if (cause instanceof Error && cause.name === "AbortError") throw cause;
+            contactSheetFallback = cause instanceof Error && cause.name === "NotSupportedError"
+              ? "unavailable"
+              : "worker-failed";
+          }
+        }
       }
 
       setShotBatchProgress({
         stage: "archive",
         completed: 0,
-        total: images.length + 1,
+        total: images.length + layeredPsds.length + contactSheets.length + 1,
         label: "ZIP 패키지 생성",
       });
       const archiveOptions: StudioBg3dShotBatchBuildOptions = {
         signal: controller.signal,
+        manifest: {
+          resumeKey: batchPlan.resumeKey,
+          shots: batchPlan.shots.map(({ shotId: id, shotName: name }) => ({ id, name })),
+          requestedPasses: batchPlan.passes,
+          resolution: batchPlan.exportHeight === "per-shot"
+            ? { mode: "per-shot-maximum" }
+            : { mode: "maximum-height", height: batchPlan.exportHeight },
+          skippedArtifacts,
+          layeredPsdRequested: shotBatchIncludeLayeredPsd,
+          psdFallbacks,
+          contactSheetRequested: batchPlan.includeContactSheet,
+          ...(contactSheetFallback ? { contactSheetFallback } : {}),
+        },
+        layeredPsds,
+        contactSheets,
         onProgress: (progress) => setShotBatchProgress({
           stage: "archive",
           completed: progress.completedFiles,
@@ -3796,33 +4208,104 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
       try {
         const anchor = document.createElement("a");
         anchor.href = downloadUrl;
-        anchor.download = "toonspectrum-3d-shots.zip";
+        anchor.download = "toonspectrum-3d-shot-passes.zip";
         anchor.rel = "noopener";
         document.body.append(anchor);
         anchor.click();
         anchor.remove();
+        archiveCompleted = true;
+        shotBatchRecoveryRef.current = null;
+        setShotBatchRecoverySummary(null);
       } finally {
         window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1_000);
       }
     } catch (cause) {
-      if (!(cause instanceof Error && cause.name === "AbortError")) {
-        setError("컷 일괄 렌더를 완료하지 못했습니다. 장면 복원, 출력 해상도 또는 브라우저 메모리를 확인해 주세요.");
+      const aborted = cause instanceof Error && cause.name === "AbortError";
+      const budgetExceeded = cause instanceof RangeError;
+      if (activeQueueShotId) {
+        if (aborted) {
+          recoverySession.queue = retryStudioBg3dShotBatchQueue(recoverySession.queue);
+        } else {
+          let failureCode: StudioBg3dShotBatchFailureCode = "unknown";
+          if (document.visibilityState === "hidden") failureCode = "visibility-interrupted";
+          else if (cause instanceof Error && cause.name === "TimeoutError") failureCode = "view-timeout";
+          else if (budgetExceeded) failureCode = "artifact-budget-exceeded";
+          else if (cause instanceof Error && cause.message.includes("복원")) {
+            failureCode = "scene-restore-failed";
+          } else if (cause instanceof Error && cause.message.includes("PNG")) {
+            failureCode = "encode-failed";
+          }
+          recoverySession.queue = failStudioBg3dShotBatchQueueItem(
+            recoverySession.queue,
+            activeQueueShotId,
+            failureCode,
+          ) ?? recoverySession.queue;
+        }
+      }
+      const completedShots = studioBg3dShotBatchQueueCompletedCount(recoverySession.queue);
+      if (budgetExceeded) {
+        shotBatchRecoveryRef.current = null;
+        setShotBatchRecoverySummary(null);
+      } else {
+        shotBatchRecoveryRef.current = recoverySession;
+        setShotBatchRecoverySummary({ completedShots, totalShots: batchPlan.shots.length });
+      }
+      if (aborted) {
+        setError(
+          completedShots > 0
+            ? `${completedShots}개 컷 artifact를 보존했습니다. 같은 설정으로 다시 실행하면 이어서 렌더합니다.`
+            : "컷 일괄 렌더를 중단했습니다. 같은 설정으로 다시 실행할 수 있습니다.",
+        );
+      } else {
+        setError(
+          budgetExceeded
+            ? "컷 PNG 합계가 브라우저 메모리 예산을 넘었습니다. 컷이나 패스를 줄여 주세요."
+            : "컷 일괄 렌더를 완료하지 못했습니다. 완료 artifact를 보존했으므로 같은 설정으로 다시 시도해 주세요.",
+        );
       }
     } finally {
-      captureInFlightRef.current = false;
-      if (shotBatchAbortRef.current === controller) shotBatchAbortRef.current = null;
+      let restoreFailed = false;
       if (componentActiveRef.current) {
+        const previousViewportApi = renderedViewportApi;
+        const projectionChanged = renderedProjection !== originalLiveView.projection;
         flushSync(() => {
           setPrimitives(originalPrimitives);
           setCustomModels(originalCustomModels);
           setSceneBaseDocument(originalSceneBaseDocument);
           setCaptureBackgroundSnapshot(null);
           setLineArtPreview(originalLineArtPreview);
-          setIsCapturing(false);
-          setShotBatchProgress(null);
         });
-        viewportApiRef.current?.applyView(originalLiveView);
+        try {
+          const restoredViewportApi = await applyStudioBg3dViewportAfterTransition({
+            view: originalLiveView,
+            previousApi: previousViewportApi,
+            requireReplacement: projectionChanged,
+            readApi: () => viewportApiRef.current,
+            isActive: () => componentActiveRef.current,
+            waitForPaintFrame: waitForStudioBg3dPaintFrame,
+            timeoutMs: 5_000,
+          });
+          if (!restoredViewportApi) restoreFailed = true;
+        } catch {
+          restoreFailed = true;
+        }
+        // Ending capture remounts all four Views when the editor started in quad mode. Keep the
+        // live composition pending through that remount so the main viewport controller reapplies
+        // its position, target, projection, zoom, and lens shift instead of accepting camera props.
+        pendingInitialCameraRef.current = restoreFailed || isQuadView ? originalLiveView : null;
+        if (componentActiveRef.current) {
+          flushSync(() => {
+            setIsCapturing(false);
+            setShotBatchProgress(null);
+            if (restoreFailed) {
+              setError("컷 배치 후 원래 카메라 구도를 즉시 복원하지 못했습니다. viewport가 준비되면 자동으로 다시 적용합니다.");
+            }
+          });
+        }
       }
+      captureInFlightRef.current = false;
+      if (shotBatchAbortRef.current === controller) shotBatchAbortRef.current = null;
+      if (archiveCompleted) shotBatchRecoveryRef.current = null;
     }
   }
 
@@ -5032,13 +5515,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
       <CaptureBridge onCaptureUpdate={onCaptureUpdate} />
       <StudioBg3dWebglRenderSettingsController render={sceneBaseDocument.render} />
       <BgViewportController
-        onReady={(api) => {
-          viewportApiRef.current = api;
-          if (api && pendingInitialCameraRef.current) {
-            api.applyView(pendingInitialCameraRef.current);
-            pendingInitialCameraRef.current = null;
-          }
-        }}
+        onReady={handleViewportReady}
       />
       <SkyClearColorController clearColor={getSkyPreset(renderedSkyPresetId).clearColor} />
       <StudioBg3dScenePanorama
@@ -7272,14 +7749,121 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                       선택 컷 복제
                     </button>
                   </div>
+                  <div className="mt-3 rounded-lg border border-line bg-panel/70 p-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[0.66rem] font-bold text-fg-2">
+                        배치 대상 {shotBatchSelectedIds.length}/{savedShots.length}컷
+                      </span>
+                      <span className="flex gap-1">
+                        <button
+                          type="button"
+                          className="min-h-11 min-w-11 rounded-md border border-line bg-card px-2 text-[0.62rem] font-semibold text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-40 sm:min-h-8 sm:min-w-0"
+                          disabled={isCapturing || savedShots.length === 0}
+                          onClick={() => setShotBatchExcludedIds(new Set())}
+                        >
+                          전체
+                        </button>
+                        <button
+                          type="button"
+                          className="min-h-11 min-w-11 rounded-md border border-line bg-card px-2 text-[0.62rem] font-semibold text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-40 sm:min-h-8 sm:min-w-0"
+                          disabled={isCapturing || savedShots.length === 0}
+                          onClick={() => setShotBatchExcludedIds(new Set(savedShots.map(({ id }) => id)))}
+                        >
+                          해제
+                        </button>
+                      </span>
+                    </div>
+                    <label className="mt-2 flex min-h-10 items-center justify-between gap-2 border-t border-line/70 pt-2 text-[0.62rem] font-semibold text-fg-3">
+                      배치 출력 최대 높이
+                      <select
+                        value={String(shotBatchExportHeight)}
+                        disabled={isCapturing}
+                        onChange={(event) => setShotBatchExportHeight(
+                          event.target.value === "per-shot"
+                            ? "per-shot"
+                            : Number(event.target.value),
+                        )}
+                        className="min-h-11 rounded-lg border border-line bg-card px-2 text-[0.64rem] text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
+                      >
+                        <option value="per-shot">컷별 저장 최대값</option>
+                        {LT_EXPORT_HEIGHTS.map((height) => (
+                          <option key={height} value={height}>{height.toLocaleString()} px 최대</option>
+                        ))}
+                      </select>
+                    </label>
+                    <fieldset className="mt-2">
+                      <legend className="text-[0.62rem] font-semibold text-fg-3">
+                        PNG 렌더 패스 {selectedShotBatchPasses.length}/{STUDIO_BG3D_SHOT_BATCH_PASSES.length}
+                      </legend>
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {STUDIO_BG3D_SHOT_BATCH_PASSES.map((pass) => (
+                          <label
+                            key={pass}
+                            className={cx(
+                              "flex min-h-11 cursor-pointer items-center gap-1.5 rounded-lg border px-2 text-[0.62rem] font-semibold sm:min-h-9",
+                              shotBatchPasses.has(pass)
+                                ? "border-accent/60 bg-accent-soft text-accent"
+                                : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg",
+                              isCapturing && "cursor-not-allowed opacity-45",
+                            )}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={shotBatchPasses.has(pass)}
+                              disabled={isCapturing}
+                              onChange={(event) => setShotBatchPasses((current) => {
+                                const next = new Set(current);
+                                if (event.target.checked) next.add(pass);
+                                else next.delete(pass);
+                                return next;
+                              })}
+                              className="size-3.5 accent-accent"
+                            />
+                            {STUDIO_BG3D_SHOT_BATCH_PASS_LABELS[pass]}
+                          </label>
+                        ))}
+                      </div>
+                      <label className="mt-2 flex min-h-10 cursor-pointer items-start gap-2 rounded-lg border border-line bg-card px-2.5 py-2 text-[0.62rem] text-fg-2">
+                        <input
+                          type="checkbox"
+                          checked={shotBatchIncludeLayeredPsd}
+                          disabled={isCapturing}
+                          onChange={(event) => setShotBatchIncludeLayeredPsd(event.target.checked)}
+                          className="mt-0.5 size-3.5 accent-accent"
+                        />
+                        <span>
+                          컷별 레이어 PSD도 포함
+                          <span className="mt-0.5 block font-normal leading-relaxed text-fg-3">
+                            LT 레이어가 1080p급·합계 8.4Mpx 안일 때 Worker에서 생성합니다. 초과 시 PNG는
+                            유지하고 manifest에 예산 fallback을 기록합니다.
+                          </span>
+                        </span>
+                      </label>
+                      <label className="mt-2 flex min-h-10 cursor-pointer items-start gap-2 rounded-lg border border-line bg-card px-2.5 py-2 text-[0.62rem] text-fg-2">
+                        <input
+                          type="checkbox"
+                          checked={shotBatchIncludeContactSheet}
+                          disabled={isCapturing}
+                          onChange={(event) => setShotBatchIncludeContactSheet(event.target.checked)}
+                          className="mt-0.5 size-3.5 accent-accent"
+                        />
+                        <span>
+                          컷 검수용 콘택트 시트 포함
+                          <span className="mt-0.5 block font-normal leading-relaxed text-fg-3">
+                            컷당 LT 합성·원본·분리 패스 순으로 대표 PNG를 고르고, Worker에서 12컷씩
+                            검수 시트를 만듭니다. 미지원 브라우저에서는 PNG 패키지만 유지합니다.
+                          </span>
+                        </span>
+                      </label>
+                    </fieldset>
+                  </div>
                   <button
                     type="button"
                     className={cx(CONTROL_BUTTON, "mt-2 w-full border-line bg-panel text-fg-2 hover:bg-raised hover:text-fg")}
                     disabled={
-                      isCapturing ||
-                      isRestoringScene ||
-                      physicsInteractionLocked ||
-                      (sceneBaseDocument.shots?.length ?? 0) === 0
+                      shotBatchBlockedReason !== null ||
+                      shotBatchSelectedIds.length === 0 ||
+                      selectedShotBatchPasses.length === 0
                     }
                     onClick={() => void exportSavedShotsAsZip()}
                   >
@@ -7288,16 +7872,31 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                     ) : (
                       <Save size={14} aria-hidden />
                     )}
-                    모든 컷 LT PNG ZIP
+                    {shotBatchRecoverySummary ? "보존 작업 이어서 · " : ""}
+                    선택 {shotBatchSelectedIds.length}컷 · {selectedShotBatchPasses.length}패스
+                    {shotBatchIncludeContactSheet ? " + 콘택트" : ""}
+                    {shotBatchIncludeLayeredPsd ? " + PSD" : ""} ZIP
                   </button>
                   <p className="mt-1.5 text-[0.62rem] leading-relaxed text-fg-3">
-                    컷별 선화·톤·투명 배경·저장 해상도를 적용한 합성 PNG를 메모리 예산 안에서 출력합니다.
+                    한 번의 GPU 캡처에서 원본·LT 분리 레이어·깊이를 만들고, 꺼진 레이어는 manifest에
+                    생략 사유를 기록합니다. 기기 예산으로 축소되면 artifact에 요청/실제 높이를 함께
+                    기록합니다. 최대 64컷·448 PNG·64 PSD·콘택트 6장(장당 12컷)·384 MiB입니다.
                   </p>
+                  {shotBatchRecoverySummary ? (
+                    <p className="mt-1.5 rounded-lg border border-accent/35 bg-accent-soft px-2.5 py-2 text-[0.62rem] leading-relaxed text-accent">
+                      완료된 {shotBatchRecoverySummary.completedShots}/{shotBatchRecoverySummary.totalShots}컷을
+                      메모리에 보존했습니다. 장면·선택·패스가 같으면 완료 컷을 다시 렌더하지 않습니다.
+                    </p>
+                  ) : null}
                   {shotBatchProgress ? (
                     <div className="mt-2 rounded-lg border border-line bg-panel px-2.5 py-2" role="status" aria-live="polite">
                       <div className="flex items-center justify-between gap-2 text-[0.64rem] text-fg-3">
                         <span className="min-w-0 truncate">
-                          {shotBatchProgress.stage === "render" ? "렌더" : "패키지"} · {shotBatchProgress.label}
+                          {shotBatchProgress.stage === "render"
+                            ? "렌더"
+                            : shotBatchProgress.stage === "contact"
+                              ? "콘택트"
+                              : "패키지"} · {shotBatchProgress.label}
                         </span>
                         <span className="shrink-0 tabular-nums">
                           {shotBatchProgress.completed}/{shotBatchProgress.total}
@@ -7325,6 +7924,22 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                         const active = sceneBaseDocument.activeShotId === shot.id;
                         return (
                           <li key={shot.id} className="flex items-stretch gap-1">
+                            <label className="grid min-h-11 w-11 shrink-0 cursor-pointer place-items-center rounded-lg border border-transparent hover:border-line hover:bg-raised sm:min-h-9 sm:w-8">
+                              <span className="sr-only">{shot.name} 배치 렌더 선택</span>
+                              <input
+                                type="checkbox"
+                                aria-label={`${shot.name} 배치 렌더 선택`}
+                                checked={!shotBatchExcludedIds.has(shot.id)}
+                                disabled={isCapturing || isRestoringScene || physicsInteractionLocked}
+                                onChange={(event) => setShotBatchExcludedIds((current) => {
+                                  const next = new Set(current);
+                                  if (event.target.checked) next.delete(shot.id);
+                                  else next.add(shot.id);
+                                  return next;
+                                })}
+                                className="size-4 accent-accent"
+                              />
+                            </label>
                             <button
                               type="button"
                               aria-current={active ? "true" : undefined}
@@ -7359,7 +7974,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                                   physicsInteractionLocked
                                 }
                                 onClick={() => moveSavedShot(shot.id, index - 1)}
-                                className="grid min-h-11 w-9 place-items-center border-r border-line text-xs font-bold text-fg-3 hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-35 sm:min-h-9"
+                                className="grid min-h-11 w-11 place-items-center border-r border-line text-xs font-bold text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-35 sm:min-h-9 sm:w-9"
                               >
                                 ↑
                               </button>
@@ -7374,7 +7989,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                                   physicsInteractionLocked
                                 }
                                 onClick={() => moveSavedShot(shot.id, index + 1)}
-                                className="grid min-h-11 w-9 place-items-center border-r border-line text-xs font-bold text-fg-3 hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-35 sm:min-h-9"
+                                className="grid min-h-11 w-11 place-items-center border-r border-line text-xs font-bold text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-35 sm:min-h-9 sm:w-9"
                               >
                                 ↓
                               </button>
@@ -7384,7 +7999,7 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                                 title="삭제 · 실행 취소 가능"
                                 disabled={isCapturing || isRestoringScene || physicsInteractionLocked}
                                 onClick={() => removeSavedShot(shot.id)}
-                                className="grid min-h-11 w-9 place-items-center text-fg-3 hover:bg-accent-soft hover:text-accent disabled:cursor-not-allowed disabled:opacity-35 sm:min-h-9"
+                                className="grid min-h-11 w-11 place-items-center text-fg-3 hover:bg-accent-soft hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-35 sm:min-h-9 sm:w-9"
                               >
                                 <Trash2 size={13} aria-hidden />
                               </button>

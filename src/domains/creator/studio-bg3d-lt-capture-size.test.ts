@@ -51,6 +51,21 @@ describe("resolveStudioBg3dLtCaptureSize", () => {
     expect(result).toMatchObject({ width: 2_048, height: 512, wasReduced: true });
   });
 
+  it("keeps an ultrawide batch capture inside the downstream 4096px PNG edge", () => {
+    const result = resolveStudioBg3dLtCaptureSize({
+      sourceWidth: 3_440,
+      sourceHeight: 1_440,
+      requestedHeight: 2_160,
+      maxPixels: 8_388_608,
+      maxEdge: 4_096,
+    });
+    expect(result).not.toBeNull();
+    expect(result!.width).toBeLessThanOrEqual(4_096);
+    expect(result!.height).toBeLessThanOrEqual(4_096);
+    expect(result!.pixelCount).toBeLessThanOrEqual(8_388_608);
+    expect(result!.wasReduced).toBe(true);
+  });
+
   it("handles portrait and square sources deterministically", () => {
     expect(
       resolveStudioBg3dLtCaptureSize({

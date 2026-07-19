@@ -13,6 +13,7 @@ import {
 
 const PNG_BYTES = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0]);
 const ZIP_BYTES = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0, 0]);
+const PSD_BYTES = new Uint8Array([0x38, 0x42, 0x50, 0x53, 0, 1, 0]);
 
 class FakeWorker implements StudioBg3dShotBatchWorkerLike {
   readonly requests: StudioBg3dShotBatchWorkerRequest[] = [];
@@ -71,9 +72,34 @@ describe("Studio BG3D shot batch archive Worker client", () => {
     const result = buildStudioBg3dShotBatchArchiveInWorker([image()], {
       workerFactory: () => worker,
       onProgress: progress,
+      manifest: {
+        resumeKey: "bg3d-batch-deadbeef",
+        shots: [{ id: "shot-a", name: "첫 컷" }],
+        requestedPasses: ["lt-composite"],
+        layeredPsdRequested: true,
+        contactSheetRequested: true,
+      },
+      layeredPsds: [{
+        shotId: "shot-a",
+        shotName: "첫 컷",
+        width: 320,
+        height: 180,
+        psd: new Blob([PSD_BYTES], { type: "image/vnd.adobe.photoshop" }),
+      }],
+      contactSheets: [{
+        sheetNumber: 1,
+        fileName: "contact-sheet-001.png",
+        width: 320,
+        height: 180,
+        shotIds: ["shot-a"],
+        png: new Blob([PNG_BYTES], { type: "image/png" }),
+      }],
     });
     const request = worker.requests[0];
     expect(request && isStudioBg3dShotBatchWorkerRequest(request)).toBe(true);
+    expect(request?.manifest).toMatchObject({ resumeKey: "bg3d-batch-deadbeef" });
+    expect(request?.layeredPsds).toHaveLength(1);
+    expect(request?.contactSheets).toHaveLength(1);
     worker.emit({
       version: STUDIO_BG3D_SHOT_BATCH_WORKER_PROTOCOL_VERSION,
       kind: "progress",
@@ -134,6 +160,13 @@ describe("Studio BG3D shot batch archive Worker client", () => {
       kind: "result",
       archive: new Blob([ZIP_BYTES], { type: "application/zip" }),
       extra: true,
+    })).toBe(false);
+    expect(isStudioBg3dShotBatchWorkerRequest({
+      version: STUDIO_BG3D_SHOT_BATCH_WORKER_PROTOCOL_VERSION,
+      kind: "build",
+      requestId: 1,
+      images: [image()],
+      manifest: { resumeKey: "forged" },
     })).toBe(false);
   });
 });

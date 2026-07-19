@@ -146,6 +146,21 @@ SKP 장면, 카메라, 조명·선·재질, 다중 scene와 render pass를 웹�
   아직 lab route, feature flag UI, 동일 corpus runner와 production caller는 연결되지 않았다.
 - Three/R3F가 현재 유일한 interactive owner다. engine-neutral specialist snapshot·DTO·registry 계약과
   단위 테스트는 구현돼 있지만, 등록된 두 번째 엔진 adapter와 production 호출 경로는 아직 없다.
+- **[이번 기반]** Three/Babylon/PlayCanvas 등 후보를 감으로 채택하지 않도록 외부에서 승인한 동일
+  corpus/build/profile/device와 engine/backend/adapter fingerprint뿐 아니라 **순서가 고정된 scene id·등급·
+  capture 크기 manifest**를 요구하고, RGBA·linear-depth 허용오차,
+  frame/input p95, 30분 soak, device-loss 복구, SceneDocument 보존, dispose와 번들 회귀를 함께 판정하는
+  bounded benchmark report·승인 컨텍스트 gate를 추가했다. 모든 scene은 p95 frame 회귀 +5% 이하와
+  30 FPS 편집 용량 90% 이상을 지키고, 최소 한 large scene에서 p95 25% 개선 또는 편집 용량 2배를
+  추가로 증명해야 한다. capture 비교는 SharedArrayBuffer와 baseline/candidate backing-store 재사용을
+  거부하고 입력을 복사한 뒤 계산한다. 결과는 해당 승인 기기 컨텍스트의
+  `qualify-approved-context`일 뿐 전역 채택 판정이 아니다. 실기기 corpus runner·기기 매트릭스 집계·
+  production route에는 아직 연결하지 않았다.
+- **[이번 기반]** VRM 1.0 humanoid 55본을 의미 이름으로 저장하는 포즈 소재 v1과 full/upper/lower/
+  left-hand/right-hand/gaze-jaw 부분 적용, locked-bone merge plan, 최대 64개·256 KiB 로컬 라이브러리
+  코어를 추가했다. 회전은 `xyzw`·right-handed·VRM normalized·bone-local·rest-relative·
+  `delta × rest`로 wire semantics를 고정했다. 손상/미래 버전 저장소는 보존하며 전체 교체는 명시적
+  force가 있어야 한다. 아직 VRM poser의 사용자 패널과 runtime 적용 command에는 연결하지 않았다.
 
 ### 4.2 이번 변경에서 구현·연결된 기능
 
@@ -154,7 +169,8 @@ SKP 장면, 카메라, 조명·선·재질, 다중 scene와 render pass를 웹�
 
 | 기능 | 이번 반영 내용 | 벤치마크에서 얻은 가치 |
 | --- | --- | --- |
-| 컷·샷 보드 | 카메라, 배경, 조명, render, LT, 노드 visibility를 최대 64개 shot으로 저장·적용·복제·순서 변경·삭제하고 undo/redo. 모든 컷에 저장된 선화·톤·투명 배경·출력 해상도를 적용해 LT 합성 PNG로 렌더하고 bounded ZIP+manifest로 로컬 저장하며 취소 후 원 장면을 복원 | ABLUR의 SketchUp scene 유지·multi-scene·batch workflow |
+| 컷·샷 보드·배치 | 카메라, 배경, 조명, render, LT, 노드 visibility를 최대 64개 shot으로 저장·적용·복제·순서 변경·삭제하고 undo/redo. 선택 컷과 컷별/공통 **최대 높이**를 받아 animation sample을 고정하고 한 GPU capture에서 beauty·LT composite·color·tone·texture line·main line·depth를 최대 448 PNG로 출력한다. 기기·raster pixel budget으로 줄어들면 요청/실제 높이와 축소 여부를 artifact manifest에 기록한다. 완료 컷은 메모리에 원자 보존해 같은 scene revision/옵션으로 재시도할 때 다시 렌더하지 않고, hidden tab에서는 새 capture를 멈춘다 | ABLUR의 SketchUp scene 유지·selected-only·multi-scene·batch workflow |
+| 검수·후반작업 bundle | archive Worker가 v2 manifest와 PNG/PSD를 bounded ZIP으로 만들고, 컷별 최대 4개 LT layer PSD는 별도 Worker에서 예산 내 생성한다. 컷당 대표 패스로 4×3 콘택트 시트를 OffscreenCanvas Worker에서 만들며, PSD·콘택트가 미지원/초과/실패하면 PNG를 보존하고 manifest에 fallback 사유를 남긴다 | ABLUR의 layered PSD/pass export와 Snaptoon식 빠른 컷 검수 |
 | 분위기 rig | 맑은 낮, 골든아워, 푸른 밤, 옅은 안개, 극적 야경의 배경·안개·조명·노출·tone mapping을 원자 적용 | ABLUR/Snaptoon의 빠른 분위기 연출 |
 | 사진 포즈 스캔 | JPEG/PNG/WebP admission, EXIF·회전·mirror·resize를 Worker 처리하고 로컬 MediaPipe IMAGE-mode 결과를 VRM pose로 적용 | SHAPER/CSP의 사진 포즈 workflow와 CSP 서버 업로드 대비 privacy 이점 |
 | 포즈 편집 보강 | 팔/다리/몸통/전체 mirror, 상체 펴기, 보수적인 VRM joint limit profile과 opt-out, 3D 관절 점 선택·잠금 표시, 화면 평면에서 손목을 끄는 two-bone IK와 drag-end 단일 pose commit | CSP joint limit·시각적 관절 선택, AccuPOSE lock/controlled posing의 기초 |
@@ -233,13 +249,17 @@ frequency를 조정한다.
   있다.
 - **[이번 반영]** local photo pose workflow는 CSP처럼 서버 업로드를 요구하지 않는다. 보수적 joint limit과
   mirror도 추가됐다.
-- **[격차]** pose material library, visual joint pin/end-effector lock, 실시간 hand scanner, BVH pose sequence,
-  true vector line, scale/depth-aware line thickness는 남아 있다.
+- **[이번 기반/UI 미연결]** VRM 1.0 semantic 55본 기반 pose material과 full/upper/lower/hand/gaze-jaw scope,
+  locked-bone merge plan, bounded local library를 구현했다.
+- **[격차]** pose material의 poser UI·undo command 연결, visual joint pin/end-effector lock, 실시간 hand
+  scanner, BVH pose sequence, true vector line, scale/depth-aware line thickness는 남아 있다.
 
 #### 가져올 기능
 
-1. **[P1] 포즈 소재**: full-body, upper/lower body, left/right hand, facial expression을 분리하고 semantic
-   bone name + normalized rest-space quaternion으로 저장한다. source rig의 bone index를 저장하지 않는다.
+1. **[P1·코어 반영/UI 미연결] 포즈 소재**: full-body, upper/lower body, left/right hand, eye/jaw rotation을
+   분리하고 semantic bone name + VRM normalized rest-relative quaternion으로 저장한다. source rig의 bone
+   index를 저장하지 않으며, 다음 단계에서 poser adapter와 undo transaction을 연결한다. blink·감정·viseme
+   같은 표정은 bone pose로 과장하지 않고 별도의 bounded VRM expression-weight 계약으로 설계한다.
 2. **[P1] visual pin과 end-effector**: 손·발·골반·시선을 화면 controller로 움직이고, 선택한 joint를 pin한다.
    기존 analytic two-bone IK 결과를 같은 undo transaction에 넣는다.
 3. **[P1] 실시간 한 손 스캔**: camera permission을 명시적으로 받고 한 손씩 preview한다. 품질이 낮으면
@@ -282,7 +302,8 @@ face puppet/key, look-at, video/webcam face tracking과 lip-sync를 제공한다
 #### ToonSpectrum과의 비교
 
 - **[현재 기준선]** pose/morph, aim, two-bone IK, pose bake, VRM normalized bones, animation sampling이 있다.
-- **[이번 반영]** joint limit, mirror, 사진 pose apply는 manual pose workflow를 개선한다.
+- **[이번 반영/기반]** joint limit, mirror, 사진 pose apply가 manual pose workflow를 개선했고 VRM 1.0
+  55본 semantic pose 소재 계약이 다른 체형에 ordinal 대신 이름으로 적용할 기반을 만든다.
 - **[격차]** generic humanoid auto-rig/skin weight, user-confirmed semantic bone mapping, retarget,
   multi-clip timeline, root motion, foot contact, pose suggestion model, body/head parametric generator는 없다.
 
@@ -337,24 +358,24 @@ selected-only render를 제공한다.
 
 - **[현재 기준선]** hierarchy, camera, fog·panorama, line/tone layer, transparent capture와
   engine-neutral scene document가 있다.
-- **[이번 반영]** 5개 분위기 rig와 최대 64개 컷·샷 보드가 ABLUR의 mood·multi-scene workflow를 직접
-  보강한다.
+- **[이번 반영]** 5개 분위기 rig와 최대 64개 컷·샷 보드에 selected-only, 공통/컷별 최대 높이,
+  7종 지원 pass, 취소·실패 후 완료 컷 메모리 복구, hidden-tab pause, deterministic animation freeze,
+  bounded layered PSD와 콘택트 시트 Worker를 연결했다.
 - **[격차]** browser-direct SKP, SketchUp scene/tag/component metadata round-trip, camera near clipping·roll의
-  작가용 UX, selected-only render, 실패 shot 재시도·background resume가 가능한 고급 batch queue,
-  material/shadow pass와 실제 layered PSD package가 남아 있다.
+  작가용 UX, 새로고침 뒤에도 살아 있는 durable batch checkpoint, material-ID/shadow/normal pass가 남아 있다.
 
 #### 가져올 기능
 
 1. **[P0] shot board 안정화**: shot apply가 camera뿐 아니라 background, lighting, render,
    node visibility를 원자 변경하고 undo/redo·archive round-trip·320 KiB SceneDocument 예산을 통과하게 한다.
-2. **[P1] 선택형·복구 가능한 batch shot queue**: 현재 전체 shot LT 합성 PNG ZIP을 여러 shot 선택,
-   동일한 animation time과 deterministic quality를 갖춘 queue로 확장한다. 취소, 진행률, 실패 shot 재시도,
-   브라우저 background 복귀를 지원한다.
-3. **[P1] selected-only 및 pass bundle**: beauty/composite, flat color, line, texture line, tone, shadow,
-   material-ID, depth/normal을 명시적 pass manifest와 함께 export한다.
-4. **[P1] PSD writer**: 브라우저 memory 폭탄을 피하기 위해 각 layer byte/pixel budget을 먼저 계산하고,
-   Worker에서 압축하거나 서버 job에 위임한다. 원본이 PSD 하나가 아니어도 동일 manifest + PNG ZIP으로
-   반드시 fallback한다.
+2. **[P1·이번 반영/부분] 선택형·복구 가능한 batch shot queue**: selected-only, animation freeze,
+   cancel/progress, hidden-tab pause와 같은 탭 안의 완료 컷 재사용은 구현했다. 다음 단계는 IndexedDB quota를
+   먼저 승인받는 작은 checkpoint로 새로고침·브라우저 재시작 뒤 복구를 제공하는 것이다.
+3. **[P1·이번 반영/부분] pass bundle**: beauty/composite, color, tone, texture line, main line, depth를
+   v2 manifest와 함께 export한다. shadow, material-ID, normal은 capture adapter 계약이 마련되기 전에는
+   지원한다고 표시하지 않는다.
+4. **[P1·이번 반영] PSD writer**: layer/canvas/aggregate pixel/output byte를 사전 계산하고 별도 Worker에서
+   컷별 PSD를 만든다. 예산 초과·Worker 미지원/실패 시 동일 manifest + 개별 PNG ZIP을 유지한다.
 5. **[P1] camera direction tools**: near plane, Dutch roll, focal length/FOV, safe frame, panel aspect preset,
    selected focus와 wall clipping을 shot 속성으로 저장한다.
 6. **[P2] SketchUp metadata bridge**: SKP 자체를 영속 문서에 넣지 않고 canonical GLB + sidecar scene/tag/
@@ -499,10 +520,10 @@ process/output-byte/triangle/texture budget, cancellation과 강제 종료, outp
 | 제품 | 공식 강점 | ToonSpectrum 현재 parity | 가장 큰 격차 | 채택 방식 | 우선순위 |
 | --- | --- | --- | --- | --- | --- |
 | SHAPER | 캐릭터·의상·포즈 preset, AI preset 추천, pose scan, surface draw, PSD | VRM pose/morph/IK, 이번 반영 local photo pose·mirror·joint limit | parametric character recipe, surface paint, character pass | workflow 독립 구현 | P1~P2 |
-| CLIP STUDIO 3D | 폭넓은 import, pose material/controller/lock, photo pose, hand scanner, BVH, LT | canonical multi-format, hierarchy/All Sides, pose/IK, raster LT | pose library, visual pin, hand scanner, BVH, vector line | production UI에 직접 구현 | P1~P2 |
-| Reallusion | character morph/rig, AccuRIG, AccuPOSE, timeline/retarget/contact/facial | VRM + generic pose/morph/IK/bake, 이번 반영 constraint UX | auto-rig/weights, motion stack, natural pose suggestion | 자체 solver/data로 단계 구현 | P1~P3 |
-| ABLUR | SKP scene 유지, camera·mood·line/material, batch/pass/PSD | hierarchy/camera/LT, 이번 반영 mood rig·shot board·전체 shot LT 합성 PNG ZIP | SKP metadata, selected-only·retry 가능한 고급 batch/pass/PSD, near clip/roll | 가장 높은 workflow 참고 | P0~P2 |
-| Snaptoon | Unreal realtime, direct SKP, 2,600+ webtoon assets, toon workflow | realtime Three, model library, LT preset | 큰 권리형 catalog와 one-click placement | 공급자 계약형 asset browser | P1~P2 |
+| CLIP STUDIO 3D | 폭넓은 import, pose material/controller/lock, photo pose, hand scanner, BVH, LT | canonical multi-format, hierarchy/All Sides, pose/IK, raster LT + 이번 기반 semantic pose material/library | pose UI·visual pin, hand scanner, BVH, vector line | production UI에 직접 구현 | P1~P2 |
+| Reallusion | character morph/rig, AccuRIG, AccuPOSE, timeline/retarget/contact/facial | VRM + generic pose/morph/IK/bake, constraint UX + semantic 55본 pose contract | auto-rig/weights, motion stack, natural pose suggestion | 자체 solver/data로 단계 구현 | P1~P3 |
+| ABLUR | SKP scene 유지, camera·mood·line/material, batch/pass/PSD | hierarchy/camera/LT, mood·shot board·selected 7-pass ZIP·bounded PSD·retry | SKP metadata, durable background resume, shadow/material-ID/normal, near clip/roll | 가장 높은 workflow 참고 | P0~P2 |
+| Snaptoon | Unreal realtime, direct SKP, 2,600+ webtoon assets, toon workflow | realtime Three, model library, LT preset, Worker contact sheet | 큰 권리형 catalog와 one-click placement | 공급자 계약형 asset browser | P1~P2 |
 | SketchUp | 건축·공간 authoring, scene/tag/component, 공식 GLB/PBR export | GLB admission과 scene hierarchy | direct SKP와 metadata sidecar | GLB bridge 우선, converter 조건부 | P0~P2 |
 | Blender | 전체 DCC, rig/animation, Line Art/Freestyle, headless batch | web 컷 배치 속도, secure import, immediate raster LT | topology/sculpt/UV/weights/vector NPR | 외부 DCC + 격리 specialist | P0~P3 |
 
@@ -546,9 +567,9 @@ flowchart LR
 | Rapier physics | **현재 WASM Worker** | fixed timestep preview/bake, rig transform ownership 충돌 차단 |
 | Meshopt/KTX2/Draco | Worker/WASM | decoder pin·hash·capability attestation, decoded memory까지 예산 청구 |
 | retarget·IK batch·key reduction | P1/P2 Worker | 수천 frame 계산을 numerical DTO로 반환; live skeleton 객체 전달 금지 |
-| thumbnail/contact sheet | P1 OffscreenCanvas 또는 별도 low-priority renderer | interactive frame과 경쟁하지 않도록 queue·cancel·visibility throttle |
-| shot LT 합성 PNG ZIP | **[이번 반영] Worker**, `Worker` 전역이 없는 환경에서만 main-thread fallback | 컷별 LT 합성은 현재 bounded main-thread raster 단계, immutable PNG Blob의 CRC/ZIP32 조립은 Worker로 격리; request correlation, 180초 timeout, terminate cancel, 400 MiB archive cap. Worker 생성·protocol·runtime 실패는 fail closed하며 main-thread로 자동 재시도하지 않음 |
-| PSD/pass 압축 | P1 Worker 또는 bounded server job | 큰 image buffer 복사 최소화, output byte 사전 계산 |
+| thumbnail/contact sheet | **[이번 반영] OffscreenCanvas Worker** | 대표 PNG를 순차 decode해 동시에 live `ImageBitmap`을 1개로 제한하고 finally에서 close; 12컷/시트, request correlation, progress, timeout, cancel/terminate, PNG IHDR·byte/pixel 재검증. 미지원이면 archive manifest fallback |
+| shot pass PNG/PSD ZIP | **[이번 반영] archive Worker** | 컷별 LT raster/PNG encode는 현재 bounded main thread, immutable Blob의 CRC/ZIP32 조립은 Worker로 격리; request correlation, 180초 timeout, terminate cancel, 400 MiB archive cap. Worker 생성·protocol·runtime 실패는 fail closed하며 main-thread로 자동 재시도하지 않음 |
+| layered PSD | **[이번 반영] 전용 Worker** | 최대 4 LT layer, 2,097,152 canvas pixel·8,388,608 aggregate layer pixel·128 MiB output을 사전 검증하고, 실패해도 PNG bundle을 유지 |
 
 Worker 운영 규칙:
 
@@ -649,18 +670,22 @@ stand-alone 재배포 제한 등을 포함한다. asset마다 creator 권리와 
 - selection, undo, animation time, capture ownership을 두 엔진이 나눠 갖기.
 - 단순히 기능 목록이 많다는 이유로 두 번째 엔진을 production bundle에 상시 포함.
 
-### 채택 수치 gate
+### 승인 컨텍스트 수치 gate
 
-두 번째 엔진은 특정 specialist task에서 아래를 모두 통과해야 한다.
+두 번째 엔진은 특정 specialist task에서 아래를 모두 통과해야 한다. 구현된 판정기는 외부에서 승인한
+정확한 corpus/build/profile/device와 engine/backend/adapter fingerprint가 report와 일치할 때만 실행되며,
+승인된 순서형 scene manifest의 id·등급·capture 크기도 report와 일치해야 한다. manifest에는 최소 한 개의
+large scene이 필요하다. 한 기기의 통과 결과를 다른 기기나 전체 사용자군의 채택 근거로 확대하지 않는다.
 
-1. Three 기준 대비 p95 frame time 25% 이상 개선 또는 같은 memory 한도에서 scene 규모 2배.
-2. cold activation bytes/request와 누적 JS/WASM gzip이 device budget 안에 있음.
-3. 종료 후 JS/WASM heap과 GPU resource proxy가 기준선 근처로 복귀.
-4. SceneDocument round-trip, attachment hash, node/skin/joint/morph/animation identity 보존.
-5. RGBA/depth/transparent capture가 허용 pixel diff 안에 있음.
-6. context loss, WebGPU device loss, Worker/WASM panic에서 WebGL path로 데이터 손실 없이 복귀.
-7. 30분 편집의 input latency, memory growth, dispose와 mobile thermal profile 통과.
-8. 라이선스, loader/decoder 보안, CSP와 공급망 정책 통과.
+1. 모든 scene에서 Three 기준 대비 p95 frame time 회귀가 5% 이하이고 30 FPS 편집 가능 용량이 90% 이상.
+2. 최소 한 large scene에서 p95 frame time 25% 이상 개선 또는 같은 memory 한도에서 편집 용량 2배.
+3. cold activation bytes/request와 누적 JS/WASM gzip이 device budget 안에 있음.
+4. 종료 후 JS/WASM heap과 GPU resource proxy가 기준선 근처로 복귀.
+5. SceneDocument round-trip, attachment hash, node/skin/joint/morph/animation identity 보존.
+6. RGBA/depth/transparent capture가 허용 pixel diff 안에 있고 diff 통계가 수학적으로 일관됨.
+7. context loss, WebGPU device loss, Worker/WASM panic에서 WebGL path로 데이터 손실 없이 복귀.
+8. 30분 편집의 input latency, memory growth, dispose와 mobile thermal profile 통과.
+9. 라이선스, loader/decoder 보안, CSP와 공급망 정책 통과.
 
 후보 우선순위는 기존 전문 런타임 문서와 같다. Babylon은 thin instance·physics·WebGPU instrumentation,
 PlayCanvas는 web 중심 WebGPU compute·Gaussian Splat 후보로 경쟁 PoC하며, 승자가 있더라도 **하나의 전문
@@ -674,9 +699,9 @@ job**만 맡는다.
 필요하지 않으며 배포 전 unit/integration/browser·실기기 gate를 고정한다.
 
 1. 컷·샷 보드의 capture/apply/duplicate, node visibility projection, active shot, archive와 undo/redo를
-   통합 테스트하고 UI mobile overflow·44 px touch target을 검증한다.
-   LT 합성 PNG ZIP batch가 임시 shot 상태를 history에 넣지 않고 취소·실패·성공 모두 원 카메라·visibility·
-   LT preview를 복원하는지도 포함한다.
+   통합 테스트하고 UI mobile overflow·44 px touch target을 검증한다. selected multi-pass/PSD/contact ZIP
+   batch가 임시 shot 상태를 history에 넣지 않고 취소·실패·성공 모두 원 카메라·visibility·LT preview를
+   복원하는지, hidden-tab pause와 같은 설정 재시도가 완료 컷을 중복 렌더하지 않는지도 포함한다.
 2. 5개 분위기 rig의 background/fog/light/exposure/tone mapping이 viewport, transparent capture,
    LT color/tone에 동일 반영되는 golden을 고정한다.
 3. 사진 pose의 admission, EXIF/rotate/mirror, Worker cancellation, stale generation, confidence와 local-only
@@ -695,17 +720,21 @@ transparent/LT capture, undo/redo가 desktop과 390/320 px mobile에서 데이�
 
 ### P1 — 웹툰 제작 속도를 직접 줄이는 기능
 
-1. 현재 LT 합성 PNG ZIP shot batch를 selected-only render, 해상도 선택, contact sheet와 pass별 batch로 확장한다.
-2. 현재의 의미 재질 suggestion/pass-plan을 사용자 확정 material slot과 실제 capture adapter에 연결하고,
-   beauty/color/line/texture-line/tone/shadow/material-ID/depth/normal pass manifest와 PNG ZIP fallback,
-   이후 bounded layered PSD를 구현한다.
-3. full-body/hand pose material library, visual end-effector pin, joint lock, ground/foot contact.
+1. **[이번 반영]** shot batch의 selected-only, 해상도 선택, pass별 PNG, 콘택트 시트, 같은 탭의 완료 컷
+   재사용을 유지하고, 다음으로 quota-aware durable checkpoint와 실패 컷만 재시도하는 UI를 연결한다.
+2. **[부분 반영]** beauty/color/line/texture-line/tone/depth와 bounded layered PSD는 연결됐다. 의미 재질
+   suggestion을 사용자가 확정한 slot과 capture adapter에 연결해 shadow/material-ID/normal을 추가한다.
+3. **[코어 반영/UI 미연결]** full-body/upper/lower/hand/gaze-jaw pose material library를 VRM poser의 저장·미리보기·
+   부분 적용 command에 연결하고 visual end-effector pin, joint lock, ground/foot contact를 보강한다.
 4. 실시간 한 손 scanner와 photo pose의 preview/freeze/confirm UX.
-5. camera near clipping, Dutch roll, safe frame, panel aspect와 shot thumbnail/contact sheet.
+5. camera near clipping, Dutch roll, safe frame, panel aspect와 shot thumbnail. 콘택트 시트 export는 이번 반영.
 6. SHAPER식 `CharacterRecipe`와 권리형 hair/clothes/accessory/material preset catalog.
 7. Snaptoon식 asset browser: device budget·license·attribution·hash가 보이는 one-click placement.
 8. SketchUp 공식 GLB export guide와 Blender official GLB authoring preset/sample.
-9. semantic rig profile과 사용자 확인 bone mapping.
+9. **[코어 반영/UI 미연결]** semantic rig profile과 사용자 확인 bone mapping.
+10. batch의 Sobel/톤/LT 합성과 pass별 PNG encode를 transferable RGBA/depth + OffscreenCanvas 전용
+    Worker로 옮긴다. 현재 contact/PSD/ZIP Worker만으로는 지배적인 CPU 단계가 main thread에 남으므로,
+    main-thread fallback은 더 낮은 pixel cap을 적용하고 peak working-set·cancel latency를 실기기에서 잰다.
 
 **P1 완료 조건:** 한 scene의 10개 shot을 batch export해도 UI가 응답하고, cancel/retry가 가능하며,
 각 pass의 camera·alpha·node visibility가 beauty와 pixel-aligned여야 한다. pose는 다른 VRM 체형에서도
@@ -719,8 +748,11 @@ hand/foot identity를 유지하고 잘못된 mapping은 확정 전에 차단한�
 4. depth/normal/material-ID 기반 vector-like line 또는 SVG specialist와 Blender golden 비교.
 5. SDK·법무·보안 gate를 통과한 native/server SKP converter와 scene/tag/component sidecar.
 6. 격리 headless Blender conversion/final-render specialist의 작은 PoC.
-7. Babylon과 PlayCanvas의 동일 corpus specialist benchmark. 수치 gate를 못 넘으면 dependency를 추가하지
-   않는다.
+7. Babylon과 PlayCanvas의 동일 corpus specialist benchmark. **[이번 기반]** report/승인 컨텍스트 gate는
+   구현했으며, 수치 gate를 채우는 별도 Vite 실기기 runner와 desktop/mobile 기기 매트릭스 집계기를
+   연결한다. first-use loader request·transfer·compile 비용도 실제 계측하며, 한 기기의
+   `qualify-approved-context`를 전역 채택으로 승격하지 않는다. gate를 못 넘으면 dependency를 production에
+   추가하지 않는다.
 
 **P2 완료 조건:** retarget/auto-rig 결과가 원본 asset을 파괴하지 않고 rollback되며, converter와 Blender
 job은 malicious corpus, timeout, memory bomb, cancel과 temp deletion audit을 통과해야 한다.

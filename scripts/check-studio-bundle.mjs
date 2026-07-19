@@ -51,6 +51,13 @@ const budgets = {
   // 2026-07-18 production output: 2,302,139 raw / 855,399 gzip. Keep ~2% version-drift headroom
   // without charging this optional engine to Studio or the 3D editor's initial graph.
   bg3dPhysicsWorker: { raw: 2_350_000, gzip: 875_000 },
+  // 2026-07-19 selected-shot/multi-pass/recovery UI baseline. This is the complete static closure
+  // activated only after the user opens StudioBackground3D; PSD/physics/engine labs stay isolated.
+  bg3dEditor: { raw: 2_380_000, gzip: 690_000, chunks: 40 },
+  // ag-psd is intentionally reachable only through the bounded per-shot PSD module Worker.
+  bg3dPsdWorker: { raw: 1_250_000, gzip: 360_000 },
+  // OffscreenCanvas/createImageBitmap contact-sheet compositor, isolated from the editor graph.
+  bg3dContactSheetWorker: { raw: 80_000, gzip: 25_000 },
   // Measured after the same build: 443,257 raw / 143,956 gzip.
   app: { raw: 500_000, gzip: 170_000 },
 };
@@ -259,6 +266,15 @@ if (!fs.existsSync(manifestPath)) {
       fail(`optional 3D runtime returned to the Studio static graph: ${eager3dRuntime.join(", ")}`);
     }
 
+    const emittedProductionEngineLabs = matchingManifestEntries(
+      /(?:studio-bg3d-(?:three-webgpu-lab|engine-benchmark-browser)|@babylonjs|babylon(?:\.js)?|playcanvas)/i,
+    );
+    if (emittedProductionEngineLabs.length > 0) {
+      fail(
+        `3D engine lab code was emitted into the production manifest: ${emittedProductionEngineLabs.join(", ")}`,
+      );
+    }
+
     checkDynamicBoundary(
       "optional 3D background editor",
       /src\/domains\/creator\/StudioBackground3D\.tsx/,
@@ -271,6 +287,14 @@ if (!fs.existsSync(manifestPath)) {
       fail(`expected one StudioBackground3D manifest entry, found ${background3dEntries.length}`);
     } else {
       const background3dKeys = staticClosure(background3dEntries[0]);
+      const background3dSize = measure(background3dKeys);
+      checkBudget("BG3D editor activation", background3dSize, budgets.bg3dEditor);
+      if (background3dKeys.size > budgets.bg3dEditor.chunks) {
+        fail(
+          `BG3D editor activation uses ${background3dKeys.size} static JS requests `
+            + `(budget ${budgets.bg3dEditor.chunks})`,
+        );
+      }
       const eagerPhysicsRuntime = matchingEntries(
         background3dKeys,
         /(?:studio-bg3d-physics-worker-client|node_modules.*rapier3d)/,
@@ -280,11 +304,54 @@ if (!fs.existsSync(manifestPath)) {
           `optional BG3D physics runtime returned to the 3D editor static graph: ${eagerPhysicsRuntime.join(", ")}`,
         );
       }
+      const eagerPsdRuntime = matchingEntries(
+        background3dKeys,
+        /(?:src\/domains\/creator\/studio-bg3d-shot-psd\.ts|node_modules.*ag-psd)/,
+      );
+      if (eagerPsdRuntime.length > 0) {
+        fail(
+          `optional BG3D PSD writer returned to the 3D editor static graph: ${eagerPsdRuntime.join(", ")}`,
+        );
+      }
+      const eagerContactSheetRuntime = matchingEntries(
+        background3dKeys,
+        /src\/domains\/creator\/studio-bg3d-shot-contact-sheet\.ts/,
+      );
+      if (eagerContactSheetRuntime.length > 0) {
+        fail(
+          `optional BG3D contact-sheet compositor returned to the editor static graph: ${eagerContactSheetRuntime.join(", ")}`,
+        );
+      }
       checkDynamicBoundary(
         "optional BG3D physics runtime",
         /src\/domains\/creator\/studio-bg3d-physics-worker-client\.ts/,
         background3dKeys,
       );
+    }
+
+
+    const contactSheetWorkerFiles = fs.readdirSync(path.join(outputDirectory, "assets"))
+      .filter((file) => /^studio-bg3d-shot-contact-sheet\.worker-[A-Za-z0-9_-]+\.js$/u.test(file));
+    if (contactSheetWorkerFiles.length !== 1) {
+      fail(`expected one isolated BG3D contact-sheet Worker asset, found ${contactSheetWorkerFiles.length}`);
+    } else {
+      const bytes = fs.readFileSync(path.join(outputDirectory, "assets", contactSheetWorkerFiles[0]));
+      checkBudget("BG3D contact-sheet Worker", {
+        raw: bytes.byteLength,
+        gzip: gzipSync(bytes).byteLength,
+      }, budgets.bg3dContactSheetWorker);
+    }
+
+    const psdWorkerFiles = fs.readdirSync(path.join(outputDirectory, "assets"))
+      .filter((file) => /^studio-bg3d-shot-psd\.worker-[A-Za-z0-9_-]+\.js$/u.test(file));
+    if (psdWorkerFiles.length !== 1) {
+      fail(`expected one isolated BG3D PSD Worker asset, found ${psdWorkerFiles.length}`);
+    } else {
+      const bytes = fs.readFileSync(path.join(outputDirectory, "assets", psdWorkerFiles[0]));
+      checkBudget("BG3D PSD Worker", {
+        raw: bytes.byteLength,
+        gzip: gzipSync(bytes).byteLength,
+      }, budgets.bg3dPsdWorker);
     }
 
     const physicsWorkerFiles = fs.readdirSync(path.join(outputDirectory, "assets"))
