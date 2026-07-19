@@ -37,7 +37,7 @@ Clip Studio Paint EX의 All Sides View는 원근·정면·측면·상단 뷰와 
 - ToonSpectrum 현재 강점: 원근·정면·측면·상단 4분할, 선택 대상 중심 맞춤, 모바일 단일 뷰 전환
 - 남은 격차: 카메라 프러스텀의 직접 편집과 뷰별 독립 표시 옵션
 
-Clip Studio Paint는 3D 객체·배경·프리미티브·파노라마를 소재 팔레트에서 재사용한다. GLB/glTF/OBJ/FBX/VRM 등 다양한 입력을 지원하지만, ToonSpectrum 웹 런타임은 외부 참조와 파서 공격면을 줄이기 위해 신규 사용자 업로드를 자체 포함 GLB 2.0으로 제한한다.
+Clip Studio Paint는 3D 객체·배경·프리미티브·파노라마를 소재 팔레트에서 재사용한다. ToonSpectrum은 GLB/glTF, OBJ/MTL, FBX, DAE, STL, PLY, 3DS와 연결 BIN/텍스처를 함께 받되, 외부 네트워크 참조를 거부하고 자체 포함 GLB 2.0으로 정규화한 뒤 동일한 검증 경계를 통과시킨다.
 
 - 공식 매뉴얼: [3D Tools](https://help.clip-studio.com/en-us/manual_en/660_3d/3D_Tools.htm)
 - 공식 매뉴얼: [Importing 3D Files](https://help.clip-studio.com/en-us/manual_en/660_3d/Importing_3D_Files.htm)

@@ -10,17 +10,7 @@
 import * as THREE from "three";
 
 import { COMPOSITE_PRESETS } from "./studio-background-3d-composites";
-
-import type { BgPrimitive, BgPrimitiveKind } from "./studio-background-3d-primitives";
-
-// studio-background-3d-primitives.ts / studio-background-3d-composites.ts의 uid()는 둘 다 미export
-// (private)다. "새 파일만 생성, 기존 파일은 절대 수정 금지" 제약 때문에 composites.ts가 이미 했던 것과
-// 동일한 방식으로 로컬 복제본을 둔다 — 후속 배선 작업에서 studio-background-3d-primitives.ts의 uid()에
-// `export`를 추가하고 이 파일과 composites.ts의 로컬 복제본을 모두 지운 뒤 그 export를 import하도록
-// 교체할 것(design 문서 §0.4 참고).
-function uid(): string {
-  return `bg3d-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-}
+import { uid, type BgPrimitive, type BgPrimitiveKind } from "./studio-background-3d-primitives";
 
 export type BgSceneTemplateCategory = "interior" | "urban" | "nature";
 

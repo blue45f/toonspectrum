@@ -21,6 +21,7 @@ import {
   Layers,
   LayoutTemplate,
   Loader2,
+  LocateFixed,
   Lock,
   Magnet,
   Maximize2,
@@ -332,6 +333,7 @@ import {
   createStudioBg3dThreeStaticInstanceBatch,
   type StudioBg3dThreeInstancingSuccess,
 } from "./studio-bg3d-three-instancing";
+import { resolveStudioBg3dThreeCenterGroundLocalPosition } from "./studio-bg3d-three-model-alignment";
 import { applyStudioBg3dThreeWebglRenderSettings } from "./studio-bg3d-three-render-settings";
 import { classifyStudioBg3dThreeSemanticMaterials } from "./studio-bg3d-three-semantic-materials";
 import {
@@ -807,6 +809,13 @@ const BG3D_VIEWPORT_HINTS = {
     title: "바닥에 접지",
     description: "선택한 도형이나 모델의 가장 낮은 지점을 계산해 바닥 높이에 정확히 맞춥니다.",
     preview: "object-3d",
+  },
+  originGround: {
+    id: "bg3d:object:origin-ground",
+    title: "원점 · 바닥 정렬",
+    description: "선택한 객체의 실제 지오메트리 경계를 XZ 원점 중앙에 놓고 가장 낮은 지점을 Y=0에 맞춥니다.",
+    preview: "object-3d",
+    tip: "피벗이 모델 밖에 있는 OBJ·GLB도 보이는 지오메트리를 기준으로 정렬합니다.",
   },
   focus: {
     id: "bg3d:camera:focus-selection",
@@ -3041,6 +3050,60 @@ export function StudioBackground3D({
     }
   }
 
+  function centerAndGroundSelectedEntity() {
+    if (
+      selectedIds.size !== 1 ||
+      isStudioBg3dPhysicsTransientPhase(physicsPhaseRef.current)
+    ) {
+      return;
+    }
+
+    const id = selectedIds.values().next().value;
+    if (typeof id !== "string") return;
+    const primitive = primitives.find((candidate) => candidate.id === id);
+    const model = customModels.find((candidate) => candidate.id === id);
+    const entity = primitive ?? model;
+    if (!entity || isBgObjectTransformBlocked(entity)) return;
+
+    const object = primitiveObjectsRef.current.get(id);
+    if (!object) {
+      setError("선택한 객체의 지오메트리를 아직 준비하지 못했습니다. 모델이 표시된 뒤 다시 시도해 주세요.");
+      return;
+    }
+
+    const nextLocalPosition = resolveStudioBg3dThreeCenterGroundLocalPosition(object);
+    if (!nextLocalPosition) {
+      setError("선택한 객체의 지오메트리 경계가 올바르지 않아 원점 정렬을 취소했습니다.");
+      return;
+    }
+
+    const currentPosition = entity.position;
+    if (currentPosition.every(
+      (value, index) => Math.abs(value - nextLocalPosition[index]) <= 1e-6
+    )) {
+      setError(null);
+      return;
+    }
+
+    const nextPrimitives = primitive
+      ? primitives.map((candidate) => candidate.id === id
+        ? { ...candidate, position: nextLocalPosition }
+        : candidate)
+      : primitives;
+    const nextCustomModels = model
+      ? customModels.map((candidate) => candidate.id === id
+        ? { ...candidate, position: nextLocalPosition }
+        : candidate)
+      : customModels;
+
+    // Explicit editor commands enter history immediately, avoiding the normal 400 ms debounce and
+    // guaranteeing one-step undo even when the user invokes another command right away.
+    commitImmediateHistoryTransition(nextPrimitives, nextCustomModels, sceneBaseDocument);
+    setPrimitives(nextPrimitives);
+    setCustomModels(nextCustomModels);
+    setError(null);
+  }
+
   function focusSelectedEntity() {
     if (selectedIds.size === 0) return;
     const firstId = Array.from(selectedIds)[0];
@@ -5073,6 +5136,22 @@ export function StudioBackground3D({
       : !canGroundSelection
         ? "선택한 객체의 잠금을 해제하세요."
         : undefined;
+  const centerGroundSelectionDisabledReason =
+    physicsInteractionLocked
+      ? "물리 미리보기 중에는 장면 변형 도구를 잠급니다."
+      : selectedEntities.length === 0
+        ? "도형 또는 3D 모델을 먼저 선택하세요."
+        : selectedEntities.length > 1
+          ? "원점에 객체가 겹치지 않도록 한 번에 하나만 선택하세요."
+          : selectedIsLocked
+            ? "선택한 객체의 잠금을 해제하세요."
+            : selectedCustomModel && !readyCloneIds.has(selectedCustomModel.id)
+              ? failedCloneIds.has(selectedCustomModel.id)
+                ? "모델 지오메트리를 불러오지 못해 정렬할 수 없습니다."
+                : "모델 지오메트리를 준비하는 중입니다."
+              : !selectedEntity || !primitiveObjectsRef.current.has(selectedEntity.id)
+                ? "선택한 객체의 지오메트리를 준비하는 중입니다."
+                : undefined;
   const snapSettingsSummary = studioBg3dSnapSettingsSummary(snapSettings);
   const layerListItems: StudioBg3dLayerListItem[] = [
     ...primitives.map((prim, index) => {
@@ -6044,6 +6123,22 @@ export function StudioBackground3D({
                     </button>
                   </StudioToolHintTarget>
                   <StudioToolHintTarget
+                    hint={BG3D_VIEWPORT_HINTS.originGround}
+                    disabled={Boolean(centerGroundSelectionDisabledReason)}
+                    unavailableReason={centerGroundSelectionDisabledReason}
+                    preferredSide="right"
+                  >
+                    <button
+                      type="button"
+                      aria-label="원점 · 바닥 정렬"
+                      disabled={Boolean(centerGroundSelectionDisabledReason)}
+                      className={cx(VIEWPORT_BTN, "disabled:cursor-not-allowed disabled:opacity-40")}
+                      onClick={centerAndGroundSelectedEntity}
+                    >
+                      <LocateFixed size={16} aria-hidden />
+                    </button>
+                  </StudioToolHintTarget>
+                  <StudioToolHintTarget
                     hint={BG3D_VIEWPORT_HINTS.focus}
                     disabled={!selectedEntity}
                     unavailableReason={!selectedEntity ? "도형 또는 3D 모델을 먼저 선택하세요." : undefined}
@@ -6444,6 +6539,16 @@ export function StudioBackground3D({
                           </button>
                           <button
                             type="button"
+                            aria-label="원점 · 바닥 정렬"
+                            title={centerGroundSelectionDisabledReason ?? "원점 · 바닥 정렬"}
+                            disabled={Boolean(centerGroundSelectionDisabledReason)}
+                            className={cx(ICON_BUTTON, "disabled:opacity-40")}
+                            onClick={centerAndGroundSelectedEntity}
+                          >
+                            <LocateFixed size={14} aria-hidden />
+                          </button>
+                          <button
+                            type="button"
                             aria-label="초점 맞춤"
                             title="초점 맞춤"
                             className={ICON_BUTTON}
@@ -6590,6 +6695,16 @@ export function StudioBackground3D({
                             onClick={groundSelectedEntity}
                           >
                             <MoveDown size={14} aria-hidden />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label="원점 · 바닥 정렬"
+                            title={centerGroundSelectionDisabledReason ?? "원점 · 바닥 정렬"}
+                            disabled={Boolean(centerGroundSelectionDisabledReason)}
+                            className={cx(ICON_BUTTON, "disabled:opacity-40")}
+                            onClick={centerAndGroundSelectedEntity}
+                          >
+                            <LocateFixed size={14} aria-hidden />
                           </button>
                           <button
                             type="button"

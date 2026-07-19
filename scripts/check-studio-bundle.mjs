@@ -44,9 +44,12 @@ const budgets = {
   // StudioPage 전체의 코드 생성을 Babel이 deopt했지만, 새 Inspector 모듈은 정상 컴파일되어
   // entry 1,258,797/376,835, incremental 2,232,628/723,459, 128 requests로 재배치됐다.
   // 전체 Studio route 상한은 그대로 유지하고, 세부 회귀 예산만 실제 관측치+약 2%로 다시 잠근다.
-  studio: { raw: 2_698_000, gzip: 882_500 },
+  // 2026-07-20 앱 셸 i18n과 drawing-assist/VRM scene 복구 계약이 함께 반영된 측정치는
+  // route 2,733,950/890,637, app-shell 이후 2,234,078/730,639, 133 requests다. 무거운 패널은
+  // 여전히 dynamic entry이며, 전체·request 상한만 관측치에 약 2%/1개 여유로 다시 잠근다.
+  studio: { raw: 2_790_000, gzip: 910_000 },
   studioEntry: { raw: 1_284_000, gzip: 384_500 },
-  studioIncremental: { raw: 2_278_000, gzip: 738_000, chunks: 131 },
+  studioIncremental: { raw: 2_278_000, gzip: 738_000, chunks: 134 },
   // Rapier deterministic compat is intentionally isolated in a user-triggered module Worker.
   // 2026-07-18 production output: 2,302,139 raw / 855,399 gzip. Keep ~2% version-drift headroom
   // without charging this optional engine to Studio or the 3D editor's initial graph.
@@ -54,9 +57,13 @@ const budgets = {
   // 2026-07-19 selected-shot/multi-pass/recovery UI baseline. This is the complete static closure
   // activated only after the user opens StudioBackground3D; PSD/physics/engine labs stay isolated.
   bg3dEditor: { raw: 2_380_000, gzip: 690_000, chunks: 40 },
-  // Durable recovery, integrity verification, contact-sheet/PSD clients, and ZIP packaging load
-  // only after explicit batch export. Measured incremental closure: 145,199 raw / 38,590 gzip.
-  bg3dShotBatchRuntime: { raw: 160_000, gzip: 45_000, chunks: 3 },
+  // Durable recovery, integrity verification, PNG/contact-sheet/PSD clients, and ZIP packaging load
+  // only after explicit batch export. 2026-07-20 OffscreenCanvas pass-PNG Worker client/protocol:
+  // measured incremental closure 164,352 raw / 43,602 gzip; retain ~2% raw headroom.
+  bg3dShotBatchRuntime: { raw: 168_000, gzip: 45_000, chunks: 3 },
+  // Per-pass OffscreenCanvas PNG compositor; measured 2,651 raw / 1,156 gzip and isolated from
+  // both the editor graph and the batch-runtime static closure by Vite's module Worker boundary.
+  bg3dShotPngWorker: { raw: 4_000, gzip: 2_000 },
   // ag-psd is intentionally reachable only through the bounded per-shot PSD module Worker.
   bg3dPsdWorker: { raw: 1_250_000, gzip: 360_000 },
   // OffscreenCanvas/createImageBitmap contact-sheet compositor, isolated from the editor graph.
@@ -402,6 +409,17 @@ if (!fs.existsSync(manifestPath)) {
       );
     }
 
+    const pngWorkerFiles = fs.readdirSync(path.join(outputDirectory, "assets"))
+      .filter((file) => /^studio-bg3d-shot-png\.worker-[A-Za-z0-9_-]+\.js$/u.test(file));
+    if (pngWorkerFiles.length !== 1) {
+      fail(`expected one isolated BG3D pass-PNG Worker asset, found ${pngWorkerFiles.length}`);
+    } else {
+      const bytes = fs.readFileSync(path.join(outputDirectory, "assets", pngWorkerFiles[0]));
+      checkBudget("BG3D pass-PNG Worker", {
+        raw: bytes.byteLength,
+        gzip: gzipSync(bytes).byteLength,
+      }, budgets.bg3dShotPngWorker);
+    }
 
     const contactSheetWorkerFiles = fs.readdirSync(path.join(outputDirectory, "assets"))
       .filter((file) => /^studio-bg3d-shot-contact-sheet\.worker-[A-Za-z0-9_-]+\.js$/u.test(file));

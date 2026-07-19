@@ -8,6 +8,7 @@ import {
   type StudioBg3dShotArtifactPipelineInput,
 } from "./studio-bg3d-shot-artifact-pipeline";
 import { STUDIO_BG3D_SHOT_BATCH_PASSES } from "./studio-bg3d-shot-batch-pass-catalog";
+import { StudioBg3dShotPngWorkerError } from "./studio-bg3d-shot-png-worker-client";
 
 import type {
   StudioBg3dLtRasterLayer,
@@ -68,7 +69,8 @@ function dependencies(
     renderLtInWorker: vi.fn(async () => renderedResult()),
     renderLtSynchronously: vi.fn(() => renderedResult()),
     createDepthLayer: vi.fn((width, height) => rasterLayer("color", 160, width, height)),
-    encodePng: vi.fn(async () => pngBlob(1)),
+    encodePngInWorker: vi.fn(async () => pngBlob(1)),
+    encodePngOnMainThread: vi.fn(async () => pngBlob(1)),
     admitPsdLayers: vi.fn(() => ({ ok: true, width: 1, height: 1 } as const)),
     buildLayeredPsdInWorker: vi.fn(async () => psdBlob(1)),
     workersAvailable: vi.fn(() => true),
@@ -110,7 +112,7 @@ describe("Studio BG3D shot artifact pipeline", () => {
     const encodedLayers: Array<readonly StudioBg3dLtRasterLayer[]> = [];
     const deps = dependencies({
       renderLtInWorker: vi.fn(async () => renderedResult(renderedLayers)),
-      encodePng: vi.fn(async (layers) => {
+      encodePngInWorker: vi.fn(async (layers) => {
         encodedLayers.push(layers);
         return pngBlob(1);
       }),
@@ -257,9 +259,81 @@ describe("Studio BG3D shot artifact pipeline", () => {
     expect(deps.renderLtSynchronously).not.toHaveBeenCalled();
   });
 
+  it("uses the bounded main-thread PNG fallback only for Worker or OffscreenCanvas creation unavailability", async () => {
+    for (const code of ["worker-unavailable", "offscreen-unavailable"] as const) {
+      const unavailable = new StudioBg3dShotPngWorkerError(code);
+      const encodePngOnMainThread = vi.fn(async () => pngBlob(3));
+      const deps = dependencies({
+        encodePngInWorker: vi.fn(async () => { throw unavailable; }),
+        encodePngOnMainThread,
+      });
+
+      const result = await buildStudioBg3dShotArtifacts(
+        pipelineInput({ passes: ["beauty"] }),
+        deps,
+      );
+
+      expect(result.artifactBytes).toBe(3);
+      expect(encodePngOnMainThread).toHaveBeenCalledOnce();
+      expect(encodePngOnMainThread).toHaveBeenCalledWith(
+        expect.any(Array),
+        { signal: undefined, timeoutMs: 20_000 },
+      );
+    }
+  });
+
+  it("keeps PNG protocol, runtime, timeout, and cancellation failures terminal", async () => {
+    for (const code of [
+      "invalid-request",
+      "protocol",
+      "encode-failed",
+      "timeout",
+      "worker-failed",
+      "aborted",
+    ] as const) {
+      const failure = new StudioBg3dShotPngWorkerError(code);
+      const encodePngOnMainThread = vi.fn(async () => pngBlob(1));
+      const deps = dependencies({
+        encodePngInWorker: vi.fn(async () => { throw failure; }),
+        encodePngOnMainThread,
+      });
+
+      await expect(buildStudioBg3dShotArtifacts(
+        pipelineInput({ passes: ["beauty"] }),
+        deps,
+      )).rejects.toBe(failure);
+      expect(encodePngOnMainThread).not.toHaveBeenCalled();
+    }
+  });
+
+  it("does not enter the PNG main-thread fallback above its pixel budget", async () => {
+    const width = 1_025;
+    const height = 1_024;
+    const unavailable = new StudioBg3dShotPngWorkerError("worker-unavailable");
+    const deps = dependencies({
+      renderLtInWorker: vi.fn(async () => renderedResult([], width, height)),
+      encodePngInWorker: vi.fn(async () => { throw unavailable; }),
+      encodePngOnMainThread: vi.fn(async () => pngBlob(1)),
+    });
+
+    await expect(buildStudioBg3dShotArtifacts(
+      pipelineInput({
+        shot: plannedShot(width, height),
+        captured: {
+          width,
+          height,
+          rgba: new Uint8Array(width * height * 4),
+        },
+        passes: ["beauty"],
+      }),
+      deps,
+    )).rejects.toBe(unavailable);
+    expect(deps.encodePngOnMainThread).not.toHaveBeenCalled();
+  });
+
   it("rejects PNG budget overflow before a shot can be committed", async () => {
     const perImageDeps = dependencies({
-      encodePng: vi.fn(async () => pngBlob(4)),
+      encodePngInWorker: vi.fn(async () => pngBlob(4)),
       maxImageBytes: 3,
     });
     await expect(buildStudioBg3dShotArtifacts(
@@ -268,7 +342,7 @@ describe("Studio BG3D shot artifact pipeline", () => {
     )).rejects.toBeInstanceOf(RangeError);
 
     const aggregateDeps = dependencies({
-      encodePng: vi.fn(async () => pngBlob(2)),
+      encodePngInWorker: vi.fn(async () => pngBlob(2)),
       maxTotalBytes: 5,
     });
     await expect(buildStudioBg3dShotArtifacts(
@@ -282,7 +356,7 @@ describe("Studio BG3D shot artifact pipeline", () => {
 
   it("reserves required PNG bytes before degrading an optional PSD on budget", async () => {
     const deps = dependencies({
-      encodePng: vi.fn(async () => pngBlob(4)),
+      encodePngInWorker: vi.fn(async () => pngBlob(4)),
       buildLayeredPsdInWorker: vi.fn(async () => psdBlob(2)),
       maxTotalBytes: 5,
     });

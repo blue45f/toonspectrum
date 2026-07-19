@@ -53,8 +53,9 @@ export interface BgCustomModelInstance {
 
 // PRIMITIVE_DEFS 도형들의 대략적인 크기 감각(반경 0.5~1m대)과 맞춘 오토핏 목표 치수.
 const DEFAULT_AUTO_FIT_TARGET_SIZE = 2;
-// .obj가 .mtl 없이 올라왔을 때 씌우는 무광 중립색 — 도형 프리셋 팔레트(예: box "#c9a876",
-// cylinder "#9fb4c9")와 톤을 맞추되 특정 프리셋과 겹치지 않는 회색조를 고른다.
+// 레거시 단일-Blob .obj가 .mtl 없이 올라왔을 때 씌우는 무광 중립색 — 도형 프리셋
+// 팔레트(예: box "#c9a876", cylinder "#9fb4c9")와 톤을 맞추되 특정 프리셋과 겹치지 않는
+// 회색조를 고른다. 현행 다중 파일 가져오기는 OBJ와 MTL/텍스처를 함께 해석해 GLB로 정규화한다.
 const BG3D_CUSTOM_MODEL_NEUTRAL_COLOR = "#b8b8c2";
 
 function uid(): string {
@@ -153,10 +154,10 @@ export function measureBg3dObjectSize(object: THREE.Object3D): [number, number, 
 }
 
 /**
- * .obj는 .mtl(머티리얼 정의) 없이 업로드되면 OBJLoader가 재질 없이(또는 검은색으로) 메시를 만들어
- * 배경 도형들과 톤이 완전히 어긋난다(.mtl 지원은 이번 작업 범위 밖 — docs/studio-bg3d-custom-model-upload.md
- * §8 참고). 대신 모든 메시에 도형 프리셋과 같은 계열의 무광 중립색 MeshStandardMaterial 하나를
- * 공유시켜 "실루엣은 정확하되 색은 신경 안 써도 되는" 블록아웃 톤을 보장한다. 교체되는 원본
+ * 현행 가져오기는 OBJ와 MTL/텍스처를 함께 받아 재질을 적용한 자체 포함 GLB로 정규화한다.
+ * 이 함수는 그 경계 이전에 저장된 레거시 단일-Blob OBJ 또는 MTL이 없는 OBJ의 폴백이다.
+ * 모든 메시에 도형 프리셋과 같은 계열의 무광 중립색 MeshStandardMaterial 하나를 공유시켜
+ * "실루엣은 정확하되 색은 신경 안 써도 되는" 블록아웃 톤을 보장한다. 교체되는 원본
  * 머티리얼(들)은 즉시 dispose해 GPU 리소스가 새지 않게 한다.
  */
 export function applyBg3dFallbackMaterial(root: THREE.Object3D, color: string = BG3D_CUSTOM_MODEL_NEUTRAL_COLOR): void {

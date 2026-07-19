@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyStudioBg3dSnapToTransform,
+  centerAndGroundWorldBoundsPosition,
   filterStudioBg3dLayerItems,
   groundModelTransform,
   groundPrimitiveTransform,
@@ -53,6 +54,44 @@ describe("studio-bg3d-object-ops", () => {
   it("grounds custom models from full bounding size", () => {
     const position = groundModelTransform([2, 4, 2], [0, 10, 0], [0, 0, 0], [1, 1, 1]);
     expect(position[1]).toBeCloseTo(2);
+  });
+
+  it("centers off-pivot geometry on XZ origin and grounds its lowest point", () => {
+    const worldPosition: [number, number, number] = [10, 1, 20];
+    const bounds = {
+      min: [8, -3, 18] as const,
+      max: [12, 5, 22] as const,
+    };
+
+    const position = centerAndGroundWorldBoundsPosition(worldPosition, bounds);
+
+    expect(position).toEqual([0, 4, 0]);
+    expect(worldPosition).toEqual([10, 1, 20]);
+    expect(bounds).toEqual({ min: [8, -3, 18], max: [12, 5, 22] });
+  });
+
+  it("supports a custom world target and is idempotent once aligned", () => {
+    expect(centerAndGroundWorldBoundsPosition(
+      [100, 2, -50],
+      { min: [99, 1, -55], max: [103, 9, -45] },
+      [2, 3, -4]
+    )).toEqual([1, 4, -4]);
+
+    expect(centerAndGroundWorldBoundsPosition(
+      [7, 2, -3],
+      { min: [-2, 0, -4], max: [2, 8, 4] }
+    )).toEqual([7, 2, -3]);
+  });
+
+  it("rejects non-finite or inverted measured bounds", () => {
+    expect(centerAndGroundWorldBoundsPosition(
+      [0, 0, 0],
+      { min: [2, 0, 0], max: [1, 1, 1] }
+    )).toBeNull();
+    expect(centerAndGroundWorldBoundsPosition(
+      [0, 0, 0],
+      { min: [0, 0, 0], max: [Number.POSITIVE_INFINITY, 1, 1] }
+    )).toBeNull();
   });
 
   it("world AABB half extents grow under 45° yaw for a square footprint", () => {

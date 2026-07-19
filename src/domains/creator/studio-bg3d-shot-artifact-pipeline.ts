@@ -25,6 +25,10 @@ import {
 } from "./studio-bg3d-shot-batch";
 import { STUDIO_BG3D_SHOT_BATCH_MAX_DIMENSION } from "./studio-bg3d-shot-batch-limits";
 import {
+  encodeStudioBg3dShotPngInWorker,
+  isStudioBg3dShotPngFallbackEligibleError,
+} from "./studio-bg3d-shot-png-worker-client";
+import {
   admitStudioBg3dShotPsdLayers,
   type StudioBg3dShotPsdAdmission,
 } from "./studio-bg3d-shot-psd-contract";
@@ -43,6 +47,7 @@ import type {
 } from "./studio-bg3d-shot-batch-plan";
 
 const STUDIO_BG3D_LT_RENDER_SYNC_FALLBACK_MAX_PIXELS = 1_048_576;
+const STUDIO_BG3D_SHOT_PNG_MAIN_THREAD_FALLBACK_MAX_PIXELS = 1_048_576;
 
 export interface StudioBg3dShotArtifactPipelineInput {
   readonly shot: StudioBg3dShotBatchPlannedShot;
@@ -79,7 +84,11 @@ export interface StudioBg3dShotArtifactPipelineDependencies {
     height: number,
     depth: Float32Array,
   ) => StudioBg3dLtRasterLayer;
-  readonly encodePng: (
+  readonly encodePngInWorker: (
+    layers: readonly StudioBg3dLtRasterLayer[],
+    options: { readonly signal?: AbortSignal; readonly timeoutMs?: number },
+  ) => Promise<Blob>;
+  readonly encodePngOnMainThread: (
     layers: readonly StudioBg3dLtRasterLayer[],
     options: { readonly signal?: AbortSignal; readonly timeoutMs?: number },
   ) => Promise<Blob>;
@@ -100,7 +109,8 @@ interface PassLayerSelection {
   readonly skipReason: StudioBg3dShotBatchSkippedArtifact["reason"];
 }
 
-async function encodeStudioBg3dLtCompositeToPngBlob(
+/** Small compatibility path used only after an explicit Worker/OffscreenCanvas creation failure. */
+async function encodeStudioBg3dLtCompositeToPngBlobOnMainThread(
   layers: readonly StudioBg3dLtRasterLayer[],
   options: { readonly signal?: AbortSignal; readonly timeoutMs?: number } = {},
 ): Promise<Blob> {
@@ -165,7 +175,8 @@ const DEFAULT_DEPENDENCIES: StudioBg3dShotArtifactPipelineDependencies = {
   renderLtInWorker: renderStudioBg3dLtLayersInWorker,
   renderLtSynchronously: renderStudioBg3dLtLayers,
   createDepthLayer: createStudioBg3dDepthRasterLayer,
-  encodePng: encodeStudioBg3dLtCompositeToPngBlob,
+  encodePngInWorker: encodeStudioBg3dShotPngInWorker,
+  encodePngOnMainThread: encodeStudioBg3dLtCompositeToPngBlobOnMainThread,
   admitPsdLayers: admitStudioBg3dShotPsdLayers,
   buildLayeredPsdInWorker: buildStudioBg3dShotLayeredPsdInWorker,
   workersAvailable: () => typeof Worker === "function",
@@ -273,7 +284,8 @@ export async function buildStudioBg3dShotArtifacts(
       input.settings,
       dependencies.createDepthLayer,
     );
-    if (!selection.layers) {
+    const passLayers = selection.layers;
+    if (!passLayers) {
       skippedArtifacts.push({
         shotId: input.shot.shotId,
         shotName: input.shot.shotName,
@@ -282,10 +294,20 @@ export async function buildStudioBg3dShotArtifacts(
       });
       continue;
     }
-    const png = await dependencies.encodePng(selection.layers, {
-      signal: input.signal,
-      timeoutMs: 20_000,
-    });
+    const pngOptions = { signal: input.signal, timeoutMs: 20_000 } as const;
+    const png = await dependencies.encodePngInWorker(passLayers, pngOptions).catch(
+      (cause: unknown) => {
+        const width = passLayers[0]?.width ?? 0;
+        const height = passLayers[0]?.height ?? 0;
+        if (
+          isStudioBg3dShotPngFallbackEligibleError(cause) &&
+          width * height <= STUDIO_BG3D_SHOT_PNG_MAIN_THREAD_FALLBACK_MAX_PIXELS
+        ) {
+          return dependencies.encodePngOnMainThread(passLayers, pngOptions);
+        }
+        throw cause;
+      },
+    );
     if (
       png.size > dependencies.maxImageBytes ||
       input.committedArtifactBytes + artifactBytes + png.size > dependencies.maxTotalBytes

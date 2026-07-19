@@ -384,6 +384,45 @@ describe("convertStudioBg3dModelFilesToGlb", () => {
     expect(view.getUint32(8, true)).toBe(buffer.byteLength);
   });
 
+  it("preserves a selected companion MTL material while canonicalizing OBJ to GLB", async () => {
+    vi.stubGlobal("FileReader", TestFileReader);
+    const obj = sourceFile("triangle.obj", [
+      "mtllib triangle.mtl",
+      "o triangle",
+      "v 0 0 0",
+      "v 1 0 0",
+      "v 0 1 0",
+      "usemtl webtoon-red",
+      "f 1 2 3",
+    ].join("\n"));
+    const mtl = sourceFile("triangle.mtl", [
+      "newmtl webtoon-red",
+      "Kd 1 0 0",
+    ].join("\n"));
+
+    const [converted] = await convertStudioBg3dModelFilesToGlb([obj, mtl]);
+    const buffer = await converted.arrayBuffer();
+    const view = new DataView(buffer);
+    const jsonChunkLength = view.getUint32(12, true);
+    const jsonChunkType = view.getUint32(16, true);
+    const json = JSON.parse(
+      new TextDecoder().decode(new Uint8Array(buffer, 20, jsonChunkLength)).trim(),
+    ) as {
+      materials?: Array<{
+        name?: string;
+        pbrMetallicRoughness?: { baseColorFactor?: number[] };
+      }>;
+    };
+
+    expect(jsonChunkType).toBe(0x4e4f534a);
+    expect(json.materials).toContainEqual(expect.objectContaining({
+      name: "webtoon-red",
+      pbrMetallicRoughness: expect.objectContaining({
+        baseColorFactor: [1, 0, 0, 1],
+      }),
+    }));
+  });
+
   it("embeds an inline glTF buffer into the canonical GLB output", async () => {
     vi.stubGlobal("FileReader", TestFileReader);
     vi.stubGlobal("ProgressEvent", class {

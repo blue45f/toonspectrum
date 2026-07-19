@@ -603,7 +603,7 @@ flowchart LR
 | retarget·IK batch·key reduction | P1/P2 Worker | 수천 frame 계산을 numerical DTO로 반환; live skeleton 객체 전달 금지 |
 | LT 선화·톤 raster | **[이번 반영] 전용 Worker** | 호출 시점 RGBA·linear depth·설정의 방어 복사본만 transferable로 넘기고 요청 ID, exact protocol, 120초 timeout, abort/terminate, 결과 크기·role·순서를 검증한다. Worker 생성 불가일 때만 1,048,576픽셀 이하 동기 fallback; protocol/render/runtime/timeout/abort는 fail closed |
 | thumbnail/contact sheet | **[이번 반영] OffscreenCanvas Worker** | 대표 PNG를 순차 decode해 동시에 live `ImageBitmap`을 1개로 제한하고 finally에서 close; 12컷/시트, request correlation, progress, timeout, cancel/terminate, 불투명 Canvas의 실제 RGB8 PNG IHDR·CRC·deflate·byte/pixel 재검증. 미지원이면 archive manifest fallback |
-| shot pass PNG/PSD ZIP | **[이번 반영] archive Worker** | 컷별 PNG encode는 현재 bounded main thread, immutable Blob의 CRC/ZIP32 조립은 Worker로 격리; 공개 manifest v3는 render 재현 정보만 포함하고 local auth/scope/recovery identity를 구조적으로 배제한다. module listener 설치 뒤 ready handshake를 보내므로 constructor/CSP/pre-ready/startup-timeout에만 bounded main-thread build를 한 번 허용하고, ready 이후 protocol/build/runtime/timeout/abort/integrity 실패는 자동 재시도하지 않는다. 응답은 400 MiB 전체를 materialize하지 않고 EOCD 22바이트→bounded central directory→entry별 `Blob.stream()` CRC 순으로 검증하며, canonical UTF-8 경로·offset/no-gap·manifest schema/render digest·원 요청 inventory를 교차검증한다. request correlation, 180초 end-to-end timeout, verifier stream cancel과 Worker terminate를 적용한다 |
+| shot pass PNG/PSD ZIP | **[이번 반영] PNG·PSD·archive Worker** | 컷별 pass 합성·PNG encode는 요청별 OffscreenCanvas module Worker로 옮겼다. caller RGBA는 detach하지 않고 exact/versioned request로 방어 복사·transfer하며, ready handshake 뒤 20초 encode timeout, request correlation, abort/terminate, PNG signature·IHDR 크기·output byte 상한을 검증한다. Worker constructor 또는 명시적 OffscreenCanvas 2D 생성 불가이고 1,048,576픽셀 이하일 때만 DOM canvas fallback을 허용하며, protocol/encode/runtime/startup·encode timeout/abort에는 재실행하지 않는다. immutable Blob의 CRC/ZIP32 조립은 별도 archive Worker로 격리하고 공개 manifest v3에는 render 재현 정보만 포함해 local auth/scope/recovery identity를 구조적으로 배제한다. archive 응답은 400 MiB 전체를 materialize하지 않고 EOCD 22바이트→bounded central directory→entry별 `Blob.stream()` CRC 순으로 검증하며, canonical UTF-8 경로·offset/no-gap·manifest schema/render digest·원 요청 inventory를 교차검증한다 |
 | layered PSD | **[이번 반영] 전용 Worker** | 최대 4 LT layer, 2,097,152 canvas pixel·8,388,608 aggregate layer pixel·128 MiB output을 사전 검증하고, 실패해도 PNG bundle을 유지 |
 
 Worker 운영 규칙:
@@ -772,10 +772,10 @@ transparent/LT capture, undo/redo가 desktop과 390/320 px mobile에서 데이�
 7. Snaptoon식 asset browser: device budget·license·attribution·hash가 보이는 one-click placement.
 8. SketchUp 공식 GLB export guide와 Blender official GLB authoring preset/sample.
 9. **[코어 반영/UI 미연결]** semantic rig profile과 사용자 확인 bone mapping.
-10. **[부분 반영]** batch의 Sobel/톤/LT 합성은 transferable RGBA/depth 전용 Worker로 옮겼고,
-    main-thread fallback은 Worker 생성 불가 + 1,048,576픽셀 이하로 제한했다. 다음은 pass별 PNG encode를
-    OffscreenCanvas Worker로 옮기고, 현재 capture→Worker 방어 복사로 늘어난 peak working-set과
-    cancel latency를 저사양 실기기에서 측정한다.
+10. **[이번 반영]** batch의 Sobel/톤/LT raster와 pass별 합성·PNG encode를 각각 transferable
+    RGBA/depth Worker와 OffscreenCanvas Worker로 옮겼다. PNG main-thread fallback은 Worker 또는
+    OffscreenCanvas 생성 불가 + 1,048,576픽셀 이하로 제한하고, 그 밖의 Worker 실패는 fail closed한다.
+    남은 검증은 capture→Worker 방어 복사로 늘어난 peak working-set과 cancel latency의 저사양 실기기 측정이다.
 
 **P1 완료 조건:** 한 scene의 10개 shot을 batch export해도 UI가 응답하고, cancel/retry가 가능하며,
 각 pass의 camera·alpha·node visibility가 beauty와 pixel-aligned여야 한다. pose는 다른 VRM 체형에서도

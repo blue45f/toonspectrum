@@ -188,7 +188,7 @@ announce→request→approved→SDP가 같은 `shareId`를 보존했고, `shareI
 
 | Clip Studio 3D 기능군 | ToonSpectrum | 구현 가능성/격차 |
 | --- | --- | --- |
-| GLB/glTF/OBJ/FBX 등 import | 부분 | 제품 신규 업로드는 공격면과 외부 참조를 줄이기 위해 embedded GLB 2.0만 허용 |
+| GLB/glTF/OBJ/FBX 등 import | 완료/강한 부분 | GLB, glTF, OBJ/MTL, FBX, DAE, STL, PLY, 3DS와 연결 리소스를 로컬에서 해석해 embedded GLB 2.0으로 정규화·검증 |
 | VRM 0/1 | 완료/강한 부분 | 별도 VRM 포저 제공 |
 | CSP 전용 cs3c/cs3o/cs3s | 미구현 | 공개 사양·라이선스 없이는 동일 호환을 보장할 수 없음 |
 | 객체 이동·회전·크기 | 완료 | TransformControls·수치 입력·undo/redo |

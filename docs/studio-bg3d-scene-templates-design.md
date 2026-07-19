@@ -273,11 +273,10 @@ undo/redo, 선화 미리보기, PNG 내보내기(`encodeBg3dSceneHash`) 전부 `
    같은 두 프리미티브가 없다"는 대략적 가드만 자동화했다. 실제 비겹침 근거는 이 문서 §1과 코드
    주석에 사람이 직접 계산한 수치로 남겼다(도형 크기가 종류마다 달라 일반적인 OBB 충돌 판정기를
    새로 만드는 건 블록아웃 도구 스코프 대비 과한 투자로 판단).
-8. **uid() 중복 정의 부채 승계** — `studio-background-3d-composites.ts`가 이미 안고 있는
-   "`uid()`가 `studio-background-3d-primitives.ts`에 export 안 돼 있어 로컬 복제"라는 부채를
-   이 파일도 그대로 승계했다(같은 "새 파일만 생성" 제약 때문). 후속 배선 패스에서 원본 `uid()`에
-   `export` 한 줄을 추가하고 두 로컬 복제본(`studio-background-3d-composites.ts`, 이 파일)을 모두
-   지운 뒤 그 export를 import하도록 교체할 것 — composites.ts 8~12번째 줄 주석과 동일한 후속 작업.
+8. **uid() 중복 정의 부채는 후속 유지보수에서 해결됨** —
+   `studio-background-3d-primitives.ts`가 export하는 canonical `uid()`를 composite과 scene-template
+   전개 경로가 모두 import한다. scene-template의 로컬 복제본과 임시 후속 작업 주석은
+   제거했고, ID 형식·고유성과 `existingCount` 기반 배치 결과는 기존 회귀 테스트로 보존했다.
 
 ## §6. 검증 패스에서 발견되어 수정된 사항
 

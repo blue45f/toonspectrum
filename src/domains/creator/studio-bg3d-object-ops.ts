@@ -8,6 +8,11 @@ import type { BgPrimitiveKind } from "./studio-background-3d-metadata";
 export type Bg3dVec3 = readonly [number, number, number];
 export type Bg3dMutableVec3 = [number, number, number];
 
+export interface StudioBg3dWorldBounds {
+  readonly min: Bg3dVec3;
+  readonly max: Bg3dVec3;
+}
+
 export type StudioBg3dSnapAxis = "xyz" | "xz" | "none";
 
 export interface StudioBg3dSnapSettings {
@@ -276,6 +281,47 @@ export function groundModelTransform(
     halfExtentsFromSize(boundingSize),
     groundY
   );
+}
+
+/**
+ * Translate an object's current world position so the *measured geometry bounds* are centered on
+ * target X/Z and rest on target Y. Unlike size/half-extent helpers, this does not assume the model
+ * pivot is already at the geometry center: imported assets commonly keep authoring-tool pivots far
+ * away from their meshes.
+ *
+ * The caller is responsible for measuring bounds after rotation/scale (and animation, if relevant)
+ * and converting the returned world position back into parent-local space. Invalid or inverted
+ * bounds return null so an editor command can fail closed instead of moving an object unpredictably.
+ */
+export function centerAndGroundWorldBoundsPosition(
+  worldPosition: Bg3dVec3,
+  bounds: StudioBg3dWorldBounds,
+  target: Bg3dVec3 = [0, 0, 0]
+): Bg3dMutableVec3 | null {
+  const values = [
+    ...worldPosition,
+    ...bounds.min,
+    ...bounds.max,
+    ...target,
+  ];
+  if (!values.every(isFiniteNumber)) return null;
+  if (
+    bounds.max[0] < bounds.min[0] ||
+    bounds.max[1] < bounds.min[1] ||
+    bounds.max[2] < bounds.min[2]
+  ) {
+    return null;
+  }
+
+  // Halving before addition avoids overflowing when valid imported coordinates are very large.
+  const centerX = bounds.min[0] / 2 + bounds.max[0] / 2;
+  const centerZ = bounds.min[2] / 2 + bounds.max[2] / 2;
+  const next: Bg3dMutableVec3 = [
+    worldPosition[0] + target[0] - centerX,
+    worldPosition[1] + target[1] - bounds.min[1],
+    worldPosition[2] + target[2] - centerZ,
+  ];
+  return next.every(isFiniteNumber) ? next : null;
 }
 
 export function normalizeStudioBg3dObjectFlags(raw: {
