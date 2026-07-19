@@ -10,6 +10,9 @@ import {
   type StudioBg3dImportFile,
 } from "./studio-bg3d-model-import";
 
+import type { Bg3dModelUploadSource } from "./bg3d-model-library";
+import type { Mesh } from "three";
+
 function sourceFile(
   name: string,
   contents: BlobPart | Uint8Array<ArrayBufferLike> = new Uint8Array([1]),
@@ -71,6 +74,128 @@ class TestFileReader {
       },
       () => this.onerror?.(),
     );
+  }
+}
+
+function concatBytes(parts: readonly Uint8Array[]): Uint8Array<ArrayBuffer> {
+  const result = new Uint8Array(parts.reduce((total, part) => total + part.byteLength, 0));
+  let offset = 0;
+  for (const part of parts) {
+    result.set(part, offset);
+    offset += part.byteLength;
+  }
+  return result;
+}
+
+function littleEndianUint16(value: number): Uint8Array<ArrayBuffer> {
+  const bytes = new Uint8Array(2);
+  new DataView(bytes.buffer).setUint16(0, value, true);
+  return bytes;
+}
+
+function littleEndianUint32(value: number): Uint8Array<ArrayBuffer> {
+  const bytes = new Uint8Array(4);
+  new DataView(bytes.buffer).setUint32(0, value, true);
+  return bytes;
+}
+
+function littleEndianFloat32(value: number): Uint8Array<ArrayBuffer> {
+  const bytes = new Uint8Array(4);
+  new DataView(bytes.buffer).setFloat32(0, value, true);
+  return bytes;
+}
+
+function nullTerminatedAscii(value: string): Uint8Array<ArrayBuffer> {
+  return concatBytes([new TextEncoder().encode(value), new Uint8Array([0])]);
+}
+
+function tdsChunk(id: number, ...payload: readonly Uint8Array[]): Uint8Array<ArrayBuffer> {
+  const body = concatBytes(payload);
+  return concatBytes([
+    littleEndianUint16(id),
+    littleEndianUint32(body.byteLength + 6),
+    body,
+  ]);
+}
+
+/** A generated, public-domain-by-construction 3DS triangle containing no vendor asset bytes. */
+function minimal3dsTriangle(): Uint8Array<ArrayBuffer> {
+  const points = tdsChunk(
+    0x4110,
+    littleEndianUint16(3),
+    littleEndianFloat32(0), littleEndianFloat32(0), littleEndianFloat32(0),
+    littleEndianFloat32(1), littleEndianFloat32(0), littleEndianFloat32(0),
+    littleEndianFloat32(0), littleEndianFloat32(1), littleEndianFloat32(0),
+  );
+  const faces = tdsChunk(
+    0x4120,
+    littleEndianUint16(1),
+    littleEndianUint16(0),
+    littleEndianUint16(1),
+    littleEndianUint16(2),
+    littleEndianUint16(0),
+  );
+  const triangleObject = tdsChunk(0x4100, points, faces);
+  const namedObject = tdsChunk(0x4000, nullTerminatedAscii("Triangle"), triangleObject);
+  const meshData = tdsChunk(0x3d3d, namedObject);
+  const version = tdsChunk(0x0002, littleEndianUint32(3));
+  return tdsChunk(0x4d4d, version, meshData);
+}
+
+async function expectCanonicalTriangleGlb(
+  converted: Bg3dModelUploadSource,
+  expectedName: string,
+): Promise<void> {
+  const buffer = await converted.arrayBuffer();
+  const view = new DataView(buffer);
+
+  expect(converted).toMatchObject({
+    name: expectedName,
+    type: "model/gltf-binary",
+    size: buffer.byteLength,
+  });
+  expect(view.getUint32(0, true)).toBe(0x46546c67);
+  expect(view.getUint32(4, true)).toBe(2);
+  expect(view.getUint32(8, true)).toBe(buffer.byteLength);
+
+  const jsonChunkLength = view.getUint32(12, true);
+  expect(view.getUint32(16, true)).toBe(0x4e4f534a);
+  const jsonChunkEnd = 20 + jsonChunkLength;
+  expect(jsonChunkEnd + 8).toBeLessThanOrEqual(buffer.byteLength);
+  const json = JSON.parse(
+    new TextDecoder().decode(new Uint8Array(buffer, 20, jsonChunkLength)).trim(),
+  ) as {
+    asset?: { version?: string };
+    buffers?: unknown[];
+    meshes?: unknown[];
+    nodes?: unknown[];
+    scenes?: unknown[];
+  };
+  expect(json).toMatchObject({ asset: { version: "2.0" } });
+  expect(json.buffers?.length).toBeGreaterThanOrEqual(1);
+  expect(json.meshes?.length).toBeGreaterThanOrEqual(1);
+  expect(json.nodes?.length).toBeGreaterThanOrEqual(1);
+  expect(json.scenes?.length).toBeGreaterThanOrEqual(1);
+  expect(view.getUint32(jsonChunkEnd, true)).toBeGreaterThan(0);
+  expect(view.getUint32(jsonChunkEnd + 4, true)).toBe(0x004e4942);
+
+  const { GLTFLoader } = await import("three/examples/jsm/loaders/GLTFLoader.js");
+  const gltf = await new GLTFLoader().parseAsync(buffer, "");
+  const meshes: Mesh[] = [];
+  gltf.scene.traverse((object) => {
+    const mesh = object as Mesh;
+    if (mesh.isMesh) meshes.push(mesh);
+  });
+  expect(meshes.length).toBeGreaterThanOrEqual(1);
+  expect(meshes.reduce(
+    (total, mesh) => total + (mesh.geometry.getAttribute("position")?.count ?? 0),
+    0,
+  )).toBeGreaterThanOrEqual(3);
+  for (const mesh of meshes) {
+    mesh.geometry.dispose();
+    for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+      material.dispose();
+    }
   }
 }
 
@@ -540,5 +665,118 @@ describe("convertStudioBg3dModelFilesToGlb", () => {
 
     expect(converted.name).toBe("triangle.glb");
     expect(new DataView(buffer).getUint32(0, true)).toBe(0x46546c67);
+  });
+
+  it("parses a generated ASCII FBX mesh and reloads its canonical GLB with Three", async () => {
+    vi.stubGlobal("FileReader", TestFileReader);
+    const fbx = sourceFile("triangle.fbx", [
+      "; FBX 7.4.0 project file",
+      "FBXHeaderExtension:  {",
+      "\tFBXHeaderVersion: 1003",
+      "\tFBXVersion: 7400",
+      "}",
+      "Objects:  {",
+      "\tGeometry: 1, \"Geometry::Triangle\", \"Mesh\" {",
+      "\t\tVertices: *9 {",
+      "\t\t\ta: 0,0,0,1,0,0,0,1,0",
+      "\t\t}",
+      "\t\tPolygonVertexIndex: *3 {",
+      "\t\t\ta: 0,1,-3",
+      "\t\t}",
+      "\t}",
+      "\tModel: 2, \"Model::Triangle\", \"Mesh\" {",
+      "\t\tVersion: 232",
+      "\t}",
+      "}",
+      "Connections:  {",
+      "\tC: \"OO\",1,2",
+      "\tC: \"OO\",2,0",
+      "}",
+    ].join("\n"));
+
+    const [converted] = await convertStudioBg3dModelFilesToGlb([fbx]);
+
+    await expectCanonicalTriangleGlb(converted, "triangle.glb");
+  });
+
+  it("parses a generated Collada mesh and reloads its canonical GLB with Three", async () => {
+    vi.stubGlobal("FileReader", TestFileReader);
+    const { createRequire } = await import("node:module");
+    const { JSDOM } = createRequire(import.meta.url)("jsdom") as {
+      JSDOM: new () => {
+        window: {
+          DOMParser: typeof DOMParser;
+          close(): void;
+        };
+      };
+    };
+    const dom = new JSDOM();
+    vi.stubGlobal("DOMParser", dom.window.DOMParser);
+    const dae = sourceFile("triangle.dae", [
+      "<?xml version=\"1.0\" encoding=\"utf-8\"?>",
+      "<COLLADA xmlns=\"http://www.collada.org/2005/11/COLLADASchema\" version=\"1.4.1\">",
+      "  <asset><unit meter=\"1\" name=\"meter\"/><up_axis>Y_UP</up_axis></asset>",
+      "  <library_geometries>",
+      "    <geometry id=\"triangle-geometry\" name=\"Triangle\">",
+      "      <mesh>",
+      "        <source id=\"triangle-positions\">",
+      "          <float_array id=\"triangle-positions-array\" count=\"9\">0 0 0 1 0 0 0 1 0</float_array>",
+      "          <technique_common>",
+      "            <accessor source=\"#triangle-positions-array\" count=\"3\" stride=\"3\">",
+      "              <param name=\"X\" type=\"float\"/><param name=\"Y\" type=\"float\"/><param name=\"Z\" type=\"float\"/>",
+      "            </accessor>",
+      "          </technique_common>",
+      "        </source>",
+      "        <vertices id=\"triangle-vertices\"><input semantic=\"POSITION\" source=\"#triangle-positions\"/></vertices>",
+      "        <triangles count=\"1\"><input semantic=\"VERTEX\" source=\"#triangle-vertices\" offset=\"0\"/><p>0 1 2</p></triangles>",
+      "      </mesh>",
+      "    </geometry>",
+      "  </library_geometries>",
+      "  <library_visual_scenes>",
+      "    <visual_scene id=\"Scene\" name=\"Scene\"><node id=\"Triangle\" name=\"Triangle\"><instance_geometry url=\"#triangle-geometry\"/></node></visual_scene>",
+      "  </library_visual_scenes>",
+      "  <scene><instance_visual_scene url=\"#Scene\"/></scene>",
+      "</COLLADA>",
+    ].join("\n"));
+
+    try {
+      const [converted] = await convertStudioBg3dModelFilesToGlb([dae]);
+      await expectCanonicalTriangleGlb(converted, "triangle.glb");
+    } finally {
+      dom.window.close();
+    }
+  });
+
+  it("parses a generated ASCII PLY face and reloads its canonical GLB with Three", async () => {
+    vi.stubGlobal("FileReader", TestFileReader);
+    const ply = sourceFile("triangle.ply", [
+      "ply",
+      "format ascii 1.0",
+      "comment generated triangle fixture",
+      "element vertex 3",
+      "property float x",
+      "property float y",
+      "property float z",
+      "element face 1",
+      "property list uchar int vertex_indices",
+      "end_header",
+      "0 0 0",
+      "1 0 0",
+      "0 1 0",
+      "3 0 1 2",
+    ].join("\n"));
+
+    const [converted] = await convertStudioBg3dModelFilesToGlb([ply]);
+
+    await expectCanonicalTriangleGlb(converted, "triangle.glb");
+  });
+
+  it("parses a generated binary 3DS mesh and reloads its canonical GLB with Three", async () => {
+    vi.stubGlobal("FileReader", TestFileReader);
+    const tds = sourceFile("triangle.3ds", minimal3dsTriangle());
+
+    const [converted] = await convertStudioBg3dModelFilesToGlb([tds]);
+
+    await expectCanonicalTriangleGlb(converted, "triangle.glb");
   });
 });
