@@ -131,10 +131,11 @@ describe("studio Konva runtime ownership boundary", () => {
     expect(imageNode.valueImports).toContain("./studio-konva-runtime");
   });
 
-  it("registers every non-Core shape named by StudioPage and StudioDrawNode", () => {
+  it("registers every non-Core shape named by StudioPage and extracted canvas nodes", () => {
     const runtime = moduleEdges("./studio-konva-runtime.ts");
     const page = moduleEdges("./StudioPage.tsx");
     const drawNode = moduleEdges("./StudioDrawNode.tsx");
+    const textNodes = moduleEdges("./StudioKonvaTextNodes.tsx");
 
     for (const shapeName of [
       "Arrow",
@@ -153,7 +154,9 @@ describe("studio Konva runtime ownership boundary", () => {
     }
     expect(page.valueImports).toContain("react-konva/lib/ReactKonvaCore");
     expect(drawNode.valueImports).toContain("react-konva/lib/ReactKonvaCore");
+    expect(textNodes.valueImports).toContain("react-konva/lib/ReactKonvaCore");
     expect(drawNode.source).toContain("Arrow,");
     expect(drawNode.source).toContain('if (kind === "arrow")');
+    expect(textNodes.source).toContain("TextPath as KTextPath");
   });
 });

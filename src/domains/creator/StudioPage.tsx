@@ -71,7 +71,7 @@ import {
 } from "lucide-react";
 import { Fragment, Profiler, Suspense, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type SetStateAction } from "react";
 import { createPortal, flushSync } from "react-dom";
-import { Stage, Layer, Rect, Text as KText, TextPath as KTextPath, Line, Group, Ellipse, Circle as KCircle, Path, Transformer, Shape } from "react-konva/lib/ReactKonvaCore";
+import { Stage, Layer, Rect, Text as KText, Line, Group, Ellipse, Circle as KCircle, Path, Transformer, Shape } from "react-konva/lib/ReactKonvaCore";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 
@@ -512,9 +512,7 @@ import {
   type OnionSkinSettings,
 } from "./studio-frame-animation";
 import {
-  estimateTextGradientBBox,
   konvaGradientProps,
-  legacyTextGradientToSpec,
 } from "./studio-gradient-engine";
 import {
   computeHealCloneSourceOffset,
@@ -682,7 +680,6 @@ import {
   type NodeEditHandle,
   type NodeEditTool,
 } from "./studio-node-edit";
-import { textNodeProps } from "./studio-node-props";
 import { useStudioPageDnd } from "./studio-page-dnd";
 import {
   isDefaultPageGrade,
@@ -965,7 +962,6 @@ import {
 } from "./studio-server-ai-client";
 import { createSfxTextConfig, SFX_LIBRARY } from "./studio-sfx-presets";
 import { sameCategoryItems } from "./studio-similar-style";
-import { toKonvaSkewAttrs } from "./studio-skew";
 import {
   EMPTY_SMART_GUIDE_OVERLAY,
   SMART_GUIDE_EPSILON,
@@ -1003,7 +999,6 @@ import {
   mergeStudioTeamCommentReadReceipt,
 } from "./studio-team-comment-frontier";
 import { partitionStudioTeamCommentMutableDocument } from "./studio-team-comment-mutable-document";
-import { buildTextPathData, normalizeTextPath, isFlatTextPath } from "./studio-text-path";
 import {
   buildStudioCompanionHello,
   buildStudioCompanionPrimaryState,
@@ -1119,6 +1114,10 @@ import {
   StudioSpeedLinesNode,
   StudioWorkAssetPlaceholderNode,
 } from "./StudioKonvaPrimitiveNodes";
+import {
+  StudioKonvaStickerNode,
+  StudioKonvaTextNode,
+} from "./StudioKonvaTextNodes";
 import {
   StudioLazyPanelStack,
   type StudioLazyPanelStackHandlers,
@@ -25834,133 +25833,36 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                     nodeEditDraft?.elId === el.id ? { ...el, points: nodeEditDraft.points, pressures: nodeEditDraft.pressures } : el;
                   return wrapClip(<StudioDrawNode key={el.id} el={liveEl} />);
                 }
-                if (el.type === "text" && el.textPath && !isFlatTextPath(normalizeTextPath(el.textPath)))
-                  return wrapClip(
-                    <KTextPath
-                      studioElementId={el.id}
-                      key={el.id}
-                      ref={setRef}
-                      text={el.text}
-                      x={el.x}
-                      y={el.y}
-                      data={buildTextPathData(normalizeTextPath(el.textPath), el.width, el.fontSize)}
-                      fontSize={el.fontSize}
-                      fill={el.fillType === "gradient" ? undefined : el.fill}
-                      {...(el.fillType === "gradient"
-                        ? konvaGradientProps(
-                            el.gradient ?? legacyTextGradientToSpec(el.gradientColorStart, el.gradientColorEnd, el.gradientDirection),
-                            // 곡선 텍스트 로컬 bbox 근사 — baseline(fontSize×1.4) 중심으로 위아래 글자 폭 커버.
-                            { x: 0, y: 0, width: Math.max(1, el.width), height: el.fontSize * 2.8 }
-                          )
-                        : {})}
-                      stroke={el.stroke}
-                      strokeWidth={el.strokeWidth ?? 0}
-                      fillAfterStrokeEnabled
-                      lineJoin="round"
-                      rotation={el.rotation}
-                      opacity={el.opacity ?? 1}
-                      fontFamily={el.font ?? "Pretendard, sans-serif"}
-                      fontStyle={el.fontStyle ?? "bold"}
-                      align={el.align ?? "left"}
-                      letterSpacing={el.letterSpacing ?? 0}
-                      shadowColor={el.shadowColor}
-                      shadowBlur={el.shadowBlur}
-                      shadowOffsetX={el.shadowOffsetX}
-                      shadowOffsetY={el.shadowOffsetY}
-                      shadowOpacity={el.shadowOpacity}
-                      shadowEnabled={!!el.shadowColor && (el.shadowOpacity ?? 0) > 0}
-                      {...toKonvaSkewAttrs(el)}
-                      {...textNodeProps<Partial<El>>({
-                        id: el.id,
-                        draggable,
-                        dragBoundFunc: snapBoundFunc,
-                        onSelect,
-                        onEdit: startEditText,
-                        onPatch: patchEl,
-                        onInteractionBegin: () => nodeInteractionBegin(el.id),
-                        onInteractionEnd: endLiveResourceEdit,
-                      })}
-                      onTransformEnd={(e) => commitTextTransformEnd(el.id, el.fontSize, e, { minFontSize: 10 })}
-                    />
-                  );
                 if (el.type === "text")
                   return wrapClip(
-                    <KText
-                      studioElementId={el.id}
+                    <StudioKonvaTextNode
                       key={el.id}
-                      ref={setRef}
-                      text={el.vertical ? formatVerticalText(el.text) : el.text}
-                      x={el.x}
-                      y={el.y}
-                      width={el.width}
-                      fontSize={el.fontSize}
-                      fill={el.fillType === "gradient" ? undefined : el.fill}
-                      {...(el.fillType === "gradient"
-                        ? konvaGradientProps(
-                            el.gradient ?? legacyTextGradientToSpec(el.gradientColorStart, el.gradientColorEnd, el.gradientDirection),
-                            estimateTextGradientBBox({
-                              width: el.width,
-                              text: el.vertical ? formatVerticalText(el.text) : el.text,
-                              fontSize: el.fontSize,
-                              lineHeight: el.lineHeight ?? 1,
-                            })
-                          )
-                        : {})}
-                      stroke={el.stroke}
-                      strokeWidth={el.strokeWidth ?? 0}
-                      fillAfterStrokeEnabled
-                      lineJoin="round"
-                      rotation={el.rotation}
-                      opacity={el.opacity ?? 1}
-                      fontFamily={el.font ?? "Pretendard, sans-serif"}
-                      fontStyle={el.fontStyle ?? "bold"}
-                      align={el.align ?? "left"}
-                      letterSpacing={el.letterSpacing ?? 0}
-                      lineHeight={el.lineHeight ?? 1}
-                      shadowColor={el.shadowColor}
-                      shadowBlur={el.shadowBlur}
-                      shadowOffsetX={el.shadowOffsetX}
-                      shadowOffsetY={el.shadowOffsetY}
-                      shadowOpacity={el.shadowOpacity}
-                      shadowEnabled={!!el.shadowColor && (el.shadowOpacity ?? 0) > 0}
-                      {...toKonvaSkewAttrs(el)}
-                      {...textNodeProps<Partial<El>>({
-                        id: el.id,
-                        draggable,
-                        dragBoundFunc: snapBoundFunc,
-                        onSelect,
-                        onEdit: startEditText,
-                        onPatch: patchEl,
-                        onInteractionBegin: () => nodeInteractionBegin(el.id),
-                        onInteractionEnd: endLiveResourceEdit,
-                      })}
-                      onTransformEnd={(e) => commitTextTransformEnd(el.id, el.fontSize, e, { minFontSize: 10, patchWidth: true })}
+                      el={el}
+                      draggable={draggable}
+                      innerRef={setRef}
+                      onSelect={onSelect}
+                      onEdit={startEditText}
+                      onPatch={patchEl}
+                      dragBoundFunc={snapBoundFunc}
+                      onInteractionBegin={() => nodeInteractionBegin(el.id)}
+                      onInteractionEnd={endLiveResourceEdit}
+                      onCommitTransform={commitTextTransformEnd}
                     />
                   );
                 if (el.type === "sticker")
                   return wrapClip(
-                    <KText
-                      studioElementId={el.id}
+                    <StudioKonvaStickerNode
                       key={el.id}
-                      ref={setRef}
-                      text={el.text}
-                      x={el.x}
-                      y={el.y}
-                      fontSize={el.fontSize}
-                      rotation={el.rotation}
-                      opacity={el.opacity ?? 1}
-                      {...toKonvaSkewAttrs(el)}
-                      {...textNodeProps<Partial<El>>({
-                        id: el.id,
-                        draggable,
-                        dragBoundFunc: snapBoundFunc,
-                        onSelect,
-                        onEdit: startEditText,
-                        onPatch: patchEl,
-                        onInteractionBegin: () => nodeInteractionBegin(el.id),
-                        onInteractionEnd: endLiveResourceEdit,
-                      })}
-                      onTransformEnd={(e) => commitTextTransformEnd(el.id, el.fontSize, e, { minFontSize: 16 })}
+                      el={el}
+                      draggable={draggable}
+                      innerRef={setRef}
+                      onSelect={onSelect}
+                      onEdit={startEditText}
+                      onPatch={patchEl}
+                      dragBoundFunc={snapBoundFunc}
+                      onInteractionBegin={() => nodeInteractionBegin(el.id)}
+                      onInteractionEnd={endLiveResourceEdit}
+                      onCommitTransform={commitTextTransformEnd}
                     />
                   );
                 // bubble
