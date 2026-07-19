@@ -149,8 +149,9 @@ async function closeCanvasDialog(dialog: Locator, page: Page): Promise<void> {
   await close.waitFor({ state: "visible", timeout: 5_000 });
   await close.click();
   await dialog.waitFor({ state: "detached", timeout: 5_000 });
-  // R3F intentionally defers renderer teardown by 500ms.
-  await page.waitForTimeout(850);
+  // R3F defers renderer teardown by 500ms. The compatibility patch also removes an unconsumed
+  // planned-loss listener after one bounded second, so wait through both lifetimes.
+  await page.waitForTimeout(1_650);
 }
 
 async function triggerObservableLiveContextLoss(dialog: Locator): Promise<{
