@@ -10,7 +10,6 @@ import {
   type StudioGpuFrameReceipt,
   type StudioGpuPerformanceMetrics,
   type StudioGpuStroke,
-  type StudioGpuViewTransform,
 } from "./studio-webgpu-engine";
 import {
   sameStudioGpuStrokes,
@@ -23,6 +22,7 @@ import {
 } from "./studio-webgpu-stroke-feed";
 
 import type { StudioWebGpuSurfaceBounds } from "./studio-webgpu-viewport";
+import type { StudioGpuViewTransform } from "./studio-webgpu-viewport-contract";
 
 import { cn } from "@/lib/utils";
 

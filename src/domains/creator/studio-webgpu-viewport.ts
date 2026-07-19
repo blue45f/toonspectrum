@@ -1,4 +1,4 @@
-import type { StudioGpuViewTransform } from "./studio-webgpu-engine";
+import type { StudioGpuViewTransform } from "./studio-webgpu-viewport-contract";
 
 export interface StudioWebGpuViewportSurfaceInput {
   /** Logical document width before editor zoom. */

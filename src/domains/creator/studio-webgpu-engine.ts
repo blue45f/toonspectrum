@@ -57,6 +57,7 @@ import type {
   StudioGpuDabRenderUpdate,
 } from "./studio-webgpu-dab-plan-contract";
 import type { StudioGpuRect } from "./studio-webgpu-tile-plan";
+import type { StudioGpuViewport } from "./studio-webgpu-viewport-contract";
 
 export {
   orderStudioGpuStrokes,
@@ -70,6 +71,10 @@ export type {
   StudioGpuDab,
   StudioGpuDabRenderUpdate,
 } from "./studio-webgpu-dab-plan-contract";
+export type {
+  StudioGpuViewport,
+  StudioGpuViewTransform,
+} from "./studio-webgpu-viewport-contract";
 export {
   STUDIO_GPU_MAX_READBACK_PIXELS,
   STUDIO_GPU_READBACK_BYTES_PER_PIXEL,
@@ -84,22 +89,6 @@ export type {
   StudioGpuReadbackLayoutResult,
   StudioGpuReadbackPixelRect,
 } from "./studio-webgpu-readback";
-
-export interface StudioGpuViewTransform {
-  readonly scaleX?: number;
-  readonly scaleY?: number;
-  readonly offsetX?: number;
-  readonly offsetY?: number;
-  readonly flipX?: boolean;
-}
-
-export interface StudioGpuViewport extends StudioGpuViewTransform {
-  readonly logicalWidth: number;
-  readonly logicalHeight: number;
-  readonly cssWidth?: number;
-  readonly cssHeight?: number;
-  readonly dpr?: number;
-}
 
 export type StudioGpuBackend = "webgpu" | "canvas2d";
 
