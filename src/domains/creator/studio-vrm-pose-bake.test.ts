@@ -1,15 +1,29 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 
+import { STUDIO_HUMANOID_BONE_NAMES } from "./studio-humanoid-bones";
 import {
+  STUDIO_VRM_DIRECT_EDIT_BONES,
   bakeStudioVrmRuntimeBoneRotation,
   bakeStudioVrmRuntimePose,
   canonicalizeStudioVrmPoseAngle,
 } from "./studio-vrm-pose-bake";
+import {
+  STUDIO_VRM_FINGER_BONES,
+  STUDIO_VRM_HUMANOID_BONES,
+} from "./studio-vrm-scene-document";
 
 import type { VRMHumanBoneName } from "@pixiv/three-vrm";
 
 describe("VRM runtime pose bake", () => {
+  it("uses the complete shared 55-bone semantic topology", () => {
+    expect(STUDIO_VRM_DIRECT_EDIT_BONES).toEqual(STUDIO_HUMANOID_BONE_NAMES);
+    expect(new Set(STUDIO_VRM_DIRECT_EDIT_BONES).size).toBe(55);
+    expect(new Set([...STUDIO_VRM_HUMANOID_BONES, ...STUDIO_VRM_FINGER_BONES])).toEqual(
+      new Set(STUDIO_HUMANOID_BONE_NAMES),
+    );
+  });
+
   it("canonicalizes finite angles into the persisted half-open range", () => {
     expect(canonicalizeStudioVrmPoseAngle(Math.PI * 3)).toBe(-Math.PI);
     expect(canonicalizeStudioVrmPoseAngle(-Math.PI * 4)).toBe(0);
@@ -50,6 +64,22 @@ describe("VRM runtime pose bake", () => {
       expect.any(Number),
     ]));
     expect(baked?.bones.leftShoulder?.rotation).toBeDefined();
+  });
+
+  it("persists optional eye, jaw and toe rotations instead of dropping them during scene bake", () => {
+    const nodes = new Map<VRMHumanBoneName, THREE.Object3D>();
+    for (const bone of ["leftEye", "rightEye", "jaw", "leftToes", "rightToes"] as const) {
+      const node = new THREE.Object3D();
+      node.rotation.set(0.05, -0.1, 0.15);
+      nodes.set(bone, node);
+    }
+    const baked = bakeStudioVrmRuntimePose({
+      humanoid: { getNormalizedBoneNode: (name) => nodes.get(name) ?? null },
+    });
+
+    expect(Object.keys(baked?.bones ?? {}).sort()).toEqual(
+      ["jaw", "leftEye", "leftToes", "rightEye", "rightToes"].sort(),
+    );
   });
 
   it("skips invalid and missing runtime nodes instead of serializing non-finite data", () => {

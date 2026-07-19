@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { serializeFullVrmState } from "./studio-vrm-poser-utils";
 import {
   appendStudioVrmFullStateHistory,
+  commitStudioVrmFullStateHistoryTransaction,
   createStudioVrmFullStateHistory,
   resetStudioVrmFullStateHistory,
   stepStudioVrmFullStateHistory,
@@ -80,5 +81,46 @@ describe("studio VRM full-state history ownership", () => {
       2,
     );
     expect(history.entries.map((entry) => entry.bodyRotation)).toEqual([0.1, -0.3]);
+  });
+
+  it("commits a discrete before/after command immediately even before the initial debounce snapshot", () => {
+    const before = state("model", 0);
+    const after = state("model", 0.7);
+    const history = commitStudioVrmFullStateHistoryTransaction(
+      createStudioVrmFullStateHistory(),
+      before,
+      after,
+      "model",
+    );
+
+    expect(history.entries.map((entry) => entry.bodyRotation)).toEqual([0, 0.7]);
+    expect(history.index).toBe(1);
+
+    const undo = stepStudioVrmFullStateHistory(history, -1, "model");
+    expect(undo.snapshot?.bodyRotation).toBe(0);
+    const redo = stepStudioVrmFullStateHistory(undo.history, 1, "model");
+    expect(redo.snapshot?.bodyRotation).toBe(0.7);
+  });
+
+  it("deduplicates an already-recorded before state and fails closed across model ownership", () => {
+    let history = createStudioVrmFullStateHistory();
+    history = appendStudioVrmFullStateHistory(history, state("model", 0), history.generation, "model");
+    history = commitStudioVrmFullStateHistoryTransaction(
+      history,
+      state("model", 0),
+      state("model", 0.25),
+      "model",
+    );
+    expect(history.entries.map((entry) => entry.bodyRotation)).toEqual([0, 0.25]);
+
+    const rejected = commitStudioVrmFullStateHistoryTransaction(
+      history,
+      state("other", 0),
+      state("other", 0.5),
+      "model",
+    );
+    expect(rejected.entries).toEqual([]);
+    expect(rejected.index).toBe(-1);
+    expect(rejected.generation).toBe(history.generation + 1);
   });
 });

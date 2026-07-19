@@ -5,6 +5,11 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type ChangeEv
 import { createPortal as createDomPortal } from "react-dom";
 import * as THREE from "three";
 
+import {
+  isStudioHumanoidBoneName,
+  type StudioHumanoidBoneName,
+  type StudioPoseScope,
+} from "./studio-humanoid-bones";
 import { EXPRESSION_PRESETS, EXTRA_POSE_PRESETS, NATURAL_IDLE_POSES, pickNaturalIdlePose, POSER_FINGER_BONES, type StudioExpressionPreset } from "./studio-pose-presets";
 import { createTwoBoneDefaultPoleTarget } from "./studio-rig-two-bone-ik";
 import {
@@ -47,6 +52,12 @@ import {
   straightenStudioVrmUpperBody,
   type StudioVrmPoseMirrorScope,
 } from "./studio-vrm-pose-editing";
+import {
+  applyStudioVrmPoseMaterial,
+  captureStudioVrmPoseMaterial,
+  type StudioVrmPoseMaterialApplyResult,
+  type StudioVrmPoseMaterialCaptureOptions,
+} from "./studio-vrm-pose-material-adapter";
 import {
   applyExpressionWeightsToVrm,
   applyPoseToVrm,
@@ -142,6 +153,7 @@ import {
 } from "./studio-vrm-scene-props";
 import {
   appendStudioVrmFullStateHistory,
+  commitStudioVrmFullStateHistoryTransaction,
   createStudioVrmFullStateHistory,
   resetStudioVrmFullStateHistory,
   stepStudioVrmFullStateHistory,
@@ -214,6 +226,7 @@ import {
   type StudioVrmJointWorldPoint,
 } from "./StudioVrmJointHandles";
 import { StudioVrmPhotoPoseScanner } from "./StudioVrmPhotoPoseScanner";
+import { StudioVrmPoseMaterialPanel } from "./StudioVrmPoseMaterialPanel";
 import { StudioVrmPropPanel } from "./StudioVrmPropPanel";
 import {
   canonicalizeVrmContentHash,
@@ -229,6 +242,7 @@ import {
   type VrmLibraryEntry,
 } from "./vrm-library";
 
+import type { StudioPoseMaterial } from "./studio-pose-material";
 import type { StudioToolHintSpec } from "./studio-tool-hints";
 import type { FaceLandmarker, HandLandmarker, PoseLandmarker } from "@mediapipe/tasks-vision";
 import type { VRM, VRMHumanBoneName } from "@pixiv/three-vrm";
@@ -761,6 +775,9 @@ const BONE_LABELS: Record<string, string> = {
   spine: "척추 (Spine)",
   chest: "가슴 (Chest)",
   upperChest: "윗가슴 (Upper Chest)",
+  leftEye: "왼쪽 눈 (L Eye)",
+  rightEye: "오른쪽 눈 (R Eye)",
+  jaw: "턱 (Jaw)",
   leftShoulder: "왼쪽 쇄골/어깨 (L Shoulder)",
   rightShoulder: "오른쪽 쇄골/어깨 (R Shoulder)",
   leftUpperArm: "왼쪽 어깨 (L Upper Arm)",
@@ -812,6 +829,7 @@ const BONE_LABELS: Record<string, string> = {
 
 const BONE_CATEGORIES: Array<{ id: string; label: string; bones: VRMHumanBoneName[] }> = [
   { id: "head", label: "머리/목", bones: ["head", "neck"] },
+  { id: "gaze", label: "시선/턱", bones: ["leftEye", "rightEye", "jaw"] },
   { id: "torso", label: "골반/몸통", bones: ["hips", "spine", "chest", "upperChest"] },
   { id: "rightArm", label: "오른팔", bones: ["rightShoulder", "rightUpperArm", "rightLowerArm", "rightHand"] },
   { id: "leftArm", label: "왼팔", bones: ["leftShoulder", "leftUpperArm", "leftLowerArm", "leftHand"] },
@@ -845,6 +863,19 @@ function extractStudioVrmFingerRotations(bones: PoseBoneMap): FingerRotationMap 
     fingers[boneName] = [rotation[0], rotation[1], rotation[2]];
   }
   return fingers;
+}
+
+function mergeStudioVrmFingerRotationsIntoBones(
+  bones: PoseBoneMap,
+  fingerEdits: FingerRotationMap,
+): PoseBoneMap {
+  const merged: PoseBoneMap = { ...bones };
+  for (const boneName of POSER_FINGER_BONES) {
+    const rotation = fingerEdits[boneName];
+    if (!rotation) continue;
+    merged[boneName] = { rotation: [rotation[0], rotation[1], rotation[2]] };
+  }
+  return merged;
 }
 
 function applyStudioVrmRotationPose(
@@ -901,14 +932,18 @@ function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
-function findPose(id: string): PosePreset {
+function findPoseById(id: string): PosePreset | null {
   // 기본 프리셋 → 확장 팩 → 자연 아이들(스폰 기본) 순으로 탐색. 셋 다 같은 본 규약을 쓴다.
   return (
     POSE_PRESETS.find((pose) => pose.id === id) ??
     EXTRA_POSE_PRESETS.find((pose) => pose.id === id) ??
     NATURAL_IDLE_POSES.find((pose) => pose.id === id) ??
-    POSE_PRESETS[0]
+    null
   );
+}
+
+function findPose(id: string): PosePreset {
+  return findPoseById(id) ?? POSE_PRESETS[0];
 }
 
 function findCameraPreset(id: string) {
@@ -2733,6 +2768,90 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     restoreHistoryStep(1);
   };
 
+  const poseMaterialRuntimeDisabled =
+    !vrm ||
+    webcamActive ||
+    webcamLoading ||
+    idleAnimation ||
+    isCapturing ||
+    isSharingPose ||
+    isThumbnailCapturing ||
+    jointHandleInteracting ||
+    isViewportHandIkDragging;
+
+  function portableLockedPoseBones(): StudioHumanoidBoneName[] {
+    return lockedPoseBones.filter(
+      (boneName): boneName is StudioHumanoidBoneName => isStudioHumanoidBoneName(boneName)
+    );
+  }
+
+  function handleCapturePoseMaterial(
+    options: StudioVrmPoseMaterialCaptureOptions,
+  ): StudioPoseMaterial | null {
+    const currentVrm = vrmRef.current;
+    if (!currentVrm || poseMaterialRuntimeDisabled) return null;
+    return captureStudioVrmPoseMaterial(currentVrm, options);
+  }
+
+  function handleApplyPoseMaterial(
+    material: StudioPoseMaterial,
+    scope: StudioPoseScope,
+  ): StudioVrmPoseMaterialApplyResult | null {
+    const currentVrm = vrmRef.current;
+    if (!currentVrm || poseMaterialRuntimeDisabled) return null;
+
+    const before = captureFullState();
+    const result = applyStudioVrmPoseMaterial(currentVrm, material, {
+      scope,
+      lockedBones: portableLockedPoseBones(),
+      bones: customBones,
+      fingerEdits,
+    });
+    if (!result || result.appliedBones.length === 0) return result;
+
+    const poseId = `pose-material:${result.materialId}`;
+    const after = serializeFullVrmState({
+      ...before,
+      poseId,
+      bones: result.bones,
+      fingerOverrides: result.fingerEdits,
+    });
+    const nextHistory = commitStudioVrmFullStateHistoryTransaction(
+      fullStateHistoryRef.current,
+      before,
+      after,
+      activeModelId,
+    );
+    fullStateHistoryRef.current = nextHistory;
+    setCanUndo(nextHistory.index > 0);
+    setCanRedo(nextHistory.index < nextHistory.entries.length - 1);
+
+    setActivePoseId(poseId);
+    setCustomBones(result.bones);
+    setFingerEdits(result.fingerEdits);
+    const nextEffectiveFingers: FingerRotationMap = {
+      ...(createAutoGripFingerOverrides(
+        vrmPropItems,
+        propDefById,
+        effectivePropRigMetrics,
+      ) as FingerRotationMap),
+      ...result.fingerEdits,
+    };
+    applyPoserVisualState(currentVrm, {
+      bones: result.bones,
+      yOffset: customYOffset,
+      fingerEdits: nextEffectiveFingers,
+      bodyScale,
+    });
+    return result;
+  }
+
+  function handlePoseMaterialProvenanceInvalidated(materialId: string): void {
+    if (activePoseId === `pose-material:${materialId}`) {
+      setActivePoseId("manual-pose");
+    }
+  }
+
   // 편집이 멈추면(디바운스) 스냅샷을 히스토리에 적재. 복원 중 변경은 건너뛴다.
   useEffect(() => {
     if (!vrm) return;
@@ -3448,7 +3567,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       id: `custom-${Date.now()}`,
       label,
       yOffset: customYOffset,
-      bones: customBones,
+      bones: mergeStudioVrmFingerRotationsIntoBones(customBones, fingerEdits),
       expressionWeights: { ...expressionWeights }
     };
     const next = [...savedPoses, newPose];
@@ -3470,10 +3589,13 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   function handleCustomPoseSelect(pose: CustomPose) {
     setActivePoseId(pose.id);
     const stripped = stripFingerBones(pose.bones);
+    const poseFingers = extractStudioVrmFingerRotations(pose.bones);
+    const nextFingers = Object.keys(poseFingers).length > 0 ? poseFingers : fingerEdits;
     setCustomBones(stripped);
+    if (nextFingers !== fingerEdits) setFingerEdits(nextFingers);
     setCustomYOffset(pose.yOffset);
     if (vrmRef.current) {
-      applyPoserVisualState(vrmRef.current, { bones: stripped, yOffset: pose.yOffset, fingerEdits, bodyScale });
+      applyPoserVisualState(vrmRef.current, { bones: stripped, yOffset: pose.yOffset, fingerEdits: nextFingers, bodyScale });
       if (preserveExpression) {
         applyExpressionWeightsToVrm(vrmRef.current, expressionWeights);
       } else if (pose.expressionWeights) {
@@ -4072,8 +4194,10 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       // 스폰 기본 포즈: T-포즈 대신 캐릭터 id로 결정되는 자연 아이들 포즈를 적용한다.
       const spawnPose = pickNaturalIdlePose(nextModelId);
       const strippedSpawn = stripFingerBones(spawnPose.bones);
+      const spawnFingers = extractStudioVrmFingerRotations(spawnPose.bones);
       setActivePoseId(spawnPose.id);
       setCustomBones(strippedSpawn);
+      setFingerEdits(spawnFingers);
       setCustomYOffset(spawnPose.yOffset ?? 0);
       setActiveExpressionId("neutral");
       setExpressionWeights({});
@@ -4083,7 +4207,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       setCustomColors({ ...DEFAULT_VRM_CUSTOM_COLORS });
       setMaterialFx(DEFAULT_VRM_MATERIAL_FX);
       setAvatarForgeState(createAvatarForgeState());
-      applyPoserVisualState(nextVrm, { bones: strippedSpawn, yOffset: spawnPose.yOffset ?? 0, fingerEdits, bodyScale });
+      applyPoserVisualState(nextVrm, { bones: strippedSpawn, yOffset: spawnPose.yOffset ?? 0, fingerEdits: spawnFingers, bodyScale });
       applyExpressionWeightsToVrm(nextVrm, {});
       applyVrmCustomColors(nextVrm, DEFAULT_VRM_CUSTOM_COLORS);
       applyVrmMaterialFx(nextVrm, DEFAULT_VRM_MATERIAL_FX);
@@ -4241,7 +4365,10 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     setActivePoseId(poseId);
     const pose = findPose(poseId);
     const strippedBones = stripFingerBones(pose.bones);
+    const poseFingers = extractStudioVrmFingerRotations(pose.bones);
+    const nextFingers = Object.keys(poseFingers).length > 0 ? poseFingers : fingerEdits;
     setCustomBones(strippedBones);
+    if (nextFingers !== fingerEdits) setFingerEdits(nextFingers);
     setCustomYOffset(pose.yOffset ?? 0);
     const nextRecent = rememberStudioVrmRecent(recentPoseState, poseId);
     setRecentPoseState(nextRecent);
@@ -4250,7 +4377,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       applyPoserVisualState(vrmRef.current, {
         bones: strippedBones,
         yOffset: pose.yOffset ?? 0,
-        fingerEdits,
+        fingerEdits: nextFingers,
         bodyScale,
       });
       if (preserveExpression) {
@@ -4261,6 +4388,16 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
         applyExpressionWeightsToVrm(vrmRef.current, {});
       }
     }
+  }
+
+  function handleResetActivePose(): void {
+    if (activePoseId.startsWith("custom-")) {
+      const savedPose = savedPoses.find((pose) => pose.id === activePoseId);
+      if (savedPose) handleCustomPoseSelect(savedPose);
+      return;
+    }
+    const preset = findPoseById(activePoseId);
+    if (preset) handlePoseSelect(preset.id);
   }
 
   function rememberCharacterSelection(modelId: string) {
@@ -5823,6 +5960,20 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                   onApply={handlePhotoPoseApply}
                 />
 
+                <StudioVrmPoseMaterialPanel
+                  disabled={poseMaterialRuntimeDisabled}
+                  activeMaterialId={
+                    activePoseId.startsWith("pose-material:")
+                      ? activePoseId.slice("pose-material:".length)
+                      : null
+                  }
+                  lockedBoneCount={portableLockedPoseBones().length}
+                  onCapture={handleCapturePoseMaterial}
+                  onApply={handleApplyPoseMaterial}
+                  onMaterialDeleted={handlePoseMaterialProvenanceInvalidated}
+                  onMaterialReplaced={handlePoseMaterialProvenanceInvalidated}
+                />
+
                 <div className="mb-3 flex flex-wrap gap-1.5">
                   {STUDIO_VRM_POSE_BUCKETS.map((bucket) => {
                     const count =
@@ -6648,32 +6799,17 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                   <button
                     type="button"
                     className="mt-3 w-full rounded-lg border border-line bg-card py-1.5 text-xs text-fg hover:bg-raised disabled:opacity-45"
-                    disabled={!vrm}
-                    onClick={() => {
-                      if (activePoseId.startsWith("custom-")) {
-                        const pose = savedPoses.find((p) => p.id === activePoseId);
-                        if (pose && vrmRef.current) {
-                          const stripped = stripFingerBones(pose.bones);
-                          setCustomBones(stripped);
-                          setCustomYOffset(pose.yOffset);
-                          if (pose.expressionWeights) {
-                            setExpressionWeights(pose.expressionWeights);
-                            applyExpressionWeightsToVrm(vrmRef.current, pose.expressionWeights);
-                          }
-                          applyPoserVisualState(vrmRef.current, { bones: stripped, yOffset: pose.yOffset, fingerEdits, bodyScale });
-                        }
-                      } else {
-                        const pose = findPose(activePoseId);
-                        if (vrmRef.current) {
-                          const stripped = stripFingerBones(pose.bones);
-                          setCustomBones(stripped);
-                          setCustomYOffset(pose.yOffset ?? 0);
-                          applyPoserVisualState(vrmRef.current, { bones: stripped, yOffset: pose.yOffset ?? 0, fingerEdits, bodyScale });
-                        }
-                      }
-                    }}
+                    disabled={
+                      !vrm ||
+                      (activePoseId.startsWith("custom-")
+                        ? !savedPoses.some((pose) => pose.id === activePoseId)
+                        : findPoseById(activePoseId) === null)
+                    }
+                    onClick={handleResetActivePose}
                   >
-                    현재 프리셋 포즈로 재설정
+                    {activePoseId.startsWith("pose-material:")
+                      ? "범용 소재 목록에서 다시 적용"
+                      : "현재 프리셋 포즈로 재설정"}
                   </button>
                 </div>
               </details>
