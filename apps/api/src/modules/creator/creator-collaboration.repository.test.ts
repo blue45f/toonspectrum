@@ -3,6 +3,12 @@ import { describe, expect, it } from "vitest";
 import { db } from "../../../../../lib/db";
 
 import {
+  buildCreatorCrdtServerSequenceQuery,
+  buildCreatorSharedDocumentMetaQuery,
+  buildCreatorSharedDocumentUpdateQuery,
+  buildCreatorSharedWorksListQuery,
+} from "./creator-collaboration.drizzle-persistence";
+import {
   CreatorCollaborationCrdtSequenceConflictError,
   CreatorCollaborationConflictError,
   CreatorCollaborationForbiddenError,
@@ -10,10 +16,6 @@ import {
   CreatorCollaborationNotFoundError,
   CreatorCollaborationRepository,
   CreatorCollaborationRevisionConflictError,
-  buildCreatorCrdtServerSequenceQuery,
-  buildCreatorSharedDocumentMetaQuery,
-  buildCreatorSharedDocumentUpdateQuery,
-  buildCreatorSharedWorksListQuery,
   decodeCreatorSharedWorksCursor,
   encodeCreatorSharedWorksCursor,
 } from "./creator-collaboration.repository";
