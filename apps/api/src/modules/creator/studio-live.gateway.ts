@@ -21,6 +21,7 @@ import {
   replyStudioLiveAck as reply,
   studioLiveFailure as failure,
 } from "./studio-live-ack";
+import { StudioLiveAdapterCleanupService } from "./studio-live-adapter-cleanup.service";
 import { StudioLiveCrdtQuotaLimiter } from "./studio-live-crdt-quota";
 import { StudioLiveJoinTransitionSequencer } from "./studio-live-join-transition-sequencer";
 import {
@@ -355,6 +356,8 @@ export class StudioLiveGateway
   constructor(
     @Inject(CreatorService)
     private readonly creatorService: CreatorService,
+    @Inject(StudioLiveAdapterCleanupService)
+    private readonly adapterCleanup: StudioLiveAdapterCleanupService,
     @Inject(StudioLiveSocketAuthService)
     private readonly socketAuthentication: StudioLiveSocketAuthService,
     @Inject(StudioLiveJoinTransitionSequencer)
@@ -2819,18 +2822,15 @@ export class StudioLiveGateway
       message: "로그인 세션이 만료되거나 해제되어 실시간 작업실 연결을 종료했습니다.",
     });
     const socket = this.server.sockets.get(socketId) as StudioLiveSocket | undefined;
-    try {
-      const leaveResult = socket?.leave(studioLiveRoom(expectedParticipant.workId));
-      if (leaveResult) void Promise.resolve(leaveResult).catch(() => undefined);
-    } catch {
-      // Participant removal and transport shutdown below remain the fail-closed enforcement path.
-    }
-    this.removeParticipant(socketId, "revoked");
-    this.rateLimits.delete(socketId);
-    this.socketAuthentication.clearBySocketId(socketId, socket);
-    if (socket) {
-      socket.disconnect(true);
-    }
+    this.adapterCleanup.closeRoomTransport({
+      socket,
+      room: studioLiveRoom(expectedParticipant.workId),
+      finalizeLocalState: () => {
+        this.removeParticipant(socketId, "revoked");
+        this.rateLimits.delete(socketId);
+        this.socketAuthentication.clearBySocketId(socketId, socket);
+      },
+    });
   }
 
   private revokeParticipant(socketId: string): void {
@@ -2841,22 +2841,16 @@ export class StudioLiveGateway
       message: "팀 권한이 변경되어 실시간 작업실 연결을 종료했습니다.",
     });
     const socket = this.server.sockets.get(socketId) as StudioLiveSocket | undefined;
-    // Start adapter cleanup, but never rely on an async/rejected leave to enforce revocation. The
-    // transport is closed below so a stale distributed-adapter membership cannot keep receiving
-    // room broadcasts while the membership operation is pending.
-    try {
-      const leaveResult = socket?.leave(studioLiveRoom(participant.workId));
-      if (leaveResult) void Promise.resolve(leaveResult).catch(() => undefined);
-    } catch {
-      // Disconnecting the transport below remains the fail-closed enforcement path.
-    }
-    this.removeParticipant(socketId, "revoked");
-    this.rateLimits.delete(socketId);
-    this.joinTransitions.invalidate(socketId);
-    this.socketAuthentication.clearBySocketId(socketId, socket);
-    if (socket) {
-      socket.disconnect(true);
-    }
+    this.adapterCleanup.closeRoomTransport({
+      socket,
+      room: studioLiveRoom(participant.workId),
+      finalizeLocalState: () => {
+        this.removeParticipant(socketId, "revoked");
+        this.rateLimits.delete(socketId);
+        this.joinTransitions.invalidate(socketId);
+        this.socketAuthentication.clearBySocketId(socketId, socket);
+      },
+    });
   }
 
   private removeParticipant(socketId: string, reason: "disconnect" | "switch" | "revoked"): void {

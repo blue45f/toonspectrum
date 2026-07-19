@@ -10,6 +10,7 @@ import {
 import { studioCrdtClusterLoadRepositoryProvider } from "./studio-crdt-cluster-load.repository";
 import { studioCrdtRepositoryProvider } from "./studio-crdt.repository";
 import { StudioCrdtService } from "./studio-crdt.service";
+import { StudioLiveAdapterCleanupService } from "./studio-live-adapter-cleanup.service";
 import { StudioLiveJoinTransitionSequencer } from "./studio-live-join-transition-sequencer";
 import { studioLiveLockRepositoryProvider } from "./studio-live-lock.repository";
 import { StudioLiveRoomTransitionCoordinator } from "./studio-live-room-transition-coordinator";
@@ -61,6 +62,7 @@ import { StudioWorkAssetService } from "./studio-work-asset.service";
     StudioCrdtService,
     studioLiveSessionAuthenticatorProvider,
     studioLiveSessionRevalidatorProvider,
+    StudioLiveAdapterCleanupService,
     StudioLiveJoinTransitionSequencer,
     StudioLiveRoomTransitionCoordinator,
     StudioLiveSocketAuthService,

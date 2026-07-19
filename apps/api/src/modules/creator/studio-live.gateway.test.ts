@@ -6,6 +6,7 @@ import {
   StudioCrdtBackpressureError,
   StudioCrdtStorageCorruptionError,
 } from "./studio-crdt.service";
+import { StudioLiveAdapterCleanupService } from "./studio-live-adapter-cleanup.service";
 import { StudioLiveJoinTransitionSequencer } from "./studio-live-join-transition-sequencer";
 import { StudioLiveRoomTransitionCoordinator } from "./studio-live-room-transition-coordinator";
 import { StudioLiveSocketAuthService } from "./studio-live-socket-auth.service";
@@ -316,11 +317,13 @@ function createHarness(
   };
   const authenticate = vi.fn(authenticateSession);
   const revalidate = vi.fn(revalidateSession);
+  const adapterCleanup = new StudioLiveAdapterCleanupService();
   const socketAuthentication = new StudioLiveSocketAuthService(authenticate, revalidate);
   const joinTransitions = new StudioLiveJoinTransitionSequencer();
   const roomTransitions = new StudioLiveRoomTransitionCoordinator();
   const gateway = new StudioLiveGateway(
     service as unknown as CreatorService,
+    adapterCleanup,
     socketAuthentication,
     joinTransitions,
     roomTransitions,
@@ -368,6 +371,7 @@ function createHarness(
     crdtService,
     authenticate,
     revalidate,
+    adapterCleanup,
     socketAuthentication,
     joinTransitions,
     roomTransitions,
@@ -2324,6 +2328,63 @@ describe("StudioLiveGateway", () => {
         action: "released",
         resourceId: "page:session",
       }),
+    });
+  });
+
+  it("does not clean up a replacement participant for an older revocation generation", async () => {
+    const harness = createHarness();
+    const staleSocket = harness.socket("cleanup-replacement", "valid:stale-user");
+    await connectAndJoin(harness, staleSocket);
+    const internals = harness.gateway as unknown as {
+      participantsBySocket: Map<string, { authorizationSequence: number; workId: string }>;
+      disconnectInvalidSession(
+        socketId: string,
+        expectedParticipant: { authorizationSequence: number; workId: string }
+      ): void;
+    };
+    const staleParticipant = internals.participantsBySocket.get(staleSocket.id);
+    if (!staleParticipant) throw new Error("missing stale participant");
+    const replacementSocket = harness.socket(
+      "cleanup-replacement",
+      "valid:replacement-user"
+    );
+    await harness.gateway.handleConnection(replacementSocket as never);
+    const replacementParticipant = {
+      ...staleParticipant,
+      authorizationSequence: staleParticipant.authorizationSequence + 1,
+      workId: "work-replacement",
+    };
+    internals.participantsBySocket.set(staleSocket.id, replacementParticipant);
+    const cleanup = vi.spyOn(harness.adapterCleanup, "closeRoomTransport");
+
+    internals.disconnectInvalidSession(staleSocket.id, staleParticipant);
+
+    expect(cleanup).not.toHaveBeenCalled();
+    expect(internals.participantsBySocket.get(staleSocket.id)).toBe(replacementParticipant);
+    expect(replacementSocket.disconnected).toBe(false);
+    expect(privateAuthPrincipal(harness, replacementSocket)?.userId).toBe("replacement-user");
+  });
+
+  it("finalizes local revocation state when the adapter socket is already absent", async () => {
+    const harness = createHarness();
+    const socket = harness.socket("cleanup-absent-socket");
+    await connectAndJoin(harness, socket);
+    const internals = harness.gateway as unknown as {
+      participantsBySocket: Map<string, unknown>;
+      disconnectInvalidSession(socketId: string, expectedParticipant: unknown): void;
+    };
+    const participant = internals.participantsBySocket.get(socket.id);
+    if (!participant) throw new Error("missing participant");
+    harness.sockets.delete(socket.id);
+
+    internals.disconnectInvalidSession(socket.id, participant);
+
+    expect(internals.participantsBySocket.has(socket.id)).toBe(false);
+    expect(privateAuthPrincipal(harness, socket)).toBeUndefined();
+    expect(harness.emissions).toContainEqual({
+      target: "studio-live:work-1",
+      event: "studio:presence:leave",
+      payload: { connectionId: socket.id, reason: "revoked" },
     });
   });
 
