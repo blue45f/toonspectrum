@@ -1,0 +1,253 @@
+// @vitest-environment jsdom
+
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { StudioVrmCharacterLibraryPanel } from "./StudioVrmCharacterLibraryPanel";
+
+import type { VrmLibraryEntry } from "./vrm-library";
+import type { ComponentProps } from "react";
+
+type PanelProps = ComponentProps<typeof StudioVrmCharacterLibraryPanel>;
+
+function createEntry(
+  id: string,
+  name: string,
+  source: VrmLibraryEntry["source"] = "sample",
+  patch: Partial<VrmLibraryEntry> = {},
+): VrmLibraryEntry {
+  return {
+    id,
+    name,
+    source,
+    thumbnail: null,
+    createdAt: 0,
+    updatedAt: 0,
+    ...patch,
+  };
+}
+
+function createDefaultProps(): PanelProps {
+  return {
+    hidden: false,
+    entries: [createEntry("sample-1", "샘플 모델")],
+    recentCharacterIds: [],
+    libraryStatus: "ready",
+    libraryError: "",
+    activeModelId: "sample-1",
+    deletingModelId: null,
+    modelStatus: "ready",
+    isUploading: false,
+    onFileChange: vi.fn(),
+    onSelect: vi.fn(),
+    onDelete: vi.fn(),
+    onCollapse: vi.fn(),
+  };
+}
+
+function renderPanel(overrides: Partial<PanelProps> = {}) {
+  const props = { ...createDefaultProps(), ...overrides };
+  return { props, ...render(<StudioVrmCharacterLibraryPanel {...props} />) };
+}
+
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
+
+describe("StudioVrmCharacterLibraryPanel", () => {
+  it("renders loading, error, upload-empty, and search-no-result states", () => {
+    const view = renderPanel({ entries: [], libraryStatus: "loading" });
+
+    expect(screen.getByText("저장된 캐릭터를 불러오는 중입니다.")).toBeTruthy();
+    expect(screen.getByText(/업로드한 캐릭터가 아직 없습니다/)).toBeTruthy();
+    expect(view.container.querySelector('[role="tabpanel"]')?.getAttribute("aria-busy")).toBe("true");
+
+    view.rerender(
+      <StudioVrmCharacterLibraryPanel
+        {...view.props}
+        entries={[]}
+        libraryStatus="error"
+        libraryError="라이브러리를 읽지 못했습니다."
+      />,
+    );
+    expect(screen.getByRole("alert").textContent).toContain("라이브러리를 읽지 못했습니다.");
+
+    view.rerender(
+      <StudioVrmCharacterLibraryPanel
+        {...view.props}
+        entries={[createEntry("lumi", "루미")]}
+        libraryStatus="ready"
+      />,
+    );
+    fireEvent.change(screen.getByLabelText("캐릭터 라이브러리 검색"), {
+      target: { value: "없는 캐릭터" },
+    });
+    expect(screen.getByText(/"없는 캐릭터"와 일치하는 캐릭터가 없어요/)).toBeTruthy();
+    expect(screen.getByText("표시 0/0명")).toBeTruthy();
+  });
+
+  it("filters entries, resets the visible batch, and expands or collapses pagination", () => {
+    const entries = Array.from({ length: 14 }, (_, index) =>
+      createEntry(`character-${index + 1}`, `캐릭터 ${String(index + 1).padStart(2, "0")}`),
+    );
+    const onCollapse = vi.fn();
+    renderPanel({ entries, onCollapse });
+
+    expect(screen.getByText("표시 12/14명")).toBeTruthy();
+    expect(screen.queryByText("캐릭터 13")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /캐릭터 2명 더 보기/ }));
+    expect(screen.getByText("표시 14/14명")).toBeTruthy();
+    expect(screen.getByText("캐릭터 13")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "처음 12명만 보기" }));
+    expect(onCollapse).toHaveBeenCalledOnce();
+    expect(screen.getByText("표시 12/14명")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /캐릭터 2명 더 보기/ }));
+    fireEvent.change(screen.getByLabelText("캐릭터 라이브러리 검색"), {
+      target: { value: "캐릭터 14" },
+    });
+    expect(screen.getByText("표시 1/1명")).toBeTruthy();
+    expect(screen.getByText("캐릭터 14")).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText("캐릭터 라이브러리 검색"), {
+      target: { value: "" },
+    });
+    expect(screen.getByText("표시 12/14명")).toBeTruthy();
+    expect(screen.queryByText("캐릭터 13")).toBeNull();
+  });
+
+  it("preserves recent character order and selects a recent entry once", () => {
+    const entries = [
+      createEntry("one", "하나"),
+      createEntry("two", "둘"),
+      createEntry("three", "셋"),
+    ];
+    const onSelect = vi.fn();
+    renderPanel({
+      entries,
+      recentCharacterIds: ["three", "missing", "one", "two"],
+      activeModelId: "one",
+      onSelect,
+    });
+
+    const recentButtons = screen.getByText("최근 캐릭터").nextElementSibling;
+    if (!(recentButtons instanceof HTMLElement)) throw new Error("missing recent character controls");
+    expect(Array.from(recentButtons.querySelectorAll("button"), (button) => button.textContent)).toEqual([
+      "셋",
+      "하나",
+      "둘",
+    ]);
+
+    fireEvent.click(within(recentButtons).getByRole("button", { name: "셋" }));
+    expect(onSelect).toHaveBeenCalledOnce();
+    expect(onSelect).toHaveBeenCalledWith(entries[2]);
+  });
+
+  it("reflects active, deleting, and uploading transactions without enabling duplicate actions", () => {
+    const uploaded = createEntry("uploaded", "업로드 모델", "indexed-db");
+    renderPanel({
+      entries: [createEntry("sample", "샘플 모델"), uploaded],
+      activeModelId: uploaded.id,
+      deletingModelId: uploaded.id,
+      modelStatus: "loading",
+      isUploading: true,
+    });
+
+    const uploadButton = screen.getByRole("button", { name: "VRM 업로드" }) as HTMLButtonElement;
+    const activeButton = screen.getByRole("button", { name: "업로드 모델 선택" }) as HTMLButtonElement;
+    const deleteButton = screen.getByRole("button", { name: "업로드 모델 삭제" }) as HTMLButtonElement;
+
+    expect(uploadButton.disabled).toBe(true);
+    expect(activeButton.disabled).toBe(true);
+    expect(activeButton.getAttribute("aria-pressed")).toBe("true");
+    expect(activeButton.parentElement?.className).toContain("border-accent/60");
+    expect(deleteButton.disabled).toBe(true);
+    expect(deleteButton.querySelector(".animate-spin")).toBeTruthy();
+    expect(viewBusyState()).toBe("true");
+  });
+
+  it("keeps thumbnails contained and distinguishes bundled and uploaded assets", () => {
+    const view = renderPanel({
+      entries: [
+        createEntry("sample", "썸네일 샘플", "sample", { thumbnail: "data:image/png;base64,sample" }),
+        createEntry("uploaded", "사용자 모델", "indexed-db"),
+      ],
+      activeModelId: "sample",
+    });
+
+    const thumbnail = view.container.querySelector("img");
+    expect(thumbnail?.getAttribute("alt")).toBe("");
+    expect(thumbnail?.className).toContain("object-contain");
+    expect(screen.getByText("번들")).toBeTruthy();
+    expect(screen.getByText("업로드")).toBeTruthy();
+  });
+
+  it("owns a multiple .vrm file picker and forwards its change exactly once", () => {
+    const onFileChange = vi.fn();
+    const view = renderPanel({ onFileChange });
+    const fileInput = screen.getByLabelText("VRM 캐릭터 파일 선택") as HTMLInputElement;
+    const inputClick = vi.spyOn(fileInput, "click");
+
+    expect(fileInput.accept).toBe(".vrm");
+    expect(fileInput.multiple).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "VRM 업로드" }));
+    expect(inputClick).toHaveBeenCalledOnce();
+
+    fireEvent.change(fileInput, {
+      target: { files: [new File(["vrm"], "character.vrm", { type: "model/gltf-binary" })] },
+    });
+    expect(onFileChange).toHaveBeenCalledOnce();
+    expect(view.container.querySelector('input[type="file"]')).toBe(fileInput);
+  });
+
+  it("selects and deletes exactly once while stopping delete click propagation", () => {
+    const entry = createEntry("uploaded", "업로드 대상", "indexed-db");
+    const onSelect = vi.fn();
+    const onDelete = vi.fn();
+    const onOuterClick = vi.fn();
+    const props = {
+      ...createDefaultProps(),
+      entries: [entry],
+      activeModelId: "different",
+      onSelect,
+      onDelete,
+    };
+    render(<StudioVrmCharacterLibraryPanel {...props} />);
+    document.body.addEventListener("click", onOuterClick, { once: true });
+
+    fireEvent.click(screen.getByRole("button", { name: "업로드 대상 삭제" }));
+    expect(onDelete).toHaveBeenCalledOnce();
+    expect(onDelete).toHaveBeenCalledWith(entry);
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(onOuterClick).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "업로드 대상 선택" }));
+    expect(onSelect).toHaveBeenCalledOnce();
+    expect(onSelect).toHaveBeenCalledWith(entry);
+    expect(onOuterClick).toHaveBeenCalledOnce();
+  });
+
+  it("keeps labeled focus affordances and coarse-pointer delete targets", () => {
+    renderPanel({ entries: [createEntry("uploaded", "접근성 모델", "indexed-db")] });
+
+    const panel = document.querySelector('[role="tabpanel"]');
+    const search = screen.getByLabelText("캐릭터 라이브러리 검색");
+    const upload = screen.getByRole("button", { name: "VRM 업로드" });
+    const deleteButton = screen.getByRole("button", { name: "접근성 모델 삭제" });
+
+    expect(panel?.id).toBe("vrm-character-section-library");
+    expect(panel?.getAttribute("aria-labelledby")).toBe("vrm-character-subtab-library");
+    expect(search.className).toContain("focus-visible:outline");
+    expect(search.className).toContain("min-h-11");
+    expect(upload.className).toContain("min-h-11");
+    expect(deleteButton.className).toContain("size-9");
+    expect(deleteButton.className).toContain("pointer-coarse:size-11");
+  });
+});
+
+function viewBusyState() {
+  return document.querySelector('[role="tabpanel"]')?.getAttribute("aria-busy");
+}

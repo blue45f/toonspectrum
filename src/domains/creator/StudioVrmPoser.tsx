@@ -1,6 +1,6 @@
 import { OrbitControls } from "@react-three/drei/core/OrbitControls.js";
 import { Canvas, useFrame, useThree, createPortal } from "@react-three/fiber";
-import { AlertTriangle, Camera, ChevronDown, Clapperboard, ExternalLink, FlipHorizontal2, ImagePlus, Loader2, Maximize2, Paintbrush, PersonStanding, Redo2, RotateCcw, RotateCw, Search, Shirt, Sliders, Smile, Sparkles, Swords, Trash2, Undo2, Upload, UserRound, WandSparkles, X, Webcam, ZoomIn, ZoomOut } from "lucide-react";
+import { AlertTriangle, Camera, ChevronDown, Clapperboard, FlipHorizontal2, ImagePlus, Loader2, Maximize2, Paintbrush, PersonStanding, Redo2, RotateCcw, RotateCw, Search, Shirt, Sliders, Smile, Sparkles, Swords, Trash2, Undo2, Upload, UserRound, WandSparkles, X, Webcam, ZoomIn, ZoomOut } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
 import { createPortal as createDomPortal } from "react-dom";
 import * as THREE from "three";
@@ -218,6 +218,7 @@ import {
 import { StudioToolHintTarget } from "./StudioToolHint";
 import { StudioVrmAvatarForge, countDetectedVrmHairMeshes } from "./StudioVrmAvatarForge";
 import { StudioVrmAvatarForgePanel } from "./StudioVrmAvatarForgePanel";
+import { StudioVrmCharacterLibraryPanel } from "./StudioVrmCharacterLibraryPanel";
 import {
   STUDIO_VRM_JOINT_HANDLE_DEFINITIONS,
   StudioVrmJointHandles,
@@ -562,7 +563,6 @@ const FACE_LOST_HINT_FRAMES = 150;
 const FALLBACK_EXPORT_WIDTH = 360;
 const THUMBNAIL_WIDTH = 72;
 const THUMBNAIL_HEIGHT = 96;
-const LIBRARY_BATCH_SIZE = 12;
 const HTML_FALLBACK_VRM_ERROR = "VRM 파일 대신 웹 페이지가 응답했습니다. 배포에 해당 .vrm 파일이 포함되어 있는지 확인해 주세요.";
 
 const CONTROL_BUTTON =
@@ -2354,11 +2354,6 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   const [libraryEntries, setLibraryEntries] = useState<VrmLibraryEntry[]>(SAMPLE_VRM_ENTRIES);
   const [libraryStatus, setLibraryStatus] = useState<LibraryStatus>("loading");
   const [libraryError, setLibraryError] = useState("");
-  // 89명 베이스 캐릭터를 검색 없이 그리드로 늘어놓으면 스크롤이 매우 길어져, 이름 검색만으로
-  // 빠르게 좁힐 수 있게 한다(클라이언트 사이드 부분일치, 대소문자 무시) — "캐릭터 만들기" 진입점을
-  // 통합하며 그쪽 UX를 이 라이브러리 자체로 흡수했다.
-  const [libraryQuery, setLibraryQuery] = useState("");
-  const [libraryVisibleCount, setLibraryVisibleCount] = useState(LIBRARY_BATCH_SIZE);
   const [activeModelId, setActiveModelId] = useState(SAMPLE_VRM_ID);
   const activeModelIdRef = useRef(activeModelId);
   activeModelIdRef.current = activeModelId;
@@ -2439,7 +2434,6 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   const frameIndexRef = useRef(0);
   const webcamActiveRef = useRef(false);
   const trackingDataRef = useRef<VrmTrackingData | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const vrmRef = useRef<VRM | null>(null);
   const loadRequestRef = useRef(0);
   const thumbnailRequestRef = useRef(0);
@@ -3008,26 +3002,15 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     NATURAL_IDLE_POSES.filter(poseMatches).length +
     EXTRA_POSE_PRESETS.filter(poseMatches).length +
     savedPoses.filter(poseMatches).length;
-  const recentCharacterEntries = recentCharacterState.ids
-    .map((id) => libraryEntries.find((entry) => entry.id === id))
-    .filter((entry): entry is (typeof libraryEntries)[number] => Boolean(entry))
-    .slice(0, 6);
   // 비활성 탭 섹션은 hidden 속성으로 숨겨 마운트는 유지(웹캠 video 등 ref 보존).
   // hidden 속성은 space-y 유틸의 :not([hidden]) 선택자에서 제외돼 간격도 자연 정리된다.
   const hideOnTab = (tab: PanelTab) => activePanelTab !== tab;
   const hideOnCharacterSection = (section: CharacterPanelSection) =>
     activePanelTab !== "character" || activeCharacterSection !== section;
-  const normalizedLibraryQuery = libraryQuery.trim().toLocaleLowerCase("ko-KR");
-  const filteredLibraryEntries = libraryEntries.filter((entry) =>
-    entry.name.toLocaleLowerCase("ko-KR").includes(normalizedLibraryQuery)
-  );
-  const visibleLibraryEntries = filteredLibraryEntries.slice(0, libraryVisibleCount);
-  const hiddenLibraryEntryCount = Math.max(0, filteredLibraryEntries.length - visibleLibraryEntries.length);
   const libraryEntryById = new Map(libraryEntries.map((entry) => [entry.id, entry] as const));
   const availableExpressionActions = getAvailableExpressionActions(vrm);
   const hasMToonMaterial = vrm ? hasVrmMToonMaterial(vrm) : false;
   const activeLibraryEntry = libraryEntryById.get(activeModelId) ?? null;
-  const hasUploadedModels = libraryEntries.some((entry) => entry.source === "indexed-db");
   const displayModelName = vrm ? modelName : "";
   interface PendingPoseData {
     poseId?: string;
@@ -4338,8 +4321,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     loadModelFromLibraryEntry(SAMPLE_VRM_ENTRIES[0]);
   }
 
-  async function handleDeleteEntry(event: MouseEvent<HTMLButtonElement>, entry: VrmLibraryEntry) {
-    event.stopPropagation();
+  async function handleDeleteEntry(entry: VrmLibraryEntry) {
     if (entry.source !== "indexed-db") return;
 
     setDeletingModelId(entry.id);
@@ -5439,252 +5421,23 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                 </div>
               ) : null}
 
-              <section
-                id="vrm-character-section-library"
-                role="tabpanel"
-                aria-labelledby="vrm-character-subtab-library"
+              <StudioVrmCharacterLibraryPanel
                 hidden={hideOnCharacterSection("library")}
-              >
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
-                    <Upload size={15} className="text-accent" aria-hidden />
-                    캐릭터 라이브러리
-                  </h3>
-                  <span className="text-[0.68rem] text-fg-3" aria-live="polite">
-                    표시 {visibleLibraryEntries.length}/{filteredLibraryEntries.length}명
-                  </span>
-                </div>
-                <input
-                  ref={fileInputRef}
-                  accept=".vrm"
-                  aria-label="VRM 캐릭터 파일 선택"
-                  className="sr-only"
-                  multiple
-                  type="file"
-                  onChange={handleFileChange}
-                />
-                <button
-                  type="button"
-                  className={cx(CONTROL_BUTTON, "w-full border-accent/50 bg-accent text-on-accent hover:bg-accent/90")}
-                  disabled={isUploading}
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  {isUploading ? <Loader2 className="animate-spin" size={14} aria-hidden /> : <Upload size={14} aria-hidden />}
-                  VRM 업로드
-                </button>
-                <p className="mt-2 rounded-xl border border-line bg-card/60 px-3 py-2 text-xs leading-relaxed text-fg-3">
-                  여러 .vrm 파일을 한 번에 올려 로맨스, 판타지, 학원물, 액션 등 장르별 캐릭터를 전환하세요. VRoid Studio에서 무료 애니메이션풍 VRM 캐릭터를 직접 만들 수 있습니다.
-                </p>
-
-                <details className="group mt-3 rounded-xl border border-line bg-accent-soft/30 p-3">
-                  <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1 text-xs font-bold text-accent [&::-webkit-details-marker]:hidden">
-                    <Sparkles size={13} aria-hidden />
-                    무료 VRM·의상 찾기
-                    <ChevronDown size={13} className="ml-auto transition-transform group-open:rotate-180" aria-hidden />
-                  </summary>
-                  <p className="mt-1 text-[0.68rem] leading-normal text-fg-2">
-                    아래 공식/커뮤니티 허브에서 무료 배포 모델을 다운로드해 보세요. 다운로드한 .vrm 파일을 ToonSpectrum에 자유롭게 추가할 수 있습니다.
-                  </p>
-                  <div className="mt-2.5 space-y-2">
-                    <a
-                      href="https://hub.vroid.com"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-between rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs text-fg hover:bg-raised transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-                    >
-                      <div className="flex flex-col min-w-0">
-                        <span className="font-bold text-[0.72rem] text-fg flex items-center gap-1">
-                          VRoid Hub <ExternalLink size={10} className="opacity-60" />
-                        </span>
-                        <span className="text-[0.68rem] text-fg-3 truncate">
-                          'Free' 태그가 달린 수많은 고품질 무료 3D 캐릭터 다운로드
-                        </span>
-                      </div>
-                    </a>
-                    <a
-                      href="https://booth.pm/ko/search/VRM?max_price=0"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-between rounded-lg border border-line bg-card px-2.5 py-1.5 text-xs text-fg hover:bg-raised transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-                    >
-                      <div className="flex flex-col min-w-0">
-                        <span className="font-bold text-[0.72rem] text-fg flex items-center gap-1">
-                          BOOTH (무료 VRM 아바타) <ExternalLink size={10} className="opacity-60" />
-                        </span>
-                        <span className="text-[0.68rem] text-fg-3 truncate">
-                          의상, 헤어, 악세사리 등 3D 소스 무료 배포 카탈로그
-                        </span>
-                      </div>
-                    </a>
-                  </div>
-                </details>
-
-                <details className="group mt-3 rounded-xl border border-line bg-card/60 p-3">
-                  <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1.5 text-xs font-bold text-fg [&::-webkit-details-marker]:hidden">
-                    <Paintbrush size={13} className="text-accent" aria-hidden />
-                    더 깊은 원본 모델 제작 · VRoid 가져오기
-                    <ChevronDown size={13} className="ml-auto text-fg-3 transition-transform group-open:rotate-180" aria-hidden />
-                  </summary>
-                  <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-2">
-                    ToonSpectrum의 조형 탭은 현재 VRM 리그를 보존한 빠른 비파괴 편집에 적합합니다. 새 스킨 메시·직접 그린 텍스처·VRM 파일 내보내기까지 필요하면 VRoid Studio에서 원본을 만든 뒤 가져오세요.
-                  </p>
-                  
-                  <div className="mt-2.5 rounded-lg border border-line bg-panel p-2 text-[0.68rem] text-fg-3 space-y-1.5">
-                    <div className="font-bold text-fg">💡 툰스펙트럼 적용 가이드:</div>
-                    <ul className="list-decimal pl-3.5 space-y-1">
-                      <li>PC/Mac 버전 VRoid Studio를 다운로드하여 설치합니다.</li>
-                      <li>원하는 슬롯(얼굴, 체형, 헤어, 옷 등)의 프리셋을 골라 취향대로 커스텀합니다.</li>
-                      <li>우측 상단 [내보내기(Export)] 아이콘 ➜ <span className="font-bold text-fg">Export as VRM</span>을 클릭합니다.</li>
-                      <li>정보(이름, 라이선스 등)를 입력하고 내보낸 <span className="font-semibold text-accent">.vrm 파일</span>을 ToonSpectrum에 업로드해 보세요!</li>
-                    </ul>
-                  </div>
-
-                  <a
-                    href="https://vroid.com/studio"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-2.5 inline-flex w-full items-center justify-center gap-1 rounded-lg bg-raised px-2.5 py-1.5 text-[0.68rem] font-bold text-fg hover:bg-line transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-                  >
-                    VRoid Studio 공식 다운로드 <ExternalLink size={10} className="opacity-70" />
-                  </a>
-                </details>
-
-                {libraryStatus === "error" && libraryError ? (
-                  <p className="mt-2 rounded-xl border border-line bg-card/70 px-3 py-2 text-xs leading-relaxed text-fg-3">
-                    <AlertTriangle className="mr-1 inline align-[-2px] text-accent" size={14} aria-hidden />
-                    {libraryError}
-                  </p>
-                ) : null}
-
-                {!hasUploadedModels ? (
-                  <div className="mt-3 rounded-xl border border-dashed border-line bg-card/45 px-3 py-3 text-xs leading-relaxed text-fg-3">
-                    업로드한 캐릭터가 아직 없습니다. 루미로 바로 테스트하거나, 다양한 장르 캐릭터를 만들어 업로드하세요.
-                  </div>
-                ) : null}
-
-                <div className="relative mt-3">
-                  <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-3" aria-hidden />
-                  <input
-                    type="text"
-                    value={libraryQuery}
-                    onChange={(e) => {
-                      setLibraryQuery(e.target.value);
-                      setLibraryVisibleCount(LIBRARY_BATCH_SIZE);
-                    }}
-                    placeholder="캐릭터 이름 검색..."
-                    aria-label="캐릭터 라이브러리 검색"
-                    spellCheck={false}
-                    className="min-h-11 w-full rounded-lg border border-line bg-card py-1.5 pl-8 pr-2 text-xs text-fg placeholder:text-fg-3 focus:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                  />
-                </div>
-
-                {recentCharacterEntries.length > 0 ? (
-                  <div className="mt-3">
-                    <p className="mb-1.5 text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">최근 캐릭터</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {recentCharacterEntries.map((entry) => (
-                        <button
-                          key={`recent-${entry.id}`}
-                          type="button"
-                          disabled={status === "loading" && entry.id === activeModelId}
-                          className={cx(
-                            "min-h-9 rounded-full border px-2.5 text-[0.68rem] font-semibold transition-colors",
-                            entry.id === activeModelId
-                              ? "border-accent/55 bg-accent-soft text-accent"
-                              : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"
-                          )}
-                          onClick={() => loadModelFromLibraryEntry(entry)}
-                        >
-                          {entry.name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  {libraryStatus === "loading" ? (
-                    <div className="col-span-2 rounded-xl border border-line bg-card/60 px-3 py-4 text-center text-xs text-fg-3">저장된 캐릭터를 불러오는 중입니다.</div>
-                  ) : null}
-
-                  {libraryEntries.length > 0 && filteredLibraryEntries.length === 0 ? (
-                    <div className="col-span-2 rounded-xl border border-line bg-card/60 px-3 py-4 text-center text-xs text-fg-3">"{libraryQuery}"와 일치하는 캐릭터가 없어요.</div>
-                  ) : null}
-
-                  {visibleLibraryEntries.map((entry) => {
-                    const isActive = entry.id === activeModelId;
-                    const isDeleting = deletingModelId === entry.id;
-
-                    return (
-                      <div
-                        key={entry.id}
-                        className={cx(
-                          "relative overflow-hidden rounded-xl border transition-colors",
-                          isActive ? "border-accent/60 bg-accent-soft" : "border-line bg-card hover:bg-raised"
-                        )}
-                      >
-                        <button
-                          type="button"
-                          className="grid min-h-[6.25rem] w-full grid-rows-[4.5rem_auto] gap-2 px-2.5 py-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent"
-                          disabled={status === "loading" && isActive}
-                          onClick={() => {
-                            loadModelFromLibraryEntry(entry);
-                          }}
-                        >
-                          <span className="grid h-[4.5rem] place-items-center overflow-hidden rounded-lg border border-line/80 bg-panel">
-                            {entry.thumbnail ? (
-                              <img alt="" className="h-full w-full object-contain" src={entry.thumbnail} />
-                            ) : (
-                              <span className="grid size-9 place-items-center rounded-lg border border-line bg-card text-fg-3">
-                                {entry.source === "sample" ? <WandSparkles size={17} aria-hidden /> : <UserRound size={17} aria-hidden />}
-                              </span>
-                            )}
-                          </span>
-                          <span className="min-w-0">
-                            <span className="block truncate text-xs font-bold text-fg">{entry.name}</span>
-                            <span className={cx("mt-0.5 inline-flex rounded-full px-1.5 py-0.5 text-[0.68rem] font-bold", isActive ? "bg-accent text-on-accent" : "bg-raised text-fg-3")}>
-                              {entry.source === "sample" ? "번들" : "업로드"}
-                            </span>
-                          </span>
-                        </button>
-
-                        {entry.source === "indexed-db" ? (
-                          <button
-                            type="button"
-                            aria-label={`${entry.name} 삭제`}
-                            className="absolute right-1.5 top-1.5 grid size-9 place-items-center rounded-lg border border-line bg-panel/90 text-fg-3 transition-colors pointer-coarse:size-11 hover:bg-raised hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-45"
-                            disabled={isDeleting}
-                            onClick={(event) => handleDeleteEntry(event, entry)}
-                          >
-                            {isDeleting ? <Loader2 className="animate-spin" size={13} aria-hidden /> : <Trash2 size={13} aria-hidden />}
-                          </button>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
-                {hiddenLibraryEntryCount > 0 ? (
-                  <button
-                    type="button"
-                    className={cx(CONTROL_BUTTON, "mt-3 w-full border-line bg-card text-fg-2 hover:bg-raised hover:text-fg")}
-                    onClick={() => setLibraryVisibleCount((count) => count + LIBRARY_BATCH_SIZE)}
-                  >
-                    캐릭터 {Math.min(LIBRARY_BATCH_SIZE, hiddenLibraryEntryCount)}명 더 보기
-                    <span className="text-fg-3">· {hiddenLibraryEntryCount}명 남음</span>
-                  </button>
-                ) : filteredLibraryEntries.length > LIBRARY_BATCH_SIZE ? (
-                  <button
-                    type="button"
-                    className={cx(CONTROL_BUTTON, "mt-3 w-full border-line bg-card text-fg-2 hover:bg-raised hover:text-fg")}
-                    onClick={() => {
-                      setLibraryVisibleCount(LIBRARY_BATCH_SIZE);
-                      panelScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
-                    }}
-                  >
-                    처음 {LIBRARY_BATCH_SIZE}명만 보기
-                  </button>
-                ) : null}
-              </section>
+                entries={libraryEntries}
+                recentCharacterIds={recentCharacterState.ids}
+                libraryStatus={libraryStatus}
+                libraryError={libraryError}
+                activeModelId={activeModelId}
+                deletingModelId={deletingModelId}
+                modelStatus={status}
+                isUploading={isUploading}
+                onFileChange={handleFileChange}
+                onSelect={loadModelFromLibraryEntry}
+                onDelete={handleDeleteEntry}
+                onCollapse={() => {
+                  panelScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+              />
 
               <section
                 id="vrm-character-section-forge"
