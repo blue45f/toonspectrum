@@ -24,7 +24,7 @@ function getEyeDropperCtor(): EyeDropperCtor | null {
 export type StudioColorPopoverProps = {
   value: string;
   onChange: (color: string) => void;
-  recentColors: string[];
+  recentColors: readonly string[];
   onUseColor?: (color: string) => void;
   title?: string;
   className?: string;

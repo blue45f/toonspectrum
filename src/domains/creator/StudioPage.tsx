@@ -3,11 +3,6 @@ import {
   ArrowUpToLine,
   Boxes,
   Clapperboard,
-  ClipboardCheck,
-  ClipboardPaste,
-  Crop,
-  Package,
-  PictureInPicture2,
   ChevronDown,
   Maximize2,
   Minimize2,
@@ -15,21 +10,13 @@ import {
   Command,
   Copy,
   Eraser,
-  Files,
   AlignLeft,
   AlignCenter,
   AlignRight,
   BookOpen,
   FlipHorizontal2,
-  Folder,
   FolderPlus,
-  FileUp,
-  Upload,
-  Images,
-  Bookmark,
-  Download,
   ImagePlus,
-  LayoutTemplate,
   Loader2,
   Lock,
   LockOpen,
@@ -38,36 +25,18 @@ import {
   Minus,
   MousePointer2,
   PaintBucket,
-  Droplets,
   Pencil,
   PenTool,
   Plus,
-  Redo2,
-  RotateCcw,
-  RotateCw,
-  Settings2,
   SlidersHorizontal,
-  Grid2x2,
   Sparkles,
-  WandSparkles,
   Square,
   Trash2,
   Type as TypeIcon,
   Undo2,
-  ScanLine,
-  Scissors,
-  X,
-  Layers,
-  LayoutGrid,
-  Palette,
-  GanttChartSquare,
-  History as HistoryIcon,
   Wind,
-  Mountain,
   Shapes,
-  Lasso,
   MessageSquare,
-  Triangle,
 } from "lucide-react";
 import { Fragment, Profiler, Suspense, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type SetStateAction } from "react";
 import { createPortal, flushSync } from "react-dom";
@@ -426,7 +395,6 @@ import {
   resolveStudioEditAvailability,
   resolveStudioEditShortcut,
   shouldHandleStudioEditEvent,
-  STUDIO_EDIT_MENU_COMMANDS,
 } from "./studio-edit-controls";
 import {
   advanceStudioDraftIdentityScope,
@@ -615,6 +583,7 @@ import {
   MAGIC_WAND_TOLERANCE_DEFAULT,
 } from "./studio-magic-wand";
 import { magicWandScanFromImage } from "./studio-magic-wand-browser";
+import { buildStudioMainMenuGroups } from "./studio-main-menu-groups";
 import {
   MASTER_EDIT_GHOST_OPACITY,
   composeMasterRenderElements,
@@ -879,6 +848,11 @@ import {
   createEmptyStudioReleaseScheduleSnapshot,
   loadStudioReleaseScheduleRuntime,
 } from "./studio-release-schedule-loader";
+import {
+  buildStudioDirectWorkSavePlan,
+  buildStudioSavePayload,
+  buildStudioSharedSavePatch,
+} from "./studio-save-payload";
 import { layoutScenarioPanels, type ScenarioPanelAspect, type ScenarioPreviewItem } from "./studio-scenario-layout";
 import {
   computeAlignDeltas,
@@ -1180,7 +1154,6 @@ import type {
   StudioLayerNavigatorItem,
 } from "./studio-layer-navigator";
 import type { StudioLiveRoom } from "./studio-live-collaboration-room";
-import type { StudioMainMenuGroup } from "./studio-main-menu-model";
 import type { MotionCutImage } from "./studio-motion-export";
 import type { PageState } from "./studio-page-state";
 import type { PaletteSuggestion } from "./studio-palette-suggest";
@@ -19293,25 +19266,19 @@ function StudioCuttoonEditor() {
       setMasterEditMode(originalMasterEditMode);
 
       const cover = await downscaleDataUrl(pageImages[0] || "", 480);
-      const tags = tagsText
-        .split(/[,\s]+/)
-        .map((t) => t.trim().replace(/^#/, ""))
-        .filter(Boolean)
-        .slice(0, 8);
-      const payload = {
-        title: title.trim(),
-        description: description.trim(),
-        tags,
-        format: "cuttoon" as const,
-        titleId: linkedTitleId ?? undefined,
+      const payload = buildStudioSavePayload({
+        title,
+        description,
+        tagsText,
+        linkedTitleId,
         cover,
-        pages: pageImages,
-        doc: {
-          // 연출(fx) 등 다른 owner 도구가 저장한 확장 키를 보존하고, 스튜디오가 소유한 키만 덮어쓴다.
-          ...(sharedDocument?.document.doc ?? loadedWork?.doc ?? {}),
+        pageImages,
+        document: {
+          // 연출(fx) 등 다른 owner 도구가 저장한 확장 키를 보존하고, 스튜디오 소유 키만 덮어쓴다.
+          extensionBase: sharedDocument?.document.doc ?? loadedWork?.doc,
           width: CANVAS_W,
           pagesList: savePages,
-          // 문서 마스터(공통 요소) — 비어 있으면 undefined 로 JSON 에서 키가 떨어진다(하위호환).
+          // 비어 있는 마스터는 undefined여서 JSON 직렬화 시 키가 떨어진다(하위호환).
           master: serializeDocumentMaster(master),
           characterBible,
           writerRoom,
@@ -19331,12 +19298,13 @@ function StudioCuttoonEditor() {
             packageSettings: effectivePublishPackageSettings,
             packageCredits: publishPackageCredits,
           },
-        } as Record<string, unknown>,
+        },
         status,
-        remixFromId: (!workId && remixId) ? remixId : undefined,
-        seriesId: linkedSeriesId ?? undefined,
-        challengeId: linkedChallengeId ?? undefined,
-      };
+        workId,
+        remixId,
+        linkedSeriesId,
+        linkedChallengeId,
+      });
       let savedWorkId: string;
       let keepSharedEditorOpen = false;
       if (!saveScopeStillCurrent()) return;
@@ -19356,17 +19324,12 @@ function StudioCuttoonEditor() {
             "팀 원고의 CRDT 서버 순번을 확인하지 못해 저장을 시작하지 않았습니다."
           );
         }
-        const sharedPatch = {
+        const sharedPatch = buildStudioSharedSavePatch({
+          payload,
           baseRevision: sharedDocument.revision,
           crdtServerSequence: authoritativeCrdtServerSequence,
-          title: payload.title,
-          description: payload.description,
-          tags: payload.tags,
-          cover: payload.cover,
-          pages: payload.pages,
-          doc: payload.doc,
-          ...(sharedDocument.role === "owner" ? { status: payload.status } : {}),
-        };
+          role: sharedDocument.role,
+        });
         assertStudioApiJsonPayloadSize(sharedPatch);
         const saved = await updateStudioSharedDocument(
           workId,
@@ -19425,17 +19388,22 @@ function StudioCuttoonEditor() {
           !saveScopeStillCurrent() ||
           !canApplyStudioMutation(saveMutationTicket, { allowDuringSave: true })
         ) return;
+        const directSavePlan = buildStudioDirectWorkSavePlan({
+          payload,
+          workId,
+          baseRevision: loadedWork?.revision,
+        });
         let work: Awaited<ReturnType<typeof createWork>>;
-        if (workId) {
-          const updatePayload = {
-            ...payload,
-            ...(loadedWork?.revision ? { baseRevision: loadedWork.revision } : {}),
-          };
-          assertStudioApiJsonPayloadSize(updatePayload);
-          work = await updateWork(workId, updatePayload, saveController.signal);
+        if (directSavePlan.kind === "update") {
+          assertStudioApiJsonPayloadSize(directSavePlan.payload);
+          work = await updateWork(
+            directSavePlan.workId,
+            directSavePlan.payload,
+            saveController.signal,
+          );
         } else {
-          assertStudioApiJsonPayloadSize(payload);
-          work = await createWork(payload, saveController.signal);
+          assertStudioApiJsonPayloadSize(directSavePlan.payload);
+          work = await createWork(directSavePlan.payload, saveController.signal);
         }
         if (!saveScopeStillCurrent()) return;
         savedWorkId = work.id;
@@ -19752,718 +19720,188 @@ function StudioCuttoonEditor() {
   const menuSharedNonOwnerSave = Boolean(sharedDocument && sharedDocument.role !== "owner");
   const menuHasSavedView = savedStudioView?.pageId === activePage.id;
   const menuHasLocallyHiddenLayers = localHiddenElementIds.size > 0;
-  const studioMainMenuGroups: StudioMainMenuGroup[] = useMemo(() => [
-    {
-      id: "file",
-      label: "파일",
-      items: [
-        {
-          id: "export",
-          label: "내보내기 / 다운로드",
-          icon: Download,
-          onSelect: () => {
+  const studioMainMenuGroups = useMemo(
+    () =>
+      buildStudioMainMenuGroups({
+        state: {
+          sharedNonOwnerSave: menuSharedNonOwnerSave,
+          saving,
+          collaborationDocumentLocked,
+          hasWorkId: Boolean(workId),
+          projectArchiveBusy,
+          psdImportBusy,
+          edit: {
+            undoDisabled: menuEditUndoDisabled,
+            redoDisabled: menuEditRedoDisabled,
+            cutDisabled: menuEditCutDisabled,
+            copyDisabled: menuEditCopyDisabled,
+            pasteDisabled: menuEditPasteDisabled,
+            selectAllDisabled: menuEditSelectAllDisabled,
+            deselectDisabled: menuEditDeselectDisabled,
+            invertSelectionDisabled: menuEditInvertDisabled,
+            clearSelectionDisabled: menuEditClearDisabled,
+            duplicateDisabled: menuEditDuplicateDisabled,
+            reorderDisabled: menuEditReorderDisabled,
+            cropLayerDisabled: menuEditCropDisabled,
+          },
+          filterDisabled: menuFilterDisabled,
+          viewTransformSuppressed,
+          canvasFlipH,
+          canvasRotation,
+          fullscreen: isFullscreen,
+          grayscaleView: colorBlindPreview === "grayscale",
+          referencePanelOpen,
+          pageSequenceOpen,
+          hasSavedView: menuHasSavedView,
+          perspectiveRulerActive,
+          hasLocallyHiddenLayers: menuHasLocallyHiddenLayers,
+          leftPanelOpen,
+          rightPanelOpen,
+          lastFilterDraft: lastStudioFilterDraft,
+        },
+        editor: {
+          copyImageToClipboard: studioMainMenuActions.handleCopyToClipboard,
+          save: studioMainMenuActions.handleSave,
+          exportProject: studioMainMenuActions.handleExportProject,
+          exportProjectArchive: studioMainMenuActions.handleExportProjectArchive,
+          undo: studioMainMenuActions.undo,
+          redo: studioMainMenuActions.redo,
+          cutSelectedElements: studioMainMenuActions.cutSelectedElements,
+          copySelectedElements: studioMainMenuActions.copySelectedElements,
+          pasteElements: studioMainMenuActions.pasteStudioElementsFromClipboard,
+          openImagePastePicker: studioMainMenuActions.openImagePastePicker,
+          selectAll: studioMainMenuActions.selectAllForEdit,
+          deselect: studioMainMenuActions.deselectForEdit,
+          invertSelection: studioMainMenuActions.invertSelectionForEdit,
+          clearSelection: studioMainMenuActions.clearSelectionForEdit,
+          duplicateSelected: studioMainMenuActions.duplicateSelected,
+          reorder: studioMainMenuActions.reorder,
+          openSelectedLayerCrop: studioMainMenuActions.openSelectedLayerCrop,
+          addText: studioMainMenuActions.addText,
+          addPage: studioMainMenuActions.addPage,
+          toggleHorizontalCanvasView: studioMainMenuActions.toggleHorizontalCanvasView,
+          rotateCanvasView: studioMainMenuActions.rotateCanvasView,
+          resetCanvasViewRotation: studioMainMenuActions.resetCanvasViewRotation,
+          fitCanvasToWidth: studioMainMenuActions.fitCanvasToWidth,
+          setActualPixelView: studioMainMenuActions.setActualPixelView,
+          toggleFullscreen: studioMainMenuActions.toggleFullscreen,
+          toggleGrayscaleView: studioMainMenuActions.toggleGrayscaleView,
+          saveCurrentStudioView: studioMainMenuActions.saveCurrentStudioView,
+          restoreSavedStudioView: studioMainMenuActions.restoreSavedStudioView,
+          togglePerspectiveGuideView: studioMainMenuActions.togglePerspectiveGuideView,
+          showAllLocallyHiddenLayers: studioMainMenuActions.showAllLocallyHiddenLayers,
+          setStudioUiDensity: studioMainMenuActions.setStudioUiDensity,
+          enterCanvasOnlyMode: studioMainMenuActions.enterCanvasOnlyMode,
+          openFeatureTutorial: () => studioMainMenuActions.openFeatureTutorial(null),
+          openStudioFilter: studioMainMenuActions.openStudioFilter,
+          toggleAdvancedFill: studioMainMenuActions.toggleAdvancedFill,
+        },
+        ui: {
+          openExportDownload: () => {
             setProjectActionsOpen(false);
             setExportMenuOpen(true);
           },
-        },
-        {
-          id: "copy-image",
-          label: "이미지를 클립보드로",
-          icon: Copy,
-          onSelect: () => {
-            void studioMainMenuActions.handleCopyToClipboard();
-          },
-          separatorAfter: true,
-        },
-        {
-          id: "save-draft",
-          label: menuSharedNonOwnerSave ? "공동 저장" : "임시저장",
-          icon: Bookmark,
-          shortcut: "⌘S",
-          disabled: saving || collaborationDocumentLocked,
-          onSelect: () => {
-            void studioMainMenuActions.handleSave("draft");
-          },
-        },
-        {
-          id: "publish",
-          label: workId ? "수정 게시" : "게시",
-          icon: Upload,
-          disabled:
-            saving ||
-            collaborationDocumentLocked ||
-            menuSharedNonOwnerSave,
-          separatorAfter: true,
-          onSelect: () => {
-            void studioMainMenuActions.handleSave("published");
-          },
-        },
-        {
-          id: "export-json",
-          label: "백업 (.json)",
-          icon: Download,
-          onSelect: () => studioMainMenuActions.handleExportProject(),
-        },
-        {
-          id: "export-archive",
-          label: "아카이브 백업",
-          icon: Package,
-          disabled: projectArchiveBusy,
-          onSelect: () => {
-            void studioMainMenuActions.handleExportProjectArchive();
-          },
-        },
-        {
-          id: "import-json",
-          label: "프로젝트 가져오기…",
-          icon: FileUp,
-          disabled: collaborationDocumentLocked,
-          onSelect: () => projectImportInputRef.current?.click(),
-        },
-        {
-          id: "import-psd",
-          label: "PSD 가져오기…",
-          icon: FileUp,
-          disabled: psdImportBusy || collaborationDocumentLocked,
-          separatorAfter: true,
-          onSelect: () => psdImportInputRef.current?.click(),
-        },
-        {
-          id: "project",
-          label: "프로젝트 도구…",
-          icon: Folder,
-          onSelect: () => {
+          requestProjectImport: () => projectImportInputRef.current?.click(),
+          requestPsdImport: () => psdImportInputRef.current?.click(),
+          openProjectTools: () => {
             setExportMenuOpen(false);
             setProjectActionsOpen(true);
           },
-        },
-      ],
-    },
-    {
-      id: "edit",
-      label: "편집",
-      items: [
-        {
-          ...STUDIO_EDIT_MENU_COMMANDS.undo,
-          icon: Undo2,
-          disabled: menuEditUndoDisabled,
-          onSelect: () => studioMainMenuActions.undo(),
-        },
-        {
-          ...STUDIO_EDIT_MENU_COMMANDS.redo,
-          icon: Redo2,
-          disabled: menuEditRedoDisabled,
-          onSelect: () => studioMainMenuActions.redo(),
-          separatorAfter: true,
-        },
-        {
-          ...STUDIO_EDIT_MENU_COMMANDS.cut,
-          icon: Scissors,
-          disabled: menuEditCutDisabled,
-          onSelect: () => {
-            studioMainMenuActions.cutSelectedElements();
-          },
-        },
-        {
-          ...STUDIO_EDIT_MENU_COMMANDS.copy,
-          icon: Copy,
-          disabled: menuEditCopyDisabled,
-          onSelect: () => {
-            studioMainMenuActions.copySelectedElements();
-          },
-        },
-        {
-          ...STUDIO_EDIT_MENU_COMMANDS.paste,
-          icon: ClipboardPaste,
-          disabled: menuEditPasteDisabled,
-          onSelect: () => {
-            void studioMainMenuActions.pasteStudioElementsFromClipboard("cascade");
-          },
-        },
-        {
-          ...STUDIO_EDIT_MENU_COMMANDS["paste-in-place"],
-          icon: ClipboardCheck,
-          disabled: menuEditPasteDisabled,
-          onSelect: () => {
-            void studioMainMenuActions.pasteStudioElementsFromClipboard("in-place");
-          },
-        },
-        {
-          ...STUDIO_EDIT_MENU_COMMANDS["paste-file"],
-          icon: ImagePlus,
-          disabled: menuEditPasteDisabled,
-          onSelect: () => studioMainMenuActions.openImagePastePicker(),
-          separatorAfter: true,
-        },
-        {
-          ...STUDIO_EDIT_MENU_COMMANDS["select-all"],
-          icon: LayoutGrid,
-          disabled: menuEditSelectAllDisabled,
-          onSelect: () => studioMainMenuActions.selectAllForEdit(),
-        },
-        {
-          ...STUDIO_EDIT_MENU_COMMANDS.deselect,
-          icon: X,
-          disabled: menuEditDeselectDisabled,
-          onSelect: () => studioMainMenuActions.deselectForEdit(),
-        },
-        {
-          ...STUDIO_EDIT_MENU_COMMANDS["invert-selection"],
-          icon: Lasso,
-          disabled: menuEditInvertDisabled,
-          onSelect: () => studioMainMenuActions.invertSelectionForEdit(),
-        },
-        {
-          ...STUDIO_EDIT_MENU_COMMANDS["clear-selection"],
-          icon: Trash2,
-          danger: true,
-          disabled: menuEditClearDisabled,
-          onSelect: () => studioMainMenuActions.clearSelectionForEdit(),
-          separatorAfter: true,
-        },
-        {
-          ...STUDIO_EDIT_MENU_COMMANDS.duplicate,
-          icon: Files,
-          disabled: menuEditDuplicateDisabled,
-          onSelect: () => studioMainMenuActions.duplicateSelected(),
-          separatorAfter: true,
-        },
-        {
-          ...STUDIO_EDIT_MENU_COMMANDS["bring-front"],
-          icon: ArrowUpToLine,
-          disabled: menuEditReorderDisabled,
-          onSelect: () => studioMainMenuActions.reorder("front"),
-        },
-        {
-          ...STUDIO_EDIT_MENU_COMMANDS["bring-forward"],
-          icon: ChevronUp,
-          disabled: menuEditReorderDisabled,
-          onSelect: () => studioMainMenuActions.reorder("forward"),
-        },
-        {
-          ...STUDIO_EDIT_MENU_COMMANDS["send-back"],
-          icon: ArrowDownToLine,
-          disabled: menuEditReorderDisabled,
-          onSelect: () => studioMainMenuActions.reorder("back"),
-        },
-        {
-          ...STUDIO_EDIT_MENU_COMMANDS["send-backward"],
-          icon: ChevronDown,
-          disabled: menuEditReorderDisabled,
-          onSelect: () => studioMainMenuActions.reorder("backward"),
-          separatorAfter: true,
-        },
-        {
-          ...STUDIO_EDIT_MENU_COMMANDS["crop-layer"],
-          icon: Crop,
-          disabled: menuEditCropDisabled,
-          onSelect: () => studioMainMenuActions.openSelectedLayerCrop(),
-          separatorAfter: true,
-        },
-        {
-          ...STUDIO_EDIT_MENU_COMMANDS.history,
-          icon: HistoryIcon,
-          onSelect: () => setHistoryPanelOpen((v) => !v),
-        },
-        {
-          ...STUDIO_EDIT_MENU_COMMANDS["pen-pressure"],
-          icon: SlidersHorizontal,
-          onSelect: () => {
-            setAppSettingsInitialTab("other");
+          toggleHistoryPanel: () => setHistoryPanelOpen((current) => !current),
+          openAppSettings: (tab) => {
+            if (tab) setAppSettingsInitialTab(tab);
             setAppSettingsOpen(true);
           },
-        },
-        {
-          ...STUDIO_EDIT_MENU_COMMANDS["app-settings"],
-          icon: Settings2,
-          onSelect: () => {
-            setAppSettingsInitialTab("general");
-            setAppSettingsOpen(true);
-          },
-        },
-      ],
-    },
-    {
-      id: "insert",
-      label: "삽입",
-      items: [
-        {
-          id: "template",
-          label: "템플릿 · 에셋",
-          icon: LayoutTemplate,
-          onSelect: () => {
+          openStudioMenu: setMenu,
+          openAssetMenu: () => {
             preloadStudioAssetMenuPanel();
             setMenu("template");
           },
-        },
-        {
-          id: "collage",
-          label: "콜라주",
-          icon: Grid2x2,
-          onSelect: () => setMenu("collage"),
-        },
-        {
-          id: "elements",
-          label: "요소 · 도형",
-          icon: Shapes,
-          onSelect: () => setMenu("elements"),
-        },
-        {
-          id: "bubble",
-          label: "말풍선",
-          icon: MessageCircle,
-          onSelect: () => setMenu("bubble"),
-        },
-        {
-          id: "text",
-          label: "텍스트",
-          icon: TypeIcon,
-          onSelect: () => studioMainMenuActions.addText(),
-        },
-        {
-          id: "image",
-          label: "이미지…",
-          icon: ImagePlus,
-          separatorAfter: true,
-          onSelect: () => {
+          requestImageInsert: () => {
             document
               .querySelector<HTMLInputElement>('label input[type="file"][accept="image/*"]')
               ?.click();
           },
-        },
-        {
-          id: "char",
-          label: "3D 캐릭터",
-          icon: Sparkles,
-          onSelect: () => setPoserVrmOpen(true),
-        },
-        {
-          id: "bg3d",
-          label: "3D 배경",
-          icon: Boxes,
-          onSelect: () => setBg3dOpen(true),
-        },
-        {
-          id: "ref",
-          label: "참고 이미지",
-          icon: PictureInPicture2,
-          onSelect: () => {
+          openVrmPoser: () => setPoserVrmOpen(true),
+          openBackground3d: () => setBg3dOpen(true),
+          openReferencePanel: () => {
             preloadStudioReferencePanel();
             setReferencePanelOpen(true);
           },
-        },
-        {
-          id: "page",
-          label: "새 페이지",
-          icon: Plus,
-          disabled: collaborationDocumentLocked,
-          onSelect: () => studioMainMenuActions.addPage(),
-        },
-      ],
-    },
-    {
-      id: "view",
-      label: "보기",
-      items: [
-        {
-          id: "zoom-in",
-          label: "확대",
-          icon: Plus,
-          shortcut: "=",
-          disabled: viewTransformSuppressed,
-          onSelect: () => setZoom((current) => stepStudioViewZoom(current, 1)),
-        },
-        {
-          id: "zoom-out",
-          label: "축소",
-          icon: Minus,
-          shortcut: "-",
-          disabled: viewTransformSuppressed,
-          onSelect: () => setZoom((current) => stepStudioViewZoom(current, -1)),
-        },
-        {
-          id: "flip-horizontal",
-          label: "수평 반전",
-          icon: FlipHorizontal2,
-          shortcut: "H",
-          checked: canvasFlipH,
-          disabled: viewTransformSuppressed,
-          onSelect: () => studioMainMenuActions.toggleHorizontalCanvasView(),
-        },
-        {
-          id: "rotate-left",
-          label: "왼쪽으로 90° 회전",
-          icon: RotateCcw,
-          disabled: viewTransformSuppressed,
-          onSelect: () => studioMainMenuActions.rotateCanvasView("left"),
-        },
-        {
-          id: "rotate-right",
-          label: "오른쪽으로 90° 회전",
-          icon: RotateCw,
-          disabled: viewTransformSuppressed,
-          onSelect: () => studioMainMenuActions.rotateCanvasView("right"),
-        },
-        {
-          id: "reset-rotation",
-          label: `보기 회전 초기화 (${canvasRotation}°)`,
-          icon: HistoryIcon,
-          disabled: viewTransformSuppressed || canvasRotation === 0,
-          separatorAfter: true,
-          onSelect: () => studioMainMenuActions.resetCanvasViewRotation(),
-        },
-        {
-          id: "fit",
-          label: "화면에 맞게 조정",
-          icon: ScanLine,
-          shortcut: "Home",
-          disabled: viewTransformSuppressed,
-          onSelect: () => studioMainMenuActions.fitCanvasToWidth(),
-        },
-        {
-          id: "actual-pixels",
-          label: "실제 픽셀 (100%)",
-          icon: Maximize2,
-          shortcut: "End",
-          disabled: viewTransformSuppressed,
-          onSelect: () => studioMainMenuActions.setActualPixelView(),
-          separatorAfter: true,
-        },
-        {
-          id: "fullscreen",
-          label: "전체화면",
-          icon: isFullscreen ? Minimize2 : Maximize2,
-          shortcut: "F11",
-          checked: isFullscreen,
-          disabled: viewTransformSuppressed,
-          onSelect: () => studioMainMenuActions.toggleFullscreen(),
-        },
-        {
-          id: "grayscale",
-          label: "흑백으로 표시",
-          icon: Palette,
-          shortcut: "Q",
-          checked: colorBlindPreview === "grayscale",
-          disabled: viewTransformSuppressed,
-          onSelect: () => studioMainMenuActions.toggleGrayscaleView(),
-        },
-        {
-          id: "reference-window",
-          label: "참고 이미지 창 열기",
-          icon: PictureInPicture2,
-          checked: referencePanelOpen,
-          onSelect: () => {
+          stepZoom: (direction) =>
+            setZoom((current) => stepStudioViewZoom(current, direction)),
+          toggleReferencePanel: () => {
             preloadStudioReferencePanel();
             setReferencePanelOpen((current) => !current);
           },
-          separatorAfter: true,
-        },
-        {
-          id: "page-sequence",
-          label: pageSequenceOpen ? "페이지 시퀀스 닫기" : "페이지 시퀀스 열기",
-          icon: Clapperboard,
-          checked: pageSequenceOpen,
-          onSelect: () => setPageSequenceOpen((current) => !current),
-          separatorAfter: true,
-        },
-        {
-          id: "save-current-view",
-          label: "현재 보기 저장",
-          icon: Bookmark,
-          shortcut: "⇧S",
-          disabled: viewTransformSuppressed,
-          onSelect: () => studioMainMenuActions.saveCurrentStudioView(),
-        },
-        {
-          id: "restore-view",
-          label: "보기 복원",
-          icon: HistoryIcon,
-          shortcut: "⇧Z",
-          disabled: viewTransformSuppressed || !menuHasSavedView,
-          onSelect: () => studioMainMenuActions.restoreSavedStudioView(),
-          separatorAfter: true,
-        },
-        {
-          id: "perspective-guide",
-          label: "원근 도우미 보기",
-          icon: Triangle,
-          shortcut: "⇧G",
-          checked: perspectiveRulerActive,
-          disabled: viewTransformSuppressed,
-          onSelect: () => studioMainMenuActions.togglePerspectiveGuideView(),
-        },
-        {
-          id: "reset-local-visibility",
-          label: "나만 숨긴 레이어 모두 표시",
-          icon: Layers,
-          disabled: !menuHasLocallyHiddenLayers,
-          onSelect: () => studioMainMenuActions.showAllLocallyHiddenLayers(),
-        },
-        {
-          id: "production-insights",
-          label: "제작 인사이트…",
-          icon: GanttChartSquare,
-          onSelect: () => setProductionInsightsOpen(true),
-          separatorAfter: true,
-        },
-        {
-          id: "density-focus",
-          label: "슈퍼심플 레이아웃",
-          icon: Minimize2,
-          onSelect: () => {
-            studioMainMenuActions.setStudioUiDensity("focus");
+          togglePageSequence: () => setPageSequenceOpen((current) => !current),
+          openProductionInsights: () => setProductionInsightsOpen(true),
+          collapseSidePanels: () => {
             setLeftPanelOpen(false);
             setRightPanelOpen(false);
           },
-        },
-        {
-          id: "density-full",
-          label: "전체 레이아웃",
-          icon: LayoutGrid,
-          onSelect: () => studioMainMenuActions.setStudioUiDensity("full"),
-        },
-        {
-          id: "wide",
-          label: "패널 접어 넓게",
-          icon: Maximize2,
-          onSelect: () => {
-            setLeftPanelOpen(false);
-            setRightPanelOpen(false);
-          },
-        },
-        {
-          id: "tools-companion",
-          label: "도구 창 분리 (멀티 디스플레이)",
-          icon: PictureInPicture2,
-          onSelect: () => {
-            const win = openStudioToolsCompanionWindow();
-            if (!win) {
-              studioMainMenuActions.announceDrawingShortcut("팝업이 차단됐습니다. 브라우저에서 팝업을 허용해 주세요.");
+          openToolsCompanion: () => {
+            const companionWindow = openStudioToolsCompanionWindow();
+            if (!companionWindow) {
+              studioMainMenuActions.announceDrawingShortcut(
+                "팝업이 차단됐습니다. 브라우저에서 팝업을 허용해 주세요.",
+              );
               return;
             }
-            studioMainMenuActions.announceDrawingShortcut("도구 창을 열었습니다 · 다른 모니터로 옮겨 쓰세요");
-            // 연결 핸드셰이크는 companion channel effect 가 처리한다.
+            studioMainMenuActions.announceDrawingShortcut(
+              "도구 창을 열었습니다 · 다른 모니터로 옮겨 쓰세요",
+            );
           },
-        },
-        {
-          id: "canvas-only",
-          label: "캔버스만",
-          icon: Square,
-          shortcut: "`",
-          onSelect: () => studioMainMenuActions.enterCanvasOnlyMode(),
-          separatorAfter: true,
-        },
-        {
-          id: "left-panel",
-          label: leftPanelOpen ? "왼쪽 패널 숨기기" : "왼쪽 패널 보이기",
-          icon: Layers,
-          onSelect: () => setLeftPanelOpen((v) => !v),
-        },
-        {
-          id: "right-panel",
-          label: rightPanelOpen ? "속성 패널 숨기기" : "속성 패널 보이기",
-          icon: SlidersHorizontal,
-          onSelect: () => setRightPanelOpen((v) => !v),
-        },
-        {
-          id: "feature-tutorials",
-          label: "기능 튜토리얼",
-          icon: BookOpen,
-          onSelect: () => studioMainMenuActions.openFeatureTutorial(null),
-        },
-        {
-          id: "shortcuts",
-          label: "단축키 도움말",
-          icon: Command,
-          shortcut: "?",
-          onSelect: () => setShortcutsOpen(true),
-        },
-        {
-          id: "app-settings",
-          label: "애플리케이션 설정",
-          icon: Settings2,
-          onSelect: () => setAppSettingsOpen(true),
-        },
-      ],
-    },
-    {
-      id: "filter",
-      label: "필터",
-      items: [
-        {
-          id: "last-filter",
-          label: lastStudioFilterDraft ? "마지막 필터 다시 열기" : "마지막 필터…",
-          icon: HistoryIcon,
-          disabled: !lastStudioFilterDraft || menuFilterDisabled,
-          separatorAfter: true,
-          onSelect: () => {
-            if (lastStudioFilterDraft) {
-              studioMainMenuActions.openStudioFilter(
-                lastStudioFilterDraft.kind,
-                lastStudioFilterDraft,
-              );
-            }
-          },
-        },
-        {
-          id: "gaussian-blur",
-          label: "가우시안 블러",
-          icon: Droplets,
-          shortcut: "⌘⇧1",
-          disabled: menuFilterDisabled,
-          onSelect: () => studioMainMenuActions.openStudioFilter("gaussian-blur"),
-        },
-        {
-          id: "motion-blur",
-          label: "모션 블러",
-          icon: Wind,
-          shortcut: "⌘⇧2",
-          disabled: menuFilterDisabled,
-          onSelect: () => studioMainMenuActions.openStudioFilter("motion-blur"),
-        },
-        {
-          id: "hue-saturation-brightness",
-          label: "색조 / 채도 / 밝기",
-          icon: Palette,
-          shortcut: "⌘⇧3",
-          disabled: menuFilterDisabled,
-          onSelect: () => studioMainMenuActions.openStudioFilter("hue-saturation-brightness"),
-        },
-        {
-          id: "brightness-contrast",
-          label: "명도 / 대비",
-          icon: SlidersHorizontal,
-          shortcut: "⌘⇧4",
-          disabled: menuFilterDisabled,
-          onSelect: () => studioMainMenuActions.openStudioFilter("brightness-contrast"),
-        },
-        {
-          id: "color-curves",
-          label: "색상 커브",
-          icon: GanttChartSquare,
-          shortcut: "⌘⇧5",
-          disabled: menuFilterDisabled,
-          onSelect: () => studioMainMenuActions.openStudioFilter("color-curves"),
-        },
-      ],
-    },
-    {
-      id: "draw",
-      label: "그리기",
-      items: [
-        {
-          id: "pen",
-          label: "펜",
-          icon: Pencil,
-          shortcut: "B",
-          onSelect: () => {
+          toggleLeftPanel: () => setLeftPanelOpen((current) => !current),
+          toggleRightPanel: () => setRightPanelOpen((current) => !current),
+          openShortcuts: () => setShortcutsOpen(true),
+          selectDrawMode: (mode) => {
             setTool("draw");
-            setDrawMode("pen");
+            setDrawMode(mode);
           },
-        },
-        {
-          id: "eraser",
-          label: "지우개",
-          icon: Eraser,
-          shortcut: "E",
-          onSelect: () => {
-            setTool("draw");
-            setDrawMode("eraser");
-          },
-        },
-        {
-          id: "fill",
-          label: "채우기",
-          icon: PaintBucket,
-          shortcut: "G",
-          onSelect: () => studioMainMenuActions.toggleAdvancedFill(),
-        },
-        {
-          id: "smart-shape",
-          label: "스마트 도형",
-          icon: Shapes,
-          onSelect: () => {
+          enableSmartShape: () => {
             setQuickShapeActive(true);
             setTool("draw");
             setDrawMode("pen");
           },
-          separatorAfter: true,
         },
-        {
-          id: "bg",
-          label: "배경 · 톤",
-          icon: Mountain,
-          onSelect: () => setMenu("bgFill"),
-        },
-        {
-          id: "style",
-          label: "팔레트 · 브랜드",
-          icon: Palette,
-          onSelect: () => setMenu("palette"),
-        },
-      ],
-    },
-    {
-      id: "ai",
-      label: "AI",
-      items: [
-        {
-          id: "ai-assist",
-          label: "AI 어시스트",
-          icon: WandSparkles,
-          onSelect: () => {
-            setMenu("aiAssist");
-          },
-        },
-        {
-          id: "stock",
-          label: "스톡 이미지",
-          icon: Images,
-          onSelect: () => setMenu("stockImage"),
-        },
-        {
-          id: "integrations",
-          label: "연동 설정",
-          icon: Settings2,
-          onSelect: () => setMenu("integrations"),
-        },
-      ],
-    },
-  ], [
-    canvasFlipH,
-    canvasRotation,
-    collaborationDocumentLocked,
-    colorBlindPreview,
-    isFullscreen,
-    lastStudioFilterDraft,
-    menuFilterDisabled,
-    menuHasLocallyHiddenLayers,
-    menuHasSavedView,
-    menuEditClearDisabled,
-    menuEditCopyDisabled,
-    menuEditCropDisabled,
-    menuEditCutDisabled,
-    menuEditDeselectDisabled,
-    menuEditDuplicateDisabled,
-    menuEditInvertDisabled,
-    menuEditPasteDisabled,
-    menuEditRedoDisabled,
-    menuEditReorderDisabled,
-    menuEditSelectAllDisabled,
-    menuEditUndoDisabled,
-    leftPanelOpen,
-    pageSequenceOpen,
-    perspectiveRulerActive,
-    projectArchiveBusy,
-    psdImportBusy,
-    referencePanelOpen,
-    rightPanelOpen,
-    saving,
-    menuSharedNonOwnerSave,
-    workId,
-    studioMainMenuActions,
-    viewTransformSuppressed,
-  ]);
+      }),
+    [
+      canvasFlipH,
+      canvasRotation,
+      collaborationDocumentLocked,
+      colorBlindPreview,
+      isFullscreen,
+      lastStudioFilterDraft,
+      leftPanelOpen,
+      menuEditClearDisabled,
+      menuEditCopyDisabled,
+      menuEditCropDisabled,
+      menuEditCutDisabled,
+      menuEditDeselectDisabled,
+      menuEditDuplicateDisabled,
+      menuEditInvertDisabled,
+      menuEditPasteDisabled,
+      menuEditRedoDisabled,
+      menuEditReorderDisabled,
+      menuEditSelectAllDisabled,
+      menuEditUndoDisabled,
+      menuFilterDisabled,
+      menuHasLocallyHiddenLayers,
+      menuHasSavedView,
+      menuSharedNonOwnerSave,
+      pageSequenceOpen,
+      perspectiveRulerActive,
+      projectArchiveBusy,
+      psdImportBusy,
+      referencePanelOpen,
+      rightPanelOpen,
+      saving,
+      studioMainMenuActions,
+      viewTransformSuppressed,
+      workId,
+    ],
+  );
   // 모바일 하단 보조 막대 버튼(페이지/추가/속성/줌) — 아이콘 + 작은 라벨 세로 스택.
   // 서브탭 칩·드로잉 도구 칩은 studioSegmentChipClass / studioToolButtonClass 로 이관됨.
   const mobileBarBtn = (active: boolean) =>

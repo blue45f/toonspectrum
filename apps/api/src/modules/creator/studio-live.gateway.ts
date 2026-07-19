@@ -22,16 +22,16 @@ import {
   studioLiveFailure as failure,
 } from "./studio-live-ack";
 import { StudioLiveCrdtQuotaLimiter } from "./studio-live-crdt-quota";
+import { StudioLiveJoinTransitionSequencer } from "./studio-live-join-transition-sequencer";
 import {
   STUDIO_LIVE_LOCK_REPOSITORY,
   type StudioLiveLockRecord,
   type StudioLiveLockRepository,
 } from "./studio-live-lock.repository";
+import { StudioLiveSocketAuthService } from "./studio-live-socket-auth.service";
 import {
   STUDIO_CRDT_PROTOCOL_VERSION,
   STUDIO_LIVE_INTER_SERVER_RELAY_EVENT,
-  STUDIO_LIVE_SESSION_AUTHENTICATOR,
-  STUDIO_LIVE_SESSION_REVALIDATOR,
   StudioLiveChatSchema,
   StudioLiveCrdtSyncSchema,
   StudioLiveCrdtUpdateSchema,
@@ -84,8 +84,6 @@ import type {
   StudioLiveScreenRequestInput,
   StudioLiveScreenStateInput,
   StudioLiveScreenStopInput,
-  StudioLiveSessionAuthenticator,
-  StudioLiveSessionRevalidator,
   StudioLiveSignalInput,
   StudioLiveSocket,
   StudioLiveSocketData,
@@ -274,13 +272,6 @@ function canonicalBase64DecodedLength(value: string): number {
   return (value.length / 4) * 3 - padding;
 }
 
-function extractHandshakeToken(client: StudioLiveSocket): string | null {
-  const auth = client.handshake?.auth;
-  if (!auth || typeof auth !== "object") return null;
-  const token = (auth as Record<string, unknown>).sessionToken;
-  return typeof token === "string" && token.length > 0 && token.length <= 8_192 ? token : null;
-}
-
 function normalizedMemberName(value: unknown): string {
   if (typeof value !== "string") return "팀원";
   const name = value.trim();
@@ -329,8 +320,6 @@ export class StudioLiveGateway
   private readonly socketIdsByWork = new Map<string, Set<string>>();
   private readonly rateLimits = new Map<string, Map<string, RateLimitBucket>>();
   private readonly crdtQuotaLimiter = new StudioLiveCrdtQuotaLimiter();
-  private readonly joinTransitionSequences = new Map<string, number>();
-  private readonly joinTransitionTails = new Map<string, Promise<void>>();
   private readonly participantAuthorizationRechecks = new Map<
     string,
     StudioLiveParticipantAuthorizationRecheck
@@ -339,11 +328,6 @@ export class StudioLiveGateway
     string,
     StudioLiveCandidateRelayAuthorization
   >();
-  /**
-   * Authentication is gateway-private. Socket.IO adapters can serialize `socket.data` across the
-   * cluster, so session principals must never be stored on that adapter-visible object.
-   */
-  private readonly authPrincipalsBySocket = new Map<StudioLiveSocket, StudioLiveAuthPrincipal>();
   private readonly voiceMembershipBySocket = new Map<string, StudioLiveVoiceMemberInternal>();
   private readonly deliveredInterServerVoiceSignals = new Map<string, number>();
   private accessRecheckTimer: ReturnType<typeof setInterval> | null = null;
@@ -367,10 +351,10 @@ export class StudioLiveGateway
   constructor(
     @Inject(CreatorService)
     private readonly creatorService: CreatorService,
-    @Inject(STUDIO_LIVE_SESSION_AUTHENTICATOR)
-    private readonly authenticateSession: StudioLiveSessionAuthenticator,
-    @Inject(STUDIO_LIVE_SESSION_REVALIDATOR)
-    private readonly revalidateSession: StudioLiveSessionRevalidator,
+    @Inject(StudioLiveSocketAuthService)
+    private readonly socketAuthentication: StudioLiveSocketAuthService,
+    @Inject(StudioLiveJoinTransitionSequencer)
+    private readonly joinTransitions: StudioLiveJoinTransitionSequencer,
     @Inject(StudioCrdtService)
     private readonly studioCrdtService: StudioCrdtService,
     @Inject(STUDIO_LIVE_LOCK_REPOSITORY)
@@ -391,7 +375,7 @@ export class StudioLiveGateway
     // Namespace middleware completes authentication before Socket.IO emits `connection`, so a
     // valid client cannot race an async handleConnection hook with its first studio:join event.
     server.use((socket, next) => {
-      void this.authenticateSocket(socket as StudioLiveSocket)
+      void this.socketAuthentication.authenticate(socket as StudioLiveSocket)
         .then((authenticated) => {
           if (authenticated) {
             next();
@@ -431,11 +415,10 @@ export class StudioLiveGateway
     this.socketIdsByWork.clear();
     this.rateLimits.clear();
     this.crdtQuotaLimiter.clear();
-    this.joinTransitionSequences.clear();
-    this.joinTransitionTails.clear();
+    this.joinTransitions.clearAll();
     this.participantAuthorizationRechecks.clear();
     this.candidateRelayAuthorizations.clear();
-    this.authPrincipalsBySocket.clear();
+    this.socketAuthentication.clearAll();
     this.voiceMembershipBySocket.clear();
     this.deliveredInterServerVoiceSignals.clear();
   }
@@ -443,18 +426,18 @@ export class StudioLiveGateway
   async handleConnection(client: StudioLiveSocket): Promise<void> {
     // Runtime connections have already passed the namespace middleware. The fallback keeps direct
     // gateway tests and non-standard adapters fail-closed without weakening the runtime ordering.
-    const principal = this.authPrincipalsBySocket.get(client);
+    const principal = this.socketAuthentication.principal(client);
     if (principal && principal.expiresAt > Date.now()) return;
-    this.clearSocketAuthentication(client);
-    if (!(await this.authenticateSocket(client))) {
+    this.socketAuthentication.clear(client);
+    if (!(await this.socketAuthentication.authenticate(client))) {
       client.emit("studio:error", failure("unauthenticated", "로그인 세션을 확인할 수 없습니다."));
       client.disconnect(true);
     }
   }
 
   handleDisconnect(client: StudioLiveSocket): void {
-    this.clearSocketAuthentication(client);
-    this.joinTransitionSequences.delete(client.id);
+    this.socketAuthentication.clear(client);
+    this.joinTransitions.invalidate(client.id);
     this.participantAuthorizationRechecks.delete(client.id);
     this.deleteCandidateRelayAuthorizationsForSocket(client.id);
     this.removeParticipant(client.id, "disconnect");
@@ -476,16 +459,9 @@ export class StudioLiveGateway
     if (!this.consumeRateLimit(client.id, "join", 12, 60_000)) {
       return reply(ack, failure("rate_limited", "작업실 참가 요청이 너무 많습니다."));
     }
-    const transitionSequence = this.nextJoinTransitionSequence(client.id);
-    return this.enqueueJoinTransition(client.id, async () => {
-      try {
-        return await this.performJoin(client, parsed.data, transitionSequence, ack);
-      } finally {
-        if (this.joinTransitionSequences.get(client.id) === transitionSequence) {
-          this.joinTransitionSequences.delete(client.id);
-        }
-      }
-    });
+    return this.joinTransitions.runLatest(client.id, (transitionSequence) =>
+      this.performJoin(client, parsed.data, transitionSequence, ack)
+    );
   }
 
   private async performJoin(
@@ -509,11 +485,11 @@ export class StudioLiveGateway
     };
     // Revalidate on every room join. A socket that outlives token expiry, logout, or a session
     // version bump must not use the previously cached user id to enter another work.
-    const authenticated = await this.revalidateSocketSession(client);
+    const authenticated = await this.socketAuthentication.revalidate(client);
     if (!this.isCurrentJoinTransition(client, transitionSequence)) {
       return reply(ack, failure("not_joined", "더 최신 작업실 참가 요청으로 대체되었습니다."));
     }
-    const principal = authenticated ? this.authPrincipalsBySocket.get(client) : undefined;
+    const principal = authenticated ? this.socketAuthentication.principal(client) : undefined;
     const userId = principal?.userId ?? null;
     if (!userId || !principal || !this.isSocketPrincipalCurrent(client, principal, userId)) {
       return rejectInvalidSession();
@@ -2137,10 +2113,10 @@ export class StudioLiveGateway
       | StudioLiveSocket
       | undefined;
     const leftPrincipal = leftSocket
-      ? this.authPrincipalsBySocket.get(leftSocket)
+      ? this.socketAuthentication.principal(leftSocket)
       : undefined;
     const rightPrincipal = rightSocket
-      ? this.authPrincipalsBySocket.get(rightSocket)
+      ? this.socketAuthentication.principal(rightSocket)
       : undefined;
     const leftRecheck = this.participantAuthorizationRechecks.get(left.connectionId);
     const rightRecheck = this.participantAuthorizationRechecks.get(right.connectionId);
@@ -2190,10 +2166,10 @@ export class StudioLiveGateway
       | StudioLiveSocket
       | undefined;
     const senderPrincipal = senderSocket
-      ? this.authPrincipalsBySocket.get(senderSocket)
+      ? this.socketAuthentication.principal(senderSocket)
       : undefined;
     const targetPrincipal = targetSocket
-      ? this.authPrincipalsBySocket.get(targetSocket)
+      ? this.socketAuthentication.principal(targetSocket)
       : undefined;
     const now = Date.now();
     if (
@@ -2258,10 +2234,10 @@ export class StudioLiveGateway
       | StudioLiveSocket
       | undefined;
     const leftPrincipal = leftSocket
-      ? this.authPrincipalsBySocket.get(leftSocket)
+      ? this.socketAuthentication.principal(leftSocket)
       : undefined;
     const rightPrincipal = rightSocket
-      ? this.authPrincipalsBySocket.get(rightSocket)
+      ? this.socketAuthentication.principal(rightSocket)
       : undefined;
     const now = Date.now();
     if (
@@ -2439,47 +2415,8 @@ export class StudioLiveGateway
     }
   }
 
-  private nextJoinTransitionSequence(socketId: string): number {
-    const sequence = (this.joinTransitionSequences.get(socketId) ?? 0) + 1;
-    this.joinTransitionSequences.set(socketId, sequence);
-    return sequence;
-  }
-
-  private enqueueJoinTransition<T>(socketId: string, operation: () => Promise<T>): Promise<T> {
-    const previous = this.joinTransitionTails.get(socketId) ?? Promise.resolve();
-    const run = previous.then(operation);
-    const tail = run.then(
-      () => undefined,
-      () => undefined
-    );
-    this.joinTransitionTails.set(socketId, tail);
-    void tail.then(() => {
-      if (this.joinTransitionTails.get(socketId) === tail) {
-        this.joinTransitionTails.delete(socketId);
-      }
-    });
-    return run;
-  }
-
   private isSocketCurrent(client: StudioLiveSocket): boolean {
     return this.server.sockets.get(client.id) === client;
-  }
-
-  private clearSocketAuthentication(client: StudioLiveSocket): void {
-    this.authPrincipalsBySocket.delete(client);
-  }
-
-  private clearSocketAuthenticationById(
-    socketId: string,
-    currentSocket?: StudioLiveSocket
-  ): void {
-    if (currentSocket) {
-      this.clearSocketAuthentication(currentSocket);
-      return;
-    }
-    for (const socket of this.authPrincipalsBySocket.keys()) {
-      if (socket.id === socketId) this.authPrincipalsBySocket.delete(socket);
-    }
   }
 
   private isSocketPrincipalCurrent(
@@ -2489,9 +2426,7 @@ export class StudioLiveGateway
   ): boolean {
     return (
       this.isSocketCurrent(client) &&
-      this.authPrincipalsBySocket.get(client) === principal &&
-      principal.userId === userId &&
-      principal.expiresAt > Date.now()
+      this.socketAuthentication.isPrincipalCurrent(client, principal, userId)
     );
   }
 
@@ -2500,7 +2435,7 @@ export class StudioLiveGateway
     workId: string
   ): StudioLiveParticipantInternal | null {
     const participant = this.participantsBySocket.get(client.id);
-    const principal = this.authPrincipalsBySocket.get(client);
+    const principal = this.socketAuthentication.principal(client);
     if (
       !participant ||
       participant.workId !== workId ||
@@ -2516,7 +2451,7 @@ export class StudioLiveGateway
     // A reconnect may reuse the Socket.IO id while speculative adapter cleanup is pending. Never
     // tear down that replacement socket or its participant when this join belongs to the old one.
     if (!this.isSocketCurrent(client)) {
-      this.clearSocketAuthentication(client);
+      this.socketAuthentication.clear(client);
       client.disconnect(true);
       return;
     }
@@ -2528,14 +2463,14 @@ export class StudioLiveGateway
     this.participantAuthorizationRechecks.delete(client.id);
     this.deleteCandidateRelayAuthorizationsForSocket(client.id);
     this.rateLimits.delete(client.id);
-    this.clearSocketAuthentication(client);
+    this.socketAuthentication.clear(client);
     client.disconnect(true);
   }
 
   private isCurrentJoinTransition(client: StudioLiveSocket, transitionSequence: number): boolean {
     return (
       this.isSocketCurrent(client) &&
-      this.joinTransitionSequences.get(client.id) === transitionSequence
+      this.joinTransitions.isCurrent(client.id, transitionSequence)
     );
   }
 
@@ -2545,7 +2480,7 @@ export class StudioLiveGateway
     } catch {
       // An adapter that cannot undo a speculative join cannot guarantee room isolation. Closing
       // the socket lets Socket.IO discard every adapter room instead of keeping a ghost listener.
-      this.clearSocketAuthentication(client);
+      this.socketAuthentication.clear(client);
       client.disconnect(true);
     }
   }
@@ -2556,44 +2491,6 @@ export class StudioLiveGateway
       if (leaveResult) void Promise.resolve(leaveResult).catch(() => undefined);
     } catch {
       // The transport is already closed by the caller, which is the authoritative isolation path.
-    }
-  }
-
-  private async authenticateSocket(client: StudioLiveSocket): Promise<boolean> {
-    const token = extractHandshakeToken(client);
-    if (!token) {
-      this.clearSocketAuthentication(client);
-      return false;
-    }
-    try {
-      const principal = await this.authenticateSession(token);
-      if (!principal || principal.expiresAt <= Date.now()) {
-        this.clearSocketAuthentication(client);
-        return false;
-      }
-      this.authPrincipalsBySocket.set(client, { ...principal });
-      return true;
-    } catch {
-      this.clearSocketAuthentication(client);
-      return false;
-    } finally {
-      const auth = client.handshake.auth;
-      if (auth && typeof auth === "object") {
-        delete (auth as Record<string, unknown>).sessionToken;
-      }
-    }
-  }
-
-  private async revalidateSocketSession(client: StudioLiveSocket): Promise<boolean> {
-    const principal = this.authPrincipalsBySocket.get(client);
-    if (!principal || principal.expiresAt <= Date.now()) {
-      return false;
-    }
-    try {
-      const allowed = await this.revalidateSession(principal);
-      return allowed && this.isSocketPrincipalCurrent(client, principal, principal.userId);
-    } catch {
-      return false;
     }
   }
 
@@ -2621,7 +2518,7 @@ export class StudioLiveGateway
     participant: StudioLiveParticipantInternal,
     requireEdit: boolean
   ): boolean {
-    const principal = this.authPrincipalsBySocket.get(client);
+    const principal = this.socketAuthentication.principal(client);
     const recheck = this.participantAuthorizationRechecks.get(client.id);
     return Boolean(
       principal &&
@@ -2686,7 +2583,7 @@ export class StudioLiveGateway
       ) {
         return null;
       }
-      const principal = this.authPrincipalsBySocket.get(client);
+      const principal = this.socketAuthentication.principal(client);
       if (
         !principal ||
         principal.userId !== participant.userId ||
@@ -2726,7 +2623,7 @@ export class StudioLiveGateway
         return null;
       }
       if (
-        this.authPrincipalsBySocket.get(client) !== principal ||
+        this.socketAuthentication.principal(client) !== principal ||
         principal.expiresAt <= Date.now() ||
         principal.userId !== participant.userId
       ) {
@@ -2773,14 +2670,11 @@ export class StudioLiveGateway
       participant.authorizationSequence === authorizationSequence;
     const socket = this.server.sockets.get(socketId) as StudioLiveSocket | undefined;
     const principal = socket
-      ? this.authPrincipalsBySocket.get(socket)
+      ? this.socketAuthentication.principal(socket)
       : undefined;
-    let sessionAllowed: boolean;
-    try {
-      sessionAllowed = principal ? await this.revalidateSession(principal) : false;
-    } catch {
-      sessionAllowed = false;
-    }
+    const sessionAllowed = socket && principal
+      ? await this.socketAuthentication.revalidate(socket)
+      : false;
     // A room switch can replace the participant while session or ACL I/O is pending. Never apply
     // a result to, or authorize an action with, a different participant generation. A newer ACL
     // check on the same participant also supersedes this result so an old editor snapshot cannot
@@ -2802,7 +2696,7 @@ export class StudioLiveGateway
         return null;
       }
       if (
-        this.authPrincipalsBySocket.get(socket) !== principal ||
+        this.socketAuthentication.principal(socket) !== principal ||
         principal.expiresAt <= Date.now() ||
         principal.userId !== participant.userId
       ) {
@@ -2894,7 +2788,7 @@ export class StudioLiveGateway
     }
     this.removeParticipant(socketId, "revoked");
     this.rateLimits.delete(socketId);
-    this.clearSocketAuthenticationById(socketId, socket);
+    this.socketAuthentication.clearBySocketId(socketId, socket);
     if (socket) {
       socket.disconnect(true);
     }
@@ -2919,8 +2813,8 @@ export class StudioLiveGateway
     }
     this.removeParticipant(socketId, "revoked");
     this.rateLimits.delete(socketId);
-    this.joinTransitionSequences.delete(socketId);
-    this.clearSocketAuthenticationById(socketId, socket);
+    this.joinTransitions.invalidate(socketId);
+    this.socketAuthentication.clearBySocketId(socketId, socket);
     if (socket) {
       socket.disconnect(true);
     }

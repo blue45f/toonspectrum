@@ -16,7 +16,6 @@ import {
   ChevronRight,
   ChevronUp,
   Copy,
-  Droplets,
   Eraser,
   FlipHorizontal2,
   FlipVertical2,
@@ -36,7 +35,7 @@ import { Suspense, memo, useEffect, useState } from "react";
 import { type StudioAdvancedFillPreview } from "./studio-advanced-fill-preview";
 import { DEFAULT_STUDIO_ADVANCED_FILL_SETTINGS, type StudioAdvancedFillSettings } from "./studio-advanced-fill-settings";
 import { isStudioAiConfigured, type StudioAiSettings } from "./studio-ai-client";
-import { BG_PRESETS, BUBBLE_VARIANTS, CANVAS_W, type BgPreset, type TemplateSpec } from "./studio-assets";
+import { CANVAS_W, type BgPreset, type TemplateSpec } from "./studio-assets";
 import { preloadStudioBackground3D } from "./studio-background-3d-loader";
 import { parseStudio3dTool } from "./studio-background-3d-metadata";
 import { type StudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
@@ -56,8 +55,6 @@ import {
   type BubbleShapeGeometryInput,
 } from "./studio-bubble-custom-shape";
 import { normalizeExtraTails } from "./studio-bubble-path";
-import { BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT } from "./studio-bubble-text-fit";
-import { bubbleAutoShrinkPreview } from "./studio-bubble-text-runtime";
 import {
   applyCropAspect,
   cropAspectRatio,
@@ -84,7 +81,6 @@ import {
   type TextEl,
 } from "./studio-element-model";
 import { legacyTextGradientToSpec } from "./studio-gradient-engine";
-import { GRADIENT_PRESETS, gradientToBgGrad } from "./studio-gradients";
 import { type HealCloneMode } from "./studio-heal-clone";
 import { uid } from "./studio-id";
 import { type StudioImageInspectorSection, type StudioInspectorLayout } from "./studio-inspector-layout";
@@ -105,8 +101,6 @@ import {
   StudioBrushLibraryPanel,
   StudioBrushStudio,
   StudioBubbleAnchorPanel,
-  StudioBubbleAutoShrinkPanel,
-  StudioBubbleStylePresetPanel,
   StudioBubbleTailControls,
   StudioColorPalettePanel,
   StudioCropPanel,
@@ -165,14 +159,13 @@ import { normalizeTextPath, type TextPathConfig } from "./studio-text-path";
 import { projectStudioViewRectToDocumentRect, type StudioViewRotation } from "./studio-view-controls";
 import { StudioBgRemoveButton } from "./StudioBgRemoveButton";
 import { StudioBubbleShapePanel } from "./StudioBubbleShapePanel";
-import { StudioBubbleVariantGlyph } from "./StudioBubbleVariantGlyph";
+import { StudioInspectorBubbleAppearanceControls } from "./StudioInspectorBubbleAppearanceControls";
+import { StudioInspectorCanvasControls } from "./StudioInspectorCanvasControls";
 import { StudioInspectorFocusSpeedFrameControls } from "./StudioInspectorFocusSpeedFrameControls";
 import { StudioInspectorNavigator } from "./StudioInspectorNavigator";
-import { LazyStudioColorPopover } from "./StudioLazyColorPopover";
 import { StudioPanelLoading } from "./StudioLazySurfaceFallback";
 import { StudioLineCleanupPanel } from "./StudioLineCleanupPanel";
 import { StudioLineCorrectionControls } from "./StudioLineCorrectionControls";
-import { StudioMagicResizePanel } from "./StudioMagicResizePanel";
 import { StudioMagicWandPanel } from "./StudioMagicWandPanel";
 import { StudioMobileSheetHandle } from "./StudioMobileSheetHandle";
 import { StudioNodeEditPanel } from "./StudioNodeEditPanel";
@@ -920,274 +913,76 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
             onChange={changeInspectorLayout}
           />
 
-          <div
-            role="tabpanel"
-            aria-label="캔버스 설정"
+          <StudioInspectorCanvasControls
+            background={bg}
+            canvasHeight={canvasH}
+            controlsDisabled={collaborationDocumentLocked}
+            gridSize={gridSize}
             hidden={
               inspectorLayout.primary !== "document" ||
               inspectorLayout.document !== "canvas"
             }
-            className="rounded-xl border border-line bg-panel/40 p-3"
-          >
-            <p className="mb-2 text-xs font-semibold text-fg-3">캔버스</p>
-            <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-              배경색
-              <input type="color" value={bg} onChange={(e) => setBg(e.target.value)} className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent" />
-            </label>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {BG_PRESETS.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => applyBgPreset(p)}
-                  title={p.label}
-                  aria-label={`배경 ${p.label}`}
-                  className="h-6 w-6 rounded-md border border-line"
-                  style={{ background: p.grad ? `linear-gradient(${p.grad[0]}, ${p.grad[1]})` : p.fill }}
-                />
-              ))}
-            </div>
-            {/* 그라디언트 배경 프리셋 — 세로 그라데이션으로 페이지 배경을 칠한다(웹툰 시간대·무드). */}
-            <div className="mt-2">
-              <p className="mb-1 text-[0.68rem] font-medium text-fg-3">그라디언트 배경</p>
-              <div className="flex flex-wrap gap-1.5">
-                {GRADIENT_PRESETS.map((g) => {
-                  const [c0, c1] = gradientToBgGrad(g);
-                  return (
-                    <button
-                      key={g.id}
-                      type="button"
-                      onClick={() => setBgGrad(gradientToBgGrad(g))}
-                      title={g.tip}
-                      aria-label={`그라디언트 ${g.label}`}
-                      className="h-6 w-6 rounded-md border border-line"
-                      style={{ background: `linear-gradient(${c0}, ${c1})` }}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setMenu("bgFill")}
-              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl border border-accent/30 bg-accent-soft px-2 py-2 text-[0.7rem] font-bold text-accent hover:border-accent/50"
-            >
-              <Droplets size={13} aria-hidden />
-              배경 편집기 · 리사이저 열기
-            </button>
-            <div className="mt-3 flex items-center justify-between gap-2 text-sm text-fg-2">
-              <span>높이</span>
-              <span className="flex items-center gap-1">
-                <button type="button" aria-label="높이 240px 줄이기" onClick={() => setCanvasH((h) => h - 240)} className="rounded border border-line px-2 text-fg-2 hover:bg-raised">
-                  −
-                </button>
-                <span className="numeral w-12 text-center text-xs" aria-label={`높이 ${canvasH}px`}>{canvasH}</span>
-                <button type="button" aria-label="높이 240px 늘리기" onClick={() => setCanvasH((h) => h + 240)} className="rounded border border-line px-2 text-fg-2 hover:bg-raised">
-                  +
-                </button>
-              </span>
-            </div>
-            {!masterEditMode && (
-              <div className="mt-3">
-                <StudioMagicResizePanel
-                  currentSize={{ width: CANVAS_W, height: canvasH }}
-                  strategy={magicResizeStrategy}
-                  onStrategyChange={setMagicResizeStrategy}
-                  onApplyPreset={applyMagicResizePreset}
-                />
-              </div>
-            )}
-            <label className="mt-3 flex items-center justify-between gap-2 text-sm text-fg-2">
-              패널 여백 (Gutter)
-              <span className="flex items-center gap-1.5">
-                <input
-                  type="range"
-                  min={8}
-                  max={48}
-                  step={2}
-                  value={panelGutter}
-                  onChange={(e) => {
-                    if (collaborationDocumentLocked) return;
-                    const nextGutter = Number(e.target.value);
-                    setPanelGutter(nextGutter);
-                    setSharedDocumentNotice(null);
-                    if (currentTemplate) {
-                      const nextEls = regenerateTemplate(currentTemplate, nextGutter);
-                      commit(nextEls);
-                    }
-                  }}
-                  className="w-24 accent-accent cursor-pointer"
-                  disabled={collaborationDocumentLocked || !currentTemplate || currentTemplate.id === "blank"}
-                />
-                <span className="w-5 text-right text-xs tabular-nums text-fg-3">{panelGutter}</span>
-              </span>
-            </label>
-            <div className="mt-3 border-t border-line/50 pt-2 space-y-2">
-              <label className="flex items-center justify-between text-xs text-fg-2">
-                정렬 가이드 (스냅)
-                <input
-                  type="checkbox"
-                  checked={snapEnabled}
-                  onChange={(e) => setSnapEnabled(e.target.checked)}
-                  className="size-3.5 accent-accent"
-                />
-              </label>
-              <label className="flex items-center justify-between text-xs text-fg-2">
-                그리드 격자 표시
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={showGrid}
-                    onChange={(e) => setShowGrid(e.target.checked)}
-                    className="size-3.5 accent-accent"
-                  />
-                  {showGrid && (
-                    <select
-                      value={gridSize}
-                      onChange={(e) => setGridSize(Number(e.target.value))}
-                      className="rounded border border-line bg-card px-1 py-0.5 text-[10px]"
-                    >
-                      {[20, 30, 40, 50, 60, 80].map((sz) => (
-                        <option key={sz} value={sz}>{sz}px</option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-              </label>
-
-              <label className="flex items-center justify-between text-xs text-fg-2">
-                웹툰 규격 가이드
-                <input
-                  type="checkbox"
-                  checked={showWebtoonGuides}
-                  onChange={(e) => {
-                    if (e.target.checked) ensureWebtoonGuidesLoaded();
-                    setShowWebtoonGuides(e.target.checked);
-                  }}
-                  onPointerEnter={ensureWebtoonGuidesLoaded}
-                  onFocus={ensureWebtoonGuidesLoaded}
-                  className="size-3.5 accent-accent"
-                />
-              </label>
-              {showWebtoonGuides && (
-                <div className="rounded-md border border-line bg-card px-2 py-1.5 text-[0.68rem] leading-snug text-fg-3">
-                  {webtoonGuides
-                    ? (() => {
-                        const len = webtoonGuides.episodeLengthLabel(canvasH);
-                        return (
-                          <>
-                            <span className="font-semibold text-fg-2">{len.label}</span> · {len.tier}
-                            <br />
-                            파란 점선 = 플랫폼 표준폭(네이버 690·카카오 720), 붉은 음영 = 세이프영역.
-                          </>
-                        );
-                      })()
-                    : "웹툰 규격 가이드를 여는 중..."}
-                </div>
-              )}
-
-              {/* 작가 가이드선 (Artist Guidelines) */}
-              <div className="pt-2 border-t border-line/35 space-y-2">
-                <p className="text-[0.65rem] font-bold text-fg-2">스냅 가이드선</p>
-                <div className="flex gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUserGuides((prev) => [
-                        ...prev,
-                        { id: uid(), type: "v", pos: 400 },
-                      ]);
-                    }}
-                    className="flex-1 rounded border border-line bg-card py-1 text-[0.68rem] font-semibold text-fg hover:bg-raised transition-colors cursor-pointer"
-                  >
-                    + 세로 가이드
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUserGuides((prev) => [
-                        ...prev,
-                        { id: uid(), type: "h", pos: canvasH / 2 },
-                      ]);
-                    }}
-                    className="flex-1 rounded border border-line bg-card py-1 text-[0.68rem] font-semibold text-fg hover:bg-raised transition-colors cursor-pointer"
-                  >
-                    + 가로 가이드
-                  </button>
-                </div>
-
-                {userGuides.length > 0 && (
-                  <div className="space-y-1.5 rounded-lg border border-line bg-card/30 p-2 max-h-40 overflow-y-auto">
-                    {userGuides.map((guide, idx) => (
-                      <div key={guide.id} className="flex items-center justify-between gap-1.5 text-[0.65rem]">
-                        <span className="text-fg-2 font-medium">
-                          {guide.type === "v" ? "세로" : "가로"} #{idx + 1} ({Math.round(guide.pos)}px)
-                        </span>
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="range"
-                            min={0}
-                            max={guide.type === "v" ? 800 : canvasH}
-                            value={guide.pos}
-                            aria-label={`${guide.type === "v" ? "세로" : "가로"} 가이드 #${idx + 1} 위치`}
-                            onChange={(e) => {
-                              const pos = Number(e.target.value);
-                              setUserGuides((prev) =>
-                                prev.map((g) => (g.id === guide.id ? { ...g, pos } : g))
-                              );
-                            }}
-                            className="w-16 h-2 accent-accent cursor-pointer"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setUserGuides((prev) => prev.filter((g) => g.id !== guide.id));
-                            }}
-                            className="text-[9px] text-bad hover:underline ml-1 cursor-pointer"
-                          >
-                            삭제
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => setUserGuides([])}
-                      className="w-full text-center text-[9px] text-bad-light hover:underline pt-1 border-t border-line/30 cursor-pointer"
-                    >
-                      모든 가이드 삭제
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="mt-3 border-t border-line pt-3">
-              <span className="text-[0.66rem] font-semibold text-fg-3 block mb-1.5">만화/웹툰 연출 스타일</span>
-              <div className="grid grid-cols-3 gap-1 bg-card rounded-lg p-0.5 border border-line">
-                {(["classic", "soft", "vivid"] as const).map((style) => (
-                  <button
-                    key={style}
-                    type="button"
-                    onClick={() => {
-                      if (collaborationDocumentLocked) return;
-                      setWebtoonTheme(style);
-                      setSharedDocumentNotice(null);
-                    }}
-                    disabled={collaborationDocumentLocked}
-                    className={cn(
-                      "rounded py-1 text-[0.66rem] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50",
-                      webtoonTheme === style
-                        ? "bg-accent text-on-accent"
-                        : "text-fg-2 hover:bg-raised"
-                    )}
-                  >
-                    {style === "classic" ? "출판만화" : style === "soft" ? "소프트" : "비비드"}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
+            magicResizeStrategy={magicResizeStrategy}
+            masterEditMode={masterEditMode}
+            panelGutter={panelGutter}
+            showGrid={showGrid}
+            showWebtoonGuides={showWebtoonGuides}
+            snapEnabled={snapEnabled}
+            templateGutterAvailable={
+              currentTemplate !== null && currentTemplate.id !== "blank"
+            }
+            userGuides={userGuides}
+            webtoonGuides={webtoonGuides}
+            webtoonTheme={webtoonTheme}
+            onAddUserGuide={(type) => {
+              setUserGuides((current) => [
+                ...current,
+                {
+                  id: uid(),
+                  type,
+                  pos: type === "v" ? CANVAS_W / 2 : canvasH / 2,
+                },
+              ]);
+            }}
+            onApplyBackgroundPreset={applyBgPreset}
+            onApplyMagicResizePreset={applyMagicResizePreset}
+            onBackgroundChange={setBg}
+            onCanvasHeightDelta={(delta) => setCanvasH((height) => height + delta)}
+            onClearUserGuides={() => setUserGuides([])}
+            onDeleteUserGuide={(id) => {
+              setUserGuides((current) => current.filter((guide) => guide.id !== id));
+            }}
+            onGradientChange={setBgGrad}
+            onGridSizeChange={setGridSize}
+            onMagicResizeStrategyChange={setMagicResizeStrategy}
+            onMoveUserGuide={(id, pos) => {
+              setUserGuides((current) =>
+                current.map((guide) => (guide.id === id ? { ...guide, pos } : guide))
+              );
+            }}
+            onOpenBackgroundEditor={() => setMenu("bgFill")}
+            onPanelGutterChange={(nextGutter) => {
+              if (collaborationDocumentLocked) return;
+              setPanelGutter(nextGutter);
+              setSharedDocumentNotice(null);
+              if (currentTemplate) {
+                const nextElements = regenerateTemplate(currentTemplate, nextGutter);
+                commit(nextElements);
+              }
+            }}
+            onShowGridChange={setShowGrid}
+            onShowWebtoonGuidesChange={(visible) => {
+              if (visible) ensureWebtoonGuidesLoaded();
+              setShowWebtoonGuides(visible);
+            }}
+            onSnapEnabledChange={setSnapEnabled}
+            onWarmWebtoonGuides={ensureWebtoonGuidesLoaded}
+            onWebtoonThemeChange={(theme) => {
+              if (collaborationDocumentLocked) return;
+              setWebtoonTheme(theme);
+              setSharedDocumentNotice(null);
+            }}
+          />
           {/* 페이지 전체 색보정(그레이드) — 무드 프리셋 + 밝기/대비/채도/색조/세피아/흑백/비네트 */}
           <div
             role="tabpanel"
@@ -1424,275 +1219,14 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                 </div>
               )}
               {selected.type === "bubble" && (
-                <>
-                  <div
-                    className="mt-2.5 rounded-2xl border border-line/45 bg-gradient-to-b from-card/70 to-canvas/20 p-2.5"
-                    data-studio-bubble-variant-picker="true"
-                  >
-                    <p className="mb-0.5 text-[0.72rem] font-semibold tracking-tight text-fg-2">모양 바꾸기</p>
-                    <p className="mb-2 text-[0.6rem] leading-snug text-fg-3">
-                      같은 대사이어도 말투만 바꿔 보면 분위기가 달라져요.
-                    </p>
-                    <div className="grid grid-cols-3 gap-1 sm:grid-cols-4">
-                      {BUBBLE_VARIANTS.map((v) => {
-                        const active = selected.variant === v.id;
-                        return (
-                          <button
-                            key={v.id}
-                            type="button"
-                            title={`${v.label} — ${v.hint}`}
-                            aria-pressed={active}
-                            onClick={() => patchEl(selected.id, { variant: v.id } as Partial<El>)}
-                            className={cn(
-                              "flex flex-col items-stretch gap-0.5 rounded-xl border p-1.5 text-left transition-[border-color,background,transform,box-shadow] duration-150 ease-out",
-                              active
-                                ? "border-accent/50 bg-accent-soft/55 shadow-sm ring-1 ring-accent/25"
-                                : "border-line/55 bg-card/80 hover:border-line-strong/50 hover:bg-raised"
-                            )}
-                          >
-                            <span
-                              className={cn(
-                                "flex h-8 items-center justify-center rounded-lg ring-1",
-                                active ? "bg-accent-soft/40 ring-accent/20" : "bg-canvas/40 ring-line/30"
-                              )}
-                            >
-                              <StudioBubbleVariantGlyph
-                                variant={v.id}
-                                className={cn("h-7 w-full", active ? "text-accent" : "text-fg-2")}
-                              />
-                            </span>
-                            <span className="truncate text-center text-[0.58rem] font-semibold text-fg">
-                              {v.label}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <Suspense fallback={<StudioPanelLoading label="말풍선 스타일을 여는 중..." />}>
-                    <StudioBubbleStylePresetPanel
-                      selected={selected}
-                      onApplyPreset={(patch) => patchEl(selected.id, patch as Partial<El>)}
-                    />
-                  </Suspense>
-
-                  <div className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
-                    배경 투명
-                    <input
-                      type="checkbox"
-                      checked={selected.fill === "transparent"}
-                      aria-label="말풍선 배경 투명"
-                      onChange={(e) => {
-                        patchEl(selected.id, {
-                          fill: e.target.checked ? "transparent" : "#ffffff",
-                        } as Partial<El>);
-                      }}
-                      className="size-4 accent-accent cursor-pointer"
-                    />
-                  </div>
-
-                  {selected.fill !== "transparent" && (
-                    <span className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
-                      말풍선색
-                      <LazyStudioColorPopover
-                        value={selected.fill}
-                        onChange={(c) => patchEl(selected.id, { fill: c } as Partial<El>)}
-                        recentColors={recentColors}
-                        onUseColor={rememberColor}
-                        onLoadRecentColors={ensureRecentColorsLoaded}
-                        title="말풍선 색상"
-                      />
-                    </span>
-                  )}
-
-                  {selected.fill !== "transparent" && (
-                    <div className="mt-2.5 border-t border-line/40 pt-2.5 space-y-2">
-                      <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">그라데이션 채우기</p>
-                      <Suspense fallback={<StudioPanelLoading label="그라데이션 패널을 여는 중..." />}>
-                        <StudioGradientEnginePanel
-                          value={selected.gradient ?? null}
-                          onChange={(spec) => patchEl(selected.id, { gradient: spec ?? undefined } as Partial<El>)}
-                          title="말풍선 그라데이션"
-                        />
-                      </Suspense>
-                    </div>
-                  )}
-
-                  <div className="mt-2.5 border-t border-line/40 pt-2.5 space-y-2.5">
-                    <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">테두리 설정</p>
-
-                    <div className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                      테두리 커스텀
-                      <input
-                        type="checkbox"
-                        checked={!!selected.stroke}
-                        aria-label="말풍선 테두리 커스텀"
-                        onChange={(e) => {
-                          const hasStroke = e.target.checked;
-                          patchEl(selected.id, {
-                            stroke: hasStroke ? (selected.stroke || "#16100c") : undefined,
-                            strokeWidth: hasStroke ? (selected.strokeWidth || 3) : undefined,
-                          } as Partial<El>);
-                        }}
-                        className="size-4 accent-accent cursor-pointer"
-                      />
-                    </div>
-
-                    {!!selected.stroke && (
-                      <>
-                        <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                          테두리 색상
-                          <input
-                            type="color"
-                            value={selected.stroke || "#16100c"}
-                            onChange={(e) => patchEl(selected.id, { stroke: e.target.value } as Partial<El>)}
-                            className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent"
-                          />
-                        </label>
-
-                        <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                          테두리 두께
-                          <span className="flex items-center gap-2">
-                            <input
-                              type="range"
-                              min={0.5}
-                              max={12}
-                              step={0.5}
-                              value={selected.strokeWidth ?? 3}
-                              onChange={(e) => patchEl(selected.id, { strokeWidth: Number(e.target.value) } as Partial<El>)}
-                              className="w-24 accent-accent cursor-pointer sm:w-28 h-2"
-                            />
-                            <span className="w-8 text-right text-xs tabular-nums text-fg-3">{(selected.strokeWidth ?? 3).toFixed(1)}px</span>
-                          </span>
-                        </label>
-                      </>
-                    )}
-                  </div>
-
-                  {(() => {
-                    // bubbleLineHeight와 정확히 같은 공식(렌더 루프와 동일) — 이 인스펙터 블록도
-                    // StudioPage 컴포넌트 스코프 안이라 webtoonTheme에 접근 가능하다.
-                    const previewLineHeight =
-                      selected.lineHeight ??
-                      (selected.vertical ? 1.4 : webtoonTheme === "soft" ? 1.35 : webtoonTheme === "vivid" ? 1.2 : 1.25);
-                    const fit = bubbleAutoShrinkPreview(selected, previewLineHeight);
-                    return (
-                      <Suspense fallback={<StudioPanelLoading label="텍스트 크기 고정 패널을 여는 중..." />}>
-                        <StudioBubbleAutoShrinkPanel
-                          enabled={!!selected.autoShrinkText}
-                          minFontSize={selected.autoShrinkMinFontSize ?? BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT}
-                          effectiveFontSize={fit ? Math.round(fit.fontSize) : null}
-                          overflow={fit?.overflow ?? false}
-                          onToggleEnabled={(v) => patchEl(selected.id, { autoShrinkText: v } as Partial<El>)}
-                          onMinFontSizeChange={(v) => patchEl(selected.id, { autoShrinkMinFontSize: v } as Partial<El>)}
-                        />
-                      </Suspense>
-                    );
-                  })()}
-
-                  <div className="mt-2.5 border-t border-line/40 pt-2.5 space-y-2.5">
-                    <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">말풍선 그림자 (Shadow)</p>
-
-                    <div className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                      그림자 사용
-                      <input
-                        type="checkbox"
-                        checked={selected.shadowColor !== undefined}
-                        aria-label="말풍선 그림자 사용"
-                        onChange={(e) => {
-                          const hasShadow = e.target.checked;
-                          patchEl(selected.id, {
-                            shadowColor: hasShadow ? (selected.shadowColor || "#000000") : undefined,
-                            shadowBlur: hasShadow ? (selected.shadowBlur || 6) : undefined,
-                            shadowOffsetX: hasShadow ? (selected.shadowOffsetX || 2) : undefined,
-                            shadowOffsetY: hasShadow ? (selected.shadowOffsetY || 3) : undefined,
-                            shadowOpacity: hasShadow ? (selected.shadowOpacity || 0.15) : undefined,
-                          } as Partial<El>);
-                        }}
-                        className="size-4 accent-accent cursor-pointer"
-                      />
-                    </div>
-
-                    {selected.shadowColor !== undefined && (
-                      <>
-                        <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                          그림자 색상
-                          <input
-                            type="color"
-                            value={selected.shadowColor || "#000000"}
-                            onChange={(e) => patchEl(selected.id, { shadowColor: e.target.value } as Partial<El>)}
-                            className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent"
-                          />
-                        </label>
-
-                        <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                          흐림 정도 (Blur)
-                          <span className="flex items-center gap-2">
-                            <input
-                              type="range"
-                              min={0}
-                              max={24}
-                              step={1}
-                              value={selected.shadowBlur ?? 6}
-                              onChange={(e) => patchEl(selected.id, { shadowBlur: Number(e.target.value) } as Partial<El>)}
-                              className="w-24 accent-accent cursor-pointer sm:w-28 h-2"
-                            />
-                            <span className="w-8 text-right text-xs tabular-nums text-fg-3">{selected.shadowBlur ?? 6}px</span>
-                          </span>
-                        </label>
-
-                        <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                          가로 오프셋 (X)
-                          <span className="flex items-center gap-2">
-                            <input
-                              type="range"
-                              min={-15}
-                              max={15}
-                              step={1}
-                              value={selected.shadowOffsetX ?? 2}
-                              onChange={(e) => patchEl(selected.id, { shadowOffsetX: Number(e.target.value) } as Partial<El>)}
-                              className="w-24 accent-accent cursor-pointer sm:w-28 h-2"
-                            />
-                            <span className="w-8 text-right text-xs tabular-nums text-fg-3">{selected.shadowOffsetX ?? 2}px</span>
-                          </span>
-                        </label>
-
-                        <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                          세로 오프셋 (Y)
-                          <span className="flex items-center gap-2">
-                            <input
-                              type="range"
-                              min={-15}
-                              max={15}
-                              step={1}
-                              value={selected.shadowOffsetY ?? 3}
-                              onChange={(e) => patchEl(selected.id, { shadowOffsetY: Number(e.target.value) } as Partial<El>)}
-                              className="w-24 accent-accent cursor-pointer sm:w-28 h-2"
-                            />
-                            <span className="w-8 text-right text-xs tabular-nums text-fg-3">{selected.shadowOffsetY ?? 3}px</span>
-                          </span>
-                        </label>
-
-                        <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                          불투명도
-                          <span className="flex items-center gap-2">
-                            <input
-                              type="range"
-                              min={0.05}
-                              max={1}
-                              step={0.05}
-                              value={selected.shadowOpacity ?? 0.15}
-                              onChange={(e) => patchEl(selected.id, { shadowOpacity: Number(e.target.value) } as Partial<El>)}
-                              className="w-24 accent-accent cursor-pointer sm:w-28 h-2"
-                            />
-                            <span className="w-8 text-right text-xs tabular-nums text-fg-3">{Math.round((selected.shadowOpacity ?? 0.15) * 100)}%</span>
-                          </span>
-                        </label>
-                      </>
-                    )}
-                  </div>
-                </>
+                <StudioInspectorBubbleAppearanceControls
+                  recentColors={recentColors}
+                  selected={selected}
+                  webtoonTheme={webtoonTheme}
+                  onEnsureRecentColorsLoaded={ensureRecentColorsLoaded}
+                  onPatch={(patch) => patchEl(selected.id, patch as Partial<El>)}
+                  onRememberColor={rememberColor}
+                />
               )}
               {selected.type === "bubble" &&
                 (selected.variant !== "double" || hasCustomBubbleShape(selected.customShapePoints)) && (

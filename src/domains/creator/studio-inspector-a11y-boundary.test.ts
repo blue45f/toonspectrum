@@ -14,12 +14,26 @@ const inspectorSources = [
       "utf8"
     ),
   },
+  {
+    file: "StudioInspectorCanvasControls.tsx",
+    source: readFileSync(
+      new URL("./StudioInspectorCanvasControls.tsx", import.meta.url),
+      "utf8"
+    ),
+  },
+  {
+    file: "StudioInspectorBubbleAppearanceControls.tsx",
+    source: readFileSync(
+      new URL("./StudioInspectorBubbleAppearanceControls.tsx", import.meta.url),
+      "utf8"
+    ),
+  },
 ] as const;
 const inspectorSource = inspectorSources.map(({ source }) => source).join("\n");
 
 describe("Studio inspector accessibility boundary", () => {
   it("keeps inspector-only form controls explicitly named", () => {
-    expect(inspectorSource).toContain('가이드 #${idx + 1} 위치');
+    expect(inspectorSource).toContain('가이드 #${index + 1} 위치');
     expect(inspectorSource).toContain('aria-label="선 색상"');
     expect(inspectorSource).toContain('aria-label="채우기 색상"');
     expect(inspectorSource).toContain('aria-label="말풍선 배경 투명"');
