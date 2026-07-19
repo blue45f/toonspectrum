@@ -210,6 +210,9 @@ importers:
       eslint-plugin-react-hooks:
         specifier: ^7.1.1
         version: 7.1.1(eslint@10.4.1(jiti@2.7.0))
+      fake-indexeddb:
+        specifier: 6.2.5
+        version: 6.2.5
       globals:
         specifier: ^17.6.0
         version: 17.6.0
@@ -3979,6 +3982,10 @@ packages:
 
   extend@3.0.2:
     resolution: {integrity: sha512-fjquC59cD7CyW6urNXK0FBufkZcoiGG80wTuPujX590cB5Ttln20E2UB4S/WARVqhXffZl2LNgS+gQdPIIim/g==}
+
+  fake-indexeddb@6.2.5:
+    resolution: {integrity: sha512-CGnyrvbhPlWYMngksqrSSUT1BAVP49dZocrHuK0SvtR0D5TMs5wP0o3j7jexDJW01KSadjBp1M/71o/KR3nD1w==}
+    engines: {node: '>=18'}
 
   fast-copy@4.0.3:
     resolution: {integrity: sha512-58apWr0GUiDFM8+3afrO6eYwJBn9ZAhDOzG3L+/9llab/haCARS2UIfffmOurYLwbgDRs8n0rfr6qAAPEAuAQw==}
@@ -9786,6 +9793,8 @@ snapshots:
       - supports-color
 
   extend@3.0.2: {}
+
+  fake-indexeddb@6.2.5: {}
 
   fast-copy@4.0.3: {}
 

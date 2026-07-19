@@ -19,6 +19,17 @@ function functionSlice(name: string, nextName: string): string {
   return source.slice(start, end);
 }
 
+function expectInOrder(haystack: string, needles: readonly string[]): void {
+  let cursor = -1;
+  for (const needle of needles) {
+    const index = haystack.indexOf(needle, cursor + 1);
+    expect(index, `Expected ${JSON.stringify(needle)} after source offset ${cursor}`).toBeGreaterThan(
+      cursor,
+    );
+    cursor = index;
+  }
+}
+
 describe("Studio BG3D shot UI integration boundary", () => {
   it("captures the current canonical runtime view as one undoable command", () => {
     const handler = functionSlice("captureCurrentShot", "applySavedShot");
@@ -55,96 +66,196 @@ describe("Studio BG3D shot UI integration boundary", () => {
   it("batch-renders selected shots and passes without recording temporary scene states in history", () => {
     const handler = functionSlice("exportSavedShotsAsZip", "updateBackgroundTransparency");
 
-    expect(handler).toContain("createStudioBg3dShotBatchPlan(shots");
     expect(handler.indexOf("if (shotBatchBlockedReason)")).toBeLessThan(
       handler.indexOf("readCurrentCanonicalSceneForShot()"),
     );
     expect(handler).toContain("if (captureInFlightRef.current)");
+    expect(handler.match(/await assertRecoveryAccess\(\)/gu)).toHaveLength(8);
+
+    // Quad view is collapsed before the adapter and its render identity are frozen into Plan v2.
+    expectInOrder(handler, [
+      "const transitionedViewport = await applyStudioBg3dViewportAfterTransition({",
+      "requireReplacement: isQuadView",
+      "const planningAdapter = await acquireStudioBg3dCaptureAdapterAfterViewTransition({",
+      "const sourceSize = getStudioBg3dCaptureSourceSize(planningAdapter)",
+      "const captureSpecs:",
+      "const batchPlanResult = await createStudioBg3dShotBatchPlan(shots, {",
+      "backend: planningAdapter.backend",
+      "engineId: planningAdapter.engineId",
+      "engineRevision: planningAdapter.engineVersion",
+      "implementationRevision: planningAdapter.implementationRevision",
+      "graphicsApi: planningAdapter.graphicsApi",
+      "profileId: planningAdapter.profileId",
+      "sourceWidth: sourceSize.width",
+      "sourceHeight: sourceSize.height",
+      "shots: captureSpecs",
+      "recoverySession = await shotBatchRecoveryStore.acquire(batchPlan, batchSourceRevision, {",
+      "signal: controller.signal",
+      "provisionalRecoverySession = recoverySession",
+      "await assertRecoveryAccess()",
+      "shotBatchRecoveryRef.current = recoverySession",
+    ]);
     expect(handler).toContain("selectedShotIds: shotBatchSelectedIds");
     expect(handler).toContain("passes: selectedShotBatchPasses");
+    expect(handler).toContain("scope: recoveryScope");
+    expect(handler).toContain("deviceProfile: captureQuality.profile");
+    expect(handler).toContain("textureScale: captureQuality.textureScale");
+    expect(handler).toContain("lodBias: captureQuality.lodBias");
+    expect(handler).toContain("ltPipelineId: STUDIO_BG3D_SHOT_BATCH_LT_PIPELINE_V1");
+    expect(handler).toContain("pngEncodingId: STUDIO_BG3D_SHOT_BATCH_PNG_ENCODING_V1");
+    expect(handler).toContain("psdEncodingId: STUDIO_BG3D_SHOT_BATCH_PSD_ENCODING_V1");
     expect(handler).toContain("contactSheet: shotBatchIncludeContactSheet");
-    expect(handler).toContain("for (let index = 0; index < batchPlan.shots.length; index += 1)");
-    expect(handler).toContain("applyStudioBg3dShot(currentDocument, shot.shotId)");
-    expect(handler).toContain("freezeStudioBg3dShotAnimationsForBatch(appliedShot)");
-    expect(handler).toContain("const projectionChanged = renderedProjection !== applied.camera.projection");
-    expect(handler).toContain("await applyStudioBg3dViewportAfterTransition({");
-    expect(handler).toContain("previousApi: previousViewportApi");
-    expect(handler).toContain("requireReplacement: firstShotRequiresViewportReplacement || projectionChanged");
-    expect(handler).toContain("view: applied.camera");
-    expect(handler.indexOf("view: applied.camera")).toBeLessThan(
-      handler.indexOf("captured = await captureStudioBg3dRaster("),
+    const acquireIndex = handler.indexOf(
+      "recoverySession = await shotBatchRecoveryStore.acquire(batchPlan, batchSourceRevision, {",
     );
-    expect(handler).toContain("captured = await captureStudioBg3dRaster(");
-    expect(handler).toContain("captureAdapter,");
+    expect(handler.lastIndexOf("await assertRecoveryAccess()", acquireIndex)).toBeGreaterThan(
+      handler.indexOf("batchPlan = batchPlanResult.plan"),
+    );
+
+    // Every selected shot is fenced by the recovery store and rendered only from frozen Plan values.
+    expect(handler).toContain("for (let index = 0; index < batchPlan.shots.length; index += 1)");
+    expect(handler).toContain('if (queueItem?.status === "succeeded") continue');
+    expect(handler).toContain("waitForStudioBg3dBatchDocumentVisible(document");
+    const startShotIndex = handler.indexOf(
+      "activeRunToken = await shotBatchRecoveryStore.startShot(recoverySession, shot.shotId)",
+    );
+    expect(handler.lastIndexOf("await assertRecoveryAccess()", startShotIndex)).toBeGreaterThan(
+      handler.indexOf("await waitForStudioBg3dBatchDocumentVisible(document"),
+    );
+    expectInOrder(handler, [
+      "activeRunToken = await shotBatchRecoveryStore.startShot(recoverySession, shot.shotId)",
+      "applyStudioBg3dShot(currentDocument, shot.shotId)",
+      "freezeStudioBg3dShotAnimationsForBatch(appliedShot)",
+      "backgroundSnapshot.clearColor.toLowerCase() !== shot.capture.background.color.toLowerCase()",
+      "appliedCaptureQuality.shadows !== shot.capture.shadows",
+      "const projectionChanged = renderedProjection !== applied.camera.projection",
+      "view: applied.camera",
+      "const requestedCaptureHeight = shot.capture.requestedHeight",
+      "const captureWasReduced = shot.capture.wasReduced",
+      "const captureAdapter = await acquireStudioBg3dCaptureAdapterAfterViewTransition({",
+      "const sourceSize = getStudioBg3dCaptureSourceSize(captureAdapter)",
+      "const captureOwnerMismatches = [",
+      "captureAdapter.backend === batchPlan.captureOwner.backend",
+      "captureAdapter.engineId === batchPlan.captureOwner.engineId",
+      "captureAdapter.engineVersion === batchPlan.captureOwner.engineRevision",
+      "captureAdapter.implementationRevision ===",
+      "captureAdapter.graphicsApi === batchPlan.captureOwner.graphicsApi",
+      "captureAdapter.profileId === batchPlan.captureOwner.profileId",
+      "sourceSize.width === batchPlan.captureOwner.sourceWidth",
+      "sourceSize.height === batchPlan.captureOwner.sourceHeight",
+      "if (captureOwnerMismatches.length > 0)",
+      "captured = await captureStudioBg3dRaster(",
+      "width: shot.capture.width",
+      "height: shot.capture.height",
+      "background: shot.capture.background",
+      "includeDepth: shot.capture.includeDepth",
+    ]);
+    expect(handler).toContain("previousApi: previousViewportApi");
+    expect(handler).toContain("requireReplacement: projectionChanged");
+    expect(handler).not.toContain("firstShotRequiresViewportReplacement");
     expect(handler).toContain("signal: controller.signal");
     expect(handler).toContain("timeoutMs: 30_000");
     expect(handler).toContain("timeoutMs: 20_000");
-    expect(handler).toContain('batchPlan.exportHeight === "per-shot"');
-    expect(handler).toContain("? applied.output.exportHeight");
-    expect(handler).toContain('applied.output.line.depthEnabled || batchPlan.passes.includes("depth")');
-    expect(handler).toContain("renderStudioBg3dLtLayers(");
+    expect(handler).toContain("await renderStudioBg3dLtLayersInWorker(");
+    expect(handler).toContain("{ signal: controller.signal }");
+    expect(handler).toContain('cause.code === "worker-unavailable"');
+    expect(handler).toContain("STUDIO_BG3D_LT_RENDER_SYNC_FALLBACK_MAX_PIXELS");
+    expect(handler).toContain("return renderStudioBg3dLtLayers(ltRenderInput, ltRenderSettings)");
+    expect(handler).not.toContain('cause.code === "timeout"');
+    expect(handler).not.toContain('cause.code === "render-failed"');
+    expect(handler).not.toContain('cause.code === "worker-failed"');
     expect(handler).toContain("for (const pass of batchPlan.passes)");
     expect(handler).toContain('pass === "beauty"');
     expect(handler).toContain('pass === "lt-composite"');
     expect(handler).toContain('pass === "depth"');
     expect(handler).toContain("createStudioBg3dDepthRasterLayer(");
     expect(handler).toContain("encodeStudioBg3dLtCompositeToPngBlob(");
-    expect(handler).toContain("pass,");
-    expect(handler).toContain(
-      "accumulatedArtifactBytes + stagedArtifactBytes + png.size >",
-    );
-    expect(handler.indexOf("stagedArtifactBytes += png.size")).toBeLessThan(
-      handler.indexOf("stagedImages.push({"),
-    );
-    expect(handler).toContain("await buildStudioBg3dShotBatchArchiveInWorker(images");
-    expect(handler).toContain("await buildStudioBg3dShotBatchArchive(images");
-    expect(handler).toContain("resumeKey: batchPlan.resumeKey");
-    expect(handler).toContain("requestedPasses: batchPlan.passes");
-    expect(handler).toContain('mode: "maximum-height"');
     expect(handler).toContain("requestedHeight: requestedCaptureHeight");
     expect(handler).toContain("wasReduced: captureWasReduced");
-    expect(handler).toContain("maxEdge: STUDIO_BG3D_SHOT_BATCH_MAX_DIMENSION");
-    expect(handler).toContain("skippedArtifacts");
-    expect(handler).toContain("layeredPsdRequested: shotBatchIncludeLayeredPsd");
-    expect(handler).toContain("contactSheetRequested: batchPlan.includeContactSheet");
-    expect(handler).toContain("isStudioBg3dShotBatchQueueCompatible(");
-    expect(handler).toContain("retryStudioBg3dShotBatchQueue(");
-    expect(handler).toContain("waitForStudioBg3dBatchDocumentVisible(document");
-    expect(handler).toContain("stagedImages.push({");
-    expect(handler.indexOf("images.push(...stagedImages)")).toBeGreaterThan(
-      handler.indexOf("for (const pass of batchPlan.passes)"),
+
+    // A shot becomes locally archive-visible only after its validated artifacts commit atomically.
+    expectInOrder(handler, [
+      "await shotBatchRecoveryStore.completeShot(recoverySession, activeRunToken, {",
+      "images.push(...stagedImages)",
+      "skippedArtifacts.push(...stagedSkippedArtifacts)",
+      "layeredPsds.push(...stagedLayeredPsds)",
+      "psdFallbacks.push(...stagedPsdFallbacks)",
+    ]);
+    const completeShotIndex = handler.indexOf(
+      "await shotBatchRecoveryStore.completeShot(recoverySession, activeRunToken, {",
     );
-    expect(handler).toContain("succeedStudioBg3dShotBatchQueueItem(");
-    expect(handler).toContain("shotBatchRecoveryRef.current = recoverySession");
+    expect(handler.lastIndexOf("await assertRecoveryAccess()", completeShotIndex)).toBeGreaterThan(
+      handler.indexOf("if (!activeRunToken)"),
+    );
+    expectInOrder(handler.slice(completeShotIndex), [
+      "psdFallbacks: stagedPsdFallbacks",
+      "signal: controller.signal",
+      "authorizeBeforeCommit: async () => {",
+      "await assertRecoveryAccess()",
+      "const authorizedAt = Date.now()",
+      "isLocallyCurrent: () => componentActiveRef.current",
+      "images.push(...stagedImages)",
+    ]);
+    expect(handler).toContain("if (activeRunToken && !recoveryAccessRevoked)");
+    expectInOrder(handler, [
+      "if (activeRunToken && !recoveryAccessRevoked)",
+      "await shotBatchRecoveryStore.resetInterrupted(recoverySession)",
+      "await shotBatchRecoveryStore.release(recoverySession)",
+    ]);
     expect(handler).toContain("admitStudioBg3dShotPsdLayers(rendered.layers)");
     expect(handler).toContain("await buildStudioBg3dShotLayeredPsdInWorker(rendered.layers");
-    expect(handler.indexOf("await buildStudioBg3dShotLayeredPsdInWorker(rendered.layers"))
-      .toBeGreaterThan(handler.indexOf("stagedImages.push({"));
-    expect(handler).toContain("layeredPsds.push(...stagedLayeredPsds)");
-    expect(handler).toContain("psdFallbacks");
-    expect(handler).toContain("layeredPsds,");
-    expect(handler).toContain("batchPlan.includeContactSheet");
     expect(handler).toContain("STUDIO_BG3D_SHOT_CONTACT_SHEET_PASS_PRIORITY");
     expect(handler).toContain("await buildStudioBg3dShotContactSheetsInWorker(");
     expect(handler).toContain('contactSheetFallback = "source-unavailable"');
-    expect(handler).toContain("contactSheets,");
+
+    // The public ZIP manifest deliberately excludes the scoped local recovery key.
+    expect(handler).toContain("await buildStudioBg3dShotBatchArchiveInWorker(images");
+    expect(handler).toContain("await buildStudioBg3dShotBatchArchive(images");
+    expectInOrder(handler, [
+      'if (typeof Worker !== "function")',
+      "archive = await buildStudioBg3dShotBatchArchive(images, archiveOptions)",
+      "archive = await buildStudioBg3dShotBatchArchiveInWorker(images, archiveOptions)",
+      "if (!isStudioBg3dShotBatchWorkerUnavailableError(cause)) throw cause",
+      "archive = await buildStudioBg3dShotBatchArchive(images, archiveOptions)",
+    ]);
+    expect(handler).not.toContain('cause.code === "timeout"');
+    expect(handler).not.toContain('cause.code === "worker-failed"');
+    expect(handler).not.toContain('cause.code === "archive-invalid"');
+    expect(handler).toContain("publicRenderPlan: await projectStudioBg3dShotBatchPlanForPublicArchive(batchPlan");
+    expect(handler).toContain("appProfileId: STUDIO_BG3D_SHOT_BATCH_APP_IMPLEMENTATION_PROFILE_V1");
+    expect(handler).toContain("sourceRevision: batchSourceRevision");
+    expect(handler).not.toContain("requestedPasses: batchPlan.passes");
+    expect(handler).not.toContain("layeredPsdRequested:");
+    expect(handler).not.toContain("contactSheetRequested:");
+    expect(handler).not.toContain("resumeKey:");
+    expect(handler).not.toContain("isStudioBg3dShotBatchQueueCompatible(");
+    expect(handler).not.toContain("retryStudioBg3dShotBatchQueue(");
+    expect(handler).not.toContain("succeedStudioBg3dShotBatchQueueItem(");
+    expectInOrder(handler, [
+      "await commitStudioBg3dShotBatchDownload({",
+      "signal: controller.signal",
+      "isActive: () => componentActiveRef.current",
+      "assertAccess: assertRecoveryAccess",
+      "markDownloadRequested: () =>",
+      "shotBatchRecoveryStore.markDownloadRequested(recoverySession)",
+      "download: () => anchor.click()",
+    ]);
+
     expect(handler).not.toContain("commitImmediateHistoryTransition");
     expect(handler).toContain("const originalSceneBaseDocument = sceneBaseDocument");
     expect(handler).toContain("const originalLiveView = originalViewportApi?.readView()");
-    expect(handler).toContain("setSceneBaseDocument(originalSceneBaseDocument)");
-    expect(handler).toContain("view: originalLiveView");
-    expect(handler).toContain("requireReplacement: projectionChanged");
-    expect(handler.indexOf("setSceneBaseDocument(originalSceneBaseDocument)")).toBeLessThan(
-      handler.lastIndexOf("view: originalLiveView"),
-    );
-    expect(handler.lastIndexOf("view: originalLiveView")).toBeLessThan(
-      handler.lastIndexOf("setIsCapturing(false)"),
-    );
+    const outerFinally = handler.lastIndexOf("} finally {");
+    expect(outerFinally).toBeGreaterThanOrEqual(0);
+    expectInOrder(handler.slice(outerFinally), [
+      "setSceneBaseDocument(originalSceneBaseDocument)",
+      "view: originalLiveView",
+      "setIsCapturing(false)",
+      "await shotBatchRecoveryStore.release(recoverySession)",
+      "shotBatchRecoveryRef.current = null",
+    ]);
     expect(handler).toContain(
       "pendingInitialCameraRef.current = restoreFailed || isQuadView ? originalLiveView : null",
     );
-    expect(handler.indexOf("pendingInitialCameraRef.current = restoreFailed || isQuadView"))
-      .toBeLessThan(handler.lastIndexOf("setIsCapturing(false)"));
     expect(source).toContain("if (isRestoringScene || isBatchRenderingShots) return;");
     expect(source).toContain("onClick={() => shotBatchAbortRef.current?.abort()}");
     expect(source).toContain("setShotBatchExcludedIds");

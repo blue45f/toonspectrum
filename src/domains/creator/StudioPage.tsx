@@ -1147,6 +1147,7 @@ import type {
   StudioAutoActionSet,
 } from "./studio-auto-actions";
 import type { StudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
+import type { StudioBg3dShotBatchRecoveryScope } from "./studio-bg3d-shot-batch-plan";
 import type { StudioClip } from "./studio-clips";
 import type { ComipoAssemblySeed } from "./studio-comipo-assembly";
 import type {
@@ -1243,6 +1244,105 @@ function requireStudioDrawingPointerTransport(ref: {
     throw new Error("Studio drawing pointer transport is not initialized");
   }
   return transport;
+}
+
+interface StudioBg3dRecoveryAccessSnapshot {
+  readonly open: boolean;
+  readonly authUserId: string | null;
+  readonly hasSessionToken: boolean;
+  readonly workId: string | null;
+  readonly remixId: string | null;
+  readonly authorizedWorkId: string | null;
+  readonly workHydrated: boolean;
+  readonly workHydrationFailed: boolean;
+  readonly workHydrationUnsupportedFormat: boolean;
+  readonly documentReloadRequired: boolean;
+  readonly sharedWorkId: string | null;
+  readonly sharedDocumentStatus: StudioSharedDocument["status"] | null;
+  readonly sharedDocumentCanView: boolean;
+  readonly sharedDocumentRevision: number | null;
+  readonly currentPageId: string;
+  readonly targetElementId: string | undefined;
+  readonly currentTargetExists: boolean;
+  readonly serverPersistedTargetExists: boolean;
+  readonly memoryPartition: string;
+  readonly recoveryScope: StudioBg3dShotBatchRecoveryScope | null;
+}
+
+function studioBg3dRecoveryMemoryIdentity(partition: string): string {
+  return `memory:${partition}`;
+}
+
+/**
+ * A matching local element id is not enough to admit browser-durable recovery. Only the last
+ * server-ACKed shared document can prove that the page/element identity is stable across reloads.
+ * Parsing through the normal bounded project boundary also keeps legacy single-page documents and
+ * malformed/ambiguous ids fail-closed.
+ */
+function hasStudioBg3dServerPersistedTarget(
+  document: StudioSharedDocument["document"] | null,
+  pageId: string,
+  elementId: string | undefined
+): boolean {
+  if (!document || !elementId) return false;
+  try {
+    const project = creatorWorkSnapshotToStudioProject(document);
+    let matchingPageCount = 0;
+    let matchingElementCount = 0;
+    let matchingImageCount = 0;
+    for (const page of project.pagesList) {
+      if (page.id !== pageId) continue;
+      matchingPageCount += 1;
+      for (const candidate of page.elements) {
+        if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) continue;
+        const record = candidate as Record<string, unknown>;
+        if (record.id !== elementId) continue;
+        matchingElementCount += 1;
+        if (record.type === "image") matchingImageCount += 1;
+      }
+    }
+    return matchingPageCount === 1 && matchingElementCount === 1 && matchingImageCount === 1;
+  } catch {
+    return false;
+  }
+}
+
+function isStudioBg3dRecoveryScopeLocallyCurrent(
+  scope: StudioBg3dShotBatchRecoveryScope,
+  snapshot: StudioBg3dRecoveryAccessSnapshot
+): boolean {
+  if (
+    !snapshot.open ||
+    scope !== snapshot.recoveryScope ||
+    scope.pageId !== snapshot.currentPageId
+  ) return false;
+  if (scope.durability === "memory") {
+    const memoryIdentity = studioBg3dRecoveryMemoryIdentity(snapshot.memoryPartition);
+    return scope.authUserId === memoryIdentity &&
+      scope.workId === memoryIdentity &&
+      scope.elementId === memoryIdentity;
+  }
+  return Boolean(
+    snapshot.authUserId &&
+    snapshot.hasSessionToken &&
+    snapshot.workId &&
+    !snapshot.remixId &&
+    snapshot.authorizedWorkId === snapshot.workId &&
+    snapshot.workHydrated &&
+    !snapshot.workHydrationFailed &&
+    !snapshot.workHydrationUnsupportedFormat &&
+    !snapshot.documentReloadRequired &&
+    snapshot.sharedWorkId === snapshot.workId &&
+    snapshot.sharedDocumentStatus === "active" &&
+    snapshot.sharedDocumentCanView &&
+    snapshot.sharedDocumentRevision !== null &&
+    snapshot.targetElementId &&
+    snapshot.currentTargetExists &&
+    snapshot.serverPersistedTargetExists &&
+    scope.authUserId === snapshot.authUserId &&
+    scope.workId === snapshot.workId &&
+    scope.elementId === snapshot.targetElementId
+  );
 }
 
 function studioPatchValuesEqual(left: unknown, right: unknown): boolean {
@@ -4433,6 +4533,159 @@ function StudioCuttoonEditor() {
     undefined
   );
   const [bg3dInitialElementId, setBg3dInitialElementId] = useState<string | undefined>(undefined);
+  const bg3dMemoryRecoveryPartitionRef = useRef(
+    globalThis.crypto?.randomUUID?.() ?? `bg3d-memory-${uid()}`
+  );
+  const bg3dCurrentTargetExists = useMemo(() => {
+    if (!bg3dInitialElementId || masterEditMode || currentPageId !== activePage.id) return false;
+    let matchingPageCount = 0;
+    let matchingElementCount = 0;
+    let matchingImageCount = 0;
+    for (const page of pages) {
+      if (page.id !== activePage.id) continue;
+      matchingPageCount += 1;
+      for (const element of page.elements) {
+        if (element.id !== bg3dInitialElementId) continue;
+        matchingElementCount += 1;
+        if (element.type === "image") matchingImageCount += 1;
+      }
+    }
+    return matchingPageCount === 1 && matchingElementCount === 1 && matchingImageCount === 1;
+  }, [activePage.id, bg3dInitialElementId, currentPageId, masterEditMode, pages]);
+  const bg3dServerPersistedTargetExists = useMemo(
+    () => hasStudioBg3dServerPersistedTarget(
+      sharedDocument?.document ?? null,
+      activePage.id,
+      bg3dInitialElementId
+    ),
+    [activePage.id, bg3dInitialElementId, sharedDocument?.document]
+  );
+  const bg3dDurableRecoveryAllowed = Boolean(
+    studioAuthUserId &&
+    studioSessionToken &&
+    workId &&
+    !remixId &&
+    authorizedWorkAssetScopeId === workId &&
+    workHydrated &&
+    !workHydrationFailed &&
+    !workHydrationUnsupportedFormat &&
+    !documentReloadRequired &&
+    sharedDocument?.workId === workId &&
+    sharedDocument.status === "active" &&
+    sharedDocument.capabilities.view &&
+    bg3dInitialElementId &&
+    bg3dCurrentTargetExists &&
+    bg3dServerPersistedTargetExists
+  );
+  const bg3dBatchRecoveryScope = useMemo<StudioBg3dShotBatchRecoveryScope | null>(() => {
+    if (!bg3dOpen) return null;
+    if (
+      bg3dDurableRecoveryAllowed &&
+      sharedDocument?.revision !== undefined &&
+      studioAuthUserId &&
+      workId &&
+      bg3dInitialElementId
+    ) {
+      return {
+        durability: "durable",
+        authUserId: studioAuthUserId,
+        workId,
+        pageId: activePage.id,
+        elementId: bg3dInitialElementId,
+      };
+    }
+    const memoryIdentity = studioBg3dRecoveryMemoryIdentity(
+      bg3dMemoryRecoveryPartitionRef.current
+    );
+    return {
+      durability: "memory",
+      authUserId: memoryIdentity,
+      workId: memoryIdentity,
+      pageId: activePage.id,
+      elementId: memoryIdentity,
+    };
+  }, [
+    activePage.id,
+    bg3dDurableRecoveryAllowed,
+    bg3dInitialElementId,
+    bg3dOpen,
+    sharedDocument?.revision,
+    studioAuthUserId,
+    workId,
+  ]);
+  const bg3dRecoveryAccessSnapshotRef = useRef<StudioBg3dRecoveryAccessSnapshot>({
+    open: bg3dOpen,
+    authUserId: studioAuthUserId,
+    hasSessionToken: Boolean(studioSessionToken),
+    workId,
+    remixId,
+    authorizedWorkId: authorizedWorkAssetScopeId,
+    workHydrated,
+    workHydrationFailed,
+    workHydrationUnsupportedFormat,
+    documentReloadRequired,
+    sharedWorkId: sharedDocument?.workId ?? null,
+    sharedDocumentStatus: sharedDocument?.status ?? null,
+    sharedDocumentCanView: Boolean(sharedDocument?.capabilities.view),
+    sharedDocumentRevision: sharedDocument?.revision ?? null,
+    currentPageId,
+    targetElementId: bg3dInitialElementId,
+    currentTargetExists: bg3dCurrentTargetExists,
+    serverPersistedTargetExists: bg3dServerPersistedTargetExists,
+    memoryPartition: bg3dMemoryRecoveryPartitionRef.current,
+    recoveryScope: bg3dBatchRecoveryScope,
+  });
+  bg3dRecoveryAccessSnapshotRef.current = {
+    open: bg3dOpen,
+    authUserId: studioAuthUserId,
+    hasSessionToken: Boolean(studioSessionToken),
+    workId,
+    remixId,
+    authorizedWorkId: authorizedWorkAssetScopeId,
+    workHydrated,
+    workHydrationFailed,
+    workHydrationUnsupportedFormat,
+    documentReloadRequired,
+    sharedWorkId: sharedDocument?.workId ?? null,
+    sharedDocumentStatus: sharedDocument?.status ?? null,
+    sharedDocumentCanView: Boolean(sharedDocument?.capabilities.view),
+    sharedDocumentRevision: sharedDocument?.revision ?? null,
+    currentPageId,
+    targetElementId: bg3dInitialElementId,
+    currentTargetExists: bg3dCurrentTargetExists,
+    serverPersistedTargetExists: bg3dServerPersistedTargetExists,
+    memoryPartition: bg3dMemoryRecoveryPartitionRef.current,
+    recoveryScope: bg3dBatchRecoveryScope,
+  };
+  const validateRecoveryAccess = useCallback(async (
+    scope: StudioBg3dShotBatchRecoveryScope,
+    signal: AbortSignal
+  ): Promise<boolean> => {
+    if (signal.aborted || !editorMountedRef.current) return false;
+    const before = bg3dRecoveryAccessSnapshotRef.current;
+    if (!isStudioBg3dRecoveryScopeLocallyCurrent(scope, before)) return false;
+    if (scope.durability === "memory") return true;
+    if (documentSaveInFlightRef.current) return false;
+    const expectedRevision = before.sharedDocumentRevision;
+    if (expectedRevision === null) return false;
+    try {
+      const { getStudioSharedDocumentMeta } = await import("./studio-shared-document-client");
+      if (signal.aborted || !editorMountedRef.current) return false;
+      const fresh = await getStudioSharedDocumentMeta(scope.workId, signal);
+      if (signal.aborted || !editorMountedRef.current || documentSaveInFlightRef.current) {
+        return false;
+      }
+      const after = bg3dRecoveryAccessSnapshotRef.current;
+      return isStudioBg3dRecoveryScopeLocallyCurrent(scope, after) &&
+        after.sharedDocumentRevision === expectedRevision &&
+        fresh.workId === scope.workId &&
+        fresh.status === "active" &&
+        fresh.capabilities.view &&
+        fresh.revision === expectedRevision;
+    } catch {
+      return false;
+    }
+  }, []);
   const poserMutationTicketRef = useRef<StudioEditorMutationTicket | null>(null);
   const bg3dMutationTicketRef = useRef<StudioEditorMutationTicket | null>(null);
   useEffect(() => {
@@ -23682,6 +23935,8 @@ function StudioCuttoonEditor() {
           autoActionStatus={autoActionStatus}
           bg3dInitialDataUrl={bg3dInitialDataUrl}
           bg3dInitialScene={bg3dInitialScene}
+          bg3dBatchRecoveryScope={bg3dBatchRecoveryScope}
+          validateRecoveryAccess={validateRecoveryAccess}
           bg3dOpen={bg3dOpen}
           characterBible={characterBible}
           characterBibleOpen={characterBibleOpen}

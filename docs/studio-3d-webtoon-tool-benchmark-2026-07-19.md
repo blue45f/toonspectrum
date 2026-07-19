@@ -146,6 +146,12 @@ SKP 장면, 카메라, 조명·선·재질, 다중 scene와 render pass를 웹�
   아직 lab route, feature flag UI, 동일 corpus runner와 production caller는 연결되지 않았다.
 - Three/R3F가 현재 유일한 interactive owner다. engine-neutral specialist snapshot·DTO·registry 계약과
   단위 테스트는 구현돼 있지만, 등록된 두 번째 엔진 adapter와 production 호출 경로는 아직 없다.
+- **[이번 반영]** capture adapter는 Three/Babylon/PlayCanvas/Filament/Cesium의 엔진·graphics API 조합을
+  표현하는 엔진 중립 identity를 가지며, 현재 Three WebGL adapter도 `engineId`, 실제 Three revision,
+  ToonSpectrum adapter 구현 revision, backend, graphics API, capture profile을 함께 보고한다. Shot Batch
+  Plan v2는 이 identity와 source viewport·기기 품질·capture budget·LT/PNG/PSD profile을 동결하고, 컷마다
+  같은 adapter identity와 viewport인지 다시 확인한다. 이는 두 번째 엔진을 이미 production에 채택했다는
+  뜻이 아니라, 나중에 specialist를 추가해도 서로 다른 엔진의 artifact가 같은 계획에 섞이지 않게 하는 계약이다.
 - **[이번 기반]** Three/Babylon/PlayCanvas 등 후보를 감으로 채택하지 않도록 외부에서 승인한 동일
   corpus/build/profile/device와 engine/backend/adapter fingerprint뿐 아니라 **순서가 고정된 scene id·등급·
   capture 크기 manifest**를 요구하고, RGBA·linear-depth 허용오차,
@@ -172,8 +178,8 @@ SKP 장면, 카메라, 조명·선·재질, 다중 scene와 render pass를 웹�
 
 | 기능 | 이번 반영 내용 | 벤치마크에서 얻은 가치 |
 | --- | --- | --- |
-| 컷·샷 보드·배치 | 카메라, 배경, 조명, render, LT, 노드 visibility를 최대 64개 shot으로 저장·적용·복제·순서 변경·삭제하고 undo/redo. 선택 컷과 컷별/공통 **최대 높이**를 받아 animation sample을 고정하고 한 GPU capture에서 beauty·LT composite·color·tone·texture line·main line·depth를 최대 448 PNG로 출력한다. 기기·raster pixel budget으로 줄어들면 요청/실제 높이와 축소 여부를 artifact manifest에 기록한다. 완료 컷은 메모리에 원자 보존해 같은 scene revision/옵션으로 재시도할 때 다시 렌더하지 않고, hidden tab에서는 새 capture를 멈춘다 | ABLUR의 SketchUp scene 유지·selected-only·multi-scene·batch workflow |
-| 검수·후반작업 bundle | archive Worker가 v2 manifest와 PNG/PSD를 bounded ZIP으로 만들고, 컷별 최대 4개 LT layer PSD는 별도 Worker에서 예산 내 생성한다. 컷당 대표 패스로 4×3 콘택트 시트를 OffscreenCanvas Worker에서 만들며, PSD·콘택트가 미지원/초과/실패하면 PNG를 보존하고 manifest에 fallback 사유를 남긴다 | ABLUR의 layered PSD/pass export와 Snaptoon식 빠른 컷 검수 |
+| 컷·샷 보드·배치 | 카메라, 배경, 조명, render, LT, 노드 visibility를 최대 64개 shot으로 저장·적용·복제·순서 변경·삭제하고 undo/redo. 선택 컷과 컷별/공통 **최대 높이**를 받아 animation sample을 고정하고 한 GPU capture에서 beauty·LT composite·color·tone·texture line·main line·depth를 최대 448 PNG로 출력한다. Plan v2가 source SHA-256, scope와 독립적인 render digest, 복구 digest, engine/adapter/profile, 컷별 실제 capture 계약을 분리·동결한다. 완료 컷의 PNG/skip·PSD/fallback과 queue success는 IndexedDB 한 transaction으로 원자 커밋하며, 30초 fencing lease·10초 heartbeat·revision CAS·SHA-256 receipt·quota preflight/GC/TTL로 새로고침 뒤에도 이어 간다. 단, 인증된 사용자가 서버에 저장·ACK된 정확한 작품/페이지/이미지 요소를 열람할 수 있을 때만 durable이고, 게스트·신규/로컬 전용·리믹스·마스터 대상은 탭 메모리로 격리한다. hidden tab에서는 새 capture를 멈춘다 | ABLUR의 SketchUp scene 유지·selected-only·multi-scene·batch workflow |
+| 검수·후반작업 bundle | LT 선화·톤 raster 계산은 transferable RGBA/depth를 쓰는 요청별 전용 Worker로 실행한다. Worker 생성 자체가 불가능할 때만 1,048,576픽셀 이하를 동기 fallback하고 protocol/render/timeout/abort/runtime 오류에는 자동 재실행하지 않는다. archive Worker가 민감한 auth/work/page/element/recovery key를 구조적으로 제외한 공개 manifest v3와 PNG/PSD를 bounded ZIP으로 만들고, ready handshake 이전의 module/CSP/startup 실패에만 한 번의 bounded main-thread build를 허용한다. Worker 응답 ZIP은 EOCD·central/local header·offset·경로·entry CRC·manifest digest·요청 inventory를 전체 스트리밍 재검증한다. 컷별 최대 4개 LT layer PSD는 별도 Worker에서 예산 내 생성한다. 컷당 대표 패스로 4×3 콘택트 시트를 OffscreenCanvas Worker에서 만들며, PSD·콘택트가 미지원/초과/실패하면 PNG를 보존하고 manifest에 fallback 사유를 남긴다 | ABLUR의 layered PSD/pass export와 Snaptoon식 빠른 컷 검수 |
 | 분위기 rig | 맑은 낮, 골든아워, 푸른 밤, 옅은 안개, 극적 야경의 배경·안개·조명·노출·tone mapping을 원자 적용 | ABLUR/Snaptoon의 빠른 분위기 연출 |
 | 사진 포즈 스캔 | JPEG/PNG/WebP admission, EXIF·회전·mirror·resize를 Worker 처리하고 로컬 MediaPipe IMAGE-mode 결과를 VRM pose로 적용 | SHAPER/CSP의 사진 포즈 workflow와 CSP 서버 업로드 대비 privacy 이점 |
 | 캐릭터 공용 포즈 소재 | VRM normalized 55본 quaternion을 전신·상하체·양손·시선/턱 scope로 저장하고 다른 VRM에 부분 이식한다. joint lock과 optional-bone skip을 보존·보고하고 한 command로 undo/redo하며, 장면에는 로컬 소재 ID가 아니라 실제 bake 회전을 저장한다 | CSP 포즈 소재의 재사용성과 웹 프로젝트의 이식성·오프라인 로컬 저장 |
@@ -182,6 +188,27 @@ SKP 장면, 카메라, 조명·선·재질, 다중 scene와 render pass를 웹�
 | 원근 브리지 | 분리 LT 삽입 경로에서 회전되지 않은 3D plate의 camera로 2D 원근자용 finite 소실점 가이드를 생성·적용하는 단방향 엔진 중립 경계 | 컷 구도를 2D 후반작업까지 연결 |
 | 의미 재질 분석 | 검증된 Three 모델의 공유 재질을 bounded 이름 메타데이터만으로 피부·머리·눈·의상·액세서리·배경·미확정 슬롯에 제안하고 캐릭터/배경 pass 계획과 검토 대상을 UI에 표시 | SHAPER/Reallusion의 character semantic workflow와 ABLUR material pass의 안전한 기초 |
 | 깊이·가림 선화 | LT depth pass에서 완만한 경사를 상쇄하고 가까운 가림면 윤곽을 선택하며 선택적으로 2차 형상·접힘 단서를 추가 | ABLUR/Snaptoon/Blender Line Art 계열에서 기대하는 깨끗한 공간 선화에 근접 |
+
+복구 저장소는 Blob의 MIME·크기·헤더만 신뢰하지 않는다. PNG는 동일한 한 번의 Blob snapshot에서
+signature, 모든 chunk 경계와 CRC, 렌더 패스의 RGBA8 또는 불투명 콘택트 시트의 RGB8
+non-interlaced IHDR, 연속 IDAT, 정확한 IEND와 trailing byte 부재를 검사하고, deflate를 끝까지 풀어
+각 profile의 4/3채널 고정 해상도 scanline 수·filter byte를 확인한 뒤
+같은 bytes로 SHA-256 receipt를 만든다. PSD도 같은 방식으로 signature/version/reserved bytes,
+RGB8 canvas와 section 경계를 확인할 뿐 아니라 실제 `ag-psd` 출력의 1~4개 full-canvas LT layer record,
+RGBA channel ID·길이, normal blend, Unicode layer 이름, raw/RLE PackBits row와 3/4채널 composite 전체를
+검증한다. 복구 시에는 receipt뿐 아니라 실제 Blob을 다시 읽어 같은 구조와 hash를 재검증하므로,
+header-only·0-layer 위조·잘린 파일·CRC 또는 PackBits 손상 artifact는 완료 컷으로 인정하지 않는다.
+
+origin 예산은 Blob payload만 합산하지 않고 Plan·source·queue와 artifact envelope의 보수적 structured
+clone reservation, job 수(최대 64개)도 함께 원장에 기록한다. hashing, lease 취득, artifact 복구와
+IndexedDB transaction에는 같은 `AbortSignal`을 전달한다. 긴 무결성 검사 뒤 서버 열람 권한과 정확한
+대상 revision을 다시 확인해 최대 30초의 typed authorization receipt를 만들고, local authorization epoch를
+durable read 뒤·큰 Blob add 뒤·최종 metadata put 직전에 동기 재검증한다. quota 정리 후 재시도할 때도 새
+receipt가 필요하다. 서버 ACL과 브라우저 IndexedDB는 서로 다른 시스템이라 분산 원자 commit을 보장한다고
+표현하지 않으며, 이 짧은 receipt와 epoch fence로 TOCTOU 창을 제한한다. 권한 철회가 확인된 catch 경로는
+queue reset/fail을 쓰지 않는다. 명시적인 quota 오류만 기존 검증 artifact를 현재 탭 메모리로 강등할 수
+있고, 그 밖의 IndexedDB/open/transaction 오류는 durable lease를 best-effort로 해제하고 fail closed하여
+다른 탭의 durable writer와 메모리 writer가 동시에 권위를 갖지 않게 한다.
 
 사진 포즈 스캐너의 **이미지 decode·EXIF·resize는 Worker**, 현재 MediaPipe IMAGE-mode `detect` 호출은
 main-thread inference boundary다. 따라서 “모든 포즈 추론이 Worker에서 실행된다”고 표시하지 않는다.
@@ -365,22 +392,21 @@ selected-only render를 제공한다.
 - **[현재 기준선]** hierarchy, camera, fog·panorama, line/tone layer, transparent capture와
   engine-neutral scene document가 있다.
 - **[이번 반영]** 5개 분위기 rig와 최대 64개 컷·샷 보드에 selected-only, 공통/컷별 최대 높이,
-  7종 지원 pass, 취소·실패 후 완료 컷 메모리 복구, hidden-tab pause, deterministic animation freeze,
-  bounded layered PSD와 콘택트 시트 Worker를 연결했다.
+  7종 지원 pass, Plan v2·권한 검증형 IndexedDB 원자 복구, hidden-tab pause, deterministic animation freeze,
+  LT raster·bounded layered PSD·콘택트 시트·archive Worker를 연결했다.
 - **[격차]** browser-direct SKP, SketchUp scene/tag/component metadata round-trip, camera near clipping·roll의
-  작가용 UX, 새로고침 뒤에도 살아 있는 durable batch checkpoint, material-ID/shadow/normal pass가 남아 있다.
+  작가용 UX, material-ID/shadow/normal pass가 남아 있다.
 
 #### 가져올 기능
 
 1. **[P0] shot board 안정화**: shot apply가 camera뿐 아니라 background, lighting, render,
    node visibility를 원자 변경하고 undo/redo·archive round-trip·320 KiB SceneDocument 예산을 통과하게 한다.
-2. **[P1·이번 반영/부분] 선택형·복구 가능한 batch shot queue**: selected-only, animation freeze,
-   cancel/progress, hidden-tab pause와 같은 탭 안의 완료 컷 재사용은 구현했다. 영속화 전에 Plan v2가
-   source·plan SHA-256과 컷별 정확한 capture width/height를 고정하고, user/work/page/element scope를
-   받아야 한다. 그다음 컷의 PNG/skip·PSD/fallback과 queue success를 같은 IndexedDB transaction으로
-   커밋하고 quota·TTL·lease/CAS를 적용해 새로고침·브라우저 재시작 뒤 마지막 원자 컷부터 복구한다.
+2. **[P1·이번 반영] 선택형·복구 가능한 batch shot queue**: selected-only, animation freeze,
+   cancel/progress, hidden-tab pause, Plan v2의 source/render/recovery identity와 컷별 capture 계약,
+   권한 검증형 IndexedDB 원자 checkpoint, quota·TTL·fencing lease·heartbeat·revision CAS·SHA-256 receipt를
+   구현했다. 마지막 원자 완료 컷부터 재개하며 server ACK 대상과 열람 권한·revision이 달라지면 fail closed한다.
 3. **[P1·이번 반영/부분] pass bundle**: beauty/composite, color, tone, texture line, main line, depth를
-   v2 manifest와 함께 export한다. shadow, material-ID, normal은 capture adapter 계약이 마련되기 전에는
+   공개 manifest v3와 함께 export한다. shadow, material-ID, normal은 capture adapter 계약이 마련되기 전에는
    지원한다고 표시하지 않는다.
 4. **[P1·이번 반영] PSD writer**: layer/canvas/aggregate pixel/output byte를 사전 계산하고 별도 Worker에서
    컷별 PSD를 만든다. 예산 초과·Worker 미지원/실패 시 동일 manifest + 개별 PNG ZIP을 유지한다.
@@ -575,8 +601,9 @@ flowchart LR
 | Rapier physics | **현재 WASM Worker** | fixed timestep preview/bake, rig transform ownership 충돌 차단 |
 | Meshopt/KTX2/Draco | Worker/WASM | decoder pin·hash·capability attestation, decoded memory까지 예산 청구 |
 | retarget·IK batch·key reduction | P1/P2 Worker | 수천 frame 계산을 numerical DTO로 반환; live skeleton 객체 전달 금지 |
-| thumbnail/contact sheet | **[이번 반영] OffscreenCanvas Worker** | 대표 PNG를 순차 decode해 동시에 live `ImageBitmap`을 1개로 제한하고 finally에서 close; 12컷/시트, request correlation, progress, timeout, cancel/terminate, PNG IHDR·byte/pixel 재검증. 미지원이면 archive manifest fallback |
-| shot pass PNG/PSD ZIP | **[이번 반영] archive Worker** | 컷별 LT raster/PNG encode는 현재 bounded main thread, immutable Blob의 CRC/ZIP32 조립은 Worker로 격리; request correlation, 180초 timeout, terminate cancel, 400 MiB archive cap. Worker 생성·protocol·runtime 실패는 fail closed하며 main-thread로 자동 재시도하지 않음 |
+| LT 선화·톤 raster | **[이번 반영] 전용 Worker** | 호출 시점 RGBA·linear depth·설정의 방어 복사본만 transferable로 넘기고 요청 ID, exact protocol, 120초 timeout, abort/terminate, 결과 크기·role·순서를 검증한다. Worker 생성 불가일 때만 1,048,576픽셀 이하 동기 fallback; protocol/render/runtime/timeout/abort는 fail closed |
+| thumbnail/contact sheet | **[이번 반영] OffscreenCanvas Worker** | 대표 PNG를 순차 decode해 동시에 live `ImageBitmap`을 1개로 제한하고 finally에서 close; 12컷/시트, request correlation, progress, timeout, cancel/terminate, 불투명 Canvas의 실제 RGB8 PNG IHDR·CRC·deflate·byte/pixel 재검증. 미지원이면 archive manifest fallback |
+| shot pass PNG/PSD ZIP | **[이번 반영] archive Worker** | 컷별 PNG encode는 현재 bounded main thread, immutable Blob의 CRC/ZIP32 조립은 Worker로 격리; 공개 manifest v3는 render 재현 정보만 포함하고 local auth/scope/recovery identity를 구조적으로 배제한다. module listener 설치 뒤 ready handshake를 보내므로 constructor/CSP/pre-ready/startup-timeout에만 bounded main-thread build를 한 번 허용하고, ready 이후 protocol/build/runtime/timeout/abort/integrity 실패는 자동 재시도하지 않는다. 응답은 400 MiB 전체를 materialize하지 않고 EOCD 22바이트→bounded central directory→entry별 `Blob.stream()` CRC 순으로 검증하며, canonical UTF-8 경로·offset/no-gap·manifest schema/render digest·원 요청 inventory를 교차검증한다. request correlation, 180초 end-to-end timeout, verifier stream cancel과 Worker terminate를 적용한다 |
 | layered PSD | **[이번 반영] 전용 Worker** | 최대 4 LT layer, 2,097,152 canvas pixel·8,388,608 aggregate layer pixel·128 MiB output을 사전 검증하고, 실패해도 PNG bundle을 유지 |
 
 Worker 운영 규칙:
@@ -728,10 +755,10 @@ transparent/LT capture, undo/redo가 desktop과 390/320 px mobile에서 데이�
 
 ### P1 — 웹툰 제작 속도를 직접 줄이는 기능
 
-1. **[이번 반영]** shot batch의 selected-only, 해상도 선택, pass별 PNG, 콘택트 시트, 같은 탭의 완료 컷
-   재사용을 유지한다. 다음으로 SHA-256 source/plan identity와 frozen capture profile을 소유하는 Plan v2,
-   stable auth/work/page/element scope를 먼저 연결한 뒤 quota-aware IndexedDB checkpoint와 실패 컷만
-   재시도하는 복구 UI를 구현한다. source/plan/render/capture digest가 다르면 artifact를 섞지 않는다.
+1. **[이번 반영]** shot batch의 selected-only, 해상도 선택, pass별 PNG, 콘택트 시트에 Plan v2,
+   stable auth/work/page/element scope, quota-aware IndexedDB checkpoint와 실패 컷만 재시도하는 복구 UI를
+   연결했다. source/render/recovery/capture identity가 다르면 artifact를 섞지 않고, 서버 열람 권한·revision과
+   저장 대상은 시작·컷 commit·archive·download 경계에서 다시 확인한다.
 2. **[부분 반영]** beauty/color/line/texture-line/tone/depth와 bounded layered PSD는 연결됐다. 다음 pass는
    공통 renderer-state lease와 source alpha/side/displacement를 보존하는 auxiliary-surface capture를 먼저
    만든 뒤 view-space geometric normal과 실제 normal-angle crease를 연결한다. 그 기반 위에서 stable
@@ -745,9 +772,10 @@ transparent/LT capture, undo/redo가 desktop과 390/320 px mobile에서 데이�
 7. Snaptoon식 asset browser: device budget·license·attribution·hash가 보이는 one-click placement.
 8. SketchUp 공식 GLB export guide와 Blender official GLB authoring preset/sample.
 9. **[코어 반영/UI 미연결]** semantic rig profile과 사용자 확인 bone mapping.
-10. batch의 Sobel/톤/LT 합성과 pass별 PNG encode를 transferable RGBA/depth + OffscreenCanvas 전용
-    Worker로 옮긴다. 현재 contact/PSD/ZIP Worker만으로는 지배적인 CPU 단계가 main thread에 남으므로,
-    main-thread fallback은 더 낮은 pixel cap을 적용하고 peak working-set·cancel latency를 실기기에서 잰다.
+10. **[부분 반영]** batch의 Sobel/톤/LT 합성은 transferable RGBA/depth 전용 Worker로 옮겼고,
+    main-thread fallback은 Worker 생성 불가 + 1,048,576픽셀 이하로 제한했다. 다음은 pass별 PNG encode를
+    OffscreenCanvas Worker로 옮기고, 현재 capture→Worker 방어 복사로 늘어난 peak working-set과
+    cancel latency를 저사양 실기기에서 측정한다.
 
 **P1 완료 조건:** 한 scene의 10개 shot을 batch export해도 UI가 응답하고, cancel/retry가 가능하며,
 각 pass의 camera·alpha·node visibility가 beauty와 pixel-aligned여야 한다. pose는 다른 VRM 체형에서도

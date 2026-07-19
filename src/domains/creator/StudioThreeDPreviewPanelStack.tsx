@@ -40,6 +40,8 @@ export type StudioThreeDPreviewPanelStackProps = Pick<
   | "activePage"
   | "bg3dInitialDataUrl"
   | "bg3dInitialScene"
+  | "bg3dBatchRecoveryScope"
+  | "validateRecoveryAccess"
   | "bg3dOpen"
   | "composeWorkAssetPreviewPage"
   | "currentPageId"
@@ -187,6 +189,8 @@ export const StudioThreeDPreviewPanelStack = memo(function StudioThreeDPreviewPa
   activePage,
   bg3dInitialDataUrl,
   bg3dInitialScene,
+  bg3dBatchRecoveryScope,
+  validateRecoveryAccess,
   bg3dOpen,
   composeWorkAssetPreviewPage,
   currentPageId,
@@ -281,6 +285,8 @@ export const StudioThreeDPreviewPanelStack = memo(function StudioThreeDPreviewPa
             open
             initialDataUrl={bg3dInitialDataUrl}
             initialScene={bg3dInitialScene}
+            recoveryScope={bg3dBatchRecoveryScope}
+            validateRecoveryAccess={validateRecoveryAccess}
             onClose={() => {
               setBg3dOpen(false);
               setBg3dInitialDataUrl(undefined);

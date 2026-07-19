@@ -121,6 +121,7 @@
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-react-compiler": "19.1.0-rc.2",
     "eslint-plugin-react-hooks": "^7.1.1",
+    "fake-indexeddb": "6.2.5",
     "globals": "^17.6.0",
     "husky": "^9.1.7",
     "jsdom": "^29.1.1",

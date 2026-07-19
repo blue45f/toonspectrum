@@ -183,14 +183,48 @@ describe("Studio lazy panel stack boundary", () => {
     expect(page).toContain("insertVrmResult: (result) => applyStudioVrmInsertResult({");
     expect(page).toContain("insertBg3dResult: (result) => applyStudioBg3dInsertResult({");
     expect(stack).toContain("<StudioThreeDPreviewPanelStack");
+    expect(stack).toContain("validateRecoveryAccess={validateRecoveryAccess}");
     expect(stack).toContain("<StudioScrollScenarioPreviewPanelStack");
     expect(previewStack).toContain("onInsert={insertVrmResult}");
     expect(previewStack).toContain("onInsert={insertBg3dResult}");
+    expect(previewStack).toContain("validateRecoveryAccess={validateRecoveryAccess}");
     expect(previewStack).toContain("initialScene={poserInitialScene}");
     expect(previewStack).toContain("setPoserInitialElementId(undefined)");
     expect(previewStack).toContain("setBg3dInitialElementId(undefined)");
     expect(previewStack).not.toContain("applyStudioVrmInsertResult");
     expect(previewStack).not.toContain("applyStudioBg3dInsertResult");
+  });
+
+  it("keeps durable BG3D recovery behind current server access and persisted target proof", () => {
+    const page = moduleEdges("./StudioPage.tsx").source;
+    const helperStart = page.indexOf("function hasStudioBg3dServerPersistedTarget(");
+    const helperEnd = page.indexOf("function isStudioBg3dRecoveryScopeLocallyCurrent(", helperStart);
+    const helper = page.slice(helperStart, helperEnd);
+    const validatorStart = page.indexOf("const validateRecoveryAccess = useCallback(async (");
+    const validatorEnd = page.indexOf("const poserMutationTicketRef", validatorStart);
+    const validator = page.slice(validatorStart, validatorEnd);
+
+    expect(helperStart).toBeGreaterThanOrEqual(0);
+    expect(helperEnd).toBeGreaterThan(helperStart);
+    expect(helper).toContain("creatorWorkSnapshotToStudioProject(document)");
+    expect(helper).toContain(
+      "matchingPageCount === 1 && matchingElementCount === 1 && matchingImageCount === 1"
+    );
+    expect(page).toContain("sharedDocument?.document ?? null");
+    expect(page).toContain("bg3dServerPersistedTargetExists");
+    expect(page).toContain("authorizedWorkAssetScopeId === workId");
+    expect(page).toContain('durability: "memory"');
+    expect(page).toContain("scope !== snapshot.recoveryScope");
+    expect(page).toContain("sharedDocument?.revision,");
+    expect(validatorStart).toBeGreaterThanOrEqual(0);
+    expect(validatorEnd).toBeGreaterThan(validatorStart);
+    expect(validator).toContain("isStudioBg3dRecoveryScopeLocallyCurrent(scope, before)");
+    expect(validator).toContain("getStudioSharedDocumentMeta(scope.workId, signal)");
+    expect(validator).toContain("isStudioBg3dRecoveryScopeLocallyCurrent(scope, after)");
+    expect(validator).toContain("after.sharedDocumentRevision === expectedRevision");
+    expect(validator).toContain("fresh.revision === expectedRevision");
+    expect(validator).toContain("catch {");
+    expect(validator).toContain("return false;");
   });
 
   it("keeps all six modal loading overlays colocated with their Suspense boundaries", () => {

@@ -2,6 +2,10 @@
 
 import * as THREE from "three";
 
+import {
+  STUDIO_BG3D_CAPTURE_PROFILE_RGBA8_DEPTH_V1,
+  STUDIO_BG3D_THREE_WEBGL_CAPTURE_IMPLEMENTATION_V1,
+} from "./studio-bg3d-capture-adapter";
 import { captureStudioBg3dThreeDepth } from "./studio-bg3d-lt-three-depth";
 import { normalizeStudioBg3dRgbaReadback } from "./studio-bg3d-readback-normalize";
 import { createStudioBg3dStraightAlphaOutputPass } from "./studio-bg3d-straight-alpha-output-pass";
@@ -197,6 +201,11 @@ export function createStudioBg3dThreeWebglCaptureAdapter(
 
   return Object.freeze({
     backend: "three-webgl" as const,
+    engineId: "three" as const,
+    engineVersion: String(THREE.REVISION).toLowerCase(),
+    implementationRevision: STUDIO_BG3D_THREE_WEBGL_CAPTURE_IMPLEMENTATION_V1,
+    graphicsApi: "webgl2" as const,
+    profileId: STUDIO_BG3D_CAPTURE_PROFILE_RGBA8_DEPTH_V1,
     getSourceSize: () => ({
       width: renderer.domElement.width,
       height: renderer.domElement.height,

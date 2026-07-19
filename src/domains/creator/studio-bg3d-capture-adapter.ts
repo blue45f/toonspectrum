@@ -7,7 +7,34 @@
 
 import { STUDIO_BG3D_LT_RENDER_MAX_PIXELS } from "./studio-bg3d-lt-render";
 
-export type StudioBg3dCaptureBackend = "three-webgl" | "three-webgpu";
+export type StudioBg3dCaptureEngineId =
+  | "three"
+  | "babylon"
+  | "playcanvas"
+  | "filament"
+  | "cesium";
+export type StudioBg3dCaptureGraphicsApi = "webgl2" | "webgpu";
+export type StudioBg3dCaptureBackend =
+  | "three-webgl"
+  | "three-webgpu"
+  | "babylon-webgl"
+  | "babylon-webgpu"
+  | "playcanvas-webgl"
+  | "playcanvas-webgpu"
+  | "filament-webgl"
+  | "filament-webgpu"
+  | "cesium-webgl"
+  | "cesium-webgpu";
+
+/**
+ * Portable capture semantics used by batch-plan identity and engine conformance tests.
+ * Increment the profile when color transfer, alpha ownership, depth meaning, or row order changes.
+ */
+export const STUDIO_BG3D_CAPTURE_PROFILE_RGBA8_DEPTH_V1 =
+  "studio-rgba8-straight-srgb-topdown-depth-f32-v1";
+/** App-owned revision; bump when adapter orchestration/shaders/readback change independently. */
+export const STUDIO_BG3D_THREE_WEBGL_CAPTURE_IMPLEMENTATION_V1 =
+  "studio-three-webgl-capture-adapter-v1";
 
 export interface StudioBg3dCaptureSize {
   readonly width: number;
@@ -31,6 +58,11 @@ export interface StudioBg3dCapturedRaster extends StudioBg3dCaptureSize {
 
 export interface StudioBg3dCaptureAdapter {
   readonly backend: StudioBg3dCaptureBackend;
+  readonly engineId: StudioBg3dCaptureEngineId;
+  readonly engineVersion: string;
+  readonly implementationRevision: string;
+  readonly graphicsApi: StudioBg3dCaptureGraphicsApi;
+  readonly profileId: typeof STUDIO_BG3D_CAPTURE_PROFILE_RGBA8_DEPTH_V1;
   getSourceSize(): StudioBg3dCaptureSize;
   capture(request: StudioBg3dCaptureRequest): Promise<StudioBg3dCapturedRaster>;
 }
@@ -52,7 +84,38 @@ export interface AcquireStudioBg3dCaptureAdapterAfterViewTransitionInput {
 }
 
 const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/iu;
-const BACKEND_SET = new Set<StudioBg3dCaptureBackend>(["three-webgl", "three-webgpu"]);
+function frozenBackendIdentity(
+  engineId: StudioBg3dCaptureEngineId,
+  graphicsApi: StudioBg3dCaptureGraphicsApi,
+): readonly [StudioBg3dCaptureEngineId, StudioBg3dCaptureGraphicsApi] {
+  return Object.freeze([engineId, graphicsApi]);
+}
+
+const BACKEND_IDENTITY = new Map<StudioBg3dCaptureBackend, readonly [
+  StudioBg3dCaptureEngineId,
+  StudioBg3dCaptureGraphicsApi,
+]>([
+  ["three-webgl", frozenBackendIdentity("three", "webgl2")],
+  ["three-webgpu", frozenBackendIdentity("three", "webgpu")],
+  ["babylon-webgl", frozenBackendIdentity("babylon", "webgl2")],
+  ["babylon-webgpu", frozenBackendIdentity("babylon", "webgpu")],
+  ["playcanvas-webgl", frozenBackendIdentity("playcanvas", "webgl2")],
+  ["playcanvas-webgpu", frozenBackendIdentity("playcanvas", "webgpu")],
+  ["filament-webgl", frozenBackendIdentity("filament", "webgl2")],
+  ["filament-webgpu", frozenBackendIdentity("filament", "webgpu")],
+  ["cesium-webgl", frozenBackendIdentity("cesium", "webgl2")],
+  ["cesium-webgpu", frozenBackendIdentity("cesium", "webgpu")],
+]);
+const PROFILE_SET = new Set([STUDIO_BG3D_CAPTURE_PROFILE_RGBA8_DEPTH_V1]);
+const IDENTITY_PATTERN = /^[a-z0-9][a-z0-9._-]{0,159}$/u;
+const CAPTURE_ADAPTER_STABLE_SAMPLES = 3;
+const CAPTURE_ADAPTER_MAX_SETTLE_SAMPLES = 12;
+
+export function getStudioBg3dCaptureBackendIdentity(
+  backend: StudioBg3dCaptureBackend,
+): readonly [StudioBg3dCaptureEngineId, StudioBg3dCaptureGraphicsApi] | null {
+  return BACKEND_IDENTITY.get(backend) ?? null;
+}
 
 function captureOperationError(name: "AbortError" | "TimeoutError"): Error {
   const error = new Error(
@@ -124,8 +187,19 @@ function assertAdapter(adapter: unknown): asserts adapter is StudioBg3dCaptureAd
     throw new TypeError("3D capture adapter must be an object.");
   }
   const candidate = adapter as Partial<StudioBg3dCaptureAdapter>;
-  if (!BACKEND_SET.has(candidate.backend as StudioBg3dCaptureBackend)) {
+  const expectedIdentity = BACKEND_IDENTITY.get(candidate.backend as StudioBg3dCaptureBackend);
+  if (!expectedIdentity) {
     throw new TypeError("3D capture adapter backend is unsupported.");
+  }
+  if (candidate.engineId !== expectedIdentity[0] || candidate.graphicsApi !== expectedIdentity[1] ||
+    typeof candidate.engineVersion !== "string" ||
+    !IDENTITY_PATTERN.test(candidate.engineVersion) ||
+    typeof candidate.implementationRevision !== "string" ||
+    !IDENTITY_PATTERN.test(candidate.implementationRevision)) {
+    throw new TypeError("3D capture adapter engine identity is unsupported or inconsistent.");
+  }
+  if (!PROFILE_SET.has(candidate.profileId as typeof STUDIO_BG3D_CAPTURE_PROFILE_RGBA8_DEPTH_V1)) {
+    throw new TypeError("3D capture adapter profile is unsupported.");
   }
   if (typeof candidate.getSourceSize !== "function" || typeof candidate.capture !== "function") {
     throw new TypeError("3D capture adapter methods are unavailable.");
@@ -134,8 +208,9 @@ function assertAdapter(adapter: unknown): asserts adapter is StudioBg3dCaptureAd
 
 /**
  * A quad-to-single capture transition replaces every R3F View and therefore its capture adapter.
- * Never retain the pre-transition adapter: wait for the replacement View to commit, then bind the
- * identity that owns the actual offscreen capture transaction.
+ * Never retain the pre-transition adapter: wait for the replacement View to commit, then require
+ * the same adapter and framebuffer dimensions across consecutive paints. ResizeObserver and R3F's
+ * renderer resize can trail the React commit by more than two frames on a first lazy mount.
  */
 export async function acquireStudioBg3dCaptureAdapterAfterViewTransition(
   input: AcquireStudioBg3dCaptureAdapterAfterViewTransitionInput
@@ -153,11 +228,39 @@ export async function acquireStudioBg3dCaptureAdapterAfterViewTransition(
   await waitForStudioBg3dCapturePhase(input.waitForPaintFrame(), input);
   throwIfCaptureOperationAborted(input.signal);
   await waitForStudioBg3dCapturePhase(input.waitForPaintFrame(), input);
-  if (!input.isActive()) return null;
-  const adapter = input.readAdapter();
-  if (!adapter) return null;
-  assertAdapter(adapter);
-  return adapter;
+  let previousAdapter: StudioBg3dCaptureAdapter | null = null;
+  let previousSize: StudioBg3dCaptureSize | null = null;
+  let stableSamples = 0;
+  for (let sample = 0; sample < CAPTURE_ADAPTER_MAX_SETTLE_SAMPLES; sample += 1) {
+    throwIfCaptureOperationAborted(input.signal);
+    if (!input.isActive()) return null;
+    const adapter = input.readAdapter();
+    if (adapter) {
+      assertAdapter(adapter);
+      const size = adapter.getSourceSize();
+      assertSize(size, "3D capture source", false);
+      if (
+        adapter === previousAdapter &&
+        previousSize?.width === size.width &&
+        previousSize.height === size.height
+      ) {
+        stableSamples += 1;
+      } else {
+        previousAdapter = adapter;
+        previousSize = { width: size.width, height: size.height };
+        stableSamples = 1;
+      }
+      if (stableSamples >= CAPTURE_ADAPTER_STABLE_SAMPLES) return adapter;
+    } else {
+      previousAdapter = null;
+      previousSize = null;
+      stableSamples = 0;
+    }
+    if (sample + 1 < CAPTURE_ADAPTER_MAX_SETTLE_SAMPLES) {
+      await waitForStudioBg3dCapturePhase(input.waitForPaintFrame(), input);
+    }
+  }
+  return null;
 }
 
 function assertRequest(request: unknown): asserts request is StudioBg3dCaptureRequest {
