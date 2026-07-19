@@ -109,6 +109,7 @@ describe("Studio 3D insert controller boundary", () => {
 
   it("exposes only semantic boolean insert transactions to the lazy modal stack", () => {
     const stack = moduleShape("./StudioLazyPanelStack.tsx").source;
+    const previewStack = moduleShape("./StudioThreeDPreviewPanelStack.tsx").source;
     const handlersStart = stack.indexOf("export interface StudioLazyPanelStackHandlers");
     const propsStart = stack.indexOf("export interface StudioLazyPanelStackProps", handlersStart);
     const componentStart = stack.indexOf("export const StudioLazyPanelStack =", propsStart);
@@ -125,14 +126,15 @@ describe("Studio 3D insert controller boundary", () => {
     expect(propContract).not.toContain("RefObject<{ authScopeKey:");
     expect(propContract).not.toMatch(/^\s*bg3dInitialElementId:/mu);
     expect(propContract).not.toMatch(/^\s*(?:poser|bg3d)MutationTicketRef:/mu);
-    expect(component).toContain("onInsert={insertVrmResult}");
-    expect(component).toContain("onInsert={insertBg3dResult}");
-    expect(component).not.toContain("poserMutationTicketRef.current");
-    expect(component).not.toContain("bg3dMutationTicketRef.current");
-    expect(component).not.toContain("canApplyStudioMutation");
-    expect(component).not.toContain("applyBg3dRenderedImage");
-    expect(component).not.toContain("addRenderedImage");
-    expect(component).not.toContain("patchEl");
+    expect(component).toContain("<StudioThreeDPreviewPanelStack");
+    expect(previewStack).toContain("onInsert={insertVrmResult}");
+    expect(previewStack).toContain("onInsert={insertBg3dResult}");
+    expect(previewStack).not.toContain("poserMutationTicketRef.current");
+    expect(previewStack).not.toContain("bg3dMutationTicketRef.current");
+    expect(previewStack).not.toContain("canApplyStudioMutation");
+    expect(previewStack).not.toContain("applyBg3dRenderedImage");
+    expect(previewStack).not.toContain("addRenderedImage");
+    expect(previewStack).not.toContain("patchEl");
   });
 
   it("wires fail-closed commit results before selection, tool, and guide side effects", () => {

@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 const background3dSource = readFileSync(new URL("./StudioBackground3D.tsx", import.meta.url), "utf8");
 const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
 const studioLazyPanelStackSource = readFileSync(
-  new URL("./StudioLazyPanelStack.tsx", import.meta.url),
+  new URL("./StudioThreeDPreviewPanelStack.tsx", import.meta.url),
   "utf8"
 );
 

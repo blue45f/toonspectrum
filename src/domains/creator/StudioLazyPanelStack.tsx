@@ -1,4 +1,4 @@
-import { Loader2, X } from "lucide-react";
+import { X } from "lucide-react";
 import {
   Suspense,
   memo,
@@ -7,31 +7,22 @@ import {
   type SetStateAction,
 } from "react";
 
-import { isStudioAiConfigured } from "./studio-ai-client";
 import { createEmptyStudioAiProvenanceDocument } from "./studio-ai-provenance";
 import { selectWheelColors } from "./studio-color-wheel";
 import {
   StudioAiProvenancePanel,
   StudioAutoActionsPanel,
-  StudioBackground3D,
   StudioCharacterBiblePanel,
   StudioCheckpointPanel,
   StudioColorWheelOverlay,
   StudioCommentsPanel,
   StudioContinuityPanel,
-  StudioPageReviewPanel,
   StudioProductionInsightsPanel,
   StudioPublicationOperationsPanel,
   StudioPublishPackagePanel,
   StudioPublishPreflightPanel,
-  StudioQuickActionsMenu,
   StudioReferencePanel,
-  StudioScenarioAutoLayoutPanel,
-  StudioScrollPreviewPanel,
-  StudioStoryboardGridPanel,
   StudioTeamPanel,
-  StudioTimelapsePanel,
-  StudioVrmPoser,
   StudioWriterRoomPanel,
   WorkFxPanel,
 } from "./studio-page-lazy-ui";
@@ -39,6 +30,10 @@ import { pageDisplayName } from "./studio-page-meta";
 import { parseStudioProjectFile } from "./studio-project-file";
 import { normalizeStudioPublishCompliance } from "./studio-publish-compliance";
 import { normalizeStudioWriterRoomDocument } from "./studio-writer-room";
+import {
+  StudioScrollScenarioPreviewPanelStack,
+  StudioThreeDPreviewPanelStack,
+} from "./StudioThreeDPreviewPanelStack";
 
 import type {
   StudioBg3dInsertHandler,
@@ -134,72 +129,6 @@ interface StudioLazySharedDocumentScope {
   authScopeKey: string;
   workId: string;
   value: StudioSharedDocument;
-}
-
-function PoserLoadingOverlay() {
-  return (
-    <div aria-live="polite" className="fixed inset-0 z-50 grid place-items-center bg-[oklch(0.08_0.01_70/0.72)] p-4 text-fg backdrop-blur-sm">
-      <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-panel px-4 py-3 text-sm font-semibold shadow-xl">
-        <Loader2 className="animate-spin text-accent" size={16} aria-hidden />
-        <span>포저를 여는 중</span>
-      </div>
-    </div>
-  );
-}
-
-function Bg3DLoadingOverlay() {
-  return (
-    <div aria-live="polite" className="fixed inset-0 z-50 grid place-items-center bg-[oklch(0.08_0.01_70/0.72)] p-4 text-fg backdrop-blur-sm">
-      <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-panel px-4 py-3 text-sm font-semibold shadow-xl">
-        <Loader2 className="animate-spin text-accent" size={16} aria-hidden />
-        <span>3D 배경 도구를 여는 중</span>
-      </div>
-    </div>
-  );
-}
-
-function TimelapseLoadingOverlay() {
-  return (
-    <div aria-live="polite" className="fixed inset-0 z-50 grid place-items-center bg-[oklch(0.08_0.01_70/0.72)] p-4 text-fg backdrop-blur-sm">
-      <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-panel px-4 py-3 text-sm font-semibold shadow-xl">
-        <Loader2 className="animate-spin text-accent" size={16} aria-hidden />
-        <span>타임랩스 도구를 여는 중</span>
-      </div>
-    </div>
-  );
-}
-
-function StoryboardGridLoadingOverlay() {
-  return (
-    <div aria-live="polite" className="fixed inset-0 z-50 grid place-items-center bg-[oklch(0.08_0.01_70/0.72)] p-4 text-fg backdrop-blur-sm">
-      <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-panel px-4 py-3 text-sm font-semibold shadow-xl">
-        <Loader2 className="animate-spin text-accent" size={16} aria-hidden />
-        <span>스토리보드 그리드를 여는 중</span>
-      </div>
-    </div>
-  );
-}
-
-function ScrollPreviewLoadingOverlay() {
-  return (
-    <div aria-live="polite" className="fixed inset-0 z-50 grid place-items-center bg-[oklch(0.08_0.01_70/0.72)] p-4 text-fg backdrop-blur-sm">
-      <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-panel px-4 py-3 text-sm font-semibold shadow-xl">
-        <Loader2 className="animate-spin text-accent" size={16} aria-hidden />
-        <span>스크롤 미리보기를 여는 중</span>
-      </div>
-    </div>
-  );
-}
-
-function ScenarioAutoLayoutLoadingOverlay() {
-  return (
-    <div aria-live="polite" className="fixed inset-0 z-50 grid place-items-center bg-[oklch(0.08_0.01_70/0.72)] p-4 text-fg backdrop-blur-sm">
-      <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-panel px-4 py-3 text-sm font-semibold shadow-xl">
-        <Loader2 className="animate-spin text-accent" size={16} aria-hidden />
-        <span>시나리오 자동 생성 도구를 여는 중</span>
-      </div>
-    </div>
-  );
 }
 
 export interface StudioLazyPanelStackHandlers {
@@ -589,7 +518,6 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
   stableHandlers,
 }: StudioLazyPanelStackProps) {
   const {
-    addPage,
     applyStudioCommentsPanelChange,
     markAllStudioCommentThreadsRead,
     markStudioCommentThreadRead,
@@ -599,33 +527,15 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
     cancelWriterRoomAi,
     changeAutoActionScope,
     changeAutoActionSelectedPages,
-    commitShotTag,
     createNamedCheckpoint,
-    deletePage,
     disarmAllPixelTools,
     downloadAiPublicSummary,
     downloadPublishPackageManifest,
     downloadPublishPreflightReport,
-    duplicatePage,
     executeAutoAction,
     executePublishPackageExport,
-    executeQuickAction,
     exportAutoActionJson,
-    handleTimelapseRecordingEnd,
-    handleTimelapseRecordingStart,
     importAutoActionJson,
-    insertBg3dResult,
-    insertVrmResult,
-    onApplyScenarioPreview,
-    onCancelScenario,
-    onChangeScenarioScene,
-    onDiscardScenarioPreview,
-    onGenerateScenario,
-    onGenerateScenarioImages,
-    onRegenerateScenarioImage,
-    onRemoveScenarioScene,
-    onScenarioApplyTargetChange,
-    patchPageReview,
     planAutoAction,
     rememberColor,
     removeNamedCheckpoint,
@@ -646,120 +556,52 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
     startMacroRecord,
     stopMacroRecord,
     updatePublishPackageSettings,
-    captureTimelapseStep,
     currentStudioProjectSnapshot,
     reloadServerRevisions,
     requestWriterRoomAiDraft,
     restoreServerRevision,
   } = stableHandlers;
-  const poserInitialElement = poserInitialElementId
-    ? elementById.get(poserInitialElementId) ?? null
-    : null;
-  const poserInitialScene = poserInitialElement?.type === "image"
-    ? poserInitialElement.vrmScene
-    : undefined;
   return (
     <>
-        <Suspense fallback={null}>
-          {isMobile ? (
-            <StudioQuickActionsMenu
-              open={quickActionsOpen}
-              anchor={quickActionsAnchor}
-              preferences={quickActionsPreferences}
-              disabledActions={[...quickActionsDisabledActions]}
-              onExecute={executeQuickAction}
-              onPreferencesChange={setQuickActionsPreferences}
-              onClose={() => setQuickActionsOpen(false)}
-            />
-          ) : null}
-        </Suspense>
-
-      <Suspense fallback={<PoserLoadingOverlay />}>
-        {poserVrmOpen ? (
-          <StudioVrmPoser
-            open
-            initialDataUrl={poserInitialDataUrl}
-            initialScene={poserInitialScene}
-            onClose={() => {
-              setPoserVrmOpen(false);
-              setPoserInitialDataUrl(undefined);
-              setPoserInitialElementId(undefined);
-            }}
-            onInsert={insertVrmResult}
-          />
-        ) : null}
-      </Suspense>
-
-      <Suspense fallback={<Bg3DLoadingOverlay />}>
-        {bg3dOpen ? (
-          <StudioBackground3D
-            open
-            initialDataUrl={bg3dInitialDataUrl}
-            initialScene={bg3dInitialScene}
-            onClose={() => {
-              setBg3dOpen(false);
-              setBg3dInitialDataUrl(undefined);
-              setBg3dInitialScene(undefined);
-              setBg3dInitialElementId(undefined);
-            }}
-            onInsert={insertBg3dResult}
-          />
-        ) : null}
-      </Suspense>
-
-      <Suspense fallback={<TimelapseLoadingOverlay />}>
-        {timelapseOpen ? (
-          <StudioTimelapsePanel
-            open
-            onClose={() => setTimelapseOpen(false)}
-            pageId={activePage.id}
-            history={pagesHistory.slice(0, pagesHi + 1)}
-            title={title}
-            masterEditMode={masterEditMode}
-            captureStep={captureTimelapseStep}
-            onRecordingStart={handleTimelapseRecordingStart}
-            onRecordingEnd={handleTimelapseRecordingEnd}
-          />
-        ) : null}
-      </Suspense>
-
-      <Suspense fallback={<StoryboardGridLoadingOverlay />}>
-        {storyboardGridOpen ? (
-          <StudioStoryboardGridPanel
-            open
-            onClose={() => setStoryboardGridOpen(false)}
-            pages={pages.map(composeWorkAssetPreviewPage)}
-            currentPageId={currentPageId}
-            dnd={pageDnd}
-            onSelectPage={(id) => {
-              setCurrentPageId(id);
-              setStoryboardGridOpen(false);
-            }}
-            onAddPage={addPage}
-            onDuplicatePage={duplicatePage}
-            onDeletePage={deletePage}
-            canDelete={pages.length > 1}
-            onShotTagChange={(pageId, patch) => commitShotTag(pageId, patch)}
-          />
-        ) : null}
-      </Suspense>
-
-      <Suspense fallback={null}>
-        {pageReviewOpen ? (
-          <StudioPageReviewPanel
-            open
-            onClose={() => setPageReviewOpen(false)}
-            pages={pages.map((page, index) => ({
-              id: page.id,
-              label: pageDisplayName(page, index),
-              review: page.review,
-            }))}
-            currentPageId={currentPageId}
-            onSelectPage={setCurrentPageId}
-            onPatchReview={patchPageReview}
-          />
-        ) : null}
-      </Suspense>
+      <StudioThreeDPreviewPanelStack
+        activePage={activePage}
+        bg3dInitialDataUrl={bg3dInitialDataUrl}
+        bg3dInitialScene={bg3dInitialScene}
+        bg3dOpen={bg3dOpen}
+        composeWorkAssetPreviewPage={composeWorkAssetPreviewPage}
+        currentPageId={currentPageId}
+        elementById={elementById}
+        isMobile={isMobile}
+        masterEditMode={masterEditMode}
+        pageDnd={pageDnd}
+        pageReviewOpen={pageReviewOpen}
+        pages={pages}
+        pagesHi={pagesHi}
+        pagesHistory={pagesHistory}
+        poserInitialDataUrl={poserInitialDataUrl}
+        poserInitialElementId={poserInitialElementId}
+        poserVrmOpen={poserVrmOpen}
+        quickActionsAnchor={quickActionsAnchor}
+        quickActionsDisabledActions={quickActionsDisabledActions}
+        quickActionsOpen={quickActionsOpen}
+        quickActionsPreferences={quickActionsPreferences}
+        setBg3dInitialDataUrl={setBg3dInitialDataUrl}
+        setBg3dInitialElementId={setBg3dInitialElementId}
+        setBg3dInitialScene={setBg3dInitialScene}
+        setBg3dOpen={setBg3dOpen}
+        setPageReviewOpen={setPageReviewOpen}
+        setPoserInitialDataUrl={setPoserInitialDataUrl}
+        setPoserInitialElementId={setPoserInitialElementId}
+        setPoserVrmOpen={setPoserVrmOpen}
+        setQuickActionsOpen={setQuickActionsOpen}
+        setQuickActionsPreferences={setQuickActionsPreferences}
+        setStoryboardGridOpen={setStoryboardGridOpen}
+        setTimelapseOpen={setTimelapseOpen}
+        stableHandlers={stableHandlers}
+        storyboardGridOpen={storyboardGridOpen}
+        timelapseOpen={timelapseOpen}
+        title={title}
+      />
 
       <Suspense fallback={null}>
         {commentsPanelMounted ? (
@@ -855,52 +697,29 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
         ) : null}
       </Suspense>
 
-      <Suspense fallback={<ScrollPreviewLoadingOverlay />}>
-        {scrollPreviewOpen ? (
-          <StudioScrollPreviewPanel
-            open
-            onClose={() => setScrollPreviewOpen(false)}
-            pages={pages.map(composeWorkAssetPreviewPage)}
-            currentPageId={currentPageId}
-            onSelectPage={(id) => {
-              setCurrentPageId(id);
-              setScrollPreviewOpen(false);
-            }}
-          />
-        ) : null}
-      </Suspense>
-
-      <Suspense fallback={<ScenarioAutoLayoutLoadingOverlay />}>
-        {scenarioOpen ? (
-          <StudioScenarioAutoLayoutPanel
-            open
-            onClose={() => setScenarioOpen(false)}
-            textConfigured={textAiConfigured}
-            imageConfigured={isStudioAiConfigured(aiSettings)}
-            storyText={scenarioStoryText}
-            onStoryTextChange={setScenarioStoryText}
-            sceneCountHint={scenarioSceneCountHint}
-            onSceneCountHintChange={setScenarioSceneCountHint}
-            applyTarget={scenarioApplyTarget}
-            onApplyTargetChange={onScenarioApplyTargetChange}
-            busy={scenarioBusy}
-            stageLabel={scenarioStageLabel}
-            progress={scenarioProgress}
-            error={scenarioError}
-            preview={scenarioResult?.items ?? null}
-            textProvenance={scenarioResult?.textAiProvenance ?? null}
-            onGenerate={onGenerateScenario}
-            onGenerateImages={onGenerateScenarioImages}
-            onChangeScene={onChangeScenarioScene}
-            onRemoveScene={onRemoveScenarioScene}
-            onRegenerateScene={onRegenerateScenarioImage}
-            regeneratingIndex={scenarioRegeneratingIndex}
-            onCancel={onCancelScenario}
-            onApply={onApplyScenarioPreview}
-            onDiscard={onDiscardScenarioPreview}
-          />
-        ) : null}
-      </Suspense>
+      <StudioScrollScenarioPreviewPanelStack
+        aiSettings={aiSettings}
+        composeWorkAssetPreviewPage={composeWorkAssetPreviewPage}
+        currentPageId={currentPageId}
+        pages={pages}
+        scenarioApplyTarget={scenarioApplyTarget}
+        scenarioBusy={scenarioBusy}
+        scenarioError={scenarioError}
+        scenarioOpen={scenarioOpen}
+        scenarioProgress={scenarioProgress}
+        scenarioRegeneratingIndex={scenarioRegeneratingIndex}
+        scenarioResult={scenarioResult}
+        scenarioSceneCountHint={scenarioSceneCountHint}
+        scenarioStageLabel={scenarioStageLabel}
+        scenarioStoryText={scenarioStoryText}
+        scrollPreviewOpen={scrollPreviewOpen}
+        setScenarioOpen={setScenarioOpen}
+        setScenarioSceneCountHint={setScenarioSceneCountHint}
+        setScenarioStoryText={setScenarioStoryText}
+        setScrollPreviewOpen={setScrollPreviewOpen}
+        stableHandlers={stableHandlers}
+        textAiConfigured={textAiConfigured}
+      />
 
       <Suspense fallback={null}>
         {productionInsightsOpen && productionInsightsResult ? (

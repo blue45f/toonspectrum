@@ -88,6 +88,7 @@ describe("Studio lazy panel stack boundary", () => {
   it("keeps one-way static ownership from StudioPage", () => {
     const page = moduleEdges("./StudioPage.tsx");
     const stack = moduleEdges("./StudioLazyPanelStack.tsx");
+    const previewStack = moduleEdges("./StudioThreeDPreviewPanelStack.tsx");
 
     expect(
       page.valueImports.filter((specifier) => specifier === "./StudioLazyPanelStack")
@@ -101,21 +102,46 @@ describe("Studio lazy panel stack boundary", () => {
     expect(stack.source).toContain("export interface StudioLazyPanelStackHandlers");
     expect(stack.source).toContain("export interface StudioLazyPanelStackProps");
     expect(stack.source).toContain("export const StudioLazyPanelStack = memo(");
+    expect(
+      stack.valueImports.filter(
+        (specifier) => specifier === "./StudioThreeDPreviewPanelStack"
+      )
+    ).toEqual(["./StudioThreeDPreviewPanelStack"]);
+    expect(previewStack.allImports).toContain("./StudioLazyPanelStack");
+    expect(previewStack.valueImports).not.toContain("./StudioLazyPanelStack");
+    expect(previewStack.dynamicImports).toEqual([]);
+    expect(previewStack.source).not.toContain('"use no memo"');
+    expect(previewStack.source).toContain(
+      "export type StudioThreeDPreviewPanelStackProps = Pick<"
+    );
+    expect(previewStack.source).toContain(
+      "export type StudioScrollScenarioPreviewPanelStackProps = Pick<"
+    );
+    expect(previewStack.source).toContain(
+      "export const StudioThreeDPreviewPanelStack = memo("
+    );
+    expect(previewStack.source).toContain(
+      "export const StudioScrollScenarioPreviewPanelStack = memo("
+    );
 
-    for (const specifier of stack.valueImports) {
+    for (const specifier of [...stack.valueImports, ...previewStack.valueImports]) {
       expect(specifier).not.toMatch(/^(?:konva|react-konva|three)(?:\/|$)/);
     }
   });
 
   it("uses the neutral lazy registry instead of importing optional panel implementations", () => {
     const stack = moduleEdges("./StudioLazyPanelStack.tsx");
+    const previewStack = moduleEdges("./StudioThreeDPreviewPanelStack.tsx");
     const registry = moduleEdges("./studio-page-lazy-ui.ts");
     const background3dLoader = moduleEdges("./studio-background-3d-loader.ts");
 
     expect(stack.valueImports).toContain("./studio-page-lazy-ui");
+    expect(previewStack.valueImports).toContain("./studio-page-lazy-ui");
     for (const optionalModule of STACK_OPTIONAL_MODULES) {
       expect(stack.valueImports, `${optionalModule} must not be eager`).not.toContain(optionalModule);
       expect(stack.dynamicImports, `${optionalModule} must not bypass the registry`).not.toContain(optionalModule);
+      expect(previewStack.valueImports, `${optionalModule} must not be eager`).not.toContain(optionalModule);
+      expect(previewStack.dynamicImports, `${optionalModule} must not bypass the registry`).not.toContain(optionalModule);
       expect(registry.valueImports, `${optionalModule} must remain optional`).not.toContain(optionalModule);
       if (optionalModule === "./StudioBackground3D") {
         expect(registry.valueImports).toContain("./studio-background-3d-loader");
@@ -135,6 +161,7 @@ describe("Studio lazy panel stack boundary", () => {
   it("preserves semantic 3D transactions and initial-scene cleanup", () => {
     const page = moduleEdges("./StudioPage.tsx").source;
     const stack = moduleEdges("./StudioLazyPanelStack.tsx").source;
+    const previewStack = moduleEdges("./StudioThreeDPreviewPanelStack.tsx").source;
     const stackUseStart = page.indexOf("<StudioLazyPanelStack");
     const stackUseEnd = page.indexOf("/>", stackUseStart);
     const stackUse = page.slice(stackUseStart, stackUseEnd);
@@ -149,17 +176,19 @@ describe("Studio lazy panel stack boundary", () => {
     expect(stackUse).not.toContain("setCurrentPageId={setCurrentPageId}");
     expect(page).toContain("insertVrmResult: (result) => applyStudioVrmInsertResult({");
     expect(page).toContain("insertBg3dResult: (result) => applyStudioBg3dInsertResult({");
-    expect(stack).toContain("onInsert={insertVrmResult}");
-    expect(stack).toContain("onInsert={insertBg3dResult}");
-    expect(stack).toContain("initialScene={poserInitialScene}");
-    expect(stack).toContain("setPoserInitialElementId(undefined)");
-    expect(stack).toContain("setBg3dInitialElementId(undefined)");
-    expect(stack).not.toContain("applyStudioVrmInsertResult");
-    expect(stack).not.toContain("applyStudioBg3dInsertResult");
+    expect(stack).toContain("<StudioThreeDPreviewPanelStack");
+    expect(stack).toContain("<StudioScrollScenarioPreviewPanelStack");
+    expect(previewStack).toContain("onInsert={insertVrmResult}");
+    expect(previewStack).toContain("onInsert={insertBg3dResult}");
+    expect(previewStack).toContain("initialScene={poserInitialScene}");
+    expect(previewStack).toContain("setPoserInitialElementId(undefined)");
+    expect(previewStack).toContain("setBg3dInitialElementId(undefined)");
+    expect(previewStack).not.toContain("applyStudioVrmInsertResult");
+    expect(previewStack).not.toContain("applyStudioBg3dInsertResult");
   });
 
   it("keeps all six modal loading overlays colocated with their Suspense boundaries", () => {
-    const stack = moduleEdges("./StudioLazyPanelStack.tsx").source;
+    const stack = moduleEdges("./StudioThreeDPreviewPanelStack.tsx").source;
     const contracts = [
       ["PoserLoadingOverlay", "포저를 여는 중"],
       ["Bg3DLoadingOverlay", "3D 배경 도구를 여는 중"],
@@ -179,7 +208,9 @@ describe("Studio lazy panel stack boundary", () => {
   });
 
   it("guards optional surfaces with their existing open or mounted flags", () => {
-    const stack = moduleEdges("./StudioLazyPanelStack.tsx").source;
+    const rootStack = moduleEdges("./StudioLazyPanelStack.tsx").source;
+    const previewStack = moduleEdges("./StudioThreeDPreviewPanelStack.tsx").source;
+    const stack = `${rootStack}\n${previewStack}`;
 
     for (const condition of [
       "poserVrmOpen ? (",
@@ -204,5 +235,23 @@ describe("Studio lazy panel stack boundary", () => {
     ] as const) {
       expect(stack).toContain(condition);
     }
+  });
+
+  it("keeps the split at the original DOM seam with stable Pick-based contracts", () => {
+    const stack = moduleEdges("./StudioLazyPanelStack.tsx").source;
+    const previewStack = moduleEdges("./StudioThreeDPreviewPanelStack.tsx").source;
+    const firstPreview = stack.indexOf("<StudioThreeDPreviewPanelStack");
+    const comments = stack.indexOf("commentsPanelMounted ? (");
+    const continuity = stack.indexOf("continuityOpen ? (");
+    const secondPreview = stack.indexOf("<StudioScrollScenarioPreviewPanelStack");
+
+    expect(firstPreview).toBeGreaterThan(-1);
+    expect(comments).toBeGreaterThan(firstPreview);
+    expect(continuity).toBeGreaterThan(comments);
+    expect(secondPreview).toBeGreaterThan(continuity);
+    expect(previewStack).toContain("type StudioThreeDPreviewPanelStackHandlers = Pick<");
+    expect(previewStack).toContain("type StudioScrollScenarioPreviewPanelStackHandlers = Pick<");
+    expect(previewStack.match(/stableHandlers: Studio\w+Handlers;/g)).toHaveLength(2);
+    expect(stack.match(/stableHandlers=\{stableHandlers\}/g)).toHaveLength(2);
   });
 });
