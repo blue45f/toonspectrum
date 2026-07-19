@@ -140,9 +140,14 @@ import {
   type PropInstance,
 } from "./studio-vrm-props";
 import {
+  createStudioVrmRigProfileSelection,
+  type StudioVrmRigProfileId,
+} from "./studio-vrm-rig-profile";
+import {
   STUDIO_VRM_FINGER_BONES,
   STUDIO_VRM_HUMANOID_BONES,
   STUDIO_VRM_MODEL_MAX_BYTES,
+  STUDIO_VRM_SCENE_DOCUMENT_VERSION,
   normalizeStudioVrmSceneDocument,
   parseStudioVrmSceneDocument,
   serializeStudioVrmSceneDocument,
@@ -157,6 +162,10 @@ import {
   serializeSceneProps,
   type ScenePropAttachmentConfig as PropAttachmentConfig,
 } from "./studio-vrm-scene-props";
+import {
+  selectSharedPoseAssets,
+  shouldLoadSharedPoseLibrary,
+} from "./studio-vrm-shared-pose-library";
 import {
   appendStudioVrmFullStateHistory,
   commitStudioVrmFullStateHistoryTransaction,
@@ -235,6 +244,7 @@ import {
 import { StudioVrmPhotoPoseScanner } from "./StudioVrmPhotoPoseScanner";
 import { StudioVrmPoseMaterialPanel } from "./StudioVrmPoseMaterialPanel";
 import { StudioVrmPropPanel } from "./StudioVrmPropPanel";
+import { StudioVrmRigAssistPanel } from "./StudioVrmRigAssistPanel";
 import {
   canonicalizeVrmContentHash,
   deleteStoredVrmModel,
@@ -2230,6 +2240,10 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   const [customYOffset, setCustomYOffset] = useState<number>(POSE_PRESETS[0].yOffset ?? 0);
   const [activeCategory, setActiveCategory] = useState("head");
   const [jointLimitsEnabled, setJointLimitsEnabled] = useState(true);
+  const [rigJointProfile, setRigJointProfile] = useState<StudioVrmRigProfileId>("neutral");
+  const [fullBodyIkEnabled, setFullBodyIkEnabled] = useState(false);
+  const [footPlantEnabled, setFootPlantEnabled] = useState(false);
+  const [rigFloorHeight, setRigFloorHeight] = useState(0);
   const [lockedPoseBones, setLockedPoseBones] = useState<VRMHumanBoneName[]>([]);
   const [showPoseBoneOverlay, setShowPoseBoneOverlay] = useState(false);
   const [selectedViewportPoseBone, setSelectedViewportPoseBone] =
@@ -2291,6 +2305,8 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   const [isSharingPose, setIsSharingPose] = useState(false);
   const [sharedPoses, setSharedPoses] = useState<SharedAsset[]>([]);
   const [sharedPosesStatus, setSharedPosesStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [sharedPoseLibraryOpen, setSharedPoseLibraryOpen] = useState(false);
+  const [sharedPoseReloadToken, setSharedPoseReloadToken] = useState(0);
   const [lightingTone, setLightingTone] = useState<LightingTone>("morning");
   const [activeProps, setActiveProps] = useState<string[]>([]);
   const [propAttachments, setPropAttachments] = useState<Record<string, PropAttachmentConfig>>({});
@@ -2357,6 +2373,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   const insertCaptureGenerationRef = useRef(0);
   const insertCaptureFrameRef = useRef<number | null>(null);
   const sharePoseAbortRef = useRef<AbortController | null>(null);
+  const sharedPoseListRequestRef = useRef(0);
   const captureRef = useRef<CaptureState>({ camera: null, gl: null, scene: null });
   const captureRequestRef = useRef(0);
   const pendingCameraRestoreRef = useRef<StudioVrmCameraSettings | null>(null);
@@ -2505,6 +2522,10 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       effector,
       targetWorld: new THREE.Vector3(worldPosition[0], worldPosition[1], worldPosition[2]),
       poleWorld: transaction.poleWorld,
+      jointProfile: rigJointProfile,
+      fullBodyIk: fullBodyIkEnabled,
+      footPlant: footPlantEnabled,
+      floorHeight: rigFloorHeight,
     });
     if (!result) {
       applyStudioVrmRotationPose(currentVrm, transaction.baseline, bodyScale);
@@ -2516,7 +2537,13 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     transaction.latest = result;
     applyStudioVrmRotationPose(currentVrm, result, bodyScale);
     setJointHandleStatus(
-      result.clamped
+      result.floorContact
+        ? result.clamped
+          ? "발 목표를 바닥과 도달 가능한 다리 범위에 맞춰 미리 보는 중입니다."
+          : fullBodyIkEnabled
+            ? "발을 바닥에 맞추고 골반 높이 보정을 나눠 미리 보는 중입니다."
+            : "발 목표를 설정한 바닥 높이에 맞춰 미리 보는 중입니다."
+        : result.clamped
         ? "목표가 팔·다리 길이를 벗어나 도달 가능한 최대 위치에서 미리 보는 중입니다."
         : result.limited
           ? "관절 보호 범위 안으로 부드럽게 제한해 미리 보는 중입니다."
@@ -2961,6 +2988,10 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
 
   useEffect(() => {
     if (open && initialScene) {
+      setRigJointProfile(initialScene.rig.jointProfile.id);
+      setFullBodyIkEnabled(initialScene.rig.fullBodyIk);
+      setFootPlantEnabled(initialScene.rig.footPlant);
+      setRigFloorHeight(initialScene.rig.floorHeight);
       const poseBones: PoseBoneMap = {};
       for (const boneName of STUDIO_VRM_HUMANOID_BONES) {
         const bone = initialScene.pose.bones[boneName];
@@ -3733,24 +3764,35 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     input.click();
   }
 
-  async function loadSharedPoses() {
-    setSharedPosesStatus("loading");
-    try {
-      const assets = await listSharedAssets({ limit: 100 });
-      const poses = assets.filter((asset) => asset.name.startsWith("[3D_POSE]") || asset.kind === "vrm_pose");
-      setSharedPoses(poses);
-      setSharedPosesStatus("idle");
-    } catch (e) {
-      console.error(e);
-      setSharedPosesStatus("error");
-    }
-  }
-
   useEffect(() => {
-    if (open) {
-      loadSharedPoses();
-    }
-  }, [open]);
+    if (!shouldLoadSharedPoseLibrary({
+      editorOpen: open,
+      posePanelActive: activePanelTab === "pose",
+      libraryExpanded: sharedPoseLibraryOpen,
+    })) return;
+
+    const controller = new AbortController();
+    const requestId = sharedPoseListRequestRef.current + 1;
+    sharedPoseListRequestRef.current = requestId;
+    setSharedPosesStatus("loading");
+
+    void listSharedAssets({ limit: 100 }, controller.signal)
+      .then((assets) => {
+        if (controller.signal.aborted || sharedPoseListRequestRef.current !== requestId) return;
+        setSharedPoses(selectSharedPoseAssets(assets));
+        setSharedPosesStatus("idle");
+      })
+      .catch(() => {
+        if (controller.signal.aborted || sharedPoseListRequestRef.current !== requestId) return;
+        // The remote library is optional. Keep the local poser usable and surface
+        // a retry affordance inside the expanded section instead of logging noise.
+        setSharedPosesStatus("error");
+      });
+
+    return () => {
+      controller.abort();
+    };
+  }, [activePanelTab, open, sharedPoseLibraryOpen, sharedPoseReloadToken]);
 
   async function handleSharePoseToServer() {
     if (isSharingPose) {
@@ -3830,7 +3872,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       }, controller.signal);
 
       alert("포즈가 성공적으로 서버에 공유되었습니다!");
-      void loadSharedPoses();
+      setSharedPoseReloadToken((token) => token + 1);
     } catch (e) {
       if (controller.signal.aborted) {
         if (timedOut) {
@@ -3866,7 +3908,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     try {
       await deleteSharedAsset(asset.id);
       alert("공유된 포즈가 성공적으로 삭제되었습니다.");
-      loadSharedPoses();
+      setSharedPoseReloadToken((token) => token + 1);
     } catch (err) {
       console.error(err);
       alert("삭제에 실패했습니다.");
@@ -3907,6 +3949,10 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     setJointHandleInteracting(false);
     setJointHandleStatus("");
     setSelectedJointHandle(null);
+    setRigJointProfile("neutral");
+    setFullBodyIkEnabled(false);
+    setFootPlantEnabled(false);
+    setRigFloorHeight(0);
     setMannequinMode(false);
     setActiveCameraId("front");
     setActiveProps([]);
@@ -4832,10 +4878,12 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       if (!bone?.rotation) continue;
       bakedFingers[boneName] = [bone.rotation[0], bone.rotation[1], bone.rotation[2]];
     }
+    const jointProfile = createStudioVrmRigProfileSelection(rigJointProfile);
+    if (!jointProfile) return null;
 
     const normalized = normalizeStudioVrmSceneDocument({
       kind: "studio-vrm-scene",
-      version: 1,
+      version: STUDIO_VRM_SCENE_DOCUMENT_VERSION,
       model,
       pose: {
         bones: poseBones,
@@ -4853,6 +4901,13 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
         avatarForge: serializeAvatarForgeState(avatarForgeState),
         costume: serializeCostume(costumeState) ?? null,
         wardrobe: serializeWardrobe(wardrobeState) ?? null,
+      },
+      rig: {
+        version: 1,
+        jointProfile,
+        fullBodyIk: fullBodyIkEnabled,
+        footPlant: footPlantEnabled,
+        floorHeight: rigFloorHeight,
       },
       props: serializeVrmProps(vrmPropItems) ?? null,
       sceneProps: serializeSceneProps(activeProps, propAttachments) ?? null,
@@ -5615,6 +5670,30 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                   ) : null}
                 </div>
 
+                <StudioVrmRigAssistPanel
+                  disabled={!vrm || webcamActive || idleAnimation || isCapturing}
+                  jointProfile={rigJointProfile}
+                  fullBodyIk={fullBodyIkEnabled}
+                  footPlant={footPlantEnabled}
+                  floorHeight={rigFloorHeight}
+                  onJointProfileChange={(profile) => {
+                    setRigJointProfile(profile);
+                    setJointHandleStatus("");
+                  }}
+                  onFullBodyIkChange={(enabled) => {
+                    setFullBodyIkEnabled(enabled);
+                    setJointHandleStatus("");
+                  }}
+                  onFootPlantChange={(enabled) => {
+                    setFootPlantEnabled(enabled);
+                    setJointHandleStatus("");
+                  }}
+                  onFloorHeightChange={(height) => {
+                    setRigFloorHeight(height);
+                    setJointHandleStatus("");
+                  }}
+                />
+
                 <label className="mb-3 flex items-center gap-2 text-xs text-fg-2 cursor-pointer bg-card/30 border border-line/50 p-2 rounded-lg hover:bg-raised/40 transition-colors">
                   <input
                     type="checkbox"
@@ -5825,7 +5904,11 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                 </div>
               </section>
 
-              <details hidden={hideOnTab("pose")} className="group rounded-xl border border-line bg-card/45 p-3">
+              <details
+                hidden={hideOnTab("pose")}
+                className="group rounded-xl border border-line bg-card/45 p-3"
+                onToggle={(event) => setSharedPoseLibraryOpen(event.currentTarget.open)}
+              >
                 <summary className="mb-2 flex cursor-pointer list-none items-center gap-1.5 text-sm font-bold text-fg [&::-webkit-details-marker]:hidden">
                   <Sparkles size={15} className="text-accent" aria-hidden />
                   서버 공유 포즈 라이브러리
@@ -5846,7 +5929,18 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                   다른 웹툰 작가들이 공유한 포즈를 내 캐릭터에 즉시 입히고, 나만의 멋진 포즈를 서버에 올려 공유하세요!
                 </p>
 
-                {sharedPosesStatus === "loading" && sharedPoses.length === 0 ? (
+                {sharedPosesStatus === "error" ? (
+                  <div className="rounded-xl border border-warn/35 bg-warn/10 px-3 py-3 text-center text-xs text-fg-2" role="status">
+                    <p>공유 포즈 서버에 연결하지 못했습니다. 로컬 포즈 편집은 계속 사용할 수 있습니다.</p>
+                    <button
+                      type="button"
+                      className="mt-2 inline-flex items-center rounded-lg border border-line bg-card px-2 py-1 text-[0.68rem] font-bold text-fg hover:bg-raised"
+                      onClick={() => setSharedPoseReloadToken((token) => token + 1)}
+                    >
+                      다시 시도
+                    </button>
+                  </div>
+                ) : sharedPosesStatus === "loading" && sharedPoses.length === 0 ? (
                   <div className="rounded-xl border border-line bg-card/60 px-3 py-4 text-center text-xs text-fg-3">
                     공유된 포즈를 불러오는 중입니다...
                   </div>

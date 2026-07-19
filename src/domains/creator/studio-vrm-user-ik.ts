@@ -1,23 +1,36 @@
 import * as THREE from "three";
 
+import { solveStudioVrmFloorContact } from "./studio-vrm-contact-solver";
 import {
   STUDIO_VRM_DEFAULT_SOFT_LIMIT_STRENGTH,
   dampStudioVrmJointRotation,
 } from "./studio-vrm-joint-limits";
 import { bakeStudioVrmRuntimePose } from "./studio-vrm-pose-bake";
 import { solveTwoBoneTarget } from "./studio-vrm-prop-ik";
+import {
+  STUDIO_VRM_RIG_PROFILES,
+  dampStudioVrmJointRotationForProfile,
+  normalizeStudioVrmRigProfile,
+} from "./studio-vrm-rig-profile";
 
 import type { TwoBoneTargetSolution } from "./studio-rig-two-bone-ik";
+import type { StudioVrmFloorContactResult } from "./studio-vrm-contact-solver";
 import type { StudioVrmJointRotation } from "./studio-vrm-joint-limits";
 import type {
   StudioVrmBakedRuntimePose,
   StudioVrmRuntimePoseSource,
 } from "./studio-vrm-pose-bake";
 import type { PoseBoneMap, Vec3 } from "./studio-vrm-poser-utils";
+import type {
+  StudioVrmRigProfile,
+  StudioVrmRigProfileInput,
+} from "./studio-vrm-rig-profile";
 import type { VRMHumanBoneName } from "@pixiv/three-vrm";
 
 const VECTOR_EPSILON = 1e-12;
 const ROTATION_EPSILON = 1e-9;
+const MIN_FLOOR_HEIGHT = -10;
+const MAX_FLOOR_HEIGHT = 10;
 
 export type StudioVrmUserIkEffector =
   | "leftHand"
@@ -86,6 +99,14 @@ export interface StudioVrmUserIkRequest {
   readonly poleWorld?: THREE.Vector3;
   /** Progressive resistance outside the soft range; hard limits are always enforced. */
   readonly softLimitStrength?: number;
+  /** Versioned, non-medical drawing profile. Cannot be combined with `softLimitStrength`. */
+  readonly jointProfile?: StudioVrmRigProfileInput;
+  /** Shares vertical foot correction with the authored character root when foot planting is on. */
+  readonly fullBodyIk?: boolean;
+  /** Projects a foot effector to the horizontal floor and invokes static contact correction. */
+  readonly footPlant?: boolean;
+  /** Horizontal contact plane in Three world coordinates. */
+  readonly floorHeight?: number;
 }
 
 export interface StudioVrmUserIkDependencies {
@@ -105,13 +126,30 @@ export interface StudioVrmUserIkDependencies {
     rotation: unknown,
     strength?: unknown,
   ) => StudioVrmJointRotation;
+  readonly dampProfiledJointRotation?: (
+    boneName: unknown,
+    rotation: unknown,
+    profile: StudioVrmRigProfileInput,
+  ) => StudioVrmJointRotation | null;
+  readonly solveFloorContact?: typeof solveStudioVrmFloorContact;
 }
 
 const DEFAULT_DEPENDENCIES: StudioVrmUserIkDependencies = Object.freeze({
   solveTarget: solveTwoBoneTarget,
   bakeRuntimePose: bakeStudioVrmRuntimePose,
   dampJointRotation: dampStudioVrmJointRotation,
+  dampProfiledJointRotation: dampStudioVrmJointRotationForProfile,
+  solveFloorContact: solveStudioVrmFloorContact,
 });
+
+export interface StudioVrmUserIkFloorContact {
+  readonly floorHeight: number;
+  /** Persistable vertical root correction actually applied by this solve. */
+  readonly hipsTranslation: Vec3;
+  /** Remaining active-leg translation after the applied root correction. */
+  readonly residualLegIkTranslation: Vec3;
+  readonly contactClamped: boolean;
+}
 
 export interface StudioVrmUserIkResult {
   readonly effector: StudioVrmUserIkEffector;
@@ -127,6 +165,8 @@ export interface StudioVrmUserIkResult {
   readonly clamped: boolean;
   /** True when soft damping or a hard joint boundary changed either analytic rotation. */
   readonly limited: boolean;
+  /** Present only for a foot solve with floor planting enabled. */
+  readonly floorContact?: StudioVrmUserIkFloorContact;
 }
 
 interface ResolvedChain {
@@ -235,6 +275,75 @@ function canonicalSoftLimitStrength(value: number | undefined): number | null {
   return THREE.MathUtils.clamp(value, 0, 1);
 }
 
+interface PreparedFloorContact {
+  readonly target: THREE.Vector3;
+  readonly yOffset: number;
+  readonly result: StudioVrmUserIkFloorContact;
+}
+
+function prepareFloorContact(
+  source: StudioVrmUserIkSource,
+  request: StudioVrmUserIkRequest,
+  endWorld: THREE.Vector3,
+  bakedYOffset: number,
+  profile: StudioVrmRigProfile | null,
+  solveFloorContact: typeof solveStudioVrmFloorContact,
+): PreparedFloorContact | null {
+  const floorHeight = request.floorHeight ?? 0;
+  if (
+    !Number.isFinite(floorHeight)
+    || floorHeight < MIN_FLOOR_HEIGHT
+    || floorHeight > MAX_FLOOR_HEIGHT
+  ) return null;
+  const hips = source.humanoid.getNormalizedBoneNode("hips");
+  const leftFoot = source.humanoid.getNormalizedBoneNode("leftFoot");
+  const rightFoot = source.humanoid.getNormalizedBoneNode("rightFoot");
+  if (!hips || !leftFoot || !rightFoot) return null;
+  const hipsWorld = readWorldPosition(hips);
+  const leftFootWorld = readWorldPosition(leftFoot);
+  const rightFootWorld = readWorldPosition(rightFoot);
+  if (!hipsWorld || !leftFootWorld || !rightFootWorld) return null;
+
+  const contact: StudioVrmFloorContactResult | null = solveFloorContact({
+    floorHeight,
+    hipsWorld: tuple(hipsWorld),
+    leftFoot: { positionWorld: tuple(leftFootWorld), planted: true },
+    rightFoot: { positionWorld: tuple(rightFootWorld), planted: true },
+  });
+  if (!contact) return null;
+  const activeFoot = request.effector === "leftFoot" ? contact.leftFoot : contact.rightFoot;
+  const hipsWeight = profile?.hipsWeight ?? STUDIO_VRM_RIG_PROFILES.neutral.hipsWeight;
+  const appliedHipsY = request.fullBodyIk === true
+    ? contact.hipsTranslation[1] * hipsWeight
+    : 0;
+  if (!Number.isFinite(appliedHipsY)) return null;
+
+  // Recompose the floor target from the contact solver's residual, then subtract the persistable
+  // root translation so the existing rotation-only two-bone solve lands there after yOffset moves.
+  const contactTargetY = activeFoot.movedWithHipsWorld[1]
+    + activeFoot.residualIkTranslation[1];
+  const target = new THREE.Vector3(
+    request.targetWorld.x,
+    contactTargetY - appliedHipsY,
+    request.targetWorld.z,
+  );
+  const residualLegIkTranslation = tuple(new THREE.Vector3(
+    request.targetWorld.x - endWorld.x,
+    contactTargetY - (endWorld.y + appliedHipsY),
+    request.targetWorld.z - endWorld.z,
+  ));
+  return {
+    target,
+    yOffset: bakedYOffset + appliedHipsY,
+    result: Object.freeze({
+      floorHeight,
+      hipsTranslation: tuple(new THREE.Vector3(0, appliedHipsY, 0)),
+      residualLegIkTranslation,
+      contactClamped: contact.clamped,
+    }),
+  };
+}
+
 /**
  * Solves one normalized VRM hand/foot target without writing to the scene graph.
  *
@@ -247,12 +356,23 @@ export function solveStudioVrmUserIk(
   request: StudioVrmUserIkRequest,
   dependencies: StudioVrmUserIkDependencies = DEFAULT_DEPENDENCIES,
 ): StudioVrmUserIkResult | null {
-  const chain = STUDIO_VRM_USER_IK_CHAINS[request.effector];
-  const strength = canonicalSoftLimitStrength(request.softLimitStrength);
+  const chain = Object.hasOwn(STUDIO_VRM_USER_IK_CHAINS, request.effector)
+    ? STUDIO_VRM_USER_IK_CHAINS[request.effector]
+    : null;
+  const profile = request.jointProfile === undefined
+    ? null
+    : normalizeStudioVrmRigProfile(request.jointProfile);
+  const strength = profile
+    ? profile.damping
+    : canonicalSoftLimitStrength(request.softLimitStrength);
   if (
     !chain
     || !isFiniteVector(request.targetWorld)
     || (request.poleWorld !== undefined && !isFiniteVector(request.poleWorld))
+    || (request.jointProfile !== undefined && !profile)
+    || (request.jointProfile !== undefined && request.softLimitStrength !== undefined)
+    || (request.fullBodyIk !== undefined && typeof request.fullBodyIk !== "boolean")
+    || (request.footPlant !== undefined && typeof request.footPlant !== "boolean")
     || strength === null
   ) return null;
 
@@ -270,7 +390,24 @@ export function solveStudioVrmUserIk(
     const end = readWorldPosition(resolved.end);
     if (!start || !middle || !end) return null;
 
-    const target = request.targetWorld.clone();
+    const requestedTarget = request.targetWorld.clone();
+    let target = requestedTarget.clone();
+    let resultYOffset = baked.yOffset;
+    let floorContact: StudioVrmUserIkFloorContact | undefined;
+    if (chain.kind === "foot" && request.footPlant === true) {
+      const prepared = prepareFloorContact(
+        source,
+        request,
+        end,
+        baked.yOffset,
+        profile,
+        dependencies.solveFloorContact ?? solveStudioVrmFloorContact,
+      );
+      if (!prepared) return null;
+      target = prepared.target;
+      resultYOffset = prepared.yOffset;
+      floorContact = prepared.result;
+    }
     const pole = request.poleWorld?.clone();
     const solution = dependencies.solveTarget(start, middle, end, target, pole);
     if (!solution) return null;
@@ -325,8 +462,16 @@ export function solveStudioVrmUserIk(
     const rawUpper = rotationFromQuaternion(desiredUpperLocal);
     const rawLower = rotationFromQuaternion(desiredLowerLocal);
     if (!rawUpper || !rawLower) return null;
-    const upperRotation = dependencies.dampJointRotation(chain.upper, rawUpper, strength);
-    const lowerRotation = dependencies.dampJointRotation(chain.lower, rawLower, strength);
+    const dampRotation = (
+      boneName: VRMHumanBoneName,
+      rotation: StudioVrmJointRotation,
+    ): StudioVrmJointRotation | null => profile
+      ? (dependencies.dampProfiledJointRotation?.(boneName, rotation, profile)
+        ?? dampStudioVrmJointRotationForProfile(boneName, rotation, profile))
+      : dependencies.dampJointRotation(boneName, rotation, strength);
+    const upperRotation = dampRotation(chain.upper, rawUpper);
+    const lowerRotation = dampRotation(chain.lower, rawLower);
+    if (!upperRotation || !lowerRotation) return null;
     if (!finiteRotation(upperRotation) || !finiteRotation(lowerRotation)) return null;
 
     const bones: PoseBoneMap = {
@@ -334,19 +479,26 @@ export function solveStudioVrmUserIk(
       [chain.upper]: { rotation: [...upperRotation] as Vec3 },
       [chain.lower]: { rotation: [...lowerRotation] as Vec3 },
     };
-    return Object.freeze({
+    const effectiveTargetWorld = floorContact
+      ? solution.effectiveTarget.clone().add(new THREE.Vector3(...floorContact.hipsTranslation))
+      : solution.effectiveTarget;
+    const solvedMiddleWorld = floorContact
+      ? solution.elbow.clone().add(new THREE.Vector3(...floorContact.hipsTranslation))
+      : solution.elbow;
+    const baseResult = {
       effector: request.effector,
       chain,
       bones,
-      yOffset: baked.yOffset,
-      requestedTargetWorld: tuple(target),
-      effectiveTargetWorld: tuple(solution.effectiveTarget),
-      solvedMiddleWorld: tuple(solution.elbow),
+      yOffset: resultYOffset,
+      requestedTargetWorld: tuple(requestedTarget),
+      effectiveTargetWorld: tuple(effectiveTargetWorld),
+      solvedMiddleWorld: tuple(solvedMiddleWorld),
       poleDirectionWorld: tuple(solution.poleDirection),
       reachable: solution.reachable,
-      clamped: solution.clamped,
+      clamped: solution.clamped || floorContact?.contactClamped === true,
       limited: rotationsDiffer(rawUpper, upperRotation) || rotationsDiffer(rawLower, lowerRotation),
-    });
+    } satisfies Omit<StudioVrmUserIkResult, "floorContact">;
+    return Object.freeze(floorContact ? { ...baseResult, floorContact } : baseResult);
   } catch {
     return null;
   }

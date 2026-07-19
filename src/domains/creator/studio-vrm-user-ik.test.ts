@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 
 import { solveTwoBoneTarget } from "./studio-rig-two-bone-ik";
+import { solveStudioVrmFloorContact } from "./studio-vrm-contact-solver";
 import {
   clampStudioVrmJointRotation,
   dampStudioVrmJointRotation,
@@ -17,6 +18,7 @@ import type { PoseBoneMap } from "./studio-vrm-poser-utils";
 import type {
   StudioVrmUserIkDependencies,
   StudioVrmUserIkEffector,
+  StudioVrmUserIkRequest,
   StudioVrmUserIkSource,
 } from "./studio-vrm-user-ik";
 import type { VRMHumanBoneName } from "@pixiv/three-vrm";
@@ -25,6 +27,10 @@ const UNLIMITED_DEPENDENCIES: StudioVrmUserIkDependencies = {
   solveTarget: solveTwoBoneTarget,
   bakeRuntimePose: bakeStudioVrmRuntimePose,
   dampJointRotation: (_boneName, rotation) => {
+    if (!Array.isArray(rotation) || rotation.length < 3) return [0, 0, 0];
+    return [Number(rotation[0]), Number(rotation[1]), Number(rotation[2])];
+  },
+  dampProfiledJointRotation: (_boneName, rotation) => {
     if (!Array.isArray(rotation) || rotation.length < 3) return [0, 0, 0];
     return [Number(rotation[0]), Number(rotation[1]), Number(rotation[2])];
   },
@@ -80,6 +86,10 @@ function addLeg(
 function createRig(): RigFixture {
   const scene = new THREE.Group();
   const nodes = new Map<VRMHumanBoneName, THREE.Bone>();
+  const hips = new THREE.Bone();
+  hips.position.y = 1;
+  scene.add(hips);
+  nodes.set("hips", hips);
   addArm(scene, nodes, "left");
   addArm(scene, nodes, "right");
   addLeg(scene, nodes, "left");
@@ -349,6 +359,104 @@ describe("Studio VRM user IK", () => {
     expect(result.limited).toBe(true);
   });
 
+  it("neutral profile은 기존 IK 출력과 같고 선택 profile의 전용 damping을 사용한다", () => {
+    const fixture = createRig();
+    const request = {
+      effector: "leftHand" as const,
+      targetWorld: targetFor(fixture, "leftHand"),
+      poleWorld: poleFor(fixture, "leftHand"),
+    };
+    const legacy = solveStudioVrmUserIk(fixture.source, request);
+    const neutral = solveStudioVrmUserIk(fixture.source, {
+      ...request,
+      jointProfile: "neutral",
+    });
+    expect(neutral).toEqual(legacy);
+
+    const calls: string[] = [];
+    const profiled = solveStudioVrmUserIk(fixture.source, {
+      ...request,
+      jointProfile: "limited",
+    }, {
+      ...UNLIMITED_DEPENDENCIES,
+      dampProfiledJointRotation(bone, rotation, profile) {
+        calls.push(`${String(bone)}:${typeof profile === "string" ? profile : profile.id}`);
+        return UNLIMITED_DEPENDENCIES.dampProfiledJointRotation!(bone, rotation, profile);
+      },
+    });
+    expect(profiled).not.toBeNull();
+    expect(calls).toEqual([
+      "leftUpperArm:limited",
+      "leftLowerArm:limited",
+    ]);
+  });
+
+  it("발 고정은 contact solver의 골반 Y 분담 후 residual leg IK를 적용한다", () => {
+    const fixture = createRig();
+    let contactCalls = 0;
+    const target = new THREE.Vector3(-0.5, 25, 0);
+    const result = solveStudioVrmUserIk(fixture.source, {
+      effector: "leftFoot",
+      targetWorld: target,
+      poleWorld: poleFor(fixture, "leftFoot"),
+      jointProfile: "neutral",
+      footPlant: true,
+      fullBodyIk: true,
+      floorHeight: -1.8,
+    }, {
+      ...UNLIMITED_DEPENDENCIES,
+      solveFloorContact(input) {
+        contactCalls += 1;
+        return solveStudioVrmFloorContact(input);
+      },
+    });
+
+    expect(contactCalls).toBe(1);
+    expect(result).not.toBeNull();
+    expect(result?.requestedTargetWorld).toEqual([-0.5, 25, 0]);
+    expect(result?.floorContact?.floorHeight).toBe(-1.8);
+    expect(result?.floorContact?.contactClamped).toBe(false);
+    expect(result?.floorContact?.hipsTranslation[0]).toBe(0);
+    expect(result?.floorContact?.hipsTranslation[1]).toBeCloseTo(0.1, 12);
+    expect(result?.floorContact?.hipsTranslation[2]).toBe(0);
+    expect(result?.floorContact?.residualLegIkTranslation[0]).toBeCloseTo(0.5, 12);
+    expect(result?.floorContact?.residualLegIkTranslation[1]).toBeCloseTo(0.1, 12);
+    expect(result?.floorContact?.residualLegIkTranslation[2]).toBe(0);
+    expect(result?.yOffset).toBeCloseTo(0.1, 12);
+
+    const output = createRig();
+    applyRotationOnlyPose(output, result!.bones, result!.yOffset);
+    const footWorld = output.nodes.get("leftFoot")!.getWorldPosition(new THREE.Vector3());
+    expect(footWorld.x).toBeCloseTo(-0.5, 5);
+    expect(footWorld.y).toBeCloseTo(-1.8, 5);
+  });
+
+  it("발 고정 off 경로는 contact solver를 호출하지 않고 기존 결과를 유지한다", () => {
+    const fixture = createRig();
+    const request = {
+      effector: "rightFoot" as const,
+      targetWorld: targetFor(fixture, "rightFoot"),
+      poleWorld: poleFor(fixture, "rightFoot"),
+    };
+    const baseline = solveStudioVrmUserIk(fixture.source, request, UNLIMITED_DEPENDENCIES);
+    let contactCalls = 0;
+    const disabled = solveStudioVrmUserIk(fixture.source, {
+      ...request,
+      footPlant: false,
+      fullBodyIk: true,
+      floorHeight: -1.8,
+    }, {
+      ...UNLIMITED_DEPENDENCIES,
+      solveFloorContact(input) {
+        contactCalls += 1;
+        return solveStudioVrmFloorContact(input);
+      },
+    });
+    expect(contactCalls).toBe(0);
+    expect(disabled).toEqual(baseline);
+    expect(disabled).not.toHaveProperty("floorContact");
+  });
+
   it("missing bone, 잘못된 계층, zero length, 비유한 입력을 fail-closed한다", () => {
     const missing = createRig();
     missing.nodes.delete("leftShoulder");
@@ -387,6 +495,26 @@ describe("Studio VRM user IK", () => {
       effector: "leftFoot",
       targetWorld: new THREE.Vector3(0, -1, 0),
       softLimitStrength: Number.NaN,
+    })).toBeNull();
+    expect(solveStudioVrmUserIk(finite.source, {
+      effector: "leftFoot",
+      targetWorld: new THREE.Vector3(0, -1, 0),
+      jointProfile: "neutral",
+      softLimitStrength: 0.5,
+    })).toBeNull();
+    expect(solveStudioVrmUserIk(finite.source, {
+      effector: "leftFoot",
+      targetWorld: new THREE.Vector3(0, -1, 0),
+      // Deliberately bypass the compile-time contract to exercise runtime rejection of an
+      // untrusted persisted/network payload that makes a medical-purpose claim.
+      jointProfile: { version: 1, purpose: "medical", id: "adult" } as unknown as
+        StudioVrmUserIkRequest["jointProfile"],
+    })).toBeNull();
+    expect(solveStudioVrmUserIk(finite.source, {
+      effector: "leftFoot",
+      targetWorld: new THREE.Vector3(0, -1, 0),
+      footPlant: true,
+      floorHeight: Number.POSITIVE_INFINITY,
     })).toBeNull();
 
     finite.nodes.get("leftUpperLeg")!.quaternion.set(Number.NaN, 0, 0, 1);

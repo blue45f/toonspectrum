@@ -179,7 +179,7 @@ describe("StudioLazyPanelStack", () => {
     const setPoserInitialDataUrl = vi.fn();
     const setPoserInitialElementId = vi.fn();
     const setPoserVrmOpen = vi.fn();
-    const scene = { version: 1 };
+    const scene = { version: 2 };
     render(
       <StudioLazyPanelStack
         {...createProps({

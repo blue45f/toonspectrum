@@ -25,8 +25,11 @@ import {
 import { parseStudioProjectFile, type StudioProjectFile } from "./studio-project-file";
 import { parseStudioReferenceBoardDocument } from "./studio-reference-board";
 import {
+  STUDIO_VRM_SCENE_DOCUMENT_KIND,
   STUDIO_VRM_SCENE_DOCUMENT_MAX_BYTES,
+  migrateStudioVrmSceneDocument,
   parseStudioVrmLegacyFragment,
+  parseStudioVrmSceneDocument,
   serializeStudioVrmSceneDocument,
 } from "./studio-vrm-scene-document";
 import { SAMPLE_VRMS } from "./vrm-library";
@@ -2307,6 +2310,52 @@ function parseCanonicalJson<T>(
   return parsed.data;
 }
 
+/**
+ * Projects only strict VRM scene v1 values to v2 for archive-writer compatibility checks.
+ * No other project defaults, redactions, or schema changes are introduced here.
+ */
+function promoteStrictVersionOneVrmScenes(
+  project: Record<string, unknown>,
+): Record<string, unknown> | null {
+  let changed = false;
+  let invalid = false;
+  const visitElements = (value: unknown): unknown => {
+    if (!Array.isArray(value)) return value;
+    return value.map((element) => {
+      if (
+        !isRecord(element)
+        || element.type !== "image"
+        || !isRecord(element.vrmScene)
+        || element.vrmScene.kind !== STUDIO_VRM_SCENE_DOCUMENT_KIND
+        || element.vrmScene.version !== 1
+      ) return element;
+      const migrated = migrateStudioVrmSceneDocument(element.vrmScene);
+      const serialized = serializeStudioVrmSceneDocument(migrated);
+      const canonical = serialized ? parseStudioVrmSceneDocument(serialized) : null;
+      if (!canonical) {
+        invalid = true;
+        return element;
+      }
+      changed = true;
+      return { ...element, vrmScene: canonical };
+    });
+  };
+
+  const pages = Array.isArray(project.pagesList)
+    ? project.pagesList.map((page) => isRecord(page)
+      ? { ...page, elements: visitElements(page.elements) }
+      : page)
+    : project.pagesList;
+  const master = isRecord(project.master)
+    ? { ...project.master, elements: visitElements(project.master.elements) }
+    : project.master;
+  if (invalid) return null;
+  if (!changed) return project;
+  const promoted: Record<string, unknown> = { ...project, pagesList: pages };
+  if (Object.hasOwn(project, "master")) promoted.master = master;
+  return promoted;
+}
+
 function parseCanonicalProject(
   bytes: Uint8Array,
   limits: StudioProjectArchiveLimits,
@@ -2352,11 +2401,20 @@ function parseCanonicalProject(
     limits,
     nodes: 0,
   });
+  const legacyVrmProjection = manifestVersion === STUDIO_PROJECT_ARCHIVE_VERSION
+    ? promoteStrictVersionOneVrmScenes(sanitized)
+    : null;
+  const writerMatchesStored = isRecord(writerCanonical)
+    && canonicalJson(writerCanonical) === text;
+  const writerMatchesVrmV1Projection = isRecord(writerCanonical)
+    && legacyVrmProjection !== null
+    && canonicalJson(writerCanonical) === canonicalJson(legacyVrmProjection);
   if (
     !isRecord(writerCanonical)
     || (
       manifestVersion === STUDIO_PROJECT_ARCHIVE_VERSION
-      && canonicalJson(writerCanonical) !== text
+      && !writerMatchesStored
+      && !writerMatchesVrmV1Projection
     )
   ) {
     fail(

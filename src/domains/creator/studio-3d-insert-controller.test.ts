@@ -19,7 +19,9 @@ const mutationTicket: StudioEditorMutationTicket = {
   documentGeneration: 3,
 };
 
-const vrmScene = { version: 1 } as StudioVrmPoserInsertResult["scene"];
+// This controller test treats scene metadata as an opaque identity. The parser/serializer suites
+// own the complete scene fixture; cross the type boundary explicitly instead of duplicating it.
+const vrmScene = { version: 2 } as unknown as StudioVrmPoserInsertResult["scene"];
 const vrmResult: StudioVrmPoserInsertResult = {
   pngDataUrl: "data:image/png;base64,vrm",
   width: 200,

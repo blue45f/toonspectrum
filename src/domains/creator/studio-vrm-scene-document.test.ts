@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import { STUDIO_VRM_RIG_PROFILE_PURPOSE } from "./studio-vrm-rig-profile";
 import {
   DEFAULT_STUDIO_VRM_SCENE_DOCUMENT,
   STUDIO_VRM_SCENE_DOCUMENT_KIND,
   STUDIO_VRM_SCENE_DOCUMENT_MAX_BYTES,
+  STUDIO_VRM_SCENE_DOCUMENT_V1_MAX_BYTES,
   areStudioVrmSceneDocumentsEqual,
   createDefaultStudioVrmSceneDocument,
   migrateStudioVrmLegacyMetadata,
@@ -25,6 +27,15 @@ function canonicalScene(overrides: Partial<StudioVrmSceneDocument>): StudioVrmSc
     ...mutableDefault(),
     ...overrides,
   });
+}
+
+function canonicalVersionOne(
+  scene: StudioVrmSceneDocument = createDefaultStudioVrmSceneDocument(),
+): Record<string, unknown> {
+  const { rig: _rig, ...versionOne } = JSON.parse(JSON.stringify(scene)) as Record<string, unknown> & {
+    rig: unknown;
+  };
+  return { ...versionOne, version: 1 };
 }
 
 describe("studio-vrm-scene-document", () => {
@@ -75,6 +86,17 @@ describe("studio-vrm-scene-document", () => {
         avatarForge: { face: { jaw: 0.2 }, tags: ["hero", "adult"] },
         costume: { preset: "school" },
         wardrobe: { items: [{ id: "coat-1", visible: true }] },
+      },
+      rig: {
+        version: 1,
+        jointProfile: {
+          version: 1,
+          purpose: STUDIO_VRM_RIG_PROFILE_PURPOSE,
+          id: "limited",
+        },
+        fullBodyIk: true,
+        footPlant: true,
+        floorHeight: -0.125,
       },
       props: { items: [{ id: "prop-1", scale: [1, 1, 1] }] },
       sceneProps: { items: [{ id: "cat-1", parent: "world" }] },
@@ -197,9 +219,119 @@ describe("studio-vrm-scene-document", () => {
     expect(serializeStudioVrmSceneDocument(nan)).toBeNull();
 
     const future = mutableDefault();
-    future.version = 2;
+    future.version = 3;
     expect(parseStudioVrmSceneDocument(JSON.stringify(future))).toBeNull();
     expect(migrateStudioVrmSceneDocument(future)).toBeNull();
+  });
+
+  it("losslessly promotes strict v1 scenes to v2 with a neutral drawing rig", () => {
+    const current = canonicalScene({
+      pose: {
+        bones: {
+          leftUpperArm: { rotation: [0.25, -0.5, 0.75] },
+          rightUpperArm: { rotation: [0.25, 0.5, -0.75] },
+        },
+        yOffset: 0.14,
+        bodyRotationY: -0.4,
+        fingerOverrides: {
+          leftIndexProximal: [0.1, 0.2, -0.3],
+          rightIndexProximal: [0.1, -0.2, 0.3],
+        },
+      },
+      camera: {
+        projection: "perspective",
+        position: [-1.25, 2.1, 4.25],
+        target: [0.2, 1.3, -0.1],
+        up: [0, 1, 0],
+        fovDegrees: 37,
+        near: 0.05,
+        far: 250,
+      },
+      props: { items: [{ id: "mirror-safe-prop", side: "left" }] },
+    });
+    const versionOne = canonicalVersionOne(current);
+
+    const parsed = parseStudioVrmSceneDocument(JSON.stringify(versionOne));
+    const migrated = migrateStudioVrmSceneDocument(versionOne);
+
+    expect(parsed).toEqual(migrated);
+    expect(parsed).toMatchObject({
+      kind: STUDIO_VRM_SCENE_DOCUMENT_KIND,
+      version: 2,
+      pose: current.pose,
+      camera: current.camera,
+      props: current.props,
+      rig: {
+        version: 1,
+        jointProfile: {
+          version: 1,
+          purpose: STUDIO_VRM_RIG_PROFILE_PURPOSE,
+          id: "neutral",
+        },
+        fullBodyIk: false,
+        footPlant: false,
+        floorHeight: 0,
+      },
+    });
+    expect(parsed?.pose.bones.leftUpperArm).toEqual(current.pose.bones.leftUpperArm);
+    expect(parsed?.pose.bones.rightUpperArm).toEqual(current.pose.bones.rightUpperArm);
+    expect(parsed?.pose.fingerOverrides).toEqual(current.pose.fingerOverrides);
+    expect(serializeStudioVrmSceneDocument(parsed)).not.toBeNull();
+  });
+
+  it("rejects unknown v1/v2 root or rig keys instead of silently dropping them", () => {
+    const current = mutableDefault();
+    expect(parseStudioVrmSceneDocument(JSON.stringify({ ...current, futureRoot: true }))).toBeNull();
+    expect(serializeStudioVrmSceneDocument({ ...current, futureRoot: true })).toBeNull();
+    expect(parseStudioVrmSceneDocument(JSON.stringify({
+      ...current,
+      rig: { ...(current.rig as Record<string, unknown>), diagnosis: "none" },
+    }))).toBeNull();
+
+    const versionOne = canonicalVersionOne();
+    expect(parseStudioVrmSceneDocument(JSON.stringify({ ...versionOne, rig: {} }))).toBeNull();
+    expect(migrateStudioVrmSceneDocument({ ...versionOne, unknown: true })).toBeNull();
+  });
+
+  it("keeps near-ceiling v1 content through promotion while rejecting oversized documents", () => {
+    const noteEntries = Array.from({ length: 126 }, (_, index) => [
+        `note-${String(index).padStart(3, "0")}`,
+        "x".repeat(1_000),
+      ] as const);
+    let notes = Object.fromEntries(noteEntries);
+    let versionOne = canonicalVersionOne(canonicalScene({ props: notes }));
+    let serializedV1 = JSON.stringify(versionOne);
+    let remaining = STUDIO_VRM_SCENE_DOCUMENT_V1_MAX_BYTES - 256
+      - new TextEncoder().encode(serializedV1).byteLength;
+    for (let index = 0; remaining > 0 && index < noteEntries.length; index += 1) {
+      const extra = Math.min(24, remaining);
+      noteEntries[index] = [noteEntries[index][0], `${noteEntries[index][1]}${"x".repeat(extra)}`];
+      remaining -= extra;
+    }
+    notes = Object.fromEntries(noteEntries);
+    versionOne = canonicalVersionOne(canonicalScene({ props: notes }));
+    serializedV1 = JSON.stringify(versionOne);
+    expect(new TextEncoder().encode(serializedV1).byteLength).toBeGreaterThan(
+      STUDIO_VRM_SCENE_DOCUMENT_V1_MAX_BYTES - 512,
+    );
+
+    const migrated = parseStudioVrmSceneDocument(serializedV1);
+    const serializedV2 = serializeStudioVrmSceneDocument(migrated);
+    expect(migrated?.props).toEqual(notes);
+    expect(serializedV2).not.toBeNull();
+
+    const oversized = `${serializedV2}${" ".repeat(STUDIO_VRM_SCENE_DOCUMENT_MAX_BYTES)}`;
+    expect(parseStudioVrmSceneDocument(oversized)).toBeNull();
+
+    const compactVersionOne = JSON.stringify(canonicalVersionOne());
+    const compactVersionOneBytes = new TextEncoder().encode(compactVersionOne).byteLength;
+    const paddedVersionOne = `${compactVersionOne}${" ".repeat(
+      STUDIO_VRM_SCENE_DOCUMENT_V1_MAX_BYTES - compactVersionOneBytes + 1,
+    )}`;
+    expect(new TextEncoder().encode(paddedVersionOne).byteLength)
+      .toBe(STUDIO_VRM_SCENE_DOCUMENT_V1_MAX_BYTES + 1);
+    expect(parseStudioVrmSceneDocument(paddedVersionOne)).toBeNull();
+    expect(migrateStudioVrmSceneDocument(paddedVersionOne)).toBeNull();
   });
 
   it("never invokes accessors while parsing, serializing, or normalizing", () => {
@@ -339,5 +471,11 @@ describe("studio-vrm-scene-document", () => {
     expect(studioVrmSceneHasContent(changed)).toBe(true);
     expect(areStudioVrmSceneDocumentsEqual(first, changed)).toBe(false);
     expect(areStudioVrmSceneDocumentsEqual(first, { ...first, extra: true })).toBe(false);
+
+    const versionOneDefault = canonicalVersionOne(first);
+    const versionOneChanged = canonicalVersionOne(changed);
+    expect(areStudioVrmSceneDocumentsEqual(versionOneDefault, first)).toBe(true);
+    expect(studioVrmSceneHasContent(versionOneDefault)).toBe(false);
+    expect(studioVrmSceneHasContent(versionOneChanged)).toBe(true);
   });
 });

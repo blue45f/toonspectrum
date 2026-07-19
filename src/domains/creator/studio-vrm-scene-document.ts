@@ -1,3 +1,10 @@
+import {
+  STUDIO_VRM_RIG_PROFILE_PURPOSE,
+  STUDIO_VRM_RIG_PROFILE_VERSION,
+  createStudioVrmRigProfileSelection,
+  type StudioVrmRigProfileSelection,
+} from "./studio-vrm-rig-profile";
+
 /**
  * Engine-neutral, persistence-safe scene document for the Studio VRM poser.
  *
@@ -7,8 +14,15 @@
  */
 
 export const STUDIO_VRM_SCENE_DOCUMENT_KIND = "studio-vrm-scene" as const;
-export const STUDIO_VRM_SCENE_DOCUMENT_VERSION = 1 as const;
-export const STUDIO_VRM_SCENE_DOCUMENT_MAX_BYTES = 128 * 1024;
+export const STUDIO_VRM_SCENE_DOCUMENT_VERSION = 2 as const;
+export const STUDIO_VRM_SCENE_DOCUMENT_LEGACY_VERSION = 1 as const;
+export const STUDIO_VRM_SCENE_DOCUMENT_V1_MAX_BYTES = 128 * 1024;
+/**
+ * v2 reserves bounded headroom for the required rig block so every historically valid v1 scene
+ * can be promoted without dropping authoring data at the former 128 KiB boundary.
+ */
+export const STUDIO_VRM_SCENE_DOCUMENT_MAX_BYTES =
+  STUDIO_VRM_SCENE_DOCUMENT_V1_MAX_BYTES + 512;
 /** Matches the default project-archive per-attachment ceiling so every accepted scene is portable. */
 export const STUDIO_VRM_MODEL_MAX_BYTES = 96 * 1024 * 1024;
 export const STUDIO_VRM_MAX_POSE_BONES = 64;
@@ -204,6 +218,15 @@ export interface StudioVrmRenderSettings {
   readonly backgroundColor: string;
 }
 
+/** Versioned, engine-neutral drawing-assist settings persisted with a VRM scene. */
+export interface StudioVrmRigSettings {
+  readonly version: 1;
+  readonly jointProfile: StudioVrmRigProfileSelection;
+  readonly fullBodyIk: boolean;
+  readonly footPlant: boolean;
+  readonly floorHeight: number;
+}
+
 export interface StudioVrmSceneDocument {
   readonly kind: typeof STUDIO_VRM_SCENE_DOCUMENT_KIND;
   readonly version: typeof STUDIO_VRM_SCENE_DOCUMENT_VERSION;
@@ -212,6 +235,7 @@ export interface StudioVrmSceneDocument {
   readonly expressions: Readonly<Record<string, number>>;
   readonly camera: StudioVrmCameraSettings;
   readonly appearance: StudioVrmAppearanceSettings;
+  readonly rig: StudioVrmRigSettings;
   readonly props: StudioVrmCanonicalData;
   readonly sceneProps: StudioVrmCanonicalData;
   readonly lighting: StudioVrmLightingSettings;
@@ -299,6 +323,17 @@ const DEFAULT_RAW_DOCUMENT: StudioVrmSceneDocument = {
     costume: null,
     wardrobe: null,
   },
+  rig: {
+    version: 1,
+    jointProfile: {
+      version: STUDIO_VRM_RIG_PROFILE_VERSION,
+      purpose: STUDIO_VRM_RIG_PROFILE_PURPOSE,
+      id: "neutral",
+    },
+    fullBodyIk: false,
+    footPlant: false,
+    floorHeight: 0,
+  },
   props: null,
   sceneProps: null,
   lighting: { intensity: 1, colorTemp: 0.5, directionDeg: 45 },
@@ -318,7 +353,7 @@ const DEFAULT_RAW_DOCUMENT: StudioVrmSceneDocument = {
   },
 };
 
-const CURRENT_ROOT_KEYS = new Set([
+const VERSION_ONE_ROOT_KEYS = new Set([
   "kind",
   "version",
   "model",
@@ -332,6 +367,19 @@ const CURRENT_ROOT_KEYS = new Set([
   "physics",
   "env",
   "render",
+]);
+
+const CURRENT_ROOT_KEYS = new Set([
+  ...VERSION_ONE_ROOT_KEYS,
+  "rig",
+]);
+
+const RIG_KEYS = new Set([
+  "version",
+  "jointProfile",
+  "fullBodyIk",
+  "footPlant",
+  "floorHeight",
 ]);
 
 const LEGACY_ROOT_KEYS = new Set([
@@ -467,6 +515,13 @@ function decodeBoundedDataGraph(raw: unknown): unknown | null {
   } catch {
     return null;
   }
+}
+
+function exceedsVersionOneSourceLimit(raw: unknown, decoded: unknown): boolean {
+  return typeof raw === "string"
+    && isRecord(decoded)
+    && decoded.version === STUDIO_VRM_SCENE_DOCUMENT_LEGACY_VERSION
+    && utf8ByteLength(raw) > STUDIO_VRM_SCENE_DOCUMENT_V1_MAX_BYTES;
 }
 
 function deepFreeze<T>(value: T): T {
@@ -829,13 +884,22 @@ function normalizeRender(value: unknown): StudioVrmRenderSettings {
   };
 }
 
-function normalizeDecodedCurrentDocument(value: unknown): StudioVrmSceneDocument | null {
-  if (
-    !isRecord(value) ||
-    value.kind !== STUDIO_VRM_SCENE_DOCUMENT_KIND ||
-    value.version !== STUDIO_VRM_SCENE_DOCUMENT_VERSION
-  ) return null;
-  const document: StudioVrmSceneDocument = {
+function normalizeRig(value: unknown): StudioVrmRigSettings {
+  const candidate = isRecord(value) ? value : {};
+  const jointProfile = createStudioVrmRigProfileSelection(candidate.jointProfile)
+    ?? createStudioVrmRigProfileSelection("neutral");
+  if (!jointProfile) throw new Error("Missing internal neutral Studio VRM rig profile.");
+  return {
+    version: 1,
+    jointProfile,
+    fullBodyIk: normalizeBoolean(candidate.fullBodyIk, false),
+    footPlant: normalizeBoolean(candidate.footPlant, false),
+    floorHeight: boundedNumber(candidate.floorHeight, 0, -10, 10),
+  };
+}
+
+function normalizeDecodedDocumentFields(value: Record<string, unknown>): StudioVrmSceneDocument {
+  return {
     kind: STUDIO_VRM_SCENE_DOCUMENT_KIND,
     version: STUDIO_VRM_SCENE_DOCUMENT_VERSION,
     model: normalizeModel(value.model),
@@ -843,6 +907,7 @@ function normalizeDecodedCurrentDocument(value: unknown): StudioVrmSceneDocument
     expressions: normalizeExpressions(value.expressions),
     camera: normalizeCamera(value.camera),
     appearance: normalizeAppearance(value.appearance),
+    rig: normalizeRig(value.rig),
     props: normalizedDataOrNull(value.props),
     sceneProps: normalizedDataOrNull(value.sceneProps),
     lighting: normalizeLighting(value.lighting),
@@ -850,7 +915,15 @@ function normalizeDecodedCurrentDocument(value: unknown): StudioVrmSceneDocument
     env: isStudioVrmEnvironment(value.env) ? value.env : "none",
     render: normalizeRender(value.render),
   };
-  return deepFreeze(document);
+}
+
+function normalizeDecodedCurrentDocument(value: unknown): StudioVrmSceneDocument | null {
+  if (
+    !isRecord(value) ||
+    value.kind !== STUDIO_VRM_SCENE_DOCUMENT_KIND ||
+    value.version !== STUDIO_VRM_SCENE_DOCUMENT_VERSION
+  ) return null;
+  return deepFreeze(normalizeDecodedDocumentFields(value));
 }
 
 function strictDecodedCurrentDocument(value: unknown): StudioVrmSceneDocument | null {
@@ -859,11 +932,63 @@ function strictDecodedCurrentDocument(value: unknown): StudioVrmSceneDocument | 
   if (keys.length !== CURRENT_ROOT_KEYS.size || keys.some((key) => !CURRENT_ROOT_KEYS.has(key))) {
     return null;
   }
+  if (
+    !isRecord(value.rig)
+    || Object.keys(value.rig).length !== RIG_KEYS.size
+    || Object.keys(value.rig).some((key) => !RIG_KEYS.has(key))
+  ) return null;
   const normalized = normalizeDecodedCurrentDocument(value);
   if (!normalized || !jsonStructuresEqual(value, normalized)) return null;
   try {
     return utf8ByteLength(JSON.stringify(normalized)) <= STUDIO_VRM_SCENE_DOCUMENT_MAX_BYTES
       ? normalized
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function versionOneProjection(document: StudioVrmSceneDocument): Record<string, unknown> {
+  return {
+    kind: document.kind,
+    version: STUDIO_VRM_SCENE_DOCUMENT_LEGACY_VERSION,
+    model: document.model,
+    pose: document.pose,
+    expressions: document.expressions,
+    camera: document.camera,
+    appearance: document.appearance,
+    props: document.props,
+    sceneProps: document.sceneProps,
+    lighting: document.lighting,
+    physics: document.physics,
+    env: document.env,
+    render: document.render,
+  };
+}
+
+/** Strict, lossless v1 reader. The only authored addition is the documented neutral rig default. */
+function migrateStrictDecodedVersionOneDocument(value: unknown): StudioVrmSceneDocument | null {
+  if (
+    !isRecord(value)
+    || value.kind !== STUDIO_VRM_SCENE_DOCUMENT_KIND
+    || value.version !== STUDIO_VRM_SCENE_DOCUMENT_LEGACY_VERSION
+  ) return null;
+  const keys = Object.keys(value);
+  if (
+    keys.length !== VERSION_ONE_ROOT_KEYS.size
+    || keys.some((key) => !VERSION_ONE_ROOT_KEYS.has(key))
+  ) return null;
+  const migrated = deepFreeze(normalizeDecodedDocumentFields({
+    ...value,
+    rig: DEFAULT_RAW_DOCUMENT.rig,
+  }));
+  if (!jsonStructuresEqual(value, versionOneProjection(migrated))) return null;
+  try {
+    const sourceBytes = utf8ByteLength(JSON.stringify(value));
+    const migratedBytes = utf8ByteLength(JSON.stringify(migrated));
+    return sourceBytes <= STUDIO_VRM_SCENE_DOCUMENT_V1_MAX_BYTES
+      && migratedBytes <= STUDIO_VRM_SCENE_DOCUMENT_MAX_BYTES
+      ? migrated
       : null;
   } catch {
     return null;
@@ -894,15 +1019,21 @@ export const DEFAULT_STUDIO_VRM_SCENE_DOCUMENT = createDefaultStudioVrmSceneDocu
  */
 export function normalizeStudioVrmSceneDocument(raw: unknown): StudioVrmSceneDocument {
   const decoded = decodeBoundedDataGraph(raw);
-  return normalizeDecodedCurrentDocument(decoded) ?? createDefaultStudioVrmSceneDocument();
+  if (exceedsVersionOneSourceLimit(raw, decoded)) return createDefaultStudioVrmSceneDocument();
+  return normalizeDecodedCurrentDocument(decoded)
+    ?? migrateStrictDecodedVersionOneDocument(decoded)
+    ?? createDefaultStudioVrmSceneDocument();
 }
 
-/** Parses only complete, losslessly canonical version-1 documents. */
+/** Parses canonical v2 and losslessly promotes complete canonical v1 documents. */
 export function parseStudioVrmSceneDocument(raw: string): StudioVrmSceneDocument | null {
-  return strictDecodedCurrentDocument(decodeBoundedDataGraph(raw));
+  const decoded = decodeBoundedDataGraph(raw);
+  if (exceedsVersionOneSourceLimit(raw, decoded)) return null;
+  return strictDecodedCurrentDocument(decoded)
+    ?? migrateStrictDecodedVersionOneDocument(decoded);
 }
 
-/** Serializes only complete, losslessly canonical version-1 documents. */
+/** Serializes only complete, losslessly canonical version-2 documents. */
 export function serializeStudioVrmSceneDocument(raw: unknown): string | null {
   const document = strictDecodedCurrentDocument(decodeBoundedDataGraph(raw));
   if (!document) return null;
@@ -1001,8 +1132,11 @@ export function migrateStudioVrmSceneDocument(
   options: StudioVrmLegacyMigrationOptions = {}
 ): StudioVrmSceneDocument | null {
   const decoded = decodeBoundedDataGraph(raw);
+  if (exceedsVersionOneSourceLimit(raw, decoded)) return null;
   const current = strictDecodedCurrentDocument(decoded);
   if (current) return current;
+  const versionOne = migrateStrictDecodedVersionOneDocument(decoded);
+  if (versionOne) return versionOne;
   const migrated = migrateDecodedLegacyMetadata(decoded, options);
   return migrated?.status === "resolved" ? migrated.document : null;
 }
@@ -1053,13 +1187,14 @@ export function parseStudioVrmLegacyFragment(
 
 /** Canonical semantic equality independent of object identity and key insertion order. */
 export function areStudioVrmSceneDocumentsEqual(left: unknown, right: unknown): boolean {
-  const leftSerialized = serializeStudioVrmSceneDocument(left);
-  return leftSerialized !== null && leftSerialized === serializeStudioVrmSceneDocument(right);
+  const leftSerialized = serializeStudioVrmSceneDocument(migrateStudioVrmSceneDocument(left));
+  return leftSerialized !== null
+    && leftSerialized === serializeStudioVrmSceneDocument(migrateStudioVrmSceneDocument(right));
 }
 
 /** Returns whether a canonical scene contains authoring intent beyond the fresh default. */
 export function studioVrmSceneHasContent(raw: unknown): boolean {
-  const serialized = serializeStudioVrmSceneDocument(raw);
+  const serialized = serializeStudioVrmSceneDocument(migrateStudioVrmSceneDocument(raw));
   if (!serialized) return false;
   return serialized !== serializeStudioVrmSceneDocument(DEFAULT_STUDIO_VRM_SCENE_DOCUMENT);
 }

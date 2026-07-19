@@ -15,7 +15,10 @@ import {
   serializeStudioProjectFile,
 } from "./studio-project-file";
 import { createStudioReferenceBoardDocument } from "./studio-reference-board";
-import { createStudioVrmSceneDocument } from "./studio-vrm-scene-document";
+import {
+  createStudioVrmSceneDocument,
+  normalizeStudioVrmSceneDocument,
+} from "./studio-vrm-scene-document";
 
 const page = { id: "p1", elements: [], bg: "#ffffff", bgGrad: null, canvasH: 1080 };
 const PRIVATE_PROMPT = "원작자의 비공개 결말 프롬프트";
@@ -208,6 +211,65 @@ describe("studio project file", () => {
         elements: [{ ...image, vrmScene: { ...vrmScene, version: 99 } }],
       }],
     })).toThrow(/3D 데생 인형 장면/);
+  });
+
+  it("페이지와 마스터의 strict VRM v1 장면을 authored 값 손실 없이 v2 rig 장면으로 승격한다", () => {
+    const current = normalizeStudioVrmSceneDocument({
+      ...createStudioVrmSceneDocument(),
+      pose: {
+        bones: {
+          leftUpperArm: { rotation: [0.25, -0.5, 0.75] },
+          rightUpperArm: { rotation: [0.25, 0.5, -0.75] },
+        },
+        yOffset: 0.12,
+        bodyRotationY: -0.35,
+        fingerOverrides: {
+          leftIndexProximal: [0.1, 0.2, -0.3],
+          rightIndexProximal: [0.1, -0.2, 0.3],
+        },
+      },
+      expressions: { happy: 0.7 },
+      props: { items: [{ id: "book" }] },
+    });
+    const { rig: _rig, ...versionOne } = JSON.parse(JSON.stringify(current)) as Record<
+      string,
+      unknown
+    > & { rig: unknown };
+    versionOne.version = 1;
+    const image = {
+      id: "legacy-vrm-image",
+      type: "image",
+      src: "data:image/png;base64,iVBORw0KGgo=",
+      vrmScene: versionOne,
+    };
+
+    const parsed = parseStudioProjectFile({
+      version: 2,
+      pagesList: [{ ...page, elements: [image] }],
+      master: { elements: [{ ...image, id: "legacy-vrm-master" }] },
+    });
+    const pageScene = (parsed.pagesList[0].elements[0] as {
+      vrmScene: ReturnType<typeof createStudioVrmSceneDocument>;
+    }).vrmScene;
+    const masterScene = ((parsed.master as { elements: Array<{ vrmScene: typeof pageScene }> })
+      .elements[0]).vrmScene;
+
+    for (const scene of [pageScene, masterScene]) {
+      expect(scene.version).toBe(2);
+      expect(scene.pose).toEqual(current.pose);
+      expect(scene.expressions).toEqual(current.expressions);
+      expect(scene.props).toEqual(current.props);
+      expect(scene.rig).toMatchObject({
+        version: 1,
+        jointProfile: { version: 1, id: "neutral" },
+        fullBodyIk: false,
+        footPlant: false,
+        floorHeight: 0,
+      });
+    }
+    const serialized = JSON.parse(serializeStudioProjectFile(parsed));
+    expect(serialized.pagesList[0].elements[0].vrmScene.version).toBe(2);
+    expect(serialized.master.elements[0].vrmScene.version).toBe(2);
   });
 
   it("페이지별 드로잉 보조 문서를 프로젝트 파일로 왕복하고 손상본은 거부한다", () => {

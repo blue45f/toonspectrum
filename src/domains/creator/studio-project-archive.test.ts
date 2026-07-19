@@ -24,6 +24,10 @@ import {
   type StudioProjectArchiveAttachmentInput,
   type StudioProjectArchiveManifest,
 } from "./studio-project-archive";
+import {
+  createStudioVrmSceneDocument,
+  normalizeStudioVrmSceneDocument,
+} from "./studio-vrm-scene-document";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -1099,6 +1103,55 @@ describe("studio-project-archive", () => {
     await expectArchiveError(importStudioProjectArchive(await manualProjectOnlyArchive({
       version: 2,
       pagesList: [minimalPage()],
+    })), "PROJECT_INVALID");
+  });
+
+  it("현재 manifest의 strict VRM v1 장면만 v2로 승격하고 다른 writer 차이는 허용하지 않는다", async () => {
+    const currentScene = normalizeStudioVrmSceneDocument({
+      ...createStudioVrmSceneDocument(),
+      pose: {
+        bones: {
+          leftUpperArm: { rotation: [0.2, -0.4, 0.6] },
+          rightUpperArm: { rotation: [0.2, 0.4, -0.6] },
+        },
+        yOffset: 0.1,
+        bodyRotationY: -0.25,
+        fingerOverrides: { leftIndexProximal: [0.1, 0.2, -0.3] },
+      },
+      expressions: { happy: 0.65 },
+    });
+    const legacyScene = JSON.parse(JSON.stringify(currentScene)) as Record<string, unknown>;
+    delete legacyScene.rig;
+    legacyScene.version = 1;
+    const legacyImage = {
+      id: "legacy-vrm",
+      type: "image",
+      src: "",
+      vrmScene: legacyScene,
+    };
+
+    const imported = await importStudioProjectArchive(
+      await manualProjectOnlyArchive(projectWith([legacyImage])),
+    );
+    const promoted = (imported.project.pagesList[0]?.elements[0] as {
+      vrmScene: ReturnType<typeof createStudioVrmSceneDocument>;
+    }).vrmScene;
+    expect(promoted.version).toBe(2);
+    expect(promoted.pose).toEqual(currentScene.pose);
+    expect(promoted.expressions).toEqual(currentScene.expressions);
+    expect(promoted.rig).toMatchObject({
+      jointProfile: { id: "neutral" },
+      fullBodyIk: false,
+      footPlant: false,
+      floorHeight: 0,
+    });
+
+    await expectArchiveError(importStudioProjectArchive(await manualProjectOnlyArchive({
+      ...projectWith([{ ...legacyImage, vrmScene: { ...legacyScene, unknown: true } }]),
+    })), "PROJECT_INVALID");
+    await expectArchiveError(importStudioProjectArchive(await manualProjectOnlyArchive({
+      version: 2,
+      pagesList: [minimalPage([legacyImage])],
     })), "PROJECT_INVALID");
   });
 
