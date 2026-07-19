@@ -190,7 +190,6 @@ import {
   pressureCurveValueForPreset,
   resolveBrushPressureSample,
   resolveBrushReleasePressureSample,
-  resolveStudioBrushRenderFamily,
   smoothStrokePoints,
   strokeRenderDistance,
   strokeSampleDistanceForScale,
@@ -372,6 +371,7 @@ import {
   studioStabilizerHudLabel,
   studioSymmetryHudLabel,
 } from "./studio-draw-hud";
+import { planStudioDrawPointerStart } from "./studio-draw-pointer-start-plan";
 import {
   drawLiveFreehandDraftToContext,
   isDirectLiveDraftEl,
@@ -428,9 +428,6 @@ import {
   type StudioFillReferenceLayer,
 } from "./studio-fill-reference";
 import {
-  resolveStudioCausalInkInputPlan,
-} from "./studio-fixed-rate-input-eligibility";
-import {
   createFixedRateStrokeFilter,
   quantizeFixedRateStrokeSample,
   transitionFixedRateStrokeFilter,
@@ -480,8 +477,6 @@ import {
 import { uid } from "./studio-id";
 import { createCanvasImageElement } from "./studio-image-placement";
 import {
-  STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
-  STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
   studioInkFallbackPressure,
 } from "./studio-ink-pressure-model";
 import {
@@ -918,9 +913,6 @@ import { SMUDGE_RADIUS_DEFAULT, SMUDGE_STRENGTH_DEFAULT } from "./studio-smudge"
 import { smudgeStrokeImage } from "./studio-smudge-browser";
 import { useStudioStableHandlers } from "./studio-stable-handlers";
 import { resolveShiftFreehandTransition } from "./studio-stroke-constrain";
-import {
-  STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1,
-} from "./studio-stroke-paint-model";
 import {
   DEFAULT_SHAPE_PARAMS,
 } from "./studio-stroke-shapes";
@@ -16342,151 +16334,41 @@ function StudioCuttoonEditor() {
       };
       setSelectedId(null);
 
-      const fixedRateBrushFamily = resolveStudioBrushRenderFamily(brush);
-      const activeStampKind = drawMode === "pen" ? resolveStudioStampBrushKind(brush) : null;
-      const activeCausalWatercolor = drawMode === "pen"
-        && fixedRateBrushFamily === "watercolor";
-      const hasBrushDynamics = resolveStudioBrushDynamicsPresetId(brush) !== null;
-      const causalInputPolicy = {
-        stabilizerMode,
-        stabilizerStrength: stabilizer,
+      const drawStartPlan = planStudioDrawPointerStart({
+        id: uid(),
+        position: pos,
+        pointer: pointerSample,
         drawMode,
-        brushFamily: fixedRateBrushFamily,
-        hasBrushDynamics,
-        causalStampV2: activeStampKind !== null,
-        causalWatercolorV2: activeCausalWatercolor,
-      };
-      const causalInkInputPlan = resolveStudioCausalInkInputPlan(causalInputPolicy);
-      const causalInkInputEnabled = causalInkInputPlan.sampleSpacing === 0;
-      const fixedRateInkEnabled = causalInkInputPlan.usesFixedRateClock;
-      const linearPressureEligible = (
-        drawMode === "eraser" ||
-        drawMode === "pixel" ||
-        (drawMode === "pen" && (
-          fixedRateBrushFamily === "pen" || fixedRateBrushFamily === "marker"
-        ))
-      );
-      const residualPressureEligible = drawMode === "pen"
-        && (fixedRateBrushFamily === "pen" || fixedRateBrushFamily === "marker");
-      const pressureModel = linearPressureEligible
-        ? (
-            // Pixel/eraser retain their frozen V1 placement. Default pen/marker ink uses the V3
-            // path-phase contract even when release-only post-correction is enabled.
-            residualPressureEligible
-              ? STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3
-              : STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1
-          )
-        : undefined;
-      const layeredFlowPaintEligible = drawMode === "pen"
-        && brushOpacity < 1
-        && (fixedRateBrushFamily === "pen" || fixedRateBrushFamily === "marker")
-        && !hasBrushDynamics
-        && activeStampKind === null
-        && symmetryType === "none";
-      const resolvedPressure = resolveBrushPressureSample({
-        pointerType: pointerSample.pointerType,
-        rawPressure: pointerSample.pressure,
-        distance: 0,
-        // 첫 샘플에는 속도가 아직 없으므로 mouse/touch를 '정지=최대 필압'으로 해석하지 않는다.
-        // 실제 pen pressure는 이 플래그와 무관하게 항상 우선한다.
-        velocityFallbackEnabled: false,
+        drawShape,
+        shapeFill,
+        color,
+        strokeWidth,
+        brushOpacity,
+        brush,
+        stampTuning,
+        brushDynamics,
+        stabilizer,
+        stabilizerMode,
         velocitySensitivity,
         pressureCurve,
-        // The versioned linear model treats the selected size as the full-pressure diameter, so
-        // mouse/touch use p=1 exactly like the traced reference. Specialty/legacy brush engines
-        // retain their historical nominal p=.5 contract.
-        fallbackPressure: pressureModel ? 1 : 0.5,
-      });
-      const stylus = normalizeCalligraphyStylusInput(pointerSample);
-      // Magma quantizes the processed/coalesced input before either the immediate walker or the
-      // positive-strength cascade. Doing the same for pointerdown prevents a sub-pixel jump when
-      // the first move arrives on the quantized path.
-      const causalInitialSample = causalInkInputEnabled
-          ? quantizeFixedRateStrokeSample({
-              x: pos.x,
-              y: pos.y,
-              positionScale: effScale,
-              pressure: resolvedPressure,
-            tiltX: stylus.tiltX,
-            tiltY: stylus.tiltY,
-            timeStamp: pointerSample.timeStamp,
-          })
-        : null;
-      const strokeOrigin = causalInitialSample
-        ? { x: causalInitialSample.x, y: causalInitialSample.y }
-        : pos;
-      const pressure = causalInitialSample?.pressure ?? resolvedPressure;
-      if (drawMode === "pen") scheduleLiveDrawPressure(pressure);
-      const capturePointerDynamics = drawMode === "pen" && hasBrushDynamics;
-      const captureStylus = drawMode === "pen" && (brush === "calligraphy" || capturePointerDynamics);
-      const tangentialPressure = Number.isFinite(pointerSample.tangentialPressure)
-        ? Math.min(1, Math.max(-1, pointerSample.tangentialPressure))
-        : 0;
-      const common = {
-        id: uid(),
-        type: "draw" as const,
-        stroke: color,
-        strokeWidth,
-        opacity: brushOpacity,
-        brush: drawMode === "pen" ? brush : undefined,
-        brushTip: drawMode === "pen" && brush === "calligraphy"
-          ? { tiltEnabled, angleDeg: tipAngle, roundness: tipRoundness }
-          : undefined,
-        // 스탬프 브러시 튜닝은 획 시작 시점 값으로 스냅샷 — 협업/재생/내보내기에서 재현된다.
-        stamp: drawMode === "pen" && stampTuning && activeStampKind
-          ? { ...stampTuning }
-          : undefined,
-        stampPipeline: drawMode === "pen" && activeStampKind
-          ? "causal-walker-v2" as const
-          : undefined,
-        watercolorPipeline: activeCausalWatercolor
-          ? "causal-walker-v2" as const
-          : undefined,
-        brushDynamics: capturePointerDynamics
-          ? normalizeStudioBrushDynamicsSettings(brushDynamics)
-          : undefined,
-        symmetry: symmetryType !== "none" ? {
+        positionScale: effScale,
+        brushTip: { tiltEnabled, angleDeg: tipAngle, roundness: tipRoundness },
+        symmetry: {
           type: symmetryType,
           centerX: symmetryCenterX,
           centerY: symmetryCenterY,
           radialCount: symmetryRadialCount,
-        } : undefined,
-      };
-      const next: DrawEl =
-        drawMode === "shape"
-          ? {
-              ...common,
-              kind: drawShape,
-              mode: "pen" as const,
-              points: [pos.x, pos.y, pos.x, pos.y],
-              fill: shapeFill && drawShape !== "line" ? color : undefined,
-              pressures: [pressure, pressure],
-            }
-          : {
-              ...common,
-              kind: "freehand" as const,
-              // pixel pencil / lasso fill map to pen mode with special fill/width.
-              mode: (drawMode === "eraser" ? "eraser" : "pen") as "pen" | "eraser",
-              points: [strokeOrigin.x, strokeOrigin.y],
-              strokeWidth: drawMode === "pixel" ? 1 : strokeWidth,
-              fill: drawMode === "lasso-fill" ? color : undefined,
-              pressures: [drawMode === "pixel" ? 1 : pressure],
-              pressureModel,
-              paintModel: layeredFlowPaintEligible
-                ? STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1
-                : undefined,
-              sampleSpacing:
-                drawMode === "pixel"
-                  ? 1
-                  : causalInkInputPlan.sampleSpacing
-                    ?? strokeSampleDistanceForScale(effScale),
-              tiltXs: captureStylus && drawMode === "pen" ? [stylus.tiltX] : undefined,
-              tiltYs: captureStylus && drawMode === "pen" ? [stylus.tiltY] : undefined,
-              twists: captureStylus && drawMode === "pen" ? [stylus.twist] : undefined,
-              speeds: capturePointerDynamics && drawMode === "pen" ? [0] : undefined,
-              tangentialPressures:
-                capturePointerDynamics && drawMode === "pen" ? [tangentialPressure] : undefined,
-            };
+        },
+      });
+      const {
+        causalInitialSample,
+        causalInputPlan,
+        element: next,
+        pressure,
+        strokeOrigin,
+        stylus,
+      } = drawStartPlan;
+      if (drawMode === "pen") scheduleLiveDrawPressure(pressure);
       // Pointer-up is a lifecycle signal, not a new freehand coordinate. Retain pointer-down now
       // so a tap and a stroke with no delivered move still have authoritative release metadata.
       drawingLastAuthoritativePointerRef.current = pointerSample;
@@ -16502,10 +16384,10 @@ function StudioCuttoonEditor() {
         endLiveResourceEdit();
         return;
       }
-      drawingImmediateCausalInputRef.current = causalInkInputPlan.quantizeImmediately;
+      drawingImmediateCausalInputRef.current = causalInputPlan.quantizeImmediately;
       // Pixel pencil has no stabilizer. Positive standard strength uses the exact 5ms cascade;
       // strength zero bypasses both sampler and low-pass and is normalized in appendFreehand.
-      drawingFixedRateFilterRef.current = fixedRateInkEnabled
+      drawingFixedRateFilterRef.current = causalInputPlan.usesFixedRateClock
           ? createFixedRateStrokeFilter({
               x: strokeOrigin.x,
               y: strokeOrigin.y,
@@ -16517,7 +16399,7 @@ function StudioCuttoonEditor() {
           }, stabilizer).state
         : null;
       drawingStabilizerRef.current =
-        drawMode === "shape" || drawMode === "pixel" || causalInkInputEnabled
+        drawMode === "shape" || drawMode === "pixel" || causalInputPlan.sampleSpacing === 0
           ? null
           : createStudioStrokeStabilizerState({
               x: strokeOrigin.x,

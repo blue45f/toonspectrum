@@ -1,0 +1,261 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  planStudioDrawPointerStart,
+  type StudioDrawPointerStartInput,
+} from "./studio-draw-pointer-start-plan";
+import {
+  STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+  STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
+} from "./studio-ink-pressure-model";
+import { STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1 } from "./studio-stroke-paint-model";
+
+function input(
+  overrides: Partial<StudioDrawPointerStartInput> = {}
+): StudioDrawPointerStartInput {
+  return {
+    id: "stroke-1",
+    position: { x: 12.03, y: 34.04 },
+    pointer: {
+      pointerType: "mouse",
+      pressure: 0.5,
+      tiltX: 40,
+      tiltY: -30,
+      twist: 270,
+      tangentialPressure: 0.25,
+      timeStamp: 123,
+    },
+    drawMode: "pen",
+    drawShape: "line",
+    shapeFill: false,
+    color: "#123456",
+    strokeWidth: 8,
+    brushOpacity: 1,
+    brush: "pen",
+    stampTuning: null,
+    brushDynamics: {},
+    stabilizer: 0,
+    stabilizerMode: "standard",
+    velocitySensitivity: 0.65,
+    pressureCurve: 1,
+    positionScale: 2,
+    brushTip: { tiltEnabled: true, angleDeg: 45, roundness: 0.32 },
+    symmetry: { type: "none", centerX: 400, centerY: 600, radialCount: 6 },
+    ...overrides,
+  };
+}
+
+describe("planStudioDrawPointerStart", () => {
+  it("creates a quantized immediate pen start with the versioned path pressure model", () => {
+    const plan = planStudioDrawPointerStart(input());
+
+    expect(plan.causalInputPlan).toEqual({
+      mode: "immediate",
+      sampleSpacing: 0,
+      usesFixedRateClock: false,
+      quantizeImmediately: true,
+    });
+    expect(plan.strokeOrigin).toEqual({ x: 12.03125, y: 34.03125 });
+    expect(plan.pressure).toBe(1);
+    expect(plan.stylus).toEqual({
+      pointerType: "mouse",
+      tiltX: 0,
+      tiltY: 0,
+      twist: 0,
+      hasTilt: false,
+    });
+    expect(plan.element).toMatchObject({
+      id: "stroke-1",
+      type: "draw",
+      kind: "freehand",
+      mode: "pen",
+      points: [12.03125, 34.03125],
+      pressures: [1],
+      stroke: "#123456",
+      strokeWidth: 8,
+      opacity: 1,
+      brush: "pen",
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3,
+      sampleSpacing: 0,
+    });
+    expect(plan.capturePointerDynamics).toBe(false);
+    expect(plan.element.symmetry).toBeUndefined();
+    expect(plan.element.paintModel).toBeUndefined();
+  });
+
+  it("selects the fixed-rate clock and one-shot translucent paint for marker ink", () => {
+    const plan = planStudioDrawPointerStart(input({
+      brush: "marker",
+      brushOpacity: 0.45,
+      stabilizer: 6,
+    }));
+
+    expect(plan.causalInputPlan).toEqual({
+      mode: "fixed-rate",
+      sampleSpacing: 0,
+      usesFixedRateClock: true,
+      quantizeImmediately: false,
+    });
+    expect(plan.element.pressureModel).toBe(
+      STUDIO_INK_PRESSURE_MODEL_LINEAR_RESIDUAL_PATH_V3
+    );
+    expect(plan.element.paintModel).toBe(STUDIO_STROKE_PAINT_MODEL_LAYERED_FLOW_V1);
+    expect(plan.element.sampleSpacing).toBe(0);
+  });
+
+  it("persists symmetry while keeping mirrored translucent ink out of layered-flow paint", () => {
+    const plan = planStudioDrawPointerStart(input({
+      brushOpacity: 0.5,
+      symmetry: { type: "radial", centerX: 321, centerY: 654, radialCount: 8 },
+    }));
+
+    expect(plan.element.symmetry).toEqual({
+      type: "radial",
+      centerX: 321,
+      centerY: 654,
+      radialCount: 8,
+    });
+    expect(plan.element.paintModel).toBeUndefined();
+  });
+
+  it("keeps shape geometry on the raw endpoint contract and omits brush-only metadata", () => {
+    const plan = planStudioDrawPointerStart(input({
+      drawMode: "shape",
+      drawShape: "ellipse",
+      shapeFill: true,
+      brush: "calligraphy",
+    }));
+
+    expect(plan.causalInitialSample).toBeNull();
+    expect(plan.strokeOrigin).toEqual({ x: 12.03, y: 34.04 });
+    expect(plan.pressure).toBe(0.5);
+    expect(plan.element).toMatchObject({
+      kind: "ellipse",
+      mode: "pen",
+      points: [12.03, 34.04, 12.03, 34.04],
+      fill: "#123456",
+      pressures: [0.5, 0.5],
+    });
+    expect(plan.element.brush).toBeUndefined();
+    expect(plan.element.brushTip).toBeUndefined();
+    expect(plan.element.sampleSpacing).toBeUndefined();
+  });
+
+  it.each([
+    {
+      mode: "pixel" as const,
+      expectedMode: "pen" as const,
+      expectedWidth: 1,
+      expectedPressure: 1,
+      expectedSpacing: 1,
+      expectedFill: undefined,
+    },
+    {
+      mode: "eraser" as const,
+      expectedMode: "eraser" as const,
+      expectedWidth: 8,
+      expectedPressure: 1,
+      expectedSpacing: 0,
+      expectedFill: undefined,
+    },
+    {
+      mode: "lasso-fill" as const,
+      expectedMode: "pen" as const,
+      expectedWidth: 8,
+      expectedPressure: 0.5,
+      expectedSpacing: 0.75,
+      expectedFill: "#123456",
+    },
+  ])("preserves the $mode freehand storage contract", ({
+    mode,
+    expectedMode,
+    expectedWidth,
+    expectedPressure,
+    expectedSpacing,
+    expectedFill,
+  }) => {
+    const plan = planStudioDrawPointerStart(input({ drawMode: mode }));
+
+    expect(plan.element.mode).toBe(expectedMode);
+    expect(plan.element.strokeWidth).toBe(expectedWidth);
+    expect(plan.element.pressures).toEqual([expectedPressure]);
+    expect(plan.element.sampleSpacing).toBe(expectedSpacing);
+    expect(plan.element.fill).toBe(expectedFill);
+    if (mode === "eraser" || mode === "pixel") {
+      expect(plan.element.pressureModel).toBe(STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1);
+    } else {
+      expect(plan.element.pressureModel).toBeUndefined();
+    }
+  });
+
+  it("snapshots pen tilt for calligraphy without mistaking mouse tilt for stylus input", () => {
+    const mouse = planStudioDrawPointerStart(input({ brush: "calligraphy" }));
+    const pen = planStudioDrawPointerStart(input({
+      brush: "calligraphy",
+      pointer: {
+        pointerType: "pen",
+        pressure: 0.4,
+        tiltX: 32,
+        tiltY: -18,
+        twist: 271,
+        timeStamp: 124,
+      },
+    }));
+
+    expect(mouse.element.tiltXs).toEqual([0]);
+    expect(mouse.element.tiltYs).toEqual([0]);
+    expect(mouse.element.twists).toEqual([0]);
+    expect(pen.stylus).toMatchObject({ tiltX: 32, tiltY: -18, twist: 271, hasTilt: true });
+    expect(pen.element.tiltXs).toEqual([32]);
+    expect(pen.element.tiltYs).toEqual([-18]);
+    expect(pen.element.twists).toEqual([271]);
+    expect(pen.element.brushTip).toEqual({
+      tiltEnabled: true,
+      angleDeg: 45,
+      roundness: 0.32,
+    });
+  });
+
+  it("isolates dynamics brushes from causal input and snapshots all dynamic channels", () => {
+    const plan = planStudioDrawPointerStart(input({
+      brush: "airbrush",
+      brushOpacity: 0.4,
+      pointer: {
+        pointerType: "pen",
+        pressure: 0.25,
+        tiltX: 20,
+        tiltY: 10,
+        twist: 90,
+        tangentialPressure: 7,
+        timeStamp: 125,
+      },
+    }));
+
+    expect(plan.causalInputPlan.mode).toBe("legacy");
+    expect(plan.capturePointerDynamics).toBe(true);
+    expect(plan.element.sampleSpacing).toBe(0.75);
+    expect(plan.element.paintModel).toBeUndefined();
+    expect(plan.element.brushDynamics?.version).toBe(1);
+    expect(plan.element.tiltXs).toEqual([20]);
+    expect(plan.element.tiltYs).toEqual([10]);
+    expect(plan.element.twists).toEqual([90]);
+    expect(plan.element.speeds).toEqual([0]);
+    expect(plan.element.tangentialPressures).toEqual([1]);
+  });
+
+  it("versions stamp and watercolor walkers at stroke start", () => {
+    const stamp = planStudioDrawPointerStart(input({
+      brush: "ink-brush",
+      stampTuning: { flow: 0.2, hardness: 0.8, minSize: 0.1 },
+    }));
+    const watercolor = planStudioDrawPointerStart(input({ brush: "watercolor" }));
+
+    expect(stamp.causalInputPlan.mode).toBe("immediate");
+    expect(stamp.element.stampPipeline).toBe("causal-walker-v2");
+    expect(stamp.element.stamp).toEqual({ flow: 0.2, hardness: 0.8, minSize: 0.1 });
+    expect(stamp.element.watercolorPipeline).toBeUndefined();
+    expect(watercolor.causalInputPlan.mode).toBe("immediate");
+    expect(watercolor.element.watercolorPipeline).toBe("causal-walker-v2");
+    expect(watercolor.element.stampPipeline).toBeUndefined();
+  });
+});
