@@ -5,7 +5,7 @@
  * stacking or menubar overflow clipping.
  * When one menu is open, hovering another group switches (desktop app menubar UX).
  */
-import { Check, ChevronDown, type LucideIcon } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import {
   useEffect,
   useId,
@@ -22,31 +22,19 @@ import { StudioKbdBadge } from "./studio-chrome-ui";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { STUDIO_Z } from "./studio-z-index";
 
+import type {
+  StudioMainMenuGroup,
+  StudioMainMenuItem,
+  StudioMainMenuProps,
+} from "./studio-main-menu-model";
+
 import { cn } from "@/lib/utils";
 
-export interface StudioMainMenuItem {
-  id: string;
-  label: string;
-  shortcut?: string;
-  icon?: LucideIcon;
-  /** State for non-destructive view toggles such as canvas flip and grayscale preview. */
-  checked?: boolean;
-  disabled?: boolean;
-  danger?: boolean;
-  separatorAfter?: boolean;
-  onSelect: () => void;
-}
-
-export interface StudioMainMenuGroup {
-  id: string;
-  label: string;
-  items: readonly StudioMainMenuItem[];
-}
-
-export interface StudioMainMenuProps {
-  groups: readonly StudioMainMenuGroup[];
-  className?: string;
-}
+export type {
+  StudioMainMenuGroup,
+  StudioMainMenuItem,
+  StudioMainMenuProps,
+} from "./studio-main-menu-model";
 
 type MenuCoords = { top: number; left: number; minWidth: number };
 type MenuOpenFocusIntent = "first" | "preserve";

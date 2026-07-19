@@ -130,10 +130,12 @@ describe("Studio optional UI bundle boundaries", () => {
 
   it("keeps the heavy workspace manager behind the lightweight intent gate", () => {
     const page = moduleEdges("./StudioPage.tsx");
+    const menubar = moduleEdges("./StudioMenubarContent.tsx");
     const gate = moduleEdges("./StudioWorkspaceMenuGate.tsx");
 
     expect(page.valueImports).not.toContain("./StudioWorkspaceMenu");
-    expect(page.valueImports).toContain("./StudioWorkspaceMenuGate");
+    expect(page.valueImports).not.toContain("./StudioWorkspaceMenuGate");
+    expect(menubar.valueImports).toContain("./StudioWorkspaceMenuGate");
     expect(gate.valueImports).not.toContain("./StudioWorkspaceMenu");
     expect(gate.dynamicImports.filter((specifier) => specifier === "./StudioWorkspaceMenu")).toEqual([
       "./StudioWorkspaceMenu",

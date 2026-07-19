@@ -18,7 +18,6 @@ import {
   ClipboardCheck,
   ClipboardPaste,
   Crop,
-  Music4,
   Package,
   PictureInPicture2,
   Video,
@@ -62,7 +61,6 @@ import {
   RotateCcw,
   RotateCw,
   Settings2,
-  ShieldCheck,
   SlidersHorizontal,
   Grid2x2,
   Sparkles,
@@ -768,7 +766,6 @@ import {
   StudioDialogueTranslatePanel,
   StudioElementsPanel,
   StudioEmeresLibraryPanel,
-  StudioExportMenuPanel,
   StudioFeatureTutorialHub,
   StudioFilterDialog,
   StudioFrameAnimationPanel,
@@ -783,7 +780,6 @@ import {
   StudioLivePresenceDockConnected,
   StudioLivePressureHudPill,
   StudioLiveStampOverlayHost,
-  StudioMainMenu,
   StudioMasterPagePanel,
   StudioNodeEditOverlay,
   StudioOnionSkinImage,
@@ -826,7 +822,6 @@ import {
   loadStudioTeamCommentMutationPlanner,
   loadStudioWebtoonGuides,
   preloadStudioAssetMenuPanel,
-  preloadStudioExportMenuPanel,
   preloadStudioIntegrationsSettingsPanel,
   preloadStudioPaletteLibraryPanel,
   preloadStudioReferencePanel,
@@ -1111,6 +1106,10 @@ import {
 import { partitionStudioTeamCommentMutableDocument } from "./studio-team-comment-mutable-document";
 import { buildTextPathData, normalizeTextPath, isFlatTextPath } from "./studio-text-path";
 import {
+  STUDIO_TOOLBAR_GROUP_OF,
+  type StudioToolbarGroupId,
+} from "./studio-toolbar-groups";
+import {
   buildStudioCompanionHello,
   buildStudioCompanionPrimaryState,
   createStudioCompanionChannel,
@@ -1234,6 +1233,10 @@ import {
   type StudioCrdtSceneGraphRuntime,
 } from "./StudioLiveCollaborationProvider";
 import {
+  StudioMenubarContent,
+  type StudioMenubarContentHandlers,
+} from "./StudioMenubarContent";
+import {
   StudioMobileEditingDock,
   type StudioBrushCatalogHandlers,
   type StudioMobileEditingDockHandlers,
@@ -1255,7 +1258,6 @@ import {
   StudioToolHintPreferencesProvider,
 } from "./StudioToolHint";
 import { StudioViewToolsHud } from "./StudioViewToolsHud";
-import { StudioWorkspaceMenuGate } from "./StudioWorkspaceMenuGate";
 import { useStudioModalSheet } from "./useStudioModalSheet";
 
 import type { AdvancedFillMaskLike } from "./studio-advanced-fill";
@@ -1302,6 +1304,7 @@ import type {
   StudioLayerNavigatorItem,
 } from "./studio-layer-navigator";
 import type { StudioLiveRoom } from "./studio-live-collaboration-room";
+import type { StudioMainMenuGroup } from "./studio-main-menu-model";
 import type { MotionCutImage } from "./studio-motion-export";
 import type { PageState } from "./studio-page-state";
 import type { PaletteSuggestion } from "./studio-palette-suggest";
@@ -1331,7 +1334,6 @@ import type {
 import type { StudioBackground3DInsertResult } from "./StudioBackground3D";
 import type { StudioLayerNavigatorAction } from "./StudioLayerNavigator";
 import type { StudioLivePressureStore } from "./StudioLiveInkHosts";
-import type { StudioMainMenuGroup } from "./StudioMainMenu";
 import type { PublishContext } from "./StudioPublishContextBanner";
 import type { StudioWebGpuCanvasHandle } from "./StudioWebGpuCanvas";
 import type {
@@ -1494,31 +1496,6 @@ const groupPopoverClass = (width: "w-72" | "w-80") =>
     "fixed inset-x-2 top-[6.5rem] z-[70] max-h-[min(78dvh,36rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-2 shadow-2xl lg:inset-x-auto lg:left-3 lg:w-auto lg:max-w-[min(28rem,calc(100vw-1.5rem))]",
     width === "w-72" ? "lg:w-72" : "lg:w-80"
   );
-// 2026-07-05 툴바 그룹화 — 20개 이상의 플랫한 툴바 버튼을 논리 그룹 4개로 묶는다(선택/펜/지우개/
-// 텍스트/말풍선처럼 사용 빈도가 높은 핵심 도구는 그룹화 대상에서 제외하고 그대로 1줄 유지).
-// 그룹 팝오버는 `menu` 하나로 열림 상태·활성 서브탭을 동시에 표현한다(별도 상태 미도입) — 그룹 멤버인
-// StudioMenu 값이 `menu`에 들어오면 그 그룹이 열린 것으로 간주하고, 그 값 자체가 활성 서브탭이 된다.
-// 3D 배경·시나리오 자동 생성처럼 팝오버 콘텐츠가 없는 액션 버튼(별도 모달을 여는)은 StudioMenu 값이
-// 없으므로 이 매핑에 없다 — 그룹 안에서는 "선택 시 그룹을 닫고 모달을 여는" 액션 칩으로만 존재한다.
-type StudioToolbarGroupId = "bgGroup" | "assetGroup" | "styleGroup" | "aiGroup";
-const STUDIO_TOOLBAR_GROUP_OF: Partial<Record<StudioMenu, StudioToolbarGroupId>> = {
-  bgScene: "bgGroup",
-  bgFill: "bgGroup",
-  tone: "bgGroup",
-  template: "assetGroup",
-  collage: "assetGroup",
-  emeres: "assetGroup",
-  scene: "assetGroup",
-  clip: "assetGroup",
-  sticker: "assetGroup",
-  elements: "assetGroup",
-  asset: "assetGroup",
-  palette: "styleGroup",
-  brandKit: "styleGroup",
-  aiAssist: "aiGroup",
-  stockImage: "aiGroup",
-  integrations: "aiGroup",
-};
 type StudioBgScene = { id: string; label: string; genre: string; svg?: string; imgSrc?: string };
 type StudioFxAsset = { id: string; label: string; svg: string; width: number; height: number };
 // 이메레스(스케치 밑그림 틀) — studio-emeres-templates 모듈과 구조 호환되는 로컬 타입.
@@ -21818,6 +21795,15 @@ function StudioCuttoonEditor() {
   // 툴바 그룹(배경/에셋/스타일/AI 연동) — 현재 열린 그룹은 `menu`가 그 그룹 멤버 중 하나일 때만
   // 존재한다(별도 open 상태 없음). null이면 그룹 팝오버뿐 아니라 개별 팝오버도 전부 닫힌 상태.
   const activeToolbarGroup: StudioToolbarGroupId | null = menu ? (STUDIO_TOOLBAR_GROUP_OF[menu] ?? null) : null;
+  const studioMenubarPageLabelsSnapshot = JSON.stringify(
+    pages.map((page, index) => pageDisplayName(page, index))
+  );
+  const studioMenubarPageLabels = useMemo<string[]>(
+    () => JSON.parse(studioMenubarPageLabelsSnapshot) as string[],
+    [studioMenubarPageLabelsSnapshot]
+  );
+  const studioMenubarActivePageLabel = studioMenubarPageLabels[activePageIndex]
+    ?? pageDisplayName(activePage, activePageIndex);
 
   // 커밋마다 메뉴 그룹 useMemo가 무효화되지 않도록 elements 읽기는 이벤트 시점 번들로 승격.
   function selectAllElements() {
@@ -25071,8 +25057,7 @@ function StudioCuttoonEditor() {
         )}
       >
         <StudioMenubarContent
-          activePage={activePage}
-          activePageIndex={activePageIndex}
+          activePageLabel={studioMenubarActivePageLabel}
           activeToolbarGroup={activeToolbarGroup}
           aiProvenance={aiProvenance}
           canvasH={canvasH}
@@ -25094,7 +25079,8 @@ function StudioCuttoonEditor() {
           loadedWork={loadedWork}
           menu={menu}
           mobileImmersive={mobileImmersive}
-          pages={pages}
+          pageCount={studioMenubarPageLabels.length}
+          pageLabels={studioMenubarPageLabels}
           projectActionsOpen={projectActionsOpen}
           projectActionsRef={projectActionsRef}
           projectArchiveBusy={projectArchiveBusy}
@@ -28925,766 +28911,6 @@ const StudioToolBeltContent = memo(function StudioToolBeltContent({
           </button>
           <StudioColorBlindPreviewToggle value={colorBlindPreview} onChange={setColorBlindPreview} />
         </StudioToolbarCluster>
-    </>
-  );
-});
-
-interface StudioMenubarContentHandlers {
-  applyStudioWorkspaceLayout: (layout: StudioWorkspaceLayout) => void;
-  changeMobileImmersiveMode: (enabled: boolean) => void;
-  ensureWatermarkLoaded: () => WatermarkSettings;
-  exportCurrentPageToPsd: () => Promise<PsdExportResult>;
-  exportCurrentPageToSvg: () => Promise<SvgExportResult>;
-  handleCapturePagesForPreset: (scope: "current" | "all") => Promise<HTMLCanvasElement[]>;
-  handleCopyToClipboard: () => Promise<void>;
-  handleDownload: () => Promise<void>;
-  handleDownloadAll: (spacing?: number) => Promise<void>;
-  handleExportProject: () => void;
-  handleExportProjectArchive: () => Promise<void>;
-  handleImportProject: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  handleImportProjectArchive: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
-  handleImportPsd: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
-  handleSave: (status: "published" | "draft") => Promise<void>;
-  openAutoActions: () => Promise<void>;
-  openOwnerFxPanel: () => Promise<void>;
-  persistStudioWorkspaceState: (nextState: StudioWorkspaceState) => StudioWorkspaceSaveResult;
-  setWatermark: (next: WatermarkSettings) => void;
-}
-
-interface StudioMenubarContentProps {
-  activePage: PageState;
-  activePageIndex: number;
-  activeToolbarGroup: StudioToolbarGroupId | null;
-  aiProvenance: { version: 1; operations: { id: string; kind: "text" | "image"; task: "composition" | "scenario" | "translation" | "dialogue" | "palette" | "text-other" | "background-image" | "character-image" | "image-edit" | "colorize" | "line-cleanup" | "image-other"; provider: string; model: string; transport: "server" | "byok" | "local" | "other"; promptVersion: number; prompt: { sha256: string; summary: string; retention: "hash-only" | "raw-opt-in"; characterCount?: number | undefined; raw?: string | undefined; }; status: "pending" | "succeeded" | "failed" | "cancelled"; createdAt: string; updatedAt: string; references: { assetId?: string | undefined; sha256?: string | undefined; }[]; revisedPrompt?: { sha256: string; summary: string; retention: "hash-only" | "raw-opt-in"; characterCount?: number | undefined; raw?: string | undefined; } | undefined; usage?: { promptTokens?: number | undefined; completionTokens?: number | undefined; totalTokens?: number | undefined; } | undefined; target?: { pageId: string; frameId?: string | undefined; elementId?: string | undefined; } | undefined; requestedSize?: { width: number; height: number; } | undefined; seed?: string | undefined; requestId?: string | undefined; error?: { category: "provider" | "cancelled" | "unknown" | "configuration" | "network" | "policy"; code: string; message: string; retriable: boolean; } | undefined; }[]; };
-  canvasH: number;
-  characterBible: { version: 1; characters: { id: string; name: string; role: string; appearance: string; costume: string; colors: string[]; voice: string; goal: string; relationships: string[]; props: string[]; lockedFields: ("colors" | "relationships" | "props" | "name" | "role" | "appearance" | "costume" | "voice" | "goal")[]; }[]; };
-  collaborationDocumentLocked: boolean;
-  collaborationLockMessage: () => string;
-  currentWorkspaceOwnerScope: string;
-  displayLinkedTitleId: string | null | undefined;
-  exportFormat: ExportFormat;
-  exportMenuOpen: boolean;
-  exportMenuRef: import("react").RefObject<HTMLDivElement | null>;
-  exportPresetId: string | null;
-  exportScale: number;
-  exportTransparent: boolean;
-  fxPanelLoading: boolean;
-  isExporting: boolean;
-  isMobile: boolean;
-  liveWorkspaceLayout: StudioWorkspaceLayout;
-  loadedWork: WorkDetail | null;
-  menu: StudioMenu | null;
-  mobileImmersive: boolean;
-  pages: PageState[];
-  projectActionsOpen: boolean;
-  projectActionsRef: import("react").RefObject<HTMLDivElement | null>;
-  projectArchiveBusy: boolean;
-  projectArchiveImportInputRef: import("react").RefObject<HTMLInputElement | null>;
-  projectArchiveStatus: { tone: "good" | "warn" | "bad"; text: string; } | null;
-  projectImportInputRef: import("react").RefObject<HTMLInputElement | null>;
-  psdImportBusy: boolean;
-  psdImportInputRef: import("react").RefObject<HTMLInputElement | null>;
-  psdImportStatus: { tone: "good" | "warn"; text: string; } | null;
-  saving: boolean;
-  setAiProvenanceOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setCharacterBibleOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setCheckpointPanelOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setExportFormat: import("react").Dispatch<import("react").SetStateAction<ExportFormat>>;
-  setExportMenuOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setExportPresetId: import("react").Dispatch<import("react").SetStateAction<string | null>>;
-  setExportScale: import("react").Dispatch<import("react").SetStateAction<number>>;
-  setExportTransparent: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setMenu: import("react").Dispatch<import("react").SetStateAction<StudioMenu | null>>;
-  setProductionInsightsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setProjectActionsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setPublicationOperationsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setPublishPackageOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setPublishPreflightOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setWriterRoomOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  sharedDocument: StudioSharedDocument | null;
-  studioMainMenuGroups: StudioMainMenuGroup[];
-  title: string;
-  watermark: WatermarkSettings;
-  workId: string | null;
-  workspaceMenuEpoch: number;
-  workspacePersistence: StudioWorkspaceLoadResult;
-  workspaceState: StudioWorkspaceState;
-  workspaceSyncNotice: string | null;
-  writerRoom: { version: 1; stages: { premise: { text: string; characterIds: string[]; }; synopsis: { text: string; characterIds: string[]; }; "episode-outline": { title: string; summary: string; characterIds: string[]; }; beats: { items: { id: string; order: number; title: string; summary: string; characterIds: string[]; }[]; }; scenes: { items: { id: string; order: number; beatIds: string[]; heading: string; summary: string; location: string; time: string; characterIds: string[]; }[]; }; "panel-plan": { items: { id: string; order: number; sceneId: string; shot: string; action: string; characterIds: string[]; }[]; }; "dialogue-sfx": { dialogue: { id: string; order: number; panelId: string; characterId: string | null; text: string; }[]; sfx: { id: string; order: number; panelId: string; presetId: string | null; customText: string; style: { emphasis: "quiet" | "normal" | "strong"; scale: "small" | "medium" | "large"; }; }[]; }; }; completion: { premise: boolean; synopsis: boolean; "episode-outline": boolean; beats: boolean; scenes: boolean; "panel-plan": boolean; "dialogue-sfx": boolean; }; suggestions: { id: string; targetPath: string; currentValue: string | number | boolean | string[] | null; proposedValue: string | number | boolean | string[] | null; rationale: string; status: "pending" | "accepted" | "rejected"; createdAt: string; provenanceRef?: string | undefined; resolvedAt?: string | undefined; }[]; lastDecision?: { kind: "accept" | "reject"; suggestionStates: { id: string; status: "pending" | "accepted" | "rejected"; resolvedAt?: string | undefined; }[]; targetValues: { targetPath: string; value: string | number | boolean | string[] | null; }[]; decidedAt: string; } | undefined; };
-  stableHandlers: StudioMenubarContentHandlers;
-}
-
-const StudioMenubarContent = memo(function StudioMenubarContent({
-  activePage,
-  activePageIndex,
-  activeToolbarGroup,
-  aiProvenance,
-  canvasH,
-  characterBible,
-  collaborationDocumentLocked,
-  collaborationLockMessage,
-  currentWorkspaceOwnerScope,
-  displayLinkedTitleId,
-  exportFormat,
-  exportMenuOpen,
-  exportMenuRef,
-  exportPresetId,
-  exportScale,
-  exportTransparent,
-  fxPanelLoading,
-  isExporting,
-  isMobile,
-  liveWorkspaceLayout,
-  loadedWork,
-  menu,
-  mobileImmersive,
-  pages,
-  projectActionsOpen,
-  projectActionsRef,
-  projectArchiveBusy,
-  projectArchiveImportInputRef,
-  projectArchiveStatus,
-  projectImportInputRef,
-  psdImportBusy,
-  psdImportInputRef,
-  psdImportStatus,
-  saving,
-  setAiProvenanceOpen,
-  setCharacterBibleOpen,
-  setCheckpointPanelOpen,
-  setExportFormat,
-  setExportMenuOpen,
-  setExportPresetId,
-  setExportScale,
-  setExportTransparent,
-  setMenu,
-  setProductionInsightsOpen,
-  setProjectActionsOpen,
-  setPublicationOperationsOpen,
-  setPublishPackageOpen,
-  setPublishPreflightOpen,
-  setWriterRoomOpen,
-  sharedDocument,
-  studioMainMenuGroups,
-  title,
-  watermark,
-  workId,
-  workspaceMenuEpoch,
-  workspacePersistence,
-  workspaceState,
-  workspaceSyncNotice,
-  writerRoom,
-  stableHandlers,
-}: StudioMenubarContentProps) {
-  const {
-    applyStudioWorkspaceLayout,
-    changeMobileImmersiveMode,
-    ensureWatermarkLoaded,
-    handleCopyToClipboard,
-    handleDownload,
-    handleDownloadAll,
-    handleExportProject,
-    handleExportProjectArchive,
-    handleImportProject,
-    handleImportProjectArchive,
-    handleImportPsd,
-    handleSave,
-    openAutoActions,
-    openOwnerFxPanel,
-    persistStudioWorkspaceState,
-    setWatermark,
-    exportCurrentPageToPsd,
-    exportCurrentPageToSvg,
-    handleCapturePagesForPreset,
-  } = stableHandlers;
-  return (
-    <>
-        <div
-          data-studio-menubar-primary="true"
-          className={cn(
-            "flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-            mobileImmersive && "hidden"
-          )}
-        >
-          {/* Document context and application commands may compress; publish actions never do. */}
-          <div
-            className={cn(
-              "flex min-w-0 shrink items-center gap-1.5",
-              mobileImmersive && "hidden"
-            )}
-          >
-          <h1
-            className="min-w-0 max-w-[8rem] truncate text-[0.8125rem] font-semibold tracking-tight text-fg xl:max-w-[16rem]"
-            title={title.trim() || "무제"}
-          >
-            {title.trim() || "무제"}
-          </h1>
-          <span className="hidden shrink-0 rounded-md border border-line/60 bg-canvas/40 px-1.5 py-0.5 text-[0.62rem] font-medium tabular-nums text-fg-3 sm:inline">
-            {pageDisplayName(activePage, activePageIndex)}
-          </span>
-          {displayLinkedTitleId ? (
-            <span className="hidden rounded-full border border-accent/30 bg-accent-soft/40 px-1.5 py-0.5 text-[0.6rem] font-semibold text-accent sm:inline">
-              링크됨
-            </span>
-          ) : null}
-          {workspacePersistence.ownerScope === currentWorkspaceOwnerScope ? (
-            <StudioWorkspaceMenuGate
-              key={`${currentWorkspaceOwnerScope}:${workspaceMenuEpoch}`}
-              state={workspaceState}
-              liveLayout={liveWorkspaceLayout}
-              persistence={workspacePersistence}
-              onStateChange={persistStudioWorkspaceState}
-              onApplyLayout={applyStudioWorkspaceLayout}
-            />
-          ) : (
-            <span role="status" className="inline-flex min-h-8 items-center text-[0.65rem] text-fg-3">
-              전환 중…
-            </span>
-          )}
-          {workspaceSyncNotice && workspacePersistence.ownerScope === currentWorkspaceOwnerScope ? (
-            <span
-              role="status"
-              title={workspaceSyncNotice}
-              className="max-w-40 truncate text-[0.62rem] font-medium text-cool"
-            >
-              {workspaceSyncNotice}
-            </span>
-          ) : null}
-          </div>
-          <span aria-hidden className="mx-0.5 hidden h-4 w-px shrink-0 bg-line md:block" />
-          {/* Desktop application commands live in the compressible center lane. */}
-          <Suspense fallback={null}>
-            <StudioMainMenu
-              groups={studioMainMenuGroups}
-              className={cn("hidden min-w-0 md:flex", mobileImmersive && "!hidden")}
-            />
-          </Suspense>
-          {/* Wide layouts expose high-frequency insert shortcuts; narrower widths use Insert. */}
-          <div
-            className={cn(
-              "hidden min-w-0 items-center gap-0.5 xl:flex",
-              mobileImmersive && "!hidden"
-            )}
-            role="group"
-            aria-label="삽입 바로가기"
-          >
-          <button
-            type="button"
-            onClick={() => {
-              preloadStudioAssetMenuPanel();
-              setMenu(activeToolbarGroup === "assetGroup" ? null : "template");
-            }}
-            aria-haspopup="menu"
-            aria-expanded={activeToolbarGroup === "assetGroup"}
-            className={cn(
-              buttonClass({ size: "sm", variant: activeToolbarGroup === "assetGroup" ? "solid" : "quiet" }),
-              "min-h-9 gap-1.5 px-2.5 text-[0.72rem]"
-            )}
-            title="템플릿 · 콜라주 · 요소 · 장면 · 클립 · 효과 · 내 에셋"
-          >
-            <Folder size={14} aria-hidden />
-            템플릿·에셋
-          </button>
-          <button
-            type="button"
-            onClick={() => setMenu(menu === "bubble" ? null : "bubble")}
-            aria-haspopup="menu"
-            aria-expanded={menu === "bubble"}
-            className={cn(
-              buttonClass({ size: "sm", variant: menu === "bubble" ? "solid" : "quiet" }),
-              "min-h-9 gap-1.5 px-2.5 text-[0.72rem]"
-            )}
-            title="말풍선 라이브러리"
-          >
-            <MessageCircle size={14} aria-hidden />
-            말풍선
-          </button>
-          </div>
-          <span aria-hidden className="mx-0.5 hidden h-4 w-px shrink-0 bg-line xl:block" />
-        </div>
-        {/* 파일·내보내기 — 드로잉 앱 메뉴바 */}
-        <div
-          data-studio-menubar-actions="true"
-          className={cn(
-            "flex shrink-0 flex-nowrap items-center gap-1",
-            mobileImmersive && "min-w-0 w-full gap-0.5"
-          )}
-        >
-          {isMobile ? (
-            <button
-              type="button"
-              onClick={() => changeMobileImmersiveMode(!mobileImmersive)}
-              aria-pressed={mobileImmersive}
-              aria-label={
-                mobileImmersive
-                  ? "전체 화면 드로잉 종료"
-                  : "전체 화면 드로잉"
-              }
-              data-studio-mobile-app-mode
-              className={cn(
-                buttonClass({
-                  size: "sm",
-                  variant: mobileImmersive ? "solid" : "quiet",
-                  className: "min-h-11 shrink-0 gap-1.5 whitespace-nowrap",
-                }),
-                "sticky left-0 z-20 shadow-[0_0_0_4px_var(--color-canvas)]"
-              )}
-              title={
-                mobileImmersive
-                  ? "일반 화면으로 복원"
-                  : "전체 화면으로 그리기"
-              }
-            >
-              {mobileImmersive ? (
-                <Minimize2 size={15} aria-hidden />
-              ) : (
-                <Maximize2 size={15} aria-hidden />
-              )}
-              {mobileImmersive ? "종료" : "전체화면"}
-            </button>
-          ) : null}
-          {mobileImmersive ? (
-            <>
-              <h1 className="sr-only">드로잉 전체화면</h1>
-              <span
-                className="min-w-0 max-w-40 flex-1 truncate px-1 text-xs font-semibold text-fg-2"
-                title={`${title.trim() || "무제"} · ${pageDisplayName(activePage, activePageIndex)}`}
-              >
-                {title.trim() || "무제"} · {pageDisplayName(activePage, activePageIndex)}
-              </span>
-            </>
-          ) : null}
-          <div ref={exportMenuRef} className="relative flex shrink-0 items-center max-sm:hidden">
-            <button
-              type="button"
-              onClick={() => handleDownload()}
-              className={cn(
-                buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5 pr-2" }),
-                isMobile && "min-h-11"
-              )}
-              title={`현재 페이지를 ${exportScale}× ${exportFormat.toUpperCase()}로 다운로드${exportTransparent && exportFormat === "png" ? " (투명 배경)" : ""}`}
-            >
-              <Download size={14} /> <span className="max-xl:sr-only">다운로드</span>
-              <span className="text-[10px] font-semibold tabular-nums text-fg-3 max-xl:hidden">
-                {exportScale}× {exportFormat.toUpperCase()}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                preloadStudioExportMenuPanel();
-                ensureWatermarkLoaded();
-                setProjectActionsOpen(false);
-                setExportMenuOpen((open) => !open);
-              }}
-              onMouseEnter={preloadStudioExportMenuPanel}
-              onFocus={preloadStudioExportMenuPanel}
-              aria-expanded={exportMenuOpen}
-              aria-label="내보내기 옵션"
-              className={cn(
-                buttonClass({ size: "sm", variant: "quiet", className: "px-1.5" }),
-                isMobile && "min-h-11 min-w-11"
-              )}
-              title="내보내기 옵션 (배율·포맷·투명 배경)"
-            >
-              <ChevronDown size={13} className={cn("transition-transform", exportMenuOpen && "rotate-180")} />
-            </button>
-            {exportMenuOpen && typeof document !== "undefined"
-              ? createPortal(
-                  <Suspense
-                    fallback={
-                      <div
-                        data-studio-export-menu-panel="true"
-                        className="fixed inset-x-2 top-12 z-[100] max-h-[calc(100dvh-4rem)] overflow-y-auto rounded-xl border border-line bg-panel p-3 text-xs text-fg-3 shadow-2xl sm:inset-x-auto sm:right-3 sm:w-72"
-                      >
-                        내보내기 옵션을 여는 중...
-                      </div>
-                    }
-                  >
-                    <StudioExportMenuPanel
-                      canvasWidth={CANVAS_W}
-                      canvasHeight={canvasH}
-                      exportScale={exportScale}
-                      exportFormat={exportFormat}
-                      exportTransparent={exportTransparent}
-                      exportPresetId={exportPresetId}
-                      watermark={watermark}
-                      isExporting={isExporting}
-                      exportTitle={title}
-                      pageCount={pages.length}
-                      pageLabels={pages.map((p, idx) => pageDisplayName(p, idx))}
-                      capturePagesForPreset={handleCapturePagesForPreset}
-                      exportCurrentPageToSvg={exportCurrentPageToSvg}
-                      exportCurrentPageToPsd={exportCurrentPageToPsd}
-                      setExportScale={setExportScale}
-                      setExportFormat={setExportFormat}
-                      setExportTransparent={setExportTransparent}
-                      setExportPresetId={setExportPresetId}
-                      setWatermark={setWatermark}
-                      onCopyToClipboard={handleCopyToClipboard}
-                    />
-                  </Suspense>,
-                  document.body
-                )
-              : null}
-          </div>
-          <div ref={projectActionsRef} className="relative shrink-0 max-sm:hidden">
-            <button
-              type="button"
-              onClick={() => {
-                setExportMenuOpen(false);
-                setProjectActionsOpen((open) => !open);
-              }}
-              aria-haspopup="dialog"
-              aria-expanded={projectActionsOpen}
-              aria-controls="studio-project-actions-menu"
-              className={buttonClass({
-                size: "sm",
-                variant: "quiet",
-                className: "min-h-11 shrink-0 gap-1.5 whitespace-nowrap",
-              })}
-              title="백업·복구·기획·검토·연재·게시 도구"
-            >
-              <Folder size={14} aria-hidden /> <span className="max-xl:sr-only">프로젝트</span>
-              <ChevronDown
-                size={13}
-                className={cn("transition-transform", projectActionsOpen && "rotate-180")}
-                aria-hidden
-              />
-            </button>
-            {projectActionsOpen && typeof document !== "undefined"
-              ? createPortal(
-              <div
-                id="studio-project-actions-menu"
-                data-studio-project-actions-menu="true"
-                role="dialog"
-                aria-label="프로젝트 작업"
-                onClickCapture={(event) => {
-                  const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button");
-                  if (button && !button.dataset.projectKeepOpen) {
-                    globalThis.setTimeout(() => setProjectActionsOpen(false), 0);
-                  }
-                }}
-                className="fixed inset-x-2 top-12 z-[100] grid max-h-[calc(100dvh-4rem)] grid-cols-2 gap-1.5 overflow-y-auto overscroll-contain rounded-xl border border-line bg-panel p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-2xl [scrollbar-gutter:stable] sm:grid-cols-3 sm:inset-x-auto sm:right-3 sm:w-[min(36rem,calc(100vw-1.5rem))] [&>button]:min-h-11 [&>button]:justify-start [&>label]:min-h-11 [&>label]:justify-start"
-              >
-                <div className="col-span-2 flex items-center justify-between gap-3 border-b border-line/60 px-2 py-2 sm:col-span-3">
-                  <span>
-                    <span className="block text-xs font-bold text-fg">파일 · 프로젝트</span>
-                    <span className="mt-0.5 block text-[0.65rem] text-fg-3">백업 · 복구 · 검토 · 내보내기</span>
-                  </span>
-                  <span className="flex shrink-0 items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setProjectActionsOpen(false)}
-                      aria-label="프로젝트 작업 닫기"
-                      className="grid size-11 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg"
-                    >
-                      <X size={17} aria-hidden />
-                    </button>
-                  </span>
-                </div>
-          {pages.length > 1 && (
-            <button
-              type="button"
-              onClick={() => handleDownloadAll(24)}
-              className={buttonClass({
-                size: "sm",
-                variant: "quiet",
-                className: "shrink-0 whitespace-nowrap gap-1.5 bg-accent/10 text-accent hover:bg-accent/20 border-accent/25 border",
-              })}
-              title="모든 페이지를 긴 세로 스크롤 웹툰으로 이어 붙여 다운로드 (내보내기 옵션의 배율·포맷 적용)"
-            >
-              <Download size={14} /> 웹툰 연합 스크롤
-            </button>
-          )}
-          <button type="button" onClick={handleExportProject} className={buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5" })} title="빠른 가독형 백업입니다. 로컬 3D 모델 GLB는 포함되지 않으므로 다른 기기 이동·장기 보관에는 아카이브 백업을 사용하세요.">
-            <Download size={14} /> 백업 (.json)
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleExportProjectArchive()}
-            data-project-keep-open
-            disabled={projectArchiveBusy}
-            className={buttonClass({
-              size: "sm",
-              variant: "quiet",
-              className: "min-h-11 shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-wait disabled:opacity-60",
-            })}
-            title="프로젝트 JSON과 이미지·마스크를 SHA-256 중복 제거·무결성 검증형 단일 archive로 저장"
-          >
-            {projectArchiveBusy ? <Loader2 size={14} className="animate-spin" /> : <Package size={14} />}
-            아카이브 백업
-          </button>
-          <button
-            type="button"
-            onClick={() => setWriterRoomOpen(true)}
-            disabled={collaborationDocumentLocked}
-            className={buttonClass({
-              size: "sm",
-              variant: "quiet",
-              className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
-            })}
-            title={collaborationDocumentLocked ? collaborationLockMessage() : "한 줄 기획부터 시놉시스·비트·장면·컷·대사까지 한 흐름으로 설계하고 AI 초안을 검토"}
-          >
-            <Clapperboard size={14} /> Writer Room
-            {studioWriterRoomHasContent(writerRoom) ? (
-              <span className="rounded-full bg-accent-soft px-1.5 text-[0.65rem] font-bold text-accent">
-                {Object.values(writerRoom.completion).filter(Boolean).length}/7
-              </span>
-            ) : null}
-          </button>
-          <button
-            type="button"
-            onClick={() => setAiProvenanceOpen(true)}
-            className={buttonClass({
-              size: "sm",
-              variant: "quiet",
-              className: "shrink-0 whitespace-nowrap gap-1.5",
-            })}
-            title="AI 작업의 공급자·모델·상태·토큰 사용량을 확인하고 공개 가능한 요약만 내보내기"
-          >
-            <ClipboardCheck size={14} /> AI 작업 이력
-            {aiProvenance.operations.length > 0 ? (
-              <span className="rounded-full bg-cool/10 px-1.5 text-[0.65rem] font-bold text-cool">
-                {aiProvenance.operations.length}
-              </span>
-            ) : null}
-          </button>
-          <button
-            type="button"
-            onClick={() => setCharacterBibleOpen(true)}
-            disabled={collaborationDocumentLocked}
-            className={buttonClass({
-              size: "sm",
-              variant: "quiet",
-              className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
-            })}
-            title={collaborationDocumentLocked ? collaborationLockMessage() : "캐릭터 외형·의상·말투·관계와 AI 고정 제약을 문서에 저장"}
-          >
-            <Bookmark size={14} /> 캐릭터 바이블
-            {characterBible.characters.length > 0 ? (
-              <span className="rounded-full bg-accent-soft px-1.5 text-[0.65rem] font-bold text-accent">
-                {characterBible.characters.length}
-              </span>
-            ) : null}
-          </button>
-          <button
-            type="button"
-            onClick={() => setCheckpointPanelOpen(true)}
-            className={buttonClass({
-              size: "sm",
-              variant: "quiet",
-              className: "shrink-0 whitespace-nowrap gap-1.5",
-            })}
-            title="현재 문서를 이름 있는 복구 지점으로 브라우저에 저장하거나 이전 시점을 복원"
-          >
-            <HistoryIcon size={14} /> 버전
-          </button>
-          <button
-            type="button"
-            onClick={() => void openAutoActions()}
-            disabled={collaborationDocumentLocked}
-            className={buttonClass({
-              size: "sm",
-              variant: "quiet",
-              className: "min-h-11 shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
-            })}
-            title={collaborationDocumentLocked ? collaborationLockMessage() : "허용된 반복 편집 명령을 현재·선택·전체 페이지에 dry run 후 한 번의 실행취소 단계로 적용"}
-          >
-            <WandSparkles size={14} /> Auto Actions
-          </button>
-          <button
-            type="button"
-            data-project-keep-open
-            onClick={() => projectImportInputRef.current?.click()}
-            disabled={collaborationDocumentLocked}
-            className={buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50" })}
-            title={collaborationDocumentLocked ? collaborationLockMessage() : "빠른 .json 백업을 복구합니다. 포함되지 않은 로컬 3D 모델은 원래 기기의 검증 라이브러리에 있어야 합니다."}
-          >
-            <Upload size={14} /> 복구 (.json)
-          </button>
-          <input
-            ref={projectImportInputRef}
-            type="file"
-            accept=".json"
-            className="hidden"
-            disabled={collaborationDocumentLocked}
-            onChange={(event) => {
-              const hasFile = Boolean(event.currentTarget.files?.[0]);
-              handleImportProject(event);
-              if (hasFile) setProjectActionsOpen(false);
-            }}
-          />
-          <button
-            type="button"
-            data-project-keep-open
-            onClick={() => projectArchiveImportInputRef.current?.click()}
-            disabled={projectArchiveBusy || collaborationDocumentLocked}
-            className={cn(
-              buttonClass({
-                size: "sm",
-                variant: "quiet",
-                className: "min-h-11 shrink-0 whitespace-nowrap gap-1.5",
-              }),
-              projectArchiveBusy && "cursor-wait opacity-60",
-              collaborationDocumentLocked && "cursor-not-allowed opacity-50"
-            )}
-            title={collaborationDocumentLocked ? collaborationLockMessage() : "무결성 검증형 .toonproject.zip에서 프로젝트와 포함 자산을 복구"}
-          >
-            <FileUp size={14} /> 아카이브 복구
-          </button>
-          <input
-            ref={projectArchiveImportInputRef}
-            type="file"
-            accept=".toonproject.zip,.zip,application/zip,application/vnd.toonspectrum.project+zip"
-            className="hidden"
-            disabled={projectArchiveBusy || collaborationDocumentLocked}
-            onChange={(event) => void handleImportProjectArchive(event)}
-          />
-          {projectArchiveStatus ? (
-            <span
-              role="status"
-              className={cn(
-                "max-w-80 shrink-0 rounded-lg border px-2 py-1 text-[0.68rem] leading-relaxed",
-                projectArchiveStatus.tone === "good"
-                  ? "border-good/30 bg-good-soft/20 text-good"
-                  : projectArchiveStatus.tone === "warn"
-                    ? "border-warning/30 bg-warning-soft/20 text-warning"
-                    : "border-bad/30 bg-bad-soft/20 text-bad"
-              )}
-            >
-              {projectArchiveStatus.text}
-            </span>
-          ) : null}
-          <button
-            type="button"
-            data-project-keep-open
-            onClick={() => psdImportInputRef.current?.click()}
-            disabled={psdImportBusy || collaborationDocumentLocked}
-            className={cn(
-              buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5" }),
-              psdImportBusy && "cursor-wait opacity-60",
-              collaborationDocumentLocked && "cursor-not-allowed opacity-50"
-            )}
-            title={collaborationDocumentLocked ? collaborationLockMessage() : "포토샵(.psd) 파일의 레이어를 이미지 요소로 가져와요(래스터 평탄화, 편집 가능한 텍스트/조정 레이어는 재현되지 않음)"}
-          >
-            {psdImportBusy ? <Loader2 size={14} className="animate-spin" /> : <FileUp size={14} />}
-            PSD 가져오기
-          </button>
-          <input
-            ref={psdImportInputRef}
-            type="file"
-            accept=".psd,image/vnd.adobe.photoshop"
-            className="hidden"
-            disabled={psdImportBusy || collaborationDocumentLocked}
-            onChange={(event) => void handleImportPsd(event)}
-          />
-          {psdImportStatus && (
-            <span
-              className={cn(
-                "shrink-0 whitespace-nowrap rounded-md border px-2 py-1 text-[10px] leading-snug",
-                psdImportStatus.tone === "good" && "border-good/40 bg-good/10 text-good",
-                psdImportStatus.tone === "warn" && "border-warn/40 bg-warn/10 text-warn"
-              )}
-            >
-              {psdImportStatus.text}
-            </span>
-          )}
-          {sharedDocument?.role === "owner" || loadedWork ? (
-            <button
-              type="button"
-              onClick={() => void openOwnerFxPanel()}
-              disabled={fxPanelLoading}
-              className={buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-wait disabled:opacity-60" })}
-              title="이미 게시된 이 작품의 배경음악·스크롤 모션·컷별 애니메이션 연출을 설정합니다"
-            >
-              {fxPanelLoading ? <Loader2 size={14} className="animate-spin" /> : <Music4 size={14} />}
-              애니메이션 연출
-            </button>
-          ) : null}
-          <button
-            type="button"
-            onClick={() => setProductionInsightsOpen(true)}
-            className={buttonClass({
-              size: "sm",
-              variant: "quiet",
-              className: "shrink-0 whitespace-nowrap gap-1.5",
-            })}
-            title="현재 문서 구조에서 제작 분량·검토·AI 에셋·미해결 항목을 계산"
-          >
-            <GanttChartSquare size={14} /> 제작 인사이트
-          </button>
-          <button
-            type="button"
-            onClick={() => setPublicationOperationsOpen(true)}
-            disabled={collaborationDocumentLocked}
-            className={buttonClass({
-              size: "sm",
-              variant: "quiet",
-              className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50",
-            })}
-            title={collaborationDocumentLocked ? collaborationLockMessage() : "외부 자동 게시 없이 릴리스 일정과 직접 가져온 성과 기록을 관리"}
-          >
-            <Package size={14} /> 연재 운영
-          </button>
-          <button
-            type="button"
-            onClick={() => setPublishPreflightOpen(true)}
-            className={buttonClass({
-              size: "sm",
-              variant: "quiet",
-              className: "shrink-0 whitespace-nowrap gap-1.5",
-            })}
-            title="WEBTOON·Tapas·일반 게시 패키지의 구조와 AI 사용 고지를 미리 검사"
-          >
-            <ShieldCheck size={14} /> 게시 사전검사
-          </button>
-          <button
-            type="button"
-            onClick={() => setPublishPackageOpen(true)}
-            className={buttonClass({
-              size: "sm",
-              variant: "quiet",
-              className: "shrink-0 whitespace-nowrap gap-1.5",
-            })}
-            title="WEBTOON·Tapas·범용 목적지별 이미지 분할·썸네일·크레딧·검증 매니페스트를 계획"
-          >
-            <Files size={14} /> 게시 패키지
-          </button>
-              </div>,
-              document.body
-            )
-            : null}
-          </div>
-          <button
-            type="button"
-            onClick={() => handleSave("draft")}
-            disabled={saving || collaborationDocumentLocked}
-            title={collaborationDocumentLocked ? collaborationLockMessage() : "현재 원고를 임시저장"}
-            className={cn(
-              buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50" }),
-              isMobile && "min-h-11"
-            )}
-          >
-            {saving ? <Loader2 size={14} className="animate-spin" /> : null}
-            {sharedDocument && sharedDocument.role !== "owner" ? "공동 저장" : "임시저장"}
-          </button>
-          {!sharedDocument || sharedDocument.role === "owner" ? (
-            <button
-              type="button"
-              onClick={() => handleSave("published")}
-              disabled={saving || collaborationDocumentLocked}
-              title={collaborationDocumentLocked ? collaborationLockMessage() : "게시 상태로 저장"}
-              className={cn(
-                buttonClass({ size: "sm", variant: "solid", className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50" }),
-                isMobile && "min-h-11"
-              )}
-            >
-              {saving ? <Loader2 size={14} className="animate-spin" /> : null}
-              {workId ? "수정 게시" : "게시하기"}
-            </button>
-          ) : null}
-        </div>
     </>
   );
 });
