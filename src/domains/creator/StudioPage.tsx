@@ -190,7 +190,6 @@ import {
   pressureCurveValueForPreset,
   resolveBrushPressureSample,
   resolveBrushReleasePressureSample,
-  smoothStrokePoints,
   strokeRenderDistance,
   strokeSampleDistanceForScale,
   type BrushPreset,
@@ -359,10 +358,7 @@ import {
   loadStudioSvgExportWorkerClientModule,
 } from "./studio-document-export-loaders";
 import { StudioDraftPreviewStore } from "./studio-draft-preview-store";
-import {
-  isCompleteStudioDrawOp,
-  isStudioImmediateFreehandCommit,
-} from "./studio-draw-completion";
+import { isCompleteStudioDrawOp } from "./studio-draw-completion";
 import {
   studioDrawHudToolLabel,
   studioPressureCurveHudLabel,
@@ -371,6 +367,7 @@ import {
   studioStabilizerHudLabel,
   studioSymmetryHudLabel,
 } from "./studio-draw-hud";
+import { planStudioDrawPointerRelease } from "./studio-draw-pointer-release-plan";
 import { planStudioDrawPointerStart } from "./studio-draw-pointer-start-plan";
 import {
   drawLiveFreehandDraftToContext,
@@ -808,7 +805,6 @@ import {
 import {
   anchorQuickShapePointsForLiveDrag,
   classifyQuickShape,
-  promoteFreehandQuickShapeOnRelease,
   regularizeQuickShapePoints,
   trimQuickShapeDwellTail,
   QUICKSHAPE_LOCK_HOLD_MS,
@@ -17939,104 +17935,31 @@ function StudioCuttoonEditor() {
         flushDirectLiveDraftNow(authoritativeLiveStroke);
       }
       if (drawingRef.current && isCompleteStudioDrawOp(drawingRef.current)) {
-        let finished = drawingRef.current;
-        // Smart shape release snap: users often lift without holding 350ms still.
-        // Live hold preview still runs via runQuickShapeTick; this catches lift-to-confirm.
-        // Prefer live-converted draft (kind already non-freehand); only promote remaining freehand.
-        if (
-          quickShapeActive
-          && finished.mode !== "eraser"
-          && (finished.kind ?? "freehand") === "freehand"
-        ) {
-          const heldRecognitionPoints = quickShapeSnapshot.elapsed > 0
-            ? trimQuickShapeDwellTail(
-                quickShapeSnapshot.sourcePoints,
-                quickShapeSnapshot.stableSourceLength,
-              )
-            : quickShapeSnapshot.sourcePoints;
-          const promotionPoints = heldRecognitionPoints.length >= 8
-            ? heldRecognitionPoints
-            : finished.points;
-          const promoted = promoteFreehandQuickShapeOnRelease(promotionPoints, {
-            anchor: quickShapeSnapshot.anchor,
-            lockAspect:
-              quickShapeSnapshot.locked
-              || quickShapeSnapshot.elapsed >= QUICKSHAPE_LOCK_HOLD_MS,
-          });
-          if (promoted) {
-            finished = {
-              ...finished,
-              kind: promoted.kind,
-              brush: undefined,
-              pressures: undefined,
-              tiltXs: undefined,
-              tiltYs: undefined,
-              twists: undefined,
-              brushTip: undefined,
-              stamp: undefined,
-              stampPipeline: undefined,
-              watercolorPipeline: undefined,
-              paintModel: undefined,
-              fill: undefined,
-              points: promoted.points,
-              shapeParams:
-                promoted.polygonSides !== undefined
-                  ? { ...DEFAULT_SHAPE_PARAMS, polygonSides: promoted.polygonSides }
-                  : undefined,
-            };
-            announceDrawingShortcut(
-              `스마트 도형 · ${QUICKSHAPE_KIND_LABELS[promoted.kind] ?? promoted.kind}`
-            );
-          }
-        } else if (
-          quickShapeActive
-          && finished.mode !== "eraser"
-          && finished.kind
-          && finished.kind !== "freehand"
-          && quickShapeSnapshot.converted
-        ) {
-          // Live conversion already ran — announce so the gesture does not feel silent.
-          announceDrawingShortcut(
-            `스마트 도형 · ${QUICKSHAPE_KIND_LABELS[finished.kind] ?? finished.kind}`
-          );
-        }
-        // 라이브 입력 안정화와 독립된 후보정. 각점 보존을 켜면 말풍선·의상 모서리처럼 의도적인
-        // 방향 전환은 그대로 두고 고주파 떨림만 정리한다(점 개수·필압 정렬은 보존).
-        if (
-          (finished.kind ?? "freehand") === "freehand"
-          && (inputSettings?.postCorrection ?? postCorrection) > 0
-          && finished.stampPipeline !== "causal-walker-v2"
-          && finished.watercolorPipeline !== "causal-walker-v2"
-          && causalPostCorrectionStateRef.current?.phase !== "sealed"
-        ) {
-          finished = {
-            ...finished,
-            points: smoothStrokePoints(
-              finished.points,
-              inputSettings?.postCorrection ?? postCorrection,
-              { preserveCorners: inputSettings?.preserveCorners ?? preserveCorners }
-            ),
-          };
-        }
-        // 커밋 지연: 다이렉트 라이브 잉크(증분 오버레이/GPU 파인)는 표면에 그대로 남긴 채
-        // 큐에 쌓는다. React 커밋 렌더는 마지막 획 후 짧은 유휴에 한 번만 — 연속 스트로크가
-        // 커밋 렌더에 막히지 않는다. 지우개·비다이렉트 브러시는 기존 즉시 커밋을 유지한다.
         const overlayRenderer = liveInkOverlayRendererRef.current;
-        // 다이렉트: 라이브 표면(오버레이/GPU)이 잉크를 유지할 수 있을 때만 지연.
-        // 비다이렉트(팬시 브러시·도형): settled 프리뷰 레이어가 최종 형태를 유지하므로 항상 지연.
-        const deferCommit =
-          !masterEditMode
-          && finished.mode !== "eraser"
-          // A tap or one-segment freehand gesture is the exact path artists perceive as
-          // "released too early". Commit it in the pointerup task so Undo/autosave/history become
-          // authoritative immediately; longer strokes retain the 200ms batching optimization.
-          && !isStudioImmediateFreehandCommit(finished)
-          // A translucent settled preview would overlap the newly committed node for the handoff
-          // frames and temporarily darken to 1-(1-a)^2. Commit it atomically instead.
-          && (finished.opacity ?? 1) === 1
-          && (liveDraftDirectRef.current
-            ? overlayRenderer.isActive || gpuLiveInkPinnedRef.current
-            : true);
+        const releasePlan = planStudioDrawPointerRelease({
+          stroke: drawingRef.current,
+          quickShape: {
+            active: quickShapeActive,
+            ...quickShapeSnapshot,
+          },
+          postCorrection: {
+            strength: inputSettings?.postCorrection ?? postCorrection,
+            preserveCorners: inputSettings?.preserveCorners ?? preserveCorners,
+            causalStateSealed: causalPostCorrectionStateRef.current?.phase === "sealed",
+          },
+          commit: {
+            masterEditMode,
+            directLiveDraft: liveDraftDirectRef.current,
+            directInkSurfaceAvailable:
+              overlayRenderer.isActive || gpuLiveInkPinnedRef.current,
+          },
+        });
+        const finished = releasePlan.stroke;
+        if (releasePlan.quickShapeAnnouncementKind) {
+          const kind = releasePlan.quickShapeAnnouncementKind;
+          announceDrawingShortcut(`스마트 도형 · ${QUICKSHAPE_KIND_LABELS[kind] ?? kind}`);
+        }
+        const deferCommit = releasePlan.commitMode === "deferred";
         if (deferCommit) {
           deferInkCleanup = true;
           if (!liveDraftDirectRef.current) {
