@@ -249,7 +249,9 @@ describe("Studio ToolBelt content module boundary", () => {
 
     expect(page).toContain("const menuRef = useRef<HTMLDivElement>(null)");
     expect(page).toContain('target.closest("[data-studio-tool-popover]")');
-    expect(page).toContain("const activeToolbarGroup: StudioToolbarGroupId | null = menu ?");
+    expect(page).toContain(
+      "const activeToolbarGroup: StudioToolbarGroupId | null = resolveStudioToolbarGroup(menu);"
+    );
     expect(page).toContain("menuRef={menuRef}");
     expect(toolBelt).toContain('id="asset-group"');
     expect(toolBelt).toContain('id="bg-group"');

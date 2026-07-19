@@ -1,0 +1,159 @@
+import { MessageCircle } from "lucide-react";
+
+import { groupBubbleVariants } from "./studio-assets";
+import { StudioBubbleVariantGlyph } from "./StudioBubbleVariantGlyph";
+
+import type { StudioToolBeltContentProps } from "./StudioToolBeltContent";
+
+import { cn } from "@/lib/utils";
+
+export interface StudioBubbleToolPopoverBodyProps {
+  readonly toolBelt: StudioToolBeltContentProps;
+}
+
+export function StudioBubbleToolPopoverBody({
+  toolBelt,
+}: StudioBubbleToolPopoverBodyProps) {
+  const {
+    dialogueScript,
+    setDialogueBatchOpen,
+    setDialogueScript,
+    setDialogueTranslateOpen,
+    setMenu,
+  } = toolBelt;
+  const {
+    addBubble,
+    addDialogueBubbles,
+    openFeatureTutorial,
+  } = toolBelt.stableHandlers;
+
+  return (
+    <>
+              <div className="relative overflow-hidden border-b border-line/50 bg-gradient-to-br from-accent-soft/35 via-card/60 to-panel px-3 pb-3 pt-3">
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute -right-4 -top-6 size-20 rounded-full bg-accent/10 blur-2xl"
+                />
+                <div className="relative flex items-start gap-2.5">
+                  <span className="grid size-10 shrink-0 place-items-center rounded-2xl border border-accent/25 bg-accent-soft text-accent shadow-[inset_0_1px_0_oklch(0.95_0.02_85_/_0.12)]">
+                    <MessageCircle size={18} aria-hidden strokeWidth={1.75} />
+                  </span>
+                  <div className="min-w-0 pt-0.5">
+                    <p className="text-[0.9rem] font-semibold tracking-tight text-fg">말풍선 골라 넣기</p>
+                    <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
+                      장면에 맞는 목소리를 고르면 돼요. 대충 골라도 나중에 바꿀 수 있어요.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenu(null);
+                        openFeatureTutorial("bubble");
+                      }}
+                      className="mt-1.5 text-[0.65rem] font-medium text-accent/90 underline-offset-2 transition-colors hover:text-accent hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                    >
+                      말풍선 튜토리얼 보기
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3 p-2.5" role="menu" aria-label="말풍선 종류">
+                {groupBubbleVariants().map((section) => (
+                  <div key={section.group}>
+                    <p className="mb-1.5 flex items-center gap-1.5 px-1 text-[0.62rem] font-semibold text-fg-3">
+                      <span className="inline-block size-1 rounded-full bg-accent/55" aria-hidden />
+                      {section.group}
+                    </p>
+                    <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                      {section.variants.map((v) => (
+                        <button
+                          key={v.id}
+                          type="button"
+                          role="menuitem"
+                          onClick={() => addBubble(v.id)}
+                          // 클릭=중앙/패널 규칙, 드래그=캔버스 드롭 지점 배치(onWrapDrop 이 처리).
+                          draggable
+                          onDragStart={(event) => {
+                            event.dataTransfer.setData(
+                              "application/json-insert",
+                              JSON.stringify({ kind: "bubble", variant: v.id })
+                            );
+                            event.dataTransfer.effectAllowed = "copy";
+                          }}
+                          title={`${v.label} — 클릭해 추가하거나 캔버스로 끌어다 원하는 위치에 놓으세요`}
+                          className="group flex min-h-[5.75rem] flex-col rounded-2xl border border-line/55 bg-gradient-to-b from-card/90 to-canvas/30 p-2 text-left shadow-[inset_0_1px_0_oklch(0.95_0.02_85_/_0.04)] transition-[border-color,background,transform,box-shadow] duration-200 ease-out hover:-translate-y-px hover:border-accent/40 hover:bg-raised/80 hover:shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:translate-y-0"
+                        >
+                          <span className="flex h-12 items-center justify-center rounded-xl bg-canvas/45 ring-1 ring-line/35 transition-colors group-hover:bg-accent-soft/25 group-hover:ring-accent/20">
+                            <StudioBubbleVariantGlyph
+                              variant={v.id}
+                              className="h-10 w-full text-fg-2 transition-colors duration-200 group-hover:text-accent"
+                            />
+                          </span>
+                          <span className="mt-1.5 block text-[0.78rem] font-semibold tracking-tight text-fg">
+                            {v.label}
+                          </span>
+                          <span className="mt-0.5 block text-[0.6rem] leading-snug text-fg-3">{v.hint}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-2 border-t border-line/50 bg-canvas/25 px-2.5 py-2.5">
+                <div>
+                  <p className="text-[0.72rem] font-semibold text-fg-2">대사를 한 번에</p>
+                  <p className="mt-0.5 text-[0.64rem] leading-snug text-fg-3">
+                    한 줄에 한 마디. <span className="text-fg-2">이름: 대사</span>면 화자 자동,
+                    <span className="text-fg-2"> (지문)</span>은 나레이션.
+                  </p>
+                </div>
+                <textarea
+                  value={dialogueScript}
+                  onChange={(e) => setDialogueScript(e.target.value)}
+                  placeholder={"민수: 안녕?\n지영: 오랜만이야\n(잠시 후)"}
+                  spellCheck
+                  rows={4}
+                  className="w-full resize-y rounded-xl border border-line/60 bg-card/80 px-2.5 py-2 text-[0.7rem] leading-relaxed text-fg outline-none transition-colors placeholder:text-fg-3/80 focus:border-accent/45 focus:bg-card"
+                />
+                <button
+                  type="button"
+                  onClick={() => void addDialogueBubbles()}
+                  disabled={!dialogueScript.trim()}
+                  className={cn(
+                    "w-full rounded-xl py-2 text-xs font-semibold transition-[opacity,transform,background] duration-150",
+                    dialogueScript.trim()
+                      ? "bg-accent text-on-accent shadow-sm hover:opacity-95 active:scale-[0.99]"
+                      : "cursor-not-allowed bg-card text-fg-3 ring-1 ring-line/50"
+                  )}
+                >
+                  말풍선으로 한 번에 넣기
+                </button>
+                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenu(null);
+                      setDialogueBatchOpen(true);
+                    }}
+                    className="rounded-xl border border-line/60 bg-card/70 py-1.5 text-[0.7rem] font-medium text-fg-2 transition-colors hover:bg-raised"
+                  >
+                    배치 대사 편집
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenu(null);
+                      setDialogueBatchOpen(false);
+                      setDialogueTranslateOpen(true);
+                    }}
+                    className="rounded-xl border border-line/60 bg-card/70 py-1.5 text-[0.7rem] font-medium text-fg-2 transition-colors hover:bg-raised"
+                  >
+                    번역 (내 API 키)
+                  </button>
+                </div>
+              </div>
+
+    </>
+  );
+}
