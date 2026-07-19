@@ -176,6 +176,8 @@ export const subscriptions = pgTable(
 export const collections = pgTable(
   "collection",
   {
+    // New clients provide UUID v4 IDs for optimistic write-through. Keep text for seed/legacy
+    // opaque IDs (for example seed-col-1); this contract intentionally needs no DDL migration.
     id: text("id")
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),

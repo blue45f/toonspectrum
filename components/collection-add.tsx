@@ -4,6 +4,7 @@ import { useState } from "react";
 import { CollectionIcon } from "./visual-marks";
 import { COLLECTION_ICON_OPTIONS } from "./visual-marks-utils";
 
+import { MAX_COLLECTION_NAME_LENGTH } from "@/lib/collection-contract";
 import { useApp, useHydrated } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
@@ -62,6 +63,7 @@ export function CollectionAdd({ titleId }: { titleId: string }) {
                 onChange={(e) => setNewName(e.target.value)}
                 aria-label="새 컬렉션 이름"
                 placeholder="새 컬렉션"
+                maxLength={MAX_COLLECTION_NAME_LENGTH}
                 className="h-8 flex-1 rounded-lg border border-line bg-canvas px-2.5 text-sm outline-none focus:border-accent/50"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && newName.trim()) {
