@@ -6,6 +6,7 @@ import {
   StudioCrdtBackpressureError,
   StudioCrdtStorageCorruptionError,
 } from "./studio-crdt.service";
+import { StudioLiveSocketAuthService } from "./studio-live-socket-auth.service";
 import {
   STUDIO_LIVE_ADAPTER_DISCOVERY_TIMEOUT_MS,
   STUDIO_LIVE_RELAY_RPC_TIMEOUT_MS,
@@ -313,10 +314,10 @@ function createHarness(
   };
   const authenticate = vi.fn(authenticateSession);
   const revalidate = vi.fn(revalidateSession);
+  const socketAuthentication = new StudioLiveSocketAuthService(authenticate, revalidate);
   const gateway = new StudioLiveGateway(
     service as unknown as CreatorService,
-    authenticate,
-    revalidate,
+    socketAuthentication,
     crdtService as unknown as StudioCrdtService,
     lockRepository
   );
@@ -361,6 +362,7 @@ function createHarness(
     crdtService,
     authenticate,
     revalidate,
+    socketAuthentication,
     lockRepository,
     emissions,
     sockets,
@@ -454,10 +456,7 @@ function privateAuthPrincipal(
   harness: ReturnType<typeof createHarness>,
   socket: FakeSocket
 ): StudioLiveAuthPrincipal | undefined {
-  const internals = harness.gateway as unknown as {
-    authPrincipalsBySocket: Map<FakeSocket, StudioLiveAuthPrincipal>;
-  };
-  return internals.authPrincipalsBySocket.get(socket);
+  return harness.socketAuthentication.principal(socket as never);
 }
 
 function privateCrdtQuotaLimiter(
@@ -919,13 +918,10 @@ describe("StudioLiveGateway", () => {
     expect(privateAuthPrincipal(harness, socket)?.userId).toBe("owner");
     expectNoAdapterVisibleAuthentication(socket);
     expect(socket.handshake.auth).not.toHaveProperty("sessionToken");
-    const authInternals = harness.gateway as unknown as {
-      authPrincipalsBySocket: Map<FakeSocket, StudioLiveAuthPrincipal>;
-    };
     const quotaClear = vi.spyOn(privateCrdtQuotaLimiter(harness), "clear");
-    expect(authInternals.authPrincipalsBySocket.size).toBe(1);
+    expect(harness.socketAuthentication.principal(socket as never)).toBeDefined();
     harness.gateway.onModuleDestroy();
-    expect(authInternals.authPrincipalsBySocket.size).toBe(0);
+    expect(harness.socketAuthentication.principal(socket as never)).toBeUndefined();
     expect(quotaClear).toHaveBeenCalledOnce();
   });
 
