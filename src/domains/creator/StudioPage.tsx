@@ -71,7 +71,7 @@ import {
 } from "lucide-react";
 import { Fragment, Profiler, Suspense, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type SetStateAction } from "react";
 import { createPortal, flushSync } from "react-dom";
-import { Stage, Layer, Rect, Text as KText, Line, Group, Ellipse, Circle as KCircle, Path, Transformer, Shape } from "react-konva/lib/ReactKonvaCore";
+import { Stage, Layer, Rect, Group, Circle as KCircle, Transformer, Shape } from "react-konva/lib/ReactKonvaCore";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 
@@ -266,29 +266,7 @@ import {
   bubbleShapePointHandles,
   computeBubbleShapeGeometry,
   hasCustomBubbleShape,
-  normalizeCustomShapePoints,
 } from "./studio-bubble-custom-shape";
-import {
-  bubblePathData,
-  bubblePathDataMulti,
-  burstStarPathData,
-  doubleBubblePathData,
-  heartBubblePathData,
-  normalizeExtraTails,
-  scaredBubblePathData,
-  thoughtBubbleBodyPath,
-  type BubbleTailSpec,
-} from "./studio-bubble-path";
-import {
-  BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT,
-  bubbleHorizontalPadding,
-  bubbleVerticalPadding,
-  fitBubbleFontSize,
-} from "./studio-bubble-text-fit";
-import {
-  BUBBLE_TEXT_MEASURER,
-  formatVerticalText,
-} from "./studio-bubble-text-runtime";
 import {
   createPixelEditCanvas,
   downscaleDataUrl,
@@ -511,9 +489,6 @@ import {
   onionSkinLayers,
   type OnionSkinSettings,
 } from "./studio-frame-animation";
-import {
-  konvaGradientProps,
-} from "./studio-gradient-engine";
 import {
   computeHealCloneSourceOffset,
   healCloneSourcePoint,
@@ -981,8 +956,6 @@ import {
 } from "./studio-stroke-paint-model";
 import {
   DEFAULT_SHAPE_PARAMS,
-  normalizeStrokeStyle,
-  strokeDashArray,
 } from "./studio-stroke-shapes";
 import {
   createStudioPointerVelocityState,
@@ -1107,6 +1080,7 @@ import {
   StudioInspectorAside,
   type StudioInspectorAsideHandlers,
 } from "./StudioInspectorAside";
+import { StudioKonvaBubbleNode } from "./StudioKonvaBubbleNode";
 import { StudioKonvaImageNode } from "./StudioKonvaImageNode";
 import {
   StudioFocusLinesNode,
@@ -25866,478 +25840,24 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                     />
                   );
                 // bubble
-                // 외곽선 두께: 사용자 지정 우선, 없으면 말풍선 평균크기 3단계(작을수록 가늘게).
-                const avgSize = (el.width + el.height) / 2;
-                let bStroke = el.stroke ?? "#1f1a16"; // 순흑 대신 따뜻한 잉크색
-                let bStrokeW = el.strokeWidth ?? (avgSize < 300 ? 2.5 : avgSize < 500 ? 3 : 3.5);
-                let bRadius = 18;
-                // 그림자: 사용자 지정 없으면 테마별 기본값(종이 위에 살짝 뜬 미세 그림자).
-                let bShadowColor = el.shadowColor !== undefined ? el.shadowColor : "rgba(0, 0, 0, 0.2)";
-                let bShadowBlur = el.shadowBlur !== undefined ? el.shadowBlur : 5;
-                let bShadowOpacity = el.shadowOpacity !== undefined ? el.shadowOpacity : 0.16;
-                let bShadowOffset = el.shadowOffsetX !== undefined && el.shadowOffsetY !== undefined
-                  ? { x: el.shadowOffsetX, y: el.shadowOffsetY }
-                  : { x: 1, y: 2 };
-                const tXRatio = el.tailXRatio ?? 0.35;
-                const tHeight = el.tailHeight ?? 30;
-                const tailDir = el.tail ?? "left";
-                const tailDirection = el.tailDirection ?? "bottom";
-                const showTail = tailDir !== "none";
-
-                // 테마별 파라미터 사전 계산
-                let tHeightWithTheme = tHeight;
-                let borderRatio = 0.08;
-
-                if (webtoonTheme === "soft") {
-                  bStroke = el.stroke ?? "#2d2d2d";
-                  bStrokeW = el.strokeWidth ?? (avgSize < 300 ? 1.5 : avgSize < 500 ? 1.8 : 2);
-                  bRadius = 24;
-                  tHeightWithTheme = tHeight - 10;
-                  borderRatio = 0.08;
-                  if (el.shadowColor === undefined) {
-                    bShadowColor = "rgba(0, 0, 0, 0.1)";
-                    bShadowBlur = 5;
-                    bShadowOpacity = 0.16;
-                    bShadowOffset = { x: 1, y: 2 };
-                  }
-                } else if (webtoonTheme === "vivid") {
-                  bStroke = el.stroke ?? "#444444";
-                  bStrokeW = el.strokeWidth ?? (avgSize < 300 ? 1.2 : avgSize < 500 ? 1.5 : 1.8);
-                  bRadius = Math.min(el.width, el.height) / 2;
-                  tHeightWithTheme = tHeight - 14;
-                  borderRatio = 0.06;
-                  if (el.shadowColor === undefined) {
-                    bShadowColor = "black";
-                    bShadowBlur = 8;
-                    bShadowOpacity = 0.16;
-                    bShadowOffset = { x: 2, y: 3 };
-                  }
-                }
-
-                // 점선 등 스트로크 스타일 — strokeStyle을 지정하면 그걸 우선 적용한다. whisper는
-                // strokeStyle 미지정 시 기존 하드코딩 dash([8,5])를 그대로 유지한다(하위호환).
-                // scared/system/angry는 스트로크 색(및 system은 두께)이 이미 하드코딩이라 점선도
-                // 적용하지 않는다(사용자가 지정 안 한 색 위에 점선만 얹히는 어색함 방지 — 기존 갭,
-                // 이 배치의 책임 밖).
-                const bDash = el.strokeStyle
-                  ? strokeDashArray(normalizeStrokeStyle(el.strokeStyle).dash, bStrokeW)
-                  : el.variant === "whisper"
-                    ? [8, 5]
-                    : undefined;
-
-                // 본체+꼬리를 단일 path로(이음새 없는 매끈한 말풍선). 위치는 기존 tXRatio/flip을 보존.
-                // 꼬리 길이·밑동을 말풍선 최소변 기준으로 정규화 — 작은 말풍선의 과대 꼬리/큰 말풍선의 빈약 꼬리 방지.
-                const tailIsVertical = tailDirection === "bottom" || tailDirection === "top";
-                const bMinDim = Math.min(el.width, el.height);
-                const bTailLen = Math.max(bMinDim * 0.12, Math.min(Math.max(8, tHeightWithTheme), bMinDim * 0.3));
-                const automaticTailBase = Math.max(
-                  bMinDim * 0.1,
-                  (tailIsVertical ? el.width : el.height) * borderRatio * 1.8
-                );
-                const bTailBase = Math.max(4, Math.min(el.tailBase ?? automaticTailBase, bMinDim * 0.62));
-                const bubbleTailSpec: BubbleTailSpec | null = showTail
-                  ? {
-                      direction: tailDirection,
-                      ratio: tailDir === "right" && tailIsVertical ? 1 - tXRatio : tXRatio,
-                      length: bTailLen,
-                      base: bTailBase,
-                      side: "center",
-                      bend: Math.max(-1, Math.min(el.tailBend ?? 0, 1)),
-                    }
-                  : null;
-                // 추가 꼬리(두 화자 동시 대사)가 있으면 다중 꼬리 워커로 — 없으면 기존 단일 경로 바이트 동일 유지.
-                const bubbleExtraTails = normalizeExtraTails(el.extraTails);
-                // 드래그 중이면 미확정 draft를(커밋 전 실시간 미리보기), 아니면 저장된 값을 정규화해 쓴다 —
-                // StudioDrawNode의 nodeEditDraft 병합과 동일한 관례. normalizeCustomShapePoints는 위
-                // normalizeExtraTails(el.extraTails)와 동일하게, 저장 문서에서 불러온 값을 매 렌더 방어적으로
-                // 정규화한다(짝수 길이·유한수 아니면 undefined로 폴백 — 커스텀 모양 미적용 취급).
-                const liveCustomShapePoints =
-                  bubbleShapeDraft?.elId === el.id ? bubbleShapeDraft.points : normalizeCustomShapePoints(el.customShapePoints);
-                const showCustomShape = hasCustomBubbleShape(liveCustomShapePoints);
-                const speechPathData =
-                  bubbleExtraTails.length > 0
-                    ? bubblePathDataMulti(el.width, el.height, bRadius, [
-                        ...(bubbleTailSpec ? [bubbleTailSpec] : []),
-                        ...bubbleExtraTails,
-                      ])
-                    : bubblePathData(el.width, el.height, bRadius, bubbleTailSpec);
-                // 타이포: 한글 가독성을 위한 테마별 줄간격 + 약한 자간(세로쓰기는 넉넉히).
-                const bubbleLineHeight =
-                  el.lineHeight ?? (el.vertical ? 1.4 : webtoonTheme === "soft" ? 1.35 : webtoonTheme === "vivid" ? 1.2 : 1.25);
-                const bubbleLetterSpacing = webtoonTheme === "vivid" ? 0 : 0.3;
-                // 안쪽 여백: 글자 크기 비례(좌우 대칭, 상<하로 시각 중심 보정).
-                const bubbleMaxFontSize = el.fontSize ?? 24;
-                const bFs = el.autoShrinkText
-                  ? fitBubbleFontSize(
-                      {
-                        text: el.vertical ? formatVerticalText(el.text) : el.text,
-                        boxWidth: el.width,
-                        boxHeight: el.height,
-                        maxFontSize: bubbleMaxFontSize,
-                        minFontSize: el.autoShrinkMinFontSize ?? BUBBLE_AUTO_SHRINK_MIN_FONT_DEFAULT,
-                        fontFamily: el.font ?? "Pretendard, sans-serif",
-                        fontStyle: el.fontStyle ?? "bold",
-                        lineHeight: bubbleLineHeight,
-                      },
-                      BUBBLE_TEXT_MEASURER
-                    ).fontSize
-                  : bubbleMaxFontSize;
-                // bHPad/bVPadTop/bVPadBot 공식을 studio-bubble-text-fit.ts와 공유(§1.1) — fitBubbleFontSize의
-                // 내부 탐색이 가정한 패딩과 실제 렌더 패딩이 정확히 일치해야 한다.
-                const bHPad = bubbleHorizontalPadding(bFs);
-                const { top: bVPadTop, bottom: bVPadBot } = bubbleVerticalPadding(bFs);
-
-                const thoughtBigX = tailDir === "right" ? el.width * 0.74 : el.width * 0.26;
-                const thoughtSmallX = tailDir === "right" ? el.width * 0.84 : el.width * 0.16;
-
-                // 생각 말풍선 꼬리: 큰→중간→작은 3단 구름방울(코미포식). 외곽선은 본체보다 살짝 얇게.
-                const thoughtSW = bStrokeW * 0.8;
-                const tBubble = (x: number, y: number, rx: number, ry: number, key: string) => (
-                  <Ellipse key={key} x={x} y={y} radiusX={rx} radiusY={ry} fill={el.fill} stroke={bStroke} strokeWidth={thoughtSW} />
-                );
-                let thoughtEllipses = null;
-                if (showTail) {
-                  if (tailDirection === "bottom") {
-                    thoughtEllipses = (
-                      <>
-                        {tBubble(thoughtBigX, el.height + 14, 14, 11, "a")}
-                        {tBubble(thoughtBigX, el.height + 32, 10, 8, "b")}
-                        {tBubble(thoughtSmallX, el.height + 54, 6, 5, "c")}
-                      </>
-                    );
-                  } else if (tailDirection === "top") {
-                    thoughtEllipses = (
-                      <>
-                        {tBubble(thoughtBigX, -14, 14, 11, "a")}
-                        {tBubble(thoughtBigX, -32, 10, 8, "b")}
-                        {tBubble(thoughtSmallX, -54, 6, 5, "c")}
-                      </>
-                    );
-                  } else if (tailDirection === "left") {
-                    const bigY = tailDir === "right" ? el.height * 0.74 : el.height * 0.26;
-                    const smallY = tailDir === "right" ? el.height * 0.84 : el.height * 0.16;
-                    thoughtEllipses = (
-                      <>
-                        {tBubble(-14, bigY, 11, 14, "a")}
-                        {tBubble(-32, bigY, 8, 10, "b")}
-                        {tBubble(-54, smallY, 5, 6, "c")}
-                      </>
-                    );
-                  } else if (tailDirection === "right") {
-                    const bigY = tailDir === "right" ? el.height * 0.74 : el.height * 0.26;
-                    const smallY = tailDir === "right" ? el.height * 0.84 : el.height * 0.16;
-                    thoughtEllipses = (
-                      <>
-                        {tBubble(el.width + 14, bigY, 11, 14, "a")}
-                        {tBubble(el.width + 32, bigY, 8, 10, "b")}
-                        {tBubble(el.width + 54, smallY, 5, 6, "c")}
-                      </>
-                    );
-                  }
-                }
-
-                let lx = el.width * tXRatio;
-                let ly = el.height + bTailLen;
-
-                if (tailDirection === "bottom") {
-                  const ratio = tailDir === "right" ? 1 - tXRatio : tXRatio;
-                  lx = el.width * ratio;
-                  ly = el.height + bTailLen;
-                } else if (tailDirection === "top") {
-                  const ratio = tailDir === "right" ? 1 - tXRatio : tXRatio;
-                  lx = el.width * ratio;
-                  ly = -bTailLen;
-                } else if (tailDirection === "left") {
-                  lx = -bTailLen;
-                  ly = el.height * tXRatio;
-                } else if (tailDirection === "right") {
-                  lx = el.width + bTailLen;
-                  ly = el.height * tXRatio;
-                }
-
-                const tailHandle = selectedId === el.id && showTail && !isExporting && !showCustomShape && (
-                  <KCircle
-                    x={lx}
-                    y={ly}
-                    radius={6 / effScale}
-                    fill="#ffcc00"
-                    stroke="#1f1a16"
-                    strokeWidth={1.5 / effScale}
-                    draggable
-                    onDragMove={(e) => {
-                      e.cancelBubble = true;
-                      const node = e.target;
-                      const dx = node.x();
-                      const dy = node.y();
-
-                      const dTop = Math.abs(dy);
-                      const dBot = Math.abs(dy - el.height);
-                      const dLeft = Math.abs(dx);
-                      const dRight = Math.abs(dx - el.width);
-                      const minDist = Math.min(dTop, dBot, dLeft, dRight);
-
-                      let newDir: "bottom" | "top" | "left" | "right" = "bottom";
-                      let ratio = tXRatio;
-                      let len = tHeight;
-
-                      if (minDist === dBot) {
-                        newDir = "bottom";
-                        const rawRatio = dx / el.width;
-                        ratio = Math.max(0.15, Math.min(0.85, rawRatio));
-                        len = Math.max(8, Math.min(150, dy - el.height));
-                      } else if (minDist === dTop) {
-                        newDir = "top";
-                        const rawRatio = dx / el.width;
-                        ratio = Math.max(0.15, Math.min(0.85, rawRatio));
-                        len = Math.max(8, Math.min(150, -dy));
-                      } else if (minDist === dLeft) {
-                        newDir = "left";
-                        const rawRatio = dy / el.height;
-                        ratio = Math.max(0.15, Math.min(0.85, rawRatio));
-                        len = Math.max(8, Math.min(150, -dx));
-                      } else if (minDist === dRight) {
-                        newDir = "right";
-                        const rawRatio = dy / el.height;
-                        ratio = Math.max(0.15, Math.min(0.85, rawRatio));
-                        len = Math.max(8, Math.min(150, dx - el.width));
-                      }
-
-                      if (tailDir === "right" && (newDir === "bottom" || newDir === "top")) {
-                        ratio = 1 - ratio;
-                      }
-
-                      patchEl(el.id, {
-                        tailDirection: newDir,
-                        tailXRatio: Math.round(ratio * 100) / 100,
-                        tailHeight: Math.round(len),
-                      });
-                    }}
-                    onDragEnd={(e) => {
-                      e.cancelBubble = true;
-                      e.target.x(lx);
-                      e.target.y(ly);
-                      e.target.getLayer()?.batchDraw();
-                    }}
-                  />
-                );
-
                 return wrapClip(
-                  <Group
-                    studioElementId={el.id}
+                  <StudioKonvaBubbleNode
                     key={el.id}
-                    ref={setRef}
-                    x={el.x}
-                    y={el.y}
-                    rotation={el.rotation}
-                    opacity={el.opacity ?? 1}
+                    el={el}
+                    theme={webtoonTheme}
+                    customShapeDraftPoints={
+                      bubbleShapeDraft?.elId === el.id ? bubbleShapeDraft.points : undefined
+                    }
+                    selected={selectedId === el.id}
+                    exporting={isExporting}
+                    effectiveScale={effScale}
                     draggable={draggable}
+                    innerRef={setRef}
                     dragBoundFunc={snapBoundFunc}
-                    shadowColor={bShadowColor}
-                    shadowBlur={bShadowBlur}
-                    shadowOpacity={bShadowOpacity}
-                    shadowOffset={bShadowOffset}
-                    onMouseDown={onSelect}
-                    onTap={onSelect}
-                    onDblClick={() => startEditText(el.id)}
-                    onDblTap={() => startEditText(el.id)}
-                    onDragEnd={(e) => patchEl(el.id, { x: e.target.x(), y: e.target.y() })}
-                    onTransformEnd={(e) => {
-                      const node = e.target as Konva.Group;
-                      const w = Math.max(60, el.width * node.scaleX());
-                      const h = Math.max(50, el.height * node.scaleY());
-                      node.scaleX(1);
-                      node.scaleY(1);
-                      patchEl(el.id, { x: node.x(), y: node.y(), width: w, height: h, rotation: node.rotation() });
-                    }}
-                  >
-                    {showCustomShape ? (
-                      <Line
-                        points={liveCustomShapePoints}
-                        closed
-                        fill={el.fill}
-                        stroke={bStroke}
-                        strokeWidth={bStrokeW}
-                        lineJoin="round"
-                        lineCap="round"
-                      />
-                    ) : el.variant === "double" ? (
-                      <Path
-                        data={doubleBubblePathData(el.width, el.height, bubbleTailSpec)}
-                        fill={el.fill}
-                        {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: el.width, height: el.height })}
-                        stroke={bStroke}
-                        strokeWidth={bStrokeW}
-                        dash={bDash}
-                        lineJoin="round"
-                        lineCap="round"
-                      />
-                    ) : el.variant === "shout" ? (
-                      <Path
-                        data={burstStarPathData(
-                          el.width,
-                          el.height,
-                          20,
-                          68 * Math.min(0.95, Math.max(0.1, el.starAmplitude ?? 36 / 68)),
-                          68
-                        )}
-                        fill={el.fill}
-                        {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: el.width, height: el.height })}
-                        stroke={bStroke}
-                        strokeWidth={bStrokeW}
-                        dash={bDash}
-                        lineJoin="round"
-                        lineCap="round"
-                      />
-                    ) : el.variant === "thought" ? (
-                      <>
-                        <Path
-                          data={thoughtBubbleBodyPath(el.width, el.height)}
-                          fill={el.fill}
-                          {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: el.width, height: el.height })}
-                          stroke={bStroke}
-                          strokeWidth={bStrokeW}
-                          dash={bDash}
-                          lineJoin="round"
-                          lineCap="round"
-                        />
-                        {thoughtEllipses}
-                      </>
-                    ) : el.variant === "whisper" ? (
-                      <Path
-                        data={speechPathData}
-                        fill={el.fill}
-                        {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: el.width, height: el.height })}
-                        stroke={bStroke}
-                        strokeWidth={bStrokeW}
-                        lineJoin="round"
-                        lineCap="round"
-                        dash={bDash}
-                      />
-                    ) : el.variant === "scared" ? (
-                      <Path
-                        data={scaredBubblePathData(el.width, el.height, bubbleTailSpec)}
-                        fill={el.fill === "transparent" ? "transparent" : (el.fill === "#ffffff" ? "#f5f3ff" : el.fill)}
-                        {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: el.width, height: el.height })}
-                        stroke="#7c3aed"
-                        strokeWidth={2}
-                        shadowColor="#7c3aed"
-                        shadowBlur={6}
-                        shadowOpacity={0.16}
-                        lineJoin="round"
-                        lineCap="round"
-                      />
-                    ) : el.variant === "system" ? (
-                      <>
-                        <Rect
-                          width={el.width}
-                          height={el.height}
-                          fill="#0a0f24"
-                          opacity={0.88}
-                          cornerRadius={4}
-                          stroke="#0ea5e9"
-                          strokeWidth={2.5}
-                          shadowColor="#0ea5e9"
-                          shadowBlur={8}
-                          shadowOpacity={0.4}
-                        />
-                        <Rect
-                          x={4}
-                          y={4}
-                          width={el.width - 8}
-                          height={el.height - 8}
-                          fill="transparent"
-                          cornerRadius={2}
-                          stroke="#38bdf8"
-                          strokeWidth={1}
-                          opacity={0.5}
-                        />
-                      </>
-                    ) : el.variant === "angry" ? (
-                      <Path
-                        data={burstStarPathData(
-                          el.width,
-                          el.height,
-                          22,
-                          64 * Math.min(0.95, Math.max(0.1, el.starAmplitude ?? 28 / 64)),
-                          64
-                        )}
-                        fill={el.fill}
-                        {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: el.width, height: el.height })}
-                        stroke={webtoonTheme === "soft" ? "#dc2626" : webtoonTheme === "vivid" ? "#7f1d1d" : "#991b1b"}
-                        strokeWidth={Math.max(bStrokeW, 3.5)}
-                        lineJoin="round"
-                        lineCap="round"
-                      />
-                    ) : el.variant === "phone" ? (
-                      <Path
-                        data={bubblePathData(
-                          el.width,
-                          el.height,
-                          webtoonTheme === "soft" ? 10 : webtoonTheme === "vivid" ? 6 : 8,
-                          // 메신저는 짧은 꼬리(채팅 꼬리 느낌) — 없으면 본체만.
-                          showTail && bubbleTailSpec
-                            ? { ...bubbleTailSpec, length: Math.min(bubbleTailSpec.length, Math.max(8, bMinDim * 0.1)), base: Math.min(bubbleTailSpec.base, Math.max(6, bMinDim * 0.12)) }
-                            : null
-                        )}
-                        fill={el.fill}
-                        {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: el.width, height: el.height })}
-                        stroke={bStroke}
-                        strokeWidth={bStrokeW}
-                        dash={bDash}
-                        lineJoin="round"
-                        lineCap="round"
-                      />
-                    ) : el.variant === "heart" ? (
-                      <Path
-                        data={heartBubblePathData(el.width, el.height)}
-                        fill={el.fill}
-                        {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: el.width, height: el.height })}
-                        stroke={bStroke}
-                        strokeWidth={bStrokeW}
-                        dash={bDash}
-                        lineJoin="round"
-                        lineCap="round"
-                      />
-                    ) : el.variant === "box" ? (
-                      <Rect
-                        width={el.width}
-                        height={el.height}
-                        fill={el.fill}
-                        {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: el.width, height: el.height })}
-                        cornerRadius={webtoonTheme === "soft" ? 6 : webtoonTheme === "vivid" ? 3 : 4}
-                        stroke={bStroke}
-                        strokeWidth={bStrokeW}
-                        dash={bDash}
-                      />
-                    ) : (
-                      <Path
-                        data={speechPathData}
-                        fill={el.fill}
-                        {...konvaGradientProps(el.gradient, { x: 0, y: 0, width: el.width, height: el.height })}
-                        stroke={bStroke}
-                        strokeWidth={bStrokeW}
-                        dash={bDash}
-                        lineJoin="round"
-                        lineCap="round"
-                      />
-                    )}
-                    <KText
-                      text={el.vertical ? formatVerticalText(el.text) : el.text}
-                      width={Math.max(8, el.width - bHPad * 2)}
-                      height={Math.max(8, el.height - (bVPadTop + bVPadBot))}
-                      x={bHPad}
-                      y={bVPadTop}
-                      fontSize={bFs}
-                      fontFamily={el.font ?? "Pretendard, sans-serif"}
-                      fontStyle={el.fontStyle ?? "bold"}
-                      fill={el.textFill}
-                      align={el.align ?? "center"}
-                      verticalAlign="middle"
-                      lineHeight={bubbleLineHeight}
-                      letterSpacing={bubbleLetterSpacing}
-                    />
-                    {tailHandle}
-                  </Group>
+                    onSelect={onSelect}
+                    onEdit={() => startEditText(el.id)}
+                    onChange={(patch) => patchEl(el.id, patch)}
+                  />
                 );
                 };
                 // 문서 마스터 밑그림 — 일반 요소 "아래"(배경 위)에 비상호작용(asMask)으로 합성(studio-master-page).

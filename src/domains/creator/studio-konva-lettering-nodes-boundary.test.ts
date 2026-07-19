@@ -136,7 +136,7 @@ const INTERACTION_PROPS = [
 const PAGE_PROPS = ["key", "el", ...INTERACTION_PROPS] as const;
 
 describe("Studio Konva lettering node boundary", () => {
-  it("moves text, text-path, and sticker rendering out of StudioPage without moving bubbles", () => {
+  it("moves text, text-path, and sticker rendering out of StudioPage", () => {
     const page = moduleShape("./StudioPage.tsx");
     const nodes = moduleShape("./StudioKonvaTextNodes.tsx");
 
@@ -149,13 +149,30 @@ describe("Studio Konva lettering node boundary", () => {
     expect(page.source).not.toContain("textNodeProps<Partial<El>>");
     expect(page.source).not.toContain("buildTextPathData(");
     expect(page.source).not.toMatch(/el\.type === "text"\s*&&\s*el\.textPath/u);
-    expect(page.source).toContain("// bubble");
     expect(nodes.exportedDeclarations).toEqual(new Set([
       "StudioTextTransformOptions",
       "StudioKonvaTextNodeProps",
       "StudioKonvaStickerNodeProps",
       "StudioKonvaTextNode",
       "StudioKonvaStickerNode",
+    ]));
+  });
+
+  it("moves the complete bubble renderer behind one clipped Page call site", () => {
+    const page = moduleShape("./StudioPage.tsx");
+    const bubbleNode = moduleShape("./StudioKonvaBubbleNode.tsx");
+
+    expect(
+      page.valueImports.filter((specifier) => specifier === "./StudioKonvaBubbleNode"),
+    ).toEqual(["./StudioKonvaBubbleNode"]);
+    expect(page.source.match(/<StudioKonvaBubbleNode\b/gu)).toHaveLength(1);
+    expect(page.source).not.toContain("const avgSize = (el.width + el.height) / 2;");
+    expect(page.source).not.toContain("const tailHandle =");
+    expect(page.source).not.toContain("bubblePathData(el.width");
+    expect(page.source).not.toContain("fitBubbleFontSize(");
+    expect(bubbleNode.exportedDeclarations).toEqual(new Set([
+      "StudioKonvaBubbleNodeProps",
+      "StudioKonvaBubbleNode",
     ]));
   });
 
@@ -208,6 +225,77 @@ describe("Studio Konva lettering node boundary", () => {
     expect(nodes.source).toContain('import type { El } from "./studio-element-model";');
     expect(nodes.source).toContain('import type Konva from "konva";');
     expect(nodes.source).not.toContain('from "konva/lib/Core"');
+  });
+
+  it("locks the minimal bubble props and resolves the live draft at the Page boundary", () => {
+    const page = moduleShape("./StudioPage.tsx");
+    const bubbleNode = moduleShape("./StudioKonvaBubbleNode.tsx");
+    const expectedProps = [
+      "el",
+      "theme",
+      "customShapeDraftPoints",
+      "selected",
+      "exporting",
+      "effectiveScale",
+      "draggable",
+      "innerRef",
+      "dragBoundFunc",
+      "onSelect",
+      "onEdit",
+      "onChange",
+    ];
+
+    expect(propertyNames(findInterface(bubbleNode, "StudioKonvaBubbleNodeProps").members)).toEqual(
+      expectedProps,
+    );
+    expect(bubbleNode.source).toContain('el: Extract<El, { type: "bubble" }>;');
+    const attributes = jsxAttributes(findJsx(page, "StudioKonvaBubbleNode"));
+    expect([...attributes.keys()]).toEqual(["key", ...expectedProps]);
+    expect(attributes.get("el")).toBe("{el}");
+    expect(attributes.get("theme")).toBe("{webtoonTheme}");
+    expect(attributes.get("customShapeDraftPoints")).toContain(
+      "bubbleShapeDraft?.elId === el.id ? bubbleShapeDraft.points : undefined",
+    );
+    expect(attributes.get("selected")).toBe("{selectedId === el.id}");
+    expect(attributes.get("exporting")).toBe("{isExporting}");
+    expect(attributes.get("effectiveScale")).toBe("{effScale}");
+    expect(attributes.get("draggable")).toBe("{draggable}");
+    expect(attributes.get("innerRef")).toBe("{setRef}");
+    expect(attributes.get("dragBoundFunc")).toBe("{snapBoundFunc}");
+    expect(attributes.get("onSelect")).toBe("{onSelect}");
+    expect(attributes.get("onEdit")).toContain("startEditText(el.id)");
+    expect(attributes.get("onChange")).toContain("patchEl(el.id, patch)");
+  });
+
+  it("keeps bubble rendering one-way and preserves the pre-existing no-soft-lock mechanics", () => {
+    const bubbleNode = moduleShape("./StudioKonvaBubbleNode.tsx");
+
+    expect(bubbleNode.dynamicImports).toEqual([]);
+    expect(bubbleNode.valueImports).toEqual([
+      "react-konva/lib/ReactKonvaCore",
+      "./studio-bubble-custom-shape",
+      "./studio-bubble-path",
+      "./studio-bubble-text-fit",
+      "./studio-bubble-text-runtime",
+      "./studio-gradient-engine",
+      "./studio-stroke-shapes",
+    ]);
+    expect(bubbleNode.allImports).toContain("./studio-element-model");
+    expect(bubbleNode.allImports).toContain("konva");
+    expect(bubbleNode.allImports).not.toContain("./StudioPage");
+    expect(bubbleNode.allImports).not.toContain("./studio-node-props");
+    expect(bubbleNode.allImports).not.toContain("react-router-dom");
+    expect(bubbleNode.allImports.some((specifier) => /(?:crdt|collaboration|gpu)/u.test(specifier))).toBe(false);
+    expect(bubbleNode.source).toContain('import type { El } from "./studio-element-model";');
+    expect(bubbleNode.source).toContain('import type Konva from "konva";');
+    expect(bubbleNode.source).not.toContain('from "konva/lib/Core"');
+    expect(bubbleNode.source).not.toContain("computeBubbleShapeGeometry");
+    expect(bubbleNode.source).not.toContain("onInteractionBegin");
+    expect(bubbleNode.source).not.toContain("onInteractionEnd");
+    expect(bubbleNode.source).toContain("const bTailLen =");
+    expect(bubbleNode.source).toContain("const tailHandle = selected && showTail && !exporting && !showCustomShape");
+    expect(bubbleNode.source).toContain("const w = Math.max(60, el.width * node.scaleX());");
+    expect(bubbleNode.source).toContain("const h = Math.max(50, el.height * node.scaleY());");
   });
 
   it("keeps the transform commit and unconditional live-lock release in the parent", () => {
