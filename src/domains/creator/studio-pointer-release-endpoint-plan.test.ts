@@ -1,0 +1,177 @@
+import { describe, expect, it } from "vitest";
+
+import { STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 } from "./studio-ink-pressure-model";
+import {
+  planStudioPointerReleaseEndpoint,
+  type StudioPointerReleaseEndpointPlanInput,
+} from "./studio-pointer-release-endpoint-plan";
+
+import type { DrawEl } from "./studio-element-model";
+
+function stroke(overrides: Partial<DrawEl> = {}): DrawEl {
+  return {
+    id: "stroke-1",
+    type: "draw",
+    kind: "freehand",
+    mode: "pen",
+    points: [0, 0, 10, 10],
+    stroke: "#112233",
+    strokeWidth: 8,
+    brush: "pen",
+    pressures: [0.25, 0.75],
+    ...overrides,
+  };
+}
+
+function plan(
+  completed: DrawEl,
+  overrides: Partial<Omit<StudioPointerReleaseEndpointPlanInput, "stroke">> = {}
+) {
+  return planStudioPointerReleaseEndpoint({
+    stroke: completed,
+    endpoint: { x: 20, y: 15 },
+    pointer: { pointerType: "mouse", pressure: 0.5 },
+    pressureCurve: 1,
+    ...overrides,
+  });
+}
+
+describe("planStudioPointerReleaseEndpoint", () => {
+  it.each([
+    ["identical", { x: 10, y: 10 }],
+    ["inside the endpoint epsilon", { x: 10 + 0.5e-6, y: 10 }],
+    ["non-finite", { x: Number.NaN, y: 10 }],
+  ])("preserves the exact stroke reference for an %s endpoint", (_, endpoint) => {
+    const completed = stroke();
+    const result = plan(completed, { endpoint });
+
+    expect(result).toEqual({ stroke: completed, appended: false });
+    expect(result.stroke).toBe(completed);
+  });
+
+  it("appends one endpoint without mutating the source stroke", () => {
+    const completed = stroke();
+    const before = structuredClone(completed);
+    const result = plan(completed);
+
+    expect(result.appended).toBe(true);
+    expect(result.stroke).not.toBe(completed);
+    expect(result.stroke.points).toEqual([0, 0, 10, 10, 20, 15]);
+    expect(result.stroke.pressures).toEqual([0.25, 0.75, 0.75]);
+    expect(completed).toEqual(before);
+  });
+
+  it("aligns a short pressure channel before retaining pointerup's last pen-contact pressure", () => {
+    const completed = stroke({ pressures: [0.4] });
+    const result = plan(completed, {
+      pointer: { pointerType: "pen", pressure: 0 },
+      pressureCurve: 4,
+    });
+
+    expect(result.stroke.pressures).toEqual([0.4, 0.5, 0.4]);
+  });
+
+  it("uses the versioned nominal pressure when the prior channel is missing", () => {
+    const completed = stroke({
+      pressureModel: STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1,
+      pressures: undefined,
+    });
+    const result = plan(completed, {
+      pointer: { pointerType: "mouse", pressure: 0 },
+    });
+
+    expect(result.stroke.pressures).toEqual([1, 1, 1]);
+  });
+
+  it("captures normalized stylus and dynamics channels for a dynamic pen brush", () => {
+    const completed = stroke({
+      brush: "spray",
+      pressures: [0.3, 0.6],
+      tiltXs: [12, 999, 1_000],
+      tiltYs: undefined,
+      twists: [10],
+      speeds: [3],
+      tangentialPressures: [0.2],
+    });
+    const result = plan(completed, {
+      pointer: {
+        pointerType: "pen",
+        pressure: 0.25,
+        tiltX: 120,
+        tiltY: -140,
+        twist: 500,
+        tangentialPressure: 4,
+      },
+      pressureCurve: 2,
+    });
+
+    expect(result.stroke.pressures).toEqual([0.3, 0.6, 0.0625]);
+    expect(result.stroke.tiltXs).toEqual([12, 999, 90]);
+    expect(result.stroke.tiltYs).toEqual([0, 0, -90]);
+    expect(result.stroke.twists).toEqual([10, 0, 359]);
+    expect(result.stroke.speeds).toEqual([3, 0, 3]);
+    expect(result.stroke.tangentialPressures).toEqual([0.2, 0, 1]);
+  });
+
+  it("falls back to the last barrel-pressure sample when pointerup omits it", () => {
+    const completed = stroke({
+      brush: "airbrush",
+      tangentialPressures: [-0.3, 0.45],
+    });
+    const result = plan(completed, {
+      pointer: { pointerType: "pen", pressure: 0, tangentialPressure: Number.NaN },
+    });
+
+    expect(result.stroke.tangentialPressures).toEqual([-0.3, 0.45, 0.45]);
+  });
+
+  it("captures zeroed mouse orientation for calligraphy but preserves unrelated channels", () => {
+    const speeds = [4, 5];
+    const tangentialPressures = [0.1, 0.2];
+    const completed = stroke({
+      brush: "calligraphy",
+      speeds,
+      tangentialPressures,
+    });
+    const result = plan(completed, {
+      pointer: {
+        pointerType: "mouse",
+        pressure: 0.5,
+        tiltX: 80,
+        tiltY: 70,
+        twist: 180,
+      },
+    });
+
+    expect(result.stroke.tiltXs).toEqual([0, 0, 0]);
+    expect(result.stroke.tiltYs).toEqual([0, 0, 0]);
+    expect(result.stroke.twists).toEqual([0, 0, 0]);
+    expect(result.stroke.speeds).toBe(speeds);
+    expect(result.stroke.tangentialPressures).toBe(tangentialPressures);
+  });
+
+  it("leaves optional hardware channels untouched for a regular pen brush", () => {
+    const tiltXs = [1];
+    const tiltYs = [2];
+    const twists = [3];
+    const speeds = [4];
+    const tangentialPressures = [0.1];
+    const completed = stroke({ tiltXs, tiltYs, twists, speeds, tangentialPressures });
+    const result = plan(completed, {
+      pointer: {
+        pointerType: "pen",
+        pressure: 0,
+        tiltX: 80,
+        tiltY: 70,
+        twist: 180,
+        tangentialPressure: 0.9,
+      },
+    });
+
+    expect(result.stroke.tiltXs).toBe(tiltXs);
+    expect(result.stroke.tiltYs).toBe(tiltYs);
+    expect(result.stroke.twists).toBe(twists);
+    expect(result.stroke.speeds).toBe(speeds);
+    expect(result.stroke.tangentialPressures).toBe(tangentialPressures);
+  });
+});

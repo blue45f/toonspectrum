@@ -738,6 +738,7 @@ import {
   shouldEndStudioStrokeForReleasedContact,
   shouldCancelStudioFingerStrokeForAdditionalContact,
 } from "./studio-pointer-input";
+import { planStudioPointerReleaseEndpoint } from "./studio-pointer-release-endpoint-plan";
 import {
   appendStudioAuthoritativeInk,
   createStudioPredictedInkTailState,
@@ -18115,57 +18116,13 @@ function StudioCuttoonEditor() {
             const flushed = flushStudioStrokeStabilizerEndpoint(liveState);
             drawingStabilizerRef.current = flushed.state;
             const current = drawingRef.current;
-            const x = flushed.point[0];
-            const y = flushed.point[1];
-            const lastX = current.points[current.points.length - 2] ?? x;
-            const lastY = current.points[current.points.length - 1] ?? y;
-            if (Math.hypot(x - lastX, y - lastY) > 1e-6) {
-              const pointCount = Math.floor(current.points.length / 2);
-              const lastPressure = current.pressures?.at(-1)
-                ?? studioInkFallbackPressure(current.pressureModel);
-              const pressure = pointerEvent.pointerType === "pen"
-                ? resolveBrushReleasePressureSample({
-                    pointerType: "pen",
-                    rawPressure: pointerEvent.pressure,
-                    lastContactPressure: lastPressure,
-                    velocityFallbackEnabled: false,
-                    pressureCurve: inputSettings?.pressureCurve ?? pressureCurve,
-                    fallbackPressure: lastPressure,
-                  })
-                : lastPressure;
-              const capturePointerDynamics = current.mode === "pen" && resolveStudioBrushDynamicsPresetId(current.brush) !== null;
-              const captureStylus = current.mode === "pen" && (current.brush === "calligraphy" || capturePointerDynamics);
-              const stylus = captureStylus ? normalizeCalligraphyStylusInput(pointerEvent) : null;
-              const tangentialPressure = Number.isFinite(pointerEvent.tangentialPressure)
-                ? Math.min(1, Math.max(-1, pointerEvent.tangentialPressure))
-                : (current.tangentialPressures?.at(-1) ?? 0);
-              const appendAligned = (
-                values: number[] | undefined,
-                value: number,
-                fallback = 0
-              ): number[] => [
-                ...Array.from({ length: pointCount }, (_, index) => values?.[index] ?? fallback),
-                value,
-              ];
-              drawingRef.current = {
-                ...current,
-                points: [...current.points, x, y],
-                pressures: appendAligned(
-                  current.pressures,
-                  pressure,
-                  studioInkFallbackPressure(current.pressureModel)
-                ),
-                tiltXs: stylus ? appendAligned(current.tiltXs, stylus.tiltX) : current.tiltXs,
-                tiltYs: stylus ? appendAligned(current.tiltYs, stylus.tiltY) : current.tiltYs,
-                twists: stylus ? appendAligned(current.twists, stylus.twist) : current.twists,
-                speeds: capturePointerDynamics
-                  ? appendAligned(current.speeds, current.speeds?.at(-1) ?? 0)
-                  : current.speeds,
-                tangentialPressures: capturePointerDynamics
-                  ? appendAligned(current.tangentialPressures, tangentialPressure)
-                  : current.tangentialPressures,
-              };
-            }
+            const endpointPlan = planStudioPointerReleaseEndpoint({
+              stroke: current,
+              endpoint: { x: flushed.point[0], y: flushed.point[1] },
+              pointer: pointerEvent,
+              pressureCurve: inputSettings?.pressureCurve ?? pressureCurve,
+            });
+            if (endpointPlan.appended) drawingRef.current = endpointPlan.stroke;
           }
         }
         if (drawingRef.current) {
