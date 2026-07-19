@@ -14294,11 +14294,6 @@ function StudioCuttoonEditor() {
       default:
         break;
     }
-    // Bring the tool form into view after preset fill (hub body is the scroll container).
-    globalThis.requestAnimationFrame(() => {
-      const panel = menuRef.current?.querySelector<HTMLElement>("[data-studio-ai-assist-tool-panel]");
-      panel?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    });
   }
 
   // AI 자동 채색 실행 — elId/srcAtRequestTime을 호출 시점에 캡처해 넘긴다(await 도중 선택이 바뀌어도

@@ -16,6 +16,7 @@ import {
   UserRound,
   type LucideIcon,
 } from "lucide-react";
+import { useRef } from "react";
 
 import {
   presetsForAssistTool,
@@ -72,6 +73,7 @@ export function StudioAiAssistHub({
   toolPanel,
   className,
 }: StudioAiAssistHubProps): ReactElement {
+  const toolPanelRef = useRef<HTMLDivElement>(null);
   const toolMeta = STUDIO_AI_ASSIST_TOOLS.find((t) => t.id === activeTool) ?? STUDIO_AI_ASSIST_TOOLS[0]!;
   const presets = presetsForAssistTool(activeTool);
   const recents = recentPromptsForTool(recentState, activeTool, 3);
@@ -80,6 +82,13 @@ export function StudioAiAssistHub({
     : toolMeta.needsTextApi
       ? textConfigured
       : true;
+
+  const applyPromptAndRevealToolPanel = (prompt: string) => {
+    onApplyPresetPrompt(activeTool, prompt);
+    globalThis.requestAnimationFrame(() => {
+      toolPanelRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
+  };
 
   return (
     <div
@@ -178,7 +187,7 @@ export function StudioAiAssistHub({
                   key={preset.id}
                   type="button"
                   title={preset.prompt}
-                  onClick={() => onApplyPresetPrompt(activeTool, preset.prompt)}
+                  onClick={() => applyPromptAndRevealToolPanel(preset.prompt)}
                   className={cn(
                     "rounded-full border border-line bg-card px-2.5 py-1 text-[0.62rem] font-semibold text-fg-2",
                     STUDIO_EASE,
@@ -202,7 +211,7 @@ export function StudioAiAssistHub({
                   key={prompt}
                   type="button"
                   title={prompt}
-                  onClick={() => onApplyPresetPrompt(activeTool, prompt)}
+                  onClick={() => applyPromptAndRevealToolPanel(prompt)}
                   className={cn(
                     "truncate rounded-lg border border-line/70 bg-canvas/40 px-2 py-1.5 text-left text-[0.6rem] text-fg-3",
                     STUDIO_FOCUS_RING,
@@ -217,7 +226,11 @@ export function StudioAiAssistHub({
         ) : null}
 
         {/* Active tool panel — primary interactive surface */}
-        <div className="min-h-[8rem] shrink-0 pb-1" data-studio-ai-assist-tool-panel="true">
+        <div
+          ref={toolPanelRef}
+          className="min-h-[8rem] shrink-0 pb-1"
+          data-studio-ai-assist-tool-panel="true"
+        >
           {toolPanel}
         </div>
       </div>
