@@ -151,8 +151,6 @@ describe("Studio BG3D shot UI integration boundary", () => {
       "appliedCaptureQuality.shadows !== shot.capture.shadows",
       "const projectionChanged = renderedProjection !== applied.camera.projection",
       "view: applied.camera",
-      "const requestedCaptureHeight = shot.capture.requestedHeight",
-      "const captureWasReduced = shot.capture.wasReduced",
       "const captureAdapter = await acquireStudioBg3dCaptureAdapterAfterViewTransition({",
       "const sourceSize = getStudioBg3dCaptureSourceSize(captureAdapter)",
       "const captureOwnerMismatches = [",
@@ -170,37 +168,29 @@ describe("Studio BG3D shot UI integration boundary", () => {
       "height: shot.capture.height",
       "background: shot.capture.background",
       "includeDepth: shot.capture.includeDepth",
+      "const shotArtifacts = await buildStudioBg3dShotArtifacts({",
+      "captured,",
+      "passes: batchPlan.passes",
+      "includeLayeredPsd: shotBatchIncludeLayeredPsd",
+      "committedArtifactBytes: accumulatedArtifactBytes",
     ]);
     expect(handler).toContain("previousApi: previousViewportApi");
     expect(handler).toContain("requireReplacement: projectionChanged");
     expect(handler).not.toContain("firstShotRequiresViewportReplacement");
     expect(handler).toContain("signal: controller.signal");
     expect(handler).toContain("timeoutMs: 30_000");
-    expect(handler).toContain("timeoutMs: 20_000");
-    expect(handler).toContain("await renderStudioBg3dLtLayersInWorker(");
-    expect(handler).toContain("{ signal: controller.signal }");
-    expect(handler).toContain('cause.code === "worker-unavailable"');
-    expect(handler).toContain("STUDIO_BG3D_LT_RENDER_SYNC_FALLBACK_MAX_PIXELS");
-    expect(handler).toContain("return renderStudioBg3dLtLayers(ltRenderInput, ltRenderSettings)");
-    expect(handler).not.toContain('cause.code === "timeout"');
-    expect(handler).not.toContain('cause.code === "render-failed"');
-    expect(handler).not.toContain('cause.code === "worker-failed"');
-    expect(handler).toContain("for (const pass of batchPlan.passes)");
-    expect(handler).toContain('pass === "beauty"');
-    expect(handler).toContain('pass === "lt-composite"');
-    expect(handler).toContain('pass === "depth"');
-    expect(handler).toContain("createStudioBg3dDepthRasterLayer(");
-    expect(handler).toContain("encodeStudioBg3dLtCompositeToPngBlob(");
-    expect(handler).toContain("requestedHeight: requestedCaptureHeight");
-    expect(handler).toContain("wasReduced: captureWasReduced");
+    expect(handler).not.toContain("renderStudioBg3dLtLayersInWorker(");
+    expect(handler).not.toContain("encodeStudioBg3dLtCompositeToPngBlob(");
+    expect(handler).not.toContain("buildStudioBg3dShotLayeredPsdInWorker(");
 
     // A shot becomes locally archive-visible only after its validated artifacts commit atomically.
     expectInOrder(handler, [
+      "const shotArtifacts = await buildStudioBg3dShotArtifacts({",
       "await shotBatchRecoveryStore.completeShot(recoverySession, activeRunToken, {",
-      "images.push(...stagedImages)",
-      "skippedArtifacts.push(...stagedSkippedArtifacts)",
-      "layeredPsds.push(...stagedLayeredPsds)",
-      "psdFallbacks.push(...stagedPsdFallbacks)",
+      "images.push(...shotArtifacts.images)",
+      "skippedArtifacts.push(...shotArtifacts.skippedArtifacts)",
+      "layeredPsds.push(...shotArtifacts.layeredPsds)",
+      "psdFallbacks.push(...shotArtifacts.psdFallbacks)",
     ]);
     const completeShotIndex = handler.indexOf(
       "await shotBatchRecoveryStore.completeShot(recoverySession, activeRunToken, {",
@@ -209,13 +199,13 @@ describe("Studio BG3D shot UI integration boundary", () => {
       handler.indexOf("if (!activeRunToken)"),
     );
     expectInOrder(handler.slice(completeShotIndex), [
-      "psdFallbacks: stagedPsdFallbacks",
+      "psdFallbacks: shotArtifacts.psdFallbacks",
       "signal: controller.signal",
       "authorizeBeforeCommit: async () => {",
       "await assertRecoveryAccess()",
       "const authorizedAt = Date.now()",
       "isLocallyCurrent: () => componentActiveRef.current",
-      "images.push(...stagedImages)",
+      "images.push(...shotArtifacts.images)",
     ]);
     expect(handler).toContain("if (activeRunToken && !recoveryAccessRevoked)");
     expectInOrder(handler, [
@@ -223,8 +213,6 @@ describe("Studio BG3D shot UI integration boundary", () => {
       "await shotBatchRecoveryStore.resetInterrupted(recoverySession)",
       "const recoveryRelease = shotBatchRecoveryStore.release(recoverySession)",
     ]);
-    expect(handler).toContain("admitStudioBg3dShotPsdLayers(rendered.layers)");
-    expect(handler).toContain("await buildStudioBg3dShotLayeredPsdInWorker(rendered.layers");
     expect(handler).toContain("STUDIO_BG3D_SHOT_CONTACT_SHEET_PASS_PRIORITY");
     expect(handler).toContain("await buildStudioBg3dShotContactSheetsInWorker(");
     expect(handler).toContain('contactSheetFallback = "source-unavailable"');

@@ -141,7 +141,6 @@ import {
   acquireStudioBg3dCaptureAdapterAfterViewTransition,
   captureStudioBg3dRaster,
   getStudioBg3dCaptureSourceSize,
-  waitForStudioBg3dCapturePhase,
   type StudioBg3dCaptureAdapter,
 } from "./studio-bg3d-capture-adapter";
 import {
@@ -155,7 +154,6 @@ import {
   PanoramaRotationNumberField,
   Vec3Field,
 } from "./studio-bg3d-control-fields";
-import { createStudioBg3dDepthRasterLayer } from "./studio-bg3d-depth-pass";
 import {
   deriveStudioBg3dGlbValidationPolicy,
   resolveStudioBg3dDeviceQuality,
@@ -202,10 +200,6 @@ import {
   STUDIO_BG3D_LT_RENDER_MAX_PIXELS,
   type StudioBg3dLtRasterLayer,
 } from "./studio-bg3d-lt-render";
-import {
-  renderStudioBg3dLtLayersInWorker,
-  StudioBg3dLtRenderWorkerError,
-} from "./studio-bg3d-lt-render-worker-client";
 import {
   convertStudioBg3dModelFilesToGlb,
   StudioBg3dModelImportError,
@@ -364,10 +358,6 @@ import type {
   StudioBg3dShotBatchBuildOptions,
   StudioBg3dShotBatchContactSheet,
   StudioBg3dShotBatchContactSheetFallback,
-  StudioBg3dShotBatchImage,
-  StudioBg3dShotBatchLayeredPsd,
-  StudioBg3dShotBatchPsdFallback,
-  StudioBg3dShotBatchSkippedArtifact,
 } from "./studio-bg3d-shot-batch";
 import type { StudioBg3dShotBatchPass } from "./studio-bg3d-shot-batch-pass-catalog";
 import type {
@@ -428,7 +418,6 @@ const STUDIO_BG3D_SHOT_CONTACT_SHEET_PASS_PRIORITY: readonly StudioBg3dShotBatch
   "texture-line",
   "depth",
 ];
-const STUDIO_BG3D_LT_RENDER_SYNC_FALLBACK_MAX_PIXELS = 1_048_576;
 
 interface StudioBg3dHistorySnapshot {
   readonly primitives: BgPrimitive[];
@@ -959,63 +948,6 @@ function createStudioBg3dShotId(
     candidate = `shot-${stamp}-${ordinal.toString(36)}`;
   }
   return candidate;
-}
-
-async function encodeStudioBg3dLtCompositeToPngBlob(
-  layers: readonly StudioBg3dLtRasterLayer[],
-  options: { readonly signal?: AbortSignal; readonly timeoutMs?: number } = {},
-): Promise<Blob> {
-  const width = layers[0]?.width ?? 0;
-  const height = layers[0]?.height ?? 0;
-  if (
-    layers.length < 1 ||
-    width < 1 ||
-    height < 1 ||
-    width > STUDIO_BG3D_SHOT_BATCH_MAX_DIMENSION ||
-    height > STUDIO_BG3D_SHOT_BATCH_MAX_DIMENSION ||
-    layers.some((layer) => (
-      layer.width !== width ||
-      layer.height !== height ||
-      layer.data.byteLength !== width * height * 4
-    ))
-  ) {
-    throw new RangeError("컷 LT 레이어가 PNG 출력 예산과 일치하지 않습니다.");
-  }
-  const compositeCanvas = document.createElement("canvas");
-  const layerCanvas = document.createElement("canvas");
-  compositeCanvas.width = width;
-  compositeCanvas.height = height;
-  layerCanvas.width = width;
-  layerCanvas.height = height;
-  const compositeContext = compositeCanvas.getContext("2d");
-  const layerContext = layerCanvas.getContext("2d");
-  if (!compositeContext || !layerContext) throw new Error("컷 LT PNG 인코더를 준비하지 못했습니다.");
-  let blob: Blob | null;
-  try {
-    for (const layer of layers) {
-      if (options.signal?.aborted) {
-        const error = new Error("컷 일괄 렌더를 취소했습니다.");
-        error.name = "AbortError";
-        throw error;
-      }
-      layerContext.clearRect(0, 0, width, height);
-      const imageBytes = new Uint8ClampedArray(layer.data.length);
-      imageBytes.set(layer.data);
-      layerContext.putImageData(new ImageData(imageBytes, width, height), 0, 0);
-      compositeContext.drawImage(layerCanvas, 0, 0);
-    }
-    blob = await waitForStudioBg3dCapturePhase(
-      new Promise<Blob | null>((resolve) => compositeCanvas.toBlob(resolve, "image/png")),
-      options,
-    );
-  } finally {
-    layerCanvas.width = 1;
-    layerCanvas.height = 1;
-    compositeCanvas.width = 1;
-    compositeCanvas.height = 1;
-  }
-  if (!blob || blob.type !== "image/png") throw new Error("컷 LT PNG 인코딩에 실패했습니다.");
-  return blob;
 }
 
 function collectDeviceSignals(host?: HTMLElement | null): StudioBg3dDeviceSignals {
@@ -3804,17 +3736,15 @@ export function StudioBackground3D({
     const {
       STUDIO_BG3D_SHOT_BATCH_APP_IMPLEMENTATION_PROFILE_V1,
       STUDIO_BG3D_SHOT_BATCH_LT_PIPELINE_V1,
-      STUDIO_BG3D_SHOT_BATCH_MAX_IMAGE_BYTES,
       STUDIO_BG3D_SHOT_BATCH_MAX_TOTAL_BYTES,
       STUDIO_BG3D_SHOT_BATCH_PNG_ENCODING_V1,
       STUDIO_BG3D_SHOT_BATCH_PSD_ENCODING_V1,
       STUDIO_BG3D_SHOT_BATCH_RECOVERY_AUTHORIZATION_RECEIPT_MAX_TTL_MS,
       StudioBg3dShotBatchRecoveryError,
-      admitStudioBg3dShotPsdLayers,
+      buildStudioBg3dShotArtifacts,
       buildStudioBg3dShotBatchArchive,
       buildStudioBg3dShotBatchArchiveInWorker,
       buildStudioBg3dShotContactSheetsInWorker,
-      buildStudioBg3dShotLayeredPsdInWorker,
       commitStudioBg3dShotBatchDownload,
       createStudioBg3dShotBatchPlan,
       createStudioBg3dShotBatchRecoveryStore,
@@ -4133,8 +4063,6 @@ export function StudioBackground3D({
         renderedViewportApi = appliedViewportApi;
         renderedProjection = applied.camera.projection;
 
-        const requestedCaptureHeight = shot.capture.requestedHeight;
-        const captureWasReduced = shot.capture.wasReduced;
         let captured: Awaited<ReturnType<typeof captureStudioBg3dRaster>> | null = null;
         while (!captured) {
           if (document.visibilityState === "hidden") {
@@ -4211,160 +4139,25 @@ export function StudioBackground3D({
           }
         }
         if (controller.signal.aborted) throw Object.assign(new Error("취소됨"), { name: "AbortError" });
-        const ltRenderInput = {
-          width: captured.width,
-          height: captured.height,
-          rgba: captured.rgba,
-          ...(captured.depth ? { depth: captured.depth } : {}),
-        };
-        const ltRenderSettings = { line: applied.output.line, tone: applied.output.tone };
-        const rendered = await renderStudioBg3dLtLayersInWorker(
-          ltRenderInput,
-          ltRenderSettings,
-          { signal: controller.signal },
-        ).catch((cause: unknown) => {
-          if (
-            cause instanceof StudioBg3dLtRenderWorkerError &&
-            cause.code === "worker-unavailable" &&
-            captured.width * captured.height <= STUDIO_BG3D_LT_RENDER_SYNC_FALLBACK_MAX_PIXELS
-          ) {
-            return renderStudioBg3dLtLayers(ltRenderInput, ltRenderSettings);
-          }
-          throw cause;
+        const shotArtifacts = await buildStudioBg3dShotArtifacts({
+          shot,
+          captured,
+          settings: {
+            line: applied.output.line,
+            tone: applied.output.tone,
+          },
+          passes: batchPlan.passes,
+          includeLayeredPsd: shotBatchIncludeLayeredPsd,
+          committedArtifactBytes: accumulatedArtifactBytes,
+          signal: controller.signal,
         });
-        const layerByRole = new Map(rendered.layers.map((layer) => [layer.role, layer] as const));
-        const stagedImages: StudioBg3dShotBatchImage[] = [];
-        const stagedSkippedArtifacts: StudioBg3dShotBatchSkippedArtifact[] = [];
-        const stagedLayeredPsds: StudioBg3dShotBatchLayeredPsd[] = [];
-        const stagedPsdFallbacks: StudioBg3dShotBatchPsdFallback[] = [];
-        let stagedArtifactBytes = 0;
-        const mainLineConfigured = applied.output.line.enabled && applied.output.line.strength > 0;
-        const textureLineConfigured = mainLineConfigured &&
-          applied.output.line.textureLineEnabled && applied.output.line.textureLineStrength > 0;
-        const toneConfigured = applied.output.tone.mode !== "none" && applied.output.tone.opacity > 0;
-        const colorConfigured = toneConfigured && applied.output.tone.type === "color";
-        for (const pass of batchPlan.passes) {
-          let passLayers: readonly StudioBg3dLtRasterLayer[] | null = null;
-          let skipReason: StudioBg3dShotBatchSkippedArtifact["reason"] = "disabled";
-          if (pass === "beauty") {
-            passLayers = [{
-              role: "color",
-              width: captured.width,
-              height: captured.height,
-              data: new Uint8ClampedArray(captured.rgba),
-            }];
-          } else if (pass === "lt-composite") {
-            passLayers = rendered.layers.length > 0 ? rendered.layers : null;
-            skipReason = mainLineConfigured || textureLineConfigured || toneConfigured
-              ? "unavailable"
-              : "disabled";
-          } else if (pass === "depth") {
-            passLayers = captured.depth
-              ? [createStudioBg3dDepthRasterLayer(captured.width, captured.height, captured.depth)]
-              : null;
-            skipReason = "unavailable";
-          } else {
-            const layer = layerByRole.get(pass);
-            passLayers = layer ? [layer] : null;
-            const configured = pass === "main-line"
-              ? mainLineConfigured
-              : pass === "texture-line"
-                ? textureLineConfigured
-                : pass === "tone"
-                  ? toneConfigured && applied.output.tone.type !== "color"
-                  : colorConfigured;
-            skipReason = configured ? "unavailable" : "disabled";
-          }
-          if (!passLayers) {
-            stagedSkippedArtifacts.push({
-              shotId: shot.shotId,
-              shotName: shot.shotName,
-              pass,
-              reason: skipReason,
-            });
-            continue;
-          }
-          const png = await encodeStudioBg3dLtCompositeToPngBlob(
-            passLayers,
-            { signal: controller.signal, timeoutMs: 20_000 },
-          );
-          if (
-            png.size > STUDIO_BG3D_SHOT_BATCH_MAX_IMAGE_BYTES ||
-            accumulatedArtifactBytes + stagedArtifactBytes + png.size >
-              STUDIO_BG3D_SHOT_BATCH_MAX_TOTAL_BYTES
-          ) {
-            throw new RangeError("컷 PNG 합계가 브라우저 배치 메모리 예산을 벗어났습니다.");
-          }
-          stagedArtifactBytes += png.size;
-          stagedImages.push({
-            shotId: shot.shotId,
-            shotName: shot.shotName,
-            width: rendered.width,
-            height: rendered.height,
-            requestedHeight: requestedCaptureHeight,
-            wasReduced: captureWasReduced,
-            pass,
-            png,
-          });
-        }
-        // Required PNG passes reserve the batch budget first. PSD is optional and must fall back
-        // without invalidating already encoded PNGs or the recovery checkpoint.
-        if (shotBatchIncludeLayeredPsd) {
-          const psdAdmission = admitStudioBg3dShotPsdLayers(rendered.layers);
-          if (!psdAdmission.ok) {
-            stagedPsdFallbacks.push({
-              shotId: shot.shotId,
-              shotName: shot.shotName,
-              reason: psdAdmission.reason === "empty" ? "unavailable" : "budget",
-            });
-          } else if (typeof Worker !== "function") {
-            stagedPsdFallbacks.push({
-              shotId: shot.shotId,
-              shotName: shot.shotName,
-              reason: "unavailable",
-            });
-          } else {
-            try {
-              const psd = await buildStudioBg3dShotLayeredPsdInWorker(rendered.layers, {
-                signal: controller.signal,
-                timeoutMs: 90_000,
-              });
-              if (
-                accumulatedArtifactBytes + stagedArtifactBytes + psd.size >
-                STUDIO_BG3D_SHOT_BATCH_MAX_TOTAL_BYTES
-              ) {
-                stagedPsdFallbacks.push({
-                  shotId: shot.shotId,
-                  shotName: shot.shotName,
-                  reason: "budget",
-                });
-              } else {
-                stagedArtifactBytes += psd.size;
-                stagedLayeredPsds.push({
-                  shotId: shot.shotId,
-                  shotName: shot.shotName,
-                  width: rendered.width,
-                  height: rendered.height,
-                  psd,
-                });
-              }
-            } catch (cause) {
-              if (cause instanceof Error && cause.name === "AbortError") throw cause;
-              stagedPsdFallbacks.push({
-                shotId: shot.shotId,
-                shotName: shot.shotName,
-                reason: "worker-failed",
-              });
-            }
-          }
-        }
         if (!activeRunToken) throw new Error("컷 배치 실행 토큰을 읽지 못했습니다.");
         await assertRecoveryAccess();
         await shotBatchRecoveryStore.completeShot(recoverySession, activeRunToken, {
-          images: stagedImages,
-          skippedArtifacts: stagedSkippedArtifacts,
-          layeredPsds: stagedLayeredPsds,
-          psdFallbacks: stagedPsdFallbacks,
+          images: shotArtifacts.images,
+          skippedArtifacts: shotArtifacts.skippedArtifacts,
+          layeredPsds: shotArtifacts.layeredPsds,
+          psdFallbacks: shotArtifacts.psdFallbacks,
         }, {
           signal: controller.signal,
           authorizeBeforeCommit: async () => {
@@ -4380,11 +4173,11 @@ export function StudioBackground3D({
             };
           },
         });
-        images.push(...stagedImages);
-        skippedArtifacts.push(...stagedSkippedArtifacts);
-        layeredPsds.push(...stagedLayeredPsds);
-        psdFallbacks.push(...stagedPsdFallbacks);
-        accumulatedArtifactBytes += stagedArtifactBytes;
+        images.push(...shotArtifacts.images);
+        skippedArtifacts.push(...shotArtifacts.skippedArtifacts);
+        layeredPsds.push(...shotArtifacts.layeredPsds);
+        psdFallbacks.push(...shotArtifacts.psdFallbacks);
+        accumulatedArtifactBytes += shotArtifacts.artifactBytes;
         activeRunToken = null;
         const completedShots = studioBg3dShotBatchQueueCompletedCount(recoverySession.queue);
         setShotBatchRecoverySummary({

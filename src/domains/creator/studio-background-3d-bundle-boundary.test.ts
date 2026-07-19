@@ -58,8 +58,13 @@ describe("Studio background 3D bundle boundary", () => {
   it("loads durable shot production only after the user starts a batch", () => {
     const imports = moduleImports("./StudioBackground3D.tsx");
     const loaderImports = moduleImports("./studio-bg3d-shot-batch-runtime-loader.ts");
+    const runtimeSource = readFileSync(
+      new URL("./studio-bg3d-shot-batch-runtime.ts", import.meta.url),
+      "utf8",
+    );
 
     expect(imports.valueImports).not.toContain("./studio-bg3d-shot-batch-runtime");
+    expect(imports.valueImports).not.toContain("./studio-bg3d-shot-artifact-pipeline");
     expect(imports.dynamicImports).not.toContain("./studio-bg3d-shot-batch-runtime");
     expect(imports.valueImports).toContain("./studio-bg3d-shot-batch-runtime-loader");
     expect(loaderImports.dynamicImports).toEqual(["./studio-bg3d-shot-batch-runtime"]);
@@ -71,6 +76,7 @@ describe("Studio background 3D bundle boundary", () => {
     expect(imports.valueImports).not.toContain("./studio-bg3d-shot-batch-plan");
     expect(imports.valueImports).toContain("./studio-bg3d-shot-batch-limits");
     expect(imports.valueImports).toContain("./studio-bg3d-shot-batch-pass-catalog");
+    expect(runtimeSource).toContain('from "./studio-bg3d-shot-artifact-pipeline"');
   });
 
   it("keeps the metadata contract independent of rendering runtimes", () => {

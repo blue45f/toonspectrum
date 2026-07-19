@@ -32,6 +32,5 @@ export {
   buildStudioBg3dShotBatchArchiveInWorker,
   isStudioBg3dShotBatchWorkerUnavailableError,
 } from "./studio-bg3d-shot-batch-worker-client";
+export { buildStudioBg3dShotArtifacts } from "./studio-bg3d-shot-artifact-pipeline";
 export { buildStudioBg3dShotContactSheetsInWorker } from "./studio-bg3d-shot-contact-sheet-worker-client";
-export { admitStudioBg3dShotPsdLayers } from "./studio-bg3d-shot-psd-contract";
-export { buildStudioBg3dShotLayeredPsdInWorker } from "./studio-bg3d-shot-psd-worker-client";
