@@ -320,56 +320,12 @@ import {
   type StudioBg3dSemanticMaterialConfidence,
   type StudioBg3dSemanticMaterialSlot,
 } from "./studio-bg3d-semantic-materials";
+import { STUDIO_BG3D_SHOT_BATCH_MAX_DIMENSION } from "./studio-bg3d-shot-batch-limits";
 import {
-  buildStudioBg3dShotBatchArchive,
-  projectStudioBg3dShotBatchPlanForPublicArchive,
-  STUDIO_BG3D_SHOT_BATCH_APP_IMPLEMENTATION_PROFILE_V1,
-  STUDIO_BG3D_SHOT_BATCH_MAX_IMAGE_BYTES,
-  STUDIO_BG3D_SHOT_BATCH_MAX_DIMENSION,
-  STUDIO_BG3D_SHOT_BATCH_MAX_TOTAL_BYTES,
-  type StudioBg3dShotBatchBuildOptions,
-  type StudioBg3dShotBatchContactSheet,
-  type StudioBg3dShotBatchContactSheetFallback,
-  type StudioBg3dShotBatchImage,
-  type StudioBg3dShotBatchLayeredPsd,
-  type StudioBg3dShotBatchPsdFallback,
-  type StudioBg3dShotBatchSkippedArtifact,
-} from "./studio-bg3d-shot-batch";
-import { commitStudioBg3dShotBatchDownload } from "./studio-bg3d-shot-batch-download-gate";
-import {
-  STUDIO_BG3D_SHOT_BATCH_LT_PIPELINE_V1,
-  STUDIO_BG3D_SHOT_BATCH_PNG_ENCODING_V1,
-  STUDIO_BG3D_SHOT_BATCH_PSD_ENCODING_V1,
   STUDIO_BG3D_SHOT_BATCH_PASSES,
   STUDIO_BG3D_SHOT_BATCH_PASS_LABELS,
-  createStudioBg3dShotBatchPlan,
-  type StudioBg3dShotBatchCaptureSpecInput,
-  type StudioBg3dShotBatchPlan,
-  type StudioBg3dShotBatchPass,
-  type StudioBg3dShotBatchRecoveryScope,
-} from "./studio-bg3d-shot-batch-plan";
-import {
-  studioBg3dShotBatchQueueCompletedCount,
-  waitForStudioBg3dBatchDocumentVisible,
-  type StudioBg3dShotBatchFailureCode,
-} from "./studio-bg3d-shot-batch-queue";
-import {
-  STUDIO_BG3D_SHOT_BATCH_RECOVERY_AUTHORIZATION_RECEIPT_MAX_TTL_MS,
-  StudioBg3dShotBatchRecoveryError,
-  createStudioBg3dShotBatchRecoveryStore,
-  type StudioBg3dShotBatchRecoverySession,
-  type StudioBg3dShotBatchRunToken,
-} from "./studio-bg3d-shot-batch-recovery-store";
-import {
-  buildStudioBg3dShotBatchArchiveInWorker,
-  isStudioBg3dShotBatchWorkerUnavailableError,
-} from "./studio-bg3d-shot-batch-worker-client";
-import {
-  type StudioBg3dShotContactSheetImage,
-} from "./studio-bg3d-shot-contact-sheet-contract";
-import { buildStudioBg3dShotContactSheetsInWorker } from "./studio-bg3d-shot-contact-sheet-worker-client";
-import { admitStudioBg3dShotPsdLayers } from "./studio-bg3d-shot-psd-contract";
-import { buildStudioBg3dShotLayeredPsdInWorker } from "./studio-bg3d-shot-psd-worker-client";
+} from "./studio-bg3d-shot-batch-pass-catalog";
+import { loadStudioBg3dShotBatchRuntime } from "./studio-bg3d-shot-batch-runtime-loader";
 import {
   freezeStudioBg3dShotAnimationsForBatch,
   projectStudioBg3dShotVisibilityToRuntime,
@@ -401,6 +357,29 @@ import { StudioBg3dSceneTemplatePanel } from "./StudioBg3dSceneTemplatePanel";
 import { StudioToolHintTarget } from "./StudioToolHint";
 import { useStudioModalSheet } from "./useStudioModalSheet";
 
+import type {
+  StudioBg3dShotBatchBuildOptions,
+  StudioBg3dShotBatchContactSheet,
+  StudioBg3dShotBatchContactSheetFallback,
+  StudioBg3dShotBatchImage,
+  StudioBg3dShotBatchLayeredPsd,
+  StudioBg3dShotBatchPsdFallback,
+  StudioBg3dShotBatchSkippedArtifact,
+} from "./studio-bg3d-shot-batch";
+import type { StudioBg3dShotBatchPass } from "./studio-bg3d-shot-batch-pass-catalog";
+import type {
+  StudioBg3dShotBatchCaptureSpecInput,
+  StudioBg3dShotBatchPlan,
+  StudioBg3dShotBatchRecoveryScope,
+} from "./studio-bg3d-shot-batch-plan";
+import type { StudioBg3dShotBatchFailureCode } from "./studio-bg3d-shot-batch-queue";
+import type {
+  StudioBg3dShotBatchRecoverySession,
+  StudioBg3dShotBatchRecoveryStore,
+  StudioBg3dShotBatchRunToken,
+} from "./studio-bg3d-shot-batch-recovery-store";
+import type { StudioBg3dShotBatchRuntime } from "./studio-bg3d-shot-batch-runtime-loader";
+import type { StudioBg3dShotContactSheetImage } from "./studio-bg3d-shot-contact-sheet-contract";
 import type { StudioToolHintSpec } from "./studio-tool-hints";
 
 export interface StudioBackground3DLtLayer {
@@ -2114,12 +2093,16 @@ export function StudioBackground3D({
   const captureInFlightRef = useRef(false);
   const shotBatchAbortRef = useRef<AbortController | null>(null);
   const shotBatchRecoveryRef = useRef<StudioBg3dShotBatchRecoverySession | null>(null);
+  const shotBatchRecoveryScopeRef = useRef<{
+    readonly controller: AbortController;
+    readonly scope: StudioBg3dShotBatchRecoveryScope;
+  } | null>(null);
+  const shotBatchRecoveryStoreRef = useRef<StudioBg3dShotBatchRecoveryStore | null>(null);
   const shotBatchAuthorizationEpochRef = useRef(0);
-  const [shotBatchRecoveryStore] = useState(() => createStudioBg3dShotBatchRecoveryStore());
   useLayoutEffect(() => {
-    const active = shotBatchRecoveryRef.current;
-    if (!active) return;
-    const previous = active.plan.scope;
+    const previous = shotBatchRecoveryScopeRef.current?.scope ??
+      shotBatchRecoveryRef.current?.plan.scope;
+    if (!previous) return;
     if (!recoveryScope || previous.durability !== recoveryScope.durability ||
       previous.authUserId !== recoveryScope.authUserId || previous.workId !== recoveryScope.workId ||
       previous.pageId !== recoveryScope.pageId || previous.elementId !== recoveryScope.elementId) {
@@ -2128,9 +2111,10 @@ export function StudioBackground3D({
     }
   }, [recoveryScope]);
   useEffect(() => () => {
+    const store = shotBatchRecoveryStoreRef.current;
     const session = shotBatchRecoveryRef.current;
-    if (session) void shotBatchRecoveryStore.release(session);
-  }, [shotBatchRecoveryStore]);
+    if (store && session) void store.release(session);
+  }, []);
   const physicsPhaseRef = useRef<StudioBg3dPhysicsPhase>("idle");
   const physicsAbortRef = useRef<AbortController | null>(null);
   const physicsAnimationFrameRef = useRef<number | null>(null);
@@ -3787,10 +3771,92 @@ export function StudioBackground3D({
       setError("컷을 렌더할 3D 뷰포트가 아직 준비되지 않았습니다.");
       return;
     }
-    const originalPrimitives = clonePrimitives(primitives);
-    const originalCustomModels = cloneBgCustomModelInstances(customModels);
-    const originalLineArtPreview = lineArtPreview;
+    shotBatchAbortRef.current?.abort();
     const controller = new AbortController();
+    shotBatchAuthorizationEpochRef.current += 1;
+    const authorizationEpoch = shotBatchAuthorizationEpochRef.current;
+    shotBatchAbortRef.current = controller;
+    shotBatchRecoveryScopeRef.current = { controller, scope: recoveryScope };
+    captureInFlightRef.current = true;
+    flushSync(() => {
+      setShotBatchProgress({
+        stage: "render",
+        completed: 0,
+        total: shotBatchSelectedIds.length,
+        label: "컷 출력 런타임 불러오는 중",
+      });
+      setIsCapturing(true);
+      setError(null);
+    });
+    const finishShotBatchBeforeSession = (message: string) => {
+      captureInFlightRef.current = false;
+      if (shotBatchAbortRef.current === controller) shotBatchAbortRef.current = null;
+      if (shotBatchRecoveryScopeRef.current?.controller === controller) {
+        shotBatchRecoveryScopeRef.current = null;
+      }
+      if (!componentActiveRef.current) return;
+      pendingInitialCameraRef.current = isQuadView ? originalLiveView : null;
+      flushSync(() => {
+        setIsCapturing(false);
+        setShotBatchProgress(null);
+        setError(message);
+      });
+    };
+    let shotBatchRuntime: StudioBg3dShotBatchRuntime;
+    try {
+      shotBatchRuntime = await loadStudioBg3dShotBatchRuntime(controller.signal);
+    } catch (cause) {
+      finishShotBatchBeforeSession(
+        cause instanceof Error && cause.name === "AbortError"
+          ? "컷 일괄 렌더를 중단했습니다."
+          : "컷 일괄 출력 런타임을 불러오지 못했습니다. 네트워크 상태를 확인한 뒤 다시 시도해 주세요.",
+      );
+      return;
+    }
+    if (!componentActiveRef.current || controller.signal.aborted) {
+      finishShotBatchBeforeSession("컷 일괄 렌더를 중단했습니다.");
+      return;
+    }
+    const {
+      STUDIO_BG3D_SHOT_BATCH_APP_IMPLEMENTATION_PROFILE_V1,
+      STUDIO_BG3D_SHOT_BATCH_LT_PIPELINE_V1,
+      STUDIO_BG3D_SHOT_BATCH_MAX_IMAGE_BYTES,
+      STUDIO_BG3D_SHOT_BATCH_MAX_TOTAL_BYTES,
+      STUDIO_BG3D_SHOT_BATCH_PNG_ENCODING_V1,
+      STUDIO_BG3D_SHOT_BATCH_PSD_ENCODING_V1,
+      STUDIO_BG3D_SHOT_BATCH_RECOVERY_AUTHORIZATION_RECEIPT_MAX_TTL_MS,
+      StudioBg3dShotBatchRecoveryError,
+      admitStudioBg3dShotPsdLayers,
+      buildStudioBg3dShotBatchArchive,
+      buildStudioBg3dShotBatchArchiveInWorker,
+      buildStudioBg3dShotContactSheetsInWorker,
+      buildStudioBg3dShotLayeredPsdInWorker,
+      commitStudioBg3dShotBatchDownload,
+      createStudioBg3dShotBatchPlan,
+      createStudioBg3dShotBatchRecoveryStore,
+      isStudioBg3dShotBatchWorkerUnavailableError,
+      projectStudioBg3dShotBatchPlanForPublicArchive,
+      studioBg3dShotBatchQueueCompletedCount,
+      waitForStudioBg3dBatchDocumentVisible,
+    } = shotBatchRuntime;
+    const originalLineArtPreview = lineArtPreview;
+    let shotBatchRecoveryStore: StudioBg3dShotBatchRecoveryStore;
+    let originalPrimitives: BgPrimitive[];
+    let originalCustomModels: BgCustomModelInstance[];
+    try {
+      shotBatchRecoveryStore = shotBatchRecoveryStoreRef.current ??
+        createStudioBg3dShotBatchRecoveryStore();
+      shotBatchRecoveryStoreRef.current = shotBatchRecoveryStore;
+      originalPrimitives = clonePrimitives(primitives);
+      originalCustomModels = cloneBgCustomModelInstances(customModels);
+    } catch (cause) {
+      finishShotBatchBeforeSession(
+        cause instanceof Error && cause.message.trim().length > 0
+          ? `컷 일괄 출력 런타임을 초기화하지 못했습니다. ${cause.message}`
+          : "컷 일괄 출력 런타임을 초기화하지 못했습니다.",
+      );
+      return;
+    }
     let recoveryAccessRevoked = false;
     const assertRecoveryAccess = async () => {
       if (controller.signal.aborted) {
@@ -3811,11 +3877,6 @@ export function StudioBackground3D({
         name: "AbortError",
       });
     };
-    shotBatchAbortRef.current?.abort();
-    shotBatchAuthorizationEpochRef.current += 1;
-    const authorizationEpoch = shotBatchAuthorizationEpochRef.current;
-    shotBatchAbortRef.current = controller;
-    captureInFlightRef.current = true;
     flushSync(() => {
       setShotBatchProgress({
         stage: "render",
@@ -3824,8 +3885,6 @@ export function StudioBackground3D({
         label: "결정적 컷 계획 준비",
       });
       setLineArtPreview(false);
-      setIsCapturing(true);
-      setError(null);
     });
 
     let batchPlan: StudioBg3dShotBatchPlan;
@@ -3956,6 +4015,11 @@ export function StudioBackground3D({
         }
       }
       pendingInitialCameraRef.current = originalLiveView;
+      captureInFlightRef.current = false;
+      if (shotBatchAbortRef.current === controller) shotBatchAbortRef.current = null;
+      if (shotBatchRecoveryScopeRef.current?.controller === controller) {
+        shotBatchRecoveryScopeRef.current = null;
+      }
       if (componentActiveRef.current) {
         flushSync(() => {
           setLineArtPreview(originalLineArtPreview);
@@ -3970,10 +4034,8 @@ export function StudioBackground3D({
               : cause instanceof Error
                 ? cause.message
                 : "결정적 컷 계획을 만들지 못했습니다.");
-        });
+          });
       }
-      captureInFlightRef.current = false;
-      if (shotBatchAbortRef.current === controller) shotBatchAbortRef.current = null;
       return;
     }
     const initiallyCompletedShots = studioBg3dShotBatchQueueCompletedCount(recoverySession.queue);
@@ -4591,20 +4653,31 @@ export function StudioBackground3D({
         // live composition pending through that remount so the main viewport controller reapplies
         // its position, target, projection, zoom, and lens shift instead of accepting camera props.
         pendingInitialCameraRef.current = restoreFailed || isQuadView ? originalLiveView : null;
-        if (componentActiveRef.current) {
-          flushSync(() => {
-            setIsCapturing(false);
-            setShotBatchProgress(null);
-            if (restoreFailed) {
-              setError("컷 배치 후 원래 카메라 구도를 즉시 복원하지 못했습니다. viewport가 준비되면 자동으로 다시 적용합니다.");
-            }
-          });
-        }
+      }
+      const recoveryRelease = shotBatchRecoveryStore.release(recoverySession);
+      let releaseTimeoutId: number | null = null;
+      await Promise.race([
+        recoveryRelease,
+        new Promise<void>((resolve) => {
+          releaseTimeoutId = window.setTimeout(resolve, 2_000);
+        }),
+      ]);
+      if (releaseTimeoutId !== null) window.clearTimeout(releaseTimeoutId);
+      if (shotBatchRecoveryRef.current === recoverySession) shotBatchRecoveryRef.current = null;
+      if (shotBatchAbortRef.current === controller) shotBatchAbortRef.current = null;
+      if (shotBatchRecoveryScopeRef.current?.controller === controller) {
+        shotBatchRecoveryScopeRef.current = null;
       }
       captureInFlightRef.current = false;
-      if (shotBatchAbortRef.current === controller) shotBatchAbortRef.current = null;
-      await shotBatchRecoveryStore.release(recoverySession);
-      if (shotBatchRecoveryRef.current === recoverySession) shotBatchRecoveryRef.current = null;
+      if (componentActiveRef.current) {
+        flushSync(() => {
+          setIsCapturing(false);
+          setShotBatchProgress(null);
+          if (restoreFailed) {
+            setError("컷 배치 후 원래 카메라 구도를 즉시 복원하지 못했습니다. viewport가 준비되면 자동으로 다시 적용합니다.");
+          }
+        });
+      }
     }
   }
 

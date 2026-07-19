@@ -4,6 +4,7 @@ import {
   verifyStudioBg3dRgba8PngFile,
 } from "./studio-bg3d-file-integrity";
 import { resolveStudioBg3dLtCaptureSize } from "./studio-bg3d-lt-capture-size";
+import { STUDIO_BG3D_SHOT_BATCH_MAX_DIMENSION } from "./studio-bg3d-shot-batch-limits";
 import {
   STUDIO_BG3D_SHOT_BATCH_MAX_FILES,
   STUDIO_BG3D_SHOT_BATCH_PASSES,
@@ -35,7 +36,7 @@ export const STUDIO_BG3D_SHOT_BATCH_MAX_ARCHIVE_ARTIFACTS =
   STUDIO_BG3D_SHOT_BATCH_MAX_ARTIFACTS + STUDIO_BG3D_SHOT_BATCH_MAX_SHOTS * 2;
 export const STUDIO_BG3D_SHOT_BATCH_MAX_IMAGE_BYTES = 24 * 1024 * 1024;
 export const STUDIO_BG3D_SHOT_BATCH_MAX_TOTAL_BYTES = 384 * 1024 * 1024;
-export const STUDIO_BG3D_SHOT_BATCH_MAX_DIMENSION = 4_096;
+export { STUDIO_BG3D_SHOT_BATCH_MAX_DIMENSION } from "./studio-bg3d-shot-batch-limits";
 
 export interface StudioBg3dShotBatchImage {
   readonly shotId: string;

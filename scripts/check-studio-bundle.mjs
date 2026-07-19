@@ -54,6 +54,9 @@ const budgets = {
   // 2026-07-19 selected-shot/multi-pass/recovery UI baseline. This is the complete static closure
   // activated only after the user opens StudioBackground3D; PSD/physics/engine labs stay isolated.
   bg3dEditor: { raw: 2_380_000, gzip: 690_000, chunks: 40 },
+  // Durable recovery, integrity verification, contact-sheet/PSD clients, and ZIP packaging load
+  // only after explicit batch export. Measured incremental closure: 145,199 raw / 38,590 gzip.
+  bg3dShotBatchRuntime: { raw: 160_000, gzip: 45_000, chunks: 3 },
   // ag-psd is intentionally reachable only through the bounded per-shot PSD module Worker.
   bg3dPsdWorker: { raw: 1_250_000, gzip: 360_000 },
   // OffscreenCanvas/createImageBitmap contact-sheet compositor, isolated from the editor graph.
@@ -322,6 +325,47 @@ if (!fs.existsSync(manifestPath)) {
         fail(
           `BG3D editor activation uses ${background3dKeys.size} static JS requests `
             + `(budget ${budgets.bg3dEditor.chunks})`,
+        );
+      }
+      checkDynamicBoundary(
+        "optional BG3D shot-batch runtime",
+        /src\/domains\/creator\/studio-bg3d-shot-batch-runtime\.ts/,
+        background3dKeys,
+      );
+      const shotBatchRuntimeEntries = matchingManifestEntries(
+        /src\/domains\/creator\/studio-bg3d-shot-batch-runtime\.ts/,
+      ).filter((key) => manifest[key].isDynamicEntry === true);
+      if (shotBatchRuntimeEntries.length !== 1) {
+        fail(`expected one BG3D shot-batch runtime entry, found ${shotBatchRuntimeEntries.length}`);
+      } else {
+        const shotBatchRuntimeEntry = shotBatchRuntimeEntries[0];
+        const editorDynamicTargets = dynamicTargetsFromStaticClosure(background3dEntries[0]);
+        if (!editorDynamicTargets.has(shotBatchRuntimeEntry)) {
+          fail("BG3D shot-batch runtime introduced a nested dynamic-import waterfall");
+        }
+        const runtimeIncrementalKeys = new Set(
+          [...staticClosure(shotBatchRuntimeEntry)].filter((key) => !background3dKeys.has(key)),
+        );
+        checkBudget(
+          "BG3D shot-batch runtime after editor",
+          measure(runtimeIncrementalKeys),
+          budgets.bg3dShotBatchRuntime,
+        );
+        if (runtimeIncrementalKeys.size > budgets.bg3dShotBatchRuntime.chunks) {
+          fail(
+            `BG3D shot-batch runtime after editor uses ${runtimeIncrementalKeys.size} static JS requests `
+              + `(budget ${budgets.bg3dShotBatchRuntime.chunks})`,
+          );
+        }
+      }
+      const eagerShotBatchProductionRuntime = matchingEntries(
+        background3dKeys,
+        /(?:_studio-bg3d-shot-batch-|studio-bg3d-file-integrity|studio-package-archive|studio-bg3d-shot-batch-(?:artifact-integrity|archive-verifier|download-gate|plan|queue|recovery-store|worker-client))/,
+      ).filter((key) => !/shot-batch-(?:limits|pass-catalog|runtime)/.test(key));
+      if (eagerShotBatchProductionRuntime.length > 0) {
+        fail(
+          "optional BG3D shot-batch verification/archive runtime returned to the editor static graph: "
+            + eagerShotBatchProductionRuntime.join(", "),
         );
       }
       const eagerPhysicsRuntime = matchingEntries(

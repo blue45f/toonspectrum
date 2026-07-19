@@ -17,6 +17,7 @@ import {
   parseStudioBg3dSceneDocument,
   serializeStudioBg3dSceneDocument,
 } from "./studio-bg3d-scene-document";
+import { STUDIO_BG3D_SHOT_BATCH_PASSES } from "./studio-bg3d-shot-batch-pass-catalog";
 import { compareStudioValidationStrings } from "./studio-validation-string-order";
 
 import type {
@@ -24,30 +25,13 @@ import type {
   StudioBg3dCaptureEngineId,
   StudioBg3dCaptureGraphicsApi,
 } from "./studio-bg3d-capture-adapter";
+import type { StudioBg3dShotBatchPass } from "./studio-bg3d-shot-batch-pass-catalog";
 
-export const STUDIO_BG3D_SHOT_BATCH_PASSES = Object.freeze([
-  "beauty",
-  "lt-composite",
-  "color",
-  "tone",
-  "texture-line",
-  "main-line",
-  "depth",
-] as const);
-
-export type StudioBg3dShotBatchPass = (typeof STUDIO_BG3D_SHOT_BATCH_PASSES)[number];
-
-export const STUDIO_BG3D_SHOT_BATCH_PASS_LABELS: Readonly<
-  Record<StudioBg3dShotBatchPass, string>
-> = Object.freeze({
-  beauty: "원본 렌더",
-  "lt-composite": "LT 합성",
-  color: "컬러",
-  tone: "톤",
-  "texture-line": "질감선",
-  "main-line": "주선",
-  depth: "깊이",
-});
+export {
+  STUDIO_BG3D_SHOT_BATCH_PASSES,
+  STUDIO_BG3D_SHOT_BATCH_PASS_LABELS,
+} from "./studio-bg3d-shot-batch-pass-catalog";
+export type { StudioBg3dShotBatchPass } from "./studio-bg3d-shot-batch-pass-catalog";
 
 export const STUDIO_BG3D_SHOT_BATCH_MAX_PASSES = STUDIO_BG3D_SHOT_BATCH_PASSES.length;
 export const STUDIO_BG3D_SHOT_BATCH_MAX_FILES =

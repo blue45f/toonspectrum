@@ -72,6 +72,27 @@ describe("Studio BG3D shot UI integration boundary", () => {
     expect(handler).toContain("if (captureInFlightRef.current)");
     expect(handler.match(/await assertRecoveryAccess\(\)/gu)).toHaveLength(8);
 
+    // Runtime code splitting must not leave the editor mutable while the async chunk is loading.
+    expectInOrder(handler, [
+      "const controller = new AbortController()",
+      "shotBatchAbortRef.current = controller",
+      "shotBatchRecoveryScopeRef.current = { controller, scope: recoveryScope }",
+      "setIsCapturing(true)",
+      "shotBatchRuntime = await loadStudioBg3dShotBatchRuntime(controller.signal)",
+      "if (!componentActiveRef.current || controller.signal.aborted)",
+    ]);
+    expect(source).toContain("const previous = shotBatchRecoveryScopeRef.current?.scope ??");
+    expect(source).toContain("shotBatchAbortRef.current?.abort()");
+    expect(handler).toContain("if (shotBatchRecoveryScopeRef.current?.controller === controller)");
+    const runtimeInitialization = handler.slice(
+      handler.indexOf("let shotBatchRecoveryStore:"),
+      handler.indexOf("let recoveryAccessRevoked"),
+    );
+    expect(runtimeInitialization).toContain("try {");
+    expect(runtimeInitialization).toContain("createStudioBg3dShotBatchRecoveryStore()");
+    expect(runtimeInitialization).toContain("} catch (cause) {");
+    expect(runtimeInitialization).toContain("finishShotBatchBeforeSession(");
+
     // Quad view is collapsed before the adapter and its render identity are frozen into Plan v2.
     expectInOrder(handler, [
       "const transitionedViewport = await applyStudioBg3dViewportAfterTransition({",
@@ -200,7 +221,7 @@ describe("Studio BG3D shot UI integration boundary", () => {
     expectInOrder(handler, [
       "if (activeRunToken && !recoveryAccessRevoked)",
       "await shotBatchRecoveryStore.resetInterrupted(recoverySession)",
-      "await shotBatchRecoveryStore.release(recoverySession)",
+      "const recoveryRelease = shotBatchRecoveryStore.release(recoverySession)",
     ]);
     expect(handler).toContain("admitStudioBg3dShotPsdLayers(rendered.layers)");
     expect(handler).toContain("await buildStudioBg3dShotLayeredPsdInWorker(rendered.layers");
@@ -249,9 +270,11 @@ describe("Studio BG3D shot UI integration boundary", () => {
     expectInOrder(handler.slice(outerFinally), [
       "setSceneBaseDocument(originalSceneBaseDocument)",
       "view: originalLiveView",
-      "setIsCapturing(false)",
-      "await shotBatchRecoveryStore.release(recoverySession)",
+      "const recoveryRelease = shotBatchRecoveryStore.release(recoverySession)",
+      "await Promise.race([",
       "shotBatchRecoveryRef.current = null",
+      "shotBatchRecoveryScopeRef.current = null",
+      "setIsCapturing(false)",
     ]);
     expect(handler).toContain(
       "pendingInitialCameraRef.current = restoreFailed || isQuadView ? originalLiveView : null",
