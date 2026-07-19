@@ -374,6 +374,7 @@ import {
   registerStudioBg3dCaptureExcludedObject,
 } from "./studio-bg3d-three-webgl-capture";
 import { createTwoBoneDefaultPoleTarget } from "./studio-rig-two-bone-ik";
+import { StudioBg3dAssetLibraryPanel } from "./StudioBg3dAssetLibraryPanel";
 import {
   StudioBg3dPhysicsPanel,
   StudioBg3dPhysicsTransport,
@@ -2089,7 +2090,6 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
   const captureInFlightRef = useRef(false);
   const shotBatchAbortRef = useRef<AbortController | null>(null);
   const shotBatchRecoveryRef = useRef<StudioBg3dShotBatchRecoverySession | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const physicsPhaseRef = useRef<StudioBg3dPhysicsPhase>("idle");
   const physicsAbortRef = useRef<AbortController | null>(null);
   const physicsAnimationFrameRef = useRef<number | null>(null);
@@ -8997,118 +8997,19 @@ export function StudioBackground3D({ open, initialDataUrl, initialScene, onClose
                 </div>
                 
 
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
-                    <PackageOpen size={15} className="text-accent" aria-hidden />
-                    3D 모델
-                  </h3>
-                  <span className="text-[0.68rem] text-fg-3">
-                    {modelLibrary.length}개 · {deviceQuality.profile === "mobile" ? "모바일" : "데스크톱"} 기준
-                  </span>
-                </div>
-
-                <input
-                  ref={fileInputRef}
-                  accept=".glb,.gltf,.obj,.fbx,.dae,.stl,.ply,.3ds,.mtl,.bin,.png,.jpg,.jpeg,.webp,model/gltf-binary,model/gltf+json,model/obj,model/stl"
-                  aria-label="3D 모델 및 연결 파일 선택"
-                  className="sr-only"
-                  multiple
-                  type="file"
-                  onChange={handleUploadModelFiles}
+                <StudioBg3dAssetLibraryPanel
+                  entries={modelLibrary}
+                  libraryStatus={modelLibraryStatus}
+                  deletingModelId={deletingModelId}
+                  isUploading={isUploadingModel}
+                  importProgress={modelImportProgress}
+                  isRestoringScene={isRestoringScene}
+                  deviceProfileLabel={deviceQuality.profile === "mobile" ? "모바일" : "데스크톱"}
+                  onFileChange={handleUploadModelFiles}
+                  onCancelImport={() => modelImportAbortRef.current?.abort()}
+                  onAdd={addCustomModelToScene}
+                  onDelete={handleDeleteModelFromLibrary}
                 />
-                <button
-                  type="button"
-                  className={cx(CONTROL_BUTTON, "w-full border-accent/50 bg-accent text-on-accent hover:bg-accent/90")}
-                  onClick={() => {
-                    if (isUploadingModel) modelImportAbortRef.current?.abort();
-                    else fileInputRef.current?.click();
-                  }}
-                >
-                  {isUploadingModel ? <X size={14} aria-hidden /> : <Upload size={14} aria-hidden />}
-                  {isUploadingModel
-                    ? modelImportProgress?.totalModels
-                      ? `가져오기 취소 · ${modelImportProgress.completedModels}/${modelImportProgress.totalModels}`
-                      : "가져오기 취소"
-                    : "3D 모델 및 연결 파일 가져오기"}
-                </button>
-                <p className="mt-2 rounded-xl border border-line bg-card/60 px-3 py-2 text-xs leading-relaxed text-fg-3">
-                  GLB·glTF·OBJ·FBX·DAE·STL·PLY·3DS를 지원합니다. glTF의 BIN/텍스처나 OBJ의 MTL/텍스처도 함께 선택하세요.
-                  외부 네트워크 참조 없이 자체 포함 GLB로 변환하고, Worker에서 SHA-256·파일 구조와 기기별
-                  삼각형/텍스처 예산을 검사한 뒤 로컬 라이브러리에 저장합니다. Meshopt 압축은 별도 WASM
-                  Worker에서 풀며 디코딩 후 메모리도 같은 기기 예산으로 제한합니다.
-                </p>
-
-                {modelLibraryStatus === "error" ? (
-                  <p className="mt-2 rounded-xl border border-line bg-card/70 px-3 py-2 text-xs leading-relaxed text-fg-3">
-                    <AlertTriangle className="mr-1 inline align-[-2px] text-accent" size={14} aria-hidden />
-                    저장된 3D 모델 목록을 불러오지 못했습니다.
-                  </p>
-                ) : null}
-
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  {modelLibraryStatus === "loading" ? (
-                    <div className="col-span-2 rounded-xl border border-line bg-card/60 px-3 py-4 text-center text-xs text-fg-3">저장된 3D 모델을 불러오는 중입니다.</div>
-                  ) : null}
-
-                  {modelLibraryStatus === "ready" && modelLibrary.length === 0 ? (
-                    <div className="col-span-2 rounded-xl border border-dashed border-line bg-card/45 px-3 py-4 text-center text-xs leading-relaxed text-fg-3">
-                      가져온 3D 모델이 아직 없습니다. GLB를 선택하거나 모델과 연결 리소스를 함께 선택해 보세요.
-                    </div>
-                  ) : null}
-
-                  {modelLibrary.map((entry) => {
-                    const isDeleting = deletingModelId === entry.id;
-                    return (
-                      <div key={entry.id} className="relative overflow-hidden rounded-xl border border-line bg-card transition-colors hover:bg-raised">
-                        <button
-                          type="button"
-                          aria-describedby={`bg3d-model-status-${entry.id}`}
-                          className="grid min-h-[7.75rem] w-full grid-rows-[3rem_auto] gap-2 px-2.5 py-2 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-55"
-                          disabled={!entry.canUse || isDeleting || isUploadingModel || isRestoringScene}
-                          onClick={() => void addCustomModelToScene(entry.id)}
-                        >
-                          <span className="grid h-12 place-items-center overflow-hidden rounded-lg border border-line/80 bg-panel">
-                            <PackageOpen size={20} className="text-fg-3" aria-hidden />
-                          </span>
-                          <span className="min-w-0">
-                            <span className="block truncate text-xs font-bold text-fg">{entry.name}</span>
-                            <span className="mt-1 flex flex-wrap gap-1">
-                              <span className="inline-flex rounded-full bg-raised px-1.5 py-0.5 text-[0.64rem] font-bold uppercase text-fg-3">
-                                {entry.format}
-                              </span>
-                              <span
-                                className={cx(
-                                  "inline-flex rounded-full px-1.5 py-0.5 text-[0.64rem] font-bold",
-                                  entry.commercialUse ? "bg-[oklch(0.80_0.15_150/0.14)] text-good" : "bg-raised text-fg-3"
-                                )}
-                              >
-                                {entry.commercialUse ? "상업 이용 가능" : "상업 이용 확인 필요"}
-                              </span>
-                            </span>
-                            <span id={`bg3d-model-status-${entry.id}`} className="mt-1 line-clamp-2 block text-[0.64rem] leading-snug text-fg-3">
-                              {entry.statusMessage}
-                            </span>
-                          </span>
-                        </button>
-
-                        {entry.source === "indexed-db" ? (
-                          <button
-                            type="button"
-                            aria-label={`${entry.name} 삭제`}
-                            className="absolute right-1.5 top-1.5 grid size-11 place-items-center rounded-lg border border-line bg-panel/90 text-fg-3 transition-colors hover:bg-raised hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-45 sm:size-7"
-                            disabled={isDeleting}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              void handleDeleteModelFromLibrary(entry.id);
-                            }}
-                          >
-                            {isDeleting ? <Loader2 className="animate-spin" size={13} aria-hidden /> : <Trash2 size={13} aria-hidden />}
-                          </button>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
               </section>
             </div>
 
