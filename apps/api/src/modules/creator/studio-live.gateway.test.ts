@@ -7,6 +7,7 @@ import {
   StudioCrdtStorageCorruptionError,
 } from "./studio-crdt.service";
 import { StudioLiveAdapterCleanupService } from "./studio-live-adapter-cleanup.service";
+import { StudioLiveCleanupNotificationDispatcher } from "./studio-live-cleanup-notification-dispatcher";
 import { StudioLiveJoinTransitionSequencer } from "./studio-live-join-transition-sequencer";
 import { StudioLiveRoomTransitionCoordinator } from "./studio-live-room-transition-coordinator";
 import { StudioLiveSocketAuthService } from "./studio-live-socket-auth.service";
@@ -318,12 +319,14 @@ function createHarness(
   const authenticate = vi.fn(authenticateSession);
   const revalidate = vi.fn(revalidateSession);
   const adapterCleanup = new StudioLiveAdapterCleanupService();
+  const cleanupNotifications = new StudioLiveCleanupNotificationDispatcher();
   const socketAuthentication = new StudioLiveSocketAuthService(authenticate, revalidate);
   const joinTransitions = new StudioLiveJoinTransitionSequencer();
   const roomTransitions = new StudioLiveRoomTransitionCoordinator();
   const gateway = new StudioLiveGateway(
     service as unknown as CreatorService,
     adapterCleanup,
+    cleanupNotifications,
     socketAuthentication,
     joinTransitions,
     roomTransitions,
@@ -372,6 +375,7 @@ function createHarness(
     authenticate,
     revalidate,
     adapterCleanup,
+    cleanupNotifications,
     socketAuthentication,
     joinTransitions,
     roomTransitions,
@@ -2435,100 +2439,149 @@ describe("StudioLiveGateway", () => {
     expect(privateAuthPrincipal(harness, socket)).toBeUndefined();
   });
 
-  it("commits all local participant state before best-effort leave notifications", async () => {
+  it("commits local state before ordered best-effort leave retries", async () => {
+    vi.useFakeTimers();
     const harness = createHarness();
-    const socket = harness.socket("cleanup-notification-order");
-    await connectAndJoin(harness, socket);
-    const internals = harness.gateway as unknown as {
-      participantsBySocket: Map<string, unknown>;
-      socketIdsByWork: Map<string, Set<string>>;
-      participantAuthorizationRechecks: Map<string, unknown>;
-      candidateRelayAuthorizations: Map<
-        string,
-        { left: { connectionId: string }; right: { connectionId: string } }
-      >;
-      voiceMembershipBySocket: Map<string, unknown>;
-      removeParticipant(
-        socketId: string,
-        reason: "disconnect" | "switch" | "revoked"
-      ): void;
-    };
-    const participant = internals.participantsBySocket.get(socket.id);
-    if (!participant) throw new Error("missing participant");
-    internals.participantAuthorizationRechecks.set(socket.id, {
-      participant,
-      promise: Promise.resolve(null),
-    });
-    internals.candidateRelayAuthorizations.set("cleanup-order", {
-      left: { connectionId: socket.id },
-      right: { connectionId: "peer" },
-    });
-    internals.voiceMembershipBySocket.set(socket.id, {
-      workId: "work-1",
-      connectionId: socket.id,
-      callId: "voice-main",
-      muted: false,
-    });
-    socket.data.studioVoiceMember = {
-      connectionId: socket.id,
-      callId: "voice-main",
-      muted: false,
-    };
-    const localStateAtNotification: Array<{
-      event: string;
-      participant: boolean;
-      participantMetadata: boolean;
-      voice: boolean;
-      voiceMetadata: boolean;
-      recheck: boolean;
-      candidateAuthorization: boolean;
-      roomIndex: boolean;
-    }> = [];
-    vi.spyOn(harness.namespace, "to").mockImplementation((_target: string) => ({
-      emit(event: string) {
-        if (event !== "studio:voice:leave" && event !== "studio:presence:leave") return;
-        localStateAtNotification.push({
-          event,
-          participant: internals.participantsBySocket.has(socket.id),
-          participantMetadata: Boolean(
-            socket.data.studioParticipant || socket.data.studioWorkId
-          ),
-          voice: internals.voiceMembershipBySocket.has(socket.id),
-          voiceMetadata: Boolean(socket.data.studioVoiceMember),
-          recheck: internals.participantAuthorizationRechecks.has(socket.id),
-          candidateAuthorization: internals.candidateRelayAuthorizations.has(
-            "cleanup-order"
-          ),
-          roomIndex: Boolean(internals.socketIdsByWork.get("work-1")?.has(socket.id)),
+    try {
+      const socket = harness.socket("cleanup-notification-order");
+      await connectAndJoin(harness, socket);
+      const internals = harness.gateway as unknown as {
+        participantsBySocket: Map<string, unknown>;
+        socketIdsByWork: Map<string, Set<string>>;
+        participantAuthorizationRechecks: Map<string, unknown>;
+        candidateRelayAuthorizations: Map<
+          string,
+          { left: { connectionId: string }; right: { connectionId: string } }
+        >;
+        voiceMembershipBySocket: Map<string, unknown>;
+        removeParticipant(
+          socketId: string,
+          reason: "disconnect" | "switch" | "revoked"
+        ): void;
+      };
+      const participant = internals.participantsBySocket.get(socket.id);
+      if (!participant) throw new Error("missing participant");
+      internals.participantAuthorizationRechecks.set(socket.id, {
+        participant,
+        promise: Promise.resolve(null),
+      });
+      internals.candidateRelayAuthorizations.set("cleanup-order", {
+        left: { connectionId: socket.id },
+        right: { connectionId: "peer" },
+      });
+      internals.voiceMembershipBySocket.set(socket.id, {
+        workId: "work-1",
+        connectionId: socket.id,
+        callId: "voice-main",
+        muted: false,
+      });
+      socket.data.studioVoiceMember = {
+        connectionId: socket.id,
+        callId: "voice-main",
+        muted: false,
+      };
+      const localStateAtNotification: Array<{
+        event: string;
+        participant: boolean;
+        participantMetadata: boolean;
+        voice: boolean;
+        voiceMetadata: boolean;
+        recheck: boolean;
+        candidateAuthorization: boolean;
+        roomIndex: boolean;
+      }> = [];
+      let failFirstVoiceNotification = true;
+      vi.spyOn(harness.namespace, "to").mockImplementation((_target: string) => ({
+        emit(event: string) {
+          if (event !== "studio:voice:leave" && event !== "studio:presence:leave") return;
+          localStateAtNotification.push({
+            event,
+            participant: internals.participantsBySocket.has(socket.id),
+            participantMetadata: Boolean(
+              socket.data.studioParticipant || socket.data.studioWorkId
+            ),
+            voice: internals.voiceMembershipBySocket.has(socket.id),
+            voiceMetadata: Boolean(socket.data.studioVoiceMember),
+            recheck: internals.participantAuthorizationRechecks.has(socket.id),
+            candidateAuthorization: internals.candidateRelayAuthorizations.has(
+              "cleanup-order"
+            ),
+            roomIndex: Boolean(internals.socketIdsByWork.get("work-1")?.has(socket.id)),
+          });
+          if (event === "studio:voice:leave" && failFirstVoiceNotification) {
+            failFirstVoiceNotification = false;
+            throw new Error(`${event} notification failed`);
+          }
+        },
+      }));
+
+      expect(() => internals.removeParticipant(socket.id, "disconnect")).not.toThrow();
+      expect(localStateAtNotification.map(({ event }) => event)).toEqual([
+        "studio:voice:leave",
+      ]);
+
+      vi.advanceTimersByTime(50);
+
+      expect(localStateAtNotification.map(({ event }) => event)).toEqual([
+        "studio:voice:leave",
+        "studio:voice:leave",
+        "studio:presence:leave",
+      ]);
+      for (const state of localStateAtNotification) {
+        expect(state).toEqual({
+          event: state.event,
+          participant: false,
+          participantMetadata: false,
+          voice: false,
+          voiceMetadata: false,
+          recheck: false,
+          candidateAuthorization: false,
+          roomIndex: false,
         });
-        throw new Error(`${event} notification failed`);
-      },
-    }));
+      }
+    } finally {
+      harness.cleanupNotifications.onModuleDestroy();
+      vi.useRealTimers();
+    }
+  });
 
-    expect(() => internals.removeParticipant(socket.id, "disconnect")).not.toThrow();
+  it("cancels a delayed presence tombstone after the same socket rejoins its work", async () => {
+    vi.useFakeTimers();
+    const harness = createHarness();
+    try {
+      const socket = harness.socket("cleanup-rejoined-incarnation");
+      await connectAndJoin(harness, socket);
+      const internals = harness.gateway as unknown as {
+        participantsBySocket: Map<string, { workId: string }>;
+        removeParticipant(
+          socketId: string,
+          reason: "disconnect" | "switch" | "revoked"
+        ): void;
+      };
+      const participant = internals.participantsBySocket.get(socket.id);
+      if (!participant) throw new Error("missing participant");
+      const originalTo = harness.namespace.to.bind(harness.namespace);
+      const presenceNotification = vi.fn();
+      vi.spyOn(harness.namespace, "to").mockImplementation((target: string) => ({
+        emit(event: string, payload: unknown) {
+          if (event === "studio:presence:leave") {
+            presenceNotification();
+            throw new Error("presence notification failed");
+          }
+          originalTo(target).emit(event, payload);
+        },
+      }));
 
-    expect(localStateAtNotification).toEqual([
-      {
-        event: "studio:voice:leave",
-        participant: false,
-        participantMetadata: false,
-        voice: false,
-        voiceMetadata: false,
-        recheck: false,
-        candidateAuthorization: false,
-        roomIndex: false,
-      },
-      {
-        event: "studio:presence:leave",
-        participant: false,
-        participantMetadata: false,
-        voice: false,
-        voiceMetadata: false,
-        recheck: false,
-        candidateAuthorization: false,
-        roomIndex: false,
-      },
-    ]);
+      internals.removeParticipant(socket.id, "disconnect");
+      internals.participantsBySocket.set(socket.id, { ...participant });
+      vi.advanceTimersByTime(50);
+
+      expect(presenceNotification).toHaveBeenCalledOnce();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      harness.cleanupNotifications.onModuleDestroy();
+      vi.useRealTimers();
+    }
   });
 
   it("finalizes local revocation state when the adapter socket is already absent", async () => {

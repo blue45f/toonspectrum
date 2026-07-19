@@ -22,6 +22,10 @@ import {
   studioLiveFailure as failure,
 } from "./studio-live-ack";
 import { StudioLiveAdapterCleanupService } from "./studio-live-adapter-cleanup.service";
+import {
+  StudioLiveCleanupNotificationDispatcher,
+  type StudioLiveCleanupNotificationRetry,
+} from "./studio-live-cleanup-notification-dispatcher";
 import { StudioLiveCrdtQuotaLimiter } from "./studio-live-crdt-quota";
 import { StudioLiveJoinTransitionSequencer } from "./studio-live-join-transition-sequencer";
 import {
@@ -358,6 +362,8 @@ export class StudioLiveGateway
     private readonly creatorService: CreatorService,
     @Inject(StudioLiveAdapterCleanupService)
     private readonly adapterCleanup: StudioLiveAdapterCleanupService,
+    @Inject(StudioLiveCleanupNotificationDispatcher)
+    private readonly cleanupNotifications: StudioLiveCleanupNotificationDispatcher,
     @Inject(StudioLiveSocketAuthService)
     private readonly socketAuthentication: StudioLiveSocketAuthService,
     @Inject(StudioLiveJoinTransitionSequencer)
@@ -2881,6 +2887,11 @@ export class StudioLiveGateway
       {
         connectionId: participant.connectionId,
         reason,
+      },
+      "bounded",
+      () => {
+        const current = this.participantsBySocket.get(socketId);
+        return !current || current.workId !== participant.workId;
       }
     );
   }
@@ -2969,6 +2980,11 @@ export class StudioLiveGateway
         connectionId: member.connectionId,
         callId: member.callId,
         reason,
+      },
+      "bounded",
+      () => {
+        const current = this.voiceMembershipBySocket.get(member.connectionId);
+        return !current || current.workId !== member.workId || current.callId !== member.callId;
       }
     );
   }
@@ -2995,15 +3011,37 @@ export class StudioLiveGateway
     target: string,
     event: string,
     payload: unknown
+  ): void;
+  private emitCleanupNotificationBestEffort(
+    target: string,
+    event: string,
+    payload: unknown,
+    retry: "bounded",
+    isStillRelevant: () => boolean
+  ): void;
+  private emitCleanupNotificationBestEffort(
+    target: string,
+    event: string,
+    payload: unknown,
+    retry: StudioLiveCleanupNotificationRetry = "none",
+    isStillRelevant?: () => boolean
   ): void {
-    try {
-      this.server.to(target).emit(event, payload);
-    } catch (error) {
-      this.logger.warn(
-        { target, event, error: error instanceof Error ? error.message : "unknown" },
-        "studio live cleanup notification failed"
-      );
+    if (retry === "bounded") {
+      this.cleanupNotifications.dispatch({
+        target,
+        event,
+        retry,
+        isStillRelevant: isStillRelevant ?? (() => false),
+        deliver: () => this.server.to(target).emit(event, payload),
+      });
+      return;
     }
+    this.cleanupNotifications.dispatch({
+      target,
+      event,
+      retry,
+      deliver: () => this.server.to(target).emit(event, payload),
+    });
   }
 
   private localVoiceMembers(workId: string, callId?: string): StudioLiveVoiceMember[] {

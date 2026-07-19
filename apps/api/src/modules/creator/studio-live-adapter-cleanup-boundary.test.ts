@@ -105,9 +105,14 @@ describe("studio live adapter cleanup boundary", () => {
     expect(revoke).toContain(
       'this.emitCleanupNotificationBestEffort(socketId, "studio:access:revoked"'
     );
-    expect(notificationLeaf).toMatch(/try\s*\{[\s\S]*this\.server\.to\(target\)\.emit\(event, payload\);[\s\S]*\}\s*catch/u);
+    expect(notificationLeaf).toContain("this.cleanupNotifications.dispatch({");
+    expect(notificationLeaf).toContain(
+      "deliver: () => this.server.to(target).emit(event, payload)"
+    );
+    expect(notificationLeaf).not.toMatch(/try\s*\{/u);
     expect(voiceNotification).toBeGreaterThan(-1);
     expect(presenceNotification).toBeGreaterThan(voiceNotification);
+    expect(remove.slice(presenceNotification)).toContain('"bounded"');
     for (const marker of localCommitMarkers) {
       expect(remove.indexOf(marker)).toBeGreaterThan(-1);
       expect(remove.indexOf(marker)).toBeLessThan(voiceNotification);
