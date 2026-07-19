@@ -48,6 +48,7 @@ import type {
   StudioAutoActionSet,
 } from "./studio-auto-actions";
 import type { StudioBg3dSceneDocument } from "./studio-bg3d-scene-document";
+import type { StudioBg3dShotBatchRecoveryScope } from "./studio-bg3d-shot-batch-plan";
 import type { StudioCharacterBible } from "./studio-character-bible";
 import type { StudioCheckpoint } from "./studio-checkpoints";
 import type {
@@ -213,6 +214,11 @@ export interface StudioLazyPanelStackProps {
   autoActionStatus: string | null;
   bg3dInitialDataUrl: string | undefined;
   bg3dInitialScene: StudioBg3dSceneDocument | undefined;
+  bg3dBatchRecoveryScope: StudioBg3dShotBatchRecoveryScope | null;
+  validateRecoveryAccess: (
+    scope: StudioBg3dShotBatchRecoveryScope,
+    signal: AbortSignal
+  ) => Promise<boolean>;
   bg3dOpen: boolean;
   characterBible: StudioCharacterBible;
   characterBibleOpen: boolean;
@@ -374,6 +380,8 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
   autoActionStatus,
   bg3dInitialDataUrl,
   bg3dInitialScene,
+  bg3dBatchRecoveryScope,
+  validateRecoveryAccess,
   bg3dOpen,
   characterBible,
   characterBibleOpen,
@@ -562,6 +570,8 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
         activePage={activePage}
         bg3dInitialDataUrl={bg3dInitialDataUrl}
         bg3dInitialScene={bg3dInitialScene}
+        bg3dBatchRecoveryScope={bg3dBatchRecoveryScope}
+        validateRecoveryAccess={validateRecoveryAccess}
         bg3dOpen={bg3dOpen}
         composeWorkAssetPreviewPage={composeWorkAssetPreviewPage}
         currentPageId={currentPageId}

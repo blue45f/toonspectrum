@@ -11,6 +11,8 @@ export type StudioBg3dShotBatchFailureCode =
   | "visibility-interrupted"
   | "unknown";
 
+export const STUDIO_BG3D_SHOT_BATCH_MAX_ATTEMPTS = 1_000;
+
 export interface StudioBg3dShotBatchQueueItem {
   readonly shotId: string;
   readonly status: StudioBg3dShotBatchQueueStatus;
@@ -19,7 +21,7 @@ export interface StudioBg3dShotBatchQueueItem {
 }
 
 export interface StudioBg3dShotBatchQueue {
-  readonly version: 1;
+  readonly version: 2;
   readonly resumeKey: string;
   readonly items: readonly StudioBg3dShotBatchQueueItem[];
 }
@@ -42,7 +44,7 @@ export function createStudioBg3dShotBatchQueue(
   plan: StudioBg3dShotBatchPlan,
 ): StudioBg3dShotBatchQueue {
   return {
-    version: 1,
+    version: 2,
     resumeKey: plan.resumeKey,
     items: plan.shots.map(({ shotId }) => ({
       shotId,
@@ -56,7 +58,7 @@ export function isStudioBg3dShotBatchQueueCompatible(
   queue: StudioBg3dShotBatchQueue,
   plan: StudioBg3dShotBatchPlan,
 ): boolean {
-  return queue.version === 1 &&
+  return queue.version === 2 &&
     queue.resumeKey === plan.resumeKey &&
     queue.items.length === plan.shots.length &&
     queue.items.every((item, index) => item.shotId === plan.shots[index]?.shotId);
@@ -78,7 +80,8 @@ export function startStudioBg3dShotBatchQueueItem(
   shotId: string,
 ): StudioBg3dShotBatchQueue | null {
   if (queue.items.some((item) => item.status === "running")) return null;
-  return replaceItem(queue, shotId, (item) => item.status === "pending"
+  return replaceItem(queue, shotId, (item) => item.status === "pending" &&
+    item.attempts < STUDIO_BG3D_SHOT_BATCH_MAX_ATTEMPTS
     ? { shotId, status: "running", attempts: item.attempts + 1 }
     : null);
 }

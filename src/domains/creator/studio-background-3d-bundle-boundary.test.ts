@@ -55,6 +55,24 @@ describe("Studio background 3D bundle boundary", () => {
     expect(imports.dynamicImports).toEqual(["./StudioBackground3D"]);
   });
 
+  it("loads durable shot production only after the user starts a batch", () => {
+    const imports = moduleImports("./StudioBackground3D.tsx");
+    const loaderImports = moduleImports("./studio-bg3d-shot-batch-runtime-loader.ts");
+
+    expect(imports.valueImports).not.toContain("./studio-bg3d-shot-batch-runtime");
+    expect(imports.dynamicImports).not.toContain("./studio-bg3d-shot-batch-runtime");
+    expect(imports.valueImports).toContain("./studio-bg3d-shot-batch-runtime-loader");
+    expect(loaderImports.dynamicImports).toEqual(["./studio-bg3d-shot-batch-runtime"]);
+    expect(imports.valueImports).not.toContain("./studio-bg3d-shot-batch-recovery-store");
+    expect(imports.valueImports).not.toContain("./studio-bg3d-shot-batch-worker-client");
+    expect(imports.valueImports).not.toContain("./studio-bg3d-shot-contact-sheet-worker-client");
+    expect(imports.valueImports).not.toContain("./studio-bg3d-shot-psd-worker-client");
+    expect(imports.valueImports).not.toContain("./studio-bg3d-shot-batch");
+    expect(imports.valueImports).not.toContain("./studio-bg3d-shot-batch-plan");
+    expect(imports.valueImports).toContain("./studio-bg3d-shot-batch-limits");
+    expect(imports.valueImports).toContain("./studio-bg3d-shot-batch-pass-catalog");
+  });
+
   it("keeps the metadata contract independent of rendering runtimes", () => {
     const imports = moduleImports("./studio-background-3d-metadata.ts");
 

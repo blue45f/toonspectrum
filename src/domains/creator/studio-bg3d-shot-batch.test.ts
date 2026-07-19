@@ -1,28 +1,140 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { buildStudioBg3dShotBatchArchive } from "./studio-bg3d-shot-batch";
+import {
+  STUDIO_BG3D_CAPTURE_PROFILE_RGBA8_DEPTH_V1,
+  STUDIO_BG3D_THREE_WEBGL_CAPTURE_IMPLEMENTATION_V1,
+} from "./studio-bg3d-capture-adapter";
+import { createStudioBg3dCaptureBackgroundSnapshot } from "./studio-bg3d-capture-background";
+import {
+  DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+  serializeStudioBg3dSceneDocument,
+} from "./studio-bg3d-scene-document";
+import {
+  STUDIO_BG3D_SHOT_BATCH_APP_IMPLEMENTATION_PROFILE_V1,
+  STUDIO_BG3D_SHOT_BATCH_ARCHIVE_PROFILE_V1,
+  STUDIO_BG3D_SHOT_BATCH_CONTACT_SHEET_PROFILE_V1,
+  STUDIO_BG3D_SHOT_BATCH_DEPTH_ENCODING_V1,
+  buildStudioBg3dShotBatchArchive,
+  createStudioBg3dShotBatchPublicRenderPlan,
+  isStudioBg3dShotBatchManifestContext,
+  projectStudioBg3dShotBatchPlanForPublicArchive,
+} from "./studio-bg3d-shot-batch";
+import {
+  STUDIO_BG3D_SHOT_BATCH_LT_PIPELINE_V1,
+  STUDIO_BG3D_SHOT_BATCH_PNG_ENCODING_V1,
+  STUDIO_BG3D_SHOT_BATCH_PSD_ENCODING_V1,
+  createStudioBg3dShotBatchPlan,
+  type StudioBg3dShotBatchPlan,
+} from "./studio-bg3d-shot-batch-plan";
+import { buildStudioBg3dShotLayeredPsd } from "./studio-bg3d-shot-psd";
 
-function pngHeader(width: number, height: number): ArrayBuffer {
-  const bytes = new Uint8Array(24);
-  bytes.set([137, 80, 78, 71, 13, 10, 26, 10]);
-  const view = new DataView(bytes.buffer);
-  view.setUint32(8, 13, false);
-  bytes.set([0x49, 0x48, 0x44, 0x52], 12);
-  view.setUint32(16, width, false);
-  view.setUint32(20, height, false);
-  return bytes.buffer;
+const PNG_CRC_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let index = 0; index < table.length; index += 1) {
+    let value = index;
+    for (let bit = 0; bit < 8; bit += 1) {
+      value = (value & 1) === 1 ? 0xedb8_8320 ^ (value >>> 1) : value >>> 1;
+    }
+    table[index] = value >>> 0;
+  }
+  return table;
+})();
+
+function joinBytes(parts: readonly Uint8Array[]): Uint8Array<ArrayBuffer> {
+  const result = new Uint8Array(parts.reduce((total, part) => total + part.byteLength, 0));
+  let offset = 0;
+  for (const part of parts) {
+    result.set(part, offset);
+    offset += part.byteLength;
+  }
+  return result;
 }
 
-function psdHeader(width: number, height: number): ArrayBuffer {
-  const bytes = new Uint8Array(26);
-  bytes.set([0x38, 0x42, 0x50, 0x53, 0, 1]);
-  const view = new DataView(bytes.buffer);
-  view.setUint16(12, 4, false);
-  view.setUint32(14, height, false);
-  view.setUint32(18, width, false);
-  view.setUint16(22, 8, false);
-  view.setUint16(24, 3, false);
-  return bytes.buffer;
+function pngCrc(bytes: Uint8Array): number {
+  let crc = 0xffff_ffff;
+  for (const byte of bytes) crc = (crc >>> 8) ^ (PNG_CRC_TABLE[(crc ^ byte) & 0xff] ?? 0);
+  return (crc ^ 0xffff_ffff) >>> 0;
+}
+
+function pngChunk(type: string, data: Uint8Array): Uint8Array<ArrayBuffer> {
+  const chunk = new Uint8Array(12 + data.byteLength);
+  const view = new DataView(chunk.buffer);
+  view.setUint32(0, data.byteLength, false);
+  chunk.set(Uint8Array.from(type, (value) => value.charCodeAt(0)), 4);
+  chunk.set(data, 8);
+  view.setUint32(8 + data.byteLength, pngCrc(chunk.subarray(4, 8 + data.byteLength)), false);
+  return chunk;
+}
+
+function adler32(bytes: Uint8Array): number {
+  let first = 1;
+  let second = 0;
+  for (const byte of bytes) {
+    first = (first + byte) % 65_521;
+    second = (second + first) % 65_521;
+  }
+  return ((second << 16) | first) >>> 0;
+}
+
+function zlibStored(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
+  const blockCount = Math.ceil(bytes.byteLength / 65_535);
+  const output = new Uint8Array(2 + blockCount * 5 + bytes.byteLength + 4);
+  const view = new DataView(output.buffer);
+  output.set([0x78, 0x01]);
+  let sourceOffset = 0;
+  let outputOffset = 2;
+  while (sourceOffset < bytes.byteLength) {
+    const length = Math.min(65_535, bytes.byteLength - sourceOffset);
+    output[outputOffset] = sourceOffset + length === bytes.byteLength ? 1 : 0;
+    outputOffset += 1;
+    view.setUint16(outputOffset, length, true);
+    view.setUint16(outputOffset + 2, length ^ 0xffff, true);
+    outputOffset += 4;
+    output.set(bytes.subarray(sourceOffset, sourceOffset + length), outputOffset);
+    sourceOffset += length;
+    outputOffset += length;
+  }
+  view.setUint32(outputOffset, adler32(bytes), false);
+  return output;
+}
+
+const pngFiles = new Map<string, ArrayBuffer>();
+
+function pngHeader(width: number, height: number, colorType: 2 | 6 = 6): ArrayBuffer {
+  const key = `${width}x${height}:${colorType}`;
+  const cached = pngFiles.get(key);
+  if (cached) return cached;
+  const ihdr = new Uint8Array(13);
+  const ihdrView = new DataView(ihdr.buffer);
+  ihdrView.setUint32(0, width, false);
+  ihdrView.setUint32(4, height, false);
+  ihdr.set([8, colorType, 0, 0, 0], 8);
+  const rowBytes = width * (colorType === 2 ? 3 : 4) + 1;
+  const scanlines = new Uint8Array(rowBytes * height);
+  const result = joinBytes([
+    new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]),
+    pngChunk("IHDR", ihdr),
+    pngChunk("IDAT", zlibStored(scanlines)),
+    pngChunk("IEND", new Uint8Array()),
+  ]).buffer;
+  pngFiles.set(key, result);
+  return result;
+}
+
+const psdFiles = new Map<string, Blob>();
+
+function psdHeader(width: number, height: number): Blob {
+  const key = `${width}x${height}`;
+  const cached = psdFiles.get(key);
+  if (cached) return cached;
+  const psd = buildStudioBg3dShotLayeredPsd([{
+    role: "color",
+    width,
+    height,
+    data: new Uint8ClampedArray(width * height * 4),
+  }]);
+  psdFiles.set(key, psd);
+  return psd;
 }
 
 function image(id: string, name = "컷 1") {
@@ -33,6 +145,102 @@ function image(id: string, name = "컷 1") {
     height: 180,
     png: new Blob([pngHeader(320, 180)], { type: "image/png" }),
   };
+}
+
+function plannedImage(
+  id: string,
+  name: string,
+  pass: "beauty" | "depth",
+) {
+  return {
+    shotId: id,
+    shotName: name,
+    width: 640,
+    height: 360,
+    pass,
+    requestedHeight: 360,
+    wasReduced: false,
+    png: new Blob([pngHeader(640, 360)], { type: "image/png" }),
+  } as const;
+}
+
+async function privatePlanV2(options: {
+  readonly layeredPsd?: boolean;
+  readonly contactSheet?: boolean;
+} = {}): Promise<{ readonly plan: StudioBg3dShotBatchPlan; readonly sourceRevision: string }> {
+  const passes = ["beauty", "depth"] as const;
+  const sourceShots = [
+    { id: "shot-a", name: "첫 컷" },
+    { id: "shot-b", name: "둘째 컷" },
+  ] as const;
+  const sourceRevision = serializeStudioBg3dSceneDocument({
+    ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
+    shots: sourceShots.map((shot) => ({
+      ...shot,
+      output: {
+        exportHeight: 360,
+        transparentBackground: true,
+        line: { depthEnabled: true },
+      },
+    })),
+  });
+  if (!sourceRevision) throw new Error("canonical private Plan source unavailable");
+  const background = createStudioBg3dCaptureBackgroundSnapshot({
+    background: DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.background,
+    transparent: true,
+  });
+  const result = await createStudioBg3dShotBatchPlan(sourceShots, {
+    sourceRevision,
+    scope: {
+      durability: "durable",
+      authUserId: "private-user-7",
+      workId: "private-work-8",
+      pageId: "private-page-9",
+      elementId: "private-element-10",
+    },
+    capture: {
+      owner: {
+        backend: "three-webgl",
+        engineId: "three",
+        engineRevision: "184",
+        implementationRevision: STUDIO_BG3D_THREE_WEBGL_CAPTURE_IMPLEMENTATION_V1,
+        graphicsApi: "webgl2",
+        profileId: STUDIO_BG3D_CAPTURE_PROFILE_RGBA8_DEPTH_V1,
+        sourceWidth: 640,
+        sourceHeight: 360,
+        maxPixels: 8_388_608,
+        maxEdge: 4_096,
+        deviceProfile: "desktop",
+        textureScale: 1,
+        lodBias: 0,
+        ltPipelineId: STUDIO_BG3D_SHOT_BATCH_LT_PIPELINE_V1,
+        pngEncodingId: STUDIO_BG3D_SHOT_BATCH_PNG_ENCODING_V1,
+        psdEncodingId: STUDIO_BG3D_SHOT_BATCH_PSD_ENCODING_V1,
+      },
+      shots: sourceShots.map((shot) => ({
+        shotId: shot.id,
+        width: 640,
+        height: 360,
+        requestedHeight: 360,
+        wasReduced: false,
+        includeDepth: true,
+        shadows: DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.quality.desktop.shadows,
+        shadowMapSize: DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.quality.desktop.shadows
+          ? DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.quality.desktop.shadowMapSize
+          : 0,
+        background: {
+          color: background.clearColor,
+          alpha: 0,
+        },
+      })),
+    },
+    passes,
+    exportHeight: 360,
+    layeredPsd: options.layeredPsd ?? false,
+    contactSheet: options.contactSheet ?? false,
+  });
+  if (!result.ok) throw new Error(`private Plan fixture failed: ${result.code}`);
+  return { plan: result.plan, sourceRevision };
 }
 
 describe("Studio BG3D shot batch archive", () => {
@@ -102,6 +310,211 @@ describe("Studio BG3D shot batch archive", () => {
     expect(text).toContain('"height": 1440');
   });
 
+  it("writes a sanitized v3 public render plan without private Plan v2 recovery identity", async () => {
+    const { plan: privatePlan, sourceRevision } = await privatePlanV2({
+      layeredPsd: true,
+      contactSheet: true,
+    });
+    const publicRenderPlan = await projectStudioBg3dShotBatchPlanForPublicArchive(privatePlan, {
+      appProfileId: STUDIO_BG3D_SHOT_BATCH_APP_IMPLEMENTATION_PROFILE_V1,
+      sourceRevision,
+    });
+    const blob = await buildStudioBg3dShotBatchArchive([
+      plannedImage("shot-b", "둘째 컷", "depth"),
+      plannedImage("shot-a", "첫 컷", "depth"),
+      plannedImage("shot-b", "둘째 컷", "beauty"),
+      plannedImage("shot-a", "첫 컷", "beauty"),
+    ], {
+      manifest: {
+        publicRenderPlan,
+        psdFallbacks: [
+          { shotId: "shot-b", shotName: "둘째 컷", reason: "budget" },
+          { shotId: "shot-a", shotName: "첫 컷", reason: "unavailable" },
+        ],
+        contactSheetFallback: "worker-failed",
+      },
+    });
+    const text = new TextDecoder().decode(await blob.arrayBuffer());
+
+    expect(text).toContain('"version": 3');
+    expect(text).toContain('"publicRenderPlan"');
+    expect(text).toContain(`"sourceDigest": "${privatePlan.sourceDigest}"`);
+    expect(text).toContain(`"renderDigest": "${privatePlan.planDigest}"`);
+    expect(text).toContain('"engineId": "three"');
+    expect(text).toContain('"engineRevision": "184"');
+    expect(text).toContain('"adapterImplementationRevision": "studio-three-webgl-capture-adapter-v1"');
+    expect(text).toContain('"graphicsApi": "webgl2"');
+    expect(text).toContain('"backend": "three-webgl"');
+    expect(text).toContain(`"profileId": "${STUDIO_BG3D_CAPTURE_PROFILE_RGBA8_DEPTH_V1}"`);
+    expect(text).toContain(`"depthEncodingId": "${STUDIO_BG3D_SHOT_BATCH_DEPTH_ENCODING_V1}"`);
+    expect(text).toContain('"psdProfileId": "psd-rgba8-layered-v1"');
+    expect(text).toContain(
+      `"contactSheetProfileId": "${STUDIO_BG3D_SHOT_BATCH_CONTACT_SHEET_PROFILE_V1}"`,
+    );
+    expect(text).toContain(`"archiveProfileId": "${STUDIO_BG3D_SHOT_BATCH_ARCHIVE_PROFILE_V1}"`);
+    expect(text).toContain('"requestedHeight": 360');
+    expect(text).toContain('"includeDepth": true');
+    expect(text).toContain('"background"');
+    expect(text).toContain('"layeredPsd": true');
+    expect(text).toContain('"contactSheet": true');
+    expect(text).toContain('"contactSheetFallback": "worker-failed"');
+    expect(text.indexOf('"reason": "unavailable"'))
+      .toBeLessThan(text.indexOf('"reason": "budget"'));
+    expect(text.indexOf("shots/001/beauty.png"))
+      .toBeLessThan(text.indexOf("shots/001/depth.png"));
+    expect(text.indexOf("shots/001/depth.png"))
+      .toBeLessThan(text.indexOf("shots/002/beauty.png"));
+
+    for (const privateField of [
+      '"scope"',
+      '"scopeDigest"',
+      '"recoveryDigest"',
+      '"resumeKey"',
+      '"authUserId"',
+      '"workId"',
+      '"pageId"',
+      '"elementId"',
+      '"key":',
+    ]) {
+      expect(text).not.toContain(privateField);
+    }
+    for (const privateValue of [
+      privatePlan.scope.authUserId,
+      privatePlan.scope.workId,
+      privatePlan.scope.pageId,
+      privatePlan.scope.elementId,
+      privatePlan.scopeDigest,
+      privatePlan.recoveryDigest,
+      privatePlan.resumeKey,
+      "PRIVATE_CANONICAL_SCENE_REVISION",
+    ]) {
+      expect(text).not.toContain(privateValue);
+    }
+    expect(Object.isFrozen(publicRenderPlan)).toBe(true);
+    expect(Object.isFrozen(publicRenderPlan.shots[0]?.capture.background)).toBe(true);
+  });
+
+  it("canonicalizes the public builder but requires an exact canonical worker/archive schema", async () => {
+    const { plan, sourceRevision } = await privatePlanV2();
+    const projected = await projectStudioBg3dShotBatchPlanForPublicArchive(plan, {
+      appProfileId: STUDIO_BG3D_SHOT_BATCH_APP_IMPLEMENTATION_PROFILE_V1,
+      sourceRevision,
+    });
+    const unordered = {
+      ...projected,
+      passes: [...projected.passes].reverse(),
+      shots: [...projected.shots].reverse().map((shot) => ({
+        ...shot,
+        files: [...shot.files].reverse(),
+      })),
+    };
+    const canonical = createStudioBg3dShotBatchPublicRenderPlan(unordered);
+    expect(canonical.passes).toEqual(["beauty", "depth"]);
+    expect(canonical.shots.map((shot) => shot.shotId)).toEqual(["shot-a", "shot-b"]);
+    expect(canonical.shots[0]?.files.map((file) => file.pass)).toEqual(["beauty", "depth"]);
+    expect(isStudioBg3dShotBatchManifestContext({ publicRenderPlan: unordered })).toBe(false);
+    expect(isStudioBg3dShotBatchManifestContext({ publicRenderPlan: canonical })).toBe(true);
+    expect(isStudioBg3dShotBatchManifestContext({
+      publicRenderPlan: { ...canonical, scopeDigest: "b".repeat(64) },
+    })).toBe(false);
+    expect(isStudioBg3dShotBatchManifestContext({
+      publicRenderPlan: canonical,
+      resumeKey: "bg3d-batch-deadbeef",
+    })).toBe(false);
+  });
+
+  it("defensively snapshots public manifest metadata before the first Blob await", async () => {
+    const { plan, sourceRevision } = await privatePlanV2();
+    const projected = await projectStudioBg3dShotBatchPlanForPublicArchive(plan, {
+      appProfileId: STUDIO_BG3D_SHOT_BATCH_APP_IMPLEMENTATION_PROFILE_V1,
+      sourceRevision,
+    });
+    const mutable = JSON.parse(JSON.stringify(projected)) as typeof projected;
+    const archivePromise = buildStudioBg3dShotBatchArchive([
+      plannedImage("shot-a", "첫 컷", "beauty"),
+      plannedImage("shot-a", "첫 컷", "depth"),
+      plannedImage("shot-b", "둘째 컷", "beauty"),
+      plannedImage("shot-b", "둘째 컷", "depth"),
+    ], { manifest: { publicRenderPlan: mutable } });
+    (mutable.implementation as { appProfileId: string }).appProfileId = "private-late-work-id";
+    (mutable.shots[0] as { shotName: string }).shotName = "늦게 바꾼 비공개 컷";
+
+    const text = new TextDecoder().decode(await (await archivePromise).arrayBuffer());
+    expect(text).toContain(STUDIO_BG3D_SHOT_BATCH_APP_IMPLEMENTATION_PROFILE_V1);
+    expect(text).toContain("첫 컷");
+    expect(text).not.toContain("private-late-work-id");
+    expect(text).not.toContain("늦게 바꾼 비공개 컷");
+  });
+
+  it("rejects forged Plan digests and a source revision that does not own sourceDigest", async () => {
+    const { plan, sourceRevision } = await privatePlanV2();
+    const forged = { ...plan, planDigest: "c".repeat(64) };
+    await expect(projectStudioBg3dShotBatchPlanForPublicArchive(forged, {
+      appProfileId: STUDIO_BG3D_SHOT_BATCH_APP_IMPLEMENTATION_PROFILE_V1,
+      sourceRevision,
+    })).rejects.toThrow("digest");
+
+    const other = await privatePlanV2({ contactSheet: true });
+    await expect(projectStudioBg3dShotBatchPlanForPublicArchive(plan, {
+      appProfileId: STUDIO_BG3D_SHOT_BATCH_APP_IMPLEMENTATION_PROFILE_V1,
+      sourceRevision: other.sourceRevision.replace("첫 컷", "다른 컷"),
+    })).rejects.toThrow("digest");
+  });
+
+  it("rehashes the public render identity at the final archive boundary", async () => {
+    const { plan, sourceRevision } = await privatePlanV2();
+    const projected = await projectStudioBg3dShotBatchPlanForPublicArchive(plan, {
+      appProfileId: STUDIO_BG3D_SHOT_BATCH_APP_IMPLEMENTATION_PROFILE_V1,
+      sourceRevision,
+    });
+    const forged = { ...projected, renderDigest: "e".repeat(64) };
+    expect(isStudioBg3dShotBatchManifestContext({ publicRenderPlan: forged })).toBe(true);
+
+    await expect(buildStudioBg3dShotBatchArchive([
+      plannedImage("shot-a", "첫 컷", "beauty"),
+      plannedImage("shot-a", "첫 컷", "depth"),
+      plannedImage("shot-b", "둘째 컷", "beauty"),
+      plannedImage("shot-b", "둘째 컷", "depth"),
+    ], { manifest: { publicRenderPlan: forged } })).rejects.toThrow("render digest");
+  });
+
+  it("pins public-only implementation and artifact profiles to manifest v3 semantics", async () => {
+    const { plan, sourceRevision } = await privatePlanV2();
+    const projected = await projectStudioBg3dShotBatchPlanForPublicArchive(plan, {
+      appProfileId: STUDIO_BG3D_SHOT_BATCH_APP_IMPLEMENTATION_PROFILE_V1,
+      sourceRevision,
+    });
+    const changedProfiles = [
+      {
+        ...projected,
+        implementation: { ...projected.implementation, appProfileId: "different-app-v1" },
+      },
+      {
+        ...projected,
+        captureProfile: { ...projected.captureProfile, depthEncodingId: "different-depth-v1" },
+      },
+      {
+        ...projected,
+        artifactProfiles: {
+          ...projected.artifactProfiles,
+          contactSheetProfileId: "different-contact-v1",
+        },
+      },
+      {
+        ...projected,
+        artifactProfiles: {
+          ...projected.artifactProfiles,
+          archiveProfileId: "different-archive-v1",
+        },
+      },
+    ];
+
+    for (const candidate of changedProfiles) {
+      expect(() => createStudioBg3dShotBatchPublicRenderPlan(candidate)).toThrow();
+      expect(isStudioBg3dShotBatchManifestContext({ publicRenderPlan: candidate })).toBe(false);
+    }
+  });
+
   it("records requested and actual height when a device budget reduces a v2 artifact", async () => {
     const blob = await buildStudioBg3dShotBatchArchive([{
       ...image("shot-a", "첫 컷"),
@@ -158,7 +571,7 @@ describe("Studio BG3D shot batch archive", () => {
   });
 
   it("packages ordered contact sheets and records a truthful global fallback", async () => {
-    const contactPng = new Blob([pngHeader(2_144, 1_064)], { type: "image/png" });
+    const contactPng = new Blob([pngHeader(2_144, 1_064, 2)], { type: "image/png" });
     const blob = await buildStudioBg3dShotBatchArchive([
       { ...image("shot-a", "첫 컷"), pass: "lt-composite" },
       { ...image("shot-b", "둘째 컷"), pass: "lt-composite" },
@@ -184,6 +597,7 @@ describe("Studio BG3D shot batch archive", () => {
 
     expect(text).toContain("contact/contact-sheet-001.png");
     expect(text).toContain('"kind": "contact-sheet"');
+    expect(text).toContain('"encoding": "srgb-opaque-rgb8"');
     expect(text).toContain('"shotIds"');
     expect(text).toContain('"contactSheetFallback": null');
 
@@ -199,6 +613,25 @@ describe("Studio BG3D shot batch archive", () => {
     });
     expect(new TextDecoder().decode(await fallbackBlob.arrayBuffer()))
       .toContain('"contactSheetFallback": "unavailable"');
+  });
+
+  it("runs full PNG integrity for final contact-sheet packaging", async () => {
+    const corrupted = new Uint8Array(pngHeader(320, 180, 2).slice(0));
+    corrupted[29] = (corrupted[29] ?? 0) ^ 1;
+    await expect(buildStudioBg3dShotBatchArchive([image("shot-a", "첫 컷")], {
+      manifest: {
+        shots: [{ id: "shot-a", name: "첫 컷" }],
+        contactSheetRequested: true,
+      },
+      contactSheets: [{
+        sheetNumber: 1,
+        fileName: "contact-sheet-001.png",
+        width: 320,
+        height: 180,
+        shotIds: ["shot-a"],
+        png: new Blob([corrupted], { type: "image/png" }),
+      }],
+    })).rejects.toThrow(/CRC/iu);
   });
 
   it("rejects duplicate ids, unsafe names, MIME mismatches, and forged PNG bytes", async () => {

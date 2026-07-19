@@ -51,4 +51,11 @@ scope.addEventListener("message", (event: MessageEvent<unknown>) => {
   }));
 });
 
+// This handshake distinguishes module construction/CSP/startup failures from failures in an
+// admitted archive build. The client does not send caller-owned Blobs until this message arrives.
+post({
+  version: STUDIO_BG3D_SHOT_BATCH_WORKER_PROTOCOL_VERSION,
+  kind: "ready",
+});
+
 export {};

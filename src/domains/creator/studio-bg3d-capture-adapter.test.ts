@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  STUDIO_BG3D_CAPTURE_PROFILE_RGBA8_DEPTH_V1,
+  STUDIO_BG3D_THREE_WEBGL_CAPTURE_IMPLEMENTATION_V1,
   acquireStudioBg3dCaptureAdapterAfterViewTransition,
   captureStudioBg3dRaster,
+  getStudioBg3dCaptureBackendIdentity,
   getStudioBg3dCaptureSourceSize,
   type StudioBg3dCaptureAdapter,
   type StudioBg3dCapturedRaster,
@@ -27,17 +30,23 @@ function validRaster(): StudioBg3dCapturedRaster {
 }
 
 function adapter(
-  capture: StudioBg3dCaptureAdapter["capture"] = async () => validRaster()
+  capture: StudioBg3dCaptureAdapter["capture"] = async () => validRaster(),
+  getSourceSize: StudioBg3dCaptureAdapter["getSourceSize"] = () => ({ width: 1280, height: 720 }),
 ): StudioBg3dCaptureAdapter {
   return {
     backend: "three-webgl",
-    getSourceSize: () => ({ width: 1280, height: 720 }),
+    engineId: "three",
+    engineVersion: "184",
+    implementationRevision: STUDIO_BG3D_THREE_WEBGL_CAPTURE_IMPLEMENTATION_V1,
+    graphicsApi: "webgl2",
+    profileId: STUDIO_BG3D_CAPTURE_PROFILE_RGBA8_DEPTH_V1,
+    getSourceSize,
     capture,
   };
 }
 
 describe("Studio 3D capture adapter contract", () => {
-  it("binds the replacement single-View adapter only after two paint boundaries", async () => {
+  it("binds the replacement single-View adapter only after its framebuffer is stable", async () => {
     const quadAdapter = adapter();
     const singleViewAdapter = adapter();
     let currentAdapter: StudioBg3dCaptureAdapter | null = quadAdapter;
@@ -53,10 +62,76 @@ describe("Studio 3D capture adapter contract", () => {
       },
     });
 
-    expect(paintCount).toBe(2);
-    expect(readAdapter).toHaveBeenCalledOnce();
+    expect(paintCount).toBe(4);
+    expect(readAdapter).toHaveBeenCalledTimes(3);
     expect(acquired).toBe(singleViewAdapter);
     expect(acquired).not.toBe(quadAdapter);
+  });
+
+  it("waits through delayed ResizeObserver framebuffer changes before returning", async () => {
+    const sizes = [
+      { width: 960, height: 540 },
+      { width: 1280, height: 720 },
+      { width: 1280, height: 720 },
+      { width: 1280, height: 720 },
+    ];
+    const getSourceSize = vi.fn(() => sizes.shift() ?? { width: 1280, height: 720 });
+    const settledAdapter = adapter(async () => validRaster(), getSourceSize);
+    let paintCount = 0;
+
+    const acquired = await acquireStudioBg3dCaptureAdapterAfterViewTransition({
+      isActive: () => true,
+      readAdapter: () => settledAdapter,
+      waitForPaintFrame: async () => {
+        paintCount += 1;
+      },
+    });
+
+    expect(acquired).toBe(settledAdapter);
+    expect(getSourceSize).toHaveBeenCalledTimes(4);
+    expect(paintCount).toBe(5);
+    expect(getStudioBg3dCaptureSourceSize(acquired!)).toEqual({ width: 1280, height: 720 });
+  });
+
+  it("restarts stabilization when the renderer replaces its adapter", async () => {
+    const firstAdapter = adapter();
+    const replacementAdapter = adapter();
+    const adapters = [firstAdapter, replacementAdapter, replacementAdapter, replacementAdapter];
+    const readAdapter = vi.fn(() => adapters.shift() ?? replacementAdapter);
+    let paintCount = 0;
+
+    const acquired = await acquireStudioBg3dCaptureAdapterAfterViewTransition({
+      isActive: () => true,
+      readAdapter,
+      waitForPaintFrame: async () => {
+        paintCount += 1;
+      },
+    });
+
+    expect(acquired).toBe(replacementAdapter);
+    expect(readAdapter).toHaveBeenCalledTimes(4);
+    expect(paintCount).toBe(5);
+  });
+
+  it("fails closed after a bounded number of unstable framebuffer samples", async () => {
+    let sizeReadCount = 0;
+    const unstableAdapter = adapter(async () => validRaster(), () => {
+      sizeReadCount += 1;
+      return { width: sizeReadCount % 2 === 0 ? 1280 : 1279, height: 720 };
+    });
+    let paintCount = 0;
+
+    const acquired = await acquireStudioBg3dCaptureAdapterAfterViewTransition({
+      isActive: () => true,
+      readAdapter: () => unstableAdapter,
+      waitForPaintFrame: async () => {
+        paintCount += 1;
+      },
+    });
+
+    expect(acquired).toBeNull();
+    expect(sizeReadCount).toBe(12);
+    expect(paintCount).toBe(13);
   });
 
   it("does not read a replacement adapter after the editor session closes", async () => {
@@ -225,9 +300,22 @@ describe("Studio 3D capture adapter contract", () => {
 
   it("rejects unsupported adapters and malformed source dimensions", async () => {
     const unsupported = { ...adapter(), backend: "unknown" } as unknown as StudioBg3dCaptureAdapter;
+    const inconsistentIdentity = {
+      ...adapter(),
+      engineId: "babylon",
+    } as unknown as StudioBg3dCaptureAdapter;
     const invalidSource = { ...adapter(), getSourceSize: () => ({ width: 0, height: 1 }) };
 
     await expect(captureStudioBg3dRaster(unsupported, REQUEST)).rejects.toThrow(/backend/u);
+    await expect(captureStudioBg3dRaster(inconsistentIdentity, REQUEST)).rejects.toThrow(/identity/u);
     expect(() => getStudioBg3dCaptureSourceSize(invalidSource)).toThrow(/width/u);
+  });
+
+  it("keeps backend identity tuples immutable across untrusted callers", () => {
+    const identity = getStudioBg3dCaptureBackendIdentity("three-webgl");
+    expect(identity).toEqual(["three", "webgl2"]);
+    expect(Object.isFrozen(identity)).toBe(true);
+    expect(Reflect.set(identity as object, 0, "babylon")).toBe(false);
+    expect(getStudioBg3dCaptureBackendIdentity("three-webgl")).toEqual(["three", "webgl2"]);
   });
 });

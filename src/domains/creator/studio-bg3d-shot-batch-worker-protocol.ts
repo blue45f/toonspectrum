@@ -10,7 +10,8 @@ import {
   type StudioBg3dShotBatchProgress,
 } from "./studio-bg3d-shot-batch";
 
-export const STUDIO_BG3D_SHOT_BATCH_WORKER_PROTOCOL_VERSION = 2;
+/** v4 adds an explicit ready handshake and verified v3-public-manifest archive responses. */
+export const STUDIO_BG3D_SHOT_BATCH_WORKER_PROTOCOL_VERSION = 4;
 export const STUDIO_BG3D_SHOT_BATCH_MAX_ARCHIVE_BYTES = 400 * 1024 * 1024;
 
 export interface StudioBg3dShotBatchWorkerRequest {
@@ -24,6 +25,11 @@ export interface StudioBg3dShotBatchWorkerRequest {
 }
 
 export type StudioBg3dShotBatchWorkerResponse =
+  | {
+      /** Emitted once, immediately after the module Worker installs its request listener. */
+      readonly version: typeof STUDIO_BG3D_SHOT_BATCH_WORKER_PROTOCOL_VERSION;
+      readonly kind: "ready";
+    }
   | {
       readonly version: typeof STUDIO_BG3D_SHOT_BATCH_WORKER_PROTOCOL_VERSION;
       readonly kind: "progress";
@@ -80,11 +86,15 @@ export function isStudioBg3dShotBatchWorkerResponse(
 ): value is StudioBg3dShotBatchWorkerResponse {
   if (
     !isRecord(value) ||
-    value.version !== STUDIO_BG3D_SHOT_BATCH_WORKER_PROTOCOL_VERSION ||
-    !validRequestId(value.requestId)
+    value.version !== STUDIO_BG3D_SHOT_BATCH_WORKER_PROTOCOL_VERSION
   ) {
     return false;
   }
+  if (value.kind === "ready") {
+    return Object.keys(value).length === 2 &&
+      Object.keys(value).every((key) => ["version", "kind"].includes(key));
+  }
+  if (!validRequestId(value.requestId)) return false;
   if (value.kind === "progress") {
     if (!isRecord(value.progress)) return false;
     const completed = value.progress.completedFiles;

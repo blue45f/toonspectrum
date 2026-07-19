@@ -112,6 +112,7 @@ function createProps(
     storyboardGridOpen: false,
     teamPanelOpen: false,
     timelapseOpen: false,
+    validateRecoveryAccess: vi.fn(async () => true),
     quickActionsDisabledActions: new Set(),
     stableHandlers: createHandlers(),
     writerRoomOpen: false,
