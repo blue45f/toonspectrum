@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { hasActiveImageFilters as hasLightweightActiveImageFilters } from "./studio-konva-filter-fields";
+import {
+  hasActiveImageFilters as hasLightweightActiveImageFilters,
+  imageFilterCacheKey,
+} from "./studio-konva-filter-fields";
 import {
   buildImageFilters,
   hasActiveImageFilters,
-  imageFilterCacheKey,
   registerStudioKonvaFilters,
   type ImageFilterFields,
   type KonvaLike,
