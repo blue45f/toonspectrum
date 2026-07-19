@@ -1,0 +1,133 @@
+import * as THREE from "three";
+import { describe, expect, it, vi } from "vitest";
+
+import {
+  createStudioVrmAssetRuntime,
+  type StudioVrmAssetRuntimeDependencies,
+} from "./studio-vrm-asset-runtime";
+
+import type { VRM } from "@pixiv/three-vrm";
+
+function fakeVrm(scene: THREE.Object3D = new THREE.Group()): VRM {
+  return { scene } as unknown as VRM;
+}
+
+function dependencies(
+  patch: Partial<StudioVrmAssetRuntimeDependencies> = {},
+): StudioVrmAssetRuntimeDependencies {
+  const vrm = fakeVrm();
+  return {
+    resolveUrl: vi.fn((url: string) => url),
+    preflight: vi.fn(async () => undefined),
+    loadResolved: vi.fn(async () => vrm),
+    prepare: vi.fn(),
+    deepDispose: vi.fn(async () => undefined),
+    fallbackDispose: vi.fn(),
+    ...patch,
+  };
+}
+
+describe("studio VRM asset runtime", () => {
+  it("resolves once and keeps preflight before loader and preparation after load", async () => {
+    const order: string[] = [];
+    const vrm = fakeVrm();
+    const injected = dependencies({
+      resolveUrl: vi.fn(() => {
+        order.push("resolve");
+        return "https://assets.example/avatar.vrm";
+      }),
+      preflight: vi.fn(async () => {
+        order.push("preflight");
+      }),
+      loadResolved: vi.fn(async () => {
+        order.push("load");
+        return vrm;
+      }),
+      prepare: vi.fn(() => {
+        order.push("prepare");
+      }),
+    });
+    const runtime = createStudioVrmAssetRuntime(injected);
+
+    await expect(runtime.load("/vrm/avatar.vrm")).resolves.toBe(vrm);
+    expect(order).toEqual(["resolve", "preflight", "load", "prepare"]);
+    expect(injected.resolveUrl).toHaveBeenCalledOnce();
+    expect(injected.preflight).toHaveBeenCalledExactlyOnceWith("https://assets.example/avatar.vrm");
+    expect(injected.loadResolved).toHaveBeenCalledExactlyOnceWith("https://assets.example/avatar.vrm");
+    expect(injected.prepare).toHaveBeenCalledExactlyOnceWith(vrm);
+  });
+
+  it("fails closed before loader and preparation when preflight rejects", async () => {
+    const failure = new Error("preflight failed");
+    const injected = dependencies({
+      preflight: vi.fn(async () => {
+        throw failure;
+      }),
+    });
+    const runtime = createStudioVrmAssetRuntime(injected);
+
+    await expect(runtime.load("/vrm/missing.vrm")).rejects.toBe(failure);
+    expect(injected.loadResolved).not.toHaveBeenCalled();
+    expect(injected.prepare).not.toHaveBeenCalled();
+  });
+
+  it("detaches from the parent before one successful deep-dispose and never falls back", async () => {
+    const order: string[] = [];
+    const scene = new THREE.Group();
+    const parent = new THREE.Group();
+    parent.add(scene);
+    const originalRemove = parent.remove.bind(parent);
+    vi.spyOn(parent, "remove").mockImplementation((...objects) => {
+      order.push("detach");
+      return originalRemove(...objects);
+    });
+    const injected = dependencies({
+      deepDispose: vi.fn(async () => {
+        order.push("deep-dispose");
+      }),
+      fallbackDispose: vi.fn(() => {
+        order.push("fallback");
+      }),
+    });
+    const runtime = createStudioVrmAssetRuntime(injected);
+
+    runtime.dispose(fakeVrm(scene));
+    await Promise.resolve();
+
+    expect(order).toEqual(["detach", "deep-dispose"]);
+    expect(scene.parent).toBeNull();
+    expect(injected.deepDispose).toHaveBeenCalledExactlyOnceWith(scene);
+    expect(injected.fallbackDispose).not.toHaveBeenCalled();
+  });
+
+  it("detaches first, attempts deep-dispose once, and falls back exactly once only on failure", async () => {
+    const order: string[] = [];
+    const scene = new THREE.Group();
+    const parent = new THREE.Group();
+    parent.add(scene);
+    const originalRemove = parent.remove.bind(parent);
+    vi.spyOn(parent, "remove").mockImplementation((...objects) => {
+      order.push("detach");
+      return originalRemove(...objects);
+    });
+    const injected = dependencies({
+      deepDispose: vi.fn(async () => {
+        order.push("deep-dispose");
+        throw new Error("dynamic import failed");
+      }),
+      fallbackDispose: vi.fn(() => {
+        order.push("fallback");
+      }),
+    });
+    const runtime = createStudioVrmAssetRuntime(injected);
+
+    runtime.dispose(fakeVrm(scene));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(order).toEqual(["detach", "deep-dispose", "fallback"]);
+    expect(scene.parent).toBeNull();
+    expect(injected.deepDispose).toHaveBeenCalledExactlyOnceWith(scene);
+    expect(injected.fallbackDispose).toHaveBeenCalledExactlyOnceWith(scene);
+  });
+});

@@ -13,6 +13,12 @@ import {
 import { EXPRESSION_PRESETS, EXTRA_POSE_PRESETS, NATURAL_IDLE_POSES, pickNaturalIdlePose, POSER_FINGER_BONES, type StudioExpressionPreset } from "./studio-pose-presets";
 import { createTwoBoneDefaultPoleTarget } from "./studio-rig-two-bone-ik";
 import {
+  STUDIO_VRM_BASE_ROTATION_Y_KEY as BASE_ROTATION_Y_KEY,
+  STUDIO_VRM_HTML_FALLBACK_ERROR as HTML_FALLBACK_VRM_ERROR,
+  disposeStudioVrmAsset as disposeVrm,
+  loadStudioVrmAsset as loadVrmAsset,
+} from "./studio-vrm-asset-runtime";
+import {
   createAvatarForgeState,
   parseAvatarForgeState,
   serializeAvatarForgeState,
@@ -233,7 +239,6 @@ import {
   canonicalizeVrmContentHash,
   deleteStoredVrmModel,
   getStoredVrmModel,
-  isUsableVrmAssetResponse,
   listVrmLibraryEntries,
   SAMPLE_VRM_ID,
   SAMPLE_VRM_ENTRIES,
@@ -248,8 +253,6 @@ import type { StudioToolHintSpec } from "./studio-tool-hints";
 import type { FaceLandmarker, HandLandmarker, PoseLandmarker } from "@mediapipe/tasks-vision";
 import type { VRM, VRMHumanBoneName } from "@pixiv/three-vrm";
 
-// 채널별 자산 오리진 해소(토스 교차 출처 WebView 에서 root-relative /vrm/.. 절대화, 웹은 무변경).
-import { resolveAssetUrl } from "@/src/catalog-static";
 import {
   publishAsset,
   listSharedAssets,
@@ -524,7 +527,6 @@ const COSTUME_PRESETS: CostumePreset[] = [
   },
 ];
 
-const BASE_ROTATION_Y_KEY = "studioVrmBaseRotationY";
 const EXPORT_HEIGHT = 520;
 const STUDIO_VRM_SHARE_TIMEOUT_MS = 30_000;
 const DEFAULT_VRM_CUSTOM_COLORS: Record<string, string> = {
@@ -563,8 +565,6 @@ const FACE_LOST_HINT_FRAMES = 150;
 const FALLBACK_EXPORT_WIDTH = 360;
 const THUMBNAIL_WIDTH = 72;
 const THUMBNAIL_HEIGHT = 96;
-const HTML_FALLBACK_VRM_ERROR = "VRM 파일 대신 웹 페이지가 응답했습니다. 배포에 해당 .vrm 파일이 포함되어 있는지 확인해 주세요.";
-
 const CONTROL_BUTTON =
   "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45";
 const ICON_BUTTON =
@@ -948,85 +948,6 @@ function findPose(id: string): PosePreset {
 
 function findCameraPreset(id: string) {
   return CAMERA_PRESETS.find((preset) => preset.id === id) ?? CAMERA_PRESETS[0];
-}
-
-function isMesh(object: THREE.Object3D): object is THREE.Mesh {
-  return (object as THREE.Mesh).isMesh === true;
-}
-
-function prepareVrmScene(vrm: VRM) {
-  vrm.scene.traverse((object) => {
-    object.frustumCulled = false;
-    if (isMesh(object)) {
-      object.receiveShadow = true;
-    }
-  });
-  vrm.scene.position.set(0, 0, 0);
-  vrm.scene.userData[BASE_ROTATION_Y_KEY] = vrm.scene.rotation.y;
-}
-
-function disposeVrm(vrm: VRM) {
-  vrm.scene.parent?.remove(vrm.scene);
-  void import("@pixiv/three-vrm")
-    .then(({ VRMUtils }) => {
-      VRMUtils.deepDispose(vrm.scene);
-    })
-    .catch(() => {
-      vrm.scene.traverse((object) => {
-        if (!isMesh(object)) return;
-        object.geometry.dispose();
-        const materials = Array.isArray(object.material) ? object.material : [object.material];
-        materials.forEach((material) => material.dispose());
-      });
-    });
-}
-
-function shouldPreflightVrmUrl(url: string) {
-  return typeof fetch === "function" && !url.startsWith("blob:") && !url.startsWith("data:");
-}
-
-async function assertLoadableVrmUrl(url: string) {
-  if (!shouldPreflightVrmUrl(url)) return;
-
-  const response = await fetch(url, { method: "HEAD", cache: "force-cache" });
-  if (!response.ok) {
-    throw new Error(`VRM 파일을 찾지 못했습니다. (${response.status})`);
-  }
-  if (!isUsableVrmAssetResponse(response)) {
-    throw new Error(HTML_FALLBACK_VRM_ERROR);
-  }
-}
-
-async function loadVrmAsset(url: string) {
-  // 토스(교차 출처 WebView)에서 root-relative /vrm/.. 를 배포 오리진으로 절대화한다(웹은 무변경).
-  // HEAD 프리플라이트와 실제 GLTFLoader 로드가 같은 절대 URL 을 쓰도록 한 번만 해석한다.
-  const resolvedUrl = resolveAssetUrl(url);
-  await assertLoadableVrmUrl(resolvedUrl);
-
-  const [{ GLTFLoader }, { VRMLoaderPlugin, VRMUtils }] = await Promise.all([
-    import("three/examples/jsm/loaders/GLTFLoader.js"),
-    import("@pixiv/three-vrm"),
-  ]);
-
-  const loader = new GLTFLoader();
-  loader.register((parser) => new VRMLoaderPlugin(parser));
-
-  return loader.loadAsync(resolvedUrl).then((gltf) => {
-    VRMUtils.combineSkeletons?.(gltf.scene);
-
-    const loadedVrm = gltf.userData.vrm as VRM | undefined;
-    if (!loadedVrm) {
-      VRMUtils.deepDispose(gltf.scene);
-      throw new Error("VRM 데이터를 찾지 못했습니다.");
-    }
-
-    if (loadedVrm.meta.metaVersion === "0") {
-      VRMUtils.rotateVRM0(loadedVrm);
-    }
-
-    prepareVrmScene(loadedVrm);
-    return loadedVrm;
-  });
 }
 
 /* ── 의상(costume) 메시 수집·리컬러·토글 ─────────────────────────────── */
