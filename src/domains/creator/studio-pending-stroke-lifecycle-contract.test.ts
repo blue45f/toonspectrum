@@ -78,7 +78,7 @@ describe("pending stroke lifecycle source contract", () => {
 
     expect(pageSelection).toContain("pendingBatch.pageId !== nextPageId");
     expect(pageSelection).toContain("!flushPendingStrokeCommitsRef.current()");
-    expect(pageSelection).toContain("drawingRef.current || drawingPointerSessionRef.current");
+    expect(pageSelection).toContain("drawingRef.current || requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession()");
     expect(studioPageSource).toContain("if (!setCurrentPageId(pageId)) return;");
     expect(drawingStart).toContain("pendingBatch.pageId !== activePage.id");
     expect(drawingStart).toContain("!flushPendingStrokeCommitsRef.current()");
@@ -88,7 +88,7 @@ describe("pending stroke lifecycle source contract", () => {
     expect(pageCommit).toContain("options.pendingStrokePolicy !== \"drop\"");
     expect(pageCommit).toContain("projectStudioPendingStrokes(nextPages");
     expect(pageCommit).toContain("const currentHistory = pagesHistoryRef.current");
-    expect(pageCommit).toContain("drawingRef.current || drawingPointerSessionRef.current");
+    expect(pageCommit).toContain("drawingRef.current || requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession()");
   });
 
   it("복구와 프로젝트 교체는 활성·대기 획을 문서 경계 너머로 운반하지 않는다", () => {
@@ -101,7 +101,7 @@ describe("pending stroke lifecycle source contract", () => {
     expect(restore.indexOf("prepareStudioDocumentReplacement")).toBeLessThan(
       restore.indexOf("captureStudioMutationTicket")
     );
-    expect(restore).toContain("drawingPointerSessionRef.current");
+    expect(restore).toContain("requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession()");
     expect(restore).toContain("pendingStrokeCommitsRef.current");
     expect(restore).toContain("pagesHistoryRef.current = [restoredPages]");
     expect(replacement).toContain('prepareStudioDocumentReplacement("프로젝트를 교체")');

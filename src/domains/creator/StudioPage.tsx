@@ -414,6 +414,7 @@ import {
   studioDrawingAssistHasContent,
   type StudioDrawingAssistDocument,
 } from "./studio-drawing-assist-document";
+import { createStudioDrawingPointerTransportController } from "./studio-drawing-pointer-transport";
 import {
   adjustStudioBrushOpacity,
   adjustStudioBrushWidth,
@@ -770,19 +771,11 @@ import {
 } from "./studio-perspective-guide";
 import {
   beginStudioStrokePointerSession,
-  claimStudioStrokeMoveTransport,
   collectStudioStrokePointerBatch,
-  isStudioTopLevelWindowBlur,
   isStudioStrokePointerEvent,
-  resolveStudioPointerCaptureLoss,
   shouldCommitStudioStrokeOnPointerCancel,
-  shouldPreserveStudioStrokeOnTransportAbort,
   shouldEndStudioStrokeForReleasedContact,
   shouldCancelStudioFingerStrokeForAdditionalContact,
-  tryCaptureStudioStrokePointer,
-  tryReleaseStudioStrokePointer,
-  type StudioPointerCaptureTarget,
-  type StudioStrokePointerSession,
 } from "./studio-pointer-input";
 import {
   appendStudioAuthoritativeInk,
@@ -1237,6 +1230,20 @@ import { STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK } from "@/lib/studio-work-asset-c
 import { cn } from "@/lib/utils";
 import { resolveAssetUrl } from "@/src/catalog-static";
 import { useSession } from "@/src/compat/auth-session-store";
+
+type StudioDrawingPointerTransport = ReturnType<
+  typeof createStudioDrawingPointerTransportController
+>;
+
+function requireStudioDrawingPointerTransport(ref: {
+  current: StudioDrawingPointerTransport | null;
+}): StudioDrawingPointerTransport {
+  const transport = ref.current;
+  if (transport === null) {
+    throw new Error("Studio drawing pointer transport is not initialized");
+  }
+  return transport;
+}
 
 function studioPatchValuesEqual(left: unknown, right: unknown): boolean {
   if (Object.is(left, right)) return true;
@@ -2284,7 +2291,7 @@ function StudioCuttoonEditor() {
     const currentPage = currentPageIdRef.current;
     const nextPageId = typeof next === "function" ? next(currentPage) : next;
     if (nextPageId !== currentPage) {
-      if (drawingRef.current || drawingPointerSessionRef.current) {
+      if (drawingRef.current || requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession()) {
         setError("현재 획을 마친 뒤 페이지를 전환할 수 있어요.");
         return false;
       }
@@ -5547,7 +5554,7 @@ function StudioCuttoonEditor() {
       // handleSave는 스테이지 재캡처 동안 캔버스를 잠근다(pointer-events-none) — 획을 긋는
       // 도중이면 이번 회차는 건너뛰고, 그 획이 커밋되며 나는 다음 변경이 다시 예약한다.
       if (documentSaveInFlightRef.current) return;
-      if (drawingRef.current || drawingPointerSessionRef.current) return;
+      if (drawingRef.current || requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession()) return;
       void handleSaveRef.current("draft");
     }, STUDIO_SERVER_AUTOSAVE_IDLE_MS);
     return () => clearTimeout(timer);
@@ -5606,7 +5613,7 @@ function StudioCuttoonEditor() {
     label: string,
     options: { flushPending: boolean } = { flushPending: false }
   ): boolean {
-    if (drawingRef.current || drawingPointerSessionRef.current) {
+    if (drawingRef.current || requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession()) {
       setError(`현재 획을 마친 뒤 ${label}할 수 있어요.`);
       return false;
     }
@@ -5660,7 +5667,7 @@ function StudioCuttoonEditor() {
         ]);
         if (
           drawingRef.current
-          || drawingPointerSessionRef.current
+          || requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession()
           || pendingStrokeCommitsRef.current
         ) {
           setError("임시저장본을 준비하는 동안 새 획이 시작되어 복구하지 않았어요. 획을 마친 뒤 다시 시도해 주세요.");
@@ -6008,30 +6015,19 @@ function StudioCuttoonEditor() {
   const gpuLiveInkExposedPointsRef = useRef<number[] | null>(null);
   const drawingLastAuthoritativePointerRef = useRef<PointerEvent | null>(null);
   const drawingVelocityRef = useRef<StudioPointerVelocityState | null>(null);
-  // A stroke belongs to exactly one pointer from down through up/cancel. Keeping this high-rate
-  // ownership outside React state prevents palm/second-finger events from ending the pen stroke.
-  const drawingPointerSessionRef = useRef<StudioStrokePointerSession | null>(null);
+  // The imperative transport owns the single pointer session, DOM capture and safety listeners.
+  // React retains only the drawing/CRDT/preview/commit coordinator behind its latest callback ports.
+  const drawingPointerTransportRef = useRef<
+    ReturnType<typeof createStudioDrawingPointerTransportController> | null
+  >(null);
+  if (drawingPointerTransportRef.current === null) {
+    drawingPointerTransportRef.current = createStudioDrawingPointerTransportController();
+  }
   /** beginStroke가 성공한 세션만 접미 샘플을 전송한다(포인터마다 전체 CRDT 획 조회 금지). */
   const drawingCrdtStrokeActiveRef = useRef(false);
   /** Predicted samples may simulate the drawing pipeline, but must never schedule durable ink. */
   const drawingPredictionPreviewRef = useRef(false);
-  const drawingPointerCaptureTargetRef = useRef<StudioPointerCaptureTarget | null>(null);
-  /** Detach window-level pointerup/cancel armed for the active stroke (mouse leaves canvas). */
-  const drawingPointerSafetyCleanupRef = useRef<(() => void) | null>(null);
-  /**
-   * Latest finish/discard entry for global safety listeners. Stage handlers rebind each render;
-   * window listeners attached at stroke start must not close over a stale `elements`/`commit`.
-   */
-  const drawingPointerGlobalEndRef = useRef<(
-    pointerEvent: PointerEvent,
-    cancelled: boolean,
-    consumeReleaseSample?: boolean
-  ) => void>(() => undefined);
-  const drawingPointerGlobalMoveRef = useRef<(pointerEvent: PointerEvent) => void>(() => undefined);
-  const drawingPointerGlobalCancelRef = useRef<() => void>(() => undefined);
   const drawingUnmountCleanupRef = useRef<() => void>(() => undefined);
-  /** A capture-phase native release must not fall through into an unrelated Stage tool branch. */
-  const drawingHandledNativeEndEventsRef = useRef(new WeakSet<PointerEvent>());
   const perspectiveRayRef = useRef<PerspectiveRay | null>(null);
   const isometricAxisRayRef = useRef<IsometricAxisRay | null>(null);
   const quickShapeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -6769,6 +6765,7 @@ function StudioCuttoonEditor() {
       if (draftRafRef.current !== null) globalThis.cancelAnimationFrame(draftRafRef.current);
       if (marqueeRafRef.current !== null) globalThis.cancelAnimationFrame(marqueeRafRef.current);
       drawingUnmountCleanupRef.current();
+      requireStudioDrawingPointerTransport(drawingPointerTransportRef).dispose();
       const pendingBatch = pendingStrokeCommitsRef.current;
       // React route transitions do not dispatch pagehide. Persist every dirty stable generation as
       // well as an uncommitted batch; the ref-backed writer cheaply no-ops when both are durable.
@@ -9993,7 +9990,7 @@ function StudioCuttoonEditor() {
       setError(collaborationLockMessage());
       return false;
     }
-    if (drawingRef.current || drawingPointerSessionRef.current) {
+    if (drawingRef.current || requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession()) {
       setError("현재 획을 마친 뒤 페이지 구성을 변경할 수 있어요.");
       return false;
     }
@@ -15639,121 +15636,6 @@ function StudioCuttoonEditor() {
       converted: quickShapeConvertedRef.current,
     };
   }
-  function clearDrawingPointerSafetyListeners() {
-    drawingPointerSafetyCleanupRef.current?.();
-    drawingPointerSafetyCleanupRef.current = null;
-  }
-
-  /**
-   * Capture must land on Konva's event surface (content/canvas), not the outer container.
-   * Capture on the parent container retargets pointermove/up away from content, so Stage
-   * handlers never see the rest of a mouse drag after the cursor leaves the hit shape.
-   */
-  function resolveDrawingPointerCaptureTarget(
-    stage: Konva.Stage | null | undefined,
-    pointerEvent: PointerEvent
-  ): StudioPointerCaptureTarget | null {
-    const content = stage
-      ? ((stage as Konva.Stage & { content?: HTMLElement | null }).content ?? null)
-      : null;
-    if (content && typeof content.setPointerCapture === "function") {
-      return content;
-    }
-    const nativeTarget = pointerEvent.target;
-    if (nativeTarget && typeof (nativeTarget as StudioPointerCaptureTarget).setPointerCapture === "function") {
-      return nativeTarget as StudioPointerCaptureTarget;
-    }
-    return null;
-  }
-
-  function attachDrawingPointerSafetyListeners(pointerId: number) {
-    clearDrawingPointerSafetyListeners();
-    const captureTarget = drawingPointerCaptureTargetRef.current as EventTarget | null;
-    const onGlobalMove = (event: Event) => {
-      const pointerEvent = event as PointerEvent;
-      const session = drawingPointerSessionRef.current;
-      if (!session || session.pointerId !== pointerId) return;
-      // A processed mouse hover with buttons=0 is the recovery signal when capture and pointerup
-      // were both lost. Its coordinates are never consumed as ink.
-      if (shouldEndStudioStrokeForReleasedContact(session, pointerEvent)) {
-        drawingPointerGlobalMoveRef.current(pointerEvent);
-        return;
-      }
-      const eventType = event.type === "pointermove" ? "pointermove" : "pointerrawupdate";
-      const claim = claimStudioStrokeMoveTransport(session, pointerEvent, eventType);
-      drawingPointerSessionRef.current = claim.session;
-      if (!claim.accepted) return;
-      drawingPointerGlobalMoveRef.current(pointerEvent);
-    };
-    const onGlobalEnd = (event: Event) => {
-      const pointerEvent = event as PointerEvent;
-      if (!Number.isFinite(pointerEvent.pointerId) || pointerEvent.pointerId !== pointerId) return;
-      const session = drawingPointerSessionRef.current;
-      if (!session || session.pointerId !== pointerId) return;
-      drawingHandledNativeEndEventsRef.current.add(pointerEvent);
-      drawingPointerGlobalEndRef.current(pointerEvent, event.type === "pointercancel");
-    };
-    const onGlobalAbort = (event?: Event) => {
-      const session = drawingPointerSessionRef.current;
-      if (!session || session.pointerId !== pointerId) return;
-      // `blur` does not bubble, but a capture listener on Window observes a toolbar button losing
-      // focus when the pointer enters the canvas. That normal focus transfer must not erase the
-      // stroke that just started. Only a real top-level window blur is an abort signal.
-      if (
-        event?.type === "blur"
-        && !isStudioTopLevelWindowBlur(event.target, globalThis)
-      ) return;
-      const lastPointerSample = drawingLastAuthoritativePointerRef.current;
-      if (
-        shouldPreserveStudioStrokeOnTransportAbort(session)
-        && lastPointerSample
-        && isStudioStrokePointerEvent(session, lastPointerSample)
-      ) {
-        // A real window/page transport interruption may never deliver pointerup. Preserve the
-        // already visible mouse/pen prefix, while touch remains cancellable for scroll/pinch.
-        drawingPointerGlobalEndRef.current(lastPointerSample, true, false);
-        return;
-      }
-      drawingPointerGlobalCancelRef.current();
-    };
-    const onVisibilityChange = (event: Event) => {
-      if (globalThis.document.visibilityState !== "visible") onGlobalAbort(event);
-    };
-    const onLostPointerCapture = (event: Event) => {
-      const pointerEvent = event as PointerEvent;
-      const outcome = resolveStudioPointerCaptureLoss(
-        drawingPointerSessionRef.current,
-        pointerEvent
-      );
-      if (outcome === "foreign") return;
-      // Capture loss does not mean the browser cancelled the stroke. Window-level up/cancel and
-      // buttons=0 recovery remain armed, so a fast release cannot delete already visible ink.
-      drawingPointerCaptureTargetRef.current = null;
-      if (outcome === "finish") {
-        drawingPointerGlobalEndRef.current(pointerEvent, false, false);
-      }
-    };
-    // Capture phase makes processed pointermove + its coalesced hardware samples the one
-    // authoritative freehand transport before Konva performs cursor/hit-test work.
-    globalThis.addEventListener("pointermove", onGlobalMove, true);
-    // Still receive release when a chrome overlay stops propagation.
-    globalThis.addEventListener("pointerup", onGlobalEnd, true);
-    globalThis.addEventListener("pointercancel", onGlobalEnd, true);
-    globalThis.addEventListener("blur", onGlobalAbort);
-    globalThis.addEventListener("pagehide", onGlobalAbort, true);
-    globalThis.document.addEventListener("visibilitychange", onVisibilityChange, true);
-    captureTarget?.addEventListener("lostpointercapture", onLostPointerCapture, true);
-    drawingPointerSafetyCleanupRef.current = () => {
-      globalThis.removeEventListener("pointermove", onGlobalMove, true);
-      globalThis.removeEventListener("pointerup", onGlobalEnd, true);
-      globalThis.removeEventListener("pointercancel", onGlobalEnd, true);
-      globalThis.removeEventListener("blur", onGlobalAbort);
-      globalThis.removeEventListener("pagehide", onGlobalAbort, true);
-      globalThis.document.removeEventListener("visibilitychange", onVisibilityChange, true);
-      captureTarget?.removeEventListener("lostpointercapture", onLostPointerCapture, true);
-    };
-  }
-
   function fixedRateStrokePump(): FixedRateStrokeFramePump {
     drawingFixedRatePumpRef.current ??= createFixedRateStrokeFramePump({
       requestFrame: (callback) => globalThis.requestAnimationFrame(callback),
@@ -15803,14 +15685,8 @@ function StudioCuttoonEditor() {
 
   function releaseDrawingPointerSession() {
     stopFixedRateStrokePump();
-    clearDrawingPointerSafetyListeners();
-    const session = drawingPointerSessionRef.current;
-    if (session) {
-      tryReleaseStudioStrokePointer(drawingPointerCaptureTargetRef.current, session.pointerId);
-    }
-    drawingPointerSessionRef.current = null;
+    requireStudioDrawingPointerTransport(drawingPointerTransportRef).release();
     drawingCrdtStrokeActiveRef.current = false;
-    drawingPointerCaptureTargetRef.current = null;
     drawingPredictionPreviewRef.current = false;
     drawingStabilizerRef.current = null;
     drawingFixedRateFilterRef.current = null;
@@ -16433,9 +16309,9 @@ function StudioCuttoonEditor() {
       const touchPrefs = appSettingsRef.current.touch;
       if (pointerSample.pointerType === "touch") {
         if (touchPrefs.oneFingerDrag !== "draw") return;
-        if (touchPrefs.palmRejection && drawingPointerSessionRef.current?.pointerType === "pen") return;
+        if (touchPrefs.palmRejection && requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession()?.pointerType === "pen") return;
       }
-      const activePointerSession = drawingPointerSessionRef.current;
+      const activePointerSession = requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession();
       if (activePointerSession || drawingRef.current) {
         if (shouldCancelStudioFingerStrokeForAdditionalContact(activePointerSession, pointerSample)) {
           // Two fingers mean navigation, not two simultaneous brush tips. Cancel the unfinished
@@ -16638,18 +16514,21 @@ function StudioCuttoonEditor() {
               tangentialPressures:
                 capturePointerDynamics && drawMode === "pen" ? [tangentialPressure] : undefined,
             };
-      drawingPointerSessionRef.current = pointerSession;
       // Pointer-up is a lifecycle signal, not a new freehand coordinate. Retain pointer-down now
       // so a tap and a stroke with no delivered move still have authoritative release metadata.
       drawingLastAuthoritativePointerRef.current = pointerSample;
-      // Capture on Konva content/canvas (not outer container) so Stage keeps receiving moves after leave.
-      drawingPointerCaptureTargetRef.current = resolveDrawingPointerCaptureTarget(
-        e.target.getStage(),
-        pointerSample
-      );
-      tryCaptureStudioStrokePointer(drawingPointerCaptureTargetRef.current, pointerSession.pointerId);
-      // Window safety net: mouse can release outside the stage when capture fails or is stolen.
-      attachDrawingPointerSafetyListeners(pointerSession.pointerId);
+      const pointerTransportStart = requireStudioDrawingPointerTransport(drawingPointerTransportRef).start({
+        pointerEvent: pointerSample,
+        session: pointerSession,
+        stage: e.target.getStage(),
+      });
+      if (!pointerTransportStart.started) {
+        drawingLastAuthoritativePointerRef.current = null;
+        drawingInputSettingsRef.current = null;
+        scheduleLiveDrawPressure(null);
+        endLiveResourceEdit();
+        return;
+      }
       drawingImmediateCausalInputRef.current = causalInkInputPlan.quantizeImmediately;
       // Pixel pencil has no stabilizer. Positive standard strength uses the exact 5ms cascade;
       // strength zero bypasses both sampler and low-pass and is normalized in appendFreehand.
@@ -16883,7 +16762,7 @@ function StudioCuttoonEditor() {
     if (
       !current
       || kind === "freehand"
-      || !isStudioStrokePointerEvent(drawingPointerSessionRef.current, pointerEvent)
+      || !isStudioStrokePointerEvent(requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession(), pointerEvent)
     ) return false;
 
     // Capture-phase pointerup runs before Konva updates its pointer position. Feed the native event
@@ -17264,10 +17143,10 @@ function StudioCuttoonEditor() {
     }
     if (tool !== "draw" || !drawingRef.current) return;
     const pointerEvent = e.evt as PointerEvent;
-    if (!isStudioStrokePointerEvent(drawingPointerSessionRef.current, pointerEvent)) return;
+    if (!isStudioStrokePointerEvent(requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession(), pointerEvent)) return;
     // Mouse: buttons can report 0 mid-drag when release is lost (capture fail / leave window).
     // Pen/touch must not end on buttons alone — drivers often omit a reliable mask mid-stroke.
-    if (shouldEndStudioStrokeForReleasedContact(drawingPointerSessionRef.current, pointerEvent)) {
+    if (shouldEndStudioStrokeForReleasedContact(requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession(), pointerEvent)) {
       // Do not stop QuickShape before finish — finishDrawingPointer snapshots hold/lock first.
       if (colorWheelTimerRef.current) {
         clearTimeout(colorWheelTimerRef.current);
@@ -17697,7 +17576,7 @@ function StudioCuttoonEditor() {
       authoritativeSource?: "coalesced-or-parent" | "parent-only";
     } = {}
   ): boolean {
-    const session = drawingPointerSessionRef.current;
+    const session = requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession();
     if (!session || !isStudioStrokePointerEvent(session, pointerEvent)) return false;
 
     // Predictions are always routed to a physically separate replaceable surface. Shift gestures
@@ -17707,7 +17586,7 @@ function StudioCuttoonEditor() {
       includePredicted: predictionIsReplaceable,
       authoritativeSource: options.authoritativeSource,
     });
-    drawingPointerSessionRef.current = batch.session;
+    requireStudioDrawingPointerTransport(drawingPointerTransportRef).replaceSession(batch.session);
     const sampleClock = drawingFixedRateSampleClockRef.current;
     const sampleClockTransition = sampleClock
       ? normalizeFixedRateStrokeSampleTimeStamps(
@@ -17842,7 +17721,7 @@ function StudioCuttoonEditor() {
 
   drawingFixedRatePumpFrameRef.current = (frameTimeStamp) => {
     const drawing = drawingRef.current;
-    const session = drawingPointerSessionRef.current;
+    const session = requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession();
     const filter = drawingFixedRateFilterRef.current;
     const clock = drawingFixedRatePumpClockRef.current;
     const pointerSample = drawingLastAuthoritativePointerRef.current;
@@ -17879,38 +17758,44 @@ function StudioCuttoonEditor() {
     return true;
   };
 
-  drawingPointerGlobalMoveRef.current = (pointerEvent) => {
-    const session = drawingPointerSessionRef.current;
-    const drawing = drawingRef.current;
-    if (
-      tool !== "draw"
-      || !session
-      || !drawing
-      || (drawing.kind ?? "freehand") !== "freehand"
-      || !isStudioStrokePointerEvent(session, pointerEvent)
-    ) return;
-    if (shouldEndStudioStrokeForReleasedContact(session, pointerEvent)) {
-      if (colorWheelTimerRef.current) {
+  // Native listeners stay mounted for one contact, while these ports always point at this render's
+  // drawing settings, document, draft surfaces and finish coordinator.
+  requireStudioDrawingPointerTransport(drawingPointerTransportRef).updatePorts({
+    getLastAuthoritativePointer: () => drawingLastAuthoritativePointerRef.current,
+    onAuthoritativeMove: (pointerEvent) => {
+      const session = requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession();
+      const drawing = drawingRef.current;
+      if (
+        tool !== "draw"
+        || !session
+        || !drawing
+        || (drawing.kind ?? "freehand") !== "freehand"
+        || !isStudioStrokePointerEvent(session, pointerEvent)
+      ) return;
+      const stage = stageRef.current;
+      if (!stage) return;
+      consumeFreehandPointerBatch(stage, pointerEvent, STUDIO_POINTER_PREDICTION_ENABLED);
+      if (drawMode === "pen") {
+        const point = stage.getRelativePointerPosition();
+        if (point) noteQuickShapePointerMoved(point);
+      }
+    },
+    onDiscard: () => {
+      if (!drawingRef.current && !requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession()) return;
+      discardDrawingPointerSession();
+    },
+    onFinish: (pointerEvent, request) => {
+      // Snapshot + stop happen inside finishDrawingPointer; clearing QuickShape here would wipe
+      // the hold/lock state used by release promotion.
+      if (!request.cancelled && colorWheelTimerRef.current) {
         clearTimeout(colorWheelTimerRef.current);
         colorWheelTimerRef.current = null;
       }
-      // A hover event with buttons=0 only closes a lost mouse contact; its coordinates are not ink.
-      finishDrawingPointer(stageRef.current, pointerEvent, { consumeReleaseSample: false });
-      return;
-    }
-    const stage = stageRef.current;
-    if (!stage) return;
-    consumeFreehandPointerBatch(stage, pointerEvent, STUDIO_POINTER_PREDICTION_ENABLED);
-    if (drawMode === "pen") {
-      const point = stage.getRelativePointerPosition();
-      if (point) noteQuickShapePointerMoved(point);
-    }
-  };
-
-  drawingPointerGlobalCancelRef.current = () => {
-    if (!drawingRef.current && !drawingPointerSessionRef.current) return;
-    discardDrawingPointerSession();
-  };
+      finishDrawingPointer(stageRef.current, pointerEvent, {
+        consumeReleaseSample: request.consumeReleaseSample,
+      });
+    },
+  });
 
   function queueStudioRasterDrawPromotion(input: {
     plan: NonNullable<ReturnType<StudioCrdtSceneGraphRuntime["planRasterDrawPromotion"]>>;
@@ -18050,7 +17935,7 @@ function StudioCuttoonEditor() {
     options: { consumeReleaseSample?: boolean } = {}
   ) {
     // Idempotent: Stage pointerup and the window safety listener can both observe the same release.
-    if (!drawingRef.current && !drawingPointerSessionRef.current) return;
+    if (!drawingRef.current && !requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession()) return;
     const inputSettings = drawingInputSettingsRef.current;
     // No scheduled frame may race the final hardware sample or continue changing released pixels.
     stopFixedRateStrokePump();
@@ -18492,35 +18377,14 @@ function StudioCuttoonEditor() {
       }
     }
   }
-  // Keep window safety listeners on the latest finish/discard (refs avoid stale `elements`/`commit`).
-  drawingPointerGlobalEndRef.current = (pointerEvent, cancelled, consumeReleaseSample = true) => {
-    const session = drawingPointerSessionRef.current;
-    if (!session || !isStudioStrokePointerEvent(session, pointerEvent)) return;
-    if (cancelled) {
-      if (shouldCommitStudioStrokeOnPointerCancel(session, pointerEvent)) {
-        // Mouse/pen cancellation can be a capture/WebView transport interruption after ink was
-        // already shown. Preserve the last authoritative prefix without consuming cancel coords.
-        finishDrawingPointer(stageRef.current, pointerEvent, { consumeReleaseSample: false });
-      } else {
-        discardDrawingPointerSession();
-      }
-      return;
-    }
-    // Snapshot + stop happen inside finishDrawingPointer; clearing here wiped promote state.
-    if (colorWheelTimerRef.current) {
-      clearTimeout(colorWheelTimerRef.current);
-      colorWheelTimerRef.current = null;
-    }
-    finishDrawingPointer(stageRef.current, pointerEvent, { consumeReleaseSample });
-  };
   function onStagePointerCancel(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
     const pointerEvent = e.evt as PointerEvent;
     if (liquifyHandledNativeEndEventsRef.current.delete(pointerEvent)) return;
-    if (drawingHandledNativeEndEventsRef.current.delete(pointerEvent)) return;
+    if (requireStudioDrawingPointerTransport(drawingPointerTransportRef).consumeHandledNativeEnd(pointerEvent)) return;
     const pointerId = Number.isFinite(pointerEvent.pointerId) ? pointerEvent.pointerId : 1;
     // Drawing owns its matching cancel before any stale tool session can early-return. A foreign
     // pointer (typically a palm) cannot cancel the pen that opened the stroke.
-    const drawingPointerSession = drawingPointerSessionRef.current;
+    const drawingPointerSession = requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession();
     if (drawingRef.current || drawingPointerSession) {
       if (drawingPointerSession && !isStudioStrokePointerEvent(drawingPointerSession, pointerEvent)) {
         return;
@@ -18555,8 +18419,8 @@ function StudioCuttoonEditor() {
   function onStageUp(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
     const pointerEvent = e.evt as PointerEvent;
     if (liquifyHandledNativeEndEventsRef.current.delete(pointerEvent)) return;
-    if (drawingHandledNativeEndEventsRef.current.delete(pointerEvent)) return;
-    const drawingPointerSession = drawingPointerSessionRef.current;
+    if (requireStudioDrawingPointerTransport(drawingPointerTransportRef).consumeHandledNativeEnd(pointerEvent)) return;
+    const drawingPointerSession = requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession();
     if (drawingRef.current || drawingPointerSession) {
       if (!drawingPointerSession) {
         // Defensive HMR/legacy state: ownership is unknown, so discard rather than committing an
