@@ -412,6 +412,7 @@ import {
   loadStudioPsdImportModule,
   loadStudioSvgExportWorkerClientModule,
 } from "./studio-document-export-loaders";
+import { StudioDraftPreviewStore } from "./studio-draft-preview-store";
 import {
   isCompleteStudioDrawOp,
   isStudioImmediateFreehandCommit,
@@ -1107,6 +1108,7 @@ import {
   StudioColorBlindFilterDefs,
   type CvdMode,
 } from "./StudioColorBlindPreview";
+import { StudioDraftPreviewLayers } from "./StudioDraftPreviewLayers";
 import { StudioDrawNode } from "./StudioDrawNode";
 import {
   StudioInspectorAside,
@@ -1536,108 +1538,6 @@ function createQuickSampleFrames(): FrameEl[] {
     height,
   }));
 }
-
-/**
- * 비다이렉트 초안(수채·연필·유화·입자 등 모든 팬시 브러시와 도형 드래그)의 미니 스토어.
- * 포인터 프레임마다 이 스토어만 갱신되고, 구독자는 아래 StudioDraftPreviewLayers 하나뿐이라
- * 프레임당 리렌더가 30k 라인 페이지가 아니라 초안 레이어 서브트리로 한정된다 — 모든 브러시가
- * 펜과 같은 필기감을 갖게 만드는 격리 장치. settled 는 커밋 동기화를 기다리는 확정 획들.
- */
-interface StudioDraftPreviewSnapshot {
-  readonly active: DrawEl | null;
-  readonly settled: readonly DrawEl[];
-}
-const EMPTY_DRAFT_PREVIEW: StudioDraftPreviewSnapshot = { active: null, settled: [] };
-class StudioDraftPreviewStore {
-  private snapshot: StudioDraftPreviewSnapshot = EMPTY_DRAFT_PREVIEW;
-  private listeners = new Set<() => void>();
-  subscribe = (listener: () => void): (() => void) => {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  };
-  getSnapshot = (): StudioDraftPreviewSnapshot => this.snapshot;
-  get active(): DrawEl | null {
-    return this.snapshot.active;
-  }
-  get hasSettled(): boolean {
-    return this.snapshot.settled.length > 0;
-  }
-  get settledCount(): number {
-    return this.snapshot.settled.length;
-  }
-  setActive(el: DrawEl | null): void {
-    if (this.snapshot.active === el) return;
-    this.snapshot = { active: el, settled: this.snapshot.settled };
-    this.emit();
-  }
-  /** 펜 리프트: 확정된 최종 형태(finished)를 settled 로 넘겨 커밋 렌더까지 잉크를 유지한다. */
-  settle(el: DrawEl): void {
-    this.snapshot = { active: null, settled: [...this.snapshot.settled, el] };
-    this.emit();
-  }
-  clearSettled(): void {
-    this.releaseSettledPrefix(this.snapshot.settled.length);
-  }
-  /** 실제 메인 레이어에 그려진 FIFO 접두부만 제거하고, 이후 초안은 그대로 유지한다. */
-  releaseSettledPrefix(count: number): number {
-    const requested = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
-    const released = Math.min(requested, this.snapshot.settled.length);
-    if (released === 0) return 0;
-    this.snapshot = {
-      active: this.snapshot.active,
-      settled: this.snapshot.settled.slice(released),
-    };
-    this.emit();
-    return released;
-  }
-  clear(): void {
-    if (this.snapshot === EMPTY_DRAFT_PREVIEW) return;
-    this.snapshot = EMPTY_DRAFT_PREVIEW;
-    this.emit();
-  }
-  private emit(): void {
-    for (const listener of this.listeners) listener();
-  }
-}
-
-/** 비다이렉트 초안 전용 격리 레이어 — 스토어 구독으로 페이지 본문 렌더 없이 프레임을 그린다. */
-const StudioDraftPreviewLayers = memo(function StudioDraftPreviewLayers({
-  store,
-}: {
-  store: StudioDraftPreviewStore;
-}) {
-  const { active, settled } = useSyncExternalStore(store.subscribe, store.getSnapshot);
-  const isolatedDynamic =
-    active?.mode === "pen" && resolveStudioBrushDynamicsPresetId(active.brush) !== null
-      ? active
-      : null;
-  // Non-direct specialty brushes retain their exact accepted coordinates while the pointer is
-  // down. The former growing-prefix smoother recalculated already-visible points every frame.
-  // Default opaque pens now use the fixed-lag two-surface causal path; specialty brushes prefer a
-  // single release-time correction over visibly crawling historical geometry.
-  const normalActive = active && !isolatedDynamic && active.mode !== "eraser"
-    ? active
-    : null;
-  return (
-    <>
-      {settled.length > 0 || normalActive ? (
-        <Layer listening={false}>
-          {settled.map((el) => (
-            <StudioDrawNode key={el.id} el={el} />
-          ))}
-          {normalActive ? <StudioDrawNode el={normalActive} activeDraft /> : null}
-        </Layer>
-      ) : null}
-      {/* 라이브 입자 획은 독립 레이어에서만 다시 그린다 — committed 입자 획이 포인터 RAF마다
-          수천 개의 dab 을 재실행하지 않는다. */}
-      {isolatedDynamic ? (
-        <Layer listening={false}>
-          <StudioDrawNode el={isolatedDynamic} />
-        </Layer>
-      ) : null}
-    </>
-  );
-});
 
 /**
  * 생성형 AI(이미지 생성) 최초 사용 고지 다이얼로그(앱인토스 서비스 오픈 정책 필수).

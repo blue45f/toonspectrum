@@ -112,9 +112,11 @@ describe("studio draw rendering ownership boundary", () => {
     expect(rendering.source).not.toMatch(/\bGPUDevice\b/);
   });
 
-  it("keeps the React-Konva node in its own one-way module and the draft store in StudioPage", () => {
+  it("keeps the React-Konva node and draft preview runtime in one-way modules", () => {
     const page = moduleEdges("./StudioPage.tsx");
     const drawNode = moduleEdges("./StudioDrawNode.tsx");
+    const previewLayers = moduleEdges("./StudioDraftPreviewLayers.tsx");
+    const previewStore = moduleEdges("./studio-draft-preview-store.ts");
     const rendering = moduleEdges("./studio-draw-rendering.ts");
 
     expect(
@@ -131,10 +133,28 @@ describe("studio draw rendering ownership boundary", () => {
     expect(drawNode.valueImports).toContain("./studio-draw-rendering");
     expect(drawNode.valueImports).toContain("react-konva/lib/ReactKonvaCore");
 
-    expect(page.source).toContain("class StudioDraftPreviewStore");
-    expect(page.source).toContain(
-      "const StudioDraftPreviewLayers = memo(function StudioDraftPreviewLayers(",
+    expect(page.valueImports.filter((specifier) => specifier === "./studio-draft-preview-store"))
+      .toEqual(["./studio-draft-preview-store"]);
+    expect(page.valueImports.filter((specifier) => specifier === "./StudioDraftPreviewLayers"))
+      .toEqual(["./StudioDraftPreviewLayers"]);
+    expect(page.source).not.toMatch(/\b(?:const|function|class)\s+StudioDraftPreviewStore\b/);
+    expect(page.source).not.toMatch(/\b(?:const|function|class)\s+StudioDraftPreviewLayers\b/);
+
+    expect(previewStore.source).toContain("export class StudioDraftPreviewStore");
+    expect(previewStore.typeImports).toContain("./studio-element-model");
+    expect(previewStore.valueImports).not.toContain("./studio-element-model");
+    expect(previewStore.allImports).not.toContain("./StudioPage");
+    expect(previewStore.allImports.some((specifier) => specifier.startsWith("react"))).toBe(false);
+
+    expect(previewLayers.source).toContain(
+      "export const StudioDraftPreviewLayers = memo(function StudioDraftPreviewLayers(",
     );
+    expect(previewLayers.typeImports).toContain("./studio-draft-preview-store");
+    expect(previewLayers.valueImports).not.toContain("./studio-draft-preview-store");
+    expect(previewLayers.valueImports).toContain("./StudioDrawNode");
+    expect(previewLayers.valueImports).toContain("react-konva/lib/ReactKonvaCore");
+    expect(previewLayers.allImports).not.toContain("./StudioPage");
+
     expect(rendering.source).not.toMatch(/\b(?:const|function|class)\s+StudioDrawNode\b/);
     expect(rendering.source).not.toMatch(/\b(?:const|function|class)\s+StudioDraftPreviewStore\b/);
     expect(rendering.source).not.toMatch(/\b(?:const|function|class)\s+StudioDraftPreviewLayers\b/);
