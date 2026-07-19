@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Card3D } from "./ui/card-3d";
 
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { adConfig } from "@/src/components/deskcloud-native/config";
 import { useAppConfig } from "@/src/hooks/use-app-config";
@@ -63,6 +64,7 @@ function SponsoredRail({
   const slotsKey = slots.join(",");
   const [creatives, setCreatives] = useState<AdCreative[]>([]);
   const [resolved, setResolved] = useState(false);
+  const t = useT();
 
   useEffect(() => {
     let alive = true;
@@ -83,7 +85,7 @@ function SponsoredRail({
             creativeId: ad.creativeId,
             imageUrl: ad.imageUrl,
             linkUrl: ad.linkUrl,
-            alt: ad.alt ?? "스폰서 콘텐츠",
+            alt: ad.alt ?? t("ad.creativeFallbackAlt"),
           });
         }
         setCreatives(next);
@@ -94,7 +96,7 @@ function SponsoredRail({
       alive = false;
       ac.abort();
     };
-  }, [client, slotsKey]);
+  }, [client, slotsKey, t]);
 
   // 미해결(첫 서빙 전) 또는 서빙된 광고 0건이면 렌더하지 않음(빈 박스/깜빡임 방지).
   if (!resolved || creatives.length === 0) return null;
@@ -111,6 +113,7 @@ function AdCarousel({
   client: AdClient;
   className?: string;
 }) {
+  const t = useT();
   const multi = creatives.length > 1;
   const autoplay = useRef(
     Autoplay({ delay: 5200, stopOnInteraction: false, stopOnMouseEnter: true })
@@ -141,12 +144,12 @@ function AdCarousel({
   }, [emblaApi]);
 
   return (
-    <aside aria-label="스폰서 추천" className={cn("flex flex-col gap-2.5", className)}>
+    <aside aria-label={t("ad.slotAriaLabel")} className={cn("flex flex-col gap-2.5", className)}>
       <div className="flex items-center justify-between">
-        <p className="eyebrow text-accent">스폰서 추천</p>
+        <p className="eyebrow text-accent">{t("ad.slotLabel")}</p>
         <span
           className="inline-flex items-center gap-1 rounded-full border border-line bg-card px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-fg-3"
-          title="광고 — 스폰서가 비용을 지불한 지면입니다"
+          title={t("ad.slotTitle")}
         >
           <Megaphone size={10} aria-hidden />
           AD
@@ -186,6 +189,7 @@ function AdCarousel({
 function AdCard({ creative, client }: { creative: AdCreative; client: AdClient }) {
   const ref = useRef<HTMLAnchorElement>(null);
   const tracked = useRef(false);
+  const t = useT();
 
   // 노출 추적 — 카드가 화면에 50% 이상 들어오면 크리에이티브당 1회만 impression을 기록한다.
   useEffect(() => {
@@ -231,7 +235,7 @@ function AdCard({ creative, client }: { creative: AdCreative; client: AdClient }
             {creative.alt}
           </p>
           <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent px-2.5 py-1 text-[0.7rem] font-semibold text-on-accent">
-            자세히 보기
+            {t("ad.ctaDetails")}
             <ArrowUpRight size={12} aria-hidden />
           </span>
         </div>
@@ -242,9 +246,10 @@ function AdCard({ creative, client }: { creative: AdCreative; client: AdClient }
 
 // AdDesk 미연동 시 폴백 — 정적 하우스 자리표시자(기존 동작 보존).
 function HousePlaceholder({ label, className }: { label?: string; className?: string }) {
+  const t = useT();
   return (
     <aside
-      aria-label="스폰서 광고 지면"
+      aria-label={t("ad.placeholderAriaLabel")}
       className={cn(
         "flex flex-col items-center gap-2 rounded-2xl border border-line bg-panel px-6 py-7 text-center",
         className
@@ -252,10 +257,10 @@ function HousePlaceholder({ label, className }: { label?: string; className?: st
     >
       <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-card px-2.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-fg-3">
         <Megaphone size={11} aria-hidden />
-        AD · 스폰서
+        AD · {t("ad.tag")}
       </span>
       <p className="text-sm text-fg-3">
-        {label ?? "이 자리에 스폰서 콘텐츠가 노출됩니다 · 광고 문의"}
+        {label ?? t("ad.placeholderText")}
       </p>
     </aside>
   );

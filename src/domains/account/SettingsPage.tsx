@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 
 import { Container } from "@/components/section";
-import { useI18n, type Lang } from "@/lib/i18n";
+import { getLanguageOptions, useI18n, useT } from "@/lib/i18n";
 import { useApp, useHydrated, type RatingScale } from "@/lib/store";
 import {
   getRememberFlag,
@@ -13,16 +13,6 @@ import {
 } from "@/lib/use-remembered-filters";
 import { formatCount } from "@/lib/utils";
 import { fetchVisitStats, type VisitStats } from "@/lib/visits-api";
-
-const LANGS: { id: Lang; label: string }[] = [
-  { id: "ko", label: "한국어" },
-  { id: "en", label: "English" },
-];
-const SCALES: { id: RatingScale; label: string }[] = [
-  { id: "star", label: "별점 ★" },
-  { id: "ten", label: "10점" },
-  { id: "hundred", label: "100점" },
-];
 
 function Choice<T extends string>({
   options,
@@ -106,6 +96,17 @@ export function SettingsPage() {
   const [importError, setImportError] = useState<string | null>(null);
   const [visitStats, setVisitStats] = useState<VisitStats | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
+  const t = useT();
+  const langOptions = getLanguageOptions(lang).map((entry) => ({
+    id: entry.code,
+    code: entry.code,
+    label: entry.label,
+  }));
+  const scaleOptions: { id: RatingScale; label: string }[] = [
+    { id: "star", label: t("settings.rating.star") },
+    { id: "ten", label: t("settings.rating.ten") },
+    { id: "hundred", label: t("settings.rating.hundred") },
+  ];
 
   // 방문 통계는 best-effort 표시 — 실패하면 조용히 숨긴다(아래 Row가 null 가드).
   useEffect(() => {
@@ -161,7 +162,7 @@ export function SettingsPage() {
         setImported(true);
         setImportError(null);
       } catch {
-        setImportError("파일을 읽을 수 없어요. 올바른 백업 파일인지 확인해주세요.");
+        setImportError(t("settings.data.importError"));
         setImported(false);
       }
     };
@@ -192,38 +193,52 @@ export function SettingsPage() {
     <Container size="prose" className="py-6 sm:py-14">
       <header className="mb-6">
         <p className="eyebrow flex items-center gap-1.5 text-accent">
-          <Settings size={14} /> SETTINGS
+          <Settings size={14} /> {t("settings.eyebrow")}
         </p>
-        <h1 className="mt-2 text-[clamp(1.6rem,7vw,1.875rem)] font-bold tracking-tight sm:text-4xl">설정</h1>
+        <h1 className="mt-2 text-[clamp(1.6rem,7vw,1.875rem)] font-bold tracking-tight sm:text-4xl">{t("settings.title")}</h1>
         <p className="lede mt-2 text-pretty text-sm leading-relaxed text-fg-2">
-          표시 방식과 필터를 저장하거나 초기화합니다. 모든 설정은 이 브라우저에만 저장됩니다.
+          {t("settings.subtitle")}
         </p>
       </header>
 
       {/* 표시 설정 */}
       <section className="rounded-2xl border border-line bg-panel/40 px-5">
-        <Row icon={Globe} title="언어" desc="메뉴·버튼 표기 언어 (작품 데이터는 한국어 원본)">
-          <Choice options={LANGS} value={lang} onChange={setLang} />
+        <Row icon={Globe} title={t("settings.language.title")} desc={t("settings.language.desc")}>
+          <label className="block">
+            <span className="sr-only">{t("settings.language.title")}</span>
+            <select
+              value={lang}
+              onChange={(event) => setLang(event.target.value)}
+              aria-label={t("settings.language.title")}
+              className="h-9 w-[18rem] max-w-full rounded-lg border border-line bg-card px-2 py-1 text-sm text-fg outline-none transition-colors focus:border-accent/60 focus-visible:ring-2 focus-visible:ring-accent/40"
+            >
+              {langOptions.map((entry) => (
+                <option key={entry.code} value={entry.code} title={entry.label}>
+                  {entry.label}
+                </option>
+              ))}
+            </select>
+          </label>
         </Row>
-        <Row icon={Star} title="평점 표시 단위" desc="별점을 어떤 척도로 보여줄지 선택">
-          <Choice options={SCALES} value={ratingScale} onChange={setRatingScale} />
+        <Row icon={Star} title={t("settings.rating.title")} desc={t("settings.rating.desc")}>
+          <Choice options={scaleOptions} value={ratingScale} onChange={setRatingScale} />
         </Row>
       </section>
 
       {/* 필터 */}
-      <h2 className="mb-2 mt-8 text-sm font-bold uppercase tracking-wide text-fg-3">필터</h2>
+      <h2 className="mb-2 mt-8 text-sm font-bold uppercase tracking-wide text-fg-3">{t("settings.section.filters")}</h2>
       <section className="rounded-2xl border border-line bg-panel/40 px-5">
         <Row
           icon={SlidersHorizontal}
-          title="필터 기억"
-          desc="랭킹·추천·캘린더에서 설정한 필터를 다음 방문에도 유지합니다."
+          title={t("settings.filters.remember")}
+          desc={t("settings.filters.remember.desc")}
         >
           <button
             type="button"
             onClick={toggleRemember}
             role="switch"
             aria-checked={hydrated && remember}
-            aria-label="필터 기억"
+            aria-label={t("settings.filters.remember")}
             className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
               hydrated && remember ? "bg-accent" : "bg-line-strong"
             }`}
@@ -235,28 +250,34 @@ export function SettingsPage() {
             />
           </button>
         </Row>
-        <Row icon={Trash2} title="저장된 필터 초기화" desc="모든 페이지의 저장된 필터 값을 지웁니다.">
+        <Row
+          icon={Trash2}
+          title={t("settings.filters.clear")}
+          desc={t("settings.filters.clear.desc")}
+        >
           <button
             type="button"
             onClick={clearFilters}
             className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-fg-2 transition-colors hover:bg-raised hover:text-fg"
           >
             {filtersCleared ? <Check size={14} className="text-good" /> : <Trash2 size={14} />}
-            {filtersCleared ? "초기화됨" : "필터 초기화"}
+            {filtersCleared ? t("settings.data.clear") : t("settings.filters.clearNow")}
           </button>
         </Row>
       </section>
 
       {/* 연령 확인 */}
-      <h2 className="mb-2 mt-8 text-sm font-bold uppercase tracking-wide text-fg-3">연령 확인</h2>
+      <h2 className="mb-2 mt-8 text-sm font-bold uppercase tracking-wide text-fg-3">{t("settings.section.age")}</h2>
       <section className="rounded-2xl border border-line bg-panel/40 px-5">
         <Row
           icon={ShieldCheck}
-          title="19금 표지 열람"
+          title={t("settings.age.title")}
           desc={
             hydrated && adultVerified
-              ? `만 19세 이상으로 확인됨${adultBirthdate ? ` (${adultBirthdate})` : ""}`
-              : "생년월일로 만 19세 이상을 확인하면 19금 표지가 보입니다."
+              ? adultBirthdate
+                ? t("settings.age.descriptionVerifiedWithBirthdate").replace("{date}", adultBirthdate)
+                : t("settings.age.descriptionVerified")
+              : t("settings.age.description")
           }
         >
           {hydrated && adultVerified ? (
@@ -265,7 +286,7 @@ export function SettingsPage() {
               onClick={() => setAdultVerified(false)}
               className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-fg-2 transition-colors hover:bg-raised hover:text-fg"
             >
-              확인 해제
+              {t("settings.age.reset")}
             </button>
           ) : (
             <button
@@ -273,29 +294,29 @@ export function SettingsPage() {
               onClick={openAgeGate}
               className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-on-accent transition-opacity hover:opacity-90"
             >
-              연령 확인
+              {t("settings.age.verify")}
             </button>
           )}
         </Row>
       </section>
 
       {/* 내 데이터 */}
-      <h2 className="mb-2 mt-8 text-sm font-bold uppercase tracking-wide text-fg-3">내 데이터</h2>
+      <h2 className="mb-2 mt-8 text-sm font-bold uppercase tracking-wide text-fg-3">{t("settings.section.data")}</h2>
       <section className="rounded-2xl border border-line bg-panel/40 px-5">
-        <Row icon={Download} title="내 서재 백업 내보내기" desc="별점·읽음·구독·컬렉션을 JSON 파일로 저장합니다.">
+        <Row icon={Download} title={t("settings.data.export")} desc={t("settings.data.exportDesc")}>
           <button
             type="button"
             onClick={doExport}
             className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-fg-2 transition-colors hover:bg-raised"
           >
-            <Download size={14} /> 내보내기
+            <Download size={14} /> {t("settings.data.export")}
           </button>
         </Row>
-        <Row icon={Upload} title="백업 가져오기" desc="내보낸 JSON으로 복원합니다. 현재 이 브라우저의 데이터를 덮어씁니다.">
+        <Row icon={Upload} title={t("settings.data.import")} desc={t("settings.data.importDesc")}>
           <span className="inline-flex items-center gap-2">
             {imported && (
               <span className="inline-flex items-center gap-1 text-sm font-medium text-good">
-                <Check size={14} /> 가져옴
+                <Check size={14} /> {t("settings.data.confirmed")}
               </span>
             )}
             <button
@@ -303,7 +324,7 @@ export function SettingsPage() {
               onClick={() => importInputRef.current?.click()}
               className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-fg-2 transition-colors hover:bg-raised"
             >
-              <Upload size={14} /> 가져오기
+              <Upload size={14} /> {t("settings.data.import")}
             </button>
             <input ref={importInputRef} type="file" accept="application/json,.json" className="hidden" onChange={onImportPick} />
           </span>
@@ -311,12 +332,14 @@ export function SettingsPage() {
         {importError && <p className="-mt-1 pb-3 text-xs text-bad">{importError}</p>}
         <Row
           icon={Clock}
-          title="최근 본 기록 지우기"
-          desc={`홈·서재·검색에 표시되는 최근 본 작품 기록을 지웁니다.${recentCount > 0 ? ` (현재 ${recentCount}개)` : ""}`}
+          title={t("settings.data.recent")}
+          desc={`${t("settings.data.recentDesc")}${
+            recentCount > 0 ? ` (${t("settings.data.now")} ${formatCount(recentCount)})` : ""
+          }`}
         >
           {recentCleared ? (
             <span className="inline-flex items-center gap-1.5 text-sm font-medium text-good">
-              <Check size={14} /> 지움
+              <Check size={14} /> {t("settings.data.clear")}
             </span>
           ) : (
             <button
@@ -328,18 +351,20 @@ export function SettingsPage() {
               }}
               className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-fg-2 transition-colors hover:bg-raised disabled:opacity-40 disabled:hover:bg-transparent"
             >
-              <Clock size={14} /> 기록 지우기
+              <Clock size={14} /> {t("settings.data.recent")}
             </button>
           )}
         </Row>
         <Row
           icon={SearchX}
-          title="최근 검색어 지우기"
-          desc={`검색 화면에 표시되는 최근 검색어를 지웁니다.${recentSearchCount > 0 ? ` (현재 ${recentSearchCount}개)` : ""}`}
+          title={t("settings.data.search")}
+          desc={`${t("settings.data.searchDesc")}${
+            recentSearchCount > 0 ? ` (${t("settings.data.now")} ${formatCount(recentSearchCount)})` : ""
+          }`}
         >
           {searchesCleared ? (
             <span className="inline-flex items-center gap-1.5 text-sm font-medium text-good">
-              <Check size={14} /> 지움
+              <Check size={14} /> {t("settings.data.clear")}
             </span>
           ) : (
             <button
@@ -351,18 +376,18 @@ export function SettingsPage() {
               }}
               className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-fg-2 transition-colors hover:bg-raised disabled:opacity-40 disabled:hover:bg-transparent"
             >
-              <SearchX size={14} /> 검색어 지우기
+              <SearchX size={14} /> {t("settings.data.search")}
             </button>
           )}
         </Row>
         <Row
           icon={Trash2}
-          title="내 활동 초기화"
-          desc="별점·읽음 상태·구독·컬렉션을 모두 지웁니다. 되돌릴 수 없습니다."
+          title={t("settings.data.reset")}
+          desc={t("settings.data.resetDesc")}
         >
           {dataReset ? (
             <span className="inline-flex items-center gap-1.5 text-sm font-medium text-good">
-              <Check size={14} /> 초기화됨
+              <Check size={14} /> {t("settings.data.cleared")}
             </span>
           ) : confirmReset ? (
             <span className="inline-flex items-center gap-2">
@@ -371,14 +396,14 @@ export function SettingsPage() {
                 onClick={doReset}
                 className="rounded-lg bg-bad px-3 py-1.5 text-sm font-semibold text-on-accent transition-opacity hover:opacity-90"
               >
-                정말 초기화
+                {t("settings.data.confirmDelete")}
               </button>
               <button
                 type="button"
                 onClick={() => setConfirmReset(false)}
                 className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-fg-2 hover:bg-raised"
               >
-                취소
+                {t("settings.data.cancel")}
               </button>
             </span>
           ) : (
@@ -387,25 +412,27 @@ export function SettingsPage() {
               onClick={() => setConfirmReset(true)}
               className="inline-flex items-center gap-1.5 rounded-lg border border-bad/50 px-3 py-1.5 text-sm font-medium text-bad transition-colors hover:bg-bad/10"
             >
-              <Trash2 size={14} /> 초기화
+              <Trash2 size={14} /> {t("settings.data.confirmReset")}
             </button>
           )}
         </Row>
         {visitStats && (
           <Row
             icon={BarChart3}
-            title="방문 통계"
-            desc="툰스펙트럼을 찾아준 누적 방문 수예요. (개인 식별 없이 집계)"
+            title={t("settings.data.stats")}
+            desc={t("settings.data.statsDesc")}
           >
             <span className="inline-flex items-center gap-1.5 text-sm font-medium text-fg-2">
               <span className="tabular-nums">
-                오늘 <span className="font-semibold text-fg">{formatCount(visitStats.todayVisits)}</span>
+                {t("settings.data.statsToday")}{" "}
+                <span className="font-semibold text-fg">{formatCount(visitStats.todayVisits)}</span>
               </span>
               <span className="text-line-strong" aria-hidden>
                 ·
               </span>
               <span className="tabular-nums">
-                누적 <span className="font-semibold text-fg">{formatCount(visitStats.totalVisits)}</span>
+                {t("settings.data.statsTotal")}{" "}
+                <span className="font-semibold text-fg">{formatCount(visitStats.totalVisits)}</span>
               </span>
             </span>
           </Row>
@@ -413,18 +440,18 @@ export function SettingsPage() {
       </section>
 
       {/* 계정 */}
-      <h2 className="mb-2 mt-8 text-sm font-bold uppercase tracking-wide text-fg-3">계정</h2>
+      <h2 className="mb-2 mt-8 text-sm font-bold uppercase tracking-wide text-fg-3">{t("settings.section.account")}</h2>
       <section className="rounded-2xl border border-line bg-panel/40 px-5">
         <Row
           icon={UserCog}
-          title="계정 관리 · 회원 탈퇴"
-          desc="프로필 수정과 회원 탈퇴는 내 정보 페이지에서 할 수 있어요. 탈퇴 시 로그인 정보가 삭제되고 세션이 만료됩니다."
+          title={t("settings.account.title")}
+          desc={t("settings.account.desc")}
         >
           <Link
             to="/me"
             className="inline-flex items-center gap-1 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-fg-2 transition-colors hover:bg-raised hover:text-fg"
           >
-            내 정보 <ChevronRight size={14} />
+            {t("settings.account.toProfile")} <ChevronRight size={14} />
           </Link>
         </Row>
       </section>

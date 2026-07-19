@@ -2,6 +2,7 @@ import { Suspense, useEffect, useState, type AnimationEvent, type ReactNode } fr
 import { Route, Routes, useLocation } from "react-router-dom";
 
 import { LoadingState } from "@/components/LoadingState";
+import { useT } from "@/lib/i18n";
 import { lazyRetry } from "@/lib/lazy-retry";
 import { cn } from "@/lib/utils";
 import { ErrorBoundary } from "@/src/components/error-boundary";
@@ -10,43 +11,44 @@ import { ErrorBoundary } from "@/src/components/error-boundary";
 // /title/* 은 작품명이 필요하므로 TitleDetailPage가 useDocumentTitle로 직접 설정한다.
 const STATIC_TITLES: Record<string, string> = {
   "/": "",
-  "/ranking": "통합 랭킹",
-  "/search": "검색",
-  "/recommend": "맞춤 추천",
-  "/explore": "스펙트럼 탐색",
-  "/random": "랜덤 발견",
-  "/feedback": "의견 게시판",
-  "/tags": "태그로 찾기",
-  "/calendar": "연재 캘린더",
-  "/reviews": "리뷰",
-  "/community": "커뮤니티",
-  "/community/cafes": "장르 카페",
-  "/admin/community": "커뮤니티 관리",
-  "/admin/members": "회원 관리",
-  "/library": "내 서재",
-  "/compare": "작품 비교",
-  "/insights": "트렌드 인사이트",
-  "/authors": "작가별 보기",
-  "/news": "웹툰·웹소설 소식",
-  "/about": "소개",
-  "/design": "디자인 시스템",
-  "/sitemap": "사이트맵",
-  "/guide": "랭킹 산정 방식",
-  "/settings": "설정",
-  "/admin": "관리자 콘솔",
-  "/terms": "이용약관",
-  "/privacy": "개인정보처리방침",
-  "/copyright": "저작권·콘텐츠 안내",
-  "/contact": "광고·제휴 문의",
-  "/support": "문의",
-  "/create": "창작 게시판",
-  "/studio": "Studio",
-  "/me": "내 정보",
-  "/fortune": "캐릭터 운세",
-  "/play": "놀이터",
+  "/ranking": "route.ranking",
+  "/search": "route.search",
+  "/recommend": "route.recommend",
+  "/explore": "route.explore",
+  "/random": "route.random",
+  "/feedback": "route.feedback",
+  "/tags": "route.tags",
+  "/calendar": "route.calendar",
+  "/reviews": "route.reviews",
+  "/community": "route.community",
+  "/community/cafes": "route.community_cafes",
+  "/admin/community": "route.adminCommunity",
+  "/admin/members": "route.adminMembers",
+  "/library": "route.library",
+  "/compare": "route.compare",
+  "/insights": "route.insights",
+  "/authors": "route.authors",
+  "/news": "route.news",
+  "/about": "route.about",
+  "/design": "route.design",
+  "/sitemap": "route.sitemap",
+  "/guide": "route.guide",
+  "/settings": "route.settings",
+  "/admin": "route.admin",
+  "/terms": "route.terms",
+  "/privacy": "route.privacy",
+  "/copyright": "route.copyright",
+  "/contact": "route.contact",
+  "/support": "route.support",
+  "/create": "route.create",
+  "/studio": "route.studio",
+  "/me": "route.me",
+  "/fortune": "route.fortune",
+  "/play": "route.play",
 };
 
 function useRouteTitle(pathname: string) {
+  const t = useT();
   useEffect(() => {
     if (pathname.startsWith("/title/")) return; // 작품 상세는 페이지가 직접 설정
     if (pathname.startsWith("/create/")) return; // 창작물 상세는 페이지가 직접 설정
@@ -54,12 +56,19 @@ function useRouteTitle(pathname: string) {
     if (pathname.startsWith("/community/cafes/")) return; // 카페 상세는 페이지가 직접 설정
     if (pathname.startsWith("/community/post/")) return; // 토론 스레드는 페이지가 직접 설정
     let title: string | undefined;
-    if (pathname in STATIC_TITLES) title = STATIC_TITLES[pathname];
+    if (pathname in STATIC_TITLES) {
+      const titleKey = STATIC_TITLES[pathname];
+      title = titleKey ? t(titleKey) : "";
+    }
     else if (pathname.startsWith("/author/")) title = decodeURIComponent(pathname.slice(8));
-    else if (pathname.startsWith("/pencafe/")) title = `${decodeURIComponent(pathname.slice(9))} 펜카페`;
-    else if (pathname.startsWith("/community/")) title = "커뮤니티";
-    document.title = title ? `${title} · 툰스펙트럼` : "툰스펙트럼";
-  }, [pathname]);
+    else if (pathname.startsWith("/pencafe/"))
+      title = `${decodeURIComponent(pathname.slice(9))} ${t("route.pencafeSuffix")}`;
+    else if (pathname.startsWith("/community/")) title = t("route.community");
+    else if (pathname.startsWith("/admin/")) title = t("route.admin");
+    else if (pathname.startsWith("/create/")) title = t("route.create");
+    else if (pathname.startsWith("/me")) title = t("route.me");
+    document.title = title ? `${title} · ${t("app.name")}` : t("app.name");
+  }, [pathname, t]);
 }
 
 // 라우트별 코드 분할 — 404만 eager, 나머지는 lazy로 초기 번들에서 분리.
@@ -177,10 +186,11 @@ const NotFoundPage = lazyRetry(
 // 페이지의 대략적 골격(헤더 + 카드 그리드)을 미리 그려 레이아웃 점프와 빈 화면 깜빡임을 줄인다.
 // 스피너 금지(DESIGN.md), prefers-reduced-motion 전역 가드를 그대로 따른다.
 function RouteFallback() {
+  const t = useT();
   return (
     <LoadingState
       variant="cards"
-      label="불러오는 중"
+      label={t("common.loading")}
       className="mx-auto max-w-[1180px] px-4 py-10 sm:px-6"
     />
   );

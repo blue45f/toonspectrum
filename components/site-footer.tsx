@@ -3,58 +3,62 @@ import { BUSINESS_INFO } from "@toonspectrum/core";
 import { ToonSpectrumMark } from "./visual-marks";
 
 import { spectrumGradient } from "@/lib/genre-color";
+import { useT } from "@/lib/i18n";
 import Link from "@/src/compat/router-link";
 
 // 약관·개인정보처리방침은 내부 페이지(/terms·/privacy)가 TermsDesk 게시 정본을 렌더한다.
 // 문의는 내부 /support(desk-platform 공개 게시판)로 통합 — 외부 지원 보드 링크는 제거했다.
 
-const COLS: { title: string; links: { label: string; href: string }[] }[] = [
+const COLS: { titleKey: string; links: { key: string; href: string }[] }[] = [
   {
-    title: "탐색",
+    titleKey: "footer.section.browse",
     links: [
-      { label: "통합 검색", href: "/search" },
-      { label: "통합 랭킹", href: "/ranking" },
-      { label: "연재 캘린더", href: "/calendar" },
-      { label: "맞춤 추천", href: "/recommend" },
-      { label: "장르 스펙트럼", href: "/explore" },
-      { label: "태그로 찾기", href: "/tags" },
+      { key: "footer.link.search", href: "/search" },
+      { key: "footer.link.ranking", href: "/ranking" },
+      { key: "footer.link.calendar", href: "/calendar" },
+      { key: "footer.link.recommend", href: "/recommend" },
+      { key: "footer.link.explore", href: "/explore" },
+      { key: "footer.link.tags", href: "/tags" },
     ],
   },
   {
-    title: "커뮤니티",
+    titleKey: "footer.section.community",
     links: [
-      { label: "커뮤니티 허브", href: "/community" },
-      { label: "장르 카페", href: "/community/cafes" },
-      { label: "리뷰 피드", href: "/reviews" },
-      { label: "작품 비교", href: "/compare" },
-      { label: "트렌드 대시보드", href: "/insights" },
-      { label: "의견 게시판", href: "/feedback" },
-      { label: "내 서재", href: "/library" },
-      { label: "취향 분석", href: "/library?tab=taste" },
+      { key: "footer.link.community", href: "/community" },
+      { key: "footer.link.pencafes", href: "/community/cafes" },
+      { key: "footer.link.reviews", href: "/reviews" },
+      { key: "footer.link.compare", href: "/compare" },
+      { key: "footer.link.dashboard", href: "/insights" },
+      { key: "footer.link.feedback", href: "/feedback" },
+      { key: "footer.link.library", href: "/library" },
+      { key: "footer.link.taste", href: "/library?tab=taste" },
     ],
   },
   {
-    title: "툰스펙트럼",
+    titleKey: "footer.section.brand",
     links: [
-      { label: "웹툰·웹소설 소식", href: "/news" },
-      { label: "서비스 소개", href: "/about" },
-      { label: "랭킹 산정 방식", href: "/guide" },
-      { label: "사이트맵", href: "/sitemap" },
-      { label: "설정", href: "/settings" },
+      { key: "footer.link.news", href: "/news" },
+      { key: "footer.link.about", href: "/about" },
+      { key: "footer.link.guide", href: "/guide" },
+      { key: "footer.link.sitemap", href: "/sitemap" },
+      { key: "footer.link.settings", href: "/settings" },
     ],
   },
   {
-    title: "이용 안내",
+    titleKey: "footer.section.help",
     links: [
-      { label: "문의", href: "/support" },
-      { label: "이용약관", href: "/terms" },
-      { label: "개인정보처리방침", href: "/privacy" },
-      { label: "저작권·콘텐츠 안내", href: "/copyright" },
+      { key: "footer.link.support", href: "/support" },
+      { key: "footer.link.terms", href: "/terms" },
+      { key: "footer.link.privacy", href: "/privacy" },
+      { key: "footer.link.copyright", href: "/copyright" },
     ],
   },
 ];
 
 export function SiteFooter() {
+  const t = useT();
+  const year = new Date().getFullYear();
+
   return (
     <footer
       data-site-chrome="footer"
@@ -71,24 +75,21 @@ export function SiteFooter() {
           <Link href="/" className="group inline-flex items-center gap-2.5">
             <ToonSpectrumMark className="size-7 rounded-[0.55rem] transition-transform duration-200 ease-out-expo group-hover:-rotate-6 group-hover:scale-105" />
             <span className="font-display text-lg font-bold transition-colors group-hover:text-accent">
-              툰스펙트럼
+              {t("footer.brand")}
             </span>
           </Link>
-          <p className="mt-4 text-sm leading-relaxed text-fg-2">
-            네이버 웹툰·시리즈와 카카오웹툰을 가로지르는 웹툰·웹소설 통합 인덱스. 무엇을, 어디서,
-            왜 봐야 하는지 한 곳에서 답합니다.
-          </p>
+          <p className="mt-4 text-sm leading-relaxed text-fg-2">{t("footer.description.primary")}</p>
           <p className="mt-4 text-xs leading-relaxed text-fg-3">
-            작품 메타데이터·표지는 <span className="text-fg-2">여러 국내 웹툰·웹소설 플랫폼의 공개 카탈로그에서
-            수집한 실데이터</span>입니다. 네이버 웹툰의 별점은 실수집값이며, 조회·관심수는 네이버가 공개 집계를
-            비공개로 전환해 추정값(≈)으로 표기합니다. 그 외 플랫폼의 평점·조회·평가 수·완독률 등 일부 지표는
-            추정값(≈)으로 표기합니다.
+            <span className="text-fg-2">{t("footer.description.secondary")}</span>
           </p>
         </div>
 
         {COLS.map((col) => (
-          <nav key={col.title} className="flex flex-col gap-3 rounded-xl border border-line/60 bg-card/20 p-4">
-            <h4 className="eyebrow text-fg-3">{col.title}</h4>
+          <nav
+            key={col.titleKey}
+            className="flex flex-col gap-3 rounded-xl border border-line/60 bg-card/20 p-4"
+          >
+            <h4 className="eyebrow text-fg-3">{t(col.titleKey)}</h4>
             {col.links.map((l) => (
               <Link
                 key={l.href}
@@ -101,7 +102,7 @@ export function SiteFooter() {
                   className="h-px w-0 origin-left rounded-full bg-accent/70 transition-all duration-200 ease-out-expo group-hover/link:w-3"
                 />
                 <span className="transition-transform duration-200 ease-out-expo group-hover/link:translate-x-0.5">
-                  {l.label}
+                  {t(l.key)}
                 </span>
               </Link>
             ))}
@@ -113,31 +114,48 @@ export function SiteFooter() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4 leading-relaxed">
             {/* 사업자 표기 = @toonspectrum/core BUSINESS_INFO 단일 소스(토스 InfoPage와 공유) */}
             <div>
-              <p className="font-semibold text-fg-2">상호: {BUSINESS_INFO.name}</p>
-              <p>대표자: {BUSINESS_INFO.ceo} | 개인정보보호책임자: {BUSINESS_INFO.privacyOfficer}</p>
+              <p className="font-semibold text-fg-2">
+                {t("footer.business.company")}: {BUSINESS_INFO.name}
+              </p>
+              <p>
+                {t("footer.business.representative")}: {BUSINESS_INFO.ceo} |{" "}
+                {t("footer.business.privacyOfficer")}: {BUSINESS_INFO.privacyOfficer}
+              </p>
             </div>
             <div>
-              <p>사업자등록번호: {BUSINESS_INFO.registrationNumber}</p>
-              <p>주소: {BUSINESS_INFO.address}</p>
+              <p>
+                {t("footer.business.registrationNumber")}: {BUSINESS_INFO.registrationNumber}
+              </p>
+              <p>
+                {t("footer.business.address")}: {BUSINESS_INFO.address}
+              </p>
             </div>
             <div>
-              <p>이메일: {BUSINESS_INFO.email}</p>
-              <p>전화번호: {BUSINESS_INFO.phone}</p>
+              <p>
+                {t("footer.business.email")}: {BUSINESS_INFO.email}
+              </p>
+              <p>
+                {t("footer.business.phone")}: {BUSINESS_INFO.phone}
+              </p>
             </div>
             <div>
-              <p>호스팅 서비스: {BUSINESS_INFO.hosting}</p>
-              <p>플랫폼 형태: {BUSINESS_INFO.serviceType}</p>
+              <p>
+                {t("footer.business.hosting")}: {BUSINESS_INFO.hosting}
+              </p>
+              <p>
+                {t("footer.business.serviceType")}: {BUSINESS_INFO.serviceType}
+              </p>
             </div>
           </div>
           <div className="flex flex-col gap-2 border-t border-line/40 pt-4 sm:flex-row sm:items-center sm:justify-between">
-            <span>© {new Date().getFullYear()} 툰스펙트럼 (Beta). All rights reserved.</span>
+            <span>{t("footer.copyrightLine").replace("{year}", String(year))}</span>
             <span className="inline-flex items-center gap-2">
               <span
                 aria-hidden
                 className="h-1.5 w-7 rounded-full"
                 style={{ background: spectrumGradient(["로맨스", "판타지", "액션", "SF"], 90) }}
               />
-              <span className="eyebrow text-[0.6rem] text-fg-3">Type &amp; Spectrum</span>
+              <span className="eyebrow text-[0.6rem] text-fg-3">{t("footer.logoTag")}</span>
             </span>
           </div>
         </div>

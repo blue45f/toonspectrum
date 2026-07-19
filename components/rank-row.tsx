@@ -9,6 +9,7 @@ import { GenreChip } from "./ui/chip";
 import { RatingInline } from "./ui/stars";
 
 import { statsAreEstimated } from "@/lib/estimate";
+import { useT } from "@/lib/i18n";
 import { type RankedTitle, explainScore, type RankAxis } from "@/lib/ranking";
 import { TYPE_LABEL, STATUS_LABEL } from "@/lib/taxonomy";
 import { cn, formatCount } from "@/lib/utils";
@@ -107,6 +108,7 @@ export function RankRow({
   const top3 = rank <= 3;
   const m = metric?.(title);
   const live = ranked.evidence?.liveMatched ? ranked.evidence : null;
+  const t = useT();
   // 추정 작품의 비-별점 지표(조회·관심·완독률·몰입·트렌드)엔 ≈ 표시.
   // 별점 축(rating·hidden)은 RatingInline이 이미 ≈를 붙이므로 중복 표기를 피한다.
   const estimated = statsAreEstimated(title);
@@ -130,7 +132,7 @@ export function RankRow({
         <button
           type="button"
           onClick={() => setExpanded(!expanded)}
-          title="순위 산식 및 상세 점수 보기"
+          title={t("ranking.detailTitle")}
           className={cn(
             "relative flex min-h-11 flex-col items-center justify-center rounded-xl border px-1.5 py-1 transition-all cursor-pointer hover:border-accent hover:bg-accent-soft/30",
             top3 ? "border-accent/45 bg-accent/10 text-accent" : "border-line/70 bg-canvas/40 text-fg-3",
@@ -195,7 +197,7 @@ export function RankRow({
           <button
             type="button"
             onClick={() => setExpanded(!expanded)}
-            title="순위 세부 기여도 보기"
+            title={t("ranking.detailTitle")}
             className={cn(
               "flex items-center gap-2 rounded-md border text-right px-2 py-1 transition-all cursor-pointer hover:border-accent hover:bg-accent-soft/20",
               expanded ? "border-accent/40 bg-accent-soft/20" : "border-line/70 bg-canvas/30"
@@ -213,11 +215,11 @@ export function RankRow({
                   formatCount(title.stats.views)
                 )}
               </div>
-              <div className="text-[0.62rem] text-fg-3">{m ? m.label : "조회"}</div>
+              <div className="text-[0.62rem] text-fg-3">{m ? m.label : t("ranking.metric.views")}</div>
             </div>
             <div className="flex flex-col items-center justify-center border-l border-line/50 pl-2 text-fg-3 hover:text-accent">
               <HelpCircle size={13} className={cn("transition-transform duration-200", expanded && "rotate-180 text-accent")} />
-              <span className="text-[0.55rem] font-semibold mt-0.5">왜?</span>
+              <span className="text-[0.55rem] font-semibold mt-0.5">{t("ranking.why")}</span>
             </div>
           </button>
         </div>
@@ -230,10 +232,10 @@ export function RankRow({
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-1 font-semibold text-accent text-[0.7rem] uppercase tracking-wider">
                 <Sparkles size={11} />
-                투명 산식 기여도 분해 (why this rank)
+                {t("ranking.breakdownTitle")}
               </span>
               <span className="font-mono text-[10px] text-fg-3">
-                종합 가중 지수: <strong className="text-fg font-semibold">{ranked.score.toFixed(2)}</strong>
+                {t("ranking.totalScore")}: <strong className="text-fg font-semibold">{ranked.score.toFixed(2)}</strong>
               </span>
             </div>
             
@@ -247,7 +249,7 @@ export function RankRow({
             </div>
             
             <p className="text-[0.65rem] text-fg-3 leading-relaxed">
-              * ToonSpectrum의 통합 랭킹 점수는 플랫폼 고유 지표(인기 백분위 등)에 도달 규모 가중치를 적용하고 데이터 신뢰도(추정값 보정 인자)를 곱하여 최종 산출합니다.
+              {t("ranking.breakdownDescription")}
             </p>
           </div>
         </div>

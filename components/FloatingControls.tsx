@@ -3,7 +3,7 @@ import { Languages, Moon, Settings2, Sun, Volume2, VolumeX, X } from "lucide-rea
 import { useEffect, useRef, useState } from "react";
 
 import { cx } from "@/lib/cx";
-import { useI18n, type Lang } from "@/lib/i18n";
+import { getLanguageOptions, useI18n, useT } from "@/lib/i18n";
 import { useTheme } from "@/lib/theme";
 
 /**
@@ -25,7 +25,7 @@ export interface FloatingControlsProps {
   showBgm?: boolean;
   /** 다크/주간 테마 토글 노출. 기본 true(토스는 false). */
   showTheme?: boolean;
-  /** 언어(KO/EN) 토글 노출. 기본 true(토스는 false). */
+  /** 언어 셀렉트 노출. 기본 true(토스는 false). */
   showLang?: boolean;
   /**
    * 고정 위치 프리셋.
@@ -46,11 +46,6 @@ export interface FloatingControlsProps {
 
 const PILL =
   "grid size-11 place-items-center rounded-full border bg-panel/95 shadow-lg shadow-[oklch(0.1_0.02_70/0.35)] backdrop-blur transition-colors";
-
-const LANG_OPTS: { id: Lang; label: string }[] = [
-  { id: "ko", label: "KO" },
-  { id: "en", label: "EN" },
-];
 
 const PLACEMENT_CLASS: Record<NonNullable<FloatingControlsProps["placement"]>, string> = {
   // 모바일: 우하단(하단 탭바 ~56px + safe-area 위로 띄움). 데스크톱: 좌하단.
@@ -86,8 +81,10 @@ export function FloatingControls({
   void _showBgm;
   const theme = useTheme((s) => s.theme);
   const toggleTheme = useTheme((s) => s.toggle);
+  const t = useT();
   const lang = useI18n((s) => s.lang);
   const setLang = useI18n((s) => s.setLang);
+  const langOptions = getLanguageOptions(lang);
   const fx = useFx();
   const soundOn = fx.audio.sfxEnabled && !fx.audio.muted;
 
@@ -150,9 +147,9 @@ export function FloatingControls({
         <button
           type="button"
           onClick={toggleSound}
-          aria-label={soundOn ? "효과음 끄기" : "효과음 켜기"}
+          aria-label={soundOn ? t("control.sound.disable") : t("control.sound.enable")}
           aria-pressed={soundOn}
-          title={soundOn ? "효과음 켜짐" : "효과음 켜기"}
+          title={soundOn ? t("control.sound.disable") : t("control.sound.enable")}
           data-no-sfx
           className={cx(
             PILL,
@@ -168,37 +165,36 @@ export function FloatingControls({
         <button
           type="button"
           onClick={toggleTheme}
-          aria-label={isDark ? "주간 모드로 전환" : "야간 모드로 전환"}
+          aria-label={isDark ? t("control.theme.light") : t("control.theme.dark")}
           aria-pressed={isDark}
-          title={isDark ? "주간 모드" : "야간 모드"}
+          title={isDark ? t("control.theme.light") : t("control.theme.dark")}
           className={cx(PILL, "border-line text-fg-2 hover:text-fg")}
         >
           {isDark ? <Sun size={16} /> : <Moon size={16} />}
         </button>
       )}
 
-      {/* KO/EN 언어 토글 — 토스에선 showLang={false} */}
+      {/* 언어 선택 — 다국어 옵션을 전체 Google Play locale 목록에서 제공합니다. */}
       {showLang && (
         <div
           className="inline-flex h-11 items-center gap-1 rounded-full border border-line bg-panel/95 p-0.5 shadow-lg shadow-[oklch(0.1_0.02_70/0.35)] backdrop-blur"
           role="group"
-          aria-label="언어 선택 / Language"
+          aria-label={t("control.language.label")}
         >
           <Languages size={13} className="ml-1.5 text-fg-3" aria-hidden />
-          {LANG_OPTS.map((o) => (
-            <button
-              key={o.id}
-              type="button"
-              onClick={() => setLang(o.id)}
-              aria-pressed={lang === o.id}
-              className={cx(
-                "rounded-full px-2.5 py-1.5 text-xs font-semibold transition-colors",
-                lang === o.id ? "bg-accent text-on-accent" : "text-fg-2 hover:text-fg"
-              )}
-            >
-              {o.label}
-            </button>
-          ))}
+          <span className="sr-only">{t("control.language.label")}</span>
+          <select
+            aria-label={t("control.language.label")}
+            value={lang}
+            onChange={(event) => setLang(event.target.value)}
+            className="min-w-[10rem] max-w-[14rem] rounded-full border border-line/0 bg-transparent py-2 pl-2 pr-5 text-xs font-semibold text-fg outline-none transition focus-visible:ring-2 focus-visible:ring-accent/35 sm:max-w-[16rem]"
+          >
+            {langOptions.map((o) => (
+              <option key={o.code} value={o.code}>
+                {o.label}
+              </option>
+            ))}
+          </select>
         </div>
       )}
     </>
@@ -238,8 +234,8 @@ export function FloatingControls({
             type="button"
             onClick={() => setOpen((v) => !v)}
             aria-expanded={open}
-            aria-label={open ? "설정 닫기" : "사운드·테마·언어 설정"}
-            title="설정"
+            aria-label={open ? t("control.settings.close") : t("control.cluster.settings")}
+            title={open ? t("control.settings.close") : t("control.cluster.open")}
             className={cx(
               PILL,
               "size-12",

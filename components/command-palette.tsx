@@ -10,6 +10,7 @@ import type { Title } from "@/lib/types";
 
 import { statsAreEstimated } from "@/lib/estimate";
 import { genreTextColor } from "@/lib/genre-color";
+import { useT } from "@/lib/i18n";
 import { useApp } from "@/lib/store";
 import { TYPE_LABEL } from "@/lib/taxonomy";
 import { useRouter } from "@/src/compat/navigation";
@@ -19,16 +20,56 @@ import { fetchSearchResponse, isSearchAbortError } from "@/src/infrastructure/se
 
 
 const QUICK = [
-  { label: "통합 검색", href: "/search", icon: Search, hint: "작품·작가·태그" },
-  { label: "통합 랭킹", href: "/ranking", icon: TrendingUp, hint: "6개 축 랭킹" },
-  { label: "맞춤 추천", href: "/recommend", icon: Sparkles, hint: "취향 기반 추천" },
-  { label: "캐릭터 운세", href: "/fortune", icon: Moon, hint: "사주·타로·궁합" },
-  { label: "랜덤 작품", href: "/random", icon: Shuffle, hint: "무작위로 한 편" },
-  { label: "연재 캘린더", href: "/calendar", icon: CalendarDays, hint: "요일별 연재" },
-  { label: "작품 비교", href: "/compare", icon: Swords, hint: "두 작품 맞대보기" },
-  { label: "탐색 / 장르", href: "/explore", icon: Compass, hint: "스펙트럼 탐색" },
-  { label: "트렌드 대시보드", href: "/insights", icon: BarChart3, hint: "데이터로 보는 시장" },
-  { label: "내 서재", href: "/library", icon: Library, hint: "관심·평점·취향" },
+  { labelKey: "command.palette.quick.search", href: "/search", icon: Search, hintKey: "command.palette.quick.searchHint" },
+  {
+    labelKey: "command.palette.quick.ranking",
+    href: "/ranking",
+    icon: TrendingUp,
+    hintKey: "command.palette.quick.rankingHint",
+  },
+  {
+    labelKey: "command.palette.quick.recommend",
+    href: "/recommend",
+    icon: Sparkles,
+    hintKey: "command.palette.quick.recommendHint",
+  },
+  {
+    labelKey: "command.palette.quick.fortune",
+    href: "/fortune",
+    icon: Moon,
+    hintKey: "command.palette.quick.fortuneHint",
+  },
+  { labelKey: "command.palette.quick.random", href: "/random", icon: Shuffle, hintKey: "command.palette.quick.randomHint" },
+  {
+    labelKey: "command.palette.quick.calendar",
+    href: "/calendar",
+    icon: CalendarDays,
+    hintKey: "command.palette.quick.calendarHint",
+  },
+  {
+    labelKey: "command.palette.quick.compare",
+    href: "/compare",
+    icon: Swords,
+    hintKey: "command.palette.quick.compareHint",
+  },
+  {
+    labelKey: "command.palette.quick.explore",
+    href: "/explore",
+    icon: Compass,
+    hintKey: "command.palette.quick.exploreHint",
+  },
+  {
+    labelKey: "command.palette.quick.insights",
+    href: "/insights",
+    icon: BarChart3,
+    hintKey: "command.palette.quick.insightsHint",
+  },
+  {
+    labelKey: "command.palette.quick.library",
+    href: "/library",
+    icon: Library,
+    hintKey: "command.palette.quick.libraryHint",
+  },
 ];
 
 export function CommandPalette({
@@ -46,6 +87,7 @@ export function CommandPalette({
   const recentlyViewed = useApp((s) => s.recentlyViewed);
   const recentKey = recentlyViewed.slice(0, 5).join(",");
   const router = useRouter();
+  const t = useT();
   const trimmedQ = q.trim();
   const debouncedTrimmedQ = debouncedQ.trim();
   const searchSettling = Boolean(trimmedQ) && trimmedQ !== debouncedTrimmedQ;
@@ -133,7 +175,7 @@ export function CommandPalette({
   return (
     <div className="fixed inset-0 z-[100] flex items-start justify-center px-4 pt-[12vh]">
       <button
-        aria-label="닫기"
+        aria-label={t("common.close")}
         onClick={() => {
           playSfx("close");
           onOpenChange(false);
@@ -144,7 +186,7 @@ export function CommandPalette({
       <Command
         shouldFilter={false}
         loop
-        label="통합 검색"
+        label={t("command.palette.label")}
         className="pf-popup-open relative w-full max-w-2xl overflow-hidden rounded-2xl border border-line-strong bg-panel shadow-2xl shadow-[oklch(0.1_0.02_70/0.5)]"
         style={{ animation: "fade-up 0.22s var(--ease-out-expo)" }}
       >
@@ -157,7 +199,7 @@ export function CommandPalette({
               setResults([]);
               if (!value.trim()) setSearchLoading(false);
             }}
-            placeholder="작품, 작가, 태그를 검색하세요…"
+            placeholder={t("command.palette.placeholder")}
             className="h-14 flex-1 bg-transparent text-[0.95rem] text-fg outline-none placeholder:text-fg-3"
           />
           <kbd className="hidden rounded-md border border-line bg-card px-1.5 py-0.5 text-[0.65rem] text-fg-3 sm:block">
@@ -168,25 +210,25 @@ export function CommandPalette({
         <Command.List className="max-h-[52vh] overflow-y-auto overscroll-contain p-2">
           {trimmedQ && isSearching && (
             <div className="px-3 py-10 text-center text-sm text-fg-3" role="status" aria-live="polite">
-              검색 중…
+              {t("common.loading.search")}
             </div>
           )}
 
           {trimmedQ && !isSearching && results.length === 0 && (
             <div className="px-3 py-10 text-center text-sm text-fg-3">
-              <p>{`'${q}'`} 검색 결과가 없어요.</p>
+              <p>{t("common.notFoundWithQuery").replace("{query}", `'${q}'`)}</p>
               <button
                 onClick={() => go(`/search?q=${encodeURIComponent(q)}`)}
                 className="mt-2 text-accent hover:underline"
               >
-                전체 검색에서 다시 찾기 →
+                {t("common.openSearch")}
               </button>
             </div>
           )}
 
           {!trimmedQ && recent.length > 0 && (
             <Command.Group
-              heading="최근 본 작품"
+              heading={t("command.palette.group.recent")}
               className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:eyebrow [&_[cmdk-group-heading]]:text-fg-3"
             >
               {recent.map((t) => (
@@ -216,19 +258,19 @@ export function CommandPalette({
 
           {!trimmedQ && (
             <Command.Group
-              heading="바로가기"
+              heading={t("command.palette.group.shortcuts")}
               className="px-1 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:eyebrow [&_[cmdk-group-heading]]:text-fg-3"
             >
               {QUICK.map((item) => (
                 <Command.Item
                   key={item.href}
-                  value={item.label}
+                  value={item.labelKey}
                   onSelect={() => go(item.href)}
                   className="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2.5 text-sm text-fg-2 transition-colors data-[selected=true]:bg-raised data-[selected=true]:text-fg"
                 >
                   <item.icon size={16} className="text-fg-3" />
-                  <span className="font-medium text-fg">{item.label}</span>
-                  <span className="text-xs text-fg-3">{item.hint}</span>
+                  <span className="font-medium text-fg">{t(item.labelKey)}</span>
+                  <span className="text-xs text-fg-3">{t(item.hintKey)}</span>
                 </Command.Item>
               ))}
             </Command.Group>
@@ -236,7 +278,7 @@ export function CommandPalette({
 
           {results.length > 0 && (
             <Command.Group
-              heading="작품"
+              heading={t("command.palette.group.results")}
               className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:eyebrow [&_[cmdk-group-heading]]:text-fg-3"
             >
               {results.map((t) => (
@@ -268,7 +310,7 @@ export function CommandPalette({
                 onSelect={() => go(`/search?q=${encodeURIComponent(q)}`)}
                 className="mt-1 flex cursor-pointer items-center justify-center gap-1.5 rounded-lg px-2.5 py-2.5 text-sm font-medium text-accent transition-colors data-[selected=true]:bg-accent-soft"
               >
-                {`'${q}'`} 전체 결과 보기 →
+                {`'${q}'`} {t("common.openSearch")}
               </Command.Item>
             </Command.Group>
           )}

@@ -1,6 +1,7 @@
 import { ArrowUp } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 const SHOW_AFTER_PX = 640; // 한 화면 남짓 내려갔을 때부터 노출(짧은 페이지에선 안 뜸)
@@ -10,6 +11,7 @@ const SHOW_AFTER_PX = 640; // 한 화면 남짓 내려갔을 때부터 노출(�
 // 스크롤 동작은 prefers-reduced-motion 을 존중(감소 선호 시 즉시 점프).
 export function BackToTop() {
   const [visible, setVisible] = useState(false);
+  const t = useT();
 
   useEffect(() => {
     const onScroll = () => setVisible(globalThis.scrollY > SHOW_AFTER_PX);
@@ -31,7 +33,7 @@ export function BackToTop() {
     <button
       type="button"
       onClick={onClick}
-      aria-label="맨 위로 이동"
+      aria-label={t("common.backToTop")}
       tabIndex={visible ? 0 : -1}
       aria-hidden={!visible}
       className={cn(

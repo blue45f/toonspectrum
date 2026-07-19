@@ -34,9 +34,9 @@ describe("AdSlot", () => {
 
     const html = renderToStaticMarkup(<AdSlot label="광고 문의" />);
 
-    expect(html).toContain("AD · 스폰서");
+    expect(html).toContain("AD · 광고");
     expect(html).toContain("광고 문의");
-    expect(html).toContain('aria-label="스폰서 광고 지면"');
+    expect(html).toContain('aria-label="광고 자리표시자"');
   });
 
   it("defers the sponsored network rail to the client — no markup leaks during SSR", () => {

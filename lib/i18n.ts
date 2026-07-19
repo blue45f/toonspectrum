@@ -1308,7 +1308,10 @@ function getCollator(locale: string): Intl.Collator {
 }
 
 function detectBrowserLocale(): string {
-  if (typeof navigator === "undefined") return FALLBACK_LANG;
+  // Node 24+ exposes navigator.language even during SSR. A navigator-only guard therefore makes
+  // server markup depend on the host machine's locale and can disagree with the browser during
+  // hydration. Only consult the browser locale when an actual Window is present.
+  if (typeof window === "undefined" || typeof navigator === "undefined") return FALLBACK_LANG;
   return normalizeLocaleCode(navigator.language) || FALLBACK_LANG;
 }
 
@@ -1584,6 +1587,25 @@ function resolveTranslation(
   return DICT[FALLBACK_LANG][key] ?? key;
 }
 
+type TranslationResolver = (key: string) => string;
+
+// A translator is part of effect dependencies in data-fetching and OAuth surfaces. Returning a
+// fresh closure from useT() on every render would restart those effects (and can create a render /
+// request loop when an effect updates local state). Cache one resolver per normalized locale so
+// callers get referential stability without coupling the hook to React memoization. Runtime bundle
+// updates remain visible because resolveTranslation reads the bundle map at call time.
+const translationResolvers = new Map<string, TranslationResolver>();
+
+function getTranslationResolver(lang: string): TranslationResolver {
+  const normalized = normalizeLocaleCode(lang) || FALLBACK_LANG;
+  const cached = translationResolvers.get(normalized);
+  if (cached) return cached;
+
+  const resolver: TranslationResolver = (key) => resolveTranslation(normalized, key);
+  translationResolvers.set(normalized, resolver);
+  return resolver;
+}
+
 function applyHtmlLang(lang: string) {
   if (typeof document !== "undefined") document.documentElement.lang = normalizeLocaleCode(lang) || FALLBACK_LANG;
 }
@@ -1621,9 +1643,7 @@ export function useT(): (key: string) => string {
   useEffect(() => {
     void loadRuntimeTranslationBundle(lang);
   }, [lang]);
-  return (key: string) => {
-    return resolveTranslation(lang, key);
-  };
+  return getTranslationResolver(lang);
 }
 
 export {

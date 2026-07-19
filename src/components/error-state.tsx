@@ -1,6 +1,7 @@
 import { AlertTriangle, RefreshCw } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button-utils";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 // 데이터 로드 실패 시 페이지들이 공통으로 쓰는 에러 안내 + 재시도 블록.
@@ -16,6 +17,8 @@ export function ErrorState({
   onRetry?: () => void;
   className?: string;
 }) {
+  const t = useT();
+
   return (
     <div
       className={cn(
@@ -27,7 +30,7 @@ export function ErrorState({
       <AlertTriangle size={24} className="mx-auto mb-3 text-bad" />
       <p className="text-sm font-medium text-fg">{title}</p>
       {/* 틴트된 에러 표면 위에서 본문 대비 확보 — fg-3은 이 배경에서 흐릿함 → fg-2 */}
-      <p className="mt-1 text-sm text-fg-2">{message ?? "응답 데이터가 비어 있습니다."}</p>
+      <p className="mt-1 text-sm text-fg-2">{message ?? t("common.loading.empty")}</p>
       {onRetry && (
         <button
           type="button"
@@ -35,7 +38,7 @@ export function ErrorState({
           className={buttonClass({ size: "sm", variant: "outline", className: "mt-4 gap-1.5" })}
         >
           <RefreshCw size={14} />
-          다시 시도
+          {t("common.retry.short")}
         </button>
       )}
     </div>

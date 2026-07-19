@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 
 import { buttonClass } from "@/components/ui/button-utils";
 import { resolveSignupAvatarImage } from "@/lib/avatar";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 // 클라이언트에서 이미지를 정사각 webp dataURL 로 다운스케일. (서버 PATCH 부하/한도 보호)
@@ -20,13 +21,13 @@ function loadImage(file: File): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
-    img.onload = () => {
+  img.onload = () => {
       URL.revokeObjectURL(url);
       resolve(img);
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
-      reject(new Error("이미지를 읽지 못했어요."));
+      reject(new Error("Unable to read image file."));
     };
     img.src = url;
   });
@@ -44,7 +45,7 @@ async function fileToSquareWebp(file: File): Promise<string> {
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("이미지를 변환할 수 없어요.");
+  if (!ctx) throw new Error("Unable to render image.");
   ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size);
 
   let quality = 0.85;
@@ -77,6 +78,7 @@ export function AvatarUploader({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  const t = useT();
 
   const preview = resolveSignupAvatarImage(value) ?? (value && /^https?:\/\//.test(value) ? value : null);
 
@@ -85,7 +87,7 @@ export function AvatarUploader({
   const handleFile = async (file: File | undefined) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      onError?.("이미지 파일만 올릴 수 있어요.");
+      onError?.(t("avatar.error.invalidType"));
       return;
     }
     setBusy(true);
@@ -93,7 +95,7 @@ export function AvatarUploader({
       const dataUrl = await fileToSquareWebp(file);
       onChange(dataUrl);
     } catch (err) {
-      onError?.(err instanceof Error ? err.message : "이미지를 처리하지 못했어요.");
+      onError?.(err instanceof Error ? t("avatar.error.processFailed") : t("avatar.error.processFailed"));
     } finally {
       setBusy(false);
     }
@@ -105,7 +107,7 @@ export function AvatarUploader({
         type="button"
         onClick={pick}
         disabled={disabled || busy}
-        aria-label="아바타 이미지 변경"
+        aria-label={t("avatar.changeAria")}
         className={cn(
           "group relative grid size-20 shrink-0 place-items-center overflow-hidden rounded-2xl border border-line bg-accent text-2xl font-bold text-on-accent transition-transform active:scale-95",
           (disabled || busy) && "opacity-60"
@@ -136,7 +138,7 @@ export function AvatarUploader({
             className={buttonClass({ size: "sm", variant: "outline", className: "gap-1.5" })}
           >
             <Camera size={14} />
-            {busy ? "처리 중…" : "이미지 선택"}
+            {busy ? t("avatar.processing") : t("avatar.select")}
           </button>
           {preview && (
             <button
@@ -146,12 +148,12 @@ export function AvatarUploader({
               className={buttonClass({ size: "sm", variant: "ghost", className: "gap-1.5 text-fg-3 hover:text-bad" })}
             >
               <Trash2 size={14} />
-              제거
+              {t("avatar.remove")}
             </button>
           )}
         </div>
         <p className="text-[0.72rem] leading-relaxed text-fg-3">
-          정사각형으로 자동 변환됩니다. (최대 256px · 약 200KB)
+          {t("avatar.uploadHint")}
         </p>
       </div>
 

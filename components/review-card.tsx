@@ -8,6 +8,7 @@ import { Stars } from "./ui/stars";
 
 import type { SeedReview, Title } from "@/lib/types";
 
+import { useT } from "@/lib/i18n";
 import { useApp, useHydrated } from "@/lib/store";
 import { cn, relativeDate } from "@/lib/utils";
 import Link from "@/src/compat/router-link";
@@ -17,6 +18,13 @@ const PROGRESS_TONE: Record<string, "good" | "accent" | "neutral" | "bad"> = {
   정주행중: "accent",
   "정주행 예정": "neutral",
   하차: "bad",
+};
+
+const PROGRESS_LABEL_KEY: Record<string, string> = {
+  완독: "review.progress.complete",
+  정주행중: "review.progress.binge",
+  "정주행 예정": "review.progress.upcoming",
+  하차: "review.progress.abandoned",
 };
 
 export function ReviewCard({
@@ -36,6 +44,7 @@ export function ReviewCard({
   const hydrated = useHydrated();
   const liked = useApp((s) => s.likedReviews[review.id]);
   const toggleLike = useApp((s) => s.toggleLikeReview);
+  const t = useT();
   const likeCount = review.likes + (hydrated && liked ? 1 : 0);
   const hideText = review.spoiler && !revealed;
   const profileHref = review.userId ? `/u/${review.userId}` : null;
@@ -73,7 +82,9 @@ export function ReviewCard({
                 <span className="truncate text-sm font-semibold text-fg">{review.author}</span>
               )}
               {review.progress && (
-                <Badge tone={PROGRESS_TONE[review.progress] ?? "neutral"}>{review.progress}</Badge>
+                <Badge tone={PROGRESS_TONE[review.progress] ?? "neutral"}>
+                  {t(PROGRESS_LABEL_KEY[review.progress] ?? "review.progress.unknown")}
+                </Badge>
               )}
             </div>
             <span className="text-xs text-fg-3">{relativeDate(review.createdAt)}</span>
@@ -110,10 +121,11 @@ export function ReviewCard({
           {hideText && (
             <button
               onClick={() => setRevealed(true)}
-              aria-label="스포일러 내용 보기"
+              aria-label={t("review.spoilerRevealLabel")}
               className="absolute inset-0 flex items-center justify-center gap-1.5 text-xs font-medium text-fg-2 hover:text-fg"
             >
-              <EyeOff size={14} /> 스포일러 — 눌러서 보기
+              <EyeOff size={14} />
+              {t("review.spoilerRevealLabel")}
             </button>
           )}
         </div>

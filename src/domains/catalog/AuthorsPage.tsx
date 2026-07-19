@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import { Container } from "@/components/section";
 import { genreTint, genreBorder, genreTextColor } from "@/lib/genre-color";
-import { useT } from "@/lib/i18n";
+import { useI18n, useT } from "@/lib/i18n";
 import { formatCount } from "@/lib/utils";
 import Link from "@/src/compat/router-link";
 import { ErrorState } from "@/src/components/error-state";
@@ -28,36 +28,39 @@ interface AuthorsResponse {
 
 export function AuthorsPage() {
   const t = useT();
+  const lang = useI18n((state) => state.lang);
+  const fallbackName = t("authors.noName");
   const { data, loading, error, reload } = useApiResource<AuthorsResponse>(
     "/api/authors",
-    "작가 목록을 불러오지 못했습니다."
+    t("authors.error")
   );
   const [q, setQ] = useState("");
   const authors = data?.authors ?? [];
   const query = q.trim().toLowerCase();
   const filtered = query ? authors.filter((a) => a.name.toLowerCase().includes(query)) : authors;
+  const formatNumber = (value: number) => new Intl.NumberFormat(lang).format(value);
+  const authorStats =
+    data &&
+    t("authors.stats")
+      .replace("{total}", formatNumber(data.total))
+      .replace("{shown}", formatNumber(authors.length));
 
   return (
     <Container size="default" className="py-10">
       <header className="mb-7">
         <p className="eyebrow flex items-center gap-1.5 text-accent">
-          <PenLine size={14} /> AUTHOR DIRECTORY
+          <PenLine size={14} /> {t("authors.eyebrow")}
           <Link
             href="/community/author"
             className="ml-1.5 normal-case tracking-normal text-fg-3 transition-colors hover:text-accent"
           >
-            · 작가 팬카페
+            · {t("authors.pencafe")}
           </Link>
         </p>
         <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">{t("authors.title")}</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-fg-2">
           {t("authors.desc")}
-          {data && (
-            <span className="text-fg-3">
-              {" "}
-              · 전체 {data.total.toLocaleString("ko-KR")}명 중 상위 {authors.length.toLocaleString("ko-KR")}명
-            </span>
-          )}
+          {authorStats ? <span className="text-fg-3">{` · ${authorStats}`}</span> : null}
         </p>
         {!loading && !error && authors.length > 0 && (
           <div className="mt-4 flex items-center gap-2 rounded-xl border border-line bg-canvas px-3.5 max-w-xs transition-colors focus-within:border-accent/60">
@@ -102,9 +105,14 @@ export function AuthorsPage() {
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="truncate font-semibold text-fg group-hover:text-accent">{a.name}</h3>
+                <h3 className="truncate font-semibold text-fg group-hover:text-accent">{a.name ?? fallbackName}</h3>
                 <p className="mt-0.5 truncate text-xs text-fg-3">
-                  {a.workCount.toLocaleString("ko-KR")}작 · {formatCount(a.totalViews)} 뷰
+                  {formatNumber(a.workCount)}
+                  {t("authors.works")}
+                  {" · "}
+                  {formatCount(a.totalViews)}
+                  {" "}
+                  {t("authors.views")}
                   {a.avgRating > 0 && <> · ★{a.avgRating.toFixed(1)}</>}
                 </p>
                 <div className="mt-1.5 flex flex-wrap gap-1">

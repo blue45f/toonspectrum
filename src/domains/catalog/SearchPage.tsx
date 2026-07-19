@@ -6,6 +6,7 @@ import type { PlatformId } from "@/lib/types";
 import { SearchExplorer } from "@/components/search-explorer";
 import { Container } from "@/components/section";
 import { buttonClass } from "@/components/ui/button-utils";
+import { useT } from "@/lib/i18n";
 import { PLATFORM_LIST } from "@/lib/platforms";
 import Link from "@/src/compat/router-link";
 
@@ -18,17 +19,20 @@ export function SearchPage() {
     .split(",")
     .map((entry) => entry.trim())
     .filter((entry): entry is PlatformId => platformIds.has(entry as PlatformId));
+  const t = useT();
 
   return (
     <Container size="wide" className="py-6 sm:py-10">
       <header className="mb-6 rounded-2xl border border-line bg-panel/45 p-4 sm:mb-8 sm:p-6">
         <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-accent/35 bg-accent-soft/45 px-2.5 py-1 text-xs font-medium text-accent sm:mb-4">
           <Search size={14} />
-          통합 검색
+          {t("search.badge")}
         </div>
-        <h1 className="text-[clamp(1.6rem,7vw,1.875rem)] font-bold tracking-tight [word-break:keep-all] sm:text-4xl">작품을 바로 찾는 작업공간</h1>
+        <h1 className="text-[clamp(1.6rem,7vw,1.875rem)] font-bold tracking-tight [word-break:keep-all] sm:text-4xl">
+          {t("search.title")}
+        </h1>
         <p className="lede mt-2 max-w-2xl text-pretty text-sm leading-relaxed text-fg-2">
-          작품명, 작가, 태그를 한 번에 찾고 플랫폼과 가격 조건으로 바로 좁혀보세요.
+          {t("search.subtitle")}
         </p>
 
         <div className="mt-4 flex flex-wrap gap-2 sm:mt-6">
@@ -41,20 +45,23 @@ export function SearchPage() {
             className={buttonClass({ size: "sm", variant: "solid", className: "gap-1.5" })}
           >
             <SlidersHorizontal size={14} />
-            필터로 좁히기
+            {t("search.filterButton")}
           </a>
           <Link href="/ranking" className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1.5" })}>
             <Search size={14} />
-            랭킹에서 비교하기
+            {t("search.compareFromRanking")}
           </Link>
         </div>
 
         <p className="mt-4 flex flex-wrap items-center gap-3 text-xs text-fg-3">
           <span>
-            현재 검색어: <span className="text-fg-2">{initialQuery ? `"${initialQuery}"` : "전체"}</span>
+            {t("search.currentQuery")}:{" "}
+            <span className="text-fg-2">{initialQuery ? `"${initialQuery}"` : t("search.queryAll")}</span>
           </span>
           <span className="h-1 w-1 rounded-full bg-fg-3" />
-          <span>무료·기다무 중심: {initialFree ? "ON" : "OFF"}</span>
+          <span>
+            {t("search.freeOnlyLabel")}: {initialFree ? "ON" : "OFF"}
+          </span>
         </p>
       </header>
 

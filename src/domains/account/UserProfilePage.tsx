@@ -9,6 +9,7 @@ import { ReviewCard } from "@/components/review-card";
 import { Container } from "@/components/section";
 import { buttonClass } from "@/components/ui/button-utils";
 import { Stars } from "@/components/ui/stars";
+import { useT } from "@/lib/i18n";
 import { useApp } from "@/lib/store";
 import { cn, formatCount } from "@/lib/utils";
 import { ErrorState } from "@/src/components/error-state";
@@ -36,10 +37,10 @@ interface ReviewsResponse {
 
 type ProfileTab = "reviews" | "works" | "series";
 
-const TABS: { value: ProfileTab; label: string }[] = [
-  { value: "reviews", label: "리뷰" },
-  { value: "works", label: "창작 작품" },
-  { value: "series", label: "시리즈" },
+const TABS: { value: ProfileTab; labelKey: string }[] = [
+  { value: "reviews", labelKey: "userProfile.tabs.reviews" },
+  { value: "works", labelKey: "userProfile.tabs.works" },
+  { value: "series", labelKey: "userProfile.tabs.series" },
 ];
 
 function isTab(value: string | null): value is ProfileTab {
@@ -48,6 +49,7 @@ function isTab(value: string | null): value is ProfileTab {
 
 // ── 창작 작품 탭 ──────────────────────────────────────────────────────
 function ProfileWorksTab({ userId }: { userId: string }) {
+  const t = useT();
   const [works, setWorks] = useState<WorkSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -75,7 +77,8 @@ function ProfileWorksTab({ userId }: { userId: string }) {
   if (works.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-line bg-card/40 p-10 text-center text-sm text-fg-2 sm:p-12">
-        <PenLine size={24} className="mx-auto mb-2.5 text-fg-3" />이 회원이 아직 공개한 창작 작품이 없습니다.
+        <PenLine size={24} className="mx-auto mb-2.5 text-fg-3" />
+        {t("userProfile.works.empty")}
       </div>
     );
   }
@@ -90,6 +93,7 @@ function ProfileWorksTab({ userId }: { userId: string }) {
 
 // ── 시리즈 탭 ─────────────────────────────────────────────────────────
 function ProfileSeriesTab({ userId }: { userId: string }) {
+  const t = useT();
   const [series, setSeries] = useState<SeriesSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -131,7 +135,8 @@ function ProfileSeriesTab({ userId }: { userId: string }) {
   if (series.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-line bg-card/40 p-10 text-center text-sm text-fg-2 sm:p-12">
-        <BookOpen size={24} className="mx-auto mb-2.5 text-fg-3" />이 회원이 아직 만든 연재 시리즈가 없습니다.
+        <BookOpen size={24} className="mx-auto mb-2.5 text-fg-3" />
+        {t("userProfile.series.empty")}
       </div>
     );
   }
@@ -145,6 +150,7 @@ function ProfileSeriesTab({ userId }: { userId: string }) {
 }
 
 export function UserProfilePage() {
+  const t = useT();
   const { userId = "" } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
@@ -154,7 +160,7 @@ export function UserProfilePage() {
 
   const { data, loading, error, reload } = useApiResource<ReviewsResponse>(
     `/api/reviews?userId=${encodeURIComponent(userId)}`,
-    "프로필을 불러오지 못했습니다."
+    t("userProfile.fetchError")
   );
 
   // 창작자 프로필(이름/아바타/소개 + 팔로우/작품/시리즈 수) — 리뷰가 없어도 동작.
@@ -178,15 +184,19 @@ export function UserProfilePage() {
   }, [userId, viewerId]);
 
   const feed = data?.feed ?? [];
-  const author = profile?.name ?? feed[0]?.author ?? "사용자";
+  const author = profile?.name ?? feed[0]?.author ?? t("userProfile.authorFallback");
   const avatar = profile?.avatar ?? feed[0]?.avatar ?? "#7c5cfc";
   const total = data?.stats.total ?? 0;
   const avg = data?.stats.avg ?? 0;
   const distinctTitles = data?.stats.distinctTitles ?? 0;
-  useDocumentTitle(loading && !profile ? "프로필" : `${author} 님`);
+  useDocumentTitle(loading && !profile ? t("userProfile.eyebrow") : `${author}`);
   useMetaDescription(
     data
-      ? `${author} 님의 리뷰 ${total}편 · 작품 ${distinctTitles}편 · 평균 별점 ${avg ? avg.toFixed(1) : "-"} — 툰스펙트럼.`
+      ? t("userProfile.metaTemplate")
+          .replace("{author}", author)
+          .replace("{reviews}", String(total))
+          .replace("{works}", String(distinctTitles))
+          .replace("{avg}", avg ? avg.toFixed(1) : "-")
       : null
   );
 
@@ -223,7 +233,7 @@ export function UserProfilePage() {
     <div>
       <section className="border-b border-line bg-ledger">
         <Container size="wide" className="py-8 sm:py-12 lg:py-16">
-          <p className="eyebrow text-accent">READER PROFILE</p>
+          <p className="eyebrow text-accent">{t("userProfile.eyebrow")}</p>
           <div className="mt-4 flex flex-wrap items-center gap-4">
             <span
               className="grid size-14 shrink-0 place-items-center rounded-full text-2xl font-bold text-[oklch(0.97_0.012_85)] ring-1 ring-[oklch(0.95_0.01_85/0.16)] shadow-[inset_0_1px_0_oklch(1_0_0/0.12)] sm:size-16"
@@ -234,7 +244,9 @@ export function UserProfilePage() {
             </span>
             <div className="min-w-0 flex-1">
               <h1 className="truncate text-2xl font-bold leading-tight sm:text-3xl">{author}</h1>
-              <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-fg-2">{profile?.bio || "독자가 남긴 리뷰와 창작 활동"}</p>
+              <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-fg-2">
+                {profile?.bio || t("userProfile.bioFallback")}
+              </p>
             </div>
             {/* 팔로우 버튼 — 본인 프로필이면 숨김, 비로그인은 비활성 안내 */}
             {profile && !isSelf && (
@@ -243,7 +255,7 @@ export function UserProfilePage() {
                 onClick={onToggleFollow}
                 disabled={!viewerId || followBusy}
                 aria-pressed={profile.isFollowing}
-                title={viewerId ? undefined : "로그인 후 팔로우할 수 있습니다."}
+                title={viewerId ? undefined : t("userProfile.followHint")}
                 className={buttonClass({
                   size: "sm",
                   variant: profile.isFollowing ? "outline" : "solid",
@@ -251,33 +263,33 @@ export function UserProfilePage() {
                 })}
               >
                 {profile.isFollowing ? <UserCheck size={14} /> : <UserPlus size={14} />}
-                {profile.isFollowing ? "팔로잉" : "팔로우"}
+                {profile.isFollowing ? t("userProfile.following") : t("userProfile.follow")}
               </button>
             )}
           </div>
 
           <dl className="mt-7 grid grid-cols-2 gap-x-6 gap-y-5 border-t border-line pt-6 sm:flex sm:flex-wrap sm:items-end sm:gap-x-9">
             <div className="flex flex-col gap-1">
-              <dt className="text-xs text-fg-2">팔로워</dt>
+              <dt className="text-xs text-fg-2">{t("userProfile.stat.followers")}</dt>
               <dd className="numeral tnum text-2xl text-fg">{formatCount(profile?.followers ?? 0)}</dd>
             </div>
             <div className="flex flex-col gap-1">
-              <dt className="text-xs text-fg-2">작성한 리뷰</dt>
+              <dt className="text-xs text-fg-2">{t("userProfile.stat.totalReviews")}</dt>
               <dd className="numeral tnum text-2xl text-fg">{total.toLocaleString("ko-KR")}</dd>
             </div>
             <div className="flex flex-col gap-1">
-              <dt className="text-xs text-fg-2">평균 별점</dt>
+              <dt className="text-xs text-fg-2">{t("userProfile.stat.avgRating")}</dt>
               <dd className="flex items-center gap-2">
                 <Stars value={avg} size="sm" />
                 <span className="numeral tnum text-2xl text-fg">{avg.toFixed(2)}</span>
               </dd>
             </div>
             <div className="flex flex-col gap-1">
-              <dt className="text-xs text-fg-2">창작 작품</dt>
+              <dt className="text-xs text-fg-2">{t("userProfile.stat.works")}</dt>
               <dd className="numeral tnum text-2xl text-fg">{(profile?.works ?? 0).toLocaleString("ko-KR")}</dd>
             </div>
             <div className="flex flex-col gap-1">
-              <dt className="text-xs text-fg-2">연재 시리즈</dt>
+              <dt className="text-xs text-fg-2">{t("userProfile.stat.series")}</dt>
               <dd className="numeral tnum text-2xl text-fg">{(profile?.series ?? 0).toLocaleString("ko-KR")}</dd>
             </div>
           </dl>
@@ -287,7 +299,7 @@ export function UserProfilePage() {
       <Container size="wide" className="py-8 sm:py-10 lg:py-12">
         {/* 탭: 리뷰 / 창작 작품 / 시리즈 */}
         <div className="mb-5 flex flex-wrap items-center gap-2">
-          <div role="tablist" aria-label="프로필 콘텐츠" className="flex flex-wrap gap-1.5">
+          <div role="tablist" aria-label={t("userProfile.tabsLabel")} className="flex flex-wrap gap-1.5">
             {TABS.map((option) => {
               const on = option.value === tab;
               return (
@@ -304,7 +316,7 @@ export function UserProfilePage() {
                       : "border-line bg-card text-fg-2 hover:bg-raised"
                   )}
                 >
-                  {option.label}
+                  {t(option.labelKey)}
                 </button>
               );
             })}
@@ -316,7 +328,7 @@ export function UserProfilePage() {
               className={buttonClass({ size: "sm", variant: "quiet", className: "ml-auto gap-1.5" })}
             >
               <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-              갱신
+              {t("userProfile.refresh")}
             </button>
           )}
         </div>
@@ -336,10 +348,10 @@ export function UserProfilePage() {
             ))}
           </div>
         ) : error ? (
-          <ErrorState title="프로필을 불러오지 못했습니다." message={error} onRetry={reload} />
+          <ErrorState title={t("userProfile.fetchError")} message={error} onRetry={reload} />
         ) : feed.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-line bg-card/40 p-10 text-center text-sm text-fg-2 sm:p-12">
-            이 회원이 아직 작성한 리뷰가 없습니다.
+            {t("userProfile.emptyReviews")}
           </div>
         ) : (
           <div className="columns-1 gap-4 sm:columns-2 lg:columns-2 xl:columns-3 [&>*]:mb-4 [&>*]:break-inside-avoid">

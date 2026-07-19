@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { useCelebrate } from "./use-celebrate";
 
+import { useT } from "@/lib/i18n";
 import { useApp, useHydrated } from "@/lib/store";
 import { toast } from "@/lib/toast-store";
 import { cn } from "@/lib/utils";
@@ -20,6 +21,7 @@ export function BookmarkButton({
   const state = useApp((s) => s.reads[titleId]);
   const setRead = useApp((s) => s.setRead);
   const celebrate = useCelebrate();
+  const t = useT();
   // 담기 성공 1회성 플립 — 키를 올려 재트리거(연타 시에도 매번 새 애니메이션).
   const [flipKey, setFlipKey] = useState(0);
   // '관심(want)'만 북마크로 간주 — 하차/완독/보는 중 상태를 토글로 덮어쓰지 않도록
@@ -28,7 +30,7 @@ export function BookmarkButton({
   return (
     <button
       type="button"
-      aria-label={active ? "관심 해제" : "관심 등록"}
+      aria-label={active ? t("bookmark.remove") : t("bookmark.add")}
       aria-pressed={active}
       onClick={(e) => {
         e.preventDefault();
@@ -40,7 +42,7 @@ export function BookmarkButton({
           setFlipKey((k) => k + 1);
           celebrate(e.currentTarget, { chars: ["📚", "✨", "💖"], count: 12, spread: 0.8, sfx: "pop" });
         }
-        toast(next ? "관심 작품에 담았어요" : "관심을 해제했어요", {
+        toast(next ? t("toast.bookmarkAdded") : t("toast.bookmarkRemoved"), {
           tone: next ? "success" : "default",
         });
       }}

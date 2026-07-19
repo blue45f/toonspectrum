@@ -23,38 +23,57 @@ import { Select } from "./ui/select";
 import type { SortKey } from "@/lib/search";
 import type { WorkType, SerialStatus, AgeRating, PlatformId, Title } from "@/lib/types";
 
+import { useT } from "@/lib/i18n";
 import { PLATFORM_LIST } from "@/lib/platforms";
 import { normalizeQuery } from "@/lib/recent-searches";
 import { useApp, useSavedTitleIds } from "@/lib/store";
-import { GENRES, STATUS_LABEL, AGE_LABEL } from "@/lib/taxonomy";
+import { GENRES } from "@/lib/taxonomy";
 import { cn } from "@/lib/utils";
 import { useDebouncedValue } from "@/src/hooks/use-debounced-value";
 import { fetchSearchResponse, isSearchAbortError, type SearchCatalogMeta } from "@/src/infrastructure/search-client";
 
 
-const SORTS: { value: SortKey; label: string }[] = [
-  { value: "relevance", label: "관련도" },
-  { value: "rating", label: "평점순" },
-  { value: "popular", label: "인기순" },
-  { value: "trending", label: "급상승순" },
-  { value: "bookmarks", label: "관심순" },
-  { value: "completion", label: "완독률순" },
-  { value: "newest", label: "최신순" },
-  { value: "title", label: "가나다순" },
+const SORTS: { value: SortKey; labelKey: string }[] = [
+  { value: "relevance", labelKey: "search.explorer.sort.relevance" },
+  { value: "rating", labelKey: "search.explorer.sort.rating" },
+  { value: "popular", labelKey: "search.explorer.sort.popular" },
+  { value: "trending", labelKey: "search.explorer.sort.trending" },
+  { value: "bookmarks", labelKey: "search.explorer.sort.bookmarks" },
+  { value: "completion", labelKey: "search.explorer.sort.completion" },
+  { value: "newest", labelKey: "search.explorer.sort.newest" },
+  { value: "title", labelKey: "search.explorer.sort.title" },
 ];
 
-const YEAR_RANGES: { label: string; range: [number, number] | null }[] = [
-  { label: "전체", range: null },
-  { label: "2022+", range: [2022, 9999] },
-  { label: "2018-21", range: [2018, 2021] },
-  { label: "2014-17", range: [2014, 2017] },
-  { label: "~2013", range: [0, 2013] },
+const YEAR_RANGES: { key: string; labelKey: string; range: [number, number] | null }[] = [
+  { key: "all", labelKey: "search.explorer.year.all", range: null },
+  { key: "2022+", labelKey: "search.explorer.year.2022plus", range: [2022, 9999] },
+  { key: "2018-21", labelKey: "search.explorer.year.2018-21", range: [2018, 2021] },
+  { key: "2014-17", labelKey: "search.explorer.year.2014-17", range: [2014, 2017] },
+  { key: "upto2013", labelKey: "search.explorer.year.upto2013", range: [0, 2013] },
 ];
 
 const RATING_OPTIONS = [0, 3, 4, 4.5] as const;
 const AGE_OPTIONS: AgeRating[] = ["all", "12", "15", "19"];
-const WORK_TYPES = ["webtoon", "webnovel"] as const;
+const WORK_TYPES: { value: WorkType; labelKey: string }[] = [
+  { value: "webtoon", labelKey: "search.explorer.type.webtoon" },
+  { value: "webnovel", labelKey: "search.explorer.type.webnovel" },
+];
+const WORK_TYPE_LABEL_KEY: Record<WorkType, string> = {
+  webtoon: "search.explorer.type.webtoon",
+  webnovel: "search.explorer.type.webnovel",
+};
 const STATUS_OPTIONS = ["ongoing", "completed", "hiatus"] as const;
+const STATUS_LABEL_KEY: Record<SerialStatus, string> = {
+  ongoing: "search.explorer.status.ongoing",
+  completed: "search.explorer.status.completed",
+  hiatus: "search.explorer.status.hiatus",
+};
+const AGE_LABEL_KEY: Record<AgeRating, string> = {
+  all: "search.explorer.age.all",
+  "12": "search.explorer.age.12",
+  "15": "search.explorer.age.15",
+  "19": "search.explorer.age.19",
+};
 
 function toggle<T>(arr: T[], value: T): T[] {
   return arr.includes(value) ? arr.filter((entry) => entry !== value) : [...arr, value];
@@ -90,19 +109,19 @@ function FacetGroup({ title, children }: { title: string; children: React.ReactN
 }
 
 function compactNumber(value: number) {
-  return value.toLocaleString("ko-KR");
+  return value.toLocaleString();
 }
 
-function relativeTime(value?: string) {
-  if (!value) return "갱신 정보 없음";
+function relativeTime(value: string | undefined, t: (key: string) => string) {
+  if (!value) return t("search.explorer.time.noData");
   const elapsed = Date.now() - new Date(value).getTime();
-  if (!Number.isFinite(elapsed)) return "갱신 정보 없음";
+  if (!Number.isFinite(elapsed)) return t("search.explorer.time.noData");
   const minutes = Math.max(0, Math.floor(elapsed / 60_000));
-  if (minutes < 1) return "방금 갱신";
-  if (minutes < 60) return `${minutes}분 전 갱신`;
+  if (minutes < 1) return t("search.explorer.time.justNow");
+  if (minutes < 60) return t("search.explorer.time.minutesAgo").replace("{count}", String(minutes));
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}시간 전 갱신`;
-  return `${Math.floor(hours / 24)}일 전 갱신`;
+  if (hours < 24) return t("search.explorer.time.hoursAgo").replace("{count}", String(hours));
+  return t("search.explorer.time.daysAgo").replace("{count}", String(Math.floor(hours / 24)));
 }
 
 function platformName(id: PlatformId) {
@@ -146,6 +165,7 @@ export function SearchExplorer({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryKey, setRetryKey] = useState(0);
+  const t = useT();
 
   const recentSearches = useApp((s) => s.recentSearches);
   const recordRecentSearch = useApp((s) => s.addRecentSearch);
@@ -197,7 +217,7 @@ export function SearchExplorer({
       .catch((error: unknown) => {
         if (isSearchAbortError(error)) return;
         if (!alive) return;
-        setError("검색 데이터를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.");
+        setError(t("search.explorer.error.description"));
         setResults([]);
         setTypeCount({ webtoon: 0, webnovel: 0 });
         setCatalog(null);
@@ -210,13 +230,15 @@ export function SearchExplorer({
       alive = false;
       controller.abort();
     };
-  }, [debouncedQ, query, recordRecentSearch, retryKey, textSettling]);
+  }, [debouncedQ, query, recordRecentSearch, retryKey, textSettling, t]);
 
   const savedIds = useSavedTitleIds();
   const visibleResults = savedOnly ? results.filter((title) => savedIds.has(title.id)) : results;
   const shown = visibleResults.slice(0, limit);
   const hasResult = Boolean(visibleResults.length);
-  const resultText = hasResult ? `${visibleResults.length.toLocaleString("ko-KR")}개의 작품` : "결과가 없습니다";
+  const resultText = hasResult
+    ? t("search.explorer.resultCount").replace("{count}", compactNumber(visibleResults.length))
+    : t("search.explorer.noResult");
   const catalogCoverage = catalog?.platformCoverage.slice(0, 5) ?? [];
   const filteredCoverage = catalog?.filteredPlatformCoverage.slice(0, 4) ?? [];
   // 플랫폼 필터는 카탈로그에 실제로 존재하는 플랫폼만 노출(빈 슬롯 방지). 커버리지 정보가
@@ -245,7 +267,7 @@ export function SearchExplorer({
       entries.push({
         key: `type:${entry}`,
         category: "type",
-        label: entry === "webtoon" ? "웹툰" : "웹소설",
+        label: t(WORK_TYPE_LABEL_KEY[entry]),
       });
     });
 
@@ -258,7 +280,7 @@ export function SearchExplorer({
     });
 
     status.forEach((entry) => {
-      entries.push({ key: `status:${entry}`, category: "status", label: STATUS_LABEL[entry] });
+      entries.push({ key: `status:${entry}`, category: "status", label: t(STATUS_LABEL_KEY[entry]) });
     });
 
     platforms.forEach((entry) => {
@@ -269,7 +291,7 @@ export function SearchExplorer({
     });
 
     ages.forEach((entry) => {
-      entries.push({ key: `age:${entry}`, category: "age", label: AGE_LABEL[entry] });
+      entries.push({ key: `age:${entry}`, category: "age", label: t(AGE_LABEL_KEY[entry]) });
     });
 
     if (minRating > 0) {
@@ -280,20 +302,20 @@ export function SearchExplorer({
       entries.push({
         key: "year",
         category: "year",
-        label: yearRange[0] === 0 ? "~2013" : `${yearRange[0]}-${yearRange[1]}`,
+        label: yearRange[0] === 0 ? t("search.explorer.year.upto2013") : `${yearRange[0]}-${yearRange[1]}`,
       });
     }
 
     if (freeOnly) {
-      entries.push({ key: "freeOnly", category: "option", label: "무료·기다무" });
+      entries.push({ key: "freeOnly", category: "option", label: t("search.explorer.option.freeOnly") });
     }
 
     if (adaptedOnly) {
-      entries.push({ key: "adaptedOnly", category: "option", label: "원작·2차창작" });
+      entries.push({ key: "adaptedOnly", category: "option", label: t("search.explorer.option.adapted") });
     }
 
     return entries;
-  }, [adaptedOnly, ages, freeOnly, genres, minRating, platforms, status, tags, types, yearRange]);
+  }, [adaptedOnly, ages, freeOnly, genres, minRating, platforms, status, t, tags, types, yearRange]);
 
   const reset = () => {
     setTypes([]);
@@ -368,35 +390,35 @@ export function SearchExplorer({
 
   const typeSummary =
     typeCount.webtoon === 0 && typeCount.webnovel === 0
-      ? "유형 없음"
+      ? t("search.explorer.typeSummary.empty")
       : [
-          typeCount.webtoon ? `웹툰 ${typeCount.webtoon.toLocaleString("ko-KR")}` : "",
-          typeCount.webnovel ? `웹소설 ${typeCount.webnovel.toLocaleString("ko-KR")}` : "",
+          typeCount.webtoon ? `${t("search.explorer.type.webtoon")} ${compactNumber(typeCount.webtoon)}` : "",
+          typeCount.webnovel ? `${t("search.explorer.type.webnovel")} ${compactNumber(typeCount.webnovel)}` : "",
         ]
           .filter(Boolean)
-          .join(" · ");
+          .join(t("search.explorer.separator"));
 
   const mobileCount = activeCount;
 
   const facets = (
     <div className="flex flex-col">
-      <FacetGroup title="유형">
+      <FacetGroup title={t("search.explorer.facet.type")}>
         <div className="grid grid-cols-2 gap-1.5">
           {WORK_TYPES.map((entry) => (
             <button
-              key={entry}
+              key={entry.value}
               type="button"
-              aria-pressed={types.includes(entry)}
-              onClick={() => setTypes((prev) => toggle(prev, entry))}
-              className={facetClass(types.includes(entry))}
+              aria-pressed={types.includes(entry.value)}
+              onClick={() => setTypes((prev) => toggle(prev, entry.value))}
+              className={facetClass(types.includes(entry.value))}
             >
-              {entry === "webtoon" ? "웹툰" : "웹소설"}
+              {t(entry.labelKey)}
             </button>
           ))}
         </div>
       </FacetGroup>
 
-      <FacetGroup title="장르">
+      <FacetGroup title={t("search.explorer.facet.genre")}>
         <div className="flex flex-wrap gap-1.5">
           {GENRES.map((genre) => (
             <button
@@ -411,7 +433,7 @@ export function SearchExplorer({
         </div>
       </FacetGroup>
 
-      <FacetGroup title="태그">
+      <FacetGroup title={t("search.explorer.facet.tag")}>
         <div className="flex flex-wrap gap-1.5">
           {topTags.map((tag) => (
             <TagChip
@@ -425,7 +447,7 @@ export function SearchExplorer({
         </div>
       </FacetGroup>
 
-      <FacetGroup title="연재 연도">
+      <FacetGroup title={t("search.explorer.facet.year")}>
         <div className="grid grid-cols-3 gap-1.5">
           {YEAR_RANGES.map((entry) => {
             const active =
@@ -435,19 +457,19 @@ export function SearchExplorer({
             return (
               <button
                 type="button"
-                key={entry.label}
+                key={entry.key}
                 onClick={() => setYearRange(entry.range)}
                 aria-pressed={active}
                 className={tinyPill(active)}
               >
-                {entry.label}
+                {entry.key === "all" ? t("search.explorer.year.all") : t(entry.labelKey)}
               </button>
             );
           })}
         </div>
       </FacetGroup>
 
-      <FacetGroup title="연재 상태">
+      <FacetGroup title={t("search.explorer.facet.status")}>
         <div className="grid grid-cols-3 gap-1.5">
           {STATUS_OPTIONS.map((entry) => (
             <button
@@ -457,13 +479,13 @@ export function SearchExplorer({
               aria-pressed={status.includes(entry)}
               className={tinyPill(status.includes(entry))}
             >
-              {STATUS_LABEL[entry]}
+              {t(STATUS_LABEL_KEY[entry])}
             </button>
           ))}
         </div>
       </FacetGroup>
 
-      <FacetGroup title="플랫폼">
+      <FacetGroup title={t("search.explorer.facet.platform")}>
         <div className="grid gap-1.5 sm:grid-cols-2">
           {platformOptions.map((entry) => (
             <button
@@ -485,7 +507,7 @@ export function SearchExplorer({
         </div>
       </FacetGroup>
 
-      <FacetGroup title="최소 평점">
+      <FacetGroup title={t("search.explorer.facet.minRating")}>
         <div className="grid grid-cols-4 gap-1.5">
           {RATING_OPTIONS.map((rating) => (
             <button
@@ -495,13 +517,13 @@ export function SearchExplorer({
               aria-pressed={minRating === rating}
               className={tinyPill(minRating === rating)}
             >
-              {rating === 0 ? "전체" : `${rating}★+`}
+              {rating === 0 ? t("search.explorer.ratingAll") : `${rating}★+`}
             </button>
           ))}
         </div>
       </FacetGroup>
 
-      <FacetGroup title="이용가">
+      <FacetGroup title={t("search.explorer.facet.age")}>
         <div className="grid grid-cols-4 gap-1.5">
           {AGE_OPTIONS.map((entry) => (
             <button
@@ -511,13 +533,13 @@ export function SearchExplorer({
               aria-pressed={ages.includes(entry)}
               className={tinyPill(ages.includes(entry))}
             >
-              {AGE_LABEL[entry]}
+              {t(AGE_LABEL_KEY[entry])}
             </button>
           ))}
         </div>
       </FacetGroup>
 
-      <FacetGroup title="옵션">
+      <FacetGroup title={t("search.explorer.facet.option")}>
         <div className="flex flex-col gap-1.5">
           <button
             type="button"
@@ -531,7 +553,7 @@ export function SearchExplorer({
             aria-pressed={freeOnly}
           >
             <Gift size={15} />
-            무료·기다무만
+            {t("search.explorer.option.freeOnly")}
           </button>
           <button
             type="button"
@@ -545,7 +567,7 @@ export function SearchExplorer({
             aria-pressed={adaptedOnly}
           >
             <Link2 size={15} />
-            원작·2차창작 연결
+            {t("search.explorer.option.adapted")}
           </button>
         </div>
       </FacetGroup>
@@ -559,14 +581,14 @@ export function SearchExplorer({
           <div className="mb-3 flex items-center justify-between gap-2 border-b border-line pb-3">
             <h2 className="flex items-center gap-2 text-sm font-semibold">
               <SlidersHorizontal size={15} />
-              필터
+              {t("search.explorer.filter")}
               {activeCount > 0 && (
                 <span className="numeral rounded-full bg-accent px-1.5 text-[0.7rem] text-on-accent">{activeCount}</span>
               )}
             </h2>
             {activeCount > 0 && (
               <button type="button" onClick={reset} className="text-xs text-fg-3 hover:text-accent">
-                전체 초기화
+                {t("search.explorer.filterReset")}
               </button>
             )}
           </div>
@@ -577,7 +599,7 @@ export function SearchExplorer({
       <main>
         <div className="rounded-2xl border border-line bg-card p-3 sm:p-4">
           <label htmlFor="search-explorer-query" className="sr-only">
-            작품, 작가, 태그 검색
+            {t("search.explorer.search.label")}
           </label>
           <div className="flex items-center gap-2 rounded-xl border border-line bg-raised/60 px-3 py-2 transition-colors focus-within:border-accent/50 focus-within:bg-panel/90">
             <Search size={18} className="text-fg-3" />
@@ -592,14 +614,14 @@ export function SearchExplorer({
                 }
               }}
               className="min-w-0 flex-1 bg-transparent text-sm text-fg outline-none placeholder:text-fg-3"
-              placeholder="작품, 작가, 태그 검색"
+              placeholder={t("search.explorer.search.placeholder")}
             />
             {q && (
               <button
                 type="button"
                 onClick={() => setQ("")}
                 className="rounded-md p-1 text-fg-3 transition-colors hover:bg-raised hover:text-fg"
-                aria-label="검색어 지우기"
+                aria-label={t("search.explorer.search.clear")}
               >
                 <X size={16} />
               </button>
@@ -608,7 +630,7 @@ export function SearchExplorer({
               type="button"
               className={buttonClass({ size: "icon", variant: "quiet" })}
               onClick={() => setRetryKey((value) => value + 1)}
-              aria-label="검색 새로고침"
+              aria-label={t("search.explorer.search.reload")}
             >
               <Search size={14} />
             </button>
@@ -622,16 +644,16 @@ export function SearchExplorer({
               aria-expanded={showFilters}
             >
               <SlidersHorizontal size={14} />
-              필터
+              {t("search.explorer.filter")}
               {activeCount > 0 && <span className="ml-0.5 text-accent">{mobileCount}</span>}
             </button>
 
             <Select
               value={sort}
               onValueChange={(value) => setSort(value as SortKey)}
-              ariaLabel="정렬 기준"
+              ariaLabel={t("search.explorer.sort.label")}
               triggerClassName="h-8 rounded-lg border border-line bg-card px-2.5 text-[0.8125rem] text-fg-2"
-              options={SORTS.map((entry) => ({ value: entry.value, label: entry.label }))}
+              options={SORTS.map((entry) => ({ value: entry.value, label: t(entry.labelKey) }))}
             />
 
             <button
@@ -646,7 +668,7 @@ export function SearchExplorer({
               )}
             >
               <Bookmark size={14} className={savedOnly ? "fill-current" : ""} />
-              내 찜만
+              {t("search.explorer.savedOnly")}
             </button>
 
             <Segmented
@@ -654,8 +676,8 @@ export function SearchExplorer({
               value={view}
               onChange={(value) => setView(value)}
               items={[
-                { value: "grid", label: <LayoutGrid size={14} />, hint: "그리드 보기" },
-                { value: "list", label: <List size={14} />, hint: "리스트 보기" },
+                { value: "grid", label: <LayoutGrid size={14} />, hint: t("search.explorer.view.grid") },
+                { value: "list", label: <List size={14} />, hint: t("search.explorer.view.list") },
               ]}
               className="ml-auto"
             />
@@ -668,18 +690,20 @@ export function SearchExplorer({
               className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1.5" })}
             >
               <RefreshCw size={14} />
-              갱신
+              {t("search.explorer.refresh")}
             </button>
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-fg-3" role="status" aria-live="polite">
             <span className="truncate">
-              검색어: <strong>{q ? `"${q}"` : "전체"}</strong>
+              {t("search.explorer.search.label")}: <strong>{q ? `"${q}"` : t("search.queryAll")}</strong>
             </span>
             <span className="h-1 w-1 rounded-full bg-line-strong" />
             <span className="truncate">{resultText}</span>
             <span className="h-1 w-1 rounded-full bg-line-strong" />
-            <span className="truncate">{loading || textSettling ? "로딩 중" : typeSummary}</span>
+            <span className="truncate">
+              {loading || textSettling ? t("search.explorer.loading") : typeSummary}
+            </span>
           </div>
 
           {/* 최근 검색어 — 입력이 비었을 때만 노출, 칩 클릭으로 즉시 복귀(각 칩은 개별 삭제 가능). */}
@@ -687,7 +711,7 @@ export function SearchExplorer({
             <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-line pt-3">
               <span className="inline-flex items-center gap-1 text-[0.72rem] font-medium text-fg-3">
                 <Clock3 size={13} />
-                최근 검색
+                {t("search.explorer.recent")}
               </span>
               {recentSearches.map((entry) => (
                 <span
@@ -707,7 +731,7 @@ export function SearchExplorer({
                   <button
                     type="button"
                     onClick={() => removeRecentSearch(entry)}
-                    aria-label={`최근 검색어 "${entry}" 삭제`}
+                    aria-label={t("search.explorer.recent.delete").replace("{query}", `"${entry}"`)}
                     className="grid h-full place-items-center py-1 pl-0.5 pr-2 text-fg-3 transition-colors hover:text-bad"
                   >
                     <X size={12} />
@@ -719,7 +743,7 @@ export function SearchExplorer({
                 onClick={clearRecentSearches}
                 className="ml-0.5 rounded-full px-2 py-1 text-[0.72rem] text-fg-3 underline-offset-2 transition-colors hover:text-fg hover:underline"
               >
-                전체 지우기
+                {t("search.explorer.recent.clearAll")}
               </button>
             </div>
           )}
@@ -729,15 +753,16 @@ export function SearchExplorer({
               <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-fg-3">
                 <span className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-line bg-panel/50 px-2.5">
                   <Database size={13} className="text-accent" />
-                  서버 색인 <strong className="numeral text-fg">{compactNumber(catalog.titleCount)}</strong>편
+                  {t("search.explorer.catalog.label")} <strong className="numeral text-fg">{compactNumber(catalog.titleCount)}</strong>
+                  {t("search.explorer.unit.itemSuffix")}
                 </span>
                 <span className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-line bg-panel/50 px-2.5">
                   <Clock3 size={13} className="text-fg-2" />
-                  {relativeTime(catalog.loadedAt)}
+                  {relativeTime(catalog.loadedAt, t)}
                 </span>
                 {catalog.titleCount === 0 && (
                   <span className="inline-flex h-7 items-center rounded-lg border border-warn/40 bg-[oklch(0.82_0.15_80/0.12)] px-2.5 text-warn">
-                    DB 비어 있음
+                    {t("search.explorer.catalog.empty")}
                   </span>
                 )}
               </div>
@@ -746,7 +771,7 @@ export function SearchExplorer({
                   <span
                     key={entry.id}
                     className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-line bg-card px-2.5"
-                    title={`${platformName(entry.id)} ${compactNumber(entry.count)}편`}
+                    title={`${platformName(entry.id)} ${compactNumber(entry.count)}${t("search.explorer.unit.itemSuffix")}`}
                   >
                     <span className="size-1.5 rounded-full" style={{ backgroundColor: platformColor(entry.id) }} />
                     {platformName(entry.id)}
@@ -759,14 +784,14 @@ export function SearchExplorer({
 
           {selectedTokens.length > 0 && (
             <div className="mt-3 flex flex-wrap items-center gap-1.5">
-              <span className="text-xs uppercase tracking-[0.06em] text-fg-3">현재 필터</span>
+              <span className="text-xs uppercase tracking-[0.06em] text-fg-3">{t("search.explorer.currentFilter")}</span>
               {selectedTokens.map((token) => (
                 <button
                   type="button"
                   key={`${token.key}:${token.category}`}
                   onClick={() => removeToken(token)}
                   className="inline-flex items-center gap-1 rounded-full border border-line bg-panel/45 px-2.5 py-1 text-[0.7rem] text-fg-2 transition-all duration-150 hover:border-accent/50 hover:text-fg"
-                  aria-label={`${token.label} 필터 제거`}
+                  aria-label={t("search.explorer.token.remove").replace("{label}", token.label)}
                 >
                   <span>{token.label}</span>
                   <span aria-hidden>×</span>
@@ -778,7 +803,7 @@ export function SearchExplorer({
                 onClick={reset}
                 className="ml-auto text-xs text-accent underline underline-offset-2"
               >
-                초기화
+                {t("search.explorer.filterReset")}
               </button>
             </div>
           )}
@@ -787,10 +812,10 @@ export function SearchExplorer({
         {showFilters && (
           <div className="mt-3 rounded-2xl border border-line bg-panel/40 lg:hidden">
             <div className="flex items-center justify-between border-b border-line px-4 py-3">
-              <p className="text-sm font-semibold">필터</p>
+              <p className="text-sm font-semibold">{t("search.explorer.filter")}</p>
               {activeCount > 0 && (
                 <button type="button" onClick={reset} className="text-xs text-accent">
-                  전체 초기화
+                  {t("search.explorer.filterReset")}
                 </button>
               )}
             </div>
@@ -811,21 +836,21 @@ export function SearchExplorer({
         ) : error ? (
           <div className="mt-10 rounded-xl border border-bad/40 bg-[oklch(0.66_0.2_25/0.12)] px-5 py-12 text-center">
             <AlertTriangle size={24} className="mx-auto mb-3 text-bad" />
-            <p className="text-sm font-medium text-fg">검색 데이터를 불러오지 못했어요.</p>
+            <p className="text-sm font-medium text-fg">{t("search.explorer.error.title")}</p>
             <p className="mt-1 text-sm text-fg-3">{error}</p>
             <button
               type="button"
               onClick={() => setRetryKey((value) => value + 1)}
               className={buttonClass({ size: "sm", variant: "outline", className: "mt-4" })}
             >
-              다시 시도
+              {t("search.explorer.retry")}
             </button>
           </div>
         ) : !hasResult ? (
           <div className="mt-10 rounded-xl border border-dashed border-line bg-card/40 px-5 py-12 text-center">
-            <p className="text-sm font-medium text-fg">조건에 맞는 작품이 없어요.</p>
+            <p className="text-sm font-medium text-fg">{t("search.explorer.noResults")}</p>
             <p className="mt-1 text-sm text-fg-2">
-              {q ? "검색어를 바꾸거나 필터를 줄여보세요." : "필터를 줄이거나 다른 조건으로 찾아보세요."}
+              {q ? t("search.explorer.hint.search") : t("search.explorer.hint.filter")}
             </p>
             <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
               {q && (
@@ -835,7 +860,7 @@ export function SearchExplorer({
                   className={buttonClass({ size: "sm", variant: "outline", className: "gap-1.5" })}
                 >
                   <X size={14} />
-                  검색어 지우기
+                  {t("search.explorer.search.clear")}
                 </button>
               )}
               {activeCount > 0 && (
@@ -844,7 +869,7 @@ export function SearchExplorer({
                   onClick={reset}
                   className="text-sm text-accent underline underline-offset-2"
                 >
-                  필터 전체 초기화
+                  {t("search.explorer.filterReset")}
                 </button>
               )}
             </div>
@@ -852,7 +877,7 @@ export function SearchExplorer({
               <div className="mt-5 border-t border-line/70 pt-4">
                 <p className="mb-2 inline-flex items-center gap-1 text-[0.72rem] font-medium text-fg-3">
                   <Clock3 size={13} />
-                  최근 검색에서 다시 찾기
+                  {t("search.explorer.recent.searchAgain")}
                 </p>
                 <div className="flex flex-wrap justify-center gap-1.5">
                   {recentSearches
@@ -895,8 +920,13 @@ export function SearchExplorer({
                   onClick={() => setLimit((current) => current + 24)}
                   className={buttonClass({ size: "sm", className: "gap-1.5" })}
                 >
-                  더 보기
-                  <span className="text-fg-3">({(visibleResults.length - shown.length).toLocaleString("ko-KR")}개)</span>
+                  {t("search.explorer.loadMore")}
+                  <span className="text-fg-3">
+                    (
+                    {compactNumber(visibleResults.length - shown.length)}
+                    {t("search.explorer.unit.itemSuffix")}
+                    )
+                  </span>
                 </button>
               </div>
             )}

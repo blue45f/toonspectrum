@@ -20,17 +20,17 @@ import { useT } from "@/lib/i18n";
 import Link from "@/src/compat/router-link";
 
 const MOBILE_NAV = [
-  { label: "홈", i18n: "nav.home", href: "/", icon: Home, exact: true },
-  { label: "랭킹", i18n: "nav.ranking", href: "/ranking", icon: TrendingUp },
-  { label: "연재", i18n: "nav.calendar", href: "/calendar", icon: CalendarDays },
-  { label: "추천", i18n: "nav.recommend", href: "/recommend", icon: Sparkles },
-  { label: "탐색", i18n: "nav.explore", href: "/explore", icon: Compass },
-  { label: "운세", i18n: "nav.fortune", href: "/fortune", icon: Moon },
-  { label: "놀이터", i18n: "nav.play", href: "/play", icon: Gamepad2 },
-  { label: "리뷰", i18n: "nav.reviews", href: "/reviews", icon: MessageSquareQuote },
-  { label: "커뮤니티", i18n: "nav.community", href: "/community", icon: MessageCircle },
-  { label: "창작", i18n: "nav.create", href: "/create", icon: Palette },
-  { label: "인사이트", i18n: "nav.insights", href: "/insights", icon: BarChart3 },
+  { i18n: "nav.home", href: "/", icon: Home, exact: true },
+  { i18n: "nav.ranking", href: "/ranking", icon: TrendingUp },
+  { i18n: "nav.calendar", href: "/calendar", icon: CalendarDays },
+  { i18n: "nav.recommend", href: "/recommend", icon: Sparkles },
+  { i18n: "nav.explore", href: "/explore", icon: Compass },
+  { i18n: "nav.fortune", href: "/fortune", icon: Moon },
+  { i18n: "nav.play", href: "/play", icon: Gamepad2 },
+  { i18n: "nav.reviews", href: "/reviews", icon: MessageSquareQuote },
+  { i18n: "nav.community", href: "/community", icon: MessageCircle },
+  { i18n: "nav.create", href: "/create", icon: Palette },
+  { i18n: "nav.insights", href: "/insights", icon: BarChart3 },
 ];
 
 // 모바일 하단 탭바: 빠른 접근용 핵심 4개 (+ 서재). 나머지(연재·리뷰·인사이트)는
@@ -72,7 +72,7 @@ export function MobileHeaderNavigation({
       {menuOpen && (
         <div className="fixed inset-0 z-[60] min-[1360px]:hidden">
           <button
-            aria-label="메뉴 닫기"
+            aria-label={t("control.settings.close")}
             onClick={closeMenu}
             className="absolute inset-0 bg-canvas/70 backdrop-blur-sm motion-safe:animate-fade-up"
           />
@@ -89,7 +89,7 @@ export function MobileHeaderNavigation({
               <button
                 data-autofocus
                 onClick={closeMenu}
-                aria-label="메뉴 닫기"
+                aria-label={t("control.settings.close")}
                 className="grid size-10 place-items-center rounded-xl border border-line bg-card text-fg-2 transition-colors hover:border-line-strong hover:text-fg"
               >
                 <X size={18} />
@@ -173,7 +173,7 @@ export function MobileHeaderNavigation({
           /studio 등 자체 하단 도구막대를 쓰는 라우트에서는 겹치므로 hideBottomTabs로 뺀다. */}
       {!hideBottomTabs && (
         <nav
-          aria-label="빠른 이동"
+          aria-label={t("nav.quickAccess")}
           className="fixed inset-x-0 bottom-0 z-50 border-t border-line/80 bg-panel/90 backdrop-blur-xl md:hidden"
         >
           <div className="mx-auto grid max-w-md grid-cols-6 pb-[env(safe-area-inset-bottom)]">
@@ -207,7 +207,7 @@ export function MobileHeaderNavigation({
               )}
             >
               <Library size={19} strokeWidth={isActive("/library") ? 2.4 : 1.9} />
-              서재
+              {t("nav.library")}
             </Link>
           </div>
         </nav>

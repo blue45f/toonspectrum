@@ -19,17 +19,17 @@ import { usePathname } from "@/src/compat/navigation";
 import Link from "@/src/compat/router-link";
 
 const NAV = [
-  { label: "홈", i18n: "nav.home", href: "/", exact: true },
-  { label: "랭킹", i18n: "nav.ranking", href: "/ranking" },
-  { label: "연재", i18n: "nav.calendar", href: "/calendar" },
-  { label: "추천", i18n: "nav.recommend", href: "/recommend" },
-  { label: "탐색", i18n: "nav.explore", href: "/explore" },
-  { label: "운세", i18n: "nav.fortune", href: "/fortune" },
-  { label: "놀이터", i18n: "nav.play", href: "/play" },
-  { label: "리뷰", i18n: "nav.reviews", href: "/reviews" },
-  { label: "커뮤니티", i18n: "nav.community", href: "/community" },
-  { label: "창작", i18n: "nav.create", href: "/create" },
-  { label: "인사이트", i18n: "nav.insights", href: "/insights" },
+  { i18n: "nav.home", href: "/", exact: true },
+  { i18n: "nav.ranking", href: "/ranking" },
+  { i18n: "nav.calendar", href: "/calendar" },
+  { i18n: "nav.recommend", href: "/recommend" },
+  { i18n: "nav.explore", href: "/explore" },
+  { i18n: "nav.fortune", href: "/fortune" },
+  { i18n: "nav.play", href: "/play" },
+  { i18n: "nav.reviews", href: "/reviews" },
+  { i18n: "nav.community", href: "/community" },
+  { i18n: "nav.create", href: "/create" },
+  { i18n: "nav.insights", href: "/insights" },
 ];
 
 const MobileHeaderNavigation = lazy(() =>
@@ -125,11 +125,11 @@ export function SiteHeader() {
             <ToonSpectrumMark className="transition-transform duration-150 group-hover:scale-105" />
             <span className="flex items-center gap-1.5">
               <span className="font-display text-lg font-bold text-fg transition-colors group-hover:text-accent">
-                툰스펙트럼
+                {t("app.name")}
               </span>
               <span
                 className="hidden rounded-[0.4rem] border border-accent/40 bg-accent/15 px-1.5 py-0.5 font-display text-[0.6rem] font-bold uppercase leading-none tracking-wide text-accent min-[400px]:inline"
-                title="베타 서비스 — 데이터·기능이 변경될 수 있습니다"
+                title={t("app.brandBeta")}
               >
                 BETA
               </span>

@@ -1,3 +1,4 @@
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /**
@@ -52,20 +53,23 @@ function PulseDots({ className }: { className?: string }) {
 
 export function LoadingState({
   variant = "skeleton",
-  label = "불러오는 중",
+  label,
   cardCount = 8,
   className,
 }: LoadingStateProps) {
+  const t = useT();
+  const resolvedLabel = label ?? t("common.loading");
+
   if (variant === "pulse") {
     return (
       <span
         role="status"
         aria-busy="true"
-        aria-label={label}
+        aria-label={resolvedLabel}
         className={cn("inline-flex items-center gap-2 text-sm text-fg-2", className)}
       >
         <PulseDots />
-        <span className="sr-only">{label}</span>
+        <span className="sr-only">{resolvedLabel}</span>
       </span>
     );
   }
@@ -75,7 +79,7 @@ export function LoadingState({
       <div
         role="status"
         aria-busy="true"
-        aria-label={label}
+        aria-label={resolvedLabel}
         className={cn("w-full", className)}
       >
         <div className="flex flex-col gap-3" aria-hidden="true">
@@ -88,7 +92,7 @@ export function LoadingState({
             <span key={i} className="skeleton aspect-[3/4] w-full rounded-2xl" aria-hidden="true" />
           ))}
         </div>
-        <span className="sr-only">{label}</span>
+        <span className="sr-only">{resolvedLabel}</span>
       </div>
     );
   }
@@ -98,13 +102,13 @@ export function LoadingState({
     <div
       role="status"
       aria-busy="true"
-      aria-label={label}
+      aria-label={resolvedLabel}
       className={cn("flex w-full max-w-full flex-col gap-2.5", className)}
     >
       <span className="skeleton h-4 w-3/4" aria-hidden="true" />
       <span className="skeleton h-4 w-full" aria-hidden="true" />
       <span className="skeleton h-4 w-5/6" aria-hidden="true" />
-      <span className="sr-only">{label}</span>
+      <span className="sr-only">{resolvedLabel}</span>
     </div>
   );
 }

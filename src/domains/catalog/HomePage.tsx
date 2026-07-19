@@ -9,6 +9,7 @@ import { HeroBannerStatic } from "@/components/hero-banner-static";
 import { OpenSearchButton } from "@/components/open-search-button";
 import { ShimmerTitle } from "@/components/shimmer-title";
 import { spectrumGradient } from "@/lib/genre-color";
+import { useT } from "@/lib/i18n";
 import Link from "@/src/compat/router-link";
 import { useApiResource } from "@/src/infrastructure/use-api-resource";
 
@@ -103,7 +104,8 @@ interface HomeResponse {
 }
 
 export function HomePage() {
-  const { data, loading, error, reload } = useApiResource<HomeResponse>("/api/home", "홈 데이터를 불러오지 못했습니다.");
+  const t = useT();
+  const { data, loading, error, reload } = useApiResource<HomeResponse>("/api/home", t("home.loadError"));
   const homeReady = Boolean(data && !loading && !error);
   const deferredSectionsReady = useDeferredSections(homeReady);
   const [interactiveHeroReady, activateInteractiveHero] = useDeferredHeroBanner(homeReady);
@@ -138,10 +140,10 @@ export function HomePage() {
           className="rounded-2xl border border-bad/40 bg-[oklch(0.66_0.2_25/0.12)] p-12 text-center"
           role="alert"
         >
-          <p className="text-sm font-medium text-fg">홈 데이터를 불러오지 못했습니다.</p>
-          <p className="mt-1 text-sm text-fg-2">{error ?? "응답 데이터가 비어 있습니다."}</p>
+          <p className="text-sm font-medium text-fg">{t("home.loadError")}</p>
+          <p className="mt-1 text-sm text-fg-2">{error ?? t("common.loading.empty")}</p>
           <button type="button" onClick={reload} className={RETRY_BUTTON_CLASS}>
-            다시 시도
+            {t("common.retry.short")}
           </button>
         </div>
       </Container>
@@ -168,10 +170,10 @@ export function HomePage() {
 
   // 히어로 통계 — 의미 없는 0 값(예: 정적 카탈로그의 리뷰 0)은 "0+ 리뷰"가 고장처럼 보이므로 숨긴다.
   const heroStats = [
-    { v: stats.titles, suffix: "", label: "수록 작품" },
-    { v: stats.platforms, suffix: "", label: "연재 플랫폼" },
-    { v: stats.genres, suffix: "", label: "장르 스펙트럼" },
-    { v: stats.reviews, suffix: "+", label: "독자 리뷰" },
+    { v: stats.titles, suffix: "", label: t("home.hero.stats.titles") },
+    { v: stats.platforms, suffix: "", label: t("home.hero.stats.platforms") },
+    { v: stats.genres, suffix: "", label: t("home.hero.stats.genres") },
+    { v: stats.reviews, suffix: "+", label: t("home.hero.stats.reviews") },
   ].filter((item) => item.v > 0);
 
   return (
@@ -226,14 +228,14 @@ export function HomePage() {
                 <span
                   aria-hidden
                   className="h-2.5 w-9 rounded-full bg-[length:200%_100%] motion-safe:[animation:spectrum-sheen_3.6s_linear_infinite]"
-                  style={{ backgroundImage: spectrumGradient(["로맨스", "판타지", "액션", "SF", "스릴러"], 90) }}
-                />
-                WEBTOON × WEBNOVEL
+                style={{ backgroundImage: spectrumGradient(["로맨스", "판타지", "액션", "SF", "스릴러"], 90) }}
+              />
+                {t("home.hero.eyebrow")}
               </p>
 
               <h1 className="mt-3 text-balance [word-break:keep-all] text-[clamp(1.75rem,7.5vw,2.4rem)] font-bold leading-[1.1] tracking-[-0.02em] sm:mt-4 sm:text-5xl sm:leading-[1.06] lg:text-[3.7rem]">
                 <span className="block [animation:line-reveal_0.7s_var(--ease-out-expo)_0.12s_both]">
-                  흩어진 이야기를,
+                  {t("home.hero.titleLine1")}
                 </span>
                 <span className="block [animation:line-reveal_0.7s_var(--ease-out-expo)_0.26s_both]">
                   <ShimmerTitle
@@ -242,14 +244,14 @@ export function HomePage() {
                     particleCount={24}
                     particleSpread={1.2}
                   >
-                    한 권의 색인
+                    {t("home.hero.titleShimmer")}
                     {/* 핸드드로운 강조 밑줄 — fill-in 후 정지. accent 톤. */}
                     <span
                       aria-hidden
                       className="absolute -bottom-0.5 left-0 h-[0.14em] w-full origin-left rounded-full bg-[linear-gradient(90deg,var(--color-accent),transparent)] motion-safe:[animation:spectrum-grow_0.6s_var(--ease-out-expo)_0.9s_both]"
                     />
                   </ShimmerTitle>
-                  으로.
+                  {t("home.hero.titleSuffix")}
                 </span>
               </h1>
 
@@ -257,8 +259,7 @@ export function HomePage() {
                 className="mt-3 line-clamp-2 max-w-md text-pretty text-[0.9375rem] leading-relaxed text-fg-2 sm:mt-5 sm:line-clamp-none sm:text-base"
                 style={{ animation: "fade-up 0.6s var(--ease-out-expo) 0.4s both" }}
               >
-                네이버 웹툰·시리즈와 카카오웹툰을 가로질러 검색하고, 실시간 신호와 독자 취향을 함께
-                읽어 무엇을 볼지 빠르게 좁힙니다.
+                {t("home.hero.description")}
               </p>
 
               <div
@@ -267,12 +268,12 @@ export function HomePage() {
               >
                 <OpenSearchButton className={HERO_PRIMARY_BUTTON_CLASS}>
                   <Search size={18} />
-                  작품·작가·태그 검색
+                  {t("home.hero.searchButton")}
                   {/* 키보드 단축키 힌트는 정밀 포인터(데스크톱)에서만 — 터치 기기엔 의미 없음. */}
                   <kbd className="ml-1 hidden rounded-md bg-on-accent/18 px-1.5 py-0.5 text-[0.7rem] pointer-fine:inline-block">⌘K</kbd>
                 </OpenSearchButton>
                 <Link href="/ranking" className={HERO_OUTLINE_BUTTON_CLASS}>
-                  통합 랭킹 보기
+                  {t("home.hero.rankingButton")}
                   <ArrowRight size={17} className="transition-transform duration-150 ease-out-expo group-hover:translate-x-0.5" />
                 </Link>
               </div>
@@ -281,11 +282,11 @@ export function HomePage() {
                 style={{ animation: "fade-up 0.6s var(--ease-out-expo) 0.58s both" }}
               >
                 <Link href="/studio" className="inline-flex items-center gap-1.5 transition-colors hover:text-accent">
-                  창작 스튜디오
+                  {t("home.hero.studioLink")}
                   <ArrowRight size={14} />
                 </Link>
                 <Link href="/create" className="inline-flex items-center gap-1.5 transition-colors hover:text-accent">
-                  창작 게시판
+                  {t("home.hero.createLink")}
                   <ArrowRight size={14} />
                 </Link>
               </div>

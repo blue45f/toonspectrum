@@ -98,12 +98,13 @@ export function AuthMenu({
   const initial = (u.name ?? u.email ?? "U").charAt(0).toUpperCase();
   const imageSrc = safeProfileImageSrc(u.image);
   const showAdmin = (u.role ?? "") === "admin" || (u.role ?? "") === "operator" || isAdmin;
+  const fallbackName = t("auth.menu.fallbackName");
 
   return (
     <DropdownMenu.Root defaultOpen={defaultMenuOpen}>
       <DropdownMenu.Trigger
         className="grid size-10 place-items-center overflow-hidden rounded-xl border border-line bg-accent text-sm font-bold text-on-accent outline-none transition-transform active:scale-95"
-        aria-label="계정 메뉴"
+        aria-label={t("auth.menu.triggerLabel")}
       >
         {imageSrc ? <img src={imageSrc} alt="" className="h-full w-full object-cover" /> : initial}
       </DropdownMenu.Trigger>
@@ -114,19 +115,19 @@ export function AuthMenu({
           className="z-50 w-52 overflow-hidden rounded-xl border border-line-strong bg-panel shadow-xl shadow-[oklch(0.1_0.02_70/0.42)] data-[state=open]:animate-[fade-up_0.16s_var(--ease-out-expo)_both]"
         >
           <div className="border-b border-line px-4 py-3">
-            <p className="truncate text-sm font-semibold text-fg">{u.name ?? "독자"}</p>
+            <p className="truncate text-sm font-semibold text-fg">{u.name ?? fallbackName}</p>
             <p className="truncate text-xs text-fg-3">{u.email}</p>
           </div>
           {showAdmin && (
             <DropdownMenu.Item asChild>
               <Link href="/admin" className={ITEM_CLASS}>
-                <Shield size={15} /> 관리자 콘솔
+                <Shield size={15} /> {t("auth.menu.adminPanel")}
               </Link>
             </DropdownMenu.Item>
           )}
           <DropdownMenu.Item asChild>
             <Link href="/me" className={ITEM_CLASS}>
-              <UserRound size={15} /> 내 정보
+              <UserRound size={15} /> {t("auth.menu.profile")}
             </Link>
           </DropdownMenu.Item>
           <DropdownMenu.Item asChild>
@@ -136,14 +137,14 @@ export function AuthMenu({
           </DropdownMenu.Item>
           <DropdownMenu.Item asChild>
             <Link href="/settings" className={ITEM_CLASS}>
-              <SettingsIcon size={15} /> 설정
+              <SettingsIcon size={15} /> {t("auth.menu.settings")}
             </Link>
           </DropdownMenu.Item>
           <DropdownMenu.Item
             onSelect={() => signOut()}
             className={cn(ITEM_CLASS, "hover:text-bad focus-visible:text-bad data-[highlighted]:text-bad")}
           >
-            <LogOut size={15} /> 로그아웃
+            <LogOut size={15} /> {t("auth.menu.signOut")}
           </DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>

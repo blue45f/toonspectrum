@@ -1,6 +1,7 @@
 import { Share2, Check, Link2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 declare global {
@@ -19,6 +20,7 @@ export function ShareButton({
   slug: string;
   className?: string;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -27,7 +29,7 @@ export function ShareButton({
     typeof window !== "undefined"
       ? `${globalThis.location.origin}/title/${encodeURIComponent(slug)}`
       : `/title/${encodeURIComponent(slug)}`;
-  const shareText = `${title} · 툰스펙트럼`;
+  const shareText = `${title} · ${t("app.name")}`;
 
   useEffect(() => {
     if (!open) return;
@@ -81,10 +83,11 @@ export function ShareButton({
       <button
         type="button"
         onClick={onShare}
-        aria-label="공유"
+        aria-label={t("share.triggerAria")}
         className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-3 text-sm font-medium text-fg-2 transition-colors hover:border-line-strong hover:text-fg"
       >
-        <Share2 size={15} /> 공유
+        <Share2 size={15} />
+        {t("share.triggerLabel")}
       </button>
       {open && (
         <div className="absolute right-0 z-30 mt-2 w-44 overflow-hidden rounded-xl border border-line-strong bg-panel p-1 shadow-2xl shadow-[oklch(0.1_0.02_70/0.42)]">
@@ -94,7 +97,7 @@ export function ShareButton({
             ) : (
               <Link2 size={15} />
             )}
-            {copied ? "링크 복사됨" : "링크 복사"}
+            {copied ? t("share.copySuccess") : t("share.copy")}
           </button>
           <a
             href={x}
@@ -102,7 +105,7 @@ export function ShareButton({
             rel="noopener noreferrer"
             className={itemCls}
           >
-            X (트위터)
+            {t("share.social.x")}
           </a>
           <a
             href={fb}
@@ -110,7 +113,7 @@ export function ShareButton({
             rel="noopener noreferrer"
             className={itemCls}
           >
-            페이스북
+            {t("share.social.facebook")}
           </a>
         </div>
       )}
