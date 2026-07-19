@@ -4,11 +4,6 @@ import { resolveStudioWebGpuCanvasStrokes } from "./studio-webgpu-canvas-authori
 import {
   isStudioWebGpuCanvasActive,
   StudioWebGpuEngine,
-  type StudioGpuBackend,
-  type StudioGpuFrameReadbackRequest,
-  type StudioGpuFrameReadbackResult,
-  type StudioGpuFrameReceipt,
-  type StudioGpuPerformanceMetrics,
   type StudioGpuStroke,
 } from "./studio-webgpu-engine";
 import {
@@ -21,6 +16,13 @@ import {
   type StudioGpuStrokeSuffixPatch,
 } from "./studio-webgpu-stroke-feed";
 
+import type {
+  StudioGpuBackend,
+  StudioGpuFrameReadbackRequest,
+  StudioGpuFrameReadbackResult,
+  StudioGpuFrameReceipt,
+  StudioGpuPerformanceMetrics,
+} from "./studio-webgpu-frame-contract";
 import type { StudioWebGpuSurfaceBounds } from "./studio-webgpu-viewport";
 import type { StudioGpuViewTransform } from "./studio-webgpu-viewport-contract";
 

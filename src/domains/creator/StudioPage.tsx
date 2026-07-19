@@ -1165,7 +1165,7 @@ import type { ScenarioBeatType } from "./studio-story-beats";
 import type { SvgExportEl, SvgExportResult } from "./studio-svg-export";
 import type { StudioTeamCommentCapabilities } from "./studio-team-comment-client";
 import type { StudioToolbarGroupId } from "./studio-toolbar-groups";
-import type { StudioGpuBackend } from "./studio-webgpu-engine";
+import type { StudioGpuBackend } from "./studio-webgpu-frame-contract";
 import type { StudioGpuStroke } from "./studio-webgpu-stroke";
 import type {
   StudioAssetSortOrder,
