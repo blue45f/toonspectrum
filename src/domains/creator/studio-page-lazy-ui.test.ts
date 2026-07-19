@@ -50,7 +50,7 @@ const REPRESENTATIVE_OPTIONAL_SURFACES = [
   "./StudioAppSettingsPanel",
   "./StudioBrushStudio",
   "./StudioColorPalettePanel",
-  "./StudioCommentsPanel",
+  "./StudioCommentsPanelSession",
   "./StudioFilterDialog",
   "./StudioFloodFillPanel",
   "./StudioFrameAnimationPanel",
@@ -96,5 +96,23 @@ describe("StudioPage optional UI registry", () => {
     expect(registry).toContain("studioIntegrationsSettingsPanelPromise ??=");
     expect(registry).toContain("studioExportMenuPanelPromise ??=");
     expect(registry).toContain("studioColorPopoverPromise ??=");
+  });
+
+  it("loads one comments session boundary without a nested panel waterfall", () => {
+    const registry = moduleEdges("./studio-page-lazy-ui.ts");
+    const session = moduleEdges("./StudioCommentsPanelSession.tsx");
+
+    expect(
+      registry.dynamicImports.filter(
+        (specifier) => specifier === "./StudioCommentsPanelSession"
+      )
+    ).toEqual(["./StudioCommentsPanelSession"]);
+    expect(registry.dynamicImports).not.toContain("./StudioCommentsPanel");
+    expect(registry.valueImports).not.toContain("./StudioCommentsPanelSession");
+    expect(
+      session.valueImports.filter((specifier) => specifier === "./StudioCommentsPanel")
+    ).toEqual(["./StudioCommentsPanel"]);
+    expect(session.dynamicImports).toEqual([]);
+    expect(session.valueImports).not.toContain("./studio-page-lazy-ui");
   });
 });

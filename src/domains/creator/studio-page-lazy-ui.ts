@@ -468,12 +468,12 @@ const StudioPublicationOperationsPanel = lazyRetry(
     })),
   "StudioPublicationOperationsPanel"
 );
-const StudioCommentsPanel = lazyRetry(
+const StudioCommentsPanelSession = lazyRetry(
   () =>
-    import("./StudioCommentsPanel").then((mod) => ({
-      default: mod.StudioCommentsPanel,
+    import("./StudioCommentsPanelSession").then((mod) => ({
+      default: mod.StudioCommentsPanelSession,
     })),
-  "StudioCommentsPanel"
+  "StudioCommentsPanelSession"
 );
 
 // Review networking and mutation verification are not part of the first-paint drawing path.
@@ -652,7 +652,7 @@ export {
   StudioColorPalettePanel,
   StudioColorPopoverContent,
   StudioColorWheelOverlay,
-  StudioCommentsPanel,
+  StudioCommentsPanelSession,
   StudioContinuityMetadataEditor,
   StudioContinuityPanel,
   StudioCropOverlay,

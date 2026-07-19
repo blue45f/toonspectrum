@@ -65,7 +65,7 @@ const STACK_OPTIONAL_MODULES = [
   "./StudioCharacterBiblePanel",
   "./StudioCheckpointPanel",
   "./StudioColorWheelOverlay",
-  "./StudioCommentsPanel",
+  "./StudioCommentsPanelSession",
   "./StudioContinuityPanel",
   "./StudioPageReviewPanel",
   "./StudioProductionInsightsPanel",
@@ -132,6 +132,7 @@ describe("Studio lazy panel stack boundary", () => {
   it("uses the neutral lazy registry instead of importing optional panel implementations", () => {
     const stack = moduleEdges("./StudioLazyPanelStack.tsx");
     const previewStack = moduleEdges("./StudioThreeDPreviewPanelStack.tsx");
+    const commentsSession = moduleEdges("./StudioCommentsPanelSession.tsx");
     const registry = moduleEdges("./studio-page-lazy-ui.ts");
     const background3dLoader = moduleEdges("./studio-background-3d-loader.ts");
 
@@ -156,6 +157,11 @@ describe("Studio lazy panel stack boundary", () => {
       }
     }
     expect(stack.valueImports).not.toContain("./StudioVrmPoser");
+    expect(commentsSession.valueImports).toContain("./StudioCommentsPanel");
+    expect(commentsSession.dynamicImports).toEqual([]);
+    expect(commentsSession.valueImports).not.toContain("./studio-page-lazy-ui");
+    expect(commentsSession.allImports).toContain("./StudioLazyPanelStack");
+    expect(commentsSession.valueImports).not.toContain("./StudioLazyPanelStack");
   });
 
   it("preserves semantic 3D transactions and initial-scene cleanup", () => {
@@ -210,6 +216,7 @@ describe("Studio lazy panel stack boundary", () => {
   it("guards optional surfaces with their existing open or mounted flags", () => {
     const rootStack = moduleEdges("./StudioLazyPanelStack.tsx").source;
     const previewStack = moduleEdges("./StudioThreeDPreviewPanelStack.tsx").source;
+    const commentsSession = moduleEdges("./StudioCommentsPanelSession.tsx").source;
     const stack = `${rootStack}\n${previewStack}`;
 
     for (const condition of [
@@ -235,11 +242,17 @@ describe("Studio lazy panel stack boundary", () => {
     ] as const) {
       expect(stack).toContain(condition);
     }
+    expect(rootStack).toContain("<StudioCommentsPanelSession");
+    expect(commentsSession).toContain("<StudioCommentsPanel");
+    expect(commentsSession).toContain("open={commentsOpen}");
+    expect(commentsSession).not.toContain("commentsOpen ? (");
+    expect(commentsSession).not.toContain("key={commentsOpen}");
   });
 
   it("keeps the split at the original DOM seam with stable Pick-based contracts", () => {
     const stack = moduleEdges("./StudioLazyPanelStack.tsx").source;
     const previewStack = moduleEdges("./StudioThreeDPreviewPanelStack.tsx").source;
+    const commentsSession = moduleEdges("./StudioCommentsPanelSession.tsx").source;
     const firstPreview = stack.indexOf("<StudioThreeDPreviewPanelStack");
     const comments = stack.indexOf("commentsPanelMounted ? (");
     const continuity = stack.indexOf("continuityOpen ? (");
@@ -251,7 +264,10 @@ describe("Studio lazy panel stack boundary", () => {
     expect(secondPreview).toBeGreaterThan(continuity);
     expect(previewStack).toContain("type StudioThreeDPreviewPanelStackHandlers = Pick<");
     expect(previewStack).toContain("type StudioScrollScenarioPreviewPanelStackHandlers = Pick<");
+    expect(commentsSession).toContain("type StudioCommentsPanelSessionHandlers = Pick<");
+    expect(commentsSession).toContain("export type StudioCommentsPanelSessionProps = Pick<");
     expect(previewStack.match(/stableHandlers: Studio\w+Handlers;/g)).toHaveLength(2);
-    expect(stack.match(/stableHandlers=\{stableHandlers\}/g)).toHaveLength(2);
+    expect(commentsSession).toContain("stableHandlers: StudioCommentsPanelSessionHandlers;");
+    expect(stack.match(/stableHandlers=\{stableHandlers\}/g)).toHaveLength(3);
   });
 });

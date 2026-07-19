@@ -15,7 +15,7 @@ import {
   StudioCharacterBiblePanel,
   StudioCheckpointPanel,
   StudioColorWheelOverlay,
-  StudioCommentsPanel,
+  StudioCommentsPanelSession,
   StudioContinuityPanel,
   StudioProductionInsightsPanel,
   StudioPublicationOperationsPanel,
@@ -518,9 +518,6 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
   stableHandlers,
 }: StudioLazyPanelStackProps) {
   const {
-    applyStudioCommentsPanelChange,
-    markAllStudioCommentThreadsRead,
-    markStudioCommentThreadRead,
     applyWriterRoomAiReview,
     applyWriterRoomCanvasPlan,
     cancelAutoAction,
@@ -528,7 +525,6 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
     changeAutoActionScope,
     changeAutoActionSelectedPages,
     createNamedCheckpoint,
-    disarmAllPixelTools,
     downloadAiPublicSummary,
     downloadPublishPackageManifest,
     downloadPublishPreflightReport,
@@ -540,7 +536,6 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
     rememberColor,
     removeNamedCheckpoint,
     restoreNamedCheckpoint,
-    selectStudioCommentAnchor,
     setAiProvenance,
     setCharacterBible,
     setCurrentPageId,
@@ -605,62 +600,27 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
 
       <Suspense fallback={null}>
         {commentsPanelMounted ? (
-          <StudioCommentsPanel
-            open={commentsOpen}
-            onClose={() => setCommentsOpen(false)}
-            document={studioComments}
-            onChange={applyStudioCommentsPanelChange}
-            activeAnchor={activeCommentAnchor}
-            currentActor={studioCommentActor}
-            anchorOptions={studioCommentAnchorOptions}
-            isAnchorValid={isStudioCommentAnchorValid}
-            onSelectAnchor={selectStudioCommentAnchor}
-            focusRequest={studioCommentFocusRequest}
-            onFocusRequestHandled={(requestId) => {
-              setStudioCommentFocusRequest((current) => current?.requestId === requestId
-                ? null
-                : current);
-            }}
-            onArmPinPlacement={() => {
-              // 패널을 닫고 다음 캔버스 클릭 한 번으로 point 앵커를 잡는다(Esc/도구 전환 시 해제).
-              disarmAllPixelTools();
-              setCommentsOpen(false);
-              setCommentPinArmed(true);
-            }}
-            capabilities={workId
-              ? {
-                  create: studioTeamCommentCapabilities?.comment === true,
-                  reply: studioTeamCommentCapabilities?.comment === true,
-                  editOwn: false,
-                  deleteOwn: false,
-                  resolve: studioTeamCommentCapabilities?.resolve === true,
-                  assign: false,
-                }
-              : {
-                  create: !collaborationDocumentLocked,
-                  reply: !collaborationDocumentLocked,
-                  editOwn: !collaborationDocumentLocked,
-                  deleteOwn: !collaborationDocumentLocked,
-                  resolve: !collaborationDocumentLocked,
-                  assign: !collaborationDocumentLocked,
-                }}
-            mutationDisabledReason={workId && !studioTeamCommentCapabilities
-              ? "팀 댓글 권한과 기록을 확인하는 중이에요."
-              : workId && !studioTeamCommentCapabilities?.comment
-                ? "열람자는 댓글을 읽고 위치로 이동할 수 있지만 작성할 수는 없어요."
-                : undefined}
-            syncError={studioCommentSyncError ?? undefined}
-            storageMode={workId ? "team" : "document"}
-            unreadThreadIds={studioTeamUnreadCommentIdSet}
-            readOnlyThreadIds={studioLegacyCommentThreadIdSet}
-            pinsHidden={studioCommentPinsHidden}
-            onTogglePinsHidden={() => setStudioCommentPinsHidden((hidden) => !hidden)}
-            onMarkThreadRead={studioTeamCommentsWorkId && studioTeamCommentCapabilities?.view
-              ? markStudioCommentThreadRead
-              : undefined}
-            onMarkAllRead={studioTeamCommentsWorkId && studioTeamCommentCapabilities?.view
-              ? markAllStudioCommentThreadsRead
-              : undefined}
+          <StudioCommentsPanelSession
+            activeCommentAnchor={activeCommentAnchor}
+            collaborationDocumentLocked={collaborationDocumentLocked}
+            commentsOpen={commentsOpen}
+            isStudioCommentAnchorValid={isStudioCommentAnchorValid}
+            setCommentPinArmed={setCommentPinArmed}
+            setCommentsOpen={setCommentsOpen}
+            setStudioCommentFocusRequest={setStudioCommentFocusRequest}
+            setStudioCommentPinsHidden={setStudioCommentPinsHidden}
+            stableHandlers={stableHandlers}
+            studioCommentActor={studioCommentActor}
+            studioCommentAnchorOptions={studioCommentAnchorOptions}
+            studioCommentFocusRequest={studioCommentFocusRequest}
+            studioComments={studioComments}
+            studioCommentPinsHidden={studioCommentPinsHidden}
+            studioCommentSyncError={studioCommentSyncError}
+            studioLegacyCommentThreadIdSet={studioLegacyCommentThreadIdSet}
+            studioTeamCommentCapabilities={studioTeamCommentCapabilities}
+            studioTeamCommentsWorkId={studioTeamCommentsWorkId}
+            studioTeamUnreadCommentIdSet={studioTeamUnreadCommentIdSet}
+            workId={workId}
           />
         ) : null}
       </Suspense>

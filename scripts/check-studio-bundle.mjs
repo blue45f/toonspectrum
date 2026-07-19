@@ -137,6 +137,14 @@ if (!fs.existsSync(manifestPath)) {
     }
   }
 
+  function dynamicTargetsFromStaticClosure(entryKey) {
+    const targets = new Set();
+    for (const key of staticClosure(entryKey)) {
+      for (const target of manifest[key].dynamicImports ?? []) targets.add(target);
+    }
+    return targets;
+  }
+
   try {
     const studioKeys = staticClosure(studioEntry);
     const appKeys = staticClosure(appEntry);
@@ -222,6 +230,7 @@ if (!fs.existsSync(manifestPath)) {
     }
 
     const optionalUiBoundaries = [
+      ["optional comments session", /src\/domains\/creator\/StudioCommentsPanelSession\.tsx/],
       ["optional workspace manager", /src\/domains\/creator\/StudioWorkspaceMenu\.tsx/],
       ["optional color palette", /src\/domains\/creator\/StudioColorPalettePanel\.tsx/],
       ["optional flood fill panel", /src\/domains\/creator\/StudioFloodFillPanel\.tsx/],
@@ -236,6 +245,26 @@ if (!fs.existsSync(manifestPath)) {
     ];
     for (const [label, pattern] of optionalUiBoundaries) {
       checkDynamicBoundary(label, pattern, studioKeys);
+    }
+
+    const commentSessionEntries = matchingManifestEntries(
+      /src\/domains\/creator\/StudioCommentsPanelSession\.tsx/,
+    ).filter((key) => manifest[key].isDynamicEntry === true);
+    if (commentSessionEntries.length !== 1) {
+      fail(
+        `expected one StudioCommentsPanelSession dynamic entry, found ${commentSessionEntries.length}`,
+      );
+    } else {
+      const nestedCommentPanels = matchingEntries(
+        dynamicTargetsFromStaticClosure(commentSessionEntries[0]),
+        /src\/domains\/creator\/StudioCommentsPanel\.tsx/,
+      );
+      if (nestedCommentPanels.length > 0) {
+        fail(
+          "comments session introduced a nested StudioCommentsPanel dynamic waterfall: "
+            + nestedCommentPanels.join(", "),
+        );
+      }
     }
 
     const eagerBackgroundCatalog = matchingEntries(

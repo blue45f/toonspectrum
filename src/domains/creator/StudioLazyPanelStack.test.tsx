@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   StudioLazyPanelStack,
@@ -9,10 +9,25 @@ import {
   type StudioLazyPanelStackProps,
 } from "./StudioLazyPanelStack";
 
-vi.mock("./studio-page-lazy-ui", () => {
+const commentsSessionHarness = vi.hoisted(() => ({ nextInstanceId: 0 }));
+
+vi.mock("./studio-page-lazy-ui", async () => {
+  const { useState } = await import("react");
   const panel = (name: string) => () => (
     <div data-optional-panel={name}>{name}</div>
   );
+
+  function MockStudioCommentsPanelSession({ commentsOpen }: { commentsOpen: boolean }) {
+    const [instanceId] = useState(() => ++commentsSessionHarness.nextInstanceId);
+    return (
+      <div
+        data-optional-panel="comments"
+        data-open={String(commentsOpen)}
+        data-instance-id={instanceId}
+      />
+    );
+  }
+
   return {
     StudioAiProvenancePanel: panel("ai-provenance"),
     StudioAutoActionsPanel: panel("auto-actions"),
@@ -25,9 +40,7 @@ vi.mock("./studio-page-lazy-ui", () => {
     StudioCharacterBiblePanel: panel("character-bible"),
     StudioCheckpointPanel: panel("checkpoint"),
     StudioColorWheelOverlay: panel("color-wheel"),
-    StudioCommentsPanel: ({ open }: { open: boolean }) => (
-      <div data-optional-panel="comments" data-open={String(open)} />
-    ),
+    StudioCommentsPanelSession: MockStudioCommentsPanelSession,
     StudioContinuityPanel: panel("continuity"),
     StudioPageReviewPanel: panel("page-review"),
     StudioProductionInsightsPanel: panel("production-insights"),
@@ -106,6 +119,10 @@ function createProps(
   } as unknown as StudioLazyPanelStackProps;
 }
 
+beforeEach(() => {
+  commentsSessionHarness.nextInstanceId = 0;
+});
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -118,7 +135,7 @@ describe("StudioLazyPanelStack", () => {
     expect(view.container.querySelectorAll("[data-optional-panel]")).toHaveLength(0);
   });
 
-  it("keeps the comments rail mounted while closed only after its retry-preserving flag is set", () => {
+  it("keeps one comments session instance mounted across close and reopen after activation", () => {
     const view = render(
       <StudioLazyPanelStack
         {...createProps({ commentsOpen: false, commentsPanelMounted: false })}
@@ -128,11 +145,32 @@ describe("StudioLazyPanelStack", () => {
 
     view.rerender(
       <StudioLazyPanelStack
+        {...createProps({ commentsOpen: true, commentsPanelMounted: true })}
+      />
+    );
+    const openedSession = view.container.querySelector('[data-optional-panel="comments"]');
+    expect(openedSession?.getAttribute("data-open")).toBe("true");
+    expect(openedSession?.getAttribute("data-instance-id")).toBe("1");
+
+    view.rerender(
+      <StudioLazyPanelStack
         {...createProps({ commentsOpen: false, commentsPanelMounted: true })}
       />
     );
-    expect(view.container.querySelector('[data-optional-panel="comments"]')?.getAttribute("data-open"))
-      .toBe("false");
+    const closedSession = view.container.querySelector('[data-optional-panel="comments"]');
+    expect(closedSession).toBe(openedSession);
+    expect(closedSession?.getAttribute("data-open")).toBe("false");
+    expect(closedSession?.getAttribute("data-instance-id")).toBe("1");
+
+    view.rerender(
+      <StudioLazyPanelStack
+        {...createProps({ commentsOpen: true, commentsPanelMounted: true })}
+      />
+    );
+    const reopenedSession = view.container.querySelector('[data-optional-panel="comments"]');
+    expect(reopenedSession).toBe(openedSession);
+    expect(reopenedSession?.getAttribute("data-open")).toBe("true");
+    expect(reopenedSession?.getAttribute("data-instance-id")).toBe("1");
   });
 
   it("delegates semantic VRM insertion and clears the caller-owned initial scene on close", () => {
