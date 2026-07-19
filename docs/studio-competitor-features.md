@@ -781,9 +781,9 @@ API 키를 등록해야 하는 곳이 AI 어시스트(baseURL/API키/모델)와 
   스타일(팔레트+브랜드 킷) / AI 연동(AI 어시스트+시나리오 자동 생성+스톡 사진+연동 설정 — "API 키가
   필요한 기능은 한 곳에 모은다"는 요청과 자연스럽게 일치). 사용 빈도가 매우 높은 핵심 도구(선택/펜/
   지우개/텍스트/말풍선)는 의도적으로 그룹화하지 않고 그대로 1줄에 유지했다.
-- **상태관리**: 새 상태를 추가하지 않고 기존 `menu`(단일 nullable `StudioMenu`) 하나로 "그룹 열림"과
-  "활성 서브탭"을 동시에 표현한다. 모듈 상수 `STUDIO_TOOLBAR_GROUP_OF`(`StudioMenu` → 그룹 id 매핑)에서
-  파생하는 `activeToolbarGroup`이 현재 어느 그룹이 열려 있는지 결정하고, 그룹 버튼 클릭은 그 그룹의
+- **상태관리**: `studio-menu-session-model.ts`의 단일 메뉴 세션이 `menu`와 상단 앱 메뉴를 상호 배타적으로
+  표현하고, exhaustive `STUDIO_TOOLBAR_GROUP_BY_MENU`(`StudioMenu` → 그룹 id/null 매핑)에서
+  파생하는 `activeToolbarGroup`이 현재 어느 그룹이 열려 있는지 결정한다. 그룹 버튼 클릭은 그 그룹의
   첫 멤버로 `setMenu`할 뿐이다. 그룹 팝오버는 개별 팝오버와 동일한 `z-[60]`·
   `max-h-[calc(100dvh-13rem)]` 관례(2026-07-04 통일)를 그대로 물려받는 공용 wrapper
   (`groupPopoverClass`) 하나 안에, 서브탭 칩 행(`groupTabBtn`) + 현재 선택된 탭의 콘텐츠를 넣는 구조다.

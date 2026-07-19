@@ -70,6 +70,79 @@ describe("studio autosave", () => {
     expect(parsed?.publishPack).toEqual({ profile: "tapas", aiUsage: "none", disclosure: "" });
   });
 
+  it("새 작품 연결 메타데이터를 null 의미까지 직렬화·파싱 왕복에서 보존한다", () => {
+    const parsed = parseStudioAutosave(
+      serializeStudioAutosave({
+        version: 2,
+        savedAt: "2026-07-19T00:00:00.000Z",
+        pagesList: [{ id: "p1", elements: [] }],
+        linkedTitleId: "title/season 1",
+        linkedSeriesId: null,
+        linkedChallengeId: "challenge-7",
+      })
+    );
+
+    expect(parsed).toMatchObject({
+      linkedTitleId: "title/season 1",
+      linkedSeriesId: null,
+      linkedChallengeId: "challenge-7",
+    });
+    expect(
+      parseStudioAutosave(JSON.stringify({
+        pagesList: [{ id: "p1", elements: [] }],
+        linkedTitleId: "   ",
+        linkedSeriesId: 7,
+      }))
+    ).toMatchObject({ linkedTitleId: undefined, linkedSeriesId: undefined });
+  });
+
+  it.each([
+    ["게시 목적지", { profile: "tapas", aiUsage: "none", disclosure: "" }],
+    ["AI 사용 방식", { profile: "generic", aiUsage: "assisted", disclosure: "" }],
+    ["AI 고지", { profile: "generic", aiUsage: "none", disclosure: "배경 후보 탐색" }],
+    ["크레딧", { profile: "generic", aiUsage: "none", disclosure: "", packageCredits: "모델: 작가 소유" }],
+    ["검토 PDF", { packageSettings: { includeReviewPdf: true } }],
+    ["크레딧 제외", { packageSettings: { includeCredits: false } }],
+    ["추가 썸네일", { packageSettings: { requestedThumbnailSlots: ["episode", "series-square"] } }],
+  ])("%s만 설정한 빈 원고도 복구 후보로 발견한다", (_label, publishPack) => {
+    const key = "publish-only";
+    const raw = JSON.stringify({
+      version: 2,
+      savedAt: "2026-07-19T00:00:00.000Z",
+      pagesList: [{ id: "p1", elements: [] }],
+      publishPack,
+    });
+    const payload = parseStudioAutosave(raw);
+
+    expect(payload && studioAutosaveHasContent(payload)).toBe(true);
+    expect(readStudioAutosave({ getItem: (candidate) => candidate === key ? raw : null }, key))
+      .toMatchObject({ key, payload: { publishPack } });
+  });
+
+  it("기본값 또는 손상된 Publish Pack만 있는 레거시 문서는 빈 복구본으로 유지한다", () => {
+    const defaults = parseStudioAutosave(JSON.stringify({
+      pagesList: [{ id: "p1", elements: [] }],
+      publishPack: {
+        profile: "generic",
+        aiUsage: "none",
+        disclosure: "",
+        packageCredits: "",
+        packageSettings: {
+          requestedThumbnailSlots: ["episode"],
+          includeReviewPdf: false,
+          includeCredits: true,
+        },
+      },
+    }));
+    const malformed = parseStudioAutosave(JSON.stringify({
+      pagesList: [{ id: "p1", elements: [] }],
+      publishPack: { profile: "unknown", packageSettings: { version: 999 } },
+    }));
+
+    expect(defaults && studioAutosaveHasContent(defaults)).toBe(false);
+    expect(malformed && studioAutosaveHasContent(malformed)).toBe(false);
+  });
+
   it("공동 작품 source work/revision을 직렬화·파싱 왕복에서 보존한다", () => {
     const parsed = parseStudioAutosave(
       serializeStudioAutosave({

@@ -80,7 +80,7 @@ import {
   MessageSquare,
   Triangle,
 } from "lucide-react";
-import { Fragment, Profiler, Suspense, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { Fragment, Profiler, Suspense, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type SetStateAction } from "react";
 import { createPortal, flushSync } from "react-dom";
 import { Stage, Layer, Rect, Text as KText, TextPath as KTextPath, Image as KImage, Line, Group, Ellipse, Circle as KCircle, Path, Transformer, Shape } from "react-konva/lib/ReactKonvaCore";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -135,6 +135,10 @@ import {
   type StudioTextAiProvenance,
   type StudioTextAiTransport,
 } from "./studio-ai-client";
+import {
+  captureStudioAiGeneratedAssetProvenance,
+  finalizeStudioAiGeneratedAssetProvenance,
+} from "./studio-ai-generated-asset-model";
 import {
   createEmptyStudioAiProvenanceDocument,
   normalizeStudioAiProvenanceDocument,
@@ -658,6 +662,15 @@ import {
   type DocumentMaster,
 } from "./studio-master-page";
 import {
+  EMPTY_STUDIO_MENU_SESSION,
+  reduceStudioAppMenuOpenUpdate,
+  reduceStudioMenuSession,
+  resolveStudioCompanionTool,
+  resolveStudioToolbarGroup,
+  type StudioMenuSessionState,
+  type StudioWorkspaceLayoutSource,
+} from "./studio-menu-session-model";
+import {
   saveStudioMobileImmersivePreference,
   shouldStartStudioMobileImmersive,
   studioMobileImmersiveSessionStorage,
@@ -836,6 +849,12 @@ import {
   type StudioProjectFile,
 } from "./studio-project-file";
 import {
+  buildStudioProjectFileSnapshot,
+  resolveStudioDurableProjectPages,
+  studioProjectSnapshotHasMeaningfulContent,
+  type StudioProjectSnapshot,
+} from "./studio-project-snapshot";
+import {
   createEmptyStudioPublicationAnalyticsSnapshot,
   normalizeStudioPublicationAnalyticsDeferred,
 } from "./studio-publication-analytics-loader";
@@ -900,7 +919,6 @@ import {
   areStudioReferenceBoardDocumentsEqual,
   createDefaultStudioReferenceBoardDocument,
   normalizeStudioReferenceBoardDocument,
-  studioReferenceBoardHasContent,
   type StudioReferenceBoardDocument,
 } from "./studio-reference-board";
 import {
@@ -998,16 +1016,11 @@ import {
 import { partitionStudioTeamCommentMutableDocument } from "./studio-team-comment-mutable-document";
 import { buildTextPathData, normalizeTextPath, isFlatTextPath } from "./studio-text-path";
 import {
-  STUDIO_TOOLBAR_GROUP_OF,
-  type StudioToolbarGroupId,
-} from "./studio-toolbar-groups";
-import {
   buildStudioCompanionHello,
   buildStudioCompanionPrimaryState,
   createStudioCompanionChannel,
   openStudioToolsCompanionWindow,
   parseStudioCompanionMessage,
-  type StudioCompanionToolId,
 } from "./studio-tools-companion";
 import {
   loadStudioUiDensityState,
@@ -1093,7 +1106,6 @@ import {
   createEmptyStudioWriterRoomDocument,
   normalizeStudioWriterRoomDocument,
   replaceStudioWriterRoomStage,
-  studioWriterRoomHasContent,
   type StudioWriterRoomDocument,
   type StudioWriterRoomStage,
 } from "./studio-writer-room";
@@ -1228,6 +1240,7 @@ import type { StudioStockPhoto } from "./studio-stock-image-client";
 import type { ScenarioBeatType } from "./studio-story-beats";
 import type { SvgExportEl, SvgExportResult } from "./studio-svg-export";
 import type { StudioTeamCommentCapabilities } from "./studio-team-comment-client";
+import type { StudioToolbarGroupId } from "./studio-toolbar-groups";
 import type { StudioGpuBackend } from "./studio-webgpu-engine";
 import type { StudioGpuStroke } from "./studio-webgpu-stroke";
 import type {
@@ -4455,7 +4468,38 @@ function StudioCuttoonEditor() {
   leftResizeSetWidthRef.current = leftResize.setWidth;
   rightResizeSetWidthRef.current = rightResize.setWidth;
   const [pageGradePanelOpen, setPageGradePanelOpen] = useState(false);
-  const [menu, setMenu] = useState<null | StudioMenu>(null);
+  const [menuSession, setMenuSession] = useState<StudioMenuSessionState>(
+    EMPTY_STUDIO_MENU_SESSION
+  );
+  const menu = menuSession.toolMenu;
+  const exportMenuOpen = menuSession.appMenu === "export";
+  const projectActionsOpen = menuSession.appMenu === "project";
+  function setMenu(update: SetStateAction<StudioMenu | null>): void {
+    setMenuSession((current) => {
+      const next = typeof update === "function" ? update(current.toolMenu) : update;
+      return next === null
+        ? reduceStudioMenuSession(current, { type: "tool-menu.close" })
+        : reduceStudioMenuSession(current, { type: "tool-menu.open", menu: next });
+    });
+  }
+  function setExportMenuOpen(update: SetStateAction<boolean>): void {
+    setMenuSession((current) =>
+      reduceStudioAppMenuOpenUpdate(current, "export", update)
+    );
+  }
+  function setProjectActionsOpen(update: SetStateAction<boolean>): void {
+    setMenuSession((current) =>
+      reduceStudioAppMenuOpenUpdate(current, "project", update)
+    );
+  }
+  function closeStudioMenusForWorkspace(source: StudioWorkspaceLayoutSource): void {
+    setMenuSession((current) =>
+      reduceStudioMenuSession(current, {
+        type: "workspace.layout-applied",
+        source,
+      })
+    );
+  }
   // 모니터 전체화면(Fullscreen API) — 창작 스튜디오만 스크린 전체로.
   const [isFullscreen, setIsFullscreen] = useState(false);
   // 브라우저 창 최대화 — OS 전체화면이 아니라 브라우저 뷰포트(탭 유지)를 꽉 채운다.
@@ -4551,7 +4595,7 @@ function StudioCuttoonEditor() {
     setQuickActionsPreferences(layout.quickActions);
     setMobileSheet(null);
     setQuickActionsOpen(false);
-    setMenu(null);
+    closeStudioMenusForWorkspace("switch");
     setWorkspaceSyncNotice(null);
     globalThis.requestAnimationFrame?.(() => propsSheetRef.current?.scrollTo({ top: 0 }));
   }
@@ -4597,7 +4641,7 @@ function StudioCuttoonEditor() {
     setQuickActionsPreferences(layout.quickActions);
     setMobileSheet(null);
     setQuickActionsOpen(false);
-    setMenu(null);
+    closeStudioMenusForWorkspace("owner-scope-change");
     setWorkspaceSyncNotice(null);
   }, [
     currentWorkspaceOwnerScope,
@@ -4727,7 +4771,7 @@ function StudioCuttoonEditor() {
       setQuickActionsPreferences(layout.quickActions);
       setMobileSheet(null);
       setQuickActionsOpen(false);
-      setMenu(null);
+      closeStudioMenusForWorkspace("external-sync");
       setWorkspaceMenuEpoch((current) => current + 1);
       setWorkspaceSyncNotice("다른 탭에서 저장한 작업공간을 반영했어요.");
     };
@@ -6404,6 +6448,44 @@ function StudioCuttoonEditor() {
     studioLifecycleDurablePendingFingerprintRef.current = "";
   }, [remixId, studioAuthUserId, workHydrated, workId]);
 
+  const { buildCurrentStudioProjectFileSnapshot } = useStudioStableHandlers<{
+    buildCurrentStudioProjectFileSnapshot: (
+      durablePages: PageState[],
+      savedAt: string
+    ) => StudioProjectSnapshot;
+  }>({
+    buildCurrentStudioProjectFileSnapshot: (durablePages, savedAt) =>
+      buildStudioProjectFileSnapshot({
+        savedAt,
+        title,
+        description,
+        tagsText,
+        linkedTitleId,
+        linkedSeriesId,
+        linkedChallengeId,
+        pagesList: durablePages,
+        master,
+        characterBible,
+        writerRoom,
+        aiProvenance,
+        comments: studioComments,
+        releaseSchedule,
+        publicationAnalytics,
+        referenceBoard,
+        currentPageId,
+        webtoonTheme,
+        panelGutter,
+        publishPack: {
+          profile: publishProfile,
+          aiUsage: publishAiUsage,
+          disclosure: publishAiDisclosure,
+          compliance: publishCompliance,
+          packageSettings: effectivePublishPackageSettings,
+          packageCredits: publishPackageCredits,
+        },
+      }),
+  });
+
   // 오토세이브 임시저장 리스너 (디바운스 1.5초)
   useEffect(() => {
     if (!workHydrated) return;
@@ -6414,39 +6496,20 @@ function StudioCuttoonEditor() {
     // 재진입 1.5초 뒤 빈 초기 상태가 직전 작업을 덮어써 "복구하기"가 빈 캔버스를 복원한다.
     if (hasAutosave) return;
     const pendingBatch = pendingStrokeCommitsRef.current;
-    const durablePages = projectStudioPendingStrokes(
-      pages,
-      pendingBatch
+    const durablePages = resolveStudioDurableProjectPages({
+      pagesHistory: pagesHistoryRef.current,
+      historyIndex: pagesHiRef.current,
+      fallbackPages: pages,
+      pendingStrokeCommits: pendingBatch
         ? { pageId: pendingBatch.pageId, strokes: pendingBatch.strokes }
-        : null
-    ).pagesList as PageState[];
+        : null,
+    }).pagesList as PageState[];
     // 빈 문서(요소·게시 정보 모두 없음)는 저장하지 않는다 — 의미 없는 복구 배너를 막고,
     // 직전 작업 백업이 빈 상태로 교체되는 것도 방지한다.
-    const hasContent =
-      durablePages.some((p) => p.elements.length > 0) ||
-      durablePages.some((p) => studioDrawingAssistHasContent(p.drawingAssist, {
-        canvasWidth: CANVAS_W,
-        canvasHeight: p.canvasH,
-      })) ||
-      master.elements.length > 0 ||
-      characterBible.characters.length > 0 ||
-      studioWriterRoomHasContent(writerRoom) ||
-      aiProvenance.operations.length > 0 ||
-      studioComments.threads.length > 0 ||
-      releaseSchedule.items.length > 0 ||
-      publicationAnalytics.records.length > 0 ||
-      studioReferenceBoardHasContent(referenceBoard) ||
-      publishProfile !== "generic" ||
-      publishAiUsage !== "none" ||
-      publishAiDisclosure.trim() !== "" ||
-      publishPackageCredits.trim() !== "" ||
-      publishPackageSettings.includeReviewPdf ||
-      !publishPackageSettings.includeCredits ||
-      publishPackageSettings.requestedThumbnailSlots.join(",") !== "episode" ||
-      title.trim() !== "" ||
-      description.trim() !== "" ||
-      tagsText.trim() !== "";
-    if (!hasContent) return;
+    if (!studioProjectSnapshotHasMeaningfulContent(
+      buildCurrentStudioProjectFileSnapshot(durablePages, "content-check"),
+      { canvasWidth: CANVAS_W }
+    )) return;
     const scheduledGeneration = studioRevisionProjectGenerationRef.current;
     const scheduledPendingFingerprint = pendingBatch
       ? `${pendingBatch.pageId}:${pendingBatch.strokes.map((stroke) => stroke.id).join(",")}`
@@ -6459,40 +6522,14 @@ function StudioCuttoonEditor() {
         ) {
           return;
         }
-        const payload = {
-          version: 2 as const,
-          savedAt: new Date().toISOString(),
+        const payload: StudioAutosavePayload = {
+          ...buildCurrentStudioProjectFileSnapshot(
+            durablePages,
+            new Date().toISOString()
+          ),
           ...(workId && sharedDocument
             ? { sourceWorkId: workId, sourceRevision: sharedDocument.revision }
             : {}),
-          pagesList: durablePages,
-          master: serializeDocumentMaster(master),
-          characterBible,
-          writerRoom,
-          comments: studioComments,
-          releaseSchedule,
-          publicationAnalytics,
-          referenceBoard,
-          aiProvenance,
-          title,
-          description,
-          tagsText,
-          webtoonTheme,
-          panelGutter,
-          currentPageId,
-          publishPack: {
-            profile: publishProfile,
-            aiUsage: publishAiUsage,
-            disclosure: publishAiDisclosure,
-            compliance: publishCompliance,
-            packageSettings: normalizeStudioPublishPackageSettings({
-              ...publishPackageSettings,
-              destination: publishProfile,
-              aiUsage: publishAiUsage,
-              aiDisclosure: publishAiDisclosure,
-            }),
-            packageCredits: publishPackageCredits,
-          },
         };
         localStorage.setItem(autosaveKey, serializeStudioAutosave(payload));
         // A normal autosave only runs after recovery was explicitly resolved (`hasAutosave=false`).
@@ -6509,6 +6546,7 @@ function StudioCuttoonEditor() {
     }, 1500);
     return () => clearTimeout(timer);
   }, [
+    buildCurrentStudioProjectFileSnapshot,
     pages,
     master,
     characterBible,
@@ -6521,6 +6559,9 @@ function StudioCuttoonEditor() {
     title,
     description,
     tagsText,
+    linkedTitleId,
+    linkedSeriesId,
+    linkedChallengeId,
     webtoonTheme,
     panelGutter,
     currentPageId,
@@ -8396,12 +8437,10 @@ function StudioCuttoonEditor() {
     };
   }, [activePage.id, activePage.elements, isExporting, master, masterEditMode, pagesHi, timelapseCapturing]);
   // 내보내기 옵션(배율·포맷·투명 배경) — 다운로드 버튼 옆 팝오버에서 조정.
-  const [exportMenuOpen, setExportMenuOpen] = useState(false);
   // 배율은 플랫폼 규격(폭 690·800·1440…)에 맞추면 소수가 될 수 있어 number로 둔다.
   const [exportScale, setExportScale] = useState<number>(2);
   const [exportFormat, setExportFormat] = useState<ExportFormat>("png");
   const [exportTransparent, setExportTransparent] = useState(false);
-  const [projectActionsOpen, setProjectActionsOpen] = useState(false);
   // 선택한 플랫폼 내보내기 규격(없으면 null = 자유 배율).
   const [exportPresetId, setExportPresetId] = useState<string | null>(null);
   // 내보내기 워터마크/서명 — 세션 넘어 유지되게 localStorage에 저장.
@@ -8501,21 +8540,12 @@ function StudioCuttoonEditor() {
     companionChannelRef.current = channel;
     if (!channel) return;
 
-    const mapTool = (): StudioCompanionToolId => {
-      const s = companionUiRef.current;
-      if (s.tool === "draw" && s.drawMode === "eraser") return "eraser";
-      if (s.tool === "draw") return "pen";
-      if (s.menu === "bubble") return "bubble";
-      if (s.menu === "template" || s.menu === "asset" || s.menu === "elements") return "template";
-      if (s.menu === "aiAssist") return "ai";
-      return "select";
-    };
     const publish = () => {
       const s = companionUiRef.current;
       try {
         channel.postMessage(
           buildStudioCompanionPrimaryState({
-            tool: mapTool(),
+            tool: resolveStudioCompanionTool(s),
             density: s.uiDensityMode,
             canvasOnly: s.canvasOnlyMode,
             title: s.title || "스튜디오",
@@ -8625,17 +8655,9 @@ function StudioCuttoonEditor() {
     const channel = companionChannelRef.current;
     if (!channel) return;
     try {
-      const mapTool = (): StudioCompanionToolId => {
-        if (tool === "draw" && drawMode === "eraser") return "eraser";
-        if (tool === "draw") return "pen";
-        if (menu === "bubble") return "bubble";
-        if (menu === "template" || menu === "asset" || menu === "elements") return "template";
-        if (menu === "aiAssist") return "ai";
-        return "select";
-      };
       channel.postMessage(
         buildStudioCompanionPrimaryState({
-          tool: mapTool(),
+          tool: resolveStudioCompanionTool({ tool, drawMode, menu }),
           density: uiDensityMode,
           canvasOnly: canvasOnlyMode,
           title: title || "스튜디오",
@@ -10183,17 +10205,6 @@ function StudioCuttoonEditor() {
       setError("컷 플랜을 페이지로 만드는 중 안전 검증에 실패했어요. 컷 연결을 확인한 뒤 다시 시도해 주세요.");
     }
   }
-  function currentImageAiProvenance(action: "generated" | "edited"): StudioPublishAiProvenance {
-    const provider = studioImageAiProviderContext(aiSettings);
-    return {
-      action,
-      provider: provider.provider,
-      model: provider.model,
-      transport: provider.transport,
-      promptVersion: 1,
-      createdAt: new Date().toISOString(),
-    };
-  }
   const [aiBgPrompt, setAiBgPrompt] = useState("");
   const [aiBgSize, setAiBgSize] = useState<StudioAiImageSize>(DEFAULT_STUDIO_AI_IMAGE_SIZE);
   const [aiBgBusy, setAiBgBusy] = useState(false);
@@ -10315,6 +10326,10 @@ function StudioCuttoonEditor() {
   async function executeGenerateAsset(prompt: string) {
     if (collaborationAccessRef.current.locked) return;
     const mutationTicket = captureStudioMutationTicket();
+    const requestProvenance = captureStudioAiGeneratedAssetProvenance(
+      { provider: "openai", model: "gpt-image-2", transport: "server" },
+      "generated"
+    );
     setAssetGenerating(true);
     setError(null);
     let operationId: string | null = null;
@@ -10327,9 +10342,9 @@ function StudioCuttoonEditor() {
       operationId = beginTrackedStudioAiOperation("asset-image", {
         kind: "image",
         task: "image-other",
-        provider: "openai",
-        model: "gpt-image-2",
-        transport: "server",
+        provider: requestProvenance.provider,
+        model: requestProvenance.model,
+        transport: requestProvenance.transport,
         promptVersion: 1,
         prompt,
         target: { pageId: activePage.id },
@@ -10358,18 +10373,17 @@ function StudioCuttoonEditor() {
         kind: "ai",
       });
       if (!canApplyStudioMutation(mutationTicket)) return;
-      setAssetPrompt("");
-      setAssetPromptName("");
       await loadAssetsList();
       if (!canApplyStudioMutation(mutationTicket)) return;
-      addRenderedImage(saved.dataUrl, saved.width, saved.height, {
-        action: "generated",
-        provider: "openai",
+      const generatedProvenance = finalizeStudioAiGeneratedAssetProvenance(requestProvenance, {
         model: generated.model,
-        transport: "server",
-        promptVersion: 1,
-        createdAt: new Date().toISOString(),
       });
+      if (!addRenderedImage(saved.dataUrl, saved.width, saved.height, generatedProvenance)) {
+        setError("생성한 에셋은 라이브러리에 저장했지만 현재 캔버스에는 추가하지 못했어요. 편집 잠금과 동기화 상태를 확인한 뒤 다시 시도해 주세요.");
+        return;
+      }
+      setAssetPrompt("");
+      setAssetPromptName("");
       setMenu(null);
     } catch (err) {
       if (operationId) {
@@ -10388,6 +10402,11 @@ function StudioCuttoonEditor() {
     const action = aiNoticePendingActionRef.current;
     aiNoticePendingActionRef.current = null;
     action?.();
+  }
+
+  function cancelAiNotice() {
+    aiNoticePendingActionRef.current = null;
+    setAiNoticeOpen(false);
   }
 
   // 효과·배경 씬 피커 검색/카테고리 점프 상태 (React Compiler가 파생값을 자동 메모이즈)
@@ -14113,18 +14132,24 @@ function StudioCuttoonEditor() {
   // 프레임이 여럿이면 전부, 없으면 캔버스 전체 배경으로 맨 뒤에 새 요소 추가). width/height는
   // generateBackgroundImage가 요청한 size 문자열에서 그대로 파생한 값이라 이미지 로드 없이 동기적으로
   // 안다.
-  function insertAiBackgroundImage(dataUrl: string, width: number, height: number) {
-    const aiProvenance = currentImageAiProvenance("generated");
+  function insertAiBackgroundImage(
+    dataUrl: string,
+    width: number,
+    height: number,
+    aiProvenance: StudioPublishAiProvenance
+  ): boolean {
     if (selected?.type === "frame") {
-      patchEl(selected.id, { bg: dataUrl, aiProvenance } as Partial<El>);
+      if (!patchEl(selected.id, { bg: dataUrl, aiProvenance } as Partial<El>)) return false;
       setTool("select");
-      return;
+      return true;
     }
     const frames = elements.filter((e) => e.type === "frame");
     if (frames.length > 0) {
-      commit(elements.map((e) => (e.type === "frame" ? ({ ...e, bg: dataUrl, aiProvenance } as El) : e)));
+      if (!commit(elements.map((e) => (e.type === "frame" ? ({ ...e, bg: dataUrl, aiProvenance } as El) : e)))) {
+        return false;
+      }
       setTool("select");
-      return;
+      return true;
     }
     const el = createCanvasImageElement({
       id: uid(),
@@ -14136,9 +14161,10 @@ function StudioCuttoonEditor() {
       horizontalInset: 0,
       minY: 0,
     });
-    commit([{ ...el, aiProvenance }, ...elements]);
+    if (!commit([{ ...el, aiProvenance }, ...elements])) return false;
     setSelectedId(el.id);
     setTool("select");
+    return true;
   }
 
   // 배경 생성 실행 — 이미 runWithAiNotice로 게이팅된 상태에서만 호출된다. 실패해도 throw하지
@@ -14149,6 +14175,7 @@ function StudioCuttoonEditor() {
     setAiBgBusy(true);
     setAiBgError(null);
     const provider = studioImageAiProviderContext(aiSettings);
+    const requestProvenance = captureStudioAiGeneratedAssetProvenance(provider, "generated");
     const operationId = beginTrackedStudioAiOperation("background-image", {
       kind: "image",
       task: "background-image",
@@ -14175,7 +14202,16 @@ function StudioCuttoonEditor() {
       setAiBgBusy(false);
       return;
     }
-    insertAiBackgroundImage(result.data.dataUrl, result.data.width, result.data.height);
+    if (!insertAiBackgroundImage(
+      result.data.dataUrl,
+      result.data.width,
+      result.data.height,
+      requestProvenance
+    )) {
+      setAiBgError("배경 이미지는 생성됐지만 현재 원고에 적용하지 못했어요. 편집 잠금과 동기화 상태를 확인한 뒤 다시 시도해 주세요.");
+      setAiBgBusy(false);
+      return;
+    }
     setAiBgBusy(false);
     setMenu(null); // 다른 "생성 후 팝오버 닫기" 흐름(addBgScene 등)과 동일 UX.
   }
@@ -14220,6 +14256,7 @@ function StudioCuttoonEditor() {
     setAiColorizeBusy(true);
     setAiColorizeError(null);
     const provider = studioImageAiProviderContext(aiSettings);
+    const requestProvenance = captureStudioAiGeneratedAssetProvenance(provider, "edited");
     const operationId = beginTrackedStudioAiOperation("colorize", {
       kind: "image",
       task: "colorize",
@@ -14243,8 +14280,15 @@ function StudioCuttoonEditor() {
       return;
     }
     const target = elementById.get(elId);
-    if (target && target.type === "image") {
-      patchEl(elId, { src: result.data.dataUrl, aiProvenance: currentImageAiProvenance("edited") });
+    if (!target || target.type !== "image") {
+      setAiColorizeError("채색 결과를 적용할 원본 이미지 레이어를 찾지 못했어요. 레이어를 다시 선택한 뒤 재시도해 주세요.");
+      setAiColorizeBusy(false);
+      return;
+    }
+    if (!patchEl(elId, { src: result.data.dataUrl, aiProvenance: requestProvenance })) {
+      setAiColorizeError("채색 결과는 생성됐지만 이미지 레이어에 적용하지 못했어요. 레이어 잠금과 동기화 상태를 확인한 뒤 다시 시도해 주세요.");
+      setAiColorizeBusy(false);
+      return;
     }
     setAiColorizeBusy(false);
   }
@@ -14257,19 +14301,22 @@ function StudioCuttoonEditor() {
     runWithAiNotice(() => void executeAiColorize(elId, srcAtRequestTime, prompt));
   }
 
-  // AI 캐릭터 일관성 생성 실행(젠툰 벤치마크) — refSrc/refWidth/refHeight를 호출 시점에 캡처해
+  // AI 캐릭터 일관성 생성 실행(젠툰 벤치마크) — reference id/src/size를 호출 시점에 함께 캡처해
   // 넘긴다(await 도중 선택이 바뀌어도 엉뚱한 참고 이미지를 쓰지 않는다 — executeAiColorize와 동일
   // 관례). colorizeLineArt와 달리 기존 요소의 src를 덮어쓰지 않고, addRenderedImage로 캔버스에 새
   // 이미지 요소를 추가한다(참고 캐릭터의 온-캔버스 크기를 그대로 재사용 — studio-ai-client.ts
   // generateConsistentCharacterImage 주석 참고, 생성된 이미지를 다시 디코딩해 원본 픽셀 크기를
   // 알아낼 필요가 없다).
-  async function executeAiCharacterConsistency(refSrc: string, prompt: string, refWidth: number, refHeight: number) {
+  async function executeAiCharacterConsistency(
+    reference: { elementId: string; src: string; width: number; height: number },
+    prompt: string
+  ) {
     if (collaborationAccessRef.current.locked) return;
     const mutationTicket = captureStudioMutationTicket();
     setAiCharacterBusy(true);
     setAiCharacterError(null);
     const provider = studioImageAiProviderContext(aiSettings);
-    const referenceElementId = selected?.type === "image" ? selected.id : undefined;
+    const requestProvenance = captureStudioAiGeneratedAssetProvenance(provider, "generated");
     const operationId = beginTrackedStudioAiOperation("character-image", {
       kind: "image",
       task: "character-image",
@@ -14279,9 +14326,9 @@ function StudioCuttoonEditor() {
       promptVersion: 1,
       prompt,
       target: { pageId: activePage.id },
-      references: referenceElementId ? [{ assetId: referenceElementId }] : [],
+      references: [{ assetId: reference.elementId }],
     });
-    const result = await generateConsistentCharacterImage(aiSettings, refSrc, prompt);
+    const result = await generateConsistentCharacterImage(aiSettings, reference.src, prompt);
     if (!canApplyStudioMutation(mutationTicket)) {
       if (editorMountedRef.current) setAiCharacterBusy(false);
       return;
@@ -14292,7 +14339,11 @@ function StudioCuttoonEditor() {
       setAiCharacterBusy(false);
       return;
     }
-    addRenderedImage(result.data.dataUrl, refWidth, refHeight, currentImageAiProvenance("generated"));
+    if (!addRenderedImage(result.data.dataUrl, reference.width, reference.height, requestProvenance)) {
+      setAiCharacterError("캐릭터 이미지는 생성됐지만 현재 원고에 추가하지 못했어요. 편집 잠금과 동기화 상태를 확인한 뒤 다시 시도해 주세요.");
+      setAiCharacterBusy(false);
+      return;
+    }
     setAiCharacterBusy(false);
     setMenu(null); // 다른 "생성 후 팝오버 닫기" 흐름(AI 배경 생성 등)과 동일 UX.
   }
@@ -14302,10 +14353,13 @@ function StudioCuttoonEditor() {
     if (!selected || selected.type !== "image" || aiCharacterBusy || !isStudioAiConfigured(aiSettings)) return;
     const prompt = aiCharacterPrompt.trim();
     if (!prompt) return;
-    const refSrc = selected.src;
-    const refWidth = selected.width;
-    const refHeight = selected.height;
-    runWithAiNotice(() => void executeAiCharacterConsistency(refSrc, prompt, refWidth, refHeight));
+    const reference = {
+      elementId: selected.id,
+      src: selected.src,
+      width: selected.width,
+      height: selected.height,
+    };
+    runWithAiNotice(() => void executeAiCharacterConsistency(reference, prompt));
   }
 
   // ── 시나리오 자동 생성 ──────────────────────────────────────────────────────
@@ -14495,6 +14549,7 @@ function StudioCuttoonEditor() {
           .filter((value) => value.trim().length > 0)
           .join("\n\n");
         const provider = studioImageAiProviderContext(aiSettings);
+        const requestProvenance = captureStudioAiGeneratedAssetProvenance(provider, "generated");
         const usesReference = Boolean(referenceImageDataUrl);
         const requestPrompt = usesReference
           ? reviewedImagePrompt
@@ -14540,7 +14595,6 @@ function StudioCuttoonEditor() {
 
         if (imageResult.ok) {
           const dataUrl = imageResult.data.dataUrl;
-          const imageProvenance = currentImageAiProvenance("generated");
           referenceImageDataUrl ??= dataUrl;
           setScenarioResult((previous) =>
             previous
@@ -14548,7 +14602,7 @@ function StudioCuttoonEditor() {
                   ...previous,
                   items: previous.items.map((item, itemIndex) =>
                     itemIndex === index
-                      ? { ...item, imageDataUrl: dataUrl, imageError: undefined, imageProvenance }
+                      ? { ...item, imageDataUrl: dataUrl, imageError: undefined, imageProvenance: requestProvenance }
                       : item
                   ),
                 }
@@ -14608,6 +14662,7 @@ function StudioCuttoonEditor() {
       .filter((value) => value.trim().length > 0)
       .join("\n\n");
     const provider = studioImageAiProviderContext(aiSettings);
+    const requestProvenance = captureStudioAiGeneratedAssetProvenance(provider, "generated");
     const usesReference = Boolean(referenceImageDataUrl);
     const requestPrompt = usesReference
       ? reviewedImagePrompt
@@ -14646,7 +14701,6 @@ function StudioCuttoonEditor() {
         target: { pageId: activePage.id },
       });
       if (controller.signal.aborted) return;
-      const imageProvenance = imageResult.ok ? currentImageAiProvenance("generated") : undefined;
       setScenarioResult((previous) =>
         previous
           ? {
@@ -14654,7 +14708,12 @@ function StudioCuttoonEditor() {
               items: previous.items.map((item, itemIndex) =>
                 itemIndex === index
                   ? imageResult.ok
-                    ? { ...item, imageDataUrl: imageResult.data.dataUrl, imageError: undefined, imageProvenance }
+                    ? {
+                        ...item,
+                        imageDataUrl: imageResult.data.dataUrl,
+                        imageError: undefined,
+                        imageProvenance: requestProvenance,
+                      }
                     : { ...item, imageDataUrl: undefined, imageError: imageResult.error, imageProvenance: undefined }
                   : item
               ),
@@ -14732,10 +14791,16 @@ function StudioCuttoonEditor() {
           ? { ...page, elements: newEls, canvasH: Math.max(1080, scenarioResult.nextCanvasH) }
           : page
       );
-      if (!commitPages(populatedPages)) return;
+      if (!commitPages(populatedPages)) {
+        setScenarioError("새 페이지에 시나리오를 적용하지 못했어요. 편집 잠금과 동기화 상태를 확인한 뒤 다시 시도해 주세요.");
+        return;
+      }
       setCurrentPageId(insertedPage.id);
     } else {
-      commit([...elements, ...newEls], { canvasH: Math.max(canvasH, scenarioResult.nextCanvasH) });
+      if (!commit([...elements, ...newEls], { canvasH: Math.max(canvasH, scenarioResult.nextCanvasH) })) {
+        setScenarioError("현재 페이지에 시나리오를 적용하지 못했어요. 편집 잠금과 동기화 상태를 확인한 뒤 다시 시도해 주세요.");
+        return;
+      }
     }
     setScenarioResult(null);
     setScenarioStoryText("");
@@ -20417,7 +20482,7 @@ function StudioCuttoonEditor() {
   // 시각 토큰은 studio-panel-ui / studio-chrome-ui 와 공유한다(경쟁사 수준의 일관 어포던스).
   // 툴바 그룹(배경/에셋/스타일/AI 연동) — 현재 열린 그룹은 `menu`가 그 그룹 멤버 중 하나일 때만
   // 존재한다(별도 open 상태 없음). null이면 그룹 팝오버뿐 아니라 개별 팝오버도 전부 닫힌 상태.
-  const activeToolbarGroup: StudioToolbarGroupId | null = menu ? (STUDIO_TOOLBAR_GROUP_OF[menu] ?? null) : null;
+  const activeToolbarGroup: StudioToolbarGroupId | null = resolveStudioToolbarGroup(menu);
   const studioMenubarPageLabelsSnapshot = JSON.stringify(
     pages.map((page, index) => pageDisplayName(page, index))
   );
@@ -21983,53 +22048,22 @@ function StudioCuttoonEditor() {
     );
   }
 
-  function currentStudioProjectSnapshot() {
-    const currentHistory = pagesHistoryRef.current;
-    const currentHistoryIndex = Math.max(
-      0,
-      Math.min(pagesHiRef.current, Math.max(0, currentHistory.length - 1))
-    );
+  function currentStudioProjectSnapshot(): StudioProjectSnapshot {
     // Immediate pointerup commits advance these refs before React renders, closing the same-task
     // route/pagehide gap where this render's `pages` could still be one stroke behind.
-    const stablePages = currentHistory[currentHistoryIndex] ?? pages;
     const pendingBatch = pendingStrokeCommitsRef.current;
-    const durablePages = projectStudioPendingStrokes(
-      stablePages,
-      pendingBatch
+    const durablePages = resolveStudioDurableProjectPages({
+      pagesHistory: pagesHistoryRef.current,
+      historyIndex: pagesHiRef.current,
+      fallbackPages: pages,
+      pendingStrokeCommits: pendingBatch
         ? { pageId: pendingBatch.pageId, strokes: pendingBatch.strokes }
-        : null
-    ).pagesList as PageState[];
-    return {
-      version: 2 as const,
-      savedAt: new Date().toISOString(),
-      title,
-      description,
-      tagsText,
-      linkedTitleId,
-      linkedSeriesId,
-      linkedChallengeId,
-      pagesList: durablePages,
-      // 문서 마스터(공통 요소) — 비어 있으면 undefined 로 키가 떨어진다(과거 파일과 동일 형태).
-      master: serializeDocumentMaster(master),
-      characterBible,
-      writerRoom,
-      aiProvenance,
-      comments: studioComments,
-      releaseSchedule,
-      publicationAnalytics,
-      referenceBoard,
-      currentPageId,
-      webtoonTheme,
-      panelGutter,
-      publishPack: {
-        profile: publishProfile,
-        aiUsage: publishAiUsage,
-        disclosure: publishAiDisclosure,
-        compliance: publishCompliance,
-        packageSettings: effectivePublishPackageSettings,
-        packageCredits: publishPackageCredits,
-      },
-    };
+        : null,
+    }).pagesList as PageState[];
+    return buildCurrentStudioProjectFileSnapshot(
+      durablePages,
+      new Date().toISOString()
+    );
   }
 
   // The empty-dependency page lifecycle listeners below call through this ref, so every render
@@ -22053,14 +22087,18 @@ function StudioCuttoonEditor() {
     try {
       const savedAt = new Date().toISOString();
       const snapshot = currentStudioProjectSnapshot();
+      const stablePages = resolveStudioDurableProjectPages({
+        pagesHistory: pagesHistoryRef.current,
+        historyIndex: pagesHiRef.current,
+        fallbackPages: pages,
+        pendingStrokeCommits: null,
+      }).pagesList as PageState[];
       const basePayload: StudioAutosavePayload = {
         ...snapshot,
         savedAt,
         // The lifecycle builder projects the batch itself so its receipt can distinguish stable
         // state from still-deferred vector data. Read the latest ref-backed history, not the render.
-        pagesList:
-          pagesHistoryRef.current[pagesHiRef.current]
-          ?? pages,
+        pagesList: stablePages,
         ...(workId && sharedDocument
           ? { sourceWorkId: workId, sourceRevision: sharedDocument.revision }
           : {}),
@@ -23504,6 +23542,7 @@ function StudioCuttoonEditor() {
     applyDialogueReplacePlan,
     applyTranslationDraft,
     cancelAdvancedFillPreview,
+    cancelAiNotice,
     cancelEditText,
     captureAnimFrame,
     captureTimelineKeyframe,
@@ -24373,7 +24412,6 @@ function StudioCuttoonEditor() {
           scale={scale}
           selected={selected}
           selectedId={selectedId}
-          setAiNoticeOpen={setAiNoticeOpen}
           setAppSettingsInitialTab={setAppSettingsInitialTab}
           setAppSettingsOpen={setAppSettingsOpen}
           setBg3dOpen={setBg3dOpen}
@@ -25259,6 +25297,7 @@ interface StudioCanvasViewportHandlers {
   applyDialogueReplacePlan: (plan: DialogueReplacePlan) => void;
   applyTranslationDraft: () => void;
   cancelAdvancedFillPreview: () => void;
+  cancelAiNotice: () => void;
   captureAnimFrame: (elId: string) => Promise<void>;
   captureTimelineKeyframe: (trackId: string, frameIndex: number) => Promise<void>;
   clearAdvancedFillTapGesture: () => void;
@@ -25464,7 +25503,6 @@ interface StudioCanvasViewportProps {
   scale: number;
   selected: El | null;
   selectedId: string | null;
-  setAiNoticeOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setAppSettingsInitialTab: import("react").Dispatch<import("react").SetStateAction<"general" | "other">>;
   setAppSettingsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setBg3dOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
@@ -25721,7 +25759,6 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   scale,
   selected,
   selectedId,
-  setAiNoticeOpen,
   setAppSettingsInitialTab,
   setAppSettingsOpen,
   setBg3dOpen,
@@ -25848,6 +25885,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
     applyDialogueReplacePlan,
     applyTranslationDraft,
     cancelAdvancedFillPreview,
+    cancelAiNotice,
     cancelEditText,
     captureAnimFrame,
     captureTimelineKeyframe,
@@ -28738,7 +28776,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
           {/* 생성형 AI 최초 사용 고지(정책 필수) — 확인을 누르면 1회 저장 후 생성을 이어서 실행한다.
               스크림 클릭(자기 자신 대상일 때만)·Esc 로 닫히고, 포커스는 기본 확인 버튼이 받는다. */}
           {aiNoticeOpen && (
-            <AiAssetNotice onCancel={() => setAiNoticeOpen(false)} onAcknowledge={acknowledgeAiNotice} />
+            <AiAssetNotice onCancel={cancelAiNotice} onAcknowledge={acknowledgeAiNotice} />
           )}
 
           <StudioPageSequenceStrip

@@ -4,6 +4,8 @@ import {
 } from "./studio-ai-provenance";
 import { STUDIO_CANVAS_WIDTH } from "./studio-canvas-constants";
 import { studioDrawingAssistHasContent } from "./studio-drawing-assist-document";
+import { normalizeStudioPublishPackageSettings } from "./studio-publish-package";
+import { normalizeStudioPublishPackSettings } from "./studio-publish-preflight";
 import {
   normalizeStudioReferenceBoardDocument,
   studioReferenceBoardHasContent,
@@ -72,6 +74,10 @@ export type StudioAutosavePayload = {
   title?: string;
   description?: string;
   tagsText?: string;
+  /** New-work relationship intent. `null` explicitly means this project is not linked. */
+  linkedTitleId?: string | null;
+  linkedSeriesId?: string | null;
+  linkedChallengeId?: string | null;
   webtoonTheme?: unknown;
   panelGutter?: unknown;
   currentPageId?: string;
@@ -239,6 +245,24 @@ export function parseStudioAutosave(raw: string | null): StudioAutosavePayload |
       title: typeof record.title === "string" ? record.title : undefined,
       description: typeof record.description === "string" ? record.description : undefined,
       tagsText: typeof record.tagsText === "string" ? record.tagsText : undefined,
+      linkedTitleId:
+        record.linkedTitleId === null
+          ? null
+          : typeof record.linkedTitleId === "string" && record.linkedTitleId.trim().length > 0
+            ? record.linkedTitleId
+            : undefined,
+      linkedSeriesId:
+        record.linkedSeriesId === null
+          ? null
+          : typeof record.linkedSeriesId === "string" && record.linkedSeriesId.trim().length > 0
+            ? record.linkedSeriesId
+            : undefined,
+      linkedChallengeId:
+        record.linkedChallengeId === null
+          ? null
+          : typeof record.linkedChallengeId === "string" && record.linkedChallengeId.trim().length > 0
+            ? record.linkedChallengeId
+            : undefined,
       webtoonTheme: record.webtoonTheme,
       panelGutter: record.panelGutter,
       currentPageId: typeof record.currentPageId === "string" ? record.currentPageId : undefined,
@@ -308,6 +332,51 @@ function studioWriterRoomHasContent(value: unknown): boolean {
   return false;
 }
 
+/**
+ * Mirrors the editor snapshot's recovery-worthiness policy for publish-only work. Older payloads
+ * can omit every field, while malformed/future nested settings must never make recovery discovery
+ * throw and hide otherwise valid candidates.
+ */
+function studioAutosavePublishPackHasContent(value: unknown): boolean {
+  const publishPack = normalizeStudioPublishPackSettings(value);
+  const record = value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+  const packageCredits = typeof record.packageCredits === "string"
+    ? record.packageCredits.trim()
+    : "";
+
+  let packageSettings;
+  try {
+    packageSettings = normalizeStudioPublishPackageSettings(
+      record.packageSettings ?? {
+        destination: record.profile,
+        aiUsage: record.aiUsage,
+        aiDisclosure: record.disclosure,
+      }
+    );
+  } catch {
+    // The raw value remains available for backup/export, but unsupported future settings do not
+    // become a false-positive recovery candidate in an older client.
+    return (
+      publishPack.profile !== "generic"
+      || publishPack.aiUsage !== "none"
+      || publishPack.disclosure.trim() !== ""
+      || packageCredits !== ""
+    );
+  }
+
+  return (
+    publishPack.profile !== "generic"
+    || publishPack.aiUsage !== "none"
+    || publishPack.disclosure.trim() !== ""
+    || packageCredits !== ""
+    || packageSettings.includeReviewPdf
+    || !packageSettings.includeCredits
+    || packageSettings.requestedThumbnailSlots.join(",") !== "episode"
+  );
+}
+
 export function studioAutosaveHasContent(payload: StudioAutosavePayload): boolean {
   return (
     // A lifecycle receipt is an explicit dirty snapshot. It can intentionally represent deleting
@@ -343,6 +412,7 @@ export function studioAutosaveHasContent(payload: StudioAutosavePayload): boolea
       ((payload.publicationAnalytics as { records: unknown[] }).records.length > 0)) ||
     studioReferenceBoardHasContent(payload.referenceBoard) ||
     (payload.aiProvenance?.operations.length ?? 0) > 0 ||
+    studioAutosavePublishPackHasContent(payload.publishPack) ||
     (payload.title ?? "").trim().length > 0 ||
     (payload.description ?? "").trim().length > 0 ||
     (payload.tagsText ?? "").trim().length > 0
