@@ -13,7 +13,7 @@ import {
 import type {
   PlannedStudioGpuDabs,
   StudioGpuDab,
-} from "./studio-webgpu-engine";
+} from "./studio-webgpu-dab-plan-contract";
 import type { StudioGpuStroke } from "./studio-webgpu-stroke";
 import type {
   StudioGpuTileCompositeFrame,
