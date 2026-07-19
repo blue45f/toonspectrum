@@ -21,6 +21,29 @@ const EMPTY_IMAGE_FILTER_BUILD: ImageFilterBuild = { filters: [], attrs: {}, cac
 const imageFilterBuildCache = new Map<string, ImageFilterBuild>();
 let studioKonvaFiltersPromise: Promise<StudioKonvaFiltersModule> | null = null;
 
+interface LoadedImageState {
+  image: HTMLImageElement;
+  src: string;
+}
+
+interface DisplayImageState {
+  flipped: boolean;
+  flippedY: boolean;
+  image: CanvasImageSource;
+  isAnimatedGif: boolean;
+  loadedImage: HTMLImageElement;
+  src: string;
+}
+
+interface WorkerFilteredCanvasState {
+  canvas: HTMLCanvasElement;
+  filterKey: string;
+  height: number;
+  source: CanvasImageSource;
+  src: string;
+  width: number;
+}
+
 function loadStudioKonvaFilters(): Promise<StudioKonvaFiltersModule> {
   if (!studioKonvaFiltersPromise) {
     studioKonvaFiltersPromise = import("./studio-konva-filters")
@@ -75,11 +98,11 @@ export function StudioKonvaImageNode({
   onInteractionEnd,
   liveStrokeRef,
 }: StudioKonvaImageNodeProps) {
-  const [img, setImg] = useState<HTMLImageElement>();
-  const [displayImg, setDisplayImg] = useState<CanvasImageSource>();
+  const [loadedImage, setLoadedImage] = useState<LoadedImageState>();
+  const [displayImage, setDisplayImage] = useState<DisplayImageState>();
   const [filterModule, setFilterModule] = useState<StudioKonvaFiltersModule | null>(null);
   const [filterWorkerClient, setFilterWorkerClient] = useState<StudioImageFilterWorkerClientModule | null>(null);
-  const [workerFilteredCanvas, setWorkerFilteredCanvas] = useState<HTMLCanvasElement | undefined>(undefined);
+  const [workerFilteredCanvas, setWorkerFilteredCanvas] = useState<WorkerFilteredCanvasState>();
   const imageRef = useRef<Konva.Image | null>(null);
   // 최신 el을 담아두는 ref — 아래 Worker 필터 effect가 좌표 드래그 등 필터와 무관한 el 변경마다
   // 재실행되지 않도록(의존성은 filterCacheKey/width/height만) 최신 값만 읽어들이는 용도.
@@ -87,48 +110,89 @@ export function StudioKonvaImageNode({
   elRef.current = el;
 
   useEffect(() => {
+    const src = el.src;
     const im = new globalThis.Image();
-    im.src = el.src;
-    im.onload = () => setImg(im);
+    let active = true;
+    im.onload = () => {
+      if (active) setLoadedImage({ image: im, src });
+    };
+    im.onerror = () => {
+      if (!active) return;
+      // 현재 src의 재로딩까지 실패했다면 이전 성공 이미지를 남기지 않는다. 다른 src가 이미
+      // 성공한 뒤 도착한 오래된 error는 그 상태를 지우지 않는다.
+      setLoadedImage((current) => current?.src === src ? undefined : current);
+    };
+    // 캐시된 data/blob URL은 대입과 같은 tick에 완료될 수 있으므로 handler를 먼저 연결한다.
+    im.src = src;
     return () => {
+      active = false;
       im.onload = null;
       im.onerror = null;
     };
   }, [el.src]);
 
+  // src가 바뀐 render와 해당 effect 사이에도 이전 이미지를 한 프레임 노출하지 않는다.
+  const img = loadedImage?.src === el.src ? loadedImage.image : undefined;
+  const flipped = !!el.flipped;
+  const flippedY = !!el.flippedY;
+  const isAnimatedGif = !!el.isAnimatedGif;
+  const displayImg =
+    displayImage?.src === el.src
+    && displayImage.loadedImage === img
+    && displayImage.flipped === flipped
+    && displayImage.flippedY === flippedY
+    && displayImage.isAnimatedGif === isAnimatedGif
+      ? displayImage.image
+      : undefined;
+
   useEffect(() => {
     if (!img) {
-      setDisplayImg(undefined);
+      setDisplayImage(undefined);
       return;
     }
-    if (el.isAnimatedGif) {
+    const commitDisplayImage = (image: CanvasImageSource) => {
+      setDisplayImage({
+        flipped,
+        flippedY,
+        image,
+        isAnimatedGif,
+        loadedImage: img,
+        src: el.src,
+      });
+    };
+    if (isAnimatedGif) {
       // 반전은 캔버스에 한 프레임을 구워야만 가능한데, 그러면 애니메이션이 멈춘다 — 재생 보존이
       // 우선이므로 이 경로를 건너뛰고 항상 라이브 img를 그대로 쓴다(알려진 한계: 애니메이션 GIF는
       // 좌우/상하 반전이 적용되지 않는다).
-      setDisplayImg(img);
+      commitDisplayImage(img);
       return;
     }
-    const scaleX = el.flipped ? -1 : 1;
-    const scaleY = el.flippedY ? -1 : 1;
+    const scaleX = flipped ? -1 : 1;
+    const scaleY = flippedY ? -1 : 1;
     if (scaleX === 1 && scaleY === 1) {
-      setDisplayImg(img);
+      commitDisplayImage(img);
       return;
     }
-    const w = img.naturalWidth || img.width;
-    const h = img.naturalHeight || img.height;
-    const c = document.createElement("canvas");
-    c.width = w;
-    c.height = h;
-    const cx = c.getContext("2d");
-    if (cx) {
+    try {
+      const w = img.naturalWidth || img.width;
+      const h = img.naturalHeight || img.height;
+      const c = document.createElement("canvas");
+      c.width = w;
+      c.height = h;
+      const cx = c.getContext("2d");
+      if (!cx) {
+        commitDisplayImage(img);
+        return;
+      }
       cx.translate(scaleX === -1 ? w : 0, scaleY === -1 ? h : 0);
       cx.scale(scaleX, scaleY);
       cx.drawImage(img, 0, 0);
-      setDisplayImg(c);
-    } else {
-      setDisplayImg(img);
+      commitDisplayImage(c);
+    } catch (error) {
+      console.error("[studio] image flip canvas failed, using original image:", error);
+      commitDisplayImage(img);
     }
-  }, [img, el.flipped, el.flippedY, el.isAnimatedGif]);
+  }, [img, el.src, flipped, flippedY, isAnimatedGif]);
 
   const hasFilters = hasActiveImageFilters(el);
   const filterCacheKey = imageFilterCacheKey(el);
@@ -179,6 +243,17 @@ export function StudioKonvaImageNode({
   // 기존과 동일하게 필터 미적용(아래 cache effect의 조건과 일치, 새 동작 아님).
   const useWorkerFilterPath =
     hasFilters && !!filterModule && !!filterWorkerClient && cachePad === 0 && !el.isAnimatedGif;
+  const workerWidth = Math.max(1, Math.round(el.width));
+  const workerHeight = Math.max(1, Math.round(el.height));
+
+  const currentWorkerFilteredCanvas =
+    workerFilteredCanvas?.src === el.src
+    && workerFilteredCanvas.source === displayImg
+    && workerFilteredCanvas.filterKey === filterCacheKey
+    && workerFilteredCanvas.width === workerWidth
+    && workerFilteredCanvas.height === workerHeight
+      ? workerFilteredCanvas.canvas
+      : undefined;
 
   // 슬라이더 드래그 매 틱마다 픽셀 루프를 메인 스레드에서 도는 대신, 여기서 Worker에 위임한다.
   // 새 틱이 오면 React의 effect cleanup이 이전 컨트롤러를 abort → 진행 중이던 Worker를 즉시
@@ -190,15 +265,29 @@ export function StudioKonvaImageNode({
       setWorkerFilteredCanvas(undefined);
       return;
     }
-    const width = Math.max(1, Math.round(el.width));
-    const height = Math.max(1, Math.round(el.height));
-    const sourceCanvas = document.createElement("canvas");
-    sourceCanvas.width = width;
-    sourceCanvas.height = height;
-    const sourceCtx = sourceCanvas.getContext("2d");
-    if (!sourceCtx) return;
-    sourceCtx.drawImage(displayImg, 0, 0, width, height);
-    const imageData = sourceCtx.getImageData(0, 0, width, height);
+    // effect cleanup보다 render가 먼저 일어나는 경우도 아래 identity 비교가 이전 캔버스를 즉시
+    // 숨긴다. 같은 identity로 effect가 재시작되는 경우에도 준비 실패 뒤 낡은 결과를 남기지 않는다.
+    setWorkerFilteredCanvas(undefined);
+    const src = el.src;
+    const source = displayImg;
+    const filterKey = filterCacheKey;
+    const width = workerWidth;
+    const height = workerHeight;
+    let imageData: ImageData;
+    try {
+      const sourceCanvas = document.createElement("canvas");
+      sourceCanvas.width = width;
+      sourceCanvas.height = height;
+      const sourceCtx = sourceCanvas.getContext("2d");
+      if (!sourceCtx) return;
+      sourceCtx.drawImage(source, 0, 0, width, height);
+      imageData = sourceCtx.getImageData(0, 0, width, height);
+    } catch (error) {
+      // 오염된 외부 캔버스(SecurityError), 디코딩 중인 이미지, context 손실은 원본+Konva
+      // 필터 경로로 안전하게 폴백한다. 이전 Worker 캔버스는 identity 가드와 위 clear로 숨겨진다.
+      console.error("[studio] image filter canvas preparation failed, using Konva fallback:", error);
+      return;
+    }
 
     const controller = new AbortController();
     let cancelled = false;
@@ -206,37 +295,42 @@ export function StudioKonvaImageNode({
       .runStudioImageFilterWorker({ imageData, el: elRef.current }, { signal: controller.signal })
       .then((result) => {
         if (cancelled) return;
-        const outCanvas = document.createElement("canvas");
-        outCanvas.width = result.imageData.width;
-        outCanvas.height = result.imageData.height;
-        const outCtx = outCanvas.getContext("2d");
-        if (!outCtx) return;
-        // ImageData 생성자는 ArrayBuffer 백업 뷰만 받는다 — postMessage 전송은 항상 진짜
-        // ArrayBuffer라 안전하지만(SharedArrayBuffer 아님) 타입상 Uint8ClampedArray<ArrayBufferLike>
-        // 로 넓혀져 있어 새 뷰로 감싸 좁힌다.
-        outCtx.putImageData(
-          new ImageData(
-            new Uint8ClampedArray(result.imageData.data),
-            result.imageData.width,
-            result.imageData.height,
-          ),
-          0,
-          0,
-        );
-        setWorkerFilteredCanvas(outCanvas);
+        if (result.imageData.width !== width || result.imageData.height !== height) return;
+        try {
+          const outCanvas = document.createElement("canvas");
+          outCanvas.width = result.imageData.width;
+          outCanvas.height = result.imageData.height;
+          const outCtx = outCanvas.getContext("2d");
+          if (!outCtx) return;
+          // ImageData 생성자는 ArrayBuffer 백업 뷰만 받는다 — postMessage 전송은 항상 진짜
+          // ArrayBuffer라 안전하지만(SharedArrayBuffer 아님) 타입상 Uint8ClampedArray<ArrayBufferLike>
+          // 로 넓혀져 있어 새 뷰로 감싸 좁힌다.
+          outCtx.putImageData(
+            new ImageData(
+              new Uint8ClampedArray(result.imageData.data),
+              result.imageData.width,
+              result.imageData.height,
+            ),
+            0,
+            0,
+          );
+          setWorkerFilteredCanvas({ canvas: outCanvas, filterKey, height, source, src, width });
+        } catch (error) {
+          console.error("[studio] image filter canvas commit failed, using Konva fallback:", error);
+        }
       })
       .catch((error) => {
         if ((error as { name?: string })?.name === "AbortError") return;
-        console.error("[studio] image filter worker failed, keeping last preview:", error);
+        console.error("[studio] image filter worker failed, using Konva fallback:", error);
       });
 
     return () => {
       cancelled = true;
       controller.abort();
     };
-  }, [useWorkerFilterPath, displayImg, filterCacheKey, filterWorkerClient, el.width, el.height]);
+  }, [useWorkerFilterPath, displayImg, filterCacheKey, filterWorkerClient, el.src, workerWidth, workerHeight]);
 
-  const showWorkerCanvas = useWorkerFilterPath && !!workerFilteredCanvas;
+  const showWorkerCanvas = useWorkerFilterPath && !!currentWorkerFilteredCanvas;
 
   useEffect(() => {
     const node = imageRef.current;
@@ -292,7 +386,7 @@ export function StudioKonvaImageNode({
 
   // Worker가 이미 최종 픽셀을 계산해 뒀으면 그 캔버스를 그대로 그린다(filters/filterAttrs는
   // 비워 Konva가 다시 필터링하지 않게 한다) — 아니면 기존과 동일하게 원본 + Konva 필터.
-  const imageSource: CanvasImageSource = showWorkerCanvas ? workerFilteredCanvas! : displayImg;
+  const imageSource: CanvasImageSource = showWorkerCanvas ? currentWorkerFilteredCanvas! : displayImg;
   const activeFilters: Konva.NodeConfig["filters"] = showWorkerCanvas ? undefined : filters;
   const activeFilterAttrs = showWorkerCanvas ? {} : filterAttrs;
 
