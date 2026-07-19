@@ -28,6 +28,10 @@ import {
   type StudioLiveLockRecord,
   type StudioLiveLockRepository,
 } from "./studio-live-lock.repository";
+import {
+  StudioLiveRoomTransitionCoordinator,
+  type StudioLiveRoomTransitionState,
+} from "./studio-live-room-transition-coordinator";
 import { StudioLiveSocketAuthService } from "./studio-live-socket-auth.service";
 import {
   STUDIO_CRDT_PROTOCOL_VERSION,
@@ -355,6 +359,8 @@ export class StudioLiveGateway
     private readonly socketAuthentication: StudioLiveSocketAuthService,
     @Inject(StudioLiveJoinTransitionSequencer)
     private readonly joinTransitions: StudioLiveJoinTransitionSequencer,
+    @Inject(StudioLiveRoomTransitionCoordinator)
+    private readonly roomTransitions: StudioLiveRoomTransitionCoordinator,
     @Inject(StudioCrdtService)
     private readonly studioCrdtService: StudioCrdtService,
     @Inject(STUDIO_LIVE_LOCK_REPOSITORY)
@@ -480,7 +486,9 @@ export class StudioLiveGateway
       // Disconnect is the fail-closed boundary. Never wait for a distributed adapter leave: an
       // adapter can stall indefinitely while the expired socket remains a speculative listener.
       this.disconnectInvalidJoinSession(client);
-      if (rollbackRoom) this.leaveRoomBestEffort(client, rollbackRoom);
+      if (rollbackRoom) {
+        this.roomTransitions.leaveJoinedRoomBestEffort(client, rollbackRoom);
+      }
       return response;
     };
     // Revalidate on every room join. A socket that outlives token expiry, logout, or a session
@@ -530,16 +538,29 @@ export class StudioLiveGateway
         }
       }
 
-      // Join the adapter room before committing authoritative in-memory state. If an adapter
-      // rejects, the socket keeps its previous valid participant instead of becoming a ghost that
-      // can acquire locks without receiving room broadcasts.
-      if (joinedNewRoom) await client.join(nextRoom);
-      if (!this.isSocketCurrent(client)) {
-        if (joinedNewRoom) await this.rollbackJoinedRoom(client, nextRoom);
+      // Join the adapter room before committing authoritative in-memory state. The coordinator
+      // owns only adapter I/O and rollback ordering; socket/generation policy remains here.
+      let enteredRoomState = await this.roomTransitions.enterNextRoom({
+        socket: client,
+        nextRoom,
+        joinNextRoom: joinedNewRoom,
+        currentState: () => this.currentRoomTransitionState(client, transitionSequence),
+        onIsolationFailure: () => this.disconnectRoomIsolationFailure(client),
+      });
+      if (enteredRoomState === "current") {
+        enteredRoomState = this.currentRoomTransitionState(client, transitionSequence);
+        if (enteredRoomState !== "current" && joinedNewRoom) {
+          await this.roomTransitions.rollbackEnteredRoom(
+            client,
+            nextRoom,
+            () => this.disconnectRoomIsolationFailure(client)
+          );
+        }
+      }
+      if (enteredRoomState === "socket_stale") {
         return reply(ack, failure("not_joined", "실시간 작업실 연결이 종료되었습니다."));
       }
-      if (!this.isCurrentJoinTransition(client, transitionSequence)) {
-        if (joinedNewRoom) await this.rollbackJoinedRoom(client, nextRoom);
+      if (enteredRoomState === "generation_stale") {
         return reply(ack, failure("not_joined", "더 최신 작업실 참가 요청으로 대체되었습니다."));
       }
       if (!this.isSocketPrincipalCurrent(client, principal, userId)) {
@@ -551,15 +572,33 @@ export class StudioLiveGateway
       // room and participant behind.
       const existing = this.participantsBySocket.get(client.id);
       if (existing && existing.workId !== input.workId) {
-        try {
-          await client.leave(studioLiveRoom(existing.workId));
-        } catch (error) {
-          if (joinedNewRoom) await this.rollbackJoinedRoom(client, nextRoom);
-          throw error;
+        let leftPreviousRoomState = await this.roomTransitions.leavePreviousRoom({
+          socket: client,
+          previousRoom: studioLiveRoom(existing.workId),
+          speculativeNextRoom: joinedNewRoom ? nextRoom : null,
+          currentState: () => this.currentRoomTransitionState(client, transitionSequence),
+          onIsolationFailure: () => this.disconnectRoomIsolationFailure(client),
+        });
+        if (leftPreviousRoomState === "current") {
+          leftPreviousRoomState = this.currentRoomTransitionState(
+            client,
+            transitionSequence
+          );
+          if (leftPreviousRoomState !== "current" && joinedNewRoom) {
+            await this.roomTransitions.rollbackEnteredRoom(
+              client,
+              nextRoom,
+              () => this.disconnectRoomIsolationFailure(client)
+            );
+          }
         }
-        if (!this.isSocketCurrent(client)) {
-          if (joinedNewRoom) await this.rollbackJoinedRoom(client, nextRoom);
+        if (leftPreviousRoomState === "socket_stale") {
+          this.removeSwitchedParticipantIfCurrent(client.id, existing);
           return reply(ack, failure("not_joined", "실시간 작업실 연결이 종료되었습니다."));
+        }
+        if (leftPreviousRoomState === "generation_stale") {
+          this.removeSwitchedParticipantIfCurrent(client.id, existing);
+          return reply(ack, failure("not_joined", "더 최신 작업실 참가 요청으로 대체되었습니다."));
         }
         if (!this.isSocketPrincipalCurrent(client, principal, userId)) {
           return rejectInvalidSession(joinedNewRoom ? nextRoom : undefined);
@@ -2468,30 +2507,30 @@ export class StudioLiveGateway
   }
 
   private isCurrentJoinTransition(client: StudioLiveSocket, transitionSequence: number): boolean {
-    return (
-      this.isSocketCurrent(client) &&
-      this.joinTransitions.isCurrent(client.id, transitionSequence)
-    );
+    return this.currentRoomTransitionState(client, transitionSequence) === "current";
   }
 
-  private async rollbackJoinedRoom(client: StudioLiveSocket, room: string): Promise<void> {
-    try {
-      await client.leave(room);
-    } catch {
-      // An adapter that cannot undo a speculative join cannot guarantee room isolation. Closing
-      // the socket lets Socket.IO discard every adapter room instead of keeping a ghost listener.
-      this.socketAuthentication.clear(client);
-      client.disconnect(true);
-    }
+  private currentRoomTransitionState(
+    client: StudioLiveSocket,
+    transitionSequence: number
+  ): StudioLiveRoomTransitionState {
+    if (!this.isSocketCurrent(client)) return "socket_stale";
+    return this.joinTransitions.isCurrent(client.id, transitionSequence)
+      ? "current"
+      : "generation_stale";
   }
 
-  private leaveRoomBestEffort(client: StudioLiveSocket, room: string): void {
-    try {
-      const leaveResult = client.leave(room);
-      if (leaveResult) void Promise.resolve(leaveResult).catch(() => undefined);
-    } catch {
-      // The transport is already closed by the caller, which is the authoritative isolation path.
-    }
+  private disconnectRoomIsolationFailure(client: StudioLiveSocket): void {
+    this.socketAuthentication.clear(client);
+    client.disconnect(true);
+  }
+
+  private removeSwitchedParticipantIfCurrent(
+    socketId: string,
+    expectedParticipant: StudioLiveParticipantInternal
+  ): void {
+    if (this.participantsBySocket.get(socketId) !== expectedParticipant) return;
+    this.removeParticipant(socketId, "switch");
   }
 
   private consumeRateLimit(
