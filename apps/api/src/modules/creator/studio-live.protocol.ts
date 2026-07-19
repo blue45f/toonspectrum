@@ -60,10 +60,12 @@ const ConnectionIdSchema = boundedIdentifier(128);
 const ScreenShareIdSchema = boundedIdentifier(160);
 const ScreenShareLabelSchema = boundedIdentifier(80);
 const VoiceCallIdSchema = boundedIdentifier(160);
+export const StudioLiveLockRequestIdSchema = z.uuid();
 
-// v3 is the first room protocol that accepts page-level drawing-assist documents. Rejecting v2
-// prevents stale tabs from sharing a Yjs room whose page schema they cannot interpret safely.
-export const STUDIO_CRDT_PROTOCOL_VERSION = 3 as const;
+// v4 is the first room protocol that accepts drawing-assist v2 with authored advanced rulers.
+// Rejecting v1-v3 prevents stale tabs from sharing a Yjs room whose page schema they cannot
+// interpret safely.
+export const STUDIO_CRDT_PROTOCOL_VERSION = 4 as const;
 const StudioCrdtProtocolVersionSchema = z.literal(STUDIO_CRDT_PROTOCOL_VERSION);
 const StudioCrdtRequestIdSchema = boundedIdentifier(160);
 const StudioCrdtUpdateIdSchema = z.uuid();
@@ -110,6 +112,9 @@ export const StudioLiveLockRequestSchema = z
   .object({
     workId: WorkIdSchema,
     resourceId: ResourceIdSchema,
+    // Optional during the rolling upgrade. New clients send a UUID and the server echoes the same
+    // value from every acquired/denied/revoked decision; older clients receive a server UUID.
+    requestId: StudioLiveLockRequestIdSchema.optional(),
     leaseMs: z.number().int().min(5_000).max(30_000).default(15_000),
   })
   .strict();
@@ -525,6 +530,36 @@ export type StudioLiveFailure = {
 };
 export type StudioLiveAck<T> = StudioLiveSuccess<T> | StudioLiveFailure;
 export type StudioLiveAckCallback<T> = (response: StudioLiveAck<T>) => void;
+
+export interface StudioLiveLockAcquiredDecision {
+  decision: "acquired";
+  requestId: string;
+  lock: StudioLiveLock;
+}
+
+export type StudioLiveLockRequestFailure = StudioLiveFailure & {
+  decision: "denied" | "revoked";
+  requestId: string;
+  /** Present for a hierarchical or exact-resource conflict. */
+  lock?: StudioLiveLock;
+};
+
+export type StudioLiveLockRequestAck =
+  | StudioLiveSuccess<StudioLiveLockAcquiredDecision>
+  | StudioLiveLockRequestFailure;
+
+export type StudioLiveLockUpdate =
+  | {
+      action: "acquired";
+      requestId: string;
+      lock: StudioLiveLock;
+    }
+  | {
+      action: "released" | "expired" | "revoked";
+      requestId: string;
+      resourceId: string;
+      leaseId: string;
+    };
 
 export interface StudioLiveJoinResult {
   self: StudioLiveParticipant;

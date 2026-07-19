@@ -165,9 +165,12 @@ async function expectCanonicalTriangleGlb(
   const json = JSON.parse(
     new TextDecoder().decode(new Uint8Array(buffer, 20, jsonChunkLength)).trim(),
   ) as {
+    accessors?: Array<{ count?: number; type?: string }>;
     asset?: { version?: string };
     buffers?: unknown[];
-    meshes?: unknown[];
+    meshes?: Array<{
+      primitives?: Array<{ attributes?: { POSITION?: number } }>;
+    }>;
     nodes?: unknown[];
     scenes?: unknown[];
   };
@@ -176,8 +179,16 @@ async function expectCanonicalTriangleGlb(
   expect(json.meshes?.length).toBeGreaterThanOrEqual(1);
   expect(json.nodes?.length).toBeGreaterThanOrEqual(1);
   expect(json.scenes?.length).toBeGreaterThanOrEqual(1);
-  expect(view.getUint32(jsonChunkEnd, true)).toBeGreaterThan(0);
+  const binChunkLength = view.getUint32(jsonChunkEnd, true);
+  expect(binChunkLength).toBeGreaterThan(0);
   expect(view.getUint32(jsonChunkEnd + 4, true)).toBe(0x004e4942);
+  expect(jsonChunkEnd + 8 + binChunkLength).toBe(buffer.byteLength);
+  const positionAccessorIndex = json.meshes?.[0]?.primitives?.[0]?.attributes?.POSITION;
+  expect(positionAccessorIndex).toEqual(expect.any(Number));
+  expect(json.accessors?.[positionAccessorIndex ?? -1]).toMatchObject({
+    count: 3,
+    type: "VEC3",
+  });
 
   const { GLTFLoader } = await import("three/examples/jsm/loaders/GLTFLoader.js");
   const gltf = await new GLTFLoader().parseAsync(buffer, "");
@@ -715,7 +726,12 @@ describe("convertStudioBg3dModelFilesToGlb", () => {
     const dae = sourceFile("triangle.dae", [
       "<?xml version=\"1.0\" encoding=\"utf-8\"?>",
       "<COLLADA xmlns=\"http://www.collada.org/2005/11/COLLADASchema\" version=\"1.4.1\">",
-      "  <asset><unit meter=\"1\" name=\"meter\"/><up_axis>Y_UP</up_axis></asset>",
+      "  <asset>",
+      "    <created>2026-01-01T00:00:00Z</created>",
+      "    <modified>2026-01-01T00:00:00Z</modified>",
+      "    <unit meter=\"1\" name=\"meter\"/>",
+      "    <up_axis>Y_UP</up_axis>",
+      "  </asset>",
       "  <library_geometries>",
       "    <geometry id=\"triangle-geometry\" name=\"Triangle\">",
       "      <mesh>",

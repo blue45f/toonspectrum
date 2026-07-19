@@ -7,7 +7,10 @@ import {
   type StudioLiveChatMessagePayload,
   type StudioLiveCursorPayload,
   type StudioLiveEnvelope,
+  type StudioLiveLockAcquireResult,
   type StudioLiveLockClaimPayload,
+  type StudioLiveLockLease,
+  type StudioLiveLockRequest,
   type StudioLiveMessageKind,
   type StudioLiveParticipant,
   type StudioLivePayloadMap,
@@ -41,9 +44,15 @@ import type {
   StudioCrdtUpdateRequest,
 } from "./studio-crdt-protocol";
 
+import {
+  parseStudioLiveLockResourceScope,
+  studioLiveLockResourcesConflict,
+} from "@/lib/studio-live-lock-resource";
+
 const DEFAULT_HEARTBEAT_MS = 10_000;
 const DEFAULT_PRESENCE_TTL_MS = 30_000;
 const DEFAULT_LOCK_LEASE_MS = 15_000;
+const DEFAULT_LOCK_ACK_TIMEOUT_MS = 10_000;
 const DEFAULT_CURSOR_INTERVAL_MS = 40;
 export const STUDIO_LIVE_CHAT_HISTORY_LIMIT = 200;
 export const STUDIO_LIVE_VOICE_MAX_PARTICIPANTS = 6;
@@ -66,12 +75,7 @@ export interface StudioLivePeer extends StudioLiveParticipant {
   lastSeenAt: number;
 }
 
-export interface StudioLiveLock {
-  resource: string;
-  claimId: string;
-  owner: StudioLiveParticipant;
-  leaseUntil: number;
-}
+export type StudioLiveLock = StudioLiveLockLease;
 
 export interface StudioLiveVoiceMember {
   participant: StudioLiveParticipant;
@@ -149,10 +153,21 @@ export interface StudioLiveRoomDependencies {
   randomId?: () => string;
   setInterval?: (handler: () => void, delay: number) => unknown;
   clearInterval?: (handle: unknown) => void;
+  setTimeout?: (handler: () => void, delay: number) => unknown;
+  clearTimeout?: (handle: unknown) => void;
   heartbeatMs?: number;
   presenceTtlMs?: number;
   lockLeaseMs?: number;
+  lockAckTimeoutMs?: number;
   cursorIntervalMs?: number;
+}
+
+interface PendingStudioLiveLockClaim {
+  resource: string;
+  requestId: string;
+  promise: Promise<StudioLiveLockAcquireResult>;
+  resolve: (result: StudioLiveLockAcquireResult) => void;
+  timeout: unknown;
 }
 
 export interface StudioLiveRoomOptions {
@@ -203,9 +218,12 @@ export class StudioLiveRoom {
   private readonly randomId: () => string;
   private readonly scheduleInterval: (handler: () => void, delay: number) => unknown;
   private readonly cancelInterval: (handle: unknown) => void;
+  private readonly scheduleTimeout: (handler: () => void, delay: number) => unknown;
+  private readonly cancelTimeout: (handle: unknown) => void;
   private readonly heartbeatMs: number;
   private readonly presenceTtlMs: number;
   private readonly lockLeaseMs: number;
+  private readonly lockAckTimeoutMs: number;
   private readonly cursorIntervalMs: number;
   private readonly listeners = new Set<(event: StudioLiveRoomEvent) => void>();
   private readonly crdtListeners = new Set<(event: StudioLiveCrdtRoomEvent) => void>();
@@ -213,6 +231,7 @@ export class StudioLiveRoom {
   private readonly peers = new Map<string, StudioLivePeer>();
   private readonly voiceMembers = new Map<string, StudioLiveVoiceMember>();
   private readonly locks = new Map<string, StudioLiveLock>();
+  private readonly pendingLockClaims = new Map<string, PendingStudioLiveLockClaim>();
   private readonly chatMessages: StudioLiveChatMessage[] = [];
   private readonly lastSequenceBySession = new Map<string, number>();
   private transport: StudioLiveTransport | null = null;
@@ -240,6 +259,10 @@ export class StudioLiveRoom {
     this.randomId = deps.randomId ?? defaultRandomId;
     this.scheduleInterval = deps.setInterval ?? defaultSetInterval;
     this.cancelInterval = deps.clearInterval ?? defaultClearInterval;
+    this.scheduleTimeout = deps.setTimeout ?? ((handler, delay) => globalThis.setTimeout(handler, delay));
+    this.cancelTimeout =
+      deps.clearTimeout ??
+      ((handle) => globalThis.clearTimeout(handle as ReturnType<typeof setTimeout>));
     this.heartbeatMs = boundedTiming(deps.heartbeatMs, DEFAULT_HEARTBEAT_MS, 250, 30_000);
     this.presenceTtlMs = boundedTiming(
       deps.presenceTtlMs,
@@ -252,6 +275,12 @@ export class StudioLiveRoom {
       DEFAULT_LOCK_LEASE_MS,
       this.heartbeatMs + 250,
       STUDIO_LIVE_LOCK_MAX_LEASE_MS
+    );
+    this.lockAckTimeoutMs = boundedTiming(
+      deps.lockAckTimeoutMs,
+      DEFAULT_LOCK_ACK_TIMEOUT_MS,
+      100,
+      30_000
     );
     this.cursorIntervalMs = boundedTiming(
       deps.cursorIntervalMs,
@@ -443,32 +472,167 @@ export class StudioLiveRoom {
     return this.post("cursor:update", { x: 0, y: 0, pageId: null, tool: null });
   }
 
+  /**
+   * Legacy fire-and-observe compatibility shim. Server callers that must gate a mutation on the
+   * authoritative lease should await `claimLockAsync` instead of interpreting this boolean as ACK.
+   */
   claimLock(resource: string): boolean {
     if (!this.ready) return false;
+    if (this.transport?.mode !== "server") return this.claimLocalLock(resource);
+    if (this.pendingLockClaims.has(resource)) return true;
+    if (this.findLockConflict(resource, this.now())) return false;
+    void this.claimLockAsync(resource);
+    return true;
+  }
+
+  /** Waits for the server-authoritative lock decision and always correlates it by request UUID. */
+  claimLockAsync(resource: string): Promise<StudioLiveLockAcquireResult> {
+    const existingPending = this.pendingLockClaims.get(resource);
+    if (existingPending) return existingPending.promise;
+
+    let requestId = "unavailable";
     const now = this.now();
-    this.pruneExpired(now);
-    const previous = this.locks.get(resource);
-    if (previous && previous.owner.sessionId !== this.participant.sessionId) return false;
-
-    const claimId = previous?.claimId ?? this.randomId();
-    const payload: StudioLiveLockClaimPayload = {
-      resource,
-      claimId,
-      leaseUntil: now + this.lockLeaseMs,
-    };
-    const envelope = this.buildEnvelope("lock:claim", payload, null, now);
-    if (this.transport?.mode === "server") {
-      // The server owns lease ids and conflict decisions. Commit only after its authoritative ACK
-      // arrives through the transport control plane; otherwise an optimistic local lock diverges.
-      return this.sendEnvelope(envelope);
+    try {
+      requestId = this.randomId();
+      createStudioLiveEnvelope({
+        workId: this.workId,
+        sender: this.participant,
+        sentAt: now,
+        sequence: 1,
+        kind: "lock:claim",
+        payload: { resource, claimId: requestId, leaseUntil: now + this.lockLeaseMs },
+      });
+    } catch (error) {
+      return Promise.resolve({
+        status: "denied",
+        resource,
+        requestId,
+        code: "invalid_request",
+        message: error instanceof Error ? error.message : "편집 잠금 요청이 올바르지 않습니다.",
+      });
     }
-    this.applyLockClaim(envelope);
-    if (this.sendEnvelope(envelope)) return true;
+    if (!this.ready) {
+      return Promise.resolve({
+        status: "revoked",
+        resource,
+        requestId,
+        code: "not_ready",
+        message: "공동작업 연결이 준비되지 않았습니다.",
+      });
+    }
 
-    if (previous) this.locks.set(resource, previous);
-    else this.locks.delete(resource);
-    this.emitLocks();
-    return false;
+    this.pruneExpired(now);
+    const conflict = this.findLockConflict(resource, now);
+    if (conflict) {
+      return Promise.resolve({
+        status: "denied",
+        resource,
+        requestId,
+        code: "lock_conflict",
+        message: `${conflict.owner.displayName || "다른 편집자"}가 이 영역을 편집 중입니다.`,
+        lock: { ...conflict, owner: copyParticipant(conflict.owner) },
+      });
+    }
+
+    const current = this.locks.get(resource);
+    if (current?.owner.sessionId === this.participant.sessionId && current.leaseUntil > now) {
+      return Promise.resolve({
+        status: "acquired",
+        resource,
+        requestId,
+        lock: { ...current, owner: copyParticipant(current.owner) },
+      });
+    }
+    if (this.transport?.mode !== "server") {
+      if (!this.claimLocalLock(resource, requestId, now)) {
+        return Promise.resolve({
+          status: "denied",
+          resource,
+          requestId,
+          code: "transport_error",
+          message: "로컬 편집 잠금 요청을 보내지 못했습니다.",
+        });
+      }
+      const lock = this.locks.get(resource);
+      if (!lock || lock.owner.sessionId !== this.participant.sessionId) {
+        return Promise.resolve({
+          status: "denied",
+          resource,
+          requestId,
+          code: "lock_conflict",
+          message: "다른 편집 세션이 이 영역의 잠금을 먼저 획득했습니다.",
+        });
+      }
+      return Promise.resolve({
+        status: "acquired",
+        resource,
+        requestId,
+        lock: { ...lock, owner: copyParticipant(lock.owner) },
+      });
+    }
+
+    const acquireLock = this.transport.acquireLock;
+    if (!acquireLock) {
+      return Promise.resolve({
+        status: "denied",
+        resource,
+        requestId,
+        code: "unsupported_transport",
+        message: "현재 팀 연결은 서버 확인형 편집 잠금을 지원하지 않습니다.",
+      });
+    }
+    let resolveResult!: (result: StudioLiveLockAcquireResult) => void;
+    const promise = new Promise<StudioLiveLockAcquireResult>((resolve) => {
+      resolveResult = resolve;
+    });
+    const pending: PendingStudioLiveLockClaim = {
+      resource,
+      requestId,
+      promise,
+      resolve: resolveResult,
+      timeout: null,
+    };
+    this.pendingLockClaims.set(resource, pending);
+    pending.timeout = this.scheduleTimeout(() => {
+      this.completePendingLockClaim(pending, {
+        status: "timeout",
+        resource,
+        requestId,
+        message: "팀 서버의 편집 잠금 응답 시간이 초과되었습니다.",
+      });
+    }, this.lockAckTimeoutMs);
+
+    const request: StudioLiveLockRequest = {
+      resource,
+      requestId,
+      leaseMs: this.lockLeaseMs,
+    };
+    let operation: Promise<StudioLiveLockAcquireResult>;
+    try {
+      operation = acquireLock.call(this.transport, request);
+    } catch (error) {
+      this.completePendingLockClaim(pending, {
+        status: "denied",
+        resource,
+        requestId,
+        code: "transport_error",
+        message: error instanceof Error ? error.message : "편집 잠금 요청을 보내지 못했습니다.",
+      });
+      return promise;
+    }
+    void operation.then(
+      (result) => this.acceptTransportLockResult(pending, result),
+      (error: unknown) => {
+        this.completePendingLockClaim(pending, {
+          status: "denied",
+          resource,
+          requestId,
+          code: "transport_error",
+          message: error instanceof Error ? error.message : "편집 잠금 요청을 확인하지 못했습니다.",
+        });
+      }
+    );
+    return promise;
   }
 
   releaseLock(resource: string): boolean {
@@ -637,6 +801,10 @@ export class StudioLiveRoom {
       }
       this.post("presence:leave", {});
     }
+    this.revokePendingLockClaims(
+      "connection_closed",
+      "공동작업 연결이 종료되어 편집 잠금 요청이 취소되었습니다."
+    );
     this.phase = "closed";
     if (this.heartbeatHandle !== null) this.cancelInterval(this.heartbeatHandle);
     this.heartbeatHandle = null;
@@ -663,6 +831,104 @@ export class StudioLiveRoom {
     this.chatMessages.push(message);
     if (this.chatMessages.length > STUDIO_LIVE_CHAT_HISTORY_LIMIT) {
       this.chatMessages.splice(0, this.chatMessages.length - STUDIO_LIVE_CHAT_HISTORY_LIMIT);
+    }
+  }
+
+  private claimLocalLock(resource: string, requestId?: string, requestedAt = this.now()): boolean {
+    if (!this.ready) return false;
+    this.pruneExpired(requestedAt);
+    const conflict = this.findLockConflict(resource, requestedAt);
+    if (conflict) return false;
+    const previous = this.locks.get(resource);
+    const claimId = previous?.claimId ?? requestId ?? this.randomId();
+    const payload: StudioLiveLockClaimPayload = {
+      resource,
+      claimId,
+      leaseUntil: requestedAt + this.lockLeaseMs,
+    };
+    const envelope = this.buildEnvelope("lock:claim", payload, null, requestedAt);
+    this.applyLockClaim(envelope);
+    if (this.sendEnvelope(envelope)) return true;
+
+    if (previous) this.locks.set(resource, previous);
+    else this.locks.delete(resource);
+    this.emitLocks();
+    return false;
+  }
+
+  private findLockConflict(resource: string, now: number): StudioLiveLock | null {
+    for (const lock of this.locks.values()) {
+      if (lock.owner.sessionId === this.participant.sessionId || lock.leaseUntil <= now) continue;
+      if (studioLiveLockResourcesConflict(resource, lock.resource)) return lock;
+    }
+    return null;
+  }
+
+  private acceptTransportLockResult(
+    pending: PendingStudioLiveLockClaim,
+    result: StudioLiveLockAcquireResult
+  ): void {
+    if (this.pendingLockClaims.get(pending.resource) !== pending) return;
+    if (result.resource !== pending.resource || result.requestId !== pending.requestId) {
+      this.completePendingLockClaim(pending, {
+        status: "denied",
+        resource: pending.resource,
+        requestId: pending.requestId,
+        code: "response_mismatch",
+        message: "팀 서버의 편집 잠금 응답 식별자가 요청과 일치하지 않습니다.",
+      });
+      return;
+    }
+    if (result.status === "acquired") {
+      const lock = result.lock;
+      if (
+        lock.resource !== pending.resource ||
+        lock.owner.sessionId !== this.participant.sessionId ||
+        !Number.isFinite(lock.leaseUntil) ||
+        lock.leaseUntil <= this.now()
+      ) {
+        this.completePendingLockClaim(pending, {
+          status: "denied",
+          resource: pending.resource,
+          requestId: pending.requestId,
+          code: "invalid_response",
+          message: "팀 서버가 유효하지 않은 편집 잠금 정보를 반환했습니다.",
+        });
+        return;
+      }
+      const previous = this.locks.get(lock.resource);
+      this.locks.set(lock.resource, { ...lock, owner: copyParticipant(lock.owner) });
+      if (
+        previous?.claimId !== lock.claimId ||
+        previous.owner.sessionId !== lock.owner.sessionId ||
+        previous.leaseUntil !== lock.leaseUntil
+      ) {
+        this.emitLocks();
+      }
+    }
+    this.completePendingLockClaim(pending, result);
+  }
+
+  private completePendingLockClaim(
+    pending: PendingStudioLiveLockClaim,
+    result: StudioLiveLockAcquireResult
+  ): void {
+    if (this.pendingLockClaims.get(pending.resource) !== pending) return;
+    this.pendingLockClaims.delete(pending.resource);
+    if (pending.timeout !== null) this.cancelTimeout(pending.timeout);
+    pending.timeout = null;
+    pending.resolve(result);
+  }
+
+  private revokePendingLockClaims(code: string, message: string): void {
+    for (const pending of Array.from(this.pendingLockClaims.values())) {
+      this.completePendingLockClaim(pending, {
+        status: "revoked",
+        resource: pending.resource,
+        requestId: pending.requestId,
+        code,
+        message,
+      });
     }
   }
 
@@ -916,6 +1182,7 @@ export class StudioLiveRoom {
     if (this.phase === "closed") return;
     if (event.type === "status") {
       if (event.status.state === "revoked") {
+        this.revokePendingLockClaims("access_revoked", event.status.message);
         const hadPeers = this.peers.size > 0;
         const hadLocks = this.locks.size > 0;
         this.peers.clear();
@@ -932,6 +1199,7 @@ export class StudioLiveRoom {
           message: event.status.message,
         });
       } else if (event.status.state === "disconnected") {
+        this.revokePendingLockClaims("disconnected", event.status.message);
         let changed = false;
         for (const [sessionId, member] of this.voiceMembers) {
           if (sessionId === this.participant.sessionId) continue;
@@ -983,6 +1251,19 @@ export class StudioLiveRoom {
       };
       this.locks.set(next.resource, next);
       this.emitLocks();
+      const pending = this.pendingLockClaims.get(next.resource);
+      if (
+        pending &&
+        event.lock.requestId === pending.requestId &&
+        next.owner.sessionId === this.participant.sessionId
+      ) {
+        this.completePendingLockClaim(pending, {
+          status: "acquired",
+          resource: next.resource,
+          requestId: pending.requestId,
+          lock: { ...next, owner: copyParticipant(next.owner) },
+        });
+      }
       return;
     }
     const current = this.locks.get(event.lock.resource);
@@ -1021,16 +1302,24 @@ export class StudioLiveRoom {
       leaseUntil: envelope.payload.leaseUntil,
     };
     const now = this.now();
-    const current = this.locks.get(candidate.resource);
-    let shouldReplace = !current || current.leaseUntil <= now;
-    if (current) {
-      const sameClaim =
-        current.claimId === candidate.claimId &&
-        current.owner.sessionId === candidate.owner.sessionId;
-      shouldReplace =
-        shouldReplace || sameClaim || lockPriority(candidate) < lockPriority(current);
-    }
-    if (!shouldReplace) return;
+    const conflicting = Array.from(this.locks.values()).filter(
+      (lock) =>
+        lock.owner.sessionId !== candidate.owner.sessionId &&
+        lock.leaseUntil > now &&
+        studioLiveLockResourcesConflict(lock.resource, candidate.resource)
+    );
+    const candidateScope = parseStudioLiveLockResourceScope(candidate.resource);
+    const losesConflict = conflicting.some((lock) => {
+      if (lock.resource === candidate.resource) {
+        return lockPriority(candidate) >= lockPriority(lock);
+      }
+      const lockScope = parseStudioLiveLockResourceScope(lock.resource);
+      if (candidateScope?.kind === "page" && lockScope?.kind === "element") return false;
+      if (candidateScope?.kind === "element" && lockScope?.kind === "page") return true;
+      return lockPriority(candidate) >= lockPriority(lock);
+    });
+    if (losesConflict) return;
+    for (const lock of conflicting) this.locks.delete(lock.resource);
     this.locks.set(candidate.resource, candidate);
     this.emitLocks();
   }

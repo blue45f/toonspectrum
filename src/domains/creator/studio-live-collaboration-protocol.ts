@@ -56,6 +56,53 @@ export interface StudioLiveLockReleasePayload {
   claimId: string;
 }
 
+/** Authoritative lease returned by either the local arbiter or the authenticated server. */
+export interface StudioLiveLockLease {
+  resource: string;
+  claimId: string;
+  owner: StudioLiveParticipant;
+  leaseUntil: number;
+}
+
+/**
+ * One correlated request for an authoritative lock. `requestId` is the client-generated UUID
+ * echoed by the server ACK; it is deliberately distinct from the server-owned lease/claim id.
+ */
+export interface StudioLiveLockRequest {
+  resource: string;
+  requestId: string;
+  leaseMs: number;
+}
+
+export type StudioLiveLockAcquireResult =
+  | {
+      status: "acquired";
+      resource: string;
+      requestId: string;
+      lock: StudioLiveLockLease;
+    }
+  | {
+      status: "denied";
+      resource: string;
+      requestId: string;
+      code: string;
+      message: string;
+      lock?: StudioLiveLockLease;
+    }
+  | {
+      status: "timeout";
+      resource: string;
+      requestId: string;
+      message: string;
+    }
+  | {
+      status: "revoked";
+      resource: string;
+      requestId: string;
+      code: string;
+      message: string;
+    };
+
 export interface StudioLiveScreenAnnouncePayload {
   shareId: string;
   label: string;

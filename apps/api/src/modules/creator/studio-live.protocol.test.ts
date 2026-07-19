@@ -31,6 +31,10 @@ const publicParticipant = {
 } as const satisfies StudioLiveParticipant;
 
 describe("studio live protocol module", () => {
+  it("pins advanced drawing-assist rooms to CRDT protocol v4", () => {
+    expect(protocol.STUDIO_CRDT_PROTOCOL_VERSION).toBe(4);
+  });
+
   it("owns strict public participant and inter-server relay wire contracts", () => {
     expect(protocol.StudioLivePublicParticipantSchema.safeParse(publicParticipant).success).toBe(
       true

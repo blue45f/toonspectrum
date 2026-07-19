@@ -734,15 +734,30 @@ describe("StudioLiveSocketTransport", () => {
     const room = new StudioLiveRoom({
       workId: "work-1",
       participant: localParticipant,
-      dependencies: { transportFactory: factory, now: () => NOW },
+      dependencies: {
+        transportFactory: factory,
+        now: () => NOW,
+        randomId: () => "11111111-1111-4111-8111-111111111111",
+      },
     });
     await room.start();
 
-    expect(room.claimLock("page:page-1")).toBe(true);
+    const acquisition = room.claimLockAsync("page:page-1");
     expect(room.getLocks()).toEqual([]);
+    expect(socket.emitted.at(-1)).toEqual({
+      event: "studio:lock:request",
+      payload: {
+        workId: "work-1",
+        resourceId: "page:page-1",
+        requestId: "11111111-1111-4111-8111-111111111111",
+        leaseMs: 15_000,
+      },
+    });
     socket.reply("studio:lock:request", {
       ok: true,
       data: {
+        decision: "acquired",
+        requestId: "11111111-1111-4111-8111-111111111111",
         lock: {
           resourceId: "page:page-1",
           leaseId: "server-lease-1",
@@ -751,6 +766,16 @@ describe("StudioLiveSocketTransport", () => {
           expiresAt: new Date(NOW + 15_000).toISOString(),
         },
       },
+    });
+    await expect(acquisition).resolves.toEqual({
+      status: "acquired",
+      resource: "page:page-1",
+      requestId: "11111111-1111-4111-8111-111111111111",
+      lock: expect.objectContaining({
+        resource: "page:page-1",
+        claimId: "server-lease-1",
+        owner: localParticipant,
+      }),
     });
 
     expect(room.getLocks()).toEqual([
@@ -788,14 +813,25 @@ describe("StudioLiveSocketTransport", () => {
           now: () => NOW,
         }),
         now: () => NOW,
+        randomId: () => "22222222-2222-4222-8222-222222222222",
       },
     });
     room.subscribe((event) => event.type === "transport-status" && statuses.push(event));
     await room.start();
 
-    expect(room.claimLock("page:viewer-denied")).toBe(true);
+    const acquisition = room.claimLockAsync("page:viewer-denied");
     socket.reply("studio:lock:request", {
       ok: false,
+      decision: "denied",
+      requestId: "22222222-2222-4222-8222-222222222222",
+      code: "forbidden",
+      message: "이 원고를 편집할 권한이 없습니다.",
+    });
+
+    await expect(acquisition).resolves.toEqual({
+      status: "denied",
+      resource: "page:viewer-denied",
+      requestId: "22222222-2222-4222-8222-222222222222",
       code: "forbidden",
       message: "이 원고를 편집할 권한이 없습니다.",
     });
@@ -840,17 +876,27 @@ describe("StudioLiveSocketTransport", () => {
           now: () => NOW,
         }),
         now: () => NOW,
+        randomId: () => "33333333-3333-4333-8333-333333333333",
       },
     });
     await room.start();
-    expect(room.claimLock("page:stale")).toBe(true);
+    const acquisition = room.claimLockAsync("page:stale");
 
     socket.serverDisconnect();
+    await expect(acquisition).resolves.toEqual({
+      status: "revoked",
+      resource: "page:stale",
+      requestId: "33333333-3333-4333-8333-333333333333",
+      code: "disconnected",
+      message: expect.any(String),
+    });
     socket.serverReconnect();
     expect(room.ready).toBe(true);
     socket.reply("studio:lock:request", {
       ok: true,
       data: {
+        decision: "acquired",
+        requestId: "33333333-3333-4333-8333-333333333333",
         lock: {
           resourceId: "page:stale",
           leaseId: "stale-server-lease",
@@ -863,6 +909,183 @@ describe("StudioLiveSocketTransport", () => {
 
     expect(room.getLocks()).toEqual([]);
     room.close();
+  });
+
+  it("times out a pending lock and rolls back a late authoritative broadcast without ACK", async () => {
+    vi.useFakeTimers();
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.holdEvents.add("studio:lock:request");
+    const room = new StudioLiveRoom({
+      workId: "work-1",
+      participant: localParticipant,
+      dependencies: {
+        transportFactory: createStudioServerLiveTransportFactory(TOKEN, {
+          createSocket: () => socket,
+          now: () => NOW,
+          lockAckTimeoutMs: 100,
+        }),
+        now: () => NOW,
+        randomId: () => "44444444-4444-4444-8444-444444444444",
+        lockAckTimeoutMs: 250,
+      },
+    });
+    await room.start();
+
+    const acquisition = room.claimLockAsync("element:page-1:late");
+    await vi.advanceTimersByTimeAsync(100);
+    await expect(acquisition).resolves.toEqual({
+      status: "timeout",
+      resource: "element:page-1:late",
+      requestId: "44444444-4444-4444-8444-444444444444",
+      message: expect.any(String),
+    });
+
+    socket.serverEmit("studio:lock:update", {
+      action: "acquired",
+      requestId: "44444444-4444-4444-8444-444444444444",
+      lock: {
+        resourceId: "element:page-1:late",
+        leaseId: "late-server-lease",
+        ownerConnectionId: self.connectionId,
+        ownerName: self.name,
+        expiresAt: new Date(NOW + 15_000).toISOString(),
+      },
+    });
+
+    expect(room.getLocks()).toEqual([]);
+    expect(socket.emitted.at(-1)).toEqual({
+      event: "studio:lock:release",
+      payload: {
+        workId: "work-1",
+        resourceId: "element:page-1:late",
+        leaseId: "late-server-lease",
+      },
+    });
+    room.close();
+  });
+
+  it("accepts a correlated authoritative broadcast before ACK without later timing out", async () => {
+    vi.useFakeTimers();
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.holdEvents.add("studio:lock:request");
+    const room = new StudioLiveRoom({
+      workId: "work-1",
+      participant: localParticipant,
+      dependencies: {
+        transportFactory: createStudioServerLiveTransportFactory(TOKEN, {
+          createSocket: () => socket,
+          now: () => NOW,
+          lockAckTimeoutMs: 100,
+        }),
+        now: () => NOW,
+        randomId: () => "66666666-6666-4666-8666-666666666666",
+        lockAckTimeoutMs: 250,
+      },
+    });
+    await room.start();
+
+    const acquisition = room.claimLockAsync("page:broadcast-first");
+    socket.serverEmit("studio:lock:update", {
+      action: "acquired",
+      requestId: "66666666-6666-4666-8666-666666666666",
+      lock: {
+        resourceId: "page:broadcast-first",
+        leaseId: "broadcast-first-lease",
+        ownerConnectionId: self.connectionId,
+        ownerName: self.name,
+        expiresAt: new Date(NOW + 15_000).toISOString(),
+      },
+    });
+
+    await expect(acquisition).resolves.toEqual({
+      status: "acquired",
+      resource: "page:broadcast-first",
+      requestId: "66666666-6666-4666-8666-666666666666",
+      lock: expect.objectContaining({ claimId: "broadcast-first-lease" }),
+    });
+    await vi.advanceTimersByTimeAsync(250);
+    expect(room.getLocks()).toEqual([
+      expect.objectContaining({
+        resource: "page:broadcast-first",
+        claimId: "broadcast-first-lease",
+      }),
+    ]);
+    expect(socket.emitted.filter((entry) => entry.event === "studio:lock:release")).toEqual([]);
+    socket.serverEmit("studio:lock:update", {
+      action: "revoked",
+      resourceId: "page:broadcast-first",
+      leaseId: "broadcast-first-lease",
+      requestId: "66666666-6666-4666-8666-666666666666",
+    });
+    expect(room.getLocks()).toEqual([]);
+    room.close();
+  });
+
+  it("preserves each request correlation when the same resource already has a pending request", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.holdEvents.add("studio:lock:request");
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    await transport.connect();
+
+    const first = transport.acquireLock({
+      resource: "page:deduplicated",
+      requestId: "77777777-7777-4777-8777-777777777777",
+      leaseMs: 15_000,
+    });
+    await expect(
+      transport.acquireLock({
+        resource: "page:deduplicated",
+        requestId: "88888888-8888-4888-8888-888888888888",
+        leaseMs: 15_000,
+      })
+    ).resolves.toEqual({
+      status: "denied",
+      resource: "page:deduplicated",
+      requestId: "88888888-8888-4888-8888-888888888888",
+      code: "duplicate_resource_request",
+      message: expect.any(String),
+    });
+
+    transport.close();
+    await expect(first).resolves.toEqual({
+      status: "revoked",
+      resource: "page:deduplicated",
+      requestId: "77777777-7777-4777-8777-777777777777",
+      code: "connection_closed",
+      message: expect.any(String),
+    });
+  });
+
+  it("settles a pending lock as revoked when the room closes", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.holdEvents.add("studio:lock:request");
+    const room = new StudioLiveRoom({
+      workId: "work-1",
+      participant: localParticipant,
+      dependencies: {
+        transportFactory: createStudioServerLiveTransportFactory(TOKEN, {
+          createSocket: () => socket,
+          now: () => NOW,
+        }),
+        now: () => NOW,
+        randomId: () => "55555555-5555-4555-8555-555555555555",
+      },
+    });
+    await room.start();
+
+    const acquisition = room.claimLockAsync("page:closing");
+    room.close();
+
+    await expect(acquisition).resolves.toEqual({
+      status: "revoked",
+      resource: "page:closing",
+      requestId: "55555555-5555-4555-8555-555555555555",
+      code: "connection_closed",
+      message: expect.any(String),
+    });
   });
 
   it("rejoins before becoming ready again and exposes disconnect/revocation recovery states", async () => {

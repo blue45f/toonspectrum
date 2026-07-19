@@ -132,6 +132,9 @@ const OVERLAY_PROPS = [
   "isometricConfig",
   "onPreviewIsometricOrigin",
   "onCommitIsometricOrigin",
+  "advancedRulers",
+  "onPreviewAdvancedRuler",
+  "onCommitAdvancedRuler",
   "drawingAssistDisabled",
   "onCancelDrawingAssistPreview",
 ] as const;
@@ -152,6 +155,7 @@ describe("Studio canvas guide layer ownership boundary", () => {
       "./studio-page-lazy-ui",
     ]);
     expect(guides.typeImports).toEqual([
+      "./studio-advanced-ruler-document",
       "./studio-isometric-grid",
       "./studio-perspective-guide",
       "./studio-smart-guides",
@@ -201,11 +205,13 @@ describe("Studio canvas guide layer ownership boundary", () => {
     expect(page).not.toContain('name="symmetry-handle"');
     expect(page).not.toContain("<StudioPerspectiveOverlay");
     expect(page).not.toContain("<StudioIsometricGridOverlay");
+    expect(page).not.toContain("<StudioAdvancedRulerOverlay");
     expect(page).toContain('e.target.name() === "guide-line-handle"');
     expect(page).toContain('e.target.name() === "symmetry-handle"');
     expect(guides).toContain('name="guide-line-handle"');
     expect(guides).toContain('name="symmetry-handle"');
     expect(guides).toMatch(/<Suspense fallback=\{null\}>[\s\S]{0,700}<StudioPerspectiveOverlay/u);
     expect(guides).toMatch(/<Suspense fallback=\{null\}>[\s\S]{0,700}<StudioIsometricGridOverlay/u);
+    expect(guides).toContain("<StudioAdvancedRulerOverlay");
   });
 });

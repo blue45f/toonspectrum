@@ -68,6 +68,12 @@ import {
   type StudioAdvancedFillTapGesture,
 } from "./studio-advanced-fill-tap";
 import {
+  normalizeStudioAdvancedRulerDocument,
+  resolveActiveStudioAdvancedRuler,
+  type StudioAdvancedRuler,
+  type StudioAdvancedRulerDocument,
+} from "./studio-advanced-ruler-document";
+import {
   loadStudioAiRecentPrompts,
   pushStudioAiRecentPrompt,
   type StudioAiAssistToolId,
@@ -326,6 +332,11 @@ import {
   type CropRect,
 } from "./studio-crop";
 import {
+  beginStudioCurveSnapSession,
+  snapStudioCurvePoint,
+  type StudioCurveSnapSession,
+} from "./studio-curve-ruler";
+import {
   NODE_SMOOTH_DEFAULT_STRENGTH,
   NODE_SMOOTH_DRAG_RANGE_PX,
   smoothPointsAroundIndex,
@@ -377,6 +388,7 @@ import {
 import {
   areStudioDrawingAssistDocumentsEqual,
   normalizeStudioDrawingAssistDocument,
+  resolveStudioDrawingAssistPreviewDocument,
   studioDrawingAssistHasContent,
   type StudioDrawingAssistDocument,
 } from "./studio-drawing-assist-document";
@@ -424,6 +436,11 @@ import {
   composeStudioFillReferenceImage,
   type StudioFillReferenceLayer,
 } from "./studio-fill-reference";
+import {
+  beginStudioFisheyeSnapSession,
+  snapStudioFisheyePoint,
+  type StudioFisheyeSnapSession,
+} from "./studio-fisheye-ruler";
 import {
   createFixedRateStrokeFilter,
   quantizeFixedRateStrokeSample,
@@ -490,6 +507,10 @@ import {
   type IsometricAxisRay,
 } from "./studio-isometric-grid";
 import {
+  createStudioIsometricSolidElements,
+  planStudioIsometricSolid,
+} from "./studio-isometric-solid";
+import {
   imageFilterCacheKey,
   type ImageFilterFields,
 } from "./studio-konva-filter-fields";
@@ -549,10 +570,14 @@ import {
 } from "./studio-live-ink-overlay";
 import {
   canBeginStudioLiveMutation,
-  planStudioLiveHeldResourceClear,
   planStudioLiveHeldResourceReplace,
+  selfHoldsStudioLiveLock,
   studioLiveMutationResources,
 } from "./studio-live-mutation-guard";
+import {
+  releaseStudioLiveMutationLocks,
+  replaceStudioLiveMutationLocks,
+} from "./studio-live-mutation-lock-coordinator";
 import { createStudioServerLiveTransportFactory } from "./studio-live-socket-transport";
 import { StudioLiveStampOverlayRenderer } from "./studio-live-stamp-overlay";
 import {
@@ -1912,6 +1937,12 @@ function StudioCuttoonEditor() {
     studioWorkAssetHydrator.dispose();
   }, [studioWorkAssetAdmissionCoordinator, studioWorkAssetHydrator]);
   const studioLiveHeldResourcesRef = useRef<string[]>([]);
+  const studioLiveMutationGenerationRef = useRef(0);
+  const studioLivePendingMutationRef = useRef<{
+    room: StudioLiveRoom;
+    key: string;
+    promise: Promise<boolean>;
+  } | null>(null);
   const [uiDensityMode, setUiDensityMode] = useState<StudioUiDensityMode>(() =>
     loadStudioUiDensityState(
       typeof globalThis.localStorage === "undefined" ? null : globalThis.localStorage
@@ -1978,43 +2009,118 @@ function StudioCuttoonEditor() {
   function rememberEffectRecent(effectId: StudioEffectId) {
     persistEffectFavoriteState(rememberStudioEffectRecent(effectFavoriteState, effectId));
   }
-  function beginLiveResourceEdit(elementIds?: readonly string[] | null): boolean {
-    const room = studioLiveRoomRef.current;
-    if (!room) return true;
+  function liveMutationResources(elementIds?: readonly string[] | null): string[] {
+    return studioLiveMutationResources({
+      pageId: activePage.id,
+      elementIds,
+    });
+  }
+  function liveMutationPreflight(
+    room: StudioLiveRoom,
+    elementIds?: readonly string[] | null
+  ): boolean {
     const decision = canBeginStudioLiveMutation({
       locks: room.getLocks(),
       pageId: activePage.id,
       elementIds,
       selfSessionId: room.participant.sessionId,
     });
-    if (!decision.ok) {
-      setError(decision.reason);
+    if (decision.ok) return true;
+    setError(decision.reason);
+    return false;
+  }
+  async function beginLiveResourceEditAsync(
+    elementIds?: readonly string[] | null
+  ): Promise<boolean> {
+    const room = studioLiveRoomRef.current;
+    if (!room) return true;
+    if (!liveMutationPreflight(room, elementIds)) return false;
+    const resources = liveMutationResources(elementIds);
+    const key = JSON.stringify(resources);
+    const pending = studioLivePendingMutationRef.current;
+    if (pending) {
+      if (pending.room === room && pending.key === key) return pending.promise;
+      setError("다른 편집 잠금을 확인하고 있어요. 확인이 끝난 뒤 다시 시도해 주세요.");
       return false;
     }
-    const resources = studioLiveMutationResources({
-      pageId: activePage.id,
-      elementIds,
+
+    const generation = ++studioLiveMutationGenerationRef.current;
+    const operation = replaceStudioLiveMutationLocks({
+      room,
+      previouslyHeld: studioLiveHeldResourcesRef.current,
+      nextResources: resources,
+    }).then((result) => {
+      if (generation !== studioLiveMutationGenerationRef.current) {
+        if (result.ok) releaseStudioLiveMutationLocks(room, result.held);
+        return false;
+      }
+      studioLiveHeldResourcesRef.current = [...result.held];
+      if (!result.ok) {
+        setError(result.failure.message);
+        return false;
+      }
+      setError(null);
+      return true;
     });
-    // Release any previously held leases before claiming a new set — never overwrite untracked.
-    const plan = planStudioLiveHeldResourceReplace(
-      studioLiveHeldResourcesRef.current,
-      resources
-    );
-    for (const resource of plan.toRelease) {
-      room.releaseLock(resource);
+    const entry = { room, key, promise: operation };
+    studioLivePendingMutationRef.current = entry;
+    void operation.finally(() => {
+      if (studioLivePendingMutationRef.current === entry) {
+        studioLivePendingMutationRef.current = null;
+      }
+    });
+    return operation;
+  }
+  function beginLiveResourceEdit(elementIds?: readonly string[] | null): boolean {
+    const room = studioLiveRoomRef.current;
+    if (!room) return true;
+    if (!liveMutationPreflight(room, elementIds)) return false;
+    const resources = liveMutationResources(elementIds);
+
+    // Local-tab preview has a synchronous deterministic arbiter. Authenticated server rooms must
+    // already expose every desired authoritative lease before Konva may begin a drag/transform.
+    if (room.mode !== "server") {
+      const plan = planStudioLiveHeldResourceReplace(
+        studioLiveHeldResourcesRef.current,
+        resources
+      );
+      for (const resource of plan.toRelease) room.releaseLock(resource);
+      for (const resource of plan.toClaim) {
+        if (!room.claimLock(resource)) {
+          releaseStudioLiveMutationLocks(room, plan.held);
+          studioLiveHeldResourcesRef.current = [];
+          return false;
+        }
+      }
+      studioLiveHeldResourcesRef.current = [...plan.held];
+      return true;
     }
-    for (const resource of plan.toClaim) {
-      room.claimLock(resource);
+
+    const locks = room.getLocks();
+    if (
+      resources.every((resource) =>
+        selfHoldsStudioLiveLock(locks, resource, room.participant.sessionId)
+      )
+    ) {
+      const plan = planStudioLiveHeldResourceReplace(
+        studioLiveHeldResourcesRef.current,
+        resources
+      );
+      for (const resource of plan.toRelease) room.releaseLock(resource);
+      studioLiveHeldResourcesRef.current = [...plan.held];
+      return true;
     }
-    studioLiveHeldResourcesRef.current = [...plan.held];
-    return true;
+
+    void beginLiveResourceEditAsync(elementIds);
+    setError("팀 서버에서 편집 잠금을 확인하고 있어요. 승인 후 조작을 다시 시작해 주세요.");
+    return false;
   }
   function endLiveResourceEdit() {
     const room = studioLiveRoomRef.current;
-    const plan = planStudioLiveHeldResourceClear(studioLiveHeldResourcesRef.current);
-    studioLiveHeldResourcesRef.current = [...plan.held];
-    if (!room || plan.toRelease.length === 0) return;
-    for (const resource of plan.toRelease) room.releaseLock(resource);
+    ++studioLiveMutationGenerationRef.current;
+    studioLiveHeldResourcesRef.current = [
+      ...releaseStudioLiveMutationLocks(room, studioLiveHeldResourcesRef.current),
+    ];
   }
 
   // 텍스트류 요소의 Konva 변형 종료 커밋 — 스케일을 폰트 크기(옵션: 너비)로 환산해 patch 하고,
@@ -2103,6 +2209,13 @@ function StudioCuttoonEditor() {
     }
   }
   const handleStudioLiveRoomChange = useCallback((room: StudioLiveRoom | null) => {
+    const previous = studioLiveRoomRef.current;
+    if (previous === room) return;
+    ++studioLiveMutationGenerationRef.current;
+    studioLiveHeldResourcesRef.current = [
+      ...releaseStudioLiveMutationLocks(previous, studioLiveHeldResourcesRef.current),
+    ];
+    studioLivePendingMutationRef.current = null;
     studioLiveRoomRef.current = room;
   }, []);
   const handleStudioCrdtAuthoritativeSaveBarrierChange = useCallback((
@@ -4426,10 +4539,14 @@ function StudioCuttoonEditor() {
   } | null>(null);
   const drawingAssistPreviewRef = useRef(drawingAssistPreview);
   drawingAssistPreviewRef.current = drawingAssistPreview;
-  const drawingAssistDocument = drawingAssistPreview?.pageId === activePage.id
-    && drawingAssistPreview.source === activePage.drawingAssist
-    ? drawingAssistPreview.document
-    : defaultedDrawingAssistDocument;
+  const drawingAssistDocument = resolveStudioDrawingAssistPreviewDocument({
+    preview: drawingAssistPreview,
+    pageId: activePage.id,
+    source: activePage.drawingAssist,
+    fallback: defaultedDrawingAssistDocument,
+    viewport: { canvasWidth: CANVAS_W, canvasHeight: canvasH },
+  });
+  const advancedRulers = drawingAssistDocument.advanced;
   useEffect(() => {
     setDrawingAssistPreview(null);
   }, [activePage.id, activePage.drawingAssist]);
@@ -6201,6 +6318,7 @@ function StudioCuttoonEditor() {
     vanishingPoints: VanishingPoint[];
     isometricActive: boolean;
     isometricAngleDeg: number;
+    advancedRuler: StudioAdvancedRuler | null;
   } | null>(null);
   /** Strength-zero Magma input: quantized coalesced samples with no fixed-clock latency. */
   const drawingImmediateCausalInputRef = useRef(false);
@@ -6245,6 +6363,11 @@ function StudioCuttoonEditor() {
   const drawingUnmountCleanupRef = useRef<() => void>(() => undefined);
   const perspectiveRayRef = useRef<PerspectiveRay | null>(null);
   const isometricAxisRayRef = useRef<IsometricAxisRay | null>(null);
+  const advancedRulerSnapRef = useRef<
+    | { type: "curve"; session: StudioCurveSnapSession }
+    | { type: "fisheye"; session: StudioFisheyeSnapSession }
+    | null
+  >(null);
   const quickShapeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const quickShapeStillElapsedRef = useRef<number>(0);
   const quickShapeStillAnchorRef = useRef<{ x: number; y: number } | null>(null);
@@ -10433,9 +10556,13 @@ function StudioCuttoonEditor() {
       : normalized;
     const preview = drawingAssistPreviewRef.current;
     return {
-      document: preview?.pageId === page.id && preview.source === page.drawingAssist
-        ? preview.document
-        : defaulted,
+      document: resolveStudioDrawingAssistPreviewDocument({
+        preview,
+        pageId: page.id,
+        source: page.drawingAssist,
+        fallback: defaulted,
+        viewport: { canvasWidth: CANVAS_W, canvasHeight: page.canvasH },
+      }),
       persistedDocument: defaulted,
       page,
       pages: currentPages,
@@ -10498,6 +10625,9 @@ function StudioCuttoonEditor() {
         ...current,
         perspective: { ...current.perspective, active },
         isometric: active ? { ...current.isometric, active: false } : current.isometric,
+        advanced: active
+          ? { ...current.advanced, activeSnapRulerId: null }
+          : current.advanced,
       };
     });
   }
@@ -10511,6 +10641,9 @@ function StudioCuttoonEditor() {
         ...current,
         perspective: active ? { ...current.perspective, active: false } : current.perspective,
         isometric: { ...current.isometric, active },
+        advanced: active
+          ? { ...current.advanced, activeSnapRulerId: null }
+          : current.advanced,
       };
     });
   }
@@ -10608,6 +10741,136 @@ function StudioCuttoonEditor() {
       ...current,
       isometric: { ...current.isometric, originX: origin.x, originY: origin.y },
     }));
+  }
+
+  function updateStudioAdvancedRulers(
+    update: (current: StudioAdvancedRulerDocument) => StudioAdvancedRulerDocument,
+    preview = false
+  ): void {
+    const apply = (current: StudioDrawingAssistDocument): StudioDrawingAssistDocument => ({
+      ...current,
+      advanced: normalizeStudioAdvancedRulerDocument(update(current.advanced)),
+    });
+    if (preview) previewStudioDrawingAssistDocument(apply);
+    else commitStudioDrawingAssistDocument(apply);
+  }
+
+  function addAdvancedRuler(type: StudioAdvancedRuler["type"]): void {
+    const id = uid();
+    commitStudioDrawingAssistDocument((current) => {
+      const rulerNumber = current.advanced.rulers.filter((ruler) => ruler.type === type).length + 1;
+      const ruler: StudioAdvancedRuler = type === "curve"
+        ? {
+            id,
+            type: "curve",
+            name: `곡선 ${rulerNumber}`,
+            enabled: true,
+            visible: true,
+            scope: { kind: "page", groupId: null },
+            snapMode: "through-start",
+            fixedOffset: 0,
+            p0: { x: CANVAS_W * 0.2, y: canvasH * 0.55 },
+            p1: { x: CANVAS_W * 0.38, y: canvasH * 0.35 },
+            p2: { x: CANVAS_W * 0.62, y: canvasH * 0.75 },
+            p3: { x: CANVAS_W * 0.8, y: canvasH * 0.55 },
+          }
+        : {
+            id,
+            type: "fisheye",
+            name: `어안 ${rulerNumber}`,
+            enabled: true,
+            visible: true,
+            scope: { kind: "page", groupId: null },
+            guideFamily: "auto",
+            centerX: CANVAS_W / 2,
+            centerY: canvasH / 2,
+            radius: Math.max(80, Math.min(CANVAS_W, canvasH) * 0.38),
+            rotationDeg: 0,
+            fovDeg: 180,
+            strength: 1,
+            outsidePolicy: "clamp",
+          };
+      return {
+        ...current,
+        perspective: { ...current.perspective, active: false },
+        isometric: { ...current.isometric, active: false },
+        advanced: normalizeStudioAdvancedRulerDocument({
+          ...current.advanced,
+          rulers: [...current.advanced.rulers, ruler],
+          selectedRulerId: id,
+          activeSnapRulerId: id,
+        }),
+      };
+    });
+  }
+
+  function patchAdvancedRuler(id: string, patch: Partial<StudioAdvancedRuler>): void {
+    updateStudioAdvancedRulers((current) => ({
+      ...current,
+      rulers: current.rulers.map((ruler) => ruler.id === id
+        ? ({ ...ruler, ...patch, id: ruler.id, type: ruler.type } as StudioAdvancedRuler)
+        : ruler),
+      activeSnapRulerId: patch.enabled === false && current.activeSnapRulerId === id
+        ? null
+        : current.activeSnapRulerId,
+    }));
+  }
+
+  function previewAdvancedRuler(id: string, patch: Partial<StudioAdvancedRuler>): void {
+    updateStudioAdvancedRulers((current) => ({
+      ...current,
+      rulers: current.rulers.map((ruler) => ruler.id === id
+        ? ({ ...ruler, ...patch, id: ruler.id, type: ruler.type } as StudioAdvancedRuler)
+        : ruler),
+    }), true);
+  }
+
+  function removeAdvancedRuler(id: string): void {
+    updateStudioAdvancedRulers((current) => ({
+      ...current,
+      rulers: current.rulers.filter((ruler) => ruler.id !== id),
+      activeSnapRulerId: current.activeSnapRulerId === id ? null : current.activeSnapRulerId,
+      selectedRulerId: current.selectedRulerId === id ? null : current.selectedRulerId,
+    }));
+  }
+
+  function selectAdvancedRuler(id: string | null): void {
+    updateStudioAdvancedRulers((current) => ({ ...current, selectedRulerId: id }));
+  }
+
+  function setActiveAdvancedRuler(id: string | null): void {
+    commitStudioDrawingAssistDocument((current) => ({
+      ...current,
+      perspective: id ? { ...current.perspective, active: false } : current.perspective,
+      isometric: id ? { ...current.isometric, active: false } : current.isometric,
+      advanced: normalizeStudioAdvancedRulerDocument({
+        ...current.advanced,
+        activeSnapRulerId: id,
+      }),
+    }));
+  }
+
+  function insertIsometricSolid() {
+    const ids = [uid(), uid(), uid()] as const;
+    const unit = clampIsometricCellSize(isometricCellSize);
+    const plan = planStudioIsometricSolid({
+      originX: isometricOriginX,
+      originY: isometricOriginY,
+      angleDeg: isometricAngleDeg,
+      width: unit * 3,
+      depth: unit * 3,
+      height: unit * 3,
+    });
+    const faces = createStudioIsometricSolidElements(plan, {
+      ids,
+      baseColor: color,
+      strokeWidth: Math.max(1, Math.min(8, strokeWidth)),
+    });
+    if (!commit([...elements, ...faces])) return;
+    setTool("select");
+    setSelectedId(ids[2]);
+    setMarqueeIds([...ids]);
+    announceDrawingShortcut("편집 가능한 아이소메트릭 상자 3개 면을 생성했습니다.");
   }
 
   // patchEl과 동일하지만 commitCoalesced를 써서 연속 호출을 undo 1스텝으로 합친다(프레임 탐색 전용).
@@ -10835,7 +11098,7 @@ function StudioCuttoonEditor() {
       return;
     }
     if (layerMergeBusy) return;
-    if (!beginLiveResourceEdit(result.plan.removeIds)) return;
+    if (!(await beginLiveResourceEditAsync(result.plan.removeIds))) return;
     setLayerMergeBusy(true);
     try {
       const plan: StudioLayerMergePlan = result.plan;
@@ -15925,6 +16188,7 @@ function StudioCuttoonEditor() {
     drawingRef.current = null;
     perspectiveRayRef.current = null;
     isometricAxisRayRef.current = null;
+    advancedRulerSnapRef.current = null;
     stopQuickShapeTracking();
     // 취소 정리는 표면을 즉시 지우므로, 커밋 대기 중 획을 먼저 동기화해 잉크 유실을 막는다.
     flushPendingStrokeCommitsRef.current();
@@ -15948,6 +16212,7 @@ function StudioCuttoonEditor() {
     drawingRef.current = null;
     perspectiveRayRef.current = null;
     isometricAxisRayRef.current = null;
+    advancedRulerSnapRef.current = null;
     stopQuickShapeTracking();
     releaseDrawingPointerSession();
     pendingDraftRef.current = null;
@@ -16567,6 +16832,10 @@ function StudioCuttoonEditor() {
       // One pointer contact owns one immutable input contract. Toolbar shortcuts can re-render
       // while a pen is still down; those new preferences apply to the next stroke, never halfway
       // through the current filter/pressure/post-correction pipeline.
+      const strokeAdvancedRuler = resolveActiveStudioAdvancedRuler(
+        drawingAssistDocument.advanced,
+        selected?.groupId ?? null
+      );
       drawingInputSettingsRef.current = {
         version: 1,
         stabilizer,
@@ -16577,10 +16846,11 @@ function StudioCuttoonEditor() {
         useVelocityPressure,
         velocitySensitivity,
         coordinateScale: effScale,
-        perspectiveActive: perspectiveRulerActive,
+        perspectiveActive: !strokeAdvancedRuler && perspectiveRulerActive,
         vanishingPoints: vanishingPoints.map((point) => ({ ...point })),
-        isometricActive: isometricGridActive,
+        isometricActive: !strokeAdvancedRuler && isometricGridActive,
         isometricAngleDeg,
+        advancedRuler: strokeAdvancedRuler ? structuredClone(strokeAdvancedRuler) : null,
       };
       setSelectedId(null);
 
@@ -16680,6 +16950,7 @@ function StudioCuttoonEditor() {
       hideBrushCursor();
       perspectiveRayRef.current = null; // 새 스트로크마다 원근 락을 다시 잡는다(첫 move에서 재계산).
       isometricAxisRayRef.current = null; // 새 스트로크마다 아이소메트릭 축 락도 다시 잡는다.
+      advancedRulerSnapRef.current = null;
       // 다이렉트 라이브 초안 무장: 이 렌더(스트로크 시작) 이후 pointermove 는 React 를 거치지
       // 않는다. GPU 파인은 백엔드가 이미 준비된 경우에만 스트로크 단위로 한 번 결정한다.
       {
@@ -16857,6 +17128,39 @@ function StudioCuttoonEditor() {
     if (!cursor.visible()) cursor.visible(true);
     cursor.getLayer()?.batchDraw();
   }
+
+  function snapPointToAdvancedRuler(
+    ruler: StudioAdvancedRuler,
+    start: { x: number; y: number },
+    target: { x: number; y: number }
+  ): { x: number; y: number } | null {
+    if (ruler.type === "curve") {
+      const current = advancedRulerSnapRef.current;
+      const session = current?.type === "curve" && current.session.ruler.id === ruler.id
+        ? current.session
+        : beginStudioCurveSnapSession(ruler, start, {
+            offsetMode: ruler.snapMode,
+            offset: ruler.fixedOffset,
+          });
+      if (!session) return null;
+      const transition = snapStudioCurvePoint(session, target);
+      if (!transition) return null;
+      advancedRulerSnapRef.current = { type: "curve", session: transition.session };
+      return transition.point;
+    }
+    const current = advancedRulerSnapRef.current;
+    const session = current?.type === "fisheye" && current.session.ruler.id === ruler.id
+      ? current.session
+      : beginStudioFisheyeSnapSession(ruler, start, target, {
+          family: ruler.guideFamily,
+        });
+    if (!session) return null;
+    const transition = snapStudioFisheyePoint(session, target);
+    if (!transition) return null;
+    advancedRulerSnapRef.current = { type: "fisheye", session: transition.session };
+    return transition.point;
+  }
+
   function updateActiveShapeEndpoint(
     stage: Konva.Stage,
     pointerEvent: PointerEvent,
@@ -16882,8 +17186,19 @@ function StudioCuttoonEditor() {
       : null;
     let x1 = pos.x + (livePointerOffset?.x ?? 0);
     let y1 = pos.y + (livePointerOffset?.y ?? 0);
+    const inputSettings = drawingInputSettingsRef.current;
     // Shift is the explicit gesture and therefore wins over perspective/isometric ruler locks.
-    if (perspectiveRulerActive && kind === "line" && !pointerEvent.shiftKey && vanishingPoints.length > 0) {
+    if (inputSettings?.advancedRuler && kind === "line" && !pointerEvent.shiftKey) {
+      const snapped = snapPointToAdvancedRuler(
+        inputSettings.advancedRuler,
+        { x: x0, y: y0 },
+        { x: x1, y: y1 }
+      );
+      if (snapped) {
+        x1 = snapped.x;
+        y1 = snapped.y;
+      }
+    } else if (perspectiveRulerActive && kind === "line" && !pointerEvent.shiftKey && vanishingPoints.length > 0) {
       if (!perspectiveRayRef.current) {
         perspectiveRayRef.current = resolvePerspectiveRay(vanishingPoints, x0, y0, x1, y1);
       }
@@ -17492,7 +17807,21 @@ function StudioCuttoonEditor() {
       return;
     }
     const strokeVanishingPoints = inputSettings?.vanishingPoints ?? vanishingPoints;
-    if (
+    const strokeAdvancedRuler = inputSettings?.advancedRuler;
+    if (strokeAdvancedRuler && current.mode !== "eraser") {
+      const snapped = snapPointToAdvancedRuler(
+        strokeAdvancedRuler,
+        {
+          x: current.points[0] ?? pos.x,
+          y: current.points[1] ?? pos.y,
+        },
+        { x: targetX, y: targetY }
+      );
+      if (snapped) {
+        targetX = snapped.x;
+        targetY = snapped.y;
+      }
+    } else if (
       (inputSettings?.perspectiveActive ?? perspectiveRulerActive)
       && current.mode !== "eraser"
       && strokeVanishingPoints.length > 0
@@ -17767,6 +18096,7 @@ function StudioCuttoonEditor() {
         // Ruler locks are also restored so an estimate cannot choose the permanent perspective ray.
         const authoritativePerspectiveRay = perspectiveRayRef.current;
         const authoritativeIsometricRay = isometricAxisRayRef.current;
+        const authoritativeAdvancedRulerSnap = advancedRulerSnapRef.current;
         const authoritativeStabilizer = drawingStabilizerRef.current;
         const authoritativeVelocity = drawingVelocityRef.current;
         try {
@@ -17792,6 +18122,7 @@ function StudioCuttoonEditor() {
           drawingRef.current = authoritativeDrawing;
           perspectiveRayRef.current = authoritativePerspectiveRay;
           isometricAxisRayRef.current = authoritativeIsometricRay;
+          advancedRulerSnapRef.current = authoritativeAdvancedRulerSnap;
           drawingStabilizerRef.current = authoritativeStabilizer;
           drawingVelocityRef.current = authoritativeVelocity;
         }
@@ -18346,6 +18677,7 @@ function StudioCuttoonEditor() {
       drawingRef.current = null;
       perspectiveRayRef.current = null;
       isometricAxisRayRef.current = null;
+      advancedRulerSnapRef.current = null;
       scheduleLiveDrawPressure(null);
       clearDraftPreview({ preserveInkForDeferredCommit: deferInkCleanup });
       if (immediateSurfaceHandoff) {
@@ -18823,10 +19155,10 @@ function StudioCuttoonEditor() {
     }
   }
 
-  function startEditText(id: string) {
+  async function startEditText(id: string) {
     const el = elementById.get(id);
     if (!el || (el.type !== "text" && el.type !== "bubble" && el.type !== "sticker")) return;
-    if (!beginLiveResourceEdit([id])) return;
+    if (!(await beginLiveResourceEditAsync([id]))) return;
     setEditing({ id });
   }
 
@@ -21267,6 +21599,7 @@ function StudioCuttoonEditor() {
     : null;
 
   const studioInspectorAsideHandlers = useStudioStableHandlers<StudioInspectorAsideHandlers>({
+    addAdvancedRuler,
     addLayerGroup,
     addLayerMask,
     addVanishingPointHandler,
@@ -21297,6 +21630,8 @@ function StudioCuttoonEditor() {
     fitSelectedToFrame,
     handleLayerNavigatorAction,
     invertLayerMask,
+    insertIsometricSolid,
+    patchAdvancedRuler,
     moveVanishingPointById,
     previewVanishingPointById,
     previewIsometricOrigin,
@@ -21312,11 +21647,14 @@ function StudioCuttoonEditor() {
     rememberColor,
     rememberEffectRecent,
     removeSelected,
+    removeAdvancedRuler,
     removeVanishingPointHandler,
     reorder,
     resetIsometricOrigin,
     resetPageGrade,
     selectLayersFromNavigator,
+    selectAdvancedRuler,
+    setActiveAdvancedRuler,
     setBg,
     setBgGrad,
     setCanvasH,
@@ -21824,6 +22162,8 @@ function StudioCuttoonEditor() {
     previewVanishingPointById,
     previewIsometricOrigin,
     commitIsometricOrigin,
+    previewAdvancedRuler,
+    patchAdvancedRuler,
     cancelStudioDrawingAssistPreview,
     onStageDown,
     onStageDragEnd,
@@ -22545,6 +22885,7 @@ function StudioCuttoonEditor() {
           advancedFillArmed={advancedFillArmed}
           advancedFillBusy={advancedFillBusy}
           advancedFillPreview={advancedFillPreview}
+          advancedRulers={advancedRulers}
           aiNoticeOpen={aiNoticeOpen}
           animTimeline={animTimeline}
           appSettings={appSettings}
@@ -22801,6 +23142,7 @@ function StudioCuttoonEditor() {
         )}
         <StudioInspectorAside
           activeSavedBrushId={activeSavedBrushId}
+          advancedRulers={advancedRulers}
           activeSurfaceReviewLocked={activeSurfaceReviewLocked}
           advancedFillActive={advancedFillActive}
           advancedFillBusy={advancedFillBusy}
@@ -23583,6 +23925,8 @@ interface StudioCanvasViewportHandlers {
   previewVanishingPointById: (id: string, x: number, y: number) => void;
   previewIsometricOrigin: (x: number, y: number) => void;
   commitIsometricOrigin: (x: number, y: number) => void;
+  previewAdvancedRuler: (id: string, patch: Partial<StudioAdvancedRuler>) => void;
+  patchAdvancedRuler: (id: string, patch: Partial<StudioAdvancedRuler>) => void;
   cancelStudioDrawingAssistPreview: () => void;
   nodeInteractionBegin: (elementId: string) => boolean;
   onStageDown: (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => void;
@@ -23638,6 +23982,7 @@ interface StudioCanvasViewportProps {
   advancedFillArmed: boolean;
   advancedFillBusy: boolean;
   advancedFillPreview: StudioAdvancedFillPreview | null;
+  advancedRulers: StudioAdvancedRulerDocument;
   aiNoticeOpen: boolean;
   animTimeline: AnimationTimelineDoc;
   appSettings: StudioAppSettings;
@@ -23895,6 +24240,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   advancedFillArmed,
   advancedFillBusy,
   advancedFillPreview,
+  advancedRulers,
   aiNoticeOpen,
   animTimeline,
   appSettings,
@@ -24170,6 +24516,8 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
     previewVanishingPointById,
     previewIsometricOrigin,
     commitIsometricOrigin,
+    previewAdvancedRuler,
+    patchAdvancedRuler,
     cancelStudioDrawingAssistPreview,
     onStageDown,
     onStageDragEnd,
@@ -25612,6 +25960,9 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
               }}
               onPreviewIsometricOrigin={previewIsometricOrigin}
               onCommitIsometricOrigin={commitIsometricOrigin}
+              advancedRulers={advancedRulers}
+              onPreviewAdvancedRuler={previewAdvancedRuler}
+              onCommitAdvancedRuler={patchAdvancedRuler}
               drawingAssistDisabled={activeSurfaceReviewLocked || saving || masterEditMode}
               onCancelDrawingAssistPreview={cancelStudioDrawingAssistPreview}
             />

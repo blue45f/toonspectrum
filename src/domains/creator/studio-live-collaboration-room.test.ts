@@ -356,6 +356,56 @@ describe("StudioLiveRoom", () => {
     roomB.close();
   });
 
+  it("converges page and sibling-element claims regardless of each room's delivery order", async () => {
+    const test = harness();
+    const carol = { sessionId: "session-carol", displayName: "지우 탭", role: "editor" } as const;
+    const pageRoom = test.room(alice, { randomId: () => "claim-m" });
+    const firstElementRoom = test.room(bob, { randomId: () => "claim-a" });
+    const secondElementRoom = test.room(carol, { randomId: () => "claim-z" });
+    await pageRoom.start();
+    await firstElementRoom.start();
+    await secondElementRoom.start();
+    test.hub.queued = true;
+
+    expect(pageRoom.claimLock("page:page-1")).toBe(true);
+    expect(firstElementRoom.claimLock("element:page-1:first")).toBe(true);
+    expect(secondElementRoom.claimLock("element:page-1:second")).toBe(true);
+    test.hub.queued = false;
+    test.hub.flush();
+
+    for (const room of [pageRoom, firstElementRoom, secondElementRoom]) {
+      expect(room.getLocks()).toEqual([
+        expect.objectContaining({
+          resource: "page:page-1",
+          claimId: "claim-m",
+          owner: alice,
+        }),
+      ]);
+    }
+    pageRoom.close();
+    firstElementRoom.close();
+    secondElementRoom.close();
+  });
+
+  it("returns a denied result instead of throwing when request-id generation fails", async () => {
+    const test = harness();
+    const room = test.room(alice, {
+      randomId: () => {
+        throw new Error("secure id unavailable");
+      },
+    });
+    await room.start();
+
+    await expect(room.claimLockAsync("page:page-1")).resolves.toEqual({
+      status: "denied",
+      resource: "page:page-1",
+      requestId: "unavailable",
+      code: "invalid_request",
+      message: "secure id unavailable",
+    });
+    room.close();
+  });
+
   it("ignores stale releases for a newer lock claim", async () => {
     const test = harness();
     const room = test.room(alice);

@@ -1,3 +1,5 @@
+import { studioLiveLockResourcesConflict } from "@/lib/studio-live-lock-resource";
+
 /**
  * Soft-lock mutation guards for Studio live collaboration.
  *
@@ -29,8 +31,8 @@ export function studioLiveMutationResources(input: {
 }): string[] {
   const pageId = typeof input.pageId === "string" ? input.pageId.trim() : "";
   if (!pageId) return [];
-  const resources = [studioLivePageResource(pageId)];
-  const seen = new Set(resources);
+  const resources: string[] = [];
+  const seen = new Set<string>();
   for (const raw of input.elementIds ?? []) {
     if (typeof raw !== "string" || raw.trim().length === 0) continue;
     const resource = studioLiveElementResource(pageId, raw.trim());
@@ -38,14 +40,17 @@ export function studioLiveMutationResources(input: {
     seen.add(resource);
     resources.push(resource);
   }
-  return resources;
+  // An element mutation claims only its concrete elements. The authoritative hierarchy makes a
+  // page lease conflict with every child without turning sibling element edits into page-wide
+  // contention. A page-only mutation still claims the page resource and blocks all descendants.
+  return resources.length > 0 ? resources : [studioLivePageResource(pageId)];
 }
 
 function isActiveLock(lock: StudioLiveLockLike, now: number): boolean {
   return Number.isFinite(lock.leaseUntil) && lock.leaseUntil > now;
 }
 
-/** Active lock held by someone other than self on this exact resource, if any. */
+/** Active hierarchical lock held by someone other than self, if any. */
 export function findConflictingStudioLiveLock(
   locks: readonly StudioLiveLockLike[],
   resource: string,
@@ -54,7 +59,7 @@ export function findConflictingStudioLiveLock(
 ): StudioLiveLockLike | null {
   const self = typeof selfSessionId === "string" ? selfSessionId : "";
   for (const lock of locks) {
-    if (lock.resource !== resource) continue;
+    if (!studioLiveLockResourcesConflict(lock.resource, resource)) continue;
     if (!isActiveLock(lock, now)) continue;
     if (lock.owner.sessionId === self) continue;
     return lock;
@@ -87,7 +92,6 @@ export function findStudioLiveMutationConflict(input: {
     );
     if (conflict) return conflict;
   }
-  // Page-level lock held by other also blocks element-only lists when page resource not rechecked — already included.
   return null;
 }
 
@@ -133,9 +137,9 @@ export function selfHoldsStudioLiveLock(
 }
 
 /**
- * Plan replace of the local held-resource set before claiming a new edit.
- * Always release previous holds first so nested/aborted claims cannot strand leases.
- * Pure — callers apply `toRelease` then `toClaim` against the room.
+ * Plan the set difference for replacing locally tracked edit leases. Shared resources remain held;
+ * superseded resources release and only new resources claim. The async coordinator decides the
+ * safe operation order and re-confirms retained resources with the authoritative server.
  */
 export function planStudioLiveHeldResourceReplace(
   previouslyHeld: readonly string[] | null | undefined,
@@ -160,8 +164,8 @@ export function planStudioLiveHeldResourceReplace(
     next.push(resource);
   }
   return {
-    toRelease: prev,
-    toClaim: next,
+    toRelease: prev.filter((resource) => !seenNext.has(resource)),
+    toClaim: next.filter((resource) => !seenPrev.has(resource)),
     held: next,
   };
 }

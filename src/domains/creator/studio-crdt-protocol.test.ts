@@ -48,9 +48,9 @@ function syncResponse(bytes = new Uint8Array([1, 2, 3])) {
 }
 
 describe("studio CRDT protocol", () => {
-  it("pins the drawing-assist room gate to the v3 network and local-wire contract", () => {
-    expect(STUDIO_CRDT_PROTOCOL_VERSION).toBe(3);
-    expect(STUDIO_CRDT_LOCAL_WIRE_BRAND).toBe("toonspectrum:studio-crdt:v3");
+  it("pins advanced drawing-assist rooms to the v4 network and local-wire contract", () => {
+    expect(STUDIO_CRDT_PROTOCOL_VERSION).toBe(4);
+    expect(STUDIO_CRDT_LOCAL_WIRE_BRAND).toBe("toonspectrum:studio-crdt:v4");
   });
 
   it("accepts only canonical bounded base64 for incremental updates", () => {
@@ -87,7 +87,12 @@ describe("studio CRDT protocol", () => {
     expect(parseStudioCrdtSyncRequest(syncRequest(), { expectedWorkId: workId })).toEqual(
       syncRequest()
     );
-    expect(parseStudioCrdtSyncRequest({ ...syncRequest(), protocolVersion: 2 })).toBeNull();
+    for (const legacyVersion of [1, 2, 3]) {
+      expect(parseStudioCrdtSyncRequest({
+        ...syncRequest(),
+        protocolVersion: legacyVersion,
+      })).toBeNull();
+    }
     expect(parseStudioCrdtSyncRequest({ ...syncRequest(), extra: true })).toBeNull();
     expect(parseStudioCrdtSyncRequest(syncRequest(), { expectedWorkId: "work-2" })).toBeNull();
 
@@ -99,13 +104,22 @@ describe("studio CRDT protocol", () => {
       update,
     } as const;
     expect(parseStudioCrdtUpdateRequest(publish, { expectedWorkId: workId })).toEqual(publish);
-    expect(parseStudioCrdtUpdateRequest({ ...publish, protocolVersion: 2 })).toBeNull();
+    for (const legacyVersion of [1, 2, 3]) {
+      expect(parseStudioCrdtUpdateRequest({
+        ...publish,
+        protocolVersion: legacyVersion,
+      })).toBeNull();
+    }
     expect(parsePersistedStudioCrdtUpdateRequest(
       { ...publish, protocolVersion: 1 },
       { expectedWorkId: workId }
     )).toEqual(publish);
     expect(parsePersistedStudioCrdtUpdateRequest(
       { ...publish, protocolVersion: 2 },
+      { expectedWorkId: workId }
+    )).toEqual(publish);
+    expect(parsePersistedStudioCrdtUpdateRequest(
+      { ...publish, protocolVersion: 3 },
       { expectedWorkId: workId }
     )).toEqual(publish);
     expect(parseStudioCrdtUpdateRequest({ ...publish, updateId: "bad id" })).toBeNull();
@@ -155,9 +169,9 @@ describe("studio CRDT protocol", () => {
       parseStudioCrdtLocalWireMessage(
         {
           ...requestWire,
-          brand: "toonspectrum:studio-crdt:v2",
-          protocolVersion: 2,
-          payload: { ...requestWire.payload, protocolVersion: 2 },
+          brand: "toonspectrum:studio-crdt:v3",
+          protocolVersion: 3,
+          payload: { ...requestWire.payload, protocolVersion: 3 },
         },
         {
           expectedWorkId: workId,

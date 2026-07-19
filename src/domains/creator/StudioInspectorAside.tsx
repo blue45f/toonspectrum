@@ -97,6 +97,7 @@ import { type MagicResizePreset, type MagicResizeStrategy } from "./studio-magic
 import { isPressureWidthBrush, type NodeEditHandle, type NodeEditTool } from "./studio-node-edit";
 import { type PageGrade } from "./studio-page-grade";
 import {
+  StudioAdvancedRulerPanel,
   StudioAiColorizePanel,
   StudioBrushLibraryPanel,
   StudioBrushStudio,
@@ -171,12 +172,17 @@ import { StudioMobileSheetHandle } from "./StudioMobileSheetHandle";
 import { StudioNodeEditPanel } from "./StudioNodeEditPanel";
 import { StudioSkewPanel } from "./StudioSkewPanel";
 
+import type {
+  StudioAdvancedRuler,
+  StudioAdvancedRulerDocument,
+} from "./studio-advanced-ruler-document";
 import type { StudioLayerNavigatorAction } from "./StudioLayerNavigator";
 
 import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";
 
 export interface StudioInspectorAsideHandlers {
+  addAdvancedRuler: (type: StudioAdvancedRuler["type"]) => void;
   addLayerGroup: (seedElId?: string) => void;
   addLayerMask: (fill: LayerMaskPaintMode) => void;
   addVanishingPointHandler: () => void;
@@ -207,6 +213,8 @@ export interface StudioInspectorAsideHandlers {
   fitSelectedToFrame: () => Promise<void>;
   handleLayerNavigatorAction: (action: StudioLayerNavigatorAction) => void;
   invertLayerMask: () => void;
+  insertIsometricSolid: () => void;
+  patchAdvancedRuler: (id: string, patch: Partial<StudioAdvancedRuler>) => void;
   moveVanishingPointById: (id: string, x: number, y: number) => void;
   previewVanishingPointById: (id: string, x: number, y: number) => void;
   previewIsometricOrigin: (x: number, y: number) => void;
@@ -222,11 +230,14 @@ export interface StudioInspectorAsideHandlers {
   rememberColor: (c: string) => void;
   rememberEffectRecent: (effectId: StudioEffectId) => void;
   removeSelected: () => void;
+  removeAdvancedRuler: (id: string) => void;
   removeVanishingPointHandler: (id: string) => void;
   reorder: (dir: "front" | "back" | "forward" | "backward") => void;
   resetIsometricOrigin: () => void;
   resetPageGrade: () => void;
   selectLayersFromNavigator: (ids: readonly string[]) => void;
+  selectAdvancedRuler: (id: string | null) => void;
+  setActiveAdvancedRuler: (id: string | null) => void;
   setBg: (newBg: string | ((prev: string) => string)) => void;
   setBgGrad: (newGrad: string[] | null | ((prev: string[] | null) => string[] | null)) => void;
   setCanvasH: (newH: number | ((prev: number) => number)) => void;
@@ -254,6 +265,7 @@ export interface StudioInspectorAsideHandlers {
 
 interface StudioInspectorAsideProps {
   activeSavedBrushId: string | null;
+  advancedRulers: StudioAdvancedRulerDocument;
   activeSurfaceReviewLocked: boolean;
   advancedFillActive: boolean;
   advancedFillBusy: boolean;
@@ -497,6 +509,7 @@ interface StudioInspectorAsideProps {
 
 export const StudioInspectorAside = memo(function StudioInspectorAside({
   activeSavedBrushId,
+  advancedRulers,
   activeSurfaceReviewLocked,
   advancedFillActive,
   advancedFillBusy,
@@ -737,6 +750,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   stableHandlers,
 }: StudioInspectorAsideProps) {
   const {
+    addAdvancedRuler,
     addLayerGroup,
     addLayerMask,
     addVanishingPointHandler,
@@ -767,6 +781,8 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
     fitSelectedToFrame,
     handleLayerNavigatorAction,
     invertLayerMask,
+    insertIsometricSolid,
+    patchAdvancedRuler,
     moveVanishingPointById,
     previewVanishingPointById,
     previewIsometricOrigin,
@@ -782,11 +798,14 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
     rememberColor,
     rememberEffectRecent,
     removeSelected,
+    removeAdvancedRuler,
     removeVanishingPointHandler,
     reorder,
     resetIsometricOrigin,
     resetPageGrade,
     selectLayersFromNavigator,
+    selectAdvancedRuler,
+    setActiveAdvancedRuler,
     setBg,
     setBgGrad,
     setCanvasH,
@@ -2792,6 +2811,22 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     onPreviewOrigin={previewIsometricOrigin}
                     onCommitOrigin={commitIsometricOrigin}
                     onResetOrigin={resetIsometricOrigin}
+                    onInsertSolid={insertIsometricSolid}
+                  />
+                </Suspense>
+                <Suspense fallback={null}>
+                  <StudioAdvancedRulerPanel
+                    document={advancedRulers}
+                    groups={groups}
+                    canvasWidth={CANVAS_W}
+                    canvasHeight={canvasH}
+                    disabled={drawingAssistControlsDisabled}
+                    disabledReason={drawingAssistDisabledReason}
+                    onAdd={addAdvancedRuler}
+                    onPatch={patchAdvancedRuler}
+                    onRemove={removeAdvancedRuler}
+                    onSelect={selectAdvancedRuler}
+                    onSetActiveSnap={setActiveAdvancedRuler}
                   />
                 </Suspense>
               </div>

@@ -1,5 +1,7 @@
 import { parseStudioDrawingAssistDocument } from "./studio-drawing-assist-document";
 
+import type { StudioAdvancedRulerDocument } from "./studio-advanced-ruler-document";
+
 import {
   STUDIO_WORK_ASSET_BOOLEAN_EDIT_KEYS,
   STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS,
@@ -237,6 +239,52 @@ function cloneJsonObject(value: StudioCrdtJsonObject): StudioCrdtJsonObject {
   return cloned;
 }
 
+function copyStudioAdvancedRulerDocument(
+  document: StudioAdvancedRulerDocument
+): StudioCrdtJsonObject {
+  const rulers: StudioCrdtJsonObject[] = document.rulers.map((ruler) => {
+    const common: StudioCrdtJsonObject = {
+      id: ruler.id,
+      type: ruler.type,
+      name: ruler.name,
+      enabled: ruler.enabled,
+      visible: ruler.visible,
+      scope: {
+        kind: ruler.scope.kind,
+        groupId: ruler.scope.groupId,
+      },
+    };
+    if (ruler.type === "curve") {
+      return {
+        ...common,
+        snapMode: ruler.snapMode,
+        fixedOffset: ruler.fixedOffset,
+        p0: { x: ruler.p0.x, y: ruler.p0.y },
+        p1: { x: ruler.p1.x, y: ruler.p1.y },
+        p2: { x: ruler.p2.x, y: ruler.p2.y },
+        p3: { x: ruler.p3.x, y: ruler.p3.y },
+      };
+    }
+    return {
+      ...common,
+      guideFamily: ruler.guideFamily,
+      centerX: ruler.centerX,
+      centerY: ruler.centerY,
+      radius: ruler.radius,
+      rotationDeg: ruler.rotationDeg,
+      fovDeg: ruler.fovDeg,
+      strength: ruler.strength,
+      outsidePolicy: ruler.outsidePolicy,
+    };
+  });
+  return {
+    version: document.version,
+    rulers,
+    activeSnapRulerId: document.activeSnapRulerId,
+    selectedRulerId: document.selectedRulerId,
+  };
+}
+
 function boundedString(value: unknown, maximum = MAX_JSON_STRING_LENGTH): value is string {
   return typeof value === "string" && value.length <= maximum && !value.includes("\0");
 }
@@ -409,6 +457,7 @@ export function validateStudioCrdtPagePayload(payload: StudioCrdtPagePayload): S
         originX: drawingAssist.isometric.originX,
         originY: drawingAssist.isometric.originY,
       },
+      advanced: copyStudioAdvancedRulerDocument(drawingAssist.advanced),
     };
   }
   if (TEXT_ENCODER.encode(JSON.stringify({ version: payload.version, props })).byteLength >

@@ -4,11 +4,13 @@ import {
   creatorWorkLiveLocks,
   db,
 } from "../../../../../lib/db";
+import { studioLiveLockResourcesConflict } from "../../../../../lib/studio-live-lock-resource";
 
 export const STUDIO_LIVE_LOCK_REPOSITORY = Symbol("STUDIO_LIVE_LOCK_REPOSITORY");
 export const STUDIO_LIVE_LOCK_LIMIT_PER_WORK = 200;
 export const STUDIO_LIVE_LOCK_ADVISORY_NAMESPACE =
   "toonspectrum:creator-work-live-lock:v1:";
+const STUDIO_LIVE_LOCK_ACQUISITION_SEPARATOR = ".";
 
 type DrizzleStudioLiveLockTransaction = Parameters<
   Parameters<typeof db.transaction>[0]
@@ -18,7 +20,7 @@ export interface StudioLiveLockRecord {
   workId: string;
   resourceId: string;
   leaseId: string;
-  /** Internal fencing token for one acquire/renew mutation. Never expose this to clients. */
+  /** Internal request-correlation + server-nonce fencing token. Never expose the nonce. */
   acquisitionId: string;
   ownerConnectionId: string;
   ownerName: string;
@@ -28,7 +30,10 @@ export interface StudioLiveLockRecord {
 export interface AcquireStudioLiveLockInput {
   workId: string;
   resourceId: string;
+  /** Server-generated capability used for a newly created lease. */
   requestedLeaseId: string;
+  /** Server-unique token that embeds request correlation and fences authorization rollback. */
+  acquisitionId: string;
   ownerConnectionId: string;
   ownerName: string;
   leaseMs: number;
@@ -61,6 +66,16 @@ export interface StudioLiveLockRepository {
 
 export function studioLiveLockWorkAdvisoryQuery(workId: string) {
   return sql`select pg_advisory_xact_lock(hashtextextended(${`${STUDIO_LIVE_LOCK_ADVISORY_NAMESPACE}${workId}`}, 0))`;
+}
+
+export function createStudioLiveLockAcquisitionId(requestId: string, nonce: string): string {
+  return `${requestId}${STUDIO_LIVE_LOCK_ACQUISITION_SEPARATOR}${nonce}`;
+}
+
+/** Old rows contain one UUID; new rows prefix their private nonce with the public request UUID. */
+export function studioLiveLockRequestIdFromAcquisitionId(acquisitionId: string): string {
+  const separator = acquisitionId.indexOf(STUDIO_LIVE_LOCK_ACQUISITION_SEPARATOR);
+  return separator > 0 ? acquisitionId.slice(0, separator) : acquisitionId;
 }
 
 export async function withStudioLiveLockWorkMutation<T>(
@@ -111,27 +126,27 @@ export class DrizzleStudioLiveLockRepository implements StudioLiveLockRepository
             )
           );
 
-        const [existing] = await transaction
+        // The per-work advisory lock makes this read/check/write one atomic admission decision
+        // across API instances. Read the bounded active set so page/element ancestors participate
+        // in the same decision as an exact resource row.
+        const activeRows = await transaction
           .select()
           .from(creatorWorkLiveLocks)
-          .where(
-            and(
-              eq(creatorWorkLiveLocks.workId, input.workId),
-              eq(creatorWorkLiveLocks.resourceId, input.resourceId)
-            )
-          )
-          .limit(1);
-        if (existing && existing.ownerConnectionId !== input.ownerConnectionId) {
-          return { status: "conflict", lock: toRecord(existing) };
+          .where(eq(creatorWorkLiveLocks.workId, input.workId))
+          .orderBy(asc(creatorWorkLiveLocks.resourceId))
+          .limit(STUDIO_LIVE_LOCK_LIMIT_PER_WORK + 1);
+        const existing = activeRows.find((row) => row.resourceId === input.resourceId);
+        const conflicting = activeRows.find(
+          (row) =>
+            row.ownerConnectionId !== input.ownerConnectionId &&
+            studioLiveLockResourcesConflict(row.resourceId, input.resourceId)
+        );
+        if (conflicting) {
+          return { status: "conflict", lock: toRecord(conflicting) };
         }
 
-        if (!existing) {
-          const rows = await transaction
-            .select({ resourceId: creatorWorkLiveLocks.resourceId })
-            .from(creatorWorkLiveLocks)
-            .where(eq(creatorWorkLiveLocks.workId, input.workId))
-            .limit(STUDIO_LIVE_LOCK_LIMIT_PER_WORK);
-          if (rows.length >= STUDIO_LIVE_LOCK_LIMIT_PER_WORK) return { status: "limit" };
+        if (!existing && activeRows.length >= STUDIO_LIVE_LOCK_LIMIT_PER_WORK) {
+          return { status: "limit" };
         }
 
         const leaseId = existing?.leaseId ?? input.requestedLeaseId;
@@ -141,7 +156,7 @@ export class DrizzleStudioLiveLockRepository implements StudioLiveLockRepository
               .update(creatorWorkLiveLocks)
               .set({
                 ownerName: input.ownerName,
-                acquisitionId: input.requestedLeaseId,
+                acquisitionId: input.acquisitionId,
                 expiresAt,
                 updatedAt: sql`now()`,
               })
@@ -160,7 +175,7 @@ export class DrizzleStudioLiveLockRepository implements StudioLiveLockRepository
                 workId: input.workId,
                 resourceId: input.resourceId,
                 leaseId,
-                acquisitionId: input.requestedLeaseId,
+                acquisitionId: input.acquisitionId,
                 ownerConnectionId: input.ownerConnectionId,
                 ownerName: input.ownerName,
                 expiresAt,

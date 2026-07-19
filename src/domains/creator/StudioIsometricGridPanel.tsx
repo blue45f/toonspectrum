@@ -4,7 +4,7 @@
  * 기준점 핸들 드래그는 StudioIsometricGridOverlay(Konva, Stage 트리 안에 있어야 해서
  * 별도 파일)가 담당한다. 슬라이더는 로컬 draft/선택적 preview와 최종 커밋을 분리한다.
  */
-import { RotateCcw } from "lucide-react";
+import { Box, RotateCcw } from "lucide-react";
 
 import {
   ISOMETRIC_ANGLE_MAX_DEG,
@@ -33,6 +33,8 @@ type StudioIsometricGridPanelBaseProps = {
   config: IsometricGridConfig;
   onToggleActive: () => void;
   onResetOrigin: () => void;
+  /** Creates three independently editable vector faces at the current origin. */
+  onInsertSolid?: () => void;
   disabled?: boolean;
   disabledReason?: string;
   /** Optional transient canvas preview; must not append undo/CRDT history. */
@@ -90,6 +92,7 @@ export function StudioIsometricGridPanel({
   onChangeAngle,
   onChangeCellSize,
   onResetOrigin,
+  onInsertSolid,
 }: StudioIsometricGridPanelProps): ReactElement {
   const commitAngle = onCommitAngle ?? onChangeAngle;
   const commitCellSize = onCommitCellSize ?? onChangeCellSize;
@@ -185,6 +188,19 @@ export function StudioIsometricGridPanel({
             <RotateCcw className="size-3" aria-hidden />
             기준점 초기화
           </button>
+
+          {onInsertSolid ? (
+            <button
+              type="button"
+              onClick={onInsertSolid}
+              disabled={disabled}
+              title={disabledReason ?? "현재 각도·셀 크기·색상으로 편집 가능한 상자를 만듭니다."}
+              className="flex w-full items-center justify-center gap-1 rounded border border-accent/45 bg-accent/10 py-1.5 text-[0.68rem] font-semibold text-accent transition-colors hover:bg-accent/15 cursor-pointer disabled:cursor-not-allowed disabled:opacity-45 pointer-coarse:min-h-11"
+            >
+              <Box className="size-3" aria-hidden />
+              입체 상자 생성
+            </button>
+          ) : null}
         </div>
       )}
     </div>

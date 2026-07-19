@@ -2,13 +2,19 @@ import { getTableConfig, PgDialect } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 
 import { creatorWorkLiveLocks } from "../../../../../lib/db/schema";
+import {
+  parseStudioLiveLockResourceScope,
+  studioLiveLockResourcesConflict,
+} from "../../../../../lib/studio-live-lock-resource";
 
 import {
+  createStudioLiveLockAcquisitionId,
   DrizzleStudioLiveLockRepository,
   STUDIO_LIVE_LOCK_ADVISORY_NAMESPACE,
   STUDIO_LIVE_LOCK_LIMIT_PER_WORK,
   STUDIO_LIVE_LOCK_REPOSITORY,
   studioLiveLockRepositoryProvider,
+  studioLiveLockRequestIdFromAcquisitionId,
   studioLiveLockWorkAdvisoryQuery,
   withStudioLiveLockWorkMutation,
 } from "./studio-live-lock.repository";
@@ -23,6 +29,50 @@ function names(values: readonly { name?: string; config?: { name?: string } }[])
 }
 
 describe("studio live distributed lock persistence contract", () => {
+  it("keeps request correlation while fencing repeated request ids with a private nonce", () => {
+    const requestId = "00000000-0000-4000-8000-000000000001";
+    const first = createStudioLiveLockAcquisitionId(
+      requestId,
+      "00000000-0000-4000-8000-000000000101"
+    );
+    const second = createStudioLiveLockAcquisitionId(
+      requestId,
+      "00000000-0000-4000-8000-000000000102"
+    );
+
+    expect(first).not.toBe(second);
+    expect(first).toHaveLength(73);
+    expect(studioLiveLockRequestIdFromAcquisitionId(first)).toBe(requestId);
+    expect(studioLiveLockRequestIdFromAcquisitionId("legacy-acquisition-id")).toBe(
+      "legacy-acquisition-id"
+    );
+  });
+
+  it("parses canonical page/element scopes and leaves legacy resources opaque", () => {
+    expect(parseStudioLiveLockResourceScope("page:page-1")).toEqual({
+      kind: "page",
+      pageId: "page-1",
+    });
+    expect(parseStudioLiveLockResourceScope("element:page-1:panel:ink")).toEqual({
+      kind: "element",
+      pageId: "page-1",
+      elementId: "panel:ink",
+    });
+    expect(parseStudioLiveLockResourceScope("element:legacy-panel")).toBeNull();
+    expect(parseStudioLiveLockResourceScope("page:")).toBeNull();
+  });
+
+  it("conflicts page ancestors with children but permits sibling and legacy independence", () => {
+    expect(studioLiveLockResourcesConflict("page:page-1", "element:page-1:panel-1")).toBe(true);
+    expect(studioLiveLockResourcesConflict("element:page-1:panel-1", "page:page-1")).toBe(true);
+    expect(
+      studioLiveLockResourcesConflict("element:page-1:panel-1", "element:page-1:panel-2")
+    ).toBe(false);
+    expect(studioLiveLockResourcesConflict("page:page-1", "element:page-2:panel-1")).toBe(false);
+    expect(studioLiveLockResourcesConflict("legacy:panel-1", "legacy:panel-1")).toBe(true);
+    expect(studioLiveLockResourcesConflict("legacy:panel-1", "legacy:panel-2")).toBe(false);
+  });
+
   it("defines one bounded lease row per work/resource with cascade cleanup", () => {
     const table = getTableConfig(creatorWorkLiveLocks);
 

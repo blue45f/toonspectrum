@@ -1,7 +1,7 @@
 # ToonSpectrum Studio 기능 완성도 감사
 
 - 기준일: 2026-07-12
-- 최신 구현 반영: 2026-07-16 (CRDT/WebGPU/다중 서버 adapter/절차적 360° 환경)
+- 최신 구현 반영: 2026-07-20 (CRDT/WebGPU/다중 서버 adapter/절차적 360° 환경과 3D 후속 감사)
 - 감사 범위: 첨부 요구사항, 최근 대화 요청, 상용 드로잉·웹툰·3D·협업 제품의 공식 기능
 - 판정 원칙: UI가 보이는 것만으로 완료로 세지 않고, 실행 경로·저장/복원·권한·오류 처리·테스트까지 연결되어야 완료로 판정한다.
 
@@ -30,7 +30,8 @@
 - Konva의 committed scene/readback까지 대체하는 전면 WebGPU authority
 - VRM/3D 모델 전체 라이브러리의 사전 생성 썸네일
 - AI 텍스트/이미지→3D mesh 생성·repair·리깅
-- Clip Studio Paint 3D의 mesh surface snap, 실제 parent transform 계층, 외부 파노라마/UV 저작, BVH·texture painting
+- Clip Studio Paint 3D의 mesh surface snap, 외부 파노라마/UV 저작, BVH·texture painting
+- 표준 3D 형식별 실파일 release corpus 완결과 검증된 KTX2의 runtime renderer 연결
 - Google Drive·Dropbox·Notion 같은 외부 클라우드 연동
 - Firefly·D5·Artbreeder 등 특정 상용 서비스의 직접 API·라이선스 보증
 
@@ -188,13 +189,14 @@ announce→request→approved→SDP가 같은 `shareId`를 보존했고, `shareI
 
 | Clip Studio 3D 기능군 | ToonSpectrum | 구현 가능성/격차 |
 | --- | --- | --- |
-| GLB/glTF/OBJ/FBX 등 import | 완료/강한 부분 | GLB, glTF, OBJ/MTL, FBX, DAE, STL, PLY, 3DS와 연결 리소스를 로컬에서 해석해 embedded GLB 2.0으로 정규화·검증 |
+| GLB/glTF/OBJ/FBX 등 import | 부분/강한 부분 | GLB, glTF, OBJ/MTL, FBX, DAE, STL, PLY, 3DS와 연결 리소스를 로컬에서 해석해 self-contained GLB 2.0으로 정규화하는 로더 경로는 구현됐다. 다만 일부 형식은 실제 저작 도구·버전·텍스처 조합을 포함한 release corpus가 아직 미완이므로 모든 변형의 지원 완료로 판정하지 않는다 |
+| KTX2/Basis texture | 검증 완료/렌더 미연결 | validation Worker의 구조·예산 검사, pinned Basis transcoder attestation과 실제 mip pretranscode release gate는 연결됐다. 그러나 Three runtime GLTFLoader에는 아직 `KTX2Loader`가 연결되지 않아 검증 통과가 곧 viewport 렌더 지원을 뜻하지 않는다 |
 | VRM 0/1 | 완료/강한 부분 | 별도 VRM 포저 제공 |
 | CSP 전용 cs3c/cs3o/cs3s | 미구현 | 공개 사양·라이선스 없이는 동일 호환을 보장할 수 없음 |
 | 객체 이동·회전·크기 | 완료 | TransformControls·수치 입력·undo/redo |
 | camera orbit/pan/zoom/FOV/preset | 완료 | perspective·orthographic, FOV, preset, focus selected와 All Sides View 제공 |
 | 다중 선택·part 선택 | 완료/부분 | 객체 다중 선택·함께 변형 제공. GLB 내부 mesh part 직접 선택은 없음 |
-| 표시/잠금·부모 자식 hierarchy | 부분 | 표시·잠금과 `parentId` 저장/트리 UI는 제공하지만 런타임 transform은 아직 완전한 재귀 parent scene graph로 결합되지 않음 |
+| 표시/잠금·부모 자식 hierarchy | 완료/강한 부분 | `parentId`를 재귀 runtime scene graph로 해석하고 부모 변경 시 기존 world transform을 보존하는 local TRS를 계산한다. 비균일 scale 조합이 shear를 만들거나 부모 행렬이 singular이면 문서를 변형하지 않고 오류로 fail closed한다 |
 | 접지·이동/회전/object snap | 완료 | 바닥 접지와 이동·회전 step snap 제공. mesh surface snap은 후속 |
 | 선택 대상 focus | 완료 | 선택 bounds 중심 focus 제공 |
 | 광원·그림자·안개 | 완료 | ambient/key/fill directional light, shadow, 거리 안개 색·시작·완전 혼합 거리 제공 |
@@ -208,7 +210,7 @@ announce→request→approved→SDP가 같은 `shareId`를 보존했고, `shareI
 | LT 선화·톤 분리 | 완료/부분 | 컬러·톤·텍스처 선·주선을 별도 raster PNG로 삽입. 진짜 vector LT는 아님 |
 | 재사용 3D 소재 생태계 | 부분 | 로컬 scene/model library는 있으나 CSP Assets식 권리·태그·공유 생태계는 아님 |
 
-표준 포맷 확대, 다중 선택, hierarchy, snapping, orthographic/four-view, panorama, texture painting, BVH는 브라우저로 구현할 수 있다. Blender 수준 modeling/sculpting/UV/rigging도 기술적으로 불가능한 것은 아니지만 별도 DCC 제품 규모이며, 웹툰 제작 시간을 줄이는 순서로 나누어야 한다.
+표준 포맷의 release corpus 확대, KTX2 runtime renderer 연결, snapping, panorama, texture painting, BVH는 브라우저로 구현할 수 있다. 다중 선택과 재귀 hierarchy, orthographic/four-view는 이미 제품 경로에 연결됐다. Blender 수준 modeling/sculpting/UV/rigging도 기술적으로 불가능한 것은 아니지만 별도 DCC 제품 규모이며, 웹툰 제작 시간을 줄이는 순서로 나누어야 한다.
 
 3D 구현·테스트 상세는 [3D 상용 기능 벤치마크](./studio-3d-commercial-benchmark-2026-07-12.md)를 따른다.
 
@@ -261,7 +263,7 @@ announce→request→approved→SDP가 같은 `shareId`를 보존했고, `shareI
 5. VRM·3D 모델 전체 poster thumbnail 사전 생성
 6. 색 힌트 scribble + semantic mask 기반 AI 자동 채색
 7. transform tween·parallax·camera/VRM motion track 기반 동적 웹툰
-8. 3D mesh surface snap, 실제 parent transform 계층, 외부 panorama/UV·BVH·texture painting
+8. 3D mesh surface snap, KTX2 runtime renderer, 외부 panorama/UV·BVH·texture painting
 9. WebGPU analytic segment parity와 GPU-aware readback composition
 10. 실기기·실제 다중 서버/다중 사용자 장시간 soak 및 장애 복구 검증
 

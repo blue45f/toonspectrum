@@ -2,6 +2,8 @@ import { fromUint8Array } from "js-base64";
 import { describe, expect, it, vi } from "vitest";
 import * as Y from "yjs";
 
+import { studioLiveLockResourcesConflict } from "../../../../../lib/studio-live-lock-resource";
+
 import {
   StudioCrdtBackpressureError,
   StudioCrdtStorageCorruptionError,
@@ -119,29 +121,32 @@ class MemoryStudioLiveLockRepository implements StudioLiveLockRepository {
   }
 
   async acquire(input: AcquireStudioLiveLockInput) {
-    await this.purgeExpired();
-    const key = this.key(input.workId, input.resourceId);
-    const current = this.locks.get(key);
-    if (current && current.ownerConnectionId !== input.ownerConnectionId) {
-      return { status: "conflict" as const, lock: current };
-    }
-    if (
-      !current &&
-      [...this.locks.values()].filter((lock) => lock.workId === input.workId).length >= 200
-    ) {
-      return { status: "limit" as const };
-    }
-    const lock: StudioLiveLockRecord = {
-      workId: input.workId,
-      resourceId: input.resourceId,
-      leaseId: current?.leaseId ?? input.requestedLeaseId,
-      acquisitionId: input.requestedLeaseId,
-      ownerConnectionId: input.ownerConnectionId,
-      ownerName: input.ownerName,
-      expiresAt: new Date(Date.now() + input.leaseMs),
-    };
-    this.locks.set(key, lock);
-    return { status: "acquired" as const, lock, created: !current };
+    return this.withWorkMutation(input.workId, async () => {
+      await this.purgeExpired();
+      const key = this.key(input.workId, input.resourceId);
+      const active = [...this.locks.values()]
+        .filter((lock) => lock.workId === input.workId)
+        .sort((left, right) => left.resourceId.localeCompare(right.resourceId));
+      const current = this.locks.get(key);
+      const conflicting = active.find(
+        (lock) =>
+          lock.ownerConnectionId !== input.ownerConnectionId &&
+          studioLiveLockResourcesConflict(lock.resourceId, input.resourceId)
+      );
+      if (conflicting) return { status: "conflict" as const, lock: conflicting };
+      if (!current && active.length >= 200) return { status: "limit" as const };
+      const lock: StudioLiveLockRecord = {
+        workId: input.workId,
+        resourceId: input.resourceId,
+        leaseId: current?.leaseId ?? input.requestedLeaseId,
+        acquisitionId: input.acquisitionId,
+        ownerConnectionId: input.ownerConnectionId,
+        ownerName: input.ownerName,
+        expiresAt: new Date(Date.now() + input.leaseMs),
+      };
+      this.locks.set(key, lock);
+      return { status: "acquired" as const, lock, created: !current };
+    });
   }
 
   async release(input: {
@@ -511,7 +516,7 @@ function crdtUpdate(key = "stroke", value = "1"): string {
 
 function crdtUpdateRequest(sequence = 1) {
   return {
-    protocolVersion: 3 as const,
+    protocolVersion: 4 as const,
     workId: "work-1",
     updateId: `00000000-0000-4000-8000-${sequence.toString().padStart(12, "0")}`,
     clientSequence: sequence,
@@ -602,17 +607,20 @@ describe("studio live protocol", () => {
     ).toBe(false);
   });
 
-  it("enforces the exact CRDT v3 request shape and rejects stale v2 peers", () => {
+  it("enforces the exact CRDT v4 request shape and rejects stale v1-v3 peers", () => {
     const sync = {
-      protocolVersion: 3,
+      protocolVersion: 4,
       workId: "work-1",
       requestId: "request-1",
       stateVector: crdtStateVector(),
     };
     expect(StudioLiveCrdtSyncSchema.safeParse(sync).success).toBe(true);
-    expect(StudioLiveCrdtSyncSchema.safeParse({ ...sync, protocolVersion: 2 }).success).toBe(
-      false
-    );
+    for (const legacyVersion of [1, 2, 3]) {
+      expect(StudioLiveCrdtSyncSchema.safeParse({
+        ...sync,
+        protocolVersion: legacyVersion,
+      }).success).toBe(false);
+    }
     expect(StudioLiveCrdtSyncSchema.safeParse({ ...sync, extra: true }).success).toBe(false);
     expect(StudioLiveCrdtSyncSchema.safeParse({ ...sync, stateVector: "AB==" }).success).toBe(
       false
@@ -620,9 +628,12 @@ describe("studio live protocol", () => {
 
     const update = crdtUpdateRequest();
     expect(StudioLiveCrdtUpdateSchema.safeParse(update).success).toBe(true);
-    expect(StudioLiveCrdtUpdateSchema.safeParse({ ...update, protocolVersion: 2 }).success).toBe(
-      false
-    );
+    for (const legacyVersion of [1, 2, 3]) {
+      expect(StudioLiveCrdtUpdateSchema.safeParse({
+        ...update,
+        protocolVersion: legacyVersion,
+      }).success).toBe(false);
+    }
     expect(StudioLiveCrdtUpdateSchema.safeParse({ ...update, clientSequence: 0 }).success).toBe(
       false
     );
@@ -670,6 +681,22 @@ describe("studio live protocol", () => {
         workId: "work-1",
         resourceId: "r".repeat(201),
         leaseId: "lease-1",
+      }).success
+    ).toBe(false);
+    expect(
+      StudioLiveLockRequestSchema.safeParse({
+        workId: "work-1",
+        resourceId: "page:page-1",
+        requestId: "00000000-0000-4000-8000-000000000001",
+        leaseMs: 15_000,
+      }).success
+    ).toBe(true);
+    expect(
+      StudioLiveLockRequestSchema.safeParse({
+        workId: "work-1",
+        resourceId: "page:page-1",
+        requestId: "reused-human-label",
+        leaseMs: 15_000,
       }).success
     ).toBe(false);
   });
@@ -1747,6 +1774,30 @@ describe("StudioLiveGateway", () => {
     ).toHaveLength(20);
   });
 
+  it("preserves a valid request id when malformed lock input is denied", async () => {
+    const harness = createHarness();
+    const socket = harness.socket("editor");
+
+    await expect(
+      harness.gateway.requestLock(
+        socket as never,
+        {
+          workId: "",
+          resourceId: "page:page-1",
+          requestId: "00000000-0000-4000-8000-000000000009",
+          leaseMs: 15_000,
+        },
+        undefined
+      )
+    ).resolves.toEqual({
+      ok: false,
+      code: "invalid_payload",
+      message: "편집 잠금 정보가 올바르지 않습니다.",
+      decision: "denied",
+      requestId: "00000000-0000-4000-8000-000000000009",
+    });
+  });
+
   it("grants renewable edit leases and rejects a competing editor", async () => {
     const harness = createHarness();
     const first = harness.socket("editor-a");
@@ -1756,25 +1807,71 @@ describe("StudioLiveGateway", () => {
 
     const acquired = await harness.gateway.requestLock(
       first as never,
-      { workId: "work-1", resourceId: "element:panel-1", leaseMs: 15_000 },
+      {
+        workId: "work-1",
+        resourceId: "element:panel-1",
+        requestId: "00000000-0000-4000-8000-000000000011",
+        leaseMs: 15_000,
+      },
       undefined
     );
-    expect(acquired.ok).toBe(true);
+    expect(acquired).toMatchObject({
+      ok: true,
+      data: {
+        decision: "acquired",
+        requestId: "00000000-0000-4000-8000-000000000011",
+      },
+    });
+    expect(harness.emissions).toContainEqual({
+      target: "studio-live:work-1",
+      event: "studio:lock:update",
+      payload: expect.objectContaining({
+        action: "acquired",
+        requestId: "00000000-0000-4000-8000-000000000011",
+      }),
+    });
     if (!acquired.ok) throw new Error("lock failed");
 
     const renewed = await harness.gateway.requestLock(
       first as never,
-      { workId: "work-1", resourceId: "element:panel-1", leaseMs: 20_000 },
+      {
+        workId: "work-1",
+        resourceId: "element:panel-1",
+        requestId: "00000000-0000-4000-8000-000000000012",
+        leaseMs: 20_000,
+      },
       undefined
     );
     expect(renewed.ok && renewed.data.lock.leaseId).toBe(acquired.data.lock.leaseId);
+    expect(renewed).toMatchObject({
+      ok: true,
+      data: {
+        decision: "acquired",
+        requestId: "00000000-0000-4000-8000-000000000012",
+      },
+    });
 
     const conflict = await harness.gateway.requestLock(
       second as never,
-      { workId: "work-1", resourceId: "element:panel-1", leaseMs: 15_000 },
+      {
+        workId: "work-1",
+        resourceId: "element:panel-1",
+        requestId: "00000000-0000-4000-8000-000000000013",
+        leaseMs: 15_000,
+      },
       undefined
     );
-    expect(conflict).toMatchObject({ ok: false, code: "lock_conflict" });
+    expect(conflict).toMatchObject({
+      ok: false,
+      code: "lock_conflict",
+      decision: "denied",
+      requestId: "00000000-0000-4000-8000-000000000013",
+      lock: {
+        resourceId: "element:panel-1",
+        leaseId: acquired.data.lock.leaseId,
+        ownerConnectionId: first.id,
+      },
+    });
 
     const staleRelease = await harness.gateway.releaseLock(
       first as never,
@@ -1917,12 +2014,12 @@ describe("StudioLiveGateway", () => {
     const results = await Promise.all([
       firstHarness.gateway.requestLock(
         first as never,
-        { workId: "work-1", resourceId: "element:a", leaseMs: 15_000 },
+        { workId: "work-1", resourceId: "element:page-1:a", leaseMs: 15_000 },
         undefined
       ),
       secondHarness.gateway.requestLock(
         second as never,
-        { workId: "work-1", resourceId: "element:b", leaseMs: 15_000 },
+        { workId: "work-1", resourceId: "element:page-1:b", leaseMs: 15_000 },
         undefined
       ),
     ]);
@@ -1932,6 +2029,51 @@ describe("StudioLiveGateway", () => {
       expect.objectContaining({ ok: true }),
     ]);
     expect(await repository.list("work-1")).toHaveLength(2);
+  });
+
+  it("atomically denies concurrent page/child acquisition across API gateway instances", async () => {
+    const repository = new MemoryStudioLiveLockRepository();
+    const firstHarness = createHarness(undefined, undefined, undefined, repository);
+    const secondHarness = createHarness(undefined, undefined, undefined, repository);
+    const first = firstHarness.socket("editor-a");
+    const second = secondHarness.socket("editor-b");
+    await connectAndJoin(firstHarness, first);
+    await connectAndJoin(secondHarness, second);
+
+    const results = await Promise.all([
+      firstHarness.gateway.requestLock(
+        first as never,
+        {
+          workId: "work-1",
+          resourceId: "page:page-hierarchy",
+          requestId: "00000000-0000-4000-8000-000000000021",
+          leaseMs: 15_000,
+        },
+        undefined
+      ),
+      secondHarness.gateway.requestLock(
+        second as never,
+        {
+          workId: "work-1",
+          resourceId: "element:page-hierarchy:panel-1",
+          requestId: "00000000-0000-4000-8000-000000000022",
+          leaseMs: 15_000,
+        },
+        undefined
+      ),
+    ]);
+
+    expect(results.filter((result) => result.ok)).toHaveLength(1);
+    const denied = results.find((result) => !result.ok);
+    expect(denied).toMatchObject({
+      ok: false,
+      code: "lock_conflict",
+      decision: "denied",
+    });
+    expect(denied && !denied.ok ? denied.requestId : null).toMatch(
+      /^00000000-0000-4000-8000-00000000002[12]$/u
+    );
+    expect(await repository.list("work-1")).toHaveLength(1);
   });
 
   it("rechecks edit ACL before a new lock and fails closed after revocation", async () => {
@@ -1945,7 +2087,12 @@ describe("StudioLiveGateway", () => {
 
     const response = await harness.gateway.requestLock(
       socket as never,
-      { workId: "work-1", resourceId: "page:page-1", leaseMs: 15_000 },
+      {
+        workId: "work-1",
+        resourceId: "page:page-1",
+        requestId: "00000000-0000-4000-8000-000000000031",
+        leaseMs: 15_000,
+      },
       undefined
     );
 
@@ -1953,6 +2100,8 @@ describe("StudioLiveGateway", () => {
       ok: false,
       code: "forbidden",
       message: "이 원고를 편집할 권한이 없습니다.",
+      decision: "denied",
+      requestId: "00000000-0000-4000-8000-000000000031",
     });
   });
 
@@ -1981,7 +2130,12 @@ describe("StudioLiveGateway", () => {
     });
     const acquired = await harness.gateway.requestLock(
       socket as never,
-      { workId: "work-1", resourceId: "page:role", leaseMs: 15_000 },
+      {
+        workId: "work-1",
+        resourceId: "page:role",
+        requestId: "00000000-0000-4000-8000-000000000041",
+        leaseMs: 15_000,
+      },
       undefined
     );
     expect(acquired.ok).toBe(true);
@@ -2005,7 +2159,8 @@ describe("StudioLiveGateway", () => {
       target: "studio-live:work-1",
       event: "studio:lock:update",
       payload: expect.objectContaining({
-        action: "released",
+        action: "revoked",
+        requestId: "00000000-0000-4000-8000-000000000041",
         resourceId: "page:role",
       }),
     });
@@ -2042,7 +2197,12 @@ describe("StudioLiveGateway", () => {
 
     const renewal = harness.gateway.requestLock(
       socket as never,
-      { workId: "work-1", resourceId: "page:renew-race", leaseMs: 20_000 },
+      {
+        workId: "work-1",
+        resourceId: "page:renew-race",
+        requestId: "00000000-0000-4000-8000-000000000042",
+        leaseMs: 20_000,
+      },
       undefined
     );
     await renewalStored;
@@ -2054,7 +2214,12 @@ describe("StudioLiveGateway", () => {
     expect(rejoined).toMatchObject({ ok: true, data: { self: { capabilities: { edit: true } } } });
 
     resumeRenewal?.();
-    await expect(renewal).resolves.toMatchObject({ ok: false, code: "forbidden" });
+    await expect(renewal).resolves.toMatchObject({
+      ok: false,
+      code: "forbidden",
+      decision: "revoked",
+      requestId: "00000000-0000-4000-8000-000000000042",
+    });
     await expect(repository.list("work-1")).resolves.toEqual([
       expect.objectContaining({
         resourceId: "page:renew-race",
@@ -2092,7 +2257,12 @@ describe("StudioLiveGateway", () => {
 
     const staleAcquire = harness.gateway.requestLock(
       socket as never,
-      { workId: "work-1", resourceId: "page:adopt-race", leaseMs: 15_000 },
+      {
+        workId: "work-1",
+        resourceId: "page:adopt-race",
+        requestId: "00000000-0000-4000-8000-000000000043",
+        leaseMs: 15_000,
+      },
       undefined
     );
     await firstAcquireStored;
@@ -2106,14 +2276,25 @@ describe("StudioLiveGateway", () => {
 
     const adopted = await harness.gateway.requestLock(
       socket as never,
-      { workId: "work-1", resourceId: "page:adopt-race", leaseMs: 20_000 },
+      {
+        workId: "work-1",
+        resourceId: "page:adopt-race",
+        // Reusing the request UUID still receives a new private fencing nonce.
+        requestId: "00000000-0000-4000-8000-000000000043",
+        leaseMs: 20_000,
+      },
       undefined
     );
     expect(adopted).toMatchObject({ ok: true });
     if (!adopted.ok) throw new Error("new participant did not adopt the lease");
 
     resumeFirstAcquire?.();
-    await expect(staleAcquire).resolves.toMatchObject({ ok: false, code: "forbidden" });
+    await expect(staleAcquire).resolves.toMatchObject({
+      ok: false,
+      code: "forbidden",
+      decision: "revoked",
+      requestId: "00000000-0000-4000-8000-000000000043",
+    });
     await expect(repository.list("work-1")).resolves.toEqual([
       expect.objectContaining({
         resourceId: "page:adopt-race",
@@ -2160,7 +2341,11 @@ describe("StudioLiveGateway", () => {
     resolveWorkARecheck?.(
       teamSnapshot("member", "work-a", { role: "viewer", edit: false })
     );
-    await expect(oldWorkLock).resolves.toMatchObject({ ok: false, code: "forbidden" });
+    await expect(oldWorkLock).resolves.toMatchObject({
+      ok: false,
+      code: "forbidden",
+      decision: "denied",
+    });
     expect(
       harness.emissions.some(
         (emission) =>
@@ -2213,7 +2398,11 @@ describe("StudioLiveGateway", () => {
     resolveStaleEditor?.(
       teamSnapshot("editor", "work-1", { role: "editor", edit: true })
     );
-    await expect(staleRequest).resolves.toMatchObject({ ok: false, code: "forbidden" });
+    await expect(staleRequest).resolves.toMatchObject({
+      ok: false,
+      code: "forbidden",
+      decision: "denied",
+    });
     expect(
       harness.emissions.some(
         (emission) =>
@@ -2334,7 +2523,7 @@ describe("StudioLiveGateway", () => {
       target: "studio-live:work-1",
       event: "studio:lock:update",
       payload: expect.objectContaining({
-        action: "released",
+        action: "revoked",
         resourceId: "page:session",
       }),
     });
@@ -4487,7 +4676,7 @@ describe("StudioLiveGateway", () => {
     const response = await harness.gateway.syncCrdtDocument(
       viewer as never,
       {
-        protocolVersion: 3,
+        protocolVersion: 4,
         workId: "work-1",
         requestId: "request-1",
         stateVector: crdtStateVector(),
@@ -4498,7 +4687,7 @@ describe("StudioLiveGateway", () => {
     expect(response).toEqual({
       ok: true,
       data: {
-        protocolVersion: 3,
+        protocolVersion: 4,
         workId: "work-1",
         requestId: "request-1",
         transferId: expect.any(String),
@@ -4548,7 +4737,7 @@ describe("StudioLiveGateway", () => {
     expect(response).toEqual({
       ok: true,
       data: {
-        protocolVersion: 3,
+        protocolVersion: 4,
         workId: "work-1",
         updateId: request.updateId,
         serverSequence: "1",
@@ -4560,7 +4749,7 @@ describe("StudioLiveGateway", () => {
       target: "from:editor:studio-live:work-1",
       event: "studio:crdt:update",
       payload: {
-        protocolVersion: 3,
+        protocolVersion: 4,
         workId: "work-1",
         updateId: request.updateId,
         serverSequence: "1",
@@ -4669,7 +4858,7 @@ describe("StudioLiveGateway", () => {
       harness.gateway.syncCrdtDocument(
         editor as never,
         {
-          protocolVersion: 3,
+          protocolVersion: 4,
           workId: "work-1",
           requestId: "corrupt-storage-sync",
           stateVector: crdtStateVector(),
@@ -4736,7 +4925,7 @@ describe("StudioLiveGateway", () => {
       target: "from:editor:studio-live:work-1",
       event: "studio:crdt:update",
       payload: {
-        protocolVersion: 3,
+        protocolVersion: 4,
         workId: "work-1",
         updateId: request.updateId,
         serverSequence: "8",
@@ -4816,7 +5005,7 @@ describe("StudioLiveGateway", () => {
           harness.gateway.syncCrdtDocument(
             firstConnection as never,
             {
-              protocolVersion: 3,
+              protocolVersion: 4,
               workId: "work-1",
               requestId: `sync-before-${request}`,
               stateVector: crdtStateVector(),
@@ -4835,7 +5024,7 @@ describe("StudioLiveGateway", () => {
         harness.gateway.syncCrdtDocument(
           reconnected as never,
           {
-            protocolVersion: 3,
+            protocolVersion: 4,
             workId: "work-1",
             requestId: "sync-after-reconnect",
             stateVector: crdtStateVector(),
@@ -4882,7 +5071,7 @@ describe("StudioLiveGateway", () => {
       harness.gateway.syncCrdtDocument(
         unjoined as never,
         {
-          protocolVersion: 3,
+          protocolVersion: 4,
           workId: "work-1",
           requestId: "unjoined-sync",
           stateVector: crdtStateVector(),
@@ -4903,7 +5092,7 @@ describe("StudioLiveGateway", () => {
         harness.gateway.syncCrdtDocument(
           joined as never,
           {
-            protocolVersion: 3,
+            protocolVersion: 4,
             workId: "work-1",
             requestId: `uncharged-sync-${request}`,
             stateVector: crdtStateVector(),
@@ -4916,7 +5105,7 @@ describe("StudioLiveGateway", () => {
       harness.gateway.syncCrdtDocument(
         joined as never,
         {
-          protocolVersion: 3,
+          protocolVersion: 4,
           workId: "work-1",
           requestId: "charged-sync-limit",
           stateVector: crdtStateVector(),
@@ -4978,7 +5167,7 @@ describe("StudioLiveGateway", () => {
       harness.gateway.syncCrdtDocument(
         editor as never,
         {
-          protocolVersion: 3,
+          protocolVersion: 4,
           workId: "work-1",
           requestId: "bounded-quota-map",
           stateVector: crdtStateVector(),
@@ -4993,7 +5182,7 @@ describe("StudioLiveGateway", () => {
       harness.gateway.syncCrdtDocument(
         editor as never,
         {
-          protocolVersion: 3,
+          protocolVersion: 4,
           workId: "work-1",
           requestId: "purge-stale-quota",
           stateVector: crdtStateVector(),

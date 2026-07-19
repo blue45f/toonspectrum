@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { parseStudioAdvancedRulerDocument } from "./studio-advanced-ruler-document";
 import {
   StudioCrdtDocument,
   type StudioCrdtPageRecord,
@@ -643,18 +644,35 @@ describe("studio CRDT page bridge", () => {
     });
   });
 
-  it("round-trips page-owned perspective and isometric guide settings", () => {
+  it("round-trips a canonical, detached page-owned drawing-assist v2 document", () => {
     const drawingAssist = createDefaultStudioDrawingAssistDocument({
       canvasWidth: 800,
       canvasHeight: 1_600,
     });
     drawingAssist.perspective = {
-      active: true,
+      active: false,
       points: [
         { id: "vp-left", x: -900, y: 520 },
         { id: "vp-right", x: 1_700, y: 520 },
       ],
     };
+    drawingAssist.advanced.rulers.push({
+      id: "curve-a",
+      type: "curve",
+      name: "배경 곡선",
+      enabled: true,
+      visible: true,
+      scope: { kind: "group", groupId: "background" },
+      snapMode: "through-start",
+      fixedOffset: 0,
+      p0: { x: 10, y: 20 },
+      p1: { x: 100, y: 0 },
+      p2: { x: 200, y: 300 },
+      p3: { x: 400, y: 500 },
+    });
+    drawingAssist.advanced.activeSnapRulerId = "curve-a";
+    drawingAssist.advanced.selectedRulerId = "curve-a";
+    const canonicalDrawingAssist = structuredClone(drawingAssist);
     const page = {
       id: "page-guides",
       bg: "#fff",
@@ -664,7 +682,9 @@ describe("studio CRDT page bridge", () => {
       drawingAssist,
     };
     const encoded = studioPageToCrdtPage(page);
-    expect(encoded.payload.props.drawingAssist).toEqual(drawingAssist);
+    expect(encoded.payload.props.drawingAssist).toEqual(canonicalDrawingAssist);
+    drawingAssist.advanced.rulers[0]!.name = "mutated after encoding";
+    expect(encoded.payload.props.drawingAssist).toEqual(canonicalDrawingAssist);
 
     const reconciled = reconcileStudioCrdtSceneGraphPages(
       [page],
@@ -677,6 +697,38 @@ describe("studio CRDT page bridge", () => {
         payload: encoded.payload,
       }]
     );
-    expect(reconciled.pages[0]?.drawingAssist).toEqual(drawingAssist);
+    expect(reconciled.pages[0]?.drawingAssist).toEqual(canonicalDrawingAssist);
+  });
+
+  it("rejects an otherwise valid advanced-ruler page when the total payload exceeds 8 KiB", () => {
+    const drawingAssist = createDefaultStudioDrawingAssistDocument({
+      canvasWidth: 800,
+      canvasHeight: 1_600,
+    });
+    drawingAssist.advanced.rulers = Array.from({ length: 6 }, (_, index) => ({
+      id: `curve-${index}-${"x".repeat(140)}`,
+      type: "curve" as const,
+      name: "곡".repeat(80),
+      enabled: true,
+      visible: true,
+      scope: { kind: "page" as const, groupId: null },
+      snapMode: "on-curve" as const,
+      fixedOffset: 0,
+      p0: { x: 0, y: index },
+      p1: { x: 100, y: index + 20 },
+      p2: { x: 200, y: index + 20 },
+      p3: { x: 300, y: index },
+    }));
+    expect(parseStudioAdvancedRulerDocument(drawingAssist.advanced)).not.toBeNull();
+
+    expect(() => studioPageToCrdtPage({
+      id: "oversized-guides",
+      bg: "#fff",
+      bgGrad: null,
+      canvasH: 1_600,
+      note: "가".repeat(2_000),
+      elements: [] as Array<{ id: string; type: string }>,
+      drawingAssist,
+    })).toThrow(/8KiB/u);
   });
 });

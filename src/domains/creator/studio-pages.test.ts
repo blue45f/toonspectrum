@@ -175,7 +175,7 @@ describe("studio-pages (pure, real exports)", () => {
   it("duplicateMirroredPage mirrors drawing-assist horizontal anchors", () => {
     resetIds();
     const drawingAssist = {
-      version: 1 as const,
+      version: 2 as const,
       perspective: {
         active: true,
         points: [{ id: "vp-a", x: 120, y: 300 }],
@@ -186,6 +186,12 @@ describe("studio-pages (pure, real exports)", () => {
         cellSize: 40,
         originX: 200,
         originY: 500,
+      },
+      advanced: {
+        version: 1 as const,
+        rulers: [],
+        activeSnapRulerId: null,
+        selectedRulerId: null,
       },
     };
     const source = samplePage({ drawingAssist });

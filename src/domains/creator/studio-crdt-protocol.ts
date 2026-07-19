@@ -1,11 +1,11 @@
 import { fromUint8Array, toUint8Array } from "js-base64";
 
-// v3 gates rooms that can persist page-level drawing-assist documents. Keeping this at v2 would
-// let a long-open tab join the same room and interpret `page.drawingAssist` with an incompatible
-// schema. The local wire brand changes with the room protocol so stale BroadcastChannel peers are
-// isolated before payload parsing.
-export const STUDIO_CRDT_PROTOCOL_VERSION = 3 as const;
-export const STUDIO_CRDT_LOCAL_WIRE_BRAND = "toonspectrum:studio-crdt:v3" as const;
+// v4 gates rooms that can persist the v2 drawing-assist envelope and authored advanced rulers.
+// Keeping this at v3 would let a long-open tab join the same room and interpret
+// `page.drawingAssist` with an incompatible schema. The local wire brand changes with the room
+// protocol so stale BroadcastChannel peers are isolated before payload parsing.
+export const STUDIO_CRDT_PROTOCOL_VERSION = 4 as const;
+export const STUDIO_CRDT_LOCAL_WIRE_BRAND = "toonspectrum:studio-crdt:v4" as const;
 /**
  * v2 adds renderer-significant stroke extensions such as `paintModel`.
  * New clients still read v1, while v1 clients reject v2 instead of silently rendering different
@@ -376,15 +376,19 @@ export function parseStudioCrdtUpdateRequest(
 }
 
 /**
- * Protocol v2 and v3 changed the room capability gate, not the encoded Yjs update shape. Pending
- * v1/v2 outbox and recovery rows can therefore be upgraded locally before resend/export, while
+ * Protocol v2-v4 changed the room capability gate, not the encoded Yjs update shape. Pending
+ * v1-v3 outbox and recovery rows can therefore be upgraded locally before resend/export, while
  * network parsers continue to reject live legacy peers and prevent mixed-capability rooms.
  */
 export function parsePersistedStudioCrdtUpdateRequest(
   value: unknown,
   options: ParseStudioCrdtOptions = {}
 ): StudioCrdtUpdateRequest | null {
-  const candidate = isRecord(value) && (value.protocolVersion === 1 || value.protocolVersion === 2)
+  const candidate = isRecord(value) && (
+    value.protocolVersion === 1 ||
+    value.protocolVersion === 2 ||
+    value.protocolVersion === 3
+  )
     ? { ...value, protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION }
     : value;
   return parseStudioCrdtUpdateRequest(candidate, options);

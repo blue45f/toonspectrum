@@ -32,10 +32,10 @@ describe("studio live mutation guard", () => {
     expect(studioLivePageResource("p1")).toBe("page:p1");
     expect(studioLiveElementResource("p1", "e2")).toBe("element:p1:e2");
     expect(studioLiveMutationResources({ pageId: "p1", elementIds: ["e1", "e1", "e2"] })).toEqual([
-      "page:p1",
       "element:p1:e1",
       "element:p1:e2",
     ]);
+    expect(studioLiveMutationResources({ pageId: "p1", elementIds: [] })).toEqual(["page:p1"]);
   });
 
   it("ignores expired and self-owned locks", () => {
@@ -79,15 +79,32 @@ describe("studio live mutation guard", () => {
     });
     expect(deniedElement.ok).toBe(false);
     if (!deniedElement.ok) expect(deniedElement.lock.resource).toBe("element:p1:e2");
+
+    const deniedPageByChild = canBeginStudioLiveMutation({
+      locks: [elementLock],
+      pageId: "p1",
+      elementIds: null,
+      selfSessionId: "self",
+      now,
+    });
+    expect(deniedPageByChild.ok).toBe(false);
+
+    expect(canBeginStudioLiveMutation({
+      locks: [elementLock],
+      pageId: "p1",
+      elementIds: ["sibling"],
+      selfSessionId: "self",
+      now,
+    })).toEqual({ ok: true });
   });
 
-  it("planStudioLiveHeldResourceReplace always releases prior holds before new claims", () => {
+  it("planStudioLiveHeldResourceReplace retains the intersection and changes only the delta", () => {
     const plan = planStudioLiveHeldResourceReplace(
       ["page:p1", "element:p1:a"],
       ["page:p1", "element:p1:b"]
     );
-    expect(plan.toRelease).toEqual(["page:p1", "element:p1:a"]);
-    expect(plan.toClaim).toEqual(["page:p1", "element:p1:b"]);
+    expect(plan.toRelease).toEqual(["element:p1:a"]);
+    expect(plan.toClaim).toEqual(["element:p1:b"]);
     expect(plan.held).toEqual(["page:p1", "element:p1:b"]);
   });
 
@@ -117,7 +134,7 @@ describe("studio live mutation guard", () => {
       held = [...plan.held];
     }
     expect([...claimed].sort()).toEqual(["page:p1"]);
-    // Nested/aborted re-claim for element edit must release page-only first then re-claim
+    // A concrete element edit replaces the page-wide claim instead of holding both scopes.
     {
       const next = studioLiveMutationResources({ pageId: "p1", elementIds: ["e9"] });
       const plan = planStudioLiveHeldResourceReplace(held, next);
@@ -125,7 +142,7 @@ describe("studio live mutation guard", () => {
       for (const resource of plan.toClaim) room.claimLock(resource);
       held = [...plan.held];
     }
-    expect([...claimed].sort()).toEqual(["element:p1:e9", "page:p1"]);
+    expect([...claimed].sort()).toEqual(["element:p1:e9"]);
     // Early-exit path: clear must empty room
     {
       const plan = planStudioLiveHeldResourceClear(held);

@@ -21,11 +21,14 @@ import {
 import {
   STUDIO_LIVE_CHAT_TEXT_MAX_LENGTH,
   STUDIO_LIVE_ICE_CANDIDATE_MAX_LENGTH,
+  STUDIO_LIVE_RESOURCE_MAX_LENGTH,
   STUDIO_LIVE_SDP_MID_MAX_LENGTH,
   STUDIO_LIVE_USERNAME_FRAGMENT_MAX_LENGTH,
   createStudioLiveEnvelope,
   studioLiveStringFitsByteContract,
   type StudioLiveEnvelope,
+  type StudioLiveLockAcquireResult,
+  type StudioLiveLockRequest,
   type StudioLiveMessageKind,
   type StudioLivePayloadMap,
   type StudioLiveScreenAccessPayload,
@@ -66,6 +69,7 @@ import { getRuntimeApiBase } from "@/src/infrastructure/runtime-api-base";
 const SOCKET_PATH = "/socket.io";
 const CONNECT_TIMEOUT_MS = 10_000;
 const CRDT_ACK_TIMEOUT_MS = 10_000;
+const LOCK_ACK_TIMEOUT_MS = 10_000;
 const VOICE_JOIN_ACK_TIMEOUT_MS = 10_000;
 const MAX_TOKEN_LENGTH = 8_192;
 const MAX_SEEN_CRDT_UPDATE_IDS = 4_096;
@@ -98,6 +102,21 @@ interface PendingVoiceAdmission {
   timeout: unknown;
 }
 
+interface PendingLockAcquisition {
+  request: StudioLiveLockRequest;
+  joinGeneration: number;
+  selfConnectionId: string;
+  promise: Promise<StudioLiveLockAcquireResult>;
+  resolve: (result: StudioLiveLockAcquireResult) => void;
+  timeout: unknown;
+}
+
+interface AbandonedLockAcquisition {
+  requestId: string;
+  joinGeneration: number;
+  selfConnectionId: string;
+}
+
 export interface StudioLiveSocketLike {
   connected: boolean;
   auth: Record<string, unknown>;
@@ -114,6 +133,7 @@ export interface StudioLiveSocketTransportDependencies {
   setTimeout?: (handler: () => void, delay: number) => unknown;
   clearTimeout?: (handle: unknown) => void;
   voiceJoinAckTimeoutMs?: number;
+  lockAckTimeoutMs?: number;
 }
 
 function defaultCreateSocket(auth: { sessionToken: string }): StudioLiveSocketLike {
@@ -177,6 +197,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
   private readonly scheduleTimeout: (handler: () => void, delay: number) => unknown;
   private readonly cancelTimeout: (handle: unknown) => void;
   private readonly voiceJoinAckTimeoutMs: number;
+  private readonly lockAckTimeoutMs: number;
   private readonly listeners = new Set<(value: unknown) => void>();
   private readonly controlListeners = new Set<(event: StudioLiveTransportControlEvent) => void>();
   private readonly crdtListeners = new Set<(message: StudioCrdtTransportMessage) => void>();
@@ -186,6 +207,10 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     reject: (error: Error) => void;
     timeout: unknown;
   }>();
+  private readonly pendingLockAcquisitions = new Map<string, PendingLockAcquisition>();
+  private readonly pendingLockRequestByResource = new Map<string, string>();
+  private readonly deferredSelfLocks = new Map<string, ServerLock>();
+  private readonly abandonedLockResources = new Map<string, AbandonedLockAcquisition>();
   private readonly participants = new Map<string, ServerParticipant>();
   private readonly sequenceByConnection = new Map<string, number>();
   private readonly shareIdByConnection = new Map<string, string>();
@@ -228,6 +253,10 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
         100,
         Math.trunc(dependencies.voiceJoinAckTimeoutMs ?? VOICE_JOIN_ACK_TIMEOUT_MS)
       )
+    );
+    this.lockAckTimeoutMs = Math.min(
+      30_000,
+      Math.max(100, Math.trunc(dependencies.lockAckTimeoutMs ?? LOCK_ACK_TIMEOUT_MS))
     );
     this.socket = (dependencies.createSocket ?? defaultCreateSocket)({ sessionToken });
     this.socket.on("connect", this.onConnect);
@@ -345,6 +374,116 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     return operation;
   }
 
+  acquireLock(request: StudioLiveLockRequest): Promise<StudioLiveLockAcquireResult> {
+    if (
+      !safeIdentifier(request.resource, STUDIO_LIVE_RESOURCE_MAX_LENGTH) ||
+      !safeIdentifier(request.requestId, 160) ||
+      !Number.isInteger(request.leaseMs) ||
+      request.leaseMs < 5_000 ||
+      request.leaseMs > 30_000
+    ) {
+      return Promise.resolve({
+        status: "denied",
+        resource: request.resource,
+        requestId: request.requestId,
+        code: "invalid_request",
+        message: "편집 잠금 요청이 올바르지 않습니다.",
+      });
+    }
+    if (!this.ready || !this.selfConnectionId) {
+      return Promise.resolve({
+        status: "revoked",
+        resource: request.resource,
+        requestId: request.requestId,
+        code: this.accessRevoked ? "access_revoked" : "not_ready",
+        message: this.accessRevoked
+          ? "팀 권한이 해제되어 편집 잠금을 요청할 수 없습니다."
+          : "팀 공동작업 연결이 준비되지 않았습니다.",
+      });
+    }
+    const duplicate = this.pendingLockAcquisitions.get(request.requestId);
+    if (duplicate) {
+      if (duplicate.request.resource === request.resource) return duplicate.promise;
+      return Promise.resolve({
+        status: "denied",
+        resource: request.resource,
+        requestId: request.requestId,
+        code: "duplicate_request_id",
+        message: "같은 편집 잠금 요청 식별자가 이미 사용 중입니다.",
+      });
+    }
+    const pendingRequestId = this.pendingLockRequestByResource.get(request.resource);
+    if (pendingRequestId) {
+      const pending = this.pendingLockAcquisitions.get(pendingRequestId);
+      if (pending) {
+        return Promise.resolve({
+          status: "denied",
+          resource: request.resource,
+          requestId: request.requestId,
+          code: "duplicate_resource_request",
+          message: "같은 편집 영역의 잠금 요청이 이미 진행 중입니다.",
+        });
+      }
+      this.pendingLockRequestByResource.delete(request.resource);
+    }
+
+    let resolveResult!: (result: StudioLiveLockAcquireResult) => void;
+    const promise = new Promise<StudioLiveLockAcquireResult>((resolve) => {
+      resolveResult = resolve;
+    });
+    const pending: PendingLockAcquisition = {
+      request: { ...request },
+      joinGeneration: this.joinGeneration,
+      selfConnectionId: this.selfConnectionId,
+      promise,
+      resolve: resolveResult,
+      timeout: null,
+    };
+    this.pendingLockAcquisitions.set(request.requestId, pending);
+    this.pendingLockRequestByResource.set(request.resource, request.requestId);
+    pending.timeout = this.scheduleTimeout(() => {
+      if (!this.removePendingLockAcquisition(pending)) return;
+      const abandoned: AbandonedLockAcquisition = {
+        requestId: request.requestId,
+        joinGeneration: pending.joinGeneration,
+        selfConnectionId: pending.selfConnectionId,
+      };
+      this.abandonedLockResources.set(request.resource, abandoned);
+      const deferred = this.deferredSelfLocks.get(request.resource);
+      if (deferred) this.rollbackAbandonedLock(abandoned, deferred);
+      pending.resolve({
+        status: "timeout",
+        resource: request.resource,
+        requestId: request.requestId,
+        message: "팀 서버의 편집 잠금 응답 시간이 초과되었습니다.",
+      });
+    }, this.lockAckTimeoutMs);
+
+    try {
+      this.socket.emit(
+        "studio:lock:request",
+        {
+          workId: this.context.workId,
+          resourceId: request.resource,
+          requestId: request.requestId,
+          leaseMs: request.leaseMs,
+        },
+        (value: unknown) => this.completePendingLockAcquisition(pending, value)
+      );
+    } catch (error) {
+      if (this.removePendingLockAcquisition(pending)) {
+        pending.resolve({
+          status: "denied",
+          resource: request.resource,
+          requestId: request.requestId,
+          code: "transport_error",
+          message: eventMessage(error, "편집 잠금 요청을 보내지 못했습니다."),
+        });
+      }
+    }
+    return promise;
+  }
+
   send(envelope: StudioLiveEnvelope): boolean {
     if (!this.ready || envelope.workId !== this.context.workId) return false;
     try {
@@ -376,15 +515,11 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
         case "lock:claim": {
           const payload = envelope.payload as StudioLivePayloadMap["lock:claim"];
           const leaseMs = Math.max(5_000, Math.min(30_000, payload.leaseUntil - envelope.sentAt));
-          this.emitWithAck(
-            "studio:lock:request",
-            { workId: this.context.workId, resourceId: payload.resource, leaseMs },
-            (data) => {
-              if (!isRecord(data)) return;
-              const lock = parseLock(data.lock);
-              if (lock) this.applyAuthoritativeLock(lock);
-            }
-          );
+          void this.acquireLock({
+            resource: payload.resource,
+            requestId: payload.claimId,
+            leaseMs,
+          });
           return true;
         }
         case "lock:release": {
@@ -677,6 +812,10 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
 
   close(): void {
     if (this.closed) return;
+    this.revokePendingLockAcquisitions(
+      "connection_closed",
+      "팀 공동작업 연결이 종료되어 편집 잠금 요청이 취소되었습니다."
+    );
     this.terminateVoiceIntent(
       "removed",
       "팀 공동작업 연결이 종료되어 음성 작업실에서 나갔습니다."
@@ -752,6 +891,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
   };
 
   private revokeFromConnectError(message: string): void {
+    this.revokePendingLockAcquisitions("access_revoked", message);
     this.terminateVoiceIntent("revoked", message);
     ++this.joinGeneration;
     this.accessRevoked = true;
@@ -774,6 +914,10 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
 
   private readonly onDisconnect = (reason: unknown) => {
     if (this.closed) return;
+    this.revokePendingLockAcquisitions(
+      "disconnected",
+      "팀 서버 연결이 끊겨 편집 잠금 요청이 취소되었습니다."
+    );
     // The room retains the user's desired call across a recoverable reconnect and republishes the
     // join after the next work-room ACK. Signals from the abandoned socket generation must not.
     this.cancelPendingVoiceAdmission({
@@ -811,6 +955,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       isRecord(value) && typeof value.message === "string" && value.message.trim()
         ? value.message.slice(0, 500)
         : "팀 권한이 변경되어 실시간 작업실 연결이 종료되었습니다.";
+    this.revokePendingLockAcquisitions("access_revoked", message);
     this.terminateVoiceIntent("revoked", message);
     ++this.joinGeneration;
     this.accessRevoked = true;
@@ -1016,11 +1161,20 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     if (!isRecord(value)) return;
     if (value.action === "acquired") {
       const lock = parseLock(value.lock);
-      if (lock) this.applyAuthoritativeLock(lock);
+      const requestId = safeIdentifier(value.requestId, 160) ? value.requestId : undefined;
+      const pending = requestId ? this.pendingLockAcquisitions.get(requestId) : null;
+      if (lock && pending && pending.request.resource === lock.resourceId) {
+        this.completePendingLockAcquisition(pending, {
+          ok: true,
+          data: { decision: "acquired", requestId, lock },
+        });
+      } else if (lock) {
+        this.applyAuthoritativeLock(lock, requestId);
+      }
       return;
     }
     if (
-      (value.action === "released" || value.action === "expired") &&
+      (value.action === "released" || value.action === "expired" || value.action === "revoked") &&
       safeString(value.resourceId, 200) &&
       safeString(value.leaseId, 80)
     ) {
@@ -1680,6 +1834,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       recoverable,
     } as StudioLiveTransportStatus);
     if (!recoverable) {
+      this.revokePendingLockAcquisitions(failure.code, failure.message);
       this.terminateVoiceIntent("revoked", failure.message);
       ++this.joinGeneration;
       this.accessRevoked = true;
@@ -1747,11 +1902,23 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     for (const lock of locks) this.applyAuthoritativeLock(lock);
   }
 
-  private applyAuthoritativeLock(lock: ServerLock): void {
+  private applyAuthoritativeLock(lock: ServerLock, requestId?: string): void {
     const owner = this.participants.get(lock.ownerConnectionId);
     if (!owner) return;
     const leaseUntil = Date.parse(lock.expiresAt);
     if (!Number.isFinite(leaseUntil) || leaseUntil <= this.now()) return;
+    if (owner.connectionId === this.selfConnectionId) {
+      const abandoned = this.abandonedLockResources.get(lock.resourceId);
+      if (abandoned && (!requestId || requestId === abandoned.requestId)) {
+        this.rollbackAbandonedLock(abandoned, lock);
+        return;
+      }
+      const pendingRequestId = this.pendingLockRequestByResource.get(lock.resourceId);
+      if (pendingRequestId && (!requestId || requestId !== pendingRequestId)) {
+        this.deferredSelfLocks.set(lock.resourceId, lock);
+        return;
+      }
+    }
     const previous = this.locksByResource.get(lock.resourceId);
     this.locksByResource.set(lock.resourceId, lock);
     if (
@@ -1769,6 +1936,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       action: "acquired",
       resource: lock.resourceId,
       claimId: lock.leaseId,
+      ...(requestId ? { requestId } : {}),
       owner: participant,
       leaseUntil,
     };
@@ -2062,6 +2230,203 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
   private bestEffortVoiceLeave(callId: string): void {
     if (!this.socket.connected) return;
     this.socket.emit("studio:voice:leave", { workId: this.context.workId, callId });
+  }
+
+  private completePendingLockAcquisition(
+    pending: PendingLockAcquisition,
+    value: unknown
+  ): void {
+    if (this.pendingLockAcquisitions.get(pending.request.requestId) !== pending) {
+      const lateLock = this.parseLockAcquisitionSuccess(pending, value);
+      if (lateLock) {
+        const abandoned = this.abandonedLockResources.get(pending.request.resource);
+        if (abandoned?.requestId === pending.request.requestId) {
+          this.rollbackAbandonedLock(abandoned, lateLock);
+        }
+      }
+      return;
+    }
+    this.removePendingLockAcquisition(pending);
+
+    if (
+      this.closed ||
+      !this.ready ||
+      pending.joinGeneration !== this.joinGeneration ||
+      pending.selfConnectionId !== this.selfConnectionId
+    ) {
+      pending.resolve({
+        status: "revoked",
+        resource: pending.request.resource,
+        requestId: pending.request.requestId,
+        code: "connection_changed",
+        message: "팀 연결이 변경되어 편집 잠금 요청이 취소되었습니다.",
+      });
+      return;
+    }
+
+    const echoedRequestId = this.lockAckRequestId(value);
+    if (echoedRequestId && echoedRequestId !== pending.request.requestId) {
+      pending.resolve({
+        status: "denied",
+        resource: pending.request.resource,
+        requestId: pending.request.requestId,
+        code: "response_mismatch",
+        message: "팀 서버의 편집 잠금 응답 식별자가 요청과 일치하지 않습니다.",
+      });
+      return;
+    }
+    const failure = parseFailure(value);
+    if (failure) {
+      const revoked =
+        (isRecord(value) && value.decision === "revoked") ||
+        failure.code === "unauthenticated" ||
+        failure.code === "access_revoked";
+      const conflictLock = isRecord(value) ? parseLock(value.lock) : null;
+      const conflictOwner = conflictLock
+        ? this.participants.get(conflictLock.ownerConnectionId)
+        : null;
+      const publicConflict = conflictLock && conflictOwner
+        ? {
+            resource: conflictLock.resourceId,
+            claimId: conflictLock.leaseId,
+            owner: publicParticipant(conflictOwner),
+            leaseUntil: Date.parse(conflictLock.expiresAt),
+          }
+        : undefined;
+      pending.resolve(
+        revoked
+          ? {
+              status: "revoked",
+              resource: pending.request.resource,
+              requestId: pending.request.requestId,
+              code: failure.code,
+              message: failure.message,
+            }
+          : {
+              status: "denied",
+              resource: pending.request.resource,
+              requestId: pending.request.requestId,
+              code: failure.code,
+              message: failure.message,
+              ...(publicConflict ? { lock: publicConflict } : {}),
+            }
+      );
+      this.handleFailure(failure, "operation");
+      return;
+    }
+
+    const lock = this.parseLockAcquisitionSuccess(pending, value);
+    if (!lock) {
+      const message = "팀 서버의 편집 잠금 응답 형식이 올바르지 않습니다.";
+      pending.resolve({
+        status: "denied",
+        resource: pending.request.resource,
+        requestId: pending.request.requestId,
+        code: "invalid_response",
+        message,
+      });
+      this.emitStatus({ state: "error", message, recoverable: true });
+      return;
+    }
+    this.abandonedLockResources.delete(pending.request.resource);
+    this.deferredSelfLocks.delete(pending.request.resource);
+    const leaseUntil = Date.parse(lock.expiresAt);
+    this.applyAuthoritativeLock(lock, pending.request.requestId);
+    pending.resolve({
+      status: "acquired",
+      resource: pending.request.resource,
+      requestId: pending.request.requestId,
+      lock: {
+        resource: lock.resourceId,
+        claimId: lock.leaseId,
+        owner: this.context.participant,
+        leaseUntil,
+      },
+    });
+  }
+
+  private parseLockAcquisitionSuccess(
+    pending: PendingLockAcquisition,
+    value: unknown
+  ): ServerLock | null {
+    if (!isRecord(value) || value.ok !== true || !isRecord(value.data)) return null;
+    if (value.data.decision !== undefined && value.data.decision !== "acquired") return null;
+    if (
+      value.data.requestId !== undefined &&
+      value.data.requestId !== pending.request.requestId
+    ) return null;
+    const lock = parseLock(value.data.lock);
+    if (
+      !lock ||
+      lock.resourceId !== pending.request.resource ||
+      lock.ownerConnectionId !== pending.selfConnectionId ||
+      Date.parse(lock.expiresAt) <= this.now()
+    ) return null;
+    return lock;
+  }
+
+  private lockAckRequestId(value: unknown): string | null {
+    if (!isRecord(value)) return null;
+    if (safeIdentifier(value.requestId, 160)) return value.requestId;
+    if (isRecord(value.data) && safeIdentifier(value.data.requestId, 160)) {
+      return value.data.requestId;
+    }
+    return null;
+  }
+
+  private removePendingLockAcquisition(pending: PendingLockAcquisition): boolean {
+    if (this.pendingLockAcquisitions.get(pending.request.requestId) !== pending) return false;
+    this.pendingLockAcquisitions.delete(pending.request.requestId);
+    if (this.pendingLockRequestByResource.get(pending.request.resource) === pending.request.requestId) {
+      this.pendingLockRequestByResource.delete(pending.request.resource);
+    }
+    if (pending.timeout !== null) this.cancelTimeout(pending.timeout);
+    pending.timeout = null;
+    return true;
+  }
+
+  private revokePendingLockAcquisitions(code: string, message: string): void {
+    for (const pending of Array.from(this.pendingLockAcquisitions.values())) {
+      if (!this.removePendingLockAcquisition(pending)) continue;
+      pending.resolve({
+        status: "revoked",
+        resource: pending.request.resource,
+        requestId: pending.request.requestId,
+        code,
+        message,
+      });
+    }
+    this.deferredSelfLocks.clear();
+    this.abandonedLockResources.clear();
+  }
+
+  private rollbackAbandonedLock(
+    abandoned: AbandonedLockAcquisition,
+    lock: ServerLock
+  ): void {
+    if (
+      this.pendingLockRequestByResource.has(lock.resourceId) ||
+      abandoned.joinGeneration !== this.joinGeneration ||
+      abandoned.selfConnectionId !== this.selfConnectionId ||
+      !this.ready
+    ) {
+      this.deferredSelfLocks.set(lock.resourceId, lock);
+      return;
+    }
+    this.abandonedLockResources.delete(lock.resourceId);
+    this.deferredSelfLocks.delete(lock.resourceId);
+    this.socket.emit(
+      "studio:lock:release",
+      {
+        workId: this.context.workId,
+        resourceId: lock.resourceId,
+        leaseId: lock.leaseId,
+      },
+      (value: unknown) => {
+        const failure = parseFailure(value);
+        if (failure) this.handleFailure(failure, "operation");
+      }
+    );
   }
 
   private emitWithAck(

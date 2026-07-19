@@ -1290,6 +1290,20 @@ function serializeFreehand(
     return `<g>${dabs}</g>`;
   }
 
+  // Filled freehand paths are the document representation used by lasso fill and generated
+  // drafting faces. Preserve their closed fill in SVG instead of degrading them to an outline.
+  if (el.fill && el.mode !== "eraser" && points.length >= 6) {
+    const renderPath = resolveStudioFreehandRenderPath(points, {
+      sampleSpacing: el.sampleSpacing,
+      legacyMinDistance: renderSampleDistance,
+      legacyTension: 0.4,
+    });
+    const path = renderPath.tension === 0
+      ? pointsToPathD(renderPath.points, true)
+      : `${tensionPathD(renderPath.points, renderPath.tension)} Z`;
+    return `<path d="${path}" fill="${escapeXml(el.fill)}" stroke="${escapeXml(stroke)}" stroke-width="${fmt(strokeWidth)}" stroke-linecap="round" stroke-linejoin="round"${opacityAttr}/>`;
+  }
+
   // 레거시 기본 펜/마커 — 필압 배열이 있으면 세그먼트별 굵기 산식으로 재현.
   const smoothed = processFreehandPoints(points, renderSampleDistance);
   const pressures = el.pressures;

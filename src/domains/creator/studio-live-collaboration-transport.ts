@@ -15,7 +15,9 @@ import {
 
 import type {
   StudioLiveEnvelope,
+  StudioLiveLockAcquireResult,
   StudioLiveParticipant,
+  StudioLiveLockRequest,
 } from "./studio-live-collaboration-protocol";
 
 export type StudioLiveTransportMode = "local" | "server";
@@ -38,6 +40,8 @@ export type StudioLiveAuthoritativeLockEvent =
       action: "acquired";
       resource: string;
       claimId: string;
+      /** Present on the ACK path so Room can settle the matching pending request. */
+      requestId?: string;
       owner: StudioLiveParticipant;
       leaseUntil: number;
     }
@@ -65,6 +69,8 @@ export interface StudioLiveTransport {
   subscribe(listener: (value: unknown) => void): () => void;
   /** Optional server-only authoritative status/ACK seam; local transports need no control plane. */
   subscribeControl?(listener: (event: StudioLiveTransportControlEvent) => void): () => void;
+  /** Correlated, server-confirmed lock acquisition. Local transports may omit this fast path. */
+  acquireLock?(request: StudioLiveLockRequest): Promise<StudioLiveLockAcquireResult>;
   /** Durable CRDT operations deliberately do not share the ephemeral signaling envelope. */
   requestCrdtSync?(request: StudioCrdtSyncRequest): Promise<StudioCrdtSyncResponse | null>;
   respondCrdtSync?(response: StudioCrdtSyncResponse, targetSessionId: string): boolean;

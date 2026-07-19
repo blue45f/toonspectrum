@@ -78,6 +78,10 @@ const StudioIsometricGridOverlay = lazyRetry(
   () => import("./StudioIsometricGridOverlay").then((mod) => ({ default: mod.StudioIsometricGridOverlay })),
   "StudioIsometricGridOverlay"
 );
+const StudioAdvancedRulerOverlay = lazyRetry(
+  () => import("./StudioAdvancedRulerOverlay").then((mod) => ({ default: mod.StudioAdvancedRulerOverlay })),
+  "StudioAdvancedRulerOverlay"
+);
 const StudioLayerMaskOverlay = lazyRetry(
   () => import("./StudioLayerMaskOverlay").then((mod) => ({ default: mod.StudioLayerMaskOverlay })),
   "StudioLayerMaskOverlay"
@@ -252,6 +256,10 @@ const StudioPerspectivePanel = lazyRetry(
 const StudioIsometricGridPanel = lazyRetry(
   () => import("./StudioIsometricGridPanel").then((mod) => ({ default: mod.StudioIsometricGridPanel })),
   "StudioIsometricGridPanel"
+);
+const StudioAdvancedRulerPanel = lazyRetry(
+  () => import("./StudioAdvancedRulerPanel").then((mod) => ({ default: mod.StudioAdvancedRulerPanel })),
+  "StudioAdvancedRulerPanel"
 );
 const StudioVrmPoser = lazyRetry(
   () => import("./StudioVrmPoser").then((mod) => ({ default: mod.StudioVrmPoser })),
@@ -625,6 +633,8 @@ function preloadStudioColorPopover(): void {
 
 export {
   StudioAiAssistHub,
+  StudioAdvancedRulerOverlay,
+  StudioAdvancedRulerPanel,
   StudioAiBackgroundPanel,
   StudioAiCharacterConsistencyPanel,
   StudioAiColorizePanel,

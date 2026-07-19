@@ -41,8 +41,10 @@ ToonSpectrum의 방향은 다음과 같이 정리한다.
   Babylon.js 전환과 동의어가 아니다.
 - **두 번째 엔진:** Babylon.js나 PlayCanvas는 특정 전문 작업에서 수치로 이겼을 때만 별도 Canvas 또는
   headless job으로 사용한다. 하나의 Canvas나 mutable scene graph를 두 엔진이 공유하지 않는다.
-- **CPU 고비용 작업:** Worker와 WASM으로 파일 검사·정규화·이미지 전처리·물리·retarget·배치 계산을
-  분리한다. 인터랙티브 scene graph와 TransformControls는 main thread가 소유한다.
+- **CPU 고비용 작업:** GLB 구조·hash 검사, KTX2 preflight, 이미지 전처리·물리·배치 계산은 Worker와
+  WASM으로 분리한다. 다만 OBJ/FBX/DAE/STL/PLY/3DS의 원본 parse와 GLB export는 현재 main realm에서
+  실행하며, 검증된 성능 이득과 동일한 실패 경계를 확보한 뒤 off-main 이전을 검토한다. 인터랙티브
+  scene graph와 TransformControls는 main thread가 소유한다.
 - **SKP:** 공식 브라우저용 JS/WASM 파서가 확인되지 않았으므로 무허가 역공학 파서를 넣지 않는다.
   우선 SketchUp의 공식 GLB export를 안내하고, 필요하면 SDK·법무 승인을 거친 격리 native/server
   converter를 별도 도입한다.
@@ -283,7 +285,9 @@ frequency를 조정한다.
 - **[이번 반영]** VRM 1.0 semantic 55본 기반 pose material을 poser의 저장·부분 적용·삭제·JSON
   merge/export UI와 즉시 undo command에 연결했다. 잠긴 본, scope 밖 본, 대상 모델에 없는 optional bone은
   변경하지 않고 결과를 `aria-live`로 보고한다.
-- **[격차]** visual joint pin/end-effector lock, 포즈 강도 blend/additive layer, 실시간 hand scanner,
+- **[이번 반영]** 손·발 viewport handle의 two-bone IK와 `StudioVrmRigAssistPanel`의 versioned 관절 프로필,
+  전신 IK 보조, 발 바닥 고정·바닥 높이를 실제 static floor-contact solver와 SceneDocument 저장 경로에 연결했다.
+- **[격차]** 현재 drag handle을 작업 간 유지하는 persistent end-effector pin/lock, 포즈 강도 blend/additive layer, 실시간 hand scanner,
   BVH pose sequence, true vector line, scale/depth-aware line thickness는 남아 있다.
 
 #### 가져올 기능
@@ -293,8 +297,9 @@ frequency를 조정한다.
    index를 저장하지 않으며 poser adapter와 undo transaction까지 연결했다. 다음 단계는 강도 blend,
    additive/masked layer, thumbnail·folder·cloud share다. blink·감정·viseme 같은 표정은 bone pose로
    과장하지 않고 별도의 bounded VRM expression-weight 계약으로 설계한다.
-2. **[P1] visual pin과 end-effector**: 손·발·골반·시선을 화면 controller로 움직이고, 선택한 joint를 pin한다.
-   기존 analytic two-bone IK 결과를 같은 undo transaction에 넣는다.
+2. **[P1·부분 반영] end-effector handle과 pin**: 손·발 handle drag, analytic two-bone IK와 단일 undo
+   transaction은 연결됐다. 다음은 손·발·골반·시선 목표를 작업 간 유지하는 persistent pin/lock과 사용자
+   조정 pole target이다.
 3. **[P1] 실시간 한 손 스캔**: camera permission을 명시적으로 받고 한 손씩 preview한다. 품질이 낮으면
    자동 확정하지 않고 freeze → 사용자 확인 → apply 순서로 처리한다.
 4. **[P2] BVH/모션 retarget**: source skeleton mapping을 사용자에게 보여주고, frame range·FPS·root motion·
@@ -335,17 +340,20 @@ face puppet/key, look-at, video/webcam face tracking과 lip-sync를 제공한다
 #### ToonSpectrum과의 비교
 
 - **[현재 기준선]** pose/morph, aim, two-bone IK, pose bake, VRM normalized bones, animation sampling이 있다.
-- **[이번 반영/기반]** joint limit, mirror, 사진 pose apply가 manual pose workflow를 개선했고 VRM 1.0
-  55본 semantic pose 소재 계약이 다른 체형에 ordinal 대신 이름으로 적용할 기반을 만든다.
-- **[격차]** generic humanoid auto-rig/skin weight, user-confirmed semantic bone mapping, retarget,
-  multi-clip timeline, root motion, foot contact, pose suggestion model, body/head parametric generator는 없다.
+- **[이번 반영]** joint limit, mirror, 사진 pose apply와 VRM 1.0 55본 semantic pose 소재에 더해,
+  `StudioVrmRigAssistPanel`이 versioned 관절 프로필·전신 IK·발 바닥 고정·바닥 높이를 노출한다. 손·발
+  handle IK는 static floor-contact solver를 호출하고 설정·결과 pose는 undo/SceneDocument 경계에 연결된다.
+- **[격차]** generic humanoid auto-rig/skin weight, non-VRM source의 user-confirmed semantic bone mapping,
+  BVH/GLB retarget, multi-clip timeline, root motion, persistent end-effector pin, pose suggestion model과
+  body/head parametric generator는 없다.
 
 #### 가져올 기능
 
-1. **[P1] semantic rig profile**: VRM humanoid와 Mixamo 계열 등 알려진 naming을 자동 제안하되, 사용자
-   확인 전에는 mapping을 확정하지 않는다. rest pose, bone axis, handedness, unit, scale을 함께 기록한다.
-2. **[P1] pose constraint UX**: joint limit, end-effector lock, mirror, hand/foot contact, pole target와
-   selected-body-part focus를 기존 IK 위에 올린다.
+1. **[P1·부분 반영] semantic rig profile**: VRM normalized bone 기반 versioned 관절 프로필 선택과
+   SceneDocument 저장 UI는 연결됐다. 다음은 Mixamo 등 non-VRM source naming 제안과 사용자 확인 mapping,
+   rest pose, bone axis, handedness, unit, scale 기록이다.
+2. **[P1·부분 반영] pose constraint UX**: joint limit, mirror, 손·발 handle IK와 static foot contact는
+   연결됐다. 다음은 persistent end-effector pin/lock, 사용자 pole target와 selected-body-part focus다.
 3. **[P2] motion stack**: base clip → masked/additive clip → manual pose → IK/contact → corrective layer의
    평가 순서를 고정하고, root motion extract/loop/bake, crossfade와 key reduction을 제공한다.
 4. **[P2] 안내형 auto-rig**: “완전 자동”보다 mesh admission → humanoid 후보 판정 → landmark 제안 →
@@ -554,8 +562,8 @@ process/output-byte/triangle/texture budget, cancellation과 강제 종료, outp
 | 제품 | 공식 강점 | ToonSpectrum 현재 parity | 가장 큰 격차 | 채택 방식 | 우선순위 |
 | --- | --- | --- | --- | --- | --- |
 | SHAPER | 캐릭터·의상·포즈 preset, AI preset 추천, pose scan, surface draw, PSD | VRM pose/morph/IK, 이번 반영 local photo pose·mirror·joint limit | parametric character recipe, surface paint, character pass | workflow 독립 구현 | P1~P2 |
-| CLIP STUDIO 3D | 폭넓은 import, pose material/controller/lock, photo pose, hand scanner, BVH, LT | canonical multi-format, hierarchy/All Sides, pose/IK, raster LT + 이번 기반 semantic pose material/library | pose UI·visual pin, hand scanner, BVH, vector line | production UI에 직접 구현 | P1~P2 |
-| Reallusion | character morph/rig, AccuRIG, AccuPOSE, timeline/retarget/contact/facial | VRM + generic pose/morph/IK/bake, constraint UX + semantic 55본 pose contract | auto-rig/weights, motion stack, natural pose suggestion | 자체 solver/data로 단계 구현 | P1~P3 |
+| CLIP STUDIO 3D | 폭넓은 import, pose material/controller/lock, photo pose, hand scanner, BVH, LT | canonical multi-format, hierarchy/All Sides, pose/IK, raster LT + semantic pose material/library·손발 handle·static foot contact | persistent end-effector pin, hand scanner, BVH retarget, vector line | production UI에 직접 구현 | P1~P2 |
+| Reallusion | character morph/rig, AccuRIG, AccuPOSE, timeline/retarget/contact/facial | VRM + generic pose/morph/IK/bake, RigAssistPanel·semantic 55본 pose·static foot contact | auto-rig/weights, persistent pin, BVH/GLB retarget·motion stack, natural pose suggestion | 자체 solver/data로 단계 구현 | P1~P3 |
 | ABLUR | SKP scene 유지, camera·mood·line/material, batch/pass/PSD | hierarchy/camera/LT, mood·shot board·selected 7-pass ZIP·bounded PSD·retry | SKP metadata, durable background resume, shadow/material-ID/normal, near clip/roll | 가장 높은 workflow 참고 | P0~P2 |
 | Snaptoon | Unreal realtime, direct SKP, 2,600+ webtoon assets, toon workflow | realtime Three, model library, LT preset, Worker contact sheet | 큰 권리형 catalog와 one-click placement | 공급자 계약형 asset browser | P1~P2 |
 | SketchUp | 건축·공간 authoring, scene/tag/component, 공식 GLB/PBR export | GLB admission과 scene hierarchy | direct SKP와 metadata sidecar | GLB bridge 우선, converter 조건부 | P0~P2 |
@@ -595,11 +603,11 @@ flowchart LR
 | 작업 | 현재/권장 실행 위치 | 이유와 제약 |
 | --- | --- | --- |
 | GLB 구조·hash·복잡도 검사 | **현재 Worker** | engine parser 전에 fail closed, 겹칠 때만 최대 2-worker pool |
-| OBJ/FBX/DAE 등 parse·canonicalize | Worker 우선 | text parse와 geometry 변환의 main-thread stall 감소; output GLB 재검증 필수 |
+| OBJ/FBX/DAE/STL/PLY/3DS parse·canonicalize | **현재 main realm; P1 Worker 후보** | 현재 제품 경로는 Three loader로 원본을 parse하고 `Object3D`를 `GLTFExporter`로 변환한다. Worker 이전 시에도 output GLB 재검증과 동일한 취소·메모리 상한이 필수 |
 | JPEG/PNG/WebP decode·EXIF·resize | **[이번 반영] Worker** | transferable `ImageBitmap` ownership, generation id와 stale result 거부 |
 | pose inference | 현재 main-thread IMAGE boundary; P1 Worker A/B | model/backend가 worker realm의 WASM/WebGPU를 안정 지원하고 model duplication 비용보다 이득일 때 이동 |
 | Rapier physics | **현재 WASM Worker** | fixed timestep preview/bake, rig transform ownership 충돌 차단 |
-| Meshopt/KTX2/Draco | Worker/WASM | decoder pin·hash·capability attestation, decoded memory까지 예산 청구 |
+| Meshopt/KTX2/Draco | KTX2 검증·pretranscode는 **현재 Worker/WASM**; 나머지는 조건부 | decoder pin·hash·capability attestation과 decoded memory까지 예산 청구. KTX2 release gate와 별개로 Three runtime `KTX2Loader` 연결은 아직 남음 |
 | retarget·IK batch·key reduction | P1/P2 Worker | 수천 frame 계산을 numerical DTO로 반환; live skeleton 객체 전달 금지 |
 | LT 선화·톤 raster | **[이번 반영] 전용 Worker** | 호출 시점 RGBA·linear depth·설정의 방어 복사본만 transferable로 넘기고 요청 ID, exact protocol, 120초 timeout, abort/terminate, 결과 크기·role·순서를 검증한다. Worker 생성 불가일 때만 1,048,576픽셀 이하 동기 fallback; protocol/render/runtime/timeout/abort는 fail closed |
 | thumbnail/contact sheet | **[이번 반영] OffscreenCanvas Worker** | 대표 PNG를 순차 decode해 동시에 live `ImageBitmap`을 1개로 제한하고 finally에서 close; 12컷/시트, request correlation, progress, timeout, cancel/terminate, 불투명 Canvas의 실제 RGB8 PNG IHDR·CRC·deflate·byte/pixel 재검증. 미지원이면 archive manifest fallback |
@@ -742,8 +750,9 @@ job**만 맡는다.
 3. 사진 pose의 admission, EXIF/rotate/mirror, Worker cancellation, stale generation, confidence와 local-only
    privacy copy를 검증한다. main-thread inference long task도 실제 기기에서 측정한다.
 4. pose mirror, upper-body straighten, joint limit opt-out을 하나의 undoable pose edit로 보장한다.
-5. 기존 canonical multi-format import와 Worker/WASM 경계를 유지하고 새 UI가 raw `File`/URL/storage key를
-   SceneDocument에 영속하지 않는지 검사한다.
+5. 기존 canonical multi-format import의 현재 경계, 즉 non-GLB 원본 parse·GLB export는 main realm,
+   canonical GLB 구조·hash·KTX2 preflight는 Worker/WASM이라는 구분을 유지하고 새 UI가 raw
+   `File`/URL/storage key를 SceneDocument에 영속하지 않는지 검사한다.
 6. 의미 재질 분류가 512재질·128 KiB 메타데이터 예산, URL/제어문자 차단, low-confidence review 계약을
    지키고 원본 재질이나 SceneDocument를 자동 변경하지 않는지 검증한다.
 7. 새 가림 선화가 경사면을 과검출하지 않고 전경 윤곽만 선택하며, 8,388,608픽셀 예산과 기존 LT
@@ -764,14 +773,16 @@ transparent/LT capture, undo/redo가 desktop과 390/320 px mobile에서 데이�
    만든 뒤 view-space geometric normal과 실제 normal-angle crease를 연결한다. 그 기반 위에서 stable
    logical material legend를 갖춘 material-ID, 마지막으로 deterministic shadow camera/catcher를 구현한다.
 3. **[이번 반영]** full-body/upper/lower/hand/gaze-jaw pose material library를 VRM poser의 저장·부분 적용·
-   import/export·undo command에 연결했다. 다음은 visual end-effector pin, pose blend/additive mask,
-   ground/foot contact와 BVH retarget을 보강한다.
+   import/export·undo command에 연결했다. RigAssistPanel의 전신 IK·발 바닥 고정·바닥 높이와 static
+   contact solver도 손·발 handle IK에 연결됐다. 다음은 persistent visual end-effector pin, pose
+   blend/additive mask와 BVH/GLB retarget이다.
 4. 실시간 한 손 scanner와 photo pose의 preview/freeze/confirm UX.
 5. camera near clipping, Dutch roll, safe frame, panel aspect와 shot thumbnail. 콘택트 시트 export는 이번 반영.
 6. SHAPER식 `CharacterRecipe`와 권리형 hair/clothes/accessory/material preset catalog.
 7. Snaptoon식 asset browser: device budget·license·attribution·hash가 보이는 one-click placement.
 8. SketchUp 공식 GLB export guide와 Blender official GLB authoring preset/sample.
-9. **[코어 반영/UI 미연결]** semantic rig profile과 사용자 확인 bone mapping.
+9. **[부분 반영/UI 연결]** VRM normalized bone 기반 versioned 관절 프로필은 RigAssistPanel과
+   SceneDocument에 연결됐다. 다음은 non-VRM source의 사용자 확인 bone mapping과 retarget preview다.
 10. **[이번 반영]** batch의 Sobel/톤/LT raster와 pass별 합성·PNG encode를 각각 transferable
     RGBA/depth Worker와 OffscreenCanvas Worker로 옮겼다. PNG main-thread fallback은 Worker 또는
     OffscreenCanvas 생성 불가 + 1,048,576픽셀 이하로 제한하고, 그 밖의 Worker 실패는 fail closed한다.

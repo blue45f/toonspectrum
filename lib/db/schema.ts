@@ -594,8 +594,9 @@ export const creatorWorkLiveLocks = pgTable(
     workId: text("workId").notNull(),
     resourceId: text("resourceId").notNull(),
     leaseId: text("leaseId").notNull(),
-    // Every acquire/renew mutation rotates this internal fencing token. It is never exposed to
-    // clients; stale authorization rollback may delete only the exact mutation it created.
+    // Every acquire/renew embeds the validated request UUID plus a private server nonce. Decision
+    // events expose only the requestId prefix; the complete token lets stale authorization rollback
+    // delete only the exact mutation it created even if a client reuses a request UUID.
     acquisitionId: text("acquisitionId").notNull(),
     ownerConnectionId: text("ownerConnectionId").notNull(),
     ownerName: text("ownerName").notNull(),

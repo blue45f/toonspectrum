@@ -11,13 +11,23 @@ import {
 
 import { mirrorAxisAngle, wedgeBoundaryAngle } from "./studio-kaleidoscope";
 import {
+  StudioAdvancedRulerOverlay,
   StudioIsometricGridOverlay,
   StudioPerspectiveOverlay,
 } from "./studio-page-lazy-ui";
 
+import type { StudioAdvancedRuler, StudioAdvancedRulerDocument } from "./studio-advanced-ruler-document";
 import type { IsometricGridConfig } from "./studio-isometric-grid";
 import type { VanishingPoint } from "./studio-perspective-guide";
 import type { SmartGuideOverlay } from "./studio-smart-guides";
+
+const EMPTY_ADVANCED_RULERS: StudioAdvancedRulerDocument = {
+  version: 1,
+  rulers: [],
+  activeSnapRulerId: null,
+  selectedRulerId: null,
+};
+const NOOP_ADVANCED_RULER_CHANGE = (): void => undefined;
 
 type StudioWebtoonGuideRuntime = Pick<
   typeof import("./studio-webtoon-guides"),
@@ -139,6 +149,9 @@ export interface StudioCanvasGuideOverlayLayersProps {
   isometricConfig: IsometricGridConfig;
   onPreviewIsometricOrigin: (x: number, y: number) => void;
   onCommitIsometricOrigin: (x: number, y: number) => void;
+  advancedRulers?: StudioAdvancedRulerDocument;
+  onPreviewAdvancedRuler?: (id: string, patch: Partial<StudioAdvancedRuler>) => void;
+  onCommitAdvancedRuler?: (id: string, patch: Partial<StudioAdvancedRuler>) => void;
   drawingAssistDisabled: boolean;
   onCancelDrawingAssistPreview: () => void;
 }
@@ -168,6 +181,9 @@ export function StudioCanvasGuideOverlayLayers({
   isometricConfig,
   onPreviewIsometricOrigin,
   onCommitIsometricOrigin,
+  advancedRulers = EMPTY_ADVANCED_RULERS,
+  onPreviewAdvancedRuler = NOOP_ADVANCED_RULER_CHANGE,
+  onCommitAdvancedRuler = NOOP_ADVANCED_RULER_CHANGE,
   drawingAssistDisabled,
   onCancelDrawingAssistPreview,
 }: StudioCanvasGuideOverlayLayersProps) {
@@ -548,6 +564,20 @@ export function StudioCanvasGuideOverlayLayers({
               onPreviewOrigin={onPreviewIsometricOrigin}
               onCommitOrigin={onCommitIsometricOrigin}
               onCancelOrigin={onCancelDrawingAssistPreview}
+            />
+          </Suspense>
+        </Layer>
+      )}
+      {drawingMode && advancedRulers.rulers.some((ruler) => ruler.visible) && (
+        <Layer>
+          <Suspense fallback={null}>
+            <StudioAdvancedRulerOverlay
+              document={advancedRulers}
+              effScale={effScale}
+              disabled={drawingAssistDisabled}
+              onPreviewRuler={onPreviewAdvancedRuler}
+              onCommitRuler={onCommitAdvancedRuler}
+              onCancelPreview={onCancelDrawingAssistPreview}
             />
           </Suspense>
         </Layer>

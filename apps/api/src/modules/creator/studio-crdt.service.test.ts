@@ -327,7 +327,7 @@ function createScenePageDocument(): Y.Doc {
 
 function createDrawingAssistDocument() {
   return {
-    version: 1,
+    version: 2,
     perspective: {
       active: false,
       points: [
@@ -337,12 +337,58 @@ function createDrawingAssistDocument() {
       ],
     },
     isometric: {
-      active: true,
+      active: false,
       angleDeg: 1,
       cellSize: 200,
       originX: -10_000_000,
       originY: 10_000_000,
     },
+    advanced: {
+      version: 1,
+      rulers: [
+        {
+          id: "curve-a",
+          type: "curve",
+          name: "곡선자",
+          enabled: true,
+          visible: true,
+          scope: { kind: "page", groupId: null },
+          snapMode: "fixed",
+          fixedOffset: -1_000_000,
+          p0: { x: -10_000_000, y: 10_000_000 },
+          p1: { x: -100, y: 200 },
+          p2: { x: 100, y: 200 },
+          p3: { x: 10_000_000, y: -10_000_000 },
+        },
+        {
+          id: "fisheye-a",
+          type: "fisheye",
+          name: "어안자",
+          enabled: true,
+          visible: true,
+          scope: { kind: "group", groupId: "background" },
+          guideFamily: "auto",
+          centerX: 400,
+          centerY: 600,
+          radius: 8,
+          rotationDeg: 359,
+          fovDeg: 220,
+          strength: 0.25,
+          outsidePolicy: "clamp",
+        },
+      ],
+      activeSnapRulerId: "curve-a",
+      selectedRulerId: "fisheye-a",
+    },
+  };
+}
+
+function createLegacyDrawingAssistDocument() {
+  const current = createDrawingAssistDocument();
+  return {
+    version: 1,
+    perspective: current.perspective,
+    isometric: current.isometric,
   };
 }
 
@@ -824,7 +870,7 @@ describe("StudioCrdtService", () => {
     doc.destroy();
   });
 
-  it("persists and rehydrates the canonical page drawing-assist v1 contract", async () => {
+  it("persists and rehydrates the canonical page drawing-assist v2 contract", async () => {
     const doc = createScenePageDocument();
     doc.getMap<unknown>("studio-page:page-1")
       .set("prop:drawingAssist", createDrawingAssistDocument());
@@ -847,6 +893,22 @@ describe("StudioCrdtService", () => {
     hydrated.destroy();
   });
 
+  it("continues to admit the exact legacy drawing-assist v1 contract", () => {
+    const doc = createScenePageDocument();
+    doc.getMap<unknown>("studio-page:page-1")
+      .set("prop:drawingAssist", createLegacyDrawingAssistDocument());
+    expect(hasValidStudioCrdtRootSchema(doc)).toBe(true);
+
+    const legacyWithCurrentField = {
+      ...createLegacyDrawingAssistDocument(),
+      advanced: createDrawingAssistDocument().advanced,
+    };
+    doc.getMap<unknown>("studio-page:page-1")
+      .set("prop:drawingAssist", legacyWithCurrentField);
+    expect(hasValidStudioCrdtRootSchema(doc)).toBe(false);
+    doc.destroy();
+  });
+
   it("rejects malformed page drawing-assist documents", () => {
     const invalidCases: Array<[
       label: string,
@@ -855,8 +917,15 @@ describe("StudioCrdtService", () => {
       ["unknown root key", (value) => {
         (value as unknown as Record<string, unknown>).plugin = true;
       }],
-      ["unsupported version", (value) => { value.version = 2; }],
-      ["mutually active rulers", (value) => { value.perspective.active = true; }],
+      ["unsupported version", (value) => { value.version = 3; }],
+      ["advanced and perspective rulers both active", (value) => {
+        value.perspective.active = true;
+      }],
+      ["perspective and isometric rulers both active", (value) => {
+        value.advanced.activeSnapRulerId = null;
+        value.perspective.active = true;
+        value.isometric.active = true;
+      }],
       ["more than three points", (value) => {
         value.perspective.points.push({ id: "vp-four", x: 0, y: 0 });
       }],
@@ -889,6 +958,33 @@ describe("StudioCrdtService", () => {
       ["unknown isometric key", (value) => {
         (value.isometric as unknown as Record<string, unknown>).skew = 0;
       }],
+      ["missing advanced document", (value) => {
+        delete (value as unknown as Record<string, unknown>).advanced;
+      }],
+      ["unknown advanced key", (value) => {
+        (value.advanced as unknown as Record<string, unknown>).future = true;
+      }],
+      ["duplicate advanced ruler ids", (value) => {
+        value.advanced.rulers[1]!.id = value.advanced.rulers[0]!.id;
+      }],
+      ["inactive active snap ruler", (value) => {
+        value.advanced.rulers[0]!.enabled = false;
+      }],
+      ["invalid group scope", (value) => {
+        value.advanced.rulers[1]!.scope.groupId = null;
+      }],
+      ["collapsed curve control polygon", (value) => {
+        const curve = value.advanced.rulers[0]!;
+        if (curve.type !== "curve") throw new Error("curve fixture missing");
+        curve.p1 = { ...curve.p0 };
+        curve.p2 = { ...curve.p0 };
+        curve.p3 = { ...curve.p0 };
+      }],
+      ["non-canonical fisheye rotation", (value) => {
+        const fisheye = value.advanced.rulers[1]!;
+        if (fisheye.type !== "fisheye") throw new Error("fisheye fixture missing");
+        fisheye.rotationDeg = 360;
+      }],
     ];
 
     for (const [label, mutate] of invalidCases) {
@@ -901,15 +997,31 @@ describe("StudioCrdtService", () => {
     }
   });
 
-  it("rejects hidden invalid drawing-assist candidates and page payloads over 8 KiB", () => {
+  it("rejects hidden invalid drawing-assist candidates and advanced/page payloads over budget", () => {
     const hiddenInvalid = createScenePageDocument();
     const invalidBaseline = createDrawingAssistDocument();
-    invalidBaseline.version = 2;
+    invalidBaseline.version = 3;
     const hiddenPage = hiddenInvalid.getMap<unknown>("studio-page:page-1");
     hiddenPage.set("base:drawingAssist", invalidBaseline);
     hiddenPage.set("prop:drawingAssist", createDrawingAssistDocument());
     expect(hasValidStudioCrdtRootSchema(hiddenInvalid)).toBe(false);
     hiddenInvalid.destroy();
+
+    const oversizedAdvanced = createScenePageDocument();
+    const oversizedAdvancedValue = createDrawingAssistDocument();
+    const curve = oversizedAdvancedValue.advanced.rulers[0]!;
+    if (curve.type !== "curve") throw new Error("curve fixture missing");
+    oversizedAdvancedValue.advanced.rulers = Array.from({ length: 12 }, (_, index) => ({
+      ...curve,
+      id: `curve-${index}-${"x".repeat(140)}`,
+      name: "곡".repeat(80),
+    }));
+    oversizedAdvancedValue.advanced.activeSnapRulerId = null;
+    oversizedAdvancedValue.advanced.selectedRulerId = null;
+    oversizedAdvanced.getMap<unknown>("studio-page:page-1")
+      .set("prop:drawingAssist", oversizedAdvancedValue);
+    expect(hasValidStudioCrdtRootSchema(oversizedAdvanced)).toBe(false);
+    oversizedAdvanced.destroy();
 
     const oversized = createScenePageDocument();
     const oversizedPage = oversized.getMap<unknown>("studio-page:page-1");

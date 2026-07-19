@@ -121,12 +121,19 @@ const STUDIO_CRDT_JSON_MAX_DEPTH = 10;
 const STUDIO_CRDT_JSON_MAX_ENTRIES = 4_096;
 const STUDIO_CRDT_JSON_MAX_STRING_LENGTH = 64 * 1_024;
 const STUDIO_CRDT_MAX_COORDINATE = 10_000_000;
-const STUDIO_CRDT_DRAWING_ASSIST_VERSION = 1;
+const STUDIO_CRDT_DRAWING_ASSIST_LEGACY_VERSION = 1;
+const STUDIO_CRDT_DRAWING_ASSIST_VERSION = 2;
 const STUDIO_CRDT_DRAWING_ASSIST_MAX_VANISHING_POINTS = 3;
 const STUDIO_CRDT_DRAWING_ASSIST_ANGLE_MIN_DEG = 1;
 const STUDIO_CRDT_DRAWING_ASSIST_ANGLE_MAX_DEG = 89;
 const STUDIO_CRDT_DRAWING_ASSIST_CELL_SIZE_MIN = 8;
 const STUDIO_CRDT_DRAWING_ASSIST_CELL_SIZE_MAX = 200;
+const STUDIO_CRDT_ADVANCED_RULER_VERSION = 1;
+const STUDIO_CRDT_ADVANCED_RULER_MAX_COUNT = 12;
+const STUDIO_CRDT_ADVANCED_RULER_MAX_BYTES = 6 * 1_024;
+const STUDIO_CRDT_ADVANCED_RULER_MAX_NAME_LENGTH = 80;
+const STUDIO_CRDT_ADVANCED_RULER_MAX_OFFSET = 1_000_000;
+const STUDIO_CRDT_ADVANCED_RULER_MIN_CONTROL_POLYGON_LENGTH = 1e-6;
 const STUDIO_CRDT_DELETION_TARGET_MAX_LENGTH = 384;
 const STUDIO_CRDT_TEXT_ENCODER = new TextEncoder();
 const STUDIO_WORK_ASSET_TYPE_SET = new Set<string>(STUDIO_WORK_ASSET_TYPES);
@@ -343,7 +350,17 @@ function isExactJsonObject(
   return keys.length === requiredKeys.size && keys.every((key) => requiredKeys.has(key));
 }
 
-const STUDIO_CRDT_DRAWING_ASSIST_KEYS = new Set(["version", "perspective", "isometric"]);
+const STUDIO_CRDT_DRAWING_ASSIST_LEGACY_KEYS = new Set([
+  "version",
+  "perspective",
+  "isometric",
+]);
+const STUDIO_CRDT_DRAWING_ASSIST_KEYS = new Set([
+  "version",
+  "perspective",
+  "isometric",
+  "advanced",
+]);
 const STUDIO_CRDT_PERSPECTIVE_ASSIST_KEYS = new Set(["active", "points"]);
 const STUDIO_CRDT_VANISHING_POINT_KEYS = new Set(["id", "x", "y"]);
 const STUDIO_CRDT_ISOMETRIC_ASSIST_KEYS = new Set([
@@ -353,12 +370,165 @@ const STUDIO_CRDT_ISOMETRIC_ASSIST_KEYS = new Set([
   "originX",
   "originY",
 ]);
+const STUDIO_CRDT_ADVANCED_RULER_KEYS = new Set([
+  "version",
+  "rulers",
+  "activeSnapRulerId",
+  "selectedRulerId",
+]);
+const STUDIO_CRDT_ADVANCED_RULER_SCOPE_KEYS = new Set(["kind", "groupId"]);
+const STUDIO_CRDT_ADVANCED_RULER_POINT_KEYS = new Set(["x", "y"]);
+const STUDIO_CRDT_ADVANCED_CURVE_RULER_KEYS = new Set([
+  "id",
+  "type",
+  "name",
+  "enabled",
+  "visible",
+  "scope",
+  "snapMode",
+  "fixedOffset",
+  "p0",
+  "p1",
+  "p2",
+  "p3",
+]);
+const STUDIO_CRDT_ADVANCED_FISHEYE_RULER_KEYS = new Set([
+  "id",
+  "type",
+  "name",
+  "enabled",
+  "visible",
+  "scope",
+  "guideFamily",
+  "centerX",
+  "centerY",
+  "radius",
+  "rotationDeg",
+  "fovDeg",
+  "strength",
+  "outsidePolicy",
+]);
+
+function isValidStudioCrdtAdvancedRulerScope(value: unknown): boolean {
+  if (!isExactJsonObject(value, STUDIO_CRDT_ADVANCED_RULER_SCOPE_KEYS)) return false;
+  return (value.kind === "page" && value.groupId === null) ||
+    (value.kind === "group" && isBoundedStudioCrdtId(value.groupId));
+}
+
+function isValidStudioCrdtAdvancedRulerPoint(value: unknown): value is {
+  x: number;
+  y: number;
+} {
+  return isExactJsonObject(value, STUDIO_CRDT_ADVANCED_RULER_POINT_KEYS) &&
+    finiteNumberInRange(value.x, -STUDIO_CRDT_MAX_COORDINATE, STUDIO_CRDT_MAX_COORDINATE) &&
+    finiteNumberInRange(value.y, -STUDIO_CRDT_MAX_COORDINATE, STUDIO_CRDT_MAX_COORDINATE);
+}
+
+function hasValidStudioCrdtAdvancedRulerBase(value: Record<string, unknown>): boolean {
+  return isBoundedStudioCrdtId(value.id) &&
+    boundedExactText(value.name, STUDIO_CRDT_ADVANCED_RULER_MAX_NAME_LENGTH) &&
+    typeof value.enabled === "boolean" &&
+    typeof value.visible === "boolean" &&
+    isValidStudioCrdtAdvancedRulerScope(value.scope);
+}
+
+function isValidStudioCrdtAdvancedCurveRuler(value: unknown): value is Record<string, unknown> {
+  if (
+    !isExactJsonObject(value, STUDIO_CRDT_ADVANCED_CURVE_RULER_KEYS) ||
+    value.type !== "curve" ||
+    !hasValidStudioCrdtAdvancedRulerBase(value) ||
+    !["through-start", "on-curve", "fixed"].includes(value.snapMode as string) ||
+    !finiteNumberInRange(
+      value.fixedOffset,
+      -STUDIO_CRDT_ADVANCED_RULER_MAX_OFFSET,
+      STUDIO_CRDT_ADVANCED_RULER_MAX_OFFSET
+    ) ||
+    !isValidStudioCrdtAdvancedRulerPoint(value.p0) ||
+    !isValidStudioCrdtAdvancedRulerPoint(value.p1) ||
+    !isValidStudioCrdtAdvancedRulerPoint(value.p2) ||
+    !isValidStudioCrdtAdvancedRulerPoint(value.p3)
+  ) {
+    return false;
+  }
+  const controlPolygonLength = Math.hypot(value.p1.x - value.p0.x, value.p1.y - value.p0.y) +
+    Math.hypot(value.p2.x - value.p1.x, value.p2.y - value.p1.y) +
+    Math.hypot(value.p3.x - value.p2.x, value.p3.y - value.p2.y);
+  return controlPolygonLength >= STUDIO_CRDT_ADVANCED_RULER_MIN_CONTROL_POLYGON_LENGTH;
+}
+
+function isValidStudioCrdtAdvancedFisheyeRuler(value: unknown): value is Record<string, unknown> {
+  return isExactJsonObject(value, STUDIO_CRDT_ADVANCED_FISHEYE_RULER_KEYS) &&
+    value.type === "fisheye" &&
+    hasValidStudioCrdtAdvancedRulerBase(value) &&
+    ["auto", "radial", "spherical"].includes(value.guideFamily as string) &&
+    finiteNumberInRange(
+      value.centerX,
+      -STUDIO_CRDT_MAX_COORDINATE,
+      STUDIO_CRDT_MAX_COORDINATE
+    ) &&
+    finiteNumberInRange(
+      value.centerY,
+      -STUDIO_CRDT_MAX_COORDINATE,
+      STUDIO_CRDT_MAX_COORDINATE
+    ) &&
+    finiteNumberInRange(value.radius, 8, STUDIO_CRDT_MAX_COORDINATE) &&
+    finiteNumberInRange(value.rotationDeg, 0, 360) &&
+    value.rotationDeg !== 360 &&
+    finiteNumberInRange(value.fovDeg, 30, 220) &&
+    finiteNumberInRange(value.strength, 0.25, 4) &&
+    ["reject", "clamp", "passthrough"].includes(value.outsidePolicy as string);
+}
+
+function isValidStudioCrdtAdvancedRulerDocument(value: unknown): value is Record<string, unknown> {
+  if (
+    !isExactJsonObject(value, STUDIO_CRDT_ADVANCED_RULER_KEYS) ||
+    value.version !== STUDIO_CRDT_ADVANCED_RULER_VERSION ||
+    !Array.isArray(value.rulers) ||
+    value.rulers.length > STUDIO_CRDT_ADVANCED_RULER_MAX_COUNT
+  ) {
+    return false;
+  }
+  const ids = new Set<string>();
+  const enabledIds = new Set<string>();
+  for (const ruler of value.rulers) {
+    if (
+      (!isValidStudioCrdtAdvancedCurveRuler(ruler) &&
+        !isValidStudioCrdtAdvancedFisheyeRuler(ruler)) ||
+      ids.has(ruler.id as string)
+    ) {
+      return false;
+    }
+    ids.add(ruler.id as string);
+    if (ruler.enabled === true) enabledIds.add(ruler.id as string);
+  }
+  if (
+    value.activeSnapRulerId !== null &&
+    (!isBoundedStudioCrdtId(value.activeSnapRulerId) ||
+      !enabledIds.has(value.activeSnapRulerId))
+  ) {
+    return false;
+  }
+  if (
+    value.selectedRulerId !== null &&
+    (!isBoundedStudioCrdtId(value.selectedRulerId) || !ids.has(value.selectedRulerId))
+  ) {
+    return false;
+  }
+  const byteLength = encodedJsonByteLength(value);
+  return byteLength !== null && byteLength <= STUDIO_CRDT_ADVANCED_RULER_MAX_BYTES;
+}
 
 function isValidStudioCrdtDrawingAssist(value: unknown): boolean {
-  if (!isExactJsonObject(value, STUDIO_CRDT_DRAWING_ASSIST_KEYS)) return false;
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const version = (value as Record<string, unknown>).version;
+  const expectedKeys = version === STUDIO_CRDT_DRAWING_ASSIST_LEGACY_VERSION
+    ? STUDIO_CRDT_DRAWING_ASSIST_LEGACY_KEYS
+    : version === STUDIO_CRDT_DRAWING_ASSIST_VERSION
+      ? STUDIO_CRDT_DRAWING_ASSIST_KEYS
+      : null;
+  if (!expectedKeys || !isExactJsonObject(value, expectedKeys)) return false;
   const { perspective, isometric } = value;
   if (
-    value.version !== STUDIO_CRDT_DRAWING_ASSIST_VERSION ||
     !isExactJsonObject(perspective, STUDIO_CRDT_PERSPECTIVE_ASSIST_KEYS) ||
     !isExactJsonObject(isometric, STUDIO_CRDT_ISOMETRIC_ASSIST_KEYS) ||
     typeof perspective.active !== "boolean" ||
@@ -403,7 +573,17 @@ function isValidStudioCrdtDrawingAssist(value: unknown): boolean {
     }
     pointIds.add(point.id);
   }
-  return true;
+  if (value.version === STUDIO_CRDT_DRAWING_ASSIST_VERSION) {
+    if (!isValidStudioCrdtAdvancedRulerDocument(value.advanced)) return false;
+    if (
+      value.advanced.activeSnapRulerId !== null &&
+      (perspective.active || isometric.active)
+    ) {
+      return false;
+    }
+  }
+  const byteLength = encodedJsonByteLength(value);
+  return byteLength !== null && byteLength <= STUDIO_CRDT_PAGE_PAYLOAD_MAX_BYTES;
 }
 
 function isValidStudioWorkAssetReferenceCandidate(
