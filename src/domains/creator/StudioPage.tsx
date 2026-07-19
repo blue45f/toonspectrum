@@ -556,10 +556,6 @@ import {
   type IsometricAxisRay,
 } from "./studio-isometric-grid";
 import {
-  mirrorAxisAngle,
-  wedgeBoundaryAngle,
-} from "./studio-kaleidoscope";
-import {
   imageFilterCacheKey,
   type ImageFilterFields,
 } from "./studio-konva-filter-fields";
@@ -710,7 +706,6 @@ import {
   StudioHealCloneOverlay,
   StudioHistoryBrushOverlay,
   StudioHistoryPanel,
-  StudioIsometricGridOverlay,
   StudioLayerMaskOverlay,
   StudioLiveInkOverlayHost,
   StudioLiveInkPredictionHost,
@@ -721,7 +716,6 @@ import {
   StudioNodeEditOverlay,
   StudioOnionSkinImage,
   StudioPanelSplitOverlay,
-  StudioPerspectiveOverlay,
   StudioPublishContextBanner,
   StudioPuppetWarpOverlay,
   StudioRasterCrdtSurface,
@@ -1103,6 +1097,10 @@ import {
   projectStudioWriterRoomToCanvasPlan,
   type StudioWriterRoomCanvasProjectionResult,
 } from "./studio-writer-room-canvas-projection";
+import {
+  StudioCanvasGuideOverlayLayers,
+  StudioCanvasGuideUnderlay,
+} from "./StudioCanvasGuideLayers";
 import {
   colorBlindFilterStyle,
   StudioColorBlindFilterDefs,
@@ -25578,48 +25576,15 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
               />
             </Layer>
             <Layer ref={mainLayerRef}>
-              {showGrid && (
-                <Group listening={false}>
-                  {Array.from({ length: Math.ceil(CANVAS_W / gridSize) }).map((_, i) => (
-                    <Line
-                      key={`grid-v-${i}`}
-                      points={[i * gridSize, 0, i * gridSize, canvasH]}
-                      stroke="rgba(124, 92, 252, 0.12)"
-                      strokeWidth={1 / effScale}
-                    />
-                  ))}
-                  {Array.from({ length: Math.ceil(canvasH / gridSize) }).map((_, i) => (
-                    <Line
-                      key={`grid-h-${i}`}
-                      points={[0, i * gridSize, CANVAS_W, i * gridSize]}
-                      stroke="rgba(124, 92, 252, 0.12)"
-                      strokeWidth={1 / effScale}
-                    />
-                  ))}
-                </Group>
-              )}
-              {showWebtoonGuides &&
-                webtoonGuides &&
-                (() => {
-                  const safe = webtoonGuides.safeAreaMargin(CANVAS_W);
-                  return (
-                    <Group listening={false}>
-                      {/* 세이프영역(모바일 뷰어에서 잘릴 수 있는 양옆 여백) 음영 */}
-                      <Rect x={0} y={0} width={safe.left} height={canvasH} fill="rgba(255, 90, 90, 0.06)" />
-                      <Rect x={CANVAS_W - safe.right} y={0} width={safe.right} height={canvasH} fill="rgba(255, 90, 90, 0.06)" />
-                      {/* 플랫폼 표준 연재폭 가이드선 */}
-                      {webtoonGuides.webtoonWidthGuides(CANVAS_W).map((g) => (
-                        <Line
-                          key={`wg-${g.pos}-${g.label}`}
-                          points={[g.pos, 0, g.pos, canvasH]}
-                          stroke="rgba(70, 150, 255, 0.55)"
-                          strokeWidth={1 / effScale}
-                          dash={[6 / effScale, 6 / effScale]}
-                        />
-                      ))}
-                    </Group>
-                  );
-                })()}
+              <StudioCanvasGuideUnderlay
+                canvasWidth={CANVAS_W}
+                canvasHeight={canvasH}
+                effScale={effScale}
+                gridSize={gridSize}
+                showGrid={showGrid}
+                showWebtoonGuides={showWebtoonGuides}
+                webtoonGuides={webtoonGuides}
+              />
               {(() => {
                 // Only this paint-time array may contain ephemeral Blob URLs. The authored
                 // `elements`, page history, autosave, revisions, and CRDT publisher continue to
@@ -26875,391 +26840,38 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 </Suspense>
               </Layer>
             )}
-            {!isExporting && (guides.x.length > 0 || guides.y.length > 0) && (
-              <Layer listening={false}>
-                {guides.x.map((gx) => (
-                  <Line
-                    key={`gx-${gx}`}
-                    points={[gx, 0, gx, canvasH]}
-                    stroke="#f43f5e"
-                    strokeWidth={1 / effScale}
-                    dash={[5 / effScale, 4 / effScale]}
-                  />
-                ))}
-                {guides.y.map((gy) => (
-                  <Line
-                    key={`gy-${gy}`}
-                    points={[0, gy, CANVAS_W, gy]}
-                    stroke="#f43f5e"
-                    strokeWidth={1 / effScale}
-                    dash={[5 / effScale, 4 / effScale]}
-                  />
-                ))}
-              </Layer>
-            )}
-            
-            {/* 요소 간 스마트 가이드: 정렬 선분(로즈) + 균등 간격 배지(보라) */}
-            {!isExporting && (smartGuides.segments.length > 0 || smartGuides.spacings.length > 0) && (
-              <Layer listening={false}>
-                {smartGuides.segments.map((seg, i) => (
-                  <Line
-                    key={`sgseg-${i}`}
-                    points={seg.axis === "v" ? [seg.pos, seg.from, seg.pos, seg.to] : [seg.from, seg.pos, seg.to, seg.pos]}
-                    stroke="#f43f5e"
-                    strokeWidth={1 / effScale}
-                    dash={seg.kind === "center" ? [7 / effScale, 3 / effScale] : undefined}
-                  />
-                ))}
-                {smartGuides.spacings.map((sp, i) => (
-                  <Group key={`sgsp-${i}`}>
-                    {sp.spans.map((span, j) => (
-                      <Group key={`sgsp-${i}-${j}`}>
-                        <Line
-                          points={sp.axis === "x" ? [span.from, sp.at, span.to, sp.at] : [sp.at, span.from, sp.at, span.to]}
-                          stroke="#8b5cf6"
-                          strokeWidth={1.5 / effScale}
-                        />
-                        <Line
-                          points={
-                            sp.axis === "x"
-                              ? [span.from, sp.at - 5 / effScale, span.from, sp.at + 5 / effScale]
-                              : [sp.at - 5 / effScale, span.from, sp.at + 5 / effScale, span.from]
-                          }
-                          stroke="#8b5cf6"
-                          strokeWidth={1.5 / effScale}
-                        />
-                        <Line
-                          points={
-                            sp.axis === "x"
-                              ? [span.to, sp.at - 5 / effScale, span.to, sp.at + 5 / effScale]
-                              : [sp.at - 5 / effScale, span.to, sp.at + 5 / effScale, span.to]
-                          }
-                          stroke="#8b5cf6"
-                          strokeWidth={1.5 / effScale}
-                        />
-                        <KText
-                          x={sp.axis === "x" ? (span.from + span.to) / 2 - 24 / effScale : sp.at + 6 / effScale}
-                          y={sp.axis === "x" ? sp.at + 6 / effScale : (span.from + span.to) / 2 - 6 / effScale}
-                          width={48 / effScale}
-                          align={sp.axis === "x" ? "center" : "left"}
-                          text={`${Math.round(sp.gap)}`}
-                          fontSize={12 / effScale}
-                          fontStyle="bold"
-                          fill="#8b5cf6"
-                        />
-                      </Group>
-                    ))}
-                  </Group>
-                ))}
-              </Layer>
-            )}
-
-            {/* 작가 수동 가이드선 */}
-            {!isExporting && userGuides.length > 0 && (
-              <Layer>
-                {userGuides.map((g) => (
-                  <Group key={`user-guide-${g.id}`}>
-                    <Line
-                      points={g.type === "v" ? [g.pos, 0, g.pos, canvasH] : [0, g.pos, CANVAS_W, g.pos]}
-                      stroke="#0ea5e9"
-                      strokeWidth={1.5 / effScale}
-                      dash={[8 / effScale, 5 / effScale]}
-                      listening={false}
-                    />
-                    <Line
-                      points={g.type === "v" ? [g.pos, 0, g.pos, canvasH] : [0, g.pos, CANVAS_W, g.pos]}
-                      stroke="transparent"
-                      strokeWidth={12 / effScale}
-                      draggable={true}
-                      name="guide-line-handle"
-                      onMouseEnter={(e) => {
-                        const stage = e.target.getStage();
-                        if (stage) stage.container().style.cursor = g.type === "v" ? "ew-resize" : "ns-resize";
-                      }}
-                      onMouseLeave={(e) => {
-                        const stage = e.target.getStage();
-                        if (stage) stage.container().style.cursor = "default";
-                      }}
-                      onDragMove={(e) => {
-                        const node = e.target;
-                        if (g.type === "v") {
-                          node.y(0);
-                          const offset = node.x();
-                          const updatedPos = Math.max(0, Math.min(CANVAS_W, g.pos + offset));
-                          setUserGuides((prev) =>
-                            prev.map((item) => (item.id === g.id ? { ...item, pos: updatedPos } : item))
-                          );
-                          node.x(0);
-                        } else {
-                          node.x(0);
-                          const offset = node.y();
-                          const updatedPos = Math.max(0, Math.min(canvasH, g.pos + offset));
-                          setUserGuides((prev) =>
-                            prev.map((item) => (item.id === g.id ? { ...item, pos: updatedPos } : item))
-                          );
-                          node.y(0);
-                        }
-                      }}
-                    />
-                  </Group>
-                ))}
-              </Layer>
-            )}
-
-            {/* 대칭자 가이드선 */}
-            {!isExporting && tool === "draw" && symmetryType !== "none" && (
-              <Layer>
-                {symmetryType === "vertical" && (
-                  <>
-                    <Line
-                      points={[symmetryCenterX, 0, symmetryCenterX, canvasH]}
-                      stroke="#0ea5e9"
-                      strokeWidth={1.5 / effScale}
-                      dash={[6 / effScale, 4 / effScale]}
-                      listening={false}
-                    />
-                    <KCircle
-                      x={symmetryCenterX}
-                      y={symmetryCenterY}
-                      radius={7 / effScale}
-                      fill="#0ea5e9"
-                      stroke="#ffffff"
-                      strokeWidth={2 / effScale}
-                      draggable={true}
-                      name="symmetry-handle"
-                      onMouseEnter={(e) => {
-                        const stage = e.target.getStage();
-                        if (stage) stage.container().style.cursor = "ew-resize";
-                      }}
-                      onMouseLeave={(e) => {
-                        const stage = e.target.getStage();
-                        if (stage) stage.container().style.cursor = "default";
-                      }}
-                      onDragMove={(e) => {
-                        const node = e.target;
-                        node.y(symmetryCenterY); // Restrict Y
-                        const newX = Math.max(0, Math.min(CANVAS_W, node.x()));
-                        setSymmetryCenterX(newX);
-                      }}
-                    />
-                  </>
-                )}
-                {symmetryType === "horizontal" && (
-                  <>
-                    <Line
-                      points={[0, symmetryCenterY, CANVAS_W, symmetryCenterY]}
-                      stroke="#0ea5e9"
-                      strokeWidth={1.5 / effScale}
-                      dash={[6 / effScale, 4 / effScale]}
-                      listening={false}
-                    />
-                    <KCircle
-                      x={symmetryCenterX}
-                      y={symmetryCenterY}
-                      radius={7 / effScale}
-                      fill="#0ea5e9"
-                      stroke="#ffffff"
-                      strokeWidth={2 / effScale}
-                      draggable={true}
-                      name="symmetry-handle"
-                      onMouseEnter={(e) => {
-                        const stage = e.target.getStage();
-                        if (stage) stage.container().style.cursor = "ns-resize";
-                      }}
-                      onMouseLeave={(e) => {
-                        const stage = e.target.getStage();
-                        if (stage) stage.container().style.cursor = "default";
-                      }}
-                      onDragMove={(e) => {
-                        const node = e.target;
-                        node.x(symmetryCenterX); // Restrict X
-                        const newY = Math.max(0, Math.min(canvasH, node.y()));
-                        setSymmetryCenterY(newY);
-                      }}
-                    />
-                  </>
-                )}
-                {symmetryType === "radial" && (
-                  <>
-                    <Ellipse
-                      x={symmetryCenterX}
-                      y={symmetryCenterY}
-                      radiusX={6 / effScale}
-                      radiusY={6 / effScale}
-                      stroke="#0ea5e9"
-                      strokeWidth={1.5 / effScale}
-                      listening={false}
-                    />
-                    {Array.from({ length: symmetryRadialCount }).map((_, idx) => {
-                      const angle = (idx * 2 * Math.PI) / symmetryRadialCount;
-                      const len = Math.max(CANVAS_W, canvasH) * 1.5;
-                      return (
-                        <Line
-                          key={`radial-${idx}`}
-                          points={[
-                            symmetryCenterX,
-                            symmetryCenterY,
-                            symmetryCenterX + len * Math.cos(angle),
-                            symmetryCenterY + len * Math.sin(angle),
-                          ]}
-                          stroke="#0ea5e9"
-                          strokeWidth={1 / effScale}
-                          dash={[4 / effScale, 4 / effScale]}
-                          opacity={0.7}
-                          listening={false}
-                        />
-                      );
-                    })}
-                    <KCircle
-                      x={symmetryCenterX}
-                      y={symmetryCenterY}
-                      radius={8 / effScale}
-                      fill="#0ea5e9"
-                      stroke="#ffffff"
-                      strokeWidth={2 / effScale}
-                      draggable={true}
-                      name="symmetry-handle"
-                      onMouseEnter={(e) => {
-                        const stage = e.target.getStage();
-                        if (stage) stage.container().style.cursor = "move";
-                      }}
-                      onMouseLeave={(e) => {
-                        const stage = e.target.getStage();
-                        if (stage) stage.container().style.cursor = "default";
-                      }}
-                      onDragMove={(e) => {
-                        const node = e.target;
-                        const newX = Math.max(0, Math.min(CANVAS_W, node.x()));
-                        const newY = Math.max(0, Math.min(canvasH, node.y()));
-                        setSymmetryCenterX(newX);
-                        setSymmetryCenterY(newY);
-                      }}
-                    />
-                  </>
-                )}
-                {symmetryType === "kaleidoscope" && (
-                  <>
-                    {/* 쐐기 경계선(N개) — 기존 radial 가이드와 동일한 각도 공식(wedgeBoundaryAngle)을
-                        재사용해, 그리기 시점 변환과 화면 가이드가 어긋나지 않게 한다. */}
-                    {Array.from({ length: symmetryRadialCount }).map((_, idx) => {
-                      const angle = wedgeBoundaryAngle(idx, symmetryRadialCount);
-                      const len = Math.max(CANVAS_W, canvasH) * 1.5;
-                      return (
-                        <Line
-                          key={`kaleido-wedge-${idx}`}
-                          points={[
-                            symmetryCenterX,
-                            symmetryCenterY,
-                            symmetryCenterX + len * Math.cos(angle),
-                            symmetryCenterY + len * Math.sin(angle),
-                          ]}
-                          stroke="#0ea5e9"
-                          strokeWidth={1 / effScale}
-                          dash={[4 / effScale, 4 / effScale]}
-                          opacity={0.7}
-                          listening={false}
-                        />
-                      );
-                    })}
-                    {/* 거울축(N개) — mirrorAxisAngle로 구한 각도를 중심 양쪽으로 뻗은 실선(온전한
-                        지름선)으로 그려, 위 쐐기 경계선(한쪽으로만 뻗은 점선 ray)과 시각적으로
-                        구분한다. */}
-                    {Array.from({ length: symmetryRadialCount }).map((_, idx) => {
-                      const angle = mirrorAxisAngle(idx, symmetryRadialCount);
-                      const len = Math.max(CANVAS_W, canvasH) * 0.75;
-                      const cos = Math.cos(angle);
-                      const sin = Math.sin(angle);
-                      return (
-                        <Line
-                          key={`kaleido-mirror-${idx}`}
-                          points={[
-                            symmetryCenterX - len * cos,
-                            symmetryCenterY - len * sin,
-                            symmetryCenterX + len * cos,
-                            symmetryCenterY + len * sin,
-                          ]}
-                          stroke="#a855f7"
-                          strokeWidth={1 / effScale}
-                          opacity={0.55}
-                          listening={false}
-                        />
-                      );
-                    })}
-                    <Ellipse
-                      x={symmetryCenterX}
-                      y={symmetryCenterY}
-                      radiusX={6 / effScale}
-                      radiusY={6 / effScale}
-                      stroke="#0ea5e9"
-                      strokeWidth={1.5 / effScale}
-                      listening={false}
-                    />
-                    <KCircle
-                      x={symmetryCenterX}
-                      y={symmetryCenterY}
-                      radius={8 / effScale}
-                      fill="#0ea5e9"
-                      stroke="#ffffff"
-                      strokeWidth={2 / effScale}
-                      draggable={true}
-                      name="symmetry-handle"
-                      onMouseEnter={(e) => {
-                        const stage = e.target.getStage();
-                        if (stage) stage.container().style.cursor = "move";
-                      }}
-                      onMouseLeave={(e) => {
-                        const stage = e.target.getStage();
-                        if (stage) stage.container().style.cursor = "default";
-                      }}
-                      onDragMove={(e) => {
-                        const node = e.target;
-                        const newX = Math.max(0, Math.min(CANVAS_W, node.x()));
-                        const newY = Math.max(0, Math.min(canvasH, node.y()));
-                        setSymmetryCenterX(newX);
-                        setSymmetryCenterY(newY);
-                      }}
-                    />
-                  </>
-                )}
-              </Layer>
-            )}
-            {!isExporting && tool === "draw" && perspectiveRulerActive && vanishingPoints.length > 0 && (
-              <Layer>
-                <Suspense fallback={null}>
-                  <StudioPerspectiveOverlay
-                    points={vanishingPoints}
-                    canvasWidth={CANVAS_W}
-                    canvasHeight={canvasH}
-                    effScale={effScale}
-                    disabled={activeSurfaceReviewLocked || saving || masterEditMode}
-                    onPreviewPoint={previewVanishingPointById}
-                    onCommitPoint={moveVanishingPointById}
-                    onCancelPoint={cancelStudioDrawingAssistPreview}
-                  />
-                </Suspense>
-              </Layer>
-            )}
-            {!isExporting && tool === "draw" && isometricGridActive && (
-              <Layer>
-                <Suspense fallback={null}>
-                  <StudioIsometricGridOverlay
-                    config={{
-                      angleDeg: isometricAngleDeg,
-                      cellSize: isometricCellSize,
-                      originX: isometricOriginX,
-                      originY: isometricOriginY,
-                    }}
-                    canvasWidth={CANVAS_W}
-                    canvasHeight={canvasH}
-                    effScale={effScale}
-                    disabled={activeSurfaceReviewLocked || saving || masterEditMode}
-                    onPreviewOrigin={previewIsometricOrigin}
-                    onCommitOrigin={commitIsometricOrigin}
-                    onCancelOrigin={cancelStudioDrawingAssistPreview}
-                  />
-                </Suspense>
-              </Layer>
-            )}
+            <StudioCanvasGuideOverlayLayers
+              isExporting={isExporting}
+              drawingMode={tool === "draw"}
+              canvasWidth={CANVAS_W}
+              canvasHeight={canvasH}
+              effScale={effScale}
+              guides={guides}
+              smartGuides={smartGuides}
+              userGuides={userGuides}
+              setUserGuides={setUserGuides}
+              symmetryType={symmetryType}
+              symmetryCenterX={symmetryCenterX}
+              symmetryCenterY={symmetryCenterY}
+              symmetryRadialCount={symmetryRadialCount}
+              setSymmetryCenterX={setSymmetryCenterX}
+              setSymmetryCenterY={setSymmetryCenterY}
+              perspectiveRulerActive={perspectiveRulerActive}
+              vanishingPoints={vanishingPoints}
+              onPreviewVanishingPoint={previewVanishingPointById}
+              onCommitVanishingPoint={moveVanishingPointById}
+              isometricGridActive={isometricGridActive}
+              isometricConfig={{
+                angleDeg: isometricAngleDeg,
+                cellSize: isometricCellSize,
+                originX: isometricOriginX,
+                originY: isometricOriginY,
+              }}
+              onPreviewIsometricOrigin={previewIsometricOrigin}
+              onCommitIsometricOrigin={commitIsometricOrigin}
+              drawingAssistDisabled={activeSurfaceReviewLocked || saving || masterEditMode}
+              onCancelDrawingAssistPreview={cancelStudioDrawingAssistPreview}
+            />
           </Stage>
           </Profiler>
           {STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED && webGpuViewportSurface ? (

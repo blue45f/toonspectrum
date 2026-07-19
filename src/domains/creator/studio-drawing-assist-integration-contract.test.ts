@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const source = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const guideSource = readFileSync(new URL("./StudioCanvasGuideLayers.tsx", import.meta.url), "utf8");
 const inspectorSource = readFileSync(new URL("./StudioInspectorAside.tsx", import.meta.url), "utf8");
 
 describe("StudioPage drawing-assist integration contract", () => {
@@ -22,19 +23,25 @@ describe("StudioPage drawing-assist integration contract", () => {
     expect(inspectorSource).toMatch(/<StudioPerspectivePanel[\s\S]*?disabled=\{drawingAssistControlsDisabled\}/u);
     expect(inspectorSource).toMatch(/<StudioIsometricGridPanel[\s\S]*?disabled=\{drawingAssistControlsDisabled\}/u);
     expect(source).toMatch(
-      /<StudioPerspectiveOverlay[\s\S]*?disabled=\{activeSurfaceReviewLocked \|\| saving \|\| masterEditMode\}/u
+      /<StudioCanvasGuideOverlayLayers[\s\S]*?drawingAssistDisabled=\{activeSurfaceReviewLocked \|\| saving \|\| masterEditMode\}/u
     );
-    expect(source).toMatch(
-      /<StudioIsometricGridOverlay[\s\S]*?disabled=\{activeSurfaceReviewLocked \|\| saving \|\| masterEditMode\}/u
+    expect(guideSource).toMatch(
+      /<StudioPerspectiveOverlay[\s\S]*?disabled=\{drawingAssistDisabled\}/u
+    );
+    expect(guideSource).toMatch(
+      /<StudioIsometricGridOverlay[\s\S]*?disabled=\{drawingAssistDisabled\}/u
     );
   });
 
   it("routes every guide drag through preview, one final commit, and explicit cancellation", () => {
     expect(source).toMatch(
-      /<StudioPerspectiveOverlay[\s\S]*?onPreviewPoint=\{previewVanishingPointById\}[\s\S]*?onCommitPoint=\{moveVanishingPointById\}[\s\S]*?onCancelPoint=\{cancelStudioDrawingAssistPreview\}/u
+      /<StudioCanvasGuideOverlayLayers[\s\S]*?onPreviewVanishingPoint=\{previewVanishingPointById\}[\s\S]*?onCommitVanishingPoint=\{moveVanishingPointById\}[\s\S]*?onPreviewIsometricOrigin=\{previewIsometricOrigin\}[\s\S]*?onCommitIsometricOrigin=\{commitIsometricOrigin\}[\s\S]*?onCancelDrawingAssistPreview=\{cancelStudioDrawingAssistPreview\}/u
     );
-    expect(source).toMatch(
-      /<StudioIsometricGridOverlay[\s\S]*?onPreviewOrigin=\{previewIsometricOrigin\}[\s\S]*?onCommitOrigin=\{commitIsometricOrigin\}[\s\S]*?onCancelOrigin=\{cancelStudioDrawingAssistPreview\}/u
+    expect(guideSource).toMatch(
+      /<StudioPerspectiveOverlay[\s\S]*?onPreviewPoint=\{onPreviewVanishingPoint\}[\s\S]*?onCommitPoint=\{onCommitVanishingPoint\}[\s\S]*?onCancelPoint=\{onCancelDrawingAssistPreview\}/u
+    );
+    expect(guideSource).toMatch(
+      /<StudioIsometricGridOverlay[\s\S]*?onPreviewOrigin=\{onPreviewIsometricOrigin\}[\s\S]*?onCommitOrigin=\{onCommitIsometricOrigin\}[\s\S]*?onCancelOrigin=\{onCancelDrawingAssistPreview\}/u
     );
     expect(inspectorSource).toMatch(
       /<StudioIsometricGridPanel[\s\S]*?onPreviewOrigin=\{previewIsometricOrigin\}[\s\S]*?onCommitOrigin=\{commitIsometricOrigin\}/u

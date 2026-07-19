@@ -146,6 +146,7 @@ describe("Studio optional UI bundle boundaries", () => {
 
   it("uses local passive Suspense boundaries for lazy Konva overlays", () => {
     const source = moduleEdges("./StudioPage.tsx").source;
+    const guideSource = moduleEdges("./StudioCanvasGuideLayers.tsx").source;
 
     for (const component of [
       "StudioPanelSplitOverlay",
@@ -153,10 +154,13 @@ describe("Studio optional UI bundle boundaries", () => {
       "StudioHistoryBrushOverlay",
       "StudioPuppetWarpOverlay",
       "StudioLayerMaskOverlay",
-      "StudioPerspectiveOverlay",
-      "StudioIsometricGridOverlay",
     ] as const) {
       expect(source).toMatch(
+        new RegExp(`<Suspense fallback=\\{null\\}>[\\s\\S]{0,700}<${component}`)
+      );
+    }
+    for (const component of ["StudioPerspectiveOverlay", "StudioIsometricGridOverlay"] as const) {
+      expect(guideSource).toMatch(
         new RegExp(`<Suspense fallback=\\{null\\}>[\\s\\S]{0,700}<${component}`)
       );
     }
