@@ -15,6 +15,7 @@ import {
   extractStudioBg3dLtDepthEdges,
 } from "./studio-bg3d-lt-depth-edges";
 
+import type { StudioBg3dLtRasterLayerRole } from "./studio-3d-insert-contract";
 import type {
   StudioBg3dLineOutputSettings,
   StudioBg3dToneOutputSettings,
@@ -22,7 +23,7 @@ import type {
 
 export const STUDIO_BG3D_LT_RENDER_MAX_PIXELS = STUDIO_BG3D_LT_DEPTH_EDGE_MAX_PIXELS;
 
-export type StudioBg3dLtRasterLayerRole = "color" | "main-line" | "texture-line" | "tone";
+export type { StudioBg3dLtRasterLayerRole } from "./studio-3d-insert-contract";
 
 export interface StudioBg3dLtRasterInput {
   readonly width: number;

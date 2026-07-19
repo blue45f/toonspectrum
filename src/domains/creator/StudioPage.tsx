@@ -1099,6 +1099,7 @@ import {
 import { StudioViewToolsHud } from "./StudioViewToolsHud";
 import { useStudioModalSheet } from "./useStudioModalSheet";
 
+import type { StudioBackground3DInsertResult } from "./studio-3d-insert-contract";
 import type { AdvancedFillMaskLike } from "./studio-advanced-fill";
 import type { StudioAdvancedFillPreview } from "./studio-advanced-fill-preview";
 import type { StudioAsset } from "./studio-asset-library";
@@ -1169,7 +1170,6 @@ import type {
   StudioAssetSortOrder,
   StudioAssetTab,
 } from "./StudioAssetMenuPanel";
-import type { StudioBackground3DInsertResult } from "./StudioBackground3D";
 import type { StudioLayerNavigatorAction } from "./StudioLayerNavigator";
 import type { StudioLivePressureStore } from "./StudioLiveInkHosts";
 import type { PublishContext } from "./StudioPublishContextBanner";

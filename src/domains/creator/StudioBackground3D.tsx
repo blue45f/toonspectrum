@@ -201,7 +201,6 @@ import {
   renderStudioBg3dLtLayers,
   STUDIO_BG3D_LT_RENDER_MAX_PIXELS,
   type StudioBg3dLtRasterLayer,
-  type StudioBg3dLtRasterLayerRole,
 } from "./studio-bg3d-lt-render";
 import {
   renderStudioBg3dLtLayersInWorker,
@@ -358,6 +357,10 @@ import { StudioToolHintTarget } from "./StudioToolHint";
 import { useStudioModalSheet } from "./useStudioModalSheet";
 
 import type {
+  StudioBackground3DInsertResult,
+  StudioBackground3DLtLayer,
+} from "./studio-3d-insert-contract";
+import type {
   StudioBg3dShotBatchBuildOptions,
   StudioBg3dShotBatchContactSheet,
   StudioBg3dShotBatchContactSheetFallback,
@@ -382,29 +385,10 @@ import type { StudioBg3dShotBatchRuntime } from "./studio-bg3d-shot-batch-runtim
 import type { StudioBg3dShotContactSheetImage } from "./studio-bg3d-shot-contact-sheet-contract";
 import type { StudioToolHintSpec } from "./studio-tool-hints";
 
-export interface StudioBackground3DLtLayer {
-  readonly role: StudioBg3dLtRasterLayerRole;
-  readonly pngDataUrl: string;
-  readonly width: number;
-  readonly height: number;
-}
-
-export interface StudioBackground3DInsertResult {
-  readonly kind: "separated";
-  readonly width: number;
-  readonly height: number;
-  /** Back-to-front paint order: color/tone, texture line, main line. */
-  readonly layers: readonly StudioBackground3DLtLayer[];
-  /** Flattened fallback for document surfaces that intentionally do not support layer groups. */
-  readonly compositePngDataUrl: string;
-  /** Finite camera vanishing points normalized to the captured image placement. */
-  readonly perspectiveGuides: readonly {
-    readonly axis: "world-x" | "world-y" | "world-z";
-    readonly x: number;
-    readonly y: number;
-  }[];
-  readonly bg3dScene: StudioBg3dSceneDocument;
-}
+export type {
+  StudioBackground3DInsertResult,
+  StudioBackground3DLtLayer,
+} from "./studio-3d-insert-contract";
 
 export interface StudioBackground3DProps {
   open: boolean;

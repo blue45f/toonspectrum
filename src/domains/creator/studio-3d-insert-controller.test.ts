@@ -6,9 +6,11 @@ import {
   type ApplyStudioVrmInsertResultInput,
 } from "./studio-3d-insert-controller";
 
+import type {
+  StudioBackground3DInsertResult,
+  StudioVrmPoserInsertResult,
+} from "./studio-3d-insert-contract";
 import type { StudioEditorMutationTicket } from "./studio-editor-scope";
-import type { StudioBackground3DInsertResult } from "./StudioBackground3D";
-import type { StudioVrmPoserInsertResult } from "./StudioVrmPoser";
 
 const mutationTicket: StudioEditorMutationTicket = {
   authScopeKey: "artist-1",

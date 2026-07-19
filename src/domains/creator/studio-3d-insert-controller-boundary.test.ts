@@ -72,9 +72,8 @@ describe("Studio 3D insert controller boundary", () => {
     const controller = moduleShape("./studio-3d-insert-controller.ts");
 
     expect(controller.allImports).toEqual([
+      "./studio-3d-insert-contract",
       "./studio-editor-scope",
-      "./StudioBackground3D",
-      "./StudioVrmPoser",
     ]);
     expect(controller.wholeClauseTypeImports).toEqual(controller.allImports);
     expect(controller.valueImports).toEqual([]);
@@ -86,8 +85,57 @@ describe("Studio 3D insert controller boundary", () => {
     expect(controller.source).not.toContain("react");
   });
 
+  it("owns insert payloads in a renderer-neutral type-only leaf with compatibility re-exports", () => {
+    const contract = moduleShape("./studio-3d-insert-contract.ts");
+    const background = moduleShape("./StudioBackground3D.tsx");
+    const poser = moduleShape("./StudioVrmPoser.tsx");
+    const ltRender = moduleShape("./studio-bg3d-lt-render.ts");
+
+    expect(contract.allImports).toEqual([
+      "./studio-bg3d-scene-document",
+      "./studio-vrm-scene-document",
+    ]);
+    expect(contract.wholeClauseTypeImports).toEqual(contract.allImports);
+    expect(contract.valueImports).toEqual([]);
+    expect(contract.dynamicImports).toEqual([]);
+    expect(contract.allImports.some((specifier) => (
+      /(?:react|konva|three|StudioBackground3D|StudioVrmPoser|studio-bg3d-lt-render)/iu
+        .test(specifier)
+    ))).toBe(false);
+    expect(contract.source).not.toMatch(/from\s+["'](?:react|konva|three|@react-three)/iu);
+    expect(contract.source).toContain("export interface StudioBackground3DLtLayer");
+    expect(contract.source).toContain("export interface StudioBackground3DInsertResult");
+    expect(contract.source).toContain("export type StudioVrmPoserInsertResult");
+    expect(contract.source).toContain("export type StudioBg3dLtRasterLayerRole");
+    expect(contract.source.split("\n").length).toBeLessThanOrEqual(70);
+
+    expect(background.source).toContain(
+      'import type {\n  StudioBackground3DInsertResult,\n  StudioBackground3DLtLayer,\n} from "./studio-3d-insert-contract";'
+    );
+    expect(background.source).toContain(
+      'export type {\n  StudioBackground3DInsertResult,\n  StudioBackground3DLtLayer,\n} from "./studio-3d-insert-contract";'
+    );
+    expect(background.source).not.toContain("export interface StudioBackground3DLtLayer");
+    expect(background.source).not.toContain("export interface StudioBackground3DInsertResult");
+    expect(poser.source).toContain(
+      'import type { StudioVrmPoserInsertResult } from "./studio-3d-insert-contract";'
+    );
+    expect(poser.source).toContain(
+      'export type { StudioVrmPoserInsertResult } from "./studio-3d-insert-contract";'
+    );
+    expect(poser.source).not.toContain("export type StudioVrmPoserInsertResult =");
+    expect(ltRender.source).toContain(
+      'import type { StudioBg3dLtRasterLayerRole } from "./studio-3d-insert-contract";'
+    );
+    expect(ltRender.source).toContain(
+      'export type { StudioBg3dLtRasterLayerRole } from "./studio-3d-insert-contract";'
+    );
+    expect(ltRender.source).not.toContain("export type StudioBg3dLtRasterLayerRole =");
+  });
+
   it("keeps StudioPage as the single static orchestration owner", () => {
     const page = moduleShape("./StudioPage.tsx");
+    const controllerTest = moduleShape("./studio-3d-insert-controller.test.ts");
 
     expect(
       page.valueImports.filter(
@@ -95,6 +143,11 @@ describe("Studio 3D insert controller boundary", () => {
       )
     ).toEqual(["./studio-3d-insert-controller"]);
     expect(page.dynamicImports).not.toContain("./studio-3d-insert-controller");
+    expect(page.wholeClauseTypeImports).toContain("./studio-3d-insert-contract");
+    expect(page.allImports).not.toContain("./StudioBackground3D");
+    expect(controllerTest.wholeClauseTypeImports).toContain("./studio-3d-insert-contract");
+    expect(controllerTest.allImports).not.toContain("./StudioBackground3D");
+    expect(controllerTest.allImports).not.toContain("./StudioVrmPoser");
     expect(page.source).toContain(
       "function captureStudioMutationTicket(): StudioEditorMutationTicket"
     );

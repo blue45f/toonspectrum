@@ -248,6 +248,7 @@ import {
   type VrmLibraryEntry,
 } from "./vrm-library";
 
+import type { StudioVrmPoserInsertResult } from "./studio-3d-insert-contract";
 import type { StudioPoseMaterial } from "./studio-pose-material";
 import type { StudioToolHintSpec } from "./studio-tool-hints";
 import type { FaceLandmarker, HandLandmarker, PoseLandmarker } from "@mediapipe/tasks-vision";
@@ -260,12 +261,7 @@ import {
   type SharedAsset,
 } from "@/src/infrastructure/creator-client";
 
-export type StudioVrmPoserInsertResult = {
-  pngDataUrl: string;
-  width: number;
-  height: number;
-  scene: StudioVrmSceneDocument;
-};
+export type { StudioVrmPoserInsertResult } from "./studio-3d-insert-contract";
 
 type StudioVrmPoserProps = {
   open: boolean;
