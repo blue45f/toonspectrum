@@ -5,44 +5,15 @@ import {
   type SVGProps,
 } from "react";
 
+import type { StudioToolHintPreviewKind } from "../studio-tool-hint-preview-kind";
+
 /**
  * Small, semantic tool demonstrations used by the Studio's rich hints.
  *
  * Keep this list deliberately finite: every supported kind has a designed
  * preview rather than falling back to an unrelated generic animation.
  */
-export type StudioToolHintPreviewKind =
-  | "select"
-  | "ink"
-  | "erase"
-  | "fill"
-  | "sample"
-  | "shape"
-  | "text"
-  | "bubble"
-  | "image"
-  | "filter"
-  | "lasso"
-  | "brush-size"
-  | "opacity"
-  | "stabilizer"
-  | "pressure"
-  | "symmetry"
-  | "zoom-view"
-  | "history"
-  | "layer"
-  | "timeline"
-  | "keyframe"
-  | "frame-sequence"
-  | "onion-skin"
-  | "timelapse"
-  | "motion-fx"
-  | "video-export"
-  | "audio"
-  | "object-3d"
-  | "pose-3d"
-  | "camera-3d"
-  | "lighting-3d";
+export type { StudioToolHintPreviewKind } from "../studio-tool-hint-preview-kind";
 
 export type StudioToolHintPreviewProps = Omit<
   SVGProps<SVGSVGElement>,
@@ -1278,6 +1249,430 @@ function LassoPreview({ animate }: { animate: boolean }): ReactElement {
   );
 }
 
+function TransformPreview({ animate }: { animate: boolean }): ReactElement {
+  return (
+    <>
+      <rect x="48" y="20" width="120" height="66" rx="6" fill={COLOR.canvas} stroke={COLOR.lineStrong} />
+      <g transform="translate(108 53)" data-preview-motion={animate ? "transform" : undefined}>
+        <g transform={animate ? undefined : "rotate(8) scale(1.08)"}>
+          <rect x="-40" y="-21" width="80" height="42" rx="4" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeWidth="2" />
+          <path d="M-31 11-12-7 3 6 15-5 31 11" fill="none" stroke={COLOR.fg2} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+          {animate ? (
+            <animateTransform attributeName="transform" type="rotate" dur="3s" values="-5;9;9;-5" keyTimes="0;.42;.72;1" repeatCount="indefinite" />
+          ) : null}
+        </g>
+        {[
+          [-40, -21],
+          [40, -21],
+          [-40, 21],
+          [40, 21],
+        ].map(([x, y]) => (
+          <rect key={`${x}-${y}`} x={x - 3} y={y - 3} width="6" height="6" rx="1" fill={COLOR.canvas} stroke={COLOR.fg} />
+        ))}
+      </g>
+      <path d="M177 35a18 18 0 0 1 3 23m0-23-1 10-9-4" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" />
+    </>
+  );
+}
+
+function PanPreview({ animate }: { animate: boolean }): ReactElement {
+  return (
+    <>
+      <rect x="41" y="16" width="134" height="74" rx="8" fill={COLOR.raised} stroke={COLOR.lineStrong} />
+      <g transform={animate ? undefined : "translate(9 -4)"} data-preview-motion={animate ? "pan" : undefined}>
+        <rect x="59" y="27" width="88" height="52" rx="4" fill={COLOR.canvas} stroke={COLOR.fg2} />
+        <circle cx="80" cy="43" r="6" fill={COLOR.accent} />
+        <path d="m63 71 24-21 15 14 12-10 29 17" fill="none" stroke={COLOR.cool} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
+        {animate ? (
+          <animateTransform attributeName="transform" type="translate" dur="2.8s" values="-12 7;12 -6;12 -6;-12 7" keyTimes="0;.42;.72;1" repeatCount="indefinite" />
+        ) : null}
+      </g>
+      <path d="M108 12v13m0-13-5 6m5-6 5 6M108 92V79m0 13-5-6m5 6 5-6M34 53h16m-16 0 7-5m-7 5 7 5M182 53h-16m16 0-7-5m7 5-7 5" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+    </>
+  );
+}
+
+function MarqueePreview({ animate, ellipse }: { animate: boolean; ellipse: boolean }): ReactElement {
+  const common = {
+    fill: COLOR.accentSoft,
+    stroke: COLOR.fg,
+    strokeDasharray: "6 4",
+    strokeWidth: "2",
+  } as const;
+  return (
+    <>
+      <rect x="43" y="17" width="130" height="70" rx="6" fill={COLOR.canvas} stroke={COLOR.lineStrong} />
+      {ellipse ? (
+        <ellipse cx="108" cy="52" rx={animate ? "16" : "43"} ry={animate ? "11" : "25"} {...common}>
+          {animate ? (
+            <>
+              <animate attributeName="rx" dur="2.8s" values="16;43;43;16" keyTimes="0;.42;.75;1" repeatCount="indefinite" />
+              <animate attributeName="ry" dur="2.8s" values="11;25;25;11" keyTimes="0;.42;.75;1" repeatCount="indefinite" />
+              <animate attributeName="stroke-dashoffset" dur=".8s" values="0;-20" repeatCount="indefinite" />
+            </>
+          ) : null}
+        </ellipse>
+      ) : (
+        <rect x={animate ? "87" : "64"} y={animate ? "42" : "28"} width={animate ? "42" : "88"} height={animate ? "22" : "48"} rx="2" {...common}>
+          {animate ? (
+            <>
+              <animate attributeName="x" dur="2.8s" values="87;64;64;87" keyTimes="0;.42;.75;1" repeatCount="indefinite" />
+              <animate attributeName="y" dur="2.8s" values="42;28;28;42" keyTimes="0;.42;.75;1" repeatCount="indefinite" />
+              <animate attributeName="width" dur="2.8s" values="42;88;88;42" keyTimes="0;.42;.75;1" repeatCount="indefinite" />
+              <animate attributeName="height" dur="2.8s" values="22;48;48;22" keyTimes="0;.42;.75;1" repeatCount="indefinite" />
+              <animate attributeName="stroke-dashoffset" dur=".8s" values="0;-20" repeatCount="indefinite" />
+            </>
+          ) : null}
+        </rect>
+      )}
+      <path d="m161 73 7 17 4-7 7 6 4-4-7-6 7-4Z" fill={COLOR.fg} stroke={COLOR.canvas} strokeLinejoin="round" strokeWidth="2" />
+    </>
+  );
+}
+
+function CropPreview({ animate }: { animate: boolean }): ReactElement {
+  return (
+    <>
+      <rect x="51" y="16" width="114" height="74" rx="6" fill={COLOR.canvas} stroke={COLOR.lineStrong} />
+      <circle cx="77" cy="38" r="8" fill={COLOR.accent} />
+      <path d="m56 80 29-29 18 16 14-13 43 26" fill={COLOR.cool} opacity=".55" />
+      <rect x={animate ? "46" : "63"} y={animate ? "12" : "23"} width={animate ? "124" : "91"} height={animate ? "82" : "58"} fill="none" stroke={COLOR.fg} strokeWidth="2.5">
+        {animate ? (
+          <>
+            <animate attributeName="x" dur="2.9s" values="46;63;63;46" keyTimes="0;.42;.74;1" repeatCount="indefinite" />
+            <animate attributeName="y" dur="2.9s" values="12;23;23;12" keyTimes="0;.42;.74;1" repeatCount="indefinite" />
+            <animate attributeName="width" dur="2.9s" values="124;91;91;124" keyTimes="0;.42;.74;1" repeatCount="indefinite" />
+            <animate attributeName="height" dur="2.9s" values="82;58;58;82" keyTimes="0;.42;.74;1" repeatCount="indefinite" />
+          </>
+        ) : null}
+      </rect>
+      <path d="M39 31h21V10M177 73h-21v21" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeWidth="3" />
+    </>
+  );
+}
+
+function PixelInkPreview({ animate }: { animate: boolean }): ReactElement {
+  return (
+    <>
+      <g stroke={COLOR.line} strokeWidth="1" opacity=".7">
+        {Array.from({ length: 7 }, (_, index) => <path key={`v-${index}`} d={`M${55 + index * 16} 20v64`} />)}
+        {Array.from({ length: 5 }, (_, index) => <path key={`h-${index}`} d={`M55 ${20 + index * 16}h96`} />)}
+      </g>
+      <path d="M63 76h16V60h16V52h16V36h32" fill="none" stroke={COLOR.accent} strokeDasharray="112" strokeDashoffset={animate ? "112" : "0"} strokeLinecap="square" strokeLinejoin="miter" strokeWidth="7">
+        {animate ? <animate attributeName="stroke-dashoffset" dur="2.6s" values="112;0;0" keyTimes="0;.7;1" repeatCount="indefinite" /> : null}
+      </path>
+      <path d="m154 25 21 21-13 13-21-21Z" fill={COLOR.fg2} stroke={COLOR.canvas} strokeWidth="2" />
+      <rect x="138" y="35" width="10" height="10" fill={COLOR.accent} />
+    </>
+  );
+}
+
+function SmudgePreview({ animate }: { animate: boolean }): ReactElement {
+  return (
+    <>
+      <circle cx="76" cy="52" r="28" fill={COLOR.accent} opacity=".72" />
+      <circle cx="133" cy="52" r="28" fill={COLOR.cool} opacity=".68" />
+      <path d="M80 37c18 15 34-13 49 2M78 52c19 15 35-14 54 2M82 67c18 12 33-11 47 0" fill="none" stroke={COLOR.fg} strokeLinecap="round" strokeWidth="4" opacity=".78">
+        {animate ? <animate attributeName="d" dur="2.4s" values="M80 37c18 15 34-13 49 2M78 52c19 15 35-14 54 2M82 67c18 12 33-11 47 0;M76 37c24-13 38 15 57 0M80 52c20-13 35 14 49 0M77 67c24-11 38 12 56 0;M80 37c18 15 34-13 49 2M78 52c19 15 35-14 54 2M82 67c18 12 33-11 47 0" repeatCount="indefinite" /> : null}
+      </path>
+      <g transform={animate ? undefined : "translate(145 30)"}>
+        <path d="m0 0 24 8-12 8Z" fill={COLOR.fg2} stroke={COLOR.canvas} strokeWidth="2" />
+        {animate ? <animateMotion dur="2.4s" path="M145 30C119 70 91 27 68 64" repeatCount="indefinite" /> : null}
+      </g>
+    </>
+  );
+}
+
+function LiquifyPreview({ animate }: { animate: boolean }): ReactElement {
+  const straight = "M51 28H165M51 44H165M51 60H165M51 76H165";
+  const warped = "M51 28c35 0 35 18 57 18s26-18 57-18M51 44c30 0 37 18 58 18s27-18 56-18M51 60c30 0 36-18 57-18s29 18 57 18M51 76c35 0 34-18 57-18s28 18 57 18";
+  return (
+    <>
+      <rect x="43" y="17" width="130" height="70" rx="7" fill={COLOR.canvas} stroke={COLOR.lineStrong} />
+      <path d={animate ? straight : warped} fill="none" stroke={COLOR.fg2} strokeLinecap="round" strokeWidth="2">
+        {animate ? <animate attributeName="d" dur="2.8s" values={`${straight};${warped};${warped};${straight}`} keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}
+      </path>
+      <circle cx="108" cy="52" r="18" fill="none" stroke={COLOR.accent} strokeDasharray="4 4" strokeWidth="2" />
+      <path d="m107 38 14 14-14 14M94 52h27" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />
+    </>
+  );
+}
+
+function LassoFillPreview({ animate }: { animate: boolean }): ReactElement {
+  const path = "M57 67c-12-17 7-39 31-34 14-17 49-5 47 15 21 8 12 30-9 33-25 4-53 0-69-14Z";
+  return (
+    <>
+      <path d={path} fill={COLOR.accent} fillOpacity={animate ? ".08" : ".72"} stroke={COLOR.fg} strokeDasharray="5 4" strokeWidth="2">
+        {animate ? (
+          <>
+            <animate attributeName="fill-opacity" dur="2.9s" values=".05;.05;.72;.72" keyTimes="0;.56;.72;1" repeatCount="indefinite" />
+            <animate attributeName="stroke-dashoffset" dur=".8s" values="0;-18" repeatCount="indefinite" />
+          </>
+        ) : null}
+      </path>
+      <g transform={animate ? undefined : "translate(57 67)"}>
+        <path d="m0 0 8 19 4-8 7 7 4-4-7-7 8-4Z" fill={COLOR.fg} stroke={COLOR.canvas} strokeLinejoin="round" strokeWidth="2" />
+        {animate ? <animateMotion dur="2.9s" path={path} keyPoints="0;1;1" keyTimes="0;.56;1" repeatCount="indefinite" /> : null}
+      </g>
+      <path d="M158 28v20m-10-10h20" stroke={COLOR.accent} strokeLinecap="round" strokeWidth="2.5" />
+    </>
+  );
+}
+
+function CommentPreview({ animate }: { animate: boolean }): ReactElement {
+  return (
+    <>
+      <rect x="43" y="18" width="78" height="68" rx="6" fill={COLOR.canvas} stroke={COLOR.lineStrong} />
+      <path d="m49 76 19-20 15 13 11-10 21 17" fill="none" stroke={COLOR.cool} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
+      <g transform={animate ? undefined : "translate(91 48)"}>
+        <path d="M0-9a9 9 0 1 1 0 18 9 9 0 0 1 0-18Zm0 18v13" fill={COLOR.accent} stroke={COLOR.canvas} strokeWidth="2" />
+        {animate ? <animateMotion dur="2.7s" path="M91 28V48" keyPoints="0;1;1" keyTimes="0;.38;1" repeatCount="indefinite" /> : null}
+      </g>
+      <g transform={animate ? undefined : "translate(0 0)"}>
+        <path d="M126 29h48c7 0 12 5 12 12v22c0 7-5 12-12 12h-26l-10 9 2-9h-14c-7 0-12-5-12-12V41c0-7 5-12 12-12Z" fill={COLOR.raised} stroke={COLOR.accent} strokeWidth="2" />
+        <path d="M127 44h43M127 54h34M127 64h24" stroke={COLOR.fg2} strokeLinecap="round" strokeWidth="2" />
+        {animate ? <animateTransform attributeName="transform" type="translate" dur="2.7s" values="10 0;0 0;0 0;10 0" keyTimes="0;.38;.78;1" repeatCount="indefinite" /> : null}
+      </g>
+    </>
+  );
+}
+
+function PerspectivePreview({ animate }: { animate: boolean }): ReactElement {
+  return (
+    <>
+      <path d="M38 43h140" stroke={COLOR.fg3} strokeWidth="1.5" />
+      {[-44, -24, 0, 24, 44].map((offset) => (
+        <path key={offset} d={`M108 43 ${108 + offset * 1.65} 92`} stroke={COLOR.lineStrong} strokeWidth="1.4" />
+      ))}
+      <circle cx="108" cy="43" r={animate ? "4" : "6"} fill={COLOR.accent}>
+        {animate ? <animate attributeName="r" dur="1.4s" values="4;7;4" repeatCount="indefinite" /> : null}
+      </circle>
+      <path d="M51 77 108 43l58 34" fill="none" stroke={COLOR.accent} strokeDasharray="122" strokeDashoffset={animate ? "122" : "0"} strokeLinecap="round" strokeWidth="3">
+        {animate ? <animate attributeName="stroke-dashoffset" dur="2.8s" values="122;0;0" keyTimes="0;.72;1" repeatCount="indefinite" /> : null}
+      </path>
+      <path d="M70 77V59h20v7M146 77V59h-20v7" fill="none" stroke={COLOR.fg2} strokeWidth="2" />
+    </>
+  );
+}
+
+function RotateViewPreview({ animate }: { animate: boolean }): ReactElement {
+  return (
+    <>
+      <g transform="translate(108 52)">
+        <g transform={animate ? undefined : "rotate(18)"}>
+          <rect x="-46" y="-28" width="92" height="56" rx="5" fill={COLOR.canvas} stroke={COLOR.fg2} strokeWidth="2" />
+          <circle cx="-24" cy="-10" r="7" fill={COLOR.accent} />
+          <path d="m-40 20 24-21L1 14l13-11 25 17" fill="none" stroke={COLOR.cool} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
+          {animate ? <animateTransform attributeName="transform" type="rotate" dur="3s" values="-15;18;18;-15" keyTimes="0;.45;.72;1" repeatCount="indefinite" /> : null}
+        </g>
+      </g>
+      <path d="M51 32a66 66 0 0 1 104-9m0 0-13-1m13 1-4 12M165 72a66 66 0 0 1-104 9m0 0 13 1m-13-1 4-12" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" />
+    </>
+  );
+}
+
+function ShapeKindPreview({ animate, kind }: { animate: boolean; kind: "smart" | "rect" | "ellipse" }): ReactElement {
+  if (kind === "smart") return <ShapePreview animate={animate} />;
+  return (
+    <>
+      <path d="M54 72 70 29l47-7 43 28-25 32-61-3Z" fill="none" stroke={COLOR.fg3} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" opacity=".45" />
+      {kind === "rect" ? (
+        <rect x="62" y="25" width="92" height="57" rx="5" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeDasharray="298" strokeDashoffset={animate ? "298" : "0"} strokeWidth="2.5">
+          {animate ? <animate attributeName="stroke-dashoffset" dur="2.8s" values="298;0;0" keyTimes="0;.72;1" repeatCount="indefinite" /> : null}
+        </rect>
+      ) : (
+        <ellipse cx="108" cy="53" rx="48" ry="30" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeDasharray="248" strokeDashoffset={animate ? "248" : "0"} strokeWidth="2.5">
+          {animate ? <animate attributeName="stroke-dashoffset" dur="2.8s" values="248;0;0" keyTimes="0;.72;1" repeatCount="indefinite" /> : null}
+        </ellipse>
+      )}
+      <path d="m164 68 7 18 4-7 7 6 4-4-7-6 7-4Z" fill={COLOR.fg} stroke={COLOR.canvas} strokeLinejoin="round" strokeWidth="2" />
+    </>
+  );
+}
+
+function ReferencePreview({ animate }: { animate: boolean }): ReactElement {
+  return (
+    <>
+      <rect x="35" y="18" width="91" height="69" rx="7" fill={COLOR.canvas} stroke={COLOR.lineStrong} />
+      <path d="m41 78 23-24 15 14 12-10 29 20" fill="none" stroke={COLOR.fg2} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
+      <g transform={animate ? undefined : "translate(0 -4)"}>
+        <rect x="118" y="12" width="65" height="78" rx="8" fill={COLOR.raised} stroke={COLOR.accent} strokeWidth="2" />
+        <circle cx="139" cy="35" r="9" fill={COLOR.accent} opacity=".8" />
+        <path d="M128 75c3-17 12-25 24-25s20 8 22 25" fill={COLOR.cool} opacity=".7" />
+        <path d="M126 22h18M126 81h27" stroke={COLOR.fg2} strokeLinecap="round" strokeWidth="2" />
+        {animate ? <animateTransform attributeName="transform" type="translate" dur="2.8s" values="12 5;0 -4;0 -4;12 5" keyTimes="0;.35;.76;1" repeatCount="indefinite" /> : null}
+      </g>
+      <path d="M105 45h19m-6-6 6 6-6 6" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+    </>
+  );
+}
+
+function WorkspaceActionPreview({ animate, kind }: { animate: boolean; kind: "assets" | "export" | "project" | "fullscreen" | "settings" | "save" | "publish" | "ai" }): ReactElement {
+  if (kind === "fullscreen") {
+    return (
+      <>
+        <rect x={animate ? "68" : "45"} y={animate ? "31" : "17"} width={animate ? "80" : "126"} height={animate ? "43" : "70"} rx="6" fill={COLOR.canvas} stroke={COLOR.fg2} strokeWidth="2">
+          {animate ? <><animate attributeName="x" dur="2.8s" values="68;45;45;68" keyTimes="0;.4;.74;1" repeatCount="indefinite" /><animate attributeName="y" dur="2.8s" values="31;17;17;31" keyTimes="0;.4;.74;1" repeatCount="indefinite" /><animate attributeName="width" dur="2.8s" values="80;126;126;80" keyTimes="0;.4;.74;1" repeatCount="indefinite" /><animate attributeName="height" dur="2.8s" values="43;70;70;43" keyTimes="0;.4;.74;1" repeatCount="indefinite" /></> : null}
+        </rect>
+        <path d="M38 34V13h21M178 34V13h-21M38 70v21h21M178 70v21h-21" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeWidth="3" />
+      </>
+    );
+  }
+  if (kind === "settings") {
+    return (
+      <>
+        {[31, 52, 73].map((y) => <path key={y} d={`M52 ${y}h112`} stroke={COLOR.fg3} strokeLinecap="round" strokeWidth="3" />)}
+        {[84, 137, 104].map((x, index) => (
+          <circle key={x} cx={animate ? (index === 0 ? 84 : index === 1 ? 137 : 104) : x + (index === 1 ? -18 : 18)} cy={31 + index * 21} r="7" fill={COLOR.accent} stroke={COLOR.canvas} strokeWidth="2">
+            {animate ? <animate attributeName="cx" dur="2.7s" values={`${x};${x + (index === 1 ? -28 : 28)};${x + (index === 1 ? -28 : 28)};${x}`} keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}
+          </circle>
+        ))}
+      </>
+    );
+  }
+  if (kind === "ai") {
+    return (
+      <>
+        <path d="M43 71c17-36 32 8 49-30 15 34 30-5 47 22" fill="none" stroke={COLOR.fg3} strokeDasharray="4 4" strokeWidth="2" />
+        <path d="M43 71c19-28 38-31 56-8 17 21 34 11 51-14" fill="none" stroke={COLOR.accent} strokeDasharray="152" strokeDashoffset={animate ? "152" : "0"} strokeLinecap="round" strokeWidth="4">
+          {animate ? <animate attributeName="stroke-dashoffset" dur="2.8s" values="152;0;0" keyTimes="0;.7;1" repeatCount="indefinite" /> : null}
+        </path>
+        <path d="m168 26 3 8 8 3-8 3-3 8-3-8-8-3 8-3Z" fill={COLOR.cool} />
+        <path d="m145 17 2 5 5 2-5 2-2 5-2-5-5-2 5-2Z" fill={COLOR.accent} />
+      </>
+    );
+  }
+  if (kind === "assets") {
+    return (
+      <>
+        {[0, 1, 2].map((index) => <rect key={index} x={38 + index * 38} y="25" width="29" height="29" rx="5" fill={index === 1 ? COLOR.accentSoft : COLOR.raised} stroke={index === 1 ? COLOR.accent : COLOR.lineStrong} />)}
+        <rect x="151" y="42" width="31" height="31" rx="6" fill={COLOR.canvas} stroke={COLOR.fg2} />
+        <path d="m157 66 8-9 5 5 6-7" fill="none" stroke={COLOR.cool} strokeLinecap="round" strokeWidth="2" />
+        <g transform={animate ? undefined : "translate(76 37)"}>
+          <rect x="-10" y="-10" width="20" height="20" rx="4" fill={COLOR.accent} />
+          {animate ? <animateMotion dur="2.8s" path="M76 37C104 18 137 30 166 57" keyPoints="0;1;1" keyTimes="0;.62;1" repeatCount="indefinite" /> : null}
+        </g>
+      </>
+    );
+  }
+  const isPublish = kind === "publish";
+  const isSave = kind === "save";
+  const isExport = kind === "export";
+  return (
+    <>
+      <path d="M57 18h65l25 25v43H57Z" fill={COLOR.canvas} stroke={COLOR.fg2} strokeLinejoin="round" strokeWidth="2" />
+      <path d="M122 18v25h25M72 56h57M72 67h45" fill="none" stroke={COLOR.lineStrong} strokeLinecap="round" strokeWidth="2" />
+      {kind === "project" ? <path d="M42 37h45l8 9h52v39H42Z" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeLinejoin="round" strokeWidth="2" /> : null}
+      <g transform={animate ? undefined : `translate(${isPublish ? 164 : 160} ${isSave ? 70 : 58})`}>
+        {isSave ? <path d="M-13-12h26v24h-26Zm5 0v9H7v-9M-7 5H7" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeLinejoin="round" strokeWidth="2" /> : isPublish ? <path d="M0-17 13 8 3 5 0 17-3 5-13 8Z" fill={COLOR.accent} stroke={COLOR.canvas} strokeLinejoin="round" strokeWidth="2" /> : kind === "project" ? <path d="M-14-9h11l4 4h15V12h-30Zm5 9h18M0-5V9" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /> : <path d="M0-15v25m0 0-9-9m9 9 9-9M-13 15h26" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />}
+        {animate ? <animateTransform attributeName="transform" type="translate" dur="2.8s" values={`${isExport ? 145 : 160} 48;${isPublish ? 164 : 160} ${isSave ? 70 : 58};${isPublish ? 164 : 160} ${isSave ? 70 : 58};${isExport ? 145 : 160} 48`} keyTimes="0;.42;.75;1" repeatCount="indefinite" /> : null}
+      </g>
+      {isPublish ? <circle cx="164" cy="79" r="12" fill="none" stroke={COLOR.cool} strokeDasharray="3 3" /> : null}
+    </>
+  );
+}
+
+function HistoryStepPreview({ animate, direction }: { animate: boolean; direction: "undo" | "redo" }): ReactElement {
+  const mirror = direction === "redo";
+  return (
+    <>
+      {[0, 1, 2].map((index) => (
+        <rect key={index} x={68 + index * 13} y={23 + index * 8} width="80" height="51" rx="6" fill={index === 2 ? COLOR.canvas : COLOR.raised} stroke={index === 2 ? COLOR.accent : COLOR.lineStrong} opacity={index === 2 ? "1" : ".48"} />
+      ))}
+      <g transform={mirror ? "translate(216 0) scale(-1 1)" : undefined}>
+        <path d="M73 34H43l11-11M43 34l11 11" fill="none" stroke={COLOR.fg} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
+        <path d="M43 34c0 27 19 43 49 43" fill="none" stroke={COLOR.accent} strokeDasharray="82" strokeDashoffset={animate ? "82" : "0"} strokeLinecap="round" strokeWidth="3">
+          {animate ? <animate attributeName="stroke-dashoffset" dur="2.5s" values="82;0;0;82" keyTimes="0;.4;.72;1" repeatCount="indefinite" /> : null}
+        </path>
+      </g>
+      <path d="M99 49h37M99 59h27" stroke={COLOR.fg2} strokeLinecap="round" strokeWidth="2" />
+    </>
+  );
+}
+
+function LayerActionPreview({ animate, action }: { animate: boolean; action: "visibility" | "lock" | "merge" | "actions" }): ReactElement {
+  return (
+    <>
+      {[0, 1, 2].map((index) => (
+        <path key={index} d={`m108 ${17 + index * 18} 53 18-53 18-53-18Z`} fill={index === 1 ? COLOR.accentSoft : COLOR.canvas} stroke={index === 1 ? COLOR.accent : COLOR.lineStrong} strokeLinejoin="round" strokeWidth="1.7" opacity={action === "merge" && animate ? `${.45 + index * .2}` : "1"}>
+          {action === "merge" && animate ? <animateTransform attributeName="transform" type="translate" dur="2.8s" values={`0 0;0 ${18 - index * 18};0 ${18 - index * 18};0 0`} keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}
+        </path>
+      ))}
+      {action === "visibility" ? <><path d="M160 37c9-9 22-9 31 0-9 9-22 9-31 0Z" fill="none" stroke={COLOR.fg2} strokeWidth="2" /><circle cx="176" cy="37" r="4" fill={COLOR.accent}>{animate ? <animate attributeName="opacity" dur="1.5s" values=".15;1;.15" repeatCount="indefinite" /> : null}</circle></> : null}
+      {action === "lock" ? <g transform="translate(174 52)"><rect x="-12" y="-2" width="24" height="20" rx="4" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeWidth="2" /><path d="M-7-2v-7a7 7 0 0 1 14 0v7" fill="none" stroke={COLOR.fg} strokeWidth="2">{animate ? <animate attributeName="d" dur="2.5s" values="M-7-2v-7a7 7 0 0 1 14 0v7;M-7-2v-7a7 7 0 0 1 14 0v7;M-7-2v-7a7 7 0 0 1 12-5v7;M-7-2v-7a7 7 0 0 1 14 0v7" keyTimes="0;.45;.7;1" repeatCount="indefinite" /> : null}</path></g> : null}
+      {action === "actions" ? <g>{[76, 108, 140].map((x, index) => <circle key={x} cx={x} cy="90" r="5" fill={index === 1 ? COLOR.accent : COLOR.fg2}>{animate && index === 1 ? <animate attributeName="r" dur="1.4s" values="4;7;4" repeatCount="indefinite" /> : null}</circle>)}</g> : null}
+      {action === "merge" ? <path d="M165 83h24m-12-12v24" stroke={COLOR.accent} strokeLinecap="round" strokeWidth="2.5" /> : null}
+    </>
+  );
+}
+
+function ObjectTransformActionPreview({ animate, action }: { animate: boolean; action: "translate" | "rotate" | "scale" | "ground" }): ReactElement {
+  return (
+    <>
+      <path d="m108 25 35 18-35 18-35-18Z" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeLinejoin="round" strokeWidth="2" />
+      <path d="m73 43 35 18 35-18v34l-35 18-35-18Z" fill={COLOR.canvas} stroke={COLOR.fg2} strokeLinejoin="round" strokeWidth="2" />
+      {action === "translate" ? <g transform={animate ? undefined : "translate(18 -9)"}><path d="M108 20V6m0 0-5 7m5-7 5 7M148 48h18m0 0-7-5m7 5-7 5" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />{animate ? <animateTransform attributeName="transform" type="translate" dur="2.7s" values="0 0;18 -9;18 -9;0 0" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}</g> : null}
+      {action === "rotate" ? <path d="M61 52a51 30 0 0 0 96 0m0 0-11 3m11-3-4-10" fill="none" stroke={COLOR.accent} strokeDasharray={animate ? "150" : undefined} strokeDashoffset={animate ? "150" : undefined} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5">{animate ? <animate attributeName="stroke-dashoffset" dur="2.5s" values="150;0;0" keyTimes="0;.7;1" repeatCount="indefinite" /> : null}</path> : null}
+      {action === "scale" ? <g transform={animate ? undefined : "translate(15 -10) scale(1.12)"}><path d="M65 31 51 17m0 0 11 2m-11-2 2 11M151 75l14 14m0 0-11-2m11 2-2-11" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />{animate ? <animateTransform attributeName="transform" type="scale" dur="2.7s" values=".88;1.12;1.12;.88" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}</g> : null}
+      {action === "ground" ? <><path d="M43 91h130" stroke={COLOR.accent} strokeDasharray="5 4" strokeWidth="2" /><g transform={animate ? undefined : "translate(0 0)"}><path d="M164 54v25m0 0-7-8m7 8 7-8" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />{animate ? <animateTransform attributeName="transform" type="translate" dur="2.7s" values="0 -18;0 0;0 0;0 -18" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}</g></> : null}
+    </>
+  );
+}
+
+function CameraActionPreview({ animate, action }: { animate: boolean; action: "zoom" | "reset" | "orbit" | "quad" }): ReactElement {
+  if (action === "quad") {
+    return (
+      <>
+        {[0, 1, 2, 3].map((index) => <rect key={index} x={48 + (index % 2) * 61} y={19 + Math.floor(index / 2) * 36} width="56" height="31" rx="4" fill={index === 0 ? COLOR.accentSoft : COLOR.canvas} stroke={index === 0 ? COLOR.accent : COLOR.lineStrong} />)}
+        <circle cx={animate ? "76" : "137"} cy={animate ? "35" : "71"} r="5" fill={COLOR.accent}>{animate ? <><animate attributeName="cx" dur="2.8s" values="76;137;137;76" keyTimes="0;.45;.72;1" repeatCount="indefinite" /><animate attributeName="cy" dur="2.8s" values="35;71;71;35" keyTimes="0;.45;.72;1" repeatCount="indefinite" /></> : null}</circle>
+      </>
+    );
+  }
+  return (
+    <>
+      <circle cx="108" cy="52" r="25" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeWidth="2" />
+      <path d="M98 72v-16h20v16M101 56v-12h14v12M108 44V33" fill="none" stroke={COLOR.fg2} strokeLinejoin="round" strokeWidth="2" />
+      {action === "zoom" ? <g transform={animate ? undefined : "translate(32 18)"}><circle cx="142" cy="68" r="15" fill={COLOR.card} stroke={COLOR.fg} strokeWidth="2" /><path d="M153 79l11 10M136 68h12M142 62v12" stroke={COLOR.fg} strokeLinecap="round" strokeWidth="2.3" />{animate ? <animateTransform attributeName="transform" type="translate" dur="2.7s" values="0 0;-22 -13;-22 -13;0 0" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}</g> : null}
+      {action === "reset" ? <path d="M72 38a42 42 0 1 1-1 31m1-31-13 1m13-1-5-12" fill="none" stroke={COLOR.accent} strokeDasharray={animate ? "190" : undefined} strokeDashoffset={animate ? "190" : undefined} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5">{animate ? <animate attributeName="stroke-dashoffset" dur="2.8s" values="190;0;0" keyTimes="0;.72;1" repeatCount="indefinite" /> : null}</path> : null}
+      {action === "orbit" ? <><ellipse cx="108" cy="52" rx="65" ry="32" fill="none" stroke={COLOR.fg3} strokeDasharray="4 4" /><circle cx={animate ? "43" : "173"} cy="52" r="7" fill={COLOR.accent}>{animate ? <animate attributeName="cx" dur="2.8s" values="43;173;43" repeatCount="indefinite" /> : null}</circle></> : null}
+    </>
+  );
+}
+
+function LineArtPreview({ animate }: { animate: boolean }): ReactElement {
+  return (
+    <>
+      <path d="m108 20 48 25-48 25-48-25Z" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeLinejoin="round" strokeWidth="2" />
+      <path d="m60 45 48 25 48-25v34l-48 25-48-25Z" fill={COLOR.canvas} stroke={COLOR.fg2} strokeLinejoin="round" strokeWidth="2" />
+      <path d="M108 70V35M60 45l48-10 48 10M60 79l48-9 48 9" fill="none" stroke={COLOR.fg} strokeDasharray={animate ? "160" : undefined} strokeDashoffset={animate ? "160" : undefined} strokeWidth="1.7">
+        {animate ? <animate attributeName="stroke-dashoffset" dur="2.8s" values="160;0;0" keyTimes="0;.72;1" repeatCount="indefinite" /> : null}
+      </path>
+    </>
+  );
+}
+
+function FrameActionPreview({ animate, action }: { animate: boolean; action: "capture" | "playback" | "reorder" | "duplicate" | "delete" }): ReactElement {
+  const cards = [52, 92, 132];
+  return (
+    <>
+      {cards.map((x, index) => (
+        <g key={x} opacity={action === "delete" && index === 1 && animate ? ".2" : "1"}>
+          <rect x={x} y="27" width="32" height="43" rx="5" fill={index === 1 ? COLOR.accentSoft : COLOR.canvas} stroke={index === 1 ? COLOR.accent : COLOR.lineStrong} strokeWidth="1.7">
+            {action === "delete" && index === 1 && animate ? <animate attributeName="opacity" dur="2.5s" values="1;.12;.12;1" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}
+          </rect>
+          <circle cx={x + 10} cy="39" r="4" fill={index === 1 ? COLOR.accent : COLOR.fg3} />
+          <path d={`M${x + 5} 62l8-9 6 6 7-8`} fill="none" stroke={COLOR.fg2} strokeLinecap="round" strokeWidth="2" />
+        </g>
+      ))}
+      {action === "capture" ? <><rect x="75" y="74" width="66" height="18" rx="6" fill={COLOR.raised} stroke={COLOR.fg2} /><circle cx="108" cy="83" r="6" fill={COLOR.accent}>{animate ? <animate attributeName="r" dur="1.5s" values="4;7;4" repeatCount="indefinite" /> : null}</circle></> : null}
+      {action === "playback" ? <><path d="m93 76 17 10-17 10Z" fill={COLOR.accent} /><path d="M55 88h104" stroke={COLOR.fg3} strokeLinecap="round" strokeWidth="2" /><circle cx={animate ? "58" : "145"} cy="88" r="5" fill={COLOR.accent}>{animate ? <animate attributeName="cx" dur="2.6s" values="58;158;158;58" keyTimes="0;.68;.78;1" repeatCount="indefinite" /> : null}</circle></> : null}
+      {action === "reorder" ? <path d="M73 18h70m0 0-8-6m8 6-8 6M143 80H73m0 0 8-6m-8 6 8 6" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2">{animate ? <animate attributeName="stroke-dashoffset" dur="1.1s" values="0;-18" repeatCount="indefinite" /> : null}</path> : null}
+      {action === "duplicate" ? <g transform={animate ? undefined : "translate(0 0)"}><rect x="88" y="22" width="32" height="43" rx="5" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeWidth="2" />{animate ? <animateTransform attributeName="transform" type="translate" dur="2.6s" values="0 0;40 6;40 6;0 0" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}</g> : null}
+      {action === "delete" ? <path d="M94 78h28m-23 0 2 15h14l2-15m-14-5h10" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2">{animate ? <animate attributeName="opacity" dur="1.4s" values=".35;1;.35" repeatCount="indefinite" /> : null}</path> : null}
+    </>
+  );
+}
+
 function renderPreview(
   kind: StudioToolHintPreviewKind,
   animate: boolean,
@@ -1286,8 +1681,14 @@ function renderPreview(
   switch (kind) {
     case "select":
       return <SelectionPreview animate={animate} />;
+    case "transform":
+      return <TransformPreview animate={animate} />;
+    case "pan":
+      return <PanPreview animate={animate} />;
     case "ink":
       return <InkPreview animate={animate} />;
+    case "pixel-ink":
+      return <PixelInkPreview animate={animate} />;
     case "erase":
       return <ErasePreview animate={animate} />;
     case "fill":
@@ -1296,16 +1697,42 @@ function renderPreview(
       return <SamplePreview animate={animate} />;
     case "shape":
       return <ShapePreview animate={animate} />;
+    case "smart-shape":
+      return <ShapeKindPreview animate={animate} kind="smart" />;
+    case "shape-rect":
+      return <ShapeKindPreview animate={animate} kind="rect" />;
+    case "shape-ellipse":
+      return <ShapeKindPreview animate={animate} kind="ellipse" />;
     case "text":
       return <TextPreview animate={animate} clipId={`${id}-text-clip`} />;
     case "bubble":
       return <BubblePreview animate={animate} />;
+    case "comment":
+      return <CommentPreview animate={animate} />;
     case "image":
       return <ImagePreview animate={animate} />;
+    case "reference":
+      return <ReferencePreview animate={animate} />;
     case "filter":
       return <FilterPreview animate={animate} clipId={`${id}-filter-clip`} />;
+    case "smudge":
+      return <SmudgePreview animate={animate} />;
+    case "liquify":
+      return <LiquifyPreview animate={animate} />;
     case "lasso":
       return <LassoPreview animate={animate} />;
+    case "lasso-fill":
+      return <LassoFillPreview animate={animate} />;
+    case "marquee-rect":
+      return <MarqueePreview animate={animate} ellipse={false} />;
+    case "marquee-ellipse":
+      return <MarqueePreview animate={animate} ellipse />;
+    case "crop":
+      return <CropPreview animate={animate} />;
+    case "perspective":
+      return <PerspectivePreview animate={animate} />;
+    case "rotate-view":
+      return <RotateViewPreview animate={animate} />;
     case "brush-size":
       return <BrushSizePreview animate={animate} />;
     case "opacity":
@@ -1320,14 +1747,36 @@ function renderPreview(
       return <ZoomViewPreview animate={animate} />;
     case "history":
       return <HistoryPreview animate={animate} />;
+    case "undo":
+      return <HistoryStepPreview animate={animate} direction="undo" />;
+    case "redo":
+      return <HistoryStepPreview animate={animate} direction="redo" />;
     case "layer":
       return <LayerPreview animate={animate} />;
+    case "layer-visibility":
+      return <LayerActionPreview animate={animate} action="visibility" />;
+    case "layer-lock":
+      return <LayerActionPreview animate={animate} action="lock" />;
+    case "layer-merge":
+      return <LayerActionPreview animate={animate} action="merge" />;
+    case "layer-actions":
+      return <LayerActionPreview animate={animate} action="actions" />;
     case "timeline":
       return <TimelinePreview animate={animate} />;
     case "keyframe":
       return <KeyframePreview animate={animate} />;
     case "frame-sequence":
       return <FrameSequencePreview animate={animate} />;
+    case "frame-capture":
+      return <FrameActionPreview animate={animate} action="capture" />;
+    case "frame-playback":
+      return <FrameActionPreview animate={animate} action="playback" />;
+    case "frame-reorder":
+      return <FrameActionPreview animate={animate} action="reorder" />;
+    case "frame-duplicate":
+      return <FrameActionPreview animate={animate} action="duplicate" />;
+    case "frame-delete":
+      return <FrameActionPreview animate={animate} action="delete" />;
     case "onion-skin":
       return <OnionSkinPreview animate={animate} />;
     case "timelapse":
@@ -1340,12 +1789,46 @@ function renderPreview(
       return <AudioPreview animate={animate} />;
     case "object-3d":
       return <Object3dPreview animate={animate} />;
+    case "object-translate":
+      return <ObjectTransformActionPreview animate={animate} action="translate" />;
+    case "object-rotate":
+      return <ObjectTransformActionPreview animate={animate} action="rotate" />;
+    case "object-scale":
+      return <ObjectTransformActionPreview animate={animate} action="scale" />;
+    case "object-ground":
+      return <ObjectTransformActionPreview animate={animate} action="ground" />;
     case "pose-3d":
       return <Pose3dPreview animate={animate} />;
     case "camera-3d":
       return <Camera3dPreview animate={animate} />;
+    case "camera-zoom":
+      return <CameraActionPreview animate={animate} action="zoom" />;
+    case "camera-reset":
+      return <CameraActionPreview animate={animate} action="reset" />;
+    case "camera-orbit":
+      return <CameraActionPreview animate={animate} action="orbit" />;
+    case "quad-view":
+      return <CameraActionPreview animate={animate} action="quad" />;
     case "lighting-3d":
       return <Lighting3dPreview animate={animate} />;
+    case "line-art":
+      return <LineArtPreview animate={animate} />;
+    case "assets":
+      return <WorkspaceActionPreview animate={animate} kind="assets" />;
+    case "export":
+      return <WorkspaceActionPreview animate={animate} kind="export" />;
+    case "project":
+      return <WorkspaceActionPreview animate={animate} kind="project" />;
+    case "fullscreen":
+      return <WorkspaceActionPreview animate={animate} kind="fullscreen" />;
+    case "settings":
+      return <WorkspaceActionPreview animate={animate} kind="settings" />;
+    case "save":
+      return <WorkspaceActionPreview animate={animate} kind="save" />;
+    case "publish":
+      return <WorkspaceActionPreview animate={animate} kind="publish" />;
+    case "ai-assist":
+      return <WorkspaceActionPreview animate={animate} kind="ai" />;
   }
 }
 

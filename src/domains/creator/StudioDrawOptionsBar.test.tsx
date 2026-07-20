@@ -152,7 +152,7 @@ describe("StudioDrawOptionsBar", () => {
       "pressure",
       "symmetry",
       "shape",
-      "zoom-view",
+      "rotate-view",
       "ink",
       "erase",
     ]) {

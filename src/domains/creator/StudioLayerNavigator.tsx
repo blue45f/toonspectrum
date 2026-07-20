@@ -1035,7 +1035,7 @@ export function StudioLayerNavigator({
               id: "layer-batch-show",
               title: "선택 레이어 표시",
               description: "현재 검색 결과 안에서 선택한 숨김 레이어를 다시 보이게 합니다.",
-              preview: "layer",
+              preview: "layer-visibility",
             }}
           >
             <button
@@ -1062,7 +1062,7 @@ export function StudioLayerNavigator({
               id: "layer-batch-hide",
               title: "선택 레이어 숨김",
               description: "선택한 레이어를 문서에서 지우지 않고 캔버스에서만 숨깁니다.",
-              preview: "layer",
+              preview: "layer-visibility",
               tip: "나중에 눈 아이콘으로 다시 표시할 수 있어요.",
             }}
           >
@@ -1090,7 +1090,7 @@ export function StudioLayerNavigator({
               id: "layer-batch-lock",
               title: "선택 레이어 잠금",
               description: "선택한 레이어를 고정해 캔버스에서 실수로 이동하거나 편집하지 않도록 보호합니다.",
-              preview: "layer",
+              preview: "layer-lock",
             }}
           >
             <button
@@ -1119,7 +1119,7 @@ export function StudioLayerNavigator({
               id: "layer-batch-unlock",
               title: "선택 레이어 잠금 해제",
               description: "선택한 레이어의 보호 상태를 풀어 다시 이동·변형·편집할 수 있게 합니다.",
-              preview: "layer",
+              preview: "layer-lock",
             }}
           >
             <button
@@ -1146,7 +1146,7 @@ export function StudioLayerNavigator({
               id: "layer-batch-merge-selected",
               title: "선택 레이어 병합",
               description: "선택한 두 개 이상의 레이어를 표시 순서대로 하나의 결과로 합칩니다.",
-              preview: "layer",
+              preview: "layer-merge",
               tip: "편집 가능한 원본을 유지하려면 병합 전에 프로젝트 체크포인트를 만들어 두세요.",
             }}
           >
@@ -1168,7 +1168,7 @@ export function StudioLayerNavigator({
               id: "layer-batch-flatten-visible",
               title: "표시 레이어 병합",
               description: "현재 보이는 레이어 전체를 화면에 보이는 순서대로 하나의 결과로 합칩니다.",
-              preview: "layer",
+              preview: "layer-merge",
               tip: "숨겨진 레이어는 결과에 포함되지 않아요.",
             }}
           >
@@ -1188,7 +1188,7 @@ export function StudioLayerNavigator({
               id: "layer-batch-more",
               title: "일괄 작업 더보기",
               description: "선택 레이어의 그룹·역할·색 라벨·삭제 작업을 한 메뉴에서 실행합니다.",
-              preview: "layer",
+              preview: "layer-actions",
             }}
           >
             <button

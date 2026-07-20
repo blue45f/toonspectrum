@@ -634,7 +634,7 @@ export function StudioDrawOptionsBar({
                   ? "작업 캔버스를 원래 방향으로 되돌립니다. 데이터는 바뀌지 않아 비율과 실루엣을 점검할 때 안전해요."
                   : "캔버스를 거울처럼 좌우로 보여 비율·기울기 오류를 새 눈으로 확인합니다. 작품 데이터 자체는 뒤집히지 않아요.",
                 undefined,
-                "zoom-view"
+                "rotate-view"
               )}
             >
               <button

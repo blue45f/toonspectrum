@@ -303,7 +303,7 @@ export function StudioFrameAnimationPanel({
                 id: "frame-reorder-previous",
                 title: "프레임을 앞으로 이동",
                 description: "선택 프레임을 필름스트립에서 한 칸 앞으로 옮겨 재생 순서를 바꿉니다.",
-                preview: "frame-sequence",
+                preview: "frame-reorder",
               }}
             >
               <button
@@ -326,7 +326,7 @@ export function StudioFrameAnimationPanel({
                 id: "frame-duplicate",
                 title: "프레임 복제",
                 description: "선택 프레임을 바로 다음 칸에 복제해 이어지는 동작을 빠르게 만듭니다.",
-                preview: "frame-sequence",
+                preview: "frame-duplicate",
               }}
             >
               <button
@@ -349,7 +349,7 @@ export function StudioFrameAnimationPanel({
                 id: "frame-delete",
                 title: "프레임 삭제",
                 description: "선택 프레임을 애니메이션에서 제거하고 인접 프레임으로 이동합니다.",
-                preview: "frame-sequence",
+                preview: "frame-delete",
               }}
             >
               <button
@@ -372,7 +372,7 @@ export function StudioFrameAnimationPanel({
                 id: "frame-reorder-next",
                 title: "프레임을 뒤로 이동",
                 description: "선택 프레임을 필름스트립에서 한 칸 뒤로 옮겨 재생 순서를 바꿉니다.",
-                preview: "frame-sequence",
+                preview: "frame-reorder",
               }}
             >
               <button
@@ -400,7 +400,7 @@ export function StudioFrameAnimationPanel({
               id: "frame-capture",
               title: "현재 그림을 새 프레임으로 캡처",
               description: "캔버스의 현재 모습을 래스터 프레임으로 저장해 필름스트립 끝에 추가합니다.",
-              preview: "frame-sequence",
+              preview: "frame-capture",
               tip: "새 프레임에서 그림을 조금씩 바꾸고 다시 캡처하면 자연스러운 플립북 동작이 됩니다.",
             }}
           >
@@ -471,7 +471,7 @@ export function StudioFrameAnimationPanel({
                   id: "frame-playback",
                   title: "프레임 애니메이션 재생",
                   description: "필름스트립을 프레임별 시간과 FPS 설정에 맞춰 플립북처럼 미리 재생합니다.",
-                  preview: "frame-sequence",
+                  preview: "frame-playback",
                   tip: "각 프레임에 개별 시간을 입력하면 강조할 동작만 더 오래 보여줄 수 있어요.",
                 }}
               >

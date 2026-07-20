@@ -3,7 +3,7 @@
  * Pure data for StudioToolHint / rail buttons. No brand clones.
  */
 
-import type { StudioToolHintPreviewKind } from "./components/StudioToolHintPreview";
+import type { StudioToolHintPreviewKind } from "./studio-tool-hint-preview-kind";
 
 export type StudioToolHintSpec = {
   id: string;
@@ -62,20 +62,20 @@ const HINTS: Record<string, StudioToolHintSpec> = {
     id: "smart-shape",
     title: "스마트 도형",
     description: "낙서를 잠시 멈추면 선·원·사각형 등 깔끔한 도형으로 자동 다듬어요. AutoDraw 계열 보조 기능입니다.",
-    preview: "shape",
+    preview: "smart-shape",
     tip: "획 끝에서 잠깐 멈추면 원래 손맛을 유지한 채 모양만 정리합니다.",
   },
   "shape-rect": {
     id: "shape-rect",
     title: "사각형 도형",
     description: "드래그로 사각형을 그립니다. Shift를 누르면 정사각형으로 맞출 수 있어요.",
-    preview: "shape",
+    preview: "shape-rect",
   },
   "shape-ellipse": {
     id: "shape-ellipse",
     title: "타원 도형",
     description: "드래그로 타원을 그립니다. Shift를 누르면 정원으로 맞출 수 있어요.",
-    preview: "shape",
+    preview: "shape-ellipse",
   },
   text: {
     id: "text",
@@ -145,6 +145,7 @@ export function studioToolHint(id: string): StudioToolHintSpec | null {
 const REGISTERED_HINT_ID_BY_LABEL: Readonly<Record<string, string>> = {
   선택: "select",
   변형: "transform",
+  자르기: "crop",
   핸드: "hand",
   펜: "pen",
   "픽셀 펜": "pixel-pencil",
@@ -182,9 +183,15 @@ const REGISTERED_HINT_ID_BY_LABEL: Readonly<Record<string, string>> = {
   "사각 선택": "marquee-rect",
   "원형 선택": "marquee-circle",
   댓글: "comment",
+  "댓글 핀 배치": "comment",
+  "댓글 핀 배치 취소": "comment",
   투시도: "perspective",
+  "참고 이미지": "reference",
+  "보기 확대·축소": "zoom-view",
+  "보기 회전": "rotate-view",
+  "더보기 · 툴바 설정": "settings",
   "화면 맞춤": "zoom-view",
-  "보기 반전": "zoom-view",
+  "보기 반전": "rotate-view",
   확대: "zoom-view",
   축소: "zoom-view",
   되돌리기: "undo",
@@ -209,7 +216,7 @@ export function studioToolHintFromLabel(
   shortcut?: string,
   preview?: StudioToolHintPreviewKind
 ): StudioToolHintSpec {
-  const cleanTitle = title.replace(/\s*\([^)]*\)\s*$/u, "").trim() || title;
+  const cleanTitle = title.replace(/(?:\s*\([^)]*\))+\s*$/u, "").trim() || title;
   const normalizedLabel = cleanTitle.normalize("NFKC").trim().toLocaleLowerCase("ko-KR");
   const registeredId =
     REGISTERED_HINT_ID_BY_LABEL[normalizedLabel] ??

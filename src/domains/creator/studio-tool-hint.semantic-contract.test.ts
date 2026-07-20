@@ -4,10 +4,10 @@ import { studioToolHintPreview } from "./studio-tool-hint-preview-routing";
 
 describe("Studio motion-coach semantic preview contract", () => {
   it.each([
-    ["toolbar:undo", "history"],
+    ["toolbar:undo", "undo"],
     ["quick-access/brush_size", "brush-size"],
     ["engine:filters/gaussian_blur", "filter"],
-    ["studio:tools/marquee_rect", "lasso"],
+    ["studio:tools/marquee_rect", "marquee-rect"],
   ] as const)("uses the namespaced action identity %s", (id, expected) => {
     expect(
       studioToolHintPreview({

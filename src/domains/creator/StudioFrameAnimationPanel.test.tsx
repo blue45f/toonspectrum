@@ -59,7 +59,11 @@ describe("StudioFrameAnimationPanel motion coach", () => {
     expect(source).toContain('id: "frame-capture"');
     expect(source).toContain('id: "frame-playback"');
     expect(source).toContain('id: "frame-onion-skin"');
-    expect(source).toContain('preview: "frame-sequence"');
+    expect(source).toContain('preview: "frame-capture"');
+    expect(source).toContain('preview: "frame-playback"');
+    expect(source).toContain('preview: "frame-reorder"');
+    expect(source).toContain('preview: "frame-duplicate"');
+    expect(source).toContain('preview: "frame-delete"');
     expect(source).toContain('preview: "onion-skin"');
   });
 

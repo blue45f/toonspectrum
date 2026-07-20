@@ -24,6 +24,7 @@ describe("Studio 3D viewport Motion Coach integration", () => {
       "bg3d:history:redo",
       "bg3d:transform:snap",
       "bg3d:object:ground",
+      "bg3d:object:origin-ground",
       "bg3d:camera:focus-selection",
       "bg3d:camera:zoom-in",
       "bg3d:camera:zoom-out",
@@ -33,9 +34,16 @@ describe("Studio 3D viewport Motion Coach integration", () => {
       expect(backgroundSource).toContain(`id: "${id}"`);
     }
 
-    expect(backgroundSource).toContain('preview: "object-3d"');
-    expect(backgroundSource).toContain('preview: "camera-3d"');
-    expect(backgroundSource).toContain('preview: "history"');
+    expect(backgroundSource).toContain('preview: "object-translate"');
+    expect(backgroundSource).toContain('preview: "object-rotate"');
+    expect(backgroundSource).toContain('preview: "object-scale"');
+    expect(backgroundSource).toContain('preview: "object-ground"');
+    expect(backgroundSource).toContain('preview: "camera-zoom"');
+    expect(backgroundSource).toContain('preview: "camera-reset"');
+    expect(backgroundSource).toContain('preview: "quad-view"');
+    expect(backgroundSource).toContain('preview: "line-art"');
+    expect(backgroundSource).toContain('preview: "undo"');
+    expect(backgroundSource).toContain('preview: "redo"');
   });
 
   it("replaces native background toolbar titles and explains unavailable actions", () => {
@@ -95,6 +103,10 @@ describe("Studio 3D viewport Motion Coach integration", () => {
     ]) {
       expect(vrmSource).toContain(`id: "${id}"`);
     }
+
+    expect(vrmSource).toContain('preview: "camera-zoom"');
+    expect(vrmSource).toContain('preview: "camera-reset"');
+    expect(vrmSource).toContain('preview: "camera-orbit"');
 
     const toolbar = sliceBetween(
       vrmSource,

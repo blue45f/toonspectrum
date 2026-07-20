@@ -1,44 +1,13 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
+import { STUDIO_TOOL_HINT_PREVIEW_KINDS } from "../studio-tool-hint-preview-kind";
+
 import {
   StudioToolHintPreview,
-  type StudioToolHintPreviewKind,
 } from "./StudioToolHintPreview";
 
-const PREVIEW_KINDS = [
-  "select",
-  "ink",
-  "erase",
-  "fill",
-  "sample",
-  "shape",
-  "text",
-  "bubble",
-  "image",
-  "filter",
-  "lasso",
-  "brush-size",
-  "opacity",
-  "stabilizer",
-  "pressure",
-  "symmetry",
-  "zoom-view",
-  "history",
-  "layer",
-  "timeline",
-  "keyframe",
-  "frame-sequence",
-  "onion-skin",
-  "timelapse",
-  "motion-fx",
-  "video-export",
-  "audio",
-  "object-3d",
-  "pose-3d",
-  "camera-3d",
-  "lighting-3d",
-] as const satisfies readonly StudioToolHintPreviewKind[];
+const PREVIEW_KINDS = STUDIO_TOOL_HINT_PREVIEW_KINDS;
 
 describe("StudioToolHintPreview", () => {
   it.each(PREVIEW_KINDS)("renders the %s micro-demo with stable integration hooks", (kind) => {
@@ -61,6 +30,29 @@ describe("StudioToolHintPreview", () => {
 
     expect(html).toContain('data-motion="animated"');
     expect(html).toContain("<animate");
+  });
+
+  it("gives formerly over-shared actions different visual signatures", () => {
+    const actionKinds = [
+      "pan",
+      "transform",
+      "crop",
+      "comment",
+      "perspective",
+      "smudge",
+      "liquify",
+      "reference",
+      "rotate-view",
+      "frame-capture",
+      "frame-playback",
+      "frame-duplicate",
+      "frame-delete",
+    ] as const;
+    const signatures = actionKinds.map((kind) =>
+      renderToStaticMarkup(<StudioToolHintPreview kind={kind} reducedMotion />)
+    );
+
+    expect(new Set(signatures).size).toBe(actionKinds.length);
   });
 
   it("is decorative by default and can become a named image", () => {

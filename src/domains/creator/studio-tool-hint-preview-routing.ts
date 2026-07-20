@@ -5,44 +5,48 @@ import {
   type StudioToolHintSpec,
 } from "./studio-tool-hints";
 
-import type { StudioToolHintPreviewKind } from "./components/StudioToolHintPreview";
+import type { StudioToolHintPreviewKind } from "./studio-tool-hint-preview-kind";
 
 const STUDIO_ACTION_PREVIEW_BY_ID: Readonly<Record<string, StudioToolHintPreviewKind>> = {
   select: "select",
-  transform: "select",
+  transform: "transform",
+  crop: "crop",
   pen: "ink",
-  "pixel-pencil": "ink",
+  "pixel-pencil": "pixel-ink",
   eraser: "erase",
   fill: "fill",
   "advanced-fill": "fill",
   eyedropper: "sample",
-  "smart-shape": "shape",
-  "shape-rect": "shape",
-  "shape-ellipse": "shape",
-  perspective: "shape",
+  "smart-shape": "smart-shape",
+  "shape-rect": "shape-rect",
+  "shape-ellipse": "shape-ellipse",
+  perspective: "perspective",
   shape: "shape",
   text: "text",
   bubble: "bubble",
-  comment: "bubble",
+  comment: "comment",
   image: "image",
-  reference: "image",
+  reference: "reference",
   "frame-anim": "frame-sequence",
-  "frame-capture": "frame-sequence",
-  "frame-playback": "frame-sequence",
-  "frame-reorder": "frame-sequence",
-  "frame-duplicate": "frame-sequence",
-  "frame-delete": "frame-sequence",
+  "frame-capture": "frame-capture",
+  "frame-playback": "frame-playback",
+  "frame-reorder": "frame-reorder",
+  "frame-reorder-previous": "frame-reorder",
+  "frame-reorder-next": "frame-reorder",
+  "frame-duplicate": "frame-duplicate",
+  "frame-delete": "frame-delete",
   filter: "filter",
-  liquify: "filter",
-  blend: "filter",
+  liquify: "liquify",
+  blend: "smudge",
+  smudge: "smudge",
   lasso: "lasso",
   "poly-lasso": "lasso",
   "pixel-select": "lasso",
-  "marquee-rect": "lasso",
-  "marquee-circle": "lasso",
-  rect: "lasso",
-  ellipse: "lasso",
-  "lasso-fill": "lasso",
+  "marquee-rect": "marquee-rect",
+  "marquee-circle": "marquee-ellipse",
+  rect: "marquee-rect",
+  ellipse: "marquee-ellipse",
+  "lasso-fill": "lasso-fill",
   "brush-settings": "brush-size",
   "brush-size": "brush-size",
   "stroke-width": "brush-size",
@@ -60,17 +64,22 @@ const STUDIO_ACTION_PREVIEW_BY_ID: Readonly<Record<string, StudioToolHintPreview
   zoom: "zoom-view",
   "zoom-fit": "zoom-view",
   "fit-width": "zoom-view",
-  "rotate-view": "zoom-view",
-  "flip-view": "zoom-view",
-  hand: "zoom-view",
-  pan: "zoom-view",
+  "rotate-view": "rotate-view",
+  "flip-view": "rotate-view",
+  hand: "pan",
+  pan: "pan",
   history: "history",
-  undo: "history",
-  redo: "history",
+  undo: "undo",
+  redo: "redo",
   layer: "layer",
   layers: "layer",
   "add-layer": "layer",
   "duplicate-layer": "layer",
+  "show-layer": "layer-visibility",
+  "hide-layer": "layer-visibility",
+  "lock-layer": "layer-lock",
+  "unlock-layer": "layer-lock",
+  "merge-layer": "layer-merge",
   timeline: "timeline",
   "animation-timeline": "timeline",
   playback: "timeline",
@@ -91,19 +100,32 @@ const STUDIO_ACTION_PREVIEW_BY_ID: Readonly<Record<string, StudioToolHintPreview
   sfx: "audio",
   "object-3d": "object-3d",
   "transform-3d": "object-3d",
-  "translate-3d": "object-3d",
-  "rotate-3d": "object-3d",
-  "scale-3d": "object-3d",
+  "translate-3d": "object-translate",
+  "rotate-3d": "object-rotate",
+  "scale-3d": "object-scale",
   "pose-3d": "pose-3d",
   "hand-pose": "pose-3d",
   "body-pose": "pose-3d",
   "camera-3d": "camera-3d",
-  "orbit-camera": "camera-3d",
-  "reset-camera": "camera-3d",
-  "quad-view": "camera-3d",
+  "zoom-camera": "camera-zoom",
+  "orbit-camera": "camera-orbit",
+  "reset-camera": "camera-reset",
+  "quad-view": "quad-view",
   "lighting-3d": "lighting-3d",
   "light-direction": "lighting-3d",
   "light-intensity": "lighting-3d",
+  assets: "assets",
+  asset: "assets",
+  export: "export",
+  download: "export",
+  project: "project",
+  fullscreen: "fullscreen",
+  immersive: "fullscreen",
+  settings: "settings",
+  save: "save",
+  draft: "save",
+  publish: "publish",
+  ai: "ai-assist",
 };
 
 const STUDIO_FILTER_ENGINE_IDS = new Set(
@@ -133,6 +155,23 @@ function tokensIncludeAny(tokens: ReadonlySet<string>, values: readonly string[]
 function previewFromIdentityTokens(tokens: ReadonlySet<string>): StudioToolHintPreviewKind | null {
   if (tokensIncludeAny(tokens, ["지우개", "지우기", "eraser", "erase"])) return "erase";
   if (tokensIncludeAny(tokens, ["스포이드", "색추출", "eyedropper", "sample"])) return "sample";
+  if (tokensIncludeAny(tokens, ["자르기", "crop"])) return "crop";
+  if (tokensIncludeAny(tokens, ["변형", "transform"])) return "transform";
+  if (tokensIncludeAny(tokens, ["댓글", "코멘트", "comment"])) return "comment";
+  if (tokensIncludeAny(tokens, ["투시도", "소실점", "perspective"])) return "perspective";
+  if (tokensIncludeAny(tokens, ["참고", "레퍼런스", "reference"])) return "reference";
+  if (tokensIncludeAny(tokens, ["리퀴파이", "액체화", "liquify"])) return "liquify";
+  if (tokensIncludeAny(tokens, ["스머지", "혼합", "smudge", "blend"])) return "smudge";
+  if (tokensIncludeAny(tokens, ["핸드", "이동보기", "hand", "pan"])) return "pan";
+  if (tokensIncludeAny(tokens, ["회전", "반전", "rotate", "flip"])) return "rotate-view";
+  if (tokensIncludeAny(tokens, ["설정", "settings"])) return "settings";
+  if (tokensIncludeAny(tokens, ["저장", "임시저장", "save", "draft"])) return "save";
+  if (tokensIncludeAny(tokens, ["게시", "발행", "publish"])) return "publish";
+  if (tokensIncludeAny(tokens, ["내보내기", "다운로드", "export", "download"])) return "export";
+  if (tokensIncludeAny(tokens, ["에셋", "소재", "assets", "asset"])) return "assets";
+  if (tokensIncludeAny(tokens, ["전체화면", "몰입", "fullscreen", "immersive"])) return "fullscreen";
+  if (tokensIncludeAny(tokens, ["프로젝트", "project"])) return "project";
+  if (tokensIncludeAny(tokens, ["ai", "인공지능"])) return "ai-assist";
   if (tokensIncludeAny(tokens, ["올가미", "라쏘", "lasso"])) return "lasso";
   if (tokensIncludeAny(tokens, ["채우기", "채움", "fill", "bucket"])) return "fill";
   if (tokensIncludeAny(tokens, ["불투명도", "opacity"])) return "opacity";
@@ -140,23 +179,25 @@ function previewFromIdentityTokens(tokens: ReadonlySet<string>): StudioToolHintP
   if (tokensIncludeAny(tokens, ["보정", "안정화", "stabilizer", "smoothing"])) return "stabilizer";
   if (tokensIncludeAny(tokens, ["대칭", "symmetry", "mirror"])) return "symmetry";
   if (tokensIncludeAny(tokens, ["굵기", "brushsize"])) return "brush-size";
-  if (tokensIncludeAny(tokens, ["되돌리기", "실행취소", "다시실행", "undo", "redo", "history"])) return "history";
+  if (tokensIncludeAny(tokens, ["다시실행", "redo"])) return "redo";
+  if (tokensIncludeAny(tokens, ["되돌리기", "실행취소", "undo"])) return "undo";
+  if (tokensIncludeAny(tokens, ["작업내역", "history"])) return "history";
   if (tokensIncludeAny(tokens, ["레이어", "layer", "layers"])) return "layer";
   if (tokensIncludeAny(tokens, ["키프레임", "keyframe"])) return "keyframe";
   if (tokensIncludeAny(tokens, ["타임라인", "재생", "timeline", "playback"])) return "timeline";
   if (tokensIncludeAny(tokens, ["어니언스킨", "onionskin"])) return "onion-skin";
   if (tokensIncludeAny(tokens, ["타임랩스", "timelapse"])) return "timelapse";
-  if (tokensIncludeAny(tokens, ["내보내기", "영상", "export", "video"])) return "video-export";
+  if (tokensIncludeAny(tokens, ["영상", "video"])) return "video-export";
   if (tokensIncludeAny(tokens, ["오디오", "음악", "bgm", "sfx", "audio"])) return "audio";
   if (tokensIncludeAny(tokens, ["포즈", "관절", "pose", "joint"])) return "pose-3d";
   if (tokensIncludeAny(tokens, ["조명", "광원", "lighting", "light"])) return "lighting-3d";
   if (tokensIncludeAny(tokens, ["카메라", "시점", "camera", "orbit"])) return "camera-3d";
   if (tokensIncludeAny(tokens, ["3d", "오브젝트", "gizmo", "transform3d"])) return "object-3d";
-  if (tokensIncludeAny(tokens, ["확대", "축소", "줌", "zoom", "pan"])) return "zoom-view";
+  if (tokensIncludeAny(tokens, ["확대", "축소", "줌", "zoom"])) return "zoom-view";
   if (tokensIncludeAny(tokens, ["펜", "연필", "브러시", "pen", "pencil", "brush", "ink"])) return "ink";
-  if (tokensIncludeAny(tokens, ["말풍선", "대사", "댓글", "bubble", "comment"])) return "bubble";
+  if (tokensIncludeAny(tokens, ["말풍선", "대사", "bubble"])) return "bubble";
   if (tokensIncludeAny(tokens, ["텍스트", "글자", "자막", "text"])) return "text";
-  if (tokensIncludeAny(tokens, ["이미지", "사진", "프레임", "애니메이션", "소재", "image", "photo", "frame", "asset"])) return "image";
+  if (tokensIncludeAny(tokens, ["이미지", "사진", "프레임", "애니메이션", "image", "photo", "frame"])) return "image";
   if (tokensIncludeAny(tokens, ["도형", "사각형", "타원", "원근", "그리드", "shape", "rect", "ellipse", "grid"])) return "shape";
   if (tokensIncludeAny(tokens, ["필터", "블러", "왜곡", "리퀴파이", "혼합", "filter", "blur", "liquify", "blend"])) return "filter";
   return null;

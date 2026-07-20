@@ -30,14 +30,14 @@ describe("studio tool hints (rich hover copy)", () => {
         title: "액체화",
         description: "이미지 위를 밀어 국소 왜곡합니다.",
       })
-    ).toBe("filter");
+    ).toBe("liquify");
     expect(
       studioToolHintPreview({
         id: "comment",
         title: "댓글",
         description: "캔버스에 협업 댓글을 남깁니다.",
       })
-    ).toBe("bubble");
+    ).toBe("comment");
   });
 
   it.each([
@@ -47,7 +47,7 @@ describe("studio tool hints (rich hover copy)", () => {
     ["pen-pressure", "pressure"],
     ["symmetry", "symmetry"],
     ["zoom-fit", "zoom-view"],
-    ["undo", "history"],
+    ["undo", "undo"],
     ["add-layer", "layer"],
   ] as const)("resolves the stable %s action id before prose", (id, expected) => {
     expect(
@@ -78,13 +78,13 @@ describe("studio tool hints (rich hover copy)", () => {
     ["브러시", "brush-settings", "brush-size"],
     ["불투명도", "opacity", "opacity"],
     ["화면 맞춤", "zoom-view", "zoom-view"],
-    ["되돌리기", "undo", "history"],
+    ["되돌리기", "undo", "undo"],
     ["레이어", "layer", "layer"],
     ["텍스트 추가", "text", "text"],
-    ["핸드 (팬)", "hand", "zoom-view"],
-    ["픽셀 펜 (P)", "pixel-pencil", "ink"],
-    ["혼합 (스머지)", "blend", "filter"],
-    ["사각 선택 (M)", "marquee-rect", "lasso"],
+    ["핸드 (팬)", "hand", "pan"],
+    ["픽셀 펜 (P)", "pixel-pencil", "pixel-ink"],
+    ["혼합 (스머지)", "blend", "smudge"],
+    ["사각 선택 (M)", "marquee-rect", "marquee-rect"],
   ] as const)("turns the %s label into the stable %s id", (label, id, expectedPreview) => {
     const hint = studioToolHintFromLabel(label, "설명");
 
@@ -95,6 +95,41 @@ describe("studio tool hints (rich hover copy)", () => {
   it("creates a deterministic slug for an unregistered display label", () => {
     expect(studioToolHintFromLabel("커스텀 잉크 믹서 (⇧K)", "설명").id).toBe(
       "커스텀-잉크-믹서"
+    );
+  });
+
+  it.each([
+    ["선택 (V)", "select"],
+    ["핸드 (팬)", "pan"],
+    ["사각 선택 (M)", "marquee-rect"],
+    ["원형 선택", "marquee-ellipse"],
+    ["변형 (⇧T)", "transform"],
+    ["자르기 (C)", "crop"],
+    ["펜 (B)", "ink"],
+    ["픽셀 펜 (P)", "pixel-ink"],
+    ["지우개 (E)", "erase"],
+    ["혼합 (스머지) (N)", "smudge"],
+    ["리퀴파이 (J)", "liquify"],
+    ["채우기 (G)", "fill"],
+    ["스포이드 (I / Alt+클릭)", "sample"],
+    ["라쏘 필", "lasso-fill"],
+    ["올가미 선택", "lasso"],
+    ["댓글 핀 배치", "comment"],
+    ["투시도", "perspective"],
+    ["보기 확대·축소 (Z)", "zoom-view"],
+    ["보기 회전 (R)", "rotate-view"],
+    ["스마트 도형", "smart-shape"],
+    ["사각형 도형", "shape-rect"],
+    ["타원 도형", "shape-ellipse"],
+    ["텍스트 추가", "text"],
+    ["말풍선 추가", "bubble"],
+    ["이미지 추가", "image"],
+    ["프레임 애니메이션", "frame-sequence"],
+    ["참고 이미지", "reference"],
+    ["더보기 · 툴바 설정", "settings"],
+  ] as const)("routes the visible rail label %s to %s", (label, expectedPreview) => {
+    expect(studioToolHintPreview(studioToolHintFromLabel(label, "도구 설명"))).toBe(
+      expectedPreview
     );
   });
 
