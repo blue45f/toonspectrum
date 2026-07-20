@@ -34,7 +34,9 @@ const VITE_ERROR_OVERLAY_SELECTOR = [
 const EXPECTED_R3F_VERSION = "9.6.1";
 const EXPECTED_THREE_VERSION = "0.184.0";
 const R3F_CONTEXT_LOSS_DIAGNOSTIC = "THREE.WebGLRenderer: Context Lost.";
+const SHARED_POSE_CATALOG_API_PATH = "/api/creator/assets/catalog";
 const KTX2_SMOKE_MODEL_NAME = "studio-ktx2-runtime-smoke.glb";
+const KTX2_SMOKE_MODEL_LABEL = "studio-ktx2-runtime-smoke";
 
 // Three r184's official 40x40 ETC1S KTX2 example (MIT). The verifier embeds it into a minimal
 // self-contained GLB at runtime, so the production smoke exercises admission, the pinned Basis
@@ -290,6 +292,8 @@ async function run(page: Page, studioUrl: string): Promise<void> {
   const issues: string[] = [];
   const sharedPoseRequests: string[] = [];
   const pngEncoderWorkers: string[] = [];
+  const glbValidationWorkers: string[] = [];
+  const ktx2TranscoderWorkers: string[] = [];
   let expectingLiveContextLoss = false;
   let liveContextExplicitlyLost = false;
   let liveContextLossDiagnostics = 0;
@@ -316,13 +320,14 @@ async function run(page: Page, studioUrl: string): Promise<void> {
   });
   page.on("pageerror", (error) => issues.push(`pageerror: ${String(error)}`));
   page.on("worker", (worker) => {
-    if (worker.url().includes("studio-bg3d-shot-png.worker")) {
-      pngEncoderWorkers.push(worker.url());
-    }
+    const url = worker.url();
+    if (url.includes("studio-bg3d-shot-png.worker")) pngEncoderWorkers.push(url);
+    if (url.includes("studio-bg3d-glb-validation.worker")) glbValidationWorkers.push(url);
+    if (url.startsWith("blob:")) ktx2TranscoderWorkers.push(url);
   });
   page.on("request", (request) => {
     const url = new URL(request.url());
-    if (url.pathname === "/api/creator/assets" && request.method() === "GET") {
+    if (url.pathname === SHARED_POSE_CATALOG_API_PATH && request.method() === "GET") {
       sharedPoseRequests.push(request.url());
     }
   });
@@ -350,7 +355,7 @@ async function run(page: Page, studioUrl: string): Promise<void> {
   );
 
   await page.route(
-    (url) => url.pathname === "/api/creator/assets",
+    (url) => url.pathname === SHARED_POSE_CATALOG_API_PATH,
     (route) => route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -406,6 +411,53 @@ async function run(page: Page, studioUrl: string): Promise<void> {
   const backgroundDialog = page.getByTestId("studio-bg3d-dialog");
   await backgroundDialog.waitFor({ state: "visible", timeout: 25_000 });
   await page.waitForTimeout(1_000);
+
+  await backgroundDialog.getByRole("tab", { name: "모델", exact: true }).click();
+  await backgroundDialog.getByLabel("3D 모델 및 연결 파일 선택").setInputFiles({
+    name: KTX2_SMOKE_MODEL_NAME,
+    mimeType: "model/gltf-binary",
+    buffer: createKtx2SmokeGlb(),
+  });
+  const importedModelButton = backgroundDialog.getByRole("button", {
+    name: `${KTX2_SMOKE_MODEL_LABEL} 장면에 추가`,
+    exact: true,
+  });
+  try {
+    await importedModelButton.waitFor({ state: "visible", timeout: 90_000 });
+  } catch (cause) {
+    const dialogText = await backgroundDialog.innerText().catch(() => "(dialog unavailable)");
+    throw new Error(
+      `the KTX2 model did not enter the verified library:\n${dialogText.slice(-6_000)}`,
+      { cause },
+    );
+  }
+  await backgroundDialog.locator(
+    'section[aria-labelledby="bg3d-asset-library-title"][aria-busy="false"]',
+  ).waitFor({ state: "visible", timeout: 90_000 });
+
+  await backgroundDialog.getByRole("tab", { name: "레이어", exact: true }).click();
+  await backgroundDialog.getByText(`${KTX2_SMOKE_MODEL_LABEL} 1`, { exact: true }).waitFor({
+    state: "visible",
+    timeout: 30_000,
+  });
+  await backgroundDialog.getByText("모델 렌더 인스턴스를 준비하는 중입니다.", {
+    exact: true,
+  }).waitFor({ state: "hidden", timeout: 30_000 });
+  assertCondition(
+    await backgroundDialog.getByRole("alert").count() === 0,
+    "the KTX2 model produced a scene-recovery or render-clone failure",
+  );
+  assertCondition(
+    glbValidationWorkers.length > 0,
+    "the KTX2 model did not run through the off-main GLB validation worker",
+  );
+  assertCondition(
+    ktx2TranscoderWorkers.length > 0,
+    "the KTX2 model did not start the renderer-specific Basis transcoder worker",
+  );
+  await backgroundDialog.locator("canvas").first().evaluate(() => new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  }));
   await closeCanvasDialog(backgroundDialog, page);
 
   const overlayCount = await page.locator(VITE_ERROR_OVERLAY_SELECTOR).count();
