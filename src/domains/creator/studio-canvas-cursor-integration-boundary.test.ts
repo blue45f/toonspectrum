@@ -1,0 +1,37 @@
+import { readFileSync } from "node:fs";
+
+import { describe, expect, it } from "vitest";
+
+const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
+const perspectiveSource = readFileSync(new URL("./StudioPerspectiveOverlay.tsx", import.meta.url), "utf8");
+const isometricSource = readFileSync(new URL("./StudioIsometricGridOverlay.tsx", import.meta.url), "utf8");
+const guideSource = readFileSync(new URL("./StudioCanvasGuideLayers.tsx", import.meta.url), "utf8");
+
+describe("Studio canvas cursor integration boundary", () => {
+  it("projects pan cursors to the workspace and precision cursors only to the paper", () => {
+    expect(studioPageSource).toContain("studioCanvasViewportCursorClassName(canvasCursorInput)");
+    expect(studioPageSource).toContain("studioCanvasCursorClassName(canvasCursorInput)");
+    expect(studioPageSource).toContain("data-studio-viewport-cursor={viewportCursorClassName");
+    expect(studioPageSource).toContain("data-studio-canvas-cursor={canvasCursorClassName");
+  });
+
+  it.each(["tool-select", "tool-pen", "tool-eraser", "tool-pixel"])(
+    "disarms transient editing tools before the %s shortcut changes the base tool",
+    (shortcut) => {
+      const shortcutStart = studioPageSource.indexOf(`matchStudioShortcut(sc["${shortcut}"], e)`);
+      expect(shortcutStart).toBeGreaterThan(-1);
+      const shortcutBlock = studioPageSource.slice(shortcutStart, shortcutStart + 360);
+      expect(shortcutBlock.indexOf("disarmAllPixelTools();")).toBeGreaterThan(-1);
+      expect(shortcutBlock.indexOf("disarmAllPixelTools();")).toBeLessThan(
+        shortcutBlock.indexOf("setTool(")
+      );
+    }
+  );
+
+  it("lets guide handles restore the inherited mode cursor after hover", () => {
+    for (const source of [perspectiveSource, isometricSource, guideSource]) {
+      expect(source).not.toContain('style.cursor = "default"');
+      expect(source).toContain('style.cursor = ""');
+    }
+  });
+});

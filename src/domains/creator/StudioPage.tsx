@@ -13273,6 +13273,7 @@ function StudioCuttoonEditor() {
       }
       if (matchStudioShortcut(sc["tool-pen"], e)) {
         e.preventDefault();
+        disarmAllPixelTools();
         setTool("draw");
         setDrawMode("pen");
         setEyedropperActive(false);
@@ -13280,6 +13281,7 @@ function StudioCuttoonEditor() {
       }
       if (matchStudioShortcut(sc["tool-eraser"], e)) {
         e.preventDefault();
+        disarmAllPixelTools();
         setTool("draw");
         setDrawMode("eraser");
         setEyedropperActive(false);
@@ -13309,6 +13311,7 @@ function StudioCuttoonEditor() {
       if (matchStudioShortcut(sc["tool-pixel"], e)) {
         e.preventDefault();
         if (!activeSurfaceReviewLocked) {
+          disarmAllPixelTools();
           setTool("draw");
           setDrawMode("pixel");
           setStrokeWidth(1);
