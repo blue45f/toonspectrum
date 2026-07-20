@@ -352,7 +352,10 @@ function MenuDropdown({
         }}
         onClick={() => (open ? closeMenu() : openMenu("first"))}
         className={cn(
-          "inline-flex h-8 items-center gap-1 rounded-lg px-2.5 text-[0.78rem] font-semibold tracking-tight",
+          // Keep the full File/Edit/Insert/View/Filter/Draw/AI vocabulary at laptop widths.
+          // The chevron is decorative (aria-haspopup owns the affordance), so compact it
+          // before allowing labels to collide inside the compressible menubar lane.
+          "inline-flex h-8 items-center gap-1 rounded-lg px-1.5 text-[0.75rem] font-semibold tracking-tight xl:px-2 2xl:px-2.5 2xl:text-[0.78rem]",
           STUDIO_EASE,
           STUDIO_FOCUS_RING,
           open
@@ -364,8 +367,9 @@ function MenuDropdown({
         <ChevronDown
           size={13}
           aria-hidden
+          data-studio-main-menu-chevron="true"
           className={cn(
-            "opacity-50 transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]",
+            "hidden opacity-50 transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] 2xl:block",
             open && "rotate-180 opacity-90"
           )}
         />
@@ -385,7 +389,7 @@ export function StudioMainMenu({ groups, className }: StudioMainMenuProps): Reac
       aria-label="메인 메뉴"
       data-studio-main-menu="true"
       data-studio-shortcut-boundary="true"
-      className={cn("flex min-w-0 flex-nowrap items-center gap-0.5", className)}
+      className={cn("flex min-w-max shrink-0 flex-nowrap items-center gap-0.5", className)}
     >
       {groups.map((group) => (
         <MenuDropdown

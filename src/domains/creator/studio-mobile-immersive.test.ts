@@ -60,6 +60,8 @@ describe("Studio mobile immersive preference", () => {
 
   it("uses one adaptive canvas lane instead of stacking duplicate mobile chrome", () => {
     expect(studioPageSource).toContain('mobileImmersive && "max-lg:hidden"');
+    expect(studioPageSource).toContain('"lg:hidden"');
+    expect(studioPageSource).not.toContain("lg:h-0 lg:w-0 lg:overflow-visible");
     expect(studioPageSource).toContain("!canvasOnlyMode && !isMobile");
     expect(studioPageSource).toContain("<StudioMobileEditingDock");
     expect(studioMobileEditingDockSource).toContain('data-studio-mobile-editing-dock="true"');

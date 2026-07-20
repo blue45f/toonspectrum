@@ -170,6 +170,10 @@ describe("StudioMainMenu", () => {
     expect(html).toContain("편집");
     expect(html).toContain('aria-haspopup="menu"');
     expect(html).toContain("data-studio-main-menu-trigger");
+    expect(html).toContain('data-studio-main-menu-chevron="true"');
+    expect(html).toContain("hidden opacity-50");
+    expect(html).toContain("2xl:block");
+    expect(html).toContain("min-w-max shrink-0");
   });
 
   it("resolves the first and last enabled APG menuitems", () => {

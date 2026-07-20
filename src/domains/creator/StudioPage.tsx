@@ -22778,8 +22778,10 @@ function StudioCuttoonEditor() {
         </Suspense>
       ) : null}
 
-      {/* Legacy tool belt: primary on mobile. Desktop menubar owns discovery; belt is a zero-size
-          host for triggers (popovers portal to body — never nest fixed UI under backdrop-filter). */}
+      {/* Legacy tool belt: primary on mobile. Desktop menubar/rail own discovery. Keep the
+          component mounted so its body portals can serve rail-triggered panels, but hide its DOM
+          host completely on desktop; a zero-size overflow-visible host still painted children at
+          y < 0 and widened the editor scroll geometry. */}
       <StudioToolBelt
         inert={!isMobile}
         aria-hidden={!isMobile}
@@ -22788,9 +22790,9 @@ function StudioCuttoonEditor() {
           // Immersive mobile already exposes the same frequent actions in its 44px thumb dock.
           // Removing the 4.7x-wide belt restores canvas height and eliminates undiscoverable scroll.
           mobileImmersive && "max-lg:hidden",
-          // Desktop: collapse belt (not -100vw fixed — that + filter made popovers unusable).
-          "lg:pointer-events-none lg:absolute lg:left-0 lg:top-0 lg:z-[1] lg:h-0 lg:w-0 lg:overflow-visible lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none",
-          // 트리거/숨은 호스트는 클릭 불필요(포털 팝오버는 body). 모바일은 정상 클릭.
+          // Portalled popovers attach to body, so display:none on this host does not clip them.
+          "lg:hidden",
+          // 모바일은 정상 클릭.
           "max-lg:pointer-events-auto"
         )}
       >

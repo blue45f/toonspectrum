@@ -289,7 +289,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
           <Suspense fallback={null}>
             <StudioMainMenu
               groups={studioMainMenuGroups}
-              className={cn("hidden min-w-0 md:flex", mobileImmersive && "!hidden")}
+              className={cn("hidden min-w-max shrink-0 md:flex", mobileImmersive && "!hidden")}
             />
           </Suspense>
           {/* Wide layouts expose high-frequency insert shortcuts; narrower widths use Insert. */}
