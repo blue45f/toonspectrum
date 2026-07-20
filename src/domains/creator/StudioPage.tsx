@@ -3999,6 +3999,28 @@ function StudioCuttoonEditor() {
   const [studioFilterPreview, setStudioFilterPreview] = useState<StudioFilterPreview | null>(null);
   const [lastStudioFilterDraft, setLastStudioFilterDraft] = useState<StudioFilterDraft | null>(null);
   const [editing, setEditing] = useState<{ id: string } | null>(null);
+  const [pendingLetteringEdit, setPendingLetteringEdit] = useState<{
+    elementId: string;
+    pageId: string;
+  } | null>(null);
+  const lastLetteringInsertRef = useRef<
+    { kind: "text" } | { kind: "bubble"; variant: BubbleVariant }
+  >({ kind: "bubble", variant: "speech" });
+  const startEditTextRef = useRef<(id: string) => Promise<void>>(async () => undefined);
+  useEffect(() => {
+    startEditTextRef.current = startEditText;
+  });
+  useEffect(() => {
+    if (!pendingLetteringEdit) return;
+    if (pendingLetteringEdit.pageId !== activePage.id) {
+      setPendingLetteringEdit(null);
+      return;
+    }
+    const target = elementById.get(pendingLetteringEdit.elementId);
+    if (!target) return;
+    setPendingLetteringEdit(null);
+    void startEditTextRef.current(target.id);
+  }, [activePage.id, elementById, pendingLetteringEdit]);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [tutorialHubOpen, setTutorialHubOpen] = useState(false);
   const [tutorialInitialId, setTutorialInitialId] = useState<string | null>(null);
@@ -12929,6 +12951,28 @@ function StudioCuttoonEditor() {
         toggleLiquifyTool();
         return;
       }
+      if (matchStudioShortcut(sc["tool-lettering"], e)) {
+        e.preventDefault();
+        if (
+          selected &&
+          (selected.type === "text" || selected.type === "bubble" || selected.type === "sticker")
+        ) {
+          if (activeSurfaceReviewLocked || isEffectivelyLocked(selected, groups)) {
+            announceDrawingShortcut("잠긴 레터링은 편집할 수 없어요");
+            return;
+          }
+          void startEditText(selected.id);
+          return;
+        }
+        if (activeSurfaceReviewLocked) {
+          announceDrawingShortcut("검토 잠금을 해제한 뒤 레터링을 추가할 수 있어요");
+          return;
+        }
+        const lastLettering = lastLetteringInsertRef.current;
+        if (lastLettering.kind === "text") addText(undefined, true);
+        else addBubble(lastLettering.variant, undefined, true);
+        return;
+      }
       if (matchStudioShortcut(sc["tool-zoom"], e)) {
         e.preventDefault();
         if (!viewTransformSuppressed) {
@@ -13681,9 +13725,9 @@ function StudioCuttoonEditor() {
       : null;
     return viewportSpawnCenter(state.canvasW ?? CANVAS_W, state.canvasH, selectedRect);
   }
-  function addText(at?: { x: number; y: number }) {
+  function addText(at?: { x: number; y: number }, editImmediately = false) {
     const [cx, cy] = at ? [at.x, at.y] : spawnCenter();
-    addEl({
+    const element: El = {
       id: uid(),
       type: "text",
       text: "텍스트",
@@ -13693,7 +13737,11 @@ function StudioCuttoonEditor() {
       fontSize: 40,
       fill: color,
       rotation: 0,
-    });
+    };
+    lastLetteringInsertRef.current = { kind: "text" };
+    if (addEl(element) && editImmediately) {
+      setPendingLetteringEdit({ elementId: element.id, pageId: activePage.id });
+    }
   }
   // 멀티 디스플레이 컴패니언 "텍스트" 명령 — 채널 핸들러와 삽입 로직을 느슨히 결합.
   useEffect(() => {
@@ -13703,7 +13751,11 @@ function StudioCuttoonEditor() {
     window.addEventListener("studio-companion-add-text", onCompanionAddText);
     return () => window.removeEventListener("studio-companion-add-text", onCompanionAddText);
   });
-  function addBubble(variant: BubbleVariant, at?: { x: number; y: number }) {
+  function addBubble(
+    variant: BubbleVariant,
+    at?: { x: number; y: number },
+    editImmediately = false
+  ) {
     setMenu(null);
     let fill = "#ffffff";
     let textFill = "#111111";
@@ -13744,7 +13796,7 @@ function StudioCuttoonEditor() {
     }
 
     const [cx, cy] = at ? [at.x, at.y] : spawnCenter();
-    addEl({
+    const element: El = {
       id: uid(),
       type: "bubble",
       variant,
@@ -13756,7 +13808,11 @@ function StudioCuttoonEditor() {
       fill,
       textFill,
       rotation: 0,
-    });
+    };
+    lastLetteringInsertRef.current = { kind: "bubble", variant };
+    if (addEl(element) && editImmediately) {
+      setPendingLetteringEdit({ elementId: element.id, pageId: activePage.id });
+    }
   }
   function addSticker(emoji: string, at?: { x: number; y: number }) {
     setMenu(null);
@@ -19422,7 +19478,18 @@ function StudioCuttoonEditor() {
   async function startEditText(id: string) {
     const el = elementById.get(id);
     if (!el || (el.type !== "text" && el.type !== "bubble" && el.type !== "sticker")) return;
+    const mutationTicket = captureStudioMutationTicket();
+    const targetPageId = activePage.id;
+    const targetMasterEditMode = masterEditMode;
     if (!(await beginLiveResourceEditAsync([id]))) return;
+    if (
+      !canApplyStudioMutation(mutationTicket) ||
+      currentPageIdRef.current !== targetPageId ||
+      masterEditModeRef.current !== targetMasterEditMode
+    ) {
+      endLiveResourceEdit();
+      return;
+    }
     setEditing({ id });
   }
 
@@ -22219,6 +22286,19 @@ function StudioCuttoonEditor() {
     },
     deleteSelection: removeSelected,
     duplicateSelection: duplicateSelected,
+    editSelectionText: () => {
+      if (
+        selected &&
+        (selected.type === "text" || selected.type === "bubble" || selected.type === "sticker") &&
+        !activeSurfaceReviewLocked &&
+        !isEffectivelyLocked(selected, groups)
+      ) {
+        void startEditText(selected.id);
+      }
+    },
+    fitSelectionBubble: () => {
+      void fitBubbleToText();
+    },
     openBrushStudio: () => {
       void loadStudioBrushStudio();
       setTool("draw");
@@ -22376,8 +22456,20 @@ function StudioCuttoonEditor() {
       label: selected ? elementLabel(selected) : null,
       locked: Boolean(selected?.locked),
       canToggleLock: Boolean(selected),
+      textEditLabel:
+        selected && !activeSurfaceReviewLocked && !isEffectivelyLocked(selected, groups)
+          ? selected.type === "bubble"
+            ? "대사 편집"
+            : selected.type === "text" || selected.type === "sticker"
+              ? "글자 편집"
+              : null
+          : null,
+      canFitBubble:
+        selected?.type === "bubble" &&
+        !activeSurfaceReviewLocked &&
+        !isEffectivelyLocked(selected, groups),
     };
-  }, [canvasOnlyMode, marqueeIds.length, selected, selectedId, tool]);
+  }, [activeSurfaceReviewLocked, canvasOnlyMode, groups, marqueeIds.length, selected, selectedId, tool]);
 
   // 렌더 시점 ref 스냅샷 — RC 컴파일 자식(캔버스)은 렌더 중 ref 접근이 금지라, 비컴파일
   // 에디터에서 읽어 값으로 전달한다(어차피 렌더 시점 값만 화면에 반영되므로 의미 동일).

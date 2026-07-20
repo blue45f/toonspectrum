@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Edge = "left" | "right";
 
@@ -28,6 +28,7 @@ export interface Resizable {
     role: "separator";
     "aria-orientation": "vertical";
     "aria-valuenow": number;
+    "aria-valuetext": string;
     "aria-valuemin": number;
     "aria-valuemax": number;
     tabIndex: 0;
@@ -57,6 +58,8 @@ export function useResizable(options: ResizableOptions): Resizable {
     return initial;
   });
   const [dragging, setDragging] = useState(false);
+  const mountedRef = useRef(true);
+  const activeDragCleanupRef = useRef<(() => void) | null>(null);
 
   const setWidth = (w: number) => setWidthState(clampTo(w, min, max));
 
@@ -79,28 +82,79 @@ export function useResizable(options: ResizableOptions): Resizable {
     };
   }, [dragging]);
 
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      activeDragCleanupRef.current?.();
+      activeDragCleanupRef.current = null;
+    };
+  }, []);
+
   const onPointerDown = (e: React.PointerEvent) => {
+    activeDragCleanupRef.current?.();
     // preventDefault가 브라우저의 기본 포커스 이동도 막으므로 직접 포커스를 준다.
     // 마우스/펜으로 폭을 조절한 뒤에도 화살표·Home·End 조작을 바로 이어갈 수 있다.
-    if (e.currentTarget instanceof HTMLElement) {
-      e.currentTarget.focus({ preventScroll: true });
-    }
+    const target = e.currentTarget instanceof HTMLElement ? e.currentTarget : null;
+    target?.focus({ preventScroll: true });
     e.preventDefault();
+    const pointerId = e.pointerId;
     const startX = e.clientX;
     const startWidth = width;
+    let latestClientX = startX;
+    let frame: number | null = null;
+    let finished = false;
     setDragging(true);
 
-    const onMove = (ev: PointerEvent) => {
-      const delta = edge === "left" ? startX - ev.clientX : ev.clientX - startX;
+    const applyPendingWidth = () => {
+      frame = null;
+      const delta = edge === "left" ? startX - latestClientX : latestClientX - startX;
       setWidthState(clampTo(startWidth + delta, min, max));
     };
-    const onUp = () => {
-      setDragging(false);
-      globalThis.removeEventListener("pointermove", onMove);
-      globalThis.removeEventListener("pointerup", onUp);
+    const onMove = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return;
+      latestClientX = ev.clientX;
+      if (frame !== null) return;
+      if (typeof globalThis.requestAnimationFrame === "function") {
+        frame = globalThis.requestAnimationFrame(applyPendingWidth);
+      } else {
+        applyPendingWidth();
+      }
     };
+    const finish = (ev?: PointerEvent) => {
+      if (ev && ev.pointerId !== pointerId) return;
+      if (finished) return;
+      finished = true;
+      if (frame !== null && typeof globalThis.cancelAnimationFrame === "function") {
+        globalThis.cancelAnimationFrame(frame);
+        applyPendingWidth();
+      }
+      if (mountedRef.current) setDragging(false);
+      globalThis.removeEventListener("pointermove", onMove);
+      globalThis.removeEventListener("pointerup", finish);
+      globalThis.removeEventListener("pointercancel", finish);
+      globalThis.removeEventListener("blur", onBlur);
+      target?.removeEventListener("lostpointercapture", finish);
+      try {
+        if (target?.hasPointerCapture(pointerId)) target.releasePointerCapture(pointerId);
+      } catch {
+        // Pointer capture is optional in older embedded browsers.
+      }
+      if (activeDragCleanupRef.current === cleanup) activeDragCleanupRef.current = null;
+    };
+    const onBlur = () => finish();
+    const cleanup = () => finish();
+    activeDragCleanupRef.current = cleanup;
+    try {
+      target?.setPointerCapture(pointerId);
+    } catch {
+      // Global listeners below keep the drag functional without capture support.
+    }
     globalThis.addEventListener("pointermove", onMove);
-    globalThis.addEventListener("pointerup", onUp);
+    globalThis.addEventListener("pointerup", finish);
+    globalThis.addEventListener("pointercancel", finish);
+    globalThis.addEventListener("blur", onBlur);
+    target?.addEventListener("lostpointercapture", finish);
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -130,6 +184,7 @@ export function useResizable(options: ResizableOptions): Resizable {
       role: "separator",
       "aria-orientation": "vertical",
       "aria-valuenow": Math.round(width),
+      "aria-valuetext": `${Math.round(width)}픽셀`,
       "aria-valuemin": min,
       "aria-valuemax": max,
       tabIndex: 0,

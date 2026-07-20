@@ -87,6 +87,13 @@ describe("studio-app-settings", () => {
         shiftKey: false,
       })
     ).toBe(false);
+    expect(STUDIO_RAIL_TOOL_CATALOG.find(({ id }) => id === "text")?.defaultShortcut).toBe("T");
+    expect(STUDIO_RAIL_TOOL_CATALOG.find(({ id }) => id === "bubble")?.defaultShortcut).toBe("T");
+    expect(STUDIO_SHORTCUT_ACTIONS.find(({ id }) => id === "tool-lettering")).toMatchObject({
+      label: "레터링(텍스트·말풍선)",
+      defaultKeys: "T",
+    });
+    expect(defaults.shortcuts["tool-lettering"]).toBe("T");
   });
 
   it("adds new shortcut defaults when normalizing a legacy shortcut payload", () => {
@@ -100,6 +107,7 @@ describe("studio-app-settings", () => {
       "tool-crop": "C",
       "tool-blend": "N",
       "tool-liquify": "J",
+      "tool-lettering": "T",
       "tool-zoom": "Z",
       "tool-rotate-view": "R",
     });

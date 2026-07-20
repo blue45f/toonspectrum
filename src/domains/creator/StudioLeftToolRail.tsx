@@ -59,8 +59,12 @@ export interface StudioLeftToolRailHandlers {
   openFrameAnimationForSelected: () => void;
   openPixelSelectionTransform: () => void;
   openSelectedLayerCrop: () => void;
-  addBubble: (variant: BubbleVariant, at?: { x: number; y: number; }) => void;
-  addText: (at?: { x: number; y: number; }) => void;
+  addBubble: (
+    variant: BubbleVariant,
+    at?: { x: number; y: number; },
+    editImmediately?: boolean
+  ) => void;
+  addText: (at?: { x: number; y: number; }, editImmediately?: boolean) => void;
   announceDrawingShortcut: (message: string) => void;
   clearPolyLassoDraft: () => void;
   commitAppSettings: (next: StudioAppSettings) => void;
@@ -602,7 +606,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               label="텍스트 추가"
               description="캔버스에 글자 상자를 추가합니다. 폰트·정렬·효과는 우측 속성에서 편집해요."
               onClick={() => {
-                addText();
+                addText(undefined, true);
               }}
             />
             ) : null}
@@ -612,7 +616,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               label="말풍선 추가"
               description="만화 말풍선을 넣습니다. 꼬리 위치·스타일 프리셋은 말풍선 패널에서 바꿀 수 있어요."
               onClick={() => {
-                addBubble("speech");
+                addBubble("speech", undefined, true);
               }}
             />
             ) : null}

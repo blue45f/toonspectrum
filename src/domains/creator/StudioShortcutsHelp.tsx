@@ -33,6 +33,8 @@ const GROUPS: ShortcutGroup[] = [
   {
     title: "편집",
     rows: [
+      { keys: "T", label: "선택 대사 편집 · 최근 레터링 삽입" },
+      { keys: "⌘ Enter", label: "대사 입력 확정 · 일괄 말풍선 생성" },
       { keys: "⌘Z", label: "실행취소" },
       { keys: "⌘⇧Z · ⌘Y", label: "다시실행" },
       { keys: "⌘X · ⌘C", label: "잘라내기 · 복사" },

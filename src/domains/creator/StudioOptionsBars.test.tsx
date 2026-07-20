@@ -66,6 +66,8 @@ const SELECTION_MODEL: StudioOptionsBarsSelectionModel = {
   label: null,
   locked: false,
   canToggleLock: false,
+  textEditLabel: null,
+  canFitBubble: false,
 };
 
 function createHandlers(): StudioOptionsBarsHandlers {
@@ -74,6 +76,8 @@ function createHandlers(): StudioOptionsBarsHandlers {
     cycleStabilizer: vi.fn(),
     deleteSelection: vi.fn(),
     duplicateSelection: vi.fn(),
+    editSelectionText: vi.fn(),
+    fitSelectionBubble: vi.fn(),
     openBrushStudio: vi.fn(),
     recallBrushSlot: vi.fn(),
     reorderSelection: vi.fn(),
@@ -247,6 +251,8 @@ describe("StudioOptionsBars", () => {
             label: "대사 말풍선",
             locked: true,
             canToggleLock: true,
+            textEditLabel: "대사 편집",
+            canFitBubble: true,
           },
           stableHandlers,
         })}
@@ -258,18 +264,23 @@ describe("StudioOptionsBars", () => {
     expect(selectionProps.selectionCount).toBe(2);
     expect(selectionProps.selectionLabel).toBe("대사 말풍선");
     expect(selectionProps.locked).toBe(true);
+    expect(selectionProps.textEditLabel).toBe("대사 편집");
 
     selectionProps.onDuplicate();
     selectionProps.onDelete();
     selectionProps.onBringFront();
     selectionProps.onSendBack();
     selectionProps.onToggleLock?.();
+    selectionProps.onEditText?.();
+    selectionProps.onFitBubble?.();
 
     expect(stableHandlers.duplicateSelection).toHaveBeenCalledOnce();
     expect(stableHandlers.deleteSelection).toHaveBeenCalledOnce();
     expect(stableHandlers.reorderSelection).toHaveBeenNthCalledWith(1, "front");
     expect(stableHandlers.reorderSelection).toHaveBeenNthCalledWith(2, "back");
     expect(stableHandlers.toggleSelectedLock).toHaveBeenCalledOnce();
+    expect(stableHandlers.editSelectionText).toHaveBeenCalledOnce();
+    expect(stableHandlers.fitSelectionBubble).toHaveBeenCalledOnce();
 
     view.rerender(
       <StudioOptionsBars

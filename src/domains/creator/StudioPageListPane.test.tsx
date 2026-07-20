@@ -72,6 +72,7 @@ function createProps(
         role: "separator",
         "aria-orientation": "vertical",
         "aria-valuenow": 180,
+        "aria-valuetext": "180픽셀",
         "aria-valuemin": 128,
         "aria-valuemax": 360,
         tabIndex: 0,

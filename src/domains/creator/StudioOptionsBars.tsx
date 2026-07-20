@@ -52,6 +52,8 @@ export interface StudioOptionsBarsSelectionModel {
   label: string | null;
   locked: boolean;
   canToggleLock: boolean;
+  textEditLabel: "대사 편집" | "글자 편집" | null;
+  canFitBubble: boolean;
 }
 
 export interface StudioOptionsBarsHandlers {
@@ -59,6 +61,8 @@ export interface StudioOptionsBarsHandlers {
   cycleStabilizer: () => void;
   deleteSelection: () => void;
   duplicateSelection: () => void;
+  editSelectionText: () => void;
+  fitSelectionBubble: () => void;
   openBrushStudio: () => void;
   recallBrushSlot: (index: number) => void;
   reorderSelection: (direction: "front" | "back") => void;
@@ -170,6 +174,17 @@ export const StudioOptionsBars = memo(function StudioOptionsBars({
             onDelete={stableHandlers.deleteSelection}
             onBringFront={() => stableHandlers.reorderSelection("front")}
             onSendBack={() => stableHandlers.reorderSelection("back")}
+            textEditLabel={selection.textEditLabel}
+            onEditText={
+              selection.textEditLabel
+                ? stableHandlers.editSelectionText
+                : undefined
+            }
+            onFitBubble={
+              selection.canFitBubble
+                ? stableHandlers.fitSelectionBubble
+                : undefined
+            }
             onToggleLock={
               selection.canToggleLock
                 ? stableHandlers.toggleSelectedLock

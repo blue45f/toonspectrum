@@ -1,0 +1,32 @@
+import { readFileSync } from "node:fs";
+
+import { describe, expect, it } from "vitest";
+
+const read = (fileName: string) =>
+  readFileSync(new URL(fileName, import.meta.url), "utf8");
+
+describe("Studio lettering workflow boundary", () => {
+  it("keeps the advertised T shortcut connected to the shipped lettering handler", () => {
+    const settings = read("./studio-app-settings.ts");
+    const page = read("./StudioPage.tsx");
+    const help = read("./StudioShortcutsHelp.tsx");
+
+    expect(settings).toContain('{ id: "tool-lettering", label: "레터링(텍스트·말풍선)", defaultKeys: "T" }');
+    expect(page).toContain('matchStudioShortcut(sc["tool-lettering"], e)');
+    expect(page).toContain("void startEditText(selected.id)");
+    expect(page).toContain("addBubble(lastLettering.variant, undefined, true)");
+    expect(help).toContain('keys: "T", label: "선택 대사 편집 · 최근 레터링 삽입"');
+  });
+
+  it("starts inline editing from click insertion but leaves drag-and-drop placement uninterrupted", () => {
+    const bubblePopover = read("./StudioBubbleToolPopoverBody.tsx");
+    const rail = read("./StudioLeftToolRail.tsx");
+
+    expect(bubblePopover).toContain("addBubble(v.id, undefined, true)");
+    expect(bubblePopover).toContain('data-studio-shortcut-boundary="true"');
+    expect(bubblePopover).toContain('(event.metaKey || event.ctrlKey) && event.key === "Enter"');
+    expect(bubblePopover).toContain('JSON.stringify({ kind: "bubble", variant: v.id })');
+    expect(rail).toContain('addBubble("speech", undefined, true)');
+    expect(rail).toContain("addText(undefined, true)");
+  });
+});

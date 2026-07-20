@@ -203,6 +203,8 @@ export default function StudioTextEditOverlay({
       ref={textareaRef}
       // eslint-disable-next-line jsx-a11y/no-autofocus -- 더블클릭/더블탭으로만 열리는 인라인 편집 서페이스이며, 열릴 때 바로 타이핑 가능해야 하는 것이 올바른 동작이다
       autoFocus
+      aria-label={el.type === "bubble" ? "말풍선 대사 편집" : "캔버스 글자 편집"}
+      aria-keyshortcuts="Control+Enter Meta+Enter Escape"
       spellCheck
       value={value}
       onChange={(event) => {

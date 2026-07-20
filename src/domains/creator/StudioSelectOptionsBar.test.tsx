@@ -43,4 +43,26 @@ describe("StudioSelectOptionsBar", () => {
     expect(html).toContain("3개 선택"); // sr-only
     expect(html).toContain(">3<");
   });
+
+  it("surfaces one-click lettering actions only when the selection supports them", () => {
+    const onEditText = vi.fn();
+    const onFitBubble = vi.fn();
+    const html = renderToStaticMarkup(
+      <StudioSelectOptionsBar
+        selectionLabel="대사 말풍선"
+        selectionCount={1}
+        textEditLabel="대사 편집"
+        onEditText={onEditText}
+        onFitBubble={onFitBubble}
+        onDuplicate={vi.fn()}
+        onDelete={vi.fn()}
+        onBringFront={vi.fn()}
+        onSendBack={vi.fn()}
+      />
+    );
+
+    expect(html).toContain('aria-label="대사 편집"');
+    expect(html).toContain('aria-label="텍스트 맞춤"');
+    expect(html).toContain(">대사 편집<");
+  });
 });

@@ -8,7 +8,9 @@ import {
   Copy,
   Lock,
   LockOpen,
+  MessageSquareText,
   MousePointer2,
+  ScanText,
   Trash2,
   type LucideIcon,
 } from "lucide-react";
@@ -32,6 +34,9 @@ export interface StudioSelectOptionsBarProps {
   onDelete: () => void;
   onBringFront: () => void;
   onSendBack: () => void;
+  textEditLabel?: "대사 편집" | "글자 편집" | null;
+  onEditText?: () => void;
+  onFitBubble?: () => void;
   onToggleLock?: () => void;
   className?: string;
 }
@@ -43,6 +48,7 @@ function Action({
   description,
   tip,
   danger,
+  showLabel,
   onClick,
 }: {
   id: string;
@@ -51,6 +57,7 @@ function Action({
   description: string;
   tip?: string;
   danger?: boolean;
+  showLabel?: boolean;
   onClick: () => void;
 }): ReactElement {
   return (
@@ -69,7 +76,9 @@ function Action({
         onClick={onClick}
         aria-label={label}
         className={cn(
-          "grid size-8 place-items-center rounded-xl border",
+          showLabel
+            ? "inline-flex h-8 items-center gap-1.5 rounded-xl border px-2.5"
+            : "grid size-8 place-items-center rounded-xl border",
           STUDIO_EASE,
           STUDIO_FOCUS_RING,
           danger
@@ -78,6 +87,7 @@ function Action({
         )}
       >
         <Icon size={14} strokeWidth={1.75} aria-hidden />
+        {showLabel ? <span className="text-[0.68rem] font-semibold">{label}</span> : null}
       </button>
     </StudioToolHintTarget>
   );
@@ -91,6 +101,9 @@ export function StudioSelectOptionsBar({
   onDelete,
   onBringFront,
   onSendBack,
+  textEditLabel,
+  onEditText,
+  onFitBubble,
   onToggleLock,
   className,
 }: StudioSelectOptionsBarProps): ReactElement | null {
@@ -134,6 +147,27 @@ export function StudioSelectOptionsBar({
           <span className="sr-only">{selectionCount}개 선택</span>
         )}
       </span>
+      {textEditLabel && onEditText ? (
+        <Action
+          id="edit-text"
+          icon={MessageSquareText}
+          label={textEditLabel}
+          description="선택한 레터링을 캔버스 위에서 바로 수정합니다. 기본 문구는 곧바로 덮어쓸 수 있어요."
+          tip="T를 눌러도 선택한 말풍선이나 글자를 즉시 편집할 수 있어요."
+          showLabel
+          onClick={onEditText}
+        />
+      ) : null}
+      {onFitBubble ? (
+        <Action
+          id="fit-bubble"
+          icon={ScanText}
+          label="텍스트 맞춤"
+          description="대사 길이에 맞춰 말풍선 높이를 자동으로 조절합니다."
+          tip="긴 대사를 붙여넣은 뒤 한 번 눌러 여백을 정돈하세요."
+          onClick={onFitBubble}
+        />
+      ) : null}
       <div className="studio-opt-cluster flex shrink-0 items-center gap-0.5">
         <Action
           id="duplicate"

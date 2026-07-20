@@ -294,6 +294,7 @@ export function StudioDialogueBatchPanel({
   return (
     <section
       aria-label="대사 일괄 편집"
+      data-studio-shortcut-boundary="true"
       className="fixed inset-x-2 bottom-[calc(7rem+env(safe-area-inset-bottom)+var(--studio-mobile-keyboard-inset))] top-[calc(4.25rem+env(safe-area-inset-top))] z-[54] flex w-auto flex-col overflow-hidden rounded-xl border border-line bg-panel/95 shadow-xl backdrop-blur lg:absolute lg:inset-x-auto lg:bottom-auto lg:right-3 lg:top-3 lg:z-40 lg:max-h-[calc(100%-5rem)] lg:w-[min(21rem,calc(100%-1.5rem))]"
       style={{
         "--studio-mobile-keyboard-inset": `${safeMobileKeyboardInset}px`,

@@ -107,6 +107,7 @@ describe("StudioDialogueBatchPanel read-aloud progressive enhancement", () => {
     expect(html).toContain("대사 낭독 검수");
     expect(html).toContain("이 브라우저는 음성 낭독을 지원하지 않아요.");
     expect(html).toContain("대사 편집은 그대로 사용할 수 있습니다.");
+    expect(html).toContain('data-studio-shortcut-boundary="true"');
     expect(html).toContain('aria-label="1페이지 말풍선·말하기 대사 수정"');
     expect(html).not.toContain('aria-label="검색된 대사 전체 낭독"');
     expect(html).not.toContain("대사만 낭독하고 캔버스에서 선택");

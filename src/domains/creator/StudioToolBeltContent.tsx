@@ -198,7 +198,11 @@ export type FxPickerSection =
 export interface StudioToolBeltContentHandlers {
   openFrameAnimationForSelected: () => void;
   addBgScene: (bg: StudioBgScene) => void;
-  addBubble: (variant: BubbleVariant, at?: { x: number; y: number; }) => void;
+  addBubble: (
+    variant: BubbleVariant,
+    at?: { x: number; y: number; },
+    editImmediately?: boolean
+  ) => void;
   addBuiltinRasterAsset: (asset: StudioRasterAsset) => Promise<void>;
   addCatalogElement: (item: { svg: string; width: number; height: number; label: string; }) => void;
   addDiagonalSplit: () => void;
@@ -221,7 +225,7 @@ export interface StudioToolBeltContentHandlers {
   addSfxPreset: (preset: SfxPreset) => Promise<void>;
   addSpeedLines: () => void;
   addSticker: (emoji: string, at?: { x: number; y: number; }) => void;
-  addText: (at?: { x: number; y: number; }) => void;
+  addText: (at?: { x: number; y: number; }, editImmediately?: boolean) => void;
   addTone: (svg: string) => Promise<void>;
   announceDrawingShortcut: (message: string) => void;
   applyAiAssistPresetPrompt: (tool: StudioAiAssistToolId, prompt: string) => void;
