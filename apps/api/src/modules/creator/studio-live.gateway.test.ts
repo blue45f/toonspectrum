@@ -323,7 +323,16 @@ function createHarness(
       };
     },
   };
-  const service = { getWorkTeam: vi.fn(getWorkTeam) };
+  const getWorkTeamMock = vi.fn(getWorkTeam);
+  const service = {
+    getWorkTeam: getWorkTeamMock,
+    getWorkAuthorization: vi.fn(async (userId: string, workId: string) => {
+      // Keep existing race fixtures source-compatible while independently asserting that the
+      // gateway uses the constant-cardinality production authorization boundary.
+      const team = await getWorkTeamMock(userId, workId);
+      return { workId: team.workId, viewer: team.viewer };
+    }),
+  };
   const crdtService = {
     sync: vi.fn(async () => ({
       chunks: ["AA=="],
@@ -5506,6 +5515,8 @@ describe("StudioLiveGateway", () => {
       actorUserId: "editor",
       data: request.update,
     });
+    expect(harness.service.getWorkAuthorization).toHaveBeenCalledTimes(1);
+    expect(harness.service.getWorkAuthorization).toHaveBeenCalledWith("editor", "work-1");
     expect(response).toEqual({
       ok: true,
       data: {

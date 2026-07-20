@@ -169,7 +169,9 @@ class MemoryCollaborationStore
   lockedWorkIds: string[] = [];
   lockedUserIds: string[] = [];
   workReadIds: string[] = [];
+  userReadIds: string[] = [];
   membershipReadKeys: string[] = [];
+  membershipListWorkIds: string[] = [];
   authorizedEventReads: Array<{ actorUserId: string; workId: string; limit: number }> = [];
   authorizedEventRowsMaterialized = 0;
   beforeAuthorizedEventRead: (() => void) | null = null;
@@ -217,6 +219,7 @@ class MemoryCollaborationStore
   }
 
   async findUser(userId: string, lock = false): Promise<MemoryUser | null> {
+    this.userReadIds.push(userId);
     if (lock) this.lockedUserIds.push(userId);
     return this.users.get(userId) ?? null;
   }
@@ -227,6 +230,7 @@ class MemoryCollaborationStore
   }
 
   async listMemberships(workId: string) {
+    this.membershipListWorkIds.push(workId);
     return [...this.memberships.values()]
       .filter((membership) => membership.workId === workId)
       .sort(
@@ -767,6 +771,75 @@ describe("CreatorCollaborationRepository", () => {
       capabilities: { view: true, edit: true, manageMembers: false },
     });
     expect(editorSnapshot.members.map(({ userId }) => userId)).toEqual(["owner", "editor"]);
+  });
+
+  it("Studio 권한 probe는 작품 잠금 뒤 owner 한 행만 constant-cost로 반환한다", async () => {
+    const { repository, store } = createFixture();
+
+    await expect(repository.getAuthorization("owner", "work-1")).resolves.toEqual({
+      workId: "work-1",
+      viewer: {
+        userId: "owner",
+        role: "owner",
+        status: "active",
+        capabilities: {
+          view: true,
+          comment: true,
+          edit: true,
+          manageMembers: true,
+          respondInvite: false,
+        },
+      },
+    });
+
+    expect(store.transactionCount).toBe(1);
+    expect(store.workReadIds).toEqual(["work-1"]);
+    expect(store.lockedWorkIds).toEqual(["work-1"]);
+    expect(store.membershipReadKeys).toEqual([]);
+    expect(store.userReadIds).toEqual([]);
+    expect(store.membershipListWorkIds).toEqual([]);
+  });
+
+  it("Studio 권한 probe는 collaborator 복합키 한 행만 읽고 팀을 materialize하지 않는다", async () => {
+    const { repository, store } = createFixture();
+
+    await expect(repository.getAuthorization("editor", "work-1")).resolves.toMatchObject({
+      workId: "work-1",
+      viewer: {
+        userId: "editor",
+        role: "editor",
+        status: "active",
+        capabilities: { view: true, edit: true, manageMembers: false },
+      },
+    });
+
+    expect(store.lockedWorkIds).toEqual(["work-1"]);
+    expect(store.membershipReadKeys).toEqual([membershipKey("work-1", "editor")]);
+    expect(store.userReadIds).toEqual([]);
+    expect(store.membershipListWorkIds).toEqual([]);
+  });
+
+  it("Studio 권한 probe는 대기·거절 상태를 fail-closed projection하고 없는 멤버는 거절한다", async () => {
+    const { repository } = createFixture();
+
+    await expect(repository.getAuthorization("pending", "work-1")).resolves.toMatchObject({
+      viewer: {
+        role: "commenter",
+        status: "pending",
+        capabilities: { view: false, respondInvite: true },
+        invitationId: PENDING_INVITATION_ID,
+      },
+    });
+    await expect(repository.getAuthorization("declined", "work-1")).resolves.toMatchObject({
+      viewer: {
+        role: "viewer",
+        status: "declined",
+        capabilities: { view: false, respondInvite: false },
+      },
+    });
+    await expect(repository.getAuthorization("outsider", "work-1")).rejects.toEqual(
+      new CreatorCollaborationForbiddenError("team_access_denied")
+    );
   });
 
   it("대기 중인 초대자는 owner와 본인만 보고 본인 초대 응답 권한만 받는다", async () => {

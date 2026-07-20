@@ -90,6 +90,18 @@ export interface CreatorCollaborationTeamSnapshot {
   members: CreatorCollaborationTeamMember[];
 }
 
+/**
+ * Constant-cardinality authorization projection for Studio live hot paths.
+ *
+ * Unlike a team snapshot, this never loads the owner profile or materializes the
+ * collaborator list. The repository still serializes it through the work-row
+ * lock so a completed role change/removal is visible before authorization.
+ */
+export type CreatorCollaborationAuthorizationSnapshot = Pick<
+  CreatorCollaborationTeamSnapshot,
+  "workId" | "viewer"
+>;
+
 export interface CreatorCollaborationInvitation {
   workId: string;
   workTitle: string;
@@ -838,6 +850,28 @@ export class CreatorCollaborationRepository {
     });
   }
 
+  async getAuthorization(
+    actorUserId: string,
+    workId: string
+  ): Promise<CreatorCollaborationAuthorizationSnapshot> {
+    return this.persistence.transaction(async (unit) => {
+      // Keep the same first lock as every member mutation. Reading membership only after this
+      // lock wait prevents an in-flight downgrade from being authorized from an older snapshot.
+      const context = await this.loadContext(unit, actorUserId, workId, true);
+      if (actorUserId !== context.work.ownerUserId) {
+        const membershipRole = normalizeCreatorCollaborationRole(context.membership?.role);
+        const membershipStatus = normalizeCreatorCollaborationStatus(context.membership?.status);
+        if (!membershipRole || !membershipStatus) {
+          throw new CreatorCollaborationForbiddenError("team_access_denied");
+        }
+      }
+      return {
+        workId: context.work.id,
+        viewer: this.viewerProjection(actorUserId, context),
+      };
+    });
+  }
+
   async listInvitations(
     actorUserId: string,
     limit: number
@@ -1205,30 +1239,35 @@ export class CreatorCollaborationRepository {
       )
       .map((membership) => collaborationMember(membership, actorUserId))
       .filter((member): member is CreatorCollaborationTeamMember => member !== null);
-    const viewerRole =
+    return {
+      workId: context.work.id,
+      viewer: this.viewerProjection(actorUserId, context),
+      members: [ownerMember(context.work, owner), ...normalizedMembers],
+    };
+  }
+
+  private viewerProjection(
+    actorUserId: string,
+    context: CreatorCollaborationContext
+  ): CreatorCollaborationTeamSnapshot["viewer"] {
+    const role =
       actorUserId === context.work.ownerUserId
         ? "owner"
         : (normalizeCreatorCollaborationRole(context.membership?.role) ?? "viewer");
-    const viewerStatus =
+    const status =
       actorUserId === context.work.ownerUserId
         ? "active"
         : (normalizeCreatorCollaborationStatus(context.membership?.status) ?? "declined");
-
     const viewer: CreatorCollaborationTeamSnapshot["viewer"] = {
       userId: actorUserId,
-      role: viewerRole,
-      status: viewerStatus,
+      role,
+      status,
       capabilities: context.access,
     };
-    if (viewerStatus === "pending" && context.membership?.userId === actorUserId) {
+    if (status === "pending" && context.membership?.userId === actorUserId) {
       viewer.invitationId = context.membership.invitationId;
     }
-
-    return {
-      workId: context.work.id,
-      viewer,
-      members: [ownerMember(context.work, owner), ...normalizedMembers],
-    };
+    return viewer;
   }
 }
 

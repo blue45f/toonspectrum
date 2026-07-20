@@ -92,6 +92,7 @@ const collaborationRepository = {
   getSharedDocumentMeta: vi.fn(),
   saveSharedDocument: vi.fn(),
   getTeam: vi.fn(),
+  getAuthorization: vi.fn(),
   listInvitations: vi.fn(),
   getActivity: vi.fn(),
   invite: vi.fn(),
@@ -120,6 +121,7 @@ describe("CreatorService safety gates", () => {
     getSharedAssetContent.mockReset();
     listSharedAssets.mockReset();
     collaborationRepository.getTeam.mockReset();
+    collaborationRepository.getAuthorization.mockReset();
     collaborationRepository.listSharedWorks.mockReset();
     collaborationRepository.getSharedDocument.mockReset();
     collaborationRepository.getSharedDocumentMeta.mockReset();
@@ -298,6 +300,10 @@ describe("CreatorService safety gates", () => {
       members: [],
     };
     collaborationRepository.getTeam.mockResolvedValue(snapshot);
+    collaborationRepository.getAuthorization.mockResolvedValue({
+      workId: snapshot.workId,
+      viewer: snapshot.viewer,
+    });
     collaborationRepository.listInvitations.mockResolvedValue([]);
     collaborationRepository.getActivity.mockResolvedValue([]);
     collaborationRepository.invite.mockResolvedValue(snapshot);
@@ -312,6 +318,10 @@ describe("CreatorService safety gates", () => {
     const service = createService();
 
     await expect(service.getWorkTeam("owner", "work-team")).resolves.toBe(snapshot);
+    await expect(service.getWorkAuthorization("owner", "work-team")).resolves.toEqual({
+      workId: snapshot.workId,
+      viewer: snapshot.viewer,
+    });
     await service.listWorkTeamInvitations("artist", 12);
     await service.getWorkTeamActivity("owner", "work-team", 9);
     await service.inviteWorkTeamMember("owner", "work-team", "artist", "editor");
@@ -322,6 +332,7 @@ describe("CreatorService safety gates", () => {
     ).resolves.toBe(invitationResponse);
 
     expect(collaborationRepository.getTeam).toHaveBeenCalledWith("owner", "work-team");
+    expect(collaborationRepository.getAuthorization).toHaveBeenCalledWith("owner", "work-team");
     expect(collaborationRepository.listInvitations).toHaveBeenCalledWith("artist", 12);
     expect(collaborationRepository.getActivity).toHaveBeenCalledWith("owner", "work-team", 9);
     expect(collaborationRepository.invite).toHaveBeenCalledWith("owner", "work-team", "artist", "editor");
@@ -552,6 +563,9 @@ describe("CreatorService safety gates", () => {
     collaborationRepository.getTeam.mockRejectedValue(
       new CreatorCollaborationForbiddenError("team_access_denied")
     );
+    collaborationRepository.getAuthorization.mockRejectedValue(
+      new CreatorCollaborationForbiddenError("team_access_denied")
+    );
     collaborationRepository.invite
       .mockRejectedValueOnce(new CreatorCollaborationConflictError("invitation_already_pending"))
       .mockRejectedValueOnce(new CreatorCollaborationInvalidTargetError("target_user_unavailable"));
@@ -561,6 +575,9 @@ describe("CreatorService safety gates", () => {
     const service = createService();
 
     await expect(service.getWorkTeam("viewer", "work")).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.getWorkAuthorization("viewer", "work")).rejects.toBeInstanceOf(
+      ForbiddenException
+    );
     await expect(
       service.inviteWorkTeamMember("owner", "work", "artist", "viewer")
     ).rejects.toBeInstanceOf(ConflictException);

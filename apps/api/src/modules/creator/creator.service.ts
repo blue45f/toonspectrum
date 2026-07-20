@@ -210,6 +210,12 @@ export class CreatorService {
     );
   }
 
+  async getWorkAuthorization(userId: string, workId: string) {
+    return this.runCreatorCollaborationOperation("get_authorization", workId, () =>
+      this.creatorCollaborationRepository.getAuthorization(userId, workId)
+    );
+  }
+
   async listWorkTeamInvitations(userId: string, limit: number) {
     return this.runCreatorCollaborationOperation("list_invitations", "inbox", () =>
       this.creatorCollaborationRepository.listInvitations(userId, limit)

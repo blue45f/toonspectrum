@@ -2972,7 +2972,10 @@ export class StudioLiveGateway
       return null;
     }
     try {
-      const team = await this.creatorService.getWorkTeam(participant.userId, participant.workId);
+      const authorization = await this.creatorService.getWorkAuthorization(
+        participant.userId,
+        participant.workId
+      );
       if (!isCurrentAuthorization() || !this.isSocketCurrent(socket)) {
         return null;
       }
@@ -2985,10 +2988,10 @@ export class StudioLiveGateway
         return null;
       }
       if (
-        team.workId !== participant.workId ||
-        team.viewer.userId !== participant.userId ||
-        team.viewer.status !== "active" ||
-        !team.viewer.capabilities.view
+        authorization.workId !== participant.workId ||
+        authorization.viewer.userId !== participant.userId ||
+        authorization.viewer.status !== "active" ||
+        !authorization.viewer.capabilities.view
       ) {
         this.revokeParticipant(socketId);
         return null;
@@ -2997,16 +3000,13 @@ export class StudioLiveGateway
       const previousComment = participant.capabilities.comment;
       const previousEdit = participant.capabilities.edit;
       const previousManageMembers = participant.capabilities.manageMembers;
-      const previousName = participant.name;
-      participant.role = team.viewer.role;
+      participant.role = authorization.viewer.role;
       participant.capabilities = {
         view: true,
-        comment: team.viewer.capabilities.comment,
-        edit: team.viewer.capabilities.edit,
-        manageMembers: team.viewer.capabilities.manageMembers,
+        comment: authorization.viewer.capabilities.comment,
+        edit: authorization.viewer.capabilities.edit,
+        manageMembers: authorization.viewer.capabilities.manageMembers,
       };
-      const member = team.members.find((candidate) => candidate.userId === participant.userId);
-      participant.name = normalizedMemberName(member?.name);
       participant.authorizedAt = Date.now();
       participant.updatedAt = new Date().toISOString();
       const safeParticipant = this.publishParticipantToSocketData(socket, participant);
@@ -3016,8 +3016,7 @@ export class StudioLiveGateway
         previousRole !== participant.role ||
         previousComment !== participant.capabilities.comment ||
         previousEdit !== participant.capabilities.edit ||
-        previousManageMembers !== participant.capabilities.manageMembers ||
-        previousName !== participant.name
+        previousManageMembers !== participant.capabilities.manageMembers
       ) {
         this.server
           .to(studioLiveRoom(participant.workId))
