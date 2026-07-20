@@ -7,9 +7,11 @@
  */
 
 export const STUDIO_BG3D_MESHOPT_EXTENSION = "EXT_meshopt_compression" as const;
+export const STUDIO_BG3D_KTX2_EXTENSION = "KHR_texture_basisu" as const;
 
 export const STUDIO_BG3D_CANONICAL_REQUIRED_GLTF_EXTENSIONS = Object.freeze([
   STUDIO_BG3D_MESHOPT_EXTENSION,
+  STUDIO_BG3D_KTX2_EXTENSION,
 ] as const);
 
 export interface StudioBg3dMeshoptWorkerSignals {

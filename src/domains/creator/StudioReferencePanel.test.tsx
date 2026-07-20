@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -27,6 +27,9 @@ const canvasImageIoMock = vi.hoisted(() => ({
 const colorSamplerMock = vi.hoisted(() => ({
   loadStudioReferenceImageRaster: vi.fn(),
 }));
+const remoteReferenceMock = vi.hoisted(() => ({
+  importStudioRemoteReferenceImage: vi.fn(),
+}));
 
 vi.mock("./studio-asset-library", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./studio-asset-library")>();
@@ -49,6 +52,10 @@ vi.mock("./studio-reference-color-sampler", async (importOriginal) => {
     loadStudioReferenceImageRaster: colorSamplerMock.loadStudioReferenceImageRaster,
   };
 });
+
+vi.mock("./studio-remote-reference-image-client", () => ({
+  importStudioRemoteReferenceImage: remoteReferenceMock.importStudioRemoteReferenceImage,
+}));
 
 const HASH_A = `sha256:${"a".repeat(64)}` as const;
 const HASH_B = `sha256:${"b".repeat(64)}` as const;
@@ -86,6 +93,34 @@ const COLOR_RASTER: StudioReferenceImageRaster = {
     255, 0, 255, 255,
   ]),
 };
+
+const REMOTE_BYTES = Uint8Array.from([1, 2, 3]);
+const REMOTE_IMPORTED_IMAGE = {
+  version: 1 as const,
+  mediaType: "image/png" as const,
+  byteLength: REMOTE_BYTES.byteLength,
+  width: 320,
+  height: 180,
+  decodedRgbaBytes: 320 * 180 * 4,
+  sha256: "d".repeat(64),
+  dataUrl: "data:image/png;base64,AQID",
+  bytes: REMOTE_BYTES,
+  blob: new Blob([REMOTE_BYTES], { type: "image/png" }),
+};
+
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (error: unknown) => void;
+} {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
 
 function makeItem(
   id: string,
@@ -152,13 +187,14 @@ beforeEach(() => {
     dataUrl: string;
     width: number;
     height: number;
+    contentHash?: string;
   }) => {
     const index = importedAssetIndex;
     importedAssetIndex += 1;
     return {
       id: `imported-${index}`,
       ...input,
-      contentHash: `sha256:${String(index + 1).repeat(64)}` as `sha256:${string}`,
+      contentHash: (input.contentHash ?? `sha256:${String(index + 1).repeat(64)}`) as `sha256:${string}`,
       createdAt: 10 + index,
     } satisfies StudioAsset;
   });
@@ -169,6 +205,7 @@ beforeEach(() => {
     isAnimatedGif: false,
   }));
   colorSamplerMock.loadStudioReferenceImageRaster.mockResolvedValue(COLOR_RASTER);
+  remoteReferenceMock.importStudioRemoteReferenceImage.mockResolvedValue(REMOTE_IMPORTED_IMAGE);
 });
 
 afterEach(() => {
@@ -202,6 +239,43 @@ describe("StudioReferencePanel controlled reference board", () => {
     expect(screen.getByText("2/32")).toBeTruthy();
   });
 
+  it("does not add a library asset whose hash resolves after the document scope changes", async () => {
+    const pendingHash = deferred<StudioAsset>();
+    assetLibraryMock.ensureStudioAssetContentHash.mockReturnValueOnce(pendingHash.promise);
+    const firstOnChange = vi.fn();
+    const nextOnChange = vi.fn();
+    const firstDocument = createStudioReferenceBoardDocument();
+    const nextDocument = createStudioReferenceBoardDocument();
+    const view = render(
+      <StudioReferencePanel
+        open
+        onClose={vi.fn()}
+        document={firstDocument}
+        onChange={firstOnChange}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "참고 이미지 추가" }));
+    fireEvent.click(await screen.findByRole("button", { name: "동작 A 보드에 추가" }));
+    await waitFor(() => expect(assetLibraryMock.ensureStudioAssetContentHash).toHaveBeenCalledOnce());
+
+    view.rerender(
+      <StudioReferencePanel
+        open
+        onClose={vi.fn()}
+        document={nextDocument}
+        onChange={nextOnChange}
+      />
+    );
+    await act(async () => {
+      pendingHash.resolve(ASSET_A);
+      await pendingHash.promise;
+    });
+
+    expect(firstOnChange).not.toHaveBeenCalled();
+    expect(nextOnChange).not.toHaveBeenCalled();
+    expect(screen.getByText("0/32")).toBeTruthy();
+  });
+
   it("imports multiple device files in source order and commits the board once", async () => {
     const onCommit = vi.fn();
     render(
@@ -226,6 +300,215 @@ describe("StudioReferencePanel controlled reference board", () => {
     expect(imported.items.map((item) => item.asset.name)).toEqual(["첫 포즈", "둘째 포즈"]);
     expect(screen.getByText("2/32")).toBeTruthy();
     expect(screen.getByText("2개 참고 이미지를 추가했습니다.")).toBeTruthy();
+  });
+
+  it("imports a public image URL through the bounded server transport and persists only its hash reference", async () => {
+    const onCommit = vi.fn();
+    render(
+      <ControlledReferencePanel
+        initialDocument={createStudioReferenceBoardDocument()}
+        onCommit={onCommit}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "참고 이미지 추가" }));
+    fireEvent.change(screen.getByLabelText("공개 이미지 URL"), {
+      target: { value: "https://images.example.test/poses/running.png" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "가져오기" }));
+
+    await waitFor(() => expect(onCommit).toHaveBeenCalledOnce());
+    expect(remoteReferenceMock.importStudioRemoteReferenceImage).toHaveBeenCalledWith(
+      "https://images.example.test/poses/running.png",
+      expect.any(AbortSignal)
+    );
+    expect(assetLibraryMock.saveAsset).toHaveBeenCalledWith(expect.objectContaining({
+      name: "running",
+      width: 320,
+      height: 180,
+      kind: "remote-reference",
+      contentHash: `sha256:${"d".repeat(64)}`,
+    }));
+    const committed = onCommit.mock.calls[0]?.[0] as StudioReferenceBoardDocument;
+    expect(committed.items[0]?.asset.sha256).toBe(`sha256:${"d".repeat(64)}`);
+    expect(JSON.stringify(committed)).not.toContain("images.example.test");
+    expect(JSON.stringify(committed)).not.toContain("data:image");
+  });
+
+  it("does not continue a remote import after the panel unmounts", async () => {
+    const pendingImport = deferred<typeof REMOTE_IMPORTED_IMAGE>();
+    remoteReferenceMock.importStudioRemoteReferenceImage.mockReturnValueOnce(pendingImport.promise);
+    const onChange = vi.fn();
+    const { unmount } = render(
+      <StudioReferencePanel
+        open
+        onClose={vi.fn()}
+        document={createStudioReferenceBoardDocument()}
+        onChange={onChange}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "참고 이미지 추가" }));
+    fireEvent.change(screen.getByLabelText("공개 이미지 URL"), {
+      target: { value: "https://images.example.test/unmount.png" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "가져오기" }));
+    await waitFor(() => expect(remoteReferenceMock.importStudioRemoteReferenceImage).toHaveBeenCalledOnce());
+
+    unmount();
+    await act(async () => {
+      pendingImport.resolve(REMOTE_IMPORTED_IMAGE);
+      await pendingImport.promise;
+    });
+
+    expect(assetLibraryMock.saveAsset).not.toHaveBeenCalled();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("does not commit a remote asset saved after the controlled document scope changes", async () => {
+    const pendingSave = deferred<StudioAsset>();
+    assetLibraryMock.saveAsset.mockReturnValueOnce(pendingSave.promise);
+    const firstOnChange = vi.fn();
+    const nextOnChange = vi.fn();
+    const firstDocument = createStudioReferenceBoardDocument();
+    const nextDocument = createStudioReferenceBoardDocument([makeItem("next-work")]);
+    const view = render(
+      <StudioReferencePanel
+        open
+        onClose={vi.fn()}
+        document={firstDocument}
+        onChange={firstOnChange}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "참고 이미지 추가" }));
+    fireEvent.change(screen.getByLabelText("공개 이미지 URL"), {
+      target: { value: "https://images.example.test/slow-save.png" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "가져오기" }));
+    await waitFor(() => expect(assetLibraryMock.saveAsset).toHaveBeenCalledOnce());
+
+    view.rerender(
+      <StudioReferencePanel
+        open
+        onClose={vi.fn()}
+        document={nextDocument}
+        onChange={nextOnChange}
+      />
+    );
+    await act(async () => {
+      pendingSave.resolve({
+        id: "late-remote",
+        name: "slow-save",
+        dataUrl: REMOTE_IMPORTED_IMAGE.dataUrl,
+        contentHash: `sha256:${REMOTE_IMPORTED_IMAGE.sha256}`,
+        width: REMOTE_IMPORTED_IMAGE.width,
+        height: REMOTE_IMPORTED_IMAGE.height,
+        createdAt: 99,
+      });
+      await pendingSave.promise;
+    });
+
+    expect(firstOnChange).not.toHaveBeenCalled();
+    expect(nextOnChange).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "동작 A 이동 및 선택" })).toBeTruthy();
+  });
+
+  it("drops a local decode continuation when the panel closes", async () => {
+    const pendingDecode = deferred<{
+      src: string;
+      width: number;
+      height: number;
+      isAnimatedGif: boolean;
+    }>();
+    canvasImageIoMock.loadImageFileForCanvas.mockReturnValueOnce(pendingDecode.promise);
+    const onChange = vi.fn();
+    const document = createStudioReferenceBoardDocument();
+    const view = render(
+      <StudioReferencePanel
+        open
+        onClose={vi.fn()}
+        document={document}
+        onChange={onChange}
+      />
+    );
+    fireEvent.change(screen.getByLabelText("참고 이미지 파일 선택"), {
+      target: { files: [new File(["png"], "slow-local.png", { type: "image/png" })] },
+    });
+    await waitFor(() => expect(canvasImageIoMock.loadImageFileForCanvas).toHaveBeenCalledOnce());
+
+    view.rerender(
+      <StudioReferencePanel
+        open={false}
+        onClose={vi.fn()}
+        document={document}
+        onChange={onChange}
+      />
+    );
+    await act(async () => {
+      pendingDecode.resolve({
+        src: "data:image/webp;base64,LATE",
+        width: 640,
+        height: 480,
+        isAnimatedGif: false,
+      });
+      await pendingDecode.promise;
+    });
+
+    expect(assetLibraryMock.saveAsset).not.toHaveBeenCalled();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("lets a reopened panel finish a newer import without resurrecting the older continuation", async () => {
+    const firstImport = deferred<typeof REMOTE_IMPORTED_IMAGE>();
+    remoteReferenceMock.importStudioRemoteReferenceImage
+      .mockReturnValueOnce(firstImport.promise)
+      .mockResolvedValueOnce(REMOTE_IMPORTED_IMAGE);
+    const onChange = vi.fn();
+    const document = createStudioReferenceBoardDocument();
+    const view = render(
+      <StudioReferencePanel
+        open
+        onClose={vi.fn()}
+        document={document}
+        onChange={onChange}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "참고 이미지 추가" }));
+    const urlInput = screen.getByLabelText("공개 이미지 URL");
+    fireEvent.change(urlInput, { target: { value: "https://images.example.test/old.png" } });
+    fireEvent.click(screen.getByRole("button", { name: "가져오기" }));
+    await waitFor(() => expect(remoteReferenceMock.importStudioRemoteReferenceImage).toHaveBeenCalledOnce());
+
+    view.rerender(
+      <StudioReferencePanel
+        open={false}
+        onClose={vi.fn()}
+        document={document}
+        onChange={onChange}
+      />
+    );
+    view.rerender(
+      <StudioReferencePanel
+        open
+        onClose={vi.fn()}
+        document={document}
+        onChange={onChange}
+      />
+    );
+    await waitFor(() => expect(
+      (screen.getByRole("button", { name: "가져오기" }) as HTMLButtonElement).disabled
+    ).toBe(false));
+    fireEvent.change(screen.getByLabelText("공개 이미지 URL"), {
+      target: { value: "https://images.example.test/new.png" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "가져오기" }));
+    await waitFor(() => expect(onChange).toHaveBeenCalledOnce());
+
+    await act(async () => {
+      firstImport.resolve(REMOTE_IMPORTED_IMAGE);
+      await firstImport.promise;
+    });
+    expect(onChange).toHaveBeenCalledOnce();
+    expect(assetLibraryMock.saveAsset).toHaveBeenCalledOnce();
   });
 
   it("accepts board drops and image clipboard pastes as separate durable commits", async () => {
@@ -526,5 +809,51 @@ describe("StudioReferencePanel controlled reference board", () => {
     const stored = window.localStorage.getItem(REFERENCE_PANEL_STORAGE_KEY);
     expect(stored).not.toContain(ASSET_A.id);
     expect(onCommit).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not migrate a legacy pinned hash into a replacement document", async () => {
+    window.localStorage.setItem(
+      REFERENCE_PANEL_STORAGE_KEY,
+      serializeReferencePanelSettings({
+        x: 400,
+        y: 100,
+        width: 300,
+        height: 260,
+        assetId: ASSET_A.id,
+        flipped: false,
+      })
+    );
+    const pendingHash = deferred<StudioAsset>();
+    assetLibraryMock.ensureStudioAssetContentHash.mockReturnValueOnce(pendingHash.promise);
+    const firstOnChange = vi.fn();
+    const nextOnChange = vi.fn();
+    const firstDocument = createStudioReferenceBoardDocument();
+    const nextDocument = createStudioReferenceBoardDocument();
+    const view = render(
+      <StudioReferencePanel
+        open
+        onClose={vi.fn()}
+        document={firstDocument}
+        onChange={firstOnChange}
+      />
+    );
+    await waitFor(() => expect(assetLibraryMock.ensureStudioAssetContentHash).toHaveBeenCalledOnce());
+
+    view.rerender(
+      <StudioReferencePanel
+        open
+        onClose={vi.fn()}
+        document={nextDocument}
+        onChange={nextOnChange}
+      />
+    );
+    await act(async () => {
+      pendingHash.resolve(ASSET_A);
+      await pendingHash.promise;
+    });
+
+    expect(firstOnChange).not.toHaveBeenCalled();
+    expect(nextOnChange).not.toHaveBeenCalled();
+    expect(screen.getByText("0/32")).toBeTruthy();
   });
 });

@@ -85,6 +85,12 @@ export interface StudioLiveVoiceMember {
   muted: boolean;
 }
 
+export interface StudioLiveRoomScreenShare {
+  host: StudioLiveParticipant;
+  shareId: string;
+  label: string;
+}
+
 export type StudioLiveVoiceEvent =
   | { type: "presence"; members: StudioLiveVoiceMember[] }
   | {
@@ -238,6 +244,7 @@ export class StudioLiveRoom {
   private readonly crdtListeners = new Set<(event: StudioLiveCrdtRoomEvent) => void>();
   private readonly voiceListeners = new Set<(event: StudioLiveVoiceEvent) => void>();
   private readonly peers = new Map<string, StudioLivePeer>();
+  private readonly screenShares = new Map<string, StudioLiveRoomScreenShare>();
   private readonly voiceMembers = new Map<string, StudioLiveVoiceMember>();
   private readonly locks = new Map<string, StudioLiveLock>();
   private readonly pendingLockClaims = new Map<string, PendingStudioLiveLockClaim>();
@@ -412,6 +419,17 @@ export class StudioLiveRoom {
     })).sort((left, right) =>
       left.participant.displayName.localeCompare(right.participant.displayName, "ko-KR") ||
       left.participant.sessionId.localeCompare(right.participant.sessionId)
+    );
+  }
+
+  getScreenShares(): StudioLiveRoomScreenShare[] {
+    return Array.from(this.screenShares.values(), (share) => ({
+      ...share,
+      host: copyParticipant(share.host),
+    })).sort((left, right) =>
+      left.host.displayName.localeCompare(right.host.displayName, "ko-KR") ||
+      left.host.sessionId.localeCompare(right.host.sessionId) ||
+      left.shareId.localeCompare(right.shareId)
     );
   }
 
@@ -976,6 +994,7 @@ export class StudioLiveRoom {
     this.transport = null;
     this.emitVoice({ type: "terminal", reason: "closed" });
     this.peers.clear();
+    this.screenShares.clear();
     this.voiceMembers.clear();
     this.locks.clear();
     this.chatMessages.length = 0;
@@ -1230,6 +1249,7 @@ export class StudioLiveRoom {
 
     if (envelope.kind === "presence:leave") {
       const presenceChanged = this.peers.delete(envelope.sender.sessionId);
+      this.screenShares.delete(envelope.sender.sessionId);
       this.lastSequenceBySession.delete(envelope.sender.sessionId);
       const voiceMember = this.voiceMembers.get(envelope.sender.sessionId);
       if (voiceMember) {
@@ -1298,14 +1318,31 @@ export class StudioLiveRoom {
         });
         return;
       }
-      case "screen:announce":
+      case "screen:announce": {
+        const payload = envelope.payload as StudioLiveScreenAnnouncePayload;
+        this.screenShares.set(envelope.sender.sessionId, {
+          host: copyParticipant(envelope.sender),
+          shareId: payload.shareId,
+          label: payload.label,
+        });
+        this.emit({ type: "signal", envelope: envelope as StudioLiveSignalEnvelope });
+        return;
+      }
       case "screen:request":
       case "screen:access":
       case "webrtc:description":
       case "webrtc:ice":
-      case "screen:stop":
         this.emit({ type: "signal", envelope: envelope as StudioLiveSignalEnvelope });
         return;
+      case "screen:stop": {
+        const payload = envelope.payload as StudioLiveScreenStopPayload;
+        const current = this.screenShares.get(envelope.sender.sessionId);
+        if (current?.shareId === payload.shareId) {
+          this.screenShares.delete(envelope.sender.sessionId);
+        }
+        this.emit({ type: "signal", envelope: envelope as StudioLiveSignalEnvelope });
+        return;
+      }
       case "voice:join": {
         if (envelope.sender.role === "viewer") return;
         const payload = envelope.payload as StudioLiveVoiceJoinPayload;
@@ -1400,6 +1437,7 @@ export class StudioLiveRoom {
         const hadPeers = this.peers.size > 0;
         const hadLocks = this.locks.size > 0;
         this.peers.clear();
+        this.screenShares.clear();
         this.locks.clear();
         this.chatMessages.length = 0;
         this.lastSequenceBySession.clear();
@@ -1563,6 +1601,7 @@ export class StudioLiveRoom {
     for (const [sessionId, peer] of this.peers) {
       if (now - peer.lastSeenAt <= this.presenceTtlMs) continue;
       this.peers.delete(sessionId);
+      this.screenShares.delete(sessionId);
       this.lastSequenceBySession.delete(sessionId);
       const voiceMember = this.voiceMembers.get(sessionId);
       if (voiceMember) {

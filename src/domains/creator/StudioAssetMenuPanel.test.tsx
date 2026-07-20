@@ -9,7 +9,7 @@ import { createStudioAssetFavoriteId } from "./studio-asset-favorites";
 import { StudioAssetMenuPanel } from "./StudioAssetMenuPanel";
 
 import type { StudioAssetMenuPanelProps } from "./StudioAssetMenuPanel";
-import type { SharedAsset } from "@/src/infrastructure/creator-client";
+import type { SharedAssetCatalogItem } from "@/src/infrastructure/creator-client";
 
 const LOCAL_ASSET = {
   id: "local-1",
@@ -21,10 +21,13 @@ const LOCAL_ASSET = {
   kind: "ai",
 };
 
-const SHARED_ASSET: SharedAsset = {
+const SHARED_ASSET: SharedAssetCatalogItem = {
   id: "shared-1",
   name: "공유 에셋",
-  dataUrl: "data:image/png;base64,AA",
+  previewDataUrl: "data:image/png;base64,AA",
+  previewWidth: 160,
+  previewHeight: 160,
+  previewAvailable: true,
   width: 512,
   height: 512,
   kind: "image",
@@ -74,10 +77,14 @@ function renderPanel(overrides: Partial<StudioAssetMenuPanelProps> = {}) {
     publishingId: null,
     shared: [SHARED_ASSET],
     sharedLoading: false,
+    sharedLoadingMore: false,
+    sharedHasMore: false,
     sharedError: null,
     loadSharedAssets: noop,
+    loadMoreSharedAssets: noop,
     onUseSharedAsset: noop,
     onDeleteSharedAsset: noop,
+    onReportSharedAsset: noop,
     ...overrides,
   };
   return renderToStaticMarkup(<StudioAssetMenuPanel {...props} />);

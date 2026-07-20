@@ -36,8 +36,15 @@ import type { StudioBg3dParsedGlbMetrics, StudioBg3dSceneBudgets } from "./studi
 
 const threeLoaderMocks = vi.hoisted(() => ({
   parseAsync: vi.fn(),
+  setKtx2Loader: vi.fn(),
   setMeshoptDecoder: vi.fn(),
   skeletonClone: vi.fn(),
+}));
+const ktx2RuntimeMocks = vi.hoisted(() => ({
+  create: vi.fn(),
+  hasDecodeFailure: vi.fn(),
+  dispose: vi.fn(),
+  loader: { kind: "attested-ktx2-loader" },
 }));
 
 vi.mock("three/examples/jsm/loaders/GLTFLoader.js", () => ({
@@ -47,10 +54,19 @@ vi.mock("three/examples/jsm/loaders/GLTFLoader.js", () => ({
       return this;
     }
 
+    setKTX2Loader(loader: unknown) {
+      threeLoaderMocks.setKtx2Loader(loader);
+      return this;
+    }
+
     parseAsync(data: ArrayBuffer | string, path: string) {
       return threeLoaderMocks.parseAsync(data, path);
     }
   },
+}));
+
+vi.mock("./studio-bg3d-ktx2-renderer-runtime", () => ({
+  createStudioBg3dKtx2RendererRuntime: ktx2RuntimeMocks.create,
 }));
 
 vi.mock("three/examples/jsm/utils/SkeletonUtils.js", () => ({
@@ -258,7 +274,11 @@ function minimalGlbBytes(): Uint8Array {
   return bytes;
 }
 
-function verifiedResult(bytes: Uint8Array = minimalGlbBytes()): StudioBg3dGlbValidationSuccess {
+function verifiedResult(
+  bytes: Uint8Array = minimalGlbBytes(),
+  usesBasisTextures = false,
+  requiresBasisTextures = usesBasisTextures,
+): StudioBg3dGlbValidationSuccess {
   return {
     ok: true,
     code: "valid",
@@ -267,6 +287,8 @@ function verifiedResult(bytes: Uint8Array = minimalGlbBytes()): StudioBg3dGlbVal
     verifiedSha256: `sha256:${"0".repeat(64)}`,
     verifiedBytes: bytes,
     cumulativeBytesAfter: bytes.byteLength,
+    usesBasisTextures,
+    requiresBasisTextures,
     metrics: {
       byteSize: bytes.byteLength,
       jsonByteSize: 0,
@@ -321,8 +343,20 @@ function triangleGeometry(triangleCount: number): THREE.BufferGeometry {
 describe("verified GLB Three.js safety boundary", () => {
   beforeEach(() => {
     threeLoaderMocks.parseAsync.mockReset();
+    threeLoaderMocks.setKtx2Loader.mockReset();
     threeLoaderMocks.setMeshoptDecoder.mockReset();
     threeLoaderMocks.skeletonClone.mockReset();
+    ktx2RuntimeMocks.create.mockReset();
+    ktx2RuntimeMocks.hasDecodeFailure.mockReset();
+    ktx2RuntimeMocks.dispose.mockReset();
+    ktx2RuntimeMocks.hasDecodeFailure.mockReturnValue(false);
+    ktx2RuntimeMocks.create.mockResolvedValue({
+      loader: ktx2RuntimeMocks.loader,
+      transcoderId: "three@0.184.0/basis_transcoder",
+      workerLimit: 1,
+      hasDecodeFailure: ktx2RuntimeMocks.hasDecodeFailure,
+      dispose: ktx2RuntimeMocks.dispose,
+    });
   });
 
   it("counts instantiated/grouped scene work while deduplicating shared materials and shader-uniform textures", () => {
@@ -1598,6 +1632,121 @@ describe("verified GLB Three.js safety boundary", () => {
     expect(failed).toMatchObject({ ok: false, code: "parse-failed" });
     expect(failed.message).not.toContain("private-file-name");
     expect(failed.message).not.toContain("malicious parser detail");
+  });
+
+  it("requires an active renderer before requesting the lazy KTX2 runtime", async () => {
+    const failed = await loadVerifiedStudioBg3dGlbWithThree(
+      verifiedResult(minimalGlbBytes(), true),
+      generousBudgets,
+    );
+
+    expect(failed).toMatchObject({ ok: false, code: "ktx2-renderer-unavailable" });
+    expect(ktx2RuntimeMocks.create).not.toHaveBeenCalled();
+    expect(threeLoaderMocks.parseAsync).not.toHaveBeenCalled();
+  });
+
+  it("uses the standards-defined core image fallback for optional Basis textures", async () => {
+    threeLoaderMocks.parseAsync.mockResolvedValue(parsedGltf(new THREE.Group()));
+
+    const loaded = await loadVerifiedStudioBg3dGlbWithThree(
+      verifiedResult(minimalGlbBytes(), true, false),
+      generousBudgets,
+    );
+
+    expect(loaded).toMatchObject({ ok: true, textureRuntime: "standard" });
+    expect(ktx2RuntimeMocks.create).not.toHaveBeenCalled();
+    expect(threeLoaderMocks.setKtx2Loader).not.toHaveBeenCalled();
+    if (loaded.ok) loaded.dispose();
+  });
+
+  it("attaches the lazy KTX2 loader only for parsed Basis evidence and disposes it after parsing", async () => {
+    const renderer = { isWebGLRenderer: true } as unknown as THREE.WebGLRenderer;
+    threeLoaderMocks.parseAsync.mockResolvedValue(parsedGltf(new THREE.Group()));
+
+    const loaded = await loadVerifiedStudioBg3dGlbWithThree(
+      verifiedResult(minimalGlbBytes(), true),
+      generousBudgets,
+      { renderer },
+    );
+
+    expect(ktx2RuntimeMocks.create).toHaveBeenCalledWith({ renderer });
+    expect(threeLoaderMocks.setKtx2Loader).toHaveBeenCalledWith(ktx2RuntimeMocks.loader);
+    expect(ktx2RuntimeMocks.dispose).toHaveBeenCalledOnce();
+    expect(loaded).toMatchObject({
+      ok: true,
+      textureRuntime: "ktx2-basis",
+    });
+    if (loaded.ok) loaded.dispose();
+  });
+
+  it("reports sanitized KTX2 setup/decode failures and always tears down the decoder runtime", async () => {
+    const renderer = { isWebGLRenderer: true } as unknown as THREE.WebGLRenderer;
+    ktx2RuntimeMocks.create.mockRejectedValueOnce(new Error("private-runtime-path"));
+    const setupFailed = await loadVerifiedStudioBg3dGlbWithThree(
+      verifiedResult(minimalGlbBytes(), true),
+      generousBudgets,
+      { renderer },
+    );
+    expect(setupFailed).toMatchObject({ ok: false, code: "ktx2-runtime-unavailable" });
+    expect(setupFailed.message).not.toContain("private-runtime-path");
+    expect(threeLoaderMocks.parseAsync).not.toHaveBeenCalled();
+
+    ktx2RuntimeMocks.create.mockRejectedValueOnce({ code: "renderer-unavailable" });
+    const rendererFailed = await loadVerifiedStudioBg3dGlbWithThree(
+      verifiedResult(minimalGlbBytes(), true),
+      generousBudgets,
+      { renderer },
+    );
+    expect(rendererFailed).toMatchObject({ ok: false, code: "ktx2-renderer-unavailable" });
+
+    ktx2RuntimeMocks.hasDecodeFailure.mockReturnValueOnce(true);
+    threeLoaderMocks.parseAsync.mockRejectedValueOnce(new Error("private-texture-name.ktx2"));
+    const decodeFailed = await loadVerifiedStudioBg3dGlbWithThree(
+      verifiedResult(minimalGlbBytes(), true),
+      generousBudgets,
+      { renderer },
+    );
+    expect(decodeFailed).toMatchObject({ ok: false, code: "ktx2-decode-failed" });
+    expect(decodeFailed.message).not.toContain("private-texture-name");
+    expect(ktx2RuntimeMocks.dispose).toHaveBeenCalledOnce();
+  });
+
+  it("rejects and disposes a partial scene when Three swallows a KTX2 texture error", async () => {
+    const renderer = { isWebGLRenderer: true } as unknown as THREE.WebGLRenderer;
+    const geometry = triangleGeometry(1);
+    const material = new THREE.MeshBasicMaterial();
+    const root = new THREE.Group();
+    root.add(new THREE.Mesh(geometry, material));
+    const geometryDispose = vi.spyOn(geometry, "dispose");
+    const materialDispose = vi.spyOn(material, "dispose");
+    ktx2RuntimeMocks.hasDecodeFailure.mockReturnValue(true);
+    threeLoaderMocks.parseAsync.mockResolvedValue(parsedGltf(root));
+
+    const failed = await loadVerifiedStudioBg3dGlbWithThree(
+      verifiedResult(minimalGlbBytes(), true, true),
+      generousBudgets,
+      { renderer },
+    );
+
+    expect(failed).toMatchObject({ ok: false, code: "ktx2-decode-failed" });
+    expect(geometryDispose).toHaveBeenCalledOnce();
+    expect(materialDispose).toHaveBeenCalledOnce();
+    expect(ktx2RuntimeMocks.dispose).toHaveBeenCalledOnce();
+  });
+
+  it("classifies an unrelated parser rejection separately from KTX2 decode failure", async () => {
+    const renderer = { isWebGLRenderer: true } as unknown as THREE.WebGLRenderer;
+    threeLoaderMocks.parseAsync.mockRejectedValueOnce(new Error("private-parser-detail"));
+
+    const failed = await loadVerifiedStudioBg3dGlbWithThree(
+      verifiedResult(minimalGlbBytes(), true, true),
+      generousBudgets,
+      { renderer },
+    );
+
+    expect(failed).toMatchObject({ ok: false, code: "parse-failed" });
+    expect(failed.message).not.toContain("private-parser-detail");
+    expect(ktx2RuntimeMocks.dispose).toHaveBeenCalledOnce();
   });
 
   it("disposes the parsed roots immediately when post-parse metrics exceed the selected budget", async () => {

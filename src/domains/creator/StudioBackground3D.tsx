@@ -103,6 +103,7 @@ import {
   measureBg3dObjectSize,
   parseBg3dSceneWithModelsFromDataUrl,
   sampleStudioBg3dAnimationActionAtTime,
+  StudioBg3dThreeOperationError,
   type BgCustomModelInstance,
   type StudioBg3dEditableThreeClone,
   type StudioBg3dThreeLoadSuccess,
@@ -1062,6 +1063,7 @@ async function admitAndCacheModel(args: {
   readonly document: StudioBg3dSceneDocument;
   readonly quality: StudioBg3dResolvedDeviceQuality;
   readonly cumulativeUsedBytes: number;
+  readonly renderer: THREE.WebGLRenderer | null;
   readonly cache: Map<string, ModelRootCacheEntry>;
   readonly pending: Map<string, Promise<ModelRootCacheEntry>>;
   readonly isActive: () => boolean;
@@ -1096,8 +1098,10 @@ async function admitAndCacheModel(args: {
       cumulativeUsedBytes: args.cumulativeUsedBytes,
       maximumCumulativeBytes: selectedBudgets.complexity.maxModelBytes,
     });
-    const loaded = await loadVerifiedStudioBg3dGlbWithThree(verification, selectedBudgets);
-    if (!loaded.ok) throw new Error(loaded.message);
+    const loaded = await loadVerifiedStudioBg3dGlbWithThree(verification, selectedBudgets, {
+      renderer: args.renderer,
+    });
+    if (!loaded.ok) throw new StudioBg3dThreeOperationError(loaded.code);
     loaded.root.scale.setScalar(computeAutoFitScale(measureBg3dObjectSize(loaded.root)));
     loaded.root.traverse((object) => {
       const renderable = object as THREE.Mesh;
@@ -1885,6 +1889,7 @@ export function StudioBackground3D({
   const [customModels, setCustomModels] = useState<BgCustomModelInstance[]>([]);
   const [modelLibrary, setModelLibrary] = useState<Bg3dModelLibraryEntry[]>([]);
   const [modelLibraryStatus, setModelLibraryStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [modelRenderer, setModelRenderer] = useState<THREE.WebGLRenderer | null>(null);
   const [isUploadingModel, setIsUploadingModel] = useState(false);
   const [modelImportProgress, setModelImportProgress] = useState<StudioBg3dImportProgress | null>(null);
   const modelImportAbortRef = useRef<AbortController | null>(null);
@@ -1912,6 +1917,7 @@ export function StudioBackground3D({
     if (!open) {
       primitiveGeometryPool.dispose();
       setAdaptiveDprScale(1);
+      setModelRenderer(null);
     }
   }, [open, primitiveGeometryPool]);
   useEffect(() => {
@@ -2242,7 +2248,7 @@ export function StudioBackground3D({
   // 배열로 hydrate한다. 실패한 모델 노드는 절대 저장 시 조용히 제거하지 않고 업데이트 자체를 잠근다.
   // initialScene이 없을 때만 과거 PNG fragment를 읽어 하위 호환한다.
   useEffect(() => {
-    if (!open) return;
+    if (!open || !modelRenderer) return;
     let cancelled = false;
     setIsRestoringScene(true);
     setSceneRecoveryError(null);
@@ -2311,6 +2317,7 @@ export function StudioBackground3D({
               document: canonicalInitial,
               quality,
               cumulativeUsedBytes,
+              renderer: modelRenderer,
               cache: modelRootCacheRef.current,
               pending: modelLoadPendingRef.current,
               isActive: () => !cancelled && componentActiveRef.current,
@@ -2386,6 +2393,7 @@ export function StudioBackground3D({
               document: DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
               quality,
               cumulativeUsedBytes: sceneModelByteTotal(attachmentByStorageModelIdRef.current),
+              renderer: modelRenderer,
               cache: modelRootCacheRef.current,
               pending: modelLoadPendingRef.current,
               isActive: () => !cancelled && componentActiveRef.current,
@@ -2411,7 +2419,7 @@ export function StudioBackground3D({
     return () => {
       cancelled = true;
     };
-  }, [open, initialDataUrl, initialScene]);
+  }, [open, initialDataUrl, initialScene, modelRenderer]);
 
   // 편집이 멈추면(디바운스) 스냅샷을 히스토리에 적재한다. 도형·커스텀 모델·장면 문서를 한 타임라인에
   // 묶어 배경/조명/LT 설정도 도형과 같은 Ctrl+Z 계약을 따른다. 카메라 Orbit의 매 프레임 임시 시점은
@@ -3141,6 +3149,7 @@ export function StudioBackground3D({
       document: sceneBaseDocument,
       quality: deviceQuality,
       cumulativeUsedBytes,
+      renderer: modelRenderer,
       cache: modelRootCacheRef.current,
       pending: modelLoadPendingRef.current,
       isActive: () => componentActiveRef.current,
@@ -3166,8 +3175,12 @@ export function StudioBackground3D({
       setCustomModels((prev) => [...prev, next]);
       setSelectedIds(new Set([next.id]));
       setRefTick((n) => n + 1);
-    } catch {
-      setError("3D 모델의 원본과 무결성을 확인하지 못해 장면에 추가하지 않았습니다.");
+    } catch (modelFailure) {
+      setError(
+        modelFailure instanceof StudioBg3dThreeOperationError
+          ? modelFailure.message
+          : "3D 모델의 원본과 무결성을 확인하지 못해 장면에 추가하지 않았습니다."
+      );
     }
   }
 
@@ -3222,6 +3235,7 @@ export function StudioBackground3D({
           document: sceneBaseDocument,
           quality: deviceQuality,
           cumulativeUsedBytes,
+          renderer: modelRenderer,
           cache: modelRootCacheRef.current,
           pending: modelLoadPendingRef.current,
           isActive: () => componentActiveRef.current,
@@ -3273,6 +3287,8 @@ export function StudioBackground3D({
       setError(
         importFailure instanceof StudioBg3dModelImportError
           ? importFailure.message
+          : importFailure instanceof StudioBg3dThreeOperationError
+            ? importFailure.message
           : importController.signal.aborted
             ? "3D 모델 가져오기를 취소했습니다. 장면과 라이브러리는 변경하지 않았습니다."
             : "선택한 모델 중 하나가 변환·안전 검사 또는 기기 복잡도 기준을 통과하지 못해 아무 모델도 배치하지 않았습니다."
@@ -5965,6 +5981,7 @@ export function StudioBackground3D({
                   shadows={{ enabled: deviceQuality.shadows, type: THREE.PCFShadowMap }}
                   gl={{ antialias: sceneBaseDocument.render.antialias, alpha: true }}
                   onCreated={({ gl }) => {
+                    setModelRenderer(gl);
                     applyStudioBg3dThreeWebglRenderSettings(gl, sceneBaseDocument.render);
                     gl.setClearColor(getSkyPreset(renderedSkyPresetId).clearColor, 1);
                   }}

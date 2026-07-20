@@ -271,7 +271,14 @@ async function withDatabase<T>(callback: (db: IDBDatabase) => Promise<T>) {
   }
 }
 
-export async function saveAsset(input: { name: string; dataUrl: string; width: number; height: number; kind?: string }): Promise<StudioAssetWithContentHash> {
+export async function saveAsset(input: {
+  name: string;
+  dataUrl: string;
+  width: number;
+  height: number;
+  kind?: string;
+  contentHash?: string;
+}): Promise<StudioAssetWithContentHash> {
   const record = await ensureStudioAssetContentHash(createAssetRecord(input));
   await withDatabase(async (db) => {
     const tx = db.transaction(STORE, "readwrite");

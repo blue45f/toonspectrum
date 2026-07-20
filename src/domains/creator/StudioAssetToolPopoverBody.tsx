@@ -136,7 +136,9 @@ export function StudioAssetToolPopoverBody({
     sfxPacks,
     shared,
     sharedError,
+    sharedHasMore,
     sharedLoading,
+    sharedLoadingMore,
     studioEmeresAssetsError,
     studioEmeresAssetsLoaded,
     studioEmeresAssetsLoading,
@@ -165,8 +167,10 @@ export function StudioAssetToolPopoverBody({
     handleRenameAsset,
     insertClip,
     loadSharedAssets,
+    loadMoreSharedAssets,
     onDeleteAsset,
     onDeleteSharedAsset,
+    onReportSharedAsset,
     onGenerateAsset,
     onShareAsset,
     onUploadAsset,
@@ -775,10 +779,14 @@ export function StudioAssetToolPopoverBody({
                     publishingId={publishingId}
                     shared={shared}
                     sharedLoading={sharedLoading}
+                    sharedLoadingMore={sharedLoadingMore}
+                    sharedHasMore={sharedHasMore}
                     sharedError={sharedError}
                     loadSharedAssets={loadSharedAssets}
+                    loadMoreSharedAssets={loadMoreSharedAssets}
                     onUseSharedAsset={onUseSharedAsset}
                     onDeleteSharedAsset={onDeleteSharedAsset}
+                    onReportSharedAsset={onReportSharedAsset}
                   />
                 </Suspense>
               )}

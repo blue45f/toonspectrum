@@ -18,6 +18,9 @@ import { ZodValidationPipe } from "../../common/zod-validation.pipe";
 
 import {
   CreateCreatorWorkDto,
+  CreatorAssetListQueryDto,
+  CreatorAssetModerationQueryDto,
+  CreatorAssetParamsDto,
   CreatorSharedWorksListQueryDto,
   CreatorTeamListQueryDto,
   CreatorTeamMemberParamsDto,
@@ -26,6 +29,9 @@ import {
   CreatorWorkRevisionListQueryDto,
   CreatorWorkRevisionParamsDto,
   InviteCreatorTeamMemberDto,
+  ModerateCreatorAssetDto,
+  PublishCreatorAssetDto,
+  ReportCreatorAssetDto,
   RespondCreatorTeamInvitationDto,
   RestoreCreatorWorkRevisionDto,
   UpdateCreatorSharedDocumentDto,
@@ -285,14 +291,48 @@ export class CreatorController {
   @Get("/creator/assets")
   @Header("Cache-Control", "no-store, max-age=0")
   async listSharedAssets(
-    @Query() query: { mine?: string | null; limit?: string | null; offset?: string | null },
+    @Query(new ZodValidationPipe(CreatorAssetListQueryDto)) query: CreatorAssetListQueryDto,
     @Headers("x-user-id") userId?: string
   ) {
     return this.creatorService.listSharedAssets(query, userId || undefined);
   }
 
+  @Get("/creator/assets/catalog")
+  @Header("Cache-Control", "no-store, max-age=0")
+  async listSharedAssetCatalog(
+    @Query(new ZodValidationPipe(CreatorAssetListQueryDto)) query: CreatorAssetListQueryDto,
+    @Headers("x-user-id") userId?: string
+  ) {
+    return this.creatorService.listSharedAssetCatalog(query, userId || undefined);
+  }
+
+  @Get("/creator/assets/:id/content")
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  async getSharedAssetContent(
+    @Param(new ZodValidationPipe(CreatorAssetParamsDto)) params: CreatorAssetParamsDto,
+    @Headers("x-user-id") userId?: string
+  ) {
+    const viewerId = userId || undefined;
+    const reviewerAccess = viewerId ? await isAdminUser(viewerId) : false;
+    return this.creatorService.getSharedAssetContent(params.id, viewerId, reviewerAccess);
+  }
+
+  @Get("/creator/assets/moderation")
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  async listAssetModerationQueue(
+    @Query(new ZodValidationPipe(CreatorAssetModerationQueryDto)) query: CreatorAssetModerationQueryDto,
+    @Headers("x-user-id") userId?: string
+  ) {
+    const uid = enforceUserOrError(userId);
+    if (!(await isAdminUser(uid))) throw new ForbiddenException("관리자만 에셋 신고를 검수할 수 있습니다.");
+    return this.creatorService.listAssetModerationQueue(query);
+  }
+
   @Post("/creator/assets")
-  async publishAsset(@Body() body: unknown, @Headers("x-user-id") userId?: string) {
+  async publishAsset(
+    @Body(new ZodValidationPipe(PublishCreatorAssetDto)) body: PublishCreatorAssetDto,
+    @Headers("x-user-id") userId?: string
+  ) {
     const uid = enforceUserOrError(userId);
     return this.creatorService.publishAsset(uid, body);
   }
@@ -304,15 +344,43 @@ export class CreatorController {
   }
 
   @Delete("/creator/assets/:id")
-  async deleteSharedAsset(@Param("id") id: string, @Headers("x-user-id") userId?: string) {
+  async deleteSharedAsset(
+    @Param(new ZodValidationPipe(CreatorAssetParamsDto)) params: CreatorAssetParamsDto,
+    @Headers("x-user-id") userId?: string
+  ) {
     const uid = enforceUserOrError(userId);
     const admin = await isAdminUser(uid);
-    return this.creatorService.deleteSharedAsset(uid, id, admin);
+    return this.creatorService.deleteSharedAsset(uid, params.id, admin);
+  }
+
+  @Post("/creator/assets/:id/report")
+  async reportSharedAsset(
+    @Param(new ZodValidationPipe(CreatorAssetParamsDto)) params: CreatorAssetParamsDto,
+    @Body(new ZodValidationPipe(ReportCreatorAssetDto)) body: ReportCreatorAssetDto,
+    @Headers("x-user-id") userId?: string
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.creatorService.reportSharedAsset(uid, params.id, body);
+  }
+
+  @Patch("/creator/assets/:id/moderation")
+  async moderateSharedAsset(
+    @Param(new ZodValidationPipe(CreatorAssetParamsDto)) params: CreatorAssetParamsDto,
+    @Body(new ZodValidationPipe(ModerateCreatorAssetDto)) body: ModerateCreatorAssetDto,
+    @Headers("x-user-id") userId?: string
+  ) {
+    const uid = enforceUserOrError(userId);
+    if (!(await isAdminUser(uid))) throw new ForbiddenException("관리자만 에셋 신고를 검수할 수 있습니다.");
+    return this.creatorService.moderateSharedAsset(uid, params.id, body);
   }
 
   @Post("/creator/assets/:id/use")
-  async useSharedAsset(@Param("id") id: string) {
-    return this.creatorService.useSharedAsset(id);
+  async useSharedAsset(
+    @Param(new ZodValidationPipe(CreatorAssetParamsDto)) params: CreatorAssetParamsDto,
+    @Headers("x-user-id") userId?: string
+  ) {
+    const uid = enforceUserOrError(userId);
+    return this.creatorService.useSharedAsset(uid, params.id);
   }
 
   // ── 연재 시리즈(코미코 베스트도전 스타일) ─────────────────────────────

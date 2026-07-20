@@ -3,6 +3,7 @@
 import {
   BadgeCheck,
   Check,
+  Flag,
   Globe,
   ImagePlus,
   Loader2,
@@ -18,29 +19,45 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
+
 import {
   createStudioAssetFavoriteId,
   favoriteFirst,
   favoriteOnly as filterFavoriteOnly,
   isStudioAssetFavorite,
 } from "./studio-asset-favorites";
+import {
+  serializeStudioCommunityAssetDragPayload,
+  serializeStudioLocalAssetDragPayload,
+} from "./studio-shared-asset-drag";
 
 import type {
   StudioAssetFavoriteId,
   StudioAssetFavoriteState,
 } from "./studio-asset-favorites";
 import type { StudioAsset } from "./studio-asset-library";
+import type { CreatorAssetReportReason } from "@/lib/creator-asset-contract";
 import type {
   GeneratedAssetQuality,
   GeneratedAssetSize,
-  SharedAsset,
+  PublishAssetInput,
+  SharedAssetCatalogItem,
 } from "@/src/infrastructure/creator-client";
 import type { ChangeEvent, Dispatch, DragEvent, KeyboardEvent, SetStateAction } from "react";
 
+import {
+  CREATOR_ASSET_LICENSES,
+  CREATOR_ASSET_REPORT_REASONS,
+  creatorAssetLicenseOf,
+} from "@/lib/creator-asset-contract";
 import { cx } from "@/lib/cx";
 
 export type StudioAssetTab = "mine" | "community";
-export type StudioAssetSortOrder = "newest" | "name" | "size";
+export type StudioAssetSortOrder = "newest" | "popular" | "name" | "size";
+export type StudioAssetShareOptions = Pick<
+  PublishAssetInput,
+  "description" | "tags" | "license" | "attributionText" | "containsAi" | "rightsConfirmed"
+>;
 
 const CONTROL_FOCUS_CLASS =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-panel";
@@ -78,15 +95,19 @@ export interface StudioAssetMenuPanelProps {
   setRenamingAssetName: Dispatch<SetStateAction<string>>;
   handleRenameAsset: (id: string) => void;
   onUseLocalAsset: (asset: StudioAsset) => void;
-  onShareAsset: (asset: StudioAsset) => void;
+  onShareAsset: (asset: StudioAsset, options: StudioAssetShareOptions) => void;
   onDeleteAsset: (id: string) => void;
   publishingId: string | null;
-  shared: SharedAsset[];
+  shared: SharedAssetCatalogItem[];
   sharedLoading: boolean;
+  sharedLoadingMore: boolean;
+  sharedHasMore: boolean;
   sharedError: string | null;
   loadSharedAssets: () => void;
-  onUseSharedAsset: (asset: SharedAsset) => void;
+  loadMoreSharedAssets: () => void;
+  onUseSharedAsset: (asset: SharedAssetCatalogItem) => void | Promise<void>;
   onDeleteSharedAsset: (id: string) => void;
+  onReportSharedAsset: (asset: SharedAssetCatalogItem, reason: CreatorAssetReportReason, details: string) => void;
 }
 
 function sortLocalAssets(assets: StudioAsset[], query: string, sortOrder: StudioAssetSortOrder): StudioAsset[] {
@@ -98,6 +119,8 @@ function sortLocalAssets(assets: StudioAsset[], query: string, sortOrder: Studio
   const sorted = list.slice();
   if (sortOrder === "newest") {
     sorted.sort((a, b) => b.createdAt - a.createdAt);
+  } else if (sortOrder === "popular") {
+    sorted.sort((a, b) => b.createdAt - a.createdAt);
   } else if (sortOrder === "name") {
     sorted.sort((a, b) => a.name.localeCompare(b.name, "ko", { sensitivity: "base" }));
   } else {
@@ -106,7 +129,11 @@ function sortLocalAssets(assets: StudioAsset[], query: string, sortOrder: Studio
   return sorted;
 }
 
-function sortSharedAssets(assets: SharedAsset[], query: string, sortOrder: StudioAssetSortOrder): SharedAsset[] {
+function sortSharedAssets(
+  assets: SharedAssetCatalogItem[],
+  query: string,
+  sortOrder: StudioAssetSortOrder
+): SharedAssetCatalogItem[] {
   let list = assets;
   const normalizedQuery = query.trim().toLowerCase();
   if (normalizedQuery) {
@@ -115,6 +142,8 @@ function sortSharedAssets(assets: SharedAsset[], query: string, sortOrder: Studi
   const sorted = list.slice();
   if (sortOrder === "newest") {
     sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  } else if (sortOrder === "popular") {
+    sorted.sort((a, b) => b.downloads - a.downloads);
   } else if (sortOrder === "name") {
     sorted.sort((a, b) => a.name.localeCompare(b.name, "ko", { sensitivity: "base" }));
   } else {
@@ -123,10 +152,17 @@ function sortSharedAssets(assets: SharedAsset[], query: string, sortOrder: Studi
   return sorted;
 }
 
-function dragAssetData(event: DragEvent<HTMLElement>, asset: Pick<StudioAsset, "dataUrl" | "width" | "height">) {
+function dragLocalAssetData(event: DragEvent<HTMLElement>, asset: Pick<StudioAsset, "dataUrl" | "width" | "height">) {
   event.dataTransfer.setData(
     "application/json-asset",
-    JSON.stringify({ src: asset.dataUrl, width: asset.width, height: asset.height })
+    serializeStudioLocalAssetDragPayload({ src: asset.dataUrl, width: asset.width, height: asset.height })
+  );
+}
+
+function dragSharedAssetData(event: DragEvent<HTMLElement>, asset: Pick<SharedAssetCatalogItem, "id">) {
+  event.dataTransfer.setData(
+    "application/json-asset",
+    serializeStudioCommunityAssetDragPayload(asset.id)
   );
 }
 
@@ -209,13 +245,17 @@ export function StudioAssetMenuPanel({
   publishingId,
   shared,
   sharedLoading,
+  sharedLoadingMore,
+  sharedHasMore,
   sharedError,
   loadSharedAssets,
+  loadMoreSharedAssets,
   onUseSharedAsset,
   onDeleteSharedAsset,
+  onReportSharedAsset,
 }: StudioAssetMenuPanelProps) {
   const localFavoriteId = (asset: StudioAsset) => createStudioAssetFavoriteId("local", asset.id);
-  const sharedFavoriteId = (asset: SharedAsset) => createStudioAssetFavoriteId("community", asset.id);
+  const sharedFavoriteId = (asset: SharedAssetCatalogItem) => createStudioAssetFavoriteId("community", asset.id);
   const sortedAssets = favoriteFirst(
     sortLocalAssets(assets, assetSearchQuery, assetSortOrder),
     favoriteState,
@@ -367,6 +407,9 @@ export function StudioAssetMenuPanel({
             placeholder="에셋 검색..."
             value={assetSearchQuery}
             onChange={(event) => setAssetSearchQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && assetTab === "community") loadSharedAssets();
+            }}
             aria-label="에셋 검색"
             className={cx(
               TOUCH_CONTROL_CLASS,
@@ -397,6 +440,7 @@ export function StudioAssetMenuPanel({
           )}
         >
           <option value="newest">최신순</option>
+          <option value="popular">인기순</option>
           <option value="name">이름순</option>
           <option value="size">크기순</option>
         </select>
@@ -417,6 +461,18 @@ export function StudioAssetMenuPanel({
           즐겨찾기만
         </button>
       </div>
+
+      {assetTab === "community" && (
+        <button
+          type="button"
+          onClick={loadSharedAssets}
+          disabled={sharedLoading}
+          className={cx(TOUCH_CONTROL_CLASS, "mb-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-card text-[0.65rem] font-semibold text-fg-2 hover:bg-raised disabled:opacity-55")}
+        >
+          {sharedLoading ? <Loader2 size={13} className="animate-spin" aria-hidden /> : <Search size={13} aria-hidden />}
+          전체 카탈로그에서 검색·정렬
+        </button>
+      )}
 
       {assetTab === "mine" ? (
         <LocalAssetGrid
@@ -441,10 +497,14 @@ export function StudioAssetMenuPanel({
           shared={shared}
           filteredShared={filteredShared}
           sharedLoading={sharedLoading}
+          sharedLoadingMore={sharedLoadingMore}
+          sharedHasMore={sharedHasMore}
           sharedError={sharedError}
           loadSharedAssets={loadSharedAssets}
+          loadMoreSharedAssets={loadMoreSharedAssets}
           onUseSharedAsset={onUseSharedAsset}
           onDeleteSharedAsset={onDeleteSharedAsset}
+          onReportSharedAsset={onReportSharedAsset}
           favoriteState={favoriteState}
           favoriteOnly={favoriteOnly}
           onToggleFavorite={onToggleFavorite}
@@ -490,6 +550,7 @@ function LocalAssetGrid({
   filteredAssets: StudioAsset[];
 }) {
   const [openActionsId, setOpenActionsId] = useState<string | null>(null);
+  const [shareAsset, setShareAsset] = useState<StudioAsset | null>(null);
 
   if (assetsLoading) {
     return (
@@ -527,10 +588,20 @@ function LocalAssetGrid({
     return favoriteOnly ? <EmptyFavoriteResult /> : <EmptySearchResult />;
   }
   return (
-    <div
-      data-studio-asset-grid="true"
-      className="grid max-h-64 grid-cols-3 gap-2 overflow-y-auto pr-1"
-    >
+    <>
+      {shareAsset && (
+        <PublishAssetDialog
+          key={shareAsset.id}
+          asset={shareAsset}
+          publishing={publishingId === shareAsset.id}
+          onClose={() => setShareAsset(null)}
+          onPublish={(options) => onShareAsset(shareAsset, options)}
+        />
+      )}
+      <div
+        data-studio-asset-grid="true"
+        className="grid max-h-64 grid-cols-3 gap-2 overflow-y-auto pr-1"
+      >
       {filteredAssets.map((asset) => {
         const actionRegionId = `local-asset-actions-${asset.id}`;
         const actionsOpen = openActionsId === asset.id;
@@ -543,7 +614,7 @@ function LocalAssetGrid({
             data-studio-asset-card="true"
             className="group relative flex cursor-grab flex-col items-stretch rounded-xl border border-line/80 bg-card p-1.5 shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.04)] transition-[border-color,box-shadow,transform] duration-150 hover:-translate-y-0.5 hover:border-accent/50 hover:shadow-md focus-within:border-accent/50 active:cursor-grabbing"
             draggable
-            onDragStart={(event) => dragAssetData(event, asset)}
+            onDragStart={(event) => dragLocalAssetData(event, asset)}
           >
             <AssetFavoriteButton
               assetName={asset.name}
@@ -643,7 +714,7 @@ function LocalAssetGrid({
                       type="button"
                       onClick={() => {
                         setOpenActionsId(null);
-                        onShareAsset(asset);
+                        setShareAsset(asset);
                       }}
                       disabled={publishingId === asset.id}
                       aria-busy={publishingId === asset.id || undefined}
@@ -678,6 +749,136 @@ function LocalAssetGrid({
           </div>
         );
       })}
+      </div>
+    </>
+  );
+}
+
+function PublishAssetDialog({
+  asset,
+  publishing,
+  onClose,
+  onPublish,
+}: {
+  asset: StudioAsset;
+  publishing: boolean;
+  onClose: () => void;
+  onPublish: (options: StudioAssetShareOptions) => void;
+}) {
+  const [description, setDescription] = useState("");
+  const [tags, setTags] = useState("");
+  const [license, setLicense] = useState<StudioAssetShareOptions["license"]>("toonspectrum-standard");
+  const [attributionText, setAttributionText] = useState("");
+  const [containsAi, setContainsAi] = useState(asset.kind === "ai");
+  const [rightsConfirmed, setRightsConfirmed] = useState(false);
+  const selectedLicense = creatorAssetLicenseOf(license);
+
+  return (
+    <div
+      className="fixed inset-0 z-[120] grid place-items-center bg-black/55 p-4"
+      role="presentation"
+    >
+      <button type="button" className="absolute inset-0 cursor-default" onClick={onClose} aria-label="공유 설정 닫기" />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="publish-asset-title"
+        className="relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-panel p-4 shadow-2xl"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 id="publish-asset-title" className="text-sm font-bold text-fg">커뮤니티 사용권 설정</h3>
+            <p className="mt-1 text-[0.65rem] leading-relaxed text-fg-3">{asset.name}을 다른 창작자가 재사용할 조건을 명확히 표시합니다.</p>
+          </div>
+          <button type="button" onClick={onClose} className={cx("grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 hover:bg-raised", CONTROL_FOCUS_CLASS)} aria-label="공유 설정 닫기">
+            <X size={17} aria-hidden />
+          </button>
+        </div>
+
+        <label className="mt-3 block text-[0.65rem] font-semibold text-fg-2">
+          설명
+          <textarea
+            value={description}
+            onChange={(event) => setDescription(event.target.value.slice(0, 500))}
+            rows={3}
+            placeholder="사용하기 좋은 장면, 편집 팁, 포함 요소"
+            className="mt-1 w-full resize-none rounded-lg border border-line bg-card p-2 text-xs font-normal text-fg outline-none focus:border-accent"
+          />
+        </label>
+        <label className="mt-2 block text-[0.65rem] font-semibold text-fg-2">
+          태그
+          <input
+            value={tags}
+            onChange={(event) => setTags(event.target.value.slice(0, 240))}
+            placeholder="배경, 골목, 야경 (쉼표로 구분)"
+            className={cx(TOUCH_CONTROL_CLASS, "mt-1 w-full rounded-lg border border-line bg-card px-2 text-xs font-normal text-fg outline-none focus:border-accent")}
+          />
+        </label>
+        <label className="mt-2 block text-[0.65rem] font-semibold text-fg-2">
+          사용권
+          <select
+            value={license}
+            onChange={(event) => setLicense(event.target.value as StudioAssetShareOptions["license"])}
+            className={cx(TOUCH_CONTROL_CLASS, "mt-1 w-full rounded-lg border border-line bg-card px-2 text-xs font-normal text-fg outline-none focus:border-accent")}
+          >
+            {CREATOR_ASSET_LICENSES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+          </select>
+        </label>
+        <p className="mt-1 rounded-lg bg-raised/70 px-2 py-1.5 text-[0.62rem] leading-relaxed text-fg-3">
+          {selectedLicense.description} · {selectedLicense.commercialUse ? "상업 사용 가능" : "비상업 전용"}
+          {selectedLicense.url && (
+            <>
+              {" · "}
+              <a
+                href={selectedLicense.url}
+                target="_blank"
+                rel="noreferrer"
+                className="font-semibold text-accent underline underline-offset-2"
+              >
+                사용권 원문
+              </a>
+            </>
+          )}
+        </p>
+        {selectedLicense.attributionRequired && (
+          <label className="mt-2 block text-[0.65rem] font-semibold text-fg-2">
+            표시할 저작자명
+            <input
+              value={attributionText}
+              onChange={(event) => setAttributionText(event.target.value.slice(0, 160))}
+              placeholder="비워 두면 계정 이름 사용"
+              className={cx(TOUCH_CONTROL_CLASS, "mt-1 w-full rounded-lg border border-line bg-card px-2 text-xs font-normal text-fg outline-none focus:border-accent")}
+            />
+          </label>
+        )}
+        <label className="mt-3 flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-line bg-card px-3 text-xs text-fg-2">
+          <input type="checkbox" checked={containsAi} onChange={(event) => setContainsAi(event.target.checked)} />
+          생성형 AI가 만든 이미지 또는 요소를 포함합니다.
+        </label>
+        <label className="mt-2 flex cursor-pointer items-start gap-2 rounded-lg border border-line bg-card p-3 text-xs leading-relaxed text-fg-2">
+          <input className="mt-0.5" type="checkbox" checked={rightsConfirmed} onChange={(event) => setRightsConfirmed(event.target.checked)} />
+          <span>직접 제작했거나 이 조건으로 공유할 권한이 있으며, 타인의 권리를 침해하지 않음을 확인합니다.</span>
+        </label>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button type="button" onClick={onClose} className={cx(TOUCH_CONTROL_CLASS, "rounded-lg border border-line bg-card text-xs font-semibold text-fg-2 hover:bg-raised")}>취소</button>
+          <button
+            type="button"
+            disabled={!rightsConfirmed || publishing}
+            onClick={() => onPublish({
+              description,
+              tags: tags.split(","),
+              license,
+              attributionText,
+              containsAi,
+              rightsConfirmed: true,
+            })}
+            className={cx(TOUCH_CONTROL_CLASS, "inline-flex items-center justify-center gap-1.5 rounded-lg bg-accent text-xs font-bold text-on-accent disabled:cursor-not-allowed disabled:opacity-50")}
+          >
+            {publishing ? <Loader2 size={14} className="animate-spin" aria-hidden /> : <Share2 size={14} aria-hidden />}
+            {publishing ? "검증·공유 중" : "조건에 동의하고 공유"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -753,23 +954,28 @@ function SharedAssetGrid({
   shared,
   filteredShared,
   sharedLoading,
+  sharedLoadingMore,
+  sharedHasMore,
   sharedError,
   loadSharedAssets,
+  loadMoreSharedAssets,
   onUseSharedAsset,
   onDeleteSharedAsset,
+  onReportSharedAsset,
   favoriteState,
   favoriteOnly,
   onToggleFavorite,
 }: Pick<
   StudioAssetMenuPanelProps,
-  "shared" | "sharedLoading" | "sharedError" | "loadSharedAssets" | "onUseSharedAsset" | "onDeleteSharedAsset"
+  "shared" | "sharedLoading" | "sharedLoadingMore" | "sharedHasMore" | "sharedError" | "loadSharedAssets" | "loadMoreSharedAssets" | "onUseSharedAsset" | "onDeleteSharedAsset" | "onReportSharedAsset"
   | "favoriteState"
   | "favoriteOnly"
   | "onToggleFavorite"
 > & {
-  filteredShared: SharedAsset[];
+  filteredShared: SharedAssetCatalogItem[];
 }) {
   const [openActionsId, setOpenActionsId] = useState<string | null>(null);
+  const [reportAsset, setReportAsset] = useState<SharedAssetCatalogItem | null>(null);
 
   if (sharedLoading) {
     return (
@@ -821,7 +1027,18 @@ function SharedAssetGrid({
     return favoriteOnly ? <EmptyFavoriteResult /> : <EmptySearchResult />;
   }
   return (
-    <div data-studio-asset-grid="true" className="grid max-h-64 grid-cols-3 gap-2 overflow-y-auto pr-1">
+    <>
+      {reportAsset && (
+        <ReportAssetDialog
+          asset={reportAsset}
+          onClose={() => setReportAsset(null)}
+          onReport={(reason, details) => {
+            onReportSharedAsset(reportAsset, reason, details);
+            setReportAsset(null);
+          }}
+        />
+      )}
+      <div data-studio-asset-grid="true" className="grid max-h-64 grid-cols-3 gap-2 overflow-y-auto pr-1">
       {filteredShared.map((asset) => {
         const actionRegionId = `shared-asset-actions-${asset.id}`;
         const actionsOpen = openActionsId === asset.id;
@@ -833,7 +1050,7 @@ function SharedAssetGrid({
             data-studio-asset-card="true"
             className="group relative flex cursor-grab flex-col items-stretch rounded-xl border border-line/80 bg-card p-1.5 shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.04)] transition-[border-color,box-shadow,transform] duration-150 hover:-translate-y-0.5 hover:border-accent/50 hover:shadow-md focus-within:border-accent/50 active:cursor-grabbing"
             draggable
-            onDragStart={(event) => dragAssetData(event, asset)}
+            onDragStart={(event) => dragSharedAssetData(event, asset)}
           >
             <AssetFavoriteButton
               assetName={asset.name}
@@ -843,7 +1060,7 @@ function SharedAssetGrid({
             />
             <button
               type="button"
-              onClick={() => onUseSharedAsset(asset)}
+              onClick={() => void onUseSharedAsset(asset)}
               className={cx(
                 "relative flex h-20 w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg",
                 CONTROL_FOCUS_CLASS
@@ -859,10 +1076,15 @@ function SharedAssetGrid({
               aria-label={`${asset.name} 캔버스에 추가`}
             >
               <img
-                src={asset.dataUrl}
+                src={asset.previewDataUrl}
                 alt=""
                 className="max-h-full max-w-full object-contain drop-shadow-sm transition-transform duration-150 group-hover:scale-105"
               />
+              {asset.containsAi && (
+                <span className="pointer-events-none absolute left-1 top-1 inline-flex items-center gap-0.5 rounded-md bg-accent px-1 py-px text-[0.5rem] font-bold text-on-accent shadow">
+                  <Sparkles size={7} aria-hidden /> AI
+                </span>
+              )}
               <span className="pointer-events-none absolute bottom-1 right-1 inline-flex items-center gap-0.5 rounded-md border border-line/40 bg-panel/90 px-1.5 py-0.5 text-[0.55rem] font-semibold text-fg shadow-sm backdrop-blur-sm">
                 <Plus size={10} aria-hidden /> 추가
               </span>
@@ -871,25 +1093,33 @@ function SharedAssetGrid({
               {asset.name}
             </span>
             <span className="block w-full truncate text-center text-[0.55rem] text-fg-3">{asset.author.name}</span>
-            {asset.isOwner && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setOpenActionsId((current) => (current === asset.id ? null : asset.id))}
-                  className={cx(CARD_ACTION_CLASS, "mt-1 border border-line bg-panel text-fg-2 hover:bg-raised")}
-                  aria-expanded={actionsOpen}
-                  aria-controls={actionRegionId}
-                  aria-label={`${asset.name} 공유 관리 작업 ${actionsOpen ? "닫기" : "열기"}`}
-                >
-                  <MoreHorizontal size={15} aria-hidden /> 작업
-                </button>
-                {actionsOpen && (
-                  <div
-                    id={actionRegionId}
-                    role="group"
-                    aria-label={`${asset.name} 공유 관리 작업`}
-                    className="mt-1 border-t border-line/60 pt-1"
-                  >
+            <span className="mt-1 block truncate rounded bg-raised px-1 py-0.5 text-center text-[0.52rem] font-semibold text-fg-3" title={creatorAssetLicenseOf(asset.license).label}>
+              {asset.licenseLabel ?? creatorAssetLicenseOf(asset.license).shortLabel}
+              {asset.commercialUse === false ? " · 비상업" : ""}
+            </span>
+            {asset.isOwner && asset.moderationStatus && asset.moderationStatus !== "published" && (
+              <span className="mt-1 text-center text-[0.52rem] font-semibold text-warn">
+                {asset.moderationStatus === "under_review" ? "검수 중" : "게시 거절"}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => setOpenActionsId((current) => (current === asset.id ? null : asset.id))}
+              className={cx(CARD_ACTION_CLASS, "mt-1 border border-line bg-panel text-fg-2 hover:bg-raised")}
+              aria-expanded={actionsOpen}
+              aria-controls={actionRegionId}
+              aria-label={`${asset.name} ${asset.isOwner ? "공유 관리 작업" : "공유 작업"} ${actionsOpen ? "닫기" : "열기"}`}
+            >
+              <MoreHorizontal size={15} aria-hidden /> 작업
+            </button>
+            {actionsOpen && (
+              <div
+                id={actionRegionId}
+                role="group"
+                aria-label={`${asset.name} 공유 작업`}
+                className="mt-1 border-t border-line/60 pt-1"
+              >
+                {asset.isOwner ? (
                     <button
                       type="button"
                       onClick={() => {
@@ -901,13 +1131,80 @@ function SharedAssetGrid({
                     >
                       <Trash2 size={13} aria-hidden /> 공유 취소
                     </button>
-                  </div>
+                ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOpenActionsId(null);
+                        setReportAsset(asset);
+                      }}
+                      className={cx(CARD_ACTION_CLASS, "bg-bad/5 text-bad hover:bg-bad/10")}
+                      aria-label={`${asset.name} 신고`}
+                    >
+                      <Flag size={13} aria-hidden /> 신고
+                    </button>
                 )}
-              </>
+              </div>
             )}
           </div>
         );
       })}
+      </div>
+      {sharedHasMore && (
+        <button
+          type="button"
+          onClick={loadMoreSharedAssets}
+          disabled={sharedLoadingMore}
+          className={cx(TOUCH_CONTROL_CLASS, "mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-card text-[0.65rem] font-semibold text-fg-2 hover:bg-raised disabled:opacity-55")}
+        >
+          {sharedLoadingMore && <Loader2 size={13} className="animate-spin" aria-hidden />}
+          {sharedLoadingMore ? "다음 에셋 불러오는 중" : "더 보기"}
+        </button>
+      )}
+    </>
+  );
+}
+
+function ReportAssetDialog({
+  asset,
+  onClose,
+  onReport,
+}: {
+  asset: SharedAssetCatalogItem;
+  onClose: () => void;
+  onReport: (reason: CreatorAssetReportReason, details: string) => void;
+}) {
+  const [reason, setReason] = useState<CreatorAssetReportReason>("copyright");
+  const [details, setDetails] = useState("");
+  return (
+    <div
+      className="fixed inset-0 z-[120] grid place-items-center bg-black/55 p-4"
+      role="presentation"
+    >
+      <button type="button" className="absolute inset-0 cursor-default" onClick={onClose} aria-label="신고 닫기" />
+      <div role="dialog" aria-modal="true" aria-labelledby="report-asset-title" className="relative w-full max-w-sm rounded-2xl border border-line bg-panel p-4 shadow-2xl">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <h3 id="report-asset-title" className="text-sm font-bold text-fg">에셋 신고</h3>
+            <p className="mt-1 text-[0.65rem] text-fg-3">{asset.name}의 문제를 검수자에게 전달합니다.</p>
+          </div>
+          <button type="button" onClick={onClose} className={cx("grid size-11 place-items-center rounded-lg text-fg-3 hover:bg-raised", CONTROL_FOCUS_CLASS)} aria-label="신고 닫기"><X size={17} aria-hidden /></button>
+        </div>
+        <label className="mt-3 block text-[0.65rem] font-semibold text-fg-2">
+          사유
+          <select value={reason} onChange={(event) => setReason(event.target.value as CreatorAssetReportReason)} className={cx(TOUCH_CONTROL_CLASS, "mt-1 w-full rounded-lg border border-line bg-card px-2 text-xs font-normal text-fg outline-none focus:border-accent")}>
+            {CREATOR_ASSET_REPORT_REASONS.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+          </select>
+        </label>
+        <label className="mt-2 block text-[0.65rem] font-semibold text-fg-2">
+          상세 설명
+          <textarea value={details} onChange={(event) => setDetails(event.target.value.slice(0, 500))} rows={4} placeholder="검수에 필요한 구체적인 내용을 적어 주세요." className="mt-1 w-full resize-none rounded-lg border border-line bg-card p-2 text-xs font-normal text-fg outline-none focus:border-accent" />
+        </label>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button type="button" onClick={onClose} className={cx(TOUCH_CONTROL_CLASS, "rounded-lg border border-line bg-card text-xs font-semibold text-fg-2 hover:bg-raised")}>취소</button>
+          <button type="button" onClick={() => onReport(reason, details)} className={cx(TOUCH_CONTROL_CLASS, "inline-flex items-center justify-center gap-1.5 rounded-lg bg-bad text-xs font-bold text-white")}><Flag size={14} aria-hidden /> 신고 제출</button>
+        </div>
+      </div>
     </div>
   );
 }

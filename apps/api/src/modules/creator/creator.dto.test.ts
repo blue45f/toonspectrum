@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   CreateCreatorWorkSchema,
+  CreatorAssetListQuerySchema,
+  CreatorAssetModerationQuerySchema,
+  ModerateCreatorAssetSchema,
+  PublishCreatorAssetSchema,
+  ReportCreatorAssetSchema,
   CreatorSharedWorksListQuerySchema,
   CreatorSharedDocumentMetaResponseSchema,
   CreatorTeamListQuerySchema,
@@ -20,6 +25,48 @@ import {
   UpdateCreatorTeamMemberSchema,
   UpdateCreatorWorkSchema,
 } from "./creator.dto";
+
+describe("creator asset marketplace zod contracts", () => {
+  const publishBody = {
+    name: "골목 배경",
+    dataUrl: "data:image/png;base64,AA==",
+    width: 1,
+    height: 1,
+    previewDataUrl: "data:image/png;base64,AA==",
+    previewWidth: 1,
+    previewHeight: 1,
+    license: "cc-by-4.0",
+    rightsConfirmed: true,
+  };
+
+  it("카탈로그 검색·정렬·페이지 값을 coerce하고 unknown query를 거부한다", () => {
+    expect(CreatorAssetListQuerySchema.parse({ limit: "20", offset: "40", sort: "popular" })).toEqual({
+      limit: 20,
+      offset: 40,
+      sort: "popular",
+    });
+    expect(CreatorAssetListQuerySchema.safeParse({ limit: 121 }).success).toBe(false);
+    expect(CreatorAssetListQuerySchema.safeParse({ sort: "downloads" }).success).toBe(false);
+    expect(CreatorAssetListQuerySchema.safeParse({ extra: "blocked" }).success).toBe(false);
+  });
+
+  it("공유 시 명시적 사용권·권리 확인을 요구하고 관리 필드를 거부한다", () => {
+    expect(PublishCreatorAssetSchema.safeParse(publishBody).success).toBe(true);
+    expect(PublishCreatorAssetSchema.safeParse({ ...publishBody, rightsConfirmed: false }).success).toBe(false);
+    expect(PublishCreatorAssetSchema.safeParse({ ...publishBody, license: "all-rights-reserved" }).success).toBe(false);
+    expect(PublishCreatorAssetSchema.safeParse({ ...publishBody, previewWidth: 321 }).success).toBe(false);
+    expect(PublishCreatorAssetSchema.safeParse({ ...publishBody, previewDataUrl: undefined }).success).toBe(false);
+    expect(PublishCreatorAssetSchema.safeParse({ ...publishBody, moderationStatus: "published" }).success).toBe(false);
+  });
+
+  it("신고와 검수 입력을 화이트리스트·길이·strict 경계에서 검증한다", () => {
+    expect(ReportCreatorAssetSchema.safeParse({ reason: "copyright", details: "권리자 표기 없음" }).success).toBe(true);
+    expect(ReportCreatorAssetSchema.safeParse({ reason: "revenge" }).success).toBe(false);
+    expect(CreatorAssetModerationQuerySchema.parse({})).toEqual({ status: "open", limit: 20, offset: 0 });
+    expect(ModerateCreatorAssetSchema.safeParse({ status: "under_review", note: "확인 중" }).success).toBe(true);
+    expect(ModerateCreatorAssetSchema.safeParse({ status: "deleted" }).success).toBe(false);
+  });
+});
 
 describe("creator work zod contracts", () => {
   it("create는 제목을 요구하고 알려지지 않은 필드를 거부한다", () => {

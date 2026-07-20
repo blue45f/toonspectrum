@@ -13,6 +13,7 @@ import { solveTwoBoneTarget } from "./studio-rig-two-bone-ik";
 import type { Bg3dModelFormat } from "./bg3d-model-library";
 import type { BgPrimitive } from "./studio-background-3d-primitives";
 import type { StudioBg3dGlbValidationSuccess } from "./studio-bg3d-glb-validation";
+import type { StudioBg3dKtx2RendererRuntime } from "./studio-bg3d-ktx2-renderer-runtime";
 import type {
   StudioBg3dAnimationPlayback,
   StudioBg3dConstraintLayer,
@@ -219,6 +220,9 @@ export type StudioBg3dThreeFailureCode =
   | "invalid-budgets"
   | "model-byte-budget-exceeded"
   | "renderer-unavailable"
+  | "ktx2-renderer-unavailable"
+  | "ktx2-runtime-unavailable"
+  | "ktx2-decode-failed"
   | "parse-failed"
   | "clone-failed"
   | "invalid-scene"
@@ -273,6 +277,8 @@ export interface StudioBg3dThreeLoadSuccess {
   readonly root: THREE.Object3D;
   readonly animations: readonly THREE.AnimationClip[];
   readonly metrics: StudioBg3dParsedGlbMetrics;
+  /** Stable, privacy-safe runtime marker for local diagnostics and release telemetry. */
+  readonly textureRuntime: "standard" | "ktx2-basis";
   /** React Strict Mode 정리처럼 여러 번 호출해도 실제 Three 자원은 한 번만 해제한다. */
   readonly dispose: () => StudioBg3dThreeDisposeSummary;
 }
@@ -287,6 +293,9 @@ const THREE_FAILURE_MESSAGES: Readonly<Record<StudioBg3dThreeFailureCode, string
     "invalid-budgets": "3D 모델 안전 기준을 확인할 수 없습니다. 작업공간을 새로고침해 주세요.",
     "model-byte-budget-exceeded": "이 장면의 3D 모델 용량 기준을 초과했습니다. 더 작은 모델을 사용해 주세요.",
     "renderer-unavailable": "3D 모델 처리기를 시작하지 못했습니다. 최신 브라우저에서 다시 시도해 주세요.",
+    "ktx2-renderer-unavailable": "KTX2 텍스처를 표시할 3D 렌더러를 준비하지 못했습니다. 편집기를 다시 열어 주세요.",
+    "ktx2-runtime-unavailable": "KTX2 텍스처 처리기를 안전하게 시작하지 못했습니다. 최신 브라우저에서 다시 시도해 주세요.",
+    "ktx2-decode-failed": "KTX2 텍스처를 표시 형식으로 변환하지 못했습니다. 모델 텍스처를 다시 내보내 주세요.",
     "parse-failed": "3D 모델을 안전하게 해석하지 못했습니다. GLB 2.0으로 다시 내보내 주세요.",
     "clone-failed": "3D 모델 인스턴스를 복제하지 못했습니다. 모델을 다시 불러와 주세요.",
     "invalid-scene": "3D 모델에 표시할 수 있는 기본 장면이 없습니다. 모델을 다시 내보내 주세요.",
@@ -1753,7 +1762,10 @@ function copyVerifiedGlbBytes(verification: StudioBg3dGlbValidationSuccess): Arr
  */
 export async function loadVerifiedStudioBg3dGlbWithThree(
   verification: StudioBg3dGlbValidationSuccess,
-  budgets: StudioBg3dSceneBudgets
+  budgets: StudioBg3dSceneBudgets,
+  options: {
+    readonly renderer?: THREE.WebGLRenderer | null;
+  } = {},
 ): Promise<StudioBg3dThreeLoadResult> {
   if (!validBudgets(budgets)) return threeFailure("invalid-budgets");
   const buffer = copyVerifiedGlbBytes(verification);
@@ -1761,15 +1773,58 @@ export async function loadVerifiedStudioBg3dGlbWithThree(
   if (buffer.byteLength > budgets.complexity.maxModelBytes) {
     return threeFailure("model-byte-budget-exceeded");
   }
+  if (verification.requiresBasisTextures && !verification.usesBasisTextures) {
+    return threeFailure("invalid-verified-glb");
+  }
+  if (verification.requiresBasisTextures && !options.renderer) {
+    return threeFailure("ktx2-renderer-unavailable");
+  }
 
   let loader: import("three/examples/jsm/loaders/GLTFLoader.js").GLTFLoader;
+  let ktx2Runtime: StudioBg3dKtx2RendererRuntime | null = null;
+  const disposeKtx2Runtime = (): boolean => {
+    if (!ktx2Runtime) return true;
+    try {
+      ktx2Runtime.dispose();
+      return true;
+    } catch {
+      return false;
+    }
+  };
   try {
-    const [{ GLTFLoader }, meshoptDecoder] = await Promise.all([
+    const baseLoaderPromise = Promise.all([
       import("three/examples/jsm/loaders/GLTFLoader.js"),
       loadStudioBg3dMeshoptDecoder(),
     ]);
+    // Optional KHR_texture_basisu assets deliberately use their core PNG/JPEG source. Three only
+    // selects that standards-defined fallback when no KTX2Loader is attached.
+    const ktx2RuntimePromise = verification.requiresBasisTextures
+      ? import("./studio-bg3d-ktx2-renderer-runtime").then(({ createStudioBg3dKtx2RendererRuntime }) =>
+          createStudioBg3dKtx2RendererRuntime({ renderer: options.renderer as THREE.WebGLRenderer })
+        )
+      : Promise.resolve(null);
+    const [baseLoaderResult, ktx2RuntimeResult] = await Promise.allSettled([
+      baseLoaderPromise,
+      ktx2RuntimePromise,
+    ]);
+    if (ktx2RuntimeResult.status === "fulfilled") ktx2Runtime = ktx2RuntimeResult.value;
+    if (baseLoaderResult.status === "rejected") {
+      disposeKtx2Runtime();
+      return threeFailure("renderer-unavailable");
+    }
+    if (ktx2RuntimeResult.status === "rejected") {
+      const runtimeCode = (ktx2RuntimeResult.reason as { readonly code?: unknown } | null)?.code;
+      return threeFailure(
+        runtimeCode === "renderer-unavailable"
+          ? "ktx2-renderer-unavailable"
+          : "ktx2-runtime-unavailable"
+      );
+    }
+    const [{ GLTFLoader }, meshoptDecoder] = baseLoaderResult.value;
     loader = new GLTFLoader().setMeshoptDecoder(meshoptDecoder);
+    if (ktx2Runtime) loader.setKTX2Loader(ktx2Runtime.loader);
   } catch {
+    disposeKtx2Runtime();
     return threeFailure("renderer-unavailable");
   }
 
@@ -1777,11 +1832,19 @@ export async function loadVerifiedStudioBg3dGlbWithThree(
   try {
     parsed = await loader.parseAsync(buffer, "");
   } catch {
-    return threeFailure("parse-failed");
+    const decodeFailed = ktx2Runtime?.hasDecodeFailure() === true;
+    const disposed = disposeKtx2Runtime();
+    return threeFailure(decodeFailed || !disposed ? "ktx2-decode-failed" : "parse-failed");
   }
 
   const parsedScenes = Array.isArray(parsed.scenes) ? parsed.scenes.filter(isObject3d) : [];
   const ownedRoots = uniqueRoots(isObject3d(parsed.scene) ? [parsed.scene, ...parsedScenes] : parsedScenes);
+  const decodeFailed = ktx2Runtime?.hasDecodeFailure() === true;
+  const runtimeDisposed = disposeKtx2Runtime();
+  if (decodeFailed || !runtimeDisposed) {
+    if (ownedRoots.length > 0) disposeStudioBg3dThreeResources(ownedRoots);
+    return threeFailure("ktx2-decode-failed");
+  }
   if (!isObject3d(parsed.scene)) {
     if (ownedRoots.length > 0) disposeStudioBg3dThreeResources(ownedRoots);
     return threeFailure("invalid-scene");
@@ -1818,6 +1881,7 @@ export async function loadVerifiedStudioBg3dGlbWithThree(
     root: parsed.scene,
     animations: parsedAnimations,
     metrics: measured.metrics,
+    textureRuntime: verification.requiresBasisTextures ? "ktx2-basis" : "standard",
     dispose,
   });
 }

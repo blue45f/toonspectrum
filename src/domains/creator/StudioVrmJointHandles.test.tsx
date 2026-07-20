@@ -20,6 +20,10 @@ const fiberMock = vi.hoisted(() => ({
   frameCallbacks: [] as Array<() => void>,
   state: null as unknown,
 }));
+const animationFrameMock = vi.hoisted(() => ({
+  nextId: 1,
+  callbacks: new Map<number, FrameRequestCallback>(),
+}));
 
 vi.mock("@react-three/fiber", () => ({
   useFrame: (callback: () => void) => {
@@ -44,6 +48,17 @@ function makeVrm(
 }
 
 beforeEach(() => {
+  animationFrameMock.nextId = 1;
+  animationFrameMock.callbacks.clear();
+  vi.stubGlobal("requestAnimationFrame", vi.fn((callback: FrameRequestCallback) => {
+    const id = animationFrameMock.nextId;
+    animationFrameMock.nextId += 1;
+    animationFrameMock.callbacks.set(id, callback);
+    return id;
+  }));
+  vi.stubGlobal("cancelAnimationFrame", vi.fn((id: number) => {
+    animationFrameMock.callbacks.delete(id);
+  }));
   const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
   camera.position.set(0, 0, 5);
   camera.lookAt(0, 0, 0);
@@ -62,6 +77,7 @@ afterEach(() => {
   cleanup();
   fiberMock.frameCallbacks.length = 0;
   vi.clearAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe("StudioVrmJointHandles helpers", () => {
@@ -228,6 +244,77 @@ describe("StudioVrmJointHandles interaction boundary", () => {
     expect(onSelectBone).toHaveBeenCalledWith("leftHand");
     expect(onInteractionActiveChange.mock.calls).toEqual([[true], [false]]);
     expect(onEffectorCommit).not.toHaveBeenCalled();
+  });
+
+  it("coalesces pointer moves and synchronously flushes the latest target before pointerup commit", () => {
+    const onEffectorPreview = vi.fn();
+    const onEffectorCommit = vi.fn();
+    const vrm = makeVrm({ leftHand: new THREE.Object3D() });
+    render(
+      <StudioVrmJointHandles
+        vrm={vrm}
+        onEffectorPreview={onEffectorPreview}
+        onEffectorCommit={onEffectorCommit}
+      />
+    );
+    const handle = screen.getByRole("button", { name: "왼손 관절 IK 목표 이동" });
+
+    fireEvent.pointerDown(handle, { pointerId: 7, button: 0, clientX: 100, clientY: 100 });
+    fireEvent.pointerMove(handle, { pointerId: 7, clientX: 120, clientY: 120 });
+    fireEvent.pointerMove(handle, { pointerId: 7, clientX: 160, clientY: 140 });
+
+    expect(requestAnimationFrame).toHaveBeenCalledOnce();
+    expect(onEffectorPreview).not.toHaveBeenCalled();
+    fireEvent.pointerUp(handle, { pointerId: 7, button: 0, clientX: 160, clientY: 140 });
+
+    const expected = projectStudioVrmJointPointerToPlane(
+      160,
+      140,
+      { left: 0, top: 0, width: 400, height: 400 },
+      (fiberMock.state as { camera: THREE.Camera }).camera,
+      new THREE.Plane(new THREE.Vector3(0, 0, -1), 0)
+    )!;
+    expect(cancelAnimationFrame).toHaveBeenCalledOnce();
+    expect(animationFrameMock.callbacks).toHaveLength(0);
+    expect(onEffectorPreview).toHaveBeenCalledOnce();
+    expect(onEffectorCommit).toHaveBeenCalledOnce();
+    expect(onEffectorPreview.mock.calls[0]).toEqual(onEffectorCommit.mock.calls[0]);
+    expect(onEffectorCommit.mock.calls[0]?.[0]).toBe("leftHand");
+    expect(onEffectorCommit.mock.calls[0]?.[1][0]).toBeCloseTo(expected.x);
+    expect(onEffectorCommit.mock.calls[0]?.[1][1]).toBeCloseTo(expected.y);
+    expect(onEffectorCommit.mock.calls[0]?.[1][2]).toBeCloseTo(expected.z);
+  });
+
+  it("cancels a queued preview when the handle session is remounted", () => {
+    const onEffectorPreview = vi.fn();
+    const onEffectorRollback = vi.fn();
+    const vrm = makeVrm({ rightHand: new THREE.Object3D() });
+    const view = render(
+      <StudioVrmJointHandles
+        key="session-1"
+        vrm={vrm}
+        onEffectorPreview={onEffectorPreview}
+        onEffectorRollback={onEffectorRollback}
+      />
+    );
+    const handle = screen.getByRole("button", { name: "오른손 관절 IK 목표 이동" });
+    fireEvent.pointerDown(handle, { pointerId: 3, button: 0, clientX: 80, clientY: 90 });
+    fireEvent.pointerMove(handle, { pointerId: 3, clientX: 130, clientY: 120 });
+
+    expect(animationFrameMock.callbacks).toHaveLength(1);
+    view.rerender(
+      <StudioVrmJointHandles
+        key="session-2"
+        vrm={vrm}
+        onEffectorPreview={onEffectorPreview}
+        onEffectorRollback={onEffectorRollback}
+      />
+    );
+
+    expect(cancelAnimationFrame).toHaveBeenCalledOnce();
+    expect(animationFrameMock.callbacks).toHaveLength(0);
+    expect(onEffectorPreview).not.toHaveBeenCalled();
+    expect(onEffectorRollback).toHaveBeenCalledOnce();
   });
 
   it("rolls an active effector interaction back when its handle unmounts", () => {

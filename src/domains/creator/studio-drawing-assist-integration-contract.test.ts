@@ -5,6 +5,10 @@ import { describe, expect, it } from "vitest";
 const source = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
 const guideSource = readFileSync(new URL("./StudioCanvasGuideLayers.tsx", import.meta.url), "utf8");
 const inspectorSource = readFileSync(new URL("./StudioInspectorAside.tsx", import.meta.url), "utf8");
+const isometricPanelSource = readFileSync(
+  new URL("./StudioIsometricGridPanel.tsx", import.meta.url),
+  "utf8"
+);
 
 describe("StudioPage drawing-assist integration contract", () => {
   it("consumes both guide handles before the Stage can begin an ink stroke", () => {
@@ -46,5 +50,46 @@ describe("StudioPage drawing-assist integration contract", () => {
     expect(inspectorSource).toMatch(
       /<StudioIsometricGridPanel[\s\S]*?onPreviewOrigin=\{previewIsometricOrigin\}[\s\S]*?onCommitOrigin=\{commitIsometricOrigin\}/u
     );
+  });
+
+  it("inserts every isometric primitive face in one commit and selects the complete batch", () => {
+    const primitiveStart = source.indexOf("function insertIsometricPrimitive");
+    const legacyStart = source.indexOf("function insertIsometricSolid", primitiveStart);
+    const primitiveInsertion = source.slice(primitiveStart, legacyStart);
+    const legacyInsertion = source.slice(
+      legacyStart,
+      source.indexOf("function patchElCoalesced", legacyStart)
+    );
+
+    expect(primitiveInsertion).toContain("planStudioIsometricPrimitive({");
+    expect(primitiveInsertion).toContain("...spec,");
+    expect(primitiveInsertion).toContain("originX: isometricOriginX");
+    expect(primitiveInsertion).toContain("originY: isometricOriginY");
+    expect(primitiveInsertion).toContain("angleDeg: isometricAngleDeg");
+    expect(primitiveInsertion).toContain("const ids = plan.faces.map(() => uid())");
+    expect(primitiveInsertion).toContain("createStudioIsometricPrimitiveElements(plan");
+    expect(primitiveInsertion).toContain("const targetPageId = activePage.id");
+    expect(primitiveInsertion).toContain("const currentHistory = pagesHistoryRef.current");
+    expect(primitiveInsertion).toContain("const targetPage = currentPages.find");
+    expect(primitiveInsertion).toContain(
+      "commit([...targetPage.elements, ...faces], undefined, targetPageId)"
+    );
+    expect(primitiveInsertion.match(/\bcommit\(/gu)).toHaveLength(1);
+    expect(primitiveInsertion).toContain("setSelectedId(ids[ids.length - 1]!)");
+    expect(primitiveInsertion).toContain("setMarqueeIds(ids)");
+    expect(legacyInsertion).toMatch(
+      /insertIsometricPrimitive\(\{[\s\S]*?kind: "box"[\s\S]*?width: unit \* 3[\s\S]*?depth: unit \* 3[\s\S]*?height: unit \* 3/u
+    );
+    expect(inspectorSource).toMatch(
+      /<StudioIsometricGridPanel[\s\S]*?onInsertPrimitive=\{insertIsometricPrimitive\}[\s\S]*?onInsertSolid=\{insertIsometricSolid\}/u
+    );
+  });
+
+  it("keeps heavy primitive geometry behind one literal activation-time import", () => {
+    expect(source).toContain('await import("./studio-isometric-solid")');
+    expect(source).not.toMatch(/from "\.\/studio-isometric-solid"/u);
+    expect(inspectorSource).not.toMatch(/from "\.\/studio-isometric-solid"/u);
+    expect(isometricPanelSource).not.toMatch(/from "\.\/studio-isometric-solid"/u);
+    expect(isometricPanelSource).toContain('from "./studio-isometric-primitive-contract"');
   });
 });

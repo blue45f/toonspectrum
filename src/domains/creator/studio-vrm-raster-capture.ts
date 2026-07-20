@@ -1,0 +1,357 @@
+import * as THREE from "three";
+
+import { STUDIO_BG3D_LT_RENDER_MAX_PIXELS } from "./studio-bg3d-lt-render";
+import { STUDIO_BG3D_SHOT_BATCH_MAX_DIMENSION } from "./studio-bg3d-shot-batch-limits";
+import {
+  encodeStudioBg3dShotPngInWorker,
+  isStudioBg3dShotPngFallbackEligibleError,
+} from "./studio-bg3d-shot-png-worker-client";
+import { STUDIO_BG3D_SHOT_PNG_WORKER_MAX_OUTPUT_BYTES } from "./studio-bg3d-shot-png-worker-protocol";
+
+import type { StudioBg3dLtRasterLayer } from "./studio-bg3d-lt-render";
+
+const STUDIO_VRM_CAPTURE_MAIN_THREAD_FALLBACK_MAX_PIXELS = 1_048_576;
+
+export interface StudioVrmRasterCaptureDimensions {
+  readonly width: number;
+  readonly height: number;
+}
+
+export interface StudioVrmRasterCaptureOptions {
+  readonly signal?: AbortSignal;
+  readonly timeoutMs?: number;
+}
+
+export interface StudioVrmRasterCaptureDependencies {
+  readonly encodePngInWorker: (
+    layers: readonly StudioBg3dLtRasterLayer[],
+    options: StudioVrmRasterCaptureOptions,
+  ) => Promise<Blob>;
+  readonly encodePngOnMainThread: (
+    rgba: Uint8ClampedArray,
+    dimensions: StudioVrmRasterCaptureDimensions,
+    options: StudioVrmRasterCaptureOptions,
+  ) => Promise<Blob>;
+  readonly blobToDataUrl: (
+    blob: Blob,
+    options: StudioVrmRasterCaptureOptions,
+  ) => Promise<string>;
+}
+
+function abortError(message = "VRM 캡처를 취소했습니다."): Error {
+  const error = new Error(message);
+  error.name = "AbortError";
+  return error;
+}
+
+function timeoutError(message: string): Error {
+  const error = new Error(message);
+  error.name = "TimeoutError";
+  return error;
+}
+
+function boundedTimeoutMs(value: number | undefined): number {
+  if (!Number.isFinite(value)) return 20_000;
+  return Math.max(100, Math.min(120_000, Math.floor(value ?? 0)));
+}
+
+function assertDimensions(
+  dimensions: StudioVrmRasterCaptureDimensions,
+): StudioVrmRasterCaptureDimensions {
+  const { width, height } = dimensions;
+  if (
+    !Number.isSafeInteger(width) || width < 1 || width > STUDIO_BG3D_SHOT_BATCH_MAX_DIMENSION ||
+    !Number.isSafeInteger(height) || height < 1 || height > STUDIO_BG3D_SHOT_BATCH_MAX_DIMENSION
+  ) {
+    throw new RangeError("VRM 캡처 크기가 허용 범위를 벗어났습니다.");
+  }
+  const pixels = width * height;
+  if (!Number.isSafeInteger(pixels) || pixels > STUDIO_BG3D_LT_RENDER_MAX_PIXELS) {
+    throw new RangeError("VRM 캡처 픽셀 예산을 초과했습니다.");
+  }
+  return dimensions;
+}
+
+function assertRgba(
+  rgba: Uint8ClampedArray,
+  dimensions: StudioVrmRasterCaptureDimensions,
+): void {
+  assertDimensions(dimensions);
+  if (
+    !(rgba instanceof Uint8ClampedArray) ||
+    !(rgba.buffer instanceof ArrayBuffer) ||
+    rgba.byteLength !== dimensions.width * dimensions.height * 4
+  ) {
+    throw new TypeError("VRM 캡처 RGBA 저장소가 올바르지 않습니다.");
+  }
+}
+
+/**
+ * WebGL readback is bottom-up. Return a fresh, tightly packed top-down RGBA8 snapshot so the
+ * caller can transfer/cancel the encoder without detaching or mutating renderer-owned storage.
+ */
+export function flipStudioVrmCaptureRows(
+  source: Uint8Array,
+  dimensions: StudioVrmRasterCaptureDimensions,
+): Uint8ClampedArray {
+  assertDimensions(dimensions);
+  const { width, height } = dimensions;
+  const rowBytes = width * 4;
+  if (
+    !(source instanceof Uint8Array) ||
+    !(source.buffer instanceof ArrayBuffer) ||
+    source.byteLength !== rowBytes * height
+  ) {
+    throw new TypeError("VRM WebGL readback 저장소가 올바르지 않습니다.");
+  }
+
+  const output = new Uint8ClampedArray(source.byteLength);
+  for (let outputRow = 0; outputRow < height; outputRow += 1) {
+    const sourceRow = height - outputRow - 1;
+    output.set(
+      source.subarray(sourceRow * rowBytes, (sourceRow + 1) * rowBytes),
+      outputRow * rowBytes,
+    );
+  }
+  return output;
+}
+
+/**
+ * Render into an explicit RGBA8 target and synchronously read only the raw pixels. PNG compression
+ * happens later in a Worker. Using a render target makes capture independent of the browser's
+ * default-framebuffer preservation policy, so the interactive Canvas need not opt into
+ * `preserveDrawingBuffer`.
+ */
+export function captureStudioVrmRgba(
+  renderer: THREE.WebGLRenderer,
+  scene: THREE.Scene,
+  camera: THREE.Camera,
+  dimensions: StudioVrmRasterCaptureDimensions,
+): Uint8ClampedArray {
+  const { width, height } = assertDimensions(dimensions);
+  const previousRenderTarget = renderer.getRenderTarget();
+  const previousActiveCubeFace = renderer.getActiveCubeFace();
+  const previousActiveMipmapLevel = renderer.getActiveMipmapLevel();
+  const previousClearColor = renderer.getClearColor(new THREE.Color()).clone();
+  const previousClearAlpha = renderer.getClearAlpha();
+  const target = new THREE.WebGLRenderTarget(width, height, {
+    depthBuffer: true,
+    format: THREE.RGBAFormat,
+    samples: Math.min(4, Math.max(0, Math.floor(renderer.capabilities.maxSamples))),
+    stencilBuffer: false,
+    type: THREE.UnsignedByteType,
+  });
+  target.texture.colorSpace = renderer.outputColorSpace;
+  const bottomUp = new Uint8Array(width * height * 4);
+
+  try {
+    renderer.setRenderTarget(target);
+    renderer.setClearColor(0x000000, 0);
+    renderer.clear(true, true, true);
+    renderer.render(scene, camera);
+    renderer.readRenderTargetPixels(target, 0, 0, width, height, bottomUp);
+  } finally {
+    renderer.setRenderTarget(
+      previousRenderTarget,
+      previousActiveCubeFace,
+      previousActiveMipmapLevel,
+    );
+    renderer.setClearColor(previousClearColor, previousClearAlpha);
+    target.dispose();
+  }
+
+  return flipStudioVrmCaptureRows(bottomUp, dimensions);
+}
+
+async function validatePngBlob(
+  png: Blob,
+  dimensions: StudioVrmRasterCaptureDimensions,
+  signal?: AbortSignal,
+): Promise<void> {
+  if (signal?.aborted) throw abortError();
+  if (
+    png.type !== "image/png" || png.size < 24 ||
+    png.size > STUDIO_BG3D_SHOT_PNG_WORKER_MAX_OUTPUT_BYTES
+  ) {
+    throw new TypeError("VRM PNG 결과가 올바르지 않습니다.");
+  }
+  const header = new Uint8Array(await png.slice(0, 24).arrayBuffer());
+  if (signal?.aborted) throw abortError();
+  const signature = [137, 80, 78, 71, 13, 10, 26, 10] as const;
+  const view = new DataView(header.buffer, header.byteOffset, header.byteLength);
+  if (
+    !signature.every((value, index) => header[index] === value) ||
+    view.getUint32(8, false) !== 13 ||
+    header[12] !== 0x49 || header[13] !== 0x48 ||
+    header[14] !== 0x44 || header[15] !== 0x52 ||
+    view.getUint32(16, false) !== dimensions.width ||
+    view.getUint32(20, false) !== dimensions.height
+  ) {
+    throw new TypeError("VRM PNG 헤더가 캡처 크기와 일치하지 않습니다.");
+  }
+}
+
+/** Small compatibility path, admitted only when Worker/OffscreenCanvas creation is unavailable. */
+export async function encodeStudioVrmCapturePngOnMainThread(
+  rgba: Uint8ClampedArray,
+  dimensions: StudioVrmRasterCaptureDimensions,
+  options: StudioVrmRasterCaptureOptions = {},
+): Promise<Blob> {
+  assertRgba(rgba, dimensions);
+  if (options.signal?.aborted) throw abortError();
+  if (dimensions.width * dimensions.height > STUDIO_VRM_CAPTURE_MAIN_THREAD_FALLBACK_MAX_PIXELS) {
+    throw new RangeError("VRM PNG 호환 인코더의 픽셀 예산을 초과했습니다.");
+  }
+  if (typeof document === "undefined") {
+    throw new Error("VRM PNG 호환 인코더를 사용할 수 없습니다.");
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = dimensions.width;
+  canvas.height = dimensions.height;
+  const context = canvas.getContext("2d");
+  if (!context || typeof canvas.toBlob !== "function") {
+    canvas.width = 1;
+    canvas.height = 1;
+    throw new Error("VRM PNG 호환 인코더를 준비하지 못했습니다.");
+  }
+
+  try {
+    const imageData = context.createImageData(dimensions.width, dimensions.height);
+    imageData.data.set(rgba);
+    context.putImageData(imageData, 0, 0);
+    const png = await new Promise<Blob>((resolve, reject) => {
+      let settled = false;
+      const timeoutMs = boundedTimeoutMs(options.timeoutMs);
+      const finish = (callback: () => void) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeoutId);
+        options.signal?.removeEventListener("abort", handleAbort);
+        callback();
+      };
+      const handleAbort = () => finish(() => reject(abortError()));
+      const timeoutId = setTimeout(() => finish(() => reject(
+        timeoutError("VRM PNG 호환 인코딩 시간이 초과되었습니다."),
+      )), timeoutMs);
+      options.signal?.addEventListener("abort", handleAbort, { once: true });
+      canvas.toBlob((result) => {
+        if (options.signal?.aborted) finish(() => reject(abortError()));
+        else if (result) finish(() => resolve(result));
+        else finish(() => reject(new Error("VRM PNG 호환 인코딩에 실패했습니다.")));
+      }, "image/png");
+    });
+    await validatePngBlob(png, dimensions, options.signal);
+    return png;
+  } finally {
+    canvas.width = 1;
+    canvas.height = 1;
+  }
+}
+
+export function readStudioVrmPngBlobAsDataUrl(
+  png: Blob,
+  options: StudioVrmRasterCaptureOptions = {},
+): Promise<string> {
+  const { signal } = options;
+  if (signal?.aborted) return Promise.reject(abortError());
+  if (
+    png.type !== "image/png" || png.size < 24 ||
+    png.size > STUDIO_BG3D_SHOT_PNG_WORKER_MAX_OUTPUT_BYTES
+  ) {
+    return Promise.reject(new TypeError("VRM PNG 결과가 올바르지 않습니다."));
+  }
+  if (typeof FileReader !== "function") {
+    return Promise.reject(new Error("VRM PNG 직렬화를 지원하지 않는 브라우저입니다."));
+  }
+
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    let settled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    const cleanup = () => {
+      if (timeoutId !== null) clearTimeout(timeoutId);
+      signal?.removeEventListener("abort", handleAbort);
+      reader.onload = null;
+      reader.onerror = null;
+      reader.onabort = null;
+    };
+    const finish = (callback: () => void) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      callback();
+    };
+    const abortReader = () => {
+      try {
+        reader.abort();
+      } catch {
+        // Some host shims throw after the read has already completed.
+      }
+    };
+    const handleAbort = () => finish(() => {
+      abortReader();
+      reject(abortError());
+    });
+    const handleTimeout = () => finish(() => {
+      abortReader();
+      reject(timeoutError("VRM PNG 직렬화 시간이 초과되었습니다."));
+    });
+    reader.onload = () => {
+      const value = reader.result;
+      if (typeof value !== "string" || !value.startsWith("data:image/png;base64,")) {
+        finish(() => reject(new TypeError("VRM PNG data URL이 올바르지 않습니다.")));
+        return;
+      }
+      finish(() => resolve(value));
+    };
+    reader.onerror = () => finish(() => reject(new Error("VRM PNG를 직렬화하지 못했습니다.")));
+    reader.onabort = () => finish(() => reject(abortError()));
+    signal?.addEventListener("abort", handleAbort, { once: true });
+    if (signal?.aborted) handleAbort();
+    else {
+      timeoutId = setTimeout(handleTimeout, boundedTimeoutMs(options.timeoutMs));
+      reader.readAsDataURL(png);
+    }
+  });
+}
+
+const DEFAULT_DEPENDENCIES: StudioVrmRasterCaptureDependencies = {
+  encodePngInWorker: encodeStudioBg3dShotPngInWorker,
+  encodePngOnMainThread: encodeStudioVrmCapturePngOnMainThread,
+  blobToDataUrl: readStudioVrmPngBlobAsDataUrl,
+};
+
+/**
+ * Encode a top-down RGBA snapshot off-main, then serialize only the already-compressed Blob.
+ * Runtime Worker failures are fail-closed; only creation/capability failures may use the bounded
+ * compatibility encoder.
+ */
+export async function encodeStudioVrmCapturePngDataUrl(
+  rgba: Uint8ClampedArray,
+  dimensions: StudioVrmRasterCaptureDimensions,
+  options: StudioVrmRasterCaptureOptions = {},
+  dependencies: StudioVrmRasterCaptureDependencies = DEFAULT_DEPENDENCIES,
+): Promise<string> {
+  assertRgba(rgba, dimensions);
+  if (options.signal?.aborted) throw abortError();
+  const layer: StudioBg3dLtRasterLayer = {
+    role: "color",
+    width: dimensions.width,
+    height: dimensions.height,
+    data: rgba,
+  };
+  const png = await dependencies.encodePngInWorker([layer], options).catch(
+    (cause: unknown) => {
+      if (
+        isStudioBg3dShotPngFallbackEligibleError(cause) &&
+        dimensions.width * dimensions.height <= STUDIO_VRM_CAPTURE_MAIN_THREAD_FALLBACK_MAX_PIXELS
+      ) {
+        return dependencies.encodePngOnMainThread(rgba, dimensions, options);
+      }
+      throw cause;
+    },
+  );
+  await validatePngBlob(png, dimensions, options.signal);
+  return dependencies.blobToDataUrl(png, options);
+}

@@ -14,15 +14,18 @@ import {
  */
 
 export const STUDIO_VRM_SCENE_DOCUMENT_KIND = "studio-vrm-scene" as const;
-export const STUDIO_VRM_SCENE_DOCUMENT_VERSION = 2 as const;
+export const STUDIO_VRM_SCENE_DOCUMENT_VERSION = 3 as const;
 export const STUDIO_VRM_SCENE_DOCUMENT_LEGACY_VERSION = 1 as const;
+export const STUDIO_VRM_SCENE_DOCUMENT_PREVIOUS_VERSION = 2 as const;
 export const STUDIO_VRM_SCENE_DOCUMENT_V1_MAX_BYTES = 128 * 1024;
+export const STUDIO_VRM_SCENE_DOCUMENT_V2_MAX_BYTES =
+  STUDIO_VRM_SCENE_DOCUMENT_V1_MAX_BYTES + 512;
 /**
- * v2 reserves bounded headroom for the required rig block so every historically valid v1 scene
- * can be promoted without dropping authoring data at the former 128 KiB boundary.
+ * v3 reserves bounded headroom for the required translation block so every historically valid v2
+ * scene can be promoted without dropping authoring data at the former ceiling.
  */
 export const STUDIO_VRM_SCENE_DOCUMENT_MAX_BYTES =
-  STUDIO_VRM_SCENE_DOCUMENT_V1_MAX_BYTES + 512;
+  STUDIO_VRM_SCENE_DOCUMENT_V2_MAX_BYTES + 512;
 /** Matches the default project-archive per-attachment ceiling so every accepted scene is portable. */
 export const STUDIO_VRM_MODEL_MAX_BYTES = 96 * 1024 * 1024;
 export const STUDIO_VRM_MAX_POSE_BONES = 64;
@@ -138,6 +141,22 @@ export interface StudioVrmPoseBone {
   readonly rotation: StudioVrmVec3;
 }
 
+/**
+ * Persistable additive translations used by deterministic full-body IK.
+ *
+ * `root` is expressed in the scene parent's horizontal coordinate system and owns X/Z placement
+ * only; its Y component is canonically zero because the historical `yOffset` field remains the
+ * sole vertical scene-root coordinate. `hips` and `spine` are expressed in the avatar scene-root
+ * coordinate system before body scale. `hips` moves the whole humanoid below the scene root, while
+ * `spine` moves the upper-body subtree without translating either leg.
+ */
+export interface StudioVrmPoseTranslations {
+  readonly version: 1;
+  readonly root: StudioVrmVec3;
+  readonly hips: StudioVrmVec3;
+  readonly spine: StudioVrmVec3;
+}
+
 export type StudioVrmPoseBoneMap = Partial<
   Record<StudioVrmHumanoidBoneName, StudioVrmPoseBone>
 >;
@@ -148,6 +167,7 @@ export type StudioVrmFingerRotationMap = Partial<
 export interface StudioVrmPoseState {
   readonly bones: StudioVrmPoseBoneMap;
   readonly yOffset: number;
+  readonly translations: StudioVrmPoseTranslations;
   /** Character-root yaw, in canonical radians `[-PI, PI)`. */
   readonly bodyRotationY: number;
   readonly fingerOverrides: StudioVrmFingerRotationMap;
@@ -296,7 +316,18 @@ const DEFAULT_RAW_DOCUMENT: StudioVrmSceneDocument = {
   kind: STUDIO_VRM_SCENE_DOCUMENT_KIND,
   version: STUDIO_VRM_SCENE_DOCUMENT_VERSION,
   model: { source: "bundled", id: "sample-vrm", name: "루미" },
-  pose: { bones: {}, yOffset: 0, bodyRotationY: 0, fingerOverrides: {} },
+  pose: {
+    bones: {},
+    yOffset: 0,
+    translations: {
+      version: 1,
+      root: [0, 0, 0],
+      hips: [0, 0, 0],
+      spine: [0, 0, 0],
+    },
+    bodyRotationY: 0,
+    fingerOverrides: {},
+  },
   expressions: {},
   camera: {
     projection: "perspective",
@@ -374,6 +405,8 @@ const CURRENT_ROOT_KEYS = new Set([
   "rig",
 ]);
 
+const POSE_TRANSLATION_KEYS = new Set(["version", "root", "hips", "spine"]);
+
 const RIG_KEYS = new Set([
   "version",
   "jointProfile",
@@ -409,6 +442,33 @@ const LEGACY_ROOT_KEYS = new Set([
   "transparentBackground",
   "renderWidth",
   "renderHeight",
+]);
+
+/** Exact key vocabulary emitted by buildVrmPoseDataUrlMetadata for FullVrmState v2. */
+const FULL_STATE_V2_FRAGMENT_KEYS = new Set([
+  "tool",
+  "version",
+  "modelId",
+  "poseId",
+  "bones",
+  "yOffset",
+  "poseTranslations",
+  "bodyRotation",
+  "expressionId",
+  "expressionWeights",
+  "costume",
+  "wardrobe",
+  "sceneProps",
+  "physics",
+  "bodyScale",
+  "lighting",
+  "env",
+  "fingerOverrides",
+  "materialFx",
+  "avatarForge",
+  "customColors",
+  "modelName",
+  "vrmProps",
 ]);
 
 interface SafeCloneState {
@@ -517,11 +577,13 @@ function decodeBoundedDataGraph(raw: unknown): unknown | null {
   }
 }
 
-function exceedsVersionOneSourceLimit(raw: unknown, decoded: unknown): boolean {
-  return typeof raw === "string"
-    && isRecord(decoded)
-    && decoded.version === STUDIO_VRM_SCENE_DOCUMENT_LEGACY_VERSION
-    && utf8ByteLength(raw) > STUDIO_VRM_SCENE_DOCUMENT_V1_MAX_BYTES;
+function exceedsHistoricalSourceLimit(raw: unknown, decoded: unknown): boolean {
+  if (typeof raw !== "string" || !isRecord(decoded)) return false;
+  if (decoded.version === STUDIO_VRM_SCENE_DOCUMENT_LEGACY_VERSION) {
+    return utf8ByteLength(raw) > STUDIO_VRM_SCENE_DOCUMENT_V1_MAX_BYTES;
+  }
+  return decoded.version === STUDIO_VRM_SCENE_DOCUMENT_PREVIOUS_VERSION
+    && utf8ByteLength(raw) > STUDIO_VRM_SCENE_DOCUMENT_V2_MAX_BYTES;
 }
 
 function deepFreeze<T>(value: T): T {
@@ -688,11 +750,23 @@ function normalizeFingerOverrides(value: unknown): StudioVrmFingerRotationMap {
   return result;
 }
 
+function normalizePoseTranslations(value: unknown): StudioVrmPoseTranslations {
+  const candidate = isRecord(value) ? value : {};
+  const root = normalizeVec3(candidate.root, [0, 0, 0], -10, 10);
+  return {
+    version: 1,
+    root: [root[0], 0, root[2]],
+    hips: normalizeVec3(candidate.hips, [0, 0, 0], -2, 2),
+    spine: normalizeVec3(candidate.spine, [0, 0, 0], -0.75, 0.75),
+  };
+}
+
 function normalizePose(value: unknown): StudioVrmPoseState {
   const candidate = isRecord(value) ? value : {};
   return {
     bones: normalizePoseBones(candidate.bones),
     yOffset: boundedNumber(candidate.yOffset, 0, -10, 10),
+    translations: normalizePoseTranslations(candidate.translations),
     bodyRotationY: normalizeRotationAngle(candidate.bodyRotationY),
     fingerOverrides: normalizeFingerOverrides(candidate.fingerOverrides),
   };
@@ -937,6 +1011,12 @@ function strictDecodedCurrentDocument(value: unknown): StudioVrmSceneDocument | 
     || Object.keys(value.rig).length !== RIG_KEYS.size
     || Object.keys(value.rig).some((key) => !RIG_KEYS.has(key))
   ) return null;
+  if (
+    !isRecord(value.pose)
+    || !isRecord(value.pose.translations)
+    || Object.keys(value.pose.translations).length !== POSE_TRANSLATION_KEYS.size
+    || Object.keys(value.pose.translations).some((key) => !POSE_TRANSLATION_KEYS.has(key))
+  ) return null;
   const normalized = normalizeDecodedCurrentDocument(value);
   if (!normalized || !jsonStructuresEqual(value, normalized)) return null;
   try {
@@ -949,14 +1029,35 @@ function strictDecodedCurrentDocument(value: unknown): StudioVrmSceneDocument | 
 }
 
 function versionOneProjection(document: StudioVrmSceneDocument): Record<string, unknown> {
+  const { translations: _translations, ...legacyPose } = document.pose;
   return {
     kind: document.kind,
     version: STUDIO_VRM_SCENE_DOCUMENT_LEGACY_VERSION,
     model: document.model,
-    pose: document.pose,
+    pose: legacyPose,
     expressions: document.expressions,
     camera: document.camera,
     appearance: document.appearance,
+    props: document.props,
+    sceneProps: document.sceneProps,
+    lighting: document.lighting,
+    physics: document.physics,
+    env: document.env,
+    render: document.render,
+  };
+}
+
+function versionTwoProjection(document: StudioVrmSceneDocument): Record<string, unknown> {
+  const { translations: _translations, ...versionTwoPose } = document.pose;
+  return {
+    kind: document.kind,
+    version: STUDIO_VRM_SCENE_DOCUMENT_PREVIOUS_VERSION,
+    model: document.model,
+    pose: versionTwoPose,
+    expressions: document.expressions,
+    camera: document.camera,
+    appearance: document.appearance,
+    rig: document.rig,
     props: document.props,
     sceneProps: document.sceneProps,
     lighting: document.lighting,
@@ -980,6 +1081,12 @@ function migrateStrictDecodedVersionOneDocument(value: unknown): StudioVrmSceneD
   ) return null;
   const migrated = deepFreeze(normalizeDecodedDocumentFields({
     ...value,
+    pose: isRecord(value.pose)
+      ? {
+          ...value.pose,
+          translations: DEFAULT_RAW_DOCUMENT.pose.translations,
+        }
+      : value.pose,
     rig: DEFAULT_RAW_DOCUMENT.rig,
   }));
   if (!jsonStructuresEqual(value, versionOneProjection(migrated))) return null;
@@ -987,6 +1094,43 @@ function migrateStrictDecodedVersionOneDocument(value: unknown): StudioVrmSceneD
     const sourceBytes = utf8ByteLength(JSON.stringify(value));
     const migratedBytes = utf8ByteLength(JSON.stringify(migrated));
     return sourceBytes <= STUDIO_VRM_SCENE_DOCUMENT_V1_MAX_BYTES
+      && migratedBytes <= STUDIO_VRM_SCENE_DOCUMENT_MAX_BYTES
+      ? migrated
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Strict, lossless v2 reader. The only authored addition is the zero translation block. */
+function migrateStrictDecodedVersionTwoDocument(value: unknown): StudioVrmSceneDocument | null {
+  if (
+    !isRecord(value)
+    || value.kind !== STUDIO_VRM_SCENE_DOCUMENT_KIND
+    || value.version !== STUDIO_VRM_SCENE_DOCUMENT_PREVIOUS_VERSION
+  ) return null;
+  const keys = Object.keys(value);
+  if (
+    keys.length !== CURRENT_ROOT_KEYS.size
+    || keys.some((key) => !CURRENT_ROOT_KEYS.has(key))
+    || !isRecord(value.rig)
+    || Object.keys(value.rig).length !== RIG_KEYS.size
+    || Object.keys(value.rig).some((key) => !RIG_KEYS.has(key))
+    || !isRecord(value.pose)
+    || hasOwn(value.pose, "translations")
+  ) return null;
+  const migrated = deepFreeze(normalizeDecodedDocumentFields({
+    ...value,
+    pose: {
+      ...value.pose,
+      translations: DEFAULT_RAW_DOCUMENT.pose.translations,
+    },
+  }));
+  if (!jsonStructuresEqual(value, versionTwoProjection(migrated))) return null;
+  try {
+    const sourceBytes = utf8ByteLength(JSON.stringify(value));
+    const migratedBytes = utf8ByteLength(JSON.stringify(migrated));
+    return sourceBytes <= STUDIO_VRM_SCENE_DOCUMENT_V2_MAX_BYTES
       && migratedBytes <= STUDIO_VRM_SCENE_DOCUMENT_MAX_BYTES
       ? migrated
       : null;
@@ -1019,21 +1163,23 @@ export const DEFAULT_STUDIO_VRM_SCENE_DOCUMENT = createDefaultStudioVrmSceneDocu
  */
 export function normalizeStudioVrmSceneDocument(raw: unknown): StudioVrmSceneDocument {
   const decoded = decodeBoundedDataGraph(raw);
-  if (exceedsVersionOneSourceLimit(raw, decoded)) return createDefaultStudioVrmSceneDocument();
+  if (exceedsHistoricalSourceLimit(raw, decoded)) return createDefaultStudioVrmSceneDocument();
   return normalizeDecodedCurrentDocument(decoded)
+    ?? migrateStrictDecodedVersionTwoDocument(decoded)
     ?? migrateStrictDecodedVersionOneDocument(decoded)
     ?? createDefaultStudioVrmSceneDocument();
 }
 
-/** Parses canonical v2 and losslessly promotes complete canonical v1 documents. */
+/** Parses canonical v3 and losslessly promotes complete canonical v1/v2 documents. */
 export function parseStudioVrmSceneDocument(raw: string): StudioVrmSceneDocument | null {
   const decoded = decodeBoundedDataGraph(raw);
-  if (exceedsVersionOneSourceLimit(raw, decoded)) return null;
+  if (exceedsHistoricalSourceLimit(raw, decoded)) return null;
   return strictDecodedCurrentDocument(decoded)
+    ?? migrateStrictDecodedVersionTwoDocument(decoded)
     ?? migrateStrictDecodedVersionOneDocument(decoded);
 }
 
-/** Serializes only complete, losslessly canonical version-2 documents. */
+/** Serializes only complete, losslessly canonical version-3 documents. */
 export function serializeStudioVrmSceneDocument(raw: unknown): string | null {
   const document = strictDecodedCurrentDocument(decodeBoundedDataGraph(raw));
   if (!document) return null;
@@ -1063,6 +1209,95 @@ function readLegacyBundledModel(
 
 function hasOnlyKeys(value: Record<string, unknown>, allowed: ReadonlySet<string>): boolean {
   return Object.keys(value).every((key) => allowed.has(key));
+}
+
+function strictFullStateV2Translations(
+  value: Record<string, unknown>,
+): StudioVrmPoseTranslations | null {
+  if (!hasOwn(value, "poseTranslations")) return DEFAULT_RAW_DOCUMENT.pose.translations;
+  if (!isRecord(value.poseTranslations)) return null;
+  const keys = Object.keys(value.poseTranslations);
+  if (
+    keys.length !== POSE_TRANSLATION_KEYS.size
+    || keys.some((key) => !POSE_TRANSLATION_KEYS.has(key))
+  ) return null;
+  const normalized = normalizePoseTranslations(value.poseTranslations);
+  return jsonStructuresEqual(value.poseTranslations, normalized) ? normalized : null;
+}
+
+/**
+ * Migrates the currently emitted re-editable PNG metadata. Keeping this separate from the
+ * pre-version reader makes mixed old/new field names and future FullVrmState versions fail closed.
+ */
+function migrateDecodedFullStateV2Metadata(
+  value: unknown,
+  options: StudioVrmLegacyMigrationOptions,
+): StudioVrmLegacyMetadataMigration | null {
+  if (
+    !isRecord(value)
+    || value.tool !== "vrm-poser"
+    || value.version !== 2
+    || hasOwn(value, "kind")
+    || !hasOnlyKeys(value, FULL_STATE_V2_FRAGMENT_KEYS)
+    || !hasOwn(value, "bones")
+    || !hasOwn(value, "yOffset")
+    || !hasOwn(value, "bodyRotation")
+  ) return null;
+
+  const translations = strictFullStateV2Translations(value);
+  if (!translations) return null;
+  const normalizedBones = normalizePoseBones(value.bones);
+  if (!jsonStructuresEqual(value.bones, normalizedBones)) return null;
+  if (
+    typeof value.yOffset !== "number"
+    || !Number.isFinite(value.yOffset)
+    || value.yOffset < -10
+    || value.yOffset > 10
+    || typeof value.bodyRotation !== "number"
+    || !Number.isFinite(value.bodyRotation)
+    || value.bodyRotation < -Math.PI
+    || value.bodyRotation > Math.PI
+  ) return null;
+
+  const bundledModel = readLegacyBundledModel(value, options);
+  if (!bundledModel) {
+    return deepFreeze({
+      status: "unresolved-model",
+      modelId: typeof value.modelId === "string" ? value.modelId : null,
+      modelName: typeof value.modelName === "string"
+        ? normalizeSafeText(value.modelName, "") || null
+        : null,
+    });
+  }
+
+  const candidate: StudioVrmSceneDocument = {
+    ...DEFAULT_RAW_DOCUMENT,
+    model: bundledModel,
+    pose: normalizePose({
+      bones: normalizedBones,
+      yOffset: value.yOffset,
+      translations,
+      bodyRotationY: value.bodyRotation,
+      fingerOverrides: value.fingerOverrides,
+    }),
+    expressions: normalizeExpressions(value.expressionWeights),
+    appearance: normalizeAppearance({
+      bodyScale: value.bodyScale,
+      customColors: value.customColors,
+      materialFx: value.materialFx,
+      avatarForge: value.avatarForge,
+      costume: value.costume,
+      wardrobe: value.wardrobe,
+    }),
+    props: normalizedDataOrNull(value.vrmProps),
+    sceneProps: normalizedDataOrNull(value.sceneProps),
+    lighting: normalizeLighting(value.lighting),
+    physics: normalizePhysics(value.physics),
+    env: isStudioVrmEnvironment(value.env) ? value.env : "none",
+  };
+  const serialized = serializeStudioVrmSceneDocument(candidate);
+  const document = serialized ? parseStudioVrmSceneDocument(serialized) : null;
+  return document ? deepFreeze({ status: "resolved", document }) : null;
 }
 
 function migrateDecodedLegacyMetadata(
@@ -1132,12 +1367,15 @@ export function migrateStudioVrmSceneDocument(
   options: StudioVrmLegacyMigrationOptions = {}
 ): StudioVrmSceneDocument | null {
   const decoded = decodeBoundedDataGraph(raw);
-  if (exceedsVersionOneSourceLimit(raw, decoded)) return null;
+  if (exceedsHistoricalSourceLimit(raw, decoded)) return null;
   const current = strictDecodedCurrentDocument(decoded);
   if (current) return current;
+  const versionTwo = migrateStrictDecodedVersionTwoDocument(decoded);
+  if (versionTwo) return versionTwo;
   const versionOne = migrateStrictDecodedVersionOneDocument(decoded);
   if (versionOne) return versionOne;
-  const migrated = migrateDecodedLegacyMetadata(decoded, options);
+  const migrated = migrateDecodedFullStateV2Metadata(decoded, options)
+    ?? migrateDecodedLegacyMetadata(decoded, options);
   return migrated?.status === "resolved" ? migrated.document : null;
 }
 
@@ -1146,7 +1384,9 @@ export function migrateStudioVrmLegacyMetadata(
   raw: unknown,
   options: StudioVrmLegacyMigrationOptions = {}
 ): StudioVrmLegacyMetadataMigration | null {
-  return migrateDecodedLegacyMetadata(decodeBoundedDataGraph(raw), options);
+  const decoded = decodeBoundedDataGraph(raw);
+  return migrateDecodedFullStateV2Metadata(decoded, options)
+    ?? migrateDecodedLegacyMetadata(decoded, options);
 }
 
 /**

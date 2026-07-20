@@ -1,4 +1,4 @@
-import type { SharedAsset } from "../../infrastructure/creator-client";
+import type { SharedAssetCatalogItem } from "../../infrastructure/creator-client";
 
 export interface SharedPoseLibraryGate {
   editorOpen: boolean;
@@ -15,6 +15,6 @@ export function shouldLoadSharedPoseLibrary(gate: SharedPoseLibraryGate): boolea
   return gate.editorOpen && gate.posePanelActive && gate.libraryExpanded;
 }
 
-export function selectSharedPoseAssets(assets: readonly SharedAsset[]): SharedAsset[] {
+export function selectSharedPoseAssets(assets: readonly SharedAssetCatalogItem[]): SharedAssetCatalogItem[] {
   return assets.filter((asset) => asset.kind === "vrm_pose" || asset.name.startsWith("[3D_POSE]"));
 }

@@ -3,9 +3,14 @@ import * as THREE from "three";
 import { STUDIO_HUMANOID_BONE_NAMES } from "./studio-humanoid-bones";
 import { POSER_FINGER_BONES } from "./studio-pose-presets";
 import { classifyMeshName } from "./studio-vrm-costume";
+import {
+  EMPTY_STUDIO_VRM_POSE_TRANSLATIONS,
+  normalizeStudioVrmPoseTranslations,
+} from "./studio-vrm-pose-translations";
 import { parseVrmProps, type PropInstance } from "./studio-vrm-props";
 import { parseSceneProps, type SerializedSceneProps } from "./studio-vrm-scene-props";
 
+import type { StudioVrmPoseTranslations } from "./studio-vrm-scene-document";
 import type { VRM, VRMHumanBoneName } from "@pixiv/three-vrm";
 
 export type Vec3 = readonly [number, number, number];
@@ -800,12 +805,81 @@ function aimBoneToWorldDirection(humanoid: NonNullable<VRM["humanoid"]>, boneNam
   bone.updateMatrixWorld(true);
 }
 
-export function applyPoseToVrm(vrm: VRM, bones: PoseBoneMap, yOffset: number) {
+const translatedBoneBasePositions = new WeakMap<THREE.Object3D, THREE.Vector3>();
+
+function restoreTranslatedBoneBase(node: THREE.Object3D | null): void {
+  if (!node) return;
+  const existing = translatedBoneBasePositions.get(node);
+  if (existing) {
+    node.position.copy(existing);
+    return;
+  }
+  translatedBoneBasePositions.set(node, node.position.clone());
+}
+
+function sceneLocalTranslationToBoneLocal(
+  scene: THREE.Object3D,
+  node: THREE.Object3D,
+  translation: Vec3,
+): THREE.Vector3 | null {
+  const parent = node.parent;
+  if (!parent) return null;
+  scene.updateMatrixWorld(true);
+  parent.updateMatrixWorld(true);
+  const sceneOriginWorld = new THREE.Vector3(0, 0, 0).applyMatrix4(scene.matrixWorld);
+  const sceneEndpointWorld = new THREE.Vector3(...translation).applyMatrix4(scene.matrixWorld);
+  const worldDelta = sceneEndpointWorld.sub(sceneOriginWorld);
+  const parentInverse = parent.matrixWorld.clone().invert();
+  const parentOrigin = new THREE.Vector3(0, 0, 0).applyMatrix4(parentInverse);
+  const parentEndpoint = worldDelta.clone().applyMatrix4(parentInverse);
+  const result = parentEndpoint.sub(parentOrigin);
+  return [result.x, result.y, result.z].every(Number.isFinite) ? result : null;
+}
+
+function applyPoseTranslations(
+  vrm: VRM,
+  translations: StudioVrmPoseTranslations,
+): boolean {
   const humanoid = vrm.humanoid;
   if (!humanoid) return false;
+  const hips = humanoid.getNormalizedBoneNode("hips");
+  const spine = humanoid.getNormalizedBoneNode("spine");
+  const hasHipsTranslation = translations.hips.some((coordinate) => coordinate !== 0);
+  const hasSpineTranslation = translations.spine.some((coordinate) => coordinate !== 0);
+  if (hasHipsTranslation) {
+    if (!hips) return false;
+    const hipsLocal = sceneLocalTranslationToBoneLocal(vrm.scene, hips, translations.hips);
+    if (!hipsLocal) return false;
+    hips.position.add(hipsLocal);
+    vrm.scene.updateMatrixWorld(true);
+  }
+  if (hasSpineTranslation) {
+    if (!spine) return false;
+    const spineLocal = sceneLocalTranslationToBoneLocal(vrm.scene, spine, translations.spine);
+    if (!spineLocal) return false;
+    spine.position.add(spineLocal);
+    vrm.scene.updateMatrixWorld(true);
+  }
+  return true;
+}
+
+export function applyPoseToVrm(
+  vrm: VRM,
+  bones: PoseBoneMap,
+  yOffset: number,
+  rawTranslations: StudioVrmPoseTranslations = EMPTY_STUDIO_VRM_POSE_TRANSLATIONS,
+) {
+  const humanoid = vrm.humanoid;
+  if (!humanoid) return false;
+  const translations = normalizeStudioVrmPoseTranslations(rawTranslations);
+  if (!translations) return false;
 
   humanoid.resetNormalizedPose();
-  vrm.scene.position.y = yOffset;
+  const hips = humanoid.getNormalizedBoneNode("hips");
+  const spine = humanoid.getNormalizedBoneNode("spine");
+  restoreTranslatedBoneBase(hips);
+  restoreTranslatedBoneBase(spine);
+  vrm.scene.position.set(translations.root[0], yOffset, translations.root[2]);
   vrm.scene.updateMatrixWorld(true);
 
   PRE_DIRECTION_ROTATION_BONE_ORDER.forEach((boneName) => {
@@ -837,6 +911,8 @@ export function applyPoseToVrm(vrm: VRM, bones: PoseBoneMap, yOffset: number) {
     }
   });
 
+  humanoid.update();
+  if (!applyPoseTranslations(vrm, translations)) return false;
   humanoid.update();
   vrm.update(0);
   vrm.scene.updateMatrixWorld(true);
@@ -1066,6 +1142,8 @@ export type FullVrmState = {
   poseId?: string;
   bones: PoseBoneMap;
   yOffset: number;
+  /** Canonical v3 root/hips/spine translation state; absent v2 payloads migrate to zero. */
+  poseTranslations?: StudioVrmPoseTranslations;
   /** 캐릭터 루트의 사용자 Y축 회전(라디안, -PI~PI). */
   bodyRotation?: number;
   expressionId?: string;
@@ -1121,12 +1199,15 @@ export function canRestoreFullVrmHistoryState(state: FullVrmState, activeModelId
 }
 
 export function serializeFullVrmState(state: Partial<FullVrmState>): FullVrmState {
+  const poseTranslations = normalizeStudioVrmPoseTranslations(state.poseTranslations)
+    ?? EMPTY_STUDIO_VRM_POSE_TRANSLATIONS;
   return {
     version: 2,
     modelId: normalizeFullVrmModelId(state.modelId),
     poseId: state.poseId,
     bones: state.bones || {},
     yOffset: state.yOffset ?? 0,
+    poseTranslations,
     bodyRotation: normalizeVrmBodyRotation(state.bodyRotation),
     expressionId: state.expressionId,
     expressionWeights: state.expressionWeights,
@@ -1146,7 +1227,11 @@ export function serializeFullVrmState(state: Partial<FullVrmState>): FullVrmStat
 }
 
 export function applyFullState(vrm: VRM, state: FullVrmState, applyers: {
-  applyPose: (bones: PoseBoneMap, y: number) => void;
+  applyPose: (
+    bones: PoseBoneMap,
+    y: number,
+    translations: StudioVrmPoseTranslations,
+  ) => void;
   applyExpr: (weights: Record<string, number>) => void;
   applyCostume?: (c: unknown) => void;
   applyWardrobe?: (w: unknown) => void;
@@ -1156,7 +1241,12 @@ export function applyFullState(vrm: VRM, state: FullVrmState, applyers: {
   applyMaterialFx?: (fx: VrmMaterialFx) => void;
   applyCustomColors?: (colors: Record<string, string>) => void;
 }) {
-  if (state.bones) applyers.applyPose(stripFingerBones(state.bones), state.yOffset ?? 0);
+  if (state.bones) applyers.applyPose(
+    stripFingerBones(state.bones),
+    state.yOffset ?? 0,
+    normalizeStudioVrmPoseTranslations(state.poseTranslations)
+      ?? EMPTY_STUDIO_VRM_POSE_TRANSLATIONS,
+  );
   if (state.expressionWeights) applyers.applyExpr(state.expressionWeights);
   if (state.bodyScale) applyBodyScale(vrm, state.bodyScale);
   if (state.fingerOverrides) applyFingerRotations(vrm, state.fingerOverrides);
@@ -1184,10 +1274,22 @@ export function stripFingerBones(bones: PoseBoneMap): PoseBoneMap {
 
 export function applyPoserVisualState(
   vrm: VRM,
-  state: { bones: PoseBoneMap; yOffset?: number; fingerEdits?: FingerRotationMap; bodyScale?: BodyScale }
+  state: {
+    bones: PoseBoneMap;
+    yOffset?: number;
+    poseTranslations?: StudioVrmPoseTranslations;
+    fingerEdits?: FingerRotationMap;
+    bodyScale?: BodyScale;
+  }
 ) {
-  const { bones, yOffset = 0, fingerEdits = {}, bodyScale } = state;
-  applyPoseToVrm(vrm, stripFingerBones(bones), yOffset);
+  const {
+    bones,
+    yOffset = 0,
+    poseTranslations = EMPTY_STUDIO_VRM_POSE_TRANSLATIONS,
+    fingerEdits = {},
+    bodyScale,
+  } = state;
+  applyPoseToVrm(vrm, stripFingerBones(bones), yOffset, poseTranslations);
   if (Object.keys(fingerEdits).length) {
     applyFingerRotations(vrm, fingerEdits);
   }
@@ -1204,6 +1306,7 @@ export function planFullStateRestore(state: FullVrmState): {
   modelId?: string;
   strippedBones: PoseBoneMap;
   yOffset: number;
+  poseTranslations: StudioVrmPoseTranslations;
   bodyRotation: number;
   expressionWeights: Record<string, number>;
   bodyScale?: BodyScale;
@@ -1224,6 +1327,8 @@ export function planFullStateRestore(state: FullVrmState): {
     modelId: normalizeFullVrmModelId(state.modelId),
     strippedBones: stripFingerBones(state.bones || {}),
     yOffset: state.yOffset ?? 0,
+    poseTranslations: normalizeStudioVrmPoseTranslations(state.poseTranslations)
+      ?? EMPTY_STUDIO_VRM_POSE_TRANSLATIONS,
     bodyRotation: normalizeVrmBodyRotation(state.bodyRotation),
     expressionWeights: state.expressionWeights || {},
     bodyScale: state.bodyScale,
@@ -1271,6 +1376,7 @@ export function buildFullVrmStateFromSharedDataUrl(dataUrl: string): FullVrmStat
       poseId: poseData.poseId,
       bones: poseData.bones || {},
       yOffset: typeof poseData.yOffset === "number" ? poseData.yOffset : 0,
+      poseTranslations: poseData.poseTranslations,
       bodyRotation: poseData.bodyRotation,
       expressionId: poseData.expressionId,
       expressionWeights: poseData.expressionWeights || {},

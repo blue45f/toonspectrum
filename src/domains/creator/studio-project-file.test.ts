@@ -213,7 +213,7 @@ describe("studio project file", () => {
     })).toThrow(/3D 데생 인형 장면/);
   });
 
-  it("페이지와 마스터의 strict VRM v1 장면을 authored 값 손실 없이 v2 rig 장면으로 승격한다", () => {
+  it("페이지와 마스터의 strict VRM v1 장면을 authored 값 손실 없이 v3 장면으로 승격한다", () => {
     const current = normalizeStudioVrmSceneDocument({
       ...createStudioVrmSceneDocument(),
       pose: {
@@ -235,6 +235,7 @@ describe("studio project file", () => {
       string,
       unknown
     > & { rig: unknown };
+    delete ((versionOne.pose as Record<string, unknown>).translations);
     versionOne.version = 1;
     const image = {
       id: "legacy-vrm-image",
@@ -255,7 +256,7 @@ describe("studio project file", () => {
       .elements[0]).vrmScene;
 
     for (const scene of [pageScene, masterScene]) {
-      expect(scene.version).toBe(2);
+      expect(scene.version).toBe(3);
       expect(scene.pose).toEqual(current.pose);
       expect(scene.expressions).toEqual(current.expressions);
       expect(scene.props).toEqual(current.props);
@@ -266,10 +267,16 @@ describe("studio project file", () => {
         footPlant: false,
         floorHeight: 0,
       });
+      expect(scene.pose.translations).toEqual({
+        version: 1,
+        root: [0, 0, 0],
+        hips: [0, 0, 0],
+        spine: [0, 0, 0],
+      });
     }
     const serialized = JSON.parse(serializeStudioProjectFile(parsed));
-    expect(serialized.pagesList[0].elements[0].vrmScene.version).toBe(2);
-    expect(serialized.master.elements[0].vrmScene.version).toBe(2);
+    expect(serialized.pagesList[0].elements[0].vrmScene.version).toBe(3);
+    expect(serialized.master.elements[0].vrmScene.version).toBe(3);
   });
 
   it("페이지별 드로잉 보조 문서를 프로젝트 파일로 왕복하고 손상본은 거부한다", () => {

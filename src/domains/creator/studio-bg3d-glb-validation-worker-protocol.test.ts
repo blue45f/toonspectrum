@@ -48,6 +48,8 @@ function successResponse(): Record<string, unknown> {
       verifiedSha256: `sha256:${"a".repeat(64)}`,
       verifiedBytes: new Uint8Array(4),
       cumulativeBytesAfter: 4,
+      usesBasisTextures: false,
+      requiresBasisTextures: false,
       metrics: { ...METRICS },
     },
   };
@@ -66,6 +68,15 @@ describe("studio BG3D worker protocol guards", () => {
       } },
       { path: "cumulative", mutate: (response: Record<string, unknown>) => {
         (response.result as Record<string, unknown>).cumulativeBytesAfter = -1;
+      } },
+      { path: "basis marker", mutate: (response: Record<string, unknown>) => {
+        delete (response.result as Record<string, unknown>).usesBasisTextures;
+      } },
+      { path: "required basis marker", mutate: (response: Record<string, unknown>) => {
+        delete (response.result as Record<string, unknown>).requiresBasisTextures;
+      } },
+      { path: "required basis invariant", mutate: (response: Record<string, unknown>) => {
+        (response.result as Record<string, unknown>).requiresBasisTextures = true;
       } },
       { path: "missing metric", mutate: (response: Record<string, unknown>) => {
         delete ((response.result as Record<string, unknown>).metrics as Record<string, unknown>).triangles;

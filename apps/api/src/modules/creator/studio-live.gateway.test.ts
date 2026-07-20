@@ -3588,6 +3588,178 @@ describe("StudioLiveGateway", () => {
     });
   });
 
+  it("includes adapter-visible active shares in a late join snapshot", async () => {
+    const harness = createHarness();
+    const host = harness.socket("owner");
+    await connectAndJoin(harness, host);
+    await harness.gateway.announceScreenShare(
+      host as never,
+      { workId: "work-1", shareId: "share-live", label: "콘티 화면" },
+      undefined
+    );
+
+    expect(host.data.studioScreenShare).toEqual({
+      connectionId: "owner",
+      shareId: "share-live",
+      label: "콘티 화면",
+    });
+
+    const lateViewer = harness.socket("viewer");
+    const joined = await connectAndJoin(harness, lateViewer);
+
+    expect(joined).toMatchObject({
+      ok: true,
+      data: {
+        screenShares: [
+          { connectionId: "owner", shareId: "share-live", label: "콘티 화면" },
+        ],
+      },
+    });
+  });
+
+  it("discovers active shares through the cross-node Socket.IO adapter", async () => {
+    const firstNode = createHarness();
+    const secondNode = createHarness();
+    const bus = connectFakeInterServerBus(firstNode, secondNode);
+    try {
+      const host = firstNode.socket("owner");
+      await connectAndJoin(firstNode, host);
+      await firstNode.gateway.announceScreenShare(
+        host as never,
+        { workId: "work-1", shareId: "share-cross-node", label: "원격 노드 화면" },
+        undefined
+      );
+
+      const observer = secondNode.socket("viewer");
+      const joined = await connectAndJoin(secondNode, observer);
+
+      expect(joined).toMatchObject({
+        ok: true,
+        data: {
+          screenShares: [
+            {
+              connectionId: "owner",
+              shareId: "share-cross-node",
+              label: "원격 노드 화면",
+            },
+          ],
+        },
+      });
+    } finally {
+      bus.destroy();
+    }
+  });
+
+  it("falls back to same-node active shares when adapter discovery is unavailable", async () => {
+    const harness = createHarness();
+    const host = harness.socket("owner");
+    await connectAndJoin(harness, host);
+    await harness.gateway.announceScreenShare(
+      host as never,
+      { workId: "work-1", shareId: "share-local-fallback", label: "로컬 화면" },
+      undefined
+    );
+    harness.namespace.in = () => ({
+      async fetchSockets() {
+        throw new Error("shared adapter unavailable");
+      },
+    });
+
+    const observer = harness.socket("viewer");
+    const joined = await connectAndJoin(harness, observer);
+
+    expect(joined).toMatchObject({
+      ok: true,
+      data: {
+        screenShares: [
+          {
+            connectionId: "owner",
+            shareId: "share-local-fallback",
+            label: "로컬 화면",
+          },
+        ],
+      },
+    });
+  });
+
+  it("fences stale stops when one socket replaces its active share lifecycle", async () => {
+    const harness = createHarness();
+    const host = harness.socket("owner");
+    await connectAndJoin(harness, host);
+    await harness.gateway.announceScreenShare(
+      host as never,
+      { workId: "work-1", shareId: "share-old", label: "이전 화면" },
+      undefined
+    );
+    await harness.gateway.announceScreenShare(
+      host as never,
+      { workId: "work-1", shareId: "share-new", label: "현재 화면" },
+      undefined
+    );
+
+    expect(harness.emissions).toContainEqual({
+      target: "studio-live:work-1",
+      event: "studio:screen:stop",
+      payload: {
+        fromConnectionId: "owner",
+        fromName: "작가",
+        shareId: "share-old",
+      },
+    });
+    const emissionsBeforeStaleStop = harness.emissions.length;
+    const staleStop = await harness.gateway.stopScreenShare(
+      host as never,
+      { workId: "work-1", shareId: "share-old" },
+      undefined
+    );
+
+    expect(staleStop).toEqual({ ok: true, data: { delivered: true } });
+    expect(harness.emissions).toHaveLength(emissionsBeforeStaleStop);
+    expect(host.data.studioParticipant).toEqual(
+      expect.objectContaining({ sharingScreen: true })
+    );
+    expect(host.data.studioScreenShare).toEqual({
+      connectionId: "owner",
+      shareId: "share-new",
+      label: "현재 화면",
+    });
+
+    const observer = harness.socket("viewer");
+    const joined = await connectAndJoin(harness, observer);
+    expect(joined).toMatchObject({
+      ok: true,
+      data: {
+        screenShares: [
+          { connectionId: "owner", shareId: "share-new", label: "현재 화면" },
+        ],
+      },
+    });
+  });
+
+  it("removes active share metadata and emits a matching stop on disconnect", async () => {
+    const harness = createHarness();
+    const host = harness.socket("owner");
+    await connectAndJoin(harness, host);
+    await harness.gateway.announceScreenShare(
+      host as never,
+      { workId: "work-1", shareId: "share-disconnect", label: "작업 화면" },
+      undefined
+    );
+
+    harness.gateway.handleDisconnect(host as never);
+
+    expect(host.data).not.toHaveProperty("studioScreenShare");
+    expect(harness.emissions).toContainEqual({
+      target: "studio-live:work-1",
+      event: "studio:screen:stop",
+      payload: {
+        fromConnectionId: "owner",
+        fromName: "작가",
+        shareId: "share-disconnect",
+      },
+    });
+  });
+
   it("relays screen requests and access decisions with only public peer fields", async () => {
     const harness = createHarness();
     const viewer = harness.socket("viewer");

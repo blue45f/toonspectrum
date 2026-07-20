@@ -1,6 +1,12 @@
 import { createZodDto } from "nestjs-zod";
 import { z } from "zod";
 
+import {
+  CREATOR_ASSET_CATALOG_MAX_PAGE_SIZE,
+  CREATOR_ASSET_MODERATION_MAX_PAGE_SIZE,
+  CREATOR_ASSET_PREVIEW_MAX_DATA_URL_CHARACTERS,
+} from "../../../../../lib/creator-asset-contract";
+
 const CreatorReferenceIdSchema = z.string().trim().min(1).max(160).nullable();
 const CreatorWorkRevisionSchema = z.number().int().min(1).max(2_147_483_647);
 const CreatorCrdtServerSequenceSchema = z
@@ -230,6 +236,75 @@ export const RespondCreatorTeamInvitationSchema = z
   })
   .strict();
 
+const CreatorAssetLicenseSchema = z.enum([
+  "toonspectrum-standard",
+  "cc0-1.0",
+  "cc-by-4.0",
+  "cc-by-nc-4.0",
+]);
+
+export const CreatorAssetParamsSchema = z
+  .object({ id: z.string().trim().min(1).max(160) })
+  .strict();
+
+export const CreatorAssetListQuerySchema = z
+  .object({
+    mine: z.literal("1").optional(),
+    limit: z.coerce.number().int().min(1).max(CREATOR_ASSET_CATALOG_MAX_PAGE_SIZE).default(
+      CREATOR_ASSET_CATALOG_MAX_PAGE_SIZE
+    ),
+    offset: z.coerce.number().int().min(0).max(1_000_000).default(0),
+    search: z.string().trim().max(80).optional(),
+    tag: z.string().trim().max(24).optional(),
+    license: CreatorAssetLicenseSchema.optional(),
+    kind: z.enum(["image", "sticker", "vrm_pose"]).optional(),
+    sort: z.enum(["newest", "popular", "name"]).default("newest"),
+  })
+  .strict();
+
+export const PublishCreatorAssetSchema = z
+  .object({
+    name: z.string().trim().min(1).max(60),
+    description: z.string().max(500).default(""),
+    tags: z.array(z.string().max(80)).max(20).default([]),
+    dataUrl: z.string().min(1).max(3_300_000),
+    width: z.number().int().min(1).max(4096),
+    height: z.number().int().min(1).max(4096),
+    previewDataUrl: z.string().min(1).max(CREATOR_ASSET_PREVIEW_MAX_DATA_URL_CHARACTERS),
+    previewWidth: z.number().int().min(1).max(320),
+    previewHeight: z.number().int().min(1).max(320),
+    kind: z.enum(["image", "sticker", "vrm_pose"]).default("image"),
+    license: CreatorAssetLicenseSchema,
+    attributionText: z.string().trim().max(160).default(""),
+    containsAi: z.boolean().default(false),
+    rightsConfirmed: z.literal(true),
+  })
+  .strict();
+
+export const ReportCreatorAssetSchema = z
+  .object({
+    reason: z.enum(["copyright", "unsafe", "spam", "misleading", "other"]),
+    details: z.string().max(500).default(""),
+  })
+  .strict();
+
+export const CreatorAssetModerationQuerySchema = z
+  .object({
+    status: z.enum(["open", "resolved", "dismissed"]).default("open"),
+    limit: z.coerce.number().int().min(1).max(CREATOR_ASSET_MODERATION_MAX_PAGE_SIZE).default(
+      CREATOR_ASSET_MODERATION_MAX_PAGE_SIZE
+    ),
+    offset: z.coerce.number().int().min(0).max(1_000_000).default(0),
+  })
+  .strict();
+
+export const ModerateCreatorAssetSchema = z
+  .object({
+    status: z.enum(["published", "under_review", "rejected"]),
+    note: z.string().max(500).default(""),
+  })
+  .strict();
+
 export class CreateCreatorWorkDto extends createZodDto(CreateCreatorWorkSchema) {}
 export class UpdateCreatorWorkDto extends createZodDto(UpdateCreatorWorkSchema) {}
 export class UpdateCreatorSharedDocumentDto extends createZodDto(UpdateCreatorSharedDocumentSchema) {}
@@ -244,3 +319,9 @@ export class CreatorTeamMemberParamsDto extends createZodDto(CreatorTeamMemberPa
 export class InviteCreatorTeamMemberDto extends createZodDto(InviteCreatorTeamMemberSchema) {}
 export class UpdateCreatorTeamMemberDto extends createZodDto(UpdateCreatorTeamMemberSchema) {}
 export class RespondCreatorTeamInvitationDto extends createZodDto(RespondCreatorTeamInvitationSchema) {}
+export class CreatorAssetParamsDto extends createZodDto(CreatorAssetParamsSchema) {}
+export class CreatorAssetListQueryDto extends createZodDto(CreatorAssetListQuerySchema) {}
+export class PublishCreatorAssetDto extends createZodDto(PublishCreatorAssetSchema) {}
+export class ReportCreatorAssetDto extends createZodDto(ReportCreatorAssetSchema) {}
+export class CreatorAssetModerationQueryDto extends createZodDto(CreatorAssetModerationQuerySchema) {}
+export class ModerateCreatorAssetDto extends createZodDto(ModerateCreatorAssetSchema) {}

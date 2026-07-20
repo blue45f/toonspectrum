@@ -109,7 +109,7 @@ WebGPU-only 변형은 basic WebGL보다 initial gzip이 50,660 B 더 컸다. 이
 ## 모바일·성능 위험
 
 1. **이중 엔진 코드와 힙**: Three를 인트로/VRM에서 계속 쓰면서 Babylon을 배경에 추가하면 두 씬 그래프, 재질/텍스처 캐시, 셰이더, 로더 코드가 공존한다. 두 Canvas를 동시에 보이지 않게 해도 JS 파싱·캐시 비용은 남는다.
-2. **캡처 비용**: 현재 3D 배경은 `preserveDrawingBuffer: true`, `dpr={[1, 2]}`로 PNG 캡처 품질을 보장한다. Babylon으로 옮겨도 동일한 캡처 계약을 지키면 고 DPR의 fill-rate와 framebuffer 메모리 비용은 사라지지 않는다.
+2. **캡처 비용**: 현재 3D 배경과 VRM 포저는 별도 output render target에서 픽셀을 읽어 `preserveDrawingBuffer`를 사용하지 않고, PNG 압축은 OffscreenCanvas Worker로 넘긴다. Babylon으로 옮겨도 동일 해상도의 GPU readback·RGBA working set·압축 비용 자체는 사라지지 않으므로 저사양 기기에서 같은 캡처 계약으로 비교해야 한다.
 3. **WebGPU fallback**: Babylon WebGPU 초기화는 비동기이며 WebGL을 병행 지원한다. 모바일 브라우저/드라이버별 실패를 고려해 WebGL fallback과 동일 결과를 검증해야 하므로 WebGPU-only 번들 수치는 제품 비용의 하한이다.
 4. **편집과 aggressive optimization의 충돌**: 전역 freeze, `isPickable=false`, `skipPointerMovePicking`, bounding sync 중단은 뷰어에는 유리하지만 선택·hover·transform이 핵심인 편집기에 그대로 적용할 수 없다.
 5. **자산이 더 큰 병목**: 현재 샘플 VRM은 대략 1.5–19 MB다. 엔진 전환보다 LOD, texture compression, 필요 시점 로드, 썸네일 선로딩 금지가 모바일 체감에 먼저 영향을 준다. Babylon의 progressive glTF도 현재 파일을 자동 최적화하는 기능이 아니라 별도 LOD 저작/서버 구성이 필요하다.

@@ -84,9 +84,17 @@ KTX2/Basis 형식 계약은 [KTX 2.0 specification](https://registry.khronos.org
   여러 GPU compressed target의 결정적 output-byte golden. production Vite build가 JS/WASM 원본과
   같은 길이·SHA-256을 내보내고 실제 Chromium module Worker가 required UASTC+Zstd GLB를
   `execution: worker`, `code: valid`로 통과하는 것도 검증했다.
+- **viewport runtime에서 보장:** validator가 parsed root에서 발급한 `usesBasisTextures`가 true일 때만
+  별도 chunk를 지연 로드한다. 활성 Three WebGLRenderer의 압축 texture 지원을 `detectSupport`로 읽고,
+  validation Worker와 같은 asset loader/manifest를 사용하되 window realm에서 JS/WASM을 독립적으로
+  다시 SHA-256 attest한다. KTX2Loader에는 attest된 private snapshot의 object URL과 검증 GLB가 만든
+  embedded `blob:` URL만 허용한다. worker는 기기 코어와 무관하게 최대 2개이며 parse 성공·실패 뒤
+  loader worker/source URL을 즉시 dispose한다. validation pretranscode와 viewport GPU-format transcode는
+  서로 다른 trust/출력 경계이고 전자의 결과를 renderer 지원 증거로 재사용하지 않는다.
 - **의도적으로 미보장:** ETC/BC/ASTC byte golden은 실제 GPU가 그 block을 그린 pixel golden이 아니다.
   GPU driver별 sampling/color-space 결과와 WebGL/WebGPU context loss는 renderer conformance 영역이다.
-  Basis preflight 자체는 CPU/WASM이므로 GPU context를 소유하지 않는다. 또한 `peakEstimatedJobHeapBytes`는
+  Basis preflight 자체는 CPU/WASM이므로 GPU context를 소유하지 않는다. viewport runtime도 driver별
+  rendered-pixel golden과 context-loss 자동 복구까지 보장하지 않는다. 또한 `peakEstimatedJobHeapBytes`는
   소유권 경계의 source copy와 한 mip allocation을 보수적으로 계산한 값이며 브라우저 엔진 내부 WASM
   allocator의 실측 telemetry는 아니다. CSP가 attested glue 평가를 금지하거나 asset fetch/hash/init가
   실패하면 required/optional Basis 모두 안전하게 거부된다.

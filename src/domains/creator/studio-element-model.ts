@@ -15,6 +15,7 @@ import type { ChannelMixer } from "./studio-channel-mixer";
 import type { Clarity } from "./studio-clarity";
 import type { ColorBalance } from "./studio-color-balance";
 import type { ColorToAlpha } from "./studio-color-to-alpha";
+import type { StudioCommunityAssetCredit } from "./studio-community-asset-license";
 import type { StudioStoryBeat } from "./studio-continuity";
 import type { CurvePoint } from "./studio-curves";
 import type { Detail } from "./studio-detail";
@@ -138,6 +139,8 @@ export interface ImageEl {
   // Unsplash API Guidelines가 요구하는 "사진 사용 시 작가·Unsplash 크레딧 표시"를 삽입 이후에도
   // (예: 선택된 이미지 사이드바에서) 다시 보여줄 수 있도록 요소에 영구 보존한다.
   stockImageCredit?: StudioStockImageCredit;
+  /** 커뮤니티 에셋의 저작자·사용권·상업 이용 조건. 삽입 뒤에도 출처 표시에 사용한다. */
+  communityAssetCredit?: StudioCommunityAssetCredit;
   /** AI 생성/편집 provenance. 페이지 JSON과 함께 저장되어 Publish Pack 사전검사에 사용된다. */
   aiProvenance?: StudioPublishAiProvenance;
   /** 번들 소재 카탈로그의 안정 ID. 다시 열어도 라이선스·생성 메타데이터를 추적한다. */

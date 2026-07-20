@@ -16,10 +16,18 @@ function renderPanel(overrides: Partial<ComponentProps<typeof StudioVrmRigAssist
     fullBodyIk: false,
     footPlant: false,
     floorHeight: 0,
+    rootYOffset: 0.15,
+    translations: {
+      version: 1,
+      root: [0.25, 0, -0.5],
+      hips: [0.1, -0.2, 0.3],
+      spine: [0.02, 0.04, -0.06],
+    },
     onJointProfileChange: vi.fn(),
     onFullBodyIkChange: vi.fn(),
     onFootPlantChange: vi.fn(),
     onFloorHeightChange: vi.fn(),
+    onResetTranslations: vi.fn(),
     ...overrides,
   };
   return { props, view: render(<StudioVrmRigAssistPanel {...props} />) };
@@ -50,15 +58,25 @@ describe("StudioVrmRigAssistPanel", () => {
     expect(props.onFullBodyIkChange).toHaveBeenCalledWith(true);
     expect(props.onFootPlantChange).toHaveBeenCalledWith(true);
     expect(props.onFloorHeightChange).toHaveBeenCalledWith(-0.35);
+    fireEvent.click(screen.getByRole("button", { name: "이동 초기화" }));
+    expect(props.onResetTranslations).toHaveBeenCalledTimes(1);
   });
 
   it("keeps the floor control disabled until planting is enabled and explains idle full-body assist", () => {
     const { view, props } = renderPanel({ fullBodyIk: true });
     expect((screen.getByLabelText("발 고정 바닥 높이") as HTMLInputElement).disabled).toBe(true);
-    expect(screen.getByText(/전신 보조는 발 바닥 고정/)).toBeTruthy();
+    expect(screen.getByText(/전신 이동은 활성 손·발/)).toBeTruthy();
 
     view.rerender(<StudioVrmRigAssistPanel {...props} fullBodyIk footPlant />);
     expect((screen.getByLabelText("발 고정 바닥 높이") as HTMLInputElement).disabled).toBe(false);
-    expect(screen.queryByText(/전신 보조는 발 바닥 고정/)).toBeNull();
+    expect(screen.queryByText(/전신 이동은 활성 손·발/)).toBeNull();
+  });
+
+  it("shows the canonical root, hips, and spine translations and one-commit notice", () => {
+    renderPanel();
+    expect(screen.getByText("0.25 / 0.15 / -0.50m")).toBeTruthy();
+    expect(screen.getByText("0.10 / -0.20 / 0.30m")).toBeTruthy();
+    expect(screen.getByText("0.02 / 0.04 / -0.06m")).toBeTruthy();
+    expect(screen.getByText(/핸들을 놓을 때 포즈와 이동값을 한 번만 저장/)).toBeTruthy();
   });
 });

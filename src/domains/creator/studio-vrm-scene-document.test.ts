@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 
+import { buildVrmPoseDataUrlMetadata } from "./studio-vrm-poser-utils";
 import { STUDIO_VRM_RIG_PROFILE_PURPOSE } from "./studio-vrm-rig-profile";
 import {
   DEFAULT_STUDIO_VRM_SCENE_DOCUMENT,
   STUDIO_VRM_SCENE_DOCUMENT_KIND,
   STUDIO_VRM_SCENE_DOCUMENT_MAX_BYTES,
   STUDIO_VRM_SCENE_DOCUMENT_V1_MAX_BYTES,
+  STUDIO_VRM_SCENE_DOCUMENT_V2_MAX_BYTES,
+  STUDIO_VRM_SCENE_DOCUMENT_VERSION,
   areStudioVrmSceneDocumentsEqual,
   createDefaultStudioVrmSceneDocument,
   migrateStudioVrmLegacyMetadata,
@@ -32,10 +35,23 @@ function canonicalScene(overrides: Partial<StudioVrmSceneDocument>): StudioVrmSc
 function canonicalVersionOne(
   scene: StudioVrmSceneDocument = createDefaultStudioVrmSceneDocument(),
 ): Record<string, unknown> {
-  const { rig: _rig, ...versionOne } = JSON.parse(JSON.stringify(scene)) as Record<string, unknown> & {
+  const cloned = JSON.parse(JSON.stringify(scene)) as Record<string, unknown> & {
+    pose: Record<string, unknown>;
     rig: unknown;
   };
-  return { ...versionOne, version: 1 };
+  const { translations: _translations, ...legacyPose } = cloned.pose;
+  const { rig: _rig, ...versionOne } = cloned;
+  return { ...versionOne, version: 1, pose: legacyPose };
+}
+
+function canonicalVersionTwo(
+  scene: StudioVrmSceneDocument = createDefaultStudioVrmSceneDocument(),
+): Record<string, unknown> {
+  const cloned = JSON.parse(JSON.stringify(scene)) as Record<string, unknown> & {
+    pose: Record<string, unknown>;
+  };
+  const { translations: _translations, ...versionTwoPose } = cloned.pose;
+  return { ...cloned, version: 2, pose: versionTwoPose };
 }
 
 describe("studio-vrm-scene-document", () => {
@@ -55,6 +71,12 @@ describe("studio-vrm-scene-document", () => {
           head: { rotation: [-1.125, 0.75, 1.5] },
         },
         yOffset: -0.125,
+        translations: {
+          version: 1,
+          root: [0.4, 0, -0.25],
+          hips: [0.08, -0.04, 0.03],
+          spine: [-0.03, 0.09, 0.05],
+        },
         bodyRotationY: 1.234567890123,
         fingerOverrides: {
           leftIndexProximal: [0.1, 0.2, -0.3],
@@ -132,6 +154,7 @@ describe("studio-vrm-scene-document", () => {
     expect(parsed?.camera).toEqual(scene.camera);
     expect(parsed?.camera.position).toEqual([1.25, 2.5, 3.75]);
     expect(parsed?.pose.bodyRotationY).toBe(1.234567890123);
+    expect(parsed?.pose.translations).toEqual(scene.pose.translations);
     expect(serializeStudioVrmSceneDocument(parsed)).toBe(serialized);
   });
 
@@ -219,12 +242,12 @@ describe("studio-vrm-scene-document", () => {
     expect(serializeStudioVrmSceneDocument(nan)).toBeNull();
 
     const future = mutableDefault();
-    future.version = 3;
+    future.version = STUDIO_VRM_SCENE_DOCUMENT_VERSION + 1;
     expect(parseStudioVrmSceneDocument(JSON.stringify(future))).toBeNull();
     expect(migrateStudioVrmSceneDocument(future)).toBeNull();
   });
 
-  it("losslessly promotes strict v1 scenes to v2 with a neutral drawing rig", () => {
+  it("losslessly promotes strict v1/v2 scenes to v3 with neutral translations", () => {
     const current = canonicalScene({
       pose: {
         bones: {
@@ -232,6 +255,12 @@ describe("studio-vrm-scene-document", () => {
           rightUpperArm: { rotation: [0.25, 0.5, -0.75] },
         },
         yOffset: 0.14,
+        translations: {
+          version: 1,
+          root: [0, 0, 0],
+          hips: [0, 0, 0],
+          spine: [0, 0, 0],
+        },
         bodyRotationY: -0.4,
         fingerOverrides: {
           leftIndexProximal: [0.1, 0.2, -0.3],
@@ -250,14 +279,17 @@ describe("studio-vrm-scene-document", () => {
       props: { items: [{ id: "mirror-safe-prop", side: "left" }] },
     });
     const versionOne = canonicalVersionOne(current);
+    const versionTwo = canonicalVersionTwo(current);
 
     const parsed = parseStudioVrmSceneDocument(JSON.stringify(versionOne));
     const migrated = migrateStudioVrmSceneDocument(versionOne);
+    const migratedVersionTwo = parseStudioVrmSceneDocument(JSON.stringify(versionTwo));
 
     expect(parsed).toEqual(migrated);
+    expect(migratedVersionTwo).toEqual(parsed);
     expect(parsed).toMatchObject({
       kind: STUDIO_VRM_SCENE_DOCUMENT_KIND,
-      version: 2,
+      version: STUDIO_VRM_SCENE_DOCUMENT_VERSION,
       pose: current.pose,
       camera: current.camera,
       props: current.props,
@@ -279,7 +311,36 @@ describe("studio-vrm-scene-document", () => {
     expect(serializeStudioVrmSceneDocument(parsed)).not.toBeNull();
   });
 
-  it("rejects unknown v1/v2 root or rig keys instead of silently dropping them", () => {
+  it("keeps authored v2 rig data while adding only the canonical zero translation block", () => {
+    const current = canonicalScene({
+      rig: {
+        version: 1,
+        jointProfile: {
+          version: 1,
+          purpose: STUDIO_VRM_RIG_PROFILE_PURPOSE,
+          id: "flexible",
+        },
+        fullBodyIk: true,
+        footPlant: true,
+        floorHeight: -0.2,
+      },
+    });
+    const versionTwo = canonicalVersionTwo(current);
+    const source = JSON.stringify(versionTwo);
+    expect(new TextEncoder().encode(source).byteLength)
+      .toBeLessThanOrEqual(STUDIO_VRM_SCENE_DOCUMENT_V2_MAX_BYTES);
+    const migrated = parseStudioVrmSceneDocument(source);
+    expect(migrated?.version).toBe(STUDIO_VRM_SCENE_DOCUMENT_VERSION);
+    expect(migrated?.rig).toEqual(current.rig);
+    expect(migrated?.pose.translations).toEqual({
+      version: 1,
+      root: [0, 0, 0],
+      hips: [0, 0, 0],
+      spine: [0, 0, 0],
+    });
+  });
+
+  it("rejects unknown v1/v2/v3 root, translation, or rig keys instead of dropping them", () => {
     const current = mutableDefault();
     expect(parseStudioVrmSceneDocument(JSON.stringify({ ...current, futureRoot: true }))).toBeNull();
     expect(serializeStudioVrmSceneDocument({ ...current, futureRoot: true })).toBeNull();
@@ -289,8 +350,21 @@ describe("studio-vrm-scene-document", () => {
     }))).toBeNull();
 
     const versionOne = canonicalVersionOne();
+    const versionTwo = canonicalVersionTwo();
     expect(parseStudioVrmSceneDocument(JSON.stringify({ ...versionOne, rig: {} }))).toBeNull();
     expect(migrateStudioVrmSceneDocument({ ...versionOne, unknown: true })).toBeNull();
+    expect(migrateStudioVrmSceneDocument({ ...versionTwo, unknown: true })).toBeNull();
+    const pose = current.pose as Record<string, unknown>;
+    expect(serializeStudioVrmSceneDocument({
+      ...current,
+      pose: {
+        ...pose,
+        translations: {
+          ...(pose.translations as Record<string, unknown>),
+          future: true,
+        },
+      },
+    })).toBeNull();
   });
 
   it("keeps near-ceiling v1 content through promotion while rejecting oversized documents", () => {
@@ -334,6 +408,19 @@ describe("studio-vrm-scene-document", () => {
     expect(migrateStudioVrmSceneDocument(paddedVersionOne)).toBeNull();
   });
 
+  it("honors the historical v2 byte ceiling while reserving v3 migration headroom", () => {
+    const compactVersionTwo = JSON.stringify(canonicalVersionTwo());
+    const compactBytes = new TextEncoder().encode(compactVersionTwo).byteLength;
+    const atCeiling = `${compactVersionTwo}${" ".repeat(
+      STUDIO_VRM_SCENE_DOCUMENT_V2_MAX_BYTES - compactBytes,
+    )}`;
+    expect(new TextEncoder().encode(atCeiling).byteLength)
+      .toBe(STUDIO_VRM_SCENE_DOCUMENT_V2_MAX_BYTES);
+    expect(parseStudioVrmSceneDocument(atCeiling)?.version)
+      .toBe(STUDIO_VRM_SCENE_DOCUMENT_VERSION);
+    expect(parseStudioVrmSceneDocument(`${atCeiling} `)).toBeNull();
+  });
+
   it("never invokes accessors while parsing, serializing, or normalizing", () => {
     let reads = 0;
     const hostile = mutableDefault();
@@ -351,7 +438,7 @@ describe("studio-vrm-scene-document", () => {
     expect(reads).toBe(0);
   });
 
-  it("rejects documents over the 128 KiB UTF-8 ceiling", () => {
+  it("rejects current documents over the versioned UTF-8 ceiling", () => {
     const oversized = JSON.stringify({
       ...mutableDefault(),
       props: { note: "가".repeat(STUDIO_VRM_SCENE_DOCUMENT_MAX_BYTES) },
@@ -413,6 +500,64 @@ describe("studio-vrm-scene-document", () => {
     expect(migrateStudioVrmSceneDocument(prehistory, { bundledModels: registry })).toMatchObject({
       model: { id: "avatar-a", name: "하린" },
       pose: { bodyRotationY: 0.65 },
+    });
+  });
+
+  it("strictly migrates the currently emitted full-state v2 fragment without losing translations", () => {
+    const metadata = buildVrmPoseDataUrlMetadata({
+      modelId: "avatar-a",
+      bones: { head: { rotation: [0.1, -0.2, 0.3] } },
+      yOffset: 0.15,
+      poseTranslations: {
+        version: 1,
+        root: [0.4, 0, -0.2],
+        hips: [0.1, -0.05, 0.03],
+        spine: [-0.08, 0.12, 0.04],
+      },
+      bodyRotation: 0.45,
+      expressionWeights: { happy: 0.7 },
+      props: { version: 1, items: [] },
+    }, "하린");
+    const decodedMetadata = JSON.parse(JSON.stringify(metadata)) as typeof metadata;
+    const registry = [{ id: "avatar-a", name: "하린" }];
+    const rasterSrc = "data:image/png;base64,iVBORw0KGgo=";
+    const source = `${rasterSrc}#${encodeURIComponent(JSON.stringify(decodedMetadata))}`;
+    const migrated = parseStudioVrmLegacyFragment(source, { bundledModels: registry });
+
+    expect(migrated).toMatchObject({
+      status: "resolved",
+      rasterSrc,
+      document: {
+        model: { source: "bundled", id: "avatar-a", name: "하린" },
+        pose: {
+          bones: { head: { rotation: [0.1, -0.2, 0.3] } },
+          yOffset: 0.15,
+          translations: decodedMetadata.poseTranslations,
+          bodyRotationY: 0.45,
+        },
+        expressions: { happy: 0.7 },
+        props: { version: 1, items: [] },
+      },
+    });
+
+    expect(migrateStudioVrmLegacyMetadata({
+      ...decodedMetadata,
+      poseTranslations: { ...decodedMetadata.poseTranslations, root: [0, 0.1, 0] },
+    }, { bundledModels: registry })).toBeNull();
+    expect(migrateStudioVrmLegacyMetadata({
+      ...decodedMetadata,
+      runtimeUrl: "blob:hostile",
+    }, { bundledModels: registry })).toBeNull();
+    expect(migrateStudioVrmLegacyMetadata({
+      ...decodedMetadata,
+      version: 3,
+    }, { bundledModels: registry })).toBeNull();
+    expect(migrateStudioVrmLegacyMetadata({
+      ...decodedMetadata,
+      modelId: "local-upload-model",
+    }, { bundledModels: registry })).toMatchObject({
+      status: "unresolved-model",
+      modelId: "local-upload-model",
     });
   });
 

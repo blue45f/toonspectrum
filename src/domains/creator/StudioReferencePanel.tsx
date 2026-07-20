@@ -8,6 +8,7 @@ import {
   Image as ImageIcon,
   ImagePlus,
   Images,
+  Link2,
   Loader2,
   Palette,
   Pipette,
@@ -70,6 +71,7 @@ import {
   serializeReferencePanelSettings,
   type ReferencePanelSettings,
 } from "./studio-reference-panel";
+import { importStudioRemoteReferenceImage } from "./studio-remote-reference-image-client";
 
 import type {
   DragEvent as ReactDragEvent,
@@ -109,6 +111,10 @@ type ReferenceColorRasterCache = {
   source: string;
   raster: StudioReferenceImageRaster;
 };
+type ReferenceImportTicket = {
+  generation: number;
+  document: StudioReferenceBoardDocument;
+};
 
 const CONTROL_BUTTON =
   "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45";
@@ -136,6 +142,16 @@ function assetMimeType(asset: StudioAsset): string | undefined {
   const match = /^data:([^;,]+)/iu.exec(asset.dataUrl);
   const mimeType = match?.[1]?.trim().toLowerCase();
   return mimeType?.startsWith("image/") ? mimeType : undefined;
+}
+
+function remoteReferenceAssetName(sourceUrl: string): string {
+  try {
+    const url = new URL(sourceUrl);
+    const fileName = decodeURIComponent(url.pathname.split("/").filter(Boolean).at(-1) ?? "");
+    return normalizeAssetName(fileName || url.hostname || "원격 참고 이미지");
+  } catch {
+    return "원격 참고 이미지";
+  }
 }
 
 function buildReferenceItem(asset: StudioAsset, itemCount: number, flipX = false): StudioReferenceBoardItem | null {
@@ -300,6 +316,8 @@ export function StudioReferencePanel({
   const [libraryError, setLibraryError] = useState<string | null>(null);
   const [addingAssetId, setAddingAssetId] = useState<string | null>(null);
   const [importingFiles, setImportingFiles] = useState(false);
+  const [remoteUrl, setRemoteUrl] = useState("");
+  const [importingRemote, setImportingRemote] = useState(false);
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [dropActive, setDropActive] = useState(false);
   const [dragging, setDragging] = useState<DragKind | null>(null);
@@ -329,11 +347,20 @@ export function StudioReferencePanel({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const dropDepthRef = useRef(0);
   const importInFlightRef = useRef(false);
+  const assetAddInFlightRef = useRef(false);
   const importFilesRef = useRef<(files: readonly File[]) => Promise<void>>(async () => undefined);
+  const remoteImportAbortRef = useRef<AbortController | null>(null);
+  const mountedRef = useRef(true);
+  const importGenerationRef = useRef(0);
+  const importDocumentScopeRef = useRef(document);
+  const importOpenScopeRef = useRef(open);
+  const previousImportScopeRef = useRef({ open, document });
   settingsRef.current = settings;
   latestDocumentRef.current = document;
   onChangeRef.current = onChange;
   onPickColorRef.current = onPickColor;
+  importDocumentScopeRef.current = document;
+  importOpenScopeRef.current = open;
 
   const effectiveSelectedItem = document.items.find((item) => item.id === selectedItemId)
     ?? document.items.at(-1)
@@ -352,6 +379,47 @@ export function StudioReferencePanel({
     latestDocumentRef.current = next;
     return true;
   }
+
+  function beginReferenceImport(): ReferenceImportTicket {
+    const generation = importGenerationRef.current + 1;
+    importGenerationRef.current = generation;
+    return { generation, document: importDocumentScopeRef.current };
+  }
+
+  function isReferenceImportActive(ticket: ReferenceImportTicket): boolean {
+    return mountedRef.current
+      && importOpenScopeRef.current
+      && importGenerationRef.current === ticket.generation
+      && importDocumentScopeRef.current === ticket.document;
+  }
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      importGenerationRef.current += 1;
+      importInFlightRef.current = false;
+      assetAddInFlightRef.current = false;
+      remoteImportAbortRef.current?.abort();
+      remoteImportAbortRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const previous = previousImportScopeRef.current;
+    if (previous.open === open && previous.document === document) return;
+    previousImportScopeRef.current = { open, document };
+    const wasImporting = importInFlightRef.current;
+    importGenerationRef.current += 1;
+    importInFlightRef.current = false;
+    assetAddInFlightRef.current = false;
+    remoteImportAbortRef.current?.abort();
+    remoteImportAbortRef.current = null;
+    setAddingAssetId(null);
+    setImportingFiles(false);
+    setImportingRemote(false);
+    if (wasImporting) setImportStatus(null);
+  }, [document, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -449,8 +517,10 @@ export function StudioReferencePanel({
     setSettings((previous) => ({ ...previous, assetId: null, flipped: false }));
     if (!legacyAsset || latestDocumentRef.current.items.length > 0) return;
 
+    const ticket = beginReferenceImport();
     void ensureStudioAssetContentHash(legacyAsset)
       .then((ensuredAsset) => {
+        if (!isReferenceImportActive(ticket)) return;
         const current = latestDocumentRef.current;
         if (current.items.length > 0) return;
         const item = buildReferenceItem(ensuredAsset, 0, legacyFlip);
@@ -465,6 +535,7 @@ export function StudioReferencePanel({
         }
       })
       .catch(() => {
+        if (!isReferenceImportActive(ticket)) return;
         setLibraryError("이전 참고 이미지의 콘텐츠 해시를 계산하지 못했습니다.");
       });
   }, [assets, libraryStatus, open, settings.assetId, settings.flipped]);
@@ -604,11 +675,15 @@ export function StudioReferencePanel({
   }
 
   async function addAssetToBoard(asset: StudioAsset): Promise<void> {
+    if (importInFlightRef.current || assetAddInFlightRef.current) return;
     if (latestDocumentRef.current.items.length >= STUDIO_REFERENCE_BOARD_MAX_ITEMS) return;
+    const ticket = beginReferenceImport();
+    assetAddInFlightRef.current = true;
     setAddingAssetId(asset.id);
     setLibraryError(null);
     try {
       const ensuredAsset = await ensureStudioAssetContentHash(asset);
+      if (!isReferenceImportActive(ticket)) return;
       setAssets((previous) => previous.map((candidate) => candidate.id === ensuredAsset.id ? ensuredAsset : candidate));
       const current = latestDocumentRef.current;
       const item = buildReferenceItem(ensuredAsset, current.items.length);
@@ -620,14 +695,92 @@ export function StudioReferencePanel({
         setInspectorOpen(false);
       }
     } catch {
+      if (!isReferenceImportActive(ticket)) return;
       setLibraryError("이미지를 보드에 추가할 수 없습니다. 콘텐츠 해시 지원을 확인해 주세요.");
     } finally {
-      setAddingAssetId(null);
+      if (importGenerationRef.current === ticket.generation && mountedRef.current) {
+        assetAddInFlightRef.current = false;
+        setAddingAssetId(null);
+      }
+    }
+  }
+
+  async function importRemoteReference(): Promise<void> {
+    if (importInFlightRef.current || assetAddInFlightRef.current) return;
+    if (latestDocumentRef.current.items.length >= STUDIO_REFERENCE_BOARD_MAX_ITEMS) {
+      setImportStatus(`참고 보드는 최대 ${STUDIO_REFERENCE_BOARD_MAX_ITEMS}개까지 추가할 수 있습니다.`);
+      return;
+    }
+    const sourceUrl = remoteUrl.trim();
+    if (!sourceUrl) {
+      setImportStatus("가져올 공개 이미지 URL을 입력해 주세요.");
+      return;
+    }
+
+    const ticket = beginReferenceImport();
+    const controller = new AbortController();
+    remoteImportAbortRef.current?.abort();
+    remoteImportAbortRef.current = controller;
+    importInFlightRef.current = true;
+    setImportingRemote(true);
+    setLibraryError(null);
+    setImportStatus("공개 URL과 이미지 형식을 안전하게 확인하고 있습니다…");
+    try {
+      const imported = await importStudioRemoteReferenceImage(sourceUrl, controller.signal);
+      if (!isReferenceImportActive(ticket)) return;
+      const contentHash = `sha256:${imported.sha256}`;
+      let asset = assets.find(
+        (candidate) => canonicalizeStudioAssetContentHash(candidate.contentHash) === contentHash
+      ) ?? null;
+      if (!asset) {
+        asset = await saveAsset({
+          name: remoteReferenceAssetName(sourceUrl),
+          dataUrl: imported.dataUrl,
+          width: imported.width,
+          height: imported.height,
+          kind: "remote-reference",
+          contentHash,
+        });
+        if (!isReferenceImportActive(ticket)) return;
+        setAssets((current) => [asset!, ...current.filter((candidate) => candidate.id !== asset!.id)]);
+        setLibraryStatus("ready");
+      }
+
+      if (!isReferenceImportActive(ticket)) return;
+      const current = latestDocumentRef.current;
+      const item = buildReferenceItem(asset, current.items.length);
+      if (!item) throw new Error("원격 참고 이미지의 콘텐츠 식별자를 만들지 못했습니다.");
+      const next = addStudioReferenceBoardItem(current, item);
+      if (next === current) throw new Error("참고 보드에 이미지를 추가할 수 없습니다.");
+      if (!emitDocumentChange(next)) {
+        setImportStatus("현재 문서가 잠겨 있어 보드에는 추가하지 못했습니다. 이미지는 개인 에셋에 저장했습니다.");
+        return;
+      }
+      setSelectedItemId(item.id);
+      setInspectorOpen(false);
+      setPickerOpen(false);
+      setRemoteUrl("");
+      setImportStatus(`${asset.name} 원격 참고 이미지를 추가했습니다.`);
+    } catch (error: unknown) {
+      if (!isReferenceImportActive(ticket)) return;
+      setImportStatus(
+        controller.signal.aborted
+          ? "원격 참고 이미지 가져오기를 취소했습니다."
+          : error instanceof Error
+            ? error.message
+            : "원격 참고 이미지를 가져오지 못했습니다."
+      );
+    } finally {
+      if (remoteImportAbortRef.current === controller) remoteImportAbortRef.current = null;
+      if (importGenerationRef.current === ticket.generation) {
+        importInFlightRef.current = false;
+        if (mountedRef.current) setImportingRemote(false);
+      }
     }
   }
 
   async function importReferenceFiles(sourceFiles: readonly File[]): Promise<void> {
-    if (importInFlightRef.current) return;
+    if (importInFlightRef.current || assetAddInFlightRef.current) return;
     const remainingSlots = STUDIO_REFERENCE_BOARD_MAX_ITEMS - latestDocumentRef.current.items.length;
     const plan = planStudioReferenceImports(sourceFiles, remainingSlots);
     if (plan.files.length === 0) {
@@ -646,6 +799,7 @@ export function StudioReferencePanel({
       return;
     }
 
+    const ticket = beginReferenceImport();
     importInFlightRef.current = true;
     setImportingFiles(true);
     setImportStatus("참고 이미지를 안전하게 처리하고 있습니다…");
@@ -657,19 +811,24 @@ export function StudioReferencePanel({
       for (const file of plan.files) {
         try {
           await assertStudioReferenceGifSignature(file);
+          if (!isReferenceImportActive(ticket)) return;
           const image = await loadImageFileForCanvas(file);
+          if (!isReferenceImportActive(ticket)) return;
           const asset = await saveAsset({
             name: normalizeAssetName(file.name),
             dataUrl: image.src,
             width: image.width,
             height: image.height,
           });
+          if (!isReferenceImportActive(ticket)) return;
           savedAssets.push(asset);
         } catch (error: unknown) {
+          if (!isReferenceImportActive(ticket)) return;
           failures.push(error instanceof Error ? error.message : `${file.name} 파일을 가져오지 못했습니다.`);
         }
       }
 
+      if (!isReferenceImportActive(ticket)) return;
       if (savedAssets.length > 0) {
         const savedIds = new Set(savedAssets.map((asset) => asset.id));
         setAssets((previous) => [
@@ -717,8 +876,10 @@ export function StudioReferencePanel({
         setImportStatus(details.join(" "));
       }
     } finally {
-      importInFlightRef.current = false;
-      setImportingFiles(false);
+      if (importGenerationRef.current === ticket.generation) {
+        importInFlightRef.current = false;
+        if (mountedRef.current) setImportingFiles(false);
+      }
     }
   }
 
@@ -979,7 +1140,7 @@ export function StudioReferencePanel({
         accept={STUDIO_REFERENCE_IMPORT_ACCEPT}
         aria-label="참고 이미지 파일 선택"
         className="sr-only"
-        disabled={importingFiles || atItemLimit}
+        disabled={addingAssetId !== null || importingFiles || importingRemote || atItemLimit}
         onChange={(event) => {
           const files = Array.from(event.currentTarget.files ?? []);
           event.currentTarget.value = "";
@@ -1064,7 +1225,7 @@ export function StudioReferencePanel({
             role="status"
             className="absolute left-2 right-2 top-2 z-40 rounded-lg border border-line bg-panel/95 px-2 py-1.5 text-[0.62rem] leading-relaxed text-fg-2 shadow-lg"
           >
-            {importingFiles ? <Loader2 size={11} className="mr-1 inline animate-spin text-accent" aria-hidden /> : null}
+            {importingFiles || importingRemote ? <Loader2 size={11} className="mr-1 inline animate-spin text-accent" aria-hidden /> : null}
             {importStatus}
           </p>
         ) : null}
@@ -1229,7 +1390,7 @@ export function StudioReferencePanel({
                 CONTROL_BUTTON,
                 "mb-1.5 w-full shrink-0 border-accent/60 bg-accent text-on-accent hover:bg-accent-2"
               )}
-              disabled={importingFiles || atItemLimit}
+              disabled={addingAssetId !== null || importingFiles || importingRemote || atItemLimit}
               onClick={() => fileInputRef.current?.click()}
             >
               {importingFiles
@@ -1240,6 +1401,52 @@ export function StudioReferencePanel({
             <p className="mb-2 text-center text-[0.56rem] text-fg-3">
               여러 파일 선택 · 보드로 드롭 · 이미지 붙여넣기 지원
             </p>
+            <form
+              className="mb-2 rounded-lg border border-line bg-card/70 p-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void importRemoteReference();
+              }}
+            >
+              <label htmlFor="studio-reference-remote-url" className="mb-1 flex items-center gap-1 text-[0.62rem] font-semibold text-fg-2">
+                <Link2 size={11} aria-hidden /> 공개 이미지 URL
+              </label>
+              <div className="flex gap-1">
+                <input
+                  id="studio-reference-remote-url"
+                  type="url"
+                  inputMode="url"
+                  autoComplete="url"
+                  value={remoteUrl}
+                  maxLength={2048}
+                  disabled={addingAssetId !== null || importingFiles || importingRemote || atItemLimit}
+                  onChange={(event) => setRemoteUrl(event.target.value)}
+                  placeholder="https://example.com/reference.jpg"
+                  className="h-9 min-w-0 flex-1 rounded-lg border border-line bg-panel px-2 text-[0.65rem] text-fg outline-none placeholder:text-fg-3 focus:border-accent/60 disabled:opacity-45"
+                />
+                {importingRemote ? (
+                  <button
+                    type="button"
+                    className={cx(ICON_BUTTON, "size-9 border-bad/40 text-bad")}
+                    onClick={() => remoteImportAbortRef.current?.abort()}
+                    aria-label="URL 이미지 가져오기 취소"
+                  >
+                    <X size={13} aria-hidden />
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={!remoteUrl.trim() || addingAssetId !== null || importingFiles || atItemLimit}
+                    className={cx(CONTROL_BUTTON, "h-9 min-h-9 shrink-0 border-line bg-panel px-2 text-fg-2 hover:border-accent/50 hover:text-accent")}
+                  >
+                    <Link2 size={12} aria-hidden /> 가져오기
+                  </button>
+                )}
+              </div>
+              <p className="mt-1 text-[0.54rem] leading-relaxed text-fg-3">
+                서버가 공개 HTTP(S) 주소와 최대 3MB 이미지만 확인하며, 내부망·비공개 주소로 향하는 위험한 리디렉션은 차단합니다.
+              </p>
+            </form>
             <label className="relative mb-2 block shrink-0">
               <Search size={12} aria-hidden className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-fg-3" />
               <input
@@ -1286,7 +1493,12 @@ export function StudioReferencePanel({
                       type="button"
                       aria-label={`${asset.name} 보드에 추가`}
                       title={`${asset.name} 보드에 추가`}
-                      disabled={atItemLimit || addingAssetId !== null}
+                      disabled={
+                        atItemLimit ||
+                        addingAssetId !== null ||
+                        importingFiles ||
+                        importingRemote
+                      }
                       className="group relative flex h-16 items-center justify-center overflow-hidden rounded-lg border border-line bg-card transition-colors hover:border-accent/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent disabled:opacity-45"
                       onClick={() => void addAssetToBoard(asset)}
                     >

@@ -117,7 +117,8 @@ export function StudioBg3dAssetLibraryPanel({
         GLB·glTF·OBJ·FBX·DAE·STL·PLY·3DS를 지원합니다. glTF의 BIN/텍스처나 OBJ의 MTL/텍스처도 함께 선택하세요.
         외부 네트워크 참조 없이 자체 포함 GLB로 변환하고, Worker에서 SHA-256·파일 구조와 기기별
         삼각형/텍스처 예산을 검사한 뒤 로컬 라이브러리에 저장합니다. Meshopt 압축은 별도 WASM
-        Worker에서 풀며 디코딩 후 메모리도 같은 기기 예산으로 제한합니다.
+        Worker에서 풀며 디코딩 후 메모리도 같은 기기 예산으로 제한합니다. KTX2/Basis 텍스처는
+        전체 mip 선행 검사 뒤 현재 3D 렌더러에 맞는 형식으로 변환합니다.
       </p>
 
       {libraryStatus === "error" ? (

@@ -250,6 +250,63 @@ describe("studio-vrm-poser-utils unified pipeline", () => {
     expect(fingerBone2?.rotation.z).toBeCloseTo(0.4);
   });
 
+  it("applies root, hips, and spine translations without accumulating across previews", () => {
+    const { vrm, bones } = createMinimalVrm();
+    const translations = {
+      version: 1 as const,
+      root: [0.35, 0, -0.2] as const,
+      hips: [0.1, -0.08, 0.03] as const,
+      spine: [-0.04, 0.06, 0.02] as const,
+    };
+
+    expect(applyPoseToVrm(vrm, {}, 0.45, translations)).toBe(true);
+    expect(vrm.scene.position.toArray()).toEqual([0.35, 0.45, -0.2]);
+    expect(bones.hips?.position.toArray()).toEqual([
+      expect.closeTo(0.1, 12),
+      expect.closeTo(0.94, 12),
+      expect.closeTo(0.03, 12),
+    ]);
+    expect(bones.spine?.position.toArray()).toEqual([
+      expect.closeTo(-0.04, 12),
+      expect.closeTo(0.28, 12),
+      expect.closeTo(0.02, 12),
+    ]);
+
+    expect(applyPoseToVrm(vrm, {}, 0.45, translations)).toBe(true);
+    expect(bones.hips?.position.toArray()).toEqual([
+      expect.closeTo(0.1, 12),
+      expect.closeTo(0.94, 12),
+      expect.closeTo(0.03, 12),
+    ]);
+    expect(bones.spine?.position.toArray()).toEqual([
+      expect.closeTo(-0.04, 12),
+      expect.closeTo(0.28, 12),
+      expect.closeTo(0.02, 12),
+    ]);
+
+    expect(applyPoseToVrm(vrm, {}, 0)).toBe(true);
+    expect(vrm.scene.position.toArray()).toEqual([0, 0, 0]);
+    expect(bones.hips?.position.toArray()).toEqual([0, 1.02, 0]);
+    expect(bones.spine?.position.toArray()).toEqual([0, 0.22, 0]);
+  });
+
+  it("round-trips pose translations through full-state history and PNG metadata", () => {
+    const state = serializeFullVrmState({
+      poseTranslations: {
+        version: 1,
+        root: [0.2, 0, -0.1],
+        hips: [0.05, -0.03, 0.02],
+        spine: [-0.02, 0.04, 0.01],
+      },
+    });
+    expect(planFullStateRestore(state).poseTranslations).toEqual(state.poseTranslations);
+    const metadata = buildVrmPoseDataUrlMetadata(state, "Model");
+    const restored = buildFullVrmStateFromSharedDataUrl(
+      `data:image/png;base64,AA#${encodeURIComponent(JSON.stringify(metadata))}`,
+    );
+    expect(restored?.poseTranslations).toEqual(state.poseTranslations);
+  });
+
   it("applyFullState invokes costume/props/physics delegates when present", () => {
     const { vrm } = createMinimalVrm();
 

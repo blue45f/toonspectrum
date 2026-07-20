@@ -25,6 +25,13 @@ import {
 import { StudioRasterAssetController } from "./studio-raster-asset.controller";
 import { studioRasterAssetRepositoryProvider } from "./studio-raster-asset.repository";
 import { StudioRasterAssetService } from "./studio-raster-asset.service";
+import { studioRemoteReferenceImageDeliveryLimiterProvider } from "./studio-remote-reference-image-delivery";
+import { StudioRemoteReferenceImageController } from "./studio-remote-reference-image.controller";
+import {
+  studioRemoteReferenceDnsResolverProvider,
+  studioRemoteReferenceHttpRequesterProvider,
+} from "./studio-remote-reference-image.network";
+import { StudioRemoteReferenceImageService } from "./studio-remote-reference-image.service";
 import { StudioTeamCommentController } from "./studio-team-comment.controller";
 import { studioTeamCommentRepositoryProvider } from "./studio-team-comment.repository";
 import { StudioTeamCommentService } from "./studio-team-comment.service";
@@ -41,6 +48,7 @@ import { StudioWorkAssetService } from "./studio-work-asset.service";
   controllers: [
     CreatorController,
     StudioRasterAssetController,
+    StudioRemoteReferenceImageController,
     StudioTeamCommentController,
     StudioVoiceIcePolicyController,
     StudioWorkAssetController,
@@ -51,11 +59,15 @@ import { StudioWorkAssetService } from "./studio-work-asset.service";
     studioCrdtRepositoryProvider,
     studioLiveLockRepositoryProvider,
     studioRasterAssetRepositoryProvider,
+    studioRemoteReferenceDnsResolverProvider,
+    studioRemoteReferenceHttpRequesterProvider,
+    studioRemoteReferenceImageDeliveryLimiterProvider,
     studioTeamCommentRepositoryProvider,
     studioVoiceIceConfigurationProvider,
     studioWorkAssetRepositoryProvider,
     CreatorService,
     StudioRasterAssetService,
+    StudioRemoteReferenceImageService,
     StudioTeamCommentService,
     StudioVoiceIcePolicyService,
     StudioWorkAssetService,

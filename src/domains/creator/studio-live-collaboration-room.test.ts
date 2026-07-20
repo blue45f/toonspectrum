@@ -810,6 +810,37 @@ describe("StudioLiveRoom", () => {
     roomC.close();
   });
 
+  it("retains one copy-safe active screen share per peer until matching stop or leave", async () => {
+    const test = harness();
+    const roomA = test.room(alice);
+    const roomB = test.room(bob);
+    await roomA.start();
+    await roomB.start();
+
+    expect(roomA.announceScreen({ shareId: "share-1", label: "첫 화면" })).toBe(true);
+    const firstSnapshot = roomB.getScreenShares();
+    expect(firstSnapshot).toEqual([
+      { host: alice, shareId: "share-1", label: "첫 화면" },
+    ]);
+    firstSnapshot[0]!.host.displayName = "변조된 이름";
+    expect(roomB.getScreenShares()[0]?.host.displayName).toBe(alice.displayName);
+
+    expect(roomA.announceScreen({ shareId: "share-2", label: "교체 화면" })).toBe(true);
+    expect(roomB.getScreenShares()).toEqual([
+      { host: alice, shareId: "share-2", label: "교체 화면" },
+    ]);
+    expect(roomA.stopScreen({ shareId: "share-1" })).toBe(true);
+    expect(roomB.getScreenShares()).toHaveLength(1);
+    expect(roomA.stopScreen({ shareId: "share-2" })).toBe(true);
+    expect(roomB.getScreenShares()).toEqual([]);
+
+    expect(roomA.announceScreen({ shareId: "share-3", label: "종료 전 화면" })).toBe(true);
+    expect(roomB.getScreenShares()).toHaveLength(1);
+    roomA.close();
+    expect(roomB.getScreenShares()).toEqual([]);
+    roomB.close();
+  });
+
   it("keeps a six-seat voice huddle isolated from viewers, other calls and untargeted peers", async () => {
     const test = harness();
     const viewer = { sessionId: "session-viewer", displayName: "보기 전용", role: "viewer" } as const;

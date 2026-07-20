@@ -229,6 +229,168 @@ describe("StudioLiveSocketTransport", () => {
     ).toBeNull();
   });
 
+  it("replays active screen shares from the authoritative join snapshot", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    const sharingRemote = { ...remote, sharingScreen: true };
+    socket.joinResponse = joinSuccess({
+      participants: [self, sharingRemote],
+      screenShares: [
+        {
+          connectionId: sharingRemote.connectionId,
+          shareId: "share-running",
+          label: "콘티 화면",
+        },
+      ],
+    });
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    const received: StudioLiveEnvelope[] = [];
+    transport.subscribe((value) => received.push(value as StudioLiveEnvelope));
+
+    await transport.connect();
+    activate(transport);
+
+    expect(received).toEqual([
+      expect.objectContaining({
+        kind: "presence:heartbeat",
+        sender: expect.objectContaining({ sessionId: sharingRemote.connectionId }),
+      }),
+      expect.objectContaining({
+        kind: "screen:announce",
+        sender: expect.objectContaining({ sessionId: sharingRemote.connectionId }),
+        payload: { shareId: "share-running", label: "콘티 화면" },
+      }),
+    ]);
+    transport.close();
+  });
+
+  it("overlays pre-flush screen deltas and fences stale lifecycle stops", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.holdEvents.add("studio:join");
+    const sharingRemote = { ...remote, sharingScreen: true };
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    const received: StudioLiveEnvelope[] = [];
+    transport.subscribe((value) => received.push(value as StudioLiveEnvelope));
+
+    const connecting = transport.connect();
+    socket.serverEmit("studio:screen:announce", {
+      fromConnectionId: sharingRemote.connectionId,
+      fromName: sharingRemote.name,
+      shareId: "share-new",
+      label: "새 화면",
+    });
+    socket.serverEmit("studio:screen:stop", {
+      fromConnectionId: sharingRemote.connectionId,
+      fromName: sharingRemote.name,
+      shareId: "share-old",
+    });
+    socket.reply("studio:join", joinSuccess({
+      participants: [self, sharingRemote],
+      screenShares: [
+        {
+          connectionId: sharingRemote.connectionId,
+          shareId: "share-old",
+          label: "이전 화면",
+        },
+      ],
+    }));
+    await connecting;
+    activate(transport);
+
+    expect(received).toContainEqual(
+      expect.objectContaining({
+        kind: "screen:announce",
+        payload: { shareId: "share-new", label: "새 화면" },
+      })
+    );
+    expect(
+      received.some(
+        (event) =>
+          event.kind === "screen:announce" &&
+          (event.payload as { shareId?: string }).shareId === "share-old"
+      )
+    ).toBe(false);
+    transport.close();
+  });
+
+  it("applies a matching stop received after the ACK but before the room flushes", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    const sharingRemote = { ...remote, sharingScreen: true };
+    socket.joinResponse = joinSuccess({
+      participants: [self, sharingRemote],
+      screenShares: [
+        {
+          connectionId: sharingRemote.connectionId,
+          shareId: "share-ending",
+          label: "종료 중인 화면",
+        },
+      ],
+    });
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    const received: StudioLiveEnvelope[] = [];
+    transport.subscribe((value) => received.push(value as StudioLiveEnvelope));
+
+    await transport.connect();
+    socket.serverEmit("studio:screen:stop", {
+      fromConnectionId: sharingRemote.connectionId,
+      fromName: sharingRemote.name,
+      shareId: "share-ending",
+    });
+    activate(transport);
+
+    expect(received.some((event) => event.kind === "screen:announce")).toBe(false);
+    expect(received.some((event) => event.kind === "screen:stop")).toBe(false);
+    transport.close();
+  });
+
+  it("reconciles a replaced active share across reconnect generations", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    const sharingRemote = { ...remote, sharingScreen: true };
+    socket.joinResponse = joinSuccess({
+      participants: [self, sharingRemote],
+      screenShares: [
+        { connectionId: sharingRemote.connectionId, shareId: "share-old", label: "이전 화면" },
+      ],
+    });
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    const received: StudioLiveEnvelope[] = [];
+    transport.subscribe((value) => received.push(value as StudioLiveEnvelope));
+    await transport.connect();
+    activate(transport);
+    received.length = 0;
+
+    socket.serverDisconnect();
+    socket.joinResponse = joinSuccess({
+      participants: [self, sharingRemote],
+      screenShares: [
+        { connectionId: sharingRemote.connectionId, shareId: "share-new", label: "새 화면" },
+      ],
+    });
+    socket.serverReconnect();
+    await vi.waitFor(() => expect(transport.ready).toBe(true));
+
+    expect(
+      received
+        .filter((event) => event.kind === "screen:stop" || event.kind === "screen:announce")
+        .map((event) => [event.kind, (event.payload as { shareId: string }).shareId])
+    ).toEqual([
+      ["screen:stop", "share-old"],
+      ["screen:announce", "share-new"],
+    ]);
+    transport.close();
+  });
+
   it.each([
     {
       name: "an explicit access revocation",

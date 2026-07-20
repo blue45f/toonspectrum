@@ -208,7 +208,7 @@ describe("Studio ToolBelt content module boundary", () => {
     expect(toolBelt.source).not.toContain('"use no memo"');
   });
 
-  it("preserves all 68 stable handlers without key drift", () => {
+  it("preserves all 70 stable handlers without key drift", () => {
     const page = moduleShape("./StudioPage.tsx");
     const toolBelt = moduleShape("./StudioToolBeltContent.tsx");
     const handlerNames = propertyNames(
@@ -224,13 +224,13 @@ describe("Studio ToolBelt content module boundary", () => {
       initializer.arguments[0] as ts.ObjectLiteralExpression
     ).toSorted();
 
-    expect(handlerNames).toHaveLength(68);
-    expect(wiredHandlerNames).toHaveLength(68);
+    expect(handlerNames).toHaveLength(70);
+    expect(wiredHandlerNames).toHaveLength(70);
     expect(wiredHandlerNames).toEqual(handlerNames);
     expect(page.source).toContain("stableHandlers={studioToolBeltContentHandlers}");
   });
 
-  it("preserves all 203 props at the single Page call site", () => {
+  it("preserves all 205 props at the single Page call site", () => {
     const page = moduleShape("./StudioPage.tsx");
     const toolBelt = moduleShape("./StudioToolBeltContent.tsx");
     const propNames = propertyNames(
@@ -238,8 +238,8 @@ describe("Studio ToolBelt content module boundary", () => {
     ).toSorted();
     const wiredPropNames = findToolBeltJsxAttributes(page).toSorted();
 
-    expect(propNames).toHaveLength(203);
-    expect(wiredPropNames).toHaveLength(203);
+    expect(propNames).toHaveLength(205);
+    expect(wiredPropNames).toHaveLength(205);
     expect(wiredPropNames).toEqual(propNames);
   });
 

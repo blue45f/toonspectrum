@@ -227,6 +227,7 @@ const ELEMENT_METADATA_FIELDS = new Set([
   "aiProvenance",
   "alphaLocked",
   "clipBelow",
+  "communityAssetCredit",
   "emeresSourceId",
   "fillReference",
   "hidden",

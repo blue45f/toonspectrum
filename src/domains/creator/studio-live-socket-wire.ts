@@ -33,6 +33,12 @@ export interface ServerVoiceMember {
   muted: boolean;
 }
 
+export interface ServerActiveScreenShare {
+  connectionId: string;
+  shareId: string;
+  label: string;
+}
+
 export interface ServerJoinSnapshot {
   /** Missing on v1 gateways; new clients retain their legacy wire behavior in that case. */
   lockProtocolVersion: number;
@@ -40,6 +46,7 @@ export interface ServerJoinSnapshot {
   participants: ServerParticipant[];
   locks: ServerLock[];
   voiceMembers: ServerVoiceMember[];
+  screenShares: ServerActiveScreenShare[];
 }
 
 export interface ServerFailure {
@@ -167,6 +174,22 @@ export function parseVoiceMember(value: unknown): ServerVoiceMember | null {
   };
 }
 
+export function parseActiveScreenShare(value: unknown): ServerActiveScreenShare | null {
+  if (
+    !isRecord(value) ||
+    !safeIdentifier(value.connectionId, 128) ||
+    !safeIdentifier(value.shareId, 160) ||
+    !safeIdentifier(value.label, 80)
+  ) {
+    return null;
+  }
+  return {
+    connectionId: value.connectionId,
+    shareId: value.shareId,
+    label: value.label,
+  };
+}
+
 export function parseFailure(value: unknown): ServerFailure | null {
   if (
     !isRecord(value) ||
@@ -195,7 +218,8 @@ export function parseJoinAck(value: unknown): ServerJoinSnapshot | ServerFailure
     lockProtocolVersion > 100 ||
     !Array.isArray(value.data.participants) ||
     !Array.isArray(value.data.locks) ||
-    (value.data.voiceMembers !== undefined && !Array.isArray(value.data.voiceMembers))
+    (value.data.voiceMembers !== undefined && !Array.isArray(value.data.voiceMembers)) ||
+    (value.data.screenShares !== undefined && !Array.isArray(value.data.screenShares))
   ) {
     return null;
   }
@@ -204,10 +228,14 @@ export function parseJoinAck(value: unknown): ServerJoinSnapshot | ServerFailure
   const voiceMembers = Array.isArray(value.data.voiceMembers)
     ? value.data.voiceMembers.map(parseVoiceMember)
     : [];
+  const screenShares = Array.isArray(value.data.screenShares)
+    ? value.data.screenShares.map(parseActiveScreenShare)
+    : [];
   if (
     participants.some((participant) => participant === null) ||
     locks.some((lock) => lock === null) ||
-    voiceMembers.some((member) => member === null)
+    voiceMembers.some((member) => member === null) ||
+    screenShares.some((share) => share === null)
   ) {
     return null;
   }
@@ -217,6 +245,7 @@ export function parseJoinAck(value: unknown): ServerJoinSnapshot | ServerFailure
     participants: participants as ServerParticipant[],
     locks: locks as ServerLock[],
     voiceMembers: voiceMembers as ServerVoiceMember[],
+    screenShares: screenShares as ServerActiveScreenShare[],
   };
 }
 

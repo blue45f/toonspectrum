@@ -336,6 +336,7 @@ function hasSafeImageClipboardOptionals(value: Record<string, unknown>): boolean
     return false;
   }
   if (value.bg3dScene !== undefined && !isRecord(value.bg3dScene)) return false;
+  if (value.communityAssetCredit !== undefined && !isRecord(value.communityAssetCredit)) return false;
   if (
     value.vrmScene !== undefined
     && (!isRecord(value.vrmScene) || serializeStudioVrmSceneDocument(value.vrmScene) === null)

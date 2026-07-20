@@ -11,6 +11,9 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 
+import {
+  CREATOR_ASSET_LEGACY_FULL_MAX_PAGE_SIZE,
+} from "../../../../../lib/creator-asset-contract";
 import { rateLimit } from "../../../../../lib/rate-limit";
 import {
   addComment,
@@ -25,18 +28,23 @@ import {
   getChallenge,
   getCreatorPublicProfile,
   getSeries,
+  getSharedAssetContent,
   getWork,
   getWorkRevisionComparison,
   getWorkRevision,
+  listAssetModerationQueue,
   listChallenges,
   listComments,
   listSeries,
   listSharedAssets,
+  listSharedAssetCatalog,
   listWorkRevisions,
   listWorks,
   parseCreatorSort,
   parseSeriesSort,
+  moderateSharedAsset,
   publishAsset,
+  reportSharedAsset,
   restoreWorkRevision,
   toggleFollow,
   toggleLike,
@@ -71,7 +79,12 @@ import type {
   CreatorSharedDocumentPatch,
 } from "./creator-collaboration.repository";
 import type {
+  CreatorAssetListQueryDto,
+  CreatorAssetModerationQueryDto,
   CreateCreatorWorkDto,
+  ModerateCreatorAssetDto,
+  PublishCreatorAssetDto,
+  ReportCreatorAssetDto,
   UpdateCreatorSharedDocumentDto,
   UpdateCreatorWorkDto,
 } from "./creator.dto";
@@ -351,18 +364,49 @@ export class CreatorService {
     }
   }
 
-  async listSharedAssets(q: { mine?: string | null; limit?: string | null; offset?: string | null }, viewerId?: string) {
-    return listSharedAssets({
+  private creatorAssetListOptions(q: CreatorAssetListQueryDto, viewerId?: string) {
+    return {
       mineUserId: q.mine === "1" ? viewerId : undefined,
-      limit: q.limit ? Number(q.limit) : undefined,
-      offset: q.offset ? Number(q.offset) : undefined,
+      limit: q.limit,
+      offset: q.offset,
       viewerId,
+      search: q.search,
+      tag: q.tag,
+      license: q.license,
+      kind: q.kind,
+      sort: q.sort,
+    };
+  }
+
+  async listSharedAssets(q: CreatorAssetListQueryDto, viewerId?: string) {
+    // The legacy full-data response remains only for the VRM poser. Raster community browsing
+    // must use the preview-only catalog plus the authorized on-demand content route.
+    return listSharedAssets({
+      ...this.creatorAssetListOptions(q, viewerId),
+      kind: "vrm_pose",
+      limit: CREATOR_ASSET_LEGACY_FULL_MAX_PAGE_SIZE,
     });
   }
 
-  async publishAsset(userId: string, body: unknown) {
+  async listSharedAssetCatalog(q: CreatorAssetListQueryDto, viewerId?: string) {
+    return listSharedAssetCatalog(this.creatorAssetListOptions(q, viewerId));
+  }
+
+  async getSharedAssetContent(id: string, viewerId?: string, reviewerAccess = false) {
     try {
-      return await publishAsset(userId, (body ?? {}) as Record<string, unknown>);
+      return await getSharedAssetContent(id, viewerId, reviewerAccess);
+    } catch {
+      // Do not reveal whether an id exists but is hidden/rejected or belongs to another owner.
+      throw new NotFoundException("사용할 수 있는 공개 에셋을 찾지 못했습니다.");
+    }
+  }
+
+  async publishAsset(userId: string, body: PublishCreatorAssetDto) {
+    if (!rateLimit(`creator-asset-publish:${userId}`, 30, 60 * 60_000)) {
+      throw new HttpException("에셋 공유 한도에 도달했습니다. 잠시 후 다시 시도해 주세요.", HttpStatus.TOO_MANY_REQUESTS);
+    }
+    try {
+      return await publishAsset(userId, body);
     } catch (error) {
       throw new BadRequestException(error instanceof Error ? error.message : "에셋을 공유할 수 없습니다.");
     }
@@ -391,7 +435,39 @@ export class CreatorService {
     }
   }
 
-  async useSharedAsset(id: string) {
+  async reportSharedAsset(userId: string, id: string, body: ReportCreatorAssetDto) {
+    if (!rateLimit(`creator-asset-report:${userId}`, 20, 24 * 60 * 60_000)) {
+      throw new HttpException("오늘 제출할 수 있는 에셋 신고 수를 초과했습니다.", HttpStatus.TOO_MANY_REQUESTS);
+    }
+    try {
+      return await reportSharedAsset(userId, id, body);
+    } catch (error) {
+      throw new BadRequestException(error instanceof Error ? error.message : "에셋을 신고할 수 없습니다.");
+    }
+  }
+
+  async listAssetModerationQueue(q: CreatorAssetModerationQueryDto) {
+    return listAssetModerationQueue(q);
+  }
+
+  async moderateSharedAsset(userId: string, id: string, body: ModerateCreatorAssetDto) {
+    try {
+      return await moderateSharedAsset(userId, id, body);
+    } catch (error) {
+      throw new BadRequestException(error instanceof Error ? error.message : "에셋을 검수할 수 없습니다.");
+    }
+  }
+
+  async useSharedAsset(userId: string, id: string) {
+    if (!rateLimit(`creator-asset-use-user:${userId}`, 240, 60 * 60_000)) {
+      throw new HttpException("에셋 사용 기록 요청이 너무 많습니다.", HttpStatus.TOO_MANY_REQUESTS);
+    }
+    // Popularity is a coarse unique-use signal, not a click counter. This also prevents one signed
+    // session from inflating a card indefinitely; a shared store can replace this process-local
+    // baseline when the catalog moves to distributed analytics.
+    if (!rateLimit(`creator-asset-use:${userId}:${id}`, 1, 24 * 60 * 60_000)) {
+      return { ok: true };
+    }
     await bumpAssetDownloads(id);
     return { ok: true };
   }

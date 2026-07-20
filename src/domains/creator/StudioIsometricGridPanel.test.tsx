@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -192,5 +192,150 @@ describe("StudioIsometricGridPanel", () => {
     expect(onCommitCellSize).not.toHaveBeenCalled();
     expect(onCommitOrigin).not.toHaveBeenCalled();
     expect(onResetOrigin).not.toHaveBeenCalled();
+  });
+
+  it("keeps the legacy box insertion callback and label compatible", () => {
+    const onInsertSolid = vi.fn();
+    render(<StudioIsometricGridPanel {...baseProps({ onInsertSolid })} />);
+
+    expect(screen.queryByRole("combobox", { name: "아이소메트릭 입체 종류" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "입체 상자 생성" }));
+
+    expect(onInsertSolid).toHaveBeenCalledOnce();
+  });
+
+  it("emits bounded grid-scaled cylinder dimensions and an even segment count", () => {
+    const onInsertPrimitive = vi.fn();
+    render(<StudioIsometricGridPanel {...baseProps({ onInsertPrimitive })} />);
+
+    fireEvent.change(screen.getByRole("combobox", { name: "아이소메트릭 입체 종류" }), {
+      target: { value: "cylinder" },
+    });
+    fireEvent.change(screen.getByRole("spinbutton", { name: "아이소메트릭 입체 너비" }), {
+      target: { value: "2" },
+    });
+    fireEvent.change(screen.getByRole("spinbutton", { name: "아이소메트릭 입체 깊이" }), {
+      target: { value: "3.5" },
+    });
+    fireEvent.change(screen.getByRole("spinbutton", { name: "아이소메트릭 입체 높이" }), {
+      target: { value: "4" },
+    });
+    fireEvent.change(screen.getByRole("spinbutton", { name: "아이소메트릭 원기둥 분할 수" }), {
+      target: { value: "15" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "원기둥 생성" }));
+
+    expect(onInsertPrimitive).toHaveBeenCalledOnce();
+    expect(onInsertPrimitive).toHaveBeenLastCalledWith({
+      kind: "cylinder",
+      width: 80,
+      depth: 140,
+      height: 160,
+      segments: 16,
+    });
+  });
+
+  it("shows and clamps the step count only for the stair primitive", () => {
+    const onInsertPrimitive = vi.fn();
+    render(<StudioIsometricGridPanel {...baseProps({ onInsertPrimitive })} />);
+
+    expect(screen.queryByRole("spinbutton", { name: "아이소메트릭 계단 수" })).toBeNull();
+    fireEvent.change(screen.getByRole("combobox", { name: "아이소메트릭 입체 종류" }), {
+      target: { value: "stairs" },
+    });
+    fireEvent.change(screen.getByRole("spinbutton", { name: "아이소메트릭 계단 수" }), {
+      target: { value: "999" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "계단 생성" }));
+
+    expect(onInsertPrimitive).toHaveBeenLastCalledWith({
+      kind: "stairs",
+      width: 120,
+      depth: 120,
+      height: 120,
+      steps: 24,
+    });
+  });
+
+  it("disables every primitive control at the panel mutation boundary", () => {
+    const onInsertPrimitive = vi.fn();
+    render(
+      <StudioIsometricGridPanel
+        {...baseProps({ disabled: true, disabledReason: "검토 잠금", onInsertPrimitive })}
+      />
+    );
+
+    const kind = screen.getByRole("combobox", {
+      name: "아이소메트릭 입체 종류",
+    }) as HTMLSelectElement;
+    const dimensions = [
+      screen.getByRole("spinbutton", { name: "아이소메트릭 입체 너비" }),
+      screen.getByRole("spinbutton", { name: "아이소메트릭 입체 깊이" }),
+      screen.getByRole("spinbutton", { name: "아이소메트릭 입체 높이" }),
+    ] as HTMLInputElement[];
+    const insert = screen.getByRole("button", { name: "상자 생성" }) as HTMLButtonElement;
+    expect(kind.disabled).toBe(true);
+    expect(dimensions.every((input) => input.disabled)).toBe(true);
+    expect(insert.disabled).toBe(true);
+    expect(kind.className).toContain("pointer-coarse:min-h-11");
+    expect(dimensions[0]?.className).toContain("pointer-coarse:min-h-11");
+
+    fireEvent.click(insert);
+    expect(onInsertPrimitive).not.toHaveBeenCalled();
+  });
+
+  it("clamps an out-of-range grid unit before emitting primitive dimensions", () => {
+    const onInsertPrimitive = vi.fn();
+    render(
+      <StudioIsometricGridPanel
+        {...baseProps({
+          config: {
+            angleDeg: 30,
+            cellSize: 0,
+            originX: 400,
+            originY: 600,
+          },
+          onInsertPrimitive,
+        })}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "상자 생성" }));
+
+    expect(onInsertPrimitive).toHaveBeenCalledWith({
+      kind: "box",
+      width: 24,
+      depth: 24,
+      height: 24,
+    });
+  });
+
+  it("exposes async insertion progress and suppresses duplicate activation", async () => {
+    let finishInsertion: (() => void) | undefined;
+    const onInsertPrimitive = vi.fn(() => new Promise<void>((resolve) => {
+      finishInsertion = resolve;
+    }));
+    render(<StudioIsometricGridPanel {...baseProps({ onInsertPrimitive })} />);
+
+    const insert = screen.getByRole("button", { name: "상자 생성" }) as HTMLButtonElement;
+    fireEvent.click(insert);
+
+    expect(onInsertPrimitive).toHaveBeenCalledOnce();
+    expect(insert.disabled).toBe(true);
+    expect(insert.getAttribute("aria-busy")).toBe("true");
+    expect(screen.getByRole("status").textContent).toContain("생성하고 있습니다");
+    expect((screen.getByRole("combobox", {
+      name: "아이소메트릭 입체 종류",
+    }) as HTMLSelectElement).disabled).toBe(true);
+
+    fireEvent.click(insert);
+    expect(onInsertPrimitive).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      finishInsertion?.();
+      await Promise.resolve();
+    });
+    expect(insert.disabled).toBe(false);
+    expect(insert.getAttribute("aria-busy")).toBe("false");
   });
 });

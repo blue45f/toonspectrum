@@ -5,6 +5,7 @@ import {
   isRecord,
   isRole,
   nullableString,
+  parseActiveScreenShare,
   parseFailure,
   parseJoinAck,
   parseLock,
@@ -53,6 +54,16 @@ function voiceMember(overrides: Record<string, unknown> = {}): Record<string, un
     connectionId: "connection-1",
     callId: "voice-main",
     muted: false,
+    serverOnly: true,
+    ...overrides,
+  };
+}
+
+function screenShare(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    connectionId: "connection-1",
+    shareId: "share-1",
+    label: "작업 화면",
     serverOnly: true,
     ...overrides,
   };
@@ -180,6 +191,20 @@ describe("studio live socket wire entity parsers", () => {
     expect(parseVoiceMember(voiceMember({ muted: "false" }))).toBeNull();
   });
 
+  it("projects active screen shares exactly and enforces bounded canonical metadata", () => {
+    const parsed = parseActiveScreenShare(screenShare());
+
+    expect(parsed).toEqual({
+      connectionId: "connection-1",
+      shareId: "share-1",
+      label: "작업 화면",
+    });
+    expect(Object.keys(parsed ?? {})).toEqual(["connectionId", "shareId", "label"]);
+    expect(parseActiveScreenShare(screenShare({ shareId: " share-1" }))).toBeNull();
+    expect(parseActiveScreenShare(screenShare({ label: "x".repeat(81) }))).toBeNull();
+    expect(parseActiveScreenShare(screenShare({ connectionId: "" }))).toBeNull();
+  });
+
   it("projects failures exactly and rejects non-failure or malformed failure records", () => {
     const parsed = parseFailure({
       ok: false,
@@ -216,6 +241,7 @@ describe("studio live socket join acknowledgement", () => {
         participants: [participant({ connectionId: "self" }), participant({ connectionId: "remote" })],
         locks: [lock()],
         voiceMembers: [voiceMember()],
+        screenShares: [screenShare()],
         serverOnly: "ignored",
       },
       transportOnly: "ignored",
@@ -229,24 +255,31 @@ describe("studio live socket join acknowledgement", () => {
       "participants",
       "locks",
       "voiceMembers",
+      "screenShares",
     ]);
     if (!parsed || "ok" in parsed) throw new Error("expected a join snapshot");
     expect(parsed.lockProtocolVersion).toBe(1);
     expect(parsed.participants).toHaveLength(2);
     expect(parsed.locks).toHaveLength(1);
     expect(parsed.voiceMembers).toHaveLength(1);
+    expect(parsed.screenShares).toHaveLength(1);
   });
 
-  it("keeps legacy missing voice members compatible but rejects a malformed present collection", () => {
+  it("keeps legacy missing additive collections compatible but rejects malformed present values", () => {
     const legacy = parseJoinAck({
       ok: true,
       data: { self: participant(), participants: [participant()], locks: [] },
     });
     expect(legacy && !("ok" in legacy) ? legacy.voiceMembers : null).toEqual([]);
+    expect(legacy && !("ok" in legacy) ? legacy.screenShares : null).toEqual([]);
 
     expect(parseJoinAck({
       ok: true,
       data: { self: participant(), participants: [participant()], locks: [], voiceMembers: {} },
+    })).toBeNull();
+    expect(parseJoinAck({
+      ok: true,
+      data: { self: participant(), participants: [participant()], locks: [], screenShares: {} },
     })).toBeNull();
   });
 
@@ -281,6 +314,7 @@ describe("studio live socket join acknowledgement", () => {
     ["participants", [participant(), participant({ updatedAt: "invalid" })]],
     ["locks", [lock(), lock({ expiresAt: "invalid" })]],
     ["voiceMembers", [voiceMember(), voiceMember({ callId: " bad" })]],
+    ["screenShares", [screenShare(), screenShare({ label: " bad" })]],
   ])("rejects the whole acknowledgement when nested %s is malformed", (field, malformed) => {
     expect(parseJoinAck({
       ok: true,

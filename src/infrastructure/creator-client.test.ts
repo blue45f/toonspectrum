@@ -1,22 +1,40 @@
+import { createHash } from "node:crypto";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   WorkRevisionConflictError,
   WorkRevisionResponseContractError,
   createWork,
+  getSharedAssetContent,
   getWorkRevisionComparison,
   getWorkRevision,
+  listSharedAssetCatalog,
+  listSharedAssetModerationQueue,
+  moderateSharedAsset,
   listWorkRevisions,
   publishAsset,
+  reportSharedAsset,
   restoreWorkRevision,
   updateWork,
 } from "./creator-client";
 
-const { apiGet, apiPatch, apiPost, toApiError } = vi.hoisted(() => ({
+import { CREATOR_ASSET_LIST_RESPONSE_MAX_BYTES } from "@/lib/creator-asset-contract";
+
+const { apiGet, apiPatch, apiPost, createStudioSharedAssetPreview, toApiError } = vi.hoisted(() => ({
   apiGet: vi.fn(),
   apiPatch: vi.fn(),
   apiPost: vi.fn(),
+  createStudioSharedAssetPreview: vi.fn(async () => ({
+    previewDataUrl: "data:image/webp;base64,cHJldmlldw==",
+    previewWidth: 160,
+    previewHeight: 120,
+  })),
   toApiError: vi.fn(async () => new Error("안전한 API 오류")),
+}));
+
+vi.mock("@/src/domains/creator/studio-shared-asset-preview", () => ({
+  createStudioSharedAssetPreview,
 }));
 
 vi.mock("@/src/infrastructure/api", () => ({
@@ -30,6 +48,11 @@ vi.mock("@/src/infrastructure/api", () => ({
     Boolean(error && typeof error === "object" && (error as { httpError?: boolean }).httpError),
   toApiError,
 }));
+
+const PNG_1X1 =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAF/gL+3n0AAAAASUVORK5CYII=";
+const PNG_BYTES = Buffer.from(PNG_1X1.split(",")[1]!, "base64");
+const PNG_HASH = createHash("sha256").update(PNG_BYTES).digest("hex");
 
 function conflictError(currentRevision: unknown, extra: Record<string, unknown> = {}) {
   return {
@@ -48,6 +71,7 @@ describe("creator client revision conflicts", () => {
     apiGet.mockReset();
     apiPatch.mockReset();
     apiPost.mockReset();
+    createStudioSharedAssetPreview.mockClear();
     toApiError.mockClear();
   });
 
@@ -134,14 +158,225 @@ describe("creator client revision conflicts", () => {
       width: 360,
       height: 520,
       kind: "vrm_pose",
+      license: "toonspectrum-standard" as const,
+      rightsConfirmed: true as const,
     };
     apiPost.mockResolvedValue({ id: "shared-pose" });
 
     await publishAsset(input, controller.signal);
 
-    expect(apiPost).toHaveBeenCalledWith("/creator/assets", input, {
+    expect(createStudioSharedAssetPreview).toHaveBeenCalledWith(input.dataUrl);
+    expect(apiPost).toHaveBeenCalledWith("/creator/assets", {
+      ...input,
+      previewDataUrl: "data:image/webp;base64,cHJldmlldw==",
+      previewWidth: 160,
+      previewHeight: 120,
+    }, {
       signal: controller.signal,
     });
+  });
+
+  it("원본 content 경로를 인코딩하고 응답 id·크기 계약을 검증한다", async () => {
+    const controller = new AbortController();
+    apiGet.mockResolvedValueOnce({
+      id: "asset/a",
+      dataUrl: PNG_1X1,
+      width: 1,
+      height: 1,
+      kind: "image",
+      mimeType: "image/png",
+      byteSize: PNG_BYTES.length,
+      contentHash: PNG_HASH,
+    });
+
+    await expect(getSharedAssetContent("asset/a", controller.signal)).resolves.toMatchObject({
+      id: "asset/a",
+      width: 1,
+      height: 1,
+    });
+    expect(apiGet).toHaveBeenCalledWith("/creator/assets/asset%2Fa/content", {
+      signal: controller.signal,
+    });
+
+    apiGet.mockResolvedValueOnce({
+      id: "wrong-id",
+      dataUrl: PNG_1X1,
+      width: 1,
+      height: 1,
+      kind: "image",
+      mimeType: "image/png",
+      byteSize: PNG_BYTES.length,
+      contentHash: PNG_HASH,
+    });
+    await expect(getSharedAssetContent("asset/a")).rejects.toThrow("응답이 올바르지");
+  });
+
+  it("카탈로그 검색·페이지와 신고·검수 경로를 인코딩해 전송한다", async () => {
+    const controller = new AbortController();
+    const page = { items: [], limit: 20, offset: 40, hasMore: false, nextOffset: null };
+    apiGet.mockResolvedValueOnce(page);
+    apiPost.mockResolvedValueOnce({ reported: true, reportCount: 1 });
+    apiPatch.mockResolvedValueOnce({ updated: true, status: "rejected" });
+
+    await expect(listSharedAssetCatalog({
+      limit: 20,
+      offset: 40,
+      search: "골목",
+      license: "cc-by-4.0",
+      sort: "popular",
+    }, controller.signal)).resolves.toEqual(page);
+    await reportSharedAsset("asset/a", { reason: "copyright", details: "권리 표기 확인" });
+    await moderateSharedAsset("asset/a", { status: "rejected", note: "권리 확인 실패" });
+
+    expect(apiGet).toHaveBeenCalledWith("/creator/assets/catalog", {
+      params: {
+      mine: undefined,
+      limit: 20,
+      offset: 40,
+      search: "골목",
+      tag: undefined,
+      license: "cc-by-4.0",
+      kind: undefined,
+        sort: "popular",
+      },
+      signal: controller.signal,
+    });
+    expect(apiPost).toHaveBeenCalledWith("/creator/assets/asset%2Fa/report", {
+      reason: "copyright",
+      details: "권리 표기 확인",
+    });
+    expect(apiPatch).toHaveBeenCalledWith("/creator/assets/asset%2Fa/moderation", {
+      status: "rejected",
+      note: "권리 확인 실패",
+    });
+  });
+
+  it("카탈로그에서 검증된 raster preview만 남기고 SVG·위장 MIME item은 제거한다", async () => {
+    const valid = {
+      id: "valid",
+      name: "검증 에셋",
+      description: "",
+      tags: [],
+      width: 1,
+      height: 1,
+      kind: "image",
+      previewDataUrl: PNG_1X1,
+      previewWidth: 1,
+      previewHeight: 1,
+      previewAvailable: true,
+      downloads: 0,
+      reportCount: 0,
+      license: "cc-by-4.0",
+      licenseLabel: "CC BY",
+      licenseUrl: "https://creativecommons.org/licenses/by/4.0/",
+      attributionRequired: true,
+      commercialUse: true,
+      attributionText: "작가",
+      containsAi: false,
+      moderationStatus: "published",
+      author: { id: "author", name: "작가", avatar: "#fff" },
+      isOwner: false,
+      createdAt: "2026-07-20T00:00:00.000Z",
+    };
+    apiGet.mockResolvedValue({
+      items: [
+        valid,
+        { ...valid, id: "svg", previewDataUrl: "data:image/svg+xml;base64,PHN2Zy8+" },
+        { ...valid, id: "spoof", previewDataUrl: PNG_1X1.replace("image/png", "image/webp") },
+      ],
+      limit: 20,
+      offset: 0,
+      hasMore: false,
+      nextOffset: null,
+    });
+
+    await expect(listSharedAssetCatalog()).resolves.toMatchObject({
+      items: [{ id: "valid" }],
+    });
+  });
+
+  it("카탈로그 목록 전체 응답 크기 가드를 준수한다", async () => {
+    const oversizedDescription = "x".repeat(CREATOR_ASSET_LIST_RESPONSE_MAX_BYTES);
+    apiGet.mockResolvedValueOnce({
+      items: [
+        {
+          id: "oversized",
+          name: "대용량 에셋",
+          description: oversizedDescription,
+          tags: [],
+          width: 1,
+          height: 1,
+          kind: "image",
+          previewDataUrl: PNG_1X1,
+          previewWidth: 1,
+          previewHeight: 1,
+          previewAvailable: true,
+          downloads: 0,
+          reportCount: 0,
+          license: "cc-by-4.0",
+          licenseLabel: "CC BY",
+          licenseUrl: "https://creativecommons.org/licenses/by/4.0/",
+          attributionRequired: true,
+          commercialUse: true,
+          attributionText: "작가",
+          containsAi: false,
+          moderationStatus: "published",
+          author: { id: "author", name: "작가", avatar: "#fff" },
+          isOwner: false,
+          createdAt: "2026-07-20T00:00:00.000Z",
+        },
+      ],
+      limit: 20,
+      offset: 0,
+      hasMore: false,
+      nextOffset: null,
+    });
+
+    await expect(listSharedAssetCatalog()).rejects.toThrow("카탈로그 응답이 너무 큽니다");
+  });
+
+  it("검수 큐도 목록 크기 가드를 공유한다", async () => {
+    const oversizedString = "x".repeat(CREATOR_ASSET_LIST_RESPONSE_MAX_BYTES);
+    apiGet.mockResolvedValueOnce([
+      {
+        reportId: "report-1",
+        reason: "copyright",
+        details: oversizedString,
+        reportStatus: "open",
+        reportedAt: "2026-07-20T00:00:00.000Z",
+        reporter: { id: "reporter", name: "신고자", avatar: "#64748b" },
+        asset: {
+          id: "report-asset",
+          name: "검수",
+          description: "",
+          tags: [],
+          width: 1,
+          height: 1,
+          kind: "image",
+          previewDataUrl: PNG_1X1,
+          previewWidth: 1,
+          previewHeight: 1,
+          previewAvailable: true,
+          downloads: 0,
+          reportCount: 0,
+          license: "cc-by-4.0",
+          licenseLabel: "CC BY",
+          licenseUrl: "https://creativecommons.org/licenses/by/4.0/",
+          attributionRequired: true,
+          commercialUse: true,
+          attributionText: "작가",
+          containsAi: false,
+          moderationStatus: "published",
+          author: { id: "author", name: "작가", avatar: "#fff" },
+          isOwner: false,
+          createdAt: "2026-07-20T00:00:00.000Z",
+        },
+      },
+    ]);
+
+    await expect(listSharedAssetModerationQueue()).rejects.toThrow(
+      "공유 에셋 목록 응답이 안전한 전송 크기를 초과했습니다"
+    );
   });
 });
 

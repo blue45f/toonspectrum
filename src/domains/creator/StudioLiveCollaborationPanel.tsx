@@ -795,6 +795,9 @@ export function StudioLiveCollaborationPanel() {
       if (event.type === "state") setScreenState(event.state);
       else setScreenError(event.message);
     });
+    // The room can receive the server's active-share snapshot before this panel mounts. Hydrate
+    // immediately after subscribing so the first paint cannot miss that retained announcement.
+    setScreenState(screenController.getState());
 
     return () => {
       cancelled = true;

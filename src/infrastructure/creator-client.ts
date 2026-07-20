@@ -2,10 +2,27 @@
 // 인증은 기존 세션 스킴(localStorage "toonspectrum-auth-session" → x-user-id 헤더)을 그대로 재사용한다.
 // 공유 ky 클라이언트(api)의 beforeRequest 훅이 x-user-id 를 자동 주입하므로 호출부는 헤더를 안 넘긴다.
 // 새 저장 키를 만들지 않고 auth-session의 getAuthUserId()로 현재 사용자 id를 읽는다.
+import type {
+  CreatorAssetCatalogSort,
+  CreatorAssetLicenseId,
+  CreatorAssetModerationStatus,
+  CreatorAssetReportReason,
+} from "@/lib/creator-asset-contract";
+
+import {
+  CREATOR_ASSET_CATALOG_MAX_PAGE_SIZE,
+  CREATOR_ASSET_LIST_RESPONSE_MAX_BYTES,
+  assertCreatorAssetListResponseBudget,
+} from "@/lib/creator-asset-contract";
 import { ensureArray } from "@/lib/http-safe";
 import { projectRevisionComparisonValue } from "@/lib/revision-comparison-projection";
 import { getAuthUserId } from "@/src/compat/auth-session-store";
 import { api, isHttpError, toApiError } from "@/src/infrastructure/api";
+import {
+  validateSharedAssetCatalogItem,
+  validateSharedAssetContentResponse,
+} from "@/src/infrastructure/creator-asset-response-validation";
+
 
 export type WorkFormat = "cuttoon" | "upload";
 
@@ -531,25 +548,130 @@ export async function postComment(id: string, text: string): Promise<WorkComment
 }
 
 // ── 공유 에셋(회원이 올려 모두가 재사용) ──────────────────────────────
-export interface SharedAsset {
+export interface SharedAssetSummary {
   id: string;
   name: string;
-  dataUrl: string;
+  description?: string;
+  tags?: string[];
   width: number;
   height: number;
   kind: string;
+  license?: CreatorAssetLicenseId;
+  licenseLabel?: string;
+  licenseUrl?: string | null;
+  attributionRequired?: boolean;
+  commercialUse?: boolean;
+  attributionText?: string;
+  containsAi?: boolean;
+  moderationStatus?: CreatorAssetModerationStatus;
+  reportCount?: number;
   downloads: number;
   author: WorkAuthor;
   isOwner: boolean;
   createdAt: string;
 }
 
+/** Full-content legacy projection used by the shared VRM pose library. */
+export interface SharedAsset extends SharedAssetSummary {
+  dataUrl: string;
+}
+
+/** Catalog projection. Original bytes are fetched only when the user inserts this asset. */
+export interface SharedAssetCatalogItem extends SharedAssetSummary {
+  previewDataUrl: string;
+  previewWidth: number;
+  previewHeight: number;
+  previewAvailable: boolean;
+}
+
+export interface SharedAssetContent {
+  id: string;
+  dataUrl: string;
+  width: number;
+  height: number;
+  kind: string;
+  mimeType: "image/png" | "image/jpeg" | "image/webp";
+  byteSize: number;
+  contentHash: string;
+}
+
 export interface PublishAssetInput {
   name: string;
+  description?: string;
+  tags?: string[];
   dataUrl: string;
   width: number;
   height: number;
   kind?: string;
+  license: CreatorAssetLicenseId;
+  attributionText?: string;
+  containsAi?: boolean;
+  rightsConfirmed: true;
+}
+
+export interface SharedAssetCatalogPage {
+  items: SharedAssetCatalogItem[];
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+  nextOffset: number | null;
+}
+
+export interface SharedAssetModerationQueueItem {
+  reportId: string;
+  reason: CreatorAssetReportReason;
+  details: string;
+  reportStatus: "open" | "resolved" | "dismissed";
+  reportedAt: string;
+  reporter: WorkAuthor;
+  asset: SharedAssetCatalogItem;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function parseSharedAssetCatalogPage(value: unknown): SharedAssetCatalogPage {
+  if (typeof value === "string") {
+    if (new TextEncoder().encode(value).length > CREATOR_ASSET_LIST_RESPONSE_MAX_BYTES) {
+      throw new Error("공유 에셋 카탈로그 응답이 너무 큽니다.");
+    }
+  }
+  if (
+    !isRecord(value) ||
+    !Array.isArray(value.items) ||
+    typeof value.limit !== "number" ||
+    !Number.isInteger(value.limit) ||
+    value.limit < 1 ||
+    value.limit > CREATOR_ASSET_CATALOG_MAX_PAGE_SIZE ||
+    typeof value.offset !== "number" ||
+    !Number.isInteger(value.offset) ||
+    value.offset < 0 ||
+    typeof value.hasMore !== "boolean" ||
+    (value.nextOffset !== null && (
+      typeof value.nextOffset !== "number" ||
+      !Number.isInteger(value.nextOffset) ||
+      value.nextOffset < 0
+    ))
+  ) {
+    throw new Error("공유 에셋 카탈로그 응답이 올바르지 않습니다.");
+  }
+  const items = value.items.flatMap((item): SharedAssetCatalogItem[] => {
+    if (!isRecord(item) || !validateSharedAssetCatalogItem(item)) return [];
+    return [item as unknown as SharedAssetCatalogItem];
+  });
+  const page: SharedAssetCatalogPage = {
+    items,
+    limit: value.limit,
+    offset: value.offset,
+    hasMore: value.hasMore,
+    nextOffset: value.nextOffset,
+  };
+  if (new TextEncoder().encode(JSON.stringify(page)).length > CREATOR_ASSET_LIST_RESPONSE_MAX_BYTES) {
+    throw new Error("공유 에셋 카탈로그 응답이 너무 큽니다.");
+  }
+  assertCreatorAssetListResponseBudget(page);
+  return page;
 }
 
 export type GeneratedAssetSize = "1024x1024" | "1536x1024" | "1024x1536";
@@ -573,14 +695,32 @@ export interface GeneratedAsset {
 }
 
 export async function listSharedAssets(
-  params: { mine?: boolean; limit?: number; offset?: number } = {},
+  params: {
+    mine?: boolean;
+    limit?: number;
+    offset?: number;
+    search?: string;
+    tag?: string;
+    license?: CreatorAssetLicenseId;
+    kind?: "image" | "sticker" | "vrm_pose";
+    sort?: CreatorAssetCatalogSort;
+  } = {},
   signal?: AbortSignal
 ): Promise<SharedAsset[]> {
   // x-user-id 전송(공유 클라이언트 훅) → isOwner 판정/내 공유 필터. mine 은 서버 호환을 위해 "1" 로 보낸다.
   const data = await callOrThrow(
     () =>
       api.get<unknown>(`${BASE}/assets`, {
-        params: { mine: params.mine ? "1" : undefined, limit: params.limit, offset: params.offset },
+        params: {
+          mine: params.mine ? "1" : undefined,
+          limit: params.limit,
+          offset: params.offset,
+          search: params.search,
+          tag: params.tag,
+          license: params.license,
+          kind: params.kind,
+          sort: params.sort,
+        },
         signal,
       }),
     "공유 에셋을 불러오지 못했습니다."
@@ -588,11 +728,56 @@ export async function listSharedAssets(
   return ensureArray<SharedAsset>(data);
 }
 
+export async function listSharedAssetCatalog(
+  params: {
+    mine?: boolean;
+    limit?: number;
+    offset?: number;
+    search?: string;
+    tag?: string;
+    license?: CreatorAssetLicenseId;
+    kind?: "image" | "sticker" | "vrm_pose";
+    sort?: CreatorAssetCatalogSort;
+  } = {},
+  signal?: AbortSignal
+): Promise<SharedAssetCatalogPage> {
+  const value = await callOrThrow(
+    () =>
+      api.get<unknown>(`${BASE}/assets/catalog`, {
+        params: {
+          mine: params.mine ? "1" : undefined,
+          limit: params.limit,
+          offset: params.offset,
+          search: params.search,
+          tag: params.tag,
+          license: params.license,
+          kind: params.kind,
+          sort: params.sort,
+        },
+        signal,
+      }),
+    "공유 에셋 카탈로그를 불러오지 못했습니다."
+  );
+  return parseSharedAssetCatalogPage(value);
+}
+
 export async function publishAsset(input: PublishAssetInput, signal?: AbortSignal): Promise<SharedAsset> {
+  const { createStudioSharedAssetPreview } = await import(
+    "@/src/domains/creator/studio-shared-asset-preview"
+  );
+  const preview = await createStudioSharedAssetPreview(input.dataUrl);
   return callOrThrow(
-    () => api.post<SharedAsset>(`${BASE}/assets`, input, { signal }),
+    () => api.post<SharedAsset>(`${BASE}/assets`, { ...input, ...preview }, { signal }),
     "에셋을 공유하지 못했습니다."
   );
+}
+
+export async function getSharedAssetContent(id: string, signal?: AbortSignal): Promise<SharedAssetContent> {
+  const value = await callOrThrow(
+    () => api.get<unknown>(`${BASE}/assets/${encodeURIComponent(id)}/content`, { signal }),
+    "공유 에셋 원본을 불러오지 못했습니다."
+  );
+  return validateSharedAssetContentResponse(value, id);
 }
 
 export async function generateAsset(input: GenerateAssetInput): Promise<GeneratedAsset> {
@@ -610,7 +795,42 @@ export async function deleteSharedAsset(id: string): Promise<void> {
   }
 }
 
-// 사용(삽입) 시 다운로드 카운트 증가 — best-effort, 실패해도 무시.
+export async function reportSharedAsset(
+  id: string,
+  input: { reason: CreatorAssetReportReason; details?: string }
+): Promise<{ reported: true; reportCount: number }> {
+  return callOrThrow(
+    () => api.post(`${BASE}/assets/${encodeURIComponent(id)}/report`, input),
+    "에셋을 신고하지 못했습니다."
+  );
+}
+
+export async function listSharedAssetModerationQueue(
+  params: { status?: "open" | "resolved" | "dismissed"; limit?: number; offset?: number } = {}
+): Promise<SharedAssetModerationQueueItem[]> {
+  const data = await callOrThrow(
+    () => api.get<unknown>(`${BASE}/assets/moderation`, { params }),
+    "에셋 검수 대기열을 불러오지 못했습니다."
+  );
+  const queue = ensureArray<unknown>(data).flatMap((item): SharedAssetModerationQueueItem[] => {
+    if (!isRecord(item) || !isRecord(item.asset) || !validateSharedAssetCatalogItem(item.asset)) return [];
+    return [item as unknown as SharedAssetModerationQueueItem];
+  });
+  assertCreatorAssetListResponseBudget(queue);
+  return queue;
+}
+
+export async function moderateSharedAsset(
+  id: string,
+  input: { status: CreatorAssetModerationStatus; note?: string }
+): Promise<{ updated: true; status: CreatorAssetModerationStatus }> {
+  return callOrThrow(
+    () => api.patch(`${BASE}/assets/${encodeURIComponent(id)}/moderation`, input),
+    "에셋 검수 상태를 변경하지 못했습니다."
+  );
+}
+
+// 원본 검증과 로컬 캔버스 삽입이 모두 성공한 뒤에만 호출한다. 서버가 사용자·에셋별 중복을 제한한다.
 export async function markSharedAssetUsed(id: string): Promise<void> {
   try {
     await api.post(`${BASE}/assets/${encodeURIComponent(id)}/use`);

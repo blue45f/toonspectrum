@@ -1365,10 +1365,30 @@ export const creatorAssets = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
+    description: text("description").notNull().default(""),
+    tags: jsonb("tags").$type<string[]>().notNull().default([]),
     dataUrl: text("dataUrl").notNull(), // 축소된 webp 데이터 URL(creator_work.cover와 동일 방식)
     width: integer("width").notNull(),
     height: integer("height").notNull(),
     kind: text("kind").notNull().default("image"), // image | sticker (추후 vrm 등 확장)
+    mimeType: text("mimeType"),
+    byteSize: integer("byteSize"),
+    contentHash: text("contentHash"),
+    previewDataUrl: text("previewDataUrl"),
+    previewWidth: integer("previewWidth"),
+    previewHeight: integer("previewHeight"),
+    previewMimeType: text("previewMimeType"),
+    previewByteSize: integer("previewByteSize"),
+    previewContentHash: text("previewContentHash"),
+    license: text("license").notNull().default("toonspectrum-standard"),
+    attributionText: text("attributionText").notNull().default(""),
+    containsAi: boolean("containsAi").notNull().default(false),
+    rightsConfirmedAt: timestamp("rightsConfirmedAt", { mode: "date", withTimezone: true }),
+    moderationStatus: text("moderationStatus").notNull().default("under_review"),
+    moderationNote: text("moderationNote").notNull().default(""),
+    reportCount: integer("reportCount").notNull().default(0),
+    reviewedBy: text("reviewedBy").references(() => users.id, { onDelete: "set null" }),
+    reviewedAt: timestamp("reviewedAt", { mode: "date", withTimezone: true }),
     hidden: boolean("hidden").notNull().default(false), // 관리자 비노출
     downloads: integer("downloads").notNull().default(0),
     createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
@@ -1376,6 +1396,89 @@ export const creatorAssets = pgTable(
   (t) => [
     index("creator_asset_created_idx").on(t.createdAt), // 런타임 ensure 미러(이름 유지)
     index("idx_creator_asset_user").on(t.userId), // 내 에셋 목록
+    index("idx_creator_asset_catalog").on(t.moderationStatus, t.hidden, t.createdAt),
+    index("idx_creator_asset_downloads").on(t.downloads, t.createdAt),
+    unique("creator_asset_owner_hash_unique").on(t.userId, t.contentHash),
+    check(
+      "creator_asset_license_check",
+      sql`${t.license} in ('toonspectrum-standard', 'cc0-1.0', 'cc-by-4.0', 'cc-by-nc-4.0')`
+    ),
+    check(
+      "creator_asset_moderation_status_check",
+      sql`${t.moderationStatus} in ('published', 'under_review', 'rejected')`
+    ),
+    check(
+      "creator_asset_mime_type_check",
+      sql`${t.mimeType} is null or ${t.mimeType} in ('image/png', 'image/jpeg', 'image/webp')`
+    ),
+    check(
+      "creator_asset_byte_size_check",
+      sql`${t.byteSize} is null or ${t.byteSize} between 1 and 2250000`
+    ),
+    check(
+      "creator_asset_content_hash_check",
+      sql`${t.contentHash} is null or ${t.contentHash} ~ '^[0-9a-f]{64}$'`
+    ),
+    check(
+      "creator_asset_preview_check",
+      sql`(
+        ${t.previewDataUrl} is null
+        and ${t.previewWidth} is null
+        and ${t.previewHeight} is null
+        and ${t.previewMimeType} is null
+        and ${t.previewByteSize} is null
+        and ${t.previewContentHash} is null
+      ) or (
+        ${t.previewDataUrl} is not null
+        and ${t.previewWidth} between 1 and 320
+        and ${t.previewHeight} between 1 and 320
+        and ${t.previewMimeType} in ('image/png', 'image/jpeg', 'image/webp')
+        and ${t.previewByteSize} between 1 and 131072
+        and ${t.previewContentHash} ~ '^[0-9a-f]{64}$'
+      )`
+    ),
+    check(
+      "creator_asset_dimensions_check",
+      sql`${t.width} between 1 and 4096 and ${t.height} between 1 and 4096 and ${t.width}::bigint * ${t.height}::bigint <= 16777216`
+    ),
+    check("creator_asset_tags_check", sql`jsonb_typeof(${t.tags}) = 'array'`),
+    check("creator_asset_report_count_check", sql`${t.reportCount} >= 0`),
+    check(
+      "creator_asset_published_rights_check",
+      sql`${t.moderationStatus} <> 'published' or ${t.rightsConfirmedAt} is not null`
+    ),
+  ]
+);
+
+export const creatorAssetReports = pgTable(
+  "creator_asset_report",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    assetId: text("assetId")
+      .notNull()
+      .references(() => creatorAssets.id, { onDelete: "cascade" }),
+    reporterId: text("reporterId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    reason: text("reason").notNull(),
+    details: text("details").notNull().default(""),
+    status: text("status").notNull().default("open"),
+    resolutionNote: text("resolutionNote").notNull().default(""),
+    reviewedBy: text("reviewedBy").references(() => users.id, { onDelete: "set null" }),
+    reviewedAt: timestamp("reviewedAt", { mode: "date", withTimezone: true }),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique("creator_asset_report_asset_reporter_unique").on(t.assetId, t.reporterId),
+    index("idx_creator_asset_report_queue").on(t.status, t.createdAt),
+    index("idx_creator_asset_report_reporter").on(t.reporterId, t.createdAt),
+    check(
+      "creator_asset_report_reason_check",
+      sql`${t.reason} in ('copyright', 'unsafe', 'spam', 'misleading', 'other')`
+    ),
+    check("creator_asset_report_status_check", sql`${t.status} in ('open', 'resolved', 'dismissed')`),
   ]
 );
 

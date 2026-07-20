@@ -335,6 +335,19 @@ export const StudioLiveVoiceMemberSchema = z
   })
   .strict();
 
+/**
+ * Adapter-visible metadata for one active screen-share lifecycle. The media stream and access
+ * grants remain peer-to-peer and are never stored here; this record only lets a late joiner
+ * discover the same bounded public announcement that existing room members already received.
+ */
+export const StudioLiveActiveScreenShareSchema = z
+  .object({
+    connectionId: ConnectionIdSchema,
+    shareId: ScreenShareIdSchema,
+    label: ScreenShareLabelSchema,
+  })
+  .strict();
+
 export const StudioLivePublicParticipantSchema = z
   .object({
     connectionId: ConnectionIdSchema,
@@ -467,6 +480,9 @@ export type StudioLiveVoiceJoinInput = z.infer<typeof StudioLiveVoiceJoinSchema>
 export type StudioLiveVoiceStateInput = z.infer<typeof StudioLiveVoiceStateSchema>;
 export type StudioLiveVoiceLeaveInput = z.infer<typeof StudioLiveVoiceLeaveSchema>;
 export type StudioLiveVoiceSignalInput = z.infer<typeof StudioLiveVoiceSignalSchema>;
+export type StudioLiveActiveScreenShare = z.infer<
+  typeof StudioLiveActiveScreenShareSchema
+>;
 export type StudioLiveInterServerRelayEvent = z.infer<
   typeof StudioLiveInterServerRelayEventSchema
 >;
@@ -622,6 +638,7 @@ export interface StudioLiveJoinResult {
   participants: StudioLiveParticipant[];
   locks: StudioLiveLock[];
   voiceMembers: StudioLiveVoiceMember[];
+  screenShares: StudioLiveActiveScreenShare[];
 }
 
 export interface StudioLiveSocketData {
@@ -633,6 +650,7 @@ export interface StudioLiveSocketData {
   studioParticipant?: StudioLiveParticipant;
   studioWorkId?: string;
   studioVoiceMember?: StudioLiveVoiceMember;
+  studioScreenShare?: StudioLiveActiveScreenShare;
 }
 
 export interface StudioLiveClientToServerEvents {

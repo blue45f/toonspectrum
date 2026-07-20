@@ -347,6 +347,8 @@ describe("validateStudioBg3dGlb valid self-contained files", () => {
       code: "valid",
       profile: "desktop",
       cumulativeBytesAfter: bytes.byteLength,
+      usesBasisTextures: false,
+      requiresBasisTextures: false,
       metrics: {
         byteSize: bytes.byteLength,
         binByteSize: 32,
@@ -435,6 +437,8 @@ describe("validateStudioBg3dGlb valid self-contained files", () => {
 
     expect(result).toMatchObject({
       ok: true,
+      usesBasisTextures: false,
+      requiresBasisTextures: false,
       metrics: {
         imageBytes: 32,
         estimatedDecodedImageBytes: 0,
@@ -602,6 +606,8 @@ describe("validateStudioBg3dGlb self-contained resource policy", () => {
 
     expect(result).toMatchObject({
       ok: true,
+      usesBasisTextures: true,
+      requiresBasisTextures: false,
       metrics: {
         textures: 1,
         images: 2,
@@ -628,6 +634,8 @@ describe("validateStudioBg3dGlb self-contained resource policy", () => {
     });
     expect(result).toMatchObject({
       ok: true,
+      usesBasisTextures: true,
+      requiresBasisTextures: true,
       metrics: {
         textures: 1,
         images: 1,

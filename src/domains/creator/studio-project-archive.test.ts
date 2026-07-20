@@ -24,6 +24,7 @@ import {
   type StudioProjectArchiveAttachmentInput,
   type StudioProjectArchiveManifest,
 } from "./studio-project-archive";
+import { buildVrmPoseDataUrlMetadata } from "./studio-vrm-poser-utils";
 import {
   createStudioVrmSceneDocument,
   normalizeStudioVrmSceneDocument,
@@ -1014,6 +1015,46 @@ describe("studio-project-archive", () => {
       expressions: { happy: 0.7 },
     });
 
+    const currentMetadata = buildVrmPoseDataUrlMetadata({
+      modelId: "avatar-a",
+      bones: { head: { rotation: [0.2, -0.1, 0.04] } },
+      yOffset: 0.18,
+      poseTranslations: {
+        version: 1,
+        root: [0.3, 0, -0.15],
+        hips: [0.08, -0.04, 0.02],
+        spine: [-0.03, 0.06, 0.01],
+      },
+      bodyRotation: 0.42,
+    }, "하린");
+    const currentSrc = `${dataUrl("image/png", raster)}#${encodeURIComponent(JSON.stringify(currentMetadata))}`;
+    const currentImported = await importStudioProjectArchive((await buildStudioProjectArchive({
+      project: {
+        ...project,
+        pages: [minimalPage([{ id: "current-vrm", type: "image", src: currentSrc }])],
+      },
+    })).blob);
+    const currentImage = currentImported.project.pagesList[0]?.elements[0] as {
+      src: string;
+      vrmScene: {
+        version: number;
+        pose: {
+          yOffset: number;
+          translations: typeof currentMetadata.poseTranslations;
+          bodyRotationY: number;
+        };
+      };
+    };
+    expect(currentImage.src).toBe(dataUrl("image/png", raster));
+    expect(currentImage.vrmScene).toMatchObject({
+      version: 3,
+      pose: {
+        yOffset: 0.18,
+        translations: currentMetadata.poseTranslations,
+        bodyRotationY: 0.42,
+      },
+    });
+
     await expectArchiveError(buildStudioProjectArchive({
       project: {
         ...project,
@@ -1106,7 +1147,7 @@ describe("studio-project-archive", () => {
     })), "PROJECT_INVALID");
   });
 
-  it("현재 manifest의 strict VRM v1 장면만 v2로 승격하고 다른 writer 차이는 허용하지 않는다", async () => {
+  it("현재 manifest의 strict VRM v1/v2 장면만 v3로 승격하고 다른 writer 차이는 허용하지 않는다", async () => {
     const currentScene = normalizeStudioVrmSceneDocument({
       ...createStudioVrmSceneDocument(),
       pose: {
@@ -1122,6 +1163,7 @@ describe("studio-project-archive", () => {
     });
     const legacyScene = JSON.parse(JSON.stringify(currentScene)) as Record<string, unknown>;
     delete legacyScene.rig;
+    delete (legacyScene.pose as Record<string, unknown>).translations;
     legacyScene.version = 1;
     const legacyImage = {
       id: "legacy-vrm",
@@ -1136,7 +1178,7 @@ describe("studio-project-archive", () => {
     const promoted = (imported.project.pagesList[0]?.elements[0] as {
       vrmScene: ReturnType<typeof createStudioVrmSceneDocument>;
     }).vrmScene;
-    expect(promoted.version).toBe(2);
+    expect(promoted.version).toBe(3);
     expect(promoted.pose).toEqual(currentScene.pose);
     expect(promoted.expressions).toEqual(currentScene.expressions);
     expect(promoted.rig).toMatchObject({
@@ -1145,6 +1187,23 @@ describe("studio-project-archive", () => {
       footPlant: false,
       floorHeight: 0,
     });
+
+    const versionTwoScene = JSON.parse(JSON.stringify(currentScene)) as Record<string, unknown>;
+    delete (versionTwoScene.pose as Record<string, unknown>).translations;
+    versionTwoScene.version = 2;
+    const importedV2 = await importStudioProjectArchive(
+      await manualProjectOnlyArchive(projectWith([{
+        ...legacyImage,
+        id: "legacy-vrm-v2",
+        vrmScene: versionTwoScene,
+      }])),
+    );
+    const promotedV2 = (importedV2.project.pagesList[0]?.elements[0] as {
+      vrmScene: ReturnType<typeof createStudioVrmSceneDocument>;
+    }).vrmScene;
+    expect(promotedV2.version).toBe(3);
+    expect(promotedV2.rig).toEqual(currentScene.rig);
+    expect(promotedV2.pose.translations).toEqual(currentScene.pose.translations);
 
     await expectArchiveError(importStudioProjectArchive(await manualProjectOnlyArchive({
       ...projectWith([{ ...legacyImage, vrmScene: { ...legacyScene, unknown: true } }]),

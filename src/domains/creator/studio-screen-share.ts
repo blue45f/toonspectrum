@@ -12,6 +12,7 @@ export interface StudioScreenShareRoom {
   readonly participant: StudioLiveParticipant;
   subscribe(listener: (event: StudioLiveRoomEvent) => void): () => void;
   getPeers(): StudioLivePeer[];
+  getScreenShares?(): StudioRemoteScreenShare[];
   announceScreen(payload: { shareId: string; label: string }): boolean;
   requestScreen(targetSessionId: string, payload: { shareId: string }): boolean;
   respondScreen(
@@ -233,7 +234,16 @@ export class StudioScreenShareController {
     this.createMediaStream = dependencies.createMediaStream ?? defaultCreateMediaStream;
     this.randomId = dependencies.randomId ?? defaultRandomId;
     this.unsubscribeRoom = room.subscribe((event) => this.onRoomEvent(event));
-    for (const peer of room.getPeers()) {
+    for (const share of room.getScreenShares?.() ?? []) {
+      const copied: StudioRemoteScreenShare = {
+        ...share,
+        host: copyParticipant(share.host),
+      };
+      this.shares.set(shareKey(copied.host.sessionId, copied.shareId), copied);
+    }
+    const peers = room.getPeers();
+    this.knownPeerSessions = new Set(peers.map((peer) => peer.sessionId));
+    for (const peer of peers) {
       room.requestScreen(peer.sessionId, { shareId: STUDIO_SCREEN_SHARE_DISCOVERY_ID });
     }
   }

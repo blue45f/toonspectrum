@@ -136,6 +136,8 @@ function exportDependencies(records: ReadonlyMap<string, Bg3dVerifiedStoredRecor
       verifiedSha256: record.contentHash,
       verifiedBytes,
       cumulativeBytesAfter: (options.cumulativeUsedBytes ?? 0) + record.byteSize,
+      usesBasisTextures: false,
+      requiresBasisTextures: false,
       metrics: record.validatorMetrics,
     };
   });

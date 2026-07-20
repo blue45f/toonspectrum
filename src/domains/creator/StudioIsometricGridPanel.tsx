@@ -5,6 +5,7 @@
  * 별도 파일)가 담당한다. 슬라이더는 로컬 draft/선택적 preview와 최종 커밋을 분리한다.
  */
 import { Box, RotateCcw } from "lucide-react";
+import { useState, type ReactElement } from "react";
 
 import {
   ISOMETRIC_ANGLE_MAX_DEG,
@@ -12,16 +13,23 @@ import {
   ISOMETRIC_ANGLE_PRESETS_DEG,
   ISOMETRIC_CELL_SIZE_MAX,
   ISOMETRIC_CELL_SIZE_MIN,
+  clampIsometricCellSize,
   type IsometricGridConfig,
 } from "./studio-isometric-grid";
+import {
+  STUDIO_ISOMETRIC_CYLINDER_SEGMENTS_MAX,
+  STUDIO_ISOMETRIC_CYLINDER_SEGMENTS_MIN,
+  STUDIO_ISOMETRIC_STAIRS_STEPS_MAX,
+  STUDIO_ISOMETRIC_STAIRS_STEPS_MIN,
+  type StudioIsometricPrimitiveKind,
+  type StudioIsometricPrimitiveSpec,
+} from "./studio-isometric-primitive-contract";
 import {
   StudioCoordinateInput,
   StudioPanelChip,
   StudioSliderRow,
   StudioToggleChip,
 } from "./studio-panel-ui";
-
-import type { ReactElement } from "react";
 
 type ChangeIsometricValue = (next: number) => void;
 type ChangeIsometricOrigin = (x: number, y: number) => void;
@@ -35,6 +43,8 @@ type StudioIsometricGridPanelBaseProps = {
   onResetOrigin: () => void;
   /** Creates three independently editable vector faces at the current origin. */
   onInsertSolid?: () => void;
+  /** Creates a caller-committed, independently editable primitive face batch. */
+  onInsertPrimitive?: (spec: StudioIsometricPrimitiveSpec) => void | Promise<void>;
   disabled?: boolean;
   disabledReason?: string;
   /** Optional transient canvas preview; must not append undo/CRDT history. */
@@ -77,6 +87,32 @@ export type StudioIsometricGridPanelProps = StudioIsometricGridPanelBaseProps &
   StudioIsometricAngleCommitProps &
   StudioIsometricCellCommitProps;
 
+const PRIMITIVE_CELL_MIN = 0.25;
+const PRIMITIVE_CELL_MAX = 64;
+const PRIMITIVE_KIND_LABELS: Readonly<Record<StudioIsometricPrimitiveKind, string>> = {
+  box: "상자",
+  cylinder: "원기둥",
+  stairs: "계단",
+  wedge: "쐐기",
+};
+
+function parseBoundedInput(value: string, fallback: number, min: number, max: number): number {
+  const parsed = Number(value);
+  return Math.min(max, Math.max(min, Number.isFinite(parsed) ? parsed : fallback));
+}
+
+function parseBoundedIntegerInput(
+  value: string,
+  fallback: number,
+  min: number,
+  max: number,
+  even = false
+): number {
+  const rounded = Math.round(parseBoundedInput(value, fallback, min, max));
+  if (!even || rounded % 2 === 0) return rounded;
+  return Math.min(max, rounded + 1);
+}
+
 export function StudioIsometricGridPanel({
   active,
   config,
@@ -93,9 +129,84 @@ export function StudioIsometricGridPanel({
   onChangeCellSize,
   onResetOrigin,
   onInsertSolid,
+  onInsertPrimitive,
 }: StudioIsometricGridPanelProps): ReactElement {
   const commitAngle = onCommitAngle ?? onChangeAngle;
   const commitCellSize = onCommitCellSize ?? onChangeCellSize;
+  const [primitiveKind, setPrimitiveKind] = useState<StudioIsometricPrimitiveKind>("box");
+  const [primitiveWidthCells, setPrimitiveWidthCells] = useState("3");
+  const [primitiveDepthCells, setPrimitiveDepthCells] = useState("3");
+  const [primitiveHeightCells, setPrimitiveHeightCells] = useState("3");
+  const [primitiveSteps, setPrimitiveSteps] = useState("6");
+  const [primitiveSegments, setPrimitiveSegments] = useState("24");
+  const [primitiveInsertPending, setPrimitiveInsertPending] = useState(false);
+  const primitiveControlsDisabled = disabled || primitiveInsertPending;
+  const insertPrimitive = async (): Promise<void> => {
+    if (primitiveControlsDisabled) return;
+    if (!onInsertPrimitive) {
+      onInsertSolid?.();
+      return;
+    }
+    const unit = clampIsometricCellSize(config.cellSize);
+    const dimensions = {
+      width: parseBoundedInput(
+        primitiveWidthCells,
+        3,
+        PRIMITIVE_CELL_MIN,
+        PRIMITIVE_CELL_MAX
+      ) * unit,
+      depth: parseBoundedInput(
+        primitiveDepthCells,
+        3,
+        PRIMITIVE_CELL_MIN,
+        PRIMITIVE_CELL_MAX
+      ) * unit,
+      height: parseBoundedInput(
+        primitiveHeightCells,
+        3,
+        PRIMITIVE_CELL_MIN,
+        PRIMITIVE_CELL_MAX
+      ) * unit,
+    };
+    let spec: StudioIsometricPrimitiveSpec;
+    switch (primitiveKind) {
+      case "cylinder":
+        spec = {
+          kind: primitiveKind,
+          ...dimensions,
+          segments: parseBoundedIntegerInput(
+            primitiveSegments,
+            24,
+            STUDIO_ISOMETRIC_CYLINDER_SEGMENTS_MIN,
+            STUDIO_ISOMETRIC_CYLINDER_SEGMENTS_MAX,
+            true
+          ),
+        };
+        break;
+      case "stairs":
+        spec = {
+          kind: primitiveKind,
+          ...dimensions,
+          steps: parseBoundedIntegerInput(
+            primitiveSteps,
+            6,
+            STUDIO_ISOMETRIC_STAIRS_STEPS_MIN,
+            STUDIO_ISOMETRIC_STAIRS_STEPS_MAX
+          ),
+        };
+        break;
+      case "box":
+      case "wedge":
+        spec = { kind: primitiveKind, ...dimensions };
+        break;
+    }
+    setPrimitiveInsertPending(true);
+    try {
+      await onInsertPrimitive(spec);
+    } finally {
+      setPrimitiveInsertPending(false);
+    }
+  };
   return (
     <div className="pt-2.5 border-t border-line/35 space-y-2">
       <div className="flex items-center justify-between gap-2">
@@ -189,16 +300,132 @@ export function StudioIsometricGridPanel({
             기준점 초기화
           </button>
 
-          {onInsertSolid ? (
+          {onInsertPrimitive ? (
+            <div
+              aria-busy={primitiveInsertPending}
+              className="space-y-2 rounded border border-line/60 bg-card/55 p-2"
+            >
+              <label className="block space-y-1 text-[0.68rem] font-semibold text-fg-3">
+                <span>입체 종류</span>
+                <select
+                  aria-label="아이소메트릭 입체 종류"
+                  value={primitiveKind}
+                  disabled={primitiveControlsDisabled}
+                  onChange={(event) => {
+                    setPrimitiveKind(event.currentTarget.value as StudioIsometricPrimitiveKind);
+                  }}
+                  className="min-h-8 w-full rounded border border-line bg-panel px-2 text-xs text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45 pointer-coarse:min-h-11"
+                >
+                  {(Object.entries(PRIMITIVE_KIND_LABELS) as [StudioIsometricPrimitiveKind, string][])
+                    .map(([kind, label]) => <option key={kind} value={kind}>{label}</option>)}
+                </select>
+              </label>
+
+              <div className="grid grid-cols-3 gap-1.5">
+                <label className="space-y-1 text-[0.65rem] font-semibold text-fg-3">
+                  <span>너비(셀)</span>
+                  <input
+                    type="number"
+                    aria-label="아이소메트릭 입체 너비"
+                    min={PRIMITIVE_CELL_MIN}
+                    max={PRIMITIVE_CELL_MAX}
+                    step={0.25}
+                    value={primitiveWidthCells}
+                    disabled={primitiveControlsDisabled}
+                    onChange={(event) => setPrimitiveWidthCells(event.currentTarget.value)}
+                    className="min-h-8 w-full rounded border border-line bg-panel px-1.5 text-xs text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45 pointer-coarse:min-h-11"
+                  />
+                </label>
+                <label className="space-y-1 text-[0.65rem] font-semibold text-fg-3">
+                  <span>깊이(셀)</span>
+                  <input
+                    type="number"
+                    aria-label="아이소메트릭 입체 깊이"
+                    min={PRIMITIVE_CELL_MIN}
+                    max={PRIMITIVE_CELL_MAX}
+                    step={0.25}
+                    value={primitiveDepthCells}
+                    disabled={primitiveControlsDisabled}
+                    onChange={(event) => setPrimitiveDepthCells(event.currentTarget.value)}
+                    className="min-h-8 w-full rounded border border-line bg-panel px-1.5 text-xs text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45 pointer-coarse:min-h-11"
+                  />
+                </label>
+                <label className="space-y-1 text-[0.65rem] font-semibold text-fg-3">
+                  <span>높이(셀)</span>
+                  <input
+                    type="number"
+                    aria-label="아이소메트릭 입체 높이"
+                    min={PRIMITIVE_CELL_MIN}
+                    max={PRIMITIVE_CELL_MAX}
+                    step={0.25}
+                    value={primitiveHeightCells}
+                    disabled={primitiveControlsDisabled}
+                    onChange={(event) => setPrimitiveHeightCells(event.currentTarget.value)}
+                    className="min-h-8 w-full rounded border border-line bg-panel px-1.5 text-xs text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45 pointer-coarse:min-h-11"
+                  />
+                </label>
+              </div>
+
+              {primitiveKind === "stairs" ? (
+                <label className="block space-y-1 text-[0.68rem] font-semibold text-fg-3">
+                  <span>계단 수</span>
+                  <input
+                    type="number"
+                    aria-label="아이소메트릭 계단 수"
+                    min={STUDIO_ISOMETRIC_STAIRS_STEPS_MIN}
+                    max={STUDIO_ISOMETRIC_STAIRS_STEPS_MAX}
+                    step={1}
+                    value={primitiveSteps}
+                    disabled={primitiveControlsDisabled}
+                    onChange={(event) => setPrimitiveSteps(event.currentTarget.value)}
+                    className="min-h-8 w-full rounded border border-line bg-panel px-2 text-xs text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45 pointer-coarse:min-h-11"
+                  />
+                </label>
+              ) : null}
+
+              {primitiveKind === "cylinder" ? (
+                <label className="block space-y-1 text-[0.68rem] font-semibold text-fg-3">
+                  <span>곡면 분할</span>
+                  <input
+                    type="number"
+                    aria-label="아이소메트릭 원기둥 분할 수"
+                    min={STUDIO_ISOMETRIC_CYLINDER_SEGMENTS_MIN}
+                    max={STUDIO_ISOMETRIC_CYLINDER_SEGMENTS_MAX}
+                    step={2}
+                    value={primitiveSegments}
+                    disabled={primitiveControlsDisabled}
+                    onChange={(event) => setPrimitiveSegments(event.currentTarget.value)}
+                    className="min-h-8 w-full rounded border border-line bg-panel px-2 text-xs text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45 pointer-coarse:min-h-11"
+                  />
+                </label>
+              ) : null}
+
+              <p className="text-[0.62rem] leading-relaxed text-fg-3">
+                각 면은 닫힌 벡터로 생성되어 색상과 노드를 따로 편집할 수 있습니다.
+              </p>
+              <p role="status" aria-live="polite" className="sr-only">
+                {primitiveInsertPending ? "아이소메트릭 입체를 생성하고 있습니다." : ""}
+              </p>
+            </div>
+          ) : null}
+
+          {onInsertPrimitive || onInsertSolid ? (
             <button
               type="button"
-              onClick={onInsertSolid}
-              disabled={disabled}
-              title={disabledReason ?? "현재 각도·셀 크기·색상으로 편집 가능한 상자를 만듭니다."}
+              onClick={() => void insertPrimitive()}
+              disabled={primitiveControlsDisabled}
+              aria-busy={primitiveInsertPending}
+              title={primitiveInsertPending
+                ? "아이소메트릭 입체를 생성하고 있습니다."
+                : disabledReason ?? `현재 각도·셀 크기·색상으로 편집 가능한 ${PRIMITIVE_KIND_LABELS[primitiveKind]}를 만듭니다.`}
               className="flex w-full items-center justify-center gap-1 rounded border border-accent/45 bg-accent/10 py-1.5 text-[0.68rem] font-semibold text-accent transition-colors hover:bg-accent/15 cursor-pointer disabled:cursor-not-allowed disabled:opacity-45 pointer-coarse:min-h-11"
             >
               <Box className="size-3" aria-hidden />
-              입체 상자 생성
+              {primitiveInsertPending
+                ? "생성 중…"
+                : onInsertPrimitive
+                ? `${PRIMITIVE_KIND_LABELS[primitiveKind]} 생성`
+                : "입체 상자 생성"}
             </button>
           ) : null}
         </div>

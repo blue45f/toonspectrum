@@ -1,4 +1,4 @@
-import { ArrowLeft, Eye, EyeOff, ImageOff, MessagesSquare, RefreshCw, Search, Trash2 } from "lucide-react";
+import { ArrowLeft, Ban, CheckCircle2, Eye, EyeOff, ImageOff, MessagesSquare, RefreshCw, Search, ShieldAlert, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { adminFetch, type AdminApiError } from "./components/admin-client";
@@ -6,12 +6,20 @@ import { AdminGateFallback } from "./components/admin-gate";
 import { useAdminGate } from "./components/admin-gate-state";
 
 import type { FanCafeScopeFilter } from "@/lib/types";
+import type { SharedAssetModerationQueueItem } from "@/src/infrastructure/creator-client";
 
 import { Container } from "@/components/section";
 import { COMMUNITY_SCOPE_LABEL_WITH_ALL } from "@/lib/community-ui";
 import { cn, relativeDate } from "@/lib/utils";
 import Link from "@/src/compat/router-link";
+import { verifyStudioSharedAssetContent } from "@/src/domains/creator/studio-shared-asset-content";
 import { useDocumentTitle } from "@/src/hooks/use-document-title";
+import {
+  getSharedAssetContent,
+  listSharedAssetModerationQueue,
+  moderateSharedAsset,
+} from "@/src/infrastructure/creator-client";
+
 
 
 interface ModerationPost {
@@ -62,8 +70,164 @@ export function AdminCommunityPage() {
       </header>
 
       <AdminGateFallback gate={gate} />
-      {gate.kind === "admin" && uid && <ModerationBoard uid={uid} />}
+      {gate.kind === "admin" && uid && (
+        <div className="space-y-10">
+          <AssetModerationBoard />
+          <ModerationBoard uid={uid} />
+        </div>
+      )}
     </Container>
+  );
+}
+
+function AssetModerationBoard() {
+  const [items, setItems] = useState<SharedAssetModerationQueueItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [inspectionBusyId, setInspectionBusyId] = useState<string | null>(null);
+  const [originalInspection, setOriginalInspection] = useState<{
+    assetId: string;
+    dataUrl: string;
+  } | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
+  const [notes, setNotes] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    setError(null);
+    listSharedAssetModerationQueue({ status: "open", limit: 20 })
+      .then((data) => {
+        if (alive) setItems(data);
+      })
+      .catch((reason) => {
+        if (alive) setError(reason instanceof Error ? reason.message : "에셋 신고를 불러오지 못했습니다.");
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [refreshTick]);
+
+  async function review(
+    item: SharedAssetModerationQueueItem,
+    status: "published" | "under_review" | "rejected"
+  ) {
+    if (busyId) return;
+    setBusyId(item.reportId);
+    setError(null);
+    try {
+      await moderateSharedAsset(item.asset.id, { status, note: notes[item.reportId]?.trim() || undefined });
+      if (status === "under_review") {
+        setItems((current) => current.map((candidate) => candidate.reportId === item.reportId
+          ? { ...candidate, asset: { ...candidate.asset, moderationStatus: status } }
+          : candidate));
+      } else {
+        setItems((current) => current.filter((candidate) => candidate.asset.id !== item.asset.id));
+        setOriginalInspection((current) => current?.assetId === item.asset.id ? null : current);
+      }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "에셋 검수 상태를 변경하지 못했습니다.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function inspectOriginal(item: SharedAssetModerationQueueItem) {
+    if (originalInspection?.assetId === item.asset.id) {
+      setOriginalInspection(null);
+      return;
+    }
+    if (inspectionBusyId) return;
+    setInspectionBusyId(item.asset.id);
+    setError(null);
+    try {
+      const content = await getSharedAssetContent(item.asset.id);
+      const verified = await verifyStudioSharedAssetContent(item.asset, content);
+      setOriginalInspection({ assetId: item.asset.id, dataUrl: verified.dataUrl });
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "에셋 원본을 검수용으로 불러오지 못했습니다.");
+    } finally {
+      setInspectionBusyId(null);
+    }
+  }
+
+  return (
+    <section aria-labelledby="asset-moderation-title">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="eyebrow flex items-center gap-1.5 text-warn"><ShieldAlert size={13} /> ASSET REPORTS</p>
+          <h2 id="asset-moderation-title" className="mt-1 text-xl font-bold text-fg">공유 에셋 신고 검수</h2>
+          <p className="mt-1 text-xs leading-relaxed text-fg-3">사용권·권리침해·유해 콘텐츠 신고를 검토하고 공개 상태를 결정합니다.</p>
+        </div>
+        <button type="button" onClick={() => setRefreshTick((tick) => tick + 1)} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line px-3 text-xs font-semibold text-fg-2 hover:bg-raised">
+          <RefreshCw size={13} className={cn(loading && "animate-spin motion-reduce:animate-none")} /> 신고 갱신
+        </button>
+      </div>
+
+      {error && <p className="mb-3 rounded-lg border border-bad/40 bg-bad/10 px-3 py-2 text-xs text-bad">{error}</p>}
+      {loading ? (
+        <div className="space-y-2.5">{Array.from({ length: 3 }).map((_, index) => <div key={index} className="skeleton h-40 rounded-xl" />)}</div>
+      ) : items.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-line bg-card/40 p-8 text-center text-sm text-fg-3">처리할 에셋 신고가 없습니다.</div>
+      ) : (
+        <ul className="space-y-3">
+          {items.map((item) => {
+            const busy = busyId === item.reportId;
+            const showingOriginal = originalInspection?.assetId === item.asset.id;
+            const loadingOriginal = inspectionBusyId === item.asset.id;
+            return (
+              <li key={item.reportId} className="grid gap-4 rounded-2xl border border-line bg-card/60 p-4 sm:grid-cols-[9rem_1fr]">
+                <div className="space-y-2">
+                  <div className="flex h-36 items-center justify-center overflow-hidden rounded-xl border border-line bg-raised/50">
+                    <img
+                      src={showingOriginal ? originalInspection.dataUrl : item.asset.previewDataUrl}
+                      alt={`${item.asset.name} ${showingOriginal ? "검증된 원본" : "카탈로그 미리보기"}`}
+                      className="max-h-full max-w-full object-contain"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    disabled={Boolean(inspectionBusyId && !loadingOriginal)}
+                    aria-pressed={showingOriginal}
+                    onClick={() => void inspectOriginal(item)}
+                    className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-line px-2 text-[0.68rem] font-semibold text-fg-2 hover:bg-raised disabled:opacity-45"
+                  >
+                    <Eye size={12} />
+                    {loadingOriginal ? "원본 검증 중…" : showingOriginal ? "미리보기로 전환" : "검증된 원본 확인"}
+                  </button>
+                </div>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 text-[0.68rem] text-fg-3">
+                    <span className="rounded-full bg-bad/10 px-2 py-0.5 font-semibold text-bad">{item.reason}</span>
+                    <span>{item.asset.licenseLabel ?? item.asset.license}</span>
+                    {item.asset.containsAi && <span className="rounded-full bg-accent/10 px-2 py-0.5 text-accent">AI 포함</span>}
+                    <span className="ml-auto">누적 신고 {item.asset.reportCount ?? 1}</span>
+                  </div>
+                  <h3 className="mt-2 truncate text-sm font-bold text-fg">{item.asset.name}</h3>
+                  <p className="mt-1 text-xs text-fg-3">공유자 {item.asset.author.name} · 신고자 ID {item.reporter.id}</p>
+                  {item.details && <p className="mt-2 rounded-lg bg-raised/60 px-3 py-2 text-xs leading-relaxed text-fg-2">{item.details}</p>}
+                  <input
+                    value={notes[item.reportId] ?? ""}
+                    onChange={(event) => setNotes((current) => ({ ...current, [item.reportId]: event.target.value.slice(0, 500) }))}
+                    placeholder="검수 메모(선택)"
+                    className="mt-3 min-h-11 w-full rounded-lg border border-line bg-canvas/50 px-3 text-xs text-fg outline-none focus:border-accent"
+                  />
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button type="button" disabled={busy} onClick={() => void review(item, "published")} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-good/40 px-3 text-xs font-semibold text-good hover:bg-good/10 disabled:opacity-45"><CheckCircle2 size={13} /> 문제 없음</button>
+                    <button type="button" disabled={busy} onClick={() => void review(item, "under_review")} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-warn/40 px-3 text-xs font-semibold text-warn hover:bg-warn/10 disabled:opacity-45"><ShieldAlert size={13} /> 검수 중 숨김</button>
+                    <button type="button" disabled={busy} onClick={() => void review(item, "rejected")} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-bad/40 px-3 text-xs font-semibold text-bad hover:bg-bad/10 disabled:opacity-45"><Ban size={13} /> 게시 거절</button>
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }
 

@@ -24,7 +24,7 @@ type TabKey = (typeof TABS)[number]["key"];
 
 // 무거운 모더레이션 화면은 분할 라우트로 분리 — 콘솔 번들을 가볍게 유지한다.
 const SPLIT_ROUTES = [
-  { href: "/admin/community", label: "커뮤니티 글" },
+  { href: "/admin/community", label: "커뮤니티·에셋 검수" },
   { href: "/admin/members", label: "회원" },
 ] as const;
 

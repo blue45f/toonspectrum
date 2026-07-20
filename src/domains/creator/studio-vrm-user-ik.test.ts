@@ -191,6 +191,36 @@ describe("Studio VRM user IK", () => {
     vectorClose(actual, target);
   });
 
+  it("solves in scale-free avatar space under rotated non-uniform body scale", () => {
+    const fixture = createRig();
+    fixture.scene.scale.set(0.7, 1.4, 0.7);
+    fixture.scene.rotation.y = 0.35;
+    fixture.scene.updateMatrixWorld(true);
+    const upper = fixture.nodes.get("rightUpperArm")!;
+    const startWorld = upper.getWorldPosition(new THREE.Vector3());
+    const sceneInverse = fixture.scene.matrixWorld.clone().invert();
+    const startLocal = startWorld.clone().applyMatrix4(sceneInverse);
+    const target = startLocal.clone().add(new THREE.Vector3(1, 0.5, 0))
+      .applyMatrix4(fixture.scene.matrixWorld);
+    const pole = startLocal.clone().add(new THREE.Vector3(0, 0, 1))
+      .applyMatrix4(fixture.scene.matrixWorld);
+
+    const result = solveStudioVrmUserIk(fixture.source, {
+      effector: "rightHand",
+      targetWorld: target,
+      poleWorld: pole,
+      softLimitStrength: 0,
+    }, UNLIMITED_DEPENDENCIES);
+
+    expect(result).not.toBeNull();
+    expect(result?.reachable).toBe(true);
+    expect(result?.limited).toBe(false);
+    applyRotationOnlyPose(fixture, result!.bones, result!.yOffset);
+    const actual = fixture.nodes.get("rightHand")!.getWorldPosition(new THREE.Vector3());
+    vectorClose(actual, target, 8);
+    vectorClose(new THREE.Vector3(...result!.effectiveTargetWorld), actual, 8);
+  });
+
   it("현재 runtime 자세를 먼저 bake해 shoulder/end 회전과 yOffset을 보존한다", () => {
     const fixture = createRig();
     fixture.scene.position.y = 0.42;
@@ -357,6 +387,10 @@ describe("Studio VRM user IK", () => {
       expect(rotation.every(Number.isFinite)).toBe(true);
     }
     expect(result.limited).toBe(true);
+    applyRotationOnlyPose(fixture, result.bones, result.yOffset);
+    const actual = fixture.nodes.get("leftHand")!.getWorldPosition(new THREE.Vector3());
+    vectorClose(actual, new THREE.Vector3(...result.effectiveTargetWorld), 10);
+    expect(actual.distanceTo(target)).toBeGreaterThan(0.01);
   });
 
   it("neutral profile은 기존 IK 출력과 같고 선택 profile의 전용 damping을 사용한다", () => {

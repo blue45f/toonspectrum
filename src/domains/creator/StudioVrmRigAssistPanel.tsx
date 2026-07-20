@@ -7,16 +7,21 @@ import {
   type StudioVrmRigProfileId,
 } from "./studio-vrm-rig-profile";
 
+import type { StudioVrmPoseTranslations } from "./studio-vrm-scene-document";
+
 export interface StudioVrmRigAssistPanelProps {
   readonly disabled: boolean;
   readonly jointProfile: StudioVrmRigProfileId;
   readonly fullBodyIk: boolean;
   readonly footPlant: boolean;
   readonly floorHeight: number;
+  readonly rootYOffset: number;
+  readonly translations: StudioVrmPoseTranslations;
   readonly onJointProfileChange: (profile: StudioVrmRigProfileId) => void;
   readonly onFullBodyIkChange: (enabled: boolean) => void;
   readonly onFootPlantChange: (enabled: boolean) => void;
   readonly onFloorHeightChange: (height: number) => void;
+  readonly onResetTranslations: () => void;
 }
 
 /** Controlled product panel for the versioned VRM drawing-assist rig settings. */
@@ -26,10 +31,13 @@ export function StudioVrmRigAssistPanel({
   fullBodyIk,
   footPlant,
   floorHeight,
+  rootYOffset,
+  translations,
   onJointProfileChange,
   onFullBodyIkChange,
   onFootPlantChange,
   onFloorHeightChange,
+  onResetTranslations,
 }: StudioVrmRigAssistPanelProps) {
   const headingId = useId();
   return (
@@ -67,7 +75,7 @@ export function StudioVrmRigAssistPanel({
         <label className="flex min-h-9 cursor-pointer items-center justify-between gap-3 text-[0.68rem] font-semibold text-fg-2 pointer-coarse:min-h-11">
           <span>
             전신 IK 보조
-            <span className="ml-1 font-normal text-fg-3">발 보정 일부를 골반 높이에 분담</span>
+            <span className="ml-1 font-normal text-fg-3">root·골반·척추와 여러 체인을 반복 계산</span>
           </span>
           <input
             type="checkbox"
@@ -80,8 +88,8 @@ export function StudioVrmRigAssistPanel({
         </label>
         <label className="flex min-h-9 cursor-pointer items-center justify-between gap-3 text-[0.68rem] font-semibold text-fg-2 pointer-coarse:min-h-11">
           <span>
-            발 바닥 고정
-            <span className="ml-1 font-normal text-fg-3">발 핸들 목표를 바닥 높이에 맞춤</span>
+            양발 바닥 고정
+            <span className="ml-1 font-normal text-fg-3">손·발 편집 중 두 발을 동시 제약</span>
           </span>
           <input
             type="checkbox"
@@ -113,9 +121,34 @@ export function StudioVrmRigAssistPanel({
       </label>
       {fullBodyIk && !footPlant ? (
         <p className="mt-1.5 text-[0.62rem] leading-relaxed text-fg-3" role="status">
-          전신 보조는 발 바닥 고정을 켠 뒤 발 핸들을 움직일 때 적용됩니다.
+          전신 이동은 활성 손·발의 도달 범위를 보조합니다. 양발 고정을 켜면 두 다리까지
+          같은 반복 solve에 참여합니다.
         </p>
       ) : null}
+      <div className="mt-2.5 rounded-md border border-line/60 bg-card/45 p-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[0.65rem] font-semibold text-fg-2">저장되는 전신 이동</span>
+          <button
+            type="button"
+            disabled={disabled}
+            className="min-h-8 rounded-md border border-line px-2 text-[0.62rem] font-semibold text-fg-2 hover:bg-raised disabled:opacity-45 pointer-coarse:min-h-11"
+            onClick={onResetTranslations}
+          >
+            이동 초기화
+          </button>
+        </div>
+        <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-[0.6rem] text-fg-3">
+          <dt>Root X/Y/Z</dt>
+          <dd className="numeral text-right">{translations.root[0].toFixed(2)} / {rootYOffset.toFixed(2)} / {translations.root[2].toFixed(2)}m</dd>
+          <dt>골반 X/Y/Z</dt>
+          <dd className="numeral text-right">{translations.hips.map((value) => value.toFixed(2)).join(" / ")}m</dd>
+          <dt>척추 X/Y/Z</dt>
+          <dd className="numeral text-right">{translations.spine.map((value) => value.toFixed(2)).join(" / ")}m</dd>
+        </dl>
+        <p className="mt-1.5 text-[0.58rem] leading-relaxed text-fg-3">
+          미리보기 동안에는 장면만 바뀌며, 핸들을 놓을 때 포즈와 이동값을 한 번만 저장합니다.
+        </p>
+      </div>
     </section>
   );
 }

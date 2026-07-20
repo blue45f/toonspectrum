@@ -130,6 +130,7 @@ interface DragSession {
   startClientY: number;
   startWorld: THREE.Vector3;
   latestWorld: THREE.Vector3;
+  pendingWorld: THREE.Vector3 | null;
   plane: THREE.Plane;
   didPreview: boolean;
 }
@@ -311,6 +312,7 @@ function Handle({
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const dragRef = useRef<DragSession | null>(null);
+  const previewFrameRef = useRef<number | null>(null);
   const scratchWorldRef = useRef(new THREE.Vector3());
   const [hovered, setHovered] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -324,6 +326,9 @@ function Handle({
   });
 
   useEffect(() => () => {
+    const previewFrame = previewFrameRef.current;
+    previewFrameRef.current = null;
+    if (previewFrame !== null) cancelAnimationFrame(previewFrame);
     const session = dragRef.current;
     dragRef.current = null;
     if (session) rollbackOnUnmount(session);
@@ -354,6 +359,31 @@ function Handle({
     return isFiniteVector(world) ? world : null;
   };
 
+  const cancelPendingPreviewFrame = () => {
+    const previewFrame = previewFrameRef.current;
+    previewFrameRef.current = null;
+    if (previewFrame !== null) cancelAnimationFrame(previewFrame);
+  };
+
+  const flushPendingPreview = (session: DragSession) => {
+    const pendingWorld = session.pendingWorld;
+    if (!pendingWorld) return;
+    session.pendingWorld = null;
+    session.didPreview = true;
+    session.latestWorld.copy(pendingWorld);
+    groupRef.current?.position?.copy(pendingWorld);
+    onEffectorPreview?.(session.bone, worldPoint(pendingWorld));
+  };
+
+  const schedulePendingPreview = (session: DragSession) => {
+    if (previewFrameRef.current !== null) return;
+    previewFrameRef.current = requestAnimationFrame(() => {
+      previewFrameRef.current = null;
+      if (dragRef.current !== session) return;
+      flushPendingPreview(session);
+    });
+  };
+
   const finishDrag = (
     pointerId: number,
     cancelled: boolean,
@@ -361,6 +391,9 @@ function Handle({
   ) => {
     const session = dragRef.current;
     if (!session || session.pointerId !== pointerId) return;
+    cancelPendingPreviewFrame();
+    if (cancelled) session.pendingWorld = null;
+    else flushPendingPreview(session);
     dragRef.current = null;
     setDragging(false);
     onInteractionActiveChange?.(false);
@@ -372,7 +405,7 @@ function Handle({
       didPreview: session.didPreview,
     }, cancelled);
     if (outcome.kind === "rollback") {
-      groupRef.current?.position.copy(session.startWorld);
+      groupRef.current?.position?.copy(session.startWorld);
       onEffectorRollback?.(outcome.bone, outcome.worldPosition);
     } else if (outcome.kind === "commit") {
       onEffectorCommit?.(outcome.bone, outcome.worldPosition);
@@ -406,7 +439,7 @@ function Handle({
     const current = readCurrentWorldPosition();
     if (!current) return;
     const next = current.add(delta);
-    groupRef.current?.position.copy(next);
+    groupRef.current?.position?.copy(next);
     const nextPoint = worldPoint(next);
     onSelectBone?.(binding.bone);
     onEffectorPreview?.(effectorBone, nextPoint);
@@ -481,6 +514,7 @@ function Handle({
               startClientY: event.clientY,
               startWorld: startWorld.clone(),
               latestWorld: startWorld.clone(),
+              pendingWorld: null,
               plane: createStudioVrmJointDragPlane(camera, startWorld, dragPlane),
               didPreview: false,
             };
@@ -510,10 +544,10 @@ function Handle({
               session.plane
             );
             if (!projected) return;
-            session.didPreview = true;
-            session.latestWorld.copy(projected);
-            groupRef.current?.position.copy(projected);
-            onEffectorPreview?.(session.bone, worldPoint(projected));
+            if (session.pendingWorld) session.pendingWorld.copy(projected);
+            else session.pendingWorld = projected.clone();
+            groupRef.current?.position?.copy(projected);
+            schedulePendingPreview(session);
           }}
           onPointerUp={(event) => {
             stopPointerEvent(event);

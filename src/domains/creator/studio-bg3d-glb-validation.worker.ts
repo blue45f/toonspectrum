@@ -1,8 +1,5 @@
 /// <reference lib="webworker" />
 
-import basisJavascriptSource from "three/examples/jsm/libs/basis/basis_transcoder.js?raw";
-import basisWasmUrl from "three/examples/jsm/libs/basis/basis_transcoder.wasm?url";
-
 import { validateStudioBg3dGlb } from "./studio-bg3d-glb-validation";
 import {
   STUDIO_BG3D_GLB_VALIDATION_WORKER_PROTOCOL_VERSION,
@@ -10,12 +7,11 @@ import {
   type StudioBg3dGlbWorkerResponse,
   type StudioBg3dGlbWorkerValidateRequest,
 } from "./studio-bg3d-glb-validation-worker-protocol";
-import { STUDIO_BG3D_KTX2_TRANSCODER_ASSET_MANIFEST } from "./studio-bg3d-ktx2-transcoder-contract";
+import { loadPinnedStudioBg3dKtx2TranscoderAssets } from "./studio-bg3d-ktx2-transcoder-assets";
 import {
   createStudioBg3dKtx2TranscoderRuntime,
   type StudioBg3dKtx2TranscoderRuntime,
 } from "./studio-bg3d-ktx2-transcoder-runtime";
-import { readBoundedStudioAssetResponse } from "./studio-bounded-asset-response";
 
 const scope: DedicatedWorkerGlobalScope = self as unknown as DedicatedWorkerGlobalScope;
 const activeRequests = new Map<number, AbortController>();
@@ -36,24 +32,7 @@ async function getBasisRuntime(signal: AbortSignal): Promise<StudioBg3dKtx2Trans
     const pending = createStudioBg3dKtx2TranscoderRuntime({
       generation,
       signal,
-      // Vite's dev server transforms JavaScript reached through `?url` by appending a source map.
-      // Keep the immutable upstream source as a raw Worker-only string, then attest its reconstructed
-      // UTF-8 bytes. WASM remains an independently emitted, exact-length streamed asset.
-      loadAssets: async (assetSignal) => {
-        const javascript = new TextEncoder().encode(basisJavascriptSource);
-        const response = await fetch(basisWasmUrl, {
-          credentials: "same-origin",
-          signal: assetSignal,
-        });
-        if (!response.ok) throw new Error("basis-wasm-fetch-failed");
-        const wasm = await readBoundedStudioAssetResponse(
-          response,
-          STUDIO_BG3D_KTX2_TRANSCODER_ASSET_MANIFEST.wasm.byteLength,
-          STUDIO_BG3D_KTX2_TRANSCODER_ASSET_MANIFEST.wasm.byteLength,
-          assetSignal,
-        );
-        return { javascript, wasm };
-      },
+      loadAssets: loadPinnedStudioBg3dKtx2TranscoderAssets,
     });
     runtimePromise = pending;
     void pending.catch(() => {

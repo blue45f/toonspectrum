@@ -607,7 +607,7 @@ flowchart LR
 | JPEG/PNG/WebP decode·EXIF·resize | **[이번 반영] Worker** | transferable `ImageBitmap` ownership, generation id와 stale result 거부 |
 | pose inference | 현재 main-thread IMAGE boundary; P1 Worker A/B | model/backend가 worker realm의 WASM/WebGPU를 안정 지원하고 model duplication 비용보다 이득일 때 이동 |
 | Rapier physics | **현재 WASM Worker** | fixed timestep preview/bake, rig transform ownership 충돌 차단 |
-| Meshopt/KTX2/Draco | KTX2 검증·pretranscode는 **현재 Worker/WASM**; 나머지는 조건부 | decoder pin·hash·capability attestation과 decoded memory까지 예산 청구. KTX2 release gate와 별개로 Three runtime `KTX2Loader` 연결은 아직 남음 |
+| Meshopt/KTX2/Draco | Meshopt·KTX2는 **현재 Worker/WASM + viewport runtime**; Draco는 조건부 | decoder pin·hash·capability attestation과 decoded memory까지 예산 청구. KTX2는 validation Worker의 전체 mip 선행 검사 뒤 Basis GLB에서만 lazy `KTX2Loader`를 연결하고, 활성 WebGLRenderer 지원 감지·window-realm 재-attestation·bounded Worker·parse 후 dispose를 적용한다. Draco는 별도 validator-first 경계가 남음 |
 | retarget·IK batch·key reduction | P1/P2 Worker | 수천 frame 계산을 numerical DTO로 반환; live skeleton 객체 전달 금지 |
 | LT 선화·톤 raster | **[이번 반영] 전용 Worker** | 호출 시점 RGBA·linear depth·설정의 방어 복사본만 transferable로 넘기고 요청 ID, exact protocol, 120초 timeout, abort/terminate, 결과 크기·role·순서를 검증한다. Worker 생성 불가일 때만 1,048,576픽셀 이하 동기 fallback; protocol/render/runtime/timeout/abort는 fail closed |
 | thumbnail/contact sheet | **[이번 반영] OffscreenCanvas Worker** | 대표 PNG를 순차 decode해 동시에 live `ImageBitmap`을 1개로 제한하고 finally에서 close; 12컷/시트, request correlation, progress, timeout, cancel/terminate, 불투명 Canvas의 실제 RGB8 PNG IHDR·CRC·deflate·byte/pixel 재검증. 미지원이면 archive manifest fallback |

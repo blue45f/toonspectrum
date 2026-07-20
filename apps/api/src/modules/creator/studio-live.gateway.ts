@@ -47,6 +47,7 @@ import { StudioLiveSocketAuthService } from "./studio-live-socket-auth.service";
 import {
   STUDIO_CRDT_PROTOCOL_VERSION,
   STUDIO_LIVE_LOCK_PROTOCOL_VERSION,
+  StudioLiveActiveScreenShareSchema,
   StudioLiveChatSchema,
   StudioLiveCrdtSyncSchema,
   StudioLiveCrdtUpdateSchema,
@@ -74,6 +75,7 @@ import {
 import type {
   StudioLiveAck,
   StudioLiveAckCallback,
+  StudioLiveActiveScreenShare,
   StudioLiveAuthPrincipal,
   StudioLiveChatInput,
   StudioLiveCrdtRemoteUpdate,
@@ -676,10 +678,11 @@ export class StudioLiveGateway
       this.server
         .to(studioLiveRoom(input.workId))
         .emit("studio:presence:update", safeParticipant);
-      const [participants, locks, voiceMembers] = await Promise.all([
+      const [participants, locks, voiceMembers, screenShares] = await Promise.all([
         this.listParticipants(input.workId),
         this.listLocks(input.workId),
         this.listVoiceMembers(input.workId),
+        this.listScreenShares(input.workId),
       ]);
       if (
         !this.isCurrentJoinTransition(client, transitionSequence) ||
@@ -698,6 +701,7 @@ export class StudioLiveGateway
           participants,
           locks,
           voiceMembers,
+          screenShares,
         },
       });
     } catch {
@@ -1236,8 +1240,24 @@ export class StudioLiveGateway
       false,
       true,
       (participant) => {
+        const activeShare = this.activeScreenShareForSocket(client, participant.workId);
         participant.sharingScreen = parsed.data.sharing;
         participant.updatedAt = new Date().toISOString();
+        if (!parsed.data.sharing) {
+          delete client.data.studioScreenShare;
+          if (activeShare) {
+            this.deleteCandidateRelayAuthorizationsForShare(
+              participant.workId,
+              activeShare.shareId,
+              participant.connectionId
+            );
+            this.server.to(studioLiveRoom(participant.workId)).emit("studio:screen:stop", {
+              fromConnectionId: participant.connectionId,
+              fromName: participant.name,
+              shareId: activeShare.shareId,
+            });
+          }
+        }
         const safe = this.publishParticipantToSocketData(client, participant);
         this.server.to(studioLiveRoom(participant.workId)).emit("studio:presence:update", safe);
         return safe;
@@ -1266,13 +1286,32 @@ export class StudioLiveGateway
       false,
       true,
       (participant) => {
+        const previousShare = this.activeScreenShareForSocket(client, participant.workId);
         participant.sharingScreen = true;
         participant.updatedAt = new Date().toISOString();
+        this.publishScreenShareToSocketData(
+          client,
+          participant,
+          parsed.data.shareId,
+          parsed.data.label
+        );
         const room = this.server.to(studioLiveRoom(participant.workId));
         room.emit(
           "studio:presence:update",
           this.publishParticipantToSocketData(client, participant)
         );
+        if (previousShare && previousShare.shareId !== parsed.data.shareId) {
+          this.deleteCandidateRelayAuthorizationsForShare(
+            participant.workId,
+            previousShare.shareId,
+            participant.connectionId
+          );
+          room.emit("studio:screen:stop", {
+            fromConnectionId: participant.connectionId,
+            fromName: participant.name,
+            shareId: previousShare.shareId,
+          });
+        }
         room.emit("studio:screen:announce", {
           fromConnectionId: participant.connectionId,
           fromName: participant.name,
@@ -1444,8 +1483,14 @@ export class StudioLiveGateway
       false,
       true,
       (participant) => {
+        const activeShare = this.activeScreenShareForSocket(client, participant.workId);
+        // A delayed stop from an older getDisplayMedia lifecycle must not terminate the newer
+        // share that replaced it on the same socket.
+        if (activeShare && activeShare.shareId !== parsed.data.shareId) return;
+        const shouldNotify = activeShare !== null || participant.sharingScreen;
         participant.sharingScreen = false;
         participant.updatedAt = new Date().toISOString();
+        delete client.data.studioScreenShare;
         this.deleteCandidateRelayAuthorizationsForShare(
           participant.workId,
           parsed.data.shareId,
@@ -1456,6 +1501,7 @@ export class StudioLiveGateway
           "studio:presence:update",
           this.publishParticipantToSocketData(client, participant)
         );
+        if (!shouldNotify) return;
         room.emit("studio:screen:stop", {
           fromConnectionId: participant.connectionId,
           fromName: participant.name,
@@ -3017,9 +3063,13 @@ export class StudioLiveGateway
     const voiceMember = this.detachVoiceMembership(socketId);
     this.participantsBySocket.delete(socketId);
     const socket = this.server.sockets.get(socketId) as StudioLiveSocket | undefined;
+    const activeShare = socket
+      ? this.activeScreenShareForSocket(socket, participant.workId)
+      : null;
     if (socket) {
       delete socket.data.studioParticipant;
       delete socket.data.studioWorkId;
+      delete socket.data.studioScreenShare;
     }
     this.participantAuthorizationRechecks.delete(socketId);
     this.deleteCandidateRelayAuthorizationsForSocket(socketId);
@@ -3031,6 +3081,17 @@ export class StudioLiveGateway
       this.emitVoiceLeave(
         voiceMember,
         reason === "revoked" ? "revoked" : "removed"
+      );
+    }
+    if (activeShare) {
+      this.emitCleanupNotificationBestEffort(
+        studioLiveRoom(participant.workId),
+        "studio:screen:stop",
+        {
+          fromConnectionId: participant.connectionId,
+          fromName: participant.name,
+          shareId: activeShare.shareId,
+        }
       );
     }
     this.emitCleanupNotificationBestEffort(
@@ -3154,7 +3215,35 @@ export class StudioLiveGateway
     const safe = publicParticipant(participant);
     socket.data.studioWorkId = participant.workId;
     socket.data.studioParticipant = safe;
+    if (!participant.sharingScreen) delete socket.data.studioScreenShare;
     return safe;
+  }
+
+  private publishScreenShareToSocketData(
+    socket: StudioLiveSocket,
+    participant: StudioLiveParticipantInternal,
+    shareId: string,
+    label: string
+  ): StudioLiveActiveScreenShare {
+    const share: StudioLiveActiveScreenShare = {
+      connectionId: participant.connectionId,
+      shareId,
+      label,
+    };
+    socket.data.studioScreenShare = share;
+    return share;
+  }
+
+  private activeScreenShareForSocket(
+    socket: StudioLiveSocket,
+    workId: string
+  ): StudioLiveActiveScreenShare | null {
+    if (socket.data.studioWorkId !== workId) return null;
+    const parsed = StudioLiveActiveScreenShareSchema.safeParse(
+      socket.data.studioScreenShare
+    );
+    if (!parsed.success || parsed.data.connectionId !== socket.id) return null;
+    return parsed.data;
   }
 
   private publicVoiceMember(member: StudioLiveVoiceMemberInternal): StudioLiveVoiceMember {
@@ -3253,6 +3342,80 @@ export class StudioLiveGateway
           left.connectionId.localeCompare(right.connectionId);
       })
       .map((member) => this.publicVoiceMember(member));
+  }
+
+  private localScreenShares(workId: string): StudioLiveActiveScreenShare[] {
+    const socketIds = this.socketIdsByWork.get(workId);
+    if (!socketIds) return [];
+    const shares: StudioLiveActiveScreenShare[] = [];
+    for (const socketId of socketIds) {
+      const socket = this.server.sockets.get(socketId) as StudioLiveSocket | undefined;
+      if (!socket) continue;
+      const participant = socket.data.studioParticipant;
+      const share = this.activeScreenShareForSocket(socket, workId);
+      if (
+        !participant ||
+        participant.connectionId !== socketId ||
+        !participant.sharingScreen ||
+        !share
+      ) {
+        continue;
+      }
+      shares.push(share);
+    }
+    return shares.sort((left, right) =>
+      left.connectionId.localeCompare(right.connectionId) ||
+      left.shareId.localeCompare(right.shareId)
+    );
+  }
+
+  private async listScreenShares(workId: string): Promise<StudioLiveActiveScreenShare[]> {
+    let discoveryTimeout: ReturnType<typeof setTimeout> | null = null;
+    try {
+      const sockets = await Promise.race([
+        this.server.in(studioLiveRoom(workId)).fetchSockets(),
+        new Promise<never>((_resolve, reject) => {
+          discoveryTimeout = setTimeout(
+            () => reject(new Error("studio screen-share adapter discovery timed out")),
+            STUDIO_LIVE_ADAPTER_DISCOVERY_TIMEOUT_MS
+          );
+          discoveryTimeout.unref?.();
+        }),
+      ]);
+      const byConnectionId = new Map<string, StudioLiveActiveScreenShare>();
+      for (const socket of sockets) {
+        const data = socket.data as StudioLiveSocketData;
+        const participant = StudioLivePublicParticipantSchema.safeParse(
+          data.studioParticipant
+        );
+        const share = StudioLiveActiveScreenShareSchema.safeParse(
+          data.studioScreenShare
+        );
+        if (
+          data.studioWorkId !== workId ||
+          !participant.success ||
+          participant.data.connectionId !== socket.id ||
+          !participant.data.sharingScreen ||
+          !share.success ||
+          share.data.connectionId !== socket.id
+        ) {
+          continue;
+        }
+        byConnectionId.set(socket.id, share.data);
+      }
+      return [...byConnectionId.values()].sort((left, right) =>
+        left.connectionId.localeCompare(right.connectionId) ||
+        left.shareId.localeCompare(right.shareId)
+      );
+    } catch (error) {
+      this.logger.warn(
+        { workId, error: error instanceof Error ? error.message : "unknown" },
+        "studio screen-share adapter discovery failed"
+      );
+      return this.localScreenShares(workId);
+    } finally {
+      if (discoveryTimeout) clearTimeout(discoveryTimeout);
+    }
   }
 
   private async listVoiceMembers(

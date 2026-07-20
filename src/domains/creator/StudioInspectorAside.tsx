@@ -84,6 +84,7 @@ import { legacyTextGradientToSpec } from "./studio-gradient-engine";
 import { type HealCloneMode } from "./studio-heal-clone";
 import { uid } from "./studio-id";
 import { type StudioImageInspectorSection, type StudioInspectorLayout } from "./studio-inspector-layout";
+import { type StudioIsometricPrimitiveSpec } from "./studio-isometric-primitive-contract";
 import { type ImageFilterFields } from "./studio-konva-filter-fields";
 import { type LayerMaskPaintMode } from "./studio-layer-mask";
 import {
@@ -213,6 +214,7 @@ export interface StudioInspectorAsideHandlers {
   fitSelectedToFrame: () => Promise<void>;
   handleLayerNavigatorAction: (action: StudioLayerNavigatorAction) => void;
   invertLayerMask: () => void;
+  insertIsometricPrimitive: (spec: StudioIsometricPrimitiveSpec) => Promise<void>;
   insertIsometricSolid: () => void;
   patchAdvancedRuler: (id: string, patch: Partial<StudioAdvancedRuler>) => void;
   moveVanishingPointById: (id: string, x: number, y: number) => void;
@@ -781,6 +783,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
     fitSelectedToFrame,
     handleLayerNavigatorAction,
     invertLayerMask,
+    insertIsometricPrimitive,
     insertIsometricSolid,
     patchAdvancedRuler,
     moveVanishingPointById,
@@ -2811,6 +2814,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                     onPreviewOrigin={previewIsometricOrigin}
                     onCommitOrigin={commitIsometricOrigin}
                     onResetOrigin={resetIsometricOrigin}
+                    onInsertPrimitive={insertIsometricPrimitive}
                     onInsertSolid={insertIsometricSolid}
                   />
                 </Suspense>

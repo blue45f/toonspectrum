@@ -306,6 +306,10 @@ import {
   type StudioCommittedInkSurfaceHandoff,
   type StudioCommittedInkVisibleDrawReceipt,
 } from "./studio-committed-ink-handoff-coordinator";
+import {
+  createStudioCommunityAssetCredit,
+  formatStudioCommunityAssetCredit,
+} from "./studio-community-asset-license";
 import { bakeContentAwareFillToCanvas } from "./studio-content-aware-fill";
 import {
   lintStudioContinuity,
@@ -506,10 +510,6 @@ import {
   snapStrokePointToIsometricGrid,
   type IsometricAxisRay,
 } from "./studio-isometric-grid";
-import {
-  createStudioIsometricSolidElements,
-  planStudioIsometricSolid,
-} from "./studio-isometric-solid";
 import {
   imageFilterCacheKey,
   type ImageFilterFields,
@@ -920,6 +920,8 @@ import {
   type StudioServerAiStatus,
 } from "./studio-server-ai-client";
 import { createSfxTextConfig, SFX_LIBRARY } from "./studio-sfx-presets";
+import { verifyStudioSharedAssetContent } from "./studio-shared-asset-content";
+import { parseStudioAssetDragPayload } from "./studio-shared-asset-drag";
 import { sameCategoryItems } from "./studio-similar-style";
 import {
   EMPTY_SMART_GUIDE_OVERLAY,
@@ -1165,6 +1167,7 @@ import type {
   StudioFilterKind,
   StudioFilterPreview,
 } from "./studio-filter-menu";
+import type { StudioIsometricPrimitiveSpec } from "./studio-isometric-primitive-contract";
 import type {
   StudioLayerNavigatorItem,
 } from "./studio-layer-navigator";
@@ -1193,6 +1196,7 @@ import type { StudioToolbarGroupId } from "./studio-toolbar-groups";
 import type { StudioGpuBackend } from "./studio-webgpu-frame-contract";
 import type { StudioGpuStroke } from "./studio-webgpu-stroke";
 import type {
+  StudioAssetShareOptions,
   StudioAssetSortOrder,
   StudioAssetTab,
 } from "./StudioAssetMenuPanel";
@@ -1200,10 +1204,11 @@ import type { StudioLayerNavigatorAction } from "./StudioLayerNavigator";
 import type { StudioLivePressureStore } from "./StudioLiveInkHosts";
 import type { PublishContext } from "./StudioPublishContextBanner";
 import type { StudioWebGpuCanvasHandle } from "./StudioWebGpuCanvas";
+import type { CreatorAssetReportReason } from "@/lib/creator-asset-contract";
 import type {
   GeneratedAssetQuality,
   GeneratedAssetSize,
-  SharedAsset,
+  SharedAssetCatalogItem,
   WorkDetail,
   WorkRevisionSummary,
 } from "@/src/infrastructure/creator-client";
@@ -4599,9 +4604,12 @@ function StudioCuttoonEditor() {
       : normalizeStudioAssetFavoriteState(undefined);
   // 에셋 공유(커뮤니티): 탭·목록·로딩/에러·공유 진행 상태
   const [assetTab, setAssetTab] = useState<StudioAssetTab>("mine");
-  const [shared, setShared] = useState<SharedAsset[]>([]);
+  const [shared, setShared] = useState<SharedAssetCatalogItem[]>([]);
   const [sharedLoading, setSharedLoading] = useState(false);
+  const [sharedLoadingMore, setSharedLoadingMore] = useState(false);
+  const [sharedNextOffset, setSharedNextOffset] = useState<number | null>(null);
   const [sharedError, setSharedError] = useState<string | null>(null);
+  const sharedAssetContentInFlightRef = useRef(new Set<string>());
   const [publishingId, setPublishingId] = useState<string | null>(null);
   const [poserVrmOpen, setPoserVrmOpen] = useState(false);
   const [poserInitialDataUrl, setPoserInitialDataUrl] = useState<string | undefined>(undefined);
@@ -5119,19 +5127,25 @@ function StudioCuttoonEditor() {
   }
   // useCallback: 패널 스택 memo 자식에서 렌더 중 호출 — prop 안정성 유지.
   const currentPublishPackageCreditsText = useCallback((): string => {
-    if (publishPackageCredits.trim()) return publishPackageCredits.trim();
-    const stockCredits = new Map<string, string>();
+    const credits = new Map<string, string>();
+    if (publishPackageCredits.trim()) credits.set("manual", publishPackageCredits.trim());
     for (const page of pages) {
       for (const element of page.elements) {
-        if (element.type !== "image" || !element.stockImageCredit) continue;
-        const credit = element.stockImageCredit;
-        stockCredits.set(
-          credit.unsplashPhotoPageUrl,
-          `${credit.photographerName} · ${credit.photographerProfileUrl} · ${credit.unsplashPhotoPageUrl}`
-        );
+        if (element.type !== "image") continue;
+        if (element.stockImageCredit) {
+          const credit = element.stockImageCredit;
+          credits.set(
+            `stock:${credit.unsplashPhotoPageUrl}`,
+            `${credit.photographerName} · ${credit.photographerProfileUrl} · ${credit.unsplashPhotoPageUrl}`
+          );
+        }
+        if (element.communityAssetCredit) {
+          const line = formatStudioCommunityAssetCredit(element.communityAssetCredit);
+          if (line) credits.set(`community:${element.communityAssetCredit.assetId}`, line);
+        }
       }
     }
-    return [...stockCredits.values()].join("\n");
+    return [...credits.values()].join("\n");
   }, [publishPackageCredits, pages]);
   const publishPackagePlan: StudioPublishPackagePlan | null = publishPackageOpen
     ? (() => {
@@ -6189,6 +6203,29 @@ function StudioCuttoonEditor() {
     e.preventDefault();
   };
 
+  async function loadCommunityAssetContent(asset: SharedAssetCatalogItem) {
+    if (sharedAssetContentInFlightRef.current.has(asset.id)) {
+      throw new Error("이 에셋 원본을 이미 불러오고 있습니다.");
+    }
+    sharedAssetContentInFlightRef.current.add(asset.id);
+    try {
+      const { getSharedAssetContent } = await import("@/src/infrastructure/creator-client");
+      const content = await getSharedAssetContent(asset.id);
+      return await verifyStudioSharedAssetContent(asset, content);
+    } finally {
+      sharedAssetContentInFlightRef.current.delete(asset.id);
+    }
+  }
+
+  function recordCommunityAssetUse(assetId: string) {
+    if (!studioAuthUserId) return;
+    void import("@/src/infrastructure/creator-client")
+      .then(({ markSharedAssetUsed }) => markSharedAssetUsed(assetId))
+      .catch(() => {
+        // Usage analytics must never roll back a successful, locally persisted insertion.
+      });
+  }
+
   const onWrapDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     const mutationTicket = captureStudioMutationTicket();
@@ -6233,13 +6270,20 @@ function StudioCuttoonEditor() {
     }
 
     // 드롭 지점(스테이지 좌표) → 거기에 중앙을 맞춰 배치한다.
-    const placeAt = (src: string, width: number, height: number, isAnimatedGif = false) => {
-      const { x, y } = dropStagePoint();
+    const placeAt = (
+      src: string,
+      width: number,
+      height: number,
+      isAnimatedGif = false,
+      elementPatch?: Partial<ImageEl> & { name?: string },
+      fixedPoint?: { x: number; y: number }
+    ) => {
+      const { x, y } = fixedPoint ?? dropStagePoint();
       const fit = Math.min(1, (CANVAS_W - 80) / width);
       const targetW = Math.round(width * fit);
       const targetH = Math.round(height * fit);
       setError(null);
-      addEl({
+      return addEl({
         id: uid(),
         type: "image",
         src,
@@ -6249,6 +6293,7 @@ function StudioCuttoonEditor() {
         height: targetH,
         rotation: 0,
         ...(isAnimatedGif ? { isAnimatedGif: true } : {}),
+        ...elementPatch,
       });
     };
 
@@ -6276,10 +6321,53 @@ function StudioCuttoonEditor() {
     // 2) 내부 에셋 패널에서 드래그한 경우.
     if (!assetData) return;
     try {
-      const { src, width, height } = JSON.parse(assetData);
-      placeAt(src, width, height);
+      const payload = parseStudioAssetDragPayload(assetData);
+      if (!payload) return;
+      if (payload.source === "community") {
+        const asset = shared.find((candidate) => candidate.id === payload.assetId);
+        if (!asset) {
+          setError("공유 에셋 목록이 바뀌었습니다. 목록을 새로고침한 뒤 다시 시도해 주세요.");
+          return;
+        }
+        const communityAssetCredit = createStudioCommunityAssetCredit({
+          assetId: asset.id,
+          authorName: asset.author.name,
+          license: asset.license,
+          licenseLabel: asset.licenseLabel,
+          licenseUrl: asset.licenseUrl,
+          attributionText: asset.attributionText,
+          containsAi: asset.containsAi,
+        });
+        if (!communityAssetCredit) {
+          setError("사용권을 확인할 수 없는 커뮤니티 에셋은 캔버스에 추가할 수 없습니다.");
+          return;
+        }
+        const targetPageId = activePage.id;
+        const targetMasterEditMode = masterEditMode;
+        // Freeze document coordinates before network I/O so later scroll/zoom/rotation changes
+        // cannot move a drop that the user already placed.
+        const communityDropPoint = dropStagePoint();
+        const content = await loadCommunityAssetContent(asset);
+        if (!isStudioPasteScopeCurrent({
+          mutationAllowed: canApplyStudioMutation(mutationTicket),
+          reviewLocked: activeSurfaceReviewLockedRef.current,
+          targetPageId,
+          currentPageId: currentPageIdRef.current,
+          targetMasterEditMode,
+          currentMasterEditMode: masterEditModeRef.current,
+        })) return;
+        const inserted = placeAt(content.dataUrl, content.width, content.height, false, {
+          name: asset.name,
+          communityAssetCredit,
+        }, communityDropPoint);
+        if (inserted) recordCommunityAssetUse(asset.id);
+        return;
+      }
+      if (payload.source === "local") {
+        placeAt(payload.src, payload.width, payload.height);
+      }
     } catch (err) {
-      console.error("Drop asset failed:", err);
+      setError(err instanceof Error ? err.message : "공유 에셋 원본을 불러오지 못했어요.");
     }
   };
 
@@ -9817,22 +9905,81 @@ function StudioCuttoonEditor() {
     setSharedLoading(true);
     setSharedError(null);
     try {
-      const { listSharedAssets } = await import("@/src/infrastructure/creator-client");
-      setShared(await listSharedAssets({ limit: 60 }));
+      const { listSharedAssetCatalog } = await import("@/src/infrastructure/creator-client");
+      const page = await listSharedAssetCatalog({
+        limit: 20,
+        search: assetSearchQuery.trim() || undefined,
+        sort: assetSortOrder === "popular" || assetSortOrder === "name" ? assetSortOrder : "newest",
+      });
+      setShared(page.items);
+      setSharedNextOffset(page.nextOffset);
     } catch (err) {
       setSharedError(err instanceof Error ? err.message : "공유 에셋을 불러오지 못했어요.");
       setShared([]);
+      setSharedNextOffset(null);
     } finally {
       setSharedLoading(false);
     }
   };
 
+  const loadMoreSharedAssets = async () => {
+    if (sharedNextOffset === null || sharedLoadingMore) return;
+    setSharedLoadingMore(true);
+    setSharedError(null);
+    try {
+      const { listSharedAssetCatalog } = await import("@/src/infrastructure/creator-client");
+      const page = await listSharedAssetCatalog({
+        limit: 20,
+        offset: sharedNextOffset,
+        search: assetSearchQuery.trim() || undefined,
+        sort: assetSortOrder === "popular" || assetSortOrder === "name" ? assetSortOrder : "newest",
+      });
+      setShared((current) => {
+        const seen = new Set(current.map((asset) => asset.id));
+        return [...current, ...page.items.filter((asset) => !seen.has(asset.id))];
+      });
+      setSharedNextOffset(page.nextOffset);
+    } catch (err) {
+      setSharedError(err instanceof Error ? err.message : "다음 공유 에셋을 불러오지 못했어요.");
+    } finally {
+      setSharedLoadingMore(false);
+    }
+  };
+
   useEffect(() => {
-    if (menu === "asset" && assetTab === "community") loadSharedAssets();
-  }, [menu, assetTab]);
+    if (menu !== "asset" || assetTab !== "community") return;
+    const controller = new AbortController();
+    setSharedLoading(true);
+    setSharedError(null);
+    void import("@/src/infrastructure/creator-client")
+      .then(({ listSharedAssetCatalog }) => listSharedAssetCatalog({
+        limit: 20,
+        search: assetSearchQuery.trim() || undefined,
+        sort: assetSortOrder === "popular" || assetSortOrder === "name"
+          ? assetSortOrder
+          : "newest",
+      }, controller.signal))
+      .then((page) => {
+        if (controller.signal.aborted) return;
+        setShared(page.items);
+        setSharedNextOffset(page.nextOffset);
+      })
+      .catch((caughtError: unknown) => {
+        if (controller.signal.aborted) return;
+        setSharedError(caughtError instanceof Error
+          ? caughtError.message
+          : "공유 에셋을 불러오지 못했어요.");
+        setShared([]);
+        setSharedNextOffset(null);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setSharedLoading(false);
+      });
+    return () => controller.abort();
+  }, [menu, assetTab, assetSearchQuery, assetSortOrder]);
 
   // 내 로컬 에셋을 커뮤니티에 공유(로그인 필요)
-  async function onShareAsset(asset: StudioAsset) {
+  async function onShareAsset(asset: StudioAsset, options: StudioAssetShareOptions) {
     if (!studioAuthUserId) {
       setError("에셋을 공유하려면 로그인이 필요해요.");
       return;
@@ -9840,7 +9987,14 @@ function StudioCuttoonEditor() {
     setPublishingId(asset.id);
     try {
       const { publishAsset } = await import("@/src/infrastructure/creator-client");
-      await publishAsset({ name: asset.name, dataUrl: asset.dataUrl, width: asset.width, height: asset.height });
+      await publishAsset({
+        name: asset.name,
+        dataUrl: asset.dataUrl,
+        width: asset.width,
+        height: asset.height,
+        kind: "image",
+        ...options,
+      });
       setAssetTab("community");
       await loadSharedAssets();
     } catch (err) {
@@ -9850,11 +10004,43 @@ function StudioCuttoonEditor() {
     }
   }
 
-  // 커뮤니티 에셋을 캔버스에 삽입(다운로드 카운트 증가)
-  function onUseSharedAsset(asset: SharedAsset) {
-    addRenderedImage(asset.dataUrl, asset.width, asset.height);
-    void import("@/src/infrastructure/creator-client").then(({ markSharedAssetUsed }) => markSharedAssetUsed(asset.id));
-    setMenu(null);
+  // 카탈로그에는 bounded preview만 있다. 실제 삽입 의사가 생긴 뒤 권한 검사된 원본을 1회 가져온다.
+  async function onUseSharedAsset(asset: SharedAssetCatalogItem) {
+    const communityAssetCredit = createStudioCommunityAssetCredit({
+      assetId: asset.id,
+      authorName: asset.author.name,
+      license: asset.license,
+      licenseLabel: asset.licenseLabel,
+      licenseUrl: asset.licenseUrl,
+      attributionText: asset.attributionText,
+      containsAi: asset.containsAi,
+    });
+    if (!communityAssetCredit) {
+      setError("사용권을 확인할 수 없는 커뮤니티 에셋은 캔버스에 추가할 수 없습니다.");
+      return;
+    }
+    const mutationTicket = captureStudioMutationTicket();
+    const targetPageId = activePage.id;
+    const targetMasterEditMode = masterEditMode;
+    try {
+      const content = await loadCommunityAssetContent(asset);
+      if (!isStudioPasteScopeCurrent({
+        mutationAllowed: canApplyStudioMutation(mutationTicket),
+        reviewLocked: activeSurfaceReviewLockedRef.current,
+        targetPageId,
+        currentPageId: currentPageIdRef.current,
+        targetMasterEditMode,
+        currentMasterEditMode: masterEditModeRef.current,
+      })) return;
+      if (!addRenderedImage(content.dataUrl, content.width, content.height, undefined, false, {
+        name: asset.name,
+        communityAssetCredit,
+      })) return;
+      recordCommunityAssetUse(asset.id);
+      setMenu(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "공유 에셋 원본을 불러오지 못했어요.");
+    }
   }
 
   async function onDeleteSharedAsset(id: string) {
@@ -9865,6 +10051,25 @@ function StudioCuttoonEditor() {
       await loadSharedAssets();
     } catch (err) {
       setError(err instanceof Error ? err.message : "공유 에셋을 삭제하지 못했어요.");
+    }
+  }
+
+  async function onReportSharedAsset(
+    asset: SharedAssetCatalogItem,
+    reason: CreatorAssetReportReason,
+    details: string
+  ) {
+    if (!studioAuthUserId) {
+      setError("에셋을 신고하려면 로그인이 필요해요.");
+      return;
+    }
+    try {
+      const { reportSharedAsset } = await import("@/src/infrastructure/creator-client");
+      await reportSharedAsset(asset.id, { reason, details });
+      announceDrawingShortcut("신고가 접수되었습니다. 검수 결과에 따라 공개 상태가 조정됩니다.");
+      await loadSharedAssets();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "에셋을 신고하지 못했어요.");
     }
   }
 
@@ -10850,27 +11055,74 @@ function StudioCuttoonEditor() {
     }));
   }
 
-  function insertIsometricSolid() {
-    const ids = [uid(), uid(), uid()] as const;
+  async function insertIsometricPrimitive(spec: StudioIsometricPrimitiveSpec): Promise<void> {
+    const targetPageId = activePage.id;
+    try {
+      const {
+        createStudioIsometricPrimitiveElements,
+        planStudioIsometricPrimitive,
+      } = await import("./studio-isometric-solid");
+      const plan = planStudioIsometricPrimitive({
+        ...spec,
+        originX: isometricOriginX,
+        originY: isometricOriginY,
+        angleDeg: isometricAngleDeg,
+      });
+      const ids = plan.faces.map(() => uid());
+      const faces = createStudioIsometricPrimitiveElements(plan, {
+        ids,
+        baseColor: color,
+        strokeWidth: Math.max(1, Math.min(8, strokeWidth)),
+      });
+      if (
+        currentPageIdRef.current !== targetPageId
+        || masterEditModeRef.current
+        || activeSurfaceReviewLockedRef.current
+      ) {
+        setError("입체를 준비하는 동안 편집 페이지 또는 잠금 상태가 바뀌어 생성을 취소했어요.");
+        return;
+      }
+      if (pendingStrokeCommitsRef.current && !flushPendingStrokeCommitsRef.current()) {
+        setError("마지막 획을 원고에 확정하지 못해 아이소메트릭 입체를 추가하지 않았어요.");
+        return;
+      }
+      const currentHistory = pagesHistoryRef.current;
+      const currentHistoryIndex = Math.max(
+        0,
+        Math.min(pagesHiRef.current, Math.max(0, currentHistory.length - 1))
+      );
+      const currentPages = currentHistory[currentHistoryIndex] ?? pages;
+      const targetPage = currentPages.find((page) => page.id === targetPageId);
+      if (!targetPage) {
+        setError("입체를 추가할 페이지가 더 이상 존재하지 않아 생성을 취소했어요.");
+        return;
+      }
+      // Rebase only the append onto the latest ref-backed page. The geometry module is lazy, so a
+      // stroke, remote CRDT merge, or another primitive can commit while its first chunk loads.
+      if (!commit([...targetPage.elements, ...faces], undefined, targetPageId)) return;
+      setTool("select");
+      setSelectedId(ids[ids.length - 1]!);
+      setMarqueeIds(ids);
+      const label = {
+        box: "상자",
+        cylinder: "원기둥",
+        stairs: "계단",
+        wedge: "쐐기",
+      }[plan.kind];
+      announceDrawingShortcut(`편집 가능한 아이소메트릭 ${label} ${faces.length}개 면을 생성했습니다.`);
+    } catch {
+      setError("아이소메트릭 입체 도구를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.");
+    }
+  }
+
+  function insertIsometricSolid(): void {
     const unit = clampIsometricCellSize(isometricCellSize);
-    const plan = planStudioIsometricSolid({
-      originX: isometricOriginX,
-      originY: isometricOriginY,
-      angleDeg: isometricAngleDeg,
+    void insertIsometricPrimitive({
+      kind: "box",
       width: unit * 3,
       depth: unit * 3,
       height: unit * 3,
     });
-    const faces = createStudioIsometricSolidElements(plan, {
-      ids,
-      baseColor: color,
-      strokeWidth: Math.max(1, Math.min(8, strokeWidth)),
-    });
-    if (!commit([...elements, ...faces])) return;
-    setTool("select");
-    setSelectedId(ids[2]);
-    setMarqueeIds([...ids]);
-    announceDrawingShortcut("편집 가능한 아이소메트릭 상자 3개 면을 생성했습니다.");
   }
 
   // patchEl과 동일하지만 commitCoalesced를 써서 연속 호출을 undo 1스텝으로 합친다(프레임 탐색 전용).
@@ -21630,6 +21882,7 @@ function StudioCuttoonEditor() {
     fitSelectedToFrame,
     handleLayerNavigatorAction,
     invertLayerMask,
+    insertIsometricPrimitive,
     insertIsometricSolid,
     patchAdvancedRuler,
     moveVanishingPointById,
@@ -21741,6 +21994,7 @@ function StudioCuttoonEditor() {
     insertStockImage,
     onDeleteAsset,
     onDeleteSharedAsset,
+    onReportSharedAsset,
     onGenerateAiBackground,
     onGenerateAiCharacter,
     onGenerateAsset,
@@ -21768,6 +22022,7 @@ function StudioCuttoonEditor() {
     updateServerAiProvider,
     handleRenameAsset,
     loadSharedAssets,
+    loadMoreSharedAssets,
   });
 
   const studioMenubarContentHandlers = useStudioStableHandlers<StudioMenubarContentHandlers>({
@@ -22719,7 +22974,9 @@ function StudioCuttoonEditor() {
           shared={shared}
           sharedDocument={sharedDocument}
           sharedError={sharedError}
+          sharedHasMore={sharedNextOffset !== null}
           sharedLoading={sharedLoading}
+          sharedLoadingMore={sharedLoadingMore}
           studioBgSceneAssetsError={studioBgSceneAssetsError}
           studioBgSceneAssetsLoaded={studioBgSceneAssetsLoaded}
           studioBgSceneAssetsLoading={studioBgSceneAssetsLoading}

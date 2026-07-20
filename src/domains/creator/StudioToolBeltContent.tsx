@@ -115,13 +115,15 @@ import type { StudioSharedDocument } from "./studio-shared-document-client";
 import type { StudioStockPhoto } from "./studio-stock-image-client";
 import type { StudioToolbarGroupId } from "./studio-toolbar-groups";
 import type {
+  StudioAssetShareOptions,
   StudioAssetSortOrder,
   StudioAssetTab,
 } from "./StudioAssetMenuPanel";
+import type { CreatorAssetReportReason } from "@/lib/creator-asset-contract";
 import type {
   GeneratedAssetQuality,
   GeneratedAssetSize,
-  SharedAsset,
+  SharedAssetCatalogItem,
 } from "@/src/infrastructure/creator-client";
 
 import { cn } from "@/lib/utils";
@@ -242,15 +244,17 @@ export interface StudioToolBeltContentHandlers {
   insertDialogueSuggestionToSelected: (candidate: DialogueSuggestionCandidate) => void;
   insertStockImage: (photo: StudioStockPhoto, dataUrl: string, width: number, height: number) => void;
   loadSharedAssets: () => Promise<void>;
+  loadMoreSharedAssets: () => Promise<void>;
   onDeleteAsset: (id: string) => Promise<void>;
   onDeleteSharedAsset: (id: string) => Promise<void>;
+  onReportSharedAsset: (asset: SharedAssetCatalogItem, reason: CreatorAssetReportReason, details: string) => Promise<void>;
   onGenerateAiBackground: () => void;
   onGenerateAiCharacter: () => void;
   onGenerateAsset: () => Promise<void>;
   onPickImage: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
-  onShareAsset: (asset: StudioAsset) => Promise<void>;
+  onShareAsset: (asset: StudioAsset, options: StudioAssetShareOptions) => Promise<void>;
   onUploadAsset: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
-  onUseSharedAsset: (asset: SharedAsset) => void;
+  onUseSharedAsset: (asset: SharedAssetCatalogItem) => Promise<void>;
   openFeatureTutorial: (tutorialId?: string | null) => void;
   pendingTextAiProviderContext: () => import("./studio-ai-provenance-recorder").StudioAiOperationProviderContext;
   redo: () => void;
@@ -448,10 +452,12 @@ export interface StudioToolBeltContentProps {
   sfxError: string | null;
   sfxLoading: boolean;
   sfxPacks: StudioSfxPacks | null;
-  shared: SharedAsset[];
+  shared: SharedAssetCatalogItem[];
   sharedDocument: StudioSharedDocument | null;
   sharedError: string | null;
+  sharedHasMore: boolean;
   sharedLoading: boolean;
+  sharedLoadingMore: boolean;
   studioBgSceneAssetsError: string | null;
   studioBgSceneAssetsLoaded: boolean;
   studioBgSceneAssetsLoading: boolean;

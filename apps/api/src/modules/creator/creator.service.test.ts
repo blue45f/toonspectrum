@@ -35,7 +35,10 @@ const {
   restoreWorkRevision,
   updateWork,
   bumpViews,
+  bumpAssetDownloads,
   generateImageAsset,
+  getSharedAssetContent,
+  listSharedAssets,
 } = vi.hoisted(() => ({
   getWork: vi.fn(),
   getWorkRevisionComparison: vi.fn(),
@@ -44,12 +47,15 @@ const {
   restoreWorkRevision: vi.fn(),
   updateWork: vi.fn(),
   bumpViews: vi.fn(),
+  bumpAssetDownloads: vi.fn(),
   generateImageAsset: vi.fn(),
+  getSharedAssetContent: vi.fn(),
+  listSharedAssets: vi.fn(),
 }));
 
 vi.mock("../../../../../lib/server/creator", () => ({
   addComment: vi.fn(),
-  bumpAssetDownloads: vi.fn(),
+  bumpAssetDownloads,
   bumpViews,
   createSeries: vi.fn(),
   createWork: vi.fn(),
@@ -57,6 +63,7 @@ vi.mock("../../../../../lib/server/creator", () => ({
   deleteSharedAsset: vi.fn(),
   deleteWork: vi.fn(),
   generateImageAsset,
+  getSharedAssetContent,
   getChallenge: vi.fn(),
   getCreatorPublicProfile: vi.fn(),
   getSeries: vi.fn(),
@@ -66,7 +73,7 @@ vi.mock("../../../../../lib/server/creator", () => ({
   listChallenges: vi.fn(),
   listComments: vi.fn(),
   listSeries: vi.fn(),
-  listSharedAssets: vi.fn(),
+  listSharedAssets,
   listWorkRevisions,
   listWorks: vi.fn(),
   parseCreatorSort: vi.fn(() => "recent"),
@@ -108,7 +115,10 @@ describe("CreatorService safety gates", () => {
     restoreWorkRevision.mockReset();
     updateWork.mockReset();
     bumpViews.mockReset();
+    bumpAssetDownloads.mockReset();
     generateImageAsset.mockReset();
+    getSharedAssetContent.mockReset();
+    listSharedAssets.mockReset();
     collaborationRepository.getTeam.mockReset();
     collaborationRepository.listSharedWorks.mockReset();
     collaborationRepository.getSharedDocument.mockReset();
@@ -131,6 +141,52 @@ describe("CreatorService safety gates", () => {
     getWork.mockResolvedValue({ id: "work-owner", isOwner: true });
     await expect(createService().getWork("work-owner", "owner")).resolves.toMatchObject({ id: "work-owner" });
     expect(bumpViews).not.toHaveBeenCalled();
+  });
+
+  it("에셋 인기 집계는 인증 사용자·에셋 조합당 하루 한 번만 반영한다", async () => {
+    const service = createService();
+    const userId = `asset-use-user-${Date.now()}`;
+
+    await expect(service.useSharedAsset(userId, "asset-1")).resolves.toEqual({ ok: true });
+    await expect(service.useSharedAsset(userId, "asset-1")).resolves.toEqual({ ok: true });
+    await expect(service.useSharedAsset(userId, "asset-2")).resolves.toEqual({ ok: true });
+
+    expect(bumpAssetDownloads).toHaveBeenNthCalledWith(1, "asset-1");
+    expect(bumpAssetDownloads).toHaveBeenNthCalledWith(2, "asset-2");
+    expect(bumpAssetDownloads).toHaveBeenCalledTimes(2);
+  });
+
+  it("에셋 원본은 viewer 범위를 전달하고 비공개 여부를 구분하지 않는 404로 감춘다", async () => {
+    const content = { id: "asset-1", dataUrl: "data:image/png;base64,AA==", width: 1, height: 1 };
+    getSharedAssetContent.mockResolvedValueOnce(content);
+
+    await expect(createService().getSharedAssetContent("asset-1", "viewer-1"))
+      .resolves.toBe(content);
+    expect(getSharedAssetContent).toHaveBeenCalledWith("asset-1", "viewer-1", false);
+
+    getSharedAssetContent.mockResolvedValueOnce(content);
+    await expect(createService().getSharedAssetContent("asset-1", "admin-1", true))
+      .resolves.toBe(content);
+    expect(getSharedAssetContent).toHaveBeenLastCalledWith("asset-1", "admin-1", true);
+
+    getSharedAssetContent.mockRejectedValueOnce(new Error("hidden"));
+    await expect(createService().getSharedAssetContent("asset-2", "viewer-1"))
+      .rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it("레거시 full-data 목록은 요청 kind와 무관하게 VRM poser 에셋만 조회한다", async () => {
+    listSharedAssets.mockResolvedValue([]);
+    await createService().listSharedAssets({
+      limit: 30,
+      offset: 0,
+      kind: "image",
+      sort: "newest",
+    }, "viewer-1");
+
+    expect(listSharedAssets).toHaveBeenCalledWith(expect.objectContaining({
+      viewerId: "viewer-1",
+      kind: "vrm_pose",
+    }));
   });
 
   it("비소유자의 공개 작품 조회만 조회수를 올린다", async () => {

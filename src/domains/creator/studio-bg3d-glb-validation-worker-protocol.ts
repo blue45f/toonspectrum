@@ -5,7 +5,7 @@ import type {
   StudioBg3dGlbValidationResult,
 } from "./studio-bg3d-glb-validation";
 
-export const STUDIO_BG3D_GLB_VALIDATION_WORKER_PROTOCOL_VERSION = 4 as const;
+export const STUDIO_BG3D_GLB_VALIDATION_WORKER_PROTOCOL_VERSION = 6 as const;
 
 export type StudioBg3dGlbWorkerValidationOptions = Omit<
   StudioBg3dGlbValidationOptions,
@@ -176,6 +176,9 @@ function isValidationResult(value: unknown): value is StudioBg3dGlbValidationRes
     || !VERIFIED_SHA256_PATTERN.test(value.verifiedSha256)
     || !(value.verifiedBytes instanceof Uint8Array)
     || !isSafeNonNegativeInteger(value.cumulativeBytesAfter)
+    || typeof value.usesBasisTextures !== "boolean"
+    || typeof value.requiresBasisTextures !== "boolean"
+    || (value.requiresBasisTextures && !value.usesBasisTextures)
   ) {
     return false;
   }

@@ -342,6 +342,21 @@ describe("studio asset durable content identity", () => {
     expect(state.transactionModes).toEqual(["readwrite"]);
   });
 
+  it("accepts a previously verified SHA-256 so remote imports do not decode and hash the same bytes twice", async () => {
+    const state = installFakeIndexedDb();
+    const verifiedHash = `sha256:${"d".repeat(64)}` as const;
+    const saved = await saveAsset({
+      name: "verified.png",
+      dataUrl: "data:image/png;base64,AQID",
+      width: 1,
+      height: 1,
+      contentHash: verifiedHash,
+    });
+
+    expect(saved.contentHash).toBe(verifiedHash);
+    expect(state.records.get(saved.id)).toMatchObject({ contentHash: verifiedHash });
+  });
+
   it("backfills valid legacy rows without allowing an unhashable row to break the list", async () => {
     const legacyValid = createAssetRecord(
       {

@@ -188,7 +188,10 @@
   WASM을 attest하고, 참조된 모든 임의 KTX2 payload의 전체 mip를 RGBA32로 선행 transcode한다.
   공식 ETC1S/UASTC/UASTC+Zstd corpus의 portable pixel SHA와 ETC/BC/ASTC target-byte golden,
   직렬 실행·취소·dispose·file cleanup·heap estimate·Worker terminate/recovery metrics도 고정했다.
-  GPU target의 실제 rendered-pixel/context-loss conformance는 renderer specialist의 다음 게이트다.
+  viewport는 이 parsed-root 증거가 있는 GLB에서만 Three `KTX2Loader` chunk를 지연 로드하고 활성
+  WebGLRenderer로 target 지원을 감지한다. window realm도 같은 pinned asset을 독립 attest하며 embedded
+  blob source만 허용하고 parse 직후 최대 2개 decoder Worker를 dispose한다. GPU target의 실제
+  rendered-pixel/context-loss conformance는 renderer specialist의 다음 게이트다.
   세부 경계는 `studio-ktx2-transcoder-release-gate-2026-07-19.md`에 기록했다. Draco도 동일한
   validator-first 원칙으로 별도 진행한다.
 - LOD/instance: geometry 공유, 정적 root matrix 고정, 안전한 반복 model instancing과 engine-neutral

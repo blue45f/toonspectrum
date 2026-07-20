@@ -179,6 +179,9 @@ R3F는 공식 [Canvas WebGPU 예제](https://r3f.docs.pmnd.rs/api/canvas#webgpu)
 device loss는 별개다. 실행 중 손실은 [Renderer `onDeviceLost`](https://threejs.org/docs/pages/Renderer.html#onDeviceLost)를
 통해 Canvas subtree를 새 key로 재생성하고, 반복 손실 때 `forceWebGL`로 복구해야 한다.
 
-다음 구현 순서는 WebGL output render target 컬러 readback과 `preserveDrawingBuffer` 제거, feature flag
-아래 WebGPU renderer factory, TSL depth pass, device-loss remount, WebGL/WebGPU
-golden pixel 비교다.
+WebGL output render target 컬러 readback과 `preserveDrawingBuffer` 제거는 배경 캡처와 VRM 포저에
+모두 반영됐다. 배경 batch는 `readRenderTargetPixelsAsync()`, VRM 단일 컷은 작은 동기 GPU readback
+뒤 기존 OffscreenCanvas PNG Worker를 공유하며, 압축·data URL 직렬화 대기 동안 캡처 보조물 lease를
+유지하지 않는다. 다음 구현 순서는 feature flag 아래 WebGPU renderer factory, TSL depth pass,
+device-loss remount, WebGL/WebGPU golden pixel 비교와 저사양 실기기의 readback/방어 복사 peak
+working-set 측정이다.

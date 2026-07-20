@@ -5,17 +5,29 @@ import {
   shouldLoadSharedPoseLibrary,
 } from "./studio-vrm-shared-pose-library";
 
-import type { SharedAsset } from "../../infrastructure/creator-client";
+import type { SharedAssetCatalogItem } from "../../infrastructure/creator-client";
 
-function asset(overrides: Partial<SharedAsset>): SharedAsset {
+function asset(overrides: Partial<SharedAssetCatalogItem>): SharedAssetCatalogItem {
   return {
     id: "asset-1",
     name: "asset",
-    dataUrl: "data:application/json,{}",
+    previewDataUrl: "data:image/png;base64,AA==",
+    previewWidth: 1,
+    previewHeight: 1,
+    previewAvailable: true,
     width: 1,
     height: 1,
-    kind: "image",
+    license: "toonspectrum-standard",
+    licenseLabel: "toonspectrum",
+    licenseUrl: null,
+    attributionRequired: false,
+    commercialUse: true,
+    attributionText: "",
+    containsAi: false,
+    moderationStatus: "published",
+    reportCount: 0,
     downloads: 0,
+    kind: "image",
     author: { id: "author-1", name: "Author", avatar: "" },
     isOwner: false,
     createdAt: "2026-07-20T00:00:00.000Z",

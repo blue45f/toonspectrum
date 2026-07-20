@@ -385,6 +385,19 @@ useEffect(() => {
 - **멀티파일 glTF와 OBJ/MTL은 지원한다.** 업로드 UI에서 기본 모델과 BIN·MTL·PNG·JPEG·WebP
   연결 파일을 함께 선택하면, 안전한 로컬 상대 경로만 해석하고 외부 네트워크 참조는 거부한 뒤
   canonical self-contained GLB로 변환·검증해 라이브러리에 저장한다.
+- **공개 포맷도 검증 GLB 경계를 우회하지 않는다.** 변환 원본은 파일당 32MiB, 인라인 `data:`는
+  개별 8MiB·합계 32MiB로 제한하고, OBJ/glTF는 파싱 전에 노드·메시·정점·삼각형 선언을 검사한다.
+  모든 변환 포맷은 파싱 직후 다시 노드 2,048개, 메시 1,024개, 유효 정점 400만 개, 삼각형
+  200만 개, 디코딩 지오메트리 256MiB 상한을 통과해야 GLB exporter가 실행된다. `..` 경로,
+  외부 URL, 선택하지 않은 MTL/BIN/텍스처와 과대 인라인 이미지 치수는 fail-closed다.
+- **JSON glTF의 임의 디코더 경계는 의도적으로 좁다.** 선택한 BIN/PNG/JPEG/WebP와 제한된
+  `data:` URI는 지원하지만 bufferView 이미지와 Draco/Basis/Meshopt 압축 JSON은 파서 전에
+  거부한다. 그런 모델은 제작 도구에서 자체 포함 GLB로 다시 내보내면 기존 Worker 검증 경로에서
+  Meshopt/KTX2 지원 여부와 디코딩 후 메모리까지 검사할 수 있다.
+- **Clip Studio 전용 `.cs3c/.cs3o/.cs3s`와 `.clip`은 직접 파싱하지 않는다.** 공개된 호환
+  명세가 없는 전용 컨테이너를 추측해 읽지 않고, Clip Studio나 원 제작 도구에서 GLB/glTF/OBJ로
+  내보낸 결과를 가져오는 것을 호환 경계로 삼는다. FBX/DAE/STL/PLY/3DS 변환은 생성형 회귀
+  fixture로 검사하지만, 공급자별 확장이 많은 외부 파일 전체에 대한 완전 호환을 보증하지 않는다.
 - **번들 샘플 모델 없음** — `SAMPLE_BG3D_MODELS`가 빈 배열인 이유는 이미 복합 오브젝트
   프리셋(`studio-background-3d-composites.ts`, 건물/자연/차량/소품 카테고리)이 "미리 준비된
   배경 소재"라는 같은 역할을 코드로(라이선스 리스크 없이) 채우고 있기 때문. 라이선스 검증된

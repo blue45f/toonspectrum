@@ -29,8 +29,12 @@ import type { VRMHumanBoneName } from "@pixiv/three-vrm";
 
 const VECTOR_EPSILON = 1e-12;
 const ROTATION_EPSILON = 1e-9;
+const MATRIX_DETERMINANT_EPSILON = 1e-12;
 const MIN_FLOOR_HEIGHT = -10;
 const MAX_FLOOR_HEIGHT = 10;
+
+/** Bounds ancestor walks performed synchronously during pointer-driven IK previews. */
+export const STUDIO_VRM_IK_MAX_CHAIN_NODES = 128;
 
 export type StudioVrmUserIkEffector =
   | "leftHand"
@@ -107,6 +111,8 @@ export interface StudioVrmUserIkRequest {
   readonly footPlant?: boolean;
   /** Horizontal contact plane in Three world coordinates. */
   readonly floorHeight?: number;
+  /** Trusted drag-start bake reused across coalesced previews to avoid rebaking every VRM bone. */
+  readonly bakedPose?: StudioVrmBakedRuntimePose;
 }
 
 export interface StudioVrmUserIkDependencies {
@@ -206,21 +212,124 @@ function readWorldPosition(node: THREE.Object3D): THREE.Vector3 | null {
   return isFiniteVector(value) ? value : null;
 }
 
-function readWorldQuaternion(node: THREE.Object3D | null): THREE.Quaternion | null {
-  if (!node) return new THREE.Quaternion();
-  const value = node.getWorldQuaternion(new THREE.Quaternion());
-  if (!isFiniteQuaternion(value)) return null;
-  value.normalize();
-  return value;
-}
-
 function isDescendantOf(node: THREE.Object3D, ancestor: THREE.Object3D): boolean {
   let cursor: THREE.Object3D | null = node.parent;
-  while (cursor) {
+  let visited = 0;
+  while (cursor && visited < STUDIO_VRM_IK_MAX_CHAIN_NODES) {
     if (cursor === ancestor) return true;
     cursor = cursor.parent;
+    visited += 1;
   }
   return false;
+}
+
+/** Rejects detached or pathologically deep imported hierarchies before Three walks their parents. */
+export function isStudioVrmIkNodeWithinScene(
+  scene: THREE.Object3D,
+  node: THREE.Object3D | null,
+): node is THREE.Object3D {
+  return Boolean(node) && node !== scene && isDescendantOf(node!, scene);
+}
+
+function isFiniteMatrix(value: THREE.Matrix4): boolean {
+  return value.elements.every(Number.isFinite);
+}
+
+function invertMatrix(value: THREE.Matrix4): THREE.Matrix4 | null {
+  const determinant = value.determinant();
+  if (!Number.isFinite(determinant) || Math.abs(determinant) <= MATRIX_DETERMINANT_EPSILON) {
+    return null;
+  }
+  const inverse = value.clone().invert();
+  return isFiniteMatrix(inverse) ? inverse : null;
+}
+
+function transformPoint(matrix: THREE.Matrix4, value: THREE.Vector3): THREE.Vector3 | null {
+  const transformed = value.clone().applyMatrix4(matrix);
+  return isFiniteVector(transformed) ? transformed : null;
+}
+
+function transformDirection(matrix: THREE.Matrix4, value: THREE.Vector3): THREE.Vector3 | null {
+  const origin = new THREE.Vector3().applyMatrix4(matrix);
+  const endpoint = value.clone().applyMatrix4(matrix);
+  return normalizedDirection(origin, endpoint);
+}
+
+function readSceneSpaceQuaternion(
+  scene: THREE.Object3D,
+  sceneWorldInverse: THREE.Matrix4,
+  node: THREE.Object3D | null,
+): THREE.Quaternion | null {
+  if (!node || node === scene) return new THREE.Quaternion();
+  if (!isDescendantOf(node, scene)) return null;
+  const relative = sceneWorldInverse.clone().multiply(node.matrixWorld);
+  if (!isFiniteMatrix(relative)) return null;
+  const position = new THREE.Vector3();
+  const quaternion = new THREE.Quaternion();
+  const scale = new THREE.Vector3();
+  relative.decompose(position, quaternion, scale);
+  return isFiniteVector(position) && isFiniteVector(scale) && isFiniteQuaternion(quaternion)
+    ? quaternion.normalize()
+    : null;
+}
+
+function composeLocalMatrix(
+  node: THREE.Object3D,
+  rotation?: StudioVrmJointRotation,
+): THREE.Matrix4 | null {
+  if (
+    !isFiniteVector(node.position)
+    || !isFiniteVector(node.scale)
+    || !isFiniteQuaternion(node.quaternion)
+  ) return null;
+  const quaternion = rotation
+    ? new THREE.Quaternion().setFromEuler(new THREE.Euler(...rotation, "XYZ"))
+    : node.quaternion.clone();
+  if (!isFiniteQuaternion(quaternion)) return null;
+  const matrix = new THREE.Matrix4().compose(node.position, quaternion.normalize(), node.scale);
+  return isFiniteMatrix(matrix) ? matrix : null;
+}
+
+function composeSceneWorldMatrix(scene: THREE.Object3D, yOffset: number): THREE.Matrix4 | null {
+  if (
+    !Number.isFinite(yOffset)
+    || !isFiniteVector(scene.position)
+    || !isFiniteVector(scene.scale)
+    || !isFiniteQuaternion(scene.quaternion)
+  ) return null;
+  const position = scene.position.clone();
+  position.y = yOffset;
+  const local = new THREE.Matrix4().compose(position, scene.quaternion, scene.scale);
+  const world = scene.parent
+    ? scene.parent.matrixWorld.clone().multiply(local)
+    : local;
+  return isFiniteMatrix(world) ? world : null;
+}
+
+function virtualNodeWorldPosition(
+  scene: THREE.Object3D,
+  node: THREE.Object3D,
+  rotations: ReadonlyMap<THREE.Object3D, StudioVrmJointRotation>,
+  yOffset: number,
+): THREE.Vector3 | null {
+  const path: THREE.Object3D[] = [];
+  let cursor: THREE.Object3D | null = node;
+  while (cursor && cursor !== scene) {
+    path.push(cursor);
+    cursor = cursor.parent;
+  }
+  if (cursor !== scene) return null;
+  const world = composeSceneWorldMatrix(scene, yOffset);
+  if (!world) return null;
+  for (let index = path.length - 1; index >= 0; index -= 1) {
+    const entry = path[index];
+    if (!entry) return null;
+    const local = composeLocalMatrix(entry, rotations.get(entry));
+    if (!local) return null;
+    world.multiply(local);
+  }
+  const position = new THREE.Vector3().setFromMatrixPosition(world);
+  return isFiniteVector(position) ? position : null;
 }
 
 function resolveChain(
@@ -233,17 +342,19 @@ function resolveChain(
   const lower = lookup(chain.lower);
   const end = lookup(chain.end);
   if (!upper || !lower || !end || (chain.proximal && !proximal)) return null;
+  if (!isStudioVrmIkNodeWithinScene(source.scene, end)) return null;
+  if (proximal && !isStudioVrmIkNodeWithinScene(source.scene, proximal)) return null;
   if (!isDescendantOf(lower, upper) || !isDescendantOf(end, lower)) return null;
   if (proximal && !isDescendantOf(upper, proximal)) return null;
   return { proximal, upper, lower, end };
 }
 
 function desiredLocalRotation(
-  desiredWorld: THREE.Quaternion,
-  desiredParentWorld: THREE.Quaternion,
+  desiredSpace: THREE.Quaternion,
+  desiredParentSpace: THREE.Quaternion,
 ): THREE.Quaternion | null {
-  if (!isFiniteQuaternion(desiredWorld) || !isFiniteQuaternion(desiredParentWorld)) return null;
-  const local = desiredParentWorld.clone().invert().multiply(desiredWorld).normalize();
+  if (!isFiniteQuaternion(desiredSpace) || !isFiniteQuaternion(desiredParentSpace)) return null;
+  const local = desiredParentSpace.clone().invert().multiply(desiredSpace).normalize();
   return isFiniteQuaternion(local) ? local : null;
 }
 
@@ -377,86 +488,129 @@ export function solveStudioVrmUserIk(
   ) return null;
 
   try {
-    // This refreshes Three's derived matrix cache only; authored transforms remain untouched.
-    source.scene.updateMatrixWorld(true);
+    // Solve before the avatar root's non-uniform body scale. A world-space quaternion solve is not
+    // equivalent to rotating a local bone and then applying anisotropic (width/height) scale.
     const resolved = resolveChain(source, chain);
     if (!resolved) return null;
+    // Updating the end node with parents refreshes exactly this bounded semantic chain instead of
+    // recursively visiting meshes, accessories, and every unrelated avatar descendant.
+    resolved.end.updateWorldMatrix(true, false);
+    const sceneWorldInverse = invertMatrix(source.scene.matrixWorld);
+    if (!sceneWorldInverse) return null;
 
-    const baked = dependencies.bakeRuntimePose(source);
-    if (!baked || !Number.isFinite(baked.yOffset)) return null;
+    const baked = request.bakedPose === undefined
+      ? dependencies.bakeRuntimePose(source)
+      : request.bakedPose;
+    if (
+      !baked
+      || !Number.isFinite(baked.yOffset)
+      || !baked.bones
+      || typeof baked.bones !== "object"
+      || Array.isArray(baked.bones)
+    ) return null;
 
-    const start = readWorldPosition(resolved.upper);
-    const middle = readWorldPosition(resolved.lower);
-    const end = readWorldPosition(resolved.end);
+    const startWorld = readWorldPosition(resolved.upper);
+    const middleWorld = readWorldPosition(resolved.lower);
+    const endWorld = readWorldPosition(resolved.end);
+    if (!startWorld || !middleWorld || !endWorld) return null;
+    const start = transformPoint(sceneWorldInverse, startWorld);
+    const middle = transformPoint(sceneWorldInverse, middleWorld);
+    const end = transformPoint(sceneWorldInverse, endWorld);
     if (!start || !middle || !end) return null;
 
     const requestedTarget = request.targetWorld.clone();
-    let target = requestedTarget.clone();
+    let preparedTargetWorld = requestedTarget.clone();
     let resultYOffset = baked.yOffset;
     let floorContact: StudioVrmUserIkFloorContact | undefined;
     if (chain.kind === "foot" && request.footPlant === true) {
       const prepared = prepareFloorContact(
         source,
         request,
-        end,
+        endWorld,
         baked.yOffset,
         profile,
         dependencies.solveFloorContact ?? solveStudioVrmFloorContact,
       );
       if (!prepared) return null;
-      target = prepared.target;
+      preparedTargetWorld = prepared.target;
       resultYOffset = prepared.yOffset;
       floorContact = prepared.result;
     }
-    const pole = request.poleWorld?.clone();
-    const solution = dependencies.solveTarget(start, middle, end, target, pole);
+    const target = transformPoint(sceneWorldInverse, preparedTargetWorld);
+    const pole = request.poleWorld
+      ? transformPoint(sceneWorldInverse, request.poleWorld)
+      : undefined;
+    if (!target || (request.poleWorld && !pole)) return null;
+    const solution = dependencies.solveTarget(start, middle, end, target, pole ?? undefined);
     if (!solution) return null;
 
     const currentUpperDirection = normalizedDirection(start, middle);
     const desiredUpperDirection = normalizedDirection(start, solution.elbow);
-    const currentUpperWorld = readWorldQuaternion(resolved.upper);
-    const currentUpperParentWorld = readWorldQuaternion(resolved.upper.parent);
+    const currentUpperSpace = readSceneSpaceQuaternion(
+      source.scene,
+      sceneWorldInverse,
+      resolved.upper,
+    );
+    const currentUpperParentSpace = readSceneSpaceQuaternion(
+      source.scene,
+      sceneWorldInverse,
+      resolved.upper.parent,
+    );
     if (
       !currentUpperDirection
       || !desiredUpperDirection
-      || !currentUpperWorld
-      || !currentUpperParentWorld
+      || !currentUpperSpace
+      || !currentUpperParentSpace
     ) return null;
 
-    const upperWorldDelta = new THREE.Quaternion().setFromUnitVectors(
+    const upperSpaceDelta = new THREE.Quaternion().setFromUnitVectors(
       currentUpperDirection,
       desiredUpperDirection,
     );
-    if (!isFiniteQuaternion(upperWorldDelta)) return null;
-    const desiredUpperWorld = upperWorldDelta.clone().multiply(currentUpperWorld).normalize();
-    const desiredUpperLocal = desiredLocalRotation(desiredUpperWorld, currentUpperParentWorld);
+    if (!isFiniteQuaternion(upperSpaceDelta)) return null;
+    const desiredUpperSpace = upperSpaceDelta.clone().multiply(currentUpperSpace).normalize();
+    const desiredUpperLocal = desiredLocalRotation(
+      desiredUpperSpace,
+      currentUpperParentSpace,
+    );
     if (!desiredUpperLocal) return null;
 
     // Rotating the upper joint rigidly moves the lower segment before its own solve.
-    const movedEnd = end.clone().sub(middle).applyQuaternion(upperWorldDelta).add(solution.elbow);
+    const movedEnd = end.clone().sub(middle).applyQuaternion(upperSpaceDelta).add(solution.elbow);
     const movedLowerDirection = normalizedDirection(solution.elbow, movedEnd);
     const desiredLowerDirection = normalizedDirection(solution.elbow, solution.end);
-    const currentLowerWorld = readWorldQuaternion(resolved.lower);
-    const currentLowerParentWorld = readWorldQuaternion(resolved.lower.parent);
+    const currentLowerSpace = readSceneSpaceQuaternion(
+      source.scene,
+      sceneWorldInverse,
+      resolved.lower,
+    );
+    const currentLowerParentSpace = readSceneSpaceQuaternion(
+      source.scene,
+      sceneWorldInverse,
+      resolved.lower.parent,
+    );
     if (
       !movedLowerDirection
       || !desiredLowerDirection
-      || !currentLowerWorld
-      || !currentLowerParentWorld
+      || !currentLowerSpace
+      || !currentLowerParentSpace
     ) return null;
 
-    const lowerWorldDelta = new THREE.Quaternion().setFromUnitVectors(
+    const lowerSpaceDelta = new THREE.Quaternion().setFromUnitVectors(
       movedLowerDirection,
       desiredLowerDirection,
     );
-    if (!isFiniteQuaternion(lowerWorldDelta)) return null;
-    const movedLowerWorld = upperWorldDelta.clone().multiply(currentLowerWorld).normalize();
-    const desiredLowerWorld = lowerWorldDelta.clone().multiply(movedLowerWorld).normalize();
-    const desiredLowerParentWorld = upperWorldDelta
+    if (!isFiniteQuaternion(lowerSpaceDelta)) return null;
+    const movedLowerSpace = upperSpaceDelta.clone().multiply(currentLowerSpace).normalize();
+    const desiredLowerSpace = lowerSpaceDelta.clone().multiply(movedLowerSpace).normalize();
+    const desiredLowerParentSpace = upperSpaceDelta
       .clone()
-      .multiply(currentLowerParentWorld)
+      .multiply(currentLowerParentSpace)
       .normalize();
-    const desiredLowerLocal = desiredLocalRotation(desiredLowerWorld, desiredLowerParentWorld);
+    const desiredLowerLocal = desiredLocalRotation(
+      desiredLowerSpace,
+      desiredLowerParentSpace,
+    );
     if (!desiredLowerLocal) return null;
 
     const rawUpper = rotationFromQuaternion(desiredUpperLocal);
@@ -479,12 +633,29 @@ export function solveStudioVrmUserIk(
       [chain.upper]: { rotation: [...upperRotation] as Vec3 },
       [chain.lower]: { rotation: [...lowerRotation] as Vec3 },
     };
-    const effectiveTargetWorld = floorContact
-      ? solution.effectiveTarget.clone().add(new THREE.Vector3(...floorContact.hipsTranslation))
-      : solution.effectiveTarget;
-    const solvedMiddleWorld = floorContact
-      ? solution.elbow.clone().add(new THREE.Vector3(...floorContact.hipsTranslation))
-      : solution.elbow;
+    // Damping and hard limits alter the analytic rotations. Report the positions produced by the
+    // exact persisted Euler rotations instead of the pre-limit analytic target/elbow.
+    const virtualRotations = new Map<THREE.Object3D, StudioVrmJointRotation>([
+      [resolved.upper, upperRotation],
+      [resolved.lower, lowerRotation],
+    ]);
+    const effectiveTargetWorld = virtualNodeWorldPosition(
+      source.scene,
+      resolved.end,
+      virtualRotations,
+      resultYOffset,
+    );
+    const solvedMiddleWorld = virtualNodeWorldPosition(
+      source.scene,
+      resolved.lower,
+      virtualRotations,
+      resultYOffset,
+    );
+    const poleDirectionWorld = transformDirection(
+      source.scene.matrixWorld,
+      solution.poleDirection,
+    );
+    if (!effectiveTargetWorld || !solvedMiddleWorld || !poleDirectionWorld) return null;
     const baseResult = {
       effector: request.effector,
       chain,
@@ -493,7 +664,7 @@ export function solveStudioVrmUserIk(
       requestedTargetWorld: tuple(requestedTarget),
       effectiveTargetWorld: tuple(effectiveTargetWorld),
       solvedMiddleWorld: tuple(solvedMiddleWorld),
-      poleDirectionWorld: tuple(solution.poleDirection),
+      poleDirectionWorld: tuple(poleDirectionWorld),
       reachable: solution.reachable,
       clamped: solution.clamped || floorContact?.contactClamped === true,
       limited: rotationsDiffer(rawUpper, upperRotation) || rotationsDiffer(rawLower, lowerRotation),

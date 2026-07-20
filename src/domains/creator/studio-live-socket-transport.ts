@@ -43,6 +43,7 @@ import { resolveStudioLiveSocketEndpoint } from "./studio-live-socket-endpoint";
 import {
   isRecord,
   nullableString,
+  parseActiveScreenShare,
   parseFailure,
   parseJoinAck,
   parseLock,
@@ -53,6 +54,7 @@ import {
   safeSdpString,
   safeString,
   type ServerFailure,
+  type ServerActiveScreenShare,
   type ServerJoinSnapshot,
   type ServerLock,
   type ServerParticipant,
@@ -78,6 +80,7 @@ const VOICE_JOIN_ACK_TIMEOUT_MS = 10_000;
 const MAX_TOKEN_LENGTH = 8_192;
 const MAX_SEEN_CRDT_UPDATE_IDS = 4_096;
 const MAX_PENDING_PRESENCE_CONNECTIONS = 2_048;
+const MAX_PENDING_SCREEN_CONNECTIONS = 256;
 const MAX_PENDING_VOICE_CONNECTIONS = 256;
 const MAX_PENDING_VOICE_SIGNALS = 256;
 const MAX_ABANDONED_LOCK_ACQUISITIONS = 512;
@@ -90,6 +93,10 @@ type PendingPresenceDelta =
 type PendingVoiceDelta =
   | { kind: "update"; member: ServerVoiceMember }
   | { kind: "leave"; connectionId: string; callId: string };
+
+type PendingScreenDelta =
+  | { kind: "update"; share: ServerActiveScreenShare }
+  | { kind: "stop"; connectionId: string; shareId: string };
 
 interface PendingVoiceSignal {
   targetConnectionId: string;
@@ -215,6 +222,28 @@ function isNonRecoverable(code: string): boolean {
   return code === "unauthenticated" || code === "forbidden";
 }
 
+function parseScreenAnnouncement(value: unknown): ServerActiveScreenShare | null {
+  if (!isRecord(value)) return null;
+  return parseActiveScreenShare({
+    connectionId: value.fromConnectionId,
+    shareId: value.shareId,
+    label: value.label,
+  });
+}
+
+function parseScreenStop(
+  value: unknown
+): { connectionId: string; shareId: string } | null {
+  if (
+    !isRecord(value) ||
+    !safeIdentifier(value.fromConnectionId, 128) ||
+    !safeIdentifier(value.shareId, 160)
+  ) {
+    return null;
+  }
+  return { connectionId: value.fromConnectionId, shareId: value.shareId };
+}
+
 /**
  * Authenticated Socket.IO adapter. The session token exists only in the in-memory Socket.IO auth
  * handshake object and is never copied into protocol envelopes, payload logs or browser storage.
@@ -248,10 +277,15 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
   private readonly abandonedLockRequestIdsByResource = new Map<string, Set<string>>();
   private readonly participants = new Map<string, ServerParticipant>();
   private readonly sequenceByConnection = new Map<string, number>();
+  private readonly activeScreenShareByConnection = new Map<
+    string,
+    ServerActiveScreenShare
+  >();
   private readonly shareIdByConnection = new Map<string, string>();
   private readonly voiceMemberByConnection = new Map<string, ServerVoiceMember>();
   private readonly locksByResource = new Map<string, ServerLock>();
   private readonly pendingPresenceByConnection = new Map<string, PendingPresenceDelta>();
+  private readonly pendingScreenByConnection = new Map<string, PendingScreenDelta>();
   private readonly pendingVoiceByConnection = new Map<string, PendingVoiceDelta>();
   private sessionToken: string | null;
   private selfConnectionId: string | null = null;
@@ -1077,11 +1111,13 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.seenCrdtUpdateIds.clear();
     this.participants.clear();
     this.sequenceByConnection.clear();
+    this.activeScreenShareByConnection.clear();
     this.shareIdByConnection.clear();
     this.voiceMemberByConnection.clear();
     this.locksByResource.clear();
     this.pendingInitialSnapshot = null;
     this.pendingPresenceByConnection.clear();
+    this.pendingScreenByConnection.clear();
     this.pendingVoiceByConnection.clear();
     this.selfConnectionId = null;
   }
@@ -1113,6 +1149,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.joined = false;
     this.pendingInitialSnapshot = null;
     this.pendingPresenceByConnection.clear();
+    this.pendingScreenByConnection.clear();
     this.pendingVoiceByConnection.clear();
     this.clearConnectTimeout();
     this.rejectConnect?.(new Error(message));
@@ -1147,6 +1184,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.joined = false;
     this.selfConnectionId = null;
     this.pendingPresenceByConnection.clear();
+    this.pendingScreenByConnection.clear();
     this.pendingVoiceByConnection.clear();
     this.voiceMemberByConnection.clear();
     this.rejectPendingCrdtOperations(createStudioCrdtRetryableError(
@@ -1182,6 +1220,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.joined = false;
     this.pendingInitialSnapshot = null;
     this.pendingPresenceByConnection.clear();
+    this.pendingScreenByConnection.clear();
     this.pendingVoiceByConnection.clear();
     this.clearConnectTimeout();
     this.rejectConnect?.(new Error(message));
@@ -1245,6 +1284,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     const voice = this.voiceMemberByConnection.get(connectionId);
     const pendingVoice = this.pendingVoiceByConnection.get(connectionId);
     this.participants.delete(connectionId);
+    this.activeScreenShareByConnection.delete(connectionId);
     this.shareIdByConnection.delete(connectionId);
     this.voiceMemberByConnection.delete(connectionId);
     this.pendingVoiceByConnection.delete(connectionId);
@@ -1289,6 +1329,30 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     if (this.pendingPresenceByConnection.size <= MAX_PENDING_PRESENCE_CONNECTIONS) return;
     const oldest = this.pendingPresenceByConnection.keys().next().value;
     if (typeof oldest === "string") this.pendingPresenceByConnection.delete(oldest);
+  }
+
+  private bufferScreenDelta(delta: PendingScreenDelta): void {
+    if (this.closed || this.accessRevoked || !this.socket.connected || this.joinGeneration <= 0) {
+      return;
+    }
+    const connectionId = delta.kind === "update"
+      ? delta.share.connectionId
+      : delta.connectionId;
+    const previous = this.pendingScreenByConnection.get(connectionId);
+    // A delayed stop for an older lifecycle cannot tombstone a newer announcement from the same
+    // host while the join ACK is in flight.
+    if (
+      delta.kind === "stop" &&
+      previous?.kind === "update" &&
+      previous.share.shareId !== delta.shareId
+    ) {
+      return;
+    }
+    this.pendingScreenByConnection.delete(connectionId);
+    this.pendingScreenByConnection.set(connectionId, delta);
+    if (this.pendingScreenByConnection.size <= MAX_PENDING_SCREEN_CONNECTIONS) return;
+    const oldest = this.pendingScreenByConnection.keys().next().value;
+    if (typeof oldest === "string") this.pendingScreenByConnection.delete(oldest);
   }
 
   private bufferVoiceDelta(delta: PendingVoiceDelta): void {
@@ -1339,6 +1403,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
   private stagePresenceDelta(delta: PendingPresenceDelta): void {
     if (delta.kind === "leave") {
       this.participants.delete(delta.connectionId);
+      this.activeScreenShareByConnection.delete(delta.connectionId);
       this.shareIdByConnection.delete(delta.connectionId);
       return;
     }
@@ -1492,13 +1557,19 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
   };
 
   private readonly onScreenAnnounce = (value: unknown) => {
-    if (!this.ready) return;
-    const relay = this.screenRelay(value, true);
-    if (!relay) return;
-    this.shareIdByConnection.set(relay.participant.connectionId, relay.shareId);
-    this.deliver(relay.participant, "screen:announce", {
-      shareId: relay.shareId,
-      label: relay.label,
+    const share = parseScreenAnnouncement(value);
+    if (!share) return;
+    if (!this.ready || this.pendingInitialSnapshot) {
+      this.bufferScreenDelta({ kind: "update", share });
+      return;
+    }
+    const participant = this.remoteParticipant(share.connectionId);
+    if (!participant) return;
+    this.activeScreenShareByConnection.set(share.connectionId, share);
+    this.shareIdByConnection.set(share.connectionId, share.shareId);
+    this.deliver(participant, "screen:announce", {
+      shareId: share.shareId,
+      label: share.label,
     });
   };
 
@@ -1532,12 +1603,22 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
   };
 
   private readonly onScreenStop = (value: unknown) => {
-    if (!this.ready) return;
-    const relay = this.screenRelay(value, false);
-    if (!relay) return;
-    this.deliver(relay.participant, "screen:stop", { shareId: relay.shareId });
-    if (this.shareIdByConnection.get(relay.participant.connectionId) === relay.shareId) {
-      this.shareIdByConnection.delete(relay.participant.connectionId);
+    const stopped = parseScreenStop(value);
+    if (!stopped) return;
+    if (!this.ready || this.pendingInitialSnapshot) {
+      this.bufferScreenDelta({ kind: "stop", ...stopped });
+      return;
+    }
+    const participant = this.remoteParticipant(stopped.connectionId);
+    if (!participant) return;
+    const active = this.activeScreenShareByConnection.get(stopped.connectionId);
+    if (active && active.shareId !== stopped.shareId) return;
+    this.deliver(participant, "screen:stop", { shareId: stopped.shareId });
+    if (active?.shareId === stopped.shareId) {
+      this.activeScreenShareByConnection.delete(stopped.connectionId);
+    }
+    if (this.shareIdByConnection.get(stopped.connectionId) === stopped.shareId) {
+      this.shareIdByConnection.delete(stopped.connectionId);
     }
   };
 
@@ -1950,6 +2031,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     const generation = ++this.joinGeneration;
     this.joined = false;
     this.pendingPresenceByConnection.clear();
+    this.pendingScreenByConnection.clear();
     this.pendingVoiceByConnection.clear();
     this.emitStatus({
       state: "connecting",
@@ -2026,22 +2108,43 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       }
       voiceMembersByConnection.set(delta.member.connectionId, delta.member);
     }
+    const screenSharesByConnection = new Map(
+      snapshot.screenShares.map((share) => [share.connectionId, share])
+    );
+    for (const delta of this.pendingScreenByConnection.values()) {
+      if (delta.kind === "stop") {
+        const current = screenSharesByConnection.get(delta.connectionId);
+        if (current?.shareId === delta.shareId) {
+          screenSharesByConnection.delete(delta.connectionId);
+        }
+        continue;
+      }
+      screenSharesByConnection.set(delta.share.connectionId, delta.share);
+    }
     for (const connectionId of departedConnectionIds) {
       voiceMembersByConnection.delete(connectionId);
+      screenSharesByConnection.delete(connectionId);
     }
     participantsByConnection.set(snapshot.self.connectionId, snapshot.self);
+    for (const [connectionId] of screenSharesByConnection) {
+      const participant = participantsByConnection.get(connectionId);
+      if (!participant?.sharingScreen) screenSharesByConnection.delete(connectionId);
+    }
     this.pendingPresenceByConnection.clear();
+    this.pendingScreenByConnection.clear();
     this.pendingVoiceByConnection.clear();
     return {
       ...snapshot,
       participants: [...participantsByConnection.values()],
       voiceMembers: [...voiceMembersByConnection.values()],
+      screenShares: [...screenSharesByConnection.values()],
     };
   }
 
   private failJoin(message: string, recoverable: boolean, code?: string): void {
     this.joined = false;
     this.pendingPresenceByConnection.clear();
+    this.pendingScreenByConnection.clear();
     this.pendingVoiceByConnection.clear();
     const state: StudioLiveTransportStatus["state"] = recoverable ? "error" : "revoked";
     this.emitStatus({ state, message, recoverable } as StudioLiveTransportStatus);
@@ -2082,6 +2185,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       this.joined = false;
       this.pendingInitialSnapshot = null;
       this.pendingPresenceByConnection.clear();
+      this.pendingScreenByConnection.clear();
       this.pendingVoiceByConnection.clear();
       this.scrubCredentials();
       this.socket.disconnect();
@@ -2106,6 +2210,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.pendingInitialSnapshot = null;
     const reconciled = this.reconcilePendingPresence(snapshot);
     this.applyParticipants(reconciled.participants);
+    this.applyScreenShareSnapshot(reconciled.screenShares);
     this.applyLockSnapshot(reconciled.locks);
     this.applyVoiceSnapshot(reconciled.voiceMembers);
   }
@@ -2117,6 +2222,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       const voice = this.voiceMemberByConnection.get(previous.connectionId);
       if (voice) this.deliver(previous, "voice:leave", { callId: voice.callId });
       this.deliver(previous, "presence:leave", {});
+      this.activeScreenShareByConnection.delete(previous.connectionId);
       this.shareIdByConnection.delete(previous.connectionId);
       this.voiceMemberByConnection.delete(previous.connectionId);
       this.pendingVoiceByConnection.delete(previous.connectionId);
@@ -2130,6 +2236,47 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
         pageId: participant.pageId,
       });
       this.replayPendingVoiceForParticipant(participant);
+    }
+  }
+
+  private applyScreenShareSnapshot(screenShares: ServerActiveScreenShare[]): void {
+    const next = new Map<string, ServerActiveScreenShare>();
+    for (const share of screenShares) {
+      if (share.connectionId === this.selfConnectionId) continue;
+      const participant = this.participants.get(share.connectionId);
+      if (!participant?.sharingScreen) continue;
+      next.set(share.connectionId, share);
+    }
+
+    for (const [connectionId, current] of this.activeScreenShareByConnection) {
+      const incoming = next.get(connectionId);
+      if (
+        incoming?.shareId === current.shareId &&
+        incoming.label === current.label
+      ) {
+        this.shareIdByConnection.set(connectionId, current.shareId);
+        next.delete(connectionId);
+        continue;
+      }
+      const participant = this.remoteParticipant(connectionId);
+      if (participant) {
+        this.deliver(participant, "screen:stop", { shareId: current.shareId });
+      }
+      this.activeScreenShareByConnection.delete(connectionId);
+      if (this.shareIdByConnection.get(connectionId) === current.shareId) {
+        this.shareIdByConnection.delete(connectionId);
+      }
+    }
+
+    for (const share of next.values()) {
+      const participant = this.remoteParticipant(share.connectionId);
+      if (!participant) continue;
+      this.activeScreenShareByConnection.set(share.connectionId, share);
+      this.shareIdByConnection.set(share.connectionId, share.shareId);
+      this.deliver(participant, "screen:announce", {
+        shareId: share.shareId,
+        label: share.label,
+      });
     }
   }
 

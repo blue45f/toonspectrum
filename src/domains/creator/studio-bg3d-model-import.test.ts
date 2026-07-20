@@ -1,9 +1,15 @@
+import { readFileSync } from "node:fs";
+import { deflateSync } from "node:zlib";
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   STUDIO_BG3D_IMPORT_MAX_FILE_BYTES,
   STUDIO_BG3D_IMPORT_MAX_FILES,
+  STUDIO_BG3D_IMPORT_MAX_INLINE_RESOURCE_BYTES,
+  STUDIO_BG3D_IMPORT_MAX_NODES,
   STUDIO_BG3D_IMPORT_MAX_OUTPUT_TOTAL_BYTES,
+  STUDIO_BG3D_IMPORT_MAX_VERTICES,
   StudioBg3dModelImportError,
   convertStudioBg3dModelFilesToGlb,
   planStudioBg3dModelImports,
@@ -11,22 +17,88 @@ import {
 } from "./studio-bg3d-model-import";
 
 import type { Bg3dModelUploadSource } from "./bg3d-model-library";
-import type { Mesh } from "three";
+import type { Mesh, MeshStandardMaterial } from "three";
 
 function sourceFile(
   name: string,
   contents: BlobPart | Uint8Array<ArrayBufferLike> = new Uint8Array([1]),
   relativePath = "",
+  type = "",
 ): StudioBg3dImportFile {
   const blobPart: BlobPart = contents instanceof Uint8Array
     ? new Uint8Array(contents).buffer
     : contents;
-  const blob = new Blob([blobPart]);
+  const blob = new Blob([blobPart], { type });
   Object.defineProperties(blob, {
     name: { configurable: false, enumerable: true, value: name },
     webkitRelativePath: { configurable: false, enumerable: true, value: relativePath },
   });
   return blob as StudioBg3dImportFile;
+}
+
+function bigEndianUint32(value: number): Uint8Array<ArrayBuffer> {
+  const bytes = new Uint8Array(4);
+  new DataView(bytes.buffer).setUint32(0, value, false);
+  return bytes;
+}
+
+function crc32(bytes: Uint8Array): number {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function pngChunk(type: string, data: Uint8Array): Uint8Array<ArrayBuffer> {
+  const typeBytes = new TextEncoder().encode(type);
+  const checksumInput = new Uint8Array(typeBytes.byteLength + data.byteLength);
+  checksumInput.set(typeBytes);
+  checksumInput.set(data, typeBytes.byteLength);
+  return concatBytes([
+    bigEndianUint32(data.byteLength),
+    typeBytes,
+    data,
+    bigEndianUint32(crc32(checksumInput)),
+  ]);
+}
+
+/** A generated 2x1 RGBA PNG containing red and green pixels, with no third-party asset bytes. */
+function generatedPngFixture(): Uint8Array<ArrayBuffer> {
+  const header = new Uint8Array(13);
+  const headerView = new DataView(header.buffer);
+  headerView.setUint32(0, 2, false);
+  headerView.setUint32(4, 1, false);
+  header.set([8, 6, 0, 0, 0], 8);
+  const scanline = new Uint8Array([
+    0,
+    255, 0, 0, 255,
+    0, 255, 0, 255,
+  ]);
+  return concatBytes([
+    new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    pngChunk("IHDR", header),
+    pngChunk("IDAT", new Uint8Array(deflateSync(scanline))),
+    pngChunk("IEND", new Uint8Array()),
+  ]);
+}
+
+/** A deterministic 1x1 JFIF fixture whose single pixel contains no copyrightable content. */
+function minimalJpegFixture(): Uint8Array<ArrayBuffer> {
+  return new Uint8Array(Buffer.from([
+    "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////////",
+    "////////////////////////////////////////2wBDAf//////////////////////////////////",
+    "////////////////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QA",
+    "FQABAQAAAAAAAAAAAAAAAAAAAAX/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAF//8QA",
+    "FBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABBQJ//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAwEB",
+    "PwF//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAgEBPwF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/a",
+    "AAgBAQAGPwJ//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPyF//9oADAMBAAIAAwAAABD/xAAU",
+    "EQEAAAAAAAAAAAAAAAAAAAAA/9oACAEDAQE/EB//xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAECAQE/",
+    "EB//xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAE/EB//2Q==",
+  ].join(""), "base64"));
 }
 
 function virtualFile(
@@ -48,6 +120,23 @@ function pngHeader(width: number, height: number): Uint8Array {
   const view = new DataView(bytes.buffer);
   view.setUint32(16, width, false);
   view.setUint32(20, height, false);
+  return bytes;
+}
+
+function mismatchedExtendedWebp(): Uint8Array<ArrayBuffer> {
+  const vp8x = new Uint8Array(18);
+  vp8x.set(new TextEncoder().encode("VP8X"));
+  new DataView(vp8x.buffer).setUint32(4, 10, true);
+  const vp8l = new Uint8Array(14);
+  vp8l.set(new TextEncoder().encode("VP8L"));
+  new DataView(vp8l.buffer).setUint32(4, 5, true);
+  vp8l.set([0x2f, 0x01, 0x40, 0x00, 0x00], 8);
+  const body = concatBytes([vp8x, vp8l]);
+  const bytes = new Uint8Array(12 + body.byteLength);
+  bytes.set(new TextEncoder().encode("RIFF"));
+  new DataView(bytes.buffer).setUint32(4, bytes.byteLength - 8, true);
+  bytes.set(new TextEncoder().encode("WEBP"), 8);
+  bytes.set(body, 12);
   return bytes;
 }
 
@@ -75,6 +164,197 @@ class TestFileReader {
       () => this.onerror?.(),
     );
   }
+}
+
+interface FixtureImageMetadata {
+  readonly bytes: Uint8Array<ArrayBuffer>;
+  readonly height: number;
+  readonly mimeType: "image/jpeg" | "image/png";
+  readonly width: number;
+}
+
+function decodeFixtureImageMetadata(
+  bytes: Uint8Array<ArrayBuffer>,
+): FixtureImageMetadata {
+  const isPng = bytes.byteLength >= 24 && [
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+  ].every((value, index) => bytes[index] === value);
+  if (isPng) {
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    return {
+      bytes,
+      height: view.getUint32(20, false),
+      mimeType: "image/png",
+      width: view.getUint32(16, false),
+    };
+  }
+
+  if (bytes[0] === 0xff && bytes[1] === 0xd8) {
+    const sizeMarkers = new Set([
+      0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf,
+    ]);
+    let offset = 2;
+    while (offset + 1 < bytes.byteLength) {
+      if (bytes[offset] !== 0xff) {
+        offset += 1;
+        continue;
+      }
+      while (bytes[offset] === 0xff) offset += 1;
+      const marker = bytes[offset] ?? 0;
+      offset += 1;
+      if (marker === 0xd8 || marker === 0xd9 || (marker >= 0xd0 && marker <= 0xd7)) continue;
+      if (offset + 2 > bytes.byteLength) break;
+      const segmentLength = ((bytes[offset] ?? 0) << 8) | (bytes[offset + 1] ?? 0);
+      if (segmentLength < 2 || offset + segmentLength > bytes.byteLength) break;
+      if (sizeMarkers.has(marker) && segmentLength >= 7) {
+        return {
+          bytes,
+          height: ((bytes[offset + 3] ?? 0) << 8) | (bytes[offset + 4] ?? 0),
+          mimeType: "image/jpeg",
+          width: ((bytes[offset + 5] ?? 0) << 8) | (bytes[offset + 6] ?? 0),
+        };
+      }
+      offset += segmentLength;
+    }
+  }
+  throw new Error("Unsupported fixture image bytes");
+}
+
+/**
+ * Three's loaders/exporter stay real in this harness. Only the browser image and canvas
+ * primitives unavailable in Vitest's Node environment are represented. The canvas retains
+ * the already-valid fixture encoding, equivalent to a lossless browser canvas export for PNG
+ * and a deterministic no-op JPEG re-encode for the one-pixel fixture.
+ */
+function installThreeImageFixtureHarness(): { dispose(): void } {
+  const nativeUrl = URL;
+  const objectUrls = new Map<string, Blob>();
+
+  class FixtureImageElement {
+    readonly #listeners = new Map<string, Set<(event: Event) => void>>();
+    #src = "";
+    complete = false;
+    crossOrigin: string | null = null;
+    fixtureBytes = new Uint8Array(0);
+    fixtureMimeType: FixtureImageMetadata["mimeType"] = "image/png";
+    height = 0;
+    width = 0;
+
+    addEventListener(type: string, listener: (event: Event) => void): void {
+      const listeners = this.#listeners.get(type) ?? new Set();
+      listeners.add(listener);
+      this.#listeners.set(type, listeners);
+    }
+
+    removeEventListener(type: string, listener: (event: Event) => void): void {
+      this.#listeners.get(type)?.delete(listener);
+    }
+
+    get src(): string {
+      return this.#src;
+    }
+
+    set src(value: string) {
+      this.#src = value;
+      this.complete = false;
+      const blob = objectUrls.get(value);
+      void (blob ? blob.arrayBuffer() : Promise.reject(new Error("Unknown fixture object URL"))).then(
+        (buffer) => {
+          const decoded = decodeFixtureImageMetadata(new Uint8Array(buffer));
+          this.fixtureBytes = decoded.bytes;
+          this.fixtureMimeType = decoded.mimeType;
+          this.height = decoded.height;
+          this.width = decoded.width;
+          this.complete = true;
+          this.#dispatch("load");
+        },
+        () => this.#dispatch("error"),
+      );
+    }
+
+    #dispatch(type: string): void {
+      const event = { type } as Event;
+      for (const listener of [...(this.#listeners.get(type) ?? [])]) {
+        listener.call(this, event);
+      }
+    }
+  }
+
+  class FixtureCanvasElement {
+    #image: FixtureImageElement | null = null;
+    height = 1;
+    width = 1;
+
+    getContext(type: string): object | null {
+      if (type !== "2d") return null;
+      return {
+        drawImage: (image: FixtureImageElement) => {
+          this.#image = image;
+        },
+        scale() {},
+        translate() {},
+      };
+    }
+
+    toBlob(callback: (blob: Blob | null) => void, mimeType = "image/png"): void {
+      const image = this.#image;
+      queueMicrotask(() => {
+        callback(image ? new Blob([image.fixtureBytes], { type: mimeType }) : null);
+      });
+    }
+  }
+
+  class FixtureUrl extends nativeUrl {
+    static createObjectURL(blob: Blob): string {
+      const url = nativeUrl.createObjectURL(blob);
+      objectUrls.set(url, blob);
+      return url;
+    }
+
+    static revokeObjectURL(url: string): void {
+      objectUrls.delete(url);
+      nativeUrl.revokeObjectURL(url);
+    }
+  }
+
+  vi.stubGlobal("document", {
+    createElement(name: string) {
+      if (name !== "canvas") throw new Error(`Unexpected fixture element: ${name}`);
+      return new FixtureCanvasElement();
+    },
+    createElementNS(_namespace: string, name: string) {
+      if (name !== "img") throw new Error(`Unexpected fixture namespaced element: ${name}`);
+      return new FixtureImageElement();
+    },
+  });
+  vi.stubGlobal("FileReader", TestFileReader);
+  vi.stubGlobal("HTMLCanvasElement", FixtureCanvasElement);
+  vi.stubGlobal("HTMLImageElement", FixtureImageElement);
+  vi.stubGlobal("ProgressEvent", class {
+    readonly lengthComputable: boolean;
+    readonly loaded: number;
+    readonly total: number;
+    readonly type: string;
+
+    constructor(
+      type: string,
+      init: { lengthComputable?: boolean; loaded?: number; total?: number } = {},
+    ) {
+      this.type = type;
+      this.lengthComputable = init.lengthComputable ?? false;
+      this.loaded = init.loaded ?? 0;
+      this.total = init.total ?? 0;
+    }
+  });
+  vi.stubGlobal("URL", FixtureUrl);
+  vi.stubGlobal("self", globalThis);
+
+  return {
+    dispose() {
+      for (const url of objectUrls.keys()) nativeUrl.revokeObjectURL(url);
+      objectUrls.clear();
+    },
+  };
 }
 
 function concatBytes(parts: readonly Uint8Array[]): Uint8Array<ArrayBuffer> {
@@ -210,11 +490,157 @@ async function expectCanonicalTriangleGlb(
   }
 }
 
+interface TexturedCanonicalGlbJson {
+  readonly accessors?: ReadonlyArray<{ count?: number; type?: string }>;
+  readonly bufferViews?: ReadonlyArray<{ byteLength?: number; byteOffset?: number }>;
+  readonly buffers?: ReadonlyArray<{ byteLength?: number; uri?: string }>;
+  readonly images?: ReadonlyArray<{ bufferView?: number; mimeType?: string; uri?: string }>;
+  readonly materials?: ReadonlyArray<{
+    name?: string;
+    pbrMetallicRoughness?: {
+      baseColorFactor?: readonly number[];
+      baseColorTexture?: { index?: number };
+    };
+  }>;
+  readonly meshes?: ReadonlyArray<{
+    primitives?: ReadonlyArray<{
+      attributes?: { POSITION?: number; TEXCOORD_0?: number };
+      material?: number;
+    }>;
+  }>;
+  readonly textures?: ReadonlyArray<{ source?: number }>;
+}
+
+function inspectTexturedCanonicalGlb(
+  buffer: ArrayBuffer,
+  expectedMimeType: "image/jpeg" | "image/png",
+): { imageBytes: Uint8Array<ArrayBuffer>; json: TexturedCanonicalGlbJson } {
+  const view = new DataView(buffer);
+  expect(view.getUint32(0, true)).toBe(0x46546c67);
+  expect(view.getUint32(4, true)).toBe(2);
+  expect(view.getUint32(8, true)).toBe(buffer.byteLength);
+
+  const jsonChunkLength = view.getUint32(12, true);
+  expect(view.getUint32(16, true)).toBe(0x4e4f534a);
+  const json = JSON.parse(
+    new TextDecoder().decode(new Uint8Array(buffer, 20, jsonChunkLength)).trim(),
+  ) as TexturedCanonicalGlbJson;
+  const binHeaderOffset = 20 + jsonChunkLength;
+  expect(view.getUint32(binHeaderOffset + 4, true)).toBe(0x004e4942);
+  const binOffset = binHeaderOffset + 8;
+  const image = json.images?.[0];
+  const imageBufferViewIndex = image?.bufferView;
+  const imageBufferView = imageBufferViewIndex === undefined
+    ? undefined
+    : json.bufferViews?.[imageBufferViewIndex];
+
+  expect(json.buffers).toHaveLength(1);
+  expect(json.buffers?.[0]?.uri).toBeUndefined();
+  expect(json.images).toHaveLength(1);
+  expect(image).toMatchObject({ mimeType: expectedMimeType });
+  expect(image?.uri).toBeUndefined();
+  expect(imageBufferViewIndex).toEqual(expect.any(Number));
+  expect(imageBufferView?.byteLength).toEqual(expect.any(Number));
+  expect(json.textures).toEqual([expect.objectContaining({ source: 0 })]);
+  expect(json.materials?.[0]?.pbrMetallicRoughness?.baseColorTexture).toMatchObject({ index: 0 });
+  expect(json.meshes?.[0]?.primitives?.[0]?.material).toBe(0);
+
+  const imageByteOffset = imageBufferView?.byteOffset ?? 0;
+  const imageByteLength = imageBufferView?.byteLength ?? 0;
+  return {
+    imageBytes: new Uint8Array(buffer.slice(
+      binOffset + imageByteOffset,
+      binOffset + imageByteOffset + imageByteLength,
+    )),
+    json,
+  };
+}
+
+function expectPaddedEmbeddedImage(
+  embedded: Uint8Array<ArrayBuffer>,
+  fixture: Uint8Array<ArrayBuffer>,
+): void {
+  expect(embedded.subarray(0, fixture.byteLength)).toEqual(fixture);
+  expect(embedded.byteLength - fixture.byteLength).toBeGreaterThanOrEqual(0);
+  expect(embedded.byteLength - fixture.byteLength).toBeLessThanOrEqual(3);
+  expect([...embedded.subarray(fixture.byteLength)]).toEqual(
+    Array.from({ length: embedded.byteLength - fixture.byteLength }, () => 0),
+  );
+}
+
+async function expectReloadedTexturedTriangle(
+  buffer: ArrayBuffer,
+  expected: {
+    readonly height: number;
+    readonly imageBytes: Uint8Array<ArrayBuffer>;
+    readonly materialName: string;
+    readonly mimeType: "image/jpeg" | "image/png";
+    readonly width: number;
+  },
+): Promise<void> {
+  const { GLTFLoader } = await import("three/examples/jsm/loaders/GLTFLoader.js");
+  const gltf = await new GLTFLoader().parseAsync(buffer, "");
+  let mesh: Mesh | undefined;
+  gltf.scene.traverse((object) => {
+    const candidate = object as Mesh;
+    if (!mesh && candidate.isMesh) mesh = candidate;
+  });
+  expect(mesh).toBeDefined();
+  if (!mesh) return;
+
+  const material = (
+    Array.isArray(mesh.material) ? mesh.material[0] : mesh.material
+  ) as MeshStandardMaterial;
+  const map = material.map;
+  try {
+    expect(mesh.geometry.getAttribute("position")?.count).toBe(3);
+    expect(mesh.geometry.getAttribute("uv")?.count).toBe(3);
+    expect(material.isMeshStandardMaterial).toBe(true);
+    expect(material.name).toBe(expected.materialName);
+    expect(map).not.toBeNull();
+    if (!map) return;
+    const image = map.image as {
+      readonly fixtureBytes: Uint8Array<ArrayBuffer>;
+      readonly fixtureMimeType: string;
+      readonly height: number;
+      readonly width: number;
+    };
+    expect(map.userData.mimeType).toBe(expected.mimeType);
+    expect(image).toMatchObject({
+      fixtureMimeType: expected.mimeType,
+      height: expected.height,
+      width: expected.width,
+    });
+    expect(image.fixtureBytes).toEqual(expected.imageBytes);
+  } finally {
+    mesh.geometry.dispose();
+    map?.dispose();
+    for (const candidate of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+      candidate.dispose();
+    }
+  }
+}
+
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
 describe("planStudioBg3dModelImports", () => {
+  it("keeps format loaders and the GLB exporter behind analyzable dynamic imports", () => {
+    const source = readFileSync(new URL("./studio-bg3d-model-import.ts", import.meta.url), "utf8");
+
+    expect(source).not.toMatch(/^import .*three\/examples\/jsm\/(?:loaders|exporters)\//gmu);
+    for (const runtime of [
+      "loaders/GLTFLoader.js",
+      "loaders/OBJLoader.js",
+      "loaders/MTLLoader.js",
+      "exporters/GLTFExporter.js",
+    ]) {
+      expect(source).toContain(`import("three/examples/jsm/${runtime}")`);
+    }
+  });
+
   it("plans all standard primary formats while retaining bounded companion resources", () => {
     const files = [
       sourceFile("room.gltf", "{}", "set/room.gltf"),
@@ -345,6 +771,25 @@ describe("convertStudioBg3dModelFilesToGlb", () => {
     }
   });
 
+  it("rejects network textures declared by a selected OBJ material library", async () => {
+    const obj = sourceFile("chair.obj", [
+      "mtllib chair.mtl",
+      "v 0 0 0",
+      "v 1 0 0",
+      "v 0 1 0",
+      "usemtl unsafe",
+      "f 1 2 3",
+    ].join("\n"));
+    const mtl = sourceFile("chair.mtl", [
+      "newmtl unsafe",
+      "map_Kd https://example.com/texture.png",
+    ].join("\n"));
+
+    await expect(convertStudioBg3dModelFilesToGlb([obj, mtl])).rejects.toMatchObject({
+      code: "unsafe-resource-uri",
+    });
+  });
+
   it("rejects optional, undeclared, and malformed Meshopt buffer views before Three parses them", async () => {
     const gltf = (extensionPayload: unknown, extension = "EXT_meshopt_compression") => sourceFile(
       "scene.gltf",
@@ -397,6 +842,96 @@ describe("convertStudioBg3dModelFilesToGlb", () => {
         code: "parse-failed",
       });
     }
+  });
+
+  it("fails closed on traversal even when normalization would stay inside the selected files", async () => {
+    const gltf = sourceFile("scene.gltf", JSON.stringify({
+      asset: { version: "2.0" },
+      buffers: [{ byteLength: 4, uri: "folder/../mesh.bin" }],
+      scene: 0,
+      scenes: [{ nodes: [] }],
+    }));
+
+    await expect(convertStudioBg3dModelFilesToGlb([
+      gltf,
+      sourceFile("mesh.bin", new Uint8Array(4)),
+    ])).rejects.toMatchObject({ code: "unsafe-resource-uri" });
+  });
+
+  it("rejects oversized inline data and explosive inline image dimensions before Three loads", async () => {
+    const oversizedPayload = "A".repeat(
+      Math.ceil((STUDIO_BG3D_IMPORT_MAX_INLINE_RESOURCE_BYTES + 1) / 3) * 4,
+    );
+    const oversized = sourceFile("oversized.gltf", JSON.stringify({
+      asset: { version: "2.0" },
+      buffers: [{
+        byteLength: 1,
+        uri: `data:application/octet-stream;base64,${oversizedPayload}`,
+      }],
+      scene: 0,
+      scenes: [{ nodes: [] }],
+    }));
+    await expect(convertStudioBg3dModelFilesToGlb([oversized])).rejects.toMatchObject({
+      code: "inline-resource-too-large",
+    });
+
+    const image = Buffer.from(pngHeader(8_193, 1)).toString("base64");
+    const oversizedImage = sourceFile("oversized-image.gltf", JSON.stringify({
+      asset: { version: "2.0" },
+      images: [{ uri: `data:image/png;base64,${image}` }],
+      scene: 0,
+      scenes: [{ nodes: [] }],
+    }));
+    await expect(convertStudioBg3dModelFilesToGlb([oversizedImage])).rejects.toMatchObject({
+      code: "image-dimension-too-large",
+    });
+  });
+
+  it("rejects VP8X/payload dimension mismatch for linked and inline WebP textures", async () => {
+    const mismatch = mismatchedExtendedWebp();
+    const obj = sourceFile("triangle.obj", [
+      "v 0 0 0",
+      "v 1 0 0",
+      "v 0 1 0",
+      "f 1 2 3",
+    ].join("\n"));
+    await expect(convertStudioBg3dModelFilesToGlb([
+      obj,
+      sourceFile("mismatch.webp", mismatch, "mismatch.webp", "image/webp"),
+    ])).rejects.toMatchObject({ code: "invalid-image" });
+
+    const inline = Buffer.from(mismatch).toString("base64");
+    const gltf = sourceFile("mismatch.gltf", JSON.stringify({
+      asset: { version: "2.0" },
+      images: [{ uri: `data:image/webp;base64,${inline}` }],
+      scene: 0,
+      scenes: [{ nodes: [] }],
+    }));
+    await expect(convertStudioBg3dModelFilesToGlb([gltf])).rejects.toMatchObject({
+      code: "invalid-image",
+    });
+  });
+
+  it("rejects declared glTF vertices and OBJ hierarchy nodes before parser allocation", async () => {
+    const gltf = sourceFile("too-many-vertices.gltf", JSON.stringify({
+      accessors: [{ count: STUDIO_BG3D_IMPORT_MAX_VERTICES + 1 }],
+      asset: { version: "2.0" },
+      meshes: [{ primitives: [{ attributes: { POSITION: 0 } }] }],
+      nodes: [{ mesh: 0 }],
+      scene: 0,
+      scenes: [{ nodes: [0] }],
+    }));
+    await expect(convertStudioBg3dModelFilesToGlb([gltf])).rejects.toMatchObject({
+      code: "vertex-budget-exceeded",
+    });
+
+    const obj = sourceFile("deep.obj", Array.from(
+      { length: STUDIO_BG3D_IMPORT_MAX_NODES + 1 },
+      (_, index) => `o node-${index}`,
+    ).join("\n"));
+    await expect(convertStudioBg3dModelFilesToGlb([obj])).rejects.toMatchObject({
+      code: "node-budget-exceeded",
+    });
   });
 
   it("honors cancellation before files are read", async () => {
@@ -522,6 +1057,7 @@ describe("convertStudioBg3dModelFilesToGlb", () => {
 
   it("preserves a selected companion MTL material while canonicalizing OBJ to GLB", async () => {
     vi.stubGlobal("FileReader", TestFileReader);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const obj = sourceFile("triangle.obj", [
       "mtllib triangle.mtl",
       "o triangle",
@@ -557,6 +1093,61 @@ describe("convertStudioBg3dModelFilesToGlb", () => {
         baseColorFactor: [1, 0, 0, 1],
       }),
     }));
+    expect(warn).not.toHaveBeenCalledWith(
+      expect.stringContaining("Use MeshStandardMaterial or MeshBasicMaterial"),
+    );
+  });
+
+  it("embeds and reloads a real OBJ, MTL, and PNG companion set as a textured GLB", async () => {
+    const harness = installThreeImageFixtureHarness();
+    const png = generatedPngFixture();
+    const obj = sourceFile("triangle.obj", [
+      "mtllib triangle.mtl",
+      "o textured-triangle",
+      "v 0 0 0",
+      "v 1 0 0",
+      "v 0 1 0",
+      "vt 0 0",
+      "vt 1 0",
+      "vt 0 1",
+      "usemtl webtoon-checker",
+      "f 1/1 2/2 3/3",
+    ].join("\n"), "models/triangle.obj");
+    const mtl = sourceFile("triangle.mtl", [
+      "newmtl webtoon-checker",
+      "Kd 1 1 1",
+      "map_Kd textures/checker.png",
+    ].join("\n"), "models/triangle.mtl");
+    const texture = sourceFile(
+      "checker.png",
+      png,
+      "models/textures/checker.png",
+      "image/png",
+    );
+
+    try {
+      const [converted] = await convertStudioBg3dModelFilesToGlb([obj, mtl, texture]);
+      const buffer = await converted.arrayBuffer();
+      const { imageBytes, json } = inspectTexturedCanonicalGlb(buffer, "image/png");
+      const primitive = json.meshes?.[0]?.primitives?.[0];
+      const positionAccessor = primitive?.attributes?.POSITION;
+      const uvAccessor = primitive?.attributes?.TEXCOORD_0;
+
+      expect(converted).toMatchObject({ name: "triangle.glb", type: "model/gltf-binary" });
+      expect(json.materials?.[0]?.name).toBe("webtoon-checker");
+      expect(json.accessors?.[positionAccessor ?? -1]).toMatchObject({ count: 3, type: "VEC3" });
+      expect(json.accessors?.[uvAccessor ?? -1]).toMatchObject({ count: 3, type: "VEC2" });
+      expectPaddedEmbeddedImage(imageBytes, png);
+      await expectReloadedTexturedTriangle(buffer, {
+        height: 1,
+        imageBytes,
+        materialName: "webtoon-checker",
+        mimeType: "image/png",
+        width: 2,
+      });
+    } finally {
+      harness.dispose();
+    }
   });
 
   it("embeds an inline glTF buffer into the canonical GLB output", async () => {
@@ -604,6 +1195,106 @@ describe("convertStudioBg3dModelFilesToGlb", () => {
 
     expect(converted.name).toBe("inline.glb");
     expect(new DataView(buffer).getUint32(0, true)).toBe(0x46546c67);
+  });
+
+  it("embeds external glTF BIN and JPEG companions and reloads their texture contract", async () => {
+    const harness = installThreeImageFixtureHarness();
+    const positions = new Float32Array([
+      0, 0, 0,
+      1, 0, 0,
+      0, 1, 0,
+    ]);
+    const uvs = new Float32Array([
+      0, 0,
+      1, 0,
+      0, 1,
+    ]);
+    const geometryBytes = concatBytes([
+      new Uint8Array(positions.buffer),
+      new Uint8Array(uvs.buffer),
+    ]);
+    const jpeg = minimalJpegFixture();
+    const gltf = sourceFile("scene.gltf", JSON.stringify({
+      asset: { generator: "ToonSpectrum deterministic fixture", version: "2.0" },
+      buffers: [{ byteLength: geometryBytes.byteLength, uri: "scene.bin" }],
+      bufferViews: [
+        { buffer: 0, byteLength: positions.byteLength, byteOffset: 0 },
+        { buffer: 0, byteLength: uvs.byteLength, byteOffset: positions.byteLength },
+      ],
+      accessors: [
+        {
+          bufferView: 0,
+          componentType: 5126,
+          count: 3,
+          max: [1, 1, 0],
+          min: [0, 0, 0],
+          type: "VEC3",
+        },
+        {
+          bufferView: 1,
+          componentType: 5126,
+          count: 3,
+          max: [1, 1],
+          min: [0, 0],
+          type: "VEC2",
+        },
+      ],
+      images: [{ uri: "textures/albedo.jpg" }],
+      textures: [{ source: 0 }],
+      materials: [{
+        name: "webtoon-jpeg",
+        pbrMetallicRoughness: {
+          baseColorFactor: [0.25, 0.5, 0.75, 1],
+          baseColorTexture: { index: 0 },
+          metallicFactor: 0,
+          roughnessFactor: 1,
+        },
+      }],
+      meshes: [{
+        primitives: [{
+          attributes: { POSITION: 0, TEXCOORD_0: 1 },
+          material: 0,
+          mode: 4,
+        }],
+      }],
+      nodes: [{ mesh: 0, name: "textured-triangle" }],
+      scenes: [{ nodes: [0] }],
+      scene: 0,
+    }), "package/scene.gltf", "model/gltf+json");
+    const bin = sourceFile("scene.bin", geometryBytes, "package/scene.bin");
+    const texture = sourceFile(
+      "albedo.jpg",
+      jpeg,
+      "package/textures/albedo.jpg",
+      "image/jpeg",
+    );
+
+    try {
+      const [converted] = await convertStudioBg3dModelFilesToGlb([gltf, bin, texture]);
+      const buffer = await converted.arrayBuffer();
+      const { imageBytes, json } = inspectTexturedCanonicalGlb(buffer, "image/jpeg");
+      const primitive = json.meshes?.[0]?.primitives?.[0];
+      const positionAccessor = primitive?.attributes?.POSITION;
+      const uvAccessor = primitive?.attributes?.TEXCOORD_0;
+
+      expect(converted).toMatchObject({ name: "scene.glb", type: "model/gltf-binary" });
+      expect(json.materials?.[0]).toMatchObject({
+        name: "webtoon-jpeg",
+        pbrMetallicRoughness: { baseColorFactor: [0.25, 0.5, 0.75, 1] },
+      });
+      expect(json.accessors?.[positionAccessor ?? -1]).toMatchObject({ count: 3, type: "VEC3" });
+      expect(json.accessors?.[uvAccessor ?? -1]).toMatchObject({ count: 3, type: "VEC2" });
+      expectPaddedEmbeddedImage(imageBytes, jpeg);
+      await expectReloadedTexturedTriangle(buffer, {
+        height: 1,
+        imageBytes,
+        materialName: "webtoon-jpeg",
+        mimeType: "image/jpeg",
+        width: 1,
+      });
+    } finally {
+      harness.dispose();
+    }
   });
 
   it("resolves companion resources relative to the primary model before same-named root files", async () => {

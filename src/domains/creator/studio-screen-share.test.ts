@@ -11,6 +11,7 @@ import {
   STUDIO_SCREEN_SHARE_MAX_VIEWERS,
   StudioScreenShareController,
   studioScreenShareErrorMessage,
+  type StudioRemoteScreenShare,
   type StudioScreenShareRoom,
 } from "./studio-screen-share";
 
@@ -138,6 +139,7 @@ class FakeRoom implements StudioScreenShareRoom {
   readonly participant = local;
   readonly listeners = new Set<(event: StudioLiveRoomEvent) => void>();
   peers: StudioLivePeer[] = [];
+  screenShares: StudioRemoteScreenShare[] = [];
   readonly announcements: Array<{ shareId: string; label: string }> = [];
   readonly requests: Array<{ target: string; shareId: string }> = [];
   readonly descriptions: Array<{
@@ -157,6 +159,13 @@ class FakeRoom implements StudioScreenShareRoom {
 
   getPeers(): StudioLivePeer[] {
     return this.peers.map((peer) => ({ ...peer }));
+  }
+
+  getScreenShares(): StudioRemoteScreenShare[] {
+    return this.screenShares.map((share) => ({
+      ...share,
+      host: { ...share.host },
+    }));
   }
 
   subscribe(listener: (event: StudioLiveRoomEvent) => void) {
@@ -240,6 +249,43 @@ function emitSignal(room: FakeRoom, envelope: StudioLiveSignalEnvelope) {
 }
 
 describe("StudioScreenShareController", () => {
+  it("hydrates cached room shares immediately without starting capture or access", () => {
+    const room = new FakeRoom();
+    room.peers = [
+      {
+        ...remote,
+        visibility: "active",
+        pageId: "page-1",
+        lastSeenAt: 1,
+      },
+    ];
+    room.screenShares = [
+      { host: remote, shareId: "share-cached", label: "콘티 화면" },
+    ];
+    const getDisplayMedia = vi.fn<() => Promise<MediaStream>>();
+
+    const controller = new StudioScreenShareController(room, { getDisplayMedia });
+
+    expect(controller.getState()).toMatchObject({
+      localSharing: false,
+      shares: [
+        { host: remote, shareId: "share-cached", label: "콘티 화면" },
+      ],
+      watching: null,
+      pendingRequests: [],
+      viewers: [],
+    });
+    expect(getDisplayMedia).not.toHaveBeenCalled();
+    expect(room.requests).toEqual([
+      expect.objectContaining({
+        target: remote.sessionId,
+        shareId: expect.stringContaining("discovery"),
+      }),
+    ]);
+    expect(room.requests.some((request) => request.shareId === "share-cached")).toBe(false);
+    controller.close();
+  });
+
   it("discovers shares that began before a viewer opened the team panel", async () => {
     const lateViewerRoom = new FakeRoom();
     lateViewerRoom.peers = [

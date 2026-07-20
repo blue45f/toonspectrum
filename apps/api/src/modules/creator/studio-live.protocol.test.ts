@@ -85,6 +85,21 @@ describe("studio live protocol module", () => {
       true
     );
     expect(
+      protocol.StudioLiveActiveScreenShareSchema.safeParse({
+        connectionId: "socket-1",
+        shareId: "share-1",
+        label: "작업 화면",
+      }).success
+    ).toBe(true);
+    expect(
+      protocol.StudioLiveActiveScreenShareSchema.safeParse({
+        connectionId: "socket-1",
+        shareId: "share-1",
+        label: "작업 화면",
+        userId: "private-user-id",
+      }).success
+    ).toBe(false);
+    expect(
       protocol.StudioLivePublicParticipantSchema.safeParse({
         ...publicParticipant,
         userId: "private-user-id",

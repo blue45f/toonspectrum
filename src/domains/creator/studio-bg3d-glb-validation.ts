@@ -299,6 +299,10 @@ export interface StudioBg3dGlbValidationSuccess {
    */
   readonly verifiedBytes: Uint8Array;
   readonly cumulativeBytesAfter: number;
+  /** Parsed-root evidence, never a raw substring scan. Drives the lazy viewport KTX2 boundary. */
+  readonly usesBasisTextures: boolean;
+  /** True only when KHR_texture_basisu is required and no core PNG/JPEG fallback is permitted. */
+  readonly requiresBasisTextures: boolean;
   readonly metrics: StudioBg3dGlbMetrics;
 }
 
@@ -392,6 +396,7 @@ interface ImageDimensions {
 
 interface CountResult {
   readonly metrics?: Omit<StudioBg3dGlbMetrics, "byteSize" | "jsonByteSize" | "binByteSize">;
+  readonly usesBasisTextures?: boolean;
   readonly failure?: StudioBg3dGlbValidationFailure;
 }
 
@@ -1434,6 +1439,7 @@ async function collectMetrics(
   let estimatedDecodedImageBytes = 0;
   let maxImageDimension = 0;
   let undeterminedImageDimensions = 0;
+  let usesBasisTextures = false;
   for (const image of images) {
     if (!isRecord(image) || Object.hasOwn(image, "uri")) {
       return { failure: failure(Object.hasOwn(isRecord(image) ? image : {}, "uri") ? "external-resource-uri" : "invalid-image") };
@@ -1459,6 +1465,7 @@ async function collectMetrics(
     if (mimeType === "image/ktx2" && !basisInfo) {
       return { failure: failure("invalid-image") };
     }
+    if (basisInfo) usesBasisTextures = true;
     if (basisInfo && basisPayloadPreflight) {
       try {
         if (!await basisPayloadPreflight(Uint8Array.from(imageData), basisInfo)) {
@@ -1498,6 +1505,7 @@ async function collectMetrics(
   const materialCount = materials.length + (usesDefaultMaterial ? 1 : 0);
   if (!Number.isSafeInteger(materialCount)) return { failure: failure("arithmetic-overflow") };
   return {
+    usesBasisTextures,
     metrics: Object.freeze({
       nodes: nodes.length,
       meshes: meshes.length,
@@ -1689,6 +1697,9 @@ export async function validateStudioBg3dGlb(
     verifiedSha256: `sha256:${digestResult.digest}`,
     verifiedBytes: bytes,
     cumulativeBytesAfter: options.cumulative.usedBytes + byteLength,
+    usesBasisTextures: collected.usesBasisTextures === true,
+    requiresBasisTextures: Array.isArray(parsed.root.extensionsRequired)
+      && parsed.root.extensionsRequired.includes("KHR_texture_basisu"),
     metrics,
   });
 }

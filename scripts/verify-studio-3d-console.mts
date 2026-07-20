@@ -34,6 +34,107 @@ const VITE_ERROR_OVERLAY_SELECTOR = [
 const EXPECTED_R3F_VERSION = "9.6.1";
 const EXPECTED_THREE_VERSION = "0.184.0";
 const R3F_CONTEXT_LOSS_DIAGNOSTIC = "THREE.WebGLRenderer: Context Lost.";
+const KTX2_SMOKE_MODEL_NAME = "studio-ktx2-runtime-smoke.glb";
+
+// Three r184's official 40x40 ETC1S KTX2 example (MIT). The verifier embeds it into a minimal
+// self-contained GLB at runtime, so the production smoke exercises admission, the pinned Basis
+// Worker/WASM transcoder, GLTFLoader, GPU upload and an actual Canvas frame without network assets.
+const KTX2_ETC1S_BASE64 = [
+  "q0tUWCAyMLsNChoKAAAAAAEAAAAoAAAAKAAAAAAAAAAAAAAAAQAAAAYAAAABAAAA4AAAACwAAAAMAQAANAAAAEABAAAAAAAADgIA",
+  "AAAAAAB/AwAAAAAAAEcAAAAAAAAAAAAAAAAAAABiAwAAAAAAAB0AAAAAAAAAAAAAAAAAAABXAwAAAAAAAAsAAAAAAAAAAAAAAAAA",
+  "AABSAwAAAAAAAAUAAAAAAAAAAAAAAAAAAABQAwAAAAAAAAIAAAAAAAAAAAAAAAAAAABOAwAAAAAAAAIAAAAAAAAAAAAAAAAAAAAs",
+  "AAAAAAAAAAIAKACjAQIAAwMAAAAAAAAAAAAAAAA/AAAAAAAAAAAA/////zAAAABLVFh3cml0ZXIAa3R4IGNyZWF0ZSB2NC4zLjF+",
+  "MSAvIGxpYmt0eCB2NC4zLjB+MQARAEcATgAAAOIAAABSAAAAAAAAAAAAAAAAAAAARwAAAAAAAAAAAAAAAAAAAAAAAAAdAAAAAAAA",
+  "AAAAAAAAAAAAAAAAAAsAAAAAAAAAAAAAAAAAAAAAAAAABQAAAAAAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAIA",
+  "AAAAAAAAAAAAAB5ABIEBAIBAYFfmDwwQIJKAAABAQHB2SXmAchEQ4JHAAACAELHeUAcDAYgAAAAAEAhqLNu1NsfYtHSTp3J/U0WP",
+  "vYwSIPsfugAGwtwABJgH4gpIw1AUQE9vIk3KgxLURRzukCFqxIc6FtIOXYpgBwvi5qiT6A9cHoKDm+AiDtIpivgLPiz+gIKTHyEC",
+  "APwAQwPgIXrwEXA4HHt/RIAGiACRyAIizgE4HP2EPkAHpCNJJ09zVm6lKzf5Jb1aztlud+D7GQbRk+ZLs9HBUJ/ATFUBA8QEIZjB",
+  "C4BhmEEAE1Woqh7QZtk8yxRQM5MqBBFpQS1TmKtuFsV4Y3cwjL/xFR7vR5RnH+td9u+OuS4/H1bx3h8C71M4+bKQbKX1ZHJR1P/l",
+  "1el4uXk7WjhSN/sJa1MAweMAAQCCom8AhWQeJzMYwRhGMJAVKOXgoqygXP/vRwARAAQAEIRh3aAo0A0RWGs5EAGzd7H3QMYJxiei",
+  "0IhGi0RFwhs4ASYCAAAAAACQG0AA8gHy3qGF4QEuYTjZ3nE0bP8GPllu//5Lqne6388gOMYi00HDcP+QIFER2H8Z2lMkgvcuQHWQ",
+  "LCvp8ubDLDhx17OZv071GWV3ZrKyXZnEJt9IHqsx0jOHrPtc7ZmCasMv7Mh3dS7JB6XsDRpeoK1x87oqJtwCAAsA",
+].join("");
+
+function align4(value: number): number {
+  return (value + 3) & ~3;
+}
+
+function createKtx2SmokeGlb(): Buffer {
+  const ktx2 = Buffer.from(KTX2_ETC1S_BASE64, "base64");
+  const positionOffset = 0;
+  const normalOffset = 48;
+  const uvOffset = 96;
+  const indexOffset = 128;
+  const ktx2Offset = 140;
+  const binaryLength = align4(ktx2Offset + ktx2.byteLength);
+  const binary = Buffer.alloc(binaryLength);
+  new Float32Array(binary.buffer, binary.byteOffset + positionOffset, 12).set([
+    -1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0,
+  ]);
+  new Float32Array(binary.buffer, binary.byteOffset + normalOffset, 12).set([
+    0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1,
+  ]);
+  new Float32Array(binary.buffer, binary.byteOffset + uvOffset, 8).set([
+    0, 0, 1, 0, 1, 1, 0, 1,
+  ]);
+  new Uint16Array(binary.buffer, binary.byteOffset + indexOffset, 6).set([0, 1, 2, 0, 2, 3]);
+  ktx2.copy(binary, ktx2Offset);
+
+  const gltf = {
+    asset: { generator: "ToonSpectrum KTX2 production verifier", version: "2.0" },
+    extensionsRequired: ["KHR_texture_basisu"],
+    extensionsUsed: ["KHR_texture_basisu"],
+    scene: 0,
+    scenes: [{ nodes: [0] }],
+    nodes: [{ mesh: 0, name: "KTX2 smoke quad" }],
+    meshes: [{ primitives: [{
+      attributes: { POSITION: 0, NORMAL: 1, TEXCOORD_0: 2 },
+      indices: 3,
+      material: 0,
+    }] }],
+    materials: [{
+      doubleSided: true,
+      pbrMetallicRoughness: {
+        baseColorTexture: { index: 0 },
+        metallicFactor: 0,
+        roughnessFactor: 1,
+      },
+    }],
+    textures: [{ sampler: 0, extensions: { KHR_texture_basisu: { source: 0 } } }],
+    samplers: [{ magFilter: 9729, minFilter: 9987, wrapS: 10497, wrapT: 10497 }],
+    images: [{ bufferView: 4, mimeType: "image/ktx2", name: "Official ETC1S fixture" }],
+    accessors: [
+      { bufferView: 0, componentType: 5126, count: 4, type: "VEC3", min: [-1, -1, 0], max: [1, 1, 0] },
+      { bufferView: 1, componentType: 5126, count: 4, type: "VEC3" },
+      { bufferView: 2, componentType: 5126, count: 4, type: "VEC2" },
+      { bufferView: 3, componentType: 5123, count: 6, type: "SCALAR", min: [0], max: [3] },
+    ],
+    bufferViews: [
+      { buffer: 0, byteOffset: positionOffset, byteLength: 48, target: 34962 },
+      { buffer: 0, byteOffset: normalOffset, byteLength: 48, target: 34962 },
+      { buffer: 0, byteOffset: uvOffset, byteLength: 32, target: 34962 },
+      { buffer: 0, byteOffset: indexOffset, byteLength: 12, target: 34963 },
+      { buffer: 0, byteOffset: ktx2Offset, byteLength: ktx2.byteLength },
+    ],
+    buffers: [{ byteLength: binaryLength }],
+  };
+  const json = Buffer.from(JSON.stringify(gltf), "utf8");
+  const paddedJsonLength = align4(json.byteLength);
+  const totalLength = 12 + 8 + paddedJsonLength + 8 + binaryLength;
+  const glb = Buffer.alloc(totalLength, 0);
+  glb.writeUInt32LE(0x46546c67, 0);
+  glb.writeUInt32LE(2, 4);
+  glb.writeUInt32LE(totalLength, 8);
+  glb.writeUInt32LE(paddedJsonLength, 12);
+  glb.writeUInt32LE(0x4e4f534a, 16);
+  json.copy(glb, 20);
+  glb.fill(0x20, 20 + json.byteLength, 20 + paddedJsonLength);
+  const binaryHeaderOffset = 20 + paddedJsonLength;
+  glb.writeUInt32LE(binaryLength, binaryHeaderOffset);
+  glb.writeUInt32LE(0x004e4942, binaryHeaderOffset + 4);
+  binary.copy(glb, binaryHeaderOffset + 8);
+  return glb;
+}
 
 function assertCondition(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -148,6 +249,10 @@ async function closeCanvasDialog(dialog: Locator, page: Page): Promise<void> {
   const close = dialog.locator('button[aria-label="닫기"]');
   await close.waitFor({ state: "visible", timeout: 5_000 });
   await close.click();
+  await waitForCanvasDialogTeardown(dialog, page);
+}
+
+async function waitForCanvasDialogTeardown(dialog: Locator, page: Page): Promise<void> {
   await dialog.waitFor({ state: "detached", timeout: 5_000 });
   // R3F defers renderer teardown by 500ms. The compatibility patch also removes an unconsumed
   // planned-loss listener after one bounded second, so wait through both lifetimes.
@@ -184,6 +289,7 @@ async function triggerObservableLiveContextLoss(dialog: Locator): Promise<{
 async function run(page: Page, studioUrl: string): Promise<void> {
   const issues: string[] = [];
   const sharedPoseRequests: string[] = [];
+  const pngEncoderWorkers: string[] = [];
   let expectingLiveContextLoss = false;
   let liveContextExplicitlyLost = false;
   let liveContextLossDiagnostics = 0;
@@ -209,6 +315,11 @@ async function run(page: Page, studioUrl: string): Promise<void> {
     }
   });
   page.on("pageerror", (error) => issues.push(`pageerror: ${String(error)}`));
+  page.on("worker", (worker) => {
+    if (worker.url().includes("studio-bg3d-shot-png.worker")) {
+      pngEncoderWorkers.push(worker.url());
+    }
+  });
   page.on("request", (request) => {
     const url = new URL(request.url());
     if (url.pathname === "/api/creator/assets" && request.method() === "GET") {
@@ -257,10 +368,26 @@ async function run(page: Page, studioUrl: string): Promise<void> {
     sharedPoseRequests.length > 0,
     "expanding the shared-pose library did not issue its explicit lazy request",
   );
+  // Exercise the actual VRM render-target readback -> short-lived OffscreenCanvas PNG Worker ->
+  // editor insertion path before deliberately losing a separate Canvas context below.
+  await characterDialog.getByRole("button", { name: "이 포즈로 추가", exact: true }).click({
+    timeout: 30_000,
+  });
+  await waitForCanvasDialogTeardown(characterDialog, page);
+  assertCondition(
+    pngEncoderWorkers.length > 0,
+    "VRM insertion did not start the shared off-main PNG encoder",
+  );
+
+  const liveLossMenu = await openInsertMenu(page);
+  await liveLossMenu.getByRole("menuitem", { name: "3D 캐릭터", exact: true }).click();
+  const liveLossDialog = page.locator('[data-studio-vrm-dialog="true"]');
+  await liveLossDialog.waitFor({ state: "visible", timeout: 25_000 });
+  await page.waitForTimeout(1_000);
   const diagnosticsBeforeLiveLoss = liveContextLossDiagnostics;
   expectingLiveContextLoss = true;
   try {
-    const liveLoss = await triggerObservableLiveContextLoss(characterDialog);
+    const liveLoss = await triggerObservableLiveContextLoss(liveLossDialog);
     await page.waitForTimeout(250);
     assertCondition(liveLoss.supported, "WEBGL_lose_context is unavailable in the browser verifier");
     assertCondition(liveLoss.observed, "a live WebGL context loss did not reach the Canvas observer");
@@ -272,7 +399,7 @@ async function run(page: Page, studioUrl: string): Promise<void> {
   } finally {
     expectingLiveContextLoss = false;
   }
-  await closeCanvasDialog(characterDialog, page);
+  await closeCanvasDialog(liveLossDialog, page);
 
   const backgroundMenu = await openInsertMenu(page);
   await backgroundMenu.getByRole("menuitem", { name: "3D 배경", exact: true }).click();

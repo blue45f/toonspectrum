@@ -65,7 +65,6 @@ function useRouteTitle(pathname: string) {
       title = `${decodeURIComponent(pathname.slice(9))} ${t("route.pencafeSuffix")}`;
     else if (pathname.startsWith("/community/")) title = t("route.community");
     else if (pathname.startsWith("/admin/")) title = t("route.admin");
-    else if (pathname.startsWith("/create/")) title = t("route.create");
     else if (pathname.startsWith("/me")) title = t("route.me");
     document.title = title ? `${title} · ${t("app.name")}` : t("app.name");
   }, [pathname, t]);

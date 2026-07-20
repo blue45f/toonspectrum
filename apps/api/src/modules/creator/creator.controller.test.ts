@@ -16,15 +16,25 @@ import {
 } from "./creator.dto";
 import { CreatorService } from "./creator.service";
 
+const { isAdminUser } = vi.hoisted(() => ({
+  isAdminUser: vi.fn(),
+}));
+
+vi.mock("../../../../../lib/server/app-config", () => ({
+  isAdminUser,
+}));
+
 const creatorService = {
   listSharedWorks: vi.fn(),
   getSharedWorkDocument: vi.fn(),
   getSharedWorkDocumentMeta: vi.fn(),
   getWorkRevisionComparison: vi.fn(),
+  getSharedAssetContent: vi.fn(),
   saveSharedWorkDocument: vi.fn(),
   listWorkTeamInvitations: vi.fn(),
   getWorkTeamActivity: vi.fn(),
   respondToWorkTeamInvitation: vi.fn(),
+  useSharedAsset: vi.fn(),
 };
 
 function createController(): CreatorController {
@@ -120,10 +130,14 @@ describe("CreatorController collaboration collection endpoints", () => {
     creatorService.getSharedWorkDocument.mockReset();
     creatorService.getSharedWorkDocumentMeta.mockReset();
     creatorService.getWorkRevisionComparison.mockReset();
+    creatorService.getSharedAssetContent.mockReset();
     creatorService.saveSharedWorkDocument.mockReset();
     creatorService.listWorkTeamInvitations.mockReset();
     creatorService.getWorkTeamActivity.mockReset();
     creatorService.respondToWorkTeamInvitation.mockReset();
+    creatorService.useSharedAsset.mockReset();
+    isAdminUser.mockReset();
+    isAdminUser.mockResolvedValue(false);
   });
 
   it("인증 사용자와 Zod가 정규화한 limit만 초대함 서비스에 전달한다", async () => {
@@ -134,6 +148,51 @@ describe("CreatorController collaboration collection endpoints", () => {
       createController().listWorkTeamInvitations({ limit: 12 }, "invitee")
     ).resolves.toBe(invitations);
     expect(creatorService.listWorkTeamInvitations).toHaveBeenCalledWith("invitee", 12);
+  });
+
+  it("에셋 사용 집계는 검증된 사용자 범위로만 전달한다", async () => {
+    creatorService.useSharedAsset.mockResolvedValue({ ok: true });
+
+    await expect(
+      createController().useSharedAsset({ id: "asset-1" }, "viewer-1")
+    ).resolves.toEqual({ ok: true });
+    expect(creatorService.useSharedAsset).toHaveBeenCalledWith("viewer-1", "asset-1");
+
+    await expect(
+      createController().useSharedAsset({ id: "asset-1" })
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(creatorService.useSharedAsset).toHaveBeenCalledTimes(1);
+  });
+
+  it("에셋 원본 조회는 익명 공개 읽기와 선택적 소유자·관리자 범위를 서비스에 전달한다", async () => {
+    const content = { id: "asset-1", dataUrl: "data:image/png;base64,AA==", width: 1, height: 1 };
+    creatorService.getSharedAssetContent.mockResolvedValue(content);
+
+    await expect(createController().getSharedAssetContent({ id: "asset-1" }))
+      .resolves.toBe(content);
+    await expect(createController().getSharedAssetContent({ id: "asset-1" }, "owner-1"))
+      .resolves.toBe(content);
+    isAdminUser.mockResolvedValueOnce(true);
+    await expect(createController().getSharedAssetContent({ id: "asset-1" }, "admin-1"))
+      .resolves.toBe(content);
+    expect(creatorService.getSharedAssetContent).toHaveBeenNthCalledWith(
+      1,
+      "asset-1",
+      undefined,
+      false
+    );
+    expect(creatorService.getSharedAssetContent).toHaveBeenNthCalledWith(
+      2,
+      "asset-1",
+      "owner-1",
+      false
+    );
+    expect(creatorService.getSharedAssetContent).toHaveBeenNthCalledWith(
+      3,
+      "asset-1",
+      "admin-1",
+      true
+    );
   });
 
   it("revision 비교 endpoint는 인증 소유자 범위와 검증된 경로 값만 전달한다", async () => {

@@ -2311,10 +2311,10 @@ function parseCanonicalJson<T>(
 }
 
 /**
- * Projects only strict VRM scene v1 values to v2 for archive-writer compatibility checks.
+ * Projects only strict VRM scene v1/v2 values to v3 for archive-writer compatibility checks.
  * No other project defaults, redactions, or schema changes are introduced here.
  */
-function promoteStrictVersionOneVrmScenes(
+function promoteStrictHistoricalVrmScenes(
   project: Record<string, unknown>,
 ): Record<string, unknown> | null {
   let changed = false;
@@ -2327,7 +2327,11 @@ function promoteStrictVersionOneVrmScenes(
         || element.type !== "image"
         || !isRecord(element.vrmScene)
         || element.vrmScene.kind !== STUDIO_VRM_SCENE_DOCUMENT_KIND
-        || element.vrmScene.version !== 1
+        || (
+          element.vrmScene.version !== 1
+          && element.vrmScene.version !== 2
+          && element.vrmScene.version !== 3
+        )
       ) return element;
       const migrated = migrateStudioVrmSceneDocument(element.vrmScene);
       const serialized = serializeStudioVrmSceneDocument(migrated);
@@ -2402,7 +2406,7 @@ function parseCanonicalProject(
     nodes: 0,
   });
   const legacyVrmProjection = manifestVersion === STUDIO_PROJECT_ARCHIVE_VERSION
-    ? promoteStrictVersionOneVrmScenes(sanitized)
+    ? promoteStrictHistoricalVrmScenes(sanitized)
     : null;
   const writerMatchesStored = isRecord(writerCanonical)
     && canonicalJson(writerCanonical) === text;
