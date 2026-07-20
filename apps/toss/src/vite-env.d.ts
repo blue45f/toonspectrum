@@ -1,5 +1,7 @@
 /// <reference types="vite/client" />
 interface ImportMetaEnv {
+  // Studio live ink renderer rollout control. Missing value is capability-driven auto mode.
+  readonly VITE_STUDIO_LIVE_INK_BACKEND?: "auto" | "webgpu" | "canvas2d";
   // 배포된 toonspectrum API 오리진. 웹과 동일한 변수명(공유 ky 클라이언트가 절대 베이스로 푼다).
   readonly VITE_API_BASE?: string;
   // Socket.IO를 제공하는 장기 실행 Nest origin. Vercel serverless API와 독립적으로 지정한다.

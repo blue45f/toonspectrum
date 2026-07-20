@@ -93,12 +93,31 @@ export type StudioRasterOperationAppender = (
   signal: AbortSignal
 ) => void | Promise<void>;
 
+export interface StudioRasterLayerWriteGuardInput {
+  readonly operationId: string;
+  readonly actorId: string;
+  readonly pageId: string;
+  readonly layerId: string;
+  readonly intent: StudioRasterPatchPublishIntent;
+}
+
+/**
+ * Returns the authoritative current layer-write decision. It is evaluated before expensive pixel
+ * work and again after uploads immediately before the grow-only operation is appended, closing a
+ * lock race without retroactively hiding strokes that were validly committed while unlocked.
+ */
+export type StudioRasterLayerWriteGuard = (
+  input: Readonly<StudioRasterLayerWriteGuardInput>,
+  signal: AbortSignal
+) => boolean | Promise<boolean>;
+
 export interface StudioRasterPatchPublisherDependencies {
   readonly encode: StudioRasterPatchEncoder;
   readonly upload: StudioRasterPatchUploader;
   readonly append: StudioRasterOperationAppender;
   /** Receipt-bound best-effort cleanup used only when publication fails after a verified upload. */
   readonly compensate?: StudioRasterPatchCompensator;
+  readonly canWriteLayer?: StudioRasterLayerWriteGuard;
   /** Injectable for isolated runtimes. It must return a lowercase SHA-256 digest. */
   readonly sha256?: (bytes: Uint8Array, signal: AbortSignal) => Promise<string>;
 }
@@ -178,6 +197,36 @@ function abortError(signal: AbortSignal): Error {
 
 function throwIfAborted(signal: AbortSignal): void {
   if (signal.aborted) throw abortError(signal);
+}
+
+async function assertLayerWritable(
+  input: StudioRasterPatchPublishInput,
+  guard: StudioRasterLayerWriteGuard | undefined,
+  signal: AbortSignal
+): Promise<void> {
+  if (!guard) return;
+  throwIfAborted(signal);
+  let writable: boolean;
+  try {
+    writable = await guard(Object.freeze({
+      operationId: input.operationId,
+      actorId: input.actorId,
+      pageId: input.pageId,
+      layerId: input.layerId,
+      intent: input.intent,
+    }), signal);
+  } catch (error) {
+    if (signal.aborted) throw abortError(signal);
+    if (error instanceof StudioRasterPatchPublicationError) throw error;
+    fail("layer_write_guard_failed", "레이어 잠금 상태를 확인하지 못했습니다.", error);
+  }
+  throwIfAborted(signal);
+  if (typeof writable !== "boolean") {
+    fail("invalid_layer_write_guard_result", "레이어 쓰기 정책은 boolean을 반환해야 합니다.");
+  }
+  if (!writable) {
+    fail("layer_locked", "잠긴 레이어에는 실시간 픽셀 획을 게시할 수 없습니다.");
+  }
 }
 
 function exactKeys(value: object, keys: readonly string[]): boolean {
@@ -539,6 +588,7 @@ export async function publishStudioRasterPatch(
     typeof dependencies.upload !== "function" ||
     typeof dependencies.append !== "function" ||
     (dependencies.compensate !== undefined && typeof dependencies.compensate !== "function") ||
+    (dependencies.canWriteLayer !== undefined && typeof dependencies.canWriteLayer !== "function") ||
     (dependencies.sha256 !== undefined && typeof dependencies.sha256 !== "function")
   ) {
     fail("invalid_dependencies", "인코더, 업로더, CRDT append 및 선택적 SHA-256 함수가 올바르지 않습니다.");
@@ -571,6 +621,7 @@ export async function publishStudioRasterPatch(
 
   try {
     throwIfAborted(controller.signal);
+    await assertLayerWritable(input, dependencies.canWriteLayer, controller.signal);
     const pixels = copyInputPixels(input);
     const crops = splitAtTileBoundaries(input, pixels, maximumPatches);
     throwIfAborted(controller.signal);
@@ -728,6 +779,7 @@ export async function publishStudioRasterPatch(
       undoAcknowledgements: [],
     });
     throwIfAborted(controller.signal);
+    await assertLayerWritable(input, dependencies.canWriteLayer, controller.signal);
     await dependencies.append(log, controller.signal);
     return Object.freeze({
       status: "appended" as const,

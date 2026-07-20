@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import { describe, expect, it, vi } from "vitest";
 
+import { StudioCrdtDocument } from "./studio-crdt-document";
 import {
   StudioRasterReplayRuntimeError,
   decodeStudioRasterPngInBrowser,
@@ -9,6 +10,8 @@ import {
   type StudioRasterDecodedPng,
   type StudioRasterReplayRuntimeDependencies,
 } from "./studio-crdt-raster-replay-runtime";
+
+import type { StudioRasterCompactionCheckpoint } from "@/lib/studio-crdt-raster-compaction";
 
 import {
   STUDIO_RASTER_CRDT_VERSION,
@@ -296,6 +299,156 @@ describe("studio raster CRDT replay runtime", () => {
     expect([...second.tiles[0]!.copyRgba().slice(0, 4)]).toEqual(
       [...first.tiles[0]!.copyRgba().slice(0, 4)]
     );
+  });
+
+  it("roundtrips a sparse checkpoint and deterministically merges the concurrent tail", async () => {
+    const base = fixtureAsset(
+      "checkpoint-base",
+      128,
+      128,
+      solid(128, 128, [210, 30, 20, 255]),
+      20
+    );
+    const blue = fixtureAsset("checkpoint-blue", 1, 1, solid(1, 1, [0, 40, 255, 128]), 21);
+    const eraser = fixtureAsset("checkpoint-eraser", 1, 1, solid(1, 1, [0, 0, 0, 128]), 22);
+    const baseOperation = operation({
+      index: 21,
+      clock: "1",
+      actor: "actor-seoul",
+      patches: [compositePatch(base)],
+    });
+    const concurrentPaint = operation({
+      index: 22,
+      clock: "2",
+      actor: "actor-busan",
+      patches: [compositePatch(blue)],
+    });
+    const concurrentErase = operation({
+      index: 23,
+      clock: "2",
+      actor: "actor-seoul",
+      intent: "erase",
+      patches: [compositePatch(eraser, { blendMode: "destination-out" })],
+    });
+    const checkpoint: StudioRasterCompactionCheckpoint = {
+      version: STUDIO_RASTER_CRDT_VERSION,
+      checkpointId: uuid(24),
+      proofId: uuid(25),
+      surface: surface(),
+      through: { ...baseOperation.order, eventId: baseOperation.operationId },
+      tileManifestSha256: "e".repeat(64),
+      tiles: [{ tileX: 0, tileY: 0, asset: base.reference }],
+      sealedOperationIds: [baseOperation.operationId],
+      sealedUndoOperationIds: [],
+      sealedUndoAcknowledgementIds: [],
+    };
+    const dependencies = fixtureDependencies([base, blue, eraser]);
+
+    const fromOrigin = await replayStudioRasterCrdtPixels({
+      workId: "work-checkpoint",
+      log: log(surface(), [concurrentErase, baseOperation, concurrentPaint]),
+    }, dependencies);
+    const restoredCheckpoint = JSON.parse(JSON.stringify(checkpoint)) as StudioRasterCompactionCheckpoint;
+    const restoredTail = JSON.parse(JSON.stringify(
+      log(surface(), [concurrentErase, concurrentPaint])
+    )) as StudioRasterOperationLog;
+    const fromCheckpoint = await replayStudioRasterCrdtPixels({
+      workId: "work-checkpoint",
+      checkpoint: restoredCheckpoint,
+      log: restoredTail,
+    }, dependencies);
+    const oppositeArrival = await replayStudioRasterCrdtPixels({
+      workId: "work-checkpoint",
+      checkpoint: restoredCheckpoint,
+      log: log(surface(), [concurrentPaint, concurrentErase]),
+    }, dependencies);
+
+    expect(fromCheckpoint.checkpointId).toBe(checkpoint.checkpointId);
+    expect(fromCheckpoint.appliedOperationIds).toEqual([
+      concurrentPaint.operationId,
+      concurrentErase.operationId,
+    ]);
+    expect(oppositeArrival.appliedOperationIds).toEqual(fromCheckpoint.appliedOperationIds);
+    expect(fromCheckpoint.tiles[0]!.sha256).toBe(fromOrigin.tiles[0]!.sha256);
+    expect(oppositeArrival.tiles[0]!.sha256).toBe(fromCheckpoint.tiles[0]!.sha256);
+    expect([...fromCheckpoint.tiles[0]!.copyRgba().slice(0, 4)])
+      .toEqual([...fromOrigin.tiles[0]!.copyRgba().slice(0, 4)]);
+    expect(fromCheckpoint.tiles[0]!.copyRgba()[3]).toBe(127);
+  });
+
+  it("keeps overlapping pixel strokes idempotent across reconnect updates and a full snapshot", async () => {
+    const red = fixtureAsset("reconnect-red", 1, 1, solid(1, 1, [255, 0, 0, 160]), 23);
+    const blue = fixtureAsset("reconnect-blue", 1, 1, solid(1, 1, [0, 0, 255, 160]), 24);
+    const eraser = fixtureAsset("reconnect-eraser", 1, 1, solid(1, 1, [0, 0, 0, 64]), 25);
+    const redOperation = operation({
+      index: 26,
+      clock: "7",
+      actor: "actor-z",
+      patches: [compositePatch(red)],
+    });
+    const blueOperation = operation({
+      index: 27,
+      clock: "7",
+      actor: "actor-a",
+      patches: [compositePatch(blue)],
+    });
+    const eraseOperation = operation({
+      index: 28,
+      clock: "8",
+      actor: "actor-c",
+      intent: "erase",
+      patches: [compositePatch(eraser, { blendMode: "destination-out" })],
+    });
+    const left = new StudioCrdtDocument();
+    const right = new StudioCrdtDocument();
+    const restored = new StudioCrdtDocument();
+
+    try {
+      left.mergeRasterOperationLog(log(surface(), [redOperation]));
+      right.mergeRasterOperationLog(log(surface(), [blueOperation]));
+      const leftUpdate = left.encodeStateAsUpdate();
+      const rightUpdate = right.encodeStateAsUpdate();
+      left.applyUpdate(rightUpdate);
+      right.applyUpdate(leftUpdate);
+      left.applyUpdate(rightUpdate);
+      right.applyUpdate(leftUpdate);
+
+      const fullSnapshot = left.encodeStateAsUpdate();
+      restored.applyUpdate(fullSnapshot);
+      restored.applyUpdate(fullSnapshot);
+      restored.mergeRasterOperationLog(log(surface(), [eraseOperation]));
+      const reconnectDelta = restored.encodeStateAsUpdate(left.encodeStateVector());
+      left.applyUpdate(reconnectDelta);
+      left.applyUpdate(reconnectDelta);
+
+      const leftLog = left.getRasterOperationLog(surface().surfaceId)!;
+      const restoredLog = restored.getRasterOperationLog(surface().surfaceId)!;
+      expect(leftLog).toEqual(restoredLog);
+      expect(leftLog.operations.map(({ operationId }) => operationId)).toEqual([
+        blueOperation.operationId,
+        redOperation.operationId,
+        eraseOperation.operationId,
+      ]);
+
+      const dependencies = fixtureDependencies([red, blue, eraser]);
+      const [leftPixels, restoredPixels] = await Promise.all([
+        replayStudioRasterCrdtPixels({ workId: "work-reconnect", log: leftLog }, dependencies),
+        replayStudioRasterCrdtPixels({ workId: "work-reconnect", log: restoredLog }, dependencies),
+      ]);
+      expect(leftPixels.appliedOperationIds).toEqual([
+        blueOperation.operationId,
+        redOperation.operationId,
+        eraseOperation.operationId,
+      ]);
+      expect(leftPixels.tiles[0]!.sha256).toBe(restoredPixels.tiles[0]!.sha256);
+      expect([...leftPixels.tiles[0]!.copyRgba().slice(0, 4)])
+        .toEqual([...restoredPixels.tiles[0]!.copyRgba().slice(0, 4)]);
+      expect(leftPixels.tiles[0]!.copyRgba()[3]).toBeLessThan(255);
+    } finally {
+      left.destroy();
+      right.destroy();
+      restored.destroy();
+    }
   });
 
   it("composites destination-out with exact straight-alpha rounding", async () => {

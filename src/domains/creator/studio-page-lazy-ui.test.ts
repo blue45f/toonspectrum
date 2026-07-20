@@ -60,6 +60,7 @@ const REPRESENTATIVE_OPTIONAL_SURFACES = [
   "./StudioPageThumbnails",
   "./StudioQuickStartPanel",
   "./StudioTeamPanel",
+  "./StudioTextEditOverlay",
   "./StudioWebGpuCanvas",
 ] as const;
 

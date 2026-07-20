@@ -578,6 +578,18 @@ describe("saveBrush", () => {
     saveBrush(s, stampBrush);
     expect(listBrushes(s)[0]?.stampTuning).toEqual(stampBrush.stampTuning);
   });
+
+  it("직접 저장 경로도 런타임 계약이 없는 사용자 브러시를 안전한 펜으로 정규화한다", () => {
+    const s = fakeStorage();
+    const result = saveBrushWithResult(s, {
+      ...brush("unsupported-runtime"),
+      brushId: "marketplace-engine-not-installed",
+    });
+
+    expect(result.status).toBe("saved");
+    expect(result.brushes[0]?.brushId).toBe("pen");
+    expect(listBrushes(s)[0]?.brushId).toBe("pen");
+  });
 });
 
 describe("updateBrushSnapshotWithResult", () => {
@@ -822,6 +834,15 @@ describe("writeBrushJson / importBrushFromJson 왕복", () => {
     expect(parsed.stampTuning).toBeNull();
     expect(parsed).not.toHaveProperty("pinned");
     expect(parsed).not.toHaveProperty("lastUsedAt");
+  });
+
+  it("내보내기도 런타임 계약이 없는 사용자 브러시 id를 전파하지 않는다", () => {
+    const parsed = JSON.parse(writeBrushJson({
+      ...brush("unsupported-export"),
+      brushId: "marketplace-engine-not-installed",
+    }));
+
+    expect(parsed.brushId).toBe("pen");
   });
 
   it("왕복하면 같은 스냅샷을 얻는다(adjustedFields 없음)", () => {

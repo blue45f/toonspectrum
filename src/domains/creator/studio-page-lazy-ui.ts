@@ -134,6 +134,23 @@ const StudioDialogueBatchPanel = lazyRetry(
   () => import("./StudioDialogueBatchPanel").then((mod) => ({ default: mod.StudioDialogueBatchPanel })),
   "StudioDialogueBatchPanel"
 );
+const studioTextEditOverlayLoader = createStudioIntentLazyLoader(
+  () => import("./StudioTextEditOverlay")
+);
+const StudioTextEditOverlay = lazyRetry(
+  () => studioTextEditOverlayLoader.load().then((mod) => ({ default: mod.default })),
+  "StudioTextEditOverlay"
+);
+const StudioTextEditFallbackModal = lazyRetry(
+  () => studioTextEditOverlayLoader.load().then((mod) => ({
+    default: mod.StudioTextEditFallbackModal,
+  })),
+  "StudioTextEditFallbackModal"
+);
+
+function preloadStudioTextEditOverlay(): void {
+  studioTextEditOverlayLoader.preload();
+}
 const StudioQuickActionsMenu = lazyRetry(
   () => import("./StudioQuickActionsMenu").then((mod) => ({ default: mod.StudioQuickActionsMenu })),
   "StudioQuickActionsMenu"
@@ -738,6 +755,8 @@ export {
   StudioStoryboardGridPanel,
   StudioStrokeShapePanel,
   StudioTeamPanel,
+  StudioTextEditFallbackModal,
+  StudioTextEditOverlay,
   StudioTextEffectPanel,
   StudioTextPathPanel,
   StudioTimelapsePanel,
@@ -761,6 +780,7 @@ export {
   preloadStudioPaletteLibraryPanel,
   preloadStudioReferencePanel,
   preloadStudioStockImagePanel,
+  preloadStudioTextEditOverlay,
 };
 
 export type {

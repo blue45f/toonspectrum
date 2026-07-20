@@ -5,6 +5,7 @@ import { fromUint8Array, toUint8Array } from "js-base64";
 import * as Y from "yjs";
 
 import {
+  STUDIO_CRDT_RASTER_OPERATIONS_ROOT,
   appendedStudioCrdtRasterAssetReferences,
   appendsStudioCrdtRasterCheckpoint,
   assertStudioCrdtRasterAppendedEventAdmission,
@@ -43,7 +44,10 @@ import type {
   StudioCrdtRepository,
   StudioCrdtUpdateRecord,
 } from "./studio-crdt.repository";
-import type { StudioRasterAssetReference } from "../../../../../lib/studio-crdt-raster-ops";
+import type {
+  StudioRasterAssetReference,
+  StudioRasterOperation,
+} from "../../../../../lib/studio-crdt-raster-ops";
 import type { StudioWorkAssetReference } from "../../../../../lib/studio-work-asset-contract";
 
 export { hasValidStudioCrdtRootSchema };
@@ -89,6 +93,44 @@ const DEFAULT_CLUSTER_LOAD_HEARTBEAT_MS = 350;
 const DEFAULT_CLUSTER_LOAD_STALE_AFTER_MS = 1_500;
 const DEFAULT_MAX_CLUSTER_PENDING_OPERATIONS_TOTAL = 2_048;
 const BASE64_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u;
+const STUDIO_CRDT_LAYER_GROUP_ROOT_PREFIX = "layer-group:";
+
+function studioCrdtLayerGroupRootName(pageId: string, layerId: string): string {
+  const key = `${pageId.length}:${pageId}${layerId.length}:${layerId}`;
+  return `${STUDIO_CRDT_LAYER_GROUP_ROOT_PREFIX}${encodeURIComponent(key)}`;
+}
+
+function studioCrdtLayerGroupIsLocked(
+  doc: Y.Doc,
+  pageId: string,
+  layerId: string
+): boolean {
+  if (layerId === "page-root") return false;
+  const record = doc.share.get(studioCrdtLayerGroupRootName(pageId, layerId));
+  if (!(record instanceof Y.Map) || record.get("deleted") === true) return false;
+  if (record.get("unset:locked") === true) return false;
+  const current = record.get("prop:locked");
+  if (typeof current === "boolean") return current;
+  return record.get("base:locked") === true;
+}
+
+function assertStudioCrdtAppendedRasterLayersWritable(
+  existingOperationIds: ReadonlyMap<string, unknown> | undefined,
+  doc: Y.Doc
+): void {
+  const root = doc.share.get(STUDIO_CRDT_RASTER_OPERATIONS_ROOT);
+  if (!(root instanceof Y.Map)) return;
+  for (const [operationId, encoded] of root) {
+    if (existingOperationIds?.has(operationId)) continue;
+    const operation = (JSON.parse(encoded as string) as { operation: StudioRasterOperation })
+      .operation;
+    if (studioCrdtLayerGroupIsLocked(doc, operation.pageId, operation.layerId)) {
+      throw new StudioCrdtInvalidPayloadError(
+        "update cannot append a Studio raster operation to a locked layer"
+      );
+    }
+  }
+}
 
 export interface StudioCrdtServiceOptions {
   now?: () => Date;
@@ -721,6 +763,7 @@ export class StudioCrdtService implements OnModuleDestroy {
         );
       }
       assertStudioCrdtRasterAppendedEventAdmission(rasterRootsBefore, probe, actorUserId);
+      assertStudioCrdtAppendedRasterLayersWritable(rasterRootsBefore?.operations, probe);
       const workAssetReferences = snapshotStudioWorkAssetReferences(probe);
       for (const [id, elementType] of workAssetReferencesBefore.identities) {
         if (workAssetReferences.identities.get(id) !== elementType) {

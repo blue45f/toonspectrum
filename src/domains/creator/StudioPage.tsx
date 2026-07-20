@@ -569,6 +569,10 @@ import {
 } from "./studio-liquify-pointer";
 import { projectStudioCanvasCommentPins } from "./studio-live-canvas-overlay-model";
 import {
+  decideStudioLiveInkBackend,
+  resolveStudioLiveInkBackendPreference,
+} from "./studio-live-ink-backend";
+import {
   StudioLiveInkOverlayRenderer,
   StudioLiveInkPredictionRenderer,
   studioLiveInkFastOverlaySupportsStyle,
@@ -691,6 +695,8 @@ import {
   StudioSelectionAntsOverlay,
   StudioShapePickerGrid,
   StudioShortcutsHelp,
+  StudioTextEditFallbackModal,
+  StudioTextEditOverlay,
   StudioUnifiedBrushPicker,
   QuickStartPanel,
   StudioUploadPublish,
@@ -703,6 +709,7 @@ import {
   loadStudioWebtoonGuides,
   preloadStudioAssetMenuPanel,
   preloadStudioReferencePanel,
+  preloadStudioTextEditOverlay,
   type StudioComipoAssemblyModule,
   type StudioWebtoonGuidesModule,
 } from "./studio-page-lazy-ui";
@@ -860,6 +867,7 @@ import {
   studioRasterAuthorizedOperationIds,
   type StudioRasterHandoffCandidate,
 } from "./studio-raster-handoff-authority";
+import { canPublishStudioRasterLayer } from "./studio-raster-layer-write-guard";
 import { STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED } from "./studio-raster-publication-feature";
 import {
   projectStudioRasterOverlayElements,
@@ -1117,7 +1125,6 @@ import {
 } from "./StudioPageListPane";
 import { StudioPageSequenceStrip } from "./StudioPageSequenceStrip";
 import { StudioPanelResizeHandle } from "./StudioPanelResizeHandle";
-import StudioTextEditOverlay, { StudioTextEditFallbackModal } from "./StudioTextEditOverlay";
 import {
   StudioToolBeltContent,
   type FxPickerSection,
@@ -1523,13 +1530,11 @@ function studioElementIdOf(node: Konva.Node | null): string | null {
 }
 
 const QUICK_START_DISMISSED_KEY = "toonspectrum-studio-quick-start-dismissed";
-/**
- * Canvas2D is the visible low-latency front buffer by default because it shares the exact browser
- * rasterizer with committed Konva ink. WebGPU remains available for retained/committed surfaces
- * and can be benchmarked explicitly without reintroducing a live→commit edge-thickness jump.
- */
-const STUDIO_VISIBLE_LIVE_INK_BACKEND =
-  import.meta.env.VITE_STUDIO_LIVE_INK_BACKEND === "webgpu" ? "webgpu" : "canvas2d";
+// Production defaults to capability-driven WebGPU. The engine is warmed before the first stroke,
+// while unsupported devices, styles, and the runtime receipt probe retain the Canvas2D path.
+const STUDIO_VISIBLE_LIVE_INK_PREFERENCE = resolveStudioLiveInkBackendPreference(
+  import.meta.env.VITE_STUDIO_LIVE_INK_BACKEND
+);
 /** 공개 기준 엔진은 browser prediction 없이 coalesced hardware input만 사용한다. */
 const STUDIO_POINTER_PREDICTION_ENABLED = false;
 // 모바일 첫 사용 안내(하단 도구막대 + 두 손가락 이동/확대) 1회만 노출.
@@ -17561,14 +17566,17 @@ function StudioCuttoonEditor() {
         // 도착하지 않으면(조용히 실패하는 GPU 환경) 같은 스트로크 안에서 Konva 로 인계된다.
         // (미드스트로크 스크린샷 검증 완료 — drawImage 기반 픽셀 판정은 WebGPU 캔버스에서
         // 위음성을 내므로 합성 스크린샷/영수증으로만 판정한다.)
-        const gpuPin = STUDIO_VISIBLE_LIVE_INK_BACKEND === "webgpu"
-          && direct
-          && !causalPostCorrectionEligible
-          && next.mode !== "eraser"
-          && webGpuBackendRef.current === "webgpu"
-          && !next.fill
-          && (next.opacity ?? 1) >= 0.999
-          && (next.symmetry?.type ?? "none") === "none";
+        const liveInkBackendDecision = decideStudioLiveInkBackend({
+          preference: STUDIO_VISIBLE_LIVE_INK_PREFERENCE,
+          resolvedBackend: webGpuBackendRef.current,
+          direct,
+          postCorrectionActive: causalPostCorrectionEligible,
+          mode: next.mode,
+          fill: next.fill,
+          opacity: next.opacity ?? 1,
+          symmetryType: next.symmetry?.type ?? "none",
+        });
+        const gpuPin = liveInkBackendDecision.backend === "webgpu";
         gpuLiveInkPinnedRef.current = gpuPin;
         gpuPinnedLivePointCountRef.current = 0;
         // 파인 가시성은 자식 컴포넌트만 갱신한다 — 대기(지연 커밋) GPU 잉크가 있으면 유지.
@@ -18882,6 +18890,25 @@ function StudioCuttoonEditor() {
           }
           input.document.mergeRasterOperationLog(log);
         },
+        canWriteLayer: (guardInput) => {
+          if (
+            guardInput.operationId !== input.plan.operationId
+            || guardInput.actorId !== input.actorId
+            || guardInput.pageId !== input.pageId
+            || guardInput.layerId !== input.layerId
+            || guardInput.intent !== input.plan.intent
+            || !scopeIsCurrent()
+          ) return false;
+          const history = pagesHistoryRef.current;
+          const currentIndex = Math.max(0, Math.min(pagesHiRef.current, history.length - 1));
+          const page = history[currentIndex]?.find(({ id }) => id === input.pageId) ?? null;
+          return sourceVectorIsCurrent() && canPublishStudioRasterLayer({
+            page,
+            pageId: input.pageId,
+            operationId: input.plan.operationId,
+            layerId: input.layerId,
+          });
+        },
         compensate: ({ reference, signal }) =>
           assetClientModule.deleteUnreferencedStudioRasterAssetUpload(
             input.workId,
@@ -19732,6 +19759,10 @@ function StudioCuttoonEditor() {
   async function startEditText(id: string) {
     const el = elementById.get(id);
     if (!el || (el.type !== "text" && el.type !== "bubble" && el.type !== "sticker")) return;
+    // Start the optional editor chunk before the collaboration lock round trip. Typical networked
+    // sessions therefore pay no post-lock module waterfall, while the initial Studio bundle stays
+    // focused on the canvas shell.
+    preloadStudioTextEditOverlay();
     const mutationTicket = captureStudioMutationTicket();
     const targetPageId = activePage.id;
     const targetMasterEditMode = masterEditMode;
@@ -26718,17 +26749,19 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
               />
             </Suspense>
           ) : null}
-          {editingUseOverlay && (
-            <StudioTextEditOverlay
-              key={editing!.id}
-              elementId={editing!.id}
-              elementById={elementById}
-              nodeRefsRef={nodeRefsRef}
-              effScale={effScale}
-              onCommit={commitEditText}
-              onCancel={cancelEditText}
-            />
-          )}
+          {editingUseOverlay ? (
+            <Suspense fallback={null}>
+              <StudioTextEditOverlay
+                key={editing!.id}
+                elementId={editing!.id}
+                elementById={elementById}
+                nodeRefsRef={nodeRefsRef}
+                effScale={effScale}
+                onCommit={commitEditText}
+                onCancel={cancelEditText}
+              />
+            </Suspense>
+          ) : null}
           </div>
           </div>
 
@@ -27137,15 +27170,17 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
           {/* 텍스트 인라인 편집 — canvasFlipH(거울상)나 세로쓰기 요소는 캔버스 실시간 오버레이가
               안전하게 다룰 수 없어 예전 중앙 모달로 폴백한다(StudioTextEditOverlay 상단 주석 참고).
               이 폴백은 zoomHostRef 좌표계가 필요 없는 단순 중앙 모달이라 여기(줌 프레임 밖)에 둔다. */}
-          {editingFallbackToModal && (
-            <StudioTextEditFallbackModal
-              key={editing!.id}
-              elementId={editing!.id}
-              elementById={elementById}
-              onCommit={commitEditText}
-              onCancel={cancelEditText}
-            />
-          )}
+          {editingFallbackToModal ? (
+            <Suspense fallback={null}>
+              <StudioTextEditFallbackModal
+                key={editing!.id}
+                elementId={editing!.id}
+                elementById={elementById}
+                onCommit={commitEditText}
+                onCancel={cancelEditText}
+              />
+            </Suspense>
+          ) : null}
         </div>
   );
 });

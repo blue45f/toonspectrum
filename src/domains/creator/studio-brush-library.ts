@@ -9,13 +9,14 @@
 //
 // 저장소(localStorage 호환 인터페이스)를 주입받아 순수하게 동작한다(studio-palette-library.ts와 동일).
 
-import { BRUSH_PRESETS, STABILIZER_MAX } from "./studio-brush";
+import { STABILIZER_MAX } from "./studio-brush";
 import {
   DEFAULT_STUDIO_BRUSH_DYNAMICS_SETTINGS,
   normalizeStudioBrushDynamicsSettings,
   studioBrushDynamicsSettingsEqual,
   type NormalizedStudioBrushDynamicsSettings,
 } from "./studio-brush-dynamics";
+import { resolveStudioBrushRuntime } from "./studio-brush-runtime-contract";
 import {
   resolveStudioStampBrushKind,
   STUDIO_STAMP_BRUSH_DEFAULTS,
@@ -189,10 +190,6 @@ export const DEFAULT_STUDIO_BRUSH_SNAPSHOT: StudioBrushSnapshot = {
 
 const DEFAULT_SNAPSHOT = DEFAULT_STUDIO_BRUSH_SNAPSHOT;
 
-function isKnownBrushId(id: unknown): id is string {
-  return typeof id === "string" && BRUSH_PRESETS.some((p) => p.id === id);
-}
-
 function clampedNumberField(
   o: Record<string, unknown>,
   key: string,
@@ -289,12 +286,10 @@ export function sanitizeBrushSnapshot(raw: unknown): { snapshot: StudioBrushSnap
   const o = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   const adjustedFields: string[] = [];
 
-  let brushId: string;
-  if (isKnownBrushId(o.brushId)) {
-    brushId = o.brushId;
-  } else {
+  const runtime = resolveStudioBrushRuntime(o.brushId);
+  const brushId = runtime.resolvedId;
+  if (runtime.status === "safe-fallback") {
     adjustedFields.push("brushId");
-    brushId = DEFAULT_SNAPSHOT.brushId;
   }
   const strokeWidth = clampedNumberField(
     o,
@@ -541,11 +536,13 @@ export function saveBrushWithResult(
   const readFailure = mutationFailureStatus(read.status);
   if (readFailure) return { brushes: read.brushes, status: readFailure };
   const current = read.brushes;
+  const { snapshot: safeSnapshot } = sanitizeBrushSnapshot(brush);
+  const safeBrush: StudioSavedBrush = { ...brush, ...safeSnapshot };
   const replacesExisting = current.some((candidate) => candidate.id === brush.id);
   if (!replacesExisting && current.length >= MAX_BRUSHES) {
     return { brushes: current, status: "full" };
   }
-  const next = [brush, ...current.filter((b) => b.id !== brush.id)];
+  const next = [safeBrush, ...current.filter((b) => b.id !== brush.id)];
   if (!persist(storage, next)) return { brushes: current, status: "storage-error" };
   return { brushes: next, status: "saved" };
 }
@@ -823,26 +820,27 @@ export const BRUSH_EXPORT_VERSION = 5;
 
 /** StudioSavedBrush → JSON 텍스트(들여쓰기 2칸, 사람이 읽을 수 있게). */
 export function writeBrushJson(brush: StudioSavedBrush): string {
+  const { snapshot } = sanitizeBrushSnapshot(brush);
   const payload = {
     kind: BRUSH_EXPORT_KIND,
     version: BRUSH_EXPORT_VERSION,
     name: brush.name,
-    brushId: brush.brushId,
-    strokeWidth: brush.strokeWidth,
-    brushOpacity: brush.brushOpacity,
-    color: brush.color,
-    stabilizer: brush.stabilizer,
-    stabilizerMode: brush.stabilizerMode,
-    postCorrection: brush.postCorrection,
-    preserveCorners: brush.preserveCorners,
-    pressureCurve: brush.pressureCurve,
-    useVelocityPressure: brush.useVelocityPressure,
-    velocitySensitivity: brush.velocitySensitivity,
-    tiltEnabled: brush.tiltEnabled,
-    tipAngle: brush.tipAngle,
-    tipRoundness: brush.tipRoundness,
-    brushDynamics: normalizeStudioBrushDynamicsSettings(brush.brushDynamics),
-    stampTuning: sanitizeStampTuning(brush.brushId, brush.stampTuning, []),
+    brushId: snapshot.brushId,
+    strokeWidth: snapshot.strokeWidth,
+    brushOpacity: snapshot.brushOpacity,
+    color: snapshot.color,
+    stabilizer: snapshot.stabilizer,
+    stabilizerMode: snapshot.stabilizerMode,
+    postCorrection: snapshot.postCorrection,
+    preserveCorners: snapshot.preserveCorners,
+    pressureCurve: snapshot.pressureCurve,
+    useVelocityPressure: snapshot.useVelocityPressure,
+    velocitySensitivity: snapshot.velocitySensitivity,
+    tiltEnabled: snapshot.tiltEnabled,
+    tipAngle: snapshot.tipAngle,
+    tipRoundness: snapshot.tipRoundness,
+    brushDynamics: snapshot.brushDynamics,
+    stampTuning: snapshot.stampTuning,
   };
   return JSON.stringify(payload, null, 2);
 }

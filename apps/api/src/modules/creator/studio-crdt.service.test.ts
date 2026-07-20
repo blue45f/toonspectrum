@@ -1725,6 +1725,67 @@ describe("StudioCrdtService", () => {
     jumped.destroy();
   });
 
+  it("rejects raster appends to a locked group but admits an atomic unlock and draw", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const current = service(repository);
+    const workId = "work-raster-layer-lock";
+    const base = new Y.Doc();
+    const lockedGroup = addLayerGroup(base, { id: "layer-ink", pageId: "page-1" });
+    lockedGroup.set("prop:locked", true);
+    lockedGroup.set("unset:locked", false);
+    const baseUpdate = Y.encodeStateAsUpdate(base);
+    await current.applyUpdate({
+      workId,
+      updateId: "30000000-0000-4000-8000-000000000482",
+      actorUserId: "editor",
+      data: fromUint8Array(baseUpdate),
+    });
+
+    const rejected = createRasterDocument({
+      operation: rasterOperation(
+        "30000000-0000-4000-8000-000000000483",
+        "d".repeat(64),
+        "editor"
+      ),
+    });
+    await expect(current.applyUpdate({
+      workId,
+      updateId: "30000000-0000-4000-8000-000000000484",
+      actorUserId: "editor",
+      data: fromUint8Array(Y.encodeStateAsUpdate(rejected)),
+    })).rejects.toThrow(/locked layer/u);
+    expect(repository.updates.get(workId)).toHaveLength(1);
+    expect(repository.receipts.size).toBe(1);
+
+    const unlocked = new Y.Doc();
+    Y.applyUpdate(unlocked, baseUpdate);
+    const baseVector = Y.encodeStateVector(unlocked);
+    const unlockedGroup = addLayerGroup(unlocked, { id: "layer-ink", pageId: "page-1" });
+    unlockedGroup.set("prop:locked", false);
+    unlockedGroup.set("unset:locked", false);
+    const acceptedRaster = createRasterDocument({
+      operation: rasterOperation(
+        "30000000-0000-4000-8000-000000000485",
+        "e".repeat(64),
+        "editor"
+      ),
+    });
+    Y.applyUpdate(unlocked, Y.encodeStateAsUpdate(acceptedRaster));
+    await expect(current.applyUpdate({
+      workId,
+      updateId: "30000000-0000-4000-8000-000000000486",
+      actorUserId: "editor",
+      data: fromUint8Array(Y.encodeStateAsUpdate(unlocked, baseVector)),
+    })).resolves.toMatchObject({ duplicate: false, serverSequence: "2" });
+    expect(repository.updates.get(workId)).toHaveLength(2);
+    expect(repository.receipts.size).toBe(2);
+
+    base.destroy();
+    rejected.destroy();
+    unlocked.destroy();
+    acceptedRaster.destroy();
+  });
+
   it("allows an aggregate update to retransmit an existing other-actor event", async () => {
     const repository = new MemoryStudioCrdtRepository();
     const current = service(repository);
@@ -1975,7 +2036,7 @@ describe("StudioCrdtService", () => {
     hydrated.destroy();
   });
 
-  it("serializes raster set-union races and rejects a concurrent immutable-ID collision", async () => {
+  it("serializes different-actor raster set-union races and rejects an immutable-ID collision", async () => {
     const unionRepository = new MemoryStudioCrdtRepository();
     unionRepository.beforeAppend = twoPartyBarrier();
     const unionLeft = service(unionRepository);
@@ -1991,7 +2052,7 @@ describe("StudioCrdtService", () => {
       operation: rasterOperation(
         "30000000-0000-4000-8000-000000000461",
         "b".repeat(64),
-        "artist-a"
+        "artist-b"
       ),
     });
     const unionResults = await Promise.allSettled([
@@ -2004,7 +2065,7 @@ describe("StudioCrdtService", () => {
       unionRight.applyUpdate({
         workId: "work-raster-union-race",
         updateId: "30000000-0000-4000-8000-000000000463",
-        actorUserId: "artist-a",
+        actorUserId: "artist-b",
         data: fromUint8Array(Y.encodeStateAsUpdate(rightDocument)),
       }),
     ]);

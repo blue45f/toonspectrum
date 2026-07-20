@@ -1,6 +1,13 @@
 import {
+  createStudioRasterCompactionCheckpoint,
+  type StudioRasterCompactionCheckpoint,
+  type StudioRasterCompactionOrderKey,
+} from "@/lib/studio-crdt-raster-compaction";
+import {
   STUDIO_RASTER_MAX_ASSET_BYTES,
   STUDIO_RASTER_MAX_TILE_SIZE,
+  canonicalStudioRasterJson,
+  compareStudioRasterEventOrder,
   createStudioRasterOperationLog,
   studioRasterUndoneOperationIds,
   type StudioRasterAssetReference,
@@ -45,6 +52,12 @@ export type StudioRasterReplayTileFilter = (
 export interface StudioRasterReplayRuntimeRequest {
   readonly workId: string;
   readonly log: StudioRasterOperationLog;
+  /**
+   * Optional trusted stable-prefix snapshot. Sparse missing tiles are transparent. Operations at
+   * or before `through` are never replayed over the snapshot, while the remaining immutable tail
+   * keeps the same total-order compositing semantics as a replay from the transparent origin.
+   */
+  readonly checkpoint?: StudioRasterCompactionCheckpoint;
   /**
    * Selects returned presentation tiles. Conditional replacements pull their complete multi-tile
    * dependency closure into the private replay set so an off-screen conflict can never partially
@@ -105,6 +118,7 @@ export interface StudioRasterImmutableTileFrame {
 export interface StudioRasterReplayRuntimeResult {
   readonly workId: string;
   readonly surface: StudioRasterSurfaceSpec;
+  readonly checkpointId: string | null;
   readonly tiles: readonly StudioRasterImmutableTileFrame[];
   readonly appliedOperationIds: readonly string[];
   readonly undoneOperationIds: readonly string[];
@@ -136,6 +150,11 @@ interface DecodedAssetState {
 interface ProjectedOperation {
   readonly operation: StudioRasterOperation;
   readonly patches: readonly StudioRasterTilePatch[];
+}
+
+interface PreparedCheckpoint {
+  readonly value: StudioRasterCompactionCheckpoint;
+  readonly tilesByKey: ReadonlyMap<string, StudioRasterAssetReference>;
 }
 
 export interface StudioRasterBrowserDecodeEnvironment {
@@ -632,9 +651,74 @@ function selectedTileKeys(
   return selected;
 }
 
-function activeOperations(log: StudioRasterOperationLog): readonly StudioRasterOperation[] {
+function operationOrderKey(operation: StudioRasterOperation): StudioRasterCompactionOrderKey {
+  return { ...operation.order, eventId: operation.operationId };
+}
+
+function prepareCheckpoint(
+  checkpoint: StudioRasterCompactionCheckpoint | undefined,
+  log: StudioRasterOperationLog
+): PreparedCheckpoint | null {
+  if (checkpoint === undefined) return null;
+  const value = createStudioRasterCompactionCheckpoint(checkpoint);
+  if (canonicalStudioRasterJson(value.surface) !== canonicalStudioRasterJson(log.surface)) {
+    fail("checkpoint_surface_mismatch", "checkpoint와 래스터 작업 로그의 표면이 일치하지 않습니다.");
+  }
+
+  const sealedOperationIds = new Set(value.sealedOperationIds);
+  for (const operation of log.operations) {
+    const beforeOrAtCheckpoint = compareStudioRasterEventOrder(
+      operationOrderKey(operation),
+      value.through
+    ) <= 0;
+    if (beforeOrAtCheckpoint !== sealedOperationIds.has(operation.operationId)) {
+      fail(
+        "checkpoint_operation_mismatch",
+        "checkpoint 봉인 경계와 래스터 작업 로그의 operation 집합이 일치하지 않습니다."
+      );
+    }
+  }
+
+  const sealedUndoOperationIds = new Set(value.sealedUndoOperationIds);
+  const sealedUndoAcknowledgementIds = new Set(value.sealedUndoAcknowledgementIds);
+  for (const undo of log.undoOperations) {
+    if (
+      sealedOperationIds.has(undo.targetOperationId) &&
+      !sealedUndoOperationIds.has(undo.undoOperationId)
+    ) {
+      fail("checkpoint_undo_horizon", "checkpoint으로 봉인된 작업을 뒤늦게 실행 취소할 수 없습니다.");
+    }
+  }
+  for (const acknowledgement of log.undoAcknowledgements) {
+    if (
+      sealedUndoOperationIds.has(acknowledgement.undoOperationId) &&
+      !sealedUndoAcknowledgementIds.has(acknowledgement.acknowledgementId)
+    ) {
+      fail("checkpoint_undo_horizon", "checkpoint으로 봉인된 실행 취소를 뒤늦게 복원할 수 없습니다.");
+    }
+  }
+
+  return {
+    value,
+    tilesByKey: new Map(value.tiles.map((tile) => [
+      tileKey(tile.tileX, tile.tileY),
+      tile.asset,
+    ])),
+  };
+}
+
+function activeOperations(
+  log: StudioRasterOperationLog,
+  checkpoint: PreparedCheckpoint | null
+): readonly StudioRasterOperation[] {
   const undone = studioRasterUndoneOperationIds(log);
-  return log.operations.filter((operation) => !undone.has(operation.operationId));
+  return log.operations.filter((operation) => (
+    !undone.has(operation.operationId) &&
+    (!checkpoint || compareStudioRasterEventOrder(
+      operationOrderKey(operation),
+      checkpoint.value.through
+    ) > 0)
+  ));
 }
 
 function replacementDependencyClosure(
@@ -676,14 +760,32 @@ function projectedOperations(
   return projected;
 }
 
-function uniqueProjectedAssets(
-  operations: readonly ProjectedOperation[]
+function uniqueReplayAssets(
+  operations: readonly ProjectedOperation[],
+  checkpoint: PreparedCheckpoint | null,
+  closure: ReadonlySet<string>
 ): StudioRasterAssetReference[] {
   const assets = new Map<string, StudioRasterAssetReference>();
+  const add = (reference: StudioRasterAssetReference) => {
+    const existing = assets.get(reference.assetId);
+    if (
+      existing &&
+      canonicalStudioRasterJson(existing) !== canonicalStudioRasterJson(reference)
+    ) {
+      fail(
+        "asset_identity_conflict",
+        `checkpoint와 tail이 같은 자산 ID ${reference.assetId}에 서로 다른 내용을 선언합니다.`
+      );
+    }
+    assets.set(reference.assetId, reference);
+  };
+  for (const [key, reference] of checkpoint?.tilesByKey ?? []) {
+    if (closure.has(key)) add(reference);
+  }
   for (const { patches } of operations) {
     for (const patch of patches) {
-      assets.set(patch.effect.payload.assetId, patch.effect.payload);
-      if (patch.selectionMask) assets.set(patch.selectionMask.assetId, patch.selectionMask);
+      add(patch.effect.payload);
+      if (patch.selectionMask) add(patch.selectionMask);
     }
   }
   return [...assets.values()].sort((left, right) => left.assetId.localeCompare(right.assetId));
@@ -927,11 +1029,12 @@ export async function replayStudioRasterCrdtPixels(
 
   try {
     throwIfAborted(controller.signal);
+    const checkpoint = prepareCheckpoint(request.checkpoint, log);
     const selected = selectedTileKeys(log.surface, request.visibleTileFilter);
-    const operations = activeOperations(log);
+    const operations = activeOperations(log, checkpoint);
     const closure = replacementDependencyClosure(selected, operations);
     const projected = projectedOperations(operations, closure);
-    const assetReferences = uniqueProjectedAssets(projected);
+    const assetReferences = uniqueReplayAssets(projected, checkpoint, closure);
     assertMemoryBudget(log.surface, closure, assetReferences, concurrency, maxResidentBytes);
 
     const runtimeDependencies = {
@@ -952,9 +1055,18 @@ export async function replayStudioRasterCrdtPixels(
     for (const key of closure) {
       const [tileX, tileY] = key.split(":").map(Number);
       const dimensions = tileDimensions(log.surface, tileX!, tileY!);
+      const checkpointReference = checkpoint?.tilesByKey.get(key);
+      const checkpointAsset = checkpointReference
+        ? assetById.get(checkpointReference.assetId)
+        : undefined;
+      if (checkpointReference && !checkpointAsset) {
+        fail("asset_cache_incomplete", "checkpoint 타일 자산이 검증 캐시에 없습니다.");
+      }
       tileByKey.set(key, {
         ...dimensions,
-        rgba: new Uint8ClampedArray(dimensions.width * dimensions.height * 4),
+        rgba: checkpointAsset
+          ? Uint8ClampedArray.from(checkpointAsset.rgba)
+          : new Uint8ClampedArray(dimensions.width * dimensions.height * 4),
       });
     }
 
@@ -1009,6 +1121,7 @@ export async function replayStudioRasterCrdtPixels(
     return Object.freeze({
       workId: request.workId,
       surface: freezeSurface(log.surface),
+      checkpointId: checkpoint?.value.checkpointId ?? null,
       tiles: Object.freeze(frames),
       appliedOperationIds: freezeStrings(appliedOperationIds),
       undoneOperationIds: freezeStrings([...studioRasterUndoneOperationIds(log)].sort()),

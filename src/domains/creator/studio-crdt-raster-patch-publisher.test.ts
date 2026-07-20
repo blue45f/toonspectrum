@@ -138,6 +138,41 @@ describe("studio raster patch publisher", () => {
     }
   });
 
+  it("fails closed before encoding when the authoritative layer is locked", async () => {
+    const setup = dependencies({ canWriteLayer: vi.fn(async () => false) });
+
+    await expect(publishStudioRasterPatch(input(), setup.value)).rejects.toMatchObject({
+      code: "layer_locked",
+    });
+    expect(setup.value.canWriteLayer).toHaveBeenCalledOnce();
+    expect(setup.value.canWriteLayer).toHaveBeenCalledWith({
+      operationId: input().operationId,
+      actorId: "artist-a",
+      pageId: "page-1",
+      layerId: "layer-ink",
+      intent: "paint",
+    }, expect.any(AbortSignal));
+    expect(setup.value.encode).not.toHaveBeenCalled();
+    expect(setup.value.upload).not.toHaveBeenCalled();
+    expect(setup.append).not.toHaveBeenCalled();
+  });
+
+  it("rechecks a layer lock race before append and compensates verified uploads", async () => {
+    const canWriteLayer = vi.fn()
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+    const compensate = vi.fn(async () => true);
+    const setup = dependencies({ canWriteLayer, compensate });
+
+    await expect(publishStudioRasterPatch(input(), setup.value)).rejects.toMatchObject({
+      code: "layer_locked",
+    });
+    expect(canWriteLayer).toHaveBeenCalledTimes(2);
+    expect(setup.value.upload).toHaveBeenCalledOnce();
+    expect(compensate).toHaveBeenCalledOnce();
+    expect(setup.append).not.toHaveBeenCalled();
+  });
+
   it("omits fully transparent tile crops and skips an entirely transparent operation", async () => {
     const partial = dependencies();
     const rect = { x: 0, y: 0, width: 256, height: 128 };
