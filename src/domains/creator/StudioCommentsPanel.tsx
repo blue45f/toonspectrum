@@ -14,6 +14,7 @@ import {
   Plus,
   Reply,
   RotateCcw,
+  RotateCw,
   Search,
   Send,
   Trash2,
@@ -72,6 +73,8 @@ export interface StudioCommentsPanelProps {
   capabilities?: Partial<StudioCommentsPanelCapabilities>;
   mutationDisabledReason?: string;
   syncError?: string;
+  syncing?: boolean;
+  onRefresh?: () => void;
   storageMode?: "document" | "team";
   unreadThreadIds?: ReadonlySet<string>;
   /** 팀 댓글 도입 전에 문서에 저장된 댓글. 내용과 위치는 보존하되 서버 액션은 노출하지 않는다. */
@@ -205,6 +208,8 @@ export function StudioCommentsPanel({
   capabilities: capabilityOverrides,
   mutationDisabledReason,
   syncError,
+  syncing = false,
+  onRefresh,
   storageMode = "document",
   unreadThreadIds = EMPTY_THREAD_IDS,
   readOnlyThreadIds = EMPTY_THREAD_IDS,
@@ -238,6 +243,7 @@ export function StudioCommentsPanel({
   const [filter, setFilter] = useState<CommentFilter>("current");
   const [sort, setSort] = useState<CommentSort>("recent");
   const [composerExpanded, setComposerExpanded] = useState(false);
+  const [composerLocationPickerOpen, setComposerLocationPickerOpen] = useState(false);
   const [composerAnchor, setComposerAnchor] = useState<StudioCommentAnchor | null>(null);
   const [composerAnchorLabelSnapshot, setComposerAnchorLabelSnapshot] = useState<string | null>(null);
   const [newComment, setNewComment] = useState("");
@@ -331,6 +337,7 @@ export function StudioCommentsPanel({
         activeAnchor ? getAnchorLabel(activeAnchor, anchorOptions) : null
       );
       setComposerExpanded(capabilities.create && Boolean(activeAnchor) && !hasThreadAtAnchor);
+      setComposerLocationPickerOpen(false);
     }
     const preserveReplyDraft = Boolean(
       replyingThreadId
@@ -372,6 +379,7 @@ export function StudioCommentsPanel({
     setQuery("");
     if (!newComment.trim()) {
       setComposerExpanded(false);
+      setComposerLocationPickerOpen(false);
       setComposerAnchor(null);
       setComposerAnchorLabelSnapshot(null);
     }
@@ -526,6 +534,7 @@ export function StudioCommentsPanel({
       focusReviewRail();
       setNewComment("");
       setComposerExpanded(false);
+      setComposerLocationPickerOpen(false);
       setComposerAnchor(null);
       setComposerAnchorLabelSnapshot(null);
       pendingNewCommentIdRef.current = null;
@@ -699,6 +708,9 @@ export function StudioCommentsPanel({
   const composerAnchorLabel = composerAnchor
     ? composerAnchorLabelSnapshot ?? getAnchorLabel(composerAnchor, anchorOptions)
     : "선택한 위치 없음";
+  const reviewRailClassName = composerExpanded
+    ? "fixed inset-x-2 bottom-[calc(7rem+env(safe-area-inset-bottom))] z-[80] m-0 ml-0 flex max-h-[min(72dvh,34rem)] max-w-none flex-col overflow-hidden rounded-2xl border border-line bg-panel p-0 text-fg shadow-[0_-18px_48px_oklch(0.08_0.01_70/0.35)] outline-none sm:inset-x-auto sm:bottom-auto sm:right-3 sm:top-1/2 sm:w-[min(24rem,calc(100vw-1.5rem))] sm:-translate-y-1/2 sm:shadow-[0_18px_60px_oklch(0.08_0.01_70/0.48)]"
+    : "fixed inset-x-2 bottom-[calc(7rem+env(safe-area-inset-bottom))] top-auto z-[80] m-0 ml-0 flex h-[min(62dvh,36rem)] max-h-none max-w-none flex-col overflow-hidden rounded-2xl border border-line bg-panel p-0 text-fg shadow-[0_-18px_48px_oklch(0.08_0.01_70/0.35)] outline-none sm:inset-y-3 sm:right-3 sm:left-auto sm:h-auto sm:w-[min(27rem,calc(100vw-1.5rem))] sm:rounded-2xl sm:border sm:shadow-[0_18px_60px_oklch(0.08_0.01_70/0.48)]";
 
   const reviewRail = (
     <dialog
@@ -707,7 +719,7 @@ export function StudioCommentsPanel({
       ref={dialogRef}
       aria-labelledby={titleId}
       aria-describedby={descriptionId}
-      aria-busy={saving || readMutation !== null}
+      aria-busy={saving || readMutation !== null || syncing}
       tabIndex={-1}
       data-studio-comments-rail="true"
       onKeyDown={(event) => {
@@ -738,7 +750,7 @@ export function StudioCommentsPanel({
           onClose();
         }
       }}
-      className="fixed inset-x-2 bottom-[calc(7rem+env(safe-area-inset-bottom))] top-auto z-[80] m-0 ml-0 flex h-[min(62dvh,36rem)] max-h-none max-w-none flex-col overflow-hidden rounded-2xl border border-line bg-panel p-0 text-fg shadow-[0_-18px_48px_oklch(0.08_0.01_70/0.35)] outline-none sm:inset-y-3 sm:right-3 sm:left-auto sm:h-auto sm:w-[min(27rem,calc(100vw-1.5rem))] sm:rounded-2xl sm:border sm:shadow-[0_18px_60px_oklch(0.08_0.01_70/0.48)]"
+      className={reviewRailClassName}
     >
       <header className="flex shrink-0 items-start gap-3 border-b border-line px-4 py-3">
         <span className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl border border-line bg-card text-accent">
@@ -746,7 +758,9 @@ export function StudioCommentsPanel({
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 id={titleId} className="text-sm font-bold text-fg">검토 댓글</h2>
+            <h2 id={titleId} className="text-sm font-bold text-fg">
+              {composerExpanded ? "새 댓글" : "검토 댓글"}
+            </h2>
             <span className="inline-flex items-center gap-1 rounded-md border border-cool/30 bg-cool/10 px-1.5 py-0.5 text-[0.62rem] font-semibold text-cool" title={storageMode === "team" ? "팀 댓글 서버에 안전하게 동기화됩니다." : "프로젝트 파일에 댓글이 함께 저장됩니다."}>
               <HardDrive size={10} aria-hidden />
               {storageMode === "team" ? "팀 동기화" : "문서 저장"}
@@ -758,17 +772,31 @@ export function StudioCommentsPanel({
             ) : null}
           </div>
           <p id={descriptionId} className="mt-0.5 truncate text-xs leading-relaxed text-fg-3">
-            캔버스를 보며 위치별 피드백을 검토하세요.
+            {composerExpanded
+              ? "클릭한 위치에 바로 피드백을 남겨요."
+              : "캔버스를 보며 위치별 피드백을 검토하세요."}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
-          <span className="rounded-md bg-raised px-2 py-1 text-[0.65rem] font-semibold tabular-nums text-fg-2" aria-label={`열린 댓글 ${openCount}개`}>
+          {!composerExpanded ? <span className="rounded-md bg-raised px-2 py-1 text-[0.65rem] font-semibold tabular-nums text-fg-2" aria-label={`열린 댓글 ${openCount}개`}>
             열림 {openCount}
-          </span>
+          </span> : null}
+          {onRefresh && !composerExpanded ? (
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={syncing}
+              aria-label={syncing ? "팀 댓글 동기화 중" : "팀 댓글 새로고침"}
+              title={syncing ? "팀 댓글 동기화 중" : "팀 댓글 새로고침"}
+              className="grid size-11 shrink-0 place-items-center rounded-lg border border-line bg-card text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-60 sm:size-9"
+            >
+              <RotateCw size={15} className={syncing ? "animate-spin motion-reduce:animate-none" : undefined} aria-hidden />
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={onClose}
-            aria-label="검토 댓글 닫기"
+            aria-label={composerExpanded ? "댓글 작성 닫기" : "검토 댓글 닫기"}
             title="닫기 (Esc)"
             className="grid size-11 shrink-0 place-items-center rounded-lg border border-line bg-card text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:size-9"
           >
@@ -779,21 +807,35 @@ export function StudioCommentsPanel({
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-2 [scrollbar-gutter:stable]">
           {composerExpanded ? (
-            <form onSubmit={submitComment} className="border-b border-line bg-card/25 px-4 py-3">
-              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
-                <div className="min-w-0">
-                  <label htmlFor={`${titleId}-body`} className="block text-xs font-bold text-fg">
-                    새 댓글
+            <form onSubmit={submitComment} className="bg-card/25 px-4 py-3">
+              <div className="flex min-w-0 items-start gap-2 rounded-xl border border-line bg-panel/75 p-2.5">
+                <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent">
+                  <MapPin size={14} aria-hidden />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <label htmlFor={`${titleId}-body`} className="block text-[0.68rem] font-semibold text-fg-3">
+                    댓글 위치
                   </label>
-                  <p className="mt-0.5 truncate text-[0.7rem] text-fg-3" title={composerAnchorLabel}>
-                    연결 위치 · {composerAnchorLabel}
+                  <p className="mt-0.5 truncate text-xs font-semibold text-fg" title={composerAnchorLabel}>
+                    {composerAnchorLabel}
                   </p>
                 </div>
+                {selectableAnchorOptions.length > 0 && onSelectAnchor ? (
+                  <button
+                    type="button"
+                    aria-expanded={composerLocationPickerOpen}
+                    onClick={() => setComposerLocationPickerOpen((current) => !current)}
+                    className={QUIET_BUTTON_CLASS}
+                  >
+                    위치 변경
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => {
                     focusReviewRail();
                     setComposerExpanded(false);
+                    setComposerLocationPickerOpen(false);
                     setNewComment("");
                     setComposerAnchor(null);
                     setComposerAnchorLabelSnapshot(null);
@@ -802,16 +844,18 @@ export function StudioCommentsPanel({
                   }}
                   className={QUIET_BUTTON_CLASS}
                 >
-                  <X size={13} aria-hidden />
-                  작성 취소
+                  취소
                 </button>
-                {composerAnchor && !composerAnchorValid ? (
-                  <p role="status" className="col-span-2 rounded-lg border border-warn/35 bg-warn/10 px-2.5 py-2 text-[0.7rem] font-semibold text-warn">
-                    연결 위치가 삭제되었어요. 아래에서 새 위치를 선택해 주세요.
-                  </p>
-                ) : null}
-                {selectableAnchorOptions.length > 0 && onSelectAnchor ? (
-                  <div className="col-span-2 min-w-0">
+              </div>
+              {composerAnchor && !composerAnchorValid ? (
+                <p role="status" className="mt-2 rounded-lg border border-warn/35 bg-warn/10 px-2.5 py-2 text-[0.7rem] font-semibold text-warn">
+                  연결 위치가 삭제되었어요. 아래에서 새 위치를 선택해 주세요.
+                </p>
+              ) : null}
+              {(composerLocationPickerOpen || !composerAnchorValid)
+                && selectableAnchorOptions.length > 0
+                && onSelectAnchor ? (
+                  <div className="mt-2 min-w-0">
                     <label htmlFor={`${titleId}-anchor`} className="sr-only">댓글 연결 위치</label>
                     <select
                       id={`${titleId}-anchor`}
@@ -824,6 +868,7 @@ export function StudioCommentsPanel({
                           setComposerAnchor(option.anchor);
                           setComposerAnchorLabelSnapshot(option.label);
                           onSelectAnchor(option.anchor);
+                          setComposerLocationPickerOpen(false);
                         }
                       }}
                       className={FIELD_CLASS}
@@ -837,19 +882,18 @@ export function StudioCommentsPanel({
                     </select>
                   </div>
                 ) : null}
-              </div>
               <textarea
                 ref={composerRef}
                 id={`${titleId}-body`}
                 value={newComment}
                 maxLength={STUDIO_COMMENTS_MAX_BODY_LENGTH}
-                rows={3}
+                rows={4}
                 disabled={!composerAnchorValid || !canAddThread || saving}
                 placeholder={!composerAnchor
                   ? "먼저 페이지, 컷 또는 요소를 선택해 주세요."
                   : !composerAnchorValid
                     ? "삭제되지 않은 페이지, 컷 또는 요소를 다시 선택해 주세요."
-                    : "수정할 점이나 확인이 필요한 내용을 구체적으로 남겨 주세요."}
+                    : "수정할 점이나 확인이 필요한 내용을 남겨 주세요."}
                 onChange={(event) =>
                   setNewComment(event.target.value.slice(0, STUDIO_COMMENTS_MAX_BODY_LENGTH))
                 }
@@ -863,7 +907,7 @@ export function StudioCommentsPanel({
                     event.currentTarget.form?.requestSubmit();
                   }
                 }}
-                className={`${FIELD_CLASS} mt-2 min-h-24 resize-y`}
+                className={`${FIELD_CLASS} mt-2 min-h-28 resize-y text-sm leading-relaxed`}
               />
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                 <span className="text-[0.7rem] text-fg-3">
@@ -881,7 +925,7 @@ export function StudioCommentsPanel({
                     className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-3.5 text-xs font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-9"
                   >
                     <Send size={13} aria-hidden />
-                    댓글 등록
+                    등록
                   </button>
                 </div>
               </div>
@@ -913,6 +957,7 @@ export function StudioCommentsPanel({
                   setComposerAnchorLabelSnapshot(
                     activeAnchor ? getAnchorLabel(activeAnchor, anchorOptions) : null
                   );
+                  setComposerLocationPickerOpen(false);
                   setComposerExpanded(true);
                   setError(null);
                 }}
@@ -952,6 +997,8 @@ export function StudioCommentsPanel({
             </div>
           )}
 
+          {!composerExpanded ? (
+          <>
           <div className="sticky top-0 z-10 flex flex-col gap-1.5 border-b border-line bg-panel/95 px-4 py-2.5 backdrop-blur-sm sm:px-5">
             <div className="flex min-w-0 items-center gap-1.5">
               <label className="relative min-w-0 flex-1">
@@ -1563,6 +1610,8 @@ export function StudioCommentsPanel({
               })}
             </ol>
           )}
+          </>
+          ) : null}
         </div>
       </dialog>
   );

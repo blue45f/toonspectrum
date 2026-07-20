@@ -101,7 +101,7 @@ export function StudioIsometricGridOverlay({
           }}
           onMouseLeave={(e: Konva.KonvaEventObject<MouseEvent>) => {
             const stage = e.target.getStage();
-            if (stage) stage.container().style.cursor = "default";
+            if (stage) stage.container().style.cursor = "";
           }}
           onDragMove={(e: Konva.KonvaEventObject<DragEvent>) => {
             if (disabled) return;

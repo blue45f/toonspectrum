@@ -149,6 +149,20 @@ describe("StudioCommentsPanelSession", () => {
     expect(currentPanelProps().onMarkAllRead).toBe(
       props.stableHandlers.markAllStudioCommentThreadsRead
     );
+    expect(currentPanelProps().onRefresh).toBe(
+      props.stableHandlers.refreshStudioTeamComments
+    );
+
+    view.rerender(
+      <StudioCommentsPanelSession
+        {...props}
+        workId="work-1"
+        studioTeamCommentsWorkId="work-1"
+        studioTeamCommentsSyncing
+        studioTeamCommentCapabilities={{ view: true, comment: true, resolve: true }}
+      />
+    );
+    expect(currentPanelProps().syncing).toBe(true);
 
     view.rerender(
       <StudioCommentsPanelSession

@@ -27,12 +27,14 @@ import {
   Type as TypeIcon,
   Wind,
 } from "lucide-react";
-import { memo, useEffect, useId, useRef } from "react";
+import { memo, useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import {
   DEFAULT_STUDIO_RAIL_TOOL_ORDER,
   studioRailToolLabel,
   type StudioAppSettings,
+  type StudioAppSettingsTab,
   type StudioRailToolId,
 } from "./studio-app-settings";
 import { type BubbleVariant } from "./studio-assets";
@@ -107,6 +109,7 @@ interface StudioLeftToolRailProps {
   referencePanelOpen: boolean;
   selected: El | null;
   selectedContentMutationLocked: boolean;
+  setAppSettingsInitialTab: import("react").Dispatch<import("react").SetStateAction<StudioAppSettingsTab>>;
   setAppSettingsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setDrawMode: import("react").Dispatch<import("react").SetStateAction<DrawMode>>;
   setDrawShape: import("react").Dispatch<import("react").SetStateAction<DrawShapeKind>>;
@@ -156,6 +159,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
   referencePanelOpen,
   selected,
   selectedContentMutationLocked,
+  setAppSettingsInitialTab,
   setAppSettingsOpen,
   setDrawMode,
   setDrawShape,
@@ -181,6 +185,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
   const railMoreTriggerId = `${railMoreDialogId}-trigger`;
   const railMoreTitleId = `${railMoreDialogId}-title`;
   const railMoreDialogRef = useRef<HTMLDivElement>(null);
+  const [railMorePosition, setRailMorePosition] = useState({ bottom: 8, left: 56 });
   const {
     addBubble,
     addText,
@@ -203,6 +208,15 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
   useEffect(() => {
     if (!railMoreOpen) return;
     const dialog = railMoreDialogRef.current;
+    const updatePosition = () => {
+      const trigger = document.getElementById(railMoreTriggerId);
+      if (!trigger) return;
+      const rect = trigger.getBoundingClientRect();
+      setRailMorePosition({
+        bottom: Math.max(8, globalThis.innerHeight - rect.bottom),
+        left: Math.max(8, Math.min(rect.right + 4, globalThis.innerWidth - 216)),
+      });
+    };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       event.preventDefault();
@@ -210,7 +224,17 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
       setRailMoreOpen(false);
       requestAnimationFrame(() => document.getElementById(railMoreTriggerId)?.focus());
     };
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (dialog?.contains(target) || document.getElementById(railMoreTriggerId)?.contains(target)) return;
+      setRailMoreOpen(false);
+    };
+    updatePosition();
     dialog?.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    globalThis.addEventListener("resize", updatePosition);
+    globalThis.addEventListener("scroll", updatePosition, true);
     const frame = requestAnimationFrame(() => {
       dialog
         ?.querySelector<HTMLElement>('button:not([disabled]), [href], input:not([disabled])')
@@ -219,6 +243,9 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
     return () => {
       cancelAnimationFrame(frame);
       dialog?.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("pointerdown", handlePointerDown, true);
+      globalThis.removeEventListener("resize", updatePosition);
+      globalThis.removeEventListener("scroll", updatePosition, true);
     };
   }, [railMoreOpen, railMoreTriggerId, setRailMoreOpen]);
 
@@ -238,6 +265,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               description="캔버스 위 요소를 클릭·드래그로 고르고 옮기거나 크기를 바꿉니다. 여러 개를 드래그해 함께 선택할 수 있어요."
               active={tool === "select" && !advancedFillActive && !eyedropperActive}
               onClick={() => {
+                disarmAllPixelTools();
                 setTool("select");
                 setEyedropperActive(false);
                 setMenu(null);
@@ -251,6 +279,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               description="캔버스를 드래그해 이동합니다. Space 키와 같은 역할입니다."
               active={tool === "hand"}
               onClick={() => {
+                disarmAllPixelTools();
                 setTool((t) => (t === "hand" ? "select" : "hand"));
                 setEyedropperActive(false);
                 setMenu(null);
@@ -341,6 +370,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
               grouped
               onClick={() => {
+                disarmAllPixelTools();
                 setTool("draw");
                 setDrawMode("pen");
                 setEyedropperActive(false);
@@ -357,6 +387,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               disabled={activeSurfaceReviewLocked}
               unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
               onClick={() => {
+                disarmAllPixelTools();
                 setTool("draw");
                 setDrawMode("pixel");
                 setStrokeWidth(1);
@@ -374,6 +405,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               disabled={activeSurfaceReviewLocked}
               unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
               onClick={() => {
+                disarmAllPixelTools();
                 setTool("draw");
                 setDrawMode("eraser");
                 setEyedropperActive(false);
@@ -447,6 +479,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               disabled={activeSurfaceReviewLocked}
               unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
               onClick={() => {
+                disarmAllPixelTools();
                 setTool("draw");
                 setDrawMode("lasso-fill");
                 setEyedropperActive(false);
@@ -601,6 +634,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               disabled={activeSurfaceReviewLocked}
               unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
               onClick={() => {
+                disarmAllPixelTools();
                 setTool("draw");
                 setDrawMode("shape");
                 setDrawShape("rect");
@@ -618,6 +652,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               disabled={activeSurfaceReviewLocked}
               unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
               onClick={() => {
+                disarmAllPixelTools();
                 setTool("draw");
                 setDrawMode("shape");
                 setDrawShape("ellipse");
@@ -732,16 +767,28 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                 aria-controls={railMoreOpen ? railMoreDialogId : undefined}
                 aria-expanded={railMoreOpen}
                 aria-haspopup="dialog"
-                onClick={() => setRailMoreOpen((v) => !v)}
+                onClick={() => {
+                  if (!railMoreOpen) {
+                    const rect = document.getElementById(railMoreTriggerId)?.getBoundingClientRect();
+                    if (rect) {
+                      setRailMorePosition({
+                        bottom: Math.max(8, globalThis.innerHeight - rect.bottom),
+                        left: Math.max(8, Math.min(rect.right + 4, globalThis.innerWidth - 216)),
+                      });
+                    }
+                  }
+                  setRailMoreOpen((v) => !v);
+                }}
               />
-              {railMoreOpen ? (
+              {railMoreOpen && typeof document !== "undefined" ? createPortal((
                 <div
                   ref={railMoreDialogRef}
                   id={railMoreDialogId}
                   role="dialog"
                   aria-labelledby={railMoreTitleId}
                   tabIndex={-1}
-                  className="absolute left-full top-0 z-[80] ml-1 w-48 rounded-xl border border-line bg-panel p-1.5 shadow-2xl"
+                  className="fixed z-[80] max-h-[min(28rem,calc(100dvh-1rem))] w-52 overflow-y-auto overscroll-contain rounded-xl border border-line bg-panel p-1.5 shadow-2xl [scrollbar-gutter:stable]"
+                  style={railMorePosition}
                 >
                   <p id={railMoreTitleId} className="px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-wider text-fg-3">
                     숨긴 도구
@@ -786,7 +833,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                         <button
                           key={id}
                           type="button"
-                          className="flex w-full rounded-lg px-2 py-1.5 text-left text-xs text-fg hover:bg-raised"
+                          className="flex min-h-11 w-full items-center rounded-lg px-2 py-2 text-left text-xs text-fg hover:bg-raised sm:min-h-9 sm:py-1.5"
                           onClick={() => {
                             commitAppSettings({
                               ...appSettings,
@@ -803,9 +850,10 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                   )}
                   <button
                     type="button"
-                    className="mt-1 flex w-full items-center gap-1 rounded-lg border border-line px-2 py-1.5 text-left text-xs font-medium text-accent hover:bg-accent-soft"
+                    className="mt-1 flex min-h-11 w-full items-center gap-1 rounded-lg border border-line px-2 py-2 text-left text-xs font-medium text-accent hover:bg-accent-soft sm:min-h-9 sm:py-1.5"
                     onClick={() => {
                       setRailMoreOpen(false);
+                      setAppSettingsInitialTab("toolbar");
                       setAppSettingsOpen(true);
                     }}
                   >
@@ -813,7 +861,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                     애플리케이션 설정
                   </button>
                 </div>
-              ) : null}
+              ), document.body) : null}
             </div>
           </StudioVerticalToolRail>
         ) : null}

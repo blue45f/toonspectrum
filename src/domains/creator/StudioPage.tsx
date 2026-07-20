@@ -131,6 +131,7 @@ import {
   saveStudioAppSettings,
   studioAppSettingsStorage,
   type StudioAppSettings,
+  type StudioAppSettingsTab,
   type StudioRailToolId,
 } from "./studio-app-settings";
 import {
@@ -231,6 +232,10 @@ import {
   moveBubbleShapePoint,
   removeBubbleShapePoint,
 } from "./studio-bubble-custom-shape";
+import {
+  studioCanvasCursorClassName,
+  studioCanvasViewportCursorClassName,
+} from "./studio-canvas-cursor";
 import {
   createPixelEditCanvas,
   downscaleDataUrl,
@@ -777,6 +782,12 @@ import {
   shouldEndStudioStrokeForReleasedContact,
   shouldCancelStudioFingerStrokeForAdditionalContact,
 } from "./studio-pointer-input";
+import {
+  canUseStudioPointerPredictionForSession,
+  resolveStudioPointerPredictionPreference,
+  studioPointerPredictionEnvironment,
+  supportsStudioPointerPrediction,
+} from "./studio-pointer-prediction-capability";
 import { planStudioPointerReleaseEndpoint } from "./studio-pointer-release-endpoint-plan";
 import {
   appendStudioAuthoritativeInk,
@@ -970,6 +981,10 @@ import {
   mergeStudioTeamCommentReadReceipt,
 } from "./studio-team-comment-frontier";
 import { partitionStudioTeamCommentMutableDocument } from "./studio-team-comment-mutable-document";
+import {
+  createStudioTeamCommentRefreshSession,
+  type StudioTeamCommentRefreshSession,
+} from "./studio-team-comment-refresh-session";
 import {
   buildStudioCompanionHello,
   buildStudioCompanionPrimaryState,
@@ -1539,8 +1554,12 @@ const QUICK_START_DISMISSED_KEY = "toonspectrum-studio-quick-start-dismissed";
 const STUDIO_VISIBLE_LIVE_INK_PREFERENCE = resolveStudioLiveInkBackendPreference(
   import.meta.env.VITE_STUDIO_LIVE_INK_BACKEND
 );
-/** 공개 기준 엔진은 browser prediction 없이 coalesced hardware input만 사용한다. */
-const STUDIO_POINTER_PREDICTION_ENABLED = false;
+// Native browser predictions stay on a physically separate, replaceable canvas and are admitted
+// only for pen sessions. Unsupported/reduced-motion environments retain coalesced hardware input.
+const STUDIO_POINTER_PREDICTION_ENABLED = supportsStudioPointerPrediction(
+  resolveStudioPointerPredictionPreference(import.meta.env.VITE_STUDIO_POINTER_PREDICTION),
+  studioPointerPredictionEnvironment()
+);
 // 모바일 첫 사용 안내(하단 도구막대 + 두 손가락 이동/확대) 1회만 노출.
 const MOBILE_HINT_DISMISSED_KEY = "toonspectrum-studio-mobile-hint-dismissed";
 const WATERMARK_KEY = "toonspectrum-studio-watermark";
@@ -1988,7 +2007,7 @@ function StudioCuttoonEditor() {
     loadStudioAppSettings(studioAppSettingsStorage())
   );
   const [appSettingsOpen, setAppSettingsOpen] = useState(false);
-  const [appSettingsInitialTab, setAppSettingsInitialTab] = useState<"general" | "other">("general");
+  const [appSettingsInitialTab, setAppSettingsInitialTab] = useState<StudioAppSettingsTab>("general");
   const [railMoreOpen, setRailMoreOpen] = useState(false);
   const appSettingsRef = useRef(appSettings);
   appSettingsRef.current = appSettings;
@@ -2566,8 +2585,10 @@ function StudioCuttoonEditor() {
   const [studioTeamCommentCapabilities, setStudioTeamCommentCapabilities] =
     useState<StudioTeamCommentCapabilities | null>(null);
   const [studioCommentSyncError, setStudioCommentSyncError] = useState<string | null>(null);
+  const [studioTeamCommentsSyncing, setStudioTeamCommentsSyncing] = useState(false);
   const [studioTeamUnreadCommentIds, setStudioTeamUnreadCommentIds] = useState<string[]>([]);
   const studioTeamCommentsLoadGenerationRef = useRef(0);
+  const studioTeamCommentRefreshSessionRef = useRef<StudioTeamCommentRefreshSession | null>(null);
   const studioTeamCommentsScopeRef = useRef<string | null>(null);
   const studioTeamCommentActivitySequenceRef = useRef<Map<string, bigint>>(new Map());
   const studioTeamCommentReadSequenceRef = useRef<Map<string, bigint>>(new Map());
@@ -3216,6 +3237,7 @@ function StudioCuttoonEditor() {
   useEffect(() => {
     const generation = studioTeamCommentsLoadGenerationRef.current + 1;
     studioTeamCommentsLoadGenerationRef.current = generation;
+    studioTeamCommentRefreshSessionRef.current = null;
     if (!studioTeamCommentsWorkId) {
       studioTeamCommentsScopeRef.current = null;
       studioTeamCommentActivitySequenceRef.current.clear();
@@ -3226,6 +3248,7 @@ function StudioCuttoonEditor() {
       setStudioTeamUnreadCommentIds((current) => current.length === 0 ? current : []);
       setStudioTeamCommentCapabilities(null);
       setStudioCommentSyncError(null);
+      setStudioTeamCommentsSyncing(false);
       return;
     }
     if (studioTeamCommentsScopeRef.current !== studioTeamCommentsWorkId) {
@@ -3237,24 +3260,19 @@ function StudioCuttoonEditor() {
       setStudioTeamCommentCapabilities(null);
       setStudioCommentSyncError(null);
     }
-    const controller = new AbortController();
-    let inFlight = false;
-
-    const load = async () => {
-      if (inFlight) return;
-      inFlight = true;
+    const load = async (signal: AbortSignal) => {
       try {
         const commentClient = await loadStudioTeamCommentClient();
         const snapshot = await commentClient.listAllStudioTeamComments(
           studioTeamCommentsWorkId,
-          controller.signal
+          signal
         );
         const projected = commentClient.studioTeamCommentsToLocalDocument(snapshot, {
           unfilteredSnapshotComplete: true,
         });
         if (!projected) throw new Error("팀 댓글 전체 기록을 안전하게 투영하지 못했어요.");
         if (
-          controller.signal.aborted
+          signal.aborted
           || studioTeamCommentsLoadGenerationRef.current !== generation
         ) {
           return;
@@ -3309,26 +3327,40 @@ function StudioCuttoonEditor() {
         );
         setStudioCommentSyncError(null);
       } catch (cause) {
-        if (controller.signal.aborted) return;
+        if (signal.aborted) return;
         setStudioTeamCommentCapabilities(null);
         setStudioCommentSyncError(
           cause instanceof Error ? cause.message : "팀 댓글을 불러오지 못했어요."
         );
-      } finally {
-        inFlight = false;
       }
     };
-
-    void load();
-    const intervalId = globalThis.setInterval(
-      () => void load(),
-      commentsOpen ? 5_000 : 30_000
-    );
+    const refreshSession = createStudioTeamCommentRefreshSession({
+      load,
+      visibilityTarget: globalThis.document,
+      onlineTarget: globalThis,
+      isOnline: () => globalThis.navigator.onLine !== false,
+      onBusyChange: (busy) => {
+        if (studioTeamCommentsLoadGenerationRef.current === generation) {
+          setStudioTeamCommentsSyncing(busy);
+        }
+      },
+    });
+    studioTeamCommentRefreshSessionRef.current = refreshSession;
     return () => {
-      controller.abort();
-      globalThis.clearInterval(intervalId);
+      if (studioTeamCommentRefreshSessionRef.current === refreshSession) {
+        studioTeamCommentRefreshSessionRef.current = null;
+      }
+      refreshSession.dispose();
     };
-  }, [commentsOpen, studioTeamCommentsWorkId]);
+  }, [studioTeamCommentsWorkId]);
+  useEffect(() => {
+    if (commentsOpen) {
+      studioTeamCommentRefreshSessionRef.current?.request("panel-open");
+    }
+  }, [commentsOpen]);
+  function refreshStudioTeamComments(): void {
+    studioTeamCommentRefreshSessionRef.current?.request("manual");
+  }
   useEffect(() => {
     if (!collaborationDocumentLocked) return;
     // 역할이 편집자에서 열람자로 바뀐 직후에도 이미 열린 로컬 편집 패널이 상태를 바꾸지 못하게 한다.
@@ -13234,6 +13266,7 @@ function StudioCuttoonEditor() {
       const sc = appSettingsRef.current.shortcuts;
       if (matchStudioShortcut(sc["tool-select"], e)) {
         e.preventDefault();
+        disarmAllPixelTools();
         setTool("select");
         setEyedropperActive(false);
         return;
@@ -17879,7 +17912,10 @@ function StudioCuttoonEditor() {
         if (!stampDirect) liveStampOverlayRendererRef.current.resetActive();
         liveDraftVisualRef.current = direct || stampDirect ? next : null;
         liveDraftPendingRef.current = direct || stampDirect ? next : null;
-        const predictionTailEligible = STUDIO_POINTER_PREDICTION_ENABLED
+        const predictionTailEligible = canUseStudioPointerPredictionForSession(
+          STUDIO_POINTER_PREDICTION_ENABLED,
+          drawingPointerTransportRef.current?.getSession()
+        )
           && overlayDirect
           && next.mode !== "eraser"
           && !next.fill
@@ -19081,7 +19117,14 @@ function StudioCuttoonEditor() {
       ) return;
       const stage = stageRef.current;
       if (!stage) return;
-      consumeFreehandPointerBatch(stage, pointerEvent, STUDIO_POINTER_PREDICTION_ENABLED);
+      consumeFreehandPointerBatch(
+        stage,
+        pointerEvent,
+        canUseStudioPointerPredictionForSession(
+          STUDIO_POINTER_PREDICTION_ENABLED,
+          session
+        )
+      );
       if (drawMode === "pen") {
         const point = stage.getRelativePointerPosition();
         if (point) noteQuickShapePointerMoved(point);
@@ -22722,6 +22765,7 @@ function StudioCuttoonEditor() {
     applyStudioCommentsPanelChange,
     markAllStudioCommentThreadsRead,
     markStudioCommentThreadRead,
+    refreshStudioTeamComments,
     applyWriterRoomAiReview,
     applyWriterRoomCanvasPlan,
     cancelAutoAction,
@@ -23813,6 +23857,7 @@ function StudioCuttoonEditor() {
           referencePanelOpen={referencePanelOpen}
           selected={selected}
           selectedContentMutationLocked={selectedContentMutationLocked}
+          setAppSettingsInitialTab={setAppSettingsInitialTab}
           setAppSettingsOpen={setAppSettingsOpen}
           setDrawMode={setDrawMode}
           setDrawShape={setDrawShape}
@@ -23889,6 +23934,7 @@ function StudioCuttoonEditor() {
           drawMode={drawMode}
           drawShape={drawShape}
           editing={editing}
+          eyedropperActive={eyedropperActive}
           effScale={effScale}
           elementById={elementById}
           elements={elements}
@@ -24489,6 +24535,7 @@ function StudioCuttoonEditor() {
           studioCommentPinsHidden={studioCommentPinsHidden}
           studioLegacyCommentThreadIdSet={studioLegacyCommentThreadIdSet}
           studioTeamCommentCapabilities={studioTeamCommentCapabilities}
+          studioTeamCommentsSyncing={studioTeamCommentsSyncing}
           studioTeamCommentsWorkId={studioTeamCommentsWorkId}
           studioTeamUnreadCommentIdSet={studioTeamUnreadCommentIdSet}
           composeWorkAssetPreviewPage={composeWorkAssetPreviewPage}
@@ -24828,7 +24875,7 @@ interface StudioCanvasViewportProps {
   aiNoticeOpen: boolean;
   animTimeline: AnimationTimelineDoc;
   appSettings: StudioAppSettings;
-  appSettingsInitialTab: "general" | "other";
+  appSettingsInitialTab: StudioAppSettingsTab;
   appSettingsOpen: boolean;
   authorizedWorkAssetScopeId: string | null;
   autosaveRestoreBlockedReason: "legacy-unversioned" | "work-mismatch" | "revision-mismatch" | null;
@@ -24859,6 +24906,7 @@ interface StudioCanvasViewportProps {
   drawMode: DrawMode;
   drawShape: DrawShapeKind;
   editing: { id: string; } | null;
+  eyedropperActive: boolean;
   effScale: number;
   elementById: Map<string, El>;
   elements: El[];
@@ -24947,7 +24995,7 @@ interface StudioCanvasViewportProps {
   scale: number;
   selected: El | null;
   selectedId: string | null;
-  setAppSettingsInitialTab: import("react").Dispatch<import("react").SetStateAction<"general" | "other">>;
+  setAppSettingsInitialTab: import("react").Dispatch<import("react").SetStateAction<StudioAppSettingsTab>>;
   setAppSettingsOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setBg3dOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setCanvasOnlyMode: import("react").Dispatch<import("react").SetStateAction<boolean>>;
@@ -25117,6 +25165,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
   drawMode,
   drawShape,
   editing,
+  eyedropperActive,
   effScale,
   elementById,
   elements,
@@ -25424,6 +25473,36 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
     canvasRotation: suppressViewTransform ? 0 : canvasRotation,
   });
   const editingUseOverlay = !!editingTarget && !editingFallbackToModal;
+  const canvasInteractionBlocked =
+    activeSurfaceReviewLocked
+    || saving
+    || sourceHydrationPending
+    || collaborationDocumentUnavailable;
+  const canvasCursorInput = {
+    tool,
+    drawMode,
+    isSpacePressed,
+    isPanning,
+    interactionBlocked: canvasInteractionBlocked,
+    commentPinArmed,
+    eyedropperActive,
+    advancedFillArmed,
+    cropArmed,
+    pixelToolArmed,
+    panelSplitArmed,
+    nodeEditArmed,
+    bubbleShapeArmed,
+    puppetWarpArmed,
+    perspectiveRulerActive,
+    precisionBrushArmed:
+      smudgeArmed
+      || liquifyArmed
+      || healCloneArmed
+      || historyBrushArmed
+      || layerMaskPaintArmed,
+  } as const;
+  const viewportCursorClassName = studioCanvasViewportCursorClassName(canvasCursorInput);
+  const canvasCursorClassName = studioCanvasCursorClassName(canvasCursorInput);
   return (
         <div
           className={cn(
@@ -25619,6 +25698,7 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
           <div
             ref={wrapRef}
             data-studio-canvas-viewport
+            data-studio-viewport-cursor={viewportCursorClassName.replace("cursor-", "")}
             data-studio-draw-dock-safe-area={tool === "draw" && !canvasOnlyMode ? "true" : undefined}
             // 스크롤 뷰포트를 키보드 포커스 가능하게 해 방향키 스크롤 허용(WCAG scrollable-region) — focusable 은 의도적.
             // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
@@ -25642,8 +25722,8 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
               mobileImmersive
                 ? "min-h-0 flex-1 max-h-none rounded-xl overscroll-contain"
                 : "max-h-[calc(100dvh-11rem)] min-h-[12rem] lg:max-h-none",
-              (advancedFillArmed || commentPinArmed) && "cursor-crosshair",
-              isSpacePressed ? (isPanning ? "cursor-grabbing select-none" : "cursor-grab select-none") : ""
+              viewportCursorClassName,
+              (isSpacePressed || tool === "hand") && "select-none"
             )}
           >
           <div className="pointer-events-none sticky top-2 z-40 flex h-0 items-start justify-end pr-2">
@@ -25771,8 +25851,10 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
           {/* 색맹 시뮬레이션은 이미 색보정된 결과 위에 적용되도록 pageGradeCss 뒤에 이어 붙인다(filter 리스트는 좌→우로 순차 적용). */}
           <div
             ref={zoomHostRef}
+            data-studio-canvas-cursor={canvasCursorClassName.replace("cursor-", "")}
             className={cn(
               "relative rounded-sm shadow-[0_0_0_1px_oklch(0.3_0.012_64/0.55),0_18px_50px_oklch(0.08_0.01_70/0.45)]",
+              canvasCursorClassName,
               (activeSurfaceReviewLocked || saving) && "pointer-events-none select-none",
               (sourceHydrationPending || collaborationDocumentUnavailable) && "invisible absolute inset-0"
             )}
@@ -26896,8 +26978,16 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
                 settings={appSettings}
                 initialTab={appSettingsInitialTab}
                 onClose={() => {
+                  const restoreMoreToolsFocus = appSettingsInitialTab === "toolbar";
                   setAppSettingsOpen(false);
                   setAppSettingsInitialTab("general");
+                  if (restoreMoreToolsFocus) {
+                    requestAnimationFrame(() => {
+                      document
+                        .querySelector<HTMLElement>('[aria-label="더보기 · 툴바 설정"]')
+                        ?.focus();
+                    });
+                  }
                 }}
                 onChange={commitAppSettings}
                 onResetAll={() => {

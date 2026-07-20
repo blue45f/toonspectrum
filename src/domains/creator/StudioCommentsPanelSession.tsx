@@ -11,6 +11,7 @@ type StudioCommentsPanelSessionHandlers = Pick<
   | "disarmAllPixelTools"
   | "markAllStudioCommentThreadsRead"
   | "markStudioCommentThreadRead"
+  | "refreshStudioTeamComments"
   | "selectStudioCommentAnchor"
 >;
 
@@ -32,6 +33,7 @@ export type StudioCommentsPanelSessionProps = Pick<
   | "studioCommentSyncError"
   | "studioLegacyCommentThreadIdSet"
   | "studioTeamCommentCapabilities"
+  | "studioTeamCommentsSyncing"
   | "studioTeamCommentsWorkId"
   | "studioTeamUnreadCommentIdSet"
   | "workId"
@@ -62,6 +64,7 @@ export function StudioCommentsPanelSession({
   studioCommentSyncError,
   studioLegacyCommentThreadIdSet,
   studioTeamCommentCapabilities,
+  studioTeamCommentsSyncing,
   studioTeamCommentsWorkId,
   studioTeamUnreadCommentIdSet,
   workId,
@@ -71,6 +74,7 @@ export function StudioCommentsPanelSession({
     disarmAllPixelTools,
     markAllStudioCommentThreadsRead,
     markStudioCommentThreadRead,
+    refreshStudioTeamComments,
     selectStudioCommentAnchor,
   } = stableHandlers;
 
@@ -120,6 +124,8 @@ export function StudioCommentsPanelSession({
           ? "열람자는 댓글을 읽고 위치로 이동할 수 있지만 작성할 수는 없어요."
           : undefined}
       syncError={studioCommentSyncError ?? undefined}
+      syncing={studioTeamCommentsSyncing}
+      onRefresh={studioTeamCommentsWorkId ? refreshStudioTeamComments : undefined}
       storageMode={workId ? "team" : "document"}
       unreadThreadIds={studioTeamUnreadCommentIdSet}
       readOnlyThreadIds={studioLegacyCommentThreadIdSet}

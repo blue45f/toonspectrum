@@ -105,6 +105,12 @@ describe("Studio left tool rail module boundary", () => {
     expect(rail.source).toContain("aria-controls={railMoreOpen ? railMoreDialogId : undefined}");
     expect(rail.source).toContain('role="dialog"');
     expect(rail.source).toContain("aria-labelledby={railMoreTitleId}");
+    expect(rail.source).toContain("createPortal((");
+    expect(rail.source).toContain('className="fixed z-[80]');
+    expect(rail.source).toContain("style={railMorePosition}");
+    expect(rail.source).toContain('document.addEventListener("pointerdown", handlePointerDown, true)');
+    expect(rail.source).toContain('setAppSettingsInitialTab("toolbar")');
+    expect(rail.source).toContain("max-h-[min(28rem,calc(100dvh-1rem))]");
     expect(rail.source).toContain('if (event.key !== "Escape") return;');
     expect(rail.source).toContain("closeRailMoreAndRestoreFocus()");
     expect(rail.source).toContain("?.focus();");

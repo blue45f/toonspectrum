@@ -137,6 +137,7 @@ export interface StudioLazyPanelStackHandlers {
   applyStudioCommentsPanelChange: (value: StudioCommentsDocument) => Promise<boolean>;
   markAllStudioCommentThreadsRead: () => Promise<boolean>;
   markStudioCommentThreadRead: (threadId: string) => Promise<boolean>;
+  refreshStudioTeamComments: () => void;
   applyWriterRoomAiReview: () => void;
   applyWriterRoomCanvasPlan: () => void;
   cancelAutoAction: () => void;
@@ -235,6 +236,7 @@ export interface StudioLazyPanelStackProps {
   studioCommentPinsHidden: boolean;
   studioLegacyCommentThreadIdSet: ReadonlySet<string>;
   studioTeamCommentCapabilities: StudioTeamCommentCapabilities | null;
+  studioTeamCommentsSyncing: boolean;
   studioTeamCommentsWorkId: string | null;
   studioTeamUnreadCommentIdSet: ReadonlySet<string>;
   composeWorkAssetPreviewPage: (page: PageState) => PageState;
@@ -398,6 +400,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
   studioCommentPinsHidden,
   studioLegacyCommentThreadIdSet,
   studioTeamCommentCapabilities,
+  studioTeamCommentsSyncing,
   studioTeamCommentsWorkId,
   studioTeamUnreadCommentIdSet,
   composeWorkAssetPreviewPage,
@@ -628,6 +631,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
             studioCommentSyncError={studioCommentSyncError}
             studioLegacyCommentThreadIdSet={studioLegacyCommentThreadIdSet}
             studioTeamCommentCapabilities={studioTeamCommentCapabilities}
+            studioTeamCommentsSyncing={studioTeamCommentsSyncing}
             studioTeamCommentsWorkId={studioTeamCommentsWorkId}
             studioTeamUnreadCommentIdSet={studioTeamUnreadCommentIdSet}
             workId={workId}

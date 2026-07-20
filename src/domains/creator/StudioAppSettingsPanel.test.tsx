@@ -20,7 +20,7 @@ vi.mock("react-dom", () => ({
 
 const studioPageSource = readFileSync(new URL("./StudioPage.tsx", import.meta.url), "utf8");
 
-function renderSettings(initialTab: "general" | "touch" = "general") {
+function renderSettings(initialTab: "general" | "touch" | "toolbar" = "general") {
   const body = { nodeName: "BODY" };
   vi.stubGlobal("document", { body });
   const html = renderToStaticMarkup(
@@ -73,6 +73,18 @@ describe("StudioAppSettingsPanel", () => {
     expect(html).toContain(`min="${MIN_STUDIO_TOOL_HINT_TOUCH_HOLD_MS}"`);
     expect(html).toContain(`max="${MAX_STUDIO_TOOL_HINT_TOUCH_HOLD_MS}"`);
     expect(html).toContain("480ms");
+  });
+
+  it("툴바 설정을 검색 가능한 두 개의 독립 스크롤 목록으로 제공한다", () => {
+    const { html } = renderSettings("toolbar");
+
+    expect(html).toContain('type="search"');
+    expect(html).toContain("툴바 도구 검색");
+    expect(html).toContain("도구 이름 검색");
+    expect(html).toContain("표시 중");
+    expect(html).toContain("숨김 · 더보기에서 사용");
+    expect(html.match(/max-h-\[min\(26rem,50dvh\)\]/g)).toHaveLength(1);
+    expect(html).toContain("순서와 표시 상태는 이 기기에 즉시 저장됩니다.");
   });
 
   it("설정 모달은 단축키 모달 상태와 독립적으로 마운트된다", () => {

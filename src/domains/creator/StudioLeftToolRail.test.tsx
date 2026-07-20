@@ -130,6 +130,7 @@ function createProps(overrides: Partial<RailProps> = {}): RailProps {
     referencePanelOpen: false,
     selected: null,
     selectedContentMutationLocked: false,
+    setAppSettingsInitialTab: vi.fn(),
     setAppSettingsOpen: vi.fn(),
     setDrawMode: vi.fn(),
     setDrawShape: vi.fn(),

@@ -9,6 +9,7 @@ import {
   Eye,
   EyeOff,
   RotateCcw,
+  Search,
   Settings2,
   X,
 } from "lucide-react";
@@ -113,10 +114,14 @@ export function StudioAppSettingsPanel({
   const titleId = useId();
   const [tab, setTab] = useState<StudioAppSettingsTab>(initialTab);
   const [recordingAction, setRecordingAction] = useState<StudioShortcutActionId | null>(null);
+  const [toolbarQuery, setToolbarQuery] = useState("");
   const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (open) setTab(initialTab);
+    if (open) {
+      setTab(initialTab);
+      setToolbarQuery("");
+    }
   }, [open, initialTab]);
 
   useEffect(() => {
@@ -162,6 +167,25 @@ export function StudioAppSettingsPanel({
       if (e.key === "Escape") {
         e.preventDefault();
         onClose();
+        return;
+      }
+      if (e.key === "Tab") {
+        const focusable = Array.from(
+          dialogRef.current?.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+          ) ?? []
+        ).filter((element) => element.getAttribute("aria-hidden") !== "true");
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable.at(-1);
+        const active = document.activeElement;
+        if (e.shiftKey && (active === first || !dialogRef.current?.contains(active))) {
+          e.preventDefault();
+          last?.focus();
+        } else if (!e.shiftKey && (active === last || !dialogRef.current?.contains(active))) {
+          e.preventDefault();
+          first?.focus();
+        }
       }
     };
     globalThis.addEventListener("keydown", onKey, true);
@@ -180,6 +204,12 @@ export function StudioAppSettingsPanel({
   const patch = (partial: Partial<StudioAppSettings>) => onChange({ ...settings, ...partial });
   const visible = settings.toolbar.visibleIds;
   const hidden = studioRailHiddenIds(visible);
+  const normalizedToolbarQuery = toolbarQuery.trim().normalize("NFKC").toLocaleLowerCase();
+  const matchesToolbarQuery = (id: (typeof DEFAULT_STUDIO_RAIL_TOOL_ORDER)[number]) =>
+    !normalizedToolbarQuery
+    || studioRailToolLabel(id).normalize("NFKC").toLocaleLowerCase().includes(normalizedToolbarQuery);
+  const visibleMatches = visible.filter(matchesToolbarQuery);
+  const hiddenMatches = hidden.filter(matchesToolbarQuery);
 
   const body = (
     <div
@@ -209,7 +239,7 @@ export function StudioAppSettingsPanel({
           </div>
           <button
             type="button"
-            className={buttonClass({ size: "sm", variant: "quiet" })}
+            className={cn(buttonClass({ size: "sm", variant: "quiet" }), "min-h-11 min-w-11 sm:min-h-8 sm:min-w-8")}
             onClick={onClose}
             aria-label="설정 닫기"
           >
@@ -228,7 +258,7 @@ export function StudioAppSettingsPanel({
                 type="button"
                 onClick={() => setTab(id)}
                 className={cn(
-                  "shrink-0 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium transition",
+                  "min-h-11 shrink-0 rounded-lg px-2.5 py-2 text-left text-xs font-medium transition sm:min-h-8 sm:py-1.5",
                   tab === id
                     ? "bg-accent-soft text-accent ring-1 ring-accent/20"
                     : "text-fg-2 hover:bg-raised hover:text-fg"
@@ -485,25 +515,48 @@ export function StudioAppSettingsPanel({
 
             {tab === "toolbar" ? (
               <>
-                <SectionLabel>툴바 사용자 정의</SectionLabel>
-                <p className="text-[0.68rem] leading-relaxed text-fg-3">
-                  왼쪽 세로 레일에 보일 도구를 정하고 순서를 바꿉니다. 숨긴 도구는「더보기」에서 다시
-                  열 수 있으며 단축키는 그대로 동작합니다.
-                </p>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-xl border border-line p-2">
-                    <p className="mb-2 text-[0.66rem] font-semibold text-fg-3">표시 중</p>
-                    <ul className="space-y-1">
-                      {visible.map((id) => (
+                <div className="sticky -top-4 z-10 -mx-4 -mt-4 space-y-2 border-b border-line bg-panel/95 px-4 pb-3 pt-4 backdrop-blur-sm">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <SectionLabel>툴바 사용자 정의</SectionLabel>
+                      <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
+                        보이는 도구의 순서를 바꾸거나 숨길 수 있어요. 단축키는 숨겨도 그대로 동작합니다.
+                      </p>
+                    </div>
+                    <span className="rounded-full border border-line bg-card px-2 py-1 text-[0.65rem] font-semibold tabular-nums text-fg-3">
+                      표시 {visible.length} · 숨김 {hidden.length}
+                    </span>
+                  </div>
+                  <label className="relative block">
+                    <span className="sr-only">툴바 도구 검색</span>
+                    <Search size={14} aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-3" />
+                    <input
+                      type="search"
+                      value={toolbarQuery}
+                      onChange={(event) => setToolbarQuery(event.target.value.slice(0, 80))}
+                      placeholder="도구 이름 검색"
+                      className="h-11 w-full rounded-xl border border-line bg-card pl-9 pr-3 text-xs text-fg outline-none transition-colors placeholder:text-fg-3 hover:border-line-strong focus:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:h-10"
+                    />
+                  </label>
+                </div>
+                <div className="grid min-h-0 gap-3 sm:grid-cols-2">
+                  <section className="flex min-h-0 flex-col rounded-xl border border-line bg-card/20 p-2" aria-labelledby={`${titleId}-toolbar-visible`}>
+                    <p id={`${titleId}-toolbar-visible`} className="mb-2 flex items-center justify-between gap-2 px-1 text-[0.66rem] font-semibold text-fg-3">
+                      <span>표시 중</span>
+                      <span className="tabular-nums">{visibleMatches.length}</span>
+                    </p>
+                    <ul className="max-h-[min(26rem,50dvh)] space-y-1 overflow-y-auto overscroll-contain pr-0.5 [scrollbar-gutter:stable]">
+                      {visibleMatches.map((id) => (
                         <li
                           key={id}
-                          className="flex items-center gap-1 rounded-lg bg-card/60 px-2 py-1.5 text-xs text-fg"
+                          className="group flex min-h-11 items-center gap-1 rounded-lg border border-transparent bg-card/70 px-2 py-1.5 text-xs text-fg transition-colors hover:border-line hover:bg-raised"
                         >
                           <span className="min-w-0 flex-1 truncate">{studioRailToolLabel(id)}</span>
                           <button
                             type="button"
-                            className={buttonClass({ size: "sm", variant: "quiet" })}
+                            className={cn(buttonClass({ size: "sm", variant: "quiet" }), "min-h-11 min-w-11 sm:min-h-8 sm:min-w-8")}
                             aria-label={`${studioRailToolLabel(id)} 위로`}
+                            disabled={visible.indexOf(id) === 0}
                             onClick={() =>
                               patch({
                                 toolbar: { visibleIds: moveStudioRailTool(visible, id, -1) },
@@ -514,8 +567,9 @@ export function StudioAppSettingsPanel({
                           </button>
                           <button
                             type="button"
-                            className={buttonClass({ size: "sm", variant: "quiet" })}
+                            className={cn(buttonClass({ size: "sm", variant: "quiet" }), "min-h-11 min-w-11 sm:min-h-8 sm:min-w-8")}
                             aria-label={`${studioRailToolLabel(id)} 아래로`}
+                            disabled={visible.indexOf(id) === visible.length - 1}
                             onClick={() =>
                               patch({
                                 toolbar: { visibleIds: moveStudioRailTool(visible, id, 1) },
@@ -526,8 +580,9 @@ export function StudioAppSettingsPanel({
                           </button>
                           <button
                             type="button"
-                            className={buttonClass({ size: "sm", variant: "quiet" })}
+                            className={cn(buttonClass({ size: "sm", variant: "quiet" }), "min-h-11 min-w-11 sm:min-h-8 sm:min-w-8")}
                             aria-label={`${studioRailToolLabel(id)} 숨기기`}
+                            disabled={visible.length <= 1}
                             onClick={() =>
                               patch({ toolbar: { visibleIds: hideStudioRailTool(visible, id) } })
                             }
@@ -536,23 +591,33 @@ export function StudioAppSettingsPanel({
                           </button>
                         </li>
                       ))}
+                      {visibleMatches.length === 0 ? (
+                        <li className="rounded-lg px-2 py-6 text-center text-[0.7rem] text-fg-3">
+                          표시 중인 도구에서 검색 결과가 없어요.
+                        </li>
+                      ) : null}
                     </ul>
-                  </div>
-                  <div className="rounded-xl border border-line border-dashed p-2">
-                    <p className="mb-2 text-[0.66rem] font-semibold text-fg-3">숨김 (더보기)</p>
-                    {hidden.length === 0 ? (
-                      <p className="px-1 py-3 text-[0.68rem] text-fg-3">숨긴 도구 없음</p>
+                  </section>
+                  <section className="flex min-h-0 flex-col rounded-xl border border-line border-dashed bg-card/10 p-2" aria-labelledby={`${titleId}-toolbar-hidden`}>
+                    <p id={`${titleId}-toolbar-hidden`} className="mb-2 flex items-center justify-between gap-2 px-1 text-[0.66rem] font-semibold text-fg-3">
+                      <span>숨김 · 더보기에서 사용</span>
+                      <span className="tabular-nums">{hiddenMatches.length}</span>
+                    </p>
+                    {hiddenMatches.length === 0 ? (
+                      <p className="grid min-h-24 place-items-center px-2 py-5 text-center text-[0.68rem] leading-relaxed text-fg-3">
+                        {normalizedToolbarQuery ? "숨긴 도구에서 검색 결과가 없어요." : "숨긴 도구가 없어요."}
+                      </p>
                     ) : (
-                      <ul className="space-y-1">
-                        {hidden.map((id) => (
+                      <ul className="max-h-[min(26rem,50dvh)] space-y-1 overflow-y-auto overscroll-contain pr-0.5 [scrollbar-gutter:stable]">
+                        {hiddenMatches.map((id) => (
                           <li
                             key={id}
-                            className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-fg-2"
+                            className="flex min-h-11 items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-fg-2 transition-colors hover:bg-raised"
                           >
                             <span className="min-w-0 flex-1 truncate">{studioRailToolLabel(id)}</span>
                             <button
                               type="button"
-                              className={buttonClass({ size: "sm", variant: "quiet" })}
+                              className={cn(buttonClass({ size: "sm", variant: "quiet" }), "min-h-11 min-w-11 sm:min-h-8 sm:min-w-8")}
                               aria-label={`${studioRailToolLabel(id)} 표시`}
                               onClick={() =>
                                 patch({ toolbar: { visibleIds: showStudioRailTool(visible, id) } })
@@ -564,18 +629,21 @@ export function StudioAppSettingsPanel({
                         ))}
                       </ul>
                     )}
-                  </div>
+                  </section>
                 </div>
-                <button
-                  type="button"
-                  className={buttonClass({ size: "sm", variant: "quiet" })}
-                  onClick={() =>
-                    patch({ toolbar: { visibleIds: [...DEFAULT_STUDIO_RAIL_TOOL_ORDER] } })
-                  }
-                >
-                  <RotateCcw className="size-3.5" aria-hidden />
-                  툴바 기본값
-                </button>
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-card/20 p-2.5">
+                  <p className="text-[0.68rem] text-fg-3">순서와 표시 상태는 이 기기에 즉시 저장됩니다.</p>
+                  <button
+                    type="button"
+                    className={cn(buttonClass({ size: "sm", variant: "quiet" }), "min-h-11 sm:min-h-8")}
+                    onClick={() =>
+                      patch({ toolbar: { visibleIds: [...DEFAULT_STUDIO_RAIL_TOOL_ORDER] } })
+                    }
+                  >
+                    <RotateCcw className="size-3.5" aria-hidden />
+                    툴바 기본값
+                  </button>
+                </div>
               </>
             ) : null}
 

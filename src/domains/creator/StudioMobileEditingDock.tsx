@@ -1007,6 +1007,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               <StudioDockNavButton
                 icon={Files}
                 label="페이지"
+                aria-label="페이지"
                 active={mobileSheet === "pages"}
                 aria-pressed={mobileSheet === "pages"}
                 onClick={() => setMobileSheet((s) => (s === "pages" ? null : "pages"))}
@@ -1022,6 +1023,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               <StudioDockNavButton
                 icon={Layers}
                 label="작업"
+                aria-label="작업"
                 active={mobileSheet === "props"}
                 aria-pressed={mobileSheet === "props"}
                 onClick={() => {

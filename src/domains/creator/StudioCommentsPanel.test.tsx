@@ -58,10 +58,21 @@ describe("StudioCommentsPanel review rail contract", () => {
     expect(source).toContain("댓글을 연결한 위치가 삭제되었습니다");
     expect(source).toContain("anchor: composerAnchor");
     expect(source).toContain("선택한 피드백 위치");
-    expect(source).toContain("작성 취소");
+    expect(source).toContain("위치 변경");
     expect(source).toContain('setFilter(activeAnchor ? "current" : "all")');
     expect(source).toContain("setComposerExpanded(capabilities.create && Boolean(activeAnchor)");
-    expect(source).toContain("grid-cols-[minmax(0,1fr)_auto]");
+    expect(source).toContain("flex min-w-0 items-start gap-2");
+  });
+
+  it("switches pin placement into a compact Figma-style composer without review filters", () => {
+    expect(source).toContain("reviewRailClassName");
+    expect(source).toContain('composerExpanded ? "새 댓글" : "검토 댓글"');
+    expect(source).toContain("클릭한 위치에 바로 피드백을 남겨요.");
+    expect(source).toContain("composerLocationPickerOpen");
+    expect(source).toContain("위치 변경");
+    expect(source).toContain("{!composerExpanded ? (");
+    expect(source).toContain("수정할 점이나 확인이 필요한 내용을 남겨 주세요.");
+    expect(source).not.toContain("@이름으로 함께 볼 사람");
   });
 
   it("reuses mutation ids only while the retried comment or reply payload stays identical", () => {
@@ -123,6 +134,15 @@ describe("StudioCommentsPanel review rail contract", () => {
   it("renders comment sync failures in a dedicated rail status instead of collaboration notices", () => {
     expect(source).toContain("팀 댓글 동기화 지연");
     expect(source).toContain('aria-live="polite"');
+  });
+
+  it("uses explicit event-driven refresh instead of polling the complete team history", () => {
+    expect(studioPageSource).toContain("createStudioTeamCommentRefreshSession");
+    expect(studioPageSource).toContain('request("panel-open")');
+    expect(studioPageSource).toContain('request("manual")');
+    expect(studioPageSource).not.toContain("commentsOpen ? 5_000 : 30_000");
+    expect(source).toContain("팀 댓글 새로고침");
+    expect(source).toContain("motion-reduce:animate-none");
   });
 
   it("keeps server review state out of the persisted project comment document", () => {

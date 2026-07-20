@@ -21,6 +21,7 @@ export function createStudioCommentsPanelSessionProps(
     disarmAllPixelTools: vi.fn(),
     markAllStudioCommentThreadsRead: vi.fn(async () => true),
     markStudioCommentThreadRead: vi.fn(async () => true),
+    refreshStudioTeamComments: vi.fn(),
     selectStudioCommentAnchor: vi.fn(),
     ...stableHandlerOverrides,
   };
@@ -45,6 +46,7 @@ export function createStudioCommentsPanelSessionProps(
     studioCommentSyncError: null,
     studioLegacyCommentThreadIdSet: new Set<string>(),
     studioTeamCommentCapabilities: null,
+    studioTeamCommentsSyncing: false,
     studioTeamCommentsWorkId: null,
     studioTeamUnreadCommentIdSet: new Set<string>(),
     workId: null,

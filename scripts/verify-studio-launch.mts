@@ -126,8 +126,8 @@ interface MobileSheetContractResult {
   handleTargetReady: boolean;
   insufficientDragStayed: boolean;
   backdropDismissed: boolean;
-  keyboardHandleDismissed: boolean;
-  tapHandleDismissed: boolean;
+  keyboardSnapReady: boolean;
+  tapSnapReady: boolean;
   escapeFocusRestored: boolean;
   thresholdDragDismissed: boolean;
   dragFocusRestored: boolean;
@@ -876,19 +876,61 @@ async function verifyMobileModalSheet({
   await dialog.waitFor({ state: "visible", timeout: 3000 });
   await awaitElementAnimations(dialog);
   const keyboardHandle = dialog.locator('[data-studio-sheet-drag-handle="true"]');
+  const keyboardSnapBefore = await dialog.getAttribute("data-studio-sheet-snap");
   await keyboardHandle.focus();
   await page.keyboard.press("Enter");
-  const keyboardClosed = await waitForSheetInactive(page, id);
-  const keyboardFocusRestored = keyboardClosed && await waitForLocatorFocus(page, launcher);
-  const keyboardHandleDismissed = keyboardClosed && keyboardFocusRestored;
+  const keyboardSnapChanged = await page.waitForFunction(
+    ({ sheetId, previousSnap }) => {
+      const sheet = document.querySelector<HTMLElement>(
+        `[data-studio-sheet-id="${sheetId}"]`,
+      );
+      const nextSnap = sheet?.getAttribute("data-studio-sheet-snap") ?? null;
+      return nextSnap !== null && nextSnap !== previousSnap ? nextSnap : false;
+    },
+    { sheetId: id, previousSnap: keyboardSnapBefore },
+    { timeout: 3000 },
+  ).then((handle) => handle.jsonValue()).catch(() => false);
+  const keyboardRemainedOpen =
+    await dialog.getAttribute("aria-modal") === "true" &&
+    await dialog.getAttribute("data-studio-mobile-sheet") === "true";
+  await initialFocus.click();
+  const keyboardExplicitClosed = await waitForSheetInactive(page, id);
+  const keyboardFocusRestored = keyboardExplicitClosed && await waitForLocatorFocus(page, launcher);
+  const keyboardSnapReady =
+    keyboardSnapBefore === "medium" &&
+    keyboardSnapChanged === "full" &&
+    keyboardRemainedOpen &&
+    keyboardExplicitClosed &&
+    keyboardFocusRestored;
 
   await open();
   await dialog.waitFor({ state: "visible", timeout: 3000 });
   await awaitElementAnimations(dialog);
+  const tapSnapBefore = await dialog.getAttribute("data-studio-sheet-snap");
   await dialog.locator('[data-studio-sheet-drag-handle="true"]').tap();
-  const tapClosed = await waitForSheetInactive(page, id);
-  const tapFocusRestored = tapClosed && await waitForLocatorFocus(page, launcher);
-  const tapHandleDismissed = tapClosed && tapFocusRestored;
+  const tapSnapChanged = await page.waitForFunction(
+    ({ sheetId, previousSnap }) => {
+      const sheet = document.querySelector<HTMLElement>(
+        `[data-studio-sheet-id="${sheetId}"]`,
+      );
+      const nextSnap = sheet?.getAttribute("data-studio-sheet-snap") ?? null;
+      return nextSnap !== null && nextSnap !== previousSnap ? nextSnap : false;
+    },
+    { sheetId: id, previousSnap: tapSnapBefore },
+    { timeout: 3000 },
+  ).then((handle) => handle.jsonValue()).catch(() => false);
+  const tapRemainedOpen =
+    await dialog.getAttribute("aria-modal") === "true" &&
+    await dialog.getAttribute("data-studio-mobile-sheet") === "true";
+  await initialFocus.click();
+  const tapExplicitClosed = await waitForSheetInactive(page, id);
+  const tapFocusRestored = tapExplicitClosed && await waitForLocatorFocus(page, launcher);
+  const tapSnapReady =
+    tapSnapBefore === "full" &&
+    tapSnapChanged === "compact" &&
+    tapRemainedOpen &&
+    tapExplicitClosed &&
+    tapFocusRestored;
 
   await open();
   await dialog.waitFor({ state: "visible", timeout: 3000 });
@@ -929,8 +971,8 @@ async function verifyMobileModalSheet({
     handleTargetReady &&
     insufficientDragStayed &&
     backdropDismissed &&
-    keyboardHandleDismissed &&
-    tapHandleDismissed &&
+    keyboardSnapReady &&
+    tapSnapReady &&
     escapeFocusRestored &&
     thresholdDragDismissed &&
     dragFocusRestored &&
@@ -940,7 +982,7 @@ async function verifyMobileModalSheet({
     `mobile-sheet-${id}: opened=${opened} focus=${initialFocusReady} focusTarget=${initialFocusTargetReady} ` +
     `isolated=${backgroundIsolated} tabTrap=${tabTrapReady} handle=${handleTargetReady} ` +
     `snapback=${insufficientDragStayed} backdrop=${backdropDismissed} ` +
-    `keyboardHandle=${keyboardHandleDismissed} tapHandle=${tapHandleDismissed} ` +
+    `keyboardSnap=${keyboardSnapReady} tapSnap=${tapSnapReady} ` +
     `escapeFocus=${escapeFocusRestored} ` +
     `dragDismiss=${thresholdDragDismissed} dragFocus=${dragFocusRestored} ` +
     `thresholdState=${JSON.stringify(thresholdState)} noHorizontalOverflow=${noHorizontalOverflow}`,
@@ -956,8 +998,8 @@ async function verifyMobileModalSheet({
     handleTargetReady,
     insufficientDragStayed,
     backdropDismissed,
-    keyboardHandleDismissed,
-    tapHandleDismissed,
+    keyboardSnapReady,
+    tapSnapReady,
     escapeFocusRestored,
     thresholdDragDismissed,
     dragFocusRestored,
@@ -1056,8 +1098,11 @@ async function runMobileDockLayout(
     historyFocusReady &&= visible;
   }
 
-  const pagesLauncher = dock.getByRole("button", { name: "페이지", exact: true });
-  const propsLauncher = dock.getByRole("button", { name: "작업", exact: true });
+  // Role locators can be re-resolved inconsistently while an overflow toolbar is scrolled in
+  // Playwright/WebKit-style mobile layouts. The explicit labels are also the product's stable
+  // accessibility contract, so keep the launcher identity independent of clipping geometry.
+  const pagesLauncher = dock.locator('button[aria-label="페이지"]');
+  const propsLauncher = dock.locator('button[aria-label="작업"]');
   const brushDockLauncher = dock.getByRole("button", {
     name: "브러시 설정 (굵기·색·프리셋)",
     exact: true,

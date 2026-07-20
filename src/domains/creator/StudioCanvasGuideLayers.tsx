@@ -302,7 +302,7 @@ export function StudioCanvasGuideOverlayLayers({
                 }}
                 onMouseLeave={(event) => {
                   const stage = event.target.getStage();
-                  if (stage) stage.container().style.cursor = "default";
+                  if (stage) stage.container().style.cursor = "";
                 }}
                 onDragMove={(event) => {
                   const node = event.target;
@@ -356,7 +356,7 @@ export function StudioCanvasGuideOverlayLayers({
                 }}
                 onMouseLeave={(event) => {
                   const stage = event.target.getStage();
-                  if (stage) stage.container().style.cursor = "default";
+                  if (stage) stage.container().style.cursor = "";
                 }}
                 onDragMove={(event) => {
                   const node = event.target;
@@ -390,7 +390,7 @@ export function StudioCanvasGuideOverlayLayers({
                 }}
                 onMouseLeave={(event) => {
                   const stage = event.target.getStage();
-                  if (stage) stage.container().style.cursor = "default";
+                  if (stage) stage.container().style.cursor = "";
                 }}
                 onDragMove={(event) => {
                   const node = event.target;
@@ -446,7 +446,7 @@ export function StudioCanvasGuideOverlayLayers({
                 }}
                 onMouseLeave={(event) => {
                   const stage = event.target.getStage();
-                  if (stage) stage.container().style.cursor = "default";
+                  if (stage) stage.container().style.cursor = "";
                 }}
                 onDragMove={(event) => {
                   const node = event.target;
@@ -523,7 +523,7 @@ export function StudioCanvasGuideOverlayLayers({
                 }}
                 onMouseLeave={(event) => {
                   const stage = event.target.getStage();
-                  if (stage) stage.container().style.cursor = "default";
+                  if (stage) stage.container().style.cursor = "";
                 }}
                 onDragMove={(event) => {
                   const node = event.target;
