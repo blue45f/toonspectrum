@@ -480,6 +480,13 @@ export class StudioLiveRoom {
       kind: "presence:heartbeat",
       payload: next,
     });
+    if (
+      next.visibility === this.presence.visibility &&
+      next.pageId === this.presence.pageId &&
+      next.tool === this.presence.tool
+    ) {
+      return;
+    }
     this.presence = next;
     if (this.ready) this.sendPresence("presence:heartbeat");
   }
@@ -1166,7 +1173,10 @@ export class StudioLiveRoom {
   private onHeartbeat(): void {
     if (!this.ready) return;
     const now = this.now();
-    this.sendPresence("presence:heartbeat");
+    // BroadcastChannel has no authoritative disconnect signal, so local peers still need TTL
+    // heartbeats. Socket.IO join/leave/reconnect events own server presence; an unchanged network
+    // heartbeat only created authorization I/O and an O(room-size) broadcast every ten seconds.
+    if (this.transport?.mode === "local") this.sendPresence("presence:heartbeat");
     for (const lock of Array.from(this.locks.values())) {
       if (lock.owner.sessionId !== this.participant.sessionId) continue;
       if (this.pendingLockReleases.has(lock.resource)) continue;
@@ -1279,8 +1289,8 @@ export class StudioLiveRoom {
       case "presence:hello":
         // BroadcastChannel does not replay an older tab's hello. Reply immediately so a late joiner
         // discovers every already-open participant without waiting for the next heartbeat tick.
-        this.sendPresence("presence:heartbeat");
         if (this.transport?.mode === "local") {
+          this.sendPresence("presence:heartbeat");
           const voice = this.voiceMembers.get(this.participant.sessionId);
           if (voice) this.post("voice:join", { callId: voice.callId, muted: voice.muted });
         }
@@ -1453,6 +1463,11 @@ export class StudioLiveRoom {
       } else if (event.status.state === "disconnected") {
         this.revokePendingLockClaims("disconnected", event.status.message);
         this.revokePendingLockReleases("disconnected", event.status.message);
+        const hadPeers = this.peers.size > 0;
+        this.peers.clear();
+        this.screenShares.clear();
+        this.lastSequenceBySession.clear();
+        if (hadPeers) this.emitPresence();
         let changed = false;
         for (const [sessionId, member] of this.voiceMembers) {
           if (sessionId === this.participant.sessionId) continue;
@@ -1598,21 +1613,25 @@ export class StudioLiveRoom {
 
   private pruneExpired(now: number): void {
     let presenceChanged = false;
-    for (const [sessionId, peer] of this.peers) {
-      if (now - peer.lastSeenAt <= this.presenceTtlMs) continue;
-      this.peers.delete(sessionId);
-      this.screenShares.delete(sessionId);
-      this.lastSequenceBySession.delete(sessionId);
-      const voiceMember = this.voiceMembers.get(sessionId);
-      if (voiceMember) {
-        this.voiceMembers.delete(sessionId);
-        this.emitVoice({
-          type: "voice:left",
-          participant: copyParticipant(voiceMember.participant),
-          callId: voiceMember.callId,
-        });
+    // The server is authoritative for socket presence and can keep an idle participant alive
+    // indefinitely. Only local BroadcastChannel peers need client-side silence expiry.
+    if (this.transport?.mode !== "server") {
+      for (const [sessionId, peer] of this.peers) {
+        if (now - peer.lastSeenAt <= this.presenceTtlMs) continue;
+        this.peers.delete(sessionId);
+        this.screenShares.delete(sessionId);
+        this.lastSequenceBySession.delete(sessionId);
+        const voiceMember = this.voiceMembers.get(sessionId);
+        if (voiceMember) {
+          this.voiceMembers.delete(sessionId);
+          this.emitVoice({
+            type: "voice:left",
+            participant: copyParticipant(voiceMember.participant),
+            callId: voiceMember.callId,
+          });
+        }
+        presenceChanged = true;
       }
-      presenceChanged = true;
     }
     let locksChanged = false;
     for (const [resource, lock] of this.locks) {

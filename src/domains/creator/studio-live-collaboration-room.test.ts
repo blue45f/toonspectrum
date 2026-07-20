@@ -321,6 +321,39 @@ describe("StudioLiveRoom", () => {
     serverRoom.close();
   });
 
+  it("keeps local presence liveness without publishing idle server heartbeats", async () => {
+    const local = harness("local");
+    const localRoom = local.room(alice);
+    await localRoom.start();
+    local.hub.published.length = 0;
+    local.intervalHandlers[0]?.();
+    expect(local.hub.published.map(({ kind }) => kind)).toEqual(["presence:heartbeat"]);
+    localRoom.close();
+
+    const server = harness("server");
+    const serverRoom = server.room(alice);
+    await serverRoom.start();
+    server.hub.published.length = 0;
+    server.intervalHandlers[0]?.();
+    expect(server.hub.published).toEqual([]);
+    serverRoom.close();
+  });
+
+  it("does not republish an unchanged presence projection", async () => {
+    const test = harness("server");
+    const room = test.room(alice);
+    await room.start();
+    test.hub.published.length = 0;
+
+    room.updatePresence({ visibility: "active", pageId: null });
+    expect(test.hub.published).toEqual([]);
+    room.updatePresence({ pageId: "page-2", tool: "pen" });
+    expect(test.hub.published.map(({ kind }) => kind)).toEqual(["presence:heartbeat"]);
+    room.updatePresence({ pageId: "page-2", tool: "pen" });
+    expect(test.hub.published).toHaveLength(1);
+    room.close();
+  });
+
   it("drops cross-work, self and replayed messages before emitting cursor state", async () => {
     const test = harness();
     const room = test.room(alice);
@@ -536,7 +569,7 @@ describe("StudioLiveRoom", () => {
     test.intervalHandlers[0]!();
     expect(
       test.hub.published.filter((envelope) => envelope.kind === "presence:heartbeat")
-    ).toHaveLength(1);
+    ).toHaveLength(0);
     expect(test.hub.published.filter((envelope) => envelope.kind === "lock:claim")).toEqual([]);
 
     const releaseRequest = test.hub.lockReleaseRequests[0];
@@ -767,6 +800,70 @@ describe("StudioLiveRoom", () => {
     expect(roomA.getLocks()).toEqual([]);
     roomA.close();
     roomB.close();
+  });
+
+  it("keeps server-authoritative peers beyond the local TTL without network heartbeats", async () => {
+    const test = harness("server");
+    const room = test.room(alice);
+    await room.start();
+    test.hub.inject(
+      0,
+      createStudioLiveEnvelope({
+        workId: "work-1",
+        sender: bob,
+        sentAt: test.now(),
+        sequence: 1,
+        kind: "presence:heartbeat",
+        payload: { visibility: "active", pageId: "page-1" },
+      })
+    );
+    test.hub.published.length = 0;
+
+    test.advance(501);
+    test.intervalHandlers[0]?.();
+    expect(room.getPeers()).toEqual([expect.objectContaining({ sessionId: bob.sessionId })]);
+    expect(test.hub.published).toEqual([]);
+    room.close();
+  });
+
+  it("clears non-authoritative server peers and screen shares on disconnect", async () => {
+    const test = harness("server");
+    const room = test.room(alice);
+    const events: StudioLiveRoomEvent[] = [];
+    room.subscribe((event) => events.push(event));
+    await room.start();
+    for (const envelope of [
+      createStudioLiveEnvelope({
+        workId: "work-1",
+        sender: bob,
+        sentAt: test.now(),
+        sequence: 1,
+        kind: "presence:heartbeat",
+        payload: { visibility: "active", pageId: "page-1" },
+      }),
+      createStudioLiveEnvelope({
+        workId: "work-1",
+        sender: bob,
+        sentAt: test.now(),
+        sequence: 2,
+        kind: "screen:announce",
+        payload: { shareId: "share-1", label: "민호 화면" },
+      }),
+    ]) {
+      test.hub.inject(0, envelope);
+    }
+    expect(room.getPeers()).toHaveLength(1);
+    expect(room.getScreenShares()).toHaveLength(1);
+
+    test.hub.transports[0]?.receiveControl({
+      type: "status",
+      status: { state: "disconnected", message: "network lost", recoverable: true },
+    });
+
+    expect(room.getPeers()).toEqual([]);
+    expect(room.getScreenShares()).toEqual([]);
+    expect(events).toContainEqual({ type: "presence", peers: [] });
+    room.close();
   });
 
   it("routes screen/WebRTC signals only to the addressed session", async () => {
