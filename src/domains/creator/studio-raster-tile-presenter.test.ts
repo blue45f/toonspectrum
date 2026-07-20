@@ -415,6 +415,42 @@ describe("studio raster tile presentation planner", () => {
     presenter.dispose();
   });
 
+  it("backs off unavailable WebGPU locally instead of requesting an adapter for every frame", async () => {
+    const canvases = fakePresentationCanvases();
+    let now = 1_000;
+    const requestAdapter = vi.fn(async () => null);
+    const presenter = new StudioRasterTilePresenter({
+      gpuCanvas: canvases.gpuCanvas,
+      fallbackCanvas: canvases.fallbackCanvas,
+      gpu: { requestAdapter } as unknown as GPU,
+      sha256: async () => "a".repeat(64),
+      now: () => now,
+    });
+
+    await expect(presenter.present(request([tile(surface, 0, 0)]))).resolves.toMatchObject({
+      status: "ready",
+      backend: "canvas2d",
+    });
+    now += 29_999;
+    await expect(presenter.present(request([tile(surface, 0, 0)], { generation: 2 })))
+      .resolves.toMatchObject({ status: "ready", backend: "canvas2d" });
+    expect(requestAdapter).toHaveBeenCalledTimes(1);
+
+    now += 1;
+    await expect(presenter.present(request([tile(surface, 0, 0)], { generation: 3 })))
+      .resolves.toMatchObject({ status: "ready", backend: "canvas2d" });
+    expect(requestAdapter).toHaveBeenCalledTimes(2);
+
+    now += 119_999;
+    await presenter.present(request([tile(surface, 0, 0)], { generation: 4 }));
+    expect(requestAdapter).toHaveBeenCalledTimes(2);
+    now += 1;
+    await presenter.present(request([tile(surface, 0, 0)], { generation: 5 }));
+    expect(requestAdapter).toHaveBeenCalledTimes(3);
+    expect(requestAdapter).toHaveBeenLastCalledWith();
+    presenter.dispose();
+  });
+
   it("never reveals a superseded async generation after the newer frame is complete", async () => {
     const canvases = fakePresentationCanvases();
     const onFrameReady = vi.fn();

@@ -21,6 +21,7 @@ const GPU_VERTEX_BUFFER_USAGE = 0x20; // VERTEX
 const GPU_CANVAS_FORMAT = "rgba8unorm" as const;
 const GPU_CACHE_MAX_ENTRIES = STUDIO_RASTER_TILE_PRESENTER_MAX_VISIBLE_TILES;
 const GPU_CACHE_MAX_BYTES = STUDIO_RASTER_TILE_PRESENTER_MAX_VISIBLE_BYTES;
+const GPU_RETRY_DELAYS_MS = Object.freeze([30_000, 120_000, 300_000] as const);
 const VERTEX_FLOATS = 4;
 
 const TILE_PRESENTATION_SHADER = /* wgsl */ `
@@ -593,6 +594,8 @@ export interface StudioRasterTilePresenterOptions extends StudioRasterTilePresen
   readonly fallbackCanvas: HTMLCanvasElement;
   readonly gpu?: GPU | null;
   readonly sha256?: StudioRasterTileSha256;
+  /** Monotonic clock override used only by deterministic recovery-policy tests. */
+  readonly now?: () => number;
 }
 
 interface GpuTileCacheEntry {
@@ -665,6 +668,7 @@ export class StudioRasterTilePresenter {
   private readonly callbacks: StudioRasterTilePresenterCallbacks;
   private readonly gpuOverride: GPU | null | undefined;
   private readonly sha256: StudioRasterTileSha256;
+  private readonly now: () => number;
   private backend: StudioRasterTilePresenterBackend = "unavailable";
   private disposed = false;
   private activeRequest: ActiveRequest | null = null;
@@ -673,6 +677,8 @@ export class StudioRasterTilePresenter {
   private latestVerifiedPlan: StudioRasterTilePresentationPlan | null = null;
   private gpuState: GpuState | null = null;
   private gpuInitialization: Promise<GpuState | null> | null = null;
+  private gpuRetryNotBefore = 0;
+  private gpuFailureCount = 0;
 
   constructor(options: StudioRasterTilePresenterOptions) {
     this.gpuCanvas = options.gpuCanvas;
@@ -685,6 +691,7 @@ export class StudioRasterTilePresenter {
     };
     this.gpuOverride = options.gpu;
     this.sha256 = options.sha256 ?? browserSha256;
+    this.now = options.now ?? (() => performance.now());
     this.hideBothCanvases();
   }
 
@@ -735,6 +742,8 @@ export class StudioRasterTilePresenter {
           if (!this.isCurrent(active)) {
             return { status: "stale", generation: request.generation, reason: "stale" };
           }
+          this.gpuFailureCount = 0;
+          this.gpuRetryNotBefore = 0;
           this.publishReady(plan, "webgpu");
           return {
             status: "ready",
@@ -745,6 +754,7 @@ export class StudioRasterTilePresenter {
         } catch (error) {
           if (active.controller.signal.aborted) throw error;
           this.releaseGpuState(gpuState, true);
+          this.deferGpuRetry();
         }
       }
       if (!this.isCurrent(active)) {
@@ -893,6 +903,9 @@ export class StudioRasterTilePresenter {
     if (this.disposed) return null;
     if (this.gpuState) return this.gpuState;
     if (this.gpuInitialization) return this.gpuInitialization;
+    // A missing/unstable adapter must not turn every CRDT frame into another GPU allocation
+    // attempt. Canvas2D remains fully local and authoritative during this bounded cooldown.
+    if (this.now() < this.gpuRetryNotBefore) return null;
     const gpu = this.gpu();
     if (!gpu) return null;
     this.gpuInitialization = this.initializeGpu(gpu);
@@ -906,8 +919,11 @@ export class StudioRasterTilePresenter {
   private async initializeGpu(gpu: GPU): Promise<GpuState | null> {
     let device: GPUDevice | null = null;
     let context: GPUCanvasContext | null = null;
+    let initialized = false;
     try {
-      const adapter = await gpu.requestAdapter({ powerPreference: "high-performance" });
+      // Do not force the discrete GPU for a presentation-only surface. The browser/OS can select
+      // the most appropriate adapter, which avoids unnecessary battery and thermal cost on mobile.
+      const adapter = await gpu.requestAdapter();
       if (!adapter || this.disposed) return null;
       device = await adapter.requestDevice();
       if (this.disposed) {
@@ -968,13 +984,24 @@ export class StudioRasterTilePresenter {
         sequence: 0,
       };
       this.gpuState = state;
+      initialized = true;
       void device.lost.then((info) => this.handleDeviceLost(state, info));
       return state;
     } catch {
       safeUnconfigure(context);
       safeDestroyDevice(device);
       return null;
+    } finally {
+      if (!initialized && !this.disposed) this.deferGpuRetry();
     }
+  }
+
+  private deferGpuRetry(): void {
+    const delay = GPU_RETRY_DELAYS_MS[
+      Math.min(this.gpuFailureCount, GPU_RETRY_DELAYS_MS.length - 1)
+    ]!;
+    this.gpuFailureCount += 1;
+    this.gpuRetryNotBefore = Math.max(this.gpuRetryNotBefore, this.now() + delay);
   }
 
   private resizeSurfaces(plan: StudioRasterTilePresentationPlan): void {
@@ -1189,6 +1216,7 @@ export class StudioRasterTilePresenter {
   private handleDeviceLost(state: GpuState, info: GPUDeviceLostInfo): void {
     if (this.disposed || this.gpuState !== state) return;
     this.releaseGpuState(state, false);
+    this.deferGpuRetry();
     this.callbacks.onDeviceLost?.(info);
     this.invalidateVisibleFrame("device-lost");
     const plan = this.latestVerifiedPlan;
