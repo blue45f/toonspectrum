@@ -47,9 +47,13 @@ const budgets = {
   // 2026-07-20 앱 셸 i18n과 drawing-assist/VRM scene 복구 계약이 함께 반영된 측정치는
   // route 2,733,950/890,637, app-shell 이후 2,234,078/730,639, 133 requests다. 무거운 패널은
   // 여전히 dynamic entry이며, 전체·request 상한만 관측치에 약 2%/1개 여유로 다시 잠근다.
+  // 2026-07-20 원격 참고 이미지/공유 에셋 응답 검증, 아이소메트릭 입체, GLB interchange 계약을
+  // 추가한 production build는 app-shell 이후 약 2.27MB/740KB, 137 requests와 app entry 약
+  // 500KB raw다. 실제 3D/decoder/원본 이미지 payload는 계속 사용자 동작 뒤 dynamic graph에
+  // 남아 있으므로, 새 동기 복구·보안 계약의 관측치에 약 2%/1-request 여유만 다시 고정한다.
   studio: { raw: 2_790_000, gzip: 910_000 },
   studioEntry: { raw: 1_284_000, gzip: 384_500 },
-  studioIncremental: { raw: 2_278_000, gzip: 738_000, chunks: 134 },
+  studioIncremental: { raw: 2_278_000, gzip: 755_000, chunks: 138 },
   // Rapier deterministic compat is intentionally isolated in a user-triggered module Worker.
   // 2026-07-18 production output: 2,302,139 raw / 855,399 gzip. Keep ~2% version-drift headroom
   // without charging this optional engine to Studio or the 3D editor's initial graph.
@@ -69,7 +73,7 @@ const budgets = {
   // OffscreenCanvas/createImageBitmap contact-sheet compositor, isolated from the editor graph.
   bg3dContactSheetWorker: { raw: 80_000, gzip: 25_000 },
   // Measured after the same build: 443,257 raw / 143,956 gzip.
-  app: { raw: 500_000, gzip: 170_000 },
+  app: { raw: 510_000, gzip: 170_000 },
 };
 
 function fail(message) {
