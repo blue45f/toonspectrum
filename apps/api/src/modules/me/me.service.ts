@@ -1,8 +1,23 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable } from "@nestjs/common";
 import { and, eq } from "drizzle-orm";
 
-import { db, collections, collectionItems, ratings, reviews, reviewLikes, reads, subscriptions } from "../../../../../lib/db";
+import {
+  normalizeCollectionClientId,
+  normalizeCollectionEmoji,
+  normalizeCollectionName,
+} from "../../../../../lib/collection-contract";
+import { db, ratings, reviews, reviewLikes, reads, subscriptions } from "../../../../../lib/db";
 import { deleteMyAccount, loadMe, updateProfile, type UpdateProfileInput } from "../../../../../lib/server/me";
+
+import { type MeCollectionRepository } from "./me-collection.repository";
+import { type CollectionMutation } from "./me.dto";
+
+export {
+  MAX_COLLECTION_EMOJI_LENGTH,
+  MAX_COLLECTION_NAME_LENGTH,
+  normalizeCollectionEmoji,
+  normalizeCollectionName,
+} from "../../../../../lib/collection-contract";
 
 type MergeMapValue = Record<string, unknown>;
 
@@ -36,14 +51,6 @@ interface ProfilePayload {
   name?: unknown;
   bio?: unknown;
   image?: unknown;
-}
-
-interface CollectionPayload {
-  action?: unknown;
-  id?: unknown;
-  titleId?: unknown;
-  name?: unknown;
-  emoji?: unknown;
 }
 
 type MergePayload = {
@@ -101,9 +108,6 @@ export const MAX_MERGE_ID_LENGTH = 120;
 export const MAX_MERGE_REVIEW_TEXT_LENGTH = 2000;
 export const MAX_MERGE_TAGS = 5;
 export const MAX_MERGE_TAG_LENGTH = 32;
-export const MAX_COLLECTION_NAME_LENGTH = 80;
-export const MAX_COLLECTION_EMOJI_LENGTH = 16;
-
 const VALID_READ_STATES = new Set(["want", "reading", "done", "dropped"]);
 
 interface NormalizedMergePayload {
@@ -112,7 +116,7 @@ interface NormalizedMergePayload {
   subscriptions: { titleId: string }[];
   reviews: { titleId: string; rating: number; text: string; tags: string[]; spoiler: boolean }[];
   likedReviews: { reviewId: string }[];
-  collections: { name: string; emoji: string; titleIds: string[] }[];
+  collections: { clientId?: string; name: string; emoji: string; titleIds: string[] }[];
 }
 
 function clampText(value: unknown, max: number): string {
@@ -147,14 +151,6 @@ function normalizeReviewTags(value: unknown): string[] {
     if (tags.length >= MAX_MERGE_TAGS) break;
   }
   return tags;
-}
-
-export function normalizeCollectionName(value: unknown): string {
-  return clampText(value, MAX_COLLECTION_NAME_LENGTH);
-}
-
-export function normalizeCollectionEmoji(value: unknown): string {
-  return clampText(value, MAX_COLLECTION_EMOJI_LENGTH) || "📚";
 }
 
 export function normalizeMergePayload(payload: MergePayload): NormalizedMergePayload {
@@ -201,6 +197,7 @@ export function normalizeMergePayload(payload: MergePayload): NormalizedMergePay
     .flatMap((rawCollection) => {
       if (!rawCollection || typeof rawCollection !== "object" || Array.isArray(rawCollection)) return [];
       const collection = rawCollection as CollectionInput;
+      const clientId = normalizeCollectionClientId(collection.id);
       const name = normalizeCollectionName(collection.name);
       const titleIds = Array.isArray(collection.titleIds) ? collection.titleIds : [];
       const seen = new Set<string>();
@@ -213,8 +210,13 @@ export function normalizeMergePayload(payload: MergePayload): NormalizedMergePay
         }
         if (normalizedTitleIds.length >= MAX_MERGE_COLLECTION_TITLE_IDS) break;
       }
-      return name && normalizedTitleIds.length
-        ? [{ name, emoji: normalizeCollectionEmoji(collection.emoji), titleIds: normalizedTitleIds }]
+      return name
+        ? [{
+            ...(clientId ? { clientId } : {}),
+            name,
+            emoji: normalizeCollectionEmoji(collection.emoji),
+            titleIds: normalizedTitleIds,
+          }]
         : [];
     });
 
@@ -223,6 +225,8 @@ export function normalizeMergePayload(payload: MergePayload): NormalizedMergePay
 
 @Injectable()
 export class MeService {
+  constructor(private readonly collectionRepository: MeCollectionRepository) {}
+
   async getMe(uid: string) {
     return loadMe(uid);
   }
@@ -349,61 +353,55 @@ export class MeService {
     return { ok: true, subscribed: true };
   }
 
-  async updateCollection(uid: string, payload: CollectionPayload) {
-    const action = String(payload.action ?? "").trim();
-    if (!action) throw new BadRequestException("알 수 없는 action");
-
-    if (action === "create") {
+  async updateCollection(uid: string, payload: CollectionMutation) {
+    if (payload.action === "create") {
       const name = normalizeCollectionName(payload.name);
       if (!name) throw new BadRequestException("이름 필요");
-      const [row] = await db
-        .insert(collections)
-        .values({ userId: uid, name, emoji: normalizeCollectionEmoji(payload.emoji) })
-        .returning({ id: collections.id });
-      return { ok: true, id: row.id };
-    }
-
-    if (action === "rename") {
-      const id = String(payload.id ?? "").trim();
-      const name = normalizeCollectionName(payload.name);
-      if (!id || !name) throw new BadRequestException("컬렉션 id와 이름 필요");
-      await db.update(collections).set({ name }).where(and(eq(collections.id, id), eq(collections.userId, uid)));
-      return { ok: true };
-    }
-
-    if (action === "delete") {
-      const id = String(payload.id ?? "").trim();
-      if (!id) throw new BadRequestException("컬렉션 id 필요");
-      await db.delete(collections).where(and(eq(collections.id, id), eq(collections.userId, uid)));
-      return { ok: true };
-    }
-
-    if (action === "toggle") {
-      const id = String(payload.id ?? "").trim();
-      const titleId = String(payload.titleId ?? "").trim();
-      if (!id || !titleId) throw new BadRequestException("컬렉션 id와 titleId 필요");
-
-      const [own] = await db
-        .select({ id: collections.id })
-        .from(collections)
-        .where(and(eq(collections.id, id), eq(collections.userId, uid)))
-        .limit(1);
-      if (!own) throw new BadRequestException("권한 없음");
-
-      const [exists] = await db
-        .select()
-        .from(collectionItems)
-        .where(and(eq(collectionItems.collectionId, id), eq(collectionItems.titleId, titleId)))
-        .limit(1);
-
-      if (exists) {
-        await db.delete(collectionItems).where(and(eq(collectionItems.collectionId, id), eq(collectionItems.titleId, titleId)));
-      } else {
-        await db.insert(collectionItems).values({ collectionId: id, titleId });
+      const emoji = normalizeCollectionEmoji(payload.emoji);
+      const result = await this.collectionRepository.createOwned({
+        ...(payload.id ? { id: payload.id } : {}),
+        userId: uid,
+        name,
+        emoji,
+      });
+      if (result.status === "conflict") {
+        throw new ConflictException("컬렉션 생성 요청이 기존 데이터와 충돌합니다.");
       }
-      return { ok: true };
+      return { ok: true, id: result.id, created: result.status === "created" };
     }
 
+    if (payload.action === "rename") {
+      const id = payload.id;
+      const name = normalizeCollectionName(payload.name);
+      await this.collectionRepository.renameOwned(uid, id, name);
+      return { ok: true, id };
+    }
+
+    if (payload.action === "delete") {
+      await this.collectionRepository.deleteOwned(uid, payload.id);
+      return { ok: true, id: payload.id };
+    }
+
+    const { id, titleId } = payload;
+
+    if (payload.action === "set-item") {
+      const result = await this.collectionRepository.setItem(
+        uid,
+        id,
+        titleId,
+        payload.included
+      );
+      if (result.status === "not_found") throw new BadRequestException("권한 없음");
+      return { ok: true, id, titleId, included: result.included };
+    }
+
+    if (payload.action === "toggle") {
+      const result = await this.collectionRepository.toggleItem(uid, id, titleId);
+      if (result.status === "not_found") throw new BadRequestException("권한 없음");
+      return { ok: true, id, titleId, included: result.included };
+    }
+
+    payload satisfies never;
     throw new BadRequestException("알 수 없는 action");
   }
 
@@ -451,35 +449,8 @@ export class MeService {
       await tryInsert("reviewLikes", () => db.insert(reviewLikes).values(likeRows).onConflictDoNothing());
     }
 
-    const cols = body.collections;
-    if (cols.length) {
-      try {
-        const serverCols = await db.select().from(collections).where(eq(collections.userId, uid));
-        const byName = new Map(serverCols.map((collection) => [collection.name, collection.id]));
+    const collectionIdMap = await this.collectionRepository.mergeOwned(uid, body.collections);
 
-        for (const rawCollection of cols) {
-          const { name, emoji, titleIds } = rawCollection;
-
-          let collectionId = byName.get(name);
-          if (!collectionId) {
-            const [row] = await db
-              .insert(collections)
-              .values({ userId: uid, name, emoji })
-              .returning({ id: collections.id });
-            collectionId = row.id;
-            byName.set(name, collectionId);
-          }
-
-          await db
-            .insert(collectionItems)
-            .values(titleIds.map((titleId) => ({ collectionId, titleId })))
-            .onConflictDoNothing();
-        }
-      } catch (error) {
-        console.error("/api/me/merge collections 실패:", error);
-      }
-    }
-
-    return this.getMe(uid);
+    return { ...await this.getMe(uid), collectionIdMap };
   }
 }

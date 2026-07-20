@@ -10,6 +10,7 @@ import {
 } from "./studio-crdt-protocol";
 import {
   STUDIO_LIVE_ICE_CANDIDATE_MAX_LENGTH,
+  STUDIO_LIVE_LOCK_MAX_LEASE_MS,
   STUDIO_LIVE_SDP_MAX_LENGTH,
   STUDIO_LIVE_SDP_MID_MAX_LENGTH,
   STUDIO_LIVE_USERNAME_FRAGMENT_MAX_LENGTH,
@@ -800,6 +801,770 @@ describe("StudioLiveSocketTransport", () => {
     room.close();
   });
 
+  it("uses a fresh request id for each renewal of the same observed fence", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.joinResponse = joinSuccess({ lockProtocolVersion: 2 });
+    socket.holdEvents.add("studio:lock:request");
+    const requestIds = [
+      "10101010-1010-4010-8010-101010101010",
+      "20202020-2020-4020-8020-202020202020",
+    ];
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+      randomId: () => requestIds.shift() ?? "30303030-3030-4030-8030-303030303030",
+    });
+    await transport.connect();
+    activate(transport);
+    const claimId = "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa";
+
+    expect(transport.send(envelope("lock:claim", {
+      resource: "page:unique-renewal",
+      claimId,
+      leaseUntil: NOW + 15_000,
+    }, 2))).toBe(true);
+    expect(socket.emitted.at(-1)).toEqual({
+      event: "studio:lock:request",
+      payload: {
+        workId: "work-1",
+        resourceId: "page:unique-renewal",
+        requestId: "10101010-1010-4010-8010-101010101010",
+        protocolVersion: 2,
+        renewLeaseId: claimId,
+        leaseMs: 15_000,
+      },
+    });
+    socket.reply("studio:lock:request", {
+      ok: false,
+      decision: "denied",
+      requestId: "10101010-1010-4010-8010-101010101010",
+      code: "lock_stale",
+      message: "첫 갱신을 다시 시도합니다.",
+    });
+
+    expect(transport.send(envelope("lock:claim", {
+      resource: "page:unique-renewal",
+      claimId,
+      leaseUntil: NOW + 15_000,
+    }, 3))).toBe(true);
+    expect(socket.emitted.at(-1)).toEqual({
+      event: "studio:lock:request",
+      payload: {
+        workId: "work-1",
+        resourceId: "page:unique-renewal",
+        requestId: "20202020-2020-4020-8020-202020202020",
+        protocolVersion: 2,
+        renewLeaseId: claimId,
+        leaseMs: 15_000,
+      },
+    });
+    transport.close();
+  });
+
+  it("rejects a v2 acquisition ACK without correlation and chase-releases its fence", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.joinResponse = joinSuccess({ lockProtocolVersion: 2 });
+    socket.holdEvents.add("studio:lock:request");
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    await transport.connect();
+    activate(transport);
+    const requestId = "31313131-3131-4131-8131-313131313131";
+    const acquisition = transport.acquireLock({
+      resource: "page:missing-v2-correlation",
+      requestId,
+      leaseMs: 15_000,
+    });
+    socket.reply("studio:lock:request", {
+      ok: true,
+      data: {
+        decision: "acquired",
+        lock: {
+          resourceId: "page:missing-v2-correlation",
+          leaseId: "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb",
+          ownerConnectionId: self.connectionId,
+          ownerName: self.name,
+          expiresAt: new Date(NOW + 15_000).toISOString(),
+        },
+      },
+    });
+
+    await expect(acquisition).resolves.toMatchObject({
+      status: "denied",
+      requestId,
+      code: "response_mismatch",
+    });
+    expect(socket.emitted.at(-1)).toEqual({
+      event: "studio:lock:release",
+      payload: {
+        workId: "work-1",
+        resourceId: "page:missing-v2-correlation",
+        leaseId: "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb",
+        requestId,
+      },
+    });
+    expect(transport.ready).toBe(true);
+    transport.close();
+  });
+
+  it("legitimizes a deferred legacy fence when a retry succeeds with the same lease", async () => {
+    vi.useFakeTimers();
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.holdEvents.add("studio:lock:request");
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+      lockAckTimeoutMs: 100,
+    });
+    await transport.connect();
+    activate(transport);
+    const firstRequestId = "41414141-4141-4141-8141-414141414141";
+    const secondRequestId = "51515151-5151-4151-8151-515151515151";
+    const resource = "page:legacy-same-fence";
+    const first = transport.acquireLock({ resource, requestId: firstRequestId, leaseMs: 15_000 });
+    await vi.advanceTimersByTimeAsync(100);
+    await expect(first).resolves.toMatchObject({ status: "timeout" });
+    const second = transport.acquireLock({ resource, requestId: secondRequestId, leaseMs: 15_000 });
+    const stableLock = {
+      resourceId: resource,
+      leaseId: "cccccccc-3333-4333-8333-cccccccccccc",
+      ownerConnectionId: self.connectionId,
+      ownerName: self.name,
+      expiresAt: new Date(NOW + 15_000).toISOString(),
+    };
+    socket.reply("studio:lock:request", {
+      ok: true,
+      data: { decision: "acquired", requestId: firstRequestId, lock: stableLock },
+    });
+    socket.reply("studio:lock:request", {
+      ok: true,
+      data: { decision: "acquired", requestId: secondRequestId, lock: stableLock },
+    });
+    await expect(second).resolves.toMatchObject({
+      status: "acquired",
+      lock: { claimId: stableLock.leaseId },
+    });
+    socket.serverEmit("studio:lock:update", {
+      action: "acquired",
+      requestId: firstRequestId,
+      lock: stableLock,
+    });
+
+    expect(socket.emitted.filter((entry) => entry.event === "studio:lock:release")).toEqual([]);
+    transport.close();
+  });
+
+  it("refreshes an accepted legacy fence when its renewal ACK arrives after timeout", async () => {
+    vi.useFakeTimers();
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.holdEvents.add("studio:lock:request");
+    const renewalRequestId = "52525252-5252-4252-8252-525252525252";
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+      randomId: () => renewalRequestId,
+      lockAckTimeoutMs: 100,
+    });
+    const controls: StudioLiveTransportControlEvent[] = [];
+    transport.subscribeControl((event) => controls.push(event));
+    await transport.connect();
+    activate(transport);
+    const resource = "page:legacy-late-renewal";
+    const initialRequestId = "42424242-4242-4242-8242-424242424242";
+    const stableLeaseId = "abababab-3333-4333-8333-abababababab";
+    const initial = transport.acquireLock({
+      resource,
+      requestId: initialRequestId,
+      leaseMs: 15_000,
+    });
+    socket.reply("studio:lock:request", {
+      ok: true,
+      data: {
+        decision: "acquired",
+        requestId: initialRequestId,
+        lock: {
+          resourceId: resource,
+          leaseId: stableLeaseId,
+          ownerConnectionId: self.connectionId,
+          ownerName: self.name,
+          expiresAt: new Date(NOW + 15_000).toISOString(),
+        },
+      },
+    });
+    await expect(initial).resolves.toMatchObject({ status: "acquired" });
+    controls.length = 0;
+
+    expect(transport.send(envelope("lock:claim", {
+      resource,
+      claimId: stableLeaseId,
+      leaseUntil: NOW + 20_000,
+    }, 2))).toBe(true);
+    await vi.advanceTimersByTimeAsync(100);
+    const newerRenewal = transport.acquireLock({
+      resource,
+      requestId: "62626262-6262-4262-8262-626262626262",
+      renewLeaseId: stableLeaseId,
+      leaseMs: 15_000,
+    });
+    const refreshedLock = {
+      resourceId: resource,
+      leaseId: stableLeaseId,
+      ownerConnectionId: self.connectionId,
+      ownerName: self.name,
+      expiresAt: new Date(NOW + 20_000).toISOString(),
+    };
+    socket.reply("studio:lock:request", {
+      ok: true,
+      data: {
+        decision: "acquired",
+        requestId: renewalRequestId,
+        lock: refreshedLock,
+      },
+    });
+    socket.serverEmit("studio:lock:update", {
+      action: "acquired",
+      requestId: renewalRequestId,
+      lock: refreshedLock,
+    });
+    await vi.advanceTimersByTimeAsync(100);
+    await expect(newerRenewal).resolves.toMatchObject({ status: "timeout" });
+
+    expect(socket.emitted.filter((entry) => entry.event === "studio:lock:release")).toEqual([]);
+    expect(controls).toContainEqual({
+      type: "lock",
+      lock: expect.objectContaining({
+        action: "acquired",
+        resource,
+        claimId: stableLeaseId,
+        leaseUntil: NOW + 20_000,
+      }),
+    });
+    transport.close();
+  });
+
+  it("keeps a newer accepted legacy retry when the older request returns the same fence", async () => {
+    vi.useFakeTimers();
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.holdEvents.add("studio:lock:request");
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+      lockAckTimeoutMs: 100,
+    });
+    await transport.connect();
+    activate(transport);
+    const resource = "page:legacy-inverse-retry";
+    const firstRequestId = "43434343-4343-4343-8343-434343434343";
+    const secondRequestId = "53535353-5353-4353-8353-535353535353";
+    const stableLock = {
+      resourceId: resource,
+      leaseId: "bcbcbcbc-3434-4434-8434-bcbcbcbcbcbc",
+      ownerConnectionId: self.connectionId,
+      ownerName: self.name,
+      expiresAt: new Date(NOW + 15_000).toISOString(),
+    };
+    const first = transport.acquireLock({ resource, requestId: firstRequestId, leaseMs: 15_000 });
+    await vi.advanceTimersByTimeAsync(100);
+    await expect(first).resolves.toMatchObject({ status: "timeout" });
+    const second = transport.acquireLock({ resource, requestId: secondRequestId, leaseMs: 15_000 });
+    const acknowledgements = socket.heldAcks.get("studio:lock:request") ?? [];
+    expect(acknowledgements).toHaveLength(2);
+    acknowledgements[1]?.({
+      ok: true,
+      data: { decision: "acquired", requestId: secondRequestId, lock: stableLock },
+    });
+    await expect(second).resolves.toMatchObject({
+      status: "acquired",
+      lock: { claimId: stableLock.leaseId },
+    });
+    acknowledgements[0]?.({
+      ok: true,
+      data: { decision: "acquired", requestId: firstRequestId, lock: stableLock },
+    });
+    socket.serverEmit("studio:lock:update", {
+      action: "acquired",
+      requestId: firstRequestId,
+      lock: stableLock,
+    });
+
+    expect(socket.emitted.filter((entry) => entry.event === "studio:lock:release")).toEqual([]);
+    transport.close();
+  });
+
+  it("serializes a v2 reacquire behind the correlated release lifecycle", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.joinResponse = joinSuccess({ lockProtocolVersion: 2 });
+    socket.holdEvents.add("studio:lock:request");
+    socket.holdEvents.add("studio:lock:release");
+    const ids = [
+      "11111111-1111-4111-8111-111111111121",
+      "11111111-1111-4111-8111-111111111122",
+      "11111111-1111-4111-8111-111111111123",
+    ];
+    const room = new StudioLiveRoom({
+      workId: "work-1",
+      participant: localParticipant,
+      dependencies: {
+        transportFactory: createStudioServerLiveTransportFactory(TOKEN, {
+          createSocket: () => socket,
+          now: () => NOW,
+        }),
+        now: () => NOW,
+        randomId: () => ids.shift() ?? "11111111-1111-4111-8111-111111111199",
+      },
+    });
+    await room.start();
+
+    const first = room.claimLockAsync("page:serialized-release");
+    expect(socket.emitted.at(-1)).toEqual({
+      event: "studio:lock:request",
+      payload: {
+        workId: "work-1",
+        resourceId: "page:serialized-release",
+        requestId: "11111111-1111-4111-8111-111111111121",
+        protocolVersion: 2,
+        leaseMs: 15_000,
+      },
+    });
+    socket.reply("studio:lock:request", {
+      ok: true,
+      data: {
+        decision: "acquired",
+        requestId: "11111111-1111-4111-8111-111111111121",
+        lock: {
+          resourceId: "page:serialized-release",
+          leaseId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+          ownerConnectionId: self.connectionId,
+          ownerName: self.name,
+          expiresAt: new Date(NOW + 15_000).toISOString(),
+        },
+      },
+    });
+    await first;
+
+    const release = room.releaseLockAsync("page:serialized-release");
+    const reacquire = room.claimLockAsync("page:serialized-release");
+    expect(socket.emitted.filter((entry) => entry.event === "studio:lock:request")).toHaveLength(1);
+    expect(socket.emitted.at(-1)).toEqual({
+      event: "studio:lock:release",
+      payload: {
+        workId: "work-1",
+        resourceId: "page:serialized-release",
+        leaseId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+        requestId: "11111111-1111-4111-8111-111111111122",
+      },
+    });
+    socket.reply("studio:lock:release", {
+      ok: true,
+      data: {
+        requestId: "11111111-1111-4111-8111-111111111122",
+        resourceId: "page:serialized-release",
+        leaseId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+        released: true,
+      },
+    });
+    await expect(release).resolves.toMatchObject({ status: "released", released: true });
+    await vi.waitFor(() => {
+      expect(socket.emitted.filter((entry) => entry.event === "studio:lock:request")).toHaveLength(2);
+    });
+    expect(socket.emitted.at(-1)).toEqual({
+      event: "studio:lock:request",
+      payload: {
+        workId: "work-1",
+        resourceId: "page:serialized-release",
+        requestId: "11111111-1111-4111-8111-111111111123",
+        protocolVersion: 2,
+        leaseMs: 15_000,
+      },
+    });
+    socket.reply("studio:lock:request", {
+      ok: true,
+      data: {
+        decision: "acquired",
+        requestId: "11111111-1111-4111-8111-111111111123",
+        lock: {
+          resourceId: "page:serialized-release",
+          leaseId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2",
+          ownerConnectionId: self.connectionId,
+          ownerName: self.name,
+          expiresAt: new Date(NOW + 15_000).toISOString(),
+        },
+      },
+    });
+    await expect(reacquire).resolves.toMatchObject({
+      status: "acquired",
+      lock: { claimId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2" },
+    });
+    socket.serverEmit("studio:lock:update", {
+      action: "released",
+      requestId: "11111111-1111-4111-8111-111111111121",
+      releaseRequestId: "11111111-1111-4111-8111-111111111122",
+      resourceId: "page:serialized-release",
+      leaseId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+    });
+    expect(room.getLocks()).toEqual([
+      expect.objectContaining({ claimId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2" }),
+    ]);
+    room.close();
+  });
+
+  it("times out a v2 release without letting a late old ACK remove the reacquired fence", async () => {
+    vi.useFakeTimers();
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.joinResponse = joinSuccess({ lockProtocolVersion: 2 });
+    socket.holdEvents.add("studio:lock:request");
+    socket.holdEvents.add("studio:lock:release");
+    const ids = [
+      "22222222-2222-4222-8222-222222222221",
+      "22222222-2222-4222-8222-222222222222",
+      "22222222-2222-4222-8222-222222222223",
+    ];
+    const room = new StudioLiveRoom({
+      workId: "work-1",
+      participant: localParticipant,
+      dependencies: {
+        transportFactory: createStudioServerLiveTransportFactory(TOKEN, {
+          createSocket: () => socket,
+          now: () => NOW,
+          lockAckTimeoutMs: 100,
+        }),
+        now: () => NOW,
+        randomId: () => ids.shift() ?? "22222222-2222-4222-8222-222222222299",
+        lockAckTimeoutMs: 250,
+      },
+    });
+    await room.start();
+    const first = room.claimLockAsync("page:release-timeout");
+    socket.reply("studio:lock:request", {
+      ok: true,
+      data: {
+        decision: "acquired",
+        requestId: "22222222-2222-4222-8222-222222222221",
+        lock: {
+          resourceId: "page:release-timeout",
+          leaseId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1",
+          ownerConnectionId: self.connectionId,
+          ownerName: self.name,
+          expiresAt: new Date(NOW + 15_000).toISOString(),
+        },
+      },
+    });
+    await first;
+
+    const release = room.releaseLockAsync("page:release-timeout");
+    await vi.advanceTimersByTimeAsync(100);
+    await expect(release).resolves.toMatchObject({ status: "timeout" });
+    expect(room.getLocks()).toEqual([]);
+
+    const reacquire = room.claimLockAsync("page:release-timeout");
+    socket.reply("studio:lock:request", {
+      ok: true,
+      data: {
+        decision: "acquired",
+        requestId: "22222222-2222-4222-8222-222222222223",
+        lock: {
+          resourceId: "page:release-timeout",
+          leaseId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2",
+          ownerConnectionId: self.connectionId,
+          ownerName: self.name,
+          expiresAt: new Date(NOW + 15_000).toISOString(),
+        },
+      },
+    });
+    await reacquire;
+    socket.reply("studio:lock:release", {
+      ok: true,
+      data: {
+        requestId: "22222222-2222-4222-8222-222222222222",
+        resourceId: "page:release-timeout",
+        leaseId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1",
+        released: true,
+      },
+    });
+    expect(room.getLocks()).toEqual([
+      expect.objectContaining({ claimId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2" }),
+    ]);
+    room.close();
+  });
+
+  it("waits out a legacy lease before reacquiring and ignores the late old release", async () => {
+    vi.useFakeTimers();
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.holdEvents.add("studio:lock:request");
+    socket.holdEvents.add("studio:lock:release");
+    const ids = [
+      "23232323-2323-4323-8323-232323232321",
+      "23232323-2323-4323-8323-232323232322",
+      "23232323-2323-4323-8323-232323232323",
+    ];
+    const room = new StudioLiveRoom({
+      workId: "work-1",
+      participant: localParticipant,
+      dependencies: {
+        transportFactory: createStudioServerLiveTransportFactory(TOKEN, {
+          createSocket: () => socket,
+          now: () => NOW,
+          lockAckTimeoutMs: 100,
+        }),
+        now: () => NOW,
+        randomId: () => ids.shift() ?? "23232323-2323-4323-8323-232323232399",
+        heartbeatMs: 250,
+        lockAckTimeoutMs: 250,
+      },
+    });
+    await room.start();
+    const resource = "page:legacy-release-timeout";
+    const oldLeaseId = "bdbdbdbd-bdbd-4dbd-8dbd-bdbdbdbdbdb1";
+    const initial = room.claimLockAsync(resource);
+    socket.reply("studio:lock:request", {
+      ok: true,
+      data: {
+        decision: "acquired",
+        requestId: "23232323-2323-4323-8323-232323232321",
+        lock: {
+          resourceId: resource,
+          leaseId: oldLeaseId,
+          ownerConnectionId: self.connectionId,
+          ownerName: self.name,
+          expiresAt: new Date(NOW + 15_000).toISOString(),
+        },
+      },
+    });
+    await expect(initial).resolves.toMatchObject({ status: "acquired" });
+
+    let releaseSettled = false;
+    const release = room.releaseLockAsync(resource);
+    void release.then(() => {
+      releaseSettled = true;
+    });
+    const reacquire = room.claimLockAsync(resource);
+    await vi.advanceTimersByTimeAsync(STUDIO_LIVE_LOCK_MAX_LEASE_MS + 249);
+    expect(releaseSettled).toBe(false);
+    expect(socket.emitted.filter((entry) => entry.event === "studio:lock:request")).toHaveLength(1);
+
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(release).resolves.toMatchObject({ status: "timeout" });
+    await vi.waitFor(() => {
+      expect(socket.emitted.filter((entry) => entry.event === "studio:lock:request")).toHaveLength(2);
+    });
+    const newLeaseId = "bdbdbdbd-bdbd-4dbd-8dbd-bdbdbdbdbdb2";
+    socket.reply("studio:lock:request", {
+      ok: true,
+      data: {
+        decision: "acquired",
+        requestId: "23232323-2323-4323-8323-232323232323",
+        lock: {
+          resourceId: resource,
+          leaseId: newLeaseId,
+          ownerConnectionId: self.connectionId,
+          ownerName: self.name,
+          expiresAt: new Date(NOW + 15_000).toISOString(),
+        },
+      },
+    });
+    await expect(reacquire).resolves.toMatchObject({
+      status: "acquired",
+      lock: { claimId: newLeaseId },
+    });
+
+    socket.reply("studio:lock:release", { ok: true, data: { released: true } });
+    socket.serverEmit("studio:lock:update", {
+      action: "released",
+      requestId: "23232323-2323-4323-8323-232323232321",
+      resourceId: resource,
+      leaseId: oldLeaseId,
+    });
+    expect(room.getLocks()).toEqual([
+      expect.objectContaining({ resource, claimId: newLeaseId }),
+    ]);
+    room.close();
+  });
+
+  it("chase-releases a renewal fence that committed just before release", async () => {
+    vi.useFakeTimers();
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.joinResponse = joinSuccess({ lockProtocolVersion: 2 });
+    socket.holdEvents.add("studio:lock:request");
+    socket.holdEvents.add("studio:lock:release");
+    const ids = [
+      "33333333-3333-4333-8333-333333333331",
+      "33333333-3333-4333-8333-333333333332",
+    ];
+    const renewalRequestId = "33333333-3333-4333-8333-333333333333";
+    const room = new StudioLiveRoom({
+      workId: "work-1",
+      participant: localParticipant,
+      dependencies: {
+        transportFactory: createStudioServerLiveTransportFactory(TOKEN, {
+          createSocket: () => socket,
+          now: () => NOW,
+          randomId: () => renewalRequestId,
+        }),
+        now: () => NOW,
+        randomId: () => ids.shift() ?? "33333333-3333-4333-8333-333333333399",
+        heartbeatMs: 250,
+        lockLeaseMs: 5_000,
+      },
+    });
+    await room.start();
+    const first = room.claimLockAsync("page:renew-first");
+    socket.reply("studio:lock:request", {
+      ok: true,
+      data: {
+        decision: "acquired",
+        requestId: "33333333-3333-4333-8333-333333333331",
+        lock: {
+          resourceId: "page:renew-first",
+          leaseId: "cccccccc-cccc-4ccc-8ccc-ccccccccccc1",
+          ownerConnectionId: self.connectionId,
+          ownerName: self.name,
+          expiresAt: new Date(NOW + 5_000).toISOString(),
+        },
+      },
+    });
+    await first;
+
+    await vi.advanceTimersByTimeAsync(250);
+    expect(socket.emitted.at(-1)).toEqual({
+      event: "studio:lock:request",
+      payload: {
+        workId: "work-1",
+        resourceId: "page:renew-first",
+        requestId: renewalRequestId,
+        protocolVersion: 2,
+        renewLeaseId: "cccccccc-cccc-4ccc-8ccc-ccccccccccc1",
+        leaseMs: 5_000,
+      },
+    });
+    const release = room.releaseLockAsync("page:renew-first");
+    socket.reply("studio:lock:request", {
+      ok: true,
+      data: {
+        decision: "acquired",
+        requestId: renewalRequestId,
+        lock: {
+          resourceId: "page:renew-first",
+          leaseId: "cccccccc-cccc-4ccc-8ccc-ccccccccccc2",
+          ownerConnectionId: self.connectionId,
+          ownerName: self.name,
+          expiresAt: new Date(NOW + 5_000).toISOString(),
+        },
+      },
+    });
+    expect(room.getLocks()).toEqual([
+      expect.objectContaining({ claimId: "cccccccc-cccc-4ccc-8ccc-ccccccccccc1" }),
+    ]);
+    const releases = socket.emitted.filter((entry) => entry.event === "studio:lock:release");
+    expect(releases).toEqual([
+      {
+        event: "studio:lock:release",
+        payload: {
+          workId: "work-1",
+          resourceId: "page:renew-first",
+          leaseId: "cccccccc-cccc-4ccc-8ccc-ccccccccccc1",
+          requestId: "33333333-3333-4333-8333-333333333332",
+        },
+      },
+      {
+        event: "studio:lock:release",
+        payload: {
+          workId: "work-1",
+          resourceId: "page:renew-first",
+          leaseId: "cccccccc-cccc-4ccc-8ccc-ccccccccccc2",
+          requestId: renewalRequestId,
+        },
+      },
+    ]);
+    socket.reply("studio:lock:release", {
+      ok: true,
+      data: {
+        requestId: "33333333-3333-4333-8333-333333333332",
+        resourceId: "page:renew-first",
+        leaseId: "cccccccc-cccc-4ccc-8ccc-ccccccccccc1",
+        released: false,
+      },
+    });
+    await expect(release).resolves.toMatchObject({ status: "released", released: false });
+    socket.reply("studio:lock:release", {
+      ok: true,
+      data: {
+        requestId: renewalRequestId,
+        resourceId: "page:renew-first",
+        leaseId: "cccccccc-cccc-4ccc-8ccc-ccccccccccc2",
+        released: true,
+      },
+    });
+    await vi.advanceTimersByTimeAsync(500);
+    expect(
+      socket.emitted.filter((entry) => entry.event === "studio:lock:request")
+    ).toHaveLength(2);
+    expect(room.getLocks()).toEqual([]);
+    room.close();
+  });
+
+  it("settles a v2 release from its correlated broadcast before the ACK", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.joinResponse = joinSuccess({ lockProtocolVersion: 2 });
+    socket.holdEvents.add("studio:lock:request");
+    socket.holdEvents.add("studio:lock:release");
+    const ids = [
+      "44444444-4444-4444-8444-444444444441",
+      "44444444-4444-4444-8444-444444444442",
+    ];
+    const room = new StudioLiveRoom({
+      workId: "work-1",
+      participant: localParticipant,
+      dependencies: {
+        transportFactory: createStudioServerLiveTransportFactory(TOKEN, {
+          createSocket: () => socket,
+          now: () => NOW,
+        }),
+        now: () => NOW,
+        randomId: () => ids.shift() ?? "44444444-4444-4444-8444-444444444499",
+      },
+    });
+    await room.start();
+    const first = room.claimLockAsync("page:broadcast-release");
+    socket.reply("studio:lock:request", {
+      ok: true,
+      data: {
+        decision: "acquired",
+        requestId: "44444444-4444-4444-8444-444444444441",
+        lock: {
+          resourceId: "page:broadcast-release",
+          leaseId: "dddddddd-dddd-4ddd-8ddd-ddddddddddd1",
+          ownerConnectionId: self.connectionId,
+          ownerName: self.name,
+          expiresAt: new Date(NOW + 15_000).toISOString(),
+        },
+      },
+    });
+    await first;
+    const release = room.releaseLockAsync("page:broadcast-release");
+    socket.serverEmit("studio:lock:update", {
+      action: "released",
+      requestId: "44444444-4444-4444-8444-444444444441",
+      releaseRequestId: "44444444-4444-4444-8444-444444444442",
+      resourceId: "page:broadcast-release",
+      leaseId: "dddddddd-dddd-4ddd-8ddd-ddddddddddd1",
+    });
+    await expect(release).resolves.toMatchObject({ status: "released", released: true });
+    expect(room.getLocks()).toEqual([]);
+    socket.reply("studio:lock:release", {
+      ok: true,
+      data: {
+        requestId: "44444444-4444-4444-8444-444444444442",
+        resourceId: "page:broadcast-release",
+        leaseId: "dddddddd-dddd-4ddd-8ddd-ddddddddddd1",
+        released: true,
+      },
+    });
+    expect(room.getLocks()).toEqual([]);
+    room.close();
+  });
+
   it("keeps an active room connected when one lock operation is forbidden", async () => {
     const socket = new FakeSocket({ sessionToken: TOKEN });
     socket.holdEvents.add("studio:lock:request");
@@ -906,6 +1671,17 @@ describe("StudioLiveSocketTransport", () => {
         },
       },
     });
+    socket.serverEmit("studio:lock:update", {
+      action: "acquired",
+      requestId: "33333333-3333-4333-8333-333333333333",
+      lock: {
+        resourceId: "page:stale",
+        leaseId: "stale-server-lease",
+        ownerConnectionId: self.connectionId,
+        ownerName: self.name,
+        expiresAt: new Date(NOW + 15_000).toISOString(),
+      },
+    });
 
     expect(room.getLocks()).toEqual([]);
     room.close();
@@ -962,6 +1738,200 @@ describe("StudioLiveSocketTransport", () => {
       },
     });
     room.close();
+  });
+
+  it("chase-releases an abandoned fence deferred behind a newer denied request", async () => {
+    vi.useFakeTimers();
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.joinResponse = joinSuccess({ lockProtocolVersion: 2 });
+    socket.holdEvents.add("studio:lock:request");
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+      lockAckTimeoutMs: 100,
+    });
+    await transport.connect();
+    activate(transport);
+
+    const firstRequestId = "45454545-4545-4545-8545-454545454545";
+    const secondRequestId = "56565656-5656-4656-8656-565656565656";
+    const resource = "page:deferred-abandoned";
+    const first = transport.acquireLock({
+      resource,
+      requestId: firstRequestId,
+      leaseMs: 15_000,
+    });
+    await vi.advanceTimersByTimeAsync(100);
+    await expect(first).resolves.toMatchObject({ status: "timeout", requestId: firstRequestId });
+
+    const second = transport.acquireLock({
+      resource,
+      requestId: secondRequestId,
+      leaseMs: 15_000,
+    });
+    const lateLock = {
+      resourceId: resource,
+      leaseId: "abababab-abab-4bab-8bab-abababababab",
+      ownerConnectionId: self.connectionId,
+      ownerName: self.name,
+      expiresAt: new Date(NOW + 15_000).toISOString(),
+    };
+    socket.serverEmit("studio:lock:update", {
+      action: "acquired",
+      requestId: firstRequestId,
+      lock: lateLock,
+    });
+    socket.reply("studio:lock:request", {
+      ok: true,
+      data: { decision: "acquired", requestId: firstRequestId, lock: lateLock },
+    });
+    socket.reply("studio:lock:request", {
+      ok: false,
+      decision: "denied",
+      requestId: secondRequestId,
+      code: "lock_stale",
+      message: "편집 잠금 임대가 이미 변경되었습니다.",
+    });
+    await expect(second).resolves.toMatchObject({
+      status: "denied",
+      requestId: secondRequestId,
+      code: "lock_stale",
+    });
+
+    expect(socket.emitted.filter((entry) => entry.event === "studio:lock:release")).toEqual([
+      {
+        event: "studio:lock:release",
+        payload: {
+          workId: "work-1",
+          resourceId: resource,
+          leaseId: lateLock.leaseId,
+          requestId: firstRequestId,
+        },
+      },
+    ]);
+    transport.close();
+  });
+
+  it("retains the newer abandonment when a deferred older fence is released", async () => {
+    vi.useFakeTimers();
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.joinResponse = joinSuccess({ lockProtocolVersion: 2 });
+    socket.holdEvents.add("studio:lock:request");
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+      lockAckTimeoutMs: 100,
+    });
+    await transport.connect();
+    activate(transport);
+    const firstRequestId = "61616161-6161-4161-8161-616161616161";
+    const secondRequestId = "71717171-7171-4171-8171-717171717171";
+    const resource = "page:two-abandoned-generations";
+    const first = transport.acquireLock({ resource, requestId: firstRequestId, leaseMs: 15_000 });
+    await vi.advanceTimersByTimeAsync(100);
+    await expect(first).resolves.toMatchObject({ status: "timeout" });
+
+    const second = transport.acquireLock({ resource, requestId: secondRequestId, leaseMs: 15_000 });
+    const firstLateLock = {
+      resourceId: resource,
+      leaseId: "dddddddd-4444-4444-8444-dddddddddddd",
+      ownerConnectionId: self.connectionId,
+      ownerName: self.name,
+      expiresAt: new Date(NOW + 15_000).toISOString(),
+    };
+    socket.reply("studio:lock:request", {
+      ok: true,
+      data: { decision: "acquired", requestId: firstRequestId, lock: firstLateLock },
+    });
+    await vi.advanceTimersByTimeAsync(100);
+    await expect(second).resolves.toMatchObject({ status: "timeout" });
+
+    const secondLateLock = {
+      ...firstLateLock,
+      leaseId: "eeeeeeee-5555-4555-8555-eeeeeeeeeeee",
+    };
+    socket.reply("studio:lock:request", {
+      ok: true,
+      data: { decision: "acquired", requestId: secondRequestId, lock: secondLateLock },
+    });
+
+    expect(socket.emitted.filter((entry) => entry.event === "studio:lock:release")).toEqual([
+      {
+        event: "studio:lock:release",
+        payload: {
+          workId: "work-1",
+          resourceId: resource,
+          leaseId: firstLateLock.leaseId,
+          requestId: firstRequestId,
+        },
+      },
+      {
+        event: "studio:lock:release",
+        payload: {
+          workId: "work-1",
+          resourceId: resource,
+          leaseId: secondLateLock.leaseId,
+          requestId: secondRequestId,
+        },
+      },
+    ]);
+    transport.close();
+  });
+
+  it("rejects a mismatched v2 release ACK without disconnecting the room", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.joinResponse = joinSuccess({ lockProtocolVersion: 2 });
+    socket.holdEvents.add("studio:lock:request");
+    socket.holdEvents.add("studio:lock:release");
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, {
+      createSocket: () => socket,
+      now: () => NOW,
+    });
+    await transport.connect();
+    activate(transport);
+    const acquireRequestId = "81818181-8181-4181-8181-818181818181";
+    const resource = "page:release-response-mismatch";
+    const acquisition = transport.acquireLock({
+      resource,
+      requestId: acquireRequestId,
+      leaseMs: 15_000,
+    });
+    const lock = {
+      resourceId: resource,
+      leaseId: "ffffffff-6666-4666-8666-ffffffffffff",
+      ownerConnectionId: self.connectionId,
+      ownerName: self.name,
+      expiresAt: new Date(NOW + 15_000).toISOString(),
+    };
+    socket.reply("studio:lock:request", {
+      ok: true,
+      data: { decision: "acquired", requestId: acquireRequestId, lock },
+    });
+    await acquisition;
+
+    const releaseRequestId = "91919191-9191-4191-8191-919191919191";
+    const release = transport.releaseLock({
+      resource,
+      requestId: releaseRequestId,
+      claimId: lock.leaseId,
+    });
+    socket.reply("studio:lock:release", {
+      ok: true,
+      data: {
+        requestId: "92929292-9292-4292-8292-929292929292",
+        resourceId: resource,
+        leaseId: lock.leaseId,
+        released: true,
+      },
+    });
+
+    await expect(release).resolves.toMatchObject({
+      status: "denied",
+      requestId: releaseRequestId,
+      code: "response_mismatch",
+    });
+    expect(transport.ready).toBe(true);
+    transport.close();
   });
 
   it("accepts a correlated authoritative broadcast before ACK without later timing out", async () => {

@@ -1,11 +1,30 @@
-
 import { useSyncExternalStore } from "react";
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
+import {
+  MAX_COLLECTION_ID_LENGTH,
+  normalizeCollectionClientId,
+  normalizeCollectionEmoji,
+  normalizeCollectionName,
+} from "./collection-contract";
+import {
+  CollectionWriteThroughCoordinator,
+  collectionAccountKey,
+  collectionLaneKey,
+  remapCollectionCommand,
+  remapCollectionId,
+  waitForCollectionMerge,
+} from "./collection-write-through";
 import { addRecentSearch, removeRecentSearch } from "./recent-searches";
+import { toast } from "./toast-store";
 import { deriveSavedTitleIds } from "./types";
 
+import type {
+  CollectionAuthFence,
+  CollectionCommand,
+  CollectionIdMap,
+} from "./collection-write-through";
 import type { ReadState, UserReview } from "./types";
 
 // 로그인 시 변경을 DB API로 write-through (게스트는 localStorage만)
@@ -24,6 +43,7 @@ export interface HydratePayload {
   reviews: Record<string, UserReview>;
   likedReviews: Record<string, boolean>;
   collections: Collection[];
+  collectionIdMap?: CollectionIdMap;
 }
 
 export type RatingScale = "star" | "ten" | "hundred";
@@ -36,6 +56,577 @@ export interface Collection {
   createdAt: string;
 }
 
+export type CollectionRollback =
+  | { kind: "create" }
+  | { kind: "rename"; previousName: string; attemptedName: string }
+  | { kind: "delete"; collection: Collection; index: number }
+  | {
+      kind: "set-item";
+      titleId: string;
+      previousIncluded: boolean;
+      intendedIncluded: boolean;
+    };
+
+export interface CollectionOutboxEntry {
+  mutationId: string;
+  ownerId: string;
+  command: CollectionCommand;
+  rollback: CollectionRollback;
+  recovery?: true;
+}
+
+export interface HydrateOptions {
+  /** Collection revision captured before a server request started. */
+  collectionRevision?: number;
+  /** A request started while optimistic collection writes were still in flight. */
+  preserveCollections?: boolean;
+  /** Authenticated owner of a server snapshot. Omitted for an explicit local import. */
+  ownerId?: string;
+  /** Guest UUIDs remapped by the server because of an existing global ID collision. */
+  collectionIdMap?: CollectionIdMap;
+}
+
+class CollectionRequestError extends Error {
+  constructor(
+    message: string,
+    readonly transient: boolean,
+    readonly status: number | null = null,
+    options?: ErrorOptions
+  ) {
+    super(message, options);
+    this.name = "CollectionRequestError";
+  }
+}
+
+const collectionWriteThrough = new CollectionWriteThroughCoordinator();
+const scheduledCollectionMutations = new Set<string>();
+const COLLECTION_REQUEST_TIMEOUT_MS = 15_000;
+
+function newClientCollectionId(): string {
+  return globalThis.crypto.randomUUID();
+}
+
+function currentCollectionAuthFence(): CollectionAuthFence | null {
+  const { userId, sessionToken, authGeneration } = useApp.getState();
+  return userId && sessionToken
+    ? { userId, sessionToken, generation: authGeneration }
+    : null;
+}
+
+export function isCollectionAuthFenceCurrent(fence: CollectionAuthFence): boolean {
+  const state = useApp.getState();
+  return (
+    state.userId === fence.userId &&
+    state.sessionToken === fence.sessionToken &&
+    state.authGeneration === fence.generation
+  );
+}
+
+function isCollectionCommandResponse(
+  command: CollectionCommand,
+  payload: unknown
+): boolean {
+  if (!payload || typeof payload !== "object" || (payload as { ok?: unknown }).ok !== true) {
+    return false;
+  }
+  const response = payload as Record<string, unknown>;
+  if (response.id !== command.id) return false;
+  if (command.action === "set-item") {
+    return (
+      response.titleId === command.titleId &&
+      response.included === command.included
+    );
+  }
+  return true;
+}
+
+async function sendCollectionCommand(
+  fence: CollectionAuthFence,
+  command: CollectionCommand
+): Promise<void> {
+  let response: Response;
+  const controller = new AbortController();
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const timeoutRequest = new Promise<never>((_resolve, reject) => {
+      timeout = setTimeout(() => {
+        controller.abort();
+        reject(new CollectionRequestError(
+          "컬렉션 서버 응답 시간이 초과되었습니다.",
+          true
+        ));
+      }, COLLECTION_REQUEST_TIMEOUT_MS);
+    });
+    response = await Promise.race([
+      fetch("/api/me/collection", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": fence.sessionToken,
+        },
+        body: JSON.stringify(command),
+        signal: controller.signal,
+      }),
+      timeoutRequest,
+    ]);
+  } catch (error) {
+    if (error instanceof CollectionRequestError) throw error;
+    throw new CollectionRequestError("컬렉션 서버에 연결하지 못했습니다.", true, null, {
+      cause: error,
+    });
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+
+  if (!response.ok) {
+    // Authentication failures are durable deferrals, not mutation rejection. A rotated token may
+    // already be available for the coordinator's one retry; otherwise the outbox survives until
+    // this owner signs in again.
+    const transient =
+      response.status === 401 ||
+      response.status === 403 ||
+      response.status === 408 ||
+      response.status === 429 ||
+      response.status >= 500;
+    throw new CollectionRequestError(
+      `컬렉션 요청이 실패했습니다. (${response.status})`,
+      transient,
+      response.status
+    );
+  }
+
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch (error) {
+    throw new CollectionRequestError("컬렉션 서버 응답을 확인할 수 없습니다.", false, response.status, {
+      cause: error,
+    });
+  }
+  if (!isCollectionCommandResponse(command, payload)) {
+    throw new CollectionRequestError("컬렉션 서버 응답의 작업 식별자가 일치하지 않습니다.", false, response.status);
+  }
+}
+
+function remapCollection(collection: Collection, idMap: CollectionIdMap): Collection {
+  const id = remapCollectionId(collection.id, idMap);
+  return id === collection.id ? collection : { ...collection, id };
+}
+
+function remapOutboxEntry(
+  entry: CollectionOutboxEntry,
+  idMap: CollectionIdMap
+): CollectionOutboxEntry {
+  const command = remapCollectionCommand(entry.command, idMap);
+  const rollback = entry.rollback.kind === "delete"
+    ? {
+        ...entry.rollback,
+        collection: remapCollection(entry.rollback.collection, idMap),
+      }
+    : entry.rollback;
+  return command === entry.command && rollback === entry.rollback
+    ? entry
+    : { ...entry, command, rollback };
+}
+
+function applyCollectionRollback(
+  collections: Collection[],
+  command: CollectionCommand,
+  rollback: CollectionRollback
+): Collection[] {
+  if (rollback.kind === "create") {
+    return collections.some((collection) => collection.id === command.id)
+      ? collections.filter((collection) => collection.id !== command.id)
+      : collections;
+  }
+
+  if (rollback.kind === "rename") {
+    const current = collections.find((collection) => collection.id === command.id);
+    if (!current || current.name !== rollback.attemptedName) return collections;
+    return collections.map((collection) =>
+      collection.id === command.id
+        ? { ...collection, name: rollback.previousName }
+        : collection
+    );
+  }
+
+  if (rollback.kind === "delete") {
+    if (collections.some((collection) => collection.id === command.id)) return collections;
+    const restored = [...collections];
+    restored.splice(
+      Math.min(Math.max(rollback.index, 0), restored.length),
+      0,
+      rollback.collection
+    );
+    return restored;
+  }
+
+  const current = collections.find((collection) => collection.id === command.id);
+  if (!current) return collections;
+  const currentlyIncluded = current.titleIds.includes(rollback.titleId);
+  if (currentlyIncluded !== rollback.intendedIncluded) return collections;
+  return collections.map((collection) => {
+    if (collection.id !== command.id) return collection;
+    return {
+      ...collection,
+      titleIds: rollback.previousIncluded
+        ? [...collection.titleIds.filter((id) => id !== rollback.titleId), rollback.titleId]
+        : collection.titleIds.filter((id) => id !== rollback.titleId),
+    };
+  });
+}
+
+function applyOptimisticCollectionCommand(
+  collections: Collection[],
+  command: CollectionCommand
+): Collection[] {
+  if (command.action === "create") {
+    if (collections.some((collection) => collection.id === command.id)) return collections;
+    return [
+      ...collections,
+      {
+        id: command.id,
+        name: command.name,
+        emoji: command.emoji,
+        titleIds: [],
+        createdAt: new Date().toISOString(),
+      },
+    ];
+  }
+  if (command.action === "rename") {
+    return collections.map((collection) =>
+      collection.id === command.id ? { ...collection, name: command.name } : collection
+    );
+  }
+  if (command.action === "delete") {
+    return collections.filter((collection) => collection.id !== command.id);
+  }
+  return collections.map((collection) => {
+    if (collection.id !== command.id) return collection;
+    return {
+      ...collection,
+      titleIds: command.included
+        ? [...collection.titleIds.filter((titleId) => titleId !== command.titleId), command.titleId]
+        : collection.titleIds.filter((titleId) => titleId !== command.titleId),
+    };
+  });
+}
+
+function rebaseCollectionOutbox(
+  serverCollections: Collection[],
+  outbox: CollectionOutboxEntry[],
+  ownerId: string
+): Collection[] {
+  return outbox
+    .filter((entry) => entry.ownerId === ownerId)
+    .reduce(
+      (collections, entry) => applyOptimisticCollectionCommand(collections, entry.command),
+      serverCollections
+    );
+}
+
+function currentCollectionFenceForOwner(
+  ownerId: string
+): CollectionAuthFence | null {
+  const state = useApp.getState();
+  return state.userId === ownerId && state.sessionToken
+    ? {
+        userId: ownerId,
+        sessionToken: state.sessionToken,
+        generation: state.authGeneration,
+      }
+    : null;
+}
+
+function queueCollectionOutboxEntry(
+  fence: CollectionAuthFence,
+  entry: CollectionOutboxEntry
+): void {
+  if (scheduledCollectionMutations.has(entry.mutationId)) return;
+  scheduledCollectionMutations.add(entry.mutationId);
+  let resolvedEntry = entry;
+  let mergeIdentityResolved = false;
+  collectionWriteThrough.enqueue({
+    accountKey: collectionAccountKey(fence),
+    laneKey: collectionLaneKey(fence, entry.command.id),
+    run: async () => {
+      if (!mergeIdentityResolved) {
+        let idMap: CollectionIdMap;
+        try {
+          idMap = await waitForCollectionMerge(entry.ownerId);
+        } catch (error) {
+          throw new CollectionRequestError(
+            "게스트 컬렉션 병합이 끝나지 않아 변경을 보류했습니다.",
+            true,
+            null,
+            { cause: error }
+          );
+        }
+        resolvedEntry = remapOutboxEntry(entry, idMap);
+        mergeIdentityResolved = true;
+      }
+      const activeFence = currentCollectionFenceForOwner(resolvedEntry.ownerId);
+      if (!activeFence) {
+        throw new CollectionRequestError(
+          "해당 계정으로 다시 로그인할 때까지 컬렉션 변경을 보류합니다.",
+          true
+        );
+      }
+      await sendCollectionCommand(activeFence, resolvedEntry.command);
+    },
+    shouldRetry: (error) => error instanceof CollectionRequestError && error.transient,
+    onSuccess: () => {
+      scheduledCollectionMutations.delete(entry.mutationId);
+      useApp.setState((state) => ({
+        collectionOutbox: state.collectionOutbox.filter(
+          (candidate) => candidate.mutationId !== entry.mutationId
+        ),
+      }));
+    },
+    onPermanentFailure: () => {
+      scheduledCollectionMutations.delete(entry.mutationId);
+      let rolledBack = false;
+      useApp.setState((state) => {
+        const collectionOutbox = state.collectionOutbox.filter(
+          (candidate) => candidate.mutationId !== entry.mutationId
+        );
+        if (state.userId !== resolvedEntry.ownerId) return { collectionOutbox };
+        const collections = applyCollectionRollback(
+          state.collections,
+          resolvedEntry.command,
+          resolvedEntry.rollback
+        );
+        rolledBack = collections !== state.collections;
+        return {
+          collectionOutbox,
+          ...(rolledBack
+            ? {
+                collections,
+                collectionRevision: state.collectionRevision + 1,
+              }
+            : {}),
+        };
+      });
+      if (useApp.getState().userId === resolvedEntry.ownerId) {
+        toast(rolledBack
+          ? "컬렉션 변경을 저장하지 못해 이전 상태로 되돌렸어요."
+          : "컬렉션 변경을 저장하지 못했지만 더 최신인 로컬 상태는 유지했어요.");
+      }
+    },
+    onTransientFailure: () => {
+      scheduledCollectionMutations.delete(entry.mutationId);
+      if (useApp.getState().userId === resolvedEntry.ownerId) {
+        toast("컬렉션 변경을 이 기기의 동기화 대기열에 보관했어요. 연결이 복구되면 자동으로 다시 시도합니다.");
+      }
+    },
+  });
+}
+
+export async function replayPendingCollectionWrites(
+  fence: CollectionAuthFence
+): Promise<void> {
+  const entries = useApp.getState().collectionOutbox.filter(
+    (entry) => entry.ownerId === fence.userId
+  );
+  for (const entry of entries) queueCollectionOutboxEntry(fence, entry);
+  await collectionWriteThrough.waitForAccountIdle(collectionAccountKey(fence));
+}
+
+export function claimGuestCollectionsForOwner(fence: CollectionAuthFence): void {
+  useApp.setState((state) => {
+    const outbox = [...state.collectionOutbox];
+    const hasCreate = new Set(
+      outbox
+        .filter((entry) => entry.ownerId === fence.userId && entry.command.action === "create")
+        .map((entry) => entry.command.id)
+    );
+    const hasIncludedItem = new Set(
+      outbox.flatMap((entry) =>
+        entry.ownerId === fence.userId &&
+        entry.command.action === "set-item" &&
+        entry.command.included
+          ? [`${entry.command.id}\u0000${entry.command.titleId}`]
+          : []
+      )
+    );
+
+    for (const collection of state.collections) {
+      if (!hasCreate.has(collection.id)) {
+        outbox.push({
+          mutationId: newClientCollectionId(),
+          ownerId: fence.userId,
+          command: {
+            action: "create",
+            id: collection.id,
+            name: normalizeCollectionName(collection.name),
+            emoji: normalizeCollectionEmoji(collection.emoji),
+          },
+          rollback: { kind: "create" },
+          recovery: true,
+        });
+        hasCreate.add(collection.id);
+      }
+      for (const rawTitleId of collection.titleIds) {
+        const titleId = String(rawTitleId).trim().slice(0, MAX_COLLECTION_ID_LENGTH);
+        const key = `${collection.id}\u0000${titleId}`;
+        if (!titleId || hasIncludedItem.has(key)) continue;
+        outbox.push({
+          mutationId: newClientCollectionId(),
+          ownerId: fence.userId,
+          command: {
+            action: "set-item",
+            id: collection.id,
+            titleId,
+            included: true,
+          },
+          rollback: {
+            kind: "set-item",
+            titleId,
+            previousIncluded: true,
+            intendedIncluded: true,
+          },
+          recovery: true,
+        });
+        hasIncludedItem.add(key);
+      }
+    }
+
+    return {
+      libraryMergeOwnerId: fence.userId,
+      collectionOutbox: outbox,
+    };
+  });
+}
+
+export function discardGuestCollectionRecovery(
+  ownerId: string,
+  mergedIdMap: CollectionIdMap
+): void {
+  const mergedClientIds = new Set(Object.keys(mergedIdMap));
+  useApp.setState((state) => ({
+    collectionOutbox: state.collectionOutbox.filter(
+      (entry) =>
+        entry.ownerId !== ownerId ||
+        entry.recovery !== true ||
+        !mergedClientIds.has(entry.command.id)
+    ),
+  }));
+}
+
+export function collectionMergeCollectionsForOwner(ownerId: string): Collection[] {
+  const state = useApp.getState();
+  return rebaseCollectionOutbox(state.collections, state.collectionOutbox, ownerId);
+}
+
+function appendOutboxEntry(
+  outbox: CollectionOutboxEntry[],
+  entry: CollectionOutboxEntry
+): CollectionOutboxEntry[] {
+  // Never drop an older create dependency merely to cap localStorage. Successful commands are
+  // removed immediately, so this grows only while an account is offline and drains on reconnect.
+  return [...outbox, entry];
+}
+
+function canonicalizeGuestCollections(collections: Collection[]): {
+  collections: Collection[];
+  idMap: CollectionIdMap;
+} {
+  const idMap: CollectionIdMap = {};
+  for (const collection of collections) {
+    const canonicalId = normalizeCollectionClientId(collection.id) ?? newClientCollectionId();
+    if (canonicalId !== collection.id) idMap[collection.id] ??= canonicalId;
+  }
+  return {
+    collections: Object.keys(idMap).length === 0
+    ? collections
+      : collections.map((collection) => remapCollection(collection, idMap)),
+    idMap,
+  };
+}
+
+function migrateGuestCollectionIds(collections: Collection[]): Collection[] {
+  return canonicalizeGuestCollections(collections).collections;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function isPersistedCollection(value: unknown): value is Collection {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.id === "string" &&
+    typeof value.name === "string" &&
+    typeof value.emoji === "string" &&
+    typeof value.createdAt === "string" &&
+    Array.isArray(value.titleIds) &&
+    value.titleIds.every((titleId) => typeof titleId === "string")
+  );
+}
+
+function isPersistedCollectionCommand(value: unknown): value is CollectionCommand {
+  if (!isRecord(value) || typeof value.action !== "string" || typeof value.id !== "string") {
+    return false;
+  }
+  if (value.action === "create") {
+    return typeof value.name === "string" && typeof value.emoji === "string";
+  }
+  if (value.action === "rename") return typeof value.name === "string";
+  if (value.action === "delete") return true;
+  return (
+    value.action === "set-item" &&
+    typeof value.titleId === "string" &&
+    typeof value.included === "boolean"
+  );
+}
+
+function isPersistedCollectionRollback(value: unknown): value is CollectionRollback {
+  if (!isRecord(value) || typeof value.kind !== "string") return false;
+  if (value.kind === "create") return true;
+  if (value.kind === "rename") {
+    return typeof value.previousName === "string" && typeof value.attemptedName === "string";
+  }
+  if (value.kind === "delete") {
+    return (
+      Number.isInteger(value.index) &&
+      Number(value.index) >= 0 &&
+      isPersistedCollection(value.collection)
+    );
+  }
+  return (
+    value.kind === "set-item" &&
+    typeof value.titleId === "string" &&
+    typeof value.previousIncluded === "boolean" &&
+    typeof value.intendedIncluded === "boolean"
+  );
+}
+
+function sanitizeCollectionOutbox(value: unknown): CollectionOutboxEntry[] {
+  if (!Array.isArray(value)) return [];
+  const seenMutationIds = new Set<string>();
+  return value.filter((entry): entry is CollectionOutboxEntry => {
+    if (
+      !isRecord(entry) ||
+      typeof entry.mutationId !== "string" ||
+      typeof entry.ownerId !== "string" ||
+      !isPersistedCollectionCommand(entry.command) ||
+      !isPersistedCollectionRollback(entry.rollback) ||
+      (entry.recovery !== undefined && entry.recovery !== true)
+    ) {
+      return false;
+    }
+    const matchingRollback = (
+      (entry.command.action === "create" && entry.rollback.kind === "create") ||
+      (entry.command.action === "rename" && entry.rollback.kind === "rename") ||
+      (entry.command.action === "delete" && entry.rollback.kind === "delete") ||
+      (entry.command.action === "set-item" && entry.rollback.kind === "set-item")
+    );
+    if (!matchingRollback || seenMutationIds.has(entry.mutationId)) return false;
+    seenMutationIds.add(entry.mutationId);
+    return true;
+  });
+}
+
 interface AppState {
   ratings: Record<string, number>; // titleId -> 0.5~5
   reviews: Record<string, UserReview>; // titleId -> review
@@ -46,6 +637,7 @@ interface AppState {
   adultBirthdate: string | null; // 입력한 생년월일(ISO). 한번 입력하면 유지.
   ageGateOpen: boolean; // 연령 확인 모달 표시 여부
   collections: Collection[];
+  collectionOutbox: CollectionOutboxEntry[]; // 계정별 서버 동기화 대기열(세션 토큰 미포함)
   recentlyViewed: string[]; // 최근 본 작품 titleId (최신순, 브라우저 저장)
   addRecentlyViewed: (titleId: string) => void;
   clearRecentlyViewed: () => void;
@@ -55,10 +647,13 @@ interface AppState {
   clearRecentSearches: () => void;
   ratingScale: RatingScale;
   userId: string | null; // 로그인 사용자 (있으면 DB write-through)
-  setUserId: (id: string | null) => void;
   sessionToken: string | null; // 서명 세션 토큰(x-user-id 헤더로 전송)
-  setSessionToken: (token: string | null) => void;
-  hydrateFromServer: (data: HydratePayload) => void;
+  libraryOwnerId: string | null; // 서버 서재 snapshot 소유자(null이면 게스트 로컬 데이터)
+  libraryMergeOwnerId: string | null; // 실패한 게스트 병합을 다른 계정으로 보내지 않는 durable claim
+  authGeneration: number; // 계정 전환 뒤 늦은 응답이 새 계정 상태에 적용되지 않도록 하는 fence
+  collectionRevision: number; // 낙관적 컬렉션 변경과 서버 hydrate의 순서를 비교하는 fence
+  setSessionIdentity: (id: string | null, token: string | null) => void;
+  hydrateFromServer: (data: HydratePayload, options?: HydrateOptions) => void;
 
   setRating: (titleId: string, rating: number) => void;
   clearRating: (titleId: string) => void;
@@ -95,24 +690,82 @@ export const useApp = create<AppState>()(
       adultBirthdate: null,
       ageGateOpen: false,
       collections: seedCollections,
+      collectionOutbox: [],
       recentlyViewed: [],
       recentSearches: [],
       ratingScale: "star",
       userId: null,
       sessionToken: null,
+      libraryOwnerId: null,
+      libraryMergeOwnerId: null,
+      authGeneration: 0,
+      collectionRevision: 0,
 
-      setUserId: (userId) => set({ userId }),
-      setSessionToken: (sessionToken) => set({ sessionToken }),
+      setSessionIdentity: (userId, sessionToken) =>
+        set((state) => {
+          if (state.userId === userId && state.sessionToken === sessionToken) return state;
+          const claimedLibraryOwner = state.libraryOwnerId ?? state.libraryMergeOwnerId;
+          const ownerChanged =
+            (state.userId !== null && state.userId !== userId) ||
+            (claimedLibraryOwner !== null && claimedLibraryOwner !== userId);
+          return {
+            userId,
+            sessionToken,
+            authGeneration: state.authGeneration + 1,
+            ...(ownerChanged
+              ? {
+                  ratings: {},
+                  reviews: {},
+                  reads: {},
+                  likedReviews: {},
+                  subscriptions: {},
+                  collections: [],
+                  libraryOwnerId: null,
+                  libraryMergeOwnerId: null,
+                  collectionRevision: state.collectionRevision + 1,
+                }
+              : {}),
+          };
+        }),
       // 서버를 진실원천으로 교체(replace). 게스트 데이터는 로그인 시 /api/me/merge 가 먼저 서버로
       // 병합하므로 여기서 덮어써도 손실이 없고, 다른 기기에서의 삭제·변경도 정확히 반영된다.
-      hydrateFromServer: (d) =>
-        set({
-          ratings: d.ratings,
-          reads: d.reads,
-          subscriptions: d.subscriptions,
-          reviews: d.reviews,
-          likedReviews: d.likedReviews,
-          collections: d.collections,
+      hydrateFromServer: (d, options) =>
+        set((state) => {
+          const idMap = options?.collectionIdMap ?? d.collectionIdMap ?? {};
+          const collectionOutbox = options?.ownerId
+            ? state.collectionOutbox.map((entry) =>
+                entry.ownerId === options.ownerId
+                  ? remapOutboxEntry(entry, idMap)
+                  : entry
+              )
+            : state.collectionOutbox;
+          const ownerOutbox = options?.ownerId
+            ? collectionOutbox.filter((entry) => entry.ownerId === options.ownerId)
+            : [];
+          const revisionChanged =
+            options?.collectionRevision !== undefined &&
+            options.collectionRevision !== state.collectionRevision;
+          const collections = options?.ownerId
+            ? ownerOutbox.length > 0
+              ? rebaseCollectionOutbox(d.collections, collectionOutbox, options.ownerId)
+              : options.preserveCollections === true || revisionChanged
+                ? state.collections.map((collection) => remapCollection(collection, idMap))
+                : d.collections
+            : migrateGuestCollectionIds(d.collections);
+          return {
+            ratings: d.ratings,
+            reads: d.reads,
+            subscriptions: d.subscriptions,
+            reviews: d.reviews,
+            likedReviews: d.likedReviews,
+            ...(options?.ownerId
+              ? { libraryOwnerId: options.ownerId, libraryMergeOwnerId: null }
+              : {}),
+            // Rebase optimistic commands over the authoritative snapshot. Preserving the entire
+            // local array would hide pre-existing server collections during a guest merge.
+            collections,
+            collectionOutbox,
+          };
         }),
 
       setRating: (titleId, rating) => {
@@ -188,14 +841,37 @@ export const useApp = create<AppState>()(
       setRatingScale: (ratingScale) => set({ ratingScale }),
 
       createCollection: (name, emoji) => {
-        const id = `col-${Math.abs(hashStr(name + emoji + Object.keys(get().collections).length))}`;
+        const cleanName = normalizeCollectionName(name);
+        if (!cleanName) return "";
+        const id = newClientCollectionId();
+        const cleanEmoji = normalizeCollectionEmoji(emoji);
+        const fence = currentCollectionAuthFence();
+        const outboxEntry: CollectionOutboxEntry | null = fence
+          ? {
+              mutationId: newClientCollectionId(),
+              ownerId: fence.userId,
+              command: { action: "create", id, name: cleanName, emoji: cleanEmoji },
+              rollback: { kind: "create" },
+            }
+          : null;
+        const revision = get().collectionRevision + 1;
         set((s) => ({
           collections: [
             ...s.collections,
-            { id, name, emoji, titleIds: [], createdAt: "2025-05-29T00:00:00Z" },
+            {
+              id,
+              name: cleanName,
+              emoji: cleanEmoji,
+              titleIds: [],
+              createdAt: new Date().toISOString(),
+            },
           ],
+          collectionRevision: revision,
+          ...(outboxEntry
+            ? { collectionOutbox: appendOutboxEntry(s.collectionOutbox, outboxEntry) }
+            : {}),
         }));
-        if (get().userId) apiPost("/api/me/collection", { action: "create", name, emoji });
+        if (fence && outboxEntry) queueCollectionOutboxEntry(fence, outboxEntry);
         return id;
       },
       addRecentlyViewed: (titleId) => {
@@ -210,29 +886,97 @@ export const useApp = create<AppState>()(
         set((s) => ({ recentSearches: removeRecentSearch(s.recentSearches, query) })),
       clearRecentSearches: () => set({ recentSearches: [] }),
       renameCollection: (id, name) => {
-        const clean = name.trim();
-        if (!clean) return;
-        set((s) => ({ collections: s.collections.map((c) => (c.id === id ? { ...c, name: clean } : c)) }));
-        if (get().userId) apiPost("/api/me/collection", { action: "rename", id, name: clean });
+        const clean = normalizeCollectionName(name);
+        const previous = get().collections.find((collection) => collection.id === id);
+        if (!clean || !previous) return;
+        if (previous.name === clean) return;
+        const fence = currentCollectionAuthFence();
+        const outboxEntry: CollectionOutboxEntry | null = fence
+          ? {
+              mutationId: newClientCollectionId(),
+              ownerId: fence.userId,
+              command: { action: "rename", id, name: clean },
+              rollback: {
+                kind: "rename",
+                previousName: previous.name,
+                attemptedName: clean,
+              },
+            }
+          : null;
+        const revision = get().collectionRevision + 1;
+        set((s) => ({
+          collections: s.collections.map((c) => (c.id === id ? { ...c, name: clean } : c)),
+          collectionRevision: revision,
+          ...(outboxEntry
+            ? { collectionOutbox: appendOutboxEntry(s.collectionOutbox, outboxEntry) }
+            : {}),
+        }));
+        if (fence && outboxEntry) queueCollectionOutboxEntry(fence, outboxEntry);
       },
       deleteCollection: (id) => {
-        set((s) => ({ collections: s.collections.filter((c) => c.id !== id) }));
-        if (get().userId) apiPost("/api/me/collection", { action: "delete", id });
+        const index = get().collections.findIndex((collection) => collection.id === id);
+        if (index < 0) return;
+        const deleted = get().collections[index];
+        if (!deleted) return;
+        const fence = currentCollectionAuthFence();
+        const outboxEntry: CollectionOutboxEntry | null = fence
+          ? {
+              mutationId: newClientCollectionId(),
+              ownerId: fence.userId,
+              command: { action: "delete", id },
+              rollback: { kind: "delete", collection: deleted, index },
+            }
+          : null;
+        const revision = get().collectionRevision + 1;
+        set((s) => ({
+          collections: s.collections.filter((c) => c.id !== id),
+          collectionRevision: revision,
+          ...(outboxEntry
+            ? { collectionOutbox: appendOutboxEntry(s.collectionOutbox, outboxEntry) }
+            : {}),
+        }));
+        if (fence && outboxEntry) queueCollectionOutboxEntry(fence, outboxEntry);
       },
       toggleInCollection: (collectionId, titleId) => {
+        const previous = get().collections.find((collection) => collection.id === collectionId);
+        if (!previous) return;
+        const included = !previous.titleIds.includes(titleId);
+        const fence = currentCollectionAuthFence();
+        const outboxEntry: CollectionOutboxEntry | null = fence
+          ? {
+              mutationId: newClientCollectionId(),
+              ownerId: fence.userId,
+              command: {
+                action: "set-item",
+                id: collectionId,
+                titleId,
+                included,
+              },
+              rollback: {
+                kind: "set-item",
+                titleId,
+                previousIncluded: !included,
+                intendedIncluded: included,
+              },
+            }
+          : null;
+        const revision = get().collectionRevision + 1;
         set((s) => ({
           collections: s.collections.map((c) => {
             if (c.id !== collectionId) return c;
-            const has = c.titleIds.includes(titleId);
             return {
               ...c,
-              titleIds: has
-                ? c.titleIds.filter((t) => t !== titleId)
-                : [...c.titleIds, titleId],
+              titleIds: included
+                ? [...c.titleIds.filter((t) => t !== titleId), titleId]
+                : c.titleIds.filter((t) => t !== titleId),
             };
           }),
+          collectionRevision: revision,
+          ...(outboxEntry
+            ? { collectionOutbox: appendOutboxEntry(s.collectionOutbox, outboxEntry) }
+            : {}),
         }));
-        if (get().userId) apiPost("/api/me/collection", { action: "toggle", id: collectionId, titleId });
+        if (fence && outboxEntry) queueCollectionOutboxEntry(fence, outboxEntry);
       },
 
       resetAll: () =>
@@ -243,6 +987,8 @@ export const useApp = create<AppState>()(
           likedReviews: {},
           subscriptions: {},
           collections: seedCollections,
+          collectionOutbox: [],
+          collectionRevision: get().collectionRevision + 1,
           recentlyViewed: [],
           recentSearches: [],
         }),
@@ -251,14 +997,80 @@ export const useApp = create<AppState>()(
       name: "toonspectrum-store",
       storage: createJSONStorage(() => localStorage),
       version: 1,
+      partialize: (state) => ({
+        ratings: state.ratings,
+        reviews: state.reviews,
+        reads: state.reads,
+        likedReviews: state.likedReviews,
+        subscriptions: state.subscriptions,
+        adultVerified: state.adultVerified,
+        adultBirthdate: state.adultBirthdate,
+        libraryOwnerId: state.libraryOwnerId,
+        libraryMergeOwnerId: state.libraryMergeOwnerId,
+        collections: state.collections,
+        collectionOutbox: state.collectionOutbox,
+        recentlyViewed: state.recentlyViewed,
+        recentSearches: state.recentSearches,
+        ratingScale: state.ratingScale,
+      }),
+      // Older v1 snapshots included auth fields because partialize was absent. Merge only the
+      // intended local-library data so a stale token can never be revived from this second store.
+      merge: (persisted, current) => {
+        const saved = (persisted ?? {}) as Partial<AppState>;
+        const libraryOwnerId =
+          saved.libraryOwnerId ??
+          (typeof saved.userId === "string" ? saved.userId : current.libraryOwnerId);
+        const savedCollections = saved.collections ?? current.collections;
+        const canonicalGuest = libraryOwnerId === null
+          ? canonicalizeGuestCollections(savedCollections)
+          : { collections: savedCollections, idMap: {} };
+        const savedOutbox = sanitizeCollectionOutbox(saved.collectionOutbox).map((entry) =>
+          remapOutboxEntry(entry, canonicalGuest.idMap)
+        );
+        return {
+          ...current,
+          ratings: saved.ratings ?? current.ratings,
+          reviews: saved.reviews ?? current.reviews,
+          reads: saved.reads ?? current.reads,
+          likedReviews: saved.likedReviews ?? current.likedReviews,
+          subscriptions: saved.subscriptions ?? current.subscriptions,
+          adultVerified: saved.adultVerified ?? current.adultVerified,
+          adultBirthdate: saved.adultBirthdate ?? current.adultBirthdate,
+          libraryOwnerId,
+          libraryMergeOwnerId:
+            typeof saved.libraryMergeOwnerId === "string"
+              ? saved.libraryMergeOwnerId
+              : null,
+          collections: canonicalGuest.collections,
+          collectionOutbox: savedOutbox,
+          recentlyViewed: saved.recentlyViewed ?? current.recentlyViewed,
+          recentSearches: saved.recentSearches ?? current.recentSearches,
+          ratingScale: saved.ratingScale ?? current.ratingScale,
+          userId: null,
+          sessionToken: null,
+          authGeneration: 0,
+          collectionRevision: 0,
+        };
+      },
     }
   )
 );
 
-function hashStr(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
-  return h;
+export interface CollectionHydrationFence extends CollectionAuthFence {
+  collectionRevision: number;
+  preserveCollections: boolean;
+}
+
+export function captureCollectionHydrationFence(): CollectionHydrationFence | null {
+  const fence = currentCollectionAuthFence();
+  if (!fence) return null;
+  return {
+    ...fence,
+    collectionRevision: useApp.getState().collectionRevision,
+    preserveCollections:
+      collectionWriteThrough.hasPending(collectionAccountKey(fence)) ||
+      useApp.getState().collectionOutbox.some((entry) => entry.ownerId === fence.userId),
+  };
 }
 
 // SSR/CSR 하이드레이션 가드 — persist 가 클라이언트에서 채워질 때까지 false.

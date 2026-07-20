@@ -1,5 +1,8 @@
 import { Body, Controller, Delete, Get, Headers, Inject, Patch, Post, UnauthorizedException } from "@nestjs/common";
 
+import { ZodValidationPipe } from "../../common/zod-validation.pipe";
+
+import { CollectionMutationDto, CollectionMutationSchema } from "./me.dto";
 import { MeService } from "./me.service";
 
 interface ReviewPayload {
@@ -26,14 +29,6 @@ interface ReadPayload {
 
 interface SubscriptionPayload {
   titleId?: unknown;
-}
-
-interface CollectionPayload {
-  action?: unknown;
-  id?: unknown;
-  titleId?: unknown;
-  name?: unknown;
-  emoji?: unknown;
 }
 
 interface ProfilePayload {
@@ -115,9 +110,12 @@ export class MeController {
   }
 
   @Post("collection")
-  async updateCollection(@Headers("x-user-id") userId: string | undefined, @Body() body: CollectionPayload) {
+  async updateCollection(
+    @Headers("x-user-id") userId: string | undefined,
+    @Body(new ZodValidationPipe(CollectionMutationDto)) body: CollectionMutationDto
+  ) {
     const uid = this.userIdFromHeader(userId);
-    return this.meService.updateCollection(uid, body);
+    return this.meService.updateCollection(uid, CollectionMutationSchema.parse(body));
   }
 
   @Post("merge")

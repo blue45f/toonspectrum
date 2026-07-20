@@ -14,6 +14,10 @@ import {
 import {
   createStudioLiveEnvelope,
   type StudioLiveEnvelope,
+  type StudioLiveLockAcquireResult,
+  type StudioLiveLockReleaseRequest,
+  type StudioLiveLockReleaseResult,
+  type StudioLiveLockRequest,
   type StudioLiveParticipant,
 } from "./studio-live-collaboration-protocol";
 import {
@@ -81,6 +85,33 @@ class FakeHubTransport implements StudioLiveTransport {
     return Promise.resolve(this.hub.crdtSyncResponse);
   }
 
+  acquireLock(request: StudioLiveLockRequest): Promise<StudioLiveLockAcquireResult> {
+    const cloned = structuredClone(request);
+    this.hub.lockAcquireRequests.push(cloned);
+    return this.hub.lockAcquireHandler?.(cloned) ??
+      Promise.resolve({
+        status: "denied",
+        resource: request.resource,
+        requestId: request.requestId,
+        code: "unsupported_test_transport",
+        message: "테스트 잠금 획득 응답이 설정되지 않았습니다.",
+      });
+  }
+
+  releaseLock(request: StudioLiveLockReleaseRequest): Promise<StudioLiveLockReleaseResult> {
+    const cloned = structuredClone(request);
+    this.hub.lockReleaseRequests.push(cloned);
+    return this.hub.lockReleaseHandler?.(cloned) ??
+      Promise.resolve({
+        status: "denied",
+        resource: request.resource,
+        requestId: request.requestId,
+        claimId: request.claimId,
+        code: "unsupported_test_transport",
+        message: "테스트 잠금 해제 응답이 설정되지 않았습니다.",
+      });
+  }
+
   publishCrdtUpdate(request: StudioCrdtUpdateRequest): Promise<StudioCrdtUpdateAck> {
     this.hub.crdtUpdateRequests.push(structuredClone(request));
     return Promise.resolve({
@@ -100,7 +131,10 @@ class FakeHubTransport implements StudioLiveTransport {
 
   receiveControl(event: StudioLiveTransportControlEvent): void {
     if (this.closed) return;
-    if (event.type === "status" && event.status.state === "revoked") {
+    if (
+      event.type === "status" &&
+      (event.status.state === "revoked" || event.status.state === "disconnected")
+    ) {
       this.connected = false;
     }
     for (const listener of this.controlListeners) listener(structuredClone(event));
@@ -124,6 +158,14 @@ class FakeTransportHub {
   readonly published: StudioLiveEnvelope[] = [];
   readonly crdtSyncRequests: StudioCrdtSyncRequest[] = [];
   readonly crdtUpdateRequests: StudioCrdtUpdateRequest[] = [];
+  readonly lockAcquireRequests: StudioLiveLockRequest[] = [];
+  readonly lockReleaseRequests: StudioLiveLockReleaseRequest[] = [];
+  lockAcquireHandler:
+    | ((request: StudioLiveLockRequest) => Promise<StudioLiveLockAcquireResult>)
+    | null = null;
+  lockReleaseHandler:
+    | ((request: StudioLiveLockReleaseRequest) => Promise<StudioLiveLockReleaseResult>)
+    | null = null;
   crdtSyncResponse: StudioCrdtSyncResponse | null = null;
   queued = false;
   private queue: Array<{ sender: FakeHubTransport; value: unknown }> = [];
@@ -172,6 +214,16 @@ const bob: StudioLiveParticipant = {
   displayName: "민호 탭",
   role: "editor",
 };
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
 
 function harness(mode: StudioLiveTransportMode = "local") {
   let now = 1_000_000;
@@ -435,6 +487,267 @@ describe("StudioLiveRoom", () => {
       expect.objectContaining({ resource: "element:el-1", claimId: "new-claim" }),
     ]);
     room.close();
+  });
+
+  it("serializes reacquisition behind release and stops heartbeats for the releasing lease", async () => {
+    const test = harness("server");
+    const releaseGate = deferred<StudioLiveLockReleaseResult>();
+    const requestIds = [
+      "11111111-1111-4111-8111-111111111111",
+      "22222222-2222-4222-8222-222222222222",
+    ];
+    const room = test.room(alice, {
+      randomId: () => requestIds.shift() ?? "33333333-3333-4333-8333-333333333333",
+    });
+    test.hub.lockReleaseHandler = () => releaseGate.promise;
+    test.hub.lockAcquireHandler = async (request) => ({
+      status: "acquired",
+      resource: request.resource,
+      requestId: request.requestId,
+      lock: {
+        resource: request.resource,
+        claimId: "lease-2",
+        owner: alice,
+        leaseUntil: test.now() + 500,
+      },
+    });
+    await room.start();
+    test.hub.transports[0]?.receiveControl({
+      type: "lock",
+      lock: {
+        action: "acquired",
+        resource: "page:page-1",
+        claimId: "lease-1",
+        owner: alice,
+        leaseUntil: test.now() + 500,
+      },
+    });
+
+    const releasing = room.releaseLockAsync("page:page-1");
+    expect(room.releaseLockAsync("page:page-1")).toBe(releasing);
+    expect(room.claimLock("page:page-1")).toBe(true);
+    const reacquiring = room.claimLockAsync("page:page-1");
+    expect(test.hub.lockAcquireRequests).toEqual([]);
+
+    expect(room.getLocks()).toEqual([
+      expect.objectContaining({ resource: "page:page-1", claimId: "lease-1", owner: alice }),
+    ]);
+    expect(test.intervalHandlers).toHaveLength(1);
+    test.intervalHandlers[0]!();
+    expect(
+      test.hub.published.filter((envelope) => envelope.kind === "presence:heartbeat")
+    ).toHaveLength(1);
+    expect(test.hub.published.filter((envelope) => envelope.kind === "lock:claim")).toEqual([]);
+
+    const releaseRequest = test.hub.lockReleaseRequests[0];
+    expect(releaseRequest).toEqual({
+      resource: "page:page-1",
+      requestId: "11111111-1111-4111-8111-111111111111",
+      claimId: "lease-1",
+    });
+    releaseGate.resolve({
+      status: "released",
+      resource: releaseRequest!.resource,
+      requestId: releaseRequest!.requestId,
+      claimId: releaseRequest!.claimId,
+      released: true,
+    });
+
+    await expect(releasing).resolves.toMatchObject({ status: "released", claimId: "lease-1" });
+    await expect(reacquiring).resolves.toMatchObject({
+      status: "acquired",
+      lock: { claimId: "lease-2" },
+    });
+    expect(test.hub.lockAcquireRequests).toEqual([
+      {
+        resource: "page:page-1",
+        requestId: "22222222-2222-4222-8222-222222222222",
+        leaseMs: 500,
+      },
+    ]);
+    expect(room.getLocks()).toEqual([
+      expect.objectContaining({ resource: "page:page-1", claimId: "lease-2", owner: alice }),
+    ]);
+    room.close();
+  });
+
+  it("suppresses late self acquisitions during release while retaining remote authority", async () => {
+    const test = harness("server");
+    const releaseGate = deferred<StudioLiveLockReleaseResult>();
+    const room = test.room(alice, {
+      randomId: () => "44444444-4444-4444-8444-444444444444",
+    });
+    test.hub.lockReleaseHandler = () => releaseGate.promise;
+    await room.start();
+    const transport = test.hub.transports[0];
+    transport?.receiveControl({
+      type: "lock",
+      lock: {
+        action: "acquired",
+        resource: "element:el-1",
+        claimId: "lease-1",
+        owner: alice,
+        leaseUntil: test.now() + 500,
+      },
+    });
+    const releasing = room.releaseLockAsync("element:el-1");
+
+    transport?.receiveControl({
+      type: "lock",
+      lock: {
+        action: "acquired",
+        resource: "element:el-1",
+        claimId: "late-self-lease",
+        owner: alice,
+        leaseUntil: test.now() + 500,
+      },
+    });
+    expect(room.getLocks()).toEqual([
+      expect.objectContaining({ claimId: "lease-1", owner: alice }),
+    ]);
+
+    test.hub.inject(
+      0,
+      createStudioLiveEnvelope({
+        workId: "work-1",
+        sender: bob,
+        sentAt: test.now(),
+        sequence: 1,
+        kind: "presence:heartbeat",
+        payload: { visibility: "active", pageId: "page-1" },
+      })
+    );
+    transport?.receiveControl({
+      type: "lock",
+      lock: {
+        action: "acquired",
+        resource: "element:el-1",
+        claimId: "remote-lease",
+        owner: bob,
+        leaseUntil: test.now() + 500,
+      },
+    });
+    const releaseRequest = test.hub.lockReleaseRequests[0]!;
+    releaseGate.resolve({
+      status: "released",
+      resource: releaseRequest.resource,
+      requestId: releaseRequest.requestId,
+      claimId: releaseRequest.claimId,
+      released: true,
+    });
+    await releasing;
+
+    expect(room.getLocks()).toEqual([
+      expect.objectContaining({ claimId: "remote-lease", owner: bob }),
+    ]);
+    room.close();
+  });
+
+  it("keeps a newer server fence when an older release control event arrives", async () => {
+    const test = harness("server");
+    const room = test.room(alice, {
+      randomId: () => "55555555-5555-4555-8555-555555555555",
+    });
+    test.hub.lockReleaseHandler = async (request) => ({
+      status: "released",
+      resource: request.resource,
+      requestId: request.requestId,
+      claimId: request.claimId,
+      released: true,
+    });
+    await room.start();
+    const transport = test.hub.transports[0];
+    for (const claimId of ["lease-old", "lease-new"]) {
+      transport?.receiveControl({
+        type: "lock",
+        lock: {
+          action: "acquired",
+          resource: "page:page-1",
+          claimId,
+          owner: alice,
+          leaseUntil: test.now() + 500,
+        },
+      });
+    }
+    transport?.receiveControl({
+      type: "lock",
+      lock: { action: "released", resource: "page:page-1", claimId: "lease-old" },
+    });
+
+    expect(room.getLocks()).toEqual([
+      expect.objectContaining({ resource: "page:page-1", claimId: "lease-new" }),
+    ]);
+    await expect(room.releaseLockAsync("page:page-1")).resolves.toMatchObject({
+      status: "released",
+      claimId: "lease-new",
+    });
+    expect(test.hub.lockReleaseRequests).toEqual([
+      expect.objectContaining({ resource: "page:page-1", claimId: "lease-new" }),
+    ]);
+    room.close();
+  });
+
+  it("settles pending releases on disconnect, access revocation and close", async () => {
+    const cases = [
+      {
+        lifecycle: "disconnected",
+        expectedCode: "disconnected",
+        status: {
+          state: "disconnected",
+          message: "disconnected lifecycle",
+          recoverable: true,
+        },
+      },
+      {
+        lifecycle: "revoked",
+        expectedCode: "access_revoked",
+        status: {
+          state: "revoked",
+          message: "revoked lifecycle",
+          recoverable: false,
+        },
+      },
+      { lifecycle: "closed", expectedCode: "connection_closed", status: null },
+    ] as const;
+
+    for (const { lifecycle, expectedCode, status } of cases) {
+      const test = harness("server");
+      const releaseGate = deferred<StudioLiveLockReleaseResult>();
+      const room = test.room(alice, {
+        randomId: () => "66666666-6666-4666-8666-666666666666",
+      });
+      test.hub.lockReleaseHandler = () => releaseGate.promise;
+      await room.start();
+      test.hub.transports[0]?.receiveControl({
+        type: "lock",
+        lock: {
+          action: "acquired",
+          resource: "page:page-1",
+          claimId: "lease-1",
+          owner: alice,
+          leaseUntil: test.now() + 500,
+        },
+      });
+      const releasing = room.releaseLockAsync("page:page-1");
+
+      if (status === null) {
+        room.close();
+      } else {
+        test.hub.transports[0]?.receiveControl({
+          type: "status",
+          status,
+        });
+      }
+
+      await expect(releasing).resolves.toMatchObject({
+        status: "revoked",
+        code: expectedCode,
+        resource: "page:page-1",
+        claimId: "lease-1",
+      });
+      expect(room.getLocks()).toEqual([]);
+      if (lifecycle !== "closed") room.close();
+    }
   });
 
   it("expires silent peers and their locks without waiting for a leave message", async () => {

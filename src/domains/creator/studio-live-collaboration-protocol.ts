@@ -9,6 +9,8 @@ import { STUDIO_TEAM_ROLES, type StudioTeamRole } from "./studio-team-client";
  * structurally valid envelope is not an authorization decision.
  */
 export const STUDIO_LIVE_PROTOCOL_VERSION = 1 as const;
+/** Socket lock-control capability negotiated independently from the local envelope version. */
+export const STUDIO_LIVE_LOCK_PROTOCOL_VERSION = 2 as const;
 export const STUDIO_LIVE_MESSAGE_MAX_BYTES = 64 * 1024;
 export const STUDIO_LIVE_MESSAGE_MAX_AGE_MS = 30_000;
 export const STUDIO_LIVE_MESSAGE_FUTURE_SKEW_MS = 5_000;
@@ -71,6 +73,8 @@ export interface StudioLiveLockLease {
 export interface StudioLiveLockRequest {
   resource: string;
   requestId: string;
+  /** Exact server lease observed by a heartbeat; omitted for a fresh acquisition lifecycle. */
+  renewLeaseId?: string;
   leaseMs: number;
 }
 
@@ -99,6 +103,45 @@ export type StudioLiveLockAcquireResult =
       status: "revoked";
       resource: string;
       requestId: string;
+      code: string;
+      message: string;
+    };
+
+export interface StudioLiveLockReleaseRequest {
+  resource: string;
+  requestId: string;
+  claimId: string;
+}
+
+export type StudioLiveLockReleaseResult =
+  | {
+      status: "released";
+      resource: string;
+      requestId: string;
+      claimId: string;
+      /** False means the exact fence was already absent; the release intent is still settled. */
+      released: boolean;
+    }
+  | {
+      status: "denied";
+      resource: string;
+      requestId: string;
+      claimId: string;
+      code: string;
+      message: string;
+    }
+  | {
+      status: "timeout";
+      resource: string;
+      requestId: string;
+      claimId: string;
+      message: string;
+    }
+  | {
+      status: "revoked";
+      resource: string;
+      requestId: string;
+      claimId: string;
       code: string;
       message: string;
     };

@@ -82,6 +82,21 @@ describe("me service input normalization", () => {
     expect(normalized.collections).toEqual([]);
   });
 
+  it("preserves canonical guest collection IDs and empty collections for login merge", () => {
+    const clientId = "550e8400-e29b-41d4-a716-446655440000";
+    const normalized = normalizeMergePayload({
+      collections: [
+        { id: clientId, name: " 빈 컬렉션 ", emoji: "📚", titleIds: [] },
+        { id: "legacy-local-id", name: "구버전", titleIds: [] },
+      ],
+    });
+
+    expect(normalized.collections).toEqual([
+      { clientId, name: "빈 컬렉션", emoji: "📚", titleIds: [] },
+      { name: "구버전", emoji: "📚", titleIds: [] },
+    ]);
+  });
+
   it("normalizes collection names and emoji for direct collection updates", () => {
     expect(normalizeCollectionName("  ".repeat(10))).toBe("");
     expect(normalizeCollectionName("이름".repeat(100)).length).toBeLessThanOrEqual(MAX_COLLECTION_NAME_LENGTH);

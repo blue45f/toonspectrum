@@ -46,6 +46,7 @@ import {
 import { StudioLiveSocketAuthService } from "./studio-live-socket-auth.service";
 import {
   STUDIO_CRDT_PROTOCOL_VERSION,
+  STUDIO_LIVE_LOCK_PROTOCOL_VERSION,
   StudioLiveChatSchema,
   StudioLiveCrdtSyncSchema,
   StudioLiveCrdtUpdateSchema,
@@ -87,6 +88,8 @@ import type {
   StudioLiveJoinResult,
   StudioLiveLock,
   StudioLiveLockAcquiredDecision,
+  StudioLiveLockReleaseDecision,
+  StudioLiveLockReleaseFailure,
   StudioLiveLockReleaseInput,
   StudioLiveLockRequestFailure,
   StudioLiveLockRequestInput,
@@ -300,6 +303,17 @@ function lockRequestFailure(
     decision,
     requestId,
     ...(lock ? { lock } : {}),
+  };
+}
+
+function lockReleaseFailure(
+  requestId: string,
+  code: StudioLiveFailureCode,
+  message: string
+): StudioLiveLockReleaseFailure {
+  return {
+    ...failure(code, message),
+    requestId,
   };
 }
 
@@ -679,6 +693,7 @@ export class StudioLiveGateway
       return reply(ack, {
         ok: true,
         data: {
+          lockProtocolVersion: STUDIO_LIVE_LOCK_PROTOCOL_VERSION,
           self: safeParticipant,
           participants,
           locks,
@@ -978,6 +993,10 @@ export class StudioLiveGateway
         workId: parsed.data.workId,
         resourceId: parsed.data.resourceId,
         requestedLeaseId: crypto.randomUUID(),
+        rotateLease: parsed.data.protocolVersion === STUDIO_LIVE_LOCK_PROTOCOL_VERSION,
+        ...(parsed.data.protocolVersion === STUDIO_LIVE_LOCK_PROTOCOL_VERSION && parsed.data.renewLeaseId
+          ? { renewLeaseId: parsed.data.renewLeaseId }
+          : {}),
         acquisitionId: createStudioLiveLockAcquisitionId(requestId, crypto.randomUUID()),
         ownerConnectionId: client.id,
         ownerName: authorized.value.name,
@@ -1002,31 +1021,81 @@ export class StudioLiveGateway
         )
       );
     }
-    // ACL/session checks may finish before a slow database round-trip. Do not publish a lease for
-    // a participant generation that was revoked or switched while PostgreSQL serialized it.
-    if (!this.isParticipantAuthorizationCurrent(client, authorized.value, true)) {
-      if (acquired.status === "acquired" && acquired.created) {
+    // ACL/session checks may finish before a slow database round-trip. If a same-work participant
+    // generation or a concurrent forced recheck superseded the original snapshot, join that latest
+    // authorization before publishing the already-serialized result. This is essential for v2
+    // renewals: PostgreSQL may have rotated L1 -> L2, so returning a revocation without either
+    // publishing L2 or rolling it back would strand an unannounced fence until TTL expiry.
+    let currentAuthorization = authorized.value;
+    while (!this.isParticipantAuthorizationCurrent(client, currentAuthorization, true)) {
+      const refreshed = await this.runWithAuthorizedParticipant(
+        client,
+        parsed.data.workId,
+        true,
+        false,
+        (participant) => participant
+      );
+      if (!refreshed) {
+        if (acquired.status === "acquired") {
+          await this.rollbackLockAcquireBestEffort(
+            acquired.lock,
+            parsed.data.protocolVersion === STUDIO_LIVE_LOCK_PROTOCOL_VERSION,
+            parsed.data.renewLeaseId
+          );
+        }
+        return reply(
+          ack,
+          lockRequestFailure(
+            requestId,
+            "revoked",
+            "forbidden",
+            "이 원고를 편집할 권한이 없습니다."
+          )
+        );
+      }
+      currentAuthorization = refreshed.value;
+      if (acquired.status === "acquired") {
+        let current: StudioLiveLockRecord | undefined;
         try {
-          await this.studioLiveLockRepository.rollbackAcquire({
-            workId: acquired.lock.workId,
-            resourceId: acquired.lock.resourceId,
-            leaseId: acquired.lock.leaseId,
-            acquisitionId: acquired.lock.acquisitionId,
-            ownerConnectionId: acquired.lock.ownerConnectionId,
-          });
+          current = (await this.studioLiveLockRepository.list(acquired.lock.workId)).find(
+            (lock) => lock.resourceId === acquired.lock.resourceId
+          );
         } catch {
-          // The short database lease remains fail-safe even when best-effort rollback is unavailable.
+          await this.rollbackLockAcquireBestEffort(
+            acquired.lock,
+            parsed.data.protocolVersion === STUDIO_LIVE_LOCK_PROTOCOL_VERSION,
+            parsed.data.renewLeaseId
+          );
+          return reply(
+            ack,
+            lockRequestFailure(
+              requestId,
+              "denied",
+              "internal_error",
+              "편집 잠금의 최신 상태를 확인하지 못했습니다."
+            )
+          );
+        }
+        if (
+          !current ||
+          current.leaseId !== acquired.lock.leaseId ||
+          current.acquisitionId !== acquired.lock.acquisitionId ||
+          current.ownerConnectionId !== acquired.lock.ownerConnectionId
+        ) {
+          return reply(
+            ack,
+            lockRequestFailure(
+              requestId,
+              "revoked",
+              "lock_stale",
+              "편집 잠금이 더 최신 요청으로 교체되었습니다.",
+              current ? publicLock(current) : undefined
+            )
+          );
         }
       }
-      return reply(
-        ack,
-        lockRequestFailure(
-          requestId,
-          "revoked",
-          "forbidden",
-          "이 원고를 편집할 권한이 없습니다."
-        )
-      );
+      // Recheck after the awaited row verification. If a newer ACL generation started while list()
+      // was pending, loop and join it before the synchronous ACK/broadcast section below.
     }
     if (acquired.status === "conflict") {
       return reply(
@@ -1037,6 +1106,18 @@ export class StudioLiveGateway
           "lock_conflict",
           `${acquired.lock.ownerName}님이 이 항목을 편집하고 있습니다.`,
           publicLock(acquired.lock)
+        )
+      );
+    }
+    if (acquired.status === "stale") {
+      return reply(
+        ack,
+        lockRequestFailure(
+          requestId,
+          "denied",
+          "lock_stale",
+          "편집 잠금 임대가 이미 변경되었거나 해제되었습니다.",
+          acquired.lock ? publicLock(acquired.lock) : undefined
         )
       );
     }
@@ -1065,10 +1146,23 @@ export class StudioLiveGateway
   async releaseLock(
     @ConnectedSocket() client: StudioLiveSocket,
     @MessageBody() body: StudioLiveLockReleaseInput,
-    @Ack() ack?: StudioLiveAckCallback<{ released: boolean }>
+    @Ack() ack?: StudioLiveAckCallback<StudioLiveLockReleaseDecision>
   ) {
+    const parsedRequestId = StudioLiveLockRequestIdSchema.safeParse(
+      (body as { requestId?: unknown } | null)?.requestId
+    );
+    const requestId = parsedRequestId.success ? parsedRequestId.data : crypto.randomUUID();
     const parsed = StudioLiveLockReleaseSchema.safeParse(body);
-    if (!parsed.success) return reply(ack, failure("invalid_payload", "편집 잠금 해제 정보가 올바르지 않습니다."));
+    if (!parsed.success) {
+      return reply(
+        ack,
+        lockReleaseFailure(
+          requestId,
+          "invalid_payload",
+          "편집 잠금 해제 정보가 올바르지 않습니다."
+        )
+      );
+    }
     const authorized = await this.runWithAuthorizedParticipant(
       client,
       parsed.data.workId,
@@ -1076,7 +1170,12 @@ export class StudioLiveGateway
       false,
       (participant) => participant
     );
-    if (!authorized) return reply(ack, failure("forbidden", "이 원고를 편집할 권한이 없습니다."));
+    if (!authorized) {
+      return reply(
+        ack,
+        lockReleaseFailure(requestId, "forbidden", "이 원고를 편집할 권한이 없습니다.")
+      );
+    }
     let released: StudioLiveLockRecord | null;
     try {
       released = await this.studioLiveLockRepository.release({
@@ -1094,18 +1193,30 @@ export class StudioLiveGateway
         },
         "studio distributed lock release failed"
       );
-      return reply(ack, failure("internal_error", "편집 잠금을 해제하지 못했습니다."));
+      return reply(
+        ack,
+        lockReleaseFailure(requestId, "internal_error", "편집 잠금을 해제하지 못했습니다.")
+      );
     }
     if (released) {
       const update: StudioLiveLockUpdate = {
         action: "released",
         requestId: studioLiveLockRequestIdFromAcquisitionId(released.acquisitionId),
+        releaseRequestId: requestId,
         resourceId: released.resourceId,
         leaseId: released.leaseId,
       };
       this.server.to(studioLiveRoom(parsed.data.workId)).emit("studio:lock:update", update);
     }
-    return reply(ack, { ok: true, data: { released: released !== null } });
+    return reply(ack, {
+      ok: true,
+      data: {
+        requestId,
+        resourceId: parsed.data.resourceId,
+        leaseId: parsed.data.leaseId,
+        released: released !== null,
+      },
+    });
   }
 
   @SubscribeMessage("studio:screen:set")
@@ -2935,6 +3046,43 @@ export class StudioLiveGateway
         return !current || current.workId !== participant.workId;
       }
     );
+  }
+
+  private async rollbackLockAcquireBestEffort(
+    lock: StudioLiveLockRecord,
+    rotatingProtocol: boolean,
+    previousLeaseId?: string
+  ): Promise<void> {
+    let rolledBack: StudioLiveLockRecord | null = null;
+    try {
+      rolledBack = await this.studioLiveLockRepository.rollbackAcquire({
+        workId: lock.workId,
+        resourceId: lock.resourceId,
+        leaseId: lock.leaseId,
+        acquisitionId: lock.acquisitionId,
+        ownerConnectionId: lock.ownerConnectionId,
+      });
+    } catch {
+      // The bounded database lease remains the final fail-safe when rollback is unavailable.
+    }
+    if (!rolledBack && !rotatingProtocol) return;
+    const source = rolledBack ?? lock;
+    const requestId = studioLiveLockRequestIdFromAcquisitionId(source.acquisitionId);
+    const fences = new Set([
+      ...(rolledBack || rotatingProtocol ? [source.leaseId] : []),
+      ...(rotatingProtocol ? [previousLeaseId] : []),
+    ].filter(
+      (leaseId): leaseId is string => Boolean(leaseId)
+    ));
+    for (const leaseId of fences) {
+      const update: StudioLiveLockUpdate = {
+        action: "revoked",
+        requestId,
+        resourceId: source.resourceId,
+        leaseId,
+      };
+      this.server.to(studioLiveRoom(source.workId)).emit("studio:lock:update", update);
+    }
   }
 
   private releaseSocketLocks(

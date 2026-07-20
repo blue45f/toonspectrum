@@ -30,8 +30,12 @@ export interface StudioLiveLockRecord {
 export interface AcquireStudioLiveLockInput {
   workId: string;
   resourceId: string;
-  /** Server-generated capability used for a newly created lease. */
+  /** Server-generated public fence used by a fresh lease or a successful v2 renewal. */
   requestedLeaseId: string;
+  /** v2 clients rotate the public fence on every successful acquire/renew. */
+  rotateLease?: boolean;
+  /** Exact lease observed by a renewal heartbeat. Omit only for a fresh acquisition lifecycle. */
+  renewLeaseId?: string;
   /** Server-unique token that embeds request correlation and fences authorization rollback. */
   acquisitionId: string;
   ownerConnectionId: string;
@@ -42,6 +46,7 @@ export interface AcquireStudioLiveLockInput {
 export type AcquireStudioLiveLockResult =
   | { status: "acquired"; lock: StudioLiveLockRecord; created: boolean }
   | { status: "conflict"; lock: StudioLiveLockRecord }
+  | { status: "stale"; lock?: StudioLiveLockRecord }
   | { status: "limit" };
 
 export interface ReleaseStudioLiveLockInput {
@@ -145,16 +150,42 @@ export class DrizzleStudioLiveLockRepository implements StudioLiveLockRepository
           return { status: "conflict", lock: toRecord(conflicting) };
         }
 
+        // A renewal is a compare-and-swap operation, not a new acquisition. If release already
+        // removed the observed fence, or a newer lifecycle rotated it, the delayed heartbeat must
+        // fail closed instead of recreating or replacing the newer lease.
+        if (
+          input.renewLeaseId !== undefined &&
+          (!existing ||
+            existing.ownerConnectionId !== input.ownerConnectionId ||
+            existing.leaseId !== input.renewLeaseId)
+        ) {
+          return {
+            status: "stale",
+            ...(existing ? { lock: toRecord(existing) } : {}),
+          };
+        }
+        // In v2, omission means a fresh lifecycle that expects no row. It must not rotate a newer
+        // lifecycle merely because the same socket still owns that resource.
+        if (input.rotateLease && input.renewLeaseId === undefined && existing) {
+          return { status: "stale", lock: toRecord(existing) };
+        }
+
         if (!existing && activeRows.length >= STUDIO_LIVE_LOCK_LIMIT_PER_WORK) {
           return { status: "limit" };
         }
 
-        const leaseId = existing?.leaseId ?? input.requestedLeaseId;
+        // v2 clients receive a new fence on every success. Legacy clients retain the stable lease
+        // behavior during the rolling window so a new server cannot strand an old Room on L2 after
+        // it already sent release(L1).
+        const leaseId = existing && !input.rotateLease
+          ? existing.leaseId
+          : input.requestedLeaseId;
         const expiresAt = sql`now() + (${input.leaseMs} * interval '1 millisecond')`;
         const [stored] = existing
           ? await transaction
               .update(creatorWorkLiveLocks)
               .set({
+                leaseId,
                 ownerName: input.ownerName,
                 acquisitionId: input.acquisitionId,
                 expiresAt,
@@ -165,7 +196,7 @@ export class DrizzleStudioLiveLockRepository implements StudioLiveLockRepository
                   eq(creatorWorkLiveLocks.workId, input.workId),
                   eq(creatorWorkLiveLocks.resourceId, input.resourceId),
                   eq(creatorWorkLiveLocks.ownerConnectionId, input.ownerConnectionId),
-                  eq(creatorWorkLiveLocks.leaseId, leaseId)
+                  eq(creatorWorkLiveLocks.leaseId, existing.leaseId)
                 )
               )
               .returning()

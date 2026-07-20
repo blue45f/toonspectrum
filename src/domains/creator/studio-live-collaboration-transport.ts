@@ -16,6 +16,8 @@ import {
 import type {
   StudioLiveEnvelope,
   StudioLiveLockAcquireResult,
+  StudioLiveLockReleaseRequest,
+  StudioLiveLockReleaseResult,
   StudioLiveParticipant,
   StudioLiveLockRequest,
 } from "./studio-live-collaboration-protocol";
@@ -71,6 +73,8 @@ export interface StudioLiveTransport {
   subscribeControl?(listener: (event: StudioLiveTransportControlEvent) => void): () => void;
   /** Correlated, server-confirmed lock acquisition. Local transports may omit this fast path. */
   acquireLock?(request: StudioLiveLockRequest): Promise<StudioLiveLockAcquireResult>;
+  /** Correlated, fence-specific release. It settles only the lease named by `claimId`. */
+  releaseLock?(request: StudioLiveLockReleaseRequest): Promise<StudioLiveLockReleaseResult>;
   /** Durable CRDT operations deliberately do not share the ephemeral signaling envelope. */
   requestCrdtSync?(request: StudioCrdtSyncRequest): Promise<StudioCrdtSyncResponse | null>;
   respondCrdtSync?(response: StudioCrdtSyncResponse, targetSessionId: string): boolean;

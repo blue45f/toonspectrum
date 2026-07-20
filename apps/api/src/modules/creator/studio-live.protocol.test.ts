@@ -6,6 +6,7 @@ import * as protocol from "./studio-live.protocol";
 import type {
   StudioLiveAck,
   StudioLiveAuthPrincipal,
+  StudioLiveLockUpdate,
   StudioLiveParticipant,
   StudioLiveSessionAuthenticator,
   StudioLiveSessionRevalidator,
@@ -33,6 +34,50 @@ const publicParticipant = {
 describe("studio live protocol module", () => {
   it("pins advanced drawing-assist rooms to CRDT protocol v4", () => {
     expect(protocol.STUDIO_CRDT_PROTOCOL_VERSION).toBe(4);
+    expect(protocol.STUDIO_LIVE_LOCK_PROTOCOL_VERSION).toBe(2);
+  });
+
+  it("validates v2 renewal fences and correlated release requests strictly", () => {
+    const renewal = {
+      workId: "work-1",
+      resourceId: "page:page-1",
+      protocolVersion: 2,
+      requestId: "00000000-0000-4000-8000-000000000001",
+      renewLeaseId: "lease-1",
+      leaseMs: 15_000,
+    };
+    expect(protocol.StudioLiveLockRequestSchema.safeParse(renewal).success).toBe(true);
+    expect(
+      protocol.StudioLiveLockRequestSchema.safeParse({ ...renewal, renewLeaseId: "x".repeat(81) })
+        .success
+    ).toBe(false);
+    expect(
+      protocol.StudioLiveLockRequestSchema.safeParse({ ...renewal, protocolVersion: 1 }).success
+    ).toBe(false);
+    const { protocolVersion: _protocolVersion, ...renewalWithoutVersion } = renewal;
+    expect(
+      protocol.StudioLiveLockRequestSchema.safeParse(renewalWithoutVersion).success
+    ).toBe(false);
+    const { requestId: _requestId, ...v2WithoutRequestId } = renewal;
+    expect(
+      protocol.StudioLiveLockRequestSchema.safeParse(v2WithoutRequestId).success
+    ).toBe(false);
+
+    const release = {
+      workId: "work-1",
+      resourceId: "page:page-1",
+      leaseId: "lease-2",
+      requestId: "00000000-0000-4000-8000-000000000002",
+    };
+    expect(protocol.StudioLiveLockReleaseSchema.safeParse(release).success).toBe(true);
+    expect(
+      protocol.StudioLiveLockReleaseSchema.safeParse({ ...release, requestId: "not-a-uuid" })
+        .success
+    ).toBe(false);
+    expect(
+      protocol.StudioLiveLockReleaseSchema.safeParse({ ...release, internalNonce: "private" })
+        .success
+    ).toBe(false);
   });
 
   it("owns strict public participant and inter-server relay wire contracts", () => {
@@ -77,6 +122,7 @@ describe("studio live protocol module", () => {
             | "not_joined"
             | "rate_limited"
             | "lock_conflict"
+            | "lock_stale"
             | "lock_limit"
             | "peer_unavailable"
             | "temporarily_unavailable"
@@ -89,6 +135,10 @@ describe("studio live protocol module", () => {
       StudioLiveAuthPrincipal | null
     >();
     expectTypeOf<StudioLiveSessionRevalidator>().returns.resolves.toBeBoolean();
+    expectTypeOf<Extract<StudioLiveLockUpdate, { action: "released" }>>()
+      .toHaveProperty("releaseRequestId");
+    expectTypeOf<Extract<StudioLiveLockUpdate, { action: "expired" | "revoked" }>>()
+      .not.toHaveProperty("releaseRequestId");
 
     expect(protocol.studioLiveSessionAuthenticatorProvider.provide).toBe(
       protocol.STUDIO_LIVE_SESSION_AUTHENTICATOR

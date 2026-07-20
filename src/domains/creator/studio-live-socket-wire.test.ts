@@ -223,8 +223,15 @@ describe("studio live socket join acknowledgement", () => {
 
     expect(parsed).not.toBeNull();
     expect(parsed).not.toHaveProperty("ok");
-    expect(Object.keys(parsed ?? {})).toEqual(["self", "participants", "locks", "voiceMembers"]);
+    expect(Object.keys(parsed ?? {})).toEqual([
+      "lockProtocolVersion",
+      "self",
+      "participants",
+      "locks",
+      "voiceMembers",
+    ]);
     if (!parsed || "ok" in parsed) throw new Error("expected a join snapshot");
+    expect(parsed.lockProtocolVersion).toBe(1);
     expect(parsed.participants).toHaveLength(2);
     expect(parsed.locks).toHaveLength(1);
     expect(parsed.voiceMembers).toHaveLength(1);
@@ -241,6 +248,32 @@ describe("studio live socket join acknowledgement", () => {
       ok: true,
       data: { self: participant(), participants: [participant()], locks: [], voiceMembers: {} },
     })).toBeNull();
+  });
+
+  it("negotiates lock protocol v2 while rejecting malformed capability values", () => {
+    const v2 = parseJoinAck({
+      ok: true,
+      data: {
+        lockProtocolVersion: 2,
+        self: participant(),
+        participants: [participant()],
+        locks: [],
+      },
+    });
+    expect(v2 && !("ok" in v2) ? v2.lockProtocolVersion : null).toBe(2);
+    for (const malformed of [null, 0, 1.5, "2", 101]) {
+      expect(
+        parseJoinAck({
+          ok: true,
+          data: {
+            lockProtocolVersion: malformed,
+            self: participant(),
+            participants: [participant()],
+            locks: [],
+          },
+        })
+      ).toBeNull();
+    }
   });
 
   it.each([

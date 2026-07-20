@@ -10,6 +10,8 @@ import {
   type StudioLiveLockAcquireResult,
   type StudioLiveLockClaimPayload,
   type StudioLiveLockLease,
+  type StudioLiveLockReleaseRequest,
+  type StudioLiveLockReleaseResult,
   type StudioLiveLockRequest,
   type StudioLiveMessageKind,
   type StudioLiveParticipant,
@@ -170,6 +172,13 @@ interface PendingStudioLiveLockClaim {
   timeout: unknown;
 }
 
+interface PendingStudioLiveLockRelease {
+  request: StudioLiveLockReleaseRequest;
+  promise: Promise<StudioLiveLockReleaseResult>;
+  resolve: (result: StudioLiveLockReleaseResult) => void;
+  timeout: unknown;
+}
+
 export interface StudioLiveRoomOptions {
   workId: string;
   participant: StudioLiveParticipant;
@@ -232,6 +241,7 @@ export class StudioLiveRoom {
   private readonly voiceMembers = new Map<string, StudioLiveVoiceMember>();
   private readonly locks = new Map<string, StudioLiveLock>();
   private readonly pendingLockClaims = new Map<string, PendingStudioLiveLockClaim>();
+  private readonly pendingLockReleases = new Map<string, PendingStudioLiveLockRelease>();
   private readonly chatMessages: StudioLiveChatMessage[] = [];
   private readonly lastSequenceBySession = new Map<string, number>();
   private transport: StudioLiveTransport | null = null;
@@ -479,6 +489,10 @@ export class StudioLiveRoom {
   claimLock(resource: string): boolean {
     if (!this.ready) return false;
     if (this.transport?.mode !== "server") return this.claimLocalLock(resource);
+    if (this.pendingLockReleases.has(resource)) {
+      void this.claimLockAsync(resource);
+      return true;
+    }
     if (this.pendingLockClaims.has(resource)) return true;
     if (this.findLockConflict(resource, this.now())) return false;
     void this.claimLockAsync(resource);
@@ -487,6 +501,12 @@ export class StudioLiveRoom {
 
   /** Waits for the server-authoritative lock decision and always correlates it by request UUID. */
   claimLockAsync(resource: string): Promise<StudioLiveLockAcquireResult> {
+    const pendingRelease = this.pendingLockReleases.get(resource);
+    if (pendingRelease) {
+      // A new gesture is serialized behind the previous lifecycle's ACK/timeout. Recursion occurs
+      // only after completePendingLockRelease removes the map entry.
+      return pendingRelease.promise.then(() => this.claimLockAsync(resource));
+    }
     const existingPending = this.pendingLockClaims.get(resource);
     if (existingPending) return existingPending.promise;
 
@@ -636,15 +656,12 @@ export class StudioLiveRoom {
   }
 
   releaseLock(resource: string): boolean {
+    if (this.pendingLockReleases.has(resource)) return true;
     const current = this.locks.get(resource);
     if (!current || current.owner.sessionId !== this.participant.sessionId) return false;
     if (this.transport?.mode === "server") {
-      return this.post(
-        "lock:release",
-        { resource, claimId: current.claimId },
-        null,
-        this.now()
-      );
+      void this.releaseLockAsync(resource);
+      return true;
     }
     this.locks.delete(resource);
     this.emitLocks();
@@ -654,6 +671,143 @@ export class StudioLiveRoom {
       null,
       this.now()
     );
+  }
+
+  releaseLockAsync(resource: string): Promise<StudioLiveLockReleaseResult> {
+    const existingPending = this.pendingLockReleases.get(resource);
+    if (existingPending) return existingPending.promise;
+
+    let requestId = "unavailable";
+    try {
+      requestId = this.randomId();
+    } catch (error) {
+      return Promise.resolve({
+        status: "denied",
+        resource,
+        requestId,
+        claimId: "unavailable",
+        code: "invalid_request",
+        message: error instanceof Error ? error.message : "편집 잠금 해제 요청이 올바르지 않습니다.",
+      });
+    }
+    const current = this.locks.get(resource);
+    if (!current || current.owner.sessionId !== this.participant.sessionId) {
+      return Promise.resolve({
+        status: "denied",
+        resource,
+        requestId,
+        claimId: current?.claimId ?? "unavailable",
+        code: "not_owned",
+        message: "현재 세션이 소유한 편집 잠금이 없습니다.",
+      });
+    }
+    if (!this.ready) {
+      return Promise.resolve({
+        status: "revoked",
+        resource,
+        requestId,
+        claimId: current.claimId,
+        code: "not_ready",
+        message: "공동작업 연결이 준비되지 않았습니다.",
+      });
+    }
+
+    const request: StudioLiveLockReleaseRequest = {
+      resource,
+      requestId,
+      claimId: current.claimId,
+    };
+    if (this.transport?.mode !== "server") {
+      this.locks.delete(resource);
+      this.emitLocks();
+      const sent = this.post("lock:release", { resource, claimId: current.claimId });
+      return Promise.resolve({
+        status: "released",
+        resource,
+        requestId,
+        claimId: current.claimId,
+        released: sent,
+      });
+    }
+
+    const releaseLock = this.transport.releaseLock;
+    if (!releaseLock) {
+      // Compatibility seam for custom/legacy server transports. Production Socket.IO implements
+      // correlated release; this branch preserves older embedders without reintroducing heartbeat.
+      const sent = this.post("lock:release", { resource, claimId: current.claimId });
+      if (sent) {
+        this.locks.delete(resource);
+        this.emitLocks();
+      }
+      return Promise.resolve(
+        sent
+          ? {
+              status: "released",
+              resource,
+              requestId,
+              claimId: current.claimId,
+              released: true,
+            }
+          : {
+              status: "denied",
+              resource,
+              requestId,
+              claimId: current.claimId,
+              code: "unsupported_transport",
+              message: "현재 팀 연결은 서버 확인형 잠금 해제를 지원하지 않습니다.",
+            }
+      );
+    }
+
+    let resolveResult!: (result: StudioLiveLockReleaseResult) => void;
+    const promise = new Promise<StudioLiveLockReleaseResult>((resolve) => {
+      resolveResult = resolve;
+    });
+    const pending: PendingStudioLiveLockRelease = {
+      request,
+      promise,
+      resolve: resolveResult,
+      timeout: null,
+    };
+    this.pendingLockReleases.set(resource, pending);
+    pending.timeout = this.scheduleTimeout(() => {
+      this.completePendingLockRelease(pending, {
+        status: "timeout",
+        resource,
+        requestId,
+        claimId: current.claimId,
+        message: "팀 서버의 편집 잠금 해제 응답 시간이 초과되었습니다.",
+      });
+    }, Math.max(this.lockAckTimeoutMs, STUDIO_LIVE_LOCK_MAX_LEASE_MS + 500));
+
+    let operation: Promise<StudioLiveLockReleaseResult>;
+    try {
+      operation = releaseLock.call(this.transport, request);
+    } catch (error) {
+      this.completePendingLockRelease(pending, {
+        status: "denied",
+        resource,
+        requestId,
+        claimId: current.claimId,
+        code: "transport_error",
+        message: error instanceof Error ? error.message : "편집 잠금 해제 요청을 보내지 못했습니다.",
+      });
+      return promise;
+    }
+    void operation.then(
+      (result) => this.acceptTransportLockReleaseResult(pending, result),
+      (error: unknown) => {
+        this.completePendingLockRelease(pending, {
+          status: "denied",
+          resource,
+          requestId,
+          claimId: current.claimId,
+          code: "transport_error",
+          message: error instanceof Error ? error.message : "편집 잠금 해제를 확인하지 못했습니다.",
+        });
+      }
+    );
+    return promise;
   }
 
   announceScreen(payload: StudioLiveScreenAnnouncePayload): boolean {
@@ -805,6 +959,10 @@ export class StudioLiveRoom {
       "connection_closed",
       "공동작업 연결이 종료되어 편집 잠금 요청이 취소되었습니다."
     );
+    this.revokePendingLockReleases(
+      "connection_closed",
+      "공동작업 연결이 종료되어 편집 잠금 해제 확인이 취소되었습니다."
+    );
     this.phase = "closed";
     if (this.heartbeatHandle !== null) this.cancelInterval(this.heartbeatHandle);
     this.heartbeatHandle = null;
@@ -920,6 +1078,60 @@ export class StudioLiveRoom {
     pending.resolve(result);
   }
 
+  private acceptTransportLockReleaseResult(
+    pending: PendingStudioLiveLockRelease,
+    result: StudioLiveLockReleaseResult
+  ): void {
+    if (this.pendingLockReleases.get(pending.request.resource) !== pending) return;
+    if (
+      result.resource !== pending.request.resource ||
+      result.requestId !== pending.request.requestId ||
+      result.claimId !== pending.request.claimId
+    ) {
+      this.completePendingLockRelease(pending, {
+        status: "denied",
+        resource: pending.request.resource,
+        requestId: pending.request.requestId,
+        claimId: pending.request.claimId,
+        code: "response_mismatch",
+        message: "팀 서버의 편집 잠금 해제 응답 식별자가 요청과 일치하지 않습니다.",
+      });
+      return;
+    }
+    this.completePendingLockRelease(pending, result);
+  }
+
+  private completePendingLockRelease(
+    pending: PendingStudioLiveLockRelease,
+    result: StudioLiveLockReleaseResult
+  ): void {
+    if (this.pendingLockReleases.get(pending.request.resource) !== pending) return;
+    this.pendingLockReleases.delete(pending.request.resource);
+    if (pending.timeout !== null) this.cancelTimeout(pending.timeout);
+    pending.timeout = null;
+    const current = this.locks.get(pending.request.resource);
+    if (current?.owner.sessionId === this.participant.sessionId) {
+      // Release intent wins locally even on timeout/denial. The transport fences the old lease and
+      // the server TTL remains the final fail-safe, so this Room must never heartbeat it again.
+      this.locks.delete(pending.request.resource);
+      this.emitLocks();
+    }
+    pending.resolve(result);
+  }
+
+  private revokePendingLockReleases(code: string, message: string): void {
+    for (const pending of Array.from(this.pendingLockReleases.values())) {
+      this.completePendingLockRelease(pending, {
+        status: "revoked",
+        resource: pending.request.resource,
+        requestId: pending.request.requestId,
+        claimId: pending.request.claimId,
+        code,
+        message,
+      });
+    }
+  }
+
   private revokePendingLockClaims(code: string, message: string): void {
     for (const pending of Array.from(this.pendingLockClaims.values())) {
       this.completePendingLockClaim(pending, {
@@ -938,6 +1150,7 @@ export class StudioLiveRoom {
     this.sendPresence("presence:heartbeat");
     for (const lock of Array.from(this.locks.values())) {
       if (lock.owner.sessionId !== this.participant.sessionId) continue;
+      if (this.pendingLockReleases.has(lock.resource)) continue;
       const payload: StudioLiveLockClaimPayload = {
         resource: lock.resource,
         claimId: lock.claimId,
@@ -1183,6 +1396,7 @@ export class StudioLiveRoom {
     if (event.type === "status") {
       if (event.status.state === "revoked") {
         this.revokePendingLockClaims("access_revoked", event.status.message);
+        this.revokePendingLockReleases("access_revoked", event.status.message);
         const hadPeers = this.peers.size > 0;
         const hadLocks = this.locks.size > 0;
         this.peers.clear();
@@ -1200,6 +1414,7 @@ export class StudioLiveRoom {
         });
       } else if (event.status.state === "disconnected") {
         this.revokePendingLockClaims("disconnected", event.status.message);
+        this.revokePendingLockReleases("disconnected", event.status.message);
         let changed = false;
         for (const [sessionId, member] of this.voiceMembers) {
           if (sessionId === this.participant.sessionId) continue;
@@ -1249,6 +1464,12 @@ export class StudioLiveRoom {
         owner: copyParticipant(event.lock.owner),
         leaseUntil: event.lock.leaseUntil,
       };
+      if (
+        next.owner.sessionId === this.participant.sessionId &&
+        this.pendingLockReleases.has(next.resource)
+      ) {
+        return;
+      }
       this.locks.set(next.resource, next);
       this.emitLocks();
       const pending = this.pendingLockClaims.get(next.resource);

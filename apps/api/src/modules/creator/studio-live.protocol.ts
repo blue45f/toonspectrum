@@ -61,6 +61,7 @@ const ScreenShareIdSchema = boundedIdentifier(160);
 const ScreenShareLabelSchema = boundedIdentifier(80);
 const VoiceCallIdSchema = boundedIdentifier(160);
 export const StudioLiveLockRequestIdSchema = z.uuid();
+export const STUDIO_LIVE_LOCK_PROTOCOL_VERSION = 2 as const;
 
 // v4 is the first room protocol that accepts drawing-assist v2 with authored advanced rulers.
 // Rejecting v1-v3 prevents stale tabs from sharing a Yjs room whose page schema they cannot
@@ -112,18 +113,48 @@ export const StudioLiveLockRequestSchema = z
   .object({
     workId: WorkIdSchema,
     resourceId: ResourceIdSchema,
+    // Explicit opt-in keeps v1 clients on their stable-lease behavior while API nodes roll out.
+    protocolVersion: z.literal(STUDIO_LIVE_LOCK_PROTOCOL_VERSION).optional(),
     // Optional during the rolling upgrade. New clients send a UUID and the server echoes the same
     // value from every acquired/denied/revoked decision; older clients receive a server UUID.
     requestId: StudioLiveLockRequestIdSchema.optional(),
+    // v2 renewal fence. A delayed heartbeat may only rotate the exact lease it observed; it must
+    // never recreate a lease that a newer release already removed.
+    renewLeaseId: boundedIdentifier(80).optional(),
     leaseMs: z.number().int().min(5_000).max(30_000).default(15_000),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    if (
+      value.renewLeaseId !== undefined &&
+      value.protocolVersion !== STUDIO_LIVE_LOCK_PROTOCOL_VERSION
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["protocolVersion"],
+        message: "renewLeaseId requires lock protocol v2",
+      });
+    }
+    if (
+      value.protocolVersion === STUDIO_LIVE_LOCK_PROTOCOL_VERSION &&
+      value.requestId === undefined
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["requestId"],
+        message: "lock protocol v2 requires request correlation",
+      });
+    }
+  });
 
 export const StudioLiveLockReleaseSchema = z
   .object({
     workId: WorkIdSchema,
     resourceId: ResourceIdSchema,
     leaseId: boundedIdentifier(80),
+    // Optional for one rolling-deploy window. v2 clients send a UUID and v2 servers echo it from
+    // success and failure ACKs; v1 clients continue to receive a server-generated correlation id.
+    requestId: StudioLiveLockRequestIdSchema.optional(),
   })
   .strict();
 
@@ -518,6 +549,7 @@ export type StudioLiveFailureCode =
   | "not_joined"
   | "rate_limited"
   | "lock_conflict"
+  | "lock_stale"
   | "lock_limit"
   | "peer_unavailable"
   | "temporarily_unavailable"
@@ -548,6 +580,21 @@ export type StudioLiveLockRequestAck =
   | StudioLiveSuccess<StudioLiveLockAcquiredDecision>
   | StudioLiveLockRequestFailure;
 
+export interface StudioLiveLockReleaseDecision {
+  requestId: string;
+  resourceId: string;
+  leaseId: string;
+  released: boolean;
+}
+
+export type StudioLiveLockReleaseFailure = StudioLiveFailure & {
+  requestId: string;
+};
+
+export type StudioLiveLockReleaseAck =
+  | StudioLiveSuccess<StudioLiveLockReleaseDecision>
+  | StudioLiveLockReleaseFailure;
+
 export type StudioLiveLockUpdate =
   | {
       action: "acquired";
@@ -555,13 +602,22 @@ export type StudioLiveLockUpdate =
       lock: StudioLiveLock;
     }
   | {
-      action: "released" | "expired" | "revoked";
+      action: "released";
+      requestId: string;
+      /** Release-operation correlation is additive; requestId remains the acquisition correlation. */
+      releaseRequestId?: string;
+      resourceId: string;
+      leaseId: string;
+    }
+  | {
+      action: "expired" | "revoked";
       requestId: string;
       resourceId: string;
       leaseId: string;
     };
 
 export interface StudioLiveJoinResult {
+  lockProtocolVersion: typeof STUDIO_LIVE_LOCK_PROTOCOL_VERSION;
   self: StudioLiveParticipant;
   participants: StudioLiveParticipant[];
   locks: StudioLiveLock[];

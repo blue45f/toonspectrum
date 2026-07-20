@@ -1,14 +1,31 @@
 import { useEffect } from "react";
 
-import { useApp, useHydrated } from "@/lib/store";
+import type { CollectionMergeHandle } from "@/lib/collection-write-through";
+import type { HydratePayload } from "@/lib/store";
+
+import {
+  beginCollectionMerge,
+  clearCollectionMergeBarrier,
+  completeCollectionMerge,
+  failCollectionMerge,
+} from "@/lib/collection-write-through";
+import {
+  captureCollectionHydrationFence,
+  claimGuestCollectionsForOwner,
+  collectionMergeCollectionsForOwner,
+  discardGuestCollectionRecovery,
+  isCollectionAuthFenceCurrent,
+  replayPendingCollectionWrites,
+  useApp,
+  useHydrated,
+} from "@/lib/store";
 import { useSession } from "@/src/compat/auth-session-store";
 
 // 세션 ↔ 스토어 동기화: 로그인 시 userId 설정 + DB 데이터 하이드레이션, 로그아웃 시 해제
 export function StoreSync() {
   const { data: session, status } = useSession();
   const hydrated = useHydrated();
-  const setUserId = useApp((s) => s.setUserId);
-  const setSessionToken = useApp((s) => s.setSessionToken);
+  const setSessionIdentity = useApp((s) => s.setSessionIdentity);
   const hydrate = useApp((s) => s.hydrateFromServer);
   const uid = session?.user?.id;
   const token = session?.token ?? null;
@@ -17,48 +34,244 @@ export function StoreSync() {
     // persist 복원 후에만 — 게스트 로컬 데이터가 스토어에 올라온 뒤 병합해야 손실이 없다.
     if (!hydrated) return;
 
-    if (status === "authenticated" && uid) {
-      const prev = useApp.getState().userId;
-      setUserId(uid);
-      setSessionToken(token);
-      // 서명 토큰을 x-user-id로 전송(서버가 검증). 토큰 없는 레거시 세션은 미인증 → 재로그인 필요.
-      const authHeaders = { "Content-Type": "application/json", "x-user-id": token ?? "" };
+    const controller = new AbortController();
+    let activeMerge: CollectionMergeHandle | null = null;
+    let running = false;
+    let rerunRequested = false;
+    let retryDelayMs = 1_000;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    const syncRequestTimeoutMs = 15_000;
 
-      if (prev !== uid) {
-        // 로그인 전환(게스트→계정 등): 로컬 상태를 서버로 1회 병합 후 통합 결과 하이드레이트
-        const s = useApp.getState();
-        const local = {
-          ratings: s.ratings,
-          reads: s.reads,
-          subscriptions: s.subscriptions,
-          reviews: s.reviews,
-          likedReviews: s.likedReviews,
-          collections: s.collections,
-        };
-        fetch("/api/me/merge", {
-          method: "POST",
-          headers: authHeaders,
-          body: JSON.stringify(local),
-        })
-          .then((r) => (r.ok ? r.json() : null))
-          .then((d) => {
-            if (d) hydrate(d);
-          })
-          .catch(() => {});
-      } else {
-        // 이미 로그인 상태(새로고침): 서버 데이터만 하이드레이트
-        fetch("/api/me", { headers: { "x-user-id": token ?? "" } })
-          .then((r) => (r.ok ? r.json() : null))
-          .then((d) => {
-            if (d) hydrate(d);
-          })
-          .catch(() => {});
+    type SyncJsonResult<T> =
+      | { ok: true; response: Response; data: T }
+      | { ok: false; response: Response; data: null };
+
+    async function fetchSyncJson<T>(
+      input: RequestInfo | URL,
+      init: RequestInit
+    ): Promise<SyncJsonResult<T>> {
+      const attemptController = new AbortController();
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      let rejectOnCleanup: ((error: Error) => void) | undefined;
+      const abortAttempt = () => {
+        attemptController.abort();
+        const error = new Error("컬렉션 동기화 요청이 중단되었습니다.");
+        error.name = "AbortError";
+        rejectOnCleanup?.(error);
+      };
+      controller.signal.addEventListener("abort", abortAttempt, { once: true });
+      try {
+        const timeoutRequest = new Promise<never>((_resolve, reject) => {
+          timeout = setTimeout(() => {
+            attemptController.abort();
+            reject(new Error("컬렉션 동기화 서버 응답 시간이 초과되었습니다."));
+          }, syncRequestTimeoutMs);
+        });
+        const cleanupRequest = new Promise<never>((_resolve, reject) => {
+          rejectOnCleanup = reject;
+          if (controller.signal.aborted) abortAttempt();
+        });
+        const request = (async (): Promise<SyncJsonResult<T>> => {
+          const response = await fetch(input, {
+            ...init,
+            signal: attemptController.signal,
+          });
+          if (!response.ok) return { ok: false, response, data: null };
+          const data = await response.json() as T;
+          return { ok: true, response, data };
+        })();
+        return await Promise.race([
+          request,
+          timeoutRequest,
+          cleanupRequest,
+        ]);
+      } finally {
+        if (timeout) clearTimeout(timeout);
+        rejectOnCleanup = undefined;
+        controller.signal.removeEventListener("abort", abortAttempt);
       }
-    } else if (status === "unauthenticated") {
-      setUserId(null);
-      setSessionToken(null);
     }
-  }, [hydrated, status, uid, token, setUserId, setSessionToken, hydrate]);
+
+    const clearRetryTimer = () => {
+      if (retryTimer) clearTimeout(retryTimer);
+      retryTimer = undefined;
+    };
+
+    const scheduleRetry = () => {
+      if (controller.signal.aborted || retryTimer) return;
+      retryTimer = setTimeout(() => {
+        retryTimer = undefined;
+        requestRun();
+      }, retryDelayMs);
+      retryDelayMs = Math.min(retryDelayMs * 2, 30_000);
+    };
+
+    const markSyncHealthy = () => {
+      clearRetryTimer();
+      retryDelayMs = 1_000;
+    };
+
+    const run = async () => {
+      if (running) return;
+      running = true;
+      try {
+        if (status === "authenticated" && uid) {
+          const beforeIdentity = useApp.getState();
+          const ownerHasRecovery = beforeIdentity.collectionOutbox.some(
+            (entry) => entry.ownerId === uid && entry.recovery === true
+          );
+          const mergeGuestLibrary =
+            ownerHasRecovery ||
+            (beforeIdentity.libraryOwnerId === null &&
+              (beforeIdentity.libraryMergeOwnerId === null ||
+                beforeIdentity.libraryMergeOwnerId === uid));
+          setSessionIdentity(uid, token);
+          const initialFence = captureCollectionHydrationFence();
+          if (!initialFence) return;
+
+          if (mergeGuestLibrary) {
+            // Install the barrier before the first await. Collection commands produced while login
+            // merge is running cannot escape with a guest UUID that the server had to remap.
+            const mergeHandle = beginCollectionMerge(initialFence);
+            activeMerge = mergeHandle;
+            // Turn the guest collection graph into an owner-scoped recovery outbox before the
+            // request starts. If login merge never reaches the server and the user switches
+            // accounts, the original create/item dependencies can still be rebuilt later.
+            claimGuestCollectionsForOwner(initialFence);
+            const local = useApp.getState();
+            const mergeCollections = collectionMergeCollectionsForOwner(initialFence.userId);
+            try {
+              const result = await fetchSyncJson<HydratePayload>("/api/me/merge", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "x-user-id": initialFence.sessionToken,
+                },
+                body: JSON.stringify({
+                  ratings: local.ratings,
+                  reads: local.reads,
+                  subscriptions: local.subscriptions,
+                  reviews: local.reviews,
+                  likedReviews: local.likedReviews,
+                  collections: mergeCollections,
+                }),
+              });
+              if (!result.ok) {
+                throw new Error(`컬렉션 병합 요청 실패 (${result.response.status})`);
+              }
+              const data = result.data;
+              if (controller.signal.aborted || !isCollectionAuthFenceCurrent(initialFence)) {
+                throw new Error("세션이 변경되어 이전 컬렉션 병합 응답을 폐기했습니다.");
+              }
+              const collectionIdMap = data.collectionIdMap ?? {};
+              discardGuestCollectionRecovery(initialFence.userId, collectionIdMap);
+              hydrate(data, {
+                collectionRevision: initialFence.collectionRevision,
+                // Recovery commands represented in this merge response were removed above;
+                // any genuinely newer edit is still in the owner outbox and is rebased by hydrate.
+                preserveCollections: false,
+                ownerId: initialFence.userId,
+                collectionIdMap,
+              });
+              completeCollectionMerge(mergeHandle, collectionIdMap);
+              if (activeMerge === mergeHandle) activeMerge = null;
+              markSyncHealthy();
+
+              const replayFence = captureCollectionHydrationFence();
+              if (replayFence && replayFence.userId === initialFence.userId) {
+                await replayPendingCollectionWrites(replayFence);
+                if (useApp.getState().collectionOutbox.some(
+                  (entry) => entry.ownerId === replayFence.userId
+                )) {
+                  scheduleRetry();
+                }
+              }
+            } catch (error) {
+              failCollectionMerge(mergeHandle, error);
+              if (activeMerge === mergeHandle) activeMerge = null;
+              if (!controller.signal.aborted) scheduleRetry();
+            }
+            return;
+          }
+
+          // Reloading an existing account first drains its durable local outbox, then requests a
+          // fresh snapshot. If transport is still offline, hydration preserves that local projection.
+          clearCollectionMergeBarrier(initialFence.userId);
+          await replayPendingCollectionWrites(initialFence);
+          if (!isCollectionAuthFenceCurrent(initialFence)) return;
+          const hydrationFence = captureCollectionHydrationFence();
+          if (!hydrationFence) return;
+          try {
+            const result = await fetchSyncJson<HydratePayload>("/api/me", {
+              headers: { "x-user-id": hydrationFence.sessionToken },
+            });
+            if (!result.ok) {
+              scheduleRetry();
+              return;
+            }
+            const data = result.data;
+            if (!isCollectionAuthFenceCurrent(hydrationFence)) return;
+            if (useApp.getState().collectionRevision !== hydrationFence.collectionRevision) {
+              // A local command completed after this snapshot started. Applying the old response
+              // could resurrect a deleted collection or overwrite an unrelated server edit, so
+              // drain the lanes and fetch a new authoritative snapshot instead.
+              rerunRequested = true;
+              return;
+            }
+            hydrate(data, {
+              collectionRevision: hydrationFence.collectionRevision,
+              preserveCollections: hydrationFence.preserveCollections,
+              ownerId: hydrationFence.userId,
+            });
+            markSyncHealthy();
+            if (useApp.getState().collectionOutbox.some(
+              (entry) => entry.ownerId === hydrationFence.userId
+            )) {
+              scheduleRetry();
+            }
+          } catch {
+            // Offline snapshots remain usable; the next online event retries them.
+            if (!controller.signal.aborted) scheduleRetry();
+          }
+        } else if (status === "unauthenticated") {
+          setSessionIdentity(null, null);
+        }
+      } finally {
+        running = false;
+        if (rerunRequested && !controller.signal.aborted) {
+          rerunRequested = false;
+          clearRetryTimer();
+          queueMicrotask(requestRun);
+        }
+      }
+    };
+
+    const requestRun = () => {
+      if (controller.signal.aborted) return;
+      if (running) {
+        rerunRequested = true;
+        return;
+      }
+      void run();
+    };
+    const handleOnline = () => {
+      retryDelayMs = 1_000;
+      clearRetryTimer();
+      requestRun();
+    };
+
+    requestRun();
+    window.addEventListener("online", handleOnline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      clearRetryTimer();
+      controller.abort();
+      if (activeMerge) {
+        failCollectionMerge(activeMerge, new Error("컬렉션 병합이 중단되었습니다."));
+        activeMerge = null;
+      }
+    };
+  }, [hydrated, status, uid, token, setSessionIdentity, hydrate]);
 
   return null;
 }

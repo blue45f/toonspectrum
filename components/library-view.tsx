@@ -11,7 +11,7 @@ import { COLLECTION_ICON_OPTIONS } from "./visual-marks-utils";
 
 import type { ReadState, Title } from "@/lib/types";
 
-
+import { MAX_COLLECTION_NAME_LENGTH } from "@/lib/collection-contract";
 import { statsAreEstimated } from "@/lib/estimate";
 import { genreColor, spectrumGradient } from "@/lib/genre-color";
 import { useApp, useHydrated } from "@/lib/store";
@@ -572,6 +572,7 @@ function CollectionsTab({
           onChange={(e) => setName(e.target.value)}
           aria-label="새 컬렉션 이름"
           placeholder="새 컬렉션 이름"
+          maxLength={MAX_COLLECTION_NAME_LENGTH}
           className="h-10 min-w-40 flex-1 rounded-lg border border-line bg-canvas px-3 text-sm outline-none focus:border-accent/50"
         />
         <button
@@ -618,6 +619,7 @@ function CollectionsTab({
                             else if (e.key === "Escape") setEditingId(null);
                           }}
                           aria-label="컬렉션 이름 변경"
+                          maxLength={MAX_COLLECTION_NAME_LENGTH}
                           className="h-7 w-full rounded-md border border-accent/50 bg-canvas px-2 text-sm font-semibold text-fg outline-none"
                         />
                       ) : (
