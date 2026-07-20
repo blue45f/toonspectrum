@@ -3,7 +3,6 @@ import { createHmac } from "node:crypto";
 import {
   ForbiddenException,
   HttpException,
-  ServiceUnavailableException,
 } from "@nestjs/common";
 import { describe, expect, it, vi } from "vitest";
 
@@ -188,68 +187,9 @@ describe("Studio voice ICE credential issuance", () => {
 });
 
 describe("StudioVoiceIcePolicyService", () => {
-  it("authorizes active commenter-or-higher collaborators before issuing credentials", async () => {
-    const getWorkTeam = vi.fn().mockResolvedValue(team({
-      userId: "voice-commenter-a",
-      workId: "voice-work-a",
-      role: "commenter",
-    }));
-    const service = new StudioVoiceIcePolicyService(
-      { getWorkTeam } as unknown as CreatorService,
-      configuration()
-    );
-
-    await expect(service.issue("voice-commenter-a", "voice-work-a")).resolves.toMatchObject({
-      mode: "direct",
-    });
-    expect(getWorkTeam).toHaveBeenCalledWith("voice-commenter-a", "voice-work-a");
-  });
-
-  it("fails closed for viewer, mismatched and inactive memberships", async () => {
-    const cases = [
-      team({ userId: "voice-viewer-a", workId: "voice-work-b", role: "viewer" }),
-      team({ userId: "another-user", workId: "voice-work-c", role: "editor" }),
-      {
-        ...team({ userId: "voice-editor-c", workId: "voice-work-d", role: "editor" }),
-        viewer: {
-          ...team({ userId: "voice-editor-c", workId: "voice-work-d", role: "editor" }).viewer,
-          status: "pending",
-        },
-      },
-    ];
-    for (const [index, snapshot] of cases.entries()) {
-      const getWorkTeam = vi.fn().mockResolvedValue(snapshot);
-      const service = new StudioVoiceIcePolicyService(
-        { getWorkTeam } as unknown as CreatorService,
-        configuration()
-      );
-      await expect(
-        service.issue(
-          index === 0 ? "voice-viewer-a" : index === 1 ? "voice-editor-b" : "voice-editor-c",
-          index === 0 ? "voice-work-b" : index === 1 ? "voice-work-c" : "voice-work-d"
-        )
-      ).rejects.toBeInstanceOf(ForbiddenException);
-    }
-  });
-
-  it("fails only the voice policy endpoint when production TURN was not enabled", async () => {
-    const userId = "voice-production-user";
-    const workId = "voice-production-work";
-    const getWorkTeam = vi.fn().mockResolvedValue(team({ userId, workId }));
-    const service = new StudioVoiceIcePolicyService(
-      { getWorkTeam } as unknown as CreatorService,
-      configuration({ production: true, turnRequired: false })
-    );
-
-    await expect(service.issue(userId, workId)).rejects.toBeInstanceOf(
-      ServiceUnavailableException
-    );
-    expect(getWorkTeam).toHaveBeenCalledOnce();
-  });
-
-  it("rate-limits bearer credential issuance per authenticated user and work", async () => {
-    const userId = "voice-rate-user-unique-0718";
-    const workId = "voice-rate-work-unique-0718";
+  it("rate-limits screen-share relay credential issuance per user and work", async () => {
+    const userId = "screen-rate-user-unique-0720";
+    const workId = "screen-rate-work-unique-0720";
     const getWorkTeam = vi.fn().mockResolvedValue(team({ userId, workId }));
     const service = new StudioVoiceIcePolicyService(
       { getWorkTeam } as unknown as CreatorService,
@@ -257,13 +197,17 @@ describe("StudioVoiceIcePolicyService", () => {
     );
 
     for (let count = 0; count < 12; count += 1) {
-      await expect(service.issue(userId, workId)).resolves.toMatchObject({ mode: "direct" });
+      await expect(service.issueScreenShare(userId, workId)).resolves.toMatchObject({
+        mode: "direct",
+      });
     }
-    await expect(service.issue(userId, workId)).rejects.toBeInstanceOf(HttpException);
+    await expect(service.issueScreenShare(userId, workId)).rejects.toBeInstanceOf(
+      HttpException
+    );
     expect(getWorkTeam).toHaveBeenCalledTimes(12);
   });
 
-  it("issues screen-share ICE credentials to active viewers without widening voice access", async () => {
+  it("issues screen-share ICE credentials to active viewers", async () => {
     const userId = "screen-viewer-unique-a";
     const workId = "screen-work-unique-a";
     const getWorkTeam = vi.fn().mockResolvedValue(team({
@@ -279,10 +223,7 @@ describe("StudioVoiceIcePolicyService", () => {
     await expect(service.issueScreenShare(userId, workId)).resolves.toMatchObject({
       mode: "direct",
     });
-    await expect(service.issue(userId, workId)).rejects.toBeInstanceOf(
-      ForbiddenException
-    );
-    expect(getWorkTeam).toHaveBeenCalledTimes(2);
+    expect(getWorkTeam).toHaveBeenCalledTimes(1);
   });
 
   it("fails closed when a screen-share ICE caller has no active view capability", async () => {

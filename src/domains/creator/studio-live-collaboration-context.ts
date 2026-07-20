@@ -4,10 +4,6 @@ import {
   INITIAL_STUDIO_LIVE_SYNC_SNAPSHOT,
   type StudioLiveSyncSnapshot,
 } from "./studio-live-sync-safety";
-import {
-  createEmptyStudioVoiceCallState,
-  type StudioVoiceCallState,
-} from "./studio-voice-call-model";
 
 import type {
   StudioLiveChatMessage,
@@ -16,7 +12,6 @@ import type {
   StudioLiveRoom,
 } from "./studio-live-collaboration-room";
 import type { StudioLiveTransportMode } from "./studio-live-collaboration-transport";
-import type { StudioVoiceIcePolicyMode } from "@/lib/studio-voice-ice-policy-contract";
 
 export type StudioLiveAvailability = "idle" | "connecting" | "ready" | "unsupported" | "error";
 
@@ -26,25 +21,6 @@ export interface StudioLiveRecoveryState {
   exportAvailable: boolean;
   exported: boolean;
   message: string;
-}
-
-export interface StudioLiveVoiceContextValue {
-  /** The current room can initialize voice; the controller itself loads only on explicit join(). */
-  ready: boolean;
-  /** Runtime support only. Microphone permission is requested exclusively by join(). */
-  supported: boolean;
-  /** Viewer roles fail closed; commenter/editor/admin/owner may explicitly join. */
-  allowed: boolean;
-  /** Null before explicit join; otherwise the deployment policy used for new peer connections. */
-  networkMode: StudioVoiceIcePolicyMode | null;
-  state: StudioVoiceCallState;
-  error: string | null;
-  join: (options?: { muted?: boolean }) => Promise<boolean>;
-  leave: () => void;
-  setMuted: (muted: boolean) => boolean;
-  setPushToTalk: (enabled: boolean) => boolean;
-  setPushToTalkPressed: (pressed: boolean) => boolean;
-  retryRemoteAudio: (sessionId: string) => Promise<boolean>;
 }
 
 export interface StudioLiveCollaborationContextValue {
@@ -61,7 +37,6 @@ export interface StudioLiveCollaborationContextValue {
   localFallbackAllowed: boolean;
   usingLocalFallback: boolean;
   sendChatMessage: (text: string) => boolean;
-  voice: StudioLiveVoiceContextValue;
   /** Structured, fail-closed durability state for always-visible editor chrome. */
   sync: StudioLiveSyncSnapshot;
   recovery: StudioLiveRecoveryState | null;
@@ -84,20 +59,6 @@ export const EMPTY_STUDIO_LIVE_CONTEXT: StudioLiveCollaborationContextValue = {
   localFallbackAllowed: false,
   usingLocalFallback: false,
   sendChatMessage: () => false,
-  voice: {
-    ready: false,
-    supported: false,
-    allowed: false,
-    networkMode: null,
-    state: createEmptyStudioVoiceCallState(),
-    error: null,
-    join: async () => false,
-    leave: () => undefined,
-    setMuted: () => false,
-    setPushToTalk: () => false,
-    setPushToTalkPressed: () => false,
-    retryRemoteAudio: async () => false,
-  },
   sync: INITIAL_STUDIO_LIVE_SYNC_SNAPSHOT,
   recovery: null,
   exportRecovery: async () => undefined,

@@ -28,13 +28,6 @@ import {
   type StudioCrdtSyncTelemetry,
   type StudioLivePersistenceDurability,
 } from "./studio-live-sync-safety";
-import {
-  createEmptyStudioVoiceCallState,
-  isStudioVoiceCallSupported,
-  studioVoiceCallErrorMessage,
-  type StudioVoiceCallEvent,
-  type StudioVoiceCallState,
-} from "./studio-voice-call-model";
 
 import type { StudioCrdtDocument } from "./studio-crdt-document";
 import type { StudioCrdtRecoveryVaultEntry } from "./studio-crdt-recovery-vault";
@@ -43,11 +36,6 @@ import type {
   StudioCrdtBindingStatus,
   StudioCrdtRoomBinding,
 } from "./studio-crdt-room-binding";
-import type { StudioVoiceCallController } from "./studio-voice-call";
-import type {
-  StudioVoiceIcePolicyLease,
-} from "./studio-voice-ice-policy";
-import type { StudioVoiceIcePolicyMode } from "@/lib/studio-voice-ice-policy-contract";
 
 export type StudioCrdtAuthoritativeSaveBarrier = (
   timeoutMs?: number
@@ -121,42 +109,8 @@ interface StudioLiveRevocationBoundaryLatch {
   message: string;
 }
 
-interface StudioVoiceErrorScope {
-  code: Extract<StudioVoiceCallEvent, { type: "error" }>["code"] | "action";
-  participantSessionId: string | null;
-}
-
-interface StudioVoiceControllerScope {
-  generation: number;
-  room: StudioLiveRoom;
-}
-
-interface StudioVoiceControllerBinding {
-  scope: StudioVoiceControllerScope;
-  controller: StudioVoiceCallController;
-  icePolicyLease: StudioVoiceIcePolicyLease | null;
-  unsubscribeIcePolicy: () => void;
-  unsubscribe: () => void;
-}
-
-interface StudioVoiceControllerLoad {
-  scope: StudioVoiceControllerScope;
-  promise: Promise<StudioVoiceCallController | null>;
-  cancel: () => void;
-}
-
 const RECOVERY_VAULT_REHYDRATION_INITIAL_DELAY_MS = 50;
 const RECOVERY_VAULT_REHYDRATION_MAX_DELAY_MS = 5_000;
-
-function closeStudioVoiceControllerBinding(
-  binding: StudioVoiceControllerBinding | null | undefined
-): void {
-  if (!binding) return;
-  binding.unsubscribe();
-  binding.unsubscribeIcePolicy();
-  binding.controller.close();
-  binding.icePolicyLease?.close();
-}
 
 function findStudioLiveRecoveryBoundaryEntry(
   entries: readonly StudioCrdtRecoveryVaultEntry[],
@@ -244,17 +198,6 @@ export function StudioLiveCollaborationProvider({
   const [peers, setPeers] = useState<StudioLivePeer[]>([]);
   const [locks, setLocks] = useState<StudioLiveLock[]>([]);
   const [chatMessages, setChatMessages] = useState<StudioLiveChatMessage[]>([]);
-  const [voiceState, setVoiceState] = useState<StudioVoiceCallState>(() =>
-    createEmptyStudioVoiceCallState()
-  );
-  const [voiceNetworkMode, setVoiceNetworkMode] =
-    useState<StudioVoiceIcePolicyMode | null>(null);
-  const [voiceError, setVoiceError] = useState<string | null>(null);
-  const voiceErrorScopeRef = useRef<StudioVoiceErrorScope | null>(null);
-  const voiceControllerBindingRef = useRef<StudioVoiceControllerBinding | null>(null);
-  const voiceControllerLoadRef = useRef<StudioVoiceControllerLoad | null>(null);
-  const voiceControllerScopeRef = useRef<StudioVoiceControllerScope | null>(null);
-  const voiceControllerGenerationRef = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [localFallbackAllowed, setLocalFallbackAllowed] = useState(true);
   const [transportPreference, setTransportPreference] = useState<"server" | "local">(
@@ -280,8 +223,6 @@ export function StudioLiveCollaborationProvider({
   const participantName = participant?.displayName ?? null;
   const participantRole = participant?.role ?? null;
   const participantCanEdit = canParticipantEdit(participantRole);
-  const participantCanVoice = participantRole !== null && participantRole !== "viewer";
-  const voiceSupported = isStudioVoiceCallSupported();
   const recoveryBoundaryScopeKey = workId
     ? JSON.stringify([outboxScope || null, workId])
     : null;
@@ -788,150 +729,6 @@ export function StudioLiveCollaborationProvider({
     }
   }, [currentPageId, currentTool, room]);
 
-  // Voice belongs to the authenticated room lifecycle, not to the team panel lifecycle. The heavy
-  // WebRTC controller is intentionally not imported here: the first explicit join action is its
-  // only load boundary. Work navigation, unsupported runtimes and ACL changes invalidate that
-  // boundary before any late import can construct a controller or request the microphone.
-  useEffect(() => {
-    const generation = ++voiceControllerGenerationRef.current;
-    const scope = room && participantCanVoice && voiceSupported
-      ? { generation, room }
-      : null;
-    voiceControllerScopeRef.current = scope;
-    const previousLoad = voiceControllerLoadRef.current;
-    voiceControllerLoadRef.current = null;
-    previousLoad?.cancel();
-    const previous = voiceControllerBindingRef.current;
-    voiceControllerBindingRef.current = null;
-    closeStudioVoiceControllerBinding(previous);
-    setVoiceState(createEmptyStudioVoiceCallState());
-    setVoiceNetworkMode(null);
-    setVoiceError(null);
-    voiceErrorScopeRef.current = null;
-
-    return () => {
-      if (voiceControllerScopeRef.current === scope) {
-        voiceControllerScopeRef.current = null;
-      }
-      if (voiceControllerLoadRef.current?.scope === scope) {
-        voiceControllerLoadRef.current.cancel();
-        voiceControllerLoadRef.current = null;
-      }
-      const current = voiceControllerBindingRef.current;
-      if (current?.scope === scope) {
-        voiceControllerBindingRef.current = null;
-        closeStudioVoiceControllerBinding(current);
-      }
-    };
-  }, [participantCanVoice, room, voiceSupported]);
-
-  const ensureVoiceController = (
-    scope: StudioVoiceControllerScope
-  ): Promise<StudioVoiceCallController | null> => {
-    const current = voiceControllerBindingRef.current;
-    if (current?.scope === scope) return Promise.resolve(current.controller);
-    const loading = voiceControllerLoadRef.current;
-    if (loading?.scope === scope) return loading.promise;
-
-    const abortController = new AbortController();
-    const promise = Promise.all([
-      import("./studio-voice-call"),
-      scope.room.mode === "server"
-        ? import("./studio-voice-ice-policy")
-        : Promise.resolve(null),
-    ])
-      .then(async ([{ StudioVoiceCallController: VoiceController }, icePolicyModule]) => {
-        if (voiceControllerScopeRef.current !== scope) return null;
-        const icePolicyLease = icePolicyModule
-          ? await icePolicyModule.acquireStudioVoiceIcePolicyLease(
-              scope.room.workId,
-              { signal: abortController.signal }
-            )
-          : null;
-        if (voiceControllerScopeRef.current !== scope) {
-          icePolicyLease?.close();
-          return null;
-        }
-        let controller: StudioVoiceCallController;
-        try {
-          controller = new VoiceController(
-            scope.room,
-            icePolicyLease
-              ? { createPeerConnection: icePolicyLease.createPeerConnection }
-              : undefined
-          );
-        } catch (error) {
-          icePolicyLease?.close();
-          throw error;
-        }
-        if (voiceControllerScopeRef.current !== scope) {
-          controller.close();
-          icePolicyLease?.close();
-          return null;
-        }
-        const binding: StudioVoiceControllerBinding = {
-          scope,
-          controller,
-          icePolicyLease,
-          unsubscribeIcePolicy: () => undefined,
-          unsubscribe: () => undefined,
-        };
-        binding.unsubscribeIcePolicy =
-          icePolicyLease?.subscribeConfigurationChange(() => {
-            if (voiceControllerBindingRef.current !== binding) return;
-            setVoiceNetworkMode(icePolicyLease.mode);
-            controller.refreshNetworkPolicy();
-          }) ?? (() => undefined);
-        binding.unsubscribe = controller.subscribe((event) => {
-          if (voiceControllerBindingRef.current !== binding) return;
-          if (event.type === "state") {
-            setVoiceState(event.state);
-            const issue = voiceErrorScopeRef.current;
-            if (issue?.participantSessionId) {
-              const remote = event.state.participants.find(
-                ({ participant: remoteParticipant }) =>
-                  remoteParticipant.sessionId === issue.participantSessionId
-              );
-              const resolved =
-                !remote ||
-                (issue.code === "autoplay" && remote.autoplay !== "blocked") ||
-                (issue.code === "connection" && remote.connection === "live");
-              if (resolved) {
-                voiceErrorScopeRef.current = null;
-                setVoiceError(null);
-              }
-            }
-            return;
-          }
-          voiceErrorScopeRef.current = {
-            code: event.code,
-            participantSessionId: event.participant?.sessionId ?? null,
-          };
-          if (event.code === "media" && controller.getState().phase === "idle") {
-            voiceControllerBindingRef.current = null;
-            closeStudioVoiceControllerBinding(binding);
-            setVoiceNetworkMode(null);
-            setVoiceState(createEmptyStudioVoiceCallState());
-          }
-          setVoiceError(event.message);
-        });
-        voiceControllerBindingRef.current = binding;
-        setVoiceNetworkMode(icePolicyLease?.mode ?? "direct");
-        return controller;
-      })
-      .finally(() => {
-        if (voiceControllerLoadRef.current?.scope === scope) {
-          voiceControllerLoadRef.current = null;
-        }
-      });
-    voiceControllerLoadRef.current = {
-      scope,
-      promise,
-      cancel: () => abortController.abort(),
-    };
-    return promise;
-  };
-
   // State updates from the previous room can survive for one render while React tears that room
   // down. Never project those guarantees onto a different work id.
   const scopedOperationSyncReady = Boolean(
@@ -1028,96 +825,6 @@ export function StudioLiveCollaborationProvider({
         setError(messageFrom(cause, "채팅 메시지를 보내지 못했습니다."));
         return false;
       }
-    },
-    voice: {
-      supported: voiceSupported,
-      ready: Boolean(room && participantCanVoice && voiceSupported),
-      allowed: participantCanVoice,
-      state: voiceState,
-      networkMode: voiceNetworkMode,
-      error: voiceError,
-      join: async (options) => {
-        const scope = voiceControllerScopeRef.current;
-        if (!participantCanVoice || !voiceSupported || !room || scope?.room !== room) {
-          voiceErrorScopeRef.current = { code: "action", participantSessionId: null };
-          setVoiceError(
-            !participantCanVoice
-              ? "열람자 권한에서는 음성 작업실에 참여할 수 없습니다."
-              : !voiceSupported
-                ? "이 브라우저는 마이크 WebRTC 음성 작업실을 지원하지 않습니다."
-                : "팀 작업실 연결이 준비되지 않았습니다."
-          );
-          return false;
-        }
-        voiceErrorScopeRef.current = null;
-        setVoiceError(null);
-        setVoiceState((previous) =>
-          previous.phase === "idle" ? { ...previous, phase: "joining" } : previous
-        );
-        try {
-          const controller = await ensureVoiceController(scope);
-          if (!controller || voiceControllerScopeRef.current !== scope) return false;
-          await controller.join(options);
-          return voiceControllerBindingRef.current?.controller === controller;
-        } catch (cause) {
-          if (voiceControllerScopeRef.current === scope) {
-            const current = voiceControllerBindingRef.current;
-            if (current?.scope === scope) {
-              voiceControllerBindingRef.current = null;
-              closeStudioVoiceControllerBinding(current);
-            }
-            setVoiceNetworkMode(null);
-            setVoiceState(createEmptyStudioVoiceCallState());
-            voiceErrorScopeRef.current = { code: "action", participantSessionId: null };
-            setVoiceError(studioVoiceCallErrorMessage(cause));
-          }
-          return false;
-        }
-      },
-      leave: () => {
-        voiceErrorScopeRef.current = null;
-        setVoiceError(null);
-        const current = voiceControllerBindingRef.current;
-        voiceControllerBindingRef.current = null;
-        current?.controller.leave();
-        closeStudioVoiceControllerBinding(current);
-        setVoiceNetworkMode(null);
-        setVoiceState(createEmptyStudioVoiceCallState());
-      },
-      setMuted: (muted) => {
-        const changed = voiceControllerBindingRef.current?.controller.setMuted(muted) ?? false;
-        if (changed) {
-          voiceErrorScopeRef.current = null;
-          setVoiceError(null);
-        }
-        return changed;
-      },
-      setPushToTalk: (enabled) => {
-        const changed =
-          voiceControllerBindingRef.current?.controller.setPushToTalk(enabled) ?? false;
-        if (changed) {
-          voiceErrorScopeRef.current = null;
-          setVoiceError(null);
-        }
-        return changed;
-      },
-      setPushToTalkPressed: (pressed) =>
-        voiceControllerBindingRef.current?.controller.setPushToTalkPressed(pressed) ?? false,
-      retryRemoteAudio: async (sessionId) => {
-        const controller = voiceControllerBindingRef.current?.controller;
-        if (!controller) return false;
-        voiceErrorScopeRef.current = null;
-        setVoiceError(null);
-        try {
-          return await controller.retryRemoteAudio(sessionId);
-        } catch (cause) {
-          if (voiceControllerBindingRef.current?.controller === controller) {
-            voiceErrorScopeRef.current = { code: "action", participantSessionId: sessionId };
-            setVoiceError(studioVoiceCallErrorMessage(cause));
-          }
-          return false;
-        }
-      },
     },
     sync: syncSnapshot,
     recovery,

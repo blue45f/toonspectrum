@@ -25,16 +25,6 @@ export class StudioVoiceIcePolicyController {
     private readonly service: StudioVoiceIcePolicyService
   ) {}
 
-  @Get("/creator/works/:id/voice/ice")
-  @Header("Cache-Control", "private, no-store, max-age=0")
-  async issue(
-    @Param(new ZodValidationPipe(CreatorTeamWorkParamsDto))
-    params: CreatorTeamWorkParamsDto,
-    @Headers("x-user-id") userId?: string
-  ) {
-    return this.service.issue(authenticatedUserId(userId), params.id);
-  }
-
   @Get("/creator/works/:id/screen-share/ice")
   @Header("Cache-Control", "private, no-store, max-age=0")
   async issueScreenShare(

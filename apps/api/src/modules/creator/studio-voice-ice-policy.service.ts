@@ -6,7 +6,6 @@ import {
   HttpStatus,
   Inject,
   Injectable,
-  ServiceUnavailableException,
 } from "@nestjs/common";
 import { z } from "zod";
 
@@ -212,38 +211,6 @@ export class StudioVoiceIcePolicyService {
     @Inject(STUDIO_VOICE_ICE_CONFIGURATION)
     private readonly configuration: StudioVoiceIceConfiguration
   ) {}
-
-  async issue(userId: string, workId: string): Promise<StudioVoiceIcePolicyResponse> {
-    if (
-      !rateLimit(`studio-voice-ice:user:${userId}`, 60, 60 * 60_000) ||
-      !rateLimit(`studio-voice-ice:work:${userId}:${workId}`, 12, 60_000)
-    ) {
-      throw new HttpException(
-        "음성 연결 설정 요청이 너무 많습니다. 잠시 뒤 다시 시도해 주세요.",
-        HttpStatus.TOO_MANY_REQUESTS
-      );
-    }
-    const team = await this.creatorService.getWorkTeam(userId, workId);
-    if (
-      team.workId !== workId ||
-      team.viewer.userId !== userId ||
-      team.viewer.status !== "active" ||
-      !team.viewer.capabilities.view ||
-      team.viewer.role === "viewer"
-    ) {
-      throw new ForbiddenException("보기 전용 권한으로는 음성 연결 설정을 받을 수 없습니다.");
-    }
-    if (this.configuration.production && !this.configuration.turnRequired) {
-      throw new ServiceUnavailableException(
-        "운영 음성 중계가 아직 안전하게 구성되지 않았습니다. 관리자에게 문의해 주세요."
-      );
-    }
-    return issueStudioVoiceIcePolicy({
-      configuration: this.configuration,
-      userId,
-      workId,
-    });
-  }
 
   async issueScreenShare(
     userId: string,
