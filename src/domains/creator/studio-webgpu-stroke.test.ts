@@ -3,7 +3,12 @@ import { describe, expect, it } from "vitest";
 import { STUDIO_INK_PRESSURE_MODEL_LINEAR_FULL_V1 } from "./studio-ink-pressure-model";
 import { planStudioGpuDabUpdate } from "./studio-webgpu-dab-planner";
 import {
+  planStudioGpuLiveStroke,
+  STUDIO_GPU_MAX_LIVE_SYMMETRY_DIRECTIONS,
+} from "./studio-webgpu-live-stroke-plan";
+import {
   buildStudioGpuLiveStroke,
+  orderStudioGpuStrokes,
   sameStudioGpuStroke,
   sameStudioGpuStrokes,
   snapshotStudioGpuStrokes,
@@ -171,5 +176,175 @@ describe("studio WebGPU stroke authority helpers", () => {
     expect(snapshot[0]?.points).toEqual([0, 0, 12, 8]);
     expect(snapshot[0]?.pressures).toEqual([0.25, 0.75]);
     expect(sameStudioGpuStrokes(snapshot, source)).toBe(false);
+  });
+
+  it("prepares translucent destination-out symmetry as independent deterministic operations", () => {
+    const plan = planStudioGpuLiveStroke({
+      id: "erase-live",
+      points: [2, 3, 8, 11],
+      pressures: [0.25, 0.75],
+      color: "transparent",
+      size: 6,
+      opacity: 0.4,
+      composite: "erase",
+      destination: "retained-layer",
+      orderKey: "operation:9",
+      symmetry: {
+        type: "vertical",
+        centerX: 10,
+        centerY: 20,
+      },
+    });
+
+    expect(plan).toMatchObject({
+      preparation: {
+        composite: "erase",
+        opacity: 0.4,
+        symmetry: "expanded",
+        geometry: "source",
+        destination: "retained-layer",
+      },
+      sourcePointCount: 2,
+      renderedPointCount: 2,
+      variationCount: 2,
+    });
+    expect(plan?.strokes).toEqual([
+      expect.objectContaining({
+        id: "erase-live",
+        points: [2, 3, 8, 11],
+        pressures: [0.25, 0.75],
+        composite: "erase",
+        opacity: 0.4,
+        orderKey: "operation:9",
+      }),
+      expect.objectContaining({
+        id: "erase-live:gpu-symmetry:1",
+        points: [18, 3, 12, 11],
+        pressures: [0.25, 0.75],
+        composite: "erase",
+        opacity: 0.4,
+        orderKey: "operation:9",
+      }),
+    ]);
+    expect(orderStudioGpuStrokes([
+      ...plan!.strokes,
+      stroke({ id: "next-operation", orderKey: "operation:9z" }),
+    ]).map(({ id }) => id)).toEqual([
+      "erase-live",
+      "erase-live:gpu-symmetry:1",
+      "next-operation",
+    ]);
+    const dabs = planStudioGpuDabUpdate([], plan!.strokes);
+    expect(dabs.complete).toBe(true);
+    expect(dabs.batches.map(({ composite }) => composite)).toEqual(["erase"]);
+    expect(dabs.dabs.every(({ alpha, composite }) => (
+      composite === "erase" && alpha === 0.4
+    ))).toBe(true);
+  });
+
+  it("expands radial and kaleidoscope variants in stable source-first order", () => {
+    const input = {
+      id: "kaleido",
+      points: [2, 1, 1, 2],
+      pressures: [0.5, 0.75],
+      color: "#123456",
+      size: 6,
+      symmetry: {
+        type: "kaleidoscope" as const,
+        centerX: 1,
+        centerY: 1,
+        radialCount: 4,
+      },
+    };
+    const first = planStudioGpuLiveStroke(input);
+    const second = planStudioGpuLiveStroke(input);
+
+    expect(first?.variationCount).toBe(8);
+    expect(first?.strokes.map(({ id }) => id)).toEqual([
+      "kaleido",
+      "kaleido:gpu-symmetry:1",
+      "kaleido:gpu-symmetry:2",
+      "kaleido:gpu-symmetry:3",
+      "kaleido:gpu-symmetry:4",
+      "kaleido:gpu-symmetry:5",
+      "kaleido:gpu-symmetry:6",
+      "kaleido:gpu-symmetry:7",
+    ]);
+    expect(first?.strokes.map(({ points }) => points)).toEqual(
+      second?.strokes.map(({ points }) => points)
+    );
+    expect(first?.strokes[1]?.points.map((value) => (
+      Math.abs(value) < 1e-10 ? 0 : Number(value.toFixed(10))
+    ))).toEqual([1, 2, 0, 1]);
+  });
+
+  it("uses final post-corrected points and pressures without retaining predicted source geometry", () => {
+    const plan = planStudioGpuLiveStroke({
+      id: "corrected",
+      points: [0, 0, 10, 5, 20, -3],
+      pressures: [0.2, 0.4, 0.6],
+      correctedPoints: [0, 0, 9, 2, 18, 1, 24, 0],
+      correctedPressures: [0.2, 0.5, 0.75, 0.9],
+      color: "rgba(10, 20, 30, 0.8)",
+      size: 7,
+      opacity: 0.5,
+    });
+
+    expect(plan).toMatchObject({
+      preparation: {
+        composite: "normal",
+        opacity: 0.5,
+        symmetry: "identity",
+        geometry: "post-corrected",
+        destination: "transparent-overlay",
+      },
+      sourcePointCount: 3,
+      renderedPointCount: 4,
+      variationCount: 1,
+    });
+    expect(plan?.strokes[0]).toMatchObject({
+      points: [0, 0, 9, 2, 18, 1, 24, 0],
+      pressures: [0.2, 0.5, 0.75, 0.9],
+      opacity: 0.5,
+      composite: "normal",
+    });
+    const rendered = planStudioGpuDabUpdate([], plan!.strokes);
+    // rgba color alpha (0.8) and element opacity (0.5) are multiplied once before premultiplication.
+    expect(rendered.dabs.every(({ alpha }) => Math.abs(alpha - 0.4) < 1e-10)).toBe(true);
+  });
+
+  it.each([
+    ["invalid color", { color: "currentColor" }],
+    ["invalid opacity", { opacity: 1.2 }],
+    ["invalid composite", { composite: "multiply" }],
+    ["non-finite symmetry center", {
+      symmetry: { type: "vertical", centerX: Number.NaN, centerY: 0 },
+    }],
+    ["unbounded radial count", {
+      symmetry: {
+        type: "radial",
+        centerX: 0,
+        centerY: 0,
+        radialCount: STUDIO_GPU_MAX_LIVE_SYMMETRY_DIRECTIONS + 1,
+      },
+    }],
+    ["orphan corrected pressure", { correctedPressures: [0.5] }],
+    ["odd corrected coordinate", { correctedPoints: [0, 0, 1] }],
+    ["mismatched corrected pressure", {
+      correctedPoints: [0, 0, 1, 1, 2, 2],
+      correctedPressures: [0.5, 0.6],
+    }],
+  ] as const)("fails closed for %s instead of emitting a partial GPU operation", (
+    _label,
+    overrides
+  ) => {
+    expect(planStudioGpuLiveStroke({
+      id: "invalid",
+      points: [0, 0, 1, 1],
+      pressures: [0.5, 0.5],
+      color: "#000000",
+      size: 4,
+      ...overrides,
+    } as Parameters<typeof planStudioGpuLiveStroke>[0])).toBeNull();
   });
 });

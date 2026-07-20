@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { studioBrushDynamicsPresetSettings } from "./studio-brush-dynamics";
+import { MAX_BRUSHES } from "./studio-brush-library";
 import { StudioBrushLibraryPanel } from "./StudioBrushLibraryPanel";
 
 import type { StudioBrushSnapshot, StudioSavedBrush } from "./studio-brush-library";
@@ -50,8 +51,9 @@ describe("StudioBrushLibraryPanel", () => {
     expect(html).toContain('data-studio-brush-library-scope="saved"');
     expect(html).toContain('aria-label="내 브러시"');
     expect(html).toContain("사용자 저장");
-    expect(html).toContain("1/40");
-    expect(html).toContain('aria-label="브러시 설정 가져오기"');
+    expect(html).toContain(`1/${MAX_BRUSHES}`);
+    expect(html).toContain('aria-label="브러시 설정 또는 Photoshop ABR 가져오기"');
+    expect(html).toContain('accept=".json,.abr,application/json,application/octet-stream,application/x-photoshop"');
     expect(html).toContain("주력 펜 고정 해제");
     expect(html).toContain("주력 펜 복제");
     expect(html).toContain("주력 펜 이름 변경");

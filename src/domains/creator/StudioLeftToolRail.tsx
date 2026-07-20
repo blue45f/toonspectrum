@@ -54,6 +54,9 @@ import { StudioToolHintTarget } from "./StudioToolHint";
 
 import { cn } from "@/lib/utils";
 
+const REVIEW_LOCK_REASON = "현재 작업면의 검토 잠금을 먼저 해제하세요.";
+const IMAGE_EDIT_LOCK_REASON = "선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요.";
+
 export interface StudioLeftToolRailHandlers {
   fitCanvasToWidth: () => void;
   openFrameAnimationForSelected: () => void;
@@ -265,7 +268,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                 selected?.type !== "image"
                   ? "픽셀을 선택할 이미지 레이어를 먼저 고르세요."
                   : selectedContentMutationLocked
-                    ? "선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요."
+                    ? IMAGE_EDIT_LOCK_REASON
                     : undefined
               }
               onClick={() => togglePixelMarquee("rect")}
@@ -282,7 +285,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                 selected?.type !== "image"
                   ? "픽셀을 선택할 이미지 레이어를 먼저 고르세요."
                   : selectedContentMutationLocked
-                    ? "선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요."
+                    ? IMAGE_EDIT_LOCK_REASON
                     : undefined
               }
               onClick={() => togglePixelMarquee("circle")}
@@ -294,13 +297,19 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               label="변형 (⇧T)"
               description="픽셀 선택이 있으면 속성→리터치에서 내용 변형(스케일·회전·뒤집기)을 적용합니다."
               active={false}
-              disabled={selected?.type !== "image" || !isSelectionUsable(pixelSel)}
+              disabled={
+                selected?.type !== "image"
+                || selectedContentMutationLocked
+                || !isSelectionUsable(pixelSel)
+              }
               unavailableReason={
                 selected?.type !== "image"
                   ? "변형할 이미지 레이어를 먼저 고르세요."
-                  : !isSelectionUsable(pixelSel)
-                    ? "이미지 안에서 변형할 픽셀 영역을 먼저 선택하세요."
-                    : undefined
+                  : selectedContentMutationLocked
+                    ? IMAGE_EDIT_LOCK_REASON
+                    : !isSelectionUsable(pixelSel)
+                      ? "이미지 안에서 변형할 픽셀 영역을 먼저 선택하세요."
+                      : undefined
               }
               onClick={openPixelSelectionTransform}
             />
@@ -316,7 +325,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                 selected?.type !== "image"
                   ? "자를 이미지 레이어를 먼저 고르세요."
                   : selectedContentMutationLocked
-                    ? "선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요."
+                    ? IMAGE_EDIT_LOCK_REASON
                     : undefined
               }
               onClick={openSelectedLayerCrop}
@@ -329,7 +338,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               description="자유선으로 그립니다. 필압·보정·브러시 프리셋은 하단 옵션 도크와 브러시 스튜디오에서 조절해요."
               active={tool === "draw" && drawMode === "pen"}
               disabled={activeSurfaceReviewLocked}
-              unavailableReason={activeSurfaceReviewLocked ? "현재 작업면의 검토 잠금을 먼저 해제하세요." : undefined}
+              unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
               grouped
               onClick={() => {
                 setTool("draw");
@@ -346,7 +355,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               description="1px 하드 픽셀 펜으로 그립니다. 안티앨리어스·필압 없이 또렷한 선을 남깁니다."
               active={tool === "draw" && drawMode === "pixel"}
               disabled={activeSurfaceReviewLocked}
-              unavailableReason={activeSurfaceReviewLocked ? "현재 작업면의 검토 잠금을 먼저 해제하세요." : undefined}
+              unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
               onClick={() => {
                 setTool("draw");
                 setDrawMode("pixel");
@@ -363,7 +372,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               description="현재 레이어/획 위를 지웁니다. 굵기는 펜과 같은 크기 칩으로 맞출 수 있어요."
               active={tool === "draw" && drawMode === "eraser"}
               disabled={activeSurfaceReviewLocked}
-              unavailableReason={activeSurfaceReviewLocked ? "현재 작업면의 검토 잠금을 먼저 해제하세요." : undefined}
+              unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
               onClick={() => {
                 setTool("draw");
                 setDrawMode("eraser");
@@ -383,7 +392,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                 selected?.type !== "image"
                   ? "색을 섞을 이미지 레이어를 먼저 고르세요."
                   : selectedContentMutationLocked
-                    ? "선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요."
+                    ? IMAGE_EDIT_LOCK_REASON
                     : undefined
               }
               onClick={toggleSmudgeTool}
@@ -400,7 +409,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                 selected?.type !== "image"
                   ? "왜곡할 이미지 레이어를 먼저 고르세요."
                   : selectedContentMutationLocked
-                    ? "선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요."
+                    ? IMAGE_EDIT_LOCK_REASON
                     : undefined
               }
               onClick={toggleLiquifyTool}
@@ -436,7 +445,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               description="닫힌 궤적을 그려 현재 색으로 채웁니다."
               active={tool === "draw" && drawMode === "lasso-fill"}
               disabled={activeSurfaceReviewLocked}
-              unavailableReason={activeSurfaceReviewLocked ? "현재 작업면의 검토 잠금을 먼저 해제하세요." : undefined}
+              unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
               onClick={() => {
                 setTool("draw");
                 setDrawMode("lasso-fill");
@@ -450,9 +459,9 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               icon={Lasso}
               label={
                 pixelTool === "lasso"
-                    ? "자유 올가미 끄기"
+                    ? "자유 올가미 · 다시 누르면 다각형 올가미"
                     : pixelTool === "poly-lasso"
-                      ? "다각형 올가미 사용 중 · 다시 누르면 자유 올가미"
+                      ? "다각형 올가미 · 다시 누르면 끄기"
                       : "올가미 선택"
               }
               description="이미지 픽셀을 자유 올가미(드래그) 또는 다각형 올가미(클릭)로 선택합니다."
@@ -462,7 +471,7 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                 selected?.type !== "image"
                   ? "픽셀을 고를 이미지 레이어를 먼저 선택하세요."
                   : selectedContentMutationLocked
-                    ? "선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요."
+                    ? IMAGE_EDIT_LOCK_REASON
                     : undefined
               }
               onClick={() => {
@@ -502,9 +511,21 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               label="투시도"
               description="소실점 가이드로 원근을 맞춥니다."
               active={perspectiveRulerActive}
+              disabled={activeSurfaceReviewLocked}
+              unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
               onClick={() => {
-                setPerspectiveRulerActive((v) => !v);
-                setTool("draw");
+                const next = !perspectiveRulerActive;
+                setPerspectiveRulerActive(next);
+                if (next) {
+                  disarmAllPixelTools();
+                  setTool("draw");
+                  setDrawMode("pen");
+                  setEyedropperActive(false);
+                  announceDrawingShortcut("투시도 켜짐 · 소실점 방향으로 펜 선을 맞춰요");
+                } else {
+                  announceDrawingShortcut("투시도 꺼짐");
+                }
+                setMenu(null);
               }}
             />
             ) : null}
@@ -552,6 +573,8 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               label="스마트 도형"
               description="낙서를 잠시 멈추면 선·원·사각형 등 깔끔한 도형으로 자동 다듬어요."
               active={quickShapeActive}
+              disabled={activeSurfaceReviewLocked}
+              unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
               accented
               onClick={() => {
                 const next = !quickShapeActive;
@@ -575,6 +598,8 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               label="사각형 도형"
               description="드래그로 사각형을 그립니다. Shift를 누르면 정사각형으로 맞출 수 있어요."
               active={tool === "draw" && drawMode === "shape" && drawShape === "rect"}
+              disabled={activeSurfaceReviewLocked}
+              unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
               onClick={() => {
                 setTool("draw");
                 setDrawMode("shape");
@@ -590,6 +615,8 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               label="타원 도형"
               description="드래그로 타원을 그립니다. Shift를 누르면 정원으로 맞출 수 있어요."
               active={tool === "draw" && drawMode === "shape" && drawShape === "ellipse"}
+              disabled={activeSurfaceReviewLocked}
+              unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
               onClick={() => {
                 setTool("draw");
                 setDrawMode("shape");
@@ -605,6 +632,8 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               icon={TypeIcon}
               label="텍스트 추가"
               description="캔버스에 글자 상자를 추가합니다. 폰트·정렬·효과는 우측 속성에서 편집해요."
+              disabled={activeSurfaceReviewLocked}
+              unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
               onClick={() => {
                 addText(undefined, true);
               }}
@@ -615,6 +644,8 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               icon={MessageCircle}
               label="말풍선 추가"
               description="만화 말풍선을 넣습니다. 꼬리 위치·스타일 프리셋은 말풍선 패널에서 바꿀 수 있어요."
+              disabled={activeSurfaceReviewLocked}
+              unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
               onClick={() => {
                 addBubble("speech", undefined, true);
               }}
@@ -622,6 +653,8 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
             ) : null}
             {isRailToolVisible("image") ? (
             <StudioToolHintTarget
+              disabled={activeSurfaceReviewLocked}
+              unavailableReason={activeSurfaceReviewLocked ? REVIEW_LOCK_REASON : undefined}
               hint={{
                 id: "image",
                 title: "이미지 추가",
@@ -630,15 +663,27 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
                 tip: "클립보드의 이미지는 ⌘V 또는 Ctrl+V로 바로 붙여넣을 수도 있어요.",
               }}
             >
-              <label className="relative grid size-9 cursor-pointer place-items-center rounded-md border border-transparent text-fg-2 hover:border-line hover:bg-raised hover:text-fg">
+              <label
+                aria-disabled={activeSurfaceReviewLocked}
+                className={cn(
+                  "relative grid size-10 place-items-center rounded-2xl border border-transparent text-fg-2 xl:size-11",
+                  activeSurfaceReviewLocked
+                    ? "cursor-not-allowed opacity-35"
+                    : "cursor-pointer hover:border-line hover:bg-raised hover:text-fg"
+                )}
+              >
                 <ImagePlus size={16} strokeWidth={1.75} aria-hidden />
                 <span className="sr-only">이미지 추가</span>
                 <input
                   type="file"
                   accept="image/*"
-                  className="absolute inset-0 cursor-pointer opacity-0"
+                  className={cn(
+                    "absolute inset-0 opacity-0",
+                    activeSurfaceReviewLocked ? "cursor-not-allowed" : "cursor-pointer"
+                  )}
                   onChange={onPickImage}
                   aria-label="이미지 추가"
+                  disabled={activeSurfaceReviewLocked}
                 />
               </label>
             </StudioToolHintTarget>
@@ -650,8 +695,14 @@ export const StudioLeftToolRail = memo(function StudioLeftToolRail({
               label="프레임 애니메이션"
               description="선택한 이미지에 여러 프레임을 쌓아 간단한 셀 애니메이션을 만듭니다."
               active={frameAnimOpen && frameAnimTargetId === selected?.id}
-              disabled={selected?.type !== "image"}
-              unavailableReason={selected?.type !== "image" ? "애니메이션으로 편집할 이미지 레이어를 먼저 선택하세요." : undefined}
+              disabled={selected?.type !== "image" || selectedContentMutationLocked}
+              unavailableReason={
+                selected?.type !== "image"
+                  ? "애니메이션으로 편집할 이미지 레이어를 먼저 선택하세요."
+                  : selectedContentMutationLocked
+                    ? IMAGE_EDIT_LOCK_REASON
+                    : undefined
+              }
               onClick={openFrameAnimationForSelected}
             />
             ) : null}

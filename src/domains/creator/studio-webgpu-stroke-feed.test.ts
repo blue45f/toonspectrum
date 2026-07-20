@@ -8,6 +8,7 @@ import {
 import { STUDIO_GPU_STROKE_FEED_REVISION, type StudioGpuStroke } from "./studio-webgpu-stroke";
 import {
   advanceStudioGpuStrokeFeed,
+  advanceStudioGpuStrokeFeedBatch,
   createStudioGpuStrokeFeedBaseline,
   planStudioGpuPinnedStrokeFeedUpdate,
   studioGpuStrokeFeedSuffixFromPointCount,
@@ -108,6 +109,89 @@ describe("Studio WebGPU append-only stroke feed", () => {
       points: [2, 3, 8, 4, 13, 9],
       pressures: [0.5, 0.65, 0.9],
     });
+  });
+
+  it("advances every terminal symmetry variation atomically without reading retained history", () => {
+    const initial = [
+      stroke({ id: "live", points: [2, 3], pressures: [0.5] }),
+      stroke({ id: "live:gpu-symmetry:1", points: [98, 3], pressures: [0.5] }),
+    ];
+    const baseline = createStudioGpuStrokeFeedBaseline(initial, "symmetry-feed")!;
+    const fallback = [
+      stroke({
+        id: "live",
+        points: inaccessiblePrefix([2, 3, 9, 7], 2),
+        pressures: [0.5, 0.8],
+      }),
+      stroke({
+        id: "live:gpu-symmetry:1",
+        points: inaccessiblePrefix([98, 3, 91, 7], 2),
+        pressures: [0.5, 0.8],
+      }),
+    ];
+    const advanced = advanceStudioGpuStrokeFeedBatch(baseline, {
+      fallbackStrokes: fallback,
+      patches: fallback.map((nextStroke, strokeIndex) => ({
+        strokeIndex,
+        previousPointCount: 1,
+        suffixPoints: nextStroke.points.slice(2),
+        suffixPressures: [0.8],
+        nextStroke,
+        fallbackStrokes: fallback,
+      })),
+    });
+
+    expect(advanced.status).toBe("appended");
+    expect(advanced.strokes).toHaveLength(2);
+    expect(advanced.strokes.map((candidate) => (
+      candidate[STUDIO_GPU_STROKE_FEED_REVISION]?.pointCount
+    ))).toEqual([2, 2]);
+    expect(studioGpuStrokeFeedSuffixFromPointCount(advanced.strokes[1]!, 1)).toMatchObject({
+      points: [98, 3, 91, 7],
+      pressures: [0.5, 0.8],
+    });
+  });
+
+  it("rejects a torn symmetry suffix batch without publishing a partial variation", () => {
+    const initial = [
+      stroke({ id: "live" }),
+      stroke({ id: "live:gpu-symmetry:1", points: [98, 3] }),
+    ];
+    const baseline = createStudioGpuStrokeFeedBaseline(initial, "atomic-symmetry-feed")!;
+    const fallback = [
+      stroke({ id: "live", points: [2, 3, 9, 7], pressures: [0.5, 0.8] }),
+      stroke({
+        id: "live:gpu-symmetry:1",
+        points: [98, 3, 91, 7],
+        pressures: [0.5, 0.8],
+      }),
+    ];
+    const advanced = advanceStudioGpuStrokeFeedBatch(baseline, {
+      fallbackStrokes: fallback,
+      patches: [
+        {
+          strokeIndex: 0,
+          previousPointCount: 1,
+          suffixPoints: [9, 7],
+          suffixPressures: [0.8],
+          nextStroke: fallback[0]!,
+          fallbackStrokes: fallback,
+        },
+        {
+          strokeIndex: 1,
+          previousPointCount: 1,
+          suffixPoints: [91, 7],
+          suffixPressures: [0.2],
+          nextStroke: fallback[1]!,
+          fallbackStrokes: fallback,
+        },
+      ],
+    });
+
+    expect(advanced).toEqual({ status: "rejected", strokes: baseline });
+    expect(baseline.map((candidate) => (
+      candidate[STUDIO_GPU_STROKE_FEED_REVISION]?.pointCount
+    ))).toEqual([1, 1]);
   });
 
   it("treats a final sealed endpoint as one ordinary append and rejects a stale count", () => {

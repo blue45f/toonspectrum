@@ -673,6 +673,52 @@ export function assertStudioCrdtRasterAppendedEventAdmission(
   }
 }
 
+/**
+ * Once a trusted server checkpoint closes a surface prefix, future client events must sort after
+ * that horizon and may not undo an identity the checkpoint sealed. This is what makes the
+ * server-durable frontier a real compaction fence rather than an advisory rendering hint.
+ */
+export function assertStudioCrdtRasterAppendedEventsAfterCheckpointHorizon(
+  snapshot: StudioCrdtRasterRootSnapshot | null,
+  doc: Y.Doc
+): void {
+  if (!snapshot) fail("래스터 checkpoint horizon 검증을 위한 durable root snapshot이 올바르지 않습니다.");
+  const parsed = readStudioCrdtRasterDocument(doc);
+  for (const [surfaceId, log] of parsed.logs) {
+    const checkpoint = parsed.checkpoints
+      .filter((candidate) => candidate.surface.surfaceId === surfaceId)
+      .sort((left, right) => compareStudioRasterEventOrder(left.through, right.through))
+      .at(-1);
+    if (!checkpoint) continue;
+    const assertAfter = (
+      order: { readonly logicalClock: string; readonly actorId: string },
+      eventId: string
+    ) => {
+      if (compareStudioRasterEventOrder({ ...order, eventId }, checkpoint.through) <= 0) {
+        fail("새 래스터 이벤트가 서버 checkpoint의 닫힌 정렬 경계를 침범합니다.");
+      }
+    };
+    for (const operation of log.operations) {
+      if (snapshot.operations.has(operation.operationId)) continue;
+      assertAfter(operation.order, operation.operationId);
+    }
+    for (const undoOperation of log.undoOperations) {
+      if (snapshot.undoOperations.has(undoOperation.undoOperationId)) continue;
+      assertAfter(undoOperation.order, undoOperation.undoOperationId);
+      if (checkpoint.sealedOperationIds.includes(undoOperation.targetOperationId)) {
+        fail("새 래스터 실행 취소가 서버 checkpoint에 봉인된 작업을 대상으로 합니다.");
+      }
+    }
+    for (const acknowledgement of log.undoAcknowledgements) {
+      if (snapshot.undoAcknowledgements.has(acknowledgement.acknowledgementId)) continue;
+      assertAfter(acknowledgement.order, acknowledgement.acknowledgementId);
+      if (checkpoint.sealedUndoOperationIds.includes(acknowledgement.undoOperationId)) {
+        fail("새 래스터 복원 확인이 서버 checkpoint에 봉인된 실행 취소를 대상으로 합니다.");
+      }
+    }
+  }
+}
+
 const MAX_STUDIO_RASTER_CLOCK = "18446744073709551615";
 
 /** Adds a small validated event count without requiring an ES2020 BigInt runtime. */

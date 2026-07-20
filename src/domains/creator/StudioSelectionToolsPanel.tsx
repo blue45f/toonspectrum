@@ -274,10 +274,11 @@ export function StudioSelectionToolsPanel({
           onClick={onUndoSubpath}
           disabled={!selection || subpathCount === 0 || busy}
           className={buttonClass({ size: "sm", variant: "quiet" })}
-          title="마지막으로 그린 선택 영역 한 개를 되돌립니다."
+          title="마지막으로 그린 선택 영역 한 개만 제거합니다. 문서 작업 실행 취소에는 영향을 주지 않습니다."
+          aria-label="마지막 선택 영역 제거"
         >
           <Undo2 className="size-3.5" />
-          되돌리기
+          마지막 영역 제거
         </button>
       </div>
 

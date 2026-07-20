@@ -137,6 +137,15 @@ export default defineConfig(({ mode }) => ({
       output: {
         manualChunks(id) {
           if (
+            id.endsWith("/lib/studio-raster-asset-admission.ts")
+            || id.endsWith("/src/domains/creator/studio-background-gradient-color-stops.ts")
+            || id.endsWith("/src/domains/creator/studio-characters.ts")
+          ) {
+            // These dependency-free contracts are shared by several Studio lazy entries. Keeping
+            // them together avoids three sub-kilobyte HTTP requests on every editor launch.
+            return "studio-core-micro-contracts";
+          }
+          if (
             id.includes("/node_modules/react/") ||
             id.includes("/node_modules/react-dom/") ||
             id.includes("/node_modules/scheduler/") ||

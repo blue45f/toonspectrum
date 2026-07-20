@@ -30,6 +30,7 @@ import {
   restoreDeletedBrush,
   sanitizeBrushSnapshot,
   saveBrush,
+  saveBrushBatchWithResult,
   saveBrushWithResult,
   selectQuickBrushes,
   sortBrushesForLibrary,
@@ -752,12 +753,37 @@ describe("빠른 선반·복제·삭제 취소", () => {
     expect(result.brushes.map((item) => item.id)).toEqual(["b", "a", result.brush?.id]);
   });
 
-  it("40개에서 복제를 거부하고 모든 원본을 유지한다", () => {
+  it("라이브러리 상한에서 복제를 거부하고 모든 원본을 유지한다", () => {
     const s = fakeStorage();
     for (let index = 0; index < MAX_BRUSHES; index++) saveBrush(s, brush(`b${index}`));
     const result = duplicateBrush(s, "b0");
     expect(result.status).toBe("full");
     expect(result.brushes).toHaveLength(MAX_BRUSHES);
+  });
+
+  it("브러시 팩을 한 번에 저장하고 남은 용량까지만 명시적으로 부분 수용한다", () => {
+    const s = fakeStorage();
+    for (let index = 0; index < MAX_BRUSHES - 1; index++) saveBrush(s, brush(`base-${index}`));
+    const result = saveBrushBatchWithResult(s, [brush("pack-a"), brush("pack-b")]);
+    expect(result.status).toBe("partial");
+    expect(result.savedCount).toBe(1);
+    expect(result.skippedCount).toBe(1);
+    expect(result.brushes).toHaveLength(MAX_BRUSHES);
+    expect(result.brushes[0]?.id).toBe("pack-a");
+  });
+
+  it("브러시 팩 저장 실패는 영속 원본을 보존하고 부분 성공을 노출하지 않는다", () => {
+    const original = brush("original");
+    const storage = {
+      getItem: () => JSON.stringify({
+        version: BRUSH_LIBRARY_STORAGE_VERSION,
+        brushes: [original],
+      }),
+      setItem: () => { throw new Error("quota"); },
+    };
+    const result = saveBrushBatchWithResult(storage, [brush("pack-a"), brush("pack-b")]);
+    expect(result).toMatchObject({ status: "storage-error", savedCount: 0, skippedCount: 2 });
+    expect(result.brushes).toEqual([original]);
   });
 
   it("삭제 receipt로 동일 id와 원래 위치를 복원한다", () => {

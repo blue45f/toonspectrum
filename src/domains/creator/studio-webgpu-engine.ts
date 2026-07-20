@@ -26,9 +26,11 @@ import {
 } from "./studio-webgpu-stroke";
 import {
   advanceStudioGpuStrokeFeed,
+  advanceStudioGpuStrokeFeedBatch,
   appendStudioGpuStrokeFeedOperations,
   createStudioGpuStrokeFeedBaseline,
   type StudioGpuStrokeOperationsAppendPatch,
+  type StudioGpuStrokeSuffixBatchPatch,
   type StudioGpuStrokeSuffixPatch,
 } from "./studio-webgpu-stroke-feed";
 import {
@@ -689,6 +691,24 @@ export class StudioWebGpuEngine {
   ): "appended" | "rebuilt" {
     if (this.disposed) return "rebuilt";
     const advanced = advanceStudioGpuStrokeFeed(this.lastStrokes, patch);
+    if (advanced.status === "rejected") {
+      this.replaceStrokeFeed(patch.fallbackStrokes, requestId);
+      return "rebuilt";
+    }
+    this.renderPreparedStrokes(advanced.strokes, requestId);
+    return "appended";
+  }
+
+  /**
+   * Advances every suffix in one terminal symmetry group before rendering. This avoids N full
+   * frame submissions and never re-reads the retained point prefix of any variation.
+   */
+  public appendStrokeFeedSuffixBatch(
+    patch: StudioGpuStrokeSuffixBatchPatch,
+    requestId = this.lastRequestId
+  ): "appended" | "rebuilt" {
+    if (this.disposed) return "rebuilt";
+    const advanced = advanceStudioGpuStrokeFeedBatch(this.lastStrokes, patch);
     if (advanced.status === "rejected") {
       this.replaceStrokeFeed(patch.fallbackStrokes, requestId);
       return "rebuilt";

@@ -413,6 +413,22 @@ describe("deterministic event batching", () => {
     expect(split.state).toEqual(oneBatch.state);
   });
 
+  it("keeps the single-sample hot path identical to one multi-sample transition", () => {
+    const started = createFixedRateStrokeFilter(initial, 3.4);
+    const together = append(started.state, samples);
+    let state = started.state;
+    const emitted: FixedRateStrokeFilteredSample[] = [];
+
+    for (const sample of samples) {
+      const result = append(state, [sample]);
+      state = result.state;
+      emitted.push(...result.emitted);
+    }
+
+    expect(emitted).toEqual(together.emitted);
+    expect(state).toEqual(together.state);
+  });
+
   it("lets the last equal-timestamp sample win even when duplicates cross batches", () => {
     const duplicateSamples = [
       { x: 4, y: 0, timeStamp: 4 },

@@ -16,6 +16,7 @@ import {
   fingerprintStudioGpuFrame,
   StudioWebGpuEngine,
 } from "./studio-webgpu-engine";
+import { planStudioGpuLiveStroke } from "./studio-webgpu-live-stroke-plan";
 import { STUDIO_GPU_DAB_INSTANCE_FLOATS } from "./studio-webgpu-tile-compositor";
 
 import type { StudioGpuFrameReceipt } from "./studio-webgpu-frame-contract";
@@ -529,6 +530,62 @@ describe("StudioWebGpuEngine", () => {
     expect(fallback.clearRect).toHaveBeenCalledTimes(clearsAfterTap);
   });
 
+  it("advances a symmetry suffix group with one engine request and rejects torn groups", () => {
+    const gpuSurface = fakeGpuCanvas(null);
+    const fallback = fakeCanvas2d();
+    const engine = new StudioWebGpuEngine({
+      canvas: gpuSurface,
+      fallbackCanvas: fallback.canvas,
+      gpu: null,
+    });
+    const initial = [
+      stroke({ id: "live", orderKey: "group", points: [2, 3], pressures: [0.5] }),
+      stroke({
+        id: "live:gpu-symmetry:1",
+        orderKey: "group",
+        points: [98, 3],
+        pressures: [0.5],
+      }),
+    ];
+    engine.resize({ logicalWidth: 100, logicalHeight: 80 });
+    engine.replaceStrokeFeed(initial, "symmetry:tap");
+
+    const fallbackStrokes = [
+      stroke({
+        id: "live",
+        orderKey: "group",
+        points: [2, 3, 9, 7],
+        pressures: [0.5, 0.8],
+      }),
+      stroke({
+        id: "live:gpu-symmetry:1",
+        orderKey: "group",
+        points: [98, 3, 91, 7],
+        pressures: [0.5, 0.8],
+      }),
+    ];
+    const patches = fallbackStrokes.map((nextStroke, strokeIndex) => ({
+      strokeIndex,
+      previousPointCount: 1,
+      suffixPoints: nextStroke.points.slice(2),
+      suffixPressures: [0.8],
+      nextStroke,
+      fallbackStrokes,
+    }));
+
+    expect(engine.appendStrokeFeedSuffixBatch({
+      patches,
+      fallbackStrokes,
+    }, "symmetry:move")).toBe("appended");
+    expect(fallback.arcs.some(({ x, y }) => x === 9 && y === 7)).toBe(true);
+    expect(fallback.arcs.some(({ x, y }) => x === 91 && y === 7)).toBe(true);
+
+    expect(engine.appendStrokeFeedSuffixBatch({
+      patches,
+      fallbackStrokes,
+    }, "symmetry:stale")).toBe("rebuilt");
+  });
+
   it("appends residual V2 feed dabs from cached phase without rereading retained coordinates", () => {
     const gpuSurface = fakeGpuCanvas(null);
     const fallback = fakeCanvas2d();
@@ -780,6 +837,85 @@ describe("StudioWebGpuEngine", () => {
 
     engine.dispose();
     expect(fake.buffer.destroy).toHaveBeenCalled();
+  });
+
+  it("submits corrected symmetric translucency and destination-out erasing to real GPU batches", async () => {
+    const fake = fakeGpuDevice(new Promise<GPUDeviceLostInfo>(() => undefined));
+    const context = {
+      configure: vi.fn(),
+      unconfigure: vi.fn(),
+      getCurrentTexture: vi.fn(() => ({ createView: vi.fn(() => ({ view: true })) })),
+    } as unknown as GPUCanvasContext;
+    const adapter = { requestDevice: vi.fn(async () => fake.device) } as unknown as GPUAdapter;
+    const gpu = {
+      requestAdapter: vi.fn(async () => adapter),
+      getPreferredCanvasFormat: vi.fn(() => "bgra8unorm"),
+    } as unknown as GPU;
+    const normal = planStudioGpuLiveStroke({
+      id: "corrected-alpha",
+      points: [5, 10, 20, 14],
+      correctedPoints: [5, 10, 18, 12, 30, 10],
+      correctedPressures: [0.4, 0.7, 0.9],
+      color: "rgba(100, 50, 25, 0.5)",
+      size: 8,
+      opacity: 0.4,
+      orderKey: "a",
+      symmetry: { type: "vertical", centerX: 50, centerY: 40 },
+    });
+    const erase = planStudioGpuLiveStroke({
+      id: "erase-alpha",
+      points: [8, 10, 24, 10],
+      pressures: [0.5, 1],
+      color: "transparent",
+      size: 10,
+      opacity: 0.3,
+      composite: "erase",
+      destination: "retained-layer",
+      orderKey: "b",
+    });
+    expect(normal?.preparation).toMatchObject({
+      opacity: 0.4,
+      symmetry: "expanded",
+      geometry: "post-corrected",
+    });
+    expect(erase?.preparation).toMatchObject({ composite: "erase", opacity: 0.3 });
+
+    const engine = new StudioWebGpuEngine({
+      canvas: fakeGpuCanvas(context),
+      fallbackCanvas: fakeCanvas2d().canvas,
+      gpu,
+      retainReadbackSnapshot: false,
+    });
+    engine.resize({ logicalWidth: 100, logicalHeight: 80, cssWidth: 100, cssHeight: 80 });
+    engine.render([...normal!.strokes, ...erase!.strokes], "advanced-live");
+
+    await expect(engine.initialize()).resolves.toBe("webgpu");
+    await vi.waitFor(() => {
+      const pipelineLabels = fake.setPipeline.mock.calls.map(([pipeline]) => (
+        (pipeline as { descriptor?: GPURenderPipelineDescriptor }).descriptor?.label
+      ));
+      expect(pipelineLabels).toEqual(expect.arrayContaining([
+        "Studio round-dab brush pipeline",
+        "Studio destination-out round-dab pipeline",
+      ]));
+    });
+    const instanceWrite = vi.mocked(fake.device.queue.writeBuffer).mock.calls.find((call) => (
+      call.length >= 5
+      && call[2] instanceof ArrayBuffer
+      && Number(call[4]) >= STUDIO_GPU_DAB_INSTANCE_FLOATS * Float32Array.BYTES_PER_ELEMENT
+      && Number(call[4]) % (STUDIO_GPU_DAB_INSTANCE_FLOATS * Float32Array.BYTES_PER_ELEMENT) === 0
+    ));
+    expect(instanceWrite).toBeDefined();
+    const packed = new Float32Array(
+      instanceWrite![2] as ArrayBuffer,
+      Number(instanceWrite![3]),
+      Number(instanceWrite![4]) / Float32Array.BYTES_PER_ELEMENT
+    );
+    // rgba alpha .5 × element opacity .4 = .2, packed as premultiplied source color.
+    expect(packed[7]).toBeCloseTo(0.2, 6);
+    expect(packed[4]).toBeCloseTo((100 / 255) * 0.2, 6);
+    expect(fake.draw).toHaveBeenCalled();
+    engine.dispose();
   });
 
   it("starts recovered-device rendering without waiting for a hung lost-device flight", async () => {

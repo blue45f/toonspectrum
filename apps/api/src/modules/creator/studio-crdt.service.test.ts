@@ -21,6 +21,7 @@ import {
   type StudioRasterUndoOperation,
 } from "../../../../../lib/studio-crdt-raster-ops";
 
+import { StudioCrdtRasterCheckpointCoordinator } from "./studio-crdt-raster-checkpoint.coordinator";
 import { hasValidStudioCrdtRootSchema } from "./studio-crdt-root-schema";
 import {
   STUDIO_CRDT_UPDATE_MAX_BYTES,
@@ -2025,15 +2026,66 @@ describe("StudioCrdtService", () => {
       payload: Y.encodeStateAsUpdate(trusted),
       createdAt: new Date("2026-07-16T00:00:00.000Z"),
     }]);
+    trustedRepository.nextSequence = 2n;
+    const trustedService = service(trustedRepository);
     const hydrated = new Y.Doc();
-    applySync(hydrated, await service(trustedRepository).sync("work-raster-trusted-checkpoint"));
+    applySync(hydrated, await trustedService.sync("work-raster-trusted-checkpoint"));
     expect(hydrated.getMap(STUDIO_CRDT_RASTER_CHECKPOINTS_ROOT).has(RASTER_CHECKPOINT_ID))
       .toBe(true);
+
+    const validTail = new Y.Doc();
+    Y.applyUpdate(validTail, Y.encodeStateAsUpdate(trusted));
+    const validTailVector = Y.encodeStateVector(validTail);
+    const afterCheckpoint = rasterOperation(
+      "30000000-0000-4000-8000-000000000458",
+      "b".repeat(64),
+      "editor",
+      "2"
+    );
+    validTail.getMap<string>(STUDIO_CRDT_RASTER_OPERATIONS_ROOT).set(
+      afterCheckpoint.operationId,
+      canonicalStudioRasterJson({
+        surfaceId: RASTER_SURFACE.surfaceId,
+        operation: afterCheckpoint,
+      })
+    );
+    await expect(trustedService.applyUpdate({
+      workId: "work-raster-trusted-checkpoint",
+      updateId: "30000000-0000-4000-8000-000000000459",
+      actorUserId: "editor",
+      data: fromUint8Array(Y.encodeStateAsUpdate(validTail, validTailVector)),
+    })).resolves.toMatchObject({ duplicate: false });
+
+    const lateUndo = new Y.Doc();
+    Y.applyUpdate(lateUndo, Y.encodeStateAsUpdate(validTail));
+    const lateUndoVector = Y.encodeStateVector(lateUndo);
+    const crossesClosedHorizon: StudioRasterUndoOperation = {
+      version: STUDIO_RASTER_CRDT_VERSION,
+      undoOperationId: "30000000-0000-4000-8000-000000000460",
+      targetOperationId: RASTER_OPERATION_ID,
+      order: { logicalClock: "3", actorId: "editor" },
+    };
+    lateUndo.getMap<string>(STUDIO_CRDT_RASTER_UNDO_OPERATIONS_ROOT).set(
+      crossesClosedHorizon.undoOperationId,
+      canonicalStudioRasterJson({
+        surfaceId: RASTER_SURFACE.surfaceId,
+        undoOperation: crossesClosedHorizon,
+      })
+    );
+    await expect(trustedService.applyUpdate({
+      workId: "work-raster-trusted-checkpoint",
+      updateId: "30000000-0000-4000-8000-000000000461",
+      actorUserId: "editor",
+      data: fromUint8Array(Y.encodeStateAsUpdate(lateUndo, lateUndoVector)),
+    })).rejects.toBeInstanceOf(StudioCrdtInvalidPayloadError);
+
     base.destroy();
     withCheckpoint.destroy();
     attacker.destroy();
     trusted.destroy();
     hydrated.destroy();
+    validTail.destroy();
+    lateUndo.destroy();
   });
 
   it("serializes different-actor raster set-union races and rejects an immutable-ID collision", async () => {
@@ -3322,6 +3374,37 @@ describe("StudioCrdtService", () => {
     applySync(target, await second.sync("work-1"));
     expect(Object.fromEntries(target.getMap("root"))).toEqual({ a: "1", b: "2", c: "3" });
     target.destroy();
+  });
+
+  it("hands a committed frontier to the event-driven raster checkpoint coordinator", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    const maybeEnqueue = vi.fn().mockResolvedValue(false);
+    const coordinator = {
+      maybeEnqueue,
+    } as unknown as StudioCrdtRasterCheckpointCoordinator;
+    const current = new StudioCrdtService(
+      repository,
+      allowStoredRasterAssetReferences,
+      allowStoredWorkAssetReferences,
+      new MemoryStudioCrdtClusterLoadRepository(),
+      {},
+      coordinator
+    );
+    services.push(current);
+
+    await current.applyUpdate({
+      workId: "work-checkpoint-trigger",
+      updateId: "00000000-0000-4000-8000-000000000790",
+      actorUserId: "editor",
+      data: yUpdate("committed", "frontier"),
+    });
+
+    expect(maybeEnqueue).toHaveBeenCalledOnce();
+    expect(maybeEnqueue).toHaveBeenCalledWith(
+      "work-checkpoint-trigger",
+      expect.any(Y.Doc),
+      1n
+    );
   });
 
   it("keeps exact-retry dedupe receipts after compaction deletes old update payloads", async () => {

@@ -9,6 +9,7 @@ import {
   appendedStudioCrdtRasterAssetReferences,
   appendsStudioCrdtRasterCheckpoint,
   assertStudioCrdtRasterAppendedEventAdmission,
+  assertStudioCrdtRasterAppendedEventsAfterCheckpointHorizon,
   conflictsWithStudioCrdtRasterRootSnapshot,
   preservesStudioCrdtRasterRoots,
   snapshotStudioCrdtRasterRoots,
@@ -21,6 +22,7 @@ import {
   STUDIO_CRDT_CLUSTER_LOAD_REPOSITORY,
   type StudioCrdtClusterLoadRepository,
 } from "./studio-crdt-cluster-load.repository";
+import { StudioCrdtRasterCheckpointCoordinator } from "./studio-crdt-raster-checkpoint.coordinator";
 import {
   STUDIO_CRDT_UUID_PATTERN as UUID_PATTERN,
   hasValidStudioCrdtRootSchema,
@@ -348,7 +350,10 @@ export class StudioCrdtService implements OnModuleDestroy {
     private readonly clusterLoadRepository: StudioCrdtClusterLoadRepository,
     @Optional()
     @Inject(STUDIO_CRDT_SERVICE_OPTIONS)
-    options: StudioCrdtServiceOptions = {}
+    options: StudioCrdtServiceOptions = {},
+    @Optional()
+    @Inject(StudioCrdtRasterCheckpointCoordinator)
+    private readonly rasterCheckpointCoordinator?: StudioCrdtRasterCheckpointCoordinator
   ) {
     this.now = options.now ?? (() => new Date());
     this.stateVectorMaxBytes = boundedInteger(
@@ -502,6 +507,11 @@ export class StudioCrdtService implements OnModuleDestroy {
       await this.catchUpDocument(input.workId, entry);
       entry.lastAccessedAt = this.now().getTime();
       await this.maybeCompact(input.workId, entry);
+      await this.rasterCheckpointCoordinator?.maybeEnqueue(
+        input.workId,
+        entry.doc,
+        entry.sequence
+      );
       return {
         duplicate: !persisted.inserted,
         updateId: persisted.receipt.updateId,
@@ -763,6 +773,9 @@ export class StudioCrdtService implements OnModuleDestroy {
         );
       }
       assertStudioCrdtRasterAppendedEventAdmission(rasterRootsBefore, probe, actorUserId);
+      if ((rasterRootsBefore?.checkpoints.size ?? 0) > 0) {
+        assertStudioCrdtRasterAppendedEventsAfterCheckpointHorizon(rasterRootsBefore, probe);
+      }
       assertStudioCrdtAppendedRasterLayersWritable(rasterRootsBefore?.operations, probe);
       const workAssetReferences = snapshotStudioWorkAssetReferences(probe);
       for (const [id, elementType] of workAssetReferencesBefore.identities) {

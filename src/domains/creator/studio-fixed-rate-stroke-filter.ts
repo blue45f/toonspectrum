@@ -443,6 +443,11 @@ function appendSamples(
   readonly state: FixedRateStrokeFilterState;
   readonly emitted: readonly FixedRateStrokeFilteredSample[];
 } {
+  // The live pointer route submits one coalesced sample per transition. Reuse ingestSample's
+  // append-only suffix directly so that hot path does not allocate a second array and copy every
+  // emitted logical tick into it. Multi-sample callers retain the same deterministic aggregation.
+  if (samples.length === 1) return ingestSample(initialState, samples[0]!);
+
   let state = initialState;
   const emitted: FixedRateStrokeFilteredSample[] = [];
   for (const sample of samples) {

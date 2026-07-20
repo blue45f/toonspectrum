@@ -104,7 +104,9 @@ export function browserBrushLibraryStorage(): BrushLibraryStorage | null {
 
 export const BRUSH_LIBRARY_KEY = "toonspectrum-studio-brush-library";
 export const BRUSH_LIBRARY_STORAGE_VERSION = 1;
-export const MAX_BRUSHES = 40; // studio-palette-library.ts의 MAX_PALETTES와 동일한 상한 정책을 따른다.
+// Imported PNG/ABR tips are compact (at most 64×64 alpha), so 120 professional presets remain
+// comfortably below ordinary localStorage quotas while avoiding the old 40-brush pack truncation.
+export const MAX_BRUSHES = 120;
 export const MAX_QUICK_BRUSHES = 8; // Procreate Recent와 같은, 한 번에 기억하기 좋은 빠른 접근 상한.
 export const DEFAULT_BRUSH_NAME = "이름 없는 브러시";
 
@@ -126,6 +128,13 @@ type BrushMutationFailureStatus = "storage-error" | "library-unreadable";
 export interface BrushSaveResult {
   brushes: StudioSavedBrush[];
   status: "saved" | "full" | BrushMutationFailureStatus;
+}
+
+export interface BrushBatchSaveResult {
+  brushes: StudioSavedBrush[];
+  savedCount: number;
+  skippedCount: number;
+  status: "saved" | "partial" | "full" | BrushMutationFailureStatus;
 }
 
 export interface DeletedBrushRecord {
@@ -550,6 +559,65 @@ export function saveBrushWithResult(
 /** 배열만 필요한 기존 호출부를 위한 호환 래퍼. 신규 UI는 saveBrushWithResult로 full을 안내한다. */
 export function saveBrush(storage: BrushLibraryStorage | null | undefined, brush: StudioSavedBrush): StudioSavedBrush[] {
   return saveBrushWithResult(storage, brush).brushes;
+}
+
+/**
+ * Persist a third-party brush pack in one storage write. Capacity overflow is deterministic and
+ * explicit: brushes keep source order, as many as fit are saved, and no half-written JSON state is
+ * exposed if the single write fails.
+ */
+export function saveBrushBatchWithResult(
+  storage: BrushLibraryStorage | null | undefined,
+  incoming: readonly StudioSavedBrush[]
+): BrushBatchSaveResult {
+  const read = readBrushLibrary(storage);
+  const readFailure = mutationFailureStatus(read.status);
+  if (readFailure) {
+    return {
+      brushes: read.brushes,
+      savedCount: 0,
+      skippedCount: incoming.length,
+      status: readFailure,
+    };
+  }
+  const unique: StudioSavedBrush[] = [];
+  const incomingIds = new Set<string>();
+  for (const brush of incoming) {
+    if (incomingIds.has(brush.id)) continue;
+    incomingIds.add(brush.id);
+    const { snapshot } = sanitizeBrushSnapshot(brush);
+    unique.push({ ...brush, ...snapshot });
+  }
+  if (unique.length === 0) {
+    return { brushes: read.brushes, savedCount: 0, skippedCount: 0, status: "saved" };
+  }
+  const retained = read.brushes.filter((brush) => !incomingIds.has(brush.id));
+  const available = Math.max(0, MAX_BRUSHES - retained.length);
+  const accepted = unique.slice(0, available);
+  const skippedCount = incoming.length - accepted.length;
+  if (accepted.length === 0) {
+    return {
+      brushes: read.brushes,
+      savedCount: 0,
+      skippedCount,
+      status: "full",
+    };
+  }
+  const next = [...accepted, ...retained];
+  if (!persist(storage, next)) {
+    return {
+      brushes: read.brushes,
+      savedCount: 0,
+      skippedCount: incoming.length,
+      status: "storage-error",
+    };
+  }
+  return {
+    brushes: next,
+    savedCount: accepted.length,
+    skippedCount,
+    status: skippedCount > 0 ? "partial" : "saved",
+  };
 }
 
 /**

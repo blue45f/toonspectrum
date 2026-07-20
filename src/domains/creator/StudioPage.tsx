@@ -1,25 +1,12 @@
 import {
-  ArrowDownToLine,
-  ArrowUpToLine,
-  Boxes,
   Clapperboard,
-  ChevronDown,
   Maximize2,
   Minimize2,
-  ChevronUp,
   Command,
-  Copy,
   Eraser,
-  AlignLeft,
-  AlignCenter,
-  AlignRight,
   BookOpen,
   FlipHorizontal2,
-  FolderPlus,
-  ImagePlus,
-  Loader2,
   Lock,
-  LockOpen,
   MessageCircle,
   UsersRound,
   Minus,
@@ -31,8 +18,6 @@ import {
   SlidersHorizontal,
   Sparkles,
   Square,
-  Trash2,
-  Type as TypeIcon,
   Undo2,
   Wind,
   Shapes,
@@ -1017,7 +1002,6 @@ import {
   snapshotStudioWebGpuAuthority,
   type StudioWebGpuAuthorityFrame,
 } from "./studio-webgpu-authority";
-import { buildStudioGpuLiveStroke } from "./studio-webgpu-stroke";
 import { planStudioWebGpuViewportSurface } from "./studio-webgpu-viewport";
 import {
   StudioWorkAssetAdmissionCoordinator,
@@ -1067,10 +1051,12 @@ import {
   projectStudioWriterRoomToCanvasPlan,
   type StudioWriterRoomCanvasProjectionResult,
 } from "./studio-writer-room-canvas-projection";
+import { StudioCanvasContextMenu } from "./StudioCanvasContextMenu";
 import {
   StudioCanvasGuideOverlayLayers,
   StudioCanvasGuideUnderlay,
 } from "./StudioCanvasGuideLayers";
+import { StudioCanvasStatusRail } from "./StudioCanvasStatusRail";
 import {
   colorBlindFilterStyle,
   StudioColorBlindFilterDefs,
@@ -1208,6 +1194,10 @@ import type { SvgExportEl, SvgExportResult } from "./studio-svg-export";
 import type { StudioTeamCommentCapabilities } from "./studio-team-comment-client";
 import type { StudioToolbarGroupId } from "./studio-toolbar-groups";
 import type { StudioGpuBackend } from "./studio-webgpu-frame-contract";
+import type {
+  StudioGpuLiveStrokePlan,
+  StudioGpuLiveStrokePlanner,
+} from "./studio-webgpu-live-stroke-plan";
 import type { StudioGpuStroke } from "./studio-webgpu-stroke";
 import type {
   StudioAssetShareOptions,
@@ -6539,6 +6529,7 @@ function StudioCuttoonEditor() {
   const [webGpuAuthority, setWebGpuAuthority] = useState<StudioWebGpuAuthorityFrame | null>(null);
   // 라이브 잉크 파인닝: 스트로크 시작 시점의 백엔드로 렌더러를 한 번 결정한다(중도 교대 금지).
   const webGpuBackendRef = useRef<StudioGpuBackend | null>(null);
+  const gpuLiveStrokePlannerRef = useRef<StudioGpuLiveStrokePlanner | null>(null);
   const webGpuCanvasHandleRef = useRef<StudioWebGpuCanvasHandle | null>(null);
   // 캔버스 memo 자식은 prop 경유 ref 변이가 금지(React Compiler)라 GPU 캔버스 콜백을 승격.
   function setWebGpuCanvasHandle(handle: StudioWebGpuCanvasHandle | null) {
@@ -6546,6 +6537,14 @@ function StudioCuttoonEditor() {
   }
   function onWebGpuBackendChange(backend: StudioGpuBackend) {
     webGpuBackendRef.current = backend;
+    if (backend !== "webgpu" || gpuLiveStrokePlannerRef.current) return;
+    void import("./studio-webgpu-live-stroke-plan")
+      .then(({ planStudioGpuLiveStroke }) => {
+        gpuLiveStrokePlannerRef.current = planStudioGpuLiveStroke;
+      })
+      .catch(() => {
+        // The ordinary Canvas2D overlay stays authoritative if an optional GPU helper chunk fails.
+      });
   }
   function onWebGpuDeviceLost() {
     // fail-once: 남은 스트로크는 Konva 초안이 즉시 이어받고 이 스트로크 동안
@@ -6866,10 +6865,12 @@ function StudioCuttoonEditor() {
       liveInkPredictionRendererRef.current.clear();
     }
   };
-  const buildGpuLiveStroke = (
+  const buildGpuLiveStrokePlan = (
     el: DrawEl,
-    options: { sealEndpoint?: boolean } = {}
-  ): StudioGpuStroke | null => {
+    options: { sealEndpoint?: boolean; correctedEl?: DrawEl | null } = {}
+  ): StudioGpuLiveStrokePlan | null => {
+    const planner = gpuLiveStrokePlannerRef.current;
+    if (!planner) return null;
     const samples = selectStudioCausalInkSamples({
       points: el.points,
       pressures: el.pressures,
@@ -6879,17 +6880,37 @@ function StudioCuttoonEditor() {
       // later sample arrives. Pointer-up explicitly seals the final endpoint below.
       sealEndpoint: options.sealEndpoint ?? false,
     });
-    return buildStudioGpuLiveStroke({
+    const correctedSamples = options.correctedEl
+      ? selectStudioCausalInkSamples({
+          points: options.correctedEl.points,
+          pressures: options.correctedEl.pressures,
+          pressureModel: options.correctedEl.pressureModel,
+          minDistance: options.correctedEl.sampleSpacing ?? 0,
+          sealEndpoint: true,
+        })
+      : null;
+    return planner({
       id: el.id,
       // 입력 단계에서 이미 거리 필터·스태빌라이저를 통과했다. 라이브 GPU 경계에서 다시
       // smoothing/resampling하면 새 점 하나가 과거 좌표와 필압을 바꿔 전체 texture rebuild가 된다.
       points: samples.flatMap(({ x, y }) => [x, y]),
       pressures: samples.map(({ pressure }) => pressure),
+      ...(correctedSamples
+        ? {
+            correctedPoints: correctedSamples.flatMap(({ x, y }) => [x, y]),
+            correctedPressures: correctedSamples.map(({ pressure }) => pressure),
+          }
+        : {}),
       color: el.stroke,
       size: Math.max(1, el.strokeWidth),
       pressureModel: el.pressureModel,
-      opacity: el.opacity,
-      composite: "normal" as const,
+      opacity: el.opacity ?? 1,
+      composite: el.mode === "eraser" ? "erase" : "normal",
+      orderKey: el.id,
+      symmetry: el.symmetry,
+      // The current live canvas is a transparent overlay over Konva. It must never claim that a
+      // destination-out eraser can punch through the retained document layer.
+      destination: "transparent-overlay",
     });
   };
   const buildGpuLiveStrokeView = (el: DrawEl): StudioGpuStroke | null => {
@@ -6898,7 +6919,7 @@ function StudioCuttoonEditor() {
     if (!el.pressures || el.pressures.length < pointCount) return null;
     // Building a view here does NOT by itself expose el.points to the async GPU queue — the
     // caller may still discard it (no-growth early-return) or replace it with a differently
-    // resampled array (the baseline branch's buildGpuLiveStroke(next), no "View" suffix). Only
+    // resampled array (the baseline branch's buildGpuLiveStrokePlan(next), no "View" suffix). Only
     // mark gpuLiveInkExposedPointsRef at the specific call site that actually retains this
     // reference asynchronously (the appendPinnedStrokeSuffix branch below).
     return {
@@ -6910,9 +6931,27 @@ function StudioCuttoonEditor() {
       color: el.stroke,
       size: Math.max(1, el.strokeWidth),
       pressureModel: el.pressureModel,
-      opacity: el.opacity,
-      composite: "normal",
+      opacity: el.opacity ?? 1,
+      composite: el.mode === "eraser" ? "erase" : "normal",
+      orderKey: el.id,
     };
+  };
+  const settleGpuLiveStroke = (source: DrawEl, finished: DrawEl): boolean => {
+    const correctedEl = source.points === finished.points
+      && source.pressures === finished.pressures
+      ? null
+      : finished;
+    const settled = buildGpuLiveStrokePlan(source, {
+      sealEndpoint: true,
+      correctedEl,
+    });
+    if (!settled) return false;
+    pendingGpuStrokesRef.current = [
+      ...pendingGpuStrokesRef.current,
+      ...settled.strokes,
+    ];
+    webGpuCanvasHandleRef.current?.syncPinnedStrokes(pendingGpuStrokesRef.current);
+    return true;
   };
   const flushDirectLiveDraft = () => {
     const next = liveDraftPendingRef.current;
@@ -6941,6 +6980,32 @@ function StudioCuttoonEditor() {
     liveDraftVisualRef.current = next;
     if (gpuLiveInkPinnedRef.current) {
       const handle = webGpuCanvasHandleRef.current;
+      const strokePlan = buildGpuLiveStrokePlan(next);
+      if (handle && strokePlan && strokePlan.variationCount > 1) {
+        const pointCount = strokePlan.renderedPointCount;
+        const previousPointCount = gpuPinnedLivePointCountRef.current;
+        const fallbackStrokes = [...pendingGpuStrokesRef.current, ...strokePlan.strokes];
+        if (previousPointCount > 0 && pointCount > previousPointCount) {
+          const firstStrokeIndex = pendingGpuStrokesRef.current.length;
+          handle.appendPinnedStrokeSuffixBatch({
+            fallbackStrokes,
+            patches: strokePlan.strokes.map((stroke, variationIndex) => ({
+              strokeIndex: firstStrokeIndex + variationIndex,
+              previousPointCount,
+              suffixPoints: stroke.points.slice(previousPointCount * 2),
+              suffixPressures: stroke.pressures!.slice(previousPointCount, pointCount),
+              nextStroke: stroke,
+              fallbackStrokes,
+            })),
+          });
+          gpuPinnedLivePointCountRef.current = pointCount;
+          return;
+        }
+        if (previousPointCount === pointCount && pointCount > 0) return;
+        handle.syncPinnedStrokes(fallbackStrokes);
+        gpuPinnedLivePointCountRef.current = pointCount;
+        return;
+      }
       const strokeView = buildGpuLiveStrokeView(next);
       if (handle && strokeView) {
         const pointCount = strokeView.points.length / 2;
@@ -6967,7 +7032,7 @@ function StudioCuttoonEditor() {
 
         // First tap (or a defensive non-prefix replacement) establishes one validated baseline.
         // Subsequent pointer frames use only the explicit suffix above.
-        const baselineStroke = buildGpuLiveStroke(next);
+        const baselineStroke = strokePlan?.strokes[0] ?? null;
         if (baselineStroke) {
           handle.syncPinnedStrokes([...pendingGpuStrokesRef.current, baselineStroke]);
           gpuPinnedLivePointCountRef.current = baselineStroke.points.length / 2;
@@ -10603,17 +10668,15 @@ function StudioCuttoonEditor() {
       if (gpuLingerRafRef.current) globalThis.cancelAnimationFrame(gpuLingerRafRef.current);
       gpuLingerRafRef.current = 0;
       const handle = webGpuCanvasHandleRef.current;
-      const activeGpuStroke = gpuLiveInkPinnedRef.current && drawingRef.current
-        ? buildGpuLiveStroke(drawingRef.current)
+      const activeGpuPlan = gpuLiveInkPinnedRef.current && drawingRef.current
+        ? buildGpuLiveStrokePlan(drawingRef.current)
         : null;
-      const nextGpuStrokes = activeGpuStroke
-        ? [...pendingGpuStrokesRef.current, activeGpuStroke]
+      const nextGpuStrokes = activeGpuPlan
+        ? [...pendingGpuStrokesRef.current, ...activeGpuPlan.strokes]
         : pendingGpuStrokesRef.current;
       handle?.syncPinnedStrokes(nextGpuStrokes);
       handle?.setPinnedVisible(nextGpuStrokes.length > 0);
-      gpuPinnedLivePointCountRef.current = activeGpuStroke
-        ? activeGpuStroke.points.length / 2
-        : 0;
+      gpuPinnedLivePointCountRef.current = activeGpuPlan?.renderedPointCount ?? 0;
     }
   }
 
@@ -11005,9 +11068,14 @@ function StudioCuttoonEditor() {
   ): void {
     commitStudioDrawingAssistDocument((current) => {
       const active = typeof action === "function" ? action(current.perspective.active) : action;
+      let points = current.perspective.points;
+      if (active && points.length === 0) {
+        const position = defaultVanishingPointPosition(points, CANVAS_W, canvasH);
+        points = addVanishingPoint(points, { id: uid(), x: position.x, y: position.y });
+      }
       return {
         ...current,
-        perspective: { ...current.perspective, active },
+        perspective: { active, points },
         isometric: active ? { ...current.isometric, active: false } : current.isometric,
         advanced: active
           ? { ...current.advanced, activeSnapRulerId: null }
@@ -17523,7 +17591,7 @@ function StudioCuttoonEditor() {
           && next.mode !== "eraser"
           && !next.fill
           && (next.symmetry?.type ?? "none") === "none";
-        const direct = isDirectLiveDraftEl(next)
+        const overlayDirect = isDirectLiveDraftEl(next)
           && (next.opacity ?? 1) === 1
           && studioLiveInkFastOverlaySupportsStyle(liveInkStyleFor(next));
         const stampKind = resolveStudioStampBrushKind(next.brush);
@@ -17545,13 +17613,35 @@ function StudioCuttoonEditor() {
             next.pressures?.[0] ?? 0.5
           )
         );
+        // GPU 파인은 낙관적으로 걸되 자가검증 게이트가 지킨다: 첫 프레임 영수증이 기한 안에
+        // 도착하지 않으면(조용히 실패하는 GPU 환경) 같은 스트로크 안에서 Konva 로 인계된다.
+        // (미드스트로크 스크린샷 검증 완료 — drawImage 기반 픽셀 판정은 WebGPU 캔버스에서
+        // 위음성을 내므로 합성 스크린샷/영수증으로만 판정한다.)
+        const gpuStartPlan = isDirectLiveDraftEl(next)
+          ? buildGpuLiveStrokePlan(next)
+          : null;
+        const liveInkBackendDecision = decideStudioLiveInkBackend({
+          preference: STUDIO_VISIBLE_LIVE_INK_PREFERENCE,
+          resolvedBackend: webGpuBackendRef.current,
+          // Advanced GPU preparation is a deferred capability. Until its small helper chunk is
+          // warm, the exact Canvas2D overlay owns the first stroke instead of racing module load.
+          direct: overlayDirect && gpuStartPlan !== null,
+          postCorrectionActive: causalPostCorrectionEligible,
+          mode: next.mode,
+          fill: next.fill,
+          opacity: next.opacity ?? 1,
+          symmetryType: next.symmetry?.type ?? "none",
+          preparedStroke: gpuStartPlan?.preparation,
+        });
+        const gpuPin = liveInkBackendDecision.backend === "webgpu";
+        const direct = overlayDirect || gpuPin;
         liveDraftDirectRef.current = direct;
         liveStampDraftDirectRef.current = stampDirect;
         if (!stampDirect) liveStampOverlayRendererRef.current.resetActive();
         liveDraftVisualRef.current = direct || stampDirect ? next : null;
         liveDraftPendingRef.current = direct || stampDirect ? next : null;
         const predictionTailEligible = STUDIO_POINTER_PREDICTION_ENABLED
-          && direct
+          && overlayDirect
           && next.mode !== "eraser"
           && !next.fill
           && (next.symmetry?.type ?? "none") === "none";
@@ -17562,21 +17652,6 @@ function StudioCuttoonEditor() {
           predictedInkTailStateRef.current = null;
           liveInkPredictionRendererRef.current.clear();
         }
-        // GPU 파인은 낙관적으로 걸되 자가검증 게이트가 지킨다: 첫 프레임 영수증이 기한 안에
-        // 도착하지 않으면(조용히 실패하는 GPU 환경) 같은 스트로크 안에서 Konva 로 인계된다.
-        // (미드스트로크 스크린샷 검증 완료 — drawImage 기반 픽셀 판정은 WebGPU 캔버스에서
-        // 위음성을 내므로 합성 스크린샷/영수증으로만 판정한다.)
-        const liveInkBackendDecision = decideStudioLiveInkBackend({
-          preference: STUDIO_VISIBLE_LIVE_INK_PREFERENCE,
-          resolvedBackend: webGpuBackendRef.current,
-          direct,
-          postCorrectionActive: causalPostCorrectionEligible,
-          mode: next.mode,
-          fill: next.fill,
-          opacity: next.opacity ?? 1,
-          symmetryType: next.symmetry?.type ?? "none",
-        });
-        const gpuPin = liveInkBackendDecision.backend === "webgpu";
         gpuLiveInkPinnedRef.current = gpuPin;
         gpuPinnedLivePointCountRef.current = 0;
         // 파인 가시성은 자식 컴포넌트만 갱신한다 — 대기(지연 커밋) GPU 잉크가 있으면 유지.
@@ -17586,7 +17661,7 @@ function StudioCuttoonEditor() {
         // 증분 오버레이: GPU 파인이 아닌 일반 펜/마커(대칭·채움 없음)는 표면에
         // 새 조각만 누적한다. begin 실패(표면 미준비) 시 Konva 초안이 자연 폴백.
         liveInkOverlayClearGenRef.current += 1;
-        if (direct && !gpuPin && next.mode !== "eraser" && !next.fill
+        if (overlayDirect && !gpuPin && next.mode !== "eraser" && !next.fill
           && (next.symmetry?.type ?? "none") === "none") {
           const liveInkStyle = liveInkStyleFor(next);
           if (causalPostCorrectionEligible) {
@@ -19084,16 +19159,10 @@ function StudioCuttoonEditor() {
             draftPreviewStoreRef.current.settle(finished);
           }
           if (gpuLiveInkPinnedRef.current) {
-            const settledGpu = buildGpuLiveStroke(authoritativeLiveStroke ?? finished, {
-              sealEndpoint: true,
-            });
-            if (settledGpu) {
-              pendingGpuStrokesRef.current = [...pendingGpuStrokesRef.current, settledGpu];
-              // Publish the sealed endpoint before preserveInk releases the active draft. Without
-              // this sync, a short final stabilizer sample would exist only in the later Konva
-              // commit and visibly pop in after the deferred interval.
-              webGpuCanvasHandleRef.current?.syncPinnedStrokes(pendingGpuStrokesRef.current);
-            }
+            // Publish the sealed endpoint before preserveInk releases the active draft. Without
+            // this sync, a short final stabilizer sample would exist only in the later Konva
+            // commit and visibly pop in after the deferred interval.
+            settleGpuLiveStroke(authoritativeLiveStroke ?? finished, finished);
           }
           queueDeferredStrokeCommit(finished);
         } else {
@@ -19131,13 +19200,7 @@ function StudioCuttoonEditor() {
             if (liveDraftDirectRef.current) {
               deferInkCleanup = overlayRenderer.isActive || gpuLiveInkPinnedRef.current;
               if (gpuLiveInkPinnedRef.current) {
-                const settledGpu = buildGpuLiveStroke(authoritativeLiveStroke ?? finished, {
-                  sealEndpoint: true,
-                });
-                if (settledGpu) {
-                  pendingGpuStrokesRef.current = [...pendingGpuStrokesRef.current, settledGpu];
-                  webGpuCanvasHandleRef.current?.syncPinnedStrokes(pendingGpuStrokesRef.current);
-                }
+                settleGpuLiveStroke(authoritativeLiveStroke ?? finished, finished);
               }
               if (!deferInkCleanup) {
                 // The live Canvas/WebGPU surface can be briefly unavailable during initial layout,
@@ -19164,13 +19227,7 @@ function StudioCuttoonEditor() {
             if (liveDraftDirectRef.current) {
               deferInkCleanup = true;
               if (gpuLiveInkPinnedRef.current) {
-                const settledGpu = buildGpuLiveStroke(authoritativeLiveStroke ?? finished, {
-                  sealEndpoint: true,
-                });
-                if (settledGpu) {
-                  pendingGpuStrokesRef.current = [...pendingGpuStrokesRef.current, settledGpu];
-                  webGpuCanvasHandleRef.current?.syncPinnedStrokes(pendingGpuStrokesRef.current);
-                }
+                settleGpuLiveStroke(authoritativeLiveStroke ?? finished, finished);
               } else if (!overlayRenderer.isActive && finished.mode !== "eraser") {
                 draftPreviewStoreRef.current.settle(finished);
               }
@@ -24316,210 +24373,58 @@ function StudioCuttoonEditor() {
         </Suspense>
       ) : null}
 
-      {contextMenu.visible && (
-        // onClick은 사용자 액션이 아니라 window의 바깥-클릭 닫기로의 버블링만 막는 용도(stopPropagation)이며, 실제 동작은 내부 <button> 메뉴 항목이 담당하는 false positive다.
-        // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
-        <div
-          style={{ top: contextMenu.y, left: contextMenu.x }}
-          className="fixed z-50 min-w-[140px] rounded-lg border border-line bg-panel p-1 shadow-xl motion-safe:animate-fade-in"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {contextMenu.elId ? (
-            <>
-              {contextMenuEl?.type === "image" && (contextMenuEl.vrmScene || parseStudio3dTool(contextMenuEl.src) === "vrm-poser") && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPoserInitialDataUrl(contextMenuEl.src);
-                      setPoserInitialElementId(contextMenuEl.id);
-                      setPoserVrmOpen(true);
-                      setContextMenu((prev) => ({ ...prev, visible: false }));
-                    }}
-                    className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs font-semibold text-accent hover:bg-raised"
-                  >
-                    <Sparkles size={12} />
-                    3D 캐릭터 편집
-                  </button>
-                  <div className="my-1 h-px bg-line" />
-                </>
-              )}
-              {contextMenuEl?.type === "image" && contextMenuBg3dEditSource && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setBg3dInitialScene(contextMenuBg3dEditSource.scene);
-                      setBg3dInitialDataUrl(contextMenuBg3dEditSource.legacyDataUrl);
-                      setBg3dInitialElementId(contextMenuEl.id);
-                      setBg3dOpen(true);
-                      setContextMenu((prev) => ({ ...prev, visible: false }));
-                    }}
-                    onPointerEnter={preloadStudioBackground3D}
-                    onPointerDown={preloadStudioBackground3D}
-                    onFocus={preloadStudioBackground3D}
-                    className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs font-semibold text-accent hover:bg-raised"
-                  >
-                    <Boxes size={12} />
-                    3D 배경 편집
-                  </button>
-                  <div className="my-1 h-px bg-line" />
-                </>
-              )}
-              <button
-                type="button"
-                onClick={() => void saveElementAsEmeresLibraryItem(contextMenu.elId!)}
-                className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-fg hover:bg-raised"
-              >
-                <ImagePlus size={12} />
-                이메레스로 저장
-              </button>
-              <div className="my-1 h-px bg-line" />
-              <button
-                type="button"
-                onClick={() => {
-                  duplicateSelected();
-                  setContextMenu((prev) => ({ ...prev, visible: false }));
-                }}
-                className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-fg hover:bg-raised"
-              >
-                <Copy size={12} />
-                복제하기 (⌘J)
-              </button>
-              <div className="my-1 h-px bg-line" />
-              <button
-                type="button"
-                onClick={() => {
-                  reorder("front");
-                  setContextMenu((prev) => ({ ...prev, visible: false }));
-                }}
-                className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-fg hover:bg-raised"
-              >
-                <ArrowUpToLine size={12} />
-                맨 앞으로
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  reorder("forward");
-                  setContextMenu((prev) => ({ ...prev, visible: false }));
-                }}
-                className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-fg hover:bg-raised"
-              >
-                <ChevronUp size={12} />
-                한 단계 앞으로
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  reorder("backward");
-                  setContextMenu((prev) => ({ ...prev, visible: false }));
-                }}
-                className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-fg hover:bg-raised"
-              >
-                <ChevronDown size={12} />
-                한 단계 뒤로
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  reorder("back");
-                  setContextMenu((prev) => ({ ...prev, visible: false }));
-                }}
-                className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-fg hover:bg-raised"
-              >
-                <ArrowDownToLine size={12} />
-                맨 뒤로
-              </button>
-              <div className="my-1 h-px bg-line" />
-              <button
-                type="button"
-                onClick={() => {
-                  if (contextMenuEl) patchEl(contextMenuEl.id, { locked: !contextMenuEl.locked });
-                  setContextMenu((prev) => ({ ...prev, visible: false }));
-                }}
-                className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-fg hover:bg-raised"
-              >
-                {contextMenuEl?.locked ? <LockOpen size={12} /> : <Lock size={12} />}
-                {contextMenuEl?.locked ? "잠금 해제" : "위치 잠금"}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  removeSelected();
-                  setContextMenu((prev) => ({ ...prev, visible: false }));
-                }}
-                className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-bad hover:bg-bad-soft/30"
-              >
-                <Trash2 size={12} />
-                삭제하기
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={() => {
-                  setTool("draw");
-                  setDrawMode("pen");
-                  setContextMenu((prev) => ({ ...prev, visible: false }));
-                }}
-                className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs font-semibold text-fg hover:bg-raised"
-              >
-                <Pencil size={12} />
-                펜으로 그리기
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  addBubble("speech");
-                  setContextMenu((prev) => ({ ...prev, visible: false }));
-                }}
-                className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-fg hover:bg-raised"
-              >
-                <MessageCircle size={12} />
-                말풍선 추가
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  addText();
-                  setContextMenu((prev) => ({ ...prev, visible: false }));
-                }}
-                className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-fg hover:bg-raised"
-              >
-                <TypeIcon size={12} />
-                텍스트 추가
-              </button>
-              <div className="my-1 h-px bg-line" />
-              <button
-                type="button"
-                onClick={() => {
-                  addPage();
-                  setContextMenu((prev) => ({ ...prev, visible: false }));
-                }}
-                className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-fg hover:bg-raised"
-              >
-                <Plus size={12} />
-                새 페이지 추가
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setQuickShapeActive(true);
-                  setTool("draw");
-                  setDrawMode("pen");
-                  setContextMenu((prev) => ({ ...prev, visible: false }));
-                }}
-                className="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-accent hover:bg-raised"
-              >
-                <Shapes size={12} />
-                스마트 도형 켜기
-              </button>
-            </>
-          )}
-        </div>
-      )}
+      <StudioCanvasContextMenu
+        open={contextMenu.visible}
+        x={contextMenu.x}
+        y={contextMenu.y}
+        hasElement={contextMenu.elId !== null}
+        locked={contextMenuEl?.locked === true}
+        onEditVrm={
+          contextMenuEl?.type === "image" &&
+          (contextMenuEl.vrmScene || parseStudio3dTool(contextMenuEl.src) === "vrm-poser")
+            ? () => {
+                setPoserInitialDataUrl(contextMenuEl.src);
+                setPoserInitialElementId(contextMenuEl.id);
+                setPoserVrmOpen(true);
+              }
+            : undefined
+        }
+        onEditBackground3d={
+          contextMenuEl?.type === "image" && contextMenuBg3dEditSource
+            ? () => {
+                setBg3dInitialScene(contextMenuBg3dEditSource.scene);
+                setBg3dInitialDataUrl(contextMenuBg3dEditSource.legacyDataUrl);
+                setBg3dInitialElementId(contextMenuEl.id);
+                setBg3dOpen(true);
+              }
+            : undefined
+        }
+        onPreloadBackground3d={preloadStudioBackground3D}
+        onSaveAsEmeres={() => {
+          if (contextMenu.elId) void saveElementAsEmeresLibraryItem(contextMenu.elId);
+        }}
+        onDuplicate={duplicateSelected}
+        onReorder={reorder}
+        onToggleLock={() => {
+          if (contextMenuEl) {
+            patchEl(contextMenuEl.id, { locked: !contextMenuEl.locked });
+          }
+        }}
+        onDelete={removeSelected}
+        onSelectPen={() => {
+          setTool("draw");
+          setDrawMode("pen");
+        }}
+        onAddSpeechBubble={() => addBubble("speech")}
+        onAddText={() => addText()}
+        onAddPage={addPage}
+        onEnableQuickShape={() => {
+          setQuickShapeActive(true);
+          setTool("draw");
+          setDrawMode("pen");
+        }}
+        onClose={() => setContextMenu((prev) => ({ ...prev, visible: false }))}
+      />
     </Container>
     {canvasOnlyMode ? (
       <div className="pointer-events-none fixed inset-x-0 top-[max(0.5rem,env(safe-area-inset-top))] z-[45] flex justify-center px-3">
@@ -25255,228 +25160,26 @@ const StudioCanvasViewport = memo(function StudioCanvasViewport({
           )}
           data-studio-logical-w={CANVAS_W}
         >
-          <div
-            data-studio-canvas-status-rail
-            className={cn(
-              mobileImmersive
-                ? "max-h-[min(30dvh,12rem)] shrink-0 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]"
-                : "contents"
-            )}
-          >
-          {/* 임시저장 복구 배너 */}
-          {hasAutosave && (
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-warning/30 bg-warning-soft/20 p-2.5 text-xs text-warning">
-              <span className="min-w-0 flex-1 font-medium leading-relaxed">
-                {autosaveRestoreBlockedReason
-                  ? autosaveRestoreBlockedReason === "revision-mismatch"
-                    ? "⚠️ 임시저장본이 현재 서버 revision과 달라 자동 복구를 차단했습니다. JSON으로 백업해 수동 병합해 주세요."
-                    : "⚠️ 출처 revision을 확인할 수 없는 공동 임시저장본입니다. 자동 복구하지 않고 원본을 보존합니다."
-                  : "⚠️ 이전에 작성 중이던 임시저장 데이터가 있습니다."}
-              </span>
-              <div className="ml-auto flex shrink-0 items-center gap-1.5">
-                {autosaveRestoreBlockedReason ? (
-                  <button
-                    type="button"
-                    onClick={downloadAutosaveBackup}
-                    className="min-h-11 rounded-lg bg-accent/20 px-3 py-2 font-bold text-accent hover:bg-accent/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                  >
-                    JSON 백업
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => void restoreAutosave()}
-                    className="min-h-11 rounded-lg bg-accent/20 px-3 py-2 font-bold text-accent hover:bg-accent/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                  >
-                    복구하기
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={clearAutosave}
-                  className="min-h-11 rounded-lg bg-line px-3 py-2 font-medium text-fg-3 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                >
-                  비우기
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* 마퀴 다중선택 액션바 */}
-          {marqueeIds.length > 0 && (
-            <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-accent/40 bg-accent-soft/30 px-3 py-1.5 text-xs">
-              <span className="font-semibold text-accent">{marqueeIds.length}개 선택됨</span>
-              <span className="text-fg-3">· 방향키로 이동 · 모서리로 크기·회전</span>
-              <div className="ml-auto flex items-center gap-1.5 flex-wrap">
-                {marqueeIds.length >= 2 && (
-                  <button
-                    type="button"
-                    onClick={groupSelectedElements}
-                    className="flex items-center gap-1 rounded-md border border-line bg-card px-2 py-1 font-semibold text-fg-2 transition-colors hover:bg-raised cursor-pointer"
-                    title="그룹화"
-                  >
-                    <FolderPlus size={13} />
-                    <span>그룹화</span>
-                  </button>
-                )}
-                <div className="h-4 w-px bg-line/60 mx-1" />
-                <div className="inline-flex gap-0.5 rounded-md border border-line bg-card/50 p-0.5">
-                  <button
-                    type="button"
-                    onClick={() => alignSelected("left")}
-                    className="rounded p-1 hover:bg-raised text-fg-3 hover:text-fg cursor-pointer"
-                    title="왼쪽 정렬"
-                  >
-                    <AlignLeft size={13} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => alignSelected("hcenter")}
-                    className="rounded p-1 hover:bg-raised text-fg-3 hover:text-fg cursor-pointer"
-                    title="가로 가운데 정렬"
-                  >
-                    <AlignCenter size={13} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => alignSelected("right")}
-                    className="rounded p-1 hover:bg-raised text-fg-3 hover:text-fg cursor-pointer"
-                    title="오른쪽 정렬"
-                  >
-                    <AlignRight size={13} />
-                  </button>
-                </div>
-                <div className="inline-flex gap-0.5 rounded-md border border-line bg-card/50 p-0.5">
-                  <button
-                    type="button"
-                    onClick={() => alignSelected("top")}
-                    className="rounded px-1.5 py-0.5 hover:bg-raised text-[0.66rem] font-bold text-fg-3 hover:text-fg cursor-pointer"
-                    title="위쪽 정렬"
-                  >
-                    상
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => alignSelected("vcenter")}
-                    className="rounded px-1.5 py-0.5 hover:bg-raised text-[0.66rem] font-bold text-fg-3 hover:text-fg cursor-pointer"
-                    title="세로 가운데 정렬"
-                  >
-                    중
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => alignSelected("bottom")}
-                    className="rounded px-1.5 py-0.5 hover:bg-raised text-[0.66rem] font-bold text-fg-3 hover:text-fg cursor-pointer"
-                    title="아래쪽 정렬"
-                  >
-                    하
-                  </button>
-                </div>
-                {marqueeIds.length >= 3 && (
-                  <div className="inline-flex gap-0.5 rounded-md border border-line bg-card/50 p-0.5">
-                    <button
-                      type="button"
-                      onClick={() => alignSelected("distributeH")}
-                      className="rounded px-1.5 py-0.5 hover:bg-raised text-[0.66rem] font-bold text-fg-3 hover:text-fg cursor-pointer"
-                      title="가로 간격 동일하게 정렬"
-                    >
-                      가로 분배
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => alignSelected("distributeV")}
-                      className="rounded px-1.5 py-0.5 hover:bg-raised text-[0.66rem] font-bold text-fg-3 hover:text-fg cursor-pointer"
-                      title="세로 간격 동일하게 정렬"
-                    >
-                      세로 분배
-                    </button>
-                  </div>
-                )}
-                <div className="h-4 w-px bg-line/60 mx-1" />
-                <button
-                  type="button"
-                  onClick={duplicateSelected}
-                  className="rounded-md border border-line bg-card px-2 py-1 font-semibold text-fg-2 transition-colors hover:bg-raised cursor-pointer"
-                >
-                  복제
-                </button>
-                <button
-                  type="button"
-                  onClick={removeSelected}
-                  className="rounded-md border border-line bg-card px-2 py-1 font-semibold text-bad transition-colors hover:bg-raised cursor-pointer"
-                >
-                  삭제
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMarqueeIds([])}
-                  className="rounded-md border border-line bg-card px-2 py-1 font-semibold text-fg-2 transition-colors hover:bg-raised cursor-pointer"
-                >
-                  해제
-                </button>
-              </div>
-            </div>
-          )}
-
-          {(advancedFillBusy || advancedFillPreview) && (
-            <div
-              role="status"
-              aria-live="polite"
-              className={cn(
-                "mb-2 flex min-h-12 flex-wrap items-center gap-2 rounded-xl border px-3 py-2 text-xs shadow-sm",
-                advancedFillPreview
-                  ? "border-good/35 bg-good-soft/20 text-fg"
-                  : "border-accent/35 bg-accent-soft/25 text-fg",
-              )}
-            >
-              <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-panel/80 text-accent">
-                {advancedFillBusy ? (
-                  <Loader2 size={16} className="animate-spin motion-reduce:animate-none" aria-hidden />
-                ) : (
-                  <PaintBucket size={16} aria-hidden />
-                )}
-              </span>
-              <span className="min-w-0 flex-1 leading-relaxed">
-                <strong className="block font-bold">
-                  {advancedFillBusy ? "고급 채우기 분석 중" : "채우기 미리보기"}
-                </strong>
-                <span className="text-fg-3">
-                  {advancedFillBusy
-                    ? "참조 경계와 누수 가능성을 확인하고 있어요."
-                    : `${advancedFillPreview?.message ?? ""}${advancedFillActive ? " · 다른 영역을 탭해 한 번의 적용으로 누적할 수 있어요." : ""}`}
-                </span>
-              </span>
-              {advancedFillPreview && !advancedFillBusy && (
-                <span className="ml-auto flex min-w-full gap-2 sm:min-w-0">
-                  <button
-                    type="button"
-                    onClick={cancelAdvancedFillPreview}
-                    className="min-h-11 flex-1 rounded-lg border border-line bg-card px-3 font-semibold text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:flex-none"
-                  >
-                    취소
-                  </button>
-                  <button
-                    type="button"
-                    onClick={applyAdvancedFillPreview}
-                    className="min-h-11 flex-1 rounded-lg bg-accent px-4 font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:flex-none"
-                  >
-                    적용 · 실행취소 1회
-                  </button>
-                </span>
-              )}
-              {advancedFillBusy && (
-                <button
-                  type="button"
-                  onClick={toggleAdvancedFill}
-                  className="ml-auto min-h-11 min-w-24 rounded-lg border border-accent/35 bg-card px-3 font-bold text-accent transition-colors hover:bg-accent-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                >
-                  계산 취소
-                </button>
-              )}
-            </div>
-          )}
-          </div>
-
+          <StudioCanvasStatusRail
+            mobileImmersive={mobileImmersive}
+            hasAutosave={hasAutosave}
+            autosaveRestoreBlockedReason={autosaveRestoreBlockedReason}
+            selectionCount={marqueeIds.length}
+            advancedFillBusy={advancedFillBusy}
+            advancedFillPreviewMessage={advancedFillPreview?.message ?? null}
+            advancedFillActive={advancedFillActive}
+            onDownloadAutosaveBackup={downloadAutosaveBackup}
+            onRestoreAutosave={restoreAutosave}
+            onClearAutosave={clearAutosave}
+            onGroupSelection={groupSelectedElements}
+            onAlignSelection={alignSelected}
+            onDuplicateSelection={duplicateSelected}
+            onRemoveSelection={removeSelected}
+            onClearSelection={() => setMarqueeIds([])}
+            onCancelAdvancedFillPreview={cancelAdvancedFillPreview}
+            onApplyAdvancedFillPreview={applyAdvancedFillPreview}
+            onCancelAdvancedFillCalculation={toggleAdvancedFill}
+          />
           {/* 색맹 시뮬레이션용 숨김 SVG filter defs — filter id 는 문서 전역 참조라 위치 무관, 정적이라 무조건 마운트 */}
           <StudioColorBlindFilterDefs />
           {/* Sketchbook/Krita/Concepts status — zoom HUD + tool metrics over canvas */}

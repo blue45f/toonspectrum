@@ -1,10 +1,11 @@
 // 브러시 라이브러리 패널 — StudioPage가 소유하는 단일 목록을 데스크톱/모바일과 공유하는
 // controlled consumer다. 이름 붙은 브러시 설정을 저장·고정·복제·이름변경·안전 삭제하고,
-// 앱 전용 JSON 포맷으로 가져오기/내보내기 한다.
+// 앱 전용 JSON과 Photoshop ABR 팩을 가져오고, 안전한 앱 전용 JSON으로 내보낸다.
 import {
   Check,
   Copy,
   Download,
+  LoaderCircle,
   Pencil,
   Pin,
   RefreshCw,
@@ -24,6 +25,7 @@ import {
   importBrushFromJson,
   MAX_BRUSHES,
   renameBrushWithResult,
+  saveBrushBatchWithResult,
   saveBrushWithResult,
   sortBrushesForLibrary,
   toggleBrushPinnedWithResult,
@@ -84,6 +86,7 @@ export function StudioBrushLibraryPanel({
   const [newName, setNewName] = useState("");
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renamingName, setRenamingName] = useState("");
+  const [importing, setImporting] = useState(false);
   const saveTriggerRef = useRef<HTMLButtonElement>(null);
   const renameReturnFocusRef = useRef<HTMLButtonElement | null>(null);
   const orderedBrushes = sortBrushesForLibrary(brushes);
@@ -211,21 +214,54 @@ export function StudioBrushLibraryPanel({
     globalThis.requestAnimationFrame?.(() => saveTriggerRef.current?.focus({ preventScroll: true }));
   }
 
-  function handleImportFile(event: ChangeEvent<HTMLInputElement>) {
+  async function handleImportFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
     setError(null);
     setDoneMsg(null);
+    const abr = /\.abr$/iu.test(file.name) || file.type === "application/x-photoshop";
+    if (abr) {
+      setImporting(true);
+      try {
+        const { importStudioAbrFile } = await import("./studio-abr-import-client");
+        const result = await importStudioAbrFile(file);
+        const imported = result.brushes.map((candidate) => createBrush(candidate.name, candidate.snapshot));
+        const saved = saveBrushBatchWithResult(browserBrushLibraryStorage(), imported);
+        if (saved.status === "storage-error" || saved.status === "library-unreadable") {
+          setMutationError(saved.status);
+          return;
+        }
+        if (saved.status === "full") {
+          setError(capacityMessage);
+          return;
+        }
+        onBrushesChange(saved.brushes);
+        const details = [`ABR에서 브러시 ${saved.savedCount}개를 가져왔어요.`];
+        const skipped = result.skippedBrushCount + saved.skippedCount;
+        if (skipped > 0) details.push(`${skipped}개는 펜촉 누락 또는 라이브러리 한도로 건너뛰었어요.`);
+        if (result.approximatedBrushCount > 0) {
+          details.push(`${result.approximatedBrushCount}개의 Photoshop 전용 효과는 가장 가까운 Studio 다이내믹스로 변환했어요.`);
+        }
+        setDoneMsg(details.join(" "));
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : "ABR 브러시 팩을 가져오지 못했어요.");
+      } finally {
+        setImporting(false);
+      }
+      return;
+    }
     if (file.size > MAX_IMPORT_FILE_BYTES) {
       setError("파일이 너무 커요. 2MB 이하 브러시 설정(.json) 파일만 가져올 수 있어요.");
       return;
     }
+    setImporting(true);
     const reader = new FileReader();
     reader.onload = (loadEvent) => {
       const text = loadEvent.target?.result;
       if (typeof text !== "string") {
         setError("브러시 설정 파일을 읽지 못했어요.");
+        setImporting(false);
         return;
       }
       try {
@@ -238,9 +274,14 @@ export function StudioBrushLibraryPanel({
         storeNewBrush(imported, parts.join(" "));
       } catch (caught) {
         setError(caught instanceof Error ? caught.message : "브러시 설정 파일을 가져오지 못했어요.");
+      } finally {
+        setImporting(false);
       }
     };
-    reader.onerror = () => setError("브러시 설정 파일을 읽지 못했어요.");
+    reader.onerror = () => {
+      setError("브러시 설정 파일을 읽지 못했어요.");
+      setImporting(false);
+    };
     reader.readAsText(file);
   }
 
@@ -265,12 +306,16 @@ export function StudioBrushLibraryPanel({
           </p>
         </div>
         <label className="flex min-h-11 shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-line px-2 text-[0.62rem] font-semibold text-fg-2 transition-colors hover:bg-raised focus-within:outline focus-within:outline-2 focus-within:outline-accent lg:min-h-8">
-          <Upload size={12} aria-hidden /> 가져오기
+          {importing
+            ? <LoaderCircle size={12} className="animate-spin" aria-hidden />
+            : <Upload size={12} aria-hidden />}
+          {importing ? "변환 중…" : "가져오기"}
           <input
             type="file"
-            accept=".json,application/json"
-            aria-label="브러시 설정 가져오기"
+            accept=".json,.abr,application/json,application/octet-stream,application/x-photoshop"
+            aria-label="브러시 설정 또는 Photoshop ABR 가져오기"
             className="sr-only"
+            disabled={importing}
             onChange={handleImportFile}
           />
         </label>

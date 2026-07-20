@@ -131,4 +131,16 @@ describe("StudioWebGpuCanvas", () => {
     );
     expect(webGpuCanvasSource).not.toContain("setPerformanceMetrics");
   });
+
+  it("exposes one atomic suffix-batch command for live symmetry groups", () => {
+    expect(webGpuCanvasSource).toContain(
+      "readonly appendPinnedStrokeSuffixBatch: (patch: StudioGpuStrokeSuffixBatchPatch) => void",
+    );
+    expect(webGpuCanvasSource).toContain(
+      'queuePinnedRequest(patch.fallbackStrokes, { mode: "append-batch", patch })',
+    );
+    expect(webGpuCanvasSource).toContain(
+      "engine.appendStrokeFeedSuffixBatch(command.patch, requestId)",
+    );
+  });
 });

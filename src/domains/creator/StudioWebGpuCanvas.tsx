@@ -11,6 +11,7 @@ import {
 import {
   planStudioGpuPinnedStrokeFeedUpdate,
   type StudioGpuStrokeOperationsAppendPatch,
+  type StudioGpuStrokeSuffixBatchPatch,
   type StudioGpuStrokeSuffixPatch,
 } from "./studio-webgpu-stroke-feed";
 
@@ -87,6 +88,8 @@ export interface StudioWebGpuCanvasHandle {
   readonly syncPinnedStrokes: (strokes: readonly StudioGpuStroke[]) => void;
   /** Explicit zero-history-copy hot path for callers that already own a proven point suffix. */
   readonly appendPinnedStrokeSuffix: (patch: StudioGpuStrokeSuffixPatch) => void;
+  /** Appends a terminal symmetry group's suffixes atomically and submits exactly one frame. */
+  readonly appendPinnedStrokeSuffixBatch: (patch: StudioGpuStrokeSuffixBatchPatch) => void;
   /** Appends newly-started operations while retaining earlier normal/erase pixels in place. */
   readonly appendPinnedStrokeOperations: (patch: StudioGpuStrokeOperationsAppendPatch) => void;
   /** Replaces the pinned baseline and deliberately pays one full validation/snapshot cost. */
@@ -121,6 +124,7 @@ type StudioGpuEngineFeedCommand =
   | { readonly mode: "replace" }
   | { readonly mode: "append-operations"; readonly patch: StudioGpuStrokeOperationsAppendPatch }
   | { readonly mode: "append"; readonly patch: StudioGpuStrokeSuffixPatch }
+  | { readonly mode: "append-batch"; readonly patch: StudioGpuStrokeSuffixBatchPatch }
   | { readonly mode: "retain" }
   | { readonly mode: "reset" };
 
@@ -278,6 +282,9 @@ function StudioWebGpuCanvas({
     appendPinnedStrokeSuffix: (patch) => {
       queuePinnedRequest(patch.fallbackStrokes, { mode: "append", patch });
     },
+    appendPinnedStrokeSuffixBatch: (patch) => {
+      queuePinnedRequest(patch.fallbackStrokes, { mode: "append-batch", patch });
+    },
     appendPinnedStrokeOperations: (patch) => {
       queuePinnedRequest(patch.fallbackStrokes, { mode: "append-operations", patch });
     },
@@ -383,6 +390,8 @@ function StudioWebGpuCanvas({
       syncViewport();
       if (command.mode === "append") {
         engine.appendStrokeFeedSuffix(command.patch, requestId);
+      } else if (command.mode === "append-batch") {
+        engine.appendStrokeFeedSuffixBatch(command.patch, requestId);
       } else if (command.mode === "append-operations") {
         engine.appendStrokeFeedOperations(command.patch, requestId);
       } else if (command.mode === "retain") {

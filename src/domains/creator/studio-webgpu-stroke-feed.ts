@@ -42,6 +42,16 @@ export interface StudioGpuStrokeOperationsAppendPatch {
   readonly fallbackStrokes: readonly StudioGpuStroke[];
 }
 
+/**
+ * Applies one append-only suffix to every operation in a terminal symmetry group, then submits a
+ * single frame. Each child patch keeps the ordinary suffix proof; the shared fallback prevents a
+ * partially accepted group from becoming visible if any variation is stale or malformed.
+ */
+export interface StudioGpuStrokeSuffixBatchPatch {
+  readonly patches: readonly StudioGpuStrokeSuffixPatch[];
+  readonly fallbackStrokes: readonly StudioGpuStroke[];
+}
+
 export type StudioGpuPinnedStrokeFeedUpdate =
   | { readonly mode: "reset" }
   | { readonly mode: "replace"; readonly strokes: readonly StudioGpuStroke[] }
@@ -318,15 +328,16 @@ function validSuffixPatch(
 }
 
 /** Applies a proven suffix without copying or comparing retained point history. */
-export function advanceStudioGpuStrokeFeed(
+function advanceStudioGpuStrokeFeedAtIndex(
   previousStrokes: readonly StudioGpuStroke[],
-  patch: StudioGpuStrokeSuffixPatch
+  patch: StudioGpuStrokeSuffixPatch,
+  requireTerminal: boolean
 ): StudioGpuStrokeFeedAdvance {
   if (
     !Number.isSafeInteger(patch.strokeIndex)
     || patch.strokeIndex < 0
     || patch.strokeIndex >= previousStrokes.length
-    || patch.strokeIndex !== previousStrokes.length - 1
+    || (requireTerminal && patch.strokeIndex !== previousStrokes.length - 1)
     || patch.fallbackStrokes.length !== previousStrokes.length
     || patch.fallbackStrokes[patch.strokeIndex] !== patch.nextStroke
   ) {
@@ -415,6 +426,60 @@ export function advanceStudioGpuStrokeFeed(
   const strokes = previousStrokes.slice();
   strokes[patch.strokeIndex] = nextStroke;
   return { status: "appended", strokes: Object.freeze(strokes) };
+}
+
+/** Applies one proven suffix to the terminal live operation. */
+export function advanceStudioGpuStrokeFeed(
+  previousStrokes: readonly StudioGpuStroke[],
+  patch: StudioGpuStrokeSuffixPatch
+): StudioGpuStrokeFeedAdvance {
+  return advanceStudioGpuStrokeFeedAtIndex(previousStrokes, patch, true);
+}
+
+/**
+ * Advances a contiguous terminal group (for example radial/kaleidoscope copies) atomically.
+ * Historical point arrays are never compared or copied. A single invalid variation rejects the
+ * complete batch so symmetry cannot tear across frames.
+ */
+export function advanceStudioGpuStrokeFeedBatch(
+  previousStrokes: readonly StudioGpuStroke[],
+  batch: StudioGpuStrokeSuffixBatchPatch
+): StudioGpuStrokeFeedAdvance {
+  const { patches, fallbackStrokes } = batch;
+  const firstStrokeIndex = previousStrokes.length - patches.length;
+  if (
+    patches.length < 1
+    || patches.length > 32
+    || firstStrokeIndex < 0
+    || fallbackStrokes.length !== previousStrokes.length
+  ) {
+    return { status: "rejected", strokes: previousStrokes };
+  }
+  for (let index = 0; index < firstStrokeIndex; index += 1) {
+    if (!sameStudioGpuStroke(previousStrokes[index]!, fallbackStrokes[index]!)) {
+      return { status: "rejected", strokes: previousStrokes };
+    }
+  }
+  for (let index = 0; index < patches.length; index += 1) {
+    const patch = patches[index]!;
+    if (
+      patch.strokeIndex !== firstStrokeIndex + index
+      || patch.fallbackStrokes !== fallbackStrokes
+      || patch.nextStroke !== fallbackStrokes[patch.strokeIndex]
+    ) {
+      return { status: "rejected", strokes: previousStrokes };
+    }
+  }
+
+  let advancedStrokes = previousStrokes;
+  for (const patch of patches) {
+    const advanced = advanceStudioGpuStrokeFeedAtIndex(advancedStrokes, patch, false);
+    if (advanced.status === "rejected") {
+      return { status: "rejected", strokes: previousStrokes };
+    }
+    advancedStrokes = advanced.strokes;
+  }
+  return { status: "appended", strokes: advancedStrokes };
 }
 
 /**
