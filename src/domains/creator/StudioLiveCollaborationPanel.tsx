@@ -846,10 +846,11 @@ export function StudioLiveCollaborationPanel() {
             return;
           }
           icePolicyLease = lease;
-          attachController(lease);
+          const controller = attachController(lease);
           unsubscribeIcePolicy = lease.subscribeConfigurationChange(() => {
             if (cancelled) return;
             setScreenNetworkMode(lease.mode);
+            controller.refreshNetworkPolicy();
           });
         })
         .catch((error: unknown) => {

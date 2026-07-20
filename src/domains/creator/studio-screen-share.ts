@@ -218,12 +218,15 @@ export class StudioScreenShareController {
   private readonly pendingRequests = new Map<string, StudioScreenShareRequest>();
   private readonly viewers = new Map<string, StudioScreenShareViewer>();
   private readonly earlyViewerIce = new Map<string, RTCIceCandidateInit[]>();
+  private readonly pendingHostIceRestarts = new Set<string>();
+  private readonly hostIceRestartPromises = new Map<string, Promise<void>>();
   private knownPeerSessions = new Set<string>();
   private unsubscribeRoom: (() => void) | null;
   private localShare: LocalShareState | null = null;
   private watching: StudioScreenWatchingState | null = null;
   private viewerPeer: PeerState | null = null;
   private startSharePromise: Promise<void> | null = null;
+  private viewerOfferPromise: Promise<void> | null = null;
   private shareGeneration = 0;
   private closed = false;
 
@@ -349,6 +352,8 @@ export class StudioScreenShareController {
     stopTracks(local.stream);
     for (const peer of this.hostPeers.values()) closePeer(peer);
     this.hostPeers.clear();
+    this.pendingHostIceRestarts.clear();
+    this.hostIceRestartPromises.clear();
     this.pendingRequests.clear();
     this.viewers.clear();
     this.emitState();
@@ -393,6 +398,8 @@ export class StudioScreenShareController {
     if (!peer || peer.shareId !== shareId) return false;
     closePeer(peer);
     this.hostPeers.delete(viewerSessionId);
+    this.pendingHostIceRestarts.delete(viewerSessionId);
+    this.hostIceRestartPromises.delete(viewerSessionId);
     this.viewers.delete(viewerSessionId);
     const sent = this.room.respondScreen(viewerSessionId, { shareId, decision: "ended" });
     this.emitState();
@@ -421,6 +428,29 @@ export class StudioScreenShareController {
     this.stopWatchingInternal(true);
   }
 
+  /**
+   * Applies a refreshed ICE configuration without replacing the captured stream. The host is the
+   * sole offerer, so only host peers initiate ICE restart; viewers answer the targeted re-offer on
+   * their existing peer connection. A peer still waiting for its first answer is queued and
+   * restarted as soon as its signaling state becomes stable.
+   */
+  refreshNetworkPolicy(): boolean {
+    if (this.closed) return false;
+    let requested = false;
+    for (const [viewerSessionId, peer] of this.hostPeers) {
+      if (
+        peer.connection.connectionState === "closed" ||
+        peer.connection.connectionState === "failed"
+      ) {
+        continue;
+      }
+      requested = true;
+      this.pendingHostIceRestarts.add(viewerSessionId);
+      this.scheduleHostIceRestart(viewerSessionId, peer);
+    }
+    return requested;
+  }
+
   private stopWatchingInternal(notifyHost: boolean): void {
     const watching = this.watching;
     if (notifyHost && watching) {
@@ -433,6 +463,7 @@ export class StudioScreenShareController {
     this.watching = null;
     closePeer(this.viewerPeer);
     this.viewerPeer = null;
+    this.viewerOfferPromise = null;
     this.earlyViewerIce.clear();
     stopTracks(stream);
     this.emitState();
@@ -523,6 +554,8 @@ export class StudioScreenShareController {
       if (activeSessions.has(sessionId)) continue;
       closePeer(peer);
       this.hostPeers.delete(sessionId);
+      this.pendingHostIceRestarts.delete(sessionId);
+      this.hostIceRestartPromises.delete(sessionId);
       this.viewers.delete(sessionId);
       changed = true;
     }
@@ -622,6 +655,8 @@ export class StudioScreenShareController {
       if (peer?.shareId === shareId) {
         closePeer(peer);
         this.hostPeers.delete(sender.sessionId);
+        this.pendingHostIceRestarts.delete(sender.sessionId);
+        this.hostIceRestartPromises.delete(sender.sessionId);
         changed = true;
       }
       const viewer = this.viewers.get(sender.sessionId);
@@ -668,6 +703,8 @@ export class StudioScreenShareController {
     if (existing) {
       closePeer(existing);
       this.hostPeers.delete(viewer.sessionId);
+      this.pendingHostIceRestarts.delete(viewer.sessionId);
+      this.hostIceRestartPromises.delete(viewer.sessionId);
       this.viewers.delete(viewer.sessionId);
     }
 
@@ -687,6 +724,8 @@ export class StudioScreenShareController {
       if (connection.connectionState !== "failed" && connection.connectionState !== "closed") return;
       if (this.hostPeers.get(viewer.sessionId) === peer) {
         this.hostPeers.delete(viewer.sessionId);
+        this.pendingHostIceRestarts.delete(viewer.sessionId);
+        this.hostIceRestartPromises.delete(viewer.sessionId);
         this.viewers.delete(viewer.sessionId);
         this.emitState();
       }
@@ -717,6 +756,8 @@ export class StudioScreenShareController {
       }
     } catch (error) {
       if (this.hostPeers.get(viewer.sessionId) === peer) this.hostPeers.delete(viewer.sessionId);
+      this.pendingHostIceRestarts.delete(viewer.sessionId);
+      this.hostIceRestartPromises.delete(viewer.sessionId);
       this.viewers.delete(viewer.sessionId);
       closePeer(peer);
       this.emitState();
@@ -725,6 +766,22 @@ export class StudioScreenShareController {
   }
 
   private async handleOffer(host: StudioLiveParticipant, shareId: string, sdp: string): Promise<void> {
+    const previous = this.viewerOfferPromise;
+    const operation = (previous ? previous.catch(() => undefined) : Promise.resolve())
+      .then(() => this.applyOffer(host, shareId, sdp));
+    this.viewerOfferPromise = operation;
+    try {
+      await operation;
+    } finally {
+      if (this.viewerOfferPromise === operation) this.viewerOfferPromise = null;
+    }
+  }
+
+  private async applyOffer(
+    host: StudioLiveParticipant,
+    shareId: string,
+    sdp: string
+  ): Promise<void> {
     const watching = this.watching;
     if (
       !watching ||
@@ -734,30 +791,34 @@ export class StudioScreenShareController {
       // No implicit playback: an offer is ignored unless the viewer explicitly requested it.
       return;
     }
-    closePeer(this.viewerPeer);
-    const connection = this.createPeerConnection();
-    const earlyIceKey = shareKey(host.sessionId, shareId);
-    const pendingIce = this.earlyViewerIce.get(earlyIceKey) ?? [];
-    this.earlyViewerIce.delete(earlyIceKey);
-    const peer: PeerState = { connection, shareId, pendingIce };
-    this.viewerPeer = peer;
-    this.watching = { ...watching, status: "connecting" };
-    this.configureIce(peer, host.sessionId);
-    connection.ontrack = (event) => {
-      if (this.viewerPeer !== peer || !this.watching) return;
-      if (event.track.kind !== "video") {
-        event.track.stop();
-        return;
-      }
-      const stream = event.streams[0] ?? this.createMediaStream([event.track]);
-      this.watching = { ...this.watching, status: "live", stream };
+    let peer = this.viewerPeer;
+    if (!peer || peer.shareId !== shareId) {
+      closePeer(peer);
+      const connection = this.createPeerConnection();
+      const earlyIceKey = shareKey(host.sessionId, shareId);
+      const pendingIce = this.earlyViewerIce.get(earlyIceKey) ?? [];
+      this.earlyViewerIce.delete(earlyIceKey);
+      peer = { connection, shareId, pendingIce };
+      this.viewerPeer = peer;
+      this.watching = { ...watching, status: "connecting" };
+      this.configureIce(peer, host.sessionId);
+      connection.ontrack = (event) => {
+        if (this.viewerPeer !== peer || !this.watching) return;
+        if (event.track.kind !== "video") {
+          event.track.stop();
+          return;
+        }
+        const stream = event.streams[0] ?? this.createMediaStream([event.track]);
+        this.watching = { ...this.watching, status: "live", stream };
+        this.emitState();
+      };
+      connection.onconnectionstatechange = () => {
+        if (connection.connectionState !== "failed" && connection.connectionState !== "closed") return;
+        if (this.viewerPeer === peer) this.stopWatchingInternal(true);
+      };
       this.emitState();
-    };
-    connection.onconnectionstatechange = () => {
-      if (connection.connectionState !== "failed" && connection.connectionState !== "closed") return;
-      if (this.viewerPeer === peer) this.stopWatchingInternal(true);
-    };
-    this.emitState();
+    }
+    const connection = peer.connection;
 
     try {
       await connection.setRemoteDescription({ type: "offer", sdp });
@@ -783,6 +844,67 @@ export class StudioScreenShareController {
     if (!peer || peer.shareId !== shareId) return;
     await peer.connection.setRemoteDescription({ type: "answer", sdp });
     await this.flushIce(peer);
+    this.scheduleHostIceRestart(viewer.sessionId, peer);
+  }
+
+  private scheduleHostIceRestart(viewerSessionId: string, peer: PeerState): void {
+    if (
+      this.closed ||
+      !this.pendingHostIceRestarts.has(viewerSessionId) ||
+      this.hostIceRestartPromises.has(viewerSessionId) ||
+      this.hostPeers.get(viewerSessionId) !== peer ||
+      peer.connection.connectionState === "closed" ||
+      peer.connection.connectionState === "failed"
+    ) {
+      return;
+    }
+    if (
+      peer.connection.signalingState !== undefined &&
+      peer.connection.signalingState !== "stable"
+    ) {
+      return;
+    }
+
+    this.pendingHostIceRestarts.delete(viewerSessionId);
+    const operation = this.restartHostIce(viewerSessionId, peer)
+      .catch((error: unknown) => {
+        if (this.hostPeers.get(viewerSessionId) === peer) {
+          closePeer(peer);
+          this.hostPeers.delete(viewerSessionId);
+          this.pendingHostIceRestarts.delete(viewerSessionId);
+          this.viewers.delete(viewerSessionId);
+          this.emitState();
+        }
+        this.emit({
+          type: "error",
+          message: `화면 공유 네트워크 경로를 갱신하지 못했습니다. ${studioScreenShareErrorMessage(error)}`,
+        });
+      })
+      .finally(() => {
+        if (this.hostIceRestartPromises.get(viewerSessionId) === operation) {
+          this.hostIceRestartPromises.delete(viewerSessionId);
+        }
+        const current = this.hostPeers.get(viewerSessionId);
+        if (current) this.scheduleHostIceRestart(viewerSessionId, current);
+      });
+    this.hostIceRestartPromises.set(viewerSessionId, operation);
+  }
+
+  private async restartHostIce(
+    viewerSessionId: string,
+    peer: PeerState
+  ): Promise<void> {
+    peer.connection.restartIce?.();
+    const offer = await peer.connection.createOffer({ iceRestart: true });
+    if (this.closed || this.hostPeers.get(viewerSessionId) !== peer) return;
+    await peer.connection.setLocalDescription(offer);
+    const description = sessionDescription(peer.connection.localDescription ?? offer, "offer");
+    if (!this.room.sendWebRtcDescription(viewerSessionId, {
+      shareId: peer.shareId,
+      ...description,
+    })) {
+      throw new Error("갱신된 화면 공유 연결 제안을 보내지 못했습니다.");
+    }
   }
 
   private async handleIce(

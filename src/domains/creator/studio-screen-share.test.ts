@@ -71,6 +71,7 @@ function fakeStream(tracks: FakeTrack[]): MediaStream {
 
 class FakePeerConnection {
   connectionState: RTCPeerConnectionState = "new";
+  signalingState: RTCSignalingState = "stable";
   localDescription: RTCSessionDescription | null = null;
   remoteDescription: RTCSessionDescription | null = null;
   onicecandidate: ((event: RTCPeerConnectionIceEvent) => void) | null = null;
@@ -78,10 +79,16 @@ class FakePeerConnection {
   onconnectionstatechange: (() => void) | null = null;
   readonly addedTracks: MediaStreamTrack[] = [];
   readonly addedIce: RTCIceCandidateInit[] = [];
+  readonly offerOptions: Array<RTCOfferOptions | undefined> = [];
+  restartIceCalls = 0;
   closed = false;
 
-  createOffer(): Promise<RTCSessionDescriptionInit> {
-    return Promise.resolve({ type: "offer", sdp: "v=0\r\no=host-offer" });
+  createOffer(options?: RTCOfferOptions): Promise<RTCSessionDescriptionInit> {
+    this.offerOptions.push(options);
+    return Promise.resolve({
+      type: "offer",
+      sdp: `v=0\r\no=host-offer-${this.offerOptions.length}`,
+    });
   }
 
   createAnswer(): Promise<RTCSessionDescriptionInit> {
@@ -90,12 +97,18 @@ class FakePeerConnection {
 
   setLocalDescription(description: RTCSessionDescriptionInit): Promise<void> {
     this.localDescription = description as RTCSessionDescription;
+    this.signalingState = description.type === "offer" ? "have-local-offer" : "stable";
     return Promise.resolve();
   }
 
   setRemoteDescription(description: RTCSessionDescriptionInit): Promise<void> {
     this.remoteDescription = description as RTCSessionDescription;
+    this.signalingState = description.type === "offer" ? "have-remote-offer" : "stable";
     return Promise.resolve();
+  }
+
+  restartIce(): void {
+    this.restartIceCalls += 1;
   }
 
   addIceCandidate(candidate: RTCIceCandidateInit): Promise<void> {
@@ -111,6 +124,7 @@ class FakePeerConnection {
   close(): void {
     this.closed = true;
     this.connectionState = "closed";
+    this.signalingState = "closed";
   }
 
   setConnectionState(state: RTCPeerConnectionState): void {
@@ -461,6 +475,52 @@ describe("StudioScreenShareController", () => {
     controller.close();
   });
 
+  it("answers a refreshed host offer on the existing viewer peer without interrupting playback", async () => {
+    const room = new FakeRoom();
+    const peer = new FakePeerConnection();
+    const createPeerConnection = vi.fn(() => peer as unknown as RTCPeerConnection);
+    const remoteTrack = new FakeTrack();
+    const remoteStream = fakeStream([remoteTrack]);
+    const controller = new StudioScreenShareController(room, { createPeerConnection });
+    emitSignal(
+      room,
+      signal("screen:announce", { shareId: "share-1", label: "작업 화면" }, null)
+    );
+    controller.watchShare(remote.sessionId, "share-1");
+
+    emitSignal(
+      room,
+      signal(
+        "webrtc:description",
+        { shareId: "share-1", type: "offer", sdp: "v=0\r\no=initial-offer" },
+        local.sessionId
+      )
+    );
+    await vi.waitFor(() => expect(room.descriptions).toHaveLength(1));
+    peer.emitTrack(remoteStream, remoteTrack as unknown as MediaStreamTrack);
+    expect(controller.getState().watching).toEqual(
+      expect.objectContaining({ status: "live", stream: remoteStream })
+    );
+
+    emitSignal(
+      room,
+      signal(
+        "webrtc:description",
+        { shareId: "share-1", type: "offer", sdp: "v=0\r\no=ice-restart-offer" },
+        local.sessionId
+      )
+    );
+
+    await vi.waitFor(() => expect(room.descriptions).toHaveLength(2));
+    expect(createPeerConnection).toHaveBeenCalledTimes(1);
+    expect(peer.closed).toBe(false);
+    expect(remoteTrack.stopCalls).toBe(0);
+    expect(controller.getState().watching).toEqual(
+      expect.objectContaining({ status: "live", stream: remoteStream })
+    );
+    controller.close();
+  });
+
   it("ends a pending watch cleanly when the host rejects it", () => {
     const room = new FakeRoom();
     const errors: string[] = [];
@@ -778,6 +838,53 @@ describe("StudioScreenShareController", () => {
     });
     expect(controller.getState().viewers).toEqual([]);
     expect(peer.closed).toBe(true);
+    controller.close();
+  });
+
+  it("coalesces ICE policy refreshes and restarts the existing host peer after signaling stabilizes", async () => {
+    const room = new FakeRoom();
+    const track = new FakeTrack();
+    const peer = new FakePeerConnection();
+    const createPeerConnection = vi.fn(() => peer as unknown as RTCPeerConnection);
+    const controller = new StudioScreenShareController(room, {
+      getDisplayMedia: () => Promise.resolve(fakeStream([track])),
+      createPeerConnection,
+      randomId: () => "share-1",
+    });
+    await controller.startShare();
+    emitSignal(room, signal("screen:request", { shareId: "share-1" }, local.sessionId));
+    await controller.approveScreenRequest(remote.sessionId, "share-1");
+    expect(room.descriptions).toHaveLength(1);
+    expect(peer.signalingState).toBe("have-local-offer");
+
+    expect(controller.refreshNetworkPolicy()).toBe(true);
+    expect(controller.refreshNetworkPolicy()).toBe(true);
+    await Promise.resolve();
+    expect(peer.restartIceCalls).toBe(0);
+    expect(room.descriptions).toHaveLength(1);
+
+    emitSignal(
+      room,
+      signal(
+        "webrtc:description",
+        { shareId: "share-1", type: "answer", sdp: "v=0\r\no=initial-answer" },
+        local.sessionId
+      )
+    );
+
+    await vi.waitFor(() => expect(room.descriptions).toHaveLength(2));
+    expect(createPeerConnection).toHaveBeenCalledTimes(1);
+    expect(peer.restartIceCalls).toBe(1);
+    expect(peer.offerOptions).toEqual([undefined, { iceRestart: true }]);
+    expect(room.descriptions[1]).toEqual(
+      expect.objectContaining({
+        target: remote.sessionId,
+        shareId: "share-1",
+        type: "offer",
+        sdp: "v=0\r\no=host-offer-2",
+      })
+    );
+    expect(track.stopCalls).toBe(0);
     controller.close();
   });
 
