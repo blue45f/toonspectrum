@@ -13,6 +13,8 @@ import {
 } from "react";
 import * as THREE from "three";
 
+import { studioVrmSceneLocalPointToWorld } from "./studio-vrm-ik-constraints";
+
 import type { VRM, VRMHumanBoneName } from "@pixiv/three-vrm";
 
 const POSITION_EPSILON = 1e-8;
@@ -99,7 +101,7 @@ export type StudioVrmJointDragOutcome =
 export interface StudioVrmJointHandlesProps {
   vrm: Pick<VRM, "humanoid"> | null;
   selectedBone?: StudioVrmJointHandleBone | null;
-  effectorTargets?: Partial<Record<StudioVrmIkEffectorBone, StudioVrmJointWorldPoint>>;
+  effectorSceneTargets?: Partial<Record<StudioVrmIkEffectorBone, StudioVrmJointWorldPoint>>;
   dragPlane?: THREE.Plane | null;
   screenSize?: number;
   keyboardStep?: number;
@@ -284,7 +286,7 @@ function handleColor(side: StudioVrmJointSide): string {
 function Handle({
   binding,
   selected,
-  controlledTarget,
+  controlledSceneTarget,
   dragPlane,
   screenSize,
   keyboardStep,
@@ -298,7 +300,7 @@ function Handle({
 }: {
   binding: StudioVrmJointNodeBinding;
   selected: boolean;
-  controlledTarget?: StudioVrmJointWorldPoint;
+  controlledSceneTarget?: StudioVrmJointWorldPoint;
   dragPlane?: THREE.Plane | null;
   screenSize: number;
   keyboardStep: number;
@@ -318,7 +320,14 @@ function Handle({
   const [dragging, setDragging] = useState(false);
   const camera = useThree((state) => state.camera);
   const canvas = useThree((state) => state.gl.domElement);
+  const coordinateScene = useThree((state) => state.scene);
   const effectorBone = isStudioVrmIkEffectorBone(binding.bone) ? binding.bone : null;
+
+  const readControlledWorldPosition = (): THREE.Vector3 | null => {
+    if (!binding.effector || !isFiniteWorldPoint(controlledSceneTarget)) return null;
+    const world = studioVrmSceneLocalPointToWorld(coordinateScene, controlledSceneTarget);
+    return world ? new THREE.Vector3(world[0], world[1], world[2]) : null;
+  };
 
   const rollbackOnUnmount = useEffectEvent((session: DragSession) => {
     onEffectorRollback?.(session.bone, worldPoint(session.startWorld));
@@ -338,8 +347,9 @@ function Handle({
     const group = groupRef.current;
     if (!group || dragRef.current) return;
 
-    if (binding.effector && isFiniteWorldPoint(controlledTarget)) {
-      group.position.fromArray(controlledTarget);
+    const controlledWorld = readControlledWorldPosition();
+    if (controlledWorld) {
+      group.position.copy(controlledWorld);
       group.visible = true;
       return;
     }
@@ -351,9 +361,8 @@ function Handle({
   });
 
   const readCurrentWorldPosition = (): THREE.Vector3 | null => {
-    if (binding.effector && isFiniteWorldPoint(controlledTarget)) {
-      return new THREE.Vector3().fromArray(controlledTarget);
-    }
+    const controlledWorld = readControlledWorldPosition();
+    if (controlledWorld) return controlledWorld;
     binding.node.updateWorldMatrix(true, false);
     const world = binding.node.getWorldPosition(new THREE.Vector3());
     return isFiniteVector(world) ? world : null;
@@ -604,7 +613,7 @@ function Handle({
 export function StudioVrmJointHandles({
   vrm,
   selectedBone = null,
-  effectorTargets,
+  effectorSceneTargets,
   dragPlane,
   screenSize = 22,
   keyboardStep = DEFAULT_KEYBOARD_STEP,
@@ -633,8 +642,8 @@ export function StudioVrmJointHandles({
           key={binding.bone}
           binding={binding}
           selected={selectedBone === binding.bone}
-          controlledTarget={isStudioVrmIkEffectorBone(binding.bone)
-            ? effectorTargets?.[binding.bone]
+          controlledSceneTarget={isStudioVrmIkEffectorBone(binding.bone)
+            ? effectorSceneTargets?.[binding.bone]
             : undefined}
           dragPlane={dragPlane}
           screenSize={safeScreenSize}

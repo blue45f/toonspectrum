@@ -8,11 +8,12 @@ describe("Studio VRM full-body editor integration boundary", () => {
   it("invalidates an active IK transaction before history restore and stale pointer release", () => {
     const restoreStart = source.indexOf("const restoreHistoryStep =");
     const cancel = source.indexOf("cancelJointIkTransaction({", restoreStart);
-    const restore = source.indexOf("commitFullStateRestore(snap, currentVrm)", restoreStart);
+    const restore = source.indexOf("commitFullStateRestore(snap, currentVrm, {", restoreStart);
 
     expect(restoreStart).toBeGreaterThan(-1);
     expect(cancel).toBeGreaterThan(restoreStart);
     expect(restore).toBeGreaterThan(cancel);
+    expect(source.slice(restore, restore + 160)).toContain("trustPersistentIkPose: true");
     expect(source).toContain("transaction.revision !== jointIkRevisionRef.current");
     expect(source).toContain("key={jointHandleSessionGeneration}");
     expect(source).toContain("jointIkTransactionRef.current = null;");
@@ -30,5 +31,44 @@ describe("Studio VRM full-body editor integration boundary", () => {
     );
     expect(source).toContain("poseTranslations: nextTranslations,");
     expect(source).toContain("pastedTranslations,");
+  });
+
+  it("commits locked-pin commands only after reconciliation and never records the unresolved pose", () => {
+    expect(source).toContain("type PendingStudioVrmPersistentIkCommand = {");
+    expect(source.match(/pendingPersistentIkCommandRef\.current = \{/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(source).toContain("candidateAfter: after,");
+    expect(source).toContain("commitPendingCommand(serializeFullVrmState({");
+    expect(source).toContain("...pending.candidateAfter,");
+    expect(source).toContain("pendingPersistentIkCommandRef.current.inputSignature !== inputSignature");
+
+    const historyEffect = source.indexOf("// 편집이 멈추면(디바운스)");
+    const pendingGuard = source.indexOf("pendingPersistentIkCommandRef.current", historyEffect);
+    const append = source.indexOf("appendStudioVrmFullStateHistory(", historyEffect);
+    expect(historyEffect).toBeGreaterThan(-1);
+    expect(pendingGuard).toBeGreaterThan(historyEffect);
+    expect(append).toBeGreaterThan(pendingGuard);
+  });
+
+  it("retries after the Canvas scene mounts and preserves one body rotation field on shared restore", () => {
+    expect(source).toContain("setCaptureSceneGeneration((generation) => generation + 1)");
+    expect(source).toContain("captureSceneGeneration,");
+    expect(source).toContain("bodyRotation: initialScene.pose.bodyRotationY,");
+    expect(source).not.toContain("pending.bodyRotationY");
+    expect(source).toContain("forceInvalidate: true,");
+  });
+
+  it("aborts deferred insert/share capture when the persistent pose changes before readback", () => {
+    expect(source).toContain("const sharePoseSignature = currentPersistentIkSignature();");
+    expect(source).toContain("const capturePoseSignature = currentPersistentIkSignature();");
+    expect(source).toContain(
+      "persistentIkCurrentSignatureRef.current !== sharePoseSignature",
+    );
+    expect(source).toContain(
+      "persistentIkCurrentSignatureRef.current !== capturePoseSignature",
+    );
+    expect(source).toContain("pendingPersistentIkCommandRef.current !== null");
+    expect(source).toContain("hasLockedConstraint && (webcamActive || idleAnimation)");
+    expect(source).toContain("dynamicPoseGenerationRef.current !== shareDynamicPoseGeneration");
+    expect(source).toContain("dynamicPoseGenerationRef.current !== captureDynamicPoseGeneration");
   });
 });

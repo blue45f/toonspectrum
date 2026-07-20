@@ -2311,7 +2311,8 @@ function parseCanonicalJson<T>(
 }
 
 /**
- * Projects only strict VRM scene v1/v2 values to v3 for archive-writer compatibility checks.
+ * Projects strict historical VRM scene v1/v2/v3 values to the current scene version for
+ * archive-writer compatibility checks. Current documents pass through unchanged.
  * No other project defaults, redactions, or schema changes are introduced here.
  */
 function promoteStrictHistoricalVrmScenes(

@@ -54,6 +54,12 @@ export interface StudioVrmFullBodyIkFootPlant {
   readonly floorHeight: number;
 }
 
+export interface StudioVrmFullBodyIkLockedTarget {
+  readonly effector: StudioVrmUserIkEffector;
+  readonly targetWorld: THREE.Vector3;
+  readonly poleWorld?: THREE.Vector3;
+}
+
 export interface StudioVrmFullBodyIkRequest {
   readonly primary: StudioVrmFullBodyIkPrimaryTarget;
   readonly baseTranslations?: StudioVrmPoseTranslations;
@@ -62,6 +68,8 @@ export interface StudioVrmFullBodyIkRequest {
   readonly fullBodyIk: boolean;
   /** When enabled, both feet become simultaneous constraints; the dragged foot keeps its X/Z. */
   readonly footPlant?: StudioVrmFullBodyIkFootPlant;
+  /** Other enabled locked pins solved from the same immutable baseline as the primary drag. */
+  readonly lockedTargets?: readonly StudioVrmFullBodyIkLockedTarget[];
   readonly iterations?: number;
   readonly tolerance?: number;
 }
@@ -226,6 +234,14 @@ function buildConstraints(
     pole?: THREE.Vector3;
     locked: boolean;
   }>();
+  for (const lockedTarget of request.lockedTargets ?? []) {
+    if (requested.has(lockedTarget.effector)) return null;
+    requested.set(lockedTarget.effector, {
+      target: lockedTarget.targetWorld.clone(),
+      pole: lockedTarget.poleWorld?.clone(),
+      locked: true,
+    });
+  }
   const plant = request.footPlant;
   if (plant?.enabled) {
     if (!Number.isFinite(plant.floorHeight) || plant.floorHeight < -10 || plant.floorHeight > 10) {
@@ -235,7 +251,7 @@ function buildConstraints(
       const node = source.humanoid.getNormalizedBoneNode(effector);
       const position = worldPosition(node);
       if (!position) return null;
-      requested.set(effector, {
+      if (!requested.has(effector)) requested.set(effector, {
         target: new THREE.Vector3(position.x, plant.floorHeight, position.z),
         locked: true,
       });
@@ -355,6 +371,17 @@ export function solveStudioVrmFullBodyIk(
     || !Number.isFinite(tolerance)
     || tolerance <= 0
     || tolerance > MAX_TOLERANCE
+  ) return null;
+  const lockedTargets = request.lockedTargets ?? [];
+  if (
+    lockedTargets.length > EFFECTOR_ORDER.length - 1
+    || new Set(lockedTargets.map((constraint) => constraint.effector)).size !== lockedTargets.length
+    || lockedTargets.some((constraint) => (
+      constraint.effector === request.primary.effector
+      || !EFFECTOR_ORDER.includes(constraint.effector)
+      || !isFiniteVector(constraint.targetWorld)
+      || (constraint.poleWorld !== undefined && !isFiniteVector(constraint.poleWorld))
+    ))
   ) return null;
 
   try {
@@ -549,7 +576,7 @@ export function solveStudioVrmFullBodyIk(
       bones,
       yOffset,
       translations,
-      requestedTargetWorld: tuple(request.primary.targetWorld),
+      requestedTargetWorld: primaryConstraint.targetWorld,
       effectiveTargetWorld: primaryConstraint.effectiveTargetWorld,
       constraints: Object.freeze(constraintResults),
       iterations: iterationsUsed,

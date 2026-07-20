@@ -26,6 +26,7 @@ import {
 } from "./studio-project-archive";
 import { buildVrmPoseDataUrlMetadata } from "./studio-vrm-poser-utils";
 import {
+  STUDIO_VRM_SCENE_DOCUMENT_VERSION,
   createStudioVrmSceneDocument,
   normalizeStudioVrmSceneDocument,
 } from "./studio-vrm-scene-document";
@@ -1047,7 +1048,7 @@ describe("studio-project-archive", () => {
     };
     expect(currentImage.src).toBe(dataUrl("image/png", raster));
     expect(currentImage.vrmScene).toMatchObject({
-      version: 3,
+      version: STUDIO_VRM_SCENE_DOCUMENT_VERSION,
       pose: {
         yOffset: 0.18,
         translations: currentMetadata.poseTranslations,
@@ -1147,7 +1148,7 @@ describe("studio-project-archive", () => {
     })), "PROJECT_INVALID");
   });
 
-  it("현재 manifest의 strict VRM v1/v2 장면만 v3로 승격하고 다른 writer 차이는 허용하지 않는다", async () => {
+  it("현재 manifest의 strict VRM v1/v2 장면만 현재 버전으로 승격하고 다른 writer 차이는 허용하지 않는다", async () => {
     const currentScene = normalizeStudioVrmSceneDocument({
       ...createStudioVrmSceneDocument(),
       pose: {
@@ -1164,6 +1165,7 @@ describe("studio-project-archive", () => {
     const legacyScene = JSON.parse(JSON.stringify(currentScene)) as Record<string, unknown>;
     delete legacyScene.rig;
     delete (legacyScene.pose as Record<string, unknown>).translations;
+    delete (legacyScene.pose as Record<string, unknown>).ikConstraints;
     legacyScene.version = 1;
     const legacyImage = {
       id: "legacy-vrm",
@@ -1178,7 +1180,7 @@ describe("studio-project-archive", () => {
     const promoted = (imported.project.pagesList[0]?.elements[0] as {
       vrmScene: ReturnType<typeof createStudioVrmSceneDocument>;
     }).vrmScene;
-    expect(promoted.version).toBe(3);
+    expect(promoted.version).toBe(STUDIO_VRM_SCENE_DOCUMENT_VERSION);
     expect(promoted.pose).toEqual(currentScene.pose);
     expect(promoted.expressions).toEqual(currentScene.expressions);
     expect(promoted.rig).toMatchObject({
@@ -1190,6 +1192,7 @@ describe("studio-project-archive", () => {
 
     const versionTwoScene = JSON.parse(JSON.stringify(currentScene)) as Record<string, unknown>;
     delete (versionTwoScene.pose as Record<string, unknown>).translations;
+    delete (versionTwoScene.pose as Record<string, unknown>).ikConstraints;
     versionTwoScene.version = 2;
     const importedV2 = await importStudioProjectArchive(
       await manualProjectOnlyArchive(projectWith([{
@@ -1201,7 +1204,7 @@ describe("studio-project-archive", () => {
     const promotedV2 = (importedV2.project.pagesList[0]?.elements[0] as {
       vrmScene: ReturnType<typeof createStudioVrmSceneDocument>;
     }).vrmScene;
-    expect(promotedV2.version).toBe(3);
+    expect(promotedV2.version).toBe(STUDIO_VRM_SCENE_DOCUMENT_VERSION);
     expect(promotedV2.rig).toEqual(currentScene.rig);
     expect(promotedV2.pose.translations).toEqual(currentScene.pose.translations);
 

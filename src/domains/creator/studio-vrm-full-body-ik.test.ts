@@ -158,6 +158,36 @@ describe("Studio VRM deterministic full-body IK", () => {
     ).toBeGreaterThan(0);
   });
 
+  it("solves one primary plus three persistent locks from one immutable baseline", () => {
+    const fixture = createFixture();
+    const world = (boneName: VRMHumanBoneName) => fixture.nodes.get(boneName)!
+      .getWorldPosition(new THREE.Vector3());
+    const result = solveStudioVrmFullBodyIk(fixture.source, {
+      primary: {
+        effector: "rightHand",
+        targetWorld: world("rightHand").add(new THREE.Vector3(0.15, 0.1, 0.05)),
+      },
+      lockedTargets: [
+        {
+          effector: "leftHand",
+          targetWorld: world("leftHand"),
+          poleWorld: new THREE.Vector3(-0.8, 3, 1),
+        },
+        { effector: "leftFoot", targetWorld: world("leftFoot") },
+        { effector: "rightFoot", targetWorld: world("rightFoot") },
+      ],
+      fullBodyIk: true,
+    });
+
+    expect(result?.constraints.map((constraint) => constraint.effector)).toEqual([
+      "leftFoot",
+      "rightFoot",
+      "leftHand",
+      "rightHand",
+    ]);
+    expect(result?.constraints.filter((constraint) => constraint.locked)).toHaveLength(3);
+  });
+
   it("uses two simultaneous leg chains when one planted foot is dragged", () => {
     const fixture = createFixture();
     const rightFoot = fixture.nodes.get("rightFoot")!.getWorldPosition(new THREE.Vector3());
@@ -178,6 +208,7 @@ describe("Studio VRM deterministic full-body IK", () => {
       .toBe(true);
     expect(result?.constraints.find((constraint) => constraint.effector === "rightFoot")?.targetWorld[1])
       .toBe(0.25);
+    expect(result?.requestedTargetWorld[1]).toBe(0.25);
   });
 
   it("runs one simultaneous chain pass when foot planting is enabled without torso translation", () => {
@@ -363,6 +394,27 @@ describe("Studio VRM deterministic full-body IK", () => {
     expect(solveStudioVrmFullBodyIk(fixture.source, {
       ...valid,
       iterations: 100,
+    })).toBeNull();
+    expect(solveStudioVrmFullBodyIk(fixture.source, {
+      ...valid,
+      lockedTargets: [{
+        effector: valid.primary.effector,
+        targetWorld: valid.primary.targetWorld.clone(),
+      }],
+    })).toBeNull();
+    expect(solveStudioVrmFullBodyIk(fixture.source, {
+      ...valid,
+      lockedTargets: [
+        { effector: "leftHand", targetWorld: new THREE.Vector3() },
+        { effector: "leftHand", targetWorld: new THREE.Vector3(1, 0, 0) },
+      ],
+    })).toBeNull();
+    expect(solveStudioVrmFullBodyIk(fixture.source, {
+      ...valid,
+      lockedTargets: [{
+        effector: "leftHand",
+        targetWorld: new THREE.Vector3(Number.POSITIVE_INFINITY, 0, 0),
+      }],
     })).toBeNull();
     expect(solveStudioVrmFullBodyIk(fixture.source, {
       ...valid,

@@ -14,9 +14,10 @@ import {
  */
 
 export const STUDIO_VRM_SCENE_DOCUMENT_KIND = "studio-vrm-scene" as const;
-export const STUDIO_VRM_SCENE_DOCUMENT_VERSION = 3 as const;
+export const STUDIO_VRM_SCENE_DOCUMENT_VERSION = 4 as const;
 export const STUDIO_VRM_SCENE_DOCUMENT_LEGACY_VERSION = 1 as const;
-export const STUDIO_VRM_SCENE_DOCUMENT_PREVIOUS_VERSION = 2 as const;
+export const STUDIO_VRM_SCENE_DOCUMENT_VERSION_TWO = 2 as const;
+export const STUDIO_VRM_SCENE_DOCUMENT_PREVIOUS_VERSION = 3 as const;
 export const STUDIO_VRM_SCENE_DOCUMENT_V1_MAX_BYTES = 128 * 1024;
 export const STUDIO_VRM_SCENE_DOCUMENT_V2_MAX_BYTES =
   STUDIO_VRM_SCENE_DOCUMENT_V1_MAX_BYTES + 512;
@@ -24,13 +25,17 @@ export const STUDIO_VRM_SCENE_DOCUMENT_V2_MAX_BYTES =
  * v3 reserves bounded headroom for the required translation block so every historically valid v2
  * scene can be promoted without dropping authoring data at the former ceiling.
  */
-export const STUDIO_VRM_SCENE_DOCUMENT_MAX_BYTES =
+export const STUDIO_VRM_SCENE_DOCUMENT_V3_MAX_BYTES =
   STUDIO_VRM_SCENE_DOCUMENT_V2_MAX_BYTES + 512;
+/** v4 reserves bounded headroom for four persistent IK target/pole constraints. */
+export const STUDIO_VRM_SCENE_DOCUMENT_MAX_BYTES =
+  STUDIO_VRM_SCENE_DOCUMENT_V3_MAX_BYTES + 2 * 1024;
 /** Matches the default project-archive per-attachment ceiling so every accepted scene is portable. */
 export const STUDIO_VRM_MODEL_MAX_BYTES = 96 * 1024 * 1024;
 export const STUDIO_VRM_MAX_POSE_BONES = 64;
 export const STUDIO_VRM_MAX_FINGER_BONES = 32;
 export const STUDIO_VRM_MAX_EXPRESSIONS = 64;
+export const STUDIO_VRM_MAX_IK_CONSTRAINTS = 4;
 
 const MAX_WORLD_COORDINATE = 10_000;
 const MAX_DATA_DEPTH = 8;
@@ -54,6 +59,29 @@ const UNSAFE_REFERENCE_KEY_PATTERN = /(?:^|_)(?:url|uri|href|src)$|(?:url|uri)$/
 const FORBIDDEN_KEYS = new Set(["__proto__", "prototype", "constructor"]);
 
 export type StudioVrmVec3 = readonly [number, number, number];
+
+export const STUDIO_VRM_IK_EFFECTORS = [
+  "leftHand",
+  "rightHand",
+  "leftFoot",
+  "rightFoot",
+] as const;
+
+export type StudioVrmIkEffector = (typeof STUDIO_VRM_IK_EFFECTORS)[number];
+
+/**
+ * A persistent IK pin expressed in VRM scene-local coordinates.
+ *
+ * `enabled` controls participation and visibility. `locked` means other authoritative pose edits
+ * must preserve the target; it never prevents the user from explicitly moving or deleting it.
+ */
+export interface StudioVrmIkConstraint {
+  readonly effector: StudioVrmIkEffector;
+  readonly enabled: boolean;
+  readonly locked: boolean;
+  readonly target: StudioVrmVec3;
+  readonly pole: StudioVrmVec3 | null;
+}
 
 export const STUDIO_VRM_HUMANOID_BONES = [
   "hips",
@@ -171,6 +199,7 @@ export interface StudioVrmPoseState {
   /** Character-root yaw, in canonical radians `[-PI, PI)`. */
   readonly bodyRotationY: number;
   readonly fingerOverrides: StudioVrmFingerRotationMap;
+  readonly ikConstraints: readonly StudioVrmIkConstraint[];
 }
 
 export interface StudioVrmCameraSettings {
@@ -298,6 +327,7 @@ export type StudioVrmLegacyFragmentMigration =
 
 const HUMANOID_BONE_SET = new Set<string>(STUDIO_VRM_HUMANOID_BONES);
 const FINGER_BONE_SET = new Set<string>(STUDIO_VRM_FINGER_BONES);
+const IK_EFFECTOR_SET = new Set<string>(STUDIO_VRM_IK_EFFECTORS);
 const ENVIRONMENT_SET = new Set<string>(["none", "floor", "wall", "room", "outdoor"]);
 
 function isStudioVrmHumanoidBoneName(value: string): value is StudioVrmHumanoidBoneName {
@@ -306,6 +336,10 @@ function isStudioVrmHumanoidBoneName(value: string): value is StudioVrmHumanoidB
 
 function isStudioVrmFingerBoneName(value: string): value is StudioVrmFingerBoneName {
   return FINGER_BONE_SET.has(value);
+}
+
+function isStudioVrmIkEffector(value: unknown): value is StudioVrmIkEffector {
+  return typeof value === "string" && IK_EFFECTOR_SET.has(value);
 }
 
 function isStudioVrmEnvironment(value: unknown): value is StudioVrmEnvironment {
@@ -327,6 +361,7 @@ const DEFAULT_RAW_DOCUMENT: StudioVrmSceneDocument = {
     },
     bodyRotationY: 0,
     fingerOverrides: {},
+    ikConstraints: [],
   },
   expressions: {},
   camera: {
@@ -405,7 +440,22 @@ const CURRENT_ROOT_KEYS = new Set([
   "rig",
 ]);
 
+const VERSION_ONE_POSE_KEYS = new Set([
+  "bones",
+  "yOffset",
+  "bodyRotationY",
+  "fingerOverrides",
+]);
+const VERSION_THREE_POSE_KEYS = new Set([
+  ...VERSION_ONE_POSE_KEYS,
+  "translations",
+]);
+const CURRENT_POSE_KEYS = new Set([
+  ...VERSION_THREE_POSE_KEYS,
+  "ikConstraints",
+]);
 const POSE_TRANSLATION_KEYS = new Set(["version", "root", "hips", "spine"]);
+const IK_CONSTRAINT_KEYS = new Set(["effector", "enabled", "locked", "target", "pole"]);
 
 const RIG_KEYS = new Set([
   "version",
@@ -469,6 +519,10 @@ const FULL_STATE_V2_FRAGMENT_KEYS = new Set([
   "customColors",
   "modelName",
   "vrmProps",
+]);
+const FULL_STATE_V3_FRAGMENT_KEYS = new Set([
+  ...FULL_STATE_V2_FRAGMENT_KEYS,
+  "ikConstraints",
 ]);
 
 interface SafeCloneState {
@@ -582,8 +636,11 @@ function exceedsHistoricalSourceLimit(raw: unknown, decoded: unknown): boolean {
   if (decoded.version === STUDIO_VRM_SCENE_DOCUMENT_LEGACY_VERSION) {
     return utf8ByteLength(raw) > STUDIO_VRM_SCENE_DOCUMENT_V1_MAX_BYTES;
   }
+  if (decoded.version === STUDIO_VRM_SCENE_DOCUMENT_VERSION_TWO) {
+    return utf8ByteLength(raw) > STUDIO_VRM_SCENE_DOCUMENT_V2_MAX_BYTES;
+  }
   return decoded.version === STUDIO_VRM_SCENE_DOCUMENT_PREVIOUS_VERSION
-    && utf8ByteLength(raw) > STUDIO_VRM_SCENE_DOCUMENT_V2_MAX_BYTES;
+    && utf8ByteLength(raw) > STUDIO_VRM_SCENE_DOCUMENT_V3_MAX_BYTES;
 }
 
 function deepFreeze<T>(value: T): T {
@@ -761,6 +818,30 @@ function normalizePoseTranslations(value: unknown): StudioVrmPoseTranslations {
   };
 }
 
+function normalizeIkConstraints(value: unknown): readonly StudioVrmIkConstraint[] {
+  if (!Array.isArray(value)) return [];
+  const byEffector = new Map<StudioVrmIkEffector, StudioVrmIkConstraint>();
+  for (const rawConstraint of value) {
+    if (byEffector.size >= STUDIO_VRM_MAX_IK_CONSTRAINTS || !isRecord(rawConstraint)) continue;
+    if (!isStudioVrmIkEffector(rawConstraint.effector) || byEffector.has(rawConstraint.effector)) {
+      continue;
+    }
+    byEffector.set(rawConstraint.effector, {
+      effector: rawConstraint.effector,
+      enabled: normalizeBoolean(rawConstraint.enabled, false),
+      locked: normalizeBoolean(rawConstraint.locked, false),
+      target: normalizeVec3(rawConstraint.target, [0, 0, 0]),
+      pole: rawConstraint.pole === null
+        ? null
+        : normalizeVec3(rawConstraint.pole, [0, 0, 0]),
+    });
+  }
+  return STUDIO_VRM_IK_EFFECTORS.flatMap((effector) => {
+    const constraint = byEffector.get(effector);
+    return constraint ? [constraint] : [];
+  });
+}
+
 function normalizePose(value: unknown): StudioVrmPoseState {
   const candidate = isRecord(value) ? value : {};
   return {
@@ -769,6 +850,7 @@ function normalizePose(value: unknown): StudioVrmPoseState {
     translations: normalizePoseTranslations(candidate.translations),
     bodyRotationY: normalizeRotationAngle(candidate.bodyRotationY),
     fingerOverrides: normalizeFingerOverrides(candidate.fingerOverrides),
+    ikConstraints: normalizeIkConstraints(candidate.ikConstraints),
   };
 }
 
@@ -1000,6 +1082,23 @@ function normalizeDecodedCurrentDocument(value: unknown): StudioVrmSceneDocument
   return deepFreeze(normalizeDecodedDocumentFields(value));
 }
 
+function hasStrictIkConstraints(value: unknown): boolean {
+  if (!Array.isArray(value) || value.length > STUDIO_VRM_MAX_IK_CONSTRAINTS) return false;
+  const effectors = new Set<StudioVrmIkEffector>();
+  for (const constraint of value) {
+    if (!isRecord(constraint)) return false;
+    const keys = Object.keys(constraint);
+    if (
+      keys.length !== IK_CONSTRAINT_KEYS.size
+      || keys.some((key) => !IK_CONSTRAINT_KEYS.has(key))
+      || !isStudioVrmIkEffector(constraint.effector)
+      || effectors.has(constraint.effector)
+    ) return false;
+    effectors.add(constraint.effector);
+  }
+  return true;
+}
+
 function strictDecodedCurrentDocument(value: unknown): StudioVrmSceneDocument | null {
   if (!isRecord(value)) return null;
   const keys = Object.keys(value);
@@ -1013,9 +1112,12 @@ function strictDecodedCurrentDocument(value: unknown): StudioVrmSceneDocument | 
   ) return null;
   if (
     !isRecord(value.pose)
+    || Object.keys(value.pose).length !== CURRENT_POSE_KEYS.size
+    || Object.keys(value.pose).some((key) => !CURRENT_POSE_KEYS.has(key))
     || !isRecord(value.pose.translations)
     || Object.keys(value.pose.translations).length !== POSE_TRANSLATION_KEYS.size
     || Object.keys(value.pose.translations).some((key) => !POSE_TRANSLATION_KEYS.has(key))
+    || !hasStrictIkConstraints(value.pose.ikConstraints)
   ) return null;
   const normalized = normalizeDecodedCurrentDocument(value);
   if (!normalized || !jsonStructuresEqual(value, normalized)) return null;
@@ -1029,7 +1131,11 @@ function strictDecodedCurrentDocument(value: unknown): StudioVrmSceneDocument | 
 }
 
 function versionOneProjection(document: StudioVrmSceneDocument): Record<string, unknown> {
-  const { translations: _translations, ...legacyPose } = document.pose;
+  const {
+    translations: _translations,
+    ikConstraints: _ikConstraints,
+    ...legacyPose
+  } = document.pose;
   return {
     kind: document.kind,
     version: STUDIO_VRM_SCENE_DOCUMENT_LEGACY_VERSION,
@@ -1048,12 +1154,36 @@ function versionOneProjection(document: StudioVrmSceneDocument): Record<string, 
 }
 
 function versionTwoProjection(document: StudioVrmSceneDocument): Record<string, unknown> {
-  const { translations: _translations, ...versionTwoPose } = document.pose;
+  const {
+    translations: _translations,
+    ikConstraints: _ikConstraints,
+    ...versionTwoPose
+  } = document.pose;
+  return {
+    kind: document.kind,
+    version: STUDIO_VRM_SCENE_DOCUMENT_VERSION_TWO,
+    model: document.model,
+    pose: versionTwoPose,
+    expressions: document.expressions,
+    camera: document.camera,
+    appearance: document.appearance,
+    rig: document.rig,
+    props: document.props,
+    sceneProps: document.sceneProps,
+    lighting: document.lighting,
+    physics: document.physics,
+    env: document.env,
+    render: document.render,
+  };
+}
+
+function versionThreeProjection(document: StudioVrmSceneDocument): Record<string, unknown> {
+  const { ikConstraints: _ikConstraints, ...versionThreePose } = document.pose;
   return {
     kind: document.kind,
     version: STUDIO_VRM_SCENE_DOCUMENT_PREVIOUS_VERSION,
     model: document.model,
-    pose: versionTwoPose,
+    pose: versionThreePose,
     expressions: document.expressions,
     camera: document.camera,
     appearance: document.appearance,
@@ -1085,6 +1215,7 @@ function migrateStrictDecodedVersionOneDocument(value: unknown): StudioVrmSceneD
       ? {
           ...value.pose,
           translations: DEFAULT_RAW_DOCUMENT.pose.translations,
+          ikConstraints: DEFAULT_RAW_DOCUMENT.pose.ikConstraints,
         }
       : value.pose,
     rig: DEFAULT_RAW_DOCUMENT.rig,
@@ -1107,7 +1238,7 @@ function migrateStrictDecodedVersionTwoDocument(value: unknown): StudioVrmSceneD
   if (
     !isRecord(value)
     || value.kind !== STUDIO_VRM_SCENE_DOCUMENT_KIND
-    || value.version !== STUDIO_VRM_SCENE_DOCUMENT_PREVIOUS_VERSION
+    || value.version !== STUDIO_VRM_SCENE_DOCUMENT_VERSION_TWO
   ) return null;
   const keys = Object.keys(value);
   if (
@@ -1124,6 +1255,7 @@ function migrateStrictDecodedVersionTwoDocument(value: unknown): StudioVrmSceneD
     pose: {
       ...value.pose,
       translations: DEFAULT_RAW_DOCUMENT.pose.translations,
+      ikConstraints: DEFAULT_RAW_DOCUMENT.pose.ikConstraints,
     },
   }));
   if (!jsonStructuresEqual(value, versionTwoProjection(migrated))) return null;
@@ -1131,6 +1263,47 @@ function migrateStrictDecodedVersionTwoDocument(value: unknown): StudioVrmSceneD
     const sourceBytes = utf8ByteLength(JSON.stringify(value));
     const migratedBytes = utf8ByteLength(JSON.stringify(migrated));
     return sourceBytes <= STUDIO_VRM_SCENE_DOCUMENT_V2_MAX_BYTES
+      && migratedBytes <= STUDIO_VRM_SCENE_DOCUMENT_MAX_BYTES
+      ? migrated
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Strict, lossless v3 reader. The only authored addition is the empty persistent-IK block. */
+function migrateStrictDecodedVersionThreeDocument(value: unknown): StudioVrmSceneDocument | null {
+  if (
+    !isRecord(value)
+    || value.kind !== STUDIO_VRM_SCENE_DOCUMENT_KIND
+    || value.version !== STUDIO_VRM_SCENE_DOCUMENT_PREVIOUS_VERSION
+  ) return null;
+  const keys = Object.keys(value);
+  if (
+    keys.length !== CURRENT_ROOT_KEYS.size
+    || keys.some((key) => !CURRENT_ROOT_KEYS.has(key))
+    || !isRecord(value.rig)
+    || Object.keys(value.rig).length !== RIG_KEYS.size
+    || Object.keys(value.rig).some((key) => !RIG_KEYS.has(key))
+    || !isRecord(value.pose)
+    || Object.keys(value.pose).length !== VERSION_THREE_POSE_KEYS.size
+    || Object.keys(value.pose).some((key) => !VERSION_THREE_POSE_KEYS.has(key))
+    || !isRecord(value.pose.translations)
+    || Object.keys(value.pose.translations).length !== POSE_TRANSLATION_KEYS.size
+    || Object.keys(value.pose.translations).some((key) => !POSE_TRANSLATION_KEYS.has(key))
+  ) return null;
+  const migrated = deepFreeze(normalizeDecodedDocumentFields({
+    ...value,
+    pose: {
+      ...value.pose,
+      ikConstraints: DEFAULT_RAW_DOCUMENT.pose.ikConstraints,
+    },
+  }));
+  if (!jsonStructuresEqual(value, versionThreeProjection(migrated))) return null;
+  try {
+    const sourceBytes = utf8ByteLength(JSON.stringify(value));
+    const migratedBytes = utf8ByteLength(JSON.stringify(migrated));
+    return sourceBytes <= STUDIO_VRM_SCENE_DOCUMENT_V3_MAX_BYTES
       && migratedBytes <= STUDIO_VRM_SCENE_DOCUMENT_MAX_BYTES
       ? migrated
       : null;
@@ -1165,21 +1338,23 @@ export function normalizeStudioVrmSceneDocument(raw: unknown): StudioVrmSceneDoc
   const decoded = decodeBoundedDataGraph(raw);
   if (exceedsHistoricalSourceLimit(raw, decoded)) return createDefaultStudioVrmSceneDocument();
   return normalizeDecodedCurrentDocument(decoded)
+    ?? migrateStrictDecodedVersionThreeDocument(decoded)
     ?? migrateStrictDecodedVersionTwoDocument(decoded)
     ?? migrateStrictDecodedVersionOneDocument(decoded)
     ?? createDefaultStudioVrmSceneDocument();
 }
 
-/** Parses canonical v3 and losslessly promotes complete canonical v1/v2 documents. */
+/** Parses canonical v4 and losslessly promotes complete canonical v1/v2/v3 documents. */
 export function parseStudioVrmSceneDocument(raw: string): StudioVrmSceneDocument | null {
   const decoded = decodeBoundedDataGraph(raw);
   if (exceedsHistoricalSourceLimit(raw, decoded)) return null;
   return strictDecodedCurrentDocument(decoded)
+    ?? migrateStrictDecodedVersionThreeDocument(decoded)
     ?? migrateStrictDecodedVersionTwoDocument(decoded)
     ?? migrateStrictDecodedVersionOneDocument(decoded);
 }
 
-/** Serializes only complete, losslessly canonical version-3 documents. */
+/** Serializes only complete, losslessly canonical version-4 documents. */
 export function serializeStudioVrmSceneDocument(raw: unknown): string | null {
   const document = strictDecodedCurrentDocument(decodeBoundedDataGraph(raw));
   if (!document) return null;
@@ -1229,25 +1404,39 @@ function strictFullStateV2Translations(
  * Migrates the currently emitted re-editable PNG metadata. Keeping this separate from the
  * pre-version reader makes mixed old/new field names and future FullVrmState versions fail closed.
  */
-function migrateDecodedFullStateV2Metadata(
+function migrateDecodedFullStateMetadata(
   value: unknown,
   options: StudioVrmLegacyMigrationOptions,
 ): StudioVrmLegacyMetadataMigration | null {
+  const fullStateVersion = isRecord(value) ? value.version : undefined;
+  const allowedKeys = fullStateVersion === 3
+    ? FULL_STATE_V3_FRAGMENT_KEYS
+    : FULL_STATE_V2_FRAGMENT_KEYS;
   if (
     !isRecord(value)
     || value.tool !== "vrm-poser"
-    || value.version !== 2
+    || (value.version !== 2 && value.version !== 3)
     || hasOwn(value, "kind")
-    || !hasOnlyKeys(value, FULL_STATE_V2_FRAGMENT_KEYS)
+    || !hasOnlyKeys(value, allowedKeys)
     || !hasOwn(value, "bones")
     || !hasOwn(value, "yOffset")
     || !hasOwn(value, "bodyRotation")
+    || (value.version === 3 && !hasOwn(value, "ikConstraints"))
+    || (value.version === 3 && !hasOwn(value, "poseTranslations"))
   ) return null;
 
   const translations = strictFullStateV2Translations(value);
   if (!translations) return null;
   const normalizedBones = normalizePoseBones(value.bones);
   if (!jsonStructuresEqual(value.bones, normalizedBones)) return null;
+  const ikConstraints = value.version === 2
+    ? DEFAULT_RAW_DOCUMENT.pose.ikConstraints
+    : hasStrictIkConstraints(value.ikConstraints)
+      ? normalizeIkConstraints(value.ikConstraints)
+      : null;
+  if (!ikConstraints || (value.version === 3 && !jsonStructuresEqual(value.ikConstraints, ikConstraints))) {
+    return null;
+  }
   if (
     typeof value.yOffset !== "number"
     || !Number.isFinite(value.yOffset)
@@ -1279,6 +1468,7 @@ function migrateDecodedFullStateV2Metadata(
       translations,
       bodyRotationY: value.bodyRotation,
       fingerOverrides: value.fingerOverrides,
+      ikConstraints,
     }),
     expressions: normalizeExpressions(value.expressionWeights),
     appearance: normalizeAppearance({
@@ -1370,11 +1560,13 @@ export function migrateStudioVrmSceneDocument(
   if (exceedsHistoricalSourceLimit(raw, decoded)) return null;
   const current = strictDecodedCurrentDocument(decoded);
   if (current) return current;
+  const versionThree = migrateStrictDecodedVersionThreeDocument(decoded);
+  if (versionThree) return versionThree;
   const versionTwo = migrateStrictDecodedVersionTwoDocument(decoded);
   if (versionTwo) return versionTwo;
   const versionOne = migrateStrictDecodedVersionOneDocument(decoded);
   if (versionOne) return versionOne;
-  const migrated = migrateDecodedFullStateV2Metadata(decoded, options)
+  const migrated = migrateDecodedFullStateMetadata(decoded, options)
     ?? migrateDecodedLegacyMetadata(decoded, options);
   return migrated?.status === "resolved" ? migrated.document : null;
 }
@@ -1385,7 +1577,7 @@ export function migrateStudioVrmLegacyMetadata(
   options: StudioVrmLegacyMigrationOptions = {}
 ): StudioVrmLegacyMetadataMigration | null {
   const decoded = decodeBoundedDataGraph(raw);
-  return migrateDecodedFullStateV2Metadata(decoded, options)
+  return migrateDecodedFullStateMetadata(decoded, options)
     ?? migrateDecodedLegacyMetadata(decoded, options);
 }
 

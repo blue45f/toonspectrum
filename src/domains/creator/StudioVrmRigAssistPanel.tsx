@@ -7,7 +7,18 @@ import {
   type StudioVrmRigProfileId,
 } from "./studio-vrm-rig-profile";
 
-import type { StudioVrmPoseTranslations } from "./studio-vrm-scene-document";
+import type {
+  StudioVrmIkConstraint,
+  StudioVrmIkEffector,
+  StudioVrmPoseTranslations,
+} from "./studio-vrm-scene-document";
+
+const EFFECTOR_LABELS: Record<StudioVrmIkEffector, string> = {
+  leftHand: "왼손",
+  rightHand: "오른손",
+  leftFoot: "왼발",
+  rightFoot: "오른발",
+};
 
 export interface StudioVrmRigAssistPanelProps {
   readonly disabled: boolean;
@@ -17,11 +28,15 @@ export interface StudioVrmRigAssistPanelProps {
   readonly floorHeight: number;
   readonly rootYOffset: number;
   readonly translations: StudioVrmPoseTranslations;
+  readonly ikConstraints: readonly StudioVrmIkConstraint[];
   readonly onJointProfileChange: (profile: StudioVrmRigProfileId) => void;
   readonly onFullBodyIkChange: (enabled: boolean) => void;
   readonly onFootPlantChange: (enabled: boolean) => void;
   readonly onFloorHeightChange: (height: number) => void;
   readonly onResetTranslations: () => void;
+  readonly onConstraintEnabledChange: (effector: StudioVrmIkEffector, enabled: boolean) => void;
+  readonly onConstraintLockedChange: (effector: StudioVrmIkEffector, locked: boolean) => void;
+  readonly onConstraintRemove: (effector: StudioVrmIkEffector) => void;
 }
 
 /** Controlled product panel for the versioned VRM drawing-assist rig settings. */
@@ -33,11 +48,15 @@ export function StudioVrmRigAssistPanel({
   floorHeight,
   rootYOffset,
   translations,
+  ikConstraints,
   onJointProfileChange,
   onFullBodyIkChange,
   onFootPlantChange,
   onFloorHeightChange,
   onResetTranslations,
+  onConstraintEnabledChange,
+  onConstraintLockedChange,
+  onConstraintRemove,
 }: StudioVrmRigAssistPanelProps) {
   const headingId = useId();
   return (
@@ -147,6 +166,70 @@ export function StudioVrmRigAssistPanel({
         </dl>
         <p className="mt-1.5 text-[0.58rem] leading-relaxed text-fg-3">
           미리보기 동안에는 장면만 바뀌며, 핸들을 놓을 때 포즈와 이동값을 한 번만 저장합니다.
+        </p>
+      </div>
+      <div className="mt-2.5 rounded-md border border-line/60 bg-card/45 p-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[0.65rem] font-semibold text-fg-2">손·발 고정점</span>
+          <span className="numeral text-[0.58rem] text-fg-3">{ikConstraints.length}/4</span>
+        </div>
+        {ikConstraints.length === 0 ? (
+          <p className="mt-1.5 text-[0.58rem] leading-relaxed text-fg-3">
+            손·발 마름모를 이동하면 장면 좌표에 고정점이 저장됩니다.
+          </p>
+        ) : (
+          <ul className="mt-1.5 grid gap-1.5">
+            {ikConstraints.map((constraint) => (
+              <li
+                key={constraint.effector}
+                className="flex min-h-9 items-center gap-2 rounded-md border border-line/50 bg-panel/40 px-2 py-1 pointer-coarse:min-h-11"
+              >
+                <span className="min-w-10 flex-1 text-[0.62rem] font-semibold text-fg-2">
+                  {EFFECTOR_LABELS[constraint.effector]}
+                </span>
+                <label className="flex items-center gap-1 text-[0.58rem] text-fg-3">
+                  <input
+                    type="checkbox"
+                    aria-label={`${EFFECTOR_LABELS[constraint.effector]} 고정점 사용`}
+                    checked={constraint.enabled}
+                    disabled={disabled}
+                    className="size-3.5 accent-accent"
+                    onChange={(event) => onConstraintEnabledChange(
+                      constraint.effector,
+                      event.target.checked,
+                    )}
+                  />
+                  사용
+                </label>
+                <label className="flex items-center gap-1 text-[0.58rem] text-fg-3">
+                  <input
+                    type="checkbox"
+                    aria-label={`${EFFECTOR_LABELS[constraint.effector]} 다른 포즈 편집 중 유지`}
+                    checked={constraint.locked}
+                    disabled={disabled || !constraint.enabled}
+                    className="size-3.5 accent-accent"
+                    onChange={(event) => onConstraintLockedChange(
+                      constraint.effector,
+                      event.target.checked,
+                    )}
+                  />
+                  유지
+                </label>
+                <button
+                  type="button"
+                  aria-label={`${EFFECTOR_LABELS[constraint.effector]} 고정점 삭제`}
+                  disabled={disabled}
+                  className="min-h-7 rounded border border-line px-1.5 text-[0.56rem] font-semibold text-fg-3 hover:bg-raised disabled:opacity-45 pointer-coarse:min-h-10"
+                  onClick={() => onConstraintRemove(constraint.effector)}
+                >
+                  삭제
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="mt-1.5 text-[0.58rem] leading-relaxed text-fg-3">
+          사용을 끄면 핸들과 계산에서 제외됩니다. ‘유지’는 다른 포즈 편집 중에도 목표를 함께 풉니다.
         </p>
       </div>
     </section>

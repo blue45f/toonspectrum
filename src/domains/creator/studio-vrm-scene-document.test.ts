@@ -8,6 +8,7 @@ import {
   STUDIO_VRM_SCENE_DOCUMENT_MAX_BYTES,
   STUDIO_VRM_SCENE_DOCUMENT_V1_MAX_BYTES,
   STUDIO_VRM_SCENE_DOCUMENT_V2_MAX_BYTES,
+  STUDIO_VRM_SCENE_DOCUMENT_V3_MAX_BYTES,
   STUDIO_VRM_SCENE_DOCUMENT_VERSION,
   areStudioVrmSceneDocumentsEqual,
   createDefaultStudioVrmSceneDocument,
@@ -39,7 +40,11 @@ function canonicalVersionOne(
     pose: Record<string, unknown>;
     rig: unknown;
   };
-  const { translations: _translations, ...legacyPose } = cloned.pose;
+  const {
+    translations: _translations,
+    ikConstraints: _ikConstraints,
+    ...legacyPose
+  } = cloned.pose;
   const { rig: _rig, ...versionOne } = cloned;
   return { ...versionOne, version: 1, pose: legacyPose };
 }
@@ -50,8 +55,22 @@ function canonicalVersionTwo(
   const cloned = JSON.parse(JSON.stringify(scene)) as Record<string, unknown> & {
     pose: Record<string, unknown>;
   };
-  const { translations: _translations, ...versionTwoPose } = cloned.pose;
+  const {
+    translations: _translations,
+    ikConstraints: _ikConstraints,
+    ...versionTwoPose
+  } = cloned.pose;
   return { ...cloned, version: 2, pose: versionTwoPose };
+}
+
+function canonicalVersionThree(
+  scene: StudioVrmSceneDocument = createDefaultStudioVrmSceneDocument(),
+): Record<string, unknown> {
+  const cloned = JSON.parse(JSON.stringify(scene)) as Record<string, unknown> & {
+    pose: Record<string, unknown>;
+  };
+  const { ikConstraints: _ikConstraints, ...versionThreePose } = cloned.pose;
+  return { ...cloned, version: 3, pose: versionThreePose };
 }
 
 describe("studio-vrm-scene-document", () => {
@@ -82,6 +101,22 @@ describe("studio-vrm-scene-document", () => {
           leftIndexProximal: [0.1, 0.2, -0.3],
           rightThumbDistal: [-0.4, 0.5, 0.6],
         },
+        ikConstraints: [
+          {
+            effector: "leftHand",
+            enabled: true,
+            locked: true,
+            target: [-0.45, 1.25, 0.2],
+            pole: [-0.8, 1.15, 0.35],
+          },
+          {
+            effector: "rightFoot",
+            enabled: false,
+            locked: false,
+            target: [0.2, 0, -0.1],
+            pole: null,
+          },
+        ],
       },
       expressions: { blinkLeft: 0.25, happy: 0.8 },
       camera: {
@@ -247,7 +282,7 @@ describe("studio-vrm-scene-document", () => {
     expect(migrateStudioVrmSceneDocument(future)).toBeNull();
   });
 
-  it("losslessly promotes strict v1/v2 scenes to v3 with neutral translations", () => {
+  it("losslessly promotes strict v1/v2/v3 scenes to v4 with neutral additions", () => {
     const current = canonicalScene({
       pose: {
         bones: {
@@ -266,6 +301,7 @@ describe("studio-vrm-scene-document", () => {
           leftIndexProximal: [0.1, 0.2, -0.3],
           rightIndexProximal: [0.1, -0.2, 0.3],
         },
+        ikConstraints: [],
       },
       camera: {
         projection: "perspective",
@@ -280,13 +316,16 @@ describe("studio-vrm-scene-document", () => {
     });
     const versionOne = canonicalVersionOne(current);
     const versionTwo = canonicalVersionTwo(current);
+    const versionThree = canonicalVersionThree(current);
 
     const parsed = parseStudioVrmSceneDocument(JSON.stringify(versionOne));
     const migrated = migrateStudioVrmSceneDocument(versionOne);
     const migratedVersionTwo = parseStudioVrmSceneDocument(JSON.stringify(versionTwo));
+    const migratedVersionThree = parseStudioVrmSceneDocument(JSON.stringify(versionThree));
 
     expect(parsed).toEqual(migrated);
     expect(migratedVersionTwo).toEqual(parsed);
+    expect(migratedVersionThree).toEqual(parsed);
     expect(parsed).toMatchObject({
       kind: STUDIO_VRM_SCENE_DOCUMENT_KIND,
       version: STUDIO_VRM_SCENE_DOCUMENT_VERSION,
@@ -309,6 +348,64 @@ describe("studio-vrm-scene-document", () => {
     expect(parsed?.pose.bones.rightUpperArm).toEqual(current.pose.bones.rightUpperArm);
     expect(parsed?.pose.fingerOverrides).toEqual(current.pose.fingerOverrides);
     expect(serializeStudioVrmSceneDocument(parsed)).not.toBeNull();
+  });
+
+  it("requires canonical unique bounded persistent IK constraints in v4", () => {
+    const current = canonicalScene({
+      pose: {
+        ...createDefaultStudioVrmSceneDocument().pose,
+        ikConstraints: [
+          {
+            effector: "leftHand",
+            enabled: true,
+            locked: true,
+            target: [-0.5, 1.25, 0.125],
+            pole: [-0.8, 1.1, 0.35],
+          },
+          {
+            effector: "rightFoot",
+            enabled: true,
+            locked: false,
+            target: [0.25, 0, -0.15],
+            pole: null,
+          },
+        ],
+      },
+    });
+    const serialized = serializeStudioVrmSceneDocument(current);
+    expect(serialized).not.toBeNull();
+    expect(parseStudioVrmSceneDocument(serialized!)).toEqual(current);
+
+    const missing = mutableDefault();
+    delete (missing.pose as Record<string, unknown>).ikConstraints;
+    expect(serializeStudioVrmSceneDocument(missing)).toBeNull();
+
+    const malformed = (constraints: unknown) => ({
+      ...mutableDefault(),
+      pose: {
+        ...(mutableDefault().pose as Record<string, unknown>),
+        ikConstraints: constraints,
+      },
+    });
+    expect(serializeStudioVrmSceneDocument(malformed([
+      current.pose.ikConstraints[0],
+      current.pose.ikConstraints[0],
+    ]))).toBeNull();
+    expect(serializeStudioVrmSceneDocument(malformed([
+      ...current.pose.ikConstraints,
+      { effector: "leftFoot", enabled: true, locked: true, target: [0, 0, 0], pole: null },
+      { effector: "rightHand", enabled: true, locked: true, target: [0, 0, 0], pole: null },
+      { effector: "head", enabled: true, locked: true, target: [0, 0, 0], pole: null },
+    ]))).toBeNull();
+    expect(serializeStudioVrmSceneDocument(malformed([
+      { effector: "leftHand", enabled: true, locked: true, target: [10_001, 0, 0], pole: null },
+    ]))).toBeNull();
+    expect(serializeStudioVrmSceneDocument(malformed([
+      { effector: "leftHand", enabled: true, locked: true, target: [0, Number.NaN, 0], pole: null },
+    ]))).toBeNull();
+    expect(serializeStudioVrmSceneDocument(malformed([
+      { effector: "leftHand", enabled: true, locked: true, target: [0, 0, 0], pole: null, future: true },
+    ]))).toBeNull();
   });
 
   it("keeps authored v2 rig data while adding only the canonical zero translation block", () => {
@@ -408,7 +505,7 @@ describe("studio-vrm-scene-document", () => {
     expect(migrateStudioVrmSceneDocument(paddedVersionOne)).toBeNull();
   });
 
-  it("honors the historical v2 byte ceiling while reserving v3 migration headroom", () => {
+  it("honors historical v2/v3 byte ceilings while reserving v4 migration headroom", () => {
     const compactVersionTwo = JSON.stringify(canonicalVersionTwo());
     const compactBytes = new TextEncoder().encode(compactVersionTwo).byteLength;
     const atCeiling = `${compactVersionTwo}${" ".repeat(
@@ -419,6 +516,17 @@ describe("studio-vrm-scene-document", () => {
     expect(parseStudioVrmSceneDocument(atCeiling)?.version)
       .toBe(STUDIO_VRM_SCENE_DOCUMENT_VERSION);
     expect(parseStudioVrmSceneDocument(`${atCeiling} `)).toBeNull();
+
+    const compactVersionThree = JSON.stringify(canonicalVersionThree());
+    const compactVersionThreeBytes = new TextEncoder().encode(compactVersionThree).byteLength;
+    const versionThreeAtCeiling = `${compactVersionThree}${" ".repeat(
+      STUDIO_VRM_SCENE_DOCUMENT_V3_MAX_BYTES - compactVersionThreeBytes,
+    )}`;
+    expect(new TextEncoder().encode(versionThreeAtCeiling).byteLength)
+      .toBe(STUDIO_VRM_SCENE_DOCUMENT_V3_MAX_BYTES);
+    expect(parseStudioVrmSceneDocument(versionThreeAtCeiling)?.version)
+      .toBe(STUDIO_VRM_SCENE_DOCUMENT_VERSION);
+    expect(parseStudioVrmSceneDocument(`${versionThreeAtCeiling} `)).toBeNull();
   });
 
   it("never invokes accessors while parsing, serializing, or normalizing", () => {
@@ -503,7 +611,7 @@ describe("studio-vrm-scene-document", () => {
     });
   });
 
-  it("strictly migrates the currently emitted full-state v2 fragment without losing translations", () => {
+  it("strictly migrates full-state v2/v3 fragments without losing translations or pins", () => {
     const metadata = buildVrmPoseDataUrlMetadata({
       modelId: "avatar-a",
       bones: { head: { rotation: [0.1, -0.2, 0.3] } },
@@ -515,6 +623,13 @@ describe("studio-vrm-scene-document", () => {
         spine: [-0.08, 0.12, 0.04],
       },
       bodyRotation: 0.45,
+      ikConstraints: [{
+        effector: "leftHand",
+        enabled: true,
+        locked: true,
+        target: [-0.4, 1.2, 0.15],
+        pole: [-0.7, 1.05, 0.3],
+      }],
       expressionWeights: { happy: 0.7 },
       props: { version: 1, items: [] },
     }, "하린");
@@ -533,6 +648,7 @@ describe("studio-vrm-scene-document", () => {
           bones: { head: { rotation: [0.1, -0.2, 0.3] } },
           yOffset: 0.15,
           translations: decodedMetadata.poseTranslations,
+          ikConstraints: decodedMetadata.ikConstraints,
           bodyRotationY: 0.45,
         },
         expressions: { happy: 0.7 },
@@ -548,9 +664,22 @@ describe("studio-vrm-scene-document", () => {
       ...decodedMetadata,
       runtimeUrl: "blob:hostile",
     }, { bundledModels: registry })).toBeNull();
+    const { ikConstraints: _ikConstraints, ...historicalVersionTwo } = decodedMetadata;
+    expect(migrateStudioVrmLegacyMetadata({
+      ...historicalVersionTwo,
+      version: 2,
+    }, { bundledModels: registry })).toMatchObject({
+      status: "resolved",
+      document: { pose: { ikConstraints: [] } },
+    });
+    const { ikConstraints: _missingConstraints, ...missingCurrentConstraints } = decodedMetadata;
+    expect(migrateStudioVrmLegacyMetadata(
+      missingCurrentConstraints,
+      { bundledModels: registry },
+    )).toBeNull();
     expect(migrateStudioVrmLegacyMetadata({
       ...decodedMetadata,
-      version: 3,
+      ikConstraints: [decodedMetadata.ikConstraints[0], decodedMetadata.ikConstraints[0]],
     }, { bundledModels: registry })).toBeNull();
     expect(migrateStudioVrmLegacyMetadata({
       ...decodedMetadata,

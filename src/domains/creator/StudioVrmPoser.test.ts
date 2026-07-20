@@ -289,7 +289,7 @@ describe("StudioVrmPoser pose presets", () => {
 
     // full state roundtrip
     const full = serializeFullVrmState({ bodyScale: scale, fingerOverrides: finger });
-    expect(full.version).toBe(2);
+    expect(full.version).toBe(3);
     applyFullState(vrm, full as any, {
       applyPose: (b, y) => applyPoseToVrm(vrm, b, y),
       applyExpr: () => {},
@@ -303,9 +303,12 @@ describe("StudioVrmPoser pose presets", () => {
     const vrm = created.vrm;
 
     const fullAC2: FullVrmState = {
-      version: 2,
+      version: 3,
       bones: { hips: { rotation: [0, 0.1, 0] } },
       yOffset: 0.05,
+      poseTranslations: { version: 1, root: [0, 0, 0], hips: [0, 0, 0], spine: [0, 0, 0] },
+      ikConstraints: [],
+      bodyRotation: 0,
       expressionWeights: { happy: 0.7 },
       bodyScale: { height: 1.1, width: 0.9 },
       lighting: { intensity: 1.8, colorTemp: 0.6, directionDeg: 120 },
@@ -313,7 +316,13 @@ describe("StudioVrmPoser pose presets", () => {
       fingerOverrides: { leftIndexProximal: [0, 0, 0.35] },
       costume: { hidden: ["c1"], recolor: {} },
       props: { items: [{ uid: "p1", propId: "book" }] },
-      physics: { stiffnessScale: 0.9 },
+      physics: {
+        version: 1,
+        stiffnessScale: 0.9,
+        gravityScale: 1,
+        windDirectionDeg: 0,
+        windStrength: 0,
+      },
     } as any;
 
     const savedFullStates = { "test-full-ac2": fullAC2 };
@@ -362,12 +371,21 @@ describe("StudioVrmPoser pose presets", () => {
     const vrmRef = { current: vrm };
 
     const full: FullVrmState = {
-      version: 2,
+      version: 3,
       bones: {},
       yOffset: 0,
+      poseTranslations: { version: 1, root: [0, 0, 0], hips: [0, 0, 0], spine: [0, 0, 0] },
+      ikConstraints: [],
+      bodyRotation: 0,
       expressionWeights: {},
       fingerOverrides: { rightThumbProximal: [0, 0, 0.22] },
-      physics: { gravityPower: 0.5 },
+      physics: {
+        version: 1,
+        stiffnessScale: 1,
+        gravityScale: 0.5,
+        windDirectionDeg: 0,
+        windStrength: 0,
+      },
     } as any;
 
     const calls: string[] = [];
@@ -404,11 +422,20 @@ describe("StudioVrmPoser pose presets", () => {
     const vrmRef = { current: vrm };
 
     const fullWithPhysics: FullVrmState = {
-      version: 2,
+      version: 3,
       bones: {},
       yOffset: 0,
+      poseTranslations: { version: 1, root: [0, 0, 0], hips: [0, 0, 0], spine: [0, 0, 0] },
+      ikConstraints: [],
+      bodyRotation: 0,
       expressionWeights: {},
-      physics: { stiffnessScale: 1.2, gravityPower: 0.11 } as any,
+      physics: {
+        version: 1,
+        stiffnessScale: 1.2,
+        gravityScale: 1,
+        windDirectionDeg: 0,
+        windStrength: 0.11,
+      },
     } as any;
 
     const physicsApplied: any[] = [];

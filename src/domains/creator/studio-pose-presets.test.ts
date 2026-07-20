@@ -400,7 +400,7 @@ describe("new poser helpers (finger/scale/lighting/fullstate)", () => {
   });
   it("full state serializes new fields", () => {
     const full = serializeFullVrmState({ lighting: {intensity:1.5} as any, env: "floor" as any });
-    expect(full.version).toBe(2);
+    expect(full.version).toBe(3);
     expect(full.lighting?.intensity).toBe(1.5);
   });
 });

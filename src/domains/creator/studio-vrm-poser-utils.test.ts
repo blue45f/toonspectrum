@@ -11,6 +11,7 @@ import {
   planFullStateRestore,
   buildFullVrmStateFromSharedDataUrl,
   canRestoreFullVrmHistoryState,
+  deserializeFullVrmState,
   normalizeVrmBodyRotation,
   serializeFullVrmState,
   buildVrmPoseDataUrlMetadata,
@@ -201,6 +202,146 @@ describe("studio-vrm-poser-utils unified pipeline", () => {
     expect(planFullStateRestore(restored as FullVrmState).bodyRotation).toBeCloseTo(Math.PI / 6);
   });
 
+  it("strictly promotes v2 full state and rejects non-canonical current IK/translation payloads", () => {
+    const legacy = deserializeFullVrmState({
+      version: 2,
+      bones: {},
+      yOffset: 0,
+      bodyRotation: 0,
+    });
+    expect(legacy).toEqual(expect.objectContaining({
+      version: 3,
+      poseTranslations: {
+        version: 1,
+        root: [0, 0, 0],
+        hips: [0, 0, 0],
+        spine: [0, 0, 0],
+      },
+      ikConstraints: [],
+    }));
+
+    const current = serializeFullVrmState({
+      bones: {},
+      yOffset: 0,
+      bodyRotation: 0,
+      ikConstraints: [{
+        effector: "leftHand",
+        enabled: true,
+        locked: true,
+        target: [0.5, 1.2, -0.1],
+        pole: [0.2, 0.9, 0.3],
+      }],
+    });
+    expect(deserializeFullVrmState(JSON.parse(JSON.stringify(current)))).toEqual(current);
+    expect(deserializeFullVrmState({ ...current, poseTranslations: undefined })).toBeNull();
+    expect(deserializeFullVrmState({
+      ...current,
+      poseTranslations: { ...current.poseTranslations, root: [0, 0, Number.NaN] },
+    })).toBeNull();
+    expect(deserializeFullVrmState({
+      version: 2,
+      bones: {},
+      yOffset: 0,
+      bodyRotation: 0,
+      poseTranslations: { version: 1, root: [0, 1, 0], hips: [0, 0, 0], spine: [0, 0, 0] },
+    })).toBeNull();
+    expect(deserializeFullVrmState({ ...current, futureField: true })).toBeNull();
+  });
+
+  it("rejects unsafe current runtime pose fields before shared data reaches Three.js", () => {
+    const current = serializeFullVrmState({
+      bones: { hips: { rotation: [0.1, 0.2, 0.3] } },
+      yOffset: 0,
+      bodyRotation: 0,
+      expressionWeights: { happy: 0.5 },
+      fingerOverrides: { leftIndexProximal: [0.1, 0.2, 0.3] },
+      bodyScale: { height: 1, width: 1 },
+      customColors: { hair: "#aabbcc" },
+    });
+    expect(deserializeFullVrmState({
+      ...current,
+      bones: { ...current.bones, arbitrarySceneNode: { rotation: [0, 0, 0] } },
+    })).toBeNull();
+    expect(deserializeFullVrmState({
+      ...current,
+      bones: { hips: { rotation: [0, Number.NaN, 0] } },
+    })).toBeNull();
+    expect(deserializeFullVrmState({
+      ...current,
+      fingerOverrides: { arbitraryFinger: [0, 0, 0] },
+    })).toBeNull();
+    expect(deserializeFullVrmState({
+      ...current,
+      bodyScale: { height: 99, width: 1 },
+    })).toBeNull();
+    expect(deserializeFullVrmState({
+      ...current,
+      expressionWeights: { happy: 2 },
+    })).toBeNull();
+    expect(deserializeFullVrmState({
+      ...current,
+      customColors: { constructor: "#ffffff" },
+    })).toBeNull();
+    expect(deserializeFullVrmState({ ...current, physics: {} })).toBeNull();
+    expect(deserializeFullVrmState({
+      ...current,
+      physics: {
+        version: 1,
+        stiffnessScale: Number.NaN,
+        gravityScale: 1,
+        windDirectionDeg: 0,
+        windStrength: 0,
+      },
+    })).toBeNull();
+    expect(deserializeFullVrmState({
+      ...current,
+      physics: {
+        version: 1,
+        stiffnessScale: 1,
+        gravityScale: 1,
+        windDirectionDeg: 0,
+        windStrength: 0,
+        future: true,
+      },
+    })).toBeNull();
+    expect(deserializeFullVrmState({
+      ...current,
+      physics: {
+        version: 1,
+        stiffnessScale: 1,
+        gravityScale: 1,
+        windDirectionDeg: 0,
+        windStrength: 0.25,
+      },
+    })?.physics).toEqual({
+      version: 1,
+      stiffnessScale: 1,
+      gravityScale: 1,
+      windDirectionDeg: 0,
+      windStrength: 0.25,
+    });
+  });
+
+  it("requires every current shared-fragment base field instead of manufacturing defaults", () => {
+    const current = buildVrmPoseDataUrlMetadata(serializeFullVrmState({}), "Model");
+    for (const key of ["bones", "yOffset", "bodyRotation", "poseTranslations", "ikConstraints"] as const) {
+      const malformed = { ...current } as Record<string, unknown>;
+      delete malformed[key];
+      expect(buildFullVrmStateFromSharedDataUrl(
+        `data:image/png;base64,AA#${encodeURIComponent(JSON.stringify(malformed))}`,
+      )).toBeNull();
+    }
+
+    const legacy = buildFullVrmStateFromSharedDataUrl(
+      `data:image/png;base64,AA#${encodeURIComponent(JSON.stringify({ bones: {}, yOffset: 0 }))}`,
+    );
+    expect(legacy).toEqual(expect.objectContaining({
+      version: 3,
+      bodyRotation: 0,
+      ikConstraints: [],
+    }));
+  });
+
   it("keeps explicit full-state load as an intentional cross-model transfer", () => {
     const saved = serializeFullVrmState({
       modelId: "source-model",
@@ -350,13 +491,14 @@ describe("studio-vrm-poser-utils unified pipeline", () => {
 
   it("planFullStateRestore returns complete plan with stripped bones for maximal AC2 input", () => {
     const input: FullVrmState = {
-      version: 2,
+      version: 3,
       modelId: "model-a",
       bones: {
         hips: { rotation: [0, 0, 0] },
         leftIndexProximal: { rotation: [0, 0, 0.3] },
       },
       yOffset: 0.1,
+      ikConstraints: [],
       bodyRotation: Math.PI / 4,
       expressionWeights: { happy: 0.8 },
       bodyScale: { height: 1.2, width: 0.95 },

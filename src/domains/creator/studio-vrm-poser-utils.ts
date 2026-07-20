@@ -1,8 +1,19 @@
 import * as THREE from "three";
 
-import { STUDIO_HUMANOID_BONE_NAMES } from "./studio-humanoid-bones";
+import {
+  STUDIO_HUMANOID_BONE_NAMES,
+  isStudioHumanoidBoneName,
+} from "./studio-humanoid-bones";
 import { POSER_FINGER_BONES } from "./studio-pose-presets";
 import { classifyMeshName } from "./studio-vrm-costume";
+import {
+  cloneStudioVrmIkConstraints,
+  parseStudioVrmIkConstraints,
+} from "./studio-vrm-ik-constraints";
+import {
+  parseVrmPhysicsSettings,
+  type VrmPhysicsSettings,
+} from "./studio-vrm-physics";
 import {
   EMPTY_STUDIO_VRM_POSE_TRANSLATIONS,
   normalizeStudioVrmPoseTranslations,
@@ -10,7 +21,10 @@ import {
 import { parseVrmProps, type PropInstance } from "./studio-vrm-props";
 import { parseSceneProps, type SerializedSceneProps } from "./studio-vrm-scene-props";
 
-import type { StudioVrmPoseTranslations } from "./studio-vrm-scene-document";
+import type {
+  StudioVrmIkConstraint,
+  StudioVrmPoseTranslations,
+} from "./studio-vrm-scene-document";
 import type { VRM, VRMHumanBoneName } from "@pixiv/three-vrm";
 
 export type Vec3 = readonly [number, number, number];
@@ -1133,7 +1147,7 @@ export function computeLightingUniforms(params: LightingParams) {
 export type EnvVariant = "none" | "floor" | "wall" | "room" | "outdoor";
 
 export type FullVrmState = {
-  version: 2;
+  version: 3;
   /**
    * 이 상태를 캡처한 VRM 라이브러리 엔트리. 저장 상태의 명시적 모델 간 이식은 허용하지만,
    * 편집 undo/redo는 이 소유권이 현재 모델과 일치할 때만 복원한다.
@@ -1143,9 +1157,11 @@ export type FullVrmState = {
   bones: PoseBoneMap;
   yOffset: number;
   /** Canonical v3 root/hips/spine translation state; absent v2 payloads migrate to zero. */
-  poseTranslations?: StudioVrmPoseTranslations;
+  poseTranslations: StudioVrmPoseTranslations;
+  /** Canonical scene-local persistent hand/foot targets; absent v2 payloads migrate to empty. */
+  ikConstraints: readonly StudioVrmIkConstraint[];
   /** 캐릭터 루트의 사용자 Y축 회전(라디안, -PI~PI). */
-  bodyRotation?: number;
+  bodyRotation: number;
   expressionId?: string;
   expressionWeights?: Record<string, number>;
   costume?: unknown;
@@ -1166,12 +1182,260 @@ export type FullVrmState = {
   customColors?: Record<string, string>;
 };
 
+/** Historical v2 payloads are accepted at read boundaries and promoted by serializeFullVrmState. */
+export type FullVrmStateInput = Partial<Omit<FullVrmState, "version" | "ikConstraints">> & {
+  version: 2 | 3;
+  ikConstraints?: unknown;
+};
+
 const MAX_VRM_MODEL_ID_LENGTH = 256;
+const MAX_VRM_STATE_TEXT_LENGTH = 256;
+const MAX_VRM_RUNTIME_NUMBER = 10_000;
+const MAX_VRM_RUNTIME_DATA_DEPTH = 16;
+const MAX_VRM_RUNTIME_DATA_NODES = 8_192;
+const MAX_VRM_RUNTIME_ARRAY_ITEMS = 1_024;
+const MAX_VRM_RUNTIME_OBJECT_KEYS = 1_024;
+const MAX_VRM_RUNTIME_STRING_LENGTH = 1_024;
+const SAFE_VRM_RUNTIME_KEY_PATTERN = /^[\p{L}\p{N}_. :/@+-]{1,64}$/u;
+const CSS_HEX_COLOR_PATTERN = /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+const FORBIDDEN_VRM_RUNTIME_KEYS = new Set(["__proto__", "prototype", "constructor"]);
+const FINGER_BONE_SET = new Set<string>(POSER_FINGER_BONES);
+const FULL_VRM_STATE_KEYS = new Set([
+  "version",
+  "modelId",
+  "poseId",
+  "bones",
+  "yOffset",
+  "poseTranslations",
+  "ikConstraints",
+  "bodyRotation",
+  "expressionId",
+  "expressionWeights",
+  "costume",
+  "wardrobe",
+  "props",
+  "sceneProps",
+  "physics",
+  "bodyScale",
+  "lighting",
+  "env",
+  "fingerOverrides",
+  "materialFx",
+  "avatarForge",
+  "customColors",
+]);
+const FULL_VRM_FRAGMENT_KEYS = new Set([
+  ...FULL_VRM_STATE_KEYS,
+  "tool",
+  "modelName",
+  "vrmProps",
+]);
+
+function isFullVrmStateRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function hasOnlyFullVrmKeys(value: Record<string, unknown>, allowed: ReadonlySet<string>): boolean {
+  return Object.keys(value).every((key) => allowed.has(key));
+}
+
+function isFiniteFullVrmNumber(value: unknown, min: number, max: number): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= min && value <= max;
+}
+
+function isStrictFullVrmVec3(value: unknown, maxAbs = MAX_VRM_RUNTIME_NUMBER): value is Vec3 {
+  return Array.isArray(value)
+    && value.length === 3
+    && value.every((coordinate) => isFiniteFullVrmNumber(coordinate, -maxAbs, maxAbs));
+}
+
+function isStrictFullVrmPoseBones(value: unknown): value is PoseBoneMap {
+  if (!isFullVrmStateRecord(value)) return false;
+  const entries = Object.entries(value);
+  if (entries.length > STUDIO_HUMANOID_BONE_NAMES.length) return false;
+  for (const [boneName, rawBone] of entries) {
+    if (!isStudioHumanoidBoneName(boneName) || !isFullVrmStateRecord(rawBone)) return false;
+    const keys = Object.keys(rawBone);
+    if (
+      keys.length === 0
+      || keys.some((key) => key !== "rotation" && key !== "direction")
+    ) return false;
+    if (Object.prototype.hasOwnProperty.call(rawBone, "rotation")
+      && !isStrictFullVrmVec3(rawBone.rotation, Math.PI * 4)) return false;
+    if (Object.prototype.hasOwnProperty.call(rawBone, "direction")) {
+      const direction = rawBone.direction;
+      if (Array.isArray(direction)) {
+        if (!isStrictFullVrmVec3(direction, 4)) return false;
+      } else if (
+        !isFullVrmStateRecord(direction)
+        || !hasOnlyFullVrmKeys(direction, new Set(["sideX", "y", "z"]))
+        || !Object.prototype.hasOwnProperty.call(direction, "sideX")
+        || !Object.prototype.hasOwnProperty.call(direction, "y")
+        || !isFiniteFullVrmNumber(direction.sideX, -4, 4)
+        || !isFiniteFullVrmNumber(direction.y, -4, 4)
+        || (Object.prototype.hasOwnProperty.call(direction, "z")
+          && !isFiniteFullVrmNumber(direction.z, -4, 4))
+      ) return false;
+    }
+  }
+  return true;
+}
+
+function isStrictFullVrmFingerOverrides(value: unknown): value is FingerRotationMap {
+  if (!isFullVrmStateRecord(value)) return false;
+  const entries = Object.entries(value);
+  return entries.length <= POSER_FINGER_BONES.length
+    && entries.every(([boneName, rotation]) => (
+      FINGER_BONE_SET.has(boneName) && isStrictFullVrmVec3(rotation, Math.PI * 4)
+    ));
+}
+
+function isSafeFullVrmRuntimeKey(key: string): boolean {
+  return SAFE_VRM_RUNTIME_KEY_PATTERN.test(key)
+    && !FORBIDDEN_VRM_RUNTIME_KEYS.has(key.toLowerCase());
+}
+
+function isStrictFullVrmNumberRecord(
+  value: unknown,
+  maxEntries: number,
+  min: number,
+  max: number,
+): value is Record<string, number> {
+  if (!isFullVrmStateRecord(value)) return false;
+  const entries = Object.entries(value);
+  return entries.length <= maxEntries && entries.every(([key, entry]) => (
+    isSafeFullVrmRuntimeKey(key) && isFiniteFullVrmNumber(entry, min, max)
+  ));
+}
+
+function isStrictFullVrmBodyScale(value: unknown): value is BodyScale {
+  return isFullVrmStateRecord(value)
+    && Object.keys(value).length === 2
+    && Object.prototype.hasOwnProperty.call(value, "height")
+    && Object.prototype.hasOwnProperty.call(value, "width")
+    && isFiniteFullVrmNumber(value.height, 0.5, 1.6)
+    && isFiniteFullVrmNumber(value.width, 0.5, 1.6);
+}
+
+function isStrictFullVrmCustomColors(value: unknown): value is Record<string, string> {
+  if (!isFullVrmStateRecord(value)) return false;
+  const entries = Object.entries(value);
+  return entries.length <= 32 && entries.every(([key, color]) => (
+    isSafeFullVrmRuntimeKey(key)
+    && typeof color === "string"
+    && CSS_HEX_COLOR_PATTERN.test(color)
+  ));
+}
+
+function isStrictFullVrmMaterialFx(value: unknown): boolean {
+  if (!isFullVrmStateRecord(value)) return false;
+  const colorKeys = ["shadeColor", "outlineColor", "rimColor", "emissiveColor"] as const;
+  const allowed = new Set([...colorKeys, "rimIntensity", "emissiveIntensity"]);
+  return Object.keys(value).length <= allowed.size
+    && hasOnlyFullVrmKeys(value, allowed)
+    && colorKeys.every((key) => (
+      !Object.prototype.hasOwnProperty.call(value, key)
+      || value[key] === null
+      || (typeof value[key] === "string" && CSS_HEX_COLOR_PATTERN.test(value[key]))
+    ))
+    && (!Object.prototype.hasOwnProperty.call(value, "rimIntensity")
+      || isFiniteFullVrmNumber(value.rimIntensity, 0, 1))
+    && (!Object.prototype.hasOwnProperty.call(value, "emissiveIntensity")
+      || isFiniteFullVrmNumber(value.emissiveIntensity, 0, 1));
+}
+
+function isStrictFullVrmLighting(value: unknown): value is LightingParams {
+  if (!isFullVrmStateRecord(value)) return false;
+  return Object.keys(value).length === 3
+    && hasOnlyFullVrmKeys(value, new Set(["intensity", "colorTemp", "directionDeg"]))
+    && isFiniteFullVrmNumber(value.intensity, 0.1, 4)
+    && isFiniteFullVrmNumber(value.colorTemp, 0, 1)
+    && isFiniteFullVrmNumber(value.directionDeg, -180, 180);
+}
+
+function isStrictFullVrmPhysics(value: unknown): value is VrmPhysicsSettings {
+  if (!isFullVrmStateRecord(value)) return false;
+  const keys = new Set([
+    "version",
+    "stiffnessScale",
+    "gravityScale",
+    "windDirectionDeg",
+    "windStrength",
+  ]);
+  if (Object.keys(value).length !== keys.size || !hasOnlyFullVrmKeys(value, keys)) return false;
+  const normalized = parseVrmPhysicsSettings(value);
+  return value.version === normalized.version
+    && value.stiffnessScale === normalized.stiffnessScale
+    && value.gravityScale === normalized.gravityScale
+    && value.windDirectionDeg === normalized.windDirectionDeg
+    && value.windStrength === normalized.windStrength;
+}
+
+function isSafeFullVrmOpaqueId(value: unknown): value is string {
+  if (typeof value !== "string" || value.length === 0 || value.length > MAX_VRM_STATE_TEXT_LENGTH) {
+    return false;
+  }
+  return value === value.trim() && !Array.from(value).some((character) => {
+    const codePoint = character.codePointAt(0) ?? 0;
+    return codePoint <= 0x1f || codePoint === 0x7f;
+  });
+}
+
+function isBoundedFullVrmRuntimeData(
+  value: unknown,
+  state: { nodes: number },
+  depth = 0,
+): boolean {
+  state.nodes += 1;
+  if (state.nodes > MAX_VRM_RUNTIME_DATA_NODES || depth > MAX_VRM_RUNTIME_DATA_DEPTH) return false;
+  if (value === null || typeof value === "boolean") return true;
+  if (typeof value === "number") return Number.isFinite(value);
+  if (typeof value === "string") return Array.from(value).length <= MAX_VRM_RUNTIME_STRING_LENGTH;
+  if (Array.isArray(value)) {
+    return value.length <= MAX_VRM_RUNTIME_ARRAY_ITEMS
+      && value.every((item) => isBoundedFullVrmRuntimeData(item, state, depth + 1));
+  }
+  if (!isFullVrmStateRecord(value)) return false;
+  const entries = Object.entries(value);
+  return entries.length <= MAX_VRM_RUNTIME_OBJECT_KEYS
+    && entries.every(([key, entry]) => (
+      isSafeFullVrmRuntimeKey(key)
+      && isBoundedFullVrmRuntimeData(entry, state, depth + 1)
+    ));
+}
+
+function hasStrictFullVrmRuntimeFields(value: Record<string, unknown>): boolean {
+  if (!isStrictFullVrmPoseBones(value.bones)) return false;
+  if (value.modelId !== undefined && normalizeFullVrmModelId(value.modelId) !== value.modelId) return false;
+  if (value.poseId !== undefined && !isSafeFullVrmOpaqueId(value.poseId)) return false;
+  if (value.expressionId !== undefined && !isSafeFullVrmOpaqueId(value.expressionId)) return false;
+  if (value.expressionWeights !== undefined
+    && !isStrictFullVrmNumberRecord(value.expressionWeights, 64, 0, 1)) return false;
+  if (value.fingerOverrides !== undefined
+    && !isStrictFullVrmFingerOverrides(value.fingerOverrides)) return false;
+  if (value.bodyScale !== undefined && !isStrictFullVrmBodyScale(value.bodyScale)) return false;
+  if (value.customColors !== undefined && !isStrictFullVrmCustomColors(value.customColors)) return false;
+  if (value.materialFx !== undefined && !isStrictFullVrmMaterialFx(value.materialFx)) return false;
+  if (value.lighting !== undefined && !isStrictFullVrmLighting(value.lighting)) return false;
+  if (value.physics !== undefined && !isStrictFullVrmPhysics(value.physics)) return false;
+  if (value.env !== undefined && !["none", "floor", "wall", "room", "outdoor"].includes(String(value.env))) {
+    return false;
+  }
+  for (const key of ["costume", "wardrobe", "props", "sceneProps", "avatarForge"] as const) {
+    if (value[key] !== undefined && !isBoundedFullVrmRuntimeData(value[key], { nodes: 0 })) return false;
+  }
+  return true;
+}
 
 /** 외부 저장/공유 데이터가 NaN, Infinity, 과도한 회전을 React/Three 상태에 주입하지 못하게 한다. */
 export function normalizeVrmBodyRotation(value: unknown): number {
   if (typeof value !== "number" || !Number.isFinite(value)) return 0;
   return Math.max(-Math.PI, Math.min(Math.PI, value));
+}
+
+function normalizeFullVrmYOffset(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return 0;
+  return Math.max(-10, Math.min(10, Object.is(value, -0) ? 0 : value));
 }
 
 /**
@@ -1192,22 +1456,29 @@ export function normalizeFullVrmModelId(value: unknown): string | undefined {
  * Undo/redo는 명시적 포즈 이식이 아니다. 소유권이 없거나 현재 모델과 다르면 fail closed한다.
  * 구버전 저장 상태는 명시적 불러오기 경로에서는 계속 사용할 수 있다.
  */
-export function canRestoreFullVrmHistoryState(state: FullVrmState, activeModelId: unknown): boolean {
+export function canRestoreFullVrmHistoryState(state: FullVrmStateInput, activeModelId: unknown): boolean {
   const stateModelId = normalizeFullVrmModelId(state.modelId);
   const currentModelId = normalizeFullVrmModelId(activeModelId);
   return stateModelId !== undefined && currentModelId !== undefined && stateModelId === currentModelId;
 }
 
-export function serializeFullVrmState(state: Partial<FullVrmState>): FullVrmState {
+export function serializeFullVrmState(
+  state: Partial<Omit<FullVrmState, "version" | "ikConstraints">> & {
+    version?: 2 | 3;
+    ikConstraints?: unknown;
+  },
+): FullVrmState {
   const poseTranslations = normalizeStudioVrmPoseTranslations(state.poseTranslations)
     ?? EMPTY_STUDIO_VRM_POSE_TRANSLATIONS;
+  const ikConstraints = parseStudioVrmIkConstraints(state.ikConstraints ?? []) ?? [];
   return {
-    version: 2,
+    version: 3,
     modelId: normalizeFullVrmModelId(state.modelId),
     poseId: state.poseId,
     bones: state.bones || {},
-    yOffset: state.yOffset ?? 0,
+    yOffset: normalizeFullVrmYOffset(state.yOffset),
     poseTranslations,
+    ikConstraints: cloneStudioVrmIkConstraints(ikConstraints),
     bodyRotation: normalizeVrmBodyRotation(state.bodyRotation),
     expressionId: state.expressionId,
     expressionWeights: state.expressionWeights,
@@ -1226,7 +1497,48 @@ export function serializeFullVrmState(state: Partial<FullVrmState>): FullVrmStat
   };
 }
 
-export function applyFullState(vrm: VRM, state: FullVrmState, applyers: {
+/** Strict external reader: current v3 must contain the exact canonical persistent-IK block. */
+export function deserializeFullVrmState(value: unknown): FullVrmState | null {
+  if (!isFullVrmStateRecord(value) || (value.version !== 2 && value.version !== 3)) return null;
+  const keys = Object.keys(value);
+  if (
+    keys.some((key) => !FULL_VRM_STATE_KEYS.has(key))
+    || !Object.prototype.hasOwnProperty.call(value, "bones")
+    || !Object.prototype.hasOwnProperty.call(value, "yOffset")
+    || !Object.prototype.hasOwnProperty.call(value, "bodyRotation")
+    || !hasStrictFullVrmRuntimeFields(value)
+  ) return null;
+  const hasPoseTranslations = Object.prototype.hasOwnProperty.call(value, "poseTranslations");
+  const normalizedTranslations = hasPoseTranslations
+    ? normalizeStudioVrmPoseTranslations(value.poseTranslations)
+    : null;
+  if (value.version === 2) {
+    if (Object.prototype.hasOwnProperty.call(value, "ikConstraints")) return null;
+    if (
+      hasPoseTranslations
+      && (!normalizedTranslations
+        || JSON.stringify(normalizedTranslations) !== JSON.stringify(value.poseTranslations))
+    ) return null;
+  } else {
+    if (!Object.prototype.hasOwnProperty.call(value, "ikConstraints")) return null;
+    const constraints = parseStudioVrmIkConstraints(value.ikConstraints);
+    if (!constraints || JSON.stringify(constraints) !== JSON.stringify(value.ikConstraints)) return null;
+    if (
+      !hasPoseTranslations
+      || !normalizedTranslations
+      || JSON.stringify(normalizedTranslations) !== JSON.stringify(value.poseTranslations)
+    ) return null;
+  }
+  if (
+    typeof value.yOffset !== "number"
+    || normalizeFullVrmYOffset(value.yOffset) !== value.yOffset
+    || normalizeVrmBodyRotation(value.bodyRotation) !== value.bodyRotation
+    || !isFullVrmStateRecord(value.bones)
+  ) return null;
+  return serializeFullVrmState(value as FullVrmStateInput);
+}
+
+export function applyFullState(vrm: VRM, state: FullVrmStateInput, applyers: {
   applyPose: (
     bones: PoseBoneMap,
     y: number,
@@ -1302,11 +1614,12 @@ export function applyPoserVisualState(
  * Pure planner for full state restore (AC2).
  * Returns a plan object with every React state field + stripped bones.
  */
-export function planFullStateRestore(state: FullVrmState): {
+export function planFullStateRestore(state: FullVrmStateInput): {
   modelId?: string;
   strippedBones: PoseBoneMap;
   yOffset: number;
   poseTranslations: StudioVrmPoseTranslations;
+  ikConstraints: readonly StudioVrmIkConstraint[];
   bodyRotation: number;
   expressionWeights: Record<string, number>;
   bodyScale?: BodyScale;
@@ -1329,6 +1642,9 @@ export function planFullStateRestore(state: FullVrmState): {
     yOffset: state.yOffset ?? 0,
     poseTranslations: normalizeStudioVrmPoseTranslations(state.poseTranslations)
       ?? EMPTY_STUDIO_VRM_POSE_TRANSLATIONS,
+    ikConstraints: cloneStudioVrmIkConstraints(
+      parseStudioVrmIkConstraints(state.ikConstraints) ?? [],
+    ),
     bodyRotation: normalizeVrmBodyRotation(state.bodyRotation),
     expressionWeights: state.expressionWeights || {},
     bodyScale: state.bodyScale,
@@ -1369,15 +1685,35 @@ export function buildFullVrmStateFromSharedDataUrl(dataUrl: string): FullVrmStat
     const hashIndex = dataUrl.indexOf("#");
     if (hashIndex === -1) return null;
     const hashStr = dataUrl.substring(hashIndex + 1);
-    const poseData = JSON.parse(decodeURIComponent(hashStr));
-
-    return serializeFullVrmState({
+    const poseData: unknown = JSON.parse(decodeURIComponent(hashStr));
+    if (!isFullVrmStateRecord(poseData)) return null;
+    const keys = Object.keys(poseData);
+    if (
+      keys.some((key) => !FULL_VRM_FRAGMENT_KEYS.has(key))
+      || (poseData.tool !== undefined && poseData.tool !== "vrm-poser")
+      || (poseData.version !== undefined && poseData.version !== 2 && poseData.version !== 3)
+    ) return null;
+    const sourceVersion = poseData.version === 3 ? 3 : 2;
+    if (sourceVersion === 3) {
+      for (const requiredKey of [
+        "bones",
+        "yOffset",
+        "bodyRotation",
+        "poseTranslations",
+        "ikConstraints",
+      ]) {
+        if (!Object.prototype.hasOwnProperty.call(poseData, requiredKey)) return null;
+      }
+    }
+    const candidate = {
+      version: sourceVersion,
       modelId: poseData.modelId,
       poseId: poseData.poseId,
       bones: poseData.bones || {},
       yOffset: typeof poseData.yOffset === "number" ? poseData.yOffset : 0,
-      poseTranslations: poseData.poseTranslations,
-      bodyRotation: poseData.bodyRotation,
+      bodyRotation: sourceVersion === 2 && poseData.bodyRotation === undefined
+        ? 0
+        : poseData.bodyRotation,
       expressionId: poseData.expressionId,
       expressionWeights: poseData.expressionWeights || {},
       bodyScale: poseData.bodyScale,
@@ -1396,7 +1732,12 @@ export function buildFullVrmStateFromSharedDataUrl(dataUrl: string): FullVrmStat
       materialFx: poseData.materialFx,
       avatarForge: poseData.avatarForge,
       customColors: poseData.customColors,
-    });
+      ...(sourceVersion === 3 || Object.prototype.hasOwnProperty.call(poseData, "poseTranslations")
+        ? { poseTranslations: poseData.poseTranslations }
+        : {}),
+      ...(sourceVersion === 3 ? { ikConstraints: poseData.ikConstraints } : {}),
+    };
+    return deserializeFullVrmState(candidate);
   } catch {
     return null;
   }
@@ -1421,9 +1762,10 @@ export function createFullStateLoadHandlers(deps: {
       if (!s) return;
       deps.commitFullStateRestore(s, deps.vrmRef.current);
     },
-    handlePasteFullStateFromParsed(s: FullVrmState | null) {
-      if (!s || s.version !== 2) return;
-      deps.commitFullStateRestore(s, deps.vrmRef.current);
+    handlePasteFullStateFromParsed(s: FullVrmStateInput | null) {
+      const full = deserializeFullVrmState(s);
+      if (!full) return;
+      deps.commitFullStateRestore(full, deps.vrmRef.current);
     },
     handleSelectSharedPose(asset: { dataUrl: string }) {
       const full = buildFullVrmStateFromSharedDataUrl(asset.dataUrl);

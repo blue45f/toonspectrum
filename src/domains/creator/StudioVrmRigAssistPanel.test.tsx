@@ -23,11 +23,15 @@ function renderPanel(overrides: Partial<ComponentProps<typeof StudioVrmRigAssist
       hips: [0.1, -0.2, 0.3],
       spine: [0.02, 0.04, -0.06],
     },
+    ikConstraints: [],
     onJointProfileChange: vi.fn(),
     onFullBodyIkChange: vi.fn(),
     onFootPlantChange: vi.fn(),
     onFloorHeightChange: vi.fn(),
     onResetTranslations: vi.fn(),
+    onConstraintEnabledChange: vi.fn(),
+    onConstraintLockedChange: vi.fn(),
+    onConstraintRemove: vi.fn(),
     ...overrides,
   };
   return { props, view: render(<StudioVrmRigAssistPanel {...props} />) };
@@ -78,5 +82,23 @@ describe("StudioVrmRigAssistPanel", () => {
     expect(screen.getByText("0.10 / -0.20 / 0.30m")).toBeTruthy();
     expect(screen.getByText("0.02 / 0.04 / -0.06m")).toBeTruthy();
     expect(screen.getByText(/핸들을 놓을 때 포즈와 이동값을 한 번만 저장/)).toBeTruthy();
+  });
+
+  it("exposes persistent pin enable, lock, and explicit delete controls", () => {
+    const { props } = renderPanel({
+      ikConstraints: [{
+        effector: "leftHand",
+        enabled: true,
+        locked: true,
+        target: [-0.4, 1.2, 0.15],
+        pole: [-0.7, 1.05, 0.3],
+      }],
+    });
+    fireEvent.click(screen.getByLabelText("왼손 고정점 사용"));
+    fireEvent.click(screen.getByLabelText("왼손 다른 포즈 편집 중 유지"));
+    fireEvent.click(screen.getByRole("button", { name: "왼손 고정점 삭제" }));
+    expect(props.onConstraintEnabledChange).toHaveBeenCalledWith("leftHand", false);
+    expect(props.onConstraintLockedChange).toHaveBeenCalledWith("leftHand", false);
+    expect(props.onConstraintRemove).toHaveBeenCalledWith("leftHand");
   });
 });

@@ -294,6 +294,7 @@ async function run(page: Page, studioUrl: string): Promise<void> {
   const pngEncoderWorkers: string[] = [];
   const glbValidationWorkers: string[] = [];
   const ktx2TranscoderWorkers: string[] = [];
+  const basisWasmResponses: string[] = [];
   let expectingLiveContextLoss = false;
   let liveContextExplicitlyLost = false;
   let liveContextLossDiagnostics = 0;
@@ -329,6 +330,16 @@ async function run(page: Page, studioUrl: string): Promise<void> {
     const url = new URL(request.url());
     if (url.pathname === SHARED_POSE_CATALOG_API_PATH && request.method() === "GET") {
       sharedPoseRequests.push(request.url());
+    }
+  });
+  page.on("response", (response) => {
+    const url = new URL(response.url());
+    if (
+      url.pathname.includes("basis_transcoder")
+      && url.pathname.endsWith(".wasm")
+      && response.ok()
+    ) {
+      basisWasmResponses.push(response.url());
     }
   });
 
@@ -413,6 +424,15 @@ async function run(page: Page, studioUrl: string): Promise<void> {
   await page.waitForTimeout(1_000);
 
   await backgroundDialog.getByRole("tab", { name: "모델", exact: true }).click();
+  const ktxCanvas = backgroundDialog.locator("canvas").first();
+  await ktxCanvas.waitFor({ state: "visible", timeout: 5_000 });
+  await ktxCanvas.evaluate(() => new Promise<void>((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+  }));
+  const canvasBeforeKtx2 = await ktxCanvas.screenshot({ type: "png" });
+  const glbValidationWorkersBefore = glbValidationWorkers.length;
+  const ktx2TranscoderWorkersBefore = ktx2TranscoderWorkers.length;
+  const basisWasmResponsesBefore = basisWasmResponses.length;
   await backgroundDialog.getByLabel("3D 모델 및 연결 파일 선택").setInputFiles({
     name: KTX2_SMOKE_MODEL_NAME,
     mimeType: "model/gltf-binary",
@@ -448,16 +468,41 @@ async function run(page: Page, studioUrl: string): Promise<void> {
     "the KTX2 model produced a scene-recovery or render-clone failure",
   );
   assertCondition(
-    glbValidationWorkers.length > 0,
+    glbValidationWorkers.length > glbValidationWorkersBefore,
     "the KTX2 model did not run through the off-main GLB validation worker",
   );
   assertCondition(
-    ktx2TranscoderWorkers.length > 0,
+    ktx2TranscoderWorkers.length > ktx2TranscoderWorkersBefore,
     "the KTX2 model did not start the renderer-specific Basis transcoder worker",
   );
-  await backgroundDialog.locator("canvas").first().evaluate(() => new Promise<void>((resolve) => {
+  assertCondition(
+    basisWasmResponses.length > basisWasmResponsesBefore,
+    "the KTX2 path did not load the pinned Basis transcoder WASM asset",
+  );
+  await ktxCanvas.evaluate(() => new Promise<void>((resolve) => {
     requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
   }));
+  const canvasAfterKtx2 = await ktxCanvas.screenshot({ type: "png" });
+  const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  assertCondition(
+    canvasAfterKtx2.length > pngSignature.length
+      && canvasAfterKtx2.subarray(0, pngSignature.length).equals(pngSignature),
+    "the KTX2 Canvas did not produce a valid PNG frame",
+  );
+  assertCondition(
+    !canvasAfterKtx2.equals(canvasBeforeKtx2),
+    "the verified KTX2 scene placement did not change the rendered Canvas frame",
+  );
+  const webglStatus = await ktxCanvas.evaluate((element) => {
+    const canvas = element as HTMLCanvasElement;
+    const context = canvas.getContext("webgl2") ?? canvas.getContext("webgl");
+    return context
+      ? { exists: true, contextLost: context.isContextLost(), error: context.getError() }
+      : { exists: false, contextLost: true, error: -1 };
+  });
+  assertCondition(webglStatus.exists, "the KTX2 renderer Canvas has no WebGL context");
+  assertCondition(!webglStatus.contextLost, "the KTX2 renderer WebGL context is lost");
+  assertCondition(webglStatus.error === 0, `the KTX2 renderer reported WebGL error ${webglStatus.error}`);
   await closeCanvasDialog(backgroundDialog, page);
 
   const overlayCount = await page.locator(VITE_ERROR_OVERLAY_SELECTOR).count();

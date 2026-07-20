@@ -1,7 +1,7 @@
 import { OrbitControls } from "@react-three/drei/core/OrbitControls.js";
 import { Canvas, useFrame, useThree, createPortal } from "@react-three/fiber";
 import { AlertTriangle, Camera, ChevronDown, Clapperboard, FlipHorizontal2, ImagePlus, Loader2, Maximize2, Paintbrush, PersonStanding, Redo2, RotateCcw, RotateCw, Search, Shirt, Sliders, Smile, Sparkles, Swords, Trash2, Undo2, Upload, UserRound, WandSparkles, X, Webcam, ZoomIn, ZoomOut } from "lucide-react";
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
 import { createPortal as createDomPortal } from "react-dom";
 import * as THREE from "three";
 
@@ -41,7 +41,20 @@ import {
   type StudioVrmFullBodyIkResult,
 } from "./studio-vrm-full-body-ik";
 import { avatarSideForHand, solveHandToFingerBones } from "./studio-vrm-hand-solver";
+import {
+  cloneStudioVrmIkConstraints,
+  enabledStudioVrmIkTargetsSceneLocal,
+  mirrorStudioVrmIkConstraints,
+  removeStudioVrmIkConstraint,
+  studioVrmSceneLocalPointToWorld,
+  studioVrmWorldPointToSceneLocal,
+  upsertStudioVrmIkConstraint,
+} from "./studio-vrm-ik-constraints";
 import { clampStudioVrmJointRotation, getStudioVrmJointLimit } from "./studio-vrm-joint-limits";
+import {
+  buildStudioVrmPersistentIkSignature,
+  type StudioVrmPersistentIkSignatureInput,
+} from "./studio-vrm-persistent-ik-signature";
 import {
   parseVrmPhysicsSettings,
   DEFAULT_VRM_PHYSICS,
@@ -85,6 +98,7 @@ import {
   POSE_PRESETS,
   ZERO_ROTATION,
   computeLightingUniforms,
+  deserializeFullVrmState,
   serializeFullVrmState,
   applyFullState,
   stripFingerBones,
@@ -92,6 +106,7 @@ import {
   planFullStateRestore,
   createFullStateLoadHandlers,
   buildVrmPoseDataUrlMetadata,
+  buildFullVrmStateFromSharedDataUrl,
   normalizeFullVrmModelId,
   DEFAULT_VRM_MATERIAL_FX,
   type PoseBoneMap,
@@ -102,6 +117,7 @@ import {
   type LightingParams,
   type EnvVariant,
   type FullVrmState,
+  type FullVrmStateInput,
   type VrmMaterialFx,
 } from "./studio-vrm-poser-utils";
 import {
@@ -167,6 +183,7 @@ import {
   serializeStudioVrmSceneDocument,
   type StudioVrmCameraSettings,
   type StudioVrmFingerRotationMap,
+  type StudioVrmIkConstraint,
   type StudioVrmPoseBoneMap,
   type StudioVrmPoseTranslations,
   type StudioVrmSceneDocument,
@@ -875,8 +892,11 @@ const VIEWPORT_POSE_BONES: readonly VRMHumanBoneName[] = Object.freeze([
 
 type StudioVrmIkTransaction = {
   vrm: VRM;
+  coordinateScene: THREE.Scene;
   effector: StudioVrmIkEffectorBone;
   revision: number;
+  /** React-side pose/config snapshot that owns this pointer transaction. */
+  authoritativeSignature: string;
   baseline: {
     bones: PoseBoneMap;
     yOffset: number;
@@ -884,6 +904,13 @@ type StudioVrmIkTransaction = {
   };
   poleWorld?: THREE.Vector3;
   latest: StudioVrmUserIkResult | StudioVrmFullBodyIkResult | null;
+};
+
+type PendingStudioVrmPersistentIkCommand = {
+  before: FullVrmState;
+  candidateAfter: FullVrmState;
+  inputSignature: string;
+  historyGeneration: number;
 };
 
 function extractStudioVrmFingerRotations(bones: PoseBoneMap): FingerRotationMap {
@@ -2323,6 +2350,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   const [poseTranslations, setPoseTranslations] = useState<StudioVrmPoseTranslations>(() =>
     cloneStudioVrmPoseTranslations(EMPTY_STUDIO_VRM_POSE_TRANSLATIONS)
   );
+  const [ikConstraints, setIkConstraints] = useState<StudioVrmIkConstraint[]>([]);
   const [activeCategory, setActiveCategory] = useState("head");
   const [jointLimitsEnabled, setJointLimitsEnabled] = useState(true);
   const [rigJointProfile, setRigJointProfile] = useState<StudioVrmRigProfileId>("neutral");
@@ -2455,6 +2483,9 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   const lastFingersRef = useRef<Record<string, readonly [number, number, number]> | null>(null);
   const frameIndexRef = useRef(0);
   const webcamActiveRef = useRef(false);
+  const idleAnimationRef = useRef(false);
+  const dynamicPoseGenerationRef = useRef(0);
+  const dynamicPoseStateRef = useRef({ webcamActive: false, idleAnimation: false });
   const trackingDataRef = useRef<VrmTrackingData | null>(null);
   const vrmRef = useRef<VRM | null>(null);
   const loadRequestRef = useRef(0);
@@ -2474,6 +2505,12 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   const manualPoseDetailsRef = useRef<HTMLDetailsElement>(null);
   const jointIkTransactionRef = useRef<StudioVrmIkTransaction | null>(null);
   const jointIkRevisionRef = useRef(0);
+  const persistentIkReconcileRevisionRef = useRef(0);
+  const persistentIkResolvedSignatureRef = useRef("");
+  const persistentIkCurrentSignatureRef = useRef("");
+  const pendingPersistentIkCommandRef = useRef<PendingStudioVrmPersistentIkCommand | null>(null);
+  const [persistentIkReconciling, setPersistentIkReconciling] = useState(false);
+  const [captureSceneGeneration, setCaptureSceneGeneration] = useState(0);
   // 캡처(투명 PNG 삽입) 순간에만 발밑 타원 그림자를 꺼서 캐릭터만 남긴다 — React state가 아니라
   // three.js 객체를 직접 명령형으로 토글해야 gl.render() 호출 전에 확실히 반영된다(state 갱신은
   // 다음 R3F 커밋을 기다려야 해서 같은 프레임 안에서 타이밍을 보장할 수 없다).
@@ -2689,6 +2726,64 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     setViewportHinted(true);
   }, []);
 
+  const currentPersistentIkSignature = useCallback((overrides: Partial<Pick<
+    StudioVrmPersistentIkSignatureInput,
+    "bones" | "fingerEdits" | "yOffset" | "translations" | "constraints"
+  >> = {}): string => {
+    return buildStudioVrmPersistentIkSignature({
+      modelId: activeModelId,
+      bones: overrides.bones ?? customBones,
+      fingerEdits: overrides.fingerEdits ?? fingerEdits,
+      yOffset: overrides.yOffset ?? customYOffset,
+      translations: overrides.translations ?? poseTranslations,
+      bodyRotation,
+      bodyScale,
+      constraints: overrides.constraints ?? ikConstraints,
+      lockedPoseBones,
+      jointProfile: rigJointProfile,
+      fullBodyIk: fullBodyIkEnabled,
+      footPlant: footPlantEnabled,
+      floorHeight: rigFloorHeight,
+    });
+  }, [
+    activeModelId,
+    bodyRotation,
+    bodyScale,
+    customBones,
+    customYOffset,
+    fingerEdits,
+    footPlantEnabled,
+    fullBodyIkEnabled,
+    ikConstraints,
+    lockedPoseBones,
+    poseTranslations,
+    rigFloorHeight,
+    rigJointProfile,
+  ]);
+  useLayoutEffect(() => {
+    persistentIkCurrentSignatureRef.current = currentPersistentIkSignature();
+  }, [currentPersistentIkSignature]);
+  useLayoutEffect(() => {
+    const previous = dynamicPoseStateRef.current;
+    if (
+      previous.webcamActive !== webcamActive
+      || previous.idleAnimation !== idleAnimation
+    ) {
+      dynamicPoseGenerationRef.current += 1;
+      dynamicPoseStateRef.current = { webcamActive, idleAnimation };
+    }
+    webcamActiveRef.current = webcamActive;
+    idleAnimationRef.current = idleAnimation;
+  }, [idleAnimation, webcamActive]);
+
+  const persistentIkCaptureIsReady = useCallback((): boolean => {
+    const hasLockedConstraint = ikConstraints.some((constraint) => (
+      constraint.enabled && constraint.locked
+    ));
+    return !hasLockedConstraint
+      || persistentIkResolvedSignatureRef.current === currentPersistentIkSignature();
+  }, [currentPersistentIkSignature, ikConstraints]);
+
   function handleJointHandleSelect(bone: StudioVrmJointHandleBone) {
     setSelectedJointHandle(bone);
     const category = categoryForStudioVrmJointHandle(bone);
@@ -2704,17 +2799,19 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   }
 
   function cancelJointIkTransaction(options: {
+    forceInvalidate?: boolean;
     restoreBaseline?: boolean;
     remountHandles?: boolean;
     status?: string;
   } = {}) {
     const {
+      forceInvalidate = false,
       restoreBaseline = true,
       remountHandles = true,
       status: nextStatus,
     } = options;
     const transaction = jointIkTransactionRef.current;
-    if (!transaction && !jointHandleInteracting) {
+    if (!forceInvalidate && !transaction && !jointHandleInteracting) {
       if (nextStatus !== undefined) setJointHandleStatus(nextStatus);
       return;
     }
@@ -2737,7 +2834,8 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     worldPosition: StudioVrmJointWorldPoint,
   ): StudioVrmUserIkResult | StudioVrmFullBodyIkResult | null {
     const currentVrm = vrmRef.current;
-    if (!currentVrm || webcamActive || idleAnimation || isCapturing) {
+    const coordinateScene = captureRef.current.scene;
+    if (!currentVrm || !coordinateScene || webcamActive || idleAnimation || isCapturing) {
       setJointHandleStatus("실시간 추적·대기 애니메이션·캡처 중에는 관절 핸들을 편집할 수 없습니다.");
       return null;
     }
@@ -2774,13 +2872,25 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       }
       transaction = {
         vrm: currentVrm,
+        coordinateScene,
         effector,
         revision: jointIkRevisionRef.current,
+        authoritativeSignature: currentPersistentIkSignature(),
         baseline: {
           ...baseline,
           translations: cloneStudioVrmPoseTranslations(poseTranslations),
         },
-        poleWorld: createStudioVrmIkPole(currentVrm, effector),
+        poleWorld: (() => {
+          const persistedPole = ikConstraints.find((constraint) => (
+            constraint.effector === effector && constraint.enabled
+          ))?.pole;
+          const worldPole = persistedPole
+            ? studioVrmSceneLocalPointToWorld(coordinateScene, persistedPole)
+            : null;
+          return worldPole
+            ? new THREE.Vector3(worldPole[0], worldPole[1], worldPole[2])
+            : createStudioVrmIkPole(currentVrm, effector);
+        })(),
         latest: null,
       };
       jointIkTransactionRef.current = transaction;
@@ -2790,7 +2900,40 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     }
 
     const targetWorld = new THREE.Vector3(worldPosition[0], worldPosition[1], worldPosition[2]);
-    const result = fullBodyIkEnabled || footPlantEnabled
+    const lockedTargets: Array<{
+      effector: StudioVrmIkEffectorBone;
+      targetWorld: THREE.Vector3;
+      poleWorld?: THREE.Vector3;
+    }> = [];
+    for (const constraint of ikConstraints) {
+      if (!constraint.enabled || !constraint.locked || constraint.effector === effector) continue;
+      const lockedChain = STUDIO_VRM_USER_IK_CHAINS[constraint.effector];
+      if (
+        [lockedChain.upper, lockedChain.lower, lockedChain.end]
+          .some((boneName) => lockedPoseBones.includes(boneName))
+      ) {
+        applyStudioVrmRotationPose(currentVrm, transaction.baseline, bodyScale);
+        transaction.latest = null;
+        setJointHandleStatus("유지 중인 고정점 체인에 잠긴 관절이 있습니다. 관절 잠금 또는 고정점 유지를 해제해 주세요.");
+        return null;
+      }
+      const target = studioVrmSceneLocalPointToWorld(coordinateScene, constraint.target);
+      const pole = constraint.pole
+        ? studioVrmSceneLocalPointToWorld(coordinateScene, constraint.pole)
+        : null;
+      if (!target || (constraint.pole && !pole)) {
+        applyStudioVrmRotationPose(currentVrm, transaction.baseline, bodyScale);
+        transaction.latest = null;
+        setJointHandleStatus("유지 중인 고정점의 장면 좌표를 해석하지 못해 IK 계산을 중단했습니다.");
+        return null;
+      }
+      lockedTargets.push({
+        effector: constraint.effector,
+        targetWorld: new THREE.Vector3(target[0], target[1], target[2]),
+        poleWorld: pole ? new THREE.Vector3(pole[0], pole[1], pole[2]) : undefined,
+      });
+    }
+    const result = fullBodyIkEnabled || footPlantEnabled || lockedTargets.length > 0
       ? solveStudioVrmFullBodyIk(currentVrm, {
           primary: {
             effector,
@@ -2804,6 +2947,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
             enabled: footPlantEnabled,
             floorHeight: rigFloorHeight,
           },
+          lockedTargets,
         })
       : solveStudioVrmUserIk(currentVrm, {
           effector,
@@ -2856,6 +3000,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       !result
       || !currentVrm
       || transaction?.vrm !== currentVrm
+      || transaction.coordinateScene !== captureRef.current.scene
       || transaction.revision !== jointIkRevisionRef.current
     ) {
       cancelJointIkTransaction({ remountHandles: false });
@@ -2867,6 +3012,55 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     const nextTranslations = "translations" in result
       ? result.translations
       : transaction.baseline.translations;
+    const persistedTargetWorld = "constraints" in result
+      ? result.constraints.find((constraint) => constraint.effector === effector)?.targetWorld
+      : worldPosition;
+    const targetLocal = persistedTargetWorld
+      ? studioVrmWorldPointToSceneLocal(transaction.coordinateScene, persistedTargetWorld)
+      : null;
+    const poleLocal = transaction.poleWorld
+      ? studioVrmWorldPointToSceneLocal(transaction.coordinateScene, transaction.poleWorld)
+      : null;
+    if (!targetLocal || (transaction.poleWorld && !poleLocal)) {
+      cancelJointIkTransaction({ remountHandles: false });
+      setJointHandleStatus("IK 목표를 장면 좌표로 저장하지 못했습니다.");
+      return;
+    }
+    const existingConstraint = ikConstraints.find((constraint) => constraint.effector === effector);
+    const nextConstraints = upsertStudioVrmIkConstraint(ikConstraints, {
+      effector,
+      enabled: true,
+      locked: existingConstraint?.locked ?? true,
+      target: targetLocal,
+      pole: poleLocal,
+    });
+    const before = captureFullState();
+    const after = serializeFullVrmState({
+      ...before,
+      poseId: "manual-ik",
+      bones: nextBones,
+      fingerOverrides: nextFingers,
+      yOffset: result.yOffset,
+      poseTranslations: nextTranslations,
+      ikConstraints: nextConstraints,
+    });
+    persistentIkResolvedSignatureRef.current = currentPersistentIkSignature({
+      bones: nextBones,
+      fingerEdits: nextFingers,
+      yOffset: result.yOffset,
+      translations: nextTranslations,
+      constraints: nextConstraints,
+    });
+    setPersistentIkReconciling(false);
+    const nextHistory = commitStudioVrmFullStateHistoryTransaction(
+      fullStateHistoryRef.current,
+      before,
+      after,
+      activeModelId,
+    );
+    fullStateHistoryRef.current = nextHistory;
+    setCanUndo(nextHistory.index > 0);
+    setCanRedo(nextHistory.index < nextHistory.entries.length - 1);
     jointIkRevisionRef.current += 1;
     jointIkTransactionRef.current = null;
     setActivePoseId("manual-ik");
@@ -2874,6 +3068,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     setFingerEdits(nextFingers);
     setCustomYOffset(result.yOffset);
     setPoseTranslations(cloneStudioVrmPoseTranslations(nextTranslations));
+    setIkConstraints(nextConstraints);
     setSelectedJointHandle(effector);
     setJointHandleInteracting(false);
     applyStudioVrmRotationPose(currentVrm, {
@@ -2956,6 +3151,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
         bones: customBones,
         yOffset: customYOffset,
         poseTranslations,
+        ikConstraints,
         bodyRotation,
         expressionWeights,
         costume: costumeState,
@@ -2971,8 +3167,318 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
         materialFx,
         avatarForge: serializeAvatarForgeState(avatarForgeState),
       }),
-    [activeModelId, activePoseId, activeExpressionId, customBones, customYOffset, poseTranslations, bodyRotation, expressionWeights, costumeState, wardrobeState, vrmPropItems, activeProps, propAttachments, vrmPhysics, bodyScale, lighting, envVariant, fingerEdits, customColors, materialFx, avatarForgeState]
+    [activeModelId, activePoseId, activeExpressionId, customBones, customYOffset, poseTranslations, ikConstraints, bodyRotation, expressionWeights, costumeState, wardrobeState, vrmPropItems, activeProps, propAttachments, vrmPhysics, bodyScale, lighting, envVariant, fingerEdits, customColors, materialFx, avatarForgeState]
   );
+
+  // A pointer transaction owns the exact React-side pose/config it started from. Any preset,
+  // restore, root/body edit, pin toggle, or lock change invalidates that ownership before a late
+  // pointerup can overwrite the newer authoritative edit.
+  useEffect(() => {
+    const transaction = jointIkTransactionRef.current;
+    if (!transaction) return;
+    const signature = buildStudioVrmPersistentIkSignature({
+      modelId: activeModelId,
+      bones: customBones,
+      fingerEdits,
+      yOffset: customYOffset,
+      translations: poseTranslations,
+      bodyRotation,
+      bodyScale,
+      constraints: ikConstraints,
+      lockedPoseBones,
+      jointProfile: rigJointProfile,
+      fullBodyIk: fullBodyIkEnabled,
+      footPlant: footPlantEnabled,
+      floorHeight: rigFloorHeight,
+    });
+    if (transaction.authoritativeSignature === signature) return;
+    jointIkRevisionRef.current += 1;
+    jointIkTransactionRef.current = null;
+    if (transaction.vrm === vrmRef.current) {
+      applyStudioVrmRotationPose(transaction.vrm, transaction.baseline, bodyScale);
+    }
+    setJointHandleInteracting(false);
+    setJointHandleSessionGeneration((generation) => generation + 1);
+    setJointHandleStatus("다른 포즈·리그 변경을 우선 적용하고 진행 중이던 IK 이동을 취소했습니다.");
+  }, [
+    activeModelId,
+    bodyRotation,
+    bodyScale,
+    customBones,
+    customYOffset,
+    fingerEdits,
+    footPlantEnabled,
+    fullBodyIkEnabled,
+    ikConstraints,
+    lockedPoseBones,
+    poseTranslations,
+    rigFloorHeight,
+    rigJointProfile,
+  ]);
+
+  // Any authoritative FK/root/body edit must preserve enabled locked pins immediately. Waiting
+  // until the next handle drag would leave the visible target and the actual effector divergent.
+  useEffect(() => {
+    const lockedConstraints = ikConstraints.filter((constraint) => (
+      constraint.enabled && constraint.locked
+    ));
+    const inputSignature = buildStudioVrmPersistentIkSignature({
+      modelId: activeModelId,
+      bones: customBones,
+      fingerEdits,
+      yOffset: customYOffset,
+      translations: poseTranslations,
+      bodyRotation,
+      bodyScale,
+      constraints: ikConstraints,
+      lockedPoseBones,
+      jointProfile: rigJointProfile,
+      fullBodyIk: fullBodyIkEnabled,
+      footPlant: footPlantEnabled,
+      floorHeight: rigFloorHeight,
+    });
+    const commitPendingCommand = (resolvedAfter: FullVrmState): void => {
+      const pending = pendingPersistentIkCommandRef.current;
+      if (
+        !pending
+        || pending.inputSignature !== inputSignature
+        || pending.historyGeneration !== fullStateHistoryRef.current.generation
+      ) return;
+      pendingPersistentIkCommandRef.current = null;
+      const nextHistory = commitStudioVrmFullStateHistoryTransaction(
+        fullStateHistoryRef.current,
+        pending.before,
+        resolvedAfter,
+        activeModelId,
+      );
+      fullStateHistoryRef.current = nextHistory;
+      setCanUndo(nextHistory.index > 0);
+      setCanRedo(nextHistory.index < nextHistory.entries.length - 1);
+    };
+    const rollbackPendingCommand = (message: string): void => {
+      if (!vrm) {
+        pendingPersistentIkCommandRef.current = null;
+        setPersistentIkReconciling(false);
+        setJointHandleStatus(message);
+        return;
+      }
+      const pending = pendingPersistentIkCommandRef.current;
+      if (!pending) {
+        setPersistentIkReconciling(false);
+        setJointHandleStatus(message);
+        return;
+      }
+      pendingPersistentIkCommandRef.current = null;
+      const rollbackBones = stripFingerBones(pending.before.bones);
+      const rollbackFingers = pending.before.fingerOverrides ?? {};
+      const rollbackTranslations = cloneStudioVrmPoseTranslations(pending.before.poseTranslations);
+      const rollbackConstraints = cloneStudioVrmIkConstraints(pending.before.ikConstraints);
+      persistentIkResolvedSignatureRef.current = buildStudioVrmPersistentIkSignature({
+        modelId: activeModelId,
+        bones: rollbackBones,
+        fingerEdits: rollbackFingers,
+        yOffset: pending.before.yOffset,
+        translations: rollbackTranslations,
+        bodyRotation: pending.before.bodyRotation,
+        bodyScale: pending.before.bodyScale ?? bodyScale,
+        constraints: rollbackConstraints,
+        lockedPoseBones,
+        jointProfile: rigJointProfile,
+        fullBodyIk: fullBodyIkEnabled,
+        footPlant: footPlantEnabled,
+        floorHeight: rigFloorHeight,
+      });
+      setPersistentIkReconciling(false);
+      setActivePoseId(pending.before.poseId ?? "default");
+      setCustomBones(rollbackBones);
+      setFingerEdits(rollbackFingers);
+      setCustomYOffset(pending.before.yOffset);
+      setPoseTranslations(rollbackTranslations);
+      setIkConstraints(rollbackConstraints);
+      setBodyRotation(pending.before.bodyRotation);
+      applyPoserVisualState(vrm, {
+        bones: rollbackBones,
+        yOffset: pending.before.yOffset,
+        poseTranslations: rollbackTranslations,
+        fingerEdits: rollbackFingers,
+        bodyScale: pending.before.bodyScale ?? bodyScale,
+      });
+      applyRotationToVrm(vrm, pending.before.bodyRotation);
+      setJointHandleStatus(`${message} 변경 전 상태로 되돌렸습니다.`);
+    };
+    if (
+      pendingPersistentIkCommandRef.current
+      && pendingPersistentIkCommandRef.current.inputSignature !== inputSignature
+    ) {
+      rollbackPendingCommand("고정점 보정 중 다른 포즈 변경이 시작되어 먼저 하던 명령을 취소했습니다.");
+      return;
+    }
+    if (
+      !open
+      || !vrm
+      || lockedConstraints.length === 0
+      || jointHandleInteracting
+      || jointIkTransactionRef.current
+      || webcamActive
+      || idleAnimation
+      || isCapturing
+      || isSharingPose
+      || isThumbnailCapturing
+    ) {
+      if (lockedConstraints.length === 0) {
+        persistentIkResolvedSignatureRef.current = "";
+        setPersistentIkReconciling(false);
+      }
+      return;
+    }
+    if (persistentIkResolvedSignatureRef.current === inputSignature) {
+      const pending = pendingPersistentIkCommandRef.current;
+      if (pending?.inputSignature === inputSignature) {
+        commitPendingCommand(pending.candidateAfter);
+      }
+      setPersistentIkReconciling(false);
+      return;
+    }
+
+    const revision = persistentIkReconcileRevisionRef.current + 1;
+    persistentIkReconcileRevisionRef.current = revision;
+    setPersistentIkReconciling(true);
+    const frame = requestAnimationFrame(() => {
+      if (
+        persistentIkReconcileRevisionRef.current !== revision
+        || jointIkTransactionRef.current
+        || vrmRef.current !== vrm
+      ) {
+        setPersistentIkReconciling(false);
+        return;
+      }
+      const coordinateScene = captureRef.current.scene;
+      if (!coordinateScene) {
+        // CaptureBridge가 scene generation을 올리면 이 effect가 다시 실행된다. 그 전까지는
+        // 미해결 포즈를 캡처하거나 history에 넣지 않는다.
+        setPersistentIkReconciling(true);
+        setJointHandleStatus("고정점 장면 좌표를 준비하지 못해 포즈 변경을 보정하지 못했습니다.");
+        return;
+      }
+      for (const constraint of lockedConstraints) {
+        const chain = STUDIO_VRM_USER_IK_CHAINS[constraint.effector];
+        if ([chain.upper, chain.lower, chain.end].some((bone) => lockedPoseBones.includes(bone))) {
+          rollbackPendingCommand("관절 잠금과 손·발 고정점 유지가 충돌합니다.");
+          return;
+        }
+      }
+
+      applyPoserVisualState(vrm, {
+        bones: customBones,
+        yOffset: customYOffset,
+        poseTranslations,
+        fingerEdits,
+        bodyScale,
+      });
+      applyRotationToVrm(vrm, bodyRotation);
+      const worldConstraints = lockedConstraints.map((constraint) => {
+        const target = studioVrmSceneLocalPointToWorld(coordinateScene, constraint.target);
+        const pole = constraint.pole
+          ? studioVrmSceneLocalPointToWorld(coordinateScene, constraint.pole)
+          : null;
+        return target && (!constraint.pole || pole)
+          ? {
+              effector: constraint.effector,
+              targetWorld: new THREE.Vector3(target[0], target[1], target[2]),
+              poleWorld: pole ? new THREE.Vector3(pole[0], pole[1], pole[2]) : undefined,
+            }
+          : null;
+      });
+      if (worldConstraints.some((constraint) => constraint === null)) {
+        rollbackPendingCommand("저장된 손·발 고정점 좌표를 해석하지 못했습니다.");
+        return;
+      }
+      const [primary, ...rest] = worldConstraints as Array<{
+        effector: StudioVrmIkEffectorBone;
+        targetWorld: THREE.Vector3;
+        poleWorld?: THREE.Vector3;
+      }>;
+      if (!primary) {
+        rollbackPendingCommand("유지할 손·발 고정점을 찾지 못했습니다.");
+        return;
+      }
+      const result = solveStudioVrmFullBodyIk(vrm, {
+        primary,
+        lockedTargets: rest,
+        baseTranslations: poseTranslations,
+        jointProfile: rigJointProfile,
+        fullBodyIk: fullBodyIkEnabled,
+        footPlant: { enabled: footPlantEnabled, floorHeight: rigFloorHeight },
+      });
+      if (!result || persistentIkReconcileRevisionRef.current !== revision) {
+        rollbackPendingCommand("현재 포즈에서 저장된 손·발 고정점을 함께 유지하지 못했습니다.");
+        return;
+      }
+      const nextBones = stripFingerBones(result.bones);
+      const nextFingers = extractStudioVrmFingerRotations(result.bones);
+      const nextTranslations = cloneStudioVrmPoseTranslations(result.translations);
+      const outputSignature = buildStudioVrmPersistentIkSignature({
+        modelId: activeModelId,
+        bones: nextBones,
+        fingerEdits: nextFingers,
+        yOffset: result.yOffset,
+        translations: nextTranslations,
+        bodyRotation,
+        bodyScale,
+        constraints: ikConstraints,
+        lockedPoseBones,
+        jointProfile: rigJointProfile,
+        fullBodyIk: fullBodyIkEnabled,
+        footPlant: footPlantEnabled,
+        floorHeight: rigFloorHeight,
+      });
+      persistentIkResolvedSignatureRef.current = outputSignature;
+      const pending = pendingPersistentIkCommandRef.current;
+      if (pending?.inputSignature === inputSignature) {
+        commitPendingCommand(serializeFullVrmState({
+          ...pending.candidateAfter,
+          bones: nextBones,
+          fingerOverrides: nextFingers,
+          yOffset: result.yOffset,
+          poseTranslations: nextTranslations,
+        }));
+      }
+      setPersistentIkReconciling(false);
+      setCustomBones(nextBones);
+      setFingerEdits(nextFingers);
+      setCustomYOffset(result.yOffset);
+      setPoseTranslations(nextTranslations);
+      applyStudioVrmRotationPose(vrm, result, bodyScale);
+      setJointHandleStatus(`고정점 ${lockedConstraints.length}개를 현재 포즈에 다시 맞췄습니다.`);
+    });
+    return () => {
+      persistentIkReconcileRevisionRef.current += 1;
+      cancelAnimationFrame(frame);
+    };
+  }, [
+    activeModelId,
+    bodyRotation,
+    bodyScale,
+    captureSceneGeneration,
+    customBones,
+    customYOffset,
+    fingerEdits,
+    footPlantEnabled,
+    fullBodyIkEnabled,
+    idleAnimation,
+    ikConstraints,
+    isCapturing,
+    isSharingPose,
+    isThumbnailCapturing,
+    jointHandleInteracting,
+    lockedPoseBones,
+    open,
+    poseTranslations,
+    rigFloorHeight,
+    rigJointProfile,
+    vrm,
+    webcamActive,
+  ]);
 
   const resetFullStateHistory = useCallback(() => {
     fullStateHistoryRef.current = resetStudioVrmFullStateHistory(fullStateHistoryRef.current);
@@ -2982,6 +3488,14 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   }, []);
 
   const restoreHistoryStep = (direction: -1 | 1) => {
+    if (
+      pendingPersistentIkCommandRef.current
+      || persistentIkReconciling
+      || !persistentIkCaptureIsReady()
+    ) {
+      setJointHandleStatus("손·발 고정점 보정이 끝난 뒤 편집 기록을 복원해 주세요.");
+      return;
+    }
     if (jointHandleInteracting || jointIkTransactionRef.current) {
       cancelJointIkTransaction({
         status: "진행 중인 IK 이동을 취소한 뒤 편집 기록을 복원했습니다.",
@@ -3005,7 +3519,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       return;
     }
     isRestoringRef.current = true;
-    commitFullStateRestore(snap, currentVrm);
+    commitFullStateRestore(snap, currentVrm, { trustPersistentIkPose: true });
     setCanUndo(transition.history.index > 0);
     setCanRedo(transition.history.index < transition.history.entries.length - 1);
   };
@@ -3024,6 +3538,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     isCapturing ||
     isSharingPose ||
     isThumbnailCapturing ||
+    persistentIkReconciling ||
     jointHandleInteracting ||
     isViewportHandIkDragging;
 
@@ -3064,15 +3579,43 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       bones: result.bones,
       fingerOverrides: result.fingerEdits,
     });
-    const nextHistory = commitStudioVrmFullStateHistoryTransaction(
-      fullStateHistoryRef.current,
-      before,
-      after,
-      activeModelId,
-    );
-    fullStateHistoryRef.current = nextHistory;
-    setCanUndo(nextHistory.index > 0);
-    setCanRedo(nextHistory.index < nextHistory.entries.length - 1);
+    const candidateSignature = buildStudioVrmPersistentIkSignature({
+      modelId: activeModelId,
+      bones: result.bones,
+      fingerEdits: result.fingerEdits,
+      yOffset: after.yOffset,
+      translations: after.poseTranslations,
+      bodyRotation: after.bodyRotation,
+      bodyScale: after.bodyScale ?? bodyScale,
+      constraints: after.ikConstraints,
+      lockedPoseBones,
+      jointProfile: rigJointProfile,
+      fullBodyIk: fullBodyIkEnabled,
+      footPlant: footPlantEnabled,
+      floorHeight: rigFloorHeight,
+    });
+    if (
+      after.ikConstraints.some((constraint) => constraint.enabled && constraint.locked)
+      && persistentIkResolvedSignatureRef.current !== candidateSignature
+    ) {
+      pendingPersistentIkCommandRef.current = {
+        before,
+        candidateAfter: after,
+        inputSignature: candidateSignature,
+        historyGeneration: fullStateHistoryRef.current.generation,
+      };
+      setPersistentIkReconciling(true);
+    } else {
+      const nextHistory = commitStudioVrmFullStateHistoryTransaction(
+        fullStateHistoryRef.current,
+        before,
+        after,
+        activeModelId,
+      );
+      fullStateHistoryRef.current = nextHistory;
+      setCanUndo(nextHistory.index > 0);
+      setCanRedo(nextHistory.index < nextHistory.entries.length - 1);
+    }
 
     setActivePoseId(poseId);
     setCustomBones(result.bones);
@@ -3103,7 +3646,12 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
 
   // 편집이 멈추면(디바운스) 스냅샷을 히스토리에 적재. 복원 중 변경은 건너뛴다.
   useEffect(() => {
-    if (!vrm) return;
+    if (
+      !vrm
+      || pendingPersistentIkCommandRef.current
+      || persistentIkReconciling
+      || !persistentIkCaptureIsReady()
+    ) return;
     if (isRestoringRef.current) {
       isRestoringRef.current = false;
       return;
@@ -3124,7 +3672,13 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       setCanRedo(false);
     }, 450);
     return () => clearTimeout(timer);
-  }, [activeModelId, vrm, captureFullState]);
+  }, [
+    activeModelId,
+    captureFullState,
+    persistentIkCaptureIsReady,
+    persistentIkReconciling,
+    vrm,
+  ]);
 
   // 키보드 핸들러가 항상 최신 undo/redo를 호출하도록 ref 동기화(렌더 후).
   const undoRef = useRef(doUndo);
@@ -3234,9 +3788,18 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     if (cleanupGl) {
       if (captureRef.current.gl === cleanupGl) {
         captureRef.current = { camera: null, gl: null, scene: null };
+        setCaptureSceneGeneration((generation) => generation + 1);
       }
     } else {
+      const previous = captureRef.current;
       captureRef.current = state;
+      if (
+        previous.camera !== state.camera
+        || previous.gl !== state.gl
+        || previous.scene !== state.scene
+      ) {
+        setCaptureSceneGeneration((generation) => generation + 1);
+      }
     }
   }, []);
   const activeCamera = findCameraPreset(activeCameraId);
@@ -3276,6 +3839,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     bones?: PoseBoneMap;
     yOffset?: number;
     poseTranslations?: StudioVrmPoseTranslations;
+    ikConstraints?: readonly StudioVrmIkConstraint[];
     bodyRotation?: number;
     expressionId?: string;
     expressionWeights?: Record<string, number>;
@@ -3295,7 +3859,6 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     lighting?: LightingParams;
     env?: EnvVariant;
     avatarForge?: unknown;
-    bodyRotationY?: number;
     camera?: StudioVrmCameraSettings;
     mannequin?: boolean;
   }
@@ -3326,7 +3889,8 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
         bones: poseBones,
         yOffset: initialScene.pose.yOffset,
         poseTranslations: cloneStudioVrmPoseTranslations(initialScene.pose.translations),
-        bodyRotationY: initialScene.pose.bodyRotationY,
+        ikConstraints: cloneStudioVrmIkConstraints(initialScene.pose.ikConstraints),
+        bodyRotation: initialScene.pose.bodyRotationY,
         expressionWeights: { ...initialScene.expressions },
         customColors: { ...initialScene.appearance.customColors },
         materialFx: { ...initialScene.appearance.materialFx },
@@ -3353,20 +3917,34 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       if (poseData.modelId) setActiveModelId(poseData.modelId);
     } else if (open && initialDataUrl) {
       try {
-        const hashIndex = initialDataUrl.indexOf("#");
-        if (hashIndex !== -1) {
-          const hashStr = initialDataUrl.substring(hashIndex + 1);
-          const parsedPoseData: unknown = JSON.parse(decodeURIComponent(hashStr));
-          if (typeof parsedPoseData !== "object" || parsedPoseData === null || Array.isArray(parsedPoseData)) {
-            throw new Error("Invalid VRM pose metadata");
-          }
-          const poseData = parsedPoseData as PendingPoseData;
-          const pendingModelId = normalizeFullVrmModelId(poseData.modelId);
-          pendingPoseDataRef.current = { ...poseData, modelId: pendingModelId };
-          if (pendingModelId) {
-            setActiveModelId(pendingModelId);
-          }
-        }
+        const full = buildFullVrmStateFromSharedDataUrl(initialDataUrl);
+        if (!full) throw new Error("Invalid VRM pose metadata");
+        const poseData: PendingPoseData = {
+          poseId: full.poseId,
+          bones: full.bones,
+          yOffset: full.yOffset,
+          poseTranslations: full.poseTranslations,
+          ikConstraints: full.ikConstraints,
+          bodyRotation: full.bodyRotation,
+          expressionId: full.expressionId,
+          expressionWeights: full.expressionWeights,
+          customColors: full.customColors,
+          materialFx: full.materialFx,
+          modelId: full.modelId,
+          vrmProps: full.props,
+          sceneProps: full.sceneProps,
+          costume: full.costume,
+          wardrobe: full.wardrobe,
+          physics: full.physics,
+          bodyScale: full.bodyScale,
+          fingerOverrides: full.fingerOverrides,
+          lighting: full.lighting,
+          env: full.env,
+          avatarForge: full.avatarForge,
+        };
+        const pendingModelId = normalizeFullVrmModelId(poseData.modelId);
+        pendingPoseDataRef.current = { ...poseData, modelId: pendingModelId };
+        if (pendingModelId) setActiveModelId(pendingModelId);
       } catch (e) {
         console.error("Failed to parse initial data URL", e);
       }
@@ -3389,7 +3967,16 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     const fullStored = localStorage.getItem("studio_vrm_full_states");
     if (fullStored) {
       try {
-        setSavedFullStates(JSON.parse(fullStored));
+        const parsed: unknown = JSON.parse(fullStored);
+        const restored: Record<string, FullVrmState> = {};
+        if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+          for (const [name, candidate] of Object.entries(parsed).slice(0, 100)) {
+            if (!name || name.length > 24) continue;
+            const full = deserializeFullVrmState(candidate);
+            if (full) restored[name] = full;
+          }
+        }
+        setSavedFullStates(restored);
       } catch (e) {
         console.error("Failed to load full vrm states", e);
       }
@@ -3440,11 +4027,6 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   useEffect(() => {
     trackingOptionsRef.current = trackingOptions;
   }, [trackingOptions]);
-
-  // webcamActive 를 ref 로 미러링 — visibilitychange 핸들러가 최신 값을 참조.
-  useEffect(() => {
-    webcamActiveRef.current = webcamActive;
-  }, [webcamActive]);
 
   // 탭 숨김 → 카메라 완전 해제(LED 소등 = 프라이버시) + 루프 정지, 복귀 시 재시작.
   // 기존 웹캠 effect 가 webcamActive=false 에서 track.stop 을 이미 수행하므로 토글을 재사용한다
@@ -3951,9 +4533,9 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     try {
       let json = ""; try { json = await navigator.clipboard.readText(); } catch { json = localStorage.getItem("studio_vrm_full_clip") || ""; }
       if (!json) return alert("전체 상태 데이터 없음");
-      const s = JSON.parse(json) as FullVrmState;
+      const s = JSON.parse(json) as FullVrmStateInput;
       loadHandlers.handlePasteFullStateFromParsed(s);
-      if (s && s.version === 2) alert("전체 상태 붙여넣기 OK");
+      if (s && (s.version === 2 || s.version === 3)) alert("전체 상태 붙여넣기 OK");
     } catch { alert("붙여넣기 실패"); }
   }
   function handleSaveFullLocal() {
@@ -3964,14 +4546,28 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     localStorage.setItem("studio_vrm_full_states", JSON.stringify(next));
     setFullStateName(""); alert(`저장: ${name}`);
   }
-  function commitFullStateRestore(s: FullVrmState, vrm: VRM | null) {
+  function commitFullStateRestore(
+    s: FullVrmState,
+    vrm: VRM | null,
+    options: { trustPersistentIkPose?: boolean } = {},
+  ) {
+    cancelJointIkTransaction({
+      forceInvalidate: true,
+      restoreBaseline: false,
+      status: jointHandleInteracting || jointIkTransactionRef.current
+        ? "진행 중인 IK 이동을 취소하고 전체 포즈 상태를 복원했습니다."
+        : undefined,
+    });
+    pendingPersistentIkCommandRef.current = null;
     const plan = planFullStateRestore(s);
     const restoredColors = plan.customColors ?? DEFAULT_VRM_CUSTOM_COLORS;
     const restoredCostume = parseCostumeState(plan.costume);
     const restoredWardrobe = parseWardrobe(plan.wardrobe);
+    const restoredPhysics = parseVrmPhysicsSettings(plan.physics);
     setCustomBones(plan.strippedBones);
     setCustomYOffset(plan.yOffset);
     setPoseTranslations(cloneStudioVrmPoseTranslations(plan.poseTranslations));
+    setIkConstraints(cloneStudioVrmIkConstraints(plan.ikConstraints));
     setBodyRotation(plan.bodyRotation);
     setActivePoseId(s.poseId ?? "default");
     setActiveExpressionId(s.expressionId ?? "neutral");
@@ -3988,7 +4584,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     setActiveProps(restoredSceneProps.active);
     setPropAttachments(restoredSceneProps.attachments);
     setSelectedPropId(null);
-    if (plan.physics && typeof plan.physics === "object") setVrmPhysics(plan.physics as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    setVrmPhysics(restoredPhysics);
     // materialFx 는 별도 저장/공유 payload에 담기지만(poseMetadata.materialFx), FullVrmState 경로
     // (undo/redo·저장한 포즈 불러오기·공유 데이터URL 붙여넣기)에서 빠지면 재질 효과가 조용히
     // 사라진다 — plan에 실려 왔으면 항상 state로 복원한다(없으면 기본값으로 되돌려 이전 값이
@@ -3996,6 +4592,26 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     setMaterialFx(plan.materialFx ?? DEFAULT_VRM_MATERIAL_FX);
     setCustomColors({ ...restoredColors });
     setAvatarForgeState(parseAvatarForgeState(plan.avatarForge));
+
+    persistentIkReconcileRevisionRef.current += 1;
+    setPersistentIkReconciling(false);
+    persistentIkResolvedSignatureRef.current = options.trustPersistentIkPose
+      ? buildStudioVrmPersistentIkSignature({
+          modelId: activeModelId,
+          bones: plan.strippedBones,
+          fingerEdits: plan.fingerOverrides ?? {},
+          yOffset: plan.yOffset,
+          translations: plan.poseTranslations,
+          bodyRotation: plan.bodyRotation,
+          bodyScale: plan.bodyScale ?? bodyScale,
+          constraints: plan.ikConstraints,
+          lockedPoseBones,
+          jointProfile: rigJointProfile,
+          fullBodyIk: fullBodyIkEnabled,
+          footPlant: footPlantEnabled,
+          floorHeight: rigFloorHeight,
+        })
+      : "";
 
     if (vrm) {
       const meshes = collectCostumeMeshes(vrm);
@@ -4017,10 +4633,13 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
           setActiveProps(next.active);
           setPropAttachments(next.attachments);
         },
-        applyPhysics: (p: any) => { if (p) { setVrmPhysics(p as any); if (countSpringBoneJoints(vrm)) { applyVrmSpringBonePhysics(vrm, p as any); settleVrmPhysics(vrm); } } }, // eslint-disable-line @typescript-eslint/no-explicit-any
         applyMaterialFx: (fx) => applyVrmMaterialFx(vrm, fx),
         applyCustomColors: (colors) => applyVrmCustomColors(vrm, colors),
       });
+      if (countSpringBoneJoints(vrm) > 0) {
+        applyVrmSpringBonePhysics(vrm, restoredPhysics);
+        settleVrmPhysics(vrm);
+      }
       applyRotationToVrm(vrm, plan.bodyRotation);
       if (!plan.customColors) applyVrmCustomColors(vrm, DEFAULT_VRM_CUSTOM_COLORS);
     } else {
@@ -4137,6 +4756,17 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       alert("공유할 VRM 장면이 아직 준비되지 않았습니다.");
       return;
     }
+    if (!persistentIkCaptureIsReady()) {
+      setJointHandleStatus("손·발 고정점을 현재 포즈에 맞추는 중입니다. 완료 후 다시 공유해 주세요.");
+      return;
+    }
+    const hasLockedConstraint = ikConstraints.some((constraint) => (
+      constraint.enabled && constraint.locked
+    ));
+    if (hasLockedConstraint && (webcamActive || idleAnimation)) {
+      setJointHandleStatus("실시간 추적·대기 애니메이션을 끈 뒤 고정점이 있는 포즈를 공유해 주세요.");
+      return;
+    }
 
     const title = globalThis.prompt("서버에 공유할 포즈의 이름을 입력해주세요 (최대 30자):");
     if (!title) return;
@@ -4150,6 +4780,8 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     )) return;
 
     const name = `[3D_POSE] ${title}`;
+    const sharePoseSignature = currentPersistentIkSignature();
+    const shareDynamicPoseGeneration = dynamicPoseGenerationRef.current;
 
     cancelPendingPoseShare();
     const controller = new AbortController();
@@ -4175,7 +4807,16 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
         vrmRef.current !== currentVrm ||
         captureRef.current.gl !== gl ||
         captureRef.current.scene !== scene ||
-        captureRef.current.camera !== camera
+        captureRef.current.camera !== camera ||
+        persistentIkCurrentSignatureRef.current !== sharePoseSignature ||
+        pendingPersistentIkCommandRef.current !== null ||
+        dynamicPoseGenerationRef.current !== shareDynamicPoseGeneration ||
+        (hasLockedConstraint
+          && (
+            persistentIkResolvedSignatureRef.current !== sharePoseSignature
+            || webcamActiveRef.current
+            || idleAnimationRef.current
+          ))
       ) {
         throw new Error("공유 캡처 장면이 변경되었습니다.");
       }
@@ -4203,7 +4844,12 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       );
       const fullDataUrl = `${baseDataUrl}#${hashPayload}`;
 
-      if (controller.signal.aborted) return;
+      if (
+        controller.signal.aborted
+        || persistentIkCurrentSignatureRef.current !== sharePoseSignature
+        || pendingPersistentIkCommandRef.current !== null
+        || dynamicPoseGenerationRef.current !== shareDynamicPoseGeneration
+      ) return;
       await publishAsset({
         name,
         description: `${modelName || "VRM 캐릭터"}의 재편집 가능한 3D 데생 포즈`,
@@ -4368,6 +5014,28 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
 
   useEffect(() => {
     if (!open || status !== "ready" || !vrm || !activeLibraryEntry || activeLibraryEntry.thumbnail) return;
+    const hasLockedConstraint = ikConstraints.some((constraint) => (
+      constraint.enabled && constraint.locked
+    ));
+    const signature = buildStudioVrmPersistentIkSignature({
+      modelId: activeModelId,
+      bones: customBones,
+      fingerEdits,
+      yOffset: customYOffset,
+      translations: poseTranslations,
+      bodyRotation,
+      bodyScale,
+      constraints: ikConstraints,
+      lockedPoseBones,
+      jointProfile: rigJointProfile,
+      fullBodyIk: fullBodyIkEnabled,
+      footPlant: footPlantEnabled,
+      floorHeight: rigFloorHeight,
+    });
+    if (
+      hasLockedConstraint
+      && (persistentIkReconciling || persistentIkResolvedSignatureRef.current !== signature)
+    ) return;
 
     const requestId = thumbnailRequestRef.current + 1;
     thumbnailRequestRef.current = requestId;
@@ -4419,9 +5087,23 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       finish();
     };
   }, [
+    activeModelId,
     activeLibraryEntry,
     acquireVrmCaptureHelperLease,
+    bodyRotation,
+    bodyScale,
+    customBones,
+    customYOffset,
+    fingerEdits,
+    footPlantEnabled,
+    fullBodyIkEnabled,
+    ikConstraints,
+    lockedPoseBones,
     open,
+    persistentIkReconciling,
+    poseTranslations,
+    rigFloorHeight,
+    rigJointProfile,
     status,
     vrm,
   ]);
@@ -4430,6 +5112,11 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     setIsViewportHandIkDragging(false);
     jointIkRevisionRef.current += 1;
     jointIkTransactionRef.current = null;
+    persistentIkReconcileRevisionRef.current += 1;
+    persistentIkResolvedSignatureRef.current = "";
+    pendingPersistentIkCommandRef.current = null;
+    setPersistentIkReconciling(false);
+    setIkConstraints([]);
     setJointHandleInteracting(false);
     setJointHandleSessionGeneration((generation) => generation + 1);
     if (vrmRef.current) {
@@ -4458,13 +5145,13 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       const yOffset = typeof pending.yOffset === "number" ? pending.yOffset : 0;
       const expressionWeights = pending.expressionWeights || {};
 
-      const pendingFull: FullVrmState = {
-        version: 2,
+      const pendingFull = serializeFullVrmState({
         modelId: nextModelId,
         poseId: pending.poseId,
         bones: bones,
         yOffset,
         poseTranslations: pending.poseTranslations,
+        ikConstraints: pending.ikConstraints,
         bodyRotation: pending.bodyRotation,
         expressionId: pending.expressionId,
         expressionWeights,
@@ -4480,9 +5167,8 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
         materialFx: pending.materialFx,
         avatarForge: pending.avatarForge,
         customColors: pending.customColors,
-      };
+      });
       commitFullStateRestore(pendingFull, nextVrm);
-      setBodyRotation(typeof pending.bodyRotationY === "number" ? pending.bodyRotationY : 0);
       setMannequinMode(pending.mannequin ?? false);
       const cameraToRestore = pending.camera ?? pendingCameraRestoreRef.current;
       pendingCameraRestoreRef.current = null;
@@ -4758,9 +5444,11 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     const mirroredBones = mirrorStudioVrmPoseBones(customBones, scope);
     const mirroredFingers = mirrorStudioVrmFingerRotations(fingerEdits, scope);
     const mirroredTranslations = mirrorStudioVrmPoseTranslations(poseTranslations, scope);
+    const mirroredConstraints = mirrorStudioVrmIkConstraints(ikConstraints, scope);
     setCustomBones(mirroredBones);
     setFingerEdits(mirroredFingers);
     setPoseTranslations(mirroredTranslations);
+    setIkConstraints(mirroredConstraints);
     if (vrmRef.current) {
       applyPoserVisualState(vrmRef.current, {
         bones: mirroredBones,
@@ -4770,6 +5458,55 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
         bodyScale,
       });
     }
+  }
+
+  function commitIkConstraintSettings(
+    nextConstraints: readonly StudioVrmIkConstraint[],
+    statusMessage: string,
+  ) {
+    cancelJointIkTransaction({ restoreBaseline: false });
+    const before = captureFullState();
+    const canonical = cloneStudioVrmIkConstraints(nextConstraints);
+    const after = serializeFullVrmState({ ...before, ikConstraints: canonical });
+    const candidateSignature = buildStudioVrmPersistentIkSignature({
+      modelId: activeModelId,
+      bones: before.bones,
+      fingerEdits: before.fingerOverrides ?? {},
+      yOffset: before.yOffset,
+      translations: before.poseTranslations,
+      bodyRotation: before.bodyRotation,
+      bodyScale: before.bodyScale ?? bodyScale,
+      constraints: canonical,
+      lockedPoseBones,
+      jointProfile: rigJointProfile,
+      fullBodyIk: fullBodyIkEnabled,
+      footPlant: footPlantEnabled,
+      floorHeight: rigFloorHeight,
+    });
+    if (
+      canonical.some((constraint) => constraint.enabled && constraint.locked)
+      && persistentIkResolvedSignatureRef.current !== candidateSignature
+    ) {
+      pendingPersistentIkCommandRef.current = {
+        before,
+        candidateAfter: after,
+        inputSignature: candidateSignature,
+        historyGeneration: fullStateHistoryRef.current.generation,
+      };
+      setPersistentIkReconciling(true);
+    } else {
+      const nextHistory = commitStudioVrmFullStateHistoryTransaction(
+        fullStateHistoryRef.current,
+        before,
+        after,
+        activeModelId,
+      );
+      fullStateHistoryRef.current = nextHistory;
+      setCanUndo(nextHistory.index > 0);
+      setCanRedo(nextHistory.index < nextHistory.entries.length - 1);
+    }
+    setIkConstraints(canonical);
+    setJointHandleStatus(statusMessage);
   }
 
   function handleStraightenUpperBody() {
@@ -4790,6 +5527,17 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
   function togglePoseBoneLock(boneName: VRMHumanBoneName) {
     if (jointHandleInteracting || jointIkTransactionRef.current) {
       cancelJointIkTransaction({ status: "진행 중인 IK 이동을 취소하고 관절 잠금을 변경했습니다." });
+    }
+    if (!lockedPoseBones.includes(boneName)) {
+      const conflictsWithPin = ikConstraints.some((constraint) => {
+        if (!constraint.enabled || !constraint.locked) return false;
+        const chain = STUDIO_VRM_USER_IK_CHAINS[constraint.effector];
+        return [chain.upper, chain.lower, chain.end].includes(boneName);
+      });
+      if (conflictsWithPin) {
+        setJointHandleStatus("이 관절은 유지 중인 손·발 고정점이 사용합니다. 먼저 고정점 유지를 해제해 주세요.");
+        return;
+      }
     }
     setLockedPoseBones((current) =>
       current.includes(boneName)
@@ -5269,6 +6017,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
         translations: poseTranslations,
         bodyRotationY: bodyRotation,
         fingerOverrides: bakedFingers,
+        ikConstraints,
       },
       expressions: expressionWeights,
       camera,
@@ -5314,8 +6063,23 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
       setStatus(vrmRef.current ? "ready" : "error");
       return;
     }
+    if (!persistentIkCaptureIsReady()) {
+      setError("손·발 고정점을 현재 포즈에 맞추는 중입니다. 보정 완료 후 다시 추가해 주세요.");
+      setStatus("ready");
+      return;
+    }
+    const hasLockedConstraint = ikConstraints.some((constraint) => (
+      constraint.enabled && constraint.locked
+    ));
+    if (hasLockedConstraint && (webcamActive || idleAnimation)) {
+      setError("실시간 추적·대기 애니메이션을 끈 뒤 고정점이 있는 포즈를 추가해 주세요.");
+      setStatus("ready");
+      return;
+    }
 
     if (isCapturing) return;
+    const capturePoseSignature = currentPersistentIkSignature();
+    const captureDynamicPoseGeneration = dynamicPoseGenerationRef.current;
     const captureRequest = captureRequestRef.current + 1;
     captureRequestRef.current = captureRequest;
     const { camera, gl, scene } = currentCapture;
@@ -5335,6 +6099,15 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
         || captureRef.current.gl !== gl
         || captureRef.current.scene !== scene
         || captureRef.current.camera !== camera
+        || persistentIkCurrentSignatureRef.current !== capturePoseSignature
+        || pendingPersistentIkCommandRef.current !== null
+        || dynamicPoseGenerationRef.current !== captureDynamicPoseGeneration
+        || (hasLockedConstraint
+          && (
+            persistentIkResolvedSignatureRef.current !== capturePoseSignature
+            || webcamActiveRef.current
+            || idleAnimationRef.current
+          ))
       ) {
         if (insertCaptureAbortRef.current === captureController) {
           captureController.abort();
@@ -5395,7 +6168,10 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
             vrmRef.current !== currentVrm ||
             captureRef.current.gl !== gl ||
             captureRef.current.scene !== scene ||
-            captureRef.current.camera !== camera
+            captureRef.current.camera !== camera ||
+            persistentIkCurrentSignatureRef.current !== capturePoseSignature ||
+            pendingPersistentIkCommandRef.current !== null ||
+            dynamicPoseGenerationRef.current !== captureDynamicPoseGeneration
           ) return;
 
           const accepted = await onInsert({
@@ -5557,9 +6333,17 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                     <StudioVrmJointHandles
                       key={jointHandleSessionGeneration}
                       vrm={vrm}
-                      visible={jointHandlesVisible && activePanelTab === "pose"}
+                      visible={
+                        jointHandlesVisible
+                        && activePanelTab === "pose"
+                        && !isCapturing
+                        && !isSharingPose
+                        && !isThumbnailCapturing
+                        && !persistentIkReconciling
+                      }
+                      effectorSceneTargets={enabledStudioVrmIkTargetsSceneLocal(ikConstraints)}
                       selectedBone={selectedJointHandle}
-                      disabled={webcamActive || idleAnimation || isCapturing}
+                      disabled={webcamActive || idleAnimation || isCapturing || persistentIkReconciling}
                       onSelectBone={handleJointHandleSelect}
                       onEffectorPreview={previewJointHandleIk}
                       onEffectorCommit={handleJointHandleIkCommit}
@@ -6091,13 +6875,14 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                 </div>
 
                 <StudioVrmRigAssistPanel
-                  disabled={!vrm || webcamActive || idleAnimation || isCapturing}
+                  disabled={!vrm || webcamActive || idleAnimation || isCapturing || persistentIkReconciling}
                   jointProfile={rigJointProfile}
                   fullBodyIk={fullBodyIkEnabled}
                   footPlant={footPlantEnabled}
                   floorHeight={rigFloorHeight}
                   rootYOffset={customYOffset}
                   translations={poseTranslations}
+                  ikConstraints={ikConstraints}
                   onJointProfileChange={(profile) => {
                     cancelJointIkTransaction();
                     setRigJointProfile(profile);
@@ -6136,6 +6921,28 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                       });
                     }
                     setJointHandleStatus("저장된 root·골반·척추 이동을 초기화했습니다.");
+                  }}
+                  onConstraintEnabledChange={(effector, enabled) => {
+                    commitIkConstraintSettings(
+                      ikConstraints.map((constraint) => (
+                        constraint.effector === effector ? { ...constraint, enabled } : constraint
+                      )),
+                      enabled ? "고정점을 다시 활성화했습니다." : "고정점을 계산과 화면에서 제외했습니다.",
+                    );
+                  }}
+                  onConstraintLockedChange={(effector, locked) => {
+                    commitIkConstraintSettings(
+                      ikConstraints.map((constraint) => (
+                        constraint.effector === effector ? { ...constraint, locked } : constraint
+                      )),
+                      locked ? "다른 포즈 편집 중에도 고정점을 유지합니다." : "고정점 유지 잠금을 해제했습니다.",
+                    );
+                  }}
+                  onConstraintRemove={(effector) => {
+                    commitIkConstraintSettings(
+                      removeStudioVrmIkConstraint(ikConstraints, effector),
+                      "손·발 고정점을 삭제했습니다.",
+                    );
                   }}
                 />
 
@@ -6362,7 +7169,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                 <div className="mb-2 flex justify-end">
                   <button
                     type="button"
-                    disabled={!vrm}
+                    disabled={!vrm || persistentIkReconciling}
                     onClick={() => void handleSharePoseToServer()}
                     className="inline-flex items-center gap-1 rounded-lg border border-accent/30 bg-accent-soft/40 px-2 py-1 text-[0.68rem] font-bold text-accent hover:bg-accent-soft disabled:opacity-45"
                   >
@@ -8166,7 +8973,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
               <button
                 type="button"
                 className={cx(CONTROL_BUTTON, "min-w-36 border-accent/60 bg-accent text-on-accent hover:bg-accent/90")}
-                disabled={!vrm || status === "loading" || isCapturing || isSharingPose || isThumbnailCapturing}
+                disabled={!vrm || status === "loading" || isCapturing || isSharingPose || isThumbnailCapturing || persistentIkReconciling}
                 onClick={handleInsert}
               >
                 {isCapturing ? <Loader2 className="animate-spin" size={14} aria-hidden /> : <ImagePlus size={14} aria-hidden />}
