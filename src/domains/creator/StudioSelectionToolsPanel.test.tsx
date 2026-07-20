@@ -26,6 +26,10 @@ describe("StudioSelectionToolsPanel", () => {
         onCombineModeChange={vi.fn()}
         onFeatherChange={vi.fn()}
         onToggleInvert={vi.fn()}
+        canUndoSelection
+        canRedoSelection={false}
+        onUndoSelection={vi.fn()}
+        onRedoSelection={vi.fn()}
         onUndoSubpath={vi.fn()}
         onClearSelection={vi.fn()}
         onSelectAll={vi.fn()}
@@ -43,6 +47,9 @@ describe("StudioSelectionToolsPanel", () => {
 
     expect(html).toContain('aria-label="마지막 선택 영역 제거"');
     expect(html).toContain("마지막 영역 제거");
+    expect(html).toContain('aria-label="선택 작업 실행 취소"');
+    expect(html).toContain('aria-label="선택 작업 다시 실행"');
+    expect(html).toContain("선택 기록");
     expect(html).not.toContain(">되돌리기<");
   });
 });

@@ -21,12 +21,14 @@ import { createPortal } from "react-dom";
 import { StudioKbdBadge } from "./studio-chrome-ui";
 import { STUDIO_EASE, STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { STUDIO_Z } from "./studio-z-index";
+import { StudioToolHintTarget } from "./StudioToolHint";
 
 import type {
   StudioMainMenuGroup,
   StudioMainMenuItem,
   StudioMainMenuProps,
 } from "./studio-main-menu-model";
+import type { StudioToolHintSpec } from "./studio-tool-hints";
 
 import { cn } from "@/lib/utils";
 
@@ -39,6 +41,59 @@ export type {
 type MenuCoords = { top: number; left: number; minWidth: number };
 type MenuOpenFocusIntent = "first" | "preserve";
 export type StudioMainMenuNavigationCommand = "first" | "last" | "next" | "previous";
+
+const MAIN_MENU_HINTS: Readonly<Record<string, StudioToolHintSpec>> = {
+  file: {
+    id: "main-menu-file",
+    title: "파일",
+    description: "원고를 저장·가져오기하고 이미지, PSD, 프로젝트 백업과 게시 결과물로 내보냅니다.",
+    tip: "작업 중에는 임시저장을, 기기 이동 전에는 자산이 포함된 아카이브 백업을 사용하세요.",
+  },
+  edit: {
+    id: "main-menu-edit",
+    title: "편집",
+    description: "실행취소, 클립보드, 픽셀 선택, 복제와 레이어 순서를 한곳에서 제어합니다.",
+    tip: "메뉴를 연 뒤 ↑·↓와 Home·End로 이동하고 Enter로 실행할 수 있어요.",
+  },
+  insert: {
+    id: "main-menu-insert",
+    title: "삽입",
+    description: "템플릿, 말풍선, 텍스트, 이미지와 3D 캐릭터·배경을 현재 장면에 추가합니다.",
+    tip: "자주 쓰는 말풍선과 에셋은 넓은 화면의 바로가기에서도 즉시 열 수 있어요.",
+  },
+  view: {
+    id: "main-menu-view",
+    title: "보기",
+    description: "확대·축소, 화면 맞춤, 반전, 원근 도우미와 패널 레이아웃을 바꿉니다.",
+    tip: "캔버스만 보기(`)로 전환하면 주변 패널을 숨기고 원고에 집중할 수 있어요.",
+  },
+  filter: {
+    id: "main-menu-filter",
+    title: "필터",
+    description: "선택한 이미지에 블러, 색조·채도·밝기, 명도·대비와 색상 커브를 적용합니다.",
+    tip: "원본을 보존하려면 스마트 필터 스택에서 효과 순서와 강도를 조절하세요.",
+  },
+  draw: {
+    id: "main-menu-draw",
+    title: "그리기",
+    description: "펜, 지우개, 채우기, 스마트 도형과 배경·톤·팔레트 작업으로 바로 전환합니다.",
+    tip: "B·E·G 단축키로 펜, 지우개, 채우기를 작업 흐름 안에서 빠르게 바꿀 수 있어요.",
+  },
+  ai: {
+    id: "main-menu-ai",
+    title: "AI",
+    description: "AI 어시스트, 스톡 이미지와 공급자 연동 설정을 열어 창작 보조 작업을 시작합니다.",
+    tip: "생성 결과를 적용하기 전에 공급자와 작업 이력을 확인해 재현 가능한 원고를 유지하세요.",
+  },
+};
+
+function resolveMainMenuHint(group: StudioMainMenuGroup): StudioToolHintSpec {
+  return MAIN_MENU_HINTS[group.id] ?? {
+    id: `main-menu-${group.id}`,
+    title: group.label,
+    description: `${group.label} 명령을 열어 현재 원고 작업에 적용합니다.`,
+  };
+}
 
 /** Pure APG roving-index resolver; enabled items wrap while disabled items are never targeted. */
 // This colocated export is intentional: the parent task limits the APG change to this component
@@ -322,58 +377,64 @@ function MenuDropdown({
         }
       }}
     >
-      <button
-        ref={buttonRef}
-        type="button"
-        data-studio-main-menu-trigger={group.id}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-controls={open ? panelId : undefined}
-        onPointerDown={(e) => {
-          // Capture coords before open so the first paint is already positioned.
-          if (e.button !== 0) return;
-          if (!open) setCoords(measureTrigger(buttonRef.current));
-        }}
-        onKeyDown={(event) => {
-          if (event.key === "Escape" && open) {
+      <StudioToolHintTarget
+        hint={barActive ? null : resolveMainMenuHint(group)}
+        preferredSide="bottom"
+        className="shrink-0"
+      >
+        <button
+          ref={buttonRef}
+          type="button"
+          data-studio-main-menu-trigger={group.id}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          aria-controls={open ? panelId : undefined}
+          onPointerDown={(e) => {
+            // Capture coords before open so the first paint is already positioned.
+            if (e.button !== 0) return;
+            if (!open) setCoords(measureTrigger(buttonRef.current));
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape" && open) {
+              event.preventDefault();
+              event.stopPropagation();
+              closeMenu();
+              return;
+            }
+            if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
             event.preventDefault();
             event.stopPropagation();
-            closeMenu();
-            return;
-          }
-          if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-          event.preventDefault();
-          event.stopPropagation();
-          if (open) {
-            focusMenuItem("first", -1);
-          } else {
-            openMenu("first");
-          }
-        }}
-        onClick={() => (open ? closeMenu() : openMenu("first"))}
-        className={cn(
-          // Keep the full File/Edit/Insert/View/Filter/Draw/AI vocabulary at laptop widths.
-          // The chevron is decorative (aria-haspopup owns the affordance), so compact it
-          // before allowing labels to collide inside the compressible menubar lane.
-          "inline-flex h-8 items-center gap-1 rounded-lg px-1.5 text-[0.75rem] font-semibold tracking-tight xl:px-2 2xl:px-2.5 2xl:text-[0.78rem]",
-          STUDIO_EASE,
-          STUDIO_FOCUS_RING,
-          open
-            ? "bg-raised text-fg shadow-[inset_0_0_0_1px_oklch(0.45_0.014_64/0.4)]"
-            : "text-fg-2 hover:bg-raised/80 hover:text-fg"
-        )}
-      >
-        {group.label}
-        <ChevronDown
-          size={13}
-          aria-hidden
-          data-studio-main-menu-chevron="true"
+            if (open) {
+              focusMenuItem("first", -1);
+            } else {
+              openMenu("first");
+            }
+          }}
+          onClick={() => (open ? closeMenu() : openMenu("first"))}
           className={cn(
-            "hidden opacity-50 transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] 2xl:block",
-            open && "rotate-180 opacity-90"
+            // Keep the full File/Edit/Insert/View/Filter/Draw/AI vocabulary at laptop widths.
+            // The chevron is decorative (aria-haspopup owns the affordance), so compact it
+            // before allowing labels to collide inside the compressible menubar lane.
+            "inline-flex h-8 items-center gap-1 rounded-lg px-1.5 text-[0.75rem] font-semibold tracking-tight xl:px-2 2xl:px-2.5 2xl:text-[0.78rem]",
+            STUDIO_EASE,
+            STUDIO_FOCUS_RING,
+            open
+              ? "bg-raised text-fg shadow-[inset_0_0_0_1px_oklch(0.45_0.014_64/0.4)]"
+              : "text-fg-2 hover:bg-raised/80 hover:text-fg"
           )}
-        />
-      </button>
+        >
+          {group.label}
+          <ChevronDown
+            size={13}
+            aria-hidden
+            data-studio-main-menu-chevron="true"
+            className={cn(
+              "hidden opacity-50 transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] 2xl:block motion-reduce:transition-none",
+              open && "rotate-180 opacity-90"
+            )}
+          />
+        </button>
+      </StudioToolHintTarget>
       {menu}
     </div>
   );

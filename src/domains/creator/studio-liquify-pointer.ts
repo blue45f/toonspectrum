@@ -1,3 +1,5 @@
+import { normalizeStudioLiquifyMode, type StudioLiquifyMode } from "./studio-liquify-contract";
+
 import type { SelectionFrame, SelPoint } from "./studio-selection-tools";
 
 export interface StudioLiquifyPointerLike {
@@ -12,6 +14,8 @@ export interface StudioLiquifyPointerSession {
   points: SelPoint[];
   pointerId: number;
   pointerType: string;
+  /** 포인터다운 순간의 모드 스냅샷 — 제스처 도중 패널 변경이 현재 dab 의미를 바꾸지 않는다. */
+  mode: StudioLiquifyMode;
 }
 
 export type StudioLiquifyPointerEnd =
@@ -28,6 +32,8 @@ export function beginStudioLiquifyPointerSession(input: {
   frame: SelectionFrame;
   point: SelPoint;
   pointer: StudioLiquifyPointerLike;
+  /** 생략하면 기존 호환 동작인 Push. */
+  mode?: StudioLiquifyMode;
 }): StudioLiquifyPointerSession | null {
   if (input.pointer.isPrimary === false) return null;
   return {
@@ -36,6 +42,7 @@ export function beginStudioLiquifyPointerSession(input: {
     points: [input.point],
     pointerId: pointerId(input.pointer),
     pointerType: input.pointer.pointerType || "mouse",
+    mode: normalizeStudioLiquifyMode(input.mode),
   };
 }
 
@@ -73,6 +80,9 @@ export function endStudioLiquifyPointerSession(
     // The lift sample bypasses move throttling: a quick down→up drag still has a direction vector.
     points = [...points, release];
   }
-  if (points.length < 2) return { kind: "discarded", session: null };
+  // Push는 이동 방향이 필요하지만, 중심 기반 Twirl/Pinch/Bloat는 포인터다운 한 점 자체가 dab이다.
+  if (points.length < (session.mode === "push" ? 2 : 1)) {
+    return { kind: "discarded", session: null };
+  }
   return { kind: "apply", session: null, elId: session.elId, points };
 }

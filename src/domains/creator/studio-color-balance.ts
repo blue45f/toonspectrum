@@ -88,8 +88,9 @@ export function isIdentityColorBalance(cb: ColorBalance): boolean {
  * 알파(+3)는 보존한다.
  */
 export function applyColorBalance(img: StudioImageDataLike, cb: ColorBalance): void {
-  if (isIdentityColorBalance(cb)) return;
-  const { shadows, midtones, highlights } = cb;
+  const safe = normalizeColorBalance(cb);
+  if (isIdentityColorBalance(safe)) return;
+  const { shadows, midtones, highlights } = safe;
   const sR = shadows[0];
   const sG = shadows[1];
   const sB = shadows[2];

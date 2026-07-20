@@ -534,3 +534,32 @@ describe("gradientMapKonvaFilter", () => {
 // 미사용 import 방지용 타입 참조.
 const _typecheck: GradientMap = DEFAULT_GRADIENT_MAP;
 void _typecheck;
+
+describe("gradient map hostile-input bounds", () => {
+  it("caps an oversized stop list and never mutates it", () => {
+    const stops = Array.from({ length: 20_000 }, (_, index) => ({
+      pos: index / 19_999,
+      color: index % 2 === 0 ? "#000000" : "#ffffff",
+    }));
+    const map = { stops };
+    const normalized = normalizeGradientMap(map);
+    expect(normalized.stops.length).toBeLessThanOrEqual(1024);
+    expect(stops).toHaveLength(20_000);
+  });
+
+  it("drops a malformed flat tuple without shifting later stop channel boundaries", () => {
+    const img = makeImage(1, 1, [[10, 20, 30, 77]]);
+    gradientMapKonvaFilter.call({ attrs: {
+      gradientMap: [
+        0, 0, 0, 0,
+        0.5, Number.NaN, 1, 1,
+        1, 255, 255, 255,
+      ],
+    } }, img);
+    const [r, g, b, a] = pixelAt(img, 0);
+    expect(r).toBe(g);
+    expect(g).toBe(b);
+    expect(r).toBeGreaterThan(10);
+    expect(a).toBe(77);
+  });
+});

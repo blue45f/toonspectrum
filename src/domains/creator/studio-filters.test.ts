@@ -225,6 +225,16 @@ describe("STUDIO_PIXEL_FILTERS (Konva 레지스트리)", () => {
     }
   });
 
+  it("Duotone 레지스트리는 잘못된 hex 문자열을 픽셀 손상 없이 무시한다", () => {
+    const img = makeImage(1, 1, [[10, 20, 30, 40]]);
+    const before = Array.from(img.data);
+    STUDIO_PIXEL_FILTERS.Duotone!(img, {
+      duotoneShadow: "not-a-color",
+      duotoneHighlight: "#ffffff",
+    });
+    expect(Array.from(img.data)).toEqual(before);
+  });
+
   it("applies Temperature from attrs.temperature and clamps out-of-range values", () => {
     const viaAttrs = makeGray(1, 1, [100]);
     STUDIO_PIXEL_FILTERS.Temperature!(viaAttrs, { temperature: 50 });

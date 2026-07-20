@@ -23,7 +23,7 @@ import {
   Shapes,
   MessageSquare,
 } from "lucide-react";
-import { Fragment, Profiler, Suspense, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type SetStateAction } from "react";
+import { Fragment, Profiler, Suspense, lazy, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type SetStateAction } from "react";
 import { createPortal, flushSync } from "react-dom";
 import { Stage, Layer, Rect, Group, Circle as KCircle, Transformer, Shape } from "react-konva/lib/ReactKonvaCore";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -544,7 +544,7 @@ import {
   ungroupItems,
   type LayerGroup,
 } from "./studio-layers";
-import { bakeLiquifyStrokeToCanvas } from "./studio-liquify-browser";
+import { type StudioLiquifyMode } from "./studio-liquify-contract";
 import {
   appendStudioLiquifyPointerPoint,
   beginStudioLiquifyPointerSession,
@@ -758,6 +758,17 @@ import {
   type PerspectiveRay,
   type VanishingPoint,
 } from "./studio-perspective-guide";
+import {
+  bindPixelSelectionHistory,
+  canRedoPixelSelectionHistory,
+  canUndoPixelSelectionHistory,
+  commitPixelSelectionHistory,
+  createPixelSelectionHistory,
+  redoPixelSelectionHistory,
+  resolvePixelSelectionHistoryShortcut,
+  undoPixelSelectionHistory,
+  type PixelSelectionHistoryOperation,
+} from "./studio-pixel-selection-session-history";
 import {
   beginStudioStrokePointerSession,
   collectStudioStrokePointerBatch,
@@ -1094,10 +1105,6 @@ import {
   type StudioCrdtAuthoritativeSaveBarrier,
   type StudioCrdtSceneGraphRuntime,
 } from "./StudioLiveCollaborationProvider";
-import {
-  StudioMenubarContent,
-  type StudioMenubarContentHandlers,
-} from "./StudioMenubarContent";
 import { StudioMobileSheetHandle } from "./StudioMobileSheetHandle";
 import {
   StudioOptionsBars,
@@ -1206,6 +1213,7 @@ import type {
 } from "./StudioAssetMenuPanel";
 import type { StudioLayerNavigatorAction } from "./StudioLayerNavigator";
 import type { StudioLivePressureStore } from "./StudioLiveInkHosts";
+import type { StudioMenubarContentHandlers } from "./StudioMenubarContent";
 import type {
   StudioBrushCatalogHandlers,
   StudioMobileEditingDockHandlers,
@@ -1232,6 +1240,12 @@ import { STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK } from "@/lib/studio-work-asset-c
 import { cn } from "@/lib/utils";
 import { resolveAssetUrl } from "@/src/catalog-static";
 import { useSession } from "@/src/compat/auth-session-store";
+
+const LazyStudioMenubarContent = lazy(() =>
+  import("./StudioMenubarContent").then(({ StudioMenubarContent }) => ({
+    default: StudioMenubarContent,
+  }))
+);
 
 const STUDIO_MOBILE_EDITING_DOCK_UI: StudioMobileEditingDockUi = {
   StudioBrushLibraryPanel,
@@ -7362,6 +7376,14 @@ function StudioCuttoonEditor() {
   } | null>(null);
   const advancedFillColorRef = useRef(color);
   const [pixelSel, setPixelSel] = useState<PixelSelection | null>(null);
+  const pixelSelRef = useRef<PixelSelection | null>(null);
+  pixelSelRef.current = pixelSel;
+  const [pixelSelectionHistory, setPixelSelectionHistory] = useState(() =>
+    createPixelSelectionHistory(null)
+  );
+  const pixelSelectionHistoryRef = useRef(pixelSelectionHistory);
+  pixelSelectionHistoryRef.current = pixelSelectionHistory;
+  const pixelSelectionDocumentHistoryOwnsLatestEditRef = useRef(false);
   // "wand"는 이 파일에서만 쓰는 로컬 확장 — StudioSelectionToolsPanel의 activeTool prop은 여전히
   // SelectionToolKind만 받으므로(export 자체는 안 건드림), 그 패널에 넘길 때는 wand를 null로 좁힌다.
   const [pixelTool, setPixelTool] = useState<SelectionToolKind | "wand" | null>(null);
@@ -7371,6 +7393,7 @@ function StudioCuttoonEditor() {
   const [liquifyActive, setLiquifyActive] = useState(false);
   const [liquifyRadius, setLiquifyRadius] = useState(40);
   const [liquifyStrength, setLiquifyStrength] = useState(50);
+  const [liquifyMode, setLiquifyMode] = useState<StudioLiquifyMode>("push");
   const [liquifyBusy, setLiquifyBusy] = useState(false);
   const liquifyDragRef = useRef<StudioLiquifyPointerSession | null>(null);
   const liquifyCaptureTargetRef = useRef<Element | null>(null);
@@ -7426,7 +7449,17 @@ function StudioCuttoonEditor() {
   const smudgeCursorRef = useRef<Konva.Circle>(null);
   // 진행 중 드래그 — ref 가 원본(포인터 이벤트마다 갱신), 미리보기 상태는 RAF 로 합쳐 반영(마퀴와
   // 동일 패턴). frame 은 드래그 시작 시점 스냅샷 — 제스처 중 좌표 변환이 흔들리지 않는다.
-  const pixelDragRef = useRef<{ elId: string; frame: SelectionFrame; drag: SelectionDragState } | null>(null);
+  const pixelDragRef = useRef<{
+    elId: string;
+    frame: SelectionFrame;
+    drag: SelectionDragState;
+    pointerId: number;
+  } | null>(null);
+  const pixelSelectionCaptureTargetRef = useRef<Element | null>(null);
+  const pixelSelectionHandledNativeEndEventsRef = useRef(new WeakSet<Event>());
+  const pixelSelectionPointerGlobalEndRef = useRef<
+    (event: PointerEvent, cancelled: boolean) => boolean
+  >(() => false);
   const pixelDragRafRef = useRef<number | null>(null);
   const pendingPixelDragRef = useRef<SelectionDragState | null>(null);
   const [pixelDragPreview, setPixelDragPreview] = useState<SelectionDragState | null>(null);
@@ -7439,6 +7472,71 @@ function StudioCuttoonEditor() {
     polyLassoSessionRef.current = null;
     setPolyLassoSession(null);
     setPolyLassoHover(null);
+  };
+  type PixelSelectionStateUpdate =
+    | PixelSelection
+    | null
+    | ((current: PixelSelection | null) => PixelSelection | null);
+  const selectedImageElementId = selectedId && activePage.elements.some(
+    (element) => element.id === selectedId && element.type === "image"
+  )
+    ? selectedId
+    : null;
+  const activePixelSelectionElementId = () => selectedImageElementId;
+  const publishPixelSelectionHistory = (
+    history: typeof pixelSelectionHistory,
+    selection: PixelSelection | null
+  ) => {
+    pixelSelectionDocumentHistoryOwnsLatestEditRef.current = false;
+    pixelSelectionHistoryRef.current = history;
+    pixelSelRef.current = selection;
+    setPixelSelectionHistory(history);
+    setPixelSel(selection);
+  };
+  const commitPixelSelectionState = (
+    update: PixelSelectionStateUpdate,
+    operation: PixelSelectionHistoryOperation,
+    coalesceKey?: string
+  ): boolean => {
+    const ownerElementId = activePixelSelectionElementId();
+    const bound = bindPixelSelectionHistory(
+      pixelSelectionHistoryRef.current,
+      ownerElementId,
+      pixelSelRef.current
+    );
+    const current = pixelSelRef.current;
+    const next = typeof update === "function" ? update(current) : update;
+    const transition = commitPixelSelectionHistory(bound, ownerElementId, next, {
+      operation,
+      ...(coalesceKey ? { coalesceKey } : {}),
+    });
+    if (!transition.applied) {
+      if (bound !== pixelSelectionHistoryRef.current) {
+        publishPixelSelectionHistory(bound, current);
+      }
+      return false;
+    }
+    publishPixelSelectionHistory(transition.history, transition.selection);
+    return true;
+  };
+  const resetPixelSelectionHistoryState = (
+    ownerElementId: string | null,
+    selection: PixelSelection | null
+  ) => {
+    publishPixelSelectionHistory(
+      createPixelSelectionHistory(ownerElementId, selection, pixelSelectionHistoryRef.current.limits),
+      selection
+    );
+  };
+  const applyPixelSelectionHistoryCommand = (command: "undo" | "redo"): boolean => {
+    const ownerElementId = activePixelSelectionElementId();
+    const transition = command === "undo"
+      ? undoPixelSelectionHistory(pixelSelectionHistoryRef.current, ownerElementId)
+      : redoPixelSelectionHistory(pixelSelectionHistoryRef.current, ownerElementId);
+    if (!transition.applied) return false;
+    publishPixelSelectionHistory(transition.history, transition.selection);
+    announceDrawingShortcut(command === "undo" ? "선택 작업 실행 취소" : "선택 작업 다시 실행");
+    return true;
   };
   const schedulePixelDragPreview = (next: SelectionDragState | null) => {
     pendingPixelDragRef.current = next;
@@ -7456,28 +7554,76 @@ function StudioCuttoonEditor() {
     }
     setPixelDragPreview(null);
   };
-  useEffect(
-    () => () => {
-      if (pixelDragRafRef.current !== null) globalThis.cancelAnimationFrame(pixelDragRafRef.current);
+  const releasePixelSelectionPointerCapture = useCallback(
+    (session = pixelDragRef.current) => {
+      const target = pixelSelectionCaptureTargetRef.current;
+      pixelSelectionCaptureTargetRef.current = null;
+      if (!session || !target) return;
+      try {
+        if (target.hasPointerCapture(session.pointerId)) {
+          target.releasePointerCapture(session.pointerId);
+        }
+      } catch {
+        // Pointer capture may already be released after an outside pointerup or browser cancel.
+      }
     },
     []
   );
-  // 선택 요소가 바뀌면 픽셀 선택·진행 중 드래그·busy 를 해제한다(선택 영역은 이미지 1개 귀속).
-  useEffect(() => {
-    void selectedId; // 값 자체는 안 쓰지만 "바뀌면 초기화"를 위해 의존성으로 구독한다.
-    cancelLiquifyPointerSession();
+  const cancelPixelSelectionPointerSession = useCallback(() => {
+    const session = pixelDragRef.current;
     pixelDragRef.current = null;
+    releasePixelSelectionPointerCapture(session);
     pendingPixelDragRef.current = null;
     if (pixelDragRafRef.current !== null) {
       globalThis.cancelAnimationFrame(pixelDragRafRef.current);
       pixelDragRafRef.current = null;
     }
     setPixelDragPreview(null);
+  }, [releasePixelSelectionPointerCapture]);
+  useEffect(() => {
+    const onPointerUp = (event: PointerEvent) => {
+      if (!pixelSelectionPointerGlobalEndRef.current(event, false)) return;
+      pixelSelectionHandledNativeEndEventsRef.current.add(event);
+    };
+    const onPointerCancel = (event: PointerEvent) => {
+      if (!pixelSelectionPointerGlobalEndRef.current(event, true)) return;
+      pixelSelectionHandledNativeEndEventsRef.current.add(event);
+    };
+    globalThis.addEventListener("pointerup", onPointerUp, true);
+    globalThis.addEventListener("pointercancel", onPointerCancel, true);
+    globalThis.addEventListener("lostpointercapture", onPointerCancel, true);
+    return () => {
+      globalThis.removeEventListener("pointerup", onPointerUp, true);
+      globalThis.removeEventListener("pointercancel", onPointerCancel, true);
+      globalThis.removeEventListener("lostpointercapture", onPointerCancel, true);
+      const session = pixelDragRef.current;
+      pixelDragRef.current = null;
+      releasePixelSelectionPointerCapture(session);
+      pendingPixelDragRef.current = null;
+      if (pixelDragRafRef.current !== null) {
+        globalThis.cancelAnimationFrame(pixelDragRafRef.current);
+        pixelDragRafRef.current = null;
+      }
+    };
+  }, [releasePixelSelectionPointerCapture]);
+  // 선택 요소가 바뀌면 픽셀 선택·진행 중 드래그·busy 를 해제한다(선택 영역은 이미지 1개 귀속).
+  useEffect(() => {
+    cancelLiquifyPointerSession();
+    cancelPixelSelectionPointerSession();
     clearPolyLassoDraft();
+    pixelSelectionDocumentHistoryOwnsLatestEditRef.current = false;
+    const history = createPixelSelectionHistory(
+      selectedImageElementId,
+      null,
+      pixelSelectionHistoryRef.current.limits
+    );
+    pixelSelectionHistoryRef.current = history;
+    pixelSelRef.current = null;
+    setPixelSelectionHistory(history);
     setPixelSel(null);
     setPixelBusy(false);
     pixelWandRunIdRef.current += 1; // 요소가 바뀌면 진행 중인 매직완드 스캔 결과를 무효화한다.
-  }, [cancelLiquifyPointerSession, selectedId]);
+  }, [cancelLiquifyPointerSession, cancelPixelSelectionPointerSession, selectedImageElementId]);
   useEffect(() => {
     saveStudioAdvancedFillSettings(studioAdvancedFillStorage(), advancedFillSettings);
   }, [advancedFillSettings]);
@@ -10938,7 +11084,10 @@ function StudioCuttoonEditor() {
     if (!session) return;
     clearPolyLassoDraft();
     if (session.points.length < 3) return;
-    setPixelSel((prev) => commitPolyLassoSession(prev, session) ?? prev);
+    commitPixelSelectionState(
+      (previous) => commitPolyLassoSession(previous, session) ?? previous,
+      "poly-lasso"
+    );
   }
   // pointerdown/pointermove 이벤트(마우스/터치 유니언)에서 뷰포트 기준 client 좌표를 뽑는다.
   // Stage 이벤트는 마우스/터치 둘 다 이 유니언 타입으로 온다.
@@ -13266,16 +13415,48 @@ function StudioCuttoonEditor() {
       const filterShortcut = mod && e.shiftKey && !e.altKey
         ? STUDIO_FILTER_SHORTCUTS[e.code]
         : undefined;
-      if (filterShortcut) {
+      const pixelSelectionHistoryShortcut = resolvePixelSelectionHistoryShortcut(e, {
+        history: pixelSelectionHistoryRef.current,
+        activeElementId: selected?.type === "image" ? selected.id : null,
+        pixelSelectionContextActive:
+          !pixelBusy
+          && selected?.type === "image"
+          && Boolean(
+            pixelTool
+            || pixelSel
+            || canUndoPixelSelectionHistory(
+              pixelSelectionHistoryRef.current,
+              selected.id
+            )
+            || canRedoPixelSelectionHistory(
+              pixelSelectionHistoryRef.current,
+              selected.id
+            )
+          ),
+        documentHistoryOwnsLatestEdit:
+          pixelSelectionDocumentHistoryOwnsLatestEditRef.current,
+      });
+      if (pixelSelectionHistoryShortcut.command) {
+        if (pixelSelectionHistoryShortcut.preventDefault) e.preventDefault();
+        applyPixelSelectionHistoryCommand(
+          pixelSelectionHistoryShortcut.command === "selection-undo" ? "undo" : "redo"
+        );
+      } else if (filterShortcut) {
         e.preventDefault();
         openStudioFilter(filterShortcut);
       } else if (mod && (e.key === "z" || e.key === "Z")) {
         e.preventDefault();
-        if (e.shiftKey) redo();
-        else undo();
+        if (e.shiftKey) {
+          redo();
+          pixelSelectionDocumentHistoryOwnsLatestEditRef.current = true;
+        } else {
+          undo();
+          pixelSelectionDocumentHistoryOwnsLatestEditRef.current = false;
+        }
       } else if (mod && (e.key === "y" || e.key === "Y")) {
         e.preventDefault();
         redo();
+        pixelSelectionDocumentHistoryOwnsLatestEditRef.current = true;
       } else if (editShortcut === "cut") {
         if (cutSelectedElements()) e.preventDefault();
       } else if (editShortcut === "copy") {
@@ -13558,7 +13739,7 @@ function StudioCuttoonEditor() {
         } else if (pixelTool || pixelSel) {
           // 픽셀 선택 도구/영역을 먼저 해제 — 다음 Esc 가 요소 선택을 해제한다.
           setPixelTool(null);
-          setPixelSel(null);
+          commitPixelSelectionState(null, "clear");
           clearPolyLassoDraft();
         } else {
           setSelectedId(null);
@@ -15773,7 +15954,10 @@ function StudioCuttoonEditor() {
       });
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (runId !== pixelWandRunIdRef.current) return; // 그사이 요소가 바뀌었거나 새 스캔이 시작됨.
-      setPixelSel((prev) => applyMagicWandRegionToSelection(prev, region, pixelCombine));
+      commitPixelSelectionState(
+        (previous) => applyMagicWandRegionToSelection(previous, region, pixelCombine),
+        "magic-wand"
+      );
     } catch (err) {
       if (runId === pixelWandRunIdRef.current) {
         setError(err instanceof Error ? err.message : "이 지점에서 선택할 영역을 찾지 못했어요.");
@@ -15815,7 +15999,9 @@ function StudioCuttoonEditor() {
       const src = (out as HTMLCanvasElement).toDataURL("image/png");
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (isLatestLayerContentMutationLocked(target.id)) return;
-      patchEl(target.id, { src } as Partial<El>);
+      if (!patchEl(target.id, { src } as Partial<El>)) return;
+      resetPixelSelectionHistoryState(target.id, sel);
+      pixelSelectionDocumentHistoryOwnsLatestEditRef.current = true;
       setError(null);
     } catch (err) {
       console.error("Failed to apply pixel selection adjust:", err);
@@ -15876,7 +16062,13 @@ function StudioCuttoonEditor() {
         flipY: transform.flipY,
         aspect,
       });
-      if (nextSel) setPixelSel(nextSel);
+      if (nextSel) {
+        // Pixel content and its marquee moved atomically. Rebase the ephemeral selection timeline
+        // so the next ⌘Z reaches document history and restores the pixels, instead of reverting
+        // only the marquee and leaving it misaligned with already-baked content.
+        resetPixelSelectionHistoryState(target.id, nextSel);
+        pixelSelectionDocumentHistoryOwnsLatestEditRef.current = true;
+      }
       setError(null);
     } catch (err) {
       console.error("Failed to apply selection content transform:", err);
@@ -15914,7 +16106,9 @@ function StudioCuttoonEditor() {
       const src = (out as HTMLCanvasElement).toDataURL("image/png");
       if (!canApplyStudioMutation(mutationTicket)) return;
       if (isLatestLayerContentMutationLocked(target.id)) return;
-      patchEl(target.id, { src } as Partial<El>);
+      if (!patchEl(target.id, { src } as Partial<El>)) return;
+      resetPixelSelectionHistoryState(target.id, sel);
+      pixelSelectionDocumentHistoryOwnsLatestEditRef.current = true;
       setError(null);
     } catch (err) {
       console.error("Failed to apply content-aware fill:", err);
@@ -15948,6 +16142,7 @@ function StudioCuttoonEditor() {
         y: p.y * h,
       }));
       const radiusDevice = (liquifyRadius / Math.max(1, target.width)) * w;
+      const { bakeLiquifyStrokeToCanvas } = await import("./studio-liquify-browser");
       const out = await bakeLiquifyStrokeToCanvas(
         img,
         w,
@@ -15956,7 +16151,11 @@ function StudioCuttoonEditor() {
         radiusDevice,
         liquifyStrength / 100,
         createPixelEditCanvas,
-        { flipX: target.flipped ?? false, flipY: target.flippedY ?? false }
+        {
+          flipX: target.flipped ?? false,
+          flipY: target.flippedY ?? false,
+          mode: liquifyMode,
+        }
       );
       if (!out) return;
       const src = (out as HTMLCanvasElement).toDataURL("image/png");
@@ -16003,6 +16202,31 @@ function StudioCuttoonEditor() {
   }
   liquifyPointerGlobalEndRef.current = (event, cancelled) =>
     finishLiquifyPointerSession(event, cancelled, stageRef.current);
+
+  function finishPixelSelectionPointerSession(
+    pointerEvent: PointerEvent,
+    cancelled: boolean
+  ): boolean {
+    const session = pixelDragRef.current;
+    const pointerId = Number.isFinite(pointerEvent.pointerId) ? pointerEvent.pointerId : 1;
+    if (!session || session.pointerId !== pointerId) return false;
+    pixelDragRef.current = null;
+    releasePixelSelectionPointerCapture(session);
+    clearPixelDragPreview();
+    if (!cancelled) {
+      commitPixelSelectionState(
+        (previous) => commitSelectionDrag(previous, session.drag) ?? previous,
+        session.drag.tool === "lasso"
+          ? "free-lasso"
+          : session.drag.tool === "brush"
+            ? "brush"
+            : "marquee"
+      );
+    }
+    return true;
+  }
+  pixelSelectionPointerGlobalEndRef.current = (event, cancelled) =>
+    finishPixelSelectionPointerSession(event, cancelled);
 
   async function applySmudgeStroke(elId: string, points: SelPoint[]) {
     if (smudgeBusy) return;
@@ -16992,6 +17216,8 @@ function StudioCuttoonEditor() {
     const stagePointerEvent = e.evt as PointerEvent;
     // One contact owns a liquify gesture. A second finger is ignored and cannot cancel or replace it.
     if (liquifyDragRef.current) return;
+    // One contact also owns a pixel-selection drag; a palm/second finger cannot replace it.
+    if (pixelDragRef.current) return;
     // The first contact owns a bubble point drag. A palm/second finger cannot replace its owner.
     if (bubbleShapeDragRef.current) return;
     // Figma식 자유 위치 댓글 핀: 무장 상태의 첫 캔버스 클릭이 point 앵커를 확정하고 소비된다.
@@ -17214,6 +17440,7 @@ function StudioCuttoonEditor() {
       const session = beginStudioLiquifyPointerSession({
         elId: selected.id,
         frame,
+        mode: liquifyMode,
         point: canvasPointToNormalized(pos.x, pos.y, frame),
         pointer: stagePointerEvent,
       });
@@ -17395,7 +17622,19 @@ function StudioCuttoonEditor() {
         brushRadiusNorm,
         { forceCircle: pixelForceCircle || (pixelTool === "ellipse" && e.evt.shiftKey) }
       );
-      pixelDragRef.current = { elId: selected.id, frame, drag };
+      const pointerId = Number.isFinite(stagePointerEvent.pointerId)
+        ? stagePointerEvent.pointerId
+        : 1;
+      pixelDragRef.current = { elId: selected.id, frame, drag, pointerId };
+      const captureTarget = stagePointerEvent.target instanceof Element
+        ? stagePointerEvent.target
+        : e.target.getStage()?.container() ?? null;
+      pixelSelectionCaptureTargetRef.current = captureTarget;
+      try {
+        captureTarget?.setPointerCapture(pointerId);
+      } catch {
+        // Global capture-phase pointerup remains the safety net on browsers without capture.
+      }
       schedulePixelDragPreview(drag);
       return;
     }
@@ -19333,6 +19572,7 @@ function StudioCuttoonEditor() {
   function onStagePointerCancel(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
     const pointerEvent = e.evt as PointerEvent;
     if (liquifyHandledNativeEndEventsRef.current.delete(pointerEvent)) return;
+    if (pixelSelectionHandledNativeEndEventsRef.current.delete(pointerEvent)) return;
     if (requireStudioDrawingPointerTransport(drawingPointerTransportRef).consumeHandledNativeEnd(pointerEvent)) return;
     const pointerId = Number.isFinite(pointerEvent.pointerId) ? pointerEvent.pointerId : 1;
     // Drawing owns its matching cancel before any stale tool session can early-return. A foreign
@@ -19355,6 +19595,10 @@ function StudioCuttoonEditor() {
     if (liquifyDragRef.current) {
       if (!isStudioLiquifyPointerOwner(liquifyDragRef.current, pointerEvent)) return;
       finishLiquifyPointerSession(pointerEvent, true, e.target.getStage());
+      return;
+    }
+    if (pixelDragRef.current) {
+      if (!finishPixelSelectionPointerSession(pointerEvent, true)) return;
       return;
     }
     if (bubbleShapeDragRef.current) {
@@ -19384,6 +19628,7 @@ function StudioCuttoonEditor() {
   function onStageUp(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
     const pointerEvent = e.evt as PointerEvent;
     if (liquifyHandledNativeEndEventsRef.current.delete(pointerEvent)) return;
+    if (pixelSelectionHandledNativeEndEventsRef.current.delete(pointerEvent)) return;
     if (requireStudioDrawingPointerTransport(drawingPointerTransportRef).consumeHandledNativeEnd(pointerEvent)) return;
     const drawingPointerSession = requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession();
     if (drawingRef.current || drawingPointerSession) {
@@ -19410,6 +19655,10 @@ function StudioCuttoonEditor() {
     if (liquifyDragRef.current) {
       if (!isStudioLiquifyPointerOwner(liquifyDragRef.current, pointerEvent)) return;
       finishLiquifyPointerSession(pointerEvent, false, e.target.getStage());
+      return;
+    }
+    if (pixelDragRef.current) {
+      if (!finishPixelSelectionPointerSession(pointerEvent, false)) return;
       return;
     }
     stopQuickShapeTracking(); // 드로잉이 아닌 경로 — 잔여 인터벌만 정리.
@@ -19540,14 +19789,6 @@ function StudioCuttoonEditor() {
           setBubbleShapeSelectedPointIndex(session.pointIndex);
         }
       }
-      return;
-    }
-    // 픽셀 선택 드래그 종료: 의미 있는 면적이면 서브패스로 결합(찰나 클릭은 변화 없음 = null).
-    if (pixelDragRef.current) {
-      const session = pixelDragRef.current;
-      pixelDragRef.current = null;
-      clearPixelDragPreview();
-      setPixelSel((prev) => commitSelectionDrag(prev, session.drag) ?? prev);
       return;
     }
     // 문지르기 드래그 종료 — 누적된 좌표로 실제 픽셀 스트로크를 적용한다.
@@ -20292,7 +20533,7 @@ function StudioCuttoonEditor() {
   }
   function selectAllForEdit() {
     if (selected?.type === "image" && (pixelTool || pixelSel)) {
-      setPixelSel((current) => selectAllPixels(current));
+      commitPixelSelectionState((current) => selectAllPixels(current), "select-all");
       clearPolyLassoDraft();
       announceDrawingShortcut("이미지 픽셀 모두 선택");
       return;
@@ -20303,7 +20544,7 @@ function StudioCuttoonEditor() {
   function deselectForEdit() {
     if (pixelTool || pixelSel) {
       setPixelTool(null);
-      setPixelSel(null);
+      commitPixelSelectionState(null, "clear");
       clearPolyLassoDraft();
       announceDrawingShortcut("픽셀 선택 해제");
       return;
@@ -20315,7 +20556,10 @@ function StudioCuttoonEditor() {
   }
   function invertSelectionForEdit() {
     if (selected?.type !== "image" || !isSelectionUsable(pixelSel)) return;
-    setPixelSel((current) => toggleSelectionInvert(current ?? emptyPixelSelection()));
+    commitPixelSelectionState(
+      (current) => toggleSelectionInvert(current ?? emptyPixelSelection()),
+      "invert"
+    );
     announceDrawingShortcut("선택 반전");
   }
   function clearSelectionForEdit() {
@@ -20332,7 +20576,7 @@ function StudioCuttoonEditor() {
     setTool("select");
     setEyedropperActive(false);
     disarmAllPixelTools();
-    setPixelSel(null);
+    resetPixelSelectionHistoryState(selected.id, null);
     setCropRect(initialCropRect());
     openInspectorRoute({ primary: "properties", image: "transform" });
     setRightPanelOpen(true);
@@ -23021,8 +23265,17 @@ function StudioCuttoonEditor() {
             "min-h-8 gap-1 py-0.5 [&_[data-studio-app-menubar-scroll]]:px-1"
         )}
       >
-        <StudioMenubarContent
-          activePageLabel={studioMenubarActivePageLabel}
+        <Suspense
+          fallback={(
+            <div
+              aria-hidden
+              data-studio-menubar-loading="true"
+              className="h-9 min-w-0 flex-1 animate-pulse rounded-lg bg-raised/45 motion-reduce:animate-none"
+            />
+          )}
+        >
+          <LazyStudioMenubarContent
+            activePageLabel={studioMenubarActivePageLabel}
           activeToolbarGroup={activeToolbarGroup}
           aiProvenance={aiProvenance}
           canvasH={canvasH}
@@ -23084,8 +23337,9 @@ function StudioCuttoonEditor() {
           workspaceState={workspaceState}
           workspaceSyncNotice={workspaceSyncNotice}
           writerRoom={writerRoom}
-          stableHandlers={studioMenubarContentHandlers}
-        />
+            stableHandlers={studioMenubarContentHandlers}
+          />
+        </Suspense>
         <button
           type="button"
           data-studio-comments-inbox="true"
@@ -23933,6 +24187,7 @@ function StudioCuttoonEditor() {
           localHiddenElementIds={localHiddenElementIds}
           liquifyActive={liquifyActive}
           liquifyBusy={liquifyBusy}
+          liquifyMode={liquifyMode}
           liquifyRadius={liquifyRadius}
           liquifyStrength={liquifyStrength}
           liveDraftShapeKind={liveDraftShapeKind}
@@ -23956,6 +24211,14 @@ function StudioCuttoonEditor() {
           pixelBusy={pixelBusy}
           pixelCombine={pixelCombine}
           pixelSel={pixelSel}
+          pixelSelectionCanRedo={canRedoPixelSelectionHistory(
+            pixelSelectionHistory,
+            selected?.type === "image" ? selected.id : null
+          )}
+          pixelSelectionCanUndo={canUndoPixelSelectionHistory(
+            pixelSelectionHistory,
+            selected?.type === "image" ? selected.id : null
+          )}
           pixelTool={pixelTool}
           polyLassoSession={polyLassoSession}
           postCorrection={postCorrection}
@@ -24014,6 +24277,7 @@ function StudioCuttoonEditor() {
           setLayerMaskRadius={setLayerMaskRadius}
           setLayerMaskStrength={setLayerMaskStrength}
           setLiquifyRadius={setLiquifyRadius}
+          setLiquifyMode={setLiquifyMode}
           setLiquifyStrength={setLiquifyStrength}
           setMagicResizeStrategy={setMagicResizeStrategy}
           setMenu={setMenu}
@@ -24028,7 +24292,17 @@ function StudioCuttoonEditor() {
           setPixelBrushRadius={setPixelBrushRadius}
           setPixelCombine={setPixelCombine}
           setPixelForceCircle={setPixelForceCircle}
-          setPixelSel={setPixelSel}
+          commitPixelSelectionState={commitPixelSelectionState}
+          resetPixelSelectionState={(selection) => resetPixelSelectionHistoryState(
+            selected?.type === "image" ? selected.id : null,
+            selection
+          )}
+          undoPixelSelectionState={() => {
+            applyPixelSelectionHistoryCommand("undo");
+          }}
+          redoPixelSelectionState={() => {
+            applyPixelSelectionHistoryCommand("redo");
+          }}
           setPixelTool={setPixelTool}
           setPoserInitialDataUrl={setPoserInitialDataUrl}
           setPoserInitialElementId={setPoserInitialElementId}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { drawStampStroke } from "./studio-brush-stamp-engine";
 import { planStudioCausalInk } from "./studio-causal-ink";
 import { fillStudioCausalInkDabs } from "./studio-causal-ink-canvas";
 import {
@@ -11,7 +12,12 @@ import {
   isDirectLiveDraftEl,
   isDirectLiveStampDraftEl,
 } from "./studio-draw-rendering";
+import {
+  drawStudioStampStrokeWithSymmetry,
+  planStudioStampSymmetryRender,
+} from "./studio-stamp-symmetry-rendering";
 
+import type { StudioStampBrushStyle } from "./studio-brush-stamp-engine";
 import type { DrawEl } from "./studio-element-model";
 import type { StudioStrokePaintModel } from "./studio-stroke-paint-model";
 import type Konva from "konva";
@@ -113,8 +119,16 @@ class RecordingContext {
     this.operations.push(`quadratic:${cpx},${cpy},${x},${y}`);
   }
 
+  transform(a: number, b: number, c: number, d: number, e: number, f: number): void {
+    this.operations.push(`transform:${a},${b},${c},${d},${e},${f}`);
+  }
+
   closePath(): void {
     this.operations.push("close");
+  }
+
+  createRadialGradient(): CanvasGradient {
+    return { addColorStop: () => undefined } as unknown as CanvasGradient;
   }
 
   arc(x: number, y: number, radius: number, startAngle: number, endAngle: number): void {
@@ -150,6 +164,20 @@ function roundedVariations(variations: readonly number[][]): number[][] {
     if (Math.abs(value) < 1e-10) return 0;
     return Number(value.toFixed(10));
   }));
+}
+
+function stampStyle(
+  kind: StudioStampBrushStyle["kind"] = "ink"
+): StudioStampBrushStyle {
+  return {
+    kind,
+    color: "#123456",
+    size: 10,
+    opacity: 0.8,
+    flow: 0.7,
+    hardness: 0.9,
+    minSizeRatio: 0.25,
+  };
 }
 
 describe("studio draw rendering bounds and symmetry", () => {
@@ -197,6 +225,194 @@ describe("studio draw rendering bounds and symmetry", () => {
       [0, 1, 1, 0],
       [1, 0, 2, 1],
     ]);
+  });
+
+  it("bounds imported radial fans and replaces non-finite centers without emitting NaN", () => {
+    const variations = getSymmetricPoints([2, 1], {
+      type: "kaleidoscope",
+      centerX: Number.NaN,
+      centerY: Number.POSITIVE_INFINITY,
+      radialCount: Number.MAX_SAFE_INTEGER,
+    });
+
+    expect(variations).toHaveLength(64);
+    expect(variations.flat().every(Number.isFinite)).toBe(true);
+  });
+});
+
+describe("v2 stamp symmetry render plan", () => {
+  it("deduplicates a center tap and an axis-aligned mirror before translucent buildup", () => {
+    const center = planStudioStampSymmetryRender(
+      stampStyle("airbrush"),
+      [50, 40],
+      [0.5],
+      { type: "kaleidoscope", centerX: 50, centerY: 40, radialCount: 16 },
+    );
+    expect(center.transforms).toHaveLength(1);
+    expect(center.dabs).toHaveLength(1);
+    expect(center.totalDabCount).toBe(1);
+
+    const mirrorAxis = planStudioStampSymmetryRender(
+      stampStyle(),
+      [10, 0, 10, 20],
+      [0.4, 0.8],
+      { type: "vertical", centerX: 10, centerY: 0 },
+    );
+    expect(mirrorAxis.transforms).toHaveLength(1);
+  });
+
+  it("uses the canonical source-first affine transforms for radial and kaleidoscope copies", () => {
+    const points = [2, 1, 1, 2];
+    for (const type of ["radial", "kaleidoscope"] as const) {
+      const symmetry = { type, centerX: 1, centerY: 1, radialCount: 4 };
+      const expected = roundedVariations(getSymmetricPoints(points, symmetry));
+      const plan = planStudioStampSymmetryRender(
+        stampStyle(),
+        points,
+        [0.5, 0.5],
+        symmetry,
+      );
+      const actual = plan.transforms.map((transform) => {
+        const mapped: number[] = [];
+        for (let index = 0; index < points.length; index += 2) {
+          mapped.push(
+            transform.a * points[index]! + transform.c * points[index + 1]! + transform.e,
+            transform.b * points[index]! + transform.d * points[index + 1]! + transform.f,
+          );
+        }
+        return mapped;
+      });
+      expect(roundedVariations(actual)).toEqual(expected);
+    }
+  });
+
+  it("stops at the finite coordinate prefix and normalizes corrupt pressure samples", () => {
+    const plan = planStudioStampSymmetryRender(
+      stampStyle(),
+      [0, 0, 8, 0, Number.NaN, 4, 100, 100],
+      [Number.NaN, Number.POSITIVE_INFINITY],
+      { type: "vertical", centerX: 20, centerY: 0 },
+      100,
+    );
+
+    expect(plan.sourcePointCount).toBe(2);
+    expect(plan.dabs.length).toBeGreaterThan(1);
+    expect(plan.dabs.every((dab) =>
+      [dab.x, dab.y, dab.radius, dab.alpha].every(Number.isFinite)
+    )).toBe(true);
+  });
+
+  it("enforces one total dab budget across a corrupt fan and an enormous segment", () => {
+    const plan = planStudioStampSymmetryRender(
+      stampStyle(),
+      [0, 0, 1_000_000_000, 0],
+      [0.5, 0.5],
+      {
+        type: "kaleidoscope",
+        centerX: 5,
+        centerY: 5,
+        radialCount: Number.MAX_SAFE_INTEGER,
+      },
+      37,
+    );
+
+    expect(plan.transforms).toHaveLength(37);
+    expect(plan.totalDabCount).toBeLessThanOrEqual(37);
+    expect(plan.dabs).toHaveLength(1);
+  });
+
+  it("keeps finite output and the global budget across deterministic generated inputs", () => {
+    let state = 0x51f15e;
+    const random = () => {
+      state = (Math.imul(state, 1_664_525) + 1_013_904_223) >>> 0;
+      return state / 0x1_0000_0000;
+    };
+    const types = ["vertical", "horizontal", "radial", "kaleidoscope"] as const;
+    const radialCounts = [1, 4, 16, 32, 1_000_000, Number.NaN] as const;
+
+    for (let sample = 0; sample < 96; sample += 1) {
+      const centerX = random() * 2_000 - 1_000;
+      const centerY = random() * 2_000 - 1_000;
+      const points = sample % 11 === 0
+        ? [centerX, centerY]
+        : Array.from({ length: 8 }, () => random() * 4_000 - 2_000);
+      const maximumOutputDabs = 1 + Math.floor(random() * 257);
+      const plan = planStudioStampSymmetryRender(
+        stampStyle(sample % 2 === 0 ? "pencil" : "airbrush"),
+        points,
+        Array.from({ length: points.length / 2 }, () => random()),
+        {
+          type: types[sample % types.length]!,
+          centerX,
+          centerY,
+          radialCount: radialCounts[sample % radialCounts.length],
+        },
+        maximumOutputDabs,
+      );
+
+      expect(plan.totalDabCount).toBeLessThanOrEqual(maximumOutputDabs);
+      expect(plan.transforms.length).toBeLessThanOrEqual(64);
+      expect(plan.dabs.every((dab) =>
+        [dab.x, dab.y, dab.radius, dab.alpha].every(Number.isFinite)
+      )).toBe(true);
+      for (const transform of plan.transforms) {
+        expect([
+          transform.a,
+          transform.b,
+          transform.c,
+          transform.d,
+          transform.e,
+          transform.f,
+        ].every(Number.isFinite)).toBe(true);
+      }
+    }
+  });
+
+  it("applies symmetry to the complete pencil footprint instead of regenerating axial jitter", () => {
+    const context = new RecordingContext();
+    const plan = drawStudioStampStrokeWithSymmetry(
+      context as unknown as CanvasRenderingContext2D,
+      stampStyle("pencil"),
+      [2, 3],
+      [0.7],
+      { type: "vertical", centerX: 10, centerY: 0 },
+    );
+
+    expect(plan.transforms).toHaveLength(2);
+    expect(context.operations.filter((operation) => operation.startsWith("transform:"))).toEqual([
+      "transform:1,0,0,1,0,0",
+      "transform:-1,0,0,1,20,0",
+    ]);
+    const perCopyArcCount = 3;
+    const arcs = context.operations.filter((operation) => operation.startsWith("arc:"));
+    expect(arcs).toHaveLength(perCopyArcCount * 2);
+    expect(arcs.slice(0, perCopyArcCount)).toEqual(arcs.slice(perCopyArcCount));
+  });
+
+  it("keeps the identity Canvas fallback byte-for-operation equivalent to direct replay", () => {
+    const points = [0, 0, 8, 0, 14, 3];
+    const pressures = [0.3, 0.7, 1];
+    for (const kind of ["ink", "pencil", "airbrush", "watercolor"] as const) {
+      const direct = new RecordingContext();
+      drawStampStroke(direct as unknown as CanvasRenderingContext2D, stampStyle(kind), points, pressures);
+
+      const symmetric = new RecordingContext();
+      const plan = drawStudioStampStrokeWithSymmetry(
+        symmetric as unknown as CanvasRenderingContext2D,
+        stampStyle(kind),
+        points,
+        pressures,
+        undefined,
+      );
+
+      expect(plan.transforms).toHaveLength(1);
+      expect(symmetric.operations.slice(0, 2)).toEqual([
+        "save",
+        "transform:1,0,0,1,0,0",
+      ]);
+      expect(symmetric.operations.at(-1)).toBe("restore");
+      expect(symmetric.operations.slice(2, -1)).toEqual(direct.operations);
+    }
   });
 });
 

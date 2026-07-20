@@ -128,6 +128,7 @@ describe("studio draw rendering ownership boundary", () => {
     );
     expect(drawNode.allImports).not.toContain("./StudioPage");
     expect(drawNode.dynamicImports).toEqual([]);
+    expect(drawNode.valueImports).toContain("./StudioStampDrawShape");
     expect(drawNode.typeImports).toContain("./studio-element-model");
     expect(drawNode.valueImports).not.toContain("./studio-element-model");
     expect(drawNode.valueImports).toContain("./studio-draw-rendering");
@@ -174,11 +175,16 @@ describe("studio draw rendering ownership boundary", () => {
 
   it("locks the stamp, watercolor, pattern, and memo routing seams in the extracted node", () => {
     const drawNode = moduleEdges("./StudioDrawNode.tsx");
+    const stampShape = moduleEdges("./StudioStampDrawShape.tsx");
 
     expect(drawNode.source).toContain("const tileSrc = pattern ? patternDataUrl(pattern) : null;");
     expect(drawNode.source).toContain("if (active) setImage(img);");
-    expect(drawNode.source).toContain('el.stampPipeline === "causal-walker-v2"');
-    expect(drawNode.source).toContain("? points\n                : processFreehandPoints(points, renderSampleDistance)");
+    expect(drawNode.source).toContain("const symmetricVariations = stampBrushKind");
+    expect(drawNode.source).toContain("<StudioStampDrawShape");
+    expect(drawNode.valueImports).toContain("./StudioStampDrawShape");
+    expect(stampShape.source).toContain('el.stampPipeline === "causal-walker-v2"');
+    expect(stampShape.source).toContain("? el.points\n    : processFreehandPoints(el.points, renderSampleDistance)");
+    expect(stampShape.source).toContain("drawStudioStampStrokeWithSymmetry(");
     expect(drawNode.source).toContain('el.watercolorPipeline === "causal-walker-v2"');
     expect(drawNode.source).toContain("planCausalWatercolorBrushDabs(watercolorInput, !activeDraft)");
     expect(drawNode.source).toContain('globalCompositeOperation="multiply"');

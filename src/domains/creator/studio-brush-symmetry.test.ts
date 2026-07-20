@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  STUDIO_BRUSH_MAX_RADIAL_SYMMETRY_DIRECTIONS,
   studioDynamicBrushDabVariations,
   studioBrushSymmetryTransforms,
   transformStudioDynamicBrushDab,
@@ -77,6 +78,21 @@ describe("studioBrushSymmetryTransforms", () => {
       centerY: Number.POSITIVE_INFINITY,
       radialCount: Number.NaN,
     })).toHaveLength(4);
+  });
+
+  it("caps untrusted radial and kaleidoscope fans at the live GPU contract", () => {
+    expect(studioBrushSymmetryTransforms({
+      type: "radial",
+      centerX: 0,
+      centerY: 0,
+      radialCount: Number.MAX_SAFE_INTEGER,
+    })).toHaveLength(STUDIO_BRUSH_MAX_RADIAL_SYMMETRY_DIRECTIONS);
+    expect(studioBrushSymmetryTransforms({
+      type: "kaleidoscope",
+      centerX: 0,
+      centerY: 0,
+      radialCount: Number.MAX_SAFE_INTEGER,
+    })).toHaveLength(STUDIO_BRUSH_MAX_RADIAL_SYMMETRY_DIRECTIONS * 2);
   });
 
   it("creates every variation from one base dab plan without mutating it", () => {

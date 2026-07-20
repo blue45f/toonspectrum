@@ -271,4 +271,32 @@ describe("StudioMenubarContent", () => {
       screen.getByRole("button", { name: "작업 내역" }).getAttribute("aria-pressed")
     ).toBe("true");
   });
+
+  it("routes meaningful top actions through the exclusive rich-tooltip channel", () => {
+    render(
+      <StudioMenubarContent
+        {...createProps({
+          redoDisabled: false,
+          undoDisabled: false,
+        })}
+      />
+    );
+
+    for (const name of [
+      "실행취소",
+      "다시실행",
+      "작업 내역",
+      "템플릿·에셋",
+      "말풍선",
+      "현재 페이지 다운로드",
+      "내보내기 옵션",
+      "프로젝트 작업",
+      "임시저장",
+      "게시하기",
+    ]) {
+      const control = screen.getByRole("button", { name });
+      expect(control.closest('[data-studio-tool-hint-target="true"]')).not.toBeNull();
+      expect(control.getAttribute("title")).toBeNull();
+    }
+  });
 });

@@ -100,7 +100,7 @@ class HangingWorker implements StudioImageFilterWorkerLike {
     }
   }
 
-  postMessage(): void {}
+  postMessage(_message: StudioImageFilterWorkerRunMessage, _transfer: Transferable[]): void {}
 
   terminate(): void {
     this.terminateCount++;
@@ -132,6 +132,35 @@ class LoadErrorWorker extends HangingWorker {
     super(false);
     queueMicrotask(() => {
       this.onerror?.({ message: "worker chunk failed to load" });
+    });
+  }
+}
+
+class ImmediateApplyingWorker extends HangingWorker {
+  override postMessage(message: StudioImageFilterWorkerRunMessage, transfer: Transferable[]): void {
+    const received = structuredClone(message, { transfer });
+    const { filters, attrs } = buildImageFilters(received.request.el, testRegistry);
+    applyImageFilters(received.request.imageData, filters, attrs);
+    this.onmessage?.({
+      data: {
+        type: "studio-image-filter/success",
+        version: 1,
+        imageData: received.request.imageData,
+      },
+    } as MessageEvent<StudioImageFilterWorkerResponseMessage>);
+  }
+}
+
+class InvalidSuccessWorker extends HangingWorker {
+  override postMessage(): void {
+    queueMicrotask(() => {
+      this.onmessage?.({
+        data: {
+          type: "studio-image-filter/success",
+          version: 1,
+          imageData: { data: new Uint8ClampedArray(4), width: 2, height: 2 },
+        },
+      } as MessageEvent<StudioImageFilterWorkerResponseMessage>);
     });
   }
 }
@@ -198,6 +227,33 @@ describe("runStudioImageFilterWorker", () => {
     expect(worker.requestTransferCount).toBe(1);
     expect(worker.terminateCount).toBe(1);
     expect(Array.from(output.imageData.data)).toEqual(Array.from(expected));
+  });
+
+  it("copies a partial ArrayBuffer view so unrelated caller bytes and sibling views are not detached", async () => {
+    const backing = new ArrayBuffer(40);
+    const pixels = new Uint8ClampedArray(backing, 8, 24);
+    pixels.set(makeImageData(3, 2).data);
+    const sibling = new Uint8Array(backing, 0, 4);
+    sibling.set([9, 8, 7, 6]);
+    const worker = new ApplyingWorker();
+
+    const output = await runStudioImageFilterWorker(
+      { imageData: { data: pixels, width: 3, height: 2 }, el: { brightness: 0.3 } },
+      { workerFactory: () => worker },
+    );
+
+    expect(output.execution).toBe("worker");
+    expect(backing.byteLength).toBe(40);
+    expect(Array.from(sibling)).toEqual([9, 8, 7, 6]);
+    expect(worker.requestTransferCount).toBe(1);
+  });
+
+  it("accepts a synchronous worker result without misclassifying it as a pre-ready race", async () => {
+    const output = await runStudioImageFilterWorker(requestFixture(), {
+      workerFactory: () => new ImmediateApplyingWorker(),
+    });
+
+    expect(output.execution).toBe("worker");
   });
 
   it("strips browser lifecycle helpers instead of falling back from DataCloneError", async () => {
@@ -272,6 +328,56 @@ describe("runStudioImageFilterWorker", () => {
 
     expect(output.execution).toBe("direct");
     expect(Array.from(output.imageData.data)).toEqual(Array.from(expected));
+  });
+
+  it("falls back and terminates when a worker never announces readiness", async () => {
+    vi.useFakeTimers();
+    try {
+      const request = requestFixture();
+      const expected = expectedPixels(request.el);
+      const worker = new HangingWorker(false);
+      const pending = runStudioImageFilterWorker(request, { workerFactory: () => worker });
+
+      await vi.advanceTimersByTimeAsync(3_000);
+
+      const output = await pending;
+      expect(output.execution).toBe("direct");
+      expect(Array.from(output.imageData.data)).toEqual(Array.from(expected));
+      expect(worker.terminateCount).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("rejects malformed dimensions and oversized requests before constructing a worker", async () => {
+    const constructed = vi.fn(() => new HangingWorker());
+    await expect(runStudioImageFilterWorker({
+      imageData: { data: new Uint8ClampedArray(4), width: 2, height: 2 },
+      el: {},
+    }, { workerFactory: constructed })).rejects.toThrow(/버퍼 길이/);
+    await expect(runStudioImageFilterWorker({
+      imageData: { data: new Uint8ClampedArray(4), width: 8193, height: 8193 },
+      el: {},
+    }, { workerFactory: constructed })).rejects.toThrow(/안전 한도/);
+    expect(constructed).not.toHaveBeenCalled();
+  });
+
+  it("treats non-finite scalar filter values as no-ops instead of blackening pixels", async () => {
+    const request = requestFixture({ brightness: Number.NaN, contrast: Number.POSITIVE_INFINITY });
+    const original = Array.from(request.imageData.data);
+
+    const output = await runStudioImageFilterWorker(request, { workerFactory: null });
+
+    expect(Array.from(output.imageData.data)).toEqual(original);
+  });
+
+  it("rejects an invalid success payload and terminates the worker", async () => {
+    const worker = new InvalidSuccessWorker();
+
+    await expect(runStudioImageFilterWorker(requestFixture(), {
+      workerFactory: () => worker,
+    })).rejects.toThrow(/버퍼 길이/);
+    expect(worker.terminateCount).toBe(1);
   });
 
   it("terminates an in-flight worker and rejects with AbortError when the signal aborts", async () => {

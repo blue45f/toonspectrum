@@ -13,6 +13,24 @@ interface CapturedKonvaNode {
   props: Record<string, unknown>;
 }
 
+class StampSceneContext {
+  readonly arcs: string[] = [];
+  readonly transforms: string[] = [];
+  globalAlpha = 1;
+  fillStyle: string | CanvasGradient | CanvasPattern = "";
+
+  save(): void {}
+  restore(): void {}
+  beginPath(): void {}
+  fill(): void {}
+  arc(x: number, y: number, radius: number): void {
+    this.arcs.push(`${x},${y},${radius}`);
+  }
+  transform(a: number, b: number, c: number, d: number, e: number, f: number): void {
+    this.transforms.push(`${a},${b},${c},${d},${e},${f}`);
+  }
+}
+
 const konvaCapture = vi.hoisted(() => ({
   nodes: [] as CapturedKonvaNode[],
 }));
@@ -94,6 +112,12 @@ function pattern(overrides: Partial<StudioPatternSpec> = {}): StudioPatternSpec 
 
 function captured(kind: string): CapturedKonvaNode[] {
   return konvaCapture.nodes.filter((node) => node.kind === kind);
+}
+
+async function flushStampRenderer(): Promise<void> {
+  await act(async () => {
+    await import("./StudioStampDrawShape");
+  });
 }
 
 beforeEach(() => {
@@ -279,11 +303,72 @@ describe("StudioDrawNode orchestration", () => {
       points: [4, 7],
       stampPipeline: "causal-walker-v2",
     }],
-  ])("keeps a one-point %s on its engine-specific Shape route", (_label, overrides) => {
+  ])("keeps a one-point %s on its engine-specific Shape route", async (_label, overrides) => {
     render(<StudioDrawNode el={drawEl(overrides as Partial<DrawEl>)} />);
+    await flushStampRenderer();
 
     expect(captured("Circle")).toHaveLength(0);
     expect(captured("Shape").length).toBeGreaterThan(0);
+  });
+
+  it("renders a symmetric v2 pencil stamp through one bounded affine compositor", async () => {
+    render(
+      <StudioDrawNode
+        el={drawEl({
+          brush: "pencil-grain",
+          mode: "pen",
+          points: [2, 3],
+          pressures: [0.7],
+          stampPipeline: "causal-walker-v2",
+          symmetry: { type: "vertical", centerX: 10, centerY: 0 },
+        })}
+      />,
+    );
+    await flushStampRenderer();
+
+    expect(captured("Shape")).toHaveLength(1);
+    const context = new StampSceneContext();
+    const sceneFunc = captured("Shape")[0]!.props.sceneFunc as (
+      context: CanvasRenderingContext2D
+    ) => void;
+    sceneFunc(context as unknown as CanvasRenderingContext2D);
+
+    expect(context.transforms).toEqual([
+      "1,0,0,1,0,0",
+      "-1,0,0,1,20,0",
+    ]);
+    expect(context.arcs).toHaveLength(6);
+    expect(context.arcs.slice(0, 3)).toEqual(context.arcs.slice(3));
+  });
+
+  it("does not overpaint a kaleidoscope center tap through duplicate Shapes or dabs", async () => {
+    render(
+      <StudioDrawNode
+        el={drawEl({
+          brush: "ink-brush",
+          mode: "pen",
+          points: [50, 40],
+          pressures: [0.5],
+          stampPipeline: "causal-walker-v2",
+          symmetry: {
+            type: "kaleidoscope",
+            centerX: 50,
+            centerY: 40,
+            radialCount: 16,
+          },
+        })}
+      />,
+    );
+    await flushStampRenderer();
+
+    expect(captured("Shape")).toHaveLength(1);
+    const context = new StampSceneContext();
+    const sceneFunc = captured("Shape")[0]!.props.sceneFunc as (
+      context: CanvasRenderingContext2D
+    ) => void;
+    sceneFunc(context as unknown as CanvasRenderingContext2D);
+    expect(context.transforms).toEqual(["1,0,0,1,0,0"]);
+    expect(context.arcs).toHaveLength(1);
   });
 
   it.each([

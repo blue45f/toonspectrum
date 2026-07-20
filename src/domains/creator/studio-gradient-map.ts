@@ -16,6 +16,7 @@ import type { StudioImageDataLike } from "./studio-filters";
 
 // #rgb / #rrggbb 허용 정규식.
 const HEX_RE = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
+const MAX_GRADIENT_STOPS = 1024;
 
 /** 0..255 정수로 반올림·클램프 후 2자리 소문자 헥스. */
 function channelHex(v: number): string {
@@ -96,7 +97,8 @@ export function normalizeGradientMap(g?: Partial<GradientMap> | null): GradientM
 
   // 1) 유효 스톱만 채택.
   const valid: GradientStop[] = [];
-  for (const s of rawStops) {
+  for (let i = 0; i < Math.min(rawStops.length, MAX_GRADIENT_STOPS); i++) {
+    const s = rawStops[i];
     if (!s || typeof s !== "object") continue;
     const pos = (s as GradientStop).pos;
     const color = normalizeColor((s as GradientStop).color);
@@ -312,7 +314,8 @@ export function gradientMapToFlat(g: GradientMap): number[] {
 export function flatToGradientMap(flat: number[]): GradientMap {
   if (!Array.isArray(flat)) return defaultMapCopy();
   const stops: GradientStop[] = [];
-  for (let i = 0; i + 3 < flat.length; i += 4) {
+  const limit = Math.min(flat.length, MAX_GRADIENT_STOPS * 4);
+  for (let i = 0; i + 3 < limit; i += 4) {
     const pos = flat[i]!;
     const r = flat[i + 1]!;
     const g = flat[i + 2]!;
@@ -350,10 +353,15 @@ export function gradientMapKonvaFilter(
   if (!attrs) return;
   const flat = attrs.gradientMap;
   if (!Array.isArray(flat)) return;
-  // 숫자만 추려 안전하게 변환(무효 원소가 섞여도 throw 없이 무시).
+  // 스톱(4칸) 경계를 보존하며 유효 튜플만 채택한다. 무효 원소만 빼서 배열을
+  // 당기면 뒤 스톱의 pos/r/g/b 의미가 바뀌어 엉뚱한 색이 적용될 수 있다.
   const numeric: number[] = [];
-  for (const v of flat) {
-    if (typeof v === "number" && Number.isFinite(v)) numeric.push(v);
+  const limit = Math.min(flat.length, MAX_GRADIENT_STOPS * 4);
+  for (let i = 0; i + 3 < limit; i += 4) {
+    const tuple = flat.slice(i, i + 4);
+    if (tuple.every((v) => typeof v === "number" && Number.isFinite(v))) {
+      numeric.push(...(tuple as number[]));
+    }
   }
   // 스톱 하나당 4개 — 2 스톱 미만(8개 미만)이면 적용하지 않는다.
   if (numeric.length < 8) return;

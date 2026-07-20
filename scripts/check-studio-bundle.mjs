@@ -245,6 +245,7 @@ if (!fs.existsSync(manifestPath)) {
 
     const optionalUiBoundaries = [
       ["optional comments session", /src\/domains\/creator\/StudioCommentsPanelSession\.tsx/],
+      ["optional Studio menubar commands", /src\/domains\/creator\/StudioMenubarContent\.tsx/],
       ["optional workspace manager", /src\/domains\/creator\/StudioWorkspaceMenu\.tsx/],
       ["optional color palette", /src\/domains\/creator\/StudioColorPalettePanel\.tsx/],
       ["optional flood fill panel", /src\/domains\/creator\/StudioFloodFillPanel\.tsx/],

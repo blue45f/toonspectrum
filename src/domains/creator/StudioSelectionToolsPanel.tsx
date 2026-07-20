@@ -20,6 +20,7 @@ import {
   Pentagon,
   RotateCcw,
   RotateCw,
+  Redo2,
   Square,
   Undo2,
   WandSparkles,
@@ -74,6 +75,10 @@ export type StudioSelectionToolsPanelProps = {
   onBrushRadiusChange?: (px: number) => void;
   onFeatherChange: (px: number) => void;
   onToggleInvert: () => void;
+  canUndoSelection: boolean;
+  canRedoSelection: boolean;
+  onUndoSelection: () => void;
+  onRedoSelection: () => void;
   onUndoSubpath: () => void;
   onClearSelection: () => void;
   onSelectAll: () => void;
@@ -111,6 +116,10 @@ export function StudioSelectionToolsPanel({
   onBrushRadiusChange,
   onFeatherChange,
   onToggleInvert,
+  canUndoSelection,
+  canRedoSelection,
+  onUndoSelection,
+  onRedoSelection,
   onUndoSubpath,
   onClearSelection,
   onSelectAll,
@@ -279,6 +288,36 @@ export function StudioSelectionToolsPanel({
         >
           <Undo2 className="size-3.5" />
           마지막 영역 제거
+        </button>
+      </div>
+
+      <div
+        className="flex flex-wrap items-center gap-1.5 rounded-lg border border-line/40 bg-bg/35 p-1.5"
+        role="group"
+        aria-label="픽셀 선택 기록"
+      >
+        <span className="mr-auto text-[0.66rem] font-medium text-fg-3">선택 기록</span>
+        <button
+          type="button"
+          onClick={onUndoSelection}
+          disabled={!canUndoSelection || busy}
+          className={buttonClass({ size: "sm", variant: "quiet" })}
+          title="마지막 선택 영역 생성·이동·변형을 되돌립니다. 문서 픽셀 기록과는 별도로 관리됩니다. (⌘/Ctrl+Z)"
+          aria-label="선택 작업 실행 취소"
+        >
+          <Undo2 className="size-3.5" aria-hidden />
+          실행 취소
+        </button>
+        <button
+          type="button"
+          onClick={onRedoSelection}
+          disabled={!canRedoSelection || busy}
+          className={buttonClass({ size: "sm", variant: "quiet" })}
+          title="되돌린 선택 작업을 다시 적용합니다. (⌘/Ctrl+Shift+Z 또는 Ctrl+Y)"
+          aria-label="선택 작업 다시 실행"
+        >
+          <Redo2 className="size-3.5" aria-hidden />
+          다시 실행
         </button>
       </div>
 

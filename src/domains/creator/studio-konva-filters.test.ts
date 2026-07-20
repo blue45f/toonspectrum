@@ -1,18 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
+import { IMAGE_FILTER_PRESETS, type StudioImageDataLike } from "./studio-filters";
 import {
   hasActiveImageFilters as hasLightweightActiveImageFilters,
   imageFilterCacheKey,
 } from "./studio-konva-filter-fields";
 import {
+  applyImageFilters,
   buildImageFilters,
   hasActiveImageFilters,
   registerStudioKonvaFilters,
   type ImageFilterFields,
   type KonvaLike,
 } from "./studio-konva-filters";
-
-import type { StudioImageDataLike } from "./studio-filters";
 
 // 내장 필터 스텁을 가진 가짜 konva — node 없이 순수 검증.
 function fakeKonva(): KonvaLike {
@@ -89,6 +89,23 @@ describe("registerStudioKonvaFilters", () => {
     konva.Filters.Temperature!.call({ attrs: { temperature: 100 } }, img);
     expect(img.data[0]!).toBeGreaterThan(128); // red 증가
     expect(img.data[2]!).toBeLessThan(128); // blue 감소
+  });
+
+  it("0/무효 스타일 attrs는 no-op이고 Lineart는 기존 alpha를 보존한다", () => {
+    const konva: KonvaLike = { Filters: {} };
+    registerStudioKonvaFilters(konva);
+    const source = solidImage(4, 4, 64, 128, 192);
+    source.data[3] = 37;
+    const before = Array.from(source.data);
+    const F = konva.Filters as Record<string, (imageData: StudioImageDataLike) => void>;
+
+    F.Chromatic!.call({ attrs: { chromatic: 0 } }, source);
+    F.Posterize!.call({ attrs: { posterize: 0 } }, source);
+    F.Noise!.call({ attrs: { noise: Number.NaN } }, source);
+    expect(Array.from(source.data)).toEqual(before);
+
+    F.Lineart!.call({ attrs: {} }, source);
+    expect(source.data[3]).toBe(37);
   });
 });
 
@@ -226,6 +243,28 @@ describe("buildImageFilters", () => {
     expect(attrs).toEqual({});
   });
 
+  it("NaN/Infinity/음수 강도는 비활성이고 유한한 거대값은 UI 안전 범위로 제한한다", () => {
+    const konva = fakeKonva();
+    registerStudioKonvaFilters(konva);
+    const malformed = {
+      blur: Number.NaN,
+      brightness: Number.POSITIVE_INFINITY,
+      chromatic: -5,
+      posterize: -1,
+      noise: Number.NEGATIVE_INFINITY,
+      duotoneShadow: "invalid",
+      duotoneHighlight: "#fff",
+    } as ImageFilterFields;
+    expect(hasActiveImageFilters(malformed)).toBe(false);
+    expect(buildImageFilters(malformed, konva)).toMatchObject({ filters: [], attrs: {} });
+
+    expect(buildImageFilters({ blur: 1e12 }, konva).attrs.blurRadius).toBe(30);
+    expect(buildImageFilters({ brightness: -1e12 }, konva).attrs.brightness).toBe(-0.8);
+    expect(buildImageFilters({ contrast: 1e12 }, konva).attrs.contrast).toBe(80);
+    expect(buildImageFilters({ posterize: 1 }, konva).attrs.posterize).toBe(2);
+    expect(buildImageFilters({ pixelate: 1e12 }, konva).attrs.pixelSize).toBe(40);
+  });
+
   it("수묵 재질은 활성값만 필터와 전용 attrs로 직렬화한다", () => {
     const konva = fakeKonva();
     registerStudioKonvaFilters(konva);
@@ -263,6 +302,37 @@ describe("buildImageFilters", () => {
   });
 });
 
+describe("IMAGE_FILTER_PRESETS pixel integration", () => {
+  it("원본 외 모든 프리셋이 실제 RGB를 바꾸고 일정 alpha를 보존한다", () => {
+    const konva: KonvaLike = { Filters: {} };
+    registerStudioKonvaFilters(konva);
+    const random = vi.spyOn(Math, "random").mockReturnValue(0.75);
+    try {
+      for (const preset of IMAGE_FILTER_PRESETS) {
+        const img = solidImage(7, 7, 0, 0, 0);
+        for (let i = 0; i < img.data.length; i += 4) {
+          const pixel = i / 4;
+          img.data[i] = (pixel * 37 + 19) % 256;
+          img.data[i + 1] = (pixel * 71 + 53) % 256;
+          img.data[i + 2] = (pixel * 109 + 97) % 256;
+          img.data[i + 3] = 173;
+        }
+        const beforeRgb = Array.from(img.data).filter((_, index) => index % 4 !== 3);
+        const { filters, attrs } = buildImageFilters(preset.patch, konva);
+        applyImageFilters(img, filters, attrs);
+        const afterRgb = Array.from(img.data).filter((_, index) => index % 4 !== 3);
+
+        if (preset.id === "original") expect(afterRgb, preset.id).toEqual(beforeRgb);
+        else expect(afterRgb, preset.id).not.toEqual(beforeRgb);
+        expect(Array.from(img.data).filter((_, index) => index % 4 === 3), preset.id)
+          .toEqual(Array.from({ length: 49 }, () => 173));
+      }
+    } finally {
+      random.mockRestore();
+    }
+  });
+});
+
 describe("hasActiveImageFilters", () => {
   it("활성 보정이 있으면 true", () => {
     expect(hasActiveImageFilters({ blur: 3 })).toBe(true);
@@ -284,6 +354,23 @@ describe("hasActiveImageFilters", () => {
     expect(hasLightweightActiveImageFilters({ inkWash: none })).toBe(false);
     expect(hasLightweightActiveImageFilters({ inkWash: { ...none, strength: 1 } })).toBe(true);
     expect(hasLightweightActiveImageFilters({ inkWash: {} as ImageFilterFields["inkWash"] })).toBe(false);
+  });
+
+  it("가벼운 초기 청크 판정은 비유한·음수 강도로 필터 엔진을 불필요하게 불러오지 않는다", () => {
+    expect(hasLightweightActiveImageFilters({
+      blur: Number.NaN,
+      brightness: Number.POSITIVE_INFINITY,
+      contrast: Number.NEGATIVE_INFINITY,
+      chromatic: -3,
+      posterize: -1,
+      noise: -20,
+      pixelate: -4,
+      sharpen: -0.5,
+      inkThreshold: -1,
+      levelsGamma: Number.NaN,
+    })).toBe(false);
+    expect(hasLightweightActiveImageFilters({ hue: -90 })).toBe(true);
+    expect(hasLightweightActiveImageFilters({ brightness: -0.25 })).toBe(true);
   });
 });
 

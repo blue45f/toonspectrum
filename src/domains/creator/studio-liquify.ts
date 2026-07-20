@@ -1,11 +1,11 @@
 /**
- * Studio Liquify — Procreate "Push" 브러시(왜곡) 대응 순수 코어.
+ * Studio Liquify — 상용 이미지 편집기의 국소 왜곡 브러시에 대응하는 순수 코어.
  *
  * 개념: 사용자가 브러시로 이미지 위를 드래그하면 그 궤적을 따라 픽셀이 밀리듯 국소적으로
  * 왜곡된다. heal-clone/smudge와 동일하게 **비파괴가 아니다** — 스트로크가 끝나면 실제 픽셀을
  * 재배치해 el.src 자체를 결과 PNG로 교체한다(히스토리 1건, ⌘Z로 원복).
  *
- * 알고리즘(스코프 — Push 모드만, §design 문서 §5 참고. Twirl/Pinch/Bloat 등은 후속 확장):
+ * 알고리즘(Push / Twirl / Pinch / Bloat):
  *   순수 forward mapping(원본 픽셀을 이동벡터만큼 옮겨 목적지에 쓰기)은 목적지에 구멍(빈 픽셀)이
  *   생긴다. 대신:
  *   1) 스트로크가 누적한 "변위 필드"(각 캔버스 좌표에서 얼마나/어느 방향으로 밀렸는지, dx/dy)를
@@ -32,7 +32,22 @@
  * studio-layer-mask.ts의 동일한 선례 참고). 화면 반전(flipX/flipY)은 이미 되돌려진 상태로 이 모듈에
  * 들어와야 한다 — 호출부(StudioPage)가 flipNormalizedPoint로 되돌린 뒤 자연 해상도로 스케일해서 넘긴다.
  */
+import {
+  normalizeStudioLiquifyMode,
+  type StudioLiquifyMode,
+} from "./studio-liquify-contract";
+
 import type { StudioImageDataLike } from "./studio-filters";
+
+export {
+  LIQUIFY_RADIUS_DEFAULT,
+  LIQUIFY_RADIUS_RANGE,
+  LIQUIFY_STRENGTH_DEFAULT,
+  LIQUIFY_STRENGTH_RANGE,
+  STUDIO_LIQUIFY_MODES,
+  normalizeStudioLiquifyMode,
+  type StudioLiquifyMode,
+} from "./studio-liquify-contract";
 
 // ---------------------------------------------------------------------------
 // 타입 · 상수
@@ -41,15 +56,42 @@ import type { StudioImageDataLike } from "./studio-filters";
 /** 픽셀 공간(원본 자연 해상도) 좌표 — SelPoint(정규화 0..1)와는 다른 개념(heal-clone/smudge와 동일 규약). */
 export type LiquifyPixelPoint = { x: number; y: number };
 
-export const LIQUIFY_RADIUS_RANGE = { min: 20, max: 240, step: 5 } as const; // 캔버스 표시 px
-export const LIQUIFY_RADIUS_DEFAULT = 80;
-export const LIQUIFY_STRENGTH_RANGE = { min: 10, max: 100, step: 5 } as const; // %(UI); 코어엔 /100 한 0..1로 넘긴다
-export const LIQUIFY_STRENGTH_DEFAULT = 50;
+/**
+ * Push는 드래그 방향을 사용하고, 나머지 모드는 경로를 일정 간격의 dab으로 바꿔 각 dab 중심에서
+ * 회전·수축·팽창 변위를 누적한다. 영속 상태나 외부 입력에서 알 수 없는 값이 들어오면 아래 빌더가
+ * 안전하게 Push로 폴백한다.
+ */
+export type LiquifyDisplacementOptions = {
+  mode?: StudioLiquifyMode;
+  /** 긴 동기 계산 전·중단 지점에서 취소를 관찰한다. Worker 경로는 클라이언트가 Worker도 종료한다. */
+  signal?: AbortSignal;
+};
 
 // 리샘플 간격 = radiusPx * 이 비율(studio-smudge.ts의 SMUDGE_STEP_RATIO와 동일한 정신 — 촘촘할수록
 // 부드럽지만 세그먼트 수가 늘어 느려진다). 병적으로 길거나 루프 도는 스트로크 방어 상한도 동일.
 const LIQUIFY_STEP_RATIO = 0.35;
 const LIQUIFY_MAX_RESAMPLED_POINTS = 2000;
+/** dx+dy Float32Array 합계 128MiB. 입력 크기와 무관하게 단일 스트로크 할당을 유한하게 묶는다. */
+export const LIQUIFY_MAX_FIELD_CELLS = 16_777_216;
+/** 병적 장거리/반복 경로가 Worker 한 작업에서 만드는 최대 dab×셀 방문 추정치. */
+export const LIQUIFY_MAX_DAB_CELL_VISITS = 96_000_000;
+/** 여러 dab이 겹쳐도 한 번의 스트로크가 반경의 두 배보다 멀리 픽셀을 접지 않게 한다. */
+const LIQUIFY_MAX_DISPLACEMENT_RADIUS_RATIO = 2;
+const LIQUIFY_MAX_TWIRL_RADIANS = Math.PI / 3;
+const LIQUIFY_MAX_RADIAL_SCALE_DELTA = 0.45;
+
+function createLiquifyAbortError(): Error {
+  if (typeof DOMException === "function") {
+    return new DOMException("리퀴파이 계산을 취소했습니다.", "AbortError");
+  }
+  const error = new Error("리퀴파이 계산을 취소했습니다.");
+  error.name = "AbortError";
+  return error;
+}
+
+function throwIfLiquifyAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) throw createLiquifyAbortError();
+}
 
 function clampInt(v: number, min: number, max: number): number {
   if (!Number.isFinite(v)) return min;
@@ -150,8 +192,8 @@ export type LiquifyDisplacementField = {
 };
 
 /**
- * 스트로크 궤적 → 변위 필드. points.length<2(방향을 정할 수 없음) 또는 radiusPx<=0 또는
- * strength<=0 또는 캔버스 크기가 비정상이면 null(구울 게 없음 신호).
+ * 스트로크 궤적 → 변위 필드. Push는 points.length<2(방향을 정할 수 없음), 그 외 모드는
+ * points.length<1, radiusPx<=0, strength<=0 또는 캔버스 크기가 비정상이면 null이다.
  *
  * @param strength 0..1 (호출부가 %/100로 변환해서 넘긴다, smudge 관례와 동일).
  * @param canvasW/canvasH 원본(자연) 픽셀 크기 — 필드 바운딩박스를 이 안으로 클램프한다.
@@ -168,17 +210,21 @@ export function buildLiquifyDisplacementField(
   radiusPx: number,
   strength: number,
   canvasW: number,
-  canvasH: number
+  canvasH: number,
+  options: LiquifyDisplacementOptions = {}
 ): LiquifyDisplacementField | null {
+  throwIfLiquifyAborted(options.signal);
+  const mode = normalizeStudioLiquifyMode(options.mode);
   const R = Number.isFinite(radiusPx) ? Math.max(0, radiusPx) : 0;
-  const s = Number.isFinite(strength) ? Math.max(0, strength) : 0;
+  const s = Number.isFinite(strength) ? Math.min(1, Math.max(0, strength)) : 0;
   const w = Number.isFinite(canvasW) ? Math.max(0, Math.round(canvasW)) : 0;
   const h = Number.isFinite(canvasH) ? Math.max(0, Math.round(canvasH)) : 0;
-  if (points.length < 2 || R <= 0 || s <= 0 || w <= 0 || h <= 0) return null;
+  const minimumPointCount = mode === "push" ? 2 : 1;
+  if (points.length < minimumPointCount || R <= 0 || s <= 0 || w <= 0 || h <= 0) return null;
 
   const step = Math.max(1, R * LIQUIFY_STEP_RATIO);
   const resampled = resampleLiquifyPath(points, step).slice(0, LIQUIFY_MAX_RESAMPLED_POINTS);
-  if (resampled.length < 2) return null;
+  if (resampled.length < minimumPointCount) return null;
 
   let minX = Infinity;
   let minY = Infinity;
@@ -204,15 +250,53 @@ export function buildLiquifyDisplacementField(
 
   const fieldW = endX - originX + 1;
   const fieldH = endY - originY + 1;
-  const dx = new Float32Array(fieldW * fieldH);
-  const dy = new Float32Array(fieldW * fieldH);
+  if (
+    !Number.isSafeInteger(fieldW) ||
+    !Number.isSafeInteger(fieldH) ||
+    fieldW <= 0 ||
+    fieldH <= 0 ||
+    fieldW > LIQUIFY_MAX_FIELD_CELLS / fieldH
+  ) {
+    return null;
+  }
 
-  for (let i = 1; i < resampled.length; i += 1) {
-    const prev = resampled[i - 1]!;
+  const fieldCells = fieldW * fieldH;
+  const dabCount = resampled.length - (mode === "push" ? 1 : 0);
+  const dabWidth = Math.min(fieldW, rCeil * 2 + 1);
+  const dabHeight = Math.min(fieldH, rCeil * 2 + 1);
+  if (dabCount > LIQUIFY_MAX_DAB_CELL_VISITS / (dabWidth * dabHeight)) return null;
+  let dx: Float32Array;
+  let dy: Float32Array;
+  try {
+    dx = new Float32Array(fieldCells);
+    dy = new Float32Array(fieldCells);
+  } catch {
+    return null;
+  }
+
+  const maximumDisplacement = Math.max(1, R * LIQUIFY_MAX_DISPLACEMENT_RADIUS_RATIO);
+  const accumulate = (idx: number, addX: number, addY: number): void => {
+    if (!Number.isFinite(addX) || !Number.isFinite(addY)) return;
+    let nextX = dx[idx]! + addX;
+    let nextY = dy[idx]! + addY;
+    const magnitude = Math.hypot(nextX, nextY);
+    if (magnitude > maximumDisplacement) {
+      const scale = maximumDisplacement / magnitude;
+      nextX *= scale;
+      nextY *= scale;
+    }
+    dx[idx] = nextX;
+    dy[idx] = nextY;
+  };
+
+  const firstDabIndex = mode === "push" ? 1 : 0;
+  for (let i = firstDabIndex; i < resampled.length; i += 1) {
+    if ((i & 15) === 0) throwIfLiquifyAborted(options.signal);
     const curr = resampled[i]!;
-    const segX = (curr.x - prev.x) * s;
-    const segY = (curr.y - prev.y) * s;
-    if (segX === 0 && segY === 0) continue;
+    const prev = mode === "push" ? resampled[i - 1]! : curr;
+    const segX = mode === "push" ? (curr.x - prev.x) * s : 0;
+    const segY = mode === "push" ? (curr.y - prev.y) * s : 0;
+    if (mode === "push" && segX === 0 && segY === 0) continue;
 
     const minLocalX = clampInt(Math.floor(curr.x - rCeil), originX, endX);
     const maxLocalX = clampInt(Math.ceil(curr.x + rCeil), originX, endX);
@@ -220,13 +304,34 @@ export function buildLiquifyDisplacementField(
     const maxLocalY = clampInt(Math.ceil(curr.y + rCeil), originY, endY);
 
     for (let y = minLocalY; y <= maxLocalY; y += 1) {
+      if (((y - minLocalY) & 31) === 0) throwIfLiquifyAborted(options.signal);
       const rowOffset = (y - originY) * fieldW;
       for (let x = minLocalX; x <= maxLocalX; x += 1) {
-        const weight = liquifyBrushWeight(x - curr.x, y - curr.y, R);
+        const offsetX = x - curr.x;
+        const offsetY = y - curr.y;
+        const weight = liquifyBrushWeight(offsetX, offsetY, R);
         if (weight <= 0) continue;
         const idx = rowOffset + (x - originX);
-        dx[idx] = dx[idx]! + segX * weight;
-        dy[idx] = dy[idx]! + segY * weight;
+        if (mode === "push") {
+          accumulate(idx, segX * weight, segY * weight);
+          continue;
+        }
+
+        if (mode === "twirl-clockwise" || mode === "twirl-counterclockwise") {
+          // 화면 좌표계는 +y가 아래라 양의 각도가 시계 방향이다.
+          const direction = mode === "twirl-clockwise" ? 1 : -1;
+          const angle = direction * LIQUIFY_MAX_TWIRL_RADIANS * s * weight;
+          const cos = Math.cos(angle);
+          const sin = Math.sin(angle);
+          const rotatedX = offsetX * cos - offsetY * sin;
+          const rotatedY = offsetX * sin + offsetY * cos;
+          accumulate(idx, rotatedX - offsetX, rotatedY - offsetY);
+          continue;
+        }
+
+        const direction = mode === "bloat" ? 1 : -1;
+        const scaleDelta = direction * LIQUIFY_MAX_RADIAL_SCALE_DELTA * s * weight;
+        accumulate(idx, offsetX * scaleDelta, offsetY * scaleDelta);
       }
     }
   }
@@ -282,21 +387,39 @@ export function sampleBilinearClamped(
 export function applyLiquifyDisplacement(
   src: StudioImageDataLike,
   dst: StudioImageDataLike,
-  field: LiquifyDisplacementField
+  field: LiquifyDisplacementField,
+  options: Pick<LiquifyDisplacementOptions, "signal"> = {}
 ): void {
+  throwIfLiquifyAborted(options.signal);
   const w = dst.width;
   const h = dst.height;
-  for (let ly = 0; ly < field.height; ly += 1) {
+  const fieldWidth = Number.isSafeInteger(field.width) && field.width > 0 ? field.width : 0;
+  const fieldHeight = Number.isSafeInteger(field.height) && field.height > 0 ? field.height : 0;
+  const expectedCells = fieldWidth * fieldHeight;
+  if (
+    !Number.isFinite(field.originX) ||
+    !Number.isFinite(field.originY) ||
+    fieldWidth === 0 ||
+    fieldHeight === 0 ||
+    !Number.isSafeInteger(expectedCells) ||
+    expectedCells > LIQUIFY_MAX_FIELD_CELLS ||
+    field.dx.length < expectedCells ||
+    field.dy.length < expectedCells
+  ) {
+    return;
+  }
+  for (let ly = 0; ly < fieldHeight; ly += 1) {
+    if ((ly & 31) === 0) throwIfLiquifyAborted(options.signal);
     const y = field.originY + ly;
     if (y < 0 || y >= h) continue;
-    const rowOffset = ly * field.width;
-    for (let lx = 0; lx < field.width; lx += 1) {
+    const rowOffset = ly * fieldWidth;
+    for (let lx = 0; lx < fieldWidth; lx += 1) {
       const x = field.originX + lx;
       if (x < 0 || x >= w) continue;
       const idx = rowOffset + lx;
       const ddx = field.dx[idx]!;
       const ddy = field.dy[idx]!;
-      if (ddx === 0 && ddy === 0) continue;
+      if (!Number.isFinite(ddx) || !Number.isFinite(ddy) || (ddx === 0 && ddy === 0)) continue;
       const [r, g, b, a] = sampleBilinearClamped(src, x - ddx, y - ddy);
       const dstIdx = (y * w + x) * 4;
       dst.data[dstIdx] = r;

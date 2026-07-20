@@ -98,4 +98,21 @@ describe("studio-konva-native-filters parity with real Konva filters", () => {
     realBrighten.call({ brightness: () => 0 }, b);
     expect(Array.from(a.data)).toEqual(Array.from(b.data));
   });
+
+  it("non-finite scalar attrs fail closed and a huge blur radius stays bounded", () => {
+    for (const run of [
+      (img: StudioImageDataLike) => nativeBrighten.call({ attrs: { brightness: Number.NaN } }, img),
+      (img: StudioImageDataLike) => nativeContrast.call({ attrs: { contrast: Number.POSITIVE_INFINITY } }, img),
+      (img: StudioImageDataLike) => nativeHSL.call({ attrs: { hue: Number.NaN } }, img),
+      (img: StudioImageDataLike) => nativeBlur.call({ attrs: { blurRadius: Number.POSITIVE_INFINITY } }, img),
+    ]) {
+      const img = makeImageData(5, 5, 7);
+      const before = Array.from(img.data);
+      expect(() => run(img)).not.toThrow();
+      expect(Array.from(img.data)).toEqual(before);
+    }
+
+    const onePixel = makeImageData(1, 1, 8);
+    expect(() => nativeBlur.call({ attrs: { blurRadius: Number.MAX_VALUE } }, onePixel)).not.toThrow();
+  });
 });

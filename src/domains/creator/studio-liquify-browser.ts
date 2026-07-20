@@ -1,5 +1,9 @@
 /** Canvas-factory orchestration for the pure Liquify engine. */
-import { buildLiquifyDisplacementField, type LiquifyPixelPoint } from "./studio-liquify";
+import {
+  buildLiquifyDisplacementField,
+  type LiquifyPixelPoint,
+  type StudioLiquifyMode,
+} from "./studio-liquify";
 import { runStudioLiquifyWorker } from "./studio-liquify-worker-client";
 import { flipNormalizedPoint } from "./studio-magic-wand";
 
@@ -24,6 +28,23 @@ export type LiquifyCanvasFactory = (
 ) => { canvas: MaskCanvasLike & MaskImageSource; ctx: LiquifyCtx2DLike } | null;
 
 /**
+ * Structured-cloning an ImageData-like payload through a Worker preserves its typed pixel buffer,
+ * but browsers are not required to recreate the ImageData prototype. Canvas putImageData is stricter
+ * than our pure pixel engines and rejects that otherwise-valid plain object, so restore the native
+ * wrapper at the browser boundary while keeping non-DOM test/fallback environments supported.
+ */
+function restoreCanvasImageData(image: StudioImageDataLike): StudioImageDataLike {
+  if (typeof globalThis.ImageData !== "function" || image instanceof globalThis.ImageData) {
+    return image;
+  }
+  // ImageData requires an ArrayBuffer-backed view; the pure engine deliberately accepts the
+  // wider ArrayBufferLike shape, so copy once at this final canvas boundary.
+  const pixels = new Uint8ClampedArray(image.data.length);
+  pixels.set(image.data);
+  return new globalThis.ImageData(pixels, image.width, image.height);
+}
+
+/**
  * 스트로크 전체를 원본에 구워 결과 캔버스를 만든다. 변위 필드가 null이면(스트로크가 너무 짧거나
  * 반경/강도가 0) null — 이 경우 캔버스를 아예 만들지 않는다(불필요한 DOM 작업 방지, 호출자는
  * patchEl을 생략해야 한다는 신호). radiusPx는 **디바이스(자연) px**여야 한다(호출자가 target.width
@@ -42,7 +63,14 @@ export async function bakeLiquifyStrokeToCanvas(
   radiusPx: number,
   strength: number,
   createCanvas: LiquifyCanvasFactory,
-  opts?: { flipX?: boolean; flipY?: boolean }
+  opts?: {
+    flipX?: boolean;
+    flipY?: boolean;
+    /** 생략하면 기존과 동일한 Push 모드. */
+    mode?: StudioLiquifyMode;
+    /** 필드 생성과 Worker 실행을 모두 취소한다. */
+    signal?: AbortSignal;
+  }
 ): Promise<(MaskCanvasLike & MaskImageSource) | null> {
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null;
   const w = Math.max(1, Math.round(width));
@@ -58,7 +86,10 @@ export async function bakeLiquifyStrokeToCanvas(
         })
       : points;
 
-  const field = buildLiquifyDisplacementField(sourcePoints, radiusPx, strength, w, h);
+  const field = buildLiquifyDisplacementField(sourcePoints, radiusPx, strength, w, h, {
+    mode: opts?.mode,
+    signal: opts?.signal,
+  });
   if (!field) return null;
 
   // frozen — 변위 계산의 유일한 색 소스, 다시는 건드리지 않는다(원본을 한 번 그린 뒤 고정).
@@ -73,9 +104,17 @@ export async function bakeLiquifyStrokeToCanvas(
 
   const frozenData = frozen.ctx.getImageData(0, 0, w, h);
   const workData = work.ctx.getImageData(0, 0, w, h);
+  // 필드 밖 픽셀은 applyLiquifyDisplacement가 의도적으로 건드리지 않는다. 따라서 dst는 반드시
+  // src와 바이트 단위로 같아야 한다. 두 번째 drawImage/getImageData 결과에만 의존하면 일부
+  // 브라우저의 디코드/context 복구 타이밍에서 투명 초기 버퍼가 남아 단일 dab 뒤 화면 전체가
+  // 사라질 수 있으므로, frozen 스냅샷을 명시적으로 복제해 불변식을 강제한다.
+  workData.data.set(frozenData.data);
 
-  const { dst } = await runStudioLiquifyWorker({ src: frozenData, dst: workData, field });
+  const { dst } = await runStudioLiquifyWorker(
+    { src: frozenData, dst: workData, field },
+    { signal: opts?.signal }
+  );
 
-  work.ctx.putImageData(dst, 0, 0);
+  work.ctx.putImageData(restoreCanvasImageData(dst), 0, 0);
   return work.canvas;
 }

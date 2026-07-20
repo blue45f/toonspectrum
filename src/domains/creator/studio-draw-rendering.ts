@@ -5,12 +5,18 @@ import {
   strokeRenderDistance,
 } from "./studio-brush";
 import { resolveStudioBrushDynamicsPresetId } from "./studio-brush-dynamics";
-import { resolveStudioStampBrushKind } from "./studio-brush-stamp-engine";
+import {
+  resolveStudioStampBrushKind,
+} from "./studio-brush-stamp-engine";
+import {
+  studioBrushSymmetryTransforms,
+  transformStudioBrushSymmetryPoint,
+} from "./studio-brush-symmetry";
 import { planStudioCausalInk } from "./studio-causal-ink";
 import { fillStudioCausalInkDabs } from "./studio-causal-ink-canvas";
-import { getKaleidoscopePoints } from "./studio-kaleidoscope";
 import { isStudioStrokePaintModelCompatible } from "./studio-stroke-paint-model";
 
+import type { StudioBrushSymmetrySpec } from "./studio-brush-symmetry";
 import type { DrawEl } from "./studio-element-model";
 import type { StudioInkPressureModel } from "./studio-ink-pressure-model";
 import type { StudioStrokePaintModel } from "./studio-stroke-paint-model";
@@ -28,49 +34,24 @@ export function drawBounds(points: number[]) {
 
 export function getSymmetricPoints(
   points: number[],
-  symmetry: { type: "none" | "vertical" | "horizontal" | "radial" | "kaleidoscope"; centerX: number; centerY: number; radialCount?: number } | undefined
+  symmetry: StudioBrushSymmetrySpec | undefined
 ): number[][] {
   if (!symmetry || symmetry.type === "none" || points.length === 0) {
     return [points];
   }
 
-  const result: number[][] = [points];
-  const cx = symmetry.centerX;
-  const cy = symmetry.centerY;
-
-  if (symmetry.type === "vertical") {
-    const mirrored: number[] = [];
+  return studioBrushSymmetryTransforms(symmetry).map((transform, transformIndex) => {
+    if (transformIndex === 0) return points;
+    const mapped: number[] = [];
     for (let i = 0; i < points.length; i += 2) {
       const x = points[i];
       const y = points[i + 1];
       if (x !== undefined && y !== undefined) {
-        mirrored.push(cx * 2 - x, y);
+        mapped.push(...transformStudioBrushSymmetryPoint(x, y, transform));
       }
     }
-    result.push(mirrored);
-  } else if (symmetry.type === "horizontal") {
-    const mirrored: number[] = [];
-    for (let i = 0; i < points.length; i += 2) {
-      const x = points[i];
-      const y = points[i + 1];
-      if (x !== undefined && y !== undefined) {
-        mirrored.push(x, cy * 2 - y);
-      }
-    }
-    result.push(mirrored);
-  } else if (symmetry.type === "radial" || symmetry.type === "kaleidoscope") {
-    const variations = getKaleidoscopePoints(points, {
-      centerX: cx,
-      centerY: cy,
-      radialCount: symmetry.radialCount,
-      mirror: symmetry.type === "kaleidoscope",
-    });
-    // variations[0]은 항상 원본 그대로(getKaleidoscopePoints 계약) — result에 이미 원본이 있으니
-    // 중복을 피하려면 나머지만 이어붙인다.
-    result.push(...variations.slice(1));
-  }
-
-  return result;
+    return mapped;
+  });
 }
 
 /**
@@ -157,7 +138,7 @@ export function isDirectLiveDraftEl(el: DrawEl): boolean {
   return resolveStudioBrushDynamicsPresetId(el.brush) === null;
 }
 
-/** v2 스탬프는 raw accepted point 접미사를 자체 walker에 공급한다(대칭은 후속 compositor 범위). */
+/** v2 스탬프는 raw accepted point 접미사를 자체 walker에 공급한다(대칭은 retained affine compositor가 소유). */
 export function isDirectLiveStampDraftEl(el: DrawEl): boolean {
   return (el.kind ?? "freehand") === "freehand"
     && el.mode === "pen"

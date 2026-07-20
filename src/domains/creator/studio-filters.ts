@@ -145,6 +145,8 @@ export const STUDIO_PIXEL_FILTERS: Record<
     const shadow = attrs.duotoneShadow;
     const highlight = attrs.duotoneHighlight;
     if (typeof shadow !== "string" || typeof highlight !== "string") return;
+    const hex = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+    if (!hex.test(shadow) || !hex.test(highlight)) return;
     applyDuotone(img, shadow, highlight);
   },
 };

@@ -4,8 +4,6 @@ import {
   Clapperboard,
   ClipboardCheck,
   Download,
-  Files,
-  FileUp,
   Folder,
   GanttChartSquare,
   History as HistoryIcon,
@@ -41,6 +39,7 @@ import {
   preloadStudioExportMenuPanel,
 } from "./studio-page-lazy-ui";
 import { studioWriterRoomHasContent } from "./studio-writer-room";
+import { StudioToolHintTarget } from "./StudioToolHint";
 import { StudioWorkspaceMenuGate } from "./StudioWorkspaceMenuGate";
 
 import type { StudioAiProvenanceDocument } from "./studio-ai-provenance";
@@ -50,6 +49,7 @@ import type { ExportFormat } from "./studio-export";
 import type { PsdExportResult } from "./studio-psd-export";
 import type { StudioSharedDocument } from "./studio-shared-document-client";
 import type { SvgExportResult } from "./studio-svg-export";
+import type { StudioToolHintSpec } from "./studio-tool-hints";
 import type { StudioToolbarGroupId } from "./studio-toolbar-groups";
 import type { WatermarkSettings } from "./studio-watermark";
 import type {
@@ -63,6 +63,72 @@ import type { WorkDetail } from "@/src/infrastructure/creator-client";
 
 import { buttonClass } from "@/components/ui/button-utils";
 import { cn } from "@/lib/utils";
+
+const MENUBAR_HINTS = {
+  undo: {
+    id: "menubar-undo",
+    title: "실행취소",
+    description: "가장 최근의 캔버스 또는 선택 편집을 한 단계 되돌립니다.",
+    shortcut: "⌘Z",
+  },
+  redo: {
+    id: "menubar-redo",
+    title: "다시실행",
+    description: "되돌린 캔버스 또는 선택 편집을 다시 적용합니다.",
+    shortcut: "⌘⇧Z",
+  },
+  history: {
+    id: "menubar-history",
+    title: "작업 내역",
+    description: "이 문서의 편집 단계를 확인하고 원하는 시점으로 이동합니다.",
+    tip: "중요한 시점은 프로젝트 메뉴의 버전 기능으로 별도 복구 지점에 저장할 수 있어요.",
+  },
+  assets: {
+    id: "menubar-assets",
+    title: "템플릿·에셋",
+    description: "템플릿, 콜라주, 장면, 클립, 효과와 내 에셋 라이브러리를 엽니다.",
+    tip: "자주 쓰는 소재는 내 에셋에 모아 반복 작업 시간을 줄여보세요.",
+  },
+  bubbles: {
+    id: "menubar-bubbles",
+    title: "말풍선",
+    description: "말풍선 라이브러리를 열어 형태를 고르고 현재 장면에 배치합니다.",
+    tip: "배치 후 우측 속성에서 꼬리, 테두리, 여백과 대사를 정교하게 다듬을 수 있어요.",
+  },
+  download: {
+    id: "menubar-download",
+    title: "현재 페이지 다운로드",
+    description: "현재 페이지를 선택한 배율과 이미지 형식으로 즉시 내보냅니다.",
+    tip: "인쇄·후편집은 고배율, 빠른 검토 공유는 1×를 권장해요.",
+  },
+  exportOptions: {
+    id: "menubar-export-options",
+    title: "내보내기 옵션",
+    description: "배율, 파일 형식, 투명 배경, 워터마크와 플랫폼 프리셋을 설정합니다.",
+  },
+  project: {
+    id: "menubar-project",
+    title: "프로젝트 작업",
+    description: "백업·복구, 기획, 검토, 연재 운영과 게시 패키지 도구를 엽니다.",
+    tip: "장기 보관이나 다른 기기로 옮길 때는 자산이 포함된 아카이브 백업을 사용하세요.",
+  },
+  immersive: {
+    id: "menubar-immersive",
+    title: "전체 화면 드로잉",
+    description: "사이트 헤더와 보조 UI를 숨기고 모바일 화면을 캔버스 작업에 집중합니다.",
+  },
+  draft: {
+    id: "menubar-save-draft",
+    title: "임시저장",
+    description: "현재 원고와 편집 상태를 게시하지 않고 안전하게 저장합니다.",
+    shortcut: "⌘S",
+  },
+  publish: {
+    id: "menubar-publish",
+    title: "게시하기",
+    description: "현재 원고를 게시 상태로 저장합니다. 게시 전 사전검사에서 구조와 고지를 확인할 수 있어요.",
+  },
+} satisfies Readonly<Record<string, StudioToolHintSpec>>;
 
 export interface StudioMenubarContentHandlers {
   applyStudioWorkspaceLayout: (layout: StudioWorkspaceLayout) => void;
@@ -310,48 +376,61 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               mobileImmersive && "!hidden"
             )}
           >
-            <button
-              type="button"
-              onClick={undo}
+            <StudioToolHintTarget
+              hint={MENUBAR_HINTS.undo}
               disabled={undoDisabled}
-              aria-label="실행취소"
-              className={buttonClass({
-                size: "sm",
-                variant: "quiet",
-                className: "min-h-9 min-w-9 px-0 disabled:opacity-35",
-              })}
-              title="실행취소 (⌘Z)"
+              unavailableReason={undoDisabled ? "되돌릴 편집 작업이 아직 없습니다." : undefined}
+              preferredSide="bottom"
             >
-              <Undo2 size={14} aria-hidden />
-            </button>
-            <button
-              type="button"
-              onClick={redo}
+              <button
+                type="button"
+                onClick={undo}
+                disabled={undoDisabled}
+                aria-label="실행취소"
+                className={buttonClass({
+                  size: "sm",
+                  variant: "quiet",
+                  className: "min-h-9 min-w-9 px-0 disabled:opacity-35",
+                })}
+              >
+                <Undo2 size={14} aria-hidden />
+              </button>
+            </StudioToolHintTarget>
+            <StudioToolHintTarget
+              hint={MENUBAR_HINTS.redo}
               disabled={redoDisabled}
-              aria-label="다시실행"
-              className={buttonClass({
-                size: "sm",
-                variant: "quiet",
-                className: "min-h-9 min-w-9 px-0 disabled:opacity-35",
-              })}
-              title="다시실행 (⌘⇧Z)"
+              unavailableReason={redoDisabled ? "다시 적용할 편집 작업이 아직 없습니다." : undefined}
+              preferredSide="bottom"
             >
-              <Redo2 size={14} aria-hidden />
-            </button>
-            <button
-              type="button"
-              onClick={toggleHistoryPanel}
-              aria-label="작업 내역"
-              aria-pressed={historyPanelOpen}
-              className={buttonClass({
-                size: "sm",
-                variant: historyPanelOpen ? "solid" : "quiet",
-                className: "min-h-9 min-w-9 px-0",
-              })}
-              title={historyPanelOpen ? "작업 내역 닫기" : "작업 내역 열기"}
-            >
-              <HistoryIcon size={14} aria-hidden />
-            </button>
+              <button
+                type="button"
+                onClick={redo}
+                disabled={redoDisabled}
+                aria-label="다시실행"
+                className={buttonClass({
+                  size: "sm",
+                  variant: "quiet",
+                  className: "min-h-9 min-w-9 px-0 disabled:opacity-35",
+                })}
+              >
+                <Redo2 size={14} aria-hidden />
+              </button>
+            </StudioToolHintTarget>
+            <StudioToolHintTarget hint={MENUBAR_HINTS.history} preferredSide="bottom">
+              <button
+                type="button"
+                onClick={toggleHistoryPanel}
+                aria-label="작업 내역"
+                aria-pressed={historyPanelOpen}
+                className={buttonClass({
+                  size: "sm",
+                  variant: historyPanelOpen ? "solid" : "quiet",
+                  className: "min-h-9 min-w-9 px-0",
+                })}
+              >
+                <HistoryIcon size={14} aria-hidden />
+              </button>
+            </StudioToolHintTarget>
           </div>
           <span aria-hidden className="mx-0.5 hidden h-4 w-px shrink-0 bg-line md:block" />
           {/* Desktop application commands live in the compressible center lane. */}
@@ -370,37 +449,41 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             role="group"
             aria-label="삽입 바로가기"
           >
-          <button
-            type="button"
-            onClick={() => {
-              preloadStudioAssetMenuPanel();
-              setMenu(activeToolbarGroup === "assetGroup" ? null : "template");
-            }}
-            aria-haspopup="menu"
-            aria-expanded={activeToolbarGroup === "assetGroup"}
-            className={cn(
-              buttonClass({ size: "sm", variant: activeToolbarGroup === "assetGroup" ? "solid" : "quiet" }),
-              "min-h-9 gap-1.5 px-2.5 text-[0.72rem]"
-            )}
-            title="템플릿 · 콜라주 · 요소 · 장면 · 클립 · 효과 · 내 에셋"
-          >
-            <Folder size={14} aria-hidden />
-            템플릿·에셋
-          </button>
-          <button
-            type="button"
-            onClick={() => setMenu(menu === "bubble" ? null : "bubble")}
-            aria-haspopup="menu"
-            aria-expanded={menu === "bubble"}
-            className={cn(
-              buttonClass({ size: "sm", variant: menu === "bubble" ? "solid" : "quiet" }),
-              "min-h-9 gap-1.5 px-2.5 text-[0.72rem]"
-            )}
-            title="말풍선 라이브러리"
-          >
-            <MessageCircle size={14} aria-hidden />
-            말풍선
-          </button>
+          <StudioToolHintTarget hint={MENUBAR_HINTS.assets} preferredSide="bottom">
+            <button
+              type="button"
+              onClick={() => {
+                preloadStudioAssetMenuPanel();
+                setMenu(activeToolbarGroup === "assetGroup" ? null : "template");
+              }}
+              aria-label="템플릿·에셋"
+              aria-haspopup="menu"
+              aria-expanded={activeToolbarGroup === "assetGroup"}
+              className={cn(
+                buttonClass({ size: "sm", variant: activeToolbarGroup === "assetGroup" ? "solid" : "quiet" }),
+                "min-h-9 gap-1.5 px-2.5 text-[0.72rem]"
+              )}
+            >
+              <Folder size={14} aria-hidden />
+              템플릿·에셋
+            </button>
+          </StudioToolHintTarget>
+          <StudioToolHintTarget hint={MENUBAR_HINTS.bubbles} preferredSide="bottom">
+            <button
+              type="button"
+              onClick={() => setMenu(menu === "bubble" ? null : "bubble")}
+              aria-label="말풍선"
+              aria-haspopup="menu"
+              aria-expanded={menu === "bubble"}
+              className={cn(
+                buttonClass({ size: "sm", variant: menu === "bubble" ? "solid" : "quiet" }),
+                "min-h-9 gap-1.5 px-2.5 text-[0.72rem]"
+              )}
+            >
+              <MessageCircle size={14} aria-hidden />
+              말풍선
+            </button>
+          </StudioToolHintTarget>
           </div>
           <span aria-hidden className="mx-0.5 hidden h-4 w-px shrink-0 bg-line xl:block" />
         </div>
@@ -413,37 +496,34 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
           )}
         >
           {isMobile ? (
-            <button
-              type="button"
-              onClick={() => changeMobileImmersiveMode(!mobileImmersive)}
-              aria-pressed={mobileImmersive}
-              aria-label={
-                mobileImmersive
-                  ? "전체 화면 드로잉 종료"
-                  : "전체 화면 드로잉"
-              }
-              data-studio-mobile-app-mode
-              className={cn(
-                buttonClass({
-                  size: "sm",
-                  variant: mobileImmersive ? "solid" : "quiet",
-                  className: "min-h-11 shrink-0 gap-1.5 whitespace-nowrap",
-                }),
-                "sticky left-0 z-20 shadow-[0_0_0_4px_var(--color-canvas)]"
-              )}
-              title={
-                mobileImmersive
-                  ? "일반 화면으로 복원"
-                  : "전체 화면으로 그리기"
-              }
-            >
-              {mobileImmersive ? (
-                <Minimize2 size={15} aria-hidden />
-              ) : (
-                <Maximize2 size={15} aria-hidden />
-              )}
-              {mobileImmersive ? "종료" : "전체화면"}
-            </button>
+            <StudioToolHintTarget hint={MENUBAR_HINTS.immersive} preferredSide="bottom">
+              <button
+                type="button"
+                onClick={() => changeMobileImmersiveMode(!mobileImmersive)}
+                aria-pressed={mobileImmersive}
+                aria-label={
+                  mobileImmersive
+                    ? "전체 화면 드로잉 종료"
+                    : "전체 화면 드로잉"
+                }
+                data-studio-mobile-app-mode
+                className={cn(
+                  buttonClass({
+                    size: "sm",
+                    variant: mobileImmersive ? "solid" : "quiet",
+                    className: "min-h-11 shrink-0 gap-1.5 whitespace-nowrap",
+                  }),
+                  "sticky left-0 z-20 shadow-[0_0_0_4px_var(--color-canvas)]"
+                )}
+              >
+                {mobileImmersive ? (
+                  <Minimize2 size={15} aria-hidden />
+                ) : (
+                  <Maximize2 size={15} aria-hidden />
+                )}
+                {mobileImmersive ? "종료" : "전체화면"}
+              </button>
+            </StudioToolHintTarget>
           ) : null}
           {mobileImmersive ? (
             <>
@@ -457,40 +537,51 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             </>
           ) : null}
           <div ref={exportMenuRef} className="relative flex shrink-0 items-center max-sm:hidden">
-            <button
-              type="button"
-              onClick={() => handleDownload()}
-              className={cn(
-                buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5 pr-2" }),
-                isMobile && "min-h-11"
-              )}
-              title={`현재 페이지를 ${exportScale}× ${exportFormat.toUpperCase()}로 다운로드${exportTransparent && exportFormat === "png" ? " (투명 배경)" : ""}`}
-            >
-              <Download size={14} /> <span className="max-xl:sr-only">다운로드</span>
-              <span className="text-[10px] font-semibold tabular-nums text-fg-3 max-xl:hidden">
-                {exportScale}× {exportFormat.toUpperCase()}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                preloadStudioExportMenuPanel();
-                ensureWatermarkLoaded();
-                setProjectActionsOpen(false);
-                setExportMenuOpen((open) => !open);
-              }}
-              onMouseEnter={preloadStudioExportMenuPanel}
-              onFocus={preloadStudioExportMenuPanel}
-              aria-expanded={exportMenuOpen}
-              aria-label="내보내기 옵션"
-              className={cn(
-                buttonClass({ size: "sm", variant: "quiet", className: "px-1.5" }),
-                isMobile && "min-h-11 min-w-11"
-              )}
-              title="내보내기 옵션 (배율·포맷·투명 배경)"
-            >
-              <ChevronDown size={13} className={cn("transition-transform", exportMenuOpen && "rotate-180")} />
-            </button>
+            <StudioToolHintTarget hint={MENUBAR_HINTS.download} preferredSide="bottom">
+              <button
+                type="button"
+                onClick={() => handleDownload()}
+                aria-label="현재 페이지 다운로드"
+                className={cn(
+                  buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5 pr-2" }),
+                  isMobile && "min-h-11"
+                )}
+              >
+                <Download size={14} aria-hidden /> <span className="max-xl:sr-only">다운로드</span>
+                <span className="text-[10px] font-semibold tabular-nums text-fg-3 max-xl:hidden">
+                  {exportScale}× {exportFormat.toUpperCase()}
+                  {exportTransparent && exportFormat === "png" ? " · 투명" : null}
+                </span>
+              </button>
+            </StudioToolHintTarget>
+            <StudioToolHintTarget hint={MENUBAR_HINTS.exportOptions} preferredSide="bottom">
+              <button
+                type="button"
+                onClick={() => {
+                  preloadStudioExportMenuPanel();
+                  ensureWatermarkLoaded();
+                  setProjectActionsOpen(false);
+                  setExportMenuOpen((open) => !open);
+                }}
+                onMouseEnter={preloadStudioExportMenuPanel}
+                onFocus={preloadStudioExportMenuPanel}
+                aria-expanded={exportMenuOpen}
+                aria-label="내보내기 옵션"
+                className={cn(
+                  buttonClass({ size: "sm", variant: "quiet", className: "px-1.5" }),
+                  isMobile && "min-h-11 min-w-11"
+                )}
+              >
+                <ChevronDown
+                  size={13}
+                  aria-hidden
+                  className={cn(
+                    "transition-transform motion-reduce:transition-none",
+                    exportMenuOpen && "rotate-180"
+                  )}
+                />
+              </button>
+            </StudioToolHintTarget>
             {exportMenuOpen && typeof document !== "undefined"
               ? createPortal(
                   <Suspense
@@ -531,29 +622,34 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               : null}
           </div>
           <div ref={projectActionsRef} className="relative shrink-0 max-sm:hidden">
-            <button
-              type="button"
-              onClick={() => {
-                setExportMenuOpen(false);
-                setProjectActionsOpen((open) => !open);
-              }}
-              aria-haspopup="dialog"
-              aria-expanded={projectActionsOpen}
-              aria-controls="studio-project-actions-menu"
-              className={buttonClass({
-                size: "sm",
-                variant: "quiet",
-                className: "min-h-11 shrink-0 gap-1.5 whitespace-nowrap",
-              })}
-              title="백업·복구·기획·검토·연재·게시 도구"
-            >
-              <Folder size={14} aria-hidden /> <span className="max-xl:sr-only">프로젝트</span>
-              <ChevronDown
-                size={13}
-                className={cn("transition-transform", projectActionsOpen && "rotate-180")}
-                aria-hidden
-              />
-            </button>
+            <StudioToolHintTarget hint={MENUBAR_HINTS.project} preferredSide="bottom">
+              <button
+                type="button"
+                onClick={() => {
+                  setExportMenuOpen(false);
+                  setProjectActionsOpen((open) => !open);
+                }}
+                aria-label="프로젝트 작업"
+                aria-haspopup="dialog"
+                aria-expanded={projectActionsOpen}
+                aria-controls="studio-project-actions-menu"
+                className={buttonClass({
+                  size: "sm",
+                  variant: "quiet",
+                  className: "min-h-11 shrink-0 gap-1.5 whitespace-nowrap",
+                })}
+              >
+                <Folder size={14} aria-hidden /> <span className="max-xl:sr-only">프로젝트</span>
+                <ChevronDown
+                  size={13}
+                  className={cn(
+                    "transition-transform motion-reduce:transition-none",
+                    projectActionsOpen && "rotate-180"
+                  )}
+                  aria-hidden
+                />
+              </button>
+            </StudioToolHintTarget>
             {projectActionsOpen && typeof document !== "undefined"
               ? createPortal(
               <div
@@ -733,7 +829,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             )}
             title={collaborationDocumentLocked ? collaborationLockMessage() : "무결성 검증형 .toonproject.zip에서 프로젝트와 포함 자산을 복구"}
           >
-            <FileUp size={14} /> 아카이브 복구
+            <Upload size={14} /> 아카이브 복구
           </button>
           <input
             ref={projectArchiveImportInputRef}
@@ -770,7 +866,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             )}
             title={collaborationDocumentLocked ? collaborationLockMessage() : "포토샵(.psd) 파일의 레이어를 이미지 요소로 가져와요(래스터 평탄화, 편집 가능한 텍스트/조정 레이어는 재현되지 않음)"}
           >
-            {psdImportBusy ? <Loader2 size={14} className="animate-spin" /> : <FileUp size={14} />}
+            {psdImportBusy ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
             PSD 가져오기
           </button>
           <input
@@ -851,40 +947,72 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
             })}
             title="WEBTOON·Tapas·범용 목적지별 이미지 분할·썸네일·크레딧·검증 매니페스트를 계획"
           >
-            <Files size={14} /> 게시 패키지
+            <Package size={14} /> 게시 패키지
           </button>
               </div>,
               document.body
             )
             : null}
           </div>
-          <button
-            type="button"
-            onClick={() => handleSave("draft")}
+          <StudioToolHintTarget
+            hint={{
+              ...MENUBAR_HINTS.draft,
+              title: sharedDocument && sharedDocument.role !== "owner" ? "공동 저장" : "임시저장",
+            }}
             disabled={saving || collaborationDocumentLocked}
-            title={collaborationDocumentLocked ? collaborationLockMessage() : "현재 원고를 임시저장"}
-            className={cn(
-              buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50" }),
-              isMobile && "min-h-11"
-            )}
+            unavailableReason={
+              collaborationDocumentLocked
+                ? collaborationLockMessage()
+                : saving
+                  ? "현재 저장 작업이 끝난 뒤 다시 시도하세요."
+                  : undefined
+            }
+            preferredSide="bottom"
           >
-            {saving ? <Loader2 size={14} className="animate-spin" /> : null}
-            {sharedDocument && sharedDocument.role !== "owner" ? "공동 저장" : "임시저장"}
-          </button>
-          {!sharedDocument || sharedDocument.role === "owner" ? (
             <button
               type="button"
-              onClick={() => handleSave("published")}
+              onClick={() => handleSave("draft")}
               disabled={saving || collaborationDocumentLocked}
-              title={collaborationDocumentLocked ? collaborationLockMessage() : "게시 상태로 저장"}
+              aria-label={sharedDocument && sharedDocument.role !== "owner" ? "공동 저장" : "임시저장"}
               className={cn(
-                buttonClass({ size: "sm", variant: "solid", className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50" }),
+                buttonClass({ size: "sm", variant: "quiet", className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50" }),
                 isMobile && "min-h-11"
               )}
             >
-              {saving ? <Loader2 size={14} className="animate-spin" /> : null}
-              {workId ? "수정 게시" : "게시하기"}
+              {saving ? <Loader2 size={14} className="animate-spin motion-reduce:animate-none" aria-hidden /> : null}
+              {sharedDocument && sharedDocument.role !== "owner" ? "공동 저장" : "임시저장"}
             </button>
+          </StudioToolHintTarget>
+          {!sharedDocument || sharedDocument.role === "owner" ? (
+            <StudioToolHintTarget
+              hint={{
+                ...MENUBAR_HINTS.publish,
+                title: workId ? "수정 게시" : "게시하기",
+              }}
+              disabled={saving || collaborationDocumentLocked}
+              unavailableReason={
+                collaborationDocumentLocked
+                  ? collaborationLockMessage()
+                  : saving
+                    ? "현재 저장 작업이 끝난 뒤 다시 시도하세요."
+                    : undefined
+              }
+              preferredSide="bottom"
+            >
+              <button
+                type="button"
+                onClick={() => handleSave("published")}
+                disabled={saving || collaborationDocumentLocked}
+                aria-label={workId ? "수정 게시" : "게시하기"}
+                className={cn(
+                  buttonClass({ size: "sm", variant: "solid", className: "shrink-0 whitespace-nowrap gap-1.5 disabled:cursor-not-allowed disabled:opacity-50" }),
+                  isMobile && "min-h-11"
+                )}
+              >
+                {saving ? <Loader2 size={14} className="animate-spin motion-reduce:animate-none" aria-hidden /> : null}
+                {workId ? "수정 게시" : "게시하기"}
+              </button>
+            </StudioToolHintTarget>
           ) : null}
         </div>
     </>

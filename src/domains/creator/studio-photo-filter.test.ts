@@ -237,3 +237,17 @@ describe("photoFilterKonvaFilter", () => {
 // 미사용 import 방지용 타입 참조.
 const _typecheck: PhotoFilter = DEFAULT_PHOTO_FILTER;
 void _typecheck;
+
+describe("photo filter hostile direct-call safety", () => {
+  it("NaN density and invalid color fail closed without mutating caller settings", () => {
+    const filter = Object.freeze({
+      color: "invalid",
+      density: Number.NaN,
+      preserveLuminosity: false,
+    }) as PhotoFilter;
+    const img = makeImage(1, 1, [[10, 20, 30, 77]]);
+    expect(() => applyPhotoFilter(img, filter)).not.toThrow();
+    expect(pixelAt(img, 0)).toEqual([10, 20, 30, 77]);
+    expect(filter.color).toBe("invalid");
+  });
+});

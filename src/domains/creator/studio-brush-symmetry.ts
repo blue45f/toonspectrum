@@ -19,13 +19,20 @@ export interface StudioBrushSymmetryTransform {
 
 const IDENTITY: StudioBrushSymmetryTransform = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
 
+/**
+ * Persisted/imported documents do not pass through the inspector's 4..16 option list. Keep the
+ * renderer boundary finite and aligned with the live WebGPU planner, which accepts at most 32
+ * radial directions (64 affine copies for kaleidoscope).
+ */
+export const STUDIO_BRUSH_MAX_RADIAL_SYMMETRY_DIRECTIONS = 32;
+
 function finite(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
 function radialCount(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) && value >= 1
-    ? Math.round(value)
+    ? Math.min(STUDIO_BRUSH_MAX_RADIAL_SYMMETRY_DIRECTIONS, Math.round(value))
     : 4;
 }
 
@@ -83,7 +90,7 @@ export function studioBrushSymmetryTransforms(
   return transforms;
 }
 
-function transformPoint(
+export function transformStudioBrushSymmetryPoint(
   x: number,
   y: number,
   transform: StudioBrushSymmetryTransform
@@ -105,8 +112,12 @@ export function transformStudioDynamicBrushDab(
   ) {
     return { ...dab };
   }
-  const [sourceX, sourceY] = transformPoint(dab.sourceX, dab.sourceY, transform);
-  const [x, y] = transformPoint(dab.x, dab.y, transform);
+  const [sourceX, sourceY] = transformStudioBrushSymmetryPoint(
+    dab.sourceX,
+    dab.sourceY,
+    transform
+  );
+  const [x, y] = transformStudioBrushSymmetryPoint(dab.x, dab.y, transform);
   const angleRadians = dab.angle * Math.PI / 180;
   const axisX = Math.cos(angleRadians);
   const axisY = Math.sin(angleRadians);

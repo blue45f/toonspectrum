@@ -366,3 +366,18 @@ describe("channelMixerKonvaFilter", () => {
 // 미사용 import 방지용 타입 참조.
 const _typecheck: ChannelMixer = DEFAULT_CHANNEL_MIXER;
 void _typecheck;
+
+describe("channel mixer hostile direct-call safety", () => {
+  it("invalid direct parameters normalize to identity without mutating caller data", () => {
+    const mixer = Object.freeze({
+      red: Object.freeze({ r: Number.NaN, g: 0, b: 0, constant: Number.POSITIVE_INFINITY }),
+      green: Object.freeze({ r: 0, g: Number.NaN, b: 0, constant: 0 }),
+      blue: Object.freeze({ r: 0, g: 0, b: Number.NaN, constant: 0 }),
+      monochrome: false,
+    }) as unknown as ChannelMixer;
+    const img = makeImage(1, 1, [[10, 20, 30, 77]]);
+    expect(() => applyChannelMixer(img, mixer)).not.toThrow();
+    expect(pixelAt(img, 0)).toEqual([10, 20, 30, 77]);
+    expect(mixer.red.r).toBeNaN();
+  });
+});

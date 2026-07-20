@@ -1,6 +1,7 @@
 import { applyLiquifyDisplacement } from "./studio-liquify";
 import {
   STUDIO_LIQUIFY_WORKER_PROTOCOL_VERSION,
+  assertStudioLiquifyRequest,
   studioLiquifySuccessTransfers,
   type StudioLiquifyWorkerFailureMessage,
   type StudioLiquifyWorkerResponseMessage,
@@ -30,6 +31,8 @@ function serializeWorkerError(error: unknown): StudioLiquifyWorkerFailureMessage
 workerScope.onmessage = (event) => {
   const message = event.data;
   if (
+    !message ||
+    typeof message !== "object" ||
     message.type !== "studio-liquify/run" ||
     message.version !== STUDIO_LIQUIFY_WORKER_PROTOCOL_VERSION
   ) {
@@ -37,6 +40,7 @@ workerScope.onmessage = (event) => {
   }
 
   try {
+    assertStudioLiquifyRequest(message.request);
     const { src, dst, field } = message.request;
     applyLiquifyDisplacement(src, dst, field);
     const response: StudioLiquifyWorkerSuccessMessage = {

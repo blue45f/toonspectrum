@@ -89,7 +89,7 @@ import {
   type StudioLayerRole,
 } from "./studio-layer-navigator";
 import { groupOfItem, isEffectivelyHidden, type LayerGroup } from "./studio-layers";
-import { LIQUIFY_RADIUS_RANGE, LIQUIFY_STRENGTH_RANGE } from "./studio-liquify";
+import { LIQUIFY_RADIUS_RANGE, LIQUIFY_STRENGTH_RANGE, type StudioLiquifyMode } from "./studio-liquify-contract";
 import { type MagicResizePreset, type MagicResizeStrategy } from "./studio-magic-resize";
 import {
   studioMobileSheetSizeStyle,
@@ -129,6 +129,7 @@ import {
 } from "./studio-page-lazy-ui";
 import { type PageState } from "./studio-page-state";
 import { type VanishingPoint } from "./studio-perspective-guide";
+import { type PixelSelectionHistoryOperation } from "./studio-pixel-selection-history";
 import {
   isPuppetWarpNoop,
   removePuppetPin,
@@ -347,6 +348,7 @@ interface StudioInspectorAsideProps {
   localHiddenElementIds: ReadonlySet<string>;
   liquifyActive: boolean;
   liquifyBusy: boolean;
+  liquifyMode: StudioLiquifyMode;
   liquifyRadius: number;
   liquifyStrength: number;
   liveDraftShapeKind: DrawShapeKind | "freehand" | null | undefined;
@@ -370,6 +372,7 @@ interface StudioInspectorAsideProps {
   pixelBusy: boolean;
   pixelCombine: SelectionCombineMode;
   pixelSel: PixelSelection | null;
+  pixelSelectionCanRedo: boolean; pixelSelectionCanUndo: boolean;
   pixelTool: SelectionToolKind | "wand" | null;
   polyLassoSession: PolyLassoSession | null;
   postCorrection: number;
@@ -428,6 +431,7 @@ interface StudioInspectorAsideProps {
   setLayerMaskRadius: import("react").Dispatch<import("react").SetStateAction<number>>;
   setLayerMaskStrength: import("react").Dispatch<import("react").SetStateAction<number>>;
   setLiquifyRadius: import("react").Dispatch<import("react").SetStateAction<number>>;
+  setLiquifyMode: import("react").Dispatch<import("react").SetStateAction<StudioLiquifyMode>>;
   setLiquifyStrength: import("react").Dispatch<import("react").SetStateAction<number>>;
   setMagicResizeStrategy: import("react").Dispatch<import("react").SetStateAction<MagicResizeStrategy>>;
   setMenu: import("react").Dispatch<import("react").SetStateAction<StudioMenu | null>>;
@@ -442,7 +446,10 @@ interface StudioInspectorAsideProps {
   setPixelBrushRadius: import("react").Dispatch<import("react").SetStateAction<number>>;
   setPixelCombine: import("react").Dispatch<import("react").SetStateAction<SelectionCombineMode>>;
   setPixelForceCircle: import("react").Dispatch<import("react").SetStateAction<boolean>>;
-  setPixelSel: import("react").Dispatch<import("react").SetStateAction<PixelSelection | null>>;
+  commitPixelSelectionState: (update: PixelSelection | null | ((current: PixelSelection | null) => PixelSelection | null), operation: PixelSelectionHistoryOperation, coalesceKey?: string) => boolean;
+  resetPixelSelectionState: (selection: PixelSelection | null) => void;
+  undoPixelSelectionState: () => void;
+  redoPixelSelectionState: () => void;
   setPixelTool: import("react").Dispatch<import("react").SetStateAction<SelectionToolKind | "wand" | null>>;
   setPoserInitialDataUrl: import("react").Dispatch<import("react").SetStateAction<string | undefined>>;
   setPoserInitialElementId: import("react").Dispatch<import("react").SetStateAction<string | undefined>>;
@@ -591,6 +598,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   localHiddenElementIds,
   liquifyActive,
   liquifyBusy,
+  liquifyMode,
   liquifyRadius,
   liquifyStrength,
   liveDraftShapeKind,
@@ -614,6 +622,8 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   pixelBusy,
   pixelCombine,
   pixelSel,
+  pixelSelectionCanRedo,
+  pixelSelectionCanUndo,
   pixelTool,
   polyLassoSession,
   postCorrection,
@@ -672,6 +682,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   setLayerMaskRadius,
   setLayerMaskStrength,
   setLiquifyRadius,
+  setLiquifyMode,
   setLiquifyStrength,
   setMagicResizeStrategy,
   setMenu,
@@ -686,7 +697,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   setPixelBrushRadius,
   setPixelCombine,
   setPixelForceCircle,
-  setPixelSel,
+  commitPixelSelectionState, resetPixelSelectionState, undoPixelSelectionState, redoPixelSelectionState,
   setPixelTool,
   setPoserInitialDataUrl,
   setPoserInitialElementId,
@@ -2083,34 +2094,38 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                       setPixelTool(t);
                     }}
                     onCombineModeChange={setPixelCombine}
-                    onFeatherChange={(px) => setPixelSel((s) => (s ? setSelectionFeather(s, px) : s))}
-                    onToggleInvert={() => setPixelSel((s) => toggleSelectionInvert(s ?? emptyPixelSelection()))}
-                    onUndoSubpath={() => setPixelSel((s) => (s ? removeLastSubpath(s) : s))}
+                    onFeatherChange={(px) => commitPixelSelectionState((selection) => selection ? setSelectionFeather(selection, px) : selection, "feather", "feather")}
+                    onToggleInvert={() => commitPixelSelectionState((selection) => toggleSelectionInvert(selection ?? emptyPixelSelection()), "invert")}
+                    canUndoSelection={pixelSelectionCanUndo}
+                    canRedoSelection={pixelSelectionCanRedo}
+                    onUndoSelection={undoPixelSelectionState}
+                    onRedoSelection={redoPixelSelectionState}
+                    onUndoSubpath={() => commitPixelSelectionState((selection) => selection ? removeLastSubpath(selection) : selection, "remove-subpath")}
                     onClearSelection={() => {
                       clearPolyLassoDraft();
-                      setPixelSel(null);
+                      commitPixelSelectionState(null, "clear");
                     }}
                     onSelectAll={() => {
                       clearPolyLassoDraft();
-                      setPixelSel((s) => selectAllPixels(s));
+                      commitPixelSelectionState((selection) => selectAllPixels(selection), "select-all");
                     }}
-                    onExpand={(amount) => setPixelSel((s) => expandContractSelection(s, amount))}
-                    onContract={(amount) => setPixelSel((s) => expandContractSelection(s, -amount))}
+                    onExpand={(amount) => commitPixelSelectionState((selection) => expandContractSelection(selection, amount), "transform")}
+                    onContract={(amount) => commitPixelSelectionState((selection) => expandContractSelection(selection, -amount), "transform")}
                     onRotate={(degrees) => {
                       const aspect =
                         selected?.type === "image" && selected.width > 0
                           ? selected.height / selected.width
                           : 1;
-                      setPixelSel((s) => rotateSelection(s, degrees, { aspect }) ?? s);
+                      commitPixelSelectionState((selection) => rotateSelection(selection, degrees, { aspect }) ?? selection, "transform");
                     }}
-                    onFlip={(axis) => setPixelSel((s) => flipSelection(s, axis) ?? s)}
-                    onTranslate={(dx, dy) => setPixelSel((s) => translateSelection(s, dx, dy) ?? s)}
+                    onFlip={(axis) => commitPixelSelectionState((selection) => flipSelection(selection, axis) ?? selection, "transform")}
+                    onTranslate={(dx, dy) => commitPixelSelectionState((selection) => translateSelection(selection, dx, dy) ?? selection, "move")}
                     onScale={(factor) => {
                       const aspect =
                         selected?.type === "image" && selected.width > 0
                           ? selected.height / selected.width
                           : 1;
-                      setPixelSel((s) => scaleSelection(s, factor, { aspect }) ?? s);
+                      commitPixelSelectionState((selection) => scaleSelection(selection, factor, { aspect }) ?? selection, "transform");
                     }}
                     onContentTransform={(t) => void applyPixelSelectionContentTransform(t)}
                     onApplyAdjust={(plan) => void applyPixelSelectionAdjust(plan)}
@@ -2138,10 +2153,12 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   />
                   <StudioLiquifyPanel
                     active={liquifyActive}
+                    mode={liquifyMode}
                     radius={Math.min(LIQUIFY_RADIUS_RANGE.max, Math.max(LIQUIFY_RADIUS_RANGE.min, liquifyRadius))}
                     strength={Math.min(LIQUIFY_STRENGTH_RANGE.max, Math.max(LIQUIFY_STRENGTH_RANGE.min, liquifyStrength))}
                     busy={liquifyBusy}
                     onToggleActive={toggleLiquifyTool}
+                    onModeChange={setLiquifyMode}
                     onRadiusChange={setLiquifyRadius}
                     onStrengthChange={setLiquifyStrength}
                   />
@@ -2157,7 +2174,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                       const next = healCloneTool === mode ? null : mode;
                       if (next) {
                         disarmAllPixelTools();
-                        setPixelSel(null); // 픽셀 선택 영역이 남아있으면 heal/clone 오버레이와 시각적으로 겹쳐 헷갈린다.
+                        resetPixelSelectionState(null); // 픽셀 선택 영역이 남아있으면 heal/clone 오버레이와 시각적으로 겹쳐 헷갈린다.
                       }
                       setHealCloneTool(next);
                     }}
@@ -2244,7 +2261,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                       }
                       // 크롭 진입 — 스테이지 제스처가 겹치지 않게 다른 무장 도구를 함께 끈다.
                       disarmAllPixelTools();
-                      setPixelSel(null);
+                      resetPixelSelectionState(null);
                       setCropRect(initialCropRect());
                     }}
                     onAspectChange={(id) => {

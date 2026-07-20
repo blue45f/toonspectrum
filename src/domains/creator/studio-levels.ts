@@ -93,16 +93,17 @@ export function isIdentityLevels(p: LevelsParams): boolean {
  * Uint8ClampedArray가 반올림·0..255 클램프를 함께 처리한다.
  */
 export function buildLevelsLut(p: LevelsParams): Uint8ClampedArray {
+  const safe = normalizeLevels(p);
   const lut = new Uint8ClampedArray(256);
-  const span = Math.max(1, p.whitePoint - p.blackPoint);
-  const invGamma = 1 / p.gamma;
-  const outSpan = p.outWhite - p.outBlack;
+  const span = Math.max(1, safe.whitePoint - safe.blackPoint);
+  const invGamma = 1 / safe.gamma;
+  const outSpan = safe.outWhite - safe.outBlack;
   for (let i = 0; i < 256; i++) {
-    let t = (i - p.blackPoint) / span;
+    let t = (i - safe.blackPoint) / span;
     if (t < 0) t = 0;
     else if (t > 1) t = 1;
     t = Math.pow(t, invGamma);
-    lut[i] = Math.round(p.outBlack + t * outSpan);
+    lut[i] = Math.round(safe.outBlack + t * outSpan);
   }
   return lut;
 }
@@ -112,8 +113,9 @@ export function buildLevelsLut(p: LevelsParams): Uint8ClampedArray {
  * 알파(+3)는 보존한다.
  */
 export function applyLevels(img: StudioImageDataLike, p: LevelsParams): void {
-  if (isIdentityLevels(p)) return;
-  const lut = buildLevelsLut(p);
+  const safe = normalizeLevels(p);
+  if (isIdentityLevels(safe)) return;
+  const lut = buildLevelsLut(safe);
   const data = img.data;
   for (let i = 0; i < data.length; i += 4) {
     data[i] = lut[data[i]!]!;

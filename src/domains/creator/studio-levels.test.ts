@@ -258,3 +258,20 @@ describe("levelsKonvaFilter", () => {
 // 미사용 import 방지용 타입 참조.
 const _typecheck: LevelsParams = DEFAULT_LEVELS;
 void _typecheck;
+
+describe("levels hostile direct-call safety", () => {
+  it("apply/build normalize NaN and huge values without mutating caller params", () => {
+    const params = Object.freeze({
+      blackPoint: Number.NaN,
+      whitePoint: Number.POSITIVE_INFINITY,
+      gamma: Number.NaN,
+      outBlack: -1e12,
+      outWhite: 1e12,
+    }) as LevelsParams;
+    const img = makeImage(1, 1, [[10, 20, 30, 77]]);
+    expect(() => applyLevels(img, params)).not.toThrow();
+    expect(pixelAt(img, 0)).toEqual([10, 20, 30, 77]);
+    expect(() => buildLevelsLut(params)).not.toThrow();
+    expect(params.gamma).toBeNaN();
+  });
+});

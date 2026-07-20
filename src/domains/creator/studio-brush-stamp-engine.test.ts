@@ -135,6 +135,50 @@ describe("studio stamp brush engine", () => {
     }
   });
 
+  it("bounds huge finite segments identically in the planner, replay, and incremental walker", () => {
+    const brushStyle = style("ink", { size: 1, minSizeRatio: 1 });
+    const points = [0, 0, 1_000_000_000, 0];
+    const planned = planStudioStampBrushDabs(brushStyle, points, [0.5, 0.5], 7);
+    expect(planned).toHaveLength(7);
+
+    const replay = recordingContext();
+    drawStampStroke(replay.context, brushStyle, points, [0.5, 0.5], 7);
+    expect(replay.dabs).toHaveLength(7);
+
+    const incremental = recordingContext();
+    stampStrokeDot(incremental.context, brushStyle, 0, 0, 0.5);
+    const state = beginStampWalker(0, 0, 0.5);
+    state.stampIndex = 1;
+    walkStampSegment(incremental.context, brushStyle, state, 1_000_000_000, 0, 0.5, 7);
+    expect(incremental.dabs).toHaveLength(7);
+    expect(incremental.dabs).toEqual(replay.dabs);
+    expect(state.stampIndex).toBe(7);
+    walkStampSegment(incremental.context, brushStyle, state, 2_000_000_000, 0, 0.5, 7);
+    expect(incremental.dabs).toHaveLength(7);
+  });
+
+  it("stops at the first non-finite coordinate pair and falls back corrupt pressure to 0.5", () => {
+    const brushStyle = style("ink", { size: 10, minSizeRatio: 0 });
+    const points = [2, 3, 8, 3, Number.NaN, 4, 100, 100];
+    const corrupt = planStudioStampBrushDabs(
+      brushStyle,
+      points,
+      [Number.NaN, Number.POSITIVE_INFINITY, 1, 1],
+      100,
+    );
+    const canonical = planStudioStampBrushDabs(
+      brushStyle,
+      [2, 3, 8, 3],
+      [0.5, 0.5],
+      100,
+    );
+
+    expect(corrupt).toEqual(canonical);
+    expect(corrupt.every((dab) =>
+      [dab.x, dab.y, dab.radius, dab.alpha].every(Number.isFinite)
+    )).toBe(true);
+  });
+
   it("pressure grows dab radius between min-size and full size", () => {
     const soft = recordingContext();
     drawStampStroke(soft.context, style("ink"), [0, 0, 40, 0], [0.05, 0.05]);

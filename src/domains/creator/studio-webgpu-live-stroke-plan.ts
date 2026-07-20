@@ -1,4 +1,5 @@
 import {
+  STUDIO_BRUSH_MAX_RADIAL_SYMMETRY_DIRECTIONS,
   studioBrushSymmetryTransforms,
   type StudioBrushSymmetrySpec,
   type StudioBrushSymmetryTransform,
@@ -13,7 +14,8 @@ import {
 } from "./studio-webgpu-stroke";
 
 /** Bounded imported symmetry fan; malformed presets cannot exhaust the live GPU dab budget. */
-export const STUDIO_GPU_MAX_LIVE_SYMMETRY_DIRECTIONS = 32;
+export const STUDIO_GPU_MAX_LIVE_SYMMETRY_DIRECTIONS =
+  STUDIO_BRUSH_MAX_RADIAL_SYMMETRY_DIRECTIONS;
 
 export interface StudioGpuLiveStrokePlanInput extends StudioGpuLiveStrokeInput {
   readonly orderKey?: string;

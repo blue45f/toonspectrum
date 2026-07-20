@@ -77,9 +77,10 @@ export function isIdentityPhotoFilter(p: PhotoFilter): boolean {
  * Uint8ClampedArray가 반올림·0..255 클램프를 처리한다. 알파(+3)는 보존.
  */
 export function applyPhotoFilter(img: StudioImageDataLike, p: PhotoFilter): void {
-  if (isIdentityPhotoFilter(p)) return;
-  const { r: fr, g: fg, b: fb } = hexToRgb(p.color);
-  const d = Math.min(1, Math.max(0, p.density / 100));
+  const safe = normalizePhotoFilter(p);
+  if (isIdentityPhotoFilter(safe)) return;
+  const { r: fr, g: fg, b: fb } = hexToRgb(safe.color);
+  const d = safe.density / 100;
   const inv = 1 - d;
   // 채널별 멀티플라이 계수: c' = c * (inv + (f/255)*d) = c * mul[c].
   const mulR = inv + (fr / 255) * d;
@@ -87,7 +88,7 @@ export function applyPhotoFilter(img: StudioImageDataLike, p: PhotoFilter): void
   const mulB = inv + (fb / 255) * d;
 
   const data = img.data;
-  if (p.preserveLuminosity) {
+  if (safe.preserveLuminosity) {
     for (let i = 0; i < data.length; i += 4) {
       const r = data[i]!;
       const g = data[i + 1]!;

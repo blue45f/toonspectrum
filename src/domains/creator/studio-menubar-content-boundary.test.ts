@@ -59,14 +59,18 @@ function moduleEdges(relativePath: string): ModuleEdges {
 }
 
 describe("Studio menubar ownership boundary", () => {
-  it("keeps StudioPage as the single parent and forbids a reverse dependency", () => {
+  it("keeps StudioPage as the single lazy parent and forbids a reverse dependency", () => {
     const page = moduleEdges("./StudioPage.tsx");
     const menubar = moduleEdges("./StudioMenubarContent.tsx");
 
     expect(
       page.valueImports.filter((specifier) => specifier === "./StudioMenubarContent")
+    ).toEqual([]);
+    expect(
+      page.dynamicImports.filter((specifier) => specifier === "./StudioMenubarContent")
     ).toEqual(["./StudioMenubarContent"]);
-    expect(page.source.match(/<StudioMenubarContent\b/g)).toHaveLength(1);
+    expect(page.source.match(/<LazyStudioMenubarContent\b/g)).toHaveLength(1);
+    expect(page.source).toContain('data-studio-menubar-loading="true"');
     expect(page.source).not.toContain("interface StudioMenubarContentProps");
     expect(page.source).not.toContain("interface StudioMenubarContentHandlers");
     expect(menubar.allImports).not.toContain("./StudioPage");

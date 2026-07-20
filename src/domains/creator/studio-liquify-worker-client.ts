@@ -1,6 +1,8 @@
 import { applyLiquifyDisplacement, type LiquifyDisplacementField } from "./studio-liquify";
 import {
   STUDIO_LIQUIFY_WORKER_PROTOCOL_VERSION,
+  assertStudioLiquifyImageData,
+  assertStudioLiquifyRequest,
   studioLiquifyRequestTransfers,
   type StudioLiquifyWorkerResponseMessage,
   type StudioLiquifyWorkerRunMessage,
@@ -57,12 +59,55 @@ function throwIfAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted) throw createAbortError();
 }
 
+function transferableView<T extends Uint8ClampedArray | Float32Array>(
+  view: T,
+  claimedBuffers: Set<ArrayBuffer>,
+): T {
+  const buffer = view.buffer;
+  const canTransferWithoutOversharing =
+    buffer instanceof ArrayBuffer
+    && view.byteOffset === 0
+    && view.byteLength === buffer.byteLength
+    && !claimedBuffers.has(buffer);
+  if (canTransferWithoutOversharing) {
+    claimedBuffers.add(buffer);
+    return view;
+  }
+  return new (view.constructor as { new (source: ArrayLike<number>): T })(view);
+}
+
+/** 부분/shared view가 무관한 메모리를 detach·노출하지 않고 src/dst가 항상 분리되게 한다. */
+function cloneSafeLiquifyRequest(request: StudioLiquifyWorkerRunRequest): StudioLiquifyWorkerRunRequest {
+  assertStudioLiquifyRequest(request);
+  const claimedBuffers = new Set<ArrayBuffer>();
+  return {
+    src: {
+      data: transferableView(request.src.data, claimedBuffers),
+      width: request.src.width,
+      height: request.src.height,
+    },
+    dst: {
+      data: transferableView(request.dst.data, claimedBuffers),
+      width: request.dst.width,
+      height: request.dst.height,
+    },
+    field: {
+      originX: request.field.originX,
+      originY: request.field.originY,
+      width: request.field.width,
+      height: request.field.height,
+      dx: transferableView(request.field.dx, claimedBuffers),
+      dy: transferableView(request.field.dy, claimedBuffers),
+    },
+  };
+}
+
 function runLiquifyDirect(
   request: StudioLiquifyWorkerRunRequest,
   signal: AbortSignal | undefined,
 ): StudioLiquifyWorkerClientResult {
   throwIfAborted(signal);
-  applyLiquifyDisplacement(request.src, request.dst, request.field as LiquifyDisplacementField);
+  applyLiquifyDisplacement(request.src, request.dst, request.field as LiquifyDisplacementField, { signal });
   return { execution: "direct", dst: request.dst };
 }
 
@@ -114,7 +159,11 @@ function runLiquifyWithWorker(
 
     worker.onmessage = (event) => {
       const response = event.data;
-      if (response.version !== STUDIO_LIQUIFY_WORKER_PROTOCOL_VERSION) {
+      if (
+        !response
+        || typeof response !== "object"
+        || response.version !== STUDIO_LIQUIFY_WORKER_PROTOCOL_VERSION
+      ) {
         finish(() => reject(new Error("리퀴파이 Worker가 알 수 없는 응답을 반환했습니다.")));
         return;
       }
@@ -125,9 +174,10 @@ function runLiquifyWithWorker(
           readyTimer = null;
         }
         try {
-          worker.postMessage(message, studioLiquifyRequestTransfers(message));
           requestPosted = true;
+          worker.postMessage(message, studioLiquifyRequestTransfers(message));
         } catch {
+          requestPosted = false;
           resolveDirectFallback();
         }
         return;
@@ -138,6 +188,19 @@ function runLiquifyWithWorker(
       }
       if (response.type === "studio-liquify/failure") {
         finish(() => reject(deserializeWorkerError(response)));
+        return;
+      }
+      if (response.type !== "studio-liquify/success") {
+        finish(() => reject(new Error("리퀴파이 Worker가 알 수 없는 응답을 반환했습니다.")));
+        return;
+      }
+      try {
+        assertStudioLiquifyImageData(response.dst, "리퀴파이 Worker 결과");
+        if (response.dst.width !== request.dst.width || response.dst.height !== request.dst.height) {
+          throw new RangeError("리퀴파이 Worker 결과 크기가 요청과 일치하지 않습니다.");
+        }
+      } catch (error) {
+        finish(() => reject(error));
         return;
       }
       finish(() => resolve({ execution: "worker", dst: response.dst }));
@@ -175,16 +238,17 @@ export async function runStudioLiquifyWorker(
   options: StudioLiquifyWorkerClientOptions = {},
 ): Promise<StudioLiquifyWorkerClientResult> {
   throwIfAborted(options.signal);
+  const cloneSafeRequest = cloneSafeLiquifyRequest(request);
   const factory =
     options.workerFactory === undefined ? createStudioLiquifyModuleWorker : options.workerFactory;
-  if (!factory) return runLiquifyDirect(request, options.signal);
+  if (!factory) return runLiquifyDirect(cloneSafeRequest, options.signal);
 
   let worker: StudioLiquifyWorkerLike | null;
   try {
     worker = factory();
   } catch {
-    return runLiquifyDirect(request, options.signal);
+    return runLiquifyDirect(cloneSafeRequest, options.signal);
   }
-  if (!worker) return runLiquifyDirect(request, options.signal);
-  return runLiquifyWithWorker(worker, request, options.signal);
+  if (!worker) return runLiquifyDirect(cloneSafeRequest, options.signal);
+  return runLiquifyWithWorker(worker, cloneSafeRequest, options.signal);
 }

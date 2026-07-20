@@ -262,3 +262,17 @@ describe("colorBalanceKonvaFilter", () => {
 // 미사용 import 방지용 타입 참조.
 const _typecheck: ColorBalance = DEFAULT_COLOR_BALANCE;
 void _typecheck;
+
+describe("color balance hostile direct-call safety", () => {
+  it("NaN/Infinity input normalizes to a no-op and leaves caller tuples untouched", () => {
+    const balance = Object.freeze({
+      shadows: Object.freeze([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]),
+      midtones: Object.freeze([0, 0, 0]),
+      highlights: Object.freeze([0, 0, 0]),
+    }) as unknown as ColorBalance;
+    const img = makeImage(1, 1, [[10, 20, 30, 77]]);
+    expect(() => applyColorBalance(img, balance)).not.toThrow();
+    expect(pixelAt(img, 0)).toEqual([10, 20, 30, 77]);
+    expect(balance.shadows[0]).toBeNaN();
+  });
+});

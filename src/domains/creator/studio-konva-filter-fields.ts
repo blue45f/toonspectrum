@@ -75,16 +75,24 @@ export type ImageFilterFields = {
 };
 
 function isActiveNumber(value: number | undefined): boolean {
-  return value != null && value !== 0;
+  return typeof value === "number" && Number.isFinite(value) && value !== 0;
+}
+
+function isActivePositiveNumber(value: number | undefined): boolean {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
+}
+
+function isFiniteNonDefault(value: number | undefined, defaultValue: number): boolean {
+  return typeof value === "number" && Number.isFinite(value) && value !== defaultValue;
 }
 
 function isNonDefaultLevelFields(el: ImageFilterFields): boolean {
   return !!(
-    (el.levelsBlack != null && el.levelsBlack !== 0) ||
-    (el.levelsWhite != null && el.levelsWhite !== 255) ||
-    (el.levelsGamma != null && el.levelsGamma !== 1) ||
-    (el.levelsOutBlack != null && el.levelsOutBlack !== 0) ||
-    (el.levelsOutWhite != null && el.levelsOutWhite !== 255)
+    isFiniteNonDefault(el.levelsBlack, 0) ||
+    isFiniteNonDefault(el.levelsWhite, 255) ||
+    isFiniteNonDefault(el.levelsGamma, 1) ||
+    isFiniteNonDefault(el.levelsOutBlack, 0) ||
+    isFiniteNonDefault(el.levelsOutWhite, 255)
   );
 }
 
@@ -104,7 +112,7 @@ function hasActiveInkWashCandidate(value: unknown): boolean {
 /** 가벼운 활성 판정. true면 고급 필터 엔진을 동적 로드하고, 엔진이 최종 identity 여부를 다시 판정한다. */
 export function hasActiveImageFilters(el: ImageFilterFields): boolean {
   return !!(
-    isActiveNumber(el.blur) ||
+    isActivePositiveNumber(el.blur) ||
     isActiveNumber(el.brightness) ||
     isActiveNumber(el.contrast) ||
     el.grayscale ||
@@ -136,16 +144,16 @@ export function hasActiveImageFilters(el: ImageFilterFields): boolean {
     isActiveNumber(el.saturation) ||
     isActiveNumber(el.hue) ||
     isActiveNumber(el.temperature) ||
-    isActiveNumber(el.sharpen) ||
-    isActiveNumber(el.pixelate) ||
+    isActivePositiveNumber(el.sharpen) ||
+    isActivePositiveNumber(el.pixelate) ||
     el.invert ||
-    isActiveNumber(el.inkThreshold) ||
+    isActivePositiveNumber(el.inkThreshold) ||
     (el.duotoneShadow && el.duotoneHighlight) ||
     el.screentone ||
     el.lineart ||
-    isActiveNumber(el.chromatic) ||
-    isActiveNumber(el.posterize) ||
-    isActiveNumber(el.noise)
+    isActivePositiveNumber(el.chromatic) ||
+    isActivePositiveNumber(el.posterize) ||
+    isActivePositiveNumber(el.noise)
   );
 }
 

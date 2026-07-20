@@ -102,8 +102,9 @@ export function isIdentityChannelMixer(cm: ChannelMixer): boolean {
  * 알파(+3)는 보존한다.
  */
 export function applyChannelMixer(img: StudioImageDataLike, cm: ChannelMixer): void {
-  if (isIdentityChannelMixer(cm)) return;
-  const { red, green, blue, monochrome } = cm;
+  const safe = normalizeChannelMixer(cm);
+  if (isIdentityChannelMixer(safe)) return;
+  const { red, green, blue, monochrome } = safe;
   const rOff = red.constant * 255;
   const gOff = green.constant * 255;
   const bOff = blue.constant * 255;
@@ -133,12 +134,13 @@ export function applyChannelMixer(img: StudioImageDataLike, cm: ChannelMixer): v
 
 /** 채널 혼합 → 길이 13 평탄 배열(행 단위 r·g·b·constant ×3 + 마지막 mono 0/1). */
 export function channelMixerToFlat(cm: ChannelMixer): number[] {
-  const { red, green, blue } = cm;
+  const safe = normalizeChannelMixer(cm);
+  const { red, green, blue } = safe;
   return [
     red.r, red.g, red.b, red.constant,
     green.r, green.g, green.b, green.constant,
     blue.r, blue.g, blue.b, blue.constant,
-    cm.monochrome ? 1 : 0,
+    safe.monochrome ? 1 : 0,
   ];
 }
 

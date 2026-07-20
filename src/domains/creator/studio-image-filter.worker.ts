@@ -1,5 +1,6 @@
 import {
   STUDIO_IMAGE_FILTER_WORKER_PROTOCOL_VERSION,
+  assertStudioImageFilterImageData,
   studioImageFilterSuccessTransfers,
   type StudioImageFilterWorkerFailureMessage,
   type StudioImageFilterWorkerResponseMessage,
@@ -35,6 +36,8 @@ function serializeWorkerError(error: unknown): StudioImageFilterWorkerFailureMes
 workerScope.onmessage = (event) => {
   const message = event.data;
   if (
+    !message ||
+    typeof message !== "object" ||
     message.type !== "studio-image-filter/run" ||
     message.version !== STUDIO_IMAGE_FILTER_WORKER_PROTOCOL_VERSION
   ) {
@@ -43,6 +46,7 @@ workerScope.onmessage = (event) => {
 
   try {
     const { imageData, el } = message.request;
+    assertStudioImageFilterImageData(imageData);
     const { filters, attrs } = buildImageFilters(el, workerFilterRegistry);
     applyImageFilters(imageData, filters, attrs);
     const response: StudioImageFilterWorkerSuccessMessage = {

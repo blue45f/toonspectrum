@@ -12,6 +12,13 @@
 
 export type StudioStampBrushKind = "airbrush" | "pencil" | "ink" | "watercolor";
 
+/**
+ * One logical stamp stroke may be replayed from an imported/collaborative document. A finite cap
+ * prevents a single enormous segment from monopolising the main thread while remaining far above
+ * the amount of detail visible in a normal Studio viewport.
+ */
+export const STUDIO_STAMP_BRUSH_MAX_DABS = 100_000;
+
 /** 스탬프 엔진을 쓰는 브러시 프리셋 id → 종류. 그 외 id 는 null(기존 패밀리 파이프라인). */
 export function resolveStudioStampBrushKind(
   brushId: string | undefined
@@ -104,6 +111,17 @@ export function stampJitter(seed: number, salt: number): number {
 
 function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
+}
+
+function normalizedPressure(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? clamp01(value) : 0.5;
+}
+
+function normalizedDabLimit(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return STUDIO_STAMP_BRUSH_MAX_DABS;
+  }
+  return Math.min(STUDIO_STAMP_BRUSH_MAX_DABS, Math.max(0, Math.floor(value)));
 }
 
 function pressureRadius(style: StudioStampBrushStyle, pressure: number): number {
@@ -231,9 +249,10 @@ export function walkStampSegment(
   state: StudioStampWalkerState,
   x: number,
   y: number,
-  pressure: number
+  pressure: number,
+  maximumDabs = STUDIO_STAMP_BRUSH_MAX_DABS
 ): void {
-  walkStampSegmentPlan(style, state, x, y, pressure, (dab) => {
+  walkStampSegmentPlan(style, state, x, y, pressure, normalizedDabLimit(maximumDabs), (dab) => {
     drawDab(context, style, dab.x, dab.y, dab.radius, dab.alpha, dab.index);
   });
 }
@@ -248,12 +267,15 @@ function walkStampSegmentPlan(
   x: number,
   y: number,
   pressure: number,
+  maximumDabs: number,
   emit: (dab: StudioStampBrushDab) => void
 ): void {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+  const safePressure = normalizedPressure(pressure);
   const dx = x - state.lastX;
   const dy = y - state.lastY;
   const distance = Math.hypot(dx, dy);
-  if (distance <= 0) return;
+  if (!Number.isFinite(distance) || distance <= 0) return;
   const speedFactor = style.kind === "ink"
     ? inkVelocityFactor(distance / Math.max(1, style.size))
     : 1;
@@ -261,20 +283,20 @@ function walkStampSegmentPlan(
   let travelled = state.residual;
   const spacingOf = (p: number): number =>
     Math.max(0.5, pressureRadius(style, p) * 2 * STAMP_SPACING_RATIO[style.kind]);
-  while (travelled <= distance) {
+  while (travelled <= distance && state.stampIndex < maximumDabs) {
     const t = distance === 0 ? 0 : travelled / distance;
     const px = state.lastX + dx * t;
     const py = state.lastY + dy * t;
-    const p = state.lastPressure + (pressure - state.lastPressure) * t;
+    const p = state.lastPressure + (safePressure - state.lastPressure) * t;
     const radius = pressureRadius(style, p) * speedFactor;
     emit({ x: px, y: py, radius, alpha: baseAlpha, index: state.stampIndex });
     state.stampIndex += 1;
     travelled += spacingOf(p);
   }
-  state.residual = travelled - distance;
+  state.residual = state.stampIndex >= maximumDabs ? 0 : travelled - distance;
   state.lastX = x;
   state.lastY = y;
-  state.lastPressure = pressure;
+  state.lastPressure = safePressure;
 }
 
 /** 시작점의 단일 dab(탭 도트). */
@@ -296,11 +318,18 @@ export function stampStrokeDot(
 export function planStudioStampBrushDabs(
   style: StudioStampBrushStyle,
   points: readonly number[],
-  pressures: readonly number[] | undefined
+  pressures: readonly number[] | undefined,
+  maximumDabs = STUDIO_STAMP_BRUSH_MAX_DABS
 ): StudioStampBrushDab[] {
-  const total = Math.floor(points.length / 2);
+  const limit = normalizedDabLimit(maximumDabs);
+  if (limit === 0) return [];
+  let total = 0;
+  for (let index = 0; index + 1 < points.length; index += 2) {
+    if (!Number.isFinite(points[index]) || !Number.isFinite(points[index + 1])) break;
+    total += 1;
+  }
   if (total === 0) return [];
-  const pressureAt = (index: number): number => pressures?.[index] ?? 0.5;
+  const pressureAt = (index: number): number => normalizedPressure(pressures?.[index]);
   const dabs: StudioStampBrushDab[] = [
     stampDotPlan(style, points[0]!, points[1]!, pressureAt(0), 0),
   ];
@@ -314,10 +343,23 @@ export function planStudioStampBrushDabs(
       points[index * 2]!,
       points[index * 2 + 1]!,
       pressureAt(index),
+      limit,
       (dab) => dabs.push(dab)
     );
+    if (state.stampIndex >= limit) break;
   }
   return dabs;
+}
+
+/** Draws an already bounded deterministic plan without changing its coordinates. */
+export function drawStudioStampBrushDabs(
+  context: CanvasRenderingContext2D,
+  style: StudioStampBrushStyle,
+  dabs: readonly StudioStampBrushDab[]
+): void {
+  for (const dab of dabs) {
+    drawDab(context, style, dab.x, dab.y, dab.radius, dab.alpha, dab.index);
+  }
 }
 
 /**
@@ -328,13 +370,20 @@ export function drawStampStroke(
   context: CanvasRenderingContext2D,
   style: StudioStampBrushStyle,
   points: readonly number[],
-  pressures: readonly number[] | undefined
+  pressures: readonly number[] | undefined,
+  maximumDabs = STUDIO_STAMP_BRUSH_MAX_DABS
 ): void {
   // Canvas 재생은 긴 획에서도 배열을 추가 할당하지 않고 스트리밍한다. planner와 같은
   // walkStampSegmentPlan 코어를 쓰므로 출력 규약은 동일하다.
-  const total = Math.floor(points.length / 2);
+  const limit = normalizedDabLimit(maximumDabs);
+  if (limit === 0) return;
+  let total = 0;
+  for (let index = 0; index + 1 < points.length; index += 2) {
+    if (!Number.isFinite(points[index]) || !Number.isFinite(points[index + 1])) break;
+    total += 1;
+  }
   if (total === 0) return;
-  const pressureAt = (index: number): number => pressures?.[index] ?? 0.5;
+  const pressureAt = (index: number): number => normalizedPressure(pressures?.[index]);
   stampStrokeDot(context, style, points[0]!, points[1]!, pressureAt(0));
   if (total === 1) return;
   const state = beginStampWalker(points[0]!, points[1]!, pressureAt(0));
@@ -346,7 +395,9 @@ export function drawStampStroke(
       state,
       points[index * 2]!,
       points[index * 2 + 1]!,
-      pressureAt(index)
+      pressureAt(index),
+      limit
     );
+    if (state.stampIndex >= limit) break;
   }
 }

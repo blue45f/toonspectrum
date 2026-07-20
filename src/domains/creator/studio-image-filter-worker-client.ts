@@ -1,5 +1,6 @@
 import {
   STUDIO_IMAGE_FILTER_WORKER_PROTOCOL_VERSION,
+  assertStudioImageFilterImageData,
   studioImageFilterRequestTransfers,
   type StudioImageFilterWorkerResponseMessage,
   type StudioImageFilterWorkerRunMessage,
@@ -67,31 +68,33 @@ type ExhaustiveImageFilterFieldProjection = ImageFilterFields & Record<keyof Ima
  * structured clone 경계로 새어 나가지 않으며, 필드 추가 시 exhaustive 타입이 누락을 잡는다.
  */
 function projectImageFilterFields(el: ImageFilterFields): ImageFilterFields {
+  const finite = (value: number | undefined): number | undefined =>
+    typeof value === "number" && Number.isFinite(value) ? value : undefined;
   const projection = {
-    blur: el.blur,
-    brightness: el.brightness,
-    contrast: el.contrast,
+    blur: finite(el.blur),
+    brightness: finite(el.brightness),
+    contrast: finite(el.contrast),
     grayscale: el.grayscale,
     sepia: el.sepia,
     screentone: el.screentone,
     lineart: el.lineart,
-    chromatic: el.chromatic,
-    posterize: el.posterize,
-    noise: el.noise,
-    saturation: el.saturation,
-    hue: el.hue,
-    temperature: el.temperature,
-    sharpen: el.sharpen,
-    pixelate: el.pixelate,
+    chromatic: finite(el.chromatic),
+    posterize: finite(el.posterize),
+    noise: finite(el.noise),
+    saturation: finite(el.saturation),
+    hue: finite(el.hue),
+    temperature: finite(el.temperature),
+    sharpen: finite(el.sharpen),
+    pixelate: finite(el.pixelate),
     invert: el.invert,
-    inkThreshold: el.inkThreshold,
+    inkThreshold: finite(el.inkThreshold),
     duotoneShadow: el.duotoneShadow,
     duotoneHighlight: el.duotoneHighlight,
-    levelsBlack: el.levelsBlack,
-    levelsWhite: el.levelsWhite,
-    levelsGamma: el.levelsGamma,
-    levelsOutBlack: el.levelsOutBlack,
-    levelsOutWhite: el.levelsOutWhite,
+    levelsBlack: finite(el.levelsBlack),
+    levelsWhite: finite(el.levelsWhite),
+    levelsGamma: finite(el.levelsGamma),
+    levelsOutBlack: finite(el.levelsOutBlack),
+    levelsOutWhite: finite(el.levelsOutWhite),
     levelsCh: el.levelsCh,
     curve: el.curve,
     curveCh: el.curveCh,
@@ -122,9 +125,17 @@ function projectImageFilterFields(el: ImageFilterFields): ImageFilterFields {
 
 /** Narrows the input to the protocol's clone-safe contract — drops any caller-attached helpers. */
 function cloneSafeWorkerRequest(request: StudioImageFilterWorkerRunRequest): StudioImageFilterWorkerRunRequest {
+  assertStudioImageFilterImageData(request.imageData);
+  const sourceData = request.imageData.data;
+  // 부분 view를 그대로 transfer하면 같은 ArrayBuffer의 무관한 바이트까지 Worker로 노출되고
+  // 형제 view도 함께 detach된다. SharedArrayBuffer도 transferable이 아니므로 전용 버퍼로 복제한다.
+  const hasDedicatedTransferableBuffer =
+    sourceData.buffer instanceof ArrayBuffer
+    && sourceData.byteOffset === 0
+    && sourceData.byteLength === sourceData.buffer.byteLength;
   return {
     imageData: {
-      data: request.imageData.data,
+      data: hasDedicatedTransferableBuffer ? sourceData : new Uint8ClampedArray(sourceData),
       width: request.imageData.width,
       height: request.imageData.height,
     },
@@ -193,7 +204,11 @@ function runImageFilterWithWorker(
 
     worker.onmessage = (event) => {
       const response = event.data;
-      if (response.version !== STUDIO_IMAGE_FILTER_WORKER_PROTOCOL_VERSION) {
+      if (
+        !response
+        || typeof response !== "object"
+        || response.version !== STUDIO_IMAGE_FILTER_WORKER_PROTOCOL_VERSION
+      ) {
         finish(() => reject(new Error("이미지 필터 Worker가 알 수 없는 응답을 반환했습니다.")));
         return;
       }
@@ -204,9 +219,10 @@ function runImageFilterWithWorker(
           readyTimer = null;
         }
         try {
-          worker.postMessage(message, studioImageFilterRequestTransfers(message));
           requestPosted = true;
+          worker.postMessage(message, studioImageFilterRequestTransfers(message));
         } catch {
+          requestPosted = false;
           resolveDirectFallback();
         }
         return;
@@ -217,6 +233,16 @@ function runImageFilterWithWorker(
       }
       if (response.type === "studio-image-filter/failure") {
         finish(() => reject(deserializeWorkerError(response)));
+        return;
+      }
+      if (response.type !== "studio-image-filter/success") {
+        finish(() => reject(new Error("이미지 필터 Worker가 알 수 없는 응답을 반환했습니다.")));
+        return;
+      }
+      try {
+        assertStudioImageFilterImageData(response.imageData, "이미지 필터 Worker 결과");
+      } catch (error) {
+        finish(() => reject(error));
         return;
       }
       finish(() => resolve({ execution: "worker", imageData: response.imageData }));

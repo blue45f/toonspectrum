@@ -15,7 +15,7 @@ type NativeFilterThis = { attrs?: Record<string, unknown> };
 
 function attrNumber(attrs: Record<string, unknown> | undefined, key: string, fallback: number): number {
   const value = attrs?.[key];
-  return typeof value === "number" ? value : fallback;
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
 // konva/lib/filters/Brighten.js verbatim (attrs 기반).
@@ -378,6 +378,8 @@ function nativeFilterGaussBlurRGBA(imageData: StudioImageDataLike, radius: numbe
 
 // konva/lib/filters/Blur.js verbatim (attrs 기반).
 export function nativeBlur(this: NativeFilterThis, imageData: StudioImageDataLike): void {
-  const radius = Math.round(attrNumber(this.attrs, "blurRadius", 0));
+  // Konva의 stack-blur 테이블은 0..254 반지름만 정의돼 있다. 손상된 저장본의
+  // Infinity/거대값이 무한 루프나 undefined 테이블 조회로 이어지지 않게 제한한다.
+  const radius = Math.min(MUL_TABLE.length - 1, Math.max(0, Math.round(attrNumber(this.attrs, "blurRadius", 0))));
   if (radius > 0) nativeFilterGaussBlurRGBA(imageData, radius);
 }

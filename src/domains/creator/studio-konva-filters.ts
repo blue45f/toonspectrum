@@ -184,9 +184,22 @@ const BUILT_IN_KONVA_FILTERS: Record<string, unknown> = {
   Sepia,
 };
 
-// 보정값이 "활성"인지: 불리언은 truthy, 숫자는 0이 아니고 null/undefined가 아닐 때.
+// 보정값이 "활성"인지: 유한한 숫자만 허용한다. 손상된 저장본의 NaN/Infinity가
+// Worker/Konva 필터로 흘러가 픽셀을 검게 만들거나 과도한 루프를 만들면 안 된다.
 function isActiveNumber(value: number | undefined): boolean {
-  return value != null && value !== 0;
+  return typeof value === "number" && Number.isFinite(value) && value !== 0;
+}
+
+function isActivePositive(value: number | undefined): boolean {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
+}
+
+function clampFinite(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function isHexColor(value: unknown): value is string {
+  return typeof value === "string" && /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(value);
 }
 
 /**
@@ -293,12 +306,10 @@ export function registerStudioKonvaFilters(konva: KonvaLike): void {
           data[currentIdx] = 0;
           data[currentIdx + 1] = 0;
           data[currentIdx + 2] = 0;
-          data[currentIdx + 3] = 255;
         } else {
           data[currentIdx] = 255;
           data[currentIdx + 1] = 255;
           data[currentIdx + 2] = 255;
-          data[currentIdx + 3] = 255;
         }
       }
     }
@@ -309,7 +320,9 @@ export function registerStudioKonvaFilters(konva: KonvaLike): void {
     const width = imageData.width;
     const height = imageData.height;
     // `this`는 Konva.Node — node.attrs에서 색수차 오프셋을 읽는다.
-    const offset = (this.attrs?.chromatic as number) || 4;
+    const rawOffset = this.attrs?.chromatic;
+    if (typeof rawOffset !== "number" || !Number.isFinite(rawOffset) || rawOffset <= 0) return;
+    const offset = Math.min(12, Math.max(1, Math.round(rawOffset)));
     const src = new Uint8ClampedArray(data);
 
     for (let y = 0; y < height; y++) {
@@ -330,7 +343,10 @@ export function registerStudioKonvaFilters(konva: KonvaLike): void {
   F.Posterize = function (this: FilterThis, imageData: StudioImageDataLike) {
     const data = imageData.data;
     // `this`는 Konva.Node — node.attrs에서 포스터화 레벨을 읽는다.
-    const levels = (this.attrs?.posterize as number) || 4;
+    const rawLevels = this.attrs?.posterize;
+    if (typeof rawLevels !== "number" || !Number.isFinite(rawLevels) || rawLevels <= 0) return;
+    // 1단계 포스터화는 수학적으로 정의되지 않는다(255 / 0). 활성값은 최소 2단계.
+    const levels = Math.min(8, Math.max(2, Math.round(rawLevels)));
     const step = 255 / (levels - 1);
     for (let i = 0; i < data.length; i += 4) {
       data[i] = Math.round(data[i]! / step) * step;
@@ -342,7 +358,9 @@ export function registerStudioKonvaFilters(konva: KonvaLike): void {
   F.Noise = function (this: FilterThis, imageData: StudioImageDataLike) {
     const data = imageData.data;
     // `this`는 Konva.Node — node.attrs에서 노이즈 강도를 읽는다.
-    const amount = (this.attrs?.noise as number) || 20;
+    const rawAmount = this.attrs?.noise;
+    if (typeof rawAmount !== "number" || !Number.isFinite(rawAmount) || rawAmount <= 0) return;
+    const amount = Math.min(100, rawAmount);
     for (let i = 0; i < data.length; i += 4) {
       const noiseVal = (Math.random() - 0.5) * amount * 2.55; // NOSONAR S2245 비암호화 용도(시각효과/ID 생성)
       data[i] = Math.min(255, Math.max(0, data[i]! + noiseVal));
@@ -415,7 +433,7 @@ export function registerStudioKonvaFilters(konva: KonvaLike): void {
 /** 활성 보정이 하나라도 있으면 true (캐시 on/off 판단용). */
 export function hasActiveImageFilters(el: ImageFilterFields): boolean {
   return !!(
-    isActiveNumber(el.blur) ||
+    isActivePositive(el.blur) ||
     isActiveNumber(el.brightness) ||
     isActiveNumber(el.contrast) ||
     el.grayscale ||
@@ -445,16 +463,16 @@ export function hasActiveImageFilters(el: ImageFilterFields): boolean {
     isActiveNumber(el.saturation) ||
     isActiveNumber(el.hue) ||
     isActiveNumber(el.temperature) ||
-    isActiveNumber(el.sharpen) ||
-    isActiveNumber(el.pixelate) ||
+    isActivePositive(el.sharpen) ||
+    isActivePositive(el.pixelate) ||
     el.invert ||
-    isActiveNumber(el.inkThreshold) ||
-    (el.duotoneShadow && el.duotoneHighlight) ||
+    isActivePositive(el.inkThreshold) ||
+    (isHexColor(el.duotoneShadow) && isHexColor(el.duotoneHighlight)) ||
     el.screentone ||
     el.lineart ||
-    isActiveNumber(el.chromatic) ||
-    isActiveNumber(el.posterize) ||
-    isActiveNumber(el.noise)
+    isActivePositive(el.chromatic) ||
+    isActivePositive(el.posterize) ||
+    isActivePositive(el.noise)
   );
 }
 
@@ -500,30 +518,30 @@ export function buildImageFilters(
   // --- 색/톤 보정 먼저 ---
   if (isActiveNumber(el.brightness)) {
     filters.push(F.Brighten as (imageData: StudioImageDataLike) => void);
-    attrs.brightness = el.brightness!;
+    attrs.brightness = clampFinite(el.brightness!, -0.8, 0.8);
   }
   if (isActiveNumber(el.contrast)) {
     filters.push(F.Contrast as (imageData: StudioImageDataLike) => void);
-    attrs.contrast = el.contrast!;
+    attrs.contrast = clampFinite(el.contrast!, -80, 80);
   }
-  if (isActiveNumber(el.blur)) {
+  if (isActivePositive(el.blur)) {
     filters.push(F.Blur as (imageData: StudioImageDataLike) => void);
-    attrs.blurRadius = el.blur!;
+    attrs.blurRadius = clampFinite(el.blur!, 0, 30);
   }
   if (isActiveNumber(el.saturation) || isActiveNumber(el.hue)) {
     filters.push(F.HSL as (imageData: StudioImageDataLike) => void);
     // Konva HSL: saturation -1..1, hue 0..359(도), luminance 0이 중립.
-    attrs.saturation = isActiveNumber(el.saturation) ? el.saturation! : 0;
+    attrs.saturation = isActiveNumber(el.saturation) ? clampFinite(el.saturation!, -1, 1) : 0;
     attrs.hue = isActiveNumber(el.hue) ? (((el.hue! % 360) + 360) % 360) : 0;
     attrs.luminance = 0;
   }
   if (isActiveNumber(el.temperature)) {
     filters.push(F.Temperature!);
-    attrs.temperature = el.temperature!;
+    attrs.temperature = clampFinite(el.temperature!, -100, 100);
   }
-  if (isActiveNumber(el.sharpen)) {
+  if (isActivePositive(el.sharpen)) {
     filters.push(F.Sharpen!);
-    attrs.sharpen = el.sharpen!;
+    attrs.sharpen = clampFinite(el.sharpen!, 0, 1);
   }
   if (hasActiveLevels(el)) {
     filters.push(F.Levels!);
@@ -631,11 +649,11 @@ export function buildImageFilters(
     attrs.inkWashColor = iw.inkColor;
     attrs.inkWashSeed = iw.seed;
   }
-  if (isActiveNumber(el.inkThreshold)) {
+  if (isActivePositive(el.inkThreshold)) {
     filters.push(F.InkThreshold!);
-    attrs.inkThreshold = el.inkThreshold!;
+    attrs.inkThreshold = clampFinite(el.inkThreshold!, 0, 1);
   }
-  if (el.duotoneShadow && el.duotoneHighlight) {
+  if (isHexColor(el.duotoneShadow) && isHexColor(el.duotoneHighlight)) {
     filters.push(F.Duotone!);
     attrs.duotoneShadow = el.duotoneShadow;
     attrs.duotoneHighlight = el.duotoneHighlight;
@@ -646,21 +664,21 @@ export function buildImageFilters(
   if (el.lineart) {
     filters.push(F.Lineart!);
   }
-  if (isActiveNumber(el.chromatic)) {
+  if (isActivePositive(el.chromatic)) {
     filters.push(F.Chromatic!);
-    attrs.chromatic = el.chromatic!;
+    attrs.chromatic = clampFinite(Math.round(el.chromatic!), 1, 12);
   }
-  if (isActiveNumber(el.posterize)) {
+  if (isActivePositive(el.posterize)) {
     filters.push(F.Posterize!);
-    attrs.posterize = el.posterize!;
+    attrs.posterize = clampFinite(Math.round(el.posterize!), 2, 8);
   }
-  if (isActiveNumber(el.noise)) {
+  if (isActivePositive(el.noise)) {
     filters.push(F.Noise!);
-    attrs.noise = el.noise!;
+    attrs.noise = clampFinite(el.noise!, 0, 100);
   }
-  if (isActiveNumber(el.pixelate)) {
+  if (isActivePositive(el.pixelate)) {
     filters.push(F.Pixelate as (imageData: StudioImageDataLike) => void);
-    attrs.pixelSize = Math.max(1, Math.round(el.pixelate!));
+    attrs.pixelSize = clampFinite(Math.round(el.pixelate!), 1, 40);
   }
   // 하프톤(망점) → 그레인(질감) → 글로우 → 테두리 순으로 스타일라이즈를 마무리한다.
   if (hasActiveHalftone(el)) {

@@ -31,9 +31,7 @@ import {
 } from "./studio-brush-dynamics";
 import { resolveStudioBrushSinglePointRoute } from "./studio-brush-runtime-contract";
 import {
-  drawStampStroke,
   resolveStudioStampBrushKind,
-  resolveStudioStampBrushStyle,
 } from "./studio-brush-stamp-engine";
 import { studioDynamicBrushDabVariations } from "./studio-brush-symmetry";
 import {
@@ -78,6 +76,7 @@ import {
   planWatercolorBrushDabs,
   watercolorBrushSeedFromKey,
 } from "./studio-watercolor-brush";
+import { StudioStampDrawShape } from "./StudioStampDrawShape";
 
 import type { CalligraphyStylusInput } from "./studio-brush";
 import type { DrawEl } from "./studio-element-model";
@@ -134,7 +133,14 @@ export const StudioDrawNode = memo(function StudioDrawNode({
   const shapeParams = normalizeShapeParams(el.shapeParams);
   const shapeDash = strokeDashArray(strokeStyle.dash, strokeWidth);
 
-  const symmetricVariations = getSymmetricPoints(el.points, el.symmetry);
+  const stampBrushKind = kind === "freehand" && el.mode !== "eraser"
+    ? resolveStudioStampBrushKind(el.brush)
+    : null;
+  // Stamp symmetry owns its affine fan inside one bounded Shape. Avoid allocating and then
+  // discarding up to 64 complete point-array copies on every active-draft render.
+  const symmetricVariations = stampBrushKind
+    ? [el.points]
+    : getSymmetricPoints(el.points, el.symmetry);
   const dynamicBrushId = kind === "freehand" && el.mode !== "eraser"
     ? resolveStudioBrushDynamicsPresetId(el.brush)
     : null;
@@ -312,7 +318,7 @@ export const StudioDrawNode = memo(function StudioDrawNode({
         if (kind === "freehand") {
           const brush = el.brush ?? "pen";
           const brushFamily = resolveStudioBrushRenderFamily(brush);
-          const stampKind = el.mode !== "eraser" ? resolveStudioStampBrushKind(brush) : null;
+          const stampKind = stampBrushKind;
           const dynamicBrush = dynamicBrushId !== null;
           const renderSampleDistance = strokeRenderDistance(el.sampleSpacing);
           // Legacy documents predate the explicit causal-walker marker, but their four stamp
@@ -356,40 +362,16 @@ export const StudioDrawNode = memo(function StudioDrawNode({
             // 스탬프 엔진 계열(속도 잉크·정밀 에어브러시·그레인 연필·물맛 붓): 라이브 프리뷰와
             // 커밋이 같은 결정적 dab 시퀀스를 그린다 — 증분/재생/협업 복원에서 픽셀이 동일하다.
             if (stampKind) {
-              const stampStyle = resolveStudioStampBrushStyle(
-                stampKind,
-                { color: stroke, size: Math.max(1, strokeWidth), opacity },
-                el.stamp
-              );
-              // v2 stores the already accepted/stabilized point stream as its rendering contract.
-              // Re-smoothing a growing prefix would move or delete dabs that were already visible.
-              const causalStamp = el.stampPipeline === "causal-walker-v2";
-              const stampPoints = causalStamp
-                ? points
-                : processFreehandPoints(points, renderSampleDistance);
-              const stampPressures = causalStamp
-                ? el.pressures
-                : resampleStrokePressures(
-                    el.pressures ?? [],
-                    Math.floor(stampPoints.length / 2),
-                    0.5
-                  );
               return (
-                <Shape
+                <StudioStampDrawShape
                   key={index}
-                  sceneFunc={(context) => {
-                    context.save();
-                    drawStampStroke(
-                      context as unknown as CanvasRenderingContext2D,
-                      stampStyle,
-                      stampPoints,
-                      stampPressures
-                    );
-                    context.restore();
-                  }}
-                  globalCompositeOperation={composite}
-                  listening={false}
-                  perfectDrawEnabled={false}
+                  composite={composite}
+                  el={el}
+                  opacity={opacity}
+                  renderSampleDistance={renderSampleDistance}
+                  stampKind={stampKind}
+                  stroke={stroke}
+                  strokeWidth={strokeWidth}
                 />
               );
             }
