@@ -83,9 +83,8 @@ const DEFAULT_EVICTION_SWEEP_MS = 60_000;
 // below the room limit while a stalled database cannot retain an unbounded heap of request bodies.
 const DEFAULT_MAX_PENDING_OPERATIONS_PER_WORK = 128;
 const DEFAULT_MAX_PENDING_OPERATIONS_TOTAL = 512;
-// Cluster-wide extension of the two local caps above: a periodic heartbeat (below) lets every
-// node approximate total cluster pending-operation count from a locally cached read, so this
-// check never adds a synchronous DB round-trip to withWorkLock's per-operation hot path.
+// Cluster-wide extension of the two local caps above. Sampling is active only while this process
+// has pending work; an idle API node performs no recurring cluster-load database traffic.
 const DEFAULT_CLUSTER_LOAD_HEARTBEAT_MS = 350;
 const DEFAULT_CLUSTER_LOAD_STALE_AFTER_MS = 1_500;
 const DEFAULT_MAX_CLUSTER_PENDING_OPERATIONS_TOTAL = 2_048;
@@ -284,8 +283,14 @@ export class StudioCrdtService implements OnModuleDestroy {
   private readonly maxClusterPendingOperationsTotal: number;
   private cachedClusterPendingOperations = 0;
   private lastClusterLoadSuccessAt = 0;
+  private lastReportedPendingOperationCount: number | null = null;
+  private clusterLoadReportQueued = false;
   private clusterLoadHeartbeatPromise: Promise<void> | null = null;
-  private readonly clusterLoadTimer: ReturnType<typeof setInterval>;
+  private clusterLoadTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly scheduleInterval: (
+    handler: () => void,
+    delay: number
+  ) => ReturnType<typeof setInterval>;
   private readonly cancelInterval: (handle: ReturnType<typeof setInterval>) => void;
   private readonly evictionTimer: ReturnType<typeof setInterval>;
   private destroyed = false;
@@ -366,8 +371,8 @@ export class StudioCrdtService implements OnModuleDestroy {
       1_000_000
     );
     this.cancelInterval = options.cancelInterval ?? clearInterval;
-    const scheduleInterval = options.scheduleInterval ?? setInterval;
-    this.evictionTimer = scheduleInterval(
+    this.scheduleInterval = options.scheduleInterval ?? setInterval;
+    this.evictionTimer = this.scheduleInterval(
       () => this.evictIdleDocuments(),
       boundedInteger(
         options.evictionSweepMs,
@@ -377,14 +382,6 @@ export class StudioCrdtService implements OnModuleDestroy {
       )
     );
     this.evictionTimer.unref?.();
-    this.clusterLoadTimer = scheduleInterval(
-      () => void this.reportClusterLoad(),
-      this.clusterLoadHeartbeatMs
-    );
-    this.clusterLoadTimer.unref?.();
-    // Fire once immediately so a cold-started node isn't local-cap-only for a full heartbeat
-    // interval — this can only shrink the fail-closed window, never widen it.
-    void this.reportClusterLoad();
   }
 
   get cachedDocumentCount(): number {
@@ -496,7 +493,8 @@ export class StudioCrdtService implements OnModuleDestroy {
     if (this.destroyed) return;
     this.destroyed = true;
     this.cancelInterval(this.evictionTimer);
-    this.cancelInterval(this.clusterLoadTimer);
+    if (this.clusterLoadTimer) this.cancelInterval(this.clusterLoadTimer);
+    this.clusterLoadTimer = null;
     // Wait out the active heartbeat control promise. A database driver cannot cancel a query that
     // already lost the bounded timeout race, but that detached query never owns service state (see
     // runClusterLoadHeartbeat), so it cannot mutate admission data after teardown completes.
@@ -504,6 +502,7 @@ export class StudioCrdtService implements OnModuleDestroy {
       ...this.workTails.values(),
       ...(this.clusterLoadHeartbeatPromise ? [this.clusterLoadHeartbeatPromise] : []),
     ]);
+    await this.clearReportedClusterLoadOnShutdown();
     for (const entry of this.documents.values()) entry.doc.destroy();
     this.documents.clear();
     this.workTails.clear();
@@ -856,34 +855,74 @@ export class StudioCrdtService implements OnModuleDestroy {
     }
   }
 
-  // Cluster-wide extension of the local admission caps. Never awaited from withWorkLock: a
-  // hung/down Postgres can only leave cachedClusterPendingOperations/lastClusterLoadSuccessAt
-  // stale, never block sync/applyUpdate. The moment the last successful heartbeat is older than
-  // clusterLoadStaleAfterMs, withWorkLock silently reverts to exactly today's process-local-only
-  // behavior -- a stalled cluster signal falls back to the pre-existing local caps, never to
-  // unlimited admission and never to a hard block on real editing.
+  // Cluster-wide extension of the local admission caps. The first operation wakes sampling and
+  // the interval refreshes it only while work remains pending. A cold first operation is still
+  // bounded by the strict local caps and never waits on Postgres. The last operation publishes one
+  // zero transition, after which an idle node performs no cluster-load I/O at all.
   //
   // Returns the existing in-flight attempt (rather than a fresh resolved promise) when one is
   // already running, so onModuleDestroy can await the SAME promise a caller is holding instead of
   // racing a teardown against a heartbeat still mutating instance state after "destroyed" is set.
   private reportClusterLoad(): Promise<void> {
+    if (this.destroyed) return Promise.resolve();
+    this.clusterLoadReportQueued = true;
     if (this.clusterLoadHeartbeatPromise) return this.clusterLoadHeartbeatPromise;
-    const run = this.runClusterLoadHeartbeat();
+    const run = (async () => {
+      do {
+        this.clusterLoadReportQueued = false;
+        await this.runClusterLoadHeartbeat();
+      } while (this.clusterLoadReportQueued && !this.destroyed);
+    })();
     this.clusterLoadHeartbeatPromise = run;
+    void run.finally(() => {
+      if (this.clusterLoadHeartbeatPromise !== run) return;
+      this.clusterLoadHeartbeatPromise = null;
+      // A request can arrive after the drain loop's final condition but before this settled
+      // promise clears. Preserve that transition instead of losing a final zero report.
+      if (this.clusterLoadReportQueued && !this.destroyed) void this.reportClusterLoad();
+    });
     return run;
+  }
+
+  private startClusterLoadHeartbeat(): void {
+    if (this.destroyed || this.clusterLoadTimer) return;
+    this.clusterLoadTimer = this.scheduleInterval(
+      () => void this.reportClusterLoad(),
+      this.clusterLoadHeartbeatMs
+    );
+    this.clusterLoadTimer.unref?.();
+    void this.reportClusterLoad();
+  }
+
+  private stopClusterLoadHeartbeat(): void {
+    if (this.clusterLoadTimer) this.cancelInterval(this.clusterLoadTimer);
+    this.clusterLoadTimer = null;
+    void this.reportClusterLoad();
   }
 
   private async runClusterLoadHeartbeat(): Promise<void> {
     let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
     try {
       const now = this.now();
-      const observedClusterLoad = await Promise.race([
+      const pendingOperationCount = this.pendingOperationCount;
+      const previouslyReportedPendingOperationCount = this.lastReportedPendingOperationCount;
+      const report = await Promise.race([
         (async () => {
-          await this.clusterLoadRepository.reportLoad(this.nodeId, this.pendingOperationCount, now);
-          return this.clusterLoadRepository.readClusterLoad(
-            now,
-            this.clusterLoadStaleAfterMs
+          await this.clusterLoadRepository.reportLoad(
+            this.nodeId,
+            pendingOperationCount,
+            now
           );
+          if (pendingOperationCount === 0) {
+            return { pendingOperationCount, observedClusterLoad: null };
+          }
+          return {
+            pendingOperationCount,
+            observedClusterLoad: await this.clusterLoadRepository.readClusterLoad(
+              now,
+              this.clusterLoadStaleAfterMs
+            ),
+          };
         })(),
         new Promise<never>((_resolve, reject) => {
           // Bounds how long a single hung Postgres call can keep this node's heartbeat disabled.
@@ -902,8 +941,21 @@ export class StudioCrdtService implements OnModuleDestroy {
       // loses the timeout race and completes later, its stale result has no continuation capable
       // of overwriting a newer heartbeat. Teardown likewise prevents the winning result from
       // publishing after the service has been destroyed.
+      this.lastReportedPendingOperationCount = report.pendingOperationCount;
       if (this.destroyed) return;
-      this.cachedClusterPendingOperations = observedClusterLoad;
+      if (report.observedClusterLoad === null) {
+        if (
+          previouslyReportedPendingOperationCount !== null &&
+          previouslyReportedPendingOperationCount > 0
+        ) {
+          this.cachedClusterPendingOperations = Math.max(
+            0,
+            this.cachedClusterPendingOperations - previouslyReportedPendingOperationCount
+          );
+        }
+        return;
+      }
+      this.cachedClusterPendingOperations = report.observedClusterLoad;
       this.lastClusterLoadSuccessAt = now.getTime();
     } catch (error) {
       this.logger.warn(
@@ -912,7 +964,35 @@ export class StudioCrdtService implements OnModuleDestroy {
       );
     } finally {
       if (timeoutHandle) clearTimeout(timeoutHandle);
-      this.clusterLoadHeartbeatPromise = null;
+    }
+  }
+
+  private async clearReportedClusterLoadOnShutdown(): Promise<void> {
+    if (
+      this.lastReportedPendingOperationCount === null ||
+      this.lastReportedPendingOperationCount === 0
+    ) return;
+    let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+    try {
+      const now = this.now();
+      await Promise.race([
+        this.clusterLoadRepository.reportLoad(this.nodeId, 0, now),
+        new Promise<never>((_resolve, reject) => {
+          timeoutHandle = setTimeout(
+            () => reject(new Error("studio CRDT final cluster load clear timed out")),
+            Math.min(this.clusterLoadHeartbeatMs * 4, 5_000)
+          );
+          timeoutHandle.unref?.();
+        }),
+      ]);
+      this.lastReportedPendingOperationCount = 0;
+    } catch (error) {
+      this.logger.warn(
+        { nodeId: this.nodeId, error: error instanceof Error ? error.message : "unknown" },
+        "studio CRDT final cluster load clear failed"
+      );
+    } finally {
+      if (timeoutHandle) clearTimeout(timeoutHandle);
     }
   }
 
@@ -935,6 +1015,7 @@ export class StudioCrdtService implements OnModuleDestroy {
     // promise/payload backlog through many authenticated editors or rooms in this API process.
     this.pendingOperationsByWork.set(workId, pendingForWork + 1);
     this.pendingOperationCount += 1;
+    if (this.pendingOperationCount === 1) this.startClusterLoadHeartbeat();
     const previous = this.workTails.get(workId) ?? Promise.resolve();
     const run = previous.then(() => {
       if (this.destroyed) throw new Error("Studio CRDT service is shutting down");
@@ -950,6 +1031,7 @@ export class StudioCrdtService implements OnModuleDestroy {
       if (remainingForWork > 0) this.pendingOperationsByWork.set(workId, remainingForWork);
       else this.pendingOperationsByWork.delete(workId);
       this.pendingOperationCount = Math.max(0, this.pendingOperationCount - 1);
+      if (this.pendingOperationCount === 0) this.stopClusterLoadHeartbeat();
       if (this.workTails.get(workId) === tail) this.workTails.delete(workId);
     });
     return run;

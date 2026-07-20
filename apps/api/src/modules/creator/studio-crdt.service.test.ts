@@ -216,10 +216,6 @@ class MemoryStudioCrdtClusterLoadRepository implements StudioCrdtClusterLoadRepo
   // When set, readClusterLoad suspends until the test resolves it -- used to hold a heartbeat
   // genuinely in-flight (e.g. to test onModuleDestroy racing against it).
   readGate: Promise<void> | undefined;
-  private firstReadResolve: (() => void) | undefined;
-  readonly firstRead = new Promise<void>((resolve) => {
-    this.firstReadResolve = resolve;
-  });
 
   async reportLoad(nodeId: string, pendingOperations: number, now: Date): Promise<void> {
     this.reportedLoads.push({ nodeId, pendingOperations, now });
@@ -228,13 +224,6 @@ class MemoryStudioCrdtClusterLoadRepository implements StudioCrdtClusterLoadRepo
   async readClusterLoad(): Promise<number> {
     if (this.readGate) await this.readGate;
     if (this.failReads) throw new Error("cluster load discovery failed");
-    // Scheduled as a macrotask, not resolved synchronously: the caller (reportClusterLoad) still
-    // has a pending microtask-queued assignment of cachedClusterPendingOperations after this
-    // promise settles. A setTimeout only fires once the full microtask queue has drained, so
-    // awaiting firstRead is guaranteed to observe that assignment already applied.
-    const resolve = this.firstReadResolve;
-    this.firstReadResolve = undefined;
-    if (resolve) setTimeout(resolve, 0);
     return this.clusterLoad;
   }
 }
@@ -2886,6 +2875,72 @@ describe("StudioCrdtService", () => {
     });
   });
 
+  it("keeps idle nodes silent and reports only active load plus the final zero transition", async () => {
+    const repository = new MemoryStudioCrdtRepository();
+    let releaseLoad: (() => void) | undefined;
+    const loadGate = new Promise<void>((resolve) => {
+      releaseLoad = resolve;
+    });
+    vi.spyOn(repository, "loadDocument").mockImplementation(async () => {
+      await loadGate;
+      return { snapshot: null, updates: [] };
+    });
+    const reportLoad = vi.fn(async () => undefined);
+    const readClusterLoad = vi.fn(async () => 1);
+    const scheduled: Array<{
+      handler: () => void;
+      delay: number;
+      handle: ReturnType<typeof setInterval>;
+    }> = [];
+    const cancelInterval = vi.fn();
+    const current = service(
+      repository,
+      {
+        scheduleInterval: (handler, delay) => {
+          const handle = {} as ReturnType<typeof setInterval>;
+          scheduled.push({ handler, delay, handle });
+          return handle;
+        },
+        cancelInterval,
+      },
+      undefined,
+      undefined,
+      { reportLoad, readClusterLoad }
+    );
+
+    await Promise.resolve();
+    expect(scheduled.some(({ delay }) => delay === 350)).toBe(false);
+    expect(reportLoad).not.toHaveBeenCalled();
+    expect(readClusterLoad).not.toHaveBeenCalled();
+
+    const syncing = current.sync("work-active-cluster-load");
+    await vi.waitFor(() => {
+      expect(reportLoad).toHaveBeenCalledWith(
+        expect.any(String),
+        1,
+        expect.any(Date)
+      );
+    });
+    const clusterTimer = scheduled.find(({ delay }) => delay === 350);
+    expect(clusterTimer?.handler).toBeTypeOf("function");
+    expect(readClusterLoad).toHaveBeenCalledOnce();
+
+    releaseLoad?.();
+    await syncing;
+    await vi.waitFor(() => {
+      expect(reportLoad).toHaveBeenLastCalledWith(
+        expect.any(String),
+        0,
+        expect.any(Date)
+      );
+    });
+    expect(cancelInterval).toHaveBeenCalledWith(clusterTimer?.handle);
+    const reportCountAfterFinalZero = reportLoad.mock.calls.length;
+    await Promise.resolve();
+    expect(reportLoad).toHaveBeenCalledTimes(reportCountAfterFinalZero);
+    expect(readClusterLoad).toHaveBeenCalledOnce();
+  });
+
   it("rejects a new operation when the cached cluster-wide load is at or over budget", async () => {
     const repository = new MemoryStudioCrdtRepository();
     const clusterLoadRepository = new MemoryStudioCrdtClusterLoadRepository();
@@ -2897,7 +2952,12 @@ describe("StudioCrdtService", () => {
       undefined,
       clusterLoadRepository
     );
-    await clusterLoadRepository.firstRead;
+    const internals = current as unknown as {
+      pendingOperationCount: number;
+      reportClusterLoad(): Promise<void>;
+    };
+    internals.pendingOperationCount = 1;
+    await internals.reportClusterLoad();
 
     await expect(current.sync("work-cluster-cap")).rejects.toBeInstanceOf(
       StudioCrdtBackpressureError
@@ -2915,8 +2975,7 @@ describe("StudioCrdtService", () => {
         now: () => currentTime,
         maxClusterPendingOperationsTotal: 1,
         clusterLoadStaleAfterMs: 1_000,
-        // Only the constructor's immediate heartbeat should run in this test; a real recurring
-        // timer would race the manually-advanced clock below.
+        // Manual sampling below owns the clock in this test; no real recurring timer may race it.
         scheduleInterval: () => ({}) as ReturnType<typeof setInterval>,
         cancelInterval: () => undefined,
       },
@@ -2924,7 +2983,12 @@ describe("StudioCrdtService", () => {
       undefined,
       clusterLoadRepository
     );
-    await clusterLoadRepository.firstRead;
+    const internals = current as unknown as {
+      pendingOperationCount: number;
+      reportClusterLoad(): Promise<void>;
+    };
+    internals.pendingOperationCount = 1;
+    await internals.reportClusterLoad();
 
     await expect(current.sync("work-stale-cluster")).rejects.toBeInstanceOf(
       StudioCrdtBackpressureError
@@ -2980,10 +3044,15 @@ describe("StudioCrdtService", () => {
       );
       const internals = current as unknown as {
         cachedClusterPendingOperations: number;
+        pendingOperationCount: number;
+        reportClusterLoad(): Promise<void>;
       };
+      internals.pendingOperationCount = 1;
 
-      // The first immediate read times out at 400 ms; the 500 ms interval tick completes with 2.
-      await vi.advanceTimersByTimeAsync(501);
+      const first = internals.reportClusterLoad();
+      await vi.advanceTimersByTimeAsync(401);
+      await first;
+      await internals.reportClusterLoad();
       expect(readCount).toBeGreaterThanOrEqual(2);
       expect(internals.cachedClusterPendingOperations).toBe(2);
 
@@ -3004,8 +3073,13 @@ describe("StudioCrdtService", () => {
     clusterLoadRepository.readGate = new Promise((resolve) => {
       releaseGate = resolve;
     });
-    // The constructor's own immediate heartbeat is now suspended inside readClusterLoad.
     const current = service(repository, {}, undefined, undefined, clusterLoadRepository);
+    const internals = current as unknown as {
+      pendingOperationCount: number;
+      reportClusterLoad(): Promise<void>;
+    };
+    internals.pendingOperationCount = 1;
+    void internals.reportClusterLoad();
 
     let destroyed = false;
     const destroying = current.onModuleDestroy().then(() => {
