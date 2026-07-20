@@ -42,6 +42,8 @@ export type StudioServerAiStatus = {
     failureMode: "closed";
     dailyRequestLimit: number;
     dailyTokenLimit: number;
+    globalDailyRequestLimit?: number;
+    globalDailyTokenLimit?: number;
   };
 };
 

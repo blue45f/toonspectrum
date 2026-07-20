@@ -219,6 +219,8 @@ export class StudioAiService {
         failureMode: "closed" as const,
         dailyRequestLimit: limits.dailyRequests,
         dailyTokenLimit: limits.dailyTokens,
+        globalDailyRequestLimit: limits.globalDailyRequests,
+        globalDailyTokenLimit: limits.globalDailyTokens,
       },
     };
   }

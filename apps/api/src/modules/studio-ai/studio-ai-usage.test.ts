@@ -4,6 +4,8 @@ import {
   attemptStudioAiQuotaReservation,
   DEFAULT_STUDIO_AI_DAILY_REQUEST_LIMIT,
   DEFAULT_STUDIO_AI_DAILY_TOKEN_LIMIT,
+  DEFAULT_STUDIO_AI_GLOBAL_DAILY_REQUEST_LIMIT,
+  DEFAULT_STUDIO_AI_GLOBAL_DAILY_TOKEN_LIMIT,
   estimateStudioAiTokenReservation,
   resolveStudioAiQuotaLimits,
   settleStudioAiQuotaReservation,
@@ -16,21 +18,34 @@ describe("Studio AI usage quota helpers", () => {
     expect(resolveStudioAiQuotaLimits({})).toEqual({
       dailyRequests: DEFAULT_STUDIO_AI_DAILY_REQUEST_LIMIT,
       dailyTokens: DEFAULT_STUDIO_AI_DAILY_TOKEN_LIMIT,
+      globalDailyRequests: DEFAULT_STUDIO_AI_GLOBAL_DAILY_REQUEST_LIMIT,
+      globalDailyTokens: DEFAULT_STUDIO_AI_GLOBAL_DAILY_TOKEN_LIMIT,
     });
     expect(
       resolveStudioAiQuotaLimits({
         STUDIO_AI_DAILY_REQUEST_LIMIT: "25",
         STUDIO_AI_DAILY_TOKEN_LIMIT: "75000",
+        STUDIO_AI_GLOBAL_DAILY_REQUEST_LIMIT: "1000",
+        STUDIO_AI_GLOBAL_DAILY_TOKEN_LIMIT: "5000000",
       })
-    ).toEqual({ dailyRequests: 25, dailyTokens: 75_000 });
+    ).toEqual({
+      dailyRequests: 25,
+      dailyTokens: 75_000,
+      globalDailyRequests: 1_000,
+      globalDailyTokens: 5_000_000,
+    });
     expect(
       resolveStudioAiQuotaLimits({
         STUDIO_AI_DAILY_REQUEST_LIMIT: "invalid",
         STUDIO_AI_DAILY_TOKEN_LIMIT: "0",
+        STUDIO_AI_GLOBAL_DAILY_REQUEST_LIMIT: "-1",
+        STUDIO_AI_GLOBAL_DAILY_TOKEN_LIMIT: "invalid",
       })
     ).toEqual({
       dailyRequests: DEFAULT_STUDIO_AI_DAILY_REQUEST_LIMIT,
       dailyTokens: DEFAULT_STUDIO_AI_DAILY_TOKEN_LIMIT,
+      globalDailyRequests: DEFAULT_STUDIO_AI_GLOBAL_DAILY_REQUEST_LIMIT,
+      globalDailyTokens: DEFAULT_STUDIO_AI_GLOBAL_DAILY_TOKEN_LIMIT,
     });
   });
 

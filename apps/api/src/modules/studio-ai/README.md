@@ -20,13 +20,13 @@ provider error bodies, client IPs, or the provider-facing pseudonymous user ID.
 
 ## Atomic quota flow
 
-1. Before an external request, one conditional PostgreSQL
-   `INSERT ... ON CONFLICT ... DO UPDATE ... WHERE ... RETURNING` reserves the
-   request and a conservative token upper bound in the `(user, UTC day)` row.
-   PostgreSQL row locking makes this atomic across all API instances.
+1. Before an external request, one short PostgreSQL transaction reserves the
+   request and a conservative token upper bound in both the global UTC-day row
+   and the `(user, UTC day)` row. The global row is always locked first, making
+   service-wide and per-user admission atomic across all API instances.
 2. No database transaction remains open during a Z.ai or DeepSeek HTTP request.
-3. A short transaction releases the reservation, charges returned token usage,
-   and inserts the terminal ledger event together.
+3. A short transaction releases both reservations, charges returned token
+   usage to both quota rows, and inserts the terminal ledger event together.
 4. The UTC day comes from the PostgreSQL clock, not an API instance clock. A
    request that crosses midnight settles against the day on which it reserved.
 
@@ -83,10 +83,13 @@ retry could duplicate billing. Provider error bodies and business messages are
 used transiently for the allowlist check and are never returned, logged, or
 written to the usage ledger.
 
-Defaults are 200 requests and 1,000,000 reserved/consumed tokens per user per
-UTC day. Override them with `STUDIO_AI_DAILY_REQUEST_LIMIT` and
-`STUDIO_AI_DAILY_TOKEN_LIMIT`.
+Defaults are 200 requests and 1,000,000 reserved/consumed tokens per user, with
+a service-wide ceiling of 500 requests and 2,000,000 tokens per UTC day.
+Override them with `STUDIO_AI_DAILY_REQUEST_LIMIT`,
+`STUDIO_AI_DAILY_TOKEN_LIMIT`, `STUDIO_AI_GLOBAL_DAILY_REQUEST_LIMIT`, and
+`STUDIO_AI_GLOBAL_DAILY_TOKEN_LIMIT`.
 
-Apply `lib/db/migrations/0001_studio_ai_usage_ledger.sql` (or the equivalent
-`drizzle-kit push`) before deploying the quota-enforcing API build. If the
-tables are missing, Studio AI safely returns `503`.
+Apply `lib/db/migrations/0001_studio_ai_usage_ledger.sql` and
+`lib/db/migrations/0014_studio_ai_global_daily_quota.sql` (or the equivalent
+`drizzle-kit push`) before deploying the quota-enforcing API build. If any
+quota table is missing, Studio AI safely returns `503` before provider use.

@@ -1484,7 +1484,24 @@ export const creatorAssetReports = pgTable(
 
 // ── 창작 스튜디오 서버 AI: 분산 일일 쿼터 + 최소 사용 이력 ──────────────
 // 원장에는 프롬프트/응답/API 키/제공자 오류 본문을 저장하지 않는다. 일일 집계 행은 외부 호출 전에
-// 토큰을 보수적으로 예약해 여러 API 인스턴스의 동시 요청도 단일 Postgres UPSERT로 제한한다.
+// 토큰을 보수적으로 예약해 여러 API 인스턴스의 동시 요청도 짧은 Postgres 트랜잭션으로 제한한다.
+export const studioAiGlobalDailyQuotas = pgTable(
+  "studio_ai_global_daily_quota",
+  {
+    usageDay: date("usageDay", { mode: "string" }).primaryKey(), // DB clock 기준 UTC 날짜
+    requestCount: integer("requestCount").notNull().default(0),
+    tokenCount: bigint("tokenCount", { mode: "number" }).notNull().default(0),
+    reservedTokens: bigint("reservedTokens", { mode: "number" }).notNull().default(0),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check("studio_ai_global_daily_quota_request_count_check", sql`${t.requestCount} >= 0`),
+    check("studio_ai_global_daily_quota_token_count_check", sql`${t.tokenCount} >= 0`),
+    check("studio_ai_global_daily_quota_reserved_tokens_check", sql`${t.reservedTokens} >= 0`),
+  ]
+);
+
 export const studioAiDailyQuotas = pgTable(
   "studio_ai_daily_quota",
   {

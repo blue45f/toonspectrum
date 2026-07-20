@@ -66,6 +66,14 @@ const envSchema = z.object({
     .string()
     .regex(/^[1-9]\d*$/, "STUDIO_AI_DAILY_TOKEN_LIMIT must be a positive integer")
     .optional(),
+  STUDIO_AI_GLOBAL_DAILY_REQUEST_LIMIT: z
+    .string()
+    .regex(/^[1-9]\d*$/, "STUDIO_AI_GLOBAL_DAILY_REQUEST_LIMIT must be a positive integer")
+    .optional(),
+  STUDIO_AI_GLOBAL_DAILY_TOKEN_LIMIT: z
+    .string()
+    .regex(/^[1-9]\d*$/, "STUDIO_AI_GLOBAL_DAILY_TOKEN_LIMIT must be a positive integer")
+    .optional(),
   // OAuth(선택 — 둘 다 있으면 실제 OAuth, 없으면 데모 폴백).
   GOOGLE_OAUTH_CLIENT_ID: z.string().min(1).optional(),
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().min(1).optional(),

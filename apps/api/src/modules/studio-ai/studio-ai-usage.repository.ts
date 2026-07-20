@@ -23,35 +23,59 @@ interface StudioAiSqlClient {
 }
 
 export interface StudioAiSqlPool {
-  query<Row extends Record<string, unknown> = Record<string, unknown>>(
-    text: string,
-    values?: unknown[]
-  ): Promise<SqlResult<Row>>;
   connect(): Promise<StudioAiSqlClient>;
 }
 
-const RESERVE_QUOTA_SQL = `
-WITH quota_clock AS (
-  SELECT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date AS usage_day
+const QUOTA_USAGE_DAY_SQL = `
+SELECT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date::text AS "usageDay"
+`;
+
+const RESERVE_GLOBAL_QUOTA_SQL = `
+INSERT INTO studio_ai_global_daily_quota (
+  "usageDay", "requestCount", "tokenCount", "reservedTokens", "createdAt", "updatedAt"
 )
-INSERT INTO studio_ai_daily_quota (
-  "userId", "usageDay", "requestCount", "tokenCount", "reservedTokens", "createdAt", "updatedAt"
-)
-SELECT $1, quota_clock.usage_day, 1, 0, $2::bigint, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-FROM quota_clock
+SELECT $1::date, 1, 0, $2::bigint, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 WHERE $3::integer >= 1 AND $2::bigint <= $4::bigint
-ON CONFLICT ("userId", "usageDay") DO UPDATE SET
-  "requestCount" = studio_ai_daily_quota."requestCount" + 1,
-  "reservedTokens" = studio_ai_daily_quota."reservedTokens" + $2::bigint,
+ON CONFLICT ("usageDay") DO UPDATE SET
+  "requestCount" = studio_ai_global_daily_quota."requestCount" + 1,
+  "reservedTokens" = studio_ai_global_daily_quota."reservedTokens" + $2::bigint,
   "updatedAt" = CURRENT_TIMESTAMP
-WHERE studio_ai_daily_quota."requestCount" < $3::integer
-  AND studio_ai_daily_quota."tokenCount"
-    + studio_ai_daily_quota."reservedTokens"
+WHERE studio_ai_global_daily_quota."requestCount" < $3::integer
+  AND studio_ai_global_daily_quota."tokenCount"
+    + studio_ai_global_daily_quota."reservedTokens"
     + $2::bigint <= $4::bigint
 RETURNING "usageDay"::text AS "usageDay"
 `;
 
-const SETTLE_QUOTA_SQL = `
+const RESERVE_USER_QUOTA_SQL = `
+INSERT INTO studio_ai_daily_quota (
+  "userId", "usageDay", "requestCount", "tokenCount", "reservedTokens", "createdAt", "updatedAt"
+)
+SELECT $1, $2::date, 1, 0, $3::bigint, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+WHERE $4::integer >= 1 AND $3::bigint <= $5::bigint
+ON CONFLICT ("userId", "usageDay") DO UPDATE SET
+  "requestCount" = studio_ai_daily_quota."requestCount" + 1,
+  "reservedTokens" = studio_ai_daily_quota."reservedTokens" + $3::bigint,
+  "updatedAt" = CURRENT_TIMESTAMP
+WHERE studio_ai_daily_quota."requestCount" < $4::integer
+  AND studio_ai_daily_quota."tokenCount"
+    + studio_ai_daily_quota."reservedTokens"
+    + $3::bigint <= $5::bigint
+RETURNING "usageDay"::text AS "usageDay"
+`;
+
+const SETTLE_GLOBAL_QUOTA_SQL = `
+UPDATE studio_ai_global_daily_quota
+SET
+  "reservedTokens" = "reservedTokens" - $2::bigint,
+  "tokenCount" = "tokenCount" + $3::bigint,
+  "updatedAt" = CURRENT_TIMESTAMP
+WHERE "usageDay" = $1::date
+  AND "reservedTokens" >= $2::bigint
+RETURNING "usageDay"::text AS "usageDay"
+`;
+
+const SETTLE_USER_QUOTA_SQL = `
 UPDATE studio_ai_daily_quota
 SET
   "reservedTokens" = "reservedTokens" - $3::bigint,
@@ -85,17 +109,59 @@ export class PostgresStudioAiUsageStore implements StudioAiUsageStore {
     requireNonNegativeSafeInteger(input.reservedTokens, "reservedTokens");
     requireNonNegativeSafeInteger(input.limits.dailyRequests, "dailyRequests");
     requireNonNegativeSafeInteger(input.limits.dailyTokens, "dailyTokens");
+    requireNonNegativeSafeInteger(input.limits.globalDailyRequests, "globalDailyRequests");
+    requireNonNegativeSafeInteger(input.limits.globalDailyTokens, "globalDailyTokens");
 
-    const result = await this.pool.query<{ usageDay: string }>(RESERVE_QUOTA_SQL, [
-      input.userId,
-      input.reservedTokens,
-      input.limits.dailyRequests,
-      input.limits.dailyTokens,
-    ]);
-    const usageDay = result.rows[0]?.usageDay;
-    return result.rowCount === 1 && typeof usageDay === "string"
-      ? { allowed: true, usageDay }
-      : { allowed: false };
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const clock = await client.query<{ usageDay: string }>(QUOTA_USAGE_DAY_SQL);
+      const usageDay = clock.rows[0]?.usageDay;
+      if (typeof usageDay !== "string") {
+        throw new Error("Studio AI quota clock did not return a UTC day.");
+      }
+      // Lock the single global day row first in both admission and settlement. The short-lived
+      // transaction makes the service-wide cap authoritative across API instances without holding
+      // any database lock during the external AI request.
+      const globalReservation = await client.query<{ usageDay: string }>(
+        RESERVE_GLOBAL_QUOTA_SQL,
+        [
+          usageDay,
+          input.reservedTokens,
+          input.limits.globalDailyRequests,
+          input.limits.globalDailyTokens,
+        ]
+      );
+      if (globalReservation.rowCount !== 1) {
+        await client.query("ROLLBACK");
+        return { allowed: false };
+      }
+      const userReservation = await client.query<{ usageDay: string }>(
+        RESERVE_USER_QUOTA_SQL,
+        [
+          input.userId,
+          usageDay,
+          input.reservedTokens,
+          input.limits.dailyRequests,
+          input.limits.dailyTokens,
+        ]
+      );
+      if (userReservation.rowCount !== 1) {
+        await client.query("ROLLBACK");
+        return { allowed: false };
+      }
+      await client.query("COMMIT");
+      return { allowed: true, usageDay };
+    } catch (error) {
+      try {
+        await client.query("ROLLBACK");
+      } catch {
+        // Preserve the admission failure; the service fails closed before provider invocation.
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async finalize(input: StudioAiUsageFinalizationInput): Promise<void> {
@@ -108,13 +174,21 @@ export class PostgresStudioAiUsageStore implements StudioAiUsageStore {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
-      const settled = await client.query(SETTLE_QUOTA_SQL, [
+      const globalSettled = await client.query(SETTLE_GLOBAL_QUOTA_SQL, [
+        input.usageDay,
+        input.reservedTokens,
+        chargedTokens,
+      ]);
+      if (globalSettled.rowCount !== 1) {
+        throw new Error("Studio AI global quota reservation was not available for finalization.");
+      }
+      const userSettled = await client.query(SETTLE_USER_QUOTA_SQL, [
         input.userId,
         input.usageDay,
         input.reservedTokens,
         chargedTokens,
       ]);
-      if (settled.rowCount !== 1) {
+      if (userSettled.rowCount !== 1) {
         throw new Error("Studio AI quota reservation was not available for finalization.");
       }
       await client.query(INSERT_LEDGER_SQL, [

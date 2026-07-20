@@ -60,6 +60,8 @@ describe("StudioAiService", () => {
     delete process.env.DEEPSEEK_TIMEOUT_MS;
     delete process.env.STUDIO_AI_DAILY_REQUEST_LIMIT;
     delete process.env.STUDIO_AI_DAILY_TOKEN_LIMIT;
+    delete process.env.STUDIO_AI_GLOBAL_DAILY_REQUEST_LIMIT;
+    delete process.env.STUDIO_AI_GLOBAL_DAILY_TOKEN_LIMIT;
   });
 
   afterEach(() => {
@@ -78,6 +80,8 @@ describe("StudioAiService", () => {
       failureMode: "closed",
       dailyRequestLimit: 200,
       dailyTokenLimit: 1_000_000,
+      globalDailyRequestLimit: 500,
+      globalDailyTokenLimit: 2_000_000,
     });
     expect(status.selection).toMatchObject({
       fallback: true,
@@ -135,7 +139,12 @@ describe("StudioAiService", () => {
     expect(reserve).toHaveBeenCalledWith({
       userId: "studio-user-success",
       reservedTokens: expect.any(Number),
-      limits: { dailyRequests: 200, dailyTokens: 1_000_000 },
+      limits: {
+        dailyRequests: 200,
+        dailyTokens: 1_000_000,
+        globalDailyRequests: 500,
+        globalDailyTokens: 2_000_000,
+      },
     });
     expect(finalize).toHaveBeenCalledWith(
       expect.objectContaining({

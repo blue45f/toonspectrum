@@ -7,17 +7,37 @@ import type { StudioAiSqlPool } from "./studio-ai-usage.repository";
 vi.mock("../../../../../lib/db", () => ({ dbPool: {} }));
 
 function createPool(input?: {
-  reserveRows?: Array<{ usageDay: string }>;
-  settleRowCount?: number;
+  clockRows?: Array<{ usageDay: string }>;
+  globalReserveRows?: Array<{ usageDay: string }>;
+  userReserveRows?: Array<{ usageDay: string }>;
+  globalSettleRowCount?: number;
+  userSettleRowCount?: number;
   ledgerError?: Error;
 }) {
-  const query = vi.fn().mockResolvedValue({
-    rowCount: input?.reserveRows?.length ?? 1,
-    rows: input?.reserveRows ?? [{ usageDay: "2026-07-10" }],
-  });
   const clientQuery = vi.fn().mockImplementation((sql: string) => {
+    if (sql.includes("CURRENT_TIMESTAMP AT TIME ZONE 'UTC'")) {
+      const rows = input?.clockRows ?? [{ usageDay: "2026-07-10" }];
+      return Promise.resolve({ rowCount: rows.length, rows });
+    }
+    if (sql.includes("INSERT INTO studio_ai_global_daily_quota")) {
+      const rows = input?.globalReserveRows ?? [{ usageDay: "2026-07-10" }];
+      return Promise.resolve({ rowCount: rows.length, rows });
+    }
+    if (sql.includes("INSERT INTO studio_ai_daily_quota")) {
+      const rows = input?.userReserveRows ?? [{ usageDay: "2026-07-10" }];
+      return Promise.resolve({ rowCount: rows.length, rows });
+    }
+    if (sql.includes("UPDATE studio_ai_global_daily_quota")) {
+      return Promise.resolve({
+        rowCount: input?.globalSettleRowCount ?? 1,
+        rows: [{ usageDay: "2026-07-10" }],
+      });
+    }
     if (sql.includes("UPDATE studio_ai_daily_quota")) {
-      return Promise.resolve({ rowCount: input?.settleRowCount ?? 1, rows: [{ userId: "user-1" }] });
+      return Promise.resolve({
+        rowCount: input?.userSettleRowCount ?? 1,
+        rows: [{ userId: "user-1" }],
+      });
     }
     if (sql.includes("INSERT INTO studio_ai_usage_ledger") && input?.ledgerError) {
       return Promise.reject(input.ledgerError);
@@ -26,42 +46,85 @@ function createPool(input?: {
   });
   const release = vi.fn();
   const connect = vi.fn().mockResolvedValue({ query: clientQuery, release });
-  const pool = { query, connect } as unknown as StudioAiSqlPool;
-  return { pool, query, clientQuery, connect, release };
+  const pool = { connect } as unknown as StudioAiSqlPool;
+  return { pool, clientQuery, connect, release };
 }
 
 describe("PostgresStudioAiUsageStore", () => {
-  it("uses one UTC database-clock UPSERT for cross-instance atomic admission", async () => {
-    const { pool, query } = createPool();
+  it("atomically reserves global and per-user UTC quotas in one short transaction", async () => {
+    const { pool, clientQuery, release } = createPool();
     const store = new PostgresStudioAiUsageStore(pool);
 
     await expect(
       store.reserve({
         userId: "user-1",
         reservedTokens: 1_200,
-        limits: { dailyRequests: 200, dailyTokens: 1_000_000 },
+        limits: {
+          dailyRequests: 200,
+          dailyTokens: 1_000_000,
+          globalDailyRequests: 500,
+          globalDailyTokens: 2_000_000,
+        },
       })
     ).resolves.toEqual({ allowed: true, usageDay: "2026-07-10" });
 
-    expect(query).toHaveBeenCalledOnce();
-    const [sql, values] = query.mock.calls[0] as [string, unknown[]];
-    expect(sql).toContain("CURRENT_TIMESTAMP AT TIME ZONE 'UTC'");
-    expect(sql).toContain("ON CONFLICT");
-    expect(sql).toContain("RETURNING");
-    expect(values).toEqual(["user-1", 1_200, 200, 1_000_000]);
+    expect(clientQuery.mock.calls.map(([sql]) => String(sql).trim().split(/\s+/)[0])).toEqual([
+      "BEGIN",
+      "SELECT",
+      "INSERT",
+      "INSERT",
+      "COMMIT",
+    ]);
+    const globalCall = clientQuery.mock.calls.find(([sql]) =>
+      String(sql).includes("INSERT INTO studio_ai_global_daily_quota")
+    );
+    expect(globalCall?.[1]).toEqual(["2026-07-10", 1_200, 500, 2_000_000]);
+    const userCall = clientQuery.mock.calls.find(([sql]) =>
+      String(sql).includes("INSERT INTO studio_ai_daily_quota")
+    );
+    expect(userCall?.[1]).toEqual(["user-1", "2026-07-10", 1_200, 200, 1_000_000]);
+    expect(release).toHaveBeenCalledOnce();
   });
 
-  it("returns a quota denial when the conditional UPSERT returns no row", async () => {
-    const { pool } = createPool({ reserveRows: [] });
+  it("rolls back before user admission when the service-wide quota is exhausted", async () => {
+    const { pool, clientQuery } = createPool({ globalReserveRows: [] });
     const store = new PostgresStudioAiUsageStore(pool);
 
     await expect(
       store.reserve({
         userId: "user-1",
         reservedTokens: 1_200,
-        limits: { dailyRequests: 1, dailyTokens: 1_000 },
+        limits: {
+          dailyRequests: 1,
+          dailyTokens: 1_000,
+          globalDailyRequests: 1,
+          globalDailyTokens: 1_000,
+        },
       })
     ).resolves.toEqual({ allowed: false });
+    expect(
+      clientQuery.mock.calls.some(([sql]) => String(sql).includes("INSERT INTO studio_ai_daily_quota"))
+    ).toBe(false);
+    expect(clientQuery).toHaveBeenLastCalledWith("ROLLBACK");
+  });
+
+  it("rolls back the global reservation when the individual quota is exhausted", async () => {
+    const { pool, clientQuery } = createPool({ userReserveRows: [] });
+    const store = new PostgresStudioAiUsageStore(pool);
+
+    await expect(
+      store.reserve({
+        userId: "user-1",
+        reservedTokens: 1_200,
+        limits: {
+          dailyRequests: 1,
+          dailyTokens: 1_000,
+          globalDailyRequests: 500,
+          globalDailyTokens: 2_000_000,
+        },
+      })
+    ).resolves.toEqual({ allowed: false });
+    expect(clientQuery).toHaveBeenLastCalledWith("ROLLBACK");
   });
 
   it("settles quota and inserts only the privacy-minimized ledger fields in one transaction", async () => {
@@ -85,11 +148,18 @@ describe("PostgresStudioAiUsageStore", () => {
     expect(clientQuery.mock.calls.map(([sql]) => String(sql).trim().split(/\s+/)[0])).toEqual([
       "BEGIN",
       "UPDATE",
+      "UPDATE",
       "INSERT",
       "COMMIT",
     ]);
-    const updateCall = clientQuery.mock.calls.find(([sql]) => String(sql).includes("UPDATE studio_ai_daily_quota"));
-    expect(updateCall?.[1]).toEqual(["user-1", "2026-07-10", 1_200, 20]);
+    const globalUpdateCall = clientQuery.mock.calls.find(([sql]) =>
+      String(sql).includes("UPDATE studio_ai_global_daily_quota")
+    );
+    expect(globalUpdateCall?.[1]).toEqual(["2026-07-10", 1_200, 20]);
+    const userUpdateCall = clientQuery.mock.calls.find(([sql]) =>
+      String(sql).includes("UPDATE studio_ai_daily_quota")
+    );
+    expect(userUpdateCall?.[1]).toEqual(["user-1", "2026-07-10", 1_200, 20]);
     const ledgerCall = clientQuery.mock.calls.find(([sql]) => String(sql).includes("studio_ai_usage_ledger"));
     expect(ledgerCall?.[1]).toEqual([
       "user-1",
@@ -127,8 +197,14 @@ describe("PostgresStudioAiUsageStore", () => {
       finishedAt: new Date("2026-07-10T00:00:01.000Z"),
     });
 
-    const updateCall = clientQuery.mock.calls.find(([sql]) => String(sql).includes("UPDATE studio_ai_daily_quota"));
-    expect(updateCall?.[1]).toEqual(["user-1", "2026-07-10", 1_200, 1_200]);
+    const globalUpdateCall = clientQuery.mock.calls.find(([sql]) =>
+      String(sql).includes("UPDATE studio_ai_global_daily_quota")
+    );
+    expect(globalUpdateCall?.[1]).toEqual(["2026-07-10", 1_200, 1_200]);
+    const userUpdateCall = clientQuery.mock.calls.find(([sql]) =>
+      String(sql).includes("UPDATE studio_ai_daily_quota")
+    );
+    expect(userUpdateCall?.[1]).toEqual(["user-1", "2026-07-10", 1_200, 1_200]);
     const ledgerCall = clientQuery.mock.calls.find(([sql]) => String(sql).includes("studio_ai_usage_ledger"));
     expect((ledgerCall?.[1] as unknown[]).slice(6, 9)).toEqual([null, null, null]);
   });
@@ -153,6 +229,33 @@ describe("PostgresStudioAiUsageStore", () => {
       })
     ).rejects.toThrow("db unavailable");
 
+    expect(clientQuery).toHaveBeenCalledWith("ROLLBACK");
+    expect(release).toHaveBeenCalledOnce();
+  });
+
+  it("rolls back both settlements when the global reservation is missing", async () => {
+    const { pool, clientQuery, release } = createPool({ globalSettleRowCount: 0 });
+    const store = new PostgresStudioAiUsageStore(pool);
+
+    await expect(
+      store.finalize({
+        userId: "user-1",
+        usageDay: "2026-07-10",
+        reservedTokens: 1_200,
+        task: "composition",
+        provider: "deepseek",
+        model: "deepseek-v4-flash",
+        attemptCount: 1,
+        status: "provider_error",
+        usage: {},
+        startedAt: new Date("2026-07-10T00:00:00.000Z"),
+        finishedAt: new Date("2026-07-10T00:00:01.000Z"),
+      })
+    ).rejects.toThrow("global quota reservation");
+
+    expect(
+      clientQuery.mock.calls.some(([sql]) => String(sql).includes("UPDATE studio_ai_daily_quota"))
+    ).toBe(false);
     expect(clientQuery).toHaveBeenCalledWith("ROLLBACK");
     expect(release).toHaveBeenCalledOnce();
   });

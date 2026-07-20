@@ -22,6 +22,8 @@ export interface StudioAiTokenUsage {
 export interface StudioAiQuotaLimits {
   dailyRequests: number;
   dailyTokens: number;
+  globalDailyRequests: number;
+  globalDailyTokens: number;
 }
 
 export interface StudioAiDailyQuotaState {
@@ -63,8 +65,12 @@ export const STUDIO_AI_USAGE_STORE = Symbol("STUDIO_AI_USAGE_STORE");
 
 export const DEFAULT_STUDIO_AI_DAILY_REQUEST_LIMIT = 200;
 export const DEFAULT_STUDIO_AI_DAILY_TOKEN_LIMIT = 1_000_000;
+export const DEFAULT_STUDIO_AI_GLOBAL_DAILY_REQUEST_LIMIT = 500;
+export const DEFAULT_STUDIO_AI_GLOBAL_DAILY_TOKEN_LIMIT = 2_000_000;
 export const MAX_STUDIO_AI_DAILY_REQUEST_LIMIT = 10_000;
 export const MAX_STUDIO_AI_DAILY_TOKEN_LIMIT = 100_000_000;
+export const MAX_STUDIO_AI_GLOBAL_DAILY_REQUEST_LIMIT = 10_000_000;
+export const MAX_STUDIO_AI_GLOBAL_DAILY_TOKEN_LIMIT = 1_000_000_000;
 const PROVIDER_MESSAGE_OVERHEAD_TOKENS = 256;
 
 type EnvLike = Partial<Record<string, string | undefined>>;
@@ -87,6 +93,16 @@ export function resolveStudioAiQuotaLimits(env: EnvLike = process.env): StudioAi
       env.STUDIO_AI_DAILY_TOKEN_LIMIT,
       DEFAULT_STUDIO_AI_DAILY_TOKEN_LIMIT,
       MAX_STUDIO_AI_DAILY_TOKEN_LIMIT
+    ),
+    globalDailyRequests: boundedPositiveInteger(
+      env.STUDIO_AI_GLOBAL_DAILY_REQUEST_LIMIT,
+      DEFAULT_STUDIO_AI_GLOBAL_DAILY_REQUEST_LIMIT,
+      MAX_STUDIO_AI_GLOBAL_DAILY_REQUEST_LIMIT
+    ),
+    globalDailyTokens: boundedPositiveInteger(
+      env.STUDIO_AI_GLOBAL_DAILY_TOKEN_LIMIT,
+      DEFAULT_STUDIO_AI_GLOBAL_DAILY_TOKEN_LIMIT,
+      MAX_STUDIO_AI_GLOBAL_DAILY_TOKEN_LIMIT
     ),
   };
 }
@@ -136,7 +152,7 @@ export function studioAiQuotaTokenCharge(usage: StudioAiTokenUsage, reservedToke
 export function attemptStudioAiQuotaReservation(
   state: StudioAiDailyQuotaState,
   reservedTokens: number,
-  limits: StudioAiQuotaLimits
+  limits: Pick<StudioAiQuotaLimits, "dailyRequests" | "dailyTokens">
 ): { allowed: true; state: StudioAiDailyQuotaState } | { allowed: false; state: StudioAiDailyQuotaState } {
   const allowed =
     state.requestCount < limits.dailyRequests &&
