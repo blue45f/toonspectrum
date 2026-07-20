@@ -12,6 +12,7 @@ import { studioCrdtRepositoryProvider } from "./studio-crdt.repository";
 import { StudioCrdtService } from "./studio-crdt.service";
 import { StudioLiveAdapterCleanupService } from "./studio-live-adapter-cleanup.service";
 import { StudioLiveCleanupNotificationDispatcher } from "./studio-live-cleanup-notification-dispatcher";
+import { studioLiveFeaturePolicyProvider } from "./studio-live-feature-policy";
 import { StudioLiveInterServerRelayTransport } from "./studio-live-inter-server-relay-transport";
 import { StudioLiveJoinTransitionSequencer } from "./studio-live-join-transition-sequencer";
 import { studioLiveLockRepositoryProvider } from "./studio-live-lock.repository";
@@ -57,6 +58,7 @@ import { StudioWorkAssetService } from "./studio-work-asset.service";
     creatorCollaborationRepositoryProvider,
     studioCrdtClusterLoadRepositoryProvider,
     studioCrdtRepositoryProvider,
+    studioLiveFeaturePolicyProvider,
     studioLiveLockRepositoryProvider,
     studioRasterAssetRepositoryProvider,
     studioRemoteReferenceDnsResolverProvider,

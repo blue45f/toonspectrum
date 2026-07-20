@@ -28,6 +28,10 @@ import {
 } from "./studio-live-cleanup-notification-dispatcher";
 import { StudioLiveCrdtQuotaLimiter } from "./studio-live-crdt-quota";
 import {
+  STUDIO_LIVE_FEATURE_POLICY,
+  type StudioLiveFeaturePolicy,
+} from "./studio-live-feature-policy";
+import {
   STUDIO_LIVE_RELAY_RPC_TIMEOUT_MS,
   StudioLiveInterServerRelayTransport,
 } from "./studio-live-inter-server-relay-transport";
@@ -399,6 +403,8 @@ export class StudioLiveGateway
     private readonly joinTransitions: StudioLiveJoinTransitionSequencer,
     @Inject(StudioLiveRoomTransitionCoordinator)
     private readonly roomTransitions: StudioLiveRoomTransitionCoordinator,
+    @Inject(STUDIO_LIVE_FEATURE_POLICY)
+    private readonly liveFeatures: StudioLiveFeaturePolicy,
     @Inject(StudioCrdtService)
     private readonly studioCrdtService: StudioCrdtService,
     @Inject(STUDIO_LIVE_LOCK_REPOSITORY)
@@ -681,7 +687,9 @@ export class StudioLiveGateway
       const [participants, locks, voiceMembers, screenShares] = await Promise.all([
         this.listParticipants(input.workId),
         this.listLocks(input.workId),
-        this.listVoiceMembers(input.workId),
+        this.liveFeatures.voiceEnabled
+          ? this.listVoiceMembers(input.workId)
+          : Promise.resolve([]),
         this.listScreenShares(input.workId),
       ]);
       if (
@@ -1521,6 +1529,12 @@ export class StudioLiveGateway
     @MessageBody() body: StudioLiveVoiceJoinInput,
     @Ack() ack?: StudioLiveAckCallback<{ members: StudioLiveVoiceMember[] }>
   ) {
+    if (!this.liveFeatures.voiceEnabled) {
+      return reply(
+        ack,
+        failure("forbidden", "서버 비용 절감 정책으로 음성 대화가 비활성화되어 있습니다.")
+      );
+    }
     const parsed = StudioLiveVoiceJoinSchema.safeParse(body);
     if (!parsed.success) {
       return reply(ack, failure("invalid_payload", "음성 대화 참가 정보가 올바르지 않습니다."));
@@ -1626,6 +1640,12 @@ export class StudioLiveGateway
     @MessageBody() body: StudioLiveVoiceStateInput,
     @Ack() ack?: StudioLiveAckCallback<{ member: StudioLiveVoiceMember }>
   ) {
+    if (!this.liveFeatures.voiceEnabled) {
+      return reply(
+        ack,
+        failure("forbidden", "서버 비용 절감 정책으로 음성 대화가 비활성화되어 있습니다.")
+      );
+    }
     const parsed = StudioLiveVoiceStateSchema.safeParse(body);
     if (!parsed.success) {
       return reply(ack, failure("invalid_payload", "음성 대화 상태가 올바르지 않습니다."));
@@ -1668,6 +1688,12 @@ export class StudioLiveGateway
     @MessageBody() body: StudioLiveVoiceLeaveInput,
     @Ack() ack?: StudioLiveAckCallback<{ left: true }>
   ) {
+    if (!this.liveFeatures.voiceEnabled) {
+      return reply(
+        ack,
+        failure("forbidden", "서버 비용 절감 정책으로 음성 대화가 비활성화되어 있습니다.")
+      );
+    }
     const parsed = StudioLiveVoiceLeaveSchema.safeParse(body);
     if (!parsed.success) {
       return reply(ack, failure("invalid_payload", "음성 대화 종료 정보가 올바르지 않습니다."));
@@ -1744,6 +1770,12 @@ export class StudioLiveGateway
     @MessageBody() body: StudioLiveVoiceSignalInput,
     @Ack() ack?: StudioLiveAckCallback<{ delivered: true; signalId: string }>
   ) {
+    if (!this.liveFeatures.voiceEnabled) {
+      return reply(
+        ack,
+        failure("forbidden", "서버 비용 절감 정책으로 음성 대화가 비활성화되어 있습니다.")
+      );
+    }
     const parsed = StudioLiveVoiceSignalSchema.safeParse(body);
     if (!parsed.success) {
       return reply(ack, failure("invalid_payload", "음성 WebRTC 연결 정보가 올바르지 않습니다."));
@@ -1972,6 +2004,9 @@ export class StudioLiveGateway
   private async receiveInterServerRelay(request: unknown): Promise<boolean> {
     const parsed = StudioLiveInterServerRelayRequestSchema.safeParse(request);
     if (!parsed.success) return false;
+    if (parsed.data.relay.type === "voice-signal" && !this.liveFeatures.voiceEnabled) {
+      return false;
+    }
     const { workId, targetConnectionId, deadlineAt, sender, relay } = parsed.data;
     const now = Date.now();
     if (

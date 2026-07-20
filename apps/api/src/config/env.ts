@@ -28,6 +28,7 @@ const envSchema = z.object({
     .string()
     .regex(/^(?:[2-9]|10)$/u, "STUDIO_LIVE_POSTGRES_POOL_MAX must be between 2 and 10")
     .optional(),
+  STUDIO_LIVE_VOICE_ENABLED: z.enum(["true", "false"]).optional(),
   STUDIO_VOICE_STUN_URLS: z.string().optional(),
   STUDIO_VOICE_TURN_URLS: z.string().optional(),
   STUDIO_VOICE_TURN_SHARED_SECRET: z.string().min(32).optional(),

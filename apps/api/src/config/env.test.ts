@@ -87,6 +87,16 @@ describe("Studio live cluster environment validation", () => {
 });
 
 describe("Studio voice TURN environment validation", () => {
+  it("accepts the explicit recurring-cost voice feature switch", () => {
+    const logger = { warn: vi.fn(), error: vi.fn() };
+
+    expect(validateEnv({
+      NODE_ENV: "test",
+      STUDIO_LIVE_VOICE_ENABLED: "false",
+    }, logger)).toMatchObject({ STUDIO_LIVE_VOICE_ENABLED: "false" });
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
   it("accepts TURN settings while keeping the shared secret out of diagnostics", () => {
     const logger = { warn: vi.fn(), error: vi.fn() };
     const secret = "voice-turn-secret-at-least-thirty-two-characters";

@@ -40,6 +40,7 @@ import {
 import type { CreatorService } from "./creator.service";
 import type { StudioCrdtService } from "./studio-crdt.service";
 import type { StudioLiveCrdtQuotaLimiter } from "./studio-live-crdt-quota";
+import type { StudioLiveFeaturePolicy } from "./studio-live-feature-policy";
 import type {
   AcquireStudioLiveLockInput,
   StudioLiveLockRecord,
@@ -279,7 +280,8 @@ function createHarness(
       : null,
   revalidateSession: StudioLiveSessionRevalidator = async (principal) =>
     principal.expiresAt > Date.now(),
-  lockRepository: StudioLiveLockRepository = new MemoryStudioLiveLockRepository()
+  lockRepository: StudioLiveLockRepository = new MemoryStudioLiveLockRepository(),
+  liveFeatures: StudioLiveFeaturePolicy = { voiceEnabled: true }
 ) {
   const emissions: Emission[] = [];
   const sockets = new Map<string, FakeSocket>();
@@ -354,6 +356,7 @@ function createHarness(
     socketAuthentication,
     joinTransitions,
     roomTransitions,
+    liveFeatures,
     crdtService as unknown as StudioCrdtService,
     lockRepository
   );
@@ -4142,6 +4145,61 @@ describe("StudioLiveGateway", () => {
 
     expect(response).toMatchObject({ ok: false, code: "rate_limited" });
     expect(harness.service.getWorkTeam).toHaveBeenCalledTimes(teamReadsBefore);
+  });
+
+  it("keeps legacy voice discovery and handlers dormant when the cost policy is disabled", async () => {
+    const harness = createHarness(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { voiceEnabled: false }
+    );
+    const listVoiceMembers = vi.spyOn(
+      harness.gateway as unknown as {
+        listVoiceMembers(workId: string): Promise<unknown[]>;
+      },
+      "listVoiceMembers"
+    );
+    const socket = harness.socket("voice-disabled");
+    const joined = await connectAndJoin(harness, socket);
+
+    expect(joined).toMatchObject({
+      ok: true,
+      data: { voiceMembers: [] },
+    });
+    expect(listVoiceMembers).not.toHaveBeenCalled();
+    const teamReadsBefore = harness.service.getWorkTeam.mock.calls.length;
+
+    await expect(harness.gateway.joinVoice(
+      socket as never,
+      { workId: "work-1", callId: "voice-main", muted: false },
+      undefined
+    )).resolves.toMatchObject({ ok: false, code: "forbidden" });
+    await expect(harness.gateway.updateVoiceState(
+      socket as never,
+      { workId: "work-1", callId: "voice-main", muted: true },
+      undefined
+    )).resolves.toMatchObject({ ok: false, code: "forbidden" });
+    await expect(harness.gateway.leaveVoice(
+      socket as never,
+      { workId: "work-1", callId: "voice-main" },
+      undefined
+    )).resolves.toMatchObject({ ok: false, code: "forbidden" });
+    await expect(harness.gateway.relayVoiceSignal(
+      socket as never,
+      {
+        workId: "work-1",
+        targetConnectionId: "missing-peer",
+        callId: "voice-main",
+        kind: "description",
+        description: { type: "offer", sdp: "v=0" },
+      },
+      undefined
+    )).resolves.toMatchObject({ ok: false, code: "forbidden" });
+
+    expect(harness.service.getWorkTeam).toHaveBeenCalledTimes(teamReadsBefore);
+    expect(socket.data.studioVoiceMember).toBeUndefined();
   });
 
   it("authorizes a bounded voice huddle and isolates work, call, role and signaling channels", async () => {
