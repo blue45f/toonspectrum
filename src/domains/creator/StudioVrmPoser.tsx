@@ -169,6 +169,7 @@ import {
   captureStudioVrmRgba,
   encodeStudioVrmCapturePngDataUrl,
 } from "./studio-vrm-raster-capture";
+import { resolveStudioVrmFrameLoop } from "./studio-vrm-render-policy";
 import {
   createStudioVrmRigProfileSelection,
   type StudioVrmRigProfileId,
@@ -3541,6 +3542,18 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
     persistentIkReconciling ||
     jointHandleInteracting ||
     isViewportHandIkDragging;
+  const vrmFrameLoop = resolveStudioVrmFrameLoop({
+    webcamActive,
+    idleAnimation,
+    physicsPreview,
+    turntable,
+    viewportHandIkDragging: isViewportHandIkDragging,
+    jointHandleInteracting,
+    persistentIkReconciling,
+    capturing: isCapturing,
+    sharingPose: isSharingPose,
+    thumbnailCapturing: isThumbnailCapturing,
+  });
 
   function portableLockedPoseBones(): StudioHumanoidBoneName[] {
     return lockedPoseBones.filter(
@@ -6283,6 +6296,7 @@ export function StudioVrmPoser({ open, onClose, onInsert, initialDataUrl, initia
                   camera={{ fov: activeCamera.fov, position: [...activeCamera.position], near: 0.1, far: 20 }}
                   className="h-full w-full"
                   dpr={[1, 2]}
+                  frameloop={vrmFrameLoop}
                   gl={{ alpha: true, antialias: true }}
                   onCreated={({ gl }) => {
                     gl.setClearColor(0x000000, 0);

@@ -197,6 +197,7 @@ describe("Studio lazy panel stack boundary", () => {
 
   it("keeps durable BG3D recovery behind current server access and persisted target proof", () => {
     const page = moduleEdges("./StudioPage.tsx").source;
+    const accessGate = moduleEdges("./studio-bg3d-recovery-access-lease.ts").source;
     const helperStart = page.indexOf("function hasStudioBg3dServerPersistedTarget(");
     const helperEnd = page.indexOf("function isStudioBg3dRecoveryScopeLocallyCurrent(", helperStart);
     const helper = page.slice(helperStart, helperEnd);
@@ -220,11 +221,16 @@ describe("Studio lazy panel stack boundary", () => {
     expect(validatorEnd).toBeGreaterThan(validatorStart);
     expect(validator).toContain("isStudioBg3dRecoveryScopeLocallyCurrent(scope, before)");
     expect(validator).toContain("getStudioSharedDocumentMeta(scope.workId, signal)");
-    expect(validator).toContain("isStudioBg3dRecoveryScopeLocallyCurrent(scope, after)");
-    expect(validator).toContain("after.sharedDocumentRevision === expectedRevision");
+    expect(validator).toContain("bg3dRecoveryAccessGateRef.current.authorize({");
+    expect(validator).toContain("isStudioBg3dRecoveryScopeLocallyCurrent(scope, current)");
+    expect(validator).toContain("current.sharedDocumentRevision === expectedRevision");
+    expect(validator).toContain(
+      "studioRevisionProjectGenerationRef.current !== projectGeneration"
+    );
     expect(validator).toContain("fresh.revision === expectedRevision");
-    expect(validator).toContain("catch {");
     expect(validator).toContain("return false;");
+    expect(accessGate).toContain("catch {");
+    expect(accessGate).toContain("return false;");
   });
 
   it("keeps all six modal loading overlays colocated with their Suspense boundaries", () => {

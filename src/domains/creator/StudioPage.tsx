@@ -188,6 +188,9 @@ import {
   planStudioBg3dLtLayers,
   preserveStudioBg3dLtSceneAnchorAfterRemoval,
 } from "./studio-bg3d-lt-layer-plan";
+import {
+  StudioBg3dRecoveryAccessGate,
+} from "./studio-bg3d-recovery-access-lease";
 import { BRAND_KIT_LOGO_MASTER_ID, placeBrandKitLogo, type BrandKit } from "./studio-brand-kit";
 import {
   BRUSH_PRESETS,
@@ -4722,6 +4725,8 @@ function StudioCuttoonEditor() {
     memoryPartition: bg3dMemoryRecoveryPartitionRef.current,
     recoveryScope: bg3dBatchRecoveryScope,
   });
+  const bg3dRecoveryAccessGateRef = useRef<StudioBg3dRecoveryAccessGate>(null as never);
+  bg3dRecoveryAccessGateRef.current ??= new StudioBg3dRecoveryAccessGate();
   bg3dRecoveryAccessSnapshotRef.current = {
     open: bg3dOpen,
     authUserId: studioAuthUserId,
@@ -4755,23 +4760,30 @@ function StudioCuttoonEditor() {
     if (documentSaveInFlightRef.current) return false;
     const expectedRevision = before.sharedDocumentRevision;
     if (expectedRevision === null) return false;
-    try {
-      const { getStudioSharedDocumentMeta } = await import("./studio-shared-document-client");
-      if (signal.aborted || !editorMountedRef.current) return false;
-      const fresh = await getStudioSharedDocumentMeta(scope.workId, signal);
-      if (signal.aborted || !editorMountedRef.current || documentSaveInFlightRef.current) {
-        return false;
-      }
-      const after = bg3dRecoveryAccessSnapshotRef.current;
-      return isStudioBg3dRecoveryScopeLocallyCurrent(scope, after) &&
-        after.sharedDocumentRevision === expectedRevision &&
-        fresh.workId === scope.workId &&
-        fresh.status === "active" &&
-        fresh.capabilities.view &&
-        fresh.revision === expectedRevision;
-    } catch {
-      return false;
-    }
+    const projectGeneration = studioRevisionProjectGenerationRef.current;
+    return bg3dRecoveryAccessGateRef.current.authorize({
+      scope,
+      revision: expectedRevision,
+      projectGeneration,
+      signal,
+      isLocallyCurrent: () => {
+        if (
+          signal.aborted || !editorMountedRef.current || documentSaveInFlightRef.current ||
+          studioRevisionProjectGenerationRef.current !== projectGeneration
+        ) return false;
+        const current = bg3dRecoveryAccessSnapshotRef.current;
+        return isStudioBg3dRecoveryScopeLocallyCurrent(scope, current) &&
+          current.sharedDocumentRevision === expectedRevision;
+      },
+      verify: async () => {
+        const { getStudioSharedDocumentMeta } = await import("./studio-shared-document-client");
+        const fresh = await getStudioSharedDocumentMeta(scope.workId, signal);
+        return fresh.workId === scope.workId &&
+          fresh.status === "active" &&
+          fresh.capabilities.view &&
+          fresh.revision === expectedRevision;
+      },
+    });
   }, []);
   const poserMutationTicketRef = useRef<StudioEditorMutationTicket | null>(null);
   const bg3dMutationTicketRef = useRef<StudioEditorMutationTicket | null>(null);

@@ -259,6 +259,7 @@ import {
   StudioBg3dPrimitiveGeometryPool,
   synchronizeStudioBg3dRootMatrix,
 } from "./studio-bg3d-render-optimization";
+import { resolveStudioBg3dFrameLoop } from "./studio-bg3d-render-policy";
 import {
   createStudioBg3dRigPoseBakeHistoryTransition,
   type StudioBg3dRigPoseBakeSnapshot,
@@ -5618,6 +5619,13 @@ export function StudioBackground3D({
   if (!open) return null;
 
   const effectiveIsQuadView = isQuadView && !isCapturing && !physicsInteractionLocked;
+  const bg3dFrameLoop = resolveStudioBg3dFrameLoop({
+    modelAnimationPlaying: customModels.some((model) => model.animation?.playing === true),
+    physicsPlaying: physicsPhase === "running",
+    transforming: isTransforming,
+    capturing: isCapturing,
+    batchRendering: isBatchRenderingShots,
+  });
   const isMainOrtho = sceneBaseDocument.camera.projection === "orthographic";
   const selectedSky = getSkyPreset(skyPresetId);
   const panoramaRotation = normalizePanoramaRotationDegrees(
@@ -5978,6 +5986,7 @@ export function StudioBackground3D({
                   }}
                   className={cx("h-full w-full", effectiveIsQuadView && "pointer-events-none absolute inset-0 z-10")}
                   dpr={deviceQuality.effectiveDpr * adaptiveDprScale}
+                  frameloop={bg3dFrameLoop}
                   shadows={{ enabled: deviceQuality.shadows, type: THREE.PCFShadowMap }}
                   gl={{ antialias: sceneBaseDocument.render.antialias, alpha: true }}
                   onCreated={({ gl }) => {
