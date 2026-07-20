@@ -21,7 +21,6 @@ import {
   useStudioLiveCollaboration,
   type StudioLiveAvailability,
   type StudioLiveRecoveryState,
-  type StudioLiveVoiceContextValue,
 } from "./studio-live-collaboration-context";
 import { STUDIO_LIVE_CHAT_TEXT_MAX_LENGTH } from "./studio-live-collaboration-protocol";
 import {
@@ -38,15 +37,15 @@ import {
   type StudioScreenShareState,
   type StudioScreenShareViewer,
 } from "./studio-screen-share";
-import { StudioVoiceCallPanelSection } from "./StudioVoiceCallControls";
-
 
 import type {
   StudioLiveChatMessage,
   StudioLivePeer,
 } from "./studio-live-collaboration-room";
 import type { StudioLiveTransportMode } from "./studio-live-collaboration-transport";
+import type { StudioScreenIcePolicyMode } from "./studio-screen-ice-policy";
 import type { StudioTeamRole } from "./studio-team-client";
+import type { StudioVoiceIcePolicyLease } from "./studio-voice-ice-policy";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -75,9 +74,10 @@ export interface StudioLiveCollaborationPanelViewProps {
   canChat: boolean;
   chatDraft: string;
   chatNotice: string | null;
-  voice: StudioLiveVoiceContextValue;
   screenState: StudioScreenShareState;
   screenSupported: boolean;
+  screenReady: boolean;
+  screenNetworkMode: StudioScreenIcePolicyMode | null;
   serverAvailable: boolean;
   localFallbackAllowed: boolean;
   usingLocalFallback: boolean;
@@ -137,6 +137,18 @@ function chatTimeLabel(sentAt: number): string {
   return time.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
 }
 
+function screenNetworkSummary(
+  supported: boolean,
+  ready: boolean,
+  mode: StudioScreenIcePolicyMode | null
+): string {
+  if (!supported) return "이 브라우저는 화면 공유를 지원하지 않음";
+  if (!ready) return "보안 화면 중계 준비 중";
+  if (mode === "turn") return "TURN 중계 · 원격 지원 · 영상만 · 오디오는 캡처하지 않음";
+  if (mode === "stun") return "STUN 연결 · 영상만 · 오디오는 캡처하지 않음";
+  return "직접 연결 · 영상만 · 오디오는 캡처하지 않음";
+}
+
 export function StudioLiveCollaborationPanelView({
   availability,
   mode,
@@ -145,9 +157,10 @@ export function StudioLiveCollaborationPanelView({
   canChat,
   chatDraft,
   chatNotice,
-  voice,
   screenState,
   screenSupported,
+  screenReady,
+  screenNetworkMode,
   serverAvailable,
   localFallbackAllowed,
   usingLocalFallback,
@@ -520,21 +533,6 @@ export function StudioLiveCollaborationPanelView({
         ) : null}
       </div>
 
-      <StudioVoiceCallPanelSection
-        ready={ready && voice.ready}
-        supported={voice.supported}
-        allowed={voice.allowed}
-        networkMode={voice.networkMode}
-        state={voice.state}
-        error={voice.error}
-        onJoin={voice.join}
-        onLeave={voice.leave}
-        onMutedChange={voice.setMuted}
-        onPushToTalkChange={voice.setPushToTalk}
-        onPushToTalkPressedChange={voice.setPushToTalkPressed}
-        onRetryRemoteAudio={voice.retryRemoteAudio}
-      />
-
       <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
         {screenState.localSharing ? (
           <Button
@@ -549,7 +547,7 @@ export function StudioLiveCollaborationPanelView({
           <Button
             aria-busy={busyAction === "start-share"}
             className="min-h-11"
-            disabled={!ready || !screenSupported || busyAction != null}
+            disabled={!ready || !screenReady || !screenSupported || busyAction != null}
             type="button"
             onClick={onStartShare}
           >
@@ -561,8 +559,11 @@ export function StudioLiveCollaborationPanelView({
             화면 공유
           </Button>
         )}
-        <div className="flex min-h-11 items-center rounded-xl border border-line bg-card px-3 text-xs leading-relaxed text-fg-3">
-          {screenSupported ? "영상만 · 오디오는 캡처하지 않음" : "이 브라우저는 화면 공유를 지원하지 않음"}
+        <div
+          className="flex min-h-11 items-center rounded-xl border border-line bg-card px-3 text-xs leading-relaxed text-fg-3"
+          data-studio-screen-network-mode={screenNetworkMode ?? "preparing"}
+        >
+          {screenNetworkSummary(screenSupported, screenReady, screenNetworkMode)}
         </div>
       </div>
 
@@ -695,7 +696,7 @@ export function StudioLiveCollaborationPanelView({
                   <Button
                     aria-label={`${share.host.displayName} 화면 보기`}
                     className="min-h-11 shrink-0"
-                    disabled={!ready || busyAction != null}
+                    disabled={!ready || !screenReady || busyAction != null}
                     size="sm"
                     type="button"
                     variant="outline"
@@ -750,6 +751,7 @@ export function StudioLiveCollaborationPanelView({
         <ul className="space-y-1.5 border-t border-line pt-2 text-xs leading-relaxed text-fg-3">
           <li>공유 버튼을 누른 뒤 브라우저 선택기에서 허용한 탭·창·화면만 캡처합니다.</li>
           <li>상대의 보기 요청을 화면 공유자가 개별 승인한 뒤에만 WebRTC로 연결합니다.</li>
+          <li>서버 팀 세션은 로그인 권한으로 단기 ICE 설정을 받고, TURN은 운영자가 명시한 경우에만 사용하며 브라우저에 영구 저장하지 않습니다.</li>
           <li>오디오는 요청하지 않으며, 패널을 닫으면 로컬 트랙과 모든 피어 연결을 정리합니다.</li>
           <li>SDP·ICE 신호는 메모리에서만 전달하고 문서·localStorage·활동 기록에 저장하지 않습니다.</li>
         </ul>
@@ -763,6 +765,9 @@ export function StudioLiveCollaborationPanel() {
   const screenControllerRef = useRef<StudioScreenShareController | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [screenState, setScreenState] = useState<StudioScreenShareState>(EMPTY_SCREEN_STATE);
+  const [screenReady, setScreenReady] = useState(false);
+  const [screenNetworkMode, setScreenNetworkMode] =
+    useState<StudioScreenIcePolicyMode | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [screenError, setScreenError] = useState<string | null>(null);
   const [chatDraft, setChatDraft] = useState("");
@@ -771,42 +776,100 @@ export function StudioLiveCollaborationPanel() {
   useEffect(() => {
     const room = live.room;
     let cancelled = false;
+    let screenController: StudioScreenShareController | null = null;
+    let icePolicyLease: StudioVoiceIcePolicyLease | null = null;
+    let unsubscribeRoom: () => void = () => undefined;
+    let unsubscribeScreen: () => void = () => undefined;
+    let unsubscribeIcePolicy: () => void = () => undefined;
+    const abortController = new AbortController();
     setBusyAction(null);
     setScreenState(EMPTY_SCREEN_STATE);
+    setScreenReady(false);
+    setScreenNetworkMode(null);
     setScreenError(null);
     setChatDraft("");
     setChatNotice(null);
     if (!room) return;
 
-    const screenController = new StudioScreenShareController(room);
-    screenControllerRef.current = screenController;
+    const attachController = (
+      lease: StudioVoiceIcePolicyLease | null
+    ): StudioScreenShareController => {
+      const controller = new StudioScreenShareController(
+        room,
+        lease ? { createPeerConnection: lease.createPeerConnection } : undefined
+      );
+      screenController = controller;
+      screenControllerRef.current = controller;
+      unsubscribeRoom = room.subscribe((event) => {
+        if (cancelled || event.type !== "transport-status" || event.status.recoverable) return;
+        // The room outlives this panel, but a terminal ACL revocation must still stop every capture
+        // track and P2P connection immediately.
+        controller.close();
+        if (screenControllerRef.current === controller) screenControllerRef.current = null;
+        setBusyAction(null);
+        setScreenReady(false);
+        setScreenState(EMPTY_SCREEN_STATE);
+      });
+      unsubscribeScreen = controller.subscribe((event) => {
+        if (cancelled) return;
+        if (event.type === "state") setScreenState(event.state);
+        else setScreenError(event.message);
+      });
+      // The room can receive the server's active-share snapshot before this panel mounts. Hydrate
+      // immediately after subscribing so the first paint cannot miss that retained announcement.
+      setScreenState(controller.getState());
+      setScreenNetworkMode(lease?.mode ?? "direct");
+      setScreenReady(true);
+      return controller;
+    };
 
-    const unsubscribeRoom = room.subscribe((event) => {
-      if (cancelled || event.type !== "transport-status" || event.status.recoverable) return;
-      // The room outlives this panel, but a terminal ACL revocation must still stop every capture
-      // track and P2P connection immediately.
-      screenController.close();
-      if (screenControllerRef.current === screenController) screenControllerRef.current = null;
-      setBusyAction(null);
-      setScreenState(EMPTY_SCREEN_STATE);
-    });
-    const unsubscribeScreen = screenController.subscribe((event) => {
-      if (cancelled) return;
-      if (event.type === "state") setScreenState(event.state);
-      else setScreenError(event.message);
-    });
-    // The room can receive the server's active-share snapshot before this panel mounts. Hydrate
-    // immediately after subscribing so the first paint cannot miss that retained announcement.
-    setScreenState(screenController.getState());
+    if (live.mode !== "server") {
+      attachController(null);
+    } else {
+      void import("./studio-screen-ice-policy")
+        .then(({ acquireStudioScreenIcePolicyLease }) =>
+          acquireStudioScreenIcePolicyLease(room.workId, {
+            signal: abortController.signal,
+            onRefreshError: (error, expired) => {
+              if (cancelled) return;
+              setScreenError(
+                expired
+                  ? "화면 공유 중계 자격이 만료되었습니다. 팀 세션을 다시 연결해 주세요."
+                  : studioScreenShareErrorMessage(error)
+              );
+            },
+          })
+        )
+        .then((lease) => {
+          if (cancelled) {
+            lease.close();
+            return;
+          }
+          icePolicyLease = lease;
+          attachController(lease);
+          unsubscribeIcePolicy = lease.subscribeConfigurationChange(() => {
+            if (cancelled) return;
+            setScreenNetworkMode(lease.mode);
+          });
+        })
+        .catch((error: unknown) => {
+          if (cancelled || (error instanceof Error && error.name === "AbortError")) return;
+          setScreenReady(false);
+          setScreenError(studioScreenShareErrorMessage(error));
+        });
+    }
 
     return () => {
       cancelled = true;
+      abortController.abort();
+      unsubscribeIcePolicy();
       unsubscribeScreen();
       unsubscribeRoom();
-      screenController.close();
+      screenController?.close();
+      icePolicyLease?.close();
       if (screenControllerRef.current === screenController) screenControllerRef.current = null;
     };
-  }, [live.room]);
+  }, [live.mode, live.room]);
 
   const remoteStream = screenState.watching?.stream ?? null;
   useEffect(() => {
@@ -921,7 +984,6 @@ export function StudioLiveCollaborationPanel() {
       chatDraft={chatDraft}
       chatMessages={live.chatMessages}
       chatNotice={chatNotice}
-      voice={live.voice}
       error={screenError ?? live.error}
       syncSnapshot={live.sync}
       recovery={live.recovery}
@@ -929,6 +991,8 @@ export function StudioLiveCollaborationPanel() {
       peers={live.peers}
       screenState={screenState}
       screenSupported={isStudioScreenShareSupported()}
+      screenReady={screenReady}
+      screenNetworkMode={screenNetworkMode}
       serverAvailable={live.serverAvailable}
       localFallbackAllowed={live.localFallbackAllowed}
       usingLocalFallback={live.usingLocalFallback}

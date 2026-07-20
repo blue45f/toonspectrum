@@ -34,4 +34,14 @@ export class StudioVoiceIcePolicyController {
   ) {
     return this.service.issue(authenticatedUserId(userId), params.id);
   }
+
+  @Get("/creator/works/:id/screen-share/ice")
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  async issueScreenShare(
+    @Param(new ZodValidationPipe(CreatorTeamWorkParamsDto))
+    params: CreatorTeamWorkParamsDto,
+    @Headers("x-user-id") userId?: string
+  ) {
+    return this.service.issueScreenShare(authenticatedUserId(userId), params.id);
+  }
 }

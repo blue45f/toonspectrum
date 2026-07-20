@@ -32,7 +32,6 @@ import {
   type StudioLiveSyncPhase,
   type StudioLiveSyncSnapshot,
 } from "./studio-live-sync-safety";
-import { StudioVoiceCallMiniDock } from "./StudioVoiceCallControls";
 
 import type { StudioCommentAnchor } from "./studio-comments";
 import type {
@@ -618,19 +617,6 @@ export function StudioLivePresenceDockConnected({
       onOpenTeam={onOpenTeam}
       onToggleFollow={onToggleFollow}
       syncSnapshot={sync}
-      voiceControls={(
-        <StudioVoiceCallMiniDock
-          ready={availability === "ready" && live.voice.ready}
-          supported={live.voice.supported}
-          allowed={live.voice.allowed}
-          state={live.voice.state}
-          error={live.voice.error}
-          onJoin={live.voice.join}
-          onLeave={live.voice.leave}
-          onMutedChange={live.voice.setMuted}
-          onOpenDetails={onOpenTeam}
-        />
-      )}
     />
   );
 }

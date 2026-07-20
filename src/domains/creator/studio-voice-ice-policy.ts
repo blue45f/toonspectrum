@@ -143,14 +143,14 @@ class BrowserStudioVoiceIcePolicyLease implements StudioVoiceIcePolicyLease {
 
   createPeerConnection = (): RTCPeerConnection => {
     if (this.closed) {
-      throw new Error("음성 연결 설정이 이미 종료되었습니다.");
+      throw new Error("실시간 연결 설정이 이미 종료되었습니다.");
     }
     if (
       this.policy.mode === "turn" &&
       (this.localExpiresAt === null || this.localExpiresAt <= this.now())
     ) {
       void this.refresh();
-      throw new Error("음성 중계 연결 자격 증명이 만료되었습니다. 잠시 뒤 다시 시도해 주세요.");
+      throw new Error("실시간 중계 연결 자격 증명이 만료되었습니다. 잠시 뒤 다시 시도해 주세요.");
     }
     const connection = this.createConnection(rtcConfiguration(this.policy));
     this.peerConnections.add(connection);

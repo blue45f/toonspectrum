@@ -6,7 +6,6 @@ import {
   createStudioLiveEnvelope,
   studioLiveDisplayName,
 } from "./studio-live-collaboration-protocol";
-import { createEmptyStudioVoiceCallState } from "./studio-voice-call-model";
 import {
   StudioLiveCollaborationPanelView,
   type StudioLiveCollaborationPanelViewProps,
@@ -68,22 +67,10 @@ function renderView(overrides: Partial<StudioLiveCollaborationPanelViewProps> = 
     canChat: true,
     chatDraft: "",
     chatNotice: null,
-    voice: {
-      ready: true,
-      supported: true,
-      allowed: true,
-      networkMode: "direct",
-      state: createEmptyStudioVoiceCallState(),
-      error: null,
-      join: async () => true,
-      leave: noop,
-      setMuted: () => true,
-      setPushToTalk: () => true,
-      setPushToTalkPressed: () => true,
-      retryRemoteAudio: async () => true,
-    },
     screenState: screenState(),
     screenSupported: true,
+    screenReady: true,
+    screenNetworkMode: "direct",
     serverAvailable: false,
     localFallbackAllowed: true,
     usingLocalFallback: false,
@@ -308,14 +295,33 @@ describe("StudioLiveCollaborationPanelView", () => {
     expect(unsupported).toContain("disabled");
   });
 
-  it("integrates an explicit, ephemeral voice workspace independently from screen audio", () => {
-    const html = renderView();
+  it("blocks capture until authenticated relay setup is ready and discloses TURN mode", () => {
+    const preparing = renderView({
+      mode: "server",
+      screenReady: false,
+      screenNetworkMode: null,
+    });
+    expect(preparing).toContain('data-studio-screen-network-mode="preparing"');
+    expect(preparing).toContain("보안 화면 중계 준비 중");
+    expect(preparing).toMatch(/<button[^>]*disabled=""[^>]*>[\s\S]*?화면 공유<\/button>/u);
 
-    expect(html).toContain('data-studio-voice-call="true"');
-    expect(html).toContain("음성 작업실");
-    expect(html).toContain("버튼을 누른 뒤에만 브라우저가 마이크 권한을 요청");
-    expect(html).toContain("영상만 · 오디오는 캡처하지 않음");
-    expect(html).toContain("녹음·문서·DB·로컬 저장소에 보존하지 않음");
+    const relayed = renderView({
+      mode: "server",
+      screenReady: true,
+      screenNetworkMode: "turn",
+    });
+    expect(relayed).toContain('data-studio-screen-network-mode="turn"');
+    expect(relayed).toContain("TURN 중계 · 원격 지원");
+    expect(relayed).toContain("영상만 · 오디오는 캡처하지 않음");
+    expect(relayed).toContain("TURN은 운영자가 명시한 경우에만 사용");
+  });
+
+  it("keeps nonessential microphone calling out of the collaboration surface", () => {
+    const html = renderView({ mode: "server" });
+
+    expect(html).not.toContain("음성 작업실");
+    expect(html).not.toContain("마이크 권한");
+    expect(html).not.toContain("data-studio-voice-call");
   });
 
   it("renders host approval and current-viewer termination controls without leaking ids", () => {

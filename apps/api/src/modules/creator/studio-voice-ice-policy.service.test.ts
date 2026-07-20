@@ -262,4 +262,62 @@ describe("StudioVoiceIcePolicyService", () => {
     await expect(service.issue(userId, workId)).rejects.toBeInstanceOf(HttpException);
     expect(getWorkTeam).toHaveBeenCalledTimes(12);
   });
+
+  it("issues screen-share ICE credentials to active viewers without widening voice access", async () => {
+    const userId = "screen-viewer-unique-a";
+    const workId = "screen-work-unique-a";
+    const getWorkTeam = vi.fn().mockResolvedValue(team({
+      userId,
+      workId,
+      role: "viewer",
+    }));
+    const service = new StudioVoiceIcePolicyService(
+      { getWorkTeam } as unknown as CreatorService,
+      configuration()
+    );
+
+    await expect(service.issueScreenShare(userId, workId)).resolves.toMatchObject({
+      mode: "direct",
+    });
+    await expect(service.issue(userId, workId)).rejects.toBeInstanceOf(
+      ForbiddenException
+    );
+    expect(getWorkTeam).toHaveBeenCalledTimes(2);
+  });
+
+  it("fails closed when a screen-share ICE caller has no active view capability", async () => {
+    const userId = "screen-revoked-unique-a";
+    const workId = "screen-work-unique-b";
+    const snapshot = team({ userId, workId, role: "viewer" });
+    const getWorkTeam = vi.fn().mockResolvedValue({
+      ...snapshot,
+      viewer: {
+        ...snapshot.viewer,
+        capabilities: { ...snapshot.viewer.capabilities, view: false },
+      },
+    });
+    const service = new StudioVoiceIcePolicyService(
+      { getWorkTeam } as unknown as CreatorService,
+      configuration()
+    );
+
+    await expect(service.issueScreenShare(userId, workId)).rejects.toBeInstanceOf(
+      ForbiddenException
+    );
+  });
+
+  it("keeps production screen sharing on the zero-relay-cost direct path when TURN is optional", async () => {
+    const userId = "screen-production-unique-a";
+    const workId = "screen-production-work-unique-a";
+    const getWorkTeam = vi.fn().mockResolvedValue(team({ userId, workId }));
+    const service = new StudioVoiceIcePolicyService(
+      { getWorkTeam } as unknown as CreatorService,
+      configuration({ production: true, turnRequired: false })
+    );
+
+    await expect(service.issueScreenShare(userId, workId)).resolves.toMatchObject({
+      mode: "direct",
+      iceServers: [],
+    });
+  });
 });
