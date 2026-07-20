@@ -22040,8 +22040,11 @@ function StudioCuttoonEditor() {
     handleSave,
     openAutoActions,
     openOwnerFxPanel,
+    redo,
     persistStudioWorkspaceState,
     setWatermark,
+    toggleHistoryPanel: () => setHistoryPanelOpen((open) => !open),
+    undo,
     exportCurrentPageToPsd,
     exportCurrentPageToSvg,
     handleCapturePagesForPreset,
@@ -22592,6 +22595,7 @@ function StudioCuttoonEditor() {
           loadedWork={loadedWork}
           menu={menu}
           mobileImmersive={mobileImmersive}
+          historyPanelOpen={historyPanelOpen}
           pageCount={studioMenubarPageLabels.length}
           pageLabels={studioMenubarPageLabels}
           projectActionsOpen={projectActionsOpen}
@@ -22603,6 +22607,7 @@ function StudioCuttoonEditor() {
           psdImportBusy={psdImportBusy}
           psdImportInputRef={psdImportInputRef}
           psdImportStatus={psdImportStatus}
+          redoDisabled={menuEditRedoDisabled}
           saving={saving}
           setAiProvenanceOpen={setAiProvenanceOpen}
           setCharacterBibleOpen={setCharacterBibleOpen}
@@ -22622,6 +22627,7 @@ function StudioCuttoonEditor() {
           sharedDocument={sharedDocument}
           studioMainMenuGroups={studioMainMenuGroups}
           title={title}
+          undoDisabled={menuEditUndoDisabled}
           watermark={watermark}
           workId={workId}
           workspaceMenuEpoch={workspaceMenuEpoch}

@@ -60,8 +60,11 @@ function createHandlers(): StudioMenubarContentHandlers {
     handleSave: vi.fn(async () => undefined),
     openAutoActions: vi.fn(async () => undefined),
     openOwnerFxPanel: vi.fn(async () => undefined),
+    redo: vi.fn(),
     persistStudioWorkspaceState: vi.fn((state) => ({ state }) as never),
     setWatermark: vi.fn(),
+    toggleHistoryPanel: vi.fn(),
+    undo: vi.fn(),
   };
 }
 
@@ -91,6 +94,7 @@ function createProps(
     loadedWork: null,
     menu: null,
     mobileImmersive: false,
+    historyPanelOpen: false,
     pageCount: 2,
     pageLabels: ["첫 장면", "두 번째"],
     projectActionsOpen: false,
@@ -102,6 +106,7 @@ function createProps(
     psdImportBusy: false,
     psdImportInputRef: { current: null },
     psdImportStatus: null,
+    redoDisabled: true,
     saving: false,
     setAiProvenanceOpen: vi.fn(),
     setCharacterBibleOpen: vi.fn(),
@@ -122,6 +127,7 @@ function createProps(
     stableHandlers: createHandlers(),
     studioMainMenuGroups: [],
     title: "테스트 원고",
+    undoDisabled: true,
     watermark: WATERMARK,
     workId: null,
     workspaceMenuEpoch: 0,
@@ -237,5 +243,32 @@ describe("StudioMenubarContent", () => {
 
     expect(preloadStudioAssetMenuPanel).toHaveBeenCalledOnce();
     expect(setMenu).toHaveBeenCalledWith("template");
+  });
+
+  it("exposes one authoritative desktop history cluster and delegates its commands", () => {
+    const stableHandlers = createHandlers();
+    render(
+      <StudioMenubarContent
+        {...createProps({
+          historyPanelOpen: true,
+          redoDisabled: false,
+          stableHandlers,
+          undoDisabled: false,
+        })}
+      />
+    );
+
+    const group = screen.getByRole("group", { name: "작업 내역 빠른 작업" });
+    expect(group.getAttribute("data-studio-menubar-history-actions")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "실행취소" }));
+    fireEvent.click(screen.getByRole("button", { name: "다시실행" }));
+    fireEvent.click(screen.getByRole("button", { name: "작업 내역" }));
+
+    expect(stableHandlers.undo).toHaveBeenCalledOnce();
+    expect(stableHandlers.redo).toHaveBeenCalledOnce();
+    expect(stableHandlers.toggleHistoryPanel).toHaveBeenCalledOnce();
+    expect(
+      screen.getByRole("button", { name: "작업 내역" }).getAttribute("aria-pressed")
+    ).toBe("true");
   });
 });

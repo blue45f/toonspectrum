@@ -16,6 +16,8 @@ import {
   Music4,
   Package,
   ShieldCheck,
+  Redo2,
+  Undo2,
   Upload,
   WandSparkles,
   X,
@@ -80,8 +82,11 @@ export interface StudioMenubarContentHandlers {
   handleSave: (status: "published" | "draft") => Promise<void>;
   openAutoActions: () => Promise<void>;
   openOwnerFxPanel: () => Promise<void>;
+  redo: () => void;
   persistStudioWorkspaceState: (nextState: StudioWorkspaceState) => StudioWorkspaceSaveResult;
   setWatermark: (next: WatermarkSettings) => void;
+  toggleHistoryPanel: () => void;
+  undo: () => void;
 }
 
 export interface StudioMenubarContentProps {
@@ -107,6 +112,7 @@ export interface StudioMenubarContentProps {
   loadedWork: WorkDetail | null;
   menu: StudioMenu | null;
   mobileImmersive: boolean;
+  historyPanelOpen: boolean;
   pageCount: number;
   pageLabels: string[];
   projectActionsOpen: boolean;
@@ -119,6 +125,7 @@ export interface StudioMenubarContentProps {
   psdImportInputRef: RefObject<HTMLInputElement | null>;
   psdImportStatus: { tone: "good" | "warn"; text: string; } | null;
   saving: boolean;
+  redoDisabled: boolean;
   setAiProvenanceOpen: Dispatch<SetStateAction<boolean>>;
   setCharacterBibleOpen: Dispatch<SetStateAction<boolean>>;
   setCheckpointPanelOpen: Dispatch<SetStateAction<boolean>>;
@@ -137,6 +144,7 @@ export interface StudioMenubarContentProps {
   sharedDocument: StudioSharedDocument | null;
   studioMainMenuGroups: ComponentProps<typeof StudioMainMenu>["groups"];
   title: string;
+  undoDisabled: boolean;
   watermark: WatermarkSettings;
   workId: string | null;
   workspaceMenuEpoch: number;
@@ -170,6 +178,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
   loadedWork,
   menu,
   mobileImmersive,
+  historyPanelOpen,
   pageCount,
   pageLabels,
   projectActionsOpen,
@@ -182,6 +191,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
   psdImportInputRef,
   psdImportStatus,
   saving,
+  redoDisabled,
   setAiProvenanceOpen,
   setCharacterBibleOpen,
   setCheckpointPanelOpen,
@@ -200,6 +210,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
   sharedDocument,
   studioMainMenuGroups,
   title,
+  undoDisabled,
   watermark,
   workId,
   workspaceMenuEpoch,
@@ -224,8 +235,11 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
     handleSave,
     openAutoActions,
     openOwnerFxPanel,
+    redo,
     persistStudioWorkspaceState,
     setWatermark,
+    toggleHistoryPanel,
+    undo,
     exportCurrentPageToPsd,
     exportCurrentPageToSvg,
     handleCapturePagesForPreset,
@@ -283,6 +297,61 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               {workspaceSyncNotice}
             </span>
           ) : null}
+          </div>
+          <span aria-hidden className="mx-0.5 hidden h-4 w-px shrink-0 bg-line md:block" />
+          {/* The legacy tool belt is mobile-only. Keep the desktop history authority visible here
+              so pointer commits, keyboard users, screen readers, and automation share one control. */}
+          <div
+            role="group"
+            aria-label="작업 내역 빠른 작업"
+            data-studio-menubar-history-actions="true"
+            className={cn(
+              "hidden shrink-0 items-center gap-0.5 md:flex",
+              mobileImmersive && "!hidden"
+            )}
+          >
+            <button
+              type="button"
+              onClick={undo}
+              disabled={undoDisabled}
+              aria-label="실행취소"
+              className={buttonClass({
+                size: "sm",
+                variant: "quiet",
+                className: "min-h-9 min-w-9 px-0 disabled:opacity-35",
+              })}
+              title="실행취소 (⌘Z)"
+            >
+              <Undo2 size={14} aria-hidden />
+            </button>
+            <button
+              type="button"
+              onClick={redo}
+              disabled={redoDisabled}
+              aria-label="다시실행"
+              className={buttonClass({
+                size: "sm",
+                variant: "quiet",
+                className: "min-h-9 min-w-9 px-0 disabled:opacity-35",
+              })}
+              title="다시실행 (⌘⇧Z)"
+            >
+              <Redo2 size={14} aria-hidden />
+            </button>
+            <button
+              type="button"
+              onClick={toggleHistoryPanel}
+              aria-label="작업 내역"
+              aria-pressed={historyPanelOpen}
+              className={buttonClass({
+                size: "sm",
+                variant: historyPanelOpen ? "solid" : "quiet",
+                className: "min-h-9 min-w-9 px-0",
+              })}
+              title={historyPanelOpen ? "작업 내역 닫기" : "작업 내역 열기"}
+            >
+              <HistoryIcon size={14} aria-hidden />
+            </button>
           </div>
           <span aria-hidden className="mx-0.5 hidden h-4 w-px shrink-0 bg-line md:block" />
           {/* Desktop application commands live in the compressible center lane. */}
