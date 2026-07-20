@@ -295,15 +295,28 @@ describe("StudioLiveCollaborationPanelView", () => {
     expect(unsupported).toContain("disabled");
   });
 
-  it("blocks capture until authenticated relay setup is ready and discloses TURN mode", () => {
-    const preparing = renderView({
+  it("loads authenticated relay policy on demand and discloses active TURN mode", () => {
+    const onDemand = renderView({
       mode: "server",
-      screenReady: false,
+      screenReady: true,
       screenNetworkMode: null,
     });
-    expect(preparing).toContain('data-studio-screen-network-mode="preparing"');
-    expect(preparing).toContain("보안 화면 중계 준비 중");
-    expect(preparing).toMatch(/<button[^>]*disabled=""[^>]*>[\s\S]*?화면 공유<\/button>/u);
+    expect(onDemand).toContain('data-studio-screen-network-mode="on-demand"');
+    expect(onDemand).toContain("사용할 때 보안 연결 준비 · 영상만");
+    const shareButton = onDemand.match(
+      /<button[^>]*aria-busy="false"[^>]*>[\s\S]*?화면 공유<\/button>/u
+    )?.[0];
+    expect(shareButton).toBeTruthy();
+    expect(shareButton).not.toContain(' disabled=""');
+
+    const loading = renderView({
+      mode: "server",
+      screenReady: true,
+      screenNetworkMode: null,
+      busyAction: "start-share",
+    });
+    expect(loading).toContain('data-studio-screen-network-mode="loading"');
+    expect(loading).toContain("보안 화면 연결 확인 중");
 
     const relayed = renderView({
       mode: "server",

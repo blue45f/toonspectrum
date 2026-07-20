@@ -43,9 +43,11 @@ import type {
   StudioLivePeer,
 } from "./studio-live-collaboration-room";
 import type { StudioLiveTransportMode } from "./studio-live-collaboration-transport";
-import type { StudioScreenIcePolicyMode } from "./studio-screen-ice-policy";
+import type {
+  StudioScreenIcePolicyMode,
+  StudioScreenIcePolicySession,
+} from "./studio-screen-ice-policy";
 import type { StudioTeamRole } from "./studio-team-client";
-import type { StudioVoiceIcePolicyLease } from "./studio-voice-ice-policy";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -140,10 +142,13 @@ function chatTimeLabel(sentAt: number): string {
 function screenNetworkSummary(
   supported: boolean,
   ready: boolean,
-  mode: StudioScreenIcePolicyMode | null
+  mode: StudioScreenIcePolicyMode | null,
+  loading: boolean
 ): string {
   if (!supported) return "이 브라우저는 화면 공유를 지원하지 않음";
-  if (!ready) return "보안 화면 중계 준비 중";
+  if (!ready) return "화면 공유 도구 준비 중";
+  if (loading) return "보안 화면 연결 확인 중";
+  if (mode === null) return "사용할 때 보안 연결 준비 · 영상만";
   if (mode === "turn") return "TURN 중계 · 원격 지원 · 영상만 · 오디오는 캡처하지 않음";
   if (mode === "stun") return "STUN 연결 · 영상만 · 오디오는 캡처하지 않음";
   return "직접 연결 · 영상만 · 오디오는 캡처하지 않음";
@@ -191,6 +196,9 @@ export function StudioLiveCollaborationPanelView({
     ? presentStudioLiveSyncSnapshot(syncSnapshot)
     : null;
   const syncStatusCopy = syncPresentation?.shortLabel ?? statusCopy(availability, mode);
+  const screenConnectionLoading =
+    screenNetworkMode === null &&
+    (busyAction === "start-share" || busyAction?.startsWith("[") === true);
 
   useEffect(() => {
     const log = chatLogRef.current;
@@ -561,9 +569,16 @@ export function StudioLiveCollaborationPanelView({
         )}
         <div
           className="flex min-h-11 items-center rounded-xl border border-line bg-card px-3 text-xs leading-relaxed text-fg-3"
-          data-studio-screen-network-mode={screenNetworkMode ?? "preparing"}
+          data-studio-screen-network-mode={
+            screenConnectionLoading ? "loading" : (screenNetworkMode ?? "on-demand")
+          }
         >
-          {screenNetworkSummary(screenSupported, screenReady, screenNetworkMode)}
+          {screenNetworkSummary(
+            screenSupported,
+            screenReady,
+            screenNetworkMode,
+            screenConnectionLoading
+          )}
         </div>
       </div>
 
@@ -751,7 +766,7 @@ export function StudioLiveCollaborationPanelView({
         <ul className="space-y-1.5 border-t border-line pt-2 text-xs leading-relaxed text-fg-3">
           <li>공유 버튼을 누른 뒤 브라우저 선택기에서 허용한 탭·창·화면만 캡처합니다.</li>
           <li>상대의 보기 요청을 화면 공유자가 개별 승인한 뒤에만 WebRTC로 연결합니다.</li>
-          <li>서버 팀 세션은 로그인 권한으로 단기 ICE 설정을 받고, TURN은 운영자가 명시한 경우에만 사용하며 브라우저에 영구 저장하지 않습니다.</li>
+          <li>서버 팀 세션은 공유·보기·승인을 누를 때만 로그인 권한으로 단기 ICE 설정을 받고, TURN은 운영자가 명시한 경우에만 사용하며 브라우저에 영구 저장하지 않습니다.</li>
           <li>오디오는 요청하지 않으며, 패널을 닫으면 로컬 트랙과 모든 피어 연결을 정리합니다.</li>
           <li>SDP·ICE 신호는 메모리에서만 전달하고 문서·localStorage·활동 기록에 저장하지 않습니다.</li>
         </ul>
@@ -763,6 +778,11 @@ export function StudioLiveCollaborationPanelView({
 export function StudioLiveCollaborationPanel() {
   const live = useStudioLiveCollaboration();
   const screenControllerRef = useRef<StudioScreenShareController | null>(null);
+  const screenIceSessionRef = useRef<{
+    controller: StudioScreenShareController;
+    session: StudioScreenIcePolicySession;
+    unsubscribe: () => void;
+  } | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [screenState, setScreenState] = useState<StudioScreenShareState>(EMPTY_SCREEN_STATE);
   const [screenReady, setScreenReady] = useState(false);
@@ -777,11 +797,8 @@ export function StudioLiveCollaborationPanel() {
     const room = live.room;
     let cancelled = false;
     let screenController: StudioScreenShareController | null = null;
-    let icePolicyLease: StudioVoiceIcePolicyLease | null = null;
     let unsubscribeRoom: () => void = () => undefined;
     let unsubscribeScreen: () => void = () => undefined;
-    let unsubscribeIcePolicy: () => void = () => undefined;
-    const abortController = new AbortController();
     setBusyAction(null);
     setScreenState(EMPTY_SCREEN_STATE);
     setScreenReady(false);
@@ -791,12 +808,20 @@ export function StudioLiveCollaborationPanel() {
     setChatNotice(null);
     if (!room) return;
 
-    const attachController = (
-      lease: StudioVoiceIcePolicyLease | null
-    ): StudioScreenShareController => {
+    const attachController = (): StudioScreenShareController => {
       const controller = new StudioScreenShareController(
         room,
-        lease ? { createPeerConnection: lease.createPeerConnection } : undefined
+        live.mode === "server"
+          ? {
+              createPeerConnection: () => {
+                const entry = screenIceSessionRef.current;
+                if (!entry || entry.controller !== controller) {
+                  throw new Error("화면 공유 보안 연결이 아직 준비되지 않았습니다.");
+                }
+                return entry.session.createPeerConnection();
+              },
+            }
+          : undefined
       );
       screenController = controller;
       screenControllerRef.current = controller;
@@ -805,6 +830,12 @@ export function StudioLiveCollaborationPanel() {
         // The room outlives this panel, but a terminal ACL revocation must still stop every capture
         // track and P2P connection immediately.
         controller.close();
+        const iceEntry = screenIceSessionRef.current;
+        if (iceEntry?.controller === controller) {
+          iceEntry.unsubscribe();
+          iceEntry.session.close();
+          screenIceSessionRef.current = null;
+        }
         if (screenControllerRef.current === controller) screenControllerRef.current = null;
         setBusyAction(null);
         setScreenReady(false);
@@ -818,56 +849,24 @@ export function StudioLiveCollaborationPanel() {
       // The room can receive the server's active-share snapshot before this panel mounts. Hydrate
       // immediately after subscribing so the first paint cannot miss that retained announcement.
       setScreenState(controller.getState());
-      setScreenNetworkMode(lease?.mode ?? "direct");
+      setScreenNetworkMode(live.mode === "server" ? null : "direct");
       setScreenReady(true);
       return controller;
     };
 
-    if (live.mode !== "server") {
-      attachController(null);
-    } else {
-      void import("./studio-screen-ice-policy")
-        .then(({ acquireStudioScreenIcePolicyLease }) =>
-          acquireStudioScreenIcePolicyLease(room.workId, {
-            signal: abortController.signal,
-            onRefreshError: (error, expired) => {
-              if (cancelled) return;
-              setScreenError(
-                expired
-                  ? "화면 공유 중계 자격이 만료되었습니다. 팀 세션을 다시 연결해 주세요."
-                  : studioScreenShareErrorMessage(error)
-              );
-            },
-          })
-        )
-        .then((lease) => {
-          if (cancelled) {
-            lease.close();
-            return;
-          }
-          icePolicyLease = lease;
-          const controller = attachController(lease);
-          unsubscribeIcePolicy = lease.subscribeConfigurationChange(() => {
-            if (cancelled) return;
-            setScreenNetworkMode(lease.mode);
-            controller.refreshNetworkPolicy();
-          });
-        })
-        .catch((error: unknown) => {
-          if (cancelled || (error instanceof Error && error.name === "AbortError")) return;
-          setScreenReady(false);
-          setScreenError(studioScreenShareErrorMessage(error));
-        });
-    }
+    attachController();
 
     return () => {
       cancelled = true;
-      abortController.abort();
-      unsubscribeIcePolicy();
       unsubscribeScreen();
       unsubscribeRoom();
       screenController?.close();
-      icePolicyLease?.close();
+      const iceEntry = screenIceSessionRef.current;
+      if (iceEntry && iceEntry.controller === screenController) {
+        iceEntry.unsubscribe();
+        iceEntry.session.close();
+        screenIceSessionRef.current = null;
+      }
       if (screenControllerRef.current === screenController) screenControllerRef.current = null;
     };
   }, [live.mode, live.room]);
@@ -883,12 +882,67 @@ export function StudioLiveCollaborationPanel() {
     };
   }, [remoteStream]);
 
+  async function ensureScreenNetwork(
+    controller: StudioScreenShareController
+  ): Promise<boolean> {
+    if (live.mode !== "server") return true;
+    let entry = screenIceSessionRef.current;
+    if (!entry || entry.controller !== controller) {
+      const { StudioScreenIcePolicySession } = await import("./studio-screen-ice-policy");
+      if (screenControllerRef.current !== controller || !live.room) return false;
+      entry = screenIceSessionRef.current;
+      if (!entry || entry.controller !== controller) {
+        const session = new StudioScreenIcePolicySession(live.room.workId, {
+          onRefreshError: (error, expired) => {
+            if (screenControllerRef.current !== controller) return;
+            setScreenError(
+              expired
+                ? "화면 공유 중계 자격이 만료되었습니다. 다시 시도해 주세요."
+                : studioScreenShareErrorMessage(error)
+            );
+          },
+        });
+        const unsubscribe = session.subscribeConfigurationChange(() => {
+          if (screenControllerRef.current !== controller) return;
+          setScreenNetworkMode(session.mode);
+          controller.refreshNetworkPolicy();
+        });
+        entry = { controller, session, unsubscribe };
+        screenIceSessionRef.current = entry;
+      }
+    }
+    await entry.session.ensureActive();
+    if (screenControllerRef.current !== controller || screenIceSessionRef.current !== entry) {
+      return false;
+    }
+    setScreenNetworkMode(entry.session.mode);
+    return true;
+  }
+
+  const screenActionBusy =
+    busyAction === "start-share" || busyAction?.startsWith("[") === true;
+  useEffect(() => {
+    if (
+      screenActionBusy ||
+      screenState.localSharing ||
+      screenState.watching !== null ||
+      screenState.viewers.length > 0
+    ) {
+      return;
+    }
+    const entry = screenIceSessionRef.current;
+    if (!entry || entry.controller !== screenControllerRef.current) return;
+    entry.session.release();
+    setScreenNetworkMode(live.mode === "server" ? null : "direct");
+  }, [live.mode, screenActionBusy, screenState.localSharing, screenState.viewers.length, screenState.watching]);
+
   async function handleStartShare() {
     const controller = screenControllerRef.current;
     if (!controller || busyAction) return;
     setBusyAction("start-share");
     setScreenError(null);
     try {
+      if (!(await ensureScreenNetwork(controller))) return;
       await controller.startShare();
     } catch (shareError) {
       if (screenControllerRef.current === controller) {
@@ -899,13 +953,14 @@ export function StudioLiveCollaborationPanel() {
     }
   }
 
-  function handleWatchShare(share: StudioRemoteScreenShare) {
+  async function handleWatchShare(share: StudioRemoteScreenShare) {
     const controller = screenControllerRef.current;
     if (!controller || busyAction) return;
     const actionKey = screenItemKey("watch", share.host.sessionId, share.shareId);
     setBusyAction(actionKey);
     setScreenError(null);
     try {
+      if (!(await ensureScreenNetwork(controller))) return;
       controller.watchShare(share.host.sessionId, share.shareId);
     } catch (watchError) {
       setScreenError(studioScreenShareErrorMessage(watchError));
@@ -921,6 +976,7 @@ export function StudioLiveCollaborationPanel() {
     setBusyAction(actionKey);
     setScreenError(null);
     try {
+      if (!(await ensureScreenNetwork(controller))) return;
       await controller.approveScreenRequest(request.viewer.sessionId, request.shareId);
     } catch (approvalError) {
       if (screenControllerRef.current === controller) {
@@ -1013,7 +1069,7 @@ export function StudioLiveCollaborationPanel() {
       onReloadAuthoritative={live.reloadAuthoritative}
       onStopViewer={handleStopViewer}
       onStopWatching={() => screenControllerRef.current?.stopWatching()}
-      onWatchShare={handleWatchShare}
+      onWatchShare={(share) => void handleWatchShare(share)}
     />
   );
 }
