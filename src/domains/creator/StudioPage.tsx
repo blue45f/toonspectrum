@@ -242,6 +242,9 @@ import {
   bubbleShapePointHandles,
   computeBubbleShapeGeometry,
   hasCustomBubbleShape,
+  insertBubbleShapePointAtClosestSegment,
+  moveBubbleShapePoint,
+  removeBubbleShapePoint,
 } from "./studio-bubble-custom-shape";
 import {
   createPixelEditCanvas,
@@ -624,6 +627,7 @@ import {
   type StudioMenuSessionState,
   type StudioWorkspaceLayoutSource,
 } from "./studio-menu-session-model";
+import { StudioMobileEditingDock } from "./studio-mobile-editing-dock-loader";
 import {
   saveStudioMobileImmersivePreference,
   shouldStartStudioMobileImmersive,
@@ -657,6 +661,8 @@ import {
 import {
   StudioAnimTimelinePanel,
   StudioAppSettingsPanel,
+  StudioBrushLibraryPanel,
+  StudioBrushStudio,
   StudioBrushCatalogPortal,
   StudioBubbleShapeOverlay,
   StudioCropOverlay,
@@ -683,7 +689,9 @@ import {
   StudioRasterCrdtSurface,
   StudioRemoteCursorOverlay,
   StudioSelectionAntsOverlay,
+  StudioShapePickerGrid,
   StudioShortcutsHelp,
+  StudioUnifiedBrushPicker,
   QuickStartPanel,
   StudioUploadPublish,
   StudioWebGpuCanvas,
@@ -1096,11 +1104,7 @@ import {
   StudioMenubarContent,
   type StudioMenubarContentHandlers,
 } from "./StudioMenubarContent";
-import {
-  StudioMobileEditingDock,
-  type StudioBrushCatalogHandlers,
-  type StudioMobileEditingDockHandlers,
-} from "./StudioMobileEditingDock";
+import { StudioMobileSheetHandle } from "./StudioMobileSheetHandle";
 import {
   StudioOptionsBars,
   type StudioOptionsBarsDrawModel,
@@ -1205,6 +1209,11 @@ import type {
 } from "./StudioAssetMenuPanel";
 import type { StudioLayerNavigatorAction } from "./StudioLayerNavigator";
 import type { StudioLivePressureStore } from "./StudioLiveInkHosts";
+import type {
+  StudioBrushCatalogHandlers,
+  StudioMobileEditingDockHandlers,
+  StudioMobileEditingDockUi,
+} from "./StudioMobileEditingDock";
 import type { PublishContext } from "./StudioPublishContextBanner";
 import type { StudioWebGpuCanvasHandle } from "./StudioWebGpuCanvas";
 import type { CreatorAssetReportReason } from "@/lib/creator-asset-contract";
@@ -1226,6 +1235,15 @@ import { STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK } from "@/lib/studio-work-asset-c
 import { cn } from "@/lib/utils";
 import { resolveAssetUrl } from "@/src/catalog-static";
 import { useSession } from "@/src/compat/auth-session-store";
+
+const STUDIO_MOBILE_EDITING_DOCK_UI: StudioMobileEditingDockUi = {
+  StudioBrushLibraryPanel,
+  StudioBrushStudio,
+  StudioMobileSheetHandle,
+  StudioShapePickerGrid,
+  StudioUnifiedBrushPicker,
+  loadStudioBrushStudio,
+};
 
 type StudioDrawingPointerTransport = ReturnType<
   typeof createStudioDrawingPointerTransportController
@@ -7552,11 +7570,30 @@ function StudioCuttoonEditor() {
   const nodeSmoothStrengthAtDragStartRef = useRef(NODE_SMOOTH_DEFAULT_STRENGTH);
   // ── 말풍선 커스텀 모양(폴리곤 점 편집) — studio-bubble-custom-shape 통합 상태. nodeEditDraft와
   // 동일한 구조(드래그 세션 ref + rAF 배칭 draft) — 좌표계만 다르다(말풍선 로컬, 회전 포함).
+  type BubbleShapePointerCaptureTarget = {
+    releasePointerCapture?: (pointerId: number) => void;
+  };
   const [bubbleShapeEditActive, setBubbleShapeEditActive] = useState(false);
-  const bubbleShapeDragRef = useRef<{ elId: string; session: NodeDragSession } | null>(null);
+  const [bubbleShapeSelectedPointIndex, setBubbleShapeSelectedPointIndex] = useState<number | null>(null);
+  const bubbleShapeDragRef = useRef<{
+    captureTarget: BubbleShapePointerCaptureTarget | null;
+    elId: string;
+    pointerId: number;
+    session: NodeDragSession;
+  } | null>(null);
   const bubbleShapeRafRef = useRef<number | null>(null);
   const pendingBubbleShapeDraftRef = useRef<{ elId: string; points: number[] } | null>(null);
   const [bubbleShapeDraft, setBubbleShapeDraft] = useState<{ elId: string; points: number[] } | null>(null);
+  function releaseBubbleShapePointerCapture(
+    drag: NonNullable<typeof bubbleShapeDragRef.current> | null = bubbleShapeDragRef.current
+  ) {
+    if (!drag?.captureTarget?.releasePointerCapture) return;
+    try {
+      drag.captureTarget.releasePointerCapture(drag.pointerId);
+    } catch {
+      // Browser may release capture before pointercancel/lost-capture cleanup reaches Konva.
+    }
+  }
   const scheduleBubbleShapeDraft = (next: { elId: string; points: number[] }) => {
     pendingBubbleShapeDraftRef.current = next;
     if (bubbleShapeRafRef.current !== null) return;
@@ -7569,7 +7606,32 @@ function StudioCuttoonEditor() {
     if (bubbleShapeRafRef.current !== null) globalThis.cancelAnimationFrame(bubbleShapeRafRef.current);
   }, []);
   useEffect(() => {
+    const cancelBubbleShapeDragOutsideStage = (event: PointerEvent) => {
+      const drag = bubbleShapeDragRef.current;
+      if (!drag) return;
+      const pointerId = Number.isFinite(event.pointerId) ? event.pointerId : 1;
+      if (drag.pointerId !== pointerId) return;
+      releaseBubbleShapePointerCapture(drag);
+      bubbleShapeDragRef.current = null;
+      pendingBubbleShapeDraftRef.current = null;
+      if (bubbleShapeRafRef.current !== null) {
+        globalThis.cancelAnimationFrame(bubbleShapeRafRef.current);
+        bubbleShapeRafRef.current = null;
+      }
+      setBubbleShapeDraft(null);
+    };
+    // Native capture normally routes the release back to Konva. This window safety net cancels the
+    // preview if an older WebView rejects capture and the pen/mouse is released outside the Stage.
+    globalThis.addEventListener("pointerup", cancelBubbleShapeDragOutsideStage);
+    globalThis.addEventListener("pointercancel", cancelBubbleShapeDragOutsideStage);
+    return () => {
+      globalThis.removeEventListener("pointerup", cancelBubbleShapeDragOutsideStage);
+      globalThis.removeEventListener("pointercancel", cancelBubbleShapeDragOutsideStage);
+    };
+  }, []);
+  useEffect(() => {
     void selectedId;
+    releaseBubbleShapePointerCapture();
     bubbleShapeDragRef.current = null;
     pendingBubbleShapeDraftRef.current = null;
     if (bubbleShapeRafRef.current !== null) {
@@ -7578,6 +7640,7 @@ function StudioCuttoonEditor() {
     }
     setBubbleShapeDraft(null);
     setBubbleShapeEditActive(false);
+    setBubbleShapeSelectedPointIndex(null);
   }, [selectedId]);
   // ── 복구 브러시/도장(heal/clone) — studio-heal-clone 통합 상태 ──
   // 모드(healCloneTool)는 pixelTool과 동일하게 요소가 바뀌어도 유지(사용자 선호), 소스 앵커/
@@ -8658,6 +8721,83 @@ function StudioCuttoonEditor() {
         : EMPTY_NODE_EDIT_HANDLES,
     [bubbleShapeArmed, selected, bubbleShapeDraft]
   );
+  useEffect(() => {
+    if (!bubbleShapeArmed) {
+      releaseBubbleShapePointerCapture();
+      bubbleShapeDragRef.current = null;
+      pendingBubbleShapeDraftRef.current = null;
+      if (bubbleShapeRafRef.current !== null) {
+        globalThis.cancelAnimationFrame(bubbleShapeRafRef.current);
+        bubbleShapeRafRef.current = null;
+      }
+      setBubbleShapeDraft(null);
+      setBubbleShapeSelectedPointIndex(null);
+    }
+  }, [bubbleShapeArmed]);
+  function addBubbleShapePointFromInspector(): void {
+    if (
+      !bubbleShapeArmed ||
+      selected?.type !== "bubble" ||
+      selectedContentMutationLocked ||
+      !hasCustomBubbleShape(selected.customShapePoints)
+    ) {
+      return;
+    }
+    const points = selected.customShapePoints;
+    const pointCount = points.length / 2;
+    let segmentIndex =
+      bubbleShapeSelectedPointIndex !== null &&
+      bubbleShapeSelectedPointIndex >= 0 &&
+      bubbleShapeSelectedPointIndex < pointCount
+        ? bubbleShapeSelectedPointIndex
+        : 0;
+    if (bubbleShapeSelectedPointIndex === null) {
+      let longestSquared = -1;
+      for (let index = 0; index < pointCount; index++) {
+        const nextIndex = (index + 1) % pointCount;
+        const dx = points[nextIndex * 2]! - points[index * 2]!;
+        const dy = points[nextIndex * 2 + 1]! - points[index * 2 + 1]!;
+        const lengthSquared = dx * dx + dy * dy;
+        // tie는 먼저 나온 선분을 유지해 CRDT 클라이언트간 결과를 결정적으로 만든다.
+        if (lengthSquared > longestSquared) {
+          longestSquared = lengthSquared;
+          segmentIndex = index;
+        }
+      }
+    }
+    const nextIndex = (segmentIndex + 1) % pointCount;
+    const midpointX = (points[segmentIndex * 2]! + points[nextIndex * 2]!) / 2;
+    const midpointY = (points[segmentIndex * 2 + 1]! + points[nextIndex * 2 + 1]!) / 2;
+    const inserted = insertBubbleShapePointAtClosestSegment(points, midpointX, midpointY);
+    if (!inserted.changed || inserted.pointIndex === null) return;
+    patchEl(selected.id, { customShapePoints: inserted.points } as Partial<El>);
+    setBubbleShapeSelectedPointIndex(inserted.pointIndex);
+    announceDrawingShortcut(`말풍선 외곽선 점 추가 · ${inserted.points.length / 2}개`);
+  }
+  function removeBubbleShapePointFromInspector(): void {
+    if (
+      !bubbleShapeArmed ||
+      selected?.type !== "bubble" ||
+      selectedContentMutationLocked ||
+      bubbleShapeSelectedPointIndex === null
+    ) {
+      return;
+    }
+    const removed = removeBubbleShapePoint(
+      selected.customShapePoints ?? [],
+      bubbleShapeSelectedPointIndex
+    );
+    if (removed.changed) {
+      patchEl(selected.id, { customShapePoints: removed.points } as Partial<El>);
+      const nextCount = removed.points.length / 2;
+      setBubbleShapeSelectedPointIndex(Math.min(bubbleShapeSelectedPointIndex, nextCount - 1));
+      announceDrawingShortcut(`말풍선 외곽선 점 삭제 · ${nextCount}개`);
+      return;
+    }
+    if (removed.outcome === "minimum-points") {
+      announceDrawingShortcut("말풍선 외곽선에는 최소 3개의 점이 필요합니다");
+    }
+  }
   const smudgeArmed =
     smudgeActive && !smudgeBusy && selected?.type === "image" && !selectedContentMutationLocked;
   const liquifyArmed =
@@ -13256,6 +13396,25 @@ function StudioCuttoonEditor() {
         toggleAdvancedFill();
       } else if ((e.key === "Delete" || e.key === "Backspace") && (selectedId || marqueeIds.length > 0)) {
         e.preventDefault();
+        if (
+          bubbleShapeArmed &&
+          selected?.type === "bubble" &&
+          bubbleShapeSelectedPointIndex !== null
+        ) {
+          const removed = removeBubbleShapePoint(
+            selected.customShapePoints ?? [],
+            bubbleShapeSelectedPointIndex
+          );
+          if (removed.changed) {
+            patchEl(selected.id, { customShapePoints: removed.points } as Partial<El>);
+            const nextCount = removed.points.length / 2;
+            setBubbleShapeSelectedPointIndex(Math.min(bubbleShapeSelectedPointIndex, nextCount - 1));
+            announceDrawingShortcut(`말풍선 외곽선 점 삭제 · ${nextCount}개`);
+          } else if (removed.outcome === "minimum-points") {
+            announceDrawingShortcut("말풍선 외곽선에는 최소 3개의 점이 필요합니다");
+          }
+          return;
+        }
         // 픽셀 선택이 살아 있으면 요소 삭제 대신 선택 영역 픽셀 삭제(포토샵과 동일한 기대).
         if (selected?.type === "image" && isSelectionUsable(pixelSel)) {
           if (!pixelBusy && !selectedContentMutationLocked) {
@@ -13297,6 +13456,7 @@ function StudioCuttoonEditor() {
           setNodeEditTool(null);
         } else if (bubbleShapeEditActive) {
           setBubbleShapeEditActive(false);
+          releaseBubbleShapePointerCapture();
           bubbleShapeDragRef.current = null;
         } else if (healCloneTool) {
           setHealCloneTool(null);
@@ -16675,6 +16835,8 @@ function StudioCuttoonEditor() {
     const stagePointerEvent = e.evt as PointerEvent;
     // One contact owns a liquify gesture. A second finger is ignored and cannot cancel or replace it.
     if (liquifyDragRef.current) return;
+    // The first contact owns a bubble point drag. A palm/second finger cannot replace its owner.
+    if (bubbleShapeDragRef.current) return;
     // Figma식 자유 위치 댓글 핀: 무장 상태의 첫 캔버스 클릭이 point 앵커를 확정하고 소비된다.
     if (commentPinArmed) {
       const pos = e.target.getStage()?.getRelativePointerPosition();
@@ -16870,8 +17032,57 @@ function StudioCuttoonEditor() {
       const tolerance = 14 / effScale; // crop/node-edit과 동일한 화면 14px 히트 여유
       const hitIdx = hitTestNodeHandle(local, bubbleShapeHandles, tolerance);
       if (hitIdx !== null) {
+        if (e.evt.altKey) {
+          const removed = removeBubbleShapePoint(selected.customShapePoints ?? [], hitIdx);
+          if (removed.changed) {
+            patchEl(selected.id, { customShapePoints: removed.points } as Partial<El>);
+            const nextCount = removed.points.length / 2;
+            setBubbleShapeSelectedPointIndex(Math.min(hitIdx, nextCount - 1));
+            announceDrawingShortcut(`말풍선 외곽선 점 삭제 · ${nextCount}개`);
+          } else if (removed.outcome === "minimum-points") {
+            announceDrawingShortcut("말풍선 외곽선에는 최소 3개의 점이 필요합니다");
+          }
+          return;
+        }
+        setBubbleShapeSelectedPointIndex(hitIdx);
         const session = beginNodeDrag(selected.customShapePoints ?? [], undefined, hitIdx, "move", local);
-        if (session) bubbleShapeDragRef.current = { elId: selected.id, session };
+        if (session) {
+          const pointerId = Number.isFinite(stagePointerEvent.pointerId)
+            ? stagePointerEvent.pointerId
+            : 1;
+          const nativeTarget = stagePointerEvent.currentTarget as
+            | (EventTarget & {
+                releasePointerCapture?: (capturedPointerId: number) => void;
+                setPointerCapture?: (capturedPointerId: number) => void;
+              })
+            | null;
+          let captureTarget: BubbleShapePointerCaptureTarget | null = null;
+          if (nativeTarget?.setPointerCapture) {
+            try {
+              nativeTarget.setPointerCapture(pointerId);
+              captureTarget = nativeTarget;
+            } catch {
+              // Some WebViews expose Pointer Events but reject capture for synthesized mouse input.
+            }
+          }
+          bubbleShapeDragRef.current = {
+            captureTarget,
+            elId: selected.id,
+            pointerId,
+            session,
+          };
+        }
+      } else if (e.evt.shiftKey) {
+        const inserted = insertBubbleShapePointAtClosestSegment(
+          selected.customShapePoints ?? [],
+          local.x,
+          local.y
+        );
+        if (inserted.changed && inserted.pointIndex !== null) {
+          patchEl(selected.id, { customShapePoints: inserted.points } as Partial<El>);
+          setBubbleShapeSelectedPointIndex(inserted.pointIndex);
+          announceDrawingShortcut(`말풍선 외곽선 점 추가 · ${inserted.points.length / 2}개`);
+        }
       }
       return;
     }
@@ -17688,6 +17899,9 @@ function StudioCuttoonEditor() {
     // el.customShapePoints 기준 매 틱 재계산"(직전 draft 아님) — updateNodeDragMove의 시작
     // 스냅샷+델타 설계와 일치, 무누적오차.
     if (bubbleShapeDragRef.current) {
+      const pointerEvent = e.evt as PointerEvent;
+      const pointerId = Number.isFinite(pointerEvent.pointerId) ? pointerEvent.pointerId : 1;
+      if (bubbleShapeDragRef.current.pointerId !== pointerId) return;
       const pos = e.target.getStage()?.getRelativePointerPosition();
       if (pos) {
         const { elId, session } = bubbleShapeDragRef.current;
@@ -19044,6 +19258,18 @@ function StudioCuttoonEditor() {
       finishLiquifyPointerSession(pointerEvent, true, e.target.getStage());
       return;
     }
+    if (bubbleShapeDragRef.current) {
+      if (bubbleShapeDragRef.current.pointerId !== pointerId) return;
+      releaseBubbleShapePointerCapture(bubbleShapeDragRef.current);
+      bubbleShapeDragRef.current = null;
+      pendingBubbleShapeDraftRef.current = null;
+      if (bubbleShapeRafRef.current !== null) {
+        globalThis.cancelAnimationFrame(bubbleShapeRafRef.current);
+        bubbleShapeRafRef.current = null;
+      }
+      setBubbleShapeDraft(null);
+      return;
+    }
     const current = advancedFillTapGestureRef.current;
     if (current) {
       const outcome = endStudioAdvancedFillTap(current, pointerId, true);
@@ -19183,7 +19409,10 @@ function StudioCuttoonEditor() {
     // 말풍선 커스텀 모양 점 드래그 종료 — nodeEdit과 동일하게 이 pointerup 틱에서 ref로 바로
     // 커밋한다(state는 비동기라 마지막 프레임을 놓칠 수 있다).
     if (bubbleShapeDragRef.current) {
-      const { elId } = bubbleShapeDragRef.current;
+      const pointerId = Number.isFinite(pointerEvent.pointerId) ? pointerEvent.pointerId : 1;
+      if (bubbleShapeDragRef.current.pointerId !== pointerId) return;
+      const { elId, session } = bubbleShapeDragRef.current;
+      releaseBubbleShapePointerCapture(bubbleShapeDragRef.current);
       bubbleShapeDragRef.current = null;
       if (bubbleShapeRafRef.current !== null) {
         globalThis.cancelAnimationFrame(bubbleShapeRafRef.current);
@@ -19200,7 +19429,17 @@ function StudioCuttoonEditor() {
         !activeSurfaceReviewLocked &&
         !isEffectivelyLocked(current, groups)
       ) {
-        patchEl(elId, { customShapePoints: finalDraft.points } as Partial<El>);
+        const pointOffset = session.pointIndex * 2;
+        const moved = moveBubbleShapePoint(
+          current.customShapePoints ?? [],
+          session.pointIndex,
+          finalDraft.points[pointOffset],
+          finalDraft.points[pointOffset + 1]
+        );
+        if (moved.changed) {
+          patchEl(elId, { customShapePoints: moved.points } as Partial<El>);
+          setBubbleShapeSelectedPointIndex(session.pointIndex);
+        }
       }
       return;
     }
@@ -21931,6 +22170,7 @@ function StudioCuttoonEditor() {
 
   const studioInspectorAsideHandlers = useStudioStableHandlers<StudioInspectorAsideHandlers>({
     addAdvancedRuler,
+    addBubbleShapePointFromInspector,
     addLayerGroup,
     addLayerMask,
     addVanishingPointHandler,
@@ -21980,6 +22220,7 @@ function StudioCuttoonEditor() {
     rememberEffectRecent,
     removeSelected,
     removeAdvancedRuler,
+    removeBubbleShapePointFromInspector,
     removeVanishingPointHandler,
     reorder,
     resetIsometricOrigin,
@@ -22479,7 +22720,8 @@ function StudioCuttoonEditor() {
   const liveInkPredictionRenderer = liveInkPredictionRendererRef.current;
   const liveStampOverlayRenderer = liveStampOverlayRendererRef.current;
   const nodeEditActiveHandleIndex = nodeEditDragRef.current?.session.pointIndex ?? null;
-  const bubbleShapeActiveHandleIndex = bubbleShapeDragRef.current?.session.pointIndex ?? null;
+  const bubbleShapeActiveHandleIndex =
+    bubbleShapeDragRef.current?.session.pointIndex ?? bubbleShapeSelectedPointIndex;
 
   const studioCanvasViewportHandlers = useStudioStableHandlers<StudioCanvasViewportHandlers>({
   addPage,
@@ -23534,6 +23776,7 @@ function StudioCuttoonEditor() {
           bubbleShapeArmed={bubbleShapeArmed}
           bubbleShapeEditActive={bubbleShapeEditActive}
           bubbleShapeHandles={bubbleShapeHandles}
+          bubbleShapeSelectedPointIndex={bubbleShapeSelectedPointIndex}
           canvasFlipH={canvasFlipH}
           canvasH={canvasH}
           canvasRotation={canvasRotation}
@@ -23752,7 +23995,9 @@ function StudioCuttoonEditor() {
           stableHandlers={studioInspectorAsideHandlers}
         />
 
-        <StudioMobileEditingDock
+        {isMobile ? (
+          <Suspense fallback={null}>
+            <StudioMobileEditingDock
           activeSavedBrushId={activeSavedBrushId}
           activeSurfaceReviewLocked={activeSurfaceReviewLocked}
           advancedFillActive={advancedFillActive}
@@ -23821,12 +24066,15 @@ function StudioCuttoonEditor() {
           tipAngle={tipAngle}
           tipRoundness={tipRoundness}
           tool={tool}
+          ui={STUDIO_MOBILE_EDITING_DOCK_UI}
           useVelocityPressure={useVelocityPressure}
           velocitySensitivity={velocitySensitivity}
           workspaceState={workspaceState}
           zoom={zoom}
-          stableHandlers={studioMobileEditingDockHandlers}
-        />
+              stableHandlers={studioMobileEditingDockHandlers}
+            />
+          </Suspense>
+        ) : null}
       </div>
 
         <StudioLazyPanelStack

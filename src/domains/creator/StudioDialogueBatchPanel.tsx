@@ -16,6 +16,7 @@ import {
 import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 
 import {
+  adjacentEditableDialogueItem,
   collectDialogueItems,
   dialogueExcerpt,
   dialogueItemTypeLabel,
@@ -148,12 +149,27 @@ export function StudioDialogueBatchPanel({
   );
 
   const findInputRef = useRef<HTMLInputElement>(null);
+  const textareaRefs = useRef(new Map<string, HTMLTextAreaElement>());
+  const composingIdsRef = useRef(new Set<string>());
+  const skipBlurCommitIdRef = useRef<string | null>(null);
+  const initialFocusDoneRef = useRef(false);
   const readAloudHeadingId = useId();
 
-  // 열리면 찾기 입력으로 포커스 이동(패널을 연 의도가 편집이므로).
+  // 캔버스에서 대사를 선택한 뒤 열면 바로 편집하고, 그 외에는 기존 찾아바꾸기 진입점을 유지한다.
   useEffect(() => {
-    findInputRef.current?.focus();
-  }, []);
+    if (initialFocusDoneRef.current) return;
+    initialFocusDoneRef.current = true;
+    const selectedItem = selectedId
+      ? collectDialogueItems(pages).find((item) => item.id === selectedId && !item.locked)
+      : null;
+    const textarea = selectedItem ? textareaRefs.current.get(selectedItem.id) : null;
+    if (textarea) {
+      textarea.focus();
+      textarea.select();
+    } else {
+      findInputRef.current?.focus();
+    }
+  }, [pages, selectedId]);
 
   // 시스템 음성 목록은 일부 브라우저에서 비동기로 준비된다.
   useEffect(() => {
@@ -247,6 +263,32 @@ export function StudioDialogueBatchPanel({
       const { [id]: _omit, ...rest } = prev;
       return rest;
     });
+  };
+
+  const focusDialogueEditor = (item: DialogueBatchItem) => {
+    if (item.locked) {
+      onSelectElement(item.pageId, item.id);
+      return;
+    }
+    const textarea = textareaRefs.current.get(item.id);
+    if (!textarea) {
+      onSelectElement(item.pageId, item.id);
+      return;
+    }
+    textarea.focus();
+    textarea.select();
+  };
+
+  const commitAndMove = (
+    item: DialogueBatchItem,
+    direction: "next" | "previous"
+  ) => {
+    const target = adjacentEditableDialogueItem(shown, item.id, direction);
+    commitDraft(item);
+    if (!target) return;
+    // focus()가 현재 textarea의 blur를 동기로 발생시키므로 이미 저장한 초안을 한 번 더 쓰지 않는다.
+    skipBlurCommitIdRef.current = item.id;
+    focusDialogueEditor(target);
   };
 
   const applyReplace = () => {
@@ -594,10 +636,10 @@ export function StudioDialogueBatchPanel({
                         )}
                         <button
                           type="button"
-                          onClick={() => onSelectElement(item.pageId, item.id)}
+                          onClick={() => focusDialogueEditor(item)}
                           className="min-h-11 min-w-0 flex-1 truncate rounded-md px-1 text-left text-[0.66rem] font-medium text-fg-2 transition-colors hover:bg-raised hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-                          aria-label={`${item.pageIndex + 1}페이지 ${dialogueItemTypeLabel(item)} "${dialogueExcerpt(item.text, 16)}" 캔버스에서 선택`}
-                          title="캔버스에서 이 요소 선택"
+                          aria-label={`${item.pageIndex + 1}페이지 ${dialogueItemTypeLabel(item)} "${dialogueExcerpt(item.text, 16)}" 선택하고 대사 편집`}
+                          title={item.locked ? "잠금을 풀면 편집할 수 있어요" : "선택하고 바로 대사 편집"}
                         >
                           {dialogueItemTypeLabel(item)}
                         </button>
@@ -633,18 +675,43 @@ export function StudioDialogueBatchPanel({
                         )}
                       </div>
                       <textarea
+                        ref={(node) => {
+                          if (node) textareaRefs.current.set(item.id, node);
+                          else textareaRefs.current.delete(item.id);
+                        }}
                         value={drafts[item.id] ?? item.text}
                         onChange={(e) =>
                           setDrafts((prev) => ({ ...prev, [item.id]: e.target.value }))
                         }
-                        onBlur={() => commitDraft(item)}
+                        onFocus={() => {
+                          if (selectedId !== item.id) onSelectElement(item.pageId, item.id);
+                        }}
+                        onBlur={() => {
+                          if (skipBlurCommitIdRef.current === item.id) {
+                            skipBlurCommitIdRef.current = null;
+                            return;
+                          }
+                          commitDraft(item);
+                        }}
+                        onCompositionStart={() => composingIdsRef.current.add(item.id)}
+                        onCompositionEnd={() => composingIdsRef.current.delete(item.id)}
                         onKeyDown={(e) => {
+                          if (
+                            e.nativeEvent.isComposing ||
+                            e.nativeEvent.keyCode === 229 ||
+                            composingIdsRef.current.has(item.id)
+                          ) {
+                            return;
+                          }
                           if (e.key === "Escape") {
                             // 패널 닫힘(Esc)과 분리 — 임시본만 되돌린다.
                             e.stopPropagation();
                             revertDraft(item.id);
                           } else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                            e.currentTarget.blur();
+                            if (e.repeat) return;
+                            e.preventDefault();
+                            e.stopPropagation();
+                            commitAndMove(item, e.shiftKey ? "previous" : "next");
                           }
                         }}
                         disabled={item.locked}
@@ -666,7 +733,7 @@ export function StudioDialogueBatchPanel({
       </div>
 
       <p className="border-t border-line/60 px-3 py-1.5 text-[0.58rem] leading-snug text-fg-4">
-        수정은 포커스 아웃 또는 ⌘Enter 로 저장 · 바꾸기/수정 모두 ⌘Z 로 복구할 수 있어요.
+        ⌘/Ctrl+Enter 저장 후 다음 · Shift와 함께 누르면 이전 · 잠긴 대사는 자동으로 건너뛰어요.
       </p>
     </section>
   );

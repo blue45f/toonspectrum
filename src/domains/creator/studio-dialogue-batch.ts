@@ -27,6 +27,14 @@ export type DialogueElementLike = {
   text?: string;
   variant?: string;
   name?: string;
+  /** Future/imported documents may provide an explicit reading order. */
+  order?: number;
+  /** Optional explicit panel association. Current canvas documents are also inferred spatially. */
+  frameId?: string;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
   groupId?: string;
   hidden?: boolean;
   locked?: boolean;
@@ -57,6 +65,8 @@ export type DialogueBatchItem = {
   locked: boolean;
 };
 
+export type DialogueNavigationDirection = "next" | "previous";
+
 // ── 목록화 ──────────────────────────────────────────────────────────────────
 
 /** 대사 요소인지 — bubble/text 타입이면서 문자열 text 를 가진 요소만. */
@@ -66,26 +76,161 @@ export function isDialogueElement(
   return (el.type === "bubble" || el.type === "text") && typeof el.text === "string";
 }
 
-/** 전체 페이지에서 대사 요소(bubble/text)를 페이지·요소 순서대로 목록화한다. */
+type SpatialFrame = {
+  id: string;
+  sourceIndex: number;
+  order: number | null;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+type DialogueSortRecord = {
+  item: DialogueBatchItem;
+  sourceIndex: number;
+  order: number | null;
+  frameRank: number;
+  x: number;
+  y: number;
+};
+
+function finiteNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function spatialCoordinate(value: unknown): number {
+  return finiteNumber(value) ?? Number.POSITIVE_INFINITY;
+}
+
+function compareExplicitOrderThenPosition(
+  left: Pick<DialogueSortRecord, "order" | "y" | "x" | "sourceIndex">,
+  right: Pick<DialogueSortRecord, "order" | "y" | "x" | "sourceIndex">
+): number {
+  // A partially ordered import remains deterministic: authored rows come first, then spatial rows.
+  const leftOrderBucket = left.order == null ? 1 : 0;
+  const rightOrderBucket = right.order == null ? 1 : 0;
+  return (
+    leftOrderBucket - rightOrderBucket ||
+    (left.order ?? 0) - (right.order ?? 0) ||
+    left.y - right.y ||
+    left.x - right.x ||
+    left.sourceIndex - right.sourceIndex
+  );
+}
+
+function collectSpatialFrames(elements: readonly DialogueElementLike[]): SpatialFrame[] {
+  return elements
+    .flatMap((el, sourceIndex): SpatialFrame[] => {
+      if (el.type !== "frame") return [];
+      const x = finiteNumber(el.x);
+      const y = finiteNumber(el.y);
+      const width = finiteNumber(el.width);
+      const height = finiteNumber(el.height);
+      if (x == null || y == null || width == null || height == null || width <= 0 || height <= 0) {
+        return [];
+      }
+      return [
+        {
+          id: el.id,
+          sourceIndex,
+          order: finiteNumber(el.order),
+          x,
+          y,
+          width,
+          height,
+        },
+      ];
+    })
+    .sort((left, right) => compareExplicitOrderThenPosition(left, right));
+}
+
+function inferredFrameRank(el: DialogueElementLike, frames: readonly SpatialFrame[]): number {
+  if (frames.length === 0) return 0;
+  if (el.frameId) {
+    const explicitRank = frames.findIndex((frame) => frame.id === el.frameId);
+    if (explicitRank >= 0) return explicitRank;
+  }
+
+  const x = finiteNumber(el.x);
+  const y = finiteNumber(el.y);
+  if (x == null || y == null) return frames.length;
+  const centerX = x + Math.max(0, finiteNumber(el.width) ?? 0) / 2;
+  const centerY = y + Math.max(0, finiteNumber(el.height) ?? 0) / 2;
+  let bestRank = frames.length;
+  let bestArea = Number.POSITIVE_INFINITY;
+  frames.forEach((frame, rank) => {
+    if (
+      centerX < frame.x ||
+      centerX > frame.x + frame.width ||
+      centerY < frame.y ||
+      centerY > frame.y + frame.height
+    ) {
+      return;
+    }
+    // Overlapping/nested panels resolve to the most specific containing frame.
+    const area = frame.width * frame.height;
+    if (area < bestArea) {
+      bestArea = area;
+      bestRank = rank;
+    }
+  });
+  return bestRank;
+}
+
+/**
+ * 전체 페이지에서 대사 요소를 실제 읽기 순서로 목록화한다.
+ * 페이지 → 컷(위→아래, 왼→오른) → 명시 order → 요소 위치 y/x → 원래 배열 순서다.
+ */
 export function collectDialogueItems(pages: readonly DialoguePageLike[]): DialogueBatchItem[] {
   const out: DialogueBatchItem[] = [];
   pages.forEach((page, pageIndex) => {
     const groups = page.groups ?? [];
-    for (const el of page.elements) {
-      if (!isDialogueElement(el)) continue;
-      out.push({
-        id: el.id,
-        pageId: page.id,
-        pageIndex,
-        elType: el.type,
-        variant: el.type === "bubble" ? el.variant : undefined,
-        text: el.text,
-        hidden: isEffectivelyHidden(el, groups),
-        locked: isEffectivelyLocked(el, groups),
+    const frames = collectSpatialFrames(page.elements);
+    const records: DialogueSortRecord[] = [];
+    page.elements.forEach((el, sourceIndex) => {
+      if (!isDialogueElement(el)) return;
+      records.push({
+        sourceIndex,
+        order: finiteNumber(el.order),
+        frameRank: inferredFrameRank(el, frames),
+        x: spatialCoordinate(el.x),
+        y: spatialCoordinate(el.y),
+        item: {
+          id: el.id,
+          pageId: page.id,
+          pageIndex,
+          elType: el.type,
+          variant: el.type === "bubble" ? el.variant : undefined,
+          text: el.text,
+          hidden: isEffectivelyHidden(el, groups),
+          locked: isEffectivelyLocked(el, groups),
+        },
       });
-    }
+    });
+    records.sort(
+      (left, right) =>
+        left.frameRank - right.frameRank || compareExplicitOrderThenPosition(left, right)
+    );
+    out.push(...records.map((record) => record.item));
   });
   return out;
+}
+
+/** 현재 목록 순서에서 잠기지 않은 다음/이전 대사를 찾는다. 끝에서는 순환하지 않는다. */
+export function adjacentEditableDialogueItem(
+  items: readonly DialogueBatchItem[],
+  currentId: string,
+  direction: DialogueNavigationDirection
+): DialogueBatchItem | null {
+  const currentIndex = items.findIndex((item) => item.id === currentId);
+  if (currentIndex < 0) return null;
+  const step = direction === "next" ? 1 : -1;
+  for (let index = currentIndex + step; index >= 0 && index < items.length; index += step) {
+    const candidate = items[index];
+    if (candidate && !candidate.locked) return candidate;
+  }
+  return null;
 }
 
 // 말풍선 종류 라벨 — studio-assets 의 BUBBLE_VARIANTS 를 단일 소스로 사용(드리프트 방지).

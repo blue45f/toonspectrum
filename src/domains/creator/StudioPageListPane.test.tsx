@@ -251,5 +251,29 @@ describe("StudioPageListPane", () => {
     expect(sheet?.hasAttribute("inert")).toBe(false);
     expect(sheet?.getAttribute("aria-modal")).toBe("true");
     expect(sheet?.getAttribute("data-popup-kind")).toBe("sheet");
+    expect(sheet?.getAttribute("data-studio-sheet-snap")).toBe("medium");
+
+    fireEvent.click(screen.getByRole("slider", { name: /페이지 시트 크기 조절/ }));
+    expect(sheet?.getAttribute("data-studio-sheet-snap")).toBe("full");
+  });
+
+  it("uses arrow keys to resize one level, clamps at compact, and closes explicitly", () => {
+    const props = createProps({
+      isMobile: true,
+      mobileSheet: "pages",
+    });
+    render(<StudioPageListPane {...props} />);
+    const handle = screen.getByRole("slider", { name: /페이지 시트 크기 조절/ });
+    const sheet = document.querySelector<HTMLElement>('[data-studio-sheet-id="pages"]');
+
+    fireEvent.keyDown(handle, { key: "ArrowDown" });
+    expect(sheet?.getAttribute("data-studio-sheet-snap")).toBe("compact");
+    expect(props.setMobileSheet).not.toHaveBeenCalled();
+
+    expect(fireEvent.keyDown(handle, { key: "ArrowDown" })).toBe(false);
+    expect(props.setMobileSheet).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "페이지 시트 닫기" }));
+    expect(props.setMobileSheet).toHaveBeenCalledWith(null);
   });
 });

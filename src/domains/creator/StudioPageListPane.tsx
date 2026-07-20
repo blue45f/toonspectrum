@@ -11,9 +11,13 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { Suspense, memo } from "react";
+import { Suspense, memo, useState } from "react";
 
 import { StudioEdgeRailButton } from "./studio-chrome-ui";
+import {
+  studioMobileSheetSizeStyle,
+  type StudioMobileSheetSnap,
+} from "./studio-mobile-sheet-snap";
 import { StudioPageThumbnail } from "./studio-page-lazy-ui";
 import {
   PAGE_NAME_MAX,
@@ -118,6 +122,10 @@ export const StudioPageListPane = memo(function StudioPageListPane({
     movePageToTop,
     movePageUp,
   } = stableHandlers;
+  const [mobileSnap, setMobileSnap] = useState<StudioMobileSheetSnap>("medium");
+  const safeMobileKeyboardInset = Number.isFinite(mobileKeyboardInset)
+    ? Math.max(0, Math.round(mobileKeyboardInset))
+    : 0;
   return (
     <>
         {!visibleLeftPanelOpen && !presentationPanelsHidden && (
@@ -135,6 +143,7 @@ export const StudioPageListPane = memo(function StudioPageListPane({
           aria-modal={isMobile && mobileSheet === "pages" ? true : undefined}
           data-studio-sheet-id="pages"
           data-studio-mobile-sheet={isMobile && mobileSheet === "pages" ? "true" : undefined}
+          data-studio-sheet-snap={isMobile ? mobileSnap : undefined}
           data-popup-kind={isMobile && mobileSheet === "pages" ? "sheet" : undefined}
           aria-label={isMobile ? "페이지 목록" : undefined}
           tabIndex={isMobile ? -1 : undefined}
@@ -142,7 +151,7 @@ export const StudioPageListPane = memo(function StudioPageListPane({
           className={cn(
             "flex flex-col gap-1.5 border border-line p-2",
             // 모바일: 하단에서 올라오는 바텀시트
-            "fixed inset-x-0 bottom-0 z-[60] max-h-[72dvh] overflow-hidden rounded-t-3xl bg-panel pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-2xl transition-transform duration-300 ease-out motion-reduce:transition-none",
+            "fixed inset-x-0 bottom-0 z-[60] overflow-hidden rounded-t-3xl bg-panel pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-2xl transition-[transform,height,max-height] duration-300 ease-out motion-reduce:transition-none",
             // 데스크톱: 엣지 도크(라운드·여백 최소, 캔버스 폭 최대)
             "lg:static lg:z-auto lg:max-h-none lg:min-h-0 lg:overflow-hidden lg:rounded-none lg:border-y-0 lg:border-l-0 lg:bg-panel/50 lg:pb-2 lg:shadow-none lg:transition-none lg:translate-y-0",
             mobileSheet === "pages" ? "translate-y-0" : "translate-y-full",
@@ -151,8 +160,8 @@ export const StudioPageListPane = memo(function StudioPageListPane({
           style={
             isMobile
               ? {
-                  bottom: mobileKeyboardInset,
-                  maxHeight: `calc(72dvh - ${mobileKeyboardInset}px)`,
+                  bottom: safeMobileKeyboardInset,
+                  ...studioMobileSheetSizeStyle(mobileSnap, safeMobileKeyboardInset),
                 }
               : { width: leftResize.width, minWidth: 128 }
           }
@@ -163,7 +172,9 @@ export const StudioPageListPane = memo(function StudioPageListPane({
               kind="pages"
               label="페이지 시트"
               onDismiss={() => setMobileSheet(null)}
+              onSnapChange={setMobileSnap}
               sheetRef={pagesSheetRef}
+              snap={mobileSnap}
             />
             <div className="flex min-h-11 items-center justify-between gap-2 lg:min-h-6">
               <span className="flex items-center gap-1 text-[0.7rem] font-bold text-fg-2">

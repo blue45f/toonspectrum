@@ -1,13 +1,21 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import {
+  StudioBrushLibraryPanel,
+  StudioBrushStudio,
+  StudioShapePickerGrid,
+  StudioUnifiedBrushPicker,
+  loadStudioBrushStudio,
+} from "./studio-page-lazy-ui";
 import {
   StudioMobileEditingDock,
   type StudioMobileEditingDockHandlers,
   type StudioMobileEditingDockProps,
 } from "./StudioMobileEditingDock";
+import { StudioMobileSheetHandle } from "./StudioMobileSheetHandle";
 
 import type { NormalizedStudioBrushDynamicsSettings } from "./studio-brush-dynamics";
 import type { StudioBrushSnapshot } from "./studio-brush-library";
@@ -57,10 +65,6 @@ vi.mock("./studio-page-lazy-ui", () => ({
 
 vi.mock("./StudioLineCorrectionControls", () => ({
   StudioLineCorrectionControls: () => null,
-}));
-
-vi.mock("./StudioMobileSheetHandle", () => ({
-  StudioMobileSheetHandle: () => null,
 }));
 
 vi.mock("./StudioSavedBrushShelf", () => ({
@@ -166,6 +170,14 @@ function createProps(
     tipAngle: 0,
     tipRoundness: 1,
     tool: "draw",
+    ui: {
+      StudioBrushLibraryPanel,
+      StudioBrushStudio,
+      StudioMobileSheetHandle,
+      StudioShapePickerGrid,
+      StudioUnifiedBrushPicker,
+      loadStudioBrushStudio,
+    },
     useVelocityPressure: false,
     velocitySensitivity: 1,
     workspaceState: { mobileControlSide: "right" } as StudioWorkspaceState,
@@ -226,6 +238,7 @@ describe("StudioMobileEditingDock", () => {
     const drawSheet = screen.getByRole("dialog", { name: "브러시 설정" });
     expect(drawSheet.getAttribute("data-studio-sheet-id")).toBe("draw");
     expect(drawSheet.getAttribute("aria-modal")).toBe("false");
+    expect(drawSheet.getAttribute("data-studio-sheet-snap")).toBe("medium");
 
     view.rerender(
       <StudioMobileEditingDock
@@ -241,8 +254,82 @@ describe("StudioMobileEditingDock", () => {
     const brushManager = screen.getByRole("dialog", { name: "내 브러시 관리" });
     expect(brushManager.getAttribute("data-studio-sheet-id")).toBe("brushes");
     expect(brushManager.getAttribute("aria-modal")).toBe("true");
+    expect(brushManager.getAttribute("data-studio-sheet-snap")).toBe("medium");
     expect(brushManager.style.bottom).toBe("22px");
     within(brushManager).getByRole("button", { name: "브러시 관리 닫기" }).click();
+    expect(stableHandlers.dismissBrushManager).toHaveBeenCalledOnce();
+  });
+
+  it("cycles draw sheet sizes, clamps keyboard resize at compact, and closes explicitly", () => {
+    const setMobileSheet = vi.fn();
+    render(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          mobileKeyboardInset: 19.6,
+          mobileSheet: "draw",
+          setMobileSheet,
+        })}
+      />,
+    );
+
+    const drawSheet = screen.getByRole("dialog", { name: "브러시 설정" });
+    const handle = screen.getByRole("slider", { name: /브러시 설정 크기 조절/ });
+    expect(
+      drawSheet.style.getPropertyValue("--studio-draw-sheet-reserved-bottom"),
+    ).toContain("20px");
+    expect(handle.getAttribute("aria-valuenow")).toBe("1");
+
+    fireEvent.click(handle);
+    expect(drawSheet.getAttribute("data-studio-sheet-snap")).toBe("full");
+    expect(
+      drawSheet.style.getPropertyValue("--studio-draw-sheet-height"),
+    ).toContain("min(88dvh");
+    expect(
+      drawSheet.style.getPropertyValue("--studio-draw-sheet-height"),
+    ).toContain("--studio-canvas-bottom-inset");
+
+    fireEvent.keyDown(handle, { key: "ArrowDown" });
+    fireEvent.keyDown(handle, { key: "ArrowDown" });
+    expect(drawSheet.getAttribute("data-studio-sheet-snap")).toBe("compact");
+    expect(setMobileSheet).not.toHaveBeenCalled();
+
+    expect(fireEvent.keyDown(handle, { key: "ArrowDown" })).toBe(false);
+    expect(setMobileSheet).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "브러시 설정 닫기" }));
+    expect(setMobileSheet).toHaveBeenCalledWith(null);
+  });
+
+  it("uses the same three snap levels for the mobile brush manager", () => {
+    const stableHandlers = createHandlers();
+    render(
+      <StudioMobileEditingDock
+        {...createProps({
+          isMobile: true,
+          mobileKeyboardInset: Number.NaN,
+          mobileSheet: "brushes",
+          stableHandlers,
+        })}
+      />,
+    );
+
+    const brushManager = screen.getByRole("dialog", { name: "내 브러시 관리" });
+    const handle = screen.getByRole("slider", { name: /내 브러시 관리 크기 조절/ });
+    expect(brushManager.style.bottom).toBe("0px");
+    expect(brushManager.getAttribute("data-studio-sheet-snap")).toBe("medium");
+
+    fireEvent.keyDown(handle, { key: "ArrowUp" });
+    expect(brushManager.getAttribute("data-studio-sheet-snap")).toBe("full");
+
+    fireEvent.keyDown(handle, { key: "ArrowDown" });
+    fireEvent.keyDown(handle, { key: "ArrowDown" });
+    expect(brushManager.getAttribute("data-studio-sheet-snap")).toBe("compact");
+
+    expect(fireEvent.keyDown(handle, { key: "ArrowDown" })).toBe(false);
+    expect(stableHandlers.dismissBrushManager).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "브러시 관리 닫기" }));
     expect(stableHandlers.dismissBrushManager).toHaveBeenCalledOnce();
   });
 

@@ -106,33 +106,44 @@ export default function StudioTextEditOverlay({
   const textNodeRef = useRef<Konva.Text | null>(null);
   const originalRef = useRef<OverlaySnapshot | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const initialSelectionElementIdRef = useRef<string | null>(null);
   const committedRef = useRef(false);
   const [value, setValue] = useState(el?.text ?? "");
   const [visual, setVisual] = useState<OverlayVisual | null>(null);
 
   useLayoutEffect(() => {
-    committedRef.current = false;
     if (!el) return;
     const raw = nodeRefsRef.current[elementId];
     const textNode = resolveOverlayTextNode(el, raw);
     textNodeRef.current = textNode;
     if (!textNode) return;
-    originalRef.current = {
-      text: textNode.text(),
-      fontSize: textNode.fontSize(),
-      x: textNode.x(),
-      y: textNode.y(),
-      width: textNode.width(),
-      height: textNode.height(),
-    };
+    // 최초 원본은 이 keyed 편집 세션에서 한 번만 캡처한다. 줌/무관 렌더 때 현재 live draft를
+    // 다시 원본으로 덮으면 이후 Esc가 편집 전 상태로 돌아가지 못한다.
+    if (!originalRef.current) {
+      committedRef.current = false;
+      originalRef.current = {
+        text: textNode.text(),
+        fontSize: textNode.fontSize(),
+        x: textNode.x(),
+        y: textNode.y(),
+        width: textNode.width(),
+        height: textNode.height(),
+      };
+    }
     setVisual(readOverlayVisual(textNode));
-    const textarea = textareaRef.current;
-    textarea?.focus();
-    textarea?.select();
     // effScale은 discrete 줌 변경(버튼/단축키로 커밋된 값)에 반응해 위치를 다시 계산하기 위한
     // 의존성이다 — 제스처 중 임시 CSS transform은 zoomHostRef의 자식이라 자동으로 상속돼(추가
     // 코드 불필요) 여기서 따로 다룰 필요가 없다.
   }, [el, elementId, nodeRefsRef, effScale]);
+
+  useLayoutEffect(() => {
+    if (!visual || initialSelectionElementIdRef.current === elementId) return;
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    initialSelectionElementIdRef.current = elementId;
+    textarea.focus({ preventScroll: true });
+    textarea.select();
+  }, [elementId, visual]);
 
   useLayoutEffect(() => () => {
     // 언마운트 시 라이브 mutation을 원상복구한다. 커밋 경로도 곧바로 patchEl이 최종 값으로
@@ -213,6 +224,9 @@ export default function StudioTextEditOverlay({
         applyLiveValue(next);
       }}
       onKeyDown={(event) => {
+        // Safari/WebKit은 한글 IME 확정 keydown에서 isComposing=false와 legacy 229를 함께
+        // 보낼 수 있다. 이 순간 편집면을 커밋·언마운트하면 마지막 음절이 유실된다.
+        if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
         if (event.key === "Escape") {
           event.preventDefault();
           onCancel();

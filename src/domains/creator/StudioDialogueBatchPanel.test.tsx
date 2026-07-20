@@ -1,8 +1,9 @@
-// The repository test environment is Node. Static markup verifies the progressive
-// enhancement shell and accessible control contract; queue/controller behavior is
-// covered independently without requiring the browser Web Speech API.
+// @vitest-environment jsdom
+// Static markup keeps the progressive-enhancement contract compact, while the DOM tests below
+// lock down the continuous keyboard-editing workflow and IME boundary.
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   StudioDialogueBatchPanel,
@@ -100,6 +101,8 @@ function hasNestedButton(html: string): boolean {
   return false;
 }
 
+afterEach(() => cleanup());
+
 describe("StudioDialogueBatchPanel read-aloud progressive enhancement", () => {
   it("keeps dialogue editing available with a clear unsupported-browser message", () => {
     const html = renderPanel(speechAdapter(false));
@@ -151,7 +154,7 @@ describe("StudioDialogueBatchPanel read-aloud progressive enhancement", () => {
     const speakerLabel =
       'aria-label="1페이지 말풍선·말하기 대사만 낭독하고 캔버스에서 선택"';
     const selectLabel =
-      'aria-label="1페이지 말풍선·말하기 &quot;첫 번째 대사&quot; 캔버스에서 선택"';
+      'aria-label="1페이지 말풍선·말하기 &quot;첫 번째 대사&quot; 선택하고 대사 편집"';
     const speakerStart = html.indexOf(speakerLabel);
     const speakerEnd = html.indexOf("</button>", speakerStart);
     const speakerMarkup = html.slice(speakerStart, speakerEnd);
@@ -171,5 +174,115 @@ describe("StudioDialogueBatchPanel read-aloud progressive enhancement", () => {
     expect(renderPanel(speechAdapter(true), { mobileKeyboardInset: -20 })).toContain(
       "--studio-mobile-keyboard-inset:0px"
     );
+  });
+});
+
+describe("StudioDialogueBatchPanel continuous dialogue editing", () => {
+  const WORKFLOW_PAGES: StudioDialogueBatchPanelProps["pages"] = [
+    {
+      id: "page-1",
+      elements: [
+        { id: "bubble-3", type: "bubble", variant: "speech", text: "세 번째", x: 20, y: 220 },
+        {
+          id: "bubble-2",
+          type: "bubble",
+          variant: "thought",
+          text: "잠긴 두 번째",
+          x: 20,
+          y: 120,
+          locked: true,
+        },
+        { id: "bubble-1", type: "bubble", variant: "speech", text: "첫 번째", x: 20, y: 20 },
+      ],
+    },
+  ];
+
+  function renderWorkflow(selectedId: string | null = "bubble-1") {
+    const onSelectElement = vi.fn();
+    const onPatchText = vi.fn();
+    render(
+      <StudioDialogueBatchPanel
+        pages={WORKFLOW_PAGES}
+        currentPageId="page-1"
+        selectedId={selectedId}
+        onClose={vi.fn()}
+        onSelectElement={onSelectElement}
+        onPatchText={onPatchText}
+        onApplyReplace={vi.fn()}
+        readAloudAdapter={speechAdapter(false)}
+      />
+    );
+    return { onSelectElement, onPatchText };
+  }
+
+  it("선택된 대사에서 바로 시작하고 Cmd+Enter 저장 후 잠긴 행을 건너뛴다", () => {
+    const { onPatchText, onSelectElement } = renderWorkflow();
+    const editors = screen.getAllByRole("textbox", { name: "1페이지 말풍선·말하기 대사 수정" });
+    const first = editors[0];
+    const third = editors[1];
+
+    expect(document.activeElement).toBe(first);
+    expect(first).toHaveProperty("selectionStart", 0);
+    expect(first).toHaveProperty("selectionEnd", "첫 번째".length);
+
+    fireEvent.change(first, { target: { value: "첫 번째 수정" } });
+    fireEvent.keyDown(first, { key: "Enter", metaKey: true });
+
+    expect(onPatchText).toHaveBeenCalledTimes(1);
+    expect(onPatchText).toHaveBeenCalledWith("page-1", "bubble-1", "첫 번째 수정");
+    expect(onSelectElement).toHaveBeenLastCalledWith("page-1", "bubble-3");
+    expect(document.activeElement).toBe(third);
+  });
+
+  it("Ctrl+Shift+Enter는 저장 후 이전 편집 가능 대사로 이동한다", () => {
+    const { onPatchText, onSelectElement } = renderWorkflow("bubble-3");
+    const editors = screen.getAllByRole("textbox", { name: "1페이지 말풍선·말하기 대사 수정" });
+    const first = editors[0];
+    const third = editors[1];
+
+    expect(document.activeElement).toBe(third);
+    fireEvent.change(third, { target: { value: "세 번째 수정" } });
+    fireEvent.keyDown(third, { key: "Enter", ctrlKey: true, shiftKey: true });
+
+    expect(onPatchText).toHaveBeenCalledWith("page-1", "bubble-3", "세 번째 수정");
+    expect(onSelectElement).toHaveBeenLastCalledWith("page-1", "bubble-1");
+    expect(document.activeElement).toBe(first);
+  });
+
+  it("한글 IME 조합 중 Cmd/Ctrl+Enter는 저장하거나 포커스를 옮기지 않는다", () => {
+    const { onPatchText, onSelectElement } = renderWorkflow();
+    const first = screen.getAllByRole("textbox", { name: "1페이지 말풍선·말하기 대사 수정" })[0];
+
+    fireEvent.change(first, { target: { value: "조합 중" } });
+    fireEvent.compositionStart(first);
+    fireEvent.keyDown(first, { key: "Enter", ctrlKey: true });
+    fireEvent.keyDown(first, { key: "Escape" });
+
+    expect(onPatchText).not.toHaveBeenCalled();
+    expect(onSelectElement).not.toHaveBeenCalledWith("page-1", "bubble-3");
+    expect(document.activeElement).toBe(first);
+    expect((first as HTMLTextAreaElement).value).toBe("조합 중");
+
+    fireEvent.compositionEnd(first);
+    fireEvent.keyDown(first, { key: "Enter", ctrlKey: true, keyCode: 229 });
+    expect(onPatchText).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(first);
+
+    fireEvent.keyDown(first, { key: "Enter", ctrlKey: true });
+    expect(onPatchText).toHaveBeenCalledTimes(1);
+    expect(document.activeElement).not.toBe(first);
+  });
+
+  it("행 제목 한 번 클릭으로 캔버스 선택과 textarea 편집을 함께 시작한다", () => {
+    const { onSelectElement } = renderWorkflow(null);
+    const editButton = screen.getByRole("button", {
+      name: '1페이지 말풍선·말하기 "세 번째" 선택하고 대사 편집',
+    });
+    const editors = screen.getAllByRole("textbox", { name: "1페이지 말풍선·말하기 대사 수정" });
+
+    fireEvent.click(editButton);
+
+    expect(onSelectElement).toHaveBeenLastCalledWith("page-1", "bubble-3");
+    expect(document.activeElement).toBe(editors[1]);
   });
 });

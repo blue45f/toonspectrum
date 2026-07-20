@@ -1,3 +1,11 @@
+import {
+  collapseStudioMobileSheetSnap,
+  expandStudioMobileSheetSnap,
+  nextStudioMobileSheetSnap,
+  studioMobileSheetSnapLabel,
+  studioMobileSheetSnapValue,
+  type StudioMobileSheetSnap,
+} from "./studio-mobile-sheet-snap";
 import { useStudioBottomSheetGesture } from "./useStudioBottomSheetGesture";
 
 import type { RefObject } from "react";
@@ -12,13 +20,15 @@ interface StudioMobileSheetHandleProps {
   kind: StudioMobileSheetKind;
   label: string;
   onDismiss: () => void;
+  onSnapChange?: (snap: StudioMobileSheetSnap) => void;
   sheetRef: RefObject<HTMLElement | null>;
+  snap?: StudioMobileSheetSnap;
 }
 
 /**
- * Shared 44px grabber for Studio's mobile sheets. A tap is a conventional close action; dragging
- * down follows the user's pointer and dismisses after the gesture threshold. Only this handle
- * disables native touch panning, so every content scrollport keeps its normal momentum scroll.
+ * Shared 44px grabber for Studio's mobile sheets. Snap-enabled sheets expand upward and collapse
+ * one step downward; only a compact-down gesture dismisses. Legacy callers without a snap contract
+ * retain tap/swipe-to-close behavior. Content scrollports keep their native momentum scrolling.
  */
 export function StudioMobileSheetHandle({
   active,
@@ -26,21 +36,55 @@ export function StudioMobileSheetHandle({
   kind,
   label,
   onDismiss,
+  onSnapChange,
   sheetRef,
+  snap,
 }: StudioMobileSheetHandleProps) {
+  const snapLabel = snap ? studioMobileSheetSnapLabel(snap) : null;
+  const snapEnabled = snap !== undefined && onSnapChange !== undefined;
   const { handleProps } = useStudioBottomSheetGesture({
     activeKey: active ? kind : null,
-    ariaLabel: `${label} 닫기 — 아래로 밀거나 눌러 닫기`,
+    ariaLabel: snapEnabled
+      ? `${label} 크기 조절 — 현재 ${snapLabel}. 위아래로 밀거나 눌러 크기 전환`
+      : `${label} 닫기 — 아래로 밀거나 눌러 닫기`,
+    onActivate: snapEnabled
+      ? () => onSnapChange(nextStudioMobileSheetSnap(snap))
+      : undefined,
+    onCollapse: snapEnabled
+      ? () => {
+          const nextSnap = collapseStudioMobileSheetSnap(snap);
+          if (nextSnap) onSnapChange(nextSnap);
+          else onDismiss();
+        }
+      : undefined,
     onDismiss,
+    onExpand: snapEnabled
+      ? () => onSnapChange(expandStudioMobileSheetSnap(snap))
+      : undefined,
+    // ARIA slider keyboard semantics clamp ArrowDown at the minimum. Pointer collapse remains an
+    // intentional compact-down dismissal, and the sheet also retains its explicit X button.
+    onKeyboardCollapse: snapEnabled
+      ? () => {
+          const nextSnap = collapseStudioMobileSheetSnap(snap);
+          if (nextSnap) onSnapChange(nextSnap);
+        }
+      : undefined,
     sheetRef,
   });
 
   return (
     <button
       {...handleProps}
+      aria-orientation={snapEnabled ? "vertical" : undefined}
+      aria-valuemax={snapEnabled ? 2 : undefined}
+      aria-valuemin={snapEnabled ? 0 : undefined}
+      aria-valuenow={snapEnabled ? studioMobileSheetSnapValue(snap) : undefined}
+      aria-valuetext={snapLabel ? `시트 높이 ${snapLabel}` : undefined}
       data-studio-sheet-kind={kind}
+      data-studio-sheet-snap={snap}
+      role={snapEnabled ? "slider" : undefined}
       tabIndex={active ? undefined : -1}
-      title={`${label} 닫기`}
+      title={snapEnabled ? `${label} 크기 전환 (현재 ${snapLabel})` : `${label} 닫기`}
       className={cn(
         "group relative flex min-h-11 w-full shrink-0 cursor-grab select-none items-start justify-center rounded-xl pt-2 active:cursor-grabbing",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent",

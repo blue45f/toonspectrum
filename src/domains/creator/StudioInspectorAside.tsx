@@ -56,6 +56,10 @@ import {
 } from "./studio-bubble-custom-shape";
 import { normalizeExtraTails } from "./studio-bubble-path";
 import {
+  applyBubbleQuickTransform,
+  bubbleQuickTransformUnavailableReason,
+} from "./studio-bubble-quick-transform";
+import {
   applyCropAspect,
   cropAspectRatio,
   initialCropRect,
@@ -95,6 +99,10 @@ import {
 import { groupOfItem, isEffectivelyHidden, type LayerGroup } from "./studio-layers";
 import { LIQUIFY_RADIUS_RANGE, LIQUIFY_STRENGTH_RANGE } from "./studio-liquify";
 import { type MagicResizePreset, type MagicResizeStrategy } from "./studio-magic-resize";
+import {
+  studioMobileSheetSizeStyle,
+  type StudioMobileSheetSnap,
+} from "./studio-mobile-sheet-snap";
 import { isPressureWidthBrush, type NodeEditHandle, type NodeEditTool } from "./studio-node-edit";
 import { type PageGrade } from "./studio-page-grade";
 import {
@@ -184,6 +192,7 @@ import { cn } from "@/lib/utils";
 
 export interface StudioInspectorAsideHandlers {
   addAdvancedRuler: (type: StudioAdvancedRuler["type"]) => void;
+  addBubbleShapePointFromInspector: () => void;
   addLayerGroup: (seedElId?: string) => void;
   addLayerMask: (fill: LayerMaskPaintMode) => void;
   addVanishingPointHandler: () => void;
@@ -233,6 +242,7 @@ export interface StudioInspectorAsideHandlers {
   rememberEffectRecent: (effectId: StudioEffectId) => void;
   removeSelected: () => void;
   removeAdvancedRuler: (id: string) => void;
+  removeBubbleShapePointFromInspector: () => void;
   removeVanishingPointHandler: (id: string) => void;
   reorder: (dir: "front" | "back" | "forward" | "backward") => void;
   resetIsometricOrigin: () => void;
@@ -290,6 +300,7 @@ interface StudioInspectorAsideProps {
   bubbleShapeArmed: boolean;
   bubbleShapeEditActive: boolean;
   bubbleShapeHandles: NodeEditHandle[];
+  bubbleShapeSelectedPointIndex: number | null;
   canvasFlipH: boolean;
   canvasH: number;
   canvasRotation: StudioViewRotation;
@@ -534,6 +545,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   bubbleShapeArmed,
   bubbleShapeEditActive,
   bubbleShapeHandles,
+  bubbleShapeSelectedPointIndex,
   canvasFlipH,
   canvasH,
   canvasRotation,
@@ -753,6 +765,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
 }: StudioInspectorAsideProps) {
   const {
     addAdvancedRuler,
+    addBubbleShapePointFromInspector,
     addLayerGroup,
     addLayerMask,
     addVanishingPointHandler,
@@ -802,6 +815,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
     rememberEffectRecent,
     removeSelected,
     removeAdvancedRuler,
+    removeBubbleShapePointFromInspector,
     removeVanishingPointHandler,
     reorder,
     resetIsometricOrigin,
@@ -836,6 +850,11 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
   const [activatedImageInspectorTabs, setActivatedImageInspectorTabs] = useState<
     ReadonlySet<StudioImageInspectorSection>
   >(() => new Set());
+  const [mobileInspectorSnap, setMobileInspectorSnap] =
+    useState<StudioMobileSheetSnap>("medium");
+  const safeMobileKeyboardInset = Number.isFinite(mobileKeyboardInset)
+    ? Math.max(0, Math.round(mobileKeyboardInset))
+    : 0;
   const activeImageInspectorTab =
     inspectorLayout.primary === "properties" && selected?.type === "image"
       ? inspectorLayout.image
@@ -882,6 +901,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
           aria-modal={isMobile && mobileSheet === "props" ? true : undefined}
           data-studio-sheet-id="props"
           data-studio-mobile-sheet={isMobile && mobileSheet === "props" ? "true" : undefined}
+          data-studio-sheet-snap={isMobile ? mobileInspectorSnap : undefined}
           data-popup-kind={isMobile && mobileSheet === "props" ? "sheet" : undefined}
           aria-label={isMobile ? "속성" : undefined}
           tabIndex={isMobile ? -1 : undefined}
@@ -889,7 +909,7 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
           className={cn(
             "flex min-h-0 flex-col gap-2 overscroll-contain [scrollbar-gutter:stable]",
             // 모바일: 하단에서 올라오는 바텀시트
-            "fixed inset-x-0 bottom-0 z-[60] max-h-[82dvh] overflow-y-auto rounded-t-3xl border border-line bg-panel p-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-2xl transition-transform duration-300 ease-out motion-reduce:transition-none",
+            "fixed inset-x-0 bottom-0 z-[60] overflow-y-auto rounded-t-3xl border border-line bg-panel p-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-2xl transition-[transform,height,max-height] duration-300 ease-out motion-reduce:transition-none",
             // 데스크톱: 뷰포트 높이 엣지 도크 — 메뉴바+툴벨트 높이만 빼고 캔버스와 나란히 채움.
             "lg:static lg:z-auto lg:max-h-none lg:min-h-0 lg:flex-none lg:self-stretch lg:overflow-y-auto lg:rounded-none lg:border lg:border-y-0 lg:border-r-0 lg:border-line lg:bg-panel/50 lg:p-2 lg:shadow-none lg:transition-none lg:translate-y-0",
             mobileSheet === "props" ? "translate-y-0" : "translate-y-full",
@@ -899,8 +919,11 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
           style={
             isMobile
               ? {
-                  bottom: mobileKeyboardInset,
-                  maxHeight: `calc(82dvh - ${mobileKeyboardInset}px)`,
+                  bottom: safeMobileKeyboardInset,
+                  ...studioMobileSheetSizeStyle(
+                    mobileInspectorSnap,
+                    safeMobileKeyboardInset,
+                  ),
                 }
               : { width: rightResize.width, minWidth: 240 }
           }
@@ -928,7 +951,9 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                 kind="props"
                 label="속성 시트"
                 onDismiss={() => setMobileSheet(null)}
+                onSnapChange={setMobileInspectorSnap}
                 sheetRef={propsSheetRef}
+                snap={mobileInspectorSnap}
               />
             }
             onRequestClose={() => setMobileSheet(null)}
@@ -1250,12 +1275,32 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                   onRememberColor={rememberColor}
                 />
               )}
-              {selected.type === "bubble" &&
-                (selected.variant !== "double" || hasCustomBubbleShape(selected.customShapePoints)) && (
+              {selected.type === "bubble" && (
                 <StudioBubbleShapePanel
+                  canCustomize={selected.variant !== "double" || hasCustomBubbleShape(selected.customShapePoints)}
                   hasCustomShape={hasCustomBubbleShape(selected.customShapePoints)}
                   active={bubbleShapeArmed}
                   pointCount={bubbleShapeHandles.length || Math.floor((selected.customShapePoints?.length ?? 0) / 2)}
+                  selectedPointIndex={bubbleShapeSelectedPointIndex}
+                  pointActionsDisabled={selectedContentMutationLocked}
+                  onAddPoint={addBubbleShapePointFromInspector}
+                  onRemovePoint={removeBubbleShapePointFromInspector}
+                  quickTransformDisabled={selectedContentMutationLocked}
+                  quickTransformFlipDisabled={Boolean(selected.tailAnchorId || selected.tailAnchorPoint)}
+                  quickTransformUnavailableReasons={{
+                    widen: bubbleQuickTransformUnavailableReason(selected, "widen"),
+                    narrow: bubbleQuickTransformUnavailableReason(selected, "narrow"),
+                    heighten: bubbleQuickTransformUnavailableReason(selected, "heighten"),
+                    shorten: bubbleQuickTransformUnavailableReason(selected, "shorten"),
+                    "flip-horizontal": bubbleQuickTransformUnavailableReason(selected, "flip-horizontal"),
+                    "flip-vertical": bubbleQuickTransformUnavailableReason(selected, "flip-vertical"),
+                  }}
+                  onQuickTransform={(action) => {
+                    if (selectedContentMutationLocked) return;
+                    const transformed = applyBubbleQuickTransform(selected, action);
+                    if (!transformed.changed) return;
+                    patchEl(selected.id, transformed.patch as Partial<El>);
+                  }}
                   onConvert={() => {
                     if (selectedContentMutationLocked) return;
                     const input: BubbleShapeGeometryInput = {

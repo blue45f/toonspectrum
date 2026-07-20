@@ -21,7 +21,13 @@ import {
   WandSparkles,
   X,
 } from "lucide-react";
-import { Suspense, memo, type ReactNode } from "react";
+import {
+  Suspense,
+  memo,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 
 import {
   StudioContextActionButton,
@@ -36,15 +42,11 @@ import {
 } from "./studio-draw-ux";
 import { elementLabel } from "./studio-element-label";
 import {
-  StudioBrushLibraryPanel,
-  StudioBrushStudio,
-  StudioShapePickerGrid,
-  StudioUnifiedBrushPicker,
-  loadStudioBrushStudio,
-} from "./studio-page-lazy-ui";
+  studioMobileSheetSizeStyle,
+  type StudioMobileSheetSnap,
+} from "./studio-mobile-sheet-snap";
 import { STUDIO_EASE } from "./studio-panel-ui";
 import { StudioLineCorrectionControls } from "./StudioLineCorrectionControls";
-import { StudioMobileSheetHandle } from "./StudioMobileSheetHandle";
 import { StudioSavedBrushShelf } from "./StudioSavedBrushShelf";
 
 import type { BrushPreset } from "./studio-brush";
@@ -80,8 +82,29 @@ import { cn } from "@/lib/utils";
 const ZOOM_MIN = 0.2;
 const ZOOM_MAX = 5;
 
+type StudioDrawSheetStyle = CSSProperties & {
+  "--studio-draw-sheet-height": string;
+  "--studio-draw-sheet-reserved-bottom": string;
+};
+
 function clampZoom(z: number): number {
   return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z * 20) / 20));
+}
+
+function studioDrawSheetSizeStyle(
+  snap: StudioMobileSheetSnap,
+  keyboardInset: number,
+): StudioDrawSheetStyle {
+  const baseSize = studioMobileSheetSizeStyle(snap, keyboardInset);
+  const reservedBottom = `calc(var(--studio-canvas-bottom-inset, 7rem) + ${keyboardInset}px)`;
+  const height = `min(${String(baseSize.height)}, calc(100dvh - env(safe-area-inset-top) - 0.75rem - ${reservedBottom}))`;
+  return {
+    "--studio-draw-sheet-height": height,
+    "--studio-draw-sheet-reserved-bottom": reservedBottom,
+    bottom: "var(--studio-draw-sheet-reserved-bottom)",
+    height: "var(--studio-draw-sheet-height)",
+    maxHeight: "var(--studio-draw-sheet-height)",
+  };
 }
 
 export interface StudioBrushCatalogHandlers {
@@ -113,6 +136,15 @@ export interface StudioMobileEditingDockHandlers {
   reorder: (dir: "front" | "back" | "forward" | "backward") => void;
   toggleAdvancedFill: () => void;
   undo: () => void;
+}
+
+export interface StudioMobileEditingDockUi {
+  StudioBrushLibraryPanel: typeof import("./studio-page-lazy-ui").StudioBrushLibraryPanel;
+  StudioBrushStudio: typeof import("./studio-page-lazy-ui").StudioBrushStudio;
+  StudioMobileSheetHandle: typeof import("./StudioMobileSheetHandle").StudioMobileSheetHandle;
+  StudioShapePickerGrid: typeof import("./studio-page-lazy-ui").StudioShapePickerGrid;
+  StudioUnifiedBrushPicker: typeof import("./studio-page-lazy-ui").StudioUnifiedBrushPicker;
+  loadStudioBrushStudio: typeof import("./studio-page-lazy-ui").loadStudioBrushStudio;
 }
 
 export interface StudioMobileEditingDockProps {
@@ -184,6 +216,7 @@ export interface StudioMobileEditingDockProps {
   tipAngle: number;
   tipRoundness: number;
   tool: Tool;
+  ui: StudioMobileEditingDockUi;
   useVelocityPressure: boolean;
   velocitySensitivity: number;
   workspaceState: StudioWorkspaceState;
@@ -260,12 +293,21 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   tipAngle,
   tipRoundness,
   tool,
+  ui,
   useVelocityPressure,
   velocitySensitivity,
   workspaceState,
   zoom,
   stableHandlers,
 }: StudioMobileEditingDockProps) {
+  const {
+    StudioBrushLibraryPanel,
+    StudioBrushStudio,
+    StudioMobileSheetHandle,
+    StudioShapePickerGrid,
+    StudioUnifiedBrushPicker,
+    loadStudioBrushStudio,
+  } = ui;
   const {
     applyBuiltInBrushPreset,
     applyDynamicsPreset,
@@ -284,6 +326,12 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
     toggleAdvancedFill,
     undo,
   } = stableHandlers;
+  const [drawSheetSnap, setDrawSheetSnap] = useState<StudioMobileSheetSnap>("medium");
+  const [brushManagerSheetSnap, setBrushManagerSheetSnap] =
+    useState<StudioMobileSheetSnap>("medium");
+  const safeMobileKeyboardInset = Number.isFinite(mobileKeyboardInset)
+    ? Math.max(0, Math.round(mobileKeyboardInset))
+    : 0;
   return (
     <>
         {/* Photoshop Mobile식 선택 문맥 작업바. 속성 패널까지 왕복하지 않고 가장 빈번한 후속 행동을
@@ -417,14 +465,18 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
             aria-modal="true"
             data-studio-sheet-id="brushes"
             data-studio-mobile-sheet="true"
+            data-studio-sheet-snap={brushManagerSheetSnap}
             data-popup-kind="sheet"
             aria-label="내 브러시 관리"
             tabIndex={-1}
             data-studio-shortcut-boundary="true"
-            className="fixed inset-x-0 z-[60] mx-auto max-w-[34rem] overflow-y-auto overscroll-contain rounded-t-3xl border border-line bg-panel px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-2xl motion-reduce:transition-none lg:hidden"
+            className="fixed inset-x-0 z-[60] mx-auto max-w-[34rem] overflow-y-auto overscroll-contain rounded-t-3xl border border-line bg-panel px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-2xl transition-[height,max-height] duration-300 ease-out motion-reduce:transition-none lg:hidden"
             style={{
-              bottom: mobileKeyboardInset,
-              maxHeight: `calc(100dvh - 1rem - env(safe-area-inset-top) - ${mobileKeyboardInset}px)`,
+              bottom: safeMobileKeyboardInset,
+              ...studioMobileSheetSizeStyle(
+                brushManagerSheetSnap,
+                safeMobileKeyboardInset,
+              ),
             }}
           >
             <div className="sticky top-0 z-10 -mx-3 mb-2 border-b border-line bg-panel/95 px-3 backdrop-blur">
@@ -433,7 +485,9 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 kind="brushes"
                 label="내 브러시 관리"
                 onDismiss={dismissBrushManager}
+                onSnapChange={setBrushManagerSheetSnap}
                 sheetRef={brushManagerSheetRef}
+                snap={brushManagerSheetSnap}
               />
               <div className="flex min-h-12 items-center justify-between">
                 <div>
@@ -474,17 +528,18 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
             aria-modal={false}
             data-studio-sheet-id="draw"
             data-studio-mobile-sheet={mobileSheet === "draw" ? "draw" : undefined}
+            data-studio-sheet-snap={drawSheetSnap}
             className={cn(
-              "fixed inset-x-0 z-[54] mx-auto max-w-[34rem] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel/95 p-3 shadow-2xl backdrop-blur transition-[transform,opacity] duration-200 ease-out motion-reduce:transition-none lg:hidden",
+              "fixed inset-x-0 z-[54] mx-auto max-w-[34rem] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel/95 p-3 shadow-2xl backdrop-blur transition-[transform,opacity,height,max-height] duration-300 ease-out motion-reduce:transition-none lg:hidden",
               mobileSheet === "draw"
                 ? "pointer-events-auto translate-y-0 opacity-100"
                 : "pointer-events-none translate-y-3 opacity-0"
             )}
             inert={mobileSheet === "draw" ? undefined : true}
-            style={{
-              bottom: `calc(var(--studio-canvas-bottom-inset, 7rem) + ${mobileKeyboardInset}px)`,
-              maxHeight: `min(56dvh, calc(100dvh - 8rem - env(safe-area-inset-bottom) - ${mobileKeyboardInset}px))`,
-            }}
+            style={studioDrawSheetSizeStyle(
+              drawSheetSnap,
+              safeMobileKeyboardInset,
+            )}
           >
             <div className="sticky -top-3 z-10 -mx-3 -mt-3 mb-2 border-b border-line/70 bg-panel/95 px-3 backdrop-blur">
               <StudioMobileSheetHandle
@@ -492,7 +547,9 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 kind="draw"
                 label="브러시 설정"
                 onDismiss={() => setMobileSheet(null)}
+                onSnapChange={setDrawSheetSnap}
                 sheetRef={drawSheetRef}
+                snap={drawSheetSnap}
               />
               <div className="flex min-h-12 items-center justify-between">
                 <p className="text-sm font-semibold text-fg">
@@ -1013,4 +1070,3 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
     </>
   );
 });
-

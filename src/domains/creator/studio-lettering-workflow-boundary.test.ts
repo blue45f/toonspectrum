@@ -29,4 +29,23 @@ describe("Studio lettering workflow boundary", () => {
     expect(rail).toContain('addBubble("speech", undefined, true)');
     expect(rail).toContain("addText(undefined, true)");
   });
+
+  it("does not commit or cancel inline lettering while a Korean IME event is composing", () => {
+    const overlay = read("./StudioTextEditOverlay.tsx");
+
+    expect(overlay).toContain("event.nativeEvent.isComposing");
+    expect(overlay).toContain("event.nativeEvent.keyCode === 229");
+    expect(overlay.indexOf("event.nativeEvent.isComposing")).toBeLessThan(
+      overlay.indexOf('event.key === "Escape"')
+    );
+  });
+
+  it("captures the Konva restore snapshot only once across zoom rerenders", () => {
+    const overlay = read("./StudioTextEditOverlay.tsx");
+
+    expect(overlay).toContain("if (!originalRef.current)");
+    expect(overlay.indexOf("if (!originalRef.current)")).toBeLessThan(
+      overlay.indexOf("originalRef.current = {")
+    );
+  });
 });

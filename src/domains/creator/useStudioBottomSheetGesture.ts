@@ -2,6 +2,7 @@ import {
   useLayoutEffect,
   useRef,
   type CSSProperties,
+  type KeyboardEventHandler,
   type MouseEventHandler,
   type PointerEventHandler,
   type RefObject,
@@ -57,7 +58,10 @@ export interface StudioBottomSheetGestureControllerOptions {
   dismissDistance?: number;
   dismissVelocity?: number;
   dragSlop?: number;
+  onActivate?: () => void;
+  onCollapse?: () => void;
   onDismiss: () => void;
+  onExpand?: () => void;
   reducedMotion?: boolean;
   resetDuration?: number;
   sheet: HTMLElement;
@@ -78,6 +82,7 @@ export interface StudioBottomSheetHandleProps {
   "aria-roledescription": string;
   "data-studio-sheet-drag-handle": "true";
   onClick: MouseEventHandler<HTMLButtonElement>;
+  onKeyDown: KeyboardEventHandler<HTMLButtonElement>;
   onLostPointerCapture: PointerEventHandler<HTMLButtonElement>;
   onPointerCancel: PointerEventHandler<HTMLButtonElement>;
   onPointerDown: PointerEventHandler<HTMLButtonElement>;
@@ -91,6 +96,8 @@ interface UseStudioBottomSheetGestureOptions
   extends Omit<StudioBottomSheetGestureControllerOptions, "reducedMotion" | "sheet"> {
   activeKey: string | null;
   ariaLabel?: string;
+  /** Slider keyboard collapse can clamp at its minimum while pointer collapse still dismisses. */
+  onKeyboardCollapse?: () => void;
   reducedMotion?: boolean;
   sheetRef: RefObject<HTMLElement | null>;
 }
@@ -141,7 +148,10 @@ export function createStudioBottomSheetGestureController({
   dismissDistance: dismissDistanceOption,
   dismissVelocity: dismissVelocityOption,
   dragSlop: dragSlopOption,
+  onActivate,
+  onCollapse,
   onDismiss,
+  onExpand,
   reducedMotion: reducedMotionOption,
   resetDuration: resetDurationOption,
   sheet,
@@ -189,22 +199,25 @@ export function createStudioBottomSheetGestureController({
     const drag = activeDrag;
     if (!drag || drag.pointerId !== event.pointerId) return;
     const endY = Number.isFinite(event.clientY) ? event.clientY : drag.startY;
-    const distance = Math.max(0, endY - drag.startY);
+    const distance = endY - drag.startY;
     drag.maxTravel = Math.max(drag.maxTravel, Math.abs(endY - drag.startY));
     const elapsed = Math.max(1, eventTime(event) - drag.startTime);
-    const velocity = distance / elapsed;
+    const velocity = Math.abs(distance) / elapsed;
     const wasDragged = drag.maxTravel >= dragSlop;
-    const shouldDismiss =
+    const shouldStep =
       reason === "release" &&
       wasDragged &&
-      (distance >= dismissDistance || velocity >= dismissVelocity);
+      (Math.abs(distance) >= dismissDistance || velocity >= dismissVelocity);
+    const shouldDismiss = shouldStep && distance > 0 && !onCollapse;
 
     activeDrag = null;
     releasePointer(drag.handle, drag.pointerId);
     // Pointer Events synthesize a click after pointerup. Consume it whenever the pointer actually
     // dragged, including a sub-threshold snap-back, or the semantic handle button would close it.
     suppressNextClick = reason === "release" && wasDragged;
-    restoreDrag(drag, !shouldDismiss);
+    restoreDrag(drag, !shouldStep);
+    if (shouldStep && distance < 0 && !disposed) onExpand?.();
+    if (shouldStep && distance > 0 && onCollapse && !disposed) onCollapse();
     if (shouldDismiss && !dismissed && !disposed) {
       dismissed = true;
       onDismiss();
@@ -232,8 +245,11 @@ export function createStudioBottomSheetGestureController({
         event.stopPropagation();
         return;
       }
-      dismissed = true;
-      onDismiss();
+      if (onActivate) onActivate();
+      else {
+        dismissed = true;
+        onDismiss();
+      }
     },
     handleLostPointerCapture(event) {
       const drag = activeDrag;
@@ -283,7 +299,7 @@ export function createStudioBottomSheetGestureController({
       if (!drag || drag.pointerId !== event.pointerId || !Number.isFinite(event.clientY)) return;
       const rawDistance = event.clientY - drag.startY;
       drag.maxTravel = Math.max(drag.maxTravel, Math.abs(rawDistance));
-      const distance = Math.max(0, rawDistance);
+      const distance = rawDistance < 0 && !onExpand ? 0 : rawDistance;
       sheet.style.transform = `translate3d(0, ${distance.toFixed(2)}px, 0)`;
       event.preventDefault();
     },
@@ -303,14 +319,30 @@ export function useStudioBottomSheetGesture({
   dismissDistance,
   dismissVelocity,
   dragSlop,
+  onActivate,
+  onCollapse,
   onDismiss,
+  onExpand,
+  onKeyboardCollapse,
   reducedMotion,
   resetDuration,
   sheetRef,
 }: UseStudioBottomSheetGestureOptions): { handleProps: StudioBottomSheetHandleProps } {
   const controllerRef = useRef<StudioBottomSheetGestureController | null>(null);
   const dismissRef = useRef(onDismiss);
+  const activateRef = useRef(onActivate);
+  const collapseRef = useRef(onCollapse);
+  const keyboardCollapseRef = useRef(onKeyboardCollapse ?? onCollapse);
+  const expandRef = useRef(onExpand);
   dismissRef.current = onDismiss;
+  activateRef.current = onActivate;
+  collapseRef.current = onCollapse;
+  keyboardCollapseRef.current = onKeyboardCollapse ?? onCollapse;
+  expandRef.current = onExpand;
+  const activateEnabled = onActivate !== undefined;
+  const collapseEnabled = onCollapse !== undefined;
+  const keyboardCollapseEnabled = onKeyboardCollapse !== undefined || collapseEnabled;
+  const expandEnabled = onExpand !== undefined;
 
   function ensureController(): StudioBottomSheetGestureController | null {
     if (controllerRef.current || !activeKey) return controllerRef.current;
@@ -320,7 +352,10 @@ export function useStudioBottomSheetGesture({
       dismissDistance,
       dismissVelocity,
       dragSlop,
+      onActivate: activateEnabled ? () => activateRef.current?.() : undefined,
+      onCollapse: collapseEnabled ? () => collapseRef.current?.() : undefined,
       onDismiss: () => dismissRef.current(),
+      onExpand: expandEnabled ? () => expandRef.current?.() : undefined,
       reducedMotion,
       resetDuration,
       sheet,
@@ -336,7 +371,10 @@ export function useStudioBottomSheetGesture({
           dismissDistance,
           dismissVelocity,
           dragSlop,
+          onActivate: activateEnabled ? () => activateRef.current?.() : undefined,
+          onCollapse: collapseEnabled ? () => collapseRef.current?.() : undefined,
           onDismiss: () => dismissRef.current(),
+          onExpand: expandEnabled ? () => expandRef.current?.() : undefined,
           reducedMotion,
           resetDuration,
           sheet,
@@ -347,7 +385,18 @@ export function useStudioBottomSheetGesture({
       controllerRef.current?.dispose();
       controllerRef.current = null;
     };
-  }, [activeKey, dismissDistance, dismissVelocity, dragSlop, reducedMotion, resetDuration, sheetRef]);
+  }, [
+    activeKey,
+    dismissDistance,
+    dismissVelocity,
+    dragSlop,
+    activateEnabled,
+    collapseEnabled,
+    expandEnabled,
+    reducedMotion,
+    resetDuration,
+    sheetRef,
+  ]);
 
   return {
     handleProps: {
@@ -357,6 +406,15 @@ export function useStudioBottomSheetGesture({
       // Enter/Space/assistive-tech activation may dispatch click without pointerdown, so the
       // conditional-mount fallback must also provision a controller on the semantic click path.
       onClick: (event) => ensureController()?.handleClick(event),
+      onKeyDown: (event) => {
+        if (event.key === "ArrowUp" && expandEnabled) {
+          event.preventDefault();
+          expandRef.current?.();
+        } else if (event.key === "ArrowDown" && keyboardCollapseEnabled) {
+          event.preventDefault();
+          keyboardCollapseRef.current?.();
+        }
+      },
       onLostPointerCapture: (event) => controllerRef.current?.handleLostPointerCapture(event),
       onPointerCancel: (event) => controllerRef.current?.handlePointerCancel(event),
       onPointerDown: (event) => {

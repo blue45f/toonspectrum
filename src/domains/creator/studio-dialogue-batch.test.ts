@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  adjacentEditableDialogueItem,
   applyDialogueTextEdit,
   applyReplacePlanToPages,
   collectDialogueItems,
@@ -60,6 +61,60 @@ describe("studio-dialogue-batch 목록화", () => {
     expect(items[3]).toMatchObject({ pageId: "p2", pageIndex: 1 });
   });
 
+  it("페이지 안에서는 컷의 y/x와 요소의 y/x를 실제 읽기 순서로 사용한다", () => {
+    const items = collectDialogueItems([
+      {
+        id: "p1",
+        elements: [
+          // z-order는 의도적으로 읽기 순서와 반대로 둔다.
+          { id: "right-bottom", type: "bubble", text: "4", x: 360, y: 380, width: 80, height: 40 },
+          { id: "frame-bottom", type: "frame", x: 0, y: 300, width: 500, height: 300 },
+          { id: "left-top-second", type: "text", text: "2", x: 80, y: 120, width: 80 },
+          { id: "frame-right", type: "frame", x: 260, y: 0, width: 240, height: 260 },
+          { id: "right-top", type: "bubble", text: "3", x: 320, y: 80, width: 80, height: 40 },
+          { id: "frame-left", type: "frame", x: 0, y: 0, width: 240, height: 260 },
+          { id: "left-top-first", type: "bubble", text: "1", x: 40, y: 40, width: 80, height: 40 },
+        ],
+      },
+      {
+        id: "p2",
+        elements: [{ id: "next-page", type: "bubble", text: "5", x: 0, y: 0 }],
+      },
+    ]);
+
+    expect(items.map((item) => item.id)).toEqual([
+      "left-top-first",
+      "left-top-second",
+      "right-top",
+      "right-bottom",
+      "next-page",
+    ]);
+  });
+
+  it("명시 frameId/order를 해당 컷 안에서 우선하고 동률은 위치와 원래 index로 안정 정렬한다", () => {
+    const items = collectDialogueItems([
+      {
+        id: "p1",
+        elements: [
+          { id: "frame", type: "frame", x: 0, y: 0, width: 300, height: 300 },
+          { id: "source-second", type: "bubble", text: "동률2", x: 90, y: 80, order: 2 },
+          { id: "explicit-first", type: "text", text: "우선", x: 250, y: 250, order: 1 },
+          { id: "source-first", type: "bubble", text: "동률1", x: 90, y: 80, order: 2 },
+          { id: "spatial-only", type: "bubble", text: "공간", x: 10, y: 10 },
+          { id: "linked", type: "text", text: "연결", x: 900, y: 900, frameId: "frame", order: 0 },
+        ],
+      },
+    ]);
+
+    expect(items.map((item) => item.id)).toEqual([
+      "linked",
+      "explicit-first",
+      "source-second",
+      "source-first",
+      "spatial-only",
+    ]);
+  });
+
   it("collectDialogueItems 는 유효 잠금/숨김(그룹 포함)을 계산한다", () => {
     const items = collectDialogueItems(makePages());
     const byId = new Map(items.map((i) => [i.id, i]));
@@ -90,6 +145,14 @@ describe("studio-dialogue-batch 목록화", () => {
     expect(filterDialogueItems(items, "내레이션").map((i) => i.id)).toEqual(["b3"]);
     expect(filterDialogueItems(items, "  ").map((i) => i.id)).toEqual(items.map((i) => i.id));
     expect(filterDialogueItems(items, "없는대사")).toEqual([]);
+  });
+
+  it("adjacentEditableDialogueItem 은 현재 읽기 순서에서 잠긴 대사를 건너뛴다", () => {
+    const items = collectDialogueItems(makePages());
+    expect(adjacentEditableDialogueItem(items, "t1", "next")?.id).toBe("b3");
+    expect(adjacentEditableDialogueItem(items, "b3", "previous")?.id).toBe("t1");
+    expect(adjacentEditableDialogueItem(items, "b3", "next")).toBeNull();
+    expect(adjacentEditableDialogueItem(items, "missing", "next")).toBeNull();
   });
 });
 

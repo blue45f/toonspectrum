@@ -10,9 +10,9 @@
  *      tool="move" 로만 연다; "굵기" 개념은 말풍선 외곽선에 없다).
  *
  * 스코프(§5 스케치 대비 편차는 design 문서 참조):
- *   - 완전한 베지어 핸들 편집이 아니라 "폴리곤 점 편집"이다. 점을 옮길 수만 있고(추가/삭제 없음),
- *     둥근 모서리·꼬리 곡선은 전환 시점에 직선 세그먼트로 근사돼 이후에는 각지게(원하면 사용자가
- *     점을 옮겨 다시 둥글게) 보인다.
+ *   - 완전한 베지어 핸들 편집이 아니라 "폴리곤 점 편집"이다. 이동은 기존 studio-node-edit 인프라를
+ *     재사용하고, 이 파일의 순수 편집 API가 최근접 선분 삽입·최소 3점 보호 삭제를 제공한다.
+ *     둥근 모서리·꼬리 곡선은 전환 시점에 직선 세그먼트로 근사되며, 이후 편집은 폴리곤 점을 기준으로 한다.
  *   - variant(shout/thought/heart/system/scared/phone/angry 등)의 고유 실루엣(별/하트/구름) 자체를
  *     폴리곤화하지 않는다 — "커스텀 모양 전환"은 항상 이 요소의 현재 테마·꼬리 설정으로 계산한
  *     rounded-rect(+꼬리) 윤곽(=speech/whisper 변형이 그리는 것과 동일한 베이스 모양)을 출발점으로
@@ -284,6 +284,8 @@ function walkPathDataToPolygon(d: string, samplesPerCurve: number): number[] {
 export const BUBBLE_CUSTOM_SHAPE_DEFAULT_SAMPLES_PER_CURVE = 6;
 /** 폴리곤 최소 점 개수(삼각형 미만은 도형이 성립하지 않음). */
 export const BUBBLE_CUSTOM_SHAPE_MIN_POINTS = 3;
+/** 영역 좌표에서 동일한 점으로 판정하는 거리. 샘플링 중 부동소수 오차는 흡수하되 실제 절점은 보존한다. */
+export const BUBBLE_CUSTOM_SHAPE_POINT_EPSILON = 1e-6;
 
 /**
  * 현재 말풍선 지오메트리(테마 반지름 + 꼬리 사양)를 폴리곤 점 배열로 샘플링한다 — "커스텀
@@ -350,6 +352,204 @@ export function normalizeCustomShapePoints(raw: unknown): number[] | undefined {
 /** points 가 유효한(그릴 수 있는) 커스텀 모양인지 — 렌더 분기·armed 게이팅 공용 가드. */
 export function hasCustomBubbleShape(points: readonly number[] | undefined): points is number[] {
   return !!points && points.length >= BUBBLE_CUSTOM_SHAPE_MIN_POINTS * 2 && points.length % 2 === 0;
+}
+
+// ---------------------------------------------------------------------------
+// 전문 점 편집 코어 — 삽입/이동/삭제를 하나의 결정적 결과 포맷으로 반환한다.
+// ---------------------------------------------------------------------------
+
+export type BubbleShapePointEditOperation = "insert" | "move" | "remove";
+export type BubbleShapePointEditOutcome =
+  | "applied"
+  | "unchanged"
+  | "invalid-shape"
+  | "invalid-index"
+  | "invalid-point"
+  | "duplicate-point"
+  | "minimum-points";
+
+/**
+ * 삽입/이동/삭제의 공통 결과. `before`는 undo 스냅샷, `points`는 redo/저장 스냅샷이다.
+ * 두 배열은 항상 입력과 다른 새 배열이므로 호출자가 CRDT/히스토리에 안전하게 보관할 수 있다.
+ * `pointIndex`는 적용/재선택할 점(삭제는 삭제된 점)이고, 삽입일 때 `segmentIndex`는 원본 선분이다.
+ */
+export interface BubbleShapePointEditResult {
+  operation: BubbleShapePointEditOperation;
+  outcome: BubbleShapePointEditOutcome;
+  changed: boolean;
+  before: number[];
+  points: number[];
+  pointIndex: number | null;
+  segmentIndex?: number;
+}
+
+export interface BubbleShapeEditPoint {
+  x: number;
+  y: number;
+}
+
+function normalizeEditCoordinate(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  // JSON/CRDT 직렬화에서 -0과 0이 다른 diff로 남지 않게 하나로 정규화한다.
+  return Object.is(value, -0) ? 0 : value;
+}
+
+/** 포인터/숫자 입력을 유한한 로컬 좌표로 정규화한다. */
+export function normalizeBubbleShapeEditPoint(x: unknown, y: unknown): BubbleShapeEditPoint | undefined {
+  const nx = normalizeEditCoordinate(x);
+  const ny = normalizeEditCoordinate(y);
+  return nx === undefined || ny === undefined ? undefined : { x: nx, y: ny };
+}
+
+function normalizedPointIndex(index: unknown, pointCount: number): number | undefined {
+  return typeof index === "number" && Number.isSafeInteger(index) && index >= 0 && index < pointCount
+    ? index
+    : undefined;
+}
+
+function result(
+  operation: BubbleShapePointEditOperation,
+  outcome: BubbleShapePointEditOutcome,
+  source: readonly number[],
+  next: readonly number[],
+  pointIndex: number | null,
+  segmentIndex?: number
+): BubbleShapePointEditResult {
+  return {
+    operation,
+    outcome,
+    changed: outcome === "applied",
+    before: Array.from(source),
+    points: Array.from(next),
+    pointIndex,
+    ...(segmentIndex === undefined ? {} : { segmentIndex }),
+  };
+}
+
+function editableShape(points: readonly number[]): number[] | undefined {
+  const normalized = normalizeCustomShapePoints(points);
+  if (!normalized) return undefined;
+  const epsilonSquared = BUBBLE_CUSTOM_SHAPE_POINT_EPSILON ** 2;
+  for (let i = 0; i < normalized.length; i += 2) {
+    for (let j = i + 2; j < normalized.length; j += 2) {
+      const dx = normalized[i]! - normalized[j]!;
+      const dy = normalized[i + 1]! - normalized[j + 1]!;
+      if (dx * dx + dy * dy <= epsilonSquared) return undefined;
+    }
+  }
+  return normalized;
+}
+
+function isDuplicatePoint(points: readonly number[], point: BubbleShapeEditPoint, exceptPointIndex?: number): boolean {
+  const epsilonSquared = BUBBLE_CUSTOM_SHAPE_POINT_EPSILON ** 2;
+  for (let i = 0; i < points.length; i += 2) {
+    if (i / 2 === exceptPointIndex) continue;
+    const dx = points[i]! - point.x;
+    const dy = points[i + 1]! - point.y;
+    if (dx * dx + dy * dy <= epsilonSquared) return true;
+  }
+  return false;
+}
+
+/**
+ * 폐곡선의 최근접 선분에 점을 삽입한다. 클릭 좌표를 그대로 넣지 않고 해당 선분에 정사영해
+ * 외곽선이 뛰는 현상을 막는다. 마지막→첫 점을 익명으로 닫는 closing segment도 후보에 포함된다.
+ * 동일 거리 tie는 배열에서 먼저 나온 선분을 선택해 항상 같은 결과를 낸다.
+ */
+export function insertBubbleShapePointAtClosestSegment(
+  points: readonly number[],
+  x: unknown,
+  y: unknown
+): BubbleShapePointEditResult {
+  const operation = "insert" as const;
+  const base = editableShape(points);
+  if (!base) return result(operation, "invalid-shape", points, points, null);
+  const target = normalizeBubbleShapeEditPoint(x, y);
+  if (!target) return result(operation, "invalid-point", points, points, null);
+
+  const count = base.length / 2;
+  let bestSegment = 0;
+  let bestX = base[0]!;
+  let bestY = base[1]!;
+  let bestDistanceSquared = Number.POSITIVE_INFINITY;
+
+  for (let i = 0; i < count; i++) {
+    const next = (i + 1) % count;
+    const ax = base[i * 2]!;
+    const ay = base[i * 2 + 1]!;
+    const bx = base[next * 2]!;
+    const by = base[next * 2 + 1]!;
+    const dx = bx - ax;
+    const dy = by - ay;
+    const lengthSquared = dx * dx + dy * dy;
+    const projection = lengthSquared > 0 ? ((target.x - ax) * dx + (target.y - ay) * dy) / lengthSquared : 0;
+    const t = Math.max(0, Math.min(1, projection));
+    const candidateX = ax + dx * t;
+    const candidateY = ay + dy * t;
+    const distanceX = target.x - candidateX;
+    const distanceY = target.y - candidateY;
+    const distanceSquared = distanceX * distanceX + distanceY * distanceY;
+    if (distanceSquared < bestDistanceSquared) {
+      bestDistanceSquared = distanceSquared;
+      bestSegment = i;
+      bestX = candidateX;
+      bestY = candidateY;
+    }
+  }
+
+  const inserted = normalizeBubbleShapeEditPoint(bestX, bestY);
+  if (!inserted) return result(operation, "invalid-point", points, points, null, bestSegment);
+  if (isDuplicatePoint(base, inserted)) {
+    return result(operation, "duplicate-point", points, points, null, bestSegment);
+  }
+
+  const pointIndex = bestSegment + 1;
+  const next = base.slice();
+  next.splice(pointIndex * 2, 0, inserted.x, inserted.y);
+  return result(operation, "applied", points, next, pointIndex, bestSegment);
+}
+
+/** 한 점을 유한한 좌표로 이동한다. 다른 점과 겹치는 이동은 적용하지 않는다. */
+export function moveBubbleShapePoint(
+  points: readonly number[],
+  pointIndex: unknown,
+  x: unknown,
+  y: unknown
+): BubbleShapePointEditResult {
+  const operation = "move" as const;
+  const base = editableShape(points);
+  if (!base) return result(operation, "invalid-shape", points, points, null);
+  const index = normalizedPointIndex(pointIndex, base.length / 2);
+  if (index === undefined) return result(operation, "invalid-index", points, points, null);
+  const target = normalizeBubbleShapeEditPoint(x, y);
+  if (!target) return result(operation, "invalid-point", points, points, index);
+  const oldX = base[index * 2]!;
+  const oldY = base[index * 2 + 1]!;
+  if (Math.hypot(target.x - oldX, target.y - oldY) <= BUBBLE_CUSTOM_SHAPE_POINT_EPSILON) {
+    return result(operation, "unchanged", points, points, index);
+  }
+  if (isDuplicatePoint(base, target, index)) {
+    return result(operation, "duplicate-point", points, points, index);
+  }
+  const next = base.slice();
+  next[index * 2] = target.x;
+  next[index * 2 + 1] = target.y;
+  return result(operation, "applied", points, next, index);
+}
+
+/** 한 점을 삭제하되 폐곡선이 성립하는 최소 3점을 보호한다. */
+export function removeBubbleShapePoint(points: readonly number[], pointIndex: unknown): BubbleShapePointEditResult {
+  const operation = "remove" as const;
+  const base = editableShape(points);
+  if (!base) return result(operation, "invalid-shape", points, points, null);
+  const index = normalizedPointIndex(pointIndex, base.length / 2);
+  if (index === undefined) return result(operation, "invalid-index", points, points, null);
+  if (base.length / 2 <= BUBBLE_CUSTOM_SHAPE_MIN_POINTS) {
+    return result(operation, "minimum-points", points, points, index);
+  }
+  const next = base.slice();
+  next.splice(index * 2, 2);
+  return result(operation, "applied", points, next, index);
 }
 
 // ---------------------------------------------------------------------------

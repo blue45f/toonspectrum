@@ -13,7 +13,14 @@ class SheetStyle {
   willChange = "";
 }
 
-function fixture(reducedMotion = false) {
+function fixture(
+  reducedMotion = false,
+  interactions: {
+    onActivate?: () => void;
+    onCollapse?: () => void;
+    onExpand?: () => void;
+  } = {},
+) {
   const style = new SheetStyle();
   const sheet = {
     ownerDocument: {
@@ -30,8 +37,19 @@ function fixture(reducedMotion = false) {
     setPointerCapture,
   };
   const onDismiss = vi.fn();
-  const controller = createStudioBottomSheetGestureController({ onDismiss, sheet });
-  return { controller, handle, onDismiss, releasePointerCapture, setPointerCapture, style };
+  const controller = createStudioBottomSheetGestureController({
+    ...interactions,
+    onDismiss,
+    sheet,
+  });
+  return {
+    controller,
+    handle,
+    onDismiss,
+    releasePointerCapture,
+    setPointerCapture,
+    style,
+  };
 }
 
 function pointerEvent(
@@ -120,6 +138,42 @@ describe("createStudioBottomSheetGestureController", () => {
     controller.handlePointerMove(pointerEvent(handle, { clientY: 122, timeStamp: 120 }));
     controller.handlePointerUp(pointerEvent(handle, { clientY: 122, timeStamp: 125 }));
     expect(onDismiss).toHaveBeenCalledOnce();
+  });
+
+  it("steps one snap upward or downward without treating resize as dismissal", () => {
+    const onExpand = vi.fn();
+    const upward = fixture(false, { onExpand });
+    upward.controller.handlePointerDown(pointerEvent(upward.handle));
+    upward.controller.handlePointerMove(
+      pointerEvent(upward.handle, { clientY: 8, timeStamp: 220 }),
+    );
+    expect(upward.style.transform).toBe("translate3d(0, -92.00px, 0)");
+    upward.controller.handlePointerUp(
+      pointerEvent(upward.handle, { clientY: 8, timeStamp: 240 }),
+    );
+    expect(onExpand).toHaveBeenCalledOnce();
+    expect(upward.onDismiss).not.toHaveBeenCalled();
+
+    const onCollapse = vi.fn();
+    const downward = fixture(false, { onCollapse });
+    downward.controller.handlePointerDown(pointerEvent(downward.handle));
+    downward.controller.handlePointerMove(
+      pointerEvent(downward.handle, { clientY: 192, timeStamp: 220 }),
+    );
+    downward.controller.handlePointerUp(
+      pointerEvent(downward.handle, { clientY: 192, timeStamp: 240 }),
+    );
+    expect(onCollapse).toHaveBeenCalledOnce();
+    expect(downward.onDismiss).not.toHaveBeenCalled();
+  });
+
+  it("routes semantic handle activation to resize when a snap contract is present", () => {
+    const onActivate = vi.fn();
+    const { controller, onDismiss } = fixture(false, { onActivate });
+    controller.handleClick(clickEvent());
+    controller.handleClick(clickEvent());
+    expect(onActivate).toHaveBeenCalledTimes(2);
+    expect(onDismiss).not.toHaveBeenCalled();
   });
 
   it("restores a sub-threshold drag and suppresses only its next synthesized click", () => {
