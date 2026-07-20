@@ -71,8 +71,12 @@ describe("Studio inspector bubble-appearance boundary", () => {
   it("leaves shape, tail, and anchor geometry outside the appearance leaf", () => {
     const inspector = moduleEdges("./StudioInspectorAside.tsx").source;
     const leaf = moduleEdges("./StudioInspectorBubbleAppearanceControls.tsx");
+    const shapeControls = moduleEdges("./StudioInspectorBubbleShapeControls.tsx");
 
-    expect(inspector).toContain("<StudioBubbleShapePanel");
+    expect(inspector).toContain("<StudioInspectorBubbleShapeControls");
+    expect(shapeControls.source).toContain("<StudioBubbleShapePanel");
+    expect(shapeControls.imports).not.toContain("./StudioInspectorAside");
+    expect(shapeControls.imports).not.toContain("./StudioPage");
     expect(inspector).toContain("<StudioBubbleTailControls");
     expect(inspector).toContain("<StudioBubbleAnchorPanel");
     for (const forbiddenImport of [

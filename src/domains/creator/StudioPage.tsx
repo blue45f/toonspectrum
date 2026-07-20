@@ -16823,6 +16823,90 @@ function StudioCuttoonEditor() {
       scheduleDraft(next);
     }
   }
+
+  function handleBubbleShapePointerDown(
+    e: Konva.KonvaEventObject<MouseEvent | TouchEvent>,
+    stagePointerEvent: PointerEvent,
+  ): boolean {
+    if (
+      !bubbleShapeArmed
+      || selected?.type !== "bubble"
+      || isSpacePressed
+      || e.target.getParent() instanceof KonvaRuntime.Transformer
+    ) {
+      return false;
+    }
+    const pos = e.target.getStage()?.getRelativePointerPosition();
+    if (!pos) return true;
+    const local = bubbleShapeCanvasPointToLocal(pos.x, pos.y, {
+      x: selected.x,
+      y: selected.y,
+      rotation: selected.rotation,
+    });
+    const tolerance = 14 / effScale;
+    const hitIdx = hitTestNodeHandle(local, bubbleShapeHandles, tolerance);
+    if (hitIdx !== null) {
+      if (e.evt.altKey) {
+        const removed = removeBubbleShapePoint(selected.customShapePoints ?? [], hitIdx);
+        if (removed.changed) {
+          patchEl(selected.id, { customShapePoints: removed.points } as Partial<El>);
+          const nextCount = removed.points.length / 2;
+          setBubbleShapeSelectedPointIndex(Math.min(hitIdx, nextCount - 1));
+          announceDrawingShortcut(`말풍선 외곽선 점 삭제 · ${nextCount}개`);
+        } else if (removed.outcome === "minimum-points") {
+          announceDrawingShortcut("말풍선 외곽선에는 최소 3개의 점이 필요합니다");
+        }
+        return true;
+      }
+      setBubbleShapeSelectedPointIndex(hitIdx);
+      const session = beginNodeDrag(
+        selected.customShapePoints ?? [],
+        undefined,
+        hitIdx,
+        "move",
+        local,
+      );
+      if (session) {
+        const pointerId = Number.isFinite(stagePointerEvent.pointerId)
+          ? stagePointerEvent.pointerId
+          : 1;
+        const nativeTarget = stagePointerEvent.currentTarget as
+          | (EventTarget & {
+              releasePointerCapture?: (capturedPointerId: number) => void;
+              setPointerCapture?: (capturedPointerId: number) => void;
+            })
+          | null;
+        let captureTarget: BubbleShapePointerCaptureTarget | null = null;
+        if (nativeTarget?.setPointerCapture) {
+          try {
+            nativeTarget.setPointerCapture(pointerId);
+            captureTarget = nativeTarget;
+          } catch {
+            // Some WebViews expose Pointer Events but reject capture for synthesized mouse input.
+          }
+        }
+        bubbleShapeDragRef.current = {
+          captureTarget,
+          elId: selected.id,
+          pointerId,
+          session,
+        };
+      }
+    } else if (e.evt.shiftKey) {
+      const inserted = insertBubbleShapePointAtClosestSegment(
+        selected.customShapePoints ?? [],
+        local.x,
+        local.y,
+      );
+      if (inserted.changed && inserted.pointIndex !== null) {
+        patchEl(selected.id, { customShapePoints: inserted.points } as Partial<El>);
+        setBubbleShapeSelectedPointIndex(inserted.pointIndex);
+        announceDrawingShortcut(`말풍선 외곽선 점 추가 · ${inserted.points.length / 2}개`);
+      }
+    }
+    return true;
+  }
+
   function onStageDown(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) {
     if (
       e.target.name() === "symmetry-handle"
@@ -17016,76 +17100,7 @@ function StudioCuttoonEditor() {
     // 말풍선 커스텀 모양 점 편집 무장 중: 포인터를 말풍선 로컬좌표로 변환해(회전 포함)
     // 노드 편집과 동일한 히트테스트/드래그 개시 로직을 재사용한다. 무장 중엔 핸들 밖 클릭도
     // 다른 제스처를 막는다 — crop/node-edit과 동일 정책.
-    if (
-      bubbleShapeArmed &&
-      selected?.type === "bubble" &&
-      !isSpacePressed &&
-      !(e.target.getParent() instanceof KonvaRuntime.Transformer)
-    ) {
-      const pos = e.target.getStage()?.getRelativePointerPosition();
-      if (!pos) return;
-      const local = bubbleShapeCanvasPointToLocal(pos.x, pos.y, {
-        x: selected.x,
-        y: selected.y,
-        rotation: selected.rotation,
-      });
-      const tolerance = 14 / effScale; // crop/node-edit과 동일한 화면 14px 히트 여유
-      const hitIdx = hitTestNodeHandle(local, bubbleShapeHandles, tolerance);
-      if (hitIdx !== null) {
-        if (e.evt.altKey) {
-          const removed = removeBubbleShapePoint(selected.customShapePoints ?? [], hitIdx);
-          if (removed.changed) {
-            patchEl(selected.id, { customShapePoints: removed.points } as Partial<El>);
-            const nextCount = removed.points.length / 2;
-            setBubbleShapeSelectedPointIndex(Math.min(hitIdx, nextCount - 1));
-            announceDrawingShortcut(`말풍선 외곽선 점 삭제 · ${nextCount}개`);
-          } else if (removed.outcome === "minimum-points") {
-            announceDrawingShortcut("말풍선 외곽선에는 최소 3개의 점이 필요합니다");
-          }
-          return;
-        }
-        setBubbleShapeSelectedPointIndex(hitIdx);
-        const session = beginNodeDrag(selected.customShapePoints ?? [], undefined, hitIdx, "move", local);
-        if (session) {
-          const pointerId = Number.isFinite(stagePointerEvent.pointerId)
-            ? stagePointerEvent.pointerId
-            : 1;
-          const nativeTarget = stagePointerEvent.currentTarget as
-            | (EventTarget & {
-                releasePointerCapture?: (capturedPointerId: number) => void;
-                setPointerCapture?: (capturedPointerId: number) => void;
-              })
-            | null;
-          let captureTarget: BubbleShapePointerCaptureTarget | null = null;
-          if (nativeTarget?.setPointerCapture) {
-            try {
-              nativeTarget.setPointerCapture(pointerId);
-              captureTarget = nativeTarget;
-            } catch {
-              // Some WebViews expose Pointer Events but reject capture for synthesized mouse input.
-            }
-          }
-          bubbleShapeDragRef.current = {
-            captureTarget,
-            elId: selected.id,
-            pointerId,
-            session,
-          };
-        }
-      } else if (e.evt.shiftKey) {
-        const inserted = insertBubbleShapePointAtClosestSegment(
-          selected.customShapePoints ?? [],
-          local.x,
-          local.y
-        );
-        if (inserted.changed && inserted.pointIndex !== null) {
-          patchEl(selected.id, { customShapePoints: inserted.points } as Partial<El>);
-          setBubbleShapeSelectedPointIndex(inserted.pointIndex);
-          announceDrawingShortcut(`말풍선 외곽선 점 추가 · ${inserted.points.length / 2}개`);
-        }
-      }
-      return;
-    }
+    if (handleBubbleShapePointerDown(e, stagePointerEvent)) return;
     // 문지르기 브러시 무장 중: 스테이지 드래그를 문지르기 스트로크 좌표 누적으로 가로챈다.
     if (
       smudgeArmed &&

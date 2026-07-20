@@ -49,16 +49,8 @@ import {
   type StudioBrushSnapshot,
   type StudioSavedBrush,
 } from "./studio-brush-library";
-import {
-  computeCustomShapePointsForBubble,
-  hasCustomBubbleShape,
-  type BubbleShapeGeometryInput,
-} from "./studio-bubble-custom-shape";
+import { hasCustomBubbleShape } from "./studio-bubble-custom-shape";
 import { normalizeExtraTails } from "./studio-bubble-path";
-import {
-  applyBubbleQuickTransform,
-  bubbleQuickTransformUnavailableReason,
-} from "./studio-bubble-quick-transform";
 import {
   applyCropAspect,
   cropAspectRatio,
@@ -168,8 +160,8 @@ import { normalizeShapeParams, normalizeStrokeStyle } from "./studio-stroke-shap
 import { normalizeTextPath, type TextPathConfig } from "./studio-text-path";
 import { projectStudioViewRectToDocumentRect, type StudioViewRotation } from "./studio-view-controls";
 import { StudioBgRemoveButton } from "./StudioBgRemoveButton";
-import { StudioBubbleShapePanel } from "./StudioBubbleShapePanel";
 import { StudioInspectorBubbleAppearanceControls } from "./StudioInspectorBubbleAppearanceControls";
+import { StudioInspectorBubbleShapeControls } from "./StudioInspectorBubbleShapeControls";
 import { StudioInspectorCanvasControls } from "./StudioInspectorCanvasControls";
 import { StudioInspectorFocusSpeedFrameControls } from "./StudioInspectorFocusSpeedFrameControls";
 import { StudioInspectorNavigator } from "./StudioInspectorNavigator";
@@ -1276,62 +1268,19 @@ export const StudioInspectorAside = memo(function StudioInspectorAside({
                 />
               )}
               {selected.type === "bubble" && (
-                <StudioBubbleShapePanel
-                  canCustomize={selected.variant !== "double" || hasCustomBubbleShape(selected.customShapePoints)}
-                  hasCustomShape={hasCustomBubbleShape(selected.customShapePoints)}
+                <StudioInspectorBubbleShapeControls
                   active={bubbleShapeArmed}
-                  pointCount={bubbleShapeHandles.length || Math.floor((selected.customShapePoints?.length ?? 0) / 2)}
-                  selectedPointIndex={bubbleShapeSelectedPointIndex}
-                  pointActionsDisabled={selectedContentMutationLocked}
+                  editActive={bubbleShapeEditActive}
+                  mutationLocked={selectedContentMutationLocked}
                   onAddPoint={addBubbleShapePointFromInspector}
+                  onDisarmPixelTools={disarmAllPixelTools}
+                  onPatch={(patch) => patchEl(selected.id, patch as Partial<El>)}
                   onRemovePoint={removeBubbleShapePointFromInspector}
-                  quickTransformDisabled={selectedContentMutationLocked}
-                  quickTransformFlipDisabled={Boolean(selected.tailAnchorId || selected.tailAnchorPoint)}
-                  quickTransformUnavailableReasons={{
-                    widen: bubbleQuickTransformUnavailableReason(selected, "widen"),
-                    narrow: bubbleQuickTransformUnavailableReason(selected, "narrow"),
-                    heighten: bubbleQuickTransformUnavailableReason(selected, "heighten"),
-                    shorten: bubbleQuickTransformUnavailableReason(selected, "shorten"),
-                    "flip-horizontal": bubbleQuickTransformUnavailableReason(selected, "flip-horizontal"),
-                    "flip-vertical": bubbleQuickTransformUnavailableReason(selected, "flip-vertical"),
-                  }}
-                  onQuickTransform={(action) => {
-                    if (selectedContentMutationLocked) return;
-                    const transformed = applyBubbleQuickTransform(selected, action);
-                    if (!transformed.changed) return;
-                    patchEl(selected.id, transformed.patch as Partial<El>);
-                  }}
-                  onConvert={() => {
-                    if (selectedContentMutationLocked) return;
-                    const input: BubbleShapeGeometryInput = {
-                      width: selected.width,
-                      height: selected.height,
-                      theme: webtoonTheme,
-                      tail: selected.tail,
-                      tailDirection: selected.tailDirection,
-                      tailXRatio: selected.tailXRatio,
-                      tailHeight: selected.tailHeight,
-                      tailBase: selected.tailBase,
-                      tailBend: selected.tailBend,
-                      extraTails: normalizeExtraTails(selected.extraTails),
-                    };
-                    const points = computeCustomShapePointsForBubble(input);
-                    patchEl(selected.id, { customShapePoints: points } as Partial<El>);
-                  }}
-                  onToggleEdit={() => {
-                    if (selectedContentMutationLocked) return;
-                    if (bubbleShapeEditActive) {
-                      setBubbleShapeEditActive(false);
-                      return;
-                    }
-                    disarmAllPixelTools();
-                    setBubbleShapeEditActive(true);
-                  }}
-                  onRevert={() => {
-                    if (selectedContentMutationLocked) return;
-                    setBubbleShapeEditActive(false);
-                    patchEl(selected.id, { customShapePoints: undefined } as Partial<El>);
-                  }}
+                  onSetEditActive={setBubbleShapeEditActive}
+                  pointCount={bubbleShapeHandles.length}
+                  selected={selected}
+                  selectedPointIndex={bubbleShapeSelectedPointIndex}
+                  webtoonTheme={webtoonTheme}
                 />
               )}
               {selected.type === "bubble" &&
